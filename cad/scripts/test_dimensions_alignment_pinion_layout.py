@@ -171,6 +171,7 @@ def test_current_drive_train_record_matches_the_selected_production_specs() -> N
         f"{drum.BORE_DIA:g} mm model nominal",
         f"{alignment.ENGAGED_CENTER_DISTANCE_MM:.6f} engaged centre",
         f"Current cylindrical length {crankshaft.SHAFT_LENGTH:g} mm",
+        f"plus the {crankshaft.SHAFT_DOME_HEIGHT:g} mm",
     ]
     missing = [fragment for fragment in expected if fragment not in prose]
     assert not missing, (
@@ -198,7 +199,17 @@ def test_current_drive_train_record_matches_the_selected_production_specs() -> N
         f"PA{gear64.CUTTER_PRESSURE_ANGLE_DEG:g} pair" in crank_row[1]
     )
     assert f"beta = cone incline {gear64.HELIX_ANGLE_DEG:.15g}°" in crank_row[1]
-    assert f"face {gear64.FACE_WIDTH:.4f} ±{gear64.FACE_WIDTH_BAND[0]:g}" in crank_row[1]
+    upper, lower = gear64.FACE_WIDTH_BAND
+    assert f"face {gear64.FACE_WIDTH:.4f} +{upper:.5f}/{lower:.5f}" in crank_row[1]
+    for fragment in (
+        f"face {crank_pinion.FACE_WIDTH:g} +0/{crank_pinion.FACE_WIDTH_BAND[1]:g}",
+        f"full-OD shoulder {crank_pinion.SHOULDER_LENGTH:g} "
+        f"+0/{crank_pinion.SHOULDER_LENGTH_BAND[1]:g} "
+        f"with {crank_pinion.SHOULDER_LENGTH_FITUP_MIN:g} fit-up floor",
+        f"north band Ø{crank_pinion.TURNED_DIA:g} ±{crank_pinion.TURNED_DIA_TOLERANCE_MM:g} "
+        f"with {crank_pinion.TURNED_DIA_FITUP_MIN:g} fit-up floor",
+    ):
+        assert fragment in crank_row[1], fragment
     assert (
         "normal tangent-span limits are reader-owned by "
         "dt_crank_drive_gear_spec / dt_crank_pinion_spec" in crank_row[1]

@@ -20,7 +20,7 @@ import math
 import _config
 from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, HoleSpec, blind_cut_dia_mm
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import printed_band_mm, printed_deviations
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
 import _cone_axis_constants as cone_axis
@@ -100,15 +100,21 @@ def crank_gear_platform_budget() -> dict[str, float]:
     ) / 2.0
     overhang = (
         upper(cone_shaft.COLLAR_THICKNESS, cone_shaft.DRAWING_PRECISION_BY_NAME["CollarWidth"])
-        + round(gear64.FACE_WIDTH, gear64.DRAWING_PRECISION_BY_NAME["FaceWidth"])
-        + gear64.FACE_WIDTH_BAND[0] + CONE_FLOAT_NORTH
+        + gear64.FACE_WIDTH
+        + gear64.FACE_WIDTH_BAND[0]
+        + CONE_FLOAT_NORTH
     )
     running = cone_shaft.JOURNAL_DIAMETRAL_CLEARANCE_MM[1]
     angular_air_reserve = math.radians(float(_config.title_block("angular")["value_deg"]))
     height = round(post.BORE_HEIGHT, post.DRAWING_PRECISION_BY_NAME["JournalAxisY"])
     tip_radius = (
-        round(gear64.OUTSIDE_DIA, gear64.DRAWING_PRECISION_BY_NAME["OutsideDia"])
-        + gear64.OUTSIDE_DIA_TOLERANCE_MM
+        gear64.OUTSIDE_DIA
+        + printed_deviations(
+            gear64.OUTSIDE_DIA,
+            gear64.DRAWING_PRECISION_BY_NAME["OutsideDia"],
+            (-gear64.OUTSIDE_DIA_TOLERANCE_MM, gear64.OUTSIDE_DIA_TOLERANCE_MM),
+            unit=gear64.UNIT,
+        )[1]
     ) / 2.0
     return {
         "printed journal height": height,

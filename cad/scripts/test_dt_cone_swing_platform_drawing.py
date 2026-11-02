@@ -1320,8 +1320,9 @@ def test_lower_journal_and_larger_tip_close_air_without_changing_bands(monkeypat
     import dt_cone_pivot_post_spec as post
 
     before = spec.crank_gear_platform_clearance()
-    monkeypatch.setattr(gear64, "OUTSIDE_DIA", gear64.OUTSIDE_DIA + 2.0)
-    assert spec.crank_gear_platform_clearance() == pytest.approx(before - 1.0)
+    # .080 in: whole steps of the 64T's inch print grid.
+    monkeypatch.setattr(gear64, "OUTSIDE_DIA", gear64.OUTSIDE_DIA + 2.032)
+    assert spec.crank_gear_platform_clearance() == pytest.approx(before - 1.016)
     monkeypatch.setattr(post, "BORE_HEIGHT", post.BORE_HEIGHT - 3.0)
     assert spec.crank_gear_platform_clearance() < 0.5
 
