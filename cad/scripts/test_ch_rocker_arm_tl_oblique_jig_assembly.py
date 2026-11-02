@@ -1406,13 +1406,17 @@ def test_steps_10_and_11_name_item_9_as_its_bom_row() -> None:
         assert "GAUGE PIN" not in step and "BONDED LOCATOR" not in step
 
 
-def test_step_13c_refits_the_carrier_that_hd3_left_off() -> None:
-    """Review jig-asm r1: after 13B/HD3 the carrier is already off, so 13C
-    gives O1's refit half only, not its removal."""
-    step = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("13C. "))
-    assert "PER O1" not in step
-    assert "LOWER THE CARRIER ONTO THEM, REFIT BOTH SCREWS PER P2 AND CHECK P1-P3" in step
-    assert step.endswith("DO HD4 AND THE CHECKS.")
+def test_steps_13b_and_13c_split_o1_around_the_stud_rework() -> None:
+    """Review jig-asm r1/r2: the carrier stays off from 13B through HD3, so
+    13B gives O1's removal half only and 13C its refit half only."""
+    steps = {text.split(". ", 1)[0]: text for text in spec.ASSEMBLY_STEPS}
+    assert "PER O1" not in steps["13B"] and "PER O1" not in steps["13C"]
+    assert "REMOVE BOTH SHOULDER SCREWS AND LIFT IT OFF; KEEP IT OFF" in steps["13B"]
+    assert steps["13B"].endswith("REWORK STUDS PER HD2-HD3.")
+    assert "LOWER THE CARRIER ONTO THEM, REFIT BOTH SCREWS PER P2 AND CHECK P1-P3" in steps["13C"]
+    assert steps["13C"].endswith("DO HD4 AND THE CHECKS.")
+    # Review jig-asm r2: the CR clamp screw's timing is stated.
+    assert f"CLAMP SCREW {spec._item(spec.CLAMP_SCREW)}, FITTED AT EACH WORK LOADING" in steps["12"]
 
 
 def test_general_torque_note_covers_every_fastener_no_step_torques() -> None:
