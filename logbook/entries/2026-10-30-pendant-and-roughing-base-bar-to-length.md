@@ -142,25 +142,45 @@ Next time: follow the plan.
 I asked Claude for advice after the session. None of this has been tried at the
 machine yet; the next entry will say what held up.
 
-![Setups for the base bar: what I did, op 10 width on the table, op 20 in the vise](figures/2026-10-30-base-bar-setups.png)
+![Setups for the base bar: what I did, op 10 width on the table against stops, op 20 in the vise](figures/2026-10-30-base-bar-setups.png)
 
 - **Workholding caused the ringing.** The cut was high above the jaws on a
   1/2 in plate, and the end hung past the side of the vise. Both contributed
   (panel A). Lowering the spindle speed is a fine-tune once the setup is stiff,
   not a fix for a floppy one.
-- **Op 10, width first, on the table (panel B).** Lay the bar flat on two
-  parallels running along its length, set about 20 mm back from the near edge,
-  and strap-clamp it on the far half so nothing is in the cutter's path. Cut
+- **Op 10, width first, on the table (panel B).** My parallels are 1/8 in
+  thick and 6 in long in matched pairs, so they can't run the 443 mm length.
+  Stand the 1 in pair crosswise, one 30–40 mm in from each end, with their near
+  ends 20 mm back from the near edge so the cutter never reaches them; they
+  stick out about 20 mm past the far edge. Put a 1 in support under the middle:
+  a 1-2-3 block lying flat is exactly the parallels' height. Strap-clamp the
+  far half, each strap over a parallel, so nothing is in the cutter's path. Cut
   the near long edge with the side of the cutter: axial depth is the whole
   12.7 mm thickness (cutter bottom just below the bar, never stepping down in
   Z), radial bites of 1–2 mm into the edge, 12.7 mm in all (152.4 → 139.7),
   with the last ~0.5 mm as a finish pass. Each pass runs the 443 mm length in
   X. Check the real X travel first.
+- **Op 10 stops (panel B).** Friction alone holds the bar against the cut, and
+  conventional milling along the near edge pushes it away from me and to the
+  right. Clamp 1-2-3 blocks stood 2 in tall against the far edge, beside the
+  parallels, and a step block or spare parallel against the back half of the
+  right-hand end, so the cutter still runs off the end. Clamp each stop to the
+  table on its own; a stop that is only pushed against the bar gets shoved
+  aside. The new edge comes out straight along X whatever angle the bar sits
+  at; a skewed bar only makes the width taper against the as-extruded far
+  edge. If an even width matters, indicate the far edge along X before the
+  stops go on. Order: parallels and middle support, bar, straps snug,
+  indicate, stops clamped, middle support just touching (never lifting the
+  bar), straps tight, then run the whole pass in the air with the spindle off
+  to check the collet clears the straps and the end stop. (Unverified: whether
+  I have a third 1-2-3 block for the middle, or a screw jack that sets as low
+  as 1 in.)
 - **Op 20, ends and faces in the vise (panel C).** At 5½ in wide the bar fits
-  the 5¾ in vise. Lay it flat on parallels with the end just past the side of
-  the jaws and a jack under the far end; square both ends to 440 mm, then face
-  both sides to 12.0 mm. Standing the bar on its end is out: 443 mm is more than
-  the 17 in spindle-to-table maximum.
+  the 5¾ in vise. Lay it flat on parallels with the op 10 edge against the
+  fixed jaw, the end just past the side of the jaws and a jack under the far
+  end; square both ends to 440 mm, so they come out square to the machined
+  edge, then face both sides to 12.0 mm. Standing the bar on its end is out:
+  443 mm is more than the 17 in spindle-to-table maximum.
 - **Climb or conventional.** With the spindle running forward, picture the
   cutter's travel along the part: part on the left is conventional, on the
   right is climb. On the near edge in op 10 that means the cutter travels right
