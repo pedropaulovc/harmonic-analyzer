@@ -1,10 +1,13 @@
-"""MHA-PD-VN-64: live-sourced McMaster 93600A189 arm/plate locating dowel.
+"""MHA-PD-VN-64: McMaster 98381A435 arm/plate locating dowel.
 
-316 stainless steel, passivated, ISO 2338-m6, both ends chamfered. The
-supplier specifies diameter 2.002..2.008 and nominal length 6 mm.
-ISO 2338:1997 Table 1 gives length 5.75..6.25; end c≈0.35 is only
-a reference, NOT a maximum or a full-cylinder guarantee. The purchased
-native reference remains a nominal cylinder, with no invented end form.
+Alloy steel, 3/32 x 5/16, Round x Chamfer ends, ASME B18.8.2; the supplier
+specifies diameter +.0001/+.0003 over nominal.  #290 (owner ruling
+2026-10-30, metric dowels to inch): it replaces the 2 mm ISO 2338
+93600A189.  The ruling named 98381A434 (3/32 x 1/4), but that SKU is
+already MHA-DT-VN-67, the crank-seat drive pin: one SKU in two assemblies
+would make it a Shared identity (AGENTS.md), so the PD pair takes the next
+free length of the same family.  The purchased native reference remains a
+nominal cylinder, with no invented end form.
 
 Reference frame: axis +Y, first end y=0, other end y=LENGTH. Installed
 pins are pressed into the arm's through holes from the rear, to the proud
@@ -15,25 +18,22 @@ from __future__ import annotations
 
 import math
 
+import _config
 import _transgear_arm_plate_locating_interface as INTERFACE
+from _mcmaster_98381a435 import DIA_BAND_IN, DOWEL_SIZE, MM_PER_IN
+from _package_units import drawing_unit
+from _sprocket_seat_geometry import DRIVE_PIN_LENGTH_GRADE
 from _supplier_pin_data import SupplierPinReference
 
-SKU = "93600A189"
+SKU = "98381A435"
 PART_NUMBER = "MHA-PD-VN-64"
 PART_STEM = "pd-vn-transgear-arm-plate-locating-pin"
 ASSEMBLY_QUANTITY = 2
-DIA = 2.0
-DIA_LIMITS = (2.002, 2.008)
-LENGTH = 6.0
-# Published ISO 2338:1997 Table 1, not an incoming acceptance band.
-# https://cdn.standards.iteh.ai/samples/20001/5b26cece48c448b782c0de1eccb5b16c/ISO-2338-1997.pdf
-LENGTH_LIMITS_MM = (5.75, 6.25)
-END_FORM_REFERENCE_MM = 0.35  # c≈, explicitly NOT a maximum
-# The purchased pin remains 316 stainless. As with the 17-7 PH spring,
-# the repository's valid "AISI 304" library entry is the native stand-in;
-# plain "AISI 316" is not a SolidWorks library material name.
-MATERIAL = "AISI 304"
-MATERIAL_DENSITY_KG_M3 = 8000.0  # purchased 316 engineering density, not a lot certificate
+DIA, LENGTH = DOWEL_SIZE  # 2.38125 x 7.9375
+DIA_LIMITS = tuple(DIA + band * MM_PER_IN for band in DIA_BAND_IN)
+# The 98381A family's +/-.010 length grade (the seat's drive dowels' too).
+LENGTH_LIMITS_MM = (LENGTH - DRIVE_PIN_LENGTH_GRADE, LENGTH + DRIVE_PIN_LENGTH_GRADE)
+MATERIAL_DENSITY_KG_M3 = 7850.0  # alloy steel engineering density, not a lot certificate
 PRESS_INTERFERENCE_MM = (
     DIA_LIMITS[0] - INTERFACE.PRESS_HOLE_LIMITS_MM[1],
     DIA_LIMITS[1] - INTERFACE.PRESS_HOLE_LIMITS_MM[0],
@@ -46,6 +46,8 @@ INSERTION_LIMITS_MM = (
     LENGTH_LIMITS_MM[0] - INTERFACE.PROUD_LIMITS_MM[1],
     LENGTH_LIMITS_MM[1] - INTERFACE.PROUD_LIMITS_MM[0],
 )
+if min(PRESS_INTERFERENCE_MM) <= 0.0 or min(SLIP_DIAMETRAL_CLEARANCE_MM) <= 0.0:
+    raise AssertionError(f"{SKU} loses the arm's press or the plate's slip")
 
 PURCHASED_STOCK_NOTE = "\n".join((
     "INSTALLATION - TWO PER MHA-PD-18 ARM: PRESS INTO THE ARM FROM THE REAR",
@@ -64,13 +66,19 @@ def nominal_material_properties() -> dict[str, object]:
         "model_scope": "nominal reference cylinder; catalogue chamfers remove material",
     }
 
-# Inspected McMaster engineering drawing, 2026-10-19. This is supplier
-# nominal-and-band reference information, not a measured specimen size.
+
+# McMaster family table, read 2026-11-02 (cad/references/mcmaster/README.md).
+# Exact 3/32 x 5/16 geometry, printed as untoleranced supplier REF (#2147);
+# the catalogue's +.0001/+.0003 band stays in DIA_LIMITS for the fits.
 SUPPLIER_REFERENCE = SupplierPinReference(
     sku=SKU,
-    units="mm",
+    units="in",
     diameter_mm=DIA,
     length_mm=LENGTH,
-    diameter_precision=3,
-    length_precision=0,
+    diameter_precision=4,
+    length_precision=4,
+    sheet_unit=drawing_unit(
+        "parts/pd-vn-transgear-arm-plate-locating-pin",
+        _config.parts("pd-vn-transgear-arm-plate-locating-pin"),
+    ),
 )

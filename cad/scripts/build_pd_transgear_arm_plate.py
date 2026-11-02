@@ -10,7 +10,7 @@ Layout (part frame of ``pd_transgear_arm_plate_geometry``: origin on K at the
 MOUNTING face, the Front Plane, which seats on the arm's rear face; +X/+Y the
 arm's axes; +Z to the rear):
 
-* ``PlateOutline`` (Front plane): the R12.5 end round about K, each side edge
+* ``PlateOutline`` (Front plane): the ``END_R`` end round about K, each side edge
   parallel to the long axis down to its kink [INFERENCE] and straight on to
   tangency with the round (symmetric about K), the top edge on the arm's
   upper edge; extruded ``THICKNESS_OVER_ARM`` toward +Z as ``Plate``.
@@ -20,16 +20,17 @@ arm's axes; +Z to the rear):
 * ``BearingProfile`` (Right plane, the section plane through K): the front
   hub and the rear boss [INFERENCE], revolved as ``Bearing``.  The hub face's
   station is dimensioned from the notch's inner corner on the mounting face.
-* ``Bore``: the Ø8.5 running bore through on K.
-* ``ScrewHoles``: two Ø4.5 clearance holes through, over the arm's taps.
+* ``Bore``: the knob shaft's running bore through on K.
+* ``ScrewHoles``: two drilled clearance holes through, over the arm's taps.
 * ``Countersink1`` / ``Countersink2``: the 82-degree seats of the oval heads,
   revolved cuts sketched on ``ScrewHolePlane`` (y through both hole axes).
 * ``CountersinkReference`` (blanked, on ``RearFace``, round the +X hole): the
   printed countersink Ø; the revolved cuts' own profiles lie edge-on to the plan.
 
 Datums (all blanked): ``Axis1`` bore, ``Axis2``/``Axis3`` screw holes (-X,
-+X); planes ``RearFace`` (z = 5), ``HubFace`` (z = -20.5375), ``BossFace``
-(z = 8.5) and ``ScrewHolePlane``; the Front Plane is the mounting face.
++X); planes ``RearFace`` (z = THICKNESS_OVER_ARM), ``HubFace``
+(z = -HUB_FACE_TO_MOUNTING), ``BossFace`` (z = BOSS_FACE_Z) and
+``ScrewHolePlane``; the Front Plane is the mounting face.
 
 Run (SolidWorks already open)::
 
@@ -75,8 +76,10 @@ from _drawing_tolerances import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
+from _document_units import apply_package_model_units
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
+from _part_properties import part_drawing_unit
 from _native_projected_zone import require_saved_projected_gtols
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
@@ -114,6 +117,7 @@ from pd_transgear_arm_plate_geometry import (
     WIDTH,
     notch_face_y,
     section_area_moments,
+    UNIT,
 )
 from pd_transgear_arm_plate_spec import (
     BORE_BAND,
@@ -349,6 +353,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations).  The mm suffix is load-bearing: this
     # is an INCH document and the equation manager reads bare numbers in
@@ -908,18 +914,20 @@ async def build(adapter: Any) -> dict[str, str]:
     # Size/axial fit bands are separate from the locating-hole circular
     # position controls. Their coordinates are BASIC, never +/- substitutes.
     set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "BoreDia", *deviations(BORE_BAND)
+        adapter, "BoreProfile", "BoreDia", *deviations(BORE_BAND), display_unit=UNIT,
     )
     set_dimension_symmetric_tolerance(
-        adapter, "BearingProfile", "HubToBoss", HUB_TO_BOSS_TOLERANCE
+        adapter, "BearingProfile", "HubToBoss", HUB_TO_BOSS_TOLERANCE, display_unit=UNIT,
     )
     # The hub face station: a disc-cluster stack term at the cluster's band.
     set_dimension_symmetric_tolerance(
-        adapter, "BearingProfile", "HubFaceToMounting", HUB_FACE_TO_MOUNTING_BAND
+        adapter, "BearingProfile", "HubFaceToMounting", HUB_FACE_TO_MOUNTING_BAND,
+        display_unit=UNIT,
     )
     for index in (1, 2):
         set_dimension_bilateral_tolerance(
-            adapter, "LocatorProfile", f"LocatorDia{index}", *deviations(LOCATOR_HOLE_BAND_MM)
+            adapter, "LocatorProfile", f"LocatorDia{index}", *deviations(LOCATOR_HOLE_BAND_MM),
+            display_unit=UNIT,
         )
     for feature_name, dimension_name in BASIC_REDUCER_DIMENSIONS:
         set_dimension_basic_tolerance(adapter, feature_name, dimension_name)
@@ -932,8 +940,7 @@ async def build(adapter: Any) -> dict[str, str]:
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
     # The sourced H7 running bore and the hub and boss thrust faces, resolved
-    # on its exact native face (HubFace z -20.5375 and BossFace z 8.5 are
-    # unique).
+    # on its exact native face (the HubFace and BossFace stations are unique).
     author_part_pmi(
         adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS,
         surface_finishes=SURFACE_FINISHES,

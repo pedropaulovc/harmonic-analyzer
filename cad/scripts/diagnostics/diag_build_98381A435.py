@@ -1,13 +1,12 @@
-r"""McMaster 93600A189: catalogue-only nominal 316SS 2 x 6 dowel reference.
+r"""McMaster 98381A435 -- alloy steel dowel pin, 3/32" diameter, 5/16" long.
 
-The supplier gives chamfered ends but no dimensions. The common recipe's
-plain-cylinder branch is deliberate; it is not a vendor end-form replica.
-Incoming measured end/length acceptance lives in the production pin spec.
+One of the 98381A* sizes built by the shared recipe in
+``diag_mcmaster_dowel.py`` (see its docstring for the catalogue facts).
 Used as transgear-arm-plate-locating-pin (MHA-PD-VN-64).
 
 Run standalone (SolidWorks open)::
 
-    uv run python cad\scripts\diagnostics\diag_build_93600A189.py
+    uv run python cad\scripts\diagnostics\diag_build_98381A435.py
 """
 
 from __future__ import annotations
@@ -19,14 +18,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from _stock_recipe import stock_recipe  # noqa: E402
 
-from _mcmaster_93600a189 import DOWEL_SIZE, ENDS  # noqa: E402
+from _mcmaster_98381a435 import DOWEL_SIZE, ENDS  # noqa: E402
 from diagnostics.diag_mcmaster_dowel import build_catalog, build_dowel  # noqa: E402
 
-PART_NO = "93600A189"
+PART_NO = "98381A435"
 
 
-@stock_recipe("93600A189", threaded=False)
-async def build_93600A189(adapter, truth=None):
+@stock_recipe("98381A435", threaded=False)
+async def build_98381A435(adapter, truth=None):
     await build_dowel(adapter, PART_NO, DOWEL_SIZE, ENDS)
 
 

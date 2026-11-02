@@ -7,8 +7,8 @@ widened to 1-1/2 in so the outline can stand symmetric about K (the 1-1/4 in
 bar centred on K leaves the -X countersink under the wall target).  It
 carries the knob shaft's running bore on axis K, a front hub (the thrust
 ring's seat) and a rear boss (the cup runs behind it).  Its rear portion is
-5 thick where it lies over the arm; below the arm's lower edge it drops the
-arm's thickness (7.9375) more to the arm's front face, so the step (the
+.197 thick where it lies over the arm; below the arm's lower edge it drops the
+arm's thickness (5/16 stock, 7.9375) more to the arm's front face, so the step (the
 "notch") wraps that edge, NOTCH_RELIEF clear of it. Two matched stock
 dowels locate; screws clamp.
 
@@ -19,9 +19,14 @@ rotation about Z):
   that seats on the arm's rear face (machine z -116.4625);
 * +X and +Y are the arm's +X (toward its square end) and +Y (toward its upper
   tangent edge); the plate's long axis runs along -Y;
-* +Z toward the rear (machine +Z): the over-arm section spans z 0..5, the
-  section below the arm z -7.9375..5, the front hub z -20.5375..-7.9375 and
-  the rear boss z 5..8.5.
+* +Z toward the rear (machine +Z): the over-arm section spans z 0..5.0038, the
+  section below the arm z -7.9375..5.0038, the front hub z -20.5486..-7.9375
+  and the rear boss z 5.0038..8.4836.
+
+Decimal inch (#290): the plate's own nominals are the exact millimetres of
+their printed inch values; the outline edges, notch and hole sites follow
+the MHA-PD-18 arm's mm geometry and print rounded, their walls judged at the
+printed limits' reach (``printed_reach_mm``), as the arm's do.
 
 Keep drawing-only notes out of this module.
 """
@@ -30,16 +35,29 @@ from __future__ import annotations
 
 import math
 
+import _config
 import pd_transgear_arm_geometry as ARM
 import _transgear_arm_plate_locating_interface as LOCATING_PIN
+from _fit_ream_h7 import REAM_H7
 from _gear_quality import reducer_k_setting_diameter_mm
+from _package_units import drawing_unit
 from _printed_tolerance import (
     angular_band_deg,
     drilled_oversize_mm,
     printed_band_mm,
     printed_deviations,
 )
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND
+from pd_cluster_stack_band import FIT_LENGTH_BAND_IN
+
+UNIT = drawing_unit("parts/pd-transgear-arm-plate", _config.parts("pd-transgear-arm-plate"))
+
+
+def printed_reach_mm(model: float, places: int) -> float:
+    """Farthest an accepted part may stand from the mm ``model``, either way,
+    when the sheet prints it rounded to ``places`` inch places under the title
+    block's row."""
+    return max(abs(d) for d in printed_deviations(model, places, unit=UNIT))
+
 
 # --- Where the bore sits on the arm (arm frame, mm) -------------------------
 # K follows the reducer's physical mounting centre, transformed into the arm
@@ -48,13 +66,14 @@ BORE_STATION = ARM.KNOB_BORE_STATION
 BORE_OFFSET = ARM.KNOB_BORE_OFFSET
 
 # --- Section ----------------------------------------------------------------
-END_R = 12.5  # full round about K; both tapers are tangent to it
+END_R = 12.446  # R.49, full round about K; both tapers are tangent to it
 WIDTH = 38.1  # 1-1/2 in bar, symmetric about K
-THICKNESS_OVER_ARM = 5.0  # unchanged nominal; .XX bounds the locator dowel span
-THICKNESS_OVER_ARM_PLACES = 2
-THICKNESS_OVER_ARM_BAND = printed_band_mm(THICKNESS_OVER_ARM_PLACES)
+# .XXX bounds the locator dowel span and the screw engagement.
+THICKNESS_OVER_ARM = 5.0038  # .197
+THICKNESS_OVER_ARM_PLACES = 3
+THICKNESS_OVER_ARM_BAND = printed_band_mm(THICKNESS_OVER_ARM_PLACES, unit=UNIT)
 NOTCH_DEPTH = ARM.THICKNESS  # the section below the arm reaches its front face
-THICKNESS_BELOW_ARM = THICKNESS_OVER_ARM + NOTCH_DEPTH  # 12.9375
+THICKNESS_BELOW_ARM = THICKNESS_OVER_ARM + NOTCH_DEPTH  # 12.9413
 
 # Edges along the plate's long axis, in the plate frame (x from K): the
 # outline is symmetric about the long axis through K, so the screws' midpoint
@@ -80,7 +99,7 @@ def arm_lower_edge_y(x: float) -> float:
 # The matched locating dowels register the plate; mounting screws clamp ONLY.
 # The notch is clearance, not a third locator. A nominal/graded reference
 # clearance is not a whole-body certificate inferred from pin-end geometry.
-NOTCH_RELIEF = 2.5
+NOTCH_RELIEF = 2.54  # .10
 
 
 def notch_face_y(x: float) -> float:
@@ -102,49 +121,53 @@ if NOTCH_LEFT[1] <= KINK[1]:
     raise AssertionError("the relieved notch face drops below the -X edge's kink")
 
 # --- Knob-shaft bearing: bore, front hub, rear boss (contract 1.10) ---------
-BORE_DIA = 6.0
-BORE_DIA_LIMITS = (0.0, 0.012)  # 6 H7 over the 6 g6 (-0.004/-0.012) journal
-HUB_DIA = 13.2  # .XX
-# The hub stands 12.6 proud of the arm's front face, which puts its face (the
-# thrust ring's seat) at machine z -137.0 whatever the arm stock (R9-25): the
-# mounting face to the hub face is 20.5375 on the 7.9375 arm.  .XXX: the
-# chain-plane station (contract §13).
-HUB_LENGTH = 12.6
-HUB_FACE_TO_MOUNTING = NOTCH_DEPTH + HUB_LENGTH  # 20.5375
+# .249 REAM_H7 (#290 fit D8, the owned .2490 reamer) over the knob shaft's
+# .249 g6 journal.
+BORE_DIA = 6.3246  # .249
+BORE_DIA_LIMITS = (min(REAM_H7), max(REAM_H7))  # +.0000/+.0005
+HUB_DIA = 13.208  # .52
+# The hub face (the thrust ring's seat) stands at its printed .809 station
+# from the mounting face (R9-25), whatever the arm stock: the hub runs on
+# 12.6111 past the 5/16 arm's front face.  .XXX: the chain-plane station
+# (contract §13).
+HUB_FACE_TO_MOUNTING = 20.5486  # .809
+HUB_LENGTH = HUB_FACE_TO_MOUNTING - NOTCH_DEPTH  # 12.6111
 # The chain-plane station (contract §13) and the first term of the disc
-# cluster's printed stack (F, transgear_cluster_fit): .XXX at the cluster's
-# printed band (#2038 owner ruling 2026-10-28, option A).
+# cluster's stack (F, transgear_cluster_fit), which sets the collar's air:
+# .XXX at the cluster's +/-.001 (#2124).
 HUB_STATION_PLACES = 3
-HUB_FACE_TO_MOUNTING_BAND = PRINTED_LENGTH_BAND
-BOSS_DIA = 20.0  # .X
-# The boss face's station is authoritative: the knob stack (HUB_TO_BOSS) runs
-# to it, so the boss takes whatever the over-arm section leaves.
-BOSS_FACE_Z = 8.5
+HUB_FACE_TO_MOUNTING_BAND = FIT_LENGTH_BAND_IN
+BOSS_DIA = 20.066  # .79
+# The hub-to-boss length is authoritative: the knob stack runs to the boss
+# face, so the boss takes whatever the over-arm section leaves.
+HUB_TO_BOSS = 29.0322  # 1.143
+HUB_TO_BOSS_BAND = 0.0508  # .002, knob float
+BOSS_FACE_Z = HUB_TO_BOSS - HUB_FACE_TO_MOUNTING  # 8.4836
 REAR_FACE_Z = THICKNESS_OVER_ARM
 BOSS_HEIGHT = BOSS_FACE_Z - REAR_FACE_Z
-HUB_TO_BOSS = HUB_FACE_TO_MOUNTING + BOSS_FACE_Z  # 29.0375
-HUB_TO_BOSS_BAND = 0.05  # knob float
 HUB_FACE_Z = -HUB_FACE_TO_MOUNTING
+FRONT_FACE_Z = -NOTCH_DEPTH
 
 # Shared matched-pair sites, expressed in this part's actual K-datum frame.
 LOCATOR_SITES_MM = tuple(
     (x - BORE_STATION, y - BORE_OFFSET) for x, y in ARM.LOCATOR_SITES_MM
 )
-LOCATOR_HOLE_DIA_MM = sum(LOCATING_PIN.SLIP_HOLE_LIMITS_MM) / 2.0
+LOCATOR_HOLE_DIA_MM = min(LOCATING_PIN.SLIP_HOLE_LIMITS_MM)  # .0945
+LOCATOR_HOLE_PLACES = 4
 LOCATOR_HOLE_BAND_MM = tuple(
     limit - LOCATOR_HOLE_DIA_MM for limit in reversed(LOCATING_PIN.SLIP_HOLE_LIMITS_MM)
 )
-FRONT_FACE_Z = -NOTCH_DEPTH
 
 # --- Screw holes: 2 x 82° countersinks for the #8 clamp heads ----------------
-# Clearance, drilled +0.10/0. Accommodate the published ASME maximum
+# Clearance, a #1 drill (.228) +.004/0. Accommodate the published ASME maximum
 # under-head fillet: basic shank radius + 15% basic diameter, with room for
 # the projected axes. Matched dowels alone locate.
-SCREW_HOLE_DIA = 5.8
-CSK_DIA = 7.9248  # 0.312 in, the head's Ø at the top of the bevel
+SCREW_HOLE_DIA = 5.7912  # .228
+SCREW_HOLE_PLACES = 3
+CSK_DIA = 7.9248  # .312, the head's Ø at the top of the bevel
 CSK_ANGLE_DEG = 82.0
-CSK_DIA_PLACES = 1  # ordinary row now retains the true 2 mm floor with the larger clearance
-CSK_ANGLE_BAND_DEG = angular_band_deg()
+CSK_DIA_PLACES = 3
+CSK_ANGLE_BAND_DEG = angular_band_deg(unit=UNIT)
 CSK_HALF_ANGLE_LIMITS_RAD = tuple(
     math.radians((CSK_ANGLE_DEG + sign * CSK_ANGLE_BAND_DEG) / 2.0)
     for sign in (-1.0, 1.0)
@@ -153,7 +176,7 @@ CSK_HALF_ANGLE_LIMITS_RAD = tuple(
 # arm MHA-PD-18, the mate's side (ASME Y14.5 projected tolerance zone;
 # coordinator ruling 2026-10-27, #2017). SOURCE mm.
 CLAMP_PLATE_PROJECTED_HEIGHT_MM = 7.0
-CSK_DIA_DEVIATIONS_MM = printed_deviations(CSK_DIA, CSK_DIA_PLACES)
+CSK_DIA_DEVIATIONS_MM = printed_deviations(CSK_DIA, CSK_DIA_PLACES, unit=UNIT)
 CSK_DIA_LIMITS_MM = tuple(CSK_DIA + deviation for deviation in CSK_DIA_DEVIATIONS_MM)
 CSK_DEPTH = (
     (CSK_DIA - SCREW_HOLE_DIA) / 2.0 / math.tan(math.radians(CSK_ANGLE_DEG / 2.0))
@@ -162,10 +185,21 @@ SCREW_HOLES = tuple(
     (station - BORE_STATION, -BORE_OFFSET) for station in ARM.PLATE_TAP_STATIONS
 )
 
-# --- Bands the sheet prints (hard-coded title-block rows, drawing-guidelines.md rule 3 (decimal places carry the tolerance)) ---
-BAND_X = ARM.BAND_X
-BAND_XX = ARM.BAND_XX
-BAND_XXX = ARM.BAND_XXX
+# --- Bands the sheet prints (title-block rows, drawing-guidelines.md rule 3 (decimal places carry the tolerance)) ---
+BAND_XX = printed_band_mm(2, unit=UNIT)
+BAND_XXX = printed_band_mm(3, unit=UNIT)
+# The outline and the notch print .XX (rule 3): the .X row's +/-.1 is wider
+# than every wall they bound.  Their nominals follow the arm's mm edges, so
+# each is judged at its printed limits' reach.
+OUTLINE_PLACES = 2
+NOTCH_PLACES = 2
+OUTLINE_BAND = max(
+    printed_reach_mm(abs(value), OUTLINE_PLACES)
+    for value in (END_R, WIDTH / 2.0, TOP_LEFT[1], TOP_RIGHT[1], KINK[1])
+)
+NOTCH_BAND = max(
+    printed_reach_mm(abs(value), NOTCH_PLACES) for value in (NOTCH_LEFT[1], NOTCH_RIGHT[1])
+)
 # The plate's hole patterns are toleranced from its own knob bore B (= K),
 # and the matched pilots go through at the arm's pattern from the pin S:
 # K's setting circle about S (MHA-PD-00 VIEW K) carries into every
@@ -180,14 +214,11 @@ LOCATOR_MOUTH_POSITION_RADIUS_MM = REDUCER_POSITION_RADIUS * (
     1.0 + 2.0 * LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM
     / LOCATOR_FULL_CYLINDER_SPAN_MIN_MM
 )
-DRILL_GROWTH = drilled_oversize_mm()
+DRILL_GROWTH = drilled_oversize_mm(unit=UNIT)
 WALL_TARGET = ARM.WALL_TARGET
 # Actual rounded diameter and angular limits control every cone cut and
 # the shortest-stock head seat, not symmetric bands around an unprinted model.
-CSK_DIA_BAND = printed_band_mm(CSK_DIA_PLACES)
-# The notch face's corner heights print .X: the face only clears the arm's
-# lower edge (transgear_hanger_joints.NOTCH_REFERENCE_AIR_WORST_MM).
-NOTCH_BAND = BAND_X
+CSK_DIA_BAND = printed_band_mm(CSK_DIA_PLACES, unit=UNIT)
 # Each cone is coaxial with its hole (the plan's 2X CSK callout). The zone
 # lies outside the plate, so inside it each axis is the zone's straight
 # extension: tilted at most D/H, and off true position by at most the zone
@@ -253,11 +284,11 @@ WALLS: dict[str, tuple[float, float]] = {
     ),
     "boss over the bore": (
         (BOSS_DIA - BORE_DIA) / 2.0,
-        (BOSS_DIA - BAND_X) / 2.0 - _BORE_R_MAX - 2.0 * OUTLINE_EDGE_BREAK_MAX_MM,
+        (BOSS_DIA - BAND_XX) / 2.0 - _BORE_R_MAX - 2.0 * OUTLINE_EDGE_BREAK_MAX_MM,
     ),
     "bore to end round": (
         END_R - BORE_DIA / 2.0,
-        END_R - BAND_X - _BORE_R_MAX - OUTLINE_EDGE_BREAK_MAX_MM - BORE_RUN_OFF_MM,
+        END_R - OUTLINE_BAND - _BORE_R_MAX - OUTLINE_EDGE_BREAK_MAX_MM - BORE_RUN_OFF_MM,
     ),
     "bore to notch": (
         _NOTCH_DISTANCE - BORE_DIA / 2.0,
@@ -281,7 +312,7 @@ WALLS: dict[str, tuple[float, float]] = {
         _HOLE_TO_EDGE - CSK_DIA / 2.0,
         _HOLE_TO_EDGE
         - CSK_DIA_LIMITS_MM[1] / 2.0
-        - BAND_X
+        - OUTLINE_BAND
         - SCREW_AXIS_RADIUS_IN_PLATE_MM
         # The countersink follows the drilled hole's exit at the rear face,
         # which has run off over the plate since entry at face A; the side
@@ -298,7 +329,7 @@ for _index, (_x, _y) in enumerate(LOCATOR_SITES_MM, 1):
     )
     WALLS[f"locator {_index} to plate edge/notch"] = (
         _edge_air - LOCATOR_HOLE_DIA_MM / 2.0,
-        _edge_air - BAND_X - LOCATOR_MOUTH_POSITION_RADIUS_MM
+        _edge_air - max(OUTLINE_BAND, NOTCH_BAND) - LOCATOR_MOUTH_POSITION_RADIUS_MM
         - LOCATING_PIN.SLIP_HOLE_LIMITS_MM[1] / 2.0 - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM
         - OUTLINE_EDGE_BREAK_MAX_MM - HOLE_RUN_OFF_MM,
     )

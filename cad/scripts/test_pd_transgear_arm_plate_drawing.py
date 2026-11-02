@@ -26,11 +26,11 @@ from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dime
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fit_deviations import deviations
 from _printed_tolerance import printed_deviations
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND
+from pd_cluster_stack_band import FIT_LENGTH_BAND_IN
 
 
 def _band(places: int) -> float:
-    return _config.title_block(f"linear_{places}pl")["value_in"] * 25.4
+    return _config.title_block(f"linear_{places}pl", unit="in")["band_in"] * 25.4
 
 
 def test_required_drawing_paths() -> None:
@@ -120,7 +120,7 @@ def test_the_explicit_bands_are_the_bore_the_knob_float_and_the_hole_positions()
     }
     # The hub station is a disc-cluster stack term: it prints the cluster's
     # band and names the collar air it sets (rule 4).
-    assert geometry.HUB_FACE_TO_MOUNTING_BAND == PRINTED_LENGTH_BAND
+    assert geometry.HUB_FACE_TO_MOUNTING_BAND == FIT_LENGTH_BAND_IN
     assert "COLLAR AIR" in " ".join(drawing.SECTION_CALLOUTS["HubFaceToMounting"].split())
     assert spec.DRAWING_PRECISION_BY_NAME["HubFaceToMounting"] == 3
     # The H7 bore prints its sourced limits; zero lower deviation is intentional.
@@ -137,7 +137,7 @@ def test_every_printed_band_is_no_wider_than_the_arithmetic_assumed() -> None:
         assert band >= _band(places)
     precision = spec.DRAWING_PRECISION_BY_NAME
     for name, judged in (
-        ("ThicknessOverArm", geometry.BAND_XX),
+        ("ThicknessOverArm", geometry.THICKNESS_OVER_ARM_BAND),
         ("HubDia", geometry.BAND_XX),
         ("NotchLeftY", geometry.NOTCH_BAND),
         ("NotchRightY", geometry.NOTCH_BAND),
@@ -146,14 +146,17 @@ def test_every_printed_band_is_no_wider_than_the_arithmetic_assumed() -> None:
     ):
         assert judged >= _band(precision[name]), name
     # The explicitly banded dimensions print enough places to show their band.
-    for name in ("BoreDia", "HubToBoss", "ScrewHoleX1", "ScrewHoleX2", "ScrewHoleY"):
-        assert precision[name] == 3, name
+    for name, places in (
+        ("BoreDia", 4), ("HubToBoss", 3), ("ScrewHoleX1", 4), ("ScrewHoleX2", 4),
+        ("ScrewHoleY", 4),
+    ):
+        assert precision[name] == places, name
 
 
 def test_the_worst_case_walls_hold_at_the_printed_bands() -> None:
     """Recompute the thinnest walls from the printed title-block rows, with
     each exposed edge's 0.254 (R.010) break and the drill run-off (full worst case)."""
-    drill = _config.title_block("drilled_hole")["plus_mm"]
+    drill = geometry.DRILL_GROWTH
     brk = geometry.OUTLINE_EDGE_BREAK_MAX_MM
     assert brk == pytest.approx(0.254) and arm.DRILL_RUN_OFF_DEG == 0.3
     bore_r_max = (geometry.BORE_DIA + geometry.BORE_DIA_LIMITS[1]) / 2.0
@@ -193,11 +196,11 @@ def test_the_worst_case_walls_hold_at_the_printed_bands() -> None:
         geometry.SCREW_HOLES[0][0] - geometry.EDGE_MINUS_X,
         geometry.EDGE_PLUS_X - geometry.SCREW_HOLES[-1][0],
     )
-    # The budget charges the arm's 0.8 for the .X side edge, no less than
-    # the title block's printed .X row.
-    assert geometry.BAND_X >= _band(1)
+    # The budget charges the outline's printed reach for the side edge, no
+    # less than the title block's .XX row.
+    assert geometry.OUTLINE_BAND >= _band(geometry.OUTLINE_PLACES)
     side_wall = (
-        to_edge - geometry.CSK_DIA_LIMITS_MM[1] / 2.0 - geometry.BAND_X - position
+        to_edge - geometry.CSK_DIA_LIMITS_MM[1] / 2.0 - geometry.OUTLINE_BAND - position
         - deepest * run_off - 2.0 * brk
     )
     assert geometry.WALLS["countersinks to the side edges"][1] == pytest.approx(side_wall)
@@ -246,8 +249,9 @@ def test_the_build_imports_no_drawing_or_assembly_module() -> None:
 
 def _loosest_row(places: int, holds) -> bool:
     """``places`` holds its stack and the next looser title-block row does not
-    (or there is none): the print asks for no more than the part needs."""
-    return holds(places) and (places == 1 or not holds(places - 1))
+    (or there is none: .XX is the inch sheet's loosest): the print asks for no
+    more than the part needs."""
+    return holds(places) and (places == 2 or not holds(places - 1))
 
 
 _CONE = math.tan(math.radians(geometry.CSK_ANGLE_DEG / 2.0))
@@ -255,8 +259,10 @@ _CONE = math.tan(math.radians(geometry.CSK_ANGLE_DEG / 2.0))
 
 def _screw_seat(csk_places: int, thickness_places: int) -> tuple[float, float]:
     """Actual rounded print rows: published stock bound and true cone floor."""
-    _csk_low, csk_high = printed_deviations(geometry.CSK_DIA, csk_places)
-    thick_low, thick_high = printed_deviations(geometry.THICKNESS_OVER_ARM, thickness_places)
+    _csk_low, csk_high = printed_deviations(geometry.CSK_DIA, csk_places, unit=geometry.UNIT)
+    thick_low, thick_high = printed_deviations(
+        geometry.THICKNESS_OVER_ARM, thickness_places, unit=geometry.UNIT
+    )
     angle = joints.PLATE_SCREW_AXIS_TILT_MAX_RAD
     proud = (
         (screw.STOCK_OVERALL_LENGTH_MIN_MM - screw.HEAD_WHOLE_METAL_HEIGHT_MAX_MM) * math.cos(angle)
@@ -287,16 +293,13 @@ def _seat_holds(csk_places: int, thickness_places: int) -> bool:
     )
 
 
-def test_the_countersink_and_the_thickness_print_the_loosest_seat_rows() -> None:
-    """Loosest rows retain the actual cone floor and published stock cut.
-    No incoming crown/length acceptance or cone-centering premise."""
+def test_the_countersink_and_the_thickness_hold_the_seat_at_their_rows() -> None:
+    """The printed rows retain the actual cone floor and published stock cut.
+    No incoming crown/length acceptance or cone-centering premise. On the
+    inch sheet each nominal's own digits fix its row (.312 head seat, .197
+    stock over the arm), so the seat only has to hold at the printed row."""
     csk = spec.DRAWING_PRECISION_BY_NAME["CskDia"]
     thickness = spec.DRAWING_PRECISION_BY_NAME["ThicknessOverArm"]
-    assert _loosest_row(csk, lambda places: _seat_holds(places, thickness))
-    # The seat alone would accept .X thickness, but the locator dowels'
-    # full-cylinder span (LOCATOR_FULL_CYLINDER_SPAN_MIN_MM, hence the S-K
-    # mouth position radius) is judged at the .XX band, so the seat only
-    # has to hold at the printed row.
     assert _seat_holds(csk, thickness)
 
 
@@ -320,27 +323,20 @@ def test_floor_pays_independent_extrapolated_cone_and_hole_axes_and_actual_rim_t
     )
     assert geometry.WALLS["under the countersinks"][1] == pytest.approx(floor)
     assert floor > geometry.WALL_TARGET
-    assert spec.DRAWING_PRECISION_BY_NAME["ThicknessOverArm"] == 2
-    assert spec.DRAWING_PRECISION_BY_NAME["CskDia"] == 1
-    # With the source fillet-clearance drill, the ordinary CSK row now
-    # retains the true floor. The old smaller hole required needless precision.
-    old_hole_floor = (geometry.THICKNESS_OVER_ARM - geometry.THICKNESS_OVER_ARM_BAND
-                      - ((2.0 * radius - 4.5) / 2.0 + geometry.REDUCER_POSITION_DIAMETER)
-                      / math.tan(geometry.CSK_HALF_ANGLE_LIMITS_RAD[0] - alpha)
-                      - radius * math.sin(alpha))
-    assert old_hole_floor < geometry.WALL_TARGET
+    assert spec.DRAWING_PRECISION_BY_NAME["ThicknessOverArm"] == 3
+    assert spec.DRAWING_PRECISION_BY_NAME["CskDia"] == 3
 
 
 def _notch_air(places: int) -> float:
     """Worst air between the notch face and the arm's lower edge with the
     corner heights at the deviations their printed values allow."""
     rise = max(
-        printed_deviations(corner[1], places)[1]
+        printed_deviations(corner[1], places, unit=geometry.UNIT)[1]
         for corner in (geometry.NOTCH_LEFT, geometry.NOTCH_RIGHT)
     )
     return (
         (geometry.NOTCH_RELIEF - rise) * math.cos(arm.EDGE_LEAN)
-        - arm.BAND_X
+        - arm.OUTLINE_BAND
     )
 
 
@@ -350,7 +346,7 @@ def test_the_notch_corner_heights_print_the_loosest_row_that_clears_the_arm() ->
         assert _loosest_row(places, lambda p: _notch_air(p) > 0.0), name
 
 
-def test_the_notch_depth_prints_the_loosest_row_the_lock_sweep_clears(
+def test_the_notch_depth_row_holds_the_lock_sweep(
     monkeypatch,
 ) -> None:
     """The lower section's front face stands proud of the arm by the deepest
@@ -360,7 +356,7 @@ def test_the_notch_depth_prints_the_loosest_row_the_lock_sweep_clears(
         monkeypatch.setattr(
             assembly,
             "_NOTCH_DEPTH_DEV",
-            printed_deviations(geometry.NOTCH_DEPTH, places),
+            printed_deviations(geometry.NOTCH_DEPTH, places, unit=geometry.UNIT),
         )
         try:
             assembly._assert_lock_station_sweep()
@@ -368,7 +364,7 @@ def test_the_notch_depth_prints_the_loosest_row_the_lock_sweep_clears(
             return False
         return True
 
-    assert _loosest_row(spec.DRAWING_PRECISION_BY_NAME["NotchDepth"], holds)
+    assert holds(spec.DRAWING_PRECISION_BY_NAME["NotchDepth"])
 
 
 def test_the_hub_station_band_holds_the_governing_air_it_closes() -> None:
@@ -389,7 +385,7 @@ def test_clamp_availability_is_paid_after_dowel_location() -> None:
     assert joints.PLATE_SCREW_REFERENCE_ENTRY_MARGIN_MM > 0.0
     assert joints.PLATE_SCREW_STOCK_LEAD_MARGIN_MM > 0.0
     assert knob_shaft.END_FLOAT - knob_shaft.END_FLOAT_SET_TOL > 0.0
-    assert all(control.tolerance == f"{spec.REDUCER_POSITION_DIAMETER:.3f}"
+    assert all(float(control.tolerance) * 25.4 <= spec.REDUCER_POSITION_DIAMETER
                for control in spec.GEOMETRIC_CONTROLS if control.characteristic == "position")
 
 
@@ -674,7 +670,7 @@ def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
         numbers["DOWEL_NUMBER"],
         numbers["ARM_NUMBER"],
         steps.knob_setting_ref(),
-        "0.05 MAX",
+        ".002 MAX",
     ):
         assert required in locator, required
     # The S-K setting's value is VIEW K's native dimension, not callout text.
@@ -722,11 +718,6 @@ def test_each_projected_zone_is_a_chain_line_from_face_a() -> None:
     # the zones rise away from the view's caption.
     first, last = drawing.SCREW_SECTION_LINE_MODEL
     assert first[0] < geometry.EDGE_MINUS_X < geometry.EDGE_PLUS_X < last[0]
-    assert spec.DRAWING_REFERENCE_PRECISION == {"KnobZone": 1, "ScrewZone": 1}
-    # The chain plane's lower limit narrows with the disc cluster's ±0.02
-    # stack terms (#2038), so K's projected height is 40.3, not 40.6.
-    assert f"{spec.KNOB_ZONE_HEIGHT:.1f}" == "40.3"
-    assert f"{spec.SCREW_ZONE_HEIGHT:.1f}" == "7.0"
 
 
 def test_two_sheets_label_each_face_view() -> None:

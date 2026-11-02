@@ -34,6 +34,7 @@ import pd_rack_pinion_spec as DISC
 import pd_support_bar_spec as BAR
 import _mcmaster_90325a174 as PIVOT
 from _fit_close_running import measured_close_running_clearance_mm
+from _fit_deviations import deviations
 from _gear_quality import reducer_position_diameter_mm
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
@@ -42,7 +43,6 @@ from _printed_tolerance import (
     drilled_oversize_mm,
     edge_break_chamfer_mm,
     edge_break_radius_mm,
-    printed_band_mm,
     printed_deviations,
 )
 import pd_transgear_pivot_spacer_spec as SPACER
@@ -267,29 +267,27 @@ LOCATOR_SITES_MM = (
     (PLATE_SCREW_MID_STATION, LOCATOR_PAIR_BASELINE_MM / 2.0),
     (PLATE_SCREW_MID_STATION, -LOCATOR_PAIR_BASELINE_MM / 2.0),
 )
-LOCATOR_HOLE_DIA_MM = sum(LOCATING_PIN.PRESS_HOLE_LIMITS_MM) / 2.0
-# The interface's 1.990..2.000 press ream (knob-stack batch) has no inch
-# decimal: the sheet prints its 1.995 model as .0785 at four places under
-# ±.0001, i.e. .0784..0786, which lies inside the interface's limits.
+# The interface's .093 REAM_H7 press, printed as the reamer's band
+# (upper, lower), as the named fit bands are written.
+LOCATOR_HOLE_DIA_MM = min(LOCATING_PIN.PRESS_HOLE_LIMITS_MM)  # .0930
 LOCATOR_HOLE_PLACES = 4
-LOCATOR_HOLE_PRINT_TOLERANCE_MM = 0.00254  # ±.0001
+LOCATOR_HOLE_DIA_BAND = tuple(
+    limit - LOCATOR_HOLE_DIA_MM for limit in reversed(LOCATING_PIN.PRESS_HOLE_LIMITS_MM)
+)
 _LOCATOR_PRINTED = tuple(
     LOCATOR_HOLE_DIA_MM + deviation
     for deviation in printed_deviations(
-        LOCATOR_HOLE_DIA_MM,
-        LOCATOR_HOLE_PLACES,
-        (-LOCATOR_HOLE_PRINT_TOLERANCE_MM, LOCATOR_HOLE_PRINT_TOLERANCE_MM),
-        unit=UNIT,
+        LOCATOR_HOLE_DIA_MM, LOCATOR_HOLE_PLACES, deviations(LOCATOR_HOLE_DIA_BAND), unit=UNIT,
     )
 )
 if not (
     LOCATING_PIN.PRESS_HOLE_LIMITS_MM[0] - 1e-9
-    <= _LOCATOR_PRINTED[0]
-    < _LOCATOR_PRINTED[1]
+    <= min(_LOCATOR_PRINTED)
+    < max(_LOCATOR_PRINTED)
     <= LOCATING_PIN.PRESS_HOLE_LIMITS_MM[1] + 1e-9
 ):
     raise AssertionError("the printed locating ream leaves the interface's press limits")
-LOCATOR_HOLE_PRINTED_LIMITS_MM = _LOCATOR_PRINTED
+LOCATOR_HOLE_PRINTED_LIMITS_MM = (min(_LOCATOR_PRINTED), max(_LOCATOR_PRINTED))
 LOCATOR_PROUD_MM = LOCATING_PIN.PROUD_MM
 LOCATOR_PROUD_BAND_MM = LOCATING_PIN.PROUD_TOLERANCE_MM
 PLATE_TAP_SPEC = HoleSpec("tapped", "#8-32")
@@ -331,11 +329,6 @@ PIN_HOLE_Z = THICKNESS / 2.0  # mid-thickness, on y = 0
 # The latch pin's axis in the machine frame; the hook's hole is drilled on it.
 PIN_MACHINE_Z = FRONT_FACE_MACHINE_Z + PIN_HOLE_Z  # -120.43025
 
-# The unconverted MHA-PD-19 plate (knob-stack batch) reads these as its own
-# millimetre rows; no arm dimension prints with them.
-BAND_X = printed_band_mm(1)
-BAND_XX = printed_band_mm(2)
-BAND_XXX = printed_band_mm(3)
 # The end-face latch hole's height is an ordinary .XXX row: the title block
 # governs it, with no tightened band (coordinator ruling (a), #2019).  It
 # prints .156 for the 5/32 model.

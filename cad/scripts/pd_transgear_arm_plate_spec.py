@@ -11,13 +11,13 @@ Part frame (``pd_transgear_arm_plate_geometry``): origin on the knob-shaft bore
 axis K on the MOUNTING face (the Front Plane, which seats on the MHA-PD-18
 arm's rear face); +X and +Y are the arm's axes, the long axis runs along -Y
 from the screws to the end round about K; +Z to the rear.  The over-arm
-section spans z 0..5, the section below the arm z -7.9375..5 (the arm's
-stock thickness), the front hub z -20.5375..-7.9375 and the rear boss
-z 5..8.5.
+section spans z 0..THICKNESS_OVER_ARM, the section below the arm reaches
+the arm's front face (its stock thickness), the front hub runs from there to
+HUB_FACE_TO_MOUNTING and the rear boss to BOSS_FACE_Z.
 
 [INFERENCE] items the sheet prints as they are modelled: the -X edge's kink
 station (``KINK``, read off the book's notch crop) and the rear boss
-(Ø20 x 3.5, contract §1.10).
+(contract §1.10).
 """
 
 from __future__ import annotations
@@ -30,7 +30,6 @@ import pd_transgear_arm_plate_geometry as PLATE
 import _transgear_arm_plate_locating_interface as LOCATING_PIN
 import paper_drive_arm_registration as REGISTRATION
 from pd_transgear_arm_plate_geometry import (
-    BAND_X,
     BAND_XX,
     BAND_XXX,
     BORE_DIA,
@@ -45,39 +44,38 @@ from pd_transgear_arm_plate_geometry import (
     THICKNESS_OVER_ARM,
     HUB_FACE_TO_MOUNTING,
     HUB_TO_BOSS_BAND,
-    NOTCH_BAND,
     SCREW_HOLES,
+    UNIT,
 )
 
 # The general-tolerance band each printed place count claims (the title-block
-# rows the geometry module hard-codes, drawing-guidelines.md rule 3 (decimal places carry the tolerance)).
-BAND_BY_PLACES: dict[int, float] = {1: BAND_X, 2: BAND_XX, 3: BAND_XXX}
+# rows, drawing-guidelines.md rule 3 (decimal places carry the tolerance)).
+BAND_BY_PLACES: dict[int, float] = {2: BAND_XX, 3: BAND_XXX}
 
-# Places each printed dimension carries (contract §12):
-# the outline (end radius, both side edges from K, top corners, kinks), the
-# boss Ø, the notch face's corner heights (it only clears the arm's edge) are
-# routine .X. The over-arm thickness retains .XX for the real cone floor and
-# standard-stock full-thread margin. The enlarged clearance permits an
-# ordinary .X CSK. The hub Ø and notch depth retain .XX; the arm's stock
-# thickness it takes (7.94; R9-26; at .X the lower section's front face
-# enters the guide-lock screw heads' sweep); the hub face's station from the
-# mounting face is .XXX (the chain plane, contract §13: the disc-to-platen air
-# closes at .XX); the hub-to-boss length prints .XXX under its explicit
-# knob-float band; the bore is a .XXX running fit under its explicit band;
-# the screw-hole positions are BASIC under the same circular position source
-# as the arm taps, relative to the ACTUAL running bore and clocking edge;
-# drilled clearance holes print .X under the title block's drilled-hole row
-# (R9-13).
-OUTLINE_PLACES = 1
-BOSS_DIA_PLACES = 1
-NOTCH_DEPTH_PLACES = 2
+# Places each printed dimension carries (contract §12, decimal inch #290):
+# the outline (end radius, both side edges from K, top corners, kinks) and
+# the notch face's corner heights (it only clears the arm's edge) follow the
+# arm's own outline in mm and print .XX, judged at their printed reach
+# (``pd_transgear_arm_plate_geometry.OUTLINE_BAND``/``NOTCH_BAND``). The boss
+# and hub Ø print .XX; the over-arm thickness .XXX for the real cone floor
+# and standard-stock full-thread margin; the notch depth (the arm's 5/16
+# stock it takes, R9-26) .XXX; the hub face's station from the mounting face
+# is .XXX (the chain plane, contract §13); the hub-to-boss length prints .XXX
+# under its explicit knob-float band; the bore is a four-place reamed fit
+# under its explicit band; the screw-hole positions are BASIC under the same
+# circular position source as the arm taps, relative to the ACTUAL running
+# bore and clocking edge; drilled clearance holes print .XXX under the title
+# block's drilled-hole row (R9-13).
+OUTLINE_PLACES = PLATE.OUTLINE_PLACES
+BOSS_DIA_PLACES = 2
+NOTCH_DEPTH_PLACES = 3
 THICKNESS_PLACES = PLATE.THICKNESS_OVER_ARM_PLACES
 HUB_DIA_PLACES = 2
-NOTCH_PLACES = 1
-SCREW_HOLE_PLACES = 1
+NOTCH_PLACES = PLATE.NOTCH_PLACES
+SCREW_HOLE_PLACES = PLATE.SCREW_HOLE_PLACES
 HUB_TO_BOSS_PLACES = 3
-BORE_PLACES = 3
-HOLE_POSITION_PLACES = 3
+BORE_PLACES = 4
+HOLE_POSITION_PLACES = 4
 CSK_DIA_PLACES = PLATE.CSK_DIA_PLACES
 
 # The places must claim the bands the geometry module's walls and the hanger
@@ -85,9 +83,7 @@ CSK_DIA_PLACES = PLATE.CSK_DIA_PLACES
 for _label, _places, _band in (
     ("thickness over the arm", THICKNESS_PLACES, PLATE.THICKNESS_OVER_ARM_BAND),
     ("hub", HUB_DIA_PLACES, BAND_XX),
-    ("notch face", NOTCH_PLACES, NOTCH_BAND),
-    ("boss", BOSS_DIA_PLACES, BAND_X),
-    ("outline", OUTLINE_PLACES, BAND_X),
+    ("boss", BOSS_DIA_PLACES, BAND_XX),
     ("countersink", CSK_DIA_PLACES, CSK_DIA_BAND),
 ):
     if abs(BAND_BY_PLACES[_places] - _band) > 1e-9:
@@ -120,10 +116,19 @@ PART_DATUMS = (
         ),
     ),
 )
+# The frames print in inches (#290), floored to four places so each printed
+# zone stays inside the zones the reducer stacks were judged at.
+GEOMETRIC_TOLERANCES_IN = {"position": ".0039", "projected_axis": ".0019"}
+GEOMETRIC_TOLERANCES_MM = {key: float(value) * 25.4 for key, value in GEOMETRIC_TOLERANCES_IN.items()}
+if (
+    GEOMETRIC_TOLERANCES_MM["position"] > REDUCER_POSITION_DIAMETER
+    or GEOMETRIC_TOLERANCES_MM["projected_axis"] > REGISTRATION.AXIS_PROJECTED_ZONE_DIAMETER_MM
+):
+    raise AssertionError("MHA-PD-19 prints a reducer zone wider than its stacks assume")
 GEOMETRIC_CONTROLS = tuple(
     GeometricControl(
         f"plate_hole_{index}_position", "position",
-        f"{REDUCER_POSITION_DIAMETER:.3f}",
+        GEOMETRIC_TOLERANCES_IN["position"],
         CylinderFace(
             SCREW_HOLE_DIA, contains_x_mm=x, contains_y_mm=y,
             contains_z_mm=THICKNESS_OVER_ARM / 2.0,
@@ -139,13 +144,13 @@ GEOMETRIC_CONTROLS = tuple(
 GEOMETRIC_CONTROLS += (
     GeometricControl(
         "knob_projected_axis", "perpendicularity",
-        f"{REGISTRATION.AXIS_PROJECTED_ZONE_DIAMETER_MM:.3f}",
+        GEOMETRIC_TOLERANCES_IN["projected_axis"],
         CylinderFace(BORE_DIA), ("A",), "diametral",
         projected_zone_height_mm=REGISTRATION.K_PROJECTED_HEIGHT_MM,
     ),
     *(
         GeometricControl(
-            f"plate_locator_{index}_position", "position", f"{REDUCER_POSITION_DIAMETER:.3f}",
+            f"plate_locator_{index}_position", "position", GEOMETRIC_TOLERANCES_IN["position"],
             CylinderFace(
                 PLATE.LOCATOR_HOLE_DIA_MM, contains_x_mm=x, contains_y_mm=y,
                 contains_z_mm=THICKNESS_OVER_ARM / 2.0,
@@ -172,11 +177,12 @@ DOWEL_NUMBER = "MHA-PD-VN-64"
 # lives on the assembly sheet, not here); the draw script fills the sheet
 # and view, from a module this part-build input must not import.  All of it
 # below the size: the layout audit reads an above-callout as one line.
+_MOUTH_BREAK_TEXT = f"{LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM / 25.4:.3f}".removeprefix("0")
 LOCATOR_CALLOUT = (
     f"2X REAM THRU, SLIP FIT\nON DOWEL {DOWEL_NUMBER};\n"
     f"MATCH-DRILL WITH ARM\n{ARM_NUMBER}, {{assembly}}\n"
     "{view}; BREAK EDGE\n"
-    f"{LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX, DOWEL CONTACT"
+    f"{_MOUTH_BREAK_TEXT} MAX, DOWEL CONTACT"
 )
 
 # The bore is the knob shaft's running surface (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): MACHINED, on
@@ -185,13 +191,14 @@ LOCATOR_CALLOUT = (
 # ring and the MHA-PD-16 cup), MACHINED as the crankshaft journals are (R9-13).
 SURFACE_FINISHES = (
     SurfaceFinishControl(
-        "transgear_arm_plate_bore", MACHINED_UM, CylinderFace(BORE_DIA)
+        "transgear_arm_plate_bore", MACHINED_UM, CylinderFace(BORE_DIA), display_unit=UNIT,
     ),
     SurfaceFinishControl(
-        "hub_face", MACHINED_UM, PlanarFace((0.0, 0.0, -1.0), HUB_FACE_TO_MOUNTING)
+        "hub_face", MACHINED_UM, PlanarFace((0.0, 0.0, -1.0), HUB_FACE_TO_MOUNTING),
+        display_unit=UNIT,
     ),
     SurfaceFinishControl(
-        "boss_face", MACHINED_UM, PlanarFace((0.0, 0.0, 1.0), BOSS_FACE_Z)
+        "boss_face", MACHINED_UM, PlanarFace((0.0, 0.0, 1.0), BOSS_FACE_Z), display_unit=UNIT,
     ),
 )
 # What each thrust face's finish serves, captioned at its symbol.
@@ -237,7 +244,7 @@ FRONT_VIEW_LABEL = "FRONT VIEW (FACE A)"
 KNOB_ZONE_HEIGHT = REGISTRATION.K_PROJECTED_HEIGHT_MM
 SCREW_ZONE_HEIGHT = PLATE.CLAMP_PLATE_PROJECTED_HEIGHT_MM
 # The chain lines' heights print as references: each frame states its zone.
-DRAWING_REFERENCE_PRECISION: dict[str, int] = {"KnobZone": 1, "ScrewZone": 1}
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {"KnobZone": 2, "ScrewZone": 2}
 
 ISO_VIEW_SCALE = (1, 1)
 ISOMETRIC_VIEW_NOTE = f"ISOMETRIC VIEW SCALE {ISO_VIEW_SCALE[0]}:{ISO_VIEW_SCALE[1]}"
@@ -296,7 +303,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     },
     "CountersinkReference": {"CskDia": CSK_DIA_PLACES},
     "LocatorProfile": {
-        "LocatorX1": 3, "LocatorY1": 3, "LocatorY2": 3, "LocatorDia1": 3,
+        "LocatorX1": HOLE_POSITION_PLACES, "LocatorY1": HOLE_POSITION_PLACES,
+        "LocatorY2": HOLE_POSITION_PLACES, "LocatorDia1": PLATE.LOCATOR_HOLE_PLACES,
     },
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {

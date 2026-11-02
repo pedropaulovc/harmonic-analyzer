@@ -172,7 +172,7 @@ if LOCATOR_PRESS_INTERFERENCE[0] <= 0.0:
     raise AssertionError("the MHA-PD-18 locating ream loses MHA-PD-VN-64's press")
 LOCATOR_CALLOUT = "\n".join((
     "2X REAM THRU",
-    f"MOUTH BREAKS {_inch(_floor_mm(LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM, 4), 4)}"
+    f"MOUTH BREAKS {_inch(_floor_mm(LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM, 3), 3)}"
     " MAX: DOWEL GRIP",
     f"PRESS FIT DOWEL {LOCATOR_PIN.PART_NUMBER}",
     f"{_inch(_floor_mm(LOCATOR_PRESS_INTERFERENCE[0], 4), 4)}/"
