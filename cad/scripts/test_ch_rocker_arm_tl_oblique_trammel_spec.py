@@ -115,6 +115,36 @@ def test_jig_stock_requirements_preserve_finished_geometry_without_claiming_owne
     assert not {"section_mm", "length_mm", "dia_mm"} & set(riser)
 
 
+def test_strap_blank_is_the_two_inch_strap_stock() -> None:
+    """PR-B (#2136): the MHA-CH-13 strap comes from 1/8 x 2 in 1018 flat. The
+    jig takes the blank at the as-bought width and the strap faced to its
+    finished thickness."""
+    inventory = tomllib.loads(
+        (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_bytes().decode()
+    )
+    (strap,) = [
+        row for row in inventory["stock"] if "MHA-CH-13 strap" in row.get("note", "")
+    ]
+    width, thick = strap["section_mm"]
+    assert trammel.BLANK_WIDTH == width == pytest.approx(2.0 * 25.4)
+    assert thick > trammel.STRAP_THICK == rocker.ARM_THICKNESS
+    # Four blanks in the bar's 60 in length, short by its 1/8 in cut band.
+    assert 4 * trammel.BLANK_LENGTH < strap["length_mm"] - 0.125 * 25.4
+    # The strap spans R800's tip-land ends to R816's apex across the blank,
+    # and the blank leaves at least the .080 wall of waste beyond each edge.
+    low, high = trammel.STRAP_SPAN_Y
+    assert low == pytest.approx(
+        trammel.R_INNER * math.cos(trammel.TIP_ANGLE) + trammel.ARC_CENTRE[1]
+    )
+    assert high == pytest.approx(trammel.R_OUTER + trammel.ARC_CENTRE[1])
+    assert trammel.BLANK_EDGE_WASTE == pytest.approx(
+        (trammel.BLANK_WIDTH - (high - low)) / 2.0
+    )
+    assert trammel.BLANK_EDGE_WASTE >= WALL_TARGET_MM
+    # CL/CR lie inside the strap's span, so the blank covers their holes too.
+    assert low < trammel.CR[1] < high
+
+
 def test_both_cutter_circles_share_the_arc_centre() -> None:
     centre = trammel.ARC_CENTRE
     for name, radius in (
