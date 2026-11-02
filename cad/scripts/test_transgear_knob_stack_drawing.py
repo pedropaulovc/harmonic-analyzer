@@ -202,7 +202,7 @@ def test_thumbnut_engages_one_and_a_half_diameters_over_the_travel(
     nut's seat countersink on the longest fitted pilot (R9-70: the nut seats
     on the collar's pilot, not the T24), or the shortest stud's full-thread
     end; each countersink's loss counted from the tap drill at its smallest
-    printed angle (R9-63). Least 11.51664 at the shortest fitted body."""
+    printed angle (R9-63). Least 12.16739 at the shortest fitted body."""
     tip_min = _limits(shaft.TIP_STATION, shaft.TIP_STATION_PLACES)[0]
     thread_end_max = _limits(shaft.PLAIN_CORE, _stud_places("PlainCore"))[1]
     nut_min = _limits(nut.OVERALL_LENGTH, nut.OVERALL_LENGTH_PLACES)[0]
@@ -219,10 +219,14 @@ def test_thumbnut_engages_one_and_a_half_diameters_over_the_travel(
     assert angular_row == 1.0
     assert nut.CSK_HALF_ANGLE_MIN == pytest.approx(half_min)
     rear_loss = (
-        (4.6 - nut.TAP_DRILL_DIA) / 2.0
+        (nut.CSK_DIA - nut.TAP_DRILL_DIA) / 2.0
         / math.tan(math.radians(half_min))
     )
-    front_loss = nut.DISH_DEPTH + printed_band_mm(nut.DISH_DEPTH_PLACES) + rear_loss
+    front_loss = (
+        nut.DISH_DEPTH
+        + printed_band_mm(nut.DISH_DEPTH_PLACES, unit=nut.UNIT)
+        + rear_loss
+    )
     assert nut.REAR_THREAD_LOSS == pytest.approx(rear_loss)
     assert nut.FRONT_THREAD_LOSS == pytest.approx(front_loss)
 
@@ -239,7 +243,7 @@ def test_thumbnut_engages_one_and_a_half_diameters_over_the_travel(
         for i in range(101)
     ]
     worst = min(engagement(seat) for seat in settings)
-    assert worst == pytest.approx(11.51664, abs=1e-5)
+    assert worst == pytest.approx(12.16739, abs=1e-5)
     assert worst >= ENGAGEMENT_FLOOR
     assert collar.THUMBNUT_ENGAGEMENT_WORST == pytest.approx(worst)
     # Negative control: a stud tip 8 shorter leaves less than 1.5 D.
@@ -252,7 +256,7 @@ def test_printed_countersink_angle_reaches_the_engagement_refusal(monkeypatch) -
     with monkeypatch.context() as patch:
         wider = _reloaded_nut(patch, 2.0)
         loss = (
-            (4.6 - wider.TAP_DRILL_DIA) / 2.0
+            (wider.CSK_DIA - wider.TAP_DRILL_DIA) / 2.0
             / math.tan(math.radians(43.0))
         )
         assert wider.CSK_HALF_ANGLE_MIN == 43.0
