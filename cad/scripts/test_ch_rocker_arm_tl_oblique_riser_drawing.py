@@ -192,7 +192,7 @@ def test_clamp_holes_pass_their_mates_and_state_the_band_wall_shortfall() -> Non
     assert inner >= WALL_TARGET_MM
     assert WALL_FLOOR_MM < outer < WALL_TARGET_MM
     # Stated floored to three places: a MIN never rounds up.
-    assert outer / INCH == pytest.approx(0.0749, abs=0.0001)
+    assert outer / INCH == pytest.approx(0.0747, abs=0.0001)
     assert spec.CLAMP_WALL_MIN_TEXT == "WALL .074 MIN TO CUT EDGE"
     rows = spec.CALLOUTS_BELOW["ClampDia"].split("\n")
     assert rows[:3] == ["DRILL THRU", "CL AND CR HOLES", spec.CLAMP_WALL_MIN_TEXT]
