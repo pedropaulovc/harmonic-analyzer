@@ -28,10 +28,10 @@ from _printed_tolerance import printed_band_mm
 from cone_shaft_land_bands import (
     RUNNING_DIA_BAND,
     TERMINAL_DIA_MM,
-    TERMINAL_DIA_PLACES,
     TERMINAL_FINISHED_DIA_LIMITS_MM,
     TERMINAL_FINISHED_AF_LIMITS_MM,
     TERMINAL_FLAT_AF_MM,
+    TERMINAL_PRINTED_DIA_MM,
     TERMINAL_FLAT_EDGE_BREAK_MAX,
     TERMINAL_HALF_CHORD_MIN_MM,
     TIP_COLLAR_AXIAL_PLACES,
@@ -52,10 +52,17 @@ BORE_DIA_BAND = seat_bore_band(RUNNING_DIA_BAND)
 # A real saved representative inside the SAME retained finished-bore limits.
 # Modelling nominal shaft-size here used to create a concentric zero-clearance
 # collar despite its positive printed bore band. Re-centering the dimension
-# changes neither finished limit nor the named free-fit class.
-BORE_MODEL_DIA_MM = BORE_DIA + sum(BORE_DIA_BAND) / 2.0
+# changes neither finished limit nor the named free-fit class.  It is centred
+# on the land's PRINTED size, the one manufacturing follows
+# (cone_shaft_land_bands), and prints exactly at BORE_DIA_PLACES, so the
+# printed pair holds the class float with no drift (Codjiflo P2 on #2095:
+# centred on the 1/32 in model land, 0.84455 printed at three places).
+BORE_DIA_PLACES = 4
+BORE_MODEL_DIA_MM = TERMINAL_PRINTED_DIA_MM + sum(BORE_DIA_BAND) / 2.0
 BORE_MODEL_DIA_BAND = tuple(value - sum(BORE_DIA_BAND) / 2.0 for value in BORE_DIA_BAND)
-BORE_PRINTED_DIA_MM = round(BORE_MODEL_DIA_MM, TERMINAL_DIA_PLACES)
+BORE_PRINTED_DIA_MM = round(BORE_MODEL_DIA_MM, BORE_DIA_PLACES)
+if abs(BORE_PRINTED_DIA_MM - BORE_MODEL_DIA_MM) > 1e-9:
+    raise AssertionError("collar bore nominal does not print exactly at BORE_DIA_PLACES")
 BORE_FINISHED_DIA_LIMITS_MM = (
     BORE_PRINTED_DIA_MM + BORE_MODEL_DIA_BAND[1],
     BORE_PRINTED_DIA_MM + BORE_MODEL_DIA_BAND[0],
@@ -283,11 +290,7 @@ if min(WORST_WALLS_MM.values()) < WALL_TARGET_MM:
     raise AssertionError(f"custom collar misses the wall target: {WORST_WALLS_MM}")
 if WORST_FULL_ENGAGEMENT_MM < REQUIRED_FULL_ENGAGEMENT_MM:
     raise AssertionError("custom collar set screw has less than 1.5D full thread")
-# The sheet prints the bore and land at TERMINAL_DIA_PLACES, so their printed
-# limits may sit up to half a printed digit off the class (the inch class
-# lands off the mm grid); a real divergence is larger than that.
-_PRINT_GRID_TOL_MM = 0.5 * 10**-TERMINAL_DIA_PLACES
-if abs(_FLOAT_MAX - TIP_COLLAR_MAX_RADIAL_FLOAT_MM) > _PRINT_GRID_TOL_MM / 2.0:
+if abs(_FLOAT_MAX - TIP_COLLAR_MAX_RADIAL_FLOAT_MM) > 1e-9:
     raise AssertionError("collar bore and authoritative journal retention fit diverged")
 if SCREW_LANDING_MARGIN_MM <= 0.0:
     raise AssertionError(
@@ -309,14 +312,14 @@ JOURNAL_CLEARANCE_MM = (
     BORE_FINISHED_DIA_LIMITS_MM[0] - TERMINAL_FINISHED_DIA_LIMITS_MM[1],
     BORE_FINISHED_DIA_LIMITS_MM[1] - TERMINAL_FINISHED_DIA_LIMITS_MM[0],
 )
-if abs(JOURNAL_CLEARANCE_MM[0] - 2.0 * TIP_COLLAR_MIN_RADIAL_FLOAT_MM) > _PRINT_GRID_TOL_MM or abs(
+if abs(JOURNAL_CLEARANCE_MM[0] - 2.0 * TIP_COLLAR_MIN_RADIAL_FLOAT_MM) > 1e-9 or abs(
     JOURNAL_CLEARANCE_MM[1] - 2.0 * TIP_COLLAR_MAX_RADIAL_FLOAT_MM
-) > _PRINT_GRID_TOL_MM:
+) > 1e-9:
     raise AssertionError("printed collar journal clearance diverged from the retention float")
 INSTALLATION_NOTES = "\n".join((
     f"FITS {JOURNAL_PART_NUMBER} TERMINAL JOURNAL \u00d8"
-    f"{TERMINAL_FINISHED_DIA_LIMITS_MM[0]:.4f} TO {TERMINAL_FINISHED_DIA_LIMITS_MM[1]:.4f};",
-    f"DIAMETRAL CLEARANCE {JOURNAL_CLEARANCE_MM[0]:.4f} TO {JOURNAL_CLEARANCE_MM[1]:.4f}.",
+    f"{TERMINAL_FINISHED_DIA_LIMITS_MM[0]:.5f} TO {TERMINAL_FINISHED_DIA_LIMITS_MM[1]:.5f};",
+    f"DIAMETRAL CLEARANCE {JOURNAL_CLEARANCE_MM[0]:.5f} TO {JOURNAL_CLEARANCE_MM[1]:.5f}.",
 ))
 BORE_CALLOUT = f"REAM THRU\n{INSTALLATION_NOTES}"
 # The .XXX width, nose length and tap station hold the tapped hole's walls to
@@ -344,7 +347,7 @@ DRAWING_DIMENSIONS = {
     "TapRootGauge": {"TapRootLimit"},
 }
 DRAWING_PRECISION = {
-    "RingProfile": {"NoseDia": 2, "BoreDia": TERMINAL_DIA_PLACES},
+    "RingProfile": {"NoseDia": 2, "BoreDia": BORE_DIA_PLACES},
     "BodyProfile": {"CollarDia": 2, "NoseLength": AXIAL_PLACES},
     "ShoulderRoot": {"ShoulderRadius": 2},
     "Ring": {"CollarWidth": AXIAL_PLACES},

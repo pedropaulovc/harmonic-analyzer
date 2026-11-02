@@ -1241,6 +1241,13 @@ def _print_pivot_band_exactly(display: Any) -> None:
     template's two tolerance places, so the inch H7 band (+0.0127/0) read
     "+0.01/0.00" (machinist review, #290 batch 0).  ``SetPrecision3`` cannot
     set a hole callout's tolerance places; ``ICalloutLengthVariable`` can.
+
+    This is the one render-time precision write the policy's model ownership
+    cannot replace: a hole callout does not inherit the part's places.  With
+    the Hole Wizard diameter's tolerance precision authored as 4 on the part
+    (read back 4), the callout's ``<hw-diam>`` still reported -1, the
+    document default (farm run 20261102T230110877Z, Codjiflo P2 on #2095).
+    The places come from the part's band, never a literal.
     """
     from win32com.client.dynamic import Dispatch as dynamic_dispatch  # noqa: PLC0415
 

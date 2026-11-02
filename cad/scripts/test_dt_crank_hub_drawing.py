@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -290,13 +291,12 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     assert "MHA-DT-09" in cross_hole and "MHA-DT-11" in cross_hole
     flush = cross_hole.index("CRANK-ARM END FLUSH")
     assert flush < cross_hole.index("TAPER-REAM") and "AT ASSEMBLY" in cross_hole
-    # The ream's acceptance, the driven pin's big end at least PIN_PROUD out
-    # of the barrel, reads on the same callout: no MIN dimensioned to an
-    # outline of the pin, another part (Opus reviews at 7fe9d97bd, c7115c2c3
-    # and 7e2f876c7).
-    from dt_crank_pin_ring_spec import PIN_PROUD
-
-    assert f"BIG END {PIN_PROUD:.2f} MIN PROUD" in _flat(cross_hole)
+    # The ream's acceptance is the driven pin's fit-up: its keeper-ring hole
+    # clears the barrel.  No MIN dimensioned to an outline of the pin, another
+    # part (Opus reviews at 7fe9d97bd, c7115c2c3 and 7e2f876c7), and no spec
+    # number typed into the text (Codjiflo P2 on #2095).
+    assert "RING MHA-DT-27 CLEARS HUB" in _flat(cross_hole)
+    assert re.search(r"\d\.\d", cross_hole.split("1:48", 1)[1]) is None
     assert "PinProudReference" not in dt_crank_hub_spec.DRAWING_DIMENSIONS
     assert "PinProud" not in drawing.END_KEEP
     # The bore band governs; the clearance is a reference restatement.

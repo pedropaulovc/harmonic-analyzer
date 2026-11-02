@@ -76,17 +76,10 @@ import _mcmaster_94025a164 as adjuster
 from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm
 from cone_stack_end_play import COLLAR_FEELER_BAND
-from cone_shaft_land_bands import TIP_COLLAR_MIN_CONTACT_SPAN_MM
+from cone_shaft_land_bands import TIP_COLLAR_INSTALLED_COCK_ANGLE_RAD
 from dt_cone_swing_platform_checks import manufactured_p1_stop_enclosure
 
 Vector = tuple[float, float, float]
-
-# The collar is made to its printed bore and land limits. On the mm sheet the
-# inch class lands off the printed grid, so those limits can give a fraction
-# of a micron more float than the class (dt_vn_cone_tip_collar_spec); book the
-# larger float, and the cock it allows over the shortest bearing length.
-_COLLAR_FLOAT_MAX = max(collar._FLOAT_MAX, collar.TIP_COLLAR_MAX_RADIAL_FLOAT_MM)
-_COLLAR_COCK_RAD = math.atan(2.0 * _COLLAR_FLOAT_MAX / TIP_COLLAR_MIN_CONTACT_SPAN_MM)
 
 
 @dataclass(frozen=True)
@@ -454,10 +447,10 @@ def closure_terms_mm(tier: CollarTier, fixed: DrumTier, angle_deg: float = 0.0) 
     terms["T120 set of the swing"] = _pivot_reach_mm(tier, angle_deg) * set_angle
     # The collar on its journal: float and cock (dt_vn_cone_tip_collar), then
     # the tier's own limits, each into its physical source.
-    cock = _COLLAR_COCK_RAD
+    cock = TIP_COLLAR_INSTALLED_COCK_ANGLE_RAD
     bore_upper_r = collar.BORE_FINISHED_DIA_LIMITS_MM[1] / 2.0
     terms["collar float on the journal"] = (
-        _COLLAR_FLOAT_MAX + bore_upper_r * (1.0 / math.cos(cock) - 1.0)
+        collar.TIP_COLLAR_MAX_RADIAL_FLOAT_MM + bore_upper_r * (1.0 / math.cos(cock) - 1.0)
     ) * across
     terms["collar cock on the journal"] = (
         max(abs(e - SOUTH_STATION_MM) for e in ends) * (1.0 - math.cos(cock))
