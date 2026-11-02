@@ -875,11 +875,13 @@ CONE_CRANK_STEPS = _note_text(
         f"5. SLIDE {CRANK_CHAIN_WHEEL} T12 ONTO MHA-DT-11 BEFORE THE ARM, ITS HOLES OVER",
         "   THE 2X MHA-DT-VN-67.",
         # U33 (user, 2026-09-23): crank hub MHA-DT-31 pressed into the arm and
-        # seam-pinned by MHA-DT-VN-59 (a 4 m6 dowel, 4.0 long = half the arm); the
-        # MHA-DT-09 cross-hole runs behind the arm through the hub barrel. The
-        # handle rides the MHA-DT-32 shoulder screw. Wording from crankhub.
+        # seam-pinned by MHA-DT-VN-59 (a 5/32 dowel cut to .15, driven flush in
+        # a blind seam); the MHA-DT-09 cross-hole runs behind the arm through
+        # the hub barrel. The handle rides the MHA-DT-32 shoulder screw. The
+        # seam's size and depth print once, on MHA-DT-06 and MHA-DT-31 (codex
+        # review: a copied Ø4 X 4.0 went stale when the pin went to 5/32).
         "6. PRESS MHA-DT-31 INTO MHA-DT-06 TO THE SHOULDER, FACES FLUSH.",
-        "   MATCH-DRILL/REAM THE SEAM Ø4 X 4.0 DEEP; DRIVE MHA-DT-VN-59 FLUSH. SLIDE",
+        "   MATCH-DRILL/REAM THE SEAM PER MHA-DT-31; DRIVE MHA-DT-VN-59 FLUSH. SLIDE",
         f"   ONTO MHA-DT-11, SET HUB FRONT FACE FLUSH WITH THE {HUB_FRONT_FACE_DATUM},",
         "   PUNCH MARKS ALIGNED; ONLY THEN TAPER-REAM 1:48 THROUGH HUB AND",
         "   SHAFT; LIGHT-DRIVE MHA-DT-09, REMOVABLE BY TAP ON SMALL END. HANG",

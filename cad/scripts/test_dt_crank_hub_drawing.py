@@ -543,4 +543,3 @@ def test_service_pin_station_reference_is_saved_hidden_and_imported_per_view() -
     assert "from _drawing_hidden_sketches import curate_view_dimensions" in source
     assert "    curate_view_dimensions,\n" not in source.replace("\r\n", "\n")
     assert "ServicePinStationReference" in dt_crank_hub_spec.DRAWING_DIMENSIONS
-

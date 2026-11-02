@@ -216,25 +216,25 @@ sections:
       - - Outboard arm / hub / shaft / axial-pin proportions
         - '3.14 / 2.60 / 1.65 / 0.59 (unitless)'
         - —
-        - 'primary outboard photograph; normalized relative diameters/width only. Scaling the 1.65 shaft term to the retained Ø9.525 shaft gives 18.13 / 15.01 / 9.525 / 3.405, which left a 0.5-mm hub web. U29 (2026-09-23) scales hub and pin 1.3x about the fixed shaft and makes the arm 1-in stock: 25.4 / 19.5 / 9.525 / 4.0. The seat is drawn 19.4, 0.1 under the photograph, so the .X bore keeps the arm cheek at 2.0 against the 0.004-in bar width tolerance. Named ratio deviation: arm/hub 1.309 vs the photograph''s 1.208.'
+        - 'primary outboard photograph; normalized relative diameters/width only. Scaling the 1.65 shaft term to the retained Ø9.525 shaft gives 18.13 / 15.01 / 9.525 / 3.405, which left a 0.5-mm hub web. U29 (2026-09-23) scales hub and pin 1.3x about the fixed shaft and makes the arm 1-in stock: 25.4 / 19.5 / 9.525 / 4.0. The seat is drawn 19.304 (.76 in), under the photograph, so the .XX bore keeps the arm cheek at 2.36 against the 0.004-in bar width tolerance; the seam pin is 5/32 stock (3.969). Named ratio deviation: arm/hub 1.316 vs the photograph''s 1.208.'
         - scaled ratio
         - med
       - - Crank arm width
         - 25.4 mm
         - '1.000'
-        - 'U29: 1 x 5/16-in cold-finished flat bar, width as supplied; the photograph ratio would give 23.6 at the 1.3x hub scale. Keeps the cheek around the Ø19.4 hub seat at 2.05 worst case (U27).'
+        - 'U29: 1 x 5/16-in cold-finished flat bar, width as supplied; the photograph ratio would give 23.6 at the 1.3x hub scale. Keeps the cheek around the Ø19.304 (.76 in) hub seat at 2.362 worst case (U27).'
         - user ruling
         - med
       - - Separate crank hub MHA-DT-31
-        - 'Ø19.4 × 8 through-seat; Ø22.25 rear barrel × 13.35 (z −175..−161.65; diameter at .XX, R9-38: the arm shoulder keeps a 0.255 radial land over the largest matched seat after both edge breaks) then a Ø16.50 × 3.85 chain-relief spigot (diameter at .XX, R9-37: a real #25 plate on the T12, floated on its pins, keeps 0.23 radial air) to overall length 25.2 ±0.10 from the front face (front face lined up flush with the MHA-DT-11 dome root, z −183, before the MHA-DT-09 match-ream) (rear face z −157.8, 0.7 air in front of the removable T12; the #25 plates wrapping the T12 pass over the relief, and a bought chain clears its shoulder by 0.2135 at print-worst even with the T12 floated forward onto the hub); Ø9.550 +0.030/−0.000 through bore'
+        - 'Ø19.304 (.76 in) seat, turned to suit the MHA-DT-06 bore for a light press, its length a fit-up reference set by the 5/16 arm stock (owner ruling 2026-11-01); Ø22.352 (.88 in) rear barrel then a Ø16.51 (.65 in) × 4.064 (.16 in) chain-relief spigot to overall length 25.146 +0.1016/−0.254 (.990 +.004/−.010 in) from the front face (front face lined up flush with the MHA-DT-11 dome root, z −183, before the MHA-DT-09 match-ream; its cross-hole 13.462 (.53 in) from that face) (rear face z −157.854, 0.754 air in front of the removable T12; the #25 plates wrapping the T12 pass over the relief, and a bought chain clears its shoulder by 0.2235 at print-worst even with the T12 floated forward onto the hub); Ø9.5504 +0.0127/−0 (.3760 +.0005/−.0000 in) reamed through bore. The earlier 25.2 ±0.10 hub with a Ø19.4 seat is superseded.'
         - —
-        - 'primary construction photo and user-confirmed through-hub topology. The arm and hub are a matched light arbor-press fit against the shoulder; the bore reuses the project shaft-in-bushing fit, giving 0.025..0.075 diametral shaft clearance.'
+        - 'primary construction photo and user-confirmed through-hub topology. The arm and hub are a matched light arbor-press fit, faces flush; the bore gives 0.0254..0.0584 (.0010-.0023 in) diametral clearance on the shaft (dt_crank_hub_geometry.SHAFT_CLEARANCE_MIN/MAX).'
         - derived construction
         - med
       - - Axial seam pin MHA-DT-VN-59
-        - 'Ø4 m6 dowel stock × 4.0, parallel to shaft at six o’clock, centre radius 9.7'
+        - 'Ø3.969 (5/32 in) alloy-steel dowel stock, McMaster-Carr 98381A487, cut to 3.81 (.15 in) and driven flush into a 4.318 (.17 in) deep match-reamed blind seam, parallel to shaft at six o’clock, centre radius 9.652'
         - —
-        - 'user selected the axial arm↔hub seam key after rejecting radial/Scotch alternatives; diameter is the stock dowel just under the U29 1.3x scale of the primary outboard ratio 0.59 (4.43), leaving a 2.05 worst-case hub web, and length is exactly half the 8-mm arm thickness. It does not intersect the shaft bore.'
+        - 'user selected the axial arm↔hub seam key after rejecting radial/Scotch alternatives; diameter is the 5/32 stock dowel just under the U29 1.3x scale of the primary outboard ratio 0.59 (4.43), leaving a 2.247 worst-case hub web (dt_crank_hub_geometry.SEAM_WEB_WORST_MM). The blind seam runs deeper than the cut pin at every printed limit and stops short of breaking through the 5/16 arm. It does not intersect the shaft bore. The earlier Ø4 m6 × 4.0 pin is superseded.'
         - scaled + stated topology
         - med
       - - Crankshaft diameter
