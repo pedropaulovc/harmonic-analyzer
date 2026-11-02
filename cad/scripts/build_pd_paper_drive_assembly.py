@@ -123,6 +123,8 @@ from _sketch import (
 )
 import pd_paper_drive_knob_setting_spec as KNOB_SETTING
 import pd_paper_drive_cluster_float_spec as CLUSTER_FLOAT
+from _assembly_contract import assembly_contract
+from _document_units import apply_package_model_units
 from _assembly import (
     _rebuilt_component_name,
     activate_assembly_contract,
@@ -1556,10 +1558,12 @@ _LOCK_THICK_DEV = (-LOCK_THICK_BAND, LOCK_THICK_BAND)  # the sheet's mill band
 _LOCK_HEIGHT_DEV = printed_deviations(LOCK_HEIGHT, LOCK_PRECISION["Height"], unit=LOCK_UNIT)
 _SPACER_LENGTH_DEV = (-SPACER.LENGTH_BAND, SPACER.LENGTH_BAND)
 _NOTCH_DEPTH_DEV = printed_deviations(
-    ARM_PLATE.NOTCH_DEPTH, ARM_PLATE_SPEC.NOTCH_DEPTH_PLACES
+    ARM_PLATE.NOTCH_DEPTH, ARM_PLATE_SPEC.NOTCH_DEPTH_PLACES, unit=ARM_PLATE.UNIT
 )
-_PLATE_OUTLINE_BAND = ARM_PLATE_SPEC.BAND_BY_PLACES[ARM_PLATE_SPEC.OUTLINE_PLACES]
-_HUB_DIA_DEV = printed_deviations(ARM_PLATE.HUB_DIA, ARM_PLATE_SPEC.HUB_DIA_PLACES)
+_PLATE_OUTLINE_BAND = ARM_PLATE.OUTLINE_BAND
+_HUB_DIA_DEV = printed_deviations(
+    ARM_PLATE.HUB_DIA, ARM_PLATE_SPEC.HUB_DIA_PLACES, unit=ARM_PLATE.UNIT
+)
 
 
 def _grown(
@@ -1693,7 +1697,7 @@ def _assert_lock_station_sweep() -> None:
             "arm",
             _grown(
                 (tip_y - ARM.TIP_END_R, py + ARM.PIVOT_END_R, ARM_Z0, PLATE_Z0),
-                ARM.BAND_X + ARM.TIP_STATION_BAND + pivot_tap,
+                ARM.OUTLINE_BAND + ARM.TIP_STATION_BAND + pivot_tap,
                 arm_forward,
                 0.0,
             ),
@@ -2433,7 +2437,7 @@ async def _author_knob_setting_reference(adapter) -> None:
     # associative model dimension, never a note (#1388).
     set_dimension_bilateral_tolerance(
         adapter, spec.FEATURE, spec.CENTRE_DIMENSION, *KNOB_SETTING.CENTRE_TOLERANCE_MM,
-        places=spec.PLACES,
+        places=spec.PLACES, display_unit=assembly_contract(ASM_NAME).drawing_unit,
     )
     for name in sorted(spec.REFERENCE_DIMENSIONS):
         # A reference value through the native prefix/suffix channel (the
@@ -2516,7 +2520,7 @@ async def _author_cluster_float_reference(adapter) -> None:
     # associative model dimension, never a note (#1388).
     set_dimension_bilateral_tolerance(
         adapter, spec.FEATURE, spec.DIMENSION, *CLUSTER_FLOAT.TOLERANCE_MM,
-        places=spec.PLACES,
+        places=spec.PLACES, display_unit=assembly_contract(ASM_NAME).drawing_unit,
     )
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     mark_dimensions_for_drawing(
@@ -2928,6 +2932,7 @@ async def build(adapter) -> dict[str, str]:
     # call: each freed DOF is recorded (never authored) and persisted below.
     reset_dof_manifest()
     check("create_assembly", await adapter.create_assembly())
+    apply_package_model_units(adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME)
 
     # --- support bar + two-piece clamps ---------------------------------------
     # The bar is FIRST so the auto-fixed seed is structure, not the mated platen.

@@ -10,14 +10,14 @@ assembly setting, so it is an associative model dimension, never a note.
 sketch on the assembly's Right plane (sketch u, v = machine -Z, Y): a line
 from the ring's rear face rearward along the pin, its length the floor
 (``END_FLOAT_MIN``, from the global ``GLOBAL``) toleranced +x/-0 up to the
-window's top, rounded up to the hundredth so every shimmed cluster passes.
+window's top, rounded up to the thousandth inch so every shimmed cluster passes.
 MHA-PD-00's VIEW E prints it and the shimming step cites it; the step
 prints no value of its own.  No solid or pose changes.
 """
 
 from __future__ import annotations
 
-import math
+from pd_rack_pinion_spec import inch_ceil_mm
 
 import _paper_drive_placement as placement
 import pd_transgear_pin_spec as pin
@@ -28,17 +28,14 @@ FEATURE = "ClusterFloatSetting"
 DIMENSION = "ShimmedRingGap"
 GLOBAL = "ClusterRingGap"
 DRAWING_DIMENSIONS = {FEATURE: {DIMENSION}}
-PLACES = 2
+PLACES = 3
 DRAWING_PRECISION = {FEATURE: {DIMENSION: PLACES}}
 VIEW_NAME = "VIEW E"
 
 # The printed window: the floor, and the shim's thickest step above it
-# rounded up to the hundredth.
+# rounded up to the thousandth inch.
 NOMINAL_MM = cluster.RING_FLOAT_RANGE[0]
-TOLERANCE_MM = (
-    0.0,
-    math.ceil((cluster.RING_FLOAT_RANGE[1] - NOMINAL_MM) * 100.0 - 1e-9) / 100.0,
-)
+TOLERANCE_MM = (0.0, inch_ceil_mm(cluster.RING_FLOAT_RANGE[1] - NOMINAL_MM, PLACES))
 
 # The line on the pin's axis plane, at mid-height of the ring's face: from
 # the ring's rear face rearward (machine +Z, sketch -u).

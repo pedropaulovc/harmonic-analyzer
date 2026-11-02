@@ -69,6 +69,7 @@ from _drawing_balloons import (
     assert_balloon_landings,
     isolate_drawing_view_components,
 )
+from _assembly_contract import assembly_contract
 from _drawing_common import (
     _SW_SHADED_EDGES,
     DrawingOutputs,
@@ -1495,16 +1496,6 @@ def _scale_text(scale: tuple[float, float]) -> str:
     return f"{scale[0]:g}:{scale[1]:g}"
 
 
-def _mm_window(limits: tuple[float, float], places: int) -> str:
-    """An inch-authored (min, max) window in this mm sheet's units, rounded
-    inward so the printed window never admits a value the part spec refuses
-    (machinist review: inch values on a mm sheet stop the fitter)."""
-    scale = 10**places
-    low = math.ceil(round(limits[0] * scale, 9)) / scale
-    high = math.floor(round(limits[1] * scale, 9)) / scale
-    return f"{low:.{places}f}-{high:.{places}f}"
-
-
 # --- sheet wording ---------------------------------------------------------------
 _N = BOM_PART_NUMBERS
 KNOB_TEETH = knob_shaft.TEETH
@@ -1544,12 +1535,12 @@ ENGAGED_FEED_DATUM_TEXT = (
 
 
 def engaged_feed_text(domain: RackOperatingDomain) -> str:
-    """The window the hanger step prints, in the title block's millimetres."""
-    low, high = domain.axis_from_left_end_limits_mm
-    return (
-        f"ENGAGED FEED: {low:.{OPERATING_LIMIT_PLACES}f} TO "
-        f"{high:.{OPERATING_LIMIT_PLACES}f} {ENGAGED_FEED_DATUM_TEXT}."
+    """The window the hanger step prints, in the title block's inches,
+    rounded inward."""
+    window = steps.inch_window(
+        domain.axis_from_left_end_limits_mm, OPERATING_LIMIT_PLACES + 1, " TO "
     )
+    return f"ENGAGED FEED: {window} {ENGAGED_FEED_DATUM_TEXT}."
 
 
 def _stack_text() -> str:
@@ -1559,16 +1550,16 @@ def _stack_text() -> str:
 
 
 def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
-    pin_lo, pin_hi = joints.LATCH_PIN_PROUD_RANGE
-    drive_lo, drive_hi = drive_pin.PROUD_RANGE
-    knob_lo, knob_hi = KNOB_END_FLOAT_RANGE
+    pin_window = steps.inch_window(joints.LATCH_PIN_PROUD_RANGE, 3, " TO ")
+    drive_window = steps.inch_window(drive_pin.PROUD_RANGE, 3, " TO ")
+    knob_window = steps.inch_window(KNOB_END_FLOAT_RANGE, 3, " TO ")
     teeth = f"{KNOB_TEETH}T"
     return {
         "bar-clamped": (
             f"CLAMP THE {_N['pd-support-bar']} BAR TO BOTH COLUMNS, EACH BETWEEN A "
             f"{_N['sh-column-clamp-front']} FRONT AND A {_N['sh-column-clamp-back']} BACK "
             f"ARC, WITH THE {_N['sh-vn-clamp-screw']} SCREWS FROM THE BAR FRONT. SET "
-            f"THE BAR TOP {steps.BAR_TOP_ABOVE_DECK:.1f} ABOVE THE BASE DECK AT "
+            f"THE BAR TOP {steps.BAR_TOP_ABOVE_DECK_TEXT} ABOVE THE BASE DECK AT "
             # Rule 19 fit-up for the slotted west pair (owner ruling
             # 2026-10-15, #1471 option A): the round pair locates.  Named by
             # its holes, not the bar sheet's END A, which no package sheet
@@ -1607,13 +1598,13 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         "lock-seats-faced": (
             f"FACE THE RAIL BACKS UNDER EACH {_N['pd-guide-lock']} LOCK (THE LOCK SEATS) "
             "TILL THE FEELER GAP BETWEEN LOCK FRONT FACE AND BAR BACK FACE, WITH THE LOCK "
-            f"SCREWS TIGHT, IS {_mm_window(platen_guide.LOCK_GAP_FIT, 3)}: THE "
+            f"SCREWS TIGHT, IS {steps.inch_window(platen_guide.LOCK_GAP_FIT, 3)}: THE "
             "PLATEN'S FORE-AFT FLOAT; ELSE STOP AND REPORT."
         ),
         "latch-pin-pressed": (
             f"PRESS THE {_N['pd-vn-transgear-latch-pin']} DOWEL INTO THE "
             f"{_N['pd-transgear-arm']} ARM'S REAMED HOLE TO THE HOLE FLOOR, "
-            f"{pin_lo:.2f} TO {pin_hi:.2f} PROUD."
+            f"{pin_window} PROUD."
         ),
         "pin-pressed": (
             f"PRESS THE {_N['pd-transgear-pin']} PIN INTO THE {_N['pd-transgear-arm']} "
@@ -1635,8 +1626,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"PRESS {TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-locating-pin']} "
             f"{_N['pd-vn-transgear-arm-plate-locating-pin']} DOWELS INTO THE ARM "
             "FROM THE REAR, "
-            f"{plate_locating_interface.PROUD_LIMITS_MM[0]:.2f} TO "
-            f"{plate_locating_interface.PROUD_LIMITS_MM[1]:.2f} PROUD; "
+            f"{steps.inch_window(plate_locating_interface.PROUD_LIMITS_MM, 3, ' TO ')} "
+            "PROUD; "
             "MATCH-MARK ARM AND PLATE."
         ),
         "arm-plate-fitted": (
@@ -1649,9 +1640,10 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         ),
         "arm-plate-screws-cut": (
             f"TAKE BOTH {_N['pd-vn-transgear-arm-plate-screw']} SCREWS OUT; CUT THEIR "
-            f"TIPS FLUSH TO {joints.PLATE_SCREW_CUT_PROUD_MAX:.2f} PROUD OF THE ARM'S "
+            "TIPS FLUSH TO "
+            f"{steps.inch_text(joints.PLATE_SCREW_CUT_PROUD_MAX, 3)} PROUD OF THE ARM'S "
             "FRONT FACE; BREAK THE CUT EDGE "
-            f"{steps.mm_max_text(plate_screw.CUT_END_BREAK_MAX, 2)}. "
+            f"{steps.inch_max_text(plate_screw.CUT_END_BREAK_MAX, 3)}. "
             "REFIT THE SAME SCREWS IN THE SAME HOLES BEFORE PIVOTING THE HANGER."
         ),
         # R9-71: the spacer is pressed on the shoulder, so its faces' tilt is
@@ -1665,7 +1657,7 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"SPRING, THEN ARM; PRESS THE {_N['pd-transgear-pivot-spacer']} SPACER, AS "
             "MADE, ON THE SHOULDER, FLUSH WITH ITS END ON A FLAT. FACE THE SCREW'S "
             f"TIP SO THAT, SEATED IN THE {_N['pd-support-bar']} BAR'S THROUGH TAP, IT "
-            f"STANDS {pivot_screw.TIP_RECESS[0]:.2f} TO {pivot_screw.TIP_RECESS[1]:.2f} "
+            f"STANDS {steps.inch_window(pivot_screw.TIP_RECESS, 3, ' TO ')} "
             "BELOW THE BAR'S FRONT FACE. THE ARM'S PIVOT BORE WAS REAMED TO THIS "
             "SCREW, CHOSEN BEFORE REAMING SO ITS UNFACED TIP REACHES THAT WINDOW: KEEP "
             "THEM TOGETHER. SEAT IT, THREADLOCKER OPTIONAL (LOW STRENGTH ONLY); THE "
@@ -1681,9 +1673,9 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         "disc-taps-transferred": (
             "MOUNT THE CLUSTER ON A MANDREL IN THE "
             f"{_N['pd-transgear-feed-pinion']} BORE. WITH A "
-            f"\u00d8{disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM:.3f} GAUGE PIN IN EACH "
+            f"\u00d8{steps.inch_text(disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM, 3)} GAUGE PIN IN EACH "
             f"{_N['pd-rack-pinion']} TOOTH SPACE IN TURN, TAP THE DISC CENTRAL, FACE SQUARE, "
-            f"TILL THE DIAL READS {quality.toothspace_runout_tir_mm():.2f} TIR MAX. "
+            f"TILL THE DIAL READS {disc.TOOTH_SPACE_RUNOUT_TIR_TEXT} TIR MAX. "
             "SPOT-DRILL THE DISC THROUGH THE "
             f"{hub_geometry.SCREW_COUNT} FLANGE HOLES; DRILL AND TAP {disc_screw.THREAD}. "
             f"FIX WITH {hub_geometry.SCREW_COUNT} {_N['pd-vn-transgear-disc-screw']} SCREWS. "
@@ -1692,11 +1684,12 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         ),
         "disc-screws-cut": (
             f"CUT {_N['pd-vn-transgear-disc-screw']} TIPS "
-            f"{_mm_window(disc_screw.TIP_BELOW_REAR_FACE, 2)} BELOW DISC REAR FACE; "
+            f"{disc_screw.TIP_BELOW_REAR_FACE_TEXT} BELOW DISC REAR FACE; "
             "BREAK THE CUT END."
         ),
         "oil-hole-drilled": (
-            f"DRILL THE \u00d8{hub.OIL_HOLE_DIA:.1f} OIL HOLE CENTRED ON THE HUB BODY, "
+            f"DRILL THE \u00d8{steps.inch_text(hub.OIL_HOLE_DIA, hub.OIL_HOLE_PLACES)} OIL "
+            "HOLE CENTRED ON THE HUB BODY, "
             "THROUGH HUB AND "
             f"SLEEVE IN ONE OPERATION AS {_N['pd-transgear-disc-hub']} SHOWS; "
             "DEBURR THE BORE."
@@ -1719,8 +1712,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         "collar-pins-pressed": (
             f"PRESS {TRANSGEAR_QUANTITIES['pd-vn-transgear-knob-drive-pin']} "
             f"{_N['pd-vn-transgear-knob-drive-pin']} DOWELS INTO THE "
-            f"{_N['pd-transgear-drive-collar']} COLLAR TO A STOP, {drive_lo:.2f} TO "
-            f"{drive_hi:.2f} PROUD OF ITS FRONT FACE."
+            f"{_N['pd-transgear-drive-collar']} COLLAR TO A STOP, {drive_window} "
+            "PROUD OF ITS FRONT FACE."
         ),
         "pilot-faced-to-fit": (
             f"FACE THE COLLAR'S PILOT {collar.PILOT_PROUD_TEXT} PROUD OF EACH "
@@ -1730,9 +1723,9 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         "knob-stack-fitted": (
             f"KNOB STACK, FRONT TO REAR: {_stack_text()}. SHAFT THROUGH THE LOOSE "
             "RING INTO THE PLATE BORE FROM THE FRONT, PUSHED REARWARD. CUP ON THE "
-            f"JOURNAL ON A {knob_shaft.END_FLOAT:.1f} FEELER AT THE BOSS; "
+            f"JOURNAL ON A {steps.inch_text(knob_shaft.END_FLOAT, 3)} FEELER AT THE BOSS; "
             f"MATCH-DRILL {cup_pin.HOLE_TEXT} THROUGH BOTH "
-            f"{knob_cup.PIN_HOLE_FROM_FRONT:.1f} FROM THE CUP FRONT; PRESS THE PIN "
+            f"{steps.inch_text(knob_cup.PIN_HOLE_FROM_FRONT, 3)} FROM THE CUP FRONT; PRESS THE PIN "
             "IN, CENTRED. COLLAR ON THE CORE UNPINNED, PINS FORWARD. THIS SHAFT IS "
             "THE KNOB; ITS GRIP IS THE COLLAR: HOLD OR TURN THE KNOB BY IT TILL "
             f"STEP {steps.step_number('chain-closed')}, THEN TURN THE CRANK."
@@ -1784,7 +1777,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"{steps.KNOB_HELD_BACK_TEXT}. TURN THE DISC SO, ON THE LINE THROUGH THE "
             f"KNOB AND CLUSTER AXES, A {disc.TEETH}T TOOTH STANDS CENTRED IN A "
             f"{teeth} GAP, WITHIN "
-            f"{quality.reducer_setup_clock_deviation_mm():.2f} AT THE PITCH CIRCLE. "
+            f"{steps.inch_text(steps.inch_floor_mm(quality.reducer_setup_clock_deviation_mm(), 4), 4)}"
+            " AT THE PITCH CIRCLE. "
             "TURN THE KNOB: NO TIGHT SPOT, SHAKE AT EVERY TOOTH."
         ),
         "collar-rear-faced-to-fit": (
@@ -1796,7 +1790,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"FINISHED BODY WITHIN {_N['pd-transgear-drive-collar']}'S FITTED LIMITS; "
             f"ELSE REPORT. STEP {steps.step_number('fitup-accepted')} RE-CHECKS. "
             "THE SETTING LEAVES ROOM FOR END FLOAT AND THE WHEEL'S FLOAT UNDER THE "
-            f"NUT: IN SERVICE THE WHEELS RUN WITHIN {collar.CHAIN_OFFSET_LIMIT:.1f} "
+            "NUT: IN SERVICE THE WHEELS RUN WITHIN "
+            f"{steps.inch_text(steps.inch_floor_mm(collar.CHAIN_OFFSET_LIMIT, 3), 3)} "
             "OF IN LINE, THE #25 CHAIN'S LIMIT."
         ),
         "collar-shoulder-seated": (
@@ -1823,8 +1818,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"OF THE {sprocket.CRANK_CONFIG} FRONT FACE "
             f"(STEP {steps.step_number('collar-rear-faced-to-fit')}'S SETTING, WIDENED "
             f"FOR REFITTING AND GAUGE SPREAD: THE {sprocket.KNOB_CONFIG} UP TO "
-            f"{steps.OFFSET_ACCEPT_TOL - collar.FIT_UP_OFFSET_TARGET:.2f} BEHIND "
-            f"PASSES); KNOB END FLOAT {knob_lo:.2f} TO {knob_hi:.2f}; "
+            f"{steps.inch_text(steps.OFFSET_ACCEPT_TOL - collar.FIT_UP_OFFSET_TARGET, 3)} "
+            f"BEHIND PASSES); KNOB END FLOAT {knob_window}; "
             f"{sprocket.KNOB_CONFIG} FREE "
             "UNDER THE NUT; THE HANGER FREE; RING GAP PER "
             f"{CLUSTER_FLOAT_VIEW_NAME} AND THE DISC TURNS FREE; COLLAR TO DISC "
@@ -2133,7 +2128,10 @@ def _validate_persisted_explode(model: Any) -> None:
 
 
 def _create_sheets(adapter: Any) -> None:
-    new_project_drawing(adapter, layout=SPEC.layout, scale=ASSEMBLED_SCALE)
+    new_project_drawing(
+        adapter, layout=SPEC.layout, scale=ASSEMBLED_SCALE,
+        unit=assembly_contract("pd-paper-drive").drawing_unit,
+    )
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="paper-drive package")
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     for name in SHEET_NAMES:
