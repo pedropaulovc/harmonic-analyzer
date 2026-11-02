@@ -284,7 +284,7 @@ GRIP_SOCKET_VOID_MM3 = _frustum(
 # The note names the leadscrew by its drawing number, read from the registry.
 LEADSCREW_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-leadscrew")["number"]
 DRAWING_NOTES = (
-    f"SLIDE ONTO THE FAR END OF LEADSCREW {LEADSCREW_NUMBER}; LOCK WITH ITS SET SCREW."
+    f"SLIDE ONTO LEADSCREW {LEADSCREW_NUMBER} FAR END; LOCK WITH THE HUB SET SCREW."
 )
 
 # --- Self-checks ----------------------------------------------------------------
