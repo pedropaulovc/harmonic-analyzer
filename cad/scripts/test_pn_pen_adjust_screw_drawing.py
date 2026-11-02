@@ -197,12 +197,13 @@ def test_shoulder_root_prints_its_own_nominal_radius() -> None:
     assert set(drawing.UPPER_ARC_KEEP) == {"ShoulderRadius", "PlainDia"}
 
 
-def test_shoulder_radius_leader_lands_on_the_circle_facing_its_text() -> None:
-    """The R text stands in the quarter opposite each arc, so the radial
-    leader ends on the circle facing it and the arc's extension carries the
-    arc out to it; the text's right end sits left of the bend, and the
-    leader passes clear of the head-height extension line and right of the
-    full-thread dimension's line end."""
+def test_shoulder_radius_leader_runs_through_the_centre_to_the_arc() -> None:
+    """The R text stands in the quarter opposite each arc (the arc's own
+    quarter is material), on the radial line through the centre, so the
+    inside, opposite-side arrow touches the drawn arc from the concave side;
+    the text's right end sits left of the bend, and the leader passes clear
+    of the head-height extension line and right of the full-thread
+    dimension's line end."""
     for side, keep in (
         ("lower", drawing.SIDE_KEEP["ShoulderRadius"]),
         ("upper", drawing.UPPER_ARC_KEEP["ShoulderRadius"]),

@@ -205,11 +205,12 @@ UPPER_ARC_KEEP = {
     "ShoulderRadius": _shoulder_radius_text_xy("upper", AXIS_Y + 0.021),
     "PlainDia": (PLAIN_MID_X, AXIS_Y - 0.045),
 }
-# The arrow lands on the circle facing the text: within (1 + sqrt 2) R of the
-# sharp corner it rounds (7.4 mm at 6:1 for R.02); which flank it hangs on is
-# the side of the axis the arrow lands.
+# The arrow lands on the corner's circle: within (1 + sqrt 2) R of the sharp
+# corner it rounds (7.4 mm at 6:1 for R.02); which flank it hangs on is the
+# side of the axis the arrow lands.
 _CORNER_REACH = (1.0 + math.sqrt(2.0)) * _SHOULDER_R_SHEET + 0.001
 _TOL_NONE = 0  # swTolType_e.swTolNONE
+_ARROWS_INSIDE = 0  # swDimArrowsSide_e.swDimArrowsInside
 # The native Hole Wizard Ø variable of the #54 eye's drill callout.
 EYE_CALLOUT_PRECISION = {"hw-diam": 3}
 # The eye callout stands up and LEFT of the eye, above the bare thread (the
@@ -289,12 +290,15 @@ def _dress_shoulder_radius(
 
     Read back: radial (not a diameter), measuring SHOULDER_FILLET_R, with no
     tolerance of its own (the title block's .XX governs it). The text stands
-    in the quarter opposite the arc, so ``ArcExtensionLineOrOppositeSide``
-    True has the arc's extension line carry the arc out to the arrow
-    (draw_sm_gooseneck_spring_screw._dress_underhead_corner); without it the
-    leader stopped on the undrawn circle in empty paper (the 19efce6a4
-    sheet's finding). SIDE_KEEP lays the text out for the lower arc; on the
-    upper one UPPER_ARC_KEEP moves it and PlainDia, and the rebuilt arrow
+    in the quarter opposite the arc (the arc's own quarter is the corner's
+    material). With the default outside arrow SolidWorks stops the leader on
+    the undrawn circle facing the text, in empty paper, and draws no arc
+    extension (the 19efce6a4 and 323fbd889 sheets' findings). So the arrow
+    goes inside (``ArrowSide``) on the opposite side
+    (``ArcExtensionLineOrOppositeSide``): the radial leader runs from the
+    text through the open-paper centre and its arrow touches the drawn arc
+    from the concave side. SIDE_KEEP lays the text out for the lower arc; on
+    the upper one UPPER_ARC_KEEP moves it and PlainDia, and the rebuilt arrow
     must still land on that corner.
     """
     annotation = _early_bound(by_name["ShoulderRadius"], "IAnnotation")
@@ -311,9 +315,12 @@ def _dress_shoulder_radius(
         float(dimension.SystemValue), SHOULDER_FILLET_R / 1000.0, abs_tol=1e-9
     ):
         raise RuntimeError("ShoulderRadius does not measure the shoulder fillet")
+    display.ArrowSide = _ARROWS_INSIDE
+    if int(display.ArrowSide) != _ARROWS_INSIDE:
+        raise RuntimeError("ShoulderRadius refused its inside arrow")
     display.ArcExtensionLineOrOppositeSide = True
     if display.ArcExtensionLineOrOppositeSide is not True:
-        raise RuntimeError("ShoulderRadius refused its arc extension")
+        raise RuntimeError("ShoulderRadius refused its opposite-side arrow")
     drawing_model.EditRebuild3()
     corners = {
         "upper": spt(SHOULDER_X, AXIS_Y + THREAD_HALF),
@@ -329,7 +336,8 @@ def _dress_shoulder_radius(
         if _shoulder_arc_side(display, corners) != "upper":
             raise RuntimeError("ShoulderRadius left the upper corner when moved")
     _telemetry.info(
-        f"shoulder radius: text {display.GetText(1)!r}, no own band, {side} arc"
+        f"shoulder radius: text {display.GetText(1)!r}, no own band, {side} arc, "
+        f"arrow tips {_arrow_tips(display)!r}, centre {spt(*SHOULDER_CENTRES[side])!r}"
     )
 
 
