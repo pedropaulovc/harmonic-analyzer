@@ -228,10 +228,11 @@ FRONT_KEEP = {
     # tenon's block.
     "InflectionDia": (_front_x(INFLECTION[0]) + _SHELF, _BELOW - 0.007),
     "TenonDia": (_front_x(TENON_X0) + 4.0 * _SHELF, _CALLOUT_ROW),
-    # The reamed bore's dimension line stands 12 mm right of the tangent
-    # point's, clear of its text, and the block's right edge stays 12 mm left
-    # of the title block.
-    "PivotBoreDia": (0.152, 0.068),
+    # The reamed bore's dimension line stands 22 mm right of the tangent
+    # point's, 5 mm clear of its text; the four-line block and its leader
+    # shoulder end about 6 mm left of the title block (machinist review of
+    # 4cde83cb6: at 0.152 the shoulder touched the title block's edge).
+    "PivotBoreDia": (0.146, 0.068),
     "CounterboreDia": (
         _front_x(OAK_END_X - COUNTERBORE_DEPTH) + 0.0055,
         _CALLOUT_ROW + 0.0015,
