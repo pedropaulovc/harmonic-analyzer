@@ -143,12 +143,13 @@ FACE_KEEP: dict[str, tuple[float, float, float]] = {
     # above, the leader crossed the +X .340's dimension line): the +X hole's
     # 2X Ø.144 DRILL THRU in the face's upper half, its leader in through the
     # +X side onto that hole's upper-right rim, clear of every extension
-    # line; the bore's two rows under it, level with the face's lower edge,
+    # line; the bore's three rows under it (the engagement row, rule 20, is
+    # the widest: 23 glyphs, about 54 mm), level with the face's lower edge,
     # its leader in through the +X side under the +X hole and over the stock
     # width's extension line (which runs down from the face). Both end short
-    # of the side view.
+    # of the side view (x 245).
     "HoleDia": (WIDTH + 2.5 + text_half("2X Ø.144 DRILL THRU"), HEIGHT - 4.0, LENGTH),
-    "BoreDia": (WIDTH + 16.0, 2.0, LENGTH),
+    "BoreDia": (WIDTH + 15.0, 2.0, LENGTH),
 }
 # The side view (*Right): the faced length over it.
 SIDE_KEEP: dict[str, tuple[float, float, float]] = {
