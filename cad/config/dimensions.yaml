@@ -492,19 +492,19 @@ sections:
         - derived from matched fit
         - med
       - - Cylinder arbor length
-        - 164.88 mm cylindrical strap-to-strap span; 167.88 mm including two domes
+        - 164.874 mm cylindrical strap-to-strap span; 167.922 mm including two domes
         - —
-        - 'Current cylinder_bank_layout.ARBOR_LENGTH / ARBOR_OVERALL_LENGTH: accepted gear stack plus one 2.8 mm south disc and the 0.95 mm north spring gap, with full depth of both 10 mm pedestal straps; each dome 1.5 mm proud. User ruling 2026-10-20 removes the north disc and relocates both pedestal origins from this stack. The earlier ~200 mm estimate and 165.08 mm cylinder are historical, not current cut lengths; final length is measured at fit-up.'
+        - 'Current cylinder_bank_layout.ARBOR_LENGTH / ARBOR_OVERALL_LENGTH: accepted gear stack plus one 2.794 mm (.11 in) south disc and the 0.95 mm north spring gap, with full depth of both 10 mm pedestal straps; each dome 1.524 mm (.06 in) proud. User ruling 2026-10-20 removes the north disc and relocates both pedestal origins from this stack. The earlier ~200 mm estimate, the 165.08 mm cylinder and the 164.88 / 167.88 mm lengths with 1.5 mm domes are historical, not current cut lengths; final length is measured at fit-up.'
         - derived from current bank layout
         - med
       - - Cylinder bank south end disc ×1 (user ruling 2026-10-20)
-        - C36000 brass, Ø55.0 and thickness 2.8 with ordinary .X title-block bands (±0.8); bore Ø9.60 DRILL THRU with the title-block +0.10/0 drilled-hole band (MHA-DT-26)
+        - C36000 brass, Ø55.118 (2.17 in) and thickness 2.794 (.11 in) with the title-block .XX bands (±.01 in, ±0.254 mm); bore .377 in (Ø9.5758) LETTER V DRILL THRU with the title-block +.004/.000 in drilled-hole band (MHA-DT-26, decimal-inch sheet). The Ø55.0 × 2.8 mm disc with .X ±0.8 bands and a Ø9.60 bore is the retired millimetre print.
         - —
-        - 'Supersedes #743 two Ø25 steel thrust washers: the south disc seats directly against the south pedestal and closes gear 0''s cam slot; there is no north disc. The 2.0 mm minimum web meets the drawing target without a tight thickness band. The nominal gear station grid stays fixed. Mic the disc W and locate the south strap to nominal machine Z minus (W − 2.800), equivalently rear-face drawing Y PLUS that excess. North spring preloads south; tooth station j accumulates gears 0 through j, while the gear-19 north face carries the full accepted stack deviation. The pinion rig is still feeler-set from the ACTUAL gear-19 north face, so its relative gear-to-gear budget is unchanged.'
+        - 'Supersedes #743 two Ø25 steel thrust washers: the south disc seats directly against the south pedestal and closes gear 0''s cam slot; there is no north disc. Its thinnest printed limit, .100 in (2.540 mm), meets the .080 in web target without a tight thickness band. The nominal gear station grid stays fixed. Mic the disc W and locate the south strap to nominal machine Z minus (W − 2.794), equivalently rear-face drawing Y PLUS that excess. North spring preloads south; tooth station j accumulates gears 0 through j, while the gear-19 north face carries the full accepted stack deviation. The pinion rig is still feeler-set from the ACTUAL gear-19 north face, so its relative gear-to-gear budget is unchanged.'
         - derived
         - med
       - - Arbor ends and set screws (#743, 2026-09-25)
-        - 'arbor ends domed, 1.5 proud of each strap; one #4-40 × 1/4 cup-point set screw in each pedestal crown apex (MHA-SH-VN-54)'
+        - 'arbor ends domed, 1.524 (.06 in) proud of each strap; one #4-40 × 1/4 cup-point set screw in each pedestal crown apex (MHA-SH-VN-54)'
         - '0.06'
         - 'p.23/25 + ch25 p.67: the bright dome on each pedestal is the arbor end; ch12 p.18 and the user ruling on #743 (Q3) put a set screw at each strap apex. Supersedes the Ø10 dome cap screw MHA-125 (`build_dome_cap_screw.py`, deleted)'
         - derived
@@ -524,7 +524,8 @@ sections:
 
       The later 2026-10-20 owner ruling reduces the south disc enough to
       prevent interference, superseding same-gear OD. Use a full circular
-      Ø55.0 C36000 brass disc at the existing ordinary .X ±0.8 band, not a
+      Ø55.0 C36000 brass disc at the existing ordinary .X ±0.8 band (the
+      decimal-inch sheet now prints it Ø2.17 = Ø55.118 at .XX), not a
       relieved disc or a relocated drive. The original Ø64.44 intersects the
       64T gear's solid root and the engaged alignment-pinion drum.
       dt_cylinder_end_disc_clearance derives the reduced disc's arithmetic
