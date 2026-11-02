@@ -1,12 +1,13 @@
 ch-rocker-arm-tl-vn-oblique-pivot-shim:
   title: Rocker Oblique Trammel Pivot Shim
   number: MHA-CH-06-TL-VN-79
-  stock_name: DIN 988 Spring Steel Shim, 10 mm ID x 16 mm OD x 0.2 mm
-  supplier: McMaster-Carr
-  supplier_skus: ['98055A118', '98055A117', '98055A121']
+  stock_name: Steel Shim, 3/8 ID x 5/8 OD x .008 in
+  supplier: Huyett
+  supplier_skus: ['SHIM-0375-008']
   material: Plain Carbon Steel
-  material_specification: "Spring steel, DIN 988, minimum HRB85"
+  material_specification: "Full-hard low-carbon steel, plain, lightly oiled"
   finish: as supplied
   quantity: 10
   tolerance_class: visual_noncritical
   process: purchased
+  drawing_unit: in

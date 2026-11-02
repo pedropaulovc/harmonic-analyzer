@@ -2,14 +2,15 @@ ch-rocker-arm-tl-vn-oblique-nut-screw:
   title: Rocker Oblique Trammel Leadscrew Nut Screw
   # Shop fixture: the parent MHA-CH-06 Number plus -TL-VN-nn (subsystem-identities.md).
   number: MHA-CH-06-TL-VN-66
-  stock_name: Alloy Steel Button Head Socket Cap Screw
-  supplier: Olander
-  supplier_skus: ["4C50BHCA"]
+  stock_name: Black-Oxide Alloy Steel Socket Head Screw
+  supplier: McMaster-Carr
+  supplier_skus: ["91251A113"]
   material: Alloy Steel
-  material_specification: "Alloy steel button head socket cap screw, ASME B18.3, #4-40 UNC x 1/2 in, plain finish; Olander 4C50BHCA (Olander lists McMaster-Carr 91255A110 as an alternate code)"
-  finish: plain
-  # The fastener table's NUT_TO_NUT_BRACKET count (#4-40 X 1/2 BHCS).
-  quantity: 4
+  material_specification: "Alloy steel, black oxide, 170,000 psi tensile; McMaster-Carr 91251A113"
+  finish: black oxide
+  # The fastener table's NUT_TO_FEED_BLOCK count (#4-40 X 3/4 SHCS).
+  quantity: 2
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: purchased
+  drawing_unit: in

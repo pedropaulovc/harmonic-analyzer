@@ -35,7 +35,14 @@ it to `new_project_drawing(unit=...)`. Missing declarations mean `mm`; explicit
 `mm` is retained for metric-only supplier packages. `finalize_drawing` refuses
 a sheet whose linked model carries inch rows while the drawing is not in
 inches. Remove the rollout switch when the last batch lands and make inches
-the fabrication default, retaining the supplier-unit exception.
+the fabrication default, retaining the supplier-unit exception. On an inch
+fabrication sheet, a metric-only vendor line's dimension (HGR15R, KP08, Tr8)
+keeps its exact millimetres: the builder gives the model dimension its own
+symmetric band (`set_dimension_symmetric_tolerance(display_unit="mm")`) and
+`_metric_vendor_dimension.set_metric_vendor_units` prints it in mm labelled
+`mm` in the model; the imported dimension takes the sheet's document units,
+so the draw script prints it in mm again and reads it back with
+`_drawing_metric_vendor.print_imported_metric_dimensions`.
 
 A converted package's builder selects the model's document units with
 `_document_units.apply_package_model_units` right after `create_part` or
@@ -102,10 +109,7 @@ machinist review once, even though only selected native packages change units.
   The clamp screw selects the purchased sheet's `tall_top` layout: a 96 mm
   outer Top cell retains the existing 46 mm annotation reserve, leaving
   50 mm for the measured native outline. The bottom-row cells' tops and
-  the Isometric's bottom lower 32 mm; other sheets keep `standard`. The
-  TL-VN-55 leadscrew nut, a purchased part sheet, selects `tall_top` too
-  (`build_purchased_part_drawing` passes `view_layout` through), so its
-  annotated end view holds 1:1.
+  the Isometric's bottom lower 32 mm; other sheets keep `standard`.
   Scale selection still tries the existing standard scales against complete
   native outlines,
   without subtracting fixed sheet-space padding. Short clamp-reference text
@@ -138,9 +142,8 @@ machinist review once, even though only selected native packages change units.
   gate 3 in the root `AGENTS.md`).
   Purchased drawings may opt into a recipe-local title-block setup after the
   source links resolve, returning final-rebuild checks through the existing
-  `settled_checks` contract. The TL-VN-55 leadscrew nut opts into
-  `_purchased_title_fit` (as do the catalogued supplier screws): it fits their
-  existing linked Name, Material
+  `settled_checks` contract. The catalogued supplier screws opt into
+  `_purchased_title_fit`: it fits their existing linked Name, Material
   and DWG. NO. notes inside their actual native ruled cells on one row.
   Readable native-height floors are 3 mm for Name/Number and 2 mm for Material;
   an unfit complete value refuses export, never truncates it.

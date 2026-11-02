@@ -6,73 +6,78 @@ from pathlib import Path
 import _config
 import ch_rocker_arm_tl_oblique_pivot_block_spec as spec
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
+import ch_rocker_arm_tl_vn_oblique_pivot_screw_spec as pivot_screw
+from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import printed_band_mm
+
+INCH = 25.4
 
 
 def test_rectangular_rail_two_block_and_new_stock():
-    assert (spec.BLOCK_X0,spec.BLOCK_X1,spec.BLOCK_WIDTH,spec.BLOCK_HEIGHT)==(-42,20,40,24.3)
+    assert spec.UNIT == 'in'
+    assert math.isclose(spec.BLOCK_X1-spec.BLOCK_X0,spec.BLOCK_LENGTH)
+    assert math.isclose(spec.BORE_X-spec.BLOCK_X0,spec.PLAN_BORE_X)
     assert spec.BLOCK_HEIGHT == trammel.PIVOT_BLOCK_HEIGHT
-    assert (spec.STOCK_THICKNESS,spec.STOCK_WIDTH)==(25.4,88.9)
+    assert spec.BLOCK_HEIGHT<spec.STOCK_THICKNESS and spec.BLOCK_WIDTH<spec.STOCK_WIDTH
     metadata=_config.parts(spec.PART_NAME)
     assert metadata['number']=='MHA-CH-06-TL-22'
     assert metadata['quantity']==spec.QUANTITY==1
-    # Owner ruling 2026-10-28: the stated side-wall shortfall, accepted minor.
-    (exception,)=metadata['machinist_exceptions']
-    assert (exception['id'],exception['kind'])==('RV-01','minor')
-    assert spec.CBORE_SIDE_WALL_TEXT in exception['where']
-    assert f'{spec.CBORE_SIDE_WALL_TEXT[len("SIDE WALL "):-len(" MIN")]} min' in exception['finding']
+    # Every counterbore wall meets the inch target; the one exception is the
+    # M4 engagement (test_engagement_shortfall_is_the_declared_minor).
+    assert [row['id'] for row in metadata['machinist_exceptions']]==['RV-01']
 
 
 def test_pivot_shoulder_bottoms_with_full_form_thread_engagement():
-    assert (spec.BORE_X,spec.BORE_Y)==(-32,0)
-    assert (spec.BORE_DIA,spec.BORE_BAND,spec.BORE_DEPTH)==(10,(.015,0),6.85)
-    assert spec.PIVOT_TAP=='M8x1.25'
-    assert spec.PIVOT_TAP_DRILL==6.8
+    assert (spec.BORE_X,spec.BORE_Y)==(trammel.PIN_OFFSET,0)
+    assert spec.PIVOT_TAP==pivot_screw.THREAD
+    assert spec.PIVOT_TAP_DRILL<spec.BORE_LIMITS[0]
     assert spec.PIVOT_THREAD_LENGTH==spec.BLOCK_HEIGHT-spec.BORE_DEPTH
-    # Full-form thread: the screw's 13 less 1.5 pitches, held to RV-05's floor.
-    assert spec.PIVOT_THREAD_ENGAGEMENT==13-1.5*1.25
-    assert round(spec.PIVOT_THREAD_ENGAGEMENT/8,2)>=spec.PIVOT_THREAD_ENGAGEMENT_MIN_D
-    assert spec.PIVOT_THREAD_ENGAGEMENT<1.5*8
-    assert spec.PIVOT_THREAD_LENGTH>13
-    min_text=spec.CALLOUTS_BELOW['TapDrillDia'].splitlines()[-1]
-    assert float(min_text.split()[0])<=spec.PIVOT_THREAD_ENGAGEMENT
-    assert spec.BORE_X==trammel.PIN_OFFSET
-    assert spec.BORE_LIMITS == (10.0, 10.015)
-    assert math.isclose(spec.PIVOT_LOCATING_CLEARANCE_MIN, 0.0, abs_tol=1e-9)
-    assert math.isclose(spec.PIVOT_LOCATING_CLEARANCE_MAX, 0.040, abs_tol=1e-9)
+    # Full-form thread: the shop-cut thread less 1.5 pitches, 1.5D at its worst.
+    assert math.isclose(spec.PIVOT_THREAD_ENGAGEMENT,
+                        pivot_screw.CUT_THREAD_LENGTH-1.5*pivot_screw.THREAD_PITCH)
+    assert spec.PIVOT_THREAD_ENGAGEMENT_MIN>=1.5*pivot_screw.THREAD_DIA
+    # The cut tip stays inside the block bottom by .011 at every band.
+    assert spec.PIVOT_TIP_CLEARANCE_MIN>=0.011*INCH-1e-9
+    assert spec.PIVOT_TIP_CLEARANCE>spec.PIVOT_TIP_CLEARANCE_MIN
+    # The shoulder slides in the reamed seat: clearance at every band.
+    assert 0.0<spec.PIVOT_LOCATING_CLEARANCE_MIN<spec.PIVOT_LOCATING_CLEARANCE_MAX
+    assert spec.PIVOT_LOCATING_CLEARANCE_MAX<=0.0025*INCH+1e-9
 
 
-def test_carriage_pattern_floor_and_vendor_thread_bottom_are_unchanged():
+def test_carriage_screws_cut_to_fit_from_the_lowered_floor():
     assert set(spec.BOLT_POINTS)=={(-13,-13),(-13,13),(13,-13),(13,13)}
     assert tuple(2*x for x in (spec.BOLT_X,spec.BOLT_Y))==trammel.CARRIAGE_BOLT_SPAN
-    assert (spec.HOLE_DIA,spec.CBORE_DIA,spec.CBORE_FLOOR)==(4.5,8,15.6)
-    assert math.isclose(spec.CBORE_DEPTH,8.7)
-    assert math.isclose(spec.ENGAGEMENT_MIN,3.85)
-    assert math.isclose(spec.ENGAGEMENT_MAX,4.95)
-    assert spec.ENGAGEMENT_MAX<=spec.CARRIAGE_THREAD_DEPTH-.05+1e-9
+    assert 4.0<spec.HOLE_DIA<spec.CBORE_DIA
+    assert math.isclose(spec.CBORE_DEPTH,spec.BLOCK_HEIGHT-spec.CBORE_FLOOR)
+    # Owner ruling 2026-11-01 (option A): floor .570, each M4 x 20 cut to its
+    # floor plus .189 (±.005 cut, .001 reading): .183 MIN (1.16D), never
+    # bottoming in the M4 x 5, and every cut fits the shortest bought screw.
+    assert math.isclose(spec.CBORE_FLOOR,.570*INCH)
+    assert math.isclose(spec.SCREW_REACH,.189*INCH)
+    assert math.isclose(spec.SCREW_CUT_LENGTH,(.570+.189)*INCH)
+    assert math.isclose(spec.ENGAGEMENT_MIN,.183*INCH)
+    assert spec.ENGAGEMENT_TEXT=='.183'
+    assert spec.ENGAGEMENT_MIN>=1.16*4.0
+    assert spec.ENGAGEMENT_MAX<=spec.CARRIAGE_THREAD_DEPTH-.045+1e-9
+    assert spec.SCREW_CUT_LENGTH_MAX<spec.SCREW_LENGTH-spec.SCREW_LENGTH_TOL
+    assert spec.CALLOUTS_BELOW['CboreFloor']=='FLOOR FOR M4 X 20 CUT\nENGAGES .183 MIN (1.16D)'
     assert spec.DRAWING_PRECISION[spec.CBORE_FLOOR_REFERENCE]['CboreFloor']==3
-    assert spec.CBORE_FLOOR-printed_band_mm(3)>0
+    assert spec.CBORE_FLOOR-printed_band_mm(3,unit=spec.UNIT)>0
 
 
 def test_no_bearing_web_wing_cap_or_side_features_survive():
-    assert min(spec.WALLS_MM.values())>=2
+    assert min(spec.WALLS_MM.values())>=WALL_TARGET_MM
     for name in ('WING_WIDTH','SHOULDER_HOLE_DIA','CAP_TAP_POINTS','CAP_REGISTER_POINTS',
                  'SIDE_SCREW_HOLES','SEAT_POSITION_DIA','BEARING_OD'):
         assert not hasattr(spec,name)
     assert set(spec.CALLOUTS_BELOW)<=set(spec.DRAWING_PRECISION_BY_NAME)
 
 
-def test_outline_prints_at_two_places_for_the_counterbore_walls_it_sets():
+def test_outline_bands_keep_the_counterbore_walls_at_target():
     places=spec.DRAWING_PRECISION_BY_NAME
-    assert places['BlockLength']==places['BlockWidth']==2
-    assert math.isclose(spec.CBORE_END_WALL_MIN,2.105)
-    assert math.isclose(spec.CBORE_SIDE_WALL_MIN,1.595)
-    # At .X either outline wall falls short: the end under 2.0, the side under 1.5.
-    loosen=printed_band_mm(1)-printed_band_mm(2)
-    assert spec.CBORE_END_WALL_MIN-loosen<2.0
-    assert spec.CBORE_SIDE_WALL_MIN-loosen<1.5
-    assert spec.CALLOUTS_BELOW['BlockLength']=='SETS COUNTERBORE END WALL'
-    assert spec.CALLOUTS_BELOW['BlockWidth']=='SETS COUNTERBORE\nSIDE WALL 1.59 MIN'
+    assert places['BlockLength']==places['BlockWidth']
+    assert spec.CBORE_END_WALL_MIN>=WALL_TARGET_MM
+    assert spec.CBORE_SIDE_WALL_MIN>=WALL_TARGET_MM
 
 
 def test_native_builder_owns_real_solids_dimensions_and_final_volume():
@@ -96,3 +101,18 @@ def test_drawing_has_only_pivot_and_carriage_sections_under_enforcement():
     assert 'pivot shoulder seat' in source
     assert 'add_feature_control_frame' not in source
     assert 'create_section_view' in source
+
+
+def test_block_height_prints_on_a_right_view_level_with_the_plan():
+    import draw_ch_rocker_arm_tl_oblique_pivot_block as drawing
+    assert drawing.RIGHT_XY[1]==drawing.PLAN_XY[1]
+    assert set(drawing.RIGHT_KEEP)=={'BlockHeight'}
+    assert 'BlockHeight' in spec.DRAWING_DIMENSIONS['Block']
+    assert 'BlockHeight' not in drawing.SIDE_KEEP
+
+
+def test_engagement_shortfall_is_the_declared_minor():
+    (engagement,)=_config.parts(spec.PART_NAME)['machinist_exceptions']
+    assert (engagement['id'],engagement['kind'])==('RV-01','minor')
+    assert spec.ENGAGEMENT_TEXT in engagement['where']
+    assert 'Owner exception confirmed' in engagement['reason']

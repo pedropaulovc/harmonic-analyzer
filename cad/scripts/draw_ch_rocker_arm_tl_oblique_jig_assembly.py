@@ -160,7 +160,7 @@ CLUSTERS = (
             spec.END_BRACKET,
             spec.FEED_BLOCK,
             spec.LEADSCREW,
-            spec.LEADSCREW_NUT,
+            spec.FEED_NUT,
             spec.PILLOW_BLOCK,
             spec.HANDWHEEL,
             spec.BRACKET_SCREW,
@@ -303,7 +303,7 @@ ELEVATION_LABEL_XY = _label_under(
 # The elevation's one dimension: the CL dowel's round tip above the riser top
 # (``spec.CL_TIP_LINE``), imported from the builder's hidden CL_TIP_FEATURE
 # and parenthesised as a reference; step 11 sets the tip against the actual
-# riser. Its 1.6 is 0.4 mm on the sheet at 1:4, too short to hold its text.
+# riser. Its short line is under 1 mm on the sheet at 1:4, too short to hold its text.
 # Offset the imported text independently of its dimension/witness lines:
 # 80 model mm left and 28 above the tip gives it a clear lane above the
 # left pivot, below the plan, rather than across the shoulder-screw geometry.
@@ -451,8 +451,8 @@ PART_ROWS = {
     "ch-rocker-arm-tl-vn-oblique-leadscrew": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-leadscrew"
     ),
-    "ch-rocker-arm-tl-vn-oblique-leadscrew-nut": _config.parts(
-        "ch-rocker-arm-tl-vn-oblique-leadscrew-nut"
+    "ch-rocker-arm-tl-oblique-feed-nut": _config.parts(
+        "ch-rocker-arm-tl-oblique-feed-nut"
     ),
     "ch-rocker-arm-tl-vn-oblique-pillow-block": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-pillow-block"
@@ -546,9 +546,9 @@ if spec.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
 
 
 # Glues an item citation ("ITEM 22") and a value with its unit ("3.5 N·m",
-# "25 IN·LBF") into one word while wrapping, so the fitter never reads "ITEM"
-# or a number at a line end and what it belongs to on the next.
-_UNBROKEN = re.compile(r"\bITEM (?=\d)|(?<=\d) (?=N·m|IN·LBF)")
+# "25 IN·LBF", "2.0 MM") into one word while wrapping, so the fitter never
+# reads "ITEM" or a number at a line end and what it belongs to on the next.
+_UNBROKEN = re.compile(r"\bITEM (?=\d)|(?<=\d) (?=N·m|IN·LBF|MM\b)")
 _GLUE = "\x00"
 # A step's label: its number, or a sub-step's ("7A").
 _STEP_LABEL = re.compile(r"\d+[A-Z]?")
@@ -2392,7 +2392,7 @@ def _append_template_sheet(adapter: Any, target: Any, *, name: str) -> None:
     donor_title = ""
     try:
         donor, donor_sheet = new_project_drawing(
-            adapter, layout=SHEET_LAYOUTS[name], scale=SHEET_SCALES[name]
+            adapter, layout=SHEET_LAYOUTS[name], scale=SHEET_SCALES[name], unit=spec.UNIT
         )
         donor = _early_bound(donor, "IModelDoc2")
         donor_sheet = _early_bound(donor_sheet, "ISheet")
@@ -2444,6 +2444,7 @@ def _create_package_sheets(adapter: Any) -> None:
         adapter,
         layout=SHEET_LAYOUTS[SHEET_NAMES[0]],
         scale=SHEET_SCALES[SHEET_NAMES[0]],
+        unit=spec.UNIT,
     )
     target = _early_bound(target, "IModelDoc2")
     initial = _early_bound(initial, "ISheet")

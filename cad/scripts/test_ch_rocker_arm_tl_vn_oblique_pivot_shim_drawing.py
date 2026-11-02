@@ -12,13 +12,12 @@ import build_ch_rocker_arm_tl_vn_oblique_pivot_shim as part
 import ch_rocker_arm_tl_vn_oblique_pivot_shim_spec as spec
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
-from _supplier_screw_reference_names import FEATURE_BY_PLANE
 
 STEM = "ch-rocker-arm-tl-vn-oblique-pivot-shim"
 
 
 def test_envelope_volume_preserves_the_supplied_bore():
-    assert part.MODEL_VOLUME == pytest.approx(math.pi / 4.0 * (16.0**2 - 10.0**2) * 0.2)
+    assert part.MODEL_VOLUME == pytest.approx(math.pi / 4.0 * (spec.OD**2 - spec.ID**2) * spec.THICKNESS)
 
 
 def test_native_section_is_the_nominal_shim(monkeypatch):
@@ -45,21 +44,29 @@ def test_catalogue_and_current_identity():
     assert part.PART_NAME == STEM
     assert row["number"] == "MHA-CH-06-TL-VN-79"
     assert row["process"] == "purchased"
-    assert row["supplier"] == stock.supplier == "McMaster-Carr"
-    assert tuple(row["supplier_skus"]) == stock.skus == ('98055A118', '98055A117', '98055A121')
+    assert row["supplier"] == stock.supplier == "Huyett"
+    assert tuple(row["supplier_skus"]) == stock.skus == (spec.SKU,)
     assert row["stock_name"] == stock.stock_name
     assert row["material"] == stock.material == part.MATERIAL
     assert row["quantity"] == spec.QUANTITY == 2 * spec.PER_SUPPORT == 10
 
 
 def test_supplier_dimensions_and_physical_contract():
-    assert spec.SKU == "98055A118"
-    assert (spec.ID, spec.OD, spec.THICKNESS) == (10.0, 16.0, 0.2)
-    assert spec.FIT_SKUS == {0.1: "98055A117", 0.2: "98055A118", 0.5: "98055A121"}
-    assert spec.ID_BAND == (0.4, 0.03)
-    assert spec.OD_BAND == (-0.04, -0.47)
-    assert spec.THICKNESS_BAND == (0.0, -0.04)
-    assert spec.FIT_THICKNESS_BANDS == {0.1: (0.0, -0.03), 0.2: (0.0, -0.04), 0.5: (0.0, -0.05)}
+    import ch_rocker_arm_tl_vn_oblique_pivot_screw_spec as screw
+
+    inch = 25.4
+    assert spec.SKU == "SHIM-0375-008"
+    assert spec.UNIT == "in"
+    assert spec.THICKNESS == pytest.approx(spec.THICKNESS_THOU * inch / 1000.0)
+    # The fitting stock is keyed by its nominal thickness in thou.
+    assert set(spec.FIT_SKUS) == set(spec.FIT_THICKNESS_BANDS) == {4, 8, 20}
+    assert spec.FIT_SKUS[spec.THICKNESS_THOU] == spec.SKU
+    assert spec.FIT_THICKNESS_BANDS[spec.THICKNESS_THOU] == spec.THICKNESS_BAND
+    for thou, (upper, lower) in spec.FIT_THICKNESS_BANDS.items():
+        assert thou * inch / 1000.0 + lower > 0.0 and upper >= 0.0 >= lower
+    # The shim clears the shoulder at every band and lies within the spacer's face.
+    assert spec.ID + min(spec.ID_BAND) > screw.SHOULDER_DIA + max(screw.SHOULDER_DIA_BAND)
+    assert spec.OD > spec.ID + max(spec.ID_BAND)
 
 
 def test_native_supplier_witness_inventory():
@@ -71,11 +78,16 @@ def test_native_supplier_witness_inventory():
     assert set(spec.SUPPLIER_REFERENCE_TOLERANCES_MM) <= names
     for name, value, orientation in spec.SUPPLIER_REFERENCE_DIMENSIONS:
         assert value > 0
-        plane = spec.SUPPLIER_REFERENCE_PLANES[name]
-        assert plane in FEATURE_BY_PLANE
-        assert orientation == ("horizontal" if plane == "Front" else "vertical")
-        assert spec.SUPPLIER_REFERENCE_UNITS[name] == "mm"
+        assert spec.SUPPLIER_REFERENCE_PLANES[name] == "Top"
+        assert orientation == ("vertical" if name == "SupplierThickness" else "horizontal")
+        assert spec.SUPPLIER_REFERENCE_UNITS[name] == "in"
     assert all(lower <= upper for lower, upper in spec.SUPPLIER_REFERENCE_TOLERANCES_MM.values())
+    # Every line lies on a Top-view edge: each chord on a face, the thickness
+    # on the OD silhouette (Top sketch y is -z; the shim spans z 0..THICKNESS).
+    starts = spec.SUPPLIER_REFERENCE_STARTS
+    assert starts["SupplierBoreDiameter"] == (-spec.ID / 2.0, 0.0)
+    assert starts["SupplierOuterDiameter"] == (-spec.OD / 2.0, -spec.THICKNESS)
+    assert starts["SupplierThickness"] == (spec.OD / 2.0, -spec.THICKNESS)
 
 
 def test_build_uses_contract_dimensions_and_publishes_z_axis(monkeypatch):
@@ -88,6 +100,7 @@ def test_build_uses_contract_dimensions_and_publishes_z_axis(monkeypatch):
     monkeypatch.setattr(part, "check", lambda label, value: value)
     monkeypatch.setattr(part, "name_last_feature", lambda *args: None)
     monkeypatch.setattr(part, "blank_reference_geometry", lambda *args: None)
+    monkeypatch.setattr(part, "apply_package_model_units", lambda *args, **kwargs: None)
     monkeypatch.setattr(part, "apply_custom_properties", lambda *args: None)
     for name in ("volume_check", "bbox_extent_check", "apply_material", "apply_color",
                  "_supplier_references", "report_mass_properties"):
@@ -96,7 +109,7 @@ def test_build_uses_contract_dimensions_and_publishes_z_axis(monkeypatch):
     monkeypatch.setattr(part, "save_part_and_images", saved)
     adapter = SimpleNamespace(create_part=AsyncMock(), create_axis=AsyncMock())
     assert asyncio.run(part.build(adapter)) == {"part": STEM}
-    assert calls == [('Ring', 16.0, 10.0, 0.2, {})]
+    assert calls == [("Ring", spec.OD, spec.ID, spec.THICKNESS, {})]
     axis = adapter.create_axis.call_args.args[0]
     assert axis.mode == "two_planes"
     assert set(axis.planes) == {"Top Plane", "Right Plane"}

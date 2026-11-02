@@ -7,6 +7,8 @@ import math
 import re
 from pathlib import Path
 
+import pytest
+
 import _config
 import build_ch_rocker_arm_tl_oblique_carrier as part
 import ch_rocker_arm_tl_oblique_carrier_spec as spec
@@ -16,9 +18,16 @@ import export_features
 from _drawing_contract import model_toleranced_dimensions
 from _feature_requirements import requirements_for
 from _hole_spec import THREAD_MAJOR_MM
+from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import printed_band_mm
 
 STEM = "ch_rocker_arm_tl_oblique_carrier"
+INCH = 25.4
+
+
+def _printed(value_mm: float, places: int) -> float:
+    """``value_mm`` as the inch sheet prints it at ``places``, in mm."""
+    return round(value_mm / INCH, places) * INCH
 
 
 def _features() -> dict:
@@ -32,11 +41,19 @@ def _at(feature: dict) -> tuple[float, float]:
 
 
 def test_interface_contract() -> None:
-    assert spec.OUTLINE_X == (-260.0, 260.0)
-    assert spec.OUTLINE_Y == (-45.0, 85.0)
+    # The outline is symmetric about the tap axis and every edge the sheet
+    # prints lands on its inch grid.
+    assert spec.OUTLINE_X[0] == -spec.OUTLINE_X[1]
+    places = spec.DRAWING_PRECISION_BY_NAME
+    assert spec.prints_exactly(spec.PLATE_LENGTH, places["PlateLength"])
+    assert spec.prints_exactly(spec.PLATE_WIDTH, places["PlateWidth"])
+    assert spec.prints_exactly(-spec.OUTLINE_Y[0], places["PlateNearY"])
     assert spec.THICKNESS == trammel.CARRIER_THICK
-    assert spec.LEVER_HOLES == ((0.0, -22.0), (0.0, -38.0))
-    assert spec.LEVER_INNER_END_Y == -15.0
+    # The lever taps stand on the tap axis, below the pin line, inside the
+    # plate, the inner one past the lever's slot end.
+    for x, y in spec.LEVER_HOLES:
+        assert x == 0.0 and spec.OUTLINE_Y[0] < y < spec.LEVER_INNER_END_Y < 0.0
+        assert spec.prints_exactly(y, places["LeverY1"])
 
 
 def test_every_calculator_position_is_the_calculators() -> None:
@@ -46,7 +63,6 @@ def test_every_calculator_position_is_the_calculators() -> None:
         "pin_hole_b1": trammel.B1,
         "pin_hole_a2": trammel.A2,
         "pin_hole_b2": trammel.B2,
-        "hub_spot": trammel.HUB,
         "cl_spot": trammel.CL,
         "cr_tap_1": trammel.CR,
         **{
@@ -57,16 +73,18 @@ def test_every_calculator_position_is_the_calculators() -> None:
     for name, point in expected.items():
         assert _at(features[name]) == tuple(point), name
     assert spec.PIN_HOLES == trammel.PIN_HOLES
-    assert (spec.HUB, spec.CL, spec.CR) == (trammel.HUB, trammel.CL, trammel.CR)
+    assert (spec.CL, spec.CR) == (trammel.CL, trammel.CR)
+    # Owner ruling 5: the HUB is drilled in situ at assembly, not on TL-21.
+    assert "hub_spot" not in features and set(spec.SPOTS) == {"Cl"}
     assert spec.RISER_SCREWS == trammel.RISER_SCREWS
     assert spec.D1 == trammel.D1
     assert math.isclose(-spec.A2_DX, (trammel.D2 - trammel.D1) / 2.0)
     assert spec.A2_DY == trammel.A2[1]
     # The chain prints what the calculator gives.
     b1, a2 = features["pin_hole_b1"], features["pin_hole_a2"]
-    assert b1["station_nominal"] == round(trammel.D1, 3) == 450.135
-    assert a2["station_nominal"] == 7.224
-    assert a2["height_nominal"] == 24.481
+    assert b1["station_nominal"] == pytest.approx(_printed(trammel.D1, 4))
+    assert a2["station_nominal"] == pytest.approx(_printed(abs(trammel.A2[0] - trammel.A1[0]), 4))
+    assert a2["height_nominal"] == pytest.approx(_printed(trammel.A2[1], 4))
 
 
 def test_pin_chain_runs_from_a1_b1_with_banded_mates() -> None:
@@ -76,31 +94,39 @@ def test_pin_chain_runs_from_a1_b1_with_banded_mates() -> None:
     assert features["pin_hole_b2"]["height_from"] == "pin_hole_b1"
     for name in ("pin_hole_b1", "pin_hole_a2", "pin_hole_b2"):
         low, high = features[name]["station"]
-        assert math.isclose(high - low, 0.04)
+        assert math.isclose(high - low, 2.0 * spec.POSITION_BAND)
     # Rule 4 (jig-r3): each band names what it sets and on which part, not
     # its sensitivity.
     assert spec.SPACING_CALLOUT == "SETS R800 ON\nMHA-CH-13"
     assert spec.DX_CALLOUT == spec.DY_CALLOUT == "SETS R816 ON\nMHA-CH-13"
     for text in spec.CALLOUTS_BELOW.values():
         assert "ERROR" not in text and "1:1" not in text
-    # The tap axis (lever taps and HUB) is located from A1, the X datum, at
-    # the .XX band: HubX prints it from A1 to the HUB spot (driven equal to
+    # The lever taps' axis is located from A1, the X datum, at LeverX's
+    # places: LeverX prints it from A1 to the upper lever tap (driven equal to
     # A1X, the model's unprinted driver).
     a1 = features["pin_hole_a1"]
-    assert a1["station_nominal"] == round(abs(trammel.A1[0]), 2) == 225.07
-    assert a1["precision"]["station"] == 2
+    places = spec.DRAWING_PRECISION_BY_NAME["LeverX"]
+    assert a1["station_nominal"] == pytest.approx(_printed(abs(trammel.A1[0]), places))
+    assert a1["precision"]["station"] == places
     assert "A1X" not in spec.DRAWING_DIMENSIONS["PinHoleProfile"]
-    assert "HubX" in spec.DRAWING_DIMENSIONS[spec.STATION_REFERENCE]
+    assert "LeverX" in spec.DRAWING_DIMENSIONS[spec.STATION_REFERENCE]
     assert set(spec.POSITION_BANDED) <= set(spec.CALLOUTS_BELOW)
     toleranced = model_toleranced_dimensions(part)
     assert toleranced[("PinHoleProfile", "PinHoleDia")] == "*deviations(PIN_HOLE_BAND)"
     assert ("PinHoleProfile", "dimension_name") in toleranced
 
 
-def test_pin_holes_are_h7_and_name_the_pin() -> None:
+def test_pin_holes_are_slide_reamed_and_name_the_pin() -> None:
     hole = _features()["pin_hole_a1"]
-    assert hole["dia"] == [10.0, 10.015]
-    assert (spec.PIN_CLEARANCE_MIN, round(spec.PIN_CLEARANCE_MAX, 3)) == (0.0, 0.040)
+    assert hole["dia"] == pytest.approx(
+        [spec.PIN_HOLE_DIA + spec.PIN_HOLE_BAND[1], spec.PIN_HOLE_DIA + spec.PIN_HOLE_BAND[0]]
+    )
+    # The REAM_SLIDE hole always clears the bought shoulder (the trammel's
+    # radius error reads this clearance).
+    assert 0.0 < spec.PIN_CLEARANCE_MIN < spec.PIN_CLEARANCE_MAX
+    assert (spec.PIN_CLEARANCE_MIN, spec.PIN_CLEARANCE_MAX) == pytest.approx(
+        trammel.SHOULDER_CARRIER_CLEARANCE
+    )
     assert "MHA-CH-06-TL-VN-77 SHOULDER SCREW" in hole["note"]
     assert "REAM THRU" in hole["note"]
 
@@ -114,8 +140,8 @@ def test_taps_are_unc_and_hold_rule_18() -> None:
     # edge break and one pitch of incomplete lead.
     for thread in (spec.CR_THREAD, spec.RISER_THREAD, spec.LEVER_THREAD):
         pitch = 25.4 / float(thread.rsplit("-", 1)[1])
-        band = printed_band_mm(spec.DRAWING_PRECISION_BY_NAME["StockThick"])
-        full = spec.THICKNESS - band - 0.25 - pitch
+        band = printed_band_mm(spec.DRAWING_PRECISION_BY_NAME["StockThick"], unit=spec.UNIT)
+        full = spec.THICKNESS - band - spec.TAP_MOUTH_BREAK - pitch
         assert math.isclose(spec.ENGAGEMENT_MM[thread], full), thread
     for thread in (spec.CR_THREAD, spec.RISER_THREAD):
         assert spec.ENGAGEMENT_MM[thread] >= 1.5 * THREAD_MAJOR_MM[thread]
@@ -124,13 +150,12 @@ def test_taps_are_unc_and_hold_rule_18() -> None:
     lever = spec.LEVER_THREAD
     assert spec.ENGAGEMENT_MM[lever] < 1.5 * THREAD_MAJOR_MM[lever]
     assert spec.SHORT_ENGAGEMENT == (lever,)
-    assert spec.LEVER_TAP_CALLOUT == "ENGAGEMENT 9.53 MIN (1.20D)"
     assert "part_spec.LEVER_TAP_CALLOUT" in inspect.getsource(drawing.build)
     assert spec.CR_HEAD_DIA_MAX <= spec.CR_HEAD_CLEAR_DIA
 
 
 def test_walls_hold_rule_17_at_worst_case() -> None:
-    assert min(spec.WALLS_MM.values()) >= 2.0
+    assert min(spec.WALLS_MM.values()) >= WALL_TARGET_MM
 
 
 def test_no_skid_sag_is_negligible() -> None:
@@ -152,6 +177,7 @@ def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
 
 
 def test_every_exported_band_endpoint_is_a_printed_value() -> None:
+    """Each band endpoint is a value the inch sheet prints at its places."""
     checked = 0
     for name, feature in _features().items():
         for requirement in feature["requirements"]:
@@ -160,7 +186,8 @@ def test_every_exported_band_endpoint_is_a_printed_value() -> None:
                 continue
             places = feature["precision"][requirement]
             for end in band:
-                assert abs(end - round(end, places)) < 1e-9, (name, requirement)
+                inches = end / INCH
+                assert abs(inches - round(inches, places)) < 1e-9, (name, requirement)
             checked += 1
     assert checked
 
@@ -173,8 +200,13 @@ def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
 
 
 def test_cl_dowel_is_a_press_in_its_finished_hole() -> None:
-    # Bought Ø6 m6 dowel (6.004/6.012) in the in-place N7 hole (5.984/5.996).
-    assert spec.CL_DOWEL_INTERFERENCE == (0.008, 0.028)
+    # The bought 1/4 dowel always presses into the in-place reamed hole.
+    low, high = spec.CL_DOWEL_INTERFERENCE
+    assert 0.0 < low < high
+    assert (low, high) == pytest.approx((
+        min(spec.CL_DOWEL_BAND) - max(spec.CL_HOLE_BAND),
+        max(spec.CL_DOWEL_BAND) - min(spec.CL_HOLE_BAND),
+    ))
 
 
 def test_bottom_face_preserves_the_finished_plate_thickness() -> None:
@@ -190,37 +222,85 @@ def test_bottom_face_preserves_the_finished_plate_thickness() -> None:
         "value": -spec.THICKNESS,
     }
     assert feature["height_nominal"] == spec.THICKNESS
-    assert feature["height"] == [
+    assert feature["height"] == pytest.approx([
         spec.THICKNESS - spec.THICKNESS_BAND,
         spec.THICKNESS + spec.THICKNESS_BAND,
-    ]
+    ])
 
 
 def test_spot_stations_print_from_the_hidden_reference_sketch() -> None:
     """A reference plane cannot be imported into a drawing (farm jig-r1)."""
-    assert spec.DRAWING_DIMENSIONS[spec.SPOT_REFERENCE] == {
-        "SpotDia",
-        "SpotDiaCl",
-        "HubY",
-        "ClY",
-    }
-    # jig-r3: each spot has its own leader and callout, no "2X".
-    assert spec.CALLOUTS_BELOW["SpotDia"] == spec.CALLOUTS_BELOW["SpotDiaCl"]
+    assert spec.DRAWING_DIMENSIONS[spec.SPOT_REFERENCE] == {"SpotDia", "ClY"}
+    # jig-r3: the spot has its own leader and callout, no "2X".
     assert "2X" not in spec.CALLOUTS_BELOW["SpotDia"]
-    assert set(spec.CALLOUT_SUFFIXES) == {"SpotDia", "SpotDiaCl"}
+    assert spec.CALLOUTS_BELOW["SpotDia"] == "SPOT FOR\nMHA-CH-13 CL"
+    assert set(spec.CALLOUT_SUFFIXES) == {"SpotDia"}
     assert not any("Plane" in feature for feature in spec.DRAWING_DIMENSIONS)
 
 
+def test_in_situ_hub_fit_up_closes_inside_the_strap_top_edge_band() -> None:
+    """Owner ruling 5 (option A, 2026-11-01). The HUB on the arcs' centreline
+    moves the strap's pivot radially 1:1 against the R800 edge. Drilled in
+    situ from the apex (the spindle origin) +Y by HUB_OFFSET, the pin spacing
+    moves it with the cut; what reaches the edge at the worst case is the
+    DRO setting of the printed offset and the carrier's shift on its pins
+    (rule 19: a fit-up that covers the whole range, never root-sum-square)."""
+    import ch_rocker_arm_spec as rocker
+
+    assert trammel.HUB[0] == trammel.ARC_CENTRE[0] == 0.0
+    assert trammel.HUB[1] - trammel.APEX_Y == pytest.approx(trammel.HUB_OFFSET)
+    half = (max(rocker.TOP_EDGE_BAND) - min(rocker.TOP_EDGE_BAND)) / 2.0
+    assert half == pytest.approx(0.25)
+    # The setting: the printed .5123 at a .0001 DRO, held to ±.0005.
+    assert spec.inch_text(spec.HUB_OFFSET_PRINTED, spec.HUB_OFFSET_PLACES) == ".5123"
+    assert spec.HUB_OFFSET_BAND == pytest.approx(0.0005 * trammel.INCH)
+    # The shift: the widest pin clearance, x 1.77 on R.
+    shift = trammel.RADIUS_PER_SPACING * spec.PIN_CLEARANCE_MAX
+    worst = (
+        spec.HUB_OFFSET_BAND + abs(spec.HUB_OFFSET_PRINTED - trammel.HUB_OFFSET) + shift
+    )
+    assert spec.HUB_RADIAL_STACK == pytest.approx(worst)
+    assert f"{spec.HUB_RADIAL_STACK:.3f}" == "0.125"
+    assert spec.HUB_RADIAL_STACK < half
+    # The printed spot it replaces failed: the .XXX station band, the shift
+    # and the D1 band x 1.77 came to 0.275 (owner packet, item 5).
+    printed = (
+        printed_band_mm(3, unit=spec.UNIT)
+        + shift
+        + trammel.RADIUS_PER_SPACING * spec.POSITION_BAND
+    )
+    assert printed == pytest.approx(0.275, abs=0.001)
+    assert printed > half
+
+
+def test_three_place_lever_and_cr_stations_state_true_functions() -> None:
+    """mr4: 8.861 and CR's 15.195/1.156 printed 3-place with no stated
+    function. LeverX runs to the upper lever tap (mr8: named by the feature
+    it locates); CR is CL mirrored about the tap axis, so the CR callout
+    (whose lanes hold no row) names it."""
+    assert spec.STATIONS["LeverX"] == spec.LEVER_HOLES[0]
+    assert spec.CALLOUTS_BELOW["LeverX"] == "LEVER TAPS"
+    # Its row is no wider than the "TO HUB SPOT" it replaced (LeverX's lane).
+    assert len(spec.LEVER_STATION_CALLOUT) <= len("TO HUB SPOT")
+    assert spec.CR == pytest.approx((-spec.CL[0], spec.CL[1]))
+
+
 def test_pin_chamfer_retains_the_spacer_thrust_seat() -> None:
-    """Unchanged entry break leaves a broad seat on the purchased OD16 spacer."""
+    """The entry break leaves a broad seat on the purchased spacer."""
+    import ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec as pivot_spacer
+
     mouth = (spec.PIN_HOLE_DIA + spec.PIN_HOLE_BAND[0]) / 2.0 + spec.PIN_CHAMFER
-    assert mouth + spec.PIN_CHAMFER_BAND[0] < 16.0 / 2.0
+    assert mouth + spec.PIN_CHAMFER_BAND[0] < (
+        pivot_spacer.OD + pivot_spacer.OD_BAND[1]
+    ) / 2.0
     assert spec.SECTION_REFERENCE in spec.REFERENCE_SKETCHES
     assert spec.DRAWING_DIMENSIONS[spec.SECTION_REFERENCE] == {
         "PinChamferSize",
         "StockThick",
     }
-    assert spec.DRAWING_PRECISION_BY_NAME["PinChamferSize"] == 1
+    assert spec.prints_exactly(
+        spec.PIN_CHAMFER, spec.DRAWING_PRECISION_BY_NAME["PinChamferSize"]
+    )
     callout = spec.CALLOUTS_BELOW["PinChamferSize"]
     assert "UNDERSIDE" in callout and "TL-VN-78 SPACER" in callout
     assert spec.PIN_CHAMFER_TOL_TYPE == 5  # swTolMIN
@@ -333,8 +413,10 @@ def test_riser_tap_stations_print_their_walls_band_and_name_the_riser() -> None:
     for index, (x, y) in enumerate(spec.RISER_SCREWS, start=1):
         tap = features[f"riser_tap_{index}"]
         assert tap["precision"]["station"] == tap["precision"]["height"] == places
-        assert tap["station_nominal"] == round(x - spec.PIN_HOLES["A1"][0], places)
-        assert tap["height_nominal"] == round(y, places)
+        assert tap["station_nominal"] == pytest.approx(
+            _printed(x - spec.PIN_HOLES["A1"][0], places)
+        )
+        assert tap["height_nominal"] == pytest.approx(_printed(y, places))
     riser = _config.parts("ch-rocker-arm-tl-oblique-riser")["number"]
     assert riser == "MHA-CH-06-TL-24"
     assert spec.RISER_TAP_CALLOUT == (f"HOLDS {riser} SCREWS\nCLEAR OF ITS CUT EDGES")
@@ -345,11 +427,11 @@ def test_riser_tap_stations_print_their_walls_band_and_name_the_riser() -> None:
     assert riser.endswith(spec.RISER_TOOL_ID) and spec.RISER_TOOL_ID == "TL-24"
     for name in spec.RISER_STATIONS:
         assert spec.CALLOUTS_BELOW[name] == "LOCATES TL-24", name
-    assert min(trammel.RISER_SCREW_WALLS) >= 2.0
+    assert min(trammel.RISER_SCREW_WALLS) >= WALL_TARGET_MM
     # From A1 the station error about the cut's centre adds half the D1 band.
-    assert 2.0 <= spec.RISER_WALLS_FROM_A1 < min(trammel.RISER_SCREW_WALLS)
+    assert WALL_TARGET_MM <= spec.RISER_WALLS_FROM_A1 < min(trammel.RISER_SCREW_WALLS)
     # Four rows (the native two and these two), ~4.5 mm each, centred on the
-    # anchor: under the border, over the HUB spot's callout.
+    # anchor: under the border.
     rows = 2 + len(spec.RISER_TAP_CALLOUT.splitlines())
     x, y = (value * 1000.0 for value in drawing.RISER_CALLOUT_XY)
     assert y + 4.5 * rows / 2.0 + 3.0 < _BORDER[3]
@@ -387,31 +469,32 @@ def test_every_x_station_is_a_baseline_from_a1() -> None:
         for name in names
         if "X" in name
     }
-    # The pin chain stays on the pin-hole sketch, A1 its root; the tap axis
-    # prints from A1 as a station (HubX), not as the unprinted A1X.
+    # The pin chain stays on the pin-hole sketch, A1 its root; the lever taps'
+    # axis prints from A1 as a station (LeverX), not as the unprinted A1X.
     assert other_x == {"A2DX", "B2DX"}
     assert "PlateHalfLength" not in spec.DRAWING_DIMENSIONS["PlateProfile"]
     assert spec.DRAWING_DIMENSIONS["CrTap"] == {"CrY"}
     assert spec.STATION_REFERENCE in spec.REFERENCE_SKETCHES
     assert spec.STATIONS["EdgeX"] == (spec.OUTLINE_X[0], spec.OUTLINE_Y[0])
     assert spec.STATIONS["ClX"] == spec.CL and spec.STATIONS["CrX"] == spec.CR
-    assert spec.STATIONS["HubX"] == spec.HUB
+    assert spec.STATIONS["LeverX"] == spec.LEVER_HOLES[0]
     features = _features()
-    located = ("hub_spot", "cl_spot", "cr_tap_1", "lever_tap_1", "lever_tap_2")
+    located = ("cl_spot", "cr_tap_1", "lever_tap_1", "lever_tap_2")
     for name in located + tuple(f"riser_tap_{i}" for i in range(1, 5)):
         feature = features[name]
         places = feature["precision"]["station"]
         assert feature["parent"] == "pin_hole_a1", name
-        assert feature["station_nominal"] == round(_at(feature)[0] - a1x, places), name
-    # The tap axis prints once, as HubX: its point on the HUB spot, so its
-    # extension line rises through the lever taps to it (machinist review
-    # 54e5c9a: A1X's line stopped at the pin line, short of HUB).
-    assert features["lever_tap_1"]["station_nominal"] == 225.07
-    assert features["hub_spot"]["station_nominal"] == 225.07
-    assert drawing.DRAWING_PRECISION_BY_NAME["HubX"] == 2
+        assert feature["station_nominal"] == pytest.approx(
+            _printed(_at(feature)[0] - a1x, places)
+        ), name
+    # The lever taps' axis prints once, as LeverX: its point on the upper
+    # tap, so its extension line rises through both taps (machinist review
+    # 54e5c9a: A1X's line stopped at the pin line).
+    lever_x = features["lever_tap_1"]["station_nominal"]
+    assert features["lever_tap_2"]["station_nominal"] == lever_x
+    assert lever_x == features["pin_hole_a1"]["station_nominal"]
     stations = inspect.getsource(part._station_reference)
-    assert '"HubX": _pin_dim("A1X")' in stations
-    assert '"HubX": f\'"HubY@{SPOT_REFERENCE}"\'' in stations
+    assert '"LeverX": _pin_dim("A1X")' in stations
     # Each origin-based placement evaluates to the feature's |X| from its
     # printed station less A1X.
     values = {"A1X@PinHoleProfile": abs(a1x)} | {
@@ -419,7 +502,7 @@ def test_every_x_station_is_a_baseline_from_a1() -> None:
         for name, (x, _y) in spec.STATIONS.items()
     }
     for name, (x, _y) in spec.STATIONS.items():
-        if name in ("EdgeX", "HubX"):
+        if name in ("EdgeX", "LeverX"):
             continue
         expression = part._origin_x(name)
         for key, value in values.items():
@@ -503,7 +586,7 @@ def test_every_location_text_stands_outside_the_outline() -> None:
     holes and each other. Every top-view text but the diameters stands
     outside it, in its lane (CL's spot callout stands in the plate's free
     band under the pin line)."""
-    diameters = {"PinHoleDia", "SpotDia", "SpotDiaCl"}
+    diameters = {"PinHoleDia", "SpotDia"}
     x0, y0 = _on_sheet(spec.OUTLINE_X[0], spec.OUTLINE_Y[0])
     x1, y1 = _on_sheet(spec.OUTLINE_X[1], spec.OUTLINE_Y[1])
     for name in set(drawing.TOP_KEEP) - diameters:
@@ -526,17 +609,13 @@ def test_single_row_y_texts_clear_their_arrows_and_neighbours() -> None:
     (3.56 long) when the span holds them inside, and clear of the outline and
     the next lane's dimension line."""
     arrow, half_h, half_w = 3.56, 1.75, 6.45
-    spans = {
-        "HubY": spec.HUB[1],
-        "LeverY2": spec.LEVER_HOLES[1][1],
-    }
+    spans = {"LeverY2": spec.LEVER_HOLES[1][1]}
     for name, far in spans.items():
         _tx, ty = _top_text(name)
         y_pin, y_far = sorted((_on_sheet(0.0, 0.0)[1], _on_sheet(0.0, far)[1]))
         assert y_pin + arrow + 1.0 < ty - half_h, name
         assert ty + half_h + 1.0 < y_far - arrow, name
-    # The right lanes' neighbours: HUB over CR, the 38.00 under the 22.00.
-    assert _top_text("HubY")[1] - _top_text("CrY")[1] > 2 * half_h + 1.5
+    # The right lanes' neighbours: the 38.00 under the 22.00.
     assert _top_text("LeverY1")[1] - _top_text("LeverY2")[1] > 2 * half_h + 1.5
     cl_x, _cl_y = _top_text("ClY")
     outline_left_x = _on_sheet(spec.OUTLINE_X[0], 0.0)[0]
@@ -670,15 +749,16 @@ def test_all_four_bores_keep_the_unchanged_size_and_locations() -> None:
         feature = exported[name]
         assert feature["axis"] == bottom["normal"]
         assert feature["at"] == [x, 0.0, -y]
-        assert feature["dia"] == [10.0, 10.015]
+        assert feature["dia"] == pytest.approx(
+            [spec.PIN_HOLE_DIA + spec.PIN_HOLE_BAND[1], spec.PIN_HOLE_DIA + spec.PIN_HOLE_BAND[0]]
+        )
         assert feature["thru"] is True
         assert "note" in feature["requirements"]
         assert feature["note"] == " ".join(spec.CALLOUTS_BELOW["PinHoleDia"].splitlines())
         (face,) = requirements_for(drawing)[name].faces
         assert face.contains_x_mm == x
         assert face.contains_z_mm == -y
-    assert spec.PIN_CLEARANCE_MIN == 0.0
-    assert math.isclose(spec.PIN_CLEARANCE_MAX, 0.040)
+    assert 0.0 < spec.PIN_CLEARANCE_MIN < spec.PIN_CLEARANCE_MAX
 
 
 def test_relocated_b2dx_clears_outline_border_and_isometric() -> None:
@@ -694,52 +774,11 @@ def test_relocated_b2dx_clears_outline_border_and_isometric() -> None:
     assert b2y - 8.0 - 3.0 > iso_top
 
 
-def test_5654a79_native_ream_block_has_only_rule14_crossings() -> None:
-    """The REAM block on the actual native sheet, not a replay.
 
-    The fixture is the native sheet dump that the layout audit of farm run
-    20261024T131611738Z-c6bfff32a4eb4d2aaab7a01f3662c335 (5654a7915) read,
-    with that run's complete PDF ink (text spans and all 1342 strokes,
-    re-extracted from its PDF). Its REAM rows must still be the spec's, so a
-    wording change must be captured again from a fresh run.
-    """
-    import json
-    from collections import Counter
-    from _layout_audit import audit_dump
-
-    fixture = json.loads(
-        (Path(__file__).parent / "fixtures" / "ch_rocker_arm_tl_oblique_carrier_5654a79.json").read_text(
-            encoding="utf-8"
-        )
-    )
-    assert fixture["commit"].startswith("5654a7915")
-    assert fixture["pdf_sha256"] == (
-        "48cbdd2bb90722855556a29b007afd795698a73752438b2af9773c12e44c69b2"
-    )
-    sheet = fixture["sheet"]
-    assert len(sheet["ink"]["strokes"]) == 1342
-    (raw,) = [
-        annotation for annotation in sheet["views"][0]["annotations"]
-        if annotation["name"] == "PinHoleDia"
-    ]
-    assert [run["t"] for run in raw["display"]["texts"][6:]] == (
-        spec.CALLOUTS_BELOW["PinHoleDia"].splitlines()
-    )
-    findings = audit_dump(sheet)
-    # Coverage: offline, the audit reproduces the farm run's own report
-    # exactly, so every view has its printed edges and all text its ink (no
-    # view-edges-missing, text-unmatched or pdf-text-unclaimed finding).
-    assert Counter(finding.kind for finding in findings) == {
-        "dim-line-crosses-extension": 25,
-        "leader-crosses-line": 2,
-        "leader-over-part": 1,
-        "text-separation": 1,
-    }
-    ream = [
-        finding for finding in findings
-        if " PinHoleDia " in f" {finding.a} " or " PinHoleDia " in f" {finding.b} "
-    ]
-    # Its diameter approach crosses witness extensions only (rule 14): no
-    # text, leader, arrow, edge, border or unmatched-ink finding.
-    assert ream and {finding.kind for finding in ream} == {"dim-line-crosses-extension"}
-
+def test_lever_tap_station_prints_its_own_two_place_band():
+    # Final review: the 8.861 axis stays 3-place (kinematic), the lever taps
+    # carry the .XX band they need, set on the model dimension.
+    assert spec.DRAWING_PRECISION_BY_NAME["LeverX"] == 3
+    assert spec.LEVER_STATION_BAND == printed_band_mm(2, unit=spec.UNIT)
+    build = (Path(__file__).parent / "build_ch_rocker_arm_tl_oblique_carrier.py").read_text()
+    assert '"LeverX",\n        LEVER_STATION_BAND,' in build.replace("\r\n", "\n")

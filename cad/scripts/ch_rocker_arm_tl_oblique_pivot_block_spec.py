@@ -4,56 +4,84 @@ Frame: carriage-pattern centre, bottom Z0; +X away from spindle. New
 6061 1 x 3-1/2 inch stock is shared with TL-32. No cartridge hardware.
 The print locates every X from the -X (left) edge, never from the frame
 centre: ``PLAN_DATUM_REFERENCE`` carries those ordinates.
+
+Issue #290: the sheet prints decimal inch. Lengths stay physical millimetres,
+each fabricated nominal the exact millimetres of its printed inch value. Exempt:
+the HGH15CA's 26 x 26 M4 pattern (vendor), and the seat's station
+``BORE_X``, the trammel calculator's ``PIN_OFFSET`` (kinematic). The -X edge
+puts the seat station on the .XX grid; the hole columns print the
+three-place rounding of their exact vendor offsets from it.
+
+The seat takes the TL-VN-77 inch shoulder screw (owner ruling 2026-10-30: the
+metric shop tap becomes an extended-thread 5/16-18 precision shoulder screw): a
+.375 REAM_SLIDE seat on the owned .3760 reamer, and a 5/16-18 tap through
+below it. The shop cuts the screw's thread to length so that its full-form
+engagement meets 1.5D and its tip stands inside the block at every band.
+
+The four M4 carriage screws are cut to fit at assembly (owner ruling
+2026-11-01, option A): each is cut to its own measured counterbore floor, so
+its reach into the HGH15CA's 5 mm deep M4 holes carries only the cut band.
 """
 from __future__ import annotations
 
 import math
+
+import _config
 import ch_rocker_arm_tl_vn_oblique_pivot_screw_spec as pivot_screw
 from _fit_deviations import deviations
-from _hole_spec import HoleSpec
+from _fit_ream_slide import REAM_SLIDE
+from _hole_spec import TAP_DRILL_MM
+from _inch_wall_limits import WALL_TARGET_MM
+from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
 
 PART_NAME = "ch-rocker-arm-tl-oblique-pivot-block"
+UNIT = drawing_unit(
+    "parts/ch-rocker-arm-tl-oblique-pivot-block",
+    _config.parts("ch-rocker-arm-tl-oblique-pivot-block"),
+)
 NUMBER = "MHA-CH-06-TL-22"
 QUANTITY = 1
-BLOCK_X0, BLOCK_X1 = -42.0, 20.0
-BLOCK_LENGTH = BLOCK_X1 - BLOCK_X0
-BLOCK_WIDTH, BLOCK_HEIGHT = 40.0, 24.3
+BORE_X, BORE_Y = -32.0, 0.0  # trammel PIN_OFFSET: kinematic, not snapped
+PLAN_BORE_X = 9.906  # .39, the seat from the -X edge
+BLOCK_X0 = BORE_X - PLAN_BORE_X
+BLOCK_LENGTH = 61.976  # 2.44
+BLOCK_X1 = BLOCK_X0 + BLOCK_LENGTH
+BLOCK_WIDTH = 40.132  # 1.58
+BLOCK_HEIGHT = 24.384  # .96
 STOCK_THICKNESS, STOCK_WIDTH = 25.4, 88.9
-BORE_X, BORE_Y = -32.0, 0.0
 # The TL-VN-77 shoulder bottoms on the seat floor, so the 3-place depth sets
 # how high the screw stands, hence the head-to-carrier gap the assembly's
-# shim selection then trims (jig assembly ``PIVOT_RUNNING_GAP``). Owner ruling
-# 2026-10-27 (B): shallow enough that the unshimmed gap is open at every loose
-# band (+0.09..+2.26); shims, which only close it, are the fitting adjustment.
-BORE_DIA, BORE_DEPTH = 10.0, 6.85
-BORE_BAND = (0.015, 0.0)  # H7; locating seat for TL-VN-77 shoulder
+# shim selection then trims (jig assembly ``PIVOT_RUNNING_GAP``). Shallow
+# enough that the unshimmed gap is open at every band; shims, which only
+# close it, are the fitting adjustment.
+BORE_DIA = 9.525  # .375
+BORE_BAND = REAM_SLIDE  # .3760-.3765 on the owned .3760 reamer
+BORE_PLACES = 4
+BORE_DEPTH = 9.1186  # .359
 _bore_lower, _bore_upper = deviations(BORE_BAND)
 _shoulder_lower, _shoulder_upper = deviations(pivot_screw.SHOULDER_DIA_BAND)
 BORE_LIMITS = (BORE_DIA + _bore_lower, BORE_DIA + _bore_upper)
 PIVOT_LOCATING_CLEARANCE_MIN = BORE_LIMITS[0] - (pivot_screw.SHOULDER_DIA + _shoulder_upper)
 PIVOT_LOCATING_CLEARANCE_MAX = BORE_LIMITS[1] - (pivot_screw.SHOULDER_DIA + _shoulder_lower)
-if PIVOT_LOCATING_CLEARANCE_MIN < 0.0:
-    raise AssertionError("purchased pivot shoulder interferes with its block H7 seat")
-PIVOT_TAP = "M8x1.25"
-PIVOT_TAP_DRILL = 6.8
+if PIVOT_LOCATING_CLEARANCE_MIN <= 0.0:
+    raise AssertionError("purchased pivot shoulder does not clear its block seat")
+PIVOT_TAP = pivot_screw.THREAD
+PIVOT_TAP_DRILL = TAP_DRILL_MM[PIVOT_TAP]
 PIVOT_THREAD_LENGTH = BLOCK_HEIGHT - BORE_DEPTH
-# Rule 18 counts full-form thread only: the TL-VN-77's 13 of thread less 1.5
-# incomplete pitches, 11.125 (1.39D). That falls short of 1.5D; the owner's
-# 2026-10-27 ruling accepts it (jig assembly config RV-05) and the tap callout
-# states it as a plain fact.
-PIVOT_THREAD_ENGAGEMENT = pivot_screw.THREAD_LENGTH - 1.5 * pivot_screw.THREAD_PITCH
-PIVOT_THREAD_ENGAGEMENT_MIN_D = 1.39  # RV-05's stated floor
-PIVOT_ENGAGEMENT_TEXT = f"{math.floor(PIVOT_THREAD_ENGAGEMENT * 100.0) / 100.0:.2f} MIN ENGAGEMENT"
 PIVOT_AXIS_NAME = "PivotAxis"
-BOLT_X = BOLT_Y = 13.0
+BOLT_X = BOLT_Y = 13.0  # HGH15CA 26 x 26 M4 pattern (vendor)
 BOLT_POINTS = tuple((x, y) for x in (-BOLT_X, BOLT_X) for y in (-BOLT_Y, BOLT_Y))
-HOLE_DIA, CBORE_DIA = 4.5, 8.0
-CBORE_FLOOR = 15.6
+HOLE_DIA = 4.572  # .18, M4 clearance
+CBORE_DIA = 7.874  # .31, M4 socket head
+# .570 (owner ruling 2026-11-01, option A): every M4 x 20 is cut to its own
+# counterbore at assembly (rule 19), so the floor sits low enough that the
+# longest cut a high floor needs is still shorter than the shortest bought
+# screw.
+CBORE_FLOOR = 14.478  # .570
 CBORE_DEPTH = BLOCK_HEIGHT - CBORE_FLOOR
 CBORE_FLOOR_REFERENCE = "CboreFloorReference"
-CARRIAGE_THREAD_DEPTH = 5.0
-UNDER_HEAD = CBORE_FLOOR
+CARRIAGE_THREAD_DEPTH = 5.0  # the HGH15CA's M4 x 5 (vendor)
 CBORE_SECTION_PLANE = "CboreSectionPlane"
 CBORE_SECTION_X = BOLT_X  # B-B cuts the +X hole column
 # Hidden construction sketch on the top face: a line on the -X edge and
@@ -61,16 +89,9 @@ CBORE_SECTION_X = BOLT_X  # B-B cuts the +X hole column
 # on that edge (rule 10) while staying model dimensions.
 PLAN_DATUM_REFERENCE = "PlanDatumReference"
 PLAN_DATUM_HOLES = ((-BOLT_X, BOLT_Y), (BOLT_X, BOLT_Y))
-SCREW_LENGTH, SCREW_LENGTH_TOL = 20.0, 0.42
-ENGAGEMENT_MIN = SCREW_LENGTH - SCREW_LENGTH_TOL - CBORE_FLOOR - printed_band_mm(3)
-ENGAGEMENT_MAX = SCREW_LENGTH + SCREW_LENGTH_TOL - CBORE_FLOOR + printed_band_mm(3)
-SCREW_HOLE_SPEC = HoleSpec("counterbore_socket", "#8", overrides_mm={
-    "HoleDiameter": HOLE_DIA, "CounterBoreDiameter": CBORE_DIA,
-    "CounterBoreDepth": CBORE_DEPTH,
-})
 DRAWING_VALUES = {
     "BlockLength": BLOCK_LENGTH, "BlockWidth": BLOCK_WIDTH,
-    "SectionBlockHeight": BLOCK_HEIGHT, "BlockSideY": BLOCK_WIDTH / 2,
+    "BlockHeight": BLOCK_HEIGHT, "BlockSideY": BLOCK_WIDTH / 2,
     "BoreDia": BORE_DIA, "TopBoreDepth": BORE_DEPTH,
     "TapDrillDia": PIVOT_TAP_DRILL,
     "CboreFloor": CBORE_FLOOR,
@@ -83,66 +104,126 @@ DRAWING_VALUES = {
 }
 DRAWING_DIMENSIONS = {
     "BlockProfile": ("BlockLength", "BlockWidth", "BlockSideY"),
+    # A standard Right view prints the Block extrusion's own depth: neither
+    # TL-22 section imported a full-height dimension. TL-32 prints it on B-B.
+    "Block": ("BlockHeight",),
     "TopBoreProfile": ("BoreDia",),
     "TopBore": ("TopBoreDepth",),
     "PivotTapProfile": ("TapDrillDia",),
-    CBORE_FLOOR_REFERENCE: ("CboreFloor", "SectionBlockHeight"),
+    CBORE_FLOOR_REFERENCE: ("CboreFloor",),
     "CarriageDrillProfile": ("CarriageDrills3Y", "CarriageDrills4Y", "CarriageDrills1Dia"),
     "CarriageCboreProfile": ("CarriageCounterbores3Dia",),
     PLAN_DATUM_REFERENCE: ("PlanBoreX", "PlanHole1X", "PlanHole2X"),
 }
+# Three places: the carriage pattern's fits, the seat depth and counterbore
+# floor that set the stacks, the tap drill's letter size, and the drilled
+# clearance holes (inch drill sizes print three places; the DRILLED HOLES row
+# bands them).
 THREE_PLACE_DIMENSIONS = frozenset({
-    "CboreFloor", "TopBoreDepth", "CarriageDrills3Y", "CarriageDrills4Y",
-    "PlanHole1X", "PlanHole2X",
+    "CboreFloor", "TopBoreDepth", "TapDrillDia", "CarriageDrills3Y", "CarriageDrills4Y",
+    "PlanHole1X", "PlanHole2X", "CarriageDrills1Dia",
 })
+
+
+def _places(name: str) -> int:
+    if name == "BoreDia":
+        return BORE_PLACES
+    return 3 if name in THREE_PLACE_DIMENSIONS else 2
+
+
 DRAWING_PRECISION = {
-    feature: {name: (3 if name in THREE_PLACE_DIMENSIONS else 2) for name in names}
+    feature: {name: _places(name) for name in names}
     for feature, names in DRAWING_DIMENSIONS.items()
 }
 DRAWING_PRECISION_BY_NAME = {name: places for names in DRAWING_PRECISION.values() for name, places in names.items()}
+
+
+def _band(name: str) -> float:
+    return printed_band_mm(DRAWING_PRECISION_BY_NAME[name], unit=UNIT)
+
+
 # The outline sets the counterbore walls (rule 17, worst case at the printed
 # bands): the +X end wall through BlockLength less the hole column, the -Y side
-# wall through BlockWidth less BlockSideY and the row. At .X (±0.8) the end
-# wall would fall under the 2.0 target and the side wall under the 1.5 floor,
-# so both print at two places and their callouts name the wall they set. At
-# two places the side wall still falls short of 2.0; it prints as a fact.
-_CBORE_R_MAX = (CBORE_DIA + printed_band_mm(DRAWING_PRECISION_BY_NAME["CarriageCounterbores3Dia"])) / 2
-_ROW_BAND = max(printed_band_mm(DRAWING_PRECISION_BY_NAME[name]) for name in ("CarriageDrills3Y", "CarriageDrills4Y"))
-CBORE_END_WALL_MIN = (BLOCK_X1 - BOLT_X - _CBORE_R_MAX - printed_band_mm(DRAWING_PRECISION_BY_NAME["BlockLength"])
-                      - printed_band_mm(DRAWING_PRECISION_BY_NAME["PlanHole2X"]))
+# wall through BlockWidth less BlockSideY and the row. At .X (±.1) both would
+# fall under the floor, so both print at two places and their callouts name
+# the wall they set.
+_CBORE_R_MAX = (CBORE_DIA + _band("CarriageCounterbores3Dia")) / 2
+_ROW_BAND = max(_band(name) for name in ("CarriageDrills3Y", "CarriageDrills4Y"))
+CBORE_END_WALL_MIN = BLOCK_X1 - BOLT_X - _CBORE_R_MAX - _band("BlockLength") - _band("PlanHole2X")
 CBORE_SIDE_WALL_MIN = (BLOCK_WIDTH / 2 - BOLT_Y - _CBORE_R_MAX - _ROW_BAND
-                       - printed_band_mm(DRAWING_PRECISION_BY_NAME["BlockWidth"])
-                       - printed_band_mm(DRAWING_PRECISION_BY_NAME["BlockSideY"]))
-CBORE_SIDE_WALL_TEXT = f"SIDE WALL {math.floor(CBORE_SIDE_WALL_MIN * 100.0) / 100.0:.2f} MIN"
+                       - _band("BlockWidth") - _band("BlockSideY"))
+# The M4 x 20 carriage screws' reach into the HGH15CA's M4 x 5 holes. No
+# bought length band reaches 1.5D short of the thread end, so each screw is
+# cut to fit (rule 19): the fitter measures its counterbore floor's height to
+# .001 and cuts the screw to that height plus SCREW_REACH, ±.005 under the
+# head. The reach then carries only the cut band and the reading, never the
+# bought ±0.42 or the floor's own band.
+SCREW_LENGTH, SCREW_LENGTH_TOL = 20.0, 0.42  # as bought
+SCREW_REACH = 4.8006  # .189 into the carriage
+SCREW_CUT_BAND = printed_band_mm(3, unit=UNIT)  # ±.005
+SCREW_MEASURE_BAND = 0.0254  # the .001 floor reading
+SCREW_CUT_LENGTH = CBORE_FLOOR + SCREW_REACH  # .759 at the nominal floor: the model
+ENGAGEMENT_MIN = SCREW_REACH - SCREW_CUT_BAND - SCREW_MEASURE_BAND  # .183, 1.16D
+ENGAGEMENT_MAX = SCREW_REACH + SCREW_CUT_BAND + SCREW_MEASURE_BAND
+SCREW_CUT_LENGTH_MAX = (CBORE_FLOOR + _band("CboreFloor") + SCREW_MEASURE_BAND
+                        + SCREW_REACH + SCREW_CUT_BAND)
+ENGAGEMENT_TEXT = f"{math.floor(ENGAGEMENT_MIN / 25.4 * 1000.0) / 1000.0:.3f}".lstrip("0")
+ENGAGEMENT_DIAMETERS = f"{math.floor(ENGAGEMENT_MIN / 4.0 * 100.0) / 100.0:.2f}D"  # of the M4 major
+# The cut screw in its tap: full-form engagement (rule 18) is the cut thread
+# less 1.5 incomplete pitches; the tip stands inside the block at every band
+# (block height at .XX, seat depth and cut length at .XXX).
+_CUT_MIN = pivot_screw.CUT_THREAD_LENGTH - printed_band_mm(pivot_screw.CUT_THREAD_PLACES, unit=pivot_screw.UNIT)
+_CUT_MAX = pivot_screw.CUT_THREAD_LENGTH + printed_band_mm(pivot_screw.CUT_THREAD_PLACES, unit=pivot_screw.UNIT)
+PIVOT_THREAD_ENGAGEMENT = pivot_screw.CUT_THREAD_LENGTH - 1.5 * pivot_screw.THREAD_PITCH
+PIVOT_THREAD_ENGAGEMENT_MIN = _CUT_MIN - 1.5 * pivot_screw.THREAD_PITCH
+PIVOT_TIP_CLEARANCE = BLOCK_HEIGHT - BORE_DEPTH - pivot_screw.CUT_THREAD_LENGTH
+# TL-22 prints BlockHeight (Right view), TL-32 SectionBlockHeight (B-B): both .XX.
+PIVOT_TIP_CLEARANCE_MIN = (BLOCK_HEIGHT - _band("BlockHeight")
+                           - (BORE_DEPTH + _band("TopBoreDepth")) - _CUT_MAX)
 CALLOUTS_SUFFIX: dict[str, str] = {}
 CALLOUTS_ABOVE = {
-    "BoreDia": "REAM H7", "TapDrillDia": "DRILL THRU",
+    "BoreDia": "REAM", "TapDrillDia": "DRILL THRU",
     "CarriageDrills1Dia": "4X DRILL THRU",
     "CarriageCounterbores3Dia": "4X COUNTERBORE FROM TOP",
 }
 CALLOUTS_BELOW = {
     "BoreDia": "LOCATING FIT ON MHA-CH-06-TL-VN-77 SHOULDER",
-    "TapDrillDia": f"M8x1.25 TAP THRU BELOW SHOULDER SEAT\n{PIVOT_ENGAGEMENT_TEXT}",
+    "TapDrillDia": f"{PIVOT_TAP} UNC TAP THRU BELOW SHOULDER SEAT",
     "TopBoreDepth": "SETS TL-VN-77 SHOULDER HEIGHT",
     "CarriageDrills1Dia": "MATCHES HGH15CA CARRIAGE M4 PATTERN",
     "CarriageCounterbores3Dia": "FLOOR: SECTION B-B",
     # Under the value, two rows, right of B-B (an above-text newline dropped
     # the note, farm run 20261027T175531766Z): the block height's extension
-    # lines pass left of it.
-    "CboreFloor": "M4x20 IN HGH15CA:\n3.85 MIN ENGAGEMENT",
+    # lines pass left of it. Machinist review (final head): the value names
+    # the floor and why it is .XXX (the longest cut a high floor needs stays
+    # under the shortest bought M4 x 20, SCREW_CUT_LENGTH_MAX); the shortfall
+    # is a plain fact with its ratio; cutting is assembly step 5's.
+    "CboreFloor": f"FLOOR FOR M4 X 20 CUT\nENGAGES {ENGAGEMENT_TEXT} MIN ({ENGAGEMENT_DIAMETERS})",
     "BlockLength": "SETS COUNTERBORE END WALL",
-    "BlockWidth": f"SETS COUNTERBORE\n{CBORE_SIDE_WALL_TEXT}",
+    # Two narrow rows between the row (CarriageDrills3Y/4Y) values and the
+    # BlockSideY and TL-32 PlanOverallY dimension lines (x 231 and 285 on TL-32's
+    # sheet). One 26-character row spanned x 225..294 and met all three
+    # (layout audit, farm run 20261031T200222206Z).
+    "BlockWidth": "SETS COUNTERBORE\nSIDE WALL",
 }
 REFERENCE_SKETCHES = (CBORE_FLOOR_REFERENCE, PLAN_DATUM_REFERENCE)
 WALLS_MM = {
-    "pivot seat to spindle end": BORE_X - BORE_DIA / 2 - BLOCK_X0,
+    "pivot seat to spindle end": BORE_X - BORE_LIMITS[1] / 2 - BLOCK_X0,
     "carriage counterbore to side": BLOCK_WIDTH / 2 - BOLT_Y - CBORE_DIA / 2,
     "carriage counterbore to end": BLOCK_X1 - BOLT_X - CBORE_DIA / 2,
-    "pivot seat to carriage counterbore": math.hypot(BORE_X + BOLT_X, BOLT_Y) - BORE_DIA / 2 - CBORE_DIA / 2,
+    "pivot seat to carriage counterbore": math.hypot(BORE_X + BOLT_X, BOLT_Y) - BORE_LIMITS[1] / 2 - CBORE_DIA / 2,
 }
-assert min(WALLS_MM.values()) >= 2.0
-assert CBORE_END_WALL_MIN >= 2.0
-assert 1.5 <= CBORE_SIDE_WALL_MIN < 2.0
-assert 3.8 <= round(ENGAGEMENT_MIN, 6) <= round(ENGAGEMENT_MAX, 6) <= 4.95
-assert round(PIVOT_THREAD_ENGAGEMENT / pivot_screw.THREAD_DIA, 2) >= PIVOT_THREAD_ENGAGEMENT_MIN_D
-assert PIVOT_THREAD_LENGTH > pivot_screw.THREAD_LENGTH
+assert min(WALLS_MM.values()) >= WALL_TARGET_MM
+assert CBORE_END_WALL_MIN >= WALL_TARGET_MM
+assert CBORE_SIDE_WALL_MIN >= WALL_TARGET_MM
+# 0.045: the worst-case reach margin, the long cut on a misread floor still
+# stopping short of the carriage's M4 x 5 thread end.
+assert ENGAGEMENT_MIN <= ENGAGEMENT_MAX <= CARRIAGE_THREAD_DEPTH - 0.045
+# The owner-accepted reach (jig assembly RV-05), above the 1.1D it replaces.
+assert ENGAGEMENT_MIN >= 1.16 * 4.0
+# Every screw a high floor needs is still cut from the shortest bought one.
+assert SCREW_CUT_LENGTH_MAX < SCREW_LENGTH - SCREW_LENGTH_TOL
+assert PIVOT_TAP_DRILL < BORE_LIMITS[0]
+# Rule 18 at the worst case, and the tip inside the block (.011 minimum).
+assert PIVOT_THREAD_ENGAGEMENT_MIN >= 1.5 * pivot_screw.THREAD_DIA
+assert PIVOT_TIP_CLEARANCE_MIN >= 0.011 * 25.4 - 1e-9

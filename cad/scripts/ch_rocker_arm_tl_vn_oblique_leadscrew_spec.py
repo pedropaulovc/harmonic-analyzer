@@ -8,8 +8,8 @@ sibling part spec, never retyped.
 
 What it is: a Tr8x2 screw parallel to rail 1, on the rail's column side
 (+lateral), turning in two KP08 pillow blocks. Each block stands on an
-end bracket (TL-28, two off) bolted on base bar 1's top. A flanged brass
-nut, screwed directly to the integral lug of feed block TL-32, drives
+end bracket (TL-28, two off) bolted on base bar 1's top. The shop-made brass
+feed nut (TL-27), screwed to the integral lug of feed block TL-32, drives
 carriage 1. The handwheel
 (``fixtures.trammel-handwheel``) sits on the screw's outboard end, past the
 base bar's far end, so the wheel overhangs it.
@@ -21,19 +21,19 @@ envelope below. In base bar 1's part frame, x = s - RAIL_NEAR_S ⚙ and
 y = -lateral; the turned-over bar under rail 2 carries the same holes, unused.
 
 Why the column side: the far hold-down stud stands on the rail's front side
-(lateral -37.5 ⚙ at s 405 ⚙, up to STUD_TOP_Z), away from the feed
-block's travel. The near stud (column side, s 35.9 ⚙) lies short of the near
+(lateral -1.48 ⚙ at bar station 15.35 ⚙, up to STUD_TOP_Z), away from the
+feed block's travel. The near stud (column side, s 37.1 ⚙) lies short of the near
 KP08 bracket, so the screw never passes a stud.
 
-Why lateral 55: the KP08 envelope (55 across the axis, ``KP08_MARGIN`` all
-round) must stay outside pivot block 1's side (lateral 20 ⚙), which runs
-between the two blocks; the 25.4-high bracket on the faced 12.0 bar lifts the
-axis to 52.4. The handwheel grip sweeps to Z73.9, below the carrier underside
-at Z80.3.
+Why lateral 2.165 (54.991): the KP08 envelope (55 across the axis,
+``KP08_MARGIN`` all round) must stay outside pivot block 1's side (lateral 20
+⚙), which runs between the two blocks; the 1 in bracket on the faced .47 bar
+lifts the axis to 52.338. The handwheel grip sweeps below the carrier
+underside.
 Each bracket stands wholly on bar 1 (the user's 2026-10-17 ruling A′: the
-bar widened, now 1/2 x 5-1/2, its column-side edge at lateral 88.9 ⚙), its outer
+bar widened, now 5.50 wide, its column-side edge at lateral 88.9 ⚙), its outer
 end flush with that edge, on 4 x #8 screws in one row: two pairs symmetric
-about the screw axis, the inner at ±11, the outer at ±27.5, the round
+about the screw axis, the inner at ±.433, the outer at ±1.09, the round
 half-span inside the rule-17 window (below) between the #8 tap's wall to the
 KP08's outer #6-32 tap in TL-28 and TL-20's counterbore wall to the bar's edge.
 
@@ -45,7 +45,7 @@ handwheel's bore past its grub and its set-screw flat
 HUB_GAP past the far block: SCREW_LENGTH 410. The stations
 and the screw length are fixed (the drilled parts carry them); self-checks
 guard them against the bought block, so a vendor swap changes the bought
-numbers and TL-32's nut interface only, or trips a check.
+numbers only, or trips a check.
 
 The nut remains attached to the feed block during either feed mode. Align
 the KP08 blocks to the nut at both travel ends before tightening their
@@ -56,7 +56,7 @@ Thrust is taken on the KP08 inner-ring set screws gripping the plain thread
 finish pass only.
 
 LOAD_CASES (ruling A′): 1 kN hand-abuse thrust along the screw at its axis
-(lateral 55, 40.4 above the bar top), on each TL-28's 4 x #8-32 torqued to
+(lateral 2.165, 40.4 above the bar top), on each TL-28's 4 x #8-32 torqued to
 2.8 N·m (25 in·lbf; head bearing on TL-20's counterbore floor limits it):
 preload T/(0.2 d) 3.36 kN a screw; the row's centroid is on the screw axis
 (e = 0), so the bracket slips at 2.69 kN (μ 0.2, margin 2.69). It starts to
@@ -77,6 +77,8 @@ import _config
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec
+from _inch_wall_limits import WALL_TARGET_MM
+from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
 
 INCH = trammel.INCH
@@ -90,7 +92,6 @@ RAIL = 1  # the screw runs beside rail 1 and drives carriage 1
 # Shop-inventory ids (cad/process/shop/inventory.toml); the inventory owns
 # each item's source and SKU.
 SCREW_ID = "fixtures.trammel-tr8-leadscrew"
-NUT_ID = "fixtures.trammel-tr8-flange-nut"
 KP08_ID = "fixtures.trammel-kp08-blocks"
 HANDWHEEL_ID = "fixtures.trammel-handwheel"
 
@@ -100,29 +101,12 @@ HANDWHEEL_ID = "fixtures.trammel-handwheel"
 SCREW_MAJOR_DIA = 8.0
 SCREW_LEAD = 2.0
 SCREW_STOCK_LENGTH = 600.0
-# Flanged brass nut, Zyltech HW-SC-T8x2: flange Ø22 x 3.5, 4 x Ø3.5 THRU on
-# a Ø16 circle at 45°; body Ø10.2, axially a 1.5 spigot, the flange and a 10
-# body: 15 overall.
-NUT_FLANGE_DIA = 22.0
-NUT_FLANGE_THICK = 3.5
-NUT_HOLE_DIA = 3.5
-NUT_HOLE_PCD = 16.0
-NUT_HOLE_ANGLES_DEG = (45.0, 135.0, 225.0, 315.0)
-NUT_BODY_DIA = 10.2
-NUT_LENGTH = 15.0
-NUT_BODY_SHORT = 1.5  # the spigot, in TL-32's -X counterbore
-NUT_BODY_LONG = NUT_LENGTH - NUT_FLANGE_THICK - NUT_BODY_SHORT  # 10, proud on -X
-# US-customary UNC (fastener policy): the flange's Ø3.5 plain holes float a
-# #4-40 (major 2.845) 0.33 a side. Each button head (MHA-CH-06-TL-VN-66)
-# bears directly on the brass flange, no washer (owner ruling 2026-10-20).
-NUT_SCREW = "#4-40"
-# Derived from the nut above, so a vendor swap changes numbers only.
-NUT_SCREW_MAJOR = THREAD_MAJOR_MM[NUT_SCREW]
+# US-customary UNC (fastener policy). Rule 18 at the worst case: the shortest
+# screw (ASME B18.3, -0.03 in up to 1 in long, plus nothing) past the grip,
+# less the screw tip's incomplete threads (rule 18's 1.5 pitches) and the tap
+# mouth's title-block edge break.
 INCH_SCREW_LENGTHS = ("1/4", "5/16", "3/8", "7/16", "1/2", "5/8", "3/4")  # SHCS
-# Rule 18 at the worst case: the shortest screw (ASME B18.3, -0.03 in up to
-# 1 in long, plus nothing) past the grip, less the screw tip's incomplete
-# threads (rule 18's 1.5 pitches) and the tap mouth's title-block edge break.
-SHCS_LENGTH_TOL_MM = 0.03 * INCH  # STANDARD: ASME B18.3 (SHCS, BHCS), to 1 in long
+SHCS_LENGTH_TOL_MM = 0.03 * INCH  # STANDARD: ASME B18.3 (SHCS), to 1 in long
 TAP_MOUTH_BREAK = float(_config.title_block("edge_break")["chamfer_max_mm"])
 _TIP_INCOMPLETE_PITCHES = 1.5  # rule 18
 # Each bought screw is the shortest stock length whose worst-case full thread
@@ -133,8 +117,7 @@ ENGAGEMENT_TARGET_D = 2.0
 
 def full_thread_min(length: str, grip: float, thread: str) -> float:
     """Worst-case full-thread engagement of an inch B18.3 socket screw
-    ``length`` long past ``grip`` (the grip at its nominal: the bought parts
-    state no band)."""
+    ``length`` long past ``grip`` (the grip at its worst case: the caller's)."""
     pitch = INCH / float(thread.rsplit("-", 1)[1])
     return (
         float(Fraction(length)) * INCH
@@ -157,18 +140,6 @@ def _shortest_length(grip: float, thread: str) -> str:
     )
 
 
-# UNVERIFIED: the vendor gives the flange's 3.5 with no band; a thicker flange
-# takes engagement off one for one (ENGAGEMENT_TARGET_D's half diameter).
-NUT_SCREW_GRIP = NUT_FLANGE_THICK  # the head on the flange: 3.5
-NUT_SCREW_LENGTH = _shortest_length(NUT_SCREW_GRIP, NUT_SCREW)  # 1/2
-NUT_SCREW_LENGTH_MM = float(Fraction(NUT_SCREW_LENGTH)) * INCH  # 12.7
-NUT_SCREW_ENGAGEMENT = NUT_SCREW_LENGTH_MM - NUT_SCREW_GRIP  # 9.2 nominal
-NUT_SCREW_FULL_THREAD_MIN = full_thread_min(
-    NUT_SCREW_LENGTH, NUT_SCREW_GRIP, NUT_SCREW
-)  # 7.236, 2.54 D
-# The longest screw (B18.3: never long) on the flange's nominal stops 0.8
-# inside TL-32's full thread.
-NUT_SCREW_TAP_DEPTH = NUT_SCREW_ENGAGEMENT + 0.8  # full thread: 10.0
 # KP08 pillow block. Verified: axis height, bolt spacing, length, height, bore.
 KP08_AXIS_HEIGHT = 15.0
 KP08_BOLT_SPACING = 42.0
@@ -215,10 +186,15 @@ HANDWHEEL_SWEEP_R = max(
 )  # 21.5
 
 # --- Layout (rail-1 stations s, lateral; machine Z) -------------------------------
-SCREW_LATERAL = 55.0
+# Issue #290: the fabricated layout (axis lateral, the bracket's inner end and
+# the bar screws' half-spans) sits on the .001 in grid, so TL-20's rows and
+# TL-28's #8 stations print as modelled. The bought values stay exact: the
+# KP08's 42 bolt span and 15 axis height, and the KP08 stations along the
+# Tr8 screw (its millimetre sheet's flat stations read them).
+SCREW_LATERAL = 54.991  # 2.165; TL-32's nut lug reads it
 BRACKET_THICK = 1.0 * INCH  # OnlineMetals 1165 half-by-one bar, on edge
-KP08_BASE_Z = trammel.BASE_BAR_THICK + BRACKET_THICK  # 37.4
-SCREW_AXIS_Z = KP08_BASE_Z + KP08_AXIS_HEIGHT  # 52.4
+KP08_BASE_Z = trammel.BASE_BAR_THICK + BRACKET_THICK  # 37.338
+SCREW_AXIS_Z = KP08_BASE_Z + KP08_AXIS_HEIGHT  # 52.338
 HUB_GAP = 6.0  # far KP08 outer face to the handwheel's hub end
 # The drilled parts fix the KP08 stations and the screw length; a vendor swap
 # must not move them. The self-checks below guard them against the bought
@@ -241,18 +217,18 @@ HANDWHEEL_ENGAGEMENT_MIN = max(
 # 6061-T6511 flat 1/2 x 1 in, OnlineMetals 1165, on edge. Frame: origin on
 # the bottom face at the inner end (toward the rail), mid-width; +X outward
 # (machine +lateral), +Y along the screw away from the spindle, +Z up.
-# Envelope X 0 .. 68.9, Y ±6.35, Z 0 .. 25.4.
+# Envelope X 0 .. 2.71, Y ±.25, Z 0 .. 1.00.
 BRACKET_STOCK = "6061-T6511 flat 1/2 x 1 in (OnlineMetals 1165), on edge"
 BRACKET_WIDTH = 0.5 * INCH  # 12.7 along the screw
-BRACKET_INNER_LATERAL = 20.0  # 3 clear of the carriage's side (lateral 17 ⚙)
+BRACKET_INNER_LATERAL = 20.066  # .79: 3 clear of the carriage's side (lateral 17 ⚙)
 # Ruling A′ (2026-10-17): the outer end flush with bar 1's column-side edge,
 # so the bracket stands wholly on the bar (it cantilevered past the 1/2 x 4).
-BRACKET_LENGTH = trammel.BASE_BAR_COLUMN_EDGE - BRACKET_INNER_LATERAL  # 68.9
+BRACKET_LENGTH = trammel.BASE_BAR_COLUMN_EDGE - BRACKET_INNER_LATERAL  # 2.71
 # KP08 screws: #6-32 tapped (through) at 42 centres about the screw axis.
 BRACKET_KP08_HOLES_X = tuple(
     SCREW_LATERAL + side * KP08_BOLT_SPACING / 2.0 - BRACKET_INNER_LATERAL
     for side in (-1.0, 1.0)
-)  # 14, 56
+)  # 13.925, 55.925: the vendor span, printed .548 and 2.202
 # Bar screws: #8-32 SHCS up from the bar's underside (counterbored there, the
 # head recessed: ``base_bar.BRACKET_CBORE_DEPTH``) into #8-32 tapped THRU holes
 # in the bracket; fitted before the bar goes on the table. Top-down
@@ -261,25 +237,31 @@ BAR_SCREW = "#8-32"
 BAR_SCREW_LENGTH = "5/8"
 # Ruling A′: four in one row, two pairs symmetric about the screw axis, so the
 # row's centroid stands under the thrust (LOAD_CASES: e = 0). The inner pair
-# keeps C4's 44 (between the KP08's #6-32s); the outer half-span is the round
-# value inside the rule-17 window, worst case at the printed bands: its #8 tap
-# clear of TL-28's outer #6-32 tap, its TL-20 counterbore clear of the bar's
-# column-side edge, both at the 2.0 target.
-WALL_TARGET = 2.0  # drawing-guidelines rule 17 (floor base_bar.BRACKET_WALL_MIN)
-BAR_SCREW_INNER_HALF_SPAN = SCREW_LATERAL - 44.0  # 11
-_TL28_BAND = printed_band_mm(3)  # TL-28's stations print at .XXX
+# keeps C4's 44 (between the KP08's #6-32s) on the grid; the outer half-span
+# is the .01 in value inside the rule-17 window, worst case at the printed
+# bands: its #8 tap clear of TL-28's outer #6-32 tap, its TL-20 counterbore
+# clear of the bar's column-side edge, both at the .080 target.
+WALL_TARGET = WALL_TARGET_MM  # drawing-guidelines rule 17 (floor base_bar.BRACKET_WALL_MIN)
+BAR_SCREW_INNER_HALF_SPAN = 10.9982  # .433
+_TL28_UNIT = drawing_unit(
+    "parts/ch-rocker-arm-tl-oblique-end-bracket",
+    _config.parts("ch-rocker-arm-tl-oblique-end-bracket"),
+)
+_TL28_BAND = printed_band_mm(3, unit=_TL28_UNIT)  # TL-28's stations print at .XXX
 _BAR_SCREW_R = THREAD_MAJOR_MM[BAR_SCREW] / 2.0
 _KP08_SCREW_R = THREAD_MAJOR_MM[KP08_SCREW] / 2.0
 BAR_SCREW_OUTER_HALF_SPAN_MIN = (
     KP08_BOLT_SPACING / 2.0 + 2.0 * _TL28_BAND + _BAR_SCREW_R + _KP08_SCREW_R
-) + WALL_TARGET  # 27.10
+) + WALL_TARGET  # 27.12
 BAR_SCREW_OUTER_HALF_SPAN_MAX = (
     trammel.BASE_BAR_COLUMN_EDGE
     - SCREW_LATERAL
     - base_bar.BRACKET_HOLE_BAND
     - base_bar.BRACKET_CBORE_RADIUS_MAX
-) - WALL_TARGET  # 27.545
-BAR_SCREW_OUTER_HALF_SPAN = math.floor(2.0 * BAR_SCREW_OUTER_HALF_SPAN_MAX) / 2.0
+) - WALL_TARGET  # 27.70
+BAR_SCREW_OUTER_HALF_SPAN = round(
+    math.floor(BAR_SCREW_OUTER_HALF_SPAN_MAX / INCH * 100.0) / 100.0 * INCH, 9
+)  # 1.09
 if not (
     BAR_SCREW_OUTER_HALF_SPAN_MIN
     <= BAR_SCREW_OUTER_HALF_SPAN
@@ -294,16 +276,16 @@ BAR_SCREW_LATERALS = tuple(
         (1.0, BAR_SCREW_INNER_HALF_SPAN),
         (1.0, BAR_SCREW_OUTER_HALF_SPAN),
     )
-)  # 27.5, 44, 66, 82.5
+)  # 1.075, 1.732, 2.598, 3.255
 BRACKET_BAR_HOLES_X = tuple(
     lateral - BRACKET_INNER_LATERAL for lateral in BAR_SCREW_LATERALS
-)  # 7.5, 24, 46, 62.5
+)  # .285, .942, 1.808, 2.465
 SHCS_8_HEAD = 0.164 * INCH  # #8 SHCS head height (ASME B18.3)
 SHCS_8_MAJOR = 0.164 * INCH  # #8 thread major diameter
 BAR_SCREW_LENGTH_MM = 0.625 * INCH
-BAR_SCREW_GRIP = base_bar.BAR_THICK - base_bar.BRACKET_CBORE_DEPTH  # 7.2
-BAR_SCREW_ENGAGEMENT = BAR_SCREW_LENGTH_MM - BAR_SCREW_GRIP  # 8.675 nominal
-# Worst case at TL-20's printed bands (7.365 .. 9.985).
+BAR_SCREW_GRIP = base_bar.BAR_THICK - base_bar.BRACKET_CBORE_DEPTH  # 7.137
+BAR_SCREW_ENGAGEMENT = BAR_SCREW_LENGTH_MM - BAR_SCREW_GRIP  # 8.738 nominal
+# Worst case at TL-20's printed bands (8.357 .. 9.119).
 BAR_SCREW_ENGAGEMENT_RANGE = base_bar.bracket_screw_under_head(BAR_SCREW_LENGTH_MM)
 
 KP08_S = (72.0, 443.0)  # near, far: KP08 axial centre stations
@@ -463,22 +445,15 @@ if not (
     < BRACKET_THICK
 ):
     raise AssertionError("the bar screws' engagement in the bracket")
-if not (
-    1.5 * NUT_SCREW_MAJOR
-    <= NUT_SCREW_FULL_THREAD_MIN
-    < NUT_SCREW_ENGAGEMENT
-    < NUT_SCREW_TAP_DEPTH
-):
-    raise AssertionError("the nut flange screws' engagement in the feed block")
 if not 1.5 * THREAD_MAJOR_MM[KP08_SCREW] <= KP08_SCREW_FULL_THREAD_MIN:
     raise AssertionError("the KP08 screws' engagement in the end bracket")
 
-# TL-20's counterbores stand clear of the bar's column-side edge at the 2.0
-# target (ruling A′: the outer screws sit 6.4 in from it), every wall at the
-# rule-17 floor.
+# TL-20's counterbores stand clear of the bar's column-side edge at the .080
+# target (ruling A′: the outer screws' row sits .245 in from it), every wall
+# at the rule-17 floor.
 _bar_walls = base_bar.bracket_hole_walls(BASE_BAR_HOLES)
 if _bar_walls["-Y edge"] < WALL_TARGET:
-    raise AssertionError("a TL-20 bracket counterbore is under 2.0 from the bar edge")
+    raise AssertionError("a TL-20 bracket counterbore is under .080 from the bar edge")
 if min(_bar_walls.values()) < base_bar.BRACKET_WALL_MIN:
     raise AssertionError(f"a TL-20 bracket hole wall is under rule 17: {_bar_walls}")
 

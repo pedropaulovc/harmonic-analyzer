@@ -31,9 +31,15 @@ y = -length.  Mate the Top Plane to the head's seat, the floor of TL-20's counte
 
 from __future__ import annotations
 
+import _config
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
 from _mcmaster_91251a196 import DIMS, LENGTH_TEXT, PART_NO, THREAD
+from _package_units import drawing_unit
 
+UNIT = drawing_unit(
+    "parts/ch-rocker-arm-tl-vn-oblique-bracket-screw",
+    _config.parts("ch-rocker-arm-tl-vn-oblique-bracket-screw"),
+)
 SKU = PART_NO
 ROW = fasteners.BRACKET_TO_BAR
 QUANTITY = ROW.count
@@ -51,7 +57,7 @@ if abs(DIMS.major_dia - ROW.major_mm) > 1e-3:
 
 # Exact-current product table and engineering drawing read 2026-10-21.
 # Hidden nominal source references, not physical-edge/replica assertions.
-# Drawing precision: length/head Ø/head height .XXX, major Ø .XXXX,
+# Drawing precision: length/head Ø/head height/major Ø .XXX,
 # drive an exact 9/64 fraction. The standard-only socket depth is omitted.
 SUPPLIER_PRODUCT_URL = "https://www.mcmaster.com/91251A196/"
 SUPPLIER_DRAWING_URL = (
@@ -69,7 +75,7 @@ SUPPLIER_REFERENCE_STARTS = {
     "SupplierLength": (DIMS.major_dia / 2.0, 0.0),
     "SupplierHeadDiameter": (-DIMS.head_dia / 2.0, 0.0),
     "SupplierHeadHeight": (DIMS.head_dia / 2.0, 0.0),
-    "SupplierThreadDiameter": (-DIMS.major_dia / 2.0, -DIMS.length / 2.0),
+    "SupplierThreadDiameter": (-DIMS.major_dia / 2.0, 0.0),  # on the bearing-face edge
     "SupplierDriveWidth": (-DIMS.socket_af / 2.0, 0.0),
 }
 SUPPLIER_REFERENCE_PLANES = {
@@ -87,6 +93,6 @@ SUPPLIER_REFERENCE_FORMATS = {
     "SupplierLength": (3, "length", None, None),
     "SupplierHeadDiameter": (3, "diameter", None, None),
     "SupplierHeadHeight": (3, "length", None, None),
-    "SupplierThreadDiameter": (4, "diameter", None, "8-32"),
+    "SupplierThreadDiameter": (3, "diameter", None, "#8-32"),
     "SupplierDriveWidth": (0, "length", 64, None),
 }

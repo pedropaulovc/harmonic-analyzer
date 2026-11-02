@@ -1,14 +1,15 @@
 ch-rocker-arm-tl-vn-oblique-pivot-screw:
   title: Rocker Oblique Trammel Pivot Screw
   number: MHA-CH-06-TL-VN-77
-  stock_name: 18-8 Stainless Steel Precision Shoulder Screw, 10 mm x 35 mm, M8 x 1.25
-  supplier: McMaster-Carr
-  supplier_skus: ['90323A492']
+  stock_name: 18-8 Stainless Steel Precision Shoulder Screw, Extended Thread, 3/8 x 1-1/2 in, 5/16-18
+  supplier: Huyett
+  supplier_skus: ['BLTS40-0375-1500188P']
   # CAD-library surrogate for appearance/mass only; supplier grade is 18-8,
   # not a supplier-certified AISI 304 grade. Procurement uses material_specification.
   material: AISI 304
-  material_specification: "18-8 stainless steel, HRB95"
-  finish: passivated
+  material_specification: "18-8 stainless steel, plain; AMPG STR60138C24-EXT extended-thread precision shoulder screw, special order"
+  finish: plain
   quantity: 2
   tolerance_class: visual_noncritical
   process: purchased
+  drawing_unit: in

@@ -81,6 +81,7 @@ from __future__ import annotations
 
 import math
 
+import _config
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as feed
 
 SUPPLIER = "MISUMI"
@@ -280,7 +281,11 @@ GRIP_SOCKET_VOID_MM3 = _frustum(
     _SOCKET_R**2 * _SLIVER - ((_SHANK_TIP_R + _SLIVER) ** 3 - _SHANK_TIP_R**3) / 3.0
 )
 
-DRAWING_NOTES = "SLIDE ONTO THE SCREW'S FAR END; LOCK IT WITH THE SUPPLIED SET SCREW."
+# The note names the leadscrew by its drawing number, read from the registry.
+LEADSCREW_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-leadscrew")["number"]
+DRAWING_NOTES = (
+    f"SLIDE ONTO LEADSCREW {LEADSCREW_NUMBER} FAR END; LOCK WITH THE HUB SET SCREW."
+)
 
 # --- Self-checks ----------------------------------------------------------------
 if not GRIP_OFFSET - GRIP_DIA / 2.0 > _BORE_R:

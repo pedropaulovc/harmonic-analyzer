@@ -2,16 +2,13 @@ ch-rocker-arm-tl-vn-oblique-cl-dowel:
   title: Rocker Oblique Trammel CL Locator Dowel
   # Shop fixture: the parent MHA-CH-06 Number plus -TL-VN-nn (subsystem-identities.md).
   number: MHA-CH-06-TL-VN-53
-  stock_name: 52100 Alloy Steel Dowel Pin, Ø6 x 20 mm
+  stock_name: Alloy Steel Dowel Pin, 1/4 x 1 in
   supplier: McMaster-Carr
-  supplier_skus: ["91595A452"]
+  supplier_skus: ["98381A542"]
   material: Alloy Steel
-  material_specification: "52100 alloy steel, Rockwell C52 min; DIN 6325 m6 (McMaster 91595A452)"
+  material_specification: "Alloy steel, Rockwell C47 min; ASME B18.8.2 (McMaster 98381A542)"
   finish: as supplied
   quantity: 1
   tolerance_class: machined_block
   process: purchased
-  installation_notes: |-
-    PRESS CHAMFERED END FIRST. SET HEIGHT AT JIG ASSEMBLY.
-    STRAP MUST SEAT FLAT, LOCATE AND SLIP ON/OFF.
-    PIN MUST NOT STAND ABOVE STRAP.
+  drawing_unit: in

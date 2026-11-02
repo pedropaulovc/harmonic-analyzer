@@ -1,15 +1,18 @@
 ch-rocker-arm-tl-oblique-pivot-block:
   title: Rocker Oblique Trammel Pivot Block
   number: MHA-CH-06-TL-22
-  material: 6061-T6 aluminium
-  material_specification: 6061-T6 aluminum flat bar, new 1 x 3-1/2 in stock, machined to 24.3 high
+  # No grade or temper is functional: the title block names the aluminium
+  # flat-bar family (rule 2; machinist review), as TL-28 does.
+  material: ALUMINUM FLAT BAR 1 x 3-1/2 in
+  material_specification: Aluminum flat bar (e.g. 6061-T6), new 1 x 3-1/2 in stock, machined to .96 high
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
-  process: "Rectangular rail-2 block; shoulder-screw seat and four carriage counterbores. Keep carriage counterbore floors 15.600 above the bottom; pivot seat diameter 10 H7, 6.85 deep from top with M8x1.25 tapped through hole below."
+  process: "Rectangular rail-2 block; shoulder-screw seat and four carriage counterbores. Keep carriage counterbore floors .570 above the bottom; pivot seat reamed .3760-.3765, .359 deep from top with a 5/16-18 tapped through hole below."
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
-      where: "sheet 1 plan view, the 40.00 overall width's callout SETS COUNTERBORE / SIDE WALL 1.59 MIN: the -Y side wall at the 4X counterbores"
-      finding: "-Y counterbore side wall 1.59 min at the worst case of the printed bands (40.00 - 20.00 - 13.000 - Ø8.00/2), below the 2.0 target and above the 1.5 floor (rule 17)"
-      reason: "Owner ruling 2026-10-28 accepts it as a stated minor shortfall on this shop-jig TL-22 block; the side-wall callout states the shortfall as a fact."
+      where: "Section B-B, the .570 counterbore floor callout: ENGAGES .183 MIN (1.16D)"
+      finding: "M4 carriage screw engagement .183 min (4.65 mm, 1.16D), under rule 18's 1.5D, stated as a plain fact"
+      reason: "The bought HGH15CA carriage's vendor M4 holes are 5 mm deep, so no M4 reaches 1.5D (6.0 mm). Owner ruling 2026-11-01, option A (the jig's RV-05): the counterbore floor drops .614 to .570 and each screw is cut to fit its own floor at assembly (rule 19), so the reach carries only the ±.005 cut and the .001 reading, 1.16D minimum. Owner exception confirmed 2026-11-01 (relayed by Main)."
+  drawing_unit: in

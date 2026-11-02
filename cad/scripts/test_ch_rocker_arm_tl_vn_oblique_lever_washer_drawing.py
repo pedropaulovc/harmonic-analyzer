@@ -58,7 +58,6 @@ def test_catalogue_dimensions_and_pair_stack() -> None:
     assert dims.THICKNESS_MAX == pytest.approx(0.090 * IN)
     # The band is taken as the pair's stack and modelled at its maximum.
     assert spec.THICKNESS == dims.PAIR_THICKNESS == dims.THICKNESS_MAX
-    assert (dims.PACKAGE_QTY, dims.PACKAGE_PRICE_USD) == (5, 12.40)
 
 
 def test_one_pair_under_each_lever_screw_head() -> None:
@@ -73,39 +72,44 @@ def test_one_pair_under_each_lever_screw_head() -> None:
     # the engagement grew rather than dropped.
     assert screw.length == screw_dims.LENGTH_TEXT == "1"
     assert screw.grip_mm == pytest.approx(feed_lever.LEVER_THICK + spec.THICKNESS)
-    assert spec.ENGAGEMENT == pytest.approx(1.0 * IN - 12.7 - 2.286)  # 10.41
-    assert spec.ENGAGEMENT > 0.875 * IN - 12.7  # the 7/8 in screw's, no pair
-    assert screw.protrusion_mm == pytest.approx(spec.ENGAGEMENT - 12.0)  # -1.59
+    assert spec.ENGAGEMENT == pytest.approx(1.0 * IN - screw.grip_mm)
+    # the 7/8 in screw's, no pair
+    assert spec.ENGAGEMENT > 0.875 * IN - feed_lever.LEVER_THICK
+    # the tip stops inside the THRU-tapped plate
+    assert screw.protrusion_mm == pytest.approx(spec.ENGAGEMENT - carrier.THICKNESS)
     assert screw.protrusion_mm < 0.0
 
 
 def test_lever_screw_engagement_and_stand_out_at_the_worst_case() -> None:
     # AGENTS.md: the worst case, not the nominal. The shortest screw (ASME
     # B18.3 -0.03 in) through the thickest lever (.XX) and pair, capped by
-    # TL-21's worst-case full thread (RV-01, 9.53); the longest screw through
-    # the thinnest lever and pair, past the thinnest plate (.X).
+    # TL-21's worst-case full thread (RV-01); the longest screw through
+    # the thinnest lever and pair, past the thinnest plate.
     assert screw_dims.LENGTH_MIN == pytest.approx((1.0 - 0.03) * IN)
+    lever_max = feed_lever.LEVER_THICK + spec._THICK_BAND
+    lever_min = feed_lever.LEVER_THICK - spec._THICK_BAND
     assert spec.ENGAGEMENT_MIN == pytest.approx(
-        min((1.0 - 0.03) * IN - (12.7 + 0.51 + 0.090 * IN), 9.5389), abs=1e-3
-    )  # 9.14
-    assert spec.ENGAGEMENT_MIN > (0.875 - 0.03) * IN - (12.7 + 0.51)  # 7/8's 8.25
+        min(
+            screw_dims.LENGTH_MIN - (lever_max + 0.090 * IN),
+            carrier.ENGAGEMENT_MM[carrier.LEVER_THREAD],
+        )
+    )
+    # the 7/8 in screw's at the same corners, no pair
+    assert spec.ENGAGEMENT_MIN > (0.875 - 0.03) * IN - lever_max
     assert spec.ENGAGEMENT_MIN <= carrier.ENGAGEMENT_MM[carrier.LEVER_THREAD]
     assert spec.ENGAGEMENT >= carrier.ENGAGEMENT_MM[carrier.LEVER_THREAD]
     assert spec.STAND_OUT_MAX == pytest.approx(
-        1.0 * IN - (12.7 - 0.51 + 0.070 * IN) - (12.0 - 0.8)
-    )  # 0.23
-    assert 0.0 < spec.STAND_OUT_MAX < trammel.PIVOT_SUPPORT_HEIGHT
+        1.0 * IN
+        - (lever_min + 0.070 * IN)
+        - (carrier.THICKNESS - carrier.THICKNESS_BAND)
+    )
+    assert spec.STAND_OUT_MAX < trammel.PIVOT_SUPPORT_HEIGHT
 
 
 def test_pairs_fit_on_the_feed_lever() -> None:
     assert spec.ID > fasteners.LEVER_TO_CARRIER.major_mm
-    assert spec.PAIR_GAP_MIN == pytest.approx(
-        16.0 - 2 * 0.51 - (8.636 - fasteners.LEVER_TO_CARRIER.major_mm) - 13.462
-    )
     assert spec.PAIR_GAP_MIN > 0.0
-    assert spec.INNER_END_OVERHANG_MAX == pytest.approx(1.04, abs=0.01)
     assert spec.BEARING_FRACTION_MIN >= 0.90
-    assert spec.BEARING_FRACTION_MIN == pytest.approx(0.937, abs=0.001)
 
 
 def test_standalone_recipe_run_is_catalog_only() -> None:

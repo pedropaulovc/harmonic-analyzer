@@ -8,7 +8,10 @@ import sys
 import _telemetry
 import ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec as part
 from _com import _early_bound
+from _drawing_centerline import add_view_centerline
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import NumberFit, build_purchased_fastener_drawing
 from _session import run_build
 from _supplier_limits import LIMIT
@@ -19,21 +22,23 @@ from _machinist_review_mode import MachinistReviewMode
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_pivot_spacer"]
-ITEM = '18-8 STAINLESS STEEL ROUND SPACER, 10 MM ID X 16 MM OD X 15 MM'
+ITEM = '6061 ALUMINUM ROUND SPACER, 3/8 SCREW, 5/8 OD X 5/8 LONG'
+# How the jig uses the part is a design note, not supplier operating data: it
+# rides the general line (at most the default's 74 characters), every printed
+# size already being the supplier's parenthesised reference.
+GENERAL_TEXT = "PURCHASED PART, USED AS SUPPLIED. LOOSE BORE: NOT A LOCATING BUSHING."
 # Every text shelves right of its own witnesses, clear of the lines: the bore
-# on the Front's top lane, the OD on its bottom lane, the length beside
-# the Top view. Front and Top reserve the same left/right space so the fit
-# centres them on one projection line; the Front's equal top/bottom keeps it
-# level with the unannotated Right. The 16 x 15 mm part fits at 2:1.
+# on the Top's top lane, the OD on its bottom lane, the length beside it. Only
+# the Top is annotated; the projection fit centres the Front under it. The
+# 5/8 x 5/8 part fits at 2:1 in tall_top's 96 mm Top cell with both diameter
+# lanes (standard's 64 mm leaves 28 mm: 1:1).
+VIEW_LAYOUT = "tall_top"
 SHELVES = {
     "SupplierBoreDiameter": (True, "right"),
     "SupplierOuterDiameter": (True, "right"),
     "SupplierLength": (False, "right"),
 }
-SUPPLIER_MARGINS = {
-    "*Front": (0.010, 0.018, 0.060, 0.018),
-    "*Top": (0.010, 0.010, 0.060, 0.010),
-}
+SUPPLIER_MARGINS = {"*Top": (0.010, 0.018, 0.060, 0.018)}
 
 
 def _assert_supplier_bands(displays):
@@ -68,6 +73,20 @@ async def build(adapter) -> dict[str, str]:
         )
         _assert_supplier_bands(displays)
         stations = shelve_supplier_text(adapter, displays, SHELVES)
+        # The side views carry the axis as native centerlines, picked on the
+        # OD face at mid-length (frame: axis +Z from the bottom face); the
+        # length's line lies on the Top's silhouette, not the axis.
+        for orientation, normal in (("*Top", (0.0, 1.0)), ("*Right", (1.0, 0.0))):
+            view = views[orientation]
+            add_view_centerline(
+                adapter, view, label=f"spacer {orientation[1:].upper()} axis",
+                face_xy=model_point_in_view(
+                    adapter, view,
+                    (normal[0] * part.OD / 2000.0, normal[1] * part.OD / 2000.0,
+                     part.LENGTH / 2000.0),
+                    label=f"spacer {orientation[1:].upper()} OD face",
+                ),
+            )
 
         def assert_references():
             fresh = assert_supplier_screw(
@@ -88,10 +107,11 @@ async def build(adapter) -> dict[str, str]:
 
     return await build_purchased_fastener_drawing(
         adapter, SPEC, item=ITEM, number_fit=NumberFit.SHRINK_TO_CELL,
-        cut_to_suit=False,
+        general_text=GENERAL_TEXT, view_layout=VIEW_LAYOUT,
         supplier_dimensions=supplier_dimensions,
         supplier_margins=SUPPLIER_MARGINS,
-        settled_checks=(assert_supplier_dimensions,), supplier_data=part.SUPPLIER_DATA,
+        settled_checks=(assert_supplier_dimensions,),
+        unit=part_drawing_unit(part.PART_NAME),
     )
 
 

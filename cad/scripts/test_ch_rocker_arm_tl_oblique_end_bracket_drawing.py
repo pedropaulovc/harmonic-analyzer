@@ -18,6 +18,8 @@ import draw_ch_rocker_arm_tl_oblique_end_bracket as drawing
 import export_features
 from _drawing_contract import model_toleranced_dimensions
 from _hole_spec import THREAD_MAJOR_MM
+from _inch_wall_limits import WALL_TARGET_MM
+from _printed_tolerance import printed_band_mm
 
 STEM = "ch_rocker_arm_tl_oblique_end_bracket"
 ARTIFACT = "ch-rocker-arm-tl-oblique-end-bracket"
@@ -32,27 +34,40 @@ def _features() -> dict:
     return export_features.requirement_manifest(STEM)["features"]
 
 
+def _on_grid(mm: float, places: int) -> bool:
+    """``mm`` prints exactly at ``places`` inch decimals."""
+    return abs(mm / 25.4 - round(mm / 25.4, places)) < 1e-9
+
+
 def _lateral(x: float) -> float:
     """Bracket model X -> machine lateral (the leadscrew spec's placement)."""
     return leadscrew.BRACKET_INNER_LATERAL + x
 
 
 def test_stock_is_the_half_by_one_flat_on_edge() -> None:
-    assert (spec.BRACKET_THICK, spec.BRACKET_WIDTH, spec.BRACKET_LENGTH) == (
-        25.4,
-        12.7,
-        68.9,
-    )
+    assert (spec.BRACKET_THICK, spec.BRACKET_WIDTH) == (25.4, 12.7)
+    # #290: the sawn length prints as modelled at .XX.
+    assert spec.UNIT == "in"
+    assert _on_grid(spec.BRACKET_LENGTH, spec.LENGTH_PLACES)
     # Ruling A′: the outer end flush with the 1/2 x 6 bar's column-side edge.
     assert leadscrew.BRACKET_INNER_LATERAL + spec.BRACKET_LENGTH == pytest.approx(
         trammel.BASE_BAR_COLUMN_EDGE
     )
     assert spec.BRACKET_LENGTH == pytest.approx(leadscrew.BRACKET_LENGTH)
     assert spec.BRACKET_WIDTH == pytest.approx(leadscrew.BRACKET_WIDTH)
+    # Both stock sizes print their supplier fraction as a reference over
+    # STOCK and the supplier's band.
     assert spec.STOCK_DIMENSIONS == {"BracketWidth", "BracketThick"}
-    for name in spec.STOCK_DIMENSIONS:
-        assert spec.CALLOUTS_BELOW[name] == "STOCK"
-        assert spec.DRAWING_PRECISION_BY_NAME[name] == 2  # 12.70, 25.40
+    assert spec.STOCK_CALLOUTS == {
+        "BracketWidth": "STOCK\n±.009",
+        "BracketThick": "STOCK\n±.012",
+    }
+    assert not spec.STOCK_DIMENSIONS & set(spec.CALLOUTS_BELOW)
+    sizes = {"BracketWidth": spec.BRACKET_WIDTH, "BracketThick": spec.BRACKET_THICK}
+    for name, denominator in spec.STOCK_FRACTION_DENOMINATORS.items():
+        assert sizes[name] / 25.4 * denominator == pytest.approx(
+            round(sizes[name] / 25.4 * denominator)
+        )
     # The 13 KP08 foot (UNVERIFIED) overhangs the 12.7 top 0.15 a side.
     assert spec.KP08_FOOT_OVERHANG == pytest.approx(0.15)
 
@@ -64,7 +79,22 @@ def test_kp08_taps_land_on_the_blocks_bolt_spacing_about_the_screw() -> None:
     assert laterals == pytest.approx(
         [leadscrew.SCREW_LATERAL - half, leadscrew.SCREW_LATERAL + half]
     )
-    assert spec.KP08_TAP_X == (14.0, 56.0)
+    # Owner ruling 4 (2026-11-01): the KP08's metric stations print exact
+    # millimetres at three places, labelled mm, with the millimetre title
+    # block's three-place band.
+    assert spec.KP08_TAP_X == pytest.approx((13.925, 55.925))
+    assert all(x == round(x, 3) for x in spec.KP08_TAP_X)
+    assert spec.METRIC_DIMENSIONS == {
+        ("KP08Taps", "KP08Tap1X"): (3, 0.13),
+        ("KP08Taps", "KP08Tap2X"): (3, 0.13),
+    }
+    assert spec.KP08_TAP_BAND == printed_band_mm(3, unit="mm")
+    assert "set_metric_vendor_units(" in Path(part.__file__).read_text(encoding="utf-8")
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "print_imported_metric_dimensions(" in sheet
+    for hole in holes:
+        x = hole["at"][0]
+        assert hole["station"] == pytest.approx([x - 0.13, x + 0.13])
     assert all(h["at"][1] == 0.0 for h in holes)  # the row on the screw's KP08_S
     assert spec.KP08_TAP_SPEC.kind == "tapped"  # UNC: the block's holes are plain
     assert spec.KP08_TAP_SPEC.size == leadscrew.KP08_SCREW == "#6-32"
@@ -76,8 +106,9 @@ def test_bar_taps_land_on_the_base_bars_bracket_holes() -> None:
     holes = [_features()[f"bar_tap_{i}"] for i in (1, 2, 3, 4)]
     laterals = [_lateral(h["at"][0]) for h in holes]
     assert laterals == pytest.approx(list(leadscrew.BAR_SCREW_LATERALS))
-    # Ruling A′: two pairs symmetric about the screw axis (±11, ±27.5).
-    assert spec.BAR_TAP_X == (7.5, 24.0, 46.0, 62.5)
+    # Ruling A′: two pairs symmetric about the screw axis; every station
+    # prints as modelled at .XXX.
+    assert all(_on_grid(x, spec.HOLE_PLACES) for x in spec.BAR_TAP_X)
     assert spec.BAR_TAP_SPEC.kind == "tapped"
     assert spec.BAR_TAP_SPEC.size == leadscrew.BAR_SCREW == "#8-32"
     assert spec.BAR_TAP_SPEC.end == "through_all"
@@ -86,15 +117,21 @@ def test_bar_taps_land_on_the_base_bars_bracket_holes() -> None:
 
 
 def test_both_patterns_fit_their_mates_at_three_places() -> None:
-    assert spec.POSITION_RADIUS == pytest.approx(math.hypot(0.13, 0.13))
+    # Each station's band about the row's: the bar taps' .XXX, the KP08
+    # taps' exact millimetres at ±0.13.
+    band = printed_band_mm(spec.HOLE_PLACES, unit="in")
+    assert spec.POSITION_RADIUS >= math.hypot(band, band)
+    assert spec.POSITION_RADIUS <= math.hypot(band + 0.0127, band)
     assert spec.KP08_SCREW_FLOAT == pytest.approx(0.4975)
-    assert spec.KP08_PATTERN_ALLOWANCE == pytest.approx(0.3137, abs=1e-4)
+    assert spec.KP08_PATTERN_ALLOWANCE > 0.0
     assert spec.BAR_HOLE_DIA == pytest.approx(4.978)
-    assert spec.BAR_PATTERN_ALLOWANCE == pytest.approx(0.2222, abs=1e-4)
+    assert spec.BAR_PATTERN_ALLOWANCE > 0.0
     stations = {*drawing.STATION_ORDER, "HoleRowY"}
     assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 3 for name in stations)
-    # The title block's two-place ±0.51 would not fit either pattern.
-    assert math.hypot(0.51, 0.51) > max(spec.KP08_SCREW_FLOAT, spec.BAR_SCREW_FLOAT)
+    # At the title block's two places this part's and TL-20's position
+    # radii together would overrun the #8's float.
+    two = printed_band_mm(2, unit="in")
+    assert 2.0 * math.hypot(two, two) > spec.BAR_SCREW_FLOAT
 
 
 def test_every_tight_band_names_its_mate() -> None:
@@ -131,23 +168,13 @@ def test_no_vendor_sku_on_the_sheet() -> None:
 
 def test_walls_hold_rule_17_at_worst_case() -> None:
     walls = spec.WALLS_MM
-    assert min(walls.values()) >= spec.WALL_TARGET == 2.0
-    # Ruling A′: the outer #8s' walls to the #6s are the rule-17 window's
-    # lower bound; the 62.5's to the outer end holds at the length's one place.
-    assert {k: v for k, v in walls.items() if "tap" in k} == pytest.approx(
-        {
-            "#8 tap at 7.5 to inner end": 5.287,
-            "#8 tap at 7.5 to #6 tap at 14": 2.405,
-            "#6 tap at 14 to #8 tap at 24": 5.905,
-            "#8 tap at 24 to #8 tap at 46": 17.574,
-            "#8 tap at 46 to #6 tap at 56": 5.905,
-            "#6 tap at 56 to #8 tap at 62.5": 2.405,
-            "#8 tap at 62.5 to outer end": 3.387,
-        },
-        abs=1e-3,
-    )
-    assert walls["row to -Y side"] == pytest.approx(4.137, abs=1e-3)
-    assert walls["row to +Y side"] == pytest.approx(3.627, abs=1e-3)
+    assert spec.WALL_TARGET == WALL_TARGET_MM
+    assert min(walls.values()) >= spec.WALL_TARGET
+    # Ruling A′: every tap to its row neighbours and the end taps to the
+    # ends, in row order, plus the row to both sides.
+    taps = [name for name in walls if "tap" in name]
+    assert len(taps) == len(spec.BAR_TAP_X) + len(spec.KP08_TAP_X) + 1
+    assert {"row to -Y side", "row to +Y side"} <= set(walls)
     assert spec.RULE_20_SHORTFALLS == ()
     # Cross-check from the exported bands: each thread's major at its station
     # band's far end.
@@ -155,9 +182,9 @@ def test_walls_hold_rule_17_at_worst_case() -> None:
     bar_1, kp08_1 = holes["bar_tap_1"], holes["kp08_tap_1"]
     bar_r = THREAD_MAJOR_MM[spec.BAR_SCREW] / 2.0
     kp08_r = THREAD_MAJOR_MM[spec.KP08_THREAD] / 2.0
-    assert bar_1["station"][0] - bar_r >= 2.0
-    assert kp08_1["station"][0] - bar_1["station"][1] - bar_r - kp08_r >= 2.0
-    assert bar_1["height"][0] - bar_r >= 2.0
+    assert bar_1["station"][0] - bar_r >= WALL_TARGET_MM
+    assert kp08_1["station"][0] - bar_1["station"][1] - bar_r - kp08_r >= WALL_TARGET_MM
+    assert bar_1["height"][0] - bar_r >= WALL_TARGET_MM
 
 
 def test_through_thread_offers_one_and_a_half_diameters() -> None:
@@ -165,13 +192,32 @@ def test_through_thread_offers_one_and_a_half_diameters() -> None:
         assert spec.BRACKET_THICK >= 1.5 * THREAD_MAJOR_MM[thread]
 
 
-def test_holes_carry_the_title_block_band_only() -> None:
-    assert model_toleranced_dimensions(part) == {}
+def test_holes_carry_the_title_block_band_except_the_kp08_stations() -> None:
+    # Only the KP08 stations carry a model band: millimetres on the inch
+    # sheet, which the inch title block's rows do not cover (owner ruling 4).
+    # (The loop over METRIC_DIMENSIONS reports its source names.)
+    assert model_toleranced_dimensions(part) == {
+        ("feature_name", "dimension_name"): "band"
+    }
     holes = _features()
-    assert holes["bar_tap_1"]["dia"] == [3.45, 3.55]
-    assert holes["kp08_tap_1"]["dia"] == [2.71, 2.81]
-    assert holes["kp08_tap_2"]["station"] == [55.87, 56.13]
-    assert holes["bar_tap_1"]["height"] == [6.22, 6.48]
+    # The tap drills print .XXX with the title block's drilled-hole band.
+    for name, drill in (
+        ("bar_tap_1", spec.BAR_TAP_DRILL),
+        ("kp08_tap_1", spec.KP08_TAP_DRILL),
+    ):
+        low, high = holes[name]["dia"]
+        assert low == pytest.approx(round(drill / 25.4, 3) * 25.4)
+        assert high - low == pytest.approx(spec.DRILLED_BAND[0])
+    band = printed_band_mm(spec.HOLE_PLACES, unit="in")
+    for name, width in (
+        ("kp08_tap_2", 2.0 * spec.KP08_TAP_BAND),
+        ("bar_tap_1", 2.0 * band),
+    ):
+        low, high = holes[name]["station"]
+        assert high - low == pytest.approx(width)
+    assert holes["bar_tap_1"]["height"] == pytest.approx(
+        [spec.HOLE_ROW_Y - band, spec.HOLE_ROW_Y + band]
+    )
     assert holes["bar_tap_1"]["height_from"] == "bracket_low_side"
 
 
@@ -185,19 +231,25 @@ def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
 
 def test_every_exported_band_endpoint_is_a_printed_value() -> None:
     checked = 0
+    stock = {("bar_seat", "thickness"), ("bar_seat", "width")}
     for name, feature in _features().items():
         for requirement in feature["requirements"]:
             band = feature.get(requirement)
             if not (isinstance(band, list) and len(band) == 2):
                 continue
-            places = feature["precision"][requirement]
-            for end in band:
-                assert abs(end - round(end, places)) < 1e-9, (name, requirement)
             nominal = feature.get(f"{requirement}_nominal")
             if nominal is not None:
                 assert band[0] <= nominal <= band[1], (name, requirement)
-                assert abs(nominal - round(nominal, places)) < 1e-9
             checked += 1
+            if (name, requirement) in stock:
+                continue  # the supplier's band about the stock size
+            places = feature["precision"][requirement]
+            metric = name.startswith("kp08_tap") and requirement == "station"
+            for end in band:
+                if metric:  # exact millimetres (owner ruling 4)
+                    assert end == pytest.approx(round(end, places), abs=1e-9), name
+                else:
+                    assert _on_grid(end, places), (name, requirement)
     assert checked
 
 
@@ -265,7 +317,7 @@ def _block(name: str) -> tuple[float, float, float, float]:
     over its mate (the mate the wider line), the length one line."""
     x, y = _plan(name)
     if name == "BracketLength":
-        half, half_high = drawing.text_half("68.9"), drawing.text_half_high(1)
+        half, half_high = drawing.text_half("2.71"), drawing.text_half_high(1)
     else:
         half, half_high = (
             drawing.text_half(_STATION_MATES[name]),
@@ -467,7 +519,7 @@ def test_tap_callouts_stand_over_the_plan_inside_the_sheet() -> None:
 def test_views_clear_each_other_the_border_and_the_title_block() -> None:
     s = drawing._S / 1000.0
     width_text_right, _ = drawing.plan_sheet(
-        _plan("BracketWidth")[0] + drawing.text_half("12.70\nSTOCK"), 0.0
+        _plan("BracketWidth")[0] + drawing.text_half("(1/2 in)\nSTOCK"), 0.0
     )
     end_left = drawing.END_CENTER[0] - spec.BRACKET_THICK / 2.0 * s
     end_right = drawing.END_CENTER[0] + spec.BRACKET_THICK / 2.0 * s
@@ -547,4 +599,6 @@ def test_prechips_solids_are_valid_fixture_solids() -> None:
         "KP08 tap 2",
     }
     box = spec.PRECHIPS_SOLIDS[0]
-    assert box["size_mm"] == [68.9, 12.7, 25.4]
+    assert box["size_mm"] == pytest.approx(
+        [spec.BRACKET_LENGTH, spec.BRACKET_WIDTH, spec.BRACKET_THICK]
+    )

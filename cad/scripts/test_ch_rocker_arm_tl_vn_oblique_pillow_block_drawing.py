@@ -167,6 +167,8 @@ def test_note_is_one_short_line_naming_the_end_bracket() -> None:
     assert "\n" not in note and len(note) <= 80
     assert note == note.upper()
     assert "MHA-CH-06-TL-28" in note
+    # The receipt check's pass condition: the bracket's screws pass the holes.
+    assert "#6-32 SCREWS MUST PASS BOTH HOLES" in note
 
 
 def test_sheet_is_the_registered_purchased_part_reference(monkeypatch) -> None:
@@ -179,13 +181,79 @@ def test_sheet_is_the_registered_purchased_part_reference(monkeypatch) -> None:
     assert drawn.layout is DrawingLayout.LANDSCAPE
     calls = []
 
-    async def fake(adapter, sheet, *, item, cut_to_suit=False, number_fit=None):
-        calls.append((adapter, sheet, item, cut_to_suit, number_fit))
+    async def fake(
+        adapter,
+        sheet,
+        *,
+        item,
+        cut_to_suit=False,
+        number_fit=None,
+        supplier_dimensions=None,
+        supplier_margins=None,
+        settled_checks=(),
+    ):
+        calls.append((adapter, sheet, item, cut_to_suit, number_fit, supplier_margins))
+        assert callable(supplier_dimensions) and len(settled_checks) == 1
         return {"pdf": "x"}
 
     monkeypatch.setattr(draw, "build_purchased_part_drawing", fake)
     adapter = object()
     assert asyncio.run(draw.build(adapter)) == {"pdf": "x"}
     # The 18-character number is fitted to its DWG. NO. cell, clear of REV.
-    assert calls == [(adapter, drawn, draw.ITEM, False, draw.NumberFit.SHRINK_TO_CELL)]
+    assert calls == [
+        (
+            adapter,
+            drawn,
+            draw.ITEM,
+            False,
+            draw.NumberFit.SHRINK_TO_CELL,
+            draw.SUPPLIER_MARGINS,
+        )
+    ]
     assert "KP08" in draw.ITEM
+
+
+def test_plan_view_carries_the_receipt_check_reference_sizes() -> None:
+    """Machinist review: the envelope sheet gave no bolt-hole size or spacing."""
+    from _supplier_screw_layout import supplier_screw_lane_plan
+
+    rows = {name: (value, orientation) for name, value, orientation in spec.SUPPLIER_REFERENCE_DIMENSIONS}
+    assert rows == {
+        "SupplierBoltSpacing": (leadscrew.KP08_BOLT_SPACING, "horizontal"),
+        "SupplierBoltHoleDiameter": (leadscrew.KP08_HOLE_DIA, "vertical"),
+    }
+    # All on the plan (Front) view, in millimetres.
+    assert spec.SUPPLIER_REFERENCE_PLANES == {}
+    assert set(spec.SUPPLIER_REFERENCE_UNITS.values()) == {"mm"}
+    assert spec.SUPPLIER_REFERENCE_FORMATS["SupplierBoltHoleDiameter"] == (
+        1, "diameter", None, "2X",
+    )
+
+    def chord(name):
+        (x, y), (value, orientation) = spec.SUPPLIER_REFERENCE_STARTS[name], rows[name]
+        return (x, y), (x + value, y) if orientation == "horizontal" else (x, y + value)
+
+    # The spacing lies on the holes' centreline (on the foot's edge it printed
+    # as dashed residue), the hole across the -X hole.
+    assert chord("SupplierBoltSpacing") == ((spec.HOLE_X[0], 0.0), (spec.HOLE_X[1], 0.0))
+    assert chord("SupplierBoltHoleDiameter") == ((spec.HOLE_X[0], -spec.HOLE_DIA / 2.0), (spec.HOLE_X[0], spec.HOLE_DIA / 2.0))
+    lanes = supplier_screw_lane_plan(
+        spec.SUPPLIER_REFERENCE_DIMENSIONS,
+        planes=spec.SUPPLIER_REFERENCE_PLANES,
+        sides=spec.SUPPLIER_REFERENCE_SIDES,
+    )
+    assert {name: side for name, (side, _offset) in lanes.items()} == {
+        "SupplierBoltSpacing": "top",
+        "SupplierBoltHoleDiameter": "left",
+    }
+    # The hole's text shelves left, clear of its witnesses; the spacing's stays
+    # centred in a break of its line (no offset leader doubling the line).
+    assert draw.SHELVES == {"SupplierBoltHoleDiameter": (False, "left")}
+    assert (draw.BROKEN_LINE, draw.BROKEN_LINE_ALIGNED_TEXT) == ("SupplierBoltSpacing", 3)
+    left, bottom, right, top = draw.SUPPLIER_MARGINS["*Front"]
+    # The hole text's left reserve; the plan view (55 x 13 at 2:1 plus 11.176
+    # mm of native padding) still fits the 180 mm cell beside it.
+    assert (left, right) == (0.034, 0.020) and top >= bottom
+    assert 0.180 - left - right >= 2 * spec.LENGTH / 1000.0 + 0.011176
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "supplier.SUPPLIER_REFERENCE_DIMENSIONS" in source

@@ -1522,11 +1522,11 @@ def test_shim_stock_note_refuses_a_note_that_does_not_fit(kit_bom_note_state, fa
 
 
 def test_shim_stock_note_buys_the_worst_case_at_both_supports() -> None:
-    # Owner ruling 2026-10-27: the nominal 0.2 pack plus four 0.5 and one 0.1
-    # a support (the 2.1 worst case), at both supports.
-    assert spec.PIVOT_SHIM_BUY == {
-        "98055A117": (0.1, 2), "98055A118": (0.2, 10), "98055A121": (0.5, 8),
-    }
+    # Owner ruling 2026-10-27: the nominal pack plus the worst-case pack a
+    # support, at both supports, from the fitting stock alone.
+    assert set(spec.PIVOT_SHIM_BUY) == set(spec.pivot_shim.FIT_SKUS.values())
+    assert all(count % 2 == 0 for _thickness, count in spec.PIVOT_SHIM_BUY.values())
+    assert spec.PIVOT_SHIM_BUY[spec.pivot_shim.SKU][1] >= spec.pivot_shim.QUANTITY
     note = spec.PIVOT_SHIM_STOCK_NOTE
     assert note.startswith(f"ITEM {spec.ITEM_NUMBERS[spec.PIVOT_SHIM]}:")
     for sku, (_thickness, count) in spec.PIVOT_SHIM_BUY.items():
@@ -1740,11 +1740,13 @@ def _elevation_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
 
 
 def test_cl_tip_text_stands_clear_outboard_of_the_riser() -> None:
-    """The (1.6) text, centred on its point: on the sheet, left of the dowel
-    and the riser's -X end, above the tip, clear of the plan and every note."""
+    """The parenthesised tip text, centred on its point: on the sheet, left of
+    the dowel and the riser's -X end, above the tip, clear of the plan and
+    every note."""
     tx, _ty, tz = drawing.CL_TIP_TEXT_MODEL_MM
     cx, cy = _elevation_xy(tx, tz)
-    half_w, half_h = len("(1.6)") * CHAR_M / 2.0, LINE_M / 2.0
+    printed = f"({spec._length(spec.cl_dowel.TIP_HEIGHT, spec.CL_TIP_PRECISION)})"
+    half_w, half_h = len(printed) * CHAR_M / 2.0, LINE_M / 2.0
     text = (cx - half_w, cy - half_h, cx + half_w, cy + half_h)
     (x, _riser_top), (_x, tip_z) = spec.CL_TIP_LINE
     riser_end = spec.POSE.to_machine(spec.riser.BLANK_ORIGIN)[0]
@@ -1889,7 +1891,6 @@ def test_plain_pivot_geometry_sets_the_carrier_and_positive_head_capture() -> No
         assert screw_origin[2] - screw.THREAD_LENGTH > spec.trammel.CARRIAGE_TOP_Z
         gap = screw_origin[2] + screw.SHOULDER_LENGTH - spec.trammel.CARRIER_TOP_Z
         assert spec.PIVOT_RUNNING_GAP[0] <= gap <= spec.PIVOT_RUNNING_GAP[1]
-        assert gap == pytest.approx(0.15)
         assert screw.HEAD_DIA > spec.carrier.PIN_HOLE_DIA
 
 
@@ -1902,10 +1903,8 @@ def test_block_occurrences_and_integral_nut_axis_match_the_feed_geometry() -> No
     origin, rows = spec.PLACEMENTS[spec.FEED_BLOCK][0]
     nut_axis = (block.NUT_FACE_X, block.NUT_AXIS_Y, block.NUT_AXIS_Z)
     world = tuple(origin[i] + sum(nut_axis[k] * rows[k][i] for k in range(3)) for i in range(3))
-    assert world[2] == pytest.approx(52.4)  # the faced 12.0 bar + 25.4 + 15.0
     assert world[2] == pytest.approx(spec.leadscrew.SCREW_AXIS_Z)
-    assert block.NUT_AXIS_Z - spec.leadscrew.NUT_FLANGE_DIA / 2.0 > 0.0
-    assert block.NUT_AXIS_Z + spec.leadscrew.NUT_FLANGE_DIA / 2.0 < block.BLOCK_HEIGHT
+    assert 0.0 <= block.NUT_Z[0] < block.NUT_Z[1] <= block.BLOCK_HEIGHT
 
 
 @pytest.mark.parametrize("sheet", (drawing.PIVOT_SHEET, "LEADSCREW FEED EXPLODED"))

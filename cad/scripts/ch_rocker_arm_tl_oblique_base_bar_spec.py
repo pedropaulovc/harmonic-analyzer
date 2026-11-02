@@ -11,128 +11,153 @@ table by indicating the pin, so the bar's own position on the table does not
 matter; the only tight bands are the rail holes' end distance and pitch
 (below).
 
-Material and stock: 6061-T6511 aluminium flat bar, 1/2 x 5-1/2 in (OnlineMetals
-17666; ⚙ ``BASE_BAR_STOCK_THICK`` 12.7 x ⚙ ``BASE_BAR_WIDTH`` 139.7), sawn and
-faced to ⚙ ``BASE_BAR_LENGTH`` 440 (the rail's length; rail and bar are flush).
-The width is left as supplied and prints "STOCK". Both large faces are faced
-to ⚙ ``BASE_BAR_THICK`` 12.0 (owner ruling 2026-10-30, option A), printed at
-.X and held by the title block's band like the TL-21 carrier: each is a
-static locating seat, so each carries Ra 3.2 (rule 6, ``SURFACE_FINISHES``).
-Bar 1's underside sits on the mill table and its top carries the rail and the
-TL-28 brackets; bar 2, turned over, uses them the other way round. Facing
-takes about 0.35 a face; the PM-30MV's 23 in X and 8.75 in Y travel cover the
-440 x 139.7 face, gripped across the 139.7 in the 146.05 vise opening.
-Overall finished size 440 x 139.7 x 12.0. The user's 2026-10-17 ruling (a)
-widened the bar from 1/2 x 4 to 1/2 x 6 so the leadscrew's TL-28 end brackets
-(PR C4) stand wholly on bar 1; the 2026-10-30 ruling narrowed it to
-1/2 x 5-1/2, the widest listed OnlineMetals bar that fits the 6 in vise's
-stock hard jaws (5 3/4 in), keeping the column-side edge and so the brackets.
+Issue #290: the sheet prints decimal inch (``drawing_unit: in``). Lengths
+stay physical millimetres, each fabricated nominal the exact millimetres of
+its printed inch value. Exempt: the near slot's station (it closes the T-slot
+pitch), which prints rounded, its worst cases reading the printed value's
+limits. The HGR15R rail's hole pattern and the bracket holes' stations (the
+leadscrew's KP08 stations along the Tr8 screw) belong to metric-only vendor
+lines (owner ruling 4, 2026-11-01, option B): they print exact millimetres,
+labelled ``mm``, each with its own band (``METRIC_DIMENSIONS``,
+``_metric_vendor_dimension``).
+
+Material and stock: 6061-T6511 aluminium flat bar milled from the owned 1/2 x
+6 bar (OnlineMetals 1173; owner ruling #2083), sawn and faced to ⚙
+``BASE_BAR_LENGTH`` 17.32 (the rail's 440 cut; rail and bar flush within the
+length's band) and milled to width ⚙ ``BASE_BAR_WIDTH`` 5.50 on edge in the
+vise, no bandsaw rip: the width is a machined size at the title block's .XX
+band. Both large faces are faced from ⚙ ``BASE_BAR_STOCK_THICK`` to ⚙
+``BASE_BAR_THICK`` .47 (owner ruling 2026-10-30, option A), held by the title
+block's .XX band like the TL-21 carrier: each is a static locating seat, so
+each carries Ra 125 µin (rule 6, ``SURFACE_FINISHES``). Bar 1's underside
+sits on the mill table and its top carries the rail and the TL-28 brackets;
+bar 2, turned over, uses them the other way round. The PM-30MV's 23 in X and
+8.75 in Y travel cover the 17.32 x 5.50 face, gripped across the 5.50 in the
+5.75 vise opening. The user's 2026-10-17 ruling (a) widened the bar from 1/2 x
+4 to 1/2 x 6 so the leadscrew's TL-28 end brackets (PR C4) stand wholly on bar
+1; the 2026-10-30 ruling narrowed it to 5.50, inside the 6 in vise's stock
+hard jaws, keeping the column-side edge and so the brackets.
 
 Frame: origin at the bar's spindle-end face, on the rail axis, on the bottom
 face; +X along the bar away from the spindle, +Y across it, +Z up
 (right-handed). On rail 1 the part's y is minus the calculator's lateral
 (``trammel.rail_point``, +lateral toward the column), so the column-side edge
-⚙ ``BASE_BAR_COLUMN_EDGE`` (lateral +88.9) is the -Y side and the
-operator-side edge ⚙ ``BASE_BAR_OPERATOR_EDGE`` (lateral -50.8) the +Y side:
-the bar spans x 0 .. 440, y ``LOW_SIDE_Y`` -88.9 .. ``HIGH_SIDE_Y`` 50.8,
-z 0 .. 12.0.
+⚙ ``BASE_BAR_COLUMN_EDGE`` (lateral +3.50) is the -Y side and the
+operator-side edge ⚙ ``BASE_BAR_OPERATOR_EDGE`` (lateral -2.00) the +Y side.
 
 Rail holes: 7 x #8-32 UNC tapped THRU on the rail axis (y 0) at x = ⚙
-``RAIL_HOLE_END`` + k * ⚙ ``RAIL_HOLE_PITCH`` (40 .. 400). The rail is a
-custom 440 cut; its symmetric E = 40 end distance is the ORDER requirement,
-an unverified vendor value until the supplier confirms the cut. The rail's
-Ø4.5 holes take #8 socket screws (⚙ ``RAIL_SCREW``); a 3/4 in screw seats
-⚙ 9.7 above the rail base, so 9.35 engages the bar (rule 18: at least
-1.5D = 6.25).
+``RAIL_HOLE_END`` + k * ⚙ ``RAIL_HOLE_PITCH`` (40 .. 400 mm, the rail's own
+pattern, printed ``40.00 ±0.08 mm`` .. ``400.00 ±0.08 mm``). The rail is a
+custom cut; its symmetric E = 40 end distance is the ORDER requirement, an
+unverified vendor value until the supplier confirms the cut. The rail's
+Ø4.5 mm holes take #8 socket
+screws (⚙ ``RAIL_SCREW``); a 3/4 in screw seats ⚙ 9.7 mm above the rail base,
+so .368 engages the bar (rule 18: at least 1.5D).
 
-Rail-hole bands (the one tight requirement): a #8 screw (Ø4.17) fixed in the
-bar's tapped hole has only ``RAIL_SCREW_CLEARANCE`` 0.167 a side in the rail's
-Ø4.5 hole (a fixed-fastener pattern), so every bar hole's position error plus
-the rail's own must stay inside that radius. Every hole is located by DRO
-absolutes from the two faced datums: its station from the spindle-end face
-(40.00 .. 400.00) at 2 places ± ``RAIL_HOLE_BAND`` 0.08, the rail's pitch,
-and the row from the faced -Y edge (``RAIL_ROW_Y`` 88.90, the column-side
-edge's lateral) at the title block's .XX (``RAIL_ROW_PLACES``; c3-r7, rule
-4: the row's height has no mate, the hold-down slots set the bar's place at
-fit-up and the rail is indicated in). All seven holes are cut at the one DRO
-Y setting, so the row's band moves the whole row, not one hole off another:
-only the station band scatters the holes, ``RAIL_HOLE_POSITION_RADIUS``
-0.08 from nominal, leaving ``RAIL_PATTERN_ALLOWANCE`` 0.087 radius for the
-rail's own hole positions (an unverified vendor value). The outermost
-station (400.00) carries the mate on a second line, "MATCHES HGR15R RAIL
-HOLES", above the stack where no extension line crosses it. The row's 88.90
-carries its reason (``RAIL_ROW_CALLOUT``): every hole in line with the
-rail's straight row of Ø4.5 holes, which the one setting gives.
+Rail-hole bands (the one tight requirement): a #8 screw (Ø.164) fixed in the
+bar's tapped hole has only ``RAIL_SCREW_CLEARANCE`` .0066 a side in the
+rail's Ø4.5 mm hole (a fixed-fastener pattern), so every bar hole's position
+error plus the rail's own must stay inside that radius. Every hole is located
+by DRO absolutes from the two faced datums: its station from the spindle-end
+face at 2 mm places ± ``RAIL_HOLE_BAND`` 0.08 mm, the rail's pitch, and the row
+from the faced -Y edge (``RAIL_ROW_Y`` 3.50, the column-side edge's lateral)
+at the title block's .XX (``RAIL_ROW_PLACES``; c3-r7, rule 4: the row's
+height has no mate, the hold-down slots set the bar's place at fit-up and
+the rail is indicated in). All seven holes are cut at the one DRO Y setting,
+so the row's band moves the whole row: only the station band scatters the
+holes, ``RAIL_HOLE_POSITION_RADIUS`` from nominal (the stations print exact,
+so no rounding adds to it), leaving ``RAIL_PATTERN_ALLOWANCE`` for the rail's
+own hole positions (an unverified vendor value). The outermost station
+carries the mate on a second line, "MATCHES HGR15R RAIL HOLES". The row's
+3.50 carries its reason (``RAIL_ROW_CALLOUT``).
 
-Hold-down slots: two through slots ⚙ ``HOLD_DOWN_SLOT_WIDTH`` 13.5 wide, axis
-along Y, stud travel ± ⚙ ``HOLD_DOWN_ADJUST`` 2 (17.5 overall). Near slot centre
-x = ⚙ ``HOLD_DOWN_NEAR_S`` - ⚙ ``RAIL_NEAR_S`` (20.92), far slot x = ⚙
-``HOLD_DOWN_FAR_S`` - ⚙ ``RAIL_NEAR_S`` (390), each ± ⚙ ``HOLD_DOWN_LATERAL``
-(37.5) off the rail axis. Per drawing-guidelines rule 12 the slots are
-dimensioned to their radius centres: width 13.50 and the 4.00 between the two
-end-arc centres, each centre carrying a printed centre mark, so the 4.00
-reads as centre-to-centre and not as the slot's 17.5 overall length.
+Hold-down slots: two through slots ⚙ ``HOLD_DOWN_SLOT_WIDTH`` .53 wide, axis
+along Y, stud travel ± ⚙ ``HOLD_DOWN_ADJUST`` .08 (.69 overall). Near slot
+centre x = ⚙ ``HOLD_DOWN_NEAR_S`` - ⚙ ``RAIL_NEAR_S`` (prints .87), far slot
+x = ⚙ ``HOLD_DOWN_FAR_S`` - ⚙ ``RAIL_NEAR_S`` (15.35), each ± ⚙
+``HOLD_DOWN_LATERAL`` (1.48) off the rail axis. Per drawing-guidelines rule
+12 the slots are dimensioned to their radius centres: width .53 and the .16
+between the two end-arc centres, each centre carrying a printed centre mark.
 
 One part, one configuration, two off (Main's ruling): every feature goes
 through, so the bar under rail 2 is the same part turned over (rotated 180°
 about its X axis). Turning it over mirrors plan X and keeps lateral, so on
 both bars the column-side edge stays on the column side, the near slot on
-the near stud (lateral +37.5) and the rail row on the rail. The part as
-modelled is the rail-1 bar: near slot at y -37.5, far slot at +37.5. Both
-slots are located from the faced -Y side, the datum every hole uses, to
-their lower end centres (c3-r6 review, rule 10: one datum per view): the
-near slot's rise ``NEAR_SLOT_RISE`` 49.4, the far slot's ``FAR_SLOT_RISE``
-124.4. On the 1/2 x 4 bar the far slot's wall to the +Y side, carrying the
-stock width's band, fell to 1.2 worst (c4-r2), so it was dropped from the +Y
-side. The 1/2 x 5-1/2 bar at the old ±3 travel fell to 1.18 worst again; the
-2026-10-30 ruling cut the travel to ±2 rather than bring the +Y datum back.
+the near stud and the rail row on the rail. The part as modelled is the
+rail-1 bar: near slot at y -1.48, far slot at +1.48. Both slots are located
+from the faced -Y side, the datum every hole uses, to their lower end
+centres (c3-r6 review, rule 10): the near slot's rise ``NEAR_SLOT_RISE``
+1.94, the far slot's ``FAR_SLOT_RISE`` 4.90.
 
-Walls (rule 17, worst case at the printed bands): the near slot to the bar's
-spindle end 14.2 nominal; a slot end to its bar side 4.55 nominal (the far
-slot to the +Y side; the near slot to the -Y side is 42.65), 2.18 worst (the
-far slot's: its rise, run and the stock width's bands all enter it).
+Walls (rule 17, .080 target, .060 floor, worst case at the printed bands):
+the near slot to the bar's spindle end; a slot end to its bar side (the far
+slot to the +Y side is the thinner: its rise, run and the stock width's
+supplier band all enter it).
 
 End bracket holes (PR C4): 8 x #8 SHCS clearance (``BRACKET_HOLE_DIA``
-4.978, normal fit) THRU, counterbored Ø7.94 x 4.80 from the UNDERSIDE, at
+.196, normal fit) THRU, counterbored Ø.313 x .189 from the UNDERSIDE, at
 the leadscrew layout's ``BASE_BAR_HOLES`` (four in a row at each KP08
-station, derived there; y -27.5, -44, -66 and -82.5, so rows 61.4, 44.9,
-22.9 and 6.4 from the -Y edge). Four #8-32 x 5/8 SHCS per TL-28 bracket go
-up through the bar into the bracket's tapped holes before the bar goes on
-the table; the heads sit 0.12 or more below the underside. Since the
-2026-10-17 widening (ruling A′) each bracket stands wholly on the bar, its
-outer end flush with the -Y edge. Both bars carry the holes; on the
-turned-over bar 2 the counterbores face up, unused. Stations and rows print
-at .XXX (±0.13): the row's spacings must hold TL-28's tapped row inside the
-screws' 0.406 float, so the callout names the mate. Worst-case walls
-(``bracket_hole_walls``): counterbore to the -Y edge 2.05 (the rule-17
-target, which bounds the outer screws' half-span), to the far end 6.85, to its
-row neighbour 7.68, to the nearest rail tap and hold-down slot over 20;
-counterbore floor 5.89.
+station; rows 2.425, 1.768, .902 and .245 from the -Y edge). Four #8-32 x
+5/8 SHCS per TL-28 bracket go up through the bar into the bracket's tapped
+holes before the bar goes on the table; the heads sit below the underside.
+Since the 2026-10-17 widening (ruling A′) each bracket stands wholly on the
+bar, its outer end flush with the -Y edge. Both bars carry the holes; on the
+turned-over bar 2 the counterbores face up, unused. The rows print at .XXX:
+their spacings must hold TL-28's tapped row inside the screws' float, so the
+callout names the mate. The two stations are the KP08's metric stations and
+print exact, ``57.000 ±0.13 mm`` and ``428.000 ±0.13 mm`` (the millimetre
+title block's three-place band, stated on each). Worst-case walls:
+``bracket_hole_walls``.
 """
 
 from __future__ import annotations
 
 import math
 
-
+import _config
 from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+from _package_units import drawing_unit
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 
 INCH = 25.4
+UNIT = drawing_unit(
+    "parts/ch-rocker-arm-tl-oblique-base-bar",
+    _config.parts("ch-rocker-arm-tl-oblique-base-bar"),
+)
+# The metric vendor lines' stations print in millimetres on the inch sheet
+# (owner ruling 4, 2026-11-01): exact, so no rounding adds to their band.
+METRIC_UNIT = "mm"
 
-BAR_THICK = trammel.BASE_BAR_THICK  # ⚙ 12.0, faced
-BAR_WIDTH = trammel.BASE_BAR_WIDTH  # ⚙ 139.7
-BAR_LENGTH = trammel.BASE_BAR_LENGTH  # ⚙ 440
+
+def _deviation(
+    value: float, places: int, band: float | None = None, *, unit: str = UNIT
+) -> float:
+    """The widest a part may sit off ``value`` (mm) when the sheet prints it
+    at ``places`` of ``unit`` with its title-block band, or ``band``: the band
+    plus the rounding of a value off the printed grid."""
+    limits = None if band is None else (-band, band)
+    low, high = printed_deviations(value, places, limits, unit=unit)
+    return max(-low, high)
+
+
+BAR_THICK = trammel.BASE_BAR_THICK  # ⚙ .47, faced
+BAR_WIDTH = trammel.BASE_BAR_WIDTH  # ⚙ 5.50, milled to width (#2083)
+BAR_LENGTH = trammel.BASE_BAR_LENGTH  # ⚙ 17.32
+# The width is milled from the 1/2 x 6 bar (owner ruling #2083), so it prints
+# as a machined size at the title block's .XX band.
+WIDTH_PLACES = 2
+BAR_WIDTH_BAND = printed_band_mm(WIDTH_PLACES, unit=UNIT)
 # The two long sides in the rail-1 part frame (y = -lateral): the rail sits
 # off the centreline since the 2026-10-17 widening, so each side is read from
 # its own calculator edge, never as half the width.
-LOW_SIDE_Y = -trammel.BASE_BAR_COLUMN_EDGE  # ⚙ -88.9: the faced -Y, column side
-HIGH_SIDE_Y = -trammel.BASE_BAR_OPERATOR_EDGE  # ⚙ 50.8: the +Y, operator side
+LOW_SIDE_Y = -trammel.BASE_BAR_COLUMN_EDGE  # ⚙ -3.50: the faced -Y, column side
+HIGH_SIDE_Y = -trammel.BASE_BAR_OPERATOR_EDGE  # ⚙ 2.00: the +Y, operator side
 if abs(HIGH_SIDE_Y - LOW_SIDE_Y - BAR_WIDTH) > 1e-9:
-    raise AssertionError("the base bar's sides miss its stock width")
+    raise AssertionError("the base bar's sides miss its width")
 
 # --- Rail holes ---------------------------------------------------------------
 RAIL_SCREW = trammel.RAIL_SCREW  # ⚙ "#8-32"
@@ -144,17 +169,22 @@ RAIL_HOLE_X: tuple[float, ...] = tuple(
 )
 if len(RAIL_HOLE_X) != 7:
     raise AssertionError("the brief's base bar carries seven rail holes")
-RAIL_ROW_Y = -LOW_SIDE_Y  # 88.90: the row (y 0) from the faced -Y edge
+RAIL_ROW_Y = -LOW_SIDE_Y  # 3.50: the row (y 0) from the faced -Y edge
+# The HGR15R rail's metric pattern prints exact millimetres at two places,
+# each station with the rail pitch's own band (``40.00 ±0.08 mm``).
 RAIL_HOLE_PLACES = 2
 RAIL_HOLE_BAND = 0.08  # the stations only: the rail's hole pitch
 # The row's height prints at the title block's band (c3-r7, rule 4): nothing
 # mates with it, and the one DRO Y setting keeps the holes in line.
 RAIL_ROW_PLACES = 2
 RAIL_HOLE_DIA = 4.5  # HGR15R rail's screw hole (catalogue)
-RAIL_SCREW_CLEARANCE = (RAIL_HOLE_DIA - THREAD_MAJOR_MM[RAIL_SCREW]) / 2.0  # 0.167
+RAIL_SCREW_CLEARANCE = (RAIL_HOLE_DIA - THREAD_MAJOR_MM[RAIL_SCREW]) / 2.0  # .0066
 # One Y setting for the row: only the station band scatters hole from hole.
-RAIL_HOLE_POSITION_RADIUS = RAIL_HOLE_BAND  # 0.08
-RAIL_PATTERN_ALLOWANCE = RAIL_SCREW_CLEARANCE - RAIL_HOLE_POSITION_RADIUS  # 0.087
+RAIL_HOLE_POSITION_RADIUS = max(
+    _deviation(x, RAIL_HOLE_PLACES, RAIL_HOLE_BAND, unit=METRIC_UNIT)
+    for x in RAIL_HOLE_X
+)
+RAIL_PATTERN_ALLOWANCE = RAIL_SCREW_CLEARANCE - RAIL_HOLE_POSITION_RADIUS
 if RAIL_PATTERN_ALLOWANCE <= 0.0:
     raise AssertionError("the rail-hole position bands bind the rail screws")
 RAIL_MATE_CALLOUT = "MATCHES HGR15R RAIL HOLES"
@@ -163,16 +193,18 @@ RAIL_ROW_CALLOUT = "HOLES IN LINE\nFOR HGR15R RAIL"
 RAIL_SCREW_ENGAGEMENT = trammel.RAIL_SCREW_LENGTH - trammel.RAIL_SCREW_SEAT_ABOVE_BASE
 if RAIL_SCREW_ENGAGEMENT < 1.5 * THREAD_MAJOR_MM[RAIL_SCREW]:
     raise AssertionError("the rail screws engage the bar under 1.5D")
-if RAIL_SCREW_ENGAGEMENT > BAR_THICK:
+if RAIL_SCREW_ENGAGEMENT > BAR_THICK - printed_band_mm(
+    trammel.BASE_BAR_THICK_PLACES, unit=UNIT
+):
     raise AssertionError("the rail screws stand out of the bar's underside")
 
 # --- Hold-down slots ------------------------------------------------------------
-SLOT_WIDTH = trammel.HOLD_DOWN_SLOT_WIDTH  # ⚙ 13.5
-SLOT_RUN = 2.0 * trammel.HOLD_DOWN_ADJUST  # ⚙ 4: the stud's travel along the slot
-SLOT_LENGTH = SLOT_RUN + SLOT_WIDTH  # 17.5 overall
-SLOT_LATERAL = trammel.HOLD_DOWN_LATERAL  # ⚙ 37.5
-NEAR_SLOT_X = trammel.HOLD_DOWN_NEAR_S - trammel.RAIL_NEAR_S  # ⚙ 20.92
-FAR_SLOT_X = trammel.HOLD_DOWN_FAR_S - trammel.RAIL_NEAR_S  # ⚙ 390
+SLOT_WIDTH = trammel.HOLD_DOWN_SLOT_WIDTH  # ⚙ .53
+SLOT_RUN = 2.0 * trammel.HOLD_DOWN_ADJUST  # ⚙ .16: the stud's travel along the slot
+SLOT_LENGTH = SLOT_RUN + SLOT_WIDTH  # .69 overall
+SLOT_LATERAL = trammel.HOLD_DOWN_LATERAL  # ⚙ 1.48
+NEAR_SLOT_X = trammel.HOLD_DOWN_NEAR_S - trammel.RAIL_NEAR_S  # ⚙ closure, prints .87
+FAR_SLOT_X = trammel.HOLD_DOWN_FAR_S - trammel.RAIL_NEAR_S  # ⚙ 15.35
 HOLD_DOWN_STUD_DIA = 0.5 * INCH  # 1/2-13 T-slot stud
 
 # The part as modelled is the rail-1 bar; the rail-2 bar is it turned over.
@@ -186,42 +218,39 @@ def slot_rise(y_centre: float) -> float:
     return y_centre - SLOT_RUN / 2.0 - LOW_SIDE_Y
 
 
-NEAR_SLOT_RISE = slot_rise(NEAR_SLOT_Y)  # 49.4, from the -Y side
-FAR_SLOT_RISE = slot_rise(FAR_SLOT_Y)  # 124.4, from the -Y side too
+NEAR_SLOT_RISE = slot_rise(NEAR_SLOT_Y)  # 1.94, from the -Y side
+FAR_SLOT_RISE = slot_rise(FAR_SLOT_Y)  # 4.90, from the -Y side too
 
 # --- Printed places and rule-17 walls -------------------------------------------
-STATION_PLACES = 1  # bar length, width and slot stations: the title block's .X band
-SLOT_PLACES = 2  # slot width and run: the .XX band
-# The faced thickness prints 12.0 at .X (the carrier's convention).
-THICK_PLACES = trammel.BASE_BAR_THICK_PLACES
-_X = printed_band_mm(STATION_PLACES)
-_XX = printed_band_mm(SLOT_PLACES)
+# Every length, station and slot size a wall reads prints at the title
+# block's .XX; the inch .X is for unread features only.
+STATION_PLACES = 2
+SLOT_PLACES = 2
+THICK_PLACES = trammel.BASE_BAR_THICK_PLACES  # .47 at .XX
+_XX = printed_band_mm(SLOT_PLACES, unit=UNIT)
 # The narrowest printed slot still passes the 1/2 in stud.
 if SLOT_WIDTH - _XX <= HOLD_DOWN_STUD_DIA:
     raise AssertionError("the slot's low limit binds the 1/2-13 hold-down stud")
 _R_MAX = (SLOT_WIDTH + _XX) / 2.0
-NEAR_END_WALL = NEAR_SLOT_X - SLOT_WIDTH / 2.0  # 14.2 nominal
-NEAR_END_WALL_WORST = NEAR_SLOT_X - _X - _R_MAX
+NEAR_END_WALL = NEAR_SLOT_X - SLOT_WIDTH / 2.0
+NEAR_END_WALL_WORST = NEAR_SLOT_X - _deviation(NEAR_SLOT_X, STATION_PLACES) - _R_MAX
 # The rail sits off the bar's centreline, so each slot has its own side wall:
-# the near slot's to the -Y side (42.65), the far slot's to the +Y side (4.55).
+# the near slot's to the -Y side, the far slot's to the +Y side.
 NEAR_SIDE_WALL = NEAR_SLOT_RISE - SLOT_WIDTH / 2.0
 FAR_SIDE_WALL = BAR_WIDTH - (FAR_SLOT_RISE + SLOT_RUN) - SLOT_WIDTH / 2.0
-SIDE_WALL = min(NEAR_SIDE_WALL, FAR_SIDE_WALL)  # 4.55
+SIDE_WALL = min(NEAR_SIDE_WALL, FAR_SIDE_WALL)
 # Both slots are located from the -Y side (c3-r6, rule 10), so the far slot's
-# wall to the +Y side carries the stock width's .X band, its rise's and its
-# run's .XX: 2.175 worst on the 1/2 x 5-1/2 bar at ±2 travel.
+# wall to the +Y side carries the width's .XX, its rise's and its run's.
 FAR_SIDE_WALL_WORST = (
-    (BAR_WIDTH - _X) - (FAR_SLOT_RISE + _X + SLOT_RUN + _XX) - _R_MAX
-)  # 2.175
-SIDE_WALL_WORST = min(NEAR_SLOT_RISE - _X - _R_MAX, FAR_SIDE_WALL_WORST)
-for _label, _nominal, _worst in (
-    ("near slot to the bar end", NEAR_END_WALL, NEAR_END_WALL_WORST),
-    ("slot end to the bar side", SIDE_WALL, SIDE_WALL_WORST),
+    (BAR_WIDTH - BAR_WIDTH_BAND) - (FAR_SLOT_RISE + _XX + SLOT_RUN + _XX) - _R_MAX
+)
+SIDE_WALL_WORST = min(NEAR_SLOT_RISE - _XX - _R_MAX, FAR_SIDE_WALL_WORST)
+for _label, _worst in (
+    ("near slot to the bar end", NEAR_END_WALL_WORST),
+    ("slot end to the bar side", SIDE_WALL_WORST),
 ):
-    if _nominal < 2.0 or _worst < 1.5:
-        raise AssertionError(
-            f"base bar wall {_label}: {_nominal:.2f} nominal, {_worst:.2f} worst"
-        )
+    if _worst < WALL_TARGET_MM:
+        raise AssertionError(f"base bar wall {_label}: {_worst:.3f} worst")
 # The slots stay clear of the rail holes' row and of the rail's footprint.
 if SLOT_LATERAL - SLOT_RUN / 2.0 - _R_MAX <= trammel.RAIL_WIDTH / 2.0:
     raise AssertionError("a hold-down slot runs under the rail")
@@ -233,11 +262,11 @@ if SLOT_LATERAL - SLOT_RUN / 2.0 - _R_MAX <= trammel.RAIL_WIDTH / 2.0:
 # read them, and pass them to ``bracket_hole_walls``.
 BRACKET_SCREW = "#8"
 BRACKET_HOLE_FIT = "normal"
-BRACKET_HOLE_DIA = CLEARANCE_MM[(BRACKET_SCREW, BRACKET_HOLE_FIT)]  # 4.978
-BRACKET_SCREW_HEAD_DIA = 0.270 * INCH  # #8 SHCS head, ASME B18.3 max: 6.858
-BRACKET_SCREW_HEAD_HEIGHT = 0.164 * INCH  # 4.166
-BRACKET_CBORE_DIA = 7.94  # 5/16 in
-BRACKET_CBORE_DEPTH = 4.80  # the shallowest printed depth still sinks the head
+BRACKET_HOLE_DIA = CLEARANCE_MM[(BRACKET_SCREW, BRACKET_HOLE_FIT)]  # .196
+BRACKET_SCREW_HEAD_DIA = 0.270 * INCH  # #8 SHCS head, ASME B18.3 max
+BRACKET_SCREW_HEAD_HEIGHT = 0.164 * INCH
+BRACKET_CBORE_DIA = 7.9502  # .313, the 5/16 counterbore
+BRACKET_CBORE_DEPTH = 4.8006  # .189: the head sinks at the shallowest print
 BRACKET_HOLE_SPEC = HoleSpec(
     "counterbore_socket",
     BRACKET_SCREW,
@@ -248,20 +277,27 @@ BRACKET_HOLE_SPEC = HoleSpec(
         "CounterBoreDepth": BRACKET_CBORE_DEPTH,
     },
 )
-# Stations and rows at .XXX (±0.13 a side): the row's spacings must hold
-# TL-28's four tapped holes inside the screws' 0.406 float.
+# Rows at .XXX: their spacings must hold TL-28's four tapped holes inside the
+# screws' float. Every Hole Wizard length prints .XXX. The stations are the
+# KP08's along the Tr8 screw (owner ruling 4): exact millimetres, each
+# stating the millimetre title block's three-place band. Whole millimetres,
+# they print two places like the rail row (machinist review: a third place
+# adds nothing under an explicit band).
 BRACKET_HOLE_PLACES = 3
-BRACKET_CBORE_PLACES = 2
+BRACKET_STATION_PLACES = 2
+BRACKET_STATION_BAND = printed_band_mm(3, unit=METRIC_UNIT)  # 0.13
+BRACKET_CBORE_PLACES = 3
 BRACKET_CALLOUT_PRECISION = {
-    "hw-thruholedia": 2,
+    "hw-thruholedia": 3,
     "hw-cbdia": BRACKET_CBORE_PLACES,
     "hw-cbdepth": BRACKET_CBORE_PLACES,
 }
 BRACKET_MATE = "MHA-CH-06-TL-28"
 # The plan looks at the top face; the counterbores open on the underside.
 BRACKET_CALLOUT_PROCESS = f"MATCHES {BRACKET_MATE}\nDRILL, C'BORE FAR SIDE\n"
-_XXX = printed_band_mm(BRACKET_HOLE_PLACES)
-_CB = printed_band_mm(BRACKET_CBORE_PLACES)
+_XXX = printed_band_mm(BRACKET_HOLE_PLACES, unit=UNIT)
+_CB = printed_band_mm(BRACKET_CBORE_PLACES, unit=UNIT)
+_THICK_BAND = printed_band_mm(THICK_PLACES, unit=UNIT)
 # Public for the leadscrew layout's rule-17 window (ruling A′): a hole's .XXX
 # band and the counterbore's largest printed radius.
 BRACKET_HOLE_BAND = _XXX
@@ -269,70 +305,93 @@ BRACKET_CBORE_RADIUS_MAX = (BRACKET_CBORE_DIA + _CB) / 2.0
 BRACKET_HEAD_RECESS_MIN = BRACKET_CBORE_DEPTH - _CB - BRACKET_SCREW_HEAD_HEIGHT
 BRACKET_HEAD_CLEARANCE_MIN = BRACKET_CBORE_DIA - _CB - BRACKET_SCREW_HEAD_DIA
 BRACKET_HEAD_BEARING_MIN = (
-    BRACKET_SCREW_HEAD_DIA - (BRACKET_HOLE_DIA + drilled_oversize_mm())
+    BRACKET_SCREW_HEAD_DIA - (BRACKET_HOLE_DIA + drilled_oversize_mm(unit=UNIT))
 ) / 2.0
-BRACKET_CBORE_FLOOR_MIN = (
-    BAR_THICK - printed_band_mm(THICK_PLACES) - (BRACKET_CBORE_DEPTH + _CB)
-)
+BRACKET_CBORE_FLOOR_MIN = BAR_THICK - _THICK_BAND - (BRACKET_CBORE_DEPTH + _CB)
 if BRACKET_HEAD_RECESS_MIN < 0.1:
     raise AssertionError("a bracket screw head can stand proud of the underside")
 if BRACKET_HEAD_CLEARANCE_MIN < 0.25:
     raise AssertionError("the bracket counterbore does not clear the screw head")
 if BRACKET_HEAD_BEARING_MIN < 0.5:
     raise AssertionError("the bracket screw head bears on under 0.5 a side")
-if BRACKET_CBORE_FLOOR_MIN < 1.5:
-    raise AssertionError("the bracket counterbore floor is under rule 17's 1.5")
-BRACKET_WALL_MIN = 1.5  # rule 17, worst case
+if BRACKET_CBORE_FLOOR_MIN < WALL_TARGET_MM:
+    raise AssertionError("the bracket counterbore floor is under rule 17's .080")
+BRACKET_WALL_MIN = WALL_FLOOR_MM  # rule 17, worst case
 
 
 def bracket_screw_under_head(screw_length: float) -> tuple[float, float]:
     """The screw's reach past the bar's top (min, max) at the printed bands:
     its length less the bar left under the counterbore."""
-    thick = printed_band_mm(THICK_PLACES)
     return (
-        screw_length - (BAR_THICK + thick - (BRACKET_CBORE_DEPTH - _CB)),
-        screw_length - (BAR_THICK - thick - (BRACKET_CBORE_DEPTH + _CB)),
+        screw_length - (BAR_THICK + _THICK_BAND - (BRACKET_CBORE_DEPTH - _CB)),
+        screw_length - (BAR_THICK - _THICK_BAND - (BRACKET_CBORE_DEPTH + _CB)),
     )
 
 
 def bracket_hole_walls(holes: tuple[tuple[float, float], ...]) -> dict[str, float]:
     """Rule-17 walls round the bracket counterbores (the widest cut of each
-    hole), worst case at the printed bands, for part-frame hole centres."""
-    position = math.hypot(_XXX, _XXX)  # a hole's corner of its .XXX square
-    # A rail tap's station holds ±0.08 but its row only the title block's .XX
-    # (c3-r7): the row moves all seven taps against these holes' .XXX rows.
-    rail_position = math.hypot(RAIL_HOLE_BAND, printed_band_mm(RAIL_ROW_PLACES))
-    radius = BRACKET_CBORE_RADIUS_MAX
-    xs = [x for x, _ in holes]
-    rows = [y - LOW_SIDE_Y for _, y in holes]  # from the faced -Y edge
-    # Both slots: station and rise at .X from the -Y side, as the holes' rows
-    # (c3-r6: the far slot's drop from the +Y side, which added the stock
-    # width's band, became a rise).
-    slots = (
-        (NEAR_SLOT_X, NEAR_SLOT_Y, math.hypot(_X, _X)),
-        (FAR_SLOT_X, FAR_SLOT_Y, math.hypot(_X, _X)),
-    )
-    return {
-        "-Y edge": min(rows) - _XXX - radius,
-        "+Y edge": BAR_WIDTH - _X - (max(rows) + _XXX) - radius,
-        "spindle end": min(xs) - _XXX - radius,
-        "far end": BAR_LENGTH - _X - (max(xs) + _XXX) - radius,
-        "neighbour counterbore": min(
-            math.dist(a, b) for i, a in enumerate(holes) for b in holes[i + 1 :]
+    hole), worst case at the printed bands and roundings, for part-frame hole
+    centres."""
+
+    def station(x: float) -> float:
+        return _deviation(
+            x, BRACKET_STATION_PLACES, BRACKET_STATION_BAND, unit=METRIC_UNIT
         )
-        - 2.0 * position
+
+    def row(y: float) -> float:
+        return _deviation(y - LOW_SIDE_Y, BRACKET_HOLE_PLACES)
+
+    def position(x: float, y: float) -> float:
+        return math.hypot(station(x), row(y))  # a hole's corner of its square
+
+    # A rail tap's station holds its band but its row only the title block's
+    # .XX (c3-r7): the row moves all seven taps against these holes' rows.
+    rail_position = math.hypot(RAIL_HOLE_POSITION_RADIUS, _XX)
+    radius = BRACKET_CBORE_RADIUS_MAX
+    # Both slots: station and rise at .XX from the -Y side, as the holes' rows.
+    slots = (
+        (
+            NEAR_SLOT_X,
+            NEAR_SLOT_Y,
+            math.hypot(_deviation(NEAR_SLOT_X, STATION_PLACES), _XX),
+        ),
+        (
+            FAR_SLOT_X,
+            FAR_SLOT_Y,
+            math.hypot(_deviation(FAR_SLOT_X, STATION_PLACES), _XX),
+        ),
+    )
+    length_band = _deviation(BAR_LENGTH, STATION_PLACES)
+    return {
+        "-Y edge": min(y - LOW_SIDE_Y - row(y) for _, y in holes) - radius,
+        "+Y edge": min(
+            BAR_WIDTH - BAR_WIDTH_BAND - (y - LOW_SIDE_Y + row(y)) for _, y in holes
+        )
+        - radius,
+        "spindle end": min(x - station(x) for x, _ in holes) - radius,
+        "far end": min(BAR_LENGTH - length_band - (x + station(x)) for x, _ in holes)
+        - radius,
+        "neighbour counterbore": min(
+            math.dist(a, b) - position(*a) - position(*b)
+            for i, a in enumerate(holes)
+            for b in holes[i + 1 :]
+        )
         - 2.0 * radius,
-        "rail tap": min(math.hypot(x - rx, y) for x, y in holes for rx in RAIL_HOLE_X)
-        - position
+        "rail tap": min(
+            math.hypot(x - rx, y) - position(x, y)
+            for x, y in holes
+            for rx in RAIL_HOLE_X
+        )
         - rail_position
         - radius
         - THREAD_MAJOR_MM[RAIL_SCREW] / 2.0,
         "hold-down slot": min(
-            math.hypot(x - sx, max(0.0, abs(y - sy) - SLOT_RUN / 2.0)) - slot_position
+            math.hypot(x - sx, max(0.0, abs(y - sy) - SLOT_RUN / 2.0))
+            - slot_position
+            - position(x, y)
             for x, y in holes
             for sx, sy, slot_position in slots
         )
-        - position
         - _R_MAX
         - radius,
     }
@@ -359,27 +418,30 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BracketHoles": {"BracketHole1X", "BracketHole5X"},
     "BracketRowReference": {f"BracketRow{k}Y" for k in range(1, 5)},
 }
-# The bar's width is the flat bar as bought: "STOCK" under it. The thickness
-# is faced (owner ruling 2026-10-30) and takes the title block's .X band.
-STOCK_DIMENSIONS = frozenset({"BarWidth"})
-# The rail holes' stations carry the one tight band (the rail's pitch); the
-# row's height takes the title block's (c3-r7): (feature, dimension) ->
-# symmetric band.
-TOLERANCES: dict[tuple[str, str], float] = {
-    ("RailHoles", name): RAIL_HOLE_BAND
-    for name in sorted(DRAWING_DIMENSIONS["RailHoles"])
+# The width is milled to size (owner ruling #2083) and the thickness faced
+# (owner ruling 2026-10-30): both take the title block's .XX band; the rail
+# row's height takes it too (c3-r7).
+# The metric vendor lines' stations (owner ruling 4): (feature, dimension) ->
+# (millimetre places, symmetric band mm). The rail holes' carries the one
+# tight band (the rail's pitch).
+METRIC_DIMENSIONS: dict[tuple[str, str], tuple[int, float]] = {
+    **{
+        ("RailHoles", name): (RAIL_HOLE_PLACES, RAIL_HOLE_BAND)
+        for name in sorted(DRAWING_DIMENSIONS["RailHoles"])
+    },
+    **{
+        ("BracketHoles", name): (BRACKET_STATION_PLACES, BRACKET_STATION_BAND)
+        for name in sorted(DRAWING_DIMENSIONS["BracketHoles"])
+    },
 }
 _PLACES = {
     "SlotWidth": SLOT_PLACES,
     "SlotRun": SLOT_PLACES,
     "BarThick": THICK_PLACES,
+    "BarWidth": WIDTH_PLACES,
     "RailRowY": RAIL_ROW_PLACES,
-    **{name: RAIL_HOLE_PLACES for _feature, name in TOLERANCES},
-    **{
-        name: BRACKET_HOLE_PLACES
-        for feature in ("BracketHoles", "BracketRowReference")
-        for name in DRAWING_DIMENSIONS[feature]
-    },
+    **{name: BRACKET_HOLE_PLACES for name in DRAWING_DIMENSIONS["BracketRowReference"]},
+    **{name: places for (_feature, name), (places, _band) in METRIC_DIMENSIONS.items()},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     feature: {name: _PLACES.get(name, STATION_PLACES) for name in names}
@@ -393,17 +455,21 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked base bar dimension needs authored places")
 
-# Both large faces are static locating seats (rule 6, Ra 3.2): bar 1's
+# Both large faces are static locating seats (rule 6, Ra 125 µin): bar 1's
 # underside on the mill table and its top under the rail and the TL-28
 # brackets; bar 2, the same part turned over, the other way round.
 SURFACE_FINISHES = (
-    SurfaceFinishControl("top_seat", SEAT_UM, PlanarFace((0.0, 0.0, 1.0), BAR_THICK)),
-    SurfaceFinishControl("underside_seat", SEAT_UM, PlanarFace((0.0, 0.0, -1.0), 0.0)),
+    SurfaceFinishControl(
+        "top_seat", SEAT_UM, PlanarFace((0.0, 0.0, 1.0), BAR_THICK), display_unit=UNIT
+    ),
+    SurfaceFinishControl(
+        "underside_seat", SEAT_UM, PlanarFace((0.0, 0.0, -1.0), 0.0), display_unit=UNIT
+    ),
 )
 # Why both faces carry a seat finish: each seats on the table or under the
 # rail, depending on the bar (rule 7: say why, beside the symbols).
 SEAT_FINISH_REASON = "TABLE AND RAIL SEATS"
-# No general note: the stock width says STOCK, the seats' reason rides their
-# symbols and the rail holes' mate rides their callout.
+# No general note: the seats' reason rides their symbols and the rail holes'
+# mate rides their callout.
 DRAWING_NOTES = ""
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:5"

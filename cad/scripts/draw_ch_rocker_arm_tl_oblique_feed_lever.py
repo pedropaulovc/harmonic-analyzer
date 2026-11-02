@@ -1,10 +1,10 @@
 r"""Create the drawing for the oblique-trammel jig's feed lever (MHA-CH-06-TL-26).
 
-A 300 x 25.4 x 12.7 flat at 1:1: the top view carries the length, the width,
-both bolt-hole stations from the inner end, their shared row from the back
-side, the native 2X 5/16 clearance callout and the grip-end radius; the front
-view carries the thickness; the shaded iso rides top-right at 1:4. No datums
-(drawing-guidelines.md rule 5).
+An 11.8 x 1 x 1/2 in flat at 1:1: the top view carries the length, the stock
+width, both bolt-hole stations from the inner end, their shared row from the
+back side, the native 2X 5/16 clearance callout and the grip-end radius; the
+front view carries the stock thickness; the shaded iso rides top-right at 1:4.
+No datums (drawing-guidelines.md rule 5).
 
 Run with SolidWorks open::
 
@@ -33,26 +33,30 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
-from _drawing_hole_callout import add_native_hole_callout
+
+# The front view imports the hidden LeverThickReference sketch's thickness.
+from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_dimensions import assert_imported_precision
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 import ch_rocker_arm_tl_oblique_feed_lever_spec as part_spec
 from _feature_requirements import part_metadata, requirement
 from _printed_limits import limits
+from _supplier_dimensions import supplier_reference_dimension
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from ch_rocker_arm_tl_oblique_feed_lever_spec import (
-    CALLOUTS_BELOW,
     DIMENSION_PREFIXES,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    HOLE_CALLOUT_PRECISION,
     HOLE_CALLOUT_PROCESS,
     HOLE_DIA,
     HOLE_X,
@@ -60,6 +64,8 @@ from ch_rocker_arm_tl_oblique_feed_lever_spec import (
     LEVER_LENGTH,
     LEVER_THICK,
     LEVER_WIDTH,
+    STOCK_CALLOUTS,
+    STOCK_FRACTION_DENOMINATORS,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -73,7 +79,7 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# The 300 lever at 1:1 spans sheet x 0.060..0.360 in the top view, leaving
+# The 11.8 lever at 1:1 spans sheet x 0.060..0.360 in the top view, leaving
 # the inner end's two dimension lanes inside the border; the front view
 # projects below it, the iso top-right clear of the title block.
 SHEET_SCALE = (1.0, 1.0)
@@ -92,25 +98,34 @@ _W = LEVER_WIDTH
 _R = HOLE_DIA / 2.0
 TOP_KEEP: dict[str, tuple[float, float, float]] = {
     # Stations and the length from the inner end, shortest nearest the part.
-    # The 7.00 text (about 9.4 wide) does not fit between its own extension
-    # lines at X 0 and 7 (machinist review r2: both struck it), so it stands
-    # outboard right, centred between hole 1's and hole 2's extension lines
-    # (text about X 10.3..19.7). Outboard left would put it on the 2X 12.70
-    # row dimension's line at about X -10.
+    # The inner station's text does not fit between its own extension lines
+    # at X 0 and .28 (machinist review r2: both struck the 7.00), so it
+    # stands outboard right, between hole 1's and hole 2's extension lines.
+    # Outboard left would put it on the 2X .50 row dimension's line.
     "Hole1X": (15.0, _H, 8.0),
     "Hole2X": (11.5, _H, 16.0),
     "LeverLength": (LEVER_LENGTH / 2.0, _H, 24.0),
     # Left of the inner end, each on its own lane, the smaller nearer the
-    # part: the row from the back side (text about -19..-1), then the stock
-    # width (two-line text about -41..-27). Farm run 20261017T015225029Z had
-    # the width at -22, its "25.4 STOCK" over "2X 12.70".
+    # part: the row from the back side, then the stock width's reference
+    # over STOCK. Farm run 20261017T015225029Z had the width at -22, its
+    # "25.4 STOCK" over "2X 12.70".
     "Hole1Y": (-10.0, _H, -HOLE_Y / 2.0),
     "LeverWidth": (-34.0, _H, -_W / 2.0),
     # The grip radius off the front-side grip corner, its leader on the arc.
     "GripCornerR": (LEVER_LENGTH + 14.0, _H, 10.0),
 }
+# The 1/2 thickness's stacked "(1/2 in)" over "STOCK" is taller than its
+# span: centred on its line, the numerator sat on the upper witness (layout
+# audit e5a5f5c19, extension-through-own-text), and shelved beside the span
+# its connector ended in open space (machinist review mr4) or, arrows held
+# inside, the shelf lost its dimension line (round 8). So the text stands on
+# the dimension line's own run past the lower witness: the line runs from the
+# arrows down to the text, nothing crosses it, and STOCK hangs below. The
+# value's centre sits 8.5 under the witness: clear of the outside arrow
+# (3.6 long) by 2 for a text about 4.6 tall (the base bar's measured
+# "(5-1/2 in)" row); the front view's lower right is otherwise empty.
 FRONT_KEEP: dict[str, tuple[float, float, float]] = {
-    "LeverThick": (LEVER_LENGTH + 14.0, _H / 2.0, 0.0),
+    "LeverThick": (LEVER_LENGTH + 14.0, -8.5, 0.0),
 }
 # The hole callout's leader picks hole 2's far edge; its text stands above
 # the view over the lever's inner half.
@@ -125,6 +140,22 @@ part_metadata(
     )
 )
 
+_UNIT = part_spec.UNIT
+(_CALLOUT_PLACES,) = set(HOLE_CALLOUT_PRECISION.values())
+_HOLE_DIA_PRINTED = round(round(part_spec.HOLE_DIA / 25.4, _CALLOUT_PLACES) * 25.4, 9)
+
+
+def _limits(model: float, places: int) -> list[float]:
+    """A general-band dimension's acceptance limits on the inch sheet: the
+    title block's band about the value printed at ``places``."""
+    return limits(model, places, unit=_UNIT)
+
+
+def _stock_limits(model: float, band: float) -> list[float]:
+    """An as-bought size's supplier band about its nominal."""
+    return [round(model - band, 12), round(model + band, 12)]
+
+
 requirement(
     "carrier_seat",
     kind="face",
@@ -134,25 +165,25 @@ requirement(
         "normal": ([0.0, -1.0, 0.0], ("__frame__",)),
         "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("__frame__",)),
         "thickness": (
-            limits(part_spec.LEVER_THICK, part_spec.THICK_PLACES),
-            ("LEVER_THICK", "THICK_PLACES"),
+            _stock_limits(part_spec.LEVER_THICK, part_spec.THICK_STOCK_BAND),
+            ("LEVER_THICK", "THICK_STOCK_BAND"),
         ),
         "thickness_nominal": (part_spec.LEVER_THICK, ("LEVER_THICK",)),
         "length": (
-            limits(part_spec.LEVER_LENGTH, part_spec.SIZE_PLACES),
+            _limits(part_spec.LEVER_LENGTH, part_spec.SIZE_PLACES),
             ("LEVER_LENGTH", "SIZE_PLACES"),
         ),
         "length_nominal": (part_spec.LEVER_LENGTH, ("LEVER_LENGTH",)),
         "width": (
-            limits(part_spec.LEVER_WIDTH, part_spec.SIZE_PLACES),
-            ("LEVER_WIDTH", "SIZE_PLACES"),
+            _stock_limits(part_spec.LEVER_WIDTH, part_spec.WIDTH_STOCK_BAND),
+            ("LEVER_WIDTH", "WIDTH_STOCK_BAND"),
         ),
         "width_nominal": (part_spec.LEVER_WIDTH, ("LEVER_WIDTH",)),
     },
     precision={
         "thickness": part_spec.THICK_PLACES,
         "length": part_spec.SIZE_PLACES,
-        "width": part_spec.SIZE_PLACES,
+        "width": part_spec.STOCK_PLACES,
     },
 )
 
@@ -169,17 +200,17 @@ for _index, _x in enumerate(part_spec.HOLE_X, start=1):
             ),
             "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
             "drill": (part_spec.CLEARANCE_SPEC.size, ("CLEARANCE_SPEC",)),
-            # The native callout prints the 5/16 normal-fit size to two
-            # places (8.74); the band and nominal are that printed value.
+            # The native callout prints the 5/16 normal-fit size to three
+            # places (.344); the band and nominal are that printed value.
             "dia": (
-                limits(round(part_spec.HOLE_DIA, 2), 2, part_spec.DRILLED_BAND),
+                limits(_HOLE_DIA_PRINTED, _CALLOUT_PLACES, part_spec.DRILLED_BAND),
                 ("HOLE_DIA", "DRILLED_BAND", "SCREW_THREAD"),
             ),
-            "dia_nominal": (round(part_spec.HOLE_DIA, 2), ("HOLE_DIA",)),
+            "dia_nominal": (_HOLE_DIA_PRINTED, ("HOLE_DIA",)),
             "thru": (True, ("CLEARANCE_SPEC",)),
             # Model X from the inner end: the carrier's lever station.
             "station": (
-                limits(_x, part_spec.HOLE_X_PLACES),
+                _limits(_x, part_spec.HOLE_X_PLACES),
                 (
                     "HOLE_X",
                     "HOLE_X_PLACES",
@@ -190,13 +221,13 @@ for _index, _x in enumerate(part_spec.HOLE_X, start=1):
             "station_nominal": (_x, ("HOLE_X",)),
             # Across the width from the back long side (the mid-width line).
             "width": (
-                limits(part_spec.HOLE_Y, part_spec.HOLE_Y_PLACES),
+                _limits(part_spec.HOLE_Y, part_spec.HOLE_Y_PLACES),
                 ("HOLE_Y", "HOLE_Y_PLACES"),
             ),
             "width_nominal": (part_spec.HOLE_Y, ("HOLE_Y",)),
         },
         precision={
-            "dia": 2,
+            "dia": _CALLOUT_PLACES,
             "station": part_spec.HOLE_X_PLACES,
             "width": part_spec.HOLE_Y_PLACES,
         },
@@ -239,6 +270,35 @@ def _set_dimension_prefixes(
         raise RuntimeError(f"dimension prefixes not applied: {sorted(remaining)}")
 
 
+_STOCK_SIZES = {"LeverWidth": LEVER_WIDTH, "LeverThick": LEVER_THICK}
+
+
+def _stock_references(adapter: Any, annotations: list[Any]) -> None:
+    """The as-bought width and thickness print as REF stock fractions over
+    STOCK (#290, draw_mg_magnifying_lever's rod stock)."""
+    by_name: dict[str, list[Any]] = {}
+    for item in annotations:
+        by_name.setdefault(dimension_name(adapter, item), []).append(item)
+    for name, size in _STOCK_SIZES.items():
+        matches = by_name.get(name, [])
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
+        display = _early_bound(
+            _early_bound(matches[0], "IAnnotation").GetSpecificAnnotation(),
+            "IDisplayDimension",
+        )
+        supplier_reference_dimension(
+            adapter,
+            display,
+            label=f"feed lever stock {name}",
+            units="in",
+            precision=DRAWING_PRECISION_BY_NAME[name],
+            expected_mm=size,
+            fraction_denominator=STOCK_FRACTION_DENOMINATORS[name],
+            callout=STOCK_CALLOUTS[name],
+        )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -255,7 +315,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter.currentModel, ("Revision", "Title", *required), required=required
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -296,20 +360,23 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     ]
     # Places are authored on the part; the sheet only proves the import kept
-    # them.
+    # them, then writes the prefixes and the stock references.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
+    _stock_references(adapter, annotations)
 
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the feed lever")
-    add_native_hole_callout(
+    hole_callout = add_native_hole_callout(
         adapter,
         top,
         edge_xy=on_top(HOLE_EDGE_MODEL),
         callout_xy=on_top(HOLE_CALLOUT_MODEL),
         label="feed lever bolt holes",
         process=HOLE_CALLOUT_PROCESS,
+    )
+    set_hole_callout_precision(
+        hole_callout, HOLE_CALLOUT_PRECISION, label="feed lever bolt holes"
     )
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 

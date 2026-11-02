@@ -9,4 +9,11 @@ ch-rocker-arm-tl-oblique-riser:
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
-  process: "start from 1/4 in acetal stock; face to 6.0 drawing thickness and mill the blank to 40 x 340; spot the holes from the carrier at assembly, drill #4 clearance through and countersink 82 degrees for the four screws; drill the HUB, CL and CR clearance holes through; break edges"
+  process: "start from 1/4 in acetal stock; face to .24 drawing thickness and mill the blank to 1.60 x 13.40; spot the holes from the carrier at assembly, drill #4 clearance through and countersink 82 degrees for the four screws; drill the HUB, CL and CR clearance holes through; break edges"
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "the 2X Ø.257 CL and CR clearance-hole callout: WALL .074 MIN TO CUT EDGE"
+      finding: "wall from the CL/CR holes to the jig's self-cut band edge .074 in at the printed worst case (drill at its band's top, the TL-21 CL/CR stations' title-block error about the cut's centre), under the .080 in target and over the .060 in floor (rule 17)"
+      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions (this package: .074 at the printed worst case, relayed by Main as the jig riser .075; also ruling 6); CL/CR stay on the strap's hub radius and the riser cutter and band stay as they are. ch_rocker_arm_tl_oblique_riser_spec.CLAMP_BAND_WALLS counts the carrier station error and refuses anything under the .060 floor; the sheet states the worst-case wall floored to three places, never as note text"
+  drawing_unit: in

@@ -19,7 +19,11 @@ import _process_plans as plans
 import ch_rocker_arm_spec as rocker
 import _rocker_interface as rocker_interface
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
+from _inch_wall_limits import WALL_TARGET_MM
 
+# Calculator outputs that hang only on R800/R816, the cutters and ALPHA; the
+# hub radius (and so HUB_OFFSET, RISER_HUB_CHECK, CL/CR) follows the rocker's
+# top-edge band and is checked physically below.
 PINNED = {
     "R_C1": (trammel.R_C1, 795.238),
     "R_C2": (trammel.R_C2, 820.763),
@@ -29,17 +33,12 @@ PINNED = {
     "A2.x": (trammel.A2[0], -232.292),
     "A2.y": (trammel.A2[1], 24.481),
     "B2.x": (trammel.B2[0], 232.292),
-    "HUB_OFFSET": (trammel.HUB_OFFSET, 13.013),
     "RISER_INNER_RADIUS": (trammel.RISER_INNER_RADIUS, 802.381),
     "RISER_OUTER_RADIUS": (trammel.RISER_OUTER_RADIUS, 813.619),
     "RISER_SAGITTA.inner": (trammel.RISER_SAGITTA[0], 14.145),
     "RISER_SAGITTA.outer": (trammel.RISER_SAGITTA[1], 13.947),
     "PART_SAGITTA.inner": (trammel.PART_SAGITTA[0], 14.188),
     "PART_SAGITTA.outer": (trammel.PART_SAGITTA[1], 13.905),
-    "RISER_HUB_CHECK": (trammel.RISER_HUB_CHECK, 5.869),
-    "PIVOT_BLOCK_TOP_Z": (trammel.PIVOT_BLOCK_TOP_Z, 64.3),
-    "PIVOT_SUPPORT_HEIGHT": (trammel.PIVOT_SUPPORT_HEIGHT, 16.0),
-    "CARRIER_UNDERSIDE_Z": (trammel.CARRIER_UNDERSIDE_Z, 80.3),
 }
 
 
@@ -57,27 +56,26 @@ def test_outputs_are_derived_not_typed() -> None:
         for node in ast.walk(tree)
         if isinstance(node, ast.Constant) and isinstance(node.value, float)
     }
-    # RISER_BLANK_ORIGIN's unrelated 16.0 coincides with PIVOT_SUPPORT_HEIGHT;
-    # that output is instead checked to be assigned from an expression.
-    coincident = {"PIVOT_SUPPORT_HEIGHT"}
     typed = {
-        name
-        for name, (_v, expected) in PINNED.items()
-        if name not in coincident and abs(expected) in literals
+        name for name, (_v, expected) in PINNED.items() if abs(expected) in literals
     }
     assert not typed, f"calculator outputs typed as literals: {sorted(typed)}"
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Assign) and any(
-            isinstance(t, ast.Name) and t.id in coincident for t in node.targets
-        ):
-            assert not isinstance(node.value, ast.Constant)
 
 
 def test_inputs_come_from_the_rocker_spec() -> None:
     assert trammel.R_INNER == rocker.R_TOP == 800.0
     assert trammel.R_OUTER == rocker_interface.R_BOTTOM == 816.0
     assert rocker.TOP_EDGE_ABOVE_PIVOT == rocker_interface.PIVOT_MID_Y
-    assert trammel.HUB_TO_TOP_EDGE == pytest.approx(8.25)
+    # The hub aims at the middle of the strap's one-sided top-edge band.
+    low, high = sorted(rocker.TOP_EDGE_BAND)
+    assert trammel.HUB_TO_TOP_EDGE == pytest.approx(
+        rocker.TOP_EDGE_ABOVE_PIVOT + (low + high) / 2.0
+    )
+    assert (
+        rocker.TOP_EDGE_ABOVE_PIVOT + low
+        < trammel.HUB_TO_TOP_EDGE
+        < rocker.TOP_EDGE_ABOVE_PIVOT + high
+    )
     assert trammel.ALPHA_DEG == 16.4405
 
 
@@ -137,11 +135,20 @@ def test_both_cutter_circles_share_the_arc_centre() -> None:
 def test_in_situ_hub_and_end_holes_lie_on_the_hub_radius() -> None:
     for point in (trammel.HUB, trammel.CL, trammel.CR):
         assert math.dist(point, trammel.ARC_CENTRE) == pytest.approx(trammel.HUB_RADIUS)
-    assert f"{trammel.HUB_RADIUS:.2f}" == "808.25"
+    assert trammel.HUB_RADIUS == pytest.approx(trammel.R_INNER + trammel.HUB_TO_TOP_EDGE)
+    assert trammel.HUB_OFFSET == pytest.approx(trammel.HUB_RADIUS - trammel.R_C1)
+    # The HUB stands outboard of the riser's self-cut inner edge.
+    assert trammel.RISER_HUB_CHECK == pytest.approx(
+        trammel.HUB_RADIUS - trammel.RISER_INNER_RADIUS
+    )
+    assert trammel.RISER_HUB_CHECK > 0.0
     # CL/CR sit in the end waste: past the tip land, inside the 350 blank.
     tip_x = trammel.HUB_RADIUS * math.sin(trammel.TIP_ANGLE)
     assert tip_x < trammel.CR[0] < trammel.BLANK_LENGTH / 2.0
-    assert f"{trammel.CR[0]:.3f}" == "160.895"
+    # Angularly midway between the tip land and the blank's square end.
+    blank_end = math.asin(trammel.BLANK_LENGTH / 2.0 / trammel.HUB_RADIUS)
+    cr_angle = math.atan2(trammel.CR[0], trammel.CR[1] - trammel.ARC_CENTRE[1])
+    assert cr_angle == pytest.approx((trammel.TIP_ANGLE + blank_end) / 2.0)
     assert trammel.CL == (-trammel.CR[0], trammel.CR[1])
 
 
@@ -168,8 +175,7 @@ def test_riser_countersink_walls_hold_rule_17_at_worst_case() -> None:
     assert trammel.RISER_CSK_DIA > trammel.RISER_SCREW_HEAD_DIA
     inner, outer = trammel.RISER_SCREW_WALLS
     assert inner == pytest.approx(outer)
-    assert f"{inner:.3f}" == "2.066"
-    assert min(trammel.RISER_SCREW_WALLS) >= 2.0
+    assert inner >= WALL_TARGET_MM
 
 
 def test_every_pin_stays_on_its_rail_over_both_passes() -> None:
@@ -208,18 +214,38 @@ def test_sensitivities_match_the_brief() -> None:
     assert f"{trammel.RADIUS_PER_TENTH_DEG:.1f}" == "4.7"
     # A spacing error of 0.1 changes R by about 0.18.
     assert f"{0.1 * trammel.RADIUS_PER_SPACING:.2f}" == "0.18"
-    assert trammel.SHOULDER_CARRIER_CLEARANCE == (0.0, 0.040)
-    assert f"{trammel.RADIUS_FROM_SHOULDER_CLEARANCE:.3f}" == "0.071"
+    import ch_rocker_arm_tl_oblique_carrier_spec as carrier
+
+    # The carrier's REAM_SLIDE pin hole on the bought shoulder.
+    assert trammel.SHOULDER_CARRIER_CLEARANCE == pytest.approx(
+        (carrier.PIN_CLEARANCE_MIN, carrier.PIN_CLEARANCE_MAX)
+    )
+    assert trammel.RADIUS_FROM_SHOULDER_CLEARANCE == pytest.approx(
+        trammel.RADIUS_PER_SPACING * carrier.PIN_CLEARANCE_MAX
+    )
 
 
 def test_plain_pivot_stack_sets_the_carrier_height() -> None:
-    assert trammel.PIVOT_BLOCK_HEIGHT == 24.3
-    # Owner ruling 2026-10-27: a nominal five 0.2 shims a support.
-    assert trammel.PIVOT_SHIM_PACK == 1.0
-    assert trammel.PIVOT_SPACER_LENGTH == 15.0
-    # The stack stands on the faced 12.0 base bar (owner ruling 2026-10-30).
-    assert trammel.RAIL_SEAT_Z == trammel.BASE_BAR_THICK == 12.0
-    assert trammel.CARRIER_UNDERSIDE_Z == pytest.approx(80.3)
+    # Each fabricated height prints exactly on its inch grid (#290).
+    for height, places in (
+        (trammel.BASE_BAR_THICK, trammel.BASE_BAR_THICK_PLACES),
+        (trammel.PIVOT_BLOCK_HEIGHT, 2),
+        (trammel.CARRIER_THICK, trammel.CARRIER_THICK_PLACES),
+        (trammel.RISER_THICK, trammel.RISER_THICK_PLACES),
+    ):
+        inches = height / trammel.INCH
+        assert inches == pytest.approx(round(inches, places), abs=1e-9)
+    # The stack stands on the faced base bar (owner ruling 2026-10-30).
+    assert trammel.RAIL_SEAT_Z == trammel.BASE_BAR_THICK < trammel.BASE_BAR_STOCK_THICK
+    assert trammel.PIVOT_SUPPORT_HEIGHT == pytest.approx(
+        trammel.PIVOT_SHIM_PACK + trammel.PIVOT_SPACER_LENGTH
+    )
+    assert trammel.CARRIER_UNDERSIDE_Z == pytest.approx(
+        trammel.BASE_BAR_THICK
+        + trammel.CARRIAGE_HEIGHT
+        + trammel.PIVOT_BLOCK_HEIGHT
+        + trammel.PIVOT_SUPPORT_HEIGHT
+    )
     for retired in (
         "BEARING_RADIAL_PLAY", "RADIUS_FROM_BEARING_PLAY", "BEARING_BORE",
         "BEARING_OD", "BEARING_WIDTH", "BEARINGS_PER_PIN", "BEARING_RECESS",

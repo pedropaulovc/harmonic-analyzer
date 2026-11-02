@@ -1,8 +1,11 @@
 """MHA-CH-06-TL-VN-79: purchased oblique-trammel pivot shim.
 
-Source: https://www.mcmaster.com/98055A118/
-Read live 2026-10-23; page-stated dimensions only (mm).
-Bands are (upper, lower) deviations. No supplier length band is inferred.
+Sources: https://www.huyett.com/shim-0375-004, https://www.huyett.com/shim-0375-008,
+https://www.huyett.com/shim-0375-020, read live 2026-10-31; page-stated
+dimensions only: full-hard low-carbon steel, plain, lightly oiled; ID .376-.386,
+OD .615-.635; thickness .0035-.0045 / .0073-.0088 / .019-.021.
+Bands are (upper, lower) deviations, in mm. Fitting stock is keyed by its
+nominal thickness in thousandths of an inch.
 Model: nominal supplied envelope; unstated edge forms are not invented.
 Frame: axis +Z; origin at the bottom face.
 Supplied component is installed without shop modification.
@@ -10,33 +13,45 @@ Supplied component is installed without shop modification.
 
 from __future__ import annotations
 
+import _config
 from _fit_deviations import deviations
+from _package_units import drawing_unit
 
-SKU = "98055A118"
-PER_SUPPORT = 5  # the nominal 1.0 pack under each of the two spacers
+PART_NAME = "ch-rocker-arm-tl-vn-oblique-pivot-shim"
+UNIT = drawing_unit(
+    "parts/ch-rocker-arm-tl-vn-oblique-pivot-shim",
+    _config.parts("ch-rocker-arm-tl-vn-oblique-pivot-shim"),
+)
+SKU = "SHIM-0375-008"
+PER_SUPPORT = 5  # the nominal .040 pack under each of the two spacers
 QUANTITY = 2 * PER_SUPPORT
-ID = 10.0
-ID_BAND = (0.4, 0.03)  # upper, lower deviations, mm
-OD = 16.0
-OD_BAND = (-0.04, -0.47)
-THICKNESS = 0.2
-THICKNESS_BAND = (0.0, -0.04)
-FIT_SKUS = {0.1: "98055A117", 0.2: "98055A118", 0.5: "98055A121"}
-FIT_THICKNESS_BANDS = {0.1: (0.0, -0.03), 0.2: THICKNESS_BAND, 0.5: (0.0, -0.05)}
+ID = 9.5504  # .376
+ID_BAND = (0.254, 0.0)  # .376-.386
+OD = 15.875  # .625
+OD_BAND = (0.254, -0.254)  # .615-.635
+THICKNESS_THOU = 8
+THICKNESS = 0.2032  # .008
+THICKNESS_BAND = (0.02032, -0.01778)  # .0073-.0088
+FIT_SKUS = {4: "SHIM-0375-004", 8: SKU, 20: "SHIM-0375-020"}
+FIT_THICKNESS_BANDS = {4: (0.0127, -0.0127), 8: THICKNESS_BAND, 20: (0.0254, -0.0254)}
 LENGTH = THICKNESS
 
-SUPPLIER_REFERENCE_DIMENSIONS = (('SupplierBoreDiameter', 10.0, 'horizontal'), ('SupplierOuterDiameter', 16.0, 'horizontal'), ('SupplierThickness', 0.2, 'vertical'))
-SUPPLIER_REFERENCE_STARTS = {'SupplierBoreDiameter': (-5.0, 0.0), 'SupplierOuterDiameter': (-8.0, 0.0), 'SupplierThickness': (0.0, -0.2)}
-SUPPLIER_REFERENCE_PLANES = {'SupplierBoreDiameter': 'Front', 'SupplierOuterDiameter': 'Front', 'SupplierThickness': 'Top'}
+# Every carrier lies on a Top-view edge, so its construction line prints under
+# the outline: the bore on the z = 0 face (the view's upper edge), the OD on
+# the z = THICKNESS face (its lower edge), the thickness on the OD silhouette.
+# The Front (bore) view shows no chord across the rings.
+SUPPLIER_REFERENCE_DIMENSIONS = (('SupplierBoreDiameter', ID, 'horizontal'), ('SupplierOuterDiameter', OD, 'horizontal'), ('SupplierThickness', THICKNESS, 'vertical'))
+SUPPLIER_REFERENCE_STARTS = {'SupplierBoreDiameter': (-ID / 2.0, 0.0), 'SupplierOuterDiameter': (-OD / 2.0, -THICKNESS), 'SupplierThickness': (OD / 2.0, -THICKNESS)}
+SUPPLIER_REFERENCE_PLANES = {'SupplierBoreDiameter': 'Top', 'SupplierOuterDiameter': 'Top', 'SupplierThickness': 'Top'}
 # Bands print as stacked limits (max over min) inside one parenthesis.
-SUPPLIER_REFERENCE_FORMATS = {'SupplierBoreDiameter': (2, 'diameter', None, 'BORE'), 'SupplierOuterDiameter': (2, 'diameter', None, 'OUTSIDE'), 'SupplierThickness': (2, 'length', None, 'THICKNESS')}
+SUPPLIER_REFERENCE_FORMATS = {'SupplierBoreDiameter': (3, 'diameter', None, 'BORE'), 'SupplierOuterDiameter': (3, 'diameter', None, 'OUTSIDE'), 'SupplierThickness': (4, 'length', None, 'THICKNESS')}
 # The bore takes the top lane, the OD the bottom: each shelved text stays clear
 # of the other's witnesses. The thickness sits right of the Top view.
 SUPPLIER_REFERENCE_SIDES = {'SupplierBoreDiameter': 'top', 'SupplierOuterDiameter': 'bottom', 'SupplierThickness': 'right'}
-SUPPLIER_REFERENCE_UNITS = {'SupplierBoreDiameter': 'mm', 'SupplierOuterDiameter': 'mm', 'SupplierThickness': 'mm'}
+SUPPLIER_REFERENCE_UNITS = {'SupplierBoreDiameter': 'in', 'SupplierOuterDiameter': 'in', 'SupplierThickness': 'in'}
 SUPPLIER_REFERENCE_TOLERANCES_MM = {
     'SupplierBoreDiameter': deviations(ID_BAND),
     'SupplierOuterDiameter': deviations(OD_BAND),
     'SupplierThickness': deviations(THICKNESS_BAND),
 }
-SUPPLIER_DATA = ('MODEL: FIVE 0.2 mm SHIMS PER PIVOT, NOMINAL.', 'FITTING STOCK: 98055A117 (0.1 mm), 98055A121 (0.5 mm).', 'SELECT AT ASSEMBLY TO THE JIG RUNNING-GAP REQUIREMENT.')
+SUPPLIER_DATA = ('MODEL: FIVE .008 SHIMS PER PIVOT, NOMINAL.', 'FITTING STOCK: SHIM-0375-004 (.004), SHIM-0375-020 (.020).', 'SELECT AT ASSEMBLY TO THE JIG RUNNING-GAP REQUIREMENT.')

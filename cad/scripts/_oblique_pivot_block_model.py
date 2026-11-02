@@ -11,13 +11,16 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import name_dimensions
+from _document_units import apply_package_model_units
 from _drawing_marks import clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
+from _metric_vendor_dimension import set_metric_vendor_units
 from _feature_tree import name_last_feature
 from _fit_deviations import deviations
 from _holes import wizard_holes
 from _part_checks import volume_check, report_mass_properties
+from _part_properties import part_drawing_unit
 from _rebuild import force_rebuild
 from _sketch import SketchDims, add_line_chain, anchor_point_to_origin, anchor_point_to_point, blank_reference_sketches, dimension_between, ensure_fully_defined, set_sketch_direct_db
 from _sketch_chains import define_rectilinear_chain
@@ -105,7 +108,7 @@ def _as_construction(adapter: Any, entity_id: str) -> None:
     if not bool(segment.ConstructionGeometry):
         raise RuntimeError(f"{entity_id} did not take the construction flag")
 
-async def _cbore_floor_reference(adapter) -> list[tuple[str, str]]:
+async def _cbore_floor_reference(adapter, part) -> list[tuple[str, str]]:
     """The hidden sketch carrying the printed counterbore floor height.
 
     Section B-B cuts along Y through the (+13, +13) counterbore (along X its
@@ -114,8 +117,8 @@ async def _cbore_floor_reference(adapter) -> list[tuple[str, str]]:
     its cutting plane is the Right plane (model YZ) carried to X = +BoltX; a
     derived view imports a reference sketch that lies in its cut
     (build_pd_platen ``CboreFloorReference``). One construction line on the
-    Ø4.5 hole's +Y wall, a visible section edge, from the carriage seat
-    (Z = 0) up to the counterbore floor: its foot's Y from the origin
+    M4 clearance hole's +Y wall, a visible section edge, from the carriage
+    seat (Z = 0) up to the counterbore floor: its foot's Y from the origin
     (unprinted; the Z = 0 end sits on the sketch axis), and its rise, the
     printed floor. The off-sketch check in ``_sketch_mapper`` proves the
     plane stands at X = +13 and that the sketch opened on it, not on a
@@ -174,31 +177,39 @@ async def _cbore_floor_reference(adapter) -> list[tuple[str, str]]:
         f"{feature} floor height",
     )
     dims.record("CboreFloor", '"CboreFloor"')
-    # The block height on the +Y face, where B-B prints it: the Block
-    # extrusion's own depth does not import into a removed section.
-    side_foot = to_sketch((spec.CBORE_SECTION_X, spec.BLOCK_WIDTH / 2.0, 0.0))
-    side_top = to_sketch((spec.CBORE_SECTION_X, spec.BLOCK_WIDTH / 2.0, spec.BLOCK_HEIGHT))
-    side = await _construction(adapter, adapter.add_line(side_foot[0], side_foot[1], side_top[0], side_top[1]),
-                               f"{feature} +Y face")
-    check(f"{feature} +Y face along Z", await adapter.add_sketch_constraint(side, None, "horizontal"))
-    await anchor_point_to_origin(adapter, f"{side}.start", *side_foot, f"{feature} +Y face foot")
-    dims.record("SectionSideY")
-    await dimension_between(adapter, f"{side}.start", f"{side}.end", "horizontal_distance",
-                            spec.BLOCK_HEIGHT, f"{feature} block height")
-    dims.record("SectionBlockHeight")
+    if "SectionBlockHeight" in part.DRAWING_DIMENSIONS[feature]:
+        # TL-32 prints the block height on B-B. Its line stands inside the
+        # cut face, midway between the counterbore wall and the +Y face.
+        # TL-22's sections never imported a full-height dimension (farm
+        # rounds 1 to 9), so TL-22 prints the Block extrusion's depth on a
+        # standard Right view.
+        y_side = (BOLT_Y + spec.CBORE_DIA / 2.0 + spec.BLOCK_WIDTH / 2.0) / 2.0
+        side_foot = to_sketch((spec.CBORE_SECTION_X, y_side, 0.0))
+        side_top = to_sketch((spec.CBORE_SECTION_X, y_side, spec.BLOCK_HEIGHT))
+        side = await _construction(adapter, adapter.add_line(side_foot[0], side_foot[1], side_top[0], side_top[1]),
+                                   f"{feature} block height")
+        check(f"{feature} block height along Z", await adapter.add_sketch_constraint(side, None, "horizontal"))
+        await anchor_point_to_origin(adapter, f"{side}.start", *side_foot, f"{feature} block height foot")
+        dims.record("SectionSideY")
+        await dimension_between(adapter, f"{side}.start", f"{side}.end", "horizontal_distance",
+                                spec.BLOCK_HEIGHT, f"{feature} block height")
+        dims.record("SectionBlockHeight")
     await ensure_fully_defined(adapter, feature)
     check(f"exit_sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
     return jobs + dims.apply(adapter, feature)
 
-async def _rectangle(adapter, name, bounds, names):
+
+async def _rectangle(adapter, name, bounds, names, *, anchor=0):
+    """``anchor`` indexes the origin-anchored corner: (x0,y0), (x1,y0), (x1,y1),
+    (x0,y1)."""
     check(name, await adapter.create_sketch("Front"))
     at = _xy_mapper(adapter, 0.0, name)
     x0, x1, y0, y1 = bounds
     points = [at(x0,y0),at(x1,y0),at(x1,y1),at(x0,y1)]
     dims = SketchDims()
     lines = await add_line_chain(adapter, points)
-    await define_rectilinear_chain(adapter, lines, points, label=name, dims=dims, names=names)
+    await define_rectilinear_chain(adapter, lines, points, anchor=anchor, label=name, dims=dims, names=names)
     await ensure_fully_defined(adapter, name)
     check(name, await adapter.exit_sketch())
     name_last_feature(adapter, name)
@@ -255,8 +266,8 @@ async def _construction_circle(adapter, dims, base, base_uv, uv, dia, names, lab
 async def _plan_datum_reference(adapter, part) -> None:
     """The hidden top-face sketch that carries the plan's X ordinates from
     the -X edge (rule 10): a construction line ON that edge, construction
-    circles ON the Ø10 seat and one carriage hole per column, and on TL-32 a
-    line ON the lug's -X face, which also carries the 88 overall from the
+    circles ON the shoulder seat and one carriage hole per column, and on
+    TL-32 a line ON the lug's -X face, which also carries the overall from the
     top (+Y) edge. Shown in the plan view, every entity overlies a real edge."""
     feature = spec.PLAN_DATUM_REFERENCE
     z = part.BLOCK_HEIGHT
@@ -299,10 +310,10 @@ async def _plan_datum_reference(adapter, part) -> None:
 
 async def _nut_pattern_reference(adapter, part) -> None:
     """The hidden nut-face sketch that carries VIEW D's locations: a
-    construction line ON the lug end, the nut axis (a circle ON the spigot
-    recess) from that end and the bottom face, and the four taps (circles ON
-    their drills) from the nut axis, so the pattern prints against the recess
-    it surrounds."""
+    construction line ON the lug end, the leadscrew axis (a circle ON the
+    screw clearance) from that end and the bottom face, the first tap (a
+    circle ON its drill) from the axis and the second from the first, so the
+    pair prints as the TL-27 nut's (ruling B1)."""
     feature = "NutPatternReference"
     check(f"create_sketch {feature}", await adapter.create_sketch("NutFace"))
     to_sketch = _sketch_mapper(adapter, u_axis=2, v_axis=1, label=feature)
@@ -321,11 +332,14 @@ async def _nut_pattern_reference(adapter, part) -> None:
                             part.BLOCK_HEIGHT, f"{feature} lug end length")
     dims.record("NutEndLength")
     axis_uv = at(part.NUT_AXIS_Y, part.NUT_AXIS_Z)
-    axis = await _construction_circle(adapter, dims, f"{end}.start", end_start, axis_uv, part.NUT_SEAT_DIA,
+    axis = await _construction_circle(adapter, dims, f"{end}.start", end_start, axis_uv, part.SCREW_CLEARANCE_DIA,
                                       ("NutCentreZ", "NutCentreY", "NutCentreDia"), f"{feature} nut axis")
-    for i, (y, z) in enumerate(part.NUT_HOLES_YZ, 1):
-        await _construction_circle(adapter, dims, f"{axis}.center", axis_uv, at(y, z), part.NUT_TAP_DRILL,
-                                   (f"NutTap{i}Z", f"NutTap{i}Y", f"NutTap{i}Dia"), f"{feature} tap {i}")
+    base, base_uv = axis, axis_uv
+    for i, ((y, z), name) in enumerate(zip(part.NUT_HOLES_YZ, ("NutTap1Y", "NutTapSpacing"), strict=True), 1):
+        tap_uv = at(y, z)
+        base = await _construction_circle(adapter, dims, f"{base}.center", base_uv, tap_uv, part.NUT_TAP_DRILL,
+                                          (f"NutTap{i}Z", name, f"NutTap{i}Dia"), f"{feature} tap {i}")
+        base_uv = tap_uv
     await ensure_fully_defined(adapter, feature)
     check(f"exit_sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
@@ -336,8 +350,12 @@ async def build_block_model(adapter, part) -> None:
     import math
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
     check("create part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(part.PART_NAME), label=part.PART_NAME)
+    # Anchored at the +X/-Y corner, where the printed BlockSideY's witness
+    # starts: from the -X corner its extension line ran the whole -Y edge and,
+    # on TL-32, across the lug's top face (round-5 review).
     await _rectangle(adapter,"BlockProfile",(part.BLOCK_X0,part.BLOCK_X1,-part.BLOCK_WIDTH/2,part.BLOCK_WIDTH/2),
-                     ["BlockLength","BlockWidth","BlockEndX","BlockSideY"])
+                     ["BlockLength","BlockWidth","BlockEndX","BlockSideY"], anchor=1)
     check("block",await adapter.create_extrusion(ExtrusionParameters(depth=part.BLOCK_HEIGHT)))
     name_last_feature(adapter,"Block")
     name_dimensions(adapter,"Block",["BlockHeight"])
@@ -360,7 +378,7 @@ async def build_block_model(adapter, part) -> None:
     expected -= math.pi * (spec.BORE_DIA/2)**2 * spec.BORE_DEPTH
     await _circles(adapter,"TopFace",part.BLOCK_HEIGHT,"PivotTapProfile",
                    [(spec.BORE_X,0,spec.PIVOT_TAP_DRILL,("TapX",None,"TapDrillDia"))])
-    check("M8 tap drill thru",await adapter.create_cut_extrude(ExtrusionParameters(depth=part.BLOCK_HEIGHT*2)))
+    check("pivot tap drill thru",await adapter.create_cut_extrude(ExtrusionParameters(depth=part.BLOCK_HEIGHT*2)))
     name_last_feature(adapter,"PivotTap")
     expected -= math.pi*(spec.PIVOT_TAP_DRILL/2)**2 * (part.BLOCK_HEIGHT-spec.BORE_DEPTH)
     for profile,diameter,depth,feature in (
@@ -374,39 +392,40 @@ async def build_block_model(adapter, part) -> None:
         name_last_feature(adapter,feature)
     expected -= 4*math.pi*((spec.HOLE_DIA/2)**2*spec.CBORE_FLOOR+(spec.CBORE_DIA/2)**2*spec.CBORE_DEPTH)
     # Preserve the native carriage-floor reference on the actual section plane.
-    await _cbore_floor_reference(adapter)
+    await _cbore_floor_reference(adapter, part)
     await _plan_datum_reference(adapter, part)
     if hasattr(part,"NUT_FACE_X"):
         check("nut face plane",await adapter.create_plane(CreatePlaneParameters(mode="offset",base_plane="Right Plane",offset=part.NUT_FACE_X)))
         name_last_feature(adapter,"NutFace")
         blank_reference_geometry(adapter,(("NutFace","PLANE"),))
-        for profile,dia,depth,feature,names in (
-            ("NutSeatProfile",part.NUT_SEAT_DIA,part.NUT_SPIGOT_DEPTH,"NutSeat",("NutAxisZ","NutAxisY","NutSeatDia")),
-            ("NutClearanceProfile",part.SCREW_CLEARANCE_DIA,part.LUG_WIDTH*2,"NutClearance",("NutClearanceZ","NutClearanceY","NutClearanceDia")),
-        ):
-            await _circles(adapter,"NutFace",part.NUT_FACE_X,profile,
-                           [(part.NUT_AXIS_Z,part.NUT_AXIS_Y,dia,names)],side=True)
-            check(feature,await adapter.create_cut_extrude(ExtrusionParameters(depth=depth,reverse_direction=True)))
-            name_last_feature(adapter,feature)
-            name_dimensions(adapter,feature,["NutSeatDepth" if feature=="NutSeat" else "NutClearanceDepth"])
+        await _circles(adapter,"NutFace",part.NUT_FACE_X,"NutClearanceProfile",
+                       [(part.NUT_AXIS_Z,part.NUT_AXIS_Y,part.SCREW_CLEARANCE_DIA,
+                         ("NutClearanceZ","NutClearanceY","NutClearanceDia"))],side=True)
+        check("NutClearance",await adapter.create_cut_extrude(ExtrusionParameters(depth=part.LUG_WIDTH*2,reverse_direction=True)))
+        name_last_feature(adapter,"NutClearance")
+        name_dimensions(adapter,"NutClearance",["NutClearanceDepth"])
         wizard_holes(adapter,part.NUT_TAP_SPEC,
              [[part.NUT_FACE_X,y,z] for y,z in part.NUT_HOLES_YZ],(-1.0,0.0,0.0),
-             "nut flange blind taps",name="NutTaps",expect_dia_mm=part.NUT_TAP_DRILL,
+             "feed nut screw taps (#4-40 through)",name="NutTaps",expect_dia_mm=part.NUT_TAP_DRILL,
              placement_dims=[((f"NutPlacement{i}U",None),(f"NutPlacement{i}V",None))
-                             for i in range(1,5)])
+                             for i in range(1,len(part.NUT_HOLES_YZ)+1)])
         # Drill-to-print pattern dimensions on the physical face; no transfer spotting.
         expected -= math.pi*(part.SCREW_CLEARANCE_DIA/2)**2*part.LUG_WIDTH
-        expected -= math.pi*((part.NUT_SEAT_DIA/2)**2-(part.SCREW_CLEARANCE_DIA/2)**2)*part.NUT_SPIGOT_DEPTH
-        from _holes import blind_hole_volume_mm3
-        expected -= 4*blind_hole_volume_mm3(part.NUT_TAP_DRILL,part.NUT_TAP_DRILL_DEPTH)
+        expected -= len(part.NUT_HOLES_YZ)*math.pi*(part.NUT_TAP_DRILL/2)**2*part.LUG_WIDTH
         await _nut_pattern_reference(adapter, part)
     await name_bore_axis(adapter,"Right Plane",spec.BORE_X,"Top Plane",0.0,"pivot axis")
     name_last_feature(adapter,spec.PIVOT_AXIS_NAME)
     await force_rebuild(adapter)
     _require_one_solid_body(adapter,label=part.PART_NAME)
     await volume_check(adapter,"finished block",expected,expected*0.002)
-    set_dimension_bilateral_tolerance(adapter,"TopBoreProfile","BoreDia",*deviations(spec.BORE_BAND))
+    set_dimension_bilateral_tolerance(adapter,"TopBoreProfile","BoreDia",*deviations(spec.BORE_BAND),
+                                      places=spec.BORE_PLACES,display_unit=spec.UNIT)
     apply_drawing_precision(adapter,part.DRAWING_PRECISION)
+    # TL-32's Tr8/KP08 vendor-line dimensions print exact millimetres with
+    # their own bands (owner ruling 4).
+    for (feature_name,dimension_name),(places,band) in getattr(part,"METRIC_DIMENSIONS",{}).items():
+        set_dimension_symmetric_tolerance(adapter,feature_name,dimension_name,band,display_unit="mm")
+        set_metric_vendor_units(adapter,feature_name,dimension_name,places=places)
     # Thread identity and fit/process qualifiers belong to the saved model.
     from _drawing_precision import _named_dimension
     for channel,callouts in ((2,part.CALLOUTS_SUFFIX),(3,part.CALLOUTS_ABOVE),(4,part.CALLOUTS_BELOW)):

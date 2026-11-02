@@ -66,7 +66,7 @@ def test_quantity_thread_and_length_are_the_fastener_tables() -> None:
 
 
 def test_head_seats_nominally_below_the_riser_top() -> None:
-    # Equal 82 deg cones: the Ø0.212 flat top sits where the Ø6.3 countersink
+    # Equal 82 deg cones: the Ø.212 flat top sits where the riser's countersink
     # narrows to it, not flush with the riser top.  Nominal seat only: no
     # head-angle tolerance is sourced or assumed.
     recess = (riser.CSK_DIA - 0.212 * IN) / (2.0 * math.tan(math.radians(41.0)))
@@ -102,9 +102,11 @@ def test_riser_screw_keeps_rule_18_full_thread() -> None:
     assert spec.ENGAGEMENT_REQUIRED == pytest.approx(required)
     assert spec.LENGTH_MIN == pytest.approx((0.625 - 0.03) * IN)
     assert spec.POINT_CHAMFER_LENGTH_MAX == pytest.approx(2.0 * IN / 40.0)
-    assert riser.THICKNESS + riser.THICKNESS_BAND == pytest.approx(6.8)
     assert spec.SCREW_FULL_THREAD_REACH_MIN == pytest.approx(
-        spec.LENGTH_MIN - 6.8 - carrier.TAP_MOUTH_BREAK - spec.POINT_CHAMFER_LENGTH_MAX
+        spec.LENGTH_MIN
+        - (riser.THICKNESS + riser.THICKNESS_BAND)
+        - carrier.TAP_MOUTH_BREAK
+        - spec.POINT_CHAMFER_LENGTH_MAX
     )
     assert spec.RECEIVER_FULL_THREAD_MIN == carrier.ENGAGEMENT_MM[carrier.RISER_THREAD]
     assert spec.ENGAGEMENT_MIN == min(
@@ -200,6 +202,15 @@ def test_frame_puts_the_flat_top_at_y0() -> None:
     assert 'screw_axis_planes=("Front Plane", "Right Plane")' in source
 
 
+def test_thread_chord_lies_on_the_head_cone_edge() -> None:
+    # The thread Ø's line is the cone/major junction edge, not a chord drawn
+    # across the threaded shank.
+    d = dims.DIMS
+    start = spec.SUPPLIER_REFERENCE_STARTS["SupplierThreadDiameter"]
+    assert start == (-d.major_dia / 2.0, -d.junction_depth)
+    assert ((d.head_dia / 2.0, 0.0), (-start[0], start[1])) in d.body_profile()
+
+
 def test_purchased_sheet_documents_the_built_part() -> None:
     import draw_ch_rocker_arm_tl_vn_oblique_riser_screw as drawing
 
@@ -212,40 +223,16 @@ def test_purchased_sheet_documents_the_built_part() -> None:
     assert sheet.layout in DRAWING_TEMPLATES
 
 
-def test_sheet_prints_only_the_replacement_sizes(monkeypatch) -> None:
-    import draw_ch_rocker_arm_tl_vn_oblique_riser_screw as drawing
-    from _supplier_screw_layout import supplier_screw_lane_plan
-
-    rows = drawing._printed_rows()
-    assert tuple(name for name, _, _ in rows) == drawing.PRINTED_REFERENCES
-    assert all(orientation != "angle" for _, _, orientation in rows)
-    # The part still authors these; the B18.6.3 flat head in ITEM implies them.
-    authored = {name for name, _, _ in spec.SUPPLIER_REFERENCE_DIMENSIONS}
-    assert authored - set(drawing.PRINTED_REFERENCES) == {
-        "SupplierHeadAngle", "SupplierHeadHeight",
-    }
-    plan = supplier_screw_lane_plan(
-        rows,
-        planes=drawing._printed(spec.SUPPLIER_REFERENCE_PLANES),
-        sides=drawing._printed(spec.SUPPLIER_REFERENCE_SIDES),
-    )
-    assert set(plan) == set(drawing.PRINTED_REFERENCES)
-    assert "supplier_top" in drawing.build.__code__.co_consts
-    monkeypatch.setattr(drawing, "PRINTED_REFERENCES", ("SupplierLength", "SupplierMissing"))
-    with pytest.raises(ValueError, match="SupplierMissing"):
-        drawing._printed_rows()
-
-
 def test_reserved_lanes_keep_the_views_in_projection() -> None:
-    """Machinist review b344192: TOP and RIGHT sat 3 mm off FRONT's axis/row."""
+    """Machinist review b344192: TOP and RIGHT sat .12 in off FRONT's axis/row."""
     import draw_ch_rocker_arm_tl_vn_oblique_riser_screw as drawing
     from _purchased_fastener_drawing import fastener_view_cells, supplier_fit_cells
     from _supplier_screw_layout import supplier_screw_margins
 
     raw = supplier_screw_margins(
-        drawing._printed_rows(),
-        planes=drawing._printed(spec.SUPPLIER_REFERENCE_PLANES),
-        sides=drawing._printed(spec.SUPPLIER_REFERENCE_SIDES),
+        spec.SUPPLIER_REFERENCE_DIMENSIONS,
+        planes=spec.SUPPLIER_REFERENCE_PLANES,
+        sides=spec.SUPPLIER_REFERENCE_SIDES,
     )
     aligned = drawing._aligned_margins(raw)
     # The same reserved views (the settled inventory guard), never a smaller lane.

@@ -134,6 +134,9 @@ OFFLINE_IMPORT_EXCLUSIONS: dict[str, str] = {}
 # Module-level *_BAND tuples that are not fit bands, so no checked consumer
 # reads them. A new band tuple must be fed to a consumer above or listed here.
 NOT_FIT_BANDS: dict[tuple[str, str], str] = {
+    ("ch_rocker_arm_tl_vn_oblique_pivot_screw_spec", "SHOULDER_LENGTH_BAND"): (
+        "assumed length envelope the jig's unshimmed head-gap stack reads (axial, not a fit)"
+    ),
     ("build_dt_drive_train_assembly", "ARBOR_PED_SOUTH_Z_BAND"): (
         "plan z extent of the south pedestal foot (clearance geometry)"
     ),

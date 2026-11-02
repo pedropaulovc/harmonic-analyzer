@@ -15,7 +15,7 @@ allowed_free_stems:
   - ch-rocker-arm-tl-oblique-feed-lever
   - ch-rocker-arm-tl-vn-oblique-carriage
   - ch-rocker-arm-tl-vn-oblique-cl-dowel
-  - ch-rocker-arm-tl-vn-oblique-leadscrew-nut
+  - ch-rocker-arm-tl-oblique-feed-nut
   - ch-rocker-arm-tl-vn-oblique-carriage-screw
   - ch-rocker-arm-tl-vn-oblique-nut-screw
   - ch-rocker-arm-tl-vn-oblique-riser-screw
@@ -34,7 +34,7 @@ required_free_stems:
   - ch-rocker-arm-tl-oblique-feed-lever
   - ch-rocker-arm-tl-vn-oblique-carriage
   - ch-rocker-arm-tl-vn-oblique-cl-dowel
-  - ch-rocker-arm-tl-vn-oblique-leadscrew-nut
+  - ch-rocker-arm-tl-oblique-feed-nut
   - ch-rocker-arm-tl-vn-oblique-carriage-screw
   - ch-rocker-arm-tl-vn-oblique-nut-screw
   - ch-rocker-arm-tl-vn-oblique-riser-screw
@@ -45,9 +45,9 @@ free_dof: 1
 machinist_exceptions:
   - id: "RV-01"
     kind: "accept"
-    where: "step 7 and F1: four #4-40 X 1/2 button heads directly on the Tr8 nut flange into the integral feed block, 0.4 N·m"
-    finding: "no mechanical lock on the nut-flange screws under reversing nut torque (rule 23)"
-    reason: "The unchanged four-screw flange is a static clamp: its calculated friction-slip margin exceeds 1.5 against the 1 kN hand-abuse nut torque. No operating torque reaches the screws. The owner accepted the #4-40 button-head joint without washers on 2026-10-19/20; the owner-approved 2026-10-23 simplification retains that joint in TL-32, with holes drilled to print rather than transfer spotted. Actual heads must seat flat and clear the nut body before tightening."
+    where: "step 7 and F1: two #4-40 X 3/4 SHCS through the TL-27 feed nut's loose holes into the integral feed block, 0.3 N·m"
+    finding: "no mechanical lock on the feed nut screws under reversing nut torque (rule 23)"
+    reason: "The two-screw TL-27 nut is a static clamp: its calculated friction-slip margin (1.56) exceeds 1.5 against the 1 kN hand-abuse nut torque, so no operating torque reaches the screws. The owner accepted the static clamp without washers for the bought nut's flange on 2026-10-19/20 and replaced that nut with the shop-made TL-27 on 2026-11-01 (item 4); 0.3 N·m keeps each socket head's bearing on the brass under its 17 ksi yield. Holes are drilled to print rather than transfer spotted; the nut's loose holes align it to the leadscrew before tightening."
   - id: "RV-03"
     kind: "accept"
     where: "step 8: the handwheel and KP08 set screws on leadscrew flats, locked with Loctite 222 (low-strength purple) threadlocker"
@@ -55,11 +55,13 @@ machinist_exceptions:
     reason: "Owner ruling 2026-10-18 retains bought low-strength threadlocker on each set screw; the shaft flats carry the hand-crank torque."
   - id: "RV-04"
     kind: "accept"
-    where: "P2: the two M8 shoulder screws seated in block counterbores, Loctite 222 and 4.0 N·m"
+    where: "P2: the two 5/16-18 shoulder screws seated in block counterbores, Loctite 222 and 4.0 N·m"
     finding: "pivot shoulder screws use threadlocker without a separate mechanical thread lock (rule 23)"
-    reason: "The owner-approved 2026-10-23 plain-pivot contract explicitly chooses Loctite 222 and torque. Each screw shoulder bottoms in its counterbore, leaving measured 0.05–0.25 carrier running clearance; the head, thread, block and carriage form the positive lift-capture path. This is not whole-jig load certification."
+    reason: "The owner-approved 2026-10-23 plain-pivot contract explicitly chooses Loctite 222 and torque. Each screw shoulder bottoms in its counterbore, leaving measured .002–.010 carrier running clearance; the head, thread, block and carriage form the positive lift-capture path. This is not whole-jig load certification."
   - id: "RV-05"
     kind: "accept"
-    where: "TL-22 and TL-32 sheets, the M8x1.25 TAP THRU BELOW SHOULDER SEAT callout's 11.12 MIN ENGAGEMENT, and P2: the two TL-VN-77 shoulder screws threaded into those taps"
-    finding: "M8 full-form thread engagement 11.12 (1.39D) is under 1.5D (rule 18)"
-    reason: "Owner ruling 2026-10-27: the bought 90323A492 shoulder screw has 13 of thread; less 1.5 incomplete pitches that leaves 11.125 full-form thread (about 1.39D) in the 6061 blocks' through taps. The screw is static: its shoulder seats on the counterbore floor and the thread carries only the 4.0 N·m seating preload (about 2.5 kN at K 0.20), against an estimated 43.4 kN 6061 thread-strip load on the full-form length (17.4x; 5.8x on the one-third-of-ultimate basis). More thread needs a different bought screw. This is not whole-jig load certification."
+    where: "Step 5: each M4 X 20 SHCS cut to its own counterbore floor height + .189, engaging .183-.195 of the HGH15CA carriage's M4 x 5"
+    finding: "carriage screw engagement .183 min (4.65 mm, 1.16D), under rule 18's 1.5D"
+    reason: "The bought HGH15CA carriage's vendor M4 holes are 5 mm deep, so no M4 reaches 1.5D (6.0 mm). Owner ruling 2026-11-01, option A: the TL-22/TL-32 counterbore floor drops .614 to .570 and each screw is cut to fit its own floor at assembly (rule 19), so the reach carries only the ±.005 cut and the .001 reading, 1.16D minimum against the 0.96D (.151) the uncut screw left. Owner exception confirmed 2026-11-01 (relayed by Main)."
+# drawing_unit: the jig sheet, its TOL_* rows and the saved model's units (#290).
+drawing_unit: in

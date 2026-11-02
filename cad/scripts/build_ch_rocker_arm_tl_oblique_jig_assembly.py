@@ -72,11 +72,13 @@ from _assembly import (
     save_assembly_and_images,
     write_dof_manifest,
 )
+from _assembly_contract import assembly_contract
 from _assembly_patterns import ensure_global_pattern_axis
 from _check import check
 from _com import _early_bound
 from _component_references import component_identity, component_reference_names
 from _custom_properties import apply_custom_properties
+from _document_units import apply_package_model_units
 from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
 from _drawing_precision import apply_drawing_precision
 from _feature_tree import name_last_feature
@@ -116,7 +118,7 @@ _PARTS = (
     ("ch-rocker-arm-tl-vn-oblique-carriage", "ch-rocker-arm-tl-vn-oblique-carriage"),
     ("ch-rocker-arm-tl-vn-oblique-cl-dowel", "ch-rocker-arm-tl-vn-oblique-cl-dowel"),
     ("ch-rocker-arm-tl-vn-oblique-leadscrew", "ch-rocker-arm-tl-vn-oblique-leadscrew"),
-    ("ch-rocker-arm-tl-vn-oblique-leadscrew-nut", "ch-rocker-arm-tl-vn-oblique-leadscrew-nut"),
+    ("ch-rocker-arm-tl-oblique-feed-nut", "ch-rocker-arm-tl-oblique-feed-nut"),
     ("ch-rocker-arm-tl-vn-oblique-pillow-block", "ch-rocker-arm-tl-vn-oblique-pillow-block"),
     ("ch-rocker-arm-tl-vn-oblique-handwheel", "ch-rocker-arm-tl-vn-oblique-handwheel"),
     ("sh-vn-clamping-kit-hardware", "sh-vn-clamping-kit-hardware--HoldDownStud"),
@@ -788,6 +790,7 @@ async def build(adapter) -> dict[str, str]:
     # Clear the free-DOF manifest before carriage 1's slide is recorded.
     reset_dof_manifest()
     check("create_assembly", await adapter.create_assembly())
+    apply_package_model_units(adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME)
 
     # Every family in BOM order (SolidWorks numbers a top-level BOM in
     # FeatureManager order; the base bars come first and SolidWorks fixes the

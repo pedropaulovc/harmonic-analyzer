@@ -9,11 +9,13 @@ ch-rocker-arm-tl-vn-oblique-lever-washer:
   material_specification: "316 stainless steel, Rockwell C51, case hardened; two-piece wedge-lock pair for 5/16 in screws, ID 0.340 in x OD 0.530 in x 0.070-0.090 in; McMaster-Carr 91812A230"
   finish: AS SUPPLIED
   # https://www.mcmaster.com/products/washers/washer-type~wedge/ listing read
-  # 2026-10-17 (detail page login-walled). UNVERIFIED: whether the thickness is
-  # the pair's stack and whether a package of 5 is five pairs. AISI 304 is the
-  # native library stand-in; the purchased grade is 316.
+  # 2026-10-17 and 2026-11-01 (detail page login-walled): one item is the
+  # two-piece washer, a package is five pairs, and the drawing's thickness is
+  # the pair's stack. AISI 304 is the native library stand-in; the purchased
+  # grade is 316.
   # One pair under each of the fastener table's LEVER_TO_CARRIER heads.
   quantity: 2
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: purchased
+  drawing_unit: in

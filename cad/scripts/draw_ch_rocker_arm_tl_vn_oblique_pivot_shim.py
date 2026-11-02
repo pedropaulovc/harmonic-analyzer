@@ -9,6 +9,7 @@ import _telemetry
 import ch_rocker_arm_tl_vn_oblique_pivot_shim_spec as part
 from _com import _early_bound
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import NumberFit, build_purchased_fastener_drawing
 from _session import run_build
 from _supplier_limits import LIMIT
@@ -19,21 +20,18 @@ from _machinist_review_mode import MachinistReviewMode
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_pivot_shim"]
-ITEM = 'DIN 988 SPRING STEEL SHIM, 10 MM ID X 16 MM OD X 0.2 MM'
-# Every text shelves right of its own witnesses, clear of the lines: the bore
-# on the Front's top lane, the OD on its bottom lane, the thickness beside
-# the Top view. Front and Top reserve the same left/right space so the fit
-# centres them on one projection line; the Front's equal top/bottom keeps it
-# level with the unannotated Right. The 16 mm part fits at 2:1.
+ITEM = 'LOW-CARBON STEEL SHIM, 3/8 X 5/8, .008 THICK'
+# Every text shelves past its own outer witness, clear of the lines: the bore
+# on the Top's top lane, the OD on its bottom lane, both left of the thin
+# strip so the thickness text beside it on the right stays clear of them.
+# Only the Top is annotated; the projection fit centres the Front under it.
+# The 5/8 part fits at 2:1.
 SHELVES = {
-    "SupplierBoreDiameter": (True, "right"),
-    "SupplierOuterDiameter": (True, "right"),
+    "SupplierBoreDiameter": (True, "left"),
+    "SupplierOuterDiameter": (True, "left"),
     "SupplierThickness": (False, "right"),
 }
-SUPPLIER_MARGINS = {
-    "*Front": (0.010, 0.018, 0.060, 0.018),
-    "*Top": (0.010, 0.010, 0.060, 0.010),
-}
+SUPPLIER_MARGINS = {"*Top": (0.060, 0.018, 0.060, 0.018)}
 
 
 def _assert_supplier_bands(displays):
@@ -91,6 +89,7 @@ async def build(adapter) -> dict[str, str]:
         supplier_dimensions=supplier_dimensions,
         supplier_margins=SUPPLIER_MARGINS,
         settled_checks=(assert_supplier_dimensions,), supplier_data=part.SUPPLIER_DATA,
+        unit=part_drawing_unit(part.PART_NAME),
     )
 
 

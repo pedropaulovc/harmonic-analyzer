@@ -10,8 +10,9 @@ Every value comes from the part specs and the calculator
 dimension is retyped here.
 
 The table's engagement is nominal screw/receiver overlap, capped by receiver
-depth, not full-thread engagement at tolerance limits. Protrusion is bought
-length minus grip minus receiver depth: past the far face for a THRU tap,
+depth, not full-thread engagement at tolerance limits. Protrusion is installed
+length (bought, or cut at assembly) minus grip minus receiver depth: past the
+far face for a THRU tap,
 past the full thread for a blind one. A through-tip may project only into
 the stated free clearance. Individual screw/washer specs own tolerance
 bands, incomplete threads and neighboring geometry; the nominal table
@@ -19,18 +20,18 @@ alone does not certify worst-case fit.
 
 Nominal engagement is at least 1.5 diameters except on two joints:
 
-* Carriage (M4 x 20): the HGH15CA's M4 x 5 holes limit it to 4.4 (1.1 D).
+* Carriage (M4 x 20, each cut to fit its own counterbore at assembly): the
+  HGH15CA's M4 x 5 holes limit it to 4.80 (1.2 D).
 * Feed lever (5/16-18 x 1): nominal engagement is 10.4 (1.3 D).
   The lever-washer spec records the worst-case engagement and possible
   stand-out; the nominal table alone does not bound either.
 
-Threads are US-customary UNC except the bought carriage's M4 holes and the
-supplier-defined M8 shoulder screw.
-The shoulder screw has its own datum-based row: treating its 35 mm shoulder
+Threads are US-customary UNC except the bought carriage's M4 holes.
+The shoulder screw has its own datum-based row: treating its 1.500 shoulder
 as a conventional screw grip would report a false engagement.
 
-Only the feed lever screws use wedge-lock pairs. The four nut screws are
-button heads directly on the brass flange. Hold-down studs retain their loaded
+Only the feed lever screws use wedge-lock pairs. The two feed nut screws bear
+directly on the brass nut. Hold-down studs retain their loaded
 lower ends when shortened. These nominal fit contracts do not certify the jig.
 """
 
@@ -42,6 +43,8 @@ from fractions import Fraction
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_oblique_feed_lever_spec as feed_lever
+import ch_rocker_arm_tl_oblique_feed_block_spec as feed_block
+import ch_rocker_arm_tl_oblique_feed_nut_spec as feed_nut
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_riser_spec as riser
@@ -54,7 +57,6 @@ from _printed_tolerance import printed_band_mm
 INCH = trammel.INCH
 RAILS = 2  # one rail, one base bar, one carriage, one pivot block per side
 SHCS = "SHCS"
-BHCS = "BHCS"  # ASME B18.3 button head socket cap screw
 # The riser's countersinks take only the B18.6.3 machine-screw head; a B18.3
 # socket flat head stands proud of them (trammel spec; Codex #1583).
 FLAT_HEAD = "B18.6.3 FLAT HEAD"
@@ -73,7 +75,7 @@ def inch_mm(length: str) -> float:
 class Fastener:
     joint: str
     thread: str  # as printed: "#8-32", "M4"
-    head: str  # SHCS, BHCS or FLAT HEAD
+    head: str  # SHCS or FLAT HEAD
     length: str  # as printed: "3/4" (inch) or "20" (mm)
     count: int
     grip_mm: float  # under the head, before the receiving thread
@@ -83,6 +85,9 @@ class Fastener:
     # Free space past a THRU tap's far face that the tip may stand into; 0:
     # the tip stops inside the receiving thread.
     tip_clearance_mm: float = 0.0
+    # Cut to fit at assembly: the installed length under the head; None when
+    # the screw goes in as bought.
+    cut_length_mm: float | None = None
 
     @property
     def metric(self) -> bool:
@@ -91,6 +96,10 @@ class Fastener:
     @property
     def length_mm(self) -> float:
         return float(self.length) if self.metric else inch_mm(self.length)
+
+    @property
+    def installed_length_mm(self) -> float:
+        return self.length_mm if self.cut_length_mm is None else self.cut_length_mm
 
     @property
     def major_mm(self) -> float:
@@ -104,11 +113,11 @@ class Fastener:
     @property
     def engagement_mm(self) -> float:
         # A tip standing past a THRU tap engages only the tap's depth.
-        return min(self.length_mm - self.grip_mm, self.thread_depth_mm)
+        return min(self.installed_length_mm - self.grip_mm, self.thread_depth_mm)
 
     @property
     def protrusion_mm(self) -> float:
-        return self.length_mm - self.grip_mm - self.thread_depth_mm
+        return self.installed_length_mm - self.grip_mm - self.thread_depth_mm
 
 
 @dataclass(frozen=True)
@@ -159,6 +168,7 @@ BLOCK_TO_CARRIAGE = Fastener(
     pivot_block.CARRIAGE_THREAD_DEPTH,  # the carriage's M4 x 5
     min_engagement_d=1.1,
     note="the carriage maker's M4 x 5 holes limit the engagement",
+    cut_length_mm=pivot_block.SCREW_CUT_LENGTH,  # owner ruling 2026-11-01
 )
 KP08_TO_BRACKET = Fastener(
     "KP08 pillow block to TL-28 end bracket",
@@ -170,13 +180,13 @@ KP08_TO_BRACKET = Fastener(
     leadscrew.BRACKET_THICK,  # tapped THRU
 )
 NUT_TO_FEED_BLOCK = Fastener(
-    "Tr8 flanged nut to TL-32 feed block",
-    leadscrew.NUT_SCREW,
-    BHCS,
-    leadscrew.NUT_SCREW_LENGTH,
-    len(leadscrew.NUT_HOLE_ANGLES_DEG),
-    leadscrew.NUT_SCREW_GRIP,  # the button head on the flange
-    leadscrew.NUT_SCREW_TAP_DEPTH,  # blind
+    "TL-27 feed nut to TL-32 feed block",
+    feed_nut.SCREW_THREAD,
+    SHCS,
+    feed_nut.SCREW_LENGTH_TEXT,
+    feed_nut.SCREW_COUNT,
+    feed_nut.LENGTH,  # the head on the nut's outer face
+    feed_block.LUG_WIDTH,  # tapped THRU
 )
 RISER_TO_CARRIER = Fastener(
     "TL-24 riser to TL-21 carrier",
@@ -242,7 +252,7 @@ class ShoulderScrew:
     count: int = pivot_screw.QUANTITY
     shoulder_diameter_mm: float = pivot_screw.SHOULDER_DIA
     shoulder_length_mm: float = pivot_screw.SHOULDER_LENGTH
-    thread_length_mm: float = pivot_screw.THREAD_LENGTH
+    thread_length_mm: float = pivot_screw.CUT_THREAD_LENGTH  # the shop-cut thread
     counterbore_depth_mm: float = pivot_block.BORE_DEPTH
     torque_nm: float = 4.0
     threadlocker: str = "Loctite 222"
@@ -282,9 +292,9 @@ if abs(RAIL_TO_BAR.engagement_mm - base_bar.RAIL_SCREW_ENGAGEMENT) > 1e-9:
     raise AssertionError("rail screw engagement disagrees with the base bar spec")
 if abs(BRACKET_TO_BAR.engagement_mm - leadscrew.BAR_SCREW_ENGAGEMENT) > 1e-9:
     raise AssertionError("bar screw engagement disagrees with the leadscrew spec")
-if abs(NUT_TO_FEED_BLOCK.engagement_mm - leadscrew.NUT_SCREW_ENGAGEMENT) > 1e-9:
-    raise AssertionError("nut screw engagement disagrees with the leadscrew spec")
-if abs(BLOCK_TO_CARRIAGE.engagement_mm - (pivot_block.SCREW_LENGTH - pivot_block.CBORE_FLOOR)) > 1e-9:
+if abs(NUT_TO_FEED_BLOCK.engagement_mm - feed_nut.SCREW_ENGAGEMENT) > 1e-9:
+    raise AssertionError("nut screw engagement disagrees with the feed nut spec")
+if abs(BLOCK_TO_CARRIAGE.engagement_mm - pivot_block.SCREW_REACH) > 1e-9:
     raise AssertionError("carriage screw engagement disagrees with the block spec")
 if abs(RAIL_TO_BAR.length_mm - trammel.RAIL_SCREW_LENGTH) > 1e-9:
     raise AssertionError("the rail screw's printed length is not the calculator's")

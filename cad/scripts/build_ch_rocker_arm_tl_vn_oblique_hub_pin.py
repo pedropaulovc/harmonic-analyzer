@@ -17,6 +17,8 @@ from _bought_revolve import stock_properties
 from _check import check
 from _com import _early_bound
 from _custom_properties import apply_custom_properties
+from _dimensions import name_dimensions
+from _drawing_marks import mark_dimensions_for_drawing
 from _drawing_precision import _named_dimension
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fastener_catalog import fastener
@@ -29,8 +31,12 @@ from _sketch_circle import define_circle
 from _supplier_screw_reference import add_supplier_reference_sketch
 from _supplier_screw_reference_names import FEATURE_BY_PLANE
 from _visibility import blank_reference_geometry
+from _document_units import apply_package_model_units
+from _part_properties import part_drawing_unit
 
 PART_NAME = "ch-rocker-arm-tl-vn-oblique-hub-pin"
+# swLengthUnit_e for each supplier reference unit.
+_UNIT_CODES = {"mm": 0, "in": 3}
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 AXIS_NAME = "HubAxis"
@@ -53,6 +59,22 @@ async def _ring(adapter, name, od, bore, length):
     name_last_feature(adapter, name)
 
 
+def _shop_cut_dimension(adapter) -> None:
+    """The pin extrusion's depth is the shop cut: plain, two places, named."""
+    name_dimensions(adapter, part.CUT_FEATURE, [part.CUT_DIMENSION])
+    display, native = _named_dimension(adapter, part.CUT_FEATURE, part.CUT_DIMENSION)
+    if not math.isclose(float(native.SystemValue) * 1000.0, part.CUT_LENGTH, abs_tol=1e-5):
+        raise RuntimeError(part.CUT_DIMENSION + ": cut length changed")
+    if display.SetPrecision3(part.CUT_PLACES, -1, -1, -1) != 0:
+        raise RuntimeError(part.CUT_DIMENSION + ": precision rejected")
+    display.SetText(4, part.CUT_CALLOUT)
+    if (int(display.GetPrimaryPrecision2()) != part.CUT_PLACES
+            or str(display.GetText(4) or "") != part.CUT_CALLOUT
+            or int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0):
+        raise RuntimeError(part.CUT_DIMENSION + ": shop presentation did not persist")
+    mark_dimensions_for_drawing(adapter, part.CUT_FEATURE, {part.CUT_DIMENSION})
+
+
 async def _supplier_references(adapter):
     await add_supplier_reference_sketch(
         adapter, part.SUPPLIER_REFERENCE_DIMENSIONS,
@@ -68,22 +90,24 @@ async def _supplier_references(adapter):
         precision, presentation, _denominator, callout = part.SUPPLIER_REFERENCE_FORMATS[name]
         if not math.isclose(float(native.SystemValue) * 1000.0, value, abs_tol=1e-5):
             raise RuntimeError(name + ": nominal carrier value changed")
-        if display.SetUnits2(False, 0, 1, 0, False, 0) != 0:
-            raise RuntimeError(name + ": millimetre units rejected")
+        units = part.SUPPLIER_REFERENCE_UNITS[name]
+        code, suffix = _UNIT_CODES[units], f" {units})"
+        if display.SetUnits2(False, code, 1, 0, False, 0) != 0:
+            raise RuntimeError(f"{name}: {units} units rejected")
         banded = name in part.SUPPLIER_REFERENCE_TOLERANCES_MM
         if display.SetPrecision3(precision, -1, precision if banded else -1, -1) != 0:
             raise RuntimeError(name + ": source precision rejected")
         prefix = "(<MOD-DIAM>" if presentation == "diameter" else "("
         display.ShowParenthesis = False
         display.SetText(1, prefix)
-        display.SetText(2, " mm)")
+        display.SetText(2, suffix)
         display.SetText(4, callout)
-        if (display.GetUseDocUnits() or int(display.GetUnits()) != 0
+        if (display.GetUseDocUnits() or int(display.GetUnits()) != code
             or int(display.GetPrimaryPrecision2()) != precision
             or display.ShowParenthesis or display.GetOverride()
             or not display.ShowDimensionValue
             or str(display.GetText(1) or "") != prefix
-            or str(display.GetText(2) or "") != " mm)"
+            or str(display.GetText(2) or "") != suffix
             or str(display.GetText(4) or "") != callout
             or (banded and int(display.GetPrimaryTolPrecision2()) != precision)
             or (not banded and int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0)):
@@ -94,7 +118,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreateAxisParameters
 
     check("create_part", await adapter.create_part())
-    await _ring(adapter, "Pin", part.DIA, 0.0, part.CUT_LENGTH)
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
+    await _ring(adapter, part.CUT_FEATURE, part.DIA, 0.0, part.CUT_LENGTH)
     check("publish axis", await adapter.create_axis(CreateAxisParameters(
         mode="two_planes", planes=["Top Plane", "Right Plane"]
     )))
@@ -105,6 +130,7 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     apply_custom_properties(adapter, stock_properties(_config.parts(PART_NAME)))
+    _shop_cut_dimension(adapter)
     await _supplier_references(adapter)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)

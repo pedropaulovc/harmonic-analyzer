@@ -84,32 +84,38 @@ retain their complete mate identifiers.
 ### Oblique jig plain-pivot tooling
 
 The owner-approved 2026-10-23 simplification replaces the captured bearing
-cartridges with purchased shoulder screws, spacers and selected DIN 988 shims.
-The carrier sits at nominal underside Z80.3 on the TL-20 base bars faced to
-12.0 (owner rulings 2026-10-27: the 6.85 shoulder seat leaves the unshimmed
-gap open at every loose band, and a nominal five 0.2 shims a support close
-it; 2026-10-30: face both large faces of each bar). Positive lift capture runs
-carrier → shoulder-screw head → M8 thread → block → carriage, not through a
-bearing or press fit. Fit the measured head-to-carrier running gap to
-0.05–0.25 mm using the purchased shim stock. The assembly owns the full
+cartridges with purchased shoulder screws, spacers and selected shims; the
+2026-10-30 inch ruling (issue #290) swaps the metric shoulder screw for a 3/8
+extended-thread 5/16-18 one whose thread the shop cuts to length. The carrier
+sits on loose spacers over the shim packs on the TL-20 base bars (owner
+rulings 2026-10-27: the .359 shoulder seat leaves the unshimmed gap open at
+every loose band, and a nominal five .008 shims a support close it;
+2026-10-30: face both large faces of each bar). Positive lift capture runs
+carrier → shoulder-screw head → 5/16-18 thread → block → carriage, not through
+a bearing or press fit. Fit the measured head-to-carrier running gap to
+.002–.010 in using the purchased shim stock. The assembly owns the full
 fit-up, torque, lubrication, travel and actual tool/holder clearance checks.
 
 The plain rail-2 pivot block retains MHA-CH-06-TL-22. Rail 1 uses the new
 integral feed block `ch-rocker-arm-tl-oblique-feed-block`, MHA-CH-06-TL-32,
-whose spec owns the nut layout. Drill its nut taps to print, not by transfer
-spotting. Both blocks use new 6061 1 × 3-1/2 in bar; TL-28 end brackets use
+whose spec owns the nut layout, and the shop-made brass feed nut
+`ch-rocker-arm-tl-oblique-feed-nut`, MHA-CH-06-TL-27 (owner ruling
+2026-11-01, replacing the bought TL-VN-55 flange nut). Drill the lug's nut
+taps to print, not by transfer spotting. Both blocks use new 6061 1 × 3-1/2 in bar; TL-28 end brackets use
 owned OnlineMetals 1165 1/2 × 1 in bar on edge, raising the screw axis to
 Z52.4. The owned 1164 1/2 × 3/4 in stock is spare.
 
-New purchases are TL-VN-77 shoulder screws (90323A492), TL-VN-78 spacers
-(92871A359), TL-VN-79 shims (98055A118 nominal; 98055A117/98055A121 fitting
-stock), and TL-VN-80 HUB gauge pin (2281A11-6410N695, abrasive-cut to 20.0 mm,
-factory end up, bonded with Loctite 638). These parts belong only to the
-jig, never a machine assembly. New identity-map rows use their canonical
-stem as source key, `old_number: null`, and the introduction date.
+New purchases are TL-VN-77 shoulder screws (Huyett BLTS40-0375-1500188P,
+thread shop-cut), TL-VN-78 spacers (AluminumSpacers.com AS62-18-40), TL-VN-79
+shims (Huyett SHIM-0375-008 nominal; SHIM-0375-004/-020 fitting stock),
+and TL-VN-80 HUB gauge pin (McMaster 23065A855-23065A4 .4000 Class Z NO-GO
+plug gauge, abrasive-cut to .79, factory end up, bonded with Loctite 638);
+the TL-VN-53 CL dowel is McMaster 98381A542 (1/4 x 1). These parts belong
+only to the jig, never a machine assembly. New identity-map rows use their
+canonical stem as source key, `old_number: null`, and the introduction date.
 
 Retirement records below reserve TL-23, TL-25, TL-29, TL-30, TL-31,
-TL-VN-52, TL-VN-63, TL-VN-70 and TL-VN-73 through TL-VN-76 permanently.
+TL-VN-52, TL-VN-55, TL-VN-63, TL-VN-70 and TL-VN-73 through TL-VN-76 permanently.
 TL-VN-72 also stays retired. Owned 6200 bearings remain shop stock without
 a jig identity. For a pass change, isolate the machine, support the carrier,
 unscrew both shoulder screws, lift the carrier, move the carriages and refit
@@ -420,12 +426,13 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | retired tooling part | — | — | `ch-rocker-arm-tl-oblique-pivot-cap` | MHA-CH-06-TL-30 | — | MHA-CH-06-TL-30 (retired 2026-10-23; never reissued) |
 | retired tooling part | — | — | `ch-rocker-arm-tl-oblique-pivot-retainer` | MHA-CH-06-TL-31 | — | MHA-CH-06-TL-31 (retired 2026-10-23; never reissued) |
 | new tooling part (2026-10-23) | — | — | — | — | `ch-rocker-arm-tl-oblique-feed-block` | MHA-CH-06-TL-32 |
+| new tooling part (2026-11-01) | — | — | — | — | `ch-rocker-arm-tl-oblique-feed-nut` | MHA-CH-06-TL-27 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-rail` | MHA-CH-006-TL-30 | `ch-rocker-arm-tl-vn-oblique-rail` | MHA-CH-06-TL-VN-50 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-carriage` | MHA-CH-006-TL-31 | `ch-rocker-arm-tl-vn-oblique-carriage` | MHA-CH-06-TL-VN-51 |
 | retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-bearing` | MHA-CH-006-TL-32 | — | MHA-CH-06-TL-VN-52 (retired 2026-10-23; never reissued) |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-cl-dowel` | MHA-CH-006-TL-33 | `ch-rocker-arm-tl-vn-oblique-cl-dowel` | MHA-CH-06-TL-VN-53 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-leadscrew` | MHA-CH-006-TL-34 | `ch-rocker-arm-tl-vn-oblique-leadscrew` | MHA-CH-06-TL-VN-54 |
-| tooling part | — | — | `ch-rocker-arm-tl-oblique-leadscrew-nut` | MHA-CH-006-TL-35 | `ch-rocker-arm-tl-vn-oblique-leadscrew-nut` | MHA-CH-06-TL-VN-55 |
+| retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-leadscrew-nut` | MHA-CH-006-TL-35 | — | MHA-CH-06-TL-VN-55 (retired 2026-11-01; never reissued) |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-pillow-block` | MHA-CH-006-TL-36 | `ch-rocker-arm-tl-vn-oblique-pillow-block` | MHA-CH-06-TL-VN-56 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-handwheel` | MHA-CH-006-TL-37 | `ch-rocker-arm-tl-vn-oblique-handwheel` | MHA-CH-06-TL-VN-57 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-hold-down-stud` | MHA-CH-006-TL-38 | `sh-vn-clamping-kit-hardware` (`HoldDownStud`) | MHA-SH-VN-57 |
@@ -592,9 +599,9 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | added | `ch-rocker-arm-tl-vn-oblique-rail` | MHA-CH-06-TL-VN-50 | HIWIN HGR15R linear rail cut to 440 (Motion Constrained 172270559990, special-order 7 holes at E 40), one under each oblique trammel jig carriage; bought fixture hardware modelled vendor-checked for the jig assembly |
 | added | `ch-rocker-arm-tl-vn-oblique-carriage` | MHA-CH-06-TL-VN-51 | HIWIN HGH15CAZ0C linear guideway block (DigiKey/Midwest HGH-15-CA-Z0-C), one on each oblique trammel jig rail under a pivot block; bought fixture hardware modelled vendor-checked for the jig assembly |
 | retired | `ch-rocker-arm-tl-vn-oblique-bearing` | MHA-CH-06-TL-VN-52 | 2026-10-23 plain-pivot simplification; owned 6200-2RS bearings remain shop stock without a jig identity; Number never reissued |
-| added | `ch-rocker-arm-tl-vn-oblique-cl-dowel` | MHA-CH-06-TL-VN-53 | McMaster 91595A452 Ø6 x 20 m6 dowel, press-set above the actual riser in the oblique trammel jig carrier's CL hole; locates the rocker strap blank without standing above it; bought fixture hardware modelled for the jig assembly |
+| added | `ch-rocker-arm-tl-vn-oblique-cl-dowel` | MHA-CH-06-TL-VN-53 | McMaster 98381A542 1/4 x 1 alloy-steel dowel (ASME B18.8.2, +.0001/+.0003), press-set above the actual riser in the oblique trammel jig carrier's CL hole; locates the rocker strap blank without standing above it; bought fixture hardware modelled for the jig assembly (was McMaster 91595A452 Ø6 x 20 m6 until 2026-10-31) |
 | added | `ch-rocker-arm-tl-vn-oblique-leadscrew` | MHA-CH-06-TL-VN-54 | ZYLtech HW-SC-T8x2-600 Tr8x2 304 stainless lead screw, cut to 410; the oblique trammel jig's feed screw in two KP08 pillow blocks; bought fixture hardware modelled datasheet-built for the jig assembly |
-| changed | `ch-rocker-arm-tl-vn-oblique-leadscrew-nut` | MHA-CH-06-TL-VN-55 | ZYLtech HW-SC-T8x2-NUT brass nut (included with screw); mounts to the integral TL-32 feed-block lug |
+| changed | `ch-rocker-arm-tl-vn-oblique-leadscrew-nut` | MHA-CH-06-TL-VN-55 | ZYLtech HW-SC-T8x2-NUT brass nut (included with screw); mounts to the integral TL-32 feed-block lug (retired 2026-11-01, below) |
 | added | `ch-rocker-arm-tl-vn-oblique-pillow-block` | MHA-CH-06-TL-VN-56 | AMPEC KP08 pillow blocks (Bearings Direct) x2, one on each TL-28 end bracket, carrying the TL-VN-54 leadscrew; bought fixture hardware modelled datasheet-built for the jig assembly |
 | added | `ch-rocker-arm-tl-vn-oblique-handwheel` | MHA-CH-06-TL-VN-57 | MISUMI HOK40-HC8 Ø40 knurled handwheel, revolving grip, Ø8 H8 through bore, 2 x M5 taps (one set screw supplied), on the TL-VN-54 leadscrew; bought fixture hardware modelled vendor-checked for the jig assembly |
 | added | `ch-rocker-arm-tl-vn-oblique-hold-down-stud` | MHA-CH-06-TL-VN-58 | Precision Matthews 52PCCK-9/16-14mm kit 1/2-13 x 3 in STOCK studs x4, reworked at the unused upper free ends to 57.2 ±0.8 mm finished length; unchanged lower ends, loaded intervals, insertion and TL-20 table anchors; actual G ≥3 mm through both full hand sweeps and ≥one complete pitch beyond each seated nut with its full actual complete internal span engaged are required |
@@ -603,9 +610,9 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | added | `ch-rocker-arm-tl-vn-oblique-rail-screw` | MHA-CH-06-TL-VN-61 | McMaster 91251A197 #8-32 X 3/4 SHCS x14: holds an HGR15R rail to its TL-20 base bar, tapped THRU; bought fixture hardware modelled for the jig assembly |
 | added | `ch-rocker-arm-tl-vn-oblique-bracket-screw` | MHA-CH-06-TL-VN-62 | McMaster 91251A196 #8-32 X 5/8 SHCS x8: holds a TL-28 end bracket (4 each) to the TL-20 base bar, up from the bar's underside into the bracket, tapped THRU; bought fixture hardware modelled for the jig assembly |
 | retired | `ch-rocker-arm-tl-vn-oblique-block-screw` | MHA-CH-06-TL-VN-63 | 2026-10-23 integral feed block removes the separate bracket joint; Number never reissued |
-| changed | `ch-rocker-arm-tl-vn-oblique-carriage-screw` | MHA-CH-06-TL-VN-64 | McMaster 91290A168 M4 X 20 SHCS x8: four each for TL-22 and TL-32 onto their HGH15CA carriages |
+| changed | `ch-rocker-arm-tl-vn-oblique-carriage-screw` | MHA-CH-06-TL-VN-64 | McMaster 91290A168 M4 X 20 SHCS x8, each cut to fit its counterbore floor at assembly: four each for TL-22 and TL-32 onto their HGH15CA carriages |
 | changed | `ch-rocker-arm-tl-vn-oblique-kp08-screw` | MHA-CH-06-TL-VN-65 | McMaster 91251A150 #6-32 X 5/8 SHCS x4: holds KP08 blocks to the raised TL-28 end brackets |
-| changed | `ch-rocker-arm-tl-vn-oblique-nut-screw` | MHA-CH-06-TL-VN-66 | Olander 4C50BHCA #4-40 X 1/2 BHCS x4: mounts the nut to TL-32's print-drilled blind taps, heads directly on the flange |
+| changed | `ch-rocker-arm-tl-vn-oblique-nut-screw` | MHA-CH-06-TL-VN-66 | McMaster 91251A113 #4-40 X 3/4 SHCS x2: holds the TL-27 feed nut to TL-32's lug through its loose holes, tapped THRU, heads directly on the brass (was Olander 4C50BHCA #4-40 X 1/2 BHCS x4 on the bought TL-VN-55 flange until 2026-11-01) |
 | added | `ch-rocker-arm-tl-vn-oblique-riser-screw` | MHA-CH-06-TL-VN-67 | McMaster 91771A112 #4-40 X 5/8 flat head x4: holds the TL-24 riser to the TL-21 carrier, tapped THRU; seat the head and keep the factory tip unless actual interference prevents assembly; bought fixture hardware modelled for the jig assembly |
 | added | `ch-rocker-arm-tl-vn-oblique-clamp-screw` | MHA-CH-06-TL-VN-68 | McMaster 91251A541 1/4-20 X 7/8 SHCS x1: the CR clamp, clamping the rocker-arm strap and the riser down on the TL-21 carrier, tapped THRU; used full length, its tip standing below the carrier clear of the pivot blocks, over the rails; bought fixture hardware modelled for the jig assembly |
 | added | `ch-rocker-arm-tl-vn-oblique-lever-screw` | MHA-CH-06-TL-VN-69 | McMaster 91251A583 5/16-18 X 1 SHCS x2: holds the TL-26 feed lever to the TL-21 carrier, tapped THRU, each head on a TL-VN-71 wedge-lock pair; bought fixture hardware modelled for the jig assembly |
@@ -648,7 +655,9 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | retired | `ch-rocker-arm-tl-vn-oblique-pivot-cotter` | MHA-CH-06-TL-VN-75 | 2026-10-23 cartridge removed; Number never reissued |
 | retired | `ch-rocker-arm-tl-vn-oblique-pivot-lock-wire` | MHA-CH-06-TL-VN-76 | 2026-10-23 cartridge removed; Number never reissued |
 | added | `ch-rocker-arm-tl-oblique-feed-block` | MHA-CH-06-TL-32 | 2026-10-23 integral rail-1 block and nut lug from 6061 1 × 3-1/2 in bar |
-| added | `ch-rocker-arm-tl-vn-oblique-pivot-screw` | MHA-CH-06-TL-VN-77 | McMaster 90323A492 shoulder screw x2, Ø10 × 35, M8 × 1.25 thread |
-| added | `ch-rocker-arm-tl-vn-oblique-pivot-spacer` | MHA-CH-06-TL-VN-78 | McMaster 92871A359 18-8 spacer x2, 10 ID × 16 OD × 15 |
-| added | `ch-rocker-arm-tl-vn-oblique-pivot-shim` | MHA-CH-06-TL-VN-79 | McMaster 98055A118 DIN 988 shim x10 nominal (five a support), 10 × 16 × 0.2; select fitting stock 98055A117/98055A118/98055A121 for measured running gap |
-| added | `ch-rocker-arm-tl-vn-oblique-hub-pin` | MHA-CH-06-TL-VN-80 | McMaster 2281A11-6410N695 Class Z minus Ø10.2000 gauge pin x1, abrasive-cut to 20.0 and bonded |
+| added | `ch-rocker-arm-tl-vn-oblique-pivot-screw` | MHA-CH-06-TL-VN-77 | Huyett BLTS40-0375-1500188P extended-thread shoulder screw x2, 3/8 × 1-1/2, 5/16-18, thread shop-cut to .570 (was McMaster 90323A492 until 2026-10-31) |
+| added | `ch-rocker-arm-tl-vn-oblique-pivot-spacer` | MHA-CH-06-TL-VN-78 | AluminumSpacers.com AS62-18-40 6061 spacer x2, .382 ID × .625 OD × .625 (was McMaster 92871A359 until 2026-10-31) |
+| added | `ch-rocker-arm-tl-vn-oblique-pivot-shim` | MHA-CH-06-TL-VN-79 | Huyett SHIM-0375-008 steel shim x10 nominal (five a support), 3/8 × 5/8 × .008; select fitting stock SHIM-0375-004/-008/-020 for measured running gap (was McMaster DIN 988 98055A118 until 2026-10-31) |
+| added | `ch-rocker-arm-tl-vn-oblique-hub-pin` | MHA-CH-06-TL-VN-80 | McMaster 23065A855-23065A4 Class Z NO-GO .4000 plug gauge x1, 2 in supply, abrasive-cut to .79 and bonded (was McMaster 2281A11-6410N695 Ø10.2000 until 2026-10-31) |
+| retired | `ch-rocker-arm-tl-vn-oblique-leadscrew-nut` | MHA-CH-06-TL-VN-55 | 2026-11-01 owner ruling (item 4): the shop-made TL-27 feed nut replaces the bought flange nut, so TL-32's lug needs no spigot recess; no registry, builder or drawing; Number never reissued |
+| added | `ch-rocker-arm-tl-oblique-feed-nut` | MHA-CH-06-TL-27 | 2026-11-01 shop-made Tr8x2 RH nut from brass 360-H02 3/4 × 1-1/4 in bar, faced to .40, on two TL-VN-66 screws into TL-32's lug |

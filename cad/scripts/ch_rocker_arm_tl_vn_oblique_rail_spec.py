@@ -260,6 +260,10 @@ DRAWING_PRECISION = {
 }
 # The one printed pitch stands for every gap between the holes.
 HOLE_PITCH_CALLOUT = f"{HOLE_COUNT - 1}X"
-DRAWING_NOTES = "SPECIAL ORDER CUT LENGTH AND HOLE PATTERN, TO SUIT TL-20."
+# The pattern suits the base bar's rail taps: its drawing number and name
+# (machinist review mr1: a bare "TL-20" named no drawing).
+DRAWING_NOTES = (
+    "SPECIAL ORDER CUT LENGTH AND HOLE PATTERN, TO SUIT MHA-CH-06-TL-20 BASE BAR."
+)
 if abs(LENGTH - (2.0 * HOLE_END + (HOLE_COUNT - 1) * HOLE_PITCH)) > 1e-9:
     raise AssertionError("the rail's hole pattern is not symmetric on its length")

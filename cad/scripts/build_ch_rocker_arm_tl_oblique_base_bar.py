@@ -1,17 +1,19 @@
 r"""Build the oblique trammel's base bar (MHA-CH-06-TL-20; shop fixture).
 
-A 6061-T6511 1/2 x 5-1/2 in flat bar, rail-length long, with the HIWIN rail's
-seven #8-32 tapped holes on the rail axis (off the bar's centreline, the
-column-side edge 88.9 from it) and two hold-down slots across it
+A 6061-T6511 flat bar milled to 5.50 wide from the owned 1/2 x 6 bar (owner
+ruling #2083), rail-length long, with the HIWIN rail's seven #8-32 tapped
+holes on the rail axis (off the bar's centreline, the column-side edge 3.50
+from it) and two hold-down slots across it
 (``ch_rocker_arm_tl_oblique_base_bar_spec``). One part, one configuration,
-two off: the second bar is the same part turned over.
+two off: the second bar is the same part turned over. Issue #290: an IPS
+document; the globals keep their millimetre values with the mm suffix.
 
 Layout: ONE Front-plane profile -- the bar rectangle from its spindle-end
 face (model x 0), its -Y side ``RAIL_ROW_Y`` below the rail axis, with the
 two slot stadiums inside it, both located from the faced -Y side's corner
-(0, -88.9), like every other feature (rule 10) -- extruded +Z by
+(0, -3.50), like every other feature (rule 10) -- extruded +Z by
 the faced thickness; the rail holes are one Hole Wizard feature tapped THRU
-from the top face. The row's printed lateral station (88.90 from the -Y
+from the top face. The row's printed lateral station (3.50 from the -Y
 edge) lives on a hidden reference sketch, ``RailRowReference``. The leadscrew
 brackets' eight #8 holes are one counterbored Hole Wizard feature from the
 underside, one printed station per KP08 station; their four rows print from
@@ -37,11 +39,14 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import apply_drawing_precision
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _holes import SharedCoordinate, wizard_holes
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_pmi import author_part_pmi
 from _part_save import save_part_and_images
+from _metric_vendor_dimension import set_metric_vendor_units
 from _rebuild import force_rebuild
 from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
@@ -73,6 +78,7 @@ from ch_rocker_arm_tl_oblique_base_bar_spec import (
     HIGH_SIDE_Y,
     ISOMETRIC_VIEW_NOTE,
     LOW_SIDE_Y,
+    METRIC_DIMENSIONS,
     NEAR_SLOT_RISE,
     NEAR_SLOT_X,
     NEAR_SLOT_Y,
@@ -83,7 +89,6 @@ from ch_rocker_arm_tl_oblique_base_bar_spec import (
     SURFACE_FINISHES,
     TAP_DRILL,
     TAP_SPEC,
-    TOLERANCES,
     bracket_hole_walls,
 )
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
@@ -114,7 +119,7 @@ if BRACKET_HOLES != tuple(
     (x, y) for x in (BRACKET_NEAR_X, BRACKET_FAR_X) for y in BRACKET_ROW_Y
 ):
     raise AssertionError("bracket placement assumes two stations on shared rows")
-# Each row from the faced -Y edge: 61.4, 44.9, 22.9, 6.4.
+# Each row from the faced -Y edge: 2.425, 1.768, .902, .245.
 BRACKET_ROWS = tuple(y - LOW_SIDE_Y for y in BRACKET_ROW_Y)
 _walls = bracket_hole_walls(BRACKET_HOLES)
 if min(_walls.values()) < BRACKET_WALL_MIN:
@@ -126,7 +131,7 @@ V_BRACKETED = V_TAPPED - len(BRACKET_HOLES) * math.pi * (
 )
 # The wizard dimensions each hole from the origin (on the rail axis): the
 # first of each station carries the station, the near station's holes the
-# rows (the rail row's 88.9 less the row's height); the rest share them.
+# rows (the rail row's 3.50 less the row's height); the rest share them.
 _ROW_COUNT = len(BRACKET_ROW_Y)
 _BRACKET_PLACEMENT = [
     (
@@ -184,8 +189,8 @@ async def _slot(
     Each slot's bottom end centre takes its station and rise from the -Y
     side's corner, the one datum the holes use too (c3-r6 review, rule 10:
     the far slot's drop from the +Y side was a second datum in the view; the
-    1/2 x 5-1/2 bar's 4.55 wall to the +Y side, at ±2 travel, absorbs the
-    stock width's band).
+    5.50 bar's wall to the +Y side, at ±.08 travel, absorbs the width's
+    band).
     Emission order: the width across the sides, the +X side's straight run,
     then the end centre's x and ``located`` height from the corner. The far slot's run is the printed ``SlotRun`` (2X): its
     dimension lands right of the bar, off the part; the near slot's width is
@@ -275,6 +280,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # The mm suffix is load-bearing: the equation manager reads bare numbers
     # in document units.
@@ -370,9 +377,12 @@ async def build(adapter) -> dict[str, str]:
     # --- The row's lateral station: a reference sketch -----------------------
     # The wizard sets the row on y 0 by an origin relation (a zero coordinate
     # takes no dimension), so the printed 88.90 from the faced -Y edge lives
-    # on one construction line down the end face from the origin to that
-    # edge, driven by the station the edge itself reads (the profile's
-    # BarLowSide; build_ch_rocker_arm_tl_outline_template's RodSlotReference).
+    # on one line down the end face from the origin to that edge, driven by
+    # the station the edge itself reads (the profile's BarLowSide;
+    # build_ch_rocker_arm_tl_outline_template's RodSlotReference). It lies on
+    # the end face's edge, so it stays a plain sketch line: a construction
+    # line's dash font prints over the outline (end bracket, machinist review
+    # mr4).
     row_station = SketchDims()
     check("create_sketch rail row reference", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
@@ -380,7 +390,6 @@ async def build(adapter) -> dict[str, str]:
         "rail row station line", await adapter.add_line(0.0, 0.0, 0.0, -RAIL_ROW_Y)
     )
     set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, row_line)
     await anchor_point_to_origin(adapter, f"{row_line}.start", 0.0, 0.0, "rail row")
     await anchor_point_to_origin(
         adapter, f"{row_line}.end", 0.0, -RAIL_ROW_Y, "rail row station RailRowY"
@@ -483,10 +492,14 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    # The rail holes' tight bands, stations and row, live on the model's own
-    # dimensions.
-    for (feature_name, dimension_name), band in TOLERANCES.items():
-        set_dimension_symmetric_tolerance(adapter, feature_name, dimension_name, band)
+    # The metric vendor lines' stations (the HGR15R rail's holes, the KP08
+    # stations; owner ruling 4) print exact millimetres with their own bands,
+    # authored on the model's own dimensions.
+    for (feature_name, dimension_name), (places, band) in METRIC_DIMENSIONS.items():
+        set_dimension_symmetric_tolerance(
+            adapter, feature_name, dimension_name, band, display_unit="mm"
+        )
+        set_metric_vendor_units(adapter, feature_name, dimension_name, places=places)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

@@ -3627,21 +3627,17 @@ cite = ["McMaster-Carr 5972K41 https://www.mcmaster.com/5972K41/ read live 2026-
 [fixtures.trammel-cl-dowel]
 kind = "dowel_pin"
 make = "generic"
-sku = "91595A452"
-source = "https://www.mcmaster.com/91595A452/"
+sku = "98381A542"
+source = "https://www.mcmaster.com/products/dowel-pins/diameter~1-4/length~1/"
 present = false
 verify = true
-purchase = "1 pack of 25 McMaster-Carr 91595A452, 52100 alloy-steel 6 x 20 mm dowel pins; one required for the CL locator in strap end waste, $12.66 per pack, possession unconfirmed."
-note = "Read live 2026-10-16: distributor McMaster-Carr, manufacturer not stated; 6 mm diameter, +0.004/+0.012 mm (6.004-6.012 mm), 20 mm long, DIN 6325-m6 / ISO 8734, minimum HRC 52, plain shaft, round x chamfer/round ends. Length tolerance not stated. Standard m6 meets the sourcing brief, not a verified mating fit: check the receiving CL tooling hole, received diameter and usable engagement before use. No tooling-hole design change is authorized here."
-cite = ["McMaster-Carr 91595A452 https://www.mcmaster.com/91595A452/ read live 2026-10-16: 52100 alloy steel, 6 x 20 mm, DIN 6325-m6 / ISO 8734, $12.66 per 25", "Rejected live 2026-10-16: https://www.mcmaster.com/97049A219/", "Rejected live 2026-10-16: https://www.mcmaster.com/97049A119/", "Rejected live 2026-10-16: https://www.mcmaster.com/5429N133/", "Rejected live 2026-10-16: https://www.mcmaster.com/98380A153/"]
-# Rejected live 2026-10-16: 97049A219/97049A119 are undersized ISO 2338-h8
-# (-0.018/0 mm), not the selected m6 fit; 5429N133 is grooved, max OD 6.3 mm.
-# 98380A153 is 416 stainless with +0.006/+0.015 mm diameter, not stated as m6.
-# Supersedes AndyMark am-1501 under the same McMaster sourcing preference;
-# not a claim that the prior unclassed pin failed its application.
+purchase = "1 pack of 25 McMaster-Carr 98381A542, alloy-steel 1/4 x 1 in dowel pins; one required for the CL locator in strap end waste, $10.55 per pack, possession unconfirmed."
+note = "Read live 2026-10-31 (category table; the detail page is login-walled): distributor McMaster-Carr, manufacturer not stated; 1/4 in diameter, +0.0001/+0.0003 in (.2501-.2503), 1 in long, ASME B18.8.2, Rockwell C47 minimum, 10,000 lbf, round x chamfer ends. Length tolerance not stated. Pressed into the carrier's .2490-.2495 reamed CL hole (TL-21); check the received diameter before use."
+cite = ["McMaster-Carr 98381A542 category table https://www.mcmaster.com/products/dowel-pins/diameter~1-4/length~1/ read live 2026-10-31: 1/4 Diameter, 1 in, +0.0001 to +0.0003, 10,000 lbf, Rockwell C47, ASME B18.8.2, pack 25, $10.55"]
+# Supersedes 91595A452 (6 x 20 mm DIN 6325-m6) with the inch jig (#290).
 
 # Trammel hand-feed purchases: catalogue candidates, not possession or fit proof.
-# Matched Tr8x2 screw/nut and direct-fit wheel avoid turned journals and hub boring.
+# The Tr8x2 screw and direct-fit wheel avoid turned journals and hub boring.
 [fixtures.trammel-tr8-leadscrew]
 kind = "lead_screw"
 make = "ZYLtech Engineering"
@@ -3649,8 +3645,8 @@ sku = "HW-SC-T8x2-600"
 source = "https://www.zyltech.com/8mm-t8x2-trapezoidal-acme-lead-screw-w-brass-nut-pre-cut-lengths-150mm-2000mm/"
 present = false
 verify = true
-purchase = "1 x ZYLtech HW-SC-T8x2-600, select 600 mm pre-cut length; USD 14.95 and in stock in the live variant response 2026-10-17 UTC. Includes one regular brass flange nut recorded at fixtures.trammel-tr8-flange-nut; do not buy a second nut. Houston, Texas vendor with domestic shipping and will-call pickup."
-note = "Read live 2026-10-17 UTC: nominal diameter 8 mm, T8x2 single-start right-hand trapezoidal thread, pitch 2 mm and lead 2 mm/revolution, 304 stainless steel. Ordered stock length is 600 mm, not the installed length; vendor length tolerance and straightness are unpublished. Owner's C4 layout retains 410 mm +/-0.5 mm installed total length. Shop step: confirm the matching C4 support positions and wheel engagement, cut the stock screw to 410 mm +/-0.5 mm, deburr and lightly chamfer the cut end, and check that the brass nut runs freely over it before assembly. Do not turn end journals; the KP08 and wheel set screws grip the threaded ends. Keep nut travel off set-screw-marked end threads; inspect for raised crest damage before passing the nut over a previously clamped end. Receipt checks of crest fit, runout, installed travel and bidirectional axial retention remain required."
+purchase = "1 x ZYLtech HW-SC-T8x2-600, select 600 mm pre-cut length; USD 14.95 and in stock in the live variant response 2026-10-17 UTC. The brass flange nut included with the screw is not used: the shop-made TL-27 feed nut replaces it (owner ruling 2026-11-01). Houston, Texas vendor with domestic shipping and will-call pickup."
+note = "Read live 2026-10-17 UTC: nominal diameter 8 mm, T8x2 single-start right-hand trapezoidal thread, pitch 2 mm and lead 2 mm/revolution, 304 stainless steel. Ordered stock length is 600 mm, not the installed length; vendor length tolerance and straightness are unpublished. Owner's C4 layout retains 410 mm +/-0.5 mm installed total length. Shop step: confirm the matching C4 support positions and wheel engagement, cut the stock screw to 410 mm +/-0.5 mm, deburr and lightly chamfer the cut end, and check that the TL-27 feed nut runs freely over it before assembly. Do not turn end journals; the KP08 and wheel set screws grip the threaded ends. Keep nut travel off set-screw-marked end threads; inspect for raised crest damage before passing the nut over a previously clamped end. Receipt checks of crest fit, runout, installed travel and bidirectional axial retention remain required."
 cite = ["ZYLtech pre-cut screw/regular nut kit https://www.zyltech.com/8mm-t8x2-trapezoidal-acme-lead-screw-w-brass-nut-pre-cut-lengths-150mm-2000mm/ read live 2026-10-17 UTC: T8x2 single start, pitch/lead 2 mm, right hand, 304 stainless; product 197 length variant HW-SC-T8x2-600 USD 14.95 in stock", "Owner/C4 layout decision 2026-10-16 (not vendor tolerance): cut to 410 mm +/-0.5 mm; SCREW_LENGTH = 410.0 in cad/scripts/ch_rocker_arm_tl_vn_oblique_leadscrew_spec.py, rocker/trammel-jig-4 branch stacked on PR #1583"]
 # McMaster alternatives considered, not chosen: M8 pitch 2 / lead 4 screws
 # 97783A170/97783A180 are only 200/300 mm; too short for the final 410 mm order.
@@ -3675,30 +3671,6 @@ cite = ["ZYLtech pre-cut screw/regular nut kit https://www.zyltech.com/8mm-t8x2-
 # Misumi straight D8 MTSR/MTSBR and matching brass nuts are pitch 1.5,
 # not Tr8x2; MTSRW/MTSBRW also add stepped ends. Roton starts at Tr10.
 # Helix 8 mm trapezoidal families offer 1.5/4/8 lead, not exact lead 2.
-
-[fixtures.trammel-tr8-flange-nut]
-kind = "lead_screw_nut"
-make = "ZYLtech Engineering"
-sku = "HW-SC-T8x2-NUT"
-source = "https://www.zyltech.com/zyltech-brass-nut-only-various-diameters-and-pitches-available/"
-present = false
-verify = true
-purchase = "One regular brass T8x2 flange nut is included with the HW-SC-T8x2-600 screw purchase; do not order separately. HW-SC-T8x2-NUT is the vendor's standalone replacement SKU (USD 2.95 in stock live 2026-10-17 UTC), not a second required purchase."
-note = "Read live page/drawings 2026-10-17 UTC: brass regular nut matching the ZYLtech T8x2 single-start right-hand screw, pitch/lead 2 mm. Flange OD 22 mm, thickness 3.5 mm; body OD 10.2 mm; four non-threaded 3.5 mm through holes on 16 mm bolt circle. Body projects 10 mm on the long side and 1.5 mm past the flange outer face as a short spigot, giving total axial length 15 mm. No angular datum is specified on the round flange. Backlash, dimensional tolerances and received fit remain unverified."
-# Lubrication and backlash acceptance remain shop checks, not catalogue proof.
-# Four plain 3.5 mm holes take #4-40 button head screws, no washers, into the
-# integral TL-32 feed-block lug; bought carriage threads remain M4.
-# Drill the four #4-40 taps to print, not by transfer spotting from the nut.
-# Nut layout authority: cad/scripts/ch_rocker_arm_tl_oblique_feed_block_spec.py.
-cite = ["ZYLtech kit regular-nut geometry https://www.zyltech.com/8mm-t8x2-trapezoidal-acme-lead-screw-w-brass-nut-pre-cut-lengths-150mm-2000mm/ read live 2026-10-17 UTC; nut-only https://www.zyltech.com/zyltech-brass-nut-only-various-diameters-and-pitches-available/ T8x2 single-start option resolves to HW-SC-T8x2-NUT", "ZYLtech front drawing https://cdn11.bigcommerce.com/s-eblil3q2nd/images/stencil/1280x1280/products/197/16129/s136714152818872222_p75_i6_w500__21913__97391.1698349316.jpg?c=2 : flange 22, body 10.2, PCD 16, four 3.5 holes", "ZYLtech side drawing https://cdn11.bigcommerce.com/s-eblil3q2nd/images/stencil/1280x1280/products/197/16130/s136714152818872222_p75_i5_w1005__99935__02876.1698349316.jpg?c=2 : short spigot 1.5, flange 3.5, long projection 10"]
-# McMaster matching M8 lead-4 flanged nut 97783A270 is acetal (acceptable),
-# but its matching stocked screws are too short; material is not a rejection.
-# https://www.mcmaster.com/97783A270/
-# Ooznest LSRFN-TR8-2-2P-B was a matched dimensional candidate, not a
-# material failure; superseded with its screw to avoid UK-only DHL logistics.
-# https://ooznest.co.uk/product/tr8x2-2p-lead-screw-round-flanged-nut-brass/
-# Interface delta from Ooznest: body OD 10 -> 10.2, PCD 16.1 -> 16;
-# axial split 1.5 + 3.5 + 10 = 15 is unchanged. Relayed to C4 owner.
 
 [fixtures.trammel-kp08-blocks]
 kind = "pillow_block_bearing"
@@ -5520,6 +5492,15 @@ purchase = "PROPOSED, awaiting Pedro: Tap America T/A57097 10-24 HSS 2-flute spi
 source = "DrillsandCutters.com $6.24 (https://drillsandcutters.com/10-24-hss-2-flute-spiral-point-tap-tap-america/); Bolt Depot 8474 $0.10 each search listing (https://boltdepot.com/Product-Details?product=8474); Bolt Depot 5008 $7.89/100 search listing (https://boltdepot.com/Product-Details?product=5008)"
 note = "Taps the trammel block set-screw and clamp holes (#25 tap drill)."
 
+# The shop-made TL-27 feed nut's Tr8x2 RH thread (owner ruling 2026-11-01, item 4).
+[tools.tap-tr8x2-rh]
+name = "Tr8x2 right-hand HSS trapezoidal tap (purchase)"
+kind = "tap"
+present = false
+purchase = "1 x Fedeas TR8X2 trapezoidal tap, right hand, M2 HSS, uncoated, class 7H, 30 deg flank angle; USD 14.99, in stock, read live 2026-11-01."
+source = "Fedeas https://www.fedeas.com/product/fedeas-tr8x2-trapezoidal-tap-right-hand-hss-tr82-trapezoidal-thread-tap/ read live 2026-11-01; alternative eBay listing 175178158577 not re-verified (its page did not load)."
+note = "Taps the MHA-CH-06-TL-27 feed nut's Tr8x2-7H RH thread through the .40 brass after the letter C (.242) tap drill. Vendor: use a high-viscosity EP cutting oil."
+
 # --- pivot-bracket additions ---
 
 
@@ -6469,7 +6450,7 @@ cite = ["OnlineMetals part 20743 https://www.onlinemetals.com/en/buy/carbon-stee
 [[stock]]
 form = "flat_bar"
 material = "6061-T6511 aluminium"
-note = "Owned OnlineMetals 1173, 1/2 x 6 x 72 in: allocate the TL-21 carrier and both TL-20 base bars (owner ruling #2083, 2026-10-30: mill the owned bar to width, no bandsaw rip; about 1430 of the 1829 mm). TL-21: a 540 mm length for the 520 x 130 x 12.0 carrier; its process route is not yet written (#2083). TL-20: two 443 mm blanks, the long edges milled on edge in the vise to 139.7 wide, both faces faced to 12.0. Purchased nominal dimensions are not receipt measurements."
+note = "Owned OnlineMetals 1173, 1/2 x 6 x 72 in: allocate the TL-21 carrier and both TL-20 base bars (owner ruling #2083, 2026-10-30: mill the owned bar to width, no bandsaw rip; about 56 of the 72 in). TL-21: a 21.3 in length for the 20.5 x 5.1 x .47 carrier; its process route is not yet written (#2083). TL-20: two 17.44 in blanks, the long edges milled on edge in the vise to 5.50 wide, both faces faced to .47. Purchased nominal dimensions are not receipt measurements."
 section_mm = [152.4, 12.7]
 length_mm = 1828.8
 on_hand = true
@@ -6504,6 +6485,15 @@ cite = ["Owner-reported purchased stock and reallocation, oblique jig simplifica
 
 [[stock]]
 form = "flat_bar"
+material = "Brass 360-H02 (C36000, ASTM B16), extruded"
+note = "MHA-CH-06-TL-27 feed nut: 3/4 x 1-1/4 in rectangle bar, 12 in, as bought on the 3/4 and 1-1/4 faces (stock .7500 +/-.0045, 1.250 +/-.005), sawn and faced to .40 long. Purchase, not owned."
+section_mm = [31.75, 19.05]
+length_mm = 304.8
+on_hand = false
+cite = ["OnlineMetals part 1500 https://www.onlinemetals.com/en/buy/brass/0-75-x-1-25-brass-rectangle-bar-360-h02-extruded/pid/1500 read live 2026-11-01: 3/4 x 1-1/4 360-H02 extruded, 12 in $77.45, ASTM B16, yield 17 ksi min", "OnlineMetals brass tolerances https://www.onlinemetals.com/en/brass-tolerances read live 2026-11-01: 360 extruded rectangle bar thickness .75 +/-.0045, width .875 to 1.25 +/-.005"]
+
+[[stock]]
+form = "flat_bar"
 material = "6061-T6511 aluminium"
 note = "New stock requirement: 1 x 3-1/2 in bar for TL-22 plain pivot block x1 and TL-32 integral feed block x1. Face to 24.3 mm high; feed-block outline spans 88 mm across the 88.9 mm stock width. Supplier, SKU and purchased length remain unselected; no purchase is claimed. Replaces the former 1 x 3 and 3/4 x 2 jig requirements."
 section_mm = [88.9, 25.4]
@@ -6513,5 +6503,5 @@ cite = ["Owner-approved oblique jig plain-pivot and integral feed-block design, 
 [[stock]]
 form = "rectangular_blank"
 material = "Acetal (Delrin)"
-note = "MHA-CH-06-TL-24 riser requirement: 1/4 in (6.35 mm nominal) acetal stock, faced to 6.0 and milled to finished 40 x 340. Supplier, SKU and starting width/length remain unselected; no stock is claimed purchased or owned. Blank envelope dimensions are intentionally omitted until sourcing is selected."
+note = "MHA-CH-06-TL-24 riser requirement: 1/4 in (.250 nominal) acetal stock, faced to .24 and milled to finished 1.60 x 13.40. Supplier, SKU and starting width/length remain unselected; no stock is claimed purchased or owned. Blank envelope dimensions are intentionally omitted until sourcing is selected."
 cite = ["Unsourced stock requirement, harmonic-analyzer issue 1619 https://github.com/pedropaulovc/harmonic-analyzer/issues/1619"]

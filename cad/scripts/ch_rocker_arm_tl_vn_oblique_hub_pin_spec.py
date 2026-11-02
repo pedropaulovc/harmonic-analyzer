@@ -1,36 +1,71 @@
 """MHA-CH-06-TL-VN-80: purchased oblique-trammel hub pin.
 
-Source: https://www.mcmaster.com/2281A11-6410N695/
-Read live 2026-10-23; page-stated dimensions only (mm).
-Bands are (upper, lower) deviations. No supplier length band is inferred.
-Model: nominal supplied envelope; unstated edge forms are not invented.
-Frame: axis +Z; origin at the bottom face.
-The 20.0 mm cut and Loctite 638 assembly bond are owner requirements, not supplier claims;
+Source: https://www.mcmaster.com/23065A855-23065A4/
+Read live 2026-10-31: Class Z plug gauge, tool steel, NO-GO, size .4000 -.0001/0 in,
+2 in long, Rockwell C60, ASME B89.1.5, accuracy certificate traceable to NIST.
+Page-stated dimensions only. Bands are (upper, lower) deviations, mm. No supplier
+length band is inferred. Model: nominal supplied envelope; unstated edge forms are
+not invented. Frame: axis +Z; origin at the bottom face.
+The cut length and the Loctite 638 bond are owner requirements, not supplier claims;
 the sheet prints the cut length as its one shop dimension and the diameter as a plain
-reference (the 2.5 µm class band controls nothing the shop makes).
+reference (the .0001 class band controls nothing the shop makes).
+
+Issue #290: the sheet prints decimal inch. The cut length closes the inch stack:
+bottom flush with the carrier underside, top TIP_SET above the riser, so the bonded
+length is the whole .47 carrier (``_interference_contracts.JIG_HUB_PIN_SEAT``).
 """
 
 from __future__ import annotations
 
-SKU = "2281A11"
-QUANTITY = 1
-CONFIGURED_SKU = "2281A11-6410N695"
-DIA = 10.2
-DIA_BAND = (0.0, -0.00254)  # upper, lower deviations, mm
-SUPPLY_LENGTH = 50.8  # page-stated 2 in
-CUT_LENGTH = 20.0  # owner-approved shop cut, not a supplier length
-LENGTH = CUT_LENGTH
-BOND = "Loctite 638"
-TIP_SET = 2.0
-TIP_SET_BAND = 0.2
+import _config
+from _package_units import drawing_unit
+import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 
-SUPPLIER_REFERENCE_DIMENSIONS = (('SupplierPinDiameter', 10.2, 'horizontal'), ('SupplierCutLength', 20.0, 'vertical'))
-SUPPLIER_REFERENCE_STARTS = {'SupplierPinDiameter': (-5.1, 0.0), 'SupplierCutLength': (0.0, -20.0)}
-SUPPLIER_REFERENCE_PLANES = {'SupplierPinDiameter': 'Front', 'SupplierCutLength': 'Top'}
-SUPPLIER_REFERENCE_FORMATS = {'SupplierPinDiameter': (1, 'diameter', None, 'GAUGE PIN'), 'SupplierCutLength': (1, 'length', None, 'CUT LENGTH')}
-# Diameter text shelves right of its bottom lane; the cut length sits right of the Top view.
-SUPPLIER_REFERENCE_SIDES = {'SupplierPinDiameter': 'bottom', 'SupplierCutLength': 'right'}
-SUPPLIER_REFERENCE_UNITS = {'SupplierPinDiameter': 'mm', 'SupplierCutLength': 'mm'}
+UNIT = drawing_unit(
+    "parts/ch-rocker-arm-tl-vn-oblique-hub-pin",
+    _config.parts("ch-rocker-arm-tl-vn-oblique-hub-pin"),
+)
+
+# 23065A855 is the .2505-.5005 NO-GO size family; choosing the .4000 size makes
+# the one orderable number 23065A855-23065A4 (Class Z listing, read 2026-11-01;
+# the suffix changes with size: .3995 -7759N446, .4005 -7759N73).
+SKU = "23065A855"
+QUANTITY = 1
+CONFIGURED_SKU = "23065A855-23065A4"
+DIA = 10.16  # .4000
+DIA_BAND = (0.0, -0.00254)  # upper, lower deviations, mm: -.0001/0
+SUPPLY_LENGTH = 50.8  # page-stated 2 in
+BOND = "Loctite 638"
+# The factory top above the actual riser, set with a .080 gauge: inside the
+# strap's thickness at both ends of its band.
+TIP_SET = 2.032  # .080
+TIP_SET_BAND = 0.2032  # +/-.008
+CUT_PLACES = 2
+# Owner-approved shop cut, not a supplier length: the carrier, the riser and
+# the tip set, on the .01 grid (.79).
+CUT_LENGTH = trammel.CARRIER_THICK + trammel.RISER_THICK + TIP_SET
+LENGTH = CUT_LENGTH
+_cut_in = CUT_LENGTH / trammel.INCH
+if abs(_cut_in - round(_cut_in, CUT_PLACES)) > 1e-9:
+    raise AssertionError("the hub pin cut length is off its printed .XX grid")
+if not CUT_LENGTH < SUPPLY_LENGTH:
+    raise AssertionError("the hub pin cut length exceeds the 2 in supply")
+
+# The one supplier reference: the diameter's carrier lies on the Top view's
+# z = CUT_LENGTH end-face edge (the view's lower edge), so its construction
+# line prints under the outline and the Front (end) view shows no chord.
+SUPPLIER_REFERENCE_DIMENSIONS = (("SupplierPinDiameter", DIA, "horizontal"),)
+SUPPLIER_REFERENCE_STARTS = {"SupplierPinDiameter": (-DIA / 2.0, -CUT_LENGTH)}
+SUPPLIER_REFERENCE_PLANES = {"SupplierPinDiameter": "Top"}
+SUPPLIER_REFERENCE_FORMATS = {"SupplierPinDiameter": (4, "diameter", None, "GAUGE PIN")}
+# Diameter text shelves right of its bottom lane.
+SUPPLIER_REFERENCE_SIDES = {"SupplierPinDiameter": "bottom"}
+SUPPLIER_REFERENCE_UNITS = {"SupplierPinDiameter": "in"}
+# The shop cut is the pin extrusion's own depth, between its end faces, printed
+# plain in the Top view beside the silhouette (no construction line).
+CUT_FEATURE = "Pin"
+CUT_DIMENSION = "CutLength"
+CUT_CALLOUT = "CUT LENGTH"
 SUPPLIER_REFERENCE_TOLERANCES_MM: dict[str, tuple[float, float]] = {}
 # Requirements live in the registry installation note; no supplier data lines.
 SUPPLIER_DATA: tuple[str, ...] = ()
