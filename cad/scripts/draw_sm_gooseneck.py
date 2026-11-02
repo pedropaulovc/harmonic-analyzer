@@ -4,8 +4,8 @@ The SLDPRT remains authoritative.  This recipe supplies the views, places the
 part's marked dimensions and the end piece's native tap callout, and links
 the notes; sheet/template and export behaviour lives in ``_drawing_common``.
 
-The gooseneck is a 1/2 in 4130-N tube bent R76.2, its arm ending flush in a
-solid Ø12.70 end piece brazed on a shank inside the tube and tapped 1/4-28
+The gooseneck is a 1/2 in 4130-N tube bent R3.0, its arm ending flush in a
+solid Ø.500 end piece brazed on a shank inside the tube and tapped 1/4-28
 blind, with a 5/8 in sleeve brazed over the leg (owner rulings 2026-10-27,
 #1951).  The made MHA-SM-04 spring screw is NOT part of this weldment.  The
 sheet carries, at 1:3:
@@ -25,7 +25,8 @@ cropped to the end piece, the tube's cut walls hatched across the end
 piece's and ended in a freehand break: the head Ø (flush) and length, the
 braze shank Ø (its fit) and length, and the counterbore's LIMIT Ø (with the
 stated wall) and depth (with its floor-corner limit, which names the mate).
-The isometric is at 1:4.
+The isometric is at 1:4.  The sheet prints decimal inch (#290, the registry
+row's drawing_unit).
 
 Run with SolidWorks open::
 
@@ -69,6 +70,7 @@ from _gear_drawing_entities import visible_circle_edge
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _holes import DIAMETER_TOLERANCE_MM, _verify_tap_metadata
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _section_axis import position_section_caption
 from _session import run_build
@@ -245,7 +247,7 @@ def _section_x(model_x: float) -> float:
 # near the end face and its text ends short of the shank's line (at
 # ARM_END_X + 10 the shank's line ran through it, farm run
 # 20261027T224212504Z).  The floor corner's
-# "R0.10 MAX" block stands up-left of the end face, between the
+# "R.004 MAX" block stands up-left of the end face, between the
 # counterbore Ø and the depth: its arc lies on the sketch's +v side, model -Z,
 # the section's top (ArmAxisPlane is offset from the Top plane), so its leader
 # runs down-right through the counterbore's mouth to the corner, above the
@@ -774,7 +776,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,

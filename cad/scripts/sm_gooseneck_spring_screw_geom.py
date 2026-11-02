@@ -21,13 +21,14 @@ threadlocker).  ``sm_gooseneck_spring_screw_spec`` carries the strength case;
 counter-seat certificate, settled_spring_seats.counter_upper_support_geometry,
 records the nominals), so the model keeps these millimetre values and the
 decimal-inch sheet prints them on the inch grid.  The bands and limits below
-are the millimetre ENVELOPES the joint and the seat checks charge; the inch
-sheet's printed bands are derived in ``sm_gooseneck_spring_screw_spec``
-(PRINTED_BANDS / PRINTED_LIMITS), which proves each lies inside its envelope
-or re-checks the joint margin it would eat.
+are the millimetre ENVELOPES the sheet's LIMIT bands are cut from; the inch
+sheet's printed bands and limits (PRINTED_BANDS / PRINTED_LIMITS, at the end)
+are what ``sm_gooseneck_spring_joint`` charges.
 """
 
 from __future__ import annotations
+
+import math
 
 from _printed_tolerance import printed_deviations
 
@@ -159,3 +160,75 @@ def require_body_form(
 
 
 require_body_form()
+
+# --- MHA-SM-04 as its decimal-inch sheet prints it (#290). ---
+# The sheet's unit, its registry row's drawing_unit
+# (sm_gooseneck_spring_screw_spec checks the two agree): a literal here
+# because sm_gooseneck_spring_joint, which charges the printed limits below,
+# reads no registry row (codjiflo P3 on #1997).
+SHEET_UNIT = "in"
+# Three places on the LIMIT bands and on the full-thread and corner single
+# limits (each needs them to stay on its side of its envelope); two
+# everywhere else.
+THREE_PLACE_DIMENSIONS = frozenset(
+    {"HeadDia", "HeadReliefChamfer", "BodyDia", "FullThread", "UnderHeadCornerR"}
+)
+
+
+def places(name: str) -> int:
+    return 3 if name in THREE_PLACE_DIMENSIONS else 2
+
+
+def _limit_band(model: float, lower: float, upper: float) -> tuple[float, float]:
+    """(lower, upper) mm deviations about ``model`` of the widest .001-in LIMIT
+    pair inside the mm envelope ``model + lower .. model + upper``."""
+    low = math.ceil(round((model + lower) / MM_PER_IN * 1000.0, 6)) / 1000.0
+    high = math.floor(round((model + upper) / MM_PER_IN * 1000.0, 6)) / 1000.0
+    return round(low * MM_PER_IN - model, 9), round(high * MM_PER_IN - model, 9)
+
+
+# What the sheet accepts, (lower, upper) mm about each mm model nominal: the
+# three LIMIT bands on the inch grid inside their envelopes, every other band
+# the title block's .XX about the printed (rounded) nominal.
+PRINTED_BANDS: dict[str, tuple[float, float]] = {
+    "HeadDia": _limit_band(HEAD_DIA, HEAD_DIA_LOWER, HEAD_DIA_UPPER),
+    "HeadReliefChamfer": _limit_band(
+        HEAD_RELIEF_CHAMFER, HEAD_RELIEF_CHAMFER_LOWER, HEAD_RELIEF_CHAMFER_UPPER
+    ),
+    "BodyDia": _limit_band(BODY_DIA, BODY_DIA_LOWER, BODY_DIA_UPPER),
+    **{
+        name: printed_deviations(model, places(name), unit=SHEET_UNIT)
+        for name, model in (
+            ("HeadHeight", HEAD_H),
+            ("UnderHeadLength", LENGTH),
+            ("SlotWidth", SLOT_WIDTH),
+            ("SlotDepth", SLOT_DEPTH),
+            ("TipChamfer", TIP_CHAMFER),
+        )
+    },
+}
+# The single limits as printed, mm: swTolMIN / swTolMAX print the model
+# rounded at its places, the model on the accepted side of it.  No finite inch
+# place holds the joint's 3.60 / 5.71 / 0.50, so each prints past it
+# (".14 MIN", ".225 MAX", "R.020 MAX") and the joint charges the printed one.
+PRINTED_LIMITS: dict[str, float] = {
+    name: model
+    + printed_deviations(model, places(name), (0.0, 0.0), unit=SHEET_UNIT)[0]
+    for name, model in (
+        ("PlainLength", PLAIN_LENGTH_MIN),
+        ("FullThread", FULL_THREAD_STATION_MAX),
+        ("UnderHeadCornerR", UNDERHEAD_CORNER_R),
+    )
+}
+# Every model nominal sits inside its printed band, except the body, which is
+# modelled at the thread's basic major with its blank's band below it.
+if not all(
+    lower <= 0.0 <= upper
+    for name, (lower, upper) in PRINTED_BANDS.items()
+    if name != "BodyDia"
+) or not (
+    PRINTED_LIMITS["PlainLength"] <= PLAIN_LENGTH_MIN
+    and FULL_THREAD_STATION_MAX <= PRINTED_LIMITS["FullThread"]
+    and UNDERHEAD_CORNER_R <= PRINTED_LIMITS["UnderHeadCornerR"]
+):
+    raise AssertionError("an MHA-SM-04 model nominal leaves its printed band")

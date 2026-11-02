@@ -83,6 +83,7 @@ from sm_gooseneck_spring_screw_geom import (
     OVERALL_LENGTH,
     PLAIN_LENGTH_MIN,
     PLAIN_LENGTH_MIN_TOL_TYPE,
+    PRINTED_BANDS,
     SLOT_DEPTH,
     SLOT_FLOOR_Z,
     SLOT_WIDTH,
@@ -95,7 +96,6 @@ from sm_gooseneck_spring_screw_spec import (
     DIMENSION_CALLOUTS_BY_NAME,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    PRINTED_BANDS,
     REFERENCE_DIMENSIONS,
     THREAD_CALLOUT,
 )

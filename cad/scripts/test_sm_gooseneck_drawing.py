@@ -142,18 +142,21 @@ def test_every_direct_db_block_restores_inference_in_finally(builder) -> None:
 
 def test_counterbore_callouts_floor_the_wall_from_the_joint() -> None:
     # A stated minimum is rounded DOWN, so the print never promises more
-    # wall than the joint's worst case leaves (drawing-guidelines rule 20).
-    floored = math.floor(joint.COUNTERBORE_WALL_MIN * 100.0) / 100.0
-    assert spec.COUNTERBORE_WALL_CALLOUT == f"C'BORE WALL {floored:.2f} MIN"
-    assert floored <= joint.COUNTERBORE_WALL_MIN
+    # wall than the joint's worst case leaves (drawing-guidelines rule 20):
+    # inches, to the sheet's .001.
+    floored = math.floor(joint.COUNTERBORE_WALL_MIN / 25.4 * 1000.0) / 1000.0
+    assert spec.COUNTERBORE_WALL_CALLOUT == (
+        f"C'BORE WALL {floored:.3f} MIN".replace(" 0.", " .")
+    )
+    assert floored * 25.4 <= joint.COUNTERBORE_WALL_MIN
     callouts = spec.DIMENSION_CALLOUTS_BY_NAME
     # The wall rides under the head Ø, its outer bound, with the Ø max's job:
     # the stated wall holds at the counterbore's largest size (owner ruling
-    # on machinist review r7: keep both 0.10 bands, state each max's job).
+    # on machinist review r7: keep both bands, state each max's job).
     plug_rows = callouts["PlugDia"].splitlines()
     wall_row = plug_rows.index(spec.COUNTERBORE_WALL_CALLOUT)
     assert plug_rows[wall_row + 1 :] == ["AT C'BORE MAX"]
-    # Each 0.10 band names its mate and its max's job on its own callout
+    # Each LIMIT band names its mate and its max's job on its own callout
     # (machinist review r8, farm run 20261101T035809796Z).
     assert callouts["CounterboreDia"] == spec.COUNTERBORE_DIA_CALLOUT
     assert spec.COUNTERBORE_DIA_CALLOUT.splitlines() == [
@@ -164,7 +167,7 @@ def test_counterbore_callouts_floor_the_wall_from_the_joint() -> None:
     # corner's block under its reason.
     assert spec.COUNTERBORE_AXIS_CALLOUT.splitlines() == [
         "C'BORE AXIS TO TAP AXIS",
-        f"{joint.COUNTERBORE_AXIS_OFFSET_MAX:.2f} MAX RADIAL",
+        f"{joint.COUNTERBORE_AXIS_OFFSET_MAX / 25.4:.3f} MAX RADIAL".lstrip("0"),
     ]
     assert "WITHIN" not in spec.COUNTERBORE_AXIS_CALLOUT
     assert callouts["CounterboreFloorCornerR"] == spec.COUNTERBORE_FLOOR_CALLOUT
@@ -228,7 +231,15 @@ def test_notes_state_stock_process_and_intent_without_sizes() -> None:
     assert all(re.match(r"\d\. ", line) for line in lines)
     assert drawing.NOTES_XY[0] + 0.00242 * max(map(len, lines)) < 0.214
     notes = " ".join(spec.DRAWING_NOTES.split())
-    window = f"{joint.BRAZE_CLEARANCE_MIN:.4f}-{joint.BRAZE_CLEARANCE_MAX:.4f}"
+    # The joint's window in inches, rounded inward at four places.
+    window = "-".join(
+        f"{inches:.4f}".lstrip("0")
+        for inches in (
+            math.ceil(round(joint.BRAZE_CLEARANCE_MIN / 25.4 * 1e4, 6)) / 1e4,
+            math.floor(round(joint.BRAZE_CLEARANCE_MAX / 25.4 * 1e4, 6)) / 1e4,
+        )
+    )
+    assert window == ".0040-.0098"
     for phrase in (
         "TUBE 1/2 OD X 0.065 WALL, ONLINEMETALS 7322",
         "SLEEVE 5/8 OD X 0.058 WALL, 7324",
@@ -251,7 +262,7 @@ def test_notes_state_stock_process_and_intent_without_sizes() -> None:
     assert spec.DIMENSION_CALLOUTS["SleeveProfile"] == {
         "SleeveDia": spec.SLEEVE_FIT_CALLOUT
     }
-    # A note names no tool (rule 7): R76.2 is the native bend radius.
+    # A note names no tool (rule 7): R3.0 is the native bend radius.
     assert "DIE" not in notes
     # Sizes and tolerances are native model dimensions, never note text.
     assert re.search(r"\b\d+\.\d{1,2}\b", notes) is None, notes
@@ -285,14 +296,16 @@ def _recorded_equations(module) -> dict[str, str]:
     }
 
 
-def test_overall_height_and_reach_print_as_one_place_references() -> None:
-    # Machinist review r5 of farm run 20261101T004958072Z: 417.1 and 27.16
-    # stop at the bend's tangents, so the bent part needs overall sizes to
-    # real faces, printed as references beside the governing tangent ones.
+def test_overall_height_and_reach_print_as_two_place_references() -> None:
+    # Machinist review r5 of farm run 20261101T004958072Z: the leg length and
+    # arm straight stop at the bend's tangents, so the bent part needs overall
+    # sizes to real faces, printed as references beside the governing tangent
+    # ones.  Two places: the snapped leg puts the height at 19.650 in, a
+    # one-place tie.
     names = {"OverallHeight", "OverallReach"}
     assert spec.DRAWING_DIMENSIONS["OverallReference"] == names
     assert spec.REFERENCE_DIMENSIONS["OverallReference"] == names
-    assert spec.DRAWING_PRECISION["OverallReference"] == dict.fromkeys(names, 1)
+    assert spec.DRAWING_PRECISION["OverallReference"] == dict.fromkeys(names, 2)
     assert names <= set(drawing.FRONT_KEEP)
     # The equations, evaluated on the part's globals, are the faces' spans.
     globals_mm = {
@@ -313,8 +326,8 @@ def test_overall_height_and_reach_print_as_one_place_references() -> None:
     reach = geom.TUBE_DIA / 2.0 - geom.ARM_END_X
     assert evaluate("OverallHeight") == pytest.approx(height)
     assert evaluate("OverallReach") == pytest.approx(reach)
-    assert height == pytest.approx(499.65)
-    assert reach == pytest.approx(109.71, abs=0.005)
+    assert height / 25.4 == pytest.approx(19.65)
+    assert reach / 25.4 == pytest.approx(4.319, abs=0.0005)
     # The sketch is hidden in the part and shown only by the elevation.
     blanked = {call.args[1].value for call in _calls(part, name="blank_sketch")}
     assert "OverallReference" in blanked
@@ -325,14 +338,15 @@ def test_overall_references_stand_clear_of_the_elevation_dimensions() -> None:
     height_x, height_y = keep["OverallHeight"]
     reach_x, reach_y = keep["OverallReach"]
     # Outermost on the leg's right, short of the isometric's left edge (x
-    # 0.358 in farm run 20261101T004958072Z), its text away from 417.1's.
+    # 0.358 in farm run 20261101T004958072Z), its text away from the leg's.
     assert keep["LegLength"][0] + 0.015 <= height_x <= drawing.ISO_CENTER[0] - 0.030
     assert abs(height_y - keep["LegLength"][1]) >= 0.015
     assert drawing.FOOT_Y < height_y < drawing._front_y(geom.ARM_Y + geom.TUBE_DIA / 2)
     # Over the arm straight, under the view label (bottom y 0.258).
     assert keep["ArmStraight"][1] + 0.005 <= reach_y <= 0.258 - 0.0045
     assert drawing.END_FACE_X < reach_x < drawing._front_x(geom.TUBE_DIA / 2)
-    # 27.16's text (11.3 mm wide, farm run 20261101T022045634Z) ends one
+    # The arm straight's text (11.3 mm wide at 27.16, farm run
+    # 20261101T022045634Z; 1.07 is narrower) ends one
     # text clearance (1.78 mm) left of the end face's shared extension line.
     assert keep["ArmStraight"][0] + 0.0113 / 2 + 0.00178 <= drawing.END_FACE_X
 
@@ -347,14 +361,12 @@ def test_tap_callout_states_geometry_and_its_mate_within_four_rows() -> None:
     # this job replaces the floor datum's wording).  The row is the drilled
     # hole's finished extent, not a process step: no wander.
     assert rows[0] == f"FOR {spec.SCREW_NUMBER}; DEEPEST DRILL AT C'BORE MAX"
-    assert (
-        rows[1]
-        == f"THREAD AXIS TO TUBE OD AXIS {joint.THREAD_AXIS_OFFSET_MAX:.2f} MAX RADIAL"
-    )
+    axis_limit = f"{joint.THREAD_AXIS_OFFSET_MAX / 25.4:.3f}".lstrip("0")
+    assert rows[1] == f"THREAD AXIS TO TUBE OD AXIS {axis_limit} MAX RADIAL"
     assert joint.TAP_DRILL_DEPTH_MAX > joint.COUNTERBORE_DEPTH_MAX
     # At most three characters past r7's 39-character row (103.9 mm, x 106.1-
     # 210.0 mm; ~105.3 mm in Century Gothic's metrics): ~1 mm more each side
-    # stays left of the arm straight's 27.16.
+    # stays left of the arm straight's text.
     assert len(rows[0]) <= len(f"FOR {spec.SCREW_NUMBER}; DEPTHS FROM C'BORE FLOOR") + 3
     assert "WANDER" not in spec.TAP_CALLOUT_BELOW
     assert "BRAZE" not in spec.TAP_CALLOUT_BELOW
@@ -397,8 +409,8 @@ def saved_tap(monkeypatch):
         ThreadEndCondition=0,  # blind
         EndCondition=0,
         TapDrillDiameter=0.00541,  # native model length units are metres
-        TapDrillDepth=0.01717,
-        ThreadDepth=0.01477,
+        TapDrillDepth=0.017272,  # .68 in
+        ThreadDepth=0.014732,  # .58 in
     )
     feature = SimpleNamespace(
         GetTypeName2=lambda: "HoleWzd",

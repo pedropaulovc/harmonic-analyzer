@@ -9,8 +9,8 @@ their places and callouts, the end-piece tap's callout rows, and the notes.
 
 Design (owner rulings 2026-10-27, #1951).  The whole gooseneck is 1/2 in x
 0.065 in 4130-N seamless tube (OnlineMetals 7322), its OD and wall printed as
-stock, bent R76.2 on the 1/2 in x 3 in CLR die.  The arm ends flush, with no
-step, in a solid Ø12.70 end piece silver-brazed on a shank inside the tube
+stock, bent R3.0 on the 1/2 in x 3 in CLR die.  The arm ends flush, with no
+step, in a solid Ø.500 end piece silver-brazed on a shank inside the tube
 and tapped 1/4-28 UNF-2B blind after the braze for MHA-SM-04; an arm-end
 counterbore clears that screw's die run-out.  A 5/8 in x 0.058 in 4130-N
 seamless sleeve (OnlineMetals 7324), select-fitted from stock and brazed both
@@ -20,12 +20,17 @@ takes.
 Every size is a native model dimension: the elevation's leg length, bend
 radius, arm straight and sleeve length; section A-A's end piece (head Ø and
 length, braze shank Ø and length) and counterbore (LIMIT Ø and depth, floor
-corner R0.10 MAX); the end view's native blind-tap callout.  The notes state
+corner R.004 MAX); the end view's native blind-tap callout.  The notes state
 stock, process and intent only.  The counterbore's wall shortfall (owner
-minor sm-gooseneck RV-01) is stated as ``C'BORE WALL n.nn MIN`` under the
+minor sm-gooseneck RV-01) is stated as ``C'BORE WALL .nnn MIN`` under the
 head Ø, the wall's outer bound (drawing-guidelines.md rule 20), the shank's
 braze fit on the shank Ø (rule 4, the matched fit names its mate and
 clearance) and the tap's location limits under its callout.
+
+Decimal-inch sheet (#290): every size prints at the places its band needs
+(DRAWING_PRECISION, below); the end piece's calibrated spring-support sizes
+keep their millimetre model values (sm_gooseneck_geom) and print on the inch
+grid.
 """
 
 from __future__ import annotations
@@ -34,6 +39,7 @@ import math
 
 import _config
 import sm_gooseneck_geom as geom
+from _package_units import drawing_unit
 from sm_gooseneck_spring_joint import (
     BRAZE_CLEARANCE_MAX,
     BRAZE_CLEARANCE_MIN,
@@ -44,6 +50,19 @@ from sm_gooseneck_spring_joint import (
     THREAD_AXIS_OFFSET_MAX,
     owner_minor,
 )
+
+# #290: the registry row's drawing_unit (in) is this sheet's unit; the joint
+# charges the geometry module's SHEET_UNIT, so the two must agree.
+UNIT = drawing_unit("parts/sm-gooseneck", _config.parts("sm-gooseneck"))
+if UNIT != geom.SHEET_UNIT:
+    raise AssertionError("MHA-SM-01's registry unit is not its geometry's SHEET_UNIT")
+
+
+def _inch(value_mm: float, places: int) -> str:
+    """``value_mm`` as the sheet prints it: inches at ``places``, no leading
+    zero."""
+    return f"{value_mm / geom.MM_PER_IN:.{places}f}".removeprefix("0")
+
 
 # The counterbore wall under the rule 17 target stands only on owner minor
 # RV-01 (sm_gooseneck_spring_joint.owner_minor).
@@ -65,8 +84,8 @@ for _name, _mm, _inches in (
 ):
     if not math.isclose(_mm, _inches * geom.MM_PER_IN, abs_tol=1e-9):
         raise AssertionError(f"gooseneck {_name} no longer matches its stated stock")
-# R76.2 is the 1/2 in x 3 in CLR die's (owner ruling 2026-10-27); the print
-# states the radius, not the tool (rule 7, codjiflo on #1997).
+# R3.0 (76.2 mm) is the 1/2 in x 3 in CLR die's (owner ruling 2026-10-27); the
+# print states the radius, not the tool (rule 7, codjiflo on #1997).
 if not math.isclose(geom.BEND_R, 3.000 * geom.MM_PER_IN, abs_tol=1e-9):
     raise AssertionError("gooseneck bend radius is no longer the 3 in CLR die's")
 # The sleeve's select-fit window is the end piece's cited braze window
@@ -82,7 +101,7 @@ if not (
 # Callouts the PART authors on its dimensions, below the value (the drawing
 # imports and reads them back; a drawing-side SetText can write through to
 # the part, #1942).  The counterbore's MIN limits (Ø, depth) and its axis
-# clear MHA-SM-04's thread run-out (sm_gooseneck_spring_joint).  Each 0.10
+# clear MHA-SM-04's thread run-out (sm_gooseneck_spring_joint).  Each .004
 # band names its mate and each MAX its job on its own callout (rule 4; owner
 # ruling via Main on machinist review r7 of farm run 20261101T022045634Z:
 # keep both bands, state each max's job; r8, farm run 20261101T035809796Z:
@@ -98,7 +117,9 @@ if not (
 # row between the Ø's upper dimension line and the depth's shoulder), and
 # the wall rides under the head Ø, its outer bound.
 SCREW_NUMBER = str(_config.parts("sm-gooseneck-spring-screw")["number"])
-COUNTERBORE_WALL_CALLOUT = f"C'BORE WALL {COUNTERBORE_WALL_CALLOUT_MIN:.2f} MIN"
+COUNTERBORE_WALL_CALLOUT = (
+    f"C'BORE WALL {_inch(COUNTERBORE_WALL_CALLOUT_MIN * geom.MM_PER_IN, 3)} MIN"
+)
 # ~53.6 and ~56.4 mm in Century Gothic; centred on the Ø's line at x 45 mm,
 # x ~16.5-73.5 mm: inside the left border (12.7) and short of the c'bore
 # mouth (75.0).  "WALL" is the C'BORE WALL row under the head Ø.
@@ -106,9 +127,9 @@ COUNTERBORE_DIA_CALLOUT = f"MIN CLEARS {SCREW_NUMBER}\nRUN-OUT; MAX SETS WALL"
 # A radial offset between two named axes (machinist review r7: "WITHIN"
 # said neither radial nor diametral).
 COUNTERBORE_AXIS_CALLOUT = (
-    f"C'BORE AXIS TO TAP AXIS\n{COUNTERBORE_AXIS_OFFSET_MAX:.2f} MAX RADIAL"
+    f"C'BORE AXIS TO TAP AXIS\n{_inch(COUNTERBORE_AXIS_OFFSET_MAX, 3)} MAX RADIAL"
 )
-# The floor corner's native "R0.10 MAX" names the corner it limits; its row
+# The floor corner's native "R.004 MAX" names the corner it limits; its row
 # says why, the Ø and depth beside it naming whose run-out.
 COUNTERBORE_FLOOR_CALLOUT = f"CLEARS RUN-OUT;\n{COUNTERBORE_AXIS_CALLOUT}"
 # No row longer than r8's 23-character axis row (55.5 mm): each block stands
@@ -127,21 +148,21 @@ BEND_RADIUS_CALLOUT = "CLR"
 # Three short rows, so the block ends left of the end view (sheet layout,
 # draw_sm_gooseneck).  The window is the joint's, braze or retaining compound
 # (owner ruling 2026-10-27 on #1997, sm_gooseneck_spring_joint), so the
-# callout names no method; note 3 does.
-SHANK_FIT_CALLOUT = (
-    "FIT TO TUBE BORE,\n"
-    f"{BRAZE_CLEARANCE_MIN:.4f}-{math.floor(BRAZE_CLEARANCE_MAX * 1e4) / 1e4:.4f} DIAMETRAL\n"
-    "CLEARANCE"
+# callout names no method; note 3 does.  The window prints in inches,
+# rounded inward at four places.
+_BRAZE_WINDOW = "-".join(
+    f"{inches:.4f}".removeprefix("0")
+    for inches in (
+        math.ceil(round(BRAZE_CLEARANCE_MIN / geom.MM_PER_IN * 1e4, 6)) / 1e4,
+        math.floor(round(BRAZE_CLEARANCE_MAX / geom.MM_PER_IN * 1e4, 6)) / 1e4,
+    )
 )
+SHANK_FIT_CALLOUT = f"FIT TO TUBE BORE,\n{_BRAZE_WINDOW} DIAMETRAL\nCLEARANCE"
 # The sleeve's select-fit window rides its own Ø on the elevation (rule 7: a
 # matched fit goes on the feature, not in a note; codjiflo P2 on #1997), with
 # the stock it is cut from (owner ruling 2026-10-27: select-fit from stock,
 # no hone).
-SLEEVE_FIT_CALLOUT = (
-    "STOCK; FIT ON TUBE,\n"
-    f"{BRAZE_CLEARANCE_MIN:.4f}-{math.floor(BRAZE_CLEARANCE_MAX * 1e4) / 1e4:.4f} DIAMETRAL\n"
-    "CLEARANCE"
-)
+SLEEVE_FIT_CALLOUT = f"STOCK; FIT ON TUBE,\n{_BRAZE_WINDOW} DIAMETRAL\nCLEARANCE"
 DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
     "BendPath": {"BendRadius": BEND_RADIUS_CALLOUT},
     "SleeveProfile": {"SleeveDia": SLEEVE_FIT_CALLOUT},
@@ -160,7 +181,7 @@ DIMENSION_CALLOUTS_BY_NAME: dict[str, str] = {
     for name, text in callouts.items()
 }
 # Above the value, one row (SolidWorks prints no line break in the above
-# compartment, pn_pen_v_block_spec): the counterbore depth's 0.10 LIMIT band
+# compartment, pn_pen_v_block_spec): the counterbore depth's .004 LIMIT band
 # names its MIN's mate at its own callout (rule 4; machinist review of
 # 3a807442b; r7: only the MIN does the clearing).  Below its stacked pair it
 # would cross the end face's extension lines.  ~74.6 mm wide, centred on the
@@ -191,12 +212,13 @@ DIMENSION_CALLOUTS_ABOVE_BY_NAME: dict[str, str] = {
 # The drill's wander is a budget term, not a print row
 # (sm_gooseneck_spring_joint.DRILL_WANDER_MAX).  Four rows in all (the layout
 # audit's tall-block limit: a fifth row gated, farm run 20261028T005208028Z).
-TAP_CALLOUT_PRECISION = {"hw-threaddepth": 2, "hw-tapdrldepth": 2}
+# Inch sheet: the depths at .XX (their band), the drill Ø at .XXX (#3, .213).
+TAP_CALLOUT_PRECISION = {"hw-tapdrldia": 3, "hw-threaddepth": 2, "hw-tapdrldepth": 2}
 # The thread axis's limit is a radial offset from the tube's OD axis, worded
 # as the counterbore's (r7 review: "+/-" named no zone and no surface).
 TAP_CALLOUT_BELOW = (
     f"FOR {SCREW_NUMBER}; DEEPEST DRILL AT C'BORE MAX\n"
-    f"THREAD AXIS TO TUBE OD AXIS {THREAD_AXIS_OFFSET_MAX:.2f} MAX RADIAL"
+    f"THREAD AXIS TO TUBE OD AXIS {_inch(THREAD_AXIS_OFFSET_MAX, 3)} MAX RADIAL"
 )
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
@@ -233,7 +255,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # section, so they stay as the stock designations in note 1 (rule 9).
 # sm_gooseneck_geom proves the sleeve's select fit on the supplier's bands.
 # The overall height and reach are references too: the tangent stations
-# (417.1, 27.16) lay out the bend and govern; the overall sizes check the
+# (16.4, 1.07) lay out the bend and govern; the overall sizes check the
 # finished bend from real faces (machinist review r5 of farm run
 # 20261101T004958072Z).
 REFERENCE_DIMENSIONS: dict[str, frozenset[str]] = {
@@ -245,15 +267,35 @@ REFERENCE_DIMENSIONS: dict[str, frozenset[str]] = {
 # centred mid-way between the sleeve's top and the bend's entry tangent.
 TUBE_OD_REF_Y = round((geom.SLEEVE_TOP + geom.LEG_TOP) / 2.0, 1)
 TUBE_OD_REF_SPAN = 20.0
-# The bent form's overall sizes are near enough at one place (the title
-# block's .X band, drawing-guidelines.md rule 3); the arm straight sets the
-# spring eye's station and every end-piece size is turned, so they print at
-# two.
-ONE_PLACE_DIMENSIONS = frozenset(
-    {"LegLength", "BendRadius", "SleeveLength", "OverallHeight", "OverallReach"}
+# Inch places (#290).  The leg and sleeve are sawn tube lengths and the bend
+# radius the die's: the title block's .X band (drawing-guidelines.md rule 3).
+# The two overall references print at two places (the snapped leg puts the
+# height at 19.650, a one-place tie).  The stock Ø (REF) print at their
+# three-place sizes; the braze shank and the counterbore's LIMIT Ø, depth and
+# floor-corner MAX at three, the places their bands need
+# (sm_gooseneck_spring_joint); the arm straight (the spring eye's station)
+# and the end piece's head Ø and lengths at the title block's .XX.
+ONE_PLACE_DIMENSIONS = frozenset({"LegLength", "BendRadius", "SleeveLength"})
+THREE_PLACE_DIMENSIONS = frozenset(
+    {
+        "TubeOdRef",
+        "SleeveDia",
+        "PlugShankDia",
+        "CounterboreDia",
+        "CounterboreDepth",
+        "CounterboreFloorCornerR",
+    }
 )
+
+
+def places(name: str) -> int:
+    if name in ONE_PLACE_DIMENSIONS:
+        return 1
+    return 3 if name in THREE_PLACE_DIMENSIONS else 2
+
+
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    feature: {name: 1 if name in ONE_PLACE_DIMENSIONS else 2 for name in sorted(names)}
+    feature: {name: places(name) for name in sorted(names)}
     for feature, names in DRAWING_DIMENSIONS.items()
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -274,7 +316,7 @@ if (set(DIMENSION_CALLOUTS_BY_NAME) | set(DIMENSION_CALLOUTS_ABOVE_BY_NAME)) - s
 # bending, cooled or fully cured; recorded as RV-02 in sm-gooseneck.yaml)
 # with the bend's acceptance.  The sleeve's braze is a fillet at each end of
 # its lap and the end piece's a full-penetration joint (machinist review of
-# 3a807442b: "full penetration" read as covering the sleeve's 218.0 lap too).
+# 3a807442b: "full penetration" read as covering the sleeve's 8.6 lap too).
 # Sizes are on the features and the bend radius is native, so no line names
 # a tool, and section A-A shows the end piece solid.  Each line ends left of
 # the title block.

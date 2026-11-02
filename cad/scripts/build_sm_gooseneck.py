@@ -1,14 +1,15 @@
 r"""Build MHA-SM-01, the gooseneck: a bent 1/2 in tube with a brazed end piece.
 
 Owner rulings 2026-10-27 (#1951): the whole gooseneck is 1/2 in x 0.065 in
-4130-N seamless tube, bent R76.2 (the 1/2 in x 3 in CLR die).  Its arm ends
-flush, with no step, in a SOLID Ø12.70 end piece silver-brazed on a shank
+4130-N seamless tube, bent R3.0 (the 1/2 in x 3 in CLR die).  Its arm ends
+flush, with no step, in a SOLID Ø.500 end piece silver-brazed on a shank
 inside the tube bore and tapped 1/4-28 UNF-2B BLIND for the MHA-SM-04 spring
 screw; an arm-end counterbore clears that screw's die run-out
 (``sm_gooseneck_spring_joint``).  A 5/8 in x 0.058 in 4130-N sleeve,
 select-fitted from stock and brazed, covers the leg from its foot: the post
 the east top-frame hub's Ø17 bore and set screw take.  The made MHA-SM-04
-screw is a separate component, not part of this weldment.
+screw is a separate component, not part of this weldment.  Decimal-inch
+document and sheet (#290, the registry row's drawing_unit).
 
 One weldment part of two solid bodies, the tube (its sleeve merged on) and
 the end piece, so a section hatches each as its own part and every view
@@ -24,7 +25,7 @@ draws their joint (machinist review of 3c0b5d87c), built in this order:
    carries its dimensions), NOT merged: its head bears on the tube end and
    its shank stands in the bore at the joint's nominal braze clearance.
 4. ``Counterbore``: a revolved cut Ø COUNTERBORE_DIA x COUNTERBORE_DEPTH
-   from the end face, its floor corner round at its printed R0.10 MAX; its
+   from the end face, its floor corner round at its printed R.004 MAX; its
    Ø and depth carry native LIMIT bands.  Then ``ThreadBore``: the native blind
    bottoming tap from ``TAP_SPEC``, started on the counterbore floor, both
    depths from it.  ``SpringScrewAxis`` is their hidden, equation-driven
@@ -39,8 +40,8 @@ draws their joint (machinist review of 3c0b5d87c), built in this order:
    arm's top silhouette; its dimensions are the elevation's reference overall
    height and reach.
 
-Layout: origin at the leg's reference mid-height; leg y -330..87.1, bend
-centre (-76.2, 87.1), arm axis y 163.3, end face x ARM_END_X.
+Layout (mm): origin at the leg's reference mid-height; leg y -329.46..87.1,
+bend centre (-76.2, 87.1), arm axis y 163.3, end face x ARM_END_X.
 
 Run on a SolidWorks worker::
 
@@ -58,6 +59,7 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_marks import (
     apply_drawing_properties,
@@ -75,6 +77,7 @@ from _extrude import extrude_at_offset
 from _feature_tree import name_last_feature
 from _holes import blind_hole_volume_mm3, wizard_holes
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -102,6 +105,7 @@ from sm_gooseneck_spec import (
     REFERENCE_DIMENSIONS,
     TUBE_OD_REF_SPAN,
     TUBE_OD_REF_Y,
+    UNIT,
 )
 
 # The form nominals live in sm_gooseneck_geom -- the prose-free module the
@@ -132,6 +136,7 @@ from sm_gooseneck_spring_joint import (
     COUNTERBORE_DEPTH_MIN,
     COUNTERBORE_DIA,
     COUNTERBORE_DIA_MAX,
+    COUNTERBORE_DIA_MIN,
     COUNTERBORE_FLOOR_CORNER_R_BAND,
     COUNTERBORE_FLOOR_CORNER_R_MAX,
     COUNTERBORE_FLOOR_CORNER_R_TOL_TYPE,
@@ -230,14 +235,22 @@ def _construction(adapter, line: str, label: str) -> None:
 
 @_telemetry.traced("part.limit_band", label_param="name")
 def _limit_band(
-    adapter, feature: str, name: str, deviations: tuple[float, float]
+    adapter, feature: str, name: str, model: float, limits: tuple[float, float]
 ) -> None:
     """A dimension as a native LIMIT band: SOLIDWORKS prints the upper and
     lower limits, the model value plus each deviation, at the dimension's
-    own places (build_sm_gooseneck_spring_screw._limit_band)."""
+    own places (build_sm_gooseneck_spring_screw._limit_band).  #290: the
+    calibrated mm model is off the inch grid, so the deviations are not; the
+    printed ``limits`` (mm, lower and upper) are, and they set the places.
+    The deviations come from the spec's ``model``, never the read-back
+    SystemValue, whose inch-document float noise would need more than eight
+    places."""
     label = f"{name}@{feature}"
     display, dimension = _named_dimension(adapter, feature, name)
-    lower, upper = deviations  # native API order, mm
+    value = float(dimension.SystemValue) * 1000.0
+    if not math.isclose(value, model, abs_tol=1e-6):
+        raise RuntimeError(f"{label}: nominal {value!r} mm is not the spec's {model!r}")
+    lower, upper = (limit - model for limit in limits)  # native API order, mm
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     tolerance.Type = _SW_TOL_LIMIT
     if tolerance.SetValues(lower / 1000.0, upper / 1000.0) is not True:
@@ -254,14 +267,13 @@ def _limit_band(
         raise RuntimeError(f"{label}: LIMIT tolerance readback changed")
     places = _set_tolerance_precision(
         display,
-        deviations,
-        display_unit="mm",
+        limits,
+        display_unit=UNIT,
         label=label,
         places=DRAWING_PRECISION_BY_NAME[name],
     )
-    value = float(dimension.SystemValue) * 1000.0
     _telemetry.success(
-        f"{label}: LIMIT {value + upper:.{places}f}/{value + lower:.{places}f}"
+        f"{label}: LIMIT {limits[1] / 25.4:.{places}f}/{limits[0] / 25.4:.{places}f} in"
     )
 
 
@@ -500,6 +512,8 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable form and end-piece globals drive the sketches below; the
     # native tap's thread identity comes from TAP_SPEC. The ``mm`` suffix is
@@ -844,7 +858,7 @@ async def build(adapter) -> dict[str, str]:
     # run-out, so the fat incomplete threads never reach the end piece's full
     # 2B thread.  The cutter's mouth lies on the end face, so its depth
     # dimension runs face to floor; the floor corner is modelled at its
-    # printed limit, R0.10 MAX, a native radial dimension (codjiflo P2 on
+    # printed limit, R.004 MAX, a native radial dimension (codjiflo P2 on
     # #1997).  It is cut FIRST: its floor is the tap's start face.
     counterbore = SketchDims()
     check("create_sketch counterbore", await adapter.create_sketch("ArmAxisPlane"))
@@ -1137,25 +1151,25 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"gooseneck: expected two solid bodies, found {len(bodies)}")
 
     # Model-owned limits: the counterbore depth prints as its LIMIT band from
-    # the end face (sm_gooseneck_spring_joint), the model at mid-band; its Ø
-    # as LIMIT 7.10/7.00, the model at the lower limit the run-out clearance
-    # is budgeted on (codjiflo P1 on #1997).
+    # the end face, .108/.112 (sm_gooseneck_spring_joint), the calibrated 2.78
+    # model inside it; its Ø as LIMIT .279/.275 about the calibrated 7.00, the
+    # lower limit the one the run-out clearance is budgeted on (codjiflo P1 on
+    # #1997).
     _limit_band(
         adapter,
         "CounterboreProfile",
         "CounterboreDepth",
-        (
-            COUNTERBORE_DEPTH_MIN - COUNTERBORE_DEPTH,
-            COUNTERBORE_DEPTH_MAX - COUNTERBORE_DEPTH,
-        ),
+        COUNTERBORE_DEPTH,
+        (COUNTERBORE_DEPTH_MIN, COUNTERBORE_DEPTH_MAX),
     )
     _limit_band(
         adapter,
         "CounterboreProfile",
         "CounterboreDia",
-        (0.0, COUNTERBORE_DIA_MAX - COUNTERBORE_DIA),
+        COUNTERBORE_DIA,
+        (COUNTERBORE_DIA_MIN, COUNTERBORE_DIA_MAX),
     )
-    # The floor corner's R0.10 MAX (codjiflo P1 round 5, P2 on #1997): the
+    # The floor corner's R.004 MAX (codjiflo P1 round 5, P2 on #1997): the
     # modelled radius is the limit, the band runs from sharp up to it.
     set_single_limit(
         adapter,

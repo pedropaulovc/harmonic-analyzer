@@ -88,6 +88,7 @@ from sm_gooseneck_spring_screw_geom import (
     PLAIN_LENGTH_MIN,
     PLAIN_LENGTH_MIN_BAND,
     PLAIN_LENGTH_MIN_TOL_TYPE,
+    PRINTED_BANDS,
     SLOT_DEPTH,
     SLOT_WIDTH,
     THREAD,
@@ -105,7 +106,6 @@ from sm_gooseneck_spring_screw_spec import (
     DRAWING_PRECISION,
     DRAWING_PRECISION_BY_NAME,
     ISOMETRIC_VIEW_NOTE,
-    PRINTED_BANDS,
     UNIT,
 )
 
@@ -691,7 +691,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Model-owned limits (drawing-simplicity-policy.md `How the repository
     # implements the guidelines`), owner rulings 2026-10-27 (#1951), printed
-    # in inches (#290, sm_gooseneck_spring_screw_spec.PRINTED_BANDS): the body
+    # in inches (#290, sm_gooseneck_spring_screw_geom.PRINTED_BANDS): the body
     # Ø as the LIMIT band .248/.245, the thread blank inside the 1/4-28
     # UNF-2A major band; the plain length as the single ".14 MIN" from the
     # under-head face, so the loop always bears on the plain body; the

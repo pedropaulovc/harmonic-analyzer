@@ -208,7 +208,7 @@ def counter_upper_support_geometry() -> dict[str, str | float]:
         "plug_length_mm": sm_gooseneck_geom.PLUG_LENGTH,
         "plug_counterbore_dia_mm": spring_joint.COUNTERBORE_DIA,
         "plug_counterbore_depth_mm": spring_joint.COUNTERBORE_DEPTH,
-        "plug_edge_break_mm": spring_joint.EDGE_BREAK,
+        "plug_edge_break_mm": spring_joint.CALIBRATED_EDGE_BREAK,
     }
 
 
