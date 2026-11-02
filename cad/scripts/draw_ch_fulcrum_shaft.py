@@ -115,6 +115,12 @@ FINISH_CHAR_HEIGHT = 0.0025
 # Two trailing spaces on every row stop the ink short of the line and its
 # shelf, as draw_dt_crank_drive_gear does for its chamfer block.
 SHAFT_DIA_CALLOUT_ROWS = "\n".join(f"{row}  " for row in SHAFT_DIA_CALLOUT.splitlines())
+# The across-flat block hangs right of its dimension line, which drops to the
+# shelf at the block's left edge: the S of SETS touched it (machinist review,
+# rule 14). A leading space on every row holds the ink off that line.
+ACROSS_FLAT_CALLOUT_ROWS = "\n".join(
+    f" {row}" for row in ACROSS_FLAT_CALLOUT.splitlines()
+)
 RIGHT_KEEP = {
     "FlatFromEnd": (_LEFT_TIP_X - 0.0065, _ROW_1),
     "FlatLength": (_RIGHT_FLAT_INNER_X - 0.0105, _ROW_1),
@@ -218,7 +224,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter,
         curated,
-        {"ShaftDia": SHAFT_DIA_CALLOUT_ROWS, "AcrossFlat": ACROSS_FLAT_CALLOUT},
+        {"ShaftDia": SHAFT_DIA_CALLOUT_ROWS, "AcrossFlat": ACROSS_FLAT_CALLOUT_ROWS},
     )
     _set_dome_reference(adapter, curated)
 
