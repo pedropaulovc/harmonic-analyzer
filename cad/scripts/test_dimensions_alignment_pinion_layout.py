@@ -111,7 +111,7 @@ def _expected_fragments() -> list[str]:
         f"drum radius {dt.TIP_DRUM120:.3f}, pinion radius {dt.TIP_APINION:.3f} "
         f"and parked gap {dt.APINION_GAP}",
         f"Drum z {_mm(dt.APINION_Z_FRONT)}..+{dt.APINION_Z_BACK:.3f}",
-        f"({dt.APINION_Z_BACK - dt.APINION_Z_FRONT:.1f} face",
+        f"({dt.APINION_Z_BACK - dt.APINION_Z_FRONT:.3f} face",
         f"root z {_mm(dt.ARBOR_Z0)}..+{dt.ARBOR_Z0 + ARBOR_LEN:.3f}",
         f"head/crossrod axis z {_mm(dt.HANDLE_Z)}",
         f"crossrod at +{dt.HANDLE_TILT_DEG:g}°",

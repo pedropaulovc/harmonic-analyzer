@@ -149,23 +149,22 @@ POST_MOUNT_TAP_DIA = blind_cut_dia_mm(POST_MOUNT_SPEC)
 # thread through the plate, flush to this much short of its underside.
 POST_SCREW_CUT_TO_FIT_SHORT = post_mount.CUT_TO_FIT_SHORT_MM
 POST_MOUNT_THREAD_DIA = 0.25 * 25.4
-# The title block's R0.25/0.25 edge break would take up to 0.25 of thread off
-# each end of the through tap (0.85D worst case, under the audit floor), so the
-# two tapped holes carry a local override: deburr only (Main, 2026-09-24).
-# It is printed under the taps' own callout, not in a general note
-# (machinist review r1: an override belongs on the feature it overrides).
-POST_MOUNT_TAP_EDGE_BREAK = 0.1
-POST_MOUNT_TAP_BREAK_CALLOUT = f"{POST_MOUNT_TAP_EDGE_BREAK:.1f} MAX BREAK EACH END"
+# The taps take the title block's edge break; rule 4 forbids tightening it to rescue thread (machinist review, Main 2026-11-01).
+POST_MOUNT_TAP_EDGE_BREAK = post_mount.PLATE_TAP_EDGE_BREAK_MM  # title block .010 edge break
 # U37 (2026-09-23): the user accepted short engagement for MHA-DT-VN-61 as a named
 # exception to drawing-guidelines.md rule 18 (thread engagement)'s 1.5D; the plate slides on the deck, so no boss can
-# add thread.  Worst case: the thinnest stock plate (U41) less the cut-to-fit
-# allowance and the break at both ends of the tap, counted as MHA-DT-32 counts
-# its exit break.  A MIN never rounds up, so the print floors to two places.
+# add thread.  Worst case: the thinnest stock plate (U41) less the tap's entry
+# break at the top and, at the underside, whichever reaches further: the tap's
+# exit break, or the cut-to-fit allowance plus the screw's own cut-end break.
+# A MIN never rounds up, so the print floors to two places.
 POST_MOUNT_ENGAGEMENT_WORST = round(
     PLATE_THICKNESS
     - PLATE_STOCK_BAND
-    - POST_SCREW_CUT_TO_FIT_SHORT
-    - 2.0 * POST_MOUNT_TAP_EDGE_BREAK,
+    - POST_MOUNT_TAP_EDGE_BREAK
+    - max(
+        POST_MOUNT_TAP_EDGE_BREAK,
+        POST_SCREW_CUT_TO_FIT_SHORT + post_mount.SCREW_CUT_END_BREAK_MM,
+    ),
     6,
 )
 POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS = (
@@ -179,16 +178,16 @@ POST_MOUNT_ENGAGEMENT_PRINTED = (
 if POST_MOUNT_ENGAGEMENT_PRINTED < 0.87:
     raise AssertionError("MHA-DT-VN-61 engagement fell below the audited 0.87D floor")
 # The sheet states the shortfall as a plain fact, worded like MHA-DT-32's.
-# The taps' callout names the post they mount and carries the break override
-# the figure depends on, so the line names no screw (machinist review r1).
-# Pending exception ruling: MHA-DT-VN-61 engagement (#1019).
+# The taps' callout names the post they mount, so the line names no screw
+# (machinist review r1). Owner-accepted 2026-11-01: MHA-DT-VN-61's RV-01.
 POST_MOUNT_ENGAGEMENT_NOTE = (
     f"1/4-20 THREAD ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN."
 )
 
-# Pending exception ruling: MHA-DT-VN-61 engagement (#1019).
+# Owner-accepted 2026-11-01 (MHA-DT-VN-61's RV-01).  A MIN never
+# rounds up: the length floors to two places like the diameters.
 POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT = (
-    f"ENGAGEMENT {POST_MOUNT_ENGAGEMENT_WORST:.2f} MIN "
+    f"ENGAGEMENT {math.floor(POST_MOUNT_ENGAGEMENT_WORST * 100.0) / 100.0:.2f} MIN "
     f"({POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D)."
 )
 

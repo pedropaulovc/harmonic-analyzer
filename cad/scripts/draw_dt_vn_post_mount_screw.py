@@ -9,26 +9,14 @@ isometric, both 1:1. No single length suits every in-band post and plate
 at CUT_LENGTH_MM, with no band and the cut-to-fit acceptance beneath it:
 cut at assembly, end flush to the spec band's allowance short of the MHA-DT-20
 underside, never proud (dt_vn_post_mount_screw_spec.CUT_TO_FIT_CALLOUT).
-The cut end's break
-is a deburr (Main's MHA-DT-VN-61 eye pass on #857): a 0.1 dimension at 1:1 is
-illegible and its printed +0/-0.1 band read as allowing no break at all, so
-the Front view carries no break dimension.  A 10:1 view of the tip carries
-it instead as the single limit "0.1 MAX" (the model's CutEndBreak at
-swTolMAX, generated from the spec band).  CutEndBreak is a driving
-dimension of the deburr cutter's profile.  The tip view is NOT a detail
-view: no detail child of the Front ever offered CutEndBreak to an import
-(see ``cropped_tip_view``), so it is a standalone 10:1 *Front model view,
-moved to the tip and cropped to the detail's fence, that imports the break
-by feature.  It reads as a detail on the sheet: a "DETAIL A  SCALE 10:1"
-label owned by the view, and a circle and letter "A" on the Front at the
-tip.  The Front is re-activated before the notes so they do not land in
-the tip view.  The only
-note says to deburr the cut end and that the
-undimensioned purchased geometry is reference.  No installation sequence or rule number is
-printed: the sequence is an MHA-DT-00 assembly step (Main's eye pass of
-warm-c486, drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).  The engagement minimum prints as a plain fact,
-"ENGAGEMENT 0.90D MIN", on the cut-length callout's last line, never in a
-note; the spec's asserts still guard its value.
+The cut end's break is the title block's general edge break; the sheet
+carries no part-local break limit (Main's ruling on the run-7 sheet).  The
+only note says the undimensioned purchased geometry is reference.  No
+installation sequence or rule number is printed: the sequence is an MHA-DT-00
+assembly step (Main's eye pass of warm-c486, drawing-guidelines.md rule 7
+(notes: few, flagged, never a method)).  The engagement minimum prints as a
+plain fact, "ENGAGEMENT 0.87D MIN", on the cut-length callout's last line,
+never in a note; the spec's asserts still guard its value.
 
 The separate supplier maximum-limit sheet is a construction-only source
 diagram, not a correction of the installed MSC solid (deferred in issue 1806).
@@ -64,7 +52,6 @@ from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
     dimension_name,
     place_view,
     curate_dimensions,
@@ -81,7 +68,6 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-import _drawing_dimension_import
 from _drawing_dimensions import (
     assert_imported_precision,
     set_dimension_callouts,
@@ -90,12 +76,13 @@ from _drawing_dimensions import (
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_detail_crop import native_circle_geometry, _transform_point
 from _drawing_notes import add_property_linked_note
-from _drawing_projection import model_point_in_view, model_points_in_view
+from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
+from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _drawing_view_display import set_hidden_lines_removed
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_sheet_region import sheet_drawable_region
-from _layout_geometry import Box, estimate_text_box
 from _purchased_fastener_drawing import (
     _box,
     _inside,
@@ -107,7 +94,6 @@ from _purchased_fastener_drawing import (
 from _rebuild import active_configuration_name
 from _session import run_build
 import _seat_forensics
-from _stock_trim_drawing import TrimSheet
 import _telemetry
 from _supplier_dimensions import (
     assert_supplier_reference_dimension,
@@ -121,22 +107,13 @@ from _supplier_reference_geometry import (
 from _supplier_screw_dimensions import _assert_dimension_source
 from _visibility import visible_reference_geometry
 from dt_vn_post_mount_screw_spec import (
-    CUT_END_BREAK_DIMENSION,
-    CUT_END_BREAK_BAND,
-    CUT_END_BREAK_SKETCH,
-    CUT_END_BREAK_MAX_MM,
-    CUT_END_BREAK_TEXT,
-    CUT_END_BREAK_TOL_TYPE,
     CUT_LENGTH_DIMENSION,
     CUT_LENGTH_MM,
     CUT_LENGTH_SKETCH,
     CUT_TO_FIT_CALLOUT,
-    DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FRONT_VIEW_DIMENSIONS,
-    HEAD_H_MM,
     SKU,
-    SUPPLIER_MODEL_NOTE,
     SUPPLIER_PRECISION,
     SUPPLIER_PROFILE_DIMENSIONS,
     SUPPLIER_REFERENCE_DIMENSIONS,
@@ -145,11 +122,12 @@ from dt_vn_post_mount_screw_spec import (
     SUPPLIER_STOCK_CONFIGURATION,
     SUPPLIER_STOCK_DIMENSIONS,
     SUPPLIER_STOCK_FEATURE,
-    SUPPLIER_STOCK_NOTE,
     SUPPLIER_STOCK_TITLE,
     SUPPLIER_THREAD_MAJOR_DIMENSION,
-    THREAD_DIA_MM,
 )
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["dt_vn_post_mount_screw"]
 PART_STEM = SPEC.artifact_stem
@@ -173,73 +151,19 @@ ISO_CENTER = (0.270, 0.185)
 # shank's silhouette, midway along the span, far enough out that its
 # five-line acceptance callout (22 capitals at its widest) clears the head
 # and stays inside the border.
-# The cut end's break is not dimensioned in this 1:1 view (see the module
-# docstring).  (The view is placed by its outline's centre: the end face is
-# half the screw's overall height below it.)
-TIP_Y = FRONT_CENTER[1] - (CUT_LENGTH_MM + HEAD_H_MM) / 2000.0
+# (The view is placed by its outline's centre.)
 FRONT_KEEP = {
     CUT_LENGTH_DIMENSION: (FRONT_CENTER[0] - 0.047, FRONT_CENTER[1]),
 }
 DIMENSION_CALLOUTS = {CUT_LENGTH_DIMENSION: CUT_TO_FIT_CALLOUT}
 
-# The 10:1 tip view (a cropped model view that reads as detail A): its crop
-# centres on the axis 1 mm above the cut end with a 3.6 mm fence, so both
-# ends of the break's radial leg (r 3.075 and 3.175 on the end face) sit
-# inside the crop -- a cropped view drops any dimension whose reference lies
-# outside it.  It sits between the Front view and the isometric, above the
-# note block and clear of the title block.  TIP_DETAIL keeps the sheet
-# constants: the crop fence, the label's place and the Front letter's offset.
-DETAIL_SCALE = (10.0, 1.0)
-DETAIL_FENCE_MM = 3.6
-DETAIL_OFFSET_MM = 1.0
-# A sheet circle (the tip crop fence, the Front's tip mark) must land within
-# this of its ask, in sheet metres; a snapped circle misses by a millimetre.
+# A sheet circle (the source head's crop fence) must land within this of its
+# ask, in sheet metres; a snapped circle misses by a millimetre.
 CIRCLE_TOL_M = 0.00005
-DETAIL_CENTER = (0.190, 0.175)
-DETAIL_RADIUS = DETAIL_FENCE_MM * DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
-TIP_DETAIL = TrimSheet(
-    sheet_scale=SHEET_SCALE,
-    detail_center=DETAIL_CENTER,
-    detail_scale=DETAIL_SCALE,
-    fence_radius_mm=DETAIL_FENCE_MM,
-    cut_end_y_mm=-CUT_LENGTH_MM,
-    detail_offset_mm=DETAIL_OFFSET_MM,
-    detail_label_xy=(
-        DETAIL_CENTER[0] - 0.020,
-        DETAIL_CENTER[1] - DETAIL_RADIUS - 0.010,
-    ),
-    parent_letter_offset=(0.008, 0.006),
-)
-TIP_LETTER = "A"
-TIP_VIEW_LABEL = (
-    f"DETAIL {TIP_LETTER}  SCALE {DETAIL_SCALE[0]:g}:{DETAIL_SCALE[1]:g}"
-)
 _CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
-# The tip reference must land within 0.1 mm of DETAIL_CENTER after the move:
-# draw_cylinder_gear's notch-detail outline-centre tolerance.
-TIP_VIEW_POSITION_TOLERANCE_M = 1e-4
 
-
-def _detail_point(x_mm: float, y_mm: float) -> tuple[float, float]:
-    """Sheet position of a Front-view model point inside the tip view."""
-    ratio = DETAIL_SCALE[0] / DETAIL_SCALE[1]
-    ref_y = -CUT_LENGTH_MM + DETAIL_OFFSET_MM
-    return (
-        DETAIL_CENTER[0] + ratio * x_mm / 1000.0,
-        DETAIL_CENTER[1] + ratio * (y_mm - ref_y) / 1000.0,
-    )
-
-
-# The break's text sits below the end face, under the right-hand rim.
-BREAK_RIM_XY = _detail_point(THREAD_DIA_MM / 2.0, -CUT_LENGTH_MM)
-DETAIL_KEEP = {
-    CUT_END_BREAK_DIMENSION: (BREAK_RIM_XY[0] - 0.006, BREAK_RIM_XY[1] - 0.012)
-}
 FRONT_PRECISION = {
     CUT_LENGTH_DIMENSION: DRAWING_PRECISION_BY_NAME[CUT_LENGTH_DIMENSION]
-}
-DETAIL_PRECISION = {
-    CUT_END_BREAK_DIMENSION: DRAWING_PRECISION_BY_NAME[CUT_END_BREAK_DIMENSION]
 }
 # Below the Front view (its lower end ~0.119), above the stock rows.
 NOTES_XY = (0.016, 0.100)
@@ -255,7 +179,9 @@ STOCK_CENTER = (0.235, 0.110)
 STOCK_KEEP = {
     "SupplierStockLength": (0.235, 0.083),
     "SupplierThreadLength": (0.303, 0.151),
-    "SupplierThreadMajor": (0.366, 0.116),
+    # Right of the screw end's extension line (x ~0.343) and below the major's
+    # own extension lines, so its dimension line stops short of the text.
+    "SupplierThreadMajor": (0.366, 0.094),
 }
 STOCK_HEAD_SCALE = (6.0, 1.0)
 STOCK_HEAD_CENTER = (0.100, 0.200)
@@ -272,15 +198,16 @@ STOCK_VIEW_CELL = (0.115, 0.073, 0.410, 0.177)
 STOCK_HEAD_CELL = (0.018, 0.142, 0.193, 0.264)
 STOCK_NOTES = (
     (SUPPLIER_STOCK_TITLE, 0.200, 0.258, (0.195, 0.247, 0.415, 0.264)),
-    (SUPPLIER_STOCK_NOTE, 0.016, 0.062, (0.014, 0.045, 0.2155, 0.065)),
-    (SUPPLIER_MODEL_NOTE, 0.200, 0.225, (0.195, 0.195, 0.415, 0.240)),
     (
         f"SLOT-PLANE HEAD ENVELOPE  SCALE {STOCK_HEAD_SCALE[0]:g}:{STOCK_HEAD_SCALE[1]:g}",
         0.030, 0.139, (0.018, 0.128, 0.193, 0.142),
     ),
+    # Over the full view's plain shank, right of the 6:1 head view's
+    # uncropped outline (x ~0.155), left of the 1.500 thread dimension's
+    # extension line (x ~0.266) and above the shank (y ~0.121).
     (
         f"FULL SOURCE-STOCK ENVELOPE  SCALE {STOCK_SCALE[0]:g}:{STOCK_SCALE[1]:g}",
-        0.200, 0.187, (0.195, 0.178, 0.410, 0.190),
+        0.158, 0.137, (0.156, 0.126, 0.262, 0.139),
     ),
 )
 
@@ -1250,362 +1177,6 @@ def _activate(adapter: Any, view: Any, *, label: str) -> str:
     return name
 
 
-def _note_texts(view: Any) -> list[str]:
-    return [
-        str(_early_bound(note, "INote").GetText())
-        for note in (_early_bound(view, "IView").GetNotes() or ())
-    ]
-
-
-def cropped_tip_view(adapter: Any) -> Any:
-    """The 10:1 tip view: a standalone *Front model view, NOT a detail.
-
-    Measured (diag/mha142-bisect, b6552f13b, farm worker swmaker000008): no
-    detail child of the Front offered CutEndBreak to the model-item import
-    under 10:1 HLR, 10:1 HLV, 5:1 and 2:1, imported before or after the
-    Front's own import -- every one returned available=[], as the 10:1 HLR
-    detail had in pms857-f543 (hidden reference sketch, source 1), -56f7
-    (cutter profile, source 1), -6099 (cutter profile, source 0) and 918-top
-    (source 0 after a visible-entity pre-read).  diag-9eca's lone detail
-    success was not reproduced by replaying its pre-reads.  The same *Front
-    placed at 10:1, moved so the tip lands on DETAIL_CENTER and cropped by a
-    sketch circle (IView.Crop2 status 1, IsCropped True, HLR) imported
-    CutEndBreak twice in that leaf.  So the crop, not a detail, carries it.
-
-    Sequence: place_view at 10:1; move by the tip reference point's sheet
-    error (ModelToViewTransform, SetViewPosition); ActivateView; a circle of
-    the detail fence's sheet radius in the view's own sketch; Crop2 straight
-    after it, while the circle is still the selection; an IsCropped
-    read-back that raises.
-    """
-    draw = adapter.currentModel
-    view = _early_bound(
-        place_view(adapter, str(SOURCE), "*Front", *DETAIL_CENTER, scale=DETAIL_SCALE),
-        "IView",
-    )
-    ratio = tuple(float(value) for value in view.ScaleRatio)
-    if ratio != DETAIL_SCALE:
-        raise RuntimeError(f"tip view scale {ratio!r}, expected {DETAIL_SCALE!r}")
-    reference = tuple(value / 1000 for value in TIP_DETAIL.detail_reference_mm)
-    tip = model_point_in_view(adapter, view, reference, label="tip view reference")
-    position = tuple(float(value) for value in view.Position)
-    target = [position[i] + DETAIL_CENTER[i] - tip[i] for i in range(2)]
-    if not view.SetViewPosition(double_array(target), False):
-        raise RuntimeError("cannot move the tip view onto its sheet position")
-    draw.EditRebuild3()
-    center = model_point_in_view(adapter, view, reference, label="tip view reference")
-    if math.dist(center, DETAIL_CENTER) > TIP_VIEW_POSITION_TOLERANCE_M:
-        raise RuntimeError(
-            f"tip view reference sits at {center!r}, not {DETAIL_CENTER!r}"
-        )
-    _activate(adapter, view, label="tip view")
-    _sketch_circle(adapter, view, center, DETAIL_RADIUS, label="tip view crop")
-    status = int(view.Crop2(False, False, 5))
-    draw.ClearSelection2(True)
-    draw.EditRebuild3()
-    cropped = bool(view.IsCropped())
-    _telemetry.info(
-        f"tip view {view_name(adapter, view)!r}: {ratio[0]:g}:{ratio[1]:g}, "
-        f"Crop2 status {status}, IsCropped {cropped}"
-    )
-    if status != _CROP_NO_ERROR or not cropped:
-        raise RuntimeError(
-            f"tip view is not cropped: Crop2 status {status}, IsCropped {cropped}"
-        )
-    return view
-
-
-def _curate_tip_view(adapter: Any, view: Any) -> list[Any]:
-    """Import the break into the tip view by feature: only the deburr
-    cutter's CutEndDeburrProfile is selected (source 1), never the entire
-    model.  The cropped model view's entire-model import delivered it in
-    b6552f13b; the targeted form is the one the Front already uses."""
-    return _drawing_dimension_import.curate_view_dimensions(
-        adapter,
-        view,
-        keep=DETAIL_KEEP,
-        view_label="tip view break",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-
-
-# swDimensionArrowsSide_e.swDimArrowsOutside: the arrows sit outside the
-# extension lines and point in.
-ARROWS_OUTSIDE = 1
-# Clear sheet space between the break text's right edge and the tail of the
-# left arrowhead.
-BREAK_TEXT_GAP_M = 0.002
-# GetArrowHeadAtIndex2 has no read on this project's seats yet: a width past
-# this is not an arrowhead in sheet metres, and a move past the shift bound
-# (text width + arrow + gap is ~10-25 mm) means a convention was misread.
-# Either raises rather than parking the text somewhere nobody wants it.
-_ARROW_WIDTH_MAX_M = 0.01
-_BREAK_TEXT_SHIFT_MAX_M = 0.03
-# A vertical run: its ends share x to within this.
-_VERTICAL_TOLERANCE_M = 1e-6
-# The display data's text must sit within this of the annotation's own
-# position, or its frame is not the sheet and no clearance can be read.
-_TEXT_FRAME_TOLERANCE_M = 0.05
-
-
-@dataclass(frozen=True)
-class BreakInk:
-    """The break dimension's rendered ink on the sheet, metres.
-
-    No API returns a dimension's rendered text width (INote::GetExtent is
-    for notes only), so the text box is the display data's text anchor,
-    reference corner and cap height, widened by the template's estimated
-    glyph advance (_layout_geometry.estimate_text_box).
-    """
-
-    extension_x: tuple[float, float]
-    arrow_left_x: float
-    text: str
-    height: float
-    text_box: Box
-    position: tuple[float, float]
-
-    @property
-    def left_limit(self) -> float:
-        """The leftmost ink the text must clear: left line or arrow tail."""
-        return min(self.extension_x[0], self.arrow_left_x)
-
-
-def _floats(raw: Any) -> tuple[float, ...]:
-    return tuple(float(value) for value in (raw or ()))
-
-
-def _break_annotation(adapter: Any, annotations: list[Any]) -> Any:
-    for item in annotations:
-        annotation = _early_bound(item, "IAnnotation")
-        if dimension_name(adapter, annotation) == CUT_END_BREAK_DIMENSION:
-            return annotation
-    raise RuntimeError(f"tip view has no {CUT_END_BREAK_DIMENSION} to place")
-
-
-def _extension_x(data: Any) -> tuple[float, float]:
-    """The x of the two vertical extension lines, from GetLineAtIndex2 (the
-    read draw_frame_assembly already makes on the seat).  Each line ends with
-    start[3], end[3] whichever overload's leading scalars precede them, so the
-    points are read from the array's end, as drawing_layout_audit does."""
-    xs: list[float] = []
-    for index in range(int(data.GetLineCount())):
-        values = _floats(data.GetLineAtIndex2(index))
-        if len(values) < 10:
-            raise RuntimeError(f"break dimension line {index} is incomplete: {values!r}")
-        start = len(values) - 6
-        x0, y0 = values[start], values[start + 1]
-        x1, y1 = values[start + 3], values[start + 4]
-        if abs(x0 - x1) > _VERTICAL_TOLERANCE_M or abs(y0 - y1) <= _VERTICAL_TOLERANCE_M:
-            continue
-        if all(abs(x0 - seen) > _VERTICAL_TOLERANCE_M for seen in xs):
-            xs.append(x0)
-    if len(xs) != 2:
-        raise RuntimeError(
-            f"break dimension must draw two extension lines, read x={sorted(xs)!r}"
-        )
-    left, right = sorted(xs)
-    return (left, right)
-
-
-def _arrow_left_x(data: Any, fallback: float) -> float:
-    """The leftmost arrowhead ink.  GetArrowHeadAtIndex2 returns [tip[3],
-    dir[3], width, ...]; the body is taken on BOTH sides of the tip, so the
-    result does not rest on which way dir points."""
-    lefts = [fallback]
-    for index in range(int(data.GetArrowHeadCount())):
-        values = _floats(data.GetArrowHeadAtIndex2(index))
-        if len(values) < 7:
-            raise RuntimeError(f"break arrowhead {index} is incomplete: {values!r}")
-        dx, dy, dz = values[3:6]
-        length = math.sqrt(dx * dx + dy * dy + dz * dz) or 1.0
-        width = values[6]
-        if not 0.0 <= width <= _ARROW_WIDTH_MAX_M:
-            raise RuntimeError(
-                f"break arrowhead {index} width {width!r} is not an arrowhead's"
-            )
-        lefts.append(values[0] - abs(dx / length) * width)
-    return min(lefts)
-
-
-def read_break_ink(annotation: Any) -> BreakInk:
-    """Read the break's extension lines, arrowheads and text box back."""
-    annotation = _early_bound(annotation, "IAnnotation")
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    data = _early_bound(display.GetDisplayData(), "IDisplayData")
-    extension = _extension_x(data)
-    arrow_left = _arrow_left_x(data, extension[0])
-    count = int(data.GetTextCount())
-    if count < 1:
-        raise RuntimeError("break dimension draws no text")
-    texts: list[str] = []
-    boxes: list[Box] = []
-    height = 0.0
-    for index in range(count):
-        text = str(data.GetTextAtIndex(index) or "")
-        anchor = _floats(data.GetTextPositionAtIndex(index))
-        size = float(data.GetTextHeightAtIndex(index))
-        reference = int(data.GetTextRefPositionAtIndex(index))
-        box = estimate_text_box(
-            text,
-            anchor=(anchor[0], anchor[1]),
-            height=size,
-            reference=reference if 0 <= reference <= 5 else 0,
-            angle=float(data.GetTextAngleAtIndex(index)),
-        )
-        if box is None:
-            continue
-        texts.append(text)
-        boxes.append(box)
-        height = max(height, size)
-    if not boxes:
-        raise RuntimeError("break dimension text has no extent to read")
-    text_box = Box(
-        min(box.xmin for box in boxes),
-        min(box.ymin for box in boxes),
-        max(box.xmax for box in boxes),
-        max(box.ymax for box in boxes),
-    )
-    position = _floats(annotation.GetPosition())[:2]
-    centre = (
-        (text_box.xmin + text_box.xmax) / 2.0,
-        (text_box.ymin + text_box.ymax) / 2.0,
-    )
-    if math.dist(centre, position) > _TEXT_FRAME_TOLERANCE_M:
-        raise RuntimeError(
-            f"break text at {centre!r} is not in the sheet frame of its "
-            f"annotation at {position!r}"
-        )
-    return BreakInk(
-        extension_x=extension,
-        arrow_left_x=arrow_left,
-        text=" ".join(texts),
-        height=height,
-        text_box=text_box,
-        position=(position[0], position[1]),
-    )
-
-
-def _log_break_ink(ink: BreakInk, *, stage: str) -> None:
-    clearance = ink.left_limit - ink.text_box.xmax
-    _telemetry.info(
-        f"tip view break text {stage}: {ink.text!r} box x "
-        f"{ink.text_box.xmin:.5f}..{ink.text_box.xmax:.5f} (width "
-        f"{ink.text_box.width:.5f}, height {ink.height:.5f}), extension lines x "
-        f"{ink.extension_x[0]:.5f}/{ink.extension_x[1]:.5f}, left arrow tail x "
-        f"{ink.arrow_left_x:.5f}, anchor {ink.position[0]:.5f}, "
-        f"clearance {clearance:.5f} m"
-    )
-    _telemetry.event(
-        "drawing.tip_break_text",
-        stage=stage,
-        text=ink.text,
-        text_box=(
-            ink.text_box.xmin,
-            ink.text_box.ymin,
-            ink.text_box.xmax,
-            ink.text_box.ymax,
-        ),
-        extension_x=ink.extension_x,
-        arrow_left_x=ink.arrow_left_x,
-        position=ink.position,
-        clearance_m=clearance,
-    )
-
-
-def assert_break_text_outside(ink: BreakInk) -> None:
-    """The text must sit wholly left of both extension lines and of the left
-    arrow's tail: none of it between or across the lines."""
-    if ink.text_box.xmax > ink.extension_x[0]:
-        raise RuntimeError(
-            f"break text box ends at x {ink.text_box.xmax:.5f}, across the left "
-            f"extension line at {ink.extension_x[0]:.5f}"
-        )
-    if ink.text_box.xmax > ink.arrow_left_x:
-        raise RuntimeError(
-            f"break text box ends at x {ink.text_box.xmax:.5f}, over the left "
-            f"arrow's tail at {ink.arrow_left_x:.5f}"
-        )
-
-
-def place_break_text_outside(adapter: Any, annotations: list[Any]) -> BreakInk:
-    """Put the break's text LEFT of the leader, arrows outside pointing in.
-
-    857-b835: the text sat centred almost on the 1 mm gap and overprinted
-    both extension lines and the inner arrowheads.  Arrows go outside
-    (ArrowSide), auto-centring is off (CenterText), and the text moves along
-    the dimension line only, so its right edge sits BREAK_TEXT_GAP_M left of
-    the left arrow's tail, measured from the display data's own read-back.
-    """
-    annotation = _break_annotation(adapter, annotations)
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    display.CenterText = False
-    display.ArrowSide = ARROWS_OUTSIDE
-    if int(display.ArrowSide) != ARROWS_OUTSIDE or bool(display.CenterText):
-        raise RuntimeError(
-            f"break arrows/centring did not take: ArrowSide {display.ArrowSide}, "
-            f"CenterText {display.CenterText}"
-        )
-    adapter.currentModel.EditRebuild3()
-    before = read_break_ink(annotation)
-    _log_break_ink(before, stage="imported")
-    shift = before.left_limit - BREAK_TEXT_GAP_M - before.text_box.xmax
-    if abs(shift) > _BREAK_TEXT_SHIFT_MAX_M:
-        raise RuntimeError(
-            f"break text would move {shift:.5f} m, past {_BREAK_TEXT_SHIFT_MAX_M} m: "
-            "an arrowhead or text read-back convention is off"
-        )
-    x, y = before.position
-    if not annotation.SetPosition2(x + shift, y, 0.0):
-        raise RuntimeError("cannot move the break text left of its leader")
-    adapter.currentModel.EditRebuild3()
-    after = read_break_ink(annotation)
-    _log_break_ink(after, stage="placed")
-    assert_break_text_outside(after)
-    return after
-
-
-def label_tip_view(adapter: Any, view: Any) -> None:
-    """Label the tip view "DETAIL A  SCALE 10:1".
-
-    A model view has no native label the API can show (only detail, section
-    and auxiliary views carry one; swDetailingOrthoViewLabelsEnableShow is
-    documented "Not used"), so the label is a note inserted while the tip
-    view is ACTIVE: the view owns it (IView.GetNotes) and it moves with the
-    view.  Read back: the tip view carries that label exactly once.  Other
-    notes on the view are logged, not refused: whether the template shows a
-    native label on a model view has not been read on a seat.
-    """
-    _activate(adapter, view, label="tip view")
-    if add_note(adapter, TIP_VIEW_LABEL, *TIP_DETAIL.detail_label_xy) is None:
-        raise RuntimeError("failed to add the tip view label")
-    texts = _note_texts(view)
-    _telemetry.info(f"tip view notes after its label: {texts!r}")
-    if texts.count(TIP_VIEW_LABEL) != 1:
-        raise RuntimeError(
-            f"tip view label did not land in the tip view: its notes are {texts!r}"
-        )
-
-
-def mark_tip_on_front(adapter: Any, front: Any) -> None:
-    """Circle the tip on the Front and letter it "A", so the machinist finds
-    detail A: a sketch circle of the tip view's crop fence (1:1) around the
-    same reference point, and a note "A" owned by the Front.  Both are
-    sheet-authored annotation, not dimensions."""
-    _activate(adapter, front, label="Front view")
-    reference = tuple(value / 1000 for value in TIP_DETAIL.detail_reference_mm)
-    center = model_point_in_view(adapter, front, reference, label="Front tip mark")
-    radius = DETAIL_FENCE_MM * SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
-    _sketch_circle(adapter, front, center, radius, label="Front tip mark")
-    adapter.currentModel.ClearSelection2(True)
-    offset = TIP_DETAIL.parent_letter_offset
-    if add_note(adapter, TIP_LETTER, center[0] + offset[0], center[1] + offset[1]) is None:
-        raise RuntimeError("failed to letter the Front's tip mark")
-    texts = _note_texts(front)
-    if texts.count(TIP_LETTER) != 1:
-        raise RuntimeError(f"Front tip letter did not land in the Front: {texts!r}")
-
-
 def activate_front_for_notes(adapter: Any, front: Any) -> None:
     """Make the Front the active view before the property-linked notes.
 
@@ -1623,80 +1194,6 @@ def _view_dimension_names(adapter: Any, view: Any) -> list[str]:
         dimension_name(adapter, _early_bound(item, "IAnnotation"))
         for item in (_early_bound(view, "IView").GetAnnotations() or ())
     ]
-
-
-def break_text(value_mm: float, places: int, tol_type: int, prefix: str, suffix: str) -> str:
-    """The break dimension's printed text, composed from its read-back parts.
-
-    The API exposes no rendered string for a toleranced value, so the seat
-    check composes it: value at its places, the MAX limit when the type is
-    swTolMAX, and whatever prefix and suffix the display carries.
-    """
-    limit = " MAX" if tol_type == CUT_END_BREAK_TOL_TYPE else ""
-    return f"{prefix}{value_mm:.{places}f}{limit}{suffix}"
-
-
-def _verify_tip_view(adapter: Any, front: Any, tip: Any) -> None:
-    """Seat read-back: the tip view is cropped at its scale, carries the one
-    break dimension as a MAX limit reading the spec's text, with that text
-    left of both extension lines, and the Front does not."""
-    view = _early_bound(tip, "IView")
-    ratio = tuple(float(value) for value in view.ScaleRatio)
-    if ratio != DETAIL_SCALE:
-        raise RuntimeError(f"tip view scale {ratio!r}, expected {DETAIL_SCALE!r}")
-    if not bool(view.IsCropped()):
-        raise RuntimeError("tip view is no longer cropped")
-    names = [name for name in _view_dimension_names(adapter, tip) if name]
-    if names != [CUT_END_BREAK_DIMENSION]:
-        raise RuntimeError(
-            f"tip view must carry exactly one {CUT_END_BREAK_DIMENSION}: {names}"
-        )
-    front_names = _view_dimension_names(adapter, front)
-    if CUT_END_BREAK_DIMENSION in front_names:
-        raise RuntimeError(f"Front view still carries the 1:1 break: {front_names}")
-    annotation = next(
-        _early_bound(item, "IAnnotation")
-        for item in view.GetAnnotations()
-        if dimension_name(adapter, _early_bound(item, "IAnnotation"))
-        == CUT_END_BREAK_DIMENSION
-    )
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    value_mm = float(dimension.SystemValue) * 1000.0
-    places = int(display.GetPrimaryPrecision2())
-    tol_type = int(tolerance.Type)
-    parenthesis = bool(display.ShowParenthesis)
-    text = break_text(
-        value_mm,
-        places,
-        tol_type,
-        str(display.GetText(1) or ""),  # swDimensionTextPrefix
-        str(display.GetText(2) or ""),  # swDimensionTextSuffix
-    )
-    _telemetry.event(
-        "drawing.tip_detail_break",
-        text=text,
-        value_mm=value_mm,
-        places=places,
-        tol_type=tol_type,
-        parenthesis=parenthesis,
-        scale=f"{ratio[0]:g}:{ratio[1]:g}",
-    )
-    if (
-        tol_type != CUT_END_BREAK_TOL_TYPE
-        or abs(value_mm - CUT_END_BREAK_MAX_MM) > 1e-9
-        or parenthesis
-        or text != CUT_END_BREAK_TEXT
-    ):
-        raise RuntimeError(
-            f"tip view break reads {text!r} (type {tol_type}, parenthesis "
-            f"{parenthesis}), expected {CUT_END_BREAK_TEXT!r}"
-        )
-    ink = read_break_ink(annotation)
-    _log_break_ink(ink, stage="verified")
-    assert_break_text_outside(ink)
-    _telemetry.success(f"tip view {ratio[0]:g}:{ratio[1]:g} reads {text}")
 
 
 def _reference_cut_length(adapter: Any, annotations: list[Any]) -> None:
@@ -1726,11 +1223,10 @@ def _reference_cut_length(adapter: Any, annotations: list[Any]) -> None:
     raise RuntimeError("Front view has no cut length to mark reference")
 
 
-def _verify_finished_controls(adapter, front, tip, installed_configuration) -> None:
-    """Read the original finished cut/fit and break controls after final rebuild."""
-    for view in (front, tip):
-        if str(_early_bound(view, "IView").ReferencedConfiguration) != installed_configuration:
-            raise RuntimeError("finished view no longer references the unchanged installed solid")
+def _verify_finished_controls(adapter, front, installed_configuration) -> None:
+    """Read the original finished cut/fit control after final rebuild."""
+    if str(_early_bound(front, "IView").ReferencedConfiguration) != installed_configuration:
+        raise RuntimeError("finished view no longer references the unchanged installed solid")
     front_names = [name for name in _view_dimension_names(adapter, front) if name]
     if front_names != [CUT_LENGTH_DIMENSION]:
         raise RuntimeError("finished Front no longer carries only its original cut length")
@@ -1757,27 +1253,6 @@ def _verify_finished_controls(adapter, front, tip, installed_configuration) -> N
         or not any(annotations[0].GetAttachedEntities3() or ())
     ):
         raise RuntimeError("finished cut-to-fit reference changed")
-    _verify_tip_view(adapter, front, tip)
-    tip_annotations = [
-        _early_bound(raw, "IAnnotation")
-        for raw in (_early_bound(tip, "IView").GetAnnotations() or ())
-        if dimension_name(adapter, _early_bound(raw, "IAnnotation")) == CUT_END_BREAK_DIMENSION
-    ]
-    if len(tip_annotations) != 1:
-        raise RuntimeError("finished sheet lost its one cut-end break dimension")
-    assert_imported_precision(adapter, tip_annotations, DETAIL_PRECISION)
-    tip_display = _early_bound(tip_annotations[0].GetSpecificAnnotation(), "IDisplayDimension")
-    tip_native = _early_bound(tip_display.GetDimension2(0), "IDimension")
-    tip_tolerance = _early_bound(tip_native.Tolerance, "IDimensionTolerance")
-    upper, lower = CUT_END_BREAK_BAND
-    if (
-        str(tip_native.FullName).split("@")[:2] != [CUT_END_BREAK_DIMENSION, CUT_END_BREAK_SKETCH]
-        or abs(float(tip_tolerance.GetMinValue()) * 1000.0 - lower) > 1e-8
-        or abs(float(tip_tolerance.GetMaxValue()) * 1000.0 - upper) > 1e-8
-        or tip_display.GetOverride()
-        or not tip_display.ShowDimensionValue
-    ):
-        raise RuntimeError("finished cut-end break lost its original native band/attachment")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -1827,13 +1302,16 @@ async def _build_read_only_source(adapter, source_model, source_sha256):
         "Supplier",
         "Supplier SKUs",
         "Manufacturing Notes",
-        "Supplier Geometry Status",
         "Supplier Reference Source",
         "Supplier Reference Title",
     )
     read_required_properties(adapter.currentModel, required, required=required)
     draw, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="post mount screw source package")
     drawing_doc = _early_bound(draw, "IDrawingDoc")
@@ -1896,21 +1374,6 @@ async def _build_read_only_source(adapter, source_model, source_sha256):
     _reference_cut_length(adapter, annotations)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
 
-    # The break is the deburr cutter's own dimension, imported by feature
-    # into the cropped 10:1 tip view (see cropped_tip_view), which is then
-    # labelled as detail A and circled and lettered on the Front.
-    with _telemetry.span("drawing.tip_view", scale=f"{DETAIL_SCALE[0]:g}:1"):
-        tip = cropped_tip_view(adapter)
-        source_views.append(tip)
-        set_hidden_lines_removed(adapter, tip)
-        _early_bound(tip, "IView").UpdateViewDisplayGeometry()
-        tip_annotations = _curate_tip_view(adapter, tip)
-        assert_imported_precision(adapter, tip_annotations, DETAIL_PRECISION)
-        place_break_text_outside(adapter, tip_annotations)
-        _verify_tip_view(adapter, front, tip)
-    label_tip_view(adapter, tip)
-    mark_tip_on_front(adapter, front)
-
     activate_front_for_notes(adapter, front)
     add_property_linked_note(
         adapter, "Manufacturing Notes", *NOTES_XY, char_height=0.003
@@ -1951,7 +1414,7 @@ async def _build_read_only_source(adapter, source_model, source_sha256):
             lambda: _assert_supplier_source_read_only(
                 adapter, source_model, source_views, stage="before settled checks",
             ),
-            lambda: _verify_finished_controls(adapter, front, tip, installed_configuration),
+            lambda: _verify_finished_controls(adapter, front, installed_configuration),
             lambda: _verify_supplier_stock(adapter, full_stock, source_head, stock_notes, supplier_capture),
             lambda: _assert_supplier_source_integrity(
                 adapter, source_model, source_views, source_sha256, stage="settled before drawing save",

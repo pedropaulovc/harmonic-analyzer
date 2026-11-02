@@ -15,6 +15,7 @@ import dt_cylinder_gear_spec as drum
 from _fit_deviations import deviations
 from _fit_ream_slide import REAM_SLIDE
 from _gear_fit_limits import gear_tip_band_mm
+from _package_units import drawing_unit
 from _printed_tolerance import printed_deviations
 from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -22,6 +23,8 @@ from stock_form_cutter import TOOTH_FORM_NOTE, CutterTemplate, StockFormProfile
 
 
 MM_PER_IN = 25.4
+# #290: the registry row's drawing_unit (in) is this sheet's unit.
+UNIT = drawing_unit("parts/dt-alignment-pinion", _config.parts("dt-alignment-pinion"))
 
 TEETH = int(_config.machine("alignment_pinion", "teeth"))
 DIAMETRAL_PITCH = float(_config.machine("gear_train", "diametral_pitch"))
@@ -44,17 +47,21 @@ SUPPORT_OUTSIDE_DIA_MM = 2.0 * _SUPPORT_PROFILE.support_radius_max_mm
 # Pay the retained thickness inspection band with the actual cutter
 # translation.  W = 2*Rb*(beta-k) + 2*T*sin(beta), beta = 3*pi/N.
 BASE_TANGENT_SPAN_TEETH = 3
-# Four places keep the exact standard-depth model below its printed +0 cap;
-# three places would round 4.141050... DOWN and reject the native nominal.
-BASE_TANGENT_SPAN_PLACES = 4
 BASE_TANGENT_SPAN = _SUPPORT_PROFILE.tangent_span_mm(BASE_TANGENT_SPAN_TEETH)
-BASE_TANGENT_SPAN_BAND = (0.0, -0.100)  # retained (upper, lower) inspection band
+# The gear-data block prints the span in inches at four places, rounded UP so
+# the exact standard-depth model stays under its printed +0 cap (.163033...
+# would round down to .1630 and reject the native nominal).
+BASE_TANGENT_SPAN_PLACES = 4
+BASE_TANGENT_SPAN_PRINTED_MM = (
+    math.ceil(BASE_TANGENT_SPAN / MM_PER_IN * 10**BASE_TANGENT_SPAN_PLACES - 1e-9)
+    / 10**BASE_TANGENT_SPAN_PLACES
+    * MM_PER_IN
+)
+BASE_TANGENT_SPAN_BAND = (0.0, -0.1016)  # retained (upper, lower): +.0000/-.0040 in
 _SPAN_TRANSLATION_SENSITIVITY = 2.0 * math.sin(
     math.pi * BASE_TANGENT_SPAN_TEETH / TEETH
 )
-_PRINTED_SPAN_MIN = (
-    round(BASE_TANGENT_SPAN, BASE_TANGENT_SPAN_PLACES) + BASE_TANGENT_SPAN_BAND[1]
-)
+_PRINTED_SPAN_MIN = BASE_TANGENT_SPAN_PRINTED_MM + BASE_TANGENT_SPAN_BAND[1]
 MIN_SPAN_CUTTER_RADIAL_TRANSLATION_MM = CUTTER_RADIAL_TRANSLATION_MM + (
     _PRINTED_SPAN_MIN - BASE_TANGENT_SPAN
 ) / _SPAN_TRANSLATION_SENSITIVITY
@@ -66,9 +73,18 @@ MIN_SPAN_SUPPORT_OUTSIDE_DIA_MM = (
 )
 # Turn down for the deepest accepted STOCK cutter, not only the native
 # standard-depth nominal.  The explicit OD upper deviation must fit too.
-OUTSIDE_DIA = math.floor(
-    (MIN_SPAN_SUPPORT_OUTSIDE_DIA_MM - OUTSIDE_DIA_BAND[0]) * 100.0
-) / 100.0
+# Floored to the .001-in grid the tip prints at (.694).
+OUTSIDE_DIA_PLACES = 3
+OUTSIDE_DIA = round(
+    math.floor(
+        (MIN_SPAN_SUPPORT_OUTSIDE_DIA_MM - OUTSIDE_DIA_BAND[0])
+        / MM_PER_IN
+        * 10**OUTSIDE_DIA_PLACES
+    )
+    / 10**OUTSIDE_DIA_PLACES
+    * MM_PER_IN,
+    9,
+)
 STOCK_FORM = StockFormProfile(
     TEETH, CUTTER_TEMPLATE, OUTSIDE_DIA / 2.0, CUTTER_RADIAL_TRANSLATION_MM
 )
@@ -94,7 +110,7 @@ ENGAGED_CENTER_RADIAL_STACK_MM = float(
 TOOTH_FORM = TOOTH_FORM_NOTE
 
 BORE_DIA = 7.9375  # 5/16 arbor through-bore (build_dt_pinion_arbor.py)
-# Slip fit bonded with Loctite 638, not a press: a press over the full 143.2
+# Slip fit bonded with Loctite 638, not a press: a press over the full drum
 # bore is a seizing risk for a novice (U27, U6 precedent).  The bore is
 # REAM_SLIDE, cut by the owned .3135 over reamer.  The drum sits on
 # MHA-DT-22's bond zone, not its journal lands (U39: 5/16 -.0004/-.0038 in),
@@ -104,7 +120,9 @@ BORE_DIA = 7.9375  # 5/16 arbor through-bore (build_dt_pinion_arbor.py)
 ARBOR_BORE_BAND = REAM_SLIDE  # (upper, lower) deviations
 RETAINING_COMPOUND = "LOCTITE 638"
 RETAINING_COMPOUND_MAX_GAP_MM = 0.25
-FACE_WIDTH = 143.2  # general .X; located from the back end (drawing note)
+# Prints .XX (5.64): the pinion-rig end-play budget reads its band
+# (pinion_rig_layout.DRUM_LEN), so it cannot take the .X row.
+FACE_WIDTH = 143.256  # 5.64; located from the back end (drawing note)
 # Tips are functional gear surfaces, not routine exterior profiles.  Actual
 # stock-form support, coverage/no-gap, backlash, air and TE must pay both
 # printed tip corners and the retained tangent-span/fit bands independently.
@@ -116,7 +134,9 @@ FACE_WIDTH = 143.2  # general .X; located from the back end (drawing note)
 # band (novice rule), rather than a 1.6 no function asks for (machinist
 # review of the pc-r7 sheet: over-specification; Main ruling (a), 2026-09-26).
 SURFACE_FINISHES = (
-    SurfaceFinishControl("drum_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
+    SurfaceFinishControl(
+        "drum_bore", MACHINED_UM, CylinderFace(BORE_DIA), display_unit=UNIT
+    ),
 )
 
 # The tip diameter prints on the side view beside the length it runs
@@ -135,9 +155,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "GearBlank": {"FaceWidth": 1},
-    OUTSIDE_DIA_REFERENCE: {"OutsideDia": 2},
-    # Four places print the 5/16 bore exactly (7.9375) and its REAM_SLIDE band.
+    "GearBlank": {"FaceWidth": 2},
+    OUTSIDE_DIA_REFERENCE: {"OutsideDia": OUTSIDE_DIA_PLACES},
+    # Four places print the 5/16 bore (.3125) and its REAM_SLIDE band.
     "ArborBoreProfile": {"ArborBoreDia": 4},
 }
 DRAWING_PRECISION_BY_NAME = {
@@ -155,14 +175,15 @@ def outside_dia_limits_mm() -> tuple[float, float]:
         OUTSIDE_DIA,
         DRAWING_PRECISION_BY_NAME["OutsideDia"],
         deviations(OUTSIDE_DIA_BAND),
+        unit=UNIT,
     )
     return round(OUTSIDE_DIA + lower, 12), round(OUTSIDE_DIA + upper, 12)
 
 
 def base_tangent_span_limits_mm() -> tuple[float, float]:
     """Accepted span MIN/MAX from its printed gear-data nominal and band."""
-    nominal = round(BASE_TANGENT_SPAN, BASE_TANGENT_SPAN_PLACES)
     upper, lower = BASE_TANGENT_SPAN_BAND
+    nominal = BASE_TANGENT_SPAN_PRINTED_MM
     return round(nominal + lower, 12), round(nominal + upper, 12)
 
 
@@ -219,6 +240,12 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
     return "\n".join([title] + [f"{label}:  {value}" for label, value in rows])
 
 
+def _inch(value_mm: float, places: int) -> str:
+    """An mm length as ASME decimal-inch text (no leading zero)."""
+    text = f"{value_mm / MM_PER_IN:.{places}f}"
+    return text[1:] if text.startswith("0.") else text.replace("-0.", "-.")
+
+
 # The tight tip and tooth-thickness bands exist for the mesh with the 20
 # cylinder gears, so the block names that mate and why the span is tight
 # (drawing-guidelines.md rule 4 (tighten only for function, and name the mate);
@@ -229,19 +256,15 @@ GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{TEETH}"),
         ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
-        ("MODULE (mm, REF)", f"{MODULE_MM:.3f}"),
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
-        ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
+        ("PITCH DIAMETER (REF)", _inch(PITCH_DIA, 4)),
         # The finite form's off-centre root arc spans only microns; one REF
         # value, not a range that reads like a working band (review r1 minor).
         (
-            "ROOT ENVELOPE DIAMETER (mm, REF)",
-            f"{sum(ROOT_ENVELOPE_DIA_MM) / 2.0:.2f}",
+            "ROOT ENVELOPE DIAMETER (REF)",
+            _inch(sum(ROOT_ENVELOPE_DIA_MM) / 2.0, 4),
         ),
-        (
-            "CUTTER PLUNGE (mm, REF)",
-            f"{WHOLE_DEPTH:.3f}",
-        ),
+        ("CUTTER PLUNGE (REF)", _inch(WHOLE_DEPTH, 4)),
         (
             "FORM CUTTER",
             f"#{CUTTER_NUMBER}, {CUTTER_TEETH_RANGE[0]}-{CUTTER_TEETH_RANGE[1]}T; "
@@ -255,12 +278,12 @@ GEAR_DATA = gear_data_note(
             "TIP",
             f"TOPPED, UNDER THE STANDARD {TEETH + 2}/DP BLANK; SIZE ON SIDE VIEW",
         ),
-        ("PITCH TOOTH THICKNESS (mm, REF)", f"{PITCH_TOOTH_THICKNESS_MM:.3f}"),
+        ("PITCH TOOTH THICKNESS (REF)", _inch(PITCH_TOOTH_THICKNESS_MM, 4)),
         (
-            f"BASE-TANGENT SPAN, OVER {BASE_TANGENT_SPAN_TEETH} TEETH (mm)",
-            f"{BASE_TANGENT_SPAN:.{BASE_TANGENT_SPAN_PLACES}f} "
-            f"+{BASE_TANGENT_SPAN_BAND[0]:.3f}"
-            f"/{BASE_TANGENT_SPAN_BAND[1]:.3f}",
+            f"BASE-TANGENT SPAN, OVER {BASE_TANGENT_SPAN_TEETH} TEETH",
+            f"{_inch(BASE_TANGENT_SPAN_PRINTED_MM, BASE_TANGENT_SPAN_PLACES)} "
+            f"+{_inch(BASE_TANGENT_SPAN_BAND[0], BASE_TANGENT_SPAN_PLACES)}"
+            f"/{_inch(BASE_TANGENT_SPAN_BAND[1], BASE_TANGENT_SPAN_PLACES)}",
         ),
         (
             "MATES WITH",
