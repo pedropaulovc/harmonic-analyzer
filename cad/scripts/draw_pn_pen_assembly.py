@@ -304,7 +304,8 @@ if set(notes.DIMENSION_CALLOUTS) != {
 # --- sheet 2: the exploded isometric, BOM and balloons ---------------------------
 BOM_COLUMN_WIDTHS = {
     "item": 0.012,
-    "part": 0.030,
+    # 'MHA-PN-VN-56' prints ~34 mm: the part number holds one line.
+    "part": 0.038,
     "description": 0.086,
     "sku": 0.028,
     "quantity": 0.012,

@@ -129,15 +129,22 @@ if set(BOM_DESCRIPTIONS) != set(BOM_ORDER):
     raise AssertionError("every BOM row needs exactly one description")
 # The steps call the stud by its BOM name (machinist review c03368c).
 _STUD_NAME = BOM_DESCRIPTIONS[STUD].partition(",")[0]
-# The rod and everything its pivot carries; the steps and checks call it the
-# carriage, defined once by its BOM rows (one run of items).  By step 6 it
-# also carries the stud, its jam nut and the pen wire (steps 1-2), so the
-# carriage that goes into the guides is that whole run.
+# The rod and everything its pivot carries; the checks call it the carriage,
+# defined once by its BOM rows (one run of items).
 CARRIAGE_STEMS = (ROD, V_BLOCK, FRAME, THUMB_SCREW, ROD_SET_SCREW, MARKER)
-_CARRIAGE_ITEMS = sorted(ITEM[stem] for stem in (*CARRIAGE_STEMS, STUD, STUD_NUT, WIRE))
+_CARRIAGE_ITEMS = sorted(ITEM[stem] for stem in CARRIAGE_STEMS)
 if _CARRIAGE_ITEMS != list(range(_CARRIAGE_ITEMS[0], _CARRIAGE_ITEMS[-1] + 1)):
     raise AssertionError("the carriage's BOM items must run as one range")
-_CARRIAGE = f"CARRIAGE (ITEMS {_CARRIAGE_ITEMS[0]}-{_CARRIAGE_ITEMS[-1]})"
+# Step 6: the rod rides up through both guides and the stud and wire stand
+# above them; what hangs below the lower guide is the block, its marker and
+# the stirrup (one run of BOM items).
+_BELOW_GUIDE_ITEMS = sorted(ITEM[stem] for stem in (V_BLOCK, MARKER, FRAME))
+if _BELOW_GUIDE_ITEMS != list(range(_BELOW_GUIDE_ITEMS[0], _BELOW_GUIDE_ITEMS[-1] + 1)):
+    raise AssertionError("the block, marker and stirrup must run as one range")
+_BELOW_GUIDE = (
+    "V-BLOCK, MARKER AND STIRRUP "
+    f"(ITEMS {_BELOW_GUIDE_ITEMS[0]}-{_BELOW_GUIDE_ITEMS[-1]})"
+)
 
 # --- explode trails (machine mm, exploded): from the moved part back to where it
 # fits, along the move ---------------------------------------------------------------
@@ -371,7 +378,7 @@ ASSEMBLY_STEPS = (
     "MARKER AXIS (VIEW C). TIGHTEN THE THUMB SCREW FINGER-TIGHT: ITS TIP "
     "CLAMPS THE GRIP INTO THE V. SLACKEN IT TO CHANGE A DRY MARKER.",
     "6. INTO THE GUIDES: ENTER THE ROD'S SQUARE INTO BOTH U GUIDES OF THE "
-    f"HANGER (ITEM {ITEM[HANGER]}) FROM THEIR OPEN FRONT ENDS, THE {_CARRIAGE} "
+    f"HANGER (ITEM {ITEM[HANGER]}) FROM THEIR OPEN FRONT ENDS, THE {_BELOW_GUIDE} "
     "BELOW THE LOWER GUIDE.",
     "AT MHA-HA-00:",
     f"7. HANGER SCREW LOCK: HANGER SCREW (ITEM {ITEM[HANGER_SCREW]}) FROM "
