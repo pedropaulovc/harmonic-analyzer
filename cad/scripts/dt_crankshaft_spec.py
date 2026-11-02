@@ -541,7 +541,7 @@ DRIVE_PIN_HUB_AIR_WORST, DRIVE_PIN_ENGAGEMENT_WORST = drive_pin_front_clearances
     hub_rear=HUB_LENGTH,
     hub_rear_band=HUB_LENGTH_BAND,
     plate_min=seat_geometry.PLATE + min(seat_geometry.PLATE_BAND),
-)  # 0.151, 0.618
+)  # 0.138, 0.631
 # The bare land behind the collar keeps the bore mouth's edge break at both
 # print limits (JOURNAL_START above).
 if (

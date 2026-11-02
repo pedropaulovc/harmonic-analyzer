@@ -153,8 +153,8 @@ def test_hub_overall_band_is_one_sided_to_what_the_rear_face_stacks_hold() -> No
         **kwargs,
     )
     assert geometry.HUB_LENGTH_BAND[0] == 0.10
-    assert air == pytest.approx(0.1508, abs=1e-9)
-    assert engagement == pytest.approx(0.6184, abs=1e-9)
+    assert air == pytest.approx(0.1381, abs=1e-9)
+    assert engagement == pytest.approx(0.6311, abs=1e-9)
     with pytest.raises(AssertionError, match="hub's rear face"):
         dt_crankshaft_spec.drive_pin_front_clearances(
             dt_crankshaft_spec.DRIVE_PIN_PROUD_RANGE,
