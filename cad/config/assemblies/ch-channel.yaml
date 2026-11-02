@@ -85,6 +85,9 @@ required_free_stems:
 # amplitude-bar slide.
 free_dof: 0
 free_dof_per_active_channel: 3
+# drawing_unit: the fitter sheets, their TOL_* rows and the saved model's units
+#   are decimal inch (#290).
+drawing_unit: in
 
 # machinist_exceptions: the assembly drawing's owner-declared machinist-review
 #   exceptions (drawing-simplicity-policy.md "Named exceptions"); read by
@@ -93,6 +96,6 @@ free_dof_per_active_channel: 3
 machinist_exceptions:
   - id: "RV-01"
     kind: "accept"
-    where: "sheet 4 KEEPER PLAN VIEW, the lug inner faces 40.50 ±0.02 and 182.50 ±0.02 off the MHA-FR-02 line of the upper socket centres (KeeperFrontFaceZ, KeeperRearFaceZ), and step 10's statement of what those bands hold"
-    finding: "lug inner faces DRO-set to ±0.02 where a fit-up of the keepers to the MHA-CH-04 flats could absorb the stack (rules 4, 19)"
-    reason: "owner ruling X-A (50072e913, 2026-10-18) loosened the lug centre's lateral band to ±0.10 and left the inner faces at KEEPER_FITUP_LOCATION_BAND_MM ±0.02 because the shaft flats need them. As stated in step 10, the lug centre's ±0.10 band keeps each transferred foot hole over the MHA-FR-02 rail web with a full wall round its tap; the title-block band would put the drill wall below 1.5. Both bands are named on the sheet with their mates. The south band also holds the south foot 0.57 clear of the MHA-FR-02 front socket boss (build_fr_top_frame KEEPER_FOOT_PRINTED_BOSS_MARGINS, at the keeper's printed 16.50 overall, owner ruling 2026-10-28). The ±0.02 pair is what ch_fulcrum_shaft_spec's 0.057 flat-station window and the frame's foot-to-boss stack are computed against. Replacing them with a fit-up to the flats changes those shared stacks (MHA-CH-04, MHA-FR-02), and that is left to the owner (PR #1665, decisions) (owner-accepted)"
+    where: "sheet 4 KEEPER PLAN VIEW, the lug inner faces 1.5946 ±.0010 and 7.1846 ±.0010 off the MHA-FR-02 line of the upper socket centres (KeeperFrontFaceZ, KeeperRearFaceZ), and step 10's statement of what those bands hold"
+    finding: "lug inner faces DRO-set to ±.001 where a fit-up of the keepers to the MHA-CH-04 flats could absorb the stack (rules 4, 19)"
+    reason: "owner ruling X-A (50072e913, 2026-10-18) loosened the lug centre's lateral band to ±.004 and left the inner faces at KEEPER_FITUP_LOCATION_BAND_MM ±.001 because the shaft flats need them. As stated in step 10, the lug centre's ±.004 band keeps each transferred foot hole over the MHA-FR-02 rail web with a full wall round its tap; the title-block band would put the drill wall below .059. Both bands are named on the sheet with their mates. The south band also holds the south foot .022 clear of the MHA-FR-02 front socket boss (build_fr_top_frame KEEPER_FOOT_PRINTED_BOSS_MARGINS, at the keeper's printed .65 overall, owner ruling 2026-10-28). The ±.001 pair is what ch_fulcrum_shaft_spec's .048 flat-station window and the frame's foot-to-boss stack are computed against. Replacing them with a fit-up to the flats changes those shared stacks (MHA-CH-04, MHA-FR-02), and that is left to the owner (PR #1665, decisions) (owner-accepted)"

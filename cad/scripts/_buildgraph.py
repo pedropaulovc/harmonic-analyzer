@@ -2368,10 +2368,6 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "dt_vn_cone_tip_collar_spec",
         "dt_crank_hub_geometry",
         "dt_crank_pinion_spec",
-        # Drilled-hole row bounds the rocker's #47 hole the rod-slot pin enters.
-        "ch_rocker_arm_profile_check",
-        # Drilled-hole row bounds the hub's supply bore under the Ø6.50 ream.
-        "ch_rocker_hub_spec",
         # Edge-break row sizes the pillow-block screws' full engagement.
         "ch_rocker_arm_tl_vn_oblique_leadscrew_spec",
         "dt_crankshaft_spec",
@@ -2390,7 +2386,6 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "sm_summing_assembly_sheet",
         "pd_vn_guide_lock_screw_spec",
         "dt_vn_post_mount_screw_spec",
-        "ch_vn_spring_hook_spec",
         "pd_transgear_disc_hub_spec",
         "pd_transgear_removable_notes",
         # Edge-break row sizes the knob tip and the rack window/lateral stacks.

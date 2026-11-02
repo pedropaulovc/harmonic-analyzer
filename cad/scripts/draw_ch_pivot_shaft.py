@@ -40,6 +40,7 @@ from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -123,12 +124,12 @@ for _side, _station in zip(("south", "north"), bank.PIVOT_SHAFT_FLAT_STATIONS, s
         f"{_side}_flat", kind="face",
         faces=(PlanarFace((0, 1, 0), shaft.FLAT_AF - shaft.SHAFT_DIA / 2, contains_z_mm=-_station),),
         requirements=("height", "length", "station"), fields={
-            "height": (_band(shaft.FLAT_AF, _P["FlatAF"]), ("FLAT_AF",)),
+            "height": (_band(shaft.FLAT_AF, _P["FlatAF"], unit=shaft.UNIT), ("FLAT_AF",)),
             "height_nominal": (shaft.FLAT_AF, ("FLAT_AF",)),
             "height_from": ("pivot_bearing", (("draw_ch_pivot_shaft", "build"),)),
-            "length": (_band(shaft.FLAT_LENGTH, _P["FlatLength"]), ("FLAT_LENGTH",)),
+            "length": (_band(shaft.FLAT_LENGTH, _P["FlatLength"], unit=shaft.UNIT), ("FLAT_LENGTH",)),
             "length_nominal": (shaft.FLAT_LENGTH, ("FLAT_LENGTH",)),
-            "station": (_band(shaft.FLAT_TIP_STATION, _P["FlatStation"]), ("FLAT_TIP_STATION",)),
+            "station": (_band(shaft.FLAT_TIP_STATION, _P["FlatStation"], unit=shaft.UNIT), ("FLAT_TIP_STATION",)),
             "station_nominal": (shaft.FLAT_TIP_STATION, ("FLAT_TIP_STATION",)),
             # Each from its own end's dome tip.
             "note": (shaft.FLAT_STATION_CALLOUT, ("FLAT_STATION_CALLOUT",)),
@@ -162,7 +163,7 @@ PIVOT_BEARING = requirement(
     }, precision={"dia": _P["ShaftDia"], "finish_ra": 1},
 )
 
-# DETAIL A: the north flat (6.0 long, 0.9 deep), its station and the dome are
+# DETAIL A: the north flat (.24 long, .04 deep), its station and the dome are
 # 1.5-6 mm features. At 1:1 their dimensions crammed the north end, text on
 # the witness lines and against the dome (PR #1317 eye pass), so a native 5:1
 # detail carries them. The fence centres on the axis midway between the dome
@@ -231,13 +232,13 @@ for _name, _z, _centre in (
     _south = _name == "south_dome"
     # The overall length runs tip to tip; the south tip carries it.
     _overall = {
-        "length": (_band(bank.PIVOT_SHAFT_OVERALL_LENGTH, _P["OverallLength"]), (("rocker_bank_layout", "PIVOT_SHAFT_OVERALL_LENGTH"),)),
+        "length": (_band(bank.PIVOT_SHAFT_OVERALL_LENGTH, _P["OverallLength"], unit=shaft.UNIT), (("rocker_bank_layout", "PIVOT_SHAFT_OVERALL_LENGTH"),)),
         "length_nominal": (bank.PIVOT_SHAFT_OVERALL_LENGTH, (("rocker_bank_layout", "PIVOT_SHAFT_OVERALL_LENGTH"),)),
     } if _south else {}
     requirement(
         _name, kind="dome", faces=(SphereFace(2 * shaft.DOME_SPHERE_RADIUS, (0, 0, _centre)),),
         requirements=("height", "length") if _south else ("height",), fields={
-            "height": (_band(shaft.DOME_HEIGHT, _P["DomeHeight"]), ("DOME_HEIGHT",)),
+            "height": (_band(shaft.DOME_HEIGHT, _P["DomeHeight"], unit=shaft.UNIT), ("DOME_HEIGHT",)),
             "height_nominal": (shaft.DOME_HEIGHT, ("DOME_HEIGHT",)),
             "sphere_radius": (shaft.DOME_SPHERE_RADIUS, ("DOME_SPHERE_RADIUS",)),
             "base_radius": (shaft.SHAFT_DIA / 2, ("SHAFT_DIA",)),
@@ -341,7 +342,7 @@ def _north_end_detail(adapter: Any, profile: Any) -> Any:
 
 
 def _set_spherical_reference(adapter: Any, annotation: Any, *, label: str) -> None:
-    """Print the dome's model radius as the ASME spherical reference ``(SR4.1)``.
+    """Print the dome's model radius as the ASME spherical reference ``(SR.16)``.
 
     The radius is read-only: a spherical cap of the printed dome height on the
     toleranced diameter already fixes it. Whatever radius prefix the display
@@ -390,7 +391,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("ch-pivot-shaft"),
     )
     stamp_drawing_summary(
         adapter,
@@ -471,6 +476,11 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pivot bearing finish",
         char_height=FINISH_CHAR_HEIGHT,
     )
+    # Re-assert the detail's hidden-lines-removed display now its annotations
+    # have landed: left as placed, the 5:1 dome printed as straight segments
+    # (machinist review; draw_dt_cone_gear_shaft does the same for its
+    # sections).
+    set_hidden_lines_removed(adapter, detail)
 
     # 0.020: a note is left-aligned on its anchor, so the ink starts here. The
     # bound is the 12.7 mm zone margin (~0.0127); 0.020 clears it, and the

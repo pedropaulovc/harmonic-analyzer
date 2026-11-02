@@ -1,5 +1,5 @@
-r"""Connecting-rod drawing prose -- the manufacturing notes the part build
-stamps into the SLDPRT and the isometric-view label.
+r"""Connecting-rod drawing-only data -- the marked-dimension and precision
+contract and the isometric-view label the part build stamps into the SLDPRT.
 
 Split OUT of ``ch_connecting_rod_spec`` (codex #354): assemblies import
 geometry from the spec, so drawing-only prose living there made every notes
@@ -11,13 +11,12 @@ part + drawing and leaves the assembly to its cheap token refresh.
 
 from __future__ import annotations
 
-from ch_connecting_rod_spec import TINE_MIN
-
 # Every size, location and band prints from its native model dimension, and
 # each tight band names its mate on its own callout (drawing-guidelines.md
-# rules 4 and 7), so the one note states the tines' known shortfall against
-# the 2.0 wall target as a plain fact (rule 20).  The material (1018 plate),
-# the black finish and the inside corners' R1.0 MAX are title-block rows,
+# rules 4 and 7). The tines' known shortfall against the .080 wall target is
+# the near tine's own printed lower limit, named TINE WALL on its callout
+# (rule 20), so the sheet carries no general note. The material (1018 plate),
+# the black finish and the inside corners' R.040 MAX are title-block rows,
 # never restated here (rule 2).
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  build_ch_connecting_rod marks exactly these. ---
@@ -37,20 +36,26 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinHoleProfile": {"PinHoleDia"},
 }
 
-# The tines, slot, the plate's near face and its thickness hold the inter-arm
-# gap and the ring's float in its cam slot: three places, as their model
-# bands are written. The fork over the tines is their reference sum, at the
-# same places. The reamed press hole's band is written at three places too.
+# Decimal-inch places (#290): the tines, slot, the plate's near face and its
+# thickness hold the inter-arm gap and the ring's float in its cam slot, so
+# they print at three places with their +/-.002 bands; the fork over the tines
+# is their reference sum at the same places. The strap bore prints 1.213 at
+# three with its +.004/.000; the reamed press hole at four. The ring OD, shank
+# width, fork width, slot depth and boss length take the title block's .XX.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "PlateProfile": {"RingOuterDia": 2, "ShankWidthDim": 2},
     "Plate": {"RingThick": 3},
+    "StrapBoreProfile": {"StrapBoreDia": 3},
+    "ForkProfile": {"ForkWidthDim": 2},
     "ForkBoss": {"ForkThick": 3},
     "ForkSlotProfile": {
         "TineNear": 3,
         "SlotWidth": 3,
         "RingFaceNear": 3,
+        "SlotDepth": 2,
+        "ForkBossLength": 2,
     },
     "PinHoleProfile": {"PinHoleDia": 4},
 }
 
-DRAWING_NOTES = f"1. TINE WALL {TINE_MIN:.2f} MIN."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

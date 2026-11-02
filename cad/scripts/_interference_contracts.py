@@ -775,7 +775,7 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
     ),
     # #743 PR2: the two #8-32 x 5/8 (15.875) MHA-CH-VN-57 rocker-bracket hold-downs
     # (one per bracket since the 2026-10-09 flip; 5/8 since owner Q13c) pass
-    # the 6.0 bracket foot and engage 9.875 of the support's transferred seats.
+    # the .24 (6.096) bracket foot and engage 9.779 of the support's transferred seats.
     # Literals, like the rows above, so every assembly does not re-key on the
     # rocker bank's layout; test_rocker_bracket_seat_layout pins them to
     # rocker_bracket_seat_layout.
@@ -783,28 +783,29 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
         "ch-channel-1/ch-vn-bracket-hold-down-screw",
         range(1, 3),
         "fr-frame-1/fr-rocker-arm-support",
-        _smooth_annulus_limit_mm3(4.1656, 3.454, 15.875 - 6.0),
+        _smooth_annulus_limit_mm3(4.1656, 3.454, 15.875 - 6.096),
     ),
 }
 
 # The MHA-CH-11 bar pivot pins (ch_bar_pivot_pin_spec), Ø1.984375 drill rod
 # pressed into each MHA-CH-01 bar's Ø1.9558 (.077 in) top-pin ream through both
-# top-notch cheeks: 6.35 bar less the 3.15 notch. Channel j's pin and bar are
-# both its (j + 1)th instance (build_ch_channel_assembly inserts one pin per
-# channel in channel order; _copied_chain_instances pins the bar's number).
+# top-notch cheeks: 6.35 bar less the .124 (3.1496) notch (inch #290).
+# Channel j's pin and bar are both its (j + 1)th instance (build_ch_channel_assembly
+# inserts one pin per channel in channel order; _copied_chain_instances pins the
+# bar's number).
 # Literals, like the rows above, so every assembly does not re-key on the pin
 # spec; test_ch_bar_pivot_fit pins them to it.
-BAR_PIVOT_PIN_PRESS = (1.984375, 1.9558, 6.35 - 3.15)
+BAR_PIVOT_PIN_PRESS = (1.984375, 1.9558, 6.35 - 3.1496)
 # The MHA-CH-10 rod pivot pins (ch_rod_pivot_pin_spec), the same drill rod
 # pressed into each MHA-CH-03 rod's Ø1.9558 fork ream through both tines:
-# 6.075 fork less the 2.675 slot (user ruling 2026-10-09, PR #1292 review F1;
-# slot widened from 2.625, #982).
+# .240 (6.096) fork less the .106 (2.6924) slot (user ruling 2026-10-09, PR
+# #1292 review F1; slot widened #982; inch #290).
 # Channel j's pin and rod are both its (j + 1)th instance, as the bar pin's
 # are; test_ch_rod_pivot_fit pins the literals to the pin spec.
-ROD_PIVOT_PIN_PRESS = (1.984375, 1.9558, 6.075 - 2.675)
+ROD_PIVOT_PIN_PRESS = (1.984375, 1.9558, 6.096 - 2.6924)
 # The MHA-CH-VN-53 #4-40 apex set screws (user, 2026-10-10), one down through
-# each MHA-CH-08 ear's arch (apex 9.80 over the bore since #1371) into its
-# Ø6.5 bore, the tap cut at its drill. The thread's major envelope crosses no
+# each MHA-CH-08 ear's arch (apex .388 (9.852) over the bore since #1371,
+# #290) into its Ø.256 bore, the tap cut at its drill. The thread's major envelope crosses no
 # longer a metal column than the apex's height over the bore axis less the
 # bore's height at the envelope's edge, so the smooth annulus over that column
 # bounds the overlap; the cup on the modelled shaft flat is contact, as the
@@ -813,7 +814,7 @@ ROD_PIVOT_PIN_PRESS = (1.984375, 1.9558, 6.075 - 2.675)
 # does not re-key on the bracket spec; test_ch_channel_assembly_drawing pins
 # them to ch_pivot_bracket_spec. #911: re-pin to the measured overlap x 1.10
 # from the first channel leaf.
-PIVOT_EAR_APEX_AND_BORE = (9.8, 6.5)
+PIVOT_EAR_APEX_AND_BORE = (9.852, 6.5024)
 _PIVOT_EAR_TAP_COLUMN = PIVOT_EAR_APEX_AND_BORE[0] - math.sqrt(
     (PIVOT_EAR_APEX_AND_BORE[1] / 2.0) ** 2
     - (THREAD_MAJOR_MM[_ARBOR_SET_SCREW_THREAD] / 2.0) ** 2
@@ -824,7 +825,7 @@ PIVOT_EAR_SET_SCREW_LIMIT = _smooth_annulus_limit_mm3(
     _PIVOT_EAR_TAP_COLUMN,
 )
 FULCRUM_SET_SCREW_THREAD = (1.854, 1.511, 3.96875)
-CHANNEL_ANCHOR_NUT_THREAD = (3.505, 2.705, 3.60)
+CHANNEL_ANCHOR_NUT_THREAD = (3.505, 2.705, 3.556)
 _CHANNEL_ALLOWED_PAIRS = {
     **_numbered_pairs(
         "ch-bar-pivot-pin",

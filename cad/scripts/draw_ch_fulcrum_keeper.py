@@ -45,10 +45,15 @@ from _drawing_common import (
 )
 from _drawing_dimensions import set_dimension_callouts, set_reference_dimension
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_hole_callout import add_native_hole_callout, compose_hole_callout_prefix
+from _drawing_hole_callout import (
+    add_native_hole_callout,
+    compose_hole_callout_prefix,
+    set_hole_callout_precision,
+)
 from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
@@ -64,6 +69,7 @@ from ch_fulcrum_keeper_spec import (
     CROWN_ROUND_CALLOUT,
     CROWN_TOP_Y,
     DRAWING_DIMENSIONS,
+    FOOT_HOLE_CALLOUT_PRECISION,
     FOOT_SCREW_SIDE_CALLOUT,
     FOOT_TIP_X,
     LUG_HALF_T,
@@ -161,6 +167,8 @@ SET_SCREW_CALLOUT_XY = (0.058, 0.196)
 _THREAD_CLASS = re.compile(r"\s*(?:-\s*)?<hw-threadclass>\s*", re.IGNORECASE)
 # The foot hole's process, on its own row above the native through row.
 FOOT_HOLE_PROCESS = "DRILL\n"
+# The crown tap's native drill size prints .XXX.
+SET_SCREW_CALLOUT_PRECISION = {"hw-tapdrldia": 3}
 # The two keepers' bores are drilled and reamed through in one pass at their
 # installed spacing (one straight line whatever LugRise prints) and each crown
 # is then rounded, a full round tangent to both sides at the bore's height:
@@ -548,7 +556,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("ch-fulcrum-keeper"),
     )
     stamp_drawing_summary(
         adapter,
@@ -629,6 +641,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="keeper foot screw hole",
     )
     _set_foot_hole_process(foot_callout)
+    set_hole_callout_precision(
+        foot_callout, FOOT_HOLE_CALLOUT_PRECISION, label="keeper foot screw hole"
+    )
     # Crown set-screw tap: the plan sees it end-on at the crown top on the
     # lug mid-plane; its callout sits in the band between the front view
     # and the plan, left of both.
@@ -640,8 +655,12 @@ async def build(adapter: Any) -> dict[str, str]:
         label="crown set-screw tap",
     )
     _set_tap_callout_text(tap_callout)
+    set_hole_callout_precision(
+        tap_callout, SET_SCREW_CALLOUT_PRECISION, label="crown set-screw tap"
+    )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, NOTES_TOP)
-    add_property_linked_note(adapter, "Isometric View Note", 0.310, 0.150)
+    # Just under the pictorial (its bottom ~0.172), not 20 mm below it.
+    add_property_linked_note(adapter, "Isometric View Note", 0.310, 0.163)
 
     return await finalize_drawing(
         adapter,

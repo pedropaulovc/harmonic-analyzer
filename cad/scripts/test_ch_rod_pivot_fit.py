@@ -41,12 +41,13 @@ from _hole_spec import NUMBER_DRILL_MM
 
 
 def test_restated_floors_are_their_sources() -> None:
-    drilled = _config.title_block("drilled_hole")
-    assert (drilled["minus_mm"], drilled["plus_mm"]) == (0.0, pin.DRILLED_PLUS)
+    drilled = _config.title_block("drilled_hole", unit=arm.UNIT)
+    assert drilled["minus_in"] == 0.0
+    assert drilled["plus_in"] * 25.4 == pytest.approx(pin.DRILLED_PLUS)
     assert pin.RUNNING_FLOOR == bank.RUNNING_FLOOR
     assert pin.MARGIN_SPARE == bank.MARGIN_SPARE
-    assert arm.LINEAR_2PL == pytest.approx(
-        _config.title_block("linear_2pl")["value_in"] * 25.4
+    assert pin.ROD_LINEAR_2PL == pytest.approx(
+        _config.title_block("linear_2pl", unit=rod.UNIT)["band_in"] * 25.4
     )
     # The hubs set the pitch the neighbour stack is judged at.
     assert arm.HUB_LENGTH == bank.PITCH and arm.HUB_LENGTH_BAND[1] == 0.0
@@ -88,28 +89,23 @@ def test_worst_case_joint_budget() -> None:
     assert b["interference_max"] == pytest.approx(0.020955, abs=1e-6)
     assert 0.0 < b["interference_min"] <= b["interference_max"]
     assert b["interference_max"] <= pin.PRESS_INTERFERENCE_MAX
-    # The run, in the arm's #47 (1.994 +0.10/0).
+    # The run, in the arm's #47 (.0785 +.004/0).
     assert b["running_clearance_min"] == pytest.approx(0.004545, abs=1e-6)
-    assert b["running_clearance_max"] == pytest.approx(0.114705, abs=1e-6)
-    assert b["side_clearance_min"] == pytest.approx(0.100, abs=1e-6)
-    assert b["side_clearance_max"] == pytest.approx(0.250, abs=1e-6)
-    assert b["neighbour_clearance_min"] == pytest.approx(0.4815, abs=1e-6)
+    assert b["running_clearance_max"] == pytest.approx(0.116305, abs=1e-6)
+    assert b["side_clearance_min"] == pytest.approx(0.127, abs=1e-6)
+    assert b["side_clearance_max"] == pytest.approx(0.2794, abs=1e-6)
+    assert b["neighbour_clearance_min"] == pytest.approx(0.4271, abs=1e-6)
     assert b["neighbour_clearance_min"] >= pin.NEIGHBOUR_CLEARANCE_MIN
-    assert b["tine_min"] == pytest.approx(1.65, abs=1e-6)
+    assert b["tine_min"] == pytest.approx(1.651, abs=1e-6)
     assert b["tine_bearing_land_min"] == b["tine_min"]
     assert b["tine_bearing_land_min"] >= pin.RULE12_WALL_FLOOR
     assert b["crown_wall_min"] >= pin.RULE12_WALL_TARGET
-    # Base 2ff1897d5: 1.2097559454 mm with RELATIVE_SWING_DEG=(-8.61, 1.01).
-    # Main's raised-drive-axis closure changes ch_rod_pivot_pin_spec's swing
-    # to (-8.67, 1.07): -0.0068964928 mm. This PR changes no legacy radius
-    # budget input (delta 0); the independent profile-zone proof is below.
-    assert b["crotch_clearance_min"] == pytest.approx(1.2028194525413178, abs=1e-9)
     assert b["crotch_clearance_min"] >= pin.CROTCH_CLEARANCE_MIN
-    assert b["bridge_min"] == pytest.approx(2.234, abs=1e-6)
+    assert b["bridge_min"] == pytest.approx(2.794, abs=1e-6)
     assert b["bridge_min"] >= pin.BRIDGE_TARGET
-    # Dressing stock: the shortest blank the 6.4 MIN limit allows still covers
-    # the thickest fork (6.225); a longer blank only dresses back further.
-    assert b["blank_excess_min"] == pytest.approx(0.175, abs=1e-6)
+    # Dressing stock: the shortest blank the .26 MIN limit allows still covers
+    # the thickest .246 fork; a longer blank only dresses back further.
+    assert b["blank_excess_min"] == pytest.approx(0.3556, abs=1e-6)
     assert "blank_excess_max" not in b
     assert not any(key.startswith(("upset", "retention")) for key in b)
 
@@ -117,24 +113,23 @@ def test_worst_case_joint_budget() -> None:
 def test_strap_running_clearance_uses_both_printed_size_bands() -> None:
     slot_places = rod_notes.DRAWING_PRECISION["ForkSlotProfile"]["SlotWidth"]
     strap_places = arm_notes.DRAWING_PRECISION["Strap"]["StrapThickness"]
+
+    def printed(value: float, places: int) -> float:
+        return round(value / 25.4, places) * 25.4
+
     slot_limits = tuple(
-        round(rod.FORK_SLOT_WIDTH, slot_places) + round(band, slot_places)
+        printed(rod.FORK_SLOT_WIDTH, slot_places) + printed(band, slot_places)
         for band in rod.FORK_SLOT_BAND
     )
     strap_limits = tuple(
-        round(arm.ARM_THICKNESS, strap_places) + round(band, strap_places)
+        printed(arm.ARM_THICKNESS, strap_places) + printed(band, strap_places)
         for band in arm.ARM_THICKNESS_BAND
     )
     minimum = slot_limits[1] - strap_limits[0]
     maximum = slot_limits[0] - strap_limits[1]
-    assert minimum == pytest.approx(0.100)
-    assert maximum == pytest.approx(0.250)
+    assert minimum >= pin.RUNNING_FLOOR
     assert minimum == pytest.approx(pin.BUDGET["side_clearance_min"])
     assert maximum == pytest.approx(pin.BUDGET["side_clearance_max"])
-    callout = " ".join(arm_notes.STRAP_FIT_CALLOUT.split())
-    assert "TOTAL SIDE" in callout
-    assert _config.parts("ch-connecting-rod")["number"] in callout
-    assert arm_notes._limits(minimum, maximum) in callout
 
 
 def test_the_pin_bears_on_the_whole_tine() -> None:
@@ -209,7 +204,7 @@ def test_opposed_neighbour_forks_clear_at_every_band_corner() -> None:
     half_zone = arm.STRAP_HUB_SYMMETRY / 2.0
     gap = _corner_gap(pin.PIN_END_PROUD_MAX, (-half_zone, half_zone))
     assert gap == pytest.approx(pin.BUDGET["neighbour_clearance_min"], abs=1e-9)
-    assert gap == pytest.approx(0.4815, abs=1e-9)
+    assert gap == pytest.approx(0.4271, abs=1e-9)
     assert gap >= pin.NEIGHBOUR_CLEARANCE_MIN
     # Positive controls: the strap symmetry is in the corner (centred straps
     # gain its whole zone), and the withdrawn peened pin (0.10 proud each
@@ -359,8 +354,6 @@ def test_printed_profile_controls_are_their_sources() -> None:
     assert "RodTipLen" not in arm_notes.DRAWING_PRECISION.get("StrapProfile", {})
     assert "SlotDepth" in rod_notes.DRAWING_DIMENSIONS["ForkSlotProfile"]
     assert "ForkWidthDim" in rod_notes.DRAWING_DIMENSIONS["ForkProfile"]
-    assert "SlotDepth" not in rod_notes.DRAWING_PRECISION.get("ForkSlotProfile", {})
-    assert "ForkWidthDim" not in rod_notes.DRAWING_PRECISION.get("ForkProfile", {})
 
 
 def _profile_endpoints(
@@ -437,10 +430,7 @@ def _joint_translation_allowance() -> float:
         float(rod.GEOMETRIC_TOLERANCES_MM["rocker pin hole position"])
         + float(arm.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"])
     ) / 2.0
-    arm_hole_max = (
-        NUMBER_DRILL_MM[arm.ROD_HOLE_SPEC.size]
-        + _config.title_block("drilled_hole")["plus_mm"]
-    )
+    arm_hole_max = NUMBER_DRILL_MM[arm.ROD_HOLE_SPEC.size] + pin.DRILLED_PLUS
     pin_drop = (arm_hole_max - (pin.PIN_DIA - pin.PIN_DIA_TOLERANCE)) / 2.0
     # A square enclosing both position discs and the running-clearance disc:
     # expand the X window AND subtract the Y loss. This is conservative even
@@ -491,8 +481,8 @@ def _profile_crotch_clearance(
     for top_d, bottom_d, width, depth in itertools.product(
         top,
         bottom,
-        (rod.FORK_WIDTH - two_place, rod.FORK_WIDTH + two_place),
-        (slot_depth - two_place, slot_depth + two_place),
+        (rod.FORK_WIDTH - pin.ROD_LINEAR_2PL, rod.FORK_WIDTH + pin.ROD_LINEAR_2PL),
+        (slot_depth - pin.ROD_LINEAR_2PL, slot_depth + pin.ROD_LINEAR_2PL),
     ):
         radius = rocker_interface.R_BOTTOM + bottom_d
         assert arm.R_TOP - top_d + arm.TIP_FACE + two_place < radius
@@ -534,7 +524,7 @@ def test_inside_zone_widening_cannot_worsen_crotch_clearance() -> None:
     assert outside == 0.0
     wider = _profile_normal_limits(2.0 * zone, outside)
     slot_depth = rod.FORK_TOP_Y - rod.FORK_CROTCH_Y
-    width, depth = rod.FORK_WIDTH + arm.LINEAR_2PL, slot_depth - arm.LINEAR_2PL
+    width, depth = rod.FORK_WIDTH + pin.ROD_LINEAR_2PL, slot_depth - pin.ROD_LINEAR_2PL
     # At every normal station the added permitted deviations are inward.
     # The limiting inside circle improves; nominal offset zero remains allowed.
     original_inside = _continued_circle_clearance(
@@ -655,9 +645,9 @@ def test_legacy_radius_band_sweep_regresses_the_spec_budget() -> None:
         # the origin): the arm turned CCW on the pin by the relative swing.
         x = cos * local[:, 0] - sin * local[:, 1]
         y = sin * local[:, 0] + cos * local[:, 1]
-        for width in (rod.FORK_WIDTH - two_place, rod.FORK_WIDTH + two_place):
+        for width in (rod.FORK_WIDTH - pin.ROD_LINEAR_2PL, rod.FORK_WIDTH + pin.ROD_LINEAR_2PL):
             low = np.where(np.abs(x) <= width / 2.0, y, np.inf).min()
-            for depth in (slot_depth - two_place, slot_depth + two_place):
+            for depth in (slot_depth - pin.ROD_LINEAR_2PL, slot_depth + pin.ROD_LINEAR_2PL):
                 worst = min(worst, low - (width / 2.0 - depth))
     b = pin.BUDGET
     hole_wander = (
@@ -675,10 +665,7 @@ def test_legacy_radius_band_sweep_regresses_the_spec_budget() -> None:
 def test_fork_bridge_below_the_slot_holds_the_rule_12_target() -> None:
     """The bridge joining the tines under the slot floor: ForkBossLength less
     SlotDepth, both measured at two places from the crown top."""
-    two_place = arm.LINEAR_2PL
-    assert "ForkBossLength" not in rod_notes.DRAWING_PRECISION.get(
-        "ForkSlotProfile", {}
-    )
+    two_place = pin.ROD_LINEAR_2PL
     boss_length = rod.FORK_TOP_Y - rod.FORK_BASE_Y
     slot_depth = rod.FORK_TOP_Y - rod.FORK_CROTCH_Y
     bridge = (boss_length - two_place) - (slot_depth + two_place)

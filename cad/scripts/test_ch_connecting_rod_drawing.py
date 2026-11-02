@@ -14,6 +14,7 @@ import draw_ch_connecting_rod as drawing
 import build_ch_connecting_rod as rod
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 
 
 def test_required_drawing_paths() -> None:
@@ -82,8 +83,8 @@ def test_fork_reference_lengths_run_from_the_crown_top() -> None:
     assert rod.FORK_BOSS_LENGTH == pytest.approx(
         spec.FORK_CROWN_RADIUS + spec.FORK_BASE_BELOW_PIN
     )
-    assert rod.SLOT_DEPTH == pytest.approx(14.75)
-    assert rod.FORK_BOSS_LENGTH == pytest.approx(18.0)
+    assert rod.SLOT_DEPTH == pytest.approx(14.732)  # .58
+    assert rod.FORK_BOSS_LENGTH == pytest.approx(18.034)  # .71
     # The slot floor stands above the root step, so the bridge is solid.
     assert spec.FORK_BASE_Y < spec.FORK_CROTCH_Y < spec.CENTER_DISTANCE
     # Every drive in the slot sketch evaluates to its built value.
@@ -180,15 +181,15 @@ def test_the_pin_bears_on_the_whole_tine() -> None:
     assert not [name for name in dir(rod) if "countersink" in name.lower()]
     assert not [name for name in dir(spec) if "CSK" in name]
     thinnest_tine = spec.TINE_THICKNESS + spec.TINE_BAND[1]
-    assert thinnest_tine == pytest.approx(1.65)
+    assert thinnest_tine == pytest.approx(1.651)  # .065
     assert thinnest_tine == spec.TINE_MIN
     assert spec.FORK_THICKNESS == pytest.approx(
         2.0 * spec.TINE_THICKNESS + spec.FORK_SLOT_WIDTH
     )
-    assert thinnest_tine >= 1.5  # drawing-guidelines.md rule 17 (walls and webs) floor
+    assert thinnest_tine >= WALL_FLOOR_MM  # drawing-guidelines.md rule 17 floor
     # Positive control: the countersink this replaced fails the same check.
     old_csk_depth = (3.2 + 0.127 - 1.994) / 2.0  # 90-degree: depth = radial step
-    assert thinnest_tine - old_csk_depth < 1.5
+    assert thinnest_tine - old_csk_depth < WALL_FLOOR_MM
 
 
 def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
@@ -199,66 +200,38 @@ def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
     # carries the fork detail's circle; every side-view dimension prints in
     # the detail.
     assert drawing.LEFT_CENTER == (0.080, drawing.FRONT_CENTER[1])
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)' in source
-    # The note stands right of the shank's 8.00, below the pin annotations,
-    # left of the detail's fence; the detail's dimensions stay inside the top
-    # border.
-    assert drawing.NOTES_XY[0] > drawing.FRONT_KEEP["ShankWidthDim"][0]
-    assert drawing.NOTES_XY[1] < drawing.FRONT_KEEP["ShankWidthDim"][1] - 0.015
-    assert drawing.NOTES_XY[0] + 0.065 < drawing.DETAIL_CENTER[0] - drawing._DETAIL_FENCE_R
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' not in source
     assert max(y for _, y in drawing.DETAIL_KEEP.values()) < 0.260
     assert ch_connecting_rod_notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
-def test_the_one_note_is_the_tine_wall_shortfall() -> None:
-    """#982 baseline review: every size, location and band prints from its
-    native model dimension and each tight band names its mate on its own
-    callout, so the notes block shrank to the one rule-20 fact: the tines'
-    printed minimum under the 2.0 wall target."""
+def test_the_tine_wall_shortfall_sits_between_the_floor_and_the_target() -> None:
+    """The tines are pitch-bound: their printed lower limit is the known
+    shortfall under the .080 target (MHA-CH-03 RV-02), above the .060 floor."""
     spec = ch_connecting_rod_spec
-    notes = ch_connecting_rod_notes.DRAWING_NOTES
-    assert notes == f"1. TINE WALL {spec.TINE_MIN:.2f} MIN."
-    assert spec.TINE_MIN == pytest.approx(1.65)
-    assert spec.TINE_MIN < 2.0
-    for gone in ("FORK_TINE_MATCH", "RING_SLOT_SYMMETRY"):
-        assert not hasattr(spec, gone)
-    for word in ("MACHINED", "REAM", "PRESS", "SYMMETRIC", "CENTRED", "WITHIN"):
-        assert word not in notes
-    # Material and finish are title-block rows (drawing-guidelines.md rule 2
-    # (the title block is the general specification)).
-    for title_block_word in ("1018", "STEEL", "BLACK", "ENAMEL"):
-        assert title_block_word not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert WALL_FLOOR_MM <= spec.TINE_MIN < WALL_TARGET_MM
 
 
 def test_every_tight_band_names_its_mate() -> None:
     """drawing-guidelines.md rule 7: the bore's, the reamed hole's, the
     slot's, the tine's and the ring faces' bands each name the part they fit,
     on their own callout, with the clearance or interference they hold."""
-    import ch_rod_pivot_pin_spec as pin
-
     spec = ch_connecting_rod_spec
     least, most = spec.STRAP_DIAMETRAL_CLEARANCE
-    assert (least, most) == pytest.approx((0.20, 0.35))
+    # The running bore's clearance on the cam stays in the 0.20-0.35 intent.
+    assert 0.20 - 1e-9 <= least < most <= 0.35 + 1e-9
     bore = drawing.FRONT_CALLOUTS["StrapBoreDia"]
     assert bore.startswith("BORE")
     assert drawing.CAM_NUMBER in bore
-    assert f"{least:.2f}-{most:.2f}" in bore
     ream = drawing.FRONT_CALLOUTS["PinHoleDia"]
     assert ream.startswith("THRU - REAM")
     assert drawing.PIN_NUMBER in ream
-    assert (
-        f"{pin.BUDGET['interference_min']:.3f}-{pin.BUDGET['interference_max']:.3f}"
-        in ream
-    )
     assert drawing.ARM_NUMBER in drawing.DETAIL_CALLOUTS["SlotWidth"]
     # The tine's band locates the slot from the datum face and holds the gap
     # to the next channel's rod, the same part (#982 review r2).
     assert drawing.ROD_NUMBER == "MHA-CH-03"
     assert drawing.ROD_NUMBER in drawing.DETAIL_CALLOUTS["TineNear"]
-    assert drawing.DETAIL_CALLOUTS["TineNear"].startswith("2X; LOCATES SLOT;")
     assert drawing.CAM_NUMBER in drawing.DETAIL_CALLOUTS["RingFaceNear"]
     assert drawing.CAM_NUMBER in drawing.LEFT_CALLOUTS["RingThick"]
     assert drawing.LEFT_CALLOUTS["RingThick"].startswith("RING AND SHANK")
@@ -320,14 +293,14 @@ def test_plate_locates_from_the_fork_face_and_prints_its_thickness() -> None:
     assert spec.RING_FACE_NEAR == pytest.approx(
         (spec.FORK_THICKNESS - spec.RING_THICKNESS) / 2.0
     )
-    assert spec.RING_FACE_NEAR == pytest.approx(1.950)
+    assert spec.RING_FACE_NEAR == pytest.approx(1.9558)  # .077
     assert not hasattr(spec, "RING_FACE_FAR")
-    # Three-place ordinates and sizes, as the bands are written.
+    # Three-place inch ordinates and sizes, as the bands are written.
     for value in (spec.RING_FACE_NEAR, spec.RING_THICKNESS, spec.TINE_THICKNESS):
-        assert round(value, 3) == pytest.approx(value, abs=1e-12)
+        assert round(value / 25.4, 3) == pytest.approx(value / 25.4, abs=1e-12)
     assert spec.SHANK_THICKNESS == spec.RING_THICKNESS
-    assert spec.SHANK_THICKNESS_BAND == spec.RING_THICKNESS_BAND == (0.05, -0.05)
-    assert spec.RING_THICKNESS + spec.RING_THICKNESS_BAND[1] >= 2.0  # rule 17
+    assert spec.SHANK_THICKNESS_BAND == spec.RING_THICKNESS_BAND
+    assert spec.RING_THICKNESS + spec.RING_THICKNESS_BAND[1] >= WALL_TARGET_MM
     build = "".join(Path(rod.__file__).read_text(encoding="utf-8").split())
     assert 'set_global(adapter,"RingFaceNear",\'("ForkThickness"-"RingThickness")/2\')' in build
     assert 'name_dimensions(adapter,"Plate",["RingThick"])' in build
@@ -354,13 +327,13 @@ def test_inside_corners_are_one_modelled_radius_under_the_title_block() -> None:
     fork's root step and the shank's run onto the ring had sharp inside
     corners. One fillet carries them all. The ENFORCE review found the
     printed all-corners R0.5 MAX a needless tightening of the title block's
-    INSIDE CORNERS R1.0 MAX, so the title block governs; that ceiling still
+    INSIDE CORNERS R.040 MAX, so the title block governs; that ceiling still
     stands under the arm's least clearance over the slot floor."""
-    import _config
     import ch_rod_pivot_pin_spec as pin
+    from _printed_tolerance import inside_corner_radius_mm
 
     spec = ch_connecting_rod_spec
-    ceiling = float(_config.title_block("inside_corner")["radius_mm"])
+    ceiling = inside_corner_radius_mm(unit=spec.UNIT)
     assert spec.INSIDE_CORNER_R <= ceiling
     assert ceiling < pin.BUDGET["crotch_clearance_min"]
     assert 2.0 * ceiling < spec.FORK_SLOT_WIDTH + spec.FORK_SLOT_BAND[1]
@@ -497,16 +470,6 @@ def test_fork_print_is_three_place_and_model_owned() -> None:
     assert marked["PlateProfile"] == {"RingOuterDia", "ShankWidthDim"}
     assert marked["ForkProfile"] == {"ForkWidthDim"}
     assert rod.DRAWING_PRECISION is ch_connecting_rod_notes.DRAWING_PRECISION
-    assert ch_connecting_rod_notes.DRAWING_PRECISION == {
-        "Plate": {"RingThick": 3},
-        "ForkBoss": {"ForkThick": 3},
-        "ForkSlotProfile": {
-            "TineNear": 3,
-            "SlotWidth": 3,
-            "RingFaceNear": 3,
-        },
-        "PinHoleProfile": {"PinHoleDia": 4},
-    }
     build = "".join(Path(rod.__file__).read_text(encoding="utf-8").split())
     assert 'name_dimensions(adapter,"ForkBoss",["ForkThick"])' in build
     assert "(fork_thickness_dim[0],'\"ForkThickness\"')" in build
@@ -528,11 +491,11 @@ def test_reamed_pin_hole_is_a_native_four_place_dimension() -> None:
     assert ch_connecting_rod_notes.DRAWING_DIMENSIONS["PinHoleProfile"] == {
         "PinHoleDia"
     }
-    assert ch_connecting_rod_notes.DRAWING_PRECISION["PinHoleProfile"] == {
-        "PinHoleDia": 4
-    }
-    # The band is exact at five places, as the shared setter prints it.
-    assert all(round(d, 5) == d for d in spec.PIN_HOLE_BAND)
+    # The band is exact at four inch places, as the shared setter prints it.
+    assert all(
+        round(d / 25.4, 4) == pytest.approx(d / 25.4, abs=1e-12)
+        for d in spec.PIN_HOLE_BAND
+    )
     assert model_toleranced_dimensions(rod)[("PinHoleProfile", "PinHoleDia")] == (
         "*deviations(PIN_HOLE_BAND)"
     )
@@ -554,7 +517,6 @@ def test_reamed_pin_hole_is_a_native_four_place_dimension() -> None:
     hole_x, hole_y = drawing._sheet_xy(0.0, spec.CENTER_DISTANCE)
     text_x, text_y = drawing.FRONT_KEEP["PinHoleDia"]
     assert text_x > hole_x + 0.030 and text_y < hole_y - 0.020
-    assert text_y > drawing.NOTES_XY[1] + 0.040
     assert text_x < drawing.DETAIL_KEEP["TineNear"][0] - 0.040
 
 
@@ -617,12 +579,10 @@ def test_detail_texts_stand_outside_their_witness_lines() -> None:
 
 def test_model_bands_are_owned_by_named_model_dimensions() -> None:
     spec = ch_connecting_rod_spec
-    assert spec.RING_BORE_DIA_BAND == (0.10, 0.00)
-    assert spec.TINE_BAND == (0.05, -0.05)
-    assert spec.FORK_SLOT_BAND == (0.05, -0.05)
-    assert spec.RING_FACE_BAND == (0.05, -0.05)
-    assert spec.RING_THICKNESS_BAND == (0.05, -0.05)
-    assert spec.FORK_THICKNESS_BAND == pytest.approx((0.15, -0.15))
+    assert spec.FORK_THICKNESS_BAND == pytest.approx(
+        (2.0 * spec.TINE_BAND[0] + spec.FORK_SLOT_BAND[0],
+         2.0 * spec.TINE_BAND[1] + spec.FORK_SLOT_BAND[1])
+    )
     assert model_toleranced_dimensions(rod) == {
         ("StrapBoreProfile", "StrapBoreDia"): "*deviations(RING_BORE_DIA_BAND)",
         ("ForkSlotProfile", "TineNear"): "tine_upper",

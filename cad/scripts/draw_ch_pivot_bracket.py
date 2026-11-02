@@ -43,12 +43,13 @@ from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_projection import model_points_in_view
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -188,7 +189,7 @@ FRONT_KEEP = {
 # counted in (ch_pivot_bracket_spec.APEX_ABOVE_BORE). A sheet dimension
 # between the bore circle (its centre) and the arch arc (its far point), so
 # the part and its cache key stay as they are. Its text stands in the foot
-# height's lane, halfway up its span, between the 25.20 and 35.00 extension
+# height's lane, halfway up its span, between the bore and overall heights' extension
 # lines it shares; it prints at the two heights' places, which the drawing
 # document's default must already give (the sheet sets no precision).
 APEX_REFERENCE_TEXT_XY = (
@@ -254,6 +255,8 @@ RIGHT_KEEP_NAMES = ("CornerRadius",)
 # class is the title block's. The arch's lift gives the tap 1.5D of full
 # thread (ch_pivot_bracket_spec), so the callout states no shortfall.
 SET_SCREW_PROCESS = "TAP"
+# Hole Wizard callouts print three places on the inch sheet.
+SET_SCREW_CALLOUT_PRECISION = {"hw-tapdrldia": 3}
 SET_SCREW_EXTENT = "TO BORE"
 # Centre of the native tap callout's text, above the plan's left half: its
 # leader drops from the block's right end through the plan's top edge to the
@@ -416,7 +419,7 @@ def _add_apex_reference(adapter: Any, view: Any) -> Any:
     the arch arc's furthest point (endpoint 2), each arc condition set and
     read back; its text then put back between the two heights' extension
     lines (SolidWorks keeps the text outside the span the dimension had
-    while both ends sat on centres, 1.80 apart, too short for it -- r1);
+    while both ends sat on centres, ARCH_LIFT apart, too short for it -- r1);
     then parenthesized, its value proved against APEX_ABOVE_BORE (a swapped
     endpoint would read the bore's top to the arch centre, 1.45), its text
     position and its places against the heights'.
@@ -626,7 +629,11 @@ async def build(adapter: Any) -> dict[str, str]:
         required=("Number", "Material", "Material Specification", "Finish", "Quantity"),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("ch-pivot-bracket"),
     )
     stamp_drawing_summary(
         adapter,
@@ -642,6 +649,12 @@ async def build(adapter: Any) -> dict[str, str]:
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=_VIEW_SCALE)
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=_VIEW_SCALE)
+    # The plan shows the crown's tangent seams as grey lines over its outline
+    # (machinist review): hide them.
+    top_view = _early_bound(top, "IView")
+    top_view.SetDisplayTangentEdges2(0)  # swTangentEdgesHidden
+    if int(top_view.GetDisplayTangentEdges2()) != 0:
+        raise RuntimeError("failed to hide the plan's tangent edges")
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=_VIEW_SCALE)
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=_VIEW_SCALE)
     # No view needs hidden lines: the elevation shows the bore in true circle,
@@ -741,6 +754,9 @@ async def build(adapter: Any) -> dict[str, str]:
         process=SET_SCREW_PROCESS,
     )
     _set_tap_callout_text(tap_callout)
+    set_hole_callout_precision(
+        tap_callout, SET_SCREW_CALLOUT_PRECISION, label="apex set-screw tap"
+    )
     # Re-assert the display mode now the last annotation has landed: an
     # annotation attached after placement can leave a view's edge set
     # unregenerated, and only a real mode change rebuilds it.

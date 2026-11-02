@@ -6,15 +6,16 @@ ch-anchor-jam-nut:
   finish: bright machined, oiled
   quantity: 20
   tolerance_class: machined_block
+  drawing_unit: in
   process: "turned from bar (brass): turn the O.D., drill and tap #6-32 through, part off and face to thickness, saw the drive cut across the driven face"
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
-      where: "side view, under the 3.60 thickness: ENGAGEMENT 1.9 MIN (0.5D)"
+      where: "side view, under the .14 thickness: ENGAGEMENT .083 MIN (0.6D)"
       finding: "thread engagement below 1.5D (rule 18)"
-      reason: "owner ruling 2026-10-17: a thin jam nut only locks the MHA-CH-VN-51 anchor against the MHA-SM-03 plate underside and carries no working load (the anchor's own tap engagement carries the spring pull); about 0.5D is the normal jam-nut proportion. 1.9 MIN is the full thread left at the thinnest printed thickness less a through tap's 1.5 incomplete threads"
+      reason: "owner ruling 2026-10-17: a thin jam nut only locks the MHA-CH-VN-51 anchor against the MHA-SM-03 plate underside and carries no working load (the anchor's own tap engagement carries the spring pull); about 0.5D is the normal jam-nut proportion. .083 MIN is the full thread left at the thinnest printed thickness less a through tap's 1.5 incomplete threads"
     - id: "RV-02"
       kind: "minor"
-      where: "side view, above the O.D.: WALL 1.5 MIN"
-      finding: "wall from the #6-32 major to the O.D. below the 2.0 mm target (rule 17)"
-      reason: "owner ruling 2026-10-17: the twenty nuts stand side by side at the 7.06 channel pitch, so the O.D. band sits between the 1.5 wall floor and the 0.25 clearance to the neighbouring MHA-CH-14; 1.5 MIN at the smallest printed O.D. holds the rule 17 floor, and a jam nut that carries no load needs no more"
+      where: "side view, above the O.D.: WALL .060 MIN"
+      finding: "wall from the #6-32 major to the O.D. below the .080 target (rule 17)"
+      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions. the twenty nuts stand side by side at the .2778 channel pitch, so the \u00d8.260 \u00b1.002 O.D. sits between the .060 wall floor and .0098 clearance to the neighbouring MHA-CH-14 under the \u00d8.006 tap position zone; the wall is .0605 at the smallest printed O.D., above the .060 floor, and a jam nut that carries no load needs no more"

@@ -13,4 +13,5 @@ ch-vn-rocker-bank-spring:
     REJECT ANY SPRING THAT BINDS WHEN SLID ALONG MHA-CH-05.
   quantity: 1
   tolerance_class: machined_block
+  drawing_unit: in
   process: purchased

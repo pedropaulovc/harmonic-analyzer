@@ -844,7 +844,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 1.778,
                 5.2207,
             ),
-            # Owner Q13c: MHA-CH-VN-57 #8-32 x 5/8 through the 6.0 rocker-bracket
+            # Owner Q13c: MHA-CH-VN-57 #8-32 x 5/8 through the .24 rocker-bracket
             # foot, one per bracket since the 2026-10-09 flip.
             **_expected_numbered_pairs(
                 "ch-channel-1/ch-vn-bracket-hold-down-screw",
@@ -852,7 +852,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "fr-frame-1/fr-rocker-arm-support",
                 4.1656,
                 3.454,
-                9.875,
+                15.875 - 6.096,
             ),
         },
     }
@@ -917,9 +917,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     assert 111.2 < crank_allowed[hub_pair] < 111.8
     assert 55.1 < crank_allowed[shaft_pair] < 55.6
     # MHA-CH-11: each 5/64 bar pivot pin pressed into its bar's Ø1.9558 ream
-    # through both top-notch cheeks (6.35 bar less the 3.15 notch), and
+    # through both top-notch cheeks (6.35 bar less the .124 notch), and
     # MHA-CH-10: the same pin pressed into its rod's Ø1.9558 fork ream through
-    # both tines (6.075 fork less the 2.675 slot); channel j's pin with
+    # both tines (.240 fork less the .106 slot); channel j's pin with
     # channel j's bar or rod only. MHA-CH-VN-53: each #4-40 apex set screw's
     # thread in its MHA-CH-08 ear's tap, over the 9.80 apex (R8 arch lifted
     # 1.80, #1371) less the Ø6.5 bore's height at the Ø2.845 envelope's edge;
@@ -933,21 +933,19 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             **{
                 frozenset(
                     (f"ch-bar-pivot-pin-{n}", f"ch-amplitude-bar-{n}")
-                ): _annulus_limit(1.984375, 1.9558, 3.20)
+                ): _annulus_limit(1.984375, 1.9558, 6.35 - 3.1496)
                 for n in range(1, 21)
             },
             **{
                 frozenset(
                     (f"ch-rod-pivot-pin-{n}", f"ch-connecting-rod-{n}")
-                ): _annulus_limit(1.984375, 1.9558, 3.40)
+                ): _annulus_limit(1.984375, 1.9558, 6.096 - 2.6924)
                 for n in range(1, 21)
             },
             **{
                 frozenset(
                     (f"sh-vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}")
-                ): _annulus_limit(
-                    2.845, 2.261, 9.8 - math.sqrt(3.25**2 - (2.845 / 2.0) ** 2)
-                )
+                ): _interference_contracts.PIVOT_EAR_SET_SCREW_LIMIT
                 for n in (1, 2)
             },
             **{
@@ -959,7 +957,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             **{
                 frozenset(
                     (f"ch-vn-spring-hook-{n}", f"ch-anchor-jam-nut-{n}")
-                ): _annulus_limit(3.505, 2.705, 3.60)
+                ): _annulus_limit(*_interference_contracts.CHANNEL_ANCHOR_NUT_THREAD)
                 for n in range(1, 21)
             },
         }
