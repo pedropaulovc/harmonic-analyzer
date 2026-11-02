@@ -63,7 +63,7 @@ THREAD_PITCH_MM = fasteners.HOLD_DOWN_STUD_PITCH_MM
 MAJOR_DIA = base_bar.HOLD_DOWN_STUD_DIA
 
 # Preserve the installed jig's member description under the shared purchase Number.
-BOM_DESCRIPTION = f"{THREAD} STUD, CUT {LENGTH:.1f}"
+BOM_DESCRIPTION = f"{THREAD} STUD, CUT {LENGTH:.1f} MM"  # the jig sheet is inch
 PROCESS = (
     "rework purchased PM 52PCCK-9/16-14mm 1/2-13 x 3 in stud stock: shorten only "
     "unused upper end to drawing length and restore cut-end chamfer; preserve "

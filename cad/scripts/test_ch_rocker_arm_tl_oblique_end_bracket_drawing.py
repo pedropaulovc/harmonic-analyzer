@@ -55,13 +55,10 @@ def test_stock_is_the_half_by_one_flat_on_edge() -> None:
     )
     assert spec.BRACKET_LENGTH == pytest.approx(leadscrew.BRACKET_LENGTH)
     assert spec.BRACKET_WIDTH == pytest.approx(leadscrew.BRACKET_WIDTH)
-    # Both stock sizes print their supplier fraction as a reference over
-    # STOCK and the supplier's band.
+    # Both stock sizes print their supplier fraction as an untoleranced
+    # reference over STOCK (the supplier's catalogue tolerance governs).
     assert spec.STOCK_DIMENSIONS == {"BracketWidth", "BracketThick"}
-    assert spec.STOCK_CALLOUTS == {
-        "BracketWidth": "STOCK\n±.009",
-        "BracketThick": "STOCK\n±.012",
-    }
+    assert spec.STOCK_CALLOUTS == {"BracketWidth": "STOCK", "BracketThick": "STOCK"}
     assert not spec.STOCK_DIMENSIONS & set(spec.CALLOUTS_BELOW)
     sizes = {"BracketWidth": spec.BRACKET_WIDTH, "BracketThick": spec.BRACKET_THICK}
     for name, denominator in spec.STOCK_FRACTION_DENOMINATORS.items():

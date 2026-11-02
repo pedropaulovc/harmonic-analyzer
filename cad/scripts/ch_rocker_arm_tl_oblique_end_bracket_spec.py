@@ -305,16 +305,9 @@ CALLOUTS_BELOW = {
     **dict.fromkeys(sorted(DRAWING_DIMENSIONS["BarTaps"]), BAR_MATE_CALLOUT),
     "HoleRowY": ROW_CALLOUT,
 }
-# Rule 1 (units): an as-bought fraction is a REF with the supplier's
-# tolerance (machinist review, final head), the band on its own row so the
-# width's text stays as narrow as before (the bar's end runs beside it).
-STOCK_CALLOUTS = {
-    name: "STOCK\n±" + f"{band / 25.4:.3f}".lstrip("0")
-    for name, band in (
-        ("BracketWidth", WIDTH_STOCK_BAND),
-        ("BracketThick", THICK_STOCK_BAND),
-    )
-}
+# drawing-guidelines.md (units): an as-bought fraction is an untoleranced REF;
+# the supplier's catalogue tolerance governs.
+STOCK_CALLOUTS = {"BracketWidth": "STOCK", "BracketThick": "STOCK"}
 SURFACE_FINISHES = ()
 DRAWING_NOTES = ""
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

@@ -29,7 +29,7 @@ def test_identity_and_stock():
     # The bar as bought: 3/4 x 1-1/4 at the supplier's bands, faced to .40.
     assert (spec.WIDTH, spec.HEIGHT) == pytest.approx((1.25 * INCH, 0.75 * INCH))
     assert (spec.WIDTH_STOCK_BAND, spec.HEIGHT_STOCK_BAND) == pytest.approx((0.005 * INCH, 0.0045 * INCH))
-    assert spec.STOCK_CALLOUTS == {"NutWidth": "STOCK\n±.005", "NutHeight": "STOCK\n±.0045"}
+    assert spec.STOCK_CALLOUTS == {"NutWidth": "STOCK", "NutHeight": "STOCK"}
     assert spec.LENGTH == pytest.approx(0.40 * INCH)
     assert spec.DRAWING_PRECISION_BY_NAME["NutLength"] == 2
 
