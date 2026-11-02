@@ -165,11 +165,11 @@ def test_relief_holds_the_die_lead_under_the_deepest_root() -> None:
     assert thread_end_min - core_max == pytest.approx(1.778)
     assert thread_end_min - core_max >= 1.5 * PITCH
     relief_max = _limits(shaft.RELIEF_DIA, _stud_places("ReliefDia"))[1]
-    assert relief_max == pytest.approx(2.921)
+    assert relief_max == pytest.approx(2.794)  # .10 +.01
     assert relief_max < ROOT_2A_MIN < MINOR_2B_MIN
-    # Negative control: a Ø3.0 relief at its .XXX upper limit would stand
-    # above the conservative deepest #8-32 die-cut root.
-    assert 3.0 + printed_band_mm(3, unit=shaft.UNIT) > ROOT_2A_MIN
+    # Negative control: Ø.11 at the .XX row (the review's first suggestion)
+    # would stand above the conservative deepest #8-32 die-cut root.
+    assert 2.794 + printed_band_mm(2, unit=shaft.UNIT) > ROOT_2A_MIN
 
 
 def test_thumbnut_runs_clear_of_the_core_step_at_the_rearward_stop(

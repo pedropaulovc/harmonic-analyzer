@@ -402,8 +402,12 @@ PLAIN_CORE_PLACES = 2
 THREAD_LENGTH_REF = TIP_STATION - PLAIN_CORE  # .64 REF
 DIE_RUNOUT_PITCHES = 1.5
 DIE_RUNOUT_MAX = DIE_RUNOUT_PITCHES * THREAD_PITCH
-RELIEF_DIA = 2.794  # .110
-RELIEF_DIA_PLACES = 3
+# Ø.10 at the .XX row (.09-.11): the relief only clears the thumbnut and lays
+# the die's lead in air, so it takes the loosest row whose maximum stays
+# under the deepest die root (machinist review of cf6e32b19: .110 at .XXX
+# named no function; .11 at .XX would reach .120, over the .1196 root).
+RELIEF_DIA = 2.54  # .10
+RELIEF_DIA_PLACES = 2
 _CORE_FRONT_TOL = printed_band_mm(CORE_FRONT_FROM_F_PLACES, unit=UNIT)
 _PLAIN_CORE_TOL = printed_band_mm(PLAIN_CORE_PLACES, unit=UNIT)
 RELIEF_DIA_MAX = RELIEF_DIA + printed_band_mm(RELIEF_DIA_PLACES, unit=UNIT)

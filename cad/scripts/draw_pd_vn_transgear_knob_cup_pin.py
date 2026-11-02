@@ -20,8 +20,8 @@ from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _supplier_pin_drawing import SPRING_PIN_SUPPLIER_MARGINS, add_supplier_spring_pin_dimensions
 from pd_vn_transgear_knob_cup_pin_spec import SUPPLIER_REFERENCE
 
-# Cached machinist review leaf: warnings only until the sheet ships.
-MACHINIST_REVIEW = MachinistReviewMode.LEARN
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_vn_transgear_knob_cup_pin"]
 # The footer's ITEM row: the catalogue designation in plain text.
