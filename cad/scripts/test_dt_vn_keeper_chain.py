@@ -333,7 +333,7 @@ def keeper_sheet(monkeypatch):
     def curate(actual_adapter, view, *, keep, view_label, dimensions_by_feature):
         assert actual_adapter is adapter
         assert view is views["*Front"]
-        assert keep == {_NAME: (0.156, 0.166)}
+        assert keep == {_NAME: pytest.approx((0.016, 0.150))}
         assert view_label == "keeper catalogue bead diameter"
         assert dimensions_by_feature == {"SeedProfile": {_NAME}}
         view.annotations = [_Annotation(_Display())]

@@ -28,10 +28,17 @@ def annotate_keeper_bead(adapter: Any, views: Mapping[str, Any]) -> Callable[[],
         raise RuntimeError("keeper catalogue bead size has no native owner/configuration")
     outline = tuple(float(value) for value in view.GetOutline())
     name = chain.CATALOGUE_BEAD_DIMENSION
+    # The seed bead is the chain's first, at the bottom of the front view's
+    # V with the strand rising above it and the other arm of the V to its
+    # right; only from the left does a leader reach it without running over
+    # other beads (machinist review of farm run 20261102T154950540Z: from
+    # the view's top-right it ran down a dozen beads of the left strand).
+    # The text stands left of the view, low, its leader rising gently to the
+    # bead; draw_dt_vn_keeper_chain reserves this lane.
     annotations = curate_view_dimensions(
         adapter,
         view,
-        keep={name: (outline[2] + 0.006, outline[3] + 0.006)},
+        keep={name: (outline[0] - 0.034, outline[1] + 0.030)},
         view_label="keeper catalogue bead diameter",
         dimensions_by_feature=chain.DRAWING_DIMENSIONS,
     )
