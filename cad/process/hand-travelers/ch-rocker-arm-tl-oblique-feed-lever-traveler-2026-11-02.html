@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Traveler: Oblique Trammel Feed Lever, MHA-CH-06-TL-26 v47 (2026-11-02)</title>
+<style>
+  @page { size: letter; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Arial, sans-serif; font-size: 9.5pt; color: #111; margin: 0; line-height: 1.3; }
+  h1 { font-size: 17pt; margin: 0 0 2px; }
+  h2 { font-size: 13pt; margin: 14px 0 6px; border-bottom: 2px solid #111; padding-bottom: 2px; }
+  h3 { font-size: 11pt; margin: 10px 0 4px; }
+  .sub { color: #444; margin-bottom: 8px; }
+  table { border-collapse: collapse; width: 100%; margin: 4px 0 8px; }
+  th, td { border: 1px solid #777; padding: 3px 5px; vertical-align: top; text-align: left; }
+  th { background: #e9e9e9; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.fixed { table-layout: fixed; }
+  .head td { border: 1px solid #111; }
+  .warn { border: 3px solid #b00; background: #fff4f4; padding: 6px 10px; margin: 8px 0; }
+  .warn h2 { border: none; color: #b00; margin: 0 0 4px; }
+  .warn li { margin-bottom: 3px; }
+  .note { border-left: 4px solid #555; background: #f4f4f4; padding: 4px 8px; margin: 6px 0; }
+  .changed { border: 2px solid #06c; background: #f2f8ff; padding: 6px 10px; margin: 8px 0; }
+  .changed h2 { border: none; color: #06c; margin: 0 0 4px; }
+  .check { width: 16px; }
+  .box { display: inline-block; width: 12px; height: 12px; border: 1.5px solid #111; vertical-align: middle; }
+  .blank { min-width: 60px; }
+  .op { page-break-inside: avoid; margin-bottom: 8px; }
+  .op h3 { background: #222; color: #fff; padding: 3px 6px; margin-bottom: 4px; }
+  ol, ul { margin: 2px 0 4px 20px; padding: 0; }
+  .pb { page-break-before: always; }
+  .small { font-size: 9pt; color: #444; }
+  .big { font-size: 12pt; font-weight: 600; }
+  svg text { font-family: "Segoe UI", Arial, sans-serif; }
+  .tmpl { border: 1px dashed #777; padding: 6px; display: inline-block; margin: 4px 8px 4px 0; vertical-align: top; }
+</style>
+</head>
+<body>
+
+<h1>Traveler: Oblique Trammel Feed Lever</h1>
+<div class="sub">For a beginner on the PM-30MV mill with a DRO. Read the whole sheet once before you touch the machine.</div>
+
+<table class="head">
+  <tr><th>Part</th><td>ch-rocker-arm-tl-oblique-feed-lever (shop fixture for the rocker-arm jig)</td><th>Drawing no.</th><td>MHA-CH-06-TL-26, rev v47, decimal-inch sheet (PR #2112)</td></tr>
+  <tr><th>Make</th><td class="big">1 lever</td><th>Material</th><td>6061-T6511 aluminium flat bar, 1/2 × 1 in, from the owned OnlineMetals 1165 bar (1/2 × 1 × 24 in). The same bar also gives the two TL-28 end brackets.</td></tr>
+  <tr><th>Finished size</th><td><b>11.8 × 1 × 1/2 in</b>. The width and thickness are left as bought (STOCK). Only the two ends, two holes and two corners are machined.</td><th>Finish</th><td>As machined. Edges broken <b>.010 max</b> (R.010 or .010 chamfer).</td></tr>
+  <tr><th>Machines</th><td>Saw, PM-30MV mill with DRO, 6 in vise, bench vise and files</td><th>Units</th><td><b>inches throughout.</b> Set your DRO to inch.</td></tr>
+</table>
+
+<div class="note">
+<b>Tolerances on this drawing</b> (title block): .X ±.1 &nbsp;·&nbsp; .XX ±.01 &nbsp;·&nbsp; .XXX ±.005 &nbsp;·&nbsp; drilled holes +.004 / −0 &nbsp;·&nbsp; edges R.010 or .010 chamfer max. Nothing on this part is tighter than ±.01.
+</div>
+
+<div class="warn">
+<h2>BEFORE YOU START</h2>
+<ul>
+  <li><b>Safety glasses on. No gloves, rings or loose sleeves near the spindle.</b> Aluminium chips are razor sharp. Clear them with a brush, never your hand, and only with the spindle stopped.</li>
+  <li><b>The holes are near one end, and that end is the ZERO END.</b> Both hole positions (.28 and .91) are measured from it. Mark it as soon as you've milled it.</li>
+  <li><b>The long side against the fixed jaw is the ZERO EDGE.</b> The hole row is measured .50 from it. The bar is 1 in wide, so that's the middle.</li>
+  <li>The bar is much longer than the vise jaws, so it's held in two positions. In Setup A the zero end sticks out on the left. In Setup B you slide it so the grip end sticks out on the right. <b>Keep the zero edge against the fixed jaw both times.</b></li>
+  <li>About 5 in of bar hangs out of the vise. Don't lean on it, and don't cut anything out there.</li>
+
+  <li><b>Lessons from 10-30, built into this sheet:</b> measure before you cut and write the allowance down. Cut to the DRO numbers on this sheet, and don't count passes. Conventional milling only: on the <b>left</b> end feed <b>toward you</b>, on the <b>right</b> end feed <b>away from you</b>.</li>
+  <li><b>Escape drill:</b> if it rings or grabs, hit stop, wait for all motion to stop, then raise Z. <b>Never back off sideways with the cutter in the cut.</b></li>
+  <li><b>Collet grip:</b> wipe the oil off the collet and the shank, tighten the drawbar properly, and draw a marker line on the shank at the collet face. If the line moves, stop.</li>
+</ul>
+</div>
+
+<h2>What you need</h2>
+<table>
+  <tr><th>Tool</th><th>Used for</th><th>Holder</th></tr>
+  <tr><td>Saw (miter saw or bandsaw), steel rule, Dykem, scriber, file</td><td>cut the blank 11.90 long</td><td>—</td></tr>
+  <tr><td>Two 1 in parallels (1/8 thick, 6 in long)</td><td>hold the bar up so the drill breaks through into air</td><td>vise</td></tr>
+  <tr><td>Edge finder, .200 in tip</td><td>find the zero end and zero edge</td><td>3/8 in collet</td></tr>
+  <tr><td>1/2 in end mill, 2-flute, centre cutting</td><td>square both ends</td><td>1/2 in collet</td></tr>
+  <tr><td>#2 centre drill</td><td>spot both holes</td><td>drill chuck</td></tr>
+  <tr><td><b>11/32 drill (.3438)</b>, from the 115-piece index</td><td>2 holes, Ø.344 THRU</td><td>drill chuck</td></tr>
+  <tr><td>Files (10 in mill second-cut, 8 in smooth), bench vise with soft jaws, the 1:1 template on the last page</td><td>round the two grip-end corners to R.2</td><td>—</td></tr>
+  <tr><td>Cutting oil, acid brush, calipers, dead-blow hammer, deburring tool (Noga), marker</td><td>setup, checking, deburring</td><td>—</td></tr>
+  <tr><td>For the final check: two 5/16-18 socket head cap screws</td><td>fit test</td><td>—</td></tr>
+</table>
+
+<h3>Speeds (LittleMachineShop chart, row "Wrought aluminum 6061-T6"; PM-30MV tops out at 3000 rpm)</h3>
+<table>
+  <tr><th>Tool</th><th>Chart speed</th><th class="num">Set spindle to</th><th>Feed</th></tr>
+  <tr><td>1/2 in end mill</td><td>165 ft/min milling</td><td class="num">1250 rpm</td><td>3 in/min, .02 in per pass into the end. On 10-29, 2500 rpm at slow feed gave a clean edge. Keep that if it works for you.</td></tr>
+  <tr><td>#2 centre drill</td><td>350–400 ft/min drilling</td><td class="num">3000 rpm</td><td>steady hand feed</td></tr>
+  <tr><td>11/32 drill</td><td>350–400 ft/min drilling</td><td class="num">2000 rpm</td><td>slower than the chart, so the bigger drill stays easy to control; peck every .1 in</td></tr>
+  <tr><td>Edge finder</td><td>750–1500 rpm (Travers)</td><td class="num">1000 rpm</td><td>approach very slowly near the edge</td></tr>
+</table>
+<p class="small">Source: https://littlemachineshop.com/pages/cutting-speeds. Brush cutting oil on before every cut.</p>
+
+<h2>Op 10: Cut the blank (saw)</h2>
+<div class="op">
+<p><b>One bar gives all three parts.</b> Measure the 1165 bar first (nominal 24 in) and write it here: ________ . Cut list, with about 1/8 in of kerf per cut:</p>
+<table class="fixed">
+  <colgroup><col><col style="width:14%"><col style="width:14%"><col style="width:8%"></colgroup>
+  <tr><th>Piece</th><th class="num">Saw to</th><th>Finished</th><th class="check">✓</th></tr>
+  <tr><td>TL-26 feed lever (this sheet)</td><td class="num">11.90</td><td>11.8</td><td><span class="box"></span></td></tr>
+  <tr><td>TL-28 end bracket, piece 1 (other sheet)</td><td class="num">2.85</td><td>2.71</td><td><span class="box"></span></td></tr>
+  <tr><td>TL-28 end bracket, piece 2 (other sheet)</td><td class="num">2.85</td><td>2.71</td><td><span class="box"></span></td></tr>
+  <tr><td>Left over (keep it)</td><td class="num">about 6</td><td>—</td><td></td></tr>
+</table>
+<ol>
+  <li>Dykem the cut line and let it dry, then scribe it with the rule.</li>
+  <li>Saw on the waste side of the line, so the piece comes out a little long, never short.</li>
+  <li>File off the saw burrs. Measure the blank and write it here: ________ . It must be at least 11.85. The ends will take off (that − 11.80) in total.</li>
+</ol>
+</div>
+
+<h2 class="pb">Setup A: Mill vise. Zero end, zero and both holes.</h2>
+<p>This is what you should see from where you stand, looking down at the vise. The <b>zero corner</b> is back-left. <b>X</b> is measured to the right from the zero end. <b>Y</b> is measured toward you from the zero edge. Every number below is a DRO reading from that corner.</p>
+<svg viewBox="0 0 1000 300" width="100%" xmlns="http://www.w3.org/2000/svg">
+  <defs><marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#b00"/></marker></defs>
+  <rect x="88.0" y="84" width="434.0" height="26" fill="#bbb" stroke="#333"/>
+  <text x="305.0" y="76" text-anchor="middle" font-size="13">FIXED JAW (back): the ZERO EDGE sits against it</text>
+  <rect x="88.0" y="180.0" width="434.0" height="26" fill="#bbb" stroke="#333"/>
+  <text x="305.0" y="224.0" text-anchor="middle" font-size="13">MOVING JAW (your side)</text>
+  <path d="M60,110 H872.0 A14.0,14.0 0 0 1 886.0,124.0 V166.0 A14.0,14.0 0 0 1 872.0,180.0 H60 Z" fill="#f2f2f2" stroke="#111" stroke-width="2"/>
+  <rect x="88.0" y="110" width="434.0" height="8.75" fill="none" stroke="#777" stroke-dasharray="5,3"/>
+  <rect x="88.0" y="171.25" width="434.0" height="8.75" fill="none" stroke="#777" stroke-dasharray="5,3"/>
+  <circle cx="79.6" cy="145.0" r="12.0" fill="#fff" stroke="#000" stroke-width="1.5"/><circle cx="123.7" cy="145.0" r="12.0" fill="#fff" stroke="#000" stroke-width="1.5"/>
+  <circle cx="60" cy="110" r="6" fill="#b00"/>
+  <text x="8" y="98" font-size="14" fill="#b00" font-weight="bold">X0 Y0</text>
+  <line x1="60" y1="110" x2="120" y2="110" stroke="#b00" stroke-width="3" marker-end="url(#ar)"/>
+  <text x="90" y="104" font-size="13" fill="#b00" font-weight="bold">+X</text>
+  <line x1="60" y1="110" x2="60" y2="170" stroke="#b00" stroke-width="3" marker-end="url(#ar)"/>
+  <text x="20" y="160" font-size="13" fill="#b00" font-weight="bold">+Y</text>
+  <text x="60" y="250.0" font-size="12">ZERO END on the left</text>
+  <text x="886.0" y="250.0" text-anchor="end" font-size="12">grip end (2X R.2 corners)</text>
+  <text x="500" y="275.0" text-anchor="middle" font-size="12" fill="#555">dashed = parallels underneath, against each jaw. The holes are in the middle, over air.</text>
+  <text x="500" y="292" text-anchor="middle" font-size="14" font-weight="bold">YOU STAND HERE</text>
+</svg>
+
+<div class="op">
+<h3>A1. Load the bar</h3>
+<ol>
+  <li>Wipe the vise floor, the jaws and both 1 in parallels. Put one parallel against each jaw.</li>
+  <li>Lay the bar <b>flat</b> on the parallels (the 1 in face up). Pick one long side as the <b>ZERO EDGE</b> and put it against the <b>fixed (back) jaw</b>.</li>
+  <li>Slide the bar so <b>about .4 in sticks out past the left side of the jaws</b>. That end becomes the ZERO END. The rest of the bar sticks out to the right.</li>
+  <li>Tighten the vise. Tap the bar down with the dead-blow hammer, then tighten again. If you can slide either parallel with your fingers, tap again until you can't.</li>
+</ol>
+</div>
+
+<div class="op">
+<h3>A2. Check the DRO</h3>
+<ol>
+  <li>The DRO must be in <b>inch</b> mode.</li>
+  <li>Moving the spindle <b>to the right over the bar</b>, X must count <b>up</b>. Moving the spindle <b>toward you</b>, Y must count <b>up</b>. If either one counts down, reverse that axis in the DRO setup. Every number below assumes both count up.</li>
+</ol>
+</div>
+
+<div class="op">
+<h3>A3. Clean up the zero end (1/2 in end mill, 1250 rpm)</h3>
+<ol>
+  <li>Spindle off: lower the cutter to about .04 below the bottom of the bar, beside the left end, where there's nothing under it. Lock the head.</li>
+  <li>Start left of the end, toward the back. Move in .02 in X, then <b>feed toward you</b> across the end. Come back out, move in another .02, and repeat.</li>
+  <li>Stop when the whole end face is clean. Don't take off more than half of the allowance you wrote in Op 10.</li>
+  <li>Write <b>ZERO END</b> on the top face, next to this end, and <b>ZERO EDGE</b> next to the fixed jaw.</li>
+</ol>
+</div>
+
+<div class="op">
+<h3>A4. Set zero (edge finder, 1000 rpm)</h3>
+<ol>
+  <li><b>X zero:</b> touch the edge finder off the left end face, at about the middle of the width. Set <b>X = −.100</b>.</li>
+  <li><b>Y zero:</b> raise it and move right to about <b>X 8.0</b>, past the right side of the jaws where the bar is in the open. Touch off the zero edge from behind. Set <b>Y = −.100</b>.</li>
+  <li>Check: go to X .000, Y .000. The tip should sit right over the back-left corner.</li>
+</ol>
+</div>
+
+<div class="op">
+<h3>A5 and A6. Spot and drill both holes (drill chuck)</h3>
+<p>Move to each position and <b>stop exactly on the number</b>. Brush on oil.</p>
+<table class="fixed">
+  <tr><th>Hole</th><th class="num">X</th><th class="num">Y</th><th>A5: #2 centre drill, 3000 rpm</th><th>A6: 11/32 drill, 2000 rpm</th></tr>
+  <tr><td>H1 (near the end)</td><td class="num">.280</td><td class="num">.500</td><td>until the cone is about 3/16 across <span class="box"></span></td><td>through, peck every .1, stop about .1 past breakthrough <span class="box"></span></td></tr>
+  <tr><td>H2</td><td class="num">.910</td><td class="num">.500</td><td><span class="box"></span></td><td><span class="box"></span></td></tr>
+</table>
+<p class="small">Spot both holes first, then change to the drill and drill both. Both holes sit in the middle of the width, so the drill breaks out between the parallels into air. The parallels are under the outer 1/8 in of each side, and the hole edges stay about .2 in from them. Look before you drill anyway. H1 has only about .11 in of metal between the hole and the end, so feed gently as the drill breaks through.</p>
+</div>
+
+<h2>Setup B: Same vise, bar slid left. Cut the grip end to length.</h2>
+<svg viewBox="0 0 1000 300" width="100%" xmlns="http://www.w3.org/2000/svg">
+  <defs><marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#b00"/></marker></defs>
+  <rect x="424.0" y="84" width="434.0" height="26" fill="#bbb" stroke="#333"/>
+  <text x="641.0" y="76" text-anchor="middle" font-size="13">FIXED JAW (back): the ZERO EDGE sits against it</text>
+  <rect x="424.0" y="180.0" width="434.0" height="26" fill="#bbb" stroke="#333"/>
+  <text x="641.0" y="224.0" text-anchor="middle" font-size="13">MOVING JAW (your side)</text>
+  <path d="M60,110 H872.0 A14.0,14.0 0 0 1 886.0,124.0 V166.0 A14.0,14.0 0 0 1 872.0,180.0 H60 Z" fill="#f2f2f2" stroke="#111" stroke-width="2"/>
+  <rect x="424.0" y="110" width="434.0" height="8.75" fill="none" stroke="#777" stroke-dasharray="5,3"/>
+  <rect x="424.0" y="171.25" width="434.0" height="8.75" fill="none" stroke="#777" stroke-dasharray="5,3"/>
+  <circle cx="79.6" cy="145.0" r="12.0" fill="#fff" stroke="#999" stroke-width="1"/><circle cx="123.7" cy="145.0" r="12.0" fill="#fff" stroke="#999" stroke-width="1"/>
+  <circle cx="60" cy="110" r="6" fill="#b00"/>
+  <text x="8" y="98" font-size="14" fill="#b00" font-weight="bold">X0 Y0</text>
+  <line x1="60" y1="110" x2="120" y2="110" stroke="#b00" stroke-width="3" marker-end="url(#ar)"/>
+  <text x="90" y="104" font-size="13" fill="#b00" font-weight="bold">+X</text>
+  <line x1="60" y1="110" x2="60" y2="170" stroke="#b00" stroke-width="3" marker-end="url(#ar)"/>
+  <text x="20" y="160" font-size="13" fill="#b00" font-weight="bold">+Y</text>
+  <text x="60" y="250.0" font-size="12">ZERO END on the left</text>
+  <text x="886.0" y="250.0" text-anchor="end" font-size="12">grip end (2X R.2 corners)</text>
+  <text x="500" y="275.0" text-anchor="middle" font-size="12" fill="#555">Setup B: same bar, slid left. The grip end now sticks out about .4 in past the right side of the jaws.</text>
+  <text x="500" y="292" text-anchor="middle" font-size="14" font-weight="bold">YOU STAND HERE</text>
+</svg>
+<div class="op">
+<h3>B1. Move the bar</h3>
+<ol>
+  <li>Loosen the vise. Keep the ZERO EDGE against the fixed jaw and slide the bar <b>left</b> until the grip end sticks out <b>about .4 in past the right side of the jaws</b>. The zero end is now about 5 in out on the left, in the open.</li>
+  <li>Tighten, tap the bar down, and tighten again.</li>
+</ol>
+<h3>B2. Find X again (edge finder, 1000 rpm). Don't touch Y.</h3>
+<ol>
+  <li>Touch the edge finder off the <b>zero end</b> (out on the left) from the left. Set <b>X = −.100</b>.</li>
+</ol>
+<h3>B3. Cut the grip end to length (1/2 in end mill, 1250 rpm)</h3>
+<ol>
+  <li>Measure the end mill across its cutting edges with calipers and call it <b>D</b>, normally .500. Your last pass is at <b>X = 11.800 + D/2</b>: <b>X 12.050</b> for D = .500. Write yours here: ________ .</li>
+  <li>Spindle off: lower the cutter to about .04 below the bottom of the bar, beside the right end. Lock the head.</li>
+  <li>Use .02 in passes across the end, <b>feeding away from you</b> (conventional on the right-hand end). Work in toward your last-pass X. Don't go past it.</li>
+  <li>Check: touch the edge finder on the right end. It should read <b>11.900</b>, which is 11.800 + .100 (anything from 11.800 to 12.000 is OK). Then take the bar out.</li>
+</ol>
+</div>
+
+<h2 class="pb">Op 40: Round the two grip-end corners to R.2 (bench)</h2>
+<div class="op">
+<p>The two corners at the grip end get a .2 in radius, so the lever doesn't dig into your hand. These are the vertical edges you see from above, through the whole 1/2 in thickness. Anything from <b>R.1 to R.3</b> is OK, so this is filing work, not machining.</p>
+<ol>
+  <li>Dykem the grip end on the top face. With the rule and scriber, scribe a line <b>.20 from the end</b> across the top face, and a line <b>.20 in from each long side</b>, running back about 1/2 in from the end. Each corner's radius has to stay inside these lines.</li>
+  <li>Hold the lever upright in the bench vise, in soft jaws, with the grip end up and just above the jaws.</li>
+  <li>File each corner flat at 45° until the flat just reaches both lines. Then roll the file round the corner with light strokes until the flat blends into a smooth curve that just touches both lines.</li>
+  <li>Check against the 1:1 template on the last page. Lay the lever's top face on the paper with its end and long side on the template's lines. Each corner should sit between the blue (R.1) and red (R.3) dashed arcs, close to the black one.</li>
+</ol>
+</div>
+
+<h2>Op 50: Deburr (bench)</h2>
+<div class="op">
+<ol>
+  <li>Run the deburring tool lightly round every edge, including both ends of both holes: one or two passes, <b>.010 max</b>.</li>
+</ol>
+</div>
+
+<h2>Op 60: Check the part</h2>
+<p>Write down what you measure. If a reading is outside the OK range, don't use the lever until someone has looked at it.</p>
+<table>
+  <tr><th>What</th><th>Drawing</th><th>OK range</th><th>How to check</th><th>Reading</th></tr>
+  <tr><td>Length</td><td>11.8</td><td>11.7 – 11.9</td><td>DRO in B3, or a steel rule</td><td class="blank"></td></tr>
+  <tr><td>Width, thickness</td><td>(1") and (1/2") STOCK</td><td>as bought</td><td>no machining; just look for saw or vise damage</td><td class="blank"></td></tr>
+  <tr><td>Hole size</td><td>Ø.344 THRU, 2X</td><td>.344 – .348</td><td>a 5/16-18 screw drops through both holes freely. An 11/32 drill is .3438 nominal and normally cuts a little over that.</td><td class="blank"></td></tr>
+  <tr><td>Hole positions from the zero end</td><td>.28 and .91</td><td>±.01</td><td>calipers from the zero end to the near side of each hole, plus .172</td><td class="blank"></td></tr>
+  <tr><td>Hole row from the zero edge</td><td>2X .50</td><td>.49 – .51</td><td>calipers from the zero edge to the near side of a hole, plus .172</td><td class="blank"></td></tr>
+  <tr><td>Grip-end corners</td><td>2X R.2</td><td>R.1 – R.3</td><td>between the blue and red arcs on the template</td><td class="blank"></td></tr>
+  <tr><td>Edges</td><td>R.010 / .010 chamfer max</td><td>no sharp edges, no big chamfers</td><td>finger (carefully) and eye</td><td class="blank"></td></tr>
+  <tr><td>Fit</td><td>2 × 5/16-18 SHCS</td><td>both pass</td><td>two 5/16-18 socket head cap screws go through both holes at once without binding</td><td class="blank"></td></tr>
+</table>
+
+<table class="head">
+  <tr><th>Made by</th><td class="blank"></td><th>Date</th><td class="blank"></td><th>Time taken</th><td class="blank"></td></tr>
+  <tr><th>Problems / notes</th><td colspan="5" style="height:60px"></td></tr>
+</table>
+
+<h2 class="pb">Template: grip-end corner, 1:1</h2>
+<p><b>Print at 100% (Actual size), not "Fit to page".</b> Before you use it, check the bar below the template with your calipers: it must be 1.000 in. If it isn't, the print is scaled and the template is no good.</p>
+<div class="tmpl"><svg width="2.4in" height="1.65in" viewBox="0 0 2.4 1.65" xmlns="http://www.w3.org/2000/svg">
+  <path d="M0.3,0.2 H1.6" stroke="#bbb" stroke-width="0.008" stroke-dasharray="0.03,0.03"/>
+  <path d="M2.0,0.4 V1.0" stroke="#bbb" stroke-width="0.008" stroke-dasharray="0.03,0.03"/>
+  <path d="M0.3,0.2 H1.9 A0.1,0.1 0 0 1 2.0,0.3 V1.1 A0.1,0.1 0 0 1 1.9,1.2 H0.3" fill="none" stroke="#06c" stroke-width="0.008" stroke-dasharray="0.04,0.02"/>
+  <path d="M0.3,0.2 H1.7 A0.3,0.3 0 0 1 2.0,0.5 V0.9 A0.3,0.3 0 0 1 1.7,1.2 H0.3" fill="none" stroke="#b00" stroke-width="0.008" stroke-dasharray="0.04,0.02"/>
+  <path d="M0.3,0.2 H1.8 A0.2,0.2 0 0 1 2.0,0.4 V1.0 A0.2,0.2 0 0 1 1.8,1.2 H0.3" fill="none" stroke="#000" stroke-width="0.012"/>
+  <text x="0.35" y="0.72" font-size="0.1">grip end, 1:1</text>
+  <text x="0.35" y="0.86" font-size="0.08" fill="#b00">red = R.3 (max)</text>
+  <text x="0.35" y="0.98" font-size="0.08">black = R.2</text>
+  <text x="0.35" y="1.10" font-size="0.08" fill="#06c">blue = R.1 (min)</text>
+  <line x1="0.3" y1="1.45" x2="1.3" y2="1.45" stroke="#000" stroke-width="0.012"/>
+  <line x1="0.3" y1="1.40" x2="0.3" y2="1.50" stroke="#000" stroke-width="0.012"/>
+  <line x1="1.3" y1="1.40" x2="1.3" y2="1.50" stroke="#000" stroke-width="0.012"/>
+  <text x="1.36" y="1.48" font-size="0.08">must measure 1.000 in</text>
+</svg></div>
+
+<p class="small">Hand-written traveler, 2026-11-02. Sources: drawing MHA-CH-06-TL-26 v47, decimal-inch sheet from PR #2112 (branch inch/ch-jig at 9b0da9b4e; farm run 20261102T164350963Z), and the CAD spec cad/scripts/ch_rocker_arm_tl_oblique_feed_lever_spec.py on that branch. Stock allocation is from cad/process/shop/inventory.toml (OnlineMetals 1165). It was not generated or checked by prechips. Tool and machine values come from the shop inventory, and many of those are still placeholders (#1413), so check your actual tools. Speeds are from the LittleMachineShop chart. The 11/32 drill choice, the .02 in end passes and the filing method for the corners are my choices, not drawing values.</p>
+</body>
+</html>
