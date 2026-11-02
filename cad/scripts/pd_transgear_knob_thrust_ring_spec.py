@@ -41,16 +41,17 @@ LENGTH = 5.2
 # (paper_drive_arm_registration, the paper-drive assembly) consume it; the
 # sheet names that stack at the callout (drawing-guidelines rule 4).  F is
 # the disc cluster's printed stack's reference too (transgear_cluster_fit),
-# so the band is the cluster's (#2038 owner ruling 2026-10-28, option A).
+# so the band is the cluster's (pd_cluster_stack.yaml).
 LENGTH_TOL = PRINTED_LENGTH_BAND
 
 # Places each printed dimension carries (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the O.D. is routine
 # at .X (the wall below holds at that row, and nothing fits on the O.D.); the
-# bore prints at .XX under the DRILLED HOLES row; the length at .XXX under its
-# explicit band.
+# bore prints at .XX under the DRILLED HOLES row; the length at .XX, the
+# places of its explicit ±0.02 band (machinist review: 5.200 ±0.02 printed a
+# digit the band doesn't use).
 OD_PLACES = 1
 ID_PLACES = 2
-LENGTH_PLACES = 3
+LENGTH_PLACES = 2
 
 WALL_FLOOR = 2.0
 

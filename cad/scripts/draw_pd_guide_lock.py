@@ -60,7 +60,6 @@ from pd_guide_lock_spec import (
     LOCK_HEIGHT,
     LOCK_STOCK_CALLOUT,
     LOCK_THICK,
-    LOCK_THICK_BAND,
     LOCK_WIDTH,
 )
 
@@ -159,12 +158,13 @@ RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0] + 0.036, 0.209)}
 # without, farm run 20261012T061737079Z).
 DIMENSION_PREFIXES = {"Hole1Y": "2X ", "CornerR": "4X R"}
 DIMENSION_CALLOUTS = {"Depth": LOCK_STOCK_CALLOUT}
-# The 1/16 sheet's thickness is stock: a fraction REF with the supplier's
-# band, which governs it (drawing-guidelines.md; #290; machinist review
-# round 2: the bare fraction carried neither).
+# The 1/16 sheet's thickness is stock: a fraction REF whose supplier band
+# governs without being printed (drawing-guidelines.md; #290; machinist
+# review round 2 asked for the decimal beside the bare fraction, round 15
+# for no band on the REF).
 THICKNESS_DIMENSION = "Depth"
 THICKNESS_PREFIX = "1/16 ("
-THICKNESS_SUFFIX = f") REF \u00b1.{round(LOCK_THICK_BAND / 25.4 * 1000):03d}"
+THICKNESS_SUFFIX = ") REF"
 # The 1/8 drill's Ø prints .XXX, as every native Hole Wizard length.
 HOLE_CALLOUT_PRECISION = {"hw-diam": HOLE_LOCATION_PLACES}
 # The bent leader elbows at the text's LEFT end and enters hole 2 from its

@@ -205,12 +205,9 @@ def test_the_18_000_block_stands_between_the_hole_extension_lines() -> None:
 def test_the_thickness_value_stands_outboard_of_its_extension_lines() -> None:
     """Machinist review ENFORCE r1-r3: centred between the 1/16 sheet's
     extension lines, the value's digits sat on them; it stands right of the
-    edge-on view, left of the isometric. Round 2: it prints REF with the
-    supplier's band, which governs the stock thickness."""
-    band_in = pd_guide_lock_spec.LOCK_THICK_BAND / 25.4
-    assert drawing.THICKNESS_SUFFIX.endswith(
-        f"\u00b1{band_in:.3f}".replace("0.", ".", 1)
-    )
+    edge-on view, left of the isometric. The stock thickness prints REF with
+    no band: the supplier's band governs it unprinted."""
+    assert drawing.THICKNESS_SUFFIX == ") REF"
     printed = f"{drawing.THICKNESS_PREFIX}.0625{drawing.THICKNESS_SUFFIX}"
     x, _ = drawing.RIGHT_KEEP["Depth"]
     half = len(printed) * _CHAR_WIDTH / 2.0
