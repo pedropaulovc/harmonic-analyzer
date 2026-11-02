@@ -142,6 +142,14 @@ Next time: follow the plan.
 I asked Claude for advice after the session. None of this has been tried at the
 machine yet; the next entry will say what held up.
 
+**Revised 2026-11-01.** Earlier versions of this advice are in git history and
+were incomplete for op 10. The first (commit `5ac415feb`) laid the bar on two
+parallels running along its length, which my 6 in parallels can't do, and gave
+it no stop, so friction alone held it against the cut. The next (commit
+`e6fa73247`, in [PR #2140](https://github.com/pedropaulovc/harmonic-analyzer/pull/2140))
+added stops but said the cut pushes the bar onto the far-edge stops; it can
+pull it toward the cutter instead. The op 10 advice below replaces both.
+
 ![Setups for the base bar: what I did, op 10 width on the table against stops, op 20 in the vise](figures/2026-10-30-base-bar-setups.png)
 
 - **Workholding caused the ringing.** The cut was high above the jaws on a
@@ -163,26 +171,31 @@ machine yet; the next entry will say what held up.
   Z), radial bites of 1–2 mm into the edge, 12.7 mm in all (152.4 → 139.7),
   with the last ~0.5 mm as a finish pass. Each pass runs the 443 mm length in
   X. Check the real X travel first.
-- **Op 10 stops (panel B).** Friction alone holds the bar against the cut, and
-  conventional milling along the near edge pushes it away from me and to the
-  right. Clamp both 1-2-3 blocks, stood 2 in tall, against the far edge beside
-  the parallels: two solid faces stop the bar sliding and turning. At the
-  right-hand end, set an
+- **Op 10 stops (panel B).** Conventional milling along the near edge drags
+  the bar to the right, along the edge, and can pull it toward the cutter,
+  toward me: conventional milling pulls the cutter into the wall. An end stop
+  takes the drag. At the right-hand end, set an
   [HHIP 3900-2125 universal work stop](https://www.jbtools.com/hhip-universal-work-stop-3900-2125/)
   with its rod on the back half of the end face, so the cutter still runs off
   the end: clamp block all the way down (rod about 27–30 mm up; check it lands
   on the 25.4–38.1 mm edge), as little rod sticking out as possible, both set
-  screws tight. Its single 3/8 in rod is too springy for the far edge. Clamp
-  each stop to the table on its own; a stop that is only pushed against the
-  bar gets shoved aside. The new edge comes out straight along X whatever
-  angle the bar sits at; a skewed bar only makes the width taper against the
-  as-extruded far edge. If an even width matters, indicate the far edge along
-  X before the stops go on. Order: parallels and jack, bar, straps snug,
-  indicate, stops clamped, jack just touching (never lifting the bar), straps
-  tight, then run the whole pass in the air with the spindle off to check the
-  collet clears the straps and the work stop's column. (Unverified: neither
-  the jack nor the work stop is in hand yet, and the work stop's 1/2 in base
-  hole may be too tight for a 1/2-13 kit stud.)
+  screws tight. Nothing can stop the bar on the near side, because the cutter
+  runs the whole edge, so only the straps' grip holds it against the pull
+  toward me: tighten them properly and check after the first pass that the bar
+  hasn't crept toward the cutter. Clamp both 1-2-3 blocks, stood 2 in tall,
+  against the far edge beside the parallels. They square the bar to X and hold
+  it if a pass pushes it away (a climb pass does), but they carry none of the
+  pull toward the cutter. The work stop's single 3/8 in rod would be too
+  springy there. Clamp each stop to the table on its own; a stop that is only
+  pushed against the bar gets shoved aside. The new edge comes out straight
+  along X whatever angle the bar sits at; a skewed bar only makes the width
+  taper against the as-extruded far edge. If an even width matters, indicate
+  the far edge along X before the stops go on. Order: parallels and jack, bar,
+  straps snug, indicate, stops clamped, jack just touching (never lifting the
+  bar), straps tight, then run the whole pass in the air with the spindle off
+  to check the collet clears the straps and the work stop's column.
+  (Unverified: neither the jack nor the work stop is in hand yet, and the work
+  stop's 1/2 in base hole may be too tight for a 1/2-13 kit stud.)
 - **Op 20, ends and faces in the vise (panel C).** At 5½ in wide the bar fits
   the 5¾ in vise. Lay it flat on parallels with the op 10 edge against the
   fixed jaw, the end just past the side of the jaws and a jack under the far
