@@ -80,7 +80,7 @@ def test_every_tight_band_names_its_mate_or_function() -> None:
     for label in drawing.HOLE_MATES:
         assert f'_callout, label="{label}")' in source
     assert drawing._CLEARANCE_LEAST == pytest.approx(0.15)
-    assert drawing._CLEARANCE_MOST == pytest.approx(0.20)
+    assert drawing._CLEARANCE_MOST == pytest.approx(0.20032)
 
 
 def test_walls_clear_the_floor_at_worst_case() -> None:

@@ -314,7 +314,11 @@ FRONT_KEEP = {
     # from the bore's upper-right rim under the 13° arc.  The head's Ø is not
     # given here: its extension lines run the head's full height and the
     # crank-bore Ra's leader crossed the left one (r9 leader-crosses-leader).
-    "CrankBoreDia": (0.1344, 0.169),
+    # The inch ream's four-place band widened the box to x 109.3..160.3 mm,
+    # 12.66 mm from View C's 38.10 (#290 batch 0 view-crowding): 1.4 mm
+    # left, and 1.5 mm down so the 13° extension line, which ends at y 171.6,
+    # stops above the text's left end.
+    "CrankBoreDia": (0.1330, 0.1675),
 }
 
 # The plan's angled ray is the cone bore's axis; its basic 13° runs to it
@@ -477,7 +481,7 @@ JOURNAL_BORE = requirement(
     requirements=("dia", "thru", "finish_ra", "height", "unknown"), fields={
         "at": ([0.0, cone.BORE_HEIGHT, 0.0], ("BORE_HEIGHT",)),
         "axis": ([-_NORMAL[0], 0.0, -_NORMAL[2]], ("INCLINE_DEG",)),
-        "dia": (_band(cone.BORE_DIA, _P["JournalBoreDia"], cone.RUNNING_BORE_BAND), ("BORE_DIA", "RUNNING_BORE_BAND")),
+        "dia": (_band(cone.BORE_DIA, _P["JournalBoreDia"], cone.JOURNAL_BORE_BAND), ("BORE_DIA", "JOURNAL_BORE_BAND")),
         "nominal_dia": (cone.BORE_DIA, ("BORE_DIA",)), "thru": (True, (("draw_dt_cone_pivot_post", "DIMENSION_CALLOUTS"),)),
         "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
         "height": (_band(cone.BORE_HEIGHT, _P["JournalAxisY"], (cone.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM, -cone.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM)), ("BORE_HEIGHT", "JOURNAL_AXIS_HEIGHT_TOLERANCE_MM")),

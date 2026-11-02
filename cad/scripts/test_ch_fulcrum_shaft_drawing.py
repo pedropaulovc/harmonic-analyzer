@@ -200,7 +200,7 @@ def test_three_place_sizes_name_their_mates() -> None:
         keeper.BORE_DIA_BAND[1] - spec.SHAFT_DIA_BAND[0],
         keeper.BORE_DIA_BAND[0] - spec.SHAFT_DIA_BAND[1],
     )
-    assert "0.038-0.070 DIAMETRAL CLEARANCE" in spec.SHAFT_DIA_CALLOUT
+    assert "0.0381-0.0711 DIAMETRAL CLEARANCE" in spec.SHAFT_DIA_CALLOUT
     assert "MHA-CH-07" in spec.SHAFT_DIA_CALLOUT
     assert "MHA-CH-02" in spec.SHAFT_DIA_CALLOUT
     assert "MHA-CH-VN-55" in spec.ACROSS_FLAT_CALLOUT
@@ -255,9 +255,9 @@ def test_paired_keeper_bores_keep_a_running_fit_on_the_rail_seats() -> None:
     assert math.isclose(keeper.BORE_SEAT_ALLOWANCE_MM, allowance)
     assert round(allowance, 4) == 0.0274
     least = keeper.BORE_DIA_BAND[1] - spec.SHAFT_DIA_BAND[0]
-    assert least >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM + allowance  # 0.038 >= 0.0374
+    assert least >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM + allowance  # 0.0381 >= 0.0374
     assert math.isclose(spec.PAIRED_MIN_CLEARANCE_MM, least - allowance)
-    assert round(spec.PAIRED_MIN_CLEARANCE_MM, 4) == 0.0106
+    assert round(spec.PAIRED_MIN_CLEARANCE_MM, 4) == 0.0107
     assert spec.PAIRED_MIN_CLEARANCE_MM >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM == 0.010
 
 

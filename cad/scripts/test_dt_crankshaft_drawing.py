@@ -71,7 +71,7 @@ def test_policy_migrated_sheet_carries_no_gdt_and_model_owned_places() -> None:
     # bands (drawing-guidelines.md rule 3 (decimal places carry the tolerance)) at the places that hold them; the rest at one.
     functional_places = {
         "ShaftDiaDim": 3,
-        "JournalDiaDim": 3,
+        "JournalDiaDim": 4,
         "PinionSeatDiaDim": 3,
         "SpigotDiaDim": 2,
         "SpigotLength": 2,

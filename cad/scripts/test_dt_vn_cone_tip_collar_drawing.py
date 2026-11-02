@@ -708,13 +708,13 @@ def test_coupled_body_shift_has_one_source_and_keeps_radial_and_body_process_env
 
 
 def test_printed_physical_limits_keep_exact_native_model_and_real_fit_distinct():
-    assert lands.TERMINAL_FINISHED_DIA_LIMITS_MM == pytest.approx((0.774, 0.794))
-    assert spec.BORE_FINISHED_DIA_LIMITS_MM == pytest.approx((0.819, 0.879))
+    assert lands.TERMINAL_FINISHED_DIA_LIMITS_MM == pytest.approx((0.77368, 0.794))
+    assert spec.BORE_FINISHED_DIA_LIMITS_MM == pytest.approx((0.8196, 0.8704))
     assert lands.TERMINAL_DIA_MM == pytest.approx(0.79375)
-    assert spec.BORE_MODEL_DIA_MM == pytest.approx(0.84875)
+    assert spec.BORE_MODEL_DIA_MM == pytest.approx(0.84455)
     minimum = (spec.BORE_FINISHED_DIA_LIMITS_MM[0]-lands.TERMINAL_FINISHED_DIA_LIMITS_MM[1])/2.0
     maximum = (spec.BORE_FINISHED_DIA_LIMITS_MM[1]-lands.TERMINAL_FINISHED_DIA_LIMITS_MM[0])/2.0
-    assert (minimum, maximum) == pytest.approx((lands.TIP_COLLAR_MIN_RADIAL_FLOAT_MM, lands.TIP_COLLAR_MAX_RADIAL_FLOAT_MM))
+    assert (minimum, maximum) == pytest.approx((lands.TIP_COLLAR_MIN_RADIAL_FLOAT_MM, lands.TIP_COLLAR_MAX_RADIAL_FLOAT_MM), abs=spec._PRINT_GRID_TOL_MM)
 
 
 def test_original_journal_span_pays_north_withdrawal_once():
@@ -728,7 +728,7 @@ def test_original_journal_span_pays_north_withdrawal_once():
     assert shaft.JOURNAL_SUPPORT_SPAN_MIN_MM == pytest.approx(expected)
 
 
-@pytest.mark.parametrize("section,native", [(0, 12.2308), (1, 9.525), (2, 6.35), (3, 3.175), (4, 0.79375)])
+@pytest.mark.parametrize("section,native", [(0, 12.2555), (1, 9.525), (2, 6.35), (3, 3.175), (4, 0.79375)])
 def test_all_land_physical_limit_readers_share_native_print_precision(section, native):
     import dt_cone_gear_shaft_spec as shaft
     assert shaft.DRAWING_PRECISION[f"Sec{section}Profile"][f"Sec{section}Dia"] == lands.LAND_DIA_PLACES[section]
@@ -903,14 +903,15 @@ def test_installation_notes_name_the_journal_and_its_clearance() -> None:
     bore_low, bore_high = spec.BORE_FINISHED_DIA_LIMITS_MM
     assert shaft == "MHA-DT-04"
     assert (bore_low - land_high, bore_high - land_low) == pytest.approx(
-        (2.0 * lands.TIP_COLLAR_MIN_RADIAL_FLOAT_MM, 2.0 * lands.TIP_COLLAR_MAX_RADIAL_FLOAT_MM)
+        (2.0 * lands.TIP_COLLAR_MIN_RADIAL_FLOAT_MM, 2.0 * lands.TIP_COLLAR_MAX_RADIAL_FLOAT_MM),
+        abs=spec._PRINT_GRID_TOL_MM,
     )
     lines = spec.INSTALLATION_NOTES.splitlines()
     assert lines[:2] == [
-        f"FITS {shaft} TERMINAL JOURNAL \u00d8{land_low:.3f} TO {land_high:.3f};",
-        f"DIAMETRAL CLEARANCE {bore_low - land_high:.3f} TO {bore_high - land_low:.3f}.",
+        f"FITS {shaft} TERMINAL JOURNAL \u00d8{land_low:.4f} TO {land_high:.4f};",
+        f"DIAMETRAL CLEARANCE {bore_low - land_high:.4f} TO {bore_high - land_low:.4f}.",
     ]
-    assert lines[1] == "DIAMETRAL CLEARANCE 0.025 TO 0.105."
+    assert lines[1] == "DIAMETRAL CLEARANCE 0.0256 TO 0.0967."
     assert bore_low - land_high > 0.0
     # The longest line the notes box has printed (the old supply line).
     assert max(map(len, lines)) <= 55
