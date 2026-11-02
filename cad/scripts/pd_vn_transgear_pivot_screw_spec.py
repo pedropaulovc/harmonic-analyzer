@@ -214,12 +214,6 @@ SUPPLIER_REFERENCE_DIMENSIONS = {
         "callout": "AS SUPPLIED\nSTOCK THREAD",
     },
 }
-# Native source-band carriers do not retolerance solid-driving dimensions or
-# the existing faced-tip manufacturing acceptance controls.
-SUPPLIER_REFERENCE_BANDS = {
-    "SupplierShoulderDiameter": SHOULDER_DIA_LIMITS,
-    "SupplierShoulderLength": SHOULDER_LEN_LIMITS,
-}
 SUPPLIER_REFERENCE_SKETCH = (
     ("SupplierThreadMajor", THREAD_MAJOR, "horizontal"),
     ("SupplierShoulderDiameter", SHOULDER_DIA, "horizontal"),

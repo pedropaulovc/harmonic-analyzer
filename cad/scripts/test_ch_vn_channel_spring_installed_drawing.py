@@ -23,7 +23,6 @@ def test_source_gauges_preserve_exact_values_and_supplier_spelling() -> None:
     assert math.isclose(spec.MAX_LENGTH_MM, 5.448 * 25.4)
     assert math.isclose(spec.SUPPLIER_COIL_OD_MM, 0.25 * 25.4)
     assert math.isclose(spec.SUPPLIER_WIRE_DIA_MM, 0.026 * 25.4)
-    assert math.isclose(spec.SUPPLIER_COIL_OD_TOLERANCE_MM, 0.008 * 25.4)
     assert spec.SUPPLIER_PRECISION == {
         "SupplierFreeLength": 3, "SupplierMaximumLength": 3,
         "SupplierCoilOD": 2, "SupplierWireDiameter": 3,

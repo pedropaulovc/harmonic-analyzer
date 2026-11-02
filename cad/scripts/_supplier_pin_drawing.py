@@ -171,8 +171,6 @@ def _supplier_diameter(
     adapter: Any, view: Any, circles: list[ViewEdge], source: SupplierPinReference,
     *, text_xy: tuple[float, float]
 ) -> tuple[Any, Callable[[Any], None]]:
-    if source.diameter_band is not None:
-        raise ValueError(f"{source.sku}: banded OD must be imported from its model owner")
     label = f"{source.sku} supplier diameter"
     edge = _outer_circle(circles, source.diameter_mm, label=label)
     display = _diameter_dimension(adapter, view, edge, text_xy, label=label)
@@ -320,7 +318,7 @@ def _import_model_references(
 def add_supplier_dowel_dimensions(
     adapter: Any, views: dict[str, Any], source: SupplierPinReference
 ) -> Callable[[], None]:
-    """Import source-owned OD/band; author only the bandless end-rim length."""
+    """Import the source-owned bandless OD REF; author the bandless end-rim length."""
     front = views["*Front"]
     circles = _axis_circles(scan_view_edges(front, label=f"{source.sku} dowel"), 1, label=source.sku)
     length, length_check = _supplier_length(

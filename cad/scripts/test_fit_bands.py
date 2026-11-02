@@ -70,11 +70,6 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     ("build_pn_pen_hanger", "band"): ("DRAWING_BANDS", "values"),
     ("build_pn_pen_rod", "band"): ("DRAWING_BANDS", "values"),
     ("build_pn_pen_v_block", "band"): ("DRAWING_BANDS", "values"),
-    # Supplier-reference saver forwards each model-owned source band's two limits.
-    ("build_pd_vn_transgear_pivot_screw", "band"): (
-        "SUPPLIER_REFERENCE_BANDS",
-        "values",
-    ),
     # _single_limits passes each single-limit band (MIN chamfer, MAX rounds).
     ("build_pn_pen_v_block", "limit_band"): (
         "tuple(limit[3] for limit in _SINGLE_LIMITS)",
@@ -134,6 +129,21 @@ OFFLINE_IMPORT_EXCLUSIONS: dict[str, str] = {}
 # Module-level *_BAND tuples that are not fit bands, so no checked consumer
 # reads them. A new band tuple must be fed to a consumer above or listed here.
 NOT_FIT_BANDS: dict[tuple[str, str], str] = {
+    # Catalogue records for purchased oblique-trammel parts. Their sheets print
+    # supplier sizes as untoleranced REF (the catalogue governs) and no fit
+    # stack reads these sizes; fit-read bands are in INDEXED_FIT_BANDS.
+    ("ch_rocker_arm_tl_vn_oblique_pivot_shim_spec", "ID_BAND"): (
+        "catalogue bore record; printed as untoleranced REF"
+    ),
+    ("ch_rocker_arm_tl_vn_oblique_pivot_shim_spec", "OD_BAND"): (
+        "catalogue OD record; printed as untoleranced REF"
+    ),
+    ("ch_rocker_arm_tl_vn_oblique_pivot_shim_spec", "THICKNESS_BAND"): (
+        "catalogue thickness record; printed as untoleranced REF"
+    ),
+    ("ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec", "ID_BAND"): (
+        "catalogue bore record; printed as untoleranced REF"
+    ),
     ("build_dt_drive_train_assembly", "ARBOR_PED_SOUTH_Z_BAND"): (
         "plan z extent of the south pedestal foot (clearance geometry)"
     ),
@@ -235,6 +245,18 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
 # to print or derive limits. An inverted one prints wrong limits, so they get
 # the same check as a helper-fed band.
 INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
+    ("ch_rocker_arm_tl_vn_oblique_pivot_screw_spec", "SHOULDER_LENGTH_BAND"): (
+        "catalogue shoulder-length band, indexed for the jig's "
+        "PIVOT_UNSHIMMED_GAP_RANGE; the sheet prints it as untoleranced REF"
+    ),
+    ("ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec", "LENGTH_BAND"): (
+        "catalogue length band, indexed for the jig's "
+        "PIVOT_UNSHIMMED_GAP_RANGE; the sheet prints it as untoleranced REF"
+    ),
+    ("ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec", "OD_BAND"): (
+        "catalogue OD band, upper limit indexed for the carrier's thrust-seat "
+        "chamfer-mouth check; the sheet prints it as untoleranced REF"
+    ),
     ("dt_alignment_pinion_spec", "BASE_TANGENT_SPAN_BAND"): (
         "indexed into the span-measurement note text"
     ),

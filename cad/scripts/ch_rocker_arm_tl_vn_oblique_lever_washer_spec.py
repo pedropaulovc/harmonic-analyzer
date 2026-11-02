@@ -110,9 +110,8 @@ DRAWING_REFERENCE_PRECISION = {
     "supplier bore diameter": 2,
     "supplier thickness": 2,
 }
-SUPPLIER_TOLERANCES = {
-    "supplier thickness": (THICKNESS_MIN, THICKNESS_MAX, "limits"),
-}
+# Supplier sizes the part witnesses natively; all print untoleranced REF.
+SUPPLIER_MODEL_REFERENCES = ("supplier thickness",)
 SUPPLIER_BORE_CALLOUT = "FOR 5/16 / M8 SCREW SIZE"
 SUPPLIER_DATA = (
     "SUPPLIER DRAWING SHOWS A TWO-PIECE WEDGE-LOCK STACK.",

@@ -30,7 +30,8 @@ async def build(adapter: Any) -> dict[str, str]:
         proofs.append(supplier_washer_dimensions(
             adapter, views, axis="y", bore_mm=part.ID, outer_mm=part.OD,
             thickness_mm=part.THICKNESS, units=part.SUPPLIER_UNITS,
-            precision=part.DRAWING_REFERENCE_PRECISION, bands=part.SUPPLIER_TOLERANCES,
+            precision=part.DRAWING_REFERENCE_PRECISION,
+            model_references=part.SUPPLIER_MODEL_REFERENCES,
             bore_callout=part.SUPPLIER_BORE_CALLOUT,
         ))
 

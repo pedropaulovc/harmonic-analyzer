@@ -25,7 +25,6 @@ from _part_save import save_part_and_images
 from _session import run_build
 from _sketch import ensure_fully_defined
 from _sketch_circle import define_circle
-from _supplier_limits import set_supplier_limits
 from _supplier_screw_reference import add_supplier_reference_sketch
 from _supplier_screw_reference_names import FEATURE_BY_PLANE
 from _visibility import blank_reference_geometry
@@ -59,9 +58,6 @@ async def _supplier_references(adapter):
         starts=part.SUPPLIER_REFERENCE_STARTS,
         planes=part.SUPPLIER_REFERENCE_PLANES,
     )
-    for name, (lower, upper) in part.SUPPLIER_REFERENCE_TOLERANCES_MM.items():
-        feature = FEATURE_BY_PLANE[part.SUPPLIER_REFERENCE_PLANES[name]]
-        set_supplier_limits(adapter, feature, name, lower, upper)
     for name, value, _orientation in part.SUPPLIER_REFERENCE_DIMENSIONS:
         feature = FEATURE_BY_PLANE[part.SUPPLIER_REFERENCE_PLANES[name]]
         display, native = _named_dimension(adapter, feature, name)
@@ -70,8 +66,7 @@ async def _supplier_references(adapter):
             raise RuntimeError(name + ": nominal carrier value changed")
         if display.SetUnits2(False, 0, 1, 0, False, 0) != 0:
             raise RuntimeError(name + ": millimetre units rejected")
-        banded = name in part.SUPPLIER_REFERENCE_TOLERANCES_MM
-        if display.SetPrecision3(precision, -1, precision if banded else -1, -1) != 0:
+        if display.SetPrecision3(precision, -1, -1, -1) != 0:
             raise RuntimeError(name + ": source precision rejected")
         prefix = "(<MOD-DIAM>" if presentation == "diameter" else "("
         display.ShowParenthesis = False
@@ -85,8 +80,7 @@ async def _supplier_references(adapter):
             or str(display.GetText(1) or "") != prefix
             or str(display.GetText(2) or "") != " mm)"
             or str(display.GetText(4) or "") != callout
-            or (banded and int(display.GetPrimaryTolPrecision2()) != precision)
-            or (not banded and int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0)):
+            or int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0):
             raise RuntimeError(name + ": source presentation did not persist")
 
 

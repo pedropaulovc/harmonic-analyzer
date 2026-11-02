@@ -1,13 +1,14 @@
-"""Import model-owned washer supplier bands; add only unbanded rim refs.
+"""Import model-owned washer supplier REFs; add only the remaining rim refs.
 
-The part owns every banded dimension's native value, tolerance and supplier
-specification. Imports get their drawing-local ink explicitly, without relying
-on native import inheriting the part's display-unit flag.
+The part owns the native value and supplier specification of every size it
+witnesses. Supplier sizes print untoleranced (the catalogue governs). Imports
+get their drawing-local ink explicitly, without relying on native import
+inheriting the part's display-unit flag.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
 from math import isfinite
 from typing import Any, Literal
@@ -33,7 +34,7 @@ from _supplier_washer_model import (
     OUTER_DIAMETER,
     SOURCE_DIMENSIONS,
     THICKNESS,
-    assert_supplier_washer_band,
+    assert_supplier_washer_unbanded,
     assert_supplier_washer_body,
     assert_supplier_washer_source_attachment,
     assert_supplier_washer_references,
@@ -240,7 +241,7 @@ def assert_supplier_washer_dimensions(
     adapter: Any, views: dict[str, Any], references: tuple[_WasherReference, ...], *,
     axis: Literal["y", "z"], bore_mm: float, outer_mm: float, thickness_mm: float,
     units: Literal["in", "mm"], precision: Mapping[str, int],
-    bands: Mapping[str, tuple[float, float, str]],
+    model_references: Collection[str],
     thickness_stations: Mapping[str, Any],
 ) -> None:
     """Reacquire displays, source entities and final solid rims after rebuild."""
@@ -300,15 +301,12 @@ def assert_supplier_washer_dimensions(
             )
         else:
             _assert_rim(adapter, display, face_rims[reference.label], label=reference.label)
-        assert_supplier_washer_band(
-            display, nominal_mm=reference.expected_mm, band=bands.get(reference.label),
-            precision=precision[reference.label], label=reference.label,
-        )
+        assert_supplier_washer_unbanded(display, label=reference.label)
     assert_supplier_washer_references(
         adapter, model, axis=axis, bore_mm=bore_mm, outer_mm=outer_mm,
         thickness_mm=thickness_mm, units=units, sheet_units=sheet_units(adapter),
         precision=precision,
-        bands=bands, bore_callout=next(
+        references=model_references, bore_callout=next(
             reference.callout for reference in references if reference.label == BORE_DIAMETER
         ),
     )
@@ -319,12 +317,10 @@ def assert_supplier_washer_dimensions(
 def supplier_washer_dimensions(
     adapter: Any, views: dict[str, Any], *, axis: Literal["y", "z"],
     bore_mm: float, outer_mm: float, thickness_mm: float, units: Literal["in", "mm"],
-    precision: Mapping[str, int], bands: Mapping[str, tuple[float, float, str]],
+    precision: Mapping[str, int], model_references: Collection[str],
     bore_callout: str | None = None,
 ) -> Callable[[], None]:
-    """Import every banded size; author only bandless OD/ID physical refs."""
-    if set(bands) not in ({THICKNESS}, {OUTER_DIAMETER, BORE_DIAMETER, THICKNESS}):
-        raise ValueError("unsupported washer supplier band coverage")
+    """Import every model-owned size; author only the remaining OD/ID rim refs."""
     # The purchased-sheet source checkpoint has already proved this view's
     # referenced document/path against the original read-only source.
     model = _early_bound(views["*Front"], "IView").ReferencedDocument
@@ -337,7 +333,7 @@ def supplier_washer_dimensions(
     assert_supplier_washer_references(
         adapter, model, axis=axis, bore_mm=bore_mm, outer_mm=outer_mm,
         thickness_mm=thickness_mm, units=units, sheet_units=sheet, precision=precision,
-        bands=bands, bore_callout=bore_callout,
+        references=model_references, bore_callout=bore_callout,
     )
     face = views["*Top" if axis == "y" else "*Front"]
     side = views["*Front" if axis == "y" else "*Top"]
@@ -353,7 +349,7 @@ def supplier_washer_dimensions(
     references: list[_WasherReference] = []
     displays: dict[str, Any] = {}
     for view, labels in ((face, (OUTER_DIAMETER, BORE_DIAMETER)), (side, (THICKNESS,))):
-        imported_labels = tuple(label for label in labels if label in bands)
+        imported_labels = tuple(label for label in labels if label in model_references)
         if not imported_labels:
             continue
         annotations = curate_view_dimensions(
@@ -381,16 +377,15 @@ def supplier_washer_dimensions(
             references.append(_reference(display, view, label, values[label], imported=True,
                                          callout=bore_callout if label == BORE_DIAMETER else None))
             displays[label] = display
-            assert_supplier_washer_band(
-                display, nominal_mm=values[label], band=bands[label],
-                precision=precision[label], label=label,
-            )
+            assert_supplier_washer_unbanded(display, label=label)
     assert_supplier_washer_references(
         adapter, model, axis=axis, bore_mm=bore_mm, outer_mm=outer_mm,
         thickness_mm=thickness_mm, units=units, sheet_units=sheet, precision=precision,
-        bands=bands, bore_callout=bore_callout,
+        references=model_references, bore_callout=bore_callout,
     )
-    unbanded = tuple(label for label in (OUTER_DIAMETER, BORE_DIAMETER) if label not in bands)
+    unbanded = tuple(
+        label for label in (OUTER_DIAMETER, BORE_DIAMETER) if label not in model_references
+    )
     if unbanded:
         edges = scan_view_edges(face, label="supplier washer unbanded face rims")
         for label in unbanded:
@@ -413,7 +408,7 @@ def supplier_washer_dimensions(
         assert_supplier_washer_dimensions(
             adapter, views, tuple(references), axis=axis, bore_mm=bore_mm,
             outer_mm=outer_mm, thickness_mm=thickness_mm, units=units,
-            precision=precision, bands=bands,
+            precision=precision, model_references=model_references,
             thickness_stations=thickness_stations,
         )
 

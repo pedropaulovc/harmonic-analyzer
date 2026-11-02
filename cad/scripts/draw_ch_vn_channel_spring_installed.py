@@ -39,8 +39,6 @@ def _supplier_dimensions(
         reference_bounds=reference_bounds,
         max_length_mm=supplier.MAX_LENGTH_MM, coil_od_mm=supplier.SUPPLIER_COIL_OD_MM,
         wire_dia_mm=supplier.SUPPLIER_WIRE_DIA_MM, precision=supplier.SUPPLIER_PRECISION,
-        od_tolerance_mm=supplier.SUPPLIER_COIL_OD_TOLERANCE_MM,
-        od_tolerance_precision=supplier.SUPPLIER_COIL_OD_TOLERANCE_PRECISION,
     )
 
 

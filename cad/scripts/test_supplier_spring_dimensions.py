@@ -157,16 +157,8 @@ def _extension_views(spec):
                 for owner, owned in extension.DIMENSIONS_BY_FEATURE.items()
                 if name in owned
             )
-            band = (
-                (
-                    channel.SUPPLIER_COIL_OD_TOLERANCE_MM,
-                    -channel.SUPPLIER_COIL_OD_TOLERANCE_MM,
-                )
-                if spec is channel and name == extension.COIL_OD
-                else None
-            )
             views[key].annotations.append(
-                _native_annotation(name, owner, values[name], band)
+                _native_annotation(name, owner, values[name], None)
             )
     return views
 
@@ -181,10 +173,6 @@ def _extension_checks(spec, views):
         coil_od_mm=spec.SUPPLIER_COIL_OD_MM,
         wire_dia_mm=spec.SUPPLIER_WIRE_DIA_MM,
         precision=spec.SUPPLIER_PRECISION,
-        od_tolerance_mm=getattr(spec, "SUPPLIER_COIL_OD_TOLERANCE_MM", None),
-        od_tolerance_precision=getattr(
-            spec, "SUPPLIER_COIL_OD_TOLERANCE_PRECISION", None
-        ),
     )
 
 
@@ -246,22 +234,16 @@ def test_extension_section_diameters_each_take_one_near_side_arrow(monkeypatch, 
     assert sorted(near_side) == sorted((extension.COIL_OD, extension.WIRE_DIA))
 
 
-@pytest.mark.parametrize("corruption", ["type", "lower", "upper", "precision"])
-def test_channel_source_od_band_is_rechecked_after_rebuild(monkeypatch, corruption):
+def test_channel_source_od_prints_without_a_supplier_band(monkeypatch):
     views = _extension_views(channel)
     _readback_environment(monkeypatch, layout, views)
     checks = _extension_checks(channel, views)
+    for check in checks:
+        check()
+    # The catalogue tolerance governs; a band on the printed OD is refused.
     display = views["free_right"].annotations[0].GetSpecificAnnotation()
-    tolerance = display.GetDimension2(0).Tolerance
-    if corruption == "type":
-        tolerance.Type = 0
-    elif corruption == "lower":
-        tolerance.GetMinValue = lambda: 0.0
-    elif corruption == "upper":
-        tolerance.GetMaxValue = lambda: 0.0
-    else:
-        display.GetPrimaryTolPrecision2 = lambda: 0
-    with pytest.raises(RuntimeError, match="band changed after final rebuild"):
+    display.GetDimension2(0).Tolerance.Type = 4
+    with pytest.raises(RuntimeError, match="gained a tolerance"):
         for check in checks:
             check()
 
@@ -287,12 +269,7 @@ def _disc_views(spec):
                 if name in names
             )
             views[key].annotations.append(
-                _native_annotation(
-                    name,
-                    owner,
-                    getattr(spec, semantic),
-                    getattr(spec, f"{semantic}_BAND", None),
-                )
+                _native_annotation(name, owner, getattr(spec, semantic))
             )
     return views
 
@@ -330,7 +307,7 @@ def test_disc_final_checks_reacquire_source_and_application_gauges(
     elif corruption == "extra":
         views["installed_iso"].annotations.append(view.annotations[0])
     else:
-        native.Tolerance.Type = 0 if spec is not pivot else 4
+        native.Tolerance.Type = 4
     with pytest.raises(RuntimeError):
         for check in checks:
             check()

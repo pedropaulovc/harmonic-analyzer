@@ -94,8 +94,3 @@ SUPPLIER_REFERENCE_FORMATS = {
     "SupplierHeadHeight": (3, "length", None, None),
     "SupplierDriveWidth": (3, "length", None, None),
 }
-# Absolute source limits in inches, not stock-recipe tolerances or fit bands.
-SUPPLIER_REFERENCE_LIMITS_IN = {
-    "SupplierHeadDiameter": (0.201, 0.213),
-    "SupplierHeadHeight": (0.051, 0.059),
-}

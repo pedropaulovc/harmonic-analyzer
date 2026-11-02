@@ -70,14 +70,12 @@ def test_native_supplier_witness_inventory():
     assert names == set(spec.SUPPLIER_REFERENCE_STARTS) == set(spec.SUPPLIER_REFERENCE_PLANES)
     assert names == set(spec.SUPPLIER_REFERENCE_FORMATS) == set(spec.SUPPLIER_REFERENCE_UNITS)
     assert names == set(spec.SUPPLIER_REFERENCE_SIDES)
-    assert set(spec.SUPPLIER_REFERENCE_TOLERANCES_MM) <= names
     for name, value, orientation in spec.SUPPLIER_REFERENCE_DIMENSIONS:
         assert value > 0
         plane = spec.SUPPLIER_REFERENCE_PLANES[name]
         assert plane in FEATURE_BY_PLANE
         assert orientation == ("horizontal" if plane == "Front" else "vertical")
         assert spec.SUPPLIER_REFERENCE_UNITS[name] == "mm"
-    assert all(lower <= upper for lower, upper in spec.SUPPLIER_REFERENCE_TOLERANCES_MM.values())
 
 
 def test_build_uses_contract_dimensions_and_publishes_z_axis(monkeypatch):

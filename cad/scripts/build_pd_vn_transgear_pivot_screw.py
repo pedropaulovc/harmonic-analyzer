@@ -34,10 +34,6 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import _named_dimension, apply_drawing_precision
-from _drawing_tolerances import (
-    _set_tolerance_precision,
-    set_dimension_bilateral_tolerance,
-)
 from _fastener_catalog import fastener
 from _feature_tree import _feature_by_name, name_last_feature
 from _rebuild import (
@@ -80,8 +76,6 @@ from pd_vn_transgear_pivot_screw_spec import (
     THREAD_LENGTH_MIN,
     THREAD_MAJOR,
     TIP_Y,
-    SUPPLIER_REFERENCE_BANDS,
-    SUPPLIER_REFERENCE_DIMENSIONS,
     SUPPLIER_REFERENCE_SKETCH,
     SUPPLIER_REFERENCE_STARTS,
     SUPPLIER_STOCK_CONFIGURATION,
@@ -490,34 +484,14 @@ def _add_stock_configuration(adapter) -> str:
 
 
 async def _save_supplier_references(adapter, part_name, suppressed_features):
-    """Author model-owned source bands without changing solid or final controls."""
+    """Author untoleranced source references without changing solid or final controls.
+
+    Supplier sizes print as REF with no band: the catalogue governs, and the
+    fit math reads its limits from the spec, never from these dimensions.
+    """
     await add_supplier_reference_sketch(
         adapter, SUPPLIER_REFERENCE_SKETCH, starts=SUPPLIER_REFERENCE_STARTS
     )
-    for name, band in SUPPLIER_REFERENCE_BANDS.items():
-        set_dimension_bilateral_tolerance(adapter, "SupplierReference", name, *band)
-        display, _dimension = _named_dimension(adapter, "SupplierReference", name)
-        places = SUPPLIER_REFERENCE_DIMENSIONS[name]["precision"]
-        # These are source-model dimensions, not drawing-owned annotations.
-        # Author their units/precision here; the drawing's supplier exception
-        # later adds only the reference presentation, never the tolerance band.
-        if display.SetUnits2(False, 3, 1, 0, False, 0) != 0:
-            raise RuntimeError(f"{name}: source-model inch units were rejected")
-        if display.SetPrecision3(places, -1, -1, -1) != 0:
-            raise RuntimeError(f"{name}: source-model precision was rejected")
-        if (
-            display.GetUseDocUnits()
-            or int(display.GetUnits()) != 3
-            or int(display.GetPrimaryPrecision2()) != places
-        ):
-            raise RuntimeError(f"{name}: source-model units/precision did not persist")
-        _set_tolerance_precision(
-            display,
-            band,
-            display_unit="in",
-            label=name,
-            places=places,
-        )
     apply_drawing_properties(
         adapter, part_name, {"Supplier Reference Title": SUPPLIER_STOCK_TITLE}
     )

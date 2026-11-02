@@ -27,7 +27,7 @@ async def _build_with_supplier_references(adapter, truth=None):
         adapter, axis="y", bore_mm=part.ID, outer_mm=part.OD,
         thickness_mm=part.THICKNESS, units=part.SUPPLIER_UNITS,
         sheet_units=part_drawing_unit(PART_NAME),
-        precision=part.DRAWING_REFERENCE_PRECISION, bands=part.SUPPLIER_TOLERANCES,
+        precision=part.DRAWING_REFERENCE_PRECISION, references=part.SUPPLIER_MODEL_REFERENCES,
     )
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
 

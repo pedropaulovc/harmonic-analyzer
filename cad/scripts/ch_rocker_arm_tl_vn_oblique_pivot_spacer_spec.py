@@ -13,8 +13,6 @@ Supplied component is installed without shop modification.
 
 from __future__ import annotations
 
-from _fit_deviations import deviations
-
 SKU = "92871A359"
 QUANTITY = 2
 ID = 10.0
@@ -33,9 +31,4 @@ SUPPLIER_REFERENCE_FORMATS = {'SupplierBoreDiameter': (2, 'diameter', None, 'BOR
 # of the other's witnesses. The length sits right of the Top view.
 SUPPLIER_REFERENCE_SIDES = {'SupplierBoreDiameter': 'top', 'SupplierOuterDiameter': 'bottom', 'SupplierLength': 'right'}
 SUPPLIER_REFERENCE_UNITS = {'SupplierBoreDiameter': 'mm', 'SupplierOuterDiameter': 'mm', 'SupplierLength': 'mm'}
-SUPPLIER_REFERENCE_TOLERANCES_MM = {
-    'SupplierBoreDiameter': deviations(ID_BAND),
-    'SupplierOuterDiameter': deviations(OD_BAND),
-    'SupplierLength': deviations(LENGTH_BAND),
-}
 SUPPLIER_DATA = ('LOOSE BORE IS NOT A LOCATING BUSHING.',)

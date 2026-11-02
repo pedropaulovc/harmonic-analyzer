@@ -368,7 +368,7 @@ def test_sizes_import_at_their_stations_and_settle_under_the_shared_contract(
     for name in (
         "assert_supplier_reference_dimension",
         "assert_supplier_configuration_value",
-        "_assert_source_band",
+        "_assert_unbanded",
     ):
         monkeypatch.setattr(
             drawing, name, lambda *_a, name=name, **_k: calls.append(name)

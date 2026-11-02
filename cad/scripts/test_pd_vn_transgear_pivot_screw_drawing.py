@@ -1492,7 +1492,7 @@ def test_saved_inventory_keeps_original_getter_cause_and_visits_the_other_label(
     ("changed_geometry", "top physical rim"),
     ("lost_hlr", "hidden-lines-removed"),
     ("format", "presentation"),
-    ("source_band", "tolerance type"),
+    ("source_band", "gained a tolerance"),
     ("close", "did not close"),
 ))
 def test_saved_head_height_refuses_corruption_and_always_restores_current_model(

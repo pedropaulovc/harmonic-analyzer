@@ -9,7 +9,6 @@ from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
 from _drawing_precision import _named_dimension
-from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _supplier_screw_reference import add_supplier_reference_sketch
 from _supplier_screw_reference_names import FEATURE_BY_PLANE
 from _mcmaster_91829a560 import (
@@ -17,7 +16,6 @@ from _mcmaster_91829a560 import (
     SUPPLIER_REFERENCE_FORMATS,
     SUPPLIER_REFERENCE_PLANES,
     SUPPLIER_REFERENCE_STARTS,
-    SUPPLIER_REFERENCE_TOLERANCES_IN,
 )
 from _simplified_part import save_simplified_part
 from diagnostics.diag_build_91829A560 import build_91829A560
@@ -34,11 +32,6 @@ async def _save_supplier_part(adapter, part_name, suppressed_features) -> dict[s
         starts=SUPPLIER_REFERENCE_STARTS,
         planes=SUPPLIER_REFERENCE_PLANES,
     )
-    for name, (lower, upper) in SUPPLIER_REFERENCE_TOLERANCES_IN.items():
-        feature = FEATURE_BY_PLANE[SUPPLIER_REFERENCE_PLANES.get(name, "Front")]
-        set_dimension_bilateral_tolerance(
-            adapter, feature, name, lower * 25.4, upper * 25.4
-        )
     for name, value, _orientation in SUPPLIER_REFERENCE_DIMENSIONS:
         feature = FEATURE_BY_PLANE[SUPPLIER_REFERENCE_PLANES.get(name, "Front")]
         display, native = _named_dimension(adapter, feature, name)
@@ -56,8 +49,7 @@ async def _save_supplier_part(adapter, part_name, suppressed_features) -> dict[s
         # never the shared drawing-view-owned supplier formatter.
         if display.SetUnits2(False, 3, 1, 0, False, 0) != 0:
             raise RuntimeError(f"{name}: source supplier inch units rejected")
-        tolerance_precision = precision if name in SUPPLIER_REFERENCE_TOLERANCES_IN else -1
-        if display.SetPrecision3(precision, -1, tolerance_precision, -1) != 0:
+        if display.SetPrecision3(precision, -1, -1, -1) != 0:
             raise RuntimeError(f"{name}: source supplier precision rejected")
         prefix = "(<MOD-DIAM>" if presentation == "diameter" else "("
         display.ShowParenthesis = False
@@ -75,10 +67,7 @@ async def _save_supplier_part(adapter, part_name, suppressed_features) -> dict[s
             or str(display.GetText(1) or "") != prefix
             or str(display.GetText(2) or "") != " in)"
             or str(display.GetText(4) or "") != (callout or "")
-            or (
-                name in SUPPLIER_REFERENCE_TOLERANCES_IN
-                and int(display.GetPrimaryTolPrecision2()) != precision
-            )
+            or int(native.Tolerance.Type) != 0
         ):
             raise RuntimeError(f"{name}: source supplier presentation did not persist")
     return await save_simplified_part(adapter, part_name, suppressed_features)

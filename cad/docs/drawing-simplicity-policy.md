@@ -75,13 +75,18 @@ machinist review once, even though only selected native packages change units.
   model, as the [rack source-save controls](pipeline/evidence/vm2-datum-placement/source-hash-cause.md)
   demonstrated. Source-clean guards remain fail-closed before drawing export.
   Purchased supplier-reference sheets retain the supplier's explicit units,
-  precision, exact fractions and source bands rather than project fabrication
+  precision and exact fractions, and print every supplier size as untoleranced
+  REF (the catalogue tolerance governs) rather than project fabrication
   controls. `_supplier_dimensions` formats a visible native value without
   assigning `SystemValue` or replacing numeric text; sizes are parenthesized
   and unit-labelled. Model-owned hidden construction carriers are explicitly
   nominal supplier references, not claims of physical-edge or helical-thread
   attachment. Thread identification is below-text on the native nominal-major
-  carrier. Source bands remain model-owned. Reference sketches are authored in
+  carrier. Supplier REFs carry no native band: a catalogue band that fit math
+  reads stays in the spec, and the native dimension that prints is refused if
+  it gains a tolerance (`_supplier_unbanded`). Supplier application ranges,
+  such as a spring pin's mating-hole range, are application data, not part
+  sizes, and may print. Reference sketches are authored in
   the final transformed stock frame by `_supplier_screw_reference`; only
   threaded builders import the separate `_supplier_screw_save` saver.
   Connected linear witnesses reuse an existing anchor only after both native

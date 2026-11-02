@@ -22,10 +22,6 @@ from _check import check
 from _com import _early_bound
 from _drawing_marks import mark_dimensions_for_drawing
 from _drawing_precision import _named_dimension
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
 from _feature_tree import name_last_feature
 from _sketch import (
     SketchDims,
@@ -229,29 +225,6 @@ async def author_supplier_references(adapter: Any, *, spec: Any) -> tuple[str, .
         segment_lengths_mm=(math.pi * spec.ID, math.pi * spec.OD), circles=True,
     )
     features.append("DiscSupplierPlan")
-    for key in ("ID", "OD"):
-        band = getattr(spec, f"{key}_BAND", None)
-        if band is not None:
-            upper, lower = band
-            if math.isclose(upper, -lower, rel_tol=0.0, abs_tol=1e-12):
-                set_dimension_symmetric_tolerance(
-                    adapter, "DiscSupplierPlan", SUPPLIER_DIMENSION_NAMES[key], upper
-                )
-            else:
-                set_dimension_bilateral_tolerance(
-                    adapter, "DiscSupplierPlan", SUPPLIER_DIMENSION_NAMES[key],
-                    lower, upper, places=3,
-                )
-            display, _dimension = _named_dimension(
-                adapter, "DiscSupplierPlan", SUPPLIER_DIMENSION_NAMES[key],
-            )
-            if display.SetUnits2(False, 3, 1, 0, False, 0) != 0:
-                raise RuntimeError(f"{spec.SKU} {key}: source inch units were rejected")
-            if display.SetPrecision3(-1, -1, 3, -1) != 0:
-                raise RuntimeError(f"{spec.SKU} {key}: source band precision was rejected")
-            if int(display.GetPrimaryTolPrecision2()) != 3:
-                raise RuntimeError(f"{spec.SKU} {key}: source band precision did not persist")
-
     envelope, strip = _nominal_side_profiles(spec)
     # A closed rectangle conveys only OD x free height, never the spring shape.
     dims = SketchDims()

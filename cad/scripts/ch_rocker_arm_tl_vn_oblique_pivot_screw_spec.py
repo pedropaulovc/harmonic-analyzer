@@ -13,8 +13,6 @@ Supplied component is installed without shop modification.
 
 from __future__ import annotations
 
-from _fit_deviations import deviations
-
 SKU = "90323A492"
 QUANTITY = 2
 AXIS_NAME = "PivotAxis"
@@ -42,8 +40,4 @@ SUPPLIER_REFERENCE_PLANES = {'SupplierShoulderDiameter': 'Top', 'SupplierShoulde
 SUPPLIER_REFERENCE_FORMATS = {'SupplierShoulderDiameter': (3, 'diameter', None, 'SHOULDER'), 'SupplierShoulderLength': (2, 'length', None, 'SHOULDER LENGTH'), 'SupplierHeadDiameter': (0, 'diameter', None, 'HEAD')}
 SUPPLIER_REFERENCE_SIDES = {'SupplierShoulderDiameter': 'top', 'SupplierShoulderLength': 'right', 'SupplierHeadDiameter': 'bottom'}
 SUPPLIER_REFERENCE_UNITS = {'SupplierShoulderDiameter': 'mm', 'SupplierShoulderLength': 'mm', 'SupplierHeadDiameter': 'mm'}
-SUPPLIER_REFERENCE_TOLERANCES_MM = {
-    'SupplierShoulderDiameter': deviations(SHOULDER_DIA_BAND),
-    'SupplierShoulderLength': deviations(SHOULDER_LENGTH_BAND),
-}
 SUPPLIER_DATA = ('HEAD Ø16 X 4.5; THREAD M8 X 1.25 X 13 LONG; 5 mm HEX KEY.',)

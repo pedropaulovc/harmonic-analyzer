@@ -17,8 +17,8 @@ import pd_vn_transgear_pivot_shim_spec as part
 SPEC = DRAWINGS_BY_NAME["pd_vn_transgear_pivot_shim"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "DIN 988 SHIM RING"
-# Sheet-metre reserves include the 12 mm diameter picks and two-line
-# unilateral bands; the 14 mm thickness pick has its own band ink reserve.
+# Sheet-metre reserves include the 12 mm diameter picks and their REF ink;
+# the 14 mm thickness pick has its own ink reserve.
 SUPPLIER_MARGINS = {
     "*Top": (0.0, 0.008, 0.040, 0.008),
     "*Front": (0.0, 0.006, 0.035, 0.006),
@@ -37,7 +37,7 @@ def _supplier_dimensions(
         thickness_mm=part.THICKNESS,
         units=part.SUPPLIER_UNITS,
         precision=part.DRAWING_REFERENCE_PRECISION,
-        bands=part.SUPPLIER_TOLERANCES,
+        model_references=part.SUPPLIER_MODEL_REFERENCES,
     )
 
 

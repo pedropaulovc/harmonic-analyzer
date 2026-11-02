@@ -1,9 +1,9 @@
-"""Model-owned supplier pin references, bands and presentation; never alter solids.
+"""Model-owned supplier pin references and presentation; never alter solids.
 
 Dowel witnesses use the exact constant that authors the solid, checked against
-its native cylindrical face. The separate mating-hole circle is application
-data, not a hole cut or pin-OD tolerance. Drawings retain these model values
-and bands while explicitly formatting their own imported display dimensions.
+its native cylindrical face. Supplier sizes carry no band: they print as
+untoleranced REF and the catalogue governs. The separate mating-hole circle is
+supplier application data (its recommended hole range), not a pin tolerance.
 """
 
 from __future__ import annotations
@@ -60,14 +60,9 @@ def _reference_contract(
     """Native formatter arguments and signed mm deviations; no print-value carrier."""
     band = None
     if feature == DIAMETER_FEATURE:
-        if source.diameter_band is None:
-            raise ValueError(f"{source.sku}: model diameter reference requires a source band")
         name = DIAMETER_DIMENSION
         value, precision, presentation = source.diameter_mm, source.diameter_precision, "diameter"
-        label = f"{source.sku} supplier diameter"
-        callout = "SUPPLIER LIMITS" if source.diameter_uses_limits else None
-        lower, upper = source.diameter_deviations_mm
-        band = (lower, upper, 3 if source.diameter_uses_limits else 2)
+        label, callout = f"{source.sku} supplier diameter", None
     elif feature == WALL_FEATURE:
         if source.wall_mm is None or source.wall_precision is None:
             raise ValueError(f"{source.sku}: incomplete supplier wall reference")
@@ -320,8 +315,6 @@ def _finish_reference(
 @_telemetry.traced("drawing.supplier_pin_dowel_source_author")
 async def author_supplier_dowel_references(adapter: Any, source: SupplierPinReference) -> None:
     """Exact nominal OD witness in the Top end-view plane; never a print literal."""
-    if source.diameter_band is None:
-        raise ValueError(f"{source.sku}: dowel diameter source band is missing")
     check("create supplier dowel OD reference", await adapter.create_sketch("Top"))
     dims = SketchDims()
     circle = await define_circle(
