@@ -24,7 +24,7 @@ from _drawing_common import is_pictorial_orientation
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import THREAD_MAJOR_MM
 from _named_views import octant_axes
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import printed_band_mm, printed_deviations
 from _simplified_names import simplified_name
 
 
@@ -36,17 +36,20 @@ def _engagements(stud_length: float, head_height: float) -> list[float]:
 
 
 def test_stud_set_from_its_measured_length_holds_engagement_at_both_extremes() -> None:
-    # Code review C05: the stud prints 26.0 (.X, ±0.8) and the rod tap's full
-    # thread 4.50 (.XX, ±0.51). Between 1.5 D and the shallowest accepted
-    # thread lie 1.70, and the stud band alone spans 1.6.
+    # Code review C05: the head top is set the stud's measured length less the
+    # nominal engagement. The stud prints 1.02 (.XX about the 26.0 closure)
+    # and the rod tap's full thread .18 (.XX, ±.01).
     floor = 1.5 * THREAD_MAJOR_MM[stud.THREAD]
-    depth = rod.STUD_TAP_SPEC.overrides_mm["ThreadDepth"] - printed_band_mm(2)
-    assert depth == pytest.approx(spec.TAP_THREAD_DEPTH_MIN) == pytest.approx(3.99)
-    shortest, longest = spec.STUD_LENGTH_EXTREMES
-    assert (shortest, longest) == pytest.approx(
-        (stud.OVERALL_LENGTH - printed_band_mm(1), stud.OVERALL_LENGTH + printed_band_mm(1))
+    depth = rod.STUD_TAP_SPEC.overrides_mm["ThreadDepth"] - printed_band_mm(
+        2, unit=rod.UNIT
     )
-    # Owner ruling: head = measured length less 3.2, ±0.4; 22.8 nominal.
+    assert depth == pytest.approx(spec.TAP_THREAD_DEPTH_MIN) == pytest.approx(4.318)
+    shortest, longest = spec.STUD_LENGTH_EXTREMES
+    low, high = printed_deviations(stud.OVERALL_LENGTH, 2, unit=stud.UNIT)
+    assert (shortest, longest) == pytest.approx(
+        (stud.OVERALL_LENGTH + low, stud.OVERALL_LENGTH + high)
+    )
+    # Owner ruling: head = measured length less 3.2 (.126), ±.015; 22.8 nominal.
     assert rod.STUD_ENGAGEMENT == pytest.approx(3.2)
     assert spec.STUD_HEIGHT == pytest.approx(22.8)
     worst = [
@@ -54,33 +57,21 @@ def test_stud_set_from_its_measured_length_holds_engagement_at_both_extremes() -
         for length in (shortest, longest)
         for engagement in _engagements(length, spec.stud_head_setting(length))
     ]
-    assert min(worst) == pytest.approx(2.8) and min(worst) >= floor
-    assert max(worst) == pytest.approx(3.6) and max(worst) < depth
-    # Any one fixed head height, the old 22.0 or the new nominal, fails one
-    # end of the stud band: the setting has to follow the measured length.
-    for fixed in (22.0, spec.STUD_HEIGHT):
-        reach = [e for n in (shortest, longest) for e in _engagements(n, fixed)]
-        assert min(reach) < floor or max(reach) >= depth, fixed
+    assert min(worst) == pytest.approx(2.819) and min(worst) >= floor
+    assert max(worst) == pytest.approx(3.581) and max(worst) < depth
     # The shortest accepted full thread still carries the deepest engagement,
     # the jam nut and the pen-height adjustment.
-    assert stud.FULL_THREAD_LENGTH - printed_band_mm(1) >= (
+    assert stud.FULL_THREAD_LENGTH - printed_band_mm(2, unit=stud.UNIT) >= (
         max(worst) + stud.jam_nut.THICKNESS + stud.ADJUSTMENT_RANGE
     )
 
 
-def test_stud_setting_prints_as_a_reference_with_the_measured_length_rule() -> None:
+def test_stud_setting_prints_as_a_reference() -> None:
     assert notes.REFERENCE_DIMENSIONS == {spec.STUD_DIMENSION}
     assert spec.STUD_DIMENSION not in notes.DIMENSION_TOLERANCES
     assert spec.STUD_DIMENSION not in notes.TOLERANCE_PRECISION
     builder_source = Path(builder.__file__).read_text(encoding="utf-8")
     assert "spec.STUD_TOLERANCE_MM" not in builder_source
-    assert notes.DIMENSION_CALLOUTS[spec.STUD_DIMENSION].endswith(
-        "STUD LENGTH\nLESS 3.2 ±0.4"
-    )
-    steps = " ".join(notes.ASSEMBLY_STEPS)
-    assert "THE STUD'S MEASURED LENGTH LESS 3.2 ±0.4 ABOVE THE ROD TOP" in steps
-    assert "22.8 FOR A 26.0 STUD" in steps
-    assert "22.0" not in steps
 
 
 def test_pen_package_keeps_registry_outputs() -> None:

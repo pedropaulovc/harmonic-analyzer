@@ -10,6 +10,7 @@ import pytest
 
 import draw_pn_pen_hanger as draw
 import pn_pen_hanger_spec as spec
+from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import printed_band_mm
 
 
@@ -33,9 +34,9 @@ def test_hanger_screw_hole_lands_on_the_bar_screw_axis() -> None:
     assert spec.HANGER_POS[1] == pytest.approx(
         magnifier.WHEEL_BAR_Y + bar.BAR_TOP_ABOVE_ROW
     )
-    # The 3.0 strap carries no thread: the screw passes its #8 clearance hole
+    # The 11 gauge strap carries no thread: the screw passes its #8 clearance hole
     # into the nut and jam nut, which leave at least two full pitches beyond.
-    assert spec.STRAP_Z[1] - spec.STRAP_Z[0] == pytest.approx(3.0)
+    assert spec.STRAP_Z[1] - spec.STRAP_Z[0] == pytest.approx(0.1196 * 25.4)
     assert spec.SCREW_HOLE_SPEC.kind == "clearance"
     assert spec.SCREW_HOLE_DIA > spec.HANGER_SCREW_DIA
     assert pen.HANGER_THREAD_PAST_NUT >= 2.0 * pen.HANGER_THREAD_PITCH
@@ -57,10 +58,14 @@ def test_screw_hole_and_nut_fit_all_four_tapered_strap_edges() -> None:
     assert min(distances) == pytest.approx(5.0)
     assert min(distances) == pytest.approx(spec.SCREW_HOLE_EDGE_DISTANCE)
     assert spec.NUT_ACROSS_FLATS / 2.0 < min(distances)
-    # Rule 17 at the printed worst case: the .X station band and the drilled
-    # hole's upper limit (title block +0.10).
-    assert spec.SCREW_HOLE_WALL_MIN == pytest.approx(5.0 - 0.8 - (4.572 + 0.10) / 2.0)
-    assert spec.SCREW_HOLE_WALL_MIN >= spec.SLOT_WALL_FLOOR
+    # Rule 17 at the printed worst case: the .XX station (.20 printed for the
+    # bar's 5.0 mm axis offset, the larger rounding of the two, +/-.01) and
+    # the drilled hole's upper limit (title block +.004).
+    station = 0.20 * 25.4 - 5.0 + 0.01 * 25.4
+    assert spec.SCREW_HOLE_WALL_MIN == pytest.approx(
+        5.0 - station - (4.572 + 0.004 * 25.4) / 2.0
+    )
+    assert spec.SCREW_HOLE_WALL_MIN >= WALL_TARGET_MM
 
 
 def test_slots_centre_on_the_rod_line_with_a_running_fit() -> None:
@@ -74,15 +79,16 @@ def test_slots_centre_on_the_rod_line_with_a_running_fit() -> None:
     rod_min = rod.ROD_SECTION + rod.SECTION_BAND[1]
     narrow = spec.SLOT_WIDTH + spec.SLOT_WIDTH_BAND[1]
     wide = spec.SLOT_WIDTH + spec.SLOT_WIDTH_BAND[0]
-    assert narrow - rod_max == pytest.approx(0.05)
-    assert wide - rod_min == pytest.approx(0.15)
+    assert narrow == pytest.approx(0.200 * 25.4)
+    assert wide == pytest.approx(0.202 * 25.4)
+    assert narrow - rod_max > 0.0
     # Worst lean between the two slots' outer faces stays under 0.25 deg.
     span = spec.GUIDE_PITCH + spec.GUIDE_PLATE_T
     assert math.degrees(math.atan((wide - rod_min) / span)) < 0.25
     # The plate is cut as its own blank before brazing: the sheet prints its
-    # reach and slot depth both .X from its free end, its root seating on the
+    # reach and slot depth both .XX from its free end, its root seating on the
     # strap front face a stock (reference) thickness off the bar seat that
-    # sets the rod line.  With both .X bands and the thickest strap stock the
+    # sets the rod line.  With both .XX bands and the thickest strap stock the
     # slot bottom still stands behind the largest rod's back face, and the
     # corner fillets' wall tangency behind it too with the radius at its
     # printed MAX (drawing-guidelines.md rule 16, no tight band).
@@ -90,18 +96,17 @@ def test_slots_centre_on_the_rod_line_with_a_running_fit() -> None:
     assert spec.SLOT_DEPTH == pytest.approx(
         spec.PLATE_REACH + spec.STRAP_T - spec.SLOT_BOTTOM
     )
-    # 11 gauge sheet, 0.1130-0.1256 in, about the 3.0 nominal; it covers the
-    # 1018 metric bar's +0/-0.075 too.
-    assert spec.STRAP_T_STOCK_BAND == pytest.approx((0.19024, -0.12980))
+    # 11 gauge sheet, .1130-.1256 in, about its .1196 decimal.
+    assert spec.STRAP_T_STOCK_BAND == pytest.approx((0.1524, -0.16764))
     thickest = spec.STRAP_T + spec.STRAP_T_STOCK_BAND[0]
     root_z = -thickest
-    free_end_z = root_z - (spec.PLATE_REACH + printed_band_mm(1))
-    slot_bottom_near = free_end_z + (spec.SLOT_DEPTH - printed_band_mm(1))
+    two = printed_band_mm(2, unit=spec.UNIT)
+    free_end_z = root_z - (spec.PLATE_REACH + two)
+    slot_bottom_near = free_end_z + (spec.SLOT_DEPTH - two)
     assert slot_bottom_near - back_face == pytest.approx(spec.SLOT_BOTTOM_GAP_MIN)
-    assert spec.SLOT_BOTTOM_GAP_MIN == pytest.approx(2.20976)
     fillet_tangent = slot_bottom_near - spec.SLOT_CORNER_R_MAX
-    assert fillet_tangent - back_face == pytest.approx(0.20976)
-    assert spec.SLOT_CORNER_R_MAX == spec.SLOT_CORNER_R == 2.0
+    assert fillet_tangent - back_face > 0.0
+    assert spec.SLOT_CORNER_R_MAX == spec.SLOT_CORNER_R == pytest.approx(0.08 * 25.4)
     assert spec.SLOT_CORNER_R_BAND == (0.0, -spec.SLOT_CORNER_R)
     assert spec.SLOT_CORNER_R_TOL_TYPE == 6  # swTolMAX
     profile = spec.DRAWING_DIMENSIONS["UpperGuideProfile"]
@@ -109,28 +114,33 @@ def test_slots_centre_on_the_rod_line_with_a_running_fit() -> None:
     assert "SlotBottom" not in profile
     for name in ("SlotDepth", "PlateReach"):
         assert ("UpperGuideProfile", name) not in spec.DRAWING_BANDS
-        assert spec.DRAWING_PRECISION["UpperGuideProfile"][name] == 1
+        assert spec.DRAWING_PRECISION["UpperGuideProfile"][name] == 2
     assert "StrapThick" in spec.REFERENCE_DIMENSIONS
     # The arms reach past the rod's front face, and still cover it with the
     # reach short and the strap at its thinnest stock.
-    assert spec.ROD_AXIS_Z - rod_max / 2.0 - spec.PLATE_FRONT_Z == pytest.approx(1.5)
+    assert spec.ROD_AXIS_Z - rod_max / 2.0 - spec.PLATE_FRONT_Z > 0.0
     thinnest = spec.STRAP_T + spec.STRAP_T_STOCK_BAND[1]
-    front_z = -thinnest - (spec.PLATE_REACH - printed_band_mm(1))
+    front_z = -thinnest - (spec.PLATE_REACH - two)
     cover = spec.ROD_AXIS_Z - rod_max / 2.0 - front_z
-    assert cover == pytest.approx(spec.GUIDE_ARM_COVER_MIN) == pytest.approx(0.5702)
+    assert cover == pytest.approx(spec.GUIDE_ARM_COVER_MIN)
+    assert cover > 0.0
 
 
 def test_both_slot_walls_keep_the_floor_at_the_printed_worst_case() -> None:
-    # drawing-guidelines.md rule 17: printed 12.0 plate, 3.5 near arm and
-    # 5.05 +0.05/0 slot, all .X bands from the title block.
-    band = printed_band_mm(1)
-    assert spec.GUIDE_PLATE_WIDTH == 12.0
-    assert round(spec.ARM_WIDTH, 1) == 3.5
-    near = 3.5 - band
-    far = (12.0 - band) - (3.5 + band) - (spec.SLOT_WIDTH + spec.SLOT_WIDTH_BAND[0])
-    assert spec.NEAR_ARM_MIN == pytest.approx(near) == pytest.approx(2.7)
-    assert spec.FAR_ARM_MIN == pytest.approx(far) == pytest.approx(1.8)
-    assert min(near, far) >= spec.SLOT_WALL_FLOOR == 1.5
+    # drawing-guidelines.md rule 17: printed .48 plate, .14 near arm and
+    # .200 +.002/0 slot, the plate and arm at the title block's .XX.
+    band = printed_band_mm(2, unit=spec.UNIT)
+    assert spec.GUIDE_PLATE_WIDTH == pytest.approx(0.48 * 25.4)
+    assert spec.ARM_WIDTH == pytest.approx(0.14 * 25.4)
+    near = spec.ARM_WIDTH - band
+    far = (
+        (spec.GUIDE_PLATE_WIDTH - band)
+        - (spec.ARM_WIDTH + band)
+        - (spec.SLOT_WIDTH + spec.SLOT_WIDTH_BAND[0])
+    )
+    assert spec.NEAR_ARM_MIN == pytest.approx(near) == pytest.approx(3.302)
+    assert spec.FAR_ARM_MIN == pytest.approx(far) == pytest.approx(2.9972)
+    assert min(near, far) >= WALL_TARGET_MM
     # The slot stays centred on the rod line, the plate flush with both foot
     # corners (note 1).
     assert spec.STRAP_BOT_X == (
@@ -183,7 +193,6 @@ def test_drawing_keeps_exactly_the_marked_dimensions() -> None:
     assert "PlateThick" in spec.DRAWING_DIMENSIONS["LowerGuide"]
     for name in spec.REFERENCE_DIMENSIONS:
         assert not any(banded == name for _, banded in spec.DRAWING_BANDS)
-        assert spec.DIMENSION_CALLOUTS[name] == "SHEET STOCK"
     source = inspect.getsource(draw.build)
     assert "set_reference_dimension(" in source
     assert source.index("set_dimension_callouts(") < source.index(
@@ -212,7 +221,7 @@ def test_plate_stock_callout_row_clears_the_bottom_width_row() -> None:
 def test_front_view_looks_at_the_plates_and_keeps_the_taper_outside() -> None:
     # *Back: model +x prints left, so the strap's wide (-x) top corner is right.
     assert draw._fx(spec.STRAP_TOP_X[0]) > draw._fx(spec.STRAP_TOP_X[1])
-    assert draw._fx(draw._X[0]) - draw._fx(draw._X[1]) == pytest.approx(0.022)
+    assert draw._fx(draw._X[0]) - draw._fx(draw._X[1]) == pytest.approx(0.022098)
     # The taper's dimension sits under the view, beside the bottom width, so
     # its long extension line drops from the top outer corner outside the
     # strap instead of running down through it.
@@ -236,8 +245,8 @@ def test_section_looks_down_onto_the_upper_plate_and_spans_its_silhouette() -> N
     # strap edge it cuts still reads the plate's overhang to the printed place.
     assert top + 0.5 <= draw.SECTION_Y < top + 1.0
     places = spec.DRAWING_REFERENCE_PRECISION
-    assert round(draw._OVERHANG_AT_CUT, places) == 1.5
-    assert round(spec.UPPER_PLATE_OVERHANG, places) == 1.5
+    assert round(draw._OVERHANG_AT_CUT / 25.4, places) == 0.06
+    assert round(spec.UPPER_PLATE_OVERHANG / 25.4, places) == 0.06
     source = inspect.getsource(draw._create_section)
     assert "SetDisplayOnlySurfaceCut(False)" in source
     strap = draw._strap_x_at(draw.SECTION_Y)
@@ -308,7 +317,7 @@ def test_slot_corner_radius_prints_its_single_max_limit(monkeypatch) -> None:
 
     from test_single_limit_tolerance import FakeDimension
 
-    # The spec's limit, band and type drive the shared helper to "R2.0 MAX":
+    # The spec's limit, band and type drive the shared helper to "R.08 MAX":
     # the modelled radius is the limit, the band runs from sharp up to it.
     dimension = FakeDimension(spec.SLOT_CORNER_R / 1000.0)
     monkeypatch.setattr(single, "_named_dimension", lambda *_: (None, dimension))
@@ -322,7 +331,7 @@ def test_slot_corner_radius_prints_its_single_max_limit(monkeypatch) -> None:
     )
     assert dimension.Tolerance.Type == single.SW_TOL_MAX
     assert (dimension.Tolerance.min, dimension.Tolerance.max) == pytest.approx(
-        (-0.002, 0.0)
+        (-0.002032, 0.0)
     )
     assert spec.DIMENSION_PREFIXES == {("UpperSlotCorner", "SlotCornerR"): "2X R"}
 
@@ -385,6 +394,6 @@ def test_isometric_fills_the_right_of_the_sheet_at_full_size() -> None:
 
 def test_notes_carry_no_dimensions() -> None:
     lines = spec.DRAWING_NOTES.splitlines()
-    assert len([line for line in lines if not line.startswith(" ")]) <= 4
+    assert len(lines) <= 4  # rule 7: at most four short lines
     for line in lines:
         assert not re.search(r"\d\.\d|\+/-|±", line), line

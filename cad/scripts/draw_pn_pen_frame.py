@@ -11,9 +11,11 @@ size is a native associative dimension marked on the part
 (``pn_pen_frame_spec``): the front view carries the outer envelope, the
 window's size, its lower-left corner from the left and bottom faces and the
 4X window-corner radius; the bottom view, looking up at the tapped rail,
-carries the depth, the hole's two coordinates from the outer faces and the
-hole's native Hole Wizard callout.  No datums, no frames (drawing-guidelines.md
-rule 5), no note block.  The sheet runs 2:1; the isometric stays 1:1.
+carries the depth, the hole's two coordinates from the outer faces, the
+hole's native Hole Wizard callout and the tap's stated far-wall minimum (the
+hidden TapWallReference sketch, shown in that view only).  No datums, no
+frames (drawing-guidelines.md rule 5), no note block.  The sheet runs 2:1 in
+decimal inch (the part's ``drawing_unit: in``); the isometric stays 2:1.
 
 Run with SolidWorks open::
 
@@ -23,6 +25,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -41,12 +44,17 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision
+from _drawing_dimensions import (
+    assert_imported_precision,
+    offset_dimension_text,
+    set_dimension_callouts,
+)
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_edges import scan_view_edges
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _hole_spec import blind_cut_dia_mm
@@ -55,6 +63,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 from pn_pen_frame_spec import (
+    DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FRAME_DEPTH,
@@ -63,6 +72,8 @@ from pn_pen_frame_spec import (
     RAIL_END,
     RAIL_SIDE,
     SET_SCREW_TAP_SPEC,
+    TAP_WALL_MIN_MM,
+    TAP_WALL_START_Z,
     WINDOW_CORNER_R,
 )
 
@@ -159,9 +170,6 @@ CORNER_ARC_CENTER_XY = _front_xy(
 #   arc's 0-90 deg span), crossing only the ring's right face.
 # - The 40.0 height moves 30 mm right (was 16) to leave that text 6 mm clear
 #   of its dimension line.
-# Bottom view: the hole's X coordinate below, its Z coordinate left, the depth
-# right; the hole callout stands above-right, between the bottom view and the
-# front view's height dimension.
 FRONT_KEEP = {
     "OuterSpanX": (FRONT_CENTER[0], FRONT_TOP_Y + 0.014),
     "OuterHeightDim": (FRONT_RIGHT_X + 0.030, FRONT_CENTER[1]),
@@ -171,17 +179,40 @@ FRONT_KEEP = {
     "LeftWall": (FRONT_LEFT_X - 0.012, FRONT_BOTTOM_Y - 0.017),
     "WindowCornerR": (FRONT_RIGHT_X + 0.014, FRONT_TOP_Y - 0.006),
 }
+# Bottom view: the hole's X coordinate below, its Z coordinate left, the depth
+# right; the hole callout stands above-right, between the bottom view and the
+# front view's height dimension.  The tap's far-wall minimum (.074 MIN over
+# TAP WALL) stands left too, outboard of the .16: its reference line runs up
+# the far wall from the thread's rim on the hole's axis (sheet y
+# ~0.108..0.112), so its extension lines run left across the rail above the
+# .16's top extension line (y 0.105, from the hole's centre).
 BOTTOM_KEEP = {
     "ScrewX": (_bottom_xy(OUTER_WIDTH / 4.0, 0.0)[0], BOTTOM_LOW_Y - 0.010),
     "ScrewZ": (BOTTOM_LEFT_X - 0.010, _bottom_xy(0.0, FRAME_DEPTH / 4.0)[1]),
     "Depth": (BOTTOM_RIGHT_X + 0.016, BOTTOM_CENTER[1]),
+    "TapWallMin": (
+        BOTTOM_LEFT_X - 0.020,
+        _bottom_xy(0.0, TAP_WALL_START_Z + TAP_WALL_MIN_MM / 2.0)[1],
+    ),
 }
+# The wall's 3.8 mm run cannot hold its ~21 x 9 mm two-row text: centred on
+# its own line, the line, its arrows and both extension lines ran through
+# ".074 min. TAP WALL" (machinist review of 6988bc279, 3/3).  Native
+# OffsetText parks the text on a leader left of the extension lines' ends
+# (line x - 0.001), its right edge ~4 mm clear of them and ~12 mm clear of
+# the .16's text; the anchor is the value row's bottom centre.
+TAP_WALL_TEXT_XY = (BOTTOM_LEFT_X - 0.036, BOTTOM_KEEP["TapWallMin"][1])
+_TEXT_SETTLE_M = 0.0005
+_CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 # The one printed fillet stands for all four equal window corners.  A custom
 # prefix replaces SolidWorks' own radius "R", so it carries it
 # (draw_pd_guide_lock: "4X 1.8" printed without).
 DIMENSION_PREFIXES = {"WindowCornerR": "4X R"}
 HOLE_CALLOUT_XY = (0.165, 0.128)
 HOLE_CALLOUT_PROCESS = "TAP"
+# The through-next tap's one Hole Wizard length variable, its drill
+# diameter, prints .XXX.
+TAP_CALLOUT_PRECISION = {"hw-tapdrldia": 3}
 
 FRONT_VIEW_NOTE_XY = (0.175, 0.240)
 BOTTOM_VIEW_NOTE_XY = (0.070, 0.072)
@@ -206,6 +237,32 @@ def _set_dimension_prefixes(
             raise RuntimeError(f"dimension prefix {prefix!r} did not persist")
     if remaining:
         raise RuntimeError(f"dimension prefixes not applied: {sorted(remaining)}")
+
+
+def _offset_tap_wall_text(adapter: Any, annotations: list[Any]) -> None:
+    """Park the tap wall's text on its leader shelf and read it back."""
+    offset_dimension_text(adapter, annotations, {"TapWallMin": TAP_WALL_TEXT_XY})
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        if dimension_name(adapter, annotation) != "TapWallMin":
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        position = annotation.GetPosition()
+        if (
+            not bool(display.OffsetText)
+            or position is None
+            or math.dist(position[:2], TAP_WALL_TEXT_XY) > _TEXT_SETTLE_M
+        ):
+            raise RuntimeError(
+                f"tap wall text at {position!r}, not offset to {TAP_WALL_TEXT_XY!r}"
+            )
+
+
+def _center_mark_count(view: Any) -> int:
+    """The view's centre-mark annotations (a bare view answers None)."""
+    return len(
+        _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -237,7 +294,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -281,9 +342,21 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places are authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    _offset_tap_wall_text(adapter, annotations)
 
-    if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
+    # The template may centre-mark the tap as the view is placed: every round's
+    # layout audit found two identical marks on it (duplicate-annotation, as
+    # draw_pn_pen_rod, fleet issue #913).  Mark only a bare view, then prove
+    # the tap carries exactly one.
+    if _center_mark_count(bottom) == 0 and not auto_center_marks(
+        adapter, bottom, holes=True, size=0.0025
+    ):
         raise RuntimeError("failed to add ASME center marks to the bottom view")
+    if (found := _center_mark_count(bottom)) != 1:
+        raise RuntimeError(
+            f"bottom view carries {found} centre marks, not the tap's one"
+        )
     hole_rim = scan_view_edges(bottom, label="bottom").circle_at(
         HOLE_CENTER_MM,
         blind_cut_dia_mm(SET_SCREW_TAP_SPEC) / 2.0,
@@ -301,6 +374,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # The title block's THREADS row owns the 2B class (drawing-guidelines.md
     # rule 2): the callout reads TAP 4-40 UNC THRU.
     omit_title_block_thread_class(tap_callout, label="thumb-screw tapped hole")
+    set_hole_callout_precision(
+        tap_callout, TAP_CALLOUT_PRECISION, label="thumb-screw tapped hole"
+    )
 
     add_property_linked_note(adapter, "Front View Note", *FRONT_VIEW_NOTE_XY)
     add_property_linked_note(adapter, "Bottom View Note", *BOTTOM_VIEW_NOTE_XY)

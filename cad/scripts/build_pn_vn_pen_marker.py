@@ -24,9 +24,11 @@ import _config
 from _appearance import POLISHED_STEEL, apply_color, apply_material
 from _check import check
 from _custom_properties import apply_custom_properties
+from _document_units import apply_package_model_units
 from _drawing_marks import apply_drawing_properties
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
@@ -58,6 +60,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import RevolveParameters
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     check("create_sketch profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)

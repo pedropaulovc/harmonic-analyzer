@@ -41,6 +41,8 @@ from _drawing_leader_notes import add_leader_note
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import (
     _box,
     _inside,
@@ -58,6 +60,8 @@ from pn_vn_pen_marker_spec import (
     OVERALL_LENGTH,
 )
 
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pn_vn_pen_marker"]
 PART_STEM = SPEC.artifact_stem
@@ -236,7 +240,12 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     grip_text = grip_note(properties["Manufacturing Notes"])
 
-    draw, sheet = new_project_drawing(adapter, layout=SPEC.layout, scale=SHEET_SCALE)
+    draw, sheet = new_project_drawing(
+        adapter,
+        layout=SPEC.layout,
+        scale=SHEET_SCALE,
+        unit=part_drawing_unit(PART_STEM),
+    )
     title_block_notes = _purchased_title_block(
         adapter,
         draw,

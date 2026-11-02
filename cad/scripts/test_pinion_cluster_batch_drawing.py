@@ -591,9 +591,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             ),
         },
         "pn-pen": {
-            # #4-40 thumb screw through the stirrup's 6.0 bottom rail.
+            # #4-40 thumb screw through the stirrup's .24 bottom rail.
             frozenset(("pn-vn-pen-set-screw-1", "pn-pen-frame-1")): _annulus_limit(
-                2.8448, 2.261, 6.0
+                2.8448, 2.261, 6.096
             ),
             # #4-40 x 3/16 rod set screw wholly in the v-block tap.
             frozenset(("pn-vn-pen-rod-set-screw-1", "pn-pen-v-block-1")): _annulus_limit(

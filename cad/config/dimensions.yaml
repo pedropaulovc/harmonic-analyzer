@@ -1929,21 +1929,21 @@ sections:
         - scaled
         - low
       - - Square rod length
-        - '112 square + Ø4 × 10.5 turned pivot end (122.5 overall); #0-80 blind tap 6 deep (4.5 full thread) in the top face for the adjuster stud'
+        - '112 mm square (printed 4.41) + Ø.126 × .41 in turned pivot end (122.414 mm overall, printed (4.82)); #0-80 blind tap .24 deep (.18 full thread) in the top face for the adjuster stud'
         - ~4.8
-        - 'p.64 inset; 2026-10 re-derive (engineerguy 4/4 t046): the turned pivot end drops into the v-block''s pivot bore and the square''s shoulder seats on the block top (y 384.2); the square runs up through both hanger U guides to y 496.2, staying ≥ 3 inside the upper guide (y 452.2) at the bottom of the ±15 travel. The old #47 wire cross-hole is gone: the wire ties to the adjuster stud''s eye'
+        - 'p.64 inset; 2026-10 re-derive (engineerguy 4/4 t046): the turned pivot end drops into the v-block''s pivot bore and the square''s shoulder seats on the block top (y 384.2); the square runs up through both hanger U guides to y 496.2, staying ≥ 3 inside the upper guide (y 453.7) at the bottom of the ±15 travel. The old #47 wire cross-hole is gone: the wire ties to the adjuster stud''s eye'
         - scaled + derived
         - low
       - - Frame (stirrup)
-        - 28 × 40 × 8 ring; side rails 4, end rails 6; #4-40 thumb-screw tap up through the bottom rail
+        - 1.10 × 1.58 × .31 in ring; side rails .16, end rails .24; #4-40 thumb-screw tap up through the bottom rail
         - —
-        - 'p.64–65 + t046: the ring WRAPS the v-block''s 18 × 18 end section (window 20 wide, 1.0 a side), flush with the block''s PAPER end face, its plane perpendicular to the block length, top rail 0.1 above the block top; 0.96 clear of the rod''s square diagonal. End rail 6 gives the thumb screw 1.5 D of thread'
+        - 'p.64–65 + t046: the ring WRAPS the v-block''s .70 × .71 end section (window .78 wide, .04 a side), flush with the block''s PAPER end face, its plane perpendicular to the block length, top rail 0.1 mm above the block top; 1.03 mm clear of the rod''s square diagonal. End rail .24 gives the thumb screw 1.5 D of thread'
         - scaled
         - low
       - - V-block
-        - '27.3 long × 18 tall, a simplified E in plan: an 18-deep neck over x 0–9 from the paper end (it passes the stirrup''s window) and a 22.2-deep body (2.1 proud each side) from the step to the free end; V-groove of two flanks each 45° to the bottom face (theoretical apex 6.0 up, 12 wide at the bottom face, its apex cut as a 2.0-wide flat 5.0 up, clear over the seated grip, its two internal corners R0.5 MAX) along the neck seating the marker grip, run on into a 16 × 6.5 flat-roofed relief slot from the step to the free end clearing the marker body; Ø4.0 +0.012/0 pivot bore at x 12.5, centred across the depth; #4-40 tap from the body''s front face (y 12) into the pivot bore for the rod set screw. Every depth-wise station prints at the title block''s .X from the body''s front face (the neck''s faces .XX for the window): relief walls 2.3 / 1.5 and V lands 1.69 at the printed limits'
+        - '1.07 in long × .71 tall (an 18 mm closure), a simplified E in plan: a .70-deep neck over x 0–.35 from the paper end (it passes the stirrup''s window) and a .86-deep body (.08 proud each side) from the step to the free end; V-groove of two flanks each 45° to the bottom face (theoretical apex 6.0 mm up, 12.0 mm wide at the bottom face, printed as the .19 / .67 mouth stations, its apex cut as a .08-wide flat (.20) up, clear over the seated grip, its two internal corners under the title block''s INSIDE CORNERS R.040 MAX) along the neck seating the marker grip, run on into a .62 × .26 flat-roofed relief slot from the step to the free end clearing the marker body; Ø.126 +.0005/0 reamed pivot bore at x .49, centred across the depth; #4-40 tap from the body''s front face (y .47) into the pivot bore for the rod set screw. Every station and size prints at the title block''s .XX from the body''s front face: relief walls .110 / .100 and V lands .090 at the printed limits; the tap''s wall to the step prints .064 MIN (RV-01)'
         - —
-        - 'p.60/65 close-ups + t046 (green grip in the block, body leaving the far end; through-hole at the free end): the block HANGS on the rod''s pivot end, its length at 45° to the paper. Pivot station 12.5 and the 27.3 length put the carriage CG on the rod axis (pn_pen_carriage_geom.plan_cg_residual_mm 0.013 in plan) so the pen hangs level; the lightening bore is dropped'
+        - 'p.60/65 close-ups + t046 (green grip in the block, body leaving the far end; through-hole at the free end): the block HANGS on the rod''s pivot end, its length at 45° to the paper. Pivot station .49 and the 1.07 length put the carriage CG on the rod axis (pn_pen_carriage_geom.plan_cg_residual_mm 0.038 mm in plan) so the pen hangs level; the lightening bore is dropped'
         - scaled + derived
         - low
       - - Set screw (thumb screw)
@@ -1955,23 +1955,23 @@ sections:
       - - Rod set screw (MHA-PN-VN-52, purchased)
         - '#4-40 × 3/16 cup point (McMaster 91375A105) in the v-block front-face tap, cup on the rod''s pivot end'
         - —
-        - 'p.60 (side set screw pins the block to the rod); tap length 7.0, screw recessed 2.24 below the face'
+        - 'p.60 (side set screw pins the block to the rod); tap length .367 (9.3218 mm, body front face to bore wall), screw recessed 4.56 mm below the face'
         - catalog + derived
         - med
       - - Pen-height adjuster (pn-pen-adjust-screw + MHA-PN-VN-53 jam nut)
-        - 'turned brass eye stud: #0-80 × 18 thread, Ø5 × 5 head with a #54 eye cross-hole 2.5 below its top, 23 overall; threaded 4.0 into the rod top; McMaster 92671A115 brass #0-80 hex jam nut on the rod''s top face'
+        - 'turned brass eye stud: #0-80 shank with .58 in of full thread, Ø.24 × .32 head with a #54 eye cross-hole .16 below its top, 26.0 mm overall (printed 1.02); threaded 3.2 mm into the rod top; McMaster 92671A115 brass #0-80 hex jam nut on the rod''s top face'
         - —
-        - 't046 / engineerguy 4/4 9:15–10:34 (the wire ties to a stud on the rod top); #0-80 is the only thread whose tap leaves the 5-square rod a ≥1.5 wall. Head top y 515.2 at rest, 51.6 under the rim at the top of travel'
+        - 't046 / engineerguy 4/4 9:15–10:34 (the wire ties to a stud on the rod top); #0-80 is the only thread whose tap leaves the .197-square rod the .060 in wall floor (printed .067 MIN, RV-01). Head top y 519.0 at rest, 32.8 under the rim at the top of travel'
         - derived
         - low
       - - Pen hanger (M6.4; 2026-10 re-derive)
-        - 'black strap (3 thick, tapering 16 → 10 wide, 170 tall) flat on the wheel-bar front face (z −138.9) from the bar top (y 580.7) down to y 410.7, 2.6 above the platen top (the strap cannot pass the paper top without leaving the bar plane the platen also crosses). Two open U guide plates 1.5 thick × 10 wide, 40 apart (y 410.7..412.2 and 450.7..452.2), silver-brazed across its front face and reaching 4.0 past the rod axis; each slot 5.05 +0.05/0 on the 5.0 rod (0.05..0.15 running clearance, ≤ 0.21° lean between the plates), bottom 0.5 behind the rod''s back face, opening forward (−z) so the rod lifts out. The rod line (x `PEN_ROD_X`, z `PEN_Z_MID`) is derived from `_recording_geometry`'
+        - 'black strap (11 GA sheet, .1196 in thick, tapering .63 → .48 wide, 6.69 tall) flat on the wheel-bar front face (z −138.9) from the bar top (y 580.7) down to y 410.774, 2.72 above the platen top (the strap cannot pass the paper top without leaving the bar plane the platen also crosses). Two open U guide plates of 12 GA sheet, .1046 in thick × .48 wide, the upper one''s top face 5.00 in below the strap top (y 410.774..413.431 and 451.043..453.700, 40.269 apart), silver-brazed across its front face and reaching 4.076 past the rod axis; each slot .200 +.002/0 in on the .197 +.000/−.002 rod (0.076..0.178 running clearance, ≤ 0.24° lean between the plates), bottom 4.09 behind the rod''s back face, opening forward (−z) so the rod lifts out. The rod line (x `PEN_ROD_X`, z `PEN_Z_MID`) is derived from `_recording_geometry`'
         - —
         - p.60–63; engineerguy 4/4 9:15–10:34
         - scaled + derived
         - low
       - - Hanger screw ×1, nut ×1 and jam nut ×1 (M6.10)
-        - 'McMaster 93075A199 hex-head #8-32 × 1 screw, driven from behind the wheel bar through the pen-hanger strap''s Ø4.572 #8 close-clearance hole into a McMaster 90480A009 zinc-plated steel #8-32 hex nut (MHA-PN-VN-54, 11/32 AF × 1/8) bearing on the strap front, locked by a McMaster 90760A009 zinc-plated steel #8-32 small-pattern nut (MHA-PN-VN-55, 1/4 AF × 3/32) jammed against it; 7.2 of full thread stands past the jam nut (≥ 2 pitches, tip chamfer excluded; a 3/4 screw would leave 0.8), the tip stops 3.2 short of the magnifying-wheel rim, and the nut''s corners clear the rim radially by 0.96. Hole station: wheel-bar local x −112, machine (x, y) = (−3, 575.7), 5.0 below the strap top. The bar''s Ø4.572 close-clearance hole is centred 5.0 from the fixed free end (machine x −8), leaving 2.714 nominal end wall.'
+        - 'McMaster 93075A199 hex-head #8-32 × 1 screw, driven from behind the wheel bar through the pen-hanger strap''s Ø4.572 #8 close-clearance hole into a McMaster 90480A009 zinc-plated steel #8-32 hex nut (MHA-PN-VN-54, 11/32 AF × 1/8) bearing on the strap front, locked by a McMaster 90760A009 zinc-plated steel #8-32 small-pattern nut (MHA-PN-VN-55, 1/4 AF × 3/32) jammed against it; 6.6 of full thread stands past the jam nut (≥ 2 pitches, tip chamfer excluded; a 3/4 screw would leave 0.3), the tip stops 3.7 short of the magnifying-wheel rim, and the nut''s corners clear the rim radially by 0.96. Hole station: wheel-bar local x −112, machine (x, y) = (−3, 575.7), 5.0 below the strap top. The bar''s Ø4.572 close-clearance hole is centred 5.0 from the fixed free end (machine x −8), leaving 2.714 nominal end wall.'
         - —
         - 'p.60–63 (the strap is bolted to the bar); stock wrappers `cad/scripts/build_pn_vn_hanger_screw.py` / `cad/scripts/build_pn_vn_pen_hanger_nut.py` / `cad/scripts/build_pn_vn_pen_hanger_jam_nut.py`; station and end wall from `cad/scripts/build_mg_wheel_bar.py` / `cad/scripts/mg_wheel_bar_geom.py`; clearance hole from `cad/scripts/build_pn_pen_hanger.py`; stack from `cad/scripts/build_pn_pen_assembly.py`'
         - scaled + derived
@@ -1995,17 +1995,17 @@ sections:
       build_pn_pen_assembly): pen rod vertical on the magnifying wheel's rim
       tangent, x 3.8 (`PEN_ROD_X`), z −162.5 (`PEN_Z_MID`, the wheel mid-plane, so
       the pen wire hangs plumb onto the rod axis); shoulder y 384.2, square top
-      496.2, adjuster stud head top 515.2, pen wire 60.5 up to the rim tangent at
+      496.2, adjuster stud head top 519.0, pen wire 56.7 up to the rim tangent at
       y 575.7. PEN_Z_MID is the paper-most 0.1 mm line keeping the stirrup's
-      paper-side corner (z −143.76) ≥ 0.5 off the paper front (−143.25). V-block
-      origin (−11.40, 366.2, −160.03), yawed +45° about Y (its length runs forward
-      + east from the paper end): the pivot bore (local x 12.5, z 9) on the rod
+      paper-side corner (z −143.82) ≥ 0.5 off the paper front (−143.25). V-block
+      origin (−11.29, 366.2, −159.99), yawed +45° about Y (its length runs forward
+      + east from the paper end): the pivot bore (local x 12.446, z 8.89) on the rod
       axis; marker grip in the V, axis 1.50 below the block bottom at paper
       mid-height (y 364.70), nib at (−15.20, ., −143.50) = 0.25 off the paper
       front, body running out of the free end to (35.29, ., −193.99). Stirrup
       flush on the block's paper end, top rail 0.1 above the block top; thumb
       screw stood on end on its axis, knob outer face y 337.2, tip on the grip
-      underside. Rod set screw cup on the pivot at y 378.2. All carriage parts
+      underside. Rod set screw cup on the pivot at y 378.14. All carriage parts
       lock-mated to the rod; the rod's Y travel (±15) is the freed DOF.
 - heading: Chapter 25 — Pinion Gear (pp. 66–69)
   elements:

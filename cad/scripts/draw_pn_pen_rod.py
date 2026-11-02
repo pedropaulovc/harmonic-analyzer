@@ -6,13 +6,16 @@ overall-length reference and the property-linked view notes; sheet/template
 and export behavior lives in ``_drawing_common``.  Places, bands and mate
 callouts are authored on the part (``pn_pen_rod_spec``).
 
-The side view (2:1, the sheet scale) lays the rod axis horizontal, as the
-bar sits in the lathe (drawing-guidelines.md rule 11), and carries the
-square's and the pivot's lengths from the shoulder, the pivot's banded
-diameter between its flanks, the shoulder root's R MAX and the (122.5)
-end-to-end reference; the labelled end view (5:1) under it looks at the
-tapped top face and carries the square's banded SQ size and the native Hole
-Wizard callout of the #0-80 stud tap; the labelled 1:1 isometric sits right.
+The sheet prints decimal inch (the part's ``drawing_unit: in``).  The side
+view (2:1, the sheet scale) lays the rod axis horizontal, as the bar sits in
+the lathe (drawing-guidelines.md rule 11), and carries the square's and the
+pivot's lengths from the shoulder, the pivot's banded diameter between its
+flanks, the shoulder root's R MAX and the (4.82) end-to-end reference; the
+labelled end view (5:1) under it looks at the tapped top face and carries the
+square's banded SQ size, the native Hole Wizard callout of the #0-80 stud
+tap, its drill Ø at .XXX and both depths at .XX, and the tap's .067 MIN wall
+(RV-01, from the part's hidden TapWallReference sketch, shown in that view
+only); the labelled 1:1 isometric sits right.
 
 Run with SolidWorks open::
 
@@ -42,21 +45,24 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
+from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import (
     assert_imported_precision,
+    offset_dimension_text,
     set_dimension_callouts,
     set_reference_dimension,
 )
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import ViewEdges, scan_view_edges
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -71,8 +77,11 @@ from pn_pen_rod_spec import (
     SHOULDER_FILLET_R,
     SHOULDER_FILLET_TOL_TYPE,
     SQUARE_LENGTH,
+    STUD_TAP_DEPTH_PLACES,
     STUD_TAP_DRILL_DIA,
     STUD_TAP_SPEC,
+    TAP_WALL_MIN_MM,
+    TAP_WALL_START_R,
     TOTAL_LENGTH,
 )
 
@@ -91,6 +100,13 @@ OUTPUTS = DrawingOutputs(
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
+# Hole Wizard length variables of the blind stud tap's callout, by native
+# name: the drill's Ø prints .XXX, both depths the spec's places (.XX).
+STUD_TAP_PRECISION = {
+    "hw-tapdrldia": 3,
+    "hw-tapdrldepth": STUD_TAP_DEPTH_PLACES,
+    "hw-threaddepth": STUD_TAP_DEPTH_PLACES,
+}
 
 # Rule 15: at 1:1 the side view stood 5 mm tall in the top half of the sheet
 # (final review 2026-10-14); 2:1 lays the rod 245 mm long and 10 mm tall.
@@ -138,6 +154,11 @@ def _end_x(center: tuple[float, float], model_x_mm: float) -> float:
     return center[0] + model_x_mm * END_SCALE[0] / END_SCALE[1] / 1000.0
 
 
+def _end_y(center: tuple[float, float], model_z_mm: float) -> float:
+    """Sheet y of a model z in the end view ("*Top": model +Z points down)."""
+    return center[1] - model_z_mm * END_SCALE[0] / END_SCALE[1] / 1000.0
+
+
 _HALF = ROD_SECTION / 2.0
 _END_HALF_M = _HALF * END_SCALE[0] / END_SCALE[1] / 1000.0
 
@@ -157,26 +178,26 @@ _END_HALF_M = _HALF * END_SCALE[0] / END_SCALE[1] / 1000.0
 # Above the rod, three rows baselined from the shoulder / end faces, each
 # sharing its extension lines with the row below at the common face (text
 # offsets are sheet millimetres, as on the green 1:1 sheet):
-#   row 1 (y 0.1845, 9.5 mm over the square): 112.0, shoulder to top face,
+#   row 1 (y 0.1845, 9.5 mm over the square): 4.41, shoulder to top face,
 #     text mid-span (x 0.2155);
-#   row 2 (y 0.1945): 10.5, pivot end to shoulder.  At 2:1 the span is
+#   row 2 (y 0.1945): .41, pivot end to shoulder.  At 2:1 the span is
 #     21 mm, so the ~11.6 mm text stands centred over it (x 0.0872..0.0988,
 #     4.7 mm from each extension line), its arrows FORCED inside
 #     (ARROW_SIDES) so no outside tail runs left toward the Ø's line;
-#   row 3 (y 0.2045): the (122.5) reference, end face to end face, its line
+#   row 3 (y 0.2045): the (4.82) reference, end face to end face, its line
 #     at y ~0.2017 and its text ~0.2026..0.2061 (audit offsets).
-# Ø4.000 -0.010/-0.025 between the pivot flanks: its line stands 5.75 mm
+# Ø.1260 -.0002/-.0005 between the pivot flanks: its line stands 5.75 mm
 #   left of the pivot end (x 0.07675), the flanks' extension lines reaching
 #   it, so it rises past every row clear of their lines (all start at the
 #   pivot end or right of it) to the four-row ~56 x 20 mm block centred at
-#   y 0.2225: shoulder y ~0.2124 (6.3 mm over the (122.5) text), top
+#   y 0.2225: shoulder y ~0.2124 (6.3 mm over the (4.82) text), top
 #   ~0.2325.  Hanging left it spans x 0.0210..0.0768 (8.3 mm inside the
 #   border), hanging right 0.0768..0.1326; either way only its bottom row's
 #   end meets the line, at the shoulder.  Under the rod its outside-arrow
 #   tail (6.35 mm) runs to y ~0.1597 at x 0.0768, where nothing else is.
 # Below the rod, where the ShoulderRadius's arc is (model +X, the root the
 # vertical layout's leader found):
-#   R0.2 MAX / SEATS ON PEN V-BLOCK / MHA-PN-05 down-right of the root:
+#   R.008 MAX / SEATS ON PEN V-BLOCK / MHA-PN-05 down-right of the root:
 #     farm audit 20261014T053239477Z drew that block x keep-0.0281..
 #     keep+0.0265 with its shoulder 8.35 mm under the anchor, so at
 #     (0.16925, 0.1475) it spans x 0.1412..0.1958, y 0.1392..0.1559 (9.1 mm
@@ -190,7 +211,7 @@ SIDE_KEEP = {
     "ShoulderRadius": (_sx(0.0) + 0.06575, _sy(_HALF) - 0.0175),
 }
 # swDimensionArrowsSide_e (swDimArrowsInside 0, swDimArrowsOutside 1), read
-# back (draw_dt_cone_tip_block's _set_arrow_sides): the 10.5's inside its
+# back (draw_dt_cone_tip_block's _set_arrow_sides): the .41's inside its
 # 21 mm span; the SQ size's outside its 25 mm span, so only its text stands
 # between the extension lines (the green 4:1 sheet drew them outside too).
 ARROW_SIDES = {"PivotLength": 0, "Depth": 1}
@@ -201,7 +222,7 @@ OVERALL_REF_XY = (_sx(_CY), _sy(-_HALF) + 0.0295)
 # overall length reference edge 1 at sheet (0.069, 0.08875)").  The top face's
 # near edge is the visible straight edge across the square at y 112; the
 # pivot end is the circle of the pivot's diameter about the rod axis at
-# y -10.5.  The sheet points passed beside them only document the layout.
+# y -PIVOT_LENGTH.  The sheet points passed beside them only document the layout.
 OVERALL_TOP_SHEET_XY = (_sx(SQUARE_LENGTH), _sy(-_HALF + 1.0))
 OVERALL_END_SHEET_XY = (_sx(-PIVOT_LENGTH), _sy(-PIVOT_DIA / 2.0 + 1.0))
 _EDGE_TOL_MM = 1e-4
@@ -227,7 +248,24 @@ _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 # line's lower arrow piece (x 0.132, to y ~0.0561).
 END_KEEP = {
     "Depth": (END_CENTER[0] + 0.052, END_CENTER[1] + 0.00051),
+    "TapWallMin": (
+        END_CENTER[0] - _END_HALF_M - 0.010,
+        _end_y(END_CENTER, TAP_WALL_START_R + TAP_WALL_MIN_MM / 2.0),
+    ),
 }
+# RV-01's tap wall (.067 MIN over TAP WALL) stands left of the square, the
+# one empty side: its reference line runs from the thread's rim straight
+# down the vertical centreline toward the bottom flat (sheet y ~0.0712 to
+# ~0.0627), so its extension lines run left from the centreline, under the
+# centre mark's horizontal arm and clear of the tap callout's leader (which
+# drops onto the rim from above), to its line 10 mm left of the square.
+# The 8.5 mm run cannot hold the ~21 x 9 mm two-row text, so native
+# OffsetText parks it on a leader further left (draw_pn_pen_frame's
+# TAP_WALL_TEXT_XY): x ~0.027..0.052, its right edge ~4.5 mm clear of the
+# extension lines' ends and ~7 mm over the view label's top.  The anchor is
+# the value row's bottom centre.
+TAP_WALL_TEXT_XY = (END_CENTER[0] - _END_HALF_M - 0.028, END_KEEP["TapWallMin"][1])
+_TEXT_SETTLE_M = 0.0005
 TAP_CALLOUT_XY = (END_CENTER[0] + 0.022, END_CENTER[1] + 0.035)
 END_NOTE_WIDTH = 0.075
 END_NOTE_XY = (
@@ -348,6 +386,25 @@ def _dress_shoulder_radius(adapter: Any, annotations: list[Any]) -> None:
     )
 
 
+def _offset_tap_wall_text(adapter: Any, annotations: list[Any]) -> None:
+    """Park the tap wall's text on its leader shelf and read it back."""
+    offset_dimension_text(adapter, annotations, {"TapWallMin": TAP_WALL_TEXT_XY})
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        if dimension_name(adapter, annotation) != "TapWallMin":
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        position = annotation.GetPosition()
+        if (
+            not bool(display.OffsetText)
+            or position is None
+            or math.dist(position[:2], TAP_WALL_TEXT_XY) > _TEXT_SETTLE_M
+        ):
+            raise RuntimeError(
+                f"tap wall text at {position!r}, not offset to {TAP_WALL_TEXT_XY!r}"
+            )
+
+
 def _center_mark_count(view: Any) -> int:
     """The view's centre-mark annotations (a bare view answers None)."""
     return len(
@@ -410,7 +467,7 @@ def _pivot_end_edge(edges: ViewEdges) -> Any:
 
 @_telemetry.traced("drawing.pen_rod.overall_reference")
 def _overall_reference(adapter: Any, side: Any) -> None:
-    """(122.5): top face to pivot end, a reference the square and pivot
+    """(4.82): top face to pivot end, a reference the square and pivot
     lengths own (rule 10); a drawing-added edge dimension between two
     scanned entities, proved attached to exactly them and measuring
     TOTAL_LENGTH before it is parenthesised."""
@@ -439,7 +496,7 @@ def _overall_reference(adapter: Any, side: Any) -> None:
         raise RuntimeError(
             f"{label}: expected a linear dimension, got type {dimension_type}"
         )
-    # The rim lies in the plane y -10.5, so any arc end condition reads the
+    # The rim lies in the plane y -PIVOT_LENGTH, so any arc end condition reads the
     # same distance; the attachments and the value prove the picks.
     assert_dimension_measures(
         adapter,
@@ -482,7 +539,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("pn-pen-rod"),
     )
     stamp_drawing_summary(
         adapter,
@@ -536,6 +597,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    _offset_tap_wall_text(adapter, annotations)
     # The template may centre-mark the tap as the view is placed: farm run
     # 20261023T212137739Z's layout audit found two identical marks on it
     # (duplicate-annotation, fleet issue #913) after the explicit call.  Mark
@@ -560,6 +622,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # The title block's THREADS row owns the general thread class (rule 2).
     omit_title_block_thread_class(stud_callout, label="adjuster stud blind tap")
+    set_hole_callout_precision(
+        stud_callout, STUD_TAP_PRECISION, label="adjuster stud blind tap"
+    )
 
     _overall_reference(adapter, side)
 

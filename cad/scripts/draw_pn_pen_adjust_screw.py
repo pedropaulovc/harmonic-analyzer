@@ -10,7 +10,8 @@ thread-limit split edge, the plain shank's diameter as a parenthesised
 reference, the head's diameter and height, the overall length, the eye's
 station from the head's faced end (the hidden EyeStationReference sketch,
 shown in this view only) and the shoulder root's fillet as a single R MAX
-limit. A shaded isometric at the sheet scale completes the package (rule 8).
+limit at the title block's INSIDE CORNERS row. A shaded isometric at the
+sheet scale completes the package (rule 8).
 No datums, frames or roughness symbols: the stud is not on the GD&T allowlist
 (rule 5) and nothing on it runs or locates (rule 6). No general note: the
 title block says all the stud needs.
@@ -47,9 +48,10 @@ from _drawing_dimensions import (
     set_reference_dimension,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import drill_process
 from _machinist_review_mode import MachinistReviewMode
@@ -162,35 +164,29 @@ SIDE_KEEP = {
     "HeadDia": (TOP_X + 0.021, AXIS_Y),
     "ShoulderRadius": (SHOULDER_X - 0.015, AXIS_Y - 0.0435),
 }
-# The shoulder root's R MAX (rule 16). SolidWorks hangs the imported fillet
-# radius on one of the two arcs the turned corner draws (upper or lower
+# The shoulder root's R MAX (rules 11 and 16). SolidWorks hangs the imported
+# fillet radius on one of the two arcs the turned corner draws (upper or lower
 # flank); which one is the seat's choice, so _dress_shoulder_radius reads the
-# arrow back and lays out for that side. Measured on the
-# 20261014T061028487Z sheet: FULL THREAD extension line x 0.162 (down to y
-# ~0.1264), head-height shoulder-side extension line x 0.180 (y
-# 0.1292..0.146), the 15.0's line y ~0.1275, the 26.0's text top y ~0.1166.
-# Lower arc (SIDE_KEEP): the only paper the leader can reach the lower corner
-#   through without crossing a line is the 18 mm slot between those two
-#   extension lines, so the ~18 mm "R0.2 MAX" hangs UNDER row 1, centred in
-#   the band between the 15.0's line and the 26.0's text (3 mm to each), 15 mm
-#   left of the shoulder: x ~0.156..0.174. Its leader leaves the text's right
-#   end and climbs to the corner >= 2.8 mm left of the head-height extension
-#   line, between the two rows' line ends, crossing nothing.
+# arrow back and lays out for that side.
+# Lower arc (SIDE_KEEP): the ~18 mm "R.040 MAX" hangs UNDER row 1, centred
+#   in the band between the head height's line and the overall length's text,
+#   15 mm left of the shoulder; its leader leaves the text's right end and
+#   climbs to the corner left of the head-height extension line.
 # Upper arc (UPPER_ARC_KEEP): PlainDia's line (x PLAIN_MID_X, rising from the
 #   flanks to its text) would cut that leader, so the two trade sides. The R
-#   text stands up-left of the upper corner, 21 mm over the axis (x
-#   ~0.151..0.169, 11 mm left of the head, 12 mm under the eye callout's
-#   line), its leader running down-right into the corner over the
-#   bare flank; (Ø1.52)'s line drops between the two extension lines to its
-#   text in the band under row 1 (2.4 mm under the 15.0's arrow, 2.9 mm over
-#   the 26.0's text).
+#   text stands up-left of the upper corner, 21 mm over the axis, its leader
+#   running down-right into the corner over the bare flank; (Ø.060)'s line
+#   drops between the two extension lines to its text in the band under row 1.
 UPPER_ARC_KEEP = {
     "ShoulderRadius": (SHOULDER_X - 0.020, AXIS_Y + 0.021),
     "PlainDia": (PLAIN_MID_X, AXIS_Y - 0.045),
 }
 # An arrow on the fillet arc or its extension circle stands within
-# (1 + sqrt 2) R (2.9 mm at 6:1) of the sharp corner it rounds.
-_CORNER_TOL = 0.004
+# (1 + sqrt 2) R of the sharp corner it rounds (14.7 mm at 6:1 for R.040);
+# which flank it hangs on is the side of the axis the arrow lands.
+_CORNER_REACH = (1.0 + math.sqrt(2.0)) * SHOULDER_FILLET_R * _S + 0.001
+# The native Hole Wizard Ø variable of the #54 eye's drill callout.
+EYE_CALLOUT_PRECISION = {"hw-diam": 3}
 # The eye callout stands up and LEFT of the eye, above the bare thread (the
 # old up-and-right place dropped its leader through the station dimension's
 # line, rule 14). SolidWorks hangs the leader off the text end nearer the
@@ -239,16 +235,19 @@ def _arrow_tips(display: Any) -> list[tuple[float, float]]:
 
 
 def _shoulder_arc_side(display: Any, corners: dict[str, tuple[float, float]]) -> str:
-    """Which shoulder corner ("upper"/"lower") the radius's arrow lands on."""
-    distance, side = min(
-        (math.dist(tip, corner), side)
-        for tip in _arrow_tips(display)
-        for side, corner in corners.items()
+    """Which shoulder corner ("upper"/"lower") the radius's arrow lands on:
+    the side of the turning axis (midway between the corners) it stands."""
+    axis_y = (corners["upper"][1] + corners["lower"][1]) / 2.0
+    tip = min(
+        _arrow_tips(display),
+        key=lambda t: min(math.dist(t, corner) for corner in corners.values()),
     )
-    if distance > _CORNER_TOL:
+    side = "upper" if tip[1] > axis_y else "lower"
+    distance = math.dist(tip, corners[side])
+    if distance > _CORNER_REACH:
         raise RuntimeError(
-            f"ShoulderRadius arrow lands {distance * 1000.0:.1f} mm from either "
-            "shoulder corner"
+            f"ShoulderRadius arrow lands {distance * 1000.0:.1f} mm from the "
+            f"{side} shoulder corner"
         )
     return side
 
@@ -263,9 +262,12 @@ def _dress_shoulder_radius(
     stop its leader at the corner and lay it out for the arc it landed on.
 
     Read back: radial (not a diameter), measuring SHOULDER_FILLET_R, the
-    native swTolMAX the part set. ``ArcExtensionLineOrOppositeSide`` False
-    keeps the leader from running on through the arc centre
-    (draw_pn_pen_rod._dress_shoulder_radius). SIDE_KEEP lays the text out for
+    native swTolMAX the part set. The text stands outside the arc's own
+    quadrant (the corner's material fills that ray), so
+    ``ArcExtensionLineOrOppositeSide`` True carries the leader on to the
+    drawn arc instead of stopping on its undrawn circle in empty paper (the
+    19efce6a4 sheet's finding); the arc centre it passes stands in open paper
+    off the shank and the head's face. SIDE_KEEP lays the text out for
     the lower arc; on the upper one UPPER_ARC_KEEP moves it and PlainDia, and
     the rebuilt arrow must still land on that corner.
     """
@@ -283,9 +285,9 @@ def _dress_shoulder_radius(
         float(dimension.SystemValue), SHOULDER_FILLET_R / 1000.0, abs_tol=1e-9
     ):
         raise RuntimeError("ShoulderRadius does not measure the shoulder fillet")
-    display.ArcExtensionLineOrOppositeSide = False
-    if display.ArcExtensionLineOrOppositeSide is not False:
-        raise RuntimeError("ShoulderRadius leader still runs to the opposite side")
+    display.ArcExtensionLineOrOppositeSide = True
+    if display.ArcExtensionLineOrOppositeSide is not True:
+        raise RuntimeError("ShoulderRadius leader does not reach the drawn arc")
     drawing_model.EditRebuild3()
     corners = {
         "upper": spt(SHOULDER_X, AXIS_Y + THREAD_HALF),
@@ -328,7 +330,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -391,13 +397,17 @@ async def build(adapter: Any) -> dict[str, str]:
         face_xy=spt(*CENTERLINE_PICK),
         label="adjuster stud turning axis",
     )
-    add_native_hole_callout(
+    eye_callout = add_native_hole_callout(
         adapter,
         side,
         edge_xy=spt(*EYE_RIM_PICK),
         callout_xy=spt(*EYE_CALLOUT_XY),
         label="adjuster stud eye",
         process=drill_process(EYE_SPEC),
+    )
+    # The #54 drill's Ø prints .XXX (+.004/0 from the title block).
+    set_hole_callout_precision(
+        eye_callout, EYE_CALLOUT_PRECISION, label="adjuster stud eye"
     )
 
     # The shaded isometric shows the #0-80 the callout names; imported before

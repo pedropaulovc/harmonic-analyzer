@@ -15,23 +15,25 @@ face); every feature is located across the depth from the body's front face
 * front: ``*Back`` looks at the body's front face, where the set screw
   enters, so the paper end is on the RIGHT; the neck's front face stands back
   from it at the step.  It carries the height and the tap's two coordinates,
-  the tap's native callout, and section A-A's cutting line on the pivot-bore
-  axis.
+  the tap's wall to the step (RV-01, from the part's hidden TapWallReference
+  sketch, shown in that view only), the tap's native callout, and section
+  A-A's cutting line on the pivot-bore axis.
 * right (third angle, right of the ``*Back`` face): ``*Left``, the paper end,
   shows the neck's end face with the V in solid lines and the body's wider
   faces beyond it.  Under it, one baseline row from the body's front face:
   the V's two mouth edges; at the back mouth corner, out of the view in the
   wedge vertically opposite the groove's, the flanks' "2X 45°" to the bottom
   face, its short arc at the corner and its text offset right of the view;
-  over the view, its apex flat's width and, up the back round's bisector,
-  the rounds' single-limit radius; right of it, the flat's reference height.
+  under the V's apex flat, inside the opening, its width; right of the view,
+  the flat's reference height.  Its inside corners print nothing: the title
+  block's INSIDE CORNERS R.040 MAX governs them.
   Through the V it looks along
   the open relief slot: the V is cut on past the step
   (``pn_pen_v_block_spec.V_CUT_LENGTH``), so no brass shows inside it.
 * bottom: ``*Bottom`` turned 180 degrees to keep the front view's X, looking
   up into the V and the relief; through the relief the roof shows the pivot
   bore.  It carries the stations from the paper end and the overall length
-  under it, the relief's corner radius over it, the neck's two faces and the
+  under it, the neck's two faces and the
   body's back face from the body's front face (right of the paper end, where
   the neck's step is an outline change) and the pivot bore's reamed, banded
   diameter.
@@ -44,7 +46,8 @@ face); every feature is located across the depth from the body's front face
 
 No datums, frames, basic dimensions or roughness (drawing-simplicity-policy.md
 rules 5 and 6), no note block: material and finish ride the title block.  The
-sheet runs 4:1; the isometric stays 1:1.
+sheet prints decimal inch (the part's ``drawing_unit: in``) and runs 4:1; the
+tap callout's drill diameter prints .XXX.  The isometric runs 3:2.
 
 Run with SolidWorks open::
 
@@ -85,7 +88,7 @@ from _drawing_dimensions import (
 )
 from _drawing_edges import scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
@@ -95,6 +98,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _hole_spec import TAP_DRILL_MM
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _section_axis import position_section_caption
 from _session import run_build
@@ -120,9 +124,9 @@ from pn_pen_v_block_spec import (
     SECTION_REFERENCE_SKETCHES,
     SET_SCREW_TAP_SPEC,
     SET_SCREW_Y,
+    TAP_WALL_MIN_MM,
+    TAP_WALL_START_X,
     V_ANGLE_DEG,
-    V_APEX_FILLET_R,
-    V_FLAT_WIDTH,
     V_FLAT_Y,
     V_MOUTH_Z0,
     V_MOUTH_Z1,
@@ -234,13 +238,35 @@ def _sy(model_y_mm: float) -> float:
 # its dimension line ~3.3 mm under it (r9 / r11 sheets 20261014T011745149Z,
 # 20261014T023836943Z).
 # Front: the height left; the tap's coordinates from the paper-end/bottom
-# corner right of and below the view (the station at y 0.144, ink to ~0.146,
-# its extension lines at x 0.105 / 0.155 down to ~0.139).
+# corner right of and below the view (the station at y 0.136, ink to ~0.138,
+# its extension lines at x 0.105 / 0.154 down to ~0.132, 4 mm over the bottom
+# view's NeckZ0 extension line at y 0.127).  Between it and the view, the
+# tap's wall to the step: its reference line runs from the thread's rim
+# toward the step at the tap's height (x ~0.110..0.117, y 0.204), its
+# extension lines straight down through the face, right of the section
+# line, to its line 11 mm under the bottom face, inside the station's
+# extension lines.  Over the view they would cross the tap callout's leader.
+# The keep is the line itself (farm 20261101T085904510Z: at 6 mm under, y
+# 0.150, the line's outside leg ran along section line A's arrow, drawn at
+# the cutting line's bottom end, 1.5 mm model under the face), so the line
+# stands 5 mm under that arrow and 7 mm over the station's text.
+_SECTION_ARROW_Y = _fy(SECTION_LINE_MODEL_MM[0][1])
 FRONT_KEEP = {
     "Height": (_fx(BLOCK_LENGTH) - 0.014, _fy(_CY)),
     "SetScrewY": (_fx(0.0) + 0.010, _fy(SET_SCREW_Y / 2.0)),
-    "SetScrewX": (_fx(PIVOT_BORE_X / 4.0), _fy(0.0) - 0.012),
+    "SetScrewX": (_fx(PIVOT_BORE_X / 4.0), _fy(0.0) - 0.020),
+    "TapWallMin": (
+        _fx(TAP_WALL_START_X - TAP_WALL_MIN_MM / 2.0),
+        _SECTION_ARROW_Y - 0.005,
+    ),
 }
+# The wall's 6.5 mm run cannot hold its ~21 x 9 mm two-row text (the
+# frame's lesson): native OffsetText parks it on a leader right of the line,
+# ~6 mm clear of its extension lines, between the view's bottom face (~3.5 mm
+# over the text) and the station's text (~7 mm under), its leader dropping
+# to the line's right end; the anchor is the value row's bottom centre.
+TAP_WALL_TEXT_XY = (0.134, _fy(0.0) - 0.007)
+_TEXT_SETTLE_M = 0.0005
 # Paper end: one baseline row under the view from the body's front face (the
 # view's left edge, x 0.188), nested shortest-innermost 7 mm apart so no
 # extension line crosses a dimension line it does not end on: the V's front
@@ -269,29 +295,14 @@ FRONT_KEEP = {
 #   ran into its "4"; final8: placed outside the wedge it measures,
 #   SOLIDWORKS swept the arc 40 mm about the corner through the depth row's
 #   text.
-# * the apex flat's width over the view (its line ~6 mm over the top face,
-#   y ~0.234; text ~0.2355..0.239), its extension lines rising from the
-#   flat's ends (x 0.228 / 0.236) across the end face: 8 mm under the tap's
-#   callout (from y ~0.247).
-# * the flat's height, a reference "(5.0)", right of the view (x
-#   ~0.283..0.294), 12 mm clear of section A-A (from x 0.306).
-# * the apex rounds' "2X R0.5 MAX" over the view, 70 mm up the back round's
-#   bisector (67.5 deg) from its centre (x 0.2352, y 0.174), so the radial
-#   leader meets the arc square on and crosses only the end face: its text
-#   (~28 mm, x ~0.248..0.276, y ~0.237..0.241) 5 mm right of the flat
-#   width's outside arrow (to ~0.243), 6 mm under the tap's callout (from y
-#   ~0.247) and 30 mm left of section A-A.
+# * the apex flat's width under the flat, inside the V's opening (its text
+#   ~5 mm under the flat, its line ~10 mm under, model y ~2.5, where the
+#   opening is 28 mm wide), so its extension lines drop ~11 mm from the
+#   flat's ends (x 0.228 / 0.236) through air (round 3 review: over the view
+#   they ran across the whole end face).
+# * the flat's height, a reference "(.20)", right of the view (x
+#   ~0.283..0.292), 12 mm clear of section A-A (from x 0.306).
 _END_ROW = 0.007
-_ROUND_BEARING = math.radians((90.0 + V_ANGLE_DEG / 2.0) / 2.0)
-_ROUND_CENTRE = (
-    _rz(
-        _CZ
-        + V_FLAT_WIDTH / 2.0
-        - V_APEX_FILLET_R * math.tan(math.radians(45.0 - V_ANGLE_DEG / 4.0))
-    ),
-    _ry(V_FLAT_Y - V_APEX_FILLET_R),
-)
-_ROUND_TEXT_RUN = 0.070
 # The flank's continuation past the corner runs down-right at the flank's
 # angle under the bottom face's line; the arc stands on the bisector between.
 _FLANK_ARC_BEARING = -math.radians(90.0 - V_ANGLE_DEG / 2.0) / 2.0
@@ -305,12 +316,8 @@ RIGHT_KEEP = {
         _rz(V_MOUTH_Z1) + _FLANK_ARC_RUN * math.cos(_FLANK_ARC_BEARING),
         _ry(0.0) + _FLANK_ARC_RUN * math.sin(_FLANK_ARC_BEARING),
     ),
-    "VFlatWidth": (RIGHT_CENTER[0], _ry(BLOCK_HEIGHT) + 0.0093),
+    "VFlatWidth": (RIGHT_CENTER[0], _ry(V_FLAT_Y) - 0.0066),
     "VFlatY": (_rz(BODY_Z1) + 0.012, _ry(V_FLAT_Y / 2.0)),
-    "VApexFilletR": (
-        _ROUND_CENTRE[0] + _ROUND_TEXT_RUN * math.cos(_ROUND_BEARING),
-        _ROUND_CENTRE[1] + _ROUND_TEXT_RUN * math.sin(_ROUND_BEARING),
-    ),
 }
 # Bottom (front faces at the top, y 0.128 for the body's, 0.1196 for the
 # neck's):
@@ -320,16 +327,7 @@ RIGHT_KEEP = {
 #   border).  The length's extension lines drop from the paper end's and the
 #   free end's back corners; its text toward the free end (x ~0.065..0.076).
 #   Over the view, from the front corners, its line fenced off the air in
-#   front of the block, where the relief corner's radius now prints.
-# * the relief corner's radius over the view (blind review final9: in the
-#   notch in front of the neck it was squeezed): its text (~16 mm, x
-#   ~0.135..0.151, y ~0.133..0.136) 3.7 mm over the neck faces' datum
-#   extension line (y 0.128), 5 mm under the front view's tap station (its
-#   line ~0.141, its extension lines down to ~0.139 at x 0.105 / 0.155).
-#   The radial leader, from its shoulder 3.3 mm left of the text, runs ~50
-#   deg down to the front corner's arc (centre x 0.1146, y 0.1116), across
-#   the datum's extension line and the neck's front edge 2.7 mm right of the
-#   step.
+#   front of the block.
 # * the neck's two faces and the body's back face right of the paper end,
 #   one baseline row from the body's front face at the step, nested
 #   shortest-innermost: the front face's "2.10" inside its 8.4 mm span (x
@@ -359,7 +357,6 @@ BOTTOM_KEEP = {
     "ReliefX0": (_fx(RELIEF_X0 / 2.0), _bz(BODY_Z1) - _PAPER_ROW),
     "PivotX": (_fx(PIVOT_BORE_X / 2.0), _bz(BODY_Z1) - 2 * _PAPER_ROW),
     "Length": (_fx(BLOCK_LENGTH) + 0.025, _bz(BODY_Z1) - 3 * _PAPER_ROW),
-    "ReliefCornerR": (_fx(RELIEF_X0) + 0.0245, _bz(BODY_Z0) + 0.0065),
     "NeckZ0": (_NECK_ROW_X, (_bz(BODY_Z0) + _bz(0.0)) / 2.0),
     "NeckZ1": (_NECK_ROW_X + _END_ROW, (_bz(BODY_Z0) + _bz(NECK_DEPTH)) / 2.0),
     "Depth": (
@@ -390,7 +387,7 @@ BOTTOM_KEEP = {
 #   text right put the line's end 1 mm off it).  The line runs under the
 #   whole text block, out to the far end of its widest row, the one-row
 #   "CLEARS ROD ... FILLET" above (~72 mm).  Centred 21 mm left of the rim
-#   (x 0.338) the "0.3 min." / "X 45 DEG" rows (~24 mm) end 6 mm short of
+#   (x 0.338) the "0.3 min." / "X 45°" rows (~24 mm) end 6 mm short of
 #   the extension lines and the line runs x ~0.302..0.364 at y ~0.2425, 4.8
 #   mm over PivotZ's "11.1" (top 0.2377) and 8 mm over both of its extension
 #   lines' tops (0.2345), crossing neither; the block (keep y 0.251, rows
@@ -425,6 +422,25 @@ SECTION_CAPTION_XY = (SECTION_CENTER[0], _sy(0.0) - 0.023)
 SECTION_THREAD_LAYER = "TAP-THREAD-SECTION"
 TAPPED_HOLE_NOTE = f"{SET_SCREW_TAP_SPEC.size} Tapped Hole"
 _COSMETIC_THREAD_ANNOTATION = 1  # swAnnotationType_e.swCosmeticThread
+
+
+def _offset_tap_wall_text(adapter: Any, annotations: list[Any]) -> None:
+    """Park the tap wall's text on its leader shelf and read it back."""
+    offset_dimension_text(adapter, annotations, {"TapWallMin": TAP_WALL_TEXT_XY})
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        if dimension_name(adapter, annotation) != "TapWallMin":
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        position = annotation.GetPosition()
+        if (
+            not bool(display.OffsetText)
+            or position is None
+            or math.dist(position[:2], TAP_WALL_TEXT_XY) > _TEXT_SETTLE_M
+        ):
+            raise RuntimeError(
+                f"tap wall text at {position!r}, not offset to {TAP_WALL_TEXT_XY!r}"
+            )
 
 
 def _place_flank_angle(adapter: Any, annotations: list[Any]) -> None:
@@ -549,7 +565,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("pn-pen-v-block"),
     )
     stamp_drawing_summary(
         adapter,
@@ -654,6 +674,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # The flanks' angle: its short arc at the back mouth corner, out of the
     # view, and its text offset right of the view.
     _place_flank_angle(adapter, annotations)
+    _offset_tap_wall_text(adapter, annotations)
     # Places (and the pivot band) are authored on the part; the sheet only
     # proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
@@ -684,6 +705,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # Both rows end where the hole does, in the pivot bore, not through; the
     # drill row opens with its process word (rule 12).
     _set_tap_callout_text(tap_callout)
+    set_hole_callout_precision(
+        tap_callout, TAP_CALLOUT_PRECISION, label="rod set-screw tap"
+    )
     rebuild_drawing(adapter, label="near-side diameter leaders")
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
@@ -712,6 +736,9 @@ async def build(adapter: Any) -> dict[str, str]:
 # r13: "Ø 2.26 INTO PIVOT BORE" carried no process word, so the drill row
 # opens with DRILL (rule 12).
 _TAP_END = "INTO PIVOT BORE"
+# The through-next tap's one Hole Wizard length variable, its drill
+# diameter, prints .XXX.
+TAP_CALLOUT_PRECISION = {"hw-tapdrldia": 3}
 _THRU_TOKEN = "<hw-thru>"
 _DRILL_WORD = "DRILL"
 # The drill row's size variable: <hw-tapdrldia> (or <hw-thrutapdrldia> for a

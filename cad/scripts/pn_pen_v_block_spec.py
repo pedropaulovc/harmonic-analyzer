@@ -21,8 +21,8 @@ brief (``balance_options.png`` panel C):
   whatever its diameter tolerance.
 * The marker's larger silver body runs out through a flat-roofed RELIEF slot
   along the body, so only the grip touches the block.  The body is wider
-  than the neck so both slot walls hold the rule 17 floor at the title
-  block's .X band.
+  than the neck so both slot walls hold the rule 17 .080 target at the
+  title block's .XX band.
 * The rod's turned pivot end drops into a reamed pivot bore just past the
   step; the rod's square shoulder rests on the block top, and a #4-40 set
   screw from the body's front face locks the pen's angle to the paper (book:
@@ -49,22 +49,43 @@ import math
 from typing import NamedTuple
 
 import _config
+from _fit_ream_h7 import REAM_H7
 from _hole_spec import HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
-from _printed_tolerance import angular_band_deg, printed_band_mm
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+from _package_units import drawing_unit
+from _printed_tolerance import (
+    angular_band_deg,
+    inside_corner_radius_mm,
+    printed_deviations,
+)
 import pn_pen_rod_spec as rod
 import pn_vn_pen_marker_spec as marker
 import pn_vn_pen_rod_set_screw_spec as rod_set_screw
 
+# #290: the sheet prints decimal inch (``drawing_unit: in``).  Lengths stay
+# millimetres, each the exact decimal of its printed inch value, except the
+# carriage's closures, kept at their millimetre values and printed rounded:
+# the block height (with pn_pen_rod_spec.SQUARE_LENGTH it sets the stud eye's
+# height, pn_pen_carriage_geom.STUD_HEAD_TOP_REST_Y) and the V's 12.0 mouth
+# width (it sets the marker axis, pn_pen_carriage_geom.MARKER_POS).  Every
+# printed check below judges the PRINTED limits (printed_deviations).
+UNIT = drawing_unit("parts/pn-pen-v-block", _config.parts("pn-pen-v-block"))
+# Every internal corner the sheet leaves undimensioned: the title block's
+# INSIDE CORNERS R.040 MAX governs it, and every check below judges that limit.
+INSIDE_CORNER_R_MAX = inside_corner_radius_mm(unit=UNIT)
+
 # X, along the marker: the CG solve (pn_pen_carriage_geom) puts the carriage's
-# plan CG 0.013 off the rod axis at 27.3, the .X step nearest it.
-BLOCK_LENGTH = 27.3
-BLOCK_HEIGHT = 18.0  # Y
+# plan CG on the rod axis at this length, on the .XX grid.
+BLOCK_LENGTH = 27.178  # 1.07
+BLOCK_HEIGHT = 18.0  # Y; closure, prints .71
 # --- Depth (Z): neck and body, both centred on DEPTH_MID_Z ---
-NECK_DEPTH = 18.0  # z 0..18: the stirrup's window passes it
-BODY_SIDE_STEP = 2.1  # the body stands this proud of the neck each side
+# The stirrup's window passes the neck with 1.0 a side
+# (pn_pen_carriage_geom), so the neck rounds down to .70, not up to .71.
+NECK_DEPTH = 17.78  # .70; z 0..NECK_DEPTH
+BODY_SIDE_STEP = 2.032  # .08; the body stands this proud of the neck each side
 BODY_Z0 = -BODY_SIDE_STEP  # the body's front face: the depth datum
 BODY_Z1 = NECK_DEPTH + BODY_SIDE_STEP
-BODY_DEPTH = round(BODY_Z1 - BODY_Z0, 6)  # 22.2
+BODY_DEPTH = round(BODY_Z1 - BODY_Z0, 6)  # 21.844, .86
 DEPTH_MID_Z = NECK_DEPTH / 2.0  # the V, the relief and the pivot bore centre here
 
 
@@ -81,14 +102,16 @@ def depth_station(z: float) -> float:
 # tilt together).  The mouth width and the theoretical apex height follow
 # from them.  The apex is not cut sharp
 # (drawing-guidelines.md rule 16): a flat across it, V_FLAT_WIDTH wide
-# (driving, .X), is the tip a 90 deg chamfer mill or a small end mill leaves.
+# (driving, .XX), is the tip a 90 deg chamfer mill or a small end mill leaves.
 # The flat's height is what the flanks and the width leave; it prints as a
 # reference.
 V_FLANK_ANGLE_DEG = 45.0  # each flank to the bottom face; prints "2X 45" deg
 V_ANGLE_DEG = 180.0 - 2.0 * V_FLANK_ANGLE_DEG  # the included angle, 90
-V_MOUTH_Z0 = 3.0  # front mouth edge (part frame; prints 5.1 from the datum)
-V_MOUTH_Z1 = 15.0  # back mouth edge (part frame; prints 17.1)
-V_MOUTH_WIDTH = V_MOUTH_Z1 - V_MOUTH_Z0
+# The mouth's 12.0 width is a closure (module docstring): it prints as the
+# two rounded mouth stations, centred on the neck.
+V_MOUTH_WIDTH = 12.0
+V_MOUTH_Z0 = round((NECK_DEPTH - V_MOUTH_WIDTH) / 2.0, 6)  # 2.89 (prints .19)
+V_MOUTH_Z1 = round(V_MOUTH_Z0 + V_MOUTH_WIDTH, 6)  # 14.89 (prints .67)
 _HALF = math.radians(V_ANGLE_DEG / 2.0)
 V_APEX_Y = round(
     (V_MOUTH_WIDTH / 2.0) / math.tan(_HALF), 6
@@ -97,21 +120,22 @@ V_APEX_Y = round(
 # contact lines r*sin(half-angle) below it.
 MARKER_AXIS_Y = V_APEX_Y - (marker.BARREL_DIA / 2.0) / math.sin(_HALF)
 V_CONTACT_Y = V_APEX_Y - (marker.BARREL_DIA / 2.0) * math.sin(_HALF)
-V_FLAT_WIDTH = 2.0
-V_FLAT_Y = round(V_APEX_Y - (V_FLAT_WIDTH / 2.0) / math.tan(_HALF), 6)  # 5.0
+V_FLAT_WIDTH = 2.032  # .08
+V_FLAT_Y = round(V_APEX_Y - (V_FLAT_WIDTH / 2.0) / math.tan(_HALF), 6)  # 4.984
 # The groove's section: the V's triangle less the tip the flat leaves standing.
 V_GROOVE_AREA = (
     V_APEX_Y * V_MOUTH_WIDTH / 2.0 - V_FLAT_WIDTH * (V_APEX_Y - V_FLAT_Y) / 2.0
 )  # 35.0
-# The flat meets each flank in an internal corner no cutter leaves sharp: each
-# takes the tip radius of a chamfer mill or the corner of an end mill, up to
-# V_APEX_FILLET_R.  It prints as the single limit "2X R0.5 MAX"; swTolMAX
-# prints the nominal, so the model carries the limit (pn_pen_rod_spec's
-# shoulder root).
-V_APEX_FILLET_R = 0.5
-V_APEX_FILLET_BAND = (0.0, -V_APEX_FILLET_R)
-V_APEX_FILLET_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "2X R0.5 MAX"
-V_APEX_FILLET_PLACES = 1
+# The flat meets each flank in an internal corner no cutter leaves sharp: the
+# tip radius of a chamfer mill or the corner of an end mill.  Nothing needs it
+# smaller than the title block's INSIDE CORNERS R.040 MAX (at that limit the
+# grip still clears the rounds and seats on the straight flanks, guard below),
+# so the sheet prints no radius and the title block governs (machinist review
+# 8c9a0a7: a bare R.020 MAX read as an unexplained tightening).  The model
+# carries a .020 tip.
+V_APEX_FILLET_R = 0.508  # .020
+if V_APEX_FILLET_R > INSIDE_CORNER_R_MAX:
+    raise AssertionError("the modelled apex round exceeds the title block's corner")
 # Each round turns through 90 deg - half-angle (flat to flank) and fills
 # r^2 (tan(turn/2) - turn/2) of its corner.
 _APEX_TURN = math.pi / 2.0 - _HALF
@@ -126,17 +150,20 @@ V_GROOVE_SECTION = V_GROOVE_AREA - V_APEX_FILLET_AREA
 # drops wholly into the slot at the printed limits (guard below): at 10.0 the
 # bore's edge stood 0.5 off the step, and at the limits the ream broke into
 # the step wall in a crescent (machinist review final4).  The V, and so the
-# grip's seat, is this long: 9 of the grip's 14.5.  The neck ends here too:
-# the body's step faces stand in line with the slot's.
-RELIEF_X0 = 9.0
-RELIEF_Z0 = 1.0  # near (front) wall
-RELIEF_Z1 = 17.0  # far (back) wall
-RELIEF_WIDTH = RELIEF_Z1 - RELIEF_Z0
-RELIEF_HEIGHT = 6.5
+# grip's seat, is this long.  The neck ends here too: the body's step faces
+# stand in line with the slot's.
+RELIEF_X0 = 8.89  # .35
+RELIEF_Z0 = 1.016  # .04 near (front) wall; prints .12 from the datum
+RELIEF_Z1 = round(NECK_DEPTH - RELIEF_Z0, 6)  # far (back) wall; prints .74
+RELIEF_WIDTH = round(RELIEF_Z1 - RELIEF_Z0, 6)
+RELIEF_HEIGHT = 6.604  # .26
 # The slot's two internal corners at the step (x = RELIEF_X0) keep the end
-# mill's radius, a 2 mm cutter 6.5 deep.  Modelled as plan arcs in the slot
-# profile, not a fillet feature.
-RELIEF_CORNER_R = 1.0
+# mill's radius, an .080 cutter .26 deep, at the title block's INSIDE CORNERS
+# R.040 MAX (no callout: the title block governs).  Modelled as plan arcs in
+# the slot profile, not a fillet feature.
+RELIEF_CORNER_R = 1.016  # .040
+if RELIEF_CORNER_R > INSIDE_CORNER_R_MAX:
+    raise AssertionError("the modelled relief corner exceeds the title block's corner")
 # The V is cut on one corner radius past the step, to where the corner arcs
 # end.  Past the step its whole section lies inside the slot's (guard below),
 # so the extra run removes no brass; the step face never ends in a sliver
@@ -146,30 +173,32 @@ if not (RELIEF_Z0 < V_MOUTH_Z0 and V_MOUTH_Z1 < RELIEF_Z1 and V_APEX_Y < RELIEF_
     raise AssertionError("past the step the V must lie inside the relief slot")
 
 # --- Pivot bore (rod's turned end): a sketched cut from the top face down
-# into the relief slot, reamed to the band ---
-PIVOT_BORE_DIA = 4.0  # reamed
-PIVOT_BORE_BAND = (0.012, 0.0)  # H7
-PIVOT_BORE_X = 12.5  # just past the step (guard below); the CG solve sets the length
+# into the relief slot, reamed with the owned .1260 chucking reamer (#290
+# owner ruling: the 4 mm pivot becomes .126) ---
+PIVOT_BORE_DIA = 3.2004  # .126 reamed
+PIVOT_BORE_BAND = REAM_H7  # +.0005/.0000
+# Just past the step (guard below); the CG solve sets the length.
+PIVOT_BORE_X = 12.446  # .49
 # 45 deg chamfer on the bore's TOP edge, where the rod's square shoulder seats:
 # it clears the rod's shoulder-root fillet (pn_pen_rod_spec.SHOULDER_FILLET_R
-# MAX).  Printed as a native single MIN limit: the title block's .X band would
-# let it shrink to nothing.
-PIVOT_BORE_TOP_CHAMFER = 0.3
+# MAX).  Printed as a native single MIN limit: a general band would let it
+# shrink to nothing.
+PIVOT_BORE_TOP_CHAMFER = 0.3048  # .012
 # (upper, lower): the nominal IS the MIN limit (lower 0); the upper, which a
 # MIN print does not show, is the native record of what still leaves the
 # rod's seat flats (guard below).
-PIVOT_CHAMFER_BAND = (0.1, 0.0)
-PIVOT_CHAMFER_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints "0.3 MIN"
-PIVOT_CHAMFER_PLACES = 1
+PIVOT_CHAMFER_BAND = (0.1016, 0.0)  # +.004
+PIVOT_CHAMFER_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints ".012 MIN"
+PIVOT_CHAMFER_PLACES = 3
 
 # --- Rod set screw: #4-40 tapped from the body's front face into the pivot bore ---
 SET_SCREW_TAP_SPEC = HoleSpec("tapped", rod_set_screw.THREAD, end="through_next")
-SET_SCREW_Y = 12.0
+SET_SCREW_Y = 11.938  # .47
 SET_SCREW_TAP_LENGTH = round(
     DEPTH_MID_Z - BODY_Z0 - PIVOT_BORE_DIA / 2.0, 6
-)  # 9.1: body front face to bore wall
+)  # 9.3218: body front face to bore wall
 
-_WALL = 1.5  # drawing-guidelines.md rule 17 (walls and webs) floor
+_WALL = WALL_FLOOR_MM  # drawing-guidelines.md rule 17 (walls and webs) floor
 # The carriage hangs the marker on the block's mid-depth: the neck, the body,
 # the V and the relief all centre on it (pn_pen_carriage_geom, its mass model).
 for _name, _z0, _z1 in (
@@ -180,12 +209,14 @@ for _name, _z0, _z1 in (
 ):
     if abs((_z0 + _z1) / 2.0 - DEPTH_MID_Z) > 1e-9:
         raise AssertionError(f"the {_name} must centre on the block's mid-depth")
-if min(V_MOUTH_Z0, NECK_DEPTH - V_MOUTH_Z1) < 2.0:
-    raise AssertionError("V-groove leaves under 2.0 lands on the bottom face")
+if min(V_MOUTH_Z0, NECK_DEPTH - V_MOUTH_Z1) < WALL_TARGET_MM:
+    raise AssertionError(
+        "V-groove leaves under the .080 target lands on the bottom face"
+    )
 if not 1.0 <= V_CONTACT_Y < V_FLAT_Y:
     raise AssertionError("grip contact lines must lie on the V flanks, under the flat")
-if min(RELIEF_Z0 - BODY_Z0, BODY_Z1 - RELIEF_Z1) < 2.0:
-    raise AssertionError("relief slot legs under the rule 17 2.0 target")
+if min(RELIEF_Z0 - BODY_Z0, BODY_Z1 - RELIEF_Z1) < WALL_TARGET_MM:
+    raise AssertionError("relief slot legs under the rule 17 .080 target")
 _BODY_R = marker.BODY_FRONT_DIA / 2.0
 _BODY_HALF_CHORD_AT_BOTTOM = math.sqrt(_BODY_R**2 - MARKER_AXIS_Y**2)
 if RELIEF_WIDTH / 2.0 - _BODY_HALF_CHORD_AT_BOTTOM < 0.25:
@@ -194,8 +225,10 @@ if RELIEF_HEIGHT - (MARKER_AXIS_Y + _BODY_R) < 0.25 or RELIEF_HEIGHT <= V_APEX_Y
     raise AssertionError("relief roof must clear the body and swallow the V apex")
 if PIVOT_BORE_X - PIVOT_BORE_DIA / 2.0 <= RELIEF_X0:
     raise AssertionError("pivot bore must drop wholly into the relief slot")
-if BLOCK_LENGTH - (PIVOT_BORE_X + PIVOT_BORE_DIA / 2.0) < 2.0:
-    raise AssertionError("the free end leaves under 2.0 past the pivot bore")
+if BLOCK_LENGTH - (PIVOT_BORE_X + PIVOT_BORE_DIA / 2.0) < WALL_TARGET_MM:
+    raise AssertionError(
+        "the free end leaves under the .080 target past the pivot bore"
+    )
 if SET_SCREW_TAP_LENGTH < 1.5 * THREAD_MAJOR_MM[rod_set_screw.THREAD]:
     raise AssertionError(
         "rod set-screw tap is under drawing-guidelines.md rule 18 (1.5 D)"
@@ -212,9 +245,9 @@ if BLOCK_HEIGHT - SET_SCREW_Y - TAP_DRILL_MM[rod_set_screw.THREAD] / 2.0 < _WALL
 # carriage layout owns where it starts.
 _GRIP_R = marker.BARREL_DIA / 2.0
 _GRIP_GAP_AT_BOTTOM = DEPTH_MID_Z - math.sqrt(_GRIP_R**2 - MARKER_AXIS_Y**2) - RELIEF_Z0
-if _GRIP_GAP_AT_BOTTOM - RELIEF_CORNER_R < 0.25:
+if _GRIP_GAP_AT_BOTTOM - INSIDE_CORNER_R_MAX < 0.25:
     raise AssertionError("relief corner radius reaches the marker grip")
-if RELIEF_Z0 + RELIEF_CORNER_R >= DEPTH_MID_Z - PIVOT_BORE_DIA / 2.0 - _WALL:
+if RELIEF_Z0 + INSIDE_CORNER_R_MAX >= DEPTH_MID_Z - PIVOT_BORE_DIA / 2.0 - _WALL:
     raise AssertionError("relief corner radius crowds the pivot bore")
 # The rod's shoulder fillet (R MAX) is a quarter round on the pivot; with the
 # pivot against the bore wall its arc stands at most R * (2 - sqrt 2) proud of
@@ -229,7 +262,15 @@ if (
     rod.ROD_SECTION + rod.SECTION_BAND[1]
 ) / 2.0:
     raise AssertionError("pivot-bore chamfer eats the rod shoulder's seat flats")
-if round(PIVOT_BORE_TOP_CHAMFER, PIVOT_CHAMFER_PLACES) != PIVOT_BORE_TOP_CHAMFER:
+
+
+def _on_grid(value_mm: float, places: int) -> bool:
+    """True when ``value_mm`` is an exact decimal-inch value at ``places``."""
+    inches = value_mm / 25.4
+    return math.isclose(round(inches, places), inches, abs_tol=1e-9)
+
+
+if not _on_grid(PIVOT_BORE_TOP_CHAMFER, PIVOT_CHAMFER_PLACES):
     raise AssertionError("the pivot-bore chamfer must print exactly at its places")
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
@@ -280,54 +321,52 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "VMouthZ0",
         "VMouthZ1",
     },
-    "VApexFillets": {"VApexFilletR"},
-    "ReliefProfile": {"ReliefX0", "ReliefCornerR"},
+    "ReliefProfile": {"ReliefX0"},
     "ReliefReference": {"ReliefZ0", "ReliefZ1", "ReliefHeight"},
     "PivotBoreProfile": {"PivotX", "PivotDia"},
     "PivotReference": {"PivotZ", "PivotChamferSize"},
     "SetScrewHole": {"SetScrewX", "SetScrewY"},
+    "TapWallReference": {"TapWallMin"},
 }
-REFERENCE_SKETCHES = ("ReliefReference", "PivotReference")
-SECTION_REFERENCE_SKETCHES = REFERENCE_SKETCHES
-# Places carry the title block's tolerance (drawing-guidelines.md rule 3),
-# .X by default.  The V prints each flank's angle to the bottom face (one
-# "2X 45°" for both, whole degrees, the title block's +/-1), its two mouth
-# edges and its apex flat's width; the flat's height they leave is a
-# reference, (5.0), driven in the sketch.  The flat's two rounds print their
-# single limit, R0.5 MAX.  .XX,
-# the title block's routine location row, where a mate needs it:
-# * the tap's and the pivot bore's station from the paper end (SetScrewX,
-#   PivotX): the tap must meet the bore it locks, and the bore must drop
-#   wholly past the step (guard below);
-# * the neck's two faces (NeckZ0, NeckZ1): the stirrup's window must pass
-#   the neck at both parts' loosest limits (pn_pen_frame_spec), and the V
-#   leaves its lands at the rule 17 floor between them.
-# The pivot bore's depth station prints .X: no fit depends on it (the tap
-# runs into the bore wherever it stands, and the set screw locks the pen's
-# angle).
+SECTION_REFERENCE_SKETCHES = ("ReliefReference", "PivotReference")
+# TapWallReference (Front plane) prints in the front view only.
+REFERENCE_SKETCHES = (*SECTION_REFERENCE_SKETCHES, "TapWallReference")
+TAP_WALL_MIN_PLACES = 3
+# Places carry the title block's tolerance (drawing-guidelines.md rule 3).
+# Every station and size a fit, wall or stack reads prints .XX (+/-.01): the
+# outline, the neck faces (the stirrup's window must pass the neck at both
+# parts' loosest limits, pn_pen_frame_spec), the V's mouth edges, the
+# relief's walls, roof and step, the bore and tap stations.  The V prints
+# each flank's angle to the bottom face (one "2X 45°" for both, whole degrees,
+# the title block's +/-1); the flat's height the flanks leave is a reference,
+# driven in the sketch, at the mouth stations' and flat's two places, so it
+# reads what they close to.  The bore chamfer prints its single limit at three
+# places, the reamed bore its +.0005 band at four; the inside corners print
+# nothing (the title block's R.040 MAX).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "OutlineProfile": {"Length": 1, "NeckZ0": 2, "NeckZ1": 2, "Depth": 1},
-    "Block": {"Height": 1},
+    "OutlineProfile": {"Length": 2, "NeckZ0": 2, "NeckZ1": 2, "Depth": 2},
+    "Block": {"Height": 2},
     "VGrooveProfile": {
         "VFlankAngle": 0,
-        "VFlatWidth": 1,
-        "VFlatY": 1,
-        "VMouthZ0": 1,
-        "VMouthZ1": 1,
+        "VFlatWidth": 2,
+        "VFlatY": 2,
+        "VMouthZ0": 2,
+        "VMouthZ1": 2,
     },
-    "VApexFillets": {"VApexFilletR": V_APEX_FILLET_PLACES},
-    "ReliefProfile": {"ReliefX0": 1, "ReliefCornerR": 1},
-    "ReliefReference": {"ReliefZ0": 1, "ReliefZ1": 1, "ReliefHeight": 1},
-    "PivotBoreProfile": {"PivotX": 2, "PivotDia": 3},
-    "PivotReference": {"PivotZ": 1, "PivotChamferSize": PIVOT_CHAMFER_PLACES},
-    "SetScrewHole": {"SetScrewX": 2, "SetScrewY": 1},
+    "ReliefProfile": {"ReliefX0": 2},
+    "ReliefReference": {"ReliefZ0": 2, "ReliefZ1": 2, "ReliefHeight": 2},
+    "PivotBoreProfile": {"PivotX": 2, "PivotDia": 4},
+    "PivotReference": {"PivotZ": 2, "PivotChamferSize": PIVOT_CHAMFER_PLACES},
+    "SetScrewHole": {"SetScrewX": 2, "SetScrewY": 2},
+    "TapWallReference": {"TapWallMin": TAP_WALL_MIN_PLACES},
 }
 # The one driven sketch dimension the print shows, parenthesised as a
 # reference (no tolerance): the apex flat's height, which the flanks' angles,
-# mouth edges and flat width fix.
+# mouth edges and flat width fix.  It follows the closure apex (.196) and
+# prints rounded, (.20): what the printed .19 / .67 mouth stations, .08 flat
+# and 45° flanks close to (machinist review c03368c: at three places it
+# disagreed with them).
 REFERENCE_DIMENSIONS: tuple[tuple[str, str], ...] = (("VGrooveProfile", "VFlatY"),)
-if round(V_FLAT_Y, DRAWING_PRECISION["VGrooveProfile"]["VFlatY"]) != V_FLAT_Y:
-    raise AssertionError("the V flat's reference height must print exactly")
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
     for dimensions in DRAWING_PRECISION.values()
@@ -340,9 +379,34 @@ if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
     raise AssertionError("every marked pen v-block dimension needs authored places")
 
 
-def _band(name: str) -> float:
-    """The title-block +/- the named dimension prints at."""
-    return printed_band_mm(DRAWING_PRECISION_BY_NAME[name])
+# The model value of every printed tolerance dimension the checks read, so a
+# closure that prints rounded is judged at its printed limits.
+_PRINTED_VALUES: dict[str, float] = {
+    "Length": BLOCK_LENGTH,
+    "NeckZ0": depth_station(0.0),
+    "NeckZ1": depth_station(NECK_DEPTH),
+    "Depth": BODY_DEPTH,
+    "VFlatWidth": V_FLAT_WIDTH,
+    "VMouthZ0": depth_station(V_MOUTH_Z0),
+    "VMouthZ1": depth_station(V_MOUTH_Z1),
+    "ReliefX0": RELIEF_X0,
+    "ReliefZ0": depth_station(RELIEF_Z0),
+    "ReliefZ1": depth_station(RELIEF_Z1),
+    "ReliefHeight": RELIEF_HEIGHT,
+    "PivotX": PIVOT_BORE_X,
+    "PivotZ": depth_station(DEPTH_MID_Z),
+    "Height": BLOCK_HEIGHT,
+    "SetScrewY": SET_SCREW_Y,
+    "SetScrewX": PIVOT_BORE_X,
+}
+
+
+def _dev(name: str) -> tuple[float, float]:
+    """``(lower, upper)`` mm the named dimension may deviate from its model
+    value at its printed limits (the title block's row at its places)."""
+    return printed_deviations(
+        _PRINTED_VALUES[name], DRAWING_PRECISION_BY_NAME[name], unit=UNIT
+    )
 
 
 # --- Printed worst case (every band at its limit at once) ---
@@ -350,18 +414,18 @@ def _band(name: str) -> float:
 # no band adds through another edge.  Rule 17: the near wall is ReliefZ0
 # itself, the far wall Depth - ReliefZ1; the V's lands lie between a neck
 # face and a mouth edge.
-RELIEF_NEAR_WALL_PRINTED_MIN = depth_station(RELIEF_Z0) - _band("ReliefZ0")  # 2.3
-RELIEF_FAR_WALL_PRINTED_MIN = (BODY_DEPTH - _band("Depth")) - (
-    depth_station(RELIEF_Z1) + _band("ReliefZ1")
-)  # 1.5
-V_NEAR_LAND_PRINTED_MIN = (depth_station(V_MOUTH_Z0) - _band("VMouthZ0")) - (
-    depth_station(0.0) + _band("NeckZ0")
-)  # 1.69
-V_FAR_LAND_PRINTED_MIN = (depth_station(NECK_DEPTH) - _band("NeckZ1")) - (
-    depth_station(V_MOUTH_Z1) + _band("VMouthZ1")
-)  # 1.69
-# The far wall is the floor exactly, a few ulps under it in floats; compare at
-# the micron.
+RELIEF_NEAR_WALL_PRINTED_MIN = depth_station(RELIEF_Z0) + _dev("ReliefZ0")[0]  # 2.794
+RELIEF_FAR_WALL_PRINTED_MIN = (BODY_DEPTH + _dev("Depth")[0]) - (
+    depth_station(RELIEF_Z1) + _dev("ReliefZ1")[1]
+)  # 2.54
+V_NEAR_LAND_PRINTED_MIN = (depth_station(V_MOUTH_Z0) + _dev("VMouthZ0")[0]) - (
+    depth_station(0.0) + _dev("NeckZ0")[1]
+)  # 2.286
+V_FAR_LAND_PRINTED_MIN = (depth_station(NECK_DEPTH) + _dev("NeckZ1")[0]) - (
+    depth_station(V_MOUTH_Z1) + _dev("VMouthZ1")[1]
+)  # 2.286
+# At the inch title block every wall and land clears the .080 target; compare
+# at the micron.
 if (
     round(
         min(
@@ -372,22 +436,58 @@ if (
         ),
         6,
     )
-    < _WALL
+    < WALL_TARGET_MM
 ):
-    raise AssertionError("a printed wall or land falls under the rule 17 1.5 floor")
+    raise AssertionError("a printed wall or land falls under the rule 17 .080 target")
 # The widest neck the print allows, for the stirrup's window.
-NECK_WIDTH_PRINTED_MAX = NECK_DEPTH + _band("NeckZ0") + _band("NeckZ1")  # 19.02
+NECK_WIDTH_PRINTED_MAX = NECK_DEPTH + _dev("NeckZ1")[1] - _dev("NeckZ0")[0]  # 18.288
 # The pivot bore must leave the brass wholly into the slot: its paper-side
 # edge (station and reamed diameter at their limits) stays past the step at
 # its far limit, or the ream breaks into the step wall in a crescent.
 PIVOT_BORE_STEP_CLEARANCE_PRINTED_MIN = (
     PIVOT_BORE_X
-    - _band("PivotX")
+    + _dev("PivotX")[0]
     - (PIVOT_BORE_DIA + PIVOT_BORE_BAND[0]) / 2.0
-    - (RELIEF_X0 + _band("ReliefX0"))
-)  # 0.18
+    - (RELIEF_X0 + _dev("ReliefX0")[1])
+)  # 1.441
 if PIVOT_BORE_STEP_CLEARANCE_PRINTED_MIN < 0.0:
     raise AssertionError("at its printed limits the pivot bore breaks the step wall")
+# The tap enters the body's front face just past the step, so over the
+# step's .08 (BODY_SIDE_STEP) its thread stands this wall off the step face.
+# At the printed worst case (the tap station short, the step long)
+# it is .064, under the rule 17 .080 target and over the .060 floor (RV-01):
+# neither can move.  The step can't come toward the paper end (the stirrup
+# slides on the neck with 0.016 mm to spare, pn_pen_carriage_geom), and the
+# bore can't go toward the free end (it carries the block toward the paper:
+# 0.071 mm of the carriage's paper clearance is left).  The sheet states the
+# worst case natively, floored to the micron grid it prints at (rod's recipe).
+_TAP_THREAD_R = THREAD_MAJOR_MM[SET_SCREW_TAP_SPEC.size] / 2.0
+TAP_STEP_WALL_PRINTED_MIN = (
+    (PIVOT_BORE_X + _dev("SetScrewX")[0])
+    - (RELIEF_X0 + _dev("ReliefX0")[1])
+    - _TAP_THREAD_R
+)  # 1.6255
+if TAP_STEP_WALL_PRINTED_MIN < WALL_FLOOR_MM:
+    raise AssertionError("set-screw tap wall to the step under the rule 17 floor")
+TAP_WALL_MIN_MM = round(
+    round(TAP_STEP_WALL_PRINTED_MIN / 25.4, TAP_WALL_MIN_PLACES) * 25.4, 9
+)
+if not math.isclose(TAP_STEP_WALL_PRINTED_MIN, TAP_WALL_MIN_MM, abs_tol=0.001):
+    raise AssertionError("the stated tap wall is not the printed worst case")
+TAP_WALL_MIN_TOL_TYPE = 5  # swTolType_e.swTolMIN
+# The upper deviation reaches the wall's printed maximum (station long, step
+# short).
+_TAP_STEP_WALL_PRINTED_MAX = (
+    (PIVOT_BORE_X + _dev("SetScrewX")[1])
+    - (RELIEF_X0 + _dev("ReliefX0")[0])
+    - _TAP_THREAD_R
+)
+TAP_WALL_MIN_BAND = (round(_TAP_STEP_WALL_PRINTED_MAX - TAP_WALL_MIN_MM, 6), 0.0)
+# The hidden reference line runs -X toward the step from the thread's major
+# diameter on the tap's axis, as long as the stated minimum.
+TAP_WALL_START_X = PIVOT_BORE_X - _TAP_THREAD_R
+if TAP_WALL_START_X - TAP_WALL_MIN_MM <= RELIEF_X0:
+    raise AssertionError("the tap wall reference runs past the step")
 
 
 class SeatedV(NamedTuple):
@@ -490,54 +590,47 @@ def seated_v(
     )
 
 
-# Every printed corner of the V at once: each mouth edge at its .X, each flank
-# at the title block's +/-1 deg on its own, the flat at its .X, the rounds at
-# their MAX (a smaller round only moves brass away from the grip).
+# Every printed corner of the V at once: each mouth edge at its printed .XX
+# limits, each flank at the title block's +/-1 deg on its own, the flat at its
+# .XX, the rounds at the title block's inside-corner MAX (a smaller round only
+# moves brass away from the grip).
 V_PRINTED_CORNERS = [
-    seated_v(z0, z1, front, back, width, V_APEX_FILLET_R)
-    for z0 in (V_MOUTH_Z0 - _band("VMouthZ0"), V_MOUTH_Z0 + _band("VMouthZ0"))
-    for z1 in (V_MOUTH_Z1 - _band("VMouthZ1"), V_MOUTH_Z1 + _band("VMouthZ1"))
+    seated_v(z0, z1, front, back, width, INSIDE_CORNER_R_MAX)
+    for z0 in (V_MOUTH_Z0 + dev for dev in _dev("VMouthZ0"))
+    for z1 in (V_MOUTH_Z1 + dev for dev in _dev("VMouthZ1"))
     for front in (
-        V_FLANK_ANGLE_DEG - angular_band_deg(),
-        V_FLANK_ANGLE_DEG + angular_band_deg(),
+        V_FLANK_ANGLE_DEG - angular_band_deg(unit=UNIT),
+        V_FLANK_ANGLE_DEG + angular_band_deg(unit=UNIT),
     )
     for back in (
-        V_FLANK_ANGLE_DEG - angular_band_deg(),
-        V_FLANK_ANGLE_DEG + angular_band_deg(),
+        V_FLANK_ANGLE_DEG - angular_band_deg(unit=UNIT),
+        V_FLANK_ANGLE_DEG + angular_band_deg(unit=UNIT),
     )
-    for width in (
-        V_FLAT_WIDTH - _band("VFlatWidth"),
-        V_FLAT_WIDTH + _band("VFlatWidth"),
-    )
+    for width in (V_FLAT_WIDTH + dev for dev in _dev("VFlatWidth"))
 ]
-# The body, coaxial with the grip, clears both relief walls at their limits:
-# 0.36 each side (the V leaning toward that wall, its mouth shifted there).
+# The body, coaxial with the grip, clears both relief walls at their limits
+# (the V leaning toward that wall, its mouth shifted there).
 BODY_NEAR_CLEARANCE_PRINTED_MIN = min(
-    seat.axis[0] - seat.body_half_chord - (RELIEF_Z0 + _band("ReliefZ0"))
+    seat.axis[0] - seat.body_half_chord - (RELIEF_Z0 + _dev("ReliefZ0")[1])
     for seat in V_PRINTED_CORNERS
-)  # 0.36
+)
 BODY_FAR_CLEARANCE_PRINTED_MIN = min(
-    (RELIEF_Z1 - _band("ReliefZ1")) - (seat.axis[0] + seat.body_half_chord)
+    (RELIEF_Z1 + _dev("ReliefZ1")[0]) - (seat.axis[0] + seat.body_half_chord)
     for seat in V_PRINTED_CORNERS
-)  # 0.36
+)
 if min(BODY_NEAR_CLEARANCE_PRINTED_MIN, BODY_FAR_CLEARANCE_PRINTED_MIN) <= 0.0:
     raise AssertionError("a printed relief wall may touch the marker body")
-# The grip seats on both flanks, never on the flat or its rounds: it stays
-# 0.72 under the flat and 0.78 off the rounds (1.20 / 1.15 nominal), each
-# contact line at least 1.38 up its flank and 2.06 under the round's tangent
-# line, and the narrowest flat still runs 0.78 straight between its rounds.
+# The grip seats on both flanks, never on the flat or its rounds: under the
+# flat, off the rounds, each contact line up its flank and under the round's
+# tangent line, and the narrowest flat still runs straight between its rounds.
 V_FLAT_GRIP_CLEARANCE_PRINTED_MIN = min(
     seat.flat_clearance for seat in V_PRINTED_CORNERS
-)  # 0.72
+)
 V_APEX_FILLET_GRIP_CLEARANCE_PRINTED_MIN = min(
     seat.round_clearance for seat in V_PRINTED_CORNERS
-)  # 0.78
-V_CONTACT_MARGIN_PRINTED_MIN = min(
-    seat.contact_margin for seat in V_PRINTED_CORNERS
-)  # 1.38
-V_FLAT_STRAIGHT_PRINTED_MIN = min(
-    seat.flat_straight for seat in V_PRINTED_CORNERS
-)  # 0.78
+)
+V_CONTACT_MARGIN_PRINTED_MIN = min(seat.contact_margin for seat in V_PRINTED_CORNERS)
+V_FLAT_STRAIGHT_PRINTED_MIN = min(seat.flat_straight for seat in V_PRINTED_CORNERS)
 if V_FLAT_GRIP_CLEARANCE_PRINTED_MIN < 0.25:
     raise AssertionError("at its printed limits the apex flat may touch the grip")
 if V_APEX_FILLET_GRIP_CLEARANCE_PRINTED_MIN < 0.25:
@@ -551,7 +644,7 @@ DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
     ("PivotBoreProfile", "PivotDia"): PIVOT_BORE_BAND,
 }
 # Every tight band or limit names its mate on the dimension it governs.  The
-# chamfer reads "0.3 MIN" over its angle; why it has a floor rides above it,
+# chamfer reads ".012 MIN" over its angle; why it has a floor rides above it,
 # clear of the extension lines below (draw_pn_pen_v_block's SECTION_KEEP).
 # The reamed diameter's mate runs three short rows: its callout stands in the
 # bottom view's corner, between the neck's depth dimensions and the title
@@ -559,7 +652,8 @@ DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
 PEN_ROD_NUMBER = _config.parts("pn-pen-rod")["number"]
 DIMENSION_CALLOUTS: dict[str, str] = {
     "PivotDia": f"REAM THRU\nSLIP FIT ON\nPEN ROD PIVOT\n{PEN_ROD_NUMBER}",
-    "PivotChamferSize": "X 45 DEG",
+    "PivotChamferSize": "X 45°",
+    "TapWallMin": "TAP WALL",
 }
 # One row: SolidWorks stores a line break in the above compartment but prints
 # nothing of it, while the dimension line still runs under the unprinted text
@@ -570,14 +664,10 @@ DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
 }
 if any("\n" in text for text in DIMENSION_CALLOUTS_ABOVE.values()):
     raise AssertionError("an above-callout line break would not print")
-# Both relief corners are one radius, both apex rounds one, and both flanks
-# one angle to the bottom face; the printed one stands for the pair.  A
-# custom radius prefix replaces SolidWorks' own "R", so it carries it
-# (pn_pen_hanger_spec's slot corners).
+# Both flanks are one angle to the bottom face; the printed one stands for
+# the pair.
 DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     ("VGrooveProfile", "VFlankAngle"): "2X ",
-    ("VApexFillets", "VApexFilletR"): "2X R",
-    ("ReliefProfile", "ReliefCornerR"): "2X R",
 }
 
 # Material and finish ride the title block; nothing else needs saying.

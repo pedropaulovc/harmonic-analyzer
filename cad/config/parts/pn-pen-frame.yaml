@@ -6,3 +6,10 @@ pn-pen-frame:
   material_specification: "C36000 free-machining brass"
   finish: as machined
   quantity: 1
+  drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "bottom view, TAP 4-40 UNC THRU located .16 in the .31 depth: the wall from the thread to the far face, stated by the native .074 MIN TAP WALL dimension (TapWallMin@TapWallReference)"
+      finding: "far-side tap wall .074 in at the printed worst case (depth .30, station .17, #4-40 major .1120), under the .080 in target and over the .060 in floor (rule 17)"
+      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions (MHA-PN-01 thumb-screw tap wall .074). No geometry escape: rule 17 forbids tightening the location band to protect the wall and FRAME_DEPTH can't grow (carriage fit leaves 0.016 mm); the station prints at the title block's .XX (.16) and the sheet states the worst-case wall as a model-owned single limit, never as note text (pn_pen_frame_spec.TAP_WALL_MIN_MM, which refuses anything under the .060 floor)"

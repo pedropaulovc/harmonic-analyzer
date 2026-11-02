@@ -7,6 +7,7 @@ detail regions and titles, the as-shipped note, the assembly steps and checks
 the sheets print. Only draw_pn_pen_assembly (and its tests) import this
 module; no assembly builder may (``test_assembly_sheet_isolation`` pins it),
 so a wording edit here does not rebuild the pen assembly. No SolidWorks.
+Printed lengths are decimal inch, the assembly contract's ``drawing_unit``.
 """
 
 from __future__ import annotations
@@ -24,8 +25,10 @@ import pn_vn_pen_hanger_nut_spec as hanger_nut
 import pn_vn_pen_rod_set_screw_spec as rod_set_screw
 import _mcmaster_99607a213 as thumb_screw
 from _inch_fraction import inch_fraction
+from _assembly_contract import assembly_contract
 from _column_clamp_interface import BAR_DEPTH as WHEEL_BAR_DEPTH
 from pn_pen_assembly_spec import (
+    ASM_NAME,
     BOM_ORDER,
     CARRIAGE_END_MACHINE,
     FRAME,
@@ -59,6 +62,7 @@ from pn_pen_explode_spec import EXPLODE_STEPS
 from sh_vn_music_wire_pen_spec import BOM_DESCRIPTION as _WIRE_BOM_DESCRIPTION
 
 DRAWING_NUMBER = "MHA-PN-00"
+UNIT = assembly_contract(ASM_NAME).drawing_unit
 # A top-level BOM numbers its rows in the builder's insertion order
 # (pn_pen_assembly_spec.BOM_ORDER); the drawing proves each row against this
 # and the steps cite it.
@@ -70,7 +74,7 @@ ITEM = {stem: index for index, stem in enumerate(BOM_ORDER, 1)}
 REFERENCE_DIMENSIONS = frozenset({STUD_DIMENSION})
 DIMENSION_TOLERANCES = {NIB_DIMENSION: NIB_TOLERANCE_MM}
 ANGULAR_TOLERANCES = {YAW_DIMENSION: YAW_TOLERANCE_DEG}
-TOLERANCE_PRECISION = {NIB_DIMENSION: 1, YAW_DIMENSION: 0}
+TOLERANCE_PRECISION = {NIB_DIMENSION: NIB_PRECISION, YAW_DIMENSION: 0}
 DIMENSION_NOMINALS = {STUD_DIMENSION: STUD_HEIGHT, NIB_DIMENSION: NIB_PROTRUSION}
 
 
@@ -89,11 +93,20 @@ def _inch(mm: float) -> str:
     return inch_fraction(mm, what="pen purchased size")
 
 
+def _decimal(mm: float, places: int) -> str:
+    """A length as the inch sheet prints it at ``places``, rounded, no
+    leading zero (.126, 1.024)."""
+    if UNIT != "in":
+        raise AssertionError(f"pen fitter text is authored in inch, not {UNIT!r}")
+    text = f"{mm / 25.4:.{places}f}"
+    return text[1:] if text.startswith("0.") else text
+
+
 STUD_NUT_WRENCH = _inch(stud_nut.ACROSS_FLATS)
 HANGER_NUT_WRENCH = _inch(hanger_nut.ACROSS_FLATS)
 HANGER_JAM_NUT_WRENCH = _inch(hanger_jam_nut.ACROSS_FLATS)
 HANGER_SCREW_WRENCH = _inch(hanger_screw.HEAD_AF)
-ROD_SET_SCREW_KEY = f"{rod_set_screw.HEX_AF / 25.4:.3f}"
+ROD_SET_SCREW_KEY = _decimal(rod_set_screw.HEX_AF, 3)
 
 BOM_DESCRIPTIONS = {
     HANGER: "PEN HANGER, STRAP + 2 U GUIDES",
@@ -114,6 +127,15 @@ BOM_DESCRIPTIONS = {
 }
 if set(BOM_DESCRIPTIONS) != set(BOM_ORDER):
     raise AssertionError("every BOM row needs exactly one description")
+# The steps call the stud by its BOM name (machinist review c03368c).
+_STUD_NAME = BOM_DESCRIPTIONS[STUD].partition(",")[0]
+# The rod and everything its pivot carries; the steps and checks call it the
+# carriage, defined once by its BOM rows (one run of items).
+CARRIAGE_STEMS = (ROD, V_BLOCK, FRAME, THUMB_SCREW, ROD_SET_SCREW, MARKER)
+_CARRIAGE_ITEMS = sorted(ITEM[stem] for stem in CARRIAGE_STEMS)
+if _CARRIAGE_ITEMS != list(range(_CARRIAGE_ITEMS[0], _CARRIAGE_ITEMS[-1] + 1)):
+    raise AssertionError("the carriage's BOM items must run as one range")
+_CARRIAGE = f"CARRIAGE (ITEMS {_CARRIAGE_ITEMS[0]}-{_CARRIAGE_ITEMS[-1]})"
 
 # --- explode trails (machine mm, exploded): from the moved part back to where it
 # fits, along the move ---------------------------------------------------------------
@@ -202,9 +224,8 @@ STUD_TEXT_POINT = (
 
 # The stud is set from its measured length (code review C05): the head top
 # stands that length less the nominal engagement, ±STUD_TOLERANCE_MM.
-_STUD_LESS = (
-    f"{stud.OVERALL_LENGTH - STUD_HEIGHT:.{STUD_PRECISION}f} ±{STUD_TOLERANCE_MM:.1f}"
-)
+_STUD_LESS_TEXT = _decimal(stud.OVERALL_LENGTH - STUD_HEIGHT, STUD_PRECISION)
+_STUD_LESS = f"{_STUD_LESS_TEXT} ±{_decimal(STUD_TOLERANCE_MM, STUD_PRECISION)}"
 DIMENSION_CALLOUTS = {
     STUD_DIMENSION: f"STUD HEAD\nABOVE ROD TOP:\nSTUD LENGTH\nLESS {_STUD_LESS}",
     NIB_DIMENSION: "NIB PRESET\nBEYOND END FACE",
@@ -213,13 +234,23 @@ DIMENSION_CALLOUTS = {
 
 # --- fitter text ----------------------------------------------------------------
 _STUD_SETTING = f"THE STUD'S MEASURED LENGTH LESS {_STUD_LESS}"
-_STUD_NOMINAL = (
-    f"{STUD_HEIGHT:.{STUD_PRECISION}f} FOR A "
-    f"{stud.OVERALL_LENGTH:.{STUD_PRECISION}f} STUD"
+# The worked example quotes the nominal stud at the setting's three places
+# (1.024, not the stud sheet's two-place 1.02) so the printed numbers add up
+# with the rule and with DETAIL A's native reference (.898): 1.024 - .126.
+_STUD_LENGTH_TEXT = _decimal(stud.OVERALL_LENGTH, STUD_PRECISION)
+_STUD_HEIGHT_TEXT = _decimal(STUD_HEIGHT, STUD_PRECISION)
+if round(
+    float(_STUD_LENGTH_TEXT) - float(_STUD_LESS_TEXT) - float(_STUD_HEIGHT_TEXT),
+    STUD_PRECISION,
+):
+    raise AssertionError("the stud setting's worked example does not add up")
+_STUD_NOMINAL = f"{_STUD_HEIGHT_TEXT} FOR A {_STUD_LENGTH_TEXT} STUD"
+_NIB_SETTING = (
+    f"{_decimal(NIB_PROTRUSION, NIB_PRECISION)} "
+    f"±{_decimal(NIB_TOLERANCE_MM, NIB_PRECISION)}"
 )
-_NIB_SETTING = f"{NIB_PROTRUSION:.{NIB_PRECISION}f} ±{NIB_TOLERANCE_MM:.1f}"
 _YAW_SETTING = f"{YAW_DEG:.0f}° ±{YAW_TOLERANCE_DEG:.0f}°"
-_TRAVEL = f"±{carriage.PEN_TRAVEL_HALF_MM:.0f}"
+_TRAVEL = f"±{_decimal(carriage.PEN_TRAVEL_HALF_MM, 2)}"
 
 # --- detail regions (machine mm): what each fitter detail is centred on and how
 # far round it reaches ------------------------------------------------------------
@@ -317,9 +348,10 @@ ASSEMBLY_STEPS = (
     f"{_STUD_SETTING} ABOVE THE ROD TOP ({_STUD_NOMINAL}; DETAIL A). HOLD THE "
     "STUD BY ITS HEAD AND TIGHTEN THE JAM NUT DOWN ON THE ROD TOP "
     f"({STUD_NUT_WRENCH} WRENCH): THE STUD'S LOCK.",
-    f"2. PEN WIRE TO ADJUSTER STUD EYE: PASS THE LOWER END OF THE PEN WIRE (ITEM "
-    f"{ITEM[WIRE]}) THROUGH THE MHA-PN-07 ADJUSTER STUD EYE, BEND IT BACK, "
-    "WRAP 3 TIGHT TURNS ROUND ITSELF, TRIM THE TAIL. LEAVE THE UPPER END LONG.",
+    f"2. PEN WIRE TO STUD EYE: PASS THE LOWER END OF THE PEN WIRE (ITEM "
+    f"{ITEM[WIRE]}) THROUGH THE EYE OF THE {_STUD_NAME} (ITEM {ITEM[STUD]}), "
+    "BEND IT BACK, WRAP 3 TIGHT TURNS ROUND ITSELF, TRIM THE TAIL. LEAVE THE "
+    "UPPER END LONG.",
     f"3. STIRRUP: SLIDE THE STIRRUP (ITEM {ITEM[FRAME]}) ONTO THE V-BLOCK "
     f"(ITEM {ITEM[V_BLOCK]}) FLUSH WITH ITS PAPER END. START THE THUMB SCREW "
     f"(ITEM {ITEM[THUMB_SCREW]}) UP INTO THE STIRRUP'S BOTTOM-RAIL TAP "
@@ -337,16 +369,18 @@ ASSEMBLY_STEPS = (
     "MARKER AXIS (DETAIL C). TIGHTEN THE THUMB SCREW FINGER-TIGHT: ITS TIP "
     "CLAMPS THE GRIP INTO THE V. SLACKEN IT TO CHANGE A DRY MARKER.",
     "6. INTO THE GUIDES: ENTER THE ROD'S SQUARE INTO BOTH U GUIDES OF THE "
-    f"HANGER (ITEM {ITEM[HANGER]}) FROM THEIR OPEN FRONT ENDS, CARRIAGE BELOW "
-    "THE LOWER GUIDE.",
+    f"HANGER (ITEM {ITEM[HANGER]}) FROM THEIR OPEN FRONT ENDS, THE {_CARRIAGE} "
+    "BELOW THE LOWER GUIDE.",
     "AT MHA-HA-00:",
     f"7. HANGER SCREW LOCK: HANGER SCREW (ITEM {ITEM[HANGER_SCREW]}) FROM "
     "BEHIND THE MHA-MG-08 WHEEL BAR THROUGH THE BAR AND THE STRAP HOLE. RUN "
-    f"THE HEX NUT (ITEM {ITEM[HANGER_NUT]}) ON AGAINST THE STRAP FRONT AND "
-    f"HOLD IT ({HANGER_NUT_WRENCH} WRENCH) WHILE TIGHTENING THE SCREW "
-    f"({HANGER_SCREW_WRENCH} WRENCH). HOLD THAT NUT STILL AND TIGHTEN THE "
-    f"JAM NUT (ITEM {ITEM[HANGER_JAM_NUT]}, {HANGER_JAM_NUT_WRENCH} WRENCH) "
-    "AGAINST IT (DETAIL B): THE SCREW'S LOCK.",
+    f"THE HEX NUT (ITEM {ITEM[HANGER_NUT]}) ON AGAINST THE STRAP FRONT, SNUG "
+    "ONLY. SWING THE STRAP ON THE SCREW UNTIL A SQUARE STANDING ON THE BAR "
+    "TOP READS THE ROD SQUARE TO "
+    f"IT. HOLD THE NUT ({HANGER_NUT_WRENCH} WRENCH) WHILE TIGHTENING THE SCREW "
+    f"({HANGER_SCREW_WRENCH} WRENCH), THEN RE-CHECK WITH THE SQUARE. HOLD THAT "
+    f"NUT STILL AND TIGHTEN THE JAM NUT (ITEM {ITEM[HANGER_JAM_NUT]}, "
+    f"{HANGER_JAM_NUT_WRENCH} WRENCH) AGAINST IT (DETAIL B): THE SCREW'S LOCK.",
     "8. SEAT THE PEN WIRE IN THE MHA-MG-05 WHEEL RIM GROOVE; TIE TO THE WHEEL "
     "AND SET THE NIB TO PAPER PER MHA-HA-00. THE STUD STAYS AT ITS "
     "STEP 1 SETTING; MOVE THE MARKER ONLY WITH THE THUMB SCREW SLACKENED, "
@@ -360,4 +394,5 @@ ASSEMBLY_CHECKS = (
     f"READS {_YAW_SETTING} (DETAIL C) AFTER TRYING IT.",
     f"- BOTH JAM NUTS (ITEMS {ITEM[STUD_NUT]}, {ITEM[HANGER_JAM_NUT]}) TIGHT; "
     "THE STUD AND THE HANGER SCREW DO NOT TURN BY HAND.",
+    "- A SQUARE ON THE BAR TOP STILL READS THE ROD SQUARE TO IT.",
 )

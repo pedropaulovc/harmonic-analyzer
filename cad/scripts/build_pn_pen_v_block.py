@@ -27,11 +27,12 @@ Features, in tree order:
   flat's height a driven reference,
   cut +X from the paper end to ``V_CUT_LENGTH``, one corner radius past the
   relief's step.
-* ``VApexFillets``: the rounds where the apex flat meets the flanks, at the
-  ``V_APEX_FILLET_R`` limit; the sheet prints it "2X R0.5 MAX".
+* ``VApexFillets``: the rounds where the apex flat meets the flanks, at
+  ``V_APEX_FILLET_R``; the sheet prints no radius (the title block's INSIDE
+  CORNERS R.040 MAX governs).
 * ``ReliefProfile`` (Top plane) -> ``Relief``: the slot from ``RELIEF_X0`` to
-  the free end, its two step corners the end mill's ``RELIEF_CORNER_R`` arcs,
-  cut +Y to the roof.
+  the free end, its two step corners the end mill's ``RELIEF_CORNER_R`` arcs
+  (unprinted, under the same title-block row), cut +Y to the roof.
 * ``PivotBoreProfile`` (Top plane) -> ``PivotBore``: the reamed bore, a
   sketched through cut; it removes brass only between the top face and the
   relief roof.  Its diameter carries the H7 band.
@@ -48,6 +49,9 @@ Features, in tree order:
   the section's cutting plane (the bond cradle's recipe): the drawing cuts the
   section while the part shows them, which is how a section imports a hidden
   sketch's dims.
+* ``TapWallReference`` (Front plane, sketch (u, v) = model (X, Y)), hidden:
+  the set-screw tap's wall to the step face (RV-01), a native MIN single
+  limit the front view prints.
 
 Run (SolidWorks already open)::
 
@@ -63,6 +67,7 @@ from _appearance import apply_material
 from _check import check
 from _com import _early_bound, _read_member
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -75,6 +80,7 @@ from _feature_tree import _feature_by_name, name_last_feature
 from _fit_deviations import deviations
 from _holes import TAP_DRILL_MM, cross_hole_volume_mm3, wizard_holes
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _saved_part_guard import require_saved_drawing_properties
@@ -119,12 +125,15 @@ from pn_pen_v_block_spec import (
     RELIEF_Z0,
     RELIEF_Z1,
     SET_SCREW_TAP_SPEC,
+    TAP_WALL_MIN_BAND,
+    TAP_WALL_MIN_MM,
+    TAP_WALL_MIN_TOL_TYPE,
+    TAP_WALL_START_X,
     SET_SCREW_Y,
+    UNIT,
     V_FLANK_ANGLE_DEG,
     V_APEX_FILLET_AREA,
-    V_APEX_FILLET_BAND,
     V_APEX_FILLET_R,
-    V_APEX_FILLET_TOL_TYPE,
     V_CUT_LENGTH,
     V_FLAT_WIDTH,
     V_FLAT_Y,
@@ -213,7 +222,7 @@ async def _outline(adapter, dims: SketchDims) -> None:
     and its back face (NeckZ0 / NeckZ1) and the body's back face at the step
     (Depth), one row printed in the bottom view right of the paper end, where
     the neck's step is an outline change on both long edges and the overall
-    depth closes the row (blind review final9: without it the neck's "20.10"
+    depth closes the row (blind review final9: without it the neck's back face
     read as the overall) -- 16 point DOF less 2 + 8 relations + 6 dims = 0.
     """
     step, side = RELIEF_X0, BODY_SIDE_STEP
@@ -788,9 +797,37 @@ async def _pivot_reference(adapter) -> list[tuple[str, str]]:
     ]
 
 
+async def _tap_wall_reference(adapter) -> None:
+    """RV-01's accepted wall from the set-screw tap to the step face, stated
+    natively: a hidden construction line on the Front plane at the tap's
+    height, running -X toward the step from the thread's major diameter, as
+    long as the printed minimum, so its driving dimension prints ".064 MIN"
+    once _single_limits types it (build_pn_pen_frame's recipe)."""
+    feature = "TapWallReference"
+    check(f"create sketch {feature}", await adapter.create_sketch("Front"))
+    start = (TAP_WALL_START_X, SET_SCREW_Y)
+    line = await _construction_chord(
+        adapter, feature, start, (start[0] - TAP_WALL_MIN_MM, start[1])
+    )
+    check(feature, await adapter.add_sketch_constraint(line, None, "horizontal"))
+    await dimension_between(
+        adapter,
+        f"{line}.start",
+        f"{line}.end",
+        "horizontal_distance",
+        TAP_WALL_MIN_MM,
+        feature,
+    )
+    await anchor_point_to_origin(adapter, f"{line}.start", *start, feature)
+    await ensure_fully_defined(adapter, feature)
+    check(f"exit sketch {feature}", await adapter.exit_sketch())
+    name_last_feature(adapter, feature)
+    name_dimensions(adapter, feature, ["TapWallMin", "TapWallX", "TapWallY"])
+
+
 # (feature, dimension, the limit the model carries, its native band,
-# swTolType_e, the word it prints): the pivot bore's chamfer has a floor, the
-# V's apex rounds a ceiling.
+# swTolType_e, the word it prints): the pivot bore's chamfer and the tap's
+# wall to the step have floors.
 _SINGLE_LIMITS = (
     (
         "PivotReference",
@@ -801,12 +838,12 @@ _SINGLE_LIMITS = (
         "MIN",
     ),
     (
-        "VApexFillets",
-        "VApexFilletR",
-        V_APEX_FILLET_R,
-        V_APEX_FILLET_BAND,
-        V_APEX_FILLET_TOL_TYPE,
-        "MAX",
+        "TapWallReference",
+        "TapWallMin",
+        TAP_WALL_MIN_MM,
+        TAP_WALL_MIN_BAND,
+        TAP_WALL_MIN_TOL_TYPE,
+        "MIN",
     ),
 )
 
@@ -850,7 +887,7 @@ def _single_limits(adapter) -> None:
 
 
 def _author_reference_dimensions(adapter) -> None:
-    """Show each driven dimension as a reference: no tolerance, "(5.0)"
+    """Show each driven dimension as a reference: no tolerance, "(.20)"
     (build_ms_stop_block._author_plate_location_references' recipe)."""
     for feature_name, dimension_name in REFERENCE_DIMENSIONS:
         display, dimension = _named_dimension(adapter, feature_name, dimension_name)
@@ -876,6 +913,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
@@ -949,10 +988,11 @@ async def build(adapter) -> dict[str, str]:
     ]
     volume = await volume_check(adapter, "V-groove", volume - V_GROOVE, 0.01 * V_GROOVE)
 
-    # 2b. The rounds where the apex flat meets the flanks, at the radius the
-    # print allows (R MAX): each edge picked mid-neck on its flat end, the
-    # only edge through that point.  They add ~0.1 mm^3, under the mass
-    # properties' resolution: the check proves the round ate nothing else.
+    # 2b. The rounds where the apex flat meets the flanks, a chamfer mill's
+    # tip (the title block's inside-corner row governs): each edge picked
+    # mid-neck on its flat end, the only edge through that point.  They add
+    # ~0.1 mm^3, under the mass properties' resolution: the check proves the
+    # round ate nothing else.
     check(
         "fillet V apex flat corners",
         await adapter.add_fillet(
@@ -1160,6 +1200,7 @@ async def build(adapter) -> dict[str, str]:
     await _section_plane(adapter)
     drive_jobs += await _relief_reference(adapter)
     drive_jobs += await _pivot_reference(adapter)
+    await _tap_wall_reference(adapter)
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
@@ -1181,7 +1222,7 @@ async def build(adapter) -> dict[str, str]:
     # exactly the print's dimensions marked (the drawing must find every one).
     for (feature_name, dimension_name), band in DRAWING_BANDS.items():
         set_dimension_bilateral_tolerance(
-            adapter, feature_name, dimension_name, *deviations(band)
+            adapter, feature_name, dimension_name, *deviations(band), display_unit=UNIT
         )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _single_limits(adapter)

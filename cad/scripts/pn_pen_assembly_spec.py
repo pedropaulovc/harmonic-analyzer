@@ -37,7 +37,7 @@ import pn_pen_carriage_geom as carriage
 import pn_pen_rod_spec as rod
 import pn_pen_v_block_spec as v_block
 from _hole_spec import THREAD_MAJOR_MM
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import printed_band_mm, printed_deviations
 
 ASM_NAME = "pn-pen"
 
@@ -136,23 +136,30 @@ STUD_LINE = (
 )
 STUD_HEIGHT = carriage.STUD_HEAD_TOP_REST_Y - carriage.ROD_SQUARE_TOP_REST_Y
 # Set by the stud's measured length (owner ruling on code review C05). The
-# stud's printed length band (26.0 at one place, ±0.8) alone spans 1.6 of the
-# 1.70 the tap's guaranteed thread leaves above 1.5 D, so no fixed head
-# height holds the engagement: the fitter sets the head top the measured
-# length less rod.STUD_ENGAGEMENT, ±STUD_TOLERANCE_MM. STUD_HEIGHT is that
+# stud's printed length band (1.02 at two places about the 26.0 closure,
+# -.0136/+.0064) is not the engagement's limit: the fitter sets the head top
+# the measured length less rod.STUD_ENGAGEMENT, ±STUD_TOLERANCE_MM, so the
+# engagement is that band whatever the stud's length. STUD_HEIGHT is that
 # setting for a nominal stud, the value the model and DETAIL A's reference
 # dimension carry.
-STUD_TOLERANCE_MM = 0.4
-STUD_PRECISION = 1
+STUD_TOLERANCE_MM = 0.381  # ±.015
+STUD_PRECISION = 3
 _STUD_MAJOR = THREAD_MAJOR_MM[stud.THREAD]
-STUD_LENGTH_EXTREMES = (
-    stud.OVERALL_LENGTH - printed_band_mm(1),
-    stud.OVERALL_LENGTH + printed_band_mm(1),
+_STUD_LENGTH_DEVIATIONS = printed_deviations(
+    stud.OVERALL_LENGTH, stud.OVERALL_PLACES, unit=stud.UNIT
 )
-# The rod sheet's native tap callout prints the thread depth at two places
-# ("TAP 0-80 UNF 4.50"), so the shallowest accepted full thread is 3.99.
-TAP_THREAD_DEPTH_MIN = (
-    rod.STUD_TAP_SPEC.overrides_mm["ThreadDepth"] - printed_band_mm(2)
+STUD_LENGTH_EXTREMES = (
+    stud.OVERALL_LENGTH + _STUD_LENGTH_DEVIATIONS[0],
+    stud.OVERALL_LENGTH + _STUD_LENGTH_DEVIATIONS[1],
+)
+_STUD_FULL_THREAD_BAND = printed_band_mm(
+    stud.DRAWING_PRECISION_BY_NAME["FullThreadLength"], unit=stud.UNIT
+)
+# The rod sheet's native tap callout prints the thread depth at the rod's
+# places (rod.STUD_TAP_DEPTH_PLACES, "TAP 0-80 UNF .18"), so the shallowest
+# accepted full thread is .17.
+TAP_THREAD_DEPTH_MIN = rod.STUD_TAP_SPEC.overrides_mm["ThreadDepth"] - printed_band_mm(
+    rod.STUD_TAP_DEPTH_PLACES, unit=rod.UNIT
 )
 
 
@@ -190,9 +197,11 @@ CARRIAGE_END_UV = (CARRIAGE_END_MACHINE[0], -CARRIAGE_END_MACHINE[2])
 NIB_UV = (carriage.MARKER_POS[0], -carriage.MARKER_POS[2])
 FLAT_LINE_LENGTH = 18.0  # the rod-flat reference arm, unprinted
 FLAT_END_UV = (CARRIAGE_END_UV[0] - FLAT_LINE_LENGTH, CARRIAGE_END_UV[1])
+# A closure (pn_pen_carriage_geom: the nib placed its clearance off the paper
+# face), 14.024, printed rounded, .552.
 NIB_PROTRUSION = -carriage.MARKER_NIB_LOCAL_X
-NIB_TOLERANCE_MM = 0.5
-NIB_PRECISION = 1
+NIB_TOLERANCE_MM = 0.508  # ±.020
+NIB_PRECISION = 3
 YAW_DEG = carriage.PEN_BLOCK_YAW_DEG
 YAW_TOLERANCE_DEG = 1.0
 YAW_PRECISION = 0
@@ -232,7 +241,7 @@ assert math.isclose(
 assert _STUD_ENGAGEMENT_MIN >= 1.5 * _STUD_MAJOR, _STUD_ENGAGEMENT_MIN
 assert _STUD_ENGAGEMENT_MAX < TAP_THREAD_DEPTH_MIN, _STUD_ENGAGEMENT_MAX
 assert (
-    stud.FULL_THREAD_LENGTH - printed_band_mm(1)
+    stud.FULL_THREAD_LENGTH - _STUD_FULL_THREAD_BAND
     >= _STUD_ENGAGEMENT_MAX + stud.jam_nut.THICKNESS + stud.ADJUSTMENT_RANGE
 ), _STUD_ENGAGEMENT_MAX
 # The nib preset band keeps the grip seated in the V both ways.

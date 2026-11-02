@@ -174,16 +174,7 @@ VIEW_ARROW_SQUARE_TOL = 0.0003
 VIEW_ARROW_CIRCLE_CLEARANCE = 0.002
 TRAIL_LINE_STYLE = 2  # swLineStyles_e.swLinePHANTOM: the explode trail
 
-_CARRIAGE_STEMS = frozenset(
-    (
-        spec.ROD,
-        spec.V_BLOCK,
-        spec.FRAME,
-        spec.THUMB_SCREW,
-        spec.ROD_SET_SCREW,
-        spec.MARKER,
-    )
-)
+_CARRIAGE_STEMS = frozenset(notes.CARRIAGE_STEMS)
 
 
 @dataclass(frozen=True)
@@ -524,6 +515,16 @@ if explode.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
 # --- sheets 3 and 4: the finished isometric beside the bench steps (sheet 3),
 # then beside the at-machine steps and the checks (sheet 4) -------------------------
 ASSEMBLY_ISO_CENTER = (0.062, 0.145)
+# GetOutline frames the finished iso's projected bounding box, not its ink: on
+# the c03368c sheets 3 and 4 the pen's ink spanned x 0.0304..0.0950, y
+# 0.0955..0.1952 about ASSEMBLY_ISO_CENTER while the outline's bottom stood
+# ~26 mm lower, so a label under the outline hung ~30 mm under the pen
+# (machinist review c03368c).  The label stands VIEW_LABEL_GAP under the
+# measured ink, left-aligned with it.
+FINISHED_INK_LOWER_LEFT = (
+    ASSEMBLY_ISO_CENTER[0] - 0.0316,
+    ASSEMBLY_ISO_CENTER[1] - 0.0495,
+)
 STEPS_TOP = SHEET_INNER_BORDER[3] - 0.005
 STEPS_LINE_WIDTH = 108  # characters
 
@@ -1678,7 +1679,7 @@ def _place_finished_view(adapter: Any, sheet_name: str) -> float:
         adapter,
         finished,
         notes.VIEW_TITLES["finished"],
-        (x0, y0 - VIEW_LABEL_GAP),
+        (FINISHED_INK_LOWER_LEFT[0], FINISHED_INK_LOWER_LEFT[1] - VIEW_LABEL_GAP),
         label=label,
     )
     return x1 + NOTE_GAP
@@ -1719,7 +1720,7 @@ def _place_steps_continued_sheet(adapter: Any) -> None:
 
 
 def _place_package(adapter: Any) -> Callable[[], None]:
-    new_project_drawing(adapter, layout=SPEC.layout, scale=SHEET_SCALE)
+    new_project_drawing(adapter, layout=SPEC.layout, scale=SHEET_SCALE, unit=notes.UNIT)
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="pen package")
     for sheet_name in SHEET_NAMES:
         sheet = _activate_sheet(adapter, sheet_name)
