@@ -233,9 +233,11 @@ FRONT_KEEP = {
     # they crowded the sockets and line B).
     "LocatorY1": (_LOCATOR_OFFSET_X, _front_y(PIVOT_END_R) + 0.0045),
     "LocatorY2": (_LOWER_OFFSET_X, _front_y(-PIVOT_END_R) - 0.0045),
-    # Six callout lines under the value: the block centres low enough that
-    # its top stays inside the upper border, right of the tap callout.
-    "LocatorDia1": (0.262, _front_y(PIVOT_END_R) + 0.0157),
+    # Six callout lines under the stacked-band value: the block centres low
+    # enough that its top stays inside the upper border, right of the tap
+    # callout (at +15.7 the "+.0005" touched the border: machinist review of
+    # bcdc09b35), its foot still above the arm's top edge.
+    "LocatorDia1": (0.262, _front_y(PIVOT_END_R) + 0.0149),
 }
 # The true overall (review of 19e33c6c2: the 128.90 from the bore axis read
 # as one), a reference under the stations: picked on the pivot round's upper

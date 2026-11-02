@@ -11,9 +11,8 @@ pd-vn-transgear-arm-plate-locating-pin:
   # Family table read live 2026-11-02 (product page needs login): 3/32 dia,
   # 5/16 long, dia +.0001/+.0003, 1,400 lbf double shear, RC47, ASME B18.8.2.
   installation_notes: |-
-    INSTALLATION - TWO PER MHA-PD-18 ARM: PRESS INTO THE ARM FROM THE REAR
-    TO THE PROUD SET; PUNCH OUT FROM THE FRONT. THE MHA-PD-19 PLATE SLIPS
-    ON; ITS SCREWS CLAMP ONLY, THE PINS LOCATE IT (MHA-PD-00).
+    INSTALLATION - TWO PER TRANSGEAR ARM MHA-PD-18;
+    LOCATE THE MHA-PD-19 PLATE (MHA-PD-00).
   quantity: 2
   tolerance_class: machined_block
   process: purchased

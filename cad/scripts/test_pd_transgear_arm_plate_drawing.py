@@ -209,9 +209,21 @@ def test_the_worst_case_walls_hold_at_the_printed_bands() -> None:
 
 def test_the_countersink_callout_names_no_hole_size() -> None:
     """The callout is fixed text on the countersink's native dimension: a
-    hole size typed into it would not follow the drill's native value."""
-    assert spec.CSK_CALLOUT.splitlines() == ["82\u00b0 CSK", "COAXIAL WITH", "DRILLED HOLE"]
+    hole size typed into it would not follow the drill's native value.  Its
+    .XXX diameter seats the screw's head, so it names the screw."""
+    assert spec.CSK_CALLOUT.splitlines() == [
+        "82\u00b0 CSK, HEAD", "SEAT FOR MHA-PD-VN-56", "COAXIAL WITH", "DRILLED HOLE",
+    ]
     assert not any(character.isdigit() for character in spec.CSK_CALLOUT.splitlines()[-1])
+
+
+def test_the_three_place_section_sizes_name_their_function() -> None:
+    """Rule 3: a three-place size states its function; the notch depth only
+    wraps the arm's edge and prints two places."""
+    assert drawing.SECTION_CALLOUTS["ThicknessOverArm"] == "SETS SCREW REACH\nIN ARM MHA-PD-18"
+    assert spec.DRAWING_PRECISION_BY_NAME["ThicknessOverArm"] == 3
+    assert spec.DRAWING_PRECISION_BY_NAME["NotchDepth"] == 2
+    assert round(geometry.NOTCH_DEPTH / 25.4, 2) == pytest.approx(geometry.NOTCH_DEPTH / 25.4)
 
 
 def test_the_plate_screws_engage_the_arm_one_and_a_half_diameters() -> None:
@@ -599,7 +611,8 @@ def test_section_stations_are_a_baseline_from_the_mounting_face() -> None:
     """Every shoulder station stands above the plate measured from the
     mounting face (z = 0), shortest nearest so no extension line crosses a
     dimension line; the hub-to-boss length stands above them all, and
-    nothing stands below the view, over its caption."""
+    nothing stands below the view, over its caption.  The over-arm
+    thickness's value and callout stand right of the boss face's witness."""
     keep = drawing.SECTION_KEEP
     stations = {
         "ThicknessOverArm": geometry.REAR_FACE_Z,
@@ -607,7 +620,10 @@ def test_section_stations_are_a_baseline_from_the_mounting_face() -> None:
         "HubFaceToMounting": geometry.HUB_FACE_Z,
     }
     for name, station in stations.items():
-        assert keep[name][2] == pytest.approx(station / 2.0), name
+        if name == "ThicknessOverArm":
+            assert keep[name][2] > geometry.BOSS_FACE_Z, name
+        else:
+            assert keep[name][2] == pytest.approx(station / 2.0), name
         assert keep[name][1] > geometry.arm_upper_edge_y(0.0), name
     rows = sorted(stations, key=lambda name: keep[name][1])
     assert rows == sorted(stations, key=lambda name: abs(stations[name]))

@@ -44,17 +44,18 @@ from pd_transgear_knob_shaft_spec import (
 UNIT = drawing_unit("parts/pd-transgear-knob-cup", _config.parts("pd-transgear-knob-cup"))
 
 OD = 19.05  # .75
-LENGTH = 8.001  # .315
+LENGTH = 8.128  # .32
 BORE_DIA = JOURNAL_DIA  # .249 g6 shaft
 # Reamed to the plate's H7 limits; the same journal runs/slides in both.
 BORE_BAND = (max(PLATE_BORE_LIMITS), min(PLATE_BORE_LIMITS))
 
 # Places each printed dimension carries (drawing-guidelines.md rule 3 (decimal
-# places carry the tolerance)): the O.D. is routine at .XX; the length .XXX
-# keeps the journal's end inside the cup; the bore prints four places under
-# its own reamed band.
+# places carry the tolerance)): the O.D. and the length are routine at .XX
+# (the shortest .32 cup still covers the journal's end and the pin hole's
+# rear wall: machinist review, .315 named no stack); the bore prints four
+# places under its own reamed band.
 OD_PLACES = 2
-LENGTH_PLACES = 3
+LENGTH_PLACES = 2
 BORE_PLACES = 4
 
 WALL_FLOOR = WALL_TARGET_MM
@@ -135,8 +136,8 @@ JOURNAL_END_INSET = LENGTH - JOURNAL_REAR_EXTENSION
 JOURNAL_END_INSET_WORST = LENGTH_MIN - JOURNAL_REAR_EXTENSION_MAX
 if JOURNAL_END_INSET_WORST <= 0.0:
     raise AssertionError("the knob shaft's rear end stands out of MHA-PD-16")
-if not math.isclose(JOURNAL_END_INSET, 1.4986, abs_tol=1e-9):
-    raise AssertionError("MHA-PD-16 no longer covers the journal's end by .059")
+if not math.isclose(JOURNAL_END_INSET, 1.6256, abs_tol=1e-9):
+    raise AssertionError("MHA-PD-16 no longer covers the journal's end by .064")
 
 # The front face is the running face on the plate's rear boss: MACHINED, on
 # the exact native face the part build resolves.

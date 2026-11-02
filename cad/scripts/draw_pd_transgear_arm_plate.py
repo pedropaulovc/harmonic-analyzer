@@ -126,6 +126,7 @@ from pd_transgear_arm_plate_spec import (
     SCREW_ZONE_HEIGHT,
     SHEET_NAMES,
     SURFACE_FINISHES,
+    THICKNESS_CALLOUT,
 )
 
 # Machinist review gates this sheet: the build fails on a FIX verdict.
@@ -279,7 +280,11 @@ BACK_KEEP: dict[str, tuple[float, float, float]] = {
 # read as naming the hub (machinist review, run 20261027T152452686Z); its
 # witness lines stop short of the hub face, not on through the hatched hub
 # to the profile line's far end at the rear face (run 20261027T180704579Z).
-# The boss diameter stands beyond the boss face's caption.
+# The boss diameter stands beyond the boss face's caption.  The over-arm
+# thickness's value and its two-line callout stand right of the hub-to-boss
+# dimension's boss-face witness line, in the open sheet above the boss:
+# between the plate's own witness lines they would cross face A's (machinist
+# review: the .197 carried no function).
 # The hub station's callout takes three lines (it also sets the disc
 # cluster's collar air, #2038).  SOLIDWORKS centres the value-and-callout
 # block on its position, so the third line raised the value half a line: at
@@ -289,7 +294,7 @@ BACK_KEEP: dict[str, tuple[float, float, float]] = {
 HUB_DIA_TEXT_STANDOFF_MM = 25.5
 HUB_DIA_WITNESS_MAX_M = (HUB_DIA_TEXT_STANDOFF_MM * SHEET_SCALE[0] - 1.0) / 1000.0
 SECTION_KEEP: dict[str, tuple[float, float, float]] = {
-    "ThicknessOverArm": (0.0, _SECTION_TOP + 5.0, REAR_FACE_Z / 2.0),
+    "ThicknessOverArm": (0.0, _SECTION_TOP + 5.0, BOSS_FACE_Z + 6.0),
     "NotchDepth": (0.0, _SECTION_TOP + 10.0, FRONT_FACE_Z / 2.0),
     "HubFaceToMounting": (0.0, _SECTION_TOP + 17.9, HUB_FACE_Z / 2.0),
     "HubToBoss": (0.0, _SECTION_TOP + 28.0, (HUB_FACE_Z + BOSS_FACE_Z) / 2.0),
@@ -368,6 +373,7 @@ PLAN_CALLOUTS_ABOVE = {
     "CskDia": HOLE_COUNT_CALLOUT,
 }
 SECTION_CALLOUTS = {
+    "ThicknessOverArm": THICKNESS_CALLOUT,
     "HubFaceToMounting": HUB_STATION_CALLOUT,
     "HubToBoss": HUB_TO_BOSS_CALLOUT,
 }

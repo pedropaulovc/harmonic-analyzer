@@ -422,17 +422,18 @@ def test_clip_screw_bosses_sweep_clear_of_the_bar_and_hanger(
 @pytest.mark.parametrize(
     ("deviation", "looser", "collides"),
     [
-        # A rail printed at the plain .XX row stands the heads into the plate.
+        # A rail printed at the .X row stands the lock plates into the arm
+        # (the inch arm plate's .XX notch leaves the arm the closest section).
         (
             "_GUIDE_DEPTH_DEV",
-            printed_deviations(assembly.GUIDE_DEPTH, 2, unit=assembly.GUIDE_UNIT),
-            "heads .* into the arm plate as",
+            printed_deviations(assembly.GUIDE_DEPTH, 1, unit=assembly.GUIDE_UNIT),
+            "lock plates .* into the arm as",
         ),
-        # So does a lock plate whose thickness prints .XX, not its sheet band...
+        # So does a lock plate whose thickness prints .X, not its sheet band...
         (
             "_LOCK_THICK_DEV",
-            printed_deviations(assembly.LOCK_THICK, 2),
-            "heads .* into the arm plate as",
+            printed_deviations(assembly.LOCK_THICK, 1),
+            "heads .* into the arm as",
         ),
         # ...and an arm plate whose notch depth prints .X.
         (

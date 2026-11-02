@@ -265,7 +265,7 @@ def test_bearing_material_charges_breaks_axis_error_and_loose_float():
     assert shaft.REAR_BEARING_INNER_RADIUS_MAX == pytest.approx(3.7813204160053244)
     assert shaft.REAR_BEARING_INNER_RADIUS_MAX > shaft.ROOT_DIA_EXACT_MIN / 2.0
     assert shaft.REAR_BEARING_AREA_MIN > 1.0
-    assert shaft.REAR_BEARING_AREA_MIN == pytest.approx(7.09579493007012)
+    assert shaft.REAR_BEARING_AREA_MIN == pytest.approx(7.0949877788193305)
     # Not the uncharged centred claim on the bare ring bore.
     centred = shaft.gear_bearing_area_lower(shaft.STOCK_PROFILE, ring.ID / 2.0)
     assert centred == pytest.approx(14.171169300934473)
@@ -286,7 +286,7 @@ def test_retained_walls_and_axial_stations_need_no_new_waiver():
     assert min(cup.BORE_JOURNAL_CLEARANCE) == pytest.approx(0.00508)
     assert max(cup.BORE_JOURNAL_CLEARANCE) == pytest.approx(0.0254)
     assert ring.LENGTH == 5.207
-    assert plate.HUB_LENGTH == pytest.approx(12.6111)
+    assert plate.HUB_LENGTH == pytest.approx(12.6746)
     assert shaft.CUP_FACE_Z == pytest.approx(40.3352)
     assert shaft.REAR_END_Z == pytest.approx(46.8376)
     assert collar.COLLAR_DISC_AIR_MIN == 0.1016

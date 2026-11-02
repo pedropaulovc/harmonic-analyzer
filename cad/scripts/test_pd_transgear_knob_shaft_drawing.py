@@ -62,7 +62,7 @@ def test_native_stock_source_is_the_selected_15t_48dp_master() -> None:
     assert profile.radial_translation_mm == spec.RADIAL_SETTING == 0.266
     assert profile.blank_radius_mm == spec.OUTSIDE_DIA / 2
     assert spec.OUTSIDE_DIA == 8.97382  # .3533
-    assert spec.OUTSIDE_DIA_BAND == (0.0, -0.02)
+    assert spec.OUTSIDE_DIA_BAND == (0.0, -0.02032)  # .0000/-.0008
     assert spec.CUTTER_DIA == 44.45
     assert spec.CUTTER_ARBOR_BORE == 22.225
     assert spec.CUTTER_SKU == "10-289-487"

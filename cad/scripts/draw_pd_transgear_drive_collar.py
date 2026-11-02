@@ -145,8 +145,10 @@ END_KEEP = {
 # flat at 156.4, run 20261101T183557651Z review). 8 mm higher it runs in the
 # bore's air between the flat and the axis, and the block's top stays 4 mm
 # under the bore callout's shelf (206.7 mm). Both diameters read right of the
-# pilot face, each mate callout clear of the other.
-_LENGTH_ROW_Y = SIDE_CENTER[1] - HALF_OD - 0.006
+# pilot face, each mate callout clear of the other.  At 6 mm under the view
+# the row's line ran through "SECTION" (machinist review of bcdc09b35); its
+# texts stand outside the section's span, so 3 mm under it clears both.
+_LENGTH_ROW_Y = SIDE_CENTER[1] - HALF_OD - 0.003
 _BORE_EDGE_Y = SIDE_CENTER[1] + BORE_DIA * _S / 2000.0
 SIDE_KEEP = {
     "PilotLength": (_PILOT_X + 0.019, _LENGTH_ROW_Y),

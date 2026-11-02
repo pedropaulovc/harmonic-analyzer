@@ -7,8 +7,8 @@ widened to 1-1/2 in so the outline can stand symmetric about K (the 1-1/4 in
 bar centred on K leaves the -X countersink under the wall target).  It
 carries the knob shaft's running bore on axis K, a front hub (the thrust
 ring's seat) and a rear boss (the cup runs behind it).  Its rear portion is
-.197 thick where it lies over the arm; below the arm's lower edge it drops the
-arm's thickness (5/16 stock, 7.9375) more to the arm's front face, so the step (the
+.197 thick where it lies over the arm; below the arm's lower edge it drops
+.31 more, to .0025 behind the arm's front face (5/16 stock), so the step (the
 "notch") wraps that edge, NOTCH_RELIEF clear of it. Two matched stock
 dowels locate; screws clamp.
 
@@ -20,7 +20,7 @@ rotation about Z):
 * +X and +Y are the arm's +X (toward its square end) and +Y (toward its upper
   tangent edge); the plate's long axis runs along -Y;
 * +Z toward the rear (machine +Z): the over-arm section spans z 0..5.0038, the
-  section below the arm z -7.9375..5.0038, the front hub z -20.5486..-7.9375
+  section below the arm z -7.874..5.0038, the front hub z -20.5486..-7.874
   and the rear boss z 5.0038..8.4836.
 
 Decimal inch (#290): the plate's own nominals are the exact millimetres of
@@ -72,8 +72,12 @@ WIDTH = 38.1  # 1-1/2 in bar, symmetric about K
 THICKNESS_OVER_ARM = 5.0038  # .197
 THICKNESS_OVER_ARM_PLACES = 3
 THICKNESS_OVER_ARM_BAND = printed_band_mm(THICKNESS_OVER_ARM_PLACES, unit=UNIT)
-NOTCH_DEPTH = ARM.THICKNESS  # the section below the arm reaches its front face
-THICKNESS_BELOW_ARM = THICKNESS_OVER_ARM + NOTCH_DEPTH  # 12.9413
+# The section below the arm only wraps the arm's edge: nothing mates its
+# front face, so its depth prints .XX (machinist review: .313 carried no
+# function). Its worst case stays inside the guide-lock sweep's arm-plate
+# term (build_pd_paper_drive_assembly._assert_lock_station_sweep).
+NOTCH_DEPTH = 7.874  # .31
+THICKNESS_BELOW_ARM = THICKNESS_OVER_ARM + NOTCH_DEPTH  # 12.8778
 
 # Edges along the plate's long axis, in the plate frame (x from K): the
 # outline is symmetric about the long axis through K, so the screws' midpoint
@@ -128,10 +132,10 @@ BORE_DIA_LIMITS = (min(REAM_H7), max(REAM_H7))  # +.0000/+.0005
 HUB_DIA = 13.208  # .52
 # The hub face (the thrust ring's seat) stands at its printed .809 station
 # from the mounting face (R9-25), whatever the arm stock: the hub runs on
-# 12.6111 past the 5/16 arm's front face.  .XXX: the chain-plane station
+# 12.6746 past the notch's front face.  .XXX: the chain-plane station
 # (contract §13).
 HUB_FACE_TO_MOUNTING = 20.5486  # .809
-HUB_LENGTH = HUB_FACE_TO_MOUNTING - NOTCH_DEPTH  # 12.6111
+HUB_LENGTH = HUB_FACE_TO_MOUNTING - NOTCH_DEPTH  # 12.6746
 # The chain-plane station (contract §13) and the first term of the disc
 # cluster's stack (F, transgear_cluster_fit), which sets the collar's air:
 # .XXX at the cluster's +/-.001 (#2124).
@@ -172,10 +176,11 @@ CSK_HALF_ANGLE_LIMITS_RAD = tuple(
     math.radians((CSK_ANGLE_DEG + sign * CSK_ANGLE_BAND_DEG) / 2.0)
     for sign in (-1.0, 1.0)
 )
-# Each screw hole's projected zone (P 7.0) starts at face A and runs into the
+# Each screw hole's projected zone (P .276) starts at face A and runs into the
 # arm MHA-PD-18, the mate's side (ASME Y14.5 projected tolerance zone;
-# coordinator ruling 2026-10-27, #2017). SOURCE mm.
-CLAMP_PLATE_PROJECTED_HEIGHT_MM = 7.0
+# coordinator ruling 2026-10-27, #2017): the 7.0 mm reach rounded UP to the
+# inch sheet's .001 grid, as the frame prints it.
+CLAMP_PLATE_PROJECTED_HEIGHT_MM = 7.0104  # .276
 CSK_DIA_DEVIATIONS_MM = printed_deviations(CSK_DIA, CSK_DIA_PLACES, unit=UNIT)
 CSK_DIA_LIMITS_MM = tuple(CSK_DIA + deviation for deviation in CSK_DIA_DEVIATIONS_MM)
 CSK_DEPTH = (

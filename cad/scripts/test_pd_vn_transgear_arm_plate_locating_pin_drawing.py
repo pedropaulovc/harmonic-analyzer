@@ -57,7 +57,6 @@ def test_standard_press_slip_and_length_family_fit_the_custom_arm_and_plate() ->
     # The longest pin, pressed to the lowest proud set, stays inside the
     # arm's through hole (pd_transgear_arm_spec.LOCATOR_PUNCH_AIR_MIN_MM).
     assert max(spec.INSERTION_LIMITS_MM) < 7.9375 - 0.0254
-    assert "PUNCH OUT FROM THE FRONT" in " ".join(spec.PURCHASED_STOCK_NOTE.split())
 
 
 

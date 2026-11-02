@@ -239,7 +239,7 @@ if set(PROJECTED_ZONE_DIRECTION) != {
 }:
     raise AssertionError("every projected zone needs exactly one drawn direction")
 # The heights are sheet-derived (each measures its own chain line) and print
-# to DRAWING_REFERENCE_PRECISION, as the frames print them (Ⓟ .580, Ⓟ 1.273).
+# to DRAWING_REFERENCE_PRECISION, as the frames print them (Ⓟ .580, Ⓟ 1.274).
 # The counterbore seats the MHA-PD-VN-63 spring's rim under the MHA-PD-VN-57
 # head, and its floor from the FRONT face (datum A) sets the spring's room
 # there (transgear_hanger_joints.SPRING_ROOM_*): the callout names the

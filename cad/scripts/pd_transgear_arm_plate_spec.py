@@ -58,9 +58,10 @@ BAND_BY_PLACES: dict[int, float] = {2: BAND_XX, 3: BAND_XXX}
 # arm's own outline in mm and print .XX, judged at their printed reach
 # (``pd_transgear_arm_plate_geometry.OUTLINE_BAND``/``NOTCH_BAND``). The boss
 # and hub Ø print .XX; the over-arm thickness .XXX for the real cone floor
-# and standard-stock full-thread margin; the notch depth (the arm's 5/16
-# stock it takes, R9-26) .XXX; the hub face's station from the mounting face
-# is .XXX (the chain plane, contract §13); the hub-to-boss length prints .XXX
+# and standard-stock full-thread margin (its callout names the screw reach);
+# the notch depth .XX (it only wraps the arm's edge); the hub face's station
+# from the mounting face is .XXX (the chain plane, contract §13); the
+# hub-to-boss length prints .XXX
 # under its explicit knob-float band; the bore is a four-place reamed fit
 # under its explicit band; the screw-hole positions are BASIC under the same
 # circular position source as the arm taps, relative to the ACTUAL running
@@ -68,7 +69,7 @@ BAND_BY_PLACES: dict[int, float] = {2: BAND_XX, 3: BAND_XXX}
 # block's drilled-hole row (R9-13).
 OUTLINE_PLACES = PLATE.OUTLINE_PLACES
 BOSS_DIA_PLACES = 2
-NOTCH_DEPTH_PLACES = 3
+NOTCH_DEPTH_PLACES = 2
 THICKNESS_PLACES = PLATE.THICKNESS_OVER_ARM_PLACES
 HUB_DIA_PLACES = 2
 NOTCH_PLACES = PLATE.NOTCH_PLACES
@@ -135,6 +136,7 @@ GEOMETRIC_CONTROLS = tuple(
         ),
         ("A", "B", "C"), "diametral",
         projected_zone_height_mm=PLATE.CLAMP_PLATE_PROJECTED_HEIGHT_MM,
+        projection_unit=UNIT,
     )
     for index, (x, y) in enumerate(SCREW_HOLES, 1)
 )
@@ -147,6 +149,7 @@ GEOMETRIC_CONTROLS += (
         GEOMETRIC_TOLERANCES_IN["projected_axis"],
         CylinderFace(BORE_DIA), ("A",), "diametral",
         projected_zone_height_mm=REGISTRATION.K_PROJECTED_HEIGHT_MM,
+        projection_unit=UNIT,
     ),
     *(
         GeometricControl(
@@ -218,8 +221,14 @@ BORE_CALLOUT = f"REAM THRU\nRUNNING FIT ON\nKNOB SHAFT\n{KNOB_SHAFT_NUMBER}"
 SCREW_HOLE_CALLOUT = "DRILL THRU"
 # Size-independent: the callout is fixed text on the native countersink
 # dimension, so a printed hole size here would not follow a unit change of
-# the drill callout's own native value (codjiflo review of fad938fc9).
-CSK_CALLOUT = f"{CSK_ANGLE_DEG:.0f}\u00b0 CSK\nCOAXIAL WITH\nDRILLED HOLE"
+# the drill callout's own native value (codjiflo review of fad938fc9).  The
+# .XXX diameter seats the screw's oval head and bounds the walls beside it
+# (pd_transgear_arm_plate_geometry.WALLS), so the callout names the screw.
+SCREW_NUMBER = "MHA-PD-VN-56"
+CSK_CALLOUT = (
+    f"{CSK_ANGLE_DEG:.0f}\u00b0 CSK, HEAD\nSEAT FOR {SCREW_NUMBER}\n"
+    "COAXIAL WITH\nDRILLED HOLE"
+)
 HOLE_COUNT_CALLOUT = f"{len(SCREW_HOLES)}X"
 # The hub face's station from mounting face A sets the knob shaft's 12T plane
 # through the thrust ring (the chain plane and the disc-to-platen air,
@@ -230,6 +239,9 @@ HOLE_COUNT_CALLOUT = f"{len(SCREW_HOLES)}X"
 # lines, between the dimension's own witness lines.
 HUB_STATION_CALLOUT = f"SETS 12T PLANE\nAND COLLAR AIR\nOF {KNOB_SHAFT_NUMBER}"
 HUB_TO_BOSS_CALLOUT = f"SETS CUP {KNOB_CUP_NUMBER}\nON SHAFT {KNOB_SHAFT_NUMBER}"
+# The over-arm thickness bounds the countersink floor and the screw's thread
+# reach into the arm (transgear_hanger_joints._PLATE_MIN/_PLATE_MAX): .XXX.
+THICKNESS_CALLOUT = f"SETS SCREW REACH\nIN ARM {ARM_NUMBER}"
 
 # Two sheets (drawing-guidelines.md rule 15): the rear face's plan with the
 # isometric and section D-D through the screw holes, then mounting face A's
@@ -243,8 +255,9 @@ REAR_VIEW_LABEL = "REAR VIEW"
 FRONT_VIEW_LABEL = "FRONT VIEW (FACE A)"
 KNOB_ZONE_HEIGHT = REGISTRATION.K_PROJECTED_HEIGHT_MM
 SCREW_ZONE_HEIGHT = PLATE.CLAMP_PLATE_PROJECTED_HEIGHT_MM
-# The chain lines' heights print as references: each frame states its zone.
-DRAWING_REFERENCE_PRECISION: dict[str, int] = {"KnobZone": 2, "ScrewZone": 2}
+# The chain lines' heights print as references at the frames' .001 grid
+# (Ⓟ .276 and Ⓟ 1.587), each frame stating its zone.
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {"KnobZone": 3, "ScrewZone": 3}
 
 ISO_VIEW_SCALE = (1, 1)
 ISOMETRIC_VIEW_NOTE = f"ISOMETRIC VIEW SCALE {ISO_VIEW_SCALE[0]}:{ISO_VIEW_SCALE[1]}"
