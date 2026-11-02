@@ -545,16 +545,17 @@ def test_one_axis_horizontal_view_at_the_largest_fitting_scale() -> None:
         station = spec.FLAT_STATIONS[section.flat]
         assert 2.5 < abs(section.cut_mm - station) < spec.FLAT_LENGTH / 2.0
     assert [s.flat for s in draw.CLOCK_SECTIONS] == list(spec.CLOCKED_FLATS)
-    # The note block (five rows about 22 mm tall, top-left anchored; its
-    # widest printed row 35 glyphs at about 2.5 mm, under 105 mm) stands
-    # under the main view's lowest text, right of the details and over the
-    # title block, left of the isometric.
-    printed = [row.replace("<MOD-DIAM>", "Ø") for row in draw.STOCK_REFERENCE.splitlines()]
-    assert max(len(row) for row in printed) * 0.0025 <= 0.105
+    # The note block (four rows about 18 mm tall, top-left anchored; its
+    # widest printed row, the stock's, at about 2.7 mm a glyph as farm run
+    # 20261101T232956371Z printed it, under 135 mm) stands under the main
+    # view's lowest text, right of the details and over the title block,
+    # left of the isometric.
+    printed = draw.STOCK_REFERENCE.replace("<MOD-DIAM>", "Ø")
+    assert len(printed) * 0.0027 <= 0.135
     notes = (
         draw.NOTES_XY[0],
-        draw.NOTES_XY[1] - 0.022,
-        draw.NOTES_XY[0] + 0.105,
+        draw.NOTES_XY[1] - 0.018,
+        draw.NOTES_XY[0] + 0.135,
         draw.NOTES_XY[1],
     )
     assert draw._inside_sheet(notes)
@@ -993,7 +994,7 @@ def test_builder_prints_the_note_block_with_the_stock_reference_line(
     state = leadscrew_lifecycle
     assert set(state.run()) == {"drawing", "pdf", "png"}
     assert state.notes == [(draw.NOTES, draw.NOTES_XY)]
-    assert draw.NOTES.splitlines()[-2:] == draw.STOCK_REFERENCE.splitlines()
+    assert draw.NOTES.splitlines()[-1] == draw.STOCK_REFERENCE
 
 
 def test_builder_fits_the_number_once_and_checks_only_live_boundaries(
@@ -1240,12 +1241,14 @@ def test_notes_name_the_item_not_its_length_or_material() -> None:
     assert f"{spec.LENGTH:.0f}" not in draw.NOTES
     for name in ("Supplier", "Supplier SKUs"):
         assert property_link(name) in draw.NOTES
-    # Then the bought stock's sizes as millimetre references (machinist
-    # review: they replaced a confusing 1:10 gauge sketch), from the spec.
+    # Then the bought stock's sizes as one millimetre reference row (machinist
+    # review: they replaced a confusing 1:10 gauge sketch), from the spec, the
+    # block within rule 7's four lines.
     assert draw.NOTES.splitlines()[3:] == [
-        f"STOCK AS BOUGHT: ({spec.STOCK_LENGTH:g} mm) LONG,",
-        f"(<MOD-DIAM>{spec.MAJOR_DIA:g} mm) NOMINAL MAJOR, ({spec.PITCH:g} mm) PITCH",
+        f"STOCK: ({spec.STOCK_LENGTH:g} mm) LONG, (<MOD-DIAM>{spec.MAJOR_DIA:g} mm) MAJOR,"
+        f" ({spec.PITCH:g} mm) PITCH",
     ]
+    assert len(draw.NOTES.splitlines()) == 4
     assert (spec.STOCK_LENGTH, spec.MAJOR_DIA, spec.PITCH) == (600.0, 8.0, 2.0)
     assert not hasattr(draw, "SUPPLIER_STOCK_CAPTION")
     assert not hasattr(spec, "SUPPLIER_REFERENCE_DIMENSIONS")

@@ -373,21 +373,19 @@ FLAT_CALLOUTS = {
 # The cylinder face on the axis, 50 mm right of centre: 2 mm from either
 # silhouette and clear of the dimension above.
 CENTERLINE_PICK = (MAIN_CENTER[0] + 0.050, MAIN_CENTER[1])
-# Right of the details and over the title block (top-left anchored, five
-# rows about 22 mm tall and at most 105 mm wide): under the handwheel
+# Right of the details and over the title block (top-left anchored, four
+# rows about 18 mm tall and at most 135 mm wide): under the handwheel
 # station's text (0.128) and left of the isometric.
 NOTES_XY = (0.230, 0.105)
 # The catalogue designation in plain text: the material is the title block's
-# and the cut length is the dimension's. The bought stock's sizes are two
-# reference rows in the vendor's millimetres (machinist review: a 1:10 gauge
-# sketch of them read as a confusing pseudo-view); one row would reach the
-# isometric.
+# and the cut length is the dimension's. The bought stock's sizes are one
+# reference row in the vendor's millimetres (machinist review: a 1:10 gauge
+# sketch of them read as a confusing pseudo-view; as two rows the block ran
+# past rule 7's four lines).
 ITEM = "TR8X2 LEAD SCREW"
-STOCK_REFERENCE = "\n".join(
-    (
-        f"STOCK AS BOUGHT: ({supplier.STOCK_LENGTH:g} mm) LONG,",
-        f"(<MOD-DIAM>{MAJOR_DIA:g} mm) NOMINAL MAJOR, ({supplier.PITCH:g} mm) PITCH",
-    )
+STOCK_REFERENCE = (
+    f"STOCK: ({supplier.STOCK_LENGTH:g} mm) LONG, (<MOD-DIAM>{MAJOR_DIA:g} mm) MAJOR,"
+    f" ({supplier.PITCH:g} mm) PITCH"
 )
 NOTES = "\n".join(
     (
