@@ -842,13 +842,14 @@ def test_notes_cover_the_tap_the_screw_and_the_quantity() -> None:
     assert "MHA-CH-VN-55" in notes
     assert "MHA-CH-VN-52 #2-56 FILLISTER" in notes
     assert "2 REQUIRED" in notes
-    # The notes block reserves five rows (test_function_callouts_...).
-    assert len(notes.splitlines()) <= 5
+    # Rule 7: at most four short lines (#2108 review: five drew a finding).
+    assert len(notes.splitlines()) <= 4
     assert max(map(len, notes.splitlines())) <= 64
     # Codjiflo #2108, rule 20: RV-04's accepted tip wall prints as a plain
     # fact, its full worst case floored to .001.
     spec = ch_fulcrum_keeper_spec
-    assert f"WALL TO FOOT TIP {spec.FOOT_TIP_WALL_TEXT} MIN." in notes
+    assert "FOOT HOLE FOR\n   MHA-CH-VN-52 #2-56 FILLISTER" in notes
+    assert f"TIP WALL {spec.FOOT_TIP_WALL_TEXT} MIN." in notes
     assert spec.FOOT_TIP_WALL_TEXT == ".072"
     assert 0.060 * 25.4 <= spec.FOOT_TIP_WALL_WORST_MM < WALL_TARGET_MM
     assert "RULING" not in notes and "EXCEPTION" not in notes
