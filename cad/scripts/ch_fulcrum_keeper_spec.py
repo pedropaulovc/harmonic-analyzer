@@ -616,12 +616,12 @@ if not CROWN_TOP_Y < SUPPLY_HEIGHT_MIN:
 # stack (FOOT_TIP_WALL_MM; owner ruling 2026-10-28, review exception RV-03).
 # A note saying so (MR-fleet r7, cc1a81a) drew three findings of its own, so
 # none is printed; note 1 states only the resulting tip wall, the shortfall
-# rule 20 asks the sheet to print (Codjiflo #2108).
+# rule 20 asks the sheet to print (Codjiflo #2108), inside rule 7's four
+# lines (#2108 review: five drew a finding).
 DRAWING_NOTES = "\n".join(
     (
-        "1. CROWN TAP FOR THE MHA-CH-VN-55 CUP-POINT SET SCREW; FOOT HOLE",
-        "   FOR THE MHA-CH-VN-52 #2-56 FILLISTER, HEAD FLUSH; COUNTERBORE",
-        f"   WALL TO FOOT TIP {FOOT_TIP_WALL_TEXT} MIN.",
+        "1. CROWN TAP FOR MHA-CH-VN-55 CUP-POINT SET SCREW; FOOT HOLE FOR",
+        f"   MHA-CH-VN-52 #2-56 FILLISTER, HEAD FLUSH; TIP WALL {FOOT_TIP_WALL_TEXT} MIN.",
         f"{QUANTITY_NOTE}. 2 REQUIRED, ONE PER MHA-CH-04 FULCRUM-SHAFT END (SECOND",
         "   IS THIS PART FLIPPED 180 DEG ABOUT VERTICAL).",
     )
