@@ -36,14 +36,16 @@ its first-root position; no second general note restates that location.
      **21.717 mm unsupported** past each end of a casting-shaped organic lever. Delicate (nicks/rounds)
      *and* fixturing-hostile from bar. Per §6 the edge should be a **separate hardened tool-steel
      insert**, not this parent — which also removes it from this part's machining hazard.
-  3. **`dt-cone-gear-shaft` tip** — a **Ø0.79375 mm (1/32 in) terminal land, about 33.6 mm long in steel (L/D 42)**,
+  3. **`dt-cone-gear-shaft` tip** — a **Ø.0310 +.0000/-.0008 in (0.7671–0.7874 mm) terminal land, about
+     1.32 in (33.6 mm) long in steel (L/D about 43)**,
      carrying the T012/T006 seats and the MHA-DT-VN-54 stack collar, its cup tip seated in the MHA-DT-VN-55 adjuster.
      Support the slender work with a follower/steady and take a light finishing cut;
      the terminal D-flat continues from the T018 step through the shaft tip.
-     Break the two long torque corners of the terminal flat no more than 0.02 mm; the 0.420 AF
-     already pays for that break. The model leaves these corners sharp and the sheet prints the break
-     as a callout, `TORQUE CORNERS: STONE BURR ONLY, 0.02 MAX`, because it is below the title block's
-     R0.25 edge break. The stepped collar (inch sheet: Ø.66 body, Ø.25 × .138 nose, .453 overall;
+     Break the two long torque corners of the terminal flat no more than .001 in (0.0254 mm); the
+     collar's set-screw landing on the .0170 +.0000/-.0004 in (0.4216–0.4318 mm) across-flat already
+     pays for that break. The model leaves these corners sharp and the sheet prints the break above
+     that across-flat as `CORNERS .001 MAX`, because the title block's R.010 edge break would leave
+     the flat face only about ±.005 in wide on this land. The stepped collar (inch sheet: Ø.66 body, Ø.25 × .138 nose, .453 overall;
      `dt_vn_cone_tip_collar_spec.OUTER_DIA`) has a
      finished bore of Ø.0330 ±.0010 and a radial #2-56 through tap. Fit the stock McMaster
      94355A213 #2-56 × 5/16 in flat-point screw unaltered, with no dog. To fit the collar, hold the

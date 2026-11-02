@@ -220,6 +220,7 @@ def test_mounting_hole_callouts_cite_their_split_helper_owner() -> None:
     for name in ("mount_west", "mount_east"):
         assert requirements[name].fields["dia"][1] == (
             "ATTACHMENT_THRU_DIA",
+            "UNIT",
             ("_drawing_hole_callout", "add_native_hole_callout"),
         )
 

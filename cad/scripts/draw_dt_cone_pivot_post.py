@@ -278,7 +278,7 @@ def _size_requirement(
     precision = {}
     for key, (constant, dimension) in dimensions.items():
         model = getattr(cone, constant)
-        values[key] = (_band(model, _P[dimension]), (constant,))
+        values[key] = (_band(model, _P[dimension], unit=cone.UNIT), (constant, "UNIT"))
         values[f"{key}_nominal"] = (model, (constant,))
         precision[key] = _P[dimension]
     values.update(extras or {})
@@ -339,9 +339,9 @@ CONE_AXIS_LABEL_XY = (0.122, 0.2095)
 BODY = requirement(
     "body", faces=(CylinderFace(BLOCK_DIA),),
     kind="boss", requirements=("dia", "height"), fields={
-        "dia": (_band(BLOCK_DIA, _P["MainBodyDia"]), (("dt_cone_post_envelope", "BLOCK_DIA"),)),
+        "dia": (_band(BLOCK_DIA, _P["MainBodyDia"], unit=cone.UNIT), (("dt_cone_post_envelope", "BLOCK_DIA"), "UNIT")),
         "dia_nominal": (BLOCK_DIA, (("dt_cone_post_envelope", "BLOCK_DIA"),)),
-        "height": (_band(cone.BLOCK_HEIGHT, _P["MainBodyHt"]), ("BLOCK_HEIGHT",)),
+        "height": (_band(cone.BLOCK_HEIGHT, _P["MainBodyHt"], unit=cone.UNIT), ("BLOCK_HEIGHT", "UNIT")),
         "height_nominal": (cone.BLOCK_HEIGHT, ("BLOCK_HEIGHT",)),
         "frame": ("body_axis", (*_HEAD_SOURCES, ("draw_dt_cone_pivot_post", "_cone_source_frames"), ("draw_dt_cone_pivot_post", "build"))),
         "z_mm": ([0.0, round(cone.HEAD_BASE_Y, 12)], _HEAD_SOURCES),
@@ -366,10 +366,10 @@ CRANK_BORE = requirement(
     requirements=("dia", "thru", "finish_ra", "separation", "angularity_dia", "angularity_datums"), fields={
         "at": ([0.0, cone.CRANK_BORE_HEIGHT, 0.0], ("CRANK_BORE_HEIGHT",)),
         "axis": ([0.0, 0.0, 1.0], ("INCLINE_DEG",)),
-        "dia": (_band(cone.CRANK_BORE_DIA, _P["CrankBoreDia"], cone.RUNNING_BORE_BAND), ("CRANK_BORE_DIA", "RUNNING_BORE_BAND")),
+        "dia": (_band(cone.CRANK_BORE_DIA, _P["CrankBoreDia"], cone.RUNNING_BORE_BAND, unit=cone.UNIT), ("CRANK_BORE_DIA", "RUNNING_BORE_BAND")),
         "nominal_dia": (cone.CRANK_BORE_DIA, ("CRANK_BORE_DIA",)), "thru": (True, (("draw_dt_cone_pivot_post", "DIMENSION_SUFFIXES"),)),
         "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
-        "separation": (_band(cone.CRANK_ABOVE_CONE, _P["CrankAboveCone"], cone.CRANK_ABOVE_CONE_BAND), ("CRANK_ABOVE_CONE", "CRANK_ABOVE_CONE_BAND")),
+        "separation": (_band(cone.CRANK_ABOVE_CONE, _P["CrankAboveCone"], cone.CRANK_ABOVE_CONE_BAND, unit=cone.UNIT), ("CRANK_ABOVE_CONE", "CRANK_ABOVE_CONE_BAND")),
         "height_from": ("journal_bore", (("draw_dt_cone_pivot_post", "build"),)),
         "height_nominal": (cone.CRANK_BORE_HEIGHT, ("CRANK_BORE_HEIGHT",)),
         "angularity_dia": (cone.CRANK_BORE_ANGULARITY_MM, ("CRANK_BORE_ANGULARITY_MM", "GEOMETRIC_CONTROLS")),
@@ -425,9 +425,9 @@ for _side, _x, _dim in (("west", -cone.ATTACHMENT_X, "MountWestX"), ("east", con
         _name, kind="hole", faces=(CylinderFace(cone.ATTACHMENT_THRU_DIA, contains_x_mm=_x),),
         requirements=("dia", "thru", "station"), fields={
             "at": ([_x, cone.BLOCK_HEIGHT, 0.0], ("ATTACHMENT_X", "BLOCK_HEIGHT")), "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
-            "dia": (_drilled_band(cone.ATTACHMENT_THRU_DIA, _P[_dim]), ("ATTACHMENT_THRU_DIA", ("_drawing_hole_callout", "add_native_hole_callout"))),
+            "dia": (_drilled_band(cone.ATTACHMENT_THRU_DIA, _P[_dim], unit=cone.UNIT), ("ATTACHMENT_THRU_DIA", "UNIT", ("_drawing_hole_callout", "add_native_hole_callout"))),
             "nominal_dia": (cone.ATTACHMENT_THRU_DIA, ("ATTACHMENT_THRU_DIA",)), "thru": (True, (("draw_dt_cone_pivot_post", "build"),)),
-            "station": (_band(_x, _P[_dim]), ("ATTACHMENT_X",)), "station_nominal": (_x, ("ATTACHMENT_X",)),
+            "station": (_band(_x, _P[_dim], unit=cone.UNIT), ("ATTACHMENT_X", "UNIT")), "station_nominal": (_x, ("ATTACHMENT_X",)),
         }, precision={"dia": _P[_dim], "station": _P[_dim]},
     )
     requirement(
@@ -437,8 +437,8 @@ for _side, _x, _dim in (("west", -cone.ATTACHMENT_X, "MountWestX"), ("east", con
         ),
         requirements=("dia", "depth"), fields={
             "parent": (_name, (("draw_dt_cone_pivot_post", "build"),)),
-            "dia": (_band(cone.ATTACHMENT_CBORE_DIA, _P[_dim]), ("ATTACHMENT_CBORE_DIA",)), "nominal_dia": (cone.ATTACHMENT_CBORE_DIA, ("ATTACHMENT_CBORE_DIA",)),
-            "depth": (_band(cone.ATTACHMENT_CBORE_DEPTH, _P[_dim]), ("ATTACHMENT_CBORE_DEPTH",)), "depth_ref": (cone.ATTACHMENT_CBORE_DEPTH, ("ATTACHMENT_CBORE_DEPTH",)),
+            "dia": (_band(cone.ATTACHMENT_CBORE_DIA, _P[_dim], unit=cone.UNIT), ("ATTACHMENT_CBORE_DIA", "UNIT")), "nominal_dia": (cone.ATTACHMENT_CBORE_DIA, ("ATTACHMENT_CBORE_DIA",)),
+            "depth": (_band(cone.ATTACHMENT_CBORE_DEPTH, _P[_dim], unit=cone.UNIT), ("ATTACHMENT_CBORE_DEPTH", "UNIT")), "depth_ref": (cone.ATTACHMENT_CBORE_DEPTH, ("ATTACHMENT_CBORE_DEPTH",)),
         }, precision={"dia": _P[_dim], "depth": _P[_dim]},
     )
 # The collar thrust face's station stands above the section's upper (north
@@ -497,10 +497,10 @@ JOURNAL_BORE = requirement(
     requirements=("dia", "thru", "finish_ra", "height", "unknown"), fields={
         "at": ([0.0, cone.BORE_HEIGHT, 0.0], ("BORE_HEIGHT",)),
         "axis": ([-_NORMAL[0], 0.0, -_NORMAL[2]], ("INCLINE_DEG",)),
-        "dia": (_band(cone.BORE_DIA, _P["JournalBoreDia"], cone.JOURNAL_BORE_BAND), ("BORE_DIA", "JOURNAL_BORE_BAND")),
+        "dia": (_band(cone.BORE_DIA, _P["JournalBoreDia"], cone.JOURNAL_BORE_BAND, unit=cone.UNIT), ("BORE_DIA", "JOURNAL_BORE_BAND")),
         "nominal_dia": (cone.BORE_DIA, ("BORE_DIA",)), "thru": (True, (("draw_dt_cone_pivot_post", "DIMENSION_CALLOUTS"),)),
         "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
-        "height": (_band(cone.BORE_HEIGHT, _P["JournalAxisY"], (cone.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM, -cone.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM)), ("BORE_HEIGHT", "JOURNAL_AXIS_HEIGHT_TOLERANCE_MM")),
+        "height": (_band(cone.BORE_HEIGHT, _P["JournalAxisY"], (cone.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM, -cone.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM), unit=cone.UNIT), ("BORE_HEIGHT", "JOURNAL_AXIS_HEIGHT_TOLERANCE_MM")),
         "height_from": ("foot_seat", ("BORE_HEIGHT",)), "datum": ("A", ("PART_DATUMS",)),
         # No rim-break field exists: keep the sourced note and unknown inspection.
         "note": (cone_shaft.POST_JOURNAL_RIM_BREAK, (("dt_cone_gear_shaft_spec", "POST_JOURNAL_RIM_BREAK"), ("dt_cone_gear_shaft_spec", "THRUST_EDGE_BREAK_MAX"))),
@@ -663,11 +663,11 @@ _NORTH_BOSS_FINISH_OFFSET = (-0.006, 0.008)
 CONE_BOSS_NORTH_FACE = requirement(
     "cone_boss_north_face", kind="face", faces=(cone.SURFACE_FINISHES[3].face,),
     requirements=("length", "station", "finish_ra"), fields={
-        "length": (_band(cone.CONE_BOSS_LENGTH, _P["ConeBossLen"]), ("CONE_BOSS_LENGTH",)),
+        "length": (_band(cone.CONE_BOSS_LENGTH, _P["ConeBossLen"], unit=cone.UNIT), ("CONE_BOSS_LENGTH", "UNIT")),
         "length_nominal": (cone.CONE_BOSS_LENGTH, ("CONE_BOSS_LENGTH",)),
         # The collar's thrust face from the post axis, at the stacks' half
         # band (DIMENSION_CALLOUTS names the collar).
-        "station": (_band(cone.CONE_BOSS_NORTH_STATION, _P["ConeBossNorthZ"], (cone.CONE_BOSS_NORTH_STATION_TOLERANCE_MM, -cone.CONE_BOSS_NORTH_STATION_TOLERANCE_MM)), ("CONE_BOSS_NORTH_STATION", "CONE_BOSS_NORTH_STATION_TOLERANCE_MM")),
+        "station": (_band(cone.CONE_BOSS_NORTH_STATION, _P["ConeBossNorthZ"], (cone.CONE_BOSS_NORTH_STATION_TOLERANCE_MM, -cone.CONE_BOSS_NORTH_STATION_TOLERANCE_MM), unit=cone.UNIT), ("CONE_BOSS_NORTH_STATION", "CONE_BOSS_NORTH_STATION_TOLERANCE_MM")),
         "station_nominal": (cone.CONE_BOSS_NORTH_STATION, ("CONE_BOSS_NORTH_STATION",)),
         "normal": (list(_NORMAL), ("SURFACE_FINISHES",)),
         "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),

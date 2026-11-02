@@ -36,7 +36,7 @@ from _printed_tolerance import (
     edge_break_radius_mm,
     printed_band_mm,
 )
-from _title_block_units import edge_break_chamfer_display, edge_break_radius_display
+from _title_block_units import ANGLE_UNITS, LENGTH_UNITS, edge_break_chamfer_display, edge_break_radius_display, quantity
 
 SUPPORTED_PARTS = discover_parts(Path(__file__).resolve().parent)
 REPO = Path(__file__).resolve().parents[2]
@@ -162,15 +162,22 @@ def _call_cite(path: Path, span: tuple[int, int]) -> list[str]:
     return [f"harmonic-analyzer/{path.relative_to(REPO).as_posix()}:{span[0]}-{span[1]}"]
 
 
-def _title_cite(*keys: str) -> list[str]:
-    """Stable YAML paths to the title-block facts, validated as they are read."""
+def _title_cite(*keys: str, unit: str = "mm") -> list[str]:
+    """Stable YAML paths to the ``unit`` sheet's title-block facts, validated as
+    they are read. ``row.quantity`` names a unit-suffixed number without its
+    suffix: ``linear_2pl.band`` cites ``linear_2pl.band_mm``, or on an inch
+    sheet its ``in:`` row's ``in.linear_2pl.band_in``; rows the ``in:`` block
+    does not list stay shared. Any other field (``digits``) is cited as named."""
+    inch_rows = _config._doc("title_block")["in"]
     citations = []
     for key in keys:
-        row, _, field = key.partition(".")
-        value = _config.title_block(row)
-        for component in field.split("."):
-            value = value[component]
-        citations.append(f"harmonic-analyzer/cad/config/title_block.yaml:{key}")
+        row_name, _, field = key.partition(".")
+        row = _config.title_block(row_name, unit=unit)
+        if field not in row:
+            _value, suffix, _digits = quantity(row_name, row, field, {**LENGTH_UNITS, **ANGLE_UNITS})
+            field = f"{field}_{suffix}"
+        section = "in." if unit == "in" and row_name in inch_rows else ""
+        citations.append(f"harmonic-analyzer/cad/config/title_block.yaml:{section}{row_name}.{field}")
     return citations
 
 
@@ -343,17 +350,20 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
                 citations.append(f"{defaults_reference}:defaults.{key}")
         return list(dict.fromkeys(citations))
 
+    # The general rows the package's sheet prints, as physical millimetres.
+    unit = _part_properties.part_drawing_unit(dashed)
+    unit_cite = registry_cite("drawing_unit")
     general = {
-        f"linear_{places}pl": printed_band_mm(places) for places in (1, 2, 3)
+        f"linear_{places}pl": printed_band_mm(places, unit=unit) for places in (1, 2, 3)
     }
-    general.update({"angular_deg": angular_band_deg(), "drilled_hole_plus": drilled_oversize_mm(), "drilled_hole_minus": drilled_undersize_mm(), "edge_break_r": edge_break_radius_mm(), "chamfer_max": edge_break_chamfer_mm()})
+    general.update({"angular_deg": angular_band_deg(unit=unit), "drilled_hole_plus": drilled_oversize_mm(unit=unit), "drilled_hole_minus": drilled_undersize_mm(unit=unit), "edge_break_r": edge_break_radius_mm(unit=unit), "chamfer_max": edge_break_chamfer_mm(unit=unit)})
     general["cite"] = {
-        key: _title_cite(source)
+        key: [*_title_cite(source, unit=unit), *unit_cite]
         for key, source in (
-            ("linear_1pl", "linear_1pl.band_mm"), ("linear_2pl", "linear_2pl.band_mm"),
-            ("linear_3pl", "linear_3pl.band_mm"), ("angular_deg", "angular.value_deg"),
-            ("drilled_hole_plus", "drilled_hole.plus_mm"), ("drilled_hole_minus", "drilled_hole.minus_mm"),
-            ("edge_break_r", "edge_break.radius_mm"), ("chamfer_max", "edge_break.chamfer_max_mm"),
+            ("linear_1pl", "linear_1pl.band"), ("linear_2pl", "linear_2pl.band"),
+            ("linear_3pl", "linear_3pl.band"), ("angular_deg", "angular.value"),
+            ("drilled_hole_plus", "drilled_hole.plus"), ("drilled_hole_minus", "drilled_hole.minus"),
+            ("edge_break_r", "edge_break.radius"), ("chamfer_max", "edge_break.chamfer_max"),
         )
     }
     for name, feature in features.items():
@@ -364,8 +374,8 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
             if key in feature["cite"] and isinstance(feature.get(key), list) and len(feature[key]) == 2:
                 places = feature["precision"][key]
                 # A size finer than the title block's .XXX row carries its own band.
-                rows = ("angular.value_deg",) if key.endswith("_deg") else (f"linear_{places}pl.band_mm",) if places <= 3 else ()
-                feature["cite"][key] += _title_cite(*rows, "drilled_hole.plus_mm", "drilled_hole.minus_mm")
+                rows = ("angular.value",) if key.endswith("_deg") else (f"linear_{places}pl.band",) if places <= 3 else ()
+                feature["cite"][key] += _title_cite(*rows, "drilled_hole.plus", "drilled_hole.minus", unit=unit)
         if "finish_ra" in feature:
             if isinstance(feature.get("precision"), dict):
                 feature["precision"]["finish_ra"] = _finish_precision()
@@ -392,7 +402,7 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
         "cite": {"construction": construction_cite, "units": frame_cite, "precision": fact_citations.get("precision", frame_cite), "frames": frame_cite},
         "drawing": {"number": row["number"], "revision": UNKNOWN, "cite": [*registry_cite("number"), "harmonic-analyzer/cad/config/release.yaml:next_revision", *_cite(_part_properties, "part_properties")]},
         "material": {"spec": row.get("material_specification", UNKNOWN), "name": row.get("material", UNKNOWN), "finish": facts.get("material.finish", row.get("finish", UNKNOWN)), "thickness": facts.get("material.thickness", UNKNOWN), "cite": [*registry_cite("material_specification", "material"), *fact_citations.get("material.finish", registry_cite("finish")), *fact_citations.get("material.thickness", [])]},
-        "notes": {"manufacturing": notes.splitlines(), "process": facts.get("notes.process", row.get("process", UNKNOWN)), "edge_break": f"REMOVE BURRS AND BREAK SHARP EDGES {edge_break_radius_display()} OR CHAMFER {edge_break_chamfer_display()} MAX", "cite": [*fact_citations.get("notes.process", registry_cite("process")), *_title_cite("edge_break.radius_mm", "edge_break.chamfer_max_mm", "edge_break.digits"), *_cite(notes_module, "DRAWING_NOTES")]},
+        "notes": {"manufacturing": notes.splitlines(), "process": facts.get("notes.process", row.get("process", UNKNOWN)), "edge_break": f"REMOVE BURRS AND BREAK SHARP EDGES {edge_break_radius_display(unit=unit)} OR CHAMFER {edge_break_chamfer_display(unit=unit)} MAX", "cite": [*fact_citations.get("notes.process", registry_cite("process")), *_title_cite("edge_break.radius", "edge_break.chamfer_max", "edge_break.digits", unit=unit), *unit_cite, *_cite(notes_module, "DRAWING_NOTES")]},
         "general_tolerances": general, "frames": frames, "datums": datums, "features": features,
     }
 
