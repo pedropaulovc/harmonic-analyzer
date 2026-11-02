@@ -197,14 +197,23 @@ pull it toward the cutter instead. The op 10 advice below replaces both.
   (Unverified: neither the jack nor the work stop is in hand yet, and the work
   stop's 1/2 in base hole may be too tight for a 1/2-13 kit stud.)
 - **Op 20, ends and faces in the vise (panel C).** At 5½ in wide the bar fits
-  the 5¾ in vise. Lay it flat on parallels with the op 10 edge against the
-  fixed jaw, the end just past the side of the jaws and a jack under the far
-  end. The op 10 jack tops out at 30 mm; the bar's underside is about
-  86–99 mm up (vise bed 73.3 mm with the swivel base off, plus the
-  parallels), which the HHIP 3901-0078 (70–100 mm) covers. Square both ends
-  to 440 mm, so they come out square to the machined edge, then face both
-  sides to 12.0 mm. Standing the bar on its end is out:
-  443 mm is more than the 17 in spindle-to-table maximum.
+  the 5¾ in vise. Grip it flat across its width, with the op 10 edge against
+  the fixed jaw, on 1-3/8 in (34.9 mm) parallels. The jaw tops are about
+  118.2 mm above the table (73.3 mm vise bed with the swivel base off, plus
+  44.9 mm jaws), so on those parallels the bar's underside sits at about
+  108.2 mm: its top clears the jaws, the cutter stays about 2 mm above
+  them on the last facing pass to 12.0 mm, and the jaws still grip about
+  10 mm of the bar. My parallel set stops at 1 in, which would leave the bar
+  below the jaw tops. Put an HHIP 3901-0079 screw jack (100–140 mm, same
+  series as the op 10 jack) under the far end and run it up to touch at about
+  108 mm. Square both ends to 440 mm with each end just past the side of the
+  jaws, so they come out square to the machined edge. Then face both sides to
+  12.0 mm, each side in two positions: slide the bar so the half being faced
+  is over and beside the jaws, with the jack under the far end. Standing the
+  bar on its end is out: 443 mm is more than the 17 in spindle-to-table
+  maximum. (Unverified: neither the taller parallels nor the 3901-0079 is in
+  hand, and with the swivel base fitted every height here goes up by its
+  thickness.)
 - **Climb or conventional.** With the spindle running forward, picture the
   cutter's travel along the part: part on the left is conventional, on the
   right is climb. On the near edge in op 10 that means the cutter travels right
