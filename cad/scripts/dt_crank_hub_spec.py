@@ -9,7 +9,6 @@ from dt_crank_hub_geometry import (
     AXIAL_PIN_DIA,
     AXIAL_PIN_LENGTH,
     AXIAL_PIN_RADIUS_FROM_AXIS,
-    GENERAL_2PL_TOL_MM,
     HUB_BARREL_DIA,
     HUB_BARREL_LENGTH,
     HUB_BORE_BAND,
@@ -26,13 +25,6 @@ from dt_crank_hub_geometry import (
     SHAFT_CLEARANCE_MAX,
     SHAFT_CLEARANCE_MIN,
 )
-
-# The MHA-DT-09 taper ream's acceptance (rule 4, matched fit): the driven
-# pin's big end stands at least PIN_PROUD out of the barrel, so its keeper
-# ring's hole clears it.  A single MIN limit (swTolMIN prints the nominal, so
-# the model value is the limit); only the short side is functional, and the
-# native tolerance records the title block's .XX above it.
-PIN_PROUD_MIN_BAND = (GENERAL_2PL_TOL_MM, 0.0)
 
 SERVICE_PIN_HOLE_SPEC = HoleSpec("drilled_number", "#14")
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
@@ -62,7 +54,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
     "BoreProfile": {"BoreDia"},
     "ServicePinStationReference": {"ServicePinFromShoulder"},
-    "PinProudReference": {"PinProud"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HubProfile": {
@@ -90,7 +81,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     # Two places: the .XX band is what keeps the MHA-DT-09 ream's ligament to
     # the arm shoulder at 2.1 mm (dt_crank_hub_geometry, drawing-guidelines.md rule 17 (walls and webs)).
     "ServicePinStationReference": {"ServicePinFromShoulder": 2},
-    "PinProudReference": {"PinProud": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
