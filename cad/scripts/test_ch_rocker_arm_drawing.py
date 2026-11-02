@@ -203,6 +203,7 @@ def test_native_gdt_and_finish_present() -> None:
     assert drawing.add_native_hole_callout is add_native_hole_callout
     assert drawing.ROD_HOLE.fields["dia"][1] == (
         "ROD_HOLE_SPEC",
+        "UNIT",
         ("_hole_spec", "NUMBER_DRILL_MM"),
         ("_drawing_hole_callout", "add_native_hole_callout"),
     )
@@ -245,9 +246,9 @@ def test_native_gdt_and_finish_present() -> None:
     )
     assert (
         printed_tolerance
-        == ch_rocker_arm_spec.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"]
+        == ch_rocker_arm_spec.GEOMETRIC_TOLERANCES_IN["rod-pin hole position"]
     )
-    assert drawing.ROD_HOLE.fields["position_dia"][0] == float(printed_tolerance)
+    assert drawing.ROD_HOLE.fields["position_dia"][0] == pytest.approx(float(printed_tolerance) * 25.4)
     assert ast.unparse(keywords["diameter"]) == "True"
     assert 'characteristic="position"' in source
     assert "add_surface_finish(" in source
@@ -595,14 +596,14 @@ def test_arc_profiles_attach_two_native_frames_to_nominal_circle_edges(
         (-130.0, 40.0),
         # View F holds the sheet's left band: the lower frame sits under the
         # strap's right half, between the D and E detail letters.
-        ((0.130, 0.211), (0.207, 0.163)),
-        ("0.5", "0"),
+        ((0.130, 0.211), (0.197, 0.163)),
+        (".020", "0"),
         (ch_rocker_arm_notes.TOP_EDGE_MATE_CALLOUT, ""),
     ):
         assert args == (adapter, front)
         assert kwargs["edge_entity"] is edges[2.0 * radius]
         assert kwargs["characteristic"] == "profile_surface"
-        assert kwargs["tolerance"] == "0.5"
+        assert kwargs["tolerance"] == ".020"
         assert kwargs["outside_disposition"] == outside
         assert kwargs["datums"] == ("A", "B", "C")
         assert not kwargs.get("diameter", False)
@@ -1187,7 +1188,7 @@ def test_native_profile_guard_logs_actual_position_frame_and_leaders(native_prof
     case.bottom.position = (0.021, 0.130, 0.00125)  # request != native readback
     drawing._require_arc_profile_clearance(case.adapter, case.front, case.profiles)
     text = "\n".join(case.logs)
-    assert "requested_frame_mm=(207.0, 163.0)" in text
+    assert "requested_frame_mm=(197.0, 163.0)" in text
     assert "actual_GetPosition_mm=(21.0, 130.0, 1.25)" in text
     assert "native_frame_ink_bbox_mm=" in text
     assert "native_leader_points_mm=" in text
@@ -1399,13 +1400,14 @@ def test_profile_zone_mirror_station_envelopes_and_template_aim() -> None:
     zone = float(drawing.ARC_PROFILE_ZONE_MM)
     top_outside = float(drawing.ARC_PROFILE_OUTSIDE_MM["TopRadius"])
     bottom_inside = zone - float(drawing.ARC_PROFILE_OUTSIDE_MM["BottomRadius"])
-    assert zone == top_outside == bottom_inside == 0.5
-    assert (nominal_top, nominal_top + top_outside) == pytest.approx((8.0, 8.5))
-    assert (nominal_bottom, nominal_bottom + bottom_inside) == pytest.approx((0.0, 0.5))
+    assert zone == top_outside == bottom_inside == 0.508
+    assert (nominal_top, nominal_top + top_outside) == pytest.approx((8.0, 8.508))
+    assert (nominal_bottom, nominal_bottom + bottom_inside) == pytest.approx((0.0, 0.508))
     template_aim = nominal_top + zone / 2.0
-    assert template_aim == pytest.approx(8.25)
-    # The template's own ±0.03 inspection band is not the part's total zone.
-    assert (template_aim - 0.03, template_aim + 0.03) == pytest.approx((8.22, 8.28))
+    assert template_aim == pytest.approx(8.254)
+    # The printed frames read the same zone in inch.
+    assert drawing.ARC_PROFILE_ZONE_TEXT == ".020"
+    assert drawing.ARC_PROFILE_OUTSIDE_TEXT == {"TopRadius": ".020", "BottomRadius": "0"}
 
 
 
@@ -1482,7 +1484,7 @@ def test_hub_length_prints_its_one_sided_band() -> None:
     assert model_toleranced_dimensions(arm)[("Hub", "HubLength")] == (
         "*deviations(HUB_LENGTH_BAND)"
     )
-    assert ch_rocker_arm_spec.HUB_LENGTH_BAND == (0.05, 0.0)
+    assert ch_rocker_arm_spec.HUB_LENGTH_BAND == (0.0508, 0.0)
     assert f"{ch_rocker_arm_spec.HUB_LENGTH:.2f}" not in ch_rocker_arm_notes.DRAWING_NOTES
 
 
@@ -1493,7 +1495,7 @@ def test_strap_thickness_prints_its_band_natively() -> None:
     feature and dimension name in the end view, and no note repeats it."""
     from _drawing_contract import model_toleranced_dimensions
 
-    assert ch_rocker_arm_spec.ARM_THICKNESS_BAND == (0.025, -0.025)
+    assert ch_rocker_arm_spec.ARM_THICKNESS_BAND == (0.0254, -0.0254)
     assert ch_rocker_arm_notes.DRAWING_DIMENSIONS["Strap"] == {"StrapThickness"}
     assert ch_rocker_arm_notes.DRAWING_PRECISION["Strap"]["StrapThickness"] == 3
     assert "StrapThickness" in drawing.RIGHT_KEEP
@@ -1597,7 +1599,7 @@ def test_datum_g_and_its_basic_stand_right_of_the_hub_minus_z_face() -> None:
     # The BASIC's text, centred on its request, clears the face's extension
     # line, the witness, the hub top and G.
     places = drawing.HUB_FACES.precision["length"]
-    text = f"{drawing.HUB_FACE_BASIC_MM:.{places}f}"
+    text = ch_rocker_arm_spec.inch_text(drawing.HUB_FACE_BASIC_MM, places)
     text_x, text_y = drawing.HUB_FACE_BASIC_TEXT_XY
     half_w = len(text) * CAPTION_CHAR_WIDTH / 2.0
     basic = Box(text_x - half_w, text_y - 0.00175, text_x + half_w, text_y + 0.00175)
@@ -1613,7 +1615,7 @@ def test_top_edge_model_band_is_unchanged_by_the_basic_drawing_override() -> Non
     from _drawing_contract import model_toleranced_dimensions
 
     upper, lower = ch_rocker_arm_spec.TOP_EDGE_BAND
-    assert lower == 0.0 < upper == 0.50
+    assert lower == 0.0 < upper == 0.508
     assert ch_rocker_arm_spec.TOP_EDGE_ABOVE_PIVOT == pytest.approx(8.0)
     assert not hasattr(ch_rocker_arm_notes, "TOP_EDGE_BAND")
     assert ch_rocker_arm_notes.DRAWING_DIMENSIONS["TopEdgeReference"] == {"TopAbovePivot"}
@@ -1630,7 +1632,7 @@ def test_top_edge_model_band_is_unchanged_by_the_basic_drawing_override() -> Non
     # The source centre remains an equation of the model height; the drawing
     # override changes presentation, not the source geometry or its band.
     assert '"ArmDepth" / 2 + "TopAbovePivot" + "CurveRadius"' in build
-    assert ch_rocker_arm_notes.DRAWING_PRECISION["TopEdgeReference"]["TopAbovePivot"] == 2
+    assert ch_rocker_arm_notes.DRAWING_PRECISION["TopEdgeReference"]["TopAbovePivot"] == 3
 
 
 def test_pivot_bore_ream_band_rides_its_diameter_not_a_note() -> None:
@@ -1947,7 +1949,10 @@ class _PrecisionExtension:
         return self.precision
 
 
-def _pivot_precision_case(primary, document_precision=2, name="PivotDia"):
+_PIVOT_P = drawing.PIVOT_BORE.precision["dia"]
+
+
+def _pivot_precision_case(primary, document_precision=_PIVOT_P, name="PivotDia"):
     """Method-shaped scalar getters model the typelib, not a live COM binding."""
     display = _PrecisionDisplay(primary, name)
     annotation = _PrecisionAnnotation(display)
@@ -1956,8 +1961,8 @@ def _pivot_precision_case(primary, document_precision=2, name="PivotDia"):
     return _PrecisionAdapter(), model, annotation, extension
 
 
-@pytest.mark.parametrize("primary", [2, -2], ids=["explicit", "inherited"])
-def test_pivot_precision_matching_two_places_passes(pivot_precision_bound: None, primary) -> None:
+@pytest.mark.parametrize("primary", [_PIVOT_P, -2], ids=["explicit", "inherited"])
+def test_pivot_precision_matching_places_passes(pivot_precision_bound: None, primary) -> None:
     adapter, model, annotation, extension = _pivot_precision_case(primary)
     drawing._assert_pivot_precision(adapter, model, [annotation])
     assert extension.calls == ([(24, 204)] if primary == -2 else [])
@@ -1966,7 +1971,7 @@ def test_pivot_precision_matching_two_places_passes(pivot_precision_bound: None,
 @pytest.mark.parametrize("primary", [3, -2], ids=["explicit", "inherited"])
 def test_pivot_precision_three_places_fails(pivot_precision_bound: None, primary) -> None:
     adapter, model, annotation, extension = _pivot_precision_case(primary, 3)
-    with pytest.raises(RuntimeError, match="PivotDia.*expected 2.*effective 3"):
+    with pytest.raises(RuntimeError, match=f"PivotDia.*expected {_PIVOT_P}.*effective 3"):
         drawing._assert_pivot_precision(adapter, model, [annotation])
     assert extension.calls == ([(24, 204)] if primary == -2 else [])
 
@@ -1974,7 +1979,7 @@ def test_pivot_precision_three_places_fails(pivot_precision_bound: None, primary
 @pytest.mark.parametrize(
     ("primary", "document_precision", "calls"),
     [
-        (None, 2, []),
+        (None, _PIVOT_P, []),
         (-2, None, [(24, 204)]),
         (-2, -2, [(24, 204)]),
     ],
@@ -1986,7 +1991,7 @@ def test_pivot_precision_missing_readback_fails(
     adapter, model, annotation, extension = _pivot_precision_case(
         primary, document_precision
     )
-    with pytest.raises(RuntimeError, match="PivotDia.*expected 2.*unreadable"):
+    with pytest.raises(RuntimeError, match=f"PivotDia.*expected {_PIVOT_P}.*unreadable"):
         drawing._assert_pivot_precision(adapter, model, [annotation])
     assert extension.calls == calls
 
@@ -2003,7 +2008,7 @@ def test_pivot_precision_never_coerces_unreadable_values(
     adapter, model, annotation, extension = _pivot_precision_case(
         -2 if inherited else unreadable, unreadable
     )
-    with pytest.raises(RuntimeError, match="PivotDia.*expected 2.*unreadable"):
+    with pytest.raises(RuntimeError, match=f"PivotDia.*expected {_PIVOT_P}.*unreadable"):
         drawing._assert_pivot_precision(adapter, model, [annotation])
     assert extension.calls == ([(24, 204)] if inherited else [])
 
@@ -2011,9 +2016,9 @@ def test_pivot_precision_never_coerces_unreadable_values(
 @pytest.mark.parametrize("empty", [True, False], ids=["empty", "other-dimension"])
 def test_pivot_precision_missing_dimension_fails(pivot_precision_bound: None, empty: bool) -> None:
     adapter, model, annotation, extension = _pivot_precision_case(
-        2, name="TopAbovePivot"
+        _PIVOT_P, name="TopAbovePivot"
     )
-    with pytest.raises(RuntimeError, match="PivotDia.*expected 2.*missing dimension"):
+    with pytest.raises(RuntimeError, match=f"PivotDia.*expected {_PIVOT_P}.*missing dimension"):
         drawing._assert_pivot_precision(adapter, model, [] if empty else [annotation])
     assert extension.calls == []
 
@@ -2034,7 +2039,7 @@ def test_pivot_precision_getter_exceptions_fail_closed(
         "document": (extension, "GetUserPreferenceInteger"),
     }[stage]
     monkeypatch.setattr(target, member, fail)
-    with pytest.raises(RuntimeError, match="PivotDia.*expected 2.*unreadable"):
+    with pytest.raises(RuntimeError, match=f"PivotDia.*expected {_PIVOT_P}.*unreadable"):
         drawing._assert_pivot_precision(adapter, model, [annotation])
 
 
@@ -2051,7 +2056,7 @@ def test_pivot_precision_unavailable_native_state_fails_closed(
         annotation.display.dimension.Name = None
     else:
         model.Extension = None
-    with pytest.raises(RuntimeError, match="PivotDia.*expected 2.*unreadable"):
+    with pytest.raises(RuntimeError, match=f"PivotDia.*expected {_PIVOT_P}.*unreadable"):
         drawing._assert_pivot_precision(adapter, model, [annotation])
     assert extension.calls == []
 
@@ -2071,7 +2076,7 @@ def test_pivot_precision_binding_failures_fail_closed(
         return obj
 
     monkeypatch.setattr(drawing, "_early_bound", bind)
-    with pytest.raises(RuntimeError, match="PivotDia.*expected 2.*unreadable"):
+    with pytest.raises(RuntimeError, match=f"PivotDia.*expected {_PIVOT_P}.*unreadable"):
         drawing._assert_pivot_precision(adapter, model, [annotation])
 
 
@@ -2096,14 +2101,13 @@ def test_build_keeps_pivot_out_of_strict_part_precision() -> None:
         "HubRootRadius",
         "TipLandAngle",
     }
-    # The hub-root single limit prints the part's one place ("R0.2 MAX").
+    # The hub-root single limit prints the part's places ("R.008 MAX").
     assert precision["HubRootRadius"] == (
         "rocker_notes.DRAWING_PRECISION['HubRoot']['HubRootRadius']"
     )
     assert precision["TipLandAngle"] == (
         "rocker_notes.DRAWING_PRECISION['StrapProfile']['TipLandAngle']"
     )
-    assert ch_rocker_arm_notes.DRAWING_PRECISION["HubRoot"] == {"HubRootRadius": 1}
     front_import = next(
         node for node in build.body
         if isinstance(node, ast.Assign)
@@ -2225,7 +2229,7 @@ def test_detail_d_leaders_use_four_separate_quadrants(bound, monkeypatch) -> Non
     assert quadrants == [0, 1, 2, 3]
     assert math.dist(rim, _PIVOT_CENTRE) == pytest.approx(_DETAIL_BORE_R)
     assert symbol[0] > rim[0] and symbol[1] < rim[1]
-    assert drawing.HUB_KEEP["PivotDia"] == (0.120, 0.086)
+    assert drawing.HUB_KEEP["PivotDia"] == (0.117, 0.086)
     assert drawing.HUB_KEEP["HubDia"] == (0.212, 0.108)
 
 
@@ -2437,11 +2441,11 @@ def test_land_and_hub_sizes_are_marked_model_dimensions_at_normal_precision() ->
     assert not {"RodTipLen", "HubDia"} & set(drawing.FRONT_KEEP)
     assert ch_rocker_arm_notes.DRAWING_PRECISION["HubProfile"]["HubDia"] == 2
     assert ch_rocker_arm_notes.DEFAULT_DRAWING_PRECISION == 2
-    assert ch_rocker_arm_spec.LINEAR_2PL == pytest.approx(0.508)
-    assert ch_rocker_arm_spec.STRAP_HUB_SYMMETRY == pytest.approx(0.10)
+    assert ch_rocker_arm_spec.LINEAR_2PL == pytest.approx(0.254)
+    assert ch_rocker_arm_spec.STRAP_HUB_SYMMETRY == pytest.approx(0.1016)
     # Strap symmetry is a position zone on the strap width to the hub width's
     # datum (Main's option B): no chained hub-end-to-strap offset survives.
-    assert ch_rocker_arm_spec.GEOMETRIC_TOLERANCES_MM["strap position to hub"] == "0.10"
+    assert ch_rocker_arm_spec.GEOMETRIC_TOLERANCES_IN["strap position to hub"] == ".004"
     letter = drawing.HUB_FACES.fields["datum"][0]
     assert drawing.STRAP_FACES.fields["position_datums"][0] == [letter]
     # Its letter names nothing else on the sheet (Opus #1020 r3 C4: datum D
@@ -2466,17 +2470,18 @@ def test_new_measured_quantities_follow_the_source_geometry_equations() -> None:
         * math.sin(spec.BOT_ARC_LEN / (2.0 * (rocker_interface.CURVE_RADIUS + rocker_interface.ARM_DEPTH))),
     )
     assert spec.TIP_FACE == pytest.approx(5.588)
-    assert spec.HUB_DIA == pytest.approx(10.2)
-    assert (spec.HUB_LENGTH - spec.ARM_THICKNESS) / 2.0 == pytest.approx(2.27825)
+    assert spec.HUB_DIA == pytest.approx(10.16)
+    assert (spec.HUB_LENGTH - spec.ARM_THICKNESS) / 2.0 == pytest.approx(2.28365)
 
 
-def test_rod_hole_keeps_two_mm_normal_wall_to_the_real_k_taper_at_printed_bands():
+def test_rod_hole_keeps_its_normal_wall_to_the_real_k_taper_at_printed_bands():
     """Rule 17: the finite oblique taper, not horizontal edge distance.
 
     Charge the entire lower profile zone against the wall, conservatively
     ignoring its material-adding disposition. This short through hole in
-    2.5 mm plate needs no deep-hole drill-wander allowance.
+    the .098 plate needs no deep-hole drill-wander allowance.
     """
+    from _inch_wall_limits import WALL_TARGET_MM
     from _printed_tolerance import drilled_oversize_mm
 
     spec = ch_rocker_arm_spec
@@ -2505,18 +2510,18 @@ def test_rod_hole_keeps_two_mm_normal_wall_to_the_real_k_taper_at_printed_bands(
     assert normal_distance == pytest.approx(face_distance)
     assert normal_distance == pytest.approx(3.81835328575)
     hole_nominal = blind_cut_dia_mm(spec.ROD_HOLE_SPEC)
-    # A named drill retains its real size even when its numeric callout rounds
-    # down. Charge the larger of the native and displayed nominal.
-    conservative_hole_max = max(
-        hole_nominal, round(hole_nominal, drawing.ROD_HOLE.precision["dia"])
-    ) + drilled_oversize_mm()
-    assert conservative_hole_max == pytest.approx(2.094)
+    # A named drill retains its real size even when its numeric callout rounds.
+    # Charge the larger of the native and displayed (inch, rounded up) nominal.
+    places = drawing.ROD_HOLE.precision["dia"]
+    displayed = math.ceil(hole_nominal / 25.4 * 10**places - 1e-9) / 10**places * 25.4
+    conservative_hole_max = max(hole_nominal, displayed) + drilled_oversize_mm(unit=spec.UNIT)
+    assert conservative_hole_max == pytest.approx(2.1082)
     position_diameter = float(spec.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"])
     assert position_diameter == drawing.ROD_HOLE.fields["position_dia"][0]
     profile_allowance = float(drawing.ARC_PROFILE_ZONE_MM)
     worst_wall = normal_distance - conservative_hole_max / 2.0 - position_diameter / 2.0 - profile_allowance
-    assert worst_wall == pytest.approx(2.17135328575)
-    assert worst_wall >= 2.0, f"rod-pin hole to K-taper normal wall is only {worst_wall:g} mm"
+    assert worst_wall == pytest.approx(2.15465328575)
+    assert worst_wall >= WALL_TARGET_MM, f"rod-pin hole to K-taper normal wall is only {worst_wall:g} mm"
 
 
 @pytest.mark.parametrize("ignored_part", [None, 1, 2])
@@ -2858,7 +2863,7 @@ def test_front_native_process_keeps_the_nominal_token_and_model_bore_band(
     # The ream band reads as clearance on its named mate (MR #1020).
     assert (pivot.text[3], pivot.text[4]) == ("<native-upper>", ch_rocker_arm_notes.PIVOT_FIT_CALLOUT)
     assert ch_rocker_arm_notes.PIVOT_FIT_CALLOUT == (
-        "(0.15-0.21 DIAMETRAL\nCLEARANCE ON PIVOT\nSHAFT MHA-CH-05)"
+        "(.0060-.0078 DIAMETRAL\nCLEARANCE ON PIVOT\nSHAFT MHA-CH-05)"
     )
 
 
@@ -3093,8 +3098,8 @@ def test_outline_dimensions_measure_real_endpoints_and_choose_exact_positive_z_l
         display = state.displays[label]
         assert display.arc_conditions[1] == 1
         assert display.model.GetToleranceType() == 1
-        assert display.text[4] == "R816/TAPER"
-        assert display.writes[-1] == (4, "R816/TAPER")
+        assert display.text[4] == drawing.TAPER_LABEL == "R32.126/TAPER"
+        assert display.writes[-1] == (4, drawing.TAPER_LABEL)
         assert display.MaxWitnessLineLength == drawing.TAPER_WITNESS_LENGTH
 
 
@@ -3292,8 +3297,9 @@ def test_hub_root_prints_the_part_max_limit_with_a_trimmed_leader(native_hub_roo
     drawing._dress_hub_root(native_hub_root.adapter, native_hub_root.annotations)
     display = native_hub_root.display
     assert display.ArcExtensionLineOrOppositeSide is False
-    # The part owns the value, its MAX type and the 2X; the sheet writes none.
-    assert display.writes == []
+    # The part owns the value, its MAX type and the 2X; the sheet adds only
+    # the mate the limit protects.
+    assert display.writes == [(4, ch_rocker_arm_notes.HUB_ROOT_CALLOUT)]
     assert ch_rocker_arm_notes.HUB_ROOT_R_BAND == (0.0, -ch_rocker_arm_spec.HUB_ROOT_RADIUS_MAX)
 
 
@@ -3441,12 +3447,12 @@ def test_strap_position_frame_locates_the_strap_width_to_g_on_its_size(view_f_di
     env = view_f_dimension
     assert drawing._strap_position_frame(env.adapter, env.view, env.imported) is env.gtol
     expected = gtol_frame_signature(gtol_frame_xml(
-        "position", ch_rocker_arm_spec.GEOMETRIC_TOLERANCES_MM["strap position to hub"],
+        "position", ch_rocker_arm_spec.GEOMETRIC_TOLERANCES_IN["strap position to hub"],
         datums=("G",),
     ))
     assert gtol_frame_signature(env.state["xml"]) == expected
-    assert ch_rocker_arm_spec.GEOMETRIC_TOLERANCES_MM["strap position to hub"] == (
-        f"{ch_rocker_arm_spec.STRAP_HUB_SYMMETRY:.2f}"
+    assert ch_rocker_arm_spec.GEOMETRIC_TOLERANCES_MM["strap position to hub"] == pytest.approx(
+        ch_rocker_arm_spec.STRAP_HUB_SYMMETRY
     )
     assert env.calls == [
         "ClearSelection2", ("SelectByID2", ("RD3@Drawing View2", "DIMENSION")),
@@ -3600,7 +3606,7 @@ def test_datum_g_basic_is_the_half_hub_length_off_the_face_requirements() -> Non
         ch_rocker_arm_spec.HUB_LENGTH / 2.0
     )
     places = drawing.HUB_FACES.precision["length"]
-    assert f"{drawing.HUB_FACE_BASIC_MM:.{places}f}" == "3.528"
+    assert ch_rocker_arm_spec.inch_text(drawing.HUB_FACE_BASIC_MM, places) == ".1389"
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     assert not [
         node.value
@@ -3837,7 +3843,7 @@ def test_datum_g_basic_spans_the_centreline_and_the_minus_z_rim(monkeypatch) -> 
         ),
         ({"types": (10, 10)}, "not the dimension"),
         ({"dangling": True}, "dangling=True"),
-        ({"takes_precision": False}, "did not take 3 places"),
+        ({"takes_precision": False}, "did not take 4 places"),
     ],
 )
 def test_datum_g_basic_refuses_an_unproven_span(
@@ -3963,11 +3969,12 @@ def test_datum_g_that_does_not_read_back_clear_fails_the_leaf(
 
 def test_hub_position_frame_locates_the_hub_od_to_a_on_its_own_diameter(view_f_dimension) -> None:
     """regate-r1 #2: the hub OD's coaxiality is a native Ø position frame to A
-    under its Ø10.20 in detail D, the zone the hub wall minimum is built on."""
+    under its Ø.400 in detail D, the zone the hub wall minimum is built on."""
     env = view_f_dimension
     assert drawing._hub_position_frame(env.adapter, env.view, env.imported) is env.gtol
-    zone = ch_rocker_arm_spec.GEOMETRIC_TOLERANCES_MM["hub OD position to bore"]
-    assert zone == f"{ch_rocker_arm_spec.HUB_COAXIALITY_DIA:.2f}" == "0.10"
+    zone = ch_rocker_arm_spec.GEOMETRIC_TOLERANCES_IN["hub OD position to bore"]
+    assert float(zone) * 25.4 == pytest.approx(ch_rocker_arm_spec.HUB_COAXIALITY_DIA)
+    assert zone == ".004"
     assert drawing.HUB_OD.fields["position_datums"][0] == ["A"]
     expected = gtol_frame_signature(gtol_frame_xml("position", zone, datums=("A",), diameter=True))
     assert gtol_frame_signature(env.state["xml"]) == expected
@@ -7781,8 +7788,8 @@ def _author_actual_rocker_gdt(case, kind, *, coordinate=False, arc="TopRadius"):
     return _drawing_gdt.add_feature_control_frame(
         case.adapter, case.view, **pick,
         frame_xy=drawing.ARC_PROFILE_FRAME_XY[arc], characteristic="profile_surface",
-        tolerance=drawing.ARC_PROFILE_ZONE_MM,
-        outside_disposition=drawing.ARC_PROFILE_OUTSIDE_MM[arc],
+        tolerance=drawing.ARC_PROFILE_ZONE_TEXT,
+        outside_disposition=drawing.ARC_PROFILE_OUTSIDE_TEXT[arc],
         datums=("A", "B", "C"), leader_attach_xy=case.landing,
         label=f"arc-system {arc} profile",
     )
@@ -7864,8 +7871,8 @@ def test_actual_profile_frame_helper_preserves_unequal_xml_on_frame_owner(
     arc = "TopRadius"  # The drawing's one profile frame.
     assert _author_actual_rocker_gdt(case, "frame", arc=arc, coordinate=coordinate) is case.gtol
     signature = gtol_frame_signature(case.frame.GetSymbolXml())
-    assert signature.tolerance == "0.5"
-    assert signature.outside_disposition == drawing.ARC_PROFILE_OUTSIDE_MM[arc]
+    assert signature.tolerance == "0.02"
+    assert signature.outside_disposition == "0.02"
     assert signature.datums == ("A", "B", "C")
     assert signature.tolerance_zone == "linear"
     assert len(case.frame.writes) == 1
@@ -7880,7 +7887,7 @@ def test_actual_profile_frame_helper_preserves_unequal_xml_on_frame_owner(
     assert bool(case.gtol.seed_values) is legacy
     if legacy:
         assert case.gtol.seed_values == [
-            (1, drawing.ARC_PROFILE_ZONE_MM, "", "A", "B", "C"),
+            (1, drawing.ARC_PROFILE_ZONE_TEXT, "", "A", "B", "C"),
         ]
     assert ("IGtol", case.gtol) in case.binding.calls
     assert ("IGtolFrame", case.frame) in case.binding.calls
@@ -7938,7 +7945,7 @@ def test_actual_profile_frame_helper_retains_xml_attachment_and_landing_guards(a
     from _gtol_frame import gtol_frame_xml
 
     case = actual_rocker_gdt
-    symmetric = gtol_frame_xml("profile_surface", drawing.ARC_PROFILE_ZONE_MM, datums=("A", "B", "C"))
+    symmetric = gtol_frame_xml("profile_surface", drawing.ARC_PROFILE_ZONE_TEXT, datums=("A", "B", "C"))
     if defect == "outside-before-rebuild":
         case.frame.on_write = lambda _xml: symmetric
     elif defect == "outside-after-rebuild":
@@ -9794,10 +9801,37 @@ def test_least_tip_land_is_the_basic_land_shortened_by_the_taper_tilted_into_the
     s = ((foot[0] - top[0]) * ey - (foot[1] - top[1]) * ex) / (ux * ey - uy * ex)
     tilted = s * math.hypot(ux, uy)
     assert drawing._least_tip_land_mm() == pytest.approx(tilted, abs=1e-9)
-    assert drawing.TIP_LAND_LEAST_MM == 4.979
+    assert drawing.TIP_LAND_LEAST_MM == 4.969
     assert 0.0 < drawing.TIP_LAND_LEAST_MM <= drawing._least_tip_land_mm()
     # A parallel shift of the taper (zone / sin of the land-taper angle) is
     # milder than the tilt; the land never lengthens past its basic as worst.
     cos_angle = abs(ux * tx + uy * ty) / (math.hypot(ux, uy) * length)
     parallel = ch_rocker_arm_spec.TIP_FACE - zone / math.sqrt(1.0 - cos_angle**2)
     assert drawing.TIP_LAND_LEAST_MM < parallel < ch_rocker_arm_spec.TIP_FACE
+
+
+def test_curve_quality_is_precise_before_any_view() -> None:
+    # Machinist review r1 (#2108 batch B): detail D's small circles printed
+    # as polygons at the drawing's default curve resolution.
+    build = next(
+        node
+        for node in ast.parse(Path(drawing.__file__).read_text(encoding="utf-8")).body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+    )
+    calls = [
+        node.func.id
+        for node in ast.walk(build)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    ]
+    lines = {
+        name: min(
+            node.lineno
+            for node in ast.walk(build)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == name
+        )
+        for name in ("set_precise_curve_quality", "place_view")
+    }
+    assert calls.count("set_precise_curve_quality") == 1
+    assert lines["set_precise_curve_quality"] < lines["place_view"]

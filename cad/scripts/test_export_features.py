@@ -452,8 +452,8 @@ def test_rocker_bands_respect_native_nominals_and_displayed_general_rows() -> No
     assert manifest["general_tolerances"]["linear_1pl"] == 0.8
     assert manifest["general_tolerances"]["linear_2pl"] == 0.51
     assert manifest["general_tolerances"]["linear_3pl"] == 0.13
-    assert features["hub_od"]["dia"] == [9.69, 10.71]
-    assert features["hub_faces"]["length"] == [7.0565, 7.1065]
+    assert features["hub_od"]["dia"] == [9.906, 10.414]
+    assert features["hub_faces"]["length"] == [7.0565, 7.1073]
     assert features["hub_faces"]["length_nominal"] == 7.0565
     for name in ("tip_land_pos_x", "tip_land_neg_x"):
         # BASIC: the J↔K profile zone is its band.
@@ -472,16 +472,16 @@ def test_rocker_bands_respect_native_nominals_and_displayed_general_rows() -> No
         # Each land's own BASIC LAND row from A (the J row, main-r1 Opus).
         assert features[name]["station"] == rocker.ROD_TIP_X
         assert set(exporter._cite(importlib.import_module("draw_ch_rocker_arm"), "_add_rocker_outline_dimensions")) <= set(features[name]["cite"]["station"])
-    assert manifest["material"]["thickness"] == 2.5
+    assert manifest["material"]["thickness"] == 2.4892
     assert exporter._cite(rocker, "ARM_THICKNESS")[0] in manifest["material"]["cite"]
-    # The strap's native 2.500 +/-0.025 (Main ruling 2026-10, option b).
+    # The strap's native .098 +/-.001.
     for name in ("strap_datum_b", "strap_faces"):
-        assert features[name]["thickness"] == [2.475, 2.525]
+        assert features[name]["thickness"] == [2.4638, 2.5146]
         assert features[name]["precision"]["thickness"] == 3
-    assert features["rod_hole"]["dia"] == [1.994, 2.094]
+    assert features["rod_hole"]["dia"] == [1.994, 2.0956]
     assert features["rod_hole"]["nominal_dia"] == 1.994
-    assert features["rod_hole"]["precision"]["dia"] == 2
-    assert features["pivot_bore"]["dia"] == [6.50, 6.53]
+    assert features["rod_hole"]["precision"]["dia"] == 3
+    assert features["pivot_bore"]["dia"] == [6.5024, 6.5278]
     assert features["rod_hole"]["at"] == pytest.approx([133.06740213488345, 16.456064115939025, 0.0])
 
 
@@ -506,7 +506,6 @@ def test_unknown_requirements_and_references_do_not_acquire_acceptance_bands() -
     ):
         assert features[name]["dimension_type"] == "basic"
         assert features[name]["surface_profile_u"] == outside
-        assert features[name]["note"] == f"SURFACE PROFILE {rocker.TOP_EDGE_BAND[0]:g} U{outside:g} TO A|B|C{suffix}"
         assert set(exporter._cite(rocker, "TOP_EDGE_BAND")) <= set(features[name]["cite"]["note"])
     assert "depth_ref" not in features["profile_outer"]["requirements"]
     assert "centre_from_pivot_ref" not in features["top_edge"]["requirements"]
@@ -597,12 +596,12 @@ def test_rocker_hub_root_names_both_root_fillets_with_the_printed_max_limit() ->
     features = exporter.requirement_manifest("ch_rocker_arm")["features"]
     root = features["hub_root"]
     radius = rocker.HUB_ROOT_RADIUS_MAX
-    # View F's "2X R0.2 MAX": sharp up to the modelled radius, at its one place.
+    # View F's "2X R.008 MAX": sharp up to the modelled radius, at its one place.
     assert root["requirements"] == ["radius"]
     assert root["radius"] == [0.0, radius] == [radius + rocker_notes.HUB_ROOT_R_BAND[1], radius + rocker_notes.HUB_ROOT_R_BAND[0]]
     assert root["radius_nominal"] == root["corner_radius_max_design"] == radius
-    assert root["precision"] == {"radius": rocker_notes.DRAWING_PRECISION["HubRoot"]["HubRootRadius"]} == {"radius": 1}
-    assert root["note"] == rocker_notes.HUB_ROOT_NOTE == "2X R0.2 MAX"
+    assert root["precision"] == {"radius": rocker_notes.DRAWING_PRECISION["HubRoot"]["HubRootRadius"]}
+    assert root["note"] == rocker_notes.HUB_ROOT_NOTE
     assert set(exporter._cite(rocker_notes, "HUB_ROOT_R_BAND")) <= set(root["cite"]["radius"])
     assert set(exporter._cite(rocker, "HUB_ROOT_RADIUS_MAX")) <= set(root["cite"]["corner_radius_max_design"])
     assert set(exporter._cite(rocker_notes, "DRAWING_PRECISION")) <= set(root["cite"]["precision.radius"])

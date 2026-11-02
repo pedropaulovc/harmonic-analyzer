@@ -4,19 +4,21 @@ Under ``cad/docs/drawing-guidelines.md``: the INSTALLED pin -- a 5/64
 drill-rod cylinder pressed into the connecting rod's reamed fork pin hole and
 dressed flush with both tines (user ruling 2026-10-09, PR #1292 review F1) --
 on three native model dimensions, all on the side view where a turned part's
-diameter sits beside its length (drawing-guidelines.md rule 11 (turned parts read like the lathe)): the Ø with the drill rod's own
-grind band, STOCK OK and its two fits named below it (rules 4 and 7: the
+diameter sits beside its length (drawing-guidelines.md rule 11 (turned parts read like the lathe)): the Ø as the 5/64
+stock fraction's REFERENCE (the drill rod's grind governs), the stock and its
+two fits named below it (rules 4 and 7: the
 mates are flagged where they apply), the installed length as REFERENCE
 (the fork's thickness; the MHA-CH-03 print owns it), and the blank's cut
 length as a single MIN limit from the part's blanked ``BlankReference``
 sketch. An axis centerline, a bare end view with its center mark, the
 isometric, and the property-linked note (installed state, flush ends,
 removable). No datums, no frames, no roughness symbol.
-The decimal places and the band are the PART's
-(``ch_rod_pivot_pin_notes.DRAWING_PRECISION``, applied natively by
-``build_ch_rod_pivot_pin``); this script only reads them back off the sheet.
+The decimal places are the PART's (``ch_rod_pivot_pin_notes.DRAWING_PRECISION``,
+applied natively by ``build_ch_rod_pivot_pin``); this script reads them back
+off the sheet and dresses the journal as its stock fraction. Decimal-inch
+sheet (#290); the model keeps its millimetre nominals.
 
-Drawn 10:1 -- a Ø1.98 x 6.08 pin is a speck on a B sheet at anything less.
+Drawn 10:1 -- a 5/64 x .240 pin is a speck on a B sheet at anything less.
 """
 
 from __future__ import annotations
@@ -32,6 +34,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 from _check import check
+from _com import _early_bound
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -50,13 +53,16 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+from _supplier_dimensions import supplier_reference_dimension
 from ch_rod_pivot_pin_notes import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PIN_DIA_CALLOUT,
+    PIN_DIA_FRACTION_DENOMINATOR,
     REFERENCE_DIMENSIONS,
 )
 from ch_rod_pivot_pin_spec import PIN_DIA, PIN_INSTALLED_LENGTH
@@ -125,7 +131,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("ch-rod-pivot-pin"),
     )
     stamp_drawing_summary(
         adapter,
@@ -159,20 +169,38 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, right_annotations, DRAWING_PRECISION_BY_NAME)
-    # Descriptive text only; the values, bands and MIN limit are the model's.
-    # The journal flags the stock and its two fits below its value
-    # (drawing-guidelines.md rules 4 and 7: name the mate where it applies).
-    # The installed reference says what it is, and that word -- no descender
-    # -- sits on the dimension line instead of the reference's parentheses
-    # (r2 review, rule 14: the line touched "(6.075)").
+    # Descriptive text only; the values and MIN limit are the model's. The
+    # installed reference says what it is, and that word -- no descender --
+    # sits on the dimension line instead of the reference's parentheses (r2
+    # review, rule 14: the line touched the reference).
     set_dimension_callouts(
         adapter,
         right_annotations,
-        {"PinDia": PIN_DIA_CALLOUT, "PinLen": "INSTALLED", "BlankLen": "BLANK"},
+        {"PinLen": "INSTALLED", "BlankLen": "BLANK"},
+    )
+    # The journal is the as-bought drill rod: its native value prints as the
+    # 5/64 stock fraction's REFERENCE (#290: supplier tolerance governs), the
+    # stock and its two fits below it (drawing-guidelines.md rules 4 and 7:
+    # name the mate where it applies).
+    journals = [a for a in right_annotations if dimension_name(adapter, a) == "PinDia"]
+    if len(journals) != 1:
+        raise RuntimeError("expected one pin PinDia dimension")
+    supplier_reference_dimension(
+        adapter,
+        _early_bound(
+            _early_bound(journals[0], "IAnnotation").GetSpecificAnnotation(),
+            "IDisplayDimension",
+        ),
+        label="pin PinDia",
+        units="in",
+        precision=DRAWING_PRECISION_BY_NAME["PinDia"],
+        expected_mm=PIN_DIA,
+        presentation="diameter",
+        fraction_denominator=PIN_DIA_FRACTION_DENOMINATOR,
+        callout=PIN_DIA_CALLOUT,
     )
     # The installed length is the fork's thickness: a LINEAR reference. The
-    # plural set_reference_dimensions forces a diameter glyph, printing
-    # "(Ø6.075)".
+    # plural set_reference_dimensions forces a diameter glyph.
     for name in sorted(REFERENCE_DIMENSIONS):
         matches = [a for a in right_annotations if dimension_name(adapter, a) == name]
         if len(matches) != 1:

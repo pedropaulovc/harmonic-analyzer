@@ -12,15 +12,16 @@ from __future__ import annotations
 
 import math
 
-from _printed_tolerance import printed_band_mm
 from ch_pivot_shaft_spec import SHAFT_DIA, SHAFT_DIA_BAND
 from ch_rocker_arm_spec import (
     HUB_COAXIALITY_DIA,
     HUB_DIA,
     HUB_ROOT_RADIUS_MAX,
+    LINEAR_2PL,
     PIVOT_HOLE_BAND,
     PIVOT_HOLE_DIA,
     R_TOP,
+    inch_text,
 )
 from ch_rod_pivot_pin_spec import BUDGET as ROD_JOINT_BUDGET
 
@@ -40,14 +41,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StrapProfile": {"TopRadius", "BottomRadius", "RodTipLen", "TipLandAngle"},
     "PivotHoleProfile": {"PivotDia"},
     "HubProfile": {"HubDia"},
-    # #743 PR2: the hub length carries its +0.05/0 band natively; the 20-arm
+    # #743 PR2: the hub length carries its +.0020/0 band natively; the 20-arm
     # stack acceptance (rocker_bank_layout) caps the sum.
     "Hub": {"HubLength"},
-    # The top edge's height over the pivot axis, +0.50/0 natively (Codex #936
+    # The top edge's height over the pivot axis, +.020/0 natively (Codex #936
     # PRRT_kwDOPHDy386mV3AO). Only this one of the sketch's two dimensions
     # prints; the other places the line's foot on the pivot centre.
     "TopEdgeReference": {"TopAbovePivot"},
-    # The strap thickness, +/-0.025 natively at three places (Main ruling
+    # The strap thickness, +/-.001 natively at three places (Main ruling
     # 2026-10, option b; ch_rocker_arm_spec.ARM_THICKNESS_BAND): the Strap
     # extrude's depth, printed in the end view where the section reads. Its
     # mid-plane is located by a position frame to datum G, the hub's -Z end
@@ -58,15 +59,23 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 
 # Decimal classes already authored by the part; shared with the offline
-# requirement exporter. The remaining dimensions/notes print at two places.
+# requirement exporter. Decimal inch (#290): the BASIC arc radii and the
+# pivot-to-edge height print the places their kinematic values need, the
+# reamed bore and the hub length (the station pitch) four; the remaining
+# dimensions take the sheet's default.
 DEFAULT_DRAWING_PRECISION = 2
 DRAWING_PRECISION = {
-    "StrapProfile": {"TipLandAngle": DEFAULT_DRAWING_PRECISION},
-    "Hub": {"HubLength": 3},
+    "StrapProfile": {
+        "TipLandAngle": DEFAULT_DRAWING_PRECISION,
+        "TopRadius": 3,
+        "BottomRadius": 3,
+    },
+    "PivotHoleProfile": {"PivotDia": 4},
+    "Hub": {"HubLength": 4},
     "HubProfile": {"HubDia": DEFAULT_DRAWING_PRECISION},
-    "TopEdgeReference": {"TopAbovePivot": DEFAULT_DRAWING_PRECISION},
+    "TopEdgeReference": {"TopAbovePivot": 3},
     "Strap": {"StrapThickness": 3},
-    "HubRoot": {"HubRootRadius": 1},
+    "HubRoot": {"HubRootRadius": 3},
 }
 # swTolMAX prints the nominal then MAX, so the modelled radius IS the limit;
 # the band runs from sharp up to it. Both strap faces: 2X. A custom radius
@@ -75,30 +84,32 @@ DRAWING_PRECISION = {
 HUB_ROOT_R_BAND = (0.0, -HUB_ROOT_RADIUS_MAX)  # (upper, lower)
 HUB_ROOT_R_TOL_TYPE = 6  # swTolType_e.swTolMAX
 HUB_ROOT_PREFIX = "2X R"
+# Why the corner is tighter than the title block: the foot cheeks run over it.
+HUB_ROOT_CALLOUT = "CLEARS\nMHA-CH-01\nCHEEKS"
 # The callout as printed, for the offline requirement exporter (features note).
 HUB_ROOT_NOTE = (
     f"{HUB_ROOT_PREFIX}"
-    f"{HUB_ROOT_RADIUS_MAX:.{DRAWING_PRECISION['HubRoot']['HubRootRadius']}f} MAX"
+    f"{inch_text(HUB_ROOT_RADIUS_MAX, DRAWING_PRECISION['HubRoot']['HubRootRadius'])} MAX"
 )
 # Detail E's BASIC land length and angle count both ends: the J land is
 # the K land's mirror. Their native dimensions carry 2X, not a mirror note.
 TIP_LAND_PREFIX = "2X "
 TIP_LAND_ANGLE_PREFIX = "2X "
 
-# Judge the minimum wall against the metric band the shop actually reads,
-# not the underlying 0.508 mm inch class: title_block.yaml prints ±0.51.
+# The minimum wall at the printed limits: the hub OD at its .XX band, the
+# reamed bore at its largest and the OD's position zone.
 _HUB_WALL_WORST = (
-    round(HUB_DIA, DEFAULT_DRAWING_PRECISION)
-    - printed_band_mm(DEFAULT_DRAWING_PRECISION)
-    - (round(PIVOT_HOLE_DIA, DEFAULT_DRAWING_PRECISION) + PIVOT_HOLE_BAND[0])
+    HUB_DIA - LINEAR_2PL - (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0])
 ) / 2.0 - HUB_COAXIALITY_DIA / 2.0
-# Round DOWN at the sheet's normal precision; never overstate the minimum.
+# Printed at three places, rounded DOWN; never overstate the minimum.
+_WALL_PLACES = 3
 HUB_WALL_MIN = (
-    math.floor(_HUB_WALL_WORST * 10**DEFAULT_DRAWING_PRECISION + 1e-9)
-    / 10**DEFAULT_DRAWING_PRECISION
+    math.floor(_HUB_WALL_WORST / 25.4 * 10**_WALL_PLACES + 1e-9)
+    / 10**_WALL_PLACES
+    * 25.4
 )
 # Named exception: MHA-CH-06 hub wall
-HUB_WALL_NOTE = f"HUB WALL {HUB_WALL_MIN:.{DEFAULT_DRAWING_PRECISION}f} MIN"
+HUB_WALL_NOTE = f"HUB WALL {inch_text(HUB_WALL_MIN, _WALL_PLACES)} MIN"
 
 # BUILT_UP_PERMISSION_NOTE may be supplied only as exact explicit permission
 # text in DRAWING_NOTES. None/absence means one_piece, never inferred permission.
@@ -132,12 +143,12 @@ RIGHT_VIEW_SCALE = 3
 RIGHT_VIEW_NOTE = f"VIEW {VIEW_ARROW_LETTER} SCALE {RIGHT_VIEW_SCALE}:1"
 
 
-def _limits(low: float, high: float) -> str:
-    """A clearance range at the sheet's places, rounded outward, never inward."""
-    scale = 10**DEFAULT_DRAWING_PRECISION
+def _limits(low: float, high: float, places: int) -> str:
+    """A clearance range (mm) in inch at ``places``, rounded outward, never inward."""
+    scale = 10**places / 25.4
     return (
-        f"{math.floor(low * scale + 1e-9) / scale:.{DEFAULT_DRAWING_PRECISION}f}-"
-        f"{math.ceil(high * scale - 1e-9) / scale:.{DEFAULT_DRAWING_PRECISION}f}"
+        f"{inch_text(math.floor(low * scale + 1e-9) / scale, places)}-"
+        f"{inch_text(math.ceil(high * scale - 1e-9) / scale, places)}"
     )
 
 
@@ -148,13 +159,15 @@ PIVOT_SHAFT_CLEARANCE = (
     PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[1] - (SHAFT_DIA + SHAFT_DIA_BAND[0]),
     PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0] - (SHAFT_DIA + SHAFT_DIA_BAND[1]),
 )
+# At the bore's own four places.
 PIVOT_FIT_CALLOUT = (
-    f"({_limits(*PIVOT_SHAFT_CLEARANCE)} DIAMETRAL\n"
+    f"({_limits(*PIVOT_SHAFT_CLEARANCE, DRAWING_PRECISION['PivotHoleProfile']['PivotDia'])} DIAMETRAL\n"
     "CLEARANCE ON PIVOT\n"
     "SHAFT MHA-CH-05)"
 )
+# At the strap thickness's three places.
 STRAP_FIT_CALLOUT = (
-    f"({_limits(ROD_JOINT_BUDGET['side_clearance_min'], ROD_JOINT_BUDGET['side_clearance_max'])} TOTAL\n"
+    f"({_limits(ROD_JOINT_BUDGET['side_clearance_min'], ROD_JOINT_BUDGET['side_clearance_max'], DRAWING_PRECISION['Strap']['StrapThickness'])} TOTAL\n"
     "SIDE CLEARANCE IN\n"
     "MHA-CH-03 FORK)"
 )
@@ -170,7 +183,7 @@ TOP_EDGE_MATE_CALLOUT = "MHA-CH-01 FOOT TRACK"
 ROD_PIN_MATE_CALLOUT = "FOR PIN MHA-CH-10"
 # The lower arc shares the top edge's centre (Opus #1020 r2 B1): below-text
 # rows under R816 (above-text line breaks print as one run).
-BOTTOM_RADIUS_CALLOUT = f"CONCENTRIC\nWITH R{R_TOP:.0f}"
+BOTTOM_RADIUS_CALLOUT = f"CONCENTRIC\nWITH R{inch_text(R_TOP, DRAWING_PRECISION['StrapProfile']['TopRadius'])}"
 # That shared centre sits on A's axis (x = 0 in the clocked A|B|C frame; the
 # 1:2 view cannot reach it): one below-text row under R800, the former note 1.
 # Detail E's native BASIC angle defines the radial lands, so no note narrates

@@ -1,10 +1,10 @@
 r"""Reproduction script: connecting rod (book ch. 13 pp. 22-25 / ch. 14 p. 29; 20 used).
 
 Black rod machined from 1018 low-carbon steel plate, converting each cam's
-rotation into the rocker arm's see-saw: a full ring (strap) riding the Ø30.6
+rotation into the rocker arm's see-saw: a full ring (strap) riding the
 eccentric cam (cast integral with each cylinder gear), a thin flat shank, and a
 U-shaped FORK (clevis; the Y-shaped upper end of the ch14 fan photo) whose two
-tines straddle the rocker arm's 2.500 strap and carry the pressed pivot pin
+tines straddle the rocker arm's strap and carry the pressed pivot pin
 (MHA-CH-10, ch_rod_pivot_pin_spec) through the arm's rod-pin hole near its
 rod-side tip. The centre distance follows the actual phased cam centre and the
 level rocker's pin, including the common raised drive-axis height. The ch14
@@ -13,8 +13,8 @@ lobe UP); the rod length closes that link without moving the rocker bank.
 
 The rod is FLAT: ring, shank and fork share one mid-plane, which is the cam
 plane and the arm plane (rocker_bank_layout.ARM_MID_DZ = CAM_MID_DZ), so the
-arm runs centred in the fork slot. The fork is 10 wide with a full-round
-crown on the pin; its two 1.700 +/-0.05 tines straddle a 2.675 +/-0.05 slot
+arm runs centred in the fork slot. The fork is .39 wide with a full-round
+crown on the pin; its two .067 +/-.002 tines straddle a .106 +/-.002 slot
 (Main ruling 2026-10, option b): each inter-arm gap holds one tine of each
 neighbouring rod, so tines, slot and the ring/shank faces are model bands
 located from one finished fork face (#982). The pin is pressed into a
@@ -48,7 +48,9 @@ from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
+from _part_properties import part_drawing_unit
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
@@ -68,7 +70,7 @@ from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
-from ch_connecting_rod_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
+from ch_connecting_rod_notes import ISOMETRIC_VIEW_NOTE
 from ch_connecting_rod_notes import DRAWING_DIMENSIONS, DRAWING_PRECISION
 from ch_connecting_rod_spec import (
     CENTER_DISTANCE,
@@ -98,6 +100,7 @@ from ch_connecting_rod_spec import (
     SURFACE_FINISHES,
     TINE_BAND,
     TINE_THICKNESS,
+    UNIT,
 )
 
 PART_NAME = "ch-connecting-rod"
@@ -130,8 +133,8 @@ RING_FACE_REF_RUN = 2.0  # unprinted
 # ch_connecting_rod_spec.
 THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > any local thickness or width
 
-FORK_BOSS_LENGTH = FORK_TOP_Y - FORK_BASE_Y  # crown top -> root step (18.0)
-SLOT_DEPTH = FORK_TOP_Y - FORK_CROTCH_Y  # crown top -> slot floor (14.75)
+FORK_BOSS_LENGTH = FORK_TOP_Y - FORK_BASE_Y  # crown top -> root step (.71)
+SLOT_DEPTH = FORK_TOP_Y - FORK_CROTCH_Y  # crown top -> slot floor (.58)
 SLOT_CUT_HEIGHT = SLOT_DEPTH + SLOT_RUNOUT
 
 
@@ -212,6 +215,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations) for every module constant; derived spans
     # (ring outer radius, the shank/block start heights) are equations of those
@@ -647,11 +652,13 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven connecting rod (equations neutral)", v_built, 0.001 * v_built
     )
+    # The bands are millimetres; UNIT prints them in inches.
     set_dimension_bilateral_tolerance(
         adapter,
         "StrapBoreProfile",
         "StrapBoreDia",
         *deviations(RING_BORE_DIA_BAND),
+        display_unit=UNIT,
     )
     # The fork straddles the rocker strap inside one station pitch (Main
     # ruling 2026-10, option b), and the ring must ride its cam slot while the
@@ -668,17 +675,27 @@ async def build(adapter) -> dict[str, str]:
         -tine_upper, -slot_upper, -face_upper, -thick_upper
     ):
         raise AssertionError("the fork side-view bands must be symmetric")
-    set_dimension_symmetric_tolerance(adapter, "ForkSlotProfile", "TineNear", tine_upper)
-    set_dimension_symmetric_tolerance(adapter, "ForkSlotProfile", "SlotWidth", slot_upper)
     set_dimension_symmetric_tolerance(
-        adapter, "ForkSlotProfile", "RingFaceNear", face_upper
+        adapter, "ForkSlotProfile", "TineNear", tine_upper, display_unit=UNIT
     )
-    set_dimension_symmetric_tolerance(adapter, "Plate", "RingThick", thick_upper)
+    set_dimension_symmetric_tolerance(
+        adapter, "ForkSlotProfile", "SlotWidth", slot_upper, display_unit=UNIT
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "ForkSlotProfile", "RingFaceNear", face_upper, display_unit=UNIT
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "Plate", "RingThick", thick_upper, display_unit=UNIT
+    )
     # The reamed press hole's band rides natively on its diameter; the front
-    # view imports the .077 in nominal at four places (DRAWING_PRECISION) and
-    # the band prints at the five that hold +0.02286/+0.0127 exactly.
+    # view imports the .077 nominal at four places (DRAWING_PRECISION), its
+    # +.0009/+.0005 at the same four.
     set_dimension_bilateral_tolerance(
-        adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_BAND)
+        adapter,
+        "PinHoleProfile",
+        "PinHoleDia",
+        *deviations(PIN_HOLE_BAND),
+        display_unit=UNIT,
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
 
@@ -694,17 +711,14 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter,
         PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-        },
+        {"Isometric View Note": ISOMETRIC_VIEW_NOTE},
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
         (
             "Number", "Material Specification", "Finish", "Quantity",
-            "Manufacturing Notes", "Isometric View Note",
+            "Isometric View Note",
         ),
     )
     return artefacts

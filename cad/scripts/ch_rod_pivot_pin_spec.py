@@ -31,13 +31,16 @@ import ch_connecting_rod_spec as _rod
 import ch_rocker_arm_spec as _arm
 import _rocker_interface as rocker_interface
 from _hole_spec import NUMBER_DRILL_MM
-from _printed_tolerance import drilled_oversize_mm
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 MM_PER_IN = 25.4
 
-# --- Title-block drilled-hole band (read from title_block.yaml): a twist
-# drill cuts on-size to oversize. ---
-DRILLED_PLUS = drilled_oversize_mm()
+# --- The arm sheet's drilled-hole band (its #47 rod hole): a twist drill
+# cuts on-size to oversize. ---
+DRILLED_PLUS = drilled_oversize_mm(unit=_arm.UNIT)
+# The rod sheet's .XX band: its fork outline, slot depth and boss length.
+ROD_LINEAR_2PL = printed_band_mm(2, unit=_rod.UNIT)
 
 # --- The pin: 5/64 drill rod (AISI O1/W1 drill rod or 1018 pin stock, used
 # annealed as supplied; ground to +/-0.0002 in). ---
@@ -48,8 +51,10 @@ PIN_INSTALLED_LENGTH = _rod.FORK_THICKNESS  # dressed flush with both tines
 # job is to leave stock over the thickest fork, so it prints as a single MIN
 # limit (drawing-guidelines.md rule 4 (tighten only for function); machinist
 # review 2026-10-15, #1522): any longer blank just dresses back further.
-PIN_BLANK_LENGTH = 6.4
-PIN_BLANK_LENGTH_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints "6.4 MIN"
+# .26 MIN leaves .007 of dressing stock over the thickest .246 fork (the .25
+# nearest the former 6.4 mm would leave .004 for both ends).
+PIN_BLANK_LENGTH = 6.604  # .26
+PIN_BLANK_LENGTH_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints ".26 MIN"
 # Dressed ends stand nothing proud of the tine faces (the press-fit ruling).
 PIN_END_PROUD_MAX = 0.0
 
@@ -65,13 +70,13 @@ ROD_HOLE_BAND = _rod.PIN_HOLE_BAND
 # press; the minimum only has to stay positive (the pin carries no axial load:
 # the arm bears on it radially and the tines hold it square).
 PRESS_INTERFERENCE_MAX = 0.00085 * MM_PER_IN  # 0.0216
-RULE12_WALL_TARGET = 2.0  # drawing-guidelines.md rule 17 (walls and webs)
-RULE12_WALL_FLOOR = 1.5
+RULE12_WALL_TARGET = WALL_TARGET_MM  # drawing-guidelines.md rule 17: .080 in
+RULE12_WALL_FLOOR = WALL_FLOOR_MM  # .060 in
 RUNNING_FLOOR = 0.10  # rocker_bank_layout.RUNNING_FLOOR: oiled steel faces
 MARGIN_SPARE = 0.25  # rocker_bank_layout.MARGIN_SPARE: novice spare
 NEIGHBOUR_CLEARANCE_MIN = RUNNING_FLOOR + MARGIN_SPARE  # 0.35
 CROTCH_CLEARANCE_MIN = 1.0  # slot floor below the arm's bottom edge, all poses
-BRIDGE_TARGET = 2.0  # fork bridge below the slot floor: the drawing-guidelines.md rule 17 (walls and webs) target
+BRIDGE_TARGET = WALL_TARGET_MM  # fork bridge below the slot floor: the drawing-guidelines.md rule 17 (walls and webs) target
 # Arm tilt less rod tilt, the swing the crotch must clear: the solved loop
 # (channel_kinematics, cam phase 0..360) spans -8.662..+1.061 deg with the
 # rod closing the raised drive axis to the level rocker, restated here
@@ -116,13 +121,14 @@ def joint_budget() -> dict[str, float]:
     """Worst-case values of every fit the joint must hold (all mm).
 
     Every term is at the worst case of its printed band (drawing-guidelines.md rule 17 (walls and webs)):
-    the drill rod +/-0.005, the reamed tine hole +0.010/0, the arm's #47 hole
-    +0.10/0, the arm strap 2.500 +/-0.025 and symmetric to its hub within
-    STRAP_HUB_SYMMETRY, each tine 1.700 +/-0.05, the slot 2.675 +/-0.05 (so
-    the fork over the tines, their reference sum, spans FORK_THICKNESS_BAND),
-    the hubs that set the pitch never shorter than nominal; the fork outline,
-    slot depth and arm radii at the title block's .XX class, the arm's top
-    edge 8.0 +0.5/0 over its pivot; the blank at its printed MIN length.
+    the drill rod +/-.0002 in, the reamed tine hole +.0009/+.0005, the arm's
+    #47 hole at its sheet's DRILLED HOLES row, the arm strap and its symmetry
+    to its hub (STRAP_HUB_SYMMETRY), each tine .067 +/-.002, the slot .106
+    +/-.002 (so the fork over the tines, their reference sum, spans
+    FORK_THICKNESS_BAND), the hubs that set the pitch never shorter than
+    nominal; the fork outline and slot depth at the rod sheet's .XX band, the
+    arm radii at the arm sheet's, the arm's top edge at its TOP_EDGE_BAND over
+    its pivot; the blank at its printed MIN length.
     """
     t_min, t_max = _band(_arm.ARM_THICKNESS, _arm.ARM_THICKNESS_BAND)
     _w_min, w_max = _band(_rod.FORK_THICKNESS, _rod.FORK_THICKNESS_BAND)
@@ -152,14 +158,14 @@ def joint_budget() -> dict[str, float]:
     # print-worst corner (top radius short, bottom radius long, top edge at
     # its MIN height over the pivot), swept through the relative swing across
     # the widest fork's window.
-    two_place = _arm.LINEAR_2PL
-    half_width = (_rod.FORK_WIDTH + two_place) / 2.0
+    arm_2pl = _arm.LINEAR_2PL
+    half_width = (_rod.FORK_WIDTH + ROD_LINEAR_2PL) / 2.0
     lo, hi = RELATIVE_SWING_DEG
     edge_low = min(
         _arm_bottom_low(
             lo + (hi - lo) * k / _SWING_STEPS,
-            _arm.R_TOP - two_place,
-            rocker_interface.R_BOTTOM + two_place,
+            _arm.R_TOP - arm_2pl,
+            rocker_interface.R_BOTTOM + arm_2pl,
             _arm.TOP_EDGE_ABOVE_PIVOT + _arm.TOP_EDGE_BAND[1],
             half_width,
         )
@@ -168,7 +174,7 @@ def joint_budget() -> dict[str, float]:
     # The slot floor stands SlotDepth below the crown top (half the fork
     # width over the pin): highest with the fork widest and the slot shallowest.
     floor_high = half_width - (
-        _rod.FORK_WIDTH / 2.0 + _rod.FORK_CROTCH_BELOW_PIN - two_place
+        _rod.FORK_WIDTH / 2.0 + _rod.FORK_CROTCH_BELOW_PIN - ROD_LINEAR_2PL
     )
     # Each pin hole wanders by half its position zone, and the arm drops on
     # the pin by half its running clearance (the pin is pressed in the tines).
@@ -179,7 +185,7 @@ def joint_budget() -> dict[str, float]:
     pin_drop = (arm_hole_max - pin_min) / 2.0
     # The crown radius rides the fork width at the title block's .XX class,
     # and the reamed hole wanders by half its position zone.
-    crown_loss = _arm.LINEAR_2PL / 2.0 + (
+    crown_loss = ROD_LINEAR_2PL / 2.0 + (
         float(_rod.GEOMETRIC_TOLERANCES_MM["rocker pin hole position"]) / 2.0
     )
     return {
@@ -197,7 +203,7 @@ def joint_budget() -> dict[str, float]:
         "crotch_clearance_min": edge_low - floor_high - hole_wander - pin_drop,
         # ForkBossLength less SlotDepth, both .XX from the crown top.
         "bridge_min": (
-            _rod.FORK_BASE_BELOW_PIN - _rod.FORK_CROTCH_BELOW_PIN - 2.0 * two_place
+            _rod.FORK_BASE_BELOW_PIN - _rod.FORK_CROTCH_BELOW_PIN - 2.0 * ROD_LINEAR_2PL
         ),
         "crown_wall_min": _rod.FORK_CROWN_RADIUS - crown_loss - hole_max / 2.0,
         # The shortest blank the MIN limit allows over the thickest fork: the
@@ -226,7 +232,7 @@ if BUDGET["crotch_clearance_min"] < CROTCH_CLEARANCE_MIN - 1e-9:
 if _rod.INSIDE_CORNER_R >= BUDGET["crotch_clearance_min"]:
     raise AssertionError("the slot floor's corner radii reach the arm's bottom edge")
 if BUDGET["bridge_min"] < BRIDGE_TARGET - 1e-9:
-    raise AssertionError("fork bridge below the slot under the 2.0 target")
+    raise AssertionError("fork bridge below the slot under the .080 in target")
 if BUDGET["crown_wall_min"] < RULE12_WALL_TARGET - 1e-9:
     raise AssertionError("reamed hole to fork crown under the drawing-guidelines.md rule 17 (walls and webs) target")
 if BUDGET["blank_excess_min"] <= 0.0:

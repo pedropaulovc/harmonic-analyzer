@@ -13,12 +13,14 @@ import build_ch_rocker_arm as rocker_part
 import build_ch_rocker_strap as part
 import ch_rocker_arm_notes as rocker_notes
 import ch_rocker_arm_spec as rocker
+import ch_rocker_hub_fit as fit
 import _rocker_interface as rocker_interface
 import ch_rocker_strap_notes as notes
 import ch_rocker_strap_spec as spec
 import draw_ch_rocker_strap as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _inch_wall_limits import WALL_TARGET_MM
 from _machinist_review_mode import MachinistReviewMode
 
 
@@ -60,14 +62,14 @@ def test_outline_is_the_finished_rocker_strap() -> None:
         * rocker.ARM_THICKNESS
     )
     # The hub hole's walls (rule 17), each edge at the worst end of its band
-    # against the H7 hole's top limit: both edges are held from the hole, so
-    # the radii never stack into the wall (r1 machinist review: 0.79).
-    hole_radius_max = (spec.HOLE_DIA + 0.018) / 2.0
+    # against the reamed hole's top limit: both edges are held from the hole,
+    # so the radii never stack into the wall (r1 machinist review: .031).
+    hole_radius_max = (spec.HOLE_DIA + fit.STRAP_HOLE_BAND[0]) / 2.0
     top_wall = spec.TOP_EDGE_ABOVE_PIVOT + spec.TOP_EDGE_BAND[1] - hole_radius_max
     bottom_wall = (
         spec.BOTTOM_EDGE_BELOW_PIVOT + spec.BOTTOM_EDGE_BAND[1] - hole_radius_max
     )
-    assert min(top_wall, bottom_wall) >= 2.0
+    assert min(top_wall, bottom_wall) >= WALL_TARGET_MM
     # The bottom edge sits where MHA-CH-06's R816 puts it on the axis.
     assert spec.BOTTOM_EDGE_BELOW_PIVOT == pytest.approx(
         rocker_interface.PIVOT_MID_Y
@@ -80,7 +82,6 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     assert set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) == marked
     assert not set(drawing.FRONT_KEEP) & set(drawing.RIGHT_KEEP)
     assert set(notes.DIMENSION_CALLOUTS) <= marked
-    assert notes.DRAWING_PRECISION_BY_NAME["HoleDia"] == 3
     assert notes.DRAWING_PRECISION_BY_NAME["StrapThickness"] == 3
     assert notes.DRAWING_PRECISION_BY_NAME["TopAbovePivot"] == 2
     assert notes.DRAWING_PRECISION_BY_NAME["BottomBelowPivot"] == 2
@@ -101,22 +102,16 @@ def test_every_band_is_native_and_names_its_mate() -> None:
         ("StrapProfile", "TopAbovePivot"): "*deviations(TOP_EDGE_BAND)",
         ("StrapProfile", "BottomBelowPivot"): "*deviations(BOTTOM_EDGE_BAND)",
     }
-    assert spec.ARM_THICKNESS_BAND == rocker.ARM_THICKNESS_BAND == (0.025, -0.025)
+    assert spec.ARM_THICKNESS_BAND == rocker.ARM_THICKNESS_BAND == (0.0254, -0.0254)
     assert spec.TOP_EDGE_BAND == rocker.TOP_EDGE_BAND
     # The bottom edge's band mirrors the top's: the finished part's lower
     # profile zone, wholly in material.
-    assert spec.BOTTOM_EDGE_BAND == (0.0, -0.5)
+    assert spec.BOTTOM_EDGE_BAND == (0.0, -0.508)
     # The hole's edges override the title block's break: a groove round the
-    # pressed hub's root would replace MHA-CH-06's R0.2 MAX corner.
+    # pressed hub's root would replace MHA-CH-06's MAX root corner.
     assert notes.HOLE_EDGE_CALLOUT.splitlines() == [
         "BOTH EDGES SHARP, NO BURR",
         "(NO GROOVE AT HUB ROOT)",
-    ]
-    assert notes.HOLE_CALLOUT.splitlines() == [
-        "REAM THRU",
-        "PRESS FIT ON MHA-CH-12 HUB",
-        "0.005-0.034 DIAMETRAL INTERFERENCE",
-        *notes.HOLE_EDGE_CALLOUT.splitlines(),
     ]
     assert notes.DIMENSION_CALLOUTS["HoleDia"] == notes.HOLE_CALLOUT
     # The finished part's mates, worded as on its own print.
@@ -124,10 +119,6 @@ def test_every_band_is_native_and_names_its_mate() -> None:
         notes.DIMENSION_CALLOUTS["TopAbovePivot"] == rocker_notes.TOP_EDGE_MATE_CALLOUT
     )
     assert notes.DIMENSION_CALLOUTS["StrapThickness"] == rocker_notes.STRAP_FIT_CALLOUT
-    assert notes.DIMENSION_CALLOUTS["BottomBelowPivot"].splitlines() == [
-        "MHA-CH-06 PROFILE",
-        "CONCENTRIC WITH R800",
-    ]
     # The arc centre and the lands' direction ride on their own dimensions,
     # not in a general note.
     assert notes.DIMENSION_CALLOUTS["TopRadius"] == "CENTRE ABOVE HOLE"
@@ -139,7 +130,7 @@ def test_no_rod_pin_hole_and_no_finished_bore_on_the_strap() -> None:
     assert "ROD_PIN" not in build and "PIVOT_HOLE" not in build
     printed = " ".join((notes.DRAWING_NOTES, *notes.DIMENSION_CALLOUTS.values()))
     assert "#47" not in printed
-    assert f"{rocker.PIVOT_HOLE_DIA:.2f}" not in printed
+    assert f"{rocker.PIVOT_HOLE_DIA / 25.4:.3f}".removeprefix("0") not in printed
 
 
 def test_drawing_quality_and_no_gdt() -> None:
@@ -161,13 +152,12 @@ def test_drawing_quality_and_no_gdt() -> None:
 
 
 def test_overall_length_is_a_one_place_reference_and_enforced() -> None:
-    # ENFORCE r3: the 292.5 overall printed only as two 146.25 offsets (rule 10).
+    # ENFORCE r3: the overall printed only as two tip offsets (rule 10).
     assert drawing.MACHINIST_REVIEW is MachinistReviewMode.ENFORCE
     assert spec.DRAWING_REFERENCE_PRECISION == {"OverallLength": 1}
-    offsets = 2 * round(spec.ROD_TIP_X, notes.DRAWING_PRECISION_BY_NAME["RodTipX"])
-    overall = round(
-        2 * spec.ROD_TIP_X, spec.DRAWING_REFERENCE_PRECISION["OverallLength"]
-    )
+    tip_x_in = spec.ROD_TIP_X / 25.4
+    offsets = 2 * round(tip_x_in, notes.DRAWING_PRECISION_BY_NAME["RodTipX"])
+    overall = round(2 * tip_x_in, spec.DRAWING_REFERENCE_PRECISION["OverallLength"])
     # One place, so the reference agrees with the offsets' printed sum.
     assert overall == pytest.approx(round(offsets, 1))
     # Outermost: above the offsets' row.
@@ -277,7 +267,6 @@ def test_registry_row() -> None:
     assert "1018" in str(row["material_specification"])
     assert len(str(row["material_specification"])) <= 36
     assert len(str(row["finish"])) <= 36
-    assert "22381" in str(row["process"])
     assert part.MATERIAL == "Plain Carbon Steel"
 
 

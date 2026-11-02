@@ -29,17 +29,19 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SpringHole": {"SpringCx"},
 }
 
-# Decimal places ARE the tolerance statement (drawing-simplicity-policy.md):
-# one on the milled bar height and the turned hub, two on every banded size.
+# Decimal places ARE the tolerance statement (drawing-simplicity-policy.md),
+# in inches: two on the milled bar height and the turned hub (the walls read
+# them), three on the plate, the plate offset, the hub length (the station
+# pitch's .278) and both lever arms, four on the reamed fulcrum bore.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "LeverOutline": {"BarHeight": 1},
-    "LeverBody": {"LeverThick": 2},
-    "HubProfile": {"HubDia": 1},
-    "Hub": {"HubLength": 2},
-    "PlateOffsetReference": {"PlateOffset": 2},
-    "FulcrumProfile": {"FulcrumDia": 2},
-    "BarPinHole": {"BarPinCx": 2},
-    "SpringHole": {"SpringCx": 2},
+    "LeverOutline": {"BarHeight": 2},
+    "LeverBody": {"LeverThick": 3},
+    "HubProfile": {"HubDia": 2},
+    "Hub": {"HubLength": 3},
+    "PlateOffsetReference": {"PlateOffset": 3},
+    "FulcrumProfile": {"FulcrumDia": 4},
+    "BarPinHole": {"BarPinCx": 3},
+    "SpringHole": {"SpringCx": 3},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

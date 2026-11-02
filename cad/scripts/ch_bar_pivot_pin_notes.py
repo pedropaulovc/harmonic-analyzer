@@ -36,12 +36,13 @@ LEVER_NUMBER = "MHA-CH-02"  # runs in its #47 bar-pin hole
 # The diameter and the installed length live on the revolve's half-profile
 # (``PinProfile``), so both import into the side view beside each other
 # (drawing-guidelines.md rule 11 (turned parts read like the lathe)). The
-# diameter carries the drill rod's own grind band natively at three places;
-# the installed length is the bar's width, printed as REFERENCE (the bar's
-# stock owns it). The blank's cut length lives on the blanked
-# ``BlankReference`` sketch on the same plane and prints at the spec's places
-# under the title block's band (the dressing stock in
-# ch_bar_pivot_pin_spec.joint_budget is judged at it).
+# diameter is the as-bought 5/64 drill rod: the sheet prints it as the stock
+# fraction, a REFERENCE whose supplier grind (+/-.0002) governs (#290 ruling:
+# fractions only on as-bought stock, shown as REF); the installed length is
+# the bar's width, printed as REFERENCE (the bar's stock owns it). The blank's
+# cut length lives on the blanked ``BlankReference`` sketch on the same plane
+# and prints at the spec's places under the title block's band (the dressing
+# stock in ch_bar_pivot_pin_spec.joint_budget is judged at it).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {"PinDia", "PinLen"},
     "BlankReference": {"BlankLen"},
@@ -62,18 +63,20 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
     raise AssertionError("every marked pin dimension needs authored places")
 
 # Descriptive text only; every value and band is the model's. The diameter
-# names the stock that holds its band and both mates (rule 4). Every callout
-# hangs under its value: SOLIDWORKS drops a multi-line callout stacked above a
-# value from the print (r1: the diameter's never reached the PDF). The
-# installed length's stays narrower than the 63.5 mm pin at 10:1, clear of
-# both length rows' witnesses; note 1 names the solid and dashed outlines.
+# names its stock and both mates (rule 4). Every callout hangs under its
+# value: SOLIDWORKS drops a multi-line callout stacked above a value from the
+# print (r1: the diameter's never reached the PDF). The installed length's
+# stays narrower than the pin at 10:1, clear of both length rows' witnesses;
+# note 1 names the solid and dashed outlines.
+PIN_DIA_FRACTION_DENOMINATOR = 64  # 5/64 drill rod
+# The supplier's grind tolerance travels with the as-bought REF.
+STOCK_TOLERANCE_IN = f"\u00b1{pin.PIN_DIA_TOLERANCE / 25.4:.4f}".replace("0.", ".")
 DIAMETER_CALLOUT = (
-    "5/64 DRILL ROD, AS SUPPLIED\n"
+    f"DRILL ROD {STOCK_TOLERANCE_IN}, AS SUPPLIED\n"
     f"PRESS FIT IN {BAR_NUMBER}\n"
     f"RUNS IN {LEVER_NUMBER} #47 HOLE"
 )
 DIMENSION_CALLOUTS: dict[str, str] = {
-    "PinDia": DIAMETER_CALLOUT,
     "PinLen": f"FLUSH WITH {BAR_NUMBER}",
     "BlankLen": "BLANK",
 }

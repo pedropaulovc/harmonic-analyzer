@@ -6,18 +6,19 @@ the deeper top-end notch straddles the channel lever and hangs from the
 MHA-CH-11 bar pivot pin pressed through the top pin hole (M6.3 layout: bars
 run UP the spine from the rocker bank to the top-lever bank).
 
-Dimensions: cad/DIMENSIONS.md "Chapter 15" — width 6.35 mm is book-annotated,
+Dimensions: cad/DIMENSIONS.md "Chapter 15" — width 1/4 in is book-annotated,
 length legacy 32" = 812.8 mm SHORTENED 4.5 at the top to 808.3 by the
 2026-08-02 top-frame rederive (fulcrum chain -4.5: bar top 1067.75, top pin
 1061.4; foot/arc contact unchanged, level d=0 rest pose preserved);
 notch sizes are uncontradicted legacy values; top pin hole derived (M6.3).
-Audit verdict: PASS.
+Audit verdict: PASS. The sheet prints decimal inch (#290, ``drawing_unit:
+in``).
 
 Profile (on the Front plane, bar length along +Y, origin at bottom-left
 corner) is a single 12-segment chain; both notches are centred slots in the
 end faces. Extruded by the bar depth (+Z, 0..6.35). The top pin hole -- a
-Ø1.968 +0.010/0 reamed press hole for the 5/64 pin -- runs along global X
-through the top-slot cheeks at 6.35 below the bar top, mid-depth
+Ø.0770 +.0009/+.0005 reamed press hole for the 5/64 pin -- runs along global X
+through the top-slot cheeks at .25 below the bar top, mid-depth
 (Z = 3.175): a Right-plane sketch maps local +X -> global -Z, so the circle
 centre sits at sketch_x = -BarDepth/2 to land inside the body, and the
 removed volume is asserted against analytic so a wrong side fails loud. The
@@ -39,8 +40,10 @@ from _appearance import apply_material, apply_color, BAR_STEEL
 from _bore_axis import name_bore_axis
 from _check import check
 from _dimensions import drive_dimension, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _paths import IN
 from _rebuild import force_rebuild
@@ -75,6 +78,7 @@ from ch_amplitude_bar_spec import (
     TOP_NOTCH_WIDTH_BAND,
     TOP_PIN_HOLE_BAND,
     TOP_PIN_HOLE_DIA,
+    UNIT,
 )
 
 import _telemetry
@@ -90,11 +94,11 @@ BAR_DEPTH = 0.25 * IN  # 6.35   DIMENSIONS.md ch15: legacy, square section (med)
 # Notch widths: ch_amplitude_bar_spec derives each from the plate it straddles
 # (was the legacy 1/8" = 3.175; user ruling 2026-09-27, #1038).
 BOTTOM_NOTCH_HEIGHT = 0.09375 * IN  # 2.381  DIMENSIONS.md ch15: legacy 3/32" (med)
-# TOP_NOTCH_HEIGHT (14.0, was the legacy 1/2") is the spec's: it clears the
+# TOP_NOTCH_HEIGHT (.55, was the legacy 1/2") is the spec's: it clears the
 # lever's lower edge (ch_amplitude_bar_spec).
 # top pin hole: was Ø2.0 drill, then #47 (Ø1.994) Hole Wizard; now the
-# Ø1.968 +0.010/0 reamed press hole for the MHA-CH-11 pin (a sketch cut: the
-# Hole Wizard has no reamed-size table)
+# Ø.0770 +.0009/+.0005 reamed press hole for the MHA-CH-11 pin (a sketch cut:
+# the Hole Wizard has no reamed-size table)
 TOP_PIN_DROP = 0.25 * IN  # 6.35  DIMENSIONS.md ch15: hole centre below bar top (derived)
 THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > the bar width
 
@@ -103,6 +107,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): the bar envelope, both notch sizes,
     # the top pin hole, and its drop below the bar top. The mm suffix is
@@ -385,32 +391,51 @@ async def build(adapter) -> dict[str, str]:
     # (BOTTOM_/TOP_NOTCH_WIDTH_BAND, #1038) and is centred by the band on the ledge its
     # detail prints; author every printed dimension's places, mark exactly
     # the print's dimensions and stamp the make-critical title-block properties.
+    # The bands are millimetres; UNIT prints them in inches.
     set_dimension_bilateral_tolerance(
         adapter,
         "BarProfile",
         "BottomNotchHeight",
         *deviations(BOTTOM_NOTCH_DEPTH_BAND),
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "BarProfile", "BottomNotchWidth", *deviations(BOTTOM_NOTCH_WIDTH_BAND)
+        adapter,
+        "BarProfile",
+        "BottomNotchWidth",
+        *deviations(BOTTOM_NOTCH_WIDTH_BAND),
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "BarProfile", "TopNotchWidth", *deviations(TOP_NOTCH_WIDTH_BAND)
+        adapter,
+        "BarProfile",
+        "TopNotchWidth",
+        *deviations(TOP_NOTCH_WIDTH_BAND),
+        display_unit=UNIT,
     )
     set_dimension_symmetric_tolerance(
-        adapter, "BarProfile", "BottomLeftLedge", NOTCH_OFFSET_TOLERANCE_MM
+        adapter,
+        "BarProfile",
+        "BottomLeftLedge",
+        NOTCH_OFFSET_TOLERANCE_MM,
+        display_unit=UNIT,
     )
     set_dimension_symmetric_tolerance(
-        adapter, "BarProfile", "TopRightLedge", NOTCH_OFFSET_TOLERANCE_MM
+        adapter,
+        "BarProfile",
+        "TopRightLedge",
+        NOTCH_OFFSET_TOLERANCE_MM,
+        display_unit=UNIT,
     )
     # The reamed press hole's band rides natively on its diameter, printed in
-    # the top end's right side view at the five places that hold it exactly
-    # under the four-place .077 in nominal.
+    # the top end's right side view: the .077 nominal at four places
+    # (DRAWING_PRECISION), its +.0009/+.0005 at the same four.
     set_dimension_bilateral_tolerance(
         adapter,
         "TopPinProfile",
         "TopPinDia",
         *deviations(TOP_PIN_HOLE_BAND),
+        display_unit=UNIT,
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
