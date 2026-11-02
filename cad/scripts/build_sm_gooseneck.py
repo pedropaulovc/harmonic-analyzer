@@ -296,11 +296,29 @@ def _author_dimension_callouts(adapter) -> None:
 @_telemetry.traced("part.reference_dimensions")
 def _author_reference_dimensions(adapter) -> None:
     """Parenthesize the stock Ø on their source dimensions: as supplied, they
-    print as reference, untoleranced (the drawing imports them as they are)."""
+    print as reference, untoleranced (the drawing imports them as they are).
+
+    ``ShowParenthesis`` brackets the whole text block, so a reference that
+    carries a callout below (the sleeve's fit) would read its requirement as
+    reference too (machinist review of 6b67c9516).  That one brackets only its
+    value with a "(" prefix and ")" suffix, carrying SolidWorks' own
+    "<MOD-DIAM>" token since a custom prefix replaces the Ø glyph."""
+    open_paren = "(<MOD-DIAM>"
     for feature, names in REFERENCE_DIMENSIONS.items():
         resolved = _named_dimensions(adapter, feature, set(names))
         for name in names:
             display, _dimension = resolved[name]
+            if name in DIMENSION_CALLOUTS.get(feature, {}):
+                display.SetText(1, open_paren)  # swDimensionTextPrefix
+                display.SetText(2, ")")  # swDimensionTextSuffix
+                if (str(display.GetText(1)), str(display.GetText(2))) != (
+                    open_paren,
+                    ")",
+                ):
+                    raise RuntimeError(
+                        f"{name}@{feature}: reference brackets did not persist"
+                    )
+                continue
             display.ShowParenthesis = True
             if not bool(display.ShowParenthesis):
                 raise RuntimeError(

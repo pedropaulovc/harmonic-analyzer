@@ -145,12 +145,13 @@ PLUG_DIA_CALLOUT = (
 # The bend radius is the tube's centreline radius; the arrowhead lands on the
 # outer arc, so the value says which (machinist review of e487a1bb4).
 BEND_RADIUS_CALLOUT = "CLR"
-# Three short rows, so the block and its leader shoulder end left of the end
-# view (sheet layout, draw_sm_gooseneck; Opus review at 85e75a2b5: the
-# shoulder pressed on the end view's outline).  The window is the joint's,
-# braze or retaining compound (owner ruling 2026-10-27 on #1997,
-# sm_gooseneck_spring_joint), so the callout names no method; note 3 does.
-# The window prints in inches, rounded inward at four places.
+# Short rows, so the block and its leader shoulder end left of the end view
+# (sheet layout, draw_sm_gooseneck; Opus review at 85e75a2b5: the shoulder
+# pressed on the end view's outline).  The window is the joint's, braze or
+# retaining compound (owner ruling 2026-10-27 on #1997,
+# sm_gooseneck_spring_joint), and the joint's requirement rides it (rule 7:
+# leadered where it applies; machinist review of 6b67c9516).  The window
+# prints in inches, rounded inward at four places.
 _BRAZE_WINDOW = "-".join(
     f"{inches:.4f}".removeprefix("0")
     for inches in (
@@ -158,14 +159,21 @@ _BRAZE_WINDOW = "-".join(
         math.floor(round(BRAZE_CLEARANCE_MAX / geom.MM_PER_IN * 1e4, 6)) / 1e4,
     )
 )
-SHANK_FIT_CALLOUT = f"FIT TO TUBE BORE,\n{_BRAZE_WINDOW}\nDIAMETRAL CLEARANCE"
+SHANK_FIT_CALLOUT = (
+    f"FIT TO TUBE BORE,\n{_BRAZE_WINDOW}\nDIAMETRAL\nCLEARANCE; JOIN BY\n"
+    "FULL-PENETRATION\nBRAZE OR\nLOCTITE 638"
+)
 # The sleeve's select-fit window rides its own Ø on the elevation (rule 7: a
 # matched fit goes on the feature, not in a note; codjiflo P2 on #1997), with
 # the stock it is cut from (owner ruling 2026-10-27: select-fit from stock,
-# no hone). Its rows are no wider than the window, so the block and its
-# reference parentheses fit between the end view and the elevation's leg
-# (Opus reviews at 7fe9d97bd and 85e75a2b5: wider rows crossed the end view).
-SLEEVE_FIT_CALLOUT = f"STOCK;\nFIT ON TUBE,\n{_BRAZE_WINDOW}\nDIAMETRAL\nCLEARANCE"
+# no hone) and its braze, a fillet at each end of its lap.  Its rows stay
+# about the window's width, so the block fits between the end view and the
+# elevation's leg (Opus reviews at 7fe9d97bd and 85e75a2b5: wider rows
+# crossed the end view).
+SLEEVE_FIT_CALLOUT = (
+    f"STOCK;\nFIT ON TUBE,\n{_BRAZE_WINDOW}\nDIAMETRAL\nCLEARANCE;\n"
+    "FILLET-BRAZE\nEACH END"
+)
 DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
     "BendPath": {"BendRadius": BEND_RADIUS_CALLOUT},
     "SleeveProfile": {"SleeveDia": SLEEVE_FIT_CALLOUT},
@@ -312,23 +320,19 @@ if (set(DIMENSION_CALLOUTS_BY_NAME) | set(DIMENSION_CALLOUTS_ABOVE_BY_NAME)) - s
     raise AssertionError("a gooseneck callout names an unmarked dimension")
 
 # Four lines (drawing-guidelines.md rule 7; codjiflo on #1997): the stock,
-# both members as supplied, the supplier's tolerance governing them, and the
-# sleeve's braze with its extent (its
-# select-fit window rides the sleeve's Ø), the end piece's joint, then the
-# order the owner ruled (2026-10-27, #1997: join the end piece before
+# both members as supplied with the supplier's tolerance governing them, the
+# filler both brazes use (each joint's requirement rides its fit callout),
+# then the order the owner ruled (2026-10-27, #1997: join the end piece before
 # bending, cooled or fully cured; recorded as RV-02 in sm-gooseneck.yaml)
-# with the bend's acceptance.  The sleeve's braze is a fillet at each end of
-# its lap and the end piece's a full-penetration joint (machinist review of
-# 3a807442b: "full penetration" read as covering the sleeve's 8.6 lap too).
-# Sizes are on the features and the bend radius is native, so no line names
-# a tool, and section A-A shows the end piece solid.  Each line ends left of
-# the title block.
+# with the bend's acceptance.  Sizes are on the features and the bend radius
+# is native, so no line names a tool, and section A-A shows the end piece
+# solid.  Each line ends left of the title block.
 DRAWING_NOTES = "\n".join(
     (
         f"1. TUBE {TUBE_STOCK_SIZE}, {STOCK_SUPPLIER} {TUBE_STOCK_SKU}; "
         f"SLEEVE {SLEEVE_STOCK_SIZE}, {SLEEVE_STOCK_SKU}",
-        "2. BOTH AS SUPPLIED, SUPPLIER TOL.; SLEEVE: CONTINUOUS BRAZE FILLET EACH END.",
-        "3. BRAZE BAg-7 (AWS A5.8); END PIECE: FULL-PENETRATION BRAZE OR LOCTITE 638.",
+        "2. BOTH AS SUPPLIED, SUPPLIER TOL.",
+        "3. BRAZE FILLER BAg-7 (AWS A5.8).",
         "4. JOIN END PIECE, COOL OR FULLY CURE, THEN BEND: OVALITY 5% MAX, NO KINKS.",
     )
 )

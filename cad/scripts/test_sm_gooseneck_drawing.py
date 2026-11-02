@@ -245,29 +245,29 @@ def test_notes_state_stock_process_and_intent_without_sizes() -> None:
         "SLEEVE 5/8 OD X 0.058 WALL, 7324",
         # The stock is as supplied: its catalogue tolerance governs, unprinted.
         "BOTH AS SUPPLIED, SUPPLIER TOL.",
-        "SLEEVE: CONTINUOUS BRAZE FILLET EACH END",
-        "BRAZE BAg-7 (AWS A5.8)",
-        "END PIECE: FULL-PENETRATION BRAZE OR LOCTITE 638",
+        "BRAZE FILLER BAg-7 (AWS A5.8)",
         # Owner ruling 2026-10-27 (#1997): join before bending.
         "JOIN END PIECE, COOL OR FULLY CURE, THEN BEND",
         "OVALITY 5% MAX",
     ):
         assert phrase in notes, phrase
-    # The shank and sleeve callouts state the joint's window on their own
-    # features and name no method (rule 7: a matched fit goes on the feature).
-    shank = spec.SHANK_FIT_CALLOUT.splitlines()
-    sleeve = spec.SLEEVE_FIT_CALLOUT.splitlines()
-    assert window in shank and window in sleeve
-    assert "FIT TO TUBE BORE," in shank and "FIT ON TUBE," in sleeve
-    assert " ".join(shank[-1:]) == "DIAMETRAL CLEARANCE"
-    assert " ".join(sleeve[-2:]) == "DIAMETRAL CLEARANCE"
+    # The shank and sleeve callouts state the joint's window and its joint on
+    # their own features (rule 7: leadered where it applies), not in a note.
+    shank = " ".join(spec.SHANK_FIT_CALLOUT.split())
+    sleeve = " ".join(spec.SLEEVE_FIT_CALLOUT.split())
+    assert f"FIT TO TUBE BORE, {window} DIAMETRAL CLEARANCE" in shank
+    assert "FULL-PENETRATION BRAZE OR LOCTITE 638" in shank
+    assert f"STOCK; FIT ON TUBE, {window} DIAMETRAL CLEARANCE;" in sleeve
+    assert "FILLET-BRAZE EACH END" in sleeve
+    assert "LOCTITE" not in notes and "FILLET" not in notes
     # Both blocks sit beside the narrow end view: the shank's leader shoulder
-    # ends left of it and the sleeve's parentheses fit between it and the
-    # elevation's leg (Opus reviews at 7fe9d97bd and 85e75a2b5), so the shank
-    # rows stay at the old 19-character width and the sleeve's about the
-    # window's (the inch window is narrower than "FIT ON TUBE,").
-    assert max(map(len, shank)) <= 19
-    assert max(map(len, sleeve)) <= len(window) + 1
+    # ends left of it and the sleeve fits between it and the elevation's leg
+    # (Opus reviews at 7fe9d97bd and 85e75a2b5), so the shank rows stay under
+    # the old 19-character width and the sleeve's about the window's.
+    shank_rows = spec.SHANK_FIT_CALLOUT.splitlines()
+    assert max(map(len, shank_rows)) < 19
+    sleeve_rows = spec.SLEEVE_FIT_CALLOUT.splitlines()
+    assert max(map(len, sleeve_rows)) <= len(window) + 1
     assert spec.DIMENSION_CALLOUTS["SleeveProfile"] == {
         "SleeveDia": spec.SLEEVE_FIT_CALLOUT
     }
@@ -295,6 +295,37 @@ def test_stock_diameters_print_as_untoleranced_references() -> None:
     low = spec.TUBE_OD_REF_Y - spec.TUBE_OD_REF_SPAN / 2.0
     high = spec.TUBE_OD_REF_Y + spec.TUBE_OD_REF_SPAN / 2.0
     assert geom.SLEEVE_TOP < low < high < geom.LEG_TOP
+
+
+def test_only_the_reference_value_is_bracketed_when_a_callout_rides_it(
+    monkeypatch,
+) -> None:
+    # Machinist review of 6b67c9516: ShowParenthesis bracketed the sleeve's
+    # whole block, so its fit requirement read as reference.
+    class Display:
+        def __init__(self) -> None:
+            self.ShowParenthesis = False
+            self.text: dict[int, str] = {}
+
+        def SetText(self, slot: int, text: str) -> None:
+            self.text[slot] = text
+
+        def GetText(self, slot: int) -> str:
+            return self.text.get(slot, "")
+
+    displays: dict[str, Display] = {}
+
+    def named(_adapter, _feature, names):
+        return {name: (displays.setdefault(name, Display()), None) for name in names}
+
+    monkeypatch.setattr(part, "_named_dimensions", named)
+    part._author_reference_dimensions(None)
+    sleeve = displays["SleeveDia"]
+    assert (sleeve.GetText(1), sleeve.GetText(2)) == ("(<MOD-DIAM>", ")")
+    assert not sleeve.ShowParenthesis
+    for name in ("TubeOdRef", "OverallHeight", "OverallReach"):
+        assert displays[name].ShowParenthesis
+        assert displays[name].text == {}
 
 
 def _recorded_equations(module) -> dict[str, str]:
