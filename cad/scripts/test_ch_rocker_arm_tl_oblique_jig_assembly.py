@@ -1406,6 +1406,15 @@ def test_steps_10_and_11_name_item_9_as_its_bom_row() -> None:
         assert "GAUGE PIN" not in step and "BONDED LOCATOR" not in step
 
 
+def test_step_13c_refits_the_carrier_that_hd3_left_off() -> None:
+    """Review jig-asm r1: after 13B/HD3 the carrier is already off, so 13C
+    gives O1's refit half only, not its removal."""
+    step = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("13C. "))
+    assert "PER O1" not in step
+    assert "LOWER THE CARRIER ONTO THEM, REFIT BOTH SCREWS PER P2 AND CHECK P1-P3" in step
+    assert step.endswith("DO HD4 AND THE CHECKS.")
+
+
 def test_general_torque_note_covers_every_fastener_no_step_torques() -> None:
     """Review jig-asm r1 (rule 24): one general note for the screws and nuts
     whose steps give no torque, with no invented figure."""
