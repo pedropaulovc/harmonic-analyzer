@@ -9,12 +9,15 @@ from typing import Any
 
 import _telemetry
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _session import run_build
 from _supplier_washer_drawing import supplier_washer_dimensions
 import ch_vn_rocker_thrust_washer_spec as part
 
 SPEC = DRAWINGS_BY_NAME["ch_vn_rocker_thrust_washer"]
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 # The final +Z face is Front; Top is parallel to its thickness witness.
 # Reserve 12 mm face/14 mm side picks plus supplier band/limit ink widths.
 SUPPLIER_MARGINS = {
@@ -57,6 +60,7 @@ async def build(adapter: Any) -> dict[str, str]:
         supplier_dimensions=dimensions,
         supplier_margins=SUPPLIER_MARGINS,
         settled_checks=(assert_dimensions,),
+        unit=part_drawing_unit("ch-vn-rocker-thrust-washer"),
     )
 
 

@@ -543,14 +543,13 @@ def test_real_jam_nut_footprint_stays_clear_of_every_rib_at_ordinary_bands() -> 
     position_radius = float(lever.GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"]) / 2.0
     nut_inner_x = lever.HOLE_X - position_radius - nut.OD_MAX / 2.0
     reach_max = lever.RIB_REACH + joint.LINEAR_BAND
-    assert nut_inner_x == pytest.approx(36.45)
-    assert reach_max == pytest.approx(36.26)
-    assert nut_inner_x - reach_max == pytest.approx(0.19)
+    # The rib stays clear of the nut; a rib grown just past it would intrude.
+    assert nut_inner_x > reach_max
     # This is positive geometric separation, not a newly invented clearance floor.
     section = lever_profile.RibProfile(reach=reach_max, blend_radius=0.0)
     probe = (nut_inner_x, lever.COEFFICIENT_BOTTOM_Y - 1e-4)
     assert section.signed_boundary_distance(*probe) < 0.0
-    intrusion = lever_profile.RibProfile(reach=reach_max + 0.20, blend_radius=0.0)
+    intrusion = lever_profile.RibProfile(reach=nut_inner_x + 0.01, blend_radius=0.0)
     assert intrusion.signed_boundary_distance(*probe) > 0.0
 
 

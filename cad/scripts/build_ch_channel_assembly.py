@@ -158,12 +158,12 @@ from _com import UNDER_CONSTRAINED, _early_bound
 from _custom_properties import apply_custom_properties
 from _session import run_build
 from _dimensions import drive_dimension, set_global
+from _document_units import apply_package_model_units
 from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
-from _drawing_precision import apply_drawing_precision, _named_dimension
+from _drawing_precision import apply_drawing_precision
 from _drawing_tolerances import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
-    _set_tolerance_precision,
 )
 from _feature_tree import name_last_feature
 from _sketch import (
@@ -177,6 +177,7 @@ from _sketch import (
 from _ch_channel_explode import create_channel_explode
 import ch_channel_assembly_spec as settings_spec
 from fr_top_frame_spec import BORE_DIA as SOCKET_BORE_DIA
+from _assembly_contract import assembly_contract
 from _assembly import (
     activate_assembly_contract,
     author_in_drawing_configurations,
@@ -399,6 +400,7 @@ from rocker_bank_layout import (  # noqa: E402
     PIVOT_SHAFT_FLAT_STATIONS,
     PIVOT_SHAFT_NORTH_Z,
     ROCKER_SPRING_Z,
+    SOUTH_END_INSET as _SHAFT_SOUTH_END_INSET,
     SOUTH_WASHER_Z,
     STACK_MID_Z as _STACK_MID_Z,
     hub_mid_z,
@@ -422,10 +424,16 @@ if any(abs(hub_mid_z(j) - (Z0 + PITCH * j + ARM_MID_DZ)) > 1e-9 for j in (0, 19)
 if abs(PIVOT_SHAFT_Z - (PIVOT_BRACKET_Z[1] + _bracket_spec.EAR_T / 2.0)) > 1e-9:
     raise AssertionError("pivot shaft's north end is not flush with the north ear")
 # Each flat (a station from the north end, the body running -Z) lies under its
-# ear's apex set screw, on the ear's mid-plane.
+# ear's apex set screw: the north one on its ear's mid-plane, the south one
+# off it by the shaft's south-end inset (the .XX overall length is shorter
+# than the ear span; rocker_bank_layout carries it in the cup's window).
 if any(
     abs(PIVOT_SHAFT_Z - station - ear_z) > 1e-9
-    for station, ear_z in zip(PIVOT_SHAFT_FLAT_STATIONS, PIVOT_BRACKET_Z, strict=True)
+    for station, ear_z in zip(
+        PIVOT_SHAFT_FLAT_STATIONS,
+        (PIVOT_BRACKET_Z[0] + _SHAFT_SOUTH_END_INSET, PIVOT_BRACKET_Z[1]),
+        strict=True,
+    )
 ):
     raise AssertionError("a pivot shaft flat is not under its ear's set screw")
 # The datum-located washers: the purchased part runs z 0..THICKNESS from its
@@ -974,10 +982,10 @@ def _assert_spring_mount(
         )
         - ch_anchor_jam_nut_spec.OD_MAX
     )
-    if nut_gap < spring_mounts.MIN_CLEARANCE_MM:
+    if nut_gap < ch_anchor_jam_nut_spec.NEIGHBOUR_CLEARANCE:
         raise RuntimeError(
             f"neighbouring channel anchor jam nuts clear by {nut_gap:.4f} mm, "
-            f"under {spring_mounts.MIN_CLEARANCE_MM} mm"
+            f"under {ch_anchor_jam_nut_spec.NEIGHBOUR_CLEARANCE} mm"
         )
     spring_bottom = (
         pose.lower_eye_xy[1] - uy * spring_stock.COIL_MEAN_RADIUS_MM - wire_r
@@ -1298,8 +1306,11 @@ async def _author_settings_reference(adapter) -> None:
         await drive_dimension(adapter, name, expression)
     for name, (lower, upper) in spec.DIMENSION_TOLERANCES.items():
         feature = spec.DIMENSION_FEATURE[name]
+        places = spec.TOLERANCE_PRECISION[name]
         if abs(lower + upper) < 1e-12:
-            set_dimension_symmetric_tolerance(adapter, feature, name, upper)
+            set_dimension_symmetric_tolerance(
+                adapter, feature, name, upper, places=places, display_unit=spec.UNIT
+            )
         else:
             set_dimension_bilateral_tolerance(
                 adapter,
@@ -1307,16 +1318,9 @@ async def _author_settings_reference(adapter) -> None:
                 name,
                 lower,
                 upper,
-                places=spec.TOLERANCE_PRECISION,
+                places=places,
+                display_unit=spec.UNIT,
             )
-        display, _ = _named_dimension(adapter, feature, name)
-        _set_tolerance_precision(
-            display,
-            (lower, upper),
-            display_unit="mm",
-            label=f"channel settings {name}",
-            places=spec.TOLERANCE_PRECISION,
-        )
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
     for feature in spec.FEATURES:
@@ -1423,6 +1427,7 @@ async def build(adapter) -> dict[str, str]:
     # call: each freed DOF is recorded (never authored) and persisted below.
     reset_dof_manifest()
     check("create_assembly", await adapter.create_assembly())
+    apply_package_model_units(adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME)
 
     # Shafts. The pivot-shaft is inserted FIRST, so SolidWorks auto-fixes it as
     # the assembly seed (ground=False -- the one allowed fixed component, the

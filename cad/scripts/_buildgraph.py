@@ -2392,7 +2392,6 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "sm_summing_assembly_sheet",
         "pd_vn_guide_lock_screw_spec",
         "dt_vn_post_mount_screw_spec",
-        "ch_vn_spring_hook_spec",
         "pd_transgear_disc_hub_spec",
         "pd_transgear_removable_notes",
         # Edge-break row sizes the knob tip and the rack window/lateral stacks.

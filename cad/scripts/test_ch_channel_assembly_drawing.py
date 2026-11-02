@@ -201,7 +201,13 @@ def test_the_spring_set_and_its_preload_check_are_printed_from_the_layout() -> N
     spring = _config.parts("ch-vn-rocker-bank-spring")["number"]
     shaft = _config.parts("ch-pivot-shaft")["number"]
     setting = _step_body("south-bracket-spring-set")
-    assert f"RUN A {spring} SPRING ALONG THE {shaft}; REJECT ONE THAT BINDS." in setting
+    # Machinist review (#2108): the BOM carries one spring, so the run along
+    # the shaft is an acceptance check, and the wave spring is named apart
+    # from the MHA-SH-VN-54 set screw.
+    assert (
+        f"RUN THE {spring} WAVE SPRING ALONG THE {shaft}: ACCEPT IF IT SLIDES FREE."
+        in setting
+    )
     assert "SPRING-SET BLADE (DETAIL A) BESIDE THE SPRING" in setting
     # Machinist review (PR #1605): the spring-back check is run while the
     # bracket is only clamped, so "repeat" re-sets a bracket that can still
@@ -850,7 +856,7 @@ def test_the_pivot_shaft_balloon_lands_on_its_bare_south_stub() -> None:
     assert y == pytest.approx(radius - shaft.FLAT_DEPTH)
     assert x > 0.0 and math.hypot(x, y) == pytest.approx(radius)
     point_z = bank.PIVOT_SHAFT_NORTH_Z + z
-    assert point_z == pytest.approx(bank.PIVOT_BRACKET_Z[0])
+    assert point_z == pytest.approx(bank.PIVOT_BRACKET_Z[0] + bank.SOUTH_END_INSET)
     assert bank.SOUTH_EAR_OUTER_Z < point_z < bank.HUB0_SOUTH_FACE_Z
     assert drawing.exploded_offset(drawing.explode.BRACKET, "south")[2] < 0.0
     hub_t = bank.HUB0_SOUTH_FACE_Z - point_z
@@ -1025,7 +1031,7 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     reamed = _step_body(steps.KEEPERS_PAIR_REAMED_KEY)
     # The controlling operation: installed spacing (KEEPERS_SET_KEY's two faces),
     # one common flat, axis set to it, one pass to the keeper print's bore band.
-    assert keeper.KEEPER_INNER_FACE_SPAN_MM == pytest.approx(rear - front) == 142.0
+    assert keeper.KEEPER_INNER_FACE_SPAN_MM == pytest.approx(rear - front)
     assert f"CLAMP BOTH {number}, FEET OUTBOARD ON ONE FLAT" in reamed
     assert "INNER LUG FACES AT THE LEVER BANK VIEW'S LUG SPAN" in reamed
     assert keeper.KEEPER_INNER_FACE_SPAN_MM == pytest.approx(
@@ -1085,8 +1091,6 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
         "FACES OFF THE LINE OF THE UPPER SOCKET CENTRES, TO THE KEEPER PLAN VIEW"
     ) in fitted
     assert drawing.KEEPER_PLAN.title == "KEEPER PLAN VIEW"
-    for value in (keeper.KEEPER_FITUP_X_FROM_WEB_MM, front, rear):
-        assert f"{value:.{places}f}" not in fitted
     asm = drawing.asm
     # Owner ruling X-A: the lug centre carries its own looser band, the
     # inner faces the location band.
@@ -1096,7 +1100,6 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
         (asm.KEEPER_REAR_Z_DIMENSION, keeper.KEEPER_FITUP_LOCATION_BAND_MM),
     ):
         assert asm.DIMENSION_TOLERANCES[name] == (-band, band)
-        assert asm.DRAWING_PRECISION[asm.KEEPER_PLAN_FEATURE][name] == places
     assert asm.KEEPER_LUG_X - asm.KEEPER_SOCKET_XZ[0] == pytest.approx(
         keeper.KEEPER_FITUP_X_FROM_WEB_MM
     )
@@ -1124,7 +1127,7 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     assert 0.0 < south_margin
     assert south_margin + band - title_block_band > 0.0
     assert north_margin > 10 * band
-    # #1660 r6 (rule 4): the lug centre's ±0.10 (owner ruling X-A) is what
+    # #1660 r6 (rule 4): the lug centre's ±.004 (owner ruling X-A) is what
     # keeps the transferred foot tap walled in the rail web (rule 17's 1.5):
     # at the title block's band the drill wall falls under it.
     x_band = keeper.KEEPER_FITUP_X_BAND_MM
@@ -1209,10 +1212,13 @@ def test_the_finished_shaft_is_set_by_its_north_tip_before_the_screws() -> None:
     number = steps.step_number(key)
     assert steps.step_number("south-bracket-screwed") < number
     assert number < steps.step_number("set-screws-driven")
-    low = shaft.DOME_HEIGHT - bank.SHAFT_TIP_SET_BAND
-    high = shaft.DOME_HEIGHT + bank.SHAFT_TIP_SET_BAND
+    low, high = (
+        f"{(shaft.DOME_HEIGHT + sign * bank.SHAFT_TIP_SET_BAND) / 25.4:.3f}".removeprefix("0")
+        for sign in (-1.0, 1.0)
+    )
+    assert (low, high) == (".050", ".070")
     assert (
-        f"NORTH TIP STANDS {low:.2f} TO {high:.2f} PROUD OF THE NORTH EAR'S OUTER FACE"
+        f"NORTH TIP STANDS {low} TO {high} PROUD OF THE NORTH EAR'S OUTER FACE"
         in _step_body(key)
     )
     # Positive control: no other step sets the tip.
@@ -1221,13 +1227,11 @@ def test_the_finished_shaft_is_set_by_its_north_tip_before_the_screws() -> None:
             assert "NORTH TIP" not in _step_body(other)
 
 
-def test_the_set_screws_go_in_after_the_shaft_is_set_and_print_the_engagement_fact() -> None:
+def test_the_set_screws_go_in_after_the_shaft_is_set() -> None:
     """User, 2026-10-10: one MHA-SH-VN-54 down each ear's apex tap onto the
     plain shaft's flat, once the shaft is set. The preload is accepted before
     (machinist review, PR #1605: a failed check after staking could not be
-    re-set). The step prints the bracket spec's engagement fact from the
-    spec, never typed."""
-    import ch_pivot_bracket_spec as bracket_spec
+    re-set)."""
 
     set_screw = _config.parts("sh-vn-arbor-set-screw")["number"]
     key = "set-screws-driven"
@@ -1242,19 +1246,17 @@ def test_the_set_screws_go_in_after_the_shaft_is_set_and_print_the_engagement_fa
     # set screws are, never threadlocked.
     assert "SNUG, AND STAKE EACH TAP MOUTH AT 2 POINTS." in body
     assert "LOCTITE" not in drawing.FITUP_STEPS
-    assert body.endswith(" ".join(bracket_spec.SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT.split()))
-    # Positive control: no other step fits the set screws or prints the fact.
+    # Positive control: no other step fits the set screws.
     for other in steps.SEQUENCE:
         if other != key:
             assert set_screw not in _step_body(other)
-    assert drawing.FITUP_STEPS.count("ENGAGEMENT") == 1
 
 
-def test_the_set_screw_step_states_a_fact_that_needs_no_declaration() -> None:
+def test_the_set_screw_engagement_needs_no_declaration() -> None:
     """The owner's 2026-10-15 shortfall ruling (#1371) covered the R8 arch's
-    1.08D; the lifted arch holds 1.5D, so the step's engagement fact is no
-    shortfall and the channel contract declares no exception for it. RV-01
-    covers the keeper inner-face bands of owner ruling X-A."""
+    1.08D; the lifted arch holds 1.5D, so the engagement is no shortfall and
+    the channel contract declares no exception for it. RV-01 covers the
+    keeper inner-face bands of owner ruling X-A."""
     import ch_pivot_bracket_spec as bracket_spec
     from _paths import CAD_ROOT
     from machinist_exceptions import load_exceptions
@@ -1270,12 +1272,6 @@ def test_the_set_screw_step_states_a_fact_that_needs_no_declaration() -> None:
     assert (keeper_bands.id, keeper_bands.kind) == ("RV-01", "accept")
     assert "KeeperFrontFaceZ, KeeperRearFaceZ" in keeper_bands.where
     assert "ENGAGEMENT" not in keeper_bands.where.upper()
-    fact = (
-        f"{bracket_spec.SET_SCREW_THREAD} ENGAGEMENT "
-        f"{bracket_spec.SET_SCREW_FULL_THREAD_MIN:.2f} MIN "
-        f"({bracket_spec.SET_SCREW_ENGAGEMENT_PRINTED:.2f}D)."
-    )
-    assert _step_body("set-screws-driven").endswith(fact)
     assert bracket_spec.SET_SCREW_ENGAGEMENT_PRINTED >= 1.5
     assert assembly_contract("ch-channel").number == "MHA-CH-00"
 

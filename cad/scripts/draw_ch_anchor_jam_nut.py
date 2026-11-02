@@ -1,11 +1,12 @@
 r"""Create the manufacturing drawing for the channel anchor jam nut (MHA-CH-14).
 
-The face view is ``*Front``, looking at the driven face: the drive cut runs
-across it, and it carries the slot width and the native #6-32 UNC-2B
-through-thread callout.  The side view (``*Right``) looks along the cut, so
-the notch shows in profile: the thickness, the cut depth and the O.D. print
-there (drawing-guidelines.md rule 11 (turned parts read like the lathe)).  No
-general note and no roughness symbol.
+The sheet prints decimal inch (the part's ``drawing_unit: in``).  The face
+view is ``*Front``, looking at the driven face: the drive cut runs across it,
+and it carries the slot width and the native #6-32 UNC-2B through-thread
+callout, its tap drill at three places.  The side view (``*Right``) looks
+along the cut, so the notch shows in profile: the thickness, the cut depth
+and the O.D. print there (drawing-guidelines.md rule 11 (turned parts read
+like the lathe)).  No general note and no roughness symbol.
 
 Run with SolidWorks open::
 
@@ -31,13 +32,14 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
 from _drawing_dimensions import (
     assert_imported_precision,
     move_model_dimension,
     set_dimension_callouts,
 )
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _part_properties import part_drawing_unit
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -75,7 +77,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A small round nut (about 6.7 across, 3.6 thick) at 5:1: the face view, the
+# A small round nut (about .26 across, .14 thick) at 5:1: the face view, the
 # side view and the isometric on one row midway between the top border and
 # the title block.
 SHEET_SCALE = (5.0, 1.0)
@@ -134,6 +136,8 @@ DIMENSION_CALLOUTS = {
     "NutThickness": THICKNESS_CALLOUT,
 }
 DIMENSION_CALLOUTS_ABOVE = {"NutOd": OD_WALL_CALLOUT}
+# The through tap's native drill diameter prints .XXX (#36, .1065).
+THREAD_CALLOUT_PRECISION = {"hw-thrutapdrldia": 3}
 
 
 def _assert_native_thread(display: Any) -> None:
@@ -171,7 +175,11 @@ async def build(adapter: Any) -> dict[str, str]:
         required=("Number", "Material Specification", "Finish", "Quantity"),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("ch-anchor-jam-nut"),
     )
     stamp_drawing_summary(
         adapter,
@@ -236,6 +244,11 @@ async def build(adapter: Any) -> dict[str, str]:
         label=f"{THREAD} UNC-2B through thread",
     )
     _assert_native_thread(thread_callout)
+    set_hole_callout_precision(
+        thread_callout, THREAD_CALLOUT_PRECISION, label="jam nut through tap"
+    )
+    # The face view shows the tap's major-diameter arc too (machinist review).
+    import_cosmetic_threads(adapter, front)
 
     return await finalize_drawing(
         adapter,

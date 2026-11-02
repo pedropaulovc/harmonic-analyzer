@@ -19,6 +19,8 @@ import _drawing_sections
 import build_fr_frame_assembly as frame
 import build_fr_rocker_arm_support as support
 import build_fr_vn_lag_screw as stock_screw
+import ch_pivot_bracket_spec as bracket
+from _printed_tolerance import printed_band_mm
 import draw_fr_rocker_arm_support as drawing
 import fr_rocker_arm_support_drawing_spec as drawing_spec
 import fr_rocker_arm_support_section_spec as section
@@ -605,9 +607,12 @@ def test_bracket_seats_sit_under_the_bracket_holes() -> None:
 
 
 def test_bracket_screw_stack_holds_at_the_printed_worst_case() -> None:
-    # MHA-CH-VN-57 #8-32 x 5/8 through MHA-CH-08's 6.0 (.XX) foot (owner Q13c).
-    assert seats.SCREW_REACH_MIN == pytest.approx(15.875 - 0.76 - 6.508)
-    assert seats.SCREW_REACH_MAX == pytest.approx(15.875 - 5.492)
+    # MHA-CH-VN-57 #8-32 x 5/8 through MHA-CH-08's .XX foot (owner Q13c).
+    foot_band = printed_band_mm(2, unit=bracket.UNIT)
+    assert seats.SCREW_REACH_MIN == pytest.approx(
+        15.875 - 0.76 - (bracket.FOOT_H + foot_band)
+    )
+    assert seats.SCREW_REACH_MAX == pytest.approx(15.875 - (bracket.FOOT_H - foot_band))
     assert seats.ENGAGEMENT_MIN >= 1.5 * seats.SCREW_MAJOR_DIA
     assert seats.SEAT_THREAD_DEPTH - 0.8 >= seats.SCREW_REACH_MAX + 0.25
     assert seats.SEAT_DRILL_DEPTH - 0.8 >= seats.SEAT_THREAD_DEPTH + 0.8 + 2 * 25.4 / 32
@@ -807,7 +812,11 @@ def test_seat_stations_print_as_ref_from_the_real_end_faces() -> None:
         name: f"{abs(end - seat):.{drawing.PART_PRECISION[name]}f}"
         for name, (end, seat) in lines.items()
     }
-    assert printed == {"SeatEastStation": "5.39", "SeatWestStation": "7.00"}
+    places = drawing.PART_PRECISION["SeatEastStation"]
+    assert printed == {
+        "SeatEastStation": f"{placement.SUPPORT_HALF_MACHINE_Z - max(seats.SEAT_LOCAL_X):.{places}f}",
+        "SeatWestStation": f"{placement.SUPPORT_HALF_MACHINE_Z + min(seats.SEAT_LOCAL_X):.{places}f}",
+    }
     assert support.REFERENCE_SKETCHES[0] == "SeatStationReference"
     assert support.DRAWING_DIMENSIONS["SeatStationReference"] == set(lines)
     assert set(drawing.VIEW_B_KEEP) == set(lines)
@@ -906,7 +915,7 @@ def test_seat_station_drives_end_on_the_seats_for_any_wall_width_or_seat_edit(
     # The finding's case: the REF tracks the 2.0 longer wall.
     values = {"WallWidth": support.BOSS_DEPTH + 2.0, **nominal}
     assert f"{_evaluate_equation(jobs[f'SeatEastStation@{sketch}'], values):.2f}" == (
-        "6.39"
+        f"{placement.SUPPORT_HALF_MACHINE_Z + 1.0 - max(seats.SEAT_LOCAL_X):.2f}"
     )
 
 

@@ -30,6 +30,6 @@ SUPPLIER_REFERENCE_PLANES = {
 SUPPLIER_REFERENCE_SIDES = {}
 SUPPLIER_REFERENCE_FORMATS = {
     "SupplierLength": (3, "length", None, None),
-    "SupplierThreadDiameter": (3, "diameter", None, "1-72"),
+    "SupplierThreadDiameter": (3, "diameter", None, "#1-72"),
     "SupplierDriveWidth": (3, "length", None, None),
 }

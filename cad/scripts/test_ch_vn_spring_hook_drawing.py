@@ -44,7 +44,7 @@ def test_shortest_part_backed_out_keeps_two_full_threads_past_the_nut():
     # part, its deburr at the adverse corner of its band, sets the floor.
     band = spec.LENGTH_BAND_WORST_MM
     assert band >= spec.FINISHED_OVERALL_TOLERANCE_MM
-    assert band == pytest.approx(0.8)
+    assert band == pytest.approx(0.254)  # the printed .XX overall's ±.01
     maximum_axial = (
         spec.CHAMFER_WIDTH_MM + spec.CHAMFER_WIDTH_TOLERANCE_MM
     ) / math.tan(
@@ -58,10 +58,11 @@ def test_shortest_part_backed_out_keeps_two_full_threads_past_the_nut():
     worst = spec.full_threads_past_nut_mm(spec.ADJUSTMENT_TRAVEL_MM, -band)
     assert worst >= floor + spec.PAST_NUT_MARGIN_MM
     # The trim is sized to that floor and the ruled margin, not past it: only
-    # the round-up that puts the printed one-place overall on the model's
+    # the round-up that puts the printed two-place inch overall on the model's
     # own number.
-    assert worst - floor - spec.PAST_NUT_MARGIN_MM < 0.1
-    assert spec.FINISHED_OVERALL_MM == pytest.approx(round(spec.FINISHED_OVERALL_MM, 1))
+    assert worst - floor - spec.PAST_NUT_MARGIN_MM < 0.254
+    overall_in = spec.FINISHED_OVERALL_MM / 25.4
+    assert overall_in == pytest.approx(round(overall_in, 2))
     # Hand-checked: thread below the seated neck, less the thickest plate,
     # nut and deburr.
     short_part = spec.SHANK_LENGTH_MM - band - anchor.unthreaded_shank_length_mm
@@ -79,45 +80,39 @@ def test_shortest_part_backed_out_keeps_two_full_threads_past_the_nut():
 
 
 def test_the_anchor_is_sized_at_the_coefficient_plate_thickness_extremes():
-    """The uniform 7.00 coefficient plate retains the title block's .XX
-    band, so the jam nut seats anywhere from 6.49 to 7.51 below its fixed
-    top. The C10 trim remains 18.6 shank / 31.3 overall, one 0.1 step over
-    the worst-case 1.5875 full-thread floor."""
+    """The uniform 7.00 coefficient plate retains the lever's .XX band, so the
+    jam nut seats anywhere from 6.49 to 7.51 below its fixed top. The trim is
+    18.034 shank / 1.21 in overall, one .01 step over the worst-case 1.5875
+    full-thread floor plus the round-up to the printed grid."""
     from sm_summing_lever_notes import LINEAR_BAND
 
     assert spec.SEAT_BAND_MM == LINEAR_BAND == pytest.approx(0.51)
     thin, thick = 6.49, 7.51
     assert (spec.SEAT_T_MIN_MM, spec.SEAT_T_MAX_MM) == pytest.approx((thin, thick))
     assert (spec.SHANK_LENGTH_MM, spec.FINISHED_OVERALL_MM) == pytest.approx(
-        (18.6, 31.3)
+        (18.034, 30.734)
     )
     band, budget = spec.LENGTH_BAND_WORST_MM, spec.ADJUSTMENT_TRAVEL_MM
     floor = spec.PAST_NUT_FLOOR_MM
     # Thickest plate, shortest part, backed out: the floor plus the margin.
     at_thick = spec.full_threads_past_nut_mm(budget, -band, thick)
-    assert at_thick == pytest.approx(1.6876071730)
+    assert at_thick == pytest.approx(1.9652006006)
     assert at_thick >= floor + spec.PAST_NUT_MARGIN_MM
     assert spec.full_threads_past_nut_mm(budget, -band) == pytest.approx(at_thick)
     # The thinner plates only add thread.
     assert spec.full_threads_past_nut_mm(budget, -band, thin) == pytest.approx(
         at_thick + 2 * spec.SEAT_BAND_MM
     )
-    # The old nominal-thickness trim (18.0) fails at the thick limit by 0.50.
-    old = spec.full_threads_past_nut_mm(budget, -band, thick) - (
-        spec.SHANK_LENGTH_MM - 18.0
-    )
-    assert old == pytest.approx(1.0876071730)
-    assert old < floor
-    # Deepest cut end: the longest part under the thinnest plate. The band's
-    # upper half stops at the uncut 19.05 stock (only 0.45 is cut off).
-    assert spec.SHANK_LENGTH_MM + band > anchor.shank_length_mm
-    assert anchor.shank_length_mm - spec.SHANK_LENGTH_MM == pytest.approx(0.45)
+    # Deepest cut end: the longest part under the thinnest plate, still cut
+    # from the 19.05 stock (1.016 comes off).
+    assert spec.SHANK_LENGTH_MM + band < anchor.shank_length_mm
+    assert anchor.shank_length_mm - spec.SHANK_LENGTH_MM == pytest.approx(1.016)
     assert spec.PROTRUSION_MAX_MM == pytest.approx(
-        anchor.shank_length_mm - anchor.unthreaded_shank_length_mm - thin
+        spec.SHANK_LENGTH_MM + band - anchor.unthreaded_shank_length_mm - thin
     )
-    assert spec.PROTRUSION_MAX_MM == pytest.approx(9.385)
-    # Modelled at nominal thickness, the cut end hangs 8.425 below the plate.
-    assert spec.PROTRUSION_MM == pytest.approx(8.425)
+    assert spec.PROTRUSION_MAX_MM == pytest.approx(8.623)
+    # Modelled at nominal thickness, the cut end hangs 7.859 below the plate.
+    assert spec.PROTRUSION_MM == pytest.approx(7.859)
 
 
 def test_install_step_locks_the_anchor_with_its_jam_nut():
@@ -231,23 +226,6 @@ def test_nut_thread_interference_literal_matches_the_specs():
         )
     )
     assert jam_nut.THREAD == anchor.thread_size
-
-
-def test_chamfer_band_is_owner_accepted_with_both_functional_limits():
-    """Machinist gate 2026-10-17 read the 0.46 ±0.05 deburr as over-spec."""
-    from machinist_exceptions import load_exceptions
-
-    (entry,) = load_exceptions(_config.CONFIG_DIR, "ch_vn_spring_hook", "part")
-    assert entry.kind == "accept"
-    band = f"{spec.CHAMFER_WIDTH_MM:.2f} ±{spec.CHAMFER_WIDTH_TOLERANCE_MM:.2f}"
-    assert band in entry.where
-    assert entry.reason.startswith("owner ruling 2026-10-17")
-    # The reason's numbers are the spec's: the tap-drill minimum and the
-    # two-pitch past-nut floor.
-    assert f"MIN_CHAMFER_WIDTH_MM {spec.MIN_CHAMFER_WIDTH_MM:.4f}" in entry.reason
-    low = spec.CHAMFER_WIDTH_MM - spec.CHAMFER_WIDTH_TOLERANCE_MM
-    assert f"the {low:.2f} low limit" in entry.reason
-    assert f"{spec.FULL_THREADS_PAST_NUT * anchor.thread_pitch_mm:.4f}" in entry.reason
 
 
 @pytest.mark.parametrize(

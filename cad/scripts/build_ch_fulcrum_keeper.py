@@ -37,8 +37,10 @@ from _appearance import PANEL_BLACK, apply_color, apply_material
 from _check import check
 from _com import _early_bound, _read_member
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -97,6 +99,7 @@ from ch_fulcrum_keeper_spec import (
     SHAFT_AXIS_H,
     SUPPLY_HEIGHT_MIN,
     SUPPLY_HEIGHT_TOL_TYPE,
+    UNIT,
 )
 
 PART_NAME = "ch-fulcrum-keeper"
@@ -366,6 +369,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). mm suffix load-bearing (INCH
     # document; the equation manager reads bare numbers in document units).
@@ -612,8 +617,13 @@ async def build(adapter) -> dict[str, str]:
     )
     # The crown is a full round tangent to both sides: no band of its own
     # (the width's governs it); the sheet prints it as a radial reference.
+    # The bands are millimetres; UNIT prints them in inches.
     set_dimension_bilateral_tolerance(
-        adapter, "ShaftBoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)
+        adapter,
+        "ShaftBoreProfile",
+        "BoreDia",
+        *deviations(BORE_DIA_BAND),
+        display_unit=UNIT,
     )
 
     # Manufacturing drawing support: mark exactly the print's dimensions and

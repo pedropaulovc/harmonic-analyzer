@@ -1,4 +1,7 @@
-r"""Create the curated machinist drawing for the lever fulcrum shaft."""
+r"""Create the curated machinist drawing for the lever fulcrum shaft.
+
+The sheet prints decimal inch (the part's ``drawing_unit: in``).
+"""
 
 from __future__ import annotations
 
@@ -22,6 +25,7 @@ from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
@@ -55,7 +59,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# One side view at 2:1: the 0.3 flats and their stations read at that size
+# One side view at 2:1: the .012 flats and their stations read at that size
 # and it spans most of the sheet width. No end view: from the end the dome
 # hides the flats, so it showed a bare circle (machinist review r1).
 SHEET_SCALE = (2.0, 1.0)
@@ -63,7 +67,7 @@ VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
 AXIS_Y = 0.212
 # Left of the sheet centre: the across-flat callout block starts at its
 # dimension line right of the right tip and runs ~35 mm right (r2 crossed
-# the border at 0.216); the left tip's 6.0 still clears the zone margin.
+# the border at 0.216); the left tip's .24 still clears the zone margin.
 RIGHT_CENTER = (0.198, AXIS_Y)
 # The isometric fills the free band over the title block at 1:1 (half the
 # sheet scale, hence its note): the shaft runs lower-left to upper-right
@@ -87,18 +91,21 @@ _LEFT_TIP_X = RIGHT_CENTER[0] - _on_sheet(SHAFT_LENGTH / 2.0)
 _RIGHT_TIP_X = RIGHT_CENTER[0] + _on_sheet(SHAFT_LENGTH / 2.0)
 _RIGHT_FLAT_INNER_X = _RIGHT_TIP_X - _on_sheet(FLAT_FROM_END + FLAT_LENGTH)
 # Rows above the shaft, nearest first; every text stands where no other
-# dimension's extension line runs: 6.0 outboard left of the left tip, the
+# dimension's extension line runs: .24 outboard left of the left tip, the
 # flat length left of its flat's inner edge, and the overall length (the
 # only dimension off the right tip) on the top row.
 _ROW_1 = AXIS_Y + 0.014
 _ROW_2 = AXIS_Y + 0.026
 _ROW_3 = AXIS_Y + 0.038
 _SHAFT_BOTTOM_Y = AXIS_Y - _on_sheet(SHAFT_DIA / 2.0)
-# The bearing O.D.'s roughness rides the side view's lower silhouette right
-# of centre, its symbol below the shaft, clear of the Ø callout block (which
-# hangs left of mid-length) and of the across-flat callout at the right tip.
-FINISH_EDGE = (RIGHT_CENTER[0] + 0.060, _SHAFT_BOTTOM_Y)
-FINISH_SYMBOL = (RIGHT_CENTER[0] + 0.075, AXIS_Y - 0.024)
+_SHAFT_TOP_Y = AXIS_Y + _on_sheet(SHAFT_DIA / 2.0)
+# The bearing O.D.'s roughness rides the side view's upper silhouette right
+# of centre (as draw_ch_pivot_shaft's does), its symbol in the band between
+# the shaft and the second dimension row; the first row's dimensions stand
+# only at the ends. On the inch part a symbol on the lower silhouette
+# re-attached to another face (two farm leaves, same_entity=False).
+FINISH_EDGE = (RIGHT_CENTER[0] + 0.060, _SHAFT_TOP_Y)
+FINISH_SYMBOL = (RIGHT_CENTER[0] + 0.075, AXIS_Y + 0.012)
 # The fleet's routine finish height, not the dimension height (r1: the
 # symbol was drawn far larger than the other annotation text).
 FINISH_CHAR_HEIGHT = 0.0025
@@ -108,6 +115,12 @@ FINISH_CHAR_HEIGHT = 0.0025
 # Two trailing spaces on every row stop the ink short of the line and its
 # shelf, as draw_dt_crank_drive_gear does for its chamfer block.
 SHAFT_DIA_CALLOUT_ROWS = "\n".join(f"{row}  " for row in SHAFT_DIA_CALLOUT.splitlines())
+# The across-flat block hangs right of its dimension line, which drops to the
+# shelf at the block's left edge: the S of SETS touched it (machinist review,
+# rule 14). A leading space on every row holds the ink off that line.
+ACROSS_FLAT_CALLOUT_ROWS = "\n".join(
+    f" {row}" for row in ACROSS_FLAT_CALLOUT.splitlines()
+)
 RIGHT_KEEP = {
     "FlatFromEnd": (_LEFT_TIP_X - 0.0065, _ROW_1),
     "FlatLength": (_RIGHT_FLAT_INNER_X - 0.0105, _ROW_1),
@@ -131,7 +144,7 @@ RIGHT_KEEP = {
 
 
 def _set_dome_reference(adapter: Any, annotations: list[Any]) -> None:
-    """Print DomeRadius as ``2X (SR3.18)``: both domes, a spherical reference
+    """Print DomeRadius as ``2X (SR.125)``: both domes, a spherical reference
     (the full hemisphere follows from the toleranced diameter). The display's
     own radius prefix stays behind the ``(S``; the readback proves it stuck."""
     (annotation,) = [
@@ -177,7 +190,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("ch-fulcrum-shaft"),
     )
     stamp_drawing_summary(
         adapter,
@@ -207,7 +224,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter,
         curated,
-        {"ShaftDia": SHAFT_DIA_CALLOUT_ROWS, "AcrossFlat": ACROSS_FLAT_CALLOUT},
+        {"ShaftDia": SHAFT_DIA_CALLOUT_ROWS, "AcrossFlat": ACROSS_FLAT_CALLOUT_ROWS},
     )
     _set_dome_reference(adapter, curated)
 

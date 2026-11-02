@@ -5,8 +5,9 @@ hex nut is discarded (the MHA-CH-14 round jam nut locks it) and the shank is cut
 cross the summing-lever plate and carry that nut, so the sheet carries the
 same two cutting controls as the counter anchor (``draw_boss_hook``) -- the
 finished overall length to the eye crown and the restored 45 deg deburr at the
-new end. The length band is the title block's; ``ch_vn_spring_hook_spec`` shows
-the shortest in-band part still keeps two full threads past the nut.
+new end. The sheet prints decimal inch (``drawing_unit: in``). The length band
+is the title block's .XX; ``ch_vn_spring_hook_spec`` shows the shortest
+in-band part still keeps two full threads past the nut.
 
 Run with SolidWorks open::
 
@@ -36,9 +37,11 @@ from _drawing_dimensions import set_dimension_callouts, set_dimension_precision
 from _drawing_hidden_sketches import curate_view_dimensions as curate_stock_dimensions
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 from _drawing_sheet_region import sheet_drawable_region
 from _purchased_fastener_drawing import assert_supplier_view_fits
 from _rebuild import active_configuration_name
+from _part_properties import part_drawing_unit
 from _supplier_dimensions import (
     assert_supplier_reference_dimension, supplier_reference_dimension,
 )
@@ -66,24 +69,26 @@ from ch_vn_spring_hook_spec import (
 )
 
 SPEC = DRAWINGS_BY_NAME["ch_vn_spring_hook"]
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 SOURCE = SPEC.source
 OUTPUTS = DrawingOutputs(**SPEC.outputs)
-# The finished part is 31.3 x 12.7 mm since its shank carries the MHA-CH-14
-# jam nut under the coefficient plate: 5:1 keeps the front view inside the
-# counter anchor's 4:1 sheet band, raised so the cut end's deburr dimensions clear
-# the notes.  The deburr is dimensioned on the front view itself, as on the
-# counter anchor: machinist review r7 found a 20:1 detail for a plain end
-# chamfer added nothing a machinist needs.
+# The finished part is 30.7 x 12.7 mm (1.21 in overall) since its shank carries
+# the MHA-CH-14 jam nut under the coefficient plate: 5:1 keeps the front view
+# inside the counter anchor's 4:1 sheet band, raised so the cut end's deburr
+# dimensions clear the notes.  The deburr is dimensioned on the front view
+# itself, as on the counter anchor: machinist review r7 found a 20:1 detail for
+# a plain end chamfer added nothing a machinist needs.
 SHEET_SCALE = (5.0, 1.0)
 ISO_SCALE = (3.0, 1.0)
-FRONT_CENTER = (0.100, 0.1805)
+# The view centres on its outline. The settled 31.3 mm part (run 0c4519c5
+# read y 0.1014..0.2711 at centre 0.18625, a 0.0848 half-height) stood centred
+# at 0.1805 with its cut end at 0.1023; the 30.734 mm inch part is 2.83 mm
+# shorter on the sheet, so the centre drops half that to keep the cut end, and
+# every deburr placement below, where it was. Its outline then spans about
+# 0.0957..0.2625, inside the B sheet's 12.7 mm top zone border (y 0.2667) and
+# clear of the 0.0651 notes band.
+FRONT_CENTER = (0.100, 0.1791)
 ISO_CENTER = (0.310, 0.209)
-# The settled front view's native outline is the 31.3 part plus SolidWorks'
-# boundary pad: 0.0848 half-height about the centre (run 0c4519c5 read
-# y 0.1014..0.2711 at centre 0.18625), and it must stay inside the B sheet's
-# 12.7 mm top zone border (y 0.2667). Centred at 0.1805 its top is 0.2653 and
-# its bottom 0.0957, clear of the 0.0651 notes band; the eye crown stands at
-# 0.2593. The cut end (0.078 below the centre) drops 5.75 mm to 0.1023.
 # The settled isometric outline is 0.0543 half-height about its centre (run
 # 80ff6d1a read y 0.1587..0.2673 at centre 0.213, 0.6 mm past the border);
 # centred at 0.209 its top is 0.2633 and its bottom 0.1547.
@@ -255,7 +260,11 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     read_required_properties(adapter.currentModel, required, required=required)
     draw, _sheet = new_project_drawing(
-        adapter, property_view=SPEC.artifact_stem, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=SPEC.artifact_stem,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("ch-vn-spring-hook"),
     )
     stamp_drawing_summary(
         adapter,

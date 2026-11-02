@@ -1,7 +1,7 @@
 r"""Pure-data dimensional contract shared by the rocker pivot shaft (MHA-CH-05)
 and its drawing.
 
-A plain O6.35 rod (user, 2026-10-10: the old turned shoulder and its reliefs
+A plain O.250 rod (user, 2026-10-10: the old turned shoulder and its reliefs
 are gone). Hub 19 bears through a MHA-CH-VN-56 thrust washer on the north ear's
 inner face and the MHA-CH-VN-54 spring pushes the bank north from the south ear
 (``rocker_bank_layout``); the
@@ -28,23 +28,31 @@ imports into the side view (drawing-guidelines.md rule 11 (turned parts read lik
 each end, and one Right-plane cut for both flats, whose length, across-flat
 and stations, with the overall length between the two tips, import into the
 same view.
+
+Issue #290: the sheet prints decimal inch (``drawing_unit: in``). Lengths stay
+physical millimetres, each the exact decimal of its printed inch value; the
+overall length is the ears' span plus both domes snapped to its .XX
+(``rocker_bank_layout``).
 """
 
 from __future__ import annotations
 
 import math
 
+import _config
 from _fit_shaft_h import SHAFT_H
 from _gtol_cylinder import CylinderFace
+from _package_units import drawing_unit
+from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from ch_pivot_bracket_spec import EAR_T, SET_SCREW_POINT_DIA
 
-
+UNIT = drawing_unit("parts/ch-pivot-shaft", _config.parts("ch-pivot-shaft"))
 MM_PER_IN = 25.4
 
 SHAFT_DIA = 0.25 * MM_PER_IN
 SHAFT_DIA_BAND = SHAFT_H
-DOME_HEIGHT = 1.5  # both ends, like the cylinder arbor's (user, #743 Q4)
+DOME_HEIGHT = 1.524  # .06: both ends, like the cylinder arbor's (user, #743 Q4)
 DOME_SPHERE_RADIUS = ((SHAFT_DIA / 2.0) ** 2 + DOME_HEIGHT**2) / (2.0 * DOME_HEIGHT)
 if not 0.0 < DOME_HEIGHT <= SHAFT_DIA / 2.0:
     raise AssertionError("an end crown must be a dome, never past a hemisphere")
@@ -53,33 +61,28 @@ DOME_CALLOUT = "BOTH ENDS"
 # Each flat prints once, stationed from its own end's tip.
 FLAT_STATION_CALLOUT = "BOTH ENDS"
 
-# The title block's PRINTED bands, which an accepted part is checked against
-# (not the inch grades behind them: .XX prints +/-0.51, not 0.508). Literals,
-# pinned to the title block by test_ch_pivot_shaft_drawing: reading _config
-# here would put title_block on rocker_bank_layout's and every channel
-# part's recipe.
-LINEAR_1PL = 0.8
-LINEAR_2PL = 0.51
+# The title block's printed .XX band, which an accepted part is checked
+# against.
+LINEAR_2PL = printed_band_mm(2, unit=UNIT)
 LENGTH_BAND = LINEAR_2PL  # the overall length, tip to tip, prints at .XX
-LINEAR_3PL = 0.13
 
 # --- set-screw flats (user, 2026-10-10) ----------------------------------------
 # One flat under each ear's apex screw, on the ear's mid-plane: half an ear in
 # from its cylinder end (the north one's model station), which is DOME_HEIGHT
 # more from that end's tip, the face the shop measures it from.
 NORTH_FLAT_STATION = EAR_T / 2.0
-FLAT_TIP_STATION = NORTH_FLAT_STATION + DOME_HEIGHT  # 5.50, each from its tip
+FLAT_TIP_STATION = NORTH_FLAT_STATION + DOME_HEIGHT  # .22, each from its tip
 FLAT_STATION_BAND = LINEAR_2PL  # stations print at .XX
 # The cup the flat must take whole: the screw's 45 deg x one-pitch point.
 SET_SCREW_CUP_DIA = SET_SCREW_POINT_DIA  # 1.575
-# Depth: 0.9, so the across-flat, which a micrometer reads, prints at .XX
-# like every other size a set-screw seat needs (machinist review: 5.850 at
-# three places served no function). The depth runs 0.39..1.41: at its
-# shallowest the flat's chord (3.05) still takes the cup with 0.7 to spare
-# each side, the screw itself rolling the flat square under it as it is
-# driven; at its deepest it takes under a quarter of the rod.
-FLAT_DEPTH = 0.9
-FLAT_AF = SHAFT_DIA - FLAT_DEPTH  # 5.45
+# The across-flat, which a micrometer reads, prints at .XX like every other
+# size a set-screw seat needs (machinist review: three places served no
+# function). The depth runs .030...050: at its shallowest the flat's chord
+# still takes the cup with over 1.2 mm to spare each side, the screw itself
+# rolling the flat square under it as it is driven; at its deepest it takes
+# under a quarter of the rod.
+FLAT_AF = 5.334  # .21
+FLAT_DEPTH = SHAFT_DIA - FLAT_AF  # .04
 FLAT_DEPTH_RANGE = (FLAT_DEPTH - LINEAR_2PL, FLAT_DEPTH + LINEAR_2PL)
 
 
@@ -93,14 +96,14 @@ if flat_chord(FLAT_DEPTH_RANGE[0]) < SET_SCREW_CUP_DIA + 2.0 * 0.5:
     raise AssertionError("a shallow flat is too narrow for the set-screw cup")
 if FLAT_DEPTH_RANGE[1] >= SHAFT_DIA / 4.0:
     raise AssertionError("a deep flat takes a quarter of the rod")
-# Length: 6.0 at .XX (5.49..6.51). The cup must stay wholly on the flat over
-# the fit-up's axial wander, which at the far (south) ear also carries the
-# overall length's band, the north tip being the one set, and no rocker hub
-# may ride over the flat's edge (rocker_bank_layout checks both).
-FLAT_LENGTH = 6.0
+# Length: .24 at .XX. The cup must stay wholly on the flat over the fit-up's
+# axial wander, which at the far (south) ear also carries the overall
+# length's band, the north tip being the one set, and no rocker hub may ride
+# over the flat's edge (rocker_bank_layout checks both).
+FLAT_LENGTH = 6.096  # .24
 FLAT_LENGTH_RANGE = (FLAT_LENGTH - LINEAR_2PL, FLAT_LENGTH + LINEAR_2PL)
 
-# Probe station (part z, mm) that names the O6.35 face: the body clear of the
+# Probe station (part z, mm) that names the O.250 face: the body clear of the
 # north flat.
 BODY_PROBE_Z_MM = -(EAR_T + 10.0)
 
@@ -111,6 +114,7 @@ SURFACE_FINISHES = (
         "pivot_bearing",
         MACHINED_UM,
         CylinderFace(SHAFT_DIA, contains_z_mm=BODY_PROBE_Z_MM),
+        display_unit=UNIT,
     ),
 )
 
@@ -129,12 +133,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 
 # Decimal places are the tolerance (drawing-guidelines.md rule 3 (decimal places carry the tolerance)). The O.D. carries the
-# running band at three places (1/4 in = 6.350 exactly). The dome only has to
-# read as a dome; the overall length, the stations and the flat's length and
-# across-flat hold each cup on its flat at .XX.
+# running band at four places (.2500 +.0000/-.0008). The dome height and its
+# reference radius print at .XX; the overall length, the stations and the
+# flat's length and across-flat hold each cup on its flat at .XX.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "ShaftProfile": {"ShaftDia": 3},
-    "NorthCapProfile": {"DomeHeight": 1, "Radius": 1},
+    "ShaftProfile": {"ShaftDia": 4},
+    "NorthCapProfile": {"DomeHeight": 2, "Radius": 2},
     "FlatProfile": {
         "OverallLength": 2,
         "FlatLength": 2,
@@ -159,7 +163,7 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
 # Part-specific facts a machinist cannot read off the views (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
-# A 162:6.35 slender bar is turned between centres; both flats face the same
+# A 6.4:.25 slender bar is turned between centres; both flats face the same
 # way, because one screw on each ear sets the shaft's roll.
 DRAWING_NOTES = "\n".join(
     (

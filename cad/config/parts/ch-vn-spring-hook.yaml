@@ -17,10 +17,11 @@ ch-vn-spring-hook:
     IT AND JAM MHA-CH-14 ON THE PLATE UNDERSIDE.
   quantity: 20
   tolerance_class: machined_block
+  drawing_unit: in
   process: purchased
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
-      where: "front view, at the cut end: 45° chamfer 0.46 ±0.05, MIN: CUT END STARTS IN MHA-SM-03 TAP, MAX: KEEPS FULL THREAD PAST MHA-CH-14"
+      where: "front view, at the cut end: 45° chamfer .018 ±.002, MIN: CUT END STARTS IN MHA-SM-03 TAP, MAX: KEEPS FULL THREAD PAST MHA-CH-14"
       finding: "chamfer band over-specified for a deburr; the low limit only needs some chamfer (rule 4)"
-      reason: "owner ruling 2026-10-17: both limits carry function. Low: the cut end's flat must pass the #6-32 tap drill it enters, so the chamfer is at least MIN_CHAMFER_WIDTH_MM 0.4001 ((major - tap drill) / 2), and the 0.41 low limit stays above it. High: 0.51 at the steepest in-band angle sets the axial chamfer the past-nut budget charges, keeping the worst-case full thread past MHA-CH-14 at or above the 1.5875 (two-pitch) floor"
+      reason: "owner ruling 2026-10-17: both limits carry function. Low: the cut end's flat must pass the #6-32 tap drill it enters, so the chamfer is at least .0158 ((major - tap drill) / 2), and the .016 low limit stays above it. High: .020 at the steepest in-band angle sets the axial chamfer the past-nut budget charges, keeping the worst-case full thread past MHA-CH-14 at or above the .0625 (two-pitch) floor"

@@ -78,7 +78,10 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 def test_the_part_owns_every_printed_decimal_place() -> None:
     assert drawing_spec.DRAWING_PRECISION_BY_NAME == {
         **{name: 2 for name in set().union(*drawing_spec.DRAWING_DIMENSIONS.values())},
-        "CornerRadius": 1,
+        **{
+            name: 3
+            for name in ("EarThick", "ShaftBoreDia", "HoleDia", "SetScrewLocation")
+        },
     }
     assert drawing.DRAWING_PRECISION_BY_NAME is drawing_spec.DRAWING_PRECISION_BY_NAME
     assert part.DRAWING_PRECISION is drawing_spec.DRAWING_PRECISION
@@ -93,11 +96,11 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
 
 
 def test_bore_axis_to_apex_prints_as_a_reference_in_the_foot_height_lane() -> None:
-    """Owner Q12 (2026-10-16): the R8.00 arch's centre stands 1.80 over the
+    """Owner Q12 (2026-10-16): the arch's centre stands ARCH_LIFT over the
     bore, so the sheet prints the metal over the bore as the bore axis to the
-    apex, 9.80 REF, chained on the bore height between its extension lines."""
-    assert spec.APEX_ABOVE_BORE == pytest.approx(9.80)
-    assert spec.ARCH_LIFT == pytest.approx(1.80)
+    apex, a REF chained on the bore height between its extension lines."""
+    assert spec.APEX_ABOVE_BORE == pytest.approx(9.852)
+    assert spec.ARCH_LIFT == pytest.approx(1.724)
     assert 0.0 < spec.ARCH_LIFT < spec.BORE_DIA / 2.0
     x, y = drawing.APEX_REFERENCE_TEXT_XY
     assert x == drawing.FRONT_KEEP["FootHt"][0]
@@ -123,16 +126,16 @@ def test_model_bands_come_from_named_spec_constants() -> None:
         ("SetScrewReference", "SetScrewLocation"): "SET_SCREW_STATION_BAND",
         ("ShaftBoreProfile", "ShaftBoreDia"): "*deviations(BORE_DIA_BAND)",
     }
-    assert part.EAR_T_BAND == part.SET_SCREW_STATION_BAND == 0.10
+    assert part.EAR_T_BAND == part.SET_SCREW_STATION_BAND == pytest.approx(0.1016)
     # The hold-down station rides the title block's .XX too (#1371 review: a
     # band on a clearance hole's station holds nothing), as do the overall
     # and the bore heights the tap's thread is counted against.
-    assert spec.STATION_BAND == spec.HEIGHT_BAND == 0.508
+    assert spec.STATION_BAND == spec.HEIGHT_BAND == pytest.approx(0.254)
     assert "HoleStation" not in drawing.DIMENSION_CALLOUTS
-    assert round(HOLE_STATION, 1) == pytest.approx(HOLE_STATION)
+    assert round(HOLE_STATION / 25.4, 2) * 25.4 == pytest.approx(HOLE_STATION)
     # The foot length rides the title block's .XX (its wall to the hold-down
     # hole is sized for it), so its sheet value carries no band of its own.
-    assert spec.FOOT_LEN_BAND == spec.EDGE_BAND == 0.508
+    assert spec.FOOT_LEN_BAND == spec.EDGE_BAND == pytest.approx(0.254)
     assert "FootLen" not in drawing.DIMENSION_CALLOUTS
     # The reamed bore holds the drilled-hole growth its set-screw thread
     # count assumes: largest bore = nominal + DRILL_GROWTH.
@@ -344,9 +347,8 @@ def test_apex_tap_callout_fits_above_the_plan_between_the_lanes() -> None:
 
     # The native callout font as MHA-DT-02 printed it (cap 3.5 mm,
     # 109.7 mm per 42 glyphs, lines 16.8 pt apart).
-    drill = (
-        f"Ø{blind_cut_dia_mm(spec.SET_SCREW_HOLE_SPEC):.2f} {drawing.SET_SCREW_EXTENT}"
-    )
+    drill_in = blind_cut_dia_mm(spec.SET_SCREW_HOLE_SPEC) / 25.4
+    drill = f"Ø.{round(drill_in * 1000):03d} {drawing.SET_SCREW_EXTENT}"
     thread = f"{drawing.SET_SCREW_PROCESS} 4-40 UNC {drawing.SET_SCREW_EXTENT}"
     box = estimate_text_box(
         f"{drill}\n{thread}",
@@ -403,10 +405,10 @@ def test_banded_plan_stations_each_print_at_their_own_arrows() -> None:
     ear_column = drawing.TOP_KEEP["EarThick"]
     foot_column = drawing.TOP_KEEP["FootLen"]
     tap = _hanging_block(
-        f"4.00 ±0.1\n{drawing.DIMENSION_CALLOUTS['SetScrewLocation']}", tap_column
+        f".160 ±.004\n{drawing.DIMENSION_CALLOUTS['SetScrewLocation']}", tap_column
     )
     ear = _hanging_block(
-        f"8.00 ±0.1\n{drawing.DIMENSION_CALLOUTS['EarThick']}", ear_column
+        f".320 ±.004\n{drawing.DIMENSION_CALLOUTS['EarThick']}", ear_column
     )
     # Nested shortest first, each column clear of the plan and the one inside.
     assert drawing._EAST_X + 0.008 <= tap_column[0] < ear_column[0] < foot_column[0]
@@ -446,10 +448,10 @@ def test_corner_radius_is_the_largest_the_screw_head_clears() -> None:
     """Rule 16: the foot-to-ear inside corner carries the largest radius the
     hold-down screw's head clears at the worst case, at one place, modelled
     at that limit and printed as a single MAX limit."""
-    assert drawing_spec.CORNER_R_PLACES == 1
-    assert drawing_spec.CORNER_R_MAX == pytest.approx(0.3)
+    assert drawing_spec.CORNER_R_PLACES == 2
+    assert drawing_spec.CORNER_R_MAX == pytest.approx(0.508)  # R.02
     assert drawing_spec.CORNER_R_MAX <= HEAD_TO_EAR_FACE_MIN
-    step = 10.0**-drawing_spec.CORNER_R_PLACES
+    step = 25.4 * 10.0**-drawing_spec.CORNER_R_PLACES
     assert drawing_spec.CORNER_R_MAX + step > HEAD_TO_EAR_FACE_MIN
     assert drawing_spec.CORNER_R_BAND == (0.0, -drawing_spec.CORNER_R_MAX)
     assert drawing_spec.CORNER_R_TOL_TYPE == 6  # swTolMAX
@@ -465,7 +467,7 @@ def test_corner_radius_is_the_largest_the_screw_head_clears() -> None:
         source.index("_corner_radius_max_limit(adapter)\n")
     )
     # The spandrel the fillet adds, along the ear's width, is in the target.
-    assert part.V_CORNER == pytest.approx((1.0 - math.pi / 4.0) * 0.3**2 * spec.EAR_W)
+    assert part.V_CORNER == pytest.approx((1.0 - math.pi / 4.0) * 0.508**2 * spec.EAR_W)
     assert part.V_TOTAL == pytest.approx(
         part.V_FOOT
         + part.V_BLOCK
@@ -491,7 +493,7 @@ def test_corner_radius_names_the_screw_head_it_clears() -> None:
     assert callout == f"CLEARS HEAD OF\nHOLD-DOWN SCREW\n{screw}"
     # The native dimension font as the bore callout prints (cap 3.5 mm).
     box = estimate_text_box(
-        f"R{drawing_spec.CORNER_R_MAX:.1f} MAX\n{callout}",
+        f"R.{round(drawing_spec.CORNER_R_MAX / 25.4 * 100):02d} MAX\n{callout}",
         anchor=_planned_corner_text(),
         height=0.0035,
         reference=5,  # swUPPER_CENTER: the value line on the anchor

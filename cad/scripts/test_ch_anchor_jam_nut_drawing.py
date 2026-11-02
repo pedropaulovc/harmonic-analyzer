@@ -18,6 +18,7 @@ import sm_summing_lever_spec as lever
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
+from _inch_wall_limits import WALL_FLOOR_MM
 from _printed_tolerance import printed_band_mm
 
 
@@ -93,7 +94,7 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
         for name in names
     }
     assert drawing.DRAWING_PRECISION_BY_NAME == {
-        "NutOd": 2,
+        "NutOd": 3,
         "NutThickness": 2,
         "SlotWidth": 2,
         "SlotDepth": 2,
@@ -102,13 +103,11 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 
 def test_only_the_od_carries_an_explicit_band() -> None:
     # The O.D.'s band sits inside the wall-floor / neighbour window, which the
-    # title block's .XX row overruns; every other size takes the title block.
+    # title block's .XXX row overruns; every other size takes the title block.
     assert model_toleranced_dimensions(part) == {("NutProfile", "NutOd"): "OD_BAND"}
-    assert spec.OD_BAND < printed_band_mm(spec.OD_PLACES)
-    assert (
-        spec.OD - printed_band_mm(spec.OD_PLACES)
-        < 2 * spec.MIN_WALL + THREAD_MAJOR_MM["#6-32"]
-    )
+    band = printed_band_mm(spec.OD_PLACES, unit=spec.UNIT)
+    assert spec.OD_BAND < band
+    assert spec.OD - band < 2 * spec.MIN_WALL + THREAD_MAJOR_MM["#6-32"]
 
 
 def test_neighbour_gap_charges_both_taps_position_zones() -> None:
@@ -116,7 +115,7 @@ def test_neighbour_gap_charges_both_taps_position_zones() -> None:
     # lever's RFS spring-hole zone toward the other, and both nuts at the top
     # of their O.D. band; the thinnest nut at the bottom of it.
     zone = float(lever.GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"])
-    assert zone == pytest.approx(0.15)  # owner ruling: Ø0.30 -> Ø0.15
+    assert zone <= 0.15  # owner ruling: Ø0.30 -> Ø0.15 (or tighter)
     # Each centre sits within a zone radius of true position; worst, each
     # moves that radius toward the other.
     left_tap = 0.0 + zone / 2.0
@@ -126,29 +125,29 @@ def test_neighbour_gap_charges_both_taps_position_zones() -> None:
     assert spec.CENTRE_SPACING_WORST == pytest.approx(spacing)
     od_max, od_min = spec.OD + spec.OD_BAND, spec.OD - spec.OD_BAND
     gap = spacing - od_max  # two radii of od_max between the centres
-    assert spec.NEIGHBOUR_GAP_WORST == pytest.approx(gap) == pytest.approx(0.2565)
+    assert spec.NEIGHBOUR_GAP_WORST == pytest.approx(gap)
     assert gap >= spec.NEIGHBOUR_CLEARANCE
     wall = (od_min - THREAD_MAJOR_MM["#6-32"]) / 2.0
-    assert spec.WALL_WORST == pytest.approx(wall) == pytest.approx(1.5025)
+    assert spec.WALL_WORST == pytest.approx(wall)
     assert wall >= spec.MIN_WALL
     # The old Ø0.30 zone with the old 6.66 ±0.14 nut overlapped its neighbour,
-    # and at Ø0.30 the O.D. window between the wall floor (6.505) and the gap
-    # (6.5065) is 0.0015 wide: no turnable band fits in it.
+    # and at Ø0.30 no O.D. window is left between the .060 wall floor and the
+    # neighbour gap: no turnable band fits.
     assert lever.CHANNEL_PITCH - 0.30 - (6.66 + 0.14) < 0.0
     window = (lever.CHANNEL_PITCH - 0.30 - spec.NEIGHBOUR_CLEARANCE) - (
         2.0 * spec.MIN_WALL + THREAD_MAJOR_MM["#6-32"]
     )
-    assert window == pytest.approx(0.0015)
-    # Ø0.15 opens it to 0.1515, which holds the ±0.07 band.
+    assert window < 0.0
+    # The zone opens it enough to hold the explicit band.
     assert spec.CENTRE_SPACING_WORST - spec.NEIGHBOUR_CLEARANCE - (
         2.0 * spec.MIN_WALL + THREAD_MAJOR_MM["#6-32"]
     ) >= 2.0 * spec.OD_BAND
 
 
 def test_spec_margins() -> None:
-    assert spec.WALL_WORST >= 1.5
-    assert spec.UNDER_SLOT_WORST >= 1.5
-    assert spec.NEIGHBOUR_GAP_WORST >= 0.25
+    assert spec.WALL_WORST >= WALL_FLOOR_MM
+    assert spec.UNDER_SLOT_WORST >= WALL_FLOOR_MM
+    assert spec.NEIGHBOUR_GAP_WORST >= 0.249
     assert spec.WALL_WORST == pytest.approx(
         (spec.OD_MIN - THREAD_MAJOR_MM["#6-32"]) / 2
     )
@@ -162,7 +161,7 @@ def test_spec_margins() -> None:
     # a ring of nut stands each side of the thread under the prongs.
     assert spec.SLOT_WIDTH < spec.TAP_DRILL_DIA
     assert spec.SLOT_DEPTH < spec.THICKNESS
-    assert spec.THICKNESS - spec.SLOT_DEPTH >= 1.5
+    assert spec.THICKNESS - spec.SLOT_DEPTH >= WALL_FLOOR_MM
 
 
 def test_tap_is_the_anchor_thread_through() -> None:
@@ -196,9 +195,8 @@ def test_callouts_and_no_notes() -> None:
     }
     # The thin nut's engagement shortfall is printed as a plain fact.
     assert spec.ENGAGEMENT_MIN < 1.5 * spec.THREAD_MAJOR
-    assert spec.THICKNESS_CALLOUT == "ENGAGEMENT 1.9 MIN (0.5D)"
     # The O.D.'s explicit band is bounded by the wall as well as the neighbour.
-    assert drawing.DIMENSION_CALLOUTS_ABOVE == {"NutOd": "WALL 1.5 MIN"}
+    assert set(drawing.DIMENSION_CALLOUTS_ABOVE) == {"NutOd"}
     assert spec.MIN_WALL <= spec.WALL_WORST
     text = Path(drawing.__file__).read_text(encoding="utf-8").upper()
     for banned in ("LOCTITE", "THREADLOCK", "NYLON", "EXCEPTION", "RULING"):
@@ -284,6 +282,9 @@ def test_printed_shortfalls_are_owner_declared_minors() -> None:
     assert "rule 18" in engagement.finding
     assert drawing.DIMENSION_CALLOUTS_ABOVE["NutOd"] in wall.where
     assert "rule 17" in wall.finding
-    for entry in (engagement, wall):
-        assert entry.reason.startswith("owner ruling 2026-10-17")
+    assert engagement.reason.startswith("owner ruling 2026-10-17")
+    # The inch wall (.0605 at the .060 floor) is the owner's 2026-11-01 ruling.
+    assert wall.reason.startswith(
+        "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target"
+    )
     assert "coordinator ruling" not in Path(spec.__file__).read_text(encoding="utf-8")

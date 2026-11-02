@@ -27,9 +27,11 @@ from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _holes import wizard_holes
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -57,6 +59,7 @@ from ch_anchor_jam_nut_spec import (
     TAP_DRILL_DIA,
     TAP_SPEC,
     THICKNESS,
+    UNIT,
 )
 
 PART_NAME = "ch-anchor-jam-nut"
@@ -86,6 +89,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
@@ -203,7 +207,9 @@ async def build(adapter) -> dict[str, str]:
     # The O.D. carries its explicit band natively (its window is the wall
     # floor and the neighbouring nut); every other size takes the title
     # block's row for its places.
-    set_dimension_symmetric_tolerance(adapter, "NutProfile", "NutOd", OD_BAND)
+    set_dimension_symmetric_tolerance(
+        adapter, "NutProfile", "NutOd", OD_BAND, display_unit=UNIT
+    )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

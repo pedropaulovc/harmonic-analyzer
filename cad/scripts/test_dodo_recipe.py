@@ -2916,7 +2916,14 @@ def test_config_deps_are_fine_grained():
     # stamps. _recipe_files is the single source for the FULL/REFRESH digest AND the
     # file_dep, so narrowing it keeps that parity intact.
     frame_recipe = _rel(dodo._recipe_files("fr_frame"), cfg)
-    assert not any(t.startswith("parts/") for t in frame_recipe), frame_recipe
+    # #290 transition: a spec/geometry module the frame imports reads its own
+    # registry row (and with it the shared defaults) for its sheet's
+    # drawing_unit (UNIT); only those rows may appear.  Cutover removes the
+    # switch and this allowance.
+    drawing_unit_rows = {"parts/ch-fulcrum-keeper.yaml", "parts/_defaults.yaml"}
+    assert not any(
+        t.startswith("parts/") and t not in drawing_unit_rows for t in frame_recipe
+    ), frame_recipe
     assert "dimensions.yaml" not in frame_recipe
     # Assembly title stamping is a separate contract: every released assembly
     # drawing owns TOL_* properties and therefore tracks title_block.yaml, but
