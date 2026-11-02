@@ -106,7 +106,7 @@ SUPPLIER_REFERENCE_UNITS = {
     "SupplierDowelLength": "in",
 }
 SUPPLIER_DATA = (
-    "DIAMETER +.0001/+.0003 OVER NOMINAL; ROUND / CHAMFER ENDS.",
+    "NOMINAL SUPPLIER REFERENCES; ROUND / CHAMFER ENDS.",
     "SUPPLIER LENGTH TOLERANCE NOT STATED.",
 )
 # The round end's corner: the cylinder stops ROUND_H short of the far face.
