@@ -65,6 +65,7 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_curve_quality import set_precise_curve_quality
 from _drawing_detail_crop import (
     DETAIL_GEOMETRY_TOL_M,
     native_circle_geometry,
@@ -3973,6 +3974,9 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
+    # Detail D's small circles printed as polygons at the default curve
+    # resolution (machinist review r1, #2108 batch B).
+    set_precise_curve_quality(adapter, label="rocker-arm")
 
     # Explicit per-view scale (an auto-scaled view shifts every coordinate pick).
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 2))

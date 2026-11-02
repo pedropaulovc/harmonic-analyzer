@@ -9808,3 +9808,30 @@ def test_least_tip_land_is_the_basic_land_shortened_by_the_taper_tilted_into_the
     cos_angle = abs(ux * tx + uy * ty) / (math.hypot(ux, uy) * length)
     parallel = ch_rocker_arm_spec.TIP_FACE - zone / math.sqrt(1.0 - cos_angle**2)
     assert drawing.TIP_LAND_LEAST_MM < parallel < ch_rocker_arm_spec.TIP_FACE
+
+
+def test_curve_quality_is_precise_before_any_view() -> None:
+    # Machinist review r1 (#2108 batch B): detail D's small circles printed
+    # as polygons at the drawing's default curve resolution.
+    build = next(
+        node
+        for node in ast.parse(Path(drawing.__file__).read_text(encoding="utf-8")).body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+    )
+    calls = [
+        node.func.id
+        for node in ast.walk(build)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    ]
+    lines = {
+        name: min(
+            node.lineno
+            for node in ast.walk(build)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == name
+        )
+        for name in ("set_precise_curve_quality", "place_view")
+    }
+    assert calls.count("set_precise_curve_quality") == 1
+    assert lines["set_precise_curve_quality"] < lines["place_view"]
