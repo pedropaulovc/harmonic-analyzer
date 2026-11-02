@@ -1128,7 +1128,7 @@ def test_keeper_tap_holds_stock_screw_above_a_plug_tap_lead() -> None:
     thread_places = spec.KEEPER_TAP_CALLOUT_PRECISION["hw-threaddepth"]
     reserve = spec.printed_limit(full_thread, thread_places, -1.0) - maximum_entry
     assert reserve == pytest.approx(part.KEEPER_MIN_THREAD_TIP_RESERVE)
-    assert reserve == pytest.approx(0.9351)
+    assert reserve == pytest.approx(0.8335)
     assert reserve >= 0.25
     assert tap_spec.depth_mm - full_thread - 2.0 * depth_tolerance >= 5.0 * pitch
     drill_point = part.TAP_DRILL_MM[tap_spec.size] / 2.0 * part.DRILL_POINT_H
@@ -1142,13 +1142,13 @@ def test_transferred_keeper_receiver_keeps_real_normal_wall_at_printed_bands() -
     assert part.KEEPER_MIN_WEB_HALF_WIDTH == pytest.approx(6.35)
     assert part.KEEPER_MIN_ROOT_RADIUS == pytest.approx(2.794)
     assert part.KEEPER_MIN_FLANGE_THICKNESS == pytest.approx(7.874)
-    assert part.KEEPER_MAX_FULL_THREAD_DEPTH == pytest.approx(7.7216)
+    assert part.KEEPER_MAX_FULL_THREAD_DEPTH == pytest.approx(7.874)
     assert part.KEEPER_TAP_THREAD_WALL_MARGIN_NO_WANDER == pytest.approx(
-        2.6030314247741773
+        2.5213655791488128
     )
     assert part.KEEPER_TAP_DRILL_WALL_MARGIN_NO_WANDER == pytest.approx(1.8802)
-    assert part.KEEPER_TAP_THREAD_WALL_MARGIN == pytest.approx(2.5421195753659465)
-    assert part.KEEPER_TAP_DRILL_WALL_MARGIN == pytest.approx(1.8192881505917686)
+    assert part.KEEPER_TAP_THREAD_WALL_MARGIN == pytest.approx(2.4601877391318125)
+    assert part.KEEPER_TAP_DRILL_WALL_MARGIN == pytest.approx(1.8190221599829992)
     assert (
         min(part.KEEPER_TAP_THREAD_WALL_MARGIN, part.KEEPER_TAP_DRILL_WALL_MARGIN)
         >= 1.524
@@ -1224,10 +1224,10 @@ def _printed_receiver_stack():
     cylinder_depth = spec.printed_limit(
         keeper.KEEPER_TAP_SPEC.depth_mm, drill_places, 1.0
     )
-    assert cylinder_depth == pytest.approx(11.6332)
+    assert cylinder_depth == pytest.approx(11.684)
     assert spec.KEEPER_TAP_DRILL_WANDER_DEG == 0.3
     displacement = cylinder_depth * math.tan(math.radians(0.3))
-    assert displacement == pytest.approx(0.060911849408230724)
+    assert displacement == pytest.approx(0.06117784001700028)
     assert part.KEEPER_MAX_TAP_DRILL_DEPTH == pytest.approx(cylinder_depth)
     assert part.KEEPER_TAP_AXIS_WANDER_MM == pytest.approx(displacement)
 
@@ -5510,8 +5510,8 @@ def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> No
     assert (part.HALF_H, part.FLANGE, part.FLANGE_BOT_Y) == pytest.approx(
         (18.2499, 8.128, 10.1219)
     )
-    assert part.KEEPER_TAP_THREAD_WALL_MARGIN == pytest.approx(2.5421195753659465)
-    assert part.KEEPER_TAP_DRILL_WALL_MARGIN == pytest.approx(1.8192881505917686)
+    assert part.KEEPER_TAP_THREAD_WALL_MARGIN == pytest.approx(2.4601877391318125)
+    assert part.KEEPER_TAP_DRILL_WALL_MARGIN == pytest.approx(1.8190221599829992)
     assert min(part.KEEPER_FOOT_BOSS_MARGINS) >= 1.016
     # Along the rail the faced top runs boss to boss, so the fitted foot
     # stays on it exactly when it clears the bosses at the printed bands.

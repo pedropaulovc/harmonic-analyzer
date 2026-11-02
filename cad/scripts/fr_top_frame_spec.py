@@ -628,11 +628,13 @@ def printed_limit(value: float, places: int, sign: float) -> float:
     return value + (upper if sign > 0.0 else lower)
 
 
-# Native Hole Wizard variables print the inch sheet's three places.
+# The tap drill prints its three-place drill size; its blind depths print .XX,
+# since no function needs them closer (the receiver stacks below read these
+# places).
 KEEPER_TAP_CALLOUT_PRECISION = {
     "hw-tapdrldia": 3,
-    "hw-tapdrldepth": 3,
-    "hw-threaddepth": 3,
+    "hw-tapdrldepth": 2,
+    "hw-threaddepth": 2,
 }
 # drawing-guidelines.md rule 17 (walls and webs) receiver-wall stack: realistic angular drift through the FULL
 # printed cylindrical pilot depth, without relying on a precision drill jig.
