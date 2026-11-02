@@ -14,6 +14,7 @@ import cone_pitch
 import pinion_rig_fitup as FITUP
 import pinion_rig_layout as RIG
 import pinion_rig_park_geometry
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _printed_tolerance import printed_band_mm
 from _cone_axis_constants import MECHANISM_Z_SHIFT
 from dt_pinion_pivot_block_geometry import BLOCK_EAST
@@ -75,10 +76,11 @@ def test_lever_sweeps_from_photographed_park_to_cam_solved_engagement() -> None:
 
 def test_rederived_cam_and_return_leaf_clearances_are_positive() -> None:
     # The design band the assembly itself asserts (0.10..0.25 of air).  The
-    # derived value moved 0.150 -> 0.153 with the U28 re-lay (997f3534) and
-    # -> 0.161 with U27's line-to-line follower pin, 4.016 -> 4.000 (c9685fa0).
+    # derived value moved 0.150 -> 0.153 with the U28 re-lay (997f3534),
+    # -> 0.161 with U27's line-to-line follower pin, 4.016 -> 4.000 (c9685fa0),
+    # and -> 0.176 with the 5/32 drill-rod pin's .1563 (#290).
     assert 0.10 <= drive._PARK_GAP <= 0.25
-    assert math.isclose(drive._PARK_GAP, 0.1606, abs_tol=5e-4)
+    assert math.isclose(drive._PARK_GAP, 0.1756, abs_tol=5e-4)
     cam_authority = (drive.FPIN_DIA + drive.CAM_OD) / 2.0 - drive._D_ENG
     assert cam_authority >= 0.25
     assert drive.LIFT_Y - drive._CAM_SWEEP_R - drive.Y_BASE_TOP >= 0.25
@@ -127,7 +129,9 @@ def test_return_spring_preload_and_stress_hold_at_the_stock_corners() -> None:
     )
     band = leaf.FORMED_BAND_MM
     t_lo, t_hi = (section.THICK + d for d in deviations(section.THICK_BAND))
-    w_lo = section.WIDTH + printed_deviations(section.WIDTH, section.WIDTH_PLACES)[0]
+    w_lo = section.WIDTH + printed_deviations(
+        section.WIDTH, section.WIDTH_PLACES, unit=section.UNIT
+    )[0]
     assert t_lo < section.THICK < t_hi and w_lo < section.WIDTH
     gravity = drive.SWING_GRAVITY_CORNER_NMM
     assert all(c >= n for c, n in zip(gravity, drive.SWING_GRAVITY_NMM, strict=True))
@@ -446,7 +450,7 @@ def test_rod_phase_leaves_the_cams_parked_ecc_down() -> None:
     assert math.isclose(
         drive.LIFT_ROD_PARK_DEG, 90.0 + drive.LEVER_TILT_DEG, abs_tol=1e-9
     )
-    assert math.isclose(drive._PARK_GAP, 0.1606, abs_tol=5e-4)
+    assert math.isclose(drive._PARK_GAP, 0.1756, abs_tol=5e-4)
 
 
 # Ruling (c) worst-case stack (user, 2026-09-24), under option E-a (Main,
@@ -499,9 +503,9 @@ def _back_collar_gap(e: float) -> float:
 
 def _strap_t_band() -> tuple[float, float]:
     from _printed_tolerance import printed_deviations
-    from dt_pinion_bracket_geometry import THICKNESS_PLACES
+    from dt_pinion_bracket_geometry import THICKNESS_PLACES, UNIT
 
-    lower, upper = printed_deviations(drive.STRAP_T, THICKNESS_PLACES)
+    lower, upper = printed_deviations(drive.STRAP_T, THICKNESS_PLACES, unit=UNIT)
     return (drive.STRAP_T + lower, drive.STRAP_T + upper)
 
 
@@ -545,7 +549,7 @@ def test_j19_keeps_its_full_face_at_the_worst_stack() -> None:
     # it (#948 ruling R, PR #1292).
     g0_front = drive.Z_DRUM0 - drive.DRUM_FACE / 2.0
     g0_south = sum(RIG.G0_FRONT_SOUTH_STACK.values())
-    assert math.isclose(g0_south, 0.175, abs_tol=1e-9)
+    assert math.isclose(g0_south, 0.1762, abs_tol=1e-9)
     face_min = drive.APINION_DRUM_LEN - RIG.DRUM_LEN_BAND
     slack = min(
         (g0_front - g0_south - 1.0) - (g19_back + RIG.RIG_SET_LEAF_D + d - face_min)
@@ -553,9 +557,10 @@ def test_j19_keeps_its_full_face_at_the_worst_stack() -> None:
     )
     assert slack >= RIG.RIG_MARGIN_SPARE, slack
     assert math.isclose(slack, drive.J0_SLACK_WORST, abs_tol=1e-9)
-    assert math.isclose(slack, 2.801, abs_tol=5e-4)
-    # Positive control: without the bank terms the row read 2.976 (163435c4f).
-    assert math.isclose(slack + g0_south, 2.976, abs_tol=5e-4)
+    assert math.isclose(slack, 2.803, abs_tol=5e-4)
+    # Positive control: without the bank terms the row read 2.976 (163435c4f)
+    # on the 3.0 face; the .118 in face (#290) frees its 0.0028.
+    assert math.isclose(slack + g0_south, 2.979, abs_tol=5e-4)
 
 
 def test_rig_set_leaf_d_derives_the_shift_and_books_the_743_terms() -> None:
@@ -692,6 +697,15 @@ def test_rig_aft_shift_is_the_one_rig_to_frame_move() -> None:
         drive.RIG_MARGINS["grip crossrod to the crank chain wheel"][0]
         >= 0.25 + RIG.RIG_MARGIN_SPARE
     )
+    # The crossrod rides on its own .XX station off the head's rear face, so the
+    # rod's travel books that station's band, not half the head length's.
+    import dt_pinion_arbor_geometry as arbor
+
+    assert (
+        drive.GRIP_ROD_SOUTH_TRAVEL_STACK["MHA-DT-22 cross-hole station .XX"]
+        == arbor.CROSS_HOLE_STATION_BAND
+    )
+    assert not any("head length" in k for k in drive.GRIP_ROD_SOUTH_TRAVEL_STACK)
     # 21.06 at the 11.5 head (afe7ea283): its crown sits 0.5 further forward.
     assert drive._GRIP_HEAD_Z[0] - (drive.CRANK_ARM_Z0 + drive.ARM_THICKNESS) >= 21.0
     # The base deck's north edge still stands far past the rod's reach.
@@ -835,11 +849,12 @@ def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
         assert min(stations) >= 1.0, stations
         assert max(stations) <= drive.CAM_LEN - 1.0, stations
     # User ruling P1-1: on its leaf the back collar's gap -- the rod's north
-    # float -- is F + e at most 1.00, so both pins keep >= 2.75 of collar on
-    # either side (the by-eye set it replaced left 1.90 and 2.75).
-    assert math.isclose(min(front), 2.75, abs_tol=5e-3)
-    assert math.isclose(min(back), 3.75, abs_tol=5e-3)
-    assert math.isclose(max(back), drive.CAM_LEN - 2.75, abs_tol=5e-3)
+    # float -- is F + e at most 1.00, so both pins keep >= 3.08 of collar on
+    # either side (the by-eye set it replaced left 1.90 and 2.75; #290's .XXX
+    # strap band added the rest).
+    assert math.isclose(min(front), 3.081, abs_tol=5e-3)
+    assert math.isclose(min(back), 4.089, abs_tol=5e-3)
+    assert math.isclose(max(back), drive.CAM_LEN - 3.081, abs_tol=5e-3)
     # North float at the widest setting: the back collar lands first.
     assert _back_collar_gap(_LEAF_ERR) < _hub_gap() - RIG.HUB_STOP_MARGIN
     # The model's back collar sits on its leaf, its pin BACK_CAM_PIN_STATION
@@ -851,7 +866,7 @@ def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
         abs_tol=1e-9,
     )
     assert drive.CAM_PIN_STATION[1] == RIG.BACK_CAM_PIN_STATION
-    assert math.isclose(RIG.BACK_CAM_PIN_STATION, 5.40, abs_tol=1e-9)
+    assert math.isclose(RIG.BACK_CAM_PIN_STATION, 5.4042, abs_tol=1e-9)
     assert (RIG.BACK_COLLAR_GAP_MIN, RIG.BACK_COLLAR_GAP_MAX) == pytest.approx(
         (0.80, 1.00), abs=1e-9
     )
@@ -862,10 +877,11 @@ def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
     )
 
 
-# MHA-DT-17's and MHA-DT-19's body lengths carry the title-block .X band (Main
-# 2026-09-24: keep it loose).  Both are set back-flush at fit-up, so the band
-# lands at their front ends; the back-end envelope below still takes the whole
-# band at the back as well, so either reference is covered.
+# MHA-DT-17's and MHA-DT-19's body lengths carry the title-block .XX band
+# (Main 2026-09-24: keep it loose; #290: the stacks read it, so .XX).  Both are
+# set back-flush at fit-up, so the band lands at their front ends; the
+# back-end envelope below still takes the whole band at the back as well, so
+# either reference is covered.
 _ROD_LEN_BAND = RIG.LENGTH_BAND
 
 
@@ -913,7 +929,9 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
     from dt_pinion_lever_geometry import BORE_DEPTH
 
     assert not hasattr(RIG, "STACK_BAND")  # the stacks name every term
-    assert (RIG.TORQUE_SHAFT_LEN, RIG.LIFT_ROD_LEN) == (187.0, 198.3)
+    assert (RIG.TORQUE_SHAFT_LEN, RIG.LIFT_ROD_LEN) == pytest.approx(
+        (7.29 * 25.4, 7.72 * 25.4)
+    )
     assert math.isclose(RIG.BACK_COLLAR_GAP_MAX, 1.00, abs_tol=1e-9)
     bearing_min = math.inf
     hub_margin_min = math.inf
@@ -949,7 +967,7 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
     assert math.isclose(
         bearing_min, sum(RIG.TORQUE_SHAFT_BEARING_STACK.values()), abs_tol=1e-9
     )
-    assert math.isclose(bearing_min, 10.09, abs_tol=5e-3)
+    assert math.isclose(bearing_min, 10.245, abs_tol=5e-3)
     assert hub_margin_min >= RIG.HUB_STOP_MARGIN - 1e-9
     assert math.isclose(
         hub_margin_min,
@@ -958,9 +976,12 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
         + RIG.HUB_STOP_MARGIN,
         abs_tol=1e-9,
     )
-    # The rod is sized by the lever's air to the shaft (below), which leaves
-    # the seat more than it needs.
-    assert math.isclose(hub_margin_min, 0.98, abs_tol=5e-3)
+    # The rod is sized by the seat (#290: the .XX length band left the lever's
+    # air to the shaft far more than it needs), to the .01 in above it.
+    assert math.isclose(hub_margin_min, 0.709, abs_tol=5e-3)
+    assert sum(RIG.lift_rod_seat_stack(RIG.LIFT_ROD_LEN - 0.254).values()) < (
+        RIG.LEVER_SEAT_MIN + RIG.RIG_MARGIN_SPARE
+    )
 
 
 def test_lever_station_clears_at_both_rod_extremes() -> None:
@@ -983,11 +1004,7 @@ def test_lever_station_clears_at_both_rod_extremes() -> None:
     row = drive.RIG_MARGINS["lever throw plane to the torque shaft's front end"]
     assert math.isclose(row[0], air, abs_tol=1e-9)
     assert air >= RIG.LEVER_THROW_MIN_AIR + RIG.RIG_MARGIN_SPARE - 1e-9
-    assert math.isclose(air, 0.54, abs_tol=5e-3)
-    # One .X step shorter and the plane crowds the shaft.
-    assert RIG.lever_to_shaft_front_worst(RIG.LIFT_ROD_LEN - 0.1) < (
-        RIG.LEVER_THROW_MIN_AIR + RIG.RIG_MARGIN_SPARE
-    )
+    assert math.isclose(air, 2.233, abs_tol=5e-3)
     south = sum(RIG.LEVER_SOUTH_TRAVEL_STACK.values())
     assert drive._LEV_Z[0] - south >= drive._GRIP_HEAD_Z[1] + 0.25
     hub_lo = drive.LEVER_Z - drive.LEVER_HUB_LEN / 2.0 - drive.LEVER_CAP_SAG
@@ -1008,9 +1025,9 @@ def test_lift_rod_length_band_clears_past_the_back_block() -> None:
     # The SR crown stands CAP_SAG beyond that (Codex #855 P2), and the envelope
     # runs to the crown's apex.
     body_end = rig.BACK_BLOCK_OUTER_Z + _ROD_LEN_BAND + rig.BACK_COLLAR_GAP_MAX
-    assert math.isclose(body_end - rig.BACK_BLOCK_OUTER_Z, 1.80, abs_tol=5e-3)
+    assert math.isclose(body_end - rig.BACK_BLOCK_OUTER_Z, 1.254, abs_tol=5e-3)
     reach = body_end + CAP_SAG
-    assert math.isclose(reach - rig.BACK_BLOCK_OUTER_Z, 3.00, abs_tol=5e-3)
+    assert math.isclose(reach - rig.BACK_BLOCK_OUTER_Z, 2.445, abs_tol=5e-3)
     band = (rig.BACK_BLOCK_OUTER_Z, reach + 0.25)
     # Occupants of that z band near the rod axis (drive_train + frame):
     # the north arbor pedestal stands on the drum axis, well west of the rod.
@@ -1041,12 +1058,12 @@ def test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack() -> None:
     # the U28 block bore 9.39.  Main (#858, ruling 2): the flush setting it is
     # drilled at carries its own error, printed on MHA-DT-00's SHAFT DRILL SET.
     from _printed_tolerance import printed_band_mm
-    from dt_pinion_pivot_block_geometry import BLOCK_DEPTH_PLACES
+    from dt_pinion_pivot_block_geometry import BLOCK_DEPTH_PLACES, UNIT
 
-    shallowest = drive.BLOCK_DEPTH - printed_band_mm(BLOCK_DEPTH_PLACES)
+    shallowest = drive.BLOCK_DEPTH - printed_band_mm(BLOCK_DEPTH_PLACES, unit=UNIT)
     bearing = shallowest - _P_MAX - RIG.FLUSH_SET_ERROR
     # Main (#858): a real margin, >= 0.5 over the floor, from geometry (the
-    # 11.0 block), with every band kept; the 10.5 block left 0.04.
+    # .44 block), with every band kept; the 10.5 block left 0.04.
     assert bearing >= 9.5 + 0.5 - 1e-9, bearing
     assert RIG.BLOCK_BEARING_MARGIN == 0.5
     assert RIG.BACK_BLOCK_MIN_BEARING == RIG.FRONT_BLOCK_MIN_BEARING == 9.5
@@ -1054,7 +1071,7 @@ def test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack() -> None:
     assert math.isclose(
         sum(RIG.TORQUE_SHAFT_BACK_BEARING_STACK.values()), bearing, abs_tol=1e-9
     )
-    assert math.isclose(bearing, 10.04, abs_tol=5e-3)
+    assert math.isclose(bearing, 10.472, abs_tol=5e-3)
     # The drilling station: the shaft's back end flush with that outer face.
     assert math.isclose(
         drive.PIVOT_SHAFT_Z0 + RIG.TORQUE_SHAFT_LEN,
@@ -1064,9 +1081,9 @@ def test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack() -> None:
 
 
 def test_torque_shaft_length_band_clears_both_ends() -> None:
-    # MHA-DT-19 at the title-block .X band (U27), set back-flush: at the
+    # MHA-DT-19 at the title-block .XX band (U27, #290), set back-flush: at the
     # shortest stack (both blocks thin, Codex #854 P1) the longest shaft's
-    # body end stands 7.52 proud of the front block, and its SR crown 1.2
+    # body end stands 2.95 proud of the front block, and its SR crown .05
     # beyond that (Codex #837 P1).
     import dt_arbor_pedestal_spec as ped
     import dt_pinion_lever_geometry as lever
@@ -1086,25 +1103,25 @@ def test_torque_shaft_length_band_clears_both_ends() -> None:
     )
     shortest_outer = rig.FRONT_BLOCK_Z0 + shrink
     proud = shortest_outer - front_end
-    assert math.isclose(proud, 7.52, abs_tol=5e-3)
-    assert math.isclose(proud + CAP_SAG, 8.72, abs_tol=5e-3)
+    assert math.isclose(proud, 2.947, abs_tol=5e-3)
+    assert math.isclose(proud + CAP_SAG, 4.217, abs_tol=5e-3)
     assert math.isclose(
         max(outer for _i, outer, _t in _stack_vertices()), shortest_outer, abs_tol=1e-9
     )
     # Option E-a: pinned to the straps, the shaft rides the cluster's end play
     # from its back-flush drilling station to the front stop.
-    assert math.isclose(proud + _P_MAX, 7.87, abs_tol=5e-3)
-    assert math.isclose(proud + _P_MAX + CAP_SAG, 9.07, abs_tol=5e-3)
+    assert math.isclose(proud + _P_MAX, 3.297, abs_tol=5e-3)
+    assert math.isclose(proud + _P_MAX + CAP_SAG, 4.567, abs_tol=5e-3)
     # Its back end then sits P_MAX inside the back block, bearing
     # test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack.
     # South of the front block nothing stands on the shaft's axis at any z.
     # The nearest body is the MHA-DT-16 lever on the lift rod: its hub keeps
-    # 8.95 radial clearance, and its arm points away from the shaft over the
+    # 8.97 radial clearance, and its arm points away from the shaft over the
     # whole throw.  (BDT's lever-plane gate compares z only, as a proxy.)
     shaft_r = SHAFT_DIA / 2.0
     rel = (drive.PIVOT_X - drive.LIFT_X, drive.PIVOT_Y - drive.LIFT_Y)
     hub_clear = math.hypot(*rel) - lever.HUB_OD / 2.0 - shaft_r
-    assert math.isclose(hub_clear, 8.95, abs_tol=5e-3)
+    assert math.isclose(hub_clear, 8.974, abs_tol=5e-3)
     arm_r = drive.LEVER_ROD_DIA / 2.0
     steps = 200
     for k in range(steps + 1):
@@ -1219,7 +1236,7 @@ def test_set_pin_holes_sit_at_the_physical_back_stop_straps() -> None:
     # front end, so the front strap stands the shim off the drum.
     physical_front = physical_back + t + rig.DRUM_LEN + rig.DRUM_END_SHIM
     assert math.isclose(from_back[1], physical_back, abs_tol=1e-9)
-    assert math.isclose(from_back[1], 15.5, abs_tol=1e-9)
+    assert math.isclose(from_back[1], 15.672, abs_tol=5e-3)
     assert math.isclose(from_back[0], physical_front, abs_tol=1e-9)
     # Against the pose: both strap mid-planes are the holes' stations.
     model_mid = [(o + i) / 2.0 for o, i in zip(rig.STRAP_Z_OUTER, rig.STRAP_Z_INNER)]
@@ -1238,7 +1255,7 @@ def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
     # Option E-a: the pin's west end faces the MHA-DT-23 cam collar, whose air
     # to the strap foot is 0.38 at the printed worst case.  The longest pin
     # (B18.8.2 length +/-0.010 in) fits inside the narrowest strap foot (the
-    # .X end-cap radius at its minimum), so driven flush-or-below on the west
+    # .XX end-cap radius at its minimum), so driven flush-or-below on the west
     # edge it is buried on the east edge too: it can never eat that air.
     import dt_vn_pinion_strap_pin_spec as pin
 
@@ -1247,8 +1264,9 @@ def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
     # B18.8.2's recommended 1/16 hole is 0.062-0.065 in.
     assert 0.062 * 25.4 <= pin.HOLE_DIA
     assert pin.HOLE_MAX <= 0.065 * 25.4
-    assert math.isclose(pin.PIN_CENTRED_SUB_FLUSH, 0.35, abs_tol=1e-9)
-    assert math.isclose(pin.STRAP_FOOT_MIN_WIDTH, 2.0 * (drive.STRAP_R_END - 0.8))
+    assert math.isclose(pin.PIN_CENTRED_SUB_FLUSH, 1.016, abs_tol=1e-9)
+    # R7.5 prints .30 (7.62), less the .XX row (#290).
+    assert math.isclose(pin.STRAP_FOOT_MIN_WIDTH, 2.0 * (0.290 * 25.4))
     assert pin.PIN_LEN + pin.PIN_LEN_BAND <= pin.STRAP_FOOT_MIN_WIDTH
     assert pin.PIN_BURIED_MARGIN >= 0.4
     # The drive's printed acceptance (Codex #858, PRRT_kwDOPHDy386mV2GL):
@@ -1279,31 +1297,29 @@ def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
     )
     # Engagement in each strap wall past the pivot bore.
     assert pin.PIN_LEN / 2.0 - drive.STRAP_PIVOT_BORE / 2.0 >= 3.0
-    # U27 webs: strap faces and follower seat at the 2.0 target (the far
+    # U27 webs: strap faces and follower seat at the .080 target (the far
     # strap face against the .XX-printed station, Codex #858 P2); the shaft
-    # ligament at the coarsest general (.X) offset meets the 1.5 floor, and a
-    # 0.25 V-block set-up clears the 2.0 target.
-    assert math.isclose(pin.STRAP_FACE_WEB_WORST, 2.316, abs_tol=5e-4)
-    assert pin.STRAP_FACE_WEB_WORST >= 2.0
-    assert pin.FOLLOWER_SEAT_LIGAMENT >= 2.0
-    assert math.isclose(pin.SHAFT_LIGAMENT_WORST, 1.541, abs_tol=5e-4)
-    assert pin.SHAFT_LIGAMENT_WORST >= pin.SHAFT_LIGAMENT_FLOOR == 1.5
-    assert math.isclose(pin.SHAFT_LIGAMENT_QUARTER, 2.091, abs_tol=5e-4)
-    # Where the 1.541 comes from (Codex #858, PRRT_kwDOPHDy386mTvki).  The
-    # centred wall is (min shaft 6.32968 - max hole 1.6475) / 2 = 2.341.  The
+    # ligament at the implied zero's .XX offset (#290: .X is kept for features
+    # no check reads) clears the .080 target, and a 0.25 V-block set-up too.
+    assert math.isclose(pin.STRAP_FACE_WEB_WORST, 3.163, abs_tol=5e-4)
+    assert pin.STRAP_FACE_WEB_WORST >= WALL_TARGET_MM
+    assert pin.FOLLOWER_SEAT_LIGAMENT >= WALL_TARGET_MM
+    assert math.isclose(pin.SHAFT_LIGAMENT_WORST, 2.085, abs_tol=5e-4)
+    assert pin.SHAFT_LIGAMENT_WORST >= WALL_TARGET_MM
+    assert pin.SHAFT_LIGAMENT_FLOOR == WALL_FLOOR_MM
+    assert math.isclose(pin.SHAFT_LIGAMENT_QUARTER, 2.089, abs_tol=5e-4)
+    # Where the 2.085 comes from (Codex #858, PRRT_kwDOPHDy386mTvki).  The
+    # centred wall is (min shaft 6.32968 - max hole 1.651) / 2 = 2.339.  The
     # hole's centre sits on the pivot-axis line MHA-DT-14's flank view draws
     # (an implied zero, #1007 r1; Codex P1 on #1663), so it can run off the
-    # shaft axis by the coarsest general grade (.X, 0.8).  2.0 is a target
-    # met with geometry where a lever exists; none does here (the 1/4 shaft
-    # is ruled, the 1/16 pin is the smallest B18.8.2 size, the hole band is
-    # B18.8.2's window), so the loosest band that clears the 1.5 floor governs.
+    # shaft axis by the implied zero's grade (.XX, .010).
     shaft_min = pin.PIVOT_BORE + _fit_shaft_h.SHAFT_H[1]
     assert math.isclose(shaft_min, 6.32968, abs_tol=1e-9)
-    assert math.isclose(pin.SHAFT_LIGAMENT_CENTRED, (6.32968 - 1.6475) / 2.0)
+    assert math.isclose(pin.SHAFT_LIGAMENT_CENTRED, (6.32968 - 1.651) / 2.0)
     places = pin.IMPLIED_ZERO_PLACES
-    assert places == 1
-    offset = printed_band_mm(places)
-    assert math.isclose(offset, 0.8, abs_tol=1e-9)
+    assert places == 2
+    offset = printed_band_mm(places, unit="in")
+    assert math.isclose(offset, 0.254, abs_tol=1e-9)
     assert math.isclose(
         pin.SHAFT_LIGAMENT_WORST, pin.SHAFT_LIGAMENT_CENTRED - offset, abs_tol=1e-9
     )
@@ -1464,9 +1480,10 @@ def test_rig_anchors_are_named_not_literal() -> None:
         abs_tol=1e-12,
     )
     # The drum front is a fixed arbor-local 60.0; the station follows the
-    # head rear face (61.25 at the 10.5 head, 60.75 at 11.5).
+    # head rear face (61.25 at the 10.5 head, 60.75 at 11.5, 60.66 at #290's
+    # -0.66 inch-snapped face).
     assert math.isclose(arbor.DRUM_FRONT_Z_AS_BUILT, 60.0, abs_tol=1e-12)
-    assert math.isclose(arbor.DRUM_STATION_AS_BUILT, 60.75, abs_tol=1e-12)
+    assert math.isclose(arbor.DRUM_STATION_AS_BUILT, 60.66, abs_tol=1e-12)
 
 
 @pytest.mark.xfail(
@@ -1514,8 +1531,8 @@ def test_spring_pad_east_west_placement_fits_the_preload_and_stress_window() -> 
     # back block's east end, the pad screwed through its clearance hole.
     placement = {
         "gage leaf set error": RIG.FEELER_SET_ERROR,
-        "MHA-DT-18 east end from its pivot bore, .X": printed_deviations(
-            BLOCK_EAST, 1
+        "MHA-DT-18 east end from its pivot bore, .XX": printed_deviations(
+            BLOCK_EAST, 2, unit="in"
         )[1],
         "#4 screw float in the pad's clearance hole": (
             blind_cut_dia_mm(drive.SPR_HOLE_SPEC)
@@ -1575,17 +1592,21 @@ def test_spring_blade_on_flank_books_every_primitive_term() -> None:
     # #858's stack left the strip's width band out.
     from _printed_tolerance import printed_deviations
     from dt_pinion_bracket_geometry import THICKNESS, THICKNESS_PLACES
+    from dt_pinion_bracket_geometry import UNIT as STRAP_UNIT
+    from dt_pinion_spring_section import UNIT as SPRING_UNIT
     from dt_pinion_spring_section import WIDTH, WIDTH_PLACES
 
     terms = {
         "MHA-DT-14 strap thickness": THICKNESS,
-        "MHA-DT-14 strap thickness .X, thinnest": printed_deviations(
-            THICKNESS, THICKNESS_PLACES
+        "MHA-DT-14 strap thickness .XXX, thinnest": printed_deviations(
+            THICKNESS, THICKNESS_PLACES, unit=STRAP_UNIT
         )[0],
         "spring pad leaf": -RIG.SPRING_PAD_LEAF,
         "spring pad leaf set error": -RIG.FEELER_SET_ERROR,
         "MHA-DT-24 strip width": -WIDTH,
-        "MHA-DT-24 strip width .XX, widest": -printed_deviations(WIDTH, WIDTH_PLACES)[1],
+        "MHA-DT-24 strip width .XX, widest": -printed_deviations(
+            WIDTH, WIDTH_PLACES, unit=SPRING_UNIT
+        )[1],
     }
     assert RIG.SPRING_BLADE_ON_FLANK_WORST == pytest.approx(
         sum(terms.values()), abs=1e-12
@@ -1625,17 +1646,21 @@ def test_spring_strip_clears_gear_j19_at_the_worst_fit_up() -> None:
     # strip each move the strip's front edge toward the gear.
     from _printed_tolerance import printed_deviations
     from dt_pinion_bracket_geometry import THICKNESS, THICKNESS_PLACES
+    from dt_pinion_bracket_geometry import UNIT as STRAP_UNIT
+    from dt_pinion_spring_section import UNIT as SPRING_UNIT
     from dt_pinion_spring_section import WIDTH, WIDTH_PLACES
 
     j19_back = drive.Z_DRUM0 + 19 * drive.Z_PITCH + drive.DRUM_FACE / 2.0
     terms = {
         "strip front edge, nominal": RIG.SPRING_Z - WIDTH / 2.0 - j19_back,
         "rig-set leaf D set error": -RIG.FEELER_SET_ERROR,
-        "MHA-DT-14 strap thickness .X, thinnest": printed_deviations(
-            THICKNESS, THICKNESS_PLACES
+        "MHA-DT-14 strap thickness .XXX, thinnest": printed_deviations(
+            THICKNESS, THICKNESS_PLACES, unit=STRAP_UNIT
         )[0],
         "spring pad leaf set error": -RIG.FEELER_SET_ERROR,
-        "MHA-DT-24 strip width .XX, widest": -printed_deviations(WIDTH, WIDTH_PLACES)[1],
+        "MHA-DT-24 strip width .XX, widest": -printed_deviations(
+            WIDTH, WIDTH_PLACES, unit=SPRING_UNIT
+        )[1],
     }
     worst, floor = drive.RIG_MARGINS["spring strip to gear j = 19"]
     assert worst == pytest.approx(sum(terms.values()), abs=1e-9)

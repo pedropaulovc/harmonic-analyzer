@@ -2,7 +2,7 @@ r"""Reproduction script: pinion-arbor collar (book ch. 25; MHA-DT-33, R1a).
 
 The ch25 photos show a sleeve on the arbor outboard of the front strap with a
 flush pin end about 10 out (page001_img01, page002_img07).  User ruling R1a
-(2026-09-24): a plain turned steel collar, Ø15 x 20 with a drilled Ø5/16 bore,
+(2026-09-24): a plain turned steel collar, Ø.59 x .66 with a drilled 5/16 bore,
 cross-pinned to MHA-DT-22 with the rig's 1/16 in slotted spring pin through a
 hole centred on its length.  It is a northward walk-out backstop behind the
 drum's bond; the gap stack lives in ``dt_pinion_arbor_collar_spec``.
@@ -25,8 +25,10 @@ from _appearance import POLISHED_STEEL, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -55,6 +57,7 @@ from dt_pinion_arbor_collar_spec import (
     ISOMETRIC_VIEW_NOTE,
     PIN_HOLE,
     PIN_HOLE_BAND,
+    UNIT,
 )
 
 PART_NAME = "dt-pinion-arbor-collar"
@@ -100,6 +103,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing (INCH
     # document; the equation manager reads bare numbers in document units).
@@ -206,7 +211,11 @@ async def build(adapter) -> dict[str, str]:
     # DRILLED HOLES row governs it and the dimension restates nothing (policy
     # drawing-guidelines.md rule 2 (the title block is the general specification), Codex on #860).  The places are the part's (drawing-simplicity-policy.md `How the repository implements the guidelines`).
     set_dimension_bilateral_tolerance(
-        adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_BAND)
+        adapter,
+        "PinHoleProfile",
+        "PinHoleDia",
+        *deviations(PIN_HOLE_BAND),
+        display_unit=UNIT,
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     name_octant_views(adapter, label=PART_NAME)

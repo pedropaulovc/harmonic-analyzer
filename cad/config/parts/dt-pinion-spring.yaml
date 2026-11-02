@@ -1,15 +1,16 @@
 dt-pinion-spring:
   title: Pinion Return Leaf Spring
   number: MHA-DT-24
-  material: 17-7 PH Cond C, 0.381 mm
-  material_specification: 17-7 PH stainless (UNS S17700) strip, Condition C, ASTM A693; 0.015 in (0.381 mm) +/-0.00075 in, sheared 1/4 in wide from McMaster-Carr 2325K19
+  material: 17-7 PH Cond C, .015 in
+  material_specification: 17-7 PH stainless (UNS S17700) strip, Condition C, ASTM A693; 0.015 in +/-0.00075 in, sheared 1/4 in wide from McMaster-Carr 2325K19
   finish: degreased after forming; bare stainless, no coating
   quantity: 1
   tolerance_class: machined_block
   process: "formed strip blank (17-7 PH stainless, Condition C)"
+  drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
-      where: "sheet 1, top view, PadLen 3.74 from the pad hole axis: HOLE WEB 1.54 MIN"
-      finding: "hole-to-pad-relief web 1.54 mm minimum, below the 2.0 mm target but above the 1.5 mm floor (rule 17)"
-      reason: "owner approval via coordinator Main, 2026-10-19, PR #1675 option (1): retain dt_pinion_spring_geometry.PAD_WING_LEN 8.24 and the hole-axis baselines FootLen/FreeKinkH/PadLen, computed at the printed +/-0.51 band. PAD_HOLE_WEB_MIN floors the physical worst case 1.5488 mm to 1.54, never up to 1.55. The wing and R0.25 MAX relief clear the bend at the loose band limits, no mating interface moves, and the MHA-DT-VN-58 screw head retains 0.906 mm contact margin against the approved 0.5 mm minimum. The sheet states the shortfall through dt_pinion_spring_spec.PAD_LEN_CALLOUT; no tighter band is allowed."
+      where: "sheet 1, top view, PadLen .15 from the pad hole axis: HOLE WEB .076 MIN"
+      finding: "hole-to-pad-relief web .076 in minimum, below the .080 in target but above the .060 in floor (rule 17)"
+      reason: "owner approval via coordinator Main, 2026-10-19, PR #1675 option (1), carried to the #290 inch sheet: dt_pinion_spring_geometry.PAD_WING_FROM_HOLE is the longest wing on PadLen's .XX grid whose R.010 MAX relief still clears the bend at FootLen's low limit (+/-.020 formed band), with FootLen/FreeKinkH/PadLen baselined on the hole axis. PAD_HOLE_WEB_MIN floors the physical worst case to .076, never up. No mating interface moves, and the foot screw's head still bears well inside the wing. The sheet states the shortfall through dt_pinion_spring_spec.PAD_LEN_CALLOUT; no tighter band is allowed."

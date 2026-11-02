@@ -12,18 +12,18 @@ The 86 length is re-derived from img07 against that 6 mm.  Standing up =
 disengaged, folded flat = engaged; the model carries the DISENGAGED
 rest pose.
 
-Layout: hub axis Z centred at the origin (z -5..+5), BLIND bore Ø6.35
-from the +Z face down to z -3 (2 wall behind), domed cap (sagitta 2.2)
-proud of the -Z face -- the lift rod's front end hides inside. Rod: a
-radius-3 cylinder revolved about +Y from y RodY0 (buried in the hub) to
-86. Revolve LAST (nothing later crosses its axis -- the on-axis-revolve
+Layout: hub axis Z centred at the origin (z -HUB_LEN/2..+HUB_LEN/2), BLIND
+bore Ø6.35 from the +Z face down to WALL_T short of the -Z face, domed cap
+(sagitta CAP_SAG) proud of the -Z face -- the lift rod's front end hides
+inside. Rod: a ROD_DIA cylinder revolved about +Y from y RodY0 (buried in the
+hub) to ROD_LEN. Revolve LAST (nothing later crosses its axis -- the on-axis-revolve
 pitfall's safe case).
 
 Volume gate (mm^3): annulus + wall disc + cap (spherical-cap formula)
 + rod cylinder - rod/hub-OD overlap (Simpson over circular segments).
 
-U36 (MHA-DT-30): a 1/16 in pin hole crosses the hub along local X -- 3 o'clock
-to the grip -- at mid-engagement (4.0 in from the mouth face B).  It is
+U36 (MHA-DT-30): a pin hole crosses the hub along local X -- 3 o'clock
+to the grip -- at mid-engagement (half the bore depth from the mouth face B).  It is
 match-drilled at assembly through the hub and the lift rod; the part carries
 it so the print can call it out and the assembly can seat the pin.
 
@@ -73,6 +73,8 @@ from _drawing_prefix import set_dimension_prefix
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
+from _document_units import apply_package_model_units
+from _part_properties import part_drawing_unit
 from dt_pinion_lever_spec import (
     BORE,
     BORE_BAND,
@@ -89,6 +91,7 @@ from dt_pinion_lever_spec import (
     ROD_LEN,
     ROD_Y0,
     SURFACE_FINISHES,
+    UNIT,
     WALL_T,
 )
 
@@ -221,6 +224,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing (INCH
     # document). HubLen/WallT feed extrude DEPTHS (feature parameters).
@@ -552,7 +556,7 @@ async def build(adapter) -> dict[str, str]:
     # (named in the spec); everything else rides the title block at the
     # part-authored decimal places.
     set_dimension_bilateral_tolerance(
-        adapter, "BarrelProfile", "HubBore", *deviations(BORE_BAND)
+        adapter, "BarrelProfile", "HubBore", *deviations(BORE_BAND), display_unit=UNIT
     )
     set_dimension_prefix(adapter, "CapProfile", "CapR", "SR")
     clear_dimensions_for_drawing(adapter)

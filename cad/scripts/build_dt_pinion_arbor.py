@@ -17,9 +17,11 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _extrude import extrude_at_offset
 from _feature_tree import _feature_by_name, feature_name_by_type, name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -34,7 +36,7 @@ from _sketch_circle import define_circle
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
+from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _drawing_prefix import set_dimension_prefix
 from _fit_deviations import deviations
 from _gtol_cylinder import CylinderFace
@@ -59,7 +61,6 @@ from dt_pinion_arbor_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     DRUM_STATION,
-    DRUM_STATION_BAND,
     EXPOSED_SHAFT_LEN,
     FRONT_JOURNAL_FROM_HEAD_REAR,
     FRONT_JOURNAL_Z,
@@ -84,6 +85,7 @@ from dt_pinion_arbor_spec import (
     SHAFT_DIA_BAND,
     SHAFT_LEN,
     SURFACE_FINISHES,
+    UNIT,
 )
 
 PART_NAME = "dt-pinion-arbor"
@@ -519,6 +521,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     globals_mm = {
         "HeadDia": HEAD_DIA,
@@ -896,23 +900,42 @@ async def build(adapter) -> dict[str, str]:
     )
     _require_one_solid_body(adapter, label="driven integral pinion arbor")
 
+    # The bands are millimetres; UNIT prints them in inches.  The drum
+    # station's .XX band is the title block's, so it rides no dimension.
     set_dimension_bilateral_tolerance(
-        adapter, "BondZoneReference", "BondZoneDia", *deviations(SHAFT_DIA_BAND)
+        adapter,
+        "BondZoneReference",
+        "BondZoneDia",
+        *deviations(SHAFT_DIA_BAND),
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "CrossHoleProfile", "CrossHoleDia", *deviations(CROSS_HOLE_DIA_BAND)
+        adapter,
+        "CrossHoleProfile",
+        "CrossHoleDia",
+        *deviations(CROSS_HOLE_DIA_BAND),
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_DIA_BAND)
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "DrumStationReference", "DrumStationFromHeadRear", DRUM_STATION_BAND
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "FrontJournalReference", "FrontJournalDia", *deviations(JOURNAL_DIA_BAND)
+        adapter,
+        "PinHoleProfile",
+        "PinHoleDia",
+        *deviations(PIN_HOLE_DIA_BAND),
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "BackJournalReference", "BackJournalDia", *deviations(JOURNAL_DIA_BAND)
+        adapter,
+        "FrontJournalReference",
+        "FrontJournalDia",
+        *deviations(JOURNAL_DIA_BAND),
+        display_unit=UNIT,
+    )
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "BackJournalReference",
+        "BackJournalDia",
+        *deviations(JOURNAL_DIA_BAND),
+        display_unit=UNIT,
     )
     # A diametric linear dimension on a side-view sketch prints no Ø by itself.
     for prefix in ("FrontJournal", "BackJournal", "BondZone"):

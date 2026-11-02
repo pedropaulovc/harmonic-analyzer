@@ -10,3 +10,4 @@ dt-vn-pinion-strap-pin:
   quantity: 3
   tolerance_class: machined_block
   process: purchased
+  drawing_unit: in

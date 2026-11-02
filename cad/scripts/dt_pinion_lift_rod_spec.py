@@ -2,11 +2,16 @@ r"""Pure-data dimensional contract shared by the pinion lift rod and drawing."""
 
 from __future__ import annotations
 
+import math
+
+import _config
 from _fit_shaft_h import SHAFT_H
 from _gtol_cylinder import CylinderFace
+from _package_units import drawing_unit
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pinion_rig_layout import LIFT_ROD_LEN
 
+UNIT = drawing_unit("parts/dt-pinion-lift-rod", _config.parts("dt-pinion-lift-rod"))
 ROD_DIA = 6.35
 # Back end flush with the back block, front end the lever hub's seat past the
 # front block; ruling (c) moved that block inboard (pinion_rig_layout),
@@ -20,8 +25,10 @@ ROD_DIA = 6.35
 # leaf F (user ruling P1-1): the lever throw plane's air to the torque shaft's
 # front end now sizes it, not the seat.
 ROD_LEN = LIFT_ROD_LEN
-CAP_SAG = 1.2
-CAP_R = round((ROD_DIA**2 / 4.0 + CAP_SAG**2) / (2.0 * CAP_SAG), 2)  # 4.80
+# #290: the crown's sphere radius snaps to .19, and the crown height follows
+# from it on the 1/4 in diameter (1.19, the old 1.2).
+CAP_R = 4.826  # .19
+CAP_SAG = CAP_R - math.sqrt(CAP_R**2 - ROD_DIA**2 / 4.0)
 ROD_DIA_BAND = SHAFT_H
 
 LEVER_NUMBER = "MHA-DT-16"
@@ -30,7 +37,9 @@ PIVOT_BLOCK_NUMBER = "MHA-DT-18"
 # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the rod turns in the pivot blocks' west bores -- the one running
 # surface on the part.
 SURFACE_FINISHES = (
-    SurfaceFinishControl("bearing", MACHINED_UM, CylinderFace(ROD_DIA)),
+    SurfaceFinishControl(
+        "bearing", MACHINED_UM, CylinderFace(ROD_DIA), display_unit=UNIT
+    ),
 )
 
 # One revolved half-profile carries the rod's size, body length, crown and
@@ -45,17 +54,19 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 # The overall (front face to crown apex) prints in parentheses: the body
 # length to the crown rim is the controlling size, because the rig's worst
-# fitted stack (pinion_rig_layout) reads its .X band (machinist review r1:
+# fitted stack (pinion_rig_layout) reads its .XX band (machinist review r1:
 # the body length alone read like an overall that was not one, rule 10).
 DRAWING_REFERENCE_DIMENSIONS = frozenset({"RodOverall"})
 
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`); the part authors
-# them and the drawing reads them back.  Two on the banded bearing diameter and
-# the drilled pin hole; one on the length, the crown and the pin station,
-# which the lever's mid-engagement sets at assembly.
+# them and the drawing reads them back.  Four on the banded bearing diameter;
+# three on the drilled pin hole, which takes the title block's DRILLED HOLES
+# row (.064, +.004/0); two on the length the rig's stacks read, the crown, the
+# reference overall and the pin station, which the lever's mid-engagement
+# sets at assembly.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "RodProfile": {"RodDia": 2, "RodBody": 1, "CapR": 1, "RodOverall": 1},
-    "PinHoleProfile": {"PinHoleDia": 2, "PinHoleZ": 1},
+    "RodProfile": {"RodDia": 4, "RodBody": 2, "CapR": 2, "RodOverall": 2},
+    "PinHoleProfile": {"PinHoleDia": 3, "PinHoleZ": 2},
 }
 _PRECISION_NAMES = [
     (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
@@ -70,7 +81,7 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 
 # drawing-guidelines.md rule 4 (tighten only for function, and name the mate):
 # the h band rides the diameter because the rod turns in the two MHA-DT-18
-# blocks' reamed lift bores (+0.025/+0.010 slide band); ground 1/4 in shafting
+# blocks' reamed lift bores (+.0015/+.0010 slide band); ground 1/4 in shafting
 # already holds it, so the stock is good enough as supplied (machinist review
 # r1: the band and Ra named no mate).
 ROD_DIA_CALLOUT = "\n".join(

@@ -170,6 +170,7 @@ CASES = (
                     dt_cylinder_gear_shaft_spec.SHAFT_DIA,
                     contains_y_mm=dt_cylinder_gear_shaft_spec.ARBOR_BEARING_PROBE_Y_MM,
                 ),
+                display_unit="in",
             ),
         ),
     ),

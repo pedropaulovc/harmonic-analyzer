@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import math
 import re
 from pathlib import Path
 
 import _config
-from _printed_tolerance import printed_band_mm
 import _fit_deviations
 import _fit_shaft_h
 import dt_arbor_pedestal_spec
@@ -57,20 +55,17 @@ def test_shaft_band_closes_the_configured_running_fit() -> None:
 def test_the_part_owns_display_precision_and_the_sheet_only_asserts_it() -> None:
     assert part.DRAWING_PRECISION is spec.DRAWING_PRECISION
     assert spec.DRAWING_PRECISION_BY_NAME == {
-        "ShaftDia": 3,
+        "ShaftDia": 4,
         "Depth": 1,
-        "DomeHeight": 1,
-        "DomeRadius": 1,
+        "DomeHeight": 2,
+        "DomeRadius": 2,
     }
     assert "draw_dt_cylinder_gear_shaft.py" in PRECISION_MIGRATED_DRAWINGS
-    # 3/8 in = 9.525 exactly: rounding the O.D. to 9.53 would contradict the
-    # native bearing size every mating bore is built from.
+    # 3/8 in prints exactly (.3750): the native bearing size every mating
+    # bore is built from.
     digits = spec.DRAWING_PRECISION_BY_NAME["ShaftDia"]
-    printed = float(f"{spec.SHAFT_DIA:.{digits}f}")
-    assert abs(printed - spec.SHAFT_DIA) <= math.ulp(spec.SHAFT_DIA)
-    # One place on the free length claims the title block's .X row, not the
-    # tighter .XX band a trailing 187.00 would ask for.
-    assert printed_band_mm(1) == 0.8
+    printed = round(spec.SHAFT_DIA / 25.4, digits) * 25.4
+    assert abs(printed - spec.SHAFT_DIA) <= 1e-9
 
 
 def test_a_plain_drive_train_shaft_carries_no_gdt_and_no_end_view() -> None:
@@ -129,7 +124,9 @@ def test_both_ends_are_domed_and_the_dome_form_is_model_owned() -> None:
     radius prints as the spherical reference that says the end is a sphere."""
     assert spec.REFERENCE_SKETCHES == ("DomeReference",)
     assert spec.DRAWING_DIMENSIONS["DomeReference"] == {"DomeHeight", "DomeRadius"}
-    assert spec.DRAWING_PRECISION_BY_NAME["DomeHeight"] == 1
+    # The printed .06 IS the modelled dome (#290 snap).
+    places = spec.DRAWING_PRECISION_BY_NAME["DomeHeight"]
+    assert abs(round(part.DOME_HEIGHT / 25.4, places) * 25.4 - part.DOME_HEIGHT) <= 1e-9
     assert spec.DOME_CALLOUT == "BOTH ENDS"
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "_set_spherical_reference(adapter, radius_annotations[0]" in drawing_source

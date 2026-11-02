@@ -52,8 +52,9 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import set_dimension_bilateral_tolerance
-from _fit_deviations import deviations
+from _drawing_tolerances import set_dimension_symmetric_tolerance
+from _document_units import apply_package_model_units
+from _part_properties import part_drawing_unit
 from _configuration_material import require_material_in_every_configuration
 from _grouped_bom_properties import apply_grouped_bom_properties
 from _saved_part_guard import require_saved_drawing_properties
@@ -65,6 +66,7 @@ from dt_pinion_lever_pin_spec import (
     PIN_DIA,
     PIN_DIA_BAND,
     PIN_LEN,
+    UNIT,
 )
 
 PART_NAME = "dt-pinion-lever-pin"
@@ -90,6 +92,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing (INCH
     # document; the equation manager reads bare numbers in document units).
@@ -168,14 +171,14 @@ async def build(adapter) -> dict[str, str]:
     # appearance -- precedes the INSTALLED split.  Each one made after it
     # touched only the active configuration and left INSTALLED stale
     # (IConfiguration.NeedsRebuild) in the saved part, so drive-train opened
-    # NeedsRebuild2=1: set_dimension_bilateral_tolerance (pc-lever-pin-diag)
+    # NeedsRebuild2=1: set_dimension_symmetric_tolerance (pc-lever-pin-diag)
     # and, once that moved, apply_material, which sets the ACTIVE
     # configuration's material (pc-lever-pin-diag2).  Made before the split,
     # INSTALLED is copied from a finished Default and both configurations'
     # rebuilds below are the last model edits.  #928's save guard still
     # rebuilds any stale configuration; this keeps its happy path clean.
-    set_dimension_bilateral_tolerance(
-        adapter, "PinProfile", "PinDia", *deviations(PIN_DIA_BAND)
+    set_dimension_symmetric_tolerance(
+        adapter, "PinProfile", "PinDia", PIN_DIA_BAND[0], display_unit=UNIT
     )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

@@ -74,7 +74,11 @@ import dt_vn_cone_tip_block_screw_spec as holddown_screw
 import dt_vn_cone_tip_collar_spec as collar
 import _mcmaster_94025a164 as adjuster
 from _hole_spec import THREAD_MAJOR_MM
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import (
+    edge_break_chamfer_mm,
+    edge_break_radius_mm,
+    printed_band_mm,
+)
 from cone_stack_end_play import COLLAR_FEELER_BAND
 from cone_shaft_land_bands import TIP_COLLAR_INSTALLED_COCK_ANGLE_RAD
 from dt_cone_swing_platform_checks import manufactured_p1_stop_enclosure
@@ -188,8 +192,7 @@ PIVOT_XYZ: Vector = (cone_line.PIVOT_XZ[0], cone_line.Y_BASE_TOP, cone_line.PIVO
 
 # The title block's edge break bounds G19's bore mouths.
 DRUM_BORE_END_BREAK_MAX_MM = max(
-    float(_config.title_block("edge_break")["radius_mm"]),
-    float(_config.title_block("edge_break")["chamfer_max_mm"]),
+    edge_break_radius_mm(unit=drum.UNIT), edge_break_chamfer_mm(unit=drum.UNIT)
 )
 
 # --- printed fastener and location limits -------------------------------------

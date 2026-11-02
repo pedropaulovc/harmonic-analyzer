@@ -7,12 +7,13 @@ dt-pinion-arbor:
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
-  process: "turn integral arbor, neck, and head from one blank; ream head cross-hole 6.00 +0.10/0 for MHA-DT-15 grip crossrod; bond crossrod with Loctite 638"
+  process: "turn integral arbor, neck, and head from one blank; ream head cross-hole for MHA-DT-15 grip crossrod; bond crossrod with Loctite 638"
+  drawing_unit: in
   machinist_exceptions:
     # TODO(#1625): remove RV-01 and the INSIDE CORNERS note when the title
     # block gains its inside-corner default.
     - id: "RV-01"
       kind: "accept"
-      where: "inside corners at the Ø8 to Ø10.5 neck shoulder and the Ø10.5 to Ø15 head rear face"
+      where: "inside corners at the Ø5/16 to Ø.41 neck shoulder and the Ø.41 to Ø.59 head rear face"
       finding: "shoulder fillets/undercuts not sized at each step (rule 11) or a general inside-corner note in place of a title-block default"
-      reason: "owner ruling 2026-10-18 (dt-crankshaft / fr-top-frame / sm-summing-lever precedent): turned with an R0.25 MAX inside-corner ceiling, printed as one note until the shop-wide default goes in the title block under #1625 (owner-accepted); nothing seats against either shoulder (the collar spans 29.5-46.5 from the head rear face)"
+      reason: "owner ruling 2026-10-18 (dt-crankshaft / fr-top-frame / sm-summing-lever precedent): turned with an R.010 MAX inside-corner ceiling, printed as one note until the shop-wide default goes in the title block under #1625 (owner-accepted); nothing seats against either shoulder (the collar spans 1.17-1.83 from the head rear face)"
