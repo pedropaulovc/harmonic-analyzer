@@ -217,35 +217,46 @@ def test_slot_leaves_the_rule_17_head_web() -> None:
     assert spec.SLOT_WEB_MIN >= spec.SLOT_WEB_TARGET == pytest.approx(0.080 * 25.4)
 
 
-def test_inch_print_stays_inside_the_joint_envelopes() -> None:
-    # The joint and the seat checks charge the mm envelopes; the inch LIMIT
-    # bands lie inside them, on the .001 grid.
+def test_inch_print_stays_inside_the_mm_envelopes_and_feeds_the_joint() -> None:
+    # The inch LIMIT bands lie inside the mm envelopes they are cut from, on
+    # the .001 grid.
     for name, model, envelope, limits_in in (
         ("HeadDia", geom.HEAD_DIA, (-0.10, 0.10), (0.449, 0.456)),
         ("HeadReliefChamfer", geom.HEAD_RELIEF_CHAMFER, (-0.05, 0.05), (0.056, 0.059)),
         ("BodyDia", geom.BODY_DIA, (-0.15, -0.03), (0.245, 0.248)),
     ):
-        lower, upper = spec.PRINTED_BANDS[name]
+        lower, upper = geom.PRINTED_BANDS[name]
         assert ((model + lower) / 25.4, (model + upper) / 25.4) == pytest.approx(
             limits_in, abs=1e-9
         )
         assert envelope[0] <= lower < upper <= envelope[1]
     assert geom.THREAD_MAJOR_2A_MIN_IN < 0.245 < 0.248 < geom.THREAD_MAJOR_2A_MAX_IN
-    lower, upper = spec.PRINTED_BANDS["UnderHeadLength"]
+    lower, upper = geom.PRINTED_BANDS["UnderHeadLength"]
     assert geom.LENGTH_LOWER < lower < 0.0 < upper < geom.LENGTH_UPPER
-    # The single limits print past the joint's mm values; its margins hold at
-    # the printed .14 MIN, .225 MAX and R.020 MAX.
-    assert spec.PRINTED_LIMITS == pytest.approx(
+    # The single limits print past the mm values (.14 MIN, .225 MAX, R.020
+    # MAX); the joint charges the printed ones.
+    assert geom.PRINTED_LIMITS == pytest.approx(
         {
             "PlainLength": 0.14 * 25.4,
             "FullThread": 0.225 * 25.4,
             "UnderHeadCornerR": 0.508,
         }
     )
-    assert spec.PRINTED_LOOP_PLAIN_MARGIN_MIN > 0.4
-    assert spec.PRINTED_RUNOUT_MARGIN_MIN >= joint.COUNTERBORE_RUNOUT_MARGIN_MIN
-    assert spec.PRINTED_RUNOUT_FLOOR_CORNER_CLEARANCE_MIN > 0.0
-    assert spec.PRINTED_LOOP_CORNER_CLEARANCE_MIN > 0.0
+    assert (
+        joint.SCREW_PLAIN_LENGTH_MIN,
+        joint.SCREW_FULL_THREAD_STATION_MAX,
+        joint.SCREW_UNDERHEAD_CORNER_R_MAX,
+    ) == (
+        geom.PRINTED_LIMITS["PlainLength"],
+        geom.PRINTED_LIMITS["FullThread"],
+        geom.PRINTED_LIMITS["UnderHeadCornerR"],
+    )
+    assert joint.SCREW_HEAD_DIA_MIN == pytest.approx(0.449 * 25.4)
+    assert (joint.SCREW_BODY_DIA_MIN, joint.SCREW_BODY_DIA_MAX) == pytest.approx(
+        (0.245 * 25.4, 0.248 * 25.4)
+    )
+    assert joint.SCREW_HEAD_RELIEF_CHAMFER_MAX == pytest.approx(0.059 * 25.4)
+    assert (joint.SCREW_LENGTH_LOWER, joint.SCREW_LENGTH_UPPER) == (lower, upper)
 
 
 _BAND_MODELS = {
@@ -266,8 +277,8 @@ def test_every_printed_band_resolves_to_its_inch_places() -> None:
     # off a noisy SystemValue needed more than eight).
     from _drawing_tolerances import _tolerance_places
 
-    assert set(_BAND_MODELS) == set(spec.PRINTED_BANDS)
-    for name, (lower, upper) in spec.PRINTED_BANDS.items():
+    assert set(_BAND_MODELS) == set(geom.PRINTED_BANDS)
+    for name, (lower, upper) in geom.PRINTED_BANDS.items():
         model = _BAND_MODELS[name]
         places = _tolerance_places(model + lower, model + upper, display_unit="in")
         assert places <= spec.DRAWING_PRECISION_BY_NAME[name], name
@@ -278,7 +289,7 @@ def test_limit_band_sets_places_from_the_spec_model_not_the_readback(
     monkeypatch, name: str
 ) -> None:
     model = _BAND_MODELS[name]
-    lower, upper = spec.PRINTED_BANDS[name]
+    lower, upper = geom.PRINTED_BANDS[name]
     stored: dict[str, object] = {}
 
     class Tolerance:

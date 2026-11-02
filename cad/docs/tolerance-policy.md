@@ -622,7 +622,7 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   top is flush with the coefficient top. Neither feature is referenced to
   the asymmetric slab midplane. The existing sheet-2 isometric shows the
   underside rear-bottom-right **(+X,−Y,−Z)** at **1:4**, keeping six views.
-  The gooseneck head remains Ø12 mm to retain the counter's double loop.
+  The gooseneck end piece remains Ø.500 to retain the counter's double loop.
   Option A's historical source-union estimate at the prior **8.20 mm** receiver
   depth is **+6.769 cm³**, approximately **49–53 g**,
   only at illustrative density 7.2–7.85 g/cm³; its signed-change centroid is

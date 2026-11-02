@@ -1,13 +1,14 @@
 """Offline run-out, full-thread, wall, tip and loop contracts for the upper clamp.
 
 Owner rulings 2026-10-27 (#1951): MHA-SM-04's 1/4-28 UNF thread runs into
-the BLIND 1/4-28 UNF-2B tap in the solid Ø12.70 end piece of MHA-SM-01's 1/2
-in arm, and the MHA-SM-VN-51 loop is clamped on the screw's plain Ø6.35 body.
+the BLIND 1/4-28 UNF-2B tap in the solid Ø.500 end piece of MHA-SM-01's 1/2
+in arm, and the MHA-SM-VN-51 loop is clamped on the screw's plain Ø.250 body.
 The 2026-09-21 clamp rulings stand.  The arm-end counterbore clears the
 screw's die run-out with the loop clamped coil-bound (codjiflo P1 on #1997).
 Two owner minors stand against unchanged checks: the counterbore wall
 (sm-gooseneck RV-01) and the head's retention (sm-gooseneck-spring-screw
-RV-01).
+RV-01).  Both sheets print decimal inch (#290): every term is charged at the
+limits the sheets print.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+import _config
 import machinist_exceptions
 import sm_gooseneck_geom as gooseneck
 import sm_gooseneck_spec as gooseneck_spec
@@ -28,6 +30,21 @@ import sm_vn_counter_spring_stock_geom as spring
 from _buildgraph import config_files_of
 
 ONE_POINT_FIVE_D = 1.5 * screw.MAJOR_DIA
+IN = 25.4
+# MHA-SM-04 as its inch sheet prints it.
+SCREW_LENGTH_LOWER, SCREW_LENGTH_UPPER = screw.PRINTED_BANDS["UnderHeadLength"]
+SCREW_HEAD_DIA_MIN = screw.HEAD_DIA + screw.PRINTED_BANDS["HeadDia"][0]
+SCREW_HEAD_DIA_MAX = screw.HEAD_DIA + screw.PRINTED_BANDS["HeadDia"][1]
+SCREW_BODY_DIA_MIN = screw.BODY_DIA + screw.PRINTED_BANDS["BodyDia"][0]
+SCREW_BODY_DIA_MAX = screw.BODY_DIA + screw.PRINTED_BANDS["BodyDia"][1]
+SCREW_RELIEF_MIN = (
+    screw.HEAD_RELIEF_CHAMFER + screw.PRINTED_BANDS["HeadReliefChamfer"][0]
+)
+SCREW_RELIEF_MAX = (
+    screw.HEAD_RELIEF_CHAMFER + screw.PRINTED_BANDS["HeadReliefChamfer"][1]
+)
+# The inch title block's .010 edge break.
+EDGE_BREAK = 0.010 * IN
 
 
 def test_clamp_preload_binds_the_loop_coil_bound() -> None:
@@ -64,44 +81,51 @@ def test_screw_tilts_by_its_play_over_the_shortest_engagement() -> None:
     # stacked passes allow where they bear, at most LOOP_PASS_RADIUS_MAX off
     # the axis (test_rocked_loop_keeps_the_gap_floor_and_bears_on_the_body).
     pass_radius = (
-        spring.COIL_MEAN_RADIUS_MM - (spring.EYE_ID_MM - screw.BODY_DIA_MAX) / 2.0
+        spring.COIL_MEAN_RADIUS_MM - (spring.EYE_ID_MM - SCREW_BODY_DIA_MAX) / 2.0
     )
     assert joint.LOOP_PASS_RADIUS_MAX == pytest.approx(pass_radius)
     axis_gap = joint.CLAMPED_GAP_MIN - math.tan(tilt) * pass_radius
     assert joint.CLAMPED_AXIS_GAP_MIN == pytest.approx(axis_gap)
     assert axis_gap == pytest.approx(3.111, abs=5e-4)
-    # At the end face: the deepest floor and its 0.25 break past the
+    # At the end face: the deepest floor and its .010 break past the
     # receiver's first full thread.
-    face = _screw_play() + (joint.COUNTERBORE_DEPTH_MAX + 0.25) * math.tan(tilt)
+    face = _screw_play() + (joint.COUNTERBORE_DEPTH_MAX + EDGE_BREAK) * math.tan(tilt)
     assert joint.SCREW_FACE_OFFSET_MAX == pytest.approx(face)
-    assert face == pytest.approx(0.177, abs=5e-4)
+    assert face == pytest.approx(0.178, abs=5e-4)
 
 
 def test_counterbore_depth_clears_the_deepest_runout_with_margin() -> None:
-    # The tilted full-thread circle's low side dips past its axis station.
+    # The tilted full-thread circle's low side dips past its axis station,
+    # from the ".225 MAX" MHA-SM-04 prints.
+    full_thread = screw.PRINTED_LIMITS["FullThread"]
+    assert full_thread == pytest.approx(0.225 * IN)
     dip = screw.MAJOR_DIA / 2.0 * math.sin(joint.SCREW_TILT_MAX)
-    deepest = screw.FULL_THREAD_STATION_MAX - joint.CLAMPED_AXIS_GAP_MIN + dip
-    free = screw.FULL_THREAD_STATION_MAX - gooseneck.SPRING_EYE_GAP + dip
+    deepest = full_thread - joint.CLAMPED_AXIS_GAP_MIN + dip
+    free = full_thread - gooseneck.SPRING_EYE_GAP + dip
     assert joint.SCREW_RUNOUT_INTRUSION_MAX == pytest.approx(deepest)
     assert joint.SCREW_RUNOUT_INTRUSION_FREE_MAX == pytest.approx(free)
-    assert (free, deepest) == pytest.approx((0.90, 2.67), abs=0.005)
+    assert (free, deepest) == pytest.approx((0.906, 2.676), abs=5e-4)
     assert joint.COUNTERBORE_DEPTH_MIN - deepest >= joint.COUNTERBORE_RUNOUT_MARGIN_MIN
+    # The printed LIMIT .108/.112 holds the calibrated 2.78 model.
     assert (
-        joint.COUNTERBORE_DEPTH_MIN,
-        joint.COUNTERBORE_DEPTH,
-        joint.COUNTERBORE_DEPTH_MAX,
-    ) == pytest.approx((2.73, 2.78, 2.83))
+        joint.COUNTERBORE_DEPTH_MIN / IN,
+        joint.COUNTERBORE_DEPTH_MAX / IN,
+    ) == pytest.approx((0.108, 0.112))
+    assert joint.COUNTERBORE_DEPTH_MIN < joint.COUNTERBORE_DEPTH == 2.78
+    assert joint.COUNTERBORE_DEPTH < joint.COUNTERBORE_DEPTH_MAX
 
 
 def test_counterbore_clears_the_fat_runout_radially() -> None:
     clearance = (
-        joint.COUNTERBORE_DIA / 2.0  # DRILLED HOLES minus is 0
+        joint.COUNTERBORE_DIA_MIN / 2.0  # its printed LIMIT's .275
         - screw.MAJOR_DIA / 2.0  # run-out crest, at or above the 2A major max
         - joint.COUNTERBORE_AXIS_OFFSET_MAX  # MHA-SM-01 note, to the tap
         - joint.SCREW_FACE_OFFSET_MAX  # the tilted screw, at the end face
     )
+    assert joint.COUNTERBORE_DIA_MIN / IN == pytest.approx(0.275)
+    assert joint.COUNTERBORE_DIA_MIN <= joint.COUNTERBORE_DIA == 7.00
     assert joint.RUNOUT_RADIAL_CLEARANCE_MIN == pytest.approx(clearance)
-    assert clearance == pytest.approx(0.048, abs=5e-4)
+    assert clearance == pytest.approx(0.038, abs=5e-4)
     # Ø6.90 would rub once the tilt counts: the reason the counterbore is Ø7.00.
     assert (6.90 - screw.MAJOR_DIA) / 2.0 - joint.COUNTERBORE_AXIS_OFFSET_MAX - (
         joint.SCREW_FACE_OFFSET_MAX
@@ -110,19 +134,19 @@ def test_counterbore_clears_the_fat_runout_radially() -> None:
 
 def test_counterbore_floor_corner_round_clears_the_runout() -> None:
     # The run-out's crest corner, u above the floor and v off the wall, inside
-    # the R0.10 MAX round's square: its clearance is the round's radius less
+    # the R.004 MAX round's square: its clearance is the round's radius less
     # the distance to the round's centre.
     rf = joint.COUNTERBORE_FLOOR_CORNER_R_MAX
-    assert rf == 0.10
+    assert rf == pytest.approx(0.004 * IN)
     u = joint.COUNTERBORE_DEPTH_MIN - joint.SCREW_RUNOUT_INTRUSION_MAX
     v = joint.RUNOUT_RADIAL_CLEARANCE_MIN
     assert 0.0 < u < rf and 0.0 < v < rf
     exact = rf - math.hypot(u - rf, v - rf)
     assert joint.RUNOUT_FLOOR_CORNER_CLEARANCE_MIN == pytest.approx(exact)
-    assert exact == pytest.approx(0.033, abs=5e-4)
-    # The title block's INSIDE CORNERS R1.0 MAX would stop the screw.
-    assert joint._fillet_clearance(u, v, 1.0, 0.0) < 0.0
-    # Printed by the model's own radial dimension, R0.10 MAX from sharp up.
+    assert exact == pytest.approx(0.029, abs=5e-4)
+    # The title block's INSIDE CORNERS R.040 MAX would stop the screw.
+    assert joint._fillet_clearance(u, v, 0.040 * IN, 0.0) < 0.0
+    # Printed by the model's own radial dimension, R.004 MAX from sharp up.
     assert joint.COUNTERBORE_FLOOR_CORNER_R_BAND == (0.0, -rf)
     assert joint.COUNTERBORE_FLOOR_CORNER_R_TOL_TYPE == 6  # swTolMAX
     assert (
@@ -145,7 +169,7 @@ def test_receiver_full_thread_past_the_counterbore_is_1_5d() -> None:
     # The shortest screw at the free gap, less its 1.5-pitch chamfered end,
     # against the blind tap's least full thread: the screw governs.
     screw_full = (
-        screw.LENGTH + screw.LENGTH_LOWER - gooseneck.SPRING_EYE_GAP - 1.5 * screw.PITCH
+        screw.LENGTH + SCREW_LENGTH_LOWER - gooseneck.SPRING_EYE_GAP - 1.5 * screw.PITCH
     )
     tap_full = joint.TAP_THREAD_DEPTH - joint.TAP_DEPTH_BAND
     assert joint.FULL_THREAD_REACH_MIN == pytest.approx(screw_full)
@@ -153,11 +177,11 @@ def test_receiver_full_thread_past_the_counterbore_is_1_5d() -> None:
     full_thread = (
         min(screw_full, tap_full)
         - joint.COUNTERBORE_DEPTH_MAX  # deepest counterbore
-        - 0.25  # title-block break on the tap edge at the counterbore floor
+        - EDGE_BREAK  # title-block break on the tap edge at the counterbore floor
     )
     assert joint.ENGAGEMENT_MIN == pytest.approx(full_thread)
     assert (joint.ENGAGEMENT_NOMINAL, joint.ENGAGEMENT_MIN) == pytest.approx(
-        (10.23, 9.67), abs=0.005
+        (10.225, 9.964), abs=5e-4
     )
     assert joint.ENGAGEMENT_MIN >= ONE_POINT_FIVE_D == pytest.approx(9.525)
     # Full thread starts inside the counterbore at either gap, so the mated
@@ -168,7 +192,7 @@ def test_receiver_full_thread_past_the_counterbore_is_1_5d() -> None:
 
 def test_deepest_tip_stays_inside_the_blind_full_thread() -> None:
     # The longest screw at the least gap on its axis sits deepest.
-    deepest_tip = screw.LENGTH + screw.LENGTH_UPPER - joint.CLAMPED_AXIS_GAP_MIN
+    deepest_tip = screw.LENGTH + SCREW_LENGTH_UPPER - joint.CLAMPED_AXIS_GAP_MIN
     # The tap's depths run from the counterbore floor, its start face.
     shallowest_thread = (
         joint.COUNTERBORE_DEPTH_MIN
@@ -177,7 +201,7 @@ def test_deepest_tip_stays_inside_the_blind_full_thread() -> None:
     )
     assert joint.CLAMPED_SCREW_REACH_MAX == pytest.approx(deepest_tip)
     assert joint.TIP_THREAD_MARGIN_MIN == pytest.approx(shallowest_thread - deepest_tip)
-    assert joint.TIP_THREAD_MARGIN_MIN == pytest.approx(0.09, abs=0.005)
+    assert joint.TIP_THREAD_MARGIN_MIN == pytest.approx(0.520, abs=5e-4)
     assert joint.TIP_THREAD_MARGIN_MIN > 0.0
     assert joint.TAP_SPEC.end == "blind"
     assert joint.TAP_SPEC.size == screw.THREAD_SIZE == "1/4-28"
@@ -193,12 +217,16 @@ def test_bottoming_tap_lead_stays_inside_the_drill() -> None:
     )
     shallowest_drill = joint.TAP_DRILL_DEPTH_FROM_FLOOR - joint.TAP_DEPTH_BAND
     assert joint.TAP_LEAD_DRILL_MARGIN_MIN == pytest.approx(shallowest_drill - lead_end)
-    assert joint.TAP_LEAD_DRILL_MARGIN_MIN == pytest.approx(0.019, abs=5e-4)
+    assert joint.TAP_LEAD_DRILL_MARGIN_MIN == pytest.approx(0.671, abs=5e-4)
     assert joint.TAP_LEAD_DRILL_MARGIN_MIN >= 0.0
-    # The full-Ø drill stays inside the SHORTEST head (.XX band).
-    assert joint.PLUG_HEAD_LENGTH_MIN == pytest.approx(
-        gooseneck.PLUG_HEAD_LENGTH - 0.51
-    )
+    # Both depths print .XX on the inch sheet, modelled on that grid.
+    assert (
+        joint.TAP_THREAD_DEPTH_FROM_FLOOR / IN,
+        joint.TAP_DRILL_DEPTH_FROM_FLOOR / IN,
+        joint.TAP_DEPTH_BAND / IN,
+    ) == pytest.approx((0.58, 0.68, 0.01))
+    # The full-Ø drill stays inside the SHORTEST head: .85 at its .XX band.
+    assert joint.PLUG_HEAD_LENGTH_MIN == pytest.approx(0.84 * IN)
     assert (
         joint.COUNTERBORE_DEPTH_MAX
         + joint.TAP_DRILL_DEPTH_FROM_FLOOR
@@ -208,10 +236,10 @@ def test_bottoming_tap_lead_stays_inside_the_drill() -> None:
 
 
 def _smallest_end_piece_radius() -> float:
-    return (gooseneck.PLUG_DIA - joint.PLUG_DIAMETER_BAND) / 2.0  # .XX lower limit
+    return 0.49 * IN / 2.0  # the head Ø's .50 at its .XX lower limit
 
 
-def test_tap_wall_is_2_0_at_the_full_worst_case() -> None:
+def test_tap_wall_meets_the_080_target_at_the_full_worst_case() -> None:
     largest_tap_major = screw.MAJOR_DIA + 0.025  # basic major + root oversize
     # Hole drilled after braze, head OD turned before: different setups.
     runoff = (
@@ -226,21 +254,22 @@ def test_tap_wall_is_2_0_at_the_full_worst_case() -> None:
         - joint.THREAD_AXIS_OFFSET_MAX  # MHA-SM-01 note
         - joint.DRILL_WANDER_MAX  # MHA-SM-01 note
         - runoff
-        - 2.0 * 0.25  # tap edge + head OD edge, title block
+        - 2.0 * EDGE_BREAK  # tap edge + head OD edge, title block
     )
-    assert joint.EDGE_BREAK == 0.25
+    assert joint.EDGE_BREAK == pytest.approx(EDGE_BREAK)
     assert joint.TAP_ROOT_OVERSIZE == 0.025
+    assert joint.THREAD_AXIS_OFFSET_MAX == pytest.approx(0.006 * IN)
     assert joint.DRILL_RUNOFF_MAX == pytest.approx(runoff)
     assert joint.PLUG_WALL_MIN == pytest.approx(worst_wall)
-    assert worst_wall == pytest.approx(2.056, abs=5e-4)
-    assert worst_wall >= joint.PLUG_WALL_TARGET == 2.0
+    assert worst_wall == pytest.approx(2.175, abs=5e-4)
+    assert worst_wall >= joint.PLUG_WALL_TARGET == 0.080 * IN
 
 
-def test_drill_point_shank_wall_is_2_0_at_the_full_worst_case() -> None:
+def test_drill_point_shank_wall_meets_the_080_target_at_the_full_worst_case() -> None:
     # The deepest drill's 118-degree point crosses the head's end into the
     # shank: its cone radius there, at the SHORTEST head (.XX band, codjiflo
-    # P1 on #1997), against the shank's lower printed limit.
-    drill_r = (joint.TAP_DRILL_DIA + 0.10) / 2.0  # DRILLED HOLES +0.10
+    # P1 on #1997), against the shank's lower printed limit (.363 at .XXX).
+    drill_r = (joint.TAP_DRILL_DIA + 0.004 * IN) / 2.0  # DRILLED HOLES +.004
     point_h = drill_r / math.tan(math.radians(59.0))
     tip = (
         joint.COUNTERBORE_DEPTH_MAX
@@ -248,10 +277,10 @@ def test_drill_point_shank_wall_is_2_0_at_the_full_worst_case() -> None:
         + joint.TAP_DEPTH_BAND
         + point_h
     )
-    cone_r = drill_r * (tip - (gooseneck.PLUG_HEAD_LENGTH - 0.51)) / point_h
+    cone_r = drill_r * (tip - 0.84 * IN) / point_h
     assert 0.0 < cone_r < drill_r
     worst_wall = (
-        (joint.PLUG_SHANK_DIA - joint.PLUG_DIAMETER_BAND) / 2.0
+        (0.363 - 0.005) * IN / 2.0
         - cone_r
         - joint.THREAD_AXIS_OFFSET_MAX
         - joint.DRILL_WANDER_MAX
@@ -259,12 +288,12 @@ def test_drill_point_shank_wall_is_2_0_at_the_full_worst_case() -> None:
     )
     assert joint.DRILL_POINT_RADIUS_AT_SHANK == pytest.approx(cone_r, abs=1e-4)
     assert joint.DRILL_POINT_SHANK_WALL_MIN == pytest.approx(worst_wall, abs=1e-4)
-    assert worst_wall == pytest.approx(2.033, abs=5e-4)
+    assert worst_wall == pytest.approx(3.029, abs=5e-4)
     assert worst_wall >= joint.PLUG_WALL_TARGET
 
 
 def test_counterbore_wall_holds_the_floor_and_declares_its_minor() -> None:
-    largest_cbore = 7.10  # its printed LIMIT 7.10/7.00
+    largest_cbore = 0.279 * IN  # its printed LIMIT .279/.275
     # Counterbore cut after braze, head OD turned before: different setups.
     runoff = joint.COUNTERBORE_DEPTH_MAX * math.tan(math.radians(0.3))
     worst_wall = (
@@ -273,15 +302,17 @@ def test_counterbore_wall_holds_the_floor_and_declares_its_minor() -> None:
         - joint.THREAD_AXIS_OFFSET_MAX  # MHA-SM-01 note, tap to tube
         - joint.COUNTERBORE_AXIS_OFFSET_MAX  # MHA-SM-01 note, to the tap
         - runoff
-        - 2.0 * 0.25  # counterbore mouth + head OD edge, title block
+        - 2.0 * EDGE_BREAK  # counterbore mouth + head OD edge, title block
     )
     assert joint.COUNTERBORE_DIA_MAX == pytest.approx(largest_cbore)
     assert joint.COUNTERBORE_WALL_MIN == pytest.approx(worst_wall)
-    assert worst_wall == pytest.approx(1.780, abs=5e-4)
-    assert joint.PLUG_WALL_FLOOR == 1.5 <= worst_wall < joint.PLUG_WALL_TARGET
-    # The sheet states it, floored, next to its feature (rule 20).
-    assert joint.COUNTERBORE_WALL_CALLOUT_MIN == 1.78 <= worst_wall
-    callout = f"C'BORE WALL {joint.COUNTERBORE_WALL_CALLOUT_MIN:.2f} MIN"
+    assert worst_wall / IN == pytest.approx(0.0749, abs=5e-5)
+    assert joint.PLUG_WALL_FLOOR == pytest.approx(0.060 * IN)
+    assert joint.PLUG_WALL_FLOOR <= worst_wall < joint.PLUG_WALL_TARGET
+    # The sheet states it in inches, floored, next to its feature (rule 20).
+    assert joint.COUNTERBORE_WALL_CALLOUT_MIN == 0.074
+    assert joint.COUNTERBORE_WALL_CALLOUT_MIN * IN <= worst_wall
+    callout = "C'BORE WALL .074 MIN"
     assert callout in gooseneck_spec.COUNTERBORE_WALL_CALLOUT
     assert any(
         gooseneck_spec.COUNTERBORE_WALL_CALLOUT in text
@@ -293,12 +324,13 @@ def test_head_retains_the_eye_under_its_declared_minor() -> None:
     eye_x = gooseneck.ARM_END_X - spring.END_OCCUPIED_WIDTH_MM / 2.0
     assert eye_x == pytest.approx(-105.8)
     assert gooseneck.SPRING_EYE_GAP == spring.END_OCCUPIED_WIDTH_MM
-    smallest_head = screw.HEAD_DIA + screw.HEAD_DIA_LOWER
+    smallest_head = SCREW_HEAD_DIA_MIN  # its printed LIMIT's .449
+    assert smallest_head == pytest.approx(0.449 * IN)
     retention = (smallest_head - spring.EYE_ID_MM) / 2.0
     assert joint.HEAD_RETENTION_MIN == pytest.approx(retention)
-    assert retention == pytest.approx(0.95, abs=5e-4)
+    assert retention == pytest.approx(0.9525, abs=5e-4)
     assert 0.0 < retention < joint.HEAD_RETENTION_TARGET == 1.0
-    assert screw.BODY_DIA_MAX < spring.EYE_ID_MM
+    assert SCREW_BODY_DIA_MAX < spring.EYE_ID_MM
 
 
 def _upper_transition_section(steps: int = 4000):
@@ -380,11 +412,11 @@ def test_head_relief_clears_the_vendor_transition_wire() -> None:
     worst = min(
         least(head, relief, body)
         for head in (
-            screw.HEAD_DIA + screw.HEAD_DIA_LOWER,
-            screw.HEAD_DIA + screw.HEAD_DIA_UPPER,
+            SCREW_HEAD_DIA_MIN,
+            SCREW_HEAD_DIA_MAX,
         )
-        for relief in (screw.HEAD_RELIEF_CHAMFER_MIN, screw.HEAD_RELIEF_CHAMFER_MAX)
-        for body in (screw.BODY_DIA_MIN, screw.BODY_DIA_MAX, screw.BODY_DIA)
+        for relief in (SCREW_RELIEF_MIN, SCREW_RELIEF_MAX)
+        for body in (SCREW_BODY_DIA_MIN, SCREW_BODY_DIA_MAX, screw.BODY_DIA)
     )
     assert worst > 0.0
     # The CAD seat (the nominal head and relief) clears it too.
@@ -392,8 +424,8 @@ def test_head_relief_clears_the_vendor_transition_wire() -> None:
 
 
 def test_relieved_head_flat_still_bears_the_loop() -> None:
-    flat = (screw.HEAD_DIA + screw.HEAD_DIA_LOWER) / 2.0 - screw.HEAD_RELIEF_CHAMFER_MAX
-    pass_r = spring.COIL_MEAN_RADIUS_MM - (spring.EYE_ID_MM - screw.BODY_DIA_MAX) / 2.0
+    flat = SCREW_HEAD_DIA_MIN / 2.0 - SCREW_RELIEF_MAX
+    pass_r = spring.COIL_MEAN_RADIUS_MM - (spring.EYE_ID_MM - SCREW_BODY_DIA_MAX) / 2.0
     assert joint.HEAD_FLAT_RADIUS_MIN == pytest.approx(flat)
     assert joint.LOOP_PASS_RADIUS_MAX == pytest.approx(pass_r)
     assert joint.HEAD_FLAT_BEARING_MARGIN_MIN == pytest.approx(flat - pass_r)
@@ -404,7 +436,7 @@ def _declared(package: str):
     return {
         entry.id: entry.kind
         for entry in machinist_exceptions.load_exceptions(
-            joint._config.CONFIG_DIR, package, "part"
+            _config.CONFIG_DIR, package, "part"
         )
     }
 
@@ -417,8 +449,8 @@ def test_owner_minors_are_declared_and_required(monkeypatch) -> None:
         "sm_gooseneck_spring_screw": "sm-gooseneck-spring-screw",
     }
     for package, dashed in rows.items():
-        joint.owner_minor(joint._config.parts(dashed), "RV-01", package)
-    real = joint._config.parts
+        joint.owner_minor(_config.parts(dashed), "RV-01", package)
+    real = _config.parts
 
     def without(hidden: str, accept: bool = False):
         def parts(stem=None):
@@ -448,7 +480,7 @@ def test_owner_minors_are_declared_and_required(monkeypatch) -> None:
         "sm_gooseneck_spring_screw": screw_spec,
     }
     for hidden, spec_module in specs.items():
-        monkeypatch.setattr(joint._config, "parts", without(hidden))
+        monkeypatch.setattr(_config, "parts", without(hidden))
         with pytest.raises(AssertionError, match=f"{hidden}: no owner minor RV-01"):
             runpy.run_path(spec_module.__file__)
 
@@ -468,35 +500,44 @@ def test_owner_minor_reads_stay_scoped_to_their_registry_rows() -> None:
         tokens = config_files_of(Path(spec_module.__file__))
         assert "**" not in tokens
         assert row in tokens
+    # The joint charges each inch sheet's printed limits through the geometry
+    # modules' SHEET_UNIT, and each spec holds it to its own row's unit.
+    assert gooseneck_spec.UNIT == gooseneck.SHEET_UNIT == "in"
+    assert screw_spec.UNIT == screw.SHEET_UNIT == "in"
+    assert joint.UNIT == gooseneck.SHEET_UNIT
 
 
 def test_loop_passes_bear_on_the_plain_body_free_and_clamped() -> None:
+    # The plain body's ".14 MIN" as MHA-SM-04 prints it.
+    plain = screw.PRINTED_LIMITS["PlainLength"]
+    assert plain == pytest.approx(0.14 * IN)
     head_pass, plug_pass = joint.LOOP_PASS_X
-    assert 0.0 < head_pass < plug_pass < screw.PLAIN_LENGTH_MIN
+    assert 0.0 < head_pass < plug_pass < plain
     assert (head_pass, plug_pass) == pytest.approx((1.2687, 3.1433), abs=5e-4)
     clamped_head, clamped_plug = joint.CLAMPED_LOOP_PASS_X
-    assert 0.0 < clamped_head < clamped_plug < screw.PLAIN_LENGTH_MIN
+    assert 0.0 < clamped_head < clamped_plug < plain
     assert (clamped_head, clamped_plug) == pytest.approx((1.2002, 2.8004), abs=5e-4)
     # Plug-side pass short of the thread's earliest start: worst free.
-    margin = screw.PLAIN_LENGTH_MIN - plug_pass
+    margin = plain - plug_pass
     assert joint.LOOP_PLAIN_MARGIN_MIN == pytest.approx(margin)
-    assert margin == pytest.approx(0.457, abs=5e-4)
+    assert margin == pytest.approx(0.413, abs=5e-4)
     assert joint.LOOP_PLAIN_MARGIN_MIN > 0.0
     # No step: the blank lies inside the 2A major band, so the die's crests
     # stand at the blank and the body is one diameter wherever a wire bears.
-    assert screw.THREAD_MAJOR_2A_MIN <= screw.BODY_DIA_MIN
-    assert screw.BODY_DIA_MAX <= screw.THREAD_MAJOR_2A_MAX
+    assert screw.THREAD_MAJOR_2A_MIN <= SCREW_BODY_DIA_MIN
+    assert SCREW_BODY_DIA_MAX <= screw.THREAD_MAJOR_2A_MAX
 
 
 def test_wire_on_the_head_face_clears_the_underhead_fillet() -> None:
-    r, fillet = joint.WIRE_R, screw.UNDERHEAD_CORNER_R
-    assert fillet == 0.50
+    # The under-head corner's "R.020 MAX" as MHA-SM-04 prints it.
+    r, fillet = joint.WIRE_R, screw.PRINTED_LIMITS["UnderHeadCornerR"]
+    assert fillet == pytest.approx(0.020 * IN)
     # Wire touching head face and body: its centre (r, r) from the corner, the
     # fillet circle centred (fillet, fillet).  With r > fillet the nearest
     # fillet material is a tangent point, (fillet, 0) or (0, fillet).
     floor = math.hypot(r - fillet, r) - r
     assert joint.LOOP_CORNER_CLEARANCE_MIN == pytest.approx(floor)
-    assert floor == pytest.approx(0.054, abs=5e-4)
+    assert floor == pytest.approx(0.052, abs=5e-4)
     assert joint.LOOP_CORNER_CLEARANCE_MIN > 0.0
     # The floor is the least of every state: clearance grows with station.
     stations = [r + 0.01 * k for k in range(300)]
@@ -570,7 +611,7 @@ def test_rocked_loop_keeps_the_gap_floor_and_bears_on_the_body() -> None:
     # body (either limit).  No friction or equilibrium filter: every rocked
     # state whose width fits the gap (the free gap, or CLAMPED_GAP_MAX bound)
     # counts.  Its section bears on a face wherever it meets the face's
-    # footprint, rims included (_rim_reach).  Head: from the R0.5 corner's
+    # footprint, rims included (_rim_reach).  Head: from the R.020 corner's
     # tangent out to the relieved flat's edge, then the 45-degree relief to
     # the head's Ø (_relieved_head_reach), at the least flat (smallest head,
     # largest relief) and the most.  End face: from the counterbore mouth's
@@ -582,7 +623,7 @@ def test_rocked_loop_keeps_the_gap_floor_and_bears_on_the_body() -> None:
     #    which is near-tight too (a finer grid reads it lower, toward it);
     #  * in every state that fits, the wire bears on the body at the body's
     #    own radius (no step: test_loop_passes_bear_on_the_plain_body_free_and_clamped),
-    #    past the head face's wire radius (the R0.5 corner's floor,
+    #    past the head face's wire radius (the R.020 corner's floor,
     #    LOOP_CORNER_CLEARANCE_MIN) and short of the end face: a wire on the
     #    body spans the counterbore's mouth rim, so at most it rides that rim
     #    and never enters the counterbore.
@@ -615,21 +656,19 @@ def test_rocked_loop_keeps_the_gap_floor_and_bears_on_the_body() -> None:
     )
     heads = {
         "least flat": (
-            (screw.HEAD_DIA + screw.HEAD_DIA_LOWER) / 2.0
-            - screw.HEAD_RELIEF_CHAMFER_MAX,
-            (screw.HEAD_DIA + screw.HEAD_DIA_LOWER) / 2.0,
+            SCREW_HEAD_DIA_MIN / 2.0 - SCREW_RELIEF_MAX,
+            SCREW_HEAD_DIA_MIN / 2.0,
         ),
         "most flat": (
-            (screw.HEAD_DIA + screw.HEAD_DIA_UPPER) / 2.0
-            - screw.HEAD_RELIEF_CHAMFER_MIN,
-            (screw.HEAD_DIA + screw.HEAD_DIA_UPPER) / 2.0,
+            SCREW_HEAD_DIA_MAX / 2.0 - SCREW_RELIEF_MIN,
+            SCREW_HEAD_DIA_MAX / 2.0,
         ),
     }
     assert heads["least flat"][0] == pytest.approx(joint.HEAD_FLAT_RADIUS_MIN)
     mouth_r = joint.COUNTERBORE_MOUTH_REACH
     footprints = {
         "least": _smallest_end_piece_radius() - joint.EDGE_BREAK,
-        "most": (gooseneck.PLUG_DIA + joint.PLUG_DIAMETER_BAND) / 2.0,
+        "most": (gooseneck.PLUG_DIA + joint.PLUG_DIA_DEVIATIONS[1]) / 2.0,
     }
     face_tilts = math.tan(joint.SCREW_TILT_MAX) * np.array(
         [[math.cos(a), math.sin(a)] for a in np.linspace(0.0, 2.0 * math.pi, 9)[:-1]]
@@ -640,7 +679,7 @@ def test_rocked_loop_keeps_the_gap_floor_and_bears_on_the_body() -> None:
     }
     cases = []
     for state, (gap_max, rise) in states.items():
-        for body in (screw.BODY_DIA_MIN, screw.BODY_DIA_MAX):
+        for body in (SCREW_BODY_DIA_MIN, SCREW_BODY_DIA_MAX):
             d = (spring.EYE_ID_MM - body) / 2.0
             loop = np.stack(
                 [
@@ -663,7 +702,7 @@ def test_rocked_loop_keeps_the_gap_floor_and_bears_on_the_body() -> None:
             radius = np.hypot(xy[..., 0], xy[..., 1])
             assert radius.min(axis=1) == pytest.approx(bearing_r)
             bearing = radius <= bearing_r + 1e-9
-            head_inner = body / 2.0 + screw.UNDERHEAD_CORNER_R
+            head_inner = body / 2.0 + screw.PRINTED_LIMITS["UnderHeadCornerR"]
             for head, (flat, head_r) in heads.items():
                 head_side = z - _relieved_head_reach(radius, head_inner, flat, head_r)
                 head_face = head_side.min(axis=1)
@@ -723,7 +762,7 @@ def test_rocked_loop_keeps_the_gap_floor_and_bears_on_the_body() -> None:
 def test_loop_wire_clears_the_counterbore_mouth_at_full_worst_case() -> None:
     reach = (
         joint.COUNTERBORE_DIA_MAX / 2.0  # largest counterbore
-        + 0.25  # title-block break on its mouth
+        + EDGE_BREAK  # title-block break on its mouth
         + joint.COUNTERBORE_AXIS_OFFSET_MAX  # counterbore axis vs thread axis
         + joint.SCREW_FACE_OFFSET_MAX  # the tilted screw's axis at the end face
     )
@@ -734,7 +773,7 @@ def test_loop_wire_clears_the_counterbore_mouth_at_full_worst_case() -> None:
         (gooseneck.SPRING_EYE_GAP, spring.LOOP_RISE_MM),
         (joint.CLAMPED_GAP_MAX, joint.CLAMPED_LOOP_RISE),
     ):
-        for body in (screw.BODY_DIA_MIN, screw.BODY_DIA_MAX):
+        for body in (SCREW_BODY_DIA_MIN, SCREW_BODY_DIA_MAX):
             points = list(_helix_points(gap, rise, body))
             # The plug-side tip is the wire that meets the end face.
             tip_station, tip_radius = points[-1]
@@ -783,7 +822,7 @@ def test_bending_span_reaches_the_receiver_first_full_thread() -> None:
     assert screw_spec.STRENGTH_SPAN == pytest.approx(
         max(screw.FULL_THREAD_STATION_MAX, receiver)
     )
-    assert screw_spec.STRENGTH_SPAN == pytest.approx(7.48, abs=0.005)
+    assert screw_spec.STRENGTH_SPAN == pytest.approx(7.499, abs=5e-4)
     assert screw_spec._SECTIONS[-1][1] == screw_spec.STRENGTH_SPAN
 
 

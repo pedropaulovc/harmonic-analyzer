@@ -19,7 +19,8 @@ threadlocker.  The Ø11.50 head keeps 0.95 (.037 in) retention under an owner mi
 
 Decimal-inch sheet (#290).  The screw's sizes are calibrated spring-support
 geometry, so the model keeps its millimetre nominals and the sheet prints them
-on the inch grid (PRINTED_BANDS, PRINTED_LIMITS below).  Every size takes the
+on the inch grid (sm_gooseneck_spring_screw_geom.PRINTED_BANDS /
+PRINTED_LIMITS, which the joint charges).  Every size takes the
 title block's .XX band except six limits, each named on the sheet for what
 it serves (drawing-guidelines.md rule 4): the body Ø's LIMIT band .248/.245
 (the thread blank, inside the 2A major band, and the loop's seat), the plain
@@ -41,151 +42,35 @@ import _config
 import sm_gooseneck_spring_joint as joint
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import printed_deviations
 from sm_gooseneck_spring_screw_geom import (
     BODY_DIA,
-    BODY_DIA_LOWER,
     BODY_DIA_MIN,
-    BODY_DIA_UPPER,
     FULL_THREAD_STATION_MAX,
     HEAD_DIA,
-    HEAD_DIA_LOWER,
     HEAD_DIA_UPPER,
     HEAD_H,
     HEAD_RELIEF_CHAMFER,
-    HEAD_RELIEF_CHAMFER_LOWER,
     HEAD_RELIEF_CHAMFER_MIN,
-    HEAD_RELIEF_CHAMFER_UPPER,
-    LENGTH,
-    LENGTH_LOWER,
-    LENGTH_UPPER,
     MAJOR_DIA,
     MM_PER_IN,
     PITCH,
-    PLAIN_LENGTH_MIN,
+    PRINTED_BANDS,
+    PRINTED_LIMITS,
+    SHEET_UNIT,
     SLOT_DEPTH,
-    SLOT_WIDTH,
     THREAD,
     THREAD_MINOR_2A_MIN_EST,
-    TIP_CHAMFER,
-    UNDERHEAD_CORNER_R,
+    places,
     require_body_form,
 )
 
-# #290: the registry row's drawing_unit (in) is this sheet's unit.
+# #290: the registry row's drawing_unit (in) is this sheet's unit; the
+# geometry module's printed bands, which the joint reads, assume the same.
 UNIT = drawing_unit(
     "parts/sm-gooseneck-spring-screw", _config.parts("sm-gooseneck-spring-screw")
 )
-# Three places on the LIMIT bands and on the full-thread and corner single
-# limits (each needs them to stay on its side of the envelope the joint
-# charges); two everywhere else.
-THREE_PLACE_DIMENSIONS = frozenset(
-    {"HeadDia", "HeadReliefChamfer", "BodyDia", "FullThread", "UnderHeadCornerR"}
-)
-
-
-def places(name: str) -> int:
-    return 3 if name in THREE_PLACE_DIMENSIONS else 2
-
-
-def _limit_band(model: float, lower: float, upper: float) -> tuple[float, float]:
-    """(lower, upper) mm deviations about ``model`` of the widest .001-in LIMIT
-    pair inside the mm envelope ``model + lower .. model + upper``."""
-    low = math.ceil(round((model + lower) / MM_PER_IN * 1000.0, 6)) / 1000.0
-    high = math.floor(round((model + upper) / MM_PER_IN * 1000.0, 6)) / 1000.0
-    return round(low * MM_PER_IN - model, 9), round(high * MM_PER_IN - model, 9)
-
-
-# What the sheet accepts, (lower, upper) mm about each mm model nominal: the
-# three LIMIT bands on the inch grid inside their envelopes, every other band
-# the title block's .XX about the printed (rounded) nominal.
-PRINTED_BANDS: dict[str, tuple[float, float]] = {
-    "HeadDia": _limit_band(HEAD_DIA, HEAD_DIA_LOWER, HEAD_DIA_UPPER),
-    "HeadReliefChamfer": _limit_band(
-        HEAD_RELIEF_CHAMFER, HEAD_RELIEF_CHAMFER_LOWER, HEAD_RELIEF_CHAMFER_UPPER
-    ),
-    "BodyDia": _limit_band(BODY_DIA, BODY_DIA_LOWER, BODY_DIA_UPPER),
-    **{
-        name: printed_deviations(model, places(name), unit=UNIT)
-        for name, model in (
-            ("HeadHeight", HEAD_H),
-            ("UnderHeadLength", LENGTH),
-            ("SlotWidth", SLOT_WIDTH),
-            ("SlotDepth", SLOT_DEPTH),
-            ("TipChamfer", TIP_CHAMFER),
-        )
-    },
-}
-# The single limits as printed, mm: swTolMIN / swTolMAX print the model
-# rounded at its places, the model on the accepted side of it.
-PRINTED_LIMITS: dict[str, float] = {
-    name: model + printed_deviations(model, places(name), (0.0, 0.0), unit=UNIT)[0]
-    for name, model in (
-        ("PlainLength", PLAIN_LENGTH_MIN),
-        ("FullThread", FULL_THREAD_STATION_MAX),
-        ("UnderHeadCornerR", UNDERHEAD_CORNER_R),
-    )
-}
-# Every model nominal sits inside its printed band, except the body, which is
-# modelled at the thread's basic major with its blank's band below it.
-if not all(
-    lower <= 0.0 <= upper
-    for name, (lower, upper) in PRINTED_BANDS.items()
-    if name != "BodyDia"
-) or not (
-    PRINTED_LIMITS["PlainLength"] <= PLAIN_LENGTH_MIN
-    and FULL_THREAD_STATION_MAX <= PRINTED_LIMITS["FullThread"]
-    and UNDERHEAD_CORNER_R <= PRINTED_LIMITS["UnderHeadCornerR"]
-):
-    raise AssertionError("an MHA-SM-04 model nominal leaves its printed band")
-# The joint and the seat checks charge the geometry module's millimetre
-# envelopes; each printed band they read lies inside its envelope.
-for _name, _envelope in (
-    ("HeadDia", (HEAD_DIA_LOWER, HEAD_DIA_UPPER)),
-    ("HeadReliefChamfer", (HEAD_RELIEF_CHAMFER_LOWER, HEAD_RELIEF_CHAMFER_UPPER)),
-    ("BodyDia", (BODY_DIA_LOWER, BODY_DIA_UPPER)),
-    ("UnderHeadLength", (LENGTH_LOWER, LENGTH_UPPER)),
-):
-    if not (
-        _envelope[0] - 1e-9 <= PRINTED_BANDS[_name][0]
-        and PRINTED_BANDS[_name][1] <= _envelope[1] + 1e-9
-    ):
-        raise AssertionError(f"MHA-SM-04 {_name}: printed band leaves its envelope")
-# The three single limits print past the joint's 3.60 / 5.71 / 0.50 (no
-# finite inch place holds them), so the joint margins they feed are re-checked
-# at the printed values.  The plain ".14 MIN": the loop's plug-side pass still
-# bears on the plain body.
-PRINTED_LOOP_PLAIN_MARGIN_MIN = PRINTED_LIMITS["PlainLength"] - max(
-    joint.LOOP_PASS_X[1], joint.CLAMPED_LOOP_PASS_X[1]
-)
-# ".225 MAX": the run-out still clears the arm-end counterbore by its margin,
-# and its crest corner the counterbore's floor round.
-_PRINTED_RUNOUT_INTRUSION_MAX = (
-    PRINTED_LIMITS["FullThread"]
-    - joint.CLAMPED_AXIS_GAP_MIN
-    + joint.SCREW_RUNOUT_TILT_DIP
-)
-PRINTED_RUNOUT_MARGIN_MIN = joint.COUNTERBORE_DEPTH_MIN - _PRINTED_RUNOUT_INTRUSION_MAX
-PRINTED_RUNOUT_FLOOR_CORNER_CLEARANCE_MIN = joint._fillet_clearance(
-    PRINTED_RUNOUT_MARGIN_MIN,
-    joint.RUNOUT_RADIAL_CLEARANCE_MIN,
-    joint.COUNTERBORE_FLOOR_CORNER_R_MAX,
-    0.0,
-)
-# "R.020 MAX": a loop wire on the face and the body still clears the round.
-PRINTED_LOOP_CORNER_CLEARANCE_MIN = joint._fillet_clearance(
-    joint.WIRE_R, joint.WIRE_R, PRINTED_LIMITS["UnderHeadCornerR"], joint.WIRE_R
-)
-if (
-    min(
-        PRINTED_LOOP_PLAIN_MARGIN_MIN,
-        PRINTED_RUNOUT_FLOOR_CORNER_CLEARANCE_MIN,
-        PRINTED_LOOP_CORNER_CLEARANCE_MIN,
-    )
-    <= 0.0
-    or PRINTED_RUNOUT_MARGIN_MIN < joint.COUNTERBORE_RUNOUT_MARGIN_MIN
-):
-    raise AssertionError("an MHA-SM-04 printed single limit eats a joint margin")
+if UNIT != SHEET_UNIT:
+    raise AssertionError("MHA-SM-04's registry unit is not its geometry's SHEET_UNIT")
 require_body_form(
     body_dia_max=BODY_DIA + PRINTED_BANDS["BodyDia"][1],
     body_dia_min=BODY_DIA + PRINTED_BANDS["BodyDia"][0],
@@ -213,8 +98,8 @@ if joint.HEAD_RETENTION_MIN < joint.HEAD_RETENTION_TARGET:
 # The head's worst-case overlap of the loop's eye, under the 1.0 check (owner
 # minor RV-01), stated on the head Ø as a plain fact (drawing-guidelines.md
 # rule 20; codjiflo P2 on #1997), in inches floored, never rounded up: the
-# joint's 0.9502 at its 11.40 envelope floor is .037 (the printed .449 floor
-# leaves 0.9525).  Two rows, so neither is wider than the part number's.
+# joint's 0.9525 at the printed .449 floor is .037.  Two rows, so neither is
+# wider than the part number's.
 _RETENTION_MILS = math.floor(joint.HEAD_RETENTION_MIN / MM_PER_IN * 1000.0)
 HEAD_RETENTION_CALLOUT = f"LOOP OVERLAP\n.{_RETENTION_MILS:03d} MIN"
 DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
@@ -486,8 +371,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StationReference": {"OverallLength", "PlainLength", "FullThread"},
 }
 # Inch places (#290): three on the LIMIT bands and the full-thread and corner
-# single limits (THREE_PLACE_DIMENSIONS, above), two on every other mark, the
-# tip chamfer's among them (an .X band, +/-.1, would be five chamfers wide).
+# single limits (sm_gooseneck_spring_screw_geom.THREE_PLACE_DIMENSIONS), two
+# on every other mark, the tip chamfer's among them (an .X band, +/-.1, would
+# be five chamfers wide).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     feature: {name: places(name) for name in sorted(names)}
     for feature, names in DRAWING_DIMENSIONS.items()
