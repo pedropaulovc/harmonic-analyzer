@@ -43,9 +43,9 @@ its first-root position; no second general note restates that location.
      Break the two long torque corners of the terminal flat no more than 0.02 mm; the 0.420 AF
      already pays for that break. The model leaves these corners sharp and the sheet prints the break
      as a callout, `TORQUE CORNERS: STONE BURR ONLY, 0.02 MAX`, because it is below the title block's
-     R0.25 edge break. The stepped collar (Ø17.48 body, Ø6.40 × 3.5 nose, 11.5 overall;
+     R0.25 edge break. The stepped collar (inch sheet: Ø.66 body, Ø.25 × .138 nose, .453 overall;
      `dt_vn_cone_tip_collar_spec.OUTER_DIA`) has a
-     finished bore of Ø0.849 ±0.030 and a radial #2-56 through tap. Fit the stock McMaster
+     finished bore of Ø.0330 ±.0010 and a radial #2-56 through tap. Fit the stock McMaster
      94355A213 #2-56 × 5/16 in flat-point screw unaltered, with no dog. To fit the collar, hold the
      gear stack south on the shaft's thrust collar, set the original 0.45 ±0.10 feeler off the
      T006 thrust face, seat both collar bore ends on the round back of the terminal, snug the
@@ -66,7 +66,7 @@ its first-root position; no second general note restates that location.
      thread rock, and G19 cock can all be taken up together; never put them in the RSS.
      ASME B18.6.2 limits only the cup diameter, not its depth or wall angle, so the
      released shaft swing is bounded by the post journal, not by assumed cup capture.
-     The current calculated least nose air is 0.4681 mm (`dt_tip_collar_air.require_air()`),
+     The current calculated least nose air is 0.6554 mm (`dt_tip_collar_air.require_air()`),
      not a measured clearance.
      The shaft drawing's supplementary **Setup References** sheet measures from
      the collar's north / 64T-seat face to the three shoulders and the tip.

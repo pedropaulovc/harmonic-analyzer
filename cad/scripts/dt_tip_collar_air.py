@@ -163,12 +163,13 @@ _MAX_STOCK_Y_LOSS = sum(axial for axial, _ in _SCREW_LIMITS.values())
 _MAX_STOCK_R_GAIN = sum(radial for _, radial in _SCREW_LIMITS.values())
 TIERS = (
     CollarTier("nose", 0.0, PARTITION_STATION_MM, collar.NOSE_DIA / 2.0,
-               0.0, collar.AXIAL_BAND_MM + collar.SHOULDER_ROOT_RADIUS,
+               0.0, collar.NOSE_LENGTH_BAND_MM + collar.SHOULDER_ROOT_RADIUS,
                collar.ROUTINE_BAND_MM / 2.0,
                {"collar nose diameter": (0.0, collar.ROUTINE_BAND_MM / 2.0)}),
     CollarTier("body", PARTITION_STATION_MM, collar.WIDTH, collar.OUTER_DIA / 2.0,
-               -collar.AXIAL_BAND_MM, collar.WIDTH_BAND_MM, collar.ROUTINE_BAND_MM / 2.0,
-               {"collar nose length": (collar.AXIAL_BAND_MM, 0.0),
+               -collar.NOSE_LENGTH_BAND_MM, collar.WIDTH_BAND_MM,
+               collar.ROUTINE_BAND_MM / 2.0,
+               {"collar nose length": (collar.NOSE_LENGTH_BAND_MM, 0.0),
                 "collar outside diameter": (0.0, collar.ROUTINE_BAND_MM / 2.0)}),
     CollarTier("screw", _MIN_STOCK_Y,
                collar.TAP_STATION + collar.SET_SCREW_MAJOR_DIA / 2.0,

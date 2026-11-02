@@ -14,7 +14,7 @@ import math
 
 import _config
 from _package_units import drawing_unit
-from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm, printed_deviations
+from _printed_tolerance import edge_break_chamfer_mm, printed_deviations
 from gear_seat_fit import seat_bore_band
 from _fit_shaft_h import SHAFT_H
 
@@ -102,13 +102,31 @@ TERMINAL_FLAT_EDGE_BREAK_MAX = 0.0254  # .001
 TIP_COLLAR_BODY_NORTH_SHIFT_MM = 0.50
 TIP_COLLAR_WIDTH_MM = 11.0 + TIP_COLLAR_BODY_NORTH_SHIFT_MM
 # The collar's width, nose and tap station print at the title block's .XXX
-# (+/-0.13, ordinary lathe facing and spotting): at .XX the stock screw's
-# tapped hole leaves less than the collar's 2.0 wall to its faces.
+# (ordinary lathe facing and spotting): at .XX the stock screw's tapped hole
+# leaves less than the collar's 2.0 wall to its faces.  They print on the
+# collar's own sheet, in its unit (its registry row's drawing_unit; reading
+# the collar spec here would be circular).  These mm nominals sit off that
+# sheet's grid, so each band books its printed rounding: the worst side of
+# the title-block band about the number the sheet prints.
+TIP_COLLAR_UNIT = drawing_unit(
+    "parts/dt-vn-cone-tip-collar", _config.parts("dt-vn-cone-tip-collar")
+)
 TIP_COLLAR_AXIAL_PLACES = 3
-TIP_COLLAR_WIDTH_BAND_MM = printed_band_mm(TIP_COLLAR_AXIAL_PLACES)
+
+
+def tip_collar_axial_band_mm(nominal_mm: float) -> float:
+    """The worst printed deviation of a collar .XXX length from its model, in mm."""
+    lower, upper = printed_deviations(
+        nominal_mm, TIP_COLLAR_AXIAL_PLACES, unit=TIP_COLLAR_UNIT
+    )
+    return max(-lower, upper)
+
+
+TIP_COLLAR_WIDTH_BAND_MM = tip_collar_axial_band_mm(TIP_COLLAR_WIDTH_MM)
 TIP_COLLAR_NOSE_LENGTH_MM = 3.0 + TIP_COLLAR_BODY_NORTH_SHIFT_MM
 TIP_COLLAR_TAP_STATION_MM = (TIP_COLLAR_NOSE_LENGTH_MM + TIP_COLLAR_WIDTH_MM) / 2.0
-TIP_COLLAR_FREE_EDGE_BREAK_MAX_MM = edge_break_chamfer_mm()  # title-block edge break
+# The title-block edge break, on the collar's sheet.
+TIP_COLLAR_FREE_EDGE_BREAK_MAX_MM = edge_break_chamfer_mm(unit=TIP_COLLAR_UNIT)
 _COLLAR_BORE_BAND = seat_bore_band(RUNNING_DIA_BAND)
 TIP_COLLAR_MAX_RADIAL_FLOAT_MM = (_COLLAR_BORE_BAND[0] - RUNNING_DIA_BAND[1]) / 2.0
 TIP_COLLAR_MIN_RADIAL_FLOAT_MM = (_COLLAR_BORE_BAND[1] - RUNNING_DIA_BAND[0]) / 2.0

@@ -18,8 +18,10 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import _feature_by_name, name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import (
     active_configuration_name,
@@ -337,6 +339,8 @@ def _configuration_bom_identity(adapter):
 
 async def build(adapter) -> dict[str, str]:
     check("create custom collar", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
+    # Bare equation numbers read in the document's (inch) units: keep the mm suffix.
     for name, value in (("CollarDia", spec.OUTER_DIA), ("BoreDia", spec.BORE_MODEL_DIA_MM),
                         ("NoseDia", spec.NOSE_DIA), ("NoseLength", spec.NOSE_LENGTH),
                         ("ShoulderRadius", spec.SHOULDER_ROOT_RADIUS),
@@ -363,7 +367,10 @@ async def build(adapter) -> dict[str, str]:
         -spec.INSTALLED_BORE_AXIS_OFFSET_MM, "loaded shaft axis",
     )
     name_last_feature(adapter, "InstalledShaftAxis")
-    set_dimension_bilateral_tolerance(adapter, "RingProfile", "BoreDia", *deviations(spec.BORE_MODEL_DIA_BAND))
+    set_dimension_bilateral_tolerance(
+        adapter, "RingProfile", "BoreDia", *deviations(spec.BORE_MODEL_DIA_BAND),
+        places=spec.DRAWING_PRECISION["RingProfile"]["BoreDia"], display_unit=spec.UNIT,
+    )
     _functional_dimension_types(adapter)
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
