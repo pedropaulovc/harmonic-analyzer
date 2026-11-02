@@ -468,6 +468,9 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
         set_hidden_lines_removed(adapter,nut_iso)
         nut_annotations = curate_view_dimensions(adapter,nut,keep=NUT_KEEP,view_label='nut face',
                       dimensions_by_feature=contract.DRAWING_DIMENSIONS)
+        # One lane, end to end at the axis: smart arrows put each .340's
+        # outside, past the axis into the other's text (feed-nut2 r1 audit).
+        _arrows_inside(adapter, nut_annotations, ('NutTap1Y', 'NutTap2Y'))
         print_imported_metric_dimensions(adapter, nut_annotations,
                                           {name: places for (_, name), (places, _) in contract.METRIC_DIMENSIONS.items()})
         caption = add_note(adapter, NUT_CAPTION, *NUT_CAPTION_XY)
