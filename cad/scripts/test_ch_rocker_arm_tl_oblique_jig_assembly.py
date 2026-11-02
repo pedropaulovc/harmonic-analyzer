@@ -1554,3 +1554,9 @@ def test_bonded_gauge_locator_uses_the_finished_hub_bore_and_actual_cut_overlap(
 def test_hold_down_steps_name_the_kit_drawing_and_its_stud_limits() -> None:
     """Machinist review: HD2/HD3 cited "THE STUD DRAWING" without naming it."""
     assert spec.CLAMPING_KIT_NUMBER == _config.parts(spec.CLAMPING_KIT)["number"]
+    # Codjiflo on #2126: the inch stud's 2.24/2.26 limits print exactly in mm,
+    # so HD2's G uses the true LMAX (56.90/57.40 hid 0.004 of a max stud).
+    limits = f"56.896/57.404 ON {spec.CLAMPING_KIT_NUMBER} SHEET 2"
+    assert limits in spec.HOLD_DOWN_STEPS[1] and limits in spec.HOLD_DOWN_STEPS[2]
+    printed = tuple(float(value) for value in limits.split()[0].split("/"))
+    assert printed == pytest.approx(hold_down_stud.LENGTH_LIMITS, abs=1e-9)
