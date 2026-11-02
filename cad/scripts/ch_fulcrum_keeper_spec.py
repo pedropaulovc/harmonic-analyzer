@@ -31,14 +31,19 @@ underside x -4..+12.5 is the flat seat.
 
 from __future__ import annotations
 
-from math import ceil, hypot, sqrt
+from math import ceil, floor, hypot, radians, sqrt, tan
 
 import _config
 from _fit_shaft_h import SHAFT_H
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
+from _printed_tolerance import (
+    drilled_oversize_mm,
+    edge_break_radius_mm,
+    printed_band_mm,
+    printed_deviations,
+)
 from _cone_axis_constants import CHANNEL_Z0, FRAME_FRONT_COLUMN_Z
 
 # #290: the keeper sheet prints decimal inch (its row's ``drawing_unit``).
@@ -397,6 +402,18 @@ if FOOT_TIP_WALL_MM < WALL_TARGET_MM:
     raise AssertionError(
         f"keeper counterbore tip wall {FOOT_TIP_WALL_MM:.3f} < {WALL_TARGET_MM}"
     )
+# The full worst case the sheet states as a plain fact (rule 20; review
+# exception RV-04): the band-and-oversize wall less two title-block edge
+# breaks and the 0.3 deg drill run-off over the counterbore depth, floored to
+# .001 so the MIN never overstates it.
+FOOT_TIP_WALL_WORST_MM = (
+    FOOT_TIP_WALL_MM
+    - 2.0 * edge_break_radius_mm(unit=UNIT)
+    - CBORE_DEPTH_MM * tan(radians(0.3))
+)  # 1.843 (.0726)
+FOOT_TIP_WALL_TEXT = (
+    f"{floor(FOOT_TIP_WALL_WORST_MM / 25.4 * 1000 + 1e-9) / 1000:.3f}".removeprefix("0")
+)  # .072
 FOOT_CBORE_LUG_CLEARANCE_MM = (
     (OVERALL_LENGTH - _BAND_BY_PLACES[OVERALL_LENGTH_PLACES])
     - (2.0 * LUG_HALF_T + _LUG_T_BAND)
@@ -598,11 +615,13 @@ if not CROWN_TOP_Y < SUPPLY_HEIGHT_MIN:
 # inner lug face (.47 at .XX) the .65's band would join the tip wall's
 # stack (FOOT_TIP_WALL_MM; owner ruling 2026-10-28, review exception RV-03).
 # A note saying so (MR-fleet r7, cc1a81a) drew three findings of its own, so
-# none is printed.
+# none is printed; note 1 states only the resulting tip wall, the shortfall
+# rule 20 asks the sheet to print (Codjiflo #2108).
 DRAWING_NOTES = "\n".join(
     (
         "1. CROWN TAP FOR THE MHA-CH-VN-55 CUP-POINT SET SCREW; FOOT HOLE",
-        "   FOR THE MHA-CH-VN-52 #2-56 FILLISTER, HEAD FLUSH.",
+        "   FOR THE MHA-CH-VN-52 #2-56 FILLISTER, HEAD FLUSH; COUNTERBORE",
+        f"   WALL TO FOOT TIP {FOOT_TIP_WALL_TEXT} MIN.",
         f"{QUANTITY_NOTE}. 2 REQUIRED, ONE PER MHA-CH-04 FULCRUM-SHAFT END (SECOND",
         "   IS THIS PART FLIPPED 180 DEG ABOUT VERTICAL).",
     )
