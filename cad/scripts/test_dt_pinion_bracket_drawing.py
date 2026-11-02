@@ -473,3 +473,70 @@ def test_every_web_and_ligament_clears_the_floor_at_the_printed_bands() -> None:
     assert math.isclose(worst["cross hole far face"], 3.189, abs_tol=5e-4)
     assert math.isclose(worst["seat far face"], 2.141, abs_tol=5e-4)
     assert math.isclose(worst["shaft wall"], 2.085, abs_tol=5e-4)
+
+
+def test_bore_callouts_keep_only_their_shoulder_and_rim_arrow(monkeypatch) -> None:
+    # #2106 r3 machinist review: each R.30 end radius runs to its bore's
+    # centre, where the bore's Ø callout drew its diametral line.  Both bore
+    # callouts take the tube frame's rim-only dress; the radii are left
+    # alone; a missing bore callout fails loud.
+    from types import SimpleNamespace
+
+    import pytest
+
+    assert set(drawing.RIM_ONLY_DIAMETERS) == {"ArborBoreDia", "PivotBoreDia"}
+    assert set(drawing.RIM_ONLY_DIAMETERS) <= set(drawing.FRONT_KEEP)
+    displays = {}
+
+    class Display:
+        def __init__(self) -> None:
+            self.DisplayAsLinear = False
+            self.Diametric = True
+            self.ArrowSide = 0
+            self.SolidLeader = True
+            self.LeaderVisibility = 0
+            self.second = True
+            self.broken = (True, 0)
+
+        def SetSecondArrow(self, use_doc, second):
+            self.second = bool(use_doc) or bool(second)
+
+        def GetUseDocSecondArrow(self):
+            return False
+
+        def GetSecondArrow(self):
+            return self.second
+
+        def SetBrokenLeader2(self, use_doc, style):
+            self.broken = (use_doc, style)
+            return 0
+
+        def GetUseDocBrokenLeader(self):
+            return self.broken[0]
+
+        def GetBrokenLeader2(self):
+            return self.broken[1]
+
+    def annotation(name):
+        display = Display()
+        displays[name] = display
+        return SimpleNamespace(name=name, GetSpecificAnnotation=lambda: display)
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _kind: obj)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, a: a.name)
+    names = ("ArborBoreDia", "TopCapRadius", "PivotBoreDia", "BottomCapRadius")
+    drawing._rim_only_bore_callouts(object(), [annotation(n) for n in names])
+    for name in drawing.RIM_ONLY_DIAMETERS:
+        d = displays[name]
+        assert (d.ArrowSide, d.second, d.SolidLeader, d.broken, d.LeaderVisibility) == (
+            1,
+            False,
+            False,
+            (False, 2),
+            3,
+        )
+    for name in ("TopCapRadius", "BottomCapRadius"):
+        d = displays[name]
+        assert (d.ArrowSide, d.SolidLeader, d.LeaderVisibility) == (0, True, 0)
+    with pytest.raises(RuntimeError, match="PivotBoreDia"):
+        drawing._rim_only_bore_callouts(object(), [annotation("ArborBoreDia")])

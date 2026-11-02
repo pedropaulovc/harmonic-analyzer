@@ -39,6 +39,7 @@ from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -138,6 +139,57 @@ def _center_mark_count(view: Any) -> int:
     return len(
         _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
     )
+
+
+# Each R.30 end radius is concentric with a bore, so its dimension line runs
+# to the bore centre, where the bore's Ø callout drew its diametral line
+# (#2106 r3 machinist review: two leaders meeting at each centre).  The radius
+# line keeps reaching the centre whatever its arrow side (r7 read-back; the
+# arbor pedestal's crown prints the same), so each Ø callout is dressed as
+# draw_fr_tube_frame's cross hole: a diametric callout on a broken, non-solid
+# leader with one outside arrow and its leader-line pair hidden, which leaves
+# the shoulder run and the arrow at the rim (measured there through
+# GetDisplayData).  Nothing but the R.30 line then reaches either centre.
+RIM_ONLY_DIAMETERS = ("ArborBoreDia", "PivotBoreDia")
+_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
+_BROKEN_LEADER_HORIZONTAL = 2  # swDimensionBrokenLeader: horizontal shoulder
+_LEADER_LINE_NONE = 3  # swLeaderLineVisibility_e.swLeaderLineNone
+
+
+def _rim_only_bore_callouts(adapter: Any, annotations: list[Any]) -> None:
+    """Leave each RIM_ONLY_DIAMETERS callout its shoulder and rim arrow only."""
+    found = set()
+    for raw_annotation in annotations:
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name not in RIM_ONLY_DIAMETERS:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.DisplayAsLinear = False
+        display.Diametric = True
+        display.ArrowSide = _ARROWS_OUTSIDE
+        display.SetSecondArrow(False, False)
+        display.SolidLeader = False
+        if display.SetBrokenLeader2(False, _BROKEN_LEADER_HORIZONTAL) != 0:
+            raise RuntimeError(f"{name}: failed to apply a broken horizontal leader")
+        display.LeaderVisibility = _LEADER_LINE_NONE
+        if (
+            bool(display.DisplayAsLinear)
+            or not bool(display.Diametric)
+            or int(display.ArrowSide) != _ARROWS_OUTSIDE
+            or bool(display.GetUseDocSecondArrow())
+            or bool(display.GetSecondArrow())
+            or bool(display.SolidLeader)
+            or bool(display.GetUseDocBrokenLeader())
+            or int(display.GetBrokenLeader2()) != _BROKEN_LEADER_HORIZONTAL
+            or int(display.LeaderVisibility) != _LEADER_LINE_NONE
+        ):
+            raise RuntimeError(f"{name}: the rim-only Ø callout did not persist")
+        found.add(name)
+    if found != set(RIM_ONLY_DIAMETERS):
+        raise RuntimeError(
+            f"strap face is missing Ø callouts {sorted(set(RIM_ONLY_DIAMETERS) - found)}"
+        )
 
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
@@ -417,6 +469,7 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(
         adapter, [*annotations, seat_depth], DRAWING_PRECISION_BY_NAME
     )
+    _rim_only_bore_callouts(adapter, front_annotations)
 
     for sheet_name in SHEET_NAMES:
         if not ddoc.ActivateSheet(sheet_name):
