@@ -422,30 +422,31 @@ def test_plan_stations_each_print_at_their_own_arrows_near_the_plan() -> None:
     assert plan_bottom < foot_column[1]
 
 
-def test_ear_thickness_prints_over_the_ear_on_the_right_view() -> None:
+def test_ear_thickness_prints_beside_the_ear_on_the_right_view() -> None:
     """Machinist review FIX: the ear thickness reads true between its two
-    thrust faces on the right view; its block stands centred over the ear's
-    top, under the plan's bottom edge (the foot length's lower extension
-    line), left of the isometric and above the R MAX block."""
+    thrust faces on the right view. Its block stands out past the outboard
+    face, so neither extension line rises into its letters (r1 FIX when it
+    stood centred over the span), under the plan's bottom edge (the foot
+    length's lower extension line), and above the R MAX block."""
     from _drawing_annotation_extent import CLEAR_GAP_M
     from _layout_geometry import estimate_text_box
 
-    ear_mid = drawing._right_x(spec.FOOT_Z0 + spec.EAR_T / 2.0)
+    # *Right: model +Z runs LEFT on the sheet, +Y up.
+    outboard = drawing._right_x(spec.FOOT_Z0 + spec.EAR_T)
     apex = drawing._right_y(spec.EAR_TOP_Y)
-    anchor = (ear_mid, apex + drawing.EAR_THICK_TEXT_RISE)
+    dz, dy = drawing.EAR_THICK_TEXT_OFFSET
     box = estimate_text_box(
         f".320 ±.004\n{drawing.DIMENSION_CALLOUTS['EarThick']}",
-        anchor=anchor,
+        anchor=(outboard - dz, apex + dy),
         height=0.0035,
         reference=2,  # swCENTER
         advance_ratio=109.7 / (42 * 3.5),
         line_spacing=16.8 * 25.4 / 72.0 / 3.5,
     )
+    assert box.xmax < outboard - CLEAR_GAP_M
     assert box.ymin > apex + CLEAR_GAP_M
     assert box.ymax < drawing._top_y(FOOT_Z1) - CLEAR_GAP_M
-    assert box.xmax < drawing.ISO_CENTER[0] - 0.025 - CLEAR_GAP_M
-    # The foot length's extension lines end at its column, west of the block.
-    assert drawing.TOP_KEEP["FootLen"][0] + 0.005 < box.xmin
+    assert box.xmin > drawing._EAST_X + CLEAR_GAP_M
     corner = estimate_text_box(
         f"R.02 MAX\n{drawing.DIMENSION_CALLOUTS['CornerRadius']}",
         anchor=_planned_corner_text(),
@@ -457,6 +458,7 @@ def test_ear_thickness_prints_over_the_ear_on_the_right_view() -> None:
     assert corner.ymax + CLEAR_GAP_M < box.ymin
     assert "def _right_keep" in _drawing_source()
     assert '"EarThick": (ear_text[0], ear_text[1])' in _drawing_source()
+    assert "EAR_THICK_TEXT_OFFSET[0] * units[0][axis]" in _drawing_source()
 
 
 def test_tap_note_solidworks_adds_is_removed() -> None:

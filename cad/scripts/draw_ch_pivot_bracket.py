@@ -228,11 +228,13 @@ TOP_KEEP = {
     "HoleLateral": (FRONT_CENTER[0] - FOOT_W / 4.0 * _S, _top_y(FOOT_Z1) - 0.008),
     "FootW": (FRONT_CENTER[0], _top_y(FOOT_Z1) - 0.019),
 }
-# The ear thickness's text stands this far over the ear's top on the right
-# view, centred on its span: the dimension line runs between the two thrust
-# faces' extension lines just over the apex, the two-line block (value, then
-# the washer it holds) under the plan's bottom edge.
-EAR_THICK_TEXT_RISE = 0.012
+# The ear thickness's text centre on the right view, in sheet metres along the
+# view's +Z and +Y off the ear's outboard face at its top: out past that face
+# (over the foot, under the plan's bottom edge) and just over the apex, so the
+# dimension line runs out under the ~73 mm two-line block (value, then the
+# washer it holds) and neither extension line rises into its letters (r1
+# machinist review FIX: centred over the 8 mm span, both struck the callout).
+EAR_THICK_TEXT_OFFSET = (0.042, 0.010)
 # REAM marks a fit bore, so the callout names its mate (drawing-guidelines.md
 # rule 4); the drilled hold-down hole says drill and through. The two lengths
 # that carry their own band say what the band holds, naming the mate: the
@@ -541,12 +543,11 @@ def _right_keep(adapter: Any, view: Any) -> dict[str, tuple[float, float]]:
 
     Projects the inside corner and one millimetre along model +Z and +Y, so
     the R MAX text stands CORNER_TEXT_OFFSET up into the open corner whichever
-    way the view lays the foot, and the ear's top at its mid-thickness, so the
-    ear thickness stands EAR_THICK_TEXT_RISE over it along the same +Y; a
-    frame off the planned one is logged.
+    way the view lays the foot, and the ear's outboard face at its top, so
+    the ear thickness stands EAR_THICK_TEXT_OFFSET off it along the same +Z
+    and +Y; a frame off the planned one is logged.
     """
     x, y, z = (value / 1000.0 for value in CORNER_MODEL_MM)
-    ear_mid_z = (FOOT_Z0 + EAR_T / 2.0) / 1000.0
     corner, along_z, along_y, ear_top = model_points_in_view(
         adapter,
         view,
@@ -554,10 +555,10 @@ def _right_keep(adapter: Any, view: Any) -> dict[str, tuple[float, float]]:
             (x, y, z),
             (x, y, z + 0.001),
             (x, y + 0.001, z),
-            (x, EAR_TOP_Y / 1000.0, ear_mid_z),
+            (x, EAR_TOP_Y / 1000.0, (FOOT_Z0 + EAR_T) / 1000.0),
         ],
         label="right-view corner frame",
-        names=["corner", "corner +Z", "corner +Y", "ear top"],
+        names=["corner", "corner +Z", "corner +Y", "ear outboard top"],
     )
     units = []
     for point in (along_z, along_y):
@@ -580,7 +581,10 @@ def _right_keep(adapter: Any, view: Any) -> dict[str, tuple[float, float]]:
         for axis in range(2)
     )
     ear_text = tuple(
-        ear_top[axis] + EAR_THICK_TEXT_RISE * units[1][axis] for axis in range(2)
+        ear_top[axis]
+        + EAR_THICK_TEXT_OFFSET[0] * units[0][axis]
+        + EAR_THICK_TEXT_OFFSET[1] * units[1][axis]
+        for axis in range(2)
     )
     _telemetry.info(
         f"right view corner {corner!r}, R MAX text {text!r}; "
