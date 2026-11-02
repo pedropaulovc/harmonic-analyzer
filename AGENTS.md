@@ -218,6 +218,14 @@ Authors must still supply the focused proof, render inspection and exact-sheet
 machinist review required above before merge; the direct/indirect sheet policy
 and owner-authorization requirement for human substitution are unchanged.
 
+**The gates have no required order.** Codjiflo review, local tests and checks,
+farm builds and machinist review may run in parallel, in any order the author
+prefers: request `@codjiflo review` without waiting for a farm run, and launch
+native proof or machinist review while code review is pending. The merge bar is
+unchanged: every gate must cover the final head. A push reopens each gate it
+affects (Codjiflo always; proof and sheet review when their inputs re-key), so
+batch fixes into one push per round.
+
 **Stacked PRs may share focused native proof and render inspection** when the
 tested top commit contains every covered change and the evidence identifies the
 covered commits and artifacts. A stack does not require a full build to merge.
