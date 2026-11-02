@@ -211,10 +211,7 @@ CALLOUTS_BELOW = {
     "Hole1Offset": MATE_CALLOUT,
     "Hole2Offset": MATE_CALLOUT,
 }
-# Rule 1 (units): an as-bought fraction is a REF with the supplier's
-# tolerance, the band on its own row (TL-28).
-STOCK_CALLOUTS = {
-    "NutWidth": "STOCK\n±" + f"{WIDTH_STOCK_BAND / INCH:.3f}".lstrip("0"),
-    "NutHeight": "STOCK\n±" + f"{HEIGHT_STOCK_BAND / INCH:.4f}".lstrip("0"),
-}
+# drawing-guidelines.md (units): an as-bought fraction is an untoleranced REF;
+# the supplier's catalogue tolerance governs.
+STOCK_CALLOUTS = {"NutWidth": "STOCK", "NutHeight": "STOCK"}
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
