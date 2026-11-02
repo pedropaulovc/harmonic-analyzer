@@ -39,18 +39,18 @@ C2C = 28.0
 # a foreshortened broad face plus its edge: front 61 + 62 px, back 86 + 40 px.
 # Solving 15*cos(t) + T*sin(t) = (face + edge)/7.76 for each end's own view angle
 # (cos t = face/(15*7.76)) gives T = 9.4 front, 7.6 back.  U28 (user, 2026-09-23)
-# set 9.0, inside that photo band; #290 keeps it as .354 and prints it at the
-# title block's loose .XX (.35), which the rig's span stack, the follower-seat
-# web and the cross-hole web all read at its printed limits (rule 17: a thin
-# wall is not rescued with a tighter band; Codjiflo on #2106).  The seat and
-# the cross hole are printed CENTRED on the thickness.  The cross-hole web
-# clears the .080 target (dt_vn_pinion_strap_pin_spec.STRAP_FACE_WEB_WORST);
-# the follower seat's far-face web does not, and is the owner-precedent minor
-# exception RV-01 (dt_pinion_bracket_spec.PIN_SEAT_WEB_WORST).
-THICKNESS = 8.9916  # .354, prints .35
+# set 9.0, inside that photo band; #290 puts it on the title block's loose
+# .XX grid at .36 (rule 3), which the rig's span stack, the follower-seat web
+# and the cross-hole web all read at its printed limits.  .36, not .35:
+# rule 17 fixes a thin wall with geometry, never a tighter band (Codjiflo on
+# #2106), and the thicker bar leaves the follower seat's far-face web over the
+# .080 target (dt_pinion_bracket_spec.PIN_SEAT_WEB_WORST).  The seat and the
+# cross hole are printed CENTRED on the thickness, at .180 and .18; the
+# cross-hole web clears the target too
+# (dt_vn_pinion_strap_pin_spec.STRAP_FACE_WEB_WORST).
+THICKNESS = 9.144  # .36
 THICKNESS_PLACES = 2  # Depth prints .XX (dt_pinion_bracket_spec.DRAWING_PRECISION)
-# (thinnest, thickest) at the printed .XX limits (.34/.36): the rounding puts
-# the nominal off-centre, so readers take both limits, never a symmetric band.
+# (thinnest, thickest) at the printed .XX limits (.35/.37).
 THICKNESS_LIMITS = tuple(
     THICKNESS + d for d in printed_deviations(THICKNESS, THICKNESS_PLACES, unit=UNIT)
 )

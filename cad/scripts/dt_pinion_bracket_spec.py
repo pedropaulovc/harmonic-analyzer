@@ -19,12 +19,10 @@ marks and the drawing keeps EXACTLY ``DRAWING_DIMENSIONS``.
 
 from __future__ import annotations
 
-import math
-
 from _fit_ream_h7 import REAM_H7
 from _fit_ream_slide import REAM_SLIDE
 from _gtol_cylinder import CylinderFace
-from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import printed_deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from dt_pinion_bracket_geometry import (
@@ -90,13 +88,12 @@ CROSS_HOLE_CALLOUT = "DRILL THRU\nFOR MHA-DT-VN-63\nSPRING PIN, PRESS FIT"
 # face.  Codex #858 P2, user ruling (a) (2026-09-25): the seat's station is
 # printed from broad face A as the model's own PinSeatCz, not as "CENTRED ON
 # THICKNESS" prose, and the owner approved holding the station alone (the mm
-# sheet's +/-0.10; .XXX here) for this web.  The strap's thickness stays at
-# the title block's loose .XX (rule 17: no tighter band rescues a wall;
-# Codjiflo on #2106).  The far face then sees the thinnest bar less the
-# station at its upper limit, the seat's upper-limit radius and the 0.05
-# drilled-hole allowance: .077 in, over the .060 floor and under the .080
-# target, the owner-precedent minor exception RV-01 in
-# cad/config/parts/dt-pinion-bracket.yaml.  The near face clears the target.
+# sheet's +/-0.10; .XXX here) for this web.  The strap's thickness sits on the
+# title block's loose .XX grid at .36 (rules 3 and 17: the wall is fixed with
+# geometry, not a tighter band; Codjiflo on #2106).  The far face then sees
+# the thinnest bar less the station at its upper limit, the seat's
+# upper-limit radius and the 0.05 drilled-hole allowance: .084 in, over the
+# .080 target.  The near face clears it too.
 _SEAT_STATION_LOWER, _SEAT_STATION_UPPER = printed_deviations(
     THICKNESS / 2.0, 3, unit=UNIT
 )
@@ -110,17 +107,10 @@ PIN_SEAT_WEB_WORST = (
 PIN_SEAT_NEAR_WEB_WORST = (
     THICKNESS / 2.0 + _SEAT_STATION_LOWER - _PIN_SEAT_MAX / 2.0 - 0.05
 )
-if PIN_SEAT_WEB_WORST < WALL_FLOOR_MM:
+if min(PIN_SEAT_WEB_WORST, PIN_SEAT_NEAR_WEB_WORST) < WALL_TARGET_MM:
     raise AssertionError(
-        f"follower-seat far web {PIN_SEAT_WEB_WORST:.3f} is under the .060 in floor"
+        f"follower-seat web {PIN_SEAT_WEB_WORST:.3f} is under the .080 in target"
     )
-if PIN_SEAT_NEAR_WEB_WORST < WALL_TARGET_MM:
-    raise AssertionError(
-        f"follower-seat near web {PIN_SEAT_NEAR_WEB_WORST:.3f} is under the .080 in target"
-    )
-# The sheet states the far-face web as a plain fact (rule 20), rounded down
-# so it never claims more than the worst case: the shortfall RV-01 declares.
-PIN_SEAT_WALL_CALLOUT = f"WALL .{math.floor(PIN_SEAT_WEB_WORST / 25.4 * 1000):03d} MIN"
 
 # The seat floor is modelled sharp; the corner allowance lets the builder pick
 # a flat-bottom reamer or end mill (rule 16, r2/r3 machinist review, #1007):
