@@ -335,7 +335,7 @@ for _limit in (FLAT_END_MIN, FLAT_END_STATION):
         raise AssertionError("a flat end limit does not print at its places")
 
 # .125 REAM_SLIDE bore (an owned .1260 reamer) on the MHA-PD-23 1/8 pin's
-# +.0001/-.0002: .0009...0017 diametral clearance.  The true finite root at
+# +.0000/-.0002: .0010...0017 diametral clearance.  The true finite root at
 # every radial-setting corner retains the .080 wall.
 BORE_DIA = pd_transgear_pin_spec.DIA
 BORE_DIA_BAND = REAM_SLIDE  # (upper, lower): +.0015/+.0010

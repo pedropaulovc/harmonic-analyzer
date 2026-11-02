@@ -266,18 +266,18 @@ def test_notes_fit_the_sheet_limits() -> None:
 
 
 def test_the_shank_callout_names_both_fits_its_band_sets() -> None:
-    """The +.0001/-.0002 shank against the arm's .124 REAM_H7: smallest pin
+    """The +.0000/-.0002 shank against the arm's .124 REAM_H7: smallest pin
     in the largest ream and the reverse, flagged at the Ø it serves (rule 4),
     with the bores that run on it, so the Ra 63 reads as their bearing
     surface (rule 6).  The general notes no longer carry the fit."""
     loosest = spec.DIA_MIN - arm.PIN_BORE_DIA_MAX
     tightest = spec.DIA_MAX - arm.PIN_BORE_DIA_MIN
     assert spec.PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
-    assert (loosest, tightest) == pytest.approx((0.00762, 0.02794))
+    assert (loosest, tightest) == pytest.approx((0.00762, 0.0254))
     callout = _below("ShankDia")
     assert callout == callouts.SHANK_CALLOUT
     assert f"PRESS FIT IN {spec.ARM_NUMBER} REAM" in callout
-    assert ".0003-.0011 DIAMETRAL INTERFERENCE" in callout
+    assert ".0003-.0010 DIAMETRAL INTERFERENCE" in callout
     assert all(number in callout for number in spec.RUNNING_MATES)
     assert "INTERFERENCE" not in spec.DRAWING_NOTES
     assert "GROUND" not in spec.DRAWING_NOTES

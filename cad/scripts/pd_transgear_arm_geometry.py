@@ -209,7 +209,7 @@ def require_pivot_running_fit(bore_mm: float, measured_shoulder_mm: float) -> fl
     return bore_mm - measured_shoulder_mm
 
 # --- Pin at S: REAM THROUGH, the press for the MHA-PD-23 pin (R9-68) ---------
-# The 1/8 pin (pd_transgear_pin_spec: .125 +.0001/-.0002, ground) is pressed
+# The 1/8 pin (pd_transgear_pin_spec: .125 +.0000/-.0002, ground) is pressed
 # in from the rear until its head seats on the rear face, so the hole is
 # reamed square through the ground faces.  The interference is asserted in
 # pd_transgear_arm_spec, which imports both: the pin spec imports this module.

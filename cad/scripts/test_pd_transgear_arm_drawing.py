@@ -361,7 +361,8 @@ def test_the_pin_bore_presses_the_mha_179_pin_at_every_limit() -> None:
     oversize."""
     loosest = cluster_pin.DIA_MIN - geometry.PIN_BORE_DIA_MAX
     tightest = cluster_pin.DIA_MAX - geometry.PIN_BORE_DIA_MIN
-    assert (loosest, tightest) == pytest.approx((0.00762, 0.02794))
+    assert (loosest, tightest) == pytest.approx((0.00762, 0.0254))
+    assert spec.PIN_BORE_CALLOUT.splitlines()[2] == ".0003/.0010 INTERFERENCE"
     assert spec.PIN_PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
     assert min(geometry.PIN_BORE_DIA_BAND) == 0.0 < max(geometry.PIN_BORE_DIA_BAND)
 

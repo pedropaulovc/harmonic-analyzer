@@ -362,6 +362,7 @@ _SW_LW_THICK = 2  # swLineWeights_e.swLW_THICK, the visible-edge weight
 _FLAT_SEGMENTS = {False: 9, True: 3}  # outline / bend centrelines
 
 
+@_telemetry.traced("drawing.latch_hook.flat_pattern_lines")
 def _flat_pattern_lines(adapter: Any, right: Any) -> None:
     """Draw the flat pattern's outline as visible edges, its bend lines black."""
     draw = adapter.currentModel

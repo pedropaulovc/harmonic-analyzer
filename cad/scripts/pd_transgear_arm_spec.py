@@ -278,11 +278,11 @@ PIVOT_BORE_CALLOUT = "\n".join((
 PIN_PRESS_INTERFERENCE = PIN.PRESS_INTERFERENCE
 if not all(
     math.isclose(value, expected, abs_tol=1e-9)
-    for value, expected in zip(PIN_PRESS_INTERFERENCE, (0.00762, 0.02794), strict=True)
+    for value, expected in zip(PIN_PRESS_INTERFERENCE, (0.00762, 0.0254), strict=True)
 ):
     raise AssertionError(
         f"MHA-PD-18 pin bore press on MHA-PD-23 is {PIN_PRESS_INTERFERENCE}, "
-        "not .0003..0011"
+        "not .0003..0010"
     )
 # Three short lines under the Ø: the operation, the mating pin, the press.
 PIN_BORE_CALLOUT = "\n".join(

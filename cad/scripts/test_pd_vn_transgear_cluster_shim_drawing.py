@@ -56,6 +56,20 @@ def test_the_shim_sits_inside_the_rear_bushing_face() -> None:
     assert spec.OD_MAX < rear_bushing.OD - 0.254  # the .35 O.D. at .XX
 
 
+def test_the_smallest_shim_bore_never_binds_on_the_largest_pin(monkeypatch) -> None:
+    """Codjiflo P2 on #2124: the stack check refuses a pin band whose top
+    passes the shim's catalogue minimum bore (the former +.0001 does)."""
+    import runpy
+
+    import pd_transgear_pin_spec as pin
+
+    assert spec.ID_MIN >= pin.DIA_MAX
+    assert spec.ID_MIN - pin.DIA_MAX == pytest.approx(0.0)  # line-on-line
+    monkeypatch.setattr(pin, "DIA_MAX", pin.DIA + 0.0001 * IN)
+    with pytest.raises(AssertionError, match="shim's smallest bore"):
+        runpy.run_path(fit.__file__)
+
+
 def test_purchased_sheet_documents_the_built_part() -> None:
     import draw_pd_vn_transgear_cluster_shim as drawing
 

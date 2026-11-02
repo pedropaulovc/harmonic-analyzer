@@ -1333,10 +1333,12 @@ Catalog specifications checked on September 10, 2026:
   for No. 4 screws, pack of 10. Same-size alternates in that table: 90792A209
   (316 stainless) and 91124A112 (spring steel, Rockwell C40). The 3/16 in O.D.
   arbor shims (99040A305, 98126A019, 97022A873, 3088A143) were rejected:
-  they bear on a ring only about 0.02 in wide. Catalogue-only: no vendor
-  model is downloaded, so it has no replica gate;
-  `diag_build_94773A606.py` draws the catalogue washer with the I.D. at
-  mid-band.
+  they bear on a ring only about 0.02 in wide. The 1/8 in minimum I.D. is
+  the MHA-PD-23 pin's largest shank (.1250, +.0000/−.0002), so no shim
+  binds on the pin (line-on-line at the worst case; `transgear_cluster_fit`
+  checks it). Catalogue-only: no vendor model is downloaded, so it has no
+  replica gate; `diag_build_94773A606.py` draws the catalogue washer with
+  the I.D. at mid-band.
 
 - [9715K43](https://www.mcmaster.com/9715K43/) (`pd-vn-transgear-pivot-spring`,
   MHA-PD-VN-63, one) sits on the MHA-PD-VN-57 pivot shoulder screw's shoulder, between

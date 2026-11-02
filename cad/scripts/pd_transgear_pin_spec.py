@@ -55,12 +55,14 @@ HEAD_SEAT_MACHINE_Z = round(ARM.FRONT_FACE_MACHINE_Z + ARM.THICKNESS, 6)  # -116
 
 # --- Shank: the running journal and the press in the arm -----------------------
 # The sleeve and both bushings run on it (their bores .125 REAM_SLIDE, cut by
-# the owned .1260 reamer, .0009..0017 diametral); the arm's .124 REAM_H7 (the
-# owned .1240 reamer) holds it by a .0003..0011 press
+# the owned .1260 reamer, .0010..0017 diametral); the arm's .124 REAM_H7 (the
+# owned .1240 reamer) holds it by a .0003..0010 press
 # (``pd_transgear_arm_geometry``), named at the shank Ø.  One turned diameter
-# both presses and runs, so its band is the reamers' gap less both fits: .0003.
+# both presses and runs; its top stops at .1250, the MHA-PD-VN-68 shims'
+# smallest bore, so no shim interferes (line-on-line at the worst case;
+# transgear_cluster_fit, codjiflo P2 on #2124).
 DIA = 3.175  # .125
-DIA_BAND = (0.00254, -0.00508)  # (upper, lower) deviations, +.0001/-.0002 in
+DIA_BAND = (0.0, -0.00508)  # (upper, lower) deviations, +.0000/-.0002 in
 DIA_MIN = round(DIA + DIA_BAND[1], 6)
 DIA_MAX = round(DIA + DIA_BAND[0], 6)
 DIA_PLACES = 4
@@ -68,7 +70,7 @@ DIA_PLACES = 4
 PRESS_INTERFERENCE = (
     round(DIA_MIN - ARM.PIN_BORE_DIA_MAX, 6),
     round(DIA_MAX - ARM.PIN_BORE_DIA_MIN, 6),
-)  # 0.00762, 0.02794
+)  # 0.00762, 0.0254
 
 # --- Head: Ø.20, a .09 land then a spherical dome R.18 ------------------------
 # The head stops the press and, pulled forward by the ring's thrust on the
