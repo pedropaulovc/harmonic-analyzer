@@ -301,12 +301,15 @@ TITLE_BLOCK = (
 # vertical, right of the pose caption; the alignment targets under the
 # elevation, left of the title block. At 1:4 the plan is about 241 x 106 and
 # the elevation 241 x 31 (the handwheel and the screw heads included). Each
-# view's title stands centred under it.
+# view's title stands centred under it. Review jig-asm r1 (2026-11-02): the
+# plan's title sat as close to the elevation as to the plan, so the
+# elevation and the targets under it drop 12 mm into the open room above
+# the border.
 PLAN_CENTER = (0.274, 0.205)
-ELEVATION_CENTER = (0.274, 0.125)
+ELEVATION_CENTER = (0.274, 0.113)
 CAPTION_XY = (0.018, 0.255)
 CAPTION_WIDTH = 46  # characters; default-format note text, left of the plan
-ALIGNMENT_XY = (0.018, 0.105)
+ALIGNMENT_XY = (0.018, 0.093)
 ALIGNMENT_WIDTH = 68  # characters; stops left of the title block
 # Default-format note text: about 2.9 mm a character on the farm's templates.
 NOTE_CHAR_M = 0.0029

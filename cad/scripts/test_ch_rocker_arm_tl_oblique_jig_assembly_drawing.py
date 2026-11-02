@@ -360,6 +360,9 @@ def test_assembled_sheet_regions_fit_apart() -> None:
         assert (title[0] + title[2]) / 2.0 == pytest.approx((view[0] + view[2]) / 2.0)
         assert title[3] < view[1]
     assert plan_title[1] > elevation[3]
+    # Review jig-asm r1: the plan's title reads as the plan's, with clearly
+    # more air below it to the elevation than above it to the plan.
+    assert plan_title[1] - elevation[3] >= 3.0 * (plan[1] - plan_title[3])
 
 
 def _plan_xy(x_mm: float, y_mm: float) -> tuple[float, float]:
