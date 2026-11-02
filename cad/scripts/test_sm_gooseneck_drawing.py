@@ -245,9 +245,10 @@ def test_notes_state_stock_process_and_intent_without_sizes() -> None:
     # The shank and sleeve callouts state the joint's window on their own
     # features and name no method (rule 7: a matched fit goes on the feature).
     assert spec.SHANK_FIT_CALLOUT == f"FIT TO TUBE BORE,\n{window} DIAMETRAL\nCLEARANCE"
-    assert (
-        spec.SLEEVE_FIT_CALLOUT == f"STOCK; FIT ON TUBE,\n{window} DIAMETRAL\nCLEARANCE"
-    )
+    rows = spec.SLEEVE_FIT_CALLOUT.splitlines()
+    assert rows == ["STOCK; FIT ON TUBE,", window, "DIAMETRAL CLEARANCE"]
+    # The block keeps clear of the side view's tube: no row outgrows the first.
+    assert max(map(len, rows)) == len(rows[0])
     assert spec.DIMENSION_CALLOUTS["SleeveProfile"] == {
         "SleeveDia": spec.SLEEVE_FIT_CALLOUT
     }

@@ -136,11 +136,12 @@ SHANK_FIT_CALLOUT = (
 # The sleeve's select-fit window rides its own Ø on the elevation (rule 7: a
 # matched fit goes on the feature, not in a note; codjiflo P2 on #1997), with
 # the stock it is cut from (owner ruling 2026-10-27: select-fit from stock,
-# no hone).
+# no hone). No row is wider than the first, so the block and its reference
+# parentheses stay clear of the side view's tube (Opus review at 7fe9d97bd).
 SLEEVE_FIT_CALLOUT = (
     "STOCK; FIT ON TUBE,\n"
-    f"{BRAZE_CLEARANCE_MIN:.4f}-{math.floor(BRAZE_CLEARANCE_MAX * 1e4) / 1e4:.4f} DIAMETRAL\n"
-    "CLEARANCE"
+    f"{BRAZE_CLEARANCE_MIN:.4f}-{math.floor(BRAZE_CLEARANCE_MAX * 1e4) / 1e4:.4f}\n"
+    "DIAMETRAL CLEARANCE"
 )
 DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
     "BendPath": {"BendRadius": BEND_RADIUS_CALLOUT},
