@@ -1431,6 +1431,16 @@ def test_kp08_row_and_stud_cut_timing_read_plainly() -> None:
     assert spec.BOM_DESCRIPTIONS[spec.HOLD_DOWN_STUD].endswith("CUT 57.2 MM")
 
 
+def test_caption_names_the_cl_tip_reference() -> None:
+    """TL-00 review (2026-11-02): the sheet 1 caption says what the bare
+    elevation reference measures, in the dimension's own printed form."""
+    assert spec.CL_TIP_REFERENCE == "(.064)"
+    assert spec.ASSEMBLED_CAPTION.endswith(
+        "ELEVATION (.064): CL DOWEL TIP ABOVE THE RISER, A REFERENCE; "
+        "STEP 11 SETS IT."
+    )
+
+
 def test_general_torque_note_covers_every_fastener_no_step_torques() -> None:
     """Review jig-asm r1 (rule 24): one general note for the screws and nuts
     whose steps give no torque, with no invented figure."""
