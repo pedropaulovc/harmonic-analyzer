@@ -56,13 +56,16 @@ def test_turned_diameters_and_lengths_print_on_the_side_view() -> None:
     assert body == {"CollarDia", "CollarLength", "PilotDia", "PilotLength"}
     assert body <= set(drawing.SIDE_KEEP)
     assert spec.OVERALL_LENGTH == pytest.approx(spec.LENGTH + spec.PILOT_LENGTH)
-    # Both lengths share one row under the section, above the native
-    # "SECTION A-A" label (16.6 mm under the view); the overall reads above.
+    # Both lengths share one row under the section; the native "SECTION A-A"
+    # caption is moved under the row's dimension line (machinist review of
+    # bcdc09b35: the line struck "SECTION"); the overall reads above.
     rows = {drawing.SIDE_KEEP[n][1] for n in ("CollarLength", "PilotLength")}
     assert len(rows) == 1
     (row,) = rows
     view_bottom = drawing.SIDE_CENTER[1] - drawing.HALF_OD
     assert view_bottom - 0.016 < row < view_bottom
+    assert drawing.SECTION_CAPTION_XY[1] < row - 0.012
+    assert drawing.SECTION_CAPTION_XY[1] - 0.015 > drawing.NOTES_XY[1]
     assert drawing.OVERALL_TEXT_XY[1] > drawing.SIDE_CENTER[1] + drawing.HALF_OD
     # The pilot's length text stands right of its own short span.
     assert drawing.SIDE_KEEP["PilotLength"][0] > drawing._PILOT_X + 0.0145
