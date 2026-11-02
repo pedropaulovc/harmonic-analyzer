@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Traveler: Oblique Trammel Base Bar, MHA-CH-06-TL-20 v47 (2026-10-30)</title>
+<style>
+  @page { size: letter; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Arial, sans-serif; font-size: 9.5pt; color: #111; margin: 0; line-height: 1.3; }
+  h1 { font-size: 17pt; margin: 0 0 2px; }
+  h2 { font-size: 13pt; margin: 14px 0 6px; border-bottom: 2px solid #111; padding-bottom: 2px; }
+  h3 { font-size: 11pt; margin: 10px 0 4px; }
+  .sub { color: #444; margin-bottom: 8px; }
+  table { border-collapse: collapse; width: 100%; margin: 4px 0 8px; }
+  th, td { border: 1px solid #777; padding: 3px 5px; vertical-align: top; text-align: left; }
+  th { background: #e9e9e9; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.fixed { table-layout: fixed; }
+  .head td { border: 1px solid #111; }
+  .warn { border: 3px solid #b00; background: #fff4f4; padding: 6px 10px; margin: 8px 0; }
+  .warn h2 { border: none; color: #b00; margin: 0 0 4px; }
+  .warn li { margin-bottom: 3px; }
+  .note { border-left: 4px solid #555; background: #f4f4f4; padding: 4px 8px; margin: 6px 0; }
+  .changed { border: 2px solid #06c; background: #f2f8ff; padding: 6px 10px; margin: 8px 0; }
+  .changed h2 { border: none; color: #06c; margin: 0 0 4px; }
+  .check { width: 16px; }
+  .box { display: inline-block; width: 12px; height: 12px; border: 1.5px solid #111; vertical-align: middle; }
+  .blank { min-width: 60px; }
+  .op { page-break-inside: avoid; margin-bottom: 8px; }
+  .op h3 { background: #222; color: #fff; padding: 3px 6px; margin-bottom: 4px; }
+  ol, ul { margin: 2px 0 4px 20px; padding: 0; }
+  .pb { page-break-before: always; }
+  .small { font-size: 9pt; color: #444; }
+  .big { font-size: 12pt; font-weight: 600; }
+  svg text { font-family: "Segoe UI", Arial, sans-serif; }
+</style>
+</head>
+<body>
+
+<h1>Traveler: Oblique Trammel Base Bar</h1>
+<div class="sub">For a beginner on the PM-30MV mill with a DRO. Read the whole sheet once before you touch the machine.</div>
+
+<table class="head">
+  <tr><th>Part</th><td>ch-rocker-arm-tl-oblique-base-bar (shop fixture for the rocker-arm jig)</td><th>Drawing no.</th><td>MHA-CH-06-TL-20, rev v47</td></tr>
+  <tr><th>Make</th><td class="big">2 bars, both identical</td><th>Material</th><td>6061-T6511 aluminium flat bar, 1/2 × 6 in (12.70 × 152.4 mm), the owned OnlineMetals 1173 bar</td></tr>
+  <tr><th>Finished size</th><td><b>440.0 × 139.7 × 12.0 mm</b>. Every face is machined.</td><th>Finish</th><td><b>Ra 3.2 on both big faces</b> (table and rail seats). Everything else as machined. Edges broken 0.25 mm max.</td></tr>
+  <tr><th>Machines</th><td>Saw, PM-30MV mill with DRO, 6 in vise, strap clamps</td><th>Units</th><td>millimetres throughout. Your DRO must be set to mm.</td></tr>
+</table>
+
+<div class="changed">
+<h2>What changed since the 2026-10-27 traveler</h2>
+<ul>
+  <li><b>Width 152.4 → 139.7.</b> The 6 in width doesn't fit the vise's stock hard jaws, which only open to 5 3/4 in (146 mm). New <b>Op 20</b> mills both long edges with the bar standing on edge, the way you started on 10-29.</li>
+  <li><b>Thickness 12.70 → 12.0, Ra 3.2 on both big faces.</b> Both faces sit on something: bar 1 sits on the table and carries the rail and brackets; bar 2 is the same part turned over. New <b>Op 30</b> faces them flat on the mill table.</li>
+  <li><b>Slots are shorter.</b> The stud travel is now ±2 instead of ±3, so the round ends are 4.00 apart (was 6.00). New slot Y values are in A9 and A12. Each slot now gets <b>one</b> starter hole in the middle instead of two.</li>
+  <li><b>Not changed:</b> the length, all 7 rail holes, all 8 bracket holes and counterbores, and every X position.</li>
+</ul>
+<p class="small">The drawing on main (v47) still says "1/2 x 5-1/2" material and "139.7 STOCK". You decided to mill the owned 1/2 × 6 bar instead (issue #2083). That drawing fix is still open, so this sheet treats the width as a machined size, 139.7 ±0.8 (the title block's one-decimal band).</p>
+</div>
+
+<div class="warn">
+<h2>BEFORE YOU START</h2>
+<ul>
+  <li><b>Safety glasses on. No gloves, rings or loose sleeves near the spindle.</b> Aluminium chips are razor sharp. Clear them with a brush, never your hand, and only with the spindle stopped.</li>
+  <li><b>Check your rail first.</b> The seven threaded holes must line up with the holes in your HGR15R rail. It should be 440 long, with 7 holes 60 apart and the first and last 40 from each end. <b>If it isn't, stop and ask.</b></li>
+  <li><b>The first edge you mill in Op 20 is the ZERO EDGE.</b> All the Y numbers on this sheet are measured from it, and it ends up against the vise's fixed jaw in Setup A. Mark it as soon as it's cut.</li>
+  <li><b>In Setup A, the face you see on top becomes the <u>bottom</u> of bar 1.</b> The counterbores go in that face. This is on purpose, so all the holes are made in one setup.</li>
+  <li><b>Op 30 needs the vise off the table.</b> The bar is too long to clamp beside it. When you put the vise back, indicate the fixed jaw again, the way you did on 10-29 (under 0.02 mm along X).</li>
+  <li><b>Drill only over open air.</b> In Setup A the parallels sit against the jaws. Every hole is clear of them, but look before every hole anyway.</li>
+  <li><b>The seven rail holes are the only tight feature (±0.08 mm).</b> Stop exactly on the DRO number for each one.</li>
+  <li>The bar hangs about 140 mm out of the vise at each end. Don't lean on the ends.</li>
+  <li>If something squeals, chatters or grabs, <b>stop the spindle first</b>, then work out why.</li>
+</ul>
+</div>
+
+<h2>What you need</h2>
+<table>
+  <tr><th>Tool</th><th>Used for</th><th>Holder</th></tr>
+  <tr><td>Saw (the miter saw you used on 10-29, or a bandsaw), tape measure, file</td><td>cut two blanks 443 mm long</td><td>—</td></tr>
+  <tr><td>Two 1 in parallels (6 in long)</td><td>Setup A: hold the bar up so the drills break through into air</td><td>vise</td></tr>
+  <tr><td>4 strap clamps, studs, T-nuts, step blocks (clamping kit)</td><td>Op 30: hold the bar flat on the table</td><td>table T-slots</td></tr>
+  <tr><td>Edge finder, 0.200 in tip (Ø5.08 mm)</td><td>find the zero end and zero edge</td><td>3/8 in collet</td></tr>
+  <tr><td>3/4 in end mill, 4-flute (LMS 6784 set)</td><td>Op 30: face both big faces</td><td>collet for its shank</td></tr>
+  <tr><td>1/2 in end mill, 2-flute, centre cutting</td><td>mill the long edges, face both ends, mill the two slots</td><td>1/2 in collet</td></tr>
+  <tr><td>5/16 in end mill, 2-flute, centre cutting</td><td>8 counterbores, Ø7.94</td><td>5/16 in collet</td></tr>
+  <tr><td>#2 centre drill</td><td>spot every hole so the drills start where they should</td><td>drill chuck</td></tr>
+  <tr><td>#29 drill (3.45 mm)</td><td>7 tap holes for the rail</td><td>drill chuck</td></tr>
+  <tr><td>#9 drill (4.98 mm)</td><td>8 screw holes for the leadscrew brackets</td><td>drill chuck</td></tr>
+  <tr><td>3/8 in drill (9.5 mm)</td><td>2 slot starter holes</td><td>drill chuck</td></tr>
+  <tr><td>8-32 plug tap and T-handle tap wrench</td><td>thread the 7 rail holes</td><td>drill chuck to start, then by hand</td></tr>
+  <tr><td>Cutting oil (CRC), tapping fluid (Tap Magic), acid brush, cigarette paper</td><td>stop aluminium sticking to the cutters; touch-offs</td><td>—</td></tr>
+  <tr><td>0–25 mm micrometer or calipers, steel rule, dead-blow hammer, deburring tool (Noga), marker</td><td>setup, checking, deburring</td><td>—</td></tr>
+  <tr><td>For the final check: the HGR15R rail with 7 #8-32 × 3/4 socket screws; one #8-32 × 5/8 socket screw; a 1/2-13 T-slot stud</td><td>fit tests</td><td>—</td></tr>
+</table>
+
+<h3>Speeds (LittleMachineShop chart, row "Wrought aluminum 6061-T6"; PM-30MV tops out at 3000 rpm)</h3>
+<table>
+  <tr><th>Tool</th><th>Chart speed</th><th class="num">Set spindle to</th><th>Feed</th></tr>
+  <tr><td>3/4 in end mill (facing)</td><td>165 ft/min milling</td><td class="num">840 rpm</td><td>85 mm/min roughing, 60 mm/min for the last pass. My choice, not from the chart.</td></tr>
+  <tr><td>1/2 in end mill</td><td>165 ft/min milling</td><td class="num">1250 rpm</td><td>75 mm/min. On 10-29 you ran 2500 rpm at 10 mm/min and got a very clean edge. Keep that if it works for you.</td></tr>
+  <tr><td>5/16 in end mill (counterbores)</td><td>165 ft/min milling</td><td class="num">2000 rpm</td><td>plunge slowly with the quill, like drilling</td></tr>
+  <tr><td>#2 centre drill, #29 drill, #9 drill</td><td>350–400 ft/min drilling (works out above 3000 rpm)</td><td class="num">3000 rpm</td><td>steady hand feed; peck every 3 mm</td></tr>
+  <tr><td>3/8 in drill</td><td>350–400 ft/min drilling</td><td class="num">2000 rpm</td><td>slower than the chart, so a big drill stays easy to control; peck every 3 mm</td></tr>
+  <tr><td>Edge finder</td><td>750–1500 rpm (Travers)</td><td class="num">1000 rpm</td><td>approach very slowly near the edge</td></tr>
+  <tr><td>8-32 tap</td><td colspan="3">by hand only. <b>Spindle power OFF.</b></td></tr>
+</table>
+<p class="small">Source: https://littlemachineshop.com/pages/cutting-speeds. Brush cutting oil on before every cut.</p>
+
+<!-- ============================ PAGE 2 ============================ -->
+<h2 class="pb">Op 10: Cut the blanks (saw)</h2>
+<div class="op">
+<ol>
+  <li>Cut <b>two pieces 443 mm long</b> from the 1/2 × 6 bar. That leaves 1.5 mm to clean up at each end. (Bar 1 was sawn on 10-29, but its length wasn't recorded. Measure it: it must be at least 441.)</li>
+  <li>Let the Dykem dry before you scribe the line. Support the long end of the bar so it doesn't drop as the cut finishes.</li>
+  <li>File off the saw burrs.</li>
+</ol>
+</div>
+
+<h2>Op 20: Mill the two long edges to 139.7 wide (vise, bar on edge)</h2>
+<div class="op">
+<p>The bar is too wide to lie flat in the vise, so it stands on edge, gripped across its thickness: the same setup you used on 10-29.</p>
+<ol>
+  <li>Stand the bar on edge in the vise, roughly centred along X, about 140 mm sticking out each end. Grip it firmly across the 1/2 in thickness. Seat it down with the dead-blow hammer, then re-tighten.</li>
+  <li><b>First edge = ZERO EDGE.</b> With the 1/2 in end mill, take passes along X using the bottom of the cutter, until the whole edge is clean. Take as little as you can, usually about 1 mm. Use 0.5–1 mm per pass, or what worked on 10-29. If the top starts to sing, take lighter cuts: it is 140 mm above the jaws.</li>
+  <li>Write <b>ZERO EDGE</b> on both faces next to it.</li>
+  <li><b>Second edge:</b> flip the bar over so the zero edge sits down on the vise floor, wipe the floor first, grip it and tap it down. Mill the top edge down in passes until the width is <b>139.7</b>. Measure with calipers at both ends and in the middle. Anything from <b>138.9 to 140.5</b> is OK; aim for 139.7. In total you take off about 12.7 mm.</li>
+  <li>Do both bars before you go on.</li>
+</ol>
+</div>
+
+<div class="op">
+<h3>Op 30: Face both big faces to 12.0 thick, Ra 3.2 (mill table, vise off)</h3>
+<p>Why on the table: in the vise, the bar's top would sit below the top of the jaws (1 in parallels + 12.7 bar = 38.1, jaws are 44.9 tall), so a facing cutter would hit the jaws at the edges. On the table the bar is supported over its whole length, which is what you want for a flat seat.</p>
+<ol>
+  <li><b>Take the vise off.</b> Wipe the table. Stone off any burrs on the table and on the bar's underside. One chip under the bar ruins the face.</li>
+  <li><b>Measure the thickness</b> with the micrometer at the four corners and the middle. Write it here: <span class="blank">________</span>. You'll take off (that − 12.0) in total, about 0.35 per side.</li>
+  <li>Lay the bar flat along X, <b>ZERO EDGE toward the column</b>. If it rocks, slip paper under the low corner so it sits without rocking. Don't clamp it flat over a gap: it would spring back after the cut.</li>
+  <li><b>Clamp for the middle:</b> put two straps with their toes on the bar's ends, about 15 mm in from each end, heels on step blocks a little higher than the bar. Snug them, but don't crush the bar.</li>
+  <li>3/4 in end mill, 840 rpm. Touch the top face with a cigarette paper and set Z = your measured thickness. Lock the head.</li>
+  <li><b>Roughing:</b> go to Z = thickness − 0.25. Feed along X at 85 mm/min from X 25 to X 415, step 15 mm in Y, and repeat until the whole width between the clamps is cut, about 10 passes.</li>
+  <li><b>Clamp for the ends:</b> without touching Z, put two more straps on the <b>faced</b> middle, with paper under the toes, then take the end straps off. Face the two ends (from X −15 to 30, and from 410 to 455) at the same Z.</li>
+  <li><b>Finish this face:</b> a 0.10 pass over the whole face at 60 mm/min, again in two halves for the clamps. Stop if you see chatter marks.</li>
+  <li><b>Flip the bar</b> and wipe both the table and the faced side. Faced side down. Repeat steps 4 to 8 on the second face, but this time stop at <b>Z = 12.00</b> for the finishing pass. Anything from <b>11.2 to 12.8</b> is OK.</li>
+  <li><b>Ra 3.2 check (there's no roughness gauge in the shop):</b> both faces should show an even swirl, with no chatter or tearing, and a fingernail should slide across without catching. A sharp end mill on a light finishing pass normally does better than Ra 3.2.</li>
+  <li>Do both bars. Then <b>put the vise back and indicate the fixed jaw</b>: under 0.02 mm along X, as on 10-29.</li>
+</ol>
+<p class="small">The mill is CNC-converted. If you'd rather, the same zig-zag can be run as a facing program in CNCjs. The depths and feeds stay the same.</p>
+</div>
+
+<h2 class="pb">Op 40: Mark the bar</h2>
+<div class="op">
+<ol>
+  <li>The ZERO EDGE is already marked.</li>
+  <li>Pick one end to be the <b>ZERO END</b> and write "ZERO END" there.</li>
+  <li>On one big face, write <b>"C'BORE SIDE — UP IN VISE"</b>. This face goes up in Setup A. Both faces are the same, so it doesn't matter which one you pick.</li>
+</ol>
+</div>
+
+<!-- ============================ PAGE 3 ============================ -->
+<h2>Setup A: Mill vise. All the holes, the slots and the length are cut here, in one setup.</h2>
+<p>This is what you should see from where you stand, looking down at the vise. The <b>zero corner</b> is back-left. <b>X</b> is measured to the right from the zero end. <b>Y</b> is measured toward you from the zero edge. Every number on this sheet is a DRO reading from that corner.</p>
+
+<svg viewBox="0 0 1000 450" width="100%" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#b00"/></marker>
+  </defs>
+  <!-- scale: 2 px per mm, origin (60,80) = zero corner; bar 440 x 139.7 -->
+  <rect x="342" y="52" width="316" height="26" fill="#bbb" stroke="#333"/>
+  <text x="500" y="45" text-anchor="middle" font-size="13">FIXED JAW (back, column side): the zero edge sits against it</text>
+  <rect x="342" y="361.4" width="316" height="26" fill="#bbb" stroke="#333"/>
+  <text x="500" y="404" text-anchor="middle" font-size="13">MOVING JAW (your side)</text>
+  <rect x="60" y="80" width="880" height="279.4" fill="#f2f2f2" stroke="#111" stroke-width="2"/>
+  <rect x="348" y="80" width="304" height="6.35" fill="none" stroke="#777" stroke-dasharray="5,3"/>
+  <rect x="348" y="353.05" width="304" height="6.35" fill="none" stroke="#777" stroke-dasharray="5,3"/>
+  <text x="500" y="101" text-anchor="middle" font-size="11" fill="#555">parallel underneath (dashed)</text>
+  <text x="500" y="347" text-anchor="middle" font-size="11" fill="#555">parallel underneath (dashed)</text>
+  <g fill="#fff" stroke="#000" stroke-width="1.5">
+    <circle cx="140" cy="257.8" r="4"/><circle cx="260" cy="257.8" r="4"/><circle cx="380" cy="257.8" r="4"/>
+    <circle cx="500" cy="257.8" r="4"/><circle cx="620" cy="257.8" r="4"/><circle cx="740" cy="257.8" r="4"/>
+    <circle cx="860" cy="257.8" r="4"/>
+  </g>
+  <text x="500" y="282" text-anchor="middle" font-size="12">7 rail holes, Y 88.90: #29 drill, then tap 8-32</text>
+  <g fill="#fff" stroke="#000" stroke-width="1.2">
+    <circle cx="174" cy="92.8" r="7.9"/><circle cx="174" cy="125.8" r="7.9"/><circle cx="174" cy="169.8" r="7.9"/><circle cx="174" cy="202.8" r="7.9"/>
+    <circle cx="916" cy="92.8" r="7.9"/><circle cx="916" cy="125.8" r="7.9"/><circle cx="916" cy="169.8" r="7.9"/><circle cx="916" cy="202.8" r="7.9"/>
+  </g>
+  <g fill="#000">
+    <circle cx="174" cy="92.8" r="5"/><circle cx="174" cy="125.8" r="5"/><circle cx="174" cy="169.8" r="5"/><circle cx="174" cy="202.8" r="5"/>
+    <circle cx="916" cy="92.8" r="5"/><circle cx="916" cy="125.8" r="5"/><circle cx="916" cy="169.8" r="5"/><circle cx="916" cy="202.8" r="5"/>
+  </g>
+  <text x="190" y="150" font-size="12">4 bracket holes</text>
+  <text x="190" y="164" font-size="12">#9 drill + counterbore</text>
+  <text x="800" y="150" font-size="12">4 bracket holes</text>
+  <rect x="88.3" y="165.3" width="27" height="35" rx="13.5" fill="#fff" stroke="#000" stroke-width="1.5"/>
+  <text x="122" y="214" font-size="12">slot</text>
+  <rect x="826.5" y="315.3" width="27" height="35" rx="13.5" fill="#fff" stroke="#000" stroke-width="1.5"/>
+  <text x="786" y="337" font-size="12">slot</text>
+  <circle cx="60" cy="80" r="6" fill="#b00"/>
+  <text x="10" y="70" font-size="14" fill="#b00" font-weight="bold">X0 Y0</text>
+  <line x1="60" y1="80" x2="140" y2="80" stroke="#b00" stroke-width="3" marker-end="url(#ar)"/>
+  <text x="100" y="74" font-size="13" fill="#b00" font-weight="bold">+X</text>
+  <line x1="60" y1="80" x2="60" y2="150" stroke="#b00" stroke-width="3" marker-end="url(#ar)"/>
+  <text x="20" y="130" font-size="13" fill="#b00" font-weight="bold">+Y</text>
+  <text x="62" y="378" font-size="12">ZERO END is on the left</text>
+  <text x="500" y="440" text-anchor="middle" font-size="14" font-weight="bold">YOU STAND HERE</text>
+  <text x="940" y="378" text-anchor="end" font-size="12">about 140 mm sticks out each side of the vise</text>
+</svg>
+<p class="small">Why it looks like a mirror image of the drawing: the drawing shows the other face. Through holes look the same from either side, and the counterbores really are on the face you're looking at ("C'BORE FAR SIDE" on the drawing).</p>
+
+<!-- ============================ PAGE 4 ============================ -->
+<h2 class="pb">Setup A operations (do them in this order for each bar)</h2>
+
+<div class="op">
+<h3>A1. Load the bar</h3>
+<ol>
+  <li>Wipe the vise floor, the jaws and both 1 in parallels. Put one parallel against each jaw.</li>
+  <li>Lay the bar on the parallels, <b>marked face up</b>, <b>ZERO EDGE against the fixed (back) jaw</b>, <b>ZERO END on your left</b>. At 139.7 wide it fits the 146 mm opening with about 6 mm to spare.</li>
+  <li>Slide it sideways until about the same amount, roughly 140 mm, sticks out each side.</li>
+  <li>Tighten the vise. Tap the bar down with the dead-blow hammer, then tighten again. If you can slide either parallel with your fingers, tap again until you can't.</li>
+</ol>
+</div>
+
+<div class="op">
+<h3>A2. Check which way your DRO counts</h3>
+<ol>
+  <li>Moving the spindle <b>to the right over the bar</b>, X must count <b>up</b>. Moving the spindle <b>toward you</b>, Y must count <b>up</b>.</li>
+  <li>If either one counts down, reverse that axis in the DRO setup (the EL400 simulator in CNCjs). Every number below assumes both count up.</li>
+</ol>
+</div>
+
+<div class="op">
+<h3>A3. Clean up the zero end (1/2 in end mill, 1250 rpm)</h3>
+<ol>
+  <li>Spindle off: lower the cutter to about 1 mm <b>below the bottom</b> of the bar, beside the left end, where there's nothing under it. Lock the head.</li>
+  <li>Start from left of the left end, toward the back. Move in 0.5 mm in X, then feed <b>toward you</b> across the end. Come back out, move in another 0.5 mm, and repeat.</li>
+  <li>Stop when the whole end face is clean. <b>Don't take off more than 2.5 mm in total.</b></li>
+</ol>
+</div>
+
+<div class="op">
+<h3>A4. Set zero (edge finder, 1000 rpm)</h3>
+<ol>
+  <li><b>X zero:</b> touch the edge finder off the left end face, at about Y 70. <b>Set X = −2.54.</b></li>
+  <li><b>Y zero:</b> raise it, move right to about X 100, and touch off the zero edge from behind. <b>Set Y = −2.54.</b></li>
+  <li>Check: go to X 0.000, Y 0.000. The tip should sit right over the back-left corner.</li>
+</ol>
+</div>
+
+<div class="op">
+<h3>A5. Cut the bar to length (1/2 in end mill, 1250 rpm)</h3>
+<ol>
+  <li>Measure the end mill across its cutting edges with calipers and call it <b>D</b>, normally 12.70. Your last pass is at <b>X = 440.00 + D/2</b>: <b>X 446.35</b> for D = 12.70.</li>
+  <li>Use 0.5 mm passes across the right end as in A3, feeding <b>away from you</b>. Length 440.0; anything from 439.2 to 440.8 is OK.</li>
+</ol>
+</div>
+
+<div class="op">
+<h3>A6 to A9. Spot and drill every hole (drill chuck)</h3>
+<p>Move to each X and Y below and <b>stop exactly on the number</b>. Brush on oil, peck every 3 mm, and stop about 3 mm past breakthrough.</p>
+<table>
+  <tr><th>Step</th><th>Tool, speed</th><th>Holes</th><th>Depth</th></tr>
+  <tr><td>A6</td><td>#2 centre drill, 3000 rpm</td><td><b>all 17 positions</b> below</td><td>until the cone is about 3 mm across</td></tr>
+  <tr><td>A7</td><td>#29 drill, 3000 rpm</td><td>7 rail holes</td><td>through</td></tr>
+  <tr><td>A8</td><td>#9 drill, 3000 rpm</td><td>8 bracket holes</td><td>through</td></tr>
+  <tr><td>A9</td><td>3/8 in drill, 2000 rpm</td><td>2 slot starter holes</td><td>through</td></tr>
+</table>
+
+<table class="fixed">
+  <colgroup><col style="width:16%"><col style="width:10%"><col style="width:10%"><col style="width:5%"><col style="width:19%"><col style="width:17%"><col style="width:17%"><col style="width:6%"></colgroup>
+  <tr><th>Rail holes (7)</th><th class="num">X</th><th class="num">Y</th><th class="check">✓</th><th>Bracket holes (8)</th><th class="num">X</th><th class="num">Y</th><th class="check">✓</th></tr>
+  <tr><td>R1</td><td class="num">40.00</td><td class="num">88.90</td><td><span class="box"></span></td><td>B1</td><td class="num">57.000</td><td class="num">6.400</td><td><span class="box"></span></td></tr>
+  <tr><td>R2</td><td class="num">100.00</td><td class="num">88.90</td><td><span class="box"></span></td><td>B2</td><td class="num">57.000</td><td class="num">22.900</td><td><span class="box"></span></td></tr>
+  <tr><td>R3</td><td class="num">160.00</td><td class="num">88.90</td><td><span class="box"></span></td><td>B3</td><td class="num">57.000</td><td class="num">44.900</td><td><span class="box"></span></td></tr>
+  <tr><td>R4</td><td class="num">220.00</td><td class="num">88.90</td><td><span class="box"></span></td><td>B4</td><td class="num">57.000</td><td class="num">61.400</td><td><span class="box"></span></td></tr>
+  <tr><td>R5</td><td class="num">280.00</td><td class="num">88.90</td><td><span class="box"></span></td><td>B5</td><td class="num">428.000</td><td class="num">6.400</td><td><span class="box"></span></td></tr>
+  <tr><td>R6</td><td class="num">340.00</td><td class="num">88.90</td><td><span class="box"></span></td><td>B6</td><td class="num">428.000</td><td class="num">22.900</td><td><span class="box"></span></td></tr>
+  <tr><td>R7</td><td class="num">400.00</td><td class="num">88.90</td><td><span class="box"></span></td><td>B7</td><td class="num">428.000</td><td class="num">44.900</td><td><span class="box"></span></td></tr>
+  <tr><td colspan="4"></td><td>B8</td><td class="num">428.000</td><td class="num">61.400</td><td><span class="box"></span></td></tr>
+  <tr><th>Slot starter holes (2)</th><th class="num">X</th><th class="num">Y</th><th class="check">✓</th><th colspan="4"></th></tr>
+  <tr><td>S1 (left slot, middle)</td><td class="num">20.9</td><td class="num">51.4</td><td><span class="box"></span></td><td colspan="4" rowspan="2" class="small">R3, R4 and R5 are the only holes between the jaws, and they sit over the open gap between the parallels. Everything else is out in the overhang.</td></tr>
+  <tr><td>S2 (right slot, middle)</td><td class="num">390.0</td><td class="num">126.4</td><td><span class="box"></span></td></tr>
+</table>
+</div>
+
+<div class="op">
+<h3>A10. Tap the 7 rail holes 8-32 (by hand, <u>spindle power OFF</u>)</h3>
+<ol>
+  <li>Switch the mill off at the switch. Put the tap in the drill chuck, go to R1, and add a drop of tapping fluid.</li>
+  <li>Lower the quill onto the tap. Keep light pressure on the quill handle and turn the chuck <b>clockwise by hand</b> about 3 turns so the thread starts straight.</li>
+  <li>Finish with the T-handle wrench: <b>one turn in, half a turn back</b>, all the way through the 12.0. If it gets stiff, back out a full turn and add fluid.</li>
+  <li>Repeat for R2 to R7.</li>
+</ol>
+</div>
+
+<div class="op">
+<h3>A11. Counterbore the 8 bracket holes (5/16 in end mill, 2000 rpm)</h3>
+<ol>
+  <li>Touch off the top of the bar at B1 with a cigarette paper and zero the quill depth.</li>
+  <li>Set the quill stop for <b>4.80 deep</b> (4.29 to 5.31 is OK). That leaves 7.2 of material under the counterbore.</li>
+  <li>At each of B1 to B8, plunge slowly to the stop with oil, then come straight up.</li>
+  <li>After B1: a #8 socket screw's head must sit <b>below</b> the surface. A steel rule laid across it mustn't rock.</li>
+</ol>
+</div>
+
+<div class="op">
+<h3>A12. Mill the 2 slots (1/2 in end mill, 1250 rpm)</h3>
+<p>Each slot is 13.50 wide and 17.5 long overall, with its two round ends <b>4.00</b> apart. It takes a 1/2 in hold-down stud.</p>
+<table>
+  <tr><th>Slot</th><th class="num">Centre X</th><th class="num">End centres Y</th><th class="num">Finishing lap X (D = 12.70)</th><th class="num">Finishing lap Y</th></tr>
+  <tr><td>Left</td><td class="num">20.9</td><td class="num">49.4 → 53.4</td><td class="num">20.50 and 21.30</td><td class="num">49.00 and 53.80</td></tr>
+  <tr><td>Right</td><td class="num">390.0</td><td class="num">124.4 → 128.4</td><td class="num">389.60 and 390.40</td><td class="num">124.00 and 128.80</td></tr>
+</table>
+<ol>
+  <li><b>Roughing:</b> start over the starter hole. Go 3 mm deep and move Y from one end centre to the other and back. Repeat at 6, 9 and 12.5 mm, which is 0.5 below the bottom of the 12.0 bar.</li>
+  <li><b>Finishing lap at full depth:</b> go round the rectangle in the table <b>clockwise as seen from above</b>.</li>
+  <li>If D isn't 12.70, move the lap out by (13.50 − D) ÷ 2 on each side.</li>
+  <li>Check the width with calipers: 12.99 to 14.01. The far slot leaves a 4.55 wall to the far edge, so <b>don't</b> open it up more than you have to.</li>
+</ol>
+</div>
+
+<div class="op">
+<h3>A13. Unload</h3>
+<p>Touch the edge finder on the right end. It should read 442.54, which is 440.0 + 2.54 (anything from 441.74 to 443.34 is OK). Then brush off the chips and take the bar out.</p>
+</div>
+
+<div class="op">
+<h3>Op 50: Deburr (bench)</h3>
+<ol>
+  <li>Run the deburring tool <b>lightly</b> round every edge: one or two passes, <b>0.25 mm max</b>. Don't scratch the faced seats.</li>
+  <li>Run an 8-32 screw through each rail hole.</li>
+</ol>
+</div>
+
+<!-- ============================ PAGE 5 ============================ -->
+<h2 class="pb">Op 60: Check the part</h2>
+<style>.inspect td, .inspect th { padding: 2px 4px; font-size: 9pt; }</style>
+<p>Write down what you measure. If a reading is outside the OK range, don't use the bar until someone has looked at it.</p>
+<table class="fixed inspect">
+  <colgroup><col style="width:16%"><col style="width:18%"><col style="width:16%"><col style="width:30%"><col style="width:10%"><col style="width:10%"></colgroup>
+  <tr><th>What</th><th class="num">Drawing</th><th class="num">OK range</th><th>How to check</th><th class="blank">Bar 1</th><th class="blank">Bar 2</th></tr>
+  <tr><td>Length</td><td class="num">440.0</td><td class="num">439.2 – 440.8</td><td>DRO in A13, or a steel rule</td><td></td><td></td></tr>
+  <tr><td>Width</td><td class="num">139.7</td><td class="num">138.9 – 140.5</td><td>calipers at both ends and the middle</td><td></td><td></td></tr>
+  <tr><td><b>Thickness</b></td><td class="num">12.0</td><td class="num">11.2 – 12.8</td><td>micrometer at the 4 corners and the middle</td><td></td><td></td></tr>
+  <tr><td><b>Seat finish, both faces</b></td><td class="num">Ra 3.2</td><td>even swirl, no chatter</td><td>look, and drag a fingernail across: it shouldn't catch</td><td><span class="box"></span></td><td><span class="box"></span></td></tr>
+  <tr><td>Sits flat</td><td>table seat</td><td>no rock</td><td>on the mill table: press each corner, it mustn't rock</td><td><span class="box"></span></td><td><span class="box"></span></td></tr>
+  <tr><td>Rail holes from the zero edge</td><td class="num">88.90</td><td class="num">88.39 – 89.41</td><td>calipers from the edge to the near side of a hole, plus 1.73</td><td></td><td></td></tr>
+  <tr><td>Rail threads</td><td class="num">8-32 UNC, 7×</td><td>screw runs in by hand</td><td>an 8-32 screw turns in all the way with your fingers</td><td><span class="box"></span></td><td><span class="box"></span></td></tr>
+  <tr><td><b>Rail fit (the real test)</b></td><td>matches HGR15R</td><td>all 7 screws start</td><td>Lay the rail on the <b>un-marked</b> face, ends flush. All 7 screws go in by hand without pushing the rail sideways.</td><td><span class="box"></span></td><td><span class="box"></span></td></tr>
+  <tr><td>Bracket hole size</td><td class="num">Ø4.98</td><td class="num">4.98 – 5.08</td><td>a #8 screw drops through freely</td><td><span class="box"></span></td><td><span class="box"></span></td></tr>
+  <tr><td>Bracket hole positions</td><td class="num">57.000 / 428.000; 6.400 / 22.900 / 44.900 / 61.400</td><td class="num">± 0.13</td><td>calipers to the hole side, plus 2.49</td><td></td><td></td></tr>
+  <tr><td>Counterbore</td><td class="num">Ø7.94 × 4.80 deep</td><td class="num">Ø7.43 – 8.45; 4.29 – 5.31 deep</td><td>calipers; a #8 head sits below the surface</td><td></td><td></td></tr>
+  <tr><td>Slot width</td><td class="num">13.50</td><td class="num">12.99 – 14.01</td><td>calipers</td><td></td><td></td></tr>
+  <tr><td>Slot end-centre spacing</td><td class="num">4.00</td><td class="num">3.49 – 4.51</td><td>slot length minus slot width (about 17.5 − 13.5)</td><td></td><td></td></tr>
+  <tr><td>Slot positions</td><td class="num">X 20.9 / 390.0; Y 49.4 / 124.4 to the near end centre</td><td class="num">± 0.8</td><td>calipers or rule</td><td></td><td></td></tr>
+  <tr><td>Far slot wall</td><td class="num">4.55</td><td class="num">at least 1.5</td><td>calipers from the far slot to the far edge</td><td></td><td></td></tr>
+  <tr><td>Stud fit</td><td>1/2-13 stud</td><td>slides end to end</td><td>push a 1/2-13 stud along each slot</td><td><span class="box"></span></td><td><span class="box"></span></td></tr>
+  <tr><td>Edges</td><td>R0.25 / 0.25 chamfer max</td><td>no sharp edges, no big chamfers</td><td>finger (carefully) and eye</td><td><span class="box"></span></td><td><span class="box"></span></td></tr>
+</table>
+
+<div class="note">
+<b>Then make the second bar exactly the same way.</b> Don't mirror it. When the jig goes together, bar 2 is simply turned over.
+</div>
+
+<table>
+  <tr><th>Made by</th><td style="width:30%"></td><th>Date</th><td style="width:20%"></td><th>Time taken</th><td style="width:15%"></td></tr>
+  <tr><th>Problems / notes</th><td colspan="5" style="height:60px"></td></tr>
+</table>
+
+<p class="small">Hand-written traveler, 2026-10-30. It replaces the 2026-10-27 sheet. Sources: drawing MHA-CH-06-TL-20 v47 (main b6d12df6, PR #2086; farm run 20261030T220540504Z, machinist review SHIP), the CAD spec <code>cad/scripts/ch_rocker_arm_tl_oblique_base_bar_spec.py</code> (slots from PR #2079), and your decision in issue #2083 to mill the owned 1/2 × 6 bar to width. It was not generated or checked by prechips. Tool and machine values come from <code>cad/process/shop/inventory.toml</code>, and many of those are still placeholders, so check your actual tools (#1413). The clamping kit is listed there as not yet confirmed in your possession. The facing feeds and the Ra check method are my choices, not chart or drawing values.</p>
+
+</body>
+</html>
