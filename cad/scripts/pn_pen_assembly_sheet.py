@@ -130,9 +130,11 @@ if set(BOM_DESCRIPTIONS) != set(BOM_ORDER):
 # The steps call the stud by its BOM name (machinist review c03368c).
 _STUD_NAME = BOM_DESCRIPTIONS[STUD].partition(",")[0]
 # The rod and everything its pivot carries; the steps and checks call it the
-# carriage, defined once by its BOM rows (one run of items).
+# carriage, defined once by its BOM rows (one run of items).  By step 6 it
+# also carries the stud, its jam nut and the pen wire (steps 1-2), so the
+# carriage that goes into the guides is that whole run.
 CARRIAGE_STEMS = (ROD, V_BLOCK, FRAME, THUMB_SCREW, ROD_SET_SCREW, MARKER)
-_CARRIAGE_ITEMS = sorted(ITEM[stem] for stem in CARRIAGE_STEMS)
+_CARRIAGE_ITEMS = sorted(ITEM[stem] for stem in (*CARRIAGE_STEMS, STUD, STUD_NUT, WIRE))
 if _CARRIAGE_ITEMS != list(range(_CARRIAGE_ITEMS[0], _CARRIAGE_ITEMS[-1] + 1)):
     raise AssertionError("the carriage's BOM items must run as one range")
 _CARRIAGE = f"CARRIAGE (ITEMS {_CARRIAGE_ITEMS[0]}-{_CARRIAGE_ITEMS[-1]})"
