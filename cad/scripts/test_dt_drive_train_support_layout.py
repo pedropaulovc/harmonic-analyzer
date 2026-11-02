@@ -849,12 +849,12 @@ def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
         assert min(stations) >= 1.0, stations
         assert max(stations) <= drive.CAM_LEN - 1.0, stations
     # User ruling P1-1: on its leaf the back collar's gap -- the rod's north
-    # float -- is F + e at most 1.00, so both pins keep >= 2.96 of collar on
+    # float -- is F + e at most 1.00, so both pins keep >= 3.09 of collar on
     # either side (the by-eye set it replaced left 1.90 and 2.75; #290's .XX
-    # strap limits, .34-.36 about the .354 model, set the rest).
-    assert math.isclose(min(front), 2.968, abs_tol=5e-3)
-    assert math.isclose(min(back), 4.078, abs_tol=5e-3)
-    assert math.isclose(max(back), drive.CAM_LEN - 2.968, abs_tol=5e-3)
+    # strap band set the rest).
+    assert math.isclose(min(front), 3.095, abs_tol=5e-3)
+    assert math.isclose(min(back), 3.951, abs_tol=5e-3)
+    assert math.isclose(max(back), drive.CAM_LEN - 3.095, abs_tol=5e-3)
     # North float at the widest setting: the back collar lands first.
     assert _back_collar_gap(_LEAF_ERR) < _hub_gap() - RIG.HUB_STOP_MARGIN
     # The model's back collar sits on its leaf, its pin BACK_CAM_PIN_STATION
@@ -866,7 +866,7 @@ def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
         abs_tol=1e-9,
     )
     assert drive.CAM_PIN_STATION[1] == RIG.BACK_CAM_PIN_STATION
-    assert math.isclose(RIG.BACK_CAM_PIN_STATION, 5.4042, abs_tol=1e-9)
+    assert math.isclose(RIG.BACK_CAM_PIN_STATION, 5.328, abs_tol=1e-9)
     assert (RIG.BACK_COLLAR_GAP_MIN, RIG.BACK_COLLAR_GAP_MAX) == pytest.approx(
         (0.80, 1.00), abs=1e-9
     )
@@ -930,7 +930,7 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
 
     assert not hasattr(RIG, "STACK_BAND")  # the stacks name every term
     assert (RIG.TORQUE_SHAFT_LEN, RIG.LIFT_ROD_LEN) == pytest.approx(
-        (7.29 * 25.4, 7.72 * 25.4)
+        (7.31 * 25.4, 7.74 * 25.4)
     )
     assert math.isclose(RIG.BACK_COLLAR_GAP_MAX, 1.00, abs_tol=1e-9)
     bearing_min = math.inf
@@ -1093,17 +1093,14 @@ def test_torque_shaft_length_band_clears_both_ends() -> None:
 
     front_end = rig.BACK_BLOCK_OUTER_Z - rig.TORQUE_SHAFT_LEN - _ROD_LEN_BAND
     # The shortest stack mirrors the named-term long stack of the front
-    # block's OUTER face (both blocks' depths, the drum and the feeler: the
-    # lift rod's budget less its nominal and the rod's own band), since those
-    # nominals print exactly; the .354 straps print .35, so they shrink by
-    # their own lower deviation, not the mirror of their upper one.
-    from dt_pinion_bracket_geometry import THICKNESS, THICKNESS_LIMITS
-
+    # block's OUTER face (both blocks' depths, both straps, the drum and the
+    # feeler: the lift rod's budget less its nominal and the rod's own band),
+    # since every nominal in it prints exactly.
     shrink = -sum(
         value
         for name, value in rig.LIFT_ROD_SEAT_STACK.items()
-        if not name.startswith(("nominal", "MHA-DT-17", "MHA-DT-14"))
-    ) + 2.0 * (THICKNESS - THICKNESS_LIMITS[0])
+        if not name.startswith(("nominal", "MHA-DT-17"))
+    )
     shortest_outer = rig.FRONT_BLOCK_Z0 + shrink
     proud = shortest_outer - front_end
     assert math.isclose(proud, 3.404, abs_tol=5e-3)
@@ -1239,7 +1236,7 @@ def test_set_pin_holes_sit_at_the_physical_back_stop_straps() -> None:
     # front end, so the front strap stands the shim off the drum.
     physical_front = physical_back + t + rig.DRUM_LEN + rig.DRUM_END_SHIM
     assert math.isclose(from_back[1], physical_back, abs_tol=1e-9)
-    assert math.isclose(from_back[1], 15.672, abs_tol=5e-3)
+    assert math.isclose(from_back[1], 15.748, abs_tol=5e-3)
     assert math.isclose(from_back[0], physical_front, abs_tol=1e-9)
     # Against the pose: both strap mid-planes are the holes' stations.
     model_mid = [(o + i) / 2.0 for o, i in zip(rig.STRAP_Z_OUTER, rig.STRAP_Z_INNER)]
@@ -1304,7 +1301,7 @@ def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
     # strap face against the .XX-printed station, Codex #858 P2); the shaft
     # ligament at the implied zero's .XX offset (#290: .X is kept for features
     # no check reads) clears the .080 target, and a 0.25 V-block set-up too.
-    assert math.isclose(pin.STRAP_FACE_WEB_WORST, 2.935, abs_tol=5e-4)
+    assert math.isclose(pin.STRAP_FACE_WEB_WORST, 3.189, abs_tol=5e-4)
     assert pin.STRAP_FACE_WEB_WORST >= WALL_TARGET_MM
     assert pin.FOLLOWER_SEAT_LIGAMENT >= WALL_TARGET_MM
     assert math.isclose(pin.SHAFT_LIGAMENT_WORST, 2.085, abs_tol=5e-4)

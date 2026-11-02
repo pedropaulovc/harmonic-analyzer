@@ -316,7 +316,7 @@ def test_rig_layout_shaft_and_rod_are_set_back_flush() -> None:
     assert rig.LEVER_SEAT_PROUD - 1e-9 <= proud <= rig.LEVER_SEAT_PROUD + 0.254
     # Both are budgeted on the worst fitted stack (their own tests); at
     # nominal each stands that allowance proud of the front block.
-    assert (SHAFT_LEN, ROD_LEN) == pytest.approx((7.29 * 25.4, 7.72 * 25.4))
+    assert (SHAFT_LEN, ROD_LEN) == pytest.approx((7.31 * 25.4, 7.74 * 25.4))
 
 
 def test_lift_rod_length_budgets_the_whole_fitted_stack() -> None:
@@ -384,9 +384,9 @@ def test_worst_stack_bands_are_the_printed_places() -> None:
 
     x_band = printed_band_mm(1)  # the drum's title-block .X
     assert dt_pinion_bracket_spec.DRAWING_PRECISION["Strap"]["Depth"] == 2
-    # The .354 strap prints .35, so its limits sit off-centre about the model.
+    # The .36 strap's printed .XX limits.
     assert dt_pinion_bracket_spec.THICKNESS_LIMITS == pytest.approx(
-        (0.34 * 25.4, 0.36 * 25.4)
+        (0.35 * 25.4, 0.37 * 25.4)
     )
     assert dt_alignment_pinion_spec.DRAWING_PRECISION["GearBlank"]["FaceWidth"] == 1
     assert rig.DRUM_LEN_BAND == x_band
@@ -481,8 +481,7 @@ def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
 
     depth = dt_pinion_pivot_block_spec.BLOCK_DEPTH
     shortest_shaft = rig.TORQUE_SHAFT_LEN - xx_in
-    # Straps at their printed .XX limits (.354 prints .35, so the thickest
-    # grows .006 and the thinnest shrinks .014), the drum at its own row, the
+    # Straps at their printed .XX limits, the drum at its own row, the
     # feeler and the drum shim each 0.10 wide, and the flush setting the shaft
     # is drilled at 0.10 proud (ruling 2).
     growth = 2.0 * strap_upper + rig.DRUM_LEN_BAND + 0.10 + 0.10
@@ -522,3 +521,23 @@ def test_spring_blade_stays_on_the_back_strap_flank_at_every_stack() -> None:
             inner = outer - t
             assert blade[0] >= inner + 0.1, (t, g)
             assert blade[1] <= outer - 0.1, (t, g)
+
+
+def test_screw_hole_callout_prints_the_title_block_drilled_hole_places() -> None:
+    # Codjiflo on #2106: the Hole Wizard callout's drill size is the one
+    # value this sheet cannot carry as a part-side model dimension, so the
+    # drawing sets its ICalloutLengthVariable precision natively.  What it
+    # applies is the spec's contract, and that contract is the places the
+    # inch title block's DRILLED HOLES tolerance is stated at (+.004/0).
+    from _title_block_units import LENGTH_UNITS, quantity
+
+    unit = dt_pinion_pivot_block_spec.UNIT
+    assert unit == "in"
+    row = _config.title_block("drilled_hole", unit=unit)
+    _plus, row_unit, digits = quantity("drilled_hole", row, "plus", LENGTH_UNITS)
+    assert row_unit == unit
+    assert (
+        drawing.SCREW_HOLE_CALLOUT_PRECISION
+        == dt_pinion_pivot_block_spec.SCREW_HOLE_CALLOUT_PRECISION
+    )
+    assert dt_pinion_pivot_block_spec.SCREW_HOLE_CALLOUT_PRECISION == digits == 3
