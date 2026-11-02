@@ -83,7 +83,9 @@ def _place_bore(adapter, front) -> object:
         _early_bound(raw, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension"
     )
     display = supplier_reference_dimension(adapter, display, **_BORE_REFERENCE)
-    if display.SetPrecision3(PRECISIONS[BORE], -1, PRECISIONS[BORE], -1) != 0:
+    # -1 leaves the primary places supplier_reference_dimension set; only the
+    # stacked limits' places are written.
+    if display.SetPrecision3(-1, -1, PRECISIONS[BORE], -1) != 0:
         raise RuntimeError(BORE + ": bore tolerance precision rejected")
     return display
 

@@ -64,7 +64,9 @@ def test_catalogue_and_current_identity():
     assert row["supplier"] == stock.supplier == "Huyett"
     assert tuple(row["supplier_skus"]) == stock.skus == (spec.SKU,)
     assert row["stock_name"] == stock.stock_name
-    assert row["material"] == stock.material == part.MATERIAL
+    # The title block names the bought 18-8 grade, not the native surrogate.
+    assert row["material"] == "18-8 STAINLESS (AS SUPPLIED)"
+    assert stock.material == part.MATERIAL == "AISI 304"
     assert row["quantity"] == spec.QUANTITY == 2
 
 

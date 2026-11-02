@@ -165,9 +165,10 @@ def _place_dimensions(adapter, right) -> dict[str, object]:
         )
         if name in _REFERENCES:
             display = supplier_reference_dimension(adapter, display, **_REFERENCES[name])
-            precision = _REFERENCES[name]["precision"]
+            # -1 leaves the primary places supplier_reference_dimension set;
+            # only the stacked limits' places are written.
             if name in part.REFERENCE_TOLERANCES_MM and display.SetPrecision3(
-                precision, -1, precision, -1
+                -1, -1, _REFERENCES[name]["precision"], -1
             ) != 0:
                 raise RuntimeError(name + ": supplier tolerance precision rejected")
         displays[name] = display

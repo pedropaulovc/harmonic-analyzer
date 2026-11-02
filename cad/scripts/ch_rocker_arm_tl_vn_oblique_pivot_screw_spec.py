@@ -3,8 +3,9 @@
 Source: https://www.huyett.com/blts40-0375-1500188p (Huyett BLTS40-0375-1500188P,
 the AMPG STR60138C24-EXT extended-thread precision shoulder screw), read live
 2026-10-31; page-stated dimensions only. Special order.
-Supplier material is 18-8 stainless, plain. Registry/native AISI 304 is an
-engineering CAD-library surrogate only, used for appearance and approximate mass.
+Supplier material is 18-8 stainless, plain; the title block prints that. Native
+AISI 304 is an engineering CAD-library surrogate only, used for appearance and
+approximate mass.
 Bands are (upper, lower) deviations. The page states no shoulder-length band:
 the sheet prints 1.500 as an untoleranced reference, and the stack math uses a
 +/-.005 envelope (``SHOULDER_LENGTH_BAND``), not a supplier claim.
