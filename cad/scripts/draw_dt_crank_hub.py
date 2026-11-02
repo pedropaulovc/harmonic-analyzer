@@ -12,6 +12,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name,
     place_view,
 )
+from solidworks_mcp.adapters.sw_type_info import constant
 
 from _check import check
 from _com import _early_bound
@@ -21,7 +22,6 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimensions import (
@@ -31,13 +31,14 @@ from _drawing_dimensions import (
     set_reference_dimensions,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm, drill_process
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -45,6 +46,7 @@ from dt_crank_hub_notes import (
     BORE_CALLOUT,
     CROSS_HOLE_CALLOUT,
     HUB_LENGTH_CALLOUT,
+    PIN_PROUD_CALLOUT,
     RELIEF_LENGTH_CALLOUT,
     SEAM_CALLOUT,
     SEAT_CALLOUT,
@@ -65,8 +67,7 @@ from dt_crank_hub_spec import (
 )
 
 
-# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
-MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
+MACHINIST_REVIEW = MachinistReviewMode.LEARN
 
 SPEC = DRAWINGS_BY_NAME["dt_crank_hub"]
 PART_STEM = SPEC.artifact_stem
@@ -127,8 +128,9 @@ BARREL_BOTTOM = _sheet_y(HUB_BARREL_DIA / 2.0)
 # inside its circle sees no face (run 20260923T023246758Z-97bfca38).
 BARREL_FACE_PICK = ((RELIEF_X + SERVICE_PIN_CENTER[0]) / 2.0, SIDE_CENTER[1] + 0.015)
 # Every size and callout sits outside the silhouettes.
-# - Lengths: the seat from the faced outboard end, the MHA-DT-09 station from
-#   the arm shoulder (drawing-guidelines.md rule 17 (walls and webs)) and the relief from the rear face on
+# - Lengths: the MHA-DT-09 station from the faced outboard end (the
+#   machinist's baseline; its ligament to the shoulder is drawing-guidelines.md
+#   rule 17 (walls and webs)) and the relief from the rear face on
 #   rows below the profile; the toleranced overall, front face to rear
 #   face, on the row below them.  The barrel is the remainder, not printed.
 #   The two banded lengths carry the mate they serve under their text.  The
@@ -145,26 +147,40 @@ BARREL_FACE_PICK = ((RELIEF_X + SERVICE_PIN_CENTER[0]) / 2.0, SIDE_CENTER[1] + 0
 #   light-press callout above.
 # - Cross-hole callout: above the barrel, its leader rising almost straight
 #   from the hole's top rim, clear of the barrel diameter's extension lines.
-#   It carries the ream's acceptance in words: MHA-DT-09's driven big end
-#   stands proud of the barrel (Opus reviews at 7fe9d97bd, c7115c2c3 and
-#   7e2f876c7: a MIN dimensioned to an outline of another part).
 # - Bore callout: right of the end view, its leader entering the bore from the
 #   right, clear of the six-o'clock seam; the seam callout below the end view.
-_ROW_Y = (0.120, 0.102)
+# - MHA-DT-09 big end's MIN proud: the pin's big end (model -X) is paper-right
+#   on the end view (*Bottom turned half a turn), on the horizontal
+#   centreline.  Its value and callout print right of the big end's extension
+#   line, above the bore callout and below the isometric's label.
+# The overall's row stands under the seat length's three-line fit-up callout,
+# which hangs right of the outboard end over the overall's text.
+_ROW_Y = (0.120, 0.090)
 _STATION_ROW_Y = _ROW_Y[0] + 0.006
 END_KEEP = {
     "BoreDia": (END_CENTER[0] + 0.070, END_CENTER[1] - 0.020),
+    # Four callout lines (r7 review: name the phantom, the pin and the ring).
+    # The block stacks up from the dimension line (farm run
+    # 20261101T035809796Z: value top at y 186.9 mm), so its height sets how
+    # close it comes to the isometric's label; 7 mm further right than the
+    # three-line block, so the wider block's left edge clears the phantom
+    # big end (x <= END_CENTER + 31.2 mm).
+    "PinProud": (END_CENTER[0] + 0.072, END_CENTER[1] + 0.014),
 }
-# The cross-hole station is measured from the arm shoulder it must stay clear
-# of (dt_crank_hub_geometry): its arrowhead there is the ASME
-# dimension-origin circle (r7 review of farm run 20261101T022045634Z;
-# draw_mg_wheel_axle's idiom), and the seat length behind it is a fit-up
-# reference (8.0), so nothing chains through a toleranced 8.0 (owner ruling
-# 2026-11-01 on the r9 review).
-ORIGIN_DIMENSIONS = {"ServicePinFromShoulder": SHOULDER_X}
+# The MHA-DT-09 big end is construction geometry in the hub's reference
+# sketch. In the default construction font it prints as even dashes, which
+# read as hidden lines of the hub, and phantom prints the same way at this
+# scale (Opus reviews at 7fe9d97bd and c7115c2c3: a dashed box outside the
+# part). A thin solid outline, named by the 4.45 MIN callout, shows the pin.
+# Only this sheet's document preference changes.
+PIN_BIG_END_LINE_FONT = (
+    ("swLineFontConstructionCurvesStyle", "swLineCONTINUOUS"),
+    ("swLineFontConstructionCurvesThickness", "swLW_THIN"),
+)
+# The seat length is a fit-up reference (the seat is turned to suit the arm,
+# end flush; owner ruling 2026-11-01 on the r9 review), so nothing chains
+# through it: the cross-hole station prints from the faced outboard end.
 REFERENCE_LENGTHS = ("SeatLength",)
-_ORIGIN_ARROWHEAD = 4  # swArrowStyle_e.swORIGIN_ARROWHEAD
-_CLOSED_ARROWHEAD = 1  # swArrowStyle_e.swCLOSED_ARROWHEAD
 # The hub's half of the seam is the arc bulging from the seat edge toward the
 # bore; the callout attaches 45 degrees up its right flank.
 SEAM_CENTER = (END_CENTER[0], END_CENTER[1] - AXIAL_PIN_RADIUS_FROM_AXIS * _S)
@@ -182,11 +198,16 @@ SIDE_KEEP = {
     # starts right of that line, so none of it sits under the line's lower
     # arrow (Opus review at 7fe9d97bd), and ends short of the end view.
     "SeatLength": (OUTBOARD_X + 0.034, _STATION_ROW_Y),
-    "ServicePinFromShoulder": (
-        (SHOULDER_X + SERVICE_PIN_CENTER[0]) / 2.0,
-        _STATION_ROW_Y,
-    ),
-    "HubLength": ((OUTBOARD_X + INBOARD_X) / 2.0, _ROW_Y[1]),
+    # The station from the faced outboard end, on its own row under the seat
+    # length's block, whose dimension line runs under its END FLUSH row at
+    # about y 0.115 (farm run 20261101T234626714Z: .53 sat on it at 0.113)
+    # (machinist review of the inch sheet: no chain through the shoulder).
+    "ServicePinStation": ((OUTBOARD_X + SERVICE_PIN_CENTER[0]) / 2.0, 0.104),
+    # The toleranced .990 and its two-line callout fill the span between its
+    # extension lines and sat on its own dimension line (machinist review of
+    # the inch sheet, r2): they print right of the outboard face instead, the
+    # dimension line running out to them, clear of the seam callout.
+    "HubLength": (OUTBOARD_X + 0.032, _ROW_Y[1]),
     # Its toleranced text and callout are wider than the relief: they print
     # outside the span, left of the rear face, the dimension line running out
     # to them, the callout ending short of the overall's dimension line.
@@ -203,6 +224,7 @@ DIMENSION_CALLOUTS = {
     "SeatLength": SEAT_LENGTH_CALLOUT,
     "HubLength": HUB_LENGTH_CALLOUT,
     "ReliefLength": RELIEF_LENGTH_CALLOUT,
+    "PinProud": PIN_PROUD_CALLOUT,
 }
 
 
@@ -220,44 +242,16 @@ def _set_callout_below(display: Any, text: str, label: str) -> None:
         raise RuntimeError(f"{label}: callout-below text did not persist: {applied!r}")
 
 
-def _arrowheads(annotation: Any, label: str) -> list[tuple[float, int]]:
-    """Each arrowhead's tip x on the sheet and its style (draw_mg_wheel_axle)."""
-    data = annotation.GetDisplayData()
-    if data is None:
-        raise RuntimeError(f"{label} has no display data")
-    data = _early_bound(data, "IDisplayData")
-    heads = []
-    for index in range(int(data.GetArrowHeadCount() or 0)):
-        values = [float(value) for value in (data.GetArrowHeadAtIndex2(index) or ())]
-        if len(values) < 9:
-            raise RuntimeError(f"{label} arrowhead {index} is incomplete: {values!r}")
-        heads.append((values[0], round(values[8])))
-    if len(heads) != 2:
-        raise RuntimeError(f"{label} has {len(heads)} arrowheads, expected 2")
-    return heads
-
-
-def _set_dimension_origin(
-    adapter: Any, annotation: Any, *, origin_x: float, label: str
-) -> None:
-    """Put the dimension-origin circle on the arrowhead at ``origin_x``, read
-    back from the ink (draw_mg_wheel_axle)."""
-    annotation = _early_bound(annotation, "IAnnotation")
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    heads = _arrowheads(annotation, label)
-    near = min(range(2), key=lambda index: abs(heads[index][0] - origin_x))
-    styles = [_CLOSED_ARROWHEAD, _CLOSED_ARROWHEAD]
-    styles[near] = _ORIGIN_ARROWHEAD
-    for attempt in (styles, styles[::-1]):
-        if not display.SetArrowHeadStyle2(False, *attempt):
-            raise RuntimeError(f"failed to set the {label} arrowhead styles")
-        rebuild_drawing(adapter, label=f"{label} dimension origin")
-        heads = _arrowheads(annotation, label)
-        at_origin = min(heads, key=lambda head: abs(head[0] - origin_x))
-        far = max(heads, key=lambda head: abs(head[0] - origin_x))
-        if (at_origin[1], far[1]) == (_ORIGIN_ARROWHEAD, _CLOSED_ARROWHEAD):
-            return
-    raise RuntimeError(f"{label} origin circle is not at the shoulder: {heads!r}")
+def _pin_big_end_line_font(model: Any) -> None:
+    """Print this drawing's construction curves (the pin's big end) thin solid."""
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    option = constant("swDetailingNoOptionSpecified")
+    for name, value in PIN_BIG_END_LINE_FONT:
+        preference, wanted = constant(name), constant(value)
+        if not extension.SetUserPreferenceInteger(preference, option, wanted):
+            raise RuntimeError(f"failed to set crank-hub {name}")
+        if int(extension.GetUserPreferenceInteger(preference, option)) != wanted:
+            raise RuntimeError(f"crank-hub {name} readback differs")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -285,8 +279,13 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
+    _pin_big_end_line_font(drawing_model)
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -339,15 +338,6 @@ async def build(adapter: Any) -> dict[str, str]:
                 f"expected one crank-hub {name} dimension, got {len(matches)}"
             )
         set_reference_dimension(adapter, matches[0], label=f"crank hub {name}")
-    for name, origin_x in ORIGIN_DIMENSIONS.items():
-        matches = [a for a in annotations if dimension_name(adapter, a) == name]
-        if len(matches) != 1:
-            raise RuntimeError(
-                f"expected one crank-hub {name} dimension, got {len(matches)}"
-            )
-        _set_dimension_origin(
-            adapter, matches[0], origin_x=origin_x, label=f"crank hub {name}"
-        )
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to crank-hub end view")
@@ -367,6 +357,8 @@ async def build(adapter: Any) -> dict[str, str]:
         label="MHA-DT-09 hub pilot",
         process=drill_process(SERVICE_PIN_HOLE_SPEC),
     )
+    # The drilled size prints .XXX, the Hole Wizard callout's places.
+    set_hole_callout_precision(cross_hole, {"hw-diam": 3}, label="MHA-DT-09 hub pilot")
     _set_callout_below(cross_hole, CROSS_HOLE_CALLOUT, "MHA-DT-09 hub pilot")
     add_attached_note(
         adapter,

@@ -15,11 +15,17 @@ from __future__ import annotations
 
 from dt_crank_hub_geometry import (
     AXIAL_PIN_DIA,
-    AXIAL_PIN_LENGTH,
+    MM_PER_IN,
+    SEAM_DEPTH,
     SEAT_PRESS_INTERFERENCE,
     SHAFT_CLEARANCE_MAX,
     SHAFT_CLEARANCE_MIN,
 )
+
+
+def inch_text(value_mm: float, places: int) -> str:
+    """``value_mm`` as the inch sheet prints it, without a leading zero."""
+    return f"{value_mm / MM_PER_IN:.{places}f}".removeprefix("0")
 
 
 def seat_callout(mate: str, name: str = "CRANK ARM") -> str:
@@ -28,6 +34,7 @@ def seat_callout(mate: str, name: str = "CRANK ARM") -> str:
     Four lines (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)). The seat end flush with ``mate``'s front
     face is the acceptance, naming both faces (machinist review: FACES FLUSH
     named neither); how the hub gets there (an arbor press) is a method, so
+    the sheet does not say it.  ``name`` is the mate's part name, printed with
     its number (rule 4; r7 review of farm run 20261101T022045634Z).  The bore
     is the arm's, said so on the first line: on a turned OD, "BORE FOR LIGHT
     PRESS" read as this part's bore (review of farm run 20261101T081735465Z).
@@ -37,7 +44,7 @@ def seat_callout(mate: str, name: str = "CRANK ARM") -> str:
         (
             f"TURN TO SUIT BORE OF {name}",
             f"{mate} FOR LIGHT PRESS:",
-            f"{low:.3f}-{high:.3f} DIAMETRAL INTERFERENCE;",
+            f"{inch_text(low, 4)}-{inch_text(high, 4)} DIAMETRAL INTERFERENCE;",
             f"END FLUSH WITH {name} FRONT",
         )
     )
@@ -50,23 +57,23 @@ def seat_bore_callout(mate: str) -> str:
     )
 
 
-def seam_callout(mate: str, pin: str = "MHA-DT-VN-59") -> str:
+def seam_callout(mate: str, pin: str = "SEAM PIN MHA-DT-VN-59") -> str:
     """MHA-DT-VN-59 seam, match-drilled with ``mate``: size first, then the process.
 
-    ``pin`` names the pin as the sheet identifies it, with what it is (SEAM
-    PIN; review of farm run 20261101T081735465Z: every other mate on the
-    sheet has a name).  On the hub's print the seat callout names ``mate`` in
-    full; the four-row limit leaves this one no room (r7 review of farm run
-    20261101T022045634Z).  The blind pin makes hub and ``mate`` a permanent
-    pair, taken apart at the MHA-DT-09 taper pin (owner rulings 2026-11-01;
-    r9 review: say it plainly).
+    ``mate`` and ``pin`` name the parts by name and number (rule 4; MHA-DT-06
+    machinist review, 2026-09-29; review of farm run 20261101T081735465Z:
+    SEAM PIN says what the pin is).  The blind pin makes hub and arm a
+    permanent pair, taken apart at the MHA-DT-09 taper pin (owner rulings
+    2026-11-01; r9 review: say it plainly).  The depth only has to take the
+    cut pin, so it prints at the title block's .XX.
     """
     return "\n".join(
         (
-            f"(<MOD-DIAM>{AXIAL_PIN_DIA:.1f}) <HOLE-DEPTH> {AXIAL_PIN_LENGTH:.1f} ON SEAM, MATCH-DRILL/REAM",
-            f"WITH {mate} AT ASSEMBLY; SEAM PIN",
-            f"{pin} LIGHT DRIVE FIT, PERMANENT",
-            "PAIR; DISASSEMBLE AT TAPER PIN MHA-DT-09",
+            f"(<MOD-DIAM>{inch_text(AXIAL_PIN_DIA, 3)}) <HOLE-DEPTH> {inch_text(SEAM_DEPTH, 2)}"
+            " ON SEAM, MATCH-DRILL/REAM",
+            f"WITH {mate} AT ASSEMBLY;",
+            f"{pin} LIGHT DRIVE FIT;",
+            "PERMANENT PAIR; DISASSEMBLE AT MHA-DT-09",
         )
     )
 
@@ -75,18 +82,18 @@ def seam_callout(mate: str, pin: str = "MHA-DT-VN-59") -> str:
 # reference restatement.
 BORE_CALLOUT = (
     "REAM THRU\n"
-    f"({SHAFT_CLEARANCE_MIN:.4f}-{SHAFT_CLEARANCE_MAX:.4f} DIAMETRAL\n"
+    f"({inch_text(SHAFT_CLEARANCE_MIN, 4)}-{inch_text(SHAFT_CLEARANCE_MAX, 4)} DIAMETRAL\n"
     "CLEARANCE ON MHA-DT-11)"
 )
 # The arm bore is made first and carries the band; this seat is turned to fit
 # it, so its nominal prints as a reference under the match-fit callout.
 SEAT_CALLOUT = seat_callout("MHA-DT-06")
-SEAM_CALLOUT = seam_callout("MHA-DT-06")
+SEAM_CALLOUT = seam_callout("CRANK ARM MHA-DT-06")
 # The seat length is the arm's thickness as made, not a turned size: the
-# seat end finishes flush with the arm, so the shoulder the MHA-DT-09
-# station is measured from is wherever the arm puts it (owner ruling
-# 2026-11-01; r9 review: 8.0 at .X read against the flush condition).  Its
-# nominal prints as a reference over this.
+# seat end finishes flush with the arm, so the arm shoulder is wherever the
+# arm puts it (owner ruling 2026-11-01; r9 review: a toleranced seat length
+# read against the flush condition).  Its nominal prints as a reference over
+# this.
 SEAT_LENGTH_CALLOUT = "TO SUIT\nCRANK ARM,\nEND FLUSH"
 # The cross-hole is drilled, then taper-reamed through hub and shaft together
 # at assembly.  The ream fixes the hub on the shaft for good, so the front
@@ -97,29 +104,38 @@ SEAT_LENGTH_CALLOUT = "TO SUIT\nCRANK ARM,\nEND FLUSH"
 # arm front is already flush with the hub front from the seat press).  The
 # MHA-DT-00 hub step prints the same datum.  The prose reads under the native
 # #14 drill size, in the order the work is done.  The ream's acceptance is
-# the driven pin's seated position: a deeper ream seats it deeper, and the
-# ream is deep enough while the keeper ring MHA-DT-27, hung in the pin's
-# head hole, clears this hub (machinist review of main 31cea0b73;
-# dt_crank_pin_ring_spec.PIN_PROUD books that clearance).  So the callout
-# states that fit-up condition, naming the ring and the hub (rule 4: an
-# unambiguous functional acceptance; Opus review of WIP 52c893d0c: "ring hole
-# clears barrel" named neither), the way the seat's END FLUSH does.  No
-# number: no hub dimension carries the pin's position, and a spec constant
-# typed into the text is not model-owned (drawing-simplicity-policy, Codjiflo
-# P2 on #2095).  A native MIN to an outline of the pin read as hidden hub
-# geometry in dashed, phantom and thin solid alike (Opus reviews at
-# 7fe9d97bd, c7115c2c3 and 7e2f876c7).
+# the driven pin's seated position: its big end stands at least PIN_PROUD out
+# of the barrel, printed natively on the end view (PIN_PROUD_CALLOUT), so its
+# keeper ring's hole clears the barrel (machinist review of main 31cea0b73).
 FRONT_FACE_DATUM = "MHA-DT-11 DOME ROOT"
 CROSS_HOLE_CALLOUT = "\n".join(
     (
         "CRANK-ARM END FLUSH WITH CRANKSHAFT",
         "MHA-DT-11 DOME ROOT; AT ASSEMBLY,",
-        "MATCH TAPER-REAM 1:48 FOR MHA-DT-09;",
-        "DRIVEN, ITS RING MHA-DT-27 CLEARS HUB",
+        "MATCH TAPER-REAM 1:48 WITH IT FOR",
+        "TAPER PIN MHA-DT-09: LIGHT DRIVE FIT",
     )
 )
 if FRONT_FACE_DATUM not in " ".join(CROSS_HOLE_CALLOUT.split()):
     raise AssertionError("the cross-hole callout no longer names the hub datum")
+# A deeper ream seats the driven pin deeper, so its big end's MIN proud
+# limits the ream (machinist review: the acceptance read apart from it).  The
+# end view outlines that big end in the view's own dashed style; the callout
+# says so and makes the value an assembly check (review of farm run
+# 20261101T234626714Z: a MIN to an unnamed dashed outline of another part;
+# farm run 20261101T130334243Z read "(PHANTOM)" against the dashed line).
+# It names the pin and the keeper ring whose hole must clear the barrel (r7
+# review of farm run 20261101T022045634Z: an unnamed dashed box, an unnamed
+# ring).
+PIN_PROUD_CALLOUT = "\n".join(
+    (
+        "AT ASSEMBLY, DRIVEN MHA-DT-09",
+        "TAPER PIN BIG END (DASHED);",
+        "LIMITS TAPER-REAM. KEEPER",
+        "RING MHA-DT-27 CLEARS BARREL",
+    )
+)
+
 # The two axial bands state the mate they serve, under their dimensions
 # (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the overall places the rear face against the removable sprocket
 # (stack B below), the relief places the barrel's rear shoulder ahead of the
@@ -135,9 +151,9 @@ RELIEF_LENGTH_CALLOUT = "CLEARS #25 CHAIN ON\nSPROCKET MHA-PD-09"
 # overall length -- not the arm's stock thickness -- places its rear face.
 #   Links:
 #     crank face                    CRANK_FACE_Z                     -183
-#     hub overall, front to rear    HUB_LENGTH + HUB_LENGTH_BAND     25.2 +0.10/-0.51
-#     relief, back from rear face   RELIEF_LENGTH + RELIEF_LENGTH_BAND
-#                                                                    3.85 +0.51/-0.05
+#     hub overall, front to rear    HUB_LENGTH + HUB_LENGTH_BAND     25.146 +0.1016/-0.254
+#     relief, back from rear face   RELIEF_LENGTH +/- RELIEF_LENGTH_TOL
+#                                                                    4.064 +/-0.254
 #     removable seat face           transgear_removable_spec.SEAT_FACE_Z
 #                                   + crankshaft_spec.SEAT_COLLAR_BAND
 #                                                                    -154.3 +0.1/-0.5
@@ -151,19 +167,19 @@ RELIEF_LENGTH_CALLOUT = "CLEARS #25 CHAIN ON\nSPROCKET MHA-PD-09"
 #        (SEAT_FACE_Z + min(SEAT_COLLAR_BAND) - CHAIN_REACH_FRONT)
 #        - (CRANK_FACE_Z + HUB_LENGTH + HUB_LENGTH_TOL
 #           - (RELIEF_LENGTH - RELIEF_LENGTH_TOL))
-#        = (-154.3 - 0.5 - 6.2865) - (-183 + 25.30 - 3.80)
-#        = -161.0865 - (-161.50)                  = 0.4135  (nominal 1.0635)
+#        = (-154.3 - 0.5 - 6.2865) - (-183 + 25.2476 - 3.81)
+#        = -161.0865 - (-161.5624)                = 0.4759  (nominal 1.3315)
 #      floated, the wheel walked forward off its pins onto the hub rear face
 #      (the hub and seat stations cancel):
 #        (RELIEF_LENGTH - RELIEF_LENGTH_TOL) + (PLATE + min(PLATE_BAND))
 #        - CHAIN_REACH_FRONT
-#        = 3.80 + 2.70 - 6.2865                   = 0.2135  (nominal 0.3635)
-#      The floated pose governs and sizes the relief: 3.6 left it -0.0365.
+#        = 3.81 + 2.70 - 6.2865                   = 0.2235  (nominal 0.5775)
+#      The floated pose governs and sizes the relief: .15 would leave it -0.0305.
 #   B  hub rear face -> T12 front face:
 #        (SEAT_FACE_Z + min(SEAT_COLLAR_BAND) - (PLATE + max(PLATE_BAND)))
 #        - (CRANK_FACE_Z + HUB_LENGTH + HUB_LENGTH_TOL)
-#        = (-154.3 - 0.5 - 2.8) - (-183 + 25.30)
-#        = -157.6 - (-157.70)                     = 0.10    (nominal 0.7)
+#        = (-154.3 - 0.5 - 2.8) - (-183 + 25.2476)
+#        = -157.6 - (-157.7524)                   = 0.1524  (nominal 0.754)
 #   Worst case: A seated and B with the seat collar at its forward limit and
 #   the hub long, A with the relief short, B with the plate thick; A floated
 #   with the relief short and the plate thin.

@@ -538,9 +538,7 @@ BOM_DESCRIPTIONS = {
     "dt-crank-handle-butt-cup": "CRANK HANDLE BUTT CUP",
     "dt-crank-handle-pivot-screw": "CRANK HANDLE PIVOT SCREW",
     "dt-crank-hub": "CRANK HUB",
-    # Ø4 m6 (ISO 2338), not "4 M6": the machinist review of 82158b1bb read
-    # four M6 pins against QTY 1.
-    "dt-vn-crank-hub-pin": "4 MM DOWEL PIN ISO 2338 m6, CUT TO PRINT",
+    "dt-vn-crank-hub-pin": "5/32 X 1/2 DOWEL PIN, MCMASTER 98381A487",
     "dt-vn-crank-seat-drive-pin": "3/32 X 1/4 DOWEL PIN, MCMASTER 98381A434",
     "dt-alignment-pinion": "ALIGNMENT PINION",
     "dt-pinion-bracket": "PINION BRACKET STRAP",

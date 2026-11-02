@@ -253,7 +253,7 @@ def test_mha024_station_and_notes_belong_to_hub_and_shaft() -> None:
     assert part.PIN_HOLE_SPEC is spec.PIN_HOLE_SPEC
     assert drawing.PIN_HOLE_SPEC is spec.PIN_HOLE_SPEC
     assert drawing._PIN_HOLE_DIA == blind_cut_dia_mm(spec.PIN_HOLE_SPEC)
-    assert spec.PIN_HOLE_HEIGHT == geometry.SERVICE_PIN_STATION == pytest.approx(13.6)
+    assert spec.PIN_HOLE_HEIGHT == geometry.SERVICE_PIN_STATION == pytest.approx(13.462)
     # The drill size reads first (the prefix of the native callout); the
     # matched fit, naming both mating parts, reads under it.
     assert spec.CROSS_HOLE_PROCESS == "#9 DRILL"
@@ -600,7 +600,7 @@ def test_shaft_band_ruling_holds_because_the_general_tolerance_closes_the_hub_ai
         ),
         abs=spec.dt_crank_pinion_spec.print_step(spec.COLLAR_STATION_PLACES, spec.UNIT) / 2.0,
     )
-    assert bdt.CRANK_HUB_SPROCKET_AIR == pytest.approx(0.7)
+    assert bdt.CRANK_HUB_SPROCKET_AIR == pytest.approx(bdt.CRANK_HUB_SPROCKET_AIR_CONTRACT)
     assert bdt.CRANK_HUB_SPROCKET_AIR_WORST == pytest.approx(
         bdt.CRANK_HUB_SPROCKET_AIR + min(spec.SEAT_COLLAR_BAND)
     )

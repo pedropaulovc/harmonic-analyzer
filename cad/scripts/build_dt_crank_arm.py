@@ -1,12 +1,12 @@
 r"""Build crank arm MHA-DT-06 for the separate through-hub construction.
 
-The arm is a plain 8-mm plate with an O19.4 match-fitted MHA-DT-31 seat.  It no
+The arm is a plain 5/16-in bar with a match-fitted MHA-DT-31 seat.  It no
 longer mounts directly on the crankshaft and no longer carries the MHA-DT-09
 cross-hole.  A blind axial seam groove enters the outboard face at six o'clock,
 parallel to the shaft, and accepts MHA-DT-VN-59 for half the arm thickness.  The
 outboard witness is a small punched representation, not a machined dimple.
 
-Layout: arm length +X, width +/-Y, thickness +Z (0..8).  In the drive train
+Layout: arm length +X, width +/-Y, thickness +Z.  In the drive train
 local +X hangs down and local +Z faces outboard.
 
 Run with SolidWorks open::
@@ -24,8 +24,10 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -44,7 +46,6 @@ from _holes import wizard_holes
 
 import _telemetry
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
@@ -56,14 +57,12 @@ from dt_crank_arm_spec import (
     ARM_THICKNESS,
     ARM_WIDTH,
     AXIAL_PIN_DIA,
-    AXIAL_PIN_LENGTH,
     AXIAL_PIN_X,
     AXIAL_PIN_Y,
     DRAWING_NOTES,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FIDUCIAL_MODEL_DEPTH,
-    FIDUCIAL_ORDINATE_TOL,
     FIDUCIAL_MODEL_DIA,
     FIDUCIAL_X,
     FIDUCIAL_Y,
@@ -71,6 +70,7 @@ from dt_crank_arm_spec import (
     HANDLE_PIVOT_HOLE_SPEC,
     HUB_SEAT_DIA,
     ISOMETRIC_VIEW_NOTE,
+    SEAM_DEPTH,
     SURFACE_FINISHES,
 )
 from crank_native_acceptance import assert_signed_circle_center
@@ -103,6 +103,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): every module constant above as a named
     # global that drives the dimensions below. The mm suffix is load-bearing --
@@ -115,7 +116,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ArmThickness", f"{ARM_THICKNESS}mm")
     await set_global(adapter, "HubSeatDia", f"{HUB_SEAT_DIA}mm")
     await set_global(adapter, "AxialPinDia", f"{AXIAL_PIN_DIA}mm")
-    await set_global(adapter, "AxialPinLength", f"{AXIAL_PIN_LENGTH}mm")
+    await set_global(adapter, "SeamDepth", f"{SEAM_DEPTH}mm")
     await set_global(adapter, "FiducialDia", f"{FIDUCIAL_MODEL_DIA}mm")
     await set_global(adapter, "FiducialDepth", f"{FIDUCIAL_MODEL_DEPTH}mm")
     # Sketch distance dimensions are unsigned magnitudes; the negative seeded
@@ -331,7 +332,7 @@ async def build(adapter) -> dict[str, str]:
     check(
         "cut axial seam groove",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=AXIAL_PIN_LENGTH)
+            ExtrusionParameters(depth=SEAM_DEPTH)
         ),
     )
     name_last_feature(adapter, "AxialPinGroove")
@@ -339,7 +340,7 @@ async def build(adapter) -> dict[str, str]:
     expected_arm_groove = (
         math.pi * (AXIAL_PIN_DIA / 2.0) ** 2
         - lens_area(AXIAL_PIN_DIA / 2.0, HUB_SEAT_DIA / 2.0)
-    ) * AXIAL_PIN_LENGTH
+    ) * SEAM_DEPTH
     if abs((before_axial_groove - vol) - expected_arm_groove) > max(
         0.5, 0.02 * expected_arm_groove
     ):
@@ -542,12 +543,6 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    # The punch witness's ordinates carry their own band: the .X default would
-    # let its centre into the seat bore's edge break (dt_crank_arm_spec).
-    for name in ("FiducialX", "FiducialY"):
-        set_dimension_symmetric_tolerance(
-            adapter, "FiducialProfile", name, FIDUCIAL_ORDINATE_TOL
-        )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

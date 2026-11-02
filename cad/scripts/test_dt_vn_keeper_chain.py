@@ -72,12 +72,13 @@ def _flat_side_air(swing_deg: float, mean_r: float, crown: float) -> float:
 
 
 def test_pin_station_reads_the_hub_print() -> None:
-    station = hub.DRAWING_PRECISION["ServicePinStationReference"]
-    places = station["ServicePinFromShoulder"]
-    shoulder = arm.ARM_THICKNESS  # the hub's shoulder is the arm's inboard face
-    from_shoulder = hub_geometry.SERVICE_PIN_FROM_SHOULDER
-    assert chain.PIN_Z == pytest.approx(shoulder + from_shoulder)
-    assert chain.PIN_Z_ARMWARD == pytest.approx(chain.PIN_Z - _band(places))
+    # The hub prints the station from its faced outboard end, flush with the
+    # arm's outboard face (z 0); the arm's inboard face sits wherever the
+    # thickest 5/16 stock puts it, so the arm-side corner adds that excess.
+    places = hub.DRAWING_PRECISION["ServicePinStationReference"]["ServicePinStation"]
+    assert chain.PIN_Z == pytest.approx(hub_geometry.SERVICE_PIN_STATION)
+    thick = hub_geometry.ARM_STOCK_THICKNESS_MAX - arm.ARM_THICKNESS
+    assert chain.PIN_Z_ARMWARD == pytest.approx(chain.PIN_Z - _band(places) - thick)
 
 
 def test_ring_crowned_hub_side_clears_the_arm_at_the_adverse_corner() -> None:
