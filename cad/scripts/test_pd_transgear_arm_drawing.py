@@ -28,10 +28,11 @@ import _mcmaster_90325a174 as pivot_screw
 from _drawing_registry import DRAWING_TEMPLATES
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _printed_tolerance import printed_band_mm
 
 
 def _band(places: int) -> float:
-    return _config.title_block(f"linear_{places}pl")["value_in"] * 25.4
+    return printed_band_mm(places, unit=geometry.UNIT)
 
 
 def test_required_drawing_paths() -> None:
@@ -117,10 +118,8 @@ def test_physical_centre_moves_the_bearing_not_the_pivot_latch_fixture(
 
 
 def test_the_walls_were_judged_at_no_less_than_the_printed_title_block_band() -> None:
-    """The geometry module's wall and fit arithmetic uses rounded bands; each
+    """The geometry module's wall and fit arithmetic uses printed reaches; each
     must cover the title-block row the printed places actually invoke."""
-    for places, band in spec.BAND_BY_PLACES.items():
-        assert band >= _band(places)
     precision = spec.DRAWING_PRECISION_BY_NAME
     for name, judged in (
         ("TipStation", geometry.TIP_STATION_BAND),
@@ -134,9 +133,7 @@ def test_the_thickness_prints_as_the_ground_stock_reference() -> None:
     parentheses after the stock's own size, which is the modelled one."""
     prefix, suffix = spec.STOCK_TEXT_PREFIX, spec.STOCK_TEXT_SUFFIX
     assert prefix.endswith("(") and suffix.startswith(")")
-    stock, band, unit = prefix.rstrip("( ").split()
-    # In inches, said so: on the millimetre sheet a bare ±.001 reads as mm.
-    assert unit == "IN"
+    stock, band = prefix.rstrip("( ").split()
     assert float(Fraction(stock)) * 25.4 == pytest.approx(geometry.THICKNESS)
     # The stock's thickness band, which the seat tilt is judged at, prints.
     assert float(band.lstrip("±")) * 25.4 == pytest.approx(geometry.THICKNESS_BAND)
@@ -160,8 +157,10 @@ _PIN_LENGTH_GRADE = 0.010 * 25.4
 
 def _printed_proud_range(pin_length: float, hole_depth: float) -> tuple[float, float]:
     """The pin pressed to the hole floor: its length at either end of the
-    family's grade less the depth at either end of its printed row."""
-    depth_band = _band(spec.DRAWING_PRECISION_BY_NAME["PinHoleDepth"])
+    family's grade less the depth at either end of its printed row's reach
+    (the mm model printed rounded to inches)."""
+    depth_band = geometry.PIN_HOLE_DEPTH_BAND
+    assert depth_band >= _band(spec.DRAWING_PRECISION_BY_NAME["PinHoleDepth"])
     return (
         pin_length - _PIN_LENGTH_GRADE - (hole_depth + depth_band),
         pin_length + _PIN_LENGTH_GRADE - (hole_depth - depth_band),
@@ -169,15 +168,13 @@ def _printed_proud_range(pin_length: float, hole_depth: float) -> tuple[float, f
 
 
 # The worst far-face margin this test's restatement finds at the printed
-# rows, and the retired 3/4 pin's: with the latch hole's height at its .XXX
-# row (LATCH_PIN_HEIGHT_BAND) it barely clears in a 6.10 hole; 0.05 deeper it
-# stops short of the face. Ruling B's 9.5 bar shortened the hook's ear
-# 16.0 -> 15.5, so the bend lever and its loss shrank 0.5.
-# The Ø11.0 .X pivot spacer (MHA-PD-20) widens the face squareness zone to
-# 10.2, so the hanger leans less: each margin grows ~0.0013.
-_PINNED_FAR_FACE_MARGIN = 0.819
-_PINNED_OLD_PIN_MARGIN = 0.044
-_PINNED_DEEPER_OLD_PIN_MARGIN = -0.006
+# reaches, and the retired 3/4 pin's: it barely clears in a 6.20 hole; 0.05
+# deeper it stops short of the face.  #290: the tip station and the hole
+# depth print rounded to .XX inch (reach 0.376 / 0.372), the hook its formed
+# .XX ±.02 (FORMED_BAND .024 with the rounding, MHA-PD-14).
+_PINNED_FAR_FACE_MARGIN = 0.890
+_PINNED_OLD_PIN_MARGIN = 0.015
+_PINNED_DEEPER_OLD_PIN_MARGIN = -0.035
 
 
 def _worst_far_face_margin(
@@ -263,11 +260,12 @@ def test_the_latch_pin_full_diameter_passes_the_hook_at_the_printed_tip_band() -
     formed band, and the ear's bend all reach the pin's grip on the strip; the
     7/8 pin in the 8.50 hole keeps the full diameter through the strip at
     every corner of the printed rows."""
-    printed = _band(spec.DRAWING_PRECISION_BY_NAME["TipStation"])  # 0.508
+    printed = geometry.TIP_STATION_BAND  # the 128.9 model printed 5.07 ±.01
+    assert printed >= _band(spec.DRAWING_PRECISION_BY_NAME["TipStation"])
     margin = _worst_far_face_margin(printed)
     assert margin == pytest.approx(_PINNED_FAR_FACE_MARGIN, abs=1e-3)
-    # The spec judges the rounder 0.51 rows and leans the face by a tangent
-    # rather than this test's exact turn, so it agrees within 0.01.
+    # The spec leans the face by a tangent rather than this test's exact
+    # turn, so it agrees within 0.01.
     assert 0.0 < joints.LATCH_PIN_FAR_FACE_MARGIN_WORST
     assert joints.LATCH_PIN_FAR_FACE_MARGIN_WORST == pytest.approx(margin, abs=0.01)
     # The spec judges the bend at the title block's angular row or wider.
@@ -275,13 +273,13 @@ def test_the_latch_pin_full_diameter_passes_the_hook_at_the_printed_tip_band() -
     # The screws' float turns the hook about the pin as well as sliding it,
     # so the drift along U at the hole exceeds the pure slide.
     assert joints.HOOK_DRIFT_ALONG_U > joints.HOOK_SCREW_SHIFT
-    # Negative control: the 3/4 pin barely clears in a 6.10 hole and stops
+    # Negative control: the 3/4 pin barely clears in a 6.20 hole and stops
     # short 0.05 deeper with the bends and the grade; without them it cleared.
-    old = _printed_proud_range(0.75 * 25.4, 6.10)
+    old = _printed_proud_range(0.75 * 25.4, 6.20)
     assert _worst_far_face_margin(printed, old) == pytest.approx(
         _PINNED_OLD_PIN_MARGIN, abs=1e-3
     )
-    deeper = _printed_proud_range(0.75 * 25.4, 6.15)
+    deeper = _printed_proud_range(0.75 * 25.4, 6.25)
     assert _worst_far_face_margin(printed, deeper) == pytest.approx(
         _PINNED_DEEPER_OLD_PIN_MARGIN, abs=1e-3
     )
@@ -295,18 +293,18 @@ def test_the_explicit_bands_are_the_spot_face_and_the_reams() -> None:
     assert model_toleranced_dimensions(part) == {
         ("SpotFaceProfile", "SpotFaceDia"): "*deviations(SPOT_FACE_DIA_BAND)",
         ("SpotFaceProfile", "FloorDepth"): "SPOT_FACE_FLOOR_TOLERANCE",
-        ("LocatorProfile", "f'LocatorDia{index}'"): "round(deviations(LOCATOR_HOLE_BAND_MM)[1], 6)",
+        ("LocatorProfile", "f'LocatorDia{index}'"): "LOCATOR_HOLE_PRINT_TOLERANCE_MM",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_DIA_BAND)",
         ("PinBoreProfile", "PinBoreDia"): "*deviations(PIN_BORE_DIA_BAND)",
     }
-    assert geometry.LATCH_PIN_HEIGHT_BAND == spec.BAND_BY_PLACES[
-        spec.DRAWING_PRECISION_BY_NAME["PinHoleZ"]
-    ]
+    assert geometry.LATCH_PIN_HEIGHT_BAND == geometry.printed_reach_mm(
+        geometry.PIN_HOLE_Z, spec.DRAWING_PRECISION_BY_NAME["PinHoleZ"]
+    )
     assert not hasattr(spec, "LATCH_PIN_HEIGHT_TOLERANCE")
     # The piloted counterbore only cuts oversize; the pin's press hole must
     # never end up larger than nominal.
     assert min(spec.SPOT_FACE_DIA_BAND) == 0.0 < max(spec.SPOT_FACE_DIA_BAND)
-    assert max(geometry.PIN_HOLE_DIA_BAND) == 0.0 > min(geometry.PIN_HOLE_DIA_BAND)
+    assert 0.0 >= max(geometry.PIN_HOLE_DIA_BAND) > min(geometry.PIN_HOLE_DIA_BAND)
 
 
 def test_the_section_cuts_through_the_pivot_and_the_square_end() -> None:
@@ -331,7 +329,7 @@ def test_the_qualifier_lines_ride_the_tap_thread_compartment() -> None:
         drawing.tap_callout_definitions({5: "", 6: "", 7: "", 8: ""}, "X")
 
 
-_ENGAGEMENT_LINE = re.compile(r"ENGAGEMENT (\d+\.\d{2}) MIN \((\d\.\d{2})D\)")
+_ENGAGEMENT_LINE = re.compile(r"ENGAGEMENT (\.\d{3}) MIN \((\d\.\d{2})D\)")
 
 
 def test_each_tap_callout_states_its_worst_case_full_thread_engagement() -> None:
@@ -348,13 +346,13 @@ def test_each_tap_callout_states_its_worst_case_full_thread_engagement() -> None
     for label, *_, qualifier in drawing.TAP_CALLOUTS:
         match = _ENGAGEMENT_LINE.fullmatch(qualifier.splitlines()[-1])
         assert match, label
-        printed_mm, printed_d = float(match[1]), float(match[2])
+        printed_mm, printed_d = float(match[1]) * 25.4, float(match[2])
         worst_mm, major = worst[label]
-        assert worst_mm - 0.01 < printed_mm <= worst_mm, label
+        assert worst_mm - 0.0254 < printed_mm <= worst_mm + 1e-9, label
         assert worst_mm / major - 0.01 < printed_d <= worst_mm / major, label
         assert printed_d >= joints.ENGAGEMENT_TARGET_D, label
     # A MIN never rounds up.
-    assert spec.engagement_line(7.749, 1.599) == "ENGAGEMENT 7.74 MIN (1.59D)"
+    assert spec.engagement_line(7.749, 1.599) == "ENGAGEMENT .305 MIN (1.59D)"
 
 
 def test_the_pin_bore_presses_the_mha_179_pin_at_every_limit() -> None:
@@ -363,7 +361,7 @@ def test_the_pin_bore_presses_the_mha_179_pin_at_every_limit() -> None:
     oversize."""
     loosest = cluster_pin.DIA_MIN - geometry.PIN_BORE_DIA_MAX
     tightest = cluster_pin.DIA_MAX - geometry.PIN_BORE_DIA_MIN
-    assert (loosest, tightest) == pytest.approx((0.010, 0.026))
+    assert (loosest, tightest) == pytest.approx((0.00762, 0.02794))
     assert spec.PIN_PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
     assert min(geometry.PIN_BORE_DIA_BAND) == 0.0 < max(geometry.PIN_BORE_DIA_BAND)
 
@@ -384,27 +382,27 @@ def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:
         - geometry.PIN_HOLE_DIA
         - min(geometry.PIN_HOLE_DIA_BAND)
     )
-    assert (loosest, tightest) == pytest.approx((0.00254, 0.01762))
+    assert (loosest, tightest) == pytest.approx((0.01524, 0.03302))
     assert spec.LATCH_PIN_PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
     assert joints.LATCH_PIN_PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
     assert _config.parts("pd-vn-transgear-latch-pin")["number"] == spec.LATCH_PIN_NUMBER
     low, high = spec.LATCH_PIN_PRESS_PRINTED
-    assert 0.0 < low <= loosest < tightest <= high < tightest + 1e-4
+    assert 0.0 < low <= loosest + 1e-9
+    assert loosest < tightest <= high + 1e-9 < tightest + 0.00254
     lines = spec.PIN_HOLE_CALLOUT.splitlines()
     assert lines[1] == f"PRESS FIT PIN {spec.LATCH_PIN_NUMBER}"
-    assert lines[2] == f"{low:.4f}/{high:.4f} INTERFERENCE"
-    assert lines[2] == "0.0025/0.0177 INTERFERENCE"
+    assert lines[2] == ".0006/.0013 INTERFERENCE"
     # The owner-accepted ligament shortfall prints as a plain fact, rounded
     # down so the sheet never promises more wall than the budget holds.
     worst = geometry.WALLS["pin hole to faces"][1]
-    assert spec.LATCH_PIN_WALL_PRINTED <= worst < spec.LATCH_PIN_WALL_PRINTED + 0.01
-    assert f"PIN HOLE TO FACES {spec.LATCH_PIN_WALL_PRINTED:.2f} MIN" in lines
+    assert spec.LATCH_PIN_WALL_PRINTED <= worst < spec.LATCH_PIN_WALL_PRINTED + 0.0254
+    assert "PIN HOLE TO FACES .065 MIN" in lines
 
 
 def test_the_pivot_bore_is_reamed_as_the_shoulder_running_fit() -> None:
     """A model reference cannot masquerade as a universal ±.130 bore zone."""
     lower, upper = geometry.PIVOT_BORE_DIAMETRAL_CLEARANCE
-    assert (lower, upper) == pytest.approx((0.131, 0.15132))
+    assert (lower, upper) == pytest.approx((0.14224, 0.16256))
     assert geometry.PIVOT_BORE_DIA == pytest.approx(pivot_screw.SHOULDER_DIA + (lower + upper) / 2.0)
     assert joints.SHOULDER_RADIAL_CLEARANCE == pytest.approx(lower / 2.0)
     assert joints.PIVOT_RADIAL_FLOAT_MAX == pytest.approx(upper / 2.0)
@@ -414,7 +412,7 @@ def test_the_pivot_bore_is_reamed_as_the_shoulder_running_fit() -> None:
     flat = " ".join(spec.PIVOT_BORE_CALLOUT.split())
     for fact in (
         "MEASURED SHOULDER",
-        f"{lower:.3f}-{upper:.3f} DIAMETRAL CLEARANCE",
+        ".0056-.0064 DIAMETRAL CLEARANCE",
         screw,
         "MATCHED SET",
     ):
@@ -731,10 +729,12 @@ def test_the_locating_holes_name_their_dowel_press_and_match_drill() -> None:
     import pd_rack_pinion_spec as disc
     from pd_paper_drive_assembly_steps import knob_setting_ref
 
-    loosest = min(dowel.DIA_LIMITS) - max(interface.PRESS_HOLE_LIMITS_MM)
-    tightest = max(dowel.DIA_LIMITS) - min(interface.PRESS_HOLE_LIMITS_MM)
+    loosest = min(dowel.DIA_LIMITS) - max(geometry.LOCATOR_HOLE_PRINTED_LIMITS_MM)
+    tightest = max(dowel.DIA_LIMITS) - min(geometry.LOCATOR_HOLE_PRINTED_LIMITS_MM)
     assert spec.LOCATOR_PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
-    assert spec.LOCATOR_PRESS_INTERFERENCE == pytest.approx((0.002, 0.018))
+    # The printed ream lies inside the interface's press limits.
+    assert min(interface.PRESS_HOLE_LIMITS_MM) <= min(geometry.LOCATOR_HOLE_PRINTED_LIMITS_MM)
+    assert max(geometry.LOCATOR_HOLE_PRINTED_LIMITS_MM) <= max(interface.PRESS_HOLE_LIMITS_MM)
     assert _config.parts("pd-vn-transgear-arm-plate-locating-pin")["number"] == dowel.PART_NUMBER
     plate = _config.parts("pd-transgear-arm-plate")["number"]
     flat = " ".join(drawing.LOCATOR_CALLOUT_TEXT.split())
@@ -743,9 +743,9 @@ def test_the_locating_holes_name_their_dowel_press_and_match_drill() -> None:
     # the assembly view that sets it.
     for fact in (
         "THRU",
-        f"{interface.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX",
+        ".0019 MAX",
         dowel.PART_NUMBER,
-        f"{spec.LOCATOR_PRESS_INTERFERENCE[0]:.3f}/{spec.LOCATOR_PRESS_INTERFERENCE[1]:.3f}",
+        ".0002/.0007",
         plate,
         knob_setting_ref(),
     ):
@@ -771,15 +771,16 @@ def test_the_locating_dowels_punch_out_from_the_front() -> None:
     assert geometry.LOCATOR_FULL_CYLINDER_SPAN_MIN_MM == pytest.approx(thinnest - 2.0 * front_break)
 
 
-def test_each_projected_zone_is_a_dimensioned_chain_line_from_face_a_on_its_side() -> None:
+def test_each_projected_zone_is_a_dimensioned_chain_line_from_its_mating_face() -> None:
     """Machinist review of f4a5f03a1 (clarity, rule 7; all three runs): the
     frames gave each zone's height, but where it starts and which way it
-    runs (from face A: taps rearward, pin bore forward) was printed only in
-    general note 1. Each zone is drawn at its feature as a chain line from
-    face A on its own side, dimensioned with its height as the frame prints
-    it, and the note is gone. Review of d5d1298b0: the pin bore's 32.6 rose
-    through the plan's dimension lines (gating), so it is drawn in section
-    D-D; the taps' dimension line runs on their zone's own ends; no MIN."""
+    runs was printed only in general note 1. Each zone is drawn at its
+    feature as a chain line on its own side, dimensioned with its height as
+    the frame prints it, and the note is gone. Review of d5d1298b0: the pin
+    bore's 32.6 rose through the plan's dimension lines (gating), so it is
+    drawn in section D-D; no MIN. Review r7 (gating): each zone starts at the
+    face its mating part seats on and runs outward, clear of the part (the
+    taps' ran through the stock from face A), and D-D names its face."""
     import paper_drive_arm_registration as registration
 
     projected = {
@@ -796,18 +797,19 @@ def test_each_projected_zone_is_a_dimensioned_chain_line_from_face_a_on_its_side
     taps = [key for key in projected if key.startswith("plate_tap_")]
     assert len(taps) == len(geometry.PLATE_TAP_STATIONS)
     for key in taps:
-        # Rearward, into the MHA-PD-19 plate (seated on the rear face), past
+        # Rearward from the rear face, where the MHA-PD-19 plate seats, past
         # the seated screw head's contact.
         assert spec.PROJECTED_ZONE_DIRECTION[key] == spec.PROJECTED_ZONE_REARWARD
+        assert spec.PROJECTED_ZONE_START_Z[key] == geometry.THICKNESS
         height = projected[key].projected_zone_height_mm
-        assert height > geometry.THICKNESS
-        assert height >= joints.PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM
+        assert geometry.THICKNESS + height >= joints.PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM
     # The pin bore's runs forward, to the chain plane in front of face A
     # (machine +Z runs rearward too).
     assert (
         registration.CHAIN_PLANE_MACHINE_Z_LIMITS_MM[0] < registration.ARM_FRONT_MACHINE_Z_MM
     )
     assert spec.PROJECTED_ZONE_DIRECTION["feed_stud_projected_axis"] == spec.PROJECTED_ZONE_FORWARD
+    assert spec.PROJECTED_ZONE_START_Z["feed_stud_projected_axis"] == 0.0
     assert (
         projected["feed_stud_projected_axis"].projected_zone_height_mm
         == registration.S_PROJECTED_HEIGHT_MM
@@ -828,21 +830,20 @@ def test_each_projected_zone_is_a_dimensioned_chain_line_from_face_a_on_its_side
     assert sum(counts.values()) == len(projected)
     assert counts == {"plate_tap_1_position": 2, "feed_stud_projected_axis": 1}
     for control in projected.values():
-        assert f"{control.projected_zone_height_mm:.{spec.DRAWING_REFERENCE_PRECISION}f}" == (
-            f"{control.projected_zone_height_mm:g}"
-        )
+        # The frame and its chain line print the height on the .001 in grid.
+        inches = control.projected_zone_height_mm / 25.4
+        assert inches == pytest.approx(round(inches, spec.DRAWING_REFERENCE_PRECISION), abs=1e-9)
+        assert control.projection_unit == "in"
     assert not hasattr(spec, "PROJECTED_ZONE_HEIGHT_SUFFIX")
-    # Section A-A (2:1, face A up): the taps' dimension line runs inside tap
-    # 1's hole beside its chain line, so its arrows land on the zone's own
-    # ends; the "2X" value stands below the rear face, between the taps,
-    # above the zones' far ends.
+    # Section A-A (2:1, face A up): the taps' dimension line runs beside tap
+    # 1's chain line, below the rear face, so its arrows land on the zone's
+    # own ends; the "2X" value stands between the taps, within the zones.
     tap = drawing.PROJECTED_ZONE_CHAINS["plate_tap_1_position"]
-    drill_r = drawing._PLATE_DRILL_R * drawing._S / 1000.0
     assert tap.dimension is not None and tap.dimension[1] == 0.0
-    assert 0.001 <= abs(tap.dimension[0]) <= drill_r - 0.0015
-    face_a_y = drawing.SECTION_CENTER[1] + geometry.THICKNESS * drawing._S / 2000.0
+    assert tap.dimension[0] >= 0.001
+    assert tap.face_callout == ""
     rear_y = drawing.SECTION_CENTER[1] - geometry.THICKNESS * drawing._S / 2000.0
-    tap_end_y = face_a_y - projected["plate_tap_1_position"].projected_zone_height_mm * drawing._S / 1000.0
+    tap_end_y = rear_y - projected["plate_tap_1_position"].projected_zone_height_mm * drawing._S / 1000.0
     assert tap.text_xy is not None
     assert tap_end_y < tap.text_xy[1] < rear_y - 0.004
     tap_x = [drawing._front_x(station) for station in geometry.PLATE_TAP_STATIONS]
@@ -865,8 +866,10 @@ def test_each_projected_zone_is_a_dimensioned_chain_line_from_face_a_on_its_side
     assert axis_y + half + 0.020 < plan_bottom
     pin = drawing.PROJECTED_ZONE_CHAINS["feed_stud_projected_axis"]
     assert pin.dimension is not None and pin.dimension[0] == 0.0
-    # Its dimension line clears the bore's mouth, beside the cut face.
+    # Its dimension line clears the bore's mouth, beside the cut face; no
+    # datum tag stands in D-D, so the value names its start face.
     assert geometry.PIN_BORE_DIA * drawing._S / 2000.0 < pin.dimension[1] < half
+    assert pin.face_callout
     caption_top = axis_y - half - drawing._PIN_CAPTION_GAP_M
     title_block_top = 0.065
     assert caption_top - 0.016 > title_block_top + 0.005

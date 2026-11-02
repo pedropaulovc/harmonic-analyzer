@@ -28,10 +28,6 @@ import _transgear_arm_plate_locating_interface as LOCATING_PIN
 import paper_drive_arm_registration as REGISTRATION
 import pd_transgear_pin_spec as PIN
 from pd_transgear_arm_geometry import (
-    BAND_X,
-    BAND_XX,
-    BAND_XXX,
-    LATCH_PIN_HEIGHT_BAND,
     REDUCER_POSITION_DIAMETER,
     PIN_BORE_DIA,
     PIN_STATION,
@@ -39,65 +35,45 @@ from pd_transgear_arm_geometry import (
     PLATE_TAP_SPEC,
     PLATE_TAP_STATIONS,
     THICKNESS,
-    PIN_HOLE_DEPTH_BAND,
     PIN_HOLE_DIA,
     PIN_HOLE_DIA_BAND,
     PIVOT_BORE_DIAMETRAL_CLEARANCE,
     PIVOT_FIT_CLEARANCE_PLACES,
     PIVOT_END_R,
     SPOT_FACE_DIA_GROWTH,
-    SPOT_FACE_FLOOR_BAND,
     STOCK_THICKNESS_IN,
     TIP_STATION,
-    TIP_STATION_BAND,
+    UNIT,
 )
 
-# The general-tolerance band each printed place count claims (the title-block
-# rows the geometry module hard-codes, drawing-guidelines.md rule 3 (decimal places carry the tolerance)).
-BAND_BY_PLACES: dict[int, float] = {1: BAND_X, 2: BAND_XX, 3: BAND_XXX}
-
-# Places each printed dimension carries (contract §3.1 / §12):
-# the hull radius and the end-face width are routine .X; the tip station is
-# .XX (R9-23: at .X the latch pin's full diameter can stop inside the hook
-# strip, see ``pd_transgear_arm_geometry.TIP_STATION``); the thickness is the
-# ground stock's, printed to two places as a reference (the stock band
-# governs it, ``STOCK_TEXT_PREFIX``); the pivot bore's .XXX model size is REF,
-# with acceptance matched to the measured shoulder; the latch-pin hole and
-# pin bore print .XXX under their explicit ream
-# bands; the reducer stations are BASIC under circular position controls;
-# the end-face latch-hole height is an ordinary .XXX row the title block
-# governs (coordinator ruling (a), #2019: no tightened band).
-# pin-hole depth is .XX, the band the pin's grip and proud range are judged
-# at (``PIN_HOLE_DEPTH_BAND``).
-OUTLINE_PLACES = 1
-TIP_STATION_PLACES = 2
-THICKNESS_PLACES = 2
-PIVOT_BORE_PLACES = 3
+# Places each printed dimension carries (contract §3.1 / §12), in inches
+# (#290): the hull radius and the end-face width print .XX, rounded from
+# their mm models (``pd_transgear_arm_geometry.OUTLINE_PLACES``); the tip
+# station is .XX (R9-23, ``pd_transgear_arm_geometry.TIP_STATION``); the
+# thickness is the ground stock's, a reference (the stock band governs it,
+# ``STOCK_TEXT_PREFIX``); the pivot bore's model size is REF, with acceptance
+# matched to the measured shoulder; the latch-pin hole and pin bore print
+# under their explicit ream bands; the reducer stations and locating sites
+# are BASIC under circular position controls; the end-face latch-hole height
+# is an ordinary .XXX row the title block governs (coordinator ruling (a),
+# #2019: no tightened band); the pin-hole depth is .XX.  The geometry module
+# judges the walls and the hanger joints at each print's reach.
+OUTLINE_PLACES = ARM.OUTLINE_PLACES
+TIP_STATION_PLACES = ARM.TIP_STATION_PLACES
+THICKNESS_PLACES = 4
+PIVOT_BORE_PLACES = 4
 SPOT_FACE_DIA_PLACES = 3
-SPOT_FACE_FLOOR_PLACES = 2
-STATION_PLACES = 3
-PIN_HOLE_DIA_PLACES = 3
-PIN_BORE_DIA_PLACES = 3
-PIN_HOLE_DEPTH_PLACES = 2
-
-# The places must claim the bands the geometry module's walls and the
-# hanger joints were judged at.
-for _label, _places, _band in (
-    ("tip station", TIP_STATION_PLACES, TIP_STATION_BAND),
-    ("latch-pin hole depth", PIN_HOLE_DEPTH_PLACES, PIN_HOLE_DEPTH_BAND),
-    ("latch-pin hole height", STATION_PLACES, LATCH_PIN_HEIGHT_BAND),
-):
-    if abs(BAND_BY_PLACES[_places] - _band) > 1e-9:
-        raise AssertionError(
-            f"MHA-PD-18 {_label} prints {_places} places (±{BAND_BY_PLACES[_places]}),"
-            f" not the ±{_band} its walls assume"
-        )
+SPOT_FACE_FLOOR_PLACES = ARM.SPOT_FACE_FLOOR_PLACES
+STATION_PLACES = 4
+PIN_HOLE_DIA_PLACES = 4
+PIN_BORE_DIA_PLACES = 4
+PIN_HOLE_DEPTH_PLACES = ARM.PIN_HOLE_DEPTH_PLACES
 
 # Explicit model bands, (upper, lower) deviations where one-sided.
 # The counterbore only cuts oversize (drilled-hole row).
 SPOT_FACE_DIA_BAND = (SPOT_FACE_DIA_GROWTH, 0.0)
 # Floor from the FRONT face: the MHA-PD-VN-63 spring's room under the head (R9-71).
-SPOT_FACE_FLOOR_TOLERANCE = SPOT_FACE_FLOOR_BAND
+SPOT_FACE_FLOOR_TOLERANCE = ARM.SPOT_FACE_FLOOR_TOLERANCE
 
 BASIC_REDUCER_DIMENSIONS = (
     ("StationReference", "PinStation"),
@@ -112,22 +88,32 @@ PART_DATUMS = (
     PartDatum("B", CylinderFace(PIVOT_BORE_DIA)),
     PartDatum("C", CylinderFace(PIN_BORE_DIA, contains_x_mm=PIN_STATION)),
 )
+# The frames print in inches (#290), floored to four places so each printed
+# zone stays inside the 0.05 zones the reducer stacks were judged at.
+GEOMETRIC_TOLERANCES_IN = {"position": ".0019", "projected_axis": ".0019"}
+GEOMETRIC_TOLERANCES_MM = {key: float(value) * 25.4 for key, value in GEOMETRIC_TOLERANCES_IN.items()}
+if (
+    GEOMETRIC_TOLERANCES_MM["position"] > REDUCER_POSITION_DIAMETER
+    or GEOMETRIC_TOLERANCES_MM["projected_axis"] > REGISTRATION.AXIS_PROJECTED_ZONE_DIAMETER_MM
+):
+    raise AssertionError("MHA-PD-18 prints a reducer zone wider than its stacks assume")
 GEOMETRIC_CONTROLS = (
     GeometricControl(
-        "feed_stud_position", "position", f"{REDUCER_POSITION_DIAMETER:.3f}",
+        "feed_stud_position", "position", GEOMETRIC_TOLERANCES_IN["position"],
         CylinderFace(PIN_BORE_DIA, contains_x_mm=PIN_STATION),
         ("A", "B"), "diametral",
     ),
     *(
         GeometricControl(
             f"plate_tap_{index}_position", "position",
-            f"{REDUCER_POSITION_DIAMETER:.3f}",
+            GEOMETRIC_TOLERANCES_IN["position"],
             CylinderFace(
                 blind_cut_dia_mm(PLATE_TAP_SPEC), contains_x_mm=station,
                 contains_z_mm=THICKNESS / 2.0,
             ),
             ("A", "B", "C"), "diametral",
             projected_zone_height_mm=ARM.CLAMP_TAP_PROJECTED_HEIGHT_MM,
+            projection_unit=UNIT,
         )
         for index, station in enumerate(PLATE_TAP_STATIONS, 1)
     ),
@@ -135,17 +121,18 @@ GEOMETRIC_CONTROLS = (
 GEOMETRIC_CONTROLS += (
     GeometricControl(
         "feed_stud_projected_axis", "perpendicularity",
-        f"{REGISTRATION.AXIS_PROJECTED_ZONE_DIAMETER_MM:.3f}",
+        GEOMETRIC_TOLERANCES_IN["projected_axis"],
         CylinderFace(PIN_BORE_DIA, contains_x_mm=PIN_STATION),
         ("A",), "diametral",
         projected_zone_height_mm=REGISTRATION.S_PROJECTED_HEIGHT_MM,
+        projection_unit=UNIT,
     ),
     # No frame on the rear face (machinist review, rule 5): the 9517K466
     # ground stock's thickness band carries its parallelism to A
     # (paper_drive_arm_registration.ARM_OPPOSITE_FACE_PARALLELISM_MM).
     *(
         GeometricControl(
-            f"arm_locator_{index}_position", "position", f"{REDUCER_POSITION_DIAMETER:.3f}",
+            f"arm_locator_{index}_position", "position", GEOMETRIC_TOLERANCES_IN["position"],
             CylinderFace(
                 ARM.LOCATOR_HOLE_DIA_MM, contains_x_mm=x, contains_y_mm=y,
                 contains_z_mm=THICKNESS / 2.0,
@@ -154,19 +141,42 @@ GEOMETRIC_CONTROLS += (
         ) for index, (x, y) in enumerate(ARM.LOCATOR_SITES_MM, 1)
     ),
 )
+
+
+def _inch(value_mm: float, places: int) -> str:
+    """``value_mm`` printed in inches to ``places``, without the leading zero."""
+    return f"{value_mm / 25.4:.{places}f}".removeprefix("0")
+
+
+def _floor_mm(value_mm: float, places: int) -> float:
+    """``value_mm`` floored to the inch grid of ``places``, back in mm."""
+    return math.floor(value_mm / 25.4 * 10**places + 1e-6) / 10**places * 25.4
+
+
+def _ceil_mm(value_mm: float, places: int) -> float:
+    """``value_mm`` rounded up to the inch grid of ``places``, back in mm."""
+    return math.ceil(value_mm / 25.4 * 10**places - 1e-6) / 10**places * 25.4
+
+
 # The press and its proud set are assembly (MHA-PD-00 "arm-plate-located").
 # The callout names the dowel the reamed holes take and its press (rule 4),
 # and says what the small mouth breaks keep: the dowel's full-diameter grip
 # (``pd_transgear_arm_geometry.LOCATOR_FULL_CYLINDER_SPAN_MIN_MM``). The
-# drawing adds the match-drill with the plate and its assembly step.
-LOCATOR_PRESS_INTERFERENCE = LOCATOR_PIN.PRESS_INTERFERENCE_MM
+# drawing adds the match-drill with the plate and its assembly step.  The
+# press is the dowel's band against the printed ream's limits.
+LOCATOR_PRESS_INTERFERENCE = (
+    LOCATOR_PIN.DIA_LIMITS[0] - ARM.LOCATOR_HOLE_PRINTED_LIMITS_MM[1],
+    LOCATOR_PIN.DIA_LIMITS[1] - ARM.LOCATOR_HOLE_PRINTED_LIMITS_MM[0],
+)
 if LOCATOR_PRESS_INTERFERENCE[0] <= 0.0:
     raise AssertionError("the MHA-PD-18 locating ream loses MHA-PD-VN-64's press")
 LOCATOR_CALLOUT = "\n".join((
     "2X REAM THRU",
-    f"MOUTH BREAKS {LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX: DOWEL GRIP",
+    f"MOUTH BREAKS {_inch(_floor_mm(LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM, 4), 4)}"
+    " MAX: DOWEL GRIP",
     f"PRESS FIT DOWEL {LOCATOR_PIN.PART_NUMBER}",
-    f"{LOCATOR_PRESS_INTERFERENCE[0]:.3f}/{LOCATOR_PRESS_INTERFERENCE[1]:.3f} INTERFERENCE",
+    f"{_inch(_floor_mm(LOCATOR_PRESS_INTERFERENCE[0], 4), 4)}/"
+    f"{_inch(_ceil_mm(LOCATOR_PRESS_INTERFERENCE[1], 4), 4)} INTERFERENCE",
 ))
 # Machinist review (rule 16): a pressed dowel needs a way out. The reams run
 # through, and the dowel pressed from the rear to its proud set stops short
@@ -180,29 +190,32 @@ if LOCATOR_PUNCH_AIR_MIN_MM <= 0.0:
     raise AssertionError("the MHA-PD-VN-64 dowel reaches the MHA-PD-18 front face")
 
 # --- Printed text -------------------------------------------------------------
-# The thickness is the stock's: it prints "5/16 ±.001 IN (7.94) GROUND
+# The thickness is the stock's: it prints "5/16 ±.001 (.3125) GROUND
 # STOCK", prefix and suffix around the imported model value, which the
-# parentheses mark as reference, so the title block's .XX band never applies
-# to it. The stock's own band is printed because the seat tilt and the plate
-# screw's engagement are judged at it (codjiflo review of #2015), and its
-# inch unit with it: on the millimetre sheet a bare ±.001 reads as 0.001 mm
-# (codjiflo review of 2ac1bdb28).
-STOCK_THICKNESS_BAND_IN_TEXT = f"±{ARM.THICKNESS_BAND / 25.4:.3f}".replace("±0.", "±.")
-STOCK_TEXT_PREFIX = f"{STOCK_THICKNESS_IN} {STOCK_THICKNESS_BAND_IN_TEXT} IN ("
-STOCK_TEXT_SUFFIX = ") GROUND STOCK"
+# parentheses mark as reference, so the title block's rows never apply to
+# it. The stock's own band is printed because the seat tilt and the plate
+# screw's engagement are judged at it (codjiflo review of #2015).
+STOCK_THICKNESS_BAND_IN_TEXT = f"±{_inch(ARM.THICKNESS_BAND, 3)}"
+STOCK_TEXT_PREFIX = f"{STOCK_THICKNESS_IN} {STOCK_THICKNESS_BAND_IN_TEXT} ("
+# REF: an as-bought size with the supplier's tolerance (units guidance).
+STOCK_TEXT_SUFFIX = ") GROUND STOCK REF"
 PLATE_TAP_EDGE_BREAK_CALLOUT = (
-    f"ENTRY / EXIT EDGE BREAK {ARM.PLATE_TAP_ENTRY_BREAK_MAX_MM:g} MAX BOTH SIDES"
+    f"ENTRY / EXIT EDGE BREAK {_inch(ARM.PLATE_TAP_ENTRY_BREAK_MAX_MM, 3)} MAX BOTH SIDES"
 )
 # Where each projected zone starts and which way it runs, at the feature
 # (machinist review, rule 7; it was general note 1): the sheet draws each
-# zone as a heavy chain line from front face A (z = 0) along the hole's
-# axis and dimensions its height (ASME Y14.5-2018: the extent and direction
-# of a projected zone, a dimensioned chain line on the hole's axis). Model
-# +Z runs rearward. The plate taps' zones run rearward, through the arm into
-# the MHA-PD-19 plate past the seated screw-head contact
-# (transgear_hanger_joints.PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM, from A);
-# the pin bore's runs forward to the chain plane
-# (paper_drive_arm_registration.S_PROJECTED_HEIGHT_MM). The sheet carries no
+# zone as a heavy chain line on the hole's axis, from the face its mating
+# part seats on, outward, and dimensions its height (ASME Y14.5-2018: the
+# extent and direction of a projected zone, a dimensioned chain line on the
+# hole's axis). Model +Z runs rearward. The plate taps' zones start at the
+# rear face, where the MHA-PD-19 plate seats, and run rearward into it, past
+# the seated screw-head contact
+# (transgear_hanger_joints.PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM, from A,
+# lies inside it); the pin bore's starts at face A and runs forward to the
+# chain plane (paper_drive_arm_registration.S_PROJECTED_HEIGHT_MM).
+# Machinist review r7 (clarity, gating): drawn from face A, the taps' chain
+# ran through the arm and did not read as projecting out of one face.  The
+# tilt checks read the full heights either way.  The sheet carries no
 # general notes: the matched-pair setting and fit-up check are MHA-PD-00's
 # steps, and the match-drill rides the locating holes' callout.
 PROJECTED_ZONE_REARWARD = 1.0
@@ -214,28 +227,35 @@ PROJECTED_ZONE_DIRECTION: dict[str, float] = {
     },
     "feed_stud_projected_axis": PROJECTED_ZONE_FORWARD,
 }
+# The model z of the face each zone starts on.
+PROJECTED_ZONE_START_Z: dict[str, float] = {
+    key: THICKNESS if direction == PROJECTED_ZONE_REARWARD else 0.0
+    for key, direction in PROJECTED_ZONE_DIRECTION.items()
+}
 if set(PROJECTED_ZONE_DIRECTION) != {
     control.key for control in GEOMETRIC_CONTROLS
     if control.projected_zone_height_mm is not None
 }:
     raise AssertionError("every projected zone needs exactly one drawn direction")
 # The heights are sheet-derived (each measures its own chain line) and print
-# to DRAWING_REFERENCE_PRECISION, as the frames print them (Ⓟ 14.7, Ⓟ 32.6).
+# to DRAWING_REFERENCE_PRECISION, as the frames print them (Ⓟ .580, Ⓟ 1.273).
 # The counterbore seats the MHA-PD-VN-63 spring's rim under the MHA-PD-VN-57
-# head, and its floor from the FRONT face sets the spring's room there
-# (transgear_hanger_joints.SPRING_ROOM_*): the callout names the spring, and
-# the floor's text says what its band sets (rule 4 (name the mate)).
+# head, and its floor from the FRONT face (datum A) sets the spring's room
+# there (transgear_hanger_joints.SPRING_ROOM_*): the callout names the
+# spring, and the floor's text says what its band sets (rule 4 (name the
+# mate)).  Machinist review (all three runs): "REAR FACE" / "FRONT FACE" read
+# against the plan, which is drawn from the rear, so both callouts name the
+# faces by datum A, which section A-A tags on the front face.
 _SPRING = _config.parts("pd-vn-transgear-pivot-spring")
 _PIVOT_SCREW = _config.parts("pd-vn-transgear-pivot-screw")
 SPOT_FACE_CALLOUT = "\n".join((
-    "COUNTERBORE, REAR FACE",
+    "COUNTERBORE OPPOSITE A",
     f"SEATS PIVOT SPRING {_SPRING['number']}",
 ))
 # The floor's band names the mate it serves at its own callout (review of
 # 2ac1bdb28, rule 4): it sets the pivot spring's preload.
 FLOOR_DEPTH_CALLOUT = "\n".join((
-    "FLOOR FROM",
-    "FRONT FACE:",
+    "FLOOR FROM A:",
     "SETS PRELOAD OF",
     "PIVOT SPRING",
     _SPRING["number"],
@@ -245,8 +265,8 @@ FLOOR_DEPTH_CALLOUT = "\n".join((
 # to the front face is implied and takes the title block's angular row.
 PIVOT_BORE_CALLOUT = "\n".join((
     "REAM TO MEASURED SHOULDER:",
-    f"{PIVOT_BORE_DIAMETRAL_CLEARANCE[0]:.{PIVOT_FIT_CLEARANCE_PLACES}f}-"
-    f"{PIVOT_BORE_DIAMETRAL_CLEARANCE[1]:.{PIVOT_FIT_CLEARANCE_PLACES}f}"
+    f"{_inch(PIVOT_BORE_DIAMETRAL_CLEARANCE[0], PIVOT_FIT_CLEARANCE_PLACES)}-"
+    f"{_inch(PIVOT_BORE_DIAMETRAL_CLEARANCE[1], PIVOT_FIT_CLEARANCE_PLACES)}"
     " DIAMETRAL CLEARANCE",
     f"ON PIVOT SCREW {_PIVOT_SCREW['number']}",
     "MATCHED SET; NOT INTERCHANGEABLE",
@@ -256,40 +276,43 @@ PIVOT_BORE_CALLOUT = "\n".join((
 # The pin spec owns the press (it imports the arm geometry, so the geometry
 # cannot import it back); the arm prints it under the bore.
 PIN_PRESS_INTERFERENCE = PIN.PRESS_INTERFERENCE
-if PIN_PRESS_INTERFERENCE != (0.010, 0.026):
+if not all(
+    math.isclose(value, expected, abs_tol=1e-9)
+    for value, expected in zip(PIN_PRESS_INTERFERENCE, (0.00762, 0.02794), strict=True)
+):
     raise AssertionError(
         f"MHA-PD-18 pin bore press on MHA-PD-23 is {PIN_PRESS_INTERFERENCE}, "
-        "not 0.010..0.026"
+        "not .0003..0011"
     )
 # Three short lines under the Ø: the operation, the mating pin, the press.
 PIN_BORE_CALLOUT = "\n".join(
     (
         "REAM THRU",
         f"PRESS FIT PIN {PIN.PIN_NUMBER}",
-        f"{PIN_PRESS_INTERFERENCE[0]:.3f}/{PIN_PRESS_INTERFERENCE[1]:.3f} INTERFERENCE",
+        f"{_inch(PIN_PRESS_INTERFERENCE[0], 4)}/{_inch(PIN_PRESS_INTERFERENCE[1], 4)}"
+        " INTERFERENCE",
     )
 )
 
 
 def engagement_line(worst_mm: float, worst_d: float) -> str:
     """The installed full-thread engagement a tap callout states: the
-    worst-case length and its multiple of the major diameter, each floored
-    to two places (a MIN never rounds up), pending ruling #1385."""
-    mm = int(worst_mm * 100.0 + 1e-9) / 100.0
+    worst-case length in inches and its multiple of the major diameter, each
+    floored (a MIN never rounds up), pending ruling #1385."""
     d = int(worst_d * 100.0 + 1e-9) / 100.0
-    return f"ENGAGEMENT {mm:.2f} MIN ({d:.2f}D)"
+    return f"ENGAGEMENT {_inch(_floor_mm(worst_mm, 3), 3)} MIN ({d:.2f}D)"
 
 
 # The true overall, pivot-end extreme to the square end, prints as a
 # reference; a derived reference has no part-side places, so the spec owns
-# its digit.
+# its digits (three, as the projected heights).
 OVERALL_LENGTH = PIVOT_END_R + TIP_STATION
-DRAWING_REFERENCE_PRECISION = 1
+DRAWING_REFERENCE_PRECISION = 3
 
 # --- The MHA-PD-VN-58 latch pin's press in the blind ream -------------------------
 # (loosest, tightest) from the printed ream band and the dowel's catalogue
-# band: 0.00254..0.01762.  The callout rounds both outward to four places,
-# so the range it names holds every pin and hole the two bands accept.
+# band.  The callout rounds both outward to four inch places, so the range
+# it names holds every pin and hole the two bands accept.
 LATCH_PIN_NUMBER = "MHA-PD-VN-58"
 LATCH_PIN_PRESS_INTERFERENCE = (
     round(
@@ -304,23 +327,23 @@ LATCH_PIN_PRESS_INTERFERENCE = (
 if LATCH_PIN_PRESS_INTERFERENCE[0] <= 0.0:
     raise AssertionError("the MHA-PD-18 latch-pin ream loses MHA-PD-VN-58's press")
 LATCH_PIN_PRESS_PRINTED = (
-    math.floor(LATCH_PIN_PRESS_INTERFERENCE[0] * 1e4 + 1e-6) / 1e4,
-    math.ceil(LATCH_PIN_PRESS_INTERFERENCE[1] * 1e4 - 1e-6) / 1e4,
-)  # 0.0025, 0.0177
+    _floor_mm(LATCH_PIN_PRESS_INTERFERENCE[0], 4),
+    _ceil_mm(LATCH_PIN_PRESS_INTERFERENCE[1], 4),
+)  # .0006, .0013
 # The pin bore's three lines (the operation, the mating pin, the press), plus
-# the ligament to the faces as a plain fact: 1.67 MIN at full budget is the
+# the ligament to the faces as a plain fact: .065 MIN at full budget is the
 # owner-accepted shortfall (machinist_exceptions RV-04; #2019 tracks the next
 # stock size up). Pressing it to the floor is MHA-PD-00's latch-pin-pressed
 # step (policy option (c)); the callout stands below the end view, inside the
 # border.
-LATCH_PIN_WALL_PRINTED = math.floor(ARM.WALLS["pin hole to faces"][1] * 100.0 + 1e-6) / 100.0
+LATCH_PIN_WALL_PRINTED = _floor_mm(ARM.WALLS["pin hole to faces"][1], 3)
 PIN_HOLE_CALLOUT = "\n".join(
     (
         "BLIND FLAT-BOTTOM REAM",
         f"PRESS FIT PIN {LATCH_PIN_NUMBER}",
-        f"{LATCH_PIN_PRESS_PRINTED[0]:.4f}/{LATCH_PIN_PRESS_PRINTED[1]:.4f}"
+        f"{_inch(LATCH_PIN_PRESS_PRINTED[0], 4)}/{_inch(LATCH_PIN_PRESS_PRINTED[1], 4)}"
         " INTERFERENCE",
-        f"PIN HOLE TO FACES {LATCH_PIN_WALL_PRINTED:.2f} MIN",
+        f"PIN HOLE TO FACES {_inch(LATCH_PIN_WALL_PRINTED, 3)} MIN",
     )
 )
 
@@ -362,11 +385,12 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     },
     "PinHoleProfile": {
         "PinHoleDia": PIN_HOLE_DIA_PLACES,
-        "PinHoleZ": STATION_PLACES,
+        "PinHoleZ": ARM.LATCH_PIN_HEIGHT_PLACES,
     },
     "PinHole": {"PinHoleDepth": PIN_HOLE_DEPTH_PLACES},
     "LocatorProfile": {
-        "LocatorX1": 3, "LocatorY1": 3, "LocatorY2": 3, "LocatorDia1": 3,
+        "LocatorX1": STATION_PLACES, "LocatorY1": STATION_PLACES,
+        "LocatorY2": STATION_PLACES, "LocatorDia1": ARM.LOCATOR_HOLE_PLACES,
     },
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {

@@ -19,8 +19,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 
-import _config
-from _printed_tolerance import angular_band_deg, printed_deviations
+from _printed_tolerance import (
+    angular_band_deg,
+    edge_break_chamfer_mm,
+    edge_break_radius_mm,
+    printed_deviations,
+)
 import pd_platen_rack_spec as rack
 
 OPERATING_LIMIT_PLACES = 2
@@ -54,10 +58,9 @@ def cut_end_finish_reach_mm(
     ):
         raise ValueError("actual cut-section maxima must be finite positive Y height/Z depth")
     height, depth = cut_end_section_maxima_mm
-    angle_deg = angular_band_deg()
-    edge = _config.title_block("edge_break")
-    radius = float(edge["radius_mm"])
-    chamfer = float(edge["chamfer_max_mm"])
+    angle_deg = angular_band_deg(unit=rack.UNIT)
+    radius = edge_break_radius_mm(unit=rack.UNIT)
+    chamfer = edge_break_chamfer_mm(unit=rack.UNIT)
     if (
         not math.isfinite(angle_deg)
         or not 0.0 <= angle_deg < 90.0
@@ -219,7 +222,7 @@ def rack_operating_domain_mm(
     footprint = (-contact_half_width_mm, contact_half_width_mm)
     reserve = rack.PITCH + lateral_deviation_mm
     cut_lower, _cut_upper = printed_deviations(
-        rack.CUT_LENGTH_MM, rack.DRAWING_PRECISION["BarProfile"]["Length"]
+        rack.CUT_LENGTH_MM, rack.DRAWING_PRECISION["BarProfile"]["Length"], unit=rack.UNIT
     )
     minimum_length = rack.CUT_LENGTH_MM + cut_lower
     contact_low, contact_high = footprint

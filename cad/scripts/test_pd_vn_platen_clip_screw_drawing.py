@@ -69,9 +69,9 @@ def test_pan_head_bears_holds_and_clears_on_the_clip_at_the_worst_case() -> None
     # #2 loose hole, concentric (an offset head only uncovers less hole).
     land = (spec.HEAD_DIA_MIN - clip.HOLE_DIA_MAX) / 2.0
     assert clip.HEAD_BEARING_LAND_MIN == pytest.approx(land)
-    assert land == pytest.approx(0.4435, abs=1e-4)
+    assert land == pytest.approx(0.4445, abs=1e-4)
     # The 90114A124 fillister's least head (Ø0.124 in) left 0.05.
-    assert (0.124 * IN - clip.HOLE_DIA_MAX) / 2.0 == pytest.approx(0.0498, abs=1e-4)
+    assert (0.124 * IN - clip.HOLE_DIA_MAX) / 2.0 == pytest.approx(0.0508, abs=1e-4)
     # A bearing circle as small as 90 % of the least head still covers it.
     assert 0.9 * spec.HEAD_DIA_MIN > clip.HOLE_DIA_MAX
     # Engagement: the shortest screw (B18.6.3: +0/-0.03 in to 1 in long)
@@ -84,7 +84,7 @@ def test_pan_head_bears_holds_and_clears_on_the_clip_at_the_worst_case() -> None
         - clip.TAP_MOUTH_BREAK
     )
     assert clip.CLIP_SCREW_ENGAGEMENT_MIN == pytest.approx(engaged)
-    assert engaged == pytest.approx(4.0208, abs=1e-4)
+    assert engaged == pytest.approx(4.0168, abs=1e-4)
     assert engaged >= 1.5 * THREAD_MAJOR_MM[spec.THREAD]
     # Tip: the nominal screw through the nominal sheet ends flush with the
     # platen's rear socket-boss face.
@@ -92,11 +92,11 @@ def test_pan_head_bears_holds_and_clears_on_the_clip_at_the_worst_case() -> None
     assert reach == pytest.approx(
         pd_platen_spec.PLATE_THICKNESS + pd_platen_spec.SOCKET_BOSS_H
     )
-    # Rail clearance: the largest head stays on the 7.0 screw rail, nearer
+    # Rail clearance: the largest head stays on the .30 screw rail, nearer
     # its outer edge than the slit, its edge inside the rail's ends.
     assert clip.HEAD_RAIL_MARGIN == pytest.approx(clip.HOLE_Y - spec.HEAD_DIA / 2.0)
     assert clip.SCREW_RAIL_WIDTH - clip.HOLE_Y > clip.HOLE_Y
-    assert clip.HEAD_RAIL_MARGIN == pytest.approx(1.1791, abs=1e-4)
+    assert clip.HEAD_RAIL_MARGIN == pytest.approx(1.5621, abs=1e-4)
     assert clip.HEAD_TO_SPRING_RAIL == pytest.approx(
         clip.SPRING_RAIL_Y0 - clip.HOLE_Y - spec.HEAD_DIA / 2.0
     )

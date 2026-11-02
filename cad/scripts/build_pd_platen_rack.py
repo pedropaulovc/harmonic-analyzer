@@ -62,12 +62,14 @@ from _sketch import (
     SketchDims,
 )
 from _sketch_chains import define_polygon_chain, define_rectilinear_chain
+from _document_units import apply_package_model_units
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _part_properties import part_drawing_unit
 from _simplified_part import save_simplified_part
 from _visibility import blank_reference_geometry
 from pd_platen_rack_spec import (
@@ -85,7 +87,6 @@ from pd_platen_rack_spec import (
     GAP_AREA,
     GAP_COUNT,
     GEAR_DATA,
-    INCOMING_RACK_INSPECTION_NOTE,
     ISOMETRIC_VIEW_NOTE,
     PITCH,
     PITCH_LINE_Y,
@@ -185,6 +186,8 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # The backer and square rack retain the accepted envelope. Tooth pitch and
     # flank geometry remain literal-numeric, from the shared pure-data spec.
@@ -364,7 +367,6 @@ async def build(adapter) -> dict[str, str]:
         {
             "Gear Data": GEAR_DATA,
             "Purchased Rack": PURCHASED_RACK_NOTE,
-            "Incoming Rack Inspection": INCOMING_RACK_INSPECTION_NOTE,
             "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
             "Enlarged End View Note": ENLARGED_END_VIEW_NOTE,

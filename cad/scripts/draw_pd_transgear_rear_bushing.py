@@ -1,14 +1,15 @@
 r"""Create the manufacturing drawing for the transgear rear bushing (MHA-PD-24).
 
-A turned brass ring: Ø9.0 O.D. over a reamed Ø3.900 bore, its length printed
-to the disc cluster stack's band under the stack callout.  The profile lies
-as it sits in the lathe (axis horizontal): the ``*Top`` view turned a quarter
-turn, so model +Z runs LEFT and the arm face (z 0) is the profile's right
-end, the sleeve face its left end.  Each end face carries its running
-finish, the length sits under the profile and the O.D. moves onto the
-profile (drawing-guidelines.md rule 11 (turned parts read like the lathe): diameters on the side view).  The end view to its left
+A turned brass ring: Ø.35 O.D. over a reamed Ø.1250 bore, its length printed
+to the band that holds the shim count, under the stack callout.  The profile
+lies as it sits in the lathe (axis horizontal): the ``*Top`` view turned a
+quarter turn, so model +Z runs LEFT and the arm face (z 0) is the profile's
+right end, the sleeve face its left end.  The sleeve face carries its thrust
+finish and the reason, the length sits under the profile and the O.D. moves
+onto the profile (drawing-guidelines.md rule 11 (turned parts read like the lathe): diameters on the side view).  The end view to its left
 (third angle, looking along -Z from the +Z end) keeps the bore, a solid
-circle only end-on.
+circle only end-on.  The sheet prints decimal inch (the part's
+``drawing_unit``); the model keeps its millimetre nominals.
 
 Run with SolidWorks open::
 
@@ -24,6 +25,7 @@ from typing import Any
 
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     dimension_name,
     place_view,
     view_name,
@@ -48,6 +50,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _layout_geometry import audit_sheet, format_findings
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -63,6 +66,7 @@ from pd_transgear_rear_bushing_spec import (
     LENGTH_CALLOUT,
     OD,
     SURFACE_FINISHES,
+    THRUST_FACE_CAPTION,
 )
 
 
@@ -81,8 +85,8 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø9 x 6 ring: 5:1 keeps the three sizes, the stack callout and both face
-# finishes legible on the landscape sheet.
+# A Ø9 x 6 ring: 5:1 keeps the three sizes, the stack callout and the thrust
+# face's finish legible on the landscape sheet.
 SHEET_SCALE = (5.0, 1.0)
 VIEW_SCALE = (5, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0  # model mm -> sheet m
@@ -111,32 +115,28 @@ DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "RingLength": LENGTH_CALLOUT,
 }
-# The length under the profile.  Its three-line block is wider
-# than the 6.0 between its extension lines, so it stands off to the right,
-# under the O.D. dimension, where no extension line runs through it.  The
-# O.D. sits right of the part, its dimension line far enough out that the arm
-# face's finish symbol sits between them.
+# The length under the profile.  Its block is wider than the 6.0 between its
+# extension lines, so it stands off to the right, under the O.D. dimension,
+# where no extension line runs through it.
 PROFILE_KEEP = {
     "RingLength": (_PROFILE_ARM_X + 0.045, _PROFILE_BOTTOM - 0.022),
 }
 OD_ON_PROFILE = (_PROFILE_ARM_X + 0.040, PROFILE_CENTER[1])
 
-# Each face's pick lies on its edge line between the bore and O.D. radii.  The
-# sleeve face's symbol stands above-left, clear of every dimension; the arm
-# face's stands right of the part inside the O.D.'s extension-line band,
-# below the axis, short of the O.D. dimension line.
+# The thrust face's pick lies on its edge line between the bore and O.D.
+# radii; its symbol stands above-left, clear of every dimension, and the
+# reason sits just above the symbol.
 _FACE_PICK_UP = PROFILE_CENTER[1] + (BORE_DIA + OD) / 4.0 * _S
-_FACE_PICK_DOWN = PROFILE_CENTER[1] - (BORE_DIA + OD) / 4.0 * _S
 FACE_FINISHES = {
     "sleeve_face": (
         (_PROFILE_SLEEVE_X, _FACE_PICK_UP),
         (_PROFILE_SLEEVE_X - 0.022, _PROFILE_TOP + 0.014),
     ),
-    "arm_face": (
-        (_PROFILE_ARM_X, _FACE_PICK_DOWN),
-        (_PROFILE_ARM_X + 0.014, PROFILE_CENTER[1] - 0.008),
-    ),
 }
+THRUST_CAPTION_XY = (
+    FACE_FINISHES["sleeve_face"][1][0] - 0.009,
+    FACE_FINISHES["sleeve_face"][1][1] + 0.0185,
+)
 ISO_NOTE_XY = (0.315, 0.145)
 # Text over ink, an extension line through its own text and a mark printed
 # twice are defects; leader crossings stay logged.
@@ -269,7 +269,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -344,20 +348,18 @@ async def build(adapter: Any) -> dict[str, str]:
         face_xy=(PROFILE_CENTER[0], PROFILE_CENTER[1] + OD * _S / 4.0),
         label="rear bushing axis centerline",
     )
-    for key, label in (
-        ("sleeve_face", "bushing sleeve face finish"),
-        ("arm_face", "bushing arm face finish"),
-    ):
-        pick, symbol = FACE_FINISHES[key]
-        add_surface_finish(
-            adapter,
-            profile,
-            edge_xy=pick,
-            symbol_xy=symbol,
-            control=surface_finish_by_key(SURFACE_FINISHES, key),
-            label=label,
-            char_height=0.0025,
-        )
+    pick, symbol = FACE_FINISHES["sleeve_face"]
+    add_surface_finish(
+        adapter,
+        profile,
+        edge_xy=pick,
+        symbol_xy=symbol,
+        control=surface_finish_by_key(SURFACE_FINISHES, "sleeve_face"),
+        label="bushing thrust face finish",
+        char_height=0.0025,
+    )
+    if add_note(adapter, THRUST_FACE_CAPTION, *THRUST_CAPTION_XY) is None:
+        raise RuntimeError("failed to add the bushing thrust face caption")
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     rebuild_drawing(adapter, label="rear bushing layout audit")

@@ -11,7 +11,8 @@ from types import SimpleNamespace
 import pytest
 
 import _config
-from _printed_tolerance import printed_band_mm
+from _inch_wall_limits import WALL_TARGET_MM
+from _printed_tolerance import edge_break_chamfer_mm, edge_break_radius_mm, printed_band_mm
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 import _drawing_edges
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
@@ -47,9 +48,9 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
         for feature, names in spec.DRAWING_DIMENSIONS.items()
         for name in names
     }
-    # The length and bore hold their own bands at .XXX; the O.D., an outside
-    # profile no stack reads, takes the loosest row (.X, rule 4).
-    assert spec.DRAWING_PRECISION_BY_NAME == {"RingOd": 1, "BoreDia": 3, "RingLength": 3}
+    # The length (on the .001 grid) and the bore hold their own bands; the
+    # O.D., an outside profile no stack reads, takes the loosest row (.XX).
+    assert spec.DRAWING_PRECISION_BY_NAME == {"RingOd": 2, "BoreDia": 4, "RingLength": 3}
 
 
 def test_the_length_and_the_bore_carry_their_bands_on_the_model() -> None:
@@ -58,14 +59,14 @@ def test_the_length_and_the_bore_carry_their_bands_on_the_model() -> None:
     drawing-simplicity-policy.md `How the repository implements the guidelines`).  The O.D. prints at .X and the title block's row governs it;
     restating that row on the dimension is what drawing-guidelines.md rule 2 (the title block is the general specification) forbids."""
     assert model_toleranced_dimensions(part) == {
-        ("Ring", "RingLength"): "LENGTH_BAND",
+        ("Ring", "RingLength"): "LENGTH_TOLERANCE",
         ("RingProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)",
     }
-    row = _config.title_block("linear_3pl")["value_in"] * 25.4
-    assert 0.0 < spec.LENGTH_BAND < row
+    row = printed_band_mm(3, unit=spec.UNIT)
+    assert 0.0 < spec.LENGTH_TOLERANCE <= spec.LENGTH_BAND < row
     # The ream only cuts oversize: the bore never prints under nominal.
-    assert min(spec.BORE_DIA_BAND) == 0.0 < max(spec.BORE_DIA_BAND) < row
-    assert (spec.BORE_DIA_MIN, spec.BORE_DIA_MAX) == pytest.approx((4.727, 4.735))
+    assert 0.0 < min(spec.BORE_DIA_BAND) < max(spec.BORE_DIA_BAND) < row
+    assert (spec.BORE_DIA_MIN, spec.BORE_DIA_MAX) == pytest.approx((4.7117, 4.7244))
 
 
 def test_the_bore_holds_a_light_press_on_the_shoulder_at_every_limit() -> None:
@@ -78,44 +79,43 @@ def test_the_bore_holds_a_light_press_on_the_shoulder_at_every_limit() -> None:
     loosest = shoulder_min - spec.BORE_DIA_MAX
     tightest = shoulder_max - spec.BORE_DIA_MIN
     assert spec.PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
-    assert (loosest, tightest) == pytest.approx((0.0021, 0.0355), abs=1e-6)
+    assert (loosest, tightest) == pytest.approx((0.0127, 0.0508), abs=1e-6)
     assert 0.0 < loosest < tightest
 
 
 def test_wall_holds_the_target_at_the_full_worst_case() -> None:
-    """Rule 17 with every allowance the shop sees: the O.D. at its .X row's
+    """Rule 17 with every allowance the shop sees: the O.D. at its .XX row's
     low limit, the bore at its largest ream offset from the O.D. by half the
     printed O.D. runout to A, and the title block's larger permitted break
     (radius or chamfer) on both rims of an end face.  One chucking, so no
     run-off."""
-    row = printed_band_mm(1)
-    brk = _config.title_block("edge_break")
-    setback = max(float(brk["radius_mm"]), float(brk["chamfer_max_mm"]))
+    row = printed_band_mm(2, unit=spec.UNIT)
+    setback = max(edge_break_radius_mm(unit=spec.UNIT), edge_break_chamfer_mm(unit=spec.UNIT))
     assert spec.OD_BAND == pytest.approx(row)
     assert spec.EDGE_BREAK == pytest.approx(setback)
     # Runout's full indicator movement is twice the axes' offset.
-    assert spec.OD_RUNOUT == pytest.approx(0.4)
+    assert spec.OD_RUNOUT == pytest.approx(0.016 * 25.4)
     assert spec.BORE_ECCENTRICITY == pytest.approx(spec.OD_RUNOUT / 2.0)
     worst = (
         (spec.OD - row - spec.BORE_DIA_MAX) / 2.0
         - spec.OD_RUNOUT / 2.0
         - 2.0 * setback
     )
-    assert spec.WALL_WORST == pytest.approx(worst) == pytest.approx(2.0325)
-    assert spec.WALL_WORST >= spec.WALL_TARGET == 2.0
+    assert spec.WALL_WORST == pytest.approx(worst) == pytest.approx(2.3876)
+    assert spec.WALL_WORST >= spec.WALL_TARGET == WALL_TARGET_MM
 
 
 def test_a_larger_permitted_radius_break_charges_the_wall(monkeypatch) -> None:
-    """The wall charges whichever permitted break sets back further: an R0.4
-    break with the 0.25 chamfer kept leaves 2.0325 - 2 x 0.15 < 2.0, so the
-    spec refuses rather than missing the radius."""
+    """The wall charges whichever permitted break sets back further: an R.020
+    break with the .010 chamfer kept leaves 2.3876 - 2 x 0.254 < 2.032, so
+    the spec refuses rather than missing the radius."""
     import importlib.util
 
     real = _config.title_block
 
     def title_block(key, *, unit="mm"):
         row = real(key, unit=unit)
-        return {**row, "radius_mm": 0.4} if key == "edge_break" else row
+        return {**row, "radius_in": 0.020} if key == "edge_break" and unit == "in" else row
 
     monkeypatch.setattr(_config, "title_block", title_block)
     # Execute a private copy: reloading the shared module would rebind its
@@ -124,9 +124,9 @@ def test_a_larger_permitted_radius_break_charges_the_wall(monkeypatch) -> None:
         "_pivot_spacer_spec_probe", spec.__file__
     )
     probe = importlib.util.module_from_spec(probe_spec)
-    with pytest.raises(AssertionError, match=r"MHA-PD-20 wall 1\.732 < the 2\.0"):
+    with pytest.raises(AssertionError, match=r"MHA-PD-20 wall 1\.880 < the 2\.032"):
         probe_spec.loader.exec_module(probe)
-    assert spec.EDGE_BREAK == pytest.approx(0.25)
+    assert spec.EDGE_BREAK == pytest.approx(0.254)
 
 
 def test_the_sheet_states_no_shortfall_and_no_facing_step() -> None:
@@ -181,13 +181,13 @@ def test_both_end_faces_hold_square_to_the_bore_datum() -> None:
     bar seats the front face and the arm the rear, so the arm tilts by both
     faces' perpendicularity to A over the smallest face it seats on."""
     assert spec.BORE_DATUM == "A"
-    assert spec.GEOMETRIC_TOLERANCES_MM == {
-        "rear face perpendicularity to bore": "0.01",
-        "front face perpendicularity to bore": "0.01",
-        "o.d. circular runout to bore": "0.4",
+    assert spec.GEOMETRIC_TOLERANCES_IN == {
+        "rear face perpendicularity to bore": ".0004",
+        "front face perpendicularity to bore": ".0004",
+        "o.d. circular runout to bore": ".016",
     }
-    assert spec.REAR_FACE_PERPENDICULARITY == pytest.approx(0.01)
-    assert spec.FRONT_FACE_PERPENDICULARITY == pytest.approx(0.01)
+    assert spec.REAR_FACE_PERPENDICULARITY == pytest.approx(0.0004 * 25.4)
+    assert spec.FRONT_FACE_PERPENDICULARITY == pytest.approx(0.0004 * 25.4)
     # The arm seats on the face's flat inside the O.D. rim's break.
     assert spec.FACE_PERPENDICULARITY_ZONE_DIA == pytest.approx(
         spec.OD - spec.OD_BAND - 2.0 * spec.EDGE_BREAK
@@ -551,11 +551,11 @@ def test_the_bore_callout_names_ream_for_the_shoulder_press() -> None:
     assert "THREAD" not in bore
     # The printed window encloses the spec's press at both limits; a sign
     # before either limit is never read as its magnitude.
-    (window,) = re.findall(r"(?<![-+\d.])(\d+\.\d+)-(\d+\.\d+)", bore)
-    low, high = (float(v) for v in window)
+    (window,) = re.findall(r"(?<![-+\d.])(\d*\.\d+)-(\d*\.\d+)", bore)
+    low, high = (float(v) * 25.4 for v in window)
     assert 0.0 < low <= spec.PRESS_INTERFERENCE[0] < spec.PRESS_INTERFERENCE[1] <= high
-    assert high - spec.PRESS_INTERFERENCE[1] < 0.001
-    assert spec.PRESS_INTERFERENCE[0] - low < 0.001
+    assert high - spec.PRESS_INTERFERENCE[1] < 0.00254
+    assert spec.PRESS_INTERFERENCE[0] - low < 0.00254
 
 
 def test_the_length_band_names_the_spring_room_it_sets() -> None:

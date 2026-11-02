@@ -117,29 +117,17 @@ def test_disc_cluster_rows_follow_the_pin_hub_and_disc() -> None:
 
 
 def test_ring_row_is_the_free_state_grip_on_its_prong_arcs() -> None:
-    """MHA-PD-VN-61 is the replica-gated vendor body at its free diameter, so its
-    prongs grip inside the MHA-PD-23 groove floor; the overlap is the prong
-    arcs' share of the groove-to-free annulus over the ring's thickness."""
-    from diagnostics import diag_build_97431A260 as recipe
-
+    """MHA-PD-VN-61 is modelled at its free diameter, so its prongs grip
+    inside the MHA-PD-23 groove floor; the overlap is the prong arcs' share
+    of the groove-to-free annulus over the ring's thickness."""
     assert pin.GROOVE_DIA == ring.GROOVE_DIA
     assert ring.FREE_DIA < pin.GROOVE_DIA
-    # The ring sits wholly in the groove, off the Ø3.9 land.
+    # The ring sits wholly in the groove, off the shank.
     assert ring.THICKNESS + ring.THICKNESS_TOL <= pin.GROOVE_WIDTH
-    sweeps = []
-    for segment in recipe.outline():
-        if isinstance(segment, recipe.Line):
-            continue
-        if math.hypot(*segment.start) != pytest.approx(ring.FREE_DIA / 2.0):
-            continue
-        start = math.atan2(segment.start[1], segment.start[0])
-        end = math.atan2(segment.end[1], segment.end[0])
-        sweeps.append((end - start) % (2.0 * math.pi))
-    assert len(sweeps) == 3
-    share = sum(sweeps) / (2.0 * math.pi)
     pair = _pair("pd-vn-transgear-retaining-ring-1", "pd-transgear-pin-1")
     assert _allowed()[pair] == pytest.approx(
-        share * _annulus(pin.GROOVE_DIA, ring.FREE_DIA, ring.THICKNESS)
+        _interference_contracts._RING_PRONG_SHARE
+        * _annulus(pin.GROOVE_DIA, ring.FREE_DIA, ring.THICKNESS)
     )
 
 

@@ -22,10 +22,16 @@ from __future__ import annotations
 
 import math
 
+import _config
 import pd_transgear_arm_geometry as ARM
 import pd_transgear_arm_plate_geometry as PLATE
+from _package_units import drawing_unit
 
 IN = 25.4
+# #290: the purchased reference sheet prints decimal inch.
+UNIT = drawing_unit(
+    "parts/pd-vn-transgear-arm-plate-screw", _config.parts("pd-vn-transgear-arm-plate-screw")
+)
 
 SKU = "91790A199"  # verified1in OVAL; cut to the unchanged installed fit
 THREAD = "#8-32"
@@ -90,16 +96,24 @@ CUT_LENGTH = PLATE.THICKNESS_OVER_ARM + ARM.THICKNESS
 # joint stack read LENGTH as its length.
 LENGTH = CUT_LENGTH
 # The cut end's 45 deg deburr, its radial leg; a single MAX limit, as MHA-DT-VN-61's
-# CUT_END_BREAK_MAX_MM.  The model carries the maximum.  The part sheet's
-# installation note (the registry's ``installation_notes``) prints it.
-CUT_END_BREAK_MAX = 0.1
-# What the A06 cut step prints for it.
-CUT_END_BREAK_TEXT = f"{CUT_END_BREAK_MAX:g} MAX"
+# CUT_END_BREAK_MAX_MM.  The model carries the maximum.  Tighter than the
+# title block's .010 edge break on purpose: at .010 the break would take the
+# arm tap's last thread and the joint's worst engagement falls to 1.47D, under
+# the 1.5D ``transgear_hanger_joints`` requires.  The MHA-PD-00 cut step,
+# which does the cut, prints this limit and the tip's proud limit; the part
+# sheet's note only says what the cut is for.
+CUT_END_BREAK_MAX = 0.1016  # .004
+# The cut tip may stand this far proud of the arm's front face (the joint
+# stack's ``transgear_hanger_joints.PLATE_SCREW_CUT_PROUD_MAX``).
+CUT_PROUD_MAX = 0.2032  # .008
 
+# The views show the screw as cut, shorter than the ITEM row's 1 in stock
+# (machinist review round 3); its length is the MHA-PD-00 cut step's.  Three
+# lines: no more fit beside the purchased sheet's general line (rule 7).
 PURCHASED_STOCK_NOTE = "\n".join((
-    f"1 IN ({STOCK_LENGTH:.2f}) STOCK. CUT LENGTH AT ASSEMBLY (MHA-PD-00, BEFORE THE",
-    "GUIDE-LOCK SWEEP): TIP FLUSH OR PROUD 0.2 MAX OF THE MHA-PD-18 ARM",
-    f"FRONT FACE; CUT-END BREAK {CUT_END_BREAK_TEXT}.",
+    "CUT TO LENGTH AND BREAK THE CUT END AT ASSEMBLY (MHA-PD-00 CUT STEP,",
+    "BEFORE THE GUIDE-LOCK SWEEP), SO THE TIP CLEARS THE SWEEP AND THE",
+    "THREAD STAYS FULLY ENGAGED IN THE MHA-PD-18 ARM. VIEWS SHOW IT AS CUT.",
 ))
 
 

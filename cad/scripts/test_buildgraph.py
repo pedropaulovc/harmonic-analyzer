@@ -133,9 +133,9 @@ _INSERTED_SOURCES = {
     "pd_transgear_disc_hub pd_vn_transgear_disc_screw pd_transgear_drive_collar pd_transgear_feed_pinion "
     "pd_transgear_knob_cup pd_vn_transgear_knob_cup_pin pd_vn_transgear_knob_drive_pin "
     "pd_transgear_knob_shaft pd_transgear_knob_thrust_ring pd_vn_transgear_latch_pin pd_vn_transgear_pivot_screw "
-    "pd_transgear_pin pd_transgear_pivot_spacer pd_vn_transgear_pivot_spring pd_vn_transgear_pivot_shim pd_transgear_rear_bushing "
+    "pd_transgear_pin pd_transgear_pivot_spacer pd_vn_transgear_pivot_spring pd_transgear_rear_bushing "
     "pd_transgear_front_bushing "
-    "pd_transgear_removable pd_vn_transgear_retaining_ring "
+    "pd_transgear_removable pd_vn_transgear_retaining_ring pd_vn_transgear_cluster_shim "
     "pd_transgear_thumbnut",
     "ms_measuring_stick": "ms_stick ms_stop_block ms_stop_plate ms_vn_stop_plate_screw sh_vn_thumb_screw",
     "ch_rocker_arm_tl_oblique_jig": "ch_rocker_arm_tl_oblique_base_bar ch_rocker_arm_tl_oblique_carrier "
@@ -316,6 +316,7 @@ def test_plain_pivot_components_are_first_class_jig_only_targets() -> None:
         ("ch_rocker_arm_tl_vn_oblique_pivot_clevis_pin", "MHA-CH-06-TL-VN-74"),
         ("ch_rocker_arm_tl_vn_oblique_pivot_cotter", "MHA-CH-06-TL-VN-75"),
         ("ch_rocker_arm_tl_vn_oblique_pivot_lock_wire", "MHA-CH-06-TL-VN-76"),
+        ("pd_vn_transgear_pivot_shim", "MHA-PD-VN-67"),
     ],
 )
 def test_retired_orphan_families_are_not_allocated(stem, number) -> None:

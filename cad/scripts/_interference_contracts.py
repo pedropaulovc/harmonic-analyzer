@@ -465,9 +465,10 @@ _CUP_PIN_CUP_MM3 = (
     - _CUP_PIN_JOURNAL_MM3
 )
 
-# MHA-PD-VN-61, McMaster 97431A260: the vendor replica's three prong arcs on its
-# free diameter, atan(3/4) of the turn each (diag_build_97431A260's outline:
-# the window prongs from 90 to 126.87 deg, the far one +/-atan(1/3)).
+# MHA-PD-VN-61, McMaster 97431A240: three prong arcs on its free diameter,
+# atan(3/4) of the turn each (diag_build_97431A240's outline, the 97431A260
+# replica's law: the window prongs from 90 to 126.87 deg, the far one
+# +/-atan(1/3)).
 _RING_PRONG_SHARE = 3.0 * math.atan(0.75) / (2.0 * math.pi)
 
 
@@ -557,28 +558,28 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         _smooth_annulus_limit_mm3(4.1656, 3.454, 12.9375 - 5.0),
     ),
     # MHA-PD-VN-57 (pd_vn_transgear_pivot_screw_spec, 90325A174 faced to fit) in the
-    # support bar's THROUGH #8-32 tap: its fitted 9.15 thread less the 1.1938
+    # support bar's THROUGH #8-32 tap: its fitted 9.1444 thread less the 1.1938
     # neck flat under the shoulder, whose Ø3.02 stays inside the #29 drill --
     # the full thread plus the 45° ramp back to the major (the MHA-DT-32 row's
-    # relief-and-lead-cone reading), 7.9562 of overlap; the faced tip stands
+    # relief-and-lead-cone reading), 7.9506 of overlap; the faced tip stands
     # inside the front face. The contract's engagement (transgear_hanger_joints)
     # counts full thread only, less one pitch at the faced tip.
     frozenset(
         ("pd-vn-transgear-pivot-screw-1", "pd-support-bar-1")
-    ): _smooth_annulus_limit_mm3(4.1656, 3.454, 9.15 - 1.1938),
+    ): _smooth_annulus_limit_mm3(4.1656, 3.454, 9.1444 - 1.1938),
     # MHA-SH-VN-52 #4-40 x 3/8 (pd_latch_hook_bracket_screw_spec) through the
-    # MHA-PD-14 hook's 0.8 base (Ø3.2 clearance): 9.525 - 0.8 = 8.725 in the
-    # support bar's #43 taps.
+    # MHA-PD-14 hook's .032 base (Ø.128 clearance): 9.525 - 0.8128 = 8.7122 in
+    # the support bar's #43 taps.
     **_numbered_pairs(
         "sh-vn-fillister-screw-90280a108",
         range(1, 3),
         "pd-support-bar",
-        _smooth_annulus_limit_mm3(2.8448, 2.261, 9.525 - 0.8),
+        _smooth_annulus_limit_mm3(2.8448, 2.261, 9.525 - 0.8128),
     ),
-    # MHA-PD-23 (pd_transgear_pin_spec, Ø3.900) pressed through the arm's Ø3.874
+    # MHA-PD-23 (pd_transgear_pin_spec, Ø.125) pressed through the arm's .124
     # ream (pd_transgear_arm_geometry) over the whole 7.9375 stock: the press.
     frozenset(("pd-transgear-pin-1", "pd-transgear-arm-1")): _smooth_annulus_limit_mm3(
-        3.9, 3.874, 7.9375
+        3.175, 3.1496, 7.9375
     ),
     # The two MHA-PD-VN-64 dowels (pd_vn_transgear_arm_plate_locating_pin_spec,
     # Ø2.0 model) pressed into the arm's Ø1.995 through reams
@@ -591,28 +592,28 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         "pd-transgear-arm",
         _smooth_annulus_limit_mm3(2.0, 1.995, 6.0 - 1.70),
     ),
-    # MHA-PD-20 (pd_transgear_pivot_spacer_spec, Ø4.727 ream) pressed on the
+    # MHA-PD-20 (pd_transgear_pivot_spacer_spec, Ø.1850 ream) pressed on the
     # MHA-PD-VN-57 Ø4.7625 shoulder over its whole 5.0 length (R9-71): the press.
     frozenset(("pd-transgear-pivot-spacer-1", "pd-vn-transgear-pivot-screw-1")): (
-        _smooth_annulus_limit_mm3(4.7625, 4.727, 5.0)
+        _smooth_annulus_limit_mm3(4.7625, 4.699, 5.0)
     ),
-    # MHA-PD-VN-61 (pd_vn_transgear_retaining_ring_spec) in the MHA-PD-23 groove: the
-    # vendor replica is the ring as McMaster ships it, its prongs on the
-    # Ø2.8956 free diameter, 0.0254 inside the Ø2.9464 groove floor: the grip,
-    # over the prong arcs (above) and the 0.635 thickness.  The prong-corner
-    # fillets only shorten the arcs: run 20261002T153039266Z read 0.03591
-    # over the three prongs (assembly:paper_drive), 0.72 of this bound.
+    # MHA-PD-VN-61 (pd_vn_transgear_retaining_ring_spec, McMaster 97431A240)
+    # in the MHA-PD-23 groove: the ring as McMaster ships it, its prongs on
+    # the Ø2.3876 free diameter, 0.0127 inside the Ø2.413 groove floor: the
+    # grip, over the prong arcs (above) and the 0.381 thickness.  The
+    # prong-corner fillets only shorten the arcs (the 97431A260 replica's run
+    # 20261002T153039266Z read 0.72 of its bound).
     frozenset(("pd-vn-transgear-retaining-ring-1", "pd-transgear-pin-1")): _RING_PRONG_SHARE
-    * _smooth_annulus_limit_mm3(2.9464, 2.8956, 0.635),
+    * _smooth_annulus_limit_mm3(2.413, 2.3876, 0.381),
     # MHA-PD-VN-55 #0-80 x 1/4 (pd_vn_transgear_disc_screw_spec) through the hub
-    # flange's Ø1.7 clearance into the disc's 3/64 taps (pd_rack_pinion_spec),
-    # cut at assembly (R9-47) to 5.3 under the head: 5.3 - 2.4 = 2.9 of the
-    # 3.0 face.
+    # flange's #51 (.067) clearance into the disc's 3/64 taps (pd_rack_pinion_spec),
+    # cut at assembly (R9-47) to 5.2832 under the head: 5.2832 - 2.3876 = 2.8956
+    # (.114) of the .118 face.
     **_numbered_pairs(
         "pd-vn-transgear-disc-screw",
         range(1, 4),
         "pd-rack-pinion",
-        _smooth_annulus_limit_mm3(1.524, 1.191, 5.3 - 2.4),
+        _smooth_annulus_limit_mm3(1.524, 1.191, 5.2832 - 2.3876),
     ),
     # MHA-PD-VN-62 through the knob shaft's journal and the cup (above).
     frozenset(("pd-vn-transgear-knob-cup-pin-1", "pd-transgear-knob-shaft-1")): 1.10

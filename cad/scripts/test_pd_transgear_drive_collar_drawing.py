@@ -450,7 +450,7 @@ def test_the_pilot_length_callout_points_at_its_facing_step() -> None:
 
 def test_the_thumbnut_bears_on_the_pilot_and_the_knob_wheel_floats() -> None:
     # The nut's rear countersink leaves a real annulus on the pilot.
-    assert spec.NUT_PILOT_BEARING_WORST == pytest.approx((9.49 - 4.6) / 2.0)
+    assert spec.NUT_PILOT_BEARING_WORST == pytest.approx((9.49 - 4.572) / 2.0)
     assert spec.NUT_PILOT_BEARING_WORST > 0.0
     assert min(spec.KNOB_FLOAT_RANGE) > 0.0
     # Negative control: a pilot faced flush with the wheel leaves no float.
@@ -805,7 +805,7 @@ def test_actual_native_collar_rear_face_is_measured_on_f(monkeypatch) -> None:
 
 @pytest.mark.parametrize(
     "kwargs, message",
-    [({"rear_gap": 0.01}, "not on gear F"),
+    [({"rear_gap": 0.01}, "gear F is not"),
      ({"clock_error": math.radians(3.0)}, "not clocked"),
      ({"length": spec.LENGTH_FITTED_MIN - 0.01}, "outside"),
      ({"length": spec.LENGTH - 0.01}, "source version"),

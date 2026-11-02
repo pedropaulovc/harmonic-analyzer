@@ -7,4 +7,11 @@ pd-transgear-removable:
   finish: "as supplied, unplated; supplier states no coating"
   quantity: 1
   tolerance_class: machined_block
-  process: "modify McMaster 6793K4 (T12) / 6793K11 (T18) / 6793K17 (T24) steel plain-bore ANSI #25 sprockets, teeth, OD and plate faces as supplied: turn the hub off flush with the supplied plate; bore Ø10.3 through; drill two Ø2.5 through drive-pin holes on Ø14 pitch circle"
+  drawing_unit: in
+  process: "modify McMaster 6793K4 (T12) / 6793K11 (T18) / 6793K17 (T24) steel plain-bore ANSI #25 sprockets, teeth, OD and plate faces as supplied: turn the hub off flush with the supplied plate; drill the bore 13/32 (.406) through; drill two #40 (.098) drive-pin holes through on a .551 pitch circle"
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "the BORE TO DRIVE-PIN HOLE WEB .018 MIN note"
+      finding: "bore-to-drive-pin web below the .060 floor (rule 17)"
+      reason: "Owner ruling 2026-11-01: accepted until D14/#1381. The Ø.406 bore and the #40 drive-pin holes on R.2756 come from the shared sprocket seat (_sprocket_seat_geometry); .024 nominal, .018 MIN with both holes drilled oversize and the pin at its full location band (#1377)"

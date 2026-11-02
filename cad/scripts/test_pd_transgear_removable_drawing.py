@@ -67,42 +67,46 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
             assert name in spec.DRAWING_DIMENSIONS[feature], (feature, name)
 
 
-def test_pin_locations_hold_the_shared_band_at_three_places() -> None:
-    """Each hole is located like the shafts' pins, so the slip clearance
-    absorbs both parts' spacing error; the size rows print routine .XX."""
-    assert spec.DRAWING_PRECISION_BY_NAME["PinPosY"] == 3
-    assert spec.DRAWING_PRECISION_BY_NAME["PinNegY"] == 3
-    assert spec.DRAWING_PRECISION_BY_NAME["BoreDiaDim"] == 2
-    assert spec.DRAWING_PRECISION_BY_NAME["PinPosDia"] == 2
+def test_pin_locations_print_inside_the_shared_band() -> None:
+    """Each hole is located inside the band the shafts' pins share, so the
+    slip clearance absorbs both parts' spacing error; the drilled sizes print
+    their 3-place drill."""
+    assert spec.DRAWING_PRECISION_BY_NAME["PinPosY"] == 4
+    assert spec.DRAWING_PRECISION_BY_NAME["PinNegY"] == 4
+    assert spec.DRAWING_PRECISION_BY_NAME["BoreDiaDim"] == 3
+    assert spec.DRAWING_PRECISION_BY_NAME["PinPosDia"] == 3
+    assert spec.PIN_LOCATION_TOL <= seat_geometry.DRIVE_PIN_OFFSET_TOL
+    assert spec.PIN_SLIP_CLEARANCE_MIN >= 2.0 * (
+        seat_geometry.DRIVE_PIN_OFFSET_TOL + spec.PIN_LOCATION_TOL
+    )
     import dt_crankshaft_spec
 
     assert dt_crankshaft_spec.DRIVE_PIN_SPACING_ERROR_MAX / 2.0 == seat_geometry.DRIVE_PIN_OFFSET_TOL
-    assert dt_crankshaft_spec.DRAWING_PRECISION["DrivePinProfile"] == {
-        "DrivePinOffset1": seat_geometry.DRIVE_PIN_OFFSET_PLACES,
-        "DrivePinOffset2": seat_geometry.DRIVE_PIN_OFFSET_PLACES,
-    }
 
 
-def test_incoming_plate_band_is_never_over_nominal() -> None:
+def test_printed_plate_band_stays_inside_the_stacked_plate_band() -> None:
     # Incoming plate inspection, not a facing-to-thickness operation.
     assert max(seat_geometry.PLATE_BAND) == 0.0 > min(seat_geometry.PLATE_BAND)
+    low, high = spec._PLATE_PRINTED
+    assert seat_geometry.PLATE + min(seat_geometry.PLATE_BAND) <= low < high
+    assert high <= seat_geometry.PLATE + max(seat_geometry.PLATE_BAND)
 
 
 def test_web_worst_case_is_the_printed_limits() -> None:
     """Both holes at the DRILLED HOLES maximum and the pin centre moved its
     full band toward the bore; floored so the sheet never states more web."""
-    drilled = _config.title_block("drilled_hole")
-    assert drilled["minus_mm"] == 0.0
-    oversize = drilled["plus_mm"]
+    from _printed_tolerance import drilled_oversize_mm, drilled_undersize_mm
+
+    assert drilled_undersize_mm(unit=spec.UNIT) == 0.0
+    oversize = drilled_oversize_mm(unit=spec.UNIT)
     web = (
         seat_geometry.PIN_CIRCLE_DIA / 2.0
-        - seat_geometry.DRIVE_PIN_OFFSET_TOL
-        - (seat_geometry.PIN_HOLE_DIA + oversize) / 2.0
-        - (seat_geometry.BORE_DIA + oversize) / 2.0
-    )
-    assert notes.BORE_PIN_WEB_WORST <= web < notes.BORE_PIN_WEB_WORST + 0.01
-    assert 0.0 < notes.BORE_PIN_WEB_WORST < seat_geometry.BORE_PIN_WEB < 1.5
-    assert notes.BORE_PIN_WEB_NOTE == "BORE TO DRIVE-PIN HOLE WEB 0.47 MIN."
+        - spec.PIN_LOCATION_TOL
+        - (spec.PIN_HOLE_DIA + oversize) / 2.0
+        - (spec.BORE_DIA + oversize) / 2.0
+    ) / 25.4
+    assert notes.BORE_PIN_WEB_WORST_IN <= web < notes.BORE_PIN_WEB_WORST_IN + 0.001
+    assert 0.0 < notes.BORE_PIN_WEB_WORST_IN * 25.4 < seat_geometry.BORE_PIN_WEB
     assert notes.BORE_PIN_WEB_NOTE in notes.DRAWING_NOTES.splitlines()
 
 
@@ -116,11 +120,8 @@ def test_sprocket_data_lists_every_configuration() -> None:
 
     assert values("CONFIGURATION") == [name for name, _teeth in spec.CONFIGS]
     assert values("NUMBER OF TEETH") == [str(teeth) for _name, teeth in spec.CONFIGS]
-    # T12 hand check: p / sin 15 deg = 6.35 / 0.258819 = 24.535.
-    assert values("PITCH DIAMETER (mm, REF)")[0] == "24.53"
-    # PD - Dr, Dr = 0.130 in: T12 24.535 - 3.302 = 21.233.
-    assert values("BOTTOM DIAMETER (mm, REF)") == ["21.23", "33.27", "45.35"]
-    assert rows["CHAIN"] == "ANSI #25 ROLLER, PITCH 6.35, ROLLER Ø3.30"
+    # T12 hand check: p / sin 15 deg = .250 / 0.258819 = .9659 in.
+    assert values("PITCH DIAMETER (REF)")[0] == ".966"
     assert "AS SUPPLIED" in rows["TOOTH FORM (REF)"]
 
 
@@ -129,14 +130,11 @@ def test_the_outside_diameter_is_a_model_dimension_not_sheet_text() -> None:
     turning tolerance or manufacturing operation on any configuration."""
     assert "BlankDia" in spec.DRAWING_DIMENSIONS["BlankProfile"]
     assert spec.DRAWING_REFERENCE_DIMENSIONS == {"BlankDia"}
-    assert spec.DRAWING_PRECISION_BY_NAME["BlankDia"] == 1
     assert "OUTSIDE DIAMETER" not in notes.GEAR_DATA
-    # p (0.6 + cot(180/N)): T12 6.35 (0.6 + 3.732) = 27.51.
-    assert [f"{spec.outside_dia(teeth):.1f}" for _name, teeth in spec.CONFIGS] == [
-        "27.5",
-        "39.8",
-        "52.0",
-    ]
+    # p (0.6 + cot(180/N)): T12 .250 (0.6 + 3.732) = 1.083 in.
+    assert [
+        f"{spec.outside_dia(teeth) / 25.4:.2f}" for _name, teeth in spec.CONFIGS
+    ] == ["1.08", "1.57", "2.05"]
 
 
 def test_every_configuration_prints_its_outside_diameter_once() -> None:
@@ -258,13 +256,14 @@ def _od_annotations(monkeypatch, places: int, values_m: dict[str, float]):
 
 
 _OD_M = {name: spec.outside_dia(teeth) / 1000.0 for name, teeth in spec.CONFIGS}
+_OD_PLACES = spec.DRAWING_PRECISION_BY_NAME["BlankDia"]
 
 
 @pytest.mark.parametrize("configuration", [name for name, _teeth in spec.CONFIGS])
 def test_each_view_reads_its_own_configurations_diameter(
     monkeypatch, configuration: str
 ) -> None:
-    annotations = _od_annotations(monkeypatch, 1, _OD_M)
+    annotations = _od_annotations(monkeypatch, _OD_PLACES, _OD_M)
     drawing._assert_outside_diameter(None, annotations, configuration)
 
 
@@ -272,19 +271,19 @@ def test_a_view_showing_another_configurations_diameter_is_refused(monkeypatch) 
     """One model dimension holds all three values: a T12 view reading T24's
     is the failure the per-view readback exists to catch."""
     values = dict(_OD_M, T12=_OD_M["T24"])
-    annotations = _od_annotations(monkeypatch, 1, values)
+    annotations = _od_annotations(monkeypatch, _OD_PLACES, values)
     with pytest.raises(RuntimeError, match=r"T12: sheet BlankDia reads 52\.04"):
         drawing._assert_outside_diameter(None, annotations, "T12")
 
 
 def test_a_diameter_that_lost_its_part_places_is_refused(monkeypatch) -> None:
-    annotations = _od_annotations(monkeypatch, 2, _OD_M)
-    with pytest.raises(RuntimeError, match=r"at 2 places, expected .* at 1"):
+    annotations = _od_annotations(monkeypatch, _OD_PLACES + 1, _OD_M)
+    with pytest.raises(RuntimeError, match=rf"at {_OD_PLACES + 1} places, expected .* at {_OD_PLACES}"):
         drawing._assert_outside_diameter(None, annotations, "T18")
 
 
 def test_a_view_without_exactly_one_diameter_is_refused(monkeypatch) -> None:
-    annotations = _od_annotations(monkeypatch, 1, _OD_M)
+    annotations = _od_annotations(monkeypatch, _OD_PLACES, _OD_M)
     with pytest.raises(RuntimeError, match="expected one BlankDia"):
         drawing._assert_outside_diameter(None, annotations[:1], "T24")
     with pytest.raises(RuntimeError, match="expected one BlankDia"):
@@ -295,14 +294,14 @@ def test_a_view_without_exactly_one_diameter_is_refused(monkeypatch) -> None:
 def test_a_supplied_od_that_lost_its_reference_mark_is_refused(
     monkeypatch, configuration: str
 ) -> None:
-    annotations = _od_annotations(monkeypatch, 1, _OD_M)
+    annotations = _od_annotations(monkeypatch, _OD_PLACES, _OD_M)
     annotations[1]._display._text[1] = "<MOD-DIAM>"
     with pytest.raises(RuntimeError, match="must be reference-only and unbanded"):
         drawing._assert_outside_diameter(None, annotations, configuration)
 
 
 def test_a_supplied_od_with_a_manufacturing_band_is_refused(monkeypatch) -> None:
-    annotations = _od_annotations(monkeypatch, 1, _OD_M)
+    annotations = _od_annotations(monkeypatch, _OD_PLACES, _OD_M)
     annotations[1]._display._dimension.Tolerance.Type = 2
     with pytest.raises(RuntimeError, match="must be reference-only and unbanded"):
         drawing._assert_outside_diameter(None, annotations, "T24")
@@ -1042,7 +1041,7 @@ def test_every_configuration_must_read_the_family_bands_back(monkeypatch) -> Non
     """The sheet prints the plate and pin-location bands once for all three
     sprockets, so the build reads them back in each configuration."""
     bands = part.family_bands()
-    assert bands[("BlankProfile", "BlankWidth")][1:] == (-0.10, 0.0)
+    assert bands[("BlankProfile", "BlankWidth")][1:] == (-0.0762, 0.0)  # +.000/-.003
     adapter = _Configurations({name: dict(bands) for name, _teeth in spec.CONFIGS})
     _readback(monkeypatch, adapter)
     assert adapter.visited == [name for name, _teeth in spec.CONFIGS] + [

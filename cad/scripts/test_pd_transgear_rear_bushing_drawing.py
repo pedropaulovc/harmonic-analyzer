@@ -11,11 +11,11 @@ import _config
 import build_pd_transgear_rear_bushing as part
 import draw_pd_transgear_rear_bushing as drawing
 import transgear_cluster_fit as fit
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND, STACK_NAME
 import pd_transgear_pin_spec as pin
 import pd_transgear_rear_bushing_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM
 
@@ -38,12 +38,11 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     assert set(drawing.PROFILE_KEEP) == {"RingLength"}
 
 
-def test_the_bore_and_the_printed_length_carry_model_bands() -> None:
+def test_the_bore_carries_its_model_band_and_the_length_the_title_block() -> None:
     """The bore runs on the pin, so its reamed band lives on the model
-    dimension; the length is a printed term of the disc cluster stack."""
+    dimension; the length only feeds the shimmed end float (#2124)."""
     assert model_toleranced_dimensions(part) == {
         ("RingProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)",
-        ("Ring", "RingLength"): "LENGTH_BAND",
     }
 
 
@@ -57,55 +56,44 @@ def test_the_bore_runs_on_the_pin_and_names_it() -> None:
     callout = drawing.DIMENSION_CALLOUTS["BoreDia"]
     assert callout.splitlines()[0] == "REAM THRU"
     assert pin.PIN_NUMBER in callout
-    assert f"{low:.3f}-{high:.3f}" in callout
+    assert f"{pin.inch_text(low, 4)}-{pin.inch_text(high, 4)}" in callout
 
 
 def test_wall_holds_the_target_at_the_printed_worst_case() -> None:
     worst = (
         spec.OD
-        - printed_band_mm(spec.OD_PLACES)
+        - printed_band_mm(spec.OD_PLACES, unit=spec.UNIT)
         - (spec.BORE_DIA + spec.BORE_DIA_BAND[0])
     ) / 2.0
-    assert worst >= 2.0
+    assert worst >= WALL_TARGET_MM
 
 
-def test_the_length_is_a_printed_term_of_the_disc_cluster_stack() -> None:
-    """#2038: printed 2 places, +/-0.02, named on the stack; nothing is faced
-    to fit, set at assembly or supplied as a blank."""
+def test_the_title_block_length_leaves_the_float_open_for_the_shims() -> None:
+    """#2124: at the title block's .XXX the shortest bushing leaves the
+    unshimmed float over the floor and the longest gap takes the most shims
+    the fit-up allows."""
     assert spec.LENGTH == fit.REAR_BUSHING_LENGTH
-    assert spec.LENGTH_BAND == fit.LENGTH_BAND == PRINTED_LENGTH_BAND
-    assert spec.LENGTH_PLACES == fit.LENGTH_PLACES == 2
-    assert spec.DRAWING_PRECISION_BY_NAME["RingLength"] == 2
-    assert "RingLength" not in spec.REFERENCE_DIMENSIONS
-    callout = drawing.DIMENSION_CALLOUTS["RingLength"]
-    assert callout == spec.LENGTH_CALLOUT
-    assert STACK_NAME in callout
-    sources = (
-        Path(drawing.__file__).read_text(encoding="utf-8"),
-        Path(part.__file__).read_text(encoding="utf-8"),
-    )
-    for text in (*drawing.DIMENSION_CALLOUTS.values(), *sources):
-        for banned in ("FACED TO FIT", "SET AT ASSEMBLY", "SUPPLY", "step_ref"):
-            assert banned not in text
-    assert not hasattr(drawing, "FIT_STEP_KEY")
-    assert not hasattr(spec, "DRAWING_NOTES")
+    assert fit.REAR_BUSHING_LENGTH_BAND == printed_band_mm(3, unit=spec.UNIT)
+    assert spec.DRAWING_PRECISION_BY_NAME["RingLength"] == fit.LENGTH_PLACES == 3
+    assert fit.UNSHIMMED_FLOAT_RANGE[0] >= fit.END_FLOAT_MIN
+    assert fit.SHIM_COUNT_RANGE[1] <= fit.SHIM_COUNT_MAX
+    assert drawing.DIMENSION_CALLOUTS["RingLength"] == spec.LENGTH_CALLOUT
 
 
-def test_both_end_faces_run_machined() -> None:
-    faces = {
-        control.key: (control.roughness_um, control.face)
-        for control in spec.SURFACE_FINISHES
-    }
-    assert set(faces) == {"arm_face", "sleeve_face"}
-    assert {ra for ra, _ in faces.values()} == {MACHINED_UM}
-    assert (tuple(faces["arm_face"][1].normal), faces["arm_face"][1].offset_mm) == (
-        (0.0, 0.0, -1.0),
-        0.0,
+def test_only_the_sleeve_thrust_face_carries_a_finish() -> None:
+    """The MHA-PD-10 sleeve turns on the front face; the arm face seats on
+    the shims at the title block's finish."""
+    (control,) = spec.SURFACE_FINISHES
+    assert control.key == "sleeve_face"
+    assert control.roughness_um == MACHINED_UM
+    assert (tuple(control.face.normal), control.face.offset_mm) == (
+        (0.0, 0.0, 1.0),
+        spec.LENGTH,
     )
-    assert (
-        tuple(faces["sleeve_face"][1].normal),
-        faces["sleeve_face"][1].offset_mm,
-    ) == ((0.0, 0.0, 1.0), spec.LENGTH)
+    assert set(drawing.FACE_FINISHES) == {"sleeve_face"}
+    assert _config.parts("pd-transgear-feed-pinion")["number"] in (
+        spec.THRUST_FACE_CAPTION
+    )
 
 
 def test_face_symbols_attach_to_their_own_end_of_the_lathe_profile() -> None:

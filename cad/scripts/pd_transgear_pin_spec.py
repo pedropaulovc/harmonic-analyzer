@@ -5,7 +5,11 @@ MHA-PD-18 arm's reamed hole at S from the rear until its domed head seats on
 the arm's rear face; forward of the arm it carries, rear to front, the
 MHA-PD-24 rear bushing, the MHA-PD-10 sleeve (with the disc, hub and screws on
 it), the MHA-PD-25 front bushing and, in the groove near its front end, the
-MHA-PD-VN-61 retaining ring (McMaster 97431A260).  Nothing on it is threaded.
+MHA-PD-VN-61 retaining ring (McMaster 97431A240).  Nothing on it is threaded.
+
+#290: the sheet prints decimal inch (the row's ``drawing_unit: in``); every
+length below is the exact millimetre value of its printed inch nominal.  The
+owner ruling of 2026-10-30 took the shank from 3.9 mm to 1/8 in.
 
 Frame: one revolve about local +Z.  Local z = 0 is the head's underside
 (the face that seats on the arm's rear face, machine z -116.4625) and local
@@ -20,12 +24,24 @@ from __future__ import annotations
 
 import math
 
+import _config
 import pd_transgear_arm_geometry as ARM
 import pd_vn_transgear_retaining_ring_spec as RING
 from _gtol_cylinder import CylinderFace
-from _printed_tolerance import printed_band_mm
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND
+from _inch_wall_limits import WALL_TARGET_MM
+from _package_units import drawing_unit
+from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm
+from pd_cluster_stack_band import FIT_LENGTH_BAND_IN
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+
+UNIT = drawing_unit("parts/pd-transgear-pin", _config.parts("pd-transgear-pin"))
+
+
+def inch_text(value_mm: float, places: int) -> str:
+    """``value_mm`` as decimal-inch print text: ``.0003``, ``1.860``."""
+    text = f"{value_mm / 25.4:.{places}f}"
+    return text[1:] if text.startswith("0.") else text
+
 
 PIN_NUMBER = "MHA-PD-23"
 ARM_NUMBER = "MHA-PD-18"
@@ -38,46 +54,66 @@ RUNNING_MATES = ("MHA-PD-10", "MHA-PD-24", FRONT_BUSHING_NUMBER)
 HEAD_SEAT_MACHINE_Z = round(ARM.FRONT_FACE_MACHINE_Z + ARM.THICKNESS, 6)  # -116.4625
 
 # --- Shank: the running journal and the press in the arm -----------------------
-# The sleeve and both bushings run on it (their bores Ø3.900 +0.030/+0.012,
-# 0.012..0.038 diametral); the arm's REAM Ø3.874 +0.008/0 holds it by a
-# 0.010..0.026 press (``pd_transgear_arm_geometry``), named at the shank Ø.
-DIA = 3.900
-DIA_BAND = (0.0, -0.008)  # (upper, lower) deviations, turned
+# The sleeve and both bushings run on it (their bores .125 REAM_SLIDE, cut by
+# the owned .1260 reamer, .0009..0017 diametral); the arm's .124 REAM_H7 (the
+# owned .1240 reamer) holds it by a .0003..0011 press
+# (``pd_transgear_arm_geometry``), named at the shank Ø.  One turned diameter
+# both presses and runs, so its band is the reamers' gap less both fits: .0003.
+DIA = 3.175  # .125
+DIA_BAND = (0.00254, -0.00508)  # (upper, lower) deviations, +.0001/-.0002 in
 DIA_MIN = round(DIA + DIA_BAND[1], 6)
 DIA_MAX = round(DIA + DIA_BAND[0], 6)
-DIA_PLACES = 3
+DIA_PLACES = 4
 # (loosest, tightest): smallest shank in the largest ream, and the reverse.
 PRESS_INTERFERENCE = (
     round(DIA_MIN - ARM.PIN_BORE_DIA_MAX, 6),
     round(DIA_MAX - ARM.PIN_BORE_DIA_MIN, 6),
-)  # 0.010, 0.026
+)  # 0.00762, 0.02794
 
-# --- Head: Ø5.0, a 2.10 land then a spherical dome, 2.9 proud of the arm ------
+# --- Head: Ø.20, a .09 land then a spherical dome R.18 ------------------------
 # The head stops the press and, pulled forward by the ring's thrust on the
 # load wall, holds the pin in the arm; nothing bears on its dome.  The land
-# is a wall held to the policy's 1.5 hard floor at its printed lower limit:
-# it prints .XX, so 2.10 leaves 1.59 (1.20 left 0.69, review of e0ac6477e; a
-# 0.5 land at .X went to -0.3, review of 6de7230aa).  The dome stays 0.8
-# high on top, so the apex stands 2.9 proud, less than the MHA-PD-VN-57 head.
-WALL_FLOOR = 1.5
-HEAD_DIA = 5.0
-HEAD_LAND = 2.10
+# is a wall held to the .080 target at its printed lower limit: .09 at .XX
+# leaves exactly .080.  The R.18 dome rises .030 on top, so the apex stands
+# .120 proud of the arm's rear face, under the MHA-PD-VN-57 head's 5/32.
+HEAD_DIA = 5.08  # .20
+HEAD_LAND = 2.286  # .09
 HEAD_LAND_PLACES = 2
-HEAD_LAND_MIN = round(HEAD_LAND - printed_band_mm(HEAD_LAND_PLACES), 6)  # 1.59
-HEAD_LAND_FLOOR = WALL_FLOOR
-HEAD_DOME_SAG = 0.8
-HEAD_HEIGHT = HEAD_LAND + HEAD_DOME_SAG  # 2.9 proud of the arm's rear face
-HEAD_DOME_R = ((HEAD_DIA / 2.0) ** 2 + HEAD_DOME_SAG**2) / (2.0 * HEAD_DOME_SAG)
+HEAD_LAND_MIN = round(HEAD_LAND - printed_band_mm(HEAD_LAND_PLACES, unit=UNIT), 6)
+HEAD_LAND_FLOOR = WALL_TARGET_MM
+HEAD_DOME_R = 4.572  # .18
+HEAD_DOME_SAG = HEAD_DOME_R - math.sqrt(HEAD_DOME_R**2 - (HEAD_DIA / 2.0) ** 2)
+HEAD_HEIGHT = HEAD_LAND + HEAD_DOME_SAG  # proud of the arm's rear face
+# The inside corner where the shank meets the head's seat: the tool-nose
+# radius the print allows, a single R MAX limit (machinist review round 4: the
+# title block's .040 inside corner is wider than the .0375 step and could eat
+# the whole seat).  At .005 it sinks less than .003 into the 45-deg corner, so
+# the ream mouth's deburr clears it and the head seats flat on the arm.
+SEAT_FILLET_R = 0.127  # .005 MAX
+SEAT_FILLET_PLACES = 3
+SEAT_FILLET_SUFFIX = " MAX"
+# The arm's rear face under the head: outside the ream's broken mouth, inside
+# the head's broken rim.
+SEAT_CONTACT_WIDTH_MIN = round(
+    (HEAD_DIA - printed_band_mm(2, unit=UNIT)) / 2.0
+    - edge_break_chamfer_mm(unit=UNIT)
+    - max(
+        ARM.PIN_BORE_DIA_MAX / 2.0 + edge_break_chamfer_mm(unit=UNIT),
+        DIA_MAX / 2.0 + SEAT_FILLET_R,
+    ),
+    6,
+)
 
 # --- Ring groove -------------------------------------------------------------
 # The groove's FRONT wall is the load wall: the cluster pushed forward bears
 # the front bushing on the ring and the ring on this wall.  Its station from
 # the head's underside is the pin's one functional length: a term of the
-# disc cluster's printed stack (transgear_cluster_fit), so it prints .XXX at
-# the cluster's band (#2038 owner ruling 2026-10-28, option A).
-GROOVE_STATION = 47.25  # head underside to the groove's front (load) wall
+# disc cluster's stack (transgear_cluster_fit).  The shims set the end float
+# (owner ruling 2026-11-01, #2124); the station still sets the collar-to-disc
+# air, so it prints +/-.001.
+GROOVE_STATION = 47.244  # 1.860, head underside to the groove's load wall
 GROOVE_STATION_PLACES = 3
-GROOVE_STATION_BAND = PRINTED_LENGTH_BAND
+GROOVE_STATION_BAND = FIT_LENGTH_BAND_IN
 GROOVE_DIA = RING.GROOVE_DIA
 GROOVE_DIA_BAND = RING.GROOVE_DIA_BAND
 GROOVE_WIDTH = RING.GROOVE_WIDTH
@@ -89,19 +125,18 @@ GROOVE_REAR_STATION = round(GROOVE_STATION - GROOVE_WIDTH, 6)
 # (rule 11): the dome's near-tangent junction with the shank cannot be picked
 # up, so the land from the load wall to that junction prints only as a
 # reference (ENFORCE run 20261024T034648173Z).  The land carries the ring's
-# thrust, so it is a wall held to the larger of the policy's 1.5 hard floor
-# and three groove depths (ASSUMPTION from the ring maker's edge-margin
-# guidance: 0.4768 x 3 = 1.4304) at the worst case: the tip at its printed
-# lower limit, the load wall at its upper, and the deepest dome the R2.0's
-# .X band allows on the shank, a hemisphere.  51.35 leaves 1.51 (the 50.85
-# of the 2.10 land left 1.01).
-TIP_STATION = 51.35  # head seat to the tip's apex
+# thrust, so it is a wall held to the larger of the .080 target and three
+# groove depths (ASSUMPTION from the ring maker's edge-margin guidance:
+# 3 x .015 = .045) at the worst case: the tip at its printed lower limit, the
+# load wall at its upper, and the deepest dome on the shank, a hemisphere.
+# 2.02 leaves .0867 (2.01 would leave .0767).
+TIP_STATION = 51.308  # 2.02, head seat to the tip's apex
 TIP_STATION_PLACES = 2
-TIP_STATION_BAND = printed_band_mm(TIP_STATION_PLACES)
-TIP_DOME_SAG = 1.5
-TIP_DOME_R = ((DIA / 2.0) ** 2 + TIP_DOME_SAG**2) / (2.0 * TIP_DOME_SAG)
+TIP_STATION_BAND = printed_band_mm(TIP_STATION_PLACES, unit=UNIT)
+TIP_DOME_R = 1.778  # .07
+TIP_DOME_SAG = TIP_DOME_R - math.sqrt(TIP_DOME_R**2 - (DIA / 2.0) ** 2)
 TIP_DOME_SAG_MAX = DIA_MAX / 2.0  # a hemisphere on the largest shank
-FRONT_LAND = round(TIP_STATION - GROOVE_STATION - TIP_DOME_SAG, 6)  # 2.60
+FRONT_LAND = round(TIP_STATION - GROOVE_STATION - TIP_DOME_SAG, 6)  # .12 REF
 FRONT_LAND_PLACES = 2
 FRONT_LAND_MIN = round(
     TIP_STATION
@@ -109,22 +144,23 @@ FRONT_LAND_MIN = round(
     - (GROOVE_STATION + GROOVE_STATION_BAND)
     - TIP_DOME_SAG_MAX,
     6,
-)  # 1.51
+)  # .0867
 LENGTH = TIP_STATION
-OVERALL_LENGTH = round(LENGTH + HEAD_HEIGHT, 6)  # 54.25, apex to tip
-TIP_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z - LENGTH, 6)  # -167.8125
-HEAD_APEX_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z + HEAD_HEIGHT, 6)  # -113.5625
+OVERALL_LENGTH = round(LENGTH + HEAD_HEIGHT, 6)  # apex to tip
+TIP_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z - LENGTH, 6)  # -167.7705
+HEAD_APEX_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z + HEAD_HEIGHT, 6)
 GROOVE_LOAD_WALL_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z - GROOVE_STATION, 6)
 
 GROOVE_DEPTH = (DIA - GROOVE_DIA) / 2.0
 EDGE_MARGIN_MIN = 3.0 * GROOVE_DEPTH
-FRONT_LAND_FLOOR = max(WALL_FLOOR, EDGE_MARGIN_MIN)  # 1.5
+FRONT_LAND_FLOOR = max(WALL_TARGET_MM, EDGE_MARGIN_MIN)  # .080
 
 SURFACE_FINISHES = (
     SurfaceFinishControl(
         "journal",
         MACHINED_UM,
         CylinderFace(DIA, contains_z_mm=GROOVE_REAR_STATION / 2.0),
+        display_unit=UNIT,
     ),
 )
 
@@ -145,23 +181,25 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
     "HeadDomeProfile": {"HeadDomeR", "HeadDomeSagDim"},
     "TipDomeProfile": {"TipDomeR", "TipDomeSagDim", "TipDomeZ"},
+    "SeatFillet": {"SeatRadius"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinProfile": {
         "ShankDia": DIA_PLACES,
-        "HeadDia": 1,
+        "HeadDia": 2,
         "HeadLand": HEAD_LAND_PLACES,
         "GrooveStation": GROOVE_STATION_PLACES,
         "GrooveDia": 3,
         "GrooveWidth": 3,
         "FrontLand": FRONT_LAND_PLACES,
     },
-    "HeadDomeProfile": {"HeadDomeR": 1, "HeadDomeSagDim": 1},
+    "HeadDomeProfile": {"HeadDomeR": 2, "HeadDomeSagDim": 2},
     "TipDomeProfile": {
-        "TipDomeR": 1,
-        "TipDomeSagDim": 1,
+        "TipDomeR": 2,
+        "TipDomeSagDim": 2,
         "TipDomeZ": TIP_STATION_PLACES,
     },
+    "SeatFillet": {"SeatRadius": SEAT_FILLET_PLACES},
 }
 # The overall, apex to tip, a drawing reference for the bar cut (rule 10);
 # the dome heights print as references through ``pd_transgear_pin_callouts``.
@@ -179,21 +217,22 @@ for _ok, _what in (
     (TIP_DOME_SAG < TIP_DOME_R, "the tip is not a spherical cap"),
     (
         FRONT_LAND_MIN >= FRONT_LAND_FLOOR,
-        f"the land in front of the groove leaves {FRONT_LAND_MIN:.3f} with the "
-        f"tip apex {TIP_STATION} at {TIP_STATION_PLACES} places at its lower "
-        "limit, the load wall at its upper and a hemispherical dome, under "
-        f"{FRONT_LAND_FLOOR:.4f}, the wall floor or three groove depths",
+        f"the land in front of the groove leaves {inch_text(FRONT_LAND_MIN, 4)} "
+        f"with the tip apex {inch_text(TIP_STATION, TIP_STATION_PLACES)} at its "
+        "lower limit, the load wall at its upper and a hemispherical dome, under "
+        f"{inch_text(FRONT_LAND_FLOOR, 4)}, the wall target or three groove depths",
     ),
     (GROOVE_DIA < DIA_MIN, "the groove does not cut below the shank"),
     (
-        math.isclose(HEAD_APEX_MACHINE_Z, -113.5625, abs_tol=1e-6),
-        "the head apex is not 2.9 proud of the arm's rear face",
+        SEAT_CONTACT_WIDTH_MIN > 0.0,
+        f"the head has no seat on the {ARM_NUMBER} rear face past its broken "
+        f"edges and the R{inch_text(SEAT_FILLET_R, SEAT_FILLET_PLACES)} root",
     ),
     (
-        HEAD_LAND_MIN >= HEAD_LAND_FLOOR,
-        f"the head land {HEAD_LAND} at {HEAD_LAND_PLACES} places has a printed "
-        f"lower limit {HEAD_LAND_MIN:.2f}, under the {HEAD_LAND_FLOOR:.1f} "
-        "wall floor",
+        HEAD_LAND_MIN >= HEAD_LAND_FLOOR - 1e-9,
+        f"the head land {inch_text(HEAD_LAND, HEAD_LAND_PLACES)} has a printed "
+        f"lower limit {inch_text(HEAD_LAND_MIN, 4)}, under the "
+        f"{inch_text(HEAD_LAND_FLOOR, 3)} wall target",
     ),
     (
         PRESS_INTERFERENCE[0] > 0.0,

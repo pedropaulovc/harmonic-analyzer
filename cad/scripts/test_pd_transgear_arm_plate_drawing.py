@@ -17,6 +17,8 @@ import pd_rack_pinion_spec as disc
 import pd_transgear_arm_plate_geometry as geometry
 import pd_vn_transgear_arm_plate_screw_spec as screw
 import pd_transgear_arm_plate_spec as spec
+import pd_cluster_air as cluster_air
+import transgear_cluster_fit as cluster_fit
 import transgear_hanger_joints as joints
 import pd_transgear_knob_shaft_spec as knob_shaft
 from _buildgraph import module_deps_of
@@ -150,10 +152,10 @@ def test_every_printed_band_is_no_wider_than_the_arithmetic_assumed() -> None:
 
 def test_the_worst_case_walls_hold_at_the_printed_bands() -> None:
     """Recompute the thinnest walls from the printed title-block rows, with
-    each exposed edge's 0.25 break and the drill run-off (full worst case)."""
+    each exposed edge's 0.254 (R.010) break and the drill run-off (full worst case)."""
     drill = _config.title_block("drilled_hole")["plus_mm"]
     brk = geometry.OUTLINE_EDGE_BREAK_MAX_MM
-    assert brk == 0.25 and arm.DRILL_RUN_OFF_DEG == 0.3
+    assert brk == pytest.approx(0.254) and arm.DRILL_RUN_OFF_DEG == 0.3
     bore_r_max = (geometry.BORE_DIA + geometry.BORE_DIA_LIMITS[1]) / 2.0
     hub_wall = (
         geometry.HUB_DIA - _band(spec.DRAWING_PRECISION_BY_NAME["HubDia"])
@@ -369,15 +371,17 @@ def test_the_notch_depth_prints_the_loosest_row_the_lock_sweep_clears(
     assert _loosest_row(spec.DRAWING_PRECISION_BY_NAME["NotchDepth"], holds)
 
 
-def test_the_hub_station_prints_the_loosest_row_the_disc_platen_air_holds() -> None:
-    """The disc-to-platen air was judged at HUB_STATION_PLACES' row."""
-    printed = spec.DRAWING_PRECISION_BY_NAME["HubFaceToMounting"]
-    judged = _band(geometry.HUB_STATION_PLACES)
-
-    def holds(places: int) -> bool:
-        return assembly.DISC_PLATEN_AIR_WORST - (_band(places) - judged) >= 0.0
-
-    assert _loosest_row(printed, holds)
+def test_the_hub_station_band_holds_the_governing_air_it_closes() -> None:
+    """The hub station prints an explicit band, not a title-block row, so no
+    row judges it.  It is a term of the collar-to-disc air, not of the
+    disc-to-platen air, and that air holds by the governing method at the
+    printed band."""
+    label, _, band = cluster_fit.PH
+    assert band == geometry.HUB_FACE_TO_MOUNTING_BAND
+    assert cluster_air.COLLAR_AIR.terms[label] == band
+    assert label not in assembly.PLATEN_AIR.terms
+    method = assembly.CLUSTER_AIRS["method"]
+    assert cluster_air.COLLAR_AIR.air_mm(method) >= cluster_air.COLLAR_AIR_MIN
 
 
 def test_clamp_availability_is_paid_after_dowel_location() -> None:

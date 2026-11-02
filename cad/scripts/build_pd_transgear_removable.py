@@ -30,13 +30,13 @@ construction; only the through bore and drive-pin holes are shop operations.
 Config-independent mounting interface, cut after the tooth pattern: bore
 ``BORE_DIA`` and two ``PIN_HOLE_DIA`` drive-pin holes on ``PIN_CIRCLE_RADIUS``
 at ``PIN_HOLE_ANGLES_DEG`` (local +/-Y). The bore/pin-hole web
-(``spec.BORE_PIN_WEB``, 0.60 nominal) sits below the 1.5 wall floor as a
+(``seat_geometry.BORE_PIN_WEB``) sits below the rule-17 wall floor as a
 pending exception ruling (#1377); the sheet states its printed worst case
 (``pd_transgear_removable_notes.BORE_PIN_WEB_NOTE``).
 
-Drawing marks (``draw_pd_transgear_removable``): ``spec.DRAWING_DIMENSIONS`` at
-``spec.DRAWING_PRECISION``, the plate thickness banded ``seat_geometry.PLATE_BAND``
-and each pin centre +/-``seat_geometry.DRIVE_PIN_OFFSET_TOL``; the outside diameter
+Drawing marks (``draw_pd_transgear_removable``, decimal inch): ``spec.DRAWING_DIMENSIONS`` at
+``spec.DRAWING_PRECISION``, the plate thickness banded ``spec.PLATE_PRINTED_BAND``
+and each pin centre +/-``spec.PIN_LOCATION_TOL``; the outside diameter
 ``BlankDia`` is driven per configuration, so each configuration's view prints
 its own.  The sheet's SPROCKET DATA and notes are file properties.  The
 dimensions' callout rows (``pd_transgear_removable_callouts``) are authored
@@ -73,6 +73,7 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties
 from _paths import IN, OUT_PNG
@@ -92,11 +93,12 @@ from _drawing_precision import (
 )
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
+from _drawing_tolerances import _set_tolerance_precision, set_dimension_symmetric_tolerance
 from _fit_deviations import deviations
 from _simplified_part import save_simplified_part
 from _grouped_bom_properties import apply_grouped_bom_properties
 from _visibility import blank_reference_geometry
+from _part_properties import part_drawing_unit
 from pd_transgear_removable_notes import DRAWING_NOTES, GEAR_DATA
 
 # ``set_global`` is imported from _dimensions under a distinct name: the gap-math
@@ -129,7 +131,7 @@ if any(abs(x) > 1e-9 for x, _y in PIN_HOLE_CENTRES):
     raise AssertionError("drive-pin holes must sit on local +/-Y")
 
 
-_TOL_BILAT = 2  # swTolType_e.swTolBILAT
+_TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
 _TOL_SYMMETRIC = 4  # swTolType_e.swTolSYMMETRIC
 
 
@@ -156,12 +158,35 @@ def family_bands() -> dict[tuple[str, str], tuple[int, float, float]]:
     """``(feature, dimension) -> (tolerance type, lower, upper)`` in mm: the
     bands the sheet prints once for T12, T18 and T24 (they share the plate
     and the pin holes), as the build sets them below."""
-    pin = (_TOL_SYMMETRIC, -seat_geometry.DRIVE_PIN_OFFSET_TOL, seat_geometry.DRIVE_PIN_OFFSET_TOL)
+    pin = (_TOL_SYMMETRIC, -spec.PIN_LOCATION_TOL, spec.PIN_LOCATION_TOL)
     return {
-        ("BlankProfile", "BlankWidth"): (_TOL_BILAT, *deviations(seat_geometry.PLATE_BAND)),
+        ("BlankProfile", "BlankWidth"): (_TOL_LIMIT, *deviations(spec.PLATE_PRINTED_BAND)),
         ("BorePinsProfile", "PinPosY"): pin,
         ("BorePinsProfile", "PinNegY"): pin,
     }
+
+
+def _plate_limits(adapter) -> None:
+    """The supplied plate's thickness as native LIMITs (.110/.107): a zero
+    upper deviation printed bilateral read ".000" with no sign (machinist
+    review round 2); the limits say the same with nothing to misread."""
+    label = "BlankWidth@BlankProfile"
+    display, dimension = _named_dimension(adapter, "BlankProfile", "BlankWidth")
+    lower, upper = deviations(spec.PLATE_PRINTED_BAND)
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = _TOL_LIMIT
+    if tolerance.SetValues(lower / 1000.0, upper / 1000.0) is not True:
+        raise RuntimeError(f"{label}: LIMIT deviations were rejected")
+    if (
+        int(tolerance.Type) != _TOL_LIMIT
+        or abs(float(tolerance.GetMinValue()) - lower / 1000.0) > 1e-12
+        or abs(float(tolerance.GetMaxValue()) - upper / 1000.0) > 1e-12
+    ):
+        raise RuntimeError(f"{label}: LIMIT tolerance readback changed")
+    _set_tolerance_precision(
+        display, (lower, upper), display_unit=spec.UNIT, label=label,
+        places=spec.PLATE_PLACES,
+    )
 
 
 async def assert_bands_in_every_configuration(adapter) -> None:
@@ -689,6 +714,8 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # ------------------------------------------------------------------
     # Equation-manager globals (trig dialect probe first -- see build_dt_cone_gear).
@@ -705,8 +732,8 @@ async def build(adapter) -> dict[str, str]:
     # 25.4x. The blank's outside diameter is NOT a knob here: it is
     # config-driven by the "Ra" equation link below.
     await set_global_mm(adapter, "Plate", f"{seat_geometry.PLATE}mm")
-    await set_global_mm(adapter, "BoreDia", f"{seat_geometry.BORE_DIA}mm")
-    await set_global_mm(adapter, "PinHoleDia", f"{seat_geometry.PIN_HOLE_DIA}mm")
+    await set_global_mm(adapter, "BoreDia", f"{spec.BORE_DIA}mm")
+    await set_global_mm(adapter, "PinHoleDia", f"{spec.PIN_HOLE_DIA}mm")
     await set_global_mm(adapter, "PinCircleRadius", f"{seat_geometry.PIN_CIRCLE_RADIUS}mm")
 
     # Drive equations are recorded per sketch as the dims are created and applied
@@ -931,7 +958,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         0.0,
         0.0,
-        seat_geometry.BORE_DIA / 2.0,
+        spec.BORE_DIA / 2.0,
         "bore",
         dims=bore_pins,
         names=("BoreCx", "BoreCy", "BoreDiaDim"),
@@ -943,7 +970,7 @@ async def build(adapter) -> dict[str, str]:
             adapter,
             x,
             y,
-            seat_geometry.PIN_HOLE_DIA / 2.0,
+            spec.PIN_HOLE_DIA / 2.0,
             f"pin hole {label}",
             dims=bore_pins,
             names=(f"{label}X", f"{label}Y", f"{label}Dia"),
@@ -1118,18 +1145,15 @@ async def build(adapter) -> dict[str, str]:
     )
     await report_mass_properties(adapter)
     # Manufacturing drawing support: supplied plate thickness stays within
-    # its nominal band and each machined pin centre holds its location band.
+    # its printed band and each machined pin centre holds its location band.
     # Bore and pin-hole sizes are drilled (the title block's DRILLED HOLES
     # row governs them). The places are the part's (drawing-simplicity-policy.md `How the repository implements the guidelines`).
-    set_dimension_bilateral_tolerance(
-        adapter, "BlankProfile", "BlankWidth", *deviations(seat_geometry.PLATE_BAND)
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "BorePinsProfile", "PinPosY", seat_geometry.DRIVE_PIN_OFFSET_TOL
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "BorePinsProfile", "PinNegY", seat_geometry.DRIVE_PIN_OFFSET_TOL
-    )
+    _plate_limits(adapter)
+    for name in ("PinPosY", "PinNegY"):
+        set_dimension_symmetric_tolerance(
+            adapter, "BorePinsProfile", name, spec.PIN_LOCATION_TOL,
+            display_unit=spec.UNIT,
+        )
     await assert_bands_in_every_configuration(adapter)
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)

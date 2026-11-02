@@ -50,23 +50,31 @@ from _mcmaster_90325a174 import (
     THREAD_LEN_LIMITS as THREAD_LEN_LIMITS,
     THREAD_MAJOR as THREAD_MAJOR,
 )
+import _config
+from _package_units import drawing_unit
 from _printed_tolerance import angular_band_deg
+
+UNIT = drawing_unit(
+    "parts/pd-vn-transgear-pivot-screw", _config.parts("pd-vn-transgear-pivot-screw")
+)
 
 # The faced tip's recess below the bar's front face, as fitted (user ruling
 # 2026-10-15): never proud of the platen's slide face, close enough for the
-# stake at the tap's mouth to close the thread over the tip.
-TIP_RECESS = (0.20, 0.50)
+# stake at the tap's mouth to close the thread over the tip.  .008-.020 (#290).
+TIP_RECESS = (0.2032, 0.508)
 # The printed REFERENCE thread length: the nominal 9.5 bar less the recess
-# window's middle (transgear_hanger_joints asserts the link).
-FITTED_THREAD_LEN = 9.15
+# window's middle (transgear_hanger_joints asserts the link), (.360).
+FITTED_THREAD_LEN = 9.1444
 SHOULDER_END_Y = -SHOULDER_LEN
 TIP_Y = SHOULDER_END_Y - FITTED_THREAD_LEN
 INCOMPLETE_TIP_LEN_MAX = PITCH
 # The drawing-guidelines.md rule 18 (thread engagement) floor.
 ENGAGEMENT_MIN_D = 1.5
 # Continuous tail from the faced tip that must be gauged full form beyond the
-# incomplete pitch: the 1.5D engagement plus that pitch, rounded up.
-THREAD_LENGTH_MIN = math.ceil((ENGAGEMENT_MIN_D * THREAD_MAJOR + PITCH) * 20.0) / 20.0
+# incomplete pitch: the 1.5D engagement plus that pitch, rounded up to .001 in.
+THREAD_LENGTH_MIN = (
+    math.ceil((ENGAGEMENT_MIN_D * THREAD_MAJOR + PITCH) / 25.4 * 1000.0) / 1000.0 * 25.4
+)
 FULL_FORM_TAIL_MIN = THREAD_LENGTH_MIN - INCOMPLETE_TIP_LEN_MAX
 # #8-32 UNC-2A external minor diameter, from the UNC class 2A/2B tables in
 # Kennametal's "Thread data - American UN" (read 2026-10-15,
@@ -87,11 +95,11 @@ THREAD_MINOR_2A_MIN_EST = (THREAD_PD_2A_MIN_IN - 0.649519 / 32.0) * 25.4
 # (swTolMAX prints the nominal and "max."), so the model stands at the printed
 # maximum. Its callout asks for the chamfer past the thread root, which leaves
 # no feather edge; the thread tail's 1-pitch note bounds the rest.
-CHAMFER_WIDTH = 0.60
+CHAMFER_WIDTH = 0.6096  # .024
 CHAMFER_WIDTH_MAX = CHAMFER_WIDTH
 CHAMFER_ANGLE = 45.0  # Native driving angle between tip face and chamfer.
 # Printed natively without a band: the title block's angular row governs it.
-CHAMFER_ANGLE_TOLERANCE = angular_band_deg()
+CHAMFER_ANGLE_TOLERANCE = angular_band_deg(unit=UNIT)
 # Worst axial tip loss: the widest radial leg at the steepest title-block
 # angle. It must stay inside the one incomplete pitch the engagement charges.
 CHAMFER_AXIAL_MAX = CHAMFER_WIDTH_MAX * math.tan(
@@ -127,16 +135,16 @@ DRAWING_DIMENSIONS = {
     "ThreadTailAcceptance": {"ThreadLengthMin"},
 }
 DRAWING_PRECISION = {
-    "StockTrimProfile": {"CutLength": 2},
-    "StockDeburrProfile": {"ChamferWidth": 1, "ChamferAngle": 0},
-    "ThreadTailAcceptance": {"ThreadLengthMin": 2},
+    "StockTrimProfile": {"CutLength": 3},
+    "StockDeburrProfile": {"ChamferWidth": 3, "ChamferAngle": 0},
+    "ThreadTailAcceptance": {"ThreadLengthMin": 3},
 }
 DIMENSION_PRECISION = {
     name: digits
     for dimensions in DRAWING_PRECISION.values()
     for name, digits in dimensions.items()
 }
-# CutLength is a REFERENCE (swTolNONE, "(9.15)"): the fit-up sets the length.
+# CutLength is a REFERENCE (swTolNONE, "(.360)"): the fit-up sets the length.
 REFERENCE_DIMENSIONS = (("StockTrimProfile", "CutLength"),)
 DIMENSION_TOLERANCE_TYPES = {
     "CutLength": 0,
@@ -148,8 +156,8 @@ PRINTED_THREAD = f"{THREAD} UNC"  # Class 2A comes from the title block.
 DIMENSION_CALLOUTS = {
     "CutLength": (
         "SHOULDER END TO FACED TIP\n"
-        f"TIP {TIP_RECESS[0]:.2f}-{TIP_RECESS[1]:.2f} BELOW MHA-PD-07\n"
-        "FRONT FACE AS FITTED"
+        f"TIP {TIP_RECESS[0] / 25.4:.3f}-{TIP_RECESS[1] / 25.4:.3f}".replace("0.", ".")
+        + " BELOW MHA-PD-07\nFRONT FACE AS FITTED"
     ),
     # The native ChamferAngle prints its own 45 degrees.
     "ChamferWidth": "CUT-END CHAMFER\nPAST THE THREAD ROOT",
@@ -230,7 +238,11 @@ SUPPLIER_REFERENCE_STARTS = {
         -THREAD_MAJOR / 2,
         SHOULDER_END_Y - (FULL_THREAD_START + FITTED_THREAD_LEN) / 2,
     ),
-    "SupplierShoulderDiameter": (-SHOULDER_DIA / 2, -SHOULDER_LEN / 2),
+    # On the head's bearing face (y 0), whose outline edge spans the shoulder:
+    # the drawing draws this line and the length's (on the shoulder's flank)
+    # in the outline's black, so neither prints as a stray centreline
+    # (machinist review r2, minor, all runs).
+    "SupplierShoulderDiameter": (-SHOULDER_DIA / 2, 0.0),
     "SupplierShoulderLength": (SHOULDER_DIA / 2, SHOULDER_END_Y),
 }
 SUPPLIER_DRAWING_DIMENSIONS = {

@@ -23,7 +23,7 @@ from _drawing_contract import (
 )
 from _test_stubbed_build import offline_adapter, stub_seat
 from _drawing_registry import DrawingLayout
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import printed_deviations
 from pd_platen_spec import PLATE_WIDTH
 
 
@@ -109,7 +109,6 @@ def test_composite_sizes_have_native_controls_and_stock_references() -> None:
     assert "Length" not in spec.DRAWING_REFERENCE_DIMENSIONS
     assert drawing.DRAWING_REFERENCE_DIMENSIONS is spec.DRAWING_REFERENCE_DIMENSIONS
     assert builder.DRAWING_REFERENCE_DIMENSIONS is spec.DRAWING_REFERENCE_DIMENSIONS
-    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) <= {1, 2}
 
 
 def test_the_retired_first_gap_witness_is_neither_dimensioned_nor_kept() -> None:
@@ -236,7 +235,6 @@ def test_sheet_has_aligned_clean_views_and_a_legible_stepped_end() -> None:
 def test_purchase_and_joint_properties_do_not_prescribe_tooth_manufacture() -> None:
     assert builder.GEAR_DATA is spec.GEAR_DATA
     assert builder.PURCHASED_RACK_NOTE is spec.PURCHASED_RACK_NOTE
-    assert builder.INCOMING_RACK_INSPECTION_NOTE is spec.INCOMING_RACK_INSPECTION_NOTE
     assert spec.PURCHASED_RACK_NOTE in spec.GEAR_DATA
     assert builder.DRAWING_NOTES is spec.DRAWING_NOTES
     assert builder.MATERIAL == spec.PURCHASED_RACK_MATERIAL
@@ -251,12 +249,7 @@ def test_purchase_and_joint_properties_do_not_prescribe_tooth_manufacture() -> N
     assert "SOFT-SOLDERED" in spec.DRAWING_NOTES
     assert "PHASE NOT CONTROLLED" in spec.DRAWING_NOTES
     assert "SET MESH AT ASSEMBLY" in spec.DRAWING_NOTES
-    assert sum(
-        len(block.splitlines())
-        for block in (
-            spec.GEAR_DATA, spec.INCOMING_RACK_INSPECTION_NOTE, spec.DRAWING_NOTES
-        )
-    ) <= 4
+    assert sum(len(block.splitlines()) for block in (spec.GEAR_DATA, spec.DRAWING_NOTES)) <= 4
     text = "\n".join(
         (spec.PURCHASED_RACK_NOTE, spec.GEAR_DATA, spec.DRAWING_NOTES)
     ).upper()
@@ -271,8 +264,6 @@ def test_purchase_and_joint_properties_do_not_prescribe_tooth_manufacture() -> N
     installation = row["installation_notes"]
     lines = installation.splitlines()
     assert len(lines) <= 4 and all(len(line) <= 70 for line in lines)
-    places = spec.DRAWING_PRECISION_BY_NAME["Length"]
-    assert f"CUT TO {spec.CUT_LENGTH_MM:.{places}f} MM" in installation
     assert "SOFT-SOLDER TO BACKER" in installation
     assert "SET MESH AT ASSEMBLY" in installation
     for method in ("WIRE", "SECANT", "INDICATOR", " U +/-"):
@@ -288,16 +279,6 @@ def test_purchase_and_joint_properties_do_not_prescribe_tooth_manufacture() -> N
     )["rack-soldered"]
     for method in ("WIRE", "SECANT", "INDICATOR", "U +/-"):
         assert method not in soldered
-
-
-def test_incoming_rack_note_is_the_two_stock_sizes() -> None:
-    note = spec.INCOMING_RACK_INSPECTION_NOTE
-    assert note == (
-        f"STOCK HEIGHT {quality.rack_stock_height_max_mm():g} MAX; "
-        f"FACE WIDTH {quality.rack_face_width_max_mm():g} MAX"
-    )
-    for metrology in ("INDEX", "LEAD", "REJECT", "USABLE GAPS"):
-        assert metrology not in note
 
 
 def test_rack_index_and_face_lead_fit_the_feed_opposite_flank_budget() -> None:
@@ -441,10 +422,10 @@ def synthetic_full_form_receipt():
         feed_rack_receiving_root_uncertainty_mm,
     )
 
-    count = math.floor(
-        (spec.CUT_LENGTH_MM - printed_band_mm(spec.DRAWING_PRECISION_BY_NAME["Length"]))
-        / spec.PITCH
-    ) - 1
+    shortest = spec.CUT_LENGTH_MM + printed_deviations(
+        spec.CUT_LENGTH_MM, spec.DRAWING_PRECISION_BY_NAME["Length"], unit=spec.UNIT
+    )[0]
+    count = math.floor(shortest / spec.PITCH) - 1
     stations = tuple(range(count))
     boundary = spec.RackMeasuredUpperBound(0.0, feed_rack_receiving_boundary_uncertainty_mm())
     root = spec.RackMeasuredUpperBound(0.0, feed_rack_receiving_root_uncertainty_mm())

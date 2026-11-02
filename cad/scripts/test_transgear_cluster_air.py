@@ -1,5 +1,5 @@
-"""The disc cluster's printed stack (#2038): lengths, end float, recess and
-the two air stacks, re-derived from their source specs."""
+"""The disc cluster's stack and shim fit-up (#2124): lengths, end float,
+recess and the two air stacks, re-derived from their source specs."""
 
 from __future__ import annotations
 
@@ -13,42 +13,75 @@ import pd_rack_pinion_spec as DISC
 import pd_transgear_disc_hub_spec as HUB
 import pd_transgear_front_bushing_spec as FRONT_BUSHING
 import pd_transgear_rear_bushing_spec as REAR_BUSHING
+import pd_vn_transgear_cluster_shim_spec as SHIM
 import transgear_cluster_fit as FIT
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND
+from _printed_tolerance import printed_band_mm
+from pd_cluster_stack_band import FIT_LENGTH_BAND_IN, PRINTED_LENGTH_BAND
 
-TIGHTENED = (FIT.PH, FIT.TR, FIT.FW, FIT.GS, FIT.OL, FIT.TL, FIT.SP)
-PRINTED_LENGTHS = (FIT.LHUB, FIT.LFB, FIT.LRB)
+KNOB_TRAIN = (FIT.PH, FIT.TR, FIT.FW)
+FIT_LENGTHS = (FIT.GS, FIT.OL, FIT.TL, FIT.SP, FIT.LHUB, FIT.LFB)
 
 
 def _worst(chain, sign):
     return sum(s * nominal - sign * band for (_, nominal, band), s in chain)
 
 
-def test_ruled_lengths_print_at_the_cluster_band():
+def test_stack_lengths_print_their_bands():
+    """The knob train keeps the 0.02 cluster band; the lengths that set the
+    collar air or the recess print +/-.001; the rear bushing, which only
+    feeds the shimmed end float, prints at the title block."""
     assert PRINTED_LENGTH_BAND == pytest.approx(0.02)
-    assert (FIT.HUB_LENGTH, FIT.FRONT_BUSHING_LENGTH, FIT.REAR_BUSHING_LENGTH) == (
-        pytest.approx(13.69),
-        pytest.approx(5.32),
-        pytest.approx(5.69),
-    )
-    for label, _, band in (*TIGHTENED, *PRINTED_LENGTHS):
+    assert FIT_LENGTH_BAND_IN == pytest.approx(0.0254)  # .001 in
+    for label, _, band in KNOB_TRAIN:
         assert band == pytest.approx(PRINTED_LENGTH_BAND), label
+    for label, _, band in FIT_LENGTHS:
+        assert band == pytest.approx(FIT_LENGTH_BAND_IN), label
+    assert FIT.LRB[2] == printed_band_mm(3, unit=REAR_BUSHING.UNIT)
+    assert (FIT.HUB_LENGTH, FIT.FRONT_BUSHING_LENGTH, FIT.REAR_BUSHING_LENGTH) == (
+        pytest.approx(13.6906),  # .539
+        pytest.approx(5.6388),  # .222
+        pytest.approx(5.4356),  # .214
+    )
     assert HUB.HUB_LENGTH == FIT.HUB_LENGTH
     assert FRONT_BUSHING.LENGTH == FIT.FRONT_BUSHING_LENGTH
     assert REAR_BUSHING.LENGTH == FIT.REAR_BUSHING_LENGTH
     for spec in (FRONT_BUSHING, REAR_BUSHING):
-        assert spec.LENGTH_PLACES == 2
+        assert spec.LENGTH_PLACES == 3
         assert not spec.REFERENCE_DIMENSIONS
-    assert HUB.HUB_LENGTH_PLACES == 2
+    assert HUB.HUB_LENGTH_PLACES == 3
     assert not HUB.REFERENCE_DIMENSIONS
 
 
-def test_end_float_holds_at_the_worst_case():
-    least = _worst(FIT.END_FLOAT_CHAIN, 1)
-    most = _worst(FIT.END_FLOAT_CHAIN, -1)
-    assert FIT.END_FLOAT_RANGE == pytest.approx((least, most))
+def test_unshimmed_ring_gap_never_closes_under_the_floor():
+    least = _worst(FIT.RING_FLOAT_CHAIN, 1)
+    most = _worst(FIT.RING_FLOAT_CHAIN, -1)
+    assert FIT.UNSHIMMED_FLOAT_RANGE == pytest.approx((least, most))
     assert least >= FIT.END_FLOAT_MIN
-    assert f"{least:.2f}-{most:.2f}" == FIT.END_FLOAT_TEXT
+
+
+def test_shims_close_every_cluster_into_the_window():
+    """Shims go on while the ring gap less the next one clears the floor:
+    every unshimmed gap from the shortest to the longest ends in the window,
+    with a count inside SHIM_COUNT_RANGE, whatever each shim's catalogue
+    thickness; the disc's end float is that gap plus the recess."""
+    low, high = FIT.RING_FLOAT_RANGE
+    assert low == FIT.END_FLOAT_MIN
+    assert high == pytest.approx(FIT.END_FLOAT_MIN + SHIM.THICKNESS_MAX)
+    for thickness in (SHIM.THICKNESS_MIN, SHIM.THICKNESS_MAX):
+        for unshimmed in FIT.UNSHIMMED_FLOAT_RANGE:
+            gap, count = unshimmed, 0
+            while gap - thickness >= FIT.END_FLOAT_MIN:
+                gap, count = gap - thickness, count + 1
+            assert low <= gap < high
+            assert FIT.SHIM_COUNT_RANGE[0] <= count <= FIT.SHIM_COUNT_RANGE[1]
+    model = FIT.UNSHIMMED_FLOAT_NOMINAL - FIT.SHIM_COUNT_MODEL * SHIM.THICKNESS
+    assert FIT.RING_FLOAT_MODEL == pytest.approx(model)
+    assert low <= model < high
+    assert model - SHIM.THICKNESS < FIT.END_FLOAT_MIN
+    assert FIT.END_FLOAT_RANGE == pytest.approx(
+        (low + FIT.RECESS_RANGE[0], high + FIT.RECESS_RANGE[1])
+    )
+    assert FIT.END_FLOAT_RANGE[0] >= FIT.END_FLOAT_MIN
 
 
 def test_hub_never_stands_proud_of_the_nose():
@@ -88,15 +121,23 @@ def test_collar_air_is_the_statistical_stack():
 def test_forward_stop_chain_pivots_on_the_pin_load_wall():
     # The loose front bushing and its retaining ring cock together about the
     # load wall's broken edge; the disc pivots on its least broken contact.
-    brk = 0.25
-    hub_face = min(HUB.HUB_DIA - 0.8, FRONT_BUSHING.OD - 0.8) / 2.0 - brk
+    brk = 0.254  # the inch title block's .010 break
+    hub_face = (
+        min(
+            HUB.HUB_DIA - printed_band_mm(HUB.HUB_DIA_PLACES, unit=HUB.UNIT),
+            FRONT_BUSHING.OD
+            - printed_band_mm(FRONT_BUSHING.OD_PLACES, unit=FRONT_BUSHING.UNIT),
+        )
+        / 2.0
+        - brk
+    )
     nose = (FIT.SLEEVE.BOSS_DIA + min(FIT.SLEEVE.BOSS_DIA_BAND)) / 2.0 - brk
     assert AIR.HUB_FACE_STOP_R == pytest.approx(hub_face)
     assert AIR.NOSE_STOP_R == pytest.approx(nose)
     assert AIR.DISC_STOP_R == pytest.approx(min(HUB.SEAT_CONTACT_R, hub_face, nose))
     cock = math.atan(
         FIT.BORE_DIAMETRAL_CLEARANCE[1]
-        / (FRONT_BUSHING.LENGTH - PRINTED_LENGTH_BAND - 2.0 * brk)
+        / (FRONT_BUSHING.LENGTH - FIT_LENGTH_BAND_IN - 2.0 * brk)
     )
     wall = FRONT_BUSHING.PIN.DIA_MIN / 2.0 - brk
     term = AIR.COLLAR_AIR.terms["front bushing and ring cocking on the pin"]
@@ -107,6 +148,14 @@ def test_forward_stop_chain_pivots_on_the_pin_load_wall():
 def test_platen_air_budgets_the_pin_zone_and_governs():
     platen = ASSEMBLY.PLATEN_AIR
     assert platen.terms["pin S projected axis zone"] > 0.0
+    # Cluster rearward, the step stands off the ring's load wall by the
+    # forward chain, the tooth length and the shimmed ring gap: the shims
+    # replace the rear bushing in the stack.
+    window = FIT.RING_FLOAT_RANGE[1] - FIT.RING_FLOAT_RANGE[0]
+    assert platen.terms[FIT.SHIM_WINDOW_LABEL] == pytest.approx(window)
+    for label, _, band in (FIT.GS, FIT.AT, FIT.RT, FIT.LFB, FIT.OL, FIT.TL, FIT.SP):
+        assert platen.terms[label] == pytest.approx(band), label
+    assert FIT.LRB[0] not in platen.terms
     assert platen.nominal_mm == pytest.approx(
         ASSEMBLY.PLATE_FRONT_Z - (FIT.DISC_FRONT_Z + DISC.FACE_WIDTH)
     )

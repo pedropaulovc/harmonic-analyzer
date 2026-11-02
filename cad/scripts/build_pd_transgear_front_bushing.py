@@ -2,13 +2,13 @@ r"""Reproduction script: transgear front bushing (MHA-PD-25; R9-68; 1 used).
 
 The turned brass ring on the MHA-PD-23 pin between the MHA-PD-10 sleeve's nose
 and the MHA-PD-VN-61 retaining ring (``pd_transgear_front_bushing_spec``).  Its
-length is printed (+/-LENGTH_BAND, a term of the disc cluster stack, #2038).
+length is printed (+/-LENGTH_BAND, a term of the disc cluster stack).
 
 Layout: Front-plane annulus at the origin (O.D., bore) extruded +Z by the
 length, so the nose face is the Front Plane (z = 0) and the ring face is the
 ``RingFace`` plane at z = LENGTH; the 45 deg chamfer breaks the ring face's
 O.D. edge.  ``Axis1`` is the bore axis (Top Plane ∩ Right Plane, the local Z
-axis).
+axis).  #290: the part saves in inch units (the row's ``drawing_unit``).
 
 Run (SolidWorks already open)::
 
@@ -26,8 +26,10 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -50,16 +52,16 @@ from _visibility import blank_reference_geometry
 from pd_transgear_front_bushing_spec import (
     BORE_DIA,
     BORE_DIA_BAND,
+    CHAMFER_SUFFIX,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FRONT_CHAMFER,
-    FRONT_CHAMFER_BAND,
-    FRONT_CHAMFER_TOL_TYPE,
     ISOMETRIC_VIEW_NOTE,
     LENGTH,
     LENGTH_BAND,
     OD,
     SURFACE_FINISHES,
+    UNIT,
 )
 
 PART_NAME = "pd-transgear-front-bushing"
@@ -80,36 +82,29 @@ V_TOTAL = V_RING - V_CHAMFER
 
 
 def _chamfer_max_limit(adapter) -> None:
-    """FrontChamferSize as a MAX single limit carrying the band's deviations."""
-    lower, upper = deviations(FRONT_CHAMFER_BAND)
-    _, dimension = _named_dimension(adapter, "FrontChamfer", "FrontChamferSize")
+    """FrontChamferSize as the single limit ".02 MAX": the modelled size IS
+    the max, and the part authors the MAX as the size's suffix (the drawing
+    reads it back; a sheet-side SetText writes through to the part, #1942)."""
+    display, dimension = _named_dimension(adapter, "FrontChamfer", "FrontChamferSize")
     label = "FrontChamferSize@FrontChamfer"
     value = float(dimension.SystemValue)
     if not math.isclose(value, FRONT_CHAMFER / 1000.0, abs_tol=1e-9):
         raise RuntimeError(
-            f"{label}: nominal {value * 1000.0:.7f} is not the band's max {FRONT_CHAMFER}"
+            f"{label}: nominal {value * 1000.0:.7f} is not the limit {FRONT_CHAMFER}"
         )
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = FRONT_CHAMFER_TOL_TYPE
-    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
-        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
-    if (
-        int(tolerance.Type) != FRONT_CHAMFER_TOL_TYPE
-        or not math.isclose(
-            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
-        )
-        or not math.isclose(
-            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
-        )
-    ):
-        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
-    _telemetry.success(f"{label}: single limit {FRONT_CHAMFER:g} MAX")
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetText(2, CHAMFER_SUFFIX)  # swDimensionTextSuffix
+    if str(display.GetText(2) or "") != CHAMFER_SUFFIX:
+        raise RuntimeError(f"{label}: the MAX suffix did not persist")
+    _telemetry.success(f"{label}: single limit {FRONT_CHAMFER:g}{CHAMFER_SUFFIX}")
 
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
@@ -210,9 +205,15 @@ async def build(adapter) -> dict[str, str]:
     # The length is printed to the disc cluster stack's band.  The chamfer
     # prints its MAX.
     set_dimension_bilateral_tolerance(
-        adapter, "RingProfile", "BoreDia", *deviations(BORE_DIA_BAND)
+        adapter,
+        "RingProfile",
+        "BoreDia",
+        *deviations(BORE_DIA_BAND),
+        display_unit=UNIT,
     )
-    set_dimension_symmetric_tolerance(adapter, "Ring", "RingLength", LENGTH_BAND)
+    set_dimension_symmetric_tolerance(
+        adapter, "Ring", "RingLength", LENGTH_BAND, display_unit=UNIT
+    )
     _chamfer_max_limit(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)

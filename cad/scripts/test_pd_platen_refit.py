@@ -9,6 +9,7 @@ import pytest
 import _chain as chain
 import build_pd_paper_drive_assembly as assembly
 import pd_transgear_drive_collar_spec as collar
+import transgear_cluster_fit as cluster_fit
 import _sprocket_seat_geometry as band
 import pd_platen_spec as platen
 import build_pd_platen_clip as clip
@@ -20,6 +21,7 @@ import build_pd_support_bar as support
 import sh_vn_brass_fillister_screw_spec as fillister
 import pd_vn_platen_clip_screw_spec as clip_screw
 from _hole_spec import THREAD_MAJOR_MM
+from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import printed_band_mm, printed_deviations
 
 
@@ -83,27 +85,25 @@ def test_platen_furniture_cascades_with_resized_envelope() -> None:
 
 
 def test_platen_clip_is_one_center_bridged_sheet() -> None:
-    assert clip.CLIP_THICKNESS == clip.SHEET_T == 0.8
+    # The clip is the .032 C26000 stock sheet.
+    assert clip.CLIP_THICKNESS == clip.SHEET_T == pytest.approx(0.032 * 25.4)
     assert math.isclose(
         clip.SCREW_RAIL_WIDTH + clip.NOTCH_WIDTH + clip.SPRING_RAIL_WIDTH,
         clip.CLIP_WIDTH,
     )
     # ch22 img03: a 32-px spring rail beside a 4-px slit, of the photographed
     # width.  The screw rail is widened for its holes' ligaments (user ruling
-    # 2026-10-14; owner ruling 2026-10-15, default D adjusted per rule 21) and
-    # the overall width is the widest 0.01 step holding the 2.0 paper gap;
-    # the slit's .XX worst case keeps the photographed gap, and the spring
-    # rail is what is left.
-    assert clip.CLIP_WIDTH == pytest.approx(11.39)
-    assert clip.SCREW_RAIL_WIDTH == pytest.approx(7.0)
+    # 2026-10-14; Main 2026-10-31, option B, for the .080 target), the
+    # overall width keeps the 2.0 paper gap, the slit's .XX worst case keeps
+    # the photographed gap, and the spring rail is what is left.
+    assert clip.CLIP_WIDTH == pytest.approx(0.47 * 25.4)
+    assert clip.SCREW_RAIL_WIDTH == pytest.approx(0.30 * 25.4)
     assert _clip_paper_gap(platen.SOCKET_X) > 2.0
+    assert clip.NOTCH_WIDTH == pytest.approx(0.04 * 25.4)
     assert (
-        paper_geometry.RECORDING_PAPER_LEFT_INSET_MM
-        - (platen.SOCKET_X - clip.HOLE_Y + clip.CLIP_WIDTH + 0.01)
-        <= 2.0
+        clip.NOTCH_WIDTH - printed_band_mm(2, unit=clip.UNIT)
+        >= clip.PHOTO_CLIP_WIDTH * 4.0 / 68.0
     )
-    assert clip.NOTCH_WIDTH == 1.04
-    assert clip.NOTCH_WIDTH - 0.51 >= clip.PHOTO_CLIP_WIDTH * 4.0 / 68.0
     assert clip.SPRING_RAIL_WIDTH < clip.PHOTO_CLIP_WIDTH * 32.0 / 68.0
     assert clip.SCREW_RAIL_WIDTH > clip.SPRING_RAIL_WIDTH
     assert math.isclose(
@@ -163,7 +163,7 @@ def test_platen_clip_free_halves_bow_smoothly_and_return_to_sheet_plane() -> Non
     r, a = clip.BEND_RADIUS, clip.BEND_ANGLE
     assert math.isclose(4.0 * r * math.sin(a), clip.BOW_RUN)
     assert math.isclose(2.0 * r * (1.0 - math.cos(a)), clip.ARCH_RISE)
-    assert clip.ARCH_RISE == 1.5
+    assert clip.ARCH_RISE == pytest.approx(0.06 * 25.4)
     assert clip.BOW_RUN == pytest.approx(clip.BRIDGE_X0 - clip.HOLE_INSET)
     # Gentle brass bend, far above the sheet thickness.
     assert r > 20.0 * clip.SHEET_T
@@ -190,11 +190,13 @@ def test_platen_clip_screws_seat_on_the_flat_sheet_with_full_engagement() -> Non
         clip_screw.SHANK_LEN
     )
     assert platen.SOCKET_THREAD_ENGAGEMENT >= 1.5 * clip.THREAD_MAJOR_MM["#2-56"]
-    assert platen.SOCKET_BOSS_H == pytest.approx(1.70)
+    assert platen.SOCKET_BOSS_H == pytest.approx(
+        clip_screw.SHANK_LEN - clip.SHEET_T - platen.PLATE_THICKNESS
+    )
 
 
 def test_platen_clip_holes_and_handed_assembly_placements_follow_flat_rail() -> None:
-    assert clip.HOLE_Y == pytest.approx(3.3)
+    assert clip.HOLE_Y == pytest.approx(0.145 * 25.4)
     assert clip.HOLE_Y < clip.SCREW_RAIL_WIDTH / 2.0
     assert clip.HOLE_Y - clip.HOLE_DIA / 2.0 > 0.0
     assert clip.HOLE_Y + clip.HOLE_DIA / 2.0 < clip.SCREW_RAIL_WIDTH
@@ -230,25 +232,27 @@ def test_platen_clip_holes_and_handed_assembly_placements_follow_flat_rail() -> 
 def test_platen_clip_hole_ligaments_float_and_head_land_hold_at_worst_case() -> None:
     # Rule 17 at the printed worst case: the .XXX hole station, the .XX rail
     # width, the DRILLED hole's largest size.
-    band = printed_band_mm(clip.POSITION_PLACES)
-    rail_band = printed_band_mm(clip.RAIL_WIDTH_PLACES)
+    band = printed_band_mm(clip.POSITION_PLACES, unit=clip.UNIT)
+    rail_band = printed_band_mm(clip.RAIL_WIDTH_PLACES, unit=clip.UNIT)
     assert clip.RAIL_WIDTH_PLACES == 2
     hole_r = clip.HOLE_DIA_MAX / 2.0
+    assert clip.HOLE_DIA_MAX == pytest.approx((0.116 + 0.004) * 25.4)
     assert clip.EDGE_LIGAMENT_MIN == pytest.approx(clip.HOLE_Y - band - hole_r)
     assert clip.SLIT_LIGAMENT_MIN == pytest.approx(
         clip.SCREW_RAIL_WIDTH - rail_band - clip.HOLE_Y - band - hole_r
     )
-    assert min(clip.EDGE_LIGAMENT_MIN, clip.SLIT_LIGAMENT_MIN) >= 1.5
-    assert clip.END_LIGAMENT_MIN >= 1.5
-    # The photographed 4.23 rail cannot hold the floor on both sides.
+    target = WALL_TARGET_MM - 1e-9
+    assert min(clip.EDGE_LIGAMENT_MIN, clip.SLIT_LIGAMENT_MIN) >= target
+    assert min(clip.END_LIGAMENT_MIN, clip.FAR_END_LIGAMENT_MIN) >= target
+    # The photographed 4.23 rail cannot hold the target on both sides.
     photo_rail = clip.PHOTO_CLIP_WIDTH * 32.0 / 68.0
-    assert photo_rail - photo_rail / 2.0 - 2.0 * band - hole_r < 1.5
+    assert photo_rail - photo_rail / 2.0 - 2.0 * band - hole_r < target
     # Fixed fasteners: the hole floats over the shank by both patterns'
     # zones, which holds only with the hole row at .XXX too.
     zone = 2.0 * math.sqrt(2.0) * band
     assert clip.HOLE_DIA - clip_screw.SHANK_DIA >= 2.0 * zone
     assert clip.HOLE_DIA - clip_screw.SHANK_DIA < 2.0 * (
-        2.0 * math.hypot(band, printed_band_mm(2))
+        2.0 * math.hypot(band, printed_band_mm(2, unit=clip.UNIT))
     )
     # The least head never pulls through the largest hole, with land to bear on.
     assert clip_screw.HEAD_DIA_MIN - clip.HOLE_DIA_MAX >= 0.8
@@ -260,7 +264,8 @@ def test_wider_platen_clip_stays_on_the_platen_and_off_the_recording_paper() -> 
     # inboard edge from the hole row through the .XXX hole row height and the
     # .XX overall width (the spring rail is a reference), the platen's socket
     # station at .XXX.
-    band3, band2 = printed_band_mm(3), printed_band_mm(2)
+    band3 = printed_band_mm(3, unit=clip.UNIT)
+    band2 = printed_band_mm(2, unit=clip.UNIT)
     socket_x = min(x for x, _ in platen.SOCKET_XY)
     outer_edge_min = socket_x - band3 - (clip.HOLE_Y + band3)
     assert outer_edge_min > 0.0
@@ -284,14 +289,13 @@ def _clip_paper_gap(socket_x: float) -> float:
     return paper_geometry.RECORDING_PAPER_LEFT_INSET_MM - inboard
 
 
-def test_clip_socket_station_is_the_largest_grid_value_holding_the_paper_gap() -> None:
+def test_clip_socket_station_holds_the_paper_gap() -> None:
     # The photographed station no longer holds the 2.0 nominal gap beside the
-    # 7.0 clip screw rail and the 14.6 paper inset; the station is the largest
-    # 0.1-grid value that does, on both sides.
+    # widened clip screw rail and the 14.6 paper inset; the .170 station does,
+    # on both sides.
     assert _clip_paper_gap(5.3928) < 2.0
     assert _clip_paper_gap(platen.SOCKET_X) > 2.0
-    assert _clip_paper_gap(platen.SOCKET_X + 0.1) <= 2.0
-    assert math.isclose(platen.SOCKET_X * 10.0, round(platen.SOCKET_X * 10.0))
+    assert platen.SOCKET_X == pytest.approx(0.170 * 25.4)
     assert {x for x, _ in platen.SOCKET_XY} == {
         platen.SOCKET_X,
         platen.PLATE_WIDTH - platen.SOCKET_X,
@@ -300,21 +304,28 @@ def test_clip_socket_station_is_the_largest_grid_value_holding_the_paper_gap() -
 
 def test_outboard_clip_sockets_hold_their_edges_at_the_printed_worst_case() -> None:
     # Coordinates print from the bottom-left corner: the left edge is the
-    # datum, the right edge spends the printed overall width's band too.
+    # datum; the right sockets and the right edge both print from it, through
+    # the kept width's rounded .XX value.
     places = platen.DRAWING_PRECISION_BY_NAME
-    station = printed_band_mm(places["Socket3X"])
     assert places["Socket1X"] == places["Socket3X"]
-    width = printed_band_mm(places["Width"])
+
+    def limits(nominal: float, name: str) -> tuple[float, float]:
+        lower, upper = printed_deviations(nominal, places[name], unit=platen.UNIT)
+        return nominal + lower, nominal + upper
+
+    right_x = platen.PLATE_WIDTH - platen.SOCKET_X
     edge_in = {
-        "left": platen.SOCKET_X - station,
-        "right": platen.SOCKET_X - station - width,
+        "left": limits(platen.SOCKET_X, "Socket3X")[0],
+        "right": limits(platen.PLATE_WIDTH, "Width")[0]
+        - limits(right_x, "Socket1X")[1],
     }
     tap_r = THREAD_MAJOR_MM["#2-56"] / 2.0
-    clip_hole_y_max = clip.HOLE_Y + printed_band_mm(clip.POSITION_PLACES)
+    clip_hole_y_max = clip.HOLE_Y + printed_band_mm(
+        clip.POSITION_PLACES, unit=clip.UNIT
+    )
     for side, distance in edge_in.items():
-        # Rule 17: the tap keeps its edge ligament (and the boss, should the
-        # edge flat it, its 2.0 wall round the tap).
-        assert distance - tap_r >= 2.0, side
+        # Rule 17: the tap keeps its edge ligament.
+        assert distance - tap_r >= WALL_TARGET_MM, side
         # The clip's outer edge stays on the plate.
         assert distance - clip_hole_y_max > 0.0, side
     # The station moves nothing along the screw: the engagement is the plate
@@ -330,7 +341,7 @@ def test_platen_guide_holes_float_over_the_fixed_guide_screws() -> None:
     # taps (their position zone) and pass this plate's .XXX hole coordinates.
     assert platen.GUIDE_HOLE_DIA == platen.CLEARANCE_MM[("#4", "loose")]
     tap_zone = float(guide.GEOMETRIC_TOLERANCES_MM["guide hole-pattern position"])
-    hole_zone = 2.0 * math.sqrt(2.0) * printed_band_mm(3)
+    hole_zone = 2.0 * math.sqrt(2.0) * printed_band_mm(3, unit=platen.UNIT)
     assert platen.GUIDE_HOLE_DIA - fillister.SHANK_DIA >= tap_zone + hole_zone
     # The stock head still bears on the counterbore floor around the hole.
     assert fillister.HEAD_DIA - platen.GUIDE_HOLE_DIA >= 0.5
@@ -414,7 +425,7 @@ def test_clip_screw_bosses_sweep_clear_of_the_bar_and_hanger(
         # A rail printed at the plain .XX row stands the heads into the plate.
         (
             "_GUIDE_DEPTH_DEV",
-            printed_deviations(assembly.GUIDE_DEPTH, 2),
+            printed_deviations(assembly.GUIDE_DEPTH, 2, unit=assembly.GUIDE_UNIT),
             "heads .* into the arm plate as",
         ),
         # So does a lock plate whose thickness prints .XX, not its sheet band...
@@ -454,7 +465,12 @@ def test_chain_wheels_share_the_spec_band_and_the_chain_straddles_it() -> None:
     # MHA-PD-22 drive collar's front face, set in front of the 12T's face F).
     knob_seat_z = assembly.KNOB_COLLAR_Z0
     assert math.isclose(knob_seat_z, band.SEAT_FACE_Z)
-    assert math.isclose(assembly.KNOB_SHAFT_Z0 - collar.SET_NOMINAL, knob_seat_z)
+    # F stands the fitted collar body behind the seat, inside its facing window.
+    assert (
+        collar.SEAT_MIN_FROM_F
+        <= assembly.KNOB_SHAFT_Z0 - knob_seat_z
+        <= collar.SEAT_MAX_FROM_F
+    )
     assert math.isclose(assembly.REMOVABLE_Z0 + band.PLATE, knob_seat_z)
     assert math.isclose(
         (assembly.REMOVABLE_Z0 + knob_seat_z) / 2.0, assembly.CHAIN_MID_Z
@@ -479,11 +495,17 @@ def test_knob_drive_collar_sits_between_the_seat_and_the_12t(
     # seats on the 12T's front face F; the disc's front face stands behind F.
     assert collar.LENGTH == collar.SET_NOMINAL
     assert collar.SEAT_MIN_FROM_F <= collar.LENGTH <= collar.SEAT_MAX_FROM_F
-    assert math.isclose(assembly.KNOB_SHAFT_Z0, -148.1)
+    assert assembly.KNOB_SHAFT_Z0 == cluster_fit.F_Z
     assert math.isclose(
         assembly.KNOB_COLLAR_REAR_Z, assembly.KNOB_COLLAR_Z0 + collar.LENGTH
     )
-    assert math.isclose(assembly.KNOB_COLLAR_REAR_Z, assembly.KNOB_SHAFT_Z0)
+    # The nominal collar never overlaps F; the facing takes up the gap.
+    assert assembly.KNOB_SHAFT_Z0 - assembly.KNOB_COLLAR_REAR_Z >= 0.0
+    assert (
+        collar.SEAT_MIN_FROM_F
+        <= assembly.KNOB_SHAFT_Z0 - assembly.KNOB_COLLAR_Z0
+        <= collar.SEAT_MAX_FROM_F
+    )
     assert assembly.DISC_Z0 - assembly.KNOB_SHAFT_Z0 > 0.0
     assembly._assert_knob_shaft_clearance()
     # Negative control: a disc 0.05 behind F binds on the collar pushed
@@ -496,6 +518,9 @@ def test_knob_drive_collar_sits_between_the_seat_and_the_12t(
 def test_refitted_platen_clears_fixed_support_hardware() -> None:
     assert support.CLAMP_CBORE_DEPTH > 2.5
     assert support.CLAMP_CBORE_DIA > support.CLAMP_HOLE_DIA
-    assert guide.LOCK_STATION_X == tuple(
-        guide.GUIDE_LENGTH * fraction for fraction in (0.3, 0.7)
+    # The locks stand on the guide's second and fourth screws, at the
+    # platen's (inch-snapped) guide holes near 3/10 and 7/10 of the guide.
+    assert guide.LOCK_STATION_X == (platen.GUIDE_HOLE_X[1], platen.GUIDE_HOLE_X[3])
+    assert guide.LOCK_STATION_X == pytest.approx(
+        tuple(guide.GUIDE_LENGTH * fraction for fraction in (0.3, 0.7)), abs=0.01
     )

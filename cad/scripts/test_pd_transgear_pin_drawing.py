@@ -16,9 +16,14 @@ import pd_transgear_pin_spec as spec
 import pd_vn_transgear_retaining_ring_spec as ring
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
-from _printed_tolerance import printed_band_mm
+from _inch_wall_limits import WALL_TARGET_MM
+from _printed_tolerance import (
+    edge_break_chamfer_mm,
+    edge_break_radius_mm,
+    printed_band_mm,
+)
 from _surface_finish import MACHINED_UM
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND, STACK_NAME
+from pd_cluster_stack_band import FIT_LENGTH_BAND_IN, STACK_NAME
 
 
 def test_required_drawing_paths() -> None:
@@ -56,36 +61,36 @@ def test_only_the_shank_the_ring_groove_and_its_station_carry_model_bands() -> N
         ("PinProfile", "GrooveWidth"): "*deviations(GROOVE_WIDTH_BAND)",
         ("PinProfile", "GrooveStation"): "GROOVE_STATION_BAND",
     }
-    assert spec.GROOVE_STATION_BAND == PRINTED_LENGTH_BAND
-    assert spec.DRAWING_PRECISION_BY_NAME["ShankDia"] == 3
+    assert spec.GROOVE_STATION_BAND == FIT_LENGTH_BAND_IN
+    assert spec.DRAWING_PRECISION_BY_NAME["ShankDia"] == 4
     assert spec.DRAWING_PRECISION_BY_NAME["GrooveStation"] == 3
     assert spec.DRAWING_PRECISION_BY_NAME["TipDomeZ"] == 2
     assert spec.DRAWING_PRECISION_BY_NAME["HeadLand"] == 2
 
 
-def test_the_front_land_holds_the_wall_floor_at_the_worst_case() -> None:
+def test_the_front_land_holds_the_wall_target_at_the_worst_case() -> None:
     """Review of e0ac6477e (blocker): the land in front of the groove is a
-    wall under the 1.5 floor (three groove depths, 1.4304, is the weaker
+    wall held to the .080 target (three groove depths, .045, is the weaker
     bound).  ENFORCE run 20261024T034648173Z: the land's end at the tip
     dome's junction cannot be picked up, so the tip apex prints from the
     head seat and the land is a reference.  Its worst case is then the apex
-    at its printed lower limit, the load wall at its ±band's upper, and the deepest
-    dome the R2.0's .X band allows on the shank: a hemisphere."""
+    at its printed lower limit, the load wall at its ±band's upper, and the
+    deepest dome on the shank: a hemisphere."""
     tip_places = spec.DRAWING_PRECISION_BY_NAME["TipDomeZ"]
     dome_r_places = spec.DRAWING_PRECISION_BY_NAME["TipDomeR"]
-    # At R2.0 -0.8 the sphere is smaller than the rim: the deepest real dome
-    # on the largest shank is the hemisphere.
-    assert round(spec.TIP_DOME_R, dome_r_places) - printed_band_mm(dome_r_places) < (
+    # At its printed lower limit the R is smaller than the rim: the deepest
+    # real dome on the largest shank is the hemisphere.
+    assert spec.TIP_DOME_R - printed_band_mm(dome_r_places, unit=spec.UNIT) < (
         spec.DIA_MAX / 2.0
     )
     lower = (
-        round(spec.TIP_STATION, tip_places)
-        - printed_band_mm(tip_places)
+        spec.TIP_STATION
+        - printed_band_mm(tip_places, unit=spec.UNIT)
         - (spec.GROOVE_STATION + spec.GROOVE_STATION_BAND)
         - spec.DIA_MAX / 2.0
     )
     assert spec.FRONT_LAND_MIN == pytest.approx(lower)
-    assert lower >= spec.WALL_FLOOR == 1.5
+    assert lower >= WALL_TARGET_MM
     assert lower >= spec.EDGE_MARGIN_MIN
     assert spec.LENGTH == spec.TIP_STATION
     assert spec.FRONT_LAND == pytest.approx(
@@ -93,20 +98,37 @@ def test_the_front_land_holds_the_wall_floor_at_the_worst_case() -> None:
     )
 
 
-def test_the_head_land_holds_the_wall_floor_at_its_printed_lower_limit() -> None:
+def test_the_head_land_holds_the_wall_target_at_its_printed_lower_limit() -> None:
     """Review of e0ac6477e (blocker): 1.20 at .XX let the retaining head go
-    to 0.69, under the 1.5 wall floor.  At its printed lower limit the land
+    to 0.69.  At its printed lower limit the land holds the .080 target and
     still keeps a cylindrical rim past the largest edge break on both its
     edges, under the dome on top."""
     places = spec.DRAWING_PRECISION_BY_NAME["HeadLand"]
-    lower = round(spec.HEAD_LAND, places) - printed_band_mm(places)
+    lower = spec.HEAD_LAND - printed_band_mm(places, unit=spec.UNIT)
     assert spec.HEAD_LAND_MIN == pytest.approx(lower)
-    assert lower >= spec.WALL_FLOOR == 1.5
+    assert lower >= WALL_TARGET_MM - 1e-9
     edge_break = max(
-        float(_config.title_block("edge_break")[key])
-        for key in ("radius_mm", "chamfer_max_mm")
+        edge_break_radius_mm(unit=spec.UNIT), edge_break_chamfer_mm(unit=spec.UNIT)
     )
     assert lower - 2.0 * edge_break > 0.0
+
+
+def test_the_seat_root_radius_leaves_the_head_a_flat_seat() -> None:
+    """Machinist review round 4: the head's seat gets its own root radius,
+    well inside the .0375 step, so the head still bears on the arm's rear
+    face past the ream mouth's break and its own rim break."""
+    step = (spec.HEAD_DIA - spec.DIA_MAX) / 2.0
+    assert 0.0 < spec.SEAT_FILLET_R < step / 4.0
+    contact = (
+        (spec.HEAD_DIA - printed_band_mm(2, unit=spec.UNIT)) / 2.0
+        - edge_break_chamfer_mm(unit=spec.UNIT)
+        - max(
+            arm.PIN_BORE_DIA_MAX / 2.0 + edge_break_chamfer_mm(unit=spec.UNIT),
+            spec.DIA_MAX / 2.0 + spec.SEAT_FILLET_R,
+        )
+    )
+    assert spec.SEAT_CONTACT_WIDTH_MIN == pytest.approx(contact)
+    assert contact > 0.0
 
 
 def test_the_groove_holds_the_ring_at_every_printed_limit() -> None:
@@ -179,10 +201,9 @@ def test_the_part_notes_carry_no_assembly_step() -> None:
 @pytest.mark.parametrize(
     ("station", "machine_z"),
     [
-        (-spec.HEAD_HEIGHT, -113.5625),
         (0.0, -116.4625),
-        (spec.GROOVE_STATION, -163.7125),
-        (spec.LENGTH, -167.8125),
+        (spec.GROOVE_STATION, -163.7065),
+        (spec.LENGTH, -167.7705),
     ],
 )
 def test_the_pin_sits_at_its_machine_stations(station: float, machine_z: float) -> None:
@@ -197,7 +218,7 @@ def test_the_functional_station_runs_from_the_head_seat_to_the_load_wall() -> No
     assert drawing.LOAD_WALL_X < drawing.GROOVE_REAR_X < drawing.SEAT_X
 
 
-def test_the_three_place_station_names_the_stack_it_sets() -> None:
+def test_the_station_names_the_stack_it_sets() -> None:
     """Rule 4: the station's ±band names the disc cluster stack it serves."""
     import transgear_cluster_fit as fit
 
@@ -219,14 +240,13 @@ def test_the_dome_heights_and_the_overall_print_as_references() -> None:
             ("PinProfile", "FrontLand"),
         )
     }
-    assert spec.DRAWING_PRECISION["HeadDomeProfile"]["HeadDomeSagDim"] == 1
-    assert spec.DRAWING_PRECISION["TipDomeProfile"]["TipDomeSagDim"] == 1
-    assert spec.OVERALL_LENGTH == pytest.approx(54.25)
+    assert spec.DRAWING_PRECISION["HeadDomeProfile"]["HeadDomeSagDim"] == 2
+    assert spec.DRAWING_PRECISION["TipDomeProfile"]["TipDomeSagDim"] == 2
     assert spec.DRAWING_REFERENCE_PRECISION == 2
     # The overall's row stands under the station's callout.
     assert drawing.OVERALL_TEXT_XY[1] < drawing.SIDE_KEEP["GrooveStation"][1] - 0.020
-    # The land's (2.60), about 11.3 mm wide, ends left of the tip apex's
-    # extension line that the 51.35 and the overall share.
+    # The land's (.12) ends left of the tip apex's extension line that the
+    # 2.02 and the overall share.
     land_x, _ = drawing.SIDE_KEEP["FrontLand"]
     assert land_x + 0.0057 < drawing.TIP_X - 0.001
 
@@ -246,18 +266,18 @@ def test_notes_fit_the_sheet_limits() -> None:
 
 
 def test_the_shank_callout_names_both_fits_its_band_sets() -> None:
-    """The 0/-0.008 shank against the arm's +0.008/0 ream: smallest pin in
-    the largest ream and the reverse, flagged at the Ø it serves (rule 4),
-    with the bores that run on it, so the Ra 1.6 reads as their bearing
+    """The +.0001/-.0002 shank against the arm's .124 REAM_H7: smallest pin
+    in the largest ream and the reverse, flagged at the Ø it serves (rule 4),
+    with the bores that run on it, so the Ra 63 reads as their bearing
     surface (rule 6).  The general notes no longer carry the fit."""
     loosest = spec.DIA_MIN - arm.PIN_BORE_DIA_MAX
     tightest = spec.DIA_MAX - arm.PIN_BORE_DIA_MIN
     assert spec.PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
-    assert (loosest, tightest) == pytest.approx((0.010, 0.026))
+    assert (loosest, tightest) == pytest.approx((0.00762, 0.02794))
     callout = _below("ShankDia")
     assert callout == callouts.SHANK_CALLOUT
     assert f"PRESS FIT IN {spec.ARM_NUMBER} REAM" in callout
-    assert f"{loosest:.3f}-{tightest:.3f} DIAMETRAL INTERFERENCE" in callout
+    assert ".0003-.0011 DIAMETRAL INTERFERENCE" in callout
     assert all(number in callout for number in spec.RUNNING_MATES)
     assert "INTERFERENCE" not in spec.DRAWING_NOTES
     assert "GROUND" not in spec.DRAWING_NOTES

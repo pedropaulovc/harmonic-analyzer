@@ -363,10 +363,29 @@ def test_sheet_states_the_cut_and_no_dimension_in_the_registry_names() -> None:
     assert len(lines) <= 4
     assert all(len(line) <= 70 for line in lines), lines
     flat = " ".join(lines)
-    assert (
+    assert flat.endswith(
         f"CUT EACH TIP {screw.TIP_BELOW_REAR_FACE_TEXT} BELOW THE MHA-PD-06 DISC "
-        "REAR FACE AT ASSEMBLY;"
-    ) in flat
-    assert f"BREAK THE CUT END {screw.CUT_END_BREAK_TEXT}." in flat
+        "REAR FACE AT ASSEMBLY."
+    )
+    # The cut end's break is the title block's edge break; the note repeats
+    # nothing of it (machinist review r8).
+    assert "BREAK" not in flat
 
+
+def test_the_cut_screw_carries_no_stock_length_reference() -> None:
+    """The views show the screw as cut, so neither the part nor the sheet
+    carries the supplier's .25 stock length (machinist review r7: it landed
+    below the drawn tip on a witness belonging to no feature); the ITEM row
+    names the 1/4 stock, every other supplier reference stays."""
+    import _mcmaster_91794a055 as supplier
+
+    names = {name for name, _value, _orientation in drawing.SUPPLIER_REFERENCE_DIMENSIONS}
+    assert names == {
+        name for name, _value, _orientation in supplier.SUPPLIER_REFERENCE_DIMENSIONS
+    } - {"SupplierStockLength"}
+    assert drawing.SUPPLIER_REFERENCE_DIMENSIONS is part.SUPPLIER_REFERENCE_DIMENSIONS
+    assert set(drawing.SUPPLIER_REFERENCE_FORMATS) == names
+    assert set(drawing.SUPPLIER_REFERENCE_STARTS) <= names
+    assert "x 1/4" in drawing.ITEM
+    assert supplier.SHANK_LEN == pytest.approx(0.25 * 25.4)
 

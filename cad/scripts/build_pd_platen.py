@@ -6,19 +6,19 @@ strips, and the two back-side guide rails the platen hangs on are
 separate parts (build_pd_platen_rack.py / build_pd_platen_clip.py /
 build_pd_platen_guide.py). Fastener holes:
 
-* four clip-screw #2-56 through receivers at the resized plate's extreme
-  left/right edges (x 4.5/265.14), matching the resized clips'
-  7.1904-inset end holes at local y 29.6604/127.6296, each tapped on
-  through a Ø7 x 1.70 boss on the back face for >= 1.5D engagement, each
-  boss rounded into the face at its R0.5 MAX root;
-* ten #4 loose (Ø3.658) counterbored guide-screw through-holes in two rows
+* four clip-screw #2-56 through receivers at the plate's extreme left/right
+  edges (.170 in from each), matching the clips' .283-inset end holes, each
+  tapped on through a Ø.28 boss on the back face for >= 1.5D engagement,
+  each boss rounded into the face inside the title block's inside-corner limit;
+* ten #4 loose (Ø.144) counterbored guide-screw through-holes in two rows
   of 5 (ch22 front photo) at the guide rail centrelines: bottom row y 13,
   top row y 47 (machine 318 / 352 with the plate at y 305).
 
 Dimensions: the ch30-p002 Pose Studio fit sets the width to 269.64 mm and
 the user-confirmed front-face proportion to height:width = 1:2, hence
 134.82 mm high. Thickness: the p.55 edge-on-photo estimate (~4 mm), thinned
-to 3.85 (R9-68) for disc-to-platen air.
+to 3.85 (R9-68) for disc-to-platen air. The sheet prints decimal inch
+(#290); these three keep their millimetres (pd_platen_spec).
 
 Layout: width along +X, height along +Y from the origin corner, thickness
 extruded +Z.
@@ -43,11 +43,12 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_precision import _named_dimension, apply_drawing_precision
+from _document_units import apply_package_model_units
+from _drawing_precision import apply_drawing_precision
 from _extrude import extrude_at_offset
 from _feature_tree import _feature_by_name, name_last_feature
-from _fit_deviations import deviations
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -84,10 +85,7 @@ from pd_platen_spec import (
     PLATE_WIDTH,
     RIGHT_VIEW_NOTE,
     SOCKET_BOSS_DIA,
-    SOCKET_BOSS_FILLET_BAND,
-    SOCKET_BOSS_FILLET_PRINTED_XY,
     SOCKET_BOSS_FILLET_R,
-    SOCKET_BOSS_FILLET_TOL_TYPE,
     SOCKET_BOSS_H,
     SOCKET_SPEC,
     SOCKET_THREAD_ENGAGEMENT,
@@ -135,36 +133,6 @@ GUIDE_PLACEMENT = [
 ]
 if [(x, y) for y in GUIDE_HOLE_Y for x in GUIDE_HOLE_X] != list(GUIDE_HOLE_XY):
     raise AssertionError("guide-hole placement assumes the y-major GUIDE_HOLE_XY order")
-
-
-def _boss_fillet_max_limit(adapter) -> None:
-    """BossFilletR as a MAX single limit carrying the band's deviations
-    (build_pn_pen_rod._shoulder_fillet_max_limit's recipe): the native type
-    prints the nominal, so the nominal is the limit."""
-    lower, upper = deviations(SOCKET_BOSS_FILLET_BAND)
-    _, dimension = _named_dimension(adapter, "SocketBossFillet", "BossFilletR")
-    label = "BossFilletR@SocketBossFillet"
-    value = float(dimension.SystemValue)
-    if not math.isclose(value, SOCKET_BOSS_FILLET_R / 1000.0, abs_tol=1e-9):
-        raise RuntimeError(
-            f"{label}: nominal {value * 1000.0:.7f} is not the band's max "
-            f"{SOCKET_BOSS_FILLET_R}"
-        )
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = SOCKET_BOSS_FILLET_TOL_TYPE
-    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
-        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
-    if (
-        int(tolerance.Type) != SOCKET_BOSS_FILLET_TOL_TYPE
-        or not math.isclose(
-            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
-        )
-        or not math.isclose(
-            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
-        )
-    ):
-        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
-    _telemetry.success(f"{label}: single limit {SOCKET_BOSS_FILLET_R:g} MAX")
 
 
 def _plane_frame(adapter, name: str) -> tuple[tuple[float, ...], tuple[float, ...]]:
@@ -225,6 +193,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): the plate envelope. The mm suffix is
     # load-bearing -- this is an INCH document and the equation manager reads
@@ -292,7 +262,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "plate height (1:2 front-face ratio)", "y", PLATE_HEIGHT
     )
 
-    # Clip-screw receiver bosses: four Ø7 integral bosses on the back face
+    # Clip-screw receiver bosses: four Ø.28 integral bosses on the back face
     # (z = PlateThickness), sketched on the front plane and extruded from that
     # offset, so the through taps below gain the boss height of thread.
     bosses = SketchDims()
@@ -322,30 +292,19 @@ async def build(adapter) -> dict[str, str]:
         adapter, "plate with socket bosses", v_plate + v_bosses, 0.05 * v_bosses
     )
 
-    # Boss roots: each boss rounds into the back face at the R MAX limit the
-    # print allows, picked on its root circle at +X (the only edge through
-    # that point).  The printed one is its own feature, the boss whose root
-    # silhouette the right view shows (pd_platen_spec); the other three share
-    # the global.
-    others = [xy for xy in SOCKET_XY if xy != SOCKET_BOSS_FILLET_PRINTED_XY]
-    if len(others) != len(SOCKET_XY) - 1:
-        raise AssertionError("the printed boss root must be one of the bosses")
-    fillet_jobs = []
-    for feature, dimension, stations in (
-        ("SocketBossFillet", "BossFilletR", [SOCKET_BOSS_FILLET_PRINTED_XY]),
-        ("SocketBossFillets", "BossFilletsR", others),
-    ):
-        check(
-            f"fillet {feature}",
-            await adapter.add_fillet(
-                SOCKET_BOSS_FILLET_R,
-                [[x + SOCKET_BOSS_DIA / 2.0, y, PLATE_THICKNESS] for x, y in stations],
-            ),
-        )
-        name_last_feature(adapter, feature)
-        fillet_dim = name_dimensions(adapter, feature, [dimension])
-        fillet_jobs += [(fillet_dim[0], '"SocketBossFilletR"')]
-    drive_jobs += fillet_jobs
+    # Boss roots: each boss rounds into the back face inside the title
+    # block's inside-corner limit (unprinted; pd_platen_spec), picked on its
+    # root circle at +X (the only edge through that point).
+    check(
+        "fillet SocketBossFillets",
+        await adapter.add_fillet(
+            SOCKET_BOSS_FILLET_R,
+            [[x + SOCKET_BOSS_DIA / 2.0, y, PLATE_THICKNESS] for x, y in SOCKET_XY],
+        ),
+    )
+    name_last_feature(adapter, "SocketBossFillets")
+    fillet_dim = name_dimensions(adapter, "SocketBossFillets", ["BossFilletsR"])
+    drive_jobs += [(fillet_dim[0], '"SocketBossFilletR"')]
     # Pappus: the corner spandrel r^2 (1 - pi/4), its centroid r (10 - 3 pi) /
     # (3 (4 - pi)) out from the boss surface, revolved about each boss axis.
     spandrel = SOCKET_BOSS_FILLET_R**2 * (1.0 - math.pi / 4.0)
@@ -362,7 +321,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Clip-screw receivers: ONE native Hole Wizard #2-56 through-tapped
     # feature (4 points) from the front face. The heads sit on the clip's flat
-    # 0.8 sheet, so the 3.85 plate plus the 1.70 rear boss take the rest of the
+    # .032 sheet, so the plate plus the rear boss take the rest of the
     # stock shank as thread and its tip finishes flush at the boss's rear face
     # rather than bottoming in a blind socket.
     pre = await adapter.get_mass_properties()
@@ -388,9 +347,9 @@ async def build(adapter) -> dict[str, str]:
 
     # Guide-screw through-holes + head counterbores: ONE native Hole Wizard
     # counterbored #4 FILLISTER feature (10 points) from the front face. The
-    # #4 loose shanks pass through into the guide rails and the Ø6.5 x 2.9178
-    # counterbores hold the stock heads exactly 0.2 sub-flush.
-    # The through Ø (#4 loose) and the counterbore Ø6.5 artefact diameter are
+    # #4 loose shanks pass through into the guide rails and the Ø.26 x .115
+    # counterbores hold the stock heads exactly .008 sub-flush.
+    # The through Ø (#4 loose) and the counterbore Ø.26 are
     # explicit overrides; the depth follows the exact purchased head.
     pre = post
     guide_holes = wizard_holes(
@@ -496,7 +455,6 @@ async def build(adapter) -> dict[str, str]:
     # the guidelines`), then mark exactly the print's dimensions (the drawing
     # imports the marked set and must find every one) and stamp the view notes.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    _boss_fillet_max_limit(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

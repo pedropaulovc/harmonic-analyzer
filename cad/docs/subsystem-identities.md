@@ -37,7 +37,7 @@ Components of a built-up part are the detail parts a finished part may be made f
 | `sm` / `SM` | Summing | 4 | 6 |
 | `sh` / `SH` | Shared parts | 2 | 7 (+1 tooling-only kit family) |
 
-The vendor column counts machine vendor families. The 2026-10-20 shared-vendor consolidation moved nineteen parent-scoped vendor identities into eight shared ones: CH lost 1 (8 to 7), DT lost 4 (19 to 15), FR lost 1 (5 to 4), MG lost 3 (7 to 4), PD lost 5 (18 to 13), PN lost 1 (8 to 7) and MS lost 1 (2 to 1); SM is unchanged. SH gained seven machine vendor families (MHA-SH-VN-50 to MHA-SH-VN-56) plus one tooling-only family, `sh-vn-clamping-kit-hardware` (MHA-SH-VN-57, `usage_scope: tooling`), which replaced three oblique-jig fixture identities and is listed separately because fixture hardware is excluded from machine counts. Count it neither as a machine vendor family nor twice.
+The vendor column counts machine vendor families. The 2026-10-20 shared-vendor consolidation moved nineteen parent-scoped vendor identities into eight shared ones: CH lost 1 (8 to 7), DT lost 4 (19 to 15), FR lost 1 (5 to 4), MG lost 3 (7 to 4), PD lost 5 (18 to 13), PN lost 1 (8 to 7) and MS lost 1 (2 to 1); SM is unchanged. SH gained seven machine vendor families (MHA-SH-VN-50 to MHA-SH-VN-56) plus one tooling-only family, `sh-vn-clamping-kit-hardware` (MHA-SH-VN-57, `usage_scope: tooling`), which replaced three oblique-jig fixture identities and is listed separately because fixture hardware is excluded from machine counts. Count it neither as a machine vendor family nor twice. The 2026-10-31 retirement of the MHA-PD-VN-67 pivot shim took PD from 13 to 12.
 
 SH contains fabricated parts used directly by several assemblies, currently the front and back column clamps, `sh-column-clamp-front` (MHA-SH-01) and `sh-column-clamp-back` (MHA-SH-02), and the shared vendor parts listed under [Shared vendor families](#shared-vendor-families). Each keeps one shared identity. The wheel axle nut, `mg-vn-wheel-axle-nut`, is a vendor part by commercial-process evidence. HA holds the top assembly only: its two former parts, the measuring stick and its stop, moved into the MS category on 2026-10-09 when the stop was re-derived as a block, a plate and stock screws inside their own `ms-measuring-stick` sub-assembly.
 
@@ -381,12 +381,13 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | — | — | `vn-pen-hanger-jam-nut` | MHA-VN-064 | `pn-vn-pen-hanger-jam-nut` | MHA-PN-VN-55 |
 | part | — | — | `vn-lever-wire` | MHA-VN-066 | `sh-vn-music-wire` (`LeverWire`) | MHA-SH-VN-56 |
 | part | — | — | `vn-pen-wire` | MHA-VN-067 | `sh-vn-music-wire` (`PenWire`) | MHA-SH-VN-56 |
-| part | — | — | `vn-transgear-pivot-shim` | MHA-VN-069 | `pd-vn-transgear-pivot-shim` | MHA-PD-VN-67 |
+| retired vendor part | — | — | `vn-transgear-pivot-shim` | MHA-VN-069 | — | MHA-PD-VN-67 (retired 2026-10-31; never reissued) |
 | part | — | — | `vn-rocker-thrust-washer` | MHA-VN-070 | `ch-vn-rocker-thrust-washer` | MHA-CH-VN-56 |
 | part | — | — | `vn-bracket-hold-down-screw` | MHA-VN-071 | `ch-vn-bracket-hold-down-screw` | MHA-CH-VN-57 |
 | part | — | — | `vn-boss-hook-jam-nut` | MHA-VN-072 | `sm-vn-boss-hook-jam-nut` | MHA-SM-VN-55 |
 | part | — | — | `vn-knife-hanger-washer` (new #10 family) | MHA-VN-060 | `sm-vn-knife-hanger-washer` | MHA-SM-VN-54 |
 | part | — | — | `vn-chain-connecting-link` | MHA-VN-068 | `pd-vn-chain-connecting-link` | MHA-PD-VN-66 |
+| part | — | — | — | — | `pd-vn-transgear-cluster-shim` | MHA-PD-VN-68 |
 | part | `column-clamp-front` | MHA-105 | `sh-column-clamp-front` | MHA-SH-001 | `sh-column-clamp-front` | MHA-SH-01 |
 | part | `column-clamp-back` | MHA-106 | `sh-column-clamp-back` | MHA-SH-002 | `sh-column-clamp-back` | MHA-SH-02 |
 | retired tooling part | — | — | `ch-rocker-arm-tl-vise-stop` | MHA-CH-006-TL-01 | — | MHA-CH-06-TL-01 (retired; never reissued) |
@@ -580,7 +581,8 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | added | `mg-vn-lever-wire` | MHA-MG-VN-56 | ASTM A228 music wire, 0.031 in, cut from McMaster-Carr 9666K56 coil; hooks on the MHA-MG-06 output fixture and wraps the MHA-MG-10 drum |
 | added | `pn-vn-pen-wire` | MHA-PN-VN-57 | ASTM A228 music wire, 0.031 in, cut from the same McMaster-Carr 9666K56 coil; runs from the MHA-MG-05 wheel rim groove to the MHA-PN-07 adjuster stud's eye |
 | added | `pd-vn-chain-connecting-link` | MHA-PD-VN-66 | McMaster 6261K108 clip-retained connecting link that joins the cut 6261K171 chain's two inner-link ends; MHA-PD-VN-51 keeps only the cut chain's 33 outer links |
-| added | `pd-vn-transgear-pivot-shim` | MHA-PD-VN-67 | DIN 988 spring-steel shim 98055A098 (5 x 10 x 0.5) on the MHA-PD-VN-57 shoulder under its head, on the MHA-PD-VN-63 spring; restores the spring room the 9.5 MHA-PD-07 bar took when it grew rearward |
+| retired | `pd-vn-transgear-pivot-shim` | MHA-PD-VN-67 | 2026-10-31 owner ruling (#290): the MHA-PD-18 spot face is 0.5 shallower (floor 6.4 to 6.9 from the front face), which gives the MHA-PD-VN-63 spring the room the 98055A098 shim restored; no registry, builder or drawing; Number never reissued |
+| added | `pd-vn-transgear-cluster-shim` | MHA-PD-VN-68 | 2026-11-01 owner ruling (#2124): 18-8 stainless shoulder shim, 1/8 ID x 1/4 OD x 0.005 in, McMaster-Carr 94773A606; shimmed between the MHA-PD-18 arm face and the MHA-PD-24 rear bushing to set the disc cluster's end float at assembly, so no cluster part is faced to fit |
 | retired | `ch-rocker-thrust-washer` | MHA-CH-09 | replaced by the purchased MHA-CH-VN-56 rocker thrust washer (owner, 2026-10-15: every washer is a purchased part) |
 | added | `ch-vn-rocker-thrust-washer` | MHA-CH-VN-56 | carbon-steel ring shim, 1/4 ID x 3/8 OD x 0.031 in, McMaster-Carr 3088A429; one each end of the rocker bank on the MHA-CH-05 pivot shaft, the north one against the datum MHA-CH-08 ear |
 | retired | `dt-crank-seat-washer` | MHA-DT-36 | deleted, owner ruling D1 2026-10-15: collar bears on the post boss |

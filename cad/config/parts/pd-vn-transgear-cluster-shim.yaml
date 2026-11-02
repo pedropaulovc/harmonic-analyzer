@@ -1,0 +1,17 @@
+pd-vn-transgear-cluster-shim:
+  title: Transgear Cluster Shim
+  number: MHA-PD-VN-68
+  stock_name: 18-8 Stainless Steel Shim, 1/8 ID x 1/4 OD x .005
+  supplier: McMaster-Carr
+  supplier_skus: [94773A606]
+  material: AISI 304
+  material_specification: "18-8 stainless steel shim for 1/8 in shoulder, 1/8 ID x 1/4 OD x .005 in; McMaster-Carr 94773A606"
+  finish: AS SUPPLIED
+  installation_notes: |-
+    INSTALLATION - ON THE MHA-PD-23 PIN, STACKED ON THE MHA-PD-18
+    ARM FRONT FACE UNDER THE MHA-PD-24 REAR BUSHING; AS MANY AS
+    THE MHA-PD-00 END-FLOAT FIT-UP TAKES.
+  quantity: 2
+  tolerance_class: machined_block
+  process: purchased
+  drawing_unit: in

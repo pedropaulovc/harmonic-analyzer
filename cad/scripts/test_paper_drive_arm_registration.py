@@ -12,13 +12,13 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 import pytest
 
-import _config
 import paper_drive_arm_registration as registration
 import pd_transgear_arm_geometry as arm
 import pd_transgear_arm_plate_geometry as plate
 import pd_transgear_arm_spec as arm_spec
 import pd_transgear_arm_plate_spec as plate_spec
 import _transgear_arm_plate_locating_interface as pin
+from _printed_tolerance import edge_break_chamfer_mm, edge_break_radius_mm
 from _test_stubbed_build import keyed_artefacts, offline_adapter, seat_calls, stub_seat
 
 
@@ -125,11 +125,12 @@ def test_locator_sites_share_real_part_frames_and_paid_mouth_walls() -> None:
     x, y = arm.LOCATOR_SITES_MM[0]
     # Full worst case: the outline's title-block edge break (either permitted
     # form) and the match drill's run-off through the thickest stock are paid.
-    edge_break = _config.title_block("edge_break")
-    outline_break = max(edge_break["radius_mm"], edge_break["chamfer_max_mm"])
+    outline_break = max(
+        edge_break_radius_mm(unit=arm.UNIT), edge_break_chamfer_mm(unit=arm.UNIT)
+    )
     assert arm.OUTLINE_EDGE_BREAK_MAX_MM == outline_break
     expected = (arm.PIVOT_END_R - x * math.sin(arm.EDGE_LEAN) - abs(y) * math.cos(arm.EDGE_LEAN)
-                - arm.BAND_X - arm.LOCATOR_MOUTH_POSITION_RADIUS_MM - pin.PRESS_HOLE_LIMITS_MM[1] / 2.0
+                - arm.OUTLINE_BAND - arm.LOCATOR_MOUTH_POSITION_RADIUS_MM - pin.PRESS_HOLE_LIMITS_MM[1] / 2.0
                 - pin.HOLE_MOUTH_BREAK_RADIAL_MAX_MM - outline_break
                 - (arm.THICKNESS + arm.THICKNESS_BAND) * math.tan(math.radians(0.3)))
     assert arm.WALLS["locator 1 to arm edge"][1] == pytest.approx(expected)
@@ -160,7 +161,7 @@ def test_three_accessible_rear_indicator_sites_bound_every_tilt_direction() -> N
     footprint = registration.ARM_SEAT_INDICATOR_TIP_DIA_MAX_MM / 2.0
     for x, y in points:
         edge = arm.PIVOT_END_R - x * math.sin(arm.EDGE_LEAN) - abs(y) * math.cos(arm.EDGE_LEAN)
-        assert edge - arm.BAND_X - footprint - registration.ARM_SEAT_WITNESS_POSITION_RADIUS_MM > 0.0
+        assert edge - arm.OUTLINE_BAND - footprint - registration.ARM_SEAT_WITNESS_POSITION_RADIUS_MM > 0.0
         px, py = x - plate.BORE_STATION, y - plate.BORE_OFFSET
         assert min(px - plate.EDGE_MINUS_X, plate.EDGE_PLUS_X - px,
                    (plate.arm_upper_edge_y(px) - py) * math.cos(arm.EDGE_LEAN),
@@ -174,10 +175,11 @@ def test_three_accessible_rear_indicator_sites_bound_every_tilt_direction() -> N
 
 
 def test_native_controls_reference_actual_bores_and_project_past_real_chain_plane() -> None:
-    # The arm's pattern is located from S (Ø0.050); the plate's from its own
-    # knob bore K, so it carries K's Ø0.100 setting circle about S.
+    # The arm's pattern is located from S (Ø.0019, inside the 0.05 stack
+    # zone); the plate's from its own knob bore K, so it carries K's Ø0.100
+    # setting circle about S.
     for spec, geometry, prefix, zone in (
-        (arm_spec, arm, "arm", "0.050"), (plate_spec, plate, "plate", "0.100"),
+        (arm_spec, arm, "arm", ".0019"), (plate_spec, plate, "plate", "0.100"),
     ):
         controls = {control.key: control for control in spec.GEOMETRIC_CONTROLS}
         for index, xy in enumerate(geometry.LOCATOR_SITES_MM, 1):
@@ -191,10 +193,12 @@ def test_native_controls_reference_actual_bores_and_project_past_real_chain_plan
         }
     arm_control = next(control for control in arm_spec.GEOMETRIC_CONTROLS if control.key == "feed_stud_projected_axis")
     plate_control = next(control for control in plate_spec.GEOMETRIC_CONTROLS if control.key == "knob_projected_axis")
-    for control, datum_z, height in ((arm_control, registration.ARM_FRONT_MACHINE_Z_MM, registration.S_PROJECTED_HEIGHT_MM),
-                                    (plate_control, registration.PLATE_MOUNT_MACHINE_Z_MM, registration.K_PROJECTED_HEIGHT_MM)):
+    for control, datum_z, height, zone in (
+        (arm_control, registration.ARM_FRONT_MACHINE_Z_MM, registration.S_PROJECTED_HEIGHT_MM, ".0019"),
+        (plate_control, registration.PLATE_MOUNT_MACHINE_Z_MM, registration.K_PROJECTED_HEIGHT_MM, "0.050"),
+    ):
         assert control.projected_zone_height_mm == height
-        assert control.tolerance == "0.050" and control.datums == ("A",)
+        assert control.tolerance == zone and control.datums == ("A",)
         assert datum_z - height <= registration.CHAIN_PLANE_MACHINE_Z_LIMITS_MM[0]
         assert datum_z - height < registration.gear_plane_machine_z_mm() < datum_z
 
@@ -212,7 +216,7 @@ def test_clamp_axes_have_real_projected_zones_and_each_countersink_rides_its_hol
         assert hole.projected_zone_height_mm == plate.CLAMP_PLATE_PROJECTED_HEIGHT_MM
         assert isinstance(hole.face, CylinderFace)
         assert (hole.face.contains_x_mm, hole.face.contains_y_mm) == (x, y)
-        for control, zone in ((tap, "0.050"), (hole, "0.100")):
+        for control, zone in ((tap, ".0019"), (hole, "0.100")):
             assert control.datums == ("A", "B", "C")
             assert control.tolerance == zone and control.tolerance_zone == "diametral"
 

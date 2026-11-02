@@ -36,39 +36,41 @@ from pd_support_bar_spec import (
     BAR_BAND_PLACES,
     BAR_HEIGHT,
     BRACKET_TAP_SPEC,
+    HOLE_POSITION_PLACES,
     PIVOT_TAP_THREAD,
     TAP_CSK_ANGLE_DEG,
+    UNIT,
 )
 
-# SOLIDWORKS swTolType_e single limits: the nominal prints followed by MIN or
-# MAX, so the model value is the limit itself.
-TOL_MIN = 5  # swTolMIN
-TOL_MAX = 6  # swTolMAX
-HOLE_POSITION_PLACES = 3  # the hanger holes' ±0.065 prints .XXX
-# The clamp holes' row height and stations print .XX: their position band
+# The clamp holes' row height and stations print .XXX: their position band
 # (build_pd_support_bar.CLAMP_POSITION_BAND) is the MHA-SH-02 back-arc taps'
-# fixed-fastener stack, so the title block's .X ±0.8 would miss the taps.
-CLAMP_POSITION_PLACES = 2
+# fixed-fastener stack, which the title block's .XX ±.01 would overrun.
+CLAMP_POSITION_PLACES = 3
 # The clamp counterbores' depth prints .XX: under its band the shallowest
 # depth still sinks the clamp-screw head below the front face the platen
 # slides across (build_pd_support_bar.CLAMP_HEAD_RECESS).
 CLAMP_CBORE_DEPTH_PLACES = 2
-# The round counterbores' native callout prints its Ø at the document's two
-# places, under the title block's DRILLED HOLES row.
-CLAMP_HOLE_CALLOUT_PLACES = 2
-# The west slots' runs still need .XXX to close the column-pitch stack.
-# Their counterbore width instead carries explicit asymmetric limits: retain
-# the proven 8.37 mm minimum for the head's full-float envelope, while allowing
-# the ordinary .XX upper deviation. A symmetric .XX band would let the width
-# fall to 7.99 mm and foul the head; .XXX on both sides needlessly limits the
-# maximum. Geometry and the runs remain unchanged. The round counterbores take
-# 7.99: their head stays coaxial, while a slid head adds the slot run's .XXX
-# overrun (build_pd_support_bar.clamp_slot_head_clearance), so the callout
-# says the minimum is for the slid head (3de09b9 machinist review).
-CLAMP_SLOT_WIDTH_PLACES = 2
+# Every native Hole Wizard length (the round counterbores' Ø, depth) prints
+# .XXX, under the title block's DRILLED HOLES row.
+CLAMP_HOLE_CALLOUT_PLACES = 3
+# By native Hole Wizard variable: the round counterbores' Ø's and depth.
+CLAMP_CALLOUT_PRECISION = {
+    "hw-thruholedia": CLAMP_HOLE_CALLOUT_PLACES,
+    "hw-cbdia": CLAMP_HOLE_CALLOUT_PLACES,
+    "hw-cbdepth": CLAMP_CBORE_DEPTH_PLACES,
+}
+# The west slots' runs need .XXX to close the column-pitch stack, and their
+# width carries the drilled holes' +.004/0 at .XXX. Their counterbore width
+# carries explicit asymmetric limits: the minimum (.330) clears the head's
+# full-float envelope, while the upper deviation stays the ordinary .XX
+# band. The round counterbores' head stays coaxial, while a slid head adds
+# the slot run's .XXX overrun (build_pd_support_bar.clamp_slot_head_clearance),
+# so the callout says the minimum is for the slid head (3de09b9 machinist
+# review).
+CLAMP_SLOT_WIDTH_PLACES = 3
 CLAMP_SLOT_PLACES = 3
-CLAMP_SLOT_CBORE_WIDTH_PLACES = 2
-CLAMP_SLOT_CBORE_WIDTH_LIMITS = (-0.13, 0.51)
+CLAMP_SLOT_CBORE_WIDTH_PLACES = 3
+CLAMP_SLOT_CBORE_WIDTH_LIMITS = (-0.127, 0.254)  # -.005/+.010
 HANGER_STATION_NAMES = ("PivotTapStation", "BracketTapStation1", "BracketTapStation2")
 CLAMP_STATION_NAMES = (
     "ClampStation1",
@@ -82,10 +84,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Bar": {"Depth"},
     "HangerRowReference": {"HangerRowHeight", *HANGER_STATION_NAMES},
     "ClampRowReference": {"ClampRowHeight", *CLAMP_STATION_NAMES},
-    "PivotTapProfile": {"PivotTapDrillDia"},
+    # The pivot and hook taps print once each, on their countersinks'
+    # stacked callouts (below); the tap drill is the TAP size's.
     "CountersinkReference": {"PivotCskDia", "BracketCskDia"},
     "ClampSlotProfile": {"ClampSlotWidth", "ClampSlotTravel"},
-    "ClampSlotCboreProfile": {"ClampSlotCboreWidth", "ClampSlotCboreTravel"},
+    # The counterbore's run is the slot's: one .118 between the shared end
+    # centres serves both (machinist review round 2: printed twice).
+    "ClampSlotCboreProfile": {"ClampSlotCboreWidth"},
     "ClampSlotCounterbores": {"ClampSlotCboreDepth"},
 }
 
@@ -102,15 +107,13 @@ SHEET_PRECISION: dict[str, dict[str, int]] = {
         "ClampRowHeight": CLAMP_POSITION_PLACES,
         **dict.fromkeys(CLAMP_STATION_NAMES, CLAMP_POSITION_PLACES),
     },
-    "PivotTapProfile": {"PivotTapDrillDia": 2},
-    "CountersinkReference": {"PivotCskDia": 1, "BracketCskDia": 1},
+    "CountersinkReference": {"PivotCskDia": 3, "BracketCskDia": 3},
     "ClampSlotProfile": {
         "ClampSlotWidth": CLAMP_SLOT_WIDTH_PLACES,
         "ClampSlotTravel": CLAMP_SLOT_PLACES,
     },
     "ClampSlotCboreProfile": {
         "ClampSlotCboreWidth": CLAMP_SLOT_CBORE_WIDTH_PLACES,
-        "ClampSlotCboreTravel": CLAMP_SLOT_PLACES,
     },
     "ClampSlotCounterbores": {"ClampSlotCboreDepth": CLAMP_CBORE_DEPTH_PLACES},
 }
@@ -127,22 +130,24 @@ DIMENSION_CALLOUTS = {
     "Height": "MHA-PD-11\nHANGS ON IT",
     "Depth": "MHA-PD-VN-57 TIP RECESS AND\nMHA-SH-VN-52 SCREW TIPS",
     # The two rows print on one line at 1:2 though they are separate rows
-    # (the hanger row from the machine layout, the clamp row at mid-height).
+    # (the hanger row from the machine layout, the clamp row on the SH column
+    # clamps' line, both from the top face the platen hangs on).
     "HangerRowHeight": f"MHA-PD-VN-57 PIVOT AND\n{_HOOK_TAPS},\nNOT ON THE CLAMP ROW",
     # The clamp row's band is the MHA-SH-02 taps' (CLAMP_POSITION_BAND), so
     # its mate stands at the dimension, not only under the hole callout.
-    "ClampRowHeight": "MHA-SH-02\nTAPS AT BAR\nMID-HEIGHT",
+    "ClampRowHeight": "MHA-SH-02\nTAPS",
     "PivotTapStation": "MHA-PD-VN-57 PIVOT",
     "BracketTapStation1": _HOOK_TAPS,
     "BracketTapStation2": _HOOK_TAPS,
-    # The thread class is the title block's (rule 2).
-    "PivotTapDrillDia": f"TAP {PIVOT_TAP_THREAD} UNC THRU",
-    # The historical 24-character lane predates the full vendor number;
-    # draw_pd_support_bar now moves both hook callouts right of this text.
-    # One hole countersunk on both faces: no "2X", which on the hook taps'
-    # callout counts holes (r6 machinist review, rule 12).
-    "PivotCskDia": f"{_CSK} BOTH FACES,\nMHA-PD-VN-57 BEARS OUTSIDE",
-    "BracketCskDia": f"2X {_CSK}\nBOTH FACES, {BRACKET_TAP_SPEC.size} TAPS",
+    # One stacked callout per hole or pattern, on its countersink's MAX Ø
+    # (machinist review round 5: a separate tap callout per hole put two
+    # leaders on one small hole, arrowheads stacked): the tap line above, the
+    # "90° CSK" prefix (DIMENSION_PREFIXES) before the Ø, the faces and the
+    # function below. The thread class is the title block's (rule 2). The
+    # pivot is one hole countersunk on both faces: no "2X", which on the hook
+    # taps' callout counts holes (r6 machinist review, rule 12).
+    "PivotCskDia": "BOTH FACES,\nMHA-PD-VN-57 BEARS OUTSIDE",
+    "BracketCskDia": "BOTH FACES",
     # The west slots (rule 4: each band names its mate): the slots' run and
     # stations take up the pitch of the MHA-SH-02 clamp taps the screws land
     # in (build_pd_support_bar.clamp_slot_closure_margin), and the whole
@@ -154,19 +159,36 @@ DIMENSION_CALLOUTS = {
     # and nears the counterbore's wall (clamp_slot_head_clearance); the
     # 2026-10-23 review read the take-up reason alone as no reason for the
     # width's band. The counterbore's minimum clears the slid MHA-SH-VN-53
-    # head. Short lines: detail C is 2:1 in a corner, and two lines keep the
-    # block between section B-B and the 440.50 line.
+    # head; the reason names no limit word, which under the two-sided band
+    # read as ".335 MIN" (machinist review round 2). Short lines: detail C is
+    # 2:1 in a corner, and two lines of at most 15 characters keep the block
+    # between section B-B and the 440.50 line (farm run after round 2: an
+    # 18-character "MHA-SH-VN-53 HEADS" row crowded section B-B).
+    # The slot width's broken leader runs down its text's left end to the
+    # underline, so the widest row's first glyph rode that line (machinist
+    # review round 4). A no-break space each side of the widest row widens
+    # the block by a space past every glyph; the centred rows stand clear.
     "ClampSlotWidth": (
-        "THRU, MAX SEATS\nMHA-SH-VN-53 HEADS;\nTRAVEL AND STATIONS\n"
+        "THRU, MAX SEATS\n\u00a0MHA-SH-VN-53 HEADS;\u00a0\nTRAVEL AND STATIONS\n"
         "KEEP THE FULL TAKE-UP\nOF MHA-SH-02 PITCH"
     ),
-    "ClampSlotCboreWidth": "MIN CLEARS SLID\nMHA-SH-VN-53",
+    "ClampSlotCboreWidth": "CLEARS SLIDING\nMHA-SH-VN-53",
     "ClampSlotCboreDepth": "MHA-SH-VN-53\nHEADS BELOW\nSLIDE FACE",
 }
-# The slot widths' count: both west slots share one detail.
+# Above the countersinks' Ø: the tap each callout carries (DIMENSION_CALLOUTS).
+DIMENSION_CALLOUTS_ABOVE = {
+    "PivotCskDia": f"TAP {PIVOT_TAP_THREAD} UNC THRU",
+    "BracketCskDia": f"2X TAP {BRACKET_TAP_SPEC.size} UNC THRU",
+}
+# The slot widths' count: both west slots share one detail. The countersinks'
+# Ø reads as the countersink's in its stacked tap callout; a diameter's prefix
+# replaces its native Ø token, so the prefix restates it (round 6 printed
+# "90° CSK .169" with no Ø).
 DIMENSION_PREFIXES = {
     ("ClampSlotProfile", "ClampSlotWidth"): "2X ",
     ("ClampSlotCboreProfile", "ClampSlotCboreWidth"): "2X ",
+    ("CountersinkReference", "PivotCskDia"): f"{_CSK} <MOD-DIAM>",
+    ("CountersinkReference", "BracketCskDia"): f"{_CSK} <MOD-DIAM>",
 }
 # Under the round counterbores' native callout: the taps the holes' banded
 # row height and stations locate to (rule 4: the tight band names its mate, as
@@ -181,10 +203,16 @@ CLAMP_CBORE_CALLOUT = f"{CLAMP_TAP_MATE}\nMHA-SH-VN-53 HEADS BELOW SLIDE FACE"
 # PlanarFace offsets run along the outward normal (point . normal).
 SURFACE_FINISHES = (
     SurfaceFinishControl(
-        "top_slide", MACHINED_UM, PlanarFace((0, 1, 0), BAR_HEIGHT / 2.0)
+        "top_slide",
+        MACHINED_UM,
+        PlanarFace((0, 1, 0), BAR_HEIGHT / 2.0),
+        display_unit=UNIT,
     ),
     SurfaceFinishControl(
-        "front_slide", MACHINED_UM, PlanarFace((0, 0, -1), BAR_DEPTH / 2.0)
+        "front_slide",
+        MACHINED_UM,
+        PlanarFace((0, 0, -1), BAR_DEPTH / 2.0),
+        display_unit=UNIT,
     ),
 )
 

@@ -13,7 +13,8 @@ removes hidden lines.  The head's underside (its seat on the MHA-PD-18 arm) is
 the one origin: the groove's load wall, the pin's functional station, and the
 tip's apex are dimensioned from it, and the head land runs back from it.  The
 land ahead of the groove, the dome heights and the apex-to-tip overall print
-as references.
+as references.  The sheet prints decimal inch (the part's ``drawing_unit``);
+the model keeps its millimetre nominals.
 
 Run with SolidWorks open::
 
@@ -52,6 +53,7 @@ from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -88,7 +90,7 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 # The side view prints at the sheet scale, so it needs no caption.  3:1 lays
-# the 54.25 pin 163 mm long and the 0.737 groove 2.2 mm wide.
+# the 2.14 in pin 163 mm long and the .020 groove 1.5 mm wide.
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
@@ -159,13 +161,19 @@ SIDE_KEEP = {
     "TipDomeR": (TIP_X - 0.012, SIDE_CENTER[1] - 0.016),
     "TipDomeSagDim": (TIP_X - 0.012, SIDE_CENTER[1] + 0.016),
     # The tip apex from the head seat, the pin's one faced origin (rule 11):
-    # the one controlled length at that end.
-    "TipDomeZ": ((SEAT_X + TIP_X) / 2.0, _ROW_Y - 0.022),
+    # the one controlled length at that end, under the station's three-row
+    # callout.
+    "TipDomeZ": ((SEAT_X + TIP_X) / 2.0, _ROW_Y - 0.027),
+    # The seat root's one-line R MAX just under the shank, its right end
+    # short of the seat's extension line (the 1.8600's, 2.02's and .09's),
+    # so its shelf and leader rise to the lower corner crossing nothing and
+    # stay above the (.03) and the station's row (round-5 review).
+    "SeatRadius": (SEAT_X - 0.025, SIDE_CENTER[1] - 0.010),
 }
 # The callouts and the dome heights' reference parentheses are authored on
 # the part's dimensions (``pd_transgear_pin_callouts``); the sheet only
 # proves they arrived.
-OVERALL_TEXT_XY = (SIDE_CENTER[0], _ROW_Y - 0.042)
+OVERALL_TEXT_XY = (SIDE_CENTER[0], _ROW_Y - 0.047)
 # The shank's upper silhouette, between the shank Ø's tolerance stack and the
 # head Ø (at 30 mm left of the seat its leader touched the -0.008).
 FINISH_PICK = (SEAT_X - 0.015, SHANK_TOP_Y)
@@ -213,8 +221,26 @@ def _assert_part_authored_text(adapter: Any, annotations: list[Any]) -> None:
         )
 
 
+def _dress_seat_radius(adapter: Any, annotations: list[Any]) -> None:
+    """The seat root's R MAX prints radial, and its leader stops at the
+    corner: ``ArcExtensionLineOrOppositeSide`` False keeps it from running on
+    through the arc centre into the head (draw_pn_pen_rod's shoulder)."""
+    found = [a for a in annotations if dimension_name(adapter, a) == "SeatRadius"]
+    if len(found) != 1:
+        raise RuntimeError(
+            f"expected one SeatRadius on the side view, found {len(found)}"
+        )
+    annotation = _early_bound(found[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    if bool(display.Diametric):
+        raise RuntimeError("the imported seat radius is not radial")
+    display.ArcExtensionLineOrOppositeSide = False
+    if display.ArcExtensionLineOrOppositeSide is not False:
+        raise RuntimeError("SeatRadius leader still runs to the opposite side")
+
+
 def _overall_reference(adapter: Any, side: Any) -> None:
-    """The (54.25) overall, head apex to tip apex (rule 10), for the bar cut.
+    """The overall REF, head apex to tip apex (rule 10), for the bar cut.
 
     A drawing-owned dimension, so its reference parentheses are the sheet's
     own text, not an imported part dimension's.
@@ -290,7 +316,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -318,6 +348,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _assert_part_authored_text(adapter, annotations)
+    _dress_seat_radius(adapter, annotations)
     _overall_reference(adapter, side)
 
     add_view_centerline(

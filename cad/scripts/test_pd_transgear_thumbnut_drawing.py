@@ -63,9 +63,12 @@ def test_actual_entry_cones_carry_model_owned_controls() -> None:
     assert spec.CSK_HALF_ANGLE_MIN == pytest.approx(
         spec.CSK_HALF_ANGLE_DEG - angular_band_deg()
     )
-    assert spec.CSK_DIA_TOL_TYPE == 6
-    # Machinist review: a thread-entry chamfer's MAX prints at one place.
-    assert spec.CSK_DIA_PLACES == 1
+    # Round 6: one MAX the part authors as text; SolidWorks' native swTolMAX
+    # printed a lowercase "max.".
+    assert spec.CSK_DIA_TOL_TYPE == 0
+    assert spec.CSK_DIA_SUFFIX == " MAX"
+    # Machinist review: a thread-entry chamfer's MAX needs few places (.XX).
+    assert spec.CSK_DIA_PLACES == 2
     assert spec.DRAWING_DIMENSIONS["CountersinkProfile"] == {
         "CountersinkDia", "CountersinkHalfAngle",
     }
@@ -123,12 +126,12 @@ def test_the_seat_face_bears_on_the_collar_pilot(monkeypatch) -> None:
 
 def test_countersinks_take_no_more_thread_than_the_engagement_deducts() -> None:
     """Actual MAX cone and the smallest printed half-angle charge both ends."""
-    assert spec.CSK_DIA == pytest.approx(4.6)
+    assert spec.CSK_DIA == pytest.approx(4.572)  # .18
     rear = (spec.CSK_DIA - spec.TAP_DRILL_DIA) / (
         2.0 * math.tan(math.radians(spec.CSK_HALF_ANGLE_MIN))
     )
     assert rear == pytest.approx(spec.REAR_THREAD_LOSS)
-    deepest_floor = spec.DISH_DEPTH + printed_band_mm(spec.DISH_DEPTH_PLACES)
+    deepest_floor = spec.DISH_DEPTH + printed_band_mm(spec.DISH_DEPTH_PLACES, unit=spec.UNIT)
     front = deepest_floor + rear
     assert front > rear
     assert front <= spec.FRONT_THREAD_LOSS + 1e-9
@@ -153,22 +156,22 @@ def test_the_dish_ends_on_its_floor_at_every_printed_size() -> None:
         "DishProfile"
     ]
     assert {"DishDia", "DishFloorDia", "DishDepth"} <= set(drawing.SECTION_KEEP)
-    # Title-block .X: the band the margins below are judged at.
-    assert drawing.DRAWING_PRECISION_BY_NAME["DishFloorDia"] == 1
+    # Title-block .XX: the band the margins below are judged at.
+    assert drawing.DRAWING_PRECISION_BY_NAME["DishFloorDia"] == 2
     assert spec.dish_floor_margins(
         spec.DISH_DIA, spec.DISH_FLOOR_DIA, spec.DISH_DEPTH, spec.CSK_DIA
     ) == pytest.approx(
         {
-            "floor land outside the countersink": (9.0 - 0.8 - 4.6) / 2.0,
-            "cone from the rim to the floor": 2.2,
-            "floor below the rim": 0.2,
+            "floor land outside the countersink": (8.89 - 0.254 - 4.572) / 2.0,
+            "cone from the rim to the floor": (14.986 - 0.254 - 8.89 - 0.254) / 2.0,
+            "floor below the rim": 1.016 - 0.254,
         }
     )
     rim, floor = spec.DISH_RIM_CORNER, spec.DISH_FLOOR_CORNER
     assert rim == pytest.approx((spec.DISH_DIA / 2.0, spec.RIM_Y))
     assert floor == pytest.approx((spec.DISH_FLOOR_DIA / 2.0, spec.DISH_FLOOR_Y))
     assert rim[1] - floor[1] == pytest.approx(spec.DISH_DEPTH)
-    band = printed_band_mm(spec.DISH_FLOOR_DIA_PLACES)
+    band = printed_band_mm(spec.DISH_FLOOR_DIA_PLACES, unit=spec.UNIT)
     assert _outside_every_countersink((floor[0] - band / 2.0, floor[1]))
     assert _outside_every_countersink(rim)
     # Negative controls: the 6de7230aa depth ran to the axis, inside the
@@ -421,41 +424,58 @@ def test_the_tapped_hole_note_whose_leader_the_callout_crossed_is_removed() -> N
     )
 
 
-def test_the_knurl_is_the_designated_din_82_raa_1_0() -> None:
-    """R9-57: the modelled teeth are the 1.0-pitch 90° straight knurl the
-    callout names, so the shop's wheel forms what the model shows."""
-    assert spec.KNURL_CREST_PITCH == pytest.approx(1.0, abs=0.01)
+def test_the_knurl_is_the_designated_wheel() -> None:
+    """R9-57: the modelled teeth are the 90° straight knurl the callout names
+    (25 TPI, 1.016 mm pitch), so the shop's wheel forms what the model shows."""
+    assert spec.KNURL_PITCH == pytest.approx(25.4 / 25)
+    assert spec.KNURL_CREST_PITCH == pytest.approx(spec.KNURL_PITCH, rel=0.01)
     assert spec.KNURL_TOOTH_ANGLE_DEG == pytest.approx(90.0, abs=2.0)
     assert spec.KNURL_DESIGNATION in spec.KNURL_CALLOUT
-    # Negative control: the 19e33c6c2 model (60 teeth over a Ø19.7 root)
-    # was a 1.07-pitch, 108.5° V no standard wheel forms.
-    old_angle = spec.knurl_tooth_angle_deg(spec.HEAD_DIA, 19.7, 60)
+    # Negative control: the 19e33c6c2 model (60 teeth over a Ø19.7 root
+    # under its Ø20.5 crests) was a 1.07-pitch, 108.5° V no standard wheel forms.
+    old_angle = spec.knurl_tooth_angle_deg(20.5, 19.7, 60)
     assert old_angle == pytest.approx(108.5, abs=0.1)
-    assert math.pi * spec.HEAD_DIA / 60 - spec.KNURL_PITCH > 0.01
+    assert math.pi * 20.5 / 60 - spec.KNURL_PITCH > 0.01
 
 
 def test_the_knurl_designation_is_authored_where_it_prints() -> None:
     """Run 20261001T154021634Z's machinist review: the sheet showed Ø20.5 and
     no knurl.  The designation rode a two-line above-callout, which SolidWorks
-    stored but did not print; one line in that compartment prints."""
+    stored but did not print; one line in that compartment prints.  Round 3:
+    a callout wider than the Ø.81 span ran the dimension line out under its
+    text, so it fits between the extension lines."""
+    from _layout_geometry import estimate_text_box
+
     above = drawing.DIMENSION_CALLOUTS_ABOVE
     assert spec.KNURL_DESIGNATION in above["HeadDia"]
-    assert "DIA OVER KNURL" in above["HeadDia"]
+    assert "OVER KNURL" in drawing.DIMENSION_SUFFIXES["HeadDia"]
     assert drawing._printable_above_callouts(above) == above
     with pytest.raises(RuntimeError, match="HeadDia"):
         drawing._printable_above_callouts(
             {"HeadDia": f"STRAIGHT KNURL {spec.KNURL_DESIGNATION}\nDIA OVER KNURL"}
         )
 
+    def width(text: str) -> float:
+        box = estimate_text_box(text, anchor=(0.0, 0.0), height=0.0035, reference=5)
+        assert box is not None
+        return box.xmax - box.xmin
+
+    # The estimate reads ~11 % short of the printed ink (round 3's callout:
+    # 0.104 estimated, 0.116 printed), so charge that margin.
+    span = spec.HEAD_DIA * drawing._S / 1000.0
+    assert 1.15 * width(above["HeadDia"]) < span
+    # Negative control: round 3's one-line callout overran the span.
+    assert width("STRAIGHT KNURL 25 TPI, 90° TOOTH; DIA OVER KNURL") > span
+
 
 def test_the_shortest_nut_keeps_full_thread_for_the_stud() -> None:
-    """The overall length prints at .X; the shortest nut it admits still
+    """The overall length prints at .XX; the shortest nut it admits still
     gives the stud 1.5D of the nut's full thread."""
     import pd_transgear_drive_collar_spec as collar
     import pd_transgear_knob_shaft_spec as stud
 
-    assert spec.OVERALL_LENGTH_LO == pytest.approx(-0.8)
-    assert collar.NUT_LENGTH_MIN == pytest.approx(15.3)
+    assert spec.OVERALL_LENGTH_LO == pytest.approx(-0.254)
+    assert collar.NUT_LENGTH_MIN == pytest.approx(15.748)
     assert collar.THUMBNUT_ENGAGEMENT_WORST >= 1.5 * stud.THREAD_MAJOR
     # The nut's own full thread over its shortest length, the front
     # countersink on the deepest printed floor.
@@ -482,8 +502,16 @@ def test_the_stem_diameters_print_across_their_own_cut() -> None:
         "WaistDia": (spec.FLANGE_LENGTH, spec.FLANGE_LENGTH + spec.WAIST_LENGTH),
     }.items():
         x, y = drawing.SECTION_KEEP[name]
-        assert lo < _section_station(y) < hi, name
+        # Round 4: the printed LINE, which runs DIM_LINE_BELOW_TEXT under the
+        # anchor, sits at the feature's mid-height, clear of both its ends.
+        line = _section_station(y - drawing.DIM_LINE_BELOW_TEXT)
+        assert line == pytest.approx((lo + hi) / 2.0), name
         assert x > head_right, name
+    # Negative control: round 4's Ø.43 anchored at the waist's middle drew
+    # its line within 0.2 mm (model) of the Ø.49 shoulder.
+    old_anchor = drawing._section_y(spec.FLANGE_LENGTH + spec.WAIST_LENGTH / 2.0)
+    old_line = _section_station(old_anchor - drawing.DIM_LINE_BELOW_TEXT)
+    assert old_line - spec.FLANGE_LENGTH < 0.2
     # The text clears the overall length's dimension line beyond it.
     assert drawing.SECTION_KEEP["OverallLength"][0] - drawing._STEM_TEXT_X > 0.004
     # All nine turned/dished sizes remain above the seat. The cone diameter
@@ -498,15 +526,34 @@ def test_the_stem_diameters_print_across_their_own_cut() -> None:
     angle_arc = drawing.SECTION_KEEP["CountersinkHalfAngle"]
     angle_text = drawing.COUNTERSINK_ANGLE_TEXT_XY
     assert dia[0] < drawing.SECTION_CENTER[0] - drawing.HALF_HEAD - 0.020
-    assert angle_text[0] > head_right + 0.010
-    assert dia[1] == angle_text[1] < seat_y
+    assert dia[1] < seat_y
     assert dia[1] > SHEET_INNER_LEFT + 0.020
     # Compact arc anchor just outside the rear cone, not outside the head.
     cone_right = drawing._section_x(spec.CSK_DIA / 2.0)
     assert 0.0 < angle_arc[0] - cone_right < 0.003
     assert 0.0 < seat_y - angle_arc[1] < 0.003
-    apex = (drawing.SECTION_CENTER[0], drawing._section_y(spec.REAR_CSK_APEX_Y))
+    apex = drawing.COUNTERSINK_APEX_XY
+    assert apex == (drawing.SECTION_CENTER[0], drawing._section_y(spec.REAR_CSK_APEX_Y))
     assert math.dist(angle_arc, apex) < 0.015
+
+    def from_axis(point: tuple[float, float]) -> float:
+        """Degrees off the axis below the apex, toward the right-hand cone."""
+        return math.degrees(math.atan2(point[0] - apex[0], apex[1] - point[1]))
+
+    # Round 3: the text sits inside the angle's own sector (axis to cone
+    # extension), beyond the arc and below the seat, so the native arc is
+    # never extended past the cone into the hatching.
+    assert 0.0 < from_axis(angle_text) < spec.CSK_HALF_ANGLE_DEG
+    assert math.dist(angle_text, apex) > math.dist(angle_arc, apex) + 0.005
+    assert drawing.SECTION_CAPTION_XY[1] < angle_text[1] - 0.0035 < angle_text[1] < dia[1]
+    # Its leader leaves the arc right of the cone diameter's extension line.
+    arc_r = math.dist(angle_arc, apex)
+    leader_start_x = apex[0] + arc_r * math.sin(math.radians(from_axis(angle_text)))
+    assert leader_start_x > cone_right
+    # Negative control: round 2's text right of the head sat ~73° off the
+    # axis, so the arc swung on past the 45° cone into the material.
+    round_2_text = (drawing.SECTION_CENTER[0] + 0.049, seat_y - 0.008)
+    assert from_axis(round_2_text) > spec.CSK_HALF_ANGLE_DEG
     # Negative control: 4e9a4df's sheet-outboard anchor grew a >50 mm arc.
     old_arc = (head_right + 0.025, seat_y - 0.008)
     assert math.dist(old_arc, apex) > 0.050
@@ -526,7 +573,7 @@ def test_lengths_read_from_the_seat_face() -> None:
     assert spec.DRAWING_DIMENSIONS["HeadProfile"] == {"HeadDia", "HeadRearY", "OverallLength"}
     stem = spec.DRAWING_DIMENSIONS["StemProfile"]
     assert "FlangeLength" in stem and "WaistLength" not in stem
-    assert (spec.FLANGE_LENGTH, spec.HEAD_REAR_Y) == pytest.approx((5.0, 7.4))
+    assert (spec.FLANGE_LENGTH, spec.HEAD_REAR_Y) == pytest.approx((5.08, 7.366))
     assert spec.HEAD_REAR_Y - spec.FLANGE_LENGTH == pytest.approx(spec.WAIST_LENGTH)
     # Two left lanes, the flange inner and the head's rear face outer, each
     # text inside its own span from the seat.
@@ -538,32 +585,42 @@ def test_lengths_read_from_the_seat_face() -> None:
         assert x == pytest.approx(drawing._section_x(-spec.HEAD_DIA / 2.0) - lane)
         assert 0.0 < _section_station(y) < top
     # Run 20261024T025840809Z: an outside arrow hung below the seat into
-    # the cone diameter's "max."; both spans hold their arrows inside.
-    assert drawing.ARROWS_INSIDE == ("FlangeLength", "HeadRearY")
+    # the cone diameter's "max."; both spans hold their arrows inside, and
+    # round 3's knurl diameter, whose outside tail ran under its callout.
+    assert drawing.ARROWS_INSIDE == ("FlangeLength", "HeadRearY", "HeadDia")
+
+
+def test_the_section_axis_is_sketched_at_the_sheet_scale() -> None:
+    """Round 3's gating finding: the projected axis (sheet x 0.110) passed
+    straight into the 3:1 sheet sketch printed at x 0.330, from the top
+    border down onto the isometric.  Sketch points are sheet points over
+    the sheet scale, so the printed line lands back on the section."""
+    end = (drawing.SECTION_CENTER[0], drawing._section_y(-drawing.AXIS_OVERSHOOT_MM))
+    sketch = drawing._sheet_sketch_point(end)
+    printed = (sketch[0] * drawing._S, sketch[1] * drawing._S)
+    assert printed == pytest.approx(end)
+    # Negative control: the unscaled point prints three times out.
+    assert end[0] * drawing._S == pytest.approx(0.330)
 
 
 def test_the_waist_keeps_a_length_at_every_printed_corner(monkeypatch) -> None:
-    """codjiflo on 11fe6c440: 16.1, 8.7 from the rim and 5.0 from the seat,
-    each ±0.8, let the waist close to 0. From the seat, the head's rear face
-    at its lowest stands 0.8 above the flange's shoulder at its highest."""
-    band = printed_band_mm(1)
+    """codjiflo on 11fe6c440: chained from the rim and the seat, the waist
+    could close to 0. From the seat, the head's rear face at its lowest
+    stands clear above the flange's shoulder at its highest."""
+    band = printed_band_mm(2, unit=spec.UNIT)
     assert spec.WAIST_LENGTH_WORST == pytest.approx(
         (spec.HEAD_REAR_Y - band) - (spec.FLANGE_LENGTH + band)
     )
-    assert spec.WAIST_LENGTH_WORST == pytest.approx(0.8)
-    # Negative control: the 11fe6c440 scheme's corner.
-    assert (spec.OVERALL_LENGTH - band) - (spec.HEAD_LENGTH + band) - (
-        spec.FLANGE_LENGTH + band
-    ) == pytest.approx(0.0, abs=1e-9)
+    assert spec.WAIST_LENGTH_WORST == pytest.approx(1.778)
     # The spec's own gate refuses a printed row wide enough to close the
-    # waist (one-place bands 1.7x wider; the walls still hold first).
+    # waist (two-place bands 5x wider; the walls still hold first).
     import _printed_tolerance
 
     real = _printed_tolerance.printed_deviations
 
-    def wider(nominal: float, places: int) -> tuple[float, float]:
-        lo, hi = real(nominal, places)
-        return (lo * 1.7, hi * 1.7) if places == 1 else (lo, hi)
+    def wider(nominal: float, places: int, **kwargs) -> tuple[float, float]:
+        lo, hi = real(nominal, places, **kwargs)
+        return (lo * 5.0, hi * 5.0) if places == 2 else (lo, hi)
 
     with pytest.raises(AssertionError, match="waist closes"):
         _thumbnut_spec_with(monkeypatch, _printed_tolerance, "printed_deviations", wider)
@@ -752,7 +809,9 @@ def test_the_reversed_section_is_centred_by_its_outline(monkeypatch) -> None:
     run = _SectionView()
     run.GetSection().SetReversedCutDirection(True)
     run.SetViewPosition(drawing.SECTION_CENTER)
-    assert run.project((0.0, 0.0, 0.0))[1] == pytest.approx(0.18915)
+    assert run.project((0.0, 0.0, 0.0))[1] == pytest.approx(
+        drawing.SECTION_CENTER[1] + spec.OVERALL_LENGTH * drawing._S / 2000.0
+    )
 
 
 def test_a_section_whose_ink_will_not_move_is_refused(monkeypatch) -> None:
@@ -764,8 +823,6 @@ def test_the_outline_must_be_the_nut_on_its_axis() -> None:
     view = _SectionView()
     outline = view.GetOutline()
     assert drawing._outline_is_the_nut_on_end(outline)
-    # The 19e33c6c2 section A-A outline, read by the layout audit.
-    assert drawing._outline_is_the_nut_on_end((0.178662, 0.135262, 0.251338, 0.194738))
     # The same nut lying on its side.
     x0, y0, x1, y1 = outline
     centre = ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
@@ -792,57 +849,70 @@ def test_the_thread_callout_stays_inside_the_left_border() -> None:
 
 
 class _CountersinkTolerance:
-    def __init__(self, *, accepts=True, persists=True):
-        self.Type = 0
-        self.low = self.high = 0.0
-        self.accepts, self.persists = accepts, persists
+    """A tolerance that keeps its type, or one stuck at the old swTolMAX."""
 
-    def SetValues(self, low: float, high: float) -> bool:
+    def __init__(self, *, persists=True):
+        self._type = 6
+        self.persists = persists
+
+    @property
+    def Type(self) -> int:
+        return self._type
+
+    @Type.setter
+    def Type(self, value: int) -> None:
         if self.persists:
-            self.low, self.high = low, high
-        return self.accepts
-
-    def GetMinValue(self) -> float:
-        return self.low
-
-    def GetMaxValue(self) -> float:
-        return self.high
+            self._type = value
 
 
-def _apply_countersink_max(monkeypatch, tolerance, *, diameter=None):
+class _CountersinkDisplay:
+    def __init__(self, *, persists=True):
+        self.texts: dict[int, str] = {}
+        self.persists = persists
+
+    def SetText(self, part: int, text: str) -> None:
+        if self.persists:
+            self.texts[part] = text
+
+    def GetText(self, part: int) -> str:
+        return self.texts.get(part, "")
+
+
+def _apply_countersink_max(monkeypatch, tolerance, display=None, *, diameter=None):
+    display = _CountersinkDisplay() if display is None else display
     monkeypatch.setattr(part, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(
         part, "_named_dimension",
-        lambda *_args: (object(), SimpleNamespace(
+        lambda *_args: (display, SimpleNamespace(
             SystemValue=(spec.CSK_DIA if diameter is None else diameter) / 1000.0,
             Tolerance=tolerance,
         )),
     )
     part._countersink_max_limit(object(), "CountersinkDia")
+    return display
 
 
-def test_native_countersink_max_owns_real_diameter_envelope(monkeypatch) -> None:
+def test_the_countersink_prints_its_single_max_as_authored_text(monkeypatch) -> None:
     tolerance = _CountersinkTolerance()
-    _apply_countersink_max(monkeypatch, tolerance)
-    assert tolerance.Type == spec.CSK_DIA_TOL_TYPE
-    assert (
-        spec.CSK_DIA + tolerance.low * 1000.0,
-        spec.CSK_DIA + tolerance.high * 1000.0,
-    ) == pytest.approx((spec.THREAD_MAJOR, spec.CSK_DIA))
+    display = _apply_countersink_max(monkeypatch, tolerance)
+    assert tolerance.Type == spec.CSK_DIA_TOL_TYPE == 0
+    assert display.GetText(2) == spec.CSK_DIA_SUFFIX
+    # The modelled size IS the max, and it clears the thread major.
+    assert spec.CSK_DIA > spec.THREAD_MAJOR
 
 
 @pytest.mark.parametrize(
-    "tolerance, diameter, message",
-    [(None, None, "missing"),
-     (_CountersinkTolerance(accepts=False), None, "rejected"),
-     (_CountersinkTolerance(persists=False), None, "persist"),
-     (_CountersinkTolerance(), 6.75, "diameter")],
+    "tolerance, display, diameter, message",
+    [(None, None, None, "missing"),
+     (_CountersinkTolerance(persists=False), None, None, "persist"),
+     (_CountersinkTolerance(), _CountersinkDisplay(persists=False), None, "persist"),
+     (_CountersinkTolerance(), None, 6.75, "diameter")],
 )
 def test_native_countersink_control_refuses_unwritten_or_obsolete_geometry(
-    monkeypatch, tolerance, diameter, message
+    monkeypatch, tolerance, display, diameter, message
 ) -> None:
     with pytest.raises(RuntimeError, match=message):
-        _apply_countersink_max(monkeypatch, tolerance, diameter=diameter)
+        _apply_countersink_max(monkeypatch, tolerance, display, diameter=diameter)
 
 
 def test_build_places_the_cone_angle_on_the_section_after_its_callouts(

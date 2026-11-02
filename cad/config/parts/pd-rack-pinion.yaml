@@ -3,10 +3,11 @@ pd-rack-pinion:
   number: MHA-PD-06
   material: Brass
   material_specification: C36000 free-machining brass
-  finish: gear teeth cut; polished brass
+  finish: bright machined, oiled
   quantity: 1
   tolerance_class: machined_block
   fit_class: gear_mesh
+  drawing_unit: in
   # Selected stock cutter: TTC 10-289-481, 48DP PA20 #1 (135T to rack), observed
   # in Travers' catalogue 2026-10-27 (#2034):
   # https://www.travers.com/product/ttc-10-289-481-involute-style-gear-cutter-10-289-481

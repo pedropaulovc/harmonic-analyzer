@@ -1,10 +1,10 @@
 r"""Reproduction script: latch hook (MHA-PD-14; book ch. 23 pp. 58-63; video 4/4).
 
 The "small latch that allows the operator to disengage the gearing from the
-platen" (ch23 text; p.58 "latch" callout): ONE formed 0.8 (0.032 in) 1095
+platen" (ch23 text; p.58 "latch" callout): ONE formed .032 in 1095
 spring-steel part.  A base lies on the MHA-PD-07 support bar's back face
 under two #4-40 screws (MHA-PD-VN-59); a 90 deg ear rises at its +X end; an arm
-hangs from the ear's lower edge, rolled R80 flatwise until it lies square to
+hangs from the ear's lower edge, rolled flatwise until it lies square to
 the MHA-PD-VN-58 latch pin, with the pin hole and a finger tab below it.
 Geometry and frame: ``pd_latch_hook_geometry``; printed bands, walls, notes
 and the marked dimensions: ``pd_latch_hook_spec``.
@@ -17,10 +17,10 @@ the part by translation to ``PART_ORIGIN_MACHINE``):
   extruded +Y by the width (``BaseEar``); ``InsideBend`` / ``OutsideBend``
   the concentric bend radii;
 * ``ArmProfile``: the arm's Front-plane outline -- the ear-high top, the
-  vertical, the R80 roll, the straight (split at the far face where the pin
-  crosses it), the R10 tab and its radial end -- extruded over the arm's z
+  vertical, the roll, the straight (split at the far face where the pin
+  crosses it), the tab and its radial end -- extruded over the arm's z
   band from a start offset (``Arm``);
-* ``TaperProfile`` / ``Taper``: the front edge's 10 -> 11.5 taper, cut
+* ``TaperProfile`` / ``Taper``: the front edge's taper out to the low band,
   through on the Right Plane (sketch x = model -Z);
 * ``RootRelief``: the inside corner where the arm's front edge meets the
   ear's lower edge;
@@ -30,7 +30,8 @@ the part by translation to ``PART_ORIGIN_MACHINE``):
 * ``PinHolePlane`` / ``PinHoleProfile`` / ``PinHole``: the pin hole, a
   revolve cut about its axis along U at the pin's height;
 * ``FlatBlank``: the flat pattern, a hidden reference sketch on the Right
-  Plane beside the part (the drawing's thin outline beside the side view).
+  Plane beside the part (the drawing's outline and bend centrelines beside
+  the side view).
 
 Run (SolidWorks already open)::
 
@@ -44,10 +45,12 @@ import sys
 
 from _appearance import POLISHED_STEEL, apply_color, apply_material
 from _check import check
+from _document_units import apply_package_model_units
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _extrude import extrude_at_offset
 from _feature_tree import name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -69,11 +72,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
-from _fit_deviations import deviations
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _visibility import blank_reference_geometry
 from pd_latch_hook_geometry import (
     ARM_N,
@@ -84,10 +83,13 @@ from pd_latch_hook_geometry import (
     BBOX_X,
     BBOX_Y,
     BBOX_Z,
+    DEV_ROLL_C,
+    DEV_TAB_C,
     DEV_TAPER,
     DEV_TIP,
     EAR_HEIGHT,
     FAR_FACE_STATION,
+    FLAT_BEND_C,
     FLAT_LENGTH,
     INNER_ROLL_END,
     INNER_ROLL_R,
@@ -134,21 +136,18 @@ from pd_latch_hook_geometry import (
     z_local,
 )
 from pd_latch_hook_spec import (
-    BASE_LENGTH_TOL,
-    BEND_R_BAND,
-    BOTTOM_VIEW_NOTE,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
+    FLAT_PATTERN_NOTE,
     FLAT_SKETCH,
-    FORMED_BAND,
     FORMED_DIMENSIONS,
-    HOLE_BAND,
+    FORMED_TOL,
     ISOMETRIC_VIEW_NOTE,
     POSITION_DIMENSIONS,
     POSITION_TOL,
     REFERENCE_SKETCHES,
-    WIDTH_TOL,
+    UNIT,
 )
 
 PART_NAME = "pd-latch-hook"
@@ -156,7 +155,7 @@ MATERIAL = "Plain Carbon Steel"  # 1095 spring steel (the registry row names it)
 DRAWING_PROPERTIES = {
     "Manufacturing Notes": DRAWING_NOTES,
     "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-    "Bottom View Note": BOTTOM_VIEW_NOTE,
+    "Flat Pattern Note": FLAT_PATTERN_NOTE,
 }
 
 # The L section in Top-Plane sketch coordinates (x, -z), from the base's -X
@@ -176,7 +175,7 @@ V_SHARP_L = (BASE_LENGTH + EAR_HEIGHT - SHEET_T) * SHEET_T * WIDTH
 # The arm's far (+U) face where the pin crosses it: the outer straight is
 # split there so the sheet locates the latching face from the origin.
 FAR_FACE_POINT = to_local(*on_arm(FAR_FACE_STATION))
-ARM_FRONT_Z = z_local(Z_FRONT)  # the front edge above the taper: 6.0
+ARM_FRONT_Z = z_local(Z_FRONT)  # the front edge above the taper: 5.588 (.22)
 
 # Right-Plane sketches: sketch (x, y) = (-Z, Y).
 _TAPER_POINTS = [
@@ -193,7 +192,7 @@ _ROUND_BOTTOM = min(OUTER_TAB_END[1], INNER_TAB_END[1]) - _ROUND_OVERRUN
 # The pin hole's revolve profile, on the plane at the pin's height (sketch
 # (x, y) = (X, Y)): the axis along U through the hole centre, the profile a
 # rectangle from the axis to the hole radius along +N, 2 each way along U --
-# well past the 0.8 strip it crosses square.
+# well past the strip it crosses square.
 _PIN_HALF_RUN = 2.0
 _PIN_AXIS = (
     (
@@ -234,6 +233,23 @@ _FLAT = {
 }
 if abs(_FLAT_LOW - _FLAT_FRONT - LIP_W) > 1e-9:
     raise AssertionError("the flat's taper does not step the front edge by LIP_W")
+# The bend centrelines: the ear's bend across the blank, the low edge to the
+# top; the roll's across the arm below the taper, the rear edge to the low
+# front edge; the tab's a chord of the full round (the round trims the tab).
+_TAB_HALF = math.sqrt(ROUND_R**2 - (DEV_TAB_C + _FLAT_ROUND_C[1]) ** 2)
+_FLAT_BENDS = {
+    "bend": ((FLAT_GAP + FLAT_BEND_C, 0.0), (FLAT_GAP + FLAT_BEND_C, WIDTH)),
+    "roll": ((FLAT_GAP, -DEV_ROLL_C), (_FLAT_LOW, -DEV_ROLL_C)),
+    "tab": (
+        (_FLAT_ROUND_C[0] - _TAB_HALF, -DEV_TAB_C),
+        (_FLAT_ROUND_C[0] + _TAB_HALF, -DEV_TAB_C),
+    ),
+}
+if not (
+    _FLAT["root_start"][0] < FLAT_GAP + FLAT_BEND_C < _FLAT["low_end"][0]
+    and DEV_TAPER[1] < DEV_ROLL_C < -_FLAT_ROUND_C[1] < DEV_TAB_C < DEV_TIP
+):
+    raise AssertionError("a flat-pattern bend centreline leaves its edges")
 
 
 async def _relate(adapter, rows) -> None:
@@ -438,14 +454,16 @@ async def _arm_profile(adapter) -> SketchDims:
 
 
 async def _flat_blank(adapter) -> SketchDims:
-    """The flat pattern in the open Right-plane sketch: ordinary sketch
-    geometry, so the drawing draws it as a continuous thin outline (the
-    chain font of construction geometry broke its short edges apart).
+    """The flat pattern in the open Right-plane sketch: its outline ordinary
+    sketch geometry, so the drawing draws it continuous (the chain font of
+    construction geometry broke its short edges apart), and the three bend
+    centrelines construction (chain) lines.
 
-    38 DOF: 9 joins (18); six horizontals/verticals (6); four tangencies (4);
+    50 DOF: 9 joins (18); six horizontals/verticals (6); four tangencies (4);
     the blank's top corner anchored (2); its length and width, the root
     relief radius, the arm's two widths, the taper's two developed stations
-    and the full round's centre (8).
+    and the full round's centre (8); each bend centreline's two ends on its
+    edges, its direction and its station (12).
     """
     dims = SketchDims()
     p = _FLAT
@@ -478,6 +496,10 @@ async def _flat_blank(adapter) -> SketchDims:
     rear = check(
         "flat rear edge", await adapter.add_line(*p["round_rear"], *p["top_rear"])
     )
+    bends = {
+        name: check(f"flat {name} centreline", await adapter.add_centerline(*a, *b))
+        for name, (a, b) in _FLAT_BENDS.items()
+    }
     set_sketch_direct_db(adapter, False)
     await _relate(
         adapter,
@@ -501,6 +523,40 @@ async def _flat_blank(adapter) -> SketchDims:
             ("flat root tangent to the front edge", root, front, "tangent"),
             ("flat round tangent to the front edge", tip, low_front, "tangent"),
             ("flat round tangent to the rear edge", tip, rear, "tangent"),
+            (
+                "flat bend line on the low edge",
+                f"{bends['bend']}.start",
+                low,
+                "coincident",
+            ),
+            (
+                "flat bend line on the top edge",
+                f"{bends['bend']}.end",
+                top,
+                "coincident",
+            ),
+            ("flat bend line vertical", bends["bend"], None, "vertical"),
+            (
+                "flat roll line on the rear edge",
+                f"{bends['roll']}.start",
+                rear,
+                "coincident",
+            ),
+            (
+                "flat roll line on the low front edge",
+                f"{bends['roll']}.end",
+                low_front,
+                "coincident",
+            ),
+            ("flat roll line horizontal", bends["roll"], None, "horizontal"),
+            ("flat tab line on the round", f"{bends['tab']}.start", tip, "coincident"),
+            (
+                "flat tab line across the round",
+                f"{bends['tab']}.end",
+                tip,
+                "coincident",
+            ),
+            ("flat tab line horizontal", bends["tab"], None, "horizontal"),
         ),
     )
     await anchor_point_to_origin(
@@ -550,6 +606,26 @@ async def _flat_blank(adapter) -> SketchDims:
             adapter, f"{base_end}.end", ref, "vertical_distance", value, name
         )
         dims.record(name)
+    await dimension_between(
+        adapter,
+        f"{top}.start",
+        f"{bends['bend']}.end",
+        "horizontal_distance",
+        FLAT_BEND_C,
+        "flat bend centreline",
+    )
+    dims.record("FlatBendC")
+    # Each from the line's front (+x) end, so its extension line runs clear
+    # of the blank: the roll's from the stations' baseline, the tab's chained
+    # on from the full round's centre (sharing that station's extension).
+    for name, ref, line, value in (
+        ("FlatRollC", f"{base_end}.end", bends["roll"], DEV_ROLL_C),
+        ("FlatTabC", f"{tip}.center", bends["tab"], DEV_TAB_C + _FLAT_ROUND_C[1]),
+    ):
+        await dimension_between(
+            adapter, ref, f"{line}.end", "vertical_distance", value, name
+        )
+        dims.record(name)
     return dims
 
 
@@ -561,10 +637,10 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
-    # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
-    # is an INCH document and the equation manager reads BARE numbers in
-    # document units.
+    # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- the
+    # equation manager reads BARE numbers in document units (inch here).
     for name, value in (
         ("SheetT", SHEET_T),
         ("Width", WIDTH),
@@ -617,8 +693,8 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs.append((width_dim[0], '"Width"'))
     await volume_check(adapter, "sharp L", V_SHARP_L, 0.005 * V_SHARP_L)
 
-    # The bend: inside R1.2 in the re-entrant corner, outside R2.0 on the
-    # outer corner, about one centre.
+    # The bend: the inside radius in the re-entrant corner, the outside one
+    # (inside plus the sheet) on the outer corner, about one centre.
     check(
         "fillet inside bend",
         await adapter.add_fillet(INSIDE_BEND_R, [[-SHEET_T, WIDTH / 2.0, SHEET_T]]),
@@ -637,7 +713,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "bent L", expected, 0.005 * V_L)
 
     # --- The arm: its Front-plane outline over the z band, from a start
-    # offset.  Its top (y 0..8) lies inside the ear, already solid.
+    # offset.  Its top (y 0..WIDTH) lies inside the ear, already solid.
     check("create_sketch arm", await adapter.create_sketch("Front"))
     arm = await _arm_profile(adapter)
     await ensure_fully_defined(adapter, "arm profile")
@@ -655,7 +731,7 @@ async def build(adapter) -> dict[str, str]:
     expected += V_ARM_PRISM - V_ARM_ON_EAR
     await volume_check(adapter, "arm", expected, 0.005 * expected)
 
-    # --- The taper: the front edge 1.5 forward of the guide-lock screw heads
+    # --- The taper: the front edge 1.588 forward of the guide-lock screw heads
     # down to TAPER_L[0], then out to the low band at TAPER_L[1].  Cut
     # through along X; the region stops at the ear's lower edge (y = 0).
     taper = SketchDims()
@@ -946,36 +1022,28 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
-    # Drilled after bending (screw holes) or on the pin (pin hole), never
-    # under size.
-    set_dimension_bilateral_tolerance(
-        adapter, "ScrewHoleProfile", "ScrewDia", *deviations(HOLE_BAND)
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "PinHoleProfile", "PinHoleDia", *deviations(HOLE_BAND)
-    )
-    # The inside bend: R1.5 the largest the screw head clears.
-    set_dimension_bilateral_tolerance(
-        adapter, "InsideBend", "InsideBendR", *deviations(BEND_R_BAND)
-    )
+    # The drilled holes, the width and the inside bend radius take the title
+    # block's rows (DRILLED HOLES, .XX).
     # Screw-hole positions from the formed ear and the low-Y edge.
     for feature_name, dimension_names in POSITION_DIMENSIONS.items():
         for dimension_name in dimension_names:
             set_dimension_symmetric_tolerance(
-                adapter, feature_name, dimension_name, POSITION_TOL
+                adapter,
+                feature_name,
+                dimension_name,
+                POSITION_TOL,
+                display_unit=UNIT,
             )
-    # The ear's +Y edge in the guide-lock sweep and the screw holes' y-edge
-    # walls; the far screw hole's -X edge wall.
-    set_dimension_symmetric_tolerance(adapter, "BaseEar", "Width", WIDTH_TOL)
-    set_dimension_symmetric_tolerance(
-        adapter, "BaseEarProfile", "BaseLength", BASE_LENGTH_TOL
-    )
     # Every hand-formed arm feature carries the one formed band; the far face
     # at the pin carries none (the sheet prints it as a reference).
     for feature_name, dimension_names in FORMED_DIMENSIONS.items():
         for dimension_name in sorted(dimension_names):
             set_dimension_symmetric_tolerance(
-                adapter, feature_name, dimension_name, FORMED_BAND
+                adapter,
+                feature_name,
+                dimension_name,
+                FORMED_TOL,
+                display_unit=UNIT,
             )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)

@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the platen clip (MHA-PD-03).
 
-The clip is one 0.8 brass sheet, 83.5 long: a flat screw rail carrying the two
+The clip is one .032 brass sheet, 3.29 long: a flat screw rail carrying the two
 #2 loose screw holes, an open-ended slit from each end, and a spring rail
 joined to the screw rail only at the centre bridge, formed into two shallow
 bows.  The sheet runs at 3:1: the plan (front view) is the formed part seen
@@ -13,7 +13,8 @@ references, the four stations where the bows leave and rejoin the flat, their
 radius, the developed finger and the sheet stock; a 2:1 isometric shows the
 form.
 
-Every printed dimension is an associative model dimension whose places the
+The sheet prints decimal inch (the part's ``drawing_unit: in``).  Every
+printed dimension is an associative model dimension whose places the
 part authors (``build_pd_platen_clip.DRAWING_PRECISION``); the overall width,
 the rise, the stations and the developed finger live in hidden reference
 sketches the views show to import them (``_drawing_hidden_sketches``).  The
@@ -57,6 +58,7 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -211,14 +213,14 @@ _STATION_ROWS = tuple(
     PROFILE_BOTTOM_Y - 0.0075 - _STATION_ROW_PITCH * index
     for index in range(len(DRAWN_TANGENT_STATIONS))
 )
-# A reference station's printed width ("(76.310)": 16.4 mm, r4's audit) and
-# the air between its right end and its own station.
+# A reference station's printed width ("(3.007)", r4's audit) and the air
+# between its right end and its own station.
 _STATION_CHAR_WIDTH = 0.00205
 _STATION_TEXT_GAP = 0.001
 
 
 def _station_text_x(name: str, x: float) -> float:
-    text = f"({x:.{DRAWING_PRECISION_BY_NAME[name]}f})"
+    text = f"({x / 25.4:.{DRAWING_PRECISION_BY_NAME[name]}f})".replace("(0.", "(.")
     return _plan_x(x) - _STATION_TEXT_GAP - len(text) * _STATION_CHAR_WIDTH / 2.0
 
 
@@ -396,7 +398,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,

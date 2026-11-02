@@ -29,20 +29,24 @@ import sys
 from _appearance import PANEL_BLACK, apply_color, apply_material
 from _check import check
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import SketchDims, add_line_chain, ensure_fully_defined
 from _sketch_chains import define_rectilinear_chain
-from _drawing_precision import apply_drawing_precision
+from _com import _early_bound
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _drawing_tolerances import _set_tolerance_precision
 from _fit_deviations import deviations
 from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
 from _holes import wizard_holes
@@ -52,17 +56,21 @@ from sh_vn_brass_fillister_screw_spec import SHANK_LEN as FILLISTER_SHANK_LEN
 from pd_vn_guide_lock_screw_spec import SHANK_LEN as LOCK_SCREW_SHANK_LEN
 from pd_vn_guide_lock_screw_spec import TAP_MOUTH_BREAK, TIP_REACH_MAX
 from pd_platen_spec import CBORE_DEPTH as PLATEN_CBORE_DEPTH, PLATE_THICKNESS
-from pd_guide_lock_spec import LOCK_THICK
+from pd_platen_spec import GUIDE_HOLE_X, PLATE_WIDTH
+from pd_guide_lock_spec import HOLE_XY as LOCK_HOLE_XY, LOCK_THICK
 from pd_platen_guide_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     GEOMETRIC_TOLERANCES_MM,
     GUIDE_DEPTH_BAND,
     GUIDE_DEPTH_PLACES,
+    GUIDE_HEIGHT,
     LOCK_GAP_FIT,
     LOCK_TAP_SPEC,
     SURFACE_FINISHES,
     TAPPED_HOLE_SPEC,
+    TAP_Y,
+    UNIT,
 )
 from _column_clamp_interface import BAR_DEPTH
 from pd_support_bar_spec import BAR_DEPTH_BAND
@@ -70,15 +78,23 @@ from pd_support_bar_spec import BAR_DEPTH_BAND
 PART_NAME = "pd-platen-guide"
 MATERIAL = "Plain Carbon Steel"
 
-GUIDE_LENGTH = 269.64  # = resized platen width (ch30-p002 Pose Studio)
-GUIDE_HEIGHT = 5.0
-# 0.7 past the bar's back face so the lock plates clear it: the 9.5 bar grew
-# rearward under the fixed hanger (user ruling 2026-10-15), so the rail's
-# relief shrank from 1.0 to keep the lock-screw heads off the arm plate
+# The rail runs the platen's full width and its front taps sit on the
+# platen's guide holes: both are the platen's (pd_platen_spec; the width is
+# _recording_geometry's, so it keeps its millimetres and prints 10.62).
+GUIDE_LENGTH = PLATE_WIDTH
+# .40 deep, past the bar's back face so the lock plates clear it: the 9.5 bar
+# grew rearward under the fixed hanger (user ruling 2026-10-15), so the rail's
+# relief shrank to keep the lock-screw heads off the arm plate
 # (pd_platen_guide_spec.GUIDE_DEPTH_BAND).
-GUIDE_DEPTH = BAR_DEPTH + 0.7
-LOCK_STATION_X = (80.892, 188.748)  # 30% / 70%; inboard of the east column clamp
-LOCK_SCREW_DX = 7.0  # 2 screws per lock flank its centre
+GUIDE_DEPTH = 10.16  # .40
+# The fastening screws' stations (the platen's guide holes); the two lock
+# stations, 30% and 70% across, are the second and fourth, inboard of the
+# east column clamp.
+SCREW_STATION_X = GUIDE_HOLE_X
+LOCK_STATION_X = (SCREW_STATION_X[1], SCREW_STATION_X[3])
+LOCK_SCREW_DX = 7.0104  # .276: 2 screws per lock flank its centre
+if abs(LOCK_HOLE_XY[1][0] - LOCK_HOLE_XY[0][0] - 2.0 * LOCK_SCREW_DX) > 1e-9:
+    raise AssertionError("MHA-PD-12 guide-lock hole pitch is not the guide's tap pitch")
 
 HOLE_X = tuple(s + d for s in LOCK_STATION_X for d in (-LOCK_SCREW_DX, LOCK_SCREW_DX))
 
@@ -88,7 +104,6 @@ HOLE_X = tuple(s + d for s in LOCK_STATION_X for d in (-LOCK_SCREW_DX, LOCK_SCRE
 # pan heads, rulings R9-31, R9-48) after each shank passes through a 1/16
 # sheet lock plate. Both are #4-40 tapped through (R9-64, R9-48), the tips
 # stopping inside the rail.
-SCREW_STATION_X = (26.964, 80.892, 134.82, 188.748, 242.676)
 GUIDE_SCREW_PASSAGE = PLATE_THICKNESS - PLATEN_CBORE_DEPTH
 # The stock 1/4 in shank (length band +0) is the screw's reach into the rail:
 # all of it engages full thread.
@@ -102,7 +117,7 @@ _MIN_OPPOSED_RECEIVER_C2C = min(
     abs(lock_x - guide_x) for lock_x in HOLE_X for guide_x in SCREW_STATION_X
 )
 _GUIDE_DEPTH_DEV = printed_deviations(
-    GUIDE_DEPTH, GUIDE_DEPTH_PLACES, deviations(GUIDE_DEPTH_BAND)
+    GUIDE_DEPTH, GUIDE_DEPTH_PLACES, deviations(GUIDE_DEPTH_BAND), unit=UNIT
 )
 # The lock seats' shallowest depth: the printed band's floor, or a seat faced
 # to the fitted lock gap (R9-47) on the thinnest bar. The front taps at the
@@ -122,14 +137,27 @@ GUIDE_SCREW_BOTTOM_CLEARANCE = GUIDE_SCREW_TIP_INSIDE_MIN
 # Each row's through taps exit the opposite face beside the other row's taps:
 # the least wall between the two thread majors, each at its printed position
 # and with its mouth broken at the title block's row.
-_POSITION_RADIAL = float(GEOMETRIC_TOLERANCES_MM["guide hole-pattern position"]) / 2.0
+_POSITION_RADIAL = GEOMETRIC_TOLERANCES_MM["guide hole-pattern position"] / 2.0
 LOCK_TAP_EXIT_WALL_MIN = (
     _MIN_OPPOSED_RECEIVER_C2C
     - 2.0 * _POSITION_RADIAL
     - THREAD_MAJOR_MM[LOCK_TAP_SPEC.size]
     - 2.0 * TAP_MOUTH_BREAK
 )
-RECEIVER_WALL_FLOOR = 1.5
+RECEIVER_WALL_FLOOR = WALL_FLOOR_MM
+# Owner ruling 2026-11-01 (B2): each tap row's wall to datum B and to the top
+# face at the height's printed minimum, the tap's major at its Ø.008 zone.
+_HEIGHT_DEV = printed_deviations(GUIDE_HEIGHT, GUIDE_DEPTH_PLACES, unit=UNIT)
+_TAP_REACH = THREAD_MAJOR_MM[TAPPED_HOLE_SPEC.size] / 2.0 + _POSITION_RADIAL
+TAP_EDGE_WALL_MIN = min(
+    TAP_Y - _TAP_REACH, GUIDE_HEIGHT + _HEIGHT_DEV[0] - TAP_Y - _TAP_REACH
+)
+# THREAD_MAJOR_MM rounds the #4-40's .1120 major up to 2.845 (2.8448), so the
+# .080 walls land 0.0001 under 2.032 in millimetres.
+if TAP_EDGE_WALL_MIN < WALL_TARGET_MM - 0.0005:
+    raise AssertionError(
+        f"MHA-PD-11 platen guide tap wall {TAP_EDGE_WALL_MIN:.3f} < {WALL_TARGET_MM}"
+    )
 
 if min(GUIDE_SCREW_THREAD_ENGAGEMENT, LOCK_SCREW_THREAD_ENGAGEMENT) <= 0.0:
     raise AssertionError("platen-guide screw stack has no #4-40 thread engagement")
@@ -156,7 +184,14 @@ if GUIDE_DEPTH + _GUIDE_DEPTH_DEV[0] - (BAR_DEPTH + BAR_DEPTH_BAND) < LOCK_GAP_F
         f"fitted max {LOCK_GAP_FIT[1]:.2f}"
     )
 
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
+# 1:2 (machinist review round 4: at 1:4 the black-oxide bar read as a dark
+# sliver); the sheet places the isometric at this scale.
+ISOMETRIC_VIEW_SCALE = (1, 2)
+ISOMETRIC_VIEW_NOTE = (
+    f"ISOMETRIC VIEW SCALE {ISOMETRIC_VIEW_SCALE[0]}:{ISOMETRIC_VIEW_SCALE[1]}"
+)
+
+_TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
 
 
 def _apply_drawing_properties(adapter) -> None:
@@ -165,10 +200,39 @@ def _apply_drawing_properties(adapter) -> None:
     )
 
 
+def _depth_limits(adapter) -> None:
+    """The depth's one-sided band as native LIMITs (.40/.39): bilateral, its
+    zero upper deviation printed ".00" with no sign (machinist review round
+    4); the limits say the same with nothing to misread
+    (build_pd_transgear_removable._plate_limits)."""
+    label = "Depth@Guide"
+    display, dimension = _named_dimension(adapter, "Guide", "Depth")
+    lower, upper = deviations(GUIDE_DEPTH_BAND)
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = _TOL_LIMIT
+    if tolerance.SetValues(lower / 1000.0, upper / 1000.0) is not True:
+        raise RuntimeError(f"{label}: LIMIT deviations were rejected")
+    if (
+        int(tolerance.Type) != _TOL_LIMIT
+        or abs(float(tolerance.GetMinValue()) - lower / 1000.0) > 1e-12
+        or abs(float(tolerance.GetMaxValue()) - upper / 1000.0) > 1e-12
+    ):
+        raise RuntimeError(f"{label}: LIMIT tolerance readback changed")
+    _set_tolerance_precision(
+        display,
+        (lower, upper),
+        display_unit=UNIT,
+        label=label,
+        places=GUIDE_DEPTH_PLACES,
+    )
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). mm suffix load-bearing (INCH document;
     # the equation manager reads bare numbers in document units).
@@ -224,7 +288,7 @@ async def build(adapter) -> dict[str, str]:
     wizard_holes(
         adapter,
         lock_spec,
-        [[x, GUIDE_HEIGHT / 2.0, -GUIDE_DEPTH] for x in HOLE_X],
+        [[x, TAP_Y, -GUIDE_DEPTH] for x in HOLE_X],
         (0.0, 0.0, -1.0),
         f"lock-screw tapped receivers ({lock_spec.size})",
         name="LockHoles",
@@ -244,7 +308,7 @@ async def build(adapter) -> dict[str, str]:
     wizard_holes(
         adapter,
         screw_spec,
-        [[x, GUIDE_HEIGHT / 2.0, 0.0] for x in SCREW_STATION_X],
+        [[x, TAP_Y, 0.0] for x in SCREW_STATION_X],
         (0.0, 0.0, 1.0),
         f"fastening-screw tapped receivers ({screw_spec.size})",
         name="ScrewHoles",
@@ -273,9 +337,7 @@ async def build(adapter) -> dict[str, str]:
     # The depth's one-sided band is the paper-drive lock-station sweep's
     # (pd_platen_guide_spec), native on the model so the sheet prints it; every
     # printed dimension's places are authored here too (drawing-simplicity-policy.md `How the repository implements the guidelines`).
-    set_dimension_bilateral_tolerance(
-        adapter, "Guide", "Depth", *deviations(GUIDE_DEPTH_BAND)
-    )
+    _depth_limits(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

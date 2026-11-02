@@ -1,4 +1,4 @@
-"""Create the purchased reference sheet for MHA-PD-VN-67 transgear pivot shim."""
+"""Create the purchased reference sheet for MHA-PD-VN-68 transgear cluster shim."""
 
 from __future__ import annotations
 
@@ -9,25 +9,28 @@ from typing import Any
 
 import _telemetry
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
+from _part_properties import part_drawing_unit
 from _session import run_build
 from _supplier_washer_drawing import supplier_washer_dimensions
-import pd_vn_transgear_pivot_shim_spec as part
+import pd_vn_transgear_cluster_shim_spec as part
 
-SPEC = DRAWINGS_BY_NAME["pd_vn_transgear_pivot_shim"]
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
+
+SPEC = DRAWINGS_BY_NAME["pd_vn_transgear_cluster_shim"]
 # The footer's ITEM row: the catalogue designation in plain text.
-ITEM = "DIN 988 SHIM RING"
-# Sheet-metre reserves include the 12 mm diameter picks and two-line
-# unilateral bands; the 14 mm thickness pick has its own band ink reserve.
+ITEM = "SHOULDER SHIM"
+# The +Y axis faces *Top; *Front is parallel to the thickness witness.
+# Reserve the face/side picks plus the supplier limit ink widths.
 SUPPLIER_MARGINS = {
     "*Top": (0.0, 0.008, 0.040, 0.008),
     "*Front": (0.0, 0.006, 0.035, 0.006),
 }
 
 
-def _supplier_dimensions(
-    adapter: Any, views: dict[str, Any]
-) -> Callable[[], None]:
+def _supplier_dimensions(adapter: Any, views: dict[str, Any]) -> Callable[[], None]:
     return supplier_washer_dimensions(
         adapter,
         views,
@@ -49,7 +52,9 @@ async def build(adapter: Any) -> dict[str, str]:
 
     def assert_dimensions() -> None:
         if len(proofs) != 1:
-            raise RuntimeError("supplier washer dimensions must be authored exactly once")
+            raise RuntimeError(
+                "supplier washer dimensions must be authored exactly once"
+            )
         proofs[0]()
 
     return await build_purchased_fastener_drawing(
@@ -59,6 +64,7 @@ async def build(adapter: Any) -> dict[str, str]:
         supplier_dimensions=dimensions,
         supplier_margins=SUPPLIER_MARGINS,
         settled_checks=(assert_dimensions,),
+        unit=part_drawing_unit(SPEC.artifact_stem),
     )
 
 

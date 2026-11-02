@@ -54,6 +54,8 @@ class GeometricControl:
     datums: tuple[str, ...] = ()
     tolerance_zone: ToleranceZone = "linear"
     projected_zone_height_mm: float | None = None
+    # The sheet unit the projected height prints in (#290 inch packages).
+    projection_unit: str = "mm"
 
     def __post_init__(self) -> None:
         if self.characteristic not in GTOL_SYMBOLS:
@@ -83,6 +85,7 @@ class GeometricControl:
             datums=self.datums,
             diameter=self.tolerance_zone == "diametral",
             projected_zone_height_mm=self.projected_zone_height_mm,
+            projection_unit=self.projection_unit,
         )
 
 

@@ -28,11 +28,6 @@ from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
 from _supplier_screw_save import save_supplier_reference_part
-from _mcmaster_91794a055 import (
-    SUPPLIER_REFERENCE_DIMENSIONS,
-    SUPPLIER_REFERENCE_STARTS,
-    SUPPLIER_REFERENCE_PLANES,
-)
 from diagnostics.diag_build_91794A055 import build_91794A055
 from pd_vn_transgear_disc_screw_spec import (
     CUT_END_BREAK_MAX,
@@ -40,6 +35,9 @@ from pd_vn_transgear_disc_screw_spec import (
     SHANK_LEN,
     SKU,
     STOCK_LENGTH_BAND,
+    SUPPLIER_REFERENCE_DIMENSIONS,
+    SUPPLIER_REFERENCE_PLANES,
+    SUPPLIER_REFERENCE_STARTS,
     TIP_CHAMFER,
 )
 

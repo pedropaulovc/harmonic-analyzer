@@ -7,3 +7,4 @@ pd-transgear-rear-bushing:
   quantity: 1
   tolerance_class: machined_block
   process: "turned from bar (brass): drill and ream the bore, face both ends"
+  drawing_unit: in

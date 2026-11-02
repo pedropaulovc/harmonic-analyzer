@@ -7,18 +7,25 @@ import sys
 from typing import Any
 
 import _telemetry
+from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _supplier_screw_dimensions import annotate_supplier_screw
 from _supplier_screw_layout import supplier_screw_margins
-from _mcmaster_91794a055 import (
+# The supplier's references less its stock length: the views show the screw
+# as cut, and the ITEM row names the 1/4 stock.
+from pd_vn_transgear_disc_screw_spec import (
     SUPPLIER_REFERENCE_DIMENSIONS,
     SUPPLIER_REFERENCE_STARTS,
     SUPPLIER_REFERENCE_PLANES,
     SUPPLIER_REFERENCE_SIDES,
     SUPPLIER_REFERENCE_FORMATS,
 )
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["pd_vn_transgear_disc_screw"]
@@ -62,6 +69,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         supplier_dimensions=supplier_dimensions,
         settled_checks=(assert_supplier_dimensions_settled,),
+        unit=part_drawing_unit("pd-vn-transgear-disc-screw"),
     )
 
 

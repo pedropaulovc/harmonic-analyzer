@@ -262,7 +262,7 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
         cad_map = json.loads((ROOT / "cad/config/current-identity-map.json").read_text(encoding="utf-8"))
         identity = CurrentNativeIdentity()
         retired = cad_map["retired_identities"]
-        self.assertEqual(len(retired), 30)
+        self.assertEqual(len(retired), 31)
         oblique_reservations = {
             "ch-rocker-arm-tl-oblique-pivot-pin": "MHA-CH-06-TL-23",
             "ch-rocker-arm-tl-oblique-hub-pin": "MHA-CH-06-TL-25",

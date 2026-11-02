@@ -13,6 +13,7 @@ import math
 import pytest
 
 from _column_clamp_interface import BAR_DEPTH
+from _inch_wall_limits import WALL_TARGET_MM
 import pd_support_bar_spec as bar
 import pd_transgear_arm_geometry as arm
 import pd_transgear_arm_plate_geometry as plate
@@ -20,7 +21,6 @@ import transgear_hanger_joints as joints
 import paper_drive_arm_registration as registration
 import pd_vn_transgear_latch_pin_spec as latch_pin
 import pd_vn_transgear_pivot_screw_spec as pivot
-import pd_vn_transgear_pivot_shim_spec as shim
 import pd_transgear_pivot_spacer_spec as spacer
 import pd_vn_transgear_pivot_spring_spec as spring
 
@@ -36,7 +36,7 @@ def _reload_joints():
 
 def test_pivot_screw_refuses_a_bar_too_thin_for_one_and_a_half_d(monkeypatch) -> None:
     # Thinnest bar, deepest recess, one pitch charged at the faced tip and the
-    # vendor neck: (9.37 - 0.50) - 0.794 - 1.7653 = 6.311 = 1.515 D.
+    # vendor neck: (9.373 - 0.508) - 0.794 - 1.7653 = 6.306 = 1.514 D.
     assert joints.PIVOT_ENGAGEMENT_WORST == pytest.approx(
         BAR_DEPTH
         - bar.BAR_DEPTH_BAND
@@ -44,9 +44,9 @@ def test_pivot_screw_refuses_a_bar_too_thin_for_one_and_a_half_d(monkeypatch) ->
         - pivot.INCOMPLETE_TIP_LEN_MAX
         - pivot.FULL_THREAD_START
     )
-    assert joints.PIVOT_ENGAGEMENT_WORST_D == pytest.approx(1.515, abs=1e-3)
+    assert joints.PIVOT_ENGAGEMENT_WORST_D == pytest.approx(1.514, abs=1e-3)
     assert joints.PIVOT_STOCK_SHORTFALL_AT_THICKEST_BAR == pytest.approx(
-        0.113, abs=1e-3
+        0.102, abs=1e-3
     )
     # A .X depth band (+/-0.25) on the bar leaves 6.19 = 1.49 D: refused.
     monkeypatch.setattr(bar, "BAR_DEPTH_BAND", 0.25)
@@ -70,39 +70,31 @@ def test_the_spring_room_stays_inside_the_springs_catalogue_travel(
     monkeypatch,
 ) -> None:
     """R9-71: the MHA-PD-VN-63 spring holds the arm on the spacer at every printed
-    corner, never pressed past its catalogue working height.  The old floor
-    (7.00, the free pivot's 0.10..0.35 head play) leaves the spring loose."""
-    assert joints.SPRING_ROOM_MIN == pytest.approx(0.70, abs=1e-9)
-    assert joints.SPRING_ROOM_MAX == pytest.approx(1.0008, abs=1e-9)
+    corner, never pressed past its catalogue working height.  A deeper floor
+    (7.0) presses it past that height; the old 6.4 floor, without the retired
+    MHA-PD-VN-67 shim, leaves it loose."""
+    assert joints.SPRING_ROOM_MIN == pytest.approx(0.693, abs=1e-3)
+    assert joints.SPRING_ROOM_MAX == pytest.approx(0.957, abs=1e-3)
     assert spring.WORKING_HEIGHT <= joints.SPRING_ROOM_MIN
     assert joints.SPRING_ROOM_MAX < spring.FREE_HEIGHT
-    assert joints.SPRING_PRELOAD_N == pytest.approx((15.21, 38.91), abs=0.01)
-    for floor in (7.0, 6.5):
+    assert joints.SPRING_PRELOAD_N == pytest.approx((18.63, 39.43), abs=0.01)
+    for floor in (7.0, 6.4):
         monkeypatch.setattr(arm, "SPOT_FACE_FLOOR_FROM_FRONT", floor)
         with pytest.raises(AssertionError, match="leaves the spring"):
             _reload_joints()
 
 
-def test_the_shim_restores_the_spring_room_the_rearward_bar_took(monkeypatch) -> None:
-    """Ruling B (2026-10-15): the 9.5 bar grew 0.5 rearward and the spacer
-    gave it up (5.5 -> 5.0); the MHA-PD-VN-67 shim under the head takes the 0.5
-    back, so the room keeps its 0.80 nominal and the spring its preload."""
-    assert spacer.LENGTH + shim.THICKNESS == pytest.approx(5.5)
+def test_the_shallower_spot_face_gives_the_spring_its_model_room(monkeypatch) -> None:
+    """Owner ruling 2026-10-31 (#290): the 9.5 bar grew 0.5 rearward and the
+    spacer gave it up (5.5 -> 5.0); the spot-face floor rises 0.5 (6.4 ->
+    6.9) in place of the retired shim, so the room keeps the spring's 0.80
+    model height."""
+    assert spacer.LENGTH + arm.SPOT_FACE_FLOOR_FROM_FRONT == pytest.approx(
+        pivot.SHOULDER_LEN - spring.MODEL_HEIGHT
+    )
     assert joints.SPRING_ROOM_NOMINAL == pytest.approx(spring.MODEL_HEIGHT)
-    # The shim rides the shoulder and stays inside the arm's spot face.
-    assert shim.ID_MIN > pivot.SHOULDER_DIA + max(pivot.SHOULDER_DIA_LIMITS)
-    assert shim.OD_MAX < arm.SPOT_FACE_DIA
-    assert min(joints.SHIM_BORE_CLEARANCE, joints.SHIM_RIM_CLEARANCE) > 0.0
-    # The shim's catalogue minus limit is in the room's floor: a shim
-    # 0.10 thicker leaves the spring pressed past its working height.
-    monkeypatch.setattr(shim, "THICKNESS_MAX", shim.THICKNESS + 0.10)
-    with pytest.raises(AssertionError, match="leaves the"):
-        _reload_joints()
-
-
-def test_a_shim_that_cannot_pass_the_shoulder_is_refused(monkeypatch) -> None:
-    monkeypatch.setattr(shim, "ID_MIN", pivot.SHOULDER_DIA)
-    with pytest.raises(AssertionError, match="pivot shim binds"):
+    monkeypatch.setattr(arm, "SPOT_FACE_FLOOR_FROM_FRONT", 6.905)
+    with pytest.raises(AssertionError, match="nominal room"):
         _reload_joints()
 
 
@@ -237,7 +229,7 @@ def test_plate_notch_face_clears_the_arm_edge_at_every_limit(monkeypatch) -> Non
     import pd_transgear_arm_plate_spec as plate_spec
 
     corner_band = plate_spec.BAND_BY_PLACES[plate_spec.NOTCH_PLACES]
-    worst = (plate.NOTCH_RELIEF - corner_band) * math.cos(arm.EDGE_LEAN) - arm.BAND_X
+    worst = (plate.NOTCH_RELIEF - corner_band) * math.cos(arm.EDGE_LEAN) - arm.OUTLINE_BAND
     assert worst > 0.0
     assert joints.NOTCH_REFERENCE_AIR_WORST_MM == pytest.approx(worst)
     # Each corner still sits on the relieved line parallel to the arm edge.
@@ -275,28 +267,29 @@ def test_the_shallowest_printed_hole_still_grips_the_pressed_pin(monkeypatch) ->
 
 
 def test_the_proud_range_counts_the_depth_row_and_the_pin_length_grade() -> None:
-    """R9-50: 22.225 -/+ 0.010 in - (8.50 +/- 0.51), printed 12.96 TO 14.49."""
+    """R9-50: 22.225 -/+ 0.010 in - (8.50 at its printed .33 reach)."""
     grade = 0.010 * 25.4
-    low = 7 / 8 * 25.4 - grade - (8.50 + 0.51)
-    high = 7 / 8 * 25.4 + grade - (8.50 - 0.51)
+    reach = arm.PIN_HOLE_DEPTH_BAND
+    assert reach == pytest.approx(8.50 - (0.33 - 0.01) * 25.4)
+    low = 7 / 8 * 25.4 - grade - (8.50 + reach)
+    high = 7 / 8 * 25.4 + grade - (8.50 - reach)
     assert joints.LATCH_PIN_PROUD_RANGE == pytest.approx((low, high), abs=1e-9)
-    assert f"{low:.2f} TO {high:.2f}" == "12.96 TO 14.49"
 
 
 def test_the_far_face_gate_refuses_the_three_quarter_pin(monkeypatch) -> None:
     """R9-50: the 3/4 dowel stops short of the one-piece hook's far face with
     the ear's 1 deg bend, the screws' drift, the formed band and the length
     grade; the gate refuses it and accepts the 7/8 pin in the 8.50 hole.
-    With the latch hole's height at ±0.065 the 3/4 dowel in a 6.10 hole
-    barely clears, so the refusal is shown 0.05 deeper."""
+    At the printed bands the 3/4 dowel in a 6.20 hole barely clears, so the
+    refusal is shown 0.05 deeper."""
     assert joints.LATCH_PIN_FAR_FACE_MARGIN_WORST > 0.6
     monkeypatch.setattr(latch_pin, "LENGTH", 0.75 * 25.4)
-    monkeypatch.setattr(latch_pin, "PROUD", 0.75 * 25.4 - 6.10)
-    monkeypatch.setattr(arm, "PIN_HOLE_DEPTH", 6.10)
+    monkeypatch.setattr(latch_pin, "PROUD", 0.75 * 25.4 - 6.20)
+    monkeypatch.setattr(arm, "PIN_HOLE_DEPTH", 6.20)
     clearing = _reload_joints()
     assert 0.0 < clearing.LATCH_PIN_FAR_FACE_MARGIN_WORST < 0.05
-    monkeypatch.setattr(latch_pin, "PROUD", 0.75 * 25.4 - 6.15)
-    monkeypatch.setattr(arm, "PIN_HOLE_DEPTH", 6.15)
+    monkeypatch.setattr(latch_pin, "PROUD", 0.75 * 25.4 - 6.25)
+    monkeypatch.setattr(arm, "PIN_HOLE_DEPTH", 6.25)
     with pytest.raises(
         AssertionError,
         match=r"MHA-PD-VN-58 pin / MHA-PD-14 strip far face.* 0\.\d+ short",
@@ -327,20 +320,21 @@ def test_the_reamed_hole_keeps_the_press_at_both_limits(monkeypatch) -> None:
     ids=["pd-support-bar", "pd-transgear-arm", "pd-transgear-arm-plate"],
 )
 def test_every_wall_holds_the_target_at_the_printed_worst_case(module) -> None:
+    target = getattr(module, "WALL_TARGET", WALL_TARGET_MM)
     for name, (nominal, worst) in module.WALLS.items():
         assert worst <= nominal, name
-        assert worst >= getattr(module, "WALL_FLOORS", {}).get(name, module.WALL_TARGET), name
+        assert worst >= getattr(module, "WALL_FLOORS", {}).get(name, target), name
 
 
 def test_the_latch_pin_ligament_is_the_arm_s_one_tracked_shortfall() -> None:
     # Owner ruling 2026-10-27 (#1379, tracked in #2019): the full-budget
-    # ligament, at the .XXX height band (coordinator ruling (a)), stays under
-    # the 2.0 target until the next stock size up.
+    # ligament, at the .XXX height reach (coordinator ruling (a)), stays under
+    # the .080 target until the next stock size up.
     assert arm.WALL_FLOORS == {"pin hole to faces": arm.LATCH_PIN_WALL_FLOOR}
     worst = arm.WALLS["pin hole to faces"][1]
-    assert arm.LATCH_PIN_WALL_FLOOR == 1.5 <= worst < arm.WALL_TARGET
-    assert arm.LATCH_PIN_HEIGHT_BAND == arm.BAND_XXX
-    assert worst == pytest.approx(1.6787, abs=1e-4)
+    assert arm.LATCH_PIN_WALL_FLOOR == pytest.approx(0.060 * 25.4)
+    assert arm.LATCH_PIN_WALL_FLOOR <= worst < arm.WALL_TARGET
+    assert worst == pytest.approx(1.6744, abs=1e-4)
 
 
 def test_spacer_wall_holds_the_target_with_both_rim_breaks() -> None:

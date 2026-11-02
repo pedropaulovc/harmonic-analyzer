@@ -28,10 +28,17 @@ from __future__ import annotations
 import math
 from typing import NamedTuple
 
+import _config
 import _gear_quality as quality
+from _package_units import drawing_unit
 
 import pd_transgear_feed_pinion_spec as FEED
 from pd_platen_spec import PLATE_WIDTH
+
+# #290: the sheet prints decimal inch. The backer's sizes are the rack's
+# stations on the platen (its teeth's Z inset and pitch-line height), so they
+# keep their millimetres and print rounded at three places.
+UNIT = drawing_unit("parts/pd-platen-rack", _config.parts("pd-platen-rack"))
 
 MM_PER_IN = FEED.MM_PER_IN
 DP = FEED.DIAMETRAL_PITCH
@@ -56,8 +63,8 @@ if DP != PURCHASED_RACK_DP or PA_DEG != PURCHASED_RACK_PA_DEG:
 
 CUT_LENGTH_MM = PLATE_WIDTH
 BAR_LENGTH = CUT_LENGTH_MM  # rack and backer end flush with the platen
-BAR_HEIGHT = 12.0  # accepted exposed band below the guide rail
-BAR_THICKNESS = 6.0  # accepted edge-on photo envelope
+BAR_HEIGHT = 12.0  # accepted exposed band below the guide rail; prints (.47) REF
+BAR_THICKNESS = 6.0  # accepted edge-on photo envelope; prints .24
 RACK_HEIGHT = PURCHASED_RACK_HEIGHT_IN * MM_PER_IN
 RACK_THICKNESS = PURCHASED_RACK_FACE_WIDTH_IN * MM_PER_IN
 BACKER_HEIGHT = BAR_HEIGHT - RACK_HEIGHT
@@ -449,7 +456,7 @@ def require_rack_form_admission_mm(
         feed_rack_receiving_constraint_uncertainty_mm,
         feed_rack_receiving_root_uncertainty_mm,
     )
-    from _printed_tolerance import printed_band_mm
+    from _printed_tolerance import printed_deviations
 
     controls = feed_rack_form_admission_controls()
     if not isinstance(receipt, RackFormInspectionReceipt):
@@ -464,7 +471,9 @@ def require_rack_form_admission_mm(
         raise ValueError("UNKNOWN rack complete physical gap-station manifest")
     # Cut phase is uncontrolled. Two pitch end strips and one complete-feature
     # span give this conservative necessary count, NOT the nominal CAD count.
-    minimum_length = CUT_LENGTH_MM - printed_band_mm(DRAWING_PRECISION_BY_NAME["Length"])
+    minimum_length = CUT_LENGTH_MM + printed_deviations(
+        CUT_LENGTH_MM, DRAWING_PRECISION_BY_NAME["Length"], unit=UNIT
+    )[0]
     minimum_count = math.floor(minimum_length / PITCH) - 3
     if len(stations) < minimum_count:
         raise ValueError("UNKNOWN rack sample-only manifest cannot cover the finite stock")
@@ -607,13 +616,26 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "EndStockProfile": {"RackDepth", "RackHeight", "RackInset", "SeamHeight"},
     "OverallHeightReference": {"OverallHeight"},
 }
-# The cut length and the backer's two sizes serve no fit, so they print one
-# place under the general .X band; the operating window and the cut-end
-# section maxima are paid at those bands. The rack's inset on the backer and
-# the purchased stock's reference sizes keep two places.
-_ONE_PLACE = frozenset({"Length", "BackerDepth", "SeamHeight"})
+# The cut length serves no fit but bounds the operating window
+# (paper_drive_rack_travel), so it prints .XX. The backer's height and width
+# and the rack's offset on it set no mate (the mesh is set at assembly), so
+# they print .XX too; the window's cut-end section maxima and the rear
+# bushing's air to the rack are paid at those printed limits.
+# The purchased 3/16 strip prints its exact decimal as a reference. The
+# overall height is a reference sum of the .XX backer and that strip, so it
+# prints .XX too: at .XXX its (.472) disagreed with .28 + (.1875) on the
+# sheet (machinist review round 2).
+_PLACES = {
+    "Length": 2,
+    "BackerDepth": 2,
+    "RackDepth": 4,
+    "RackHeight": 4,
+    "RackInset": 2,
+    "SeamHeight": 2,
+    "OverallHeight": 2,
+}
 DRAWING_PRECISION = {
-    feature: {name: 1 if name in _ONE_PLACE else 2 for name in names}
+    feature: {name: _PLACES[name] for name in names}
     for feature, names in DRAWING_DIMENSIONS.items()
 }
 DRAWING_PRECISION_BY_NAME = {
@@ -645,17 +667,19 @@ PURCHASED_RACK_NOTE = (
 )
 # The material is the title block's; the note does not repeat it.
 GEAR_DATA = f"{PURCHASED_RACK_NOTE}; {DP:g} DP, {PA_DEG:g}\N{DEGREE SIGN} PA"
-# A purchased rack is received by its two stock sizes; its pitch accuracy is
-# the catalogue part's, checked only by the running mesh at assembly.
-INCOMING_RACK_INSPECTION_NOTE = (
-    f"STOCK HEIGHT {quality.rack_stock_height_max_mm():g} MAX; "
-    f"FACE WIDTH {quality.rack_face_width_max_mm():g} MAX"
-)
+# A purchased rack is received by its catalogue identity and (.1875) REF
+# sizes; its pitch accuracy is the catalogue part's, checked only by the
+# running mesh at assembly. The receiving stock-size maxima stay internal
+# (_gear_quality), like the measurement uncertainties: never printed. The
+# joint names its solder family (machinist review round 6), no alloy ratio:
+# notes carry no numbers.
 DRAWING_NOTES = "\n".join(
     (
-        "SOFT-SOLDERED RACK/BACKER JOINT; ENDS FLUSH",
+        "SOFT-SOLDERED (TIN-LEAD OR LEAD-FREE) RACK/BACKER JOINT; ENDS FLUSH",
         "END TOOTH PHASE NOT CONTROLLED; SET MESH AT ASSEMBLY",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
-ENLARGED_END_VIEW_NOTE = "ENLARGED END VIEW SCALE 4:1"
+# The *Right view: the front view's right end, so the .02 offset's side reads
+# from the title (machinist review round 6: "END VIEW" named no end).
+ENLARGED_END_VIEW_NOTE = "ENLARGED RIGHT END VIEW SCALE 4:1"

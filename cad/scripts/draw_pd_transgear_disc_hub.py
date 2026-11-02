@@ -17,6 +17,7 @@ circle.
 
 The bore and its flat import the model's sleeve-matched dimensions and native
 bands; fit callouts derive their clearances from those same printed limits.
+Decimal-inch sheet (#290); the model keeps its millimetre nominals.
 """
 
 from __future__ import annotations
@@ -27,7 +28,13 @@ import math
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    dimension_name,
+    place_view,
+    view_name,
+)
 
 from _check import check
 from _com import _early_bound
@@ -36,23 +43,28 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_detail_crop import native_circle_geometry
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
-from _drawing_gdt import add_feature_control_frame
-from _drawing_notes import add_property_linked_note
-from _drawing_projection import model_points_in_view
+from _drawing_gdt import add_datum_feature, add_feature_control_frame
+from _drawing_leaders import set_near_side_diameter
+from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
 from _gtol_face_read import face_geometry
 from _gtol_planar import PlanarFace
-from _native_axis_datum import add_native_axis_datum
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _part_properties import part_drawing_unit
 from _session import run_build
 import _telemetry
+from pd_rack_pinion_spec import inch_text
+from pd_transgear_disc_hub_geometry import BOLT_CIRCLE_DIA
 from pd_transgear_disc_hub_spec import (
     BORE_DATUM,
     BORE_DIA,
@@ -60,12 +72,13 @@ from pd_transgear_disc_hub_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FLANGE_DIA,
-    FLANGE_THICK,
+    FLANGE_THICK_CALLOUT,
     FLAT_CLEARANCE,
-    GEOMETRIC_TOLERANCES_MM,
+    GEOMETRIC_TOLERANCES_IN,
     HUB_FRONT_Z,
     HUB_LENGTH_CALLOUT,
     OIL_HOLE_CALLOUT_BELOW,
+    OIL_HOLE_STATION,
     SCREW_HOLE_CALLOUT_ABOVE,
     SCREW_HOLE_CALLOUT_BELOW,
     SLEEVE_NAME,
@@ -76,6 +89,9 @@ from pd_transgear_disc_hub_spec import (
     SPIGOT_LENGTH_CALLOUT,
 )
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_disc_hub"]
 PART_STEM = SPEC.artifact_stem
@@ -89,7 +105,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø25.1 × 13.70 part: 3:1 keeps the #0-80 holes, the Ø1.2 oil hole and the
+# A Ø1.01 × .539 part: 3:1 keeps the #0-80 holes, the #57 oil hole and the
 # thin flange legible with two views across the landscape sheet.
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
@@ -106,7 +122,6 @@ END_CENTER = (0.090, AXIS_Y)
 # view's top-left arc (run 20261028T041908587Z) sat under the callout's
 # widest line, so the view drops below that row and steps right of its end.
 ISO_CENTER = (0.379, 0.188)
-NOTES_XY = (0.020, 0.062)
 
 
 def _side_x(z_mm: float) -> float:
@@ -128,7 +143,8 @@ _SPIGOT_R = SPIGOT_DIA / 2.0 * _S
 BORE_CALLOUT = "\n".join(
     (
         "THRU",
-        f"(DIA CLR {BOSS_CLEARANCE_LIMITS[0]:.3f}-{BOSS_CLEARANCE_LIMITS[1]:.3f}",
+        f"(DIA CLR {inch_text(BOSS_CLEARANCE_LIMITS[0], 4)}-"
+        f"{inch_text(BOSS_CLEARANCE_LIMITS[1], 4)}",
         f"ON {SLEEVE_NAME}",
         f"{SLEEVE_NUMBER} BOSS)",
     )
@@ -136,55 +152,110 @@ BORE_CALLOUT = "\n".join(
 FLAT_CALLOUT = "\n".join(
     (
         "BORE FLAT",
-        f"(CLR {FLAT_CLEARANCE[0]:.3f}-{FLAT_CLEARANCE[1]:.3f}",
+        f"(CLR {inch_text(FLAT_CLEARANCE[0], 4)}-{inch_text(FLAT_CLEARANCE[1], 4)}",
         f"ON {SLEEVE_NAME}",
         f"{SLEEVE_NUMBER} FLAT)",
     )
 )
 
 # Every size and callout sits outside the silhouettes.
-# - Face view: the bolt circle diameter above-left, the screw-hole size (3X,
+# - Face view: the bolt circle diameter above-left, its arrows on the
+#   circle's centreline drawn through the three hole centres (machinist
+#   review: with no circle they ended in air; near-side, its shelf ran
+#   into the screw holes' callout), the screw-hole size (3X,
 #   drilled through the flange) above-right, the flat's distance below-left
 #   (the flat's side, so its dimension line stays clear of the bore's
-#   leader) and the bore below-right, each with its fit callout under it.
+#   leader), each with its fit callout under it.  The bore's size and fit
+#   hang well below-right, one arrow on the bore (near-side): through the
+#   centre its line crossed the bolt circle's and ran almost on the
+#   vertical centreline beside the flat's extension line (machinist review
+#   r6).  SolidWorks lands that arrow on the bore's radius toward the
+#   shelf's near end, the block's lower-left corner, so the corner stands
+#   on the bore's -60° ray, below the oil hole's block: the leader leaves
+#   the bore down-right, clear of both centrelines and the flat's lines.
 # - Edge view: the hub's diameter inline left of the hub front face; the
 #   spigot's and then the flange's inline right of the spigot's end, the
 #   flange's outermost so the spigot's extension lines end inside it, the
 #   spigot's callout under its text, clear of the part, the block set a
 #   little low between its extension lines to leave the spigot end's frame
-#   room above it.  The two lengths from the flange's rear face on one row
-#   above: the flange's text left of the flange, the spigot's right of the
+#   room above it.  One row above: the oil hole's station from the hub front
+#   face, its text between its extension lines left of the flange, and the
+#   spigot's length from the flange's rear face, its text right of the
 #   spigot, its whole callout block right of the spigot end's extension line
 #   (the overall's rises through that row) and so clear of the flange's
 #   dimension line.  The overall, printed to the disc cluster stack's band, on the
 #   next row up, outermost, its text and stack callout right of the spigot end's
 #   extension line.  Its ends are the spigot's and the hub's +X corners, so
 #   from a row above its extension lines rise off the part; from below they
-#   ran down across the hub front and the spigot end.  The oil hole's size
-#   with its match-drill callout above-left, over the gap between the two
-#   views, its text ending left of the overall's hub-front extension line.
+#   ran down across the hub front and the spigot end.  Below the part: the
+#   flange's thickness, its text and reach callout wholly right of the
+#   flange's extension lines (machinist review: they ran through the text),
+#   under the flange's frame; and the oil hole's size with its match-drill
+#   callout below-left of the hole, its block ending left of the hole so its
+#   leader leaves the block's lower-right corner (SolidWorks' shoulder) and
+#   rises almost straight to the hole through the hub's underside, crossing
+#   no dimension (machinist review: from a block centred under the hole the
+#   leader left its right end and ran through the flange thickness).
 # - The two perpendicularity frames stand right of the spigot's end, each
 #   level with its leader's landing so the leader runs square onto its face's
 #   line: the flange's below the spigot, between the spigot's and the
 #   flange's extension lines; the spigot end's inside the spigot's, between
 #   its upper extension line and its diameter's text, left of that
 #   dimension's line.
+# Estimated (width, height) of the bore's six-row block, as run
+# 20261101T054343686Z printed it.
+BORE_TEXT_BLOCK = (0.046, 0.031)
+_BORE_SHOULDER_DROP = 0.110
+_BORE_SHOULDER = (
+    END_CENTER[0] + _BORE_SHOULDER_DROP / math.tan(math.radians(60.0)),
+    AXIS_Y - _BORE_SHOULDER_DROP,
+)
 END_KEEP = {
     "BoltCircleDia": (END_CENTER[0] - 0.030, AXIS_Y + _FLANGE_R + 0.016),
     "ScrewHoleDia": (END_CENTER[0] + 0.036, AXIS_Y + _FLANGE_R + 0.016),
-    "BoreDia": (END_CENTER[0] + 0.030, AXIS_Y - _FLANGE_R - 0.020),
+    "BoreDia": (
+        _BORE_SHOULDER[0] + BORE_TEXT_BLOCK[0] / 2.0,
+        _BORE_SHOULDER[1] + BORE_TEXT_BLOCK[1] / 2.0,
+    ),
     "FlatToAxis": (END_CENTER[0] - 0.030, AXIS_Y - _FLANGE_R - 0.020),
 }
+_OIL_HOLE_X = _side_x(HUB_FRONT_Z + OIL_HOLE_STATION)
+# Estimated (width, height) of the oil hole's and the flange thickness's
+# text blocks (3.5 mm caps, 2.61 mm advance).
+OIL_HOLE_TEXT_BLOCK = (0.066, 0.028)
+FLANGE_THICK_TEXT_BLOCK = (0.047, 0.017)
+_OIL_HOLE_SHOULDER = (_OIL_HOLE_X - 0.002, AXIS_Y - _FLANGE_R - 0.033)
 SIDE_KEEP = {
     "HubDia": (HUB_FRONT_X - 0.014, AXIS_Y),
     "SpigotDia": (SPIGOT_END_X + 0.040, AXIS_Y - 0.003),
     # Clear the spigot's whole fit-callout box, not just its dimension line.
     "FlangeDia": (SPIGOT_END_X + 0.083, AXIS_Y),
-    "FlangeThick": (_side_x(-FLANGE_THICK) - 0.014, AXIS_Y + _FLANGE_R + 0.009),
+    "FlangeThick": (
+        _side_x(0.0) + 0.004 + FLANGE_THICK_TEXT_BLOCK[0] / 2.0,
+        AXIS_Y - _FLANGE_R - 0.014,
+    ),
+    "OilHoleStation": ((HUB_FRONT_X + _OIL_HOLE_X) / 2.0, AXIS_Y + _FLANGE_R + 0.009),
     "SpigotLength": (SPIGOT_END_X + 0.026, AXIS_Y + _FLANGE_R + 0.009),
     "HubLength": (SPIGOT_END_X + 0.056, AXIS_Y + _FLANGE_R + 0.026),
-    "OilHoleDia": (HUB_FRONT_X - 0.052, AXIS_Y + _FLANGE_R + 0.040),
+    "OilHoleDia": (
+        _OIL_HOLE_SHOULDER[0] - OIL_HOLE_TEXT_BLOCK[0] / 2.0,
+        _OIL_HOLE_SHOULDER[1] + OIL_HOLE_TEXT_BLOCK[1] / 2.0,
+    ),
 }
+# Datum A on the bore's round side, its symbol right of the flange, in the
+# lane between the face view and the edge view's Ø.52: SolidWorks' own
+# placement of an axis datum put the tag inside the flange, on the
+# lower-left hole (machinist review).  Once the symbol moves, SolidWorks
+# re-solves the triangle onto the bore circle on the RADIAL line from the
+# bore centre toward the symbol, whatever landing was requested: with the
+# symbol at atan2(.015, _FLANGE_R + .014) = 15.95°, a 15° request printed
+# at 15.95° (run 20261101T070124857Z), and a 0° request still printed its
+# tip there, the readback's nearest point being the triangle's base corner
+# 1.4 mm along the tangent (run 20261101T082409337Z).  So the landing is
+# requested at that radial projection itself (_datum_a_landing).  The
+# leader climbs from it to the symbol above the lower-right hole's centre
+# mark, on the bore's round side, far from the flat's corners.
+DATUM_A_SYMBOL = (END_CENTER[0] + _FLANGE_R + 0.014, AXIS_Y + 0.015)
 DIMENSION_CALLOUTS_BELOW = {
     "BoreDia": BORE_CALLOUT,
     "FlatToAxis": FLAT_CALLOUT,
@@ -193,8 +264,93 @@ DIMENSION_CALLOUTS_BELOW = {
     "SpigotDia": SPIGOT_CALLOUT_BELOW,
     "SpigotLength": SPIGOT_LENGTH_CALLOUT,
     "HubLength": HUB_LENGTH_CALLOUT,
+    "FlangeThick": FLANGE_THICK_CALLOUT,
 }
 DIMENSION_CALLOUTS_ABOVE = {"ScrewHoleDia": SCREW_HOLE_CALLOUT_ABOVE}
+# The bolt circle's centreline: thin, black, centre-line font (Y14.2), in
+# the face view's sketch, straight to the database so no inference snaps it
+# onto a hole (draw_ch_connecting_rod's detail fence recipe).
+CENTER_LINE_STYLE = 4  # swLineStyles_e.swLineCENTER
+CENTER_LINE_WEIGHT = 0  # swLineWeights_e.swLW_THIN
+
+
+def _add_bolt_circle_centerline(adapter: Any, view: Any) -> None:
+    """Draw the screw holes' bolt circle as a centreline circle on the face
+    view and read its centre and radius back."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    native = _early_bound(view, "IView")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate the hub face view for its bolt circle")
+    draw.ClearSelection2(True)
+    centre = model_point_in_view(
+        adapter, view, (0.0, 0.0, HUB_FRONT_Z / 1000.0), label="hub bolt circle centre"
+    )
+    radius = BOLT_CIRCLE_DIA / 2.0 * _S
+    sketch = _early_bound(native.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (centre, (centre[0] + radius, centre[1])):
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        circle = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if circle is None:
+        raise RuntimeError("failed to sketch the hub bolt circle centreline")
+    placed_centre, placed_radius = native_circle_geometry(
+        circle, label="hub bolt circle"
+    )
+    if math.dist(placed_centre[:2], points[0][:2]) > 1e-9 or not math.isclose(
+        placed_radius, math.dist(points[0][:2], points[1][:2]), abs_tol=1e-9
+    ):
+        raise RuntimeError(
+            "the hub bolt circle centreline moved from where it was placed"
+        )
+    segment = _early_bound(circle, "ISketchSegment")
+    # COLORREF black: a view sketch line otherwise prints in the sketch's
+    # grey or under-defined blue, which reads as a hidden line.
+    segment.Color = 0
+    segment.Style = CENTER_LINE_STYLE
+    segment.Width = CENTER_LINE_WEIGHT
+    font = (int(segment.Color), int(segment.Style), int(segment.Width))
+    if font != (0, CENTER_LINE_STYLE, CENTER_LINE_WEIGHT):
+        raise RuntimeError(f"hub bolt circle centreline font reads {font!r}")
+    draw.ClearSelection2(True)
+
+
+def _set_near_side_bore(adapter: Any, annotations: list[Any]) -> None:
+    """The face view's bore diameter: one arrow on the bore, its leader to
+    the block's shelf, no line through the centre."""
+    matches = [a for a in annotations if dimension_name(adapter, a) == "BoreDia"]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one hub BoreDia dimension, found {len(matches)}")
+    set_near_side_diameter(matches[0], "hub bore near-side leader")
+    rebuild_drawing(adapter, label="hub bore near-side leader")
+
+
+def _datum_a_landing(adapter: Any, view: Any) -> tuple[float, float]:
+    """The bore circle's point on the ray from the projected bore centre
+    toward datum A's symbol: where SolidWorks re-solves the triangle."""
+    centre = model_point_in_view(
+        adapter, view, (0.0, 0.0, HUB_FRONT_Z / 1000.0), label="hub bore centre"
+    )
+    dx = DATUM_A_SYMBOL[0] - centre[0]
+    dy = DATUM_A_SYMBOL[1] - centre[1]
+    reach = math.hypot(dx, dy)
+    radius = BORE_DIA / 2.0 * _S
+    if not reach > radius:
+        raise RuntimeError(f"hub datum A symbol {DATUM_A_SYMBOL!r} is inside the bore")
+    return (centre[0] + radius * dx / reach, centre[1] + radius * dy / reach)
+
 
 # The two perpendicularity frames attach by entity, not by a sheet pick, and
 # to the controlled FACE, not to its rim.  A face seen edge-on draws as its
@@ -401,18 +557,20 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("pd-transgear-disc-hub"),
     )
     stamp_drawing_summary(
         adapter,
@@ -468,18 +626,19 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError(
                 f"failed to add ASME center marks to the hub {label} view"
             )
-    # Datum A, the bore, on the face view where it shows round; the view has
-    # no datum tag yet, as the native placement requires.
-    add_native_axis_datum(
+    # The bore's diameter lands one arrow from below-right (machinist review).
+    _set_near_side_bore(adapter, end_annotations)
+    # The bolt circle draws as its centreline, the diameter's arrows on it.
+    _add_bolt_circle_centerline(adapter, end)
+    # Datum A, the bore, on the face view where it shows round.
+    add_datum_feature(
         adapter,
         end,
         entity=visible_circle_edge(adapter, end, BORE_DIA),
-        source_path=SOURCE,
-        radius_m=BORE_DIA / 2000.0,
+        symbol_xy=DATUM_A_SYMBOL,
+        leader_attach_xy=_datum_a_landing(adapter, end),
         datum=BORE_DATUM,
         label="hub bore axis",
-        shoulder=True,
-        stability_tolerance_m=0.0001,
     )
     side_edges = scan_view_edges(side, label="hub edge view rims")
     for frame, key in (
@@ -495,7 +654,7 @@ async def build(adapter: Any) -> dict[str, str]:
             leader_attach_xy=landing,
             frame_xy=frame_position(landing),
             characteristic="perpendicularity",
-            tolerance=GEOMETRIC_TOLERANCES_MM[key],
+            tolerance=GEOMETRIC_TOLERANCES_IN[key],
             datums=(BORE_DATUM,),
             label=frame.label,
         )
@@ -504,7 +663,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # unregenerated, and only a real mode change rebuilds it.
     for view in (end, side):
         set_hidden_lines_removed(adapter, view)
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     return await finalize_drawing(
         adapter,

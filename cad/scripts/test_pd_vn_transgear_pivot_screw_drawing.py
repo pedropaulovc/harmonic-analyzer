@@ -72,10 +72,10 @@ def test_catalogue_inputs_are_pure_and_isolated_from_diagnostics() -> None:
 
 
 def test_fitted_length_is_a_reference_set_by_the_bar() -> None:
-    """Rule 19 fit-up: the tip is faced to stand 0.20-0.50 below the bar's
+    """Rule 19 fit-up: the tip is faced to stand .008-.020 below the bar's
     front face, so the printed length is the nominal bar less the window's
     middle, as a reference."""
-    assert screw.TIP_RECESS == (0.20, 0.50)
+    assert screw.TIP_RECESS == pytest.approx((0.008 * 25.4, 0.020 * 25.4))
     assert screw.FITTED_THREAD_LEN == pytest.approx(
         BAR_DEPTH - sum(screw.TIP_RECESS) / 2.0
     )
@@ -84,21 +84,21 @@ def test_fitted_length_is_a_reference_set_by_the_bar() -> None:
     assert screw.REFERENCE_DIMENSIONS == (("StockTrimProfile", "CutLength"),)
     assert screw.DIMENSION_TOLERANCE_TYPES["CutLength"] == 0
     callout = screw.DIMENSION_CALLOUTS["CutLength"]
-    assert "0.20-0.50 BELOW MHA-PD-07" in callout
+    assert ".008-.020 BELOW MHA-PD-07" in callout
     assert "FRONT FACE AS FITTED" in callout
     # Facing only shortens: the nominal fit is inside the catalogue length,
     # and every stock length reaches the thinnest bar's deepest recess.
     assert screw.FITTED_THREAD_LEN < screw.THREAD_LEN
     thin = BAR_DEPTH - bar.BAR_DEPTH_BAND
     assert screw.STOCK_THREAD_LEN_MIN >= thin - screw.TIP_RECESS[1]
-    # The corner the fit-up sets aside: ASME-short stock (9.017) in the
-    # thickest bar (9.63) stops 0.113 deeper than the 0.50 max recess.
+    # The corner the fit-up sets aside: ASME-short stock in the thickest bar
+    # stops .004 deeper than the .020 max recess.
     thick = BAR_DEPTH + bar.BAR_DEPTH_BAND
     assert joints.PIVOT_STOCK_SHORTFALL_AT_THICKEST_BAR == pytest.approx(
         thick - screw.TIP_RECESS[1] - screw.STOCK_THREAD_LEN_MIN
     )
     assert joints.PIVOT_STOCK_SHORTFALL_AT_THICKEST_BAR == pytest.approx(
-        0.113, abs=1e-3
+        0.1016, abs=1e-3
     )
 
 
@@ -110,21 +110,22 @@ def test_engagement_charges_one_pitch_and_the_neck() -> None:
     worst = joints.PIVOT_FITTED_LEN_MIN - screw.PITCH - screw.FULL_THREAD_START
     assert joints.PIVOT_ENGAGEMENT_WORST == pytest.approx(worst)
     assert joints.PIVOT_ENGAGEMENT_WORST_D >= screw.ENGAGEMENT_MIN_D
+    # The printed minimum rounds up to the .001 inch grid.
     assert screw.THREAD_LENGTH_MIN == pytest.approx(
-        math.ceil((1.5 * screw.THREAD_MAJOR + screw.PITCH) * 20.0) / 20.0
+        math.ceil((1.5 * screw.THREAD_MAJOR + screw.PITCH) / 0.0254 - 1e-9) * 0.0254
     )
 
 
 def test_chamfer_max_keeps_the_tip_inside_the_charged_pitch() -> None:
     # The model stands at the printed maximum (swTolMAX prints the nominal).
-    assert screw.CHAMFER_WIDTH == screw.CHAMFER_WIDTH_MAX == pytest.approx(0.60)
-    assert screw.CHAMFER_ANGLE_TOLERANCE == angular_band_deg() == 1.0
+    assert screw.CHAMFER_WIDTH == screw.CHAMFER_WIDTH_MAX == pytest.approx(0.024 * 25.4)
+    assert screw.CHAMFER_ANGLE_TOLERANCE == angular_band_deg(unit=screw.UNIT) == 1.0
     steepest = math.radians(screw.CHAMFER_ANGLE + screw.CHAMFER_ANGLE_TOLERANCE)
-    assert screw.CHAMFER_AXIAL_MAX == pytest.approx(0.60 * math.tan(steepest))
+    assert screw.CHAMFER_AXIAL_MAX == pytest.approx(screw.CHAMFER_WIDTH * math.tan(steepest))
     assert screw.CHAMFER_AXIAL_MAX <= screw.INCOMPLETE_TIP_LEN_MAX == screw.PITCH
-    # "Past the thread root" fits under the maximum: tip Ø 4.1656 - 1.20 =
-    # 2.9656 clears the deepest estimated 2A root Ø3.038.
-    screw.require_chamfer_past_root(0.60)
+    # "Past the thread root" fits under the maximum: tip Ø 4.1656 - 1.2192 =
+    # 2.9464 clears the deepest estimated 2A root Ø3.038.
+    screw.require_chamfer_past_root(screw.CHAMFER_WIDTH)
     assert "THREAD ROOT" in screw.DIMENSION_CALLOUTS["ChamferWidth"]
 
 
@@ -406,7 +407,7 @@ def test_native_controls_are_owned_and_the_length_prints_as_reference() -> None:
     assert set(screw.DIMENSION_PRECISION) == {"CutLength", *drawing.EXPECTED_CONTROLS}
     assert set(drawing.FRONT_KEEP) == set(screw.DIMENSION_PRECISION)
     assert drawing.EXPECTED_CONTROLS["ChamferWidth"] == pytest.approx(
-        (0.00060, 0.0, 0.0)
+        (0.024 * 0.0254, 0.0, 0.0)
     )
     assert drawing.EXPECTED_CONTROLS["ChamferAngle"] == pytest.approx(
         (math.radians(45.0), -math.radians(1.0), math.radians(1.0))
@@ -1763,6 +1764,7 @@ def _record_drawing_build(
     monkeypatch.setattr(drawing, "set_dimension_callouts", lambda *_args: None)
     monkeypatch.setattr(drawing, "offset_dimension_text", lambda *_args: None)
     monkeypatch.setattr(drawing, "_add_supplier_references", lambda *_args: references)
+    monkeypatch.setattr(drawing, "_blacken_shoulder_witnesses", lambda *_args: None)
     monkeypatch.setattr(drawing, "_align_top_origin", lambda *_args: lambda: None)
     monkeypatch.setattr(drawing, "_trim_top_mark", lambda *_args: lambda: None)
     monkeypatch.setattr(drawing, "_move_tail_column", lambda *_args: (lambda: None, {}))
@@ -3367,7 +3369,8 @@ def test_tail_column_move_uses_complete_major_ink_and_preserves_acceptance_text(
             drawing._move_tail_column(state.adapter, tail, major)
         return
     settled, _frame = drawing._move_tail_column(state.adapter, tail, major)
-    assert [row[0] for row in tail_record["display"]["arrows"]] == pytest.approx([0.2706024] * 2)
+    assert [row[0] for row in tail_record["display"]["arrows"]] == pytest.approx([0.2766024] * 2)
+    assert tail.GetSpecificAnnotation().ArrowSide == drawing._DIM_ARROWS_INSIDE
     for actual, original in zip(tail_record["display"]["texts"], original_text, strict=True):
         assert actual["t"] == original["t"]
         assert actual["pos"] == pytest.approx(original["pos"], abs=1e-12)
@@ -3410,7 +3413,7 @@ def test_tail_offset_restores_measured_native_ink_not_the_dimension_line_anchor(
         assert display.OffsetText is True
         assert tail.GetPosition() == pytest.approx(original_text[0]["pos"], abs=1e-12)
         for old, actual in zip(original_stations, record["display"]["arrows"], strict=True):
-            assert actual[0] == pytest.approx(0.2706024, abs=1e-12)
+            assert actual[0] == pytest.approx(0.2766024, abs=1e-12)
             assert tuple(actual[1:3]) == old[1:3]
         for old, actual in zip(original_text, record["display"]["texts"], strict=True):
             assert actual["t"] == old["t"]
@@ -3438,7 +3441,7 @@ def test_tail_offset_restores_measured_native_ink_not_the_dimension_line_anchor(
     assert evidence["original"]["offset_text"] is False
     assert evidence["current"]["offset_text"] is True
     assert evidence["original"]["arrow_stations"] == tuple(row[:2] for row in original_stations)
-    assert all(abs(tip[0] - 0.2706024) < 1e-12 for tip in evidence["current"]["arrow_stations"])
+    assert all(abs(tip[0] - 0.2766024) < 1e-12 for tip in evidence["current"]["arrow_stations"])
     assert tuple(
         row["text"] for row in evidence["original"]["text_fragments"]
     ) == tuple(row["t"] for row in original_text)

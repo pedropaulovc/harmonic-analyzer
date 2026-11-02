@@ -1,14 +1,15 @@
 pd-platen-clip:
   number: MHA-PD-03
   material: C26000 brass, half-hard
-  material_specification: C26000 half-hard brass sheet, 0.032 in (0.8 mm)
+  material_specification: C26000 half-hard brass sheet, 0.032 in
   finish: bright brass
   quantity: 2
   tolerance_class: machined_block
-  process: "one-piece 0.8 mm sheet brass; opposed open-ended slits with rounded ends leave a center-bridged spring rail, formed in smooth tangent bends"
+  process: "one-piece .032 in sheet brass; opposed open-ended slits with rounded ends leave a center-bridged spring rail, formed in smooth tangent bends"
+  drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
-      where: "the #2 loose hole pattern: stations 7.190 and 76.310 from the near end, the 2X 3.300 MATCHES MHA-PD-02 hole row, and the 2X Ø2.95 THRU ALL callout PATTERN MATCHES MHA-PD-02 / DRILL"
+      where: "the #2 loose hole pattern: stations .283 and 3.007 from the near end, the 2X .145 MATCHES MHA-PD-02 hole row, and the 2X Ø.116 THRU ALL callout PATTERN MATCHES MHA-PD-02 / DRILL"
       finding: "three-place hole stations and hole row on a paper-holding sheet clip read as a tight band or over-specification (rules 3, 4)"
-      reason: "the screws are fixed in the platen's #2-56 taps, so the loose hole's float over the shank (0.76 min) must hold both patterns' position zones; two .XXX coordinates give each pattern a 0.37 zone (0.74 together), where .XX would need 2.88 and a hole the pan head pulls through; transfer-drilling the clip from its platen was rejected so any clip fits any platen (owner-accepted)"
+      reason: "the screws are fixed in the platen's #2-56 taps, so the loose hole's float over the shank (.030 min) must hold both patterns' position zones; two .XXX coordinates give each pattern a .014 zone (.028 together), where .XX would need a Ø.143 hole and a pan head that pulls through; transfer-drilling the clip from its platen was rejected so any clip fits any platen (owner-accepted)"

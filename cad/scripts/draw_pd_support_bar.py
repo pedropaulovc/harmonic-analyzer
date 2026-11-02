@@ -1,6 +1,7 @@
 r"""Create the curated machinist drawing for the platen support bar (MHA-PD-07).
 
-A 452 x 28 x 9 steel bar clamped across the frame columns. Its BACK face
+A 17.8 x 1.010 x .374 steel bar clamped across the frame columns, printed in
+decimal inch (#290). Its BACK face
 carries the transgear pivot's #8-32 through tap and the latch hook's two
 #4-40 through taps on one row; its FRONT face, which the platen slides on,
 carries the four clamp screws: two counterbored holes on the east column and
@@ -15,7 +16,7 @@ two counterbored slots on the west one (owner ruling 2026-10-15, option A).
 * The lower view looks on the front face (``*Back``, so the left end is on
   the sheet's right): the banded height, the clamp row's banded stations
   from the same end and its banded height (ClampRowReference), the round
-  counterbores' native callout (depth at .XX) naming the back-arc taps the
+  counterbores' native callout (depth at .XX, sizes at .XXX) naming the back-arc taps the
   row locates to, and the front face's slide roughness. Each
   roughness symbol has its reason beside it; the sheet has no general note.
 * Detail C looks face-on at the outer slot: the slot's and its
@@ -84,8 +85,8 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_resolve import resolve_faces
-from _hole_spec import blind_cut_dia_mm
 from _paths import CAD_ROOT
+from _part_properties import part_drawing_unit
 from _layout_audit import display_box
 from _layout_geometry import Box, Segment, segment_box_overlap_length
 from _machinist_review_mode import MachinistReviewMode
@@ -104,17 +105,17 @@ from _column_clamp_interface import BAR_DEPTH
 from pd_support_bar_spec import (
     BACK_FACE_Z,
     BAR_HEIGHT,
-    BRACKET_TAP_CSK_DIA,
-    BRACKET_TAP_SPEC,
     BRACKET_TAP_X,
+    CLAMP_TAP_Y,
     HANGER_TAP_Y,
     PIVOT_TAP_X,
 )
 from pd_support_bar_drawing_spec import (
     BACK_VIEW_CAPTION,
+    CLAMP_CALLOUT_PRECISION,
     CLAMP_CBORE_CALLOUT,
-    CLAMP_CBORE_DEPTH_PLACES,
     DIMENSION_CALLOUTS,
+    DIMENSION_CALLOUTS_ABOVE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FACE_VIEW_CAPTION,
@@ -187,13 +188,18 @@ def _back_x(model_x: float) -> float:
 # outermost; their texts step right so none crosses a longer row's extension
 # line, and stand clear of the pivot station's. The row's height (from the
 # top face, its rise on the right end) stands off the right end. The section
-# line runs up through the pivot, its arrows and letters left of it, so the
-# pivot's Ø and countersink stand right of it, the Ø higher and further left
-# (its leader passes left of the countersink's text, slanting off the line);
-# the latch-hook taps' callout (high) and countersink (low) stand right of the
-# pivot's, their leaders between the two pairs.  Move that pair 8 mm farther
-# right for the full pivot vendor-number row, keeping the hook leader left of
-# its own countersink text instead of widening a text/leader allowance.
+# line runs up through the pivot, its arrows and letters left of it.
+# The pivot and the latch-hook pair each take ONE stacked callout on their
+# countersink's Ø (tap line, CSK Ø, faces and function; machinist review
+# round 5: a tap callout and a countersink callout per hole put two leaders
+# and stacked arrowheads on each small hole, the pair's both on the left
+# hole, the pivot's on the A-A line). Each block (keep = its centre) stands
+# right of its hole, its bottom shelf ~6 mm over the top face, ~13 mm over
+# the hole: the pivot's left end 25 mm right of its hole, so the leader
+# meets the countersink ~62 deg off the A-A line; the pair's, on the right
+# hole (the reference circle's, build_pd_support_bar), 31 mm right of it, so
+# its leader never crosses the left hole and its block starts ~3 mm past
+# the pivot block's right end (its widest row ~69 mm, the pair's ~54 mm).
 ROW_STEP = 0.013
 FRONT_KEEP = {
     "PivotTapStation": (LEFT_END + 0.042, FACE_BOTTOM - ROW_STEP),
@@ -201,15 +207,20 @@ FRONT_KEEP = {
     "BracketTapStation2": (LEFT_END + 0.118, FACE_BOTTOM - 3.0 * ROW_STEP),
     "Length": (FACE_CENTER[0], FACE_BOTTOM - 4.0 * ROW_STEP),
     "HangerRowHeight": (RIGHT_END + 0.022, FACE_BOTTOM - 0.010),
-    "PivotTapDrillDia": (_face_x(PIVOT_TAP_X) + 0.032, FACE_TOP + 0.030),
-    "PivotCskDia": (_face_x(PIVOT_TAP_X) + 0.039, FACE_TOP + 0.014),
-    "BracketCskDia": (_face_x(BRACKET_TAP_X[0]) + 0.067, FACE_TOP + 0.014),
+    "PivotCskDia": (_face_x(PIVOT_TAP_X) + 0.059, FACE_TOP + 0.017),
+    "BracketCskDia": (_face_x(BRACKET_TAP_X[1]) + 0.058, FACE_TOP + 0.0145),
 }
-BRACKET_CALLOUT_XY = (_face_x(BRACKET_TAP_X[1]) + 0.064, FACE_TOP + 0.031)
 # The top face's slide roughness on its edge, left of the section line.
 TOP_FINISH_MODEL_X = -178.0
 TOP_FINISH_SYMBOL_XY = (LEFT_END + 0.030, FACE_TOP + 0.014)
-TOP_REASON_TOP = (TOP_FINISH_SYMBOL_XY[0] + 0.003, FACE_TOP + 0.032)
+# Each finish's reason stands left of its symbol at the symbol's foot, its
+# right end ~6 mm short of the leader's knee, so it reads as the symbol's
+# (machinist review round 6: the top one, 18 mm over its symbol, floated).
+REASON_FROM_SYMBOL = (-0.0345, -0.001)
+TOP_REASON_TOP = (
+    TOP_FINISH_SYMBOL_XY[0] + REASON_FROM_SYMBOL[0],
+    TOP_FINISH_SYMBOL_XY[1] + REASON_FROM_SYMBOL[1],
+)
 # Under the length line, left of the round counterbores' callout.
 FACE_CAPTION_TOP = (0.150, FACE_BOTTOM - 4.0 * ROW_STEP - 0.008)
 
@@ -224,9 +235,9 @@ FACE_CAPTION_TOP = (0.150, FACE_BOTTOM - 4.0 * ROW_STEP - 0.008)
 # audit: outside-border). Naming the MHA-SH-02 taps makes it four lines of
 # at most 11 characters: about 18-47 mm by 97-117 mm, under its lower
 # extension line (122 mm) and left of detail C's letter (51 mm). The long
-# rows stand 6 and 7 mm apart, not 8: 8 mm stepping put the 440.50 line a
+# rows stand 6 and 7 mm apart, not 8: 8 mm stepping put the 17.345 line a
 # hairline over detail C's counterbore-width text, whose upper limit then
-# read as part of the 440.50 dimension (machinist review, 2026-10-23).
+# read as part of the 17.345 dimension (machinist review, 2026-10-23).
 BACK_KEEP = {
     "ClampStation1": (RIGHT_END + 0.019, BACK_BOTTOM - 0.010),
     "ClampStation2": (RIGHT_END + 0.019, BACK_BOTTOM - 0.018),
@@ -247,7 +258,10 @@ CLAMP_CALLOUT_XY = (_back_x(max(CLAMP_ROUND_X)) - 0.005, BACK_TOP + 0.017)
 FRONT_FINISH_MODEL_XY = (-40.0, 6.0)
 FRONT_FINISH_SYMBOL_XY = (0.192, BACK_TOP + 0.014)
 # Its reason stands left of it, under the face view's caption.
-FRONT_REASON_TOP = (0.1575, BACK_TOP + 0.013)
+FRONT_REASON_TOP = (
+    FRONT_FINISH_SYMBOL_XY[0] + REASON_FROM_SYMBOL[0],
+    FRONT_FINISH_SYMBOL_XY[1] + REASON_FROM_SYMBOL[1],
+)
 # Centre the front caption under the native outer station span, then keep
 # its complete text block right of detail C's native dimension text.
 FRONT_CAPTION_AIR_M = 0.004
@@ -261,11 +275,11 @@ CAPTION_SETTLE_M = 0.0006
 # met its own extension line and arrow, r6 machinist review), the slot's
 # right, its text under the slot's lower edge the same way (inside its 4.98
 # span the block was struck by its own dimension line, r4), the slot's
-# travel below and the counterbore's above; its label right of the slot's
-# width. The slot width's block centres on its point; its five callout
-# lines (the head's reason for the upper limit, then the take-up's) put
-# that point 5 mm higher than the three-line block's, off the border, and
-# the label 4.5 mm higher to keep its air over the block. It is a cropped
+# travel below and the counterbore's above; its label over the detail
+# (DETAIL_LABEL_XY). The slot width's block centres on its point; its five
+# callout lines (the head's reason for the upper limit, then the take-up's)
+# put that point 5 mm higher than the three-line block's, off the border. It
+# is a cropped
 # *Back model view, dimensioned uncropped then cropped (the
 # draw_ch_amplitude_bar notch details): a model view has no native label or
 # parent circle, so its label is a note in the native label's words and its
@@ -276,13 +290,18 @@ CAPTION_SETTLE_M = 0.0006
 # circle drawn tight round the obround counterbore read as a round
 # counterbore (r7 machinist review).
 DETAIL_SLOT_X = max(CLAMP_SLOT_X)
-DETAIL_FOCUS = (DETAIL_SLOT_X, 0.0, -BAR_DEPTH / 2.0)  # model mm
+DETAIL_FOCUS = (DETAIL_SLOT_X, CLAMP_TAP_Y, -BAR_DEPTH / 2.0)  # model mm
 DETAIL_CENTER = (0.124, 0.048)
 DETAIL_SCALE = (2, 1)
 DETAIL_MM = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0  # sheet metres per mm
 DETAIL_RADIUS_MM = 7.5
 DETAIL_LABEL = f"DETAIL C\nSCALE {DETAIL_SCALE[0]} : {DETAIL_SCALE[1]}"
-DETAIL_LABEL_XY = (0.200, 0.0645)  # top centre, above the slot-width text
+# Top centre, over the detail: right of the slot-width text it sat against
+# the title block, away from its view (machinist review round 7). Centred on
+# the detail, its ~27 mm block (y ~0.061..0.0705) clears the counterbore
+# width's upper extension line (~0.058) and shoulder (ends x ~0.107) and
+# stands left of the front caption (starts x ~0.149, bottom ~0.074).
+DETAIL_LABEL_XY = (DETAIL_CENTER[0], 0.0705)
 DETAIL_LETTER = "C"
 DETAIL_LETTER_TOP = (LEFT_END - 0.004, BACK_CENTER[1] - 0.0025)  # top centre
 DETAIL_POSITION_TOL_M = 1e-4
@@ -295,12 +314,11 @@ DETAIL_KEEP = {
     "ClampSlotCboreWidth": (DETAIL_CENTER[0] - 0.017, DETAIL_CENTER[1] + 0.020),
     "ClampSlotWidth": (DETAIL_CENTER[0] + 0.026, DETAIL_CENTER[1] - 0.014),
     "ClampSlotTravel": (DETAIL_CENTER[0] + 0.015, DETAIL_CENTER[1] - 0.020),
-    "ClampSlotCboreTravel": (DETAIL_CENTER[0] + 0.015, DETAIL_CENTER[1] + 0.021),
 }
 # Section B-B cuts the inner slot across the bar, at 1:1 in the sheet's
 # lower-left corner: the counterbore's depth with its text and callout
 # outside the front face the counterbore enters, the caption under it. The
-# depth's line runs at the bar's mid-height, through the counterbore's mouth
+# depth's line runs on the clamp line, through the counterbore's mouth
 # and the through slot, so neither extension line crosses the cut: over the
 # top face (r6) the floor's extension line ran up through the hatch and read
 # as a seam (its 0.13 stroke from the floor's lower corner, PDF paths).
@@ -433,28 +451,13 @@ def _move_caption(
         raise RuntimeError("view caption lost its native view-label fields")
 
 
-def _hole_rims(face: Any, back: Any) -> tuple[Any, Any]:
-    """The first latch-hook tap's drill edge under its back-face countersink
-    (a Hole Wizard tap edge, so its callout is native) and the inner east
-    clamp counterbore's rim on the front face (the round pair's Hole Wizard
-    feature; the west pair are slots)."""
-    tap_dia = blind_cut_dia_mm(BRACKET_TAP_SPEC)
-    tap_csk_depth = (BRACKET_TAP_CSK_DIA - tap_dia) / 2.0
-    tap = (
-        scan_view_edges(face, label="support-bar back face")
-        .circle_at(
-            (BRACKET_TAP_X[0], HANGER_TAP_Y, BACK_FACE_Z - tap_csk_depth),
-            tap_dia / 2.0,
-            axis=(0.0, 0.0, 1.0),
-            label="latch-hook tap edge",
-            radius_tol_mm=0.025,
-        )
-        .edge
-    )
-    cbore = (
+def _cbore_rim(back: Any) -> Any:
+    """The inner east clamp counterbore's rim on the front face (the round
+    pair's Hole Wizard feature; the west pair are slots)."""
+    return (
         scan_view_edges(back, label="support-bar front face")
         .circle_at(
-            (max(CLAMP_ROUND_X), 0.0, -BAR_DEPTH / 2.0),
+            (max(CLAMP_ROUND_X), CLAMP_TAP_Y, -BAR_DEPTH / 2.0),
             CLAMP_CBORE_DIA / 2.0,
             axis=(0.0, 0.0, 1.0),
             label="clamp counterbore rim",
@@ -462,7 +465,6 @@ def _hole_rims(face: Any, back: Any) -> tuple[Any, Any]:
         )
         .edge
     )
-    return tap, cbore
 
 
 def _activate(adapter: Any, view: Any, *, label: str) -> None:
@@ -623,7 +625,7 @@ def _dimension_then_crop(adapter: Any, view: Any) -> list[Any]:
 
 
 def _label_slot_detail(adapter: Any, detail: Any, back: Any) -> None:
-    """Detail C's label right of its callouts, owned by the detail, and its
+    """Detail C's label over the detail, owned by the detail, and its
     mark on the front-face view: a black circle round the outer slot and the
     letter off the bar's end. The back view is left active."""
     _activate(adapter, detail, label="slot detail C")
@@ -651,7 +653,7 @@ def _slot_section_keep(adapter: Any, section: Any) -> dict[str, tuple[float, flo
     """Seed the associative depth's line through the open slot; its text is
     subsequently offset right of B-B and below detail C."""
 
-    def point(z: float, y: float = 0.0) -> tuple[float, float]:
+    def point(z: float, y: float = CLAMP_TAP_Y) -> tuple[float, float]:
         return _sheet(adapter, section, (SLOT_SECTION_X, y, z), "section B-B")
 
     front, middle = point(-BAR_DEPTH / 2.0)
@@ -669,7 +671,7 @@ def _assert_slot_callout_clear(
     adapter: Any, annotations: list[Any], section: Any, back_annotations: list[Any]
 ) -> None:
     """Prove detail C's native width text and leader clear section B-B, and its
-    text has air under the front view's 440.50 line (machinist review: its
+    text has air under the front view's 17.345 line (machinist review: its
     upper limit hung a hairline under that line and read as part of it)."""
     matches = [
         annotation
@@ -695,11 +697,11 @@ def _assert_slot_callout_clear(
     if air < CLEAR_GAP_M:
         raise RuntimeError(
             f"slot counterbore width text {text!r} is {air:.4f} m from the "
-            f"440.50 station's lines {station_lines!r}"
+            f"17.345 station's lines {station_lines!r}"
         )
     _telemetry.info(
         f"slot counterbore width clearance: text={ink.text!r}, "
-        f"native text={text!r}, 440.50 air={air:.4f}, "
+        f"native text={text!r}, 17.345 air={air:.4f}, "
         f"segments={ink.leader!r}, section B-B outline={outline!r}"
     )
 
@@ -727,9 +729,9 @@ def _slot_section_material_boxes(
     def point(y: float, z: float = 0.0) -> tuple[float, float]:
         return _sheet(adapter, section, (SLOT_SECTION_X, y, z), "B-B material")
 
-    front = point(0.0, -BAR_DEPTH / 2.0)
-    floor = point(0.0, -BAR_DEPTH / 2.0 + CLAMP_CBORE_DEPTH)
-    back = point(0.0, BAR_DEPTH / 2.0)
+    front = point(CLAMP_TAP_Y, -BAR_DEPTH / 2.0)
+    floor = point(CLAMP_TAP_Y, -BAR_DEPTH / 2.0 + CLAMP_CBORE_DEPTH)
+    back = point(CLAMP_TAP_Y, BAR_DEPTH / 2.0)
     xs = [line[0][0] for line in witnesses]
     front_x = min(xs, key=lambda x: abs(x - front[0]))
     floor_x = min(xs, key=lambda x: abs(x - floor[0]))
@@ -741,10 +743,12 @@ def _slot_section_material_boxes(
     rear_min, rear_max = sorted((back[0], floor_x))
     bottom, top = sorted(point(y)[1] for y in (-BAR_HEIGHT / 2.0, BAR_HEIGHT / 2.0))
     slot_bottom, slot_top = sorted(
-        point(y)[1] for y in (-CLAMP_SLOT_WIDTH / 2.0, CLAMP_SLOT_WIDTH / 2.0)
+        point(CLAMP_TAP_Y + y)[1]
+        for y in (-CLAMP_SLOT_WIDTH / 2.0, CLAMP_SLOT_WIDTH / 2.0)
     )
     cbore_bottom, cbore_top = sorted(
-        point(y)[1] for y in (-CLAMP_CBORE_DIA / 2.0, CLAMP_CBORE_DIA / 2.0)
+        point(CLAMP_TAP_Y + y)[1]
+        for y in (-CLAMP_CBORE_DIA / 2.0, CLAMP_CBORE_DIA / 2.0)
     )
     return {
         "upper bar": (xmin, cbore_top, xmax, top),
@@ -1173,44 +1177,22 @@ def _assert_slot_marker_clear(
     marker_left = min((*arrows[0::3], *texts[0::3]))
     if marker_left - witness_x < FRONT_CAPTION_AIR_M:
         raise RuntimeError(
-            f"section B-B marker still meets 440.50 witness: "
+            f"section B-B marker still meets 17.345 witness: "
             f"arrows={arrows!r}, texts={texts!r}, witness_x={witness_x!r}"
         )
     _telemetry.info(
         f"section B-B unchanged plane={actual!r}, arrows={arrows!r}, "
-        f"texts={texts!r}, 440.50 witness_x={witness_x!r}"
+        f"texts={texts!r}, 17.345 witness_x={witness_x!r}"
     )
-
-
-_THREAD_CLASS_TOKEN = " <hw-threadclass>"
-
-
-def _drop_thread_class(adapter: Any, display: Any) -> None:
-    """Drop the Hole Wizard's thread-class token from the native TAP
-    callout's definition (rule 2: the title block's THREADS row carries the
-    class); the other tokens stay live (draw_sm_knife_mount precedent)."""
-    display = _early_bound(display, "IDisplayDimension")
-    before = str(display.GetText(5) or "")  # swDimensionTextPrefixDefinition
-    if before.count(_THREAD_CLASS_TOKEN) != 1:
-        raise RuntimeError(
-            f"latch-hook tap callout has no lone class token: {before!r}"
-        )
-    wanted = before.replace(_THREAD_CLASS_TOKEN, "")
-    display.SetText(1, wanted)
-    if str(display.GetText(5) or "") != wanted:
-        raise RuntimeError(
-            f"latch-hook tap callout class did not drop: {display.GetText(5)!r}"
-        )
-    rebuild_drawing(adapter, label="latch-hook tap callout class")
 
 
 def _name_clamp_screws(display: Any) -> None:
     """Hang the back-arc taps the holes locate to and the screws' part number
-    under the counterbores' native callout, and print its depth at the .XX
-    its head clearance takes."""
+    under the counterbores' native callout; its sizes print .XXX, its depth
+    the .XX its head clearance takes."""
     set_hole_callout_precision(
         display,
-        {"hw-cbdepth": CLAMP_CBORE_DEPTH_PLACES},
+        CLAMP_CALLOUT_PRECISION,
         label="clamp-screw counterbores",
     )
     display = _early_bound(display, "IDisplayDimension")
@@ -1297,7 +1279,11 @@ async def build(adapter: Any) -> dict[str, str]:
         source_model, ("Revision", "Title", *required), required=required
     )
     drawing_model, _sheet_model = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -1392,29 +1378,20 @@ async def build(adapter: Any) -> dict[str, str]:
         *slot_section_annotations,
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(
+        adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
+    )
     # Places (and so each dimension's band or limit) are authored on the part;
     # the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     # Detail C's label and mark go on once every import is done, so nothing of
     # the front-face view's own sketch is near an import.
     _label_slot_detail(adapter, detail, back)
-    tap_edge, cbore_edge = _hole_rims(face, back)
-    _drop_thread_class(
-        adapter,
-        add_native_hole_callout(
-            adapter,
-            face,
-            edge=tap_edge,
-            callout_xy=BRACKET_CALLOUT_XY,
-            label="latch-hook base taps",
-            process="TAP",
-        ),
-    )
     _name_clamp_screws(
         add_native_hole_callout(
             adapter,
             back,
-            edge=cbore_edge,
+            edge=_cbore_rim(back),
             callout_xy=CLAMP_CALLOUT_XY,
             label="clamp-screw counterbores",
             process="DRILL, C'BORE",
@@ -1448,8 +1425,8 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
-    # The native TAP callout restates the taps, so the Hole Wizard's own
-    # "Tapped Hole" note is the one redundant automatic note.
+    # The countersinks' stacked callouts restate the taps, so the Hole
+    # Wizard's own "Tapped Hole" note is the one redundant automatic note.
     return await finalize_drawing(
         adapter,
         OUTPUTS,

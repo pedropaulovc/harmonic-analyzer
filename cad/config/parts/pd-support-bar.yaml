@@ -6,3 +6,4 @@ pd-support-bar:
   quantity: 1
   tolerance_class: machined_block
   process: "machined (steel); back face drilled and tapped for the transgear pivot (flat-bottomed blind tap) and the latch hook's base screws (through taps)"
+  drawing_unit: in

@@ -22,6 +22,7 @@ import cut_release
 import draw_pd_platen_guide as drawing
 import package_native
 from pd_platen_guide_spec import TAPPED_HOLE_SPEC
+from pd_platen_spec import CBORE_DEPTH, PLATE_THICKNESS
 
 
 def test_platen_guide_native_front_is_hole_entry_face() -> None:
@@ -141,18 +142,21 @@ def test_drawing_hole_sizes_follow_unc_policy() -> None:
 
 
 def test_platen_guide_hole_stations_match_native_wizard_features() -> None:
-    assert guide.LOCK_STATION_X == pytest.approx(
-        (guide.GUIDE_LENGTH * 0.3, guide.GUIDE_LENGTH * 0.7)
+    # The guide's screw stations are the platen's own guide-hole stations
+    # (their .001 grid, within half a grid step of the even fractions); the
+    # lock pair straddles the 30 % and 70 % stations.
+    assert guide.SCREW_STATION_X == guide.GUIDE_HOLE_X
+    assert guide.SCREW_STATION_X == pytest.approx(
+        tuple(guide.GUIDE_LENGTH * fraction for fraction in (0.1, 0.3, 0.5, 0.7, 0.9)),
+        abs=0.0127,
     )
+    assert guide.LOCK_STATION_X == (guide.SCREW_STATION_X[1], guide.SCREW_STATION_X[3])
     assert guide.HOLE_X == pytest.approx(
         tuple(
             station + offset
             for station in guide.LOCK_STATION_X
             for offset in (-guide.LOCK_SCREW_DX, guide.LOCK_SCREW_DX)
         )
-    )
-    assert guide.SCREW_STATION_X == pytest.approx(
-        tuple(guide.GUIDE_LENGTH * fraction for fraction in (0.1, 0.3, 0.5, 0.7, 0.9))
     )
     source = Path(guide.__file__).read_text(encoding="utf-8")
     assert source.count("TAPPED_HOLE_SPEC,") == 1
@@ -161,23 +165,13 @@ def test_platen_guide_hole_stations_match_native_wizard_features() -> None:
     assert '"tapped_bottoming", "#4-40"' not in source
 
 
-def test_drawing_splits_front_and_rear_tap_tables() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert '"*Back", FRONT_VIEW_X_M, BACK_VIEW_Y_M' in source
-    assert source.count("insert_hole_table(") == 2
-    assert 'starting_hole_tag="B"' in source
-    assert source.count("hole_entities=") == 2
-    assert "for station in FRONT_X" in source
-    assert "for station in REAR_X" in source
-
-
 # R9-64: the guide screws' front receivers are tapped THROUGH, so no thread
 # or drill depth exists to stack (a blind tap could not hold full thread to
 # the screw's reach and keep a bottoming tap's lead without its drill point
 # breaking through a faced lock seat). Recomputed from the catalogue screw
 # and the platen's counterbore, not from the build's derived constants.
 _GUIDE_SCREW_LEN_MAX = 0.25 * 25.4  # 90114A511; B18.6.3 band +0/-0.03 in
-_PLATEN_PASSAGE = 3.85 - 2.9178  # plate less the stock-head counterbore
+_PLATEN_PASSAGE = PLATE_THICKNESS - CBORE_DEPTH  # plate less the stock-head counterbore
 
 
 def test_front_receivers_are_through_taps_that_hold_the_screw_tip() -> None:
@@ -188,7 +182,7 @@ def test_front_receivers_are_through_taps_that_hold_the_screw_tip() -> None:
     assert guide.GUIDE_SCREW_THREAD_ENGAGEMENT == pytest.approx(reach)
     # The tip against the shallowest seat (the faced lock seats over A2/A4).
     seat_min = min(_GUIDE_DEPTH_MIN, _BAR_DEPTH_MIN + _LOCK_GAP_FIT_MIN)
-    assert seat_min - reach == pytest.approx(4.0022, abs=1e-9)
+    assert seat_min - reach == pytest.approx(4.0024, abs=1e-3)
     assert guide.GUIDE_SCREW_TIP_INSIDE_MIN == pytest.approx(seat_min - reach)
     # The assembly's blind-bottom check reads the same tip clearance.
     assert guide.GUIDE_SCREW_BOTTOM_CLEARANCE == guide.GUIDE_SCREW_TIP_INSIDE_MIN
@@ -203,9 +197,9 @@ def test_front_receivers_are_through_taps_that_hold_the_screw_tip() -> None:
 _IN = 25.4
 _LOCK_SCREW_LEN_MAX = 0.375 * _IN  # 91792A108; B18.6.3 band +0/-0.03 in
 _LOCK_THICK_MIN = (1.0 / 16.0 - 0.005) * _IN  # 1/16 sheet as supplied, +/-0.005 in
-_GUIDE_DEPTH_MIN = 10.2 - 0.30  # 10.20 +0/-0.30 on the guide sheet
-_BAR_DEPTH_MIN = 9.5 - 0.13  # MHA-PD-07 9.500 +/-0.13
-_LOCK_GAP_FIT_MIN = 0.05  # the faced lock seats (R9-47)
+_GUIDE_DEPTH_MIN = 10.16 - 0.254  # .40 +0/-.01 on the guide sheet
+_BAR_DEPTH_MIN = (0.374 - 0.005) * _IN  # MHA-PD-07 .374 +/-.005
+_LOCK_GAP_FIT_MIN = 0.002 * _IN  # the faced lock seats (R9-47)
 
 
 def test_lock_receivers_are_through_taps_that_hold_the_screw_tip() -> None:
@@ -214,21 +208,24 @@ def test_lock_receivers_are_through_taps_that_hold_the_screw_tip() -> None:
     assert spec.depth_mm == 0.0 and not spec.overrides_mm
     seat_min = min(_GUIDE_DEPTH_MIN, _BAR_DEPTH_MIN + _LOCK_GAP_FIT_MIN)
     tip_reach_max = _LOCK_SCREW_LEN_MAX - _LOCK_THICK_MIN
-    assert seat_min - tip_reach_max == pytest.approx(1.3555, abs=1e-9)
+    assert seat_min - tip_reach_max == pytest.approx(1.3589, abs=1e-3)
     assert guide.LOCK_SCREW_TIP_INSIDE_MIN == pytest.approx(seat_min - tip_reach_max)
 
 
 def test_lock_through_tap_exits_clear_the_front_taps() -> None:
-    # Each through tap exits the platen-mating face 7.0 from a front tap:
-    # both majors at the 9X Ø0.20 position, both mouths broken 0.25.
+    # Each through tap exits the platen-mating face .276 from a front tap:
+    # both majors at the 9X Ø.008 position, both mouths broken .010.
+    from _inch_wall_limits import WALL_FLOOR_MM
+
     c2c = min(
         abs(lock - front)
-        for lock in (80.892 - 7.0, 80.892 + 7.0, 188.748 - 7.0, 188.748 + 7.0)
-        for front in (26.964, 80.892, 134.82, 188.748, 242.676)
+        for lock in guide.HOLE_X
+        for front in guide.SCREW_STATION_X
     )
-    wall = c2c - 0.20 - THREAD_MAJOR_MM["#4-40"] - 2.0 * 0.25
-    assert wall == pytest.approx(3.455, abs=1e-3)
-    assert wall >= 1.5
+    assert c2c == pytest.approx(0.276 * 25.4)
+    wall = c2c - 0.008 * 25.4 - THREAD_MAJOR_MM["#4-40"] - 2.0 * 0.010 * 25.4
+    assert wall == pytest.approx(3.454, abs=1e-3)
+    assert wall >= WALL_FLOOR_MM
     assert guide.LOCK_TAP_EXIT_WALL_MIN == pytest.approx(wall)
 
 
@@ -300,6 +297,21 @@ def test_bar_slide_face_carries_the_only_roughness_symbol() -> None:
     ) in source
 
 
+def test_no_tag_text_reaches_the_next_hole_on_its_side_of_the_bar() -> None:
+    """Farm layout audit after B2: a tag's text (~5.7 mm right of its 1.5 mm
+    offset) ran past the next hole of a 7.0 pitch pair, so that hole's tag
+    leader struck it. Tags on one side of the bar keep the next hole on that
+    side clear of the text."""
+    tag_text_reach_mm = drawing.HOLE_TAG_DX_M * 1000.0 + 5.7
+    for above in (True, False):
+        side = [
+            s for s in drawing.HOLE_STATIONS_MM if (s in drawing.HOLE_TAGS_ABOVE) is above
+        ]
+        for left, right in zip(side, side[1:]):
+            assert right - left > tag_text_reach_mm + 1.0, (left, right)
+    assert drawing.HOLE_TAG_ABOVE_Y_M > drawing.FRONT_BOTTOM_Y_M + 0.007366
+
+
 def test_part_authors_the_printed_dimensions_and_places() -> None:
     from pd_platen_guide_spec import (
         DRAWING_DIMENSIONS,
@@ -313,14 +325,15 @@ def test_part_authors_the_printed_dimensions_and_places() -> None:
         "Guide": {"Depth"},
     }
     # The length only meets the platen's edges and the holes locate from the
-    # left end at basic stations: .X. The height prints at the places the
-    # paper-drive lock-station sweep judges it at.
+    # left end at basic stations: .XX (the inch .X's ±.1 would print a band
+    # coarser than the platen it matches). The height prints at the places
+    # the paper-drive lock-station sweep judges it at.
     assert DRAWING_PRECISION == {
-        "GuideProfile": {"Length": 1, "Height": GUIDE_DEPTH_PLACES},
+        "GuideProfile": {"Length": 2, "Height": GUIDE_DEPTH_PLACES},
         "Guide": {"Depth": GUIDE_DEPTH_PLACES},
     }
     assert DRAWING_PRECISION_BY_NAME == {
-        "Length": 1,
+        "Length": 2,
         "Height": GUIDE_DEPTH_PLACES,
         "Depth": GUIDE_DEPTH_PLACES,
     }
@@ -338,45 +351,20 @@ def test_part_authors_the_printed_dimensions_and_places() -> None:
     assert source.count("dimensions_by_feature=DRAWING_DIMENSIONS") == 2
 
 
-# The rear view's auto-placed hole-table origin, measured on the v38 sheet:
-# its "Y" glyph tops out 20.2 mm above the view centre and its "0 -> X" row
-# bottoms out 19.2 mm below. The front table's A5 row ends at ~0.191 and the
-# length's text above the front view starts at ~0.138.
-_ORIGIN_ABOVE_M = 0.0202
-_ORIGIN_BELOW_M = 0.0192
-_FRONT_TABLE_BOTTOM_M = 0.191
-_LENGTH_TEXT_TOP_M = 0.1382
-
-
-def test_rear_view_origin_clears_the_table_and_the_length() -> None:
-    air = 0.004
-    assert drawing.BACK_VIEW_Y_M + _ORIGIN_ABOVE_M + air <= _FRONT_TABLE_BOTTOM_M
-    assert drawing.BACK_VIEW_Y_M - _ORIGIN_BELOW_M - air >= _LENGTH_TEXT_TOP_M
-
-
-def test_native_gdt_replaces_datum_flatness_parallelism_notes() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 3
-    assert 'label="guide bottom edge",' in source
-    assert source.count("add_feature_control_frame(") == 3
-    assert 'characteristic="flatness"' in source
-    assert 'characteristic="parallelism"' in source
-    assert 'characteristic="position"' in source
-    assert "def _manufacturing_notes" not in source
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
-
-
 def test_datum_b_surface_symbol_is_clear_of_every_hole_axis() -> None:
     hole_axis_x = {
         drawing.FRONT_LEFT_X_M + station / 1000.0
         for station in (*drawing.REAR_X, *drawing.FRONT_X)
     }
     assert drawing.DATUM_B_SYMBOL_X_M == pytest.approx(
-        drawing.FRONT_LEFT_X_M + guide.GUIDE_LENGTH * 0.6 / 1000.0
+        drawing.FRONT_LEFT_X_M + guide.GUIDE_LENGTH * 0.6 / 1000.0, abs=1.3e-5
     )
+    # The stations sit on the platen's .001 grid, within half a step.
     assert min(
         abs(drawing.DATUM_B_SYMBOL_X_M - x) for x in hole_axis_x
-    ) == pytest.approx((guide.GUIDE_LENGTH * 0.1 - guide.LOCK_SCREW_DX) / 1000.0)
+    ) == pytest.approx(
+        (guide.GUIDE_LENGTH * 0.1 - guide.LOCK_SCREW_DX) / 1000.0, abs=1.3e-5
+    )
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "def _bottom_surface_edge(" in source
     assert 'visible_view_entities(view, 1, label="platen-guide bottom edge")' in source

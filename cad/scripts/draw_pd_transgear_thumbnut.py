@@ -1,8 +1,11 @@
 r"""Create the manufacturing drawing for the transgear thumbnut (MHA-PD-13).
 
 The face view is the ``*Top`` orientation, looking at the dished front face:
-it carries the native #8-32 UNC-2B through-thread callout. Both actual entry
-cones print a model-owned MAX diameter and their half-angle in section.
+it carries the native #8-32 UNC-2B through-thread callout, and stands
+directly above section A-A on one vertical centreline, top view over front
+(third angle; machinist review round 2). Both actual entry cones print a
+model-owned MAX diameter and their half-angle in section, measured from the
+section's full axis centreline.
 Section A-A uses the Front plane through the axis and two knurl crests, so the
 knurl diameter, the head, waist and flange, the overall length and the
 flange length from the seat face (the waist is their remainder) and the
@@ -41,7 +44,7 @@ from _drawing_dimensions import (
     offset_dimension_text,
     set_dimension_callouts,
 )
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
@@ -50,6 +53,7 @@ from _gear_drawing_entities import visible_circle_edge
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _part_properties import part_drawing_unit
 from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
@@ -62,7 +66,9 @@ from pd_transgear_thumbnut_spec import (
     HEAD_DIA,
     HEAD_REAR_Y,
     KNURL_CALLOUT,
+    KNURL_DIA_SUFFIX,
     OVERALL_LENGTH,
+    REAR_CSK_APEX_Y,
     TAP_DRILL_DIA,
     TAP_SPEC,
     WAIST_LENGTH,
@@ -85,14 +91,16 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø20.5 × 16.1 nut: 3:1 leaves room round the section for its nine
+# A Ø.81 × .63 nut: 3:1 leaves room round the section for its nine
 # dimensions and the knurl callout on the landscape sheet.
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
-FACE_CENTER = (0.085, 0.165)
-SECTION_CENTER = (0.215, FACE_CENTER[1])
-ISO_CENTER = (0.345, FACE_CENTER[1])
+# Top over front: the face view stands over section A-A on its centreline;
+# the isometric keeps its place right of them.
+FACE_CENTER = (0.110, 0.190)
+SECTION_CENTER = (FACE_CENTER[0], 0.085)
+ISO_CENTER = (0.345, 0.165)
 # Half the knurl diameter on the sheet, and the cutting line's overrun past it.
 HALF_HEAD = HEAD_DIA * _S / 2000.0
 SECTION_LINE_OVERRUN = 0.005
@@ -128,6 +136,19 @@ def _section_y(model_y_mm: float) -> float:
 # cross another feature's hatching. The cone diameter sits below the seat,
 # left of the caption; the half-angle's short arc stays at the actual cone.
 _STEM_TEXT_X = _section_x(HEAD_DIA / 2.0) + 0.021
+# A horizontal diameter's line prints this far below its text anchor (run
+# 20261101T070124857Z: anchored at mid-height, the Ø.43 and Ø.49 lines
+# printed 3.0 and 2.8 mm lower), so the anchor stands that much above the
+# feature's mid-height to put the LINE there: Ø.43 anchored at the waist's
+# middle drew its line on the Ø.49 shoulder (machinist review round 4).
+DIM_LINE_BELOW_TEXT = 0.0029
+
+
+def _stem_dia_anchor(bottom_mm: float, top_mm: float) -> tuple[float, float]:
+    """Text anchor whose dimension line runs mid-way up a stem feature."""
+    return (_STEM_TEXT_X, _section_y((bottom_mm + top_mm) / 2.0) + DIM_LINE_BELOW_TEXT)
+
+
 SECTION_KEEP = {
     "HeadDia": (SECTION_CENTER[0], _section_y(OVERALL_LENGTH) + 0.030),
     "DishDia": (SECTION_CENTER[0], _section_y(OVERALL_LENGTH) + 0.014),
@@ -145,19 +166,32 @@ SECTION_KEEP = {
         _section_x(-HEAD_DIA / 2.0) - 0.016,
         _section_y(FLANGE_LENGTH / 2.0),
     ),
-    "FlangeDia": (_STEM_TEXT_X, _section_y(FLANGE_LENGTH / 2.0)),
-    "WaistDia": (_STEM_TEXT_X, _section_y(FLANGE_LENGTH + WAIST_LENGTH / 2.0)),
+    "FlangeDia": _stem_dia_anchor(0.0, FLANGE_LENGTH),
+    "WaistDia": _stem_dia_anchor(FLANGE_LENGTH, FLANGE_LENGTH + WAIST_LENGTH),
     # A sheet-outboard angular anchor makes the native cone/axis arc huge
     # (4e9a4df). First place its arc just beyond the actual rear cone, then
     # offset only its text; the imported model association stays unchanged.
     "CountersinkDia": (_section_x(-HEAD_DIA / 2.0) - 0.025, _section_y(0.0) - 0.008),
     "CountersinkHalfAngle": (_section_x(CSK_DIA / 2.0 + 0.6), _section_y(-0.6)),
 }
-COUNTERSINK_ANGLE_TEXT_XY = (0.264, _section_y(0.0) - 0.008)
+# The half-angle's text sits inside its own sector, between the axis below
+# the seat and the cone's extension, beyond the arc: text out at the old
+# right-of-the-head spot swung the arc on past the cone into the hatching
+# (machinist review round 3). 40° off the axis keeps its leader right of the
+# cone diameter's extension line.
+COUNTERSINK_APEX_XY = (SECTION_CENTER[0], _section_y(REAR_CSK_APEX_Y))
+_ANGLE_TEXT_RADIUS = 0.024
+_ANGLE_TEXT_FROM_AXIS = math.radians(40.0)
+COUNTERSINK_ANGLE_TEXT_XY = (
+    COUNTERSINK_APEX_XY[0] + _ANGLE_TEXT_RADIUS * math.sin(_ANGLE_TEXT_FROM_AXIS),
+    COUNTERSINK_APEX_XY[1] - _ANGLE_TEXT_RADIUS * math.cos(_ANGLE_TEXT_FROM_AXIS),
+)
 # The baseline lengths' spans hold their text and arrows: inside, so no arrow
 # hangs below the seat face into the cone diameter's "max." (run
-# 20261024T025840809Z).
-ARROWS_INSIDE = ("FlangeLength", "HeadRearY")
+# 20261024T025840809Z).  The knurl diameter's too: arrows outside, its line
+# ran on past the left extension line under the wide knurl callout
+# (machinist review round 3); the Ø.81 span holds its arrows.
+ARROWS_INSIDE = ("FlangeLength", "HeadRearY", "HeadDia")
 _DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
 # The native caption's top centre.  The cone diameter's dimension line runs
 # under its below-callout, 13.5 mm under the seat face (run
@@ -167,9 +201,11 @@ SECTION_CAPTION_XY = (SECTION_CENTER[0], _section_y(0.0) - 0.020)
 # The face view prints only the native thread callout.
 FACE_KEEP: dict[str, tuple[float, float]] = {}
 # Above the knurl diameter, the outermost of the rim's stack: the below lane
-# would run into the dish chord.
+# would run into the dish chord.  "OVER KNURL" is the value's suffix.
 DIMENSION_CALLOUTS_ABOVE = {"HeadDia": KNURL_CALLOUT}
 DIMENSION_CALLOUTS_BELOW = {"CountersinkDia": CSK_QUALIFIER}
+DIMENSION_SUFFIXES = {"HeadDia": KNURL_DIA_SUFFIX}
+_DIMENSION_TEXT_SUFFIX = 2  # swDimensionTextParts_e.swDimensionTextSuffix
 
 
 def _printable_above_callouts(callouts: dict[str, str]) -> dict[str, str]:
@@ -187,9 +223,14 @@ def _printable_above_callouts(callouts: dict[str, str]) -> dict[str, str]:
     return callouts
 
 
-# Centred over the face view's left half, so its widest line (the
-# countersink) stays inside the left border.
-THREAD_CALLOUT_XY = (FACE_CENTER[0] - 0.020, FACE_CENTER[1] + 0.060)
+# Up and left of the face view, so its leader runs in diagonally to the hole
+# rather than along the vertical centreline (machinist review round 2), and
+# its widest line stays inside the left border.
+THREAD_CALLOUT_XY = (FACE_CENTER[0] - 0.050, FACE_CENTER[1] + 0.048)
+# How far the section's axis centreline runs past the seat face and the rim
+# (model mm): it clears the cone diameter's dimension line under the seat.
+AXIS_OVERSHOOT_MM = 1.0
+_SW_LINE_CENTER = 4  # swLineStyles_e.swLineCENTER
 
 # How far the section's seat-face point may land from where SECTION_KEEP
 # assumes it (sheet metres).
@@ -348,8 +389,24 @@ def _omit_thread_class(display: Any) -> None:
         raise RuntimeError(f"thumbnut tap callout still prints its class: {resolved!r}")
 
 
+def _set_dimension_suffixes(adapter: Any, annotations: list[Any]) -> None:
+    """Write each DIMENSION_SUFFIXES text after its value, read back."""
+    remaining = dict(DIMENSION_SUFFIXES)
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        text = remaining.pop(dimension_name(adapter, annotation), None)
+        if text is None:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.SetText(_DIMENSION_TEXT_SUFFIX, text)
+        if str(display.GetText(_DIMENSION_TEXT_SUFFIX) or "") != text:
+            raise RuntimeError(f"thumbnut suffix {text!r} did not persist")
+    if remaining:
+        raise RuntimeError(f"no thumbnut dimension for suffixes: {sorted(remaining)}")
+
+
 def _place_countersink_angle(adapter: Any, annotations: list[Any]) -> None:
-    """Keep the native rear cone/axis arc local and move only its text outboard."""
+    """Keep the native rear cone/axis arc local; its text sits in its sector."""
     name = "CountersinkHalfAngle"
     matches = [item for item in annotations if dimension_name(adapter, item) == name]
     if len(matches) != 1:
@@ -396,6 +453,56 @@ def _set_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(f"no thumbnut dimension to set arrows inside: {sorted(remaining)}")
 
 
+def _sheet_sketch_point(sheet_xy: tuple[float, float]) -> tuple[float, float]:
+    """Sheet-sketch coordinates of a printed sheet point on this 3:1 sheet.
+
+    The sheet sketch draws at the sheet scale: run 20261101T054343686Z
+    passed the projected axis (x 0.110) straight in, and the line printed at
+    x 0.330, three times out, from the top border down onto the isometric
+    (machinist review round 3, the gating finding)."""
+    return (sheet_xy[0] / _S, sheet_xy[1] / _S)
+
+
+def _add_section_axis(adapter: Any, section: Any) -> None:
+    """Draw the nut's axis through section A-A, past the seat and the rim.
+
+    The 45° half-angle measured from a short stub of the countersink sketch's
+    axis left the reader to infer the cone's reference (machinist review
+    round 2).  The ends are the model axis projected through the section's
+    own transform (draw_dt_cone_pivot_post's section axis), so the line is
+    the axis itself whichever way the section was turned rim up.
+    """
+    overshoot = AXIS_OVERSHOOT_MM / 1000.0
+    ends = [
+        model_point_in_view(adapter, section, (0.0, y, 0.0), label=f"thumbnut axis {name}")
+        for name, y in (
+            ("below the seat", -overshoot),
+            ("above the rim", OVERALL_LENGTH / 1000.0 + overshoot),
+        )
+    ]
+    if abs(ends[0][0] - ends[1][0]) > 1e-6 or ends[1][1] <= ends[0][1]:
+        raise RuntimeError(f"thumbnut section axis is not vertical rim up: {ends!r}")
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    # EditSheet makes the line sheet-owned.
+    drawing.EditSheet()
+    sketch_manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    (x0, y0), (x1, y1) = (_sheet_sketch_point(end) for end in ends)
+    centerline = sketch_manager.CreateCenterLine(x0, y0, 0.0, x1, y1, 0.0)
+    if centerline is None:
+        raise RuntimeError("failed to create the thumbnut axis in section A-A")
+    # A sheet sketch line otherwise prints in the under-defined sketch blue.
+    segment = _early_bound(centerline, "ISketchSegment")
+    segment.Color = 0  # COLORREF black
+    segment.Style = _SW_LINE_CENTER
+    adapter.currentModel.ClearSelection2(True)
+    rebuild_drawing(adapter, label="thumbnut section axis")
+    if int(segment.Color) != 0 or int(segment.Style) != _SW_LINE_CENTER:
+        raise RuntimeError(
+            "thumbnut section axis did not keep black centerline font: "
+            f"color={int(segment.Color)}, style={int(segment.Style)}"
+        )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -419,7 +526,8 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -477,6 +585,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, section_annotations, DIMENSION_CALLOUTS_BELOW, location="below"
     )
+    _set_dimension_suffixes(adapter, section_annotations)
     _place_countersink_angle(adapter, section_annotations)
     _set_arrows_inside(adapter, section_annotations)
     position_section_caption(
@@ -484,6 +593,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     if not auto_center_marks(adapter, face, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the thumbnut face view")
+    _add_section_axis(adapter, section)
     # The tap-drill edge under the front countersink: the one visible circle
     # of the Hole Wizard feature from the front.
     thread_callout = add_native_hole_callout(
@@ -495,6 +605,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _assert_native_thread(thread_callout)
     _omit_thread_class(thread_callout)
+    set_hole_callout_precision(
+        thread_callout, {"hw-thrutapdrldia": 3}, label=f"{THREAD} through thread"
+    )
 
     return await finalize_drawing(
         adapter,
@@ -503,11 +616,10 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
         layout=SPEC.layout,
         # SolidWorks pins its own tapped-hole note to the face view once the
-        # real native callout exists; it repeats the same thread.
-        # tap drill, so the callout's radial leader crossed it (run
-        # 20261001T151531763Z), and it cannot route clear while the callout's
-        # text stays inside the left border.  finalize removes it before its
-        # layout audit.
+        # real native callout exists; it repeats the thread the callout
+        # states, and it sat on the tap drill, so the callout's radial leader
+        # crossed it (run 20261001T151531763Z).  finalize removes it before
+        # its layout audit.
         redundant_note_substrings=("Tapped Hole",),
         expected_redundant_notes=1,
     )

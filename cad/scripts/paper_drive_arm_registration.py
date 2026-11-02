@@ -116,10 +116,15 @@ CHAIN_PLANE_MACHINE_Z_LIMITS_MM = (
     KNOB_F_MACHINE_Z_MM + KNOB_F_AXIAL_BAND_MM
     - COLLAR.SEAT_MIN_FROM_F - (WHEEL.PLATE + min(WHEEL.PLATE_BAND)) / 2.0,
 )
-# The frames print these heights, so they are rounded UP to 0.1 mm: a longer
-# projection still reaches the farthest chain plane (run 20261009T214031408Z
-# printed the raw float "40.52290000000002" in the arm plate's frame).
-S_PROJECTED_HEIGHT_MM = math.ceil(10.0 * (ARM_FRONT_MACHINE_Z_MM - CHAIN_PLANE_MACHINE_Z_LIMITS_MM[0])) / 10.0
+# The frames print these heights, so they are rounded UP to the sheet's grid
+# (.001 in on the inch MHA-PD-18 sheet, 0.1 mm on the MHA-PD-19 sheet): a
+# longer projection still reaches the farthest chain plane (run
+# 20261009T214031408Z printed the raw float "40.52290000000002" in the arm
+# plate's frame).
+S_PROJECTED_HEIGHT_MM = (
+    math.ceil(1000.0 * (ARM_FRONT_MACHINE_Z_MM - CHAIN_PLANE_MACHINE_Z_LIMITS_MM[0]) / 25.4)
+    * 25.4 / 1000.0
+)
 K_PROJECTED_HEIGHT_MM = math.ceil(10.0 * (PLATE_MOUNT_MACHINE_Z_MM - CHAIN_PLANE_MACHINE_Z_LIMITS_MM[0])) / 10.0
 KNOB_JOURNAL_CONTACT_START_LOCAL_Z_MM = SHAFT.PINION_REAR_Z + RING.LENGTH
 KNOB_JOURNAL_CONTACT_END_LOCAL_Z_MM = KNOB_JOURNAL_CONTACT_START_LOCAL_Z_MM + PLATE.HUB_TO_BOSS

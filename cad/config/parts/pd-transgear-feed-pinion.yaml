@@ -1,12 +1,13 @@
 pd-transgear-feed-pinion:
   title: Feed Pinion Sleeve
   number: MHA-PD-10
-  material: SAE 1018 CF bar, ASTM A108-24
+  material: LOW-CARBON STEEL, E.G. 1018 CF
   material_specification: SAE 1018 CF bar, ASTM A108-24
   finish: oiled
   quantity: 1
   tolerance_class: machined_block
   fit_class: gear_mesh
+  drawing_unit: in
   # The independent 12T 32DP feed uses the finite lower-count #8/12T stock master,
   # not the reducer's 48DP cutter and not a generated positive profile shift.
   # Precise/Penn 10-289-328: 32DP PA20 #8, body OD 57.15 mm, arbor bore 25.4 mm.
@@ -26,16 +27,11 @@ pd-transgear-feed-pinion:
       reason: "tooth-space radial runout to the actual running bore, measured with a calibrated pin in each space, is the owner gear-tooth critical class (owner-accepted)"
     - id: "RV-03"
       kind: "minor"
-      where: "the D-FLAT WALL TO BORE 1.52 MIN. note (Section B-B D-flat 3.500 0/-0.015 from axis against the Ø3.900 REAM THRU bore)"
-      finding: "D-flat wall to bore below the 2.0 mm target (rules 17, 20)"
-      reason: "owner ruling 2026-10-27 (#1378): accept as is; keep the geometry and the printed 1.52 MIN. The wall is 1.527 at the worst case along the part (3.485 flat less the 1.958 bore radius); the local ~1.03 where the title block's 0.25 bore-mouth and flat/nose breaks meet at the nose face is accepted"
+      where: "the D-FLAT WALL TO BORE .074 MIN. note (Section B-B D-flat .1380 0/-.0006 from axis against the Ø.1250 +.0015/+.0010 REAM THRU bore)"
+      finding: "D-flat wall to bore below the .080 in target (rules 17, 20)"
+      reason: "owner ruling 2026-10-27 (#1378): accept as is; keep the geometry and the printed MIN. Re-sized for #290 to the contract fits (.138 flat F11, .125 bore F3): the wall is .0741 at the worst case along the part (.1374 flat less the .06325 bore radius), thicker than the 1.527 mm (.0601) first ruled; the local ~.054 where the title block's .010 bore-mouth and flat/nose breaks meet at the nose face is accepted"
     - id: "RV-04"
       kind: "minor"
-      where: "the boss wall between the Ø8.200 boss and the Ø3.900 bore at the nose face"
-      finding: "boss wall below the 2.0 mm target (rule 17)"
-      reason: "owner ruling 2026-10-27 (#1378): accept as is. 8.191/2 less 3.916/2 is 2.138; less the 0.25 OD and bore edge breaks the worst wall is 1.638, between the 1.5 floor and the 2.0 target"
-    - id: "RV-05"
-      kind: "minor"
-      where: "the 12T root to the Ø3.900 bore at the rear face (ROOT ENVELOPE Ø7.93 min.)"
-      finding: "root wall below the 2.0 mm target (rule 17)"
-      reason: "owner ruling 2026-10-27 (#1378): accept as is. 7.93/2 less 3.916/2 is 2.007; less 0.025 for the 0.05 TIR tooth-space runout and the 0.25 bore edge break the worst wall is 1.732, between the 1.5 floor and the 2.0 target"
+      where: "the boss wall between the Ø.3130 boss and the Ø.1250 bore at the nose face"
+      finding: "boss wall below the .080 in target (rule 17)"
+      reason: "owner ruling 2026-10-27 (#1378): accept as is. Re-sized for #290 (boss .313 +.0005/.0000): .3130/2 less .1265/2 is .0933; less the .010 OD and bore edge breaks the worst wall is .0733, between the .060 floor and the .080 target (first ruled at 1.638 mm, .0645)"

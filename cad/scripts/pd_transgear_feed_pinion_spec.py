@@ -1,8 +1,8 @@
 r"""Pure-data dimensional contract shared by the feed-pinion sleeve and its drawing.
 
 The transgear pinion sleeve (MHA-PD-10, R9-68): one turned steel sleeve that
-runs on the MHA-PD-23 pin's Ø3.9 shank and carries, rear to front, the
-independent 12T 32DP PA20 finite stock-form feed pinion and the Ø8.2 h6 boss.
+runs on the MHA-PD-23 pin's 1/8 shank and carries, rear to front, the
+independent 12T 32DP PA20 finite stock-form feed pinion and the Ø.313 boss.
 The pinion meshes the purchased standard platen rack. The brass hub
 slides on the boss; its rear spigot passes through
 the 120T disc's (MHA-PD-06) bore, which pilots on it, and seats its end on the
@@ -12,8 +12,8 @@ the hub's own flat and never touches it).  The hub's printed overall leaves
 its front face never proud of the nose (``transgear_cluster_fit.RECESS_RANGE``),
 so the MHA-PD-25 front bushing bears on the nose and traps hub and disc
 against the step.  The rear face runs on the MHA-PD-24 rear bushing; both
-bushings and the hub are printed lengths of the disc cluster's printed stack
-(#2038; ``transgear_cluster_fit``, which reads this module).
+bushings and the hub are lengths of the disc cluster's stack, its end float
+shimmed at assembly (#2124; ``transgear_cluster_fit``, which reads this module).
 
 Local frame: origin on the axis at the sleeve's REAR face, +Z toward the
 machine FRONT.  The teeth occupy z 0..FACE_WIDTH, the boss
@@ -29,22 +29,30 @@ imports ``transgear_cluster_fit``, the hub's spec or a bushing spec (they
 import this; the hub's spec owns the hub-to-sleeve fits and the match-drilled
 oil hole's location); the hub's spigot comes from the joint's pure-data
 ``pd_transgear_disc_hub_geometry``.
+
+Decimal inch (#290): fabricated nominals are the exact millimetre values of
+their printed inch sizes; the tooth form keeps its gear-derived values.
 """
 
 from __future__ import annotations
 
 import math
 
+import _config
 import pd_rack_pinion_spec
 import pd_transgear_pin_spec
 from _fit_deviations import deviations
+from _fit_ream_slide import REAM_SLIDE
 from _gear_fit_limits import gear_tip_band_mm
 from _gear_quality import toothspace_runout_tir_mm
 from _gtol_cylinder import CylinderFace
-from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+from _package_units import drawing_unit
+from _printed_tolerance import edge_break_chamfer_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
 from pd_transgear_disc_hub_geometry import SPIGOT_LENGTH, SPIGOT_LENGTH_BAND
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND
+from pd_cluster_stack_band import FIT_LENGTH_BAND_IN
 from paper_drive_stock_envelope import (
     cutter_end_section_area_bounds_mm2,
     cutter_end_volume_bounds_mm3,
@@ -57,6 +65,10 @@ from stock_form_cutter import (
 )
 
 MM_PER_IN = 25.4
+
+UNIT = drawing_unit(
+    "parts/pd-transgear-feed-pinion", _config.parts("pd-transgear-feed-pinion")
+)
 
 # The part numbers the sheet names.  Hard-coded, not read from ``_config.parts``
 # (dt_crank_pinion_spec's precedent: a registry read would make the part rows
@@ -94,8 +106,11 @@ PITCH_DIA = TEETH * MODULE_MM
 # brings the rack crest nearer the pinion's interference point.
 RADIAL_SETTING = 0.210
 _SPAN_DESIGN_SETTING_BAND = (0.010, -0.010)
-OUTSIDE_DIA = 11.50
-# Standard tip grade, +0/-0.10 (machinist review, stack6: +0/-0.02 on Ø11.500
+# Gear geometry, kept at its design size and printed at four inch places
+# (.4528, 0.0011 over the former 11.50) so the model is its printed value.
+OUTSIDE_DIA = 11.50112  # .4528
+OUTSIDE_DIA_PLACES = 4
+# Standard tip grade, +0/-.004 (machinist review, stack6: +0/-0.02 on Ø11.500
 # was over-specified). The tip only shortens the path of contact. At the
 # 11.48 MIN of the old grade the rack mesh had CR 1.245, at 11.45 it has 1.234
 # and at 11.40 it has 1.215: still above the 1.2 floor. Backlash, root air
@@ -128,11 +143,10 @@ _SPAN_CORNERS = tuple(
     )
     for profile in _SPAN_DESIGN_PROFILES
 )
+# Outward onto the printed .0001 in grid.
 SPAN_LIMITS = (
-    math.floor(min(row[0] for row in _SPAN_CORNERS) * 10**SPAN_PLACES)
-    / 10**SPAN_PLACES,
-    math.ceil(max(row[1] for row in _SPAN_CORNERS) * 10**SPAN_PLACES)
-    / 10**SPAN_PLACES,
+    inch_floor_mm(min(row[0] for row in _SPAN_CORNERS), SPAN_PLACES),
+    inch_ceil_mm(max(row[1] for row in _SPAN_CORNERS), SPAN_PLACES),
 )
 SPAN_BAND = (SPAN_LIMITS[1] - SPAN_NOMINAL, SPAN_LIMITS[0] - SPAN_NOMINAL)
 SPAN_DEVIATIONS = deviations(SPAN_BAND)
@@ -140,7 +154,7 @@ SPAN_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
 SPAN_PREFIX = f"SPAN {SPAN_TEETH} TEETH "
 _SPAN_SENSITIVITY = 2.0 * math.sin(math.pi * SPAN_TEETH / TEETH)
 _SPAN_ROUNDING_ALLOWANCE = (
-    10**-SPAN_PLACES + 4.0 * _SPAN_GEOMETRY_ERROR
+    10**-SPAN_PLACES * MM_PER_IN + 4.0 * _SPAN_GEOMETRY_ERROR
 ) / _SPAN_SENSITIVITY
 _SPAN_INVERSE_BOUNDS = (
     RADIAL_SETTING + _SPAN_DESIGN_SETTING_BAND[1] - _SPAN_ROUNDING_ALLOWANCE,
@@ -173,13 +187,13 @@ def manufactured_profiles() -> tuple[StockFormProfile, ...]:
 
 _PROFILE_CORNERS = manufactured_profiles()
 ROOT_DIA = 2.0 * STOCK_PROFILE.root_radius_min_mm
-ROOT_DIA_PLACES = 2
+ROOT_DIA_PLACES = 3
 # A native physical lower-limit witness owns the wall floor. Translated root
 # arcs are not concentric; deepest ground X is a distinct run-out quantity.
-ROOT_DIA_MIN = math.floor(
-    min(2.0 * profile.root_radius_min_mm for profile in _PROFILE_CORNERS)
-    * 10**ROOT_DIA_PLACES
-) / 10**ROOT_DIA_PLACES
+ROOT_DIA_MIN = inch_floor_mm(
+    min(2.0 * profile.root_radius_min_mm for profile in _PROFILE_CORNERS),
+    ROOT_DIA_PLACES,
+)
 ROOT_DEPTH_X_MIN = min(
     profile.root_point(profile.root_half_angle_rad)[0]
     for profile in _PROFILE_CORNERS
@@ -197,6 +211,8 @@ FINITE_GROUND_TIP_AIR_MIN = min(
 TOOTHSPACE_GAUGE_DIA_IN = 1.0 / 16.0
 TOOTHSPACE_GAUGE_DIA_MM = TOOTHSPACE_GAUGE_DIA_IN * MM_PER_IN
 TOOTH_SPACE_RUNOUT_TIR_MM = toothspace_runout_tir_mm()
+# The printed limit never exceeds the booked one: floored to four inch places.
+TOOTH_SPACE_RUNOUT_TIR_TEXT = inch_text(inch_floor_mm(TOOTH_SPACE_RUNOUT_TIR_MM, 4), 4)
 if not math.isfinite(TOOTH_SPACE_RUNOUT_TIR_MM) or TOOTH_SPACE_RUNOUT_TIR_MM <= 0.0:
     raise ValueError("feed toothspace inspection requires a positive configured TIR limit")
 # The actual rear-face flank edge of the indexed straight stock pass.
@@ -227,27 +243,29 @@ RACK_MESH_EXTENSION = (
 RACK_AXIS_DISTANCE = PITCH_DIA / 2.0 + RACK_MESH_EXTENSION
 
 # --- axial stations from the rear face (z 0) -----------------------------------
-# The overall and the tooth length are terms of the disc cluster's printed
-# stack (transgear_cluster_fit): the overall sets the hub's recess behind the
-# nose, the tooth length's end is the step face the hub's spigot seats on.
-# Both print at the cluster's band (#2038 owner ruling 2026-10-28, option A:
-# nothing in the cluster is faced to fit).  STATION_TOL is the allowance the
-# flat's reach and the hub's flat-end check keep on the sleeve's other
-# stations (R9-5's former overall band).
-STATION_TOL = 0.05
-STATION_PLACES = 2
-FACE_WIDTH = 13.60  # the tooth length: rear face to the step onto the boss
+# The overall and the tooth length are terms of the disc cluster's stack
+# (transgear_cluster_fit): the overall sets the hub's recess behind the nose,
+# the tooth length's end is the step face the hub's spigot seats on.  The
+# shims set the end float (owner ruling 2026-11-01, #2124); the recess still
+# needs both, so they print +/-.001.
+# STATION_TOL is the allowance the flat's reach and the hub's flat-end check
+# keep on the sleeve's other stations (R9-5's former overall band).
+STATION_TOL = 0.0508  # .002
+STATION_PLACES = 3
+FACE_WIDTH = 13.589  # .535, the tooth length: rear face to the step onto the boss
 FACE_WIDTH_PLACES = 3
-FACE_WIDTH_BAND = PRINTED_LENGTH_BAND
-OVERALL_LENGTH = 27.35
-OVERALL_LENGTH_BAND = PRINTED_LENGTH_BAND
+FACE_WIDTH_BAND = FIT_LENGTH_BAND_IN
+OVERALL_LENGTH = 27.3558  # 1.077
+OVERALL_LENGTH_BAND = FIT_LENGTH_BAND_IN
 
 # --- diameters -----------------------------------------------------------------
-# The boss is the hub's locating fit: turned h6 under the matching H7 bore
-# (pd_transgear_disc_hub_spec consumes this diameter and checks the pair).
-BOSS_DIA = 8.2
-BOSS_DIA_BAND = (0.0, -0.009)  # (upper, lower) deviations, h6
-BOSS_DIA_PLACES = 3
+# The boss is the hub's locating fit: turned .313 +.0005/.0000 under the
+# hub's .313 +.0010/+.0005 bore, .0000-.0010 diametral clearance, the
+# locational feel of the old H7/h6 pair (InchPd ruling, fit doc F12 note;
+# pd_transgear_disc_hub_spec consumes this diameter and checks the pair).
+BOSS_DIA = 7.9502  # .313
+BOSS_DIA_BAND = (0.0127, 0.0)  # (upper, lower) deviations: +.0005/.0000
+BOSS_DIA_PLACES = 4
 
 # --- the step face: the hub's seat ----------------------------------------------
 # The hub's spigot bears on the step face's tooth ends, so the face is held
@@ -259,12 +277,16 @@ BORE_DATUM = "A"
 TOOTH_SPACE_CALLOUT_PROPERTY = "Tooth Space Inspection"
 TOOTH_SPACE_CALLOUT = "\n".join(
     (
-        f"TOOTH SPACE RUNOUT {TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO {BORE_DATUM}",
-        f"\u00d8{TOOTHSPACE_GAUGE_DIA_IN:.4f} in PIN, ALL {TEETH} SPACES",
+        f"TOOTH SPACE RUNOUT {TOOTH_SPACE_RUNOUT_TIR_TEXT} TIR TO {BORE_DATUM}",
+        f"\u00d8{inch_text(TOOTHSPACE_GAUGE_DIA_MM, 4)} PIN, ALL {TEETH} SPACES",
     )
 )
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "step face perpendicularity to bore": "0.005",
+# The frame prints GEOMETRIC_TOLERANCES_IN; readers take the derived mm.
+GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
+    "step face perpendicularity to bore": ".0002",
+}
+GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
+    key: float(value) * MM_PER_IN for key, value in GEOMETRIC_TOLERANCES_IN.items()
 }
 STEP_FACE_PERPENDICULARITY = float(
     GEOMETRIC_TOLERANCES_MM["step face perpendicularity to bore"]
@@ -272,13 +294,13 @@ STEP_FACE_PERPENDICULARITY = float(
 STEP_FACE_PERPENDICULARITY_ZONE_DIA = OUTSIDE_DIA
 
 # --- D-flat (local -Y): drive only ------------------------------------------------
-# The hub drives through it.  The flat plane prints from the boss axis with
-# its own (0, −0.015): the hub's flat sits 0.020..0.050 off it (the hub owns
-# its band and checks the pair).
-FLAT_TO_AXIS = 3.5
-FLAT_TO_AXIS_BAND = (0.0, -0.015)  # (upper, lower) deviations
-FLAT_TO_AXIS_PLACES = 3
-FLAT_DEPTH = BOSS_DIA / 2.0 - FLAT_TO_AXIS  # 1.0
+# The hub drives through it.  The flat plane prints from the boss axis at
+# .138 0/-.0006: the hub's flat sits .0008...0020 off it (the hub owns its
+# band and checks the pair).
+FLAT_TO_AXIS = 3.5052  # .138
+FLAT_TO_AXIS_BAND = (0.0, -0.01524)  # (upper, lower) deviations: 0/-.0006
+FLAT_TO_AXIS_PLACES = 4
+FLAT_DEPTH = BOSS_DIA / 2.0 - FLAT_TO_AXIS  # .0185
 # The flat runs from the nose rearward to an end wall at FLAT_END_STATION,
 # cut by an end mill on an axis parallel to the sleeve's, plunged from the
 # nose.  The wall stops nothing: the hub's flat starts at its flange's rear
@@ -286,72 +308,72 @@ FLAT_DEPTH = BOSS_DIA / 2.0 - FLAT_TO_AXIS  # 1.0
 # behind it (pd_transgear_disc_hub_spec.FLAT_END_CLEARANCE_WORST), and it
 # stays clear of the step the hub's spigot seats on, so the flat never
 # notches that face.  Those are its only functions, so it prints as limits
-# at one place, looser than the title block's .X row (2026-10-27 ENFORCE
-# review: ±0.05 was unneeded precision; codjiflo P1 on 65a022125: a MAX
-# alone left the step unguarded).  The MAX is the modelled station.  The MIN
-# stands behind the longest tooth length plus the title block's 0.25 edge
-# break, and behind the cutter's run-out (asserted below).  The hub's check
-# keeps its conservative STATION_TOL allowance on top of the MAX.  The MAX
-# stands far enough behind the hub's flat that the title block's R1.0 inside
-# corner, where the flat's floor meets the wall, stays under the flats'
-# 0.020 minimum clearance where the hub's flat starts (codjiflo P2 on
-# edb402b/482fbdc: at 16.6 an R1.0 corner rose 0.21 there; #2006).  The
-# drawing test holds that envelope.
-FLAT_END_STATION = 16.0
-FLAT_END_MIN = 14.0
-FLAT_END_PLACES = 1
+# at two inch places (2026-10-27 ENFORCE review: ±0.05 was unneeded
+# precision; codjiflo P1 on 65a022125: a MAX alone left the step unguarded).
+# The MAX is the modelled station.  The MIN stands behind the longest tooth
+# length plus the title block's .010 edge break, and behind the cutter's
+# run-out (asserted below).  The hub's check keeps its conservative
+# STATION_TOL allowance on top of the MAX.  The MAX stands far enough behind
+# the hub's flat that the title block's R.040 inside corner, where the
+# flat's floor meets the wall, stays under the flats' .0008 minimum clearance
+# where the hub's flat starts (codjiflo P2 on edb402b/482fbdc: at 16.6 an
+# R1.0 corner rose 0.21 there; #2006).  The drawing test holds that envelope.
+FLAT_END_STATION = 16.002  # .63
+FLAT_END_MIN = 13.97  # .55
+FLAT_END_PLACES = 2
 FLAT_END_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
-FLAT_LENGTH = OVERALL_LENGTH - FLAT_END_STATION  # 11.35
+FLAT_LENGTH = OVERALL_LENGTH - FLAT_END_STATION  # .447
 # The reach the end mill's flutes must cover: the flat cut to its MAX
 # station on the longest sleeve.  Stopping there is always accepted; a
 # longer flat, toward the MIN, is the shop's choice of a longer cutter.
-FLAT_REACH = OVERALL_LENGTH + STATION_TOL - FLAT_END_STATION  # 11.40
+FLAT_REACH = OVERALL_LENGTH + STATION_TOL - FLAT_END_STATION  # .449
 FLAT_CUTTER_FLUTE_MIN = 12.0
 if FLAT_CUTTER_FLUTE_MIN < FLAT_REACH + 0.5:
     raise AssertionError("the flat's end mill cannot reach the end wall on its flutes")
 for _limit in (FLAT_END_MIN, FLAT_END_STATION):
-    if round(_limit, FLAT_END_PLACES) != _limit:
+    if not math.isclose(inch_floor_mm(_limit, FLAT_END_PLACES), _limit, abs_tol=1e-9):
         raise AssertionError("a flat end limit does not print at its places")
 
-# G7 bore on the preserved MHA-PD-23 h6 pin: +0.016/+0.004 over 0/-0.008
-# gives 0.004..0.024 diametral clearance. The true finite root at every
-# radial-setting corner retains the 2.0 mm wall.
+# .125 REAM_SLIDE bore (an owned .1260 reamer) on the MHA-PD-23 1/8 pin's
+# +.0001/-.0002: .0009...0017 diametral clearance.  The true finite root at
+# every radial-setting corner retains the .080 wall.
 BORE_DIA = pd_transgear_pin_spec.DIA
-BORE_DIA_BAND = (0.016, 0.004)  # (upper, lower), G7 at 3-6 mm
-BORE_PLACES = 3
+BORE_DIA_BAND = REAM_SLIDE  # (upper, lower): +.0015/+.0010
+BORE_PLACES = 4
 _PIN_UPPER, _PIN_LOWER = pd_transgear_pin_spec.DIA_BAND
 BORE_DIAMETRAL_CLEARANCE = (
-    round(BORE_DIA_BAND[1] - _PIN_UPPER, 3),
-    round(BORE_DIA_BAND[0] - _PIN_LOWER, 3),
+    round(BORE_DIA_BAND[1] - _PIN_UPPER, 6),
+    round(BORE_DIA_BAND[0] - _PIN_LOWER, 6),
 )
 if BORE_DIAMETRAL_CLEARANCE[0] <= 0.0:
     raise AssertionError(f"sleeve bore binds on the pin: {BORE_DIAMETRAL_CLEARANCE}")
 BORE_PROCESS_CALLOUT = "REAM THRU"
+# The bore's fit prints under its size on the section's own dimension, as
+# the boss's does: a separate fit note crowded the end view (run
+# 20261101T054343686Z failed the layout audit on it).
 BORE_FIT_CALLOUT = "\n".join(
     (
-        "BORE LIMITS GOVERN",
-        f"MATE PIN {PIN_NUMBER}",
-        f"(\N{DIAMETER SIGN}{BORE_DIA:.3f} +{_PIN_UPPER:.3f}/{_PIN_LOWER:.3f})",
-        f"(DIA CLR {BORE_DIAMETRAL_CLEARANCE[0]:.3f}-{BORE_DIAMETRAL_CLEARANCE[1]:.3f} mm)",
+        f"MATE PIN {PIN_NUMBER},",
+        f"{inch_text(BORE_DIAMETRAL_CLEARANCE[0], 4)}-"
+        f"{inch_text(BORE_DIAMETRAL_CLEARANCE[1], 4)} DIA CLR",
     )
 )
-
-_BAND = {places: printed_band_mm(places) for places in (1, 2, 3)}
+BORE_CALLOUT = f"{BORE_PROCESS_CALLOUT}\n{BORE_FIT_CALLOUT}"
 
 # --- the hub and disc on the step ------------------------------------------------
 # The hub's spigot seats on the step face and passes the disc's bore; the
 # hub's flange clamps the disc's front face, so that face stands the
 # spigot's length ahead of the step and the disc's rear face stands in air
-# ahead of it, the spigot's length less the disc's thickness (0.65 nominal;
+# ahead of it, the spigot's length less the disc's thickness (.026 nominal;
 # the hub's spec takes the worst case with the tilts).  The disc's bore is
 # the spigot's, outside the 12T's tips, so the two never overlap radially.
 DISC_THICKNESS = pd_rack_pinion_spec.FACE_WIDTH
-DISC_FRONT_STATION = FACE_WIDTH + SPIGOT_LENGTH  # 17.25, the hub flange's seat
-DISC_FRONT_STATION_BAND = FACE_WIDTH_BAND + SPIGOT_LENGTH_BAND  # 0.26
-DISC_REAR_STATION = DISC_FRONT_STATION - DISC_THICKNESS  # 14.25
+DISC_FRONT_STATION = FACE_WIDTH + SPIGOT_LENGTH  # .679, the hub flange's seat
+DISC_FRONT_STATION_BAND = FACE_WIDTH_BAND + SPIGOT_LENGTH_BAND
+DISC_REAR_STATION = DISC_FRONT_STATION - DISC_THICKNESS  # .561
 DISC_REAR_MIN = (
     DISC_FRONT_STATION - DISC_FRONT_STATION_BAND - pd_rack_pinion_spec.FACE_WIDTH_MAX
-)  # 13.86
+)
 if pd_rack_pinion_spec.BORE_DIA_MIN <= OUTSIDE_DIA + OUTSIDE_DIA_BAND[0]:
     raise AssertionError("the disc's bore overlaps the 12T's tips radially")
 
@@ -367,13 +389,13 @@ if pd_rack_pinion_spec.BORE_DIA_MIN <= OUTSIDE_DIA + OUTSIDE_DIA_BAND[0]:
 # ENFORCE review, r1, r3: a three-place hold served nothing).  Any cutter's
 # full depth stands behind its own run-out, so the print bounds it only by
 # that MAX (FULL_DEPTH_MAX, below).
-FULL_DEPTH = 10.15
-FULL_DEPTH_PLACES = 2
+FULL_DEPTH = 10.16  # .400
+FULL_DEPTH_PLACES = 3
 FULL_DEPTH_TOL_TYPE = 5  # swTolType_e.swTolMIN
 FULL_DEPTH_DEVIATIONS = (0.0, 0.0)
 FULL_DEPTH_MIN = FULL_DEPTH
-CUTTER_RUNOUT_MAX = 13.80  # from the rear face, a limit
-CUTTER_RUNOUT_PLACES = 2
+CUTTER_RUNOUT_MAX = 13.7922  # .543 from the rear face, a limit
+CUTTER_RUNOUT_PLACES = 3
 CUTTER_DIA_MAX_IN = 2.25
 CUTTER_DIA_MAX = CUTTER_DIA_MAX_IN * MM_PER_IN
 CUTTER_SKU = "10-289-328"
@@ -383,12 +405,14 @@ CUTTER_SKU = "10-289-328"
 CUTTER_RUNOUT_TOL_TYPE = 6  # swTolType_e.swTolMAX
 CUTTER_RUNOUT_DEVIATIONS = (FULL_DEPTH_MIN - CUTTER_RUNOUT_MAX, 0.0)
 FLAT_END_DEVIATIONS = (FLAT_END_MIN - FLAT_END_STATION, 0.0)
-_TITLE_BLOCK_EDGE_BREAK = edge_break_chamfer_mm()
+_TITLE_BLOCK_EDGE_BREAK = edge_break_chamfer_mm(unit=UNIT)
 if FLAT_END_MIN < max(
     FACE_WIDTH + FACE_WIDTH_BAND + _TITLE_BLOCK_EDGE_BREAK, CUTTER_RUNOUT_MAX
 ):
     raise AssertionError("the flat's end wall may notch the step or the run-out")
-if round(CUTTER_RUNOUT_MAX, CUTTER_RUNOUT_PLACES) != CUTTER_RUNOUT_MAX:
+if not math.isclose(
+    inch_floor_mm(CUTTER_RUNOUT_MAX, CUTTER_RUNOUT_PLACES), CUTTER_RUNOUT_MAX, abs_tol=1e-9
+):
     raise AssertionError("the run-out limit does not print at its places")
 # The outside view's cutter-station witnesses run along the floor of the
 # gap that faces it (model 195°, a gap centre, seen from -X): the section
@@ -491,16 +515,16 @@ RUNOUT_RISE_WORST = (BOSS_DIA + BOSS_DIA_BAND[0]) / 2.0 - ROOT_DEPTH_X_MIN
 # and the hub's round engagement and seat take them there.
 FULL_DEPTH_MAX = CUTTER_RUNOUT_MAX
 CUTTER_RUNOUT_END_WORST = CUTTER_RUNOUT_MAX
-RUNOUT_DISC_CLEARANCE = 0.05
+RUNOUT_DISC_CLEARANCE = 0.0508  # .002
 if FULL_DEPTH_MIN + cutter_runout(CUTTER_DIA_MAX, RUNOUT_RISE_WORST) > CUTTER_RUNOUT_MAX:
     raise AssertionError("the largest cutter at the full-depth MIN overruns the run-out MAX")
-if FULL_DEPTH_MIN >= FACE_WIDTH - _BAND[FACE_WIDTH_PLACES]:
+if FULL_DEPTH_MIN >= FACE_WIDTH - FACE_WIDTH_BAND:
     raise AssertionError("the 12T full-depth MIN reaches the step")
 if CUTTER_RUNOUT_MAX > DISC_REAR_MIN - RUNOUT_DISC_CLEARANCE + 1e-9:
     raise AssertionError("the run-out limit reaches the disc's rear face")
 
 # --- oil hole (R9-8) -----------------------------------------------------------
-# Ø1.2 drilled (+0.10/0) on +Y, centred on the hub body (R9-60), through hub
+# A #57 drill (.043, +.004/0) on +Y, centred on the hub body (R9-60), through hub
 # and boss wall in one operation at assembly.  The hub's spec owns its size,
 # its sleeve-local station (pd_transgear_disc_hub_spec.OIL_HOLE_SLEEVE_Z) and
 # the ligament to this nose; this sheet's drawing carries the drill note
@@ -520,9 +544,9 @@ OIL_HOLE_TOOTH_OFFSET_DEG = (
 if abs(OIL_HOLE_TOOTH_OFFSET_DEG - GAP_CENTRE_PHASE_DEG) > 1e-9:
     raise AssertionError("the +Y oil hole is no longer on a tooth centre")
 
-# --- walls (drawing-guidelines.md rule 17 (walls and webs): target 2.0, floor 1.5, at the printed bands) --------------
-WALL_TARGET = 2.0
-WALL_FLOOR = 1.5
+# --- walls (drawing-guidelines.md rule 17 (walls and webs): target .080, floor .060, at the printed bands) --------------
+WALL_TARGET = WALL_TARGET_MM
+WALL_FLOOR = WALL_FLOOR_MM
 _BORE_MAX = BORE_DIA + BORE_DIA_BAND[0]
 # The native root MIN is below every true translated-root corner.
 ROOT_WALL = (ROOT_DIA - BORE_DIA) / 2.0
@@ -536,17 +560,17 @@ WALLS = (
 for _name, _nominal, _worst in WALLS:
     if _worst < WALL_TARGET:
         raise AssertionError(f"sleeve wall {_name} {_worst:.3f} under {WALL_TARGET}")
-# The D-flat wall retains its existing named 1.5 mm floor. Its size and band
-# are unchanged; the smaller G7 bore raises rather than spends that margin.
+# The D-flat wall (.138 flat over the .125 bore, both contract fits) sits
+# under the .080 target and keeps the .060 floor: owner minor RV-03.
 FLAT_WALL = FLAT_TO_AXIS - BORE_DIA / 2.0
 FLAT_WALL_WORST = round(FLAT_TO_AXIS + FLAT_TO_AXIS_BAND[1] - _BORE_MAX / 2.0, 6)
-FLAT_WALL_PRINTED = math.floor(FLAT_WALL_WORST * 100.0) / 100.0  # 1.52
+FLAT_WALL_PRINTED = inch_floor_mm(FLAT_WALL_WORST, 3)  # .074
 if FLAT_WALL_WORST < WALL_FLOOR:
     raise AssertionError(f"the D-flat wall {FLAT_WALL_WORST:.3f} is under the floor")
 
 # One roughness, on the one running surface: the bore.
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
-    SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA)),
+    SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA), display_unit=UNIT),
 )
 
 # --- Marked-dimension contract -------------------------------------------------
@@ -582,7 +606,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "GearBlank": {"FaceWidth": FACE_WIDTH_PLACES},
     "SleeveProfile": {
-        "OutsideDia": 3,
+        "OutsideDia": OUTSIDE_DIA_PLACES,
         "BoreDia": BORE_PLACES,
         "BossDia": BOSS_DIA_PLACES,
         "OverallLength": STATION_PLACES,
@@ -630,18 +654,18 @@ GEAR_DATA = gear_data_note(
         ("NUMBER OF TEETH", f"{TEETH}"),
         ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
-        ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.3f}"),
-        ("WHOLE DEPTH (mm, REF)", f"{WHOLE_DEPTH:.3f}"),
+        ("PITCH DIAMETER (REF)", inch_text(PITCH_DIA, 4)),
+        ("WHOLE DEPTH (REF)", inch_text(WHOLE_DEPTH, 4)),
         ("CUTTER", f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T"),
         (
             f"SPAN OVER {SPAN_TEETH} TEETH",
-            f"{min(SPAN_LIMITS):.{SPAN_PLACES}f}-{max(SPAN_LIMITS):.{SPAN_PLACES}f}",
+            f"{inch_text(min(SPAN_LIMITS), SPAN_PLACES)}-{inch_text(max(SPAN_LIMITS), SPAN_PLACES)}",
         ),
         ("MATES WITH", f"PLATEN RACK {RACK_NUMBER}"),
     ]
 )
 
-# The title block's 0.25 edge break is 14% of this fine tooth's whole depth,
+# The title block's .010 edge break is 14% of this fine tooth's whole depth,
 # and the tooth ends seat the hub's spigot.  The drawing flags it at the
 # teeth with a leader (rule 7; 2026-10-27 ENFORCE review, r2, r3: loose in
 # the notes block it reached no feature), so the notes block omits it.
@@ -650,5 +674,5 @@ TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.
 # 2026-10-27, #1378).
 # A shop note states the requirement, not the measuring method or the cutter
 # choice (Main ruling 2026-10-10): the run-out length is dimensioned.
-FLAT_WALL_NOTE = f"D-FLAT WALL TO BORE {FLAT_WALL_PRINTED:.2f} MIN."
+FLAT_WALL_NOTE = f"D-FLAT WALL TO BORE {inch_text(FLAT_WALL_PRINTED, 3)} MIN."
 DRAWING_NOTES = FLAT_WALL_NOTE

@@ -11,3 +11,4 @@ pd-vn-platen-clip-screw:
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: purchased
+  drawing_unit: in

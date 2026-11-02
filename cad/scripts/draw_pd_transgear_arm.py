@@ -62,9 +62,10 @@ from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import visible_view_entities
 from _drawing_gdt import PmiDrawingPlacement, project_part_pmi
 import _drawing_hidden_sketches as hidden_sketches
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
+from _part_properties import part_drawing_unit
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
@@ -103,6 +104,7 @@ from pd_transgear_arm_spec import (
     PIVOT_BORE_CALLOUT,
     PLATE_TAP_EDGE_BREAK_CALLOUT,
     PROJECTED_ZONE_DIRECTION,
+    PROJECTED_ZONE_START_Z,
     SPOT_FACE_CALLOUT,
     STOCK_TEXT_PREFIX,
     STOCK_TEXT_SUFFIX,
@@ -297,19 +299,20 @@ END_KEEP = {
 # offset 9 mm above its dimension line, under the top border, on a leader.
 STOCK_TEXT_XY = (END_CENTER[0], END_KEEP["Depth"][1] + 0.009)
 
-# Each projected zone's heavy chain line, from front face A (z = 0) through
-# its height on the side ``PROJECTED_ZONE_DIRECTION`` names, in the view
-# that shows its hole cut on the axis.
+# Each projected zone's heavy chain line, from the face its mating part seats
+# on (``PROJECTED_ZONE_START_Z``) outward through its height on the side
+# ``PROJECTED_ZONE_DIRECTION`` names, in the view that shows its hole cut on
+# the axis.
 #
-# The plate taps' zones run rearward, down section A-A, on their axes
-# through the holes' open cut; each tap frame's leader lands on the near
+# The plate taps' zones run rearward from the rear face, down section A-A
+# below the cut, on their axes; each tap frame's leader lands on the near
 # wall at the mouth, so none crosses its line. Both are one height the same
-# way, so one dimension carries both ("2X"). Its dimension line runs inside
-# tap 1's hole beside the chain line, so both of its arrows sit on the
-# zone's own ends, face A and the far end (review of d5d1298b0, r3: between
-# the taps the line started in the hatch and the zone read as starting at the
-# rear face); its value stands below the section, between the taps, on a
-# leader.
+# way, so one dimension carries both ("2X"). Its dimension line runs beside
+# tap 1's chain line, so both of its arrows sit on the zone's own ends, the
+# rear face and the far end; its value stands between the taps, on a leader.
+# Machinist review r7 (clarity, gating): drawn from face A, the chain ran
+# down inside the hole through the whole stock and did not read as a zone
+# projecting out of one face.
 #
 # The pin bore's zone runs forward 32.6 (65 mm at 2:1): up section A-A it
 # crossed the plan's 68.815, 128.90 and (141.4) dimension lines (review of
@@ -319,6 +322,8 @@ STOCK_TEXT_XY = (END_CENTER[0], END_KEEP["Depth"][1] + 0.009)
 # cutting line D-D across the bore's axis, and section D-D, cut faces only,
 # also 2:1, stands under it with clear air on all sides; it looks toward
 # the pivot, so forward reads to the right. D, not C: datum C is this bore.
+# Datum A is tagged in A-A only, so the D-D height names its start face
+# after its value (machinist review r7: nothing marked which face).
 @dataclass(frozen=True)
 class ZoneChain:
     view: str  # "A-A" or "D-D"
@@ -328,6 +333,8 @@ class ZoneChain:
     dimension: tuple[float, float] | None
     # Where the value stands off its dimension line on a leader, if it does.
     text_xy: tuple[float, float] | None = None
+    # The start face, after the value, where no datum tag shares the view.
+    face_callout: str = ""
 
 
 PROJECTED_ZONE_CHAINS: dict[str, ZoneChain] = {
@@ -344,7 +351,7 @@ PROJECTED_ZONE_CHAINS: dict[str, ZoneChain] = {
         ),
     ),
     "plate_tap_2_position": ZoneChain("A-A", PLATE_TAP_STATIONS[1], None),
-    "feed_stud_projected_axis": ZoneChain("D-D", PIN_STATION, (0.0, 0.008)),
+    "feed_stud_projected_axis": ZoneChain("D-D", PIN_STATION, (0.0, 0.008), face_callout="FROM FACE A"),
 }
 SHEET_NAMES = ("Arm", "Pin bore projected zone")
 PIN_SECTION_LABEL = "D"
@@ -582,7 +589,7 @@ def _set_tap_callout_text(display: Any, qualifier: str, *, label: str) -> None:
 
 
 def _set_stock_text(adapter: Any, annotations: list[Any]) -> None:
-    """Print the thickness as the stock's: "5/16 ±.001 IN (7.94) GROUND STOCK".
+    """Print the thickness as the stock's: "5/16 ±.001 (.3125) GROUND STOCK REF".
 
     The arm is cut from 5/16 ground flat stock with its faces as supplied, so
     the stock's tolerance governs the thickness, not the .XX row.  Prefix and
@@ -613,17 +620,49 @@ def _set_stock_text(adapter: Any, annotations: list[Any]) -> None:
     raise RuntimeError("arm end view has no Depth dimension to label")
 
 
+_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
+
+
+def _end_radius_to_arc(adapter: Any, annotations: list[Any]) -> None:
+    """R.49's leader runs from its text to the end round and stops there.
+
+    Machinist review r3 (clarity): left to the document's style, its line
+    ran on to the pivot centre and met the Ø.1935 bore's diameter leader
+    there.  Arrow outside, no solid leader (draw_dt_crank_handle's radius
+    style), so it never reaches the bore.
+    """
+    for annotation in annotations:
+        if dimension_name(adapter, annotation) != "PivotEndR":
+            continue
+        display = _early_bound(
+            _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension"
+        )
+        display.ArcExtensionLineOrOppositeSide = False
+        display.ArrowSide = _ARROWS_OUTSIDE
+        display.SolidLeader = False
+        if (
+            bool(display.Diametric)
+            or bool(display.ArcExtensionLineOrOppositeSide)
+            or int(display.ArrowSide) != _ARROWS_OUTSIDE
+            or bool(display.SolidLeader)
+        ):
+            raise RuntimeError("PivotEndR kept its leader to the pivot centre")
+        return
+    raise RuntimeError("arm plan view has no PivotEndR dimension to style")
+
+
 @_telemetry.traced("drawing.transgear_arm.projected_zone_chains", label_param="label")
 def _add_projected_zone_chains(adapter: Any, view: Any, label: str) -> None:
     """Every projected zone drawn in ``view`` (section ``label``) at its
-    feature: a heavy chain line from front face A along the zone's direction
-    for its height, and, when its ``ZoneChain`` carries one, the height's
-    dimension on that line, prefixed with the count of zones it carries
-    ("2X") and printed as the frames print it.
+    feature: a heavy chain line from its start face along the zone's
+    direction for its height, and, when its ``ZoneChain`` carries one, the
+    height's dimension on that line, prefixed with the count of zones it
+    carries ("2X"), printed as the frames print it, with its start face
+    after the value where the chain names one.
 
     The ends are model points projected through the view in one frame, so
     each line is its zone's own extent at true length and on its own side of
-    face A. The lines are authored together in the view's sketch, straight
+    its face. The lines are authored together in the view's sketch, straight
     to the database (``_transgear_zone_line``, shared with the plate), the
     drawing rebuilds once, and their fonts and endpoints are read back
     settled; each dimension measures its line itself.
@@ -639,10 +678,13 @@ def _add_projected_zone_chains(adapter: Any, view: Any, label: str) -> None:
         [
             (chain.x_mm / 1000.0, 0.0, z / 1000.0)
             for key, chain in chains
-            for z in (0.0, PROJECTED_ZONE_DIRECTION[key] * heights[key])
+            for z in (
+                PROJECTED_ZONE_START_Z[key],
+                PROJECTED_ZONE_START_Z[key] + PROJECTED_ZONE_DIRECTION[key] * heights[key],
+            )
         ],
         label=f"section {label} projected zones",
-        names=[f"{key} {end}" for key, _chain in chains for end in ("face A", "far end")],
+        names=[f"{key} {end}" for key, _chain in chains for end in ("start face", "far end")],
     )
     ends = {key: projected[2 * index : 2 * index + 2] for index, (key, _chain) in enumerate(chains)}
     for key, (start, end) in ends.items():
@@ -692,9 +734,12 @@ def _add_projected_zone_chains(adapter: Any, view: Any, label: str) -> None:
             dimension.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
             count = projected_zone_count(key)
             prefix = f"{count}X (" if count > 1 else "("
+            # The start face follows the value on its line: under it, it
+            # would crowd the 5 mm between D-D's dimension and chain lines.
+            suffix = f") {chain.face_callout}" if chain.face_callout else ")"
             dimension.ShowParenthesis = False
             dimension.SetText(_SW_TEXT_PREFIX, prefix)
-            dimension.SetText(_SW_TEXT_SUFFIX, ")")
+            dimension.SetText(_SW_TEXT_SUFFIX, suffix)
             applied = (
                 int(model_dimension.DrivenState),
                 int(dimension.GetPrimaryPrecision2()),
@@ -702,7 +747,7 @@ def _add_projected_zone_chains(adapter: Any, view: Any, label: str) -> None:
                 str(dimension.GetText(_SW_TEXT_PREFIX) or ""),
                 str(dimension.GetText(_SW_TEXT_SUFFIX) or ""),
             )
-            wanted = (_SW_DIMENSION_DRIVEN, DRAWING_REFERENCE_PRECISION, False, prefix, ")")
+            wanted = (_SW_DIMENSION_DRIVEN, DRAWING_REFERENCE_PRECISION, False, prefix, suffix)
             if applied != wanted:
                 raise RuntimeError(f"{key} reference height reads {applied}, not {wanted}")
             if chain.text_xy is not None:
@@ -874,7 +919,8 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="transgear arm package")
     ddoc = _early_bound(drawing_model, "IDrawingDoc")
@@ -946,6 +992,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_reference_dimensions(adapter, annotations, ("PivotBoreDia",))
     _set_stock_text(adapter, annotations)
+    _end_radius_to_arc(adapter, annotations)
     offset_dimension_text(adapter, annotations, {"FloorDepth": FLOOR_TEXT_XY})
     # Model-owned circular zones and actual feature datums. BASIC stations
     # are imported from the part; no drawing-only coordinate tolerances.
@@ -1059,6 +1106,7 @@ async def build(adapter: Any) -> dict[str, str]:
             label=label,
         )
         _set_tap_callout_text(callout, qualifier, label=label)
+        set_hole_callout_precision(callout, {"hw-thrutapdrldia": 3}, label=label)
 
     # Sheet 2: the pin bore's projected zone in section D-D, cut from a plan
     # on sheet 1's plan centre (rule 15: its own sheet, not a shrunk view).

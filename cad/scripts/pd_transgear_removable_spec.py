@@ -44,7 +44,15 @@ from __future__ import annotations
 
 import math
 
+import _config
 import _sprocket_seat_geometry as seat
+from _dowel_dimensions import DIA_BAND_IN as DOWEL_DIA_BAND_IN
+from _package_units import drawing_unit
+
+# #290: the sheet prints decimal inch.  Its interface (plate, bore, pin holes
+# and their circle) stays ``_sprocket_seat_geometry``'s, shared with the DT
+# crank seat; the wheel prints it with the places and bands below.
+UNIT = drawing_unit("parts/pd-transgear-removable", _config.parts("pd-transgear-removable"))
 
 MM_PER_IN = 25.4
 
@@ -158,23 +166,40 @@ if type(CHAIN_LINK_COUNT) is not int or CHAIN_LINK_COUNT <= 0 or CHAIN_LINK_COUN
 
 # --- manufacturing drawing (one sheet: the T24 views plus one edge view each
 # of T12 and T18; SPROCKET DATA lists all three configurations) --------------
-# The plate thickness carries PLATE_BAND; the bore and the pin holes are
-# drilled (the title block's DRILLED HOLES row governs them); each pin centre
-# carries +/-DRIVE_PIN_OFFSET_TOL at .XXX.  PinNegDia is the same global as
-# PinPosDia and prints once as its "2X".  BlankDia is the supplied outside
-# diameter, configuration-driven ("2 * Ra"), printed once per configuration
-# at .X as a REFERENCE only: it is not a turning operation.
+# The bore (.406, 13/32 drill) and the pin holes (.098, #40 drill) are drilled
+# (the title block's DRILLED HOLES row governs them).  PinNegDia is the same
+# global as PinPosDia and prints once as its "2X".  BlankDia is the supplied
+# outside diameter, configuration-driven ("2 * Ra"), printed once per
+# configuration at .XX as a REFERENCE only: it is not a turning operation.
+#
+# The supplied .110 plate (seat.PLATE 2.8 is the shared stack's value) prints
+# as the limits .110/.107: 2.718..2.794, inside the 2.7..2.8 every chain-float
+# and drive-pin stack reads (seat.PLATE_BAND).
+PLATE_PLACES = 3
+PLATE_PRINTED_BAND = (0.0, -0.0762)  # (upper, lower): +.000/-.003
+# Each pin centre prints .2756 (the shared 7.0 at four places) +/-.0009, the
+# shared +/-DRIVE_PIN_OFFSET_TOL the crank seat's pins also carry.
+PIN_LOCATION_PLACES = 4
+PIN_LOCATION_TOL = 0.02286  # .0009
+# The drills the bore and the pin holes are cut with, and their diameters (in).
+BORE_DRILL = ("13/32", 13.0 / 32.0)
+PIN_HOLE_DRILL = ("#40", 0.098)
+# Local inch copies of seat.BORE_DIA / PIN_HOLE_DIA / DRIVE_PIN_OFFSET_TOL
+# (above) while the crank and drive-collar sheets print mm; the #290
+# knob-stack PR collapses them into _sprocket_seat_geometry.
+BORE_DIA = 10.3124  # .406
+PIN_HOLE_DIA = 2.4892  # .098
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlankProfile": {"BlankDia", "BlankWidth"},
     "BorePinsProfile": {"BoreDiaDim", "PinPosDia", "PinPosY", "PinNegY"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "BlankProfile": {"BlankDia": 1, "BlankWidth": 2},
+    "BlankProfile": {"BlankDia": 2, "BlankWidth": PLATE_PLACES},
     "BorePinsProfile": {
-        "BoreDiaDim": 2,
-        "PinPosDia": 2,
-        "PinPosY": seat.DRIVE_PIN_OFFSET_PLACES,
-        "PinNegY": seat.DRIVE_PIN_OFFSET_PLACES,
+        "BoreDiaDim": 3,
+        "PinPosDia": 3,
+        "PinPosY": PIN_LOCATION_PLACES,
+        "PinNegY": PIN_LOCATION_PLACES,
     },
 }
 if {feature: set(names) for feature, names in DRAWING_PRECISION.items()} != (
@@ -191,12 +216,44 @@ DRAWING_REFERENCE_DIMENSIONS = frozenset({"BlankDia"})
 
 if not seat.BAND_FRONT_Z < seat.DRIVE_PIN_TIP_Z < seat.SEAT_FACE_Z:
     raise AssertionError("drive-pin tips must end inside the wheel's plate")
-if seat.PIN_HOLE_DIA <= seat.DRIVE_PIN_DIA:
-    raise AssertionError("the wheel's pin holes must slip over the drive pins")
-if abs(seat.BORE_PIN_WEB - 0.6) > 1e-9:
-    raise AssertionError("bore/pin-hole web moved off the contracted 0.60")
+if seat.BORE_PIN_WEB <= 0.0:
+    raise AssertionError("the drive-pin holes break into the bore")
 if seat.SEAT_SPIGOT_RIM <= 0.0:
     raise AssertionError("the seat spigot must enclose the drive-pin holes")
+
+
+def _printed_limits(model: float, places: int, band: tuple[float, float]) -> tuple[float, float]:
+    """(min, max) mm a dimension ``model`` prints to at ``places`` inch with the
+    (upper, lower) ``band`` about its printed value."""
+    scale = MM_PER_IN / 10**places
+    printed = math.floor(model / scale + 0.5 + 1e-9) * scale
+    return printed + band[1], printed + band[0]
+
+
+# The printed plate limits stay inside the shared band the stacks read.
+_PLATE_PRINTED = _printed_limits(seat.PLATE, PLATE_PLACES, PLATE_PRINTED_BAND)
+if not (
+    seat.PLATE + min(seat.PLATE_BAND) - 1e-9
+    <= _PLATE_PRINTED[0]
+    < _PLATE_PRINTED[1]
+    <= seat.PLATE + max(seat.PLATE_BAND) + 1e-9
+):
+    raise AssertionError("the printed plate band leaves the chain-float stack's band")
+# Each drill is a size the printed hole accepts: printed nominal to +.004.
+for _what, _model, (_drill, _drill_in) in (
+    ("bore", BORE_DIA, BORE_DRILL),
+    ("pin hole", PIN_HOLE_DIA, PIN_HOLE_DRILL),
+):
+    _low, _high = _printed_limits(_model, 3, (0.004 * MM_PER_IN, 0.0))
+    if not _low - 1e-9 <= _drill_in * MM_PER_IN <= _high + 1e-9:
+        raise AssertionError(f"the {_drill} drill does not cut the printed {_what}")
+# Slip: the smallest pin hole over the largest 3/32 dowel absorbs the pins'
+# and the holes' spacing error (each pair's two centres at opposite limits).
+_PIN_HOLE_MIN = _printed_limits(PIN_HOLE_DIA, 3, (0.0, 0.0))[0]
+_DOWEL_MAX = seat.DRIVE_PIN_DIA + max(DOWEL_DIA_BAND_IN) * MM_PER_IN
+PIN_SLIP_CLEARANCE_MIN = _PIN_HOLE_MIN - _DOWEL_MAX  # 0.1003
+if PIN_SLIP_CLEARANCE_MIN < 2.0 * (seat.DRIVE_PIN_OFFSET_TOL + PIN_LOCATION_TOL):
+    raise AssertionError("pin + hole spacing error exceeds the pin holes' slip clearance")
 
 
 def chain_plate_inner_radius(teeth: int, plate_height: float) -> float:
@@ -337,8 +394,8 @@ def gap_area(teeth: int) -> float:
 
 # Static cross-section the bore and two pin holes remove (mm^2).
 BORE_PINS_AREA = (
-    math.pi * (seat.BORE_DIA / 2.0) ** 2
-    + 2.0 * math.pi * (seat.PIN_HOLE_DIA / 2.0) ** 2
+    math.pi * (BORE_DIA / 2.0) ** 2
+    + 2.0 * math.pi * (PIN_HOLE_DIA / 2.0) ** 2
 )
 
 
@@ -426,11 +483,11 @@ def part_volume(teeth: int) -> float:
 
 def root_to_pin_hole(teeth: int) -> float:
     """Radial ligament from the ANSI bottom circle to a pin hole's outer edge."""
-    return bottom_dia(teeth) / 2.0 - seat.PIN_CIRCLE_RADIUS - seat.PIN_HOLE_DIA / 2.0
+    return bottom_dia(teeth) / 2.0 - seat.PIN_CIRCLE_RADIUS - PIN_HOLE_DIA / 2.0
 
 
 for _name, _n in CONFIGS:
-    if seat_bottom_dia(_n) / 2.0 <= seat.PIN_CIRCLE_RADIUS + seat.PIN_HOLE_DIA / 2.0:
+    if seat_bottom_dia(_n) / 2.0 <= seat.PIN_CIRCLE_RADIUS + PIN_HOLE_DIA / 2.0:
         raise AssertionError(f"{_name}: seating curve breaks into the pin holes")
     if not 0.0 <= bottom_dia(_n) - seat_bottom_dia(_n) <= caliper_minus_tol(_n):
         raise AssertionError(f"{_name}: seat bottom outside the ANSI caliper tolerance")

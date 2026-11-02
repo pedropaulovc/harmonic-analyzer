@@ -10,6 +10,8 @@ from typing import Any
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _supplier_disc_spring_drawing import (
     prepare_supplier_disc_diagram,
     supplier_disc_reference_features,
@@ -19,6 +21,8 @@ from _supplier_spring_drawing import build_supplier_spring_drawing
 from _supplier_spring_reference import SUPPLIER_DIAGRAM_CONFIGURATION
 import pd_vn_transgear_pivot_spring_spec as supplier_spec
 
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_vn_transgear_pivot_spring"]
 # The footer's ITEM row: the catalogue designation in plain text.
@@ -44,6 +48,7 @@ async def build(adapter: Any) -> dict[str, str]:
         right_caption="SUPPLIER APPLICATION GAUGES — NOT PART SHAPE",
         installed_caption="INSTALLED CONICAL REPRESENTATION",
         settled_checks=settled_checks,
+        unit=part_drawing_unit(SPEC.artifact_stem),
     )
 
 

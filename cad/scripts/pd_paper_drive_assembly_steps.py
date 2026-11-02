@@ -19,6 +19,8 @@ live proof.
 
 from __future__ import annotations
 
+import math
+
 import dt_drive_train_steps
 import pd_transgear_drive_collar_spec as collar
 import paper_drive_mesh_check as mesh_check
@@ -73,8 +75,8 @@ SEQUENCE: tuple[str, ...] = (
     "hanger-pivoted",
     # Disc cluster, on the bench (R9-68: the disc on the sleeve's seat
     # shoulder, the hub's D-bore on its D-flat; R9-8, R9-9). Hub and bushings
-    # are printed lengths (#2038 owner ruling 2026-10-28; transgear_cluster_fit):
-    # nothing in the cluster is faced at assembly.
+    # are printed lengths (transgear_cluster_fit); nothing is faced: the float
+    # is shimmed at assembly (owner ruling 2026-11-01, #2124).
     # Centre and seat the disc to the sleeve's actual running-bore datum
     # before transfer-spotting; lock, re-indicate every space, then match-mark.
     "disc-cluster-assembled",
@@ -85,6 +87,9 @@ SEQUENCE: tuple[str, ...] = (
     "oil-hole-drilled",
     # R9-68: on the pin between the two bushings, as made, the ring last.
     "disc-cluster-hung",
+    # #2124: the ring gap read on a feeler, cluster rearward, and closed into
+    # VIEW E's window with MHA-PD-VN-68 shims under the rear bushing.
+    "disc-cluster-shimmed",
     # Knob stack, front to rear (contract §1). R9-70 (N-A): the collar's pilot
     # faced on the bench to stand proud of every removable wheel, the
     # thumbnut's seat (pd_transgear_drive_collar_spec.PILOT_PROUD_RANGE); R9-70
@@ -141,6 +146,13 @@ KNOB_SETTING_VIEW_NAME = "VIEW K"
 def knob_setting_ref() -> str:
     """The pointer the arm and plate sheets print: ``MHA-PD-00 VIEW K``."""
     return f"{DRAWING_NUMBER} {KNOB_SETTING_VIEW_NAME}"
+
+
+def mm_max_text(limit: float, places: int) -> str:
+    """An inch-authored maximum in the sheet's mm, rounded down so the printed
+    limit never admits a value the part spec refuses."""
+    scale = 10**places
+    return f"{math.floor(round(limit * scale, 9)) / scale:.{places}f} MAX"
 
 
 # --- Values the procedure owns (CONTRACT-paper-drive.md §13.2) --------------

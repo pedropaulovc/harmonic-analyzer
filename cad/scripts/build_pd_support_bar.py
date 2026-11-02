@@ -5,9 +5,13 @@ steel bar clamped across the two front columns by the two-piece column
 clamps (build_sh_column_clamp_front.py and build_sh_column_clamp_back.py), carrying the hanging platen
 (guides + locks on the platen back) and, on its own back face, the ch. 23
 transgear hanger (pivot screw MHA-PD-VN-57) and the latch hook (MHA-PD-14).
-Cross-section 28 tall x 9 deep (it fills the platen's guide channel to a
-1.0 bottom-rail clearance; ``pd_support_bar_spec.BAR_HEIGHT`` carries the
-photo chain); 452 long so the ends run ~29 past each column (ch30 p002).
+Cross-section 1.010 tall x 9.5 deep (it fills the platen's guide channel to a
+running clearance over the bottom rail; ``pd_support_bar_spec.BAR_HEIGHT``
+carries the photo chain); 17.8 in long so the ends run ~29 past each column
+(ch30 p002). The clamp line and hanger row keep their machine heights under the
+top edge, so they stand below the bar's centre line.
+The part builds in inch document units and its sheet prints decimal inch
+(#290); the section and stations keep their millimetre interfaces.
 
 Holes (all along local Z, the machine front-back axis):
 * 4x clamp screws flanking each column (x +-197 -+ 17.5): round counterbores
@@ -51,9 +55,11 @@ from _drawing_tolerances import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_pmi import author_part_pmi
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -87,11 +93,13 @@ from pd_support_bar_spec import (
     BRACKET_TAP_CSK_DIA,
     BRACKET_TAP_SPEC,
     BRACKET_TAP_X,
+    CLAMP_TAP_Y,
     HANGER_TAP_Y,
-    HOLE_POSITION_BAND,
+    HOLE_POSITION_TOL,
     PIVOT_TAP_CSK_DIA,
     PIVOT_TAP_DRILL_DIA,
     PIVOT_TAP_X,
+    UNIT,
 )
 from pd_support_bar_drawing_spec import (
     CLAMP_HOLE_CALLOUT_PLACES,
@@ -107,27 +115,31 @@ from pd_support_bar_drawing_spec import (
     ISOMETRIC_VIEW_NOTE,
     SHEET_PRECISION,
     SURFACE_FINISHES,
-    TOL_MAX,
 )
 
 PART_NAME = "pd-support-bar"
 MATERIAL = "Plain Carbon Steel"
 
-BAR_LENGTH = 452.0  # ends at x +-226, ~29 past each Ø25.4 column (ch30 p002)
+# 17.8: ends at x +-226.06, ~29 past each Ø25.4 column (ch30 p002). An
+# unmated overall length, so it prints .X.
+BAR_LENGTH = 452.12  # 17.8
 
+# The column line (frame) and the clamp-screw spacing (the MHA-SH-02 back-arc
+# taps) are the frame's and the clamps', so they keep their millimetres and
+# the stations print rounded.
 COLUMN_X = 197.0  # frame column line (frame assembly)
 CLAMP_SCREW_DX = 17.5  # clamp screws flank each column
 # The stock 90280A201 #8-32 clamp screws pass through #8 clearance holes.
-# Their 3.9624-mm heads sit below the bar front: the right-shifted platen
+# Their .156 heads sit below the bar front: the right-shifted platen
 # travels across the east clamp line, so proud heads would block its slide.
-# The recess is 0.80 so the depth prints at .XX
+# The depth prints at .XX
 # (pd_support_bar_drawing_spec.CLAMP_CBORE_DEPTH_PLACES) and the title block's
-# ±0.51 still leaves the head about 0.29 under the face at the shallowest: a
+# ±.01 still leaves the head about .024 under the face at the shallowest: a
 # clearance needs only a minimum, so the nominal moves, not the band (Main
-# ruling on the r4 machinist over-specification; at 0.35 it was held .XXX).
-CLAMP_HEAD_RECESS = 0.80
-CLAMP_CBORE_DIA = 8.5
-CLAMP_CBORE_DEPTH = CLAMP_HEAD_H + CLAMP_HEAD_RECESS
+# ruling on the r4 machinist over-specification).
+CLAMP_CBORE_DIA = 8.509  # .335
+CLAMP_CBORE_DEPTH = 4.826  # .19
+CLAMP_HEAD_RECESS = CLAMP_CBORE_DEPTH - CLAMP_HEAD_H  # .034
 CLAMP_THROUGH_HOLE_SPEC = HoleSpec("clearance", "#8")
 CLAMP_HOLE_DIA = blind_cut_dia_mm(CLAMP_THROUGH_HOLE_SPEC)
 CLAMP_HOLE_SPEC = HoleSpec(
@@ -154,7 +166,7 @@ HANGER_STATIONS = tuple(x - LEFT_END_X for x in (PIVOT_TAP_X, *BRACKET_TAP_X))
 # end as the hanger row, so one end is the datum on both faces, and the
 # height from the top face, its rise on the +X end.
 CLAMP_ROW_START_X = LEFT_END_X
-CLAMP_ROW_HEIGHT = BAR_HEIGHT / 2.0
+CLAMP_ROW_HEIGHT = BAR_HEIGHT / 2.0 - CLAMP_TAP_Y
 CLAMP_ROW_X = tuple(sorted(CLAMP_HOLE_X))
 CLAMP_STATIONS = tuple(x - CLAMP_ROW_START_X for x in CLAMP_ROW_X)
 
@@ -166,8 +178,8 @@ CLAMP_STATIONS = tuple(x - CLAMP_ROW_START_X for x in CLAMP_ROW_X)
 # the basic major by CLAMP_HOLE_FLOAT. A coordinate ±band is a diametral zone of
 # 2·√2·band (the rounding to the printed places included), and the bar's
 # zone plus the tap's must stay inside the float. The row height and
-# stations, at .XX, take the widest band that does: ±0.18 (0.509 + 0.283 =
-# 0.792 of 0.812; ±0.19 needs 0.820; the title block's .X ±0.8 needed 2.546).
+# stations, at .XXX, take the widest band that does: ±.006 (the .XX row's
+# ±.01 would need more than the whole float).
 CLAMP_HOLE_FLOAT = CLAMP_HOLE_DIA - CLAMP_SCREW_MAJOR
 BACK_ARC_TAP_ZONE = 2.0 * math.hypot(
     BACK_ARC_TAP_STATION_BAND, BACK_ARC_TAP_HEIGHT_BAND
@@ -179,7 +191,9 @@ def clamp_position_zone(band: float) -> float:
     twice its farthest printed corner off the model, over every station."""
 
     def reach(value: float) -> float:
-        deviations = printed_deviations(value, CLAMP_POSITION_PLACES, (-band, band))
+        deviations = printed_deviations(
+            value, CLAMP_POSITION_PLACES, (-band, band), unit=UNIT
+        )
         return max(abs(d) for d in deviations)
 
     return 2.0 * max(
@@ -188,24 +202,21 @@ def clamp_position_zone(band: float) -> float:
     )
 
 
-_CLAMP_POSITION_STEP = 10.0**-CLAMP_POSITION_PLACES
-CLAMP_POSITION_BAND = round(
-    _CLAMP_POSITION_STEP
-    * max(
-        (
-            k
-            for k in range(1, math.ceil(CLAMP_HOLE_FLOAT / _CLAMP_POSITION_STEP))
-            if clamp_position_zone(k * _CLAMP_POSITION_STEP) + BACK_ARC_TAP_ZONE
-            <= CLAMP_HOLE_FLOAT + 1e-9
-        ),
-        default=0,
+# One step of the printed places, in millimetres.
+_CLAMP_POSITION_STEP = 25.4 * 10.0**-CLAMP_POSITION_PLACES
+CLAMP_POSITION_BAND = _CLAMP_POSITION_STEP * max(
+    (
+        k
+        for k in range(1, math.ceil(CLAMP_HOLE_FLOAT / _CLAMP_POSITION_STEP))
+        if clamp_position_zone(k * _CLAMP_POSITION_STEP) + BACK_ARC_TAP_ZONE
+        <= CLAMP_HOLE_FLOAT + 1e-9
     ),
-    CLAMP_POSITION_PLACES,
+    default=0,
 )
 if CLAMP_POSITION_BAND <= 0.0:
     raise AssertionError(
         "MHA-SH-VN-53 screws in the MHA-SH-02 taps through the support bar: no "
-        f".XX clamp-hole position band fits the {CLAMP_HOLE_FLOAT:.4f} float"
+        f".XXX clamp-hole position band fits the {CLAMP_HOLE_FLOAT:.4f} float"
     )
 
 # --- West clamp slots: owner ruling 2026-10-15, option A (PR #1471 r3) -------
@@ -232,14 +243,14 @@ CLAMP_SLOT_X = tuple(x for x in CLAMP_HOLE_X if x > 0.0)
 # Each slot is the round hole's width run CLAMP_SLOT_TRAVEL each way along the
 # bar, inside the round counterbore's width run as far and as deep: the east
 # pair's screw, head seat and floor.
-CLAMP_SLOT_TRAVEL = 1.5
-CLAMP_SLOT_RUN = 2.0 * CLAMP_SLOT_TRAVEL  # straight sides, end centre to end centre
+CLAMP_SLOT_RUN = 2.9972  # .118, straight sides, end centre to end centre
+CLAMP_SLOT_TRAVEL = CLAMP_SLOT_RUN / 2.0
 CLAMP_SLOT_WIDTH = CLAMP_HOLE_DIA
 CLAMP_SLOT_CBORE_WIDTH = CLAMP_CBORE_DIA
 CLAMP_SLOT_CBORE_RUN = CLAMP_SLOT_RUN
 # The round holes print under the title block's DRILLED HOLES row; the milled
 # slot carries the same limits on its own width.
-DRILLED_HOLE_LIMITS = (0.0, drilled_oversize_mm())
+DRILLED_HOLE_LIMITS = (0.0, drilled_oversize_mm(unit=UNIT))
 CLAMP_SLOT_WIDTH_LIMITS = DRILLED_HOLE_LIMITS
 # Each column clamp may stand off its column by half the bore's widest
 # diametral clearance (sh_column_clamp_fit), the two clamps independently.
@@ -249,7 +260,7 @@ COLUMN_CLAMP_SHIFT = BORE_DIAMETRAL_CLEARANCE[1] / 2.0
 def _printed_limits(
     value: float, places: int, limits: tuple[float, float] | None = None
 ) -> tuple[float, float]:
-    lower, upper = printed_deviations(value, places, limits)
+    lower, upper = printed_deviations(value, places, limits, unit=UNIT)
     return value + lower, value + upper
 
 
@@ -387,7 +398,7 @@ CLAMP_ROW = ReferenceRow(
     "ClampRowReference",
     "Clamp",
     "ClampRowHeight",
-    0.0,
+    CLAMP_TAP_Y,
     tuple(zip(CLAMP_STATION_NAMES, CLAMP_ROW_X, strict=True)),
 )
 
@@ -475,7 +486,7 @@ async def _author_clamp_slot_profile(
 ) -> tuple[list[tuple[str, str]], bool]:
     """One closed stadium per west clamp slot on the front face
     (``FRONT_FACE_PLANE``): ``width`` across, its straight sides ``run`` long
-    along the bar, centred on the slot's station at mid-height. The outer
+    along the bar, centred on the slot's station on the clamp line. The outer
     slot's (the detail's) width and run are ``{base}Width`` and
     ``{base}Travel``; the inner slot's carry the same names numbered 1. An
     offset plane's sketch axes are SOLIDWORKS' choice, so the centres map
@@ -485,8 +496,8 @@ async def _author_clamp_slot_profile(
     front_z = -BAR_DEPTH / 2.0
     check(f"create_sketch {feature}", await adapter.create_sketch(FRONT_FACE_PLANE))
     outer = max(CLAMP_SLOT_X)
-    u0, v0, w0 = _sketch_uvw(adapter, (outer, 0.0, front_z))
-    u1, v1, _ = _sketch_uvw(adapter, (outer + 1.0, 0.0, front_z))
+    u0, v0, w0 = _sketch_uvw(adapter, (outer, CLAMP_TAP_Y, front_z))
+    u1, v1, _ = _sketch_uvw(adapter, (outer + 1.0, CLAMP_TAP_Y, front_z))
     du, dv = u1 - u0, v1 - v0
     if abs(abs(du) - 1.0) < 1e-4 and abs(dv) < 1e-4:
         u_is_x = True
@@ -494,14 +505,14 @@ async def _author_clamp_slot_profile(
         u_is_x = False
     else:
         raise RuntimeError(f"{feature}: sketch axes are not along X/Y ({du:g}, {dv:g})")
-    w_out = _sketch_uvw(adapter, (outer, 0.0, front_z - 1.0))[2] - w0
+    w_out = _sketch_uvw(adapter, (outer, CLAMP_TAP_Y, front_z - 1.0))[2] - w0
     if abs(abs(w_out) - 1.0) > 1e-4:
         raise RuntimeError(f"{feature}: sketch normal is not along Z (w {w_out:g})")
     dims = SketchDims()
     for index, x in enumerate(sorted(CLAMP_SLOT_X, reverse=True)):
         tag = str(index) if index else ""
         where = f"{feature} at x {x:g}"
-        u, v, w = _sketch_uvw(adapter, (x, 0.0, front_z))
+        u, v, w = _sketch_uvw(adapter, (x, CLAMP_TAP_Y, front_z))
         if abs(w) > 1e-4:
             raise RuntimeError(f"{where} lies {w:g} mm off the sketch plane")
         p1, p2, p3, p4, c_end_b, c_end_a = _stadium_points(
@@ -580,7 +591,10 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
     row from the left bar end through each hole to a rise at the right end
     that drops from the top face to the row, so the stations read from the
     end and the row's height from the top face. Every dimension is driven
-    from the bar globals (``row_equations``)."""
+    from the bar globals (``row_equations``). The rise lies on the bar's end
+    edge, so it is a plain sketch line, which prints inside that edge's
+    heavier stroke; as construction geometry its grey dashes showed along the
+    end (machinist review round 2)."""
     feature = row.feature
     rise_x = BAR_LENGTH / 2.0
     row_y = row.row_y
@@ -599,7 +613,6 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
         for index, (x0, x1) in enumerate(zip(row_xs, row_xs[1:]))
     ]
     set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, rise, f"{feature} rise")
     check(
         f"{feature} rise vertical",
         await adapter.add_sketch_constraint(rise, None, "vertical"),
@@ -647,29 +660,40 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
     return dims.apply(adapter, feature)
 
 
-def _single_limit(
-    adapter, feature: str, name: str, nominal: float, tol_type: int
-) -> None:
-    """A dimension printed as a single MIN or MAX limit: SOLIDWORKS prints the
-    nominal then the limit word, so the model value is the limit itself."""
+_TOL_NONE = 0  # swTolType_e.swTolNONE
+_TEXT_SUFFIX = 2  # swDimensionTextSuffix
+MAX_SUFFIX = " MAX"
+
+
+def _max_limit(adapter, feature: str, name: str, nominal: float) -> None:
+    """A dimension printed as a single MAX limit, "Ø.169 MAX": the model value
+    is the limit itself, the limit word an authored suffix
+    (pd_transgear_pin_callouts.SEAT_FILLET_SUFFIX); SolidWorks' native
+    swTolMAX prints "max." (machinist review round 6)."""
     label = f"{name}@{feature}"
-    _, dimension = _named_dimension(adapter, feature, name)
+    display, dimension = _named_dimension(adapter, feature, name)
     if not math.isclose(float(dimension.SystemValue), nominal / 1000.0, abs_tol=1e-9):
         raise RuntimeError(
             f"{label}: nominal {float(dimension.SystemValue) * 1000.0:.7f} is not "
             f"the limit {nominal:.7f}"
         )
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = tol_type
-    if not tolerance.SetValues(0.0, 0.0) or int(tolerance.Type) != tol_type:
-        raise RuntimeError(f"{label}: cannot retain the single limit {tol_type}")
-    _telemetry.success(f"{label}: single limit (swTolType {tol_type})")
+    tolerance.Type = _TOL_NONE
+    if int(tolerance.Type) != _TOL_NONE:
+        raise RuntimeError(f"{label}: tolerance did not clear")
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetText(_TEXT_SUFFIX, MAX_SUFFIX)  # void; the readback is the proof
+    if str(display.GetText(_TEXT_SUFFIX) or "") != MAX_SUFFIX:
+        raise RuntimeError(f"{label}: MAX suffix did not persist")
+    _telemetry.success(f"{label}: single MAX limit as text")
 
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): the section and the length. The
     # mm suffix is load-bearing -- this is an INCH document and the equation
@@ -707,8 +731,8 @@ async def build(adapter) -> dict[str, str]:
     expected = BAR_HEIGHT * BAR_DEPTH * BAR_LENGTH
     await volume_check(adapter, "bar", expected, 0.005 * expected)
 
-    # Clamp-screw holes, through along Z at the bar's mid-height, drilled from
-    # the bar FRONT face (local z = -BAR_DEPTH/2, where the clamp-screw heads
+    # Clamp-screw holes, through along Z on the clamp line (CLAMP_TAP_Y), drilled
+    # from the bar FRONT face (local z = -BAR_DEPTH/2, where the clamp-screw heads
     # sit -- ch30 p002), while the bar is still a plain prism: one native Hole
     # Wizard feature, the east column's 2 clamp-screw #8 COUNTERBORES, which
     # locate the bar (the west pair are slots, below).
@@ -716,7 +740,7 @@ async def build(adapter) -> dict[str, str]:
     clamp_dia = CLAMP_HOLE_DIA
     wizard_holes(
         adapter, CLAMP_HOLE_SPEC,
-        [[x, 0.0, front_z] for x in CLAMP_ROUND_X],
+        [[x, CLAMP_TAP_Y, front_z] for x in CLAMP_ROUND_X],
         (0.0, 0.0, -1.0), "clamp-screw counterbores (#8)", name="ClampHoles",
     )
     v_holes = len(CLAMP_ROUND_X) * (
@@ -882,7 +906,10 @@ async def build(adapter) -> dict[str, str]:
 
     # Drawing references, hidden in the part (blank_reference_sketches) and
     # shown per view by the drawing: the countersinks' MAX diameters on the
-    # back face, and each hole row's stations and height.
+    # back face, and each hole row's stations and height. The hook pair's
+    # circle is on its right-hand hole (BRACKET_TAP_X[1]): its stacked callout
+    # stands to the right, so the leader never crosses the other hole
+    # (draw_pd_support_bar.FRONT_KEEP).
     countersinks = SketchDims()
     check("create_sketch CountersinkReference", await adapter.create_sketch("BackFace"))
     for x, dia, label, names in (
@@ -893,7 +920,7 @@ async def build(adapter) -> dict[str, str]:
             ("PivotCskX", "PivotCskY", "PivotCskDia"),
         ),
         (
-            BRACKET_TAP_X[0],
+            BRACKET_TAP_X[1],
             BRACKET_TAP_CSK_DIA,
             "bracket countersink",
             ("BracketCskX", "BracketCskY", "BracketCskDia"),
@@ -928,8 +955,8 @@ async def build(adapter) -> dict[str, str]:
     # The bottom rail's running clearance under the bar spends the height's
     # .XXX band, and the pivot screw's tip recess and the bracket-screw tips
     # the thickness's (pd_support_bar_spec.BAR_HEIGHT_BAND, BAR_DEPTH_BAND).
-    # Both equal the title block's .XXX row, so the model dimensions carry
-    # them as their three places alone: an explicit ±0.13 would restate the
+    # Both are the title block's .XXX row, so the model dimensions carry
+    # them as their three places alone: an explicit ±.005 would restate the
     # title block (drawing-guidelines rule 2; r4 machinist review).
     apply_drawing_precision(
         adapter,
@@ -937,25 +964,30 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # The rest of the print's places, then its bands and limits: the hanger
-    # holes' row and stations carry the pivot and hook positions'
-    # HOLE_POSITION_BAND (paper_drive_geom, transgear_hanger_joints), the
-    # clamp holes' row and stations the MHA-SH-02 taps' CLAMP_POSITION_BAND;
-    # the countersinks their single MAX limits.
+    # holes' row and stations carry the pivot and hook positions' ±.002
+    # (HOLE_POSITION_TOL; paper_drive_geom and transgear_hanger_joints read
+    # HOLE_POSITION_BAND, its printed reach), the clamp holes' row and
+    # stations the MHA-SH-02 taps' CLAMP_POSITION_BAND; the countersinks their
+    # single MAX limits. The bands are millimetres; UNIT prints them in inches.
     apply_drawing_precision(adapter, SHEET_PRECISION)
     for name in ("HangerRowHeight", *HANGER_STATION_NAMES):
         set_dimension_symmetric_tolerance(
-            adapter, "HangerRowReference", name, HOLE_POSITION_BAND
+            adapter,
+            "HangerRowReference",
+            name,
+            HOLE_POSITION_TOL,
+            display_unit=UNIT,
         )
     for name in ("ClampRowHeight", *CLAMP_STATION_NAMES):
         set_dimension_symmetric_tolerance(
-            adapter, "ClampRowReference", name, CLAMP_POSITION_BAND
+            adapter,
+            "ClampRowReference",
+            name,
+            CLAMP_POSITION_BAND,
+            display_unit=UNIT,
         )
-    _single_limit(
-        adapter, "CountersinkReference", "PivotCskDia", PIVOT_TAP_CSK_DIA, TOL_MAX
-    )
-    _single_limit(
-        adapter, "CountersinkReference", "BracketCskDia", BRACKET_TAP_CSK_DIA, TOL_MAX
-    )
+    _max_limit(adapter, "CountersinkReference", "PivotCskDia", PIVOT_TAP_CSK_DIA)
+    _max_limit(adapter, "CountersinkReference", "BracketCskDia", BRACKET_TAP_CSK_DIA)
     # The milled west slots' width carries the drilled holes' limits (it is
     # their float the closure and head checks above spend); both slots share
     # one detail, so their widths print their count.
@@ -965,6 +997,7 @@ async def build(adapter) -> dict[str, str]:
         "ClampSlotWidth",
         *CLAMP_SLOT_WIDTH_LIMITS,
         places=CLAMP_SLOT_WIDTH_PLACES,
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
         adapter,
@@ -972,6 +1005,7 @@ async def build(adapter) -> dict[str, str]:
         "ClampSlotCboreWidth",
         *CLAMP_SLOT_CBORE_WIDTH_LIMITS,
         places=CLAMP_SLOT_CBORE_WIDTH_PLACES,
+        display_unit=UNIT,
     )
     for (feature_name, dimension_name), prefix in DIMENSION_PREFIXES.items():
         set_dimension_prefix(adapter, feature_name, dimension_name, prefix)

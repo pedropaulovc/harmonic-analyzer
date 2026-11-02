@@ -11,32 +11,40 @@ from __future__ import annotations
 import math
 from collections.abc import Callable
 
-import _config
 import pd_transgear_removable_spec as spec
 import _sprocket_seat_geometry as seat_geometry
+from _printed_tolerance import drilled_oversize_mm
 
+_IN = spec.MM_PER_IN
 # A drilled hole may open by the title block's DRILLED HOLES row; it never
 # closes (minus 0).
-_DRILL_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
+_DRILL_OVERSIZE = drilled_oversize_mm(unit=spec.UNIT)
 # Thinnest bore/pin-hole web the printed limits allow: both holes at their
 # drilled maximum, the pin centre moved its full location band toward the bore.
 _WEB_WORST = (
     seat_geometry.PIN_CIRCLE_RADIUS
-    - seat_geometry.DRIVE_PIN_OFFSET_TOL
-    - (seat_geometry.PIN_HOLE_DIA + _DRILL_OVERSIZE) / 2.0
-    - (seat_geometry.BORE_DIA + _DRILL_OVERSIZE) / 2.0
-)
-# Rounded DOWN, so the sheet never states more web than the limits give.
-BORE_PIN_WEB_WORST = math.floor(_WEB_WORST * 100.0 + 1e-9) / 100.0
-if BORE_PIN_WEB_WORST <= 0.0:
+    - spec.PIN_LOCATION_TOL
+    - (spec.PIN_HOLE_DIA + _DRILL_OVERSIZE) / 2.0
+    - (spec.BORE_DIA + _DRILL_OVERSIZE) / 2.0
+)  # 0.4849
+# Rounded DOWN to .001 in, so the sheet never states more web than the
+# limits give.
+BORE_PIN_WEB_WORST_IN = math.floor(_WEB_WORST / _IN * 1000.0 + 1e-9) / 1000.0
+if BORE_PIN_WEB_WORST_IN <= 0.0:
     raise AssertionError("the drive-pin holes break into the bore at print-worst")
-if abs(BORE_PIN_WEB_WORST - 0.47) > 1e-9:
-    raise AssertionError("bore/pin-hole web moved off its 0.47 worst case")
 
-# The shortfall prints as a plain fact; its governance is the
-# pending ruling issue #1377 and this tag, never the sheet.
-# Pending exception ruling: MHA-PD-09 web (#1377).
-BORE_PIN_WEB_NOTE = f"BORE TO DRIVE-PIN HOLE WEB {BORE_PIN_WEB_WORST:.2f} MIN."
+
+def _inch(value_mm: float, places: int) -> str:
+    """``value_mm`` as decimal-inch text, ASME style (no leading zero)."""
+    return f"{value_mm / _IN:.{places}f}".removeprefix("0")
+
+
+# The shortfall prints as a plain fact; its governance is RV-01 in
+# pd-transgear-removable.yaml (owner ruling 2026-11-01, accepted until
+# D14/#1381), never the sheet.
+BORE_PIN_WEB_NOTE = (
+    f"BORE TO DRIVE-PIN HOLE WEB {_inch(BORE_PIN_WEB_WORST_IN * _IN, 3)} MIN."
+)
 
 
 def _per_configuration(render: Callable[[int], str]) -> str:
@@ -48,23 +56,25 @@ def _per_configuration(render: Callable[[int], str]) -> str:
 # the three configurations, which differ only in their tooth count.  The
 # outside diameter is not here: it is the part's BlankDia, printed natively on
 # each configuration's view.  The pitch and bottom diameters follow from the
-# supplied ANSI B29.1 tooth form, so they are reference values.
+# supplied ANSI B29.1 tooth form, so they are reference values, printed to
+# .001 in (exempt chain geometry, not snapped).
 _GEAR_DATA_ROWS = (
     (
         "CHAIN",
-        f"ANSI #25 ROLLER, PITCH {spec.CHAIN_PITCH:.2f}, ROLLER Ø{spec.ROLLER_DIA:.2f}",
+        f"ANSI #25 ROLLER, PITCH {_inch(spec.CHAIN_PITCH, 3)}, "
+        f"ROLLER Ø{_inch(spec.ANSI_ROLLER_DIA, 3)}",
     ),
     ("TOOTH FORM (REF)", "AS SUPPLIED, ANSI B29.1 #25 STANDARD FORM;"),
-    ("", f"ROLLER SEAT R{spec.SEAT_CURVE_R:.2f} ON THE PITCH CIRCLE"),
+    ("", f"ROLLER SEAT R{_inch(spec.SEAT_CURVE_R, 3)} ON THE PITCH CIRCLE"),
     ("CONFIGURATION", "  /  ".join(name for name, _teeth in spec.CONFIGS)),
     ("NUMBER OF TEETH", _per_configuration(str)),
     (
-        "PITCH DIAMETER (mm, REF)",
-        _per_configuration(lambda teeth: f"{spec.pitch_dia(teeth):.2f}"),
+        "PITCH DIAMETER (REF)",
+        _per_configuration(lambda teeth: _inch(spec.pitch_dia(teeth), 3)),
     ),
     (
-        "BOTTOM DIAMETER (mm, REF)",
-        _per_configuration(lambda teeth: f"{spec.bottom_dia(teeth):.2f}"),
+        "BOTTOM DIAMETER (REF)",
+        _per_configuration(lambda teeth: _inch(spec.bottom_dia(teeth), 3)),
     ),
 )
 GEAR_DATA = "\n".join(

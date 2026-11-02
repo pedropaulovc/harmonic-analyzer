@@ -603,17 +603,6 @@
       ]
     },
     {
-      "old_stem": "vn-transgear-pivot-shim",
-      "old_number": "MHA-VN-069",
-      "new_identities": [
-        {
-          "parent": "pd-paper-drive",
-          "stem": "pd-vn-transgear-pivot-shim",
-          "number": "MHA-PD-VN-67"
-        }
-      ]
-    },
-    {
       "old_stem": "vn-transgear-pivot-spring",
       "old_number": "MHA-VN-049",
       "new_identities": [
@@ -2305,6 +2294,18 @@
           "number": "MHA-CH-06-TL-VN-80"
         }
       ]
+    },
+    {
+      "old_stem": "pd-vn-transgear-cluster-shim",
+      "old_number": null,
+      "introduced": "2026-11-01",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-transgear-cluster-shim",
+          "number": "MHA-PD-VN-68"
+        }
+      ]
     }
   ],
   "retired_identities": [
@@ -2647,6 +2648,18 @@
         {
           "stem": "ch-rocker-arm-tl-oblique-pivot-pin",
           "number": "MHA-CH-06-TL-23"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "vn-transgear-pivot-shim",
+      "old_number": "MHA-VN-069",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-transgear-pivot-shim",
+          "number": "MHA-PD-VN-67"
         }
       ],
       "status": "retired"

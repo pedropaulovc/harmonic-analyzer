@@ -1,6 +1,7 @@
 r"""Create the manufacturing drawing for the latch hook (MHA-PD-14).
 
-One formed spring-steel part, all orthographic views at 3:2 (each pinned so
+One formed spring-steel part, printed in decimal inch (the row's
+``drawing_unit: in``), all orthographic views at 3:2 (each pinned so
 the part origin -- the ear's outer face, the base's underside and its low-Y
 edge -- lands where the layout puts it):
 
@@ -8,22 +9,24 @@ edge -- lands where the layout puts it):
   reads through the edge-on strip): the screw holes on the base, located
   from the ear's outer face and the low-Y edge; the arm's formed profile --
   the roll's start below the ear, its inside radius (shortened leader: the
-  centre is 80 off), the straight's length, the inside tab radius, the tab
+  centre is off the sheet), the straight's length, the inside tab radius, the tab
   end's X -- and the far face where the pin crosses it, in X and Y from the
-  origin as references (the fit-up sets it, note 3); the pin hole's size,
-  match-drilled at assembly;
-* ``*Right`` (looking -X, Z running left): the width, the arm's front-edge
-  heights above and below the taper, the root relief and the full round;
-  left of it the formed overall height, a reference from the ear's top edge
-  to the full round's tip; beside it the flat pattern, the part's hidden
-  ``FlatBlank`` reference sketch shown in this view only (a thin outline):
-  the blank across the bend and the arm's developed stations of the taper
-  and the round's centre;
-* ``*Bottom`` (looking +Y, X right, Z up), out of projection beside the side
-  view and so labelled: the base length, the ear height and the inside bend.
+  origin as references, the Y flagged as the pin's axis at that face; the
+  pin hole's size, match-drilled at assembly (note 2 names the pin);
+* ``*Right`` (looking -X, Z running left): the width, the root relief and
+  the full round; left of it the formed overall height, a reference from
+  the ear's top edge to the full round's tip; beside it the flat pattern,
+  the part's hidden ``FlatBlank`` reference sketch shown in this view only
+  (labelled FLAT PATTERN; its outline black at the visible-edge weight, its
+  bend centrelines black chain lines): the blank across the bend, the arm's
+  two strip widths (its controlling widths), its developed stations of the
+  taper and the round's centre, and the bend centrelines' references;
+* ``*Bottom`` (looking +Y, X right, Z up), projected under the front view
+  (third angle, so unlabelled): the base length, the ear height and the
+  inside bend.
 
-The process and the heat treatment ride the part's Manufacturing Notes and
-the title block's FINISH cell.
+The heat treatment rides the title block's FINISH cell; the fit-up and
+heat-treat sequence is the assembly's (the registry row's process).
 """
 
 from __future__ import annotations
@@ -38,6 +41,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
+    view_name,
 )
 
 from _check import check
@@ -61,6 +65,8 @@ from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -72,8 +78,11 @@ from pd_latch_hook_geometry import (
     BBOX_X,
     BBOX_Y,
     BBOX_Z,
+    DEV_ROLL_C,
     DEV_TAPER,
+    DEV_TIP,
     EAR_HEIGHT,
+    FLAT_BEND_C,
     FLAT_LENGTH,
     OUTER_ROLL_END,
     OUTER_ROLL_START,
@@ -82,24 +91,30 @@ from pd_latch_hook_geometry import (
     PIN_HOLE_L,
     ROUND_C_L,
     ROUND_R,
-    SCREW_HOLE_X,
     SCREW_HOLE_Y,
     TAB_C_L,
     WIDTH,
 )
 from pd_latch_hook_spec import (
+    BEND_LINE_DIMENSIONS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     FLAT_ROUND_CALLOUT,
+    FLAT_SKETCH,
     OVERALL_HEIGHT,
     PAIR_CALLOUT,
     PIN_HOLE_CALLOUT,
+    PIN_STATION_CALLOUT,
     REFERENCE_DIMENSIONS,
     ROUND_CALLOUT,
+    ROUND_REFERENCE,
     SCREW_HOLE_CALLOUT,
     SCREW_HOLE_MATE,
 )
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_latch_hook"]
 PART_STEM = SPEC.artifact_stem
@@ -113,8 +128,8 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A 30 x 97 x 16 formed part: 3:2 keeps the arm's 97 drop and its dimensions
-# between the border and the title block, and the 0.8 strip legible.
+# A 30 x 97 x 16 mm formed part: 3:2 keeps the arm's drop and its dimensions
+# between the border and the title block, and the .032 strip legible.
 SHEET_SCALE = (3.0, 2.0)
 VIEW_SCALE = (3, 2)
 ISO_SCALE = (1, 2)
@@ -131,14 +146,16 @@ _MID_Z = sum(_LOCAL_Z) / 2.0
 
 # View centres (the part's bounding box centre on the sheet): the front view
 # at the left, the side view and its flat pattern level with it, the bottom
-# view and the isometric at the right above the title block (top 0.066).
+# view projected under the front view (its top clear under the front view's
+# lowest text), the isometric at the right above the title block (top
+# 0.066), the notes in the free top-right corner.
 FRONT_CENTER = (0.072, 0.170)
 RIGHT_CENTER = (0.205, FRONT_CENTER[1])
-BOTTOM_CENTER = (0.359, 0.230)
-ISO_CENTER = (0.372, 0.135)
-NOTES_XY = (0.020, 0.062)
+BOTTOM_CENTER = (FRONT_CENTER[0], 0.0544)
+ISO_CENTER = (0.380, 0.135)
+NOTES_XY = (0.316, 0.262)
 ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.035)
-BOTTOM_NOTE_XY = (BOTTOM_CENTER[0] - 0.013, 0.258)
+FLAT_NOTE_XY = (0.245, 0.083)
 NOTE_HEIGHT = 0.003  # the notes' characters (top-left anchored)
 
 # Where each view puts the part origin.
@@ -176,44 +193,57 @@ def _on(point: tuple[float, float], u: float, n: float = 0.0) -> tuple[float, fl
 
 
 # Per-view survivors of the marked-dimension import: name -> sheet position.
-# Front: the screw X pair stacked above the base, their Y and size left of
-# it; the roll start and the far face's Y right of the arm; the far face's X
+# Front: the screw X pair stacked above the base, their texts right of the
+# ear's outer face (its extension line crossed them between the arrows,
+# review 4), their Y and size left of it; the roll start and the far face's
+# Y right of the arm, the roll start inside so its text clears the far
+# face's dimension line; the far face's X
 # and the tab end's X stacked below it; the straight's length on the arm's
 # -U side (its extension set clear of the far face's X, which drops from the
 # far face); the pin hole's size up its +N side past the straight's roll-end
 # extension line, under the roll radius, its callout above so the dimension
-# line meets the value and never the callout; the inside roll radius in the
-# roll's concave side, the tab radius outside the tab.
+# line meets the value and never the callout;
+# the inside roll radius in the roll's concave side, the tab radius outside
+# the tab, its leader radial through the middle of the tab's 35 deg arc
+# (147-182 deg about its centre), clear of the end face and its X.
+_TAB_LEADER_DEG = 165.0
 FRONT_KEEP = {
-    "ScrewX2": _front(SCREW_HOLE_X[1] / 2.0, 12.5),
-    "ScrewX1": _front(SCREW_HOLE_X[0] / 2.0, 17.5),
+    "ScrewX2": _front(11.0, 12.5),
+    "ScrewX1": _front(11.0, 17.5),
     "ScrewY": _front(-32.0, SCREW_HOLE_Y / 2.0),
     "ScrewDia": _front(-25.0, -8.0),  # its mate line clear of the arm
-    "RollStart": _front(20.0, OUTER_ROLL_START[1] / 2.0),
-    "FaceY": _front(30.0, FAR_FACE_POINT[1] / 2.0),
+    "RollStart": _front(14.0, OUTER_ROLL_START[1] / 2.0),
+    "FaceY": _front(24.0, FAR_FACE_POINT[1] / 2.0),
     "FaceX": _front(FAR_FACE_POINT[0] / 2.0, -96.0),
     "TabEndX": _front(OUTER_TAB_END[0] / 2.0, -103.0),
-    "StraightLen": _front(*_on(OUTER_ROLL_END, -28.0, -4.0)),
+    "StraightLen": _front(*_on(OUTER_ROLL_END, -28.0, -5.0)),
     "PinHoleDia": _front(*_on(PIN_HOLE_L, -12.3, 21.2)),
     "RollR": _front(-20.0, -35.0),
     "TabR": _front(
-        TAB_C_L[0] + 21.0 * math.cos(math.radians(175.0)),
-        TAB_C_L[1] + 21.0 * math.sin(math.radians(175.0)),
+        TAB_C_L[0] + 26.0 * math.cos(math.radians(_TAB_LEADER_DEG)),
+        TAB_C_L[1] + 26.0 * math.sin(math.radians(_TAB_LEADER_DEG)),
     ),
 }
-# Side view: the width left of the ear, the two front-edge heights stacked
-# above it, the root relief right of its corner, the round under the tip;
-# the flat's length above it and its developed stations stacked to its right.
+# Side view: the width left of the ear, the root relief right of its corner,
+# the round under the tip; the flat's length above it over the ear bend's
+# centreline; its two strip widths (the arm's controlling widths) left of
+# it, between the views; its developed stations stacked to its right, the
+# longer outside (the roll's centreline among them, its text clear below
+# the taper's), the tab's centreline chained under the round's centre, its
+# text below the blank's tip.
 RIGHT_KEEP = {
     "Width": _right(26.0, 4.0),
-    "ArmFrontZ": _right(3.0, 13.0),
-    "ArmLowZ": _right(2.25, 19.0),
     "RootR": _right(-4.0, -8.0),
     "RoundR": _right(-6.0, -95.0),
-    "FlatLength": _flat(FLAT_GAP + FLAT_LENGTH / 2.0, 14.0),
+    "FlatBendC": _flat(FLAT_GAP + FLAT_BEND_C / 2.0, 14.0),
+    "FlatLength": _flat(FLAT_GAP + FLAT_LENGTH / 2.0, 19.5),
+    "FlatArmW": _flat(10.0, -12.0),
+    "FlatLowW": _flat(10.0, -40.0),
     "DevTaper1": _flat(58.0, -DEV_TAPER[0] / 2.0),
     "DevTaper2": _flat(66.0, -DEV_TAPER[1] / 2.0),
-    "DevRoundC": _flat(74.0, -45.0),
+    "FlatRollC": _flat(74.0, -DEV_ROLL_C / 2.0),
+    "DevRoundC": _flat(82.0, -50.0),
+    "FlatTabC": _flat(82.0, -(DEV_TIP + 4.0)),
 }
 # Bottom view: the base length well under the base, the ear height right of
 # the ear, and the inside bend's text between the two, right of the ear: its
@@ -224,7 +254,7 @@ RIGHT_KEEP = {
 BOTTOM_KEEP = {
     "BaseLength": _bottom(-BASE_LENGTH / 2.0, -11.0),
     "EarHeight": _bottom(6.0, EAR_HEIGHT / 2.0),
-    "InsideBendR": _bottom(15.5, -4.0),
+    "InsideBendR": _bottom(13.0, -2.0),
 }
 CALLOUTS_ABOVE = {
     "ScrewDia": PAIR_CALLOUT,
@@ -233,13 +263,14 @@ CALLOUTS_ABOVE = {
 }
 CALLOUTS_BELOW = {
     "ScrewDia": f"{SCREW_HOLE_CALLOUT}\n{SCREW_HOLE_MATE}",
+    "FaceY": PIN_STATION_CALLOUT,
     "RoundR": ROUND_CALLOUT,
 }
-# The roll's centre sits 80 left of the vertical: off the sheet at 3:2.
+# The roll's centre sits ~80 mm left of the vertical: off the sheet at 3:2.
 SHORTENED_RADII = ("RollR",)
 # The formed overall height (drawing-guidelines.md rule 10 (dimension from a real feature)), a reference left of the side view: its
 # dimension line passes left of the width's text, its text below the front
-# view's 70.4 level and clear right of it; picked on the ear's top edge and
+# view's far-face Y level and clear right of it; picked on the ear's top edge and
 # on the full round, re-anchored to the round's far extreme (its tip).
 _ROUND_PICK_DEG = -120.0  # on the round, clear of its tip and the RoundR leader
 OVERALL_PICKS = (
@@ -297,7 +328,7 @@ def _shorten_radii(
 
 
 def _overall_reference(adapter: Any, right: Any) -> None:
-    """The (96.5) formed overall height, ear top edge to the round's tip."""
+    """The (3.80) formed overall height, ear top edge to the round's tip."""
     label = "latch-hook overall height reference"
     display = add_edge_dimension(
         adapter,
@@ -322,6 +353,63 @@ def _overall_reference(adapter: Any, right: Any) -> None:
         raise RuntimeError(f"{label} precision did not persist")
 
 
+# A model sketch shown in a view draws thin and grey (review 3: the flat
+# pattern read unlike the views).  Its outline takes the visible edges'
+# black and weight; its bend centrelines (construction, the chain font)
+# black, thin.
+FLAT_LINE_COLOR = 0  # COLORREF black, the outline's colour
+_SW_LW_THICK = 2  # swLineWeights_e.swLW_THICK, the visible-edge weight
+_FLAT_SEGMENTS = {False: 9, True: 3}  # outline / bend centrelines
+
+
+def _flat_pattern_lines(adapter: Any, right: Any) -> None:
+    """Draw the flat pattern's outline as visible edges, its bend lines black."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    native = _early_bound(right, "IView")
+    if not drawing.ActivateView(view_name(adapter, right)):
+        raise RuntimeError("cannot activate the side view for the flat pattern")
+    model = native.ReferencedDocument
+    feature = (
+        None
+        if model is None
+        else _early_bound(model, "IPartDoc").FeatureByName(FLAT_SKETCH)
+    )
+    if feature is None:
+        raise RuntimeError(f"the side view's model has no {FLAT_SKETCH} sketch")
+    sketch = _early_bound(
+        _early_bound(feature, "IFeature").GetSpecificFeature2(), "ISketch"
+    )
+    segments = [
+        _early_bound(raw, "ISketchSegment") for raw in sketch.GetSketchSegments() or ()
+    ]
+    selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    for construction, count in _FLAT_SEGMENTS.items():
+        picked = [s for s in segments if bool(s.ConstructionGeometry) is construction]
+        label = "bend centrelines" if construction else "outline"
+        if len(picked) != count:
+            raise RuntimeError(
+                f"flat pattern {label}: {len(picked)} segments, want {count}"
+            )
+        draw.ClearSelection2(True)
+        for index, segment in enumerate(picked):
+            in_view = native.GetCorresponding(segment)
+            if in_view is None:
+                raise RuntimeError(f"flat pattern {label}: a segment has no instance")
+            data = selection.CreateSelectData()
+            data.View = right
+            if not _early_bound(in_view, "ISketchSegment").Select4(index > 0, data):
+                raise RuntimeError(f"cannot select the flat pattern {label}")
+        if int(selection.GetSelectedObjectCount2(-1)) != count:
+            raise RuntimeError(f"flat pattern {label}: the selection lost segments")
+        drawing.SetLineColor(FLAT_LINE_COLOR)
+        if not construction:
+            drawing.SetLineWidth(_SW_LW_THICK)
+        _telemetry.info(f"latch-hook: flat pattern {label} drawn black ({count})")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -338,7 +426,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Isometric View Note",
-            "Bottom View Note",
+            "Flat Pattern Note",
         ),
         required=(
             "Number",
@@ -347,11 +435,15 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Isometric View Note",
-            "Bottom View Note",
+            "Flat Pattern Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -406,19 +498,20 @@ async def build(adapter: Any) -> dict[str, str]:
     # Showing the FlatBlank sketch may grow the side view's box; put its
     # origin back (its dimensions travel with it).
     _pin_origin(adapter, right, RIGHT_ORIGIN, label="side view with flat pattern")
+    _flat_pattern_lines(adapter, right)
     # Places (and so each dimension's title-block row) and every band are
     # authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     _shorten_radii(adapter, annotations, SHORTENED_RADII)
-    # The far face at the pin: located at fit-up (note 3), so its X and Y
-    # print as references.
+    # The far face at the pin (located at fit-up on the pin's axis), the
+    # flat pattern's bend centrelines and the full round's radius (the .45
+    # width sets it) print as references.
     by_name = {dimension_name(adapter, a): a for a in annotations}
-    for name in sorted(REFERENCE_DIMENSIONS):
-        set_reference_dimension(
-            adapter, by_name[name], label=f"MHA-PD-14 far face {name}"
-        )
+    references = REFERENCE_DIMENSIONS | BEND_LINE_DIMENSIONS | {ROUND_REFERENCE}
+    for name in sorted(references):
+        set_reference_dimension(adapter, by_name[name], label=f"MHA-PD-14 {name}")
     _overall_reference(adapter, right)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the screw holes")
@@ -427,7 +520,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for name, xy in (
         ("Manufacturing Notes", NOTES_XY),
         ("Isometric View Note", ISO_NOTE_XY),
-        ("Bottom View Note", BOTTOM_NOTE_XY),
+        ("Flat Pattern Note", FLAT_NOTE_XY),
     ):
         add_property_linked_note(adapter, name, *xy, char_height=NOTE_HEIGHT)
 

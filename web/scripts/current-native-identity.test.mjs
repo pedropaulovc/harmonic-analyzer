@@ -69,6 +69,13 @@ retiredTooling.push(...[
   }],
   status: 'retired',
 })))
+// The MHA-PD-VN-67 pivot shim, retired 2026-10-31 (#290): the arm's spot face took its room.
+retiredTooling.push({
+  old_stem: 'vn-transgear-pivot-shim',
+  old_number: 'MHA-VN-069',
+  new_identities: [{ parent: 'pd-paper-drive', stem: 'pd-vn-transgear-pivot-shim', number: 'MHA-PD-VN-67' }],
+  status: 'retired',
+})
 
 // Independent behavioral expectations, not values copied out of the projection table.
 const sharedCases = [

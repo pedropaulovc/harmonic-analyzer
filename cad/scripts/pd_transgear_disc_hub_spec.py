@@ -1,16 +1,17 @@
 r"""MHA-PD-17 transgear-disc-hub: the brass hub and flange in front of the reducer disc.
 
-The retained Ø13.2 turned hub has an H7 bore matching the pinion sleeve's
-(MHA-PD-10) h6 boss and drives through its D-flat, with a Ø25.1 × 2.4 flange
-and a Ø13.1 h6 rear spigot.  The spigot passes the reducer disc's (MHA-PD-06)
+The retained Ø.52 turned hub has a .313 +.0010/+.0005 bore (an owned .3135
+reamer) on the pinion sleeve's (MHA-PD-10) .313 +.0005/.0000 boss and drives
+through its D-flat, with a Ø1.01 × .094 flange and a Ø.501 SHAFT_H rear
+spigot.  The spigot passes the reducer disc's (MHA-PD-06)
 bore, which pilots on it, and its end seats on the sleeve's step face (the
 12T's tooth ends); the flange's rear face clamps the disc's front face, the
 spigot's length ahead of the step.  Three #0-80 fillister screws (MHA-PD-VN-55)
-pass the flange's Ø1.7 holes on the Ø19 circle into the disc's taps
+pass the flange's #51 holes on the Ø.75 circle into the disc's taps
 (``pd_transgear_disc_hub_geometry``; the taps are spotted through these holes at
-assembly, R9-9). The bore's round diameter is H7 over its whole length; the flat
-only drives, from the flange's rear face forward, and starts clear ahead of
-the sleeve flat's end wall.  Nothing fastens the hub axially: the spigot
+assembly, R9-9). The bore's round diameter holds its band over its whole
+length; the flat only drives, from the flange's rear face forward, and starts
+clear ahead of the sleeve flat's end wall.  Nothing fastens the hub axially: the spigot
 bears rearward on the step, and the MHA-PD-25 front bushing, held by the
 MHA-PD-VN-61 ring, traps hub and disc forward.  The hub's printed overall
 leaves its front face ``transgear_cluster_fit.RECESS_RANGE`` behind the
@@ -18,31 +19,31 @@ sleeve's nose (never proud at the worst case), so the bushing, whose rear
 face covers the hub's front face, bears on the steel nose and never thrusts
 on the brass (R9-5).  The bore is
 datum A; the flange's rear face and the spigot's end are held square to it,
-all turned in one setup.  A Ø1.2 radial oil hole on +Y reaches the bore; it
+all turned in one setup.  A #57 radial oil hole on +Y reaches the bore; it
 is drilled through the hub wall and the sleeve's boss in one operation at
-assembly (R9-8), centred on the hub body (R9-60), so the sheet carries a
-match-drill note, not a free drilled hole.
+assembly (R9-8), at a printed .XX station from the hub front face, so the
+sheet carries a match-drill callout, not a free drilled hole.
 
-Sizes (drawing-guidelines.md rule 17 (walls and webs)): the Ø13.2 body and Ø13.1 spigot retain the R9-68
-outer envelope after the sleeve's boss is reduced for the finite cutter.
-The smaller matching bore increases their walls; neither diameter is a
-new minimum. The bolt circle and flange retain the screw-head air and
-hole-to-rim walls of that joint, all at the printed worst case.
+Sizes (drawing-guidelines.md rule 17 (walls and webs)): every wall holds the
+.080 target at the printed worst case; the flange is Ø1.01 so the screw
+hole keeps it to the rim with the flange and the circle both at .XX.
 
 Printed lengths, from the spigot's end and the flange's rear face: the
-overall, spigot end to hub front face, 13.69 ±0.02, and the spigot 3.650
-±0.02 (both terms of the disc cluster's printed stack, #2038 owner ruling
-2026-10-28: nothing in the cluster is faced to fit; ``transgear_cluster_fit``
-owns the overall), and the flange 2.400 .XXX (the screw-tip-to-platen stack
-reads it).  The hub body's own length is the remainder and is not printed.
+overall, spigot end to hub front face, and the spigot (both terms of the
+disc cluster's stack, +/-.001 for the collar air and the recess; the shims
+set the end float, owner ruling 2026-11-01, #2124; ``transgear_cluster_fit``
+owns the overall), and
+the flange .094 .XXX (the screw-tip-to-platen stack reads it).  The hub
+body's own length is the remainder and is not printed.  Decimal inch
+(#290): every nominal is the exact millimetre value of its printed inch.
 
 Local frame (the build's, and the one the assembly mates): the gear axis is
 Z through the origin (``Axis1``).  ``Front Plane`` (z = 0) is the flange's
 rear face, the face that clamps the disc's front face; the spigot runs
-z = 0..+SPIGOT_LENGTH, the flange z = -2.4..0 and the hub body down to the
+z = 0..+SPIGOT_LENGTH, the flange z = -FLANGE_THICK..0 and the hub body down to the
 front face, so local -Z is the machine's -Z (toward the operator).  Screw 0°
 is local +X, angles counter-clockwise seen from +Z; the bore's flat is on
-local -Y, the oil hole on local +Y, centred on the hub body.  The part sits
+local -Y, the oil hole on local +Y, on the hub body.  The part sits
 in the machine unrotated at z0 = ``transgear_cluster_fit.DISC_FRONT_Z``.
 
 Pure data; no SolidWorks calls.  This module reads the cluster fit, the
@@ -53,14 +54,20 @@ from __future__ import annotations
 
 import math
 
-import _config
 import pd_rack_pinion_spec as DISC
 import transgear_cluster_fit as FIT
 import pd_transgear_feed_pinion_spec as SLEEVE
 from _fit_deviations import deviations
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _inch_wall_limits import WALL_TARGET_MM
+from _printed_tolerance import (
+    drilled_oversize_mm,
+    edge_break_chamfer_mm,
+    inside_corner_radius_mm,
+    printed_band_mm,
+)
 from _mcmaster_91794a055 import FILLISTER_SIZE
 from pd_cluster_stack_band import STACK_NAME
+from pd_rack_pinion_spec import inch_text
 from pd_transgear_disc_hub_geometry import (
     BOLT_CIRCLE_DIA,
     BOLT_CIRCLE_PLACES,
@@ -73,10 +80,13 @@ from pd_transgear_disc_hub_geometry import (
     SPIGOT_LENGTH,
     SPIGOT_LENGTH_BAND,
     SPIGOT_LENGTH_PLACES,
+    UNIT,
 )
 
+MM_PER_IN = 25.4
+
 # The mating parts the sheet names, by name and number (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the
-# feed pinion whose h6 boss and flat the hub's bore slides on, the disc that
+# feed pinion whose boss and flat the hub's bore slides on, the disc that
 # pilots on the spigot, and the disc screws.
 SLEEVE_NUMBER = "MHA-PD-10"
 SLEEVE_NAME = "FEED PINION"
@@ -97,58 +107,66 @@ SCREW_MAJOR_DIA, SCREW_LENGTH, SCREW_HEAD_H, SCREW_HEAD_DIA, _SCREW_PITCH = (
 SCREW_HEAD_DIA_ALLOWANCE = 0.05
 
 # --- turned body ------------------------------------------------------------
-# .XXX on both diameters: the bore's walls and the heads' air read the body,
-# the hole-to-rim wall the flange.
-FLANGE_DIA = 25.1
-FLANGE_DIA_PLACES = 3
-FLANGE_THICK = 2.4
+# Every turned diameter but the spigot prints .XX.  The flange is sized so
+# the screw holes' wall to its rim holds the .080 target at the .XX row on
+# both it and the bolt circle (machinist review: a .XXX flange held only to
+# rescue that wall is over-specification); the body's walls over the bore
+# and flat and the heads' air hold at .XX too.
+FLANGE_DIA = 25.654  # 1.01
+FLANGE_DIA_PLACES = 2
+FLANGE_THICK = 2.3876  # .094
 FLANGE_THICK_PLACES = 3  # the screw-tip-to-platen stack reads it (R9-5)
-HUB_DIA = 13.2
-HUB_DIA_PLACES = 3
-# The spigot (``pd_transgear_disc_hub_geometry``): its h6 band is the model's,
-# its length the cluster's printed band.
+HUB_DIA = 13.208  # .52
+HUB_DIA_PLACES = 2
+# The spigot (``pd_transgear_disc_hub_geometry``): its SHAFT_H band is the
+# model's, its length the cluster's printed band.
 SPIGOT_DIA_DEVIATIONS = deviations(SPIGOT_DIA_BAND)
 SPIGOT_DIA_MIN = SPIGOT_DIA + SPIGOT_DIA_BAND[1]
 SPIGOT_LENGTH_MIN = SPIGOT_LENGTH - SPIGOT_LENGTH_BAND
 SPIGOT_LENGTH_MAX = SPIGOT_LENGTH + SPIGOT_LENGTH_BAND
 
-# --- overall: printed (#2038 owner ruling 2026-10-28, option A) ---------------
+# --- overall: +/-.001 (owner ruling 2026-11-01, #2124) ----------------------
 # Spigot end (on the step) to hub front face, a term of the disc cluster's
-# printed stack (transgear_cluster_fit): it leaves the front face never proud
-# of the sleeve's nose at the worst case.
-HUB_LENGTH = FIT.HUB_LENGTH  # 13.69
+# stack (transgear_cluster_fit): it sets the collar air and leaves the front
+# face never proud of the sleeve's nose at the worst case.
+HUB_LENGTH = FIT.HUB_LENGTH
 HUB_LENGTH_BAND = FIT.LENGTH_BAND
 HUB_LENGTH_MIN = HUB_LENGTH - HUB_LENGTH_BAND
 HUB_LENGTH_MAX = HUB_LENGTH + HUB_LENGTH_BAND
 HUB_LENGTH_PLACES = FIT.LENGTH_PLACES
-if HUB_LENGTH_MIN <= SPIGOT_LENGTH_MAX + FLANGE_THICK + printed_band_mm(FLANGE_THICK_PLACES):
+if HUB_LENGTH_MIN <= SPIGOT_LENGTH_MAX + FLANGE_THICK + printed_band_mm(
+    FLANGE_THICK_PLACES, unit=UNIT
+):
     raise AssertionError("MHA-PD-17 has no body between its flange and the nose")
 # The hub body (flange front face to hub front face) is the remainder of the
 # lengths; it is modelled, never printed.
-HUB_BODY_LENGTH = HUB_LENGTH - SPIGOT_LENGTH - FLANGE_THICK  # 7.64
+HUB_BODY_LENGTH = HUB_LENGTH - SPIGOT_LENGTH - FLANGE_THICK
 # Local z of the hub's front face (the spigot's end is z = +SPIGOT_LENGTH).
-HUB_FRONT_Z = SPIGOT_LENGTH - HUB_LENGTH  # -10.04
+HUB_FRONT_Z = SPIGOT_LENGTH - HUB_LENGTH
 
 # --- bore on the sleeve's boss and flat (MHA-PD-10) ---------------------------
-# Round over the whole length: it locates on the boss's h6 band, ISO H7 at
-# 6-10 mm.  The flat at local -Y only drives the disc's torque; its plane sits
-# FLAT_TO_AXIS from the axis, printed with a band above the sleeve flat's
-# (0, -0.015) for a 0.020-0.050 clearance.
+# Round over the whole length: it locates on the boss's +.0005/.0000 band,
+# .313 +.0010/+.0005.  The flat at local -Y only drives the disc's torque;
+# its plane sits FLAT_TO_AXIS from the axis, printed +.0014/+.0008 above the
+# sleeve flat's 0/-.0006 for a .0008-.0020 clearance.
 BORE_DIA = SLEEVE.BOSS_DIA
-BORE_PLACES = 3
-BORE_BAND = (0.015, 0.0)  # (upper, lower) deviations, H7
+BORE_PLACES = 4
+BORE_BAND = (0.0254, 0.0127)  # (upper, lower) deviations: +.0010/+.0005
 BORE_DEVIATIONS = deviations(BORE_BAND)
 FLAT_TO_AXIS = SLEEVE.FLAT_TO_AXIS
-FLAT_TO_AXIS_PLACES = 3
-FLAT_TO_AXIS_BAND = (0.035, 0.020)  # (upper, lower) deviations
+FLAT_TO_AXIS_PLACES = 4
+FLAT_TO_AXIS_BAND = (0.03556, 0.02032)  # (upper, lower) deviations: +.0014/+.0008
 FLAT_TO_AXIS_DEVIATIONS = deviations(FLAT_TO_AXIS_BAND)
 if not 0.0 < FLAT_TO_AXIS < BORE_DIA / 2.0:
     raise AssertionError("MHA-PD-17 bore flat must cut the round bore")
-# Both corners at the flange stay sharp: the #0-80 heads sit beside the
-# hub's, and the disc's bore chamfer clears the spigot's.
-CORNER_RADIUS_MAX = 0.1
+# The spigot's root at the flange stays sharp so the disc's front face
+# seats on the flange: the disc's bore chamfer clears it.  The hub body's
+# root takes the title block's inside corner; the #0-80 heads stand clear
+# of its fillet (checked with the head air below).
+CORNER_RADIUS_MAX = 0.1016  # .004
 if DISC.BORE_FRONT_CHAMFER_LIMITS[0] < CORNER_RADIUS_MAX:
     raise AssertionError("the disc's bore chamfer rides the spigot's corner")
+INSIDE_CORNER_RADIUS_MAX = inside_corner_radius_mm(unit=UNIT)
 
 # (least, greatest) diametral clearance of the round bore on the sleeve's
 # boss, and radial clearance of the flat on the sleeve's flat: each part is
@@ -158,15 +176,15 @@ if BORE_DIA != SLEEVE.BOSS_DIA:
 if FLAT_TO_AXIS != SLEEVE.FLAT_TO_AXIS:
     raise AssertionError("the hub's bore flat is not the sleeve's flat")
 BOSS_CLEARANCE_LIMITS = (
-    round(BORE_DIA + BORE_BAND[1] - (SLEEVE.BOSS_DIA + SLEEVE.BOSS_DIA_BAND[0]), 3),
-    round(BORE_DIA + BORE_BAND[0] - (SLEEVE.BOSS_DIA + SLEEVE.BOSS_DIA_BAND[1]), 3),
-)  # 0.000 .. 0.024
+    round(BORE_DIA + BORE_BAND[1] - (SLEEVE.BOSS_DIA + SLEEVE.BOSS_DIA_BAND[0]), 6),
+    round(BORE_DIA + BORE_BAND[0] - (SLEEVE.BOSS_DIA + SLEEVE.BOSS_DIA_BAND[1]), 6),
+)  # .0000 .. .0010
 # The greatest: the hub's rock on the boss reads it.
-BOSS_CLEARANCE = BOSS_CLEARANCE_LIMITS[1]  # 0.024
+BOSS_CLEARANCE = BOSS_CLEARANCE_LIMITS[1]
 FLAT_CLEARANCE = (
-    round(FLAT_TO_AXIS_BAND[1] - SLEEVE.FLAT_TO_AXIS_BAND[0], 3),
-    round(FLAT_TO_AXIS_BAND[0] - SLEEVE.FLAT_TO_AXIS_BAND[1], 3),
-)  # 0.020 .. 0.050
+    round(FLAT_TO_AXIS_BAND[1] - SLEEVE.FLAT_TO_AXIS_BAND[0], 6),
+    round(FLAT_TO_AXIS_BAND[0] - SLEEVE.FLAT_TO_AXIS_BAND[1], 6),
+)  # .0008 .. .0020
 if BOSS_CLEARANCE_LIMITS[0] < 0.0:
     raise AssertionError(f"MHA-PD-17 binds on the sleeve's boss: {BOSS_CLEARANCE_LIMITS}")
 if FLAT_CLEARANCE[0] <= 0.0:
@@ -181,7 +199,7 @@ FLAT_END_CLEARANCE_WORST = (
     - SLEEVE.FACE_WIDTH_BAND
     + SPIGOT_LENGTH_MIN
     - (SLEEVE.FLAT_END_STATION + SLEEVE.STATION_TOL)
-)  # 0.94
+)
 if FLAT_END_CLEARANCE_WORST <= 0.0:
     raise AssertionError(
         f"the sleeve's flat end wall reaches the hub's flat: {FLAT_END_CLEARANCE_WORST:.3f}"
@@ -219,7 +237,7 @@ FLAT_DRIVE_FACE_AREA_MIN = FLAT_DRIVE_WIDTH_MIN * FLAT_DRIVE_LENGTH_MIN
 # is nearer, over the hub's slide.  The title block's edge break comes off
 # every exposed end of the contact (codjiflo P2 on 6228b6ead), as the
 # sleeve's own bearing span does (pd_cluster_air.SLEEVE_COCK).
-_ENGAGEMENT_EDGE_BREAK = float(_config.title_block("edge_break")["chamfer_max_mm"])
+_ENGAGEMENT_EDGE_BREAK = edge_break_chamfer_mm(unit=UNIT)
 ROUND_ENGAGEMENT_MIN = min(
     *(
         tooth
@@ -240,7 +258,7 @@ ROUND_ENGAGEMENT_MIN = min(
 # The step face is the pinion's end between the boss and the tip circle.
 # The spigot's end bears from its bore's edge break to the smallest tip
 # circle (the tooth edges are never broken, TOOTH_EDGE_NOTE).
-EDGE_BREAK_MAX = float(_config.title_block("edge_break")["chamfer_max_mm"])  # 0.25
+EDGE_BREAK_MAX = edge_break_chamfer_mm(unit=UNIT)  # .010
 _BORE_MAX = BORE_DIA + BORE_BAND[0]
 SEAT_INNER_R = _BORE_MAX / 2.0 + EDGE_BREAK_MAX
 SEAT_CONTACT_R = (SLEEVE.OUTSIDE_DIA + SLEEVE.OUTSIDE_DIA_BAND[1]) / 2.0
@@ -286,9 +304,13 @@ SEAT_ISLAND_FRACTION = SEAT_CONTACT_AREA / SEAT_ANNULUS_AREA
 # circle) plus the hub's rock on the boss, the greatest clearance over the
 # shortest round engagement, unpreloaded on the step.
 BORE_DATUM = "A"
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "flange rear face perpendicularity to bore": "0.03",
-    "spigot end perpendicularity to bore": "0.005",
+# The frame prints GEOMETRIC_TOLERANCES_IN; readers take the derived mm.
+GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
+    "flange rear face perpendicularity to bore": ".001",
+    "spigot end perpendicularity to bore": ".0002",
+}
+GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
+    key: float(value) * MM_PER_IN for key, value in GEOMETRIC_TOLERANCES_IN.items()
 }
 FLANGE_FACE_PERPENDICULARITY = float(
     GEOMETRIC_TOLERANCES_MM["flange rear face perpendicularity to bore"]
@@ -311,7 +333,7 @@ DISC_TILT_MAX = (
     + FLANGE_FACE_PERPENDICULARITY / FLANGE_FACE_PERPENDICULARITY_ZONE_DIA
     + ROCK_ANGLE_MAX
 )  # rad
-DISC_STEP_GAP_NOMINAL = SPIGOT_LENGTH - DISC.FACE_WIDTH  # 0.65
+DISC_STEP_GAP_NOMINAL = SPIGOT_LENGTH - DISC.FACE_WIDTH  # .026
 DISC_STEP_GAP_WORST = (
     SPIGOT_LENGTH_MIN
     - DISC.FACE_WIDTH_MAX
@@ -323,33 +345,33 @@ if DISC_STEP_GAP_WORST <= 0.0:
         f"the disc's rear face reaches the 12T: {DISC_STEP_GAP_WORST:.3f}"
     )
 
-# --- drilled holes (the title block's DRILLED HOLES row, +0.10/0) -----------
-DRILL_OVERSIZE = drilled_oversize_mm()
-SCREW_HOLE_PLACES = 1
-OIL_HOLE_DIA = 1.2
-OIL_HOLE_PLACES = 1
-# The oil hole is centred on the hub body (R9-60): it is match-drilled at
-# assembly through hub and sleeve together, so the drill finds the body's
-# centre at fit-up instead of a printed station.
-OIL_HOLE_STATION = HUB_BODY_LENGTH / 2.0  # 3.825 behind the hub front face
-# Marking the body's centre with a rule at fit-up.
-OIL_HOLE_CENTRING_TOL = 0.25
-OIL_HOLE_Z = HUB_FRONT_Z + OIL_HOLE_STATION  # -6.225 in the local frame
+# --- drilled holes (the title block's DRILLED HOLES row, +.004/0) -----------
+DRILL_OVERSIZE = drilled_oversize_mm(unit=UNIT)
+SCREW_HOLE_PLACES = 3
+OIL_HOLE_DIA = 1.0922  # .043, a #57 drill
+OIL_HOLE_PLACES = 3
+# The oil hole is match-drilled at assembly through hub and sleeve together,
+# at a printed .XX station from the hub front face (machinist review: a
+# location given only as "centred" is missing), the body's centre to the
+# .01 grid.
+OIL_HOLE_STATION = 3.81  # .15, behind the hub front face
+OIL_HOLE_STATION_PLACES = 2
+OIL_HOLE_Z = HUB_FRONT_Z + OIL_HOLE_STATION  # in the local frame
 # The same hole in the sleeve's frame (its rear face z 0): the spigot's end
 # stands on the step.  The sleeve's model drills it here.
-OIL_HOLE_SLEEVE_Z = SLEEVE.FACE_WIDTH + HUB_LENGTH - OIL_HOLE_STATION  # 23.475
+OIL_HOLE_SLEEVE_Z = SLEEVE.FACE_WIDTH + HUB_LENGTH - OIL_HOLE_STATION
 
-_BAND = {places: printed_band_mm(places) for places in (1, 2, 3)}
+_BAND = {places: printed_band_mm(places, unit=UNIT) for places in (1, 2, 3)}
 
 # --- worst-case walls (drawing-guidelines.md rule 17 (walls and webs)) ----------------------------------------
 _FLAT_MAX = FLAT_TO_AXIS + FLAT_TO_AXIS_BAND[0]
 _SCREW_HOLE_MAX_R = (SCREW_HOLE_DIA + DRILL_OVERSIZE) / 2.0
 _OIL_HOLE_MAX_R = (OIL_HOLE_DIA + DRILL_OVERSIZE) / 2.0
 _HEAD_MAX_R = (SCREW_HEAD_DIA + SCREW_HEAD_DIA_ALLOWANCE) / 2.0
-WALL_FLOOR = 2.0
+WALL_FLOOR = WALL_TARGET_MM
 # Air from a disc screw's head to the hub body: a clearance for the driver
-# and the head's seat beside the sharp corner, not a web.
-HEAD_AIR_MIN = 1.0
+# and the head's seat clear of the body root's fillet, not a web.
+HEAD_AIR_MIN = max(1.0, INSIDE_CORNER_RADIUS_MAX)
 
 
 def body_walls_worst(hub_dia: float) -> tuple[float, float]:
@@ -385,18 +407,18 @@ HUB_WALL_WORST, FLAT_WALL_WORST = body_walls_worst(HUB_DIA)
 SPIGOT_WALL_NOMINAL = (SPIGOT_DIA - BORE_DIA) / 2.0
 SPIGOT_WALL_WORST = (SPIGOT_DIA_MIN - _BORE_MAX) / 2.0
 HEAD_TO_HUB_NOMINAL = BOLT_CIRCLE_DIA / 2.0 - SCREW_HEAD_DIA / 2.0 - HUB_DIA / 2.0
-HEAD_TO_HUB_WORST = head_air_worst(BOLT_CIRCLE_DIA, HUB_DIA)  # 1.526
+HEAD_TO_HUB_WORST = head_air_worst(BOLT_CIRCLE_DIA, HUB_DIA)
 HOLE_TO_RIM_NOMINAL = FLANGE_DIA / 2.0 - BOLT_CIRCLE_DIA / 2.0 - SCREW_HOLE_DIA / 2.0
-HOLE_TO_RIM_WORST = hole_to_rim_worst(FLANGE_DIA, BOLT_CIRCLE_DIA)  # 2.020
+HOLE_TO_RIM_WORST = hole_to_rim_worst(FLANGE_DIA, BOLT_CIRCLE_DIA)
 HOLE_TO_BORE_WORST = (
     BOLT_CIRCLE_DIA / 2.0
     - BOLT_CIRCLE_POSITION_TOL
     - _SCREW_HOLE_MAX_R
     - _BORE_MAX / 2.0
 )
-# The hole is centred on the body, so its edge sits the same distance from
-# the hub front face and from the flange face: the shortest overall less the
-# longest spigot and thickest flange, and the reverse.
+# The hole's edge to the hub front face, and to the flange face: the
+# station's printed band against the shortest body the overall less the
+# longest spigot and thickest flange leaves.
 HUB_BODY_LENGTH_RANGE = (
     HUB_LENGTH_MIN
     - SPIGOT_LENGTH_MAX
@@ -404,16 +426,21 @@ HUB_BODY_LENGTH_RANGE = (
     HUB_LENGTH_MAX
     - SPIGOT_LENGTH_MIN
     - (FLANGE_THICK - _BAND[FLANGE_THICK_PLACES]),
-)  # 7.47 .. 7.81
+)
 # (least, greatest) station of the hole centre behind the hub front face.
 OIL_HOLE_STATION_RANGE = (
-    HUB_BODY_LENGTH_RANGE[0] / 2.0 - OIL_HOLE_CENTRING_TOL,
-    HUB_BODY_LENGTH_RANGE[1] / 2.0 + OIL_HOLE_CENTRING_TOL,
+    OIL_HOLE_STATION - _BAND[OIL_HOLE_STATION_PLACES],
+    OIL_HOLE_STATION + _BAND[OIL_HOLE_STATION_PLACES],
 )
-OIL_HOLE_LIGAMENT_NOMINAL = OIL_HOLE_STATION - OIL_HOLE_DIA / 2.0
-OIL_HOLE_LIGAMENT_WORST = OIL_HOLE_STATION_RANGE[0] - _OIL_HOLE_MAX_R
+OIL_HOLE_LIGAMENT_NOMINAL = min(
+    OIL_HOLE_STATION, HUB_BODY_LENGTH - OIL_HOLE_STATION
+) - OIL_HOLE_DIA / 2.0
+OIL_HOLE_LIGAMENT_WORST = min(
+    OIL_HOLE_STATION_RANGE[0],
+    HUB_BODY_LENGTH_RANGE[0] - OIL_HOLE_STATION_RANGE[1],
+) - _OIL_HOLE_MAX_R
 # The same hole's ligament to the sleeve's nose (the sleeve's wall, judged
-# against its 2.0 target): the hub front face at its least recess plus the
+# against its .080 target): the hub front face at its least recess plus the
 # hole's least station, less its largest radius.
 OIL_HOLE_TO_NOSE = SLEEVE.OVERALL_LENGTH - OIL_HOLE_SLEEVE_Z - OIL_HOLE_DIA / 2.0
 OIL_HOLE_TO_NOSE_WORST = (
@@ -434,20 +461,21 @@ for _label, _wall, _floor in (
         raise AssertionError(f"MHA-PD-17 {_label}: {_wall:.3f} worst < floor {_floor}")
 
 # --- sheet --------------------------------------------------------------------
-CORNER_NOTE = f"SPIGOT AND HUB CORNERS AT FLANGE SHARP, R{CORNER_RADIUS_MAX:.1f} MAX."
-FLANGE_THICK_NOTE = f"FLANGE {FLANGE_THICK:.3f} SETS {SCREW_NAME} {SCREW_NUMBER} REACH."
-DRAWING_NOTES = "\n".join((CORNER_NOTE, FLANGE_THICK_NOTE))
+# No loose notes: each requirement is flagged at its feature (rule 7).
 # The two printed stack lengths name the stack they serve (rule 4); the
 # overall's reason is the nose it must never pass.
 HUB_LENGTH_CALLOUT = f"{STACK_NAME},\nNOT PROUD OF {SLEEVE_NAME} {SLEEVE_NUMBER} NOSE"
 SPIGOT_LENGTH_CALLOUT = STACK_NAME
-# The spigot's native h6 limits print with the dimension; the callout names
-# the mate and the clearance the pair gives.
+# The flange's .XXX thickness sets the disc screws' reach (the cut window
+# in pd_vn_transgear_disc_screw_spec reads it).
+FLANGE_THICK_CALLOUT = f"SETS {SCREW_NAME}\n{SCREW_NUMBER} REACH"
+# The spigot's native SHAFT_H limits print with the dimension; the callout
+# names its sharp root, the mate and the clearance the pair gives.
 SPIGOT_CALLOUT_BELOW = "\n".join(
     (
-        "SPIGOT",
-        f"(DIA CLR {DISC.SPIGOT_DIAMETRAL_CLEARANCE[0]:.3f}-"
-        f"{DISC.SPIGOT_DIAMETRAL_CLEARANCE[1]:.3f}",
+        f"SPIGOT ROOT R{inch_text(CORNER_RADIUS_MAX, 3)} MAX",
+        f"(DIA CLR {inch_text(DISC.SPIGOT_DIAMETRAL_CLEARANCE[0], 4)}-"
+        f"{inch_text(DISC.SPIGOT_DIAMETRAL_CLEARANCE[1], 4)}",
         f"IN {DISC_NAME} {DISC_NUMBER} BORE)",
     )
 )
@@ -455,25 +483,28 @@ SPIGOT_CALLOUT_BELOW = "\n".join(
 # Callouts the sheet hangs on the native dimensions.  The holes are drilled
 # (the title block's DRILLED HOLES row governs their sizes); the three screw
 # holes are one patterned feature, equally spaced on the printed circle.  The
-# oil hole is drilled with the hub seated on the sleeve, through both and
-# centred on the hub body (R9-60): the crank pinion's pin-hole wording
+# oil hole is drilled with the hub seated on the sleeve, through both, at its
+# printed station (R9-60): the crank pinion's pin-hole wording
 # (dt_crank_pinion_spec.pin_hole_note).
 SCREW_HOLE_CALLOUT_ABOVE = f"{SCREW_COUNT}X"
 SCREW_HOLE_CALLOUT_BELOW = "DRILL THRU FLANGE, EQ SP"
+# The hole is drilled on +Y, through the round wall opposite the bore's
+# flat on -Y (the face view shows the flat), into the bore.
 OIL_HOLE_CALLOUT_BELOW = "\n".join(
     (
-        "CENTRED ON HUB BODY",
-        "MATCH DRILL AT ASSY THRU HUB WALL AND",
-        f"{SLEEVE_NAME} {SLEEVE_NUMBER} WITH HUB SEATED",
+        "MATCH DRILL AT ASSY WITH",
+        "HUB SEATED ON FEED PINION",
+        f"{SLEEVE_NUMBER}, THRU ONE WALL",
+        "OPPOSITE BORE FLAT",
     )
 )
 
 # Marked model dimensions and the places the model authors on them (policy
 # drawing-simplicity-policy.md `How the repository implements the guidelines`).  Edge view: the turned profile's three diameters, the spigot's and
 # flange's lengths from the flange's rear face, the overall, and the oil
-# hole's size (drawing-guidelines.md rule 12 (hole and slot callouts say what to do)); face view: the bore and its flat, which only show
+# hole's size and station (drawing-guidelines.md rule 12 (hole and slot callouts say what to do)); face view: the bore and its flat, which only show
 # there, and the screw holes on their bolt circle.  The overall and the
-# spigot print the disc cluster's band (#2038).
+# spigot print the disc cluster's +/-.001.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HubProfile": {
         "FlangeDia",
@@ -485,7 +516,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
     "BoreProfile": {"BoreDia", "FlatToAxis"},
     "ScrewHoleProfile": {"BoltCircleDia", "ScrewHoleDia"},
-    "OilHoleProfile": {"OilHoleDia"},
+    "OilHoleProfile": {"OilHoleDia", "OilHoleStation"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HubProfile": {
@@ -501,7 +532,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "BoltCircleDia": BOLT_CIRCLE_PLACES,
         "ScrewHoleDia": SCREW_HOLE_PLACES,
     },
-    "OilHoleProfile": {"OilHoleDia": OIL_HOLE_PLACES},
+    "OilHoleProfile": {
+        "OilHoleDia": OIL_HOLE_PLACES,
+        "OilHoleStation": OIL_HOLE_STATION_PLACES,
+    },
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

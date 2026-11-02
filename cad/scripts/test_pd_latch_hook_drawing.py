@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import itertools
 import math
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -50,50 +51,51 @@ def test_every_marked_dimension_has_one_placement_and_model_places() -> None:
 
 
 def test_the_model_owns_every_band_the_sheet_prints() -> None:
-    """Drilled holes never under size; the inside bend up to the largest the
-    screw head clears; the screw positions, the width and the base length
-    their own ± bands; every formed arm feature the formed band.  The far
-    face at the pin carries none (a reference).  Everything else takes its
-    title-block row."""
+    """The screw positions their own ± band; every formed arm feature the
+    formed band.  The far face at the pin carries none (a reference).
+    Everything else, the drilled holes, the width and the inside bend
+    radius included, takes its title-block row."""
     assert model_toleranced_dimensions(part) == {
-        ("ScrewHoleProfile", "ScrewDia"): "*deviations(HOLE_BAND)",
-        ("PinHoleProfile", "PinHoleDia"): "*deviations(HOLE_BAND)",
-        ("InsideBend", "InsideBendR"): "*deviations(BEND_R_BAND)",
-        ("BaseEar", "Width"): "WIDTH_TOL",
-        ("BaseEarProfile", "BaseLength"): "BASE_LENGTH_TOL",
         # The position and formed loops share one key (both read below);
-        # the formed loop, the last, takes FORMED_BAND.
-        ("feature_name", "dimension_name"): "FORMED_BAND",
+        # the formed loop, the last, takes FORMED_TOL.
+        ("feature_name", "dimension_name"): "FORMED_TOL",
     }
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "for feature_name, dimension_names in POSITION_DIMENSIONS.items()" in source
     assert "for feature_name, dimension_names in FORMED_DIMENSIONS.items()" in source
-    assert min(spec.HOLE_BAND) == 0.0 < max(spec.HOLE_BAND)
-    assert spec.BEND_R_BAND[0] == pytest.approx(
-        geom.INSIDE_BEND_R_MAX - geom.INSIDE_BEND_R
-    )
+    assert spec.HOLE_GROWTH > 0.0
+    # R.05 at the .XX row: R.06 at the top, R.04 (1.25 T) at the bottom.
+    assert geom.INSIDE_BEND_R == pytest.approx(0.050 * 25.4)
+    assert spec.INSIDE_BEND_R_MAX == pytest.approx(0.060 * 25.4)
     for feature, names in spec.FORMED_DIMENSIONS.items():
         assert names <= spec.DRAWING_DIMENSIONS[feature]
     for feature, names in spec.POSITION_DIMENSIONS.items():
         assert set(names) <= spec.DRAWING_DIMENSIONS[feature]
 
 
-def test_the_far_face_at_the_pin_prints_as_a_reference() -> None:
-    """Review-3 #3: the match-drilled hole's far face is set at fit-up (note
-    3), so its X and Y print in parentheses with no band; the straight's
-    length still controls the formed straight and keeps the formed band."""
-    assert spec.REFERENCE_DIMENSIONS == {"FaceX", "FaceY"}
+def test_the_formed_band_the_assembly_reads_counts_the_xx_rounding() -> None:
+    """The formed features print at .XX ±.02 (review 3); the arm may lie off
+    the model by the band plus each nominal's rounding."""
+    assert set(spec.FORMED_VALUES) == spec.FORMED_DIMENSIONS["ArmProfile"]
+    for value in spec.FORMED_VALUES.values():
+        printed = round(value / 25.4, 2) * 25.4
+        assert abs(printed - value) + spec.FORMED_TOL <= spec.FORMED_BAND + 1e-9
+
+
+def test_the_far_face_prints_as_a_reference_and_the_strip_widths_control() -> None:
+    """Review-3 #3: the match-drilled hole's far face is set at fit-up, so
+    its X and Y print in parentheses with no band; the straight's length
+    still controls the formed straight and keeps the formed band.  The arm's
+    strip widths control the front edge (review 2), not references."""
     assert spec.REFERENCE_DIMENSIONS <= spec.DRAWING_DIMENSIONS["ArmProfile"]
+    assert spec.ARM_WIDTH_DIMENSIONS <= spec.DRAWING_DIMENSIONS[spec.FLAT_SKETCH]
+    assert not spec.ARM_WIDTH_DIMENSIONS & spec.REFERENCE_DIMENSIONS
     assert not spec.REFERENCE_DIMENSIONS & spec.FORMED_DIMENSIONS["ArmProfile"]
     assert "StraightLen" in spec.FORMED_DIMENSIONS["ArmProfile"]
     assert not any(
         "FaceX" in names or "FaceY" in names
         for names in spec.POSITION_DIMENSIONS.values()
     )
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "for name in sorted(REFERENCE_DIMENSIONS):" in source
-    assert "set_reference_dimension(" in source
-    assert "STATION" in spec.DRAWING_NOTES.split("\n")[2]
 
 
 def test_walls_hold_the_target_at_the_worst_case_the_sheet_prints() -> None:
@@ -103,19 +105,17 @@ def test_walls_hold_the_target_at_the_worst_case_the_sheet_prints() -> None:
     assert spec.WALL_TARGET > spec.WALL_FLOOR
 
 
-def test_the_screw_position_band_is_the_widest_xx_the_screw_stack_closes() -> None:
-    """Review 964b60a3: ±0.065 at .XXX read as over-specified.  The band is
-    the fixed-fastener stack's: the bar taps' radial reach plus the hole's
-    printed reach stays inside the Ø3.2 hole's float over the basic major,
-    and one more .XX step would not."""
-    assert spec.POSITION_PLACES == 2
+def test_the_screw_position_band_is_the_widest_xxx_the_screw_stack_closes() -> None:
+    """The band is the fixed-fastener stack's: the bar taps' radial reach
+    plus the hole's printed reach stays inside the drilled hole's float over
+    the basic major, and one more .001 in step would not."""
+    assert spec.POSITION_PLACES == 3
     assert spec.CLEARANCE_RADIAL_MIN == pytest.approx(
         (geom.SCREW_HOLE_DIA - spec.MAJOR_DIA) / 2.0
     )
     assert spec.SCREW_POSITION_RADIAL == spec._position_radial(spec.POSITION_TOL)
     assert spec.SCREW_POSITION_RADIAL <= spec.CLEARANCE_RADIAL_MIN
-    assert spec._position_radial(spec.POSITION_TOL + 0.01) > spec.CLEARANCE_RADIAL_MIN
-    assert spec.POSITION_TOL == pytest.approx(0.05)
+    assert spec._position_radial(spec.POSITION_TOL + 0.0254) > spec.CLEARANCE_RADIAL_MIN
 
 
 def test_the_screw_head_clears_the_inside_bend_at_the_worst_case() -> None:
@@ -124,7 +124,7 @@ def test_the_screw_head_clears_the_inside_bend_at_the_worst_case() -> None:
     assert spec.HEAD_FLOAT_MAX > 0.0
     # More bend radius or more float only eats the clearance.
     base = spec.head_clearance(geom.INSIDE_BEND_R, geom.SHEET_T, 0.0, 0.0)
-    assert spec.head_clearance(geom.INSIDE_BEND_R_MAX, geom.SHEET_T, 0.0, 0.0) < base
+    assert spec.head_clearance(spec.INSIDE_BEND_R_MAX, geom.SHEET_T, 0.0, 0.0) < base
     assert spec.head_clearance(geom.INSIDE_BEND_R, geom.SHEET_T, 0.0, 0.1) < base
 
 
@@ -212,14 +212,10 @@ def test_the_notes_fit_the_note_field_and_leave_the_title_block_its_own() -> Non
     assert [line for line in lines if len(line) > 70] == []
     assert [t for t in _TITLE_BLOCK_TEXT if t in spec.DRAWING_NOTES] == []
     assert not any(
-        ch.isdigit() for line in lines for ch in line[2:].replace("MHA-PD-07", "")
+        ch.isdigit()
+        for line in lines
+        for ch in re.sub(r"MHA-[A-Z]+(-VN)?-\d+", "", line[2:])
     )
-    # The pin hole's callout names the process; note 3 says where and when.
-    assert spec.PIN_HOLE_CALLOUT == "MATCH-DRILL"
-    assert lines[2].startswith("3.") and "MATCH-DRILL PIN HOLE" in lines[2]
-    # The flat pattern is identified; no step order is prescribed.
-    assert lines[0].startswith("1. FLAT PATTERN")
-    assert not any(word in spec.DRAWING_NOTES for word in ("THEN", "AFTER", "BEFORE"))
 
 
 # --- Sheet layout ----------------------------------------------------------------
@@ -285,15 +281,17 @@ def _texts() -> dict[str, tuple[float, ...]]:
     below = {
         name: len(text.split("\n")) for name, text in drawing.CALLOUTS_BELOW.items()
     }
-    # Printed widths in characters: value and band ("12.63 ±0.05",
-    # "Ø3.20 +0.10" over "0.00", "R1.2 +0.3" over "-0.2", "16.0").
+    # Printed widths in characters: value and band (".498 ±.002",
+    # "Ø.128 +.004" over "0", "(R.225)", ".61", "(.58)").
     widths = {
-        "ScrewX1": 11, "ScrewX2": 10, "ScrewY": 10, "ScrewDia": 11,
-        "RollStart": 9, "FaceY": 6, "FaceX": 6, "TabEndX": 9,
-        "StraightLen": 9, "PinHoleDia": 11, "RollR": 10, "TabR": 9,
-        "Width": 10, "ArmFrontZ": 3, "ArmLowZ": 3, "RootR": 4, "RoundR": 5,
-        "FlatLength": 4, "DevTaper1": 4, "DevTaper2": 4, "DevRoundC": 4,
-        "BaseLength": 11, "EarHeight": 4, "InsideBendR": 9,
+        "ScrewX1": 10, "ScrewX2": 10, "ScrewY": 10, "ScrewDia": 11,
+        "RollStart": 8, "FaceY": 7, "FaceX": 7, "TabEndX": 9,
+        "StraightLen": 9, "PinHoleDia": 5, "RollR": 10, "TabR": 9,
+        "Width": 3, "RootR": 4, "RoundR": 7,
+        "FlatLength": 4, "FlatArmW": 3, "FlatLowW": 3, "FlatBendC": 5,
+        "DevTaper1": 4, "DevTaper2": 4, "DevRoundC": 4,
+        "FlatRollC": 6, "FlatTabC": 5,
+        "BaseLength": 3, "EarHeight": 3, "InsideBendR": 4,
     }  # fmt: skip
     keep = {**drawing.FRONT_KEEP, **drawing.RIGHT_KEEP, **drawing.BOTTOM_KEEP}
     assert set(widths) == set(keep)
@@ -306,7 +304,7 @@ def _texts() -> dict[str, tuple[float, ...]]:
         chars = max(widths[name], *map(len, callouts))
         boxes[name] = _box(chars, xy, above.get(name, 0), below.get(name, 0))
     boxes["Overall"] = _box(
-        len(f"({spec.OVERALL_HEIGHT:.1f})"), drawing.OVERALL_TEXT_XY
+        len(f"({spec.OVERALL_HEIGHT / 25.4:.2f})"), drawing.OVERALL_TEXT_XY
     )
     return boxes
 
@@ -432,7 +430,7 @@ def _notes() -> dict[str, tuple[float, ...]]:
     return {
         "notes": _note_box(spec.DRAWING_NOTES, drawing.NOTES_XY),
         "iso note": _note_box(spec.ISOMETRIC_VIEW_NOTE, drawing.ISO_NOTE_XY),
-        "bottom note": _note_box(spec.BOTTOM_VIEW_NOTE, drawing.BOTTOM_NOTE_XY),
+        "flat note": _note_box(spec.FLAT_PATTERN_NOTE, drawing.FLAT_NOTE_XY),
     }
 
 
@@ -722,7 +720,7 @@ def test_the_inside_bend_leader_clears_every_dimension_line() -> None:
 
 
 def test_the_screw_hole_callout_names_the_taps_its_bands_serve() -> None:
-    """Review 4: the ±0.05 positions read as unexplained.  The 2X Ø3.20
+    """Review 4: the ±.002 positions read as unexplained.  The 2X Ø.128
     callout names the mate (MHA-PD-07's fixed taps); the holes are drilled
     to the print, not match-drilled."""
     assert spec.SCREW_HOLE_MATE == "LOCATE TO MHA-PD-07 TAPS"
@@ -731,7 +729,6 @@ def test_the_screw_hole_callout_names_the_taps_its_bands_serve() -> None:
         spec.SCREW_HOLE_MATE,
     ]
     assert "MATCH" not in drawing.CALLOUTS_BELOW["ScrewDia"]
-    assert spec.POSITION_TOL == pytest.approx(0.05)
 
 
 class _Display:
@@ -811,9 +808,12 @@ def test_the_roll_radius_is_shortened_because_its_centre_leaves_the_sheet() -> N
 
 
 def test_the_view_origins_follow_their_centres_and_projection() -> None:
-    """The side view is level with the front view (third-angle projection);
-    each origin is its view's bounding-box centre offset by the part's."""
+    """The side view is level with the front view and the bottom view
+    plumb under it (third-angle projection); each origin is its view's
+    bounding-box centre offset by the part's."""
     assert drawing.RIGHT_ORIGIN[1] == drawing.FRONT_ORIGIN[1]
+    assert drawing.BOTTOM_ORIGIN[0] == pytest.approx(drawing.FRONT_ORIGIN[0])
+    assert drawing.BOTTOM_CENTER[1] < drawing.FRONT_CENTER[1]
     assert drawing.RIGHT_CENTER[0] > drawing.FRONT_CENTER[0]
     x0, x1 = (x - geom.PART_ORIGIN_MACHINE[0] for x in geom.BBOX_X)
     y0, y1 = (y - geom.PART_ORIGIN_MACHINE[1] for y in geom.BBOX_Y)

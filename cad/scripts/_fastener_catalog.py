@@ -312,7 +312,15 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     "pd-vn-transgear-retaining-ring": _stock(
         "pd-vn-transgear-retaining-ring",
         "Side-Mount External Retaining Ring",
-        "97431A260",
+        "97431A240",
+    ),
+    # MHA-PD-VN-68 (#2124): the disc cluster's end-float shims, stacked under
+    # the MHA-PD-24 rear bushing at fit-up.
+    "pd-vn-transgear-cluster-shim": _stock(
+        "pd-vn-transgear-cluster-shim",
+        "18-8 Stainless Steel Shim, 1/8 ID x 1/4 OD x .005",
+        "94773A606",
+        material="AISI 304",
     ),
     # MHA-PD-VN-63: one curved disc spring under the MHA-PD-VN-57 pivot screw's head;
     # high-carbon steel, the library's plain carbon steel.
@@ -320,14 +328,6 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "pd-vn-transgear-pivot-spring",
         "Curved Disc Spring",
         "9715K43",
-    ),
-    # MHA-PD-VN-67: one DIN 988 shim under the MHA-PD-VN-57 head, on the spring (it
-    # restores the spring room after the 9.5 bar's rearward growth); spring
-    # steel, the library's plain carbon steel.
-    "pd-vn-transgear-pivot-shim": _stock(
-        "pd-vn-transgear-pivot-shim",
-        "DIN 988 Spring Steel Shim",
-        "98055A098",
     ),
     # MHA-DT-VN-68 / MHA-CH-VN-54 (#948 ruling R): one wave disc spring preloading each
     # bank north on its datum; steel and high-carbon steel, the library's
@@ -483,8 +483,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "92871A359",
         material="AISI 304",
     ),
-    # DIN 988 spring-steel shims: the library's plain carbon steel (default),
-    # as pd-vn-transgear-pivot-shim.
+    # DIN 988 spring-steel shims: the library's plain carbon steel (default).
     "ch-rocker-arm-tl-vn-oblique-pivot-shim": _stock(
         "ch-rocker-arm-tl-vn-oblique-pivot-shim",
         "DIN 988 Spring Steel Shim, 10 mm ID x 16 mm OD x 0.2 mm",

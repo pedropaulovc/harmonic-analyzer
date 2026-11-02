@@ -20,14 +20,17 @@ CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 
 # Rule 4: every tight band names its mate.  The ream's band holds a light
 # press on the MHA-PD-VN-57 shoulder: the interference both limits produce,
-# printed outward to three places, on the screw named by its number.  The
-# length's ±0.05 sets the MHA-PD-VN-63 spring's room between the arm's spot
-# face floor and the shim under the screw head (transgear_hanger_joints).
+# printed outward to four inch places, on the screw named by its number.
+# The length's ±.002 sets the MHA-PD-VN-63 spring's room between the arm's
+# spot-face floor and the screw head (transgear_hanger_joints).
 SCREW_NUMBER = _config.parts("pd-vn-transgear-pivot-screw")["number"]
 SPRING_NUMBER = _config.parts("pd-vn-transgear-pivot-spring")["number"]
+_PRESS_IN = (
+    math.floor(PRESS_INTERFERENCE[0] / 25.4 * 1e4 + 1e-6) / 1e4,
+    math.ceil(PRESS_INTERFERENCE[1] / 25.4 * 1e4 - 1e-6) / 1e4,
+)
 PRESS_CALLOUT = (
-    f"{math.floor(PRESS_INTERFERENCE[0] * 1000.0 + 1e-9) / 1000.0:.3f}-"
-    f"{math.ceil(PRESS_INTERFERENCE[1] * 1000.0 - 1e-9) / 1000.0:.3f} DIAMETRAL\n"
+    f"{_PRESS_IN[0]:.4f}-{_PRESS_IN[1]:.4f}".replace("0.", ".") + " DIAMETRAL\n"
     f"INTERFERENCE ON\n{SCREW_NUMBER} SHOULDER"
 )
 LENGTH_CALLOUT = f"SETS {SPRING_NUMBER}\nSPRING ROOM"

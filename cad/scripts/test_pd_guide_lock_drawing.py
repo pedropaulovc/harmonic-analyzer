@@ -11,6 +11,7 @@ import draw_pd_guide_lock as drawing
 import pd_guide_lock_spec
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
+from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 
@@ -55,21 +56,24 @@ def test_sheet_runs_at_4_to_1_with_2_to_1_isometric() -> None:
     assert pd_guide_lock_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 2:1"
 
 
-# Title block: .X ±0.8; drilled holes +0.10/-0.
-_ONE_PLACE = printed_band_mm(1)
-_DRILLED_PLUS = drilled_oversize_mm()
+# Inch title block: .XX ±.01; drilled holes +.004/-0.
+_TWO_PLACES = printed_band_mm(2, unit="in")
+_DRILLED_PLUS = drilled_oversize_mm(unit="in")
+_HOLE_BAND = pd_guide_lock_spec.HOLE_LOCATION_BAND
 _CHAR_WIDTH = 0.00276  # sheet m per character of 3.5-mm note text
 
 
-def _ligaments(hole_y: float, width: float = 22.5) -> dict[str, float]:
+def _ligaments(
+    hole_y: float, width: float = pd_guide_lock_spec.LOCK_WIDTH
+) -> dict[str, float]:
     r_max = (0.125 * 25.4 + _DRILLED_PLUS) / 2.0
-    band = 0.035
     xs = [x for x, _ in pd_guide_lock_spec.HOLE_XY]
+    height_min = pd_guide_lock_spec.LOCK_HEIGHT - _TWO_PLACES
     return {
-        "guide-side edge": hole_y - band - r_max,
-        "far edge": (9.8 - _ONE_PLACE) - hole_y - band - r_max,
-        "left edge": min(xs) - band - r_max,
-        "right edge": (width - _ONE_PLACE) - max(xs) - band - r_max,
+        "guide-side edge": hole_y - _HOLE_BAND - r_max,
+        "far edge": height_min - hole_y - _HOLE_BAND - r_max,
+        "left edge": min(xs) - _HOLE_BAND - r_max,
+        "right edge": (width - _TWO_PLACES) - max(xs) - _HOLE_BAND - r_max,
     }
 
 
@@ -77,19 +81,22 @@ def test_screw_holes_reach_the_wall_target_at_the_printed_worst_case() -> None:
     """Review of 19e33c6c2 (blocker): 2.5 from the guide-side edge left 0.81
     of ligament under the largest drilled 1/8 hole.  Machinist review ENFORCE
     (PR #1897): the 1.0 lip and the 22.0 plate left 1.83 and 1.53, under the
-    2.0 target, so the plate laps the rail 1.2 (holes 3.7 from that edge) and
-    runs 22.5 long with the holes still 4 and 18 from its left end."""
+    2.0 target, so the plate laps the rail (holes on the .29 rail's tap row,
+    .155 from that edge) and runs .89 long with the holes .157 and .709 from
+    its left end; the inch print holds the .080 target (#290)."""
     assert min(_ligaments(2.5).values()) < 1.0
-    assert min(_ligaments(3.5, width=22.0).values()) < 2.0
+    assert min(_ligaments(3.5, width=22.0).values()) < WALL_TARGET_MM
     (hole_y,) = {y for _, y in pd_guide_lock_spec.HOLE_XY}
-    assert hole_y == pytest.approx(3.7)
-    assert [x for x, _ in pd_guide_lock_spec.HOLE_XY] == [4.0, 18.0]
+    assert hole_y == pytest.approx(0.155 * 25.4)
+    assert [x for x, _ in pd_guide_lock_spec.HOLE_XY] == pytest.approx(
+        [0.157 * 25.4, 0.709 * 25.4]
+    )
     worst = _ligaments(hole_y)
-    assert min(worst.values()) >= 2.0
+    assert min(worst.values()) >= WALL_TARGET_MM
     assert pd_guide_lock_spec.HOLE_LIGAMENTS_WORST == pytest.approx(worst)
-    assert pd_guide_lock_spec.HOLE_PATTERN_X == pytest.approx(11.0)
-    assert pd_guide_lock_spec.DRAWING_PRECISION_BY_NAME["Height"] == 1
-    assert pd_guide_lock_spec.DRAWING_PRECISION_BY_NAME["Width"] == 1
+    assert pd_guide_lock_spec.HOLE_PATTERN_X == pytest.approx(0.433 * 25.4)
+    assert pd_guide_lock_spec.DRAWING_PRECISION_BY_NAME["Height"] == 2
+    assert pd_guide_lock_spec.DRAWING_PRECISION_BY_NAME["Width"] == 2
 
 
 def test_hole_coordinates_print_from_the_corner_without_a_frame() -> None:
@@ -103,7 +110,7 @@ def test_hole_coordinates_print_from_the_corner_without_a_frame() -> None:
 
 
 def test_the_drill_callout_stands_between_the_plate_and_the_right_view() -> None:
-    text = f"2X {drawing.HOLE_CALLOUT_PROCESS} Ø3.18 THRU ALL"
+    text = f"2X {drawing.HOLE_CALLOUT_PROCESS} Ø.125 THRU ALL"
     assert text.split()[1] == "DRILL"
     half = len(text) * _CHAR_WIDTH / 2.0
     left, right = (
@@ -118,7 +125,7 @@ def test_the_drill_callout_stands_between_the_plate_and_the_right_view() -> None
 
 
 def test_the_drill_callout_names_the_mate_its_location_bands_serve() -> None:
-    """Machinist review ENFORCE r1-r3 (blocker): the ±0.035 hole coordinates
+    """Machinist review ENFORCE r1-r3 (blocker): the banded hole coordinates
     named no mate.  The callout names the platen guide's taps the pattern
     lands on and the screws its holes clear; with every wall at the 2.0
     target it states no shortfall."""
@@ -132,7 +139,7 @@ def test_the_drill_callout_names_the_mate_its_location_bands_serve() -> None:
     ]
     # Each row is no wider than the native row the plate and right view
     # already bound (test above).
-    assert max(len(row) for row in rows) <= len("2X DRILL Ø3.18 THRU ALL")
+    assert max(len(row) for row in rows) <= len("2X DRILL Ø.125 THRU ALL")
 
 
 def test_the_hole_coordinates_name_the_taps_they_match() -> None:
@@ -153,9 +160,9 @@ def test_the_hole_coordinates_name_the_taps_they_match() -> None:
     # plate's left-edge extension line.
     width = max(len(row) for row in f"MATCHES\n{guide}".split("\n")) * _CHAR_WIDTH
     x_x, _ = drawing.FRONT_KEEP["Hole1X"]
-    assert width <= len("2X 3.700 ±0.035") * _CHAR_WIDTH
-    assert width <= len("4.000 ±0.035") * _CHAR_WIDTH
-    assert width <= len("18.000 ±0.035") * _CHAR_WIDTH
+    assert width <= len("2X .155 ±.001") * _CHAR_WIDTH
+    assert width <= len(".157 ±.001") * _CHAR_WIDTH
+    assert width <= len(".709 ±.001") * _CHAR_WIDTH
     assert x_x + width / 2.0 < drawing.LEFT_EDGE_X - 0.002
 
 
@@ -173,7 +180,7 @@ def test_the_edge_coordinate_blocks_clear_each_other_and_the_18_000() -> None:
     y_x, y_y = drawing.FRONT_KEEP["Hole1Y"]
     x_x, x_y = drawing.FRONT_KEEP["Hole1X"]
     # The hole Y's line (at its text x) passes left of the whole 4.000 block.
-    assert x_x - len("4.000 ±0.035") * _CHAR_WIDTH / 2.0 > y_x
+    assert x_x - len(".157 ±.001") * _CHAR_WIDTH / 2.0 > y_x
     # The 4.000's shelf, its dimension line, stands clear above the 18.000's
     # (the smaller dimension nearer the part); both three-row blocks hang
     # their shelves the same _BLOCK_SHELF below their text positions.
@@ -189,7 +196,7 @@ def test_the_18_000_block_stands_between_the_hole_extension_lines() -> None:
     block stands between hole 1's extension line (where the 4.000's line
     ends) and hole 2's."""
     x, y = drawing.FRONT_KEEP["Hole2X"]
-    half = len("18.000 ±0.035") * _CHAR_WIDTH / 2.0
+    half = len(".709 ±.001") * _CHAR_WIDTH / 2.0
     assert x - half > drawing._sheet_x(pd_guide_lock_spec.HOLE_XY[0][0]) + 0.002
     assert x + half < drawing.HOLE_2_X_SHEET - 0.002
     assert y - _BLOCK_SHELF > drawing.FRONT_KEEP["Width"][1] + 0.003
@@ -198,9 +205,15 @@ def test_the_18_000_block_stands_between_the_hole_extension_lines() -> None:
 def test_the_thickness_value_stands_outboard_of_its_extension_lines() -> None:
     """Machinist review ENFORCE r1-r3: centred between the 1/16 sheet's
     extension lines, the value's digits sat on them; it stands right of the
-    edge-on view, left of the isometric."""
+    edge-on view, left of the isometric. Round 2: it prints REF with the
+    supplier's band, which governs the stock thickness."""
+    band_in = pd_guide_lock_spec.LOCK_THICK_BAND / 25.4
+    assert drawing.THICKNESS_SUFFIX.endswith(
+        f"\u00b1{band_in:.3f}".replace("0.", ".", 1)
+    )
+    printed = f"{drawing.THICKNESS_PREFIX}.0625{drawing.THICKNESS_SUFFIX}"
     x, _ = drawing.RIGHT_KEEP["Depth"]
-    half = len("1.588 ±0.127") * _CHAR_WIDTH / 2.0
+    half = len(printed) * _CHAR_WIDTH / 2.0
     right_view_right = (
         drawing.RIGHT_CENTER[0]
         + pd_guide_lock_spec.LOCK_THICK * drawing.SHEET_SCALE[0] / 2000.0
@@ -212,7 +225,7 @@ def test_the_thickness_value_stands_outboard_of_its_extension_lines() -> None:
 
 def test_the_hole_y_text_stays_inside_the_border_and_under_the_plate() -> None:
     x, y = drawing.FRONT_KEEP["Hole1Y"]
-    half = len("2X 3.500±0.035") * _CHAR_WIDTH / 2.0
+    half = len("2X .155±.001") * _CHAR_WIDTH / 2.0
     assert x - 2.0 * half > 0.0127  # right-aligned or centred, inside
     assert y < drawing.BOTTOM_EDGE_Y - 0.004
     assert x + half < drawing.LEFT_EDGE_X  # clear of Hole1X's extension
@@ -223,7 +236,7 @@ def test_the_hole_1_x_text_stands_outboard_of_its_extension_lines() -> None:
     text sat on hole 1's own extension line. It now stands left of the plate's
     left edge, right of the 2X hole Y's dimension line."""
     x, y = drawing.FRONT_KEEP["Hole1X"]
-    half = len("4.000 ±0.035") * _CHAR_WIDTH / 2.0
+    half = len(".157 ±.001") * _CHAR_WIDTH / 2.0
     assert x + half < drawing.LEFT_EDGE_X - 0.002
     assert y > drawing.FRONT_KEEP["Hole2X"][1] + 0.004
 
@@ -259,15 +272,15 @@ def test_the_views_sit_centred_between_the_border_and_title_block() -> None:
 
 def test_the_four_rounded_corners_print_once_4x_clear_of_the_holes() -> None:
     """2026-10-11 (user): the plate's corners are rounded per the ch22 back
-    photo (R ~1.75 measured -> R1.8); one printed 4X radius at .X, and the
+    photo (R ~1.75 measured -> R.07); one printed 4X radius at .XX, and the
     holes stay outside every corner's R x R square at the printed worst case,
     so their edge ligaments still run to straight edges."""
     import inspect
 
     r = pd_guide_lock_spec.CORNER_R
-    assert r == pytest.approx(1.8)
+    assert r == pytest.approx(0.07 * 25.4)
     assert pd_guide_lock_spec.DRAWING_DIMENSIONS["Corners"] == {"CornerR"}
-    assert pd_guide_lock_spec.DRAWING_PRECISION_BY_NAME["CornerR"] == 1
+    assert pd_guide_lock_spec.DRAWING_PRECISION_BY_NAME["CornerR"] == 2
     # A custom prefix replaces SolidWorks' own "R" (farm run
     # 20261012T061737079Z printed "4X 1.8"), so the prefix carries it.
     assert drawing.DIMENSION_PREFIXES["CornerR"] == "4X R"
@@ -275,13 +288,13 @@ def test_the_four_rounded_corners_print_once_4x_clear_of_the_holes() -> None:
     assert '("Corners", "CornerR", ((LOCK_WIDTH, LOCK_HEIGHT),))' in source
     assert '"OtherCorners"' in source
     assert source.count("'\"LockCornerR\"'") == 1  # both fillets, one drive loop
-    r_max = r + _ONE_PLACE
-    x_min = min(x for x, _ in pd_guide_lock_spec.HOLE_XY) - 0.035
+    r_max = r + _TWO_PLACES
+    x_min = min(x for x, _ in pd_guide_lock_spec.HOLE_XY) - _HOLE_BAND
     x_from_right = (
         pd_guide_lock_spec.LOCK_WIDTH
-        - _ONE_PLACE
+        - _TWO_PLACES
         - max(x for x, _ in pd_guide_lock_spec.HOLE_XY)
-        - 0.035
+        - _HOLE_BAND
     )
     assert min(x_min, x_from_right) > r_max
 
@@ -304,7 +317,7 @@ def test_the_corner_radius_stands_off_the_top_right_corner() -> None:
     """The 4X R text rides above and right of the plate: clear of the Height's
     extension lines (left), the drill callout below it, and the right view."""
     x, y = drawing.FRONT_KEEP["CornerR"]
-    half = len("4X R1.8") * _CHAR_WIDTH / 2.0
+    half = len("4X R.07") * _CHAR_WIDTH / 2.0
     top_edge_y = drawing._sheet_y(pd_guide_lock_spec.LOCK_HEIGHT)
     assert y > top_edge_y + 0.010
     assert x - half > drawing.RIGHT_EDGE_X
@@ -318,19 +331,13 @@ def test_the_corner_radius_stands_off_the_top_right_corner() -> None:
 
 def test_the_plate_is_1_16_sheet_under_its_own_mill_band() -> None:
     """2026-10-11 (user): the lock is 1/16 in sheet as supplied, McMaster
-    1388K196 (+/-0.005 in); the band is native on Depth@Lock, printed at
-    .XXX with the stock callout above it, and the registry names the sheet."""
-    import inspect
-
+    1388K196 (+/-0.005 in). The supplier's band governs the stock thickness,
+    so it prints as its fraction, REF (#290), with the stock callout above
+    it, and the registry names the sheet and its band."""
     import _config
 
     assert pd_guide_lock_spec.LOCK_THICK == pytest.approx(25.4 / 16.0)
     assert pd_guide_lock_spec.LOCK_THICK_BAND == pytest.approx(0.005 * 25.4)
-    assert pd_guide_lock_spec.DRAWING_PRECISION_BY_NAME["Depth"] == 3
-    assert (
-        'set_dimension_symmetric_tolerance(adapter, "Lock", "Depth", LOCK_THICK_BAND)'
-        in inspect.getsource(lock.build)
-    )
     assert drawing.DIMENSION_CALLOUTS == {
         "Depth": pd_guide_lock_spec.LOCK_STOCK_CALLOUT
     }
@@ -339,6 +346,7 @@ def test_the_plate_is_1_16_sheet_under_its_own_mill_band() -> None:
     assert "\n" not in pd_guide_lock_spec.LOCK_STOCK_CALLOUT
     spec = _config.parts("pd-guide-lock")
     assert pd_guide_lock_spec.LOCK_STOCK_SKU in spec["material_specification"]
+    assert "+/-.005 in" in spec["material_specification"]
     assert "1/16" in spec["material"]
     # Machinist review ENFORCE (PR #1897, rule 2): the printed band, not a
     # grade or ground form, is the requirement, so the field names the family.

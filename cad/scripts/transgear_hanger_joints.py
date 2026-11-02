@@ -19,9 +19,8 @@ paper-drive assembly may import it; no part build does.
   not a stock-pin whole-body or positive-load retention certificate.
 * The MHA-PD-20 spacer pressed on the MHA-PD-VN-57 shoulder, and the MHA-PD-VN-63
   spring's room under the head: shoulder - spacer - spot-face floor (from
-  the arm's front face) - the MHA-PD-VN-67 shim under the head.  The spring
-  holds the arm on the spacer, so the hanger's tilt is the spacer's face
-  squareness, fixed in the bar's frame.
+  the arm's front face).  The spring holds the arm on the spacer, so the
+  hanger's tilt is the spacer's face squareness, fixed in the bar's frame.
 * The MHA-PD-VN-58 latch pin pressed to the floor of the arm's blind end-face
   hole (R9-12): the hole's reamed band keeps the press, its depth band and
   the dowel's length grade set the proud range, the shallowest hole still
@@ -50,7 +49,6 @@ import pd_vn_transgear_pivot_screw_spec as PIVOT
 import pd_vn_transgear_latch_pin_spec as LATCH_PIN
 import pd_transgear_pivot_spacer_spec as SPACER
 import pd_vn_transgear_pivot_spring_spec as SPRING
-import pd_vn_transgear_pivot_shim_spec as SHIM
 
 ENGAGEMENT_TARGET_D = 1.5
 
@@ -114,30 +112,25 @@ if not BAR.PIVOT_TAP_CSK_DIA < PIVOT.SHOULDER_DIA + PIVOT.SHOULDER_DIA_LIMITS[0]
 # faces' squareness with it (the fit-up reads the result).  The spacer's
 # spec holds the press at both limits (SPACER.PRESS_INTERFERENCE).
 _SHOULDER_MIN = PIVOT.SHOULDER_DIA + min(PIVOT.SHOULDER_DIA_LIMITS)
-_SHOULDER_MAX = PIVOT.SHOULDER_DIA + max(PIVOT.SHOULDER_DIA_LIMITS)
 
-# --- MHA-PD-VN-63 spring room: shoulder - spacer - floor - shim -------------------
+# --- MHA-PD-VN-63 spring room: shoulder - spacer - floor ------------------------
 # The spring holds the arm's front face on the spacer's rear face, so the
-# hanger has no end play; the room between the spot-face floor and the shim
-# under the head must stay between the spring's catalogue working height and
-# its free height at every printed corner.
-SPRING_ROOM_NOMINAL = (
-    PIVOT.SHOULDER_LEN - SPACER.LENGTH - ARM.SPOT_FACE_FLOOR_FROM_FRONT - SHIM.THICKNESS
-)
+# hanger has no end play; the room between the spot-face floor and the head
+# must stay between the spring's catalogue working height and its free
+# height at every printed corner.
+SPRING_ROOM_NOMINAL = PIVOT.SHOULDER_LEN - SPACER.LENGTH - ARM.SPOT_FACE_FLOOR_FROM_FRONT
 SPRING_ROOM_MIN = (
     PIVOT.SHOULDER_LEN
     + PIVOT.SHOULDER_LEN_LIMITS[0]
     - (SPACER.LENGTH + SPACER.LENGTH_BAND)
     - (ARM.SPOT_FACE_FLOOR_FROM_FRONT + ARM.SPOT_FACE_FLOOR_BAND)
-    - SHIM.THICKNESS_MAX
-)  # 0.70
+)  # 0.693
 SPRING_ROOM_MAX = (
     PIVOT.SHOULDER_LEN
     + PIVOT.SHOULDER_LEN_LIMITS[1]
     - (SPACER.LENGTH - SPACER.LENGTH_BAND)
     - (ARM.SPOT_FACE_FLOOR_FROM_FRONT - ARM.SPOT_FACE_FLOOR_BAND)
-    - SHIM.THICKNESS_MIN
-)  # 1.0008
+)  # 0.957
 if not SPRING.WORKING_HEIGHT <= SPRING_ROOM_MIN < SPRING_ROOM_MAX < SPRING.FREE_HEIGHT:
     raise AssertionError(
         f"MHA-PD-VN-63 room {SPRING_ROOM_MIN:.4f}..{SPRING_ROOM_MAX:.4f} leaves the "
@@ -149,7 +142,7 @@ if abs(SPRING.MODEL_HEIGHT - SPRING_ROOM_NOMINAL) > 1e-9:
 SPRING_PRELOAD_N = (
     SPRING.RATE_N_PER_MM * (SPRING.FREE_HEIGHT - SPRING_ROOM_MAX),
     SPRING.RATE_N_PER_MM * (SPRING.FREE_HEIGHT - SPRING_ROOM_MIN),
-)  # 15.2 .. 38.9
+)  # 18.6 .. 39.4
 
 # --- Seated spacer face-grade enclosure --------------------------------------
 # These are the spacer's geometric grades, conditional on staying seated.
@@ -171,14 +164,6 @@ SPRING_RIM_CLEARANCE = (
 ) / 2.0  # 0.21
 if min(HEAD_RADIAL_CLEARANCE, SHOULDER_RADIAL_CLEARANCE, SPRING_RIM_CLEARANCE) <= 0.0:
     raise AssertionError("the pivot screw or its spring binds in the arm")
-# The MHA-PD-VN-67 shim slides on the shoulder and, floated to one side on it,
-# stays inside the spot face.
-SHIM_BORE_CLEARANCE = (SHIM.ID_MIN - _SHOULDER_MAX) / 2.0
-SHIM_RIM_CLEARANCE = (
-    ARM.SPOT_FACE_DIA - SHIM.OD_MAX - (SHIM.ID_MAX - _SHOULDER_MIN)
-) / 2.0
-if min(SHIM_BORE_CLEARANCE, SHIM_RIM_CLEARANCE) <= 0.0:
-    raise AssertionError("the pivot shim binds on the shoulder or in the spot face")
 
 # --- MHA-PD-VN-56 plate screws in the arm ------------------------------------------
 if PLATE_SCREW.THREAD != ARM.PLATE_TAP_SPEC.size:
@@ -187,7 +172,7 @@ if abs(PLATE_SCREW.HEAD_DIA - PLATE.CSK_DIA) > 1e-9:
     raise AssertionError("the nominal countersink does not match the reference oval head")
 if PLATE_SCREW.HEAD_ANGLE_DEG != PLATE.CSK_ANGLE_DEG:
     raise AssertionError("the nominal countersink angle does not match the reference head")
-PLATE_SCREW_CUT_PROUD_MAX = 0.2
+PLATE_SCREW_CUT_PROUD_MAX = PLATE_SCREW.CUT_PROUD_MAX
 PLATE_SCREW_THREAD_RADIAL_PLAY_MAX_MM = (
     ARM.PLATE_TAP_PITCH_DIA_LIMITS_MM[1] - PLATE_SCREW.THREAD_PITCH_DIA_LIMITS_MM[0]
 ) / 2.0
@@ -347,7 +332,7 @@ def require_arm_plate_joint_inspection(
 # Graded reference-pose notch clearance only; no unsupported pin-full-span
 # manufactured-body yaw inference. Actual gear-plane/seat controls are direct.
 NOTCH_REFERENCE_AIR_WORST_MM = (
-    (PLATE.NOTCH_RELIEF - PLATE.NOTCH_BAND) * math.cos(ARM.EDGE_LEAN) - ARM.BAND_X
+    (PLATE.NOTCH_RELIEF - PLATE.NOTCH_BAND) * math.cos(ARM.EDGE_LEAN) - ARM.OUTLINE_BAND
 )
 if NOTCH_REFERENCE_AIR_WORST_MM <= 0.0:
     raise AssertionError(
@@ -367,13 +352,13 @@ _PIN_HOLE_MAX = ARM.PIN_HOLE_DIA + max(ARM.PIN_HOLE_DIA_BAND)
 LATCH_PIN_PRESS_INTERFERENCE = (
     _PIN_OD_MIN - _PIN_HOLE_MAX,
     _PIN_OD_MAX - _PIN_HOLE_MIN,
-)  # 0.0025 / 0.0176
+)  # 0.0152 / 0.0330
 if min(LATCH_PIN_PRESS_INTERFERENCE) <= 0.0:
     raise AssertionError("the arm's pin-hole band loses the latch pin's press")
 if abs(LATCH_PIN.proud_length(ARM.PIN_HOLE_DEPTH) - LATCH_PIN.PROUD) > 1e-9:
     raise AssertionError("the arm's hole depth does not leave the latch pin PROUD")
-# The depth's .XX band and the dowel's length grade move the pressed pin's
-# tip by as much: 22.225 -/+ 0.254 - (8.50 +/- 0.51) = 12.961 .. 14.489.
+# The depth's printed .XX reach and the dowel's length grade move the pressed
+# pin's tip by as much.
 LATCH_PIN_PROUD_RANGE = (
     LATCH_PIN.proud_length(
         ARM.PIN_HOLE_DEPTH + ARM.PIN_HOLE_DEPTH_BAND, -LATCH_PIN.LENGTH_GRADE
@@ -382,7 +367,7 @@ LATCH_PIN_PROUD_RANGE = (
         ARM.PIN_HOLE_DEPTH - ARM.PIN_HOLE_DEPTH_BAND, LATCH_PIN.LENGTH_GRADE
     ),
 )
-# The shallowest hole: (8.50 - 0.51) - 0.443 = 7.55 of full diameter, 2.38 D.
+# The shallowest hole, at the depth's printed .XX reach.
 LATCH_PIN_ENGAGEMENT_WORST_D = LATCH_PIN.press_engagement_d(
     ARM.PIN_HOLE_DEPTH - ARM.PIN_HOLE_DEPTH_BAND
 )
