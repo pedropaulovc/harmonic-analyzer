@@ -189,8 +189,10 @@ DONOR_CENTER = (0.360, 0.090)
 # suffix (LENGTH_FUNCTION_SUFFIXES) to end clear of it.  The one radius rides
 # above the 3/8-to-1/4 in step it attaches to (the fillet's first edge),
 # right of the Ø.2500 line.  With its stacked +.000/-.002 band its text is
-# 23.4 mm wide, so it stands 1.5 mm nearer that line than the bare MAX text
-# did, clear of section A-A's upper arrow (final3 layout proof).
+# 23.4 mm wide and its shoulder 25.4 mm, so it stands 0.4 mm nearer that line
+# than the bare MAX text did: the text ends 2.2 mm short of section A-A's upper
+# arrow (the layout proof's 2 mm gap; final3 read 1.8 at +0.010) and the
+# shoulder starts 0.7 mm right of the Ø.2500 line (r16 crossed it at +0.0085).
 SIDE_KEEP = {
     "CollarWidth": (0.1740, 0.1355),
     "Sec0End": (0.2311, 0.1355),
@@ -198,7 +200,7 @@ SIDE_KEEP = {
     "Sec2End": (0.1464, 0.1195),
     "Sec3End": (0.1429, 0.1115),
     "Sec4End": (0.1314, 0.1035),
-    "ShoulderR": (BIG_END_X - SECTION_ENDS[1] / 1000.0 + 0.0085, 0.1640),
+    "ShoulderR": (BIG_END_X - SECTION_ENDS[1] / 1000.0 + 0.0096, 0.1640),
 }
 OVERALL_REFERENCE_TEXT_XY = (0.1515, 0.0795)
 # Sheet width of one length digit or point at the dimension font (the 916a
