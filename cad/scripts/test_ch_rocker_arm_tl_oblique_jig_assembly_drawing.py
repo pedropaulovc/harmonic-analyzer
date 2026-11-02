@@ -171,9 +171,19 @@ def _cluster_extent(sheet: str):
             -block.BLOCK_WIDTH / 2.0,
             -block.LUG_Y0,
         )
+        # The feed block's four carriage screws explode above it here.
+        screw_tops = (
+            origin[2] + spec.carriage_screw.DIMS.head_h + lift(spec.CARRIAGE_SCREW)
+            for (origin, _rows), parent in zip(
+                spec.CARRIAGE_SCREW_PLACEMENTS,
+                spec.LOCKED_TO[spec.CARRIAGE_SCREW],
+                strict=True,
+            )
+            if parent == (spec.FEED_BLOCK, 0)
+        )
         z = (
             -feed.BAR_SCREW_LENGTH_MM + lift(spec.BRACKET_SCREW),
-            spec.trammel.PIVOT_BLOCK_TOP_Z + lift(spec.FEED_BLOCK),
+            max(spec.trammel.PIVOT_BLOCK_TOP_Z + lift(spec.FEED_BLOCK), *screw_tops),
         )
     else:
         assert sheet == "CARRIER EXPLODED"
@@ -234,7 +244,24 @@ def test_clusters_partition_the_bom() -> None:
     assert len(clustered) == len(set(clustered))
     feed = next(c for c in drawing.CLUSTERS if c.sheet == "LEADSCREW FEED EXPLODED")
     assert spec.FEED_BLOCK in feed.stems
-    assert feed.context == (spec.instance_name(spec.CARRIAGE, 0),)
+    # Review jig-asm r1: the feed block's carriage screws explode over it on
+    # the feed sheet, the pivot block's alone on the rail-bar sheet, which
+    # balloons them.
+    feed_screws = tuple(spec.instance_name(spec.CARRIAGE_SCREW, i) for i in range(4))
+    pivot_screws = tuple(spec.instance_name(spec.CARRIAGE_SCREW, i) for i in range(4, 8))
+    assert spec.LOCKED_TO[spec.CARRIAGE_SCREW] == (
+        ((spec.FEED_BLOCK, 0),) * 4 + ((spec.PIVOT_BLOCK, 0),) * 4
+    )
+    assert feed.context == (spec.instance_name(spec.CARRIAGE, 0), *feed_screws)
+    assert spec.CARRIAGE_SCREW not in feed.visible
+    assert set(feed_screws) <= feed.visible
+    rails = next(c for c in drawing.CLUSTERS if c.sheet == "RAIL BARS EXPLODED")
+    assert spec.CARRIAGE_SCREW in rails.stems
+    assert rails.partial == ((spec.CARRIAGE_SCREW, pivot_screws),)
+    assert rails.visible == frozenset(
+        {*rails.stems, *pivot_screws} - {spec.CARRIAGE_SCREW}
+    )
+    assert rails.title == "BASE BARS, RAILS, CARRIAGES AND PIVOT BLOCK"
     pivot = next(c for c in drawing.CLUSTERS if c.sheet == drawing.PIVOT_SHEET)
     assert set(pivot.stems) == {spec.PIVOT_SCREW, spec.PIVOT_SPACER, spec.PIVOT_SHIM}
     assert set(pivot.context) == {
@@ -290,9 +317,12 @@ def test_sheet_text_wraps_within_its_layout_width() -> None:
         (operation.checks, drawing.STEPS_LINE_WIDTH),
     ):
         assert max(len(line) for line in text.split("\n")) <= width
-    # Each alignment station prints whole on one line.
-    for line in spec.ALIGNMENT_NOTE_LINES[1:]:
+    # Each alignment station and sweep-limit row prints whole on one line.
+    for line in (*spec.ALIGNMENT_NOTE_LINES[1:], *spec.SWEEP_NOTE_LINES[1:]):
         assert line in drawing.ALIGNMENT_NOTE.split("\n")
+    # The general torque note opens sheet 7's sequence, its items unbroken.
+    assert drawing.ASSEMBLY_STEPS.split("\n")[1].startswith("TORQUE WHERE NO STEP")
+    assert "(ITEMS 21, 22, 24, 25, 27 AND 28)" in drawing.ASSEMBLY_STEPS.replace("\n", " ")
 
 
 def test_a_blank_line_parts_each_top_level_step() -> None:
@@ -770,6 +800,13 @@ def test_every_bom_row_carries_one_balloon() -> None:
     assert nut.instance == spec.instance_name(spec.T_NUT, len(spec.T_NUT_PLACEMENTS) - 1)
     assert nut.instance != spec.instance_name(spec.T_NUT, 0)
     assert nut.point_mm == (0.0, spec.t_nut.FOOT_HEIGHT, spec.t_nut.FOOT_WIDTH / 2.0)
+    # Review jig-asm r1: balloon 19 lands on bar 2's far stud, beside it,
+    # not across bar 2 on bar 1's near stud.
+    stud = drawing.BALLOON_ANCHORS[spec.HOLD_DOWN_STUD]
+    last = len(spec.HOLD_DOWN_STUD_PLACEMENTS) - 1
+    assert stud.instance == spec.instance_name(spec.HOLD_DOWN_STUD, last)
+    assert spec.STUD_XY[last] == spec.trammel.rail_point(2, *spec.trammel.HOLD_DOWN_STUDS[-1])
+    assert stud.point_mm is None
     assert drawing.BALLOON_RING_REACH == (
         drawing.BALLOON_MARGIN + drawing.BALLOON_RADIUS
     )
@@ -1907,7 +1944,9 @@ def test_block_occurrences_and_integral_nut_axis_match_the_feed_geometry() -> No
     assert 0.0 <= block.NUT_Z[0] < block.NUT_Z[1] <= block.BLOCK_HEIGHT
 
 
-@pytest.mark.parametrize("sheet", (drawing.PIVOT_SHEET, "LEADSCREW FEED EXPLODED"))
+@pytest.mark.parametrize(
+    "sheet", (drawing.PIVOT_SHEET, "LEADSCREW FEED EXPLODED", "RAIL BARS EXPLODED")
+)
 def test_cluster_recipe_isolates_real_families_and_their_context_before_fitting(
     monkeypatch, sheet,
 ) -> None:
@@ -1930,7 +1969,7 @@ def test_cluster_recipe_isolates_real_families_and_their_context_before_fitting(
     def fit(a, placed, fitted_cluster, configuration, **kwargs):
         assert a is adapter and placed is view and fitted_cluster is cluster
         assert configuration == "Default Simplified"
-        assert events[-1] == ("isolate", frozenset(cluster.stems + cluster.context))
+        assert events[-1] == ("isolate", cluster.visible)
         return (1.0, 5.0)
 
     monkeypatch.setattr(drawing, "_fit_cluster_view", fit)

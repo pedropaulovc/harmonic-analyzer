@@ -115,11 +115,15 @@ def _length(value_mm: float, places: int) -> str:
     return text
 
 
+def _outward(value_mm: float, places: int, *, up: bool) -> float:
+    """``value_mm`` (mm) rounded outward (``up`` or down) to the sheet's ``places``."""
+    scale = 10**places / LENGTH_UNITS[UNIT]
+    return (math.ceil if up else math.floor)(round(value_mm * scale, 9)) / scale
+
+
 def _bound(value_mm: float, places: int, *, up: bool) -> str:
     """``value_mm`` rounded outward (``up`` or down) to the sheet's ``places``."""
-    scale = 10**places / LENGTH_UNITS[UNIT]
-    rounded = (math.ceil if up else math.floor)(round(value_mm * scale, 9))
-    return _length(rounded / scale, places)
+    return _length(_outward(value_mm, places, up=up), places)
 
 
 # One in·lbf in N·m (exact: 4.4482216152605 N x 0.0254 m).
@@ -1234,28 +1238,48 @@ ASSEMBLED_CAPTION = (
 )
 
 
-def _alignment_rows() -> tuple[str, ...]:
-    rows = []
-    for station, pins in trammel.ALIGNMENT_TARGETS.items():
-        (x1, y1), (x2, y2) = pins["rail 1"], pins["rail 2"]
-        x1, y1, x2, y2 = (_length(v, ALIGNMENT_PLACES) for v in (x1, y1, x2, y2))
-        rows.append(
-            f"S {_length(station, 2):>5}: RAIL 1 X {x1:>8} Y {y1:>7}; "
-            f"RAIL 2 X {x2:>8} Y {y2:>7}"
-        )
-    return tuple(rows)
+def _station_row(station: float) -> str:
+    """One table row: each rail's pin at ``station``, machine X/Y."""
+    (x1, y1), (x2, y2) = (trammel.rail_point(rail, station) for rail in (1, 2))
+    x1, y1, x2, y2 = (_length(v, ALIGNMENT_PLACES) for v in (x1, y1, x2, y2))
+    return (
+        f"S {_length(station, 2):>5}: RAIL 1 X {x1:>8} Y {y1:>7}; "
+        f"RAIL 2 X {x2:>8} Y {y2:>7}"
+    )
 
 
-def _sweep_line() -> str:
-    # Review bought-tl000-r1: the checks' "sweep of each pass" gets its range,
-    # each pin's station over ±trammel.SWEEP, rounded outward.
+# Review bought-tl000-r1: the checks' "sweep of each pass" gets its range,
+# each pin's station over ±trammel.SWEEP, rounded outward. Review jig-asm r2
+# (2026-11-02): no stop ends a pass, so step 6 and its HD3 repeat set a pin
+# at each limit as at a station and witness-mark its bar at the carriage;
+# every complete pass runs mark to mark. Rounded outward to .01, a limit
+# stays well inside the leadscrew.FEED_GAP the feed lug keeps to its KP08 at
+# the exact travel end.
+SWEEP_LIMIT_PLACES = 2
+SWEEP_LIMITS = {
+    name: (
+        _outward(lo, SWEEP_LIMIT_PLACES, up=False),
+        _outward(hi, SWEEP_LIMIT_PLACES, up=True),
+    )
+    for name, (lo, hi) in trammel.PIN_TRAVEL.items()
+}
+
+
+def _sweep_lines() -> tuple[str, ...]:
     spans = ", ".join(
-        f"{name.upper()} {_bound(lo, 1, up=False)} TO {_bound(hi, 1, up=True)}"
-        for name, (lo, hi) in trammel.PIN_TRAVEL.items()
+        f"{name.upper()} {_length(lo, SWEEP_LIMIT_PLACES)} TO "
+        f"{_length(hi, SWEEP_LIMIT_PLACES)}"
+        for name, (lo, hi) in SWEEP_LIMITS.items()
     )
     return (
-        f"SWEEP OF EACH PASS, EACH PIN AT S: {spans}; NO STOP LIMITS IT, THE "
-        "FITTER ENDS EACH PASS THERE."
+        f"SWEEP LIMITS, EACH PIN AT S: {spans}; NO STOP ENDS A PASS. STEP 6 "
+        "AND HD3 SET EACH PIN AT EACH LIMIT BELOW AS AT A STATION AND "
+        "WITNESS-MARK ITS BAR AT THE CARRIAGE'S SPINDLE-END FACE, I OR O BY "
+        "PASS. A COMPLETE PASS RUNS EACH CARRIAGE MARK TO MARK:",
+        *(
+            _station_row(s)
+            for s in sorted(s for limits in SWEEP_LIMITS.values() for s in limits)
+        ),
     )
 
 
@@ -1263,9 +1287,9 @@ ALIGNMENT_NOTE_LINES = (
     "RAIL ALIGNMENT TARGETS: PIVOT PIN AXIS, MACHINE X/Y FROM THE SPINDLE, "
     "AT STATION S FROM THE SPINDLE ALONG THE RAIL "
     f"(±{_length(ALIGNMENT_BAND, ALIGNMENT_PLACES)})",
-    *_alignment_rows(),
+    *(_station_row(station) for station in trammel.ALIGNMENT_TARGETS),
 )
-SWEEP_NOTE_LINE = _sweep_line()
+SWEEP_NOTE_LINES = _sweep_lines()
 
 # Every screw by its fastener-table callout (fasteners.FASTENERS) and every
 # bought item by its BOM item number.
@@ -1445,14 +1469,16 @@ def _item(stem: str) -> str:
     return f"(ITEM {ITEM_NUMBERS[stem]})"
 
 
+# Review jig-asm r2/r3: steps 10 and 11 name item 9 as its BOM row does.
+_HUB_PIN = f"{BOM_DESCRIPTIONS[HUB_PIN]} {_item(HUB_PIN)}"
 # TL-21 supplies the CL spot; the HUB is drilled in situ from the apex
 # (owner ruling 5, option A, 2026-11-01: carrier HUB_RADIAL_STACK). Fit doc
 # F16 (HUB, the purchased .4000 reamer) and F19 (CL, the owned .2490 reamer)
 # size the finished holes.
 _HUB_HOLE = (
     f"HUB Ø{_length(carrier.HUB_HOLE_LIMITS[0], 4)}-"
-    f"{_length(carrier.HUB_HOLE_LIMITS[1], 4)} THRU, BONDED LOCATOR "
-    f"{_item(HUB_PIN)}; LOCTITE 638"
+    f"{_length(carrier.HUB_HOLE_LIMITS[1], 4)} THRU, FOR THE {_HUB_PIN}, "
+    "BONDED AT STEP 11"
 )
 _CL_HOLE = (
     f"CL Ø{_length(carrier.CL_DOWEL_DIA + min(carrier.CL_HOLE_BAND), 4)}-"
@@ -1462,6 +1488,24 @@ _CL_HOLE = (
 # The shared stud REWORK sheet points to this installed-stack acceptance.
 OPERATION_SHEET_NUMBER = 9
 HOLD_DOWN_REFERENCE = f"{DRAWING_NUMBER}, STEPS HD1-HD4 (SHEET {OPERATION_SHEET_NUMBER})"
+# Review jig-asm r1 (minor): the screws and nuts whose steps state no
+# torque. Their fastener specs carry no torque figure, so rule 24's one
+# general note gives the conventional snug instruction, no invented value.
+SNUG_FASTENERS = (
+    FLANGE_NUT,
+    RAIL_SCREW,
+    CARRIAGE_SCREW,
+    PILLOW_BLOCK_SCREW,
+    RISER_SCREW,
+    CLAMP_SCREW,
+)
+_SNUG_ITEMS = sorted(int(ITEM_NUMBERS[stem]) for stem in SNUG_FASTENERS)
+GENERAL_TORQUE_NOTE = (
+    "TORQUE WHERE NO STEP STATES ONE (ITEMS "
+    f"{', '.join(map(str, _SNUG_ITEMS[:-1]))} AND {_SNUG_ITEMS[-1]}): RUN "
+    "EACH SCREW OR NUT IN SNUG BY HAND ON A STANDARD-LENGTH HEX KEY OR "
+    "WRENCH, NO EXTENSION."
+)
 ASSEMBLY_STEPS = (
     f"1. SCREW AN HGR15R RAIL {_item(RAIL)} ON EACH BASE BAR WITH "
     f"{trammel.RAIL_HOLE_COUNT} {_RAIL_SCREW} {_item(RAIL_SCREW)}, ENDS FLUSH: "
@@ -1494,7 +1538,9 @@ ASSEMBLY_STEPS = (
     "ALIGNMENT-TABLE STATION, RUN THE TABLE UNTIL THE DRO READS ITS X AND Y, "
     "SLIDE THE CARRIAGE UNTIL ITS SCREW SHOULDER CENTRES IN X UNDER A "
     "SPINDLE-MOUNTED INDICATOR AND TAP THE BAR UNTIL IT CENTRES IN Y; "
-    "TIGHTEN THE HOLD-DOWN NUTS AND READ EACH STATION AGAIN.",
+    "TIGHTEN THE HOLD-DOWN NUTS AND READ EACH STATION AGAIN. SET EACH SWEEP "
+    "LIMIT (SHEET 1) THE SAME WAY, CENTRING IN X ONLY, AND WITNESS-MARK EACH "
+    "BAR AT ITS CARRIAGE'S SPINDLE-END FACE, I OR O BY PASS.",
     f"7. FIT THE FEED NUT {_item(FEED_NUT)} ON THE FEED BLOCK LUG'S "
     f"PRINT-DRILLED TAPS WITH 2 {_NUT_SCREW} {_item(NUT_SCREW)}, FINGER TIGHT; "
     "NO TRANSFER SPOTTING. FIT EACH KP08 "
@@ -1509,7 +1555,8 @@ ASSEMBLY_STEPS = (
     "THREADLOCKER. THEN COMPLETE F2.",
     "9. REMOVE THE TEMPORARY SHOULDER SCREWS. FIT THE SPACERS AND CARRIER "
     "ON A1/B1; SELECT SHIMS PER P1 AND COMPLETE P1-P3 (SHEET 8). RECORD HD1 "
-    "H THROUGH THE COMPLETE INNER-PASS HAND SWEEP USING THE HANDWHEEL.",
+    "H THROUGH THE COMPLETE INNER-PASS HAND SWEEP, MARK TO MARK (STEP 6), "
+    "USING THE HANDWHEEL.",
     # The carrier stays on its A1/B1 seats from step 9 to 13A: HUB and CL are
     # finished in place on the running jig (carrier spec) and nothing removes
     # it before 13A. The HUB is set from the spindle origin (the apex) by
@@ -1524,7 +1571,7 @@ ASSEMBLY_STEPS = (
     f"{len(riser.SCREW_HOLES) + 3} HOLES FROM BELOW THROUGH THE FINISHED CARRIER "
     "HOLES; FINISH TO MHA-CH-06-TL-24 AND FIT WITH "
     f"{len(riser.SCREW_HOLES)} {_RISER_SCREW}S {_item(RISER_SCREW)}. "
-    f"ABRASIVE-CUT THE GAUGE PIN {_item(HUB_PIN)} TO "
+    f"ABRASIVE-CUT THE {_HUB_PIN} TO "
     f"{_length(hub_pin.CUT_LENGTH, hub_pin.CUT_PLACES)}; "
     "DEBURR THE CUT END ONLY, CUT END DOWN, FACTORY END UP. CLEAN AND BOND "
     f"WITH LOCTITE 638; SET ITS FACTORY TOP WITH A {_length(hub_pin.TIP_SET, 3)} "
@@ -1628,7 +1675,7 @@ HOLD_DOWN_STEPS = (
     "AND MAX IN INCHES WITH GAUGE UNCERTAINTY INCLUDED: B, BAR THICKNESS; D, "
     "STUD LOWER END TO BAR UNDERSIDE AT THE ORIGINAL INSERTION; H, BAR TOP TO "
     f"MOVING BLOCK UNDERSIDE (ITEMS {ITEM_NUMBERS[FEED_BLOCK]}/{ITEM_NUMBERS[PIVOT_BLOCK]}), LEAST OVER BOTH "
-    "COMPLETE PASSES: INNER AT STEP 9, OUTER AT STEP 13A; N, SEATED FLANGE "
+    "COMPLETE PASSES, MARK TO MARK: INNER AT STEP 9, OUTER AT STEP 13A; N, SEATED FLANGE "
     f"NUT {_item(FLANGE_NUT)} BEARING FACE "
     "TO THE FAR END OF ITS COMPLETE THREADS, NOT BODY HEIGHT; W, WASHER "
     "STACK (NONE IS ADDED); U, PROPOSED CUT END TO THE FIRST COMPLETE "
@@ -1651,9 +1698,10 @@ HOLD_DOWN_STEPS = (
     f"STEP 6: TEMPORARILY SEAT BOTH SHOULDER SCREWS {_item(PIVOT_SCREW)}, "
     "SLACKEN THE HOLD-DOWN NUTS, BRING THE FEED CARRIAGE TO EACH STATION "
     "WITH THE HANDWHEEL AND THE PIVOT CARRIAGE BY HAND, INDICATE, TAP, "
-    "RETIGHTEN AND READ EVERY STATION. REMOVE THE TEMPORARY SCREWS.",
+    "RETIGHTEN AND READ EVERY STATION; THEN RENEW THE SWEEP-LIMIT MARKS THE "
+    "SAME WAY, CROSSING OUT ANY OLD MARK THAT MOVED. REMOVE THE TEMPORARY SCREWS.",
     "HD4. WITH THE CARRIER AND BOTH SCREWS FITTED PER O1, HAND-SWEEP ITS "
-    "COMPLETE PASS: "
+    "COMPLETE PASS TO THE HD3 MARKS: "
     f"EVERY STUD CLEARS EVERY MOVING BLOCK BY {_STUD_CLEARANCE} MIN "
     f"THROUGHOUT AND SHOWS {_STUD_PITCH} MIN BEYOND ITS SEATED NUT, THE NUT'S "
     "WHOLE COMPLETE-THREAD SPAN ENGAGED. REJECT ANY INCOMPATIBLE SETUP.",

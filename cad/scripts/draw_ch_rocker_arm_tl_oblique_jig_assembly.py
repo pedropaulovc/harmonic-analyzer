@@ -118,14 +118,37 @@ class Cluster:
     # Instances shown for what the families mate to, ballooned on their own
     # family's sheet, not here.
     context: tuple[str, ...] = ()
+    # A family this sheet shows only some instances of, (family, instances);
+    # it is still ballooned here, on one of those.
+    partial: tuple[tuple[str, tuple[str, ...]], ...] = ()
+
+    @property
+    def visible(self) -> frozenset[str]:
+        """The families and instances the view shows."""
+        partial = dict(self.partial)
+        shown = [stem for stem in self.stems if stem not in partial]
+        shown += [name for names in partial.values() for name in names]
+        return frozenset((*shown, *self.context))
+
+
+def _carriage_screws(block: str) -> tuple[str, ...]:
+    """The carriage screws that fasten ``block`` to its carriage."""
+    return tuple(
+        spec.instance_name(spec.CARRIAGE_SCREW, index)
+        for index, parent in enumerate(spec.LOCKED_TO[spec.CARRIAGE_SCREW])
+        if parent == (block, 0)
+    )
 
 
 # Each family belongs to exactly one ballooned cluster. Context occurrences
 # show the actual mating blocks without duplicating their BOM balloons.
+# Review jig-asm r1: the feed block's four carriage screws float over an
+# empty carriage on sheet 3 (the block is on sheet 5), so they explode over
+# it on sheet 5; sheet 3 keeps, and balloons, the pivot block's four.
 CLUSTERS = (
     Cluster(
         "RAIL BARS EXPLODED",
-        "BASE BARS, RAILS, CARRIAGES AND PIVOT BLOCKS",
+        "BASE BARS, RAILS, CARRIAGES AND PIVOT BLOCK",
         (
             spec.BASE_BAR,
             spec.PIVOT_BLOCK,
@@ -138,6 +161,7 @@ CLUSTERS = (
             spec.CARRIAGE_SCREW,
         ),
         (1.0, 5.0),
+        partial=((spec.CARRIAGE_SCREW, _carriage_screws(spec.PIVOT_BLOCK)),),
     ),
     Cluster(
         PIVOT_SHEET,
@@ -168,8 +192,12 @@ CLUSTERS = (
             spec.NUT_SCREW,
         ),
         (1.0, 3.0),
-        # The integral lug moves with the feed block on rail 1.
-        context=(spec.instance_name(spec.CARRIAGE, 0),),
+        # The integral lug moves with the feed block on rail 1, fastened to
+        # its carriage by its four carriage screws.
+        context=(
+            spec.instance_name(spec.CARRIAGE, 0),
+            *_carriage_screws(spec.FEED_BLOCK),
+        ),
     ),
     Cluster(
         "CARRIER EXPLODED",
@@ -536,6 +564,14 @@ BALLOON_ANCHORS[spec.T_NUT] = BalloonAnchor(
     point_mm=(0.0, spec.t_nut.FOOT_HEIGHT, spec.t_nut.FOOT_WIDTH / 2.0),
     instance=spec.instance_name(spec.T_NUT, len(spec.T_NUT_PLACEMENTS) - 1),
 )
+# Review jig-asm r1: balloon 19 crossed rail 2's bar to reach bar 1's near
+# stud; it lands on rail 2's far stud, the one beside it (STUD_XY order:
+# bar 1 near and far, then bar 2).
+BALLOON_ANCHORS[spec.HOLD_DOWN_STUD] = BalloonAnchor(
+    instance=spec.instance_name(
+        spec.HOLD_DOWN_STUD, len(spec.HOLD_DOWN_STUD_PLACEMENTS) - 1
+    ),
+)
 
 EXPLODED_VIEW_NAMES = {
     ASSEMBLY_VIEW_CONFIGURATION: spec.EXPLODED_VIEW_NAME,
@@ -545,10 +581,11 @@ if spec.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
     raise AssertionError("the jig explode is authored in Default")
 
 
-# Glues an item citation ("ITEM 22") and a value with its unit ("3.5 N·m",
-# "25 IN·LBF", "2.0 MM") into one word while wrapping, so the fitter never
-# reads "ITEM" or a number at a line end and what it belongs to on the next.
-_UNBROKEN = re.compile(r"\bITEM (?=\d)|(?<=\d) (?=N·m|IN·LBF|MM\b)")
+# Glues an item citation ("ITEM 22", "ITEMS 21") and a value with its unit
+# ("3.5 N·m", "25 IN·LBF", "2.0 MM") into one word while wrapping, so the
+# fitter never reads "ITEM" or a number at a line end and what it belongs to
+# on the next.
+_UNBROKEN = re.compile(r"\bITEMS? (?=\d)|(?<=\d) (?=N·m|IN·LBF|MM\b)")
 _GLUE = "\x00"
 # A step's label: its number, or a sub-step's ("7A").
 _STEP_LABEL = re.compile(r"\d+[A-Z]?")
@@ -604,7 +641,7 @@ def _wrapped(
 
 ASSEMBLED_CAPTION = _wrapped((spec.ASSEMBLED_CAPTION,), width=CAPTION_WIDTH)
 ALIGNMENT_NOTE = _wrapped(
-    (*spec.ALIGNMENT_NOTE_LINES, spec.SWEEP_NOTE_LINE), width=ALIGNMENT_WIDTH
+    (*spec.ALIGNMENT_NOTE_LINES, *spec.SWEEP_NOTE_LINES), width=ALIGNMENT_WIDTH
 )
 
 
@@ -682,7 +719,7 @@ def assembly_and_fit_layouts(
 
 
 STEPS_LAYOUT, FIT_LAYOUT = assembly_and_fit_layouts(
-    spec.ASSEMBLY_STEPS,
+    (spec.GENERAL_TORQUE_NOTE, *spec.ASSEMBLY_STEPS),
     spec.ASSEMBLY_CHECKS,
     (*spec.PIVOT_FIT_STEPS, "KP08 ALIGNMENT:", *spec.KP08_ALIGNMENT_STEPS),
 )
@@ -2299,7 +2336,7 @@ def _place_cluster_view(
     isolate_drawing_view_components(
         adapter,
         view,
-        visible_stems=frozenset(cluster.stems + cluster.context),
+        visible_stems=cluster.visible,
         label=label,
     )
     return view, _fit_cluster_view(adapter, view, cluster, configuration, label=label)
