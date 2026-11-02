@@ -75,6 +75,8 @@ def test_native_supplier_witness_inventory():
     assert names == set(spec.SUPPLIER_REFERENCE_STARTS) == set(spec.SUPPLIER_REFERENCE_PLANES)
     assert names == set(spec.SUPPLIER_REFERENCE_FORMATS) == set(spec.SUPPLIER_REFERENCE_UNITS)
     assert names == set(spec.SUPPLIER_REFERENCE_SIDES)
+    # The thickness REF prints as the catalogue's .008, not .0080.
+    assert spec.SUPPLIER_REFERENCE_FORMATS["SupplierThickness"][0] == 3
     for name, value, orientation in spec.SUPPLIER_REFERENCE_DIMENSIONS:
         assert value > 0
         assert spec.SUPPLIER_REFERENCE_PLANES[name] == "Top"

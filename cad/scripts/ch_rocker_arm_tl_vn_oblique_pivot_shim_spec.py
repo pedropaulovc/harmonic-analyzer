@@ -42,7 +42,7 @@ SUPPLIER_REFERENCE_DIMENSIONS = (('SupplierOuterDiameter', OD, 'horizontal'), ('
 SUPPLIER_REFERENCE_STARTS = {'SupplierOuterDiameter': (-OD / 2.0, -THICKNESS), 'SupplierThickness': (OD / 2.0, -THICKNESS)}
 SUPPLIER_REFERENCE_PLANES = {'SupplierOuterDiameter': 'Top', 'SupplierThickness': 'Top'}
 # Supplier sizes print as untoleranced REF; the catalogue band governs.
-SUPPLIER_REFERENCE_FORMATS = {'SupplierOuterDiameter': (3, 'diameter', None, 'OUTSIDE'), 'SupplierThickness': (4, 'length', None, 'THICKNESS')}
+SUPPLIER_REFERENCE_FORMATS = {'SupplierOuterDiameter': (3, 'diameter', None, 'OUTSIDE'), 'SupplierThickness': (3, 'length', None, 'THICKNESS')}
 # The OD takes the bottom lane; the thickness sits right of the Top view.
 SUPPLIER_REFERENCE_SIDES = {'SupplierOuterDiameter': 'bottom', 'SupplierThickness': 'right'}
 SUPPLIER_REFERENCE_UNITS = {'SupplierOuterDiameter': 'in', 'SupplierThickness': 'in'}

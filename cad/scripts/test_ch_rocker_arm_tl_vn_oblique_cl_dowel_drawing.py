@@ -88,6 +88,8 @@ def test_diameter_and_bands_are_the_carriers() -> None:
 
 
 def test_end_forms_are_the_vendor_steps() -> None:
+    # The supplier data names both ends, one round and one chamfered.
+    assert "ONE END ROUND, ONE END CHAMFERED." in spec.SUPPLIER_DATA[0]
     section = dowel_section(dims.DOWEL_SIZE, dims.ENDS)
     radius, length = spec.DIA / 2.0, spec.LENGTH
     # Chamfered end: flat face Ø.235 at y = 0, the cone reaching Ø.250 where
