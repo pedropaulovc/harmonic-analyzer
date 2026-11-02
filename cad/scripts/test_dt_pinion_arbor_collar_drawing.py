@@ -165,7 +165,7 @@ def test_collar_never_touches_the_front_strap_at_any_band_corner() -> None:
             # Pinned straps (#858): the drum's front air runs from nothing
             # to its whole end play.
             (0.0, arbor.drum_total_air()[1]),
-            (spec.STRAP_T - spec.STRAP_T_BAND, spec.STRAP_T + spec.STRAP_T_BAND),
+            spec.STRAP_T_LIMITS,
             (
                 arbor.PIN_STATION_FROM_HEAD_REAR - arbor.PIN_STATION_BAND,
                 arbor.PIN_STATION_FROM_HEAD_REAR + arbor.PIN_STATION_BAND,

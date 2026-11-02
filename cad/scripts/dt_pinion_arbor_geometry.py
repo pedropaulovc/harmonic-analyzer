@@ -23,7 +23,7 @@ from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
 from dt_pinion_bracket_geometry import THICKNESS as STRAP_T
-from dt_pinion_bracket_geometry import THICKNESS_BAND as STRAP_T_BAND
+from dt_pinion_bracket_geometry import THICKNESS_LIMITS as STRAP_T_LIMITS
 from dt_pinion_handle_geometry import ROD_DIA, ROD_DIA_BAND
 from pinion_rig_layout import (
     DRUM_END_SHIM,
@@ -115,7 +115,7 @@ HEAD_FRONT_Z = HEAD_REAR_Z - HEAD_LEN
 # drum's axial float.  The drum station prints the .XX band; no band is
 # tightened to make it fit (U27, Main 2026-09-24: a longer land rather than a
 # tighter station).  #290: the land keeps its 20 mm, snapped to .79.
-# MHA-DT-14's thickness band (STRAP_T_BAND) and the MHA-DT-01 drum length come from
+# MHA-DT-14's printed thickness limits (STRAP_T_LIMITS) and the MHA-DT-01 drum length come from
 # their geometry owners, dt_pinion_bracket_geometry and pinion_rig_layout, not
 # their drawing contracts: the drive-train recipe reads this spec.
 # User ruling 2026-09-24: the drum is bonded 0.3 further aft than the as-built
@@ -195,7 +195,7 @@ def worst_land_margins(
         (front - x, front + x),
         (back - x, back + x),
         (journal_len - x, journal_len + x),
-        (STRAP_T - STRAP_T_BAND, STRAP_T + STRAP_T_BAND),
+        STRAP_T_LIMITS,
         (DRUM_STATION - station_band, DRUM_STATION + station_band),
         (DRUM_LEN + DRUM_LEN_BAND[1], DRUM_LEN + DRUM_LEN_BAND[0]),
         drum_total_air(),

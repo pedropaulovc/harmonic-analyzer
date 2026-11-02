@@ -8,3 +8,9 @@ dt-pinion-bracket:
   tolerance_class: machined_block
   process: "machined (steel)"
   drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "left side view, the Ø.1570 follower seat located .177 from face A in the .35 thickness: WALL .077 MIN"
+      finding: "the follower seat's far-face web is .077 in at the printed worst case, under the .080 in target (rule 17), over the .060 in floor"
+      reason: "Delegated ruling 2026-11-02 (Main), following owner precedent: thin walls .060–.080 approved (DT-35 .060, DT-09 .065, #989); owner review #2144"

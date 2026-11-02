@@ -567,7 +567,7 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     # The stack's inputs are the parts' and the assembly's own values.
     assert geometry.DRUM_LEN == drum.FACE_WIDTH == assembly.APINION_DRUM_LEN
     assert geometry.STRAP_T == strap.THICKNESS == assembly.STRAP_T
-    assert geometry.STRAP_T_BAND == dt_pinion_bracket_spec.THICKNESS_BAND
+    assert geometry.STRAP_T_LIMITS == dt_pinion_bracket_spec.THICKNESS_LIMITS
     assert spec.STRAP_AXIAL_LOCATION == "pinned-shim-set"
     assert spec.DRUM_STATION == pytest.approx(
         spec.DRUM_STATION_AS_BUILT + spec.DRUM_AFT_SHIFT
@@ -598,7 +598,7 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     assert spec.LINEAR_XX_BAND == printed_band_mm(2, unit="in")
     assert spec.HEAD_LEN_BAND == printed_band_mm(2, unit="in")
     assert geometry.DRUM_LEN == rig.DRUM_LEN
-    assert geometry.STRAP_T_BAND == strap.THICKNESS_BAND
+    assert geometry.STRAP_T_LIMITS == strap.THICKNESS_LIMITS
     spec_source = inspect.getsource(spec)
     for literal in (
         "LINEAR_XX_BAND = 0.254",
