@@ -58,7 +58,9 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 # reference for each stock the MATERIAL cell allows (machinist review: the
 # two differ). Drill rod is ground to ±.0002 (ch_rod_pivot_pin_spec's figure);
 # 1018 cold-drawn rounds to 1 1/2 in are +.000/-.002 (ASTM A108).
-PIN_DIA_CALLOUT = "STOCK, AS SUPPLIED; SUPPLIER TOL. (REF):\nDRILL ROD ±.0002, 1018 CF +.000/-.002"
+PIN_DIA_CALLOUT = (
+    "STOCK, AS SUPPLIED; SUPPLIER TOL. (REF):\nDRILL ROD ±.0002, 1018 CF +.000/-.002"
+)
 
 # No manufacturing note (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): the title-block MATERIAL "AISI 1018 CF or
 # drill rod, 1/8 in" is the one statement of the stock, and the faced ends are
