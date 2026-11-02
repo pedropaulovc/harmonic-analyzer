@@ -101,7 +101,7 @@ def test_manufactured_rework_retains_actual_stock_and_property_provenance() -> N
     assert set(draw.REQUIRED_PROPERTIES) <= set(part.SAVED_DRAWING_PROPERTIES)
     assert {"Material Specification", "Finish"} <= set(part.SAVED_DRAWING_PROPERTIES)
     assert part.MEMBER_DESCRIPTIONS[CONFIGURATION] == spec.BOM_DESCRIPTION
-    assert spec.BOM_DESCRIPTION == "1/2-13 STUD, CUT 57.2"
+    assert spec.BOM_DESCRIPTION == "1/2-13 STUD, CUT 57.2 MM"
     for configuration in ("TNut", "FlangeNut"):
         other = part.MEMBER_PROPERTIES[configuration]
         assert other["Finish"] == ROW["finish"] == "black oxide, as supplied"
