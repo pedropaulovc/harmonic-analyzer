@@ -17,7 +17,7 @@ the jig sheets (MHA-CH-06-TL-20 to TL-26 and the TL-00 jig assembly) from:
 
 * the strap's edge radii and the hub-to-top-edge aim, read from
   ``ch_rocker_arm_spec`` (R800/R816; ``TOP_EDGE_ABOVE_PIVOT`` (the strap's
-  ``PIVOT_MID_Y``) plus the mid-point of ``TOP_EDGE_BAND`` = 8.25);
+  ``PIVOT_MID_Y``) plus the mid-point of ``TOP_EDGE_BAND`` = 8.254);
 * the two cutters, both on hand in inventory ``tools.endmills-lms-6784``:
   the 3/8 in four-flute end mill for the part and the 9/16 in one for the
   riser (``test_ch_rocker_arm_tl_oblique_trammel_spec`` checks both against

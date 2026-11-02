@@ -250,9 +250,9 @@ def test_in_situ_hub_fit_up_closes_inside_the_strap_top_edge_band() -> None:
     assert trammel.HUB[0] == trammel.ARC_CENTRE[0] == 0.0
     assert trammel.HUB[1] - trammel.APEX_Y == pytest.approx(trammel.HUB_OFFSET)
     half = (max(rocker.TOP_EDGE_BAND) - min(rocker.TOP_EDGE_BAND)) / 2.0
-    assert half == pytest.approx(0.25)
-    # The setting: the printed .5123 at a .0001 DRO, held to ±.0005.
-    assert spec.inch_text(spec.HUB_OFFSET_PRINTED, spec.HUB_OFFSET_PLACES) == ".5123"
+    assert half == pytest.approx(0.010 * trammel.INCH)  # .020 one-sided profile
+    # The setting: the printed .5125 at a .0001 DRO, held to ±.0005.
+    assert spec.inch_text(spec.HUB_OFFSET_PRINTED, spec.HUB_OFFSET_PLACES) == ".5125"
     assert spec.HUB_OFFSET_BAND == pytest.approx(0.0005 * trammel.INCH)
     # The shift: the widest pin clearance, x 1.77 on R.
     shift = trammel.RADIUS_PER_SPACING * spec.PIN_CLEARANCE_MAX
@@ -260,7 +260,7 @@ def test_in_situ_hub_fit_up_closes_inside_the_strap_top_edge_band() -> None:
         spec.HUB_OFFSET_BAND + abs(spec.HUB_OFFSET_PRINTED - trammel.HUB_OFFSET) + shift
     )
     assert spec.HUB_RADIAL_STACK == pytest.approx(worst)
-    assert f"{spec.HUB_RADIAL_STACK:.3f}" == "0.125"
+    assert f"{spec.HUB_RADIAL_STACK:.3f}" == "0.126"
     assert spec.HUB_RADIAL_STACK < half
     # The printed spot it replaces failed: the .XXX station band, the shift
     # and the D1 band x 1.77 came to 0.275 (owner packet, item 5).
