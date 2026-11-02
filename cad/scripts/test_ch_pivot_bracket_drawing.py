@@ -391,44 +391,72 @@ def _hanging_block(text: str, column_xy: tuple[float, float]) -> tuple[float, ..
     return (x, y + box.ymin, x + box.width, y + box.ymax)
 
 
-def test_banded_plan_stations_each_print_at_their_own_arrows() -> None:
+def test_plan_stations_each_print_at_their_own_arrows_near_the_plan() -> None:
     """5bca52e machinist review FIX: the 4.00 block stood over the 8.00
-    column's top arrow and the 8.00 text sat inside the 4.00 span. The tap
-    station's text hangs above its span, the ear thickness's below its span,
-    each off its own column, and no other column stands under either."""
+    column's top arrow. A later FIX: the 8.00 and 17.79 columns stood 77 and
+    160 mm east of the plan. The tap station's text hangs above its span off
+    its own column, the foot length's column stands just east of that block
+    and of the DRILL THRU block, and the ear thickness has left the plan."""
     from _drawing_annotation_extent import CLEAR_GAP_M
 
     plan_top = drawing._top_y(spec.FOOT_Z0)
-    ear_face = drawing._top_y(spec.FOOT_Z0 + spec.EAR_T)
     plan_bottom = drawing._top_y(FOOT_Z1)
     tap_column = drawing.TOP_KEEP["SetScrewLocation"]
-    ear_column = drawing.TOP_KEEP["EarThick"]
     foot_column = drawing.TOP_KEEP["FootLen"]
     tap = _hanging_block(
         f".160 ±.004\n{drawing.DIMENSION_CALLOUTS['SetScrewLocation']}", tap_column
     )
-    ear = _hanging_block(
-        f".320 ±.004\n{drawing.DIMENSION_CALLOUTS['EarThick']}", ear_column
-    )
+    assert "EarThick" not in drawing.TOP_KEEP
     # Nested shortest first, each column clear of the plan and the one inside.
-    assert drawing._EAST_X + 0.008 <= tap_column[0] < ear_column[0] < foot_column[0]
+    assert drawing._EAST_X + 0.008 <= tap_column[0] < foot_column[0]
     # The tap station's block: wholly above the plan's top edge.
     assert tap[1] > plan_top + CLEAR_GAP_M
-    # The ear thickness's column, and the outside arrow it raises over the
-    # top edge, stand clear east of the tap station's block.
-    assert ear_column[0] > tap[2] + 0.010
-    # Its block: under the ear's outboard-face line (its own lower witness),
-    # over the foot length's lower extension line, east of the hold-down
-    # hole's DRILL THRU block (~26 mm centred on its anchor), west of the
-    # foot length's column.
-    assert ear[3] < ear_face - CLEAR_GAP_M
-    assert ear[1] > plan_bottom + CLEAR_GAP_M
-    assert ear[0] > drawing.TOP_KEEP["HoleDia"][0] + 0.013 + 0.020
-    assert ear[2] + 0.005 < foot_column[0]
-    # The foot length's text sits in its span's upper half, above the ear
-    # thickness's block, and left of the isometric.
-    assert ear[3] + CLEAR_GAP_M < foot_column[1] - 0.003 < plan_top
-    assert foot_column[0] + 0.008 < drawing.ISO_CENTER[0] - 0.025
+    # No column's arrow stands under the tap block, and the foot length's
+    # column clears the hold-down hole's DRILL THRU block (~26 mm centred).
+    assert foot_column[0] > tap[2] + 0.008
+    assert foot_column[0] > drawing.TOP_KEEP["HoleDia"][0] + 0.013 + 0.005
+    # Near the plan: within 80 mm of its east edge.
+    assert foot_column[0] - drawing._EAST_X <= 0.080
+    # The foot length's text sits in its span's upper half.
+    assert drawing.TOP_CENTER[1] < foot_column[1] < plan_top
+    assert plan_bottom < foot_column[1]
+
+
+def test_ear_thickness_prints_over_the_ear_on_the_right_view() -> None:
+    """Machinist review FIX: the ear thickness reads true between its two
+    thrust faces on the right view; its block stands centred over the ear's
+    top, under the plan's bottom edge (the foot length's lower extension
+    line), left of the isometric and above the R MAX block."""
+    from _drawing_annotation_extent import CLEAR_GAP_M
+    from _layout_geometry import estimate_text_box
+
+    ear_mid = drawing._right_x(spec.FOOT_Z0 + spec.EAR_T / 2.0)
+    apex = drawing._right_y(spec.EAR_TOP_Y)
+    anchor = (ear_mid, apex + drawing.EAR_THICK_TEXT_RISE)
+    box = estimate_text_box(
+        f".320 ±.004\n{drawing.DIMENSION_CALLOUTS['EarThick']}",
+        anchor=anchor,
+        height=0.0035,
+        reference=2,  # swCENTER
+        advance_ratio=109.7 / (42 * 3.5),
+        line_spacing=16.8 * 25.4 / 72.0 / 3.5,
+    )
+    assert box.ymin > apex + CLEAR_GAP_M
+    assert box.ymax < drawing._top_y(FOOT_Z1) - CLEAR_GAP_M
+    assert box.xmax < drawing.ISO_CENTER[0] - 0.025 - CLEAR_GAP_M
+    # The foot length's extension lines end at its column, west of the block.
+    assert drawing.TOP_KEEP["FootLen"][0] + 0.005 < box.xmin
+    corner = estimate_text_box(
+        f"R.02 MAX\n{drawing.DIMENSION_CALLOUTS['CornerRadius']}",
+        anchor=_planned_corner_text(),
+        height=0.0035,
+        reference=5,  # swUPPER_CENTER
+        advance_ratio=109.7 / (42 * 3.5),
+        line_spacing=16.8 * 25.4 / 72.0 / 3.5,
+    )
+    assert corner.ymax + CLEAR_GAP_M < box.ymin
+    assert "def _right_keep" in _drawing_source()
+    assert '"EarThick": (ear_text[0], ear_text[1])' in _drawing_source()
 
 
 def test_tap_note_solidworks_adds_is_removed() -> None:
@@ -508,7 +536,7 @@ def test_corner_radius_names_the_screw_head_it_clears() -> None:
 
 def test_right_view_shows_the_corner_radius_clear_of_its_neighbours() -> None:
     template = DRAWING_TEMPLATES[DRAWINGS_BY_NAME["ch_pivot_bracket"].layout]
-    assert drawing.RIGHT_KEEP_NAMES == ("CornerRadius",)
+    assert drawing.RIGHT_KEEP_NAMES == ("CornerRadius", "EarThick")
     left = drawing._right_x(FOOT_Z1)
     right = drawing._right_x(spec.FOOT_Z0)
     bottom = drawing._right_y(0.0)

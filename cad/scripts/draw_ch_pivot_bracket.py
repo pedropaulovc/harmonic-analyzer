@@ -124,11 +124,14 @@ ISO_CENTER = (0.355, 0.160)
 _WEST_X = FRONT_CENTER[0] - FOOT_W / 2.0 * _S
 _EAST_X = FRONT_CENTER[0] + FOOT_W / 2.0 * _S
 # The right view (*Right: +Z runs LEFT, +Y up) shows the foot-to-ear inside
-# corner in profile, the one view where its radius is an arc. Projected off
-# the elevation at the sheet scale, it stands level with it (the same seat
-# and apex lines), right of the bore callout, x 0.244..0.280: over the title
-# block (top 0.066), under the foot length's extension line (0.180) and left
-# of the isometric. Being aligned at the sheet scale it needs no caption.
+# corner in profile, the one view where its radius is an arc, and the ear's
+# two thrust faces as true vertical lines, so the ear thickness prints there,
+# over the ear's top (machinist review FIX: on the plan its column stood 77 mm
+# east of the view). Projected off the elevation at the sheet scale, it stands
+# level with it (the same seat and apex lines), right of the bore callout,
+# x 0.244..0.280: over the title block (top 0.066), under the foot length's
+# extension line (0.180) and left of the isometric. Being aligned at the
+# sheet scale it needs no caption.
 RIGHT_CENTER = (0.262, FRONT_CENTER[1])
 
 
@@ -204,33 +207,32 @@ FRONT_CENTER_MARKS = 1  # the cross-bore
 PLAN_CENTER_MARKS = 2  # the hold-down hole and the apex set-screw tap
 # Every plan length along the foot runs from the ear's INBOARD face (the plan's
 # top edge): the face fit-up sets and the fixtures hold Z0 on. Only the hole
-# station stands on the left; the tap station, the ear thickness and the foot
-# length step out on the right, nested shortest first, each in its own column
-# (the foot length's extension lines leave the EAST corners, so on the left
-# they would run the whole top edge the tap's leader must cross). Each banded
-# station's text hangs off its own dimension line, at its own arrows, the two
-# staggered (5bca52e machinist review FIX: the 4.00 block stood over the 8.00
-# column's top arrow and the 8.00 text sat inside the 4.00 span, beside its
-# lower arrow, so neither value read as its own pair's). The tap station's
-# text stands ABOVE its short span: the shelf starts on its column 10 mm off
-# the plan and the ~55 mm block runs east from it, east of the tap callout.
-# The ear thickness's column stands clear east of that block, and its text
-# hangs BELOW its span, under the ear's outboard-face line and over the foot
-# length's lower extension line, the ~76 mm block running east from its own
-# column, east of the hold-down hole's callout. The foot length's column
-# stands past that block, its text in the upper half of its span, level with
-# neither banded block. Both laterals start on the west side face, below the
-# plan, where the foot width nests outside them. Above the plan's left half
-# only the apex tap callout stands.
+# station stands on the left; the tap station and the foot length step out on
+# the right, nested shortest first, each in its own column (the foot length's
+# extension lines leave the EAST corners, so on the left they would run the
+# whole top edge the tap's leader must cross). The tap station's text stands
+# ABOVE its short span: the shelf starts on its column 10 mm off the plan and
+# the ~55 mm block runs east from it, east of the tap callout. The foot
+# length's column stands just east of that block, so no other column's arrow
+# stands under it (5bca52e machinist review FIX: the 4.00 block over the 8.00
+# column's top arrow read as that pair's), and east of the hold-down hole's
+# DRILL THRU block; its text sits in the upper half of its span. The ear
+# thickness prints on the right view (RIGHT_CENTER). Both laterals start on
+# the west side face, below the plan, where the foot width nests outside them.
+# Above the plan's left half only the apex tap callout stands.
 TOP_KEEP = {
     "HoleStation": (_WEST_X - 0.010, _top_y(FOOT_Z0 + HOLE_STATION / 2.0)),
     "SetScrewLocation": (_EAST_X + 0.010, _top_y(FOOT_Z0) + 0.017),
-    "EarThick": (_EAST_X + 0.077, _top_y(FOOT_Z0 + EAR_T) - 0.010),
-    "FootLen": (_EAST_X + 0.160, TOP_CENTER[1] + 0.008),
+    "FootLen": (_EAST_X + 0.075, TOP_CENTER[1] + 0.008),
     "HoleDia": (FRONT_CENTER[0] + 0.045, _top_y(HOLE_Z) - 0.001),
     "HoleLateral": (FRONT_CENTER[0] - FOOT_W / 4.0 * _S, _top_y(FOOT_Z1) - 0.008),
     "FootW": (FRONT_CENTER[0], _top_y(FOOT_Z1) - 0.019),
 }
+# The ear thickness's text stands this far over the ear's top on the right
+# view, centred on its span: the dimension line runs between the two thrust
+# faces' extension lines just over the apex, the two-line block (value, then
+# the washer it holds) under the plan's bottom edge.
+EAR_THICK_TEXT_RISE = 0.012
 # REAM marks a fit bore, so the callout names its mate (drawing-guidelines.md
 # rule 4); the drilled hold-down hole says drill and through. The two lengths
 # that carry their own band say what the band holds, naming the mate: the
@@ -248,8 +250,8 @@ DIMENSION_CALLOUTS = {
     "SetScrewLocation": f"SET SCREW ON FLAT OF\nPIVOT SHAFT {PIVOT_SHAFT_NUMBER}",
     "CornerRadius": f"CLEARS HEAD OF\nHOLD-DOWN SCREW\n{HOLD_DOWN_SCREW_NUMBER}",
 }
-# The right view prints the one dimension it exists for.
-RIGHT_KEEP_NAMES = ("CornerRadius",)
+# The right view prints the corner radius and the ear thickness.
+RIGHT_KEEP_NAMES = ("CornerRadius", "EarThick")
 # The apex tap runs down into the bore and stops there. Both native extents
 # ("<hw-thru>", the drill's and the thread's) say so in words; the thread
 # class is the title block's. The arch's lift gives the tap 1.5D of full
@@ -534,19 +536,28 @@ def _hide_diameter_leader_lines(
 
 @_telemetry.traced("drawing.pivot_bracket.right_keep")
 def _right_keep(adapter: Any, view: Any) -> dict[str, tuple[float, float]]:
-    """The R MAX text's sheet point, off the corner the view really shows.
+    """The R MAX and ear-thickness texts' sheet points, off the corner and
+    the ear top the view really shows.
 
     Projects the inside corner and one millimetre along model +Z and +Y, so
-    the text stands CORNER_TEXT_OFFSET up into the open corner whichever way
-    the view lays the foot; a frame off the planned one is logged.
+    the R MAX text stands CORNER_TEXT_OFFSET up into the open corner whichever
+    way the view lays the foot, and the ear's top at its mid-thickness, so the
+    ear thickness stands EAR_THICK_TEXT_RISE over it along the same +Y; a
+    frame off the planned one is logged.
     """
     x, y, z = (value / 1000.0 for value in CORNER_MODEL_MM)
-    corner, along_z, along_y = model_points_in_view(
+    ear_mid_z = (FOOT_Z0 + EAR_T / 2.0) / 1000.0
+    corner, along_z, along_y, ear_top = model_points_in_view(
         adapter,
         view,
-        [(x, y, z), (x, y, z + 0.001), (x, y + 0.001, z)],
+        [
+            (x, y, z),
+            (x, y, z + 0.001),
+            (x, y + 0.001, z),
+            (x, EAR_TOP_Y / 1000.0, ear_mid_z),
+        ],
         label="right-view corner frame",
-        names=["corner", "corner +Z", "corner +Y"],
+        names=["corner", "corner +Z", "corner +Y", "ear top"],
     )
     units = []
     for point in (along_z, along_y):
@@ -568,8 +579,17 @@ def _right_keep(adapter: Any, view: Any) -> dict[str, tuple[float, float]]:
         + CORNER_TEXT_OFFSET[1] * units[1][axis]
         for axis in range(2)
     )
-    _telemetry.info(f"right view corner {corner!r}, R MAX text {text!r}")
-    return {"CornerRadius": (text[0], text[1])}
+    ear_text = tuple(
+        ear_top[axis] + EAR_THICK_TEXT_RISE * units[1][axis] for axis in range(2)
+    )
+    _telemetry.info(
+        f"right view corner {corner!r}, R MAX text {text!r}; "
+        f"ear top {ear_top!r}, EarThick text {ear_text!r}"
+    )
+    return {
+        "CornerRadius": (text[0], text[1]),
+        "EarThick": (ear_text[0], ear_text[1]),
+    }
 
 
 @_telemetry.traced("drawing.pivot_bracket.corner_radius")
@@ -659,7 +679,7 @@ async def build(adapter: Any) -> dict[str, str]:
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=_VIEW_SCALE)
     # No view needs hidden lines: the elevation shows the bore in true circle,
     # both holes are fully defined by their callouts in the plan, and the
-    # right view is there for the corner's outline alone.
+    # right view is there for the corner's outline and the ear's thrust faces.
     for view in (front, top, iso, right):
         set_hidden_lines_removed(adapter, view)
 
