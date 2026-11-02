@@ -13,11 +13,12 @@ import draw_dt_cylinder_end_disc as drawing
 
 def test_loose_thickness_is_compensated_without_moving_the_gear_datum() -> None:
     import cylinder_bank_layout as bank
+    from _inch_wall_limits import WALL_TARGET_MM
     from _printed_tolerance import printed_band_mm
 
-    band = printed_band_mm(spec.THICKNESS_PLACES)
+    band = printed_band_mm(spec.THICKNESS_PLACES, unit=spec.UNIT)
     assert spec.WASHER_THICK_TOLERANCE_MM == band
-    assert spec.WASHER_THICK - band >= 2.0 - 1e-9
+    assert spec.WASHER_THICK - band >= WALL_TARGET_MM - 1e-9
     assert bank.DATUM_CHAIN_STACK["south disc, mic-compensated"] == bank.MIC_RESIDUAL
     assert bank.MIC_RESIDUAL < band
     assert bank.FRONT_STRAP_INNER_Z + spec.WASHER_THICK == pytest.approx(
@@ -29,7 +30,7 @@ def test_drilled_bore_limits_clear_the_arbor() -> None:
     import dt_cylinder_gear_shaft_spec as arbor
     from _printed_tolerance import drilled_oversize_mm
 
-    assert spec.WASHER_BORE_BAND == (drilled_oversize_mm(), 0.0)
+    assert spec.WASHER_BORE_BAND == (drilled_oversize_mm(unit=spec.UNIT), 0.0)
     assert spec.WASHER_BORE > arbor.SHAFT_DIA + arbor.SHAFT_DIA_BAND[0]
 
 

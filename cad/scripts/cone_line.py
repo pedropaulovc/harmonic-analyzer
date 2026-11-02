@@ -53,7 +53,7 @@ X_DRUM = DRUM_X
 Z_DRUM0 = _config.machine("channels", "station_z0_mm")
 
 
-DRUM_FACE = 3.0  # cylinder gear face (gear z = 0..3, cam 3..6.5)
+DRUM_FACE = 2.9972  # MHA-DT-12 face width, .118 (dt_cylinder_gear_spec.FACE_WIDTH)
 
 # Mesh anchor: X_PITCH is every cone gear's pitch-section x at the contact
 # azimuth; the edge slack is the T120 set point above the standard centre

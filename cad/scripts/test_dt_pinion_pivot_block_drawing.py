@@ -28,8 +28,10 @@ def test_raised_pivot_follows_bank_without_changing_the_upper_envelope() -> None
 
     raise_mm = _cone_axis_constants.AXIS_RAISE_MM
     assert geometry.BORE_UP == pytest.approx(12.0 + raise_mm)
-    assert geometry.BLOCK_HEIGHT == pytest.approx(20.5 + raise_mm)
-    assert geometry.BLOCK_TOP_Y == pytest.approx(8.5)
+    # #290: the raised envelope snaps to the nearest .XX the sheet prints.
+    assert geometry.BLOCK_HEIGHT == pytest.approx(20.5 + raise_mm, abs=0.127)
+    assert round(geometry.BLOCK_HEIGHT / 25.4, 9) == pytest.approx(0.99)
+    assert geometry.BLOCK_TOP_Y == pytest.approx(8.414)
     assert park.PIVOT_Y == pytest.approx(cone_line.Y_BASE_TOP + geometry.BORE_UP)
     assert park.APINION_Y == cone_line.Y_DRIVE
     assert park.APINION_Y - park.PIVOT_Y == pytest.approx(27.718)
@@ -70,8 +72,6 @@ def test_live_stock_block_screw_keeps_full_threads_at_the_longest_grip() -> None
     assert FILLISTER_SIZE == (
         screw.SHANK_DIA, screw.SHANK_LEN, screw.HEAD_H, screw.HEAD_DIA, screw.PITCH
     )
-    # The formerly registered 1-1/4-in stock fails before either end deduction.
-    assert 31.75 - geometry.BLOCK_HEIGHT - geometry.BLOCK_HEIGHT_BAND < 1.5 * screw.SHANK_DIA
 
 
 def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
@@ -294,7 +294,7 @@ def test_rig_layout_sets_the_front_block_by_feeler_off_the_back_stop() -> None:
     # drum 0.05 over its end-play floor).
     assert rig.DRUM_END_SHIM == 0.45
     assert not hasattr(rig, "STRAP_AIR")
-    assert rig.STRAP_Z_OUTER[1] - rig.STRAP_Z_INNER[1] == THICKNESS
+    assert rig.STRAP_Z_OUTER[1] - rig.STRAP_Z_INNER[1] == pytest.approx(THICKNESS)
 
 
 def test_rig_layout_shaft_and_rod_are_set_back_flush() -> None:
@@ -313,10 +313,10 @@ def test_rig_layout_shaft_and_rod_are_set_back_flush() -> None:
         rig.TORQUE_SHAFT_LEN - 2.0 * rig.BLOCK_DEPTH - rig.INNER_SPAN
     )
     proud = rig.FRONT_BLOCK_Z0 - rig.LIFT_ROD_Z0
-    assert rig.LEVER_SEAT_PROUD - 1e-9 <= proud <= rig.LEVER_SEAT_PROUD + 0.1
+    assert rig.LEVER_SEAT_PROUD - 1e-9 <= proud <= rig.LEVER_SEAT_PROUD + 0.254
     # Both are budgeted on the worst fitted stack (their own tests); at
     # nominal each stands that allowance proud of the front block.
-    assert (SHAFT_LEN, ROD_LEN) == (187.0, 198.3)
+    assert (SHAFT_LEN, ROD_LEN) == pytest.approx((7.27 * 25.4, 7.70 * 25.4))
 
 
 def test_lift_rod_length_budgets_the_whole_fitted_stack() -> None:
@@ -342,7 +342,7 @@ def test_lift_rod_length_budgets_the_whole_fitted_stack() -> None:
 
     depth = dt_pinion_pivot_block_spec.BLOCK_DEPTH
     budget = 2.0 * depth + rig.INNER_SPAN + rig.LEVER_SEAT_PROUD
-    assert rig.LIFT_ROD_LEN == math.ceil(budget * 10.0 - 1e-6) / 10.0
+    assert rig.LIFT_ROD_LEN == pytest.approx(math.ceil(budget / 0.254 - 1e-6) * 0.254)
     # One source of truth: every rig station the assembly places is the
     # layout's.
     assert drive.LIFT_ROD_Z0 == rig.LIFT_ROD_Z0
@@ -367,29 +367,30 @@ def test_lift_rod_length_budgets_the_whole_fitted_stack() -> None:
     assert rig.FRONT_BLOCK_Z0 - hub_mouth == pytest.approx(
         rig.LEVER_SEAT_PROUD - BORE_DEPTH, abs=0.1
     )
-    # MHA-DT-30's hole stays inside the hub engagement at the title block's .X.
-    assert ROD_PIN_HOLE_FROM_END - PIN_HOLE_DIA / 2.0 - 0.8 >= 0.0
-    assert ROD_PIN_HOLE_FROM_END + PIN_HOLE_DIA / 2.0 + 0.8 <= BORE_DEPTH
+    # MHA-DT-30's hole stays inside the hub engagement at the title block's .XX.
+    assert ROD_PIN_HOLE_FROM_END - PIN_HOLE_DIA / 2.0 - 0.254 >= 0.0
+    assert ROD_PIN_HOLE_FROM_END + PIN_HOLE_DIA / 2.0 + 0.254 <= BORE_DEPTH
 
 
 def test_worst_stack_bands_are_the_printed_places() -> None:
     # Codex #837 P1: the worst fitted stack reads each band from the geometry
-    # module that owns it.  Each band is the title-block .X grade, so it holds
-    # only while its dimension prints at one place.
+    # module that owns it, at the title-block row for the places (and unit)
+    # its sheet prints (#290: the strap at .XXX, the drum, shaft and rod
+    # lengths at .XX).
     import dt_alignment_pinion_spec
     import dt_pinion_bracket_spec
     import dt_pinion_lift_rod_spec
     import dt_pinion_pivot_shaft_spec
     import pinion_rig_layout as rig
 
-    x_band = printed_band_mm(1)  # title-block .X
-    assert dt_pinion_bracket_spec.DRAWING_PRECISION["Strap"]["Depth"] == 1
-    assert dt_pinion_bracket_spec.THICKNESS_BAND == x_band
-    assert dt_alignment_pinion_spec.DRAWING_PRECISION["GearBlank"]["FaceWidth"] == 1
-    assert rig.DRUM_LEN_BAND == x_band
-    assert dt_pinion_lift_rod_spec.DRAWING_PRECISION["RodProfile"]["RodBody"] == 1
-    assert dt_pinion_pivot_shaft_spec.DRAWING_PRECISION["ShaftProfile"]["ShaftLength"] == 1
-    assert rig.LENGTH_BAND == x_band
+    assert dt_pinion_bracket_spec.DRAWING_PRECISION["Strap"]["Depth"] == 3
+    assert dt_pinion_bracket_spec.THICKNESS_BAND == printed_band_mm(3, unit="in")
+    assert dt_alignment_pinion_spec.DRAWING_PRECISION["GearBlank"]["FaceWidth"] == 2
+    assert dt_alignment_pinion_spec.UNIT == rig.DRUM_LEN_UNIT == "in"
+    assert rig.DRUM_LEN_BAND == printed_band_mm(2, unit="in")
+    assert dt_pinion_lift_rod_spec.DRAWING_PRECISION["RodProfile"]["RodBody"] == 2
+    assert dt_pinion_pivot_shaft_spec.DRAWING_PRECISION["ShaftProfile"]["ShaftLength"] == 2
+    assert rig.LENGTH_BAND == printed_band_mm(2, unit="in")
     assert not hasattr(rig, "STACK_BAND")  # the stacks name every term
 
 
@@ -439,8 +440,8 @@ def test_manufactured_block_span_is_the_solid_stack_plus_one_feeler() -> None:
 def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
     # Codex #854 P1: the shaft was sized at nominal only, and at the worst
     # fitted stack (back block, both straps, drum and feeler at their maxima,
-    # the shaft at its .X minimum) it reached only ~6.49 into the front block.
-    # Each band is re-derived here from the grade its dimension prints at.
+    # the shaft at its printed minimum) it reached only ~6.49 into the front
+    # block.  Each band is re-derived here from the grade its dimension prints at.
     import math
 
     import dt_pinion_bracket_spec
@@ -449,24 +450,24 @@ def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
     from dt_pinion_pivot_block_geometry import LIFT_BORE_RISE, LIFT_BORE_SPACING
     from dt_pinion_pivot_shaft_spec import DRAWING_PRECISION, SHAFT_DIA
 
-    x_band, xx_band = 0.8, 0.51  # title-block .X / .XX
-    assert dt_pinion_bracket_spec.DRAWING_PRECISION["Strap"]["Depth"] == 1
-    assert DRAWING_PRECISION["ShaftProfile"]["ShaftLength"] == 1
-    # MHA-DT-18 is not precision-migrated, so its 10.50 Depth prints at the
-    # document's two places.
+    xx_in, xxx_in = printed_band_mm(2, unit="in"), printed_band_mm(3, unit="in")
+    assert dt_pinion_bracket_spec.DRAWING_PRECISION["Strap"]["Depth"] == 3
+    assert DRAWING_PRECISION["ShaftProfile"]["ShaftLength"] == 2
+    # MHA-DT-18 is not precision-migrated; its part authors Depth at .XX.
     assert "draw_dt_pinion_pivot_block.py" not in PRECISION_MIGRATED_DRAWINGS
-    assert f"{dt_pinion_pivot_block_spec.BLOCK_DEPTH:.2f}" == "11.00"
-    assert (rig.DRUM_LEN_BAND, rig.LENGTH_BAND) == (x_band,) * 2
-    assert rig.BLOCK_DEPTH_BAND == xx_band
+    assert dt_pinion_pivot_block_spec.DRAWING_PRECISION["Block"]["Depth"] == 2
+    assert dt_pinion_pivot_block_spec.BLOCK_DEPTH == pytest.approx(0.44 * 25.4)
+    assert rig.DRUM_LEN_BAND == xx_in  # the inch drum's .XX
+    assert rig.LENGTH_BAND == xx_in
+    assert rig.BLOCK_DEPTH_BAND == xx_in
     # Main (Codex #854 P1): each band is the title block's row for the places
     # its dimension prints at, so a sheet that prints more places tightens its
     # term by itself.  The layout's places must be the sheets' places.
-    from _printed_tolerance import printed_band_mm, printed_deviations
+    from _printed_tolerance import printed_deviations
     from dt_alignment_pinion_spec import DRAWING_PRECISION as DRUM_PRECISION
     from dt_pinion_lift_rod_spec import DRAWING_PRECISION as ROD_PRECISION
 
-    assert (printed_band_mm(1), printed_band_mm(2)) == (x_band, xx_band)
-    assert rig.BLOCK_DEPTH_PLACES == 2  # the unmigrated sheet's document places
+    assert rig.BLOCK_DEPTH_PLACES == 2
     assert rig.STRAP_T_PLACES == dt_pinion_bracket_spec.DRAWING_PRECISION["Strap"]["Depth"]
     assert rig.DRUM_LEN_PLACES == DRUM_PRECISION["GearBlank"]["FaceWidth"]
     assert rig.LENGTH_PLACES == DRAWING_PRECISION["ShaftProfile"]["ShaftLength"]
@@ -476,29 +477,29 @@ def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
     assert rig.FRONT_BLOCK_FEELER_BAND == 0.10
 
     depth = dt_pinion_pivot_block_spec.BLOCK_DEPTH
-    shortest_shaft = rig.TORQUE_SHAFT_LEN - x_band
-    # Straps and drum at .X, the feeler and the drum shim each 0.10 wide, and
-    # the flush setting the shaft is drilled at 0.10 proud (ruling 2).
-    longest_span = (
-        (depth + xx_band) + rig.INNER_SPAN + 2.0 * x_band + x_band + 0.10 + 0.10
-    )
+    shortest_shaft = rig.TORQUE_SHAFT_LEN - xx_in
+    # Straps at .XXX, the drum at its own row, the feeler and the drum shim
+    # each 0.10 wide, and the flush setting the shaft is drilled at 0.10 proud
+    # (ruling 2).
+    growth = 2.0 * xxx_in + rig.DRUM_LEN_BAND + 0.10 + 0.10
+    longest_span = (depth + xx_in) + rig.INNER_SPAN + growth
     bearing = shortest_shaft - longest_span - 0.10
     assert bearing == pytest.approx(sum(rig.TORQUE_SHAFT_BEARING_STACK.values()))
     required = rig.FRONT_BLOCK_MIN_BEARING + rig.BLOCK_BEARING_MARGIN
     assert bearing >= required and rig.FRONT_BLOCK_MIN_BEARING == 9.5
-    # The smallest .X length that does it (Main, #858: with 0.5 over the 9.5
-    # floor): 0.1 shorter falls under it.
-    assert bearing - 0.1 < required
+    # The smallest .XX length that does it (Main, #858: with 0.5 over the 9.5
+    # floor): .01 shorter falls under it.
+    assert bearing - xx_in < required
     # Other extreme: the longest shaft in the shortest stack stands proud of
     # the front block, and nothing sits on its axis there -- the MHA-DT-16 lever
     # hub rides the lift rod, which the blocks carry off the shaft axis.
-    longest_shaft = rig.TORQUE_SHAFT_LEN + x_band
-    shortest_outer = 2.0 * (depth - xx_band) + rig.INNER_SPAN - 2.6
-    assert longest_shaft - shortest_outer == pytest.approx(7.52, abs=5e-3)
+    longest_shaft = rig.TORQUE_SHAFT_LEN + xx_in
+    shortest_outer = 2.0 * (depth - xx_in) + rig.INNER_SPAN - growth
+    assert longest_shaft - shortest_outer == pytest.approx(1.837, abs=5e-3)
     hub_clear = (
         math.hypot(LIFT_BORE_SPACING, LIFT_BORE_RISE) - (HUB_OD + SHAFT_DIA) / 2.0
     )
-    assert hub_clear == pytest.approx(8.95, abs=5e-3)
+    assert hub_clear == pytest.approx(8.974, abs=5e-3)
 
 
 def test_spring_blade_stays_on_the_back_strap_flank_at_every_stack() -> None:

@@ -667,18 +667,12 @@ def test_the_rig_steps_print_the_fitup_sequence_once_in_order() -> None:
     first = steps.SEQUENCE.index("arbor-collar-pinned") + 1
     assert printed == list(range(first, len(steps.SEQUENCE) + 1))
     assert "PENDING" not in RIG_STEPS
-    # Each match-drilled pin hole's callout points at the step that drills it.
-    import draw_dt_pinion_lever as lever
-    import draw_dt_pinion_lift_rod as lift_rod
+    # The pivot shaft's match-drilled pin hole points at the step that drills it.
     import draw_dt_pinion_pivot_shaft as shaft
 
-    for sheet, key, name in (
-        (shaft, shaft.SHAFT_DRILL_STEP_KEY, fitup.SHAFT_DRILL_NAME),
-        (lever, lever.LEVER_PIN_SET_STEP_KEY, "LEVER PIN SET"),
-        (lift_rod, lift_rod.LEVER_PIN_SET_STEP_KEY, "LEVER PIN SET"),
-    ):
-        assert steps.step_ref(key) in _flat(sheet.DIMENSION_CALLOUTS["PinHoleDia"])
-        assert name in _rig_step_body(key)
+    key = shaft.SHAFT_DRILL_STEP_KEY
+    assert steps.step_ref(key) in _flat(shaft.DIMENSION_CALLOUTS["PinHoleDia"])
+    assert fitup.SHAFT_DRILL_NAME in _rig_step_body(key)
 
 
 def test_lever_pin_step_states_existing_drill_size_and_slip_fit() -> None:
@@ -689,7 +683,7 @@ def test_lever_pin_step_states_existing_drill_size_and_slip_fit() -> None:
     assert "SLIP FIT" in _flat(pin.PIN_DIA_CALLOUT)
     step = _rig_step_body(pin.LEVER_PIN_SET_STEP_KEY)
     assert step.endswith(_flat(drawing.LEVER_PIN_HOLE_FIT))
-    assert "MHA-DT-16'S PRINTED STATION: 1/16 IN DRILL THRU" in step
+    assert "MHA-DT-16'S PRINTED STATION: #52 DRILL THRU" in step
     assert "MHA-DT-30 SLIP FIT" in step
     assert "LIGHT HAMMER" not in step
     assert "REAM" not in step

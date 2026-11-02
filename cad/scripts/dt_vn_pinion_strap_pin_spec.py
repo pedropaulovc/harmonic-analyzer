@@ -16,8 +16,11 @@ from __future__ import annotations
 
 import math
 
+import _config
 from _fit_ream_slide import REAM_SLIDE
 from _fit_shaft_h import SHAFT_H
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+from _package_units import drawing_unit
 from _printed_tolerance import printed_deviations
 from _supplier_pin_data import SupplierPinReference
 from dt_pinion_bracket_geometry import (
@@ -29,6 +32,7 @@ from dt_pinion_bracket_geometry import (
     R_END,
     THICKNESS,
     THICKNESS_PLACES,
+    UNIT,
 )
 
 INCH = 25.4
@@ -48,33 +52,40 @@ HOLE_DIA = PIN_DIA
 # than match-drills.
 DRILL_THRU_CALLOUT = "1/16 DRILL THRU"
 # A functional band, not habit (U27): B18.8.2's recommended hole for a 1/16
-# pin is 0.062-0.065 in (1.575-1.651).  The title block's DRILLED HOLES row
-# (+0.10/0) would let the hole open to 1.69, past what the pin can grip, so
-# the hole carries its own +0.06/0 band on its diameter dimension.
-HOLE_BAND = (0.06, 0.0)
+# pin is .062-.065 in.  The title block's DRILLED HOLES row (+.004/0) would
+# let the hole open to .0665, past what the pin can grip, so the hole carries
+# its own +.0025/.0000 band on its diameter dimension: .0625-.0650.
+HOLE_BAND = (0.0635, 0.0)
 HOLE_MAX = HOLE_DIA + HOLE_BAND[0]
-if not (0.062 * INCH <= HOLE_DIA and HOLE_MAX <= 0.065 * INCH):
+if not (0.062 * INCH <= HOLE_DIA and HOLE_MAX <= 0.065 * INCH + 1e-9):
     raise AssertionError("pin hole band leaves B18.8.2's recommended hole")
 
 # The deviations the hole's surroundings PRINT at (_printed_tolerance): each
-# dimension's title-block row for the places MHA-DT-14 shows it at.  Places
-# come from dt_pinion_bracket_geometry, which the sheet's DRAWING_PRECISION
-# also reads (restricted review).
-_THICKNESS_LOWER = printed_deviations(THICKNESS, THICKNESS_PLACES)[0]
-_CROSS_HOLE_CZ_UPPER = printed_deviations(THICKNESS / 2.0, CROSS_HOLE_CZ_PLACES)[1]
+# dimension's title-block row for the places MHA-DT-14 shows it at, in its
+# unit.  Places come from dt_pinion_bracket_geometry, which the sheet's
+# DRAWING_PRECISION also reads (restricted review).
+_THICKNESS_LOWER = printed_deviations(THICKNESS, THICKNESS_PLACES, unit=UNIT)[0]
+_CROSS_HOLE_CZ_UPPER = printed_deviations(
+    THICKNESS / 2.0, CROSS_HOLE_CZ_PLACES, unit=UNIT
+)[1]
 # The hole's height prints no offset: its centre sits on the pivot-axis line
 # the flank view draws (an implied zero).  A zero carries no decimal places,
 # so no single title-block row owns it (Codex P1 on #1663): it is charged the
-# COARSEST row, .X, so the budget holds whichever row a shop reads it under.
-IMPLIED_ZERO_PLACES = 1
-_AXIS_OFFSET_MAX = max(abs(d) for d in printed_deviations(0.0, IMPLIED_ZERO_PLACES))
-_R_END_LOWER = printed_deviations(R_END, END_RADIUS_PLACES)[0]
+# coarsest row a located feature may print at.  On the inch sheet that is
+# .XX: the owner's ruling keeps .X for profiles, chamfers and unmated
+# overall lengths only (#290).
+IMPLIED_ZERO_PLACES = 2
+_AXIS_OFFSET_MAX = max(
+    abs(d) for d in printed_deviations(0.0, IMPLIED_ZERO_PLACES, unit=UNIT)
+)
+_R_END_LOWER = printed_deviations(R_END, END_RADIUS_PLACES, unit=UNIT)[0]
 
 # Web from the cross hole to the FAR broad face (Codex #858 P2).  MHA-DT-14
-# prints the hole's station from broad face A at .XX (the model's own
-# CrossHoleCz, half the thickness), so the far face sees the thinnest bar (.X
-# minus band) less the station at its .XX maximum, the hole's upper-limit
-# radius and the 0.05 drilled-hole allowance.  The near-face web is larger.
+# prints the hole's station from broad face A at .XX (.18, the model's own
+# CrossHoleCz, half the thickness), so the far face sees the thinnest bar
+# (.XXX minus band) less the station at its printed maximum, the hole's
+# upper-limit radius and the 0.05 drilled-hole allowance.  The near-face web
+# is larger.
 STRAP_FACE_WEB_WORST = (
     (THICKNESS + _THICKNESS_LOWER)
     - (THICKNESS / 2.0 + _CROSS_HOLE_CZ_UPPER)
@@ -87,24 +98,22 @@ FOLLOWER_SEAT_LIGAMENT = abs(PIN_DROP) - HOLE_MAX / 2.0 - PIN_BORE / 2.0
 # axis: an offset e from it thins one side by e.  MHA-DT-14 draws the strap
 # hole's centre ON the pivot-axis line of its flank view (r1 machinist
 # review, ENFORCE #1007: the former 3.18 offset from the pivot-bore wall ran
-# to a hidden line, rule 9), so e is that implied zero at the coarsest
-# general grade, 0.8, and the worst wall is 2.341 - 0.8 = 1.541.  That misses the 2.0 web
-# target (Codex #858, PRRT_kwDOPHDy386mTvki), and no geometry can move to
-# meet it: the MHA-DT-19 shaft is the ruled 1/4 in, the pin is the smallest
-# B18.8.2 size (1/16), and the hole band is already B18.8.2's recommended
-# window.  With no lever, the loosest band that clears the 1.5 floor governs:
-# no print tolerance tighter than the title block, and no position frame,
-# which drawing-guidelines.md rule 5 (avoid excessive GD&T) bars on a bracket.  A V-block set-up holding 0.25 leaves
-# SHAFT_LIGAMENT_QUARTER.
+# to a hidden line, rule 9), so e is that implied zero at the .XX grade:
+# 2.339 centred less .010 in leaves 2.085, over the .080 in target.  The
+# MHA-DT-19 shaft is the ruled 1/4 in, the pin the smallest B18.8.2 size
+# (1/16), and the hole band B18.8.2's recommended window; no print tolerance
+# is tighter than the title block, and no position frame, which
+# drawing-guidelines.md rule 5 (avoid excessive GD&T) bars on a bracket.  A
+# V-block set-up holding 0.25 leaves SHAFT_LIGAMENT_QUARTER.
 # The MHA-DT-19 shaft is the pivot bore's own nominal (a lockstep test pins it).
-SHAFT_LIGAMENT_FLOOR = 1.5
+SHAFT_LIGAMENT_FLOOR = WALL_FLOOR_MM
 _SHAFT_MIN = PIVOT_BORE + SHAFT_H[1]
 SHAFT_LIGAMENT_CENTRED = (_SHAFT_MIN - HOLE_MAX) / 2.0
 SHAFT_LIGAMENT_QUARTER = SHAFT_LIGAMENT_CENTRED - 0.25
 SHAFT_LIGAMENT_WORST = SHAFT_LIGAMENT_CENTRED - _AXIS_OFFSET_MAX
 # The pin must never stand proud of either strap edge: its west end faces the
 # MHA-DT-23 cam collar with only 0.38 of air at the printed worst case.  The
-# longest pin fits inside the narrowest strap foot (twice the smallest .X
+# longest pin fits inside the narrowest strap foot (twice the smallest
 # end-cap radius), so driven flush-or-below on the west edge it is buried on
 # the east edge too; a centred nominal pin sits PIN_CENTRED_SUB_FLUSH under
 # both edges.
@@ -122,7 +131,7 @@ PIN_CENTRED_SUB_FLUSH = (STRAP_FOOT_MIN_WIDTH - PIN_LEN) / 2.0
 # pin diameter per wall is the least grip this rig accepts.  The window
 # holds every pin in every foot: the most the two ends must share, widest
 # foot less shortest pin, is under 2 S.
-_R_END_UPPER = printed_deviations(R_END, END_RADIUS_PLACES)[1]
+_R_END_UPPER = printed_deviations(R_END, END_RADIUS_PLACES, unit=UNIT)[1]
 STRAP_FOOT_MAX_WIDTH = 2.0 * (R_END + _R_END_UPPER)
 PIVOT_BORE_MAX = PIVOT_BORE + REAM_SLIDE[0]  # MHA-DT-14 PIVOT_BORE_BAND
 PIN_WALL_ENGAGEMENT_FLOOR = PIN_DIA
@@ -136,11 +145,11 @@ PIN_SUB_FLUSH_MAX = (
 PIN_WALL_ENGAGEMENT_WORST = (_PIN_LEN_MIN - PIN_SUB_FLUSH_MAX - PIVOT_BORE_MAX) / 2.0
 PIN_DRIVE_SHARE_MAX = STRAP_FOOT_MAX_WIDTH - _PIN_LEN_MIN
 
-if STRAP_FACE_WEB_WORST < 2.0:
-    raise AssertionError(f"strap face web {STRAP_FACE_WEB_WORST:.2f} is under 2.0")
-if FOLLOWER_SEAT_LIGAMENT < 2.0:
+if STRAP_FACE_WEB_WORST < WALL_TARGET_MM:
+    raise AssertionError(f"strap face web {STRAP_FACE_WEB_WORST:.3f} is under .080 in")
+if FOLLOWER_SEAT_LIGAMENT < WALL_TARGET_MM:
     raise AssertionError(
-        f"follower-seat ligament {FOLLOWER_SEAT_LIGAMENT:.2f} is under 2.0"
+        f"follower-seat ligament {FOLLOWER_SEAT_LIGAMENT:.3f} is under .080 in"
     )
 if SHAFT_LIGAMENT_WORST < SHAFT_LIGAMENT_FLOOR:
     raise AssertionError(
@@ -155,8 +164,10 @@ if PIN_DRIVE_SHARE_MAX > 2.0 * PIN_SUB_FLUSH_MAX:
     raise AssertionError("the widest foot cannot hold the shortest pin in the window")
 
 # Inspected McMaster engineering drawing, 2026-10-19. The .063 print is
-# three-place presentation of the exact installed 1/16 cylinder; the
-# supplier's hole range belongs to a separate MATING HOLE reference.
+# three-place presentation of the exact installed 1/16 cylinder.
+# The pin's own sheet unit (#290 drawing_unit), which drops the supplier REFs'
+# " in" on an inch sheet (_supplier_pin_model._reference_suffix).
+SHEET_UNIT = drawing_unit("parts/dt-vn-pinion-strap-pin", _config.parts("dt-vn-pinion-strap-pin"))
 SUPPLIER_REFERENCE = SupplierPinReference(
     sku="98296A027",
     units="in",
@@ -167,6 +178,7 @@ SUPPLIER_REFERENCE = SupplierPinReference(
     length_precision=3,
     wall_mm=WALL_T,
     wall_precision=3,
-    application_hole_limits=(0.062, 0.065),
-    application_hole_precision=3,
+    # No application hole: the MHA-DT-14 strap and MHA-DT-19 shaft sheets specify
+    # the holes; machinist review read the loose circle as a second pin feature.
+    sheet_unit=SHEET_UNIT,
 )

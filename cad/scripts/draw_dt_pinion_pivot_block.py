@@ -39,11 +39,12 @@ from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import set_dimension_callouts
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_finish import add_surface_finish
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -61,6 +62,7 @@ from dt_pinion_pivot_block_spec import (
     LIFT_BORE_RISE,
     LIFT_BORE_SPACING,
     SCREW_HALF_SPACING,
+    SCREW_HOLE_CALLOUT_PRECISION,
     SCREW_HOLE_DIA,
     SURFACE_FINISHES,
 )
@@ -249,7 +251,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -339,13 +345,16 @@ async def build(adapter: Any) -> dict[str, str]:
         _front_x(SCREW_HALF_SPACING),
         TOP_CENTER[1] + SCREW_R_SHEET,
     )
-    add_native_hole_callout(
+    screw_callout = add_native_hole_callout(
         adapter,
         top,
         edge_xy=east_screw_edge,
         callout_xy=(0.245, 0.250),
         label="hold-down screw hole",
         process="DRILL",
+    )
+    set_hole_callout_precision(
+        screw_callout, {"hw-diam": SCREW_HOLE_CALLOUT_PRECISION}, label="hold-down screw hole"
     )
     # Anchored on the bore rim at ~30 deg: the pivot centre's AnchorZ witness
     # leaves the rim at 0 deg and LiftBoreX's at 90 deg, and the diameter

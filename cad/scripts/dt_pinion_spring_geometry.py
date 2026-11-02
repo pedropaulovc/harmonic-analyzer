@@ -23,12 +23,14 @@ import math
 
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _title_block_units import LENGTH_UNITS
 from dt_pinion_pivot_block_geometry import BORE_UP
 from dt_pinion_spring_section import (
     PAD_WIDTH,
     PAD_WIDTH_PLACES as PAD_WIDTH_PLACES,
     SCREW_EAST_OF_PIVOT,
     THICK,
+    UNIT,
     WIDTH,
     WIDTH_PLACES as WIDTH_PLACES,
 )
@@ -54,7 +56,7 @@ MIN_INSIDE_BEND_R = 0.13 * 25.4  # 3.302
 R_BEND = MIN_INSIDE_BEND_R
 R_KINK = MIN_INSIDE_BEND_R  # the crest
 KINK_DEG = 25.0  # the flick turns back EAST above the crest
-FLAT_LEN = 2.0
+FLAT_LEN = 2.032  # .08 (#290: the flick past the contact sets no preload)
 FOOT_Y = THICK  # the foot's top face (the path); its underside is the base top
 
 # Contact (img04): the crest bears on the straight east flank 23.0 up the strap
@@ -64,17 +66,20 @@ FOOT_Y = THICK  # the foot's top face (the path); its underside is the base top
 CONTACT_T = 23.0
 PARKED_AIR = 0.15
 
-# Screw-down pad: #4 clearance, its end and side webs >= 2.0 at the printed .XX
-# worst case (test_dt_pinion_spring_drawing), which takes the 9.5 square.  O5 (Main,
+# Screw-down pad: #4 clearance, its end and side webs >= the .080 target at the
+# printed .XX worst case (test_dt_pinion_spring_drawing).  O5 (Main,
 # 2026-09-24, option c): the screw stands 20.0 east of the pivot axis -- 12.5
 # east of the flank.  FOOT_FLAT is the straight between the pad and the bend:
 # ruling 4 sets it to zero (the bend starts at the pad's edge). With the raised
 # pivot the blade remains inside O5's unchanged 9-13 degree flank-angle band.
+# #290: the hole's station from the free end snaps to .18; the bend tangent
+# keeps its 5.0 from the hole's axis (the formed spring is not re-derived), so
+# the pad's free end grows by the snap.
 HOLE_SPEC = HoleSpec("clearance", "#4")
 HOLE_DIA = blind_cut_dia_mm(HOLE_SPEC)
-PAD_LEN = 9.5
+HOLE_FROM_END = 4.572  # .18
+PAD_LEN = HOLE_FROM_END + 5.0
 PAD_LEN_PLACES = 2  # PadLen prints .XX (dt_pinion_spring_spec), from the hole axis
-HOLE_FROM_END = 4.5
 FOOT_FLAT = 0.0
 FOOT_LEN = PAD_LEN + FOOT_FLAT  # free end to the bend tangent
 # Bend relief (machinist review and Codex, PR #1675): the pad's wing beside the
@@ -84,10 +89,9 @@ FOOT_LEN = PAD_LEN + FOOT_FLAT  # free end to the bend tangent
 # reaches the bend.  That clearance, against the hole's web to the wing's
 # corner, sets the wing.  Both are measured from the hole's axis (the screw,
 # which fixes the foot), so the hole's own location band never enters the
-# chain: at .XX the web clears rule 17's 1.5 floor without a tight band, and
-# being under the 2.0 target it is printed (PAD_HOLE_WEB_MIN, rule 20).
-PAD_RELIEF_R = 0.25
-PAD_RELIEF_PLACES = 2
+# chain: at .XX the web clears rule 17's target without a tight band.
+PAD_RELIEF_R = 0.254  # .010, a single MAX limit
+PAD_RELIEF_PLACES = 3
 # #859 option (iv): the pad is flush with the strip's aft edge and widens
 # forward only (pinion_rig_layout).  Placed Ry(180), the part's local +z
 # runs machine -z (forward), so the pad's centre, and the hole's, stand
@@ -106,7 +110,7 @@ MODULUS_MPA = 200_000.0
 # The hand-formed profile's band (Main's r6 ruling (c)); the print states it
 # as dt_pinion_spring_spec.FORMED_TOLERANCE_MM.  The drive train gates preload at
 # the band's low end and stress at its high end, each at the stock corner.
-FORMED_BAND_MM = 0.5
+FORMED_BAND_MM = 0.508  # +/-.020
 # The pad's hole location prints .XX (sheet dimensions on the blank's edges).
 HOLE_PLACES = 2
 # The print baselines the bend, the free kink and the wing from the hole's
@@ -114,11 +118,17 @@ HOLE_PLACES = 2
 # itself (from the free end) moves none of them.
 FOOT_FROM_HOLE = FOOT_LEN - HOLE_FROM_END  # the hole axis to the bend tangent
 _WING_CLEAR_OF_BEND = (
-    FOOT_FROM_HOLE - FORMED_BAND_MM - printed_band_mm(PAD_LEN_PLACES) - PAD_RELIEF_R
+    FOOT_FROM_HOLE
+    - FORMED_BAND_MM
+    - printed_band_mm(PAD_LEN_PLACES, unit=UNIT)
+    - PAD_RELIEF_R
 )
-# Hole axis to the wing's straight edge (PadLen): the longest at PadLen's
-# places whose round still ends at or before the nearest bend tangent.
-PAD_WING_FROM_HOLE = math.floor(_WING_CLEAR_OF_BEND * 100.0 + 1e-9) / 100.0
+# Hole axis to the wing's straight edge (PadLen): the longest on PadLen's
+# printed grid whose round still ends at or before the nearest bend tangent.
+_PAD_LEN_STEP = LENGTH_UNITS[UNIT] / 10**PAD_LEN_PLACES
+PAD_WING_FROM_HOLE = round(
+    math.floor(_WING_CLEAR_OF_BEND / _PAD_LEN_STEP + 1e-9) * _PAD_LEN_STEP, 9
+)
 PAD_WING_LEN = HOLE_FROM_END + PAD_WING_FROM_HOLE  # the free end to that edge
 
 
@@ -128,22 +138,24 @@ def pad_hole_webs() -> dict[str, float]:
     MAX round) with the wing short of the hole's axis and the hole nearest the
     strip's forward edge -- the strip narrow, the pad wide and the hole short
     of its lower (forward) edge, all measured from the aft edge."""
-    xx = printed_band_mm(HOLE_PLACES)
-    radius = (HOLE_DIA + drilled_oversize_mm()) / 2.0
+    xx = printed_band_mm(HOLE_PLACES, unit=UNIT)
+    pad_band = printed_band_mm(PAD_WIDTH_PLACES, unit=UNIT)
+    radius = (HOLE_DIA + drilled_oversize_mm(unit=UNIT)) / 2.0
     across = PAD_WIDTH / 2.0  # hole from the pad's lower edge
     webs = {
         "near side": across - xx - radius,
-        "far side": PAD_WIDTH
-        - printed_band_mm(PAD_WIDTH_PLACES)
-        - (across + xx)
-        - radius,
+        "far side": PAD_WIDTH - pad_band - (across + xx) - radius,
         "end": HOLE_FROM_END - xx - radius,
     }
     hole_along = 0.0  # PadLen runs from the hole's axis
-    hole_from_aft = (PAD_WIDTH + printed_band_mm(PAD_WIDTH_PLACES)) - (across - xx)
-    hole_aft_of_strip_edge = (WIDTH - printed_band_mm(WIDTH_PLACES)) - hole_from_aft
+    hole_from_aft = (PAD_WIDTH + pad_band) - (across - xx)
+    hole_aft_of_strip_edge = (
+        WIDTH - printed_band_mm(WIDTH_PLACES, unit=UNIT)
+    ) - hole_from_aft
     for relief in (0.0, PAD_RELIEF_R):
-        corner_along = PAD_WING_FROM_HOLE - printed_band_mm(PAD_LEN_PLACES) + relief
+        corner_along = (
+            PAD_WING_FROM_HOLE - printed_band_mm(PAD_LEN_PLACES, unit=UNIT) + relief
+        )
         corner_out = relief  # the round's centre, forward of the strip edge
         webs[f"toward the strip, R{relief:g}"] = (
             math.hypot(corner_along - hole_along, corner_out + hole_aft_of_strip_edge)
@@ -154,13 +166,16 @@ def pad_hole_webs() -> dict[str, float]:
 
 
 # The web the bend's clearance leaves between the hole and the wing's corner,
-# printed on PadLen as a plain fact (rule 20), rounded down.
-PAD_HOLE_WEB_MIN = (
+# printed on PadLen as a plain fact (rule 20), rounded down to the sheet's
+# .XXX grid (.076: under the .080 target, over the .060 floor).
+_WEB_STEP = LENGTH_UNITS[UNIT] / 1000.0
+PAD_HOLE_WEB_MIN = round(
     math.floor(
         min(web for name, web in pad_hole_webs().items() if name.startswith("toward"))
-        * 100.0
+        / _WEB_STEP
     )
-    / 100.0
+    * _WEB_STEP,
+    9,
 )
 # Design yield: ASTM A693-02 Table 5, Type 631 (S17700) "cold rolled at mill"
 # (Condition C), 0.0015-0.050 in: 0.2 % yield 175 ksi (1205 MPa) MINIMUM,

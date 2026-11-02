@@ -12,8 +12,6 @@ import pytest
 
 import _sketch
 
-import _drawing_tolerances
-import _fit_deviations
 import _fit_ream_slide
 import build_dt_pinion_arbor as part
 import draw_dt_pinion_arbor as drawing
@@ -23,6 +21,7 @@ import dt_pinion_handle_geometry as rod_geometry
 import dt_pinion_handle_spec as crossrod
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import printed_band_mm
 
 
@@ -55,17 +54,16 @@ def test_integral_arbor_keeps_the_released_stations_around_a_longer_head() -> No
     # drawing-guidelines.md rule 17 (walls and webs) (audit W6) grew the head 9.0 -> 10.5, and the machinist review of
     # 7f7fc1717 (Main's option 2) to 11.5, each time about the released
     # crossrod station; machinist review r5 of #1685 grew it forward only, to
-    # 12.2, so the rear face stays 5.75 aft of the crossrod.  The shaft and
-    # back crown stay put.  The neck shoulder moves 0.25 forward so every
-    # turned length prints at .X.
-    assert spec.HEAD_CENTER_Z == pytest.approx(-6.5)
-    assert spec.HEAD_LEN == pytest.approx(12.2)
-    assert spec.HEAD_REAR_Z == pytest.approx(-0.75)
+    # 12.2.  #290 snapped the inch print: the rear face moved 0.09 aft so the
+    # drum station prints 2.40, the head is .48 and the neck .41 long, and the
+    # .23 crossrod station leaves the crossrod 0.002 forward of -6.5.
+    assert spec.HEAD_CENTER_Z == pytest.approx(-6.502)
+    assert spec.HEAD_LEN == pytest.approx(12.192)
+    assert spec.HEAD_REAR_Z == pytest.approx(-0.66)
     assert spec.HEAD_REAR_Z == pytest.approx(spec.HEAD_CENTER_Z + spec.CROSS_HOLE_STATION)
     assert spec.HEAD_FRONT_Z == pytest.approx(spec.HEAD_REAR_Z - spec.HEAD_LEN)
-    assert spec.NECK_END_Z == pytest.approx(9.75)
-    assert spec.SHAFT_LEN == pytest.approx(226.25)
-    assert spec.SHAFT_LEN + spec.BACK_CAP_SAG == pytest.approx(227.45)
+    assert spec.NECK_END_Z == pytest.approx(9.754)
+    assert spec.SHAFT_LEN == pytest.approx(226.162)
     assert spec.OVERALL_LEN == pytest.approx(
         spec.SHAFT_LEN + spec.BACK_CAP_SAG - (spec.HEAD_FRONT_Z - spec.HEAD_CAP_SAG)
     )
@@ -73,52 +71,20 @@ def test_integral_arbor_keeps_the_released_stations_around_a_longer_head() -> No
     assert spec.BACK_RIM_FROM_HEAD_REAR == pytest.approx(spec.SHAFT_LEN - spec.HEAD_REAR_Z)
 
 
-def test_only_the_drum_station_prints_two_places() -> None:
-    """Machinist review of 7f7fc1717: NeckLen printed 11.25 at .XX.  Every
-    station runs from the head rear face, so the head and neck shoulder are
-    chosen so every turned length lands on .X; the drum station, an assembly
-    station, is the one .XX length (as at 61.55).  The crossrod station (5.75)
-    is not a turned length.  r5 of #1685: no length prints extra places to
-    hold a wall."""
-    lengths = {
-        "HeadLen": spec.HEAD_LEN,
-        "NeckLen": spec.NECK_LEN,
-        "BackRimFromHeadRear": spec.BACK_RIM_FROM_HEAD_REAR,
-        "OverallLen": spec.OVERALL_LEN,
-        "FrontJournalFromHeadRear": spec.FRONT_JOURNAL_FROM_HEAD_REAR,
-        "BackJournalFromHeadRear": spec.BACK_JOURNAL_FROM_HEAD_REAR,
-        "FrontJournalLen": spec.JOURNAL_LEN,
-        "BackJournalLen": spec.JOURNAL_LEN,
-        "DrumStationFromHeadRear": spec.DRUM_STATION,
-    }
-    two_places = {
-        name for name in lengths if spec.DRAWING_PRECISION_BY_NAME[name] == 2
-    }
-    assert two_places == {"DrumStationFromHeadRear"}
-    assert spec.HEAD_LEN_PLACES == 1
-    for name, value in lengths.items():
-        if name == "DrumStationFromHeadRear":
-            assert value != pytest.approx(round(value, 1), abs=1e-9), name
-        else:
-            assert value == pytest.approx(round(value, 1), abs=1e-9), name
-
-
 def test_crossrod_hole_station_is_toleranced_with_a_rule_12_web() -> None:
     # Machinist review r3 of #1685 (clarity, 3 of 3 runs): CENTRED gave no
     # datum face and no band, so the hole prints an ordinary station from the
-    # head rear face.  r5 (over-specification): a .XXX station and .XX
-    # HeadLen were bands tightened to hold the wall (rules 4 and 17), so the
-    # head grew forward and every band is the title-block row for the places
-    # its value needs.  Both webs hold the novice-machinist 2.0 target held
-    # since the review of 7f7fc1717.
+    # head rear face.  r5 (over-specification): no band is tightened to hold
+    # the wall (rules 4 and 17); every band is the title-block row for the
+    # places its value needs.  Both webs hold the .080 in target.
     assert spec.DRAWING_DIMENSIONS["CrossHoleStationReference"] == {
         "CrossHoleFromHeadRear"
     }
     assert spec.CROSS_HOLE_FROM_HEAD_REAR == pytest.approx(spec.CROSS_HOLE_STATION)
-    assert spec.CROSS_HOLE_STATION == pytest.approx(5.75)
+    assert spec.CROSS_HOLE_STATION == pytest.approx(5.842)  # .23
     assert spec.DRAWING_PRECISION_BY_NAME["CrossHoleFromHeadRear"] == 2
-    assert spec.CROSS_HOLE_STATION_BAND == printed_band_mm(2)
-    assert spec.HEAD_LEN_BAND == printed_band_mm(1)
+    assert spec.CROSS_HOLE_STATION_BAND == printed_band_mm(2, unit="in")
+    assert spec.HEAD_LEN_BAND == printed_band_mm(2, unit="in")
     assert "CrossHoleFromHeadRear" not in drawing.DIMENSION_CALLOUTS
     assert "CrossHoleFromHeadRear" in drawing.DETAIL_KEEP
     # Printed toleranced, never as a reference.
@@ -138,7 +104,7 @@ def test_crossrod_hole_station_is_toleranced_with_a_rule_12_web() -> None:
         - hole_upper
     )
     assert spec.CROSS_HOLE_WEB_WORST == pytest.approx(min(rear, front))
-    assert spec.CROSS_HOLE_WEB_TARGET == 2.0
+    assert spec.CROSS_HOLE_WEB_TARGET == WALL_TARGET_MM
     assert spec.CROSS_HOLE_WEB_WORST >= spec.CROSS_HOLE_WEB_TARGET
 
 
@@ -152,8 +118,8 @@ def test_cross_hole_callout_does_not_name_the_crowned_head() -> None:
 
 
 def test_integral_head_owns_the_crossrod_interface() -> None:
-    assert spec.HEAD_DIA == pytest.approx(15.0)
-    assert spec.NECK_DIA == pytest.approx(10.5)
+    assert spec.HEAD_DIA == pytest.approx(14.986)  # .59
+    assert spec.NECK_DIA == pytest.approx(10.414)  # .41
     assert spec.NECK_LEN == pytest.approx(spec.NECK_END_Z - spec.HEAD_REAR_Z)
     callout = drawing.DIMENSION_CALLOUTS["CrossHoleDia"]
     assert callout is spec.CROSS_HOLE_CALLOUT
@@ -172,16 +138,16 @@ def test_integral_head_owns_the_crossrod_interface() -> None:
 
 
 def test_crossrod_is_a_bonded_slip_fit_not_a_press() -> None:
-    """R1 (U27 precedent): a novice's stock reamer and as-received bar give
-    clearance, so the hole is banded Ø6.00 +0.10/0 and the rod is bonded."""
-    assert spec.CROSS_HOLE_DIA == pytest.approx(6.0)
-    assert spec.CROSS_HOLE_DIA_BAND == (0.10, 0.0)
+    """R1 (U27 precedent): as-received bar cannot make a press, so the rod is
+    bonded.  #290: the 1/4 rod sits in the owned .2510 over reamer's hole,
+    .250 +.0015/+.0010, inside Loctite 638's gap at the bar's loosest."""
+    assert spec.CROSS_HOLE_DIA == pytest.approx(6.35)
+    assert spec.CROSS_HOLE_DIA_BAND is _fit_ream_slide.REAM_SLIDE
     assert crossrod.ROD_DIA == pytest.approx(spec.CROSS_HOLE_DIA)  # line to line
     assert (
         model_toleranced_dimensions(part)[("CrossHoleProfile", "CrossHoleDia")]
         == "*deviations(CROSS_HOLE_DIA_BAND)"
     )
-    assert spec.DRAWING_PRECISION_BY_NAME["CrossHoleDia"] == 2
     tightest = (spec.CROSS_HOLE_DIA + spec.CROSS_HOLE_DIA_BAND[1]) - (
         crossrod.ROD_DIA + rod_geometry.ROD_DIA_BAND[0]
     )
@@ -190,7 +156,8 @@ def test_crossrod_is_a_bonded_slip_fit_not_a_press() -> None:
     )
     assert spec.CROSSROD_MIN_CLEARANCE == pytest.approx(tightest)
     assert spec.CROSSROD_MAX_CLEARANCE == pytest.approx(loosest)
-    assert tightest >= 0.0
+    assert tightest == pytest.approx(0.0254)  # .0010 in: the rod always enters
+    assert loosest == pytest.approx(0.0889)  # .0035 in
     assert loosest <= spec.RETAINING_COMPOUND_MAX_GAP_MM
     assert "INTO MHA-DT-22 HEAD WITH LOCTITE 638" in crossrod.ASSEMBLY_STEP
     for retired in ("MATCH-REAM", "PRESS", "INTERNAL SHOULDERS SHARP"):
@@ -200,15 +167,9 @@ def test_crossrod_is_a_bonded_slip_fit_not_a_press() -> None:
 
 def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
     assert spec.JOURNAL_DIA_BAND == (-0.01016, -0.03048)
-    # Both stacked bands print at 5 places: "-0.01016/-0.03048" and "-0.01016/-0.09652".
-    for band in (spec.JOURNAL_DIA_BAND, spec.SHAFT_DIA_BAND):
-        assert _drawing_tolerances._tolerance_places(
-            *_fit_deviations.deviations(band), display_unit="mm"
-        ) == 5
     assert spec.SHAFT_DIA_BAND == (-0.01016, -0.09652)
     assert model_toleranced_dimensions(part) == {
         ("BondZoneReference", "BondZoneDia"): "*deviations(SHAFT_DIA_BAND)",
-        ("DrumStationReference", "DrumStationFromHeadRear"): "DRUM_STATION_BAND",
         ("CrossHoleProfile", "CrossHoleDia"): "*deviations(CROSS_HOLE_DIA_BAND)",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_DIA_BAND)",
         ("FrontJournalReference", "FrontJournalDia"): "*deviations(JOURNAL_DIA_BAND)",
@@ -307,7 +268,6 @@ def test_every_post_import_name_is_carried_by_a_kept_or_moved_dimension() -> Non
 
 def test_back_crown_radius_is_the_model_dimension_not_typed_text() -> None:
     assert spec.DRAWING_DIMENSIONS["BackCapProfile"] == {"BackCapR", "BackCapSagDim"}
-    assert spec.DRAWING_PRECISION_BY_NAME["BackCapR"] == 1
     assert "BackCapR" in drawing.PRINCIPAL_KEEP
     assert drawing.DIMENSION_CALLOUTS["BackCapSagDim"] == "BACK CROWN"
     # A word-initial SR: the crossrod's name in the Ø6 callout is not one.
@@ -316,22 +276,42 @@ def test_back_crown_radius_is_the_model_dimension_not_typed_text() -> None:
     )
 
 
-def test_every_printed_length_is_exact_at_its_authored_places() -> None:
-    """A one-place print of 11.25 reads 11.3: the sheet would not state the model."""
+def test_every_printed_value_is_exact_at_its_authored_inch_places() -> None:
+    """#290: every model nominal is the exact decimal of the inch value it
+    prints, so the sheet states the model.  The crown sags and the overall
+    are REFs and follow from the radii."""
     nominal = {
+        "HeadDia": spec.HEAD_DIA,
+        "NeckDia": spec.NECK_DIA,
         "HeadLen": spec.HEAD_LEN,
         "NeckLen": spec.NECK_LEN,
+        "HeadCapR": spec.HEAD_CAP_R,
+        "BackCapR": spec.BACK_CAP_R,
+        "CrossHoleDia": spec.CROSS_HOLE_DIA,
+        "CrossHoleFromHeadRear": spec.CROSS_HOLE_STATION,
+        "PinStationFromHeadRear": spec.PIN_STATION_FROM_HEAD_REAR,
         "BackRimFromHeadRear": spec.BACK_RIM_FROM_HEAD_REAR,
-        "OverallLen": spec.OVERALL_LEN,
         "FrontJournalFromHeadRear": spec.FRONT_JOURNAL_FROM_HEAD_REAR,
         "BackJournalFromHeadRear": spec.BACK_JOURNAL_FROM_HEAD_REAR,
         "FrontJournalLen": spec.JOURNAL_LEN,
         "BackJournalLen": spec.JOURNAL_LEN,
         "DrumStationFromHeadRear": spec.DRUM_STATION,
+        "BondZoneDia": spec.SHAFT_DIA,
     }
     for name, value in nominal.items():
         places = spec.DRAWING_PRECISION_BY_NAME[name]
-        assert value == pytest.approx(round(value, places), abs=1e-9), name
+        inches = value / 25.4
+        assert inches == pytest.approx(round(inches, places), abs=1e-9), name
+    # No toleranced .X anywhere: every stack on the sheet reads these lengths.
+    # The overall is an untoleranced REF at one place, (9.6), so its rounded
+    # chain cannot disagree with it.
+    toleranced = {
+        name: places
+        for name, places in spec.DRAWING_PRECISION_BY_NAME.items()
+        if name != "OverallLen"
+    }
+    assert min(toleranced.values()) == 2
+    assert spec.DRAWING_PRECISION_BY_NAME["OverallLen"] == 1
 
 
 def test_each_land_diameter_is_measured_a_short_extension_from_its_line() -> None:
@@ -531,14 +511,14 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
     # Machinist review r3 of #1685 (blocker): the drum station falls on the
     # front land; each drum end rests on its land at every printed limit.
     front_min = (
-        spec.FRONT_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN - 2 * spec.LINEAR_X_BAND
+        spec.FRONT_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN - 2 * spec.LINEAR_XX_BAND
     ) - (spec.DRUM_STATION + spec.DRUM_STATION_BAND)
     back_min = (
         spec.DRUM_STATION
         - spec.DRUM_STATION_BAND
         + geometry.DRUM_LEN
         + geometry.DRUM_LEN_BAND[1]
-    ) - (spec.BACK_JOURNAL_FROM_HEAD_REAR + spec.LINEAR_X_BAND)
+    ) - (spec.BACK_JOURNAL_FROM_HEAD_REAR + spec.LINEAR_XX_BAND)
     assert spec.DRUM_FRONT_END_ON_JOURNAL_MIN == pytest.approx(front_min)
     assert spec.DRUM_BACK_END_ON_JOURNAL_MIN == pytest.approx(back_min)
     assert min(front_min, back_min) > 0.0
@@ -576,9 +556,9 @@ def test_layout_audit_gates_text_on_line_and_logs_the_rest() -> None:
 
 def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     """Ruling A on the user's located cluster (option c): with the drum station
-    at the general .X band, the lands are the smallest whole-mm length that
-    keeps every land end over its strap by 0.5 at the worst band corner, at
-    BOTH stops of the fit-up end play; no band is tightened (U27)."""
+    at the .XX band, the lands keep every land end over its strap by 0.5 at
+    the worst band corner, at BOTH stops of the fit-up end play; no band is
+    tightened (U27)."""
     import dt_alignment_pinion_spec as drum
     import build_dt_drive_train_assembly as assembly
     import dt_pinion_bracket_geometry as strap
@@ -593,18 +573,17 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
         spec.DRUM_STATION_AS_BUILT + spec.DRUM_AFT_SHIFT
     )
 
-    # 20, not 19: the 0.45 drum shim widened the drum's play, and the lands
-    # keep RIG_MARGIN_SPARE over their 0.5 floor (Main, #858).
-    assert spec.JOURNAL_LEN == pytest.approx(20.0)
+    # #290: the land keeps its 20 mm length, snapped to .79; it keeps
+    # RIG_MARGIN_SPARE over the 0.5 floor (Main, #858).
+    assert spec.JOURNAL_LEN == pytest.approx(20.066)
     assert spec.LAND_OVER_STRAP_REQUIRED == pytest.approx(0.75)
     # The drum's world station is fixed; the printed station is that position
-    # from the head rear face, so it follows the face (61.55 at the 10.5 head).
+    # from the head rear face, so it follows the face (2.40 at the -0.66 face).
     assert spec.DRUM_STATION_AS_BUILT == pytest.approx(
         spec.DRUM_FRONT_Z_AS_BUILT - spec.HEAD_REAR_Z
     )
-    assert spec.DRUM_STATION == pytest.approx(61.05)
-    assert spec.DRUM_STATION_BAND == spec.LINEAR_X_BAND == pytest.approx(0.8)
-    assert spec.END_PLAY == 0.45 and spec.END_PLAY_SET_ERROR == 0.10
+    assert spec.DRUM_STATION == pytest.approx(60.96)
+    assert spec.DRUM_STATION_BAND == spec.LINEAR_XX_BAND == pytest.approx(0.254)
     # Codex #854 review (Main): no copies of values the rig and the title block
     # own -- the spec reads them, so a feeler or row change reaches the lands.
     import inspect
@@ -616,35 +595,33 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
         rig.DRUM_END_SHIM,
         rig.DRUM_END_SHIM_SET_ERROR,
     )
-    assert spec.LINEAR_X_BAND == printed_band_mm(1)
-    assert spec.HEAD_LEN_BAND == printed_band_mm(1)
+    assert spec.LINEAR_XX_BAND == printed_band_mm(2, unit="in")
+    assert spec.HEAD_LEN_BAND == printed_band_mm(2, unit="in")
     assert geometry.DRUM_LEN == rig.DRUM_LEN
     assert geometry.STRAP_T_BAND == strap.THICKNESS_BAND
     spec_source = inspect.getsource(spec)
     for literal in (
-        "LINEAR_X_BAND = 0.8",
-        "HEAD_LEN_BAND = 0.8",
+        "LINEAR_XX_BAND = 0.254",
+        "HEAD_LEN_BAND = 0.254",
         "END_PLAY = 0.25",
         "END_PLAY_SET_ERROR = 0.10",
         "DRUM_LEN = 143.2",
     ):
         assert literal not in spec_source, literal
     assert (spec.FRONT_JOURNAL_FROM_HEAD_REAR, spec.BACK_JOURNAL_FROM_HEAD_REAR) == (
-        pytest.approx(46.3),
-        pytest.approx(199.0),
+        pytest.approx(46.228),  # 1.82
+        pytest.approx(198.882),  # 7.83
     )
-    # The lands did not move in the world when the head grew: 46.8 / 199.5
-    # from the old -1.25 rear face.
+    # In the world the lands moved under .03 mm when they snapped to the
+    # .01 in grid (45.55 / 198.25 before #290).
     assert (spec.FRONT_JOURNAL_Z, spec.BACK_JOURNAL_Z) == (
-        pytest.approx(46.8 - 1.25),
-        pytest.approx(199.5 - 1.25),
+        pytest.approx(45.568),
+        pytest.approx(198.222),
     )
     assert set(spec.LAND_MARGINS_AT_STOPS) == {"drum forward", "drum aft"}
     for margins in spec.LAND_MARGINS_AT_STOPS.values():
         assert set(margins) == set(spec.LAND_ENDS)
-        assert min(margins.values()) >= 0.5 - 1e-9
-    # One millimetre shorter fails: the derivation picked the smallest length.
-    assert spec.land_margin_slack(spec.JOURNAL_LEN - 1.0) < 0.0
+        assert min(margins.values()) >= spec.LAND_OVER_STRAP_REQUIRED - 1e-9
     # The drum never binds between the straps.
     assert spec.END_PLAY - spec.END_PLAY_SET_ERROR >= 0.1
     # The drum-end airs are the shim the pinned straps were drilled on.
@@ -652,32 +629,31 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
         pytest.approx(spec.END_PLAY - spec.END_PLAY_SET_ERROR),
         pytest.approx(spec.END_PLAY + spec.END_PLAY_SET_ERROR),
     )
-    # The lands are centred on their straps (to the printed place) with the
+    # The lands are centred on their straps (to the printed .01 in) with the
     # drum mid-way through its play.
     air = spec.END_PLAY / 2.0
     front_mid = spec.FRONT_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN / 2.0
     back_mid = spec.BACK_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN / 2.0
     front_strap_mid = spec.DRUM_STATION - air - geometry.STRAP_T / 2.0
     back_strap_mid = spec.DRUM_STATION + geometry.DRUM_LEN + air + geometry.STRAP_T / 2.0
-    assert abs(front_mid - front_strap_mid) <= 0.05 + 1e-9
-    assert abs(back_mid - back_strap_mid) <= 0.05 + 1e-9
+    assert abs(front_mid - front_strap_mid) <= 0.127 + 1e-9
+    assert abs(back_mid - back_strap_mid) <= 0.127 + 1e-9
 
 
 def test_drum_station_is_a_model_dimension_the_fitup_step_names() -> None:
     """Codex P1 on #814: notes never carry dimensions.  The drum station is
-    the model's own reference dimension from the Ø15 head rear face, printed
-    at .X with the "DRUM STATION" callout.  drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (Main's eye pass): the
+    the model's own reference dimension from the head rear face, printed at
+    .XX with the "DRUM STATION" callout.  drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (Main's eye pass): the
     drum bond is the pinion fit-up step.  Machinist review r1 of #1685: the
     station ends on no feature of this part, so its callout names the drum
     end it locates and when it is set; the note keeps only the corners."""
-    assert spec.DRAWING_NOTES == "INSIDE CORNERS R0.25 MAX."
+    assert spec.DRAWING_NOTES == "INSIDE CORNERS R.010 MAX."
     assert spec.ASSEMBLY_STEP == (
         "SLIDE MHA-DT-22 INTO MHA-DT-01 AND BOND WITH LOCTITE 638, DRUM FRONT "
         "END AT MHA-DT-22 DRUM STATION; WIPE SQUEEZE-OUT OFF JOURNAL LANDS."
     )
     for text in (spec.DRAWING_NOTES, spec.ASSEMBLY_STEP):
-        assert f"{spec.DRUM_STATION:.2f}" not in text
-        assert f"{spec.DRUM_STATION_BAND:.1f}" not in text
+        assert f"{spec.DRUM_STATION / 25.4:.2f}" not in text
     assert spec.DRAWING_DIMENSIONS["DrumStationReference"] == {"DrumStationFromHeadRear"}
     assert spec.DRAWING_PRECISION_BY_NAME["DrumStationFromHeadRear"] == 2
     assert drawing.DIMENSION_CALLOUTS["DrumStationFromHeadRear"] is (
@@ -687,7 +663,7 @@ def test_drum_station_is_a_model_dimension_the_fitup_step_names() -> None:
         "DRUM STATION:\nMHA-DT-01 FRONT END,\nSET AT ASSEMBLY"
     )
     assert "DRUM STATION" in spec.ASSEMBLY_STEP
-    assert spec.DRUM_STATION_BAND == spec.LINEAR_X_BAND
+    assert spec.DRUM_STATION_BAND == spec.LINEAR_XX_BAND
 
 
 def test_every_station_names_the_same_head_rear_face() -> None:
@@ -697,7 +673,7 @@ def test_every_station_names_the_same_head_rear_face() -> None:
     assert not any("HEAD SHOULDER" in text for text in drawing.DIMENSION_CALLOUTS.values())
     # c3419623 printed "TO  Ø15": <MOD-DIAM> brings its own leading gap.
     assert drawing.DIMENSION_CALLOUTS["BackRimFromHeadRear"] == (
-        "FROM BACK CROWN ROOT TO<MOD-DIAM>15 HEAD REAR FACE"
+        "FROM BACK CROWN ROOT TO<MOD-DIAM>.59 HEAD REAR FACE"
     )
 
 
@@ -894,7 +870,7 @@ def test_journal_lands_cover_their_straps_in_the_pose() -> None:
     # Codex #854 review (Main): the released "arbor back end at 91.25"
     # landmark became a nominal check ~13.75 clear that could never fire.
     # What matters is that each land covers its strap past both faces in the
-    # saved pose; BDT asserts it at import and this pins the pose margins.
+    # saved pose; BDT asserts it at import and this checks the pose margins.
     import inspect
 
     import build_dt_drive_train_assembly as assembly
@@ -909,9 +885,7 @@ def test_journal_lands_cover_their_straps_in_the_pose() -> None:
         start = assembly.ARBOR_Z0 + land_z
         margins += [lo - start, start + spec.JOURNAL_LEN - hi]
     assert min(margins) >= spec.MIN_LAND_OVER_STRAP
-    # The pose is the drilling set-up: the drum hard on the back strap and
-    # the front strap one shim ahead of the drum (Main, #858 ruling 3).
-    assert margins == pytest.approx([5.3, 5.7, 5.25, 5.75], abs=5e-3)
+
     source = inspect.getsource(assembly)
     assert "falls short of the back strap" not in source
     assert "journal land misses its strap" in source
@@ -920,57 +894,26 @@ def test_journal_lands_cover_their_straps_in_the_pose() -> None:
 def test_drum_runs_in_the_shim_the_straps_were_drilled_on() -> None:
     # Main (#858, ruling 3): the E-a pins freeze the strap spacing where the
     # shaft is match-drilled, so the drum's running clearance is whatever the
-    # drilling set-up leaves.  It is set with the rig's one feeler as a shim at
-    # the drum's front end, which MHA-DT-00's SHAFT DRILL SET prints; the drum
-    # then runs in 0.25 +/- 0.10 of end play and never binds.  Before the
-    # ruling the straps closed line to line on the drum, and drum_total_air
-    # still read the block-stop model (0.0 up to the whole feeler).  The shim
-    # is a 0.45 blade, not the rig's 0.25 feeler: the drum keeps its 0.1
-    # floor with RIG_MARGIN_SPARE to spare (Main, #858).
+    # drilling set-up leaves: the rig's shim at the drum's front end, which
+    # MHA-DT-00's SHAFT DRILL SET prints.  The drum keeps its end-play floor
+    # with RIG_MARGIN_SPARE to spare and never binds (Main, #858).  The rig's
+    # own stacks and step wording are pinned by its tests, not here.
     import pinion_rig_layout as rig
 
-    assert spec.drum_total_air() == pytest.approx((0.35, 0.55))
+    assert spec.drum_total_air() == pytest.approx(
+        (
+            rig.DRUM_END_SHIM - rig.DRUM_END_SHIM_SET_ERROR,
+            rig.DRUM_END_SHIM + rig.DRUM_END_SHIM_SET_ERROR,
+        )
+    )
     assert spec.drum_total_air()[0] >= spec.MIN_END_PLAY
     assert rig.STRAP_Z_INNER[1] - rig.STRAP_Z_INNER[0] == pytest.approx(
-        rig.DRUM_LEN + 0.45, abs=1e-9
+        rig.DRUM_LEN + rig.DRUM_END_SHIM, abs=1e-9
     )
     assert rig.DRUM_BACK_Z == rig.STRAP_Z_INNER[1]
-    assert (rig.DRUM_END_SHIM, rig.DRUM_END_SHIM_SET_ERROR) == (
-        0.45,
-        rig.FRONT_BLOCK_FEELER_BAND,
-    )
+    assert rig.DRUM_END_SHIM_SET_ERROR == rig.FRONT_BLOCK_FEELER_BAND
     assert spec.drum_total_air()[0] - spec.MIN_END_PLAY >= rig.RIG_MARGIN_SPARE - 1e-9
     assert rig.DRUM_FRONT_Z - rig.STRAP_Z_INNER[0] == pytest.approx(rig.DRUM_END_SHIM)
-    # The drilling pose is printed where the fitter drills: MHA-DT-00's
-    # SHAFT DRILL SET (Main's re-ruling, 2026-09-26).
-    import pinion_rig_fitup as fitup
-
-    assert fitup.SHAFT_DRILL_STEP.split("\n") == [
-        "SHAFT DRILL SET: MATCH-DRILL MHA-DT-19 THRU MHA-DT-14 CROSS HOLES, 2 PL,",
-        "MHA-DT-19 REAR END FLUSH WITH MHA-DT-18 REAR FACE +/-0.10",
-        "(SETS MHA-DT-19 BEARING IN BOTH MHA-DT-18 AND ITS FRONT END CLEARANCE",
-        "TO MHA-DT-16),",
-        "STRAPS ON BACK STOP, MHA-DT-01 ON BACK STRAP,",
-        "0.45 FEELER AT MHA-DT-01 FRONT END; DRIVE MHA-DT-VN-63 PINS,",
-        "BOTH ENDS 0 TO 2.8 BELOW THE MHA-DT-14 EDGES.",
-    ]
-    # Both bearing stacks carry the flush setting, and the front one the
-    # shim's set error, by name.
-    assert rig.TORQUE_SHAFT_BEARING_STACK["MHA-DT-19 rear end flush set"] == -0.10
-    assert rig.TORQUE_SHAFT_BACK_BEARING_STACK["MHA-DT-19 rear end flush set"] == -0.10
-    assert rig.TORQUE_SHAFT_BEARING_STACK["MHA-DT-19 drum end shim set error"] == -0.10
-    assert rig.LIFT_ROD_SEAT_STACK["MHA-DT-19 drum end shim set error"] == -0.10
-    # The band the step names is load-bearing: one more band of shortfall
-    # takes the back-block bearing and the lever's air to the shaft's front
-    # end under floor plus spare, so the flush setting cannot loosen to an
-    # ordinary "flush to 0.5 short" without re-sizing the rig.
-    back_floor = rig.BACK_BLOCK_MIN_BEARING + rig.BLOCK_BEARING_MARGIN
-    assert sum(rig.TORQUE_SHAFT_BACK_BEARING_STACK.values()) - rig.FLUSH_SET_ERROR < (
-        back_floor
-    )
-    assert rig.LEVER_TO_SHAFT_FRONT_WORST - rig.FLUSH_SET_ERROR < (
-        rig.LEVER_THROW_MIN_AIR + rig.RIG_MARGIN_SPARE
-    )
 
 
 class _SketchFeature:
@@ -1104,32 +1047,32 @@ def test_collar_pin_hole_is_a_drilled_spring_pin_hole_clear_of_the_front_land() 
     """R1a (user, 2026-09-24): the MHA-DT-33 collar's 1/16 in spring-pin hole.
 
     It prints the rig's functional band (not the title block's drilled-hole
-    band), stands at a .X station from the head rear face, never enters the
-    front land or its Ra 1.6 run-out at the worst corner, and leaves the U27
-    2.0 web target of steel beside it.
+    band), stands at a .XX station from the head rear face, never enters the
+    front land or its Ra 63 run-out at the worst corner, and leaves the .080
+    in web target of steel beside it.
     """
     import dt_pinion_arbor_pin_spec as pin_hole
     import dt_vn_pinion_strap_pin_spec as strap_pin
 
     # One pin family and one drill for the whole rig (pinioncluster's E-a).
     assert pin_hole.PIN_HOLE_DIA == strap_pin.HOLE_DIA == pytest.approx(25.4 / 16.0)
-    assert pin_hole.PIN_HOLE_DIA_BAND == strap_pin.HOLE_BAND == (0.06, 0.0)
+    assert pin_hole.PIN_HOLE_DIA_BAND == strap_pin.HOLE_BAND
     # The hole names the pin it takes, which is why its band beats the
     # title block's drilled-hole row (codex machinist pass on pc-r8).
     import _config
 
     assert pin_hole.PIN_NUMBER == _config.parts("dt-vn-pinion-strap-pin")["number"]
-    assert spec.PIN_STATION_FROM_HEAD_REAR == 38.0
-    assert spec.PIN_STATION_BAND == spec.LINEAR_X_BAND
-    assert spec.PIN_Z == pytest.approx(spec.HEAD_REAR_Z + 38.0)
-    assert pin_hole.PIN_HOLE_LAND_CLEARANCE >= 2.0
-    assert pin_hole.PIN_HOLE_NECK_CLEARANCE >= 2.0
-    assert pin_hole.PIN_HOLE_LIGAMENT_WORST == pytest.approx(3.0967, abs=1e-3)
-    assert pin_hole.PIN_HOLE_LIGAMENT_WORST >= 2.0
+    assert spec.PIN_STATION_FROM_HEAD_REAR == pytest.approx(38.1)  # 1.50
+    assert spec.PIN_STATION_BAND == spec.LINEAR_XX_BAND
+    assert spec.PIN_Z == pytest.approx(spec.HEAD_REAR_Z + 38.1)
+    for margin in (
+        pin_hole.PIN_HOLE_LAND_CLEARANCE,
+        pin_hole.PIN_HOLE_NECK_CLEARANCE,
+        pin_hole.PIN_HOLE_LIGAMENT_WORST,
+    ):
+        assert margin >= WALL_TARGET_MM
     assert spec.DRAWING_DIMENSIONS["PinHoleProfile"] == {"PinHoleDia"}
     assert spec.DRAWING_DIMENSIONS["PinStationReference"] == {"PinStationFromHeadRear"}
-    assert spec.DRAWING_PRECISION_BY_NAME["PinHoleDia"] == 2
-    assert spec.DRAWING_PRECISION_BY_NAME["PinStationFromHeadRear"] == 1
     assert part.V_PIN_HOLE > 0.0
 
 

@@ -36,7 +36,8 @@ from _drawing_dimensions import (
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _part_properties import part_drawing_unit
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
@@ -55,6 +56,7 @@ from dt_arbor_pedestal_spec import (
     FOOT_MID_Z,
     FOOT_NEAR_Z,
     FOOT_WIDTH,
+    HOLE_CALLOUT_PRECISION,
     SCREW_HOLE_DIA,
     SCREW_Z,
     SET_SCREW_HOLE_SPEC,
@@ -81,17 +83,17 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (2.0, 1.0)  # 55.45 mm tall; 2:1 keeps the strap and bore legible
+SHEET_SCALE = (2.0, 1.0)  # 2.18 in tall; 2:1 keeps the strap and bore legible
 _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 
 # The part spans model y 0 (foot seat) to 55.45 (dome top); centre the front
 # elevation on that midpoint. Third-angle projection keeps the plan aligned
 # above the elevation; the isometric balances the aligned group from the
-# right. The elevation sits low so the 28-deep plan (56 on the sheet) clears
+# right. The elevation sits low so the 1.10-deep plan (2.20 on the sheet) clears
 # the crown band and still leaves two dimension lanes above itself under the
 # sheet border: lateral-location lane 0.045, elevation 0.055..0.165, crown
 # text ~0.173, plan 0.186..0.242, hole lateral lane 0.250, foot-width lane
-# 0.259, hold-down hole callout left of the plan at 0.238. The 44.45 common
+# 0.259, hold-down hole callout left of the plan at 0.238. The 1.75 common
 # cone-axis bore height grew the elevation 9.5 mm on the sheet; it grows
 # downward, so the crown-to-plan band the apex tap callout sits in keeps its
 # height.
@@ -151,7 +153,7 @@ FRONT_KEEP = {
 TOP_KEEP = {
     # ABOVE the plan, outside the hole lateral lane. Below it (0.183) the
     # apex tap callout's leader -- which can only leave the plan downward,
-    # because the 19.0, 5.00, 10.0 and 28.0 lines all span the tap's
+    # because the hold-down, set-screw, strap and depth lines all span the tap's
     # station -- crossed this dimension line (2026-10-18 ENFORCE r1, rule 14
     # (keep text off the part)). Up here its witnesses run the plan's full
     # height along the side edges; the hold-down callout's leader crosses the
@@ -187,7 +189,7 @@ TOP_KEEP = {
 # The arbor (MHA-DT-13) is what the reamed bore fits: the front pedestal's
 # apex screw locks it, and the back pedestal slides along it while its strap
 # is set off the bank's north spring blade (cylinder_bank_layout), so the bore is a
-# sliding fit and the Ra 1.6 says so (rule 4 (tighten only for function, and
+# sliding fit and the Ra 63 says so (rule 4 (tighten only for function, and
 # name the mate); 2026-10-18 ENFORCE r1 blocker).
 ARBOR_NUMBER = str(_config.parts("dt-cylinder-gear-shaft")["number"])
 DIMENSION_CALLOUTS = {
@@ -206,6 +208,9 @@ CROWN_CALLOUT = "SIDES TANGENT FROM FOOT CORNERS"
 # do not repeat it: v37's "..., AT CROWN APEX" ran the callout 22.6 mm past
 # the zone frame.
 SET_SCREW_PROCESS = "TAP"
+# Hole Wizard drill sizes print .XXX on the inch sheet, by native variable.
+HOLD_DOWN_PRECISION = {"hw-diam": HOLE_CALLOUT_PRECISION}
+SET_SCREW_PRECISION = {"hw-tapdrldia": HOLE_CALLOUT_PRECISION}
 SET_SCREW_EXTENT = "TO BORE"
 _THREAD_CLASS = re.compile(r"\s*(?:-\s*)?<hw-threadclass>\s*", re.IGNORECASE)
 # The overall height's lane, left of the elevation.
@@ -221,11 +226,12 @@ _CROWN_APEX_Y = _front_y(BORE_HEIGHT + TOP_RADIUS)
 _PLAN_FAR_Y = _top_y(STRAP_INNER_Z)
 SET_SCREW_CALLOUT_XY = (TOP_CENTER[0] - 0.055, _CROWN_APEX_Y + 0.0114)
 # The hold-down hole's callout: text CENTRE (the row runs ~50 mm) left of
-# the plan and above the 19.0 lane, its leader dropping right to the hole's
-# upper-west rim. The leader crosses only the plan's west edge (and the
-# foot-width witness on it); it stays above the 19.0's hole-station extension
-# line and west of the 12.0's. Above the plan its leader crossed the 24.0
-# dimension line once that lane moved up (TOP_KEEP["Width"]).
+# the plan and above the hold-down station's lane, its leader dropping right
+# to the hole's upper-west rim. The leader crosses only the plan's west edge
+# (and the foot-width witness on it); it stays above the hole-station
+# extension line and west of the strap depth's. Above the plan its leader
+# crossed the foot width's dimension line once that lane moved up
+# (TOP_KEEP["Width"]).
 _HOLD_DOWN_RIM = SCREW_HOLE_DIA / 2.0 * _S * sqrt(0.5)
 HOLD_DOWN_EDGE_XY = (TOP_CENTER[0] - _HOLD_DOWN_RIM, _top_y(SCREW_Z) + _HOLD_DOWN_RIM)
 HOLD_DOWN_CALLOUT_XY = (TOP_CENTER[0] - 0.055, _top_y(FOOT_NEAR_Z) - 0.004)
@@ -269,7 +275,7 @@ def set_screw_callout_beside() -> dict[str, tuple[float, ...]]:
         "plan far-face extension line": _line_box(
             lane_x, _PLAN_FAR_Y, plan_west, _PLAN_FAR_Y
         ),
-        "hold-down location (19.0) dimension line": _line_box(
+        "hold-down location dimension line": _line_box(
             lane_x, _PLAN_FAR_Y, lane_x, _top_y(SCREW_Z)
         ),
     }
@@ -379,7 +385,7 @@ def _show_crown_radius(adapter: Any, annotations: list[Any]) -> None:
         if bool(display.Diametric):
             raise RuntimeError("the imported crown dimension is not radial")
         # The crown is what places the tapered flanks: each side runs from a
-        # 24.0 foot corner up to tangency with this radius, whose centre is
+        # foot corner up to tangency with this radius, whose centre is
         # the bore's (the shared centre mark says so). The Fable round-2
         # review could not tell where the flanks start, so the words name
         # both ends. Words only -- every digit on this sheet is a dimension.
@@ -563,7 +569,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -640,8 +650,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # Under the seat's east half, between the bore lateral's witness at the
     # centreline and the foot-height lane east of the elevation: the leader
-    # drops from the seat's right quarter and the "Ra 3.2" text hangs right
-    # of the vee, short of the 5.0's lower arrow.
+    # drops from the seat's right quarter and the roughness text hangs right
+    # of the vee, short of the foot height's lower arrow.
     add_surface_finish(
         adapter,
         front,
@@ -670,13 +680,16 @@ async def build(adapter: Any) -> dict[str, str]:
     _set_reference_precision(overall, "overall height")
     _show_crown_radius(adapter, front_annotations)
     adapter.currentModel.GraphicsRedraw2()
-    add_native_hole_callout(
+    hold_down_callout = add_native_hole_callout(
         adapter,
         top,
         edge_xy=HOLD_DOWN_EDGE_XY,
         callout_xy=HOLD_DOWN_CALLOUT_XY,
         label="flange hold-down hole",
         process="DRILL",
+    )
+    set_hole_callout_precision(
+        hold_down_callout, HOLD_DOWN_PRECISION, label="flange hold-down hole"
     )
     # Apex set-screw tap (#743): the plan sees it end-on at the crown apex.
     # Its callout sits in the band between the crown apex and the plan
@@ -691,6 +704,9 @@ async def build(adapter: Any) -> dict[str, str]:
         process=SET_SCREW_PROCESS,
     )
     _set_tap_callout_text(tap_callout)
+    set_hole_callout_precision(
+        tap_callout, SET_SCREW_PRECISION, label="apex set-screw tap"
+    )
     _prove_set_screw_callout_clear(adapter, tap_callout)
     # Re-assert the display mode now the last annotation has landed: an
     # annotation attached after placement can leave a view's edge set

@@ -125,7 +125,9 @@ def test_post_screws_keep_spec_owned_stock_and_cut_to_fit_acceptance() -> None:
     )
     places = screw.DRAWING_PRECISION_BY_NAME[screw.CUT_LENGTH_DIMENSION]
     assert f"({screw.CUT_LENGTH_MM:.{places}f}) REF CUT LENGTH" in fitup
-    assert f"FLUSH TO {screw.POST_SCREW_CUT_TO_FIT_SHORT:g} SHORT" in fitup
+    # The step prints the part sheet's exact maximum short, never a wider one.
+    printed_short = float(re.search(r"FLUSH TO (\d+\.\d+) SHORT", fitup).group(1))
+    assert printed_short == screw.POST_SCREW_CUT_TO_FIT_SHORT
     assert "CUT TO FIT" in fitup and "UNDERSIDE, NEVER PROUD" in fitup
     assert "DEBURR ENDS" in fitup
     assert screw.FIXED_CUT_LENGTH_EXISTS is False
@@ -136,6 +138,14 @@ def test_post_screws_keep_spec_owned_stock_and_cut_to_fit_acceptance() -> None:
         <= screw.POST_SCREW_CUT_TO_FIT_SHORT
     )
     assert drawing.POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT in fitup
+    from machinist_exceptions import load_exceptions
+
+    declared = {
+        entry.id: entry
+        for entry in load_exceptions(_config.CONFIG_DIR, "dt_drive_train_assembly", "assembly")
+    }
+    assert declared["DT-02"].kind == "minor"
+    assert drawing.POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT in declared["DT-02"].where
 
 
 def test_crank_fit_reads_t120_before_the_full_turn_and_retention_drilling() -> None:

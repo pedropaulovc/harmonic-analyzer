@@ -40,7 +40,10 @@ CASES = (
         draw_dt_alignment_pinion,
         (
             SurfaceFinishControl(
-                "drum_bore", MACHINED_UM, CylinderFace(dt_alignment_pinion_spec.BORE_DIA)
+                "drum_bore",
+                MACHINED_UM,
+                CylinderFace(dt_alignment_pinion_spec.BORE_DIA),
+                display_unit="in",
             ),
         ),
     ),
@@ -56,11 +59,13 @@ CASES = (
                     dt_arbor_pedestal_spec.BORE_DIA,
                     contains_y_mm=dt_arbor_pedestal_spec.BORE_HEIGHT,
                 ),
+                display_unit="in",
             ),
             SurfaceFinishControl(
                 "foot_seat",
                 SEAT_UM,
                 PlanarFace((0, -1, 0), 0.0),
+                display_unit="in",
             ),
         ),
     ),
@@ -173,6 +178,7 @@ CASES = (
                     dt_cylinder_gear_shaft_spec.SHAFT_DIA,
                     contains_y_mm=dt_cylinder_gear_shaft_spec.ARBOR_BEARING_PROBE_Y_MM,
                 ),
+                display_unit="in",
             ),
         ),
     ),

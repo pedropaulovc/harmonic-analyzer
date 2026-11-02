@@ -41,11 +41,10 @@ from _drawing_finish import add_surface_finish
 from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note, property_link
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_tolerances import _tolerance_places
 from _drawing_view_display import set_hidden_lines_removed
-from _fit_deviations import deviations
 from _gear_drawing_entities import visible_circle_edge
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -57,7 +56,6 @@ from dt_alignment_pinion_spec import (
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
     OUTSIDE_DIA,
-    OUTSIDE_DIA_BAND,
     OUTSIDE_DIA_CALLOUT,
     SURFACE_FINISHES,
     TEETH,
@@ -112,7 +110,7 @@ FRONT_KEEP = {
 }
 # Diameters on the side view beside the length (rule 11): the tip diameter's
 # dimension line stands just right of the back face with its text below the
-# part, clear of the 143.2 baseline under the view.  The callout reads
+# part, clear of the face-width baseline under the view.  The callout reads
 # left-to-right off its shelf from the dimension line, so the line stands close
 # enough that the mate number ends well inside the border (machinist review
 # r4: at +45 mm it printed cut off as "MHA-DT-0").
@@ -222,7 +220,7 @@ def _assert_tolerance_places(
 def _prefix_diameter_symbol(adapter: Any, annotations: list[Any], name: str) -> None:
     """Print the Ø on a doubled centerline-to-witness (diametric linear) size.
 
-    Imported into a side view it prints as a bare "17.63", which reads as a
+    Imported into a side view it prints as a bare ".694", which reads as a
     linear height (machinist review r6 of 874c912e6, gating clarity).  The
     prefix compartment takes SolidWorks' own diameter token, read back.
     """
@@ -358,7 +356,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     material_binding = _bind_title_material_specification(
         drawing_model, properties["Material Specification"]
@@ -414,12 +416,12 @@ async def build(adapter: Any) -> dict[str, str]:
         "ArborBoreDia",
         DRAWING_PRECISION_BY_NAME["ArborBoreDia"],
     )
-    # The inch tip band (0/-0.1016) prints at the four places it needs.
+    # The inch tip band (+.000/-.004) prints at the nominal's three places.
     _assert_tolerance_places(
         adapter,
         right_annotations,
         "OutsideDia",
-        _tolerance_places(*deviations(OUTSIDE_DIA_BAND), display_unit="mm"),
+        DRAWING_PRECISION_BY_NAME["OutsideDia"],
     )
     _prefix_diameter_symbol(adapter, right_annotations, "OutsideDia")
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):

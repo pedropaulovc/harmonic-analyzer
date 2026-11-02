@@ -23,6 +23,7 @@ import dt_cone_swing_platform_geometry as geometry
 import dt_cone_swing_platform_spec as spec
 import dt_cone_swing_platform_checks as checks
 import dt_cone_tip_block_spec as block
+import dt_post_mount_stack as post_mount
 from dt_cone_post_envelope import BLOCK_DIA
 import draw_dt_cone_swing_platform as drawing
 import pytest
@@ -579,36 +580,40 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
     """Codex review of 68565ace (B1): the sheet must state MHA-DT-VN-61's exception.
 
     U37 accepts short engagement for the 1/4-20 post screws. The printed worst
-    case is the thinnest stock plate (U41 band), less the 0.3 cut-to-fit
-    allowance and the local 0.1 break at each end of the tap, floored:
-    5.72 mm = 0.90D, never under the drawing-guidelines.md rule 18 (thread engagement) audit's E7 floor of 0.87D.
+    case is the thinnest stock plate (U41 band), less the title block's .010
+    tap-entry break and, at the underside, the .005 cut-to-fit allowance plus
+    the screw's .010 cut-end break (it outreaches the tap's .010 exit break),
+    floored, never under the drawing-guidelines.md rule 18 (thread engagement)
+    audit's E7 floor of 0.87D.
     """
-    worst = (
+    # To the micron, as the spec rounds it, so a float sum a hair under an
+    # exact hundredth does not floor one place low.
+    worst = round(
         spec.PLATE_THICKNESS
         - spec.PLATE_STOCK_BAND
-        - spec.POST_SCREW_CUT_TO_FIT_SHORT
-        - 2.0 * spec.POST_MOUNT_TAP_EDGE_BREAK
+        - spec.POST_MOUNT_TAP_EDGE_BREAK
+        - (spec.POST_SCREW_CUT_TO_FIT_SHORT + 0.254),
+        6,
     )
+    assert spec.POST_SCREW_CUT_TO_FIT_SHORT + 0.254 > spec.POST_MOUNT_TAP_EDGE_BREAK
     assert spec.POST_MOUNT_ENGAGEMENT_WORST == pytest.approx(worst)
     diameters = worst / (0.25 * 25.4)
     printed = math.floor(diameters * 100.0) / 100.0
     assert printed <= diameters and printed >= 0.87
-    assert f"{printed:.2f}" == "0.90"
+    assert spec.POST_MOUNT_ENGAGEMENT_PRINTED == printed
     assert spec.POST_MOUNT_ENGAGEMENT_NOTE == (
         f"1/4-20 THREAD ENGAGEMENT {printed:.2f}D MIN."
     )
-    # The break the derivation counts is the break the tap callout allows
-    # (rule 7: a local override rides its feature's callout, machinist review
-    # r1), under the thread on the plan.
-    assert spec.POST_MOUNT_TAP_EDGE_BREAK == 0.1
-    assert spec.POST_MOUNT_TAP_BREAK_CALLOUT == "0.1 MAX BREAK EACH END"
-    assert drawing.POST_MOUNT_CALLOUT_BELOW[0] == spec.POST_MOUNT_TAP_BREAK_CALLOUT
-    # Positive control: the title block's 0.25 break at both ends would print
-    # under the audit floor, which is why the override exists.
-    title_block = (
-        spec.PLATE_THICKNESS - spec.PLATE_STOCK_BAND - spec.POST_SCREW_CUT_TO_FIT_SHORT - 0.5
-    ) / (0.25 * 25.4)
-    assert title_block < 0.87
+    # The stated shortfall is declared for the blind reviewer, as a minor.
+    from machinist_exceptions import load_exceptions
+
+    (entry,) = load_exceptions(_config.CONFIG_DIR, "dt_cone_swing_platform", "part")
+    assert (entry.id, entry.kind) == ("RV-01", "minor")
+    assert spec.POST_MOUNT_ENGAGEMENT_NOTE in entry.where
+    # The taps take the title block's edge break: no local override rides
+    # their callout (Main, 2026-11-01).
+    assert spec.POST_MOUNT_TAP_EDGE_BREAK == post_mount.PLATE_TAP_EDGE_BREAK_MM
+    assert not any("BREAK" in row for row in drawing.POST_MOUNT_CALLOUT_BELOW)
     # The note sits in the empty band above the title block (2.5 mm text,
     # ~1.93 mm a character, 4.4 mm a line).
     x, y = drawing.ENGAGEMENT_NOTE_XY
@@ -1666,7 +1671,7 @@ def test_tight_bands_name_their_mates_on_their_callouts() -> None:
     """Rule 4: the reamed bore and both +-0.1 hole groups name the part that
     makes the tolerance necessary, each at its own callout (r1 blocker)."""
     assert drawing.PIVOT_BORE_CALLOUT_BELOW == ("RUNNING FIT ON MHA-DT-VN-52 SHOULDER",)
-    assert "MHA-DT-05" in drawing.POST_MOUNT_CALLOUT_BELOW[1]
+    assert "MHA-DT-05" in drawing.POST_MOUNT_CALLOUT_BELOW[0]
     assert "MHA-DT-21" in drawing.HOLDDOWN_CALLOUT_BELOW[1]
     pivot = drawing.callout_below_definitions(
         {5: "REAM <MOD-DIAM><hw-diam>", 6: "", 7: "", 8: ""},

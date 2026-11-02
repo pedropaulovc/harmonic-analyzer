@@ -11,21 +11,21 @@ drive equations; cam, alignment notch and bore are parametric too.
 
 Features, in order:
 
-1. Gear blank: disc at the finite-support-derived tip radius, face width 3 mm,
-   extruded z = 0..3 from the Front plane. The face width comes from the
-   M6 axial-budget resolution (Appendix C #6): face/pitch = 0.38 measured
-   on the p.22 stack macro x the 7.5 mm axial pitch.
+1. Gear blank: disc at the finite-support-derived tip radius, face width .118
+   in (2.9972 mm), extruded from the Front plane. The face width comes from
+   the M6 axial-budget resolution (Appendix C #6): face/pitch = 0.38 measured
+   on the p.22 stack macro x the 7.5 mm axial pitch (#290: snapped to .118).
 2. One finite stock tooth gap, with translated reference involute flanks
    and an off-centre root arc, cut through and circular-patterned at the
    PHYSICAL 120 teeth. No unsupported upper-flank continuation.
 3. Integral eccentric cam (book ch. 13, pp. 22-25): one of the 20 cams that
    convert each gear's rotation into the near-sinusoidal reciprocation of its
-   connecting rod (displacement = ECCENTRICITY x sin(theta)). Disc OD 30.6 mm,
+   connecting rod (displacement = ECCENTRICITY x sin(theta)). Disc OD 1.205 in,
    centre offset +Y by the 8.64 mm eccentricity, boss-extruded from the Front
    plane through the blank to the OVERALL thickness z = 0..7.0565 (#743: the
    overall thickness is the station pitch, so the bank stacks cam face on back
    face and the cam fills the connecting-rod slot; the cam's own thickness,
-   4.0565, is a reference). Cam disc centred on the bore, offset +Y by the
+   4.0593, is a reference). Cam disc centred on the bore, offset +Y by the
    eccentricity -- the
    lobe points +Y, the NOTCH side: the ch14 end views prove the rocker tips sit
    at the TOP of their stroke at notch-up/0-cranks, so lobe-up is the cos-mode
@@ -37,13 +37,13 @@ Features, in order:
    follows the same simple-harmonic orbit the template was cut to produce.
    (This is the former standalone ``build_eccentric_cam.py`` / ``eccentric-cam``
    part, MHA-029, now folded into the gear -- the cam was always integral.)
-4. Alignment notch: 3 mm deep saw KERF cut between two teeth (the p.23
+4. Alignment notch: .12 in deep saw KERF cut between two teeth (the p.23
    "notch" photo shows a thin kerf -- the real gears keep all 120 teeth, NOT
    a missing tooth). +Y (90 deg = 30*gamma) is a tooth crest at 120 T, so the
    kerf is seated in the adjacent root valley (90 deg + gamma/2); the flanking
    crests stay intact. "Notches aligned to top = cosine mode" (pp. 66-67).
    Gear face only, after the pattern so it is not replicated.
-5. Plain shaft bore 3/8" through gear + cam, on the gear axis. No keyway:
+5. Plain reamed shaft bore .3760 in through gear + cam, on the gear axis. No keyway:
    gear k turns k/80 rev per crank turn (ch. 29 gear law), so the 20 gears
    all spin at DIFFERENT speeds and cannot be keyed to a common shaft --
    they run free on a stationary arbor (DIMENSIONS.md ch. 13, "M6.2 keyway
@@ -56,8 +56,8 @@ classified by that same finite repeated-tooth profile.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 13".
 
-Layout: gear axis = Z through the origin, gear z = 0..3 mm, cam z = 3..7.0565,
-cam lobe +Y, notch +Y (lobe on the notch side).
+Layout: gear axis = Z through the origin, gear z = 0..FACE_WIDTH, cam
+z = FACE_WIDTH..7.0565, cam lobe +Y, notch +Y (lobe on the notch side).
 
 Run (SolidWorks already open)::
 
@@ -70,12 +70,14 @@ import math
 import sys
 
 from _appearance import apply_material
+from _document_units import apply_package_model_units
 from _bore_axis import name_bore_axis
 from _check import check
 from _com import _flag, _early_bound, _read_member
 from _dimensions import dump_dimensions, drive_dimension, name_dimensions, set_global
 from _feature_tree import _feature_by_name, feature_name_by_type, name_last_feature
 from _part_checks import report_mass_properties
+from _part_properties import part_drawing_unit
 from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import (
@@ -106,6 +108,7 @@ from _part_pmi import author_part_pmi
 from dt_cylinder_gear_notes import GEAR_DATA
 from dt_cylinder_gear_spec import (
     BORE_DIA as BORE_DIAMETER,
+    BORE_DIA_BAND,
     CAM_DIA as CAM_DIAMETER,
     CAM_DIA_BAND,
     CAM_PHASE_TOLERANCE_DEG,
@@ -134,6 +137,7 @@ from dt_cylinder_gear_spec import (
     SURFACE_FINISHES,
     TEETH,
     TOOTH_PATTERN_GAP_RAD,
+    UNIT,
 )
 
 import _telemetry
@@ -253,7 +257,7 @@ def _body_state(adapter, feature_name: str | None = None) -> str:
 
 
 def _notch_width_max_limit(adapter) -> None:
-    """NotchWidth as the single limit "0.40 MAX" (dt_cylinder_gear_spec.
+    """NotchWidth as the single limit ".016 MAX" (dt_cylinder_gear_spec.
     NOTCH_WIDTH): swTolMAX prints the nominal then MAX, so the modelled kerf
     IS the limit; the deviations stay on the native tolerance as the model's
     record of the band (build_ch_fulcrum_keeper._single_limit's recipe)."""
@@ -338,6 +342,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable blank diameter/width and auxiliary features; the tooth-gap
     # curves remain literal and use the actual finite stock-form gap volume.
@@ -643,8 +649,8 @@ async def build(adapter) -> dict[str, str]:
 
     # ------------------------------------------------------------------
     # Shaft bore through gear + cam (the bore circle is fully inside the
-    # eccentric cam disc: ecc 8.64 + bore_r 4.76 = 13.40 < cam_r 15.3,
-    # a 1.90 mm wall at the thin side).
+    # eccentric cam disc: ecc 8.64 + bore_r 4.78 = 13.42 < cam_r 15.30,
+    # a .072 in printed-worst wall at the thin side).
     # ------------------------------------------------------------------
     # Shaft bore: ordinary on-axis circle (origin centre -> no centre dims, just
     # the diameter), driven by the BoreDiameter knob.
@@ -703,19 +709,32 @@ async def build(adapter) -> dict[str, str]:
             raise RuntimeError(
                 f"{name}@NotchProfile readback {actual!r}, expected {expected:g} mm"
             )
-    # The inch tip band (0/-0.1016) needs four places, past the nominal's
-    # two, so its places stay automatic (#290 batch 0).
+    # Every band prints at its nominal's inch places (rule 3; machinist
+    # review r1 read "0.0/-0.1" under 64.44).  The bands are millimetres;
+    # UNIT prints them in inches.
     set_dimension_bilateral_tolerance(
         adapter,
         "GearBlankProfile",
         "OutsideDia",
         *deviations(OUTSIDE_DIA_BAND),
+        places=DRAWING_PRECISION["GearBlankProfile"]["OutsideDia"],
+        display_unit=UNIT,
+    )
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "BoreProfile",
+        "BoreDia",
+        *deviations(BORE_DIA_BAND),
+        places=DRAWING_PRECISION["BoreProfile"]["BoreDia"],
+        display_unit=UNIT,
     )
     set_dimension_symmetric_tolerance(
         adapter,
         "GearBlank",
         "FaceWidth",
         FACE_WIDTH_TOLERANCE_MM,
+        places=DRAWING_PRECISION["GearBlank"]["FaceWidth"],
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
         adapter,
@@ -723,20 +742,28 @@ async def build(adapter) -> dict[str, str]:
         "CamDia",
         *deviations(CAM_DIA_BAND),
         places=DRAWING_PRECISION["CamProfile"]["CamDia"],
+        display_unit=UNIT,
     )
     # Centred (cylinder_bank_layout asserts it), so it prints +/-.
     set_dimension_symmetric_tolerance(
-        adapter, "CamBoss", "OverallThickness", OVERALL_THICKNESS_BAND[0]
+        adapter,
+        "CamBoss",
+        "OverallThickness",
+        OVERALL_THICKNESS_BAND[0],
+        places=DRAWING_PRECISION["CamBoss"]["OverallThickness"],
+        display_unit=UNIT,
     )
     set_dimension_symmetric_tolerance(
         adapter,
         "CamProfile",
         "CamCy",
         ECCENTRICITY_TOLERANCE_MM,
+        places=DRAWING_PRECISION["CamProfile"]["CamCy"],
+        display_unit=UNIT,
     )
     _notch_width_max_limit(adapter)
     # NotchDepth carries no model band: the sighted kerf prints to the
-    # title-block .X row (dt_cylinder_gear_spec.NOTCH_DEPTH).
+    # title-block .XX row (dt_cylinder_gear_spec.NOTCH_DEPTH).
     set_dimension_symmetric_angular_tolerance(
         adapter,
         "NotchProfile",

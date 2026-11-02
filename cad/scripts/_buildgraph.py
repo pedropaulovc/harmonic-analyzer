@@ -2389,7 +2389,6 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         # held inside the knife edge's free-rock floor.
         "sm_summing_assembly_sheet",
         "pd_vn_guide_lock_screw_spec",
-        "dt_vn_post_mount_screw_spec",
         "ch_vn_spring_hook_spec",
         "pd_transgear_disc_hub_spec",
         "pd_transgear_removable_notes",

@@ -19,11 +19,11 @@ marks and the drawing keeps EXACTLY ``DRAWING_DIMENSIONS``.
 
 from __future__ import annotations
 
-import math
-
 from _fit_ream_h7 import REAM_H7
 from _fit_ream_slide import REAM_SLIDE
 from _gtol_cylinder import CylinderFace
+from _inch_wall_limits import WALL_TARGET_MM
+from _printed_tolerance import printed_deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from dt_pinion_bracket_geometry import (
     ARBOR_BORE as ARBOR_BORE,
@@ -40,25 +40,27 @@ from dt_pinion_bracket_geometry import (
     THICKNESS as THICKNESS,
     THICKNESS_BAND as THICKNESS_BAND,
     THICKNESS_PLACES,
+    UNIT as UNIT,
     WIDTH as WIDTH,
 )
 import dt_vn_pinion_strap_pin_spec as _strap_pin
 
-# --- Tolerance bands.  Only the three fitted bores carry one, and each traces
-# to a NAMED fit class in ``_fit_ream_h7`` or ``_fit_ream_slide``; every other feature is governed by
-# its decimal places against the title block's general grades.  The strap's
-# former per-part numbers (a +/-0.10 bore centre distance, +/-0.05 on the seat
-# axis and through-thickness station, +/-0.05 on the bar thickness and a
-# +0.10/0 seat depth) traced to no fit class and to no error-budget row: they
-# were habit, not specification, and are gone.  The one non-fit band that
-# survives is PIN_SEAT_STATION_TOL below, and it traces to a web. ---
+# --- Tolerance bands.  Only the three fitted bores and the cross hole carry
+# one, and each traces to a NAMED fit class in ``_fit_ream_h7`` or
+# ``_fit_ream_slide`` or to the spring pin's own window; every other feature is
+# governed by its decimal places against the title block's general grades.
+# The strap's former per-part numbers (a +/-0.10 bore centre distance, +/-0.05
+# on the seat axis and through-thickness station, +/-0.05 on the bar thickness
+# and a +0.10/0 seat depth) traced to no fit class and to no error-budget row:
+# they were habit, not specification, and are gone. ---
 # Option E-a: the strap is pinned to the torque shaft, which turns with it in
 # the MHA-DT-18 block bores.  The slide fit stays so the strap goes onto the
 # shaft for fit-up and the cross hole can be match-drilled through both.
 PIVOT_BORE_BAND = REAM_SLIDE
 ARBOR_BORE_BAND = REAM_SLIDE  # pinion arbor turns in it
-# The MHA-DT-25 drill-rod stud slips into this seat and is bonded with LOCTITE
-# 638 (U27; dt_pinion_cam_pin_spec proves the 0.000-0.042 bond gap).
+# The MHA-DT-25 5/32 drill-rod stud slips into this seat, cut by the .1570
+# chucking reamer, and is bonded with LOCTITE 638 (U27; dt_pinion_cam_pin_spec
+# proves the bond gap).
 PIN_SEAT_DIA_BAND = REAM_H7
 
 # Option E-a set-pin cross hole (dt_vn_pinion_strap_pin_spec).  Its location is a
@@ -85,43 +87,38 @@ CROSS_HOLE_CALLOUT = "DRILL THRU\nFOR MHA-DT-VN-63\nSPRING PIN, PRESS FIT"
 # drawing-guidelines.md rule 17 (walls and webs) (#842, U27; audit W23) worst-case web from the blind seat to a broad
 # face.  Codex #858 P2, user ruling (a) (2026-09-25): the seat's station is
 # printed from broad face A as the model's own PinSeatCz, not as "CENTRED ON
-# THICKNESS" prose.  At the general .XX grade that web was 1.18, under the 1.5
-# floor, so the user approved tightening the station alone to +/-0.10: a
-# functional band that traces to this web, not habit.  The far face then sees
-# the thinnest bar (.X minus band) less the station at its upper limit, the
-# seat's upper-limit radius and the 0.05 drilled-hole allowance: 1.54, over
-# the 1.5 floor (the 2.0 target gives way to the printed location).  The near
-# face keeps PIN_SEAT_NEAR_WEB_WORST.
-# Symmetric, so the print reads +/- (ASME Y14.5), not an equal bilateral pair.
-PIN_SEAT_STATION_TOL = 0.10
+# THICKNESS" prose.  #290: at the .XXX thickness and station rows the far face
+# sees the thinnest bar less the station at its upper limit, the seat's
+# upper-limit radius and the 0.05 drilled-hole allowance, over the .080 in
+# target, so the station needs no band of its own (the mm sheet's +/-0.10 and
+# owner-minor RV-01 are gone).
+_SEAT_STATION_LOWER, _SEAT_STATION_UPPER = printed_deviations(
+    THICKNESS / 2.0, 3, unit=UNIT
+)
+_THICKNESS_LOWER = printed_deviations(THICKNESS, THICKNESS_PLACES, unit=UNIT)[0]
 _PIN_SEAT_MAX = PIN_BORE + PIN_SEAT_DIA_BAND[0]
 PIN_SEAT_WEB_WORST = (
-    (THICKNESS - THICKNESS_BAND)
-    - (THICKNESS / 2.0 + PIN_SEAT_STATION_TOL)
+    (THICKNESS + _THICKNESS_LOWER)
+    - (THICKNESS / 2.0 + _SEAT_STATION_UPPER)
     - _PIN_SEAT_MAX / 2.0
     - 0.05
 )
 PIN_SEAT_NEAR_WEB_WORST = (
-    THICKNESS / 2.0 - PIN_SEAT_STATION_TOL - _PIN_SEAT_MAX / 2.0 - 0.05
+    THICKNESS / 2.0 + _SEAT_STATION_LOWER - _PIN_SEAT_MAX / 2.0 - 0.05
 )
-if PIN_SEAT_WEB_WORST < 1.5:
+if min(PIN_SEAT_WEB_WORST, PIN_SEAT_NEAR_WEB_WORST) < WALL_TARGET_MM:
     raise AssertionError(
-        f"follower-seat web {PIN_SEAT_WEB_WORST:.2f} is under the 1.5 floor"
+        f"follower-seat web {PIN_SEAT_WEB_WORST:.3f} is under the .080 in target"
     )
-# The sheet states the far-face wall as a plain fact (rule 20), rounded down
-# so it never claims more than the worst case: the owner-ruled shortfall
-# declared as RV-01 in cad/config/parts/dt-pinion-bracket.yaml.
-PIN_SEAT_WALL_CALLOUT = f"WALL {math.floor(PIN_SEAT_WEB_WORST * 10) / 10:.1f} MIN"
 
 # The seat floor is modelled sharp; the corner allowance lets the builder pick
 # a flat-bottom reamer or end mill (rule 16, r2/r3 machinist review, #1007):
 # a stud bottomed on that corner stands off at most this radius, well inside
-# the seat depth's .X band.  Three rows, so the block grows right, not up
+# the seat depth's .XX band.  Three rows, so the block grows right, not up
 # into the isometric view.
-PIN_SEAT_FLOOR_CORNER_R_MAX = 0.2
+PIN_SEAT_FLOOR_CORNER_R_MAX = 0.2032  # .008
 PIN_SEAT_DEPTH_CALLOUT = (
-    "FOLLOWER SEAT REAM DEPTH\nFROM ENTRY FACE\n"
-    f"FLOOR CORNERS R{PIN_SEAT_FLOOR_CORNER_R_MAX:.1f} MAX"
+    "FOLLOWER SEAT REAM DEPTH\nFROM ENTRY FACE\nFLOOR CORNERS R.008 MAX"
 )
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
@@ -138,8 +135,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
     "Strap": {"Depth"},
     # drawing-guidelines.md rule 17 (walls and webs) (audit W23) and user ruling (a): the seat's station from broad
-    # face A prints as the model's own PinSeatCz at +/-0.10 -- see
-    # PIN_SEAT_WEB_WORST.
+    # face A prints as the model's own PinSeatCz -- see PIN_SEAT_WEB_WORST.
     "PinSeatProfile": {"PinSeatDia", "PinSeatCy", "PinSeatCz"},
     "PinSeat": {"PinSeatDepth"},
     # Option E-a: the set-pin cross hole.  Its size and its station from
@@ -151,31 +147,28 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # ), so the MODEL owns them: build_dt_pinion_bracket applies this map to the
 # .SLDPRT and draw_dt_pinion_bracket only reads it back.
 #
-# Three places (title-block .XXX, +/-0.13) on PinSeatCy alone: the follower
-# stud's height above the pivot axis sets how far the drum swings for a given
-# cam lift, and the engaged pose is budgeted with 0.25 of air -- half a
-# millimetre there is twice the whole clearance.  Everything else is two
-# places (.XX, +/-0.51): the bore centre distance and the bar thickness are
-# routine link geometry, and the two running bores plus the pressed seat carry
-# their own bands on top.  One place (.X) on the two end radii and the seat
-# depth: the ends are profiled to the bar's own width and the seat bottoms out
-# on a flat-bottom reamer.
+# #290 inch sheet.  Four places on the three reamed bores and the cross hole,
+# whose +.0015/+.0010, +.0005/.0000 and +.0025/.0000 bands need them.  Three
+# (.XXX, +/-.005) where a stack or web reads the row, each naming its function
+# at the dimension: PinSeatCy (the follower stud's height above the pivot sets
+# how far the drum swings for a given cam lift), the bar thickness (the axial
+# stack between the MHA-DT-18 blocks) and the seat's station (its far-face web
+# fails at .XX).  Two (.XX) on the rest: the bore centre distance (no check
+# reads its band; at the engaged pose a .010 error moves the mesh centre a
+# quarter of that), the unmated end radii, the cross hole's station and the
+# seat depth, which a flat-bottom reamer bottoms out.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "StrapProfile": {
-        "PivotBoreDia": 2,
-        # Four places print the 5/16 arbor bore exactly (7.9375).
+        "PivotBoreDia": 4,
         "ArborBoreDia": 4,
         "ArborBoreCz": 2,
         "BottomCapRadius": END_RADIUS_PLACES,
         "TopCapRadius": END_RADIUS_PLACES,
     },
     "Strap": {"Depth": THICKNESS_PLACES},
-    # Two places on PinSeatCz resolve its +/-0.10 band.
-    "PinSeatProfile": {"PinSeatDia": 2, "PinSeatCy": 3, "PinSeatCz": 2},
-    "PinSeat": {"PinSeatDepth": 1},
-    # Two places resolve the spring pin's +0.06/0 hole band; its station is
-    # routine .XX (its worst cases clear the 1.5 floor at that grade).
-    "CrossHoleProfile": {"CrossHoleDia": 2, "CrossHoleCz": CROSS_HOLE_CZ_PLACES},
+    "PinSeatProfile": {"PinSeatDia": 4, "PinSeatCy": 3, "PinSeatCz": 3},
+    "PinSeat": {"PinSeatDepth": 2},
+    "CrossHoleProfile": {"CrossHoleDia": 4, "CrossHoleCz": CROSS_HOLE_CZ_PLACES},
 }
 
 _PRECISION_NAMES = [
@@ -194,11 +187,11 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked dimension must state its decimal places")
 
-# The (43.0) overall is a REFERENCE the sheet derives from the outline (C2C
+# The (1.7) overall is a REFERENCE the sheet derives from the outline (C2C
 # plus both end radii), not a model dimension, so no part-side map can hand
 # its decimal places over: the spec owns the digit and the sheet passes it to
-# ``SetPrecision3`` instead of writing a literal (drawing-simplicity-policy.md `How the repository implements the guidelines`).  One place
-# because the two end radii it sums are one-place dimensions.
+# ``SetPrecision3`` instead of writing a literal (drawing-simplicity-policy.md `How the repository implements the guidelines`).  One
+# place: the printed 1.10 + 2 x .30 sums to 1.70, which (1.69) would contradict.
 DRAWING_REFERENCE_PRECISION = 1
 
 
@@ -210,6 +203,7 @@ SURFACE_FINISHES = (
         key="arbor_bore",
         roughness_um=MACHINED_UM,
         face=CylinderFace(diameter_mm=ARBOR_BORE),
+        display_unit=UNIT,
     ),
 )
 

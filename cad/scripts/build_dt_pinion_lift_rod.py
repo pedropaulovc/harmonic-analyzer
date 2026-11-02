@@ -50,8 +50,11 @@ from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _drawing_prefix import set_dimension_prefix
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
+from _document_units import apply_package_model_units
+from _part_properties import part_drawing_unit
 from dt_pinion_lever_geometry import PIN_HOLE_DIA, ROD_PIN_HOLE_FROM_END
 from dt_pinion_lift_rod_spec import (
+    CAP_R,
     CAP_SAG,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -60,6 +63,7 @@ from dt_pinion_lift_rod_spec import (
     ROD_DIA_BAND,
     ROD_LEN,
     SURFACE_FINISHES,
+    UNIT,
 )
 
 PART_NAME = "dt-pinion-lift-rod"
@@ -74,8 +78,7 @@ MATERIAL = "Plain Carbon Steel"  # bright steel (p.68)
 # dt_pinion_lift_rod_spec.py, the dimensional contract the drawing shares.
 
 ROD_R = ROD_DIA / 2.0
-CAP_R = (ROD_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 4.80 crown sphere radius
-V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0  # 19.85
+V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0  # 19.7
 
 V_ROD = math.pi * ROD_R**2 * ROD_LEN
 
@@ -102,6 +105,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): the rod diameter, body length and
     # crown sagitta -- RodDia/RodLen drive the marked drawing dims, CapSag the
@@ -254,7 +258,7 @@ async def build(adapter) -> dict[str, str]:
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
     set_dimension_bilateral_tolerance(
-        adapter, "RodProfile", "RodDia", *deviations(ROD_DIA_BAND)
+        adapter, "RodProfile", "RodDia", *deviations(ROD_DIA_BAND), display_unit=UNIT
     )
     set_dimension_prefix(adapter, "RodProfile", "CapR", "SR")
     clear_dimensions_for_drawing(adapter)

@@ -1,9 +1,9 @@
 r"""Create the curated machinist drawing for the pinion return leaf spring.
 
-NOT a coil spring: a bent 17-7 PH stainless leaf.  A 0.381 blank -- a 6.35
+NOT a coil spring: a bent 17-7 PH stainless leaf.  A .015 blank -- a 1/4 in
 strip with a square screw pad at its free end -- formed as a flat screw-down
-foot, an R3.3 bend up to a blade leaning back over the foot's bend, then an
-R3.3 crest turning 25 deg out to a short free flat.  The solid is the installed shape;
+foot, an R.130 bend up to a blade leaning back over the foot's bend, then an
+R.130 crest turning 25 deg out to a short free flat.  The solid is the installed shape;
 the front view also shows the part's hidden FreeForm reference sketch as the
 phantom free form; the bend and the free crest are baselined from the pad
 hole's axis (the screw) on it.  The projected top view carries the blank's
@@ -47,12 +47,13 @@ from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edge_dimensions import add_edge_dimension
 import _drawing_hidden_sketches as hidden_sketches
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -82,6 +83,7 @@ from dt_pinion_spring_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FREE_KINK_ANGLE,
+    HOLE_CALLOUT_PRECISION,
     PAD_LEN_CALLOUT,
 )
 
@@ -1099,7 +1101,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -1174,13 +1180,16 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         label="pad hole edge",
     )
-    add_native_hole_callout(
+    hole_callout = add_native_hole_callout(
         adapter,
         top,
         edge_xy=hole_edge,
         callout_xy=HOLE_CALLOUT_XY,
         label="spring pad clearance hole",
         process=HOLE_PROCESS,
+    )
+    set_hole_callout_precision(
+        hole_callout, {"hw-diam": HOLE_CALLOUT_PRECISION}, label="spring pad clearance hole"
     )
     # After every pick on the hole: its forward rim lies on this line.
     _hole_axis_centerline(
