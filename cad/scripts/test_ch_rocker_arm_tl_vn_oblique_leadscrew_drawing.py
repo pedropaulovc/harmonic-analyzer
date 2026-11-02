@@ -541,9 +541,12 @@ def test_one_axis_horizontal_view_at_the_largest_fitting_scale() -> None:
         # lowest ink and the cut length's text.
         caption_bottom = y - drop - draw.SECTION_CAPTION_GAP - 0.013
         assert caption_bottom > text_y + draw.TEXT_HALF_HEIGHT, section.label
-        # The cutting line crosses its station's flat, clear of its station.
-        station = spec.FLAT_STATIONS[section.flat]
-        assert 2.5 < abs(section.cut_mm - station) < spec.FLAT_LENGTH / 2.0
+        # The cutting line crosses its station's flat, 2.5 clear of both of
+        # its ends: the far flat's start prints the 375.5 station's extension
+        # line (machinist review: 0.5 off it, the two lines merged).
+        start = spec.FLAT_STARTS[section.flat]
+        assert start + 2.5 <= section.cut_mm <= start + spec.FLAT_LENGTH - 2.5
+        assert section.cut_mm != spec.FLAT_STATIONS[section.flat]
     assert [s.flat for s in draw.CLOCK_SECTIONS] == list(spec.CLOCKED_FLATS)
     # The note block (four rows about 18 mm tall, top-left anchored; its
     # widest printed row, the stock's, at about 2.7 mm a glyph as farm run

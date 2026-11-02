@@ -166,11 +166,12 @@ THREAD_LEADER_TIP = (sheet_x(80.0), MAIN_CENTER[1] + SCREW_SHEET_DIA / 2.0)
 class ClockSection(NamedTuple):
     """One KP08 station's section: the clock flat it shows, its letter, where
     its cutting line crosses the axis (model mm from the near end: inside the
-    flat, 3.5 off its station toward the screw's middle, so the line stands
-    clear of the station's extension line), whether it looks toward the far
-    end (model +Y, sheet right; its arrows then point right, away from the
-    screw's nearer end and the cut length's extension line), and where the
-    section's axis stands on the sheet."""
+    flat, 1.5 off its station toward the screw's middle, so the line stands
+    2.5 clear of both flat ends and of the far flat's printed start, 375.5:
+    3.5 off, it ran almost on that extension line, machinist review), whether
+    it looks toward the far end (model +Y, sheet right; its arrows then point
+    right, away from the screw's nearer end and the cut length's extension
+    line), and where the section's axis stands on the sheet."""
 
     flat: str
     label: str
@@ -180,7 +181,7 @@ class ClockSection(NamedTuple):
 
 
 SECTION_SCALE = (3, 1)
-_SECTION_CUT_OFF_STATION_MM = FLAT_LENGTH / 2.0 - 0.5
+_SECTION_CUT_OFF_STATION_MM = FLAT_LENGTH / 2.0 - 2.5
 # Above the main view, under the top border: each face 12 mm in radius at
 # 3:1, its texts within 24 mm of its axis, its caption under its lowest ink.
 CLOCK_SECTIONS = (
