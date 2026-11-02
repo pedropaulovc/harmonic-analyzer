@@ -37,12 +37,15 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 
 # The fit, its mates (by name and number, rule 4) and the flush acceptance sit
 # under the diameter they govern; the seam's match-drill/ream is the arm's and
-# hub's callout, and the .17 seam keeps the cut pin out of the hub bore.
+# hub's callout, and the .17 seam keeps the cut pin out of the hub bore.  The
+# faced cut end is the one left flush, so the supplier's end leads into the
+# blind seam (machinist review of farm run 20261102T154950540Z: the sheet did
+# not say which end goes out).
 PIN_DIA_CALLOUT = "\n".join(
     (
         "LIGHT DRIVE FIT IN SEAM OF CRANK ARM",
         "MHA-DT-06 AND CRANK HUB MHA-DT-31;",
-        "OUTER END FLUSH WITH THEIR FRONT FACES",
+        "FACED END OUT, FLUSH WITH FRONT FACES",
     )
 )
 DRAWING_NOTES = f"CUT FROM McMASTER-CARR {SKU} DOWEL PIN; DIAMETER AS SUPPLIED."
