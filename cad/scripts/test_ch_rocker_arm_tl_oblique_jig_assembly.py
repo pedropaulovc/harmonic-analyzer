@@ -1419,6 +1419,18 @@ def test_steps_13b_and_13c_split_o1_around_the_stud_rework() -> None:
     assert f"CLAMP SCREW {spec._item(spec.CLAMP_SCREW)}, FITTED AT EACH WORK LOADING" in steps["12"]
 
 
+def test_kp08_row_and_stud_cut_timing_read_plainly() -> None:
+    """TL-00 review (2026-11-02): item 17's row names the KP08 the steps cite,
+    and step 2 says when the stud stock is cut."""
+    assert spec.BOM_DESCRIPTIONS[spec.PILLOW_BLOCK] == "KP08 PILLOW BLOCK, 8 MM BORE"
+    step = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("2. "))
+    assert (
+        "THE STUDS STAY UNCUT UNTIL STEP 13B; THERE HD3 CUTS EACH TO ITS BOM "
+        "LENGTH, 57.2 MM." in step
+    )
+    assert spec.BOM_DESCRIPTIONS[spec.HOLD_DOWN_STUD].endswith("CUT 57.2 MM")
+
+
 def test_general_torque_note_covers_every_fastener_no_step_torques() -> None:
     """Review jig-asm r1 (rule 24): one general note for the screws and nuts
     whose steps give no torque, with no invented figure."""

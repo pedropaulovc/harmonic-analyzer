@@ -1804,6 +1804,12 @@ def test_cl_tip_text_stands_clear_outboard_of_the_riser() -> None:
     assert _inside_sheet(text)
     for other in others:
         assert not _overlap(text, other)
+    # Its label stands one line above it, centred, in the air under the plan.
+    label_half = len(spec.CL_TIP_LABEL) * CHAR_M / 2.0
+    label = (cx - label_half, text[3], cx + label_half, text[3] + LINE_M)
+    assert _inside_sheet(label)
+    for other in others:
+        assert not _overlap(label, other)
 
 
 @pytest.mark.parametrize("defect", (
@@ -1833,10 +1839,12 @@ def test_cl_tip_native_reference_offsets_without_replacing_its_model_value(
         SystemValue=spec.cl_dowel.TIP_HEIGHT / 1000.0,
         Tolerance=SimpleNamespace(Type=0),
     )
+    texts = {1: "(", 2: ")"}
     display = SimpleNamespace(
         OffsetText=defect == "inherited-offset",
         GetDimension2=lambda _configuration: dimension,
-        GetText=lambda part: "(" if part == 1 else ")",
+        GetText=lambda part: texts.get(part, ""),
+        SetText=lambda part, value: texts.__setitem__(part, value),
         GetPrimaryPrecision2=lambda: spec.CL_TIP_PRECISION,
     )
 
@@ -1899,6 +1907,7 @@ def test_cl_tip_native_reference_offsets_without_replacing_its_model_value(
         assert position == [*text_target, native_z]
         assert line_position == [*line_target, native_z]
         assert dimension.SystemValue == spec.cl_dowel.TIP_HEIGHT / 1000.0
+        assert texts[drawing._CALLOUT_ABOVE] == spec.CL_TIP_LABEL == "CL TIP ABOVE RISER"
         settled()
         line_position[0] += 0.003
         with pytest.raises(RuntimeError, match="native dimension line"):
@@ -1906,6 +1915,10 @@ def test_cl_tip_native_reference_offsets_without_replacing_its_model_value(
         line_position[:] = (*line_target, native_z)
         position[1] -= 0.003
         with pytest.raises(RuntimeError, match="native offset text"):
+            settled()
+        position[1] += 0.003
+        texts[drawing._CALLOUT_ABOVE] = ""
+        with pytest.raises(RuntimeError, match="label ''"):
             settled()
 
 
