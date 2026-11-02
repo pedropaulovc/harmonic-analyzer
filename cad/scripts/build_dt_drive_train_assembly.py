@@ -3861,7 +3861,7 @@ DRUM_TIP_TO_END_DISC_STACK = {
 # strip's front edge south, toward the gear.
 SPRING_TO_J19_STACK = {
     "rig-set leaf D, thinnest setting": RIG.FEELER_SET_ERROR,
-    "MHA-DT-14 strap thickness .XXX, thinnest": -printed_deviations(
+    "MHA-DT-14 strap thickness .XX, thinnest": -printed_deviations(
         STRAP_T, STRAP_T_PLACES, unit=STRAP_UNIT
     )[0],
     "spring pad leaf, thickest setting": RIG.FEELER_SET_ERROR,

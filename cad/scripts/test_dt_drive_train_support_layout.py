@@ -849,12 +849,12 @@ def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
         assert min(stations) >= 1.0, stations
         assert max(stations) <= drive.CAM_LEN - 1.0, stations
     # User ruling P1-1: on its leaf the back collar's gap -- the rod's north
-    # float -- is F + e at most 1.00, so both pins keep >= 3.08 of collar on
-    # either side (the by-eye set it replaced left 1.90 and 2.75; #290's .XXX
-    # strap band added the rest).
-    assert math.isclose(min(front), 3.081, abs_tol=5e-3)
-    assert math.isclose(min(back), 4.089, abs_tol=5e-3)
-    assert math.isclose(max(back), drive.CAM_LEN - 3.081, abs_tol=5e-3)
+    # float -- is F + e at most 1.00, so both pins keep >= 2.96 of collar on
+    # either side (the by-eye set it replaced left 1.90 and 2.75; #290's .XX
+    # strap limits, .34-.36 about the .354 model, set the rest).
+    assert math.isclose(min(front), 2.968, abs_tol=5e-3)
+    assert math.isclose(min(back), 4.078, abs_tol=5e-3)
+    assert math.isclose(max(back), drive.CAM_LEN - 2.968, abs_tol=5e-3)
     # North float at the widest setting: the back collar lands first.
     assert _back_collar_gap(_LEAF_ERR) < _hub_gap() - RIG.HUB_STOP_MARGIN
     # The model's back collar sits on its leaf, its pin BACK_CAM_PIN_STATION
@@ -967,7 +967,7 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
     assert math.isclose(
         bearing_min, sum(RIG.TORQUE_SHAFT_BEARING_STACK.values()), abs_tol=1e-9
     )
-    assert math.isclose(bearing_min, 10.245, abs_tol=5e-3)
+    assert math.isclose(bearing_min, 10.194, abs_tol=5e-3)
     assert hub_margin_min >= RIG.HUB_STOP_MARGIN - 1e-9
     assert math.isclose(
         hub_margin_min,
@@ -978,7 +978,7 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
     )
     # The rod is sized by the seat (#290: the .XX length band left the lever's
     # air to the shaft far more than it needs), to the .01 in above it.
-    assert math.isclose(hub_margin_min, 0.709, abs_tol=5e-3)
+    assert math.isclose(hub_margin_min, 0.658, abs_tol=5e-3)
     assert sum(RIG.lift_rod_seat_stack(RIG.LIFT_ROD_LEN - 0.254).values()) < (
         RIG.LEVER_SEAT_MIN + RIG.RIG_MARGIN_SPARE
     )
@@ -1083,7 +1083,7 @@ def test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack() -> None:
 def test_torque_shaft_length_band_clears_both_ends() -> None:
     # MHA-DT-19 at the title-block .XX band (U27, #290), set back-flush: at the
     # shortest stack (both blocks thin, Codex #854 P1) the longest shaft's
-    # body end stands 2.95 proud of the front block, and its SR crown .05
+    # body end stands 3.40 proud of the front block, and its SR crown .05
     # beyond that (Codex #837 P1).
     import dt_arbor_pedestal_spec as ped
     import dt_pinion_lever_geometry as lever
@@ -1093,25 +1093,28 @@ def test_torque_shaft_length_band_clears_both_ends() -> None:
 
     front_end = rig.BACK_BLOCK_OUTER_Z - rig.TORQUE_SHAFT_LEN - _ROD_LEN_BAND
     # The shortest stack mirrors the named-term long stack of the front
-    # block's OUTER face (both blocks' depths, both straps, the drum and the
-    # feeler: the lift rod's budget less its nominal and the rod's own band),
-    # since every nominal in it prints exactly.
+    # block's OUTER face (both blocks' depths, the drum and the feeler: the
+    # lift rod's budget less its nominal and the rod's own band), since those
+    # nominals print exactly; the .354 straps print .35, so they shrink by
+    # their own lower deviation, not the mirror of their upper one.
+    from dt_pinion_bracket_geometry import THICKNESS, THICKNESS_LIMITS
+
     shrink = -sum(
         value
         for name, value in rig.LIFT_ROD_SEAT_STACK.items()
-        if not name.startswith(("nominal", "MHA-DT-17"))
-    )
+        if not name.startswith(("nominal", "MHA-DT-17", "MHA-DT-14"))
+    ) + 2.0 * (THICKNESS - THICKNESS_LIMITS[0])
     shortest_outer = rig.FRONT_BLOCK_Z0 + shrink
     proud = shortest_outer - front_end
-    assert math.isclose(proud, 2.947, abs_tol=5e-3)
-    assert math.isclose(proud + CAP_SAG, 4.217, abs_tol=5e-3)
+    assert math.isclose(proud, 3.404, abs_tol=5e-3)
+    assert math.isclose(proud + CAP_SAG, 4.674, abs_tol=5e-3)
     assert math.isclose(
         max(outer for _i, outer, _t in _stack_vertices()), shortest_outer, abs_tol=1e-9
     )
     # Option E-a: pinned to the straps, the shaft rides the cluster's end play
     # from its back-flush drilling station to the front stop.
-    assert math.isclose(proud + _P_MAX, 3.297, abs_tol=5e-3)
-    assert math.isclose(proud + _P_MAX + CAP_SAG, 4.567, abs_tol=5e-3)
+    assert math.isclose(proud + _P_MAX, 3.754, abs_tol=5e-3)
+    assert math.isclose(proud + _P_MAX + CAP_SAG, 5.024, abs_tol=5e-3)
     # Its back end then sits P_MAX inside the back block, bearing
     # test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack.
     # South of the front block nothing stands on the shaft's axis at any z.
@@ -1301,7 +1304,7 @@ def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
     # strap face against the .XX-printed station, Codex #858 P2); the shaft
     # ligament at the implied zero's .XX offset (#290: .X is kept for features
     # no check reads) clears the .080 target, and a 0.25 V-block set-up too.
-    assert math.isclose(pin.STRAP_FACE_WEB_WORST, 3.163, abs_tol=5e-4)
+    assert math.isclose(pin.STRAP_FACE_WEB_WORST, 2.935, abs_tol=5e-4)
     assert pin.STRAP_FACE_WEB_WORST >= WALL_TARGET_MM
     assert pin.FOLLOWER_SEAT_LIGAMENT >= WALL_TARGET_MM
     assert math.isclose(pin.SHAFT_LIGAMENT_WORST, 2.085, abs_tol=5e-4)
@@ -1598,7 +1601,7 @@ def test_spring_blade_on_flank_books_every_primitive_term() -> None:
 
     terms = {
         "MHA-DT-14 strap thickness": THICKNESS,
-        "MHA-DT-14 strap thickness .XXX, thinnest": printed_deviations(
+        "MHA-DT-14 strap thickness .XX, thinnest": printed_deviations(
             THICKNESS, THICKNESS_PLACES, unit=STRAP_UNIT
         )[0],
         "spring pad leaf": -RIG.SPRING_PAD_LEAF,
@@ -1654,7 +1657,7 @@ def test_spring_strip_clears_gear_j19_at_the_worst_fit_up() -> None:
     terms = {
         "strip front edge, nominal": RIG.SPRING_Z - WIDTH / 2.0 - j19_back,
         "rig-set leaf D set error": -RIG.FEELER_SET_ERROR,
-        "MHA-DT-14 strap thickness .XXX, thinnest": printed_deviations(
+        "MHA-DT-14 strap thickness .XX, thinnest": printed_deviations(
             THICKNESS, THICKNESS_PLACES, unit=STRAP_UNIT
         )[0],
         "spring pad leaf set error": -RIG.FEELER_SET_ERROR,

@@ -204,7 +204,7 @@ if abs(INNER_SPAN - _SOLID_SPAN) > 1e-9:
 
 # Worst fitted stack (Codex #854 P1).  The span between the blocks is two
 # straps, the drum, its end shim and the feeler, each inside its own printed
-# band -- the straps' .XXX and the drum's own row, the shim's and the
+# band -- the straps' .XX and the drum's own row, the shim's and the
 # feeler's ruled band -- and each block adds its own .XX depth.  The stacks
 # below carry every term by name; nothing sums them into one symmetric band.
 # The torque shaft and the lift rod are set back-flush, so those terms land
@@ -255,7 +255,7 @@ def torque_shaft_bearing_stack(shaft_len: float) -> dict[str, float]:
             shaft_len, LENGTH_PLACES, unit=LENGTH_UNIT
         )[0],
         "MHA-DT-18 back block depth .XX": -_BLOCK_DEPTH_UPPER,
-        "MHA-DT-14 strap thickness .XXX (2 straps)": -2.0 * _STRAP_T_UPPER,
+        "MHA-DT-14 strap thickness .XX (2 straps)": -2.0 * _STRAP_T_UPPER,
         "MHA-DT-01 drum length .X": -_DRUM_LEN_UPPER,
         "MHA-DT-00 front block feeler band": -FRONT_BLOCK_FEELER_BAND,
         "MHA-DT-19 drum end shim set error": -DRUM_END_SHIM_SET_ERROR,
@@ -359,7 +359,7 @@ def lift_rod_seat_stack(rod_len: float) -> dict[str, float]:
             rod_len, LENGTH_PLACES, unit=LENGTH_UNIT
         )[0],
         "MHA-DT-18 block depth .XX (2 blocks)": -2.0 * _BLOCK_DEPTH_UPPER,
-        "MHA-DT-14 strap thickness .XXX (2 straps)": -2.0 * _STRAP_T_UPPER,
+        "MHA-DT-14 strap thickness .XX (2 straps)": -2.0 * _STRAP_T_UPPER,
         "MHA-DT-01 drum length .X": -_DRUM_LEN_UPPER,
         "MHA-DT-00 front block feeler band": -FRONT_BLOCK_FEELER_BAND,
         "MHA-DT-19 drum end shim set error": -DRUM_END_SHIM_SET_ERROR,

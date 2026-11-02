@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import _config
 from _package_units import drawing_unit
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import printed_deviations
 
 # #290: the registry row's drawing_unit (in) is this sheet's unit; every band
 # and place below is authored for it, and the drive train, the rig layout and
@@ -39,14 +39,21 @@ C2C = 28.0
 # a foreshortened broad face plus its edge: front 61 + 62 px, back 86 + 40 px.
 # Solving 15*cos(t) + T*sin(t) = (face + edge)/7.76 for each end's own view angle
 # (cos t = face/(15*7.76)) gives T = 9.4 front, 7.6 back.  U28 (user, 2026-09-23)
-# set 9.0, inside that photo band; #290 snaps it to .354 at .XXX, the row the
-# rig's span stack, the follower-seat web and the cross-hole web all read.  The
-# seat and the cross hole are printed CENTRED on the thickness, which leaves
-# the far-face webs over the .080 target (dt_pinion_bracket_spec.PIN_SEAT_WEB_WORST,
-# dt_vn_pinion_strap_pin_spec.STRAP_FACE_WEB_WORST).
-THICKNESS = 8.9916  # .354
-THICKNESS_PLACES = 3  # Depth prints .XXX (dt_pinion_bracket_spec.DRAWING_PRECISION)
-THICKNESS_BAND = printed_band_mm(THICKNESS_PLACES, unit=UNIT)  # .005; the rig's stack reads it
+# set 9.0, inside that photo band; #290 keeps it as .354 and prints it at the
+# title block's loose .XX (.35), which the rig's span stack, the follower-seat
+# web and the cross-hole web all read at its printed limits (rule 17: a thin
+# wall is not rescued with a tighter band; Codjiflo on #2106).  The seat and
+# the cross hole are printed CENTRED on the thickness.  The cross-hole web
+# clears the .080 target (dt_vn_pinion_strap_pin_spec.STRAP_FACE_WEB_WORST);
+# the follower seat's far-face web does not, and is the owner-precedent minor
+# exception RV-01 (dt_pinion_bracket_spec.PIN_SEAT_WEB_WORST).
+THICKNESS = 8.9916  # .354, prints .35
+THICKNESS_PLACES = 2  # Depth prints .XX (dt_pinion_bracket_spec.DRAWING_PRECISION)
+# (thinnest, thickest) at the printed .XX limits (.34/.36): the rounding puts
+# the nominal off-centre, so readers take both limits, never a symmetric band.
+THICKNESS_LIMITS = tuple(
+    THICKNESS + d for d in printed_deviations(THICKNESS, THICKNESS_PLACES, unit=UNIT)
+)
 PIVOT_BORE = 6.35  # .2500, REAM_SLIDE on the MHA-DT-19 shaft
 ARBOR_BORE = 7.9375  # 5/16 in, REAM_SLIDE on the MHA-DT-22 arbor
 # #290: the MHA-DT-25 stud is 5/32 drill rod, bonded in a seat cut by the

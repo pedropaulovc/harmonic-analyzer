@@ -163,15 +163,21 @@ def test_blind_seat_dimensions_are_assigned_to_readable_views() -> None:
 def test_follower_seat_station_is_printed_from_face_a_with_a_rule_12_web() -> None:
     # drawing-guidelines.md rule 17 (walls and webs) (audit W23) under user ruling (a), Codex #858 P2: the station
     # is the model's own PinSeatCz from broad face A, never "CENTRED" prose.
-    # #290: the .354 strap prints the station at .XXX, so the far-face web
-    # clears the .080 target at the title-block row and the former +/-0.10
-    # station band is retired.
+    # #290: the station prints at .XXX under that ruling; the strap keeps the
+    # title block's loose .XX thickness (rule 17: no tighter band rescues a
+    # wall), so the far-face web sits over the .060 floor and under the .080
+    # target, the declared RV-01, while the near face clears the target.
     from _inch_wall_limits import WALL_TARGET_MM
 
     assert "CENTRED" not in drawing.DIMENSION_CALLOUTS["PinSeatDia"]
     assert "PinSeatCz" in dt_pinion_bracket_spec.DRAWING_DIMENSIONS["PinSeatProfile"]
     assert dt_pinion_bracket_spec.DRAWING_PRECISION_BY_NAME["PinSeatCz"] == 3
-    assert dt_pinion_bracket_spec.PIN_SEAT_WEB_WORST >= WALL_TARGET_MM
+    assert dt_pinion_bracket_spec.DRAWING_PRECISION_BY_NAME["Depth"] == 2
+    assert (
+        WALL_FLOOR_MM
+        <= dt_pinion_bracket_spec.PIN_SEAT_WEB_WORST
+        < WALL_TARGET_MM
+    )
     assert dt_pinion_bracket_spec.PIN_SEAT_NEAR_WEB_WORST >= WALL_TARGET_MM
     # Both through-thickness stations print left of face A with their arrows
     # inside the span: centred, the cross hole's threw its right arrow outside,
@@ -356,13 +362,16 @@ def test_fitted_bores_name_their_mates_and_fits() -> None:
         for word in words:
             assert word in text, (name, word)
     assert {c.key for c in dt_pinion_bracket_spec.SURFACE_FINISHES} == {"arbor_bore"}
-    # #290: at .XXX the far-face wall clears the .080 target, so the sheet
-    # prints no WALL minimum and the former RV-01 exception is retired.
-    from _inch_wall_limits import WALL_TARGET_MM
-
-    assert "WALL" not in callouts["PinSeatCz"]
-    assert dt_pinion_bracket_spec.PIN_SEAT_WEB_WORST >= WALL_TARGET_MM
-    assert not load_exceptions(_config.CONFIG_DIR, "dt_pinion_bracket", "part")
+    # #290: at the strap's .XX thickness the far-face wall is under the .080
+    # target, so the sheet states it and the part declares it as RV-01.
+    wall = dt_pinion_bracket_spec.PIN_SEAT_WALL_CALLOUT
+    assert wall == "WALL .077 MIN"
+    assert callouts["PinSeatCz"].splitlines()[-1] == wall
+    assert float(wall.split()[1]) * 25.4 <= dt_pinion_bracket_spec.PIN_SEAT_WEB_WORST
+    (entry,) = load_exceptions(_config.CONFIG_DIR, "dt_pinion_bracket", "part")
+    assert (entry.id, entry.kind) == ("RV-01", "minor")
+    assert wall in entry.where
+    assert "#2144" in entry.reason
     # The (43.0) stands left of the flank, so no leader to the follower seat
     # (callouts right of the view) crosses its dimension line.
     face_a = drawing.LEFT_CENTER[0] - (
@@ -393,7 +402,11 @@ def test_every_web_and_ligament_clears_the_floor_at_the_printed_bands() -> None:
     import dt_vn_pinion_strap_pin_spec as pin
 
     geometry = dt_pinion_bracket_geometry
-    thickness_min = geometry.THICKNESS - _printed_band("Depth")
+    thickness_min = geometry.THICKNESS_LIMITS[0]
+    lower = printed_deviations(
+        geometry.THICKNESS, geometry.THICKNESS_PLACES, unit=geometry.UNIT
+    )[0]
+    assert math.isclose(thickness_min, geometry.THICKNESS + lower)
     hole_r = (
         dt_pinion_bracket_spec.CROSS_HOLE_DIA + dt_pinion_bracket_spec.CROSS_HOLE_BAND[0]
     ) / 2.0
@@ -459,6 +472,6 @@ def test_every_web_and_ligament_clears_the_floor_at_the_printed_bands() -> None:
     pin_source = Path(pin.__file__).read_text(encoding="utf-8")
     assert "DOT_X_BAND" not in pin_source and "DOT_XX_BAND" not in pin_source
     # The values the inch sheet leaves (#290).
-    assert math.isclose(worst["cross hole far face"], 3.163, abs_tol=5e-4)
-    assert math.isclose(worst["seat far face"], 2.192, abs_tol=5e-4)
+    assert math.isclose(worst["cross hole far face"], 2.935, abs_tol=5e-4)
+    assert math.isclose(worst["seat far face"], 1.963, abs_tol=5e-4)
     assert math.isclose(worst["shaft wall"], 2.085, abs_tol=5e-4)
