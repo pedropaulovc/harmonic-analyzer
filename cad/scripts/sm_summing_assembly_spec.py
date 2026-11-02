@@ -59,11 +59,11 @@ QUANTITIES = {
 # crossbar hole -- crossbar underside to the top of the MHA-SM-VN-54 washer
 # seated on the faced top -- plus this reach into its knife mount's tap. The
 # frame's printed grip band and the washer's catalogue thickness spread are
-# measured out of the reach; only this cut band reaches the tap. Two places,
-# so the sheet prints it as "8.92 ±0.15".
-HANGER_FIT_REACH = 8.92
-HANGER_FIT_REACH_TOL = 0.15
-HANGER_FIT_REACH_PLACES = 2
+# measured out of the reach; only this cut band reaches the tap. Three
+# decimal-inch places, so the sheet prints it as ".351 ±.006".
+HANGER_FIT_REACH = 8.9154  # .351
+HANGER_FIT_REACH_TOL = 0.1524  # .006
+HANGER_FIT_REACH_PLACES = 3
 
 # --- Assembly settings, as model dimensions -------------------------------------
 # Two blanked Front-plane construction sketches in the assembly (sketch x =
@@ -111,15 +111,18 @@ def _boss_face_rise(angle: float) -> float:
     return x * math.sin(angle) + y * math.cos(angle) - y
 
 
-ROCK_PRECISION = 2
-BOSS_ROCK_TRAVEL = (
+# Printed decimal-inch places (the contract's drawing_unit): the rock gauge
+# rounds up onto the .001 grid, the counter-screw reference prints .XX.
+ROCK_PRECISION = 3
+_ROCK_GRID_MM = 25.4 / 10**ROCK_PRECISION
+BOSS_ROCK_TRAVEL = round(
     math.ceil(
-        min(abs(_boss_face_rise(_FLOOR)), abs(_boss_face_rise(-_FLOOR)))
-        * 10**ROCK_PRECISION
+        min(abs(_boss_face_rise(_FLOOR)), abs(_boss_face_rise(-_FLOOR))) / _ROCK_GRID_MM
     )
-    / 10**ROCK_PRECISION
+    * _ROCK_GRID_MM,
+    6,
 )
-COUNTER_PRECISION = 1
+COUNTER_PRECISION = 2
 DRAWING_PRECISION = {
     COUNTER_FEATURE: {COUNTER_DIMENSION: COUNTER_PRECISION},
     ROCK_FEATURE: {ROCK_DIMENSION: ROCK_PRECISION},

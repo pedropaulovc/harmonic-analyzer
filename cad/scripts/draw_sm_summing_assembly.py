@@ -962,7 +962,9 @@ def _place_steps_sheet(adapter: Any, sheet_name: str, text: str) -> None:
 
 
 def _create_sheets(adapter: Any) -> None:
-    new_project_drawing(adapter, layout=SPEC.layout, scale=ASSEMBLED_SCALE)
+    new_project_drawing(
+        adapter, layout=SPEC.layout, scale=ASSEMBLED_SCALE, unit=notes.UNIT
+    )
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="summing package")
     for name in SHEET_NAMES:
         sheet = _activate_sheet(adapter, name)

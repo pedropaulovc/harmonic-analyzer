@@ -29,8 +29,8 @@ Seven features (the six .cs features + the hex knife edge):
    leaves PROTRUDE beyond the body (one per side), so each knife edge rests
    on a bearing support on the top plate (ch30-p003), and the stubs share
    every side face's plane by construction (code review C09).
-4. Edge ribs (x2)      -- common tangent R15.24 wrap/flank/R1 profile at the
-   plate ends, each 5.00 mm thick; the middle rib shares that thickness.
+4. Edge ribs (x2)      -- common tangent R15.24 wrap/flank/R.040 profile at the
+   plate ends, each 5.08 mm thick; the middle rib shares that thickness.
 5. Summation plate     -- Top-plane leaf on the -X (counter-spring) arm: vertical
    base edge, two curved sides, short tip edge.
 6. Summation anchor    -- Top-plane concentric ring (outer + bore) at the -X tip,
@@ -63,10 +63,12 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import math
+import re
 import sys
 
 import _telemetry
 from _appearance import CASTING_GREEN, apply_color, apply_material
+from _document_units import apply_package_model_units
 from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound, _read_member
@@ -77,6 +79,7 @@ from _named_views import name_octant_views
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _paths import IN
+from _part_properties import part_drawing_unit
 from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import (
@@ -97,8 +100,10 @@ from magnifying_bracket_joint_layout import (
     TAP_SPEC,
     TAP_DRILL_DIA,
     DRILL_DEPTH,
+    DRILL_DEPTH_BAND,
     DRILL_POINT_DEPTH,
-    DRILL_DEPTH_DEVIATIONS,
+    RECEIVER_DRILL_DEPTH_PLACES,
+    RECEIVER_HOLE_PLACES,
     THREAD_DEPTH_BAND,
     RECEIVER_PILOT_WALL_MIN,
     receiver_pilot_material_wall_budget,
@@ -110,6 +115,7 @@ from _drawing_marks import (
 )
 from _drawing_dimension_insert import add_angular_reference_dimension
 from _drawing_tolerances import (
+    set_dimension_basic_tolerance,
     set_dimension_symmetric_angular_tolerance,
     set_dimension_symmetric_tolerance,
 )
@@ -129,6 +135,9 @@ from sm_summing_lever_notes import (
     DRAWING_DIMENSIONS,
     FRONT_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
+    RECEIVER_COORDINATE_PLACES,
+    SPRING_ROW_LOCATORS,
+    BASIC_PLACES,
     RECEIVER_ISOMETRIC_OCTANT,
     RECEIVER_ISOMETRIC_VIEW_NOTE,
 )
@@ -143,22 +152,29 @@ from sm_summing_lever_spec import (
     COUNTER_HOLE_SPEC,
     DRAWING_PRECISION,
     HOLE_COUNT,
+    HOLE_END_OFFSET_LAST,
     HOLE_SPEC,
     HOLE_X,
     HOLE_Z_OFFSET,
+    HOLE_Z_LAST,
     KNIFE_FLANK_TO_SIDE_TOL_DEG,
+    KNIFE_ENVELOPE_PLACES,
     KNIFE_RIDGE_R,
     KNIFE_RIDGE_R_BAND,
+    KNIFE_RIDGE_R_PLACES,
     KNIFE_RIDGE_R_TOL_TYPE,
+    PLATE_W_DEVIATIONS,
     RIDGE_ANGLE_DEG,
     RIDGE_FROM_SIDE_TOL,
     RIB_BLEND_R,
     RIB_BLEND_R_BAND,
+    RIB_BLEND_R_PLACES,
     RIB_BLEND_R_TOL_TYPE,
     RIB_REACH,
     RIB_T,
     RIB_WRAP_R,
     SURFACE_FINISHES,
+    UNIT,
 )
 from sm_summing_lever_profile import LOWER, UPPER, edge_rib_added_area_mm2
 from sm_summing_lever_profile import receiver_pilot_wall_budget, receiver_wall_margin
@@ -219,10 +235,10 @@ ARC_R = RIB_WRAP_R
 RIB_OFFSET = PLATE_L / 2.0 - RIB_T  # both edge-rib inner caps; outside ends fixed
 # No plain anchor bore: the counter anchor's seat is the native COUNTER_HOLE_SPEC
 # tap through the boss, authored after the ribs (see _counter_anchor_tap).
-# In X, all ribs stop at 35.75 before the unchanged spring-hole column and
-# worst jam-nut footprint at 36.45. The pilot continues beyond the 5.00 mm
+# In X, all ribs stop at 35.814 (1.41) before the unchanged spring-hole column
+# and worst jam-nut footprint at 36.449. The pilot continues beyond the 5.08 mm
 # entry rib into the connected coefficient plate, not an enlarged receiver.
-# The shared positive-X branch meets both plate faces with R1 tangent
+# The shared positive-X branch meets both plate faces with R.040 tangent
 # transitions, with no separate pad, ledge or vertical tip face.
 if RIB_REACH > HOLE_X - blind_cut_dia_mm(HOLE_SPEC) / 2.0 - 2.0:
     raise AssertionError("a rib's +X end reaches the spring-hole column")
@@ -235,10 +251,31 @@ RECEIVER_EDGE_MARK = 1.0
 RECEIVER_TAP_MARK = 0.5
 if not RECEIVER_EDGE_MARK < COEFFICIENT_T or not RECEIVER_TAP_MARK < TAP_DRILL_DIA / 2.0:
     raise AssertionError("receiver coordinate marks must stay on printed ink")
+# Spring-row marks (``_spring_row_coordinates``): the ridge mark lies on the
+# plan's ridge centreline beyond the -Z stub's inboard face, the end mark on
+# the +Z end edge at X10 (the edge the plan names datum B), each tap mark on
+# its row inside the tap drill.
+SPRING_ROW_MARK = 1.0
+SPRING_ROW_TAP_MARK = 0.5
+SPRING_ROW_END_MARK_X = 10.0
+if (
+    not 0.3 * HEX_DEPTH + SPRING_ROW_MARK < HEX_DEPTH
+    or not SPRING_ROW_TAP_MARK < blind_cut_dia_mm(HOLE_SPEC) / 2.0
+):
+    raise AssertionError("spring-row coordinate marks must stay on printed ink")
 
 
 # Spring-hole Z stations (world Z); the Top-plane sketch maps world Z to -sketchY.
 HOLE_Z = [CHANNEL_Z0 + CHANNEL_PITCH * j + HOLE_Z_OFFSET for j in range(HOLE_COUNT)]
+# The spring-tap pattern's equation drives: the seed's row X and station and
+# the pattern's spacing.  The plan's hidden locators (_spring_row_coordinates)
+# are driven by the same expressions, so a Tools > Equations edit to any of
+# these globals moves the holes and the printed BASICs together.
+SPRING_ROW_X_EXPR = '"HoleX"'
+SPRING_SEED_STATION_EXPR = (
+    f'"ChannelZ0" + {HOLE_COUNT - 1} * "ChannelPitch" + "HoleZOffset"'
+)
+SPRING_PITCH_EXPR = '"ChannelPitch"'
 
 # Assembly-facing exports (build_sm_summing_assembly imports these).
 SPIN_REF_X = TIP_X  # local X of the summation-anchor tap = counter-spring ref
@@ -438,11 +475,8 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
         expect_dia_mm=seed_dia,
         placement_dims=[
             (
-                ("HoleSeedX", '"HoleX"'),
-                (
-                    "HoleSeedStation",
-                    f'"ChannelZ0" + {HOLE_COUNT - 1} * "ChannelPitch" + "HoleZOffset"',
-                ),
+                ("HoleSeedX", SPRING_ROW_X_EXPR),
+                ("HoleSeedStation", SPRING_SEED_STATION_EXPR),
             )
         ],
     )
@@ -467,7 +501,7 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     # live, not inert (the measuring-stick TickPattern Codex P2). The spacing
     # is D3 (D1 is the pattern's direction-reference length, NOT the pitch);
     # D3 == as-built CHANNEL_PITCH, so it stays neutral.
-    drive_jobs.append(("D3@SpringHolePattern", '"ChannelPitch"'))
+    drive_jobs.append(("D3@SpringHolePattern", SPRING_PITCH_EXPR))
     await volume_check(
         adapter,
         "spring-hole field",
@@ -698,7 +732,7 @@ async def _measured_volume(adapter, label: str) -> float:
 
 
 def _knife_ridge_max_limit(adapter) -> None:
-    """KnifeRidgeRadius as the single limit "R0.1 MAX" carrying the band's
+    """KnifeRidgeRadius as the single limit "R.004 MAX" carrying the band's
     deviations (build_ch_pivot_bracket._corner_radius_max_limit's recipe)."""
     lower, upper = deviations(KNIFE_RIDGE_R_BAND)
     _, dimension = _named_dimension(adapter, "KnifeRidgeFillet", "KnifeRidgeRadius")
@@ -723,7 +757,9 @@ def _knife_ridge_max_limit(adapter) -> None:
         )
     ):
         raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
-    set_dimension_display_precision(adapter, "KnifeRidgeFillet", "KnifeRidgeRadius", 1)
+    set_dimension_display_precision(
+        adapter, "KnifeRidgeFillet", "KnifeRidgeRadius", KNIFE_RIDGE_R_PLACES
+    )
     _telemetry.success(f"{label}: single limit {KNIFE_RIDGE_R:g} MAX")
 
 
@@ -807,11 +843,11 @@ async def _rib_profile_sketch(
 
     set_sketch_direct_db(adapter, True)
     upper_blend = await arc(
-        UPPER.center_xy, UPPER.flank_xy, UPPER.end_xy, "upper R1 blend"
+        UPPER.center_xy, UPPER.flank_xy, UPPER.end_xy, "upper R.040 blend"
     )
     end = await line(UPPER.end_xy, LOWER.end_xy, "buried closing line")
     lower_blend = await arc(
-        LOWER.center_xy, LOWER.end_xy, LOWER.flank_xy, "lower R1 blend"
+        LOWER.center_xy, LOWER.end_xy, LOWER.flank_xy, "lower R.040 blend"
     )
     upper_flank = await line(UPPER.wrap_xy, UPPER.flank_xy, "upper tangent flank")
     lower_flank = await line(LOWER.flank_xy, LOWER.wrap_xy, "lower tangent flank")
@@ -894,7 +930,7 @@ async def _rib_profile_sketch(
 
 
 def _assert_native_rib_profile(adapter, stem: str) -> None:
-    """Prove both real flanks and both R1 blend surfaces, not only the sketch."""
+    """Prove both real flanks and both R.040 blend surfaces, not only the sketch."""
     model = _early_bound(adapter.currentModel, "IPartDoc")
     raw = model.FeatureByName(stem)
     if raw is None:
@@ -928,7 +964,7 @@ def _assert_native_rib_profile(adapter, stem: str) -> None:
             f"{stem}: native tangent profile lost flanks {found_flanks} "
             f"or bounded blends {found_blends}"
         )
-    _telemetry.success(f"{stem}: both native tangent flanks and R1 profile blends")
+    _telemetry.success(f"{stem}: both native tangent flanks and R.040 profile blends")
 
 
 async def _edge_rib(
@@ -1256,7 +1292,7 @@ def _assert_receiver_profile_walls(adapter) -> None:
 def coefficient_underside_root_geometry() -> tuple[
     float, tuple[float, float], tuple[float, float], tuple[tuple[float, float], ...]
 ]:
-    """Nominal lower junction, tangent R1 cylinder and two inboard edge runs.
+    """Nominal lower junction, tangent R.040 cylinder and two inboard edge runs.
 
     The fillet circle is externally tangent to the pivot cylinder and tangent
     to the plate underside. Its centre is R below the underside, at distance
@@ -1347,19 +1383,16 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
         upper_bounds = (center[0] + RIB_BLEND_R, COEFFICIENT_BOTTOM_Y + RIB_BLEND_R)
         covered_runs = set()
         from magnifying_bracket_joint_layout import (
-            DRILLED_DIAMETER_PLUS, DRILL_WANDER_MAX, LINEAR_BAND, POSITION_BAND,
+            DRILL_WANDER_MAX, POSITION_BAND, receiver_pilot_radius_max,
         )
 
-        pilot_radius = (
-            (max(TAP_DRILL_DIA, round(TAP_DRILL_DIA, 2)) + DRILLED_DIAMETER_PLUS) / 2.0
-            + DRILL_WANDER_MAX
-        )
+        pilot_radius = receiver_pilot_radius_max() + DRILL_WANDER_MAX
         # This X-disjointness proof covers the finite pilot, with ordinary
         # free-edge motion and the actual-axis position band. No wall credit
         # is taken for the material added by the concave blend.
         receiver_inner_x = (
             min(point[0] for point in LEVER_HOLE_POINTS)
-            - LINEAR_BAND - POSITION_BAND - pilot_radius
+            + PLATE_W_DEVIATIONS[0] - POSITION_BAND - pilot_radius
         )
         if (
             upper_bounds[0] >= min(receiver_inner_x, PLATE_W, RIB_REACH)
@@ -1375,7 +1408,7 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
         elif surface.IsTorus():
             radius = float(surface.TorusParams[7]) * 1000.0
         # A transition patch can be nonanalytic. It must pass the same exact
-        # bounds, but cannot stand in for a proved cylindrical/toroidal R1.
+        # bounds, but cannot stand in for a proved cylindrical/toroidal R.040.
         # IFace2.GetBox is approximate. A temporary, unsaved sheet body of
         # this actual trimmed fillet face gives exact directional extrema,
         # without confusing its envelope with the plate's X44.45 free edge.
@@ -1447,7 +1480,7 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
 
 
 async def _rib_root_fillets(adapter, drive_jobs: list[tuple[str, str]]) -> None:
-    """Bounded R1 roots with no tangent propagation or geometry fallback."""
+    """Bounded R.040 roots with no tangent propagation or geometry fallback."""
     for name, picks, edge_length_bound in rib_root_edge_families():
         before = await _measured_volume(adapter, f"before {name}")
         check(
@@ -1468,12 +1501,12 @@ async def _rib_root_fillets(adapter, drive_jobs: list[tuple[str, str]]) -> None:
             )
         _assert_root_feature_bounds(adapter, name, len(picks))
         _telemetry.success(
-            f"{name}: bounded native R1 roots added {addition:.6f} mm^3"
+            f"{name}: bounded native R.040 roots added {addition:.6f} mm^3"
         )
 
 
 def _rib_radius_max_limits(adapter) -> None:
-    """Band every modeled rib blend under the title-block R1 MAX ceiling.
+    """Band every modeled rib blend under the title-block R.040 MAX ceiling.
 
     Profile blends, perpendicular rib-side roots and the changed longitudinal
     coefficient underside remain native controls without a duplicate drawing
@@ -1496,14 +1529,14 @@ def _rib_radius_max_limits(adapter) -> None:
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
         tolerance.Type = RIB_BLEND_R_TOL_TYPE
         if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
-            raise RuntimeError(f"{name}@{feature}: R1 MAX limits refused")
+            raise RuntimeError(f"{name}@{feature}: R.040 MAX limits refused")
         if (
             int(tolerance.Type) != RIB_BLEND_R_TOL_TYPE
             or abs(float(tolerance.GetMinValue()) - lower / 1000.0) > 1e-12
             or abs(float(tolerance.GetMaxValue()) - upper / 1000.0) > 1e-12
         ):
-            raise RuntimeError(f"{name}@{feature}: R1 MAX limits did not persist")
-        set_dimension_display_precision(adapter, feature, name, 1)
+            raise RuntimeError(f"{name}@{feature}: R.040 MAX limits did not persist")
+        set_dimension_display_precision(adapter, feature, name, RIB_BLEND_R_PLACES)
 
 
 async def _counter_anchor_tap(adapter, drive_jobs: list[tuple[str, str]]) -> None:
@@ -1558,9 +1591,15 @@ def _receiver_model_bands(adapter) -> None:
 
     model = _early_bound(adapter.currentModel, "IPartDoc")
     feature = _early_bound(model.FeatureByName("BracketMountingTaps"), "IFeature")
+    # name -> (nominal mm, (lower, upper) mm, display places)
     required = {
-        "FullThreadDepth": (THREAD_DEPTH, (-THREAD_DEPTH_BAND, THREAD_DEPTH_BAND)),
-        "TapDrillDepth": (DRILL_DEPTH, DRILL_DEPTH_DEVIATIONS),
+        "FullThreadDepth": (
+            THREAD_DEPTH, (-THREAD_DEPTH_BAND, THREAD_DEPTH_BAND), RECEIVER_HOLE_PLACES
+        ),
+        "TapDrillDepth": (
+            DRILL_DEPTH, (-DRILL_DEPTH_BAND, DRILL_DEPTH_BAND),
+            RECEIVER_DRILL_DEPTH_PLACES,
+        ),
     }
     matches = {name: [] for name in required}
     # Hole Wizard thread lengths can belong to its cosmetic-thread subfeature.
@@ -1585,14 +1624,14 @@ def _receiver_model_bands(adapter) -> None:
             parts = full_name.split("@")
             if not linear or len(parts) < 2 or parts[1] != owner:
                 continue
-            for name, (nominal, _band) in required.items():
+            for name, (nominal, _band, _places) in required.items():
                 if abs(value_mm - nominal) < 1e-5:
                     matches[name].append((owner, parts[0], display, dimension))
     # Native shape (farm, 2026-10-09): Hole Wizard owns the tap drill depth on
     # one sketch subfeature, but adds one cosmetic-thread subfeature PER HOLE,
     # each owning its own full-thread depth.
     expected = {"FullThreadDepth": len(LEVER_HOLE_POINTS), "TapDrillDepth": 1}
-    for name, (_nominal, limits) in required.items():
+    for name, (_nominal, limits, places) in required.items():
         owners = {match[0] for match in matches[name]}
         if len(matches[name]) != expected[name] or len(owners) != expected[name]:
             raise RuntimeError(
@@ -1606,14 +1645,14 @@ def _receiver_model_bands(adapter) -> None:
             # reachable by FeatureByName, and the per-hole threads share the
             # name D1, so band the dimensions already held, not by name.
             _band_held_dimension(
-                display, dimension, limits, f"{native_name}@{owner}"
+                display, dimension, limits, f"{native_name}@{owner}", places=places
             )
 
 
 def _band_held_dimension(
-    display, dimension, deviations: tuple[float, float], label: str
+    display, dimension, deviations: tuple[float, float], label: str, *, places: int
 ) -> None:
-    """(lower, upper) tolerance in mm + 2-place display on an already-resolved
+    """(lower, upper) tolerance in mm + ``places`` display on an already-resolved
     dimension: symmetric when the deviations mirror, else bilateral (the
     by-name ``set_dimension_*_tolerance`` contracts, minus lookup)."""
     from _com import _bind, _early_bound
@@ -1639,13 +1678,18 @@ def _band_held_dimension(
             f"{label}: tolerance readback type {int(tolerance.Type)} "
             f"{minimum:g}/{maximum:g} m != type {kind} {lower_m:g}/{upper_m:g} m"
         )
-    _set_tolerance_precision(display, (lower, upper), display_unit="mm", label=label)
+    _set_tolerance_precision(
+        display, (lower, upper), display_unit=UNIT, label=label,
+        places=places,
+    )
     display = _early_bound(display, "IDisplayDimension")
     do_not_change = -1  # swDimensionPrecisionSettings_e
-    display.SetPrecision3(2, do_not_change, do_not_change, do_not_change)
-    if int(display.GetPrimaryPrecision2()) != 2:
+    display.SetPrecision3(places, do_not_change, do_not_change, do_not_change)
+    if int(display.GetPrimaryPrecision2()) != places:
         raise RuntimeError(f"{label}: display precision did not persist")
-    _telemetry.success(f"toleranced {label}: {upper:+g}/{lower:+g} mm (2 decimals)")
+    _telemetry.success(
+        f"toleranced {label}: {upper:+g}/{lower:+g} mm ({places} decimals)"
+    )
 
 
 def _as_construction(adapter, entity_id: str) -> None:
@@ -1929,13 +1973,13 @@ def _drawing_dimension_contract(adapter) -> None:
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     # The knife-edge controls the free-rock check assumes (code review C09):
     # the ridge from each side face and the flank-to-side angle carry their
-    # own tolerances; the vertex height three places, the title block's .XXX.
-    for name in ("HexWidth", "HexHeight", "RidgeFromLeft", "RidgeFromRight"):
-        set_dimension_display_precision(adapter, "KnifeEnvelopeReference", name, 3)
+    # own tolerances; the vertex height the title block's .XXX (the envelope's
+    # places are DRAWING_PRECISION's).
     set_dimension_display_precision(adapter, "KnifeEnvelopeReference", "FlankToSide", 1)
     for name in ("RidgeFromLeft", "RidgeFromRight"):
         set_dimension_symmetric_tolerance(
-            adapter, "KnifeEnvelopeReference", name, RIDGE_FROM_SIDE_TOL
+            adapter, "KnifeEnvelopeReference", name, RIDGE_FROM_SIDE_TOL,
+            places=KNIFE_ENVELOPE_PLACES, display_unit=UNIT,
         )
     set_dimension_symmetric_angular_tolerance(
         adapter,
@@ -2038,9 +2082,12 @@ async def _receiver_coordinate_dimensions(adapter) -> None:
     names = ["ReceiverX0", "ReceiverX1", "ReceiverY0"]
     for name in names + ["ReceiverY1"]:
         set_dimension_symmetric_tolerance(
-            adapter, "ReceiverCoordinates", name, POSITION_BAND
+            adapter, "ReceiverCoordinates", name, POSITION_BAND,
+            places=RECEIVER_COORDINATE_PLACES, display_unit=UNIT,
         )
-        set_dimension_display_precision(adapter, "ReceiverCoordinates", name, 2)
+        set_dimension_display_precision(
+            adapter, "ReceiverCoordinates", name, RECEIVER_COORDINATE_PLACES
+        )
     mark_dimensions_for_drawing(adapter, "ReceiverCoordinates", names)
     model = adapter.currentModel
     model.ClearSelection2(True)
@@ -2048,6 +2095,206 @@ async def _receiver_coordinate_dimensions(adapter) -> None:
         "ReceiverCoordinates", "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
     ):
         raise RuntimeError("cannot hide receiver coordinate sketch")
+    model.BlankSketch()
+    model.ClearSelection2(True)
+
+
+# The globals the spring row's drives read, as ``build`` sets them (mm).
+SPRING_ROW_GLOBALS_MM = {
+    "PlateL": PLATE_L,
+    "HexDepth": HEX_DEPTH,
+    "HoleX": HOLE_X,
+    "ChannelZ0": CHANNEL_Z0,
+    "ChannelPitch": CHANNEL_PITCH,
+    "HoleZOffset": HOLE_Z_OFFSET,
+}
+
+
+def _evaluate_drive(expression: str, values: dict[str, float]) -> float:
+    """An equation-manager expression (arithmetic over quoted globals)."""
+    python = re.sub(r'"([^"]+)"', lambda name: f"({values[name.group(1)]!r})", expression)
+    return float(eval(python, {"__builtins__": {}}))
+
+
+def _assert_spring_row_equations(adapter, drives: list[tuple[str, str]]) -> None:
+    """Native readback of the spring row's drive equations after a rebuild.
+
+    Each drive is in the equation manager with its recorded expression; that
+    expression over the model's own global values is the equation's value
+    (every expression is first-degree in length, so the manager's display
+    unit cancels); the dimension's SystemValue is the expression over the
+    built globals; and the pitch is the live pattern's spacing."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    manager = _early_bound(model.GetEquationMgr(), "IEquationMgr")
+    rows: dict[str, tuple[int, str]] = {}
+    for index in range(int(_read_member(manager, "GetCount") or 0)):
+        left, _, right = str(manager.Equation(index) or "").partition("=")
+        rows[left.strip().strip('"')] = (index, "".join(right.split()))
+
+    def value(name: str) -> float:
+        if name not in rows:
+            raise RuntimeError(f"no equation drives {name}")
+        index = rows[name][0]
+        evaluated = float(manager.Value(index))
+        if int(manager.Status) != index:
+            raise RuntimeError(f"equation for {name} does not evaluate")
+        return evaluated
+
+    model_globals = {name: value(name) for name in SPRING_ROW_GLOBALS_MM}
+    system_mm: dict[str, float] = {}
+    for dim_name, expression in drives:
+        native = value(dim_name)
+        if rows[dim_name][1] != "".join(expression.split()):
+            raise RuntimeError(f"{dim_name}: equation reads {rows[dim_name][1]!r}")
+        from_globals = _evaluate_drive(expression, model_globals)
+        if not math.isclose(from_globals, native, rel_tol=1e-6, abs_tol=1e-9):
+            raise RuntimeError(
+                f"{dim_name}: {expression} over the model globals is "
+                f"{from_globals!r}, its equation evaluates {native!r}"
+            )
+        leaf, _, owner = dim_name.partition("@")
+        _, dimension = _named_dimension(adapter, owner, leaf)
+        system_mm[leaf] = float(dimension.SystemValue) * 1000.0
+        expected = _evaluate_drive(expression, SPRING_ROW_GLOBALS_MM)
+        if not math.isclose(system_mm[leaf], expected, abs_tol=1e-6):
+            raise RuntimeError(
+                f"{dim_name}: SystemValue {system_mm[leaf]!r} mm, its "
+                f"expression {expression} evaluates {expected!r} mm"
+            )
+    pattern = _early_bound(model.FeatureByName("SpringHolePattern"), "IFeature")
+    spacing = float(_early_bound(pattern.Parameter("D3"), "IDimension").SystemValue)
+    if not math.isclose(system_mm["SpringPitch"], spacing * 1000.0, abs_tol=1e-6):
+        raise RuntimeError(
+            f"SpringPitch {system_mm['SpringPitch']!r} mm is not the pattern's "
+            f"spacing {spacing * 1000.0!r} mm"
+        )
+    _telemetry.success(f"spring-row locators equation-driven: {system_mm}")
+
+
+async def _spring_row_coordinates(adapter) -> None:
+    """Native BASIC locators of the 20X spring-tap pattern for the plan.
+
+    Row X runs from datum A's -Z ridge axis, start Z from the +Z plate end
+    (datum B) and the pitch between the first two stations, each to a hole
+    centre.  As in ``_receiver_coordinate_dimensions``, every end is the start
+    of a short construction mark lying on ink the plan prints anyway: on the
+    ridge centreline beyond the -Z stub, along the +Z end edge, and along each
+    tap's row inside its drill.  The part owns their BASIC type, four places
+    and the 19X count (rule 3); the sketch is saved hidden and the plan shows
+    it (``_drawing_hidden_sketches``).  The locators and the plate-end and
+    ridge stations they run from are driven by the pattern's own expressions
+    (``SPRING_*_EXPR``), so an Equations edit moves holes and locators
+    together.  The Top-plane sketch maps world Z to -sketchY."""
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    check("spring-row coordinate sketch", await adapter.create_sketch("Top"))
+    dimensions = SketchDims()
+    ridge = (0.0, PLATE_L / 2.0 + 0.3 * HEX_DEPTH)
+    end = (SPRING_ROW_END_MARK_X, -PLATE_L / 2.0)
+    seed = (HOLE_X, -HOLE_Z_LAST)
+    second = (HOLE_X, -(HOLE_Z_LAST - CHANNEL_PITCH))
+    set_sketch_direct_db(adapter, True)
+    ridge_mark = check(
+        "spring-row ridge mark",
+        await adapter.add_line(*ridge, ridge[0], ridge[1] + SPRING_ROW_MARK),
+    )
+    end_mark = check(
+        "spring-row end mark",
+        await adapter.add_line(*end, end[0] + SPRING_ROW_MARK, end[1]),
+    )
+    seed_mark = check(
+        "spring-row seed mark",
+        await adapter.add_line(*seed, seed[0] + SPRING_ROW_TAP_MARK, seed[1]),
+    )
+    second_mark = check(
+        "spring-row second mark",
+        await adapter.add_line(*second, second[0] + SPRING_ROW_TAP_MARK, second[1]),
+    )
+    set_sketch_direct_db(adapter, False)
+    for mark in (ridge_mark, end_mark, seed_mark, second_mark):
+        _as_construction(adapter, mark)
+    check(
+        "spring-row ridge mark vertical",
+        await adapter.add_sketch_constraint(ridge_mark, None, "vertical"),
+    )
+    await dimension_between(
+        adapter, f"{ridge_mark}.start", f"{ridge_mark}.end", "vertical_distance",
+        SPRING_ROW_MARK, "spring-row ridge mark length",
+    )
+    dimensions.record("SpringRowRidgeMark", None)
+    await anchor_point_to_origin(
+        adapter, f"{ridge_mark}.start", *ridge, "spring-row ridge station"
+    )
+    dimensions.record("SpringRowRidgeZ", '"PlateL" / 2 + 0.3 * "HexDepth"')
+    check(
+        "spring-row end mark horizontal",
+        await adapter.add_sketch_constraint(end_mark, None, "horizontal"),
+    )
+    await dimension_between(
+        adapter, f"{end_mark}.start", f"{end_mark}.end", "horizontal_distance",
+        SPRING_ROW_MARK, "spring-row end mark length",
+    )
+    dimensions.record("SpringRowEndMark", None)
+    await anchor_point_to_origin(
+        adapter, f"{end_mark}.start", *end, "spring-row plate end"
+    )
+    dimensions.record("SpringRowEndX", None)
+    dimensions.record("SpringRowEndZ", '"PlateL" / 2')
+    for label, mark in (("seed", seed_mark), ("second", second_mark)):
+        check(
+            f"spring-row {label} mark horizontal",
+            await adapter.add_sketch_constraint(mark, None, "horizontal"),
+        )
+        await dimension_between(
+            adapter, f"{mark}.start", f"{mark}.end", "horizontal_distance",
+            SPRING_ROW_TAP_MARK, f"spring-row {label} mark length",
+        )
+        dimensions.record(f"SpringRow{label.title()}Mark", None)
+    await dimension_between(
+        adapter, f"{ridge_mark}.start", f"{seed_mark}.start", "horizontal_distance",
+        HOLE_X, "spring-hole row X",
+    )
+    dimensions.record("SpringRowX", SPRING_ROW_X_EXPR)
+    await dimension_between(
+        adapter, f"{end_mark}.start", f"{seed_mark}.start", "vertical_distance",
+        HOLE_END_OFFSET_LAST, "spring-hole start Z",
+    )
+    dimensions.record("SpringStartZ", f'"PlateL" / 2 - ({SPRING_SEED_STATION_EXPR})')
+    check(
+        "spring-row second station on the row",
+        await adapter.add_sketch_constraint(
+            f"{seed_mark}.start", f"{second_mark}.start", "vertical_points"
+        ),
+    )
+    await dimension_between(
+        adapter, f"{seed_mark}.start", f"{second_mark}.start", "vertical_distance",
+        CHANNEL_PITCH, "spring-hole pitch",
+    )
+    dimensions.record("SpringPitch", SPRING_PITCH_EXPR)
+    await ensure_fully_defined(adapter, "spring-row coordinate sketch")
+    check("exit spring-row coordinate sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, "SpringRowCoordinates")
+    drives = dimensions.apply(adapter, "SpringRowCoordinates")
+    for dim_name, expr in drives:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    _assert_spring_row_equations(adapter, drives)
+    for name in SPRING_ROW_LOCATORS:
+        set_dimension_basic_tolerance(adapter, "SpringRowCoordinates", name)
+        set_dimension_display_precision(
+            adapter, "SpringRowCoordinates", name, BASIC_PLACES
+        )
+    # Twenty taps are nineteen pitches: the count is the pitch's own prefix.
+    set_dimension_prefix(
+        adapter, "SpringRowCoordinates", "SpringPitch", f"{HOLE_COUNT - 1}X "
+    )
+    mark_dimensions_for_drawing(adapter, "SpringRowCoordinates", SPRING_ROW_LOCATORS)
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+        "SpringRowCoordinates", "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError("cannot hide spring-row coordinate sketch")
     model.BlankSketch()
     model.ClearSelection2(True)
 
@@ -2082,6 +2329,7 @@ async def _bracket_mounting_taps(adapter) -> None:
 
 async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs: named globals in the equation manager that drive every
     # sketch dim below (a GUI fine-tune edits THESE -- Tools > Equations -- never
@@ -2107,7 +2355,7 @@ async def build(adapter) -> dict[str, str]:
     # Hole Wizard taps -- a #6-32 seed + linear pattern on the plate and one
     # #10-24 through the boss -- sized by the tap standard from the purchased
     # anchors' own threads, so a diameter knob would be a second, lying source.
-    # HoleX stays -- RibReach references it -- and the three station globals
+    # HoleX stays -- it places the seed -- and the three station globals
     # drive the seed while ChannelPitch also drives the pattern spacing.)
     await set_global(adapter, "HoleX", f"{HOLE_X}mm")
     await set_global(adapter, "ChannelZ0", f"{CHANNEL_Z0}mm")
@@ -2118,7 +2366,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "HexDepth", f"{HEX_DEPTH}mm")
     await set_global(adapter, "KnifeRidgeR", f"{KNIFE_RIDGE_R}mm")
     await set_global(adapter, "ArcR", '"CylR" + "RibPad"')
-    await set_global(adapter, "RibReach", '"HoleX" - 4.1mm')
+    # On its printed 1.41 grid (rule 3), not offset from the hole column.
+    await set_global(adapter, "RibReach", f"{RIB_REACH}mm")
     await set_global(adapter, "CoefficientBottomY", '"CoefficientTopY" - "CoefficientT"')
 
     # Per-sketch SketchDims record each dim in the helper's emission order; their
@@ -2205,6 +2454,7 @@ async def build(adapter) -> dict[str, str]:
     _rib_radius_max_limits(adapter)
     _receiver_model_bands(adapter)
     await _receiver_coordinate_dimensions(adapter)
+    await _spring_row_coordinates(adapter)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,

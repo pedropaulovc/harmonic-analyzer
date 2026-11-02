@@ -97,9 +97,9 @@ def test_modified_bolt_nominals_and_inspection_are_separate() -> None:
     assert bolt.HEAD_AF == BOLT_DIMS.head_af == pytest.approx(7.9375)
     assert bolt.HEAD_H == BOLT_DIMS.head_h == pytest.approx(3.175)
     assert bolt.THREAD_LENGTH == bolt.LENGTH
-    assert bolt.THREAD_LENGTH_MIN == pytest.approx(10.62)
+    assert bolt.THREAD_LENGTH_MIN == pytest.approx(10.6172)  # .418 MIN
     assert bolt.INCOMPLETE_TIP_LEN_MAX == bolt.PITCH
-    assert bolt.FULL_FORM_TAIL_MIN == pytest.approx(9.561666666666666)
+    assert bolt.FULL_FORM_TAIL_MIN == pytest.approx(10.6172 - 25.4 / 24)
     assert not hasattr(bolt, "HEAD_DIA")  # No socket-head compatibility alias.
     assert bolt.TIP_Y == 0.0
     assert bolt.HEAD_UNDERFACE_Y == bolt.LENGTH == pytest.approx(46.70)
@@ -107,15 +107,17 @@ def test_modified_bolt_nominals_and_inspection_are_separate() -> None:
     assert bolt.ENGAGEMENT_MIN_D == 1.5
 
 
-def test_chamfer_band_is_needed_for_full_thread_engagement() -> None:
-    # Native radial leg 0.60 +/-0.05 at the title-block 45 +/-1 degrees.
+def test_title_block_chamfer_band_leads_into_the_tap_inside_one_pitch() -> None:
+    # Native radial leg .03 under the title block's .XX +/-.01, at its
+    # 45 +/-1 degrees.
+    assert bolt.CHAMFER_WIDTH_TOLERANCE == printed_band_mm(2, unit="in") == pytest.approx(0.254)
+    assert bolt.DIMENSION_PRECISION["ChamferWidth"] == 2
     assert (bolt.CHAMFER_WIDTH_MIN, bolt.CHAMFER_WIDTH_MAX) == pytest.approx(
-        (0.55, 0.65)
+        (0.508, 1.016)
     )
     assert bolt.CHAMFER_ANGLE_TOLERANCE == angular_band_deg() == 1.0
     steepest = math.radians(bolt.CHAMFER_ANGLE + bolt.CHAMFER_ANGLE_TOLERANCE)
-    assert bolt.CHAMFER_AXIAL_MAX == pytest.approx(0.65 * math.tan(steepest))
-    assert bolt.CHAMFER_AXIAL_MAX == pytest.approx(0.67309, abs=5e-6)
+    assert bolt.CHAMFER_AXIAL_MAX == pytest.approx(1.016 * math.tan(steepest))
     # Inside the one incomplete pitch the worst engagement already charges:
     # reach MIN 8.77 - 1 P = 7.7117 >= 1.5D = 7.239.
     assert bolt.CHAMFER_AXIAL_MAX <= bolt.INCOMPLETE_TIP_LEN_MAX == bolt.PITCH
@@ -124,21 +126,11 @@ def test_chamfer_band_is_needed_for_full_thread_engagement() -> None:
     tip_loss = max(bolt.CHAMFER_AXIAL_MAX, bolt.INCOMPLETE_TIP_LEN_MAX)
     assert asm.HANGER_REACH_MIN - tip_loss >= floor
     # The smallest leg still takes the cut thread start inside the mount's
-    # #25 tap drill (tip flat 3.726 < 3.797).
+    # #25 tap drill on the largest 2A major .1890 (tip flat 3.7846 < 3.797).
+    assert bolt.SHANK_DIA_MAX == pytest.approx(4.8006)
     tap_drill = TAP_DRILL_MM[bolt.THREAD]
-    assert bolt.SHANK_DIA - 2 * bolt.CHAMFER_WIDTH_MIN < tap_drill
-    # Left to the title block's two-place row (0.60 +/-0.51) the same leg
-    # fails both: 1.149 axial exceeds the one-pitch incomplete tip the tail
-    # acceptance prints and the stack charges, and the 0.09 leg leaves the
-    # feather start outside the tap drill.
-    assert bolt.CHAMFER_WIDTH_TITLE_BLOCK_BAND == printed_band_mm(2) == 0.51
-    assert bolt.CHAMFER_AXIAL_MAX_AT_TITLE_BLOCK == pytest.approx(
-        1.11 * math.tan(steepest)
-    )
-    assert bolt.CHAMFER_AXIAL_MAX_AT_TITLE_BLOCK > bolt.INCOMPLETE_TIP_LEN_MAX
+    assert bolt.SHANK_DIA_MAX - 2 * bolt.CHAMFER_WIDTH_MIN < tap_drill
     assert "1 PITCH MAX" in bolt.DIMENSION_CALLOUTS["ThreadLengthMin"]
-    loose_low = bolt.CHAMFER_WIDTH - bolt.CHAMFER_WIDTH_TITLE_BLOCK_BAND
-    assert bolt.SHANK_DIA - 2 * loose_low > tap_drill
     assert bolt.CATALOG_LENGTH - bolt.LENGTH > bolt.PITCH
 
 
@@ -303,10 +295,11 @@ def test_native_controls_are_owned_and_printed_without_precision_rewrites() -> N
     assert set(bolt_drawing.FRONT_KEEP) == set(bolt_drawing.EXPECTED_CONTROLS) | {
         bolt_drawing.REFERENCE_CONTROL
     }
+    # The leg prints .03 under the title block's .XX row (swTolGeneral).
     assert bolt_drawing.EXPECTED_CONTROLS["ChamferWidth"] == pytest.approx(
-        (0.00060, -0.00005, 0.00005)
+        (0.000762, -0.000254, 0.000254)
     )
-    assert bolt.DIMENSION_TOLERANCE_TYPES["ChamferWidth"] == 4
+    assert bolt.DIMENSION_TOLERANCE_TYPES["ChamferWidth"] == 11
     # MHA-SM-00 cuts the length at assembly: the driving CutLength prints
     # as the bracketed reference nominal, no band, two places.
     assert bolt_drawing.REFERENCE_NOMINAL == pytest.approx(0.04670)
@@ -333,7 +326,6 @@ def test_native_controls_are_owned_and_printed_without_precision_rewrites() -> N
     reason = chamfer_callout.replace("MHA-SM-02", "")
     assert not any(character.isdigit() for character in reason)
     assert "DEG" not in chamfer_callout and "°" not in chamfer_callout
-    assert "SETS FULL-THREAD ENGAGEMENT" in chamfer_callout
     assert "MHA-SM-02" in chamfer_callout
     source = (SCRIPTS / "draw_sm_vn_knife_hanger_stud.py").read_text(encoding="utf-8")
     assert "build_purchased_fastener_drawing" not in source
@@ -651,7 +643,6 @@ def test_modified_stock_route_is_complete_not_the_old_socket_recipe() -> None:
 
 def test_purchased_note_is_a_consumed_native_part_property(monkeypatch):
     stamped = {}
-    linear = []
     tolerances = {}
     for name in (
         "clear_dimensions_for_drawing",
@@ -659,11 +650,6 @@ def test_purchased_note_is_a_consumed_native_part_property(monkeypatch):
         "mark_dimensions_for_drawing",
     ):
         monkeypatch.setattr(bolt_part, name, lambda *_args: None)
-    monkeypatch.setattr(
-        bolt_part,
-        "set_dimension_symmetric_tolerance",
-        lambda _adapter, feature, name, band: linear.append((feature, name, band)),
-    )
     assert not hasattr(bolt_part, "set_dimension_symmetric_angular_tolerance")
     monkeypatch.setattr(bolt_part, "_early_bound", lambda value, _kind: value)
 
@@ -705,18 +691,22 @@ def test_purchased_note_is_a_consumed_native_part_property(monkeypatch):
     assert stamped["Supplier Reference Title"] == bolt_drawing.SUPPLIER_STOCK_TITLE
     assert list(tolerances) == [
         ("StockTrimProfile", "CutLength"),
+        ("StockDeburrProfile", "ChamferWidth"),
         ("StockDeburrProfile", "ChamferAngle"),
         ("ThreadTailAcceptance", "ThreadLengthMin"),
     ]
     # Cut at MHA-SM-00: the driving length prints as a bracketed reference.
     assert tolerances[("StockTrimProfile", "CutLength")].Type == 0
     assert displays[("StockTrimProfile", "CutLength")].texts == {1: "(", 2: ")"}
+    # The leg and its angle keep the title block's bands natively.
+    leg = tolerances[("StockDeburrProfile", "ChamferWidth")]
+    assert leg.Type == 11
+    assert (leg.GetMinValue(), leg.GetMaxValue()) == pytest.approx((-0.000254, 0.000254))
     angle = tolerances[("StockDeburrProfile", "ChamferAngle")]
     assert angle.Type == 11
     band = math.radians(angular_band_deg())
     assert (angle.GetMinValue(), angle.GetMaxValue()) == pytest.approx((-band, band))
     assert tolerances[("ThreadTailAcceptance", "ThreadLengthMin")].Type == 5
-    assert linear == [("StockDeburrProfile", "ChamferWidth", 0.05)]
 
 
 @pytest.mark.parametrize(
@@ -1348,6 +1338,24 @@ def test_layout_keeps_text_off_the_part_border_and_title_block() -> None:
     assert angle_x > shank_right + 0.008
     assert tip_y + 0.004 < angle_y < tail_top - 0.004
     assert angle_x + 0.006 < keep["ThreadLengthMin"][0]
+    # The ~20 mm HEAD AF line stands wholly left of the hex's left extension
+    # line, off the border.
+    af_x, _af_y = bolt_drawing.HEAD_AF_TEXT_XY
+    assert af_x + 0.010 < head_left - 0.003
+    assert af_x - 0.010 > 0.0127
+    # The thread-major chord lies on its own dimension line (8.23 mm under
+    # the text position), across the shank between the tail text and the
+    # bearing face, and the three-row text stays under the bearing face.
+    major_x, major_y = bolt_drawing.THREAD_MAJOR_TEXT_XY
+    chord_y = tip_y + bolt.SUPPLIER_THREAD_MAJOR_Y * scale
+    assert major_y - chord_y == pytest.approx(0.00823)
+    assert bolt.SUPPLIER_REFERENCE_STARTS["SupplierThreadMajor"] == (
+        -bolt.SHANK_DIA / 2, bolt.SUPPLIER_THREAD_MAJOR_Y
+    )
+    bearing_y = tip_y + bolt.LENGTH * scale
+    assert keep["ThreadLengthMin"][1] + 0.015 < chord_y < bearing_y - 0.020
+    assert major_y + 0.009 < bearing_y
+    assert major_x > shank_right + 0.040
     # The purchased note above the head; nothing reaches the title block.
     head_top = tip_y + bolt.HEAD_TOP_Y * scale
     assert bolt_drawing.PURCHASED_NOTE_XY[1] > head_top + 0.015
@@ -3938,7 +3946,8 @@ def test_stud_supplier_head_af_direct_call_preserves_picks_format_and_thread_maj
                points_m[0][1] * case.front.ScaleDecimal + 0.1),
         "p1": (points_m[1][0] * case.front.ScaleDecimal + 0.1,
                points_m[1][1] * case.front.ScaleDecimal + 0.1),
-        "text_xy": (0.110, 0.255), "label": "SupplierHeadAF", "orientation": "horizontal",
+        "text_xy": bolt_drawing.HEAD_AF_TEXT_XY, "label": "SupplierHeadAF",
+        "orientation": "horizontal",
     })]
     assert head_calls == [(case.front, (0.218, 0.216))]
     assert formats == [
@@ -3946,7 +3955,7 @@ def test_stud_supplier_head_af_direct_call_preserves_picks_format_and_thread_maj
         (thread_display, "SupplierThreadMajor"),
     ]
     assert imports[0][0] is case.front
-    assert imports[0][1]["keep"] == {"SupplierThreadMajor": (0.170, 0.194)}
+    assert imports[0][1]["keep"] == {"SupplierThreadMajor": bolt_drawing.THREAD_MAJOR_TEXT_XY}
     assert imports[0][1]["dimensions_by_feature"] is bolt.SUPPLIER_DRAWING_DIMENSIONS
 
 

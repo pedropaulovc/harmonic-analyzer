@@ -13,7 +13,7 @@ boss-hook / counter-spring / gooseneck chain.
   to the crossbar underside (``MOUNT_GAP`` 0).
 * knife-hanger-stud x2 -- McMaster 92314A253 #10-24 plain hex bolts from
   2 in stock, each cut at this assembly to the stack measured at its hole
-  plus the 8.92 +/-0.15 mm fit-up reach (46.70 nominal under the head);
+  plus the .351 +/-.006 in fit-up reach (46.70 mm nominal under the head);
   each passes the crossbar's #10 loose clearance hole and threads into the
   knife-mount tap.
 * knife-hanger-washer x2 -- new McMaster 96659A104 18-8 SAE washers,
@@ -66,9 +66,11 @@ import math
 import sys
 
 from _check import check, log
+from _assembly_contract import assembly_contract
 from _com import _early_bound
 from _custom_properties import apply_custom_properties
 from _dimensions import drive_dimension, set_global
+from _document_units import apply_package_model_units
 from _drawing_precision import apply_drawing_precision
 from _feature_tree import name_last_feature
 from _session import run_build
@@ -148,13 +150,13 @@ HANGER_REACH = KNIFE_MOUNT_TOP_Y - HANGER_STUD_Y  # 8.9173, the modelled nominal
 # cuts each bolt to the crossbar-underside-to-washer-top height measured at
 # its own hole plus the fit-up reach, so the printed grip band and the
 # washer's catalogue thickness spread are measured out and only the cut's
-# own band reaches the tap: 8.77..9.07.
+# own band reaches the tap: .345-.357 in, 8.763..9.0678.
 HANGER_REACH_MIN = spec.HANGER_FIT_REACH - spec.HANGER_FIT_REACH_TOL
 HANGER_REACH_MAX = spec.HANGER_FIT_REACH + spec.HANGER_FIT_REACH_TOL
 # The cut must come out of the 2 in stock and remove its factory end: the
 # longest cut is the thickest printed grip plus the thickest washer plus
-# the longest reach, 37.01 + 1.651 + 9.07 = 47.731; the shortest is
-# 35.99 + 0.9144 + 8.77 = 45.6744.
+# the longest reach, 37.01 + 1.651 + 9.0678 = 47.7288; the shortest is
+# 35.99 + 0.9144 + 8.763 = 45.6674.
 HANGER_CUT_LENGTH_MIN = (
     top_frame.HANGER_GRIP
     - top_frame.HANGER_GRIP_TOL
@@ -168,13 +170,14 @@ HANGER_CUT_LENGTH_MAX = (
     + HANGER_REACH_MAX
 )
 # Charge the cut end's maximum incomplete lead, one pitch:
-# 7.7116667 >= 1.5D = 7.239.
+# 7.7046667 >= 1.5D = 7.239.
 HANGER_ENGAGEMENT_MIN = HANGER_REACH_MIN - hanger_screw.INCOMPLETE_TIP_LEN_MAX
 HANGER_ENGAGEMENT_FLOOR = hanger_screw.ENGAGEMENT_MIN_D * hanger_screw.SHANK_DIA
-# Longest reach under the shallowest full tap: 9.52 - 9.07 = 0.45 air.
+# Longest reach under the shallowest full tap: 9.52 - 9.0678 = 0.4522 air.
 HANGER_TIP_CLEARANCE = knife_mount.STUD_TAP_THREAD_DEPTH_MIN - HANGER_REACH_MAX
 # Modified-part inspection acceptance, not a vendor thread-to-head claim:
-# the useful full-form tail (10.62 less one incomplete pitch) spans 9.07.
+# the useful full-form tail (.418 MIN, 10.6172, less one incomplete pitch)
+# spans 9.0678.
 HANGER_THREAD_SPARE = (
     hanger_screw.THREAD_LENGTH_MIN - hanger_screw.INCOMPLETE_TIP_LEN_MAX
 ) - HANGER_REACH_MAX
@@ -747,6 +750,7 @@ async def build(adapter) -> dict[str, str]:
     # call: each freed DOF is recorded (never authored) and persisted below.
     reset_dof_manifest()
     check("create_assembly", await adapter.create_assembly())
+    apply_package_model_units(adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME)
 
     # Two knife bearing supports, one per hex trunnion (overhanging the lever
     # body at SUMMING_Z +/- HEX_Z_MID). The front support is FIRST so the auto-fixed assembly

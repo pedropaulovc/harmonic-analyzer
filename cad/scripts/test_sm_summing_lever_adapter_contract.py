@@ -11,6 +11,7 @@ import ast
 import asyncio
 import copy
 import math
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -333,7 +334,8 @@ def _source_helpers(names: tuple[str, ...], **bindings):
         "COEFFICIENT_TOP_Y": spec.COEFFICIENT_TOP_Y,
         "COEFFICIENT_BOTTOM_Y": spec.COEFFICIENT_BOTTOM_Y,
         "COUNTER_WEB_T": spec.COUNTER_WEB_T,
-        "RIB_BLEND_R": spec.RIB_BLEND_R, "RIB_REACH": spec.RIB_REACH,
+        "RIB_BLEND_R": spec.RIB_BLEND_R, "RIB_BLEND_R_PLACES": spec.RIB_BLEND_R_PLACES,
+        "RIB_REACH": spec.RIB_REACH, "PLATE_W_DEVIATIONS": spec.PLATE_W_DEVIATIONS,
         "CYL_R": spec.CYL_R, "PLATE_L": spec.PLATE_L, "PLATE_W": spec.PLATE_W,
         "RIB_T": spec.RIB_T, "SUM_H": spec.SUM_H,
         "RIB_OFFSET": spec.PLATE_L / 2.0 - spec.RIB_T,
@@ -434,7 +436,7 @@ def test_extracted_taps_use_relocated_joint_axes_and_preserve_complete_pilot_vol
     assert len(cuts) == 1
     arguments, options = cuts[0]
     assert arguments[:4] == (adapter, joint.TAP_SPEC, joint.LEVER_HOLE_POINTS, (0.0, 0.0, -1.0))
-    assert all(y == pytest.approx(spec.COEFFICIENT_TOP_Y - 3.25) for _, y, _ in arguments[2])
+    assert all(y == pytest.approx(spec.COEFFICIENT_TOP_Y - 3.2512) for _, y, _ in arguments[2])
     assert options["expect_dia_mm"] == joint.TAP_DRILL_DIA
     assert joint.DRILL_DEPTH > spec.RIB_T
     complete_pilot = len(joint.LEVER_HOLE_POINTS) * math.pi * (joint.TAP_DRILL_DIA / 2.0)**2 * (
@@ -640,7 +642,8 @@ def test_lower_blend_geometry_fails_closed_outside_tangent_inboard_premises(chan
 
 
 def _root_face(
-    box_mm: tuple[float, ...], *, radius: float = 1.0, torus: bool = False, unknown: bool = False,
+    box_mm: tuple[float, ...], *, radius: float = spec.RIB_BLEND_R, torus: bool = False,
+    unknown: bool = False,
     cylinder_center=(0.0, 0.0), axis=(0.0, 0.0, 1.0),
 ):
     surface = SimpleNamespace(
@@ -725,7 +728,7 @@ def test_lower_blend_is_additive_and_its_complete_envelope_cannot_shrink_pilot_w
     # Even the larger bounded three-way cap-corner neighbourhood is outside
     # both pilot envelopes with printed axis/free-edge variation and wander.
     pilot_radius = (
-        (max(joint.TAP_DRILL_DIA, round(joint.TAP_DRILL_DIA, 2)) + joint.DRILLED_DIAMETER_PLUS) / 2.0
+        (max(joint.TAP_DRILL_DIA, round(joint.TAP_DRILL_DIA, 2)) + joint.RECEIVER_DRILLED_DIAMETER_PLUS) / 2.0
         + joint.DRILL_WANDER_MAX
     )
     x_max = center[0] + radius
@@ -907,7 +910,7 @@ def test_every_modeled_root_including_lower_longitudinal_family_gets_native_max_
         assert tolerance.Type == spec.RIB_BLEND_R_TOL_TYPE
         assert tolerance.GetMinValue() == -spec.RIB_BLEND_R / 1000.0
         assert tolerance.GetMaxValue() == 0.0
-        assert (owner, name, 1) in precision
+        assert (owner, name, spec.RIB_BLEND_R_PLACES) in precision
 
 
 @pytest.mark.parametrize("result", [None, (False, 0.0, 0.0, 0.0), (True, 0.0, 0.0),
@@ -1082,7 +1085,7 @@ def test_native_backing_refuses_wrong_planes_or_trimmed_material_beyond_rib(dama
         namespace["_assert_receiver_profile_walls"](adapter)
 
 
-@pytest.mark.parametrize("material_wall", [2.0, 2.103])
+@pytest.mark.parametrize("material_wall", [2.032, 2.103])
 def test_receiver_checks_connected_material_budget_after_nominal_native_readbacks(material_wall: float) -> None:
     import magnifying_bracket_joint_layout as joint
 
@@ -1192,3 +1195,202 @@ def test_extracted_root_guard_accepts_inboard_unknown_patches_without_counting_t
         namespace["_assert_root_feature_bounds"](
             _feature_adapter(_NativeFeature(faces=[unknown])), "RibRootFillets", 1
         )
+
+
+# --- Spring-row locators follow the spring-tap pattern's globals (#290). ---
+
+_SPRING_EXPRS = ("SPRING_ROW_X_EXPR", "SPRING_SEED_STATION_EXPR", "SPRING_PITCH_EXPR")
+_PATTERN_GLOBALS = {"HoleX", "ChannelZ0", "ChannelPitch", "HoleZOffset", "PlateL"}
+_BUILT_GLOBALS_MM = {
+    "PlateL": spec.PLATE_L, "HexDepth": spec.HEX_DEPTH, "HoleX": spec.HOLE_X,
+    "ChannelZ0": spec.CHANNEL_Z0, "ChannelPitch": spec.CHANNEL_PITCH,
+    "HoleZOffset": spec.HOLE_Z_OFFSET,
+}
+
+
+def _equation_value(expression: str, values: dict[str, float]) -> float:
+    python = re.sub(r'"(\w+)"', lambda name: repr(values[name.group(1)]), expression)
+    return float(eval(python, {"__builtins__": {}}))
+
+
+def _recipe_namespace(functions: tuple[str, ...], **bindings) -> dict:
+    """The recipe's module constants plus the named functions, imports stripped."""
+    import sm_summing_lever_notes as notes
+
+    namespace = {
+        name: value for module in (spec, notes) for name, value in vars(module).items()
+        if name.isupper()
+    }
+    namespace.update(math=math, re=re)
+    body = []
+    for node in _tree(RECIPE).body:
+        if isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name)
+            and (target.id.startswith("SPRING_ROW_") or target.id in _SPRING_EXPRS)
+            for target in node.targets
+        ):
+            body.append(node)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in functions:
+            function = copy.deepcopy(node)
+            function.body = [item for item in function.body if not isinstance(item, ast.ImportFrom)]
+            body.append(function)
+    namespace.update(bindings)
+    exec(compile(ast.fix_missing_locations(ast.Module(body=body, type_ignores=[])), str(RECIPE), "exec"), namespace)
+    return namespace
+
+
+def _run_spring_row_sketch() -> tuple[dict, dict[str, tuple[str | None, float]], list]:
+    emitted: list[float] = []
+    rows: list[tuple[str, str | None]] = []
+    events: list = []
+
+    class Dims:
+        def record(self, name, drive=None):
+            rows.append((name, drive))
+
+        def apply(self, adapter, feature):
+            assert len(rows) == len(emitted), "recorded names drifted from emitted dims"
+            return [(f"{name}@{feature}", drive) for name, drive in rows if drive]
+
+    async def distance(adapter, first, second, kind, value, label):
+        emitted.append(value)
+
+    async def anchor(adapter, point, x, y, label):
+        emitted.extend(abs(value) for value in (x, y) if value)
+
+    async def drive(adapter, name, expression):
+        events.append(("drive", name, expression))
+
+    async def rebuild(adapter):
+        events.append(("rebuild",))
+
+    async def nothing(*args):
+        return None
+
+    model = SimpleNamespace(
+        ClearSelection2=lambda flag: None, BlankSketch=lambda: None,
+        Extension=SimpleNamespace(SelectByID2=lambda *args: True),
+    )
+    recorder = _SketchRecorder()
+    recorder.currentModel = model
+    namespace = _recipe_namespace(
+        ("_spring_row_coordinates",),
+        SketchDims=Dims, check=lambda label, result: result.data,
+        set_sketch_direct_db=lambda adapter, value: None,
+        _as_construction=lambda adapter, entity: None,
+        anchor_point_to_origin=anchor, dimension_between=distance,
+        ensure_fully_defined=nothing, name_last_feature=lambda adapter, name: None,
+        drive_dimension=drive, force_rebuild=rebuild,
+        _assert_spring_row_equations=lambda adapter, drives: events.append(("readback", drives)),
+        set_dimension_basic_tolerance=lambda *args: None,
+        set_dimension_display_precision=lambda *args: None,
+        set_dimension_prefix=lambda *args: None,
+        mark_dimensions_for_drawing=lambda *args: None,
+        null_callout=lambda: None,
+    )
+    asyncio.run(namespace["_spring_row_coordinates"](recorder))
+    dims = {name: (drive, value) for (name, drive), value in zip(rows, emitted)}
+    return namespace, dims, events
+
+
+def test_spring_row_locators_are_driven_by_the_pattern_globals_and_evaluate_to_spec() -> None:
+    namespace, dims, events = _run_spring_row_sketch()
+    expected = {
+        "SpringRowX": (namespace["SPRING_ROW_X_EXPR"], spec.HOLE_X),
+        "SpringStartZ": (None, spec.HOLE_END_OFFSET_LAST),
+        "SpringPitch": (namespace["SPRING_PITCH_EXPR"], spec.CHANNEL_PITCH),
+    }
+    assert set(namespace["SPRING_ROW_LOCATORS"]) == set(expected)
+    for name, (pattern_expression, spec_value) in expected.items():
+        expression, built = dims[name]
+        assert expression is not None, f"{name} is a free sketch value"
+        assert set(re.findall(r'"(\w+)"', expression)) <= _PATTERN_GLOBALS
+        if pattern_expression is not None:
+            assert expression == pattern_expression
+        assert _equation_value(expression, _BUILT_GLOBALS_MM) == pytest.approx(spec_value, abs=1e-9)
+        assert built == pytest.approx(spec_value, abs=1e-9)
+    assert namespace["SPRING_SEED_STATION_EXPR"] in dims["SpringStartZ"][0]
+    # Datum B, the +Z end of the symmetric "PlateL" plate, is a driven anchor too.
+    assert _equation_value(dims["SpringRowEndZ"][0], _BUILT_GLOBALS_MM) == pytest.approx(spec.PLATE_L / 2.0)
+    # Every drive is applied, then rebuilt, then natively read back.
+    drives = [(f"{name}@SpringRowCoordinates", drive) for name, (drive, _) in dims.items() if drive]
+    assert events == [("drive", *job) for job in drives] + [("rebuild",), ("readback", drives)]
+
+
+def test_the_pattern_features_use_the_locators_own_expressions() -> None:
+    plate = next(
+        node for node in _tree(RECIPE).body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_coefficients_plate"
+    )
+    used = {node.id for node in ast.walk(plate) if isinstance(node, ast.Name)}
+    assert set(_SPRING_EXPRS) <= used
+
+
+@pytest.mark.parametrize("pitch", [spec.CHANNEL_PITCH, 7.5])
+def test_an_equations_edit_to_channel_pitch_moves_holes_and_locators_together(pitch: float) -> None:
+    namespace, dims, _ = _run_spring_row_sketch()
+    edited = {**_BUILT_GLOBALS_MM, "ChannelPitch": pitch}
+    seed_z = _equation_value(namespace["SPRING_SEED_STATION_EXPR"], edited)
+    second_z = seed_z - _equation_value(namespace["SPRING_PITCH_EXPR"], edited)
+    assert _equation_value(dims["SpringStartZ"][0], edited) == pytest.approx(spec.PLATE_L / 2.0 - seed_z)
+    assert _equation_value(dims["SpringPitch"][0], edited) == pytest.approx(seed_z - second_z)
+    assert _equation_value(dims["SpringRowX"][0], edited) == pytest.approx(
+        _equation_value(namespace["SPRING_ROW_X_EXPR"], edited)
+    )
+
+
+class _EquationManager:
+    def __init__(self, rows: list[tuple[str, str, float]]) -> None:
+        self.rows = rows
+        self.Status = -1
+
+    def GetCount(self) -> int:
+        return len(self.rows)
+
+    def Equation(self, index: int) -> str:
+        return f'"{self.rows[index][0]}" = {self.rows[index][1]}'
+
+    def Value(self, index: int) -> float:
+        self.Status = index
+        return self.rows[index][2]
+
+
+@pytest.mark.parametrize("mode", ["live", "frozen", "missing", "stale", "detached-pitch"])
+def test_spring_row_readback_requires_live_equations_and_matching_system_values(mode: str) -> None:
+    _, dims, events = _run_spring_row_sketch()
+    drives = events[-1][1]
+    inch = {name: value / 25.4 for name, value in _BUILT_GLOBALS_MM.items()}
+    rows = [(name, f"{value * 25.4}mm", value) for name, value in inch.items()]
+    rows += [(name, expression, _equation_value(expression, inch)) for name, expression in drives]
+    system = {name: value for name, (_, value) in dims.items()}
+    pattern_spacing = spec.CHANNEL_PITCH
+    if mode == "frozen":
+        rows[-1] = (rows[-1][0], f"{spec.CHANNEL_PITCH}mm", rows[-1][2])
+    elif mode == "missing":
+        rows.pop()
+    elif mode == "stale":
+        system["SpringStartZ"] += 0.01
+    elif mode == "detached-pitch":
+        pattern_spacing += 0.01
+    manager = _EquationManager(rows)
+    model = SimpleNamespace(
+        GetEquationMgr=lambda: manager,
+        FeatureByName=lambda name: SimpleNamespace(
+            Parameter=lambda leaf: SimpleNamespace(SystemValue=pattern_spacing / 1000.0)
+        ),
+    )
+    namespace = _recipe_namespace(
+        ("_evaluate_drive", "_assert_spring_row_equations"),
+        _early_bound=lambda value, interface: value,
+        _read_member=lambda value, name: getattr(value, name)(),
+        _named_dimension=lambda adapter, owner, leaf: (
+            None, SimpleNamespace(SystemValue=system[leaf] / 1000.0)
+        ),
+        _telemetry=SimpleNamespace(success=lambda message: None),
+    )
+    adapter = SimpleNamespace(currentModel=model)
+    if mode == "live":
+        namespace["_assert_spring_row_equations"](adapter, drives)
+    else:
+        with pytest.raises(RuntimeError):
+            namespace["_assert_spring_row_equations"](adapter, drives)

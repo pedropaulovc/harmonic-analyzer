@@ -16,6 +16,15 @@ counterbore.  The Ø11.50 head stands under an owner minor exception to the
 stand: the head clamps the loop to the end face (no torque value, no
 threadlocker).  ``sm_gooseneck_spring_screw_spec`` carries the strength case;
 ``sm_gooseneck_spring_joint`` the body, engagement and wall budgets.
+
+#290: every size here is calibrated spring-support geometry (the native
+counter-seat certificate, settled_spring_seats.counter_upper_support_geometry,
+records the nominals), so the model keeps these millimetre values and the
+decimal-inch sheet prints them on the inch grid.  The bands and limits below
+are the millimetre ENVELOPES the joint and the seat checks charge; the inch
+sheet's printed bands are derived in ``sm_gooseneck_spring_screw_spec``
+(PRINTED_BANDS / PRINTED_LIMITS), which proves each lies inside its envelope
+or re-checks the joint margin it would eat.
 """
 
 from __future__ import annotations
@@ -33,17 +42,19 @@ PITCH = MM_PER_IN / THREADS_PER_IN
 # chamfer: the free-gap reach leaves 1.5D of mated full thread past the plug's
 # counterbore floor at the shortest screw (sm_gooseneck_spring_joint).
 LENGTH = 19.50
+# Envelope: the millimetre sheet's .XX band, +/-0.51 (the joint's reach
+# budgets); the inch sheet's .77 +/-.01 lies inside it.
 LENGTH_LOWER, LENGTH_UPPER = printed_deviations(LENGTH, 2)
 # The cheese head: a flat-topped cylinder, as the reference close-up shows.
-# Its Ø prints as the LIMIT band 11.60/11.40, not the title block's .XX
-# +/-0.51: the relief chamfer below is measured from the OD, and at Ø12.01
-# the MHA-SM-VN-51 transition wire would meet the relief's outer end
+# Its Ø is a LIMIT band (envelope 11.60/11.40), not the title block's .XX:
+# the relief chamfer below is measured from the OD, and at Ø12.01 the
+# MHA-SM-VN-51 transition wire would meet the relief's outer end
 # (sm_gooseneck_spring_joint; owner ruling 2026-10-27, #1951).
 HEAD_DIA = 11.50
 HEAD_DIA_LOWER, HEAD_DIA_UPPER = -0.10, 0.10
 HEAD_DIA_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
-# The head's under-face OD edge is relieved by a 45-degree chamfer, printed
-# as the LIMIT band 1.50/1.40: the MHA-SM-VN-51 loop leaves its head-side end
+# The head's under-face OD edge is relieved by a 45-degree chamfer, a LIMIT
+# band (envelope 1.50/1.40): the MHA-SM-VN-51 loop leaves its head-side end
 # for the coil through the vendor's transition wire, which crosses the head
 # face's plane just outside the head's OD.  Unrelieved, the Ø11.50 edge cuts
 # 0.21 into that wire (native verify:spring_seats probe, farm run
@@ -60,11 +71,8 @@ HEAD_RELIEF_CHAMFER_MAX = round(HEAD_RELIEF_CHAMFER + HEAD_RELIEF_CHAMFER_UPPER,
 # (sm_gooseneck_spring_screw_spec SLOT_WEB_MIN; owner ruling 2026-10-27,
 # #1951, via coordinator Main).
 HEAD_H = 6.60
-HEAD_H_LOWER, HEAD_H_UPPER = printed_deviations(HEAD_H, 2)
 SLOT_WIDTH = 1.60
-SLOT_WIDTH_LOWER, SLOT_WIDTH_UPPER = printed_deviations(SLOT_WIDTH, 2)
 SLOT_DEPTH = 2.00  # From the flat top face.
-SLOT_DEPTH_LOWER, SLOT_DEPTH_UPPER = printed_deviations(SLOT_DEPTH, 2)
 
 # 1/4-28 UNF-2A limits, ASME B1.1 as tabled by Engineers Edge (read
 # 2026-10-27, https://www.engineersedge.com/screw_threads_chart.htm): major
@@ -81,27 +89,29 @@ THREAD_MAJOR_2A_MIN = THREAD_MAJOR_2A_MIN_IN * MM_PER_IN
 THREAD_MINOR_2A_MIN_EST = (THREAD_PD_2A_MIN_IN - 0.649519 / THREADS_PER_IN) * MM_PER_IN
 
 # The plain body is the thread blank: modelled at the basic major with the
-# thread, printed as the LIMIT band 6.32/6.20 inside the 2A major band, so the
+# thread, a LIMIT band (envelope 6.32/6.20) inside the 2A major band, so the
 # die cuts a 2A crest and the loop bears on one turned diameter.  The title
-# block's +/-0.51 would leave the blank outside the thread class.
+# block's .XX band would leave the blank outside the thread class.
 BODY_DIA = MAJOR_DIA
 BODY_DIA_LOWER, BODY_DIA_UPPER = -0.15, -0.03
 BODY_DIA_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
 BODY_DIA_MIN = round(BODY_DIA + BODY_DIA_LOWER, 6)
 BODY_DIA_MAX = round(BODY_DIA + BODY_DIA_UPPER, 6)
-# Under-head face to the die's first incomplete thread, printed as the single
-# limit "3.60 MIN": the loop's plug-side pass (sm_gooseneck_spring_joint.LOOP_PASS_X,
-# 3.14 at the free gap) always bears on the plain body.  Any longer plain body
-# only shortens the run-out window below, which the full-thread MAX bounds.
+# Under-head face to the die's first incomplete thread, a single MIN limit
+# (the inch sheet's ".14 MIN"): the loop's plug-side pass
+# (sm_gooseneck_spring_joint.LOOP_PASS_X, 3.14 at the free gap) always bears
+# on the plain body.  Any longer plain body only shortens the run-out window
+# below, which the full-thread MAX bounds.
 PLAIN_LENGTH_MIN = 3.60
 PLAIN_LENGTH_MIN_TOL_TYPE = 5  # swTolType_e.swTolMIN
 # The die's chamfered start leaves 1.5 pitches of incomplete thread
 # (drawing-guidelines.md rule 18; the repo's tip allowance,
 # sm_gooseneck_spring_joint.SCREW_END_INCOMPLETE_MAX) behind the full thread.
 DIE_RUNOUT = 1.5 * PITCH
-# Under-head face to the first full thread, printed as the single limit
-# "5.71 MAX": the largest two-place limit whose run-out the end piece's
-# counterbore (sm_gooseneck_spring_joint.COUNTERBORE_DEPTH_MIN, 2.73) clears
+# Under-head face to the first full thread, a single MAX limit (the inch
+# sheet's ".225 MAX"); 5.71 is the largest two-place mm limit whose run-out
+# the end piece's counterbore (sm_gooseneck_spring_joint.COUNTERBORE_DEPTH_MIN,
+# 2.73) clears
 # by its margin at the least gap on the screw's axis.  Between the two limits
 # a die has 2.3 pitches for its chamfer.
 FULL_THREAD_STATION_MAX = 5.71
@@ -113,17 +123,17 @@ FULL_THREAD_DIE_ROOM_MIN = 2.0 * PITCH
 # the plain body's end.
 PLAIN_LENGTH_MIN_BAND = (round(FULL_THREAD_STATION_MAX - PLAIN_LENGTH_MIN, 6), 0.0)
 FULL_THREAD_STATION_MAX_BAND = (0.0, -PLAIN_LENGTH_MIN_BAND[0])
-# The under-head inside corner (head face to body) is turned R0.5 MAX, not the
-# title block's INSIDE CORNERS R1.0 MAX (codjiflo round 4 on #1997): a loop
+# The under-head inside corner (head face to body) is turned R.020 MAX, not the
+# title block's INSIDE CORNERS R.040 MAX (codjiflo round 4 on #1997): a loop
 # wire touching both the face and the body clears a concave round only up to
 # R0.8 (sm_gooseneck_spring_joint owns the check).  swTolMAX prints the
-# nominal and "MAX", so the modelled radius IS the limit; the band runs from
+# nominal and "MAX" (0.50 rounds to .020 at three places); the band runs from
 # sharp up to it.
 UNDERHEAD_CORNER_R = 0.50
 UNDERHEAD_CORNER_R_BAND = (0.0, -UNDERHEAD_CORNER_R)  # (upper, lower)
-UNDERHEAD_CORNER_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R0.5 MAX"
+UNDERHEAD_CORNER_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R.020 MAX"
 # The thread-start chamfer, about one thread depth, rides the title block's
-# one-place band.
+# two-place band.
 TIP_CHAMFER = 0.50
 OVERALL_LENGTH = LENGTH + HEAD_H
 SLOT_FLOOR_Z = HEAD_H - SLOT_DEPTH

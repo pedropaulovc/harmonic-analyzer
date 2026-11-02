@@ -2,15 +2,16 @@ sm-gooseneck-spring-screw:
   title: Gooseneck Spring Screw
   number: MHA-SM-04
   description: "GOOSENECK SPRING SCREW"
-  material: AISI 4140 HRC 32, 1/2 in, Sy 896 MPa
+  material: AISI 4140 HRC 32, 1/2 in, Sy 130 ksi
   material_specification: "AISI 4140 alloy steel round, hardened to HRC 32, ASTM A108, 1/2 in (McMaster 6818T53); yield 130 ksi (896 MPa)"
   finish: "black oxide per MIL-DTL-13924 Class 1, oil sealed"
   quantity: 1
   tolerance_class: machined_block
-  process: "turned slotted cheese-head screw: plain Ø6.35 body under the head, die-cut 1/4-28 UNF thread"
+  process: "turned slotted cheese-head screw: plain Ø.250 body under the head, die-cut 1/4-28 UNF thread"
+  drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
-      where: "sheet 1, head Ø11.60/11.40: its worst-case overlap of the MHA-SM-VN-51 eye, 0.95"
-      finding: "head-to-eye retention 0.95 mm at the head's lower printed limit, under the project's 1.0 mm head retention check"
-      reason: "owner ruling 2026-10-27 (#1951, via coordinator Main): the Ø11.50 cheese head stands, the reference photo's proportion (0.89 x the arm); its LIMIT band 11.60/11.40 and 6.60 height clear the spring's transition wire (2026-10-27 rulings (A)/(A1)). The 1.0 check is unchanged (sm_gooseneck_spring_joint.HEAD_RETENTION_TARGET); this declaration records the exception against it. The eye cannot pass the head: 0.95 of overlap would need about 17 % hoop strain in the 1.6 mm music wire."
+      where: "sheet 1, head Ø.456/.449: its worst-case overlap of the MHA-SM-VN-51 eye, .037"
+      finding: "head-to-eye retention .037 in at the head's lower printed limit, under the project's .039 in head retention check"
+      reason: "owner ruling 2026-10-27 (#1951, via coordinator Main): the Ø.453 cheese head stands, the reference photo's proportion (0.89 x the arm); its LIMIT band .456/.449 and .26 height clear the spring's transition wire (2026-10-27 rulings (A)/(A1)). The .039 in check is unchanged (sm_gooseneck_spring_joint.HEAD_RETENTION_TARGET); this declaration records the exception against it. The eye cannot pass the head: .037 of overlap would need about 17 % hoop strain in the .063 music wire."

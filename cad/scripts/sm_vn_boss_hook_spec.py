@@ -2,10 +2,14 @@
 
 import _config
 import sm_vn_boss_hook_jam_nut_spec as jam_nut
-from _printed_tolerance import printed_band_mm
+from _package_units import drawing_unit
+from _printed_tolerance import printed_band_mm, printed_deviations
 from stock_anchor_geom import ANCHOR_9490T1, trim
 from sm_summing_lever_spec import ANCHOR_H
 from _supplier_screw_reference_names import FEATURE_BY_PLANE
+
+# #290: the registry row's drawing_unit (in) is this sheet's unit.
+UNIT = drawing_unit("parts/sm-vn-boss-hook", _config.parts("sm-vn-boss-hook"))
 
 # The MHA-SM-VN-55 jam nut locks the anchor on the boss top face (#1189), so
 # the shank is trimmed longer than the boss by the nut's height plus one
@@ -16,25 +20,39 @@ JAM_NUT_THREAD_MM = jam_nut.THICKNESS + ANCHOR_9490T1.thread_pitch_mm
 SHANK_LENGTH_MM = round(ANCHOR_H + JAM_NUT_THREAD_MM, 3)
 TRIM = trim(ANCHOR_9490T1, SHANK_LENGTH_MM)
 FINISHED_OVERALL_MM = ANCHOR_9490T1.eye_od_mm / 2 - TRIM.shank_end_y_mm
-FINISHED_OVERALL_TOLERANCE_MM = _config.title_block("linear_1pl")["value_in"] * 25.4
-# The restored deburr is a lead-in, so it prints to one place and the title
-# block's .X band governs it (no tighter band, no extra places). Its nominal is
-# raised from the factory 0.80 so that even the band's short leg brings the cut
-# end under the 3.797-mm tap drill, which needs at least
-# (4.826 - 3.797) / 2 = 0.5145: 1.4 - 0.8 = 0.6 (1.3 would leave 0.5).
-CHAMFER_WIDTH_MM = 1.4
-CHAMFER_WIDTH_TOLERANCE_MM = printed_band_mm(1)
+# #290: the trim sets the counter anchor's eye station (spring_mount_geom
+# reads SHANK_LENGTH_MM), calibrated spring geometry, so it keeps its mm
+# nominal and prints rounded at .XX (1.59): the acceptance size, never .X.
+# Checks charge the printed band about the model (lower, upper);
+# the native General record stores the same deviations.
+FINISHED_OVERALL_PLACES = 2
+FINISHED_OVERALL_TOLERANCE_MM = printed_band_mm(FINISHED_OVERALL_PLACES, unit=UNIT)
+FINISHED_OVERALL_DEVIATIONS = printed_deviations(
+    FINISHED_OVERALL_MM, FINISHED_OVERALL_PLACES, unit=UNIT
+)
+# The restored deburr is a lead-in on the title block's .XX band (an .X band,
+# +/-.1, would swallow the whole thread). Its nominal is the smallest .XX
+# whose short leg still brings the cut end under the 3.797-mm (#25) tap
+# drill, which needs at least (4.826 - 3.797) / 2 = 0.5145 (.0203): .04 - .01
+# = .03 clears it, .03 - .01 = .02 (0.508) would not.
+CHAMFER_WIDTH_MM = 1.016  # .04
+CHAMFER_WIDTH_TOLERANCE_MM = printed_band_mm(2, unit=UNIT)
+CHAMFER_WIDTH_DEVIATIONS = printed_deviations(CHAMFER_WIDTH_MM, 2, unit=UNIT)
 CHAMFER_ANGLE_DEG = 45.0
 CHAMFER_ANGLE_TOLERANCE_DEG = _config.title_block("angular")["value_deg"]
 
-# The short leg clears the mating tap drill (above). The long 2.2 leg still
-# leaves a 0.21 end flat inside the 2.413 major radius; including the adverse
+# The short leg clears the mating tap drill (above). The long .05 leg still
+# leaves a 1.14 end flat inside the 2.413 major radius; including the adverse
 # angular corner it leaves >17 mm full thread at the short overall limit.
 DRAWING_DIMENSIONS = {
     "StockTrimProfile": {"FinishedOverall"},
     "StockDeburrProfile": {"ChamferWidth", "ChamferAngle"},
 }
-DIMENSION_PRECISION = {"FinishedOverall": 1, "ChamferWidth": 1, "ChamferAngle": 0}
+DIMENSION_PRECISION = {
+    "FinishedOverall": FINISHED_OVERALL_PLACES,
+    "ChamferWidth": 2,
+    "ChamferAngle": 0,
+}
 DIMENSION_TOLERANCE_TYPES = {
     "FinishedOverall": 11,
     "ChamferWidth": 11,

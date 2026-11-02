@@ -12,6 +12,7 @@ from __future__ import annotations
 import math
 
 from _hole_spec import DRILL_POINT_H, HoleSpec, blind_cut_dia_mm
+from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import (
     drilled_oversize_mm,
     edge_break_chamfer_mm,
@@ -65,9 +66,32 @@ SCREW_PITCH_X = SCREW_MACHINE_X[1] - SCREW_MACHINE_X[0]
 BRACKET_HOLE_POINTS = tuple(
     (x - BRACKET_ORIGIN[0], RECEIVER_ROW_Y, SIDE_PLATE_Z[0]) for x in SCREW_MACHINE_X
 )
-LEVER_HOLE_POINTS = tuple(
-    (x - LEVER_ORIGIN_X, RECEIVER_ROW_Y, LEVER_FRONT_LOCAL_Z) for x in SCREW_MACHINE_X
+# MHA-MG-01 keeps its millimetre stations; the lever's taps sit at the
+# nearest .001 in to them, off its own free-edge corner and actual top (rule
+# 3: the model is the printed nominal; today 1.120 / .581 from the +X edge,
+# .128 below the top, in SCREW_MACHINE_X order).  Each lever tap then stands
+# at most LEVER_STATION_OFFSET_MAX off its bracket hole (half a grid step per
+# axis at worst), charged to the head and shank float below.
+_MM_PER_IN = 25.4
+LEVER_RECEIVER_FROM_EDGE_IN = tuple(
+    round((lever.PLATE_W - (x - LEVER_ORIGIN_X)) / _MM_PER_IN, 3) for x in SCREW_MACHINE_X
 )
+LEVER_RECEIVER_ROW_FROM_TOP_IN = round(RECEIVER_ROW_FROM_TOP / _MM_PER_IN, 3)
+LEVER_RECEIVER_ROW_FROM_TOP = round(LEVER_RECEIVER_ROW_FROM_TOP_IN * _MM_PER_IN, 6)
+LEVER_RECEIVER_ROW_Y = round(lever.COEFFICIENT_TOP_Y - LEVER_RECEIVER_ROW_FROM_TOP, 6)
+LEVER_HOLE_POINTS = tuple(
+    (round(lever.PLATE_W - inches * _MM_PER_IN, 6), LEVER_RECEIVER_ROW_Y, LEVER_FRONT_LOCAL_Z)
+    for inches in LEVER_RECEIVER_FROM_EDGE_IN
+)
+LEVER_STATION_OFFSET_MAX = max(
+    math.hypot(lever_x - (x - LEVER_ORIGIN_X), lever_y - RECEIVER_ROW_Y)
+    for (lever_x, lever_y, _z), x in zip(LEVER_HOLE_POINTS, SCREW_MACHINE_X, strict=True)
+)
+if LEVER_STATION_OFFSET_MAX > math.hypot(0.0005, 0.0005) * _MM_PER_IN + 1e-9:
+    raise AssertionError(
+        f"lever receiver grid moves a tap {LEVER_STATION_OFFSET_MAX:.4f} mm off its "
+        "bracket hole"
+    )
 # A flush head would run this screw past the tap's full thread and bottom it.
 # The heads instead bear on the flange's front face, no counterbore, inside a
 # head-clearance circle (still named COUNTERBORE_DIA) that keeps their float.
@@ -85,18 +109,33 @@ HEAD_PROTRUSION = SCREW_HEAD_HEIGHT
 # Explicit native 3.175 +/-0.13 preserves the accepted screw-grip interval.
 FLANGE_THICKNESS_BAND = FOOT_GRIP_TOL
 
-# The receiver continues from the uniform 5 mm entry rib into the connected
+# The receiver continues from the uniform 5.08 mm entry rib into the connected
 # 7 mm coefficient plate. Neither usable thread nor the drill point is required
 # to stop inside the rib. Ordinary printed depths remain independently bounded.
-THREAD_DEPTH_BAND = 0.05  # native metadata only; the drawing prints 4.95 MIN
+# #290: the receiver taps and coordinates print on the lever's decimal-inch
+# sheet (lever.UNIT); the bracket's own bands (LINEAR_BAND, the drilled
+# clearance) stay on its millimetre sheet.  The full-thread and coordinate
+# bands are +/-.002 in, the nearest exact inch decimals to the former 0.05 mm.
+THREAD_DEPTH_BAND = 0.0508  # native metadata only; the drawing prints .195 MIN
 LINEAR_BAND = printed_band_mm(2)  # PRINTED title-block .XX band, not the unrounded .02 in
-DRILL_DEPTH_DEVIATIONS = (-LINEAR_BAND, LINEAR_BAND)  # (lower, upper), mm
-POSITION_BAND = 0.05
+POSITION_BAND = 0.0508
 DRILLED_DIAMETER_PLUS = drilled_oversize_mm()
-# Engineering floor for the printed pilot, not the finished thread cavity.
-RECEIVER_PILOT_WALL_MIN = 2.0
+# The lever sheet prints the receiver tap drill's diameter at three places
+# (its drilled-hole row sizes the pilot) but the routine tap-drill depth at
+# two (rule 3: .26 +/-.01; no function asks for more, rule 4).  The depth's
+# acceptance follows its printed rounded value.
+RECEIVER_HOLE_PLACES = 3
+RECEIVER_DRILL_DEPTH_PLACES = 2
+RECEIVER_DRILLED_DIAMETER_PLUS = drilled_oversize_mm(unit=lever.UNIT)
+DRILL_DEPTH_BAND = printed_band_mm(RECEIVER_DRILL_DEPTH_PLACES, unit=lever.UNIT)
+# Engineering floor for the printed pilot, not the finished thread cavity:
+# the lever's rule-17 wall target on its inch sheet.
+RECEIVER_PILOT_WALL_MIN = WALL_TARGET_MM
 HEAD_FLOAT_MIN = (COUNTERBORE_DIA - SCREW_HEAD_DIA) / 2.0
-HEAD_POSITION_MISMATCH_MAX = 2.0 * POSITION_BAND
+# Both rows' location bands plus the lever grid's nominal offset.
+HEAD_POSITION_MISMATCH_MAX = 2.0 * POSITION_BAND + LEVER_STATION_OFFSET_MAX
+# The shank's least radial float in the printed (+0.10/0) clearance hole.
+SHANK_FLOAT_MIN = (round(CLEARANCE_DIA, 2) - SCREW_MAJOR_DIA) / 2.0
 EDGE_BREAK = edge_break_chamfer_mm()
 SCREW_LENGTH_MINUS = 0.76  # conservative stock allowance, not a catalog band
 SCREW_TIP_CHAMFER = 0.7 * SCREW_PITCH
@@ -107,7 +146,10 @@ ENGAGEMENT_MIN = (
 )
 SCREW_REACH_MAX = ENGAGEMENT + GRIP_BAND
 THREAD_DEPTH = 4.95
-DRILL_DEPTH = 6.50
+DRILL_DEPTH = 6.604  # .26 in, on its printed grid (rule 3)
+DRILL_DEPTH_DEVIATIONS = printed_deviations(  # (lower, upper), mm
+    DRILL_DEPTH, RECEIVER_DRILL_DEPTH_PLACES, unit=lever.UNIT,
+)
 DRILL_DEPTH_MIN = DRILL_DEPTH + DRILL_DEPTH_DEVIATIONS[0]
 DRILL_DEPTH_MAX = DRILL_DEPTH + DRILL_DEPTH_DEVIATIONS[1]
 TAP_SPEC = HoleSpec(
@@ -119,10 +161,20 @@ TAP_SPEC = HoleSpec(
     overrides_mm={"ThreadDepth": THREAD_DEPTH},
 )
 TAP_DRILL_DIA = blind_cut_dia_mm(TAP_SPEC)
-# Use the larger native/printed pilot for every point/wander/material budget.
-RECEIVER_PILOT_RADIUS_MAX = (
-    max(TAP_DRILL_DIA, round(TAP_DRILL_DIA, 2)) + DRILLED_DIAMETER_PLUS
-) / 2.0
+
+
+def receiver_pilot_radius_max() -> float:
+    """The larger native/printed pilot radius plus its drilled-hole row: the
+    radius for every point/wander/material budget."""
+    printed_over = printed_deviations(
+        TAP_DRILL_DIA, RECEIVER_HOLE_PLACES, (0.0, 0.0), unit=lever.UNIT,
+    )[1]
+    return (
+        TAP_DRILL_DIA + max(0.0, printed_over) + RECEIVER_DRILLED_DIAMETER_PLUS
+    ) / 2.0
+
+
+RECEIVER_PILOT_RADIUS_MAX = receiver_pilot_radius_max()
 DRILL_POINT_DEPTH = TAP_DRILL_DIA / 2.0 * DRILL_POINT_H
 DRILL_POINT_DEPTH_MAX = RECEIVER_PILOT_RADIUS_MAX * DRILL_POINT_H
 SCREW_TIP_GAP_MIN = THREAD_DEPTH - THREAD_DEPTH_BAND - SCREW_REACH_MAX
@@ -218,14 +270,13 @@ def receiver_pilot_material_wall_budget() -> float:
     The row is from the ACTUAL top, so a rigid top-position shift cancels.
     Thickness and row-location bands remain independent. The sharp transition
     excludes the root fillet; the plate's free edge and opposite end are also
-    real boundaries. The .X plate length takes its ordinary +/-0.8 mm band.
+    real boundaries. Rib, plate thickness and plate length take the lever
+    sheet's printed limits (``lever.*_DEVIATIONS``).
     The entry plane is intentionally open: depths start at that actual face.
     Longitudinal rib flank walls are screened separately by the pure profile.
     No internal-major limit, cavity envelope or tighter depth band is assumed.
     """
-    radius = (
-        max(TAP_DRILL_DIA, round(TAP_DRILL_DIA, 2)) + DRILLED_DIAMETER_PLUS
-    ) / 2.0
+    radius = receiver_pilot_radius_max()
     point_depth = radius * DRILL_POINT_H
     wander = math.tan(math.radians(DRILL_WANDER_DEG)) * (
         DRILL_DEPTH_MAX + point_depth
@@ -234,17 +285,18 @@ def receiver_pilot_material_wall_budget() -> float:
         min(
             *(
                 receiver_material_wall_margin(
-                    lever.RIB_T - LINEAR_BAND, face, DRILL_DEPTH_MAX,
+                    lever.RIB_T + lever.RIB_T_DEVIATIONS[0], face, DRILL_DEPTH_MAX,
                     radius, DRILL_POINT_H, wander,
                 )
                 for face in (
                     lever.COEFFICIENT_TOP_Y - y - POSITION_BAND,
-                    lever.COEFFICIENT_T - LINEAR_BAND
+                    lever.COEFFICIENT_T + lever.COEFFICIENT_T_DEVIATIONS[0]
                     - (lever.COEFFICIENT_TOP_Y - y) - POSITION_BAND,
                 )
             ),
             lever.PLATE_W - x - POSITION_BAND - radius - wander,
-            lever.PLATE_L - 0.8 - DRILL_DEPTH_MAX - point_depth - wander,
+            lever.PLATE_L + lever.PLATE_L_DEVIATIONS[0]
+            - DRILL_DEPTH_MAX - point_depth - wander,
         )
         for x, y, _z in LEVER_HOLE_POINTS
     )
@@ -258,6 +310,8 @@ if TAP_LEAD_MARGIN_MIN < 0.0:
     raise AssertionError("magnifying bracket tap drill loses bottoming-tap lead design allowance")
 if HEAD_FLOAT_MIN < HEAD_POSITION_MISMATCH_MAX:
     raise AssertionError("magnifying bracket counterbore loses head float")
+if SHANK_FLOAT_MIN < HEAD_POSITION_MISMATCH_MAX:
+    raise AssertionError("magnifying bracket clearance hole loses shank float")
 if min(
     GRIP_MIN, COUNTERBORE_END_WALL_MIN, COUNTERBORE_HEIGHT_WALL_MIN,
     CLEARANCE_HOLE_HEIGHT_WALL_MIN,

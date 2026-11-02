@@ -135,7 +135,7 @@ def test_shifted_row_uses_nearer_flange_edge_for_prying_and_actual_torque_for_sh
         joint.SIDE_PLATE_HEIGHT + joint.SIDE_PLATE_HEIGHT_DEVIATIONS[0]
         - row_from_lower - joint.POSITION_BAND,
     )
-    assert nearest_edge == pytest.approx(4.74)
+    assert nearest_edge == pytest.approx(4.7392)
     assert arm.JOINT_PRYING_ARM_Y == pytest.approx(nearest_edge)
     expected_tension = (
         abs(arm.JOINT_MX) / (2.0 * nearest_edge)
@@ -164,10 +164,10 @@ def test_prying_demand_bounds_every_accepted_foot_width_and_row_corner() -> None
     corner_arms = [
         min(row_from_lower, width - row_from_lower)
         for width, row_from_lower in itertools.product(
-            (10.2, 11.8), (4.74, 4.84),
+            (10.2, 11.8), (4.7392, 4.8408),
         )
     ]
-    assert (min(corner_arms), max(corner_arms)) == pytest.approx((4.74, 4.84))
+    assert (min(corner_arms), max(corner_arms)) == pytest.approx((4.7392, 4.8408))
     corner_tensions = [
         abs(arm.JOINT_MX) / (2.0 * edge_arm)
         + abs(arm.JOINT_MY) / 13.7
