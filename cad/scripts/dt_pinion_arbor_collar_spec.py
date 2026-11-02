@@ -45,7 +45,7 @@ from dt_pinion_arbor_spec import (
     drum_total_air,
 )
 from dt_pinion_bracket_geometry import THICKNESS as STRAP_T
-from dt_pinion_bracket_geometry import THICKNESS_BAND as STRAP_T_BAND
+from dt_pinion_bracket_geometry import THICKNESS_LIMITS as STRAP_T_LIMITS
 from pinion_rig_layout import RIG_MARGIN_SPARE
 
 # The rig's one pin family (dt_vn_pinion_strap_pin_spec): a 1/16 x 1/2 slotted
@@ -121,7 +121,7 @@ def collar_strap_gaps() -> tuple[float, float]:
     for station, air, strap, pin, to_face in product(
         (DRUM_STATION - DRUM_STATION_BAND, DRUM_STATION + DRUM_STATION_BAND),
         (0.0, drum_total_air()[1]),
-        (STRAP_T - STRAP_T_BAND, STRAP_T + STRAP_T_BAND),
+        STRAP_T_LIMITS,
         (
             PIN_STATION_FROM_HEAD_REAR - PIN_STATION_BAND,
             PIN_STATION_FROM_HEAD_REAR + PIN_STATION_BAND,
