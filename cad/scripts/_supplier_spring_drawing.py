@@ -226,10 +226,11 @@ def extension_spring_dimensions(
     coil_od_mm: float,
     wire_dia_mm: float,
     precision: Mapping[str, int],
-    od_tolerance_mm: float | None = None,
-    od_tolerance_precision: int | None = None,
 ) -> tuple[Callable[[], None], ...]:
-    """Import source sizes and reacquire every native dimension after final rebuild."""
+    """Import source sizes and reacquire every native dimension after final rebuild.
+
+    Supplier sizes print as untoleranced REF: the catalogue governs.
+    """
     rows_by_view = {
         "free_front": (
             (
@@ -347,21 +348,8 @@ def extension_spring_dimensions(
                 label=name,
             )
             native = _early_bound(display.GetDimension2(0), "IDimension")
-            tolerance = _early_bound(native.Tolerance, "IDimensionTolerance")
-            if name == COIL_OD and od_tolerance_mm is not None:
-                if (
-                    int(tolerance.Type) != 4
-                    or abs(float(tolerance.GetMinValue()) + od_tolerance_mm / 1000)
-                    > 1e-12
-                    or abs(float(tolerance.GetMaxValue()) - od_tolerance_mm / 1000)
-                    > 1e-12
-                    or int(display.GetPrimaryTolPrecision2()) != od_tolerance_precision
-                ):
-                    raise RuntimeError(
-                        "source supplier OD band changed after final rebuild"
-                    )
-            elif int(tolerance.Type) != 0:
-                raise RuntimeError(f"{name}: unprovided supplier tolerance appeared")
+            if int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0:
+                raise RuntimeError(f"{name}: supplier REF gained a tolerance")
 
     return (settled,)
 

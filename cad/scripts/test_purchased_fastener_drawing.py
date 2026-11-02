@@ -5120,14 +5120,9 @@ def _supplier_pin_layout_placement(monkeypatch, *, family, outline):
     monkeypatch.setattr(pins, "scan_view_edges", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(pins, "_axis_circles", lambda *_args, **_kwargs: ())
     monkeypatch.setattr(pins, "_supplier_length", lambda *_args, **_kwargs: (None, None))
-    placements = {}
-
-    def supplier_diameter(*_args, text_xy, **_kwargs):
-        placements["diameter"] = text_xy
-        return None, None
-
-    monkeypatch.setattr(pins, "_supplier_diameter", supplier_diameter)
+    monkeypatch.setattr(pins, "_supplier_diameter", lambda *_args, **_kwargs: (None, None))
     monkeypatch.setattr(pins, "_settled_pin_check", lambda *_args, **_kwargs: lambda: None)
+    placements = {}
 
     def import_references(_adapter, _view, _source, keep):
         placements.update(keep)
@@ -5142,9 +5137,7 @@ def _supplier_pin_layout_placement(monkeypatch, *, family, outline):
     )
     if family == "dowel":
         pins.add_supplier_dowel_dimensions(None, {"*Front": view, "*Top": view}, source)
-        # The printed OD is authored bandless; the banded model OD is not imported.
-        assert "SupplierPinDiameter" not in placements
-        return placements["diameter"]
+        return placements[pins.DIAMETER_DIMENSION]
     pins.add_supplier_spring_pin_dimensions(None, {"*Front": view, "*Right": view}, source)
     return placements[pins.MATING_HOLE_DIMENSION]
 
@@ -8557,7 +8550,7 @@ def _washer_paint_native(monkeypatch, case):
 
 
 def _washer_import_native(monkeypatch, *, defect=None, axis="y", values=None):
-    """Native-I/O doubles; run the real body, source, band and import guards."""
+    """Native-I/O doubles; run the real body, source, no-band and import guards."""
     import _supplier_washer_drawing as washer
     import _supplier_washer_model as model_helpers
 
@@ -8568,7 +8561,6 @@ def _washer_import_native(monkeypatch, *, defect=None, axis="y", values=None):
     values = values or {washer.OUTER_DIAMETER: 12.7, washer.BORE_DIAMETER: 6.35, washer.THICKNESS: 1.5875}
     outer, bore, thickness = (values[key] for key in (washer.OUTER_DIAMETER, washer.BORE_DIAMETER, washer.THICKNESS))
     precision = dict.fromkeys(values, 3)
-    bands = {label: (value - 0.05, value + 0.05, "bilateral") for label, value in values.items()}
 
     class Point:
         def __init__(self, values):
@@ -8650,9 +8642,7 @@ def _washer_import_native(monkeypatch, *, defect=None, axis="y", values=None):
             case.native.FullName = f"{name}@{feature_name}@stock"
             owner = mapped[id(features[feature_name])] if imported else features[feature_name]
             case.native.GetFeatureOwner = lambda owner=owner: owner
-            case.native.Tolerance = SimpleNamespace(Type=2, GetMinValue=lambda: -0.00005,
-                                                    GetMaxValue=lambda: 0.00005)
-            case.display.GetPrimaryTolPrecision2 = lambda: 3
+            case.native.Tolerance = SimpleNamespace(Type=0)
             case.display.GetNameForSelection = lambda name=name: f"{name}@View"
             case.state.use_doc = imported
             case.display.GetUseDocUnits = lambda state=case.state: state.use_doc
@@ -8704,19 +8694,19 @@ def _washer_import_native(monkeypatch, *, defect=None, axis="y", values=None):
     monkeypatch.setattr(washer, "dimension_name",
                         lambda _adapter, annotation: annotation.GetSpecificAnnotation().GetNameForSelection().split("@")[0])
     if defect == "source_band":
-        sources[washer.THICKNESS].native.Tolerance.Type = 0
+        sources[washer.THICKNESS].native.Tolerance.Type = 2
     elif defect == "import_value":
         imports[washer.THICKNESS].native.SystemValue *= 2.0
     elif defect == "source_geometry":
         points[0].X += 0.001
     elif defect == "import_band":
-        imports[washer.THICKNESS].native.Tolerance.Type = 0
+        imports[washer.THICKNESS].native.Tolerance.Type = 2
     case = SimpleNamespace(
         helper=washer, source_helper=model_helpers, adapter=adapter, model=model, views=views,
         sources=sources, imports=imports, mapped=mapped, entities=source_entities,
-        precision=precision, bands=bands, imported_calls=imported_calls,
+        precision=precision, model_references=frozenset(values), imported_calls=imported_calls,
         kwargs=dict(axis=axis, bore_mm=bore, outer_mm=outer, thickness_mm=thickness,
-                    units="in", precision=precision, bands=bands),
+                    units="in", precision=precision, model_references=frozenset(values)),
     )
     _washer_paint_native(monkeypatch, case)
     return case

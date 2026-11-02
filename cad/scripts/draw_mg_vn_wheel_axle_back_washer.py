@@ -19,7 +19,7 @@ SPEC = DRAWINGS_BY_NAME["mg_vn_wheel_axle_back_washer"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "#10 FLAT WASHER"
 # Sheet-metre reserves: 12 mm face picks plus the supplier screw callout,
-# and a 14 mm Top thickness pick plus native stacked-limit ink.
+# and a 14 mm Top thickness pick plus its REF ink.
 SUPPLIER_MARGINS = {
     "*Front": (0.0, 0.008, 0.040, 0.006),
     "*Top": (0.0, 0.008, 0.035, 0.008),
@@ -38,7 +38,7 @@ def _supplier_dimensions(
         thickness_mm=part.MODEL_THICKNESS,
         units=part.SUPPLIER_UNITS,
         precision=part.DRAWING_REFERENCE_PRECISION,
-        bands=part.SUPPLIER_TOLERANCES,
+        model_references=part.SUPPLIER_MODEL_REFERENCES,
         bore_callout=part.SUPPLIER_BORE_CALLOUT,
     )
 

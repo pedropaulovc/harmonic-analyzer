@@ -381,29 +381,11 @@ def supplier_disc_spring_dimensions(
                 arguments["expected_mm"],
                 label=name,
             )
+            # Supplier sizes print as untoleranced REF; the catalogue governs.
             dimension = _early_bound(display.GetDimension2(0), "IDimension")
             tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-            band = getattr(spec, f"{semantic}_BAND", None)
-            if band is None:
-                if int(tolerance.Type) != 0:
-                    raise RuntimeError(
-                        f"{spec.SKU} {semantic}: unprovided source band appeared"
-                    )
-                continue
-            upper, lower = band
-            expected_type = 4 if math.isclose(upper, -lower, abs_tol=1e-12) else 2
-            if int(tolerance.Type) != expected_type or not all(
-                math.isclose(actual, value / 1000.0, rel_tol=0.0, abs_tol=1e-9)
-                for actual, value in (
-                    (float(tolerance.GetMinValue()), lower),
-                    (float(tolerance.GetMaxValue()), upper),
-                )
-            ):
-                raise RuntimeError(f"{spec.SKU} {semantic}: native source band changed")
-            if int(display.GetPrimaryTolPrecision2()) != 3:
-                raise RuntimeError(
-                    f"{spec.SKU} {semantic}: source band needs three places"
-                )
+            if int(tolerance.Type) != 0:
+                raise RuntimeError(f"{spec.SKU} {semantic}: supplier REF gained a band")
 
     if settled_checks is not None:
         settled_checks.append(check_settled_references)

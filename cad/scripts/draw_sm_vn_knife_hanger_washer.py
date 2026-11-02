@@ -18,7 +18,7 @@ SPEC = DRAWINGS_BY_NAME["sm_vn_knife_hanger_washer"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "#10 SAE FLAT WASHER"
 # Sheet-metre ink reserves: face picks are 12 mm right plus the supplier
-# diameter/callout width; the 14 mm thickness pick carries stacked limits.
+# diameter/callout width; the 14 mm thickness pick carries its REF ink.
 SUPPLIER_MARGINS = {
     "*Top": (0.0, 0.008, 0.040, 0.006),
     "*Front": (0.0, 0.008, 0.035, 0.008),
@@ -37,7 +37,7 @@ def _supplier_dimensions(
         thickness_mm=part.THICKNESS,
         units=part.SUPPLIER_UNITS,
         precision=part.DRAWING_REFERENCE_PRECISION,
-        bands=part.SUPPLIER_TOLERANCES,
+        model_references=part.SUPPLIER_MODEL_REFERENCES,
         bore_callout=part.SUPPLIER_BORE_CALLOUT,
     )
 

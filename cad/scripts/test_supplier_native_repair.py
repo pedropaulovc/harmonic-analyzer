@@ -23,8 +23,6 @@ def _pin_import_case(monkeypatch, kind, *, defect=None):
     source = SimpleNamespace(
         sku="native-pin", units="in", unit_mm=25.4,
         diameter_mm=2.38125, diameter_precision=3,
-        diameter_band=(-0.01, 0.01), diameter_uses_limits=False,
-        diameter_deviations_mm=(-0.01, 0.01),
         wall_mm=0.381, wall_precision=3,
         application_hole_limits=(0.09375, 0.0945),
         application_hole_precision=4, application_hole_center=(2.0, 0.0),
@@ -36,7 +34,7 @@ def _pin_import_case(monkeypatch, kind, *, defect=None):
     # Expected metadata is independent of the production contract/formatter.
     feature, name, value_mm, precision, band, callout = {
         "diameter": (source_helpers.DIAMETER_FEATURE, "SupplierPinDiameter", 2.38125,
-                     3, (-0.00001, 0.00001, 2), ""),
+                     3, (0.0, 0.0, 0), ""),
         "wall": (source_helpers.WALL_FEATURE, "SupplierPinWall", 0.381,
                  3, (0.0, 0.0, 0), "WALL"),
         "mating_hole": (source_helpers.MATING_HOLE_FEATURE, MATING_HOLE_DIMENSION, 2.38125,
@@ -486,42 +484,15 @@ def test_washer_healthy_canonical_check_does_not_read_feature_owners_or_diagnost
     _assert_washer_source_attachment(case, label, display)
 
 
-def test_washer_import_refuses_uninherited_tolerance_precision_without_repairing_source(monkeypatch):
-    from test_purchased_fastener_drawing import _washer_import_native
-
-    case = _washer_import_native(monkeypatch)
-    label = case.helper.THICKNESS
-    before = (
-        case.sources[label].native.SystemValue,
-        case.sources[label].native.Tolerance.Type,
-        dict(vars(case.sources[label].state)),
-    )
-    case.imports[label].display.GetPrimaryTolPrecision2 = lambda: 2
-    with pytest.raises(RuntimeError, match="precision|band"):
-        case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
-    assert (
-        case.sources[label].native.SystemValue,
-        case.sources[label].native.Tolerance.Type,
-        dict(vars(case.sources[label].state)),
-    ) == before
-
-
-def _r48_washer_layout(monkeypatch, *, axis="z", banded="thickness"):
+def _r48_washer_layout(monkeypatch, *, axis="z", witnessed="thickness"):
     from test_purchased_fastener_drawing import _washer_import_native
     import _supplier_washer_drawing as washer
 
     case = _washer_import_native(monkeypatch, axis=axis, values={
         washer.OUTER_DIAMETER: 11.1252, washer.BORE_DIAMETER: 5.08, washer.THICKNESS: .91,
     })
-    # The captured limits stack, not a nominal-value-only surrogate.
-    case.bands[washer.THICKNESS] = (.7366, 1.0922, "limits")
-    for collection in (case.sources, case.imports):
-        native = collection[washer.THICKNESS].native
-        native.Tolerance.Type = 3
-        native.Tolerance.GetMinValue = lambda: (.7366 - .91) / 1000
-        native.Tolerance.GetMaxValue = lambda: (1.0922 - .91) / 1000
-    if banded == "thickness":
-        case.kwargs["bands"] = {washer.THICKNESS: case.bands[washer.THICKNESS]}
+    if witnessed == "thickness":
+        case.kwargs["model_references"] = frozenset({washer.THICKNESS})
     qualifier = "FOR No. 10 SCREW SIZE"
     case.sources[washer.BORE_DIAMETER].text[4] = qualifier
     case.kwargs["bore_callout"] = qualifier
@@ -531,22 +502,21 @@ def _r48_washer_layout(monkeypatch, *, axis="z", banded="thickness"):
 def _washer_source_state(case):
     return {
         label: (item.native.SystemValue, item.native.Tolerance.Type,
-                item.native.Tolerance.GetMinValue(), item.native.Tolerance.GetMaxValue(),
                 dict(vars(item.state)), dict(item.text), tuple(item.annotation.entities))
         for label, item in case.sources.items()
     }
 
 
 @pytest.mark.parametrize("axis", ("y", "z"))
-@pytest.mark.parametrize("banded", ("thickness", "all"))
-def test_washer_complete_consumer_replay_clears_limits_and_diameters_without_moving_witnesses(
-    monkeypatch, axis, banded,
+@pytest.mark.parametrize("witnessed", ("thickness", "all"))
+def test_washer_complete_consumer_replay_clears_thickness_and_diameters_without_moving_witnesses(
+    monkeypatch, axis, witnessed,
 ):
     import copy
     from _layout_audit import display_box
     from _supplier_screw_layout import supplier_top_text_geometry
 
-    case = _r48_washer_layout(monkeypatch, axis=axis, banded=banded)
+    case = _r48_washer_layout(monkeypatch, axis=axis, witnessed=witnessed)
     thick = case.helper.THICKNESS
     diameters = (case.helper.OUTER_DIAMETER, case.helper.BORE_DIAMETER)
     before = _washer_source_state(case)
@@ -642,21 +612,17 @@ def _retained_washer_layout(monkeypatch, scope):
         washer.THICKNESS: getattr(part, captured["thickness_attribute"]),
     }
     case = _washer_import_native(monkeypatch, axis=captured["axis"], values=values)
-    units, precision, bands = part.SUPPLIER_UNITS, part.DRAWING_REFERENCE_PRECISION, part.SUPPLIER_TOLERANCES
+    units, precision = part.SUPPLIER_UNITS, part.DRAWING_REFERENCE_PRECISION
     qualifier = getattr(part, "SUPPLIER_BORE_CALLOUT", None)
-    case.kwargs.update(units=units, precision=precision, bands=bands, bore_callout=qualifier)
-    for label, value in values.items():
+    case.kwargs.update(units=units, precision=precision,
+                       model_references=part.SUPPLIER_MODEL_REFERENCES, bore_callout=qualifier)
+    for label in values:
         for collection in (case.sources, case.imports):
             item = collection[label]
             item.state.unit = 3 if units == "in" else 0
             item.state.precision = precision[label]
-            item.display.GetPrimaryTolPrecision2 = lambda places=precision[label]: places
             item.text.update({2: f" {units})",
                               4: (qualifier or "") if label == washer.BORE_DIAMETER else ""})
-            lower, upper, style = bands.get(label, (value, value, None))
-            item.native.Tolerance.Type = {"bilateral": 2, "limits": 3, "symmetric": 4, None: 0}[style]
-            item.native.Tolerance.GetMinValue = lambda deviation=(lower - value) / 1000: deviation
-            item.native.Tolerance.GetMaxValue = lambda deviation=(upper - value) / 1000: deviation
         case.paint[label].record = copy.deepcopy(captured["records"][label])
     # These captures are the settled exported sheets, where the thickness
     # already uses OffsetText. Replaying them must not move its witnesses.

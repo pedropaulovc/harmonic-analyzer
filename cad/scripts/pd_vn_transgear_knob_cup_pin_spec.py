@@ -61,7 +61,6 @@ SUPPLIER_REFERENCE = SupplierPinReference(
     units="in",
     diameter_mm=PIN_DIA,
     length_mm=PIN_LEN,
-    diameter_nominal=0.063,
     diameter_precision=3,
     length_precision=3,
     wall_mm=WALL_T,

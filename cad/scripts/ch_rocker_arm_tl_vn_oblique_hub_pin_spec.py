@@ -31,6 +31,5 @@ SUPPLIER_REFERENCE_FORMATS = {'SupplierPinDiameter': (1, 'diameter', None, 'GAUG
 # Diameter text shelves right of its bottom lane; the cut length sits right of the Top view.
 SUPPLIER_REFERENCE_SIDES = {'SupplierPinDiameter': 'bottom', 'SupplierCutLength': 'right'}
 SUPPLIER_REFERENCE_UNITS = {'SupplierPinDiameter': 'mm', 'SupplierCutLength': 'mm'}
-SUPPLIER_REFERENCE_TOLERANCES_MM: dict[str, tuple[float, float]] = {}
 # Requirements live in the registry installation note; no supplier data lines.
 SUPPLIER_DATA: tuple[str, ...] = ()

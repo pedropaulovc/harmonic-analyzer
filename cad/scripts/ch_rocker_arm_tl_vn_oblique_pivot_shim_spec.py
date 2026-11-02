@@ -10,8 +10,6 @@ Supplied component is installed without shop modification.
 
 from __future__ import annotations
 
-from _fit_deviations import deviations
-
 SKU = "98055A118"
 PER_SUPPORT = 5  # the nominal 1.0 pack under each of the two spacers
 QUANTITY = 2 * PER_SUPPORT
@@ -34,9 +32,4 @@ SUPPLIER_REFERENCE_FORMATS = {'SupplierBoreDiameter': (2, 'diameter', None, 'BOR
 # of the other's witnesses. The thickness sits right of the Top view.
 SUPPLIER_REFERENCE_SIDES = {'SupplierBoreDiameter': 'top', 'SupplierOuterDiameter': 'bottom', 'SupplierThickness': 'right'}
 SUPPLIER_REFERENCE_UNITS = {'SupplierBoreDiameter': 'mm', 'SupplierOuterDiameter': 'mm', 'SupplierThickness': 'mm'}
-SUPPLIER_REFERENCE_TOLERANCES_MM = {
-    'SupplierBoreDiameter': deviations(ID_BAND),
-    'SupplierOuterDiameter': deviations(OD_BAND),
-    'SupplierThickness': deviations(THICKNESS_BAND),
-}
 SUPPLIER_DATA = ('MODEL: FIVE 0.2 mm SHIMS PER PIVOT, NOMINAL.', 'FITTING STOCK: 98055A117 (0.1 mm), 98055A121 (0.5 mm).', 'SELECT AT ASSEMBLY TO THE JIG RUNNING-GAP REQUIREMENT.')

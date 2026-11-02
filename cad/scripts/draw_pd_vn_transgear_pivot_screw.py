@@ -85,7 +85,6 @@ from pd_vn_transgear_pivot_screw_spec import (
     SKU,
     SOCKET_AF,
     SUPPLIER_DRAWING_DIMENSIONS,
-    SUPPLIER_REFERENCE_BANDS,
     SUPPLIER_REFERENCE_DIMENSIONS,
     SUPPLIER_STOCK_CONFIGURATION,
     SUPPLIER_STOCK_TITLE,
@@ -195,22 +194,12 @@ def _verify_reference_length(adapter: Any, annotation: Any) -> None:
 
 def _assert_supplier_tolerance(display: Any, name: str) -> None:
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    band = SUPPLIER_REFERENCE_BANDS.get(name)
-    if int(tolerance.Type) != (2 if band is not None else 0):
-        raise RuntimeError(f"{name}: native supplier tolerance type changed")
-    if band is not None:
-        lower, upper = (value / 1000 for value in band)
-        if (
-            not math.isclose(float(tolerance.GetMinValue()), lower, rel_tol=0.0, abs_tol=1e-12)
-            or not math.isclose(float(tolerance.GetMaxValue()), upper, rel_tol=0.0, abs_tol=1e-12)
-            or int(display.GetPrimaryTolPrecision2()) != SUPPLIER_REFERENCE_DIMENSIONS[name]["precision"]
-        ):
-            raise RuntimeError(f"{name}: model-owned source supplier band changed")
+    if int(_early_bound(dimension.Tolerance, "IDimensionTolerance").Type) != 0:
+        raise RuntimeError(f"{name}: supplier REF gained a tolerance")
 
 
 def _format_supplier_reference(adapter: Any, display: Any, name: str) -> Any:
-    """Only purchased-reference presentation is drawing-owned; bands are read-only."""
+    """Only purchased-reference presentation is drawing-owned; supplier REFs carry no band."""
     display = _early_bound(display, "IDisplayDimension")
     supplier_reference_dimension(
         adapter, display, label=name, **SUPPLIER_REFERENCE_DIMENSIONS[name]
@@ -358,7 +347,7 @@ def _add_physical_head_height(
 
 
 def _add_supplier_references(adapter: Any, front: Any, top: Any) -> dict[str, Any]:
-    """Measure physical head/socket; import native nominal-major and source bands."""
+    """Measure physical head/socket; import native nominal-major and supplier REFs."""
     head_r = HEAD_DIA / 2
     authored = {}
     for name, view, first, second, text_xy, orientation, entity_type in (
@@ -397,7 +386,7 @@ def _add_supplier_references(adapter: Any, front: Any, top: Any) -> dict[str, An
             "SupplierShoulderDiameter": (0.202, 0.172),
             "SupplierShoulderLength": (0.065, 0.170),
         },
-        view_label="supplier nominal envelopes and model-owned source bands",
+        view_label="supplier nominal envelopes and model-owned supplier REFs",
         dimensions_by_feature=SUPPLIER_DRAWING_DIMENSIONS,
     )
     for annotation in references:

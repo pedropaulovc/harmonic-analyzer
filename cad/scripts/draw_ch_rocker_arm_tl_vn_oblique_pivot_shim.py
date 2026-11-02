@@ -2,17 +2,15 @@
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 
 import _telemetry
 import ch_rocker_arm_tl_vn_oblique_pivot_shim_spec as part
-from _com import _early_bound
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import NumberFit, build_purchased_fastener_drawing
 from _session import run_build
-from _supplier_limits import LIMIT
 from _supplier_screw_dimensions import annotate_supplier_screw, assert_supplier_screw
+from _supplier_unbanded import assert_supplier_screw_unbanded
 from _supplier_text_shelf import assert_supplier_shelves, shelve_supplier_text
 from _machinist_review_mode import MachinistReviewMode
 
@@ -36,22 +34,6 @@ SUPPLIER_MARGINS = {
 }
 
 
-def _assert_supplier_bands(displays):
-    for name, display in displays.items():
-        display = _early_bound(display, "IDisplayDimension")
-        native = _early_bound(display.GetDimension2(0), "IDimension")
-        tolerance = _early_bound(native.Tolerance, "IDimensionTolerance")
-        lower, upper = part.SUPPLIER_REFERENCE_TOLERANCES_MM[name]
-        if int(tolerance.Type) != LIMIT or not all(
-            math.isclose(actual, expected / 1000.0, rel_tol=0.0, abs_tol=1e-12)
-            for actual, expected in ((float(tolerance.GetMinValue()), lower),
-                                     (float(tolerance.GetMaxValue()), upper))
-        ):
-            raise RuntimeError(name + ": supplier limits changed")
-        if int(display.GetPrimaryTolPrecision2()) != part.SUPPLIER_REFERENCE_FORMATS[name][0]:
-            raise RuntimeError(name + ": supplier tolerance precision changed")
-
-
 async def build(adapter) -> dict[str, str]:
     proofs = []
 
@@ -66,7 +48,7 @@ async def build(adapter) -> dict[str, str]:
             sides=part.SUPPLIER_REFERENCE_SIDES,
             units=part.SUPPLIER_REFERENCE_UNITS,
         )
-        _assert_supplier_bands(displays)
+        assert_supplier_screw_unbanded(displays)
         stations = shelve_supplier_text(adapter, displays, SHELVES)
 
         def assert_references():
@@ -76,7 +58,7 @@ async def build(adapter) -> dict[str, str]:
                 planes=part.SUPPLIER_REFERENCE_PLANES,
                 units=part.SUPPLIER_REFERENCE_UNITS,
             )
-            _assert_supplier_bands(fresh)
+            assert_supplier_screw_unbanded(fresh)
             assert_supplier_shelves(adapter, fresh, SHELVES, stations)
 
         proofs.append(assert_references)

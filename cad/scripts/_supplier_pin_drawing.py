@@ -18,7 +18,6 @@ from _com import _early_bound
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_leaders import set_near_side_diameter
 from _drawing_projection import model_points_in_view
 from _drawing_precision import _named_dimensions
 from _supplier_dimensions import (
@@ -27,6 +26,7 @@ from _supplier_dimensions import (
     supplier_reference_dimension,
 )
 from _supplier_pin_data import (
+    DIAMETER_DIMENSION,
     MATING_HOLE_DIMENSION,
     REFERENCE_DIMENSIONS,
     WALL_DIMENSION,
@@ -169,10 +169,8 @@ def _settled_pin_check(
 
 def _supplier_diameter(
     adapter: Any, view: Any, circles: list[ViewEdge], source: SupplierPinReference,
-    *, text_xy: tuple[float, float], near_side: bool = False,
+    *, text_xy: tuple[float, float]
 ) -> tuple[Any, Callable[[Any], None]]:
-    # Printed supplier sizes are untoleranced REF (drawing-guidelines): the
-    # catalogue band stays on the model-owned reference for fit checks only.
     label = f"{source.sku} supplier diameter"
     edge = _outer_circle(circles, source.diameter_mm, label=label)
     display = _diameter_dimension(adapter, view, edge, text_xy, label=label)
@@ -181,10 +179,6 @@ def _supplier_diameter(
         precision=source.diameter_precision, expected_mm=source.diameter_mm,
         presentation="diameter",
     )
-    if near_side:
-        # Text beside the end view: one rim arrow and a horizontal shelf, so
-        # no centre-crossing line runs on through the shelf and the value.
-        set_near_side_diameter(display.GetAnnotation(), label)
 
     def assert_diameter(current: Any) -> None:
         assert_supplier_reference_dimension(
@@ -324,7 +318,7 @@ def _import_model_references(
 def add_supplier_dowel_dimensions(
     adapter: Any, views: dict[str, Any], source: SupplierPinReference
 ) -> Callable[[], None]:
-    """Author bandless OD and end-rim length; the model keeps its catalogue band."""
+    """Import the source-owned bandless OD REF; author the bandless end-rim length."""
     front = views["*Front"]
     circles = _axis_circles(scan_view_edges(front, label=f"{source.sku} dowel"), 1, label=source.sku)
     length, length_check = _supplier_length(
@@ -332,16 +326,11 @@ def add_supplier_dowel_dimensions(
     )
     top = views["*Top"]
     outline = tuple(float(value) for value in top.GetOutline())
-    top_circles = _axis_circles(
-        scan_view_edges(top, label=f"{source.sku} dowel end"), 1, label=source.sku
+    imported = _import_model_references(
+        adapter, top, source,
+        {DIAMETER_DIMENSION: (outline[2] + 0.033, (outline[1] + outline[3]) / 2.0)},
     )
-    diameter, diameter_check = _supplier_diameter(
-        adapter, top, top_circles, source,
-        # Above the centre-mark line, so the leader rises to its shelf
-        # instead of running along the centre mark.
-        text_xy=(outline[2] + 0.033, (outline[1] + outline[3]) / 2.0 + 0.006),
-        near_side=True,
-    )
+    diameter, diameter_check = imported[DIAMETER_DIMENSION]
     return _settled_pin_check(
         adapter, views,
         [("*Top", diameter, diameter_check), ("*Front", length, length_check)],

@@ -46,9 +46,8 @@ DRAWING_REFERENCE_PRECISION = {
     "supplier bore diameter": 3,
     "supplier thickness": 3,
 }
-SUPPLIER_TOLERANCES = {
-    "supplier thickness": (THICKNESS_MIN, THICKNESS_MAX, "limits"),
-}
+# Supplier sizes the part witnesses natively; all print untoleranced REF.
+SUPPLIER_MODEL_REFERENCES = ("supplier thickness",)
 SUPPLIER_BORE_CALLOUT = "FOR No. 10 SCREW SIZE"
 
 REFERENCE_SKETCHES = ("SupplierWasherThicknessReference",)

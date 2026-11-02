@@ -41,8 +41,8 @@ BOTTOM_Z = 0.0
 TOP_Z = THICKNESS
 
 # The engineering drawing uses .250 +.011/-.000 for the bore. The solid
-# deliberately represents its midpoint; native equivalent limits retain the
-# exact supplier acceptance without rounding or changing that geometry.
+# deliberately represents its midpoint; the sheet prints sizes as untoleranced
+# REF and the catalogue governs, so geometry is never rounded to a print.
 SUPPLIER_DRAWING_URL = (
     "https://www.mcmaster.com/mvC/Library/CAD2/20260108/095CF7B5/"
     "3088A429_Carbon%20Steel%20ShimX.GIF"
@@ -53,11 +53,10 @@ DRAWING_REFERENCE_PRECISION = {
     "supplier bore diameter": 3,
     "supplier thickness": 3,
 }
-SUPPLIER_TOLERANCES = {
-    "supplier outer diameter": (OD_MIN, OD_MAX, "symmetric"),
-    "supplier bore diameter": (ID_MIN, ID_MAX, "limits"),
-    "supplier thickness": (THICKNESS_MIN, THICKNESS_MAX, "symmetric"),
-}
+# Supplier sizes the part witnesses natively; all print untoleranced REF.
+SUPPLIER_MODEL_REFERENCES = (
+    "supplier outer diameter", "supplier bore diameter", "supplier thickness",
+)
 
 REFERENCE_SKETCHES = (
     "SupplierWasherFaceReference",

@@ -16,8 +16,6 @@ from typing import Any
 from _check import check
 from _com import _early_bound
 from _drawing_marks import mark_dimensions_for_drawing
-from _drawing_precision import _named_dimension
-from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _feature_tree import name_last_feature
 from _sketch import (
     SketchDims,
@@ -89,14 +87,7 @@ async def _length_reference(
     return feature
 
 
-async def _sections(
-    adapter: Any,
-    *,
-    coil_od_mm: float,
-    wire_dia_mm: float,
-    od_tolerance_mm: float | None,
-    od_tolerance_precision: int | None,
-) -> str:
+async def _sections(adapter: Any, *, coil_od_mm: float, wire_dia_mm: float) -> str:
     check("create supplier nominal sections", await adapter.create_sketch("Right"))
     dims = SketchDims()
     for name, diameter, center in (
@@ -121,23 +112,6 @@ async def _sections(
     name_last_feature(adapter, SECTION_FEATURE)
     dims.apply(adapter, SECTION_FEATURE)
     mark_dimensions_for_drawing(adapter, SECTION_FEATURE, {COIL_OD, WIRE_DIA})
-    if od_tolerance_mm is not None:
-        if od_tolerance_precision is None:
-            raise ValueError("supplier OD tolerance precision is required")
-        set_dimension_symmetric_tolerance(
-            adapter, SECTION_FEATURE, COIL_OD, od_tolerance_mm
-        )
-        display, _ = _named_dimension(adapter, SECTION_FEATURE, COIL_OD)
-        # The band is source-owned; preserve its inch spelling on import.
-        if display.SetUnits2(False, 3, 1, 0, False, 0) != 0:
-            raise RuntimeError("supplier OD source units were rejected")
-        status = display.SetPrecision3(-1, -1, od_tolerance_precision, -1)
-        if status != 0:
-            raise RuntimeError(
-                f"supplier OD source tolerance precision was rejected (status {status})"
-            )
-        if int(display.GetPrimaryTolPrecision2()) != od_tolerance_precision:
-            raise RuntimeError("supplier OD source tolerance precision did not persist")
     blank_reference_sketches(adapter, (SECTION_FEATURE,))
     return SECTION_FEATURE
 
@@ -150,8 +124,6 @@ async def add_extension_spring_references(
     coil_od_mm: float,
     wire_dia_mm: float,
     body_count: int,
-    od_tolerance_mm: float | None = None,
-    od_tolerance_precision: int | None = None,
 ) -> None:
     """Add nominal source gauges only; never author free/max physical solids."""
 
@@ -159,13 +131,7 @@ async def add_extension_spring_references(
         length = await _length_reference(
             target, FREE_FEATURE, FREE_LENGTH, free_length_mm
         )
-        section = await _sections(
-            target,
-            coil_od_mm=coil_od_mm,
-            wire_dia_mm=wire_dia_mm,
-            od_tolerance_mm=od_tolerance_mm,
-            od_tolerance_precision=od_tolerance_precision,
-        )
+        section = await _sections(target, coil_od_mm=coil_od_mm, wire_dia_mm=wire_dia_mm)
         return length, section
 
     async def maximum_refs(target: Any) -> tuple[str, ...]:

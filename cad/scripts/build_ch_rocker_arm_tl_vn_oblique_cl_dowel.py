@@ -25,7 +25,6 @@ import sys
 from _appearance import POLISHED_STEEL
 from _com import _early_bound
 from _drawing_precision import _named_dimension
-from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _part_save import save_part_and_images
 from _session import run_build
 from _fastener_catalog import fastener
@@ -53,9 +52,6 @@ async def _save_supplier_part(adapter, part_name) -> dict[str, str]:
         starts=part.SUPPLIER_REFERENCE_STARTS,
         planes=part.SUPPLIER_REFERENCE_PLANES,
     )
-    for name, (lower, upper) in part.SUPPLIER_REFERENCE_TOLERANCES_MM.items():
-        feature = FEATURE_BY_PLANE[part.SUPPLIER_REFERENCE_PLANES[name]]
-        set_dimension_bilateral_tolerance(adapter, feature, name, lower, upper)
     for name, value, _orientation in part.SUPPLIER_REFERENCE_DIMENSIONS:
         feature = FEATURE_BY_PLANE[part.SUPPLIER_REFERENCE_PLANES[name]]
         display, native = _named_dimension(adapter, feature, name)
@@ -70,8 +66,7 @@ async def _save_supplier_part(adapter, part_name) -> dict[str, str]:
         # Model-owned source ink, not the drawing-view-owned formatter.
         if display.SetUnits2(False, 0, 1, 0, False, 0) != 0:
             raise RuntimeError(f"{name}: supplier millimetre units rejected")
-        banded = name in part.SUPPLIER_REFERENCE_TOLERANCES_MM
-        if display.SetPrecision3(precision, -1, precision if banded else -1, -1) != 0:
+        if display.SetPrecision3(precision, -1, -1, -1) != 0:
             raise RuntimeError(f"{name}: supplier source precision rejected")
         prefix = "(<MOD-DIAM>" if presentation == "diameter" else "("
         display.ShowParenthesis = False
@@ -89,8 +84,7 @@ async def _save_supplier_part(adapter, part_name) -> dict[str, str]:
             or str(display.GetText(1) or "") != prefix
             or str(display.GetText(2) or "") != " mm)"
             or str(display.GetText(4) or "") != (callout or "")
-            or (banded and int(display.GetPrimaryTolPrecision2()) != precision)
-            or (not banded and int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0)
+            or int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0
         ):
             raise RuntimeError(f"{name}: supplier source presentation did not persist")
     return await save_part_and_images(adapter, part_name)

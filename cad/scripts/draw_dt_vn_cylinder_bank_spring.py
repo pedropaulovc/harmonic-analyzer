@@ -320,32 +320,12 @@ def _import_sizes(
     return references
 
 
-def _assert_source_band(display: Any, field: str) -> None:
-    """The source tolerance band the shared disc check reads: ID/OD carry
-    the catalogue's symmetric band at three places, free height none."""
+def _assert_unbanded(display: Any, field: str) -> None:
+    """Supplier sizes print as untoleranced REF: the catalogue band stays in
+    the spec for the fit math and never reaches the native dimension."""
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    band = getattr(supplier_spec, f"{field}_BAND", None)
-    if band is None:
-        if int(tolerance.Type) != 0:
-            raise RuntimeError(
-                f"{supplier_spec.SKU} {field}: unprovided source band appeared"
-            )
-        return
-    upper, lower = band
-    expected_type = 4 if math.isclose(upper, -lower, abs_tol=1e-12) else 2
-    if int(tolerance.Type) != expected_type or not all(
-        math.isclose(actual, value / 1000.0, rel_tol=0.0, abs_tol=1e-9)
-        for actual, value in (
-            (float(tolerance.GetMinValue()), lower),
-            (float(tolerance.GetMaxValue()), upper),
-        )
-    ):
-        raise RuntimeError(f"{supplier_spec.SKU} {field}: native source band changed")
-    if int(display.GetPrimaryTolPrecision2()) != 3:
-        raise RuntimeError(
-            f"{supplier_spec.SKU} {field}: source band needs three places"
-        )
+    if int(_early_bound(dimension.Tolerance, "IDimensionTolerance").Type) != 0:
+        raise RuntimeError(f"{supplier_spec.SKU} {field}: supplier REF gained a band")
 
 
 def supplier_dimensions(
@@ -388,7 +368,7 @@ def supplier_dimensions(
                 arguments["expected_mm"],
                 label=name,
             )
-            _assert_source_band(display, field)
+            _assert_unbanded(display, field)
 
     settled_checks.append(check_settled_references)
 

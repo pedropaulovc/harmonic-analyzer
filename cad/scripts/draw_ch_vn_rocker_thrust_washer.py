@@ -16,7 +16,7 @@ import ch_vn_rocker_thrust_washer_spec as part
 
 SPEC = DRAWINGS_BY_NAME["ch_vn_rocker_thrust_washer"]
 # The final +Z face is Front; Top is parallel to its thickness witness.
-# Reserve 12 mm face/14 mm side picks plus supplier band/limit ink widths.
+# Reserve 12 mm face/14 mm side picks plus the supplier REF ink widths.
 SUPPLIER_MARGINS = {
     "*Front": (0.0, 0.008, 0.040, 0.008),
     "*Top": (0.0, 0.006, 0.035, 0.006),
@@ -35,7 +35,7 @@ def _supplier_dimensions(
         thickness_mm=part.THICKNESS,
         units=part.SUPPLIER_UNITS,
         precision=part.DRAWING_REFERENCE_PRECISION,
-        bands=part.SUPPLIER_TOLERANCES,
+        model_references=part.SUPPLIER_MODEL_REFERENCES,
     )
 
 

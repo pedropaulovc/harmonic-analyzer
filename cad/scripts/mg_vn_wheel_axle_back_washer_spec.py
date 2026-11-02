@@ -30,7 +30,7 @@ if not THICKNESS_MIN < MODEL_THICKNESS < THICKNESS_MAX:
     raise AssertionError("92916A480 modelled thickness is outside the catalogue range")
 
 # Engineering drawing inspected 2026-10-19. Its thickness is a limit stack;
-# deviations around MODEL_THICKNESS print those limits without changing the solid.
+# the sheet prints MODEL_THICKNESS as untoleranced REF and the catalogue governs.
 SUPPLIER_DRAWING_URL = (
     "https://www.mcmaster.com/mvC/Library/CAD2/20260702/8C5AC0BA/"
     "92916A480_Brass%20WasherX.GIF"
@@ -41,9 +41,8 @@ DRAWING_REFERENCE_PRECISION = {
     "supplier bore diameter": 3,
     "supplier thickness": 3,
 }
-SUPPLIER_TOLERANCES = {
-    "supplier thickness": (THICKNESS_MIN, THICKNESS_MAX, "limits"),
-}
+# Supplier sizes the part witnesses natively; all print untoleranced REF.
+SUPPLIER_MODEL_REFERENCES = ("supplier thickness",)
 SUPPLIER_BORE_CALLOUT = "FOR No. 10 SCREW SIZE"
 
 REFERENCE_SKETCHES = ("SupplierWasherThicknessReference",)

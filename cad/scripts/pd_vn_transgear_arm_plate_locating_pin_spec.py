@@ -71,8 +71,6 @@ SUPPLIER_REFERENCE = SupplierPinReference(
     units="mm",
     diameter_mm=DIA,
     length_mm=LENGTH,
-    diameter_nominal=2.000,
     diameter_precision=3,
     length_precision=0,
-    diameter_band=(0.002, 0.008),
 )
