@@ -18,6 +18,7 @@ from _com import _early_bound
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_leaders import set_near_side_diameter
 from _drawing_projection import model_points_in_view
 from _drawing_precision import _named_dimensions
 from _supplier_dimensions import (
@@ -168,7 +169,7 @@ def _settled_pin_check(
 
 def _supplier_diameter(
     adapter: Any, view: Any, circles: list[ViewEdge], source: SupplierPinReference,
-    *, text_xy: tuple[float, float]
+    *, text_xy: tuple[float, float], near_side: bool = False,
 ) -> tuple[Any, Callable[[Any], None]]:
     # Printed supplier sizes are untoleranced REF (drawing-guidelines): the
     # catalogue band stays on the model-owned reference for fit checks only.
@@ -180,6 +181,10 @@ def _supplier_diameter(
         precision=source.diameter_precision, expected_mm=source.diameter_mm,
         presentation="diameter",
     )
+    if near_side:
+        # Text beside the end view: one rim arrow and a horizontal shelf, so
+        # no centre-crossing line runs on through the shelf and the value.
+        set_near_side_diameter(display.GetAnnotation(), label)
 
     def assert_diameter(current: Any) -> None:
         assert_supplier_reference_dimension(
@@ -332,7 +337,10 @@ def add_supplier_dowel_dimensions(
     )
     diameter, diameter_check = _supplier_diameter(
         adapter, top, top_circles, source,
-        text_xy=(outline[2] + 0.033, (outline[1] + outline[3]) / 2.0),
+        # Above the centre-mark line, so the leader rises to its shelf
+        # instead of running along the centre mark.
+        text_xy=(outline[2] + 0.033, (outline[1] + outline[3]) / 2.0 + 0.006),
+        near_side=True,
     )
     return _settled_pin_check(
         adapter, views,
