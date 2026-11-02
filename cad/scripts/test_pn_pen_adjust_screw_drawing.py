@@ -155,32 +155,31 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "OverallLength": 2,
         "PlainDia": 3,
         "EyeFromHeadEnd": 2,
-        "ShoulderRadius": 3,
+        "ShoulderRadius": 2,
     }
 
 
-def test_shoulder_root_prints_the_title_block_max_radius() -> None:
+def test_shoulder_root_prints_its_own_nominal_radius() -> None:
     """Rules 11 and 16: the shank-to-head corner is a modelled fillet whose
-    size prints natively as R MAX. Nothing seats on the head's underside (the
-    jam nut bears on the rod top and never reaches the shoulder), so the
-    limit is the title block's INSIDE CORNERS R.040, the model stands at it,
-    and at that limit the die keeps a pitch of worst-case run-out and the
-    fillet ends inside the head."""
+    radius prints natively as its own nominal at the title block's .XX: not
+    the INSIDE CORNERS R.040 MAX restated. Nothing seats on the head's
+    underside (the jam nut bears on the rod top and never reaches the
+    shoulder). At its printed largest the fillet stays inside the INSIDE
+    CORNERS limit, the die keeps a pitch of worst-case run-out and the fillet
+    ends inside the head."""
     import pn_vn_pen_adjust_nut_spec as jam_nut
     from _printed_tolerance import printed_band_mm
 
     band = printed_band_mm(2, unit=spec.UNIT)
-    assert spec.SHOULDER_CORNER_R_MAX == pytest.approx(0.040 * 25.4)
-    assert spec.SHOULDER_FILLET_R == spec.SHOULDER_CORNER_R_MAX
-    assert spec.SHOULDER_FILLET_BAND == (0.0, -spec.SHOULDER_FILLET_R)
-    assert spec.SHOULDER_FILLET_TOL_TYPE == 6  # swTolMAX
-    assert spec.SHOULDER_FILLET_PLACES == 3
+    assert spec.SHOULDER_FILLET_PLACES == 2
+    assert spec.SHOULDER_FILLET_R / 25.4 == pytest.approx(0.02)
+    largest = spec.SHOULDER_FILLET_R + band
+    assert spec.SHOULDER_FILLET_R_PRINTED_MAX == pytest.approx(largest)
+    assert largest <= spec.SHOULDER_CORNER_R_MAX == pytest.approx(0.040 * 25.4)
     limit = spec.PLAIN_SHANK_MIN - spec.THREAD_PITCH
     assert spec.SHOULDER_FILLET_R_LIMIT == pytest.approx(limit)
-    assert spec.SHOULDER_FILLET_R <= limit
-    assert spec.THREAD_MAJOR / 2.0 + spec.SHOULDER_FILLET_R < (
-        (spec.HEAD_DIA - band) / 2.0
-    )
+    assert largest <= limit
+    assert spec.THREAD_MAJOR / 2.0 + largest < (spec.HEAD_DIA - band) / 2.0
     shortest_shank = (spec.OVERALL_LENGTH + spec.OVERALL_DEVIATIONS[0]) - (
         spec.HEAD_HEIGHT + band
     )
@@ -189,20 +188,45 @@ def test_shoulder_root_prints_the_title_block_max_radius() -> None:
     )
     assert spec.SHOULDER_OVER_ROD_TOP_MIN > jam_nut.THICKNESS
     assert "ShoulderRadius" not in spec.DIMENSION_CALLOUTS
-    source = _source(part)
-    assert "tolerance.Type = SHOULDER_FILLET_TOL_TYPE" in source
-    build_body = source[source.index("async def build(") :]
-    assert build_body.index(
-        "apply_drawing_precision(adapter, DRAWING_PRECISION)"
-    ) < build_body.index("_shoulder_fillet_max_limit(adapter)")
-    # The sheet proves the import kept the MAX type and the radial form, and
-    # lays the radius out for whichever corner arc SolidWorks hung it on.
+    # No band of its own on the part: the title block's .XX governs it.
+    assert "_shoulder_fillet_max_limit" not in _source(part)
     draw_source = _source(drawing)
     assert "_dress_shoulder_radius(adapter, drawing_model, by_name, spt)" in (
         draw_source
     )
-    assert "int(tolerance.Type) != SHOULDER_FILLET_TOL_TYPE" in draw_source
     assert set(drawing.UPPER_ARC_KEEP) == {"ShoulderRadius", "PlainDia"}
+
+
+def test_shoulder_radius_leader_lands_on_the_circle_facing_its_text() -> None:
+    """The R text stands in the quarter opposite each arc, so the radial
+    leader ends on the circle facing it and the arc's extension carries the
+    arc out to it; the text's right end sits left of the bend, and the
+    leader passes clear of the head-height extension line and right of the
+    full-thread dimension's line end."""
+    for side, keep in (
+        ("lower", drawing.SIDE_KEEP["ShoulderRadius"]),
+        ("upper", drawing.UPPER_ARC_KEEP["ShoulderRadius"]),
+    ):
+        cx, cy = drawing.SHOULDER_CENTRES[side]
+        angle = math.radians(drawing.SHOULDER_LEADER_DEG[side])
+        # The arc is the quarter facing the corner (+x, toward the axis);
+        # the leader's direction lies in the opposite quarter.
+        toward_axis = 1.0 if side == "lower" else -1.0
+        assert math.cos(angle) < 0.0
+        assert math.sin(angle) * toward_axis < 0.0
+        right_end = keep[0] + drawing._SHOULDER_R_TEXT_WIDTH / 2.0
+        bend = (right_end + drawing.RADIAL_BEND_GAP, keep[1] - drawing.RADIAL_BEND_DROP)
+        # The bend lies on the radial line through the centre.
+        assert math.atan2(bend[1] - cy, bend[0] - cx) == pytest.approx(
+            math.atan2(math.sin(angle), math.cos(angle))
+        )
+        assert bend[0] < drawing.SHOULDER_X - 0.002
+    lower_bend_x = (
+        drawing.SIDE_KEEP["ShoulderRadius"][0]
+        + drawing._SHOULDER_R_TEXT_WIDTH / 2.0
+        + drawing.RADIAL_BEND_GAP
+    )
+    assert lower_bend_x > drawing.FULL_THREAD_X + 0.002
 
 
 def test_plain_shank_diameter_prints_as_a_reference() -> None:
@@ -397,7 +421,7 @@ def test_volumes_are_analytic() -> None:
     spandrel = r_fillet**2 * (1.0 - math.pi / 4.0)
     centroid_r = r_thread + r_fillet * (10.0 - 3.0 * math.pi) / (3.0 * (4.0 - math.pi))
     assert part.V_FILLET == pytest.approx(2.0 * math.pi * centroid_r * spandrel)
-    # About 1.4 mm^3 of a ~260 mm^3 stud at R.040.
+    # About 0.3 mm^3 of a ~260 mm^3 stud at R.02.
     assert 0.0 < part.V_FILLET < 2.0
     assert part.V_TOTAL == pytest.approx(stud + part.V_FILLET - part.V_EYE)
     source = _source(part)

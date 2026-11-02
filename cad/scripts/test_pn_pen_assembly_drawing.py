@@ -969,7 +969,8 @@ def test_each_detail_title_carries_its_letter_and_any_other_direction() -> None:
     assert drawing.LETTERED_LEFT <= set(drawing.BOUNDED_ON)
     for detail in drawing.DETAILS:
         lines = detail.title.splitlines()
-        assert lines[0].startswith(f"DETAIL {notes.DETAIL_LETTERS[detail.key]}")
+        kind = "VIEW" if detail is drawing.CARRIAGE_DETAIL else "DETAIL"
+        assert lines[0].startswith(f"{kind} {notes.DETAIL_LETTERS[detail.key]}")
         # A circled detail enlarges what its circle holds: drawn from its
         # parent view's direction, unturned, its title naming no other.
         if detail.key in drawing.BOUNDED_ON:
