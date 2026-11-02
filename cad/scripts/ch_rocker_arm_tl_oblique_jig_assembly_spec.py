@@ -905,7 +905,8 @@ BOM_DESCRIPTIONS = {
     # Vendor-metric rows keep their millimetres, labelled (#290).
     LEADSCREW: f"TR8X2 LEADSCREW, {leadscrew_stock.LENGTH:.0f} MM LONG",
     FEED_NUT: "FEED NUT",
-    PILLOW_BLOCK: f"PILLOW BLOCK, {leadscrew.KP08_BORE:.0f} MM BORE, SET SCREWS",
+    # TL-00 review (2026-11-02): the row names the KP08 the steps cite.
+    PILLOW_BLOCK: f"KP08 PILLOW BLOCK, {leadscrew.KP08_BORE:.0f} MM BORE",
     HANDWHEEL: f"HANDWHEEL {leadscrew.HANDWHEEL_WHEEL_DIA:.0f} MM DIA, 8 MM BORE",
     HOLD_DOWN_STUD: hold_down_stud.BOM_DESCRIPTION,
     T_NUT: t_nut.BOM_DESCRIPTION,
@@ -1128,6 +1129,9 @@ ELEVATION_VIEW_LABEL = "ELEVATION FROM THE OPERATOR SIDE (-Y)"
 # 11), so the elevation prints it as a reference, parenthesised, no band.
 CL_TIP_FEATURE = "ClTipSetting"
 CL_TIP_DIMENSION = "ClTipAboveRiser"
+# TL-00 review (2026-11-02): the bare (.064) reference names what it measures,
+# in the callout lane above its value.
+CL_TIP_LABEL = "CL TIP ABOVE RISER"
 CL_TIP_PRECISION = 3
 CL_TIP_RISER_TOP_Z = trammel.CARRIER_TOP_Z + trammel.RISER_THICK
 # The round tip: the dowel's local +Y end (cl_dowel frame) in the machine frame.
@@ -1519,7 +1523,9 @@ ASSEMBLY_STEPS = (
     f"UNCUT {fasteners.HOLD_DOWN_STUD_THREAD} STUDS {_item(HOLD_DOWN_STUD)} "
     "PER BAR IN THE OUTER T-SLOTS, IN T-NUTS "
     f"{_item(T_NUT)} UNDER FINGER-TIGHT FLANGE NUTS {_item(FLANGE_NUT)}. "
-    "FOLLOW HD1 FOR UNCUT-STOCK OBSTRUCTIONS; REWORK AT STEP 13B.",
+    "THE STUDS STAY UNCUT UNTIL STEP 13B; THERE HD3 CUTS EACH TO ITS BOM "
+    f"LENGTH, {hold_down_stud.LENGTH:.1f} MM. UNTIL THEN FOLLOW HD1 FOR "
+    "UNCUT-STOCK OBSTRUCTIONS.",
     f"3. SLIDE A FACTORY-GREASED HGH15CA CARRIAGE {_item(CARRIAGE)} ON EACH RAIL.",
     f"4. FIT THE FEED BLOCK {_item(FEED_BLOCK)} ON RAIL 1'S CARRIAGE, "
     f"THE PLAIN PIVOT BLOCK {_item(PIVOT_BLOCK)} ON RAIL 2'S, "
