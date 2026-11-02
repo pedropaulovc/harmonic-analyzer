@@ -336,6 +336,10 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "AxialPinGroove")
+    # The cut depth follows the SeamDepth global the hub prints (Codjiflo
+    # review of 278bcf933: an unbound cut could diverge from the print).
+    groove_depth = name_dimensions(adapter, "AxialPinGroove", ["GrooveDepth"])
+    drive_jobs += [(groove_depth[0], '"SeamDepth"')]
     vol = await _volume(adapter)
     expected_arm_groove = (
         math.pi * (AXIAL_PIN_DIA / 2.0) ** 2

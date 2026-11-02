@@ -252,6 +252,10 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "AxialPinGroove")
+    # The cut depth follows the SeamDepth global the side view prints through
+    # SeamDepthReference (Codjiflo review of 278bcf933).
+    groove_depth = name_dimensions(adapter, "AxialPinGroove", ["GrooveDepth"])
+    drive_jobs += [(groove_depth[0], '"SeamDepth"')]
     await volume_check(
         adapter,
         "hub axial seam groove",
