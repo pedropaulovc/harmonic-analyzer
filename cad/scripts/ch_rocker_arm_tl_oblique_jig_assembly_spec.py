@@ -1129,10 +1129,11 @@ ELEVATION_VIEW_LABEL = "ELEVATION FROM THE OPERATOR SIDE (-Y)"
 # 11), so the elevation prints it as a reference, parenthesised, no band.
 CL_TIP_FEATURE = "ClTipSetting"
 CL_TIP_DIMENSION = "ClTipAboveRiser"
-# TL-00 review (2026-11-02): the bare (.064) reference names what it measures,
-# in the callout lane above its value.
-CL_TIP_LABEL = "CL TIP ABOVE RISER"
 CL_TIP_PRECISION = 3
+# TL-00 review (2026-11-02): the sheet 1 caption names what the bare (.064)
+# measures. A callout on the dimension itself stacked its value onto the
+# leader shelf (jig-asm r4 review), so the caption carries the name.
+CL_TIP_REFERENCE = f"({_length(cl_dowel.TIP_HEIGHT, CL_TIP_PRECISION)})"
 CL_TIP_RISER_TOP_Z = trammel.CARRIER_TOP_Z + trammel.RISER_THICK
 # The round tip: the dowel's local +Y end (cl_dowel frame) in the machine frame.
 _CL_TIP = frame_point(CL_DOWEL_PLACEMENTS[0], (0.0, cl_dowel.LENGTH, 0.0))
@@ -1238,7 +1239,9 @@ ASSEMBLED_CAPTION = (
     "INNER PASS AT THE SYMMETRIC POSITION: A1/B1; OUTER PASS: A2/B2. "
     "BOTH SHOULDER SCREWS MUST BE SEATED AND TORQUED BEFORE CUTTING. "
     "CHECK ACTUAL SPINDLE/TOOL/HOLDER CLEARANCE BEFORE USE (OPERATION SHEET). "
-    "MACHINE ORIGIN: SPINDLE AT TABLE TOP; +Y TOWARD COLUMN."
+    "MACHINE ORIGIN: SPINDLE AT TABLE TOP; +Y TOWARD COLUMN. "
+    f"ELEVATION {CL_TIP_REFERENCE}: CL DOWEL TIP ABOVE THE RISER, A "
+    "REFERENCE; STEP 11 SETS IT."
 )
 
 

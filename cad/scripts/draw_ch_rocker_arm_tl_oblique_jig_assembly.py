@@ -55,7 +55,6 @@ from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
     offset_dimension_text,
-    set_dimension_callouts,
     set_reference_dimension,
 )
 from _drawing_hidden_sketches import _show_base_view_sketches
@@ -351,8 +350,6 @@ CL_TIP_LINE_MODEL_MM = (
     0.0,
     sum(point[1] for point in spec.CL_TIP_LINE) / 2.0,
 )
-# Its label, spec.CL_TIP_LABEL, prints one line above the value.
-_CALLOUT_ABOVE = 3  # swDimensionTextCalloutAbove
 
 # Sheet 2: the full-height BOM left, its collapsed reference right. The table
 # can extend below the title block's top because it stays left of that block.
@@ -1436,11 +1433,6 @@ def _cl_tip_setting(adapter: Any, elevation: Any) -> Callable[[], None]:
         set_reference_dimension(adapter, annotations[0], label=label),
         "IDisplayDimension",
     )
-    # TL-00 review (2026-11-02): the bare (.064) names what it measures, in
-    # the callout lane above its value, toward the open air under the plan.
-    set_dimension_callouts(
-        adapter, annotations, {name: spec.CL_TIP_LABEL}, location="above"
-    )
     annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
     # Reset an inherited offset before positioning the dimension line. With
     # OffsetText on, SetPosition2 moves only the text and cannot repair a line
@@ -1492,19 +1484,16 @@ def _cl_tip_setting(adapter: Any, elevation: Any) -> Callable[[], None]:
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
         value_mm = abs(float(dimension.SystemValue)) * 1000.0
         brackets = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
-        above = str(display.GetText(_CALLOUT_ABOVE) or "")
         places = int(display.GetPrimaryPrecision2())
         if (
             abs(value_mm - spec.cl_dowel.TIP_HEIGHT) > 1e-6
             or brackets != ("(", ")")
-            or above != spec.CL_TIP_LABEL
             or int(tolerance.Type) != 0  # swTolNONE: a reference carries no band
             or places != spec.CL_TIP_PRECISION
         ):
             raise RuntimeError(
                 f"{when} {label}: {value_mm!r} mm, brackets {brackets!r}, "
-                f"label {above!r}, tolerance type {int(tolerance.Type)}, "
-                f"{places} places"
+                f"tolerance type {int(tolerance.Type)}, {places} places"
             )
         position = _native_dimension_anchor(annotation)
         if (
