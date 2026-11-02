@@ -120,7 +120,9 @@ def test_cut_length_names_its_three_place_reason_and_sized_chamfer():
     assert loose < 0.011 * 25.4 - 1e-9 <= block.PIVOT_TIP_CLEARANCE_MIN
     assert "CHAMFER .03 X 45°" in spec.CUT_NOTE
     assert "MHA-CH-06-TL-22 PIVOT BLOCK" in spec.CUT_NOTE
-    assert ".570" in spec.CUT_NOTE and ".011 MIN" in spec.CUT_NOTE
+    # The .570 CUT dimension carries the length; the note gives its function.
+    assert ".570" not in spec.CUT_NOTE and ".011 MIN" in spec.CUT_NOTE
+    assert spec.CUT_CALLOUT == "CUT"
     assert spec.CUT_CHAMFER == pytest.approx(0.03 * 25.4)
 
 
