@@ -2161,7 +2161,8 @@ def _assert_spring_row_equations(adapter, drives: list[tuple[str, str]]) -> None
                 f"{dim_name}: SystemValue {system_mm[leaf]!r} mm, its "
                 f"expression {expression} evaluates {expected!r} mm"
             )
-    pattern = _early_bound(model.FeatureByName("SpringHolePattern"), "IFeature")
+    part = _early_bound(model, "IPartDoc")
+    pattern = _early_bound(part.FeatureByName("SpringHolePattern"), "IFeature")
     spacing = float(_early_bound(pattern.Parameter("D3"), "IDimension").SystemValue)
     if not math.isclose(system_mm["SpringPitch"], spacing * 1000.0, abs_tol=1e-6):
         raise RuntimeError(
