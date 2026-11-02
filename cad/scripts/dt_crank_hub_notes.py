@@ -120,17 +120,19 @@ if FRONT_FACE_DATUM not in " ".join(CROSS_HOLE_CALLOUT.split()):
     raise AssertionError("the cross-hole callout no longer names the hub datum")
 # A deeper ream seats the driven pin deeper, so its big end's MIN proud
 # limits the ream (machinist review: the acceptance read apart from it).  The
-# end view outlines that big end (dashed, the view's own line style: the
-# review of farm run 20261101T130334243Z read "(PHANTOM)" against it, so
-# the callout names no line type); the callout names it, the pin and the
-# keeper ring whose hole must clear the barrel (r7 review of farm run
-# 20261101T022045634Z: an unnamed dashed box, an unnamed ring).
+# end view outlines that big end in the view's own dashed style; the callout
+# says so and makes the value an assembly check (review of farm run
+# 20261101T234626714Z: a MIN to an unnamed dashed outline of another part;
+# farm run 20261101T130334243Z read "(PHANTOM)" against the dashed line).
+# It names the pin and the keeper ring whose hole must clear the barrel (r7
+# review of farm run 20261101T022045634Z: an unnamed dashed box, an unnamed
+# ring).
 PIN_PROUD_CALLOUT = "\n".join(
     (
-        "MHA-DT-09 TAPER PIN BIG END,",
-        "DRIVEN; LIMITS TAPER-REAM",
-        "DEPTH; KEEPER RING MHA-DT-27",
-        "HOLE CLEARS BARREL",
+        "AT ASSEMBLY, DRIVEN MHA-DT-09",
+        "TAPER PIN BIG END (DASHED);",
+        "LIMITS TAPER-REAM. KEEPER",
+        "RING MHA-DT-27 CLEARS BARREL",
     )
 )
 

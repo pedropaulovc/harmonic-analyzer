@@ -185,9 +185,11 @@ SIDE_KEEP = {
     # Right of the seat diameter's dimension line (OUTBOARD_X + 0.020), which
     # crossed its text there (farm run 20261101T074739942Z).
     "SeatLength": (OUTBOARD_X + 0.029, _STATION_ROW_Y),
-    # The station from the faced outboard end, on its own row under the seat's
+    # The station from the faced outboard end, on its own row under the seat
+    # length's block, whose dimension line runs under its END FLUSH row at
+    # about y 0.115 (farm run 20261101T234626714Z: .53 sat on it at 0.113)
     # (machinist review of the inch sheet: no chain through the shoulder).
-    "ServicePinStation": ((OUTBOARD_X + SERVICE_PIN_CENTER[0]) / 2.0, 0.113),
+    "ServicePinStation": ((OUTBOARD_X + SERVICE_PIN_CENTER[0]) / 2.0, 0.104),
     # The toleranced .990 and its two-line callout fill the span between its
     # extension lines and sat on its own dimension line (machinist review of
     # the inch sheet, r2): they print right of the outboard face instead, the
