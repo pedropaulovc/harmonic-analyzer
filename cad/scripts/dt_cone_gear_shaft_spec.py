@@ -489,12 +489,19 @@ SURFACE_FINISHES = (
 # fit those names need once, under the gear key (drawing-guidelines.md rule
 # 4; machinist review r4b, 20261018T072511131Z).
 FLAT_FIT_NOTE = "FLATS: SLIDING FIT IN THE NAMED GEARS' D-BORES."
+# The step roots' own band (FILLET_R_BAND) names what it serves once, here:
+# the root stays clear of the smaller gear seated past it and is never sharp
+# (machinist review of the final4 render, 20261102T034848049Z).  No room at
+# the radius itself: its text sits between the Ø.2500 line and section
+# A-A's arrow.
+FILLET_FUNCTION_NOTE = "STEP ROOTS: CLEAR OF THE SMALLER GEAR'S BORE, NOT SHARP."
 DRAWING_NOTES = "\n".join(
     (
         f"{_gear(min(min(g) for g in SECTION_CONE_GEAR_TEETH if g))}"
         f"-{_gear(max(max(g) for g in SECTION_CONE_GEAR_TEETH if g))}"
         ": MHA-DT-03 CONE GEARS. 64T: MHA-DT-07.",
         FLAT_FIT_NOTE,
+        FILLET_FUNCTION_NOTE,
         "TURN THE TIP LAND WITH TAILSTOCK SUPPORT.",
     )
 )
