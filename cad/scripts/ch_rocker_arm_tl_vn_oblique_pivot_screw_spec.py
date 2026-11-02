@@ -90,9 +90,10 @@ _CHAMFER_IN = f"{CUT_CHAMFER / INCH:.2f}".removeprefix("0")
 # the head read as a head size, and the mate needs its full name). At most 27
 # characters a row, so the note fits between the tip and the Right cell's edge.
 CUT_CALLOUT = "CUT"
+# The .570 CUT dimension carries the length; the note does not repeat it
+# (machinist review).
 CUT_NOTE = (
-    "CUT THREAD AT .570;\n"
-    f"CHAMFER {_CHAMFER_IN} X 45°\n"
+    f"CUT END: CHAMFER {_CHAMFER_IN} X 45°\n"
     "TIP STAYS .011 MIN INSIDE\n"
     "MHA-CH-06-TL-22 PIVOT BLOCK"
 )
