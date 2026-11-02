@@ -52,9 +52,13 @@ PR head (`book/`, `logbook/`, `kickstarter/`, `web/`, `ai-story/`).
 Owner rulings are recorded as code comments beside the constant they govern,
 in a package's `machinist_exceptions` (`kind: accept` or `kind: minor`) in
 `cad/config/parts/<dashed>.yaml` or `cad/config/assemblies/<dashed>.yaml`, or
-in the policy's named-exception section. Do not re-raise a ruled matter. Do
-flag a change that adds or widens such a ruling without stating that it is the
-owner's ruling.
+in the policy's named-exception section. Do not re-raise a ruled matter. A
+delegated ruling (policy "Named exceptions") is valid when its reason says
+"delegated ruling", names the owner precedent it follows (or says "no
+precedent") and links #2144; do not block on owner confirmation of it. Do flag
+a change that adds or widens a ruling without saying whether it is the owner's
+or delegated, or a delegated ruling that names no precedent and doesn't say
+"no precedent".
 
 ## Source-level CAD, drawing and review-gate checks
 
