@@ -65,7 +65,7 @@ from dt_crank_hub_spec import (
 )
 
 
-MACHINIST_REVIEW = MachinistReviewMode.LEARN
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["dt_crank_hub"]
 PART_STEM = SPEC.artifact_stem
