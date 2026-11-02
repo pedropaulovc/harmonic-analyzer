@@ -26,7 +26,6 @@ from _supplier_dimensions import (
     supplier_reference_dimension,
 )
 from _supplier_pin_data import (
-    DIAMETER_DIMENSION,
     MATING_HOLE_DIMENSION,
     REFERENCE_DIMENSIONS,
     WALL_DIMENSION,
@@ -171,8 +170,8 @@ def _supplier_diameter(
     adapter: Any, view: Any, circles: list[ViewEdge], source: SupplierPinReference,
     *, text_xy: tuple[float, float]
 ) -> tuple[Any, Callable[[Any], None]]:
-    if source.diameter_band is not None:
-        raise ValueError(f"{source.sku}: banded OD must be imported from its model owner")
+    # Printed supplier sizes are untoleranced REF (drawing-guidelines): the
+    # catalogue band stays on the model-owned reference for fit checks only.
     label = f"{source.sku} supplier diameter"
     edge = _outer_circle(circles, source.diameter_mm, label=label)
     display = _diameter_dimension(adapter, view, edge, text_xy, label=label)
@@ -320,7 +319,7 @@ def _import_model_references(
 def add_supplier_dowel_dimensions(
     adapter: Any, views: dict[str, Any], source: SupplierPinReference
 ) -> Callable[[], None]:
-    """Import source-owned OD/band; author only the bandless end-rim length."""
+    """Author bandless OD and end-rim length; the model keeps its catalogue band."""
     front = views["*Front"]
     circles = _axis_circles(scan_view_edges(front, label=f"{source.sku} dowel"), 1, label=source.sku)
     length, length_check = _supplier_length(
@@ -328,11 +327,13 @@ def add_supplier_dowel_dimensions(
     )
     top = views["*Top"]
     outline = tuple(float(value) for value in top.GetOutline())
-    imported = _import_model_references(
-        adapter, top, source,
-        {DIAMETER_DIMENSION: (outline[2] + 0.033, (outline[1] + outline[3]) / 2.0)},
+    top_circles = _axis_circles(
+        scan_view_edges(top, label=f"{source.sku} dowel end"), 1, label=source.sku
     )
-    diameter, diameter_check = imported[DIAMETER_DIMENSION]
+    diameter, diameter_check = _supplier_diameter(
+        adapter, top, top_circles, source,
+        text_xy=(outline[2] + 0.033, (outline[1] + outline[3]) / 2.0),
+    )
     return _settled_pin_check(
         adapter, views,
         [("*Top", diameter, diameter_check), ("*Front", length, length_check)],

@@ -5120,9 +5120,14 @@ def _supplier_pin_layout_placement(monkeypatch, *, family, outline):
     monkeypatch.setattr(pins, "scan_view_edges", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(pins, "_axis_circles", lambda *_args, **_kwargs: ())
     monkeypatch.setattr(pins, "_supplier_length", lambda *_args, **_kwargs: (None, None))
-    monkeypatch.setattr(pins, "_supplier_diameter", lambda *_args, **_kwargs: (None, None))
-    monkeypatch.setattr(pins, "_settled_pin_check", lambda *_args, **_kwargs: lambda: None)
     placements = {}
+
+    def supplier_diameter(*_args, text_xy, **_kwargs):
+        placements["diameter"] = text_xy
+        return None, None
+
+    monkeypatch.setattr(pins, "_supplier_diameter", supplier_diameter)
+    monkeypatch.setattr(pins, "_settled_pin_check", lambda *_args, **_kwargs: lambda: None)
 
     def import_references(_adapter, _view, _source, keep):
         placements.update(keep)
@@ -5137,7 +5142,9 @@ def _supplier_pin_layout_placement(monkeypatch, *, family, outline):
     )
     if family == "dowel":
         pins.add_supplier_dowel_dimensions(None, {"*Front": view, "*Top": view}, source)
-        return placements[pins.DIAMETER_DIMENSION]
+        # The printed OD is authored bandless; the banded model OD is not imported.
+        assert "SupplierPinDiameter" not in placements
+        return placements["diameter"]
     pins.add_supplier_spring_pin_dimensions(None, {"*Front": view, "*Right": view}, source)
     return placements[pins.MATING_HOLE_DIMENSION]
 
