@@ -6004,21 +6004,39 @@ def test_omp_broker_exhausted_startup_budget_is_typed_startup_timeout(monkeypatc
 def test_quota_state_write_failure_is_retained_without_extending_attempt(
     tmp_path, sdk_transport, monkeypatch, failure,
 ):
+    import time
+
     from machinist_review_credentials import CredentialPool
     transport = sdk_transport.transport
     sdk_transport.quota = True
+    # Credential/private-home setup shares the attempt budget. Freeze monotonic
+    # time (also used by the asyncio loop) so host filesystem/ACL latency cannot
+    # expire the attempt before the quota route reaches its state write.
+    clock = [100.0]
+    # A real-time watchdog fails closed if the write is retried against the
+    # frozen clock instead of honouring the expired attempt deadline.
+    watchdog_deadline = time.perf_counter() + 30
+    def monotonic():
+        if time.perf_counter() >= watchdog_deadline:
+            pytest.fail("quota state write outlived its attempt deadline")
+        return clock[0]
+    monkeypatch.setattr(transport.time, "monotonic", monotonic)
     logs = []
     monkeypatch.setattr(transport._telemetry, "error", lambda event, **fields: logs.append((event, fields)))
+    writes = []
     def failed_write(self, *args):
+        writes.append(args)
         if failure == "write_error":
             raise OSError("state storage failed")
+        # Contend the state lock exactly as the attempt deadline expires.
+        deadline = transport._ATTEMPT_DEADLINE.get()
+        assert deadline is not None
+        clock[0] = deadline
         raise BlockingIOError("state busy")
     monkeypatch.setattr(CredentialPool, "unavailable", failed_write)
-    started = mr.time.monotonic()
     review = mr.review_package(
         mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
-        reviewer="claude", report_dir=tmp_path / "reports", retries=0,
-        timeout_s=0.1 if failure == "attempt_deadline" else 10,
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0, timeout_s=10,
     )
     assert review.error
     record, = review.extra["evidence"]["attempts"]
@@ -6027,8 +6045,9 @@ def test_quota_state_write_failure_is_retained_without_extending_attempt(
     assert route["quota_state_write_error"] in {"OSError", "AttemptTimeout", "CancelledError"}
     assert any(event == "machinist_review.quota_state_write" and fields["outcome"] == "failed"
                for event, fields in logs)
+    # The contended write is not retried past the attempt deadline.
+    assert len(writes) == 1
     if failure == "attempt_deadline":
-        assert mr.time.monotonic() - started < 2
         assert record["transport_provenance"]["timeout_phase"] == "attempt"
 
 
