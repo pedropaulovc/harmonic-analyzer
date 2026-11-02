@@ -3,12 +3,13 @@ ch-amplitude-bar:
   # Any cold-finished low-carbon 1/4 in square bar (1018, 1020, 12L14): no
   # fit, plating or load needs one grade (machinist review, rule 2).
   material: "LOW-CARBON STEEL CF, 1/4 in sq"
-  material_specification: low-carbon cold-finished steel, 6.35 sq
+  material_specification: low-carbon cold-finished steel, 1/4 in sq
   finish: "bright chrome, dims plated; pin hole bare, oiled"
   quantity: 20
   tolerance_class: machined_block
   fit_class: sliding_amplitude_bar_on_rocker
   process: "machined (steel)"
+  drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
@@ -17,16 +18,26 @@ ch-amplitude-bar:
       reason: "a coordinate plus/minus would let the 20 channels scatter; at most one control per channel part (owner-accepted channel-consistency class)"
     - id: "RV-02"
       kind: "accept"
-      where: "the two notch-centring ledge bands (+/-0.05, CENTRES ON LEVER and CENTRES ON ROCKER) in DETAIL A and DETAIL B"
+      where: "the two notch-centring ledge bands (±.002, CENTRES ON LEVER and CENTRES ON ROCKER) in DETAIL A and DETAIL B"
       finding: "tight ledge bands over-specified on centred notches (rules 4, 5)"
-      reason: "each ledge band is what holds the far cheek wall the notch-width callout states; at the title-block band the cheeks thin further under the 1.5 floor (owner-accepted: keep the bands)"
+      reason: "each ledge band is what holds the far cheek wall the notch-width callout states; at the title-block .XXX band (±.005) the cheeks thin further under the .060 floor (owner-accepted: keep the bands)"
     - id: "RV-03"
       kind: "accept"
-      where: "the three-place TopPinX location 3.175 under HOLE WALL 2.0 MIN"
+      where: "the three-place TopPinX location .125 under HOLE WALL .079 MIN"
       finding: "three-place pin-hole location over-specified (rule 4)"
-      reason: "the tight location holds the reamed press-fit pin hole's wall to the nearer depth face at the 2.0 target on the narrowest stock; a looser band lets the wall fall under it (owner-accepted: keep the band)"
+      reason: "the tight location holds the reamed press-fit pin hole's wall to the nearer depth face at .079 on the narrowest stock (RV-06); a looser band lets the wall fall further under the .080 target, to .074 at .XX (owner-accepted: keep the band)"
     - id: "RV-04"
       kind: "minor"
       where: "the CHEEK WALL n MIN line under each notch-width callout (STRADDLES the lever, RIDES the rocker)"
-      finding: "notch cheek walls below the 2.0 mm target and the 1.5 floor (rules 17, 20)"
-      reason: "the book's 1/4 square bar straddles the lever and rides the 2.5 rocker arm, so its cheeks cannot reach 2.0; approved floors 1.17 MIN at the top notch and 1.21 MIN at the foot, stated as plain facts at each width (owner-ruled shortfall)"
+      finding: "notch cheek walls below the .080 in target and the .060 floor (rules 17, 20)"
+      reason: "the book's 1/4 square bar straddles the lever and rides the .098 rocker arm, so its cheeks cannot reach the target; approved floors 1.17 mm (.046) MIN at the top notch and 1.21 mm (.047) MIN at the foot, stated as plain facts at each width: .052 and .049 on the inch print (owner-ruled shortfall, 2026-10-15)"
+    - id: "RV-05"
+      kind: "minor"
+      where: "DETAIL A and DETAIL B, each notch-centring ledge .063 ±.002 (the near cheek)"
+      finding: "near notch cheek .061 at the ledge's printed lower limit, below the .080 in target (rules 17, 20)"
+      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions. each notch is its plate at maximum material plus the running floor (.124 on the .118 lever and the rocker strap envelope), centred on the 1/4 square stock, so the ledge is .063 and its ±.002 band leaves .061 MIN above the .060 floor"
+    - id: "RV-06"
+      kind: "minor"
+      where: "the right side of DETAIL B, TopPinX .125 with its HOLE WALL .079 MIN callout"
+      finding: "reamed pin-hole wall to the far depth face .079 at the worst case, below the .080 in target (rule 17)"
+      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions. the Ø.0779 largest ream sits mid-depth in the 1/4 square stock (+.000/-.002), located .125 ±.005 from the back face, so the far wall is .079 MIN on the narrowest stock, above the .060 floor; the hole stays on the stock's centre that the bar's mid-plane mates and the pin press contract read"

@@ -497,13 +497,13 @@ def test_the_one_sided_bands_lift_the_bar_about_1_mm_at_rest(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The shallow-notch and high-edge limits can only lift a bar: at most
-    1.008 at rest, a steady ~0.45 deg on its channel lever, and at most 0.0036
-    of fundamental at any station (0.04 % of the d = 88 term), from the exact
-    chain in error_budget (rocker_arm_spec states both)."""
+    1.016 (.020 + .020) at rest, a steady ~0.45 deg on its channel lever, and
+    at most 0.0036 of fundamental at any station (0.04 % of the d = 88 term),
+    from the exact chain in error_budget (rocker_arm_spec states both)."""
     notch_shallower = -bar.BOTTOM_NOTCH_DEPTH_BAND[1]
     edge_higher = arm.TOP_EDGE_BAND[0]
     lift = notch_shallower + edge_higher
-    assert lift == pytest.approx(1.008)
+    assert lift == pytest.approx(1.016)
     with monkeypatch.context() as patch:
         base = ck.solve_state(0.0)
         patch.setattr(ck, "_CONTACT_OFF_Y", ck._CONTACT_OFF_Y - notch_shallower)

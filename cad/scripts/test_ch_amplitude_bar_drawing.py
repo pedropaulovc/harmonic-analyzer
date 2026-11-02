@@ -13,6 +13,23 @@ import draw_ch_amplitude_bar as drawing
 import build_ch_amplitude_bar as bar
 from _drawing_registry import DRAWINGS_BY_NAME
 from _config import parts
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+from _printed_tolerance import printed_deviations
+
+OWNER_THIN_WALL_RULING = (
+    "Owner ruling 2026-11-01: thin walls above the .060 floor but under the"
+    " .080 target, with no geometry escape, are accepted as package-specific"
+    " minor exceptions."
+)
+
+
+def _exception(rv: str) -> dict[str, str]:
+    (row,) = [
+        row
+        for row in parts("ch-amplitude-bar")["machinist_exceptions"]
+        if row["id"] == rv
+    ]
+    return row
 
 
 def test_required_drawing_paths() -> None:
@@ -80,13 +97,21 @@ def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
     precision = notes.DRAWING_PRECISION["TopPinProfile"]
     assert precision == {"BarSection": 2, "TopPinX": 3, "TopPinDrop": 2, "TopPinDia": 4}
     # Machinist round 1: the three-place location states its function, the
-    # hole's worst-case face wall, which the pin's joint budget holds too.
+    # hole's worst-case face wall, which the pin's joint budget holds too:
+    # .125 +/-.005 on the narrowest stock leaves the far wall .079, over the
+    # .060 floor and under the .080 target (RV-06).
     import ch_bar_pivot_pin_spec as pin
 
-    assert notes.DIMENSION_CALLOUTS["TopPinX"] == "HOLE WALL 2.0 MIN"
-    assert notes.PIN_HOLE_WALL_MIN == math.floor(
-        pin.BUDGET["hole_face_wall_min"] * 10.0
-    ) / 10.0
+    assert notes.DIMENSION_CALLOUTS["TopPinX"] == "HOLE WALL .079 MIN"
+    wall = pin.BUDGET["hole_face_wall_min"]
+    assert notes.PIN_HOLE_WALL_MIN == pytest.approx(0.079 * 25.4)
+    assert notes.PIN_HOLE_WALL_MIN <= wall < notes.PIN_HOLE_WALL_MIN + 0.0254
+    assert WALL_FLOOR_MM <= wall < WALL_TARGET_MM
+    row = _exception("RV-06")
+    assert row["kind"] == "minor"
+    assert row["reason"].startswith(OWNER_THIN_WALL_RULING)
+    assert "HOLE WALL .079 MIN" in row["where"]
+    assert "TopPinX location .125 under HOLE WALL .079 MIN" in _exception("RV-03")["where"]
 
 
 def test_pin_hole_is_a_native_sketch_located_from_the_top_edge() -> None:
@@ -108,12 +133,13 @@ def test_pin_hole_is_a_native_sketch_located_from_the_top_edge() -> None:
 
 
 def test_square_section_prints_as_stock_reference() -> None:
-    """Machinist round 1 (#1293): the 6.35 square lived only in a note. It
+    """Machinist round 1 (#1293): the 1/4 square lived only in a note. It
     prints in the top end's right side view as the stock's reference size."""
     notes = ch_amplitude_bar_notes
     assert notes.REFERENCE_DIMENSIONS == frozenset({"BarSection"})
     assert notes.DIMENSION_CALLOUTS["BarSection"] == "1/4 SQ STOCK"
     assert ch_amplitude_bar_spec.BAR_DEPTH == ch_amplitude_bar_spec.BAR_WIDTH == 6.35
+    assert ch_amplitude_bar_notes.inch_text(ch_amplitude_bar_spec.BAR_DEPTH, 2) == ".25"
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "set_reference_dimension(" in source
     config = parts("ch-amplitude-bar")
@@ -161,10 +187,10 @@ def test_callouts_name_each_mate_at_its_dimension() -> None:
     assert callouts["BottomNotchWidth"].startswith("RIDES MHA-CH-06\n")
     assert callouts["TopRightLedge"] == "CENTRES ON LEVER"
     assert callouts["BottomLeftLedge"] == "CENTRES ON ROCKER"
-    assert callouts["TopNotchHeight"] == "ROOTS R0.40 MAX"
+    assert callouts["TopNotchHeight"] == "ROOTS R.015 MAX"
     # Machinist r5: the foot depth's shallow-only band names its mate.
     assert callouts["BottomNotchHeight"] == "SITS ON MHA-CH-06"
-    assert callouts["BottomNotchWidth"].endswith("\nROOTS R0.40 MAX")
+    assert callouts["BottomNotchWidth"].endswith("\nROOTS R.015 MAX")
     assert drawing.CALLOUTS_ABOVE <= set(callouts)
     for text in callouts.values():
         assert all(len(line) <= 20 for line in text.splitlines()), text
@@ -178,8 +204,9 @@ def test_callouts_name_each_mate_at_its_dimension() -> None:
 
 def test_cheek_walls_state_their_worst_case_at_each_width() -> None:
     """Rule 20 (#1038): the cheek opposite each printed ledge, on the
-    narrowest stock beside the widest notch and ledge, falls short of the 2.0
-    target. The shortfall prints at the notch's width."""
+    narrowest stock beside the widest notch and ledge, falls short of the .060
+    floor (RV-04, owner-approved 2026-10-15). The shortfall prints at the
+    notch's width, at three inch places rounded down."""
     spec = ch_amplitude_bar_spec
     notes = ch_amplitude_bar_notes
     assert spec.BAR_STOCK_UNDERSIZE == pytest.approx(0.0508)
@@ -205,12 +232,38 @@ def test_cheek_walls_state_their_worst_case_at_each_width() -> None:
             - (ledge + spec.NOTCH_OFFSET_TOLERANCE_MM)
             - (width + upper)
         )
-        assert printed <= wall < printed + 0.01
-        assert printed < 2.0
-        assert f"CHEEK WALL {printed:.2f} MIN" in notes.DIMENSION_CALLOUTS[name].splitlines()
-    assert (notes.TOP_CHEEK_WALL_MIN, notes.BOTTOM_CHEEK_WALL_MIN) == (1.29, 1.21)
-    # Owner ruling 2026-10-15: approved exceptions at 1.17 (top), 1.21 (foot).
+        assert printed <= wall + 1e-9 < printed + 0.0254
+        assert printed < WALL_FLOOR_MM
+        text = notes.inch_text(printed, notes.WALL_PLACES)
+        assert f"CHEEK WALL {text} MIN" in notes.DIMENSION_CALLOUTS[name].splitlines()
+    # .124 notches beside .063 +/-.002 ledges in .250 -.002 stock: the top's
+    # +.007 leaves .052, the foot's +.010 .049.
+    assert (notes.TOP_CHEEK_WALL_MIN, notes.BOTTOM_CHEEK_WALL_MIN) == pytest.approx(
+        (0.052 * 25.4, 0.049 * 25.4)
+    )
+    # Owner ruling 2026-10-15: approved exceptions at 1.17 mm (top), 1.21 mm
+    # (foot); the inch walls stay at or above them.
     assert notes.CHEEK_WALL_APPROVED_MIN == {"top": 1.17, "bottom": 1.21}
+    assert notes.TOP_CHEEK_WALL_MIN >= notes.CHEEK_WALL_APPROVED_MIN["top"]
+    assert notes.BOTTOM_CHEEK_WALL_MIN >= notes.CHEEK_WALL_APPROVED_MIN["bottom"]
+    assert "1.17 mm (.046)" in _exception("RV-04")["reason"]
+    assert ".052 and .049" in _exception("RV-04")["reason"]
+
+
+def test_ledge_cheeks_hold_the_floor_under_the_target() -> None:
+    """The near cheek is the printed ledge: .063 +/-.002 leaves .061, over the
+    .060 floor and under the .080 target (RV-05, owner ruling 2026-11-01)."""
+    spec = ch_amplitude_bar_spec
+    notes = ch_amplitude_bar_notes
+    assert spec.TOP_NOTCH_OFFSET == pytest.approx(0.063 * 25.4)
+    assert spec.BOTTOM_NOTCH_OFFSET == pytest.approx(0.063 * 25.4)
+    assert notes.LEDGE_CHEEK_MIN == pytest.approx(0.061 * 25.4)
+    assert WALL_FLOOR_MM <= notes.LEDGE_CHEEK_MIN < WALL_TARGET_MM
+    row = _exception("RV-05")
+    assert row["kind"] == "minor"
+    assert row["reason"].startswith(OWNER_THIN_WALL_RULING)
+    assert ".063 \u00b1.002" in row["where"] and ".061" in row["finding"]
+    assert "\u00b1.002" in _exception("RV-02")["where"]
 
 
 def test_bottom_notch_depth_band_is_native_on_its_dimension() -> None:
@@ -222,7 +275,7 @@ def test_bottom_notch_depth_band_is_native_on_its_dimension() -> None:
     from _drawing_contract import model_toleranced_dimensions
 
     upper, lower = ch_amplitude_bar_spec.BOTTOM_NOTCH_DEPTH_BAND
-    assert lower == -0.50 < upper == 0.0
+    assert lower == pytest.approx(-0.020 * 25.4) and upper == 0.0
     assert not hasattr(ch_amplitude_bar_notes, "BOTTOM_NOTCH_DEPTH_BAND")
     assert model_toleranced_dimensions(bar)[("BarProfile", "BottomNotchHeight")] == (
         "*deviations(BOTTOM_NOTCH_DEPTH_BAND)"
@@ -447,11 +500,11 @@ def test_callouts_clear_the_bar_and_the_neighbouring_views() -> None:
 
 def test_notch_centring_bands_ride_each_details_ledge_not_a_note() -> None:
     """Main ruling A(a) 2026-09-27 (Codex #936 PRRT_kwDOPHDy386mWF0L): the
-    'CENTRED ON THE WIDTH WITHIN 0.10' note becomes a native +/-0.05 on the
+    'CENTRED ON THE WIDTH WITHIN 0.10' note becomes a native +/-.002 on the
     NotchOffset ledge each detail prints."""
     from _drawing_contract import model_toleranced_dimensions
 
-    assert ch_amplitude_bar_spec.NOTCH_OFFSET_TOLERANCE_MM == 0.05
+    assert ch_amplitude_bar_spec.NOTCH_OFFSET_TOLERANCE_MM == pytest.approx(0.002 * 25.4)
     assert ch_amplitude_bar_spec.BOTTOM_NOTCH_OFFSET == _O == bar.BOTTOM_NOTCH_OFFSET
     assert ch_amplitude_bar_spec.TOP_NOTCH_OFFSET == _OT == bar.TOP_NOTCH_OFFSET
     bands = model_toleranced_dimensions(bar)
@@ -461,7 +514,7 @@ def test_notch_centring_bands_ride_each_details_ledge_not_a_note() -> None:
     ):
         assert bands[("BarProfile", name)] == "NOTCH_OFFSET_TOLERANCE_MM"
         assert name in keep
-        assert ch_amplitude_bar_notes.DRAWING_PRECISION["BarProfile"][name] == 2
+        assert ch_amplitude_bar_notes.DRAWING_PRECISION["BarProfile"][name] == 3
 
 
 def test_sheet_carries_no_general_note() -> None:
@@ -482,13 +535,15 @@ def test_functional_notch_finish_is_a_native_symbol_on_the_floor() -> None:
     """Main ruling B 2026-09-27: the foot notch floor's finish is a native
     symbol on the floor in DETAIL A, authored on the part, not a note.
     Machinist round 1 (#1293) and drawing-simplicity-policy.md rule 6: the
-    amplitude-bar slide grades machined 1.6, not ground 0.8."""
+    amplitude-bar slide grades machined 1.6 um (63 uin), not ground."""
     import ch_amplitude_bar_drawing_spec as finish_spec
     from _gtol_planar import PlanarFace
-    from _surface_finish import MACHINED, surface_finish_by_key
+    from _surface_finish import MACHINED_UM, surface_finish_by_key
 
     control = surface_finish_by_key(finish_spec.SURFACE_FINISHES, "bottom_notch_floor")
-    assert control.roughness_ra == MACHINED == "1.6"
+    assert control.roughness_um == MACHINED_UM == 1.6
+    assert control.display_unit == ch_amplitude_bar_spec.UNIT == "in"
+    assert control.roughness_ra == "63"
     assert control.face == PlanarFace(
         (0, -1, 0), -ch_amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT
     )
@@ -560,7 +615,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     import _config
 
     spec = _config.parts("ch-amplitude-bar")
-    assert spec["material_specification"] == "low-carbon cold-finished steel, 6.35 sq"
+    assert spec["material_specification"] == "low-carbon cold-finished steel, 1/4 in sq"
     # One line in the FINISH field (r1 wrapped at 50 characters). Round 2:
     # the unplated press bore states its protection.
     assert spec["finish"] == "bright chrome, dims plated; pin hole bare, oiled"
@@ -571,7 +626,9 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
 def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
     """User ruling 2026-09-27 (#1038): a notch is never narrower than the
     plate it straddles. Its minimum -- the modelled nominal -- is the plate at
-    max material plus RUNNING_FLOOR; the band is +0.30/0, native on the width."""
+    max material plus RUNNING_FLOOR, rounded up to an even thousandth so the
+    centred ledge prints at three places; the band is one-sided, native on the
+    width."""
     import ch_rocker_arm_spec as rocker
     import rocker_bank_layout as bank
     from _drawing_contract import model_toleranced_dimensions
@@ -584,10 +641,10 @@ def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
     )
     assert spec.STRADDLE_RUNNING_FLOOR == bank.RUNNING_FLOOR
 
-    # #1038 option 2 (owner ruling 2026-10-15): the top notch +0.20/0; the
-    # foot keeps the interim +0.30/0.
-    assert spec.TOP_NOTCH_WIDTH_BAND == (0.20, 0.0)
-    assert spec.BOTTOM_NOTCH_WIDTH_BAND == (0.30, 0.0)
+    # #1038 option 2 (owner ruling 2026-10-15): the top notch +.007/.000 (the
+    # inch band that keeps the neighbour gap); the foot an interim +.010/.000.
+    assert spec.TOP_NOTCH_WIDTH_BAND == pytest.approx((0.007 * 25.4, 0.0))
+    assert spec.BOTTOM_NOTCH_WIDTH_BAND == pytest.approx((0.010 * 25.4, 0.0))
     for width, (_upper, lower), plate, tolerance in (
         (
             spec.TOP_NOTCH_WIDTH,
@@ -604,9 +661,9 @@ def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
     ):
         least = width + lower
         assert least >= plate + tolerance + bank.RUNNING_FLOOR - 1e-9
-        assert least - (plate + tolerance + bank.RUNNING_FLOOR) < 0.01  # the minimum
-    assert spec.TOP_NOTCH_WIDTH == 3.15
-    assert spec.BOTTOM_NOTCH_WIDTH == 3.11
+        assert least - (plate + tolerance + bank.RUNNING_FLOOR) < 0.002 * 25.4
+    assert spec.TOP_NOTCH_WIDTH == pytest.approx(0.124 * 25.4)
+    assert spec.BOTTOM_NOTCH_WIDTH == pytest.approx(0.124 * 25.4)
     assert bar.TOP_NOTCH_WIDTH is spec.TOP_NOTCH_WIDTH
     assert bar.BOTTOM_NOTCH_WIDTH is spec.BOTTOM_NOTCH_WIDTH
 
@@ -616,12 +673,12 @@ def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
         ("TopNotchWidth", "TOP_NOTCH_WIDTH_BAND"),
     ):
         assert bands[("BarProfile", name)] == f"*deviations({band})"
-        assert ch_amplitude_bar_notes.DRAWING_PRECISION["BarProfile"][name] == 2
+        assert ch_amplitude_bar_notes.DRAWING_PRECISION["BarProfile"][name] == 3
 
 
 def test_top_notch_keeps_the_running_gap_at_the_printed_worst_case() -> None:
     """#1038 option 2 (owner ruling 2026-10-15): the top notch's float on the
-    3.00 +/-0.05 plate leaves the 0.7065 side gap its running floor; the full
+    .118 +/-.002 plate leaves the 0.7065 side gap its running floor; the full
     stack, with both ledges and plate offsets, is
     ch_bar_pivot_pin_spec.joint_budget's neighbour_clearance_min."""
     import ch_bar_pivot_pin_spec as pin
@@ -695,3 +752,76 @@ def test_cropped_views_are_model_views_dimensioned_before_the_crop() -> None:
         scale = view.scale[0] / view.scale[1]
         assert view.crop_radius == pytest.approx(view.radius_mm * scale / 1000)
         assert view.mark_radius == pytest.approx(view.radius_mm / 4 / 1000)
+
+
+def _printed(model: float, places: int) -> float:
+    """The inch value (as SOLIDWORKS rounds it) the sheet prints for ``model``."""
+    lower, _upper = printed_deviations(
+        model, places, (0.0, 0.0), unit=ch_amplitude_bar_spec.UNIT
+    )
+    return round((model + lower) / 25.4, places)
+
+
+def test_every_printed_dimension_reads_its_inch_value() -> None:
+    """#290: the sheet prints decimal inch. Every fabricated nominal is its
+    printed value; the bar length and the foot notch's depth close the
+    rocker-bar-lever chain and stay exact, so their prints round them."""
+    spec = ch_amplitude_bar_spec
+    notes = ch_amplitude_bar_notes
+    assert spec.UNIT == "in" == parts("ch-amplitude-bar")["drawing_unit"]
+    places = notes.DRAWING_PRECISION_BY_NAME
+    printed = {
+        "BarLength": (spec.BAR_LENGTH, 31.82),
+        "BottomLeftLedge": (spec.BOTTOM_NOTCH_OFFSET, 0.063),
+        "BottomNotchHeight": (spec.BOTTOM_NOTCH_HEIGHT, 0.094),
+        "BottomNotchWidth": (spec.BOTTOM_NOTCH_WIDTH, 0.124),
+        "TopNotchHeight": (spec.TOP_NOTCH_HEIGHT, 0.55),
+        "TopNotchWidth": (spec.TOP_NOTCH_WIDTH, 0.124),
+        "TopRightLedge": (spec.TOP_NOTCH_OFFSET, 0.063),
+        "BarSection": (spec.BAR_DEPTH, 0.25),
+        "TopPinX": (spec.BAR_DEPTH / 2.0, 0.125),
+        "TopPinDrop": (spec.TOP_PIN_DROP, 0.25),
+        "TopPinDia": (spec.TOP_PIN_HOLE_DIA, 0.077),
+    }
+    assert set(printed) == set(places)
+    exact = {"BarLength", "BottomNotchHeight"}
+    for name, (model, inch) in printed.items():
+        assert _printed(model, places[name]) == pytest.approx(inch), name
+        on_grid = math.isclose(model, inch * 25.4, abs_tol=1e-9)
+        assert on_grid is (name not in exact), name
+    # The foot depth prints .094 over the 3/32 (.09375) model: its deepest
+    # accepted notch sits .00025 (0.00635) under the model, far inside the
+    # cheeks' ~0.39 air over the rocker hub (test_rocker_bank_layout).
+    upper, lower = spec.BOTTOM_NOTCH_DEPTH_BAND
+    deepest = printed_deviations(
+        spec.BOTTOM_NOTCH_HEIGHT, places["BottomNotchHeight"], (lower, upper), unit=spec.UNIT
+    )[1]
+    assert deepest == pytest.approx(0.00635, abs=1e-6)
+    # The link length prints 31.82 at .XX: the model's 808.3 stays inside
+    # +/-.01, tighter than the former 808.3 +/-0.8.
+    link = printed_deviations(spec.BAR_LENGTH, places["BarLength"], unit=spec.UNIT)
+    assert link[0] < 0.0 < link[1]
+    assert max(map(abs, link)) < 0.8
+
+
+def test_every_band_is_inch_native() -> None:
+    """Each native band is a whole number of thousandths (ten-thousandths on
+    the ream), printed in inch by the part's display unit."""
+    spec = ch_amplitude_bar_spec
+    tol = spec.NOTCH_OFFSET_TOLERANCE_MM
+    for band, inch in (
+        (spec.TOP_NOTCH_WIDTH_BAND, (0.007, 0.0)),
+        (spec.BOTTOM_NOTCH_WIDTH_BAND, (0.010, 0.0)),
+        (spec.BOTTOM_NOTCH_DEPTH_BAND, (0.0, -0.020)),
+        ((tol, -tol), (0.002, -0.002)),
+        (spec.TOP_PIN_HOLE_BAND, (0.0009, 0.0005)),
+    ):
+        assert tuple(value / 25.4 for value in band) == pytest.approx(inch, abs=1e-12)
+    part_source = Path(bar.__file__).read_text(encoding="utf-8")
+    assert part_source.count("display_unit=UNIT") == 6
+    assert (
+        "apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)"
+        in part_source
+    )
+    draw_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'unit=part_drawing_unit("ch-amplitude-bar")' in draw_source

@@ -5,7 +5,7 @@ views, dimension layout, and manufacturing notes;
 sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 
-The bar is ~808 mm long but only 6.35 mm square, so the print shows a 1:4
+The bar is ~31.8 in long but only 1/4 in square, so the print shows a 1:4
 full-length front view (overall length only) and enlarged cropped model views
 of its two ends: a 4:1 detail of each end notch (centring ledge, width and
 depth, and at the foot the floor's Ra symbol), the 4:1 right side of the top
@@ -53,6 +53,7 @@ from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
@@ -204,8 +205,8 @@ DETAIL_A = CroppedView(
     # circle, and a centred label stood in its path (r1, 64ebba372).
     label_dx=0.016,
 )
-# DETAIL B and its right side frame the top end down to the 14.0 notch roof
-# (#1038 option 2 deepened it from 12.7); the bar's top edge stays where it
+# DETAIL B and its right side frame the top end down to the .55 notch roof
+# (#1038 option 2 deepened it from 1/2); the bar's top edge stays where it
 # printed on the sheet before, and the label stays clear of DETAIL A's
 # four-line depth stack.
 DETAIL_B = CroppedView(
@@ -743,7 +744,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("ch-amplitude-bar"),
     )
     stamp_drawing_summary(
         adapter,

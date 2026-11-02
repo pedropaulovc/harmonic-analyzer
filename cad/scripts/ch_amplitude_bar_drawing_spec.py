@@ -12,13 +12,14 @@ from __future__ import annotations
 
 from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
-from ch_amplitude_bar_spec import BOTTOM_NOTCH_HEIGHT
+from ch_amplitude_bar_spec import BOTTOM_NOTCH_HEIGHT, UNIT
 
 # The foot notch's floor rides the rocker's top edge (ch. 15): the bar's one
 # sliding face, symbol on the floor in DETAIL A (Main ruling 2026-09-27, Codex
 # #936 PRRT_kwDOPHDy386mWF0L). drawing-simplicity-policy.md rule 6 grades the
-# amplitude-bar slide MACHINED_UM (1.6); a ground 0.8 asks the shop for more
-# than a chrome-plated slide on the rocker needs (machinist review, #1293).
+# amplitude-bar slide MACHINED_UM (1.6 um, 63 uin on the inch sheet); a ground
+# 32 asks the shop for more than a chrome-plated slide on the rocker needs
+# (machinist review, #1293).
 # PlanarFace offsets run ALONG the outward normal (point . normal): the floor
 # looks -Y, down into the notch, from y = BOTTOM_NOTCH_HEIGHT; the ledges' -Y
 # faces sit at 0.
@@ -27,5 +28,6 @@ SURFACE_FINISHES = (
         "bottom_notch_floor",
         MACHINED_UM,
         PlanarFace((0, -1, 0), -BOTTOM_NOTCH_HEIGHT),
+        display_unit=UNIT,
     ),
 )

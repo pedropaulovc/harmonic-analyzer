@@ -32,12 +32,13 @@ def test_restated_floors_are_their_sources() -> None:
     assert pin.BAR_HOLE_BAND is bar.TOP_PIN_HOLE_BAND
     # ANSI B4.1 FN2, 0-0.12 in: 0.85 thousandths of an inch at most.
     assert pin.PRESS_INTERFERENCE_MAX == pytest.approx(0.02159, abs=1e-6)
-    # The hole's offset prints at three places on the bar sheet: .XXX.
+    # The hole's offset prints at three places on the bar's inch sheet: .XXX.
     from _printed_tolerance import printed_band_mm
     import ch_amplitude_bar_notes as bar_notes
 
     places = bar_notes.DRAWING_PRECISION["TopPinProfile"]["TopPinX"]
-    assert pin.HOLE_LOCATION_TOLERANCE == printed_band_mm(places) == 0.13
+    assert pin.HOLE_LOCATION_TOLERANCE == printed_band_mm(places, unit=bar.UNIT)
+    assert pin.HOLE_LOCATION_TOLERANCE == pytest.approx(0.005 * 25.4)
     assert pin.BAR_STOCK_UNDERSIZE is bar.BAR_STOCK_UNDERSIZE
     # The roof budget's bands: the lever's height and the notch's depth and
     # the pin's drop, each at its own sheet's two places.
@@ -47,7 +48,7 @@ def test_restated_floors_are_their_sources() -> None:
     assert pin.LEVER_LINEAR_2PL == printed_band_mm(lever_places, unit=lever.UNIT)
     assert bar_notes.DRAWING_PRECISION["BarProfile"]["TopNotchHeight"] == 2
     assert bar_notes.DRAWING_PRECISION["TopPinProfile"]["TopPinDrop"] == 2
-    assert pin.BAR_LINEAR_2PL == printed_band_mm(2)
+    assert pin.BAR_LINEAR_2PL == printed_band_mm(2, unit=bar.UNIT)
 
 
 def test_the_pin_is_flush_with_the_bar_and_runs_in_the_lever() -> None:
@@ -69,30 +70,31 @@ def test_worst_case_joint_budget() -> None:
     assert b["running_clearance_min"] == pytest.approx(0.004545, abs=1e-6)
     assert b["running_clearance_max"] == pytest.approx(0.116305, abs=1e-6)
     # Flush ends leave the #1038 top-notch gap untouched.
-    assert b["neighbour_clearance_min"] == pytest.approx(0.1013, abs=1e-6)
+    assert b["neighbour_clearance_min"] == pytest.approx(0.1223, abs=1e-6)
     assert b["neighbour_clearance_min"] >= pin.RUNNING_FLOOR
-    # The 14.0 roof under the .43 lever turned the full relative swing.
-    assert b["notch_roof_clearance_min"] == pytest.approx(0.5062, abs=1e-4)
+    # The .55 roof under the .43 lever turned the full relative swing.
+    assert b["notch_roof_clearance_min"] == pytest.approx(0.9882, abs=1e-4)
     assert b["notch_roof_clearance_min"] >= pin.RUNNING_FLOOR
-    # The far face, the offset at its long limit on the narrowest stock.
-    assert b["hole_face_wall_min"] == pytest.approx(2.00487, abs=1e-6)
-    assert b["hole_face_wall_min"] >= pin.RULE12_WALL_TARGET
+    # The far face, the offset at its long limit on the narrowest stock: .079,
+    # under the .080 target and over the .060 floor (MHA-CH-01 RV-06).
+    assert b["hole_face_wall_min"] == pytest.approx(2.00787, abs=1e-6)
+    assert pin.RULE12_WALL_FLOOR <= b["hole_face_wall_min"] < pin.RULE12_WALL_TARGET
     # The .30 blank under the title block's .XX band.
     assert b["blank_excess_min"] == pytest.approx(1.016, abs=1e-6)
     assert b["blank_excess_max"] == pytest.approx(1.5748, abs=1e-6)
 
 
 def test_the_cheeks_the_pin_presses_into_hold_the_approved_exception() -> None:
-    """The printed ledge cheek holds the drawing-guidelines.md rule 17 (walls and webs) floor; the far cheek, derived
-    from the widest notch on the narrowest stock, is the #1038 shortfall the
-    owner approved at 1.17 MIN (2026-10-15). The pin fills the hole it presses
-    into and changes neither."""
+    """The printed ledge cheek holds the drawing-guidelines.md rule 17 (walls and webs) floor (.061, MHA-CH-01
+    RV-05); the far cheek, derived from the widest notch on the narrowest
+    stock, is the #1038 shortfall the owner approved at 1.17 mm MIN
+    (2026-10-15). The pin fills the hole it presses into and changes neither."""
     import ch_amplitude_bar_notes as bar_notes
 
     b = pin.BUDGET
-    assert b["tine_min_printed"] == pytest.approx(1.55, abs=1e-6)
+    assert b["tine_min_printed"] == pytest.approx(1.5494, abs=1e-6)
     assert b["tine_min_printed"] >= pin.RULE12_WALL_FLOOR
-    assert b["tine_min_derived"] == pytest.approx(1.2992, abs=1e-6)
+    assert b["tine_min_derived"] == pytest.approx(1.3208, abs=1e-6)
     assert b["tine_min_derived"] < pin.RULE12_WALL_FLOOR  # #1038, not this pin
     assert b["tine_min_derived"] >= bar_notes.CHEEK_WALL_APPROVED_MIN["top"]
 
@@ -111,8 +113,8 @@ def test_neighbour_stack_closes_the_inter_bar_gap_exactly() -> None:
         + 2.0 * lever.PLATE_OFFSET_TOLERANCE
         + 2.0 * pin.PIN_END_PROUD_MAX
     ) == pytest.approx(b["neighbour_clearance_min"])
-    # 7.0565 - 6.35 - (3.35 - 2.9464) - 0.10 - 0.1016.
-    assert (notch_max, lever_min) == pytest.approx((3.35, 2.9464))
+    # 7.0565 - 6.35 - (3.3274 - 2.9464) - 0.1016 - 0.1016.
+    assert (notch_max, lever_min) == pytest.approx((3.3274, 2.9464))
 
 
 def _lever_bar_swing_deg() -> float:

@@ -33,6 +33,7 @@ import _config
 import ch_amplitude_bar_spec as _bar
 import ch_channel_lever_spec as _lever
 from _hole_spec import NUMBER_DRILL_MM
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
@@ -41,7 +42,7 @@ MM_PER_IN = 25.4
 # #290: this pin's sheet prints its row's unit (in); every other band below is
 # read in the unit of the sheet that prints it.
 UNIT = drawing_unit("parts/ch-bar-pivot-pin", _config.parts("ch-bar-pivot-pin"))
-_BAR_UNIT = drawing_unit("parts/ch-amplitude-bar", _config.parts("ch-amplitude-bar"))
+_BAR_UNIT = _bar.UNIT
 
 # --- The lever sheet's drilled-hole band (its #47 bar-pin hole): a twist
 # drill cuts on-size to oversize. ---
@@ -90,9 +91,9 @@ HOLE_LOCATION_TOLERANCE = printed_band_mm(3, unit=_BAR_UNIT)
 # the lever bears on it radially and the bar cheeks hold it square).
 PRESS_INTERFERENCE_MAX = 0.00085 * MM_PER_IN  # 0.0216
 # The amplitude bar's walls (its hole-to-face wall and cheeks), judged on the
-# bar's own sheet, which is still millimetre: its 2.0 target and 1.5 floor.
-RULE12_WALL_TARGET = 2.0  # drawing-guidelines.md rule 17 (walls and webs)
-RULE12_WALL_FLOOR = 1.5
+# bar's own inch sheet: the .080 target and the .060 floor.
+RULE12_WALL_TARGET = WALL_TARGET_MM  # drawing-guidelines.md rule 17 (walls and webs)
+RULE12_WALL_FLOOR = WALL_FLOOR_MM
 RUNNING_FLOOR = _bar.STRADDLE_RUNNING_FLOOR  # 0.10, oiled steel faces
 # Each sheet's linear band: the lever's height prints at two places on the
 # lever sheet, the bar's notch depth and pin drop at two on the bar sheet.
@@ -198,8 +199,10 @@ if BUDGET["neighbour_clearance_min"] < RUNNING_FLOOR - 1e-9:
     raise AssertionError("a pin end can close the bar-to-bar running gap")
 if BUDGET["notch_roof_clearance_min"] < RUNNING_FLOOR - 1e-9:
     raise AssertionError("the lever's lower edge can reach the top notch's roof")
-if BUDGET["hole_face_wall_min"] < RULE12_WALL_TARGET - 1e-9:
-    raise AssertionError("reamed hole to bar face under the drawing-guidelines.md rule 17 (walls and webs) target")
+# The hole's far-face wall is .079 on the narrowest stock: under the .080
+# target, over the .060 floor (MHA-CH-01 RV-06, owner ruling 2026-11-01).
+if BUDGET["hole_face_wall_min"] < RULE12_WALL_FLOOR - 1e-9:
+    raise AssertionError("reamed hole to bar face under the drawing-guidelines.md rule 17 (walls and webs) floor")
 if BUDGET["blank_excess_min"] <= 0.0:
     raise AssertionError("pin blank too short to dress flush at both faces")
 if PIN_INSTALLED_LENGTH != _bar.BAR_WIDTH:
