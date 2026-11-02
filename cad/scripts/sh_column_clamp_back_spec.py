@@ -12,8 +12,10 @@ location is a +/- from the bore axis or a face, authored on the part.
 
 from __future__ import annotations
 
+import _config
 from _hole_spec import THREAD_MAJOR_MM
-from _printed_tolerance import printed_deviations
+from _package_units import drawing_unit
+from _printed_tolerance import printed_band_mm, printed_deviations
 from sh_column_clamp_back_geom import (  # noqa: F401
     BLOCK_DEPTH,
     DEPTH,
@@ -22,19 +24,19 @@ from sh_column_clamp_back_geom import (  # noqa: F401
     TAP_DRILL_DIA,
 )
 from sh_column_clamp_fit import (  # noqa: F401
+    BORE_CLEARANCE_TEXT,
     BORE_DIAMETRAL_CLEARANCE,
     BORE_RADIUS_MAX,
     COLUMN_MATE,
     BACK_EAR_WANDER,
-    DEPTH_PLACES,
+    BACK_DEPTH_PLACES,
+    EAR_HOLE_CALLOUT_PLACES,
     EAR_HEIGHT_BAND,
     EAR_STATION_BAND,
     GRIP_GAP_MIN,
     GRIP_OFFSET_BAND,
-    NOTE_PLACES,
     WALL_FLOOR,
     WALL_TARGET,
-    stated_min,
 )
 from sh_column_clamp_front_geom import (  # noqa: F401
     ARC_HEIGHT,
@@ -42,6 +44,8 @@ from sh_column_clamp_front_geom import (  # noqa: F401
     COLUMN_BORE,
     EAR_HOLE_Z,
 )
+
+UNIT = drawing_unit("parts/sh-column-clamp-back", _config.parts("sh-column-clamp-back"))
 
 FRONT_ARC_MATE = "MHA-SH-01"
 
@@ -66,30 +70,38 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 EAR_STATION_DIMENSIONS = ("EarHole1Z", "EarHole2Z")
 
 # Places and explicit bands on those dimensions.
-# * GripOffset 0.5 +/-0.1 (GRIP_OFFSET_BAND): the grip budget in
+# * GripOffset .020 +/-.004 (GRIP_OFFSET_BAND): the grip budget in
 #   sh_column_clamp_fit; the face gap stays open at its least.
-# * Depth .XX: the back wall (bore to back face) is GripOffset + Depth less
-#   the largest seated bore radius, BACK_WALL_MIN below.
-# * EarHole1Z 17.5 +/-0.1 (EAR_STATION_BAND): the ear stations line up with
+# * Depth .59 at the title block's .XX: the back wall (bore to back face) is
+#   GripOffset + Depth less the largest seated bore radius (WALLS_WORST
+#   below), and the tap's wander runs its deepest .60.
+# * EarHole1Z .689 +/-.004 (EAR_STATION_BAND): the ear stations line up with
 #   the front arc's clearance holes (sh_column_clamp_fit.SCREW_FLOAT).
-# * BoreDia prints (Ø25.6) as a reference nominal under its matched
+# * BoreDia prints (Ø1.008) as a reference nominal under its matched
 #   diametral-clearance acceptance on the column.
-# * Width, AnchorZ and Height are outside sizes at .X.
-# * EarHoleHeight 8.0 +/-0.1 (EAR_HEIGHT_BAND): the taps line up with the
+# * Width 1.89 and Height .63: outside sizes at the title block's .XX; the
+#   walls below take their +/-.01.
+# * AnchorZ prints as a reference (.945): half the width, the bore centred on
+#   the block.  The walls charge each side face the .XX +/-.01 about it.
+# * EarHoleHeight .315 +/-.004 (EAR_HEIGHT_BAND): the taps line up with the
 #   front arc's clearance holes across the bar's height too
 #   (sh_column_clamp_fit.EAR_SCREW_MISMATCH_MAX); the walls below take it.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlockProfile": {
-        "Depth": DEPTH_PLACES,
-        "Width": 1,
-        "GripOffset": 1,
-        "AnchorZ": 1,
+        "Depth": BACK_DEPTH_PLACES,
+        "Width": 2,
+        "GripOffset": 3,
+        "AnchorZ": 3,
     },
-    "Block": {"Height": 1},
-    "BoreProfile": {"BoreDia": 1},
-    "EarHoles": {"EarHole1Z": 1},
-    "EarHeightReference": {"EarHoleHeight": 1},
+    "Block": {"Height": 2},
+    "BoreProfile": {"BoreDia": 3},
+    "EarHoles": {"EarHole1Z": 3},
+    "EarHeightReference": {"EarHoleHeight": 3},
 }
+# Reference dimensions: the bore's diameter "(Ø1.008)" and the AnchorZ
+# distance, a plain "(.945)".
+REFERENCE_DIMENSIONS = ("BoreDia",)
+LINEAR_REFERENCE_DIMENSIONS = ("AnchorZ",)
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
     for dimensions in DRAWING_PRECISION.values()
@@ -101,21 +113,26 @@ if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
 ):
     raise AssertionError("every marked clamp-back dimension needs authored places")
 
-# Worst-case walls (drawing-guidelines.md rule 17: 2.0 target, 1.5 floor).
+# Worst-case walls (drawing-guidelines.md rule 17: .080 target, .060 floor).
 _DEPTH_MIN = (
     BLOCK_DEPTH
-    + printed_deviations(BLOCK_DEPTH, DRAWING_PRECISION["BlockProfile"]["Depth"])[0]
+    + printed_deviations(
+        BLOCK_DEPTH, DRAWING_PRECISION["BlockProfile"]["Depth"], unit=UNIT
+    )[0]
 )
 _WIDTH_MIN = (
     ARC_WIDTH
-    + printed_deviations(ARC_WIDTH, DRAWING_PRECISION["BlockProfile"]["Width"])[0]
+    + printed_deviations(
+        ARC_WIDTH, DRAWING_PRECISION["BlockProfile"]["Width"], unit=UNIT
+    )[0]
 )
 _ANCHOR_Z = ARC_WIDTH / 2.0
-_ANCHOR_DEV = printed_deviations(
-    _ANCHOR_Z, DRAWING_PRECISION["BlockProfile"]["AnchorZ"]
-)
+# The reference centre: the side faces stand the title block's .XX band off it.
+_ANCHOR_BAND = printed_band_mm(2, unit=UNIT)
+_ANCHOR_DEV = (-_ANCHOR_BAND, _ANCHOR_BAND)
 _HEIGHT_MIN = (
-    ARC_HEIGHT + printed_deviations(ARC_HEIGHT, DRAWING_PRECISION["Block"]["Height"])[0]
+    ARC_HEIGHT
+    + printed_deviations(ARC_HEIGHT, DRAWING_PRECISION["Block"]["Height"], unit=UNIT)[0]
 )
 # The ear holes sit at mid-height, located from the bottom face by the
 # model's EarHoleHeight at its band.
@@ -149,23 +166,14 @@ WALLS_WORST: dict[str, float] = {
 }
 if min(WALLS_WORST.values()) < WALL_FLOOR:
     raise AssertionError(f"clamp-back walls {WALLS_WORST} under the {WALL_FLOOR} floor")
-# drawing-guidelines.md rule 20: walls between the floor and the target.  The
-# back wall, 1.9765 on the largest A513 column, is the only one and the part's
-# least wall: it would need a column of at most 25.48 to reach 2.0.
-# Owner-ruled shortfall, declared as sh-column-clamp-back RV-01
-# (cad/config/parts/sh-column-clamp-back.yaml) and stated by BACK_WALL_NOTE;
-# any other wall falling short needs its own.
+# drawing-guidelines.md rule 20: at the inch bands every wall meets the .080
+# target, so the sheet states no shortfall (the back wall's sh-column-clamp-back
+# RV-01, 1.9765 mm against the old 2.0, retired with ruling B3, 2026-10-31).
 _SHORT_WALLS = {name for name, wall in WALLS_WORST.items() if wall < WALL_TARGET}
-if _SHORT_WALLS != {"back wall"} or WALLS_WORST["back wall"] != min(
-    WALLS_WORST.values()
-):
+if _SHORT_WALLS:
     raise AssertionError(
-        f"clamp-back walls under {WALL_TARGET}: {sorted(_SHORT_WALLS)}; only the "
-        "back wall is declared (sh-column-clamp-back RV-01)"
+        f"clamp-back walls under {WALL_TARGET}: {sorted(_SHORT_WALLS)}; none is "
+        "declared (cad/config/parts/sh-column-clamp-back.yaml)"
     )
-BACK_WALL_MIN = stated_min(WALLS_WORST["back wall"])  # 1.97
-# sh-column-clamp-back RV-01
-BACK_WALL_NOTE = f"MIN BACK WALL {BACK_WALL_MIN:.{NOTE_PLACES}f}"
-DRAWING_NOTES = f"1. {BACK_WALL_NOTE}."
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

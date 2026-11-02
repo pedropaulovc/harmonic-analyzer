@@ -14,6 +14,7 @@ import _telemetry
 import _config
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _supplier_chain_dimensions import (
     SOURCE_FEATURES,
     SUPPLIER_MARGINS,
@@ -27,6 +28,9 @@ from _supplier_chain_stock import (
     SUPPLIER_REFERENCE_CONFIGURATION,
 )
 from _supplier_spring_drawing import build_supplier_spring_drawing
+from _machinist_review_mode import MachinistReviewMode
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["sh_vn_chain_link"]
@@ -70,6 +74,7 @@ async def build(adapter: Any) -> dict[str, str]:
         stock_caption="SUPPLIER FAMILY NOMINAL DIAGRAM — NOT INSTALLED",
         spring_metadata=True,
         cut_to_suit=True,
+        unit=part_drawing_unit("sh-vn-chain-link"),
     )
 
 

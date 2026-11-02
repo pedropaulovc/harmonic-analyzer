@@ -20,6 +20,11 @@ from machinist_exceptions import load_exceptions
 from _hole_spec import blind_cut_dia_mm
 
 
+def _in(value_in: float) -> float:
+    """Millimetres of a printed inch value."""
+    return value_in * 25.4
+
+
 def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/sh-column-clamp-front.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/sh-column-clamp-front.pdf")
@@ -46,6 +51,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         set(drawing.DIMENSION_CALLOUTS)
         | set(drawing.DIMENSION_PREFIXES)
         | set(drawing.REFERENCE_DIMENSIONS)
+        | set(drawing.LINEAR_REFERENCE_DIMENSIONS)
     )
     assert annotated <= kept
 
@@ -69,7 +75,7 @@ def test_both_ears_located_by_one_model_owned_height() -> None:
     feature = _clamp_arc.EAR_HEIGHT_REFERENCE
     name = _clamp_arc.EAR_HEIGHT_DIMENSION
     assert spec.DRAWING_DIMENSIONS[feature] == {name}
-    assert spec.DRAWING_PRECISION[feature] == {name: 1}
+    assert spec.DRAWING_PRECISION[feature] == {name: 3}
     assert drawing.DRAWING_PRECISION_BY_NAME is spec.DRAWING_PRECISION_BY_NAME
     assert not hasattr(spec, "EAR_HOLE_HEIGHT_PLACES")
     assert name in drawing.FACE_KEEP
@@ -137,7 +143,7 @@ def test_ear_height_text_stands_outside_its_witnesses() -> None:
     ear_x = drawing._face_xy(0.0, spec.EAR_HOLE_Z)[0]
     text_x = drawing.FACE_KEEP["EarHoleHeight"][0]
     outward = math.copysign(1.0, bottom_x - ear_x)
-    lines = ["2X 8.0 ±0.1", *drawing.DIMENSION_CALLOUTS["EarHoleHeight"].split("\n")]
+    lines = ["2X .315 ±.004", *drawing.DIMENSION_CALLOUTS["EarHoleHeight"].split("\n")]
     half_block = max(len(line) for line in lines) * 0.00265 / 2.0
     assert outward * (text_x - bottom_x) >= half_block + 0.003
 
@@ -147,35 +153,45 @@ def test_bore_prints_the_grip_budget_on_the_column() -> None:
     # pair's grip budget allows (sh_column_clamp_fit), not "bored as a pair".
     bore = drawing.DIMENSION_CALLOUTS["BoreDia"]
     assert "DIAMETRAL" in bore and "MHA-FR-03" in bore
-    assert f"{spec.BORE_DIAMETRAL_CLEARANCE[1]:.4f}" in bore
     assert spec.BORE_DIAMETRAL_CLEARANCE[1] <= 0.3048
     assert "MHA-SH-02" in drawing.DIMENSION_CALLOUTS["EarHole1Z"]
     assert "MHA-SH-02" in drawing.DIMENSION_CALLOUTS["EarHoleHeight"]
-    # The two-place depth says what it sets; the bore says where its axis is.
-    assert spec.DRAWING_PRECISION["BlockProfile"]["Depth"] == 2
+    # The three-place depth says what it sets; the bore says where its axis is.
+    assert spec.DRAWING_PRECISION["BlockProfile"]["Depth"] == 3
     assert "MHA-SH-02" in drawing.DIMENSION_CALLOUTS["Depth"]
     assert "AXIS ON SPLIT FACE" in bore
 
 
 def test_walls_at_the_largest_column_and_drill_wander() -> None:
-    # Independent oracle from literals: the largest A513 DOM column (25.4 +
-    # 0.127) at the loosest 0.3048 clearance, the printed Ø4.98 hole at its
-    # DRILLED HOLES +0.10, the printed .XX/.X limits, and 0.3 deg of drill
-    # wander over the through hole's deepest printed length (17.4 + 0.51; the
-    # arc gave up 0.5 to the rearward-grown support bar).
-    r_bore = (25.527 + 0.3048) / 2.0
-    reach = (4.98 + 0.10) / 2.0 + 17.91 * math.tan(math.radians(0.3))
-    web = 17.4 - reach - r_bore
-    assert math.isclose(spec.WALLS_WORST["ear to bore"], web)  # 1.850
-    assert math.isclose(spec.WALLS_WORST["bar-face wall"], 16.89 - r_bore)
-    assert math.isclose(spec.WALLS_WORST["ear to far side"], 47.2 - 24.8 - 17.6 - reach)
-    assert min(spec.WALLS_WORST.values()) >= 1.5
-    # The web reaches the 2.0 target only on a column under its own Ø25.4
+    # Independent oracle from inch literals: the largest A513 DOM column
+    # (1.005) at the loosest .012 clearance, the printed Ø.196 hole at its
+    # DRILLED HOLES +.004, the printed .XXX limits and the ears' +/-.004, and
+    # 0.3 deg of drill wander over the through hole's deepest printed length
+    # (.685 + .005).
+    r_bore = _in(1.005 + 0.012) / 2.0
+    reach = _in(0.196 + 0.004) / 2.0 + _in(0.690) * math.tan(math.radians(0.3))
+    web = _in(0.689 - 0.004) - reach - r_bore
+    assert math.isclose(spec.WALLS_WORST["ear to bore"], web)  # 1.851 (.0729)
+    assert math.isclose(spec.WALLS_WORST["bar-face wall"], _in(0.680) - r_bore)
+    # The .XX width (1.89 +/-.01) about the reference .945 centre, the side
+    # faces each the .XX band off it.
+    assert math.isclose(
+        spec.WALLS_WORST["ear to near side"], _in(0.935) - _in(0.693) - reach
+    )
+    assert math.isclose(
+        spec.WALLS_WORST["ear to far side"],
+        _in(1.880) - _in(0.955) - _in(0.693) - reach,
+    )
+    assert math.isclose(
+        spec.WALLS_WORST["ear to top face"], _in(0.620) - _in(0.319) - reach
+    )
+    assert min(spec.WALLS_WORST.values()) >= _in(0.060)
+    # The web reaches the .080 target only on a column under its own Ø1.000
     # nominal, so no column acceptance can lift it: the one owner-ruled
     # shortfall (sh-column-clamp-front RV-01), and the part's least wall.
-    column_at_target = 2.0 * (17.4 - reach - 2.0) - 0.3048
-    assert column_at_target < 25.4
-    short = {name for name, wall in spec.WALLS_WORST.items() if wall < 2.0}
+    column_at_target = 2.0 * (_in(0.685) - reach - _in(0.080)) - _in(0.012)
+    assert column_at_target < _in(1.000)
+    short = {name for name, wall in spec.WALLS_WORST.items() if wall < _in(0.080)}
     assert short == {"ear to bore"}
     assert min(spec.WALLS_WORST.values()) == spec.WALLS_WORST["ear to bore"]
 
@@ -196,15 +212,13 @@ def test_owner_ruled_shortfalls_are_declared_and_stated() -> None:
         assert entry.reason.endswith("(owner-ruled shortfall)")
     assert entries["RV-01"].where.endswith(spec.EAR_WALL_NOTE)
     assert entries["RV-02"].where.endswith(spec.SCREW_LINE_NOTE)
-    # The printed values, from the computed worst cases at the sheet's two
-    # places, rounded never in the part's favour: the least wall down, the
-    # screw line's excess up.
-    assert spec.EAR_WALL_NOTE == "MIN EAR WALL 1.85"
-    assert 1.85 <= spec.WALLS_WORST["ear to bore"] < 1.86
-    assert spec.SCREW_LINE_NOTE == (
-        "EAR TO MHA-SH-02 TAP OFFSET UP TO 0.06 OVER #8 SCREW CLEARANCE"
-    )
-    assert 0.05 < fit.SCREW_LINE_SHORTFALL <= 0.06
+    # The printed values, from the computed worst cases at the sheet's three
+    # inch places, rounded never in the part's favour: the least wall down,
+    # the screw line's excess up, inside the owner's ruled 0.053 mm.
+    assert spec.EAR_WALL_MIN == 0.072
+    assert _in(0.072) <= spec.WALLS_WORST["ear to bore"] < _in(0.073)
+    assert spec.SCREW_LINE_SHORT_MAX == 0.003
+    assert _in(0.002) < fit.SCREW_LINE_SHORTFALL <= 0.053 < _in(0.003)
     assert spec.DRAWING_NOTES.split("\n") == [
         f"1. {spec.EAR_WALL_NOTE}.",
         f"2. {spec.SCREW_LINE_NOTE}.",

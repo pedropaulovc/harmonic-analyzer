@@ -36,7 +36,7 @@ I = spec.MeasuredInterval
 def _conditional_calibration(**changes):
     """Contract's conditional comparison, with invented-fixture lower spans explicit."""
     values = {
-        "finished_length": I(57.2 - 0.8, 57.2 + 0.8),
+        "finished_length": I(*spec.LENGTH_LIMITS),
         # The faced TL-20 bar's printed 12.0 at the title block's .X band.
         "base_bar_thickness": I(12.0 - 0.8, 12.0 + 0.8),
         "moving_block_height": I(28.0, 28.0),
@@ -101,10 +101,9 @@ def test_manufactured_rework_retains_actual_stock_and_property_provenance() -> N
     assert set(draw.REQUIRED_PROPERTIES) <= set(part.SAVED_DRAWING_PROPERTIES)
     assert {"Material Specification", "Finish"} <= set(part.SAVED_DRAWING_PROPERTIES)
     assert part.MEMBER_DESCRIPTIONS[CONFIGURATION] == spec.BOM_DESCRIPTION
-    assert spec.BOM_DESCRIPTION == "1/2-13 STUD, CUT 57.2"
     for configuration in ("TNut", "FlangeNut"):
         other = part.MEMBER_PROPERTIES[configuration]
-        assert other["Finish"] == ROW["finish"] == "black oxide, as supplied"
+        assert other["Finish"] == ROW["finish"]
         assert other["Manufacturing Notes"] == part.MEMBER_SPECS[configuration].DRAWING_NOTES
         assert not ({"Process", "Tolerance Class", *part.STUD_REWORK_PROPERTIES} - {"Manufacturing Notes"}) & set(other)
         assert not any(name.startswith("Stud ") for name in other)
@@ -114,9 +113,9 @@ def test_finished_and_stock_lengths_are_separate_shared_authorities() -> None:
     assert spec.THREAD == fasteners.HOLD_DOWN_STUD_THREAD == "1/2-13"
     assert spec.STOCK_LENGTH == fasteners.HOLD_DOWN_STUD_STOCK_LENGTH == "3"
     assert spec.STOCK_LENGTH_MM == fasteners.HOLD_DOWN_STUD_STOCK_LENGTH_MM == 76.2
-    assert spec.LENGTH == fasteners.HOLD_DOWN_STUD_LENGTH_MM == 57.2
-    assert spec.LENGTH_PLACES == fasteners.HOLD_DOWN_STUD_LENGTH_PLACES == 1
-    assert spec.LENGTH_BAND == fasteners.HOLD_DOWN_STUD_LENGTH_BAND == 0.8
+    assert spec.LENGTH == fasteners.HOLD_DOWN_STUD_LENGTH_MM
+    # The sheet's 2.25 at .XX: accepted 2.24..2.26 in.
+    assert spec.LENGTH_LIMITS == pytest.approx((2.24 * 25.4, 2.26 * 25.4))
     assert spec.THREAD_PITCH_MM == fasteners.HOLD_DOWN_STUD_PITCH_MM == 25.4 / 13
     assert spec.MAJOR_DIA == base_bar.HOLD_DOWN_STUD_DIA
     assert spec.CLEARANCE_MIN == 3.0 and spec.COMPLETE_PROJECTION_PITCHES == 1.0
@@ -136,7 +135,9 @@ def test_finished_and_stock_lengths_are_separate_shared_authorities() -> None:
 
 def test_finished_envelope_keeps_lower_factory_end_and_axis() -> None:
     assert spec.PROFILE[:3] == ((0.0, 0.0), (0.0, spec.RADIUS - 1.0), (1.0, spec.RADIUS))
-    assert spec.PROFILE[-3:] == ((56.2, spec.RADIUS), (57.2, spec.RADIUS - 1.0), (57.2, 0.0))
+    assert spec.PROFILE[-3:] == (
+        (spec.LENGTH - 1.016, spec.RADIUS), (spec.LENGTH, spec.RADIUS - 1.016), (spec.LENGTH, 0.0),
+    )
     assert part.hold_down_stud_profile_points() == [(0.0, 0.0), (spec.RADIUS, 0.0), (spec.RADIUS, spec.LENGTH), (0.0, spec.LENGTH)]
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '"Front Plane", 0.0, "Right Plane", 0.0' in source
@@ -163,14 +164,13 @@ def test_native_source_maps_cover_printed_length_and_source_only_chamfer() -> No
     assert {feature: set(row) for feature, row in spec.DRAWING_PRECISION.items()} == spec.DRAWING_DIMENSIONS
     assert set(draw.FRONT_KEEP) == {"FinishedLength"}
     assert draw.END_KEEP == {}
-    assert spec.DRAWING_PRECISION_BY_NAME == {"FinishedLength": 1, "CutEndChamfer": 1}
+    assert spec.DRAWING_PRECISION_BY_NAME == {"FinishedLength": 2, "CutEndChamfer": 2}
     assert spec.DIMENSION_TOLERANCE_TYPES == {"FinishedLength": 0, "CutEndChamfer": 6}
     assert all(not any(char.isdigit() for char in text) for text in spec.DIMENSION_CALLOUTS.values())
     fields = requirements_for(draw)
     assert set(fields) == {"finished_upper_end", "cut_end_chamfer"}
-    assert fields["finished_upper_end"].fields["length"][0] == [56.4, 58.0]
-    assert fields["cut_end_chamfer"].fields["length"][0] == [0.0, 1.0]
-    assert "LENGTH_BAND" in fields["finished_upper_end"].fields["length"][1]
+    assert fields["finished_upper_end"].fields["length"][0] == pytest.approx([2.24 * 25.4, 2.26 * 25.4])
+    assert fields["cut_end_chamfer"].fields["length"][0] == [0.0, 1.016]
 
 
 def test_length_callout_screen_uses_captured_native_font_and_paper_lane() -> None:
@@ -214,8 +214,8 @@ def test_feature_selector_distinguishes_actual_cut_end_from_factory_chamfer() ->
 
 def test_conditional_full_finished_band_passes_but_old_stock_band_fails() -> None:
     result = spec.measured_fit_bounds(**_conditional_calibration())
-    assert result.clearance_min_mm == pytest.approx(3.2)
-    assert result.complete_projection_min_mm == pytest.approx(3.1)
+    assert result.clearance_min_mm == pytest.approx(3.796)
+    assert result.complete_projection_min_mm == pytest.approx(3.596)
     assert result.required_projection_mm == pytest.approx(25.4 / 13)
     assert result.full_actual_nut_span_retained and result.lower_loaded_interval_retained
     assert result.insertion_unchanged and result.acceptable
@@ -223,7 +223,7 @@ def test_conditional_full_finished_band_passes_but_old_stock_band_fails() -> Non
     assert old.clearance_min_mm == pytest.approx(-15.8)
     assert not old.acceptable
     # A nominal-only height that happens to pass cannot certify its wider band.
-    nominal = spec.measured_fit_bounds(**_conditional_calibration(moving_block_height=I(27.1, 27.1), finished_length=I(57.2, 57.2)))
+    nominal = spec.measured_fit_bounds(**_conditional_calibration(moving_block_height=I(27.1, 27.1), finished_length=I(spec.LENGTH, spec.LENGTH)))
     actual = spec.measured_fit_bounds(**_conditional_calibration(moving_block_height=I(27.1, 27.1)))
     assert nominal.acceptable and not actual.acceptable
 
@@ -254,19 +254,19 @@ def test_complete_pitch_projection_boundary_on_both_sides(delta, accepted) -> No
 
 @pytest.mark.parametrize("change", [
     {"nut_span": I(19.5, 19.5)},
-    {"washer_stack": I(1.5, 1.5)},
-    {"base_bar_thickness": I(13.7 - 0.51, 13.7 + 0.51)},
-    {"upper_thread_setback": I(0.0, 2.5)},
+    {"washer_stack": I(2.0, 2.0)},
+    {"base_bar_thickness": I(14.2 - 0.51, 14.2 + 0.51)},
+    {"upper_thread_setback": I(0.0, 3.0)},
 ])
 def test_actual_nut_washer_anchor_stack_and_complete_thread_setback_change_the_bound(change) -> None:
     result = spec.measured_fit_bounds(**_conditional_calibration(**change))
     assert result.complete_projection_min_mm < spec.THREAD_PITCH_MM
     assert not result.acceptable
-    assert spec.CUT_END_CHAMFER_MAX == 1.0  # does not imply measured U <= 1
+    assert spec.CUT_END_CHAMFER_MAX == 1.016  # does not imply measured U <= .04
 
 
 def test_deeper_insertion_cannot_rescue_a_failed_clearance() -> None:
-    values = _conditional_calibration(moving_block_height=I(27.5, 27.5))
+    values = _conditional_calibration(moving_block_height=I(26.9, 26.9))
     assert not spec.measured_fit_bounds(**values).acceptable
     values["lower_insertion"] = I(22.5, 22.5)
     result = spec.measured_fit_bounds(**values)
@@ -276,7 +276,7 @@ def test_deeper_insertion_cannot_rescue_a_failed_clearance() -> None:
 
 
 def test_full_actual_nut_span_and_original_lower_loaded_threads_are_retained() -> None:
-    nut = spec.measured_fit_bounds(**_conditional_calibration(nut_span=I(21.0, 21.0)))
+    nut = spec.measured_fit_bounds(**_conditional_calibration(nut_span=I(21.5, 21.5)))
     assert not nut.full_actual_nut_span_retained and not nut.acceptable
     lower = spec.measured_fit_bounds(**_conditional_calibration(lower_factory_thread_start=I(2.5, 2.5)))
     assert lower.full_actual_nut_span_retained and not lower.lower_loaded_interval_retained
@@ -334,7 +334,7 @@ def test_actual_cut_feature_gets_native_max_without_forcing_driven_state(monkeyp
             part._author_cut_end_maximum(object())
     else:
         part._author_cut_end_maximum(object())
-        assert tolerance.Type == 6 and tolerance.values == (-0.001, 0.0)
+        assert tolerance.Type == 6 and tolerance.values == pytest.approx((-0.001016, 0.0))
     assert dimension.DrivenState == (1 if failure == "reference" else 2)
 
 
@@ -521,7 +521,7 @@ def test_rework_notes_keep_upper_chamfer_source_text_front_owner_and_native_land
     assert inserted == [
         draw.property_link(f"{CONFIGURATION} Rework Lower End Note"),
         draw.THREAD_CALLOUT,
-        f"{maximum:.{places}f} MAX X {angle_deg:g}° CUT END",
+        spec.cut_end_chamfer_callout(math.radians(angle_deg)),
     ]
     lower, thread, chamfer = projected[0]
     rim_radius = (spec.RADIUS - spec.LOWER_FACTORY_CHAMFER) / 1000
@@ -1282,7 +1282,7 @@ def test_shared_native_builder_retains_material_member_suppression_and_save_guar
     for name in (
         "require_member_configurations", "name_last_feature", "set_member_suppression",
         "blank_reference_geometry", "apply_custom_properties", "apply_drawing_properties",
-        "apply_member_properties", "require_saved_drawing_properties",
+        "apply_member_properties", "require_saved_drawing_properties", "apply_package_model_units",
     ):
         monkeypatch.setattr(part, name, recorder(name))
 

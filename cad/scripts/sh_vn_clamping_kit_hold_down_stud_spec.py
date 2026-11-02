@@ -14,18 +14,19 @@ The listing states 1/2-13 studs and hardened steel, but no individual stud
 lengths, chamfers or complete-thread limits. datasheet-built: no vendor CAD
 obtained (listing checked 2026-10-17 UTC).
 
-FROM C4: ``THREAD``, selected kit ``STOCK_LENGTH`` / ``STOCK_LENGTH_MM``,
-finished ``LENGTH`` and its ordinary printed band come from the fasteners
-spec; ``MAJOR_DIA`` comes from the base-bar stud clearance authority. The
-selected 3 in kit stock length remains UNVERIFIED against the delivered kit;
-57.2 is the fixed manufactured finished length under the title-block tolerance,
+FROM C4: ``THREAD``, selected kit ``STOCK_LENGTH`` / ``STOCK_LENGTH_MM`` and
+the finished ``LENGTH`` come from the fasteners spec; ``MAJOR_DIA`` comes from
+the base-bar stud clearance authority. The sheet prints ``LENGTH`` in decimal
+inch at ``.XX`` (2.25) under the title block's band. The selected 3 in kit
+stock length remains UNVERIFIED against the delivered kit; the finished length
+is the fixed manufactured length under the title-block tolerance,
 not a vendor SKU, a kit dimension or an assembly-set length. HD1-HD4 qualify
 the measured installed setup against that full printed length band.
 Main selected default B after the illustrated-choice timeout; this records
 that implementation ruling, not explicit user approval.
 
-ESTIMATED: the unmodified lower factory chamfer is 1.0 at 45 degrees. The
-new upper chamfer is a manufactured 1.0 MAX, at the native feature's 45 degrees.
+ESTIMATED: the unmodified lower factory chamfer is 1.0 mm at 45 degrees. The
+new upper chamfer is a manufactured .04 in MAX, at the native feature's 45 degrees.
 Neither chamfer proves a complete external-thread setback: measure U separately.
 PM T-nut depth, flange-nut complete internal span and all installed intervals
 remain unknown until measured. No hold-down washer is added. The fit helper
@@ -42,8 +43,22 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+import _config
+from _package_units import drawing_unit
+from _printed_tolerance import printed_band_mm
+
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
+
+UNIT = drawing_unit(
+    "parts/sh-vn-clamping-kit-hardware", _config.parts("sh-vn-clamping-kit-hardware")
+)
+
+
+def inch_text(value_mm: float, places: int) -> str:
+    """``value_mm`` as decimal-inch print text: ``.04``, ``2.25``."""
+    return f"{value_mm / 25.4:.{places}f}".removeprefix("0")
+
 
 CONFIGURATION = "HoldDownStud"
 SUPPLIER = "Precision Matthews"
@@ -55,15 +70,19 @@ THREAD = fasteners.HOLD_DOWN_STUD_THREAD
 STOCK_LENGTH = fasteners.HOLD_DOWN_STUD_STOCK_LENGTH
 STOCK_LENGTH_MM = fasteners.HOLD_DOWN_STUD_STOCK_LENGTH_MM
 LENGTH = fasteners.HOLD_DOWN_STUD_LENGTH_MM
-LENGTH_PLACES = fasteners.HOLD_DOWN_STUD_LENGTH_PLACES
-LENGTH_BAND = fasteners.HOLD_DOWN_STUD_LENGTH_BAND
+LENGTH_PLACES = 2  # .XX: prints 2.25
+LENGTH_BAND = printed_band_mm(LENGTH_PLACES, unit=UNIT)
+# The mm acceptance limits of the printed nominal and its title-block band.
+# 2.25 sits on the .XX grid, so the printed nominal is the model length.
+LENGTH_LIMITS = (LENGTH - LENGTH_BAND, LENGTH + LENGTH_BAND)
 CLEARANCE_MIN = fasteners.HOLD_DOWN_STUD_CLEARANCE_MIN
 COMPLETE_PROJECTION_PITCHES = fasteners.HOLD_DOWN_STUD_COMPLETE_PROJECTION_PITCHES
 THREAD_PITCH_MM = fasteners.HOLD_DOWN_STUD_PITCH_MM
 MAJOR_DIA = base_bar.HOLD_DOWN_STUD_DIA
 
-# Preserve the installed jig's member description under the shared purchase Number.
-BOM_DESCRIPTION = f"{THREAD} STUD, CUT {LENGTH:.1f}"
+# Preserve the installed jig's member description under the shared purchase Number;
+# the cut length names its unit because the jig sheet is still millimetre.
+BOM_DESCRIPTION = f"{THREAD} STUD, CUT {inch_text(LENGTH, LENGTH_PLACES)} IN"
 PROCESS = (
     "rework purchased PM 52PCCK-9/16-14mm 1/2-13 x 3 in stud stock: shorten only "
     "unused upper end to drawing length and restore cut-end chamfer; preserve "
@@ -72,8 +91,8 @@ PROCESS = (
 FINISH = "BLACK OXIDE AS SUPPLIED; OIL BARE CUT END"
 TOLERANCE_CLASS = "machined_block"
 LOWER_FACTORY_CHAMFER = 1.0  # ESTIMATED; as supplied and unmodified
-CUT_END_CHAMFER_MAX = 1.0
-CUT_END_CHAMFER_PLACES = 1
+CUT_END_CHAMFER_MAX = 1.016  # .04
+CUT_END_CHAMFER_PLACES = 2
 CUT_END_CHAMFER_ANGLE_DEG = 45.0
 RADIUS = MAJOR_DIA / 2.0
 
@@ -123,7 +142,7 @@ DRAWING_NOTES = (
 def cut_end_chamfer_callout(angle_radians: float) -> str:
     """Format the rework leader using the measured native chamfer angle."""
     return (
-        f"{CUT_END_CHAMFER_MAX:.{CUT_END_CHAMFER_PLACES}f} MAX "
+        f"{inch_text(CUT_END_CHAMFER_MAX, CUT_END_CHAMFER_PLACES)} MAX "
         f"X {math.degrees(angle_radians):g}° {DIMENSION_CALLOUTS['CutEndChamfer']}"
     )
 

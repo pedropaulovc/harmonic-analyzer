@@ -27,9 +27,11 @@ from _check import check
 from _com import _com_invoke, _early_bound
 from _custom_properties import apply_custom_properties
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing
 from _feature_tree import _feature_by_name, feature_name_by_type, name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _purchased_part_variants import (
     activate_member,
     apply_member_properties,
@@ -291,6 +293,7 @@ async def build(adapter) -> dict[str, str]:
 
     require_member_configurations(PART_NAME, CONFIGURATIONS)
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     await create_member_configurations(adapter, PART_NAME, CONFIGURATIONS)
     await activate_member(adapter, lever.CONFIGURATION)
     # All globals are born after the member configurations exist (IEquationMgr.Add3).

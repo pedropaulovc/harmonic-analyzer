@@ -15,4 +15,5 @@ sh-vn-music-wire:
     PenWire: 1
   tolerance_class: machined_block
   process: purchased
+  drawing_unit: in
   # Terminations, wraps and cut lengths are shop-made, not modelled; the purchase drawing gives the supplier wire Ø.

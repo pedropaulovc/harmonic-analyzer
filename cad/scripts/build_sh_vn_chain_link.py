@@ -26,8 +26,10 @@ from _chain import LINK_PITCH, PLATE_HALF_H, PLATE_THICK
 from _appearance import BAR_STEEL, apply_color, apply_material
 from _check import check
 from _custom_properties import apply_custom_properties
+from _document_units import apply_package_model_units
 from _drawing_marks import apply_drawing_properties
 from _part_checks import bbox_extent_check, report_mass_properties
+from _part_properties import part_drawing_unit
 from _purchased_part_variants import (
     activate_member,
     apply_member_properties,
@@ -72,6 +74,7 @@ _MEMBER_REFERENCES = ("Axis1", "Axis2")
 async def build(adapter: Any) -> dict[str, str]:
     require_member_configurations(PART_NAME, CONFIGURATIONS)
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     # Author before cloning configurations so every member inherits the same
     # station plane and the same two hidden, unsuppressed path-link axes.
     await _chain_link.author_link_references(adapter)

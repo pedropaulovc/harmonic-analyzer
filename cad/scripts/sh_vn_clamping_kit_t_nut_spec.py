@@ -77,7 +77,7 @@ THROAT_DEPTH = 14.0  # C4 estimate: PM-30MV throat depth to the undercut
 SLOT_WIDTH = trammel.TSLOT_WIDTH  # the PM-30MV slot throat; fit check only
 
 # Preserve the installed jig's member description under the shared SKU.
-BOM_DESCRIPTION = f"T-NUT, {SLOT_WIDTH:.0f} SLOT, {THREAD}"
+BOM_DESCRIPTION = f"T-NUT, {SLOT_WIDTH:.0f} MM SLOT, {THREAD}"
 
 # --- Estimated (verify on receipt) ---------------------------------------------
 FOOT_WIDTH = 24.0  # across the slot

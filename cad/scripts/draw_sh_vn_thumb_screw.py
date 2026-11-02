@@ -24,6 +24,7 @@ from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_layout_audit import _Reader, _dump_annotation
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
+from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import (
     assert_supplier_view_fits,
     build_purchased_fastener_drawing,
@@ -46,6 +47,9 @@ from _layout_audit import (
     severity,
 )
 import sh_vn_thumb_screw_spec as supplier
+from _machinist_review_mode import MachinistReviewMode
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["sh_vn_thumb_screw"]
@@ -73,6 +77,11 @@ _SUPPLIER_LANES = {
 # are placed from measured witness lines and text bounds, not this budget.
 _SUPPLIER_TEXT_ROOM = {"left": 0.0145, "bottom": 0.008, "right": 0.0265, "top": 0.004}
 _POSITION_TOLERANCE_M = 1e-5  # Same 10 um as imported-dimension placement readback.
+# Printed thread-diameter ink tops sit 1.06 mm above the native text box (farm
+# audit 20261031T195237722Z): at the bare 2.2 mm drop the collar witness stood
+# 1.14 mm from the ink and the thread line crossed it within half a text height.
+# The extra 1.5 mm leaves ~2.6 mm printed clearance on both counts.
+_THREAD_TEXT_DROP_M = 0.0015
 SUPPLIER_MARGINS = {
     "*Front": tuple(
         max(offset for side, offset in _SUPPLIER_LANES.values() if side == edge)
@@ -854,6 +863,7 @@ def _place_diameter_vertical_stations(
             "SupplierThreadDiameter": lower
             - CLEAR_GAP_M
             - PLACE_SETTLE_M
+            - _THREAD_TEXT_DROP_M
             - thread.ymax,
         }
         moved = False
@@ -1178,6 +1188,7 @@ async def build(adapter: Any) -> dict[str, str]:
         supplier_dimensions=annotate,
         supplier_margins=SUPPLIER_MARGINS,
         settled_checks=checks,
+        unit=part_drawing_unit("sh-vn-thumb-screw"),
     )
 
 

@@ -14,7 +14,9 @@ axis or a face, authored on the part.
 
 from __future__ import annotations
 
-from _printed_tolerance import drilled_oversize_mm, printed_deviations
+import _config
+from _package_units import drawing_unit
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
 
 # Part-owned bore and ear geometry remains separate from the shared seating
 # depths, so bar consumers need neither this drawing contract nor that geometry.
@@ -30,20 +32,25 @@ from sh_column_clamp_front_geom import (  # noqa: F401
     EAR_SPACING,
 )
 from sh_column_clamp_fit import (  # noqa: F401
+    BORE_CLEARANCE_TEXT,
     BORE_DIAMETRAL_CLEARANCE,
     BORE_RADIUS_MAX,
     COLUMN_MATE,
-    DEPTH_PLACES,
+    FRONT_DEPTH_PLACES,
     EAR_HOLE_CALLOUT_PLACES,
     FRONT_EAR_WANDER,
     EAR_HEIGHT_BAND,
     EAR_STATION_BAND,
-    NOTE_PLACES,
     SCREW_LINE_SHORTFALL,
     WALL_FLOOR,
     WALL_TARGET,
+    note_text,
     stated_max,
     stated_min,
+)
+
+UNIT = drawing_unit(
+    "parts/sh-column-clamp-front", _config.parts("sh-column-clamp-front")
 )
 
 BACK_ARC_MATE = "MHA-SH-02"
@@ -69,25 +76,32 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 EAR_STATION_DIMENSIONS = ("EarHole1Z", "EarHole2Z")
 
 # Places and explicit bands on those dimensions.
-# * Depth .XX: the bar face's station from the column axis sets the clamp
-#   screws' thread engagement in the back arc (build_pd_paper_drive_assembly's
-#   clamp stack).
-# * EarHole1Z 17.5 +/-0.1 (EAR_STATION_BAND): the clearance holes line up
+# * Depth .685 at .XXX: the bar face's station from the column axis sets the
+#   clamp screws' thread engagement in the back arc
+#   (build_pd_paper_drive_assembly's clamp stack).
+# * EarHole1Z .689 +/-.004 (EAR_STATION_BAND): the clearance holes line up
 #   with the back arc's taps (sh_column_clamp_fit.SCREW_FLOAT).
-# * BoreDia prints (Ø25.6) as a reference nominal under its matched
+# * BoreDia prints (Ø1.008) as a reference nominal under its matched
 #   diametral-clearance acceptance on the column (sh_column_clamp_fit: the
-#   grip budget spends at most 0.30 per bore).
-# * Width, AnchorZ and Height are outside sizes at .X.
-# * EarHoleHeight 8.0 +/-0.1 (EAR_HEIGHT_BAND): the clearance holes line up
+#   grip budget spends at most .012 per bore).
+# * Width 1.89 and Height .63: outside sizes at the title block's .XX; the
+#   walls below take their +/-.01.
+# * AnchorZ prints as a reference (.945): half the width, the bore centred on
+#   the block.  The walls charge each side face the .XX +/-.01 about it.
+# * EarHoleHeight .315 +/-.004 (EAR_HEIGHT_BAND): the clearance holes line up
 #   with the back arc's taps across the bar's height too
 #   (sh_column_clamp_fit.EAR_SCREW_MISMATCH_MAX); the walls below take it.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "BlockProfile": {"Depth": DEPTH_PLACES, "Width": 1, "AnchorZ": 1},
-    "Block": {"Height": 1},
-    "BoreProfile": {"BoreDia": 1},
-    "EarHoles": {"EarHole1Z": 1},
-    "EarHeightReference": {"EarHoleHeight": 1},
+    "BlockProfile": {"Depth": FRONT_DEPTH_PLACES, "Width": 2, "AnchorZ": 3},
+    "Block": {"Height": 2},
+    "BoreProfile": {"BoreDia": 3},
+    "EarHoles": {"EarHole1Z": 3},
+    "EarHeightReference": {"EarHoleHeight": 3},
 }
+# Reference dimensions: the bore's diameter "(Ø1.008)" and the AnchorZ
+# distance, a plain "(.945)".
+REFERENCE_DIMENSIONS = ("BoreDia",)
+LINEAR_REFERENCE_DIMENSIONS = ("AnchorZ",)
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
     for dimensions in DRAWING_PRECISION.values()
@@ -99,32 +113,40 @@ if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
 ):
     raise AssertionError("every marked clamp-front dimension needs authored places")
 
-# Worst-case walls (drawing-guidelines.md rule 17: 2.0 target, 1.5 floor).
+# Worst-case walls (drawing-guidelines.md rule 17: .080 target, .060 floor).
 _DEPTH_MIN = (
     ARC_DEPTH
-    + printed_deviations(ARC_DEPTH, DRAWING_PRECISION["BlockProfile"]["Depth"])[0]
+    + printed_deviations(
+        ARC_DEPTH, DRAWING_PRECISION["BlockProfile"]["Depth"], unit=UNIT
+    )[0]
 )
 _WIDTH_MIN = (
     ARC_WIDTH
-    + printed_deviations(ARC_WIDTH, DRAWING_PRECISION["BlockProfile"]["Width"])[0]
+    + printed_deviations(
+        ARC_WIDTH, DRAWING_PRECISION["BlockProfile"]["Width"], unit=UNIT
+    )[0]
 )
 _ANCHOR_Z = ARC_WIDTH / 2.0
-_ANCHOR_DEV = printed_deviations(
-    _ANCHOR_Z, DRAWING_PRECISION["BlockProfile"]["AnchorZ"]
-)
+# The reference centre: the side faces stand the title block's .XX band off it.
+_ANCHOR_BAND = printed_band_mm(2, unit=UNIT)
+_ANCHOR_DEV = (-_ANCHOR_BAND, _ANCHOR_BAND)
 _HEIGHT_MIN = (
-    ARC_HEIGHT + printed_deviations(ARC_HEIGHT, DRAWING_PRECISION["Block"]["Height"])[0]
+    ARC_HEIGHT
+    + printed_deviations(ARC_HEIGHT, DRAWING_PRECISION["Block"]["Height"], unit=UNIT)[0]
 )
 # The ear holes sit at mid-height, located from the bottom face by the
 # model's EarHoleHeight at its band.
 EAR_HOLE_HEIGHT = ARC_HEIGHT / 2.0
 _EAR_HEIGHT_DEV = (-EAR_HEIGHT_BAND, EAR_HEIGHT_BAND)
 # The largest accepted clearance hole: the Hole Wizard callout prints its
-# diameter at two places (Ø4.98), checked on the DRILLED HOLES row (+0.10/-0).
+# diameter at three places (Ø.196), checked on the DRILLED HOLES row (+.004/0).
 _EAR_HOLE_R_MAX = (
     EAR_HOLE_DIA
     + printed_deviations(
-        EAR_HOLE_DIA, EAR_HOLE_CALLOUT_PLACES, (0.0, drilled_oversize_mm())
+        EAR_HOLE_DIA,
+        EAR_HOLE_CALLOUT_PLACES,
+        (0.0, drilled_oversize_mm(unit=UNIT)),
+        unit=UNIT,
     )[1]
 ) / 2.0
 # The hole's reach: its largest radius off its wandered axis (the through
@@ -155,10 +177,10 @@ if min(WALLS_WORST.values()) < WALL_FLOOR:
     )
 # drawing-guidelines.md rule 20: walls between the floor and the target.  The
 # ear-to-bore web on the largest A513 column with drill wander, ruled at 1.850
-# on the 17.9 arc and 1.853 on the 17.4 arc (whose shorter hole wanders
-# less), is the only one and the part's least wall: it would need a column of
-# at most 25.23 -- under its own nominal -- to reach 2.0.  Owner-ruled
-# shortfall, declared as sh-column-clamp-front RV-01
+# mm on the 17.9 mm arc and restated at .072 for the inch sheet (ruling B3,
+# 2026-10-31), is the only one and the part's least wall: it would need a
+# column under its own Ø1.000 nominal to reach .080.  Owner-ruled shortfall,
+# declared as sh-column-clamp-front RV-01
 # (cad/config/parts/sh-column-clamp-front.yaml) and stated by EAR_WALL_NOTE;
 # any other wall falling short needs its own.
 _SHORT_WALLS = {name for name, wall in WALLS_WORST.items() if wall < WALL_TARGET}
@@ -169,16 +191,16 @@ if _SHORT_WALLS != {"ear to bore"} or WALLS_WORST["ear to bore"] != min(
         f"clamp-front walls under {WALL_TARGET}: {sorted(_SHORT_WALLS)}; only the "
         "ear-to-bore web is declared (sh-column-clamp-front RV-01)"
     )
-EAR_WALL_MIN = stated_min(WALLS_WORST["ear to bore"])  # 1.85
+EAR_WALL_MIN = stated_min(WALLS_WORST["ear to bore"])  # .072
 # sh-column-clamp-front RV-01
-EAR_WALL_NOTE = f"MIN EAR WALL {EAR_WALL_MIN:.{NOTE_PLACES}f}"
+EAR_WALL_NOTE = f"MIN EAR WALL {note_text(EAR_WALL_MIN)}"
 # The screw line (sh_column_clamp_fit): the worst ear-to-tap offset passes the
 # #8 screw's radial clearance in this sheet's hole, rounded up.
-SCREW_LINE_SHORT_MAX = stated_max(SCREW_LINE_SHORTFALL)  # 0.06
+SCREW_LINE_SHORT_MAX = stated_max(SCREW_LINE_SHORTFALL)  # .003
 # sh-column-clamp-front RV-02
 SCREW_LINE_NOTE = (
     f"EAR TO {BACK_ARC_MATE} TAP OFFSET UP TO "
-    f"{SCREW_LINE_SHORT_MAX:.{NOTE_PLACES}f} OVER #8 SCREW CLEARANCE"
+    f"{note_text(SCREW_LINE_SHORT_MAX)} OVER #8 SCREW CLEARANCE"
 )
 DRAWING_NOTES = "\n".join((f"1. {EAR_WALL_NOTE}.", f"2. {SCREW_LINE_NOTE}."))
 

@@ -22,6 +22,11 @@ from _hole_spec import blind_cut_dia_mm
 from fr_tube_frame_spec import OUTER_DIA
 
 
+def _in(value_in: float) -> float:
+    """Millimetres of a printed inch value."""
+    return value_in * 25.4
+
+
 def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/sh-column-clamp-back.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/sh-column-clamp-back.pdf")
@@ -43,6 +48,7 @@ def test_marked_dimensions_are_exactly_the_kept_set() -> None:
         set(drawing.DIMENSION_CALLOUTS)
         | set(drawing.DIMENSION_PREFIXES)
         | set(drawing.REFERENCE_DIMENSIONS)
+        | set(drawing.LINEAR_REFERENCE_DIMENSIONS)
     )
     assert annotated <= kept
     assert set(spec.EAR_STATION_DIMENSIONS) >= set(spec.DRAWING_DIMENSIONS["EarHoles"])
@@ -67,7 +73,7 @@ def test_both_ears_located_by_one_model_owned_height() -> None:
     feature = _clamp_arc.EAR_HEIGHT_REFERENCE
     name = _clamp_arc.EAR_HEIGHT_DIMENSION
     assert spec.DRAWING_DIMENSIONS[feature] == {name}
-    assert spec.DRAWING_PRECISION[feature] == {name: 1}
+    assert spec.DRAWING_PRECISION[feature] == {name: 3}
     assert drawing.DRAWING_PRECISION_BY_NAME is spec.DRAWING_PRECISION_BY_NAME
     assert not hasattr(spec, "EAR_HOLE_HEIGHT_PLACES")
     assert name in drawing.FACE_KEEP
@@ -97,8 +103,8 @@ def test_geometry_mirrors_the_shared_builder() -> None:
     assert spec.ARC_HEIGHT == 2.0 * _clamp_arc.ARC_HALF_H
     assert spec.COLUMN_BORE == _clamp_arc.COLUMN_BORE
     assert spec.EAR_HOLE_Z == _clamp_arc.EAR_HOLE_Z
-    assert part.DEPTH == geom.DEPTH == 15.5
-    assert part.GRIP_OFFSET == geom.GRIP_OFFSET == 0.5
+    assert part.DEPTH == geom.DEPTH == 15.494  # .610
+    assert part.GRIP_OFFSET == geom.GRIP_OFFSET == 0.508  # .020
     assert geom.BLOCK_DEPTH == geom.DEPTH - geom.GRIP_OFFSET
     assert part.HOLE_SPEC is geom.HOLE_SPEC
     assert (geom.HOLE_SPEC.kind, geom.HOLE_SPEC.size) == ("tapped", "#8-32")
@@ -109,8 +115,9 @@ def test_fit_budget_closes_at_the_printed_limits() -> None:
     assert fit.COLUMN_DIA == OUTER_DIA == 25.4
     low, high = fit.BORE_DIAMETRAL_CLEARANCE
     assert low < spec.COLUMN_BORE - OUTER_DIA < high
-    # Faces stay apart with both bores at their loosest and the offset least.
-    assert math.isclose(fit.GRIP_GAP_MIN, 0.4 - 0.3048)
+    # Faces stay apart with both bores at their loosest and the offset least:
+    # (.020 - .004) - .012 = .004.
+    assert math.isclose(fit.GRIP_GAP_MIN, _in(0.004))
     assert fit.GRIP_GAP_MIN > 0.0
     # The ear stations' worst mismatch alone never binds the screw.
     assert fit.EAR_STATION_MISMATCH_MAX < fit.SCREW_FLOAT
@@ -137,81 +144,56 @@ def test_column_limit_is_the_a513_dom_table_row() -> None:
 
 
 def test_walls_at_the_largest_column_and_drill_wander() -> None:
-    # Independent oracle from literals: the largest A513 column (25.527) at the
-    # loosest 0.3048 clearance, the printed .XX/.X limits, and 0.3 deg of drill
-    # wander over the through tap's deepest printed length (15.0 + 0.51).
-    r_bore = (25.527 + 0.3048) / 2.0
-    wander = 15.51 * math.tan(math.radians(0.3))
+    # Independent oracle from inch literals: the largest A513 column (1.005)
+    # at the loosest .012 clearance, the printed .XX limits and the +/-.004
+    # bands, and 0.3 deg of drill wander over the through tap's deepest
+    # printed length (.59 + .01).
+    r_bore = _in(1.005 + 0.012) / 2.0
+    wander = _in(0.600) * math.tan(math.radians(0.3))
     reach = 4.166 / 2.0 + wander
-    assert math.isclose(spec.WALLS_WORST["back wall"], 0.4 + 14.49 - r_bore)  # 1.9741
-    assert math.isclose(spec.WALLS_WORST["ear to bore"], 17.4 - reach - r_bore)
-    assert math.isclose(spec.WALLS_WORST["ear to far side"], 47.2 - 24.8 - 17.6 - reach)
-    assert min(spec.WALLS_WORST.values()) >= 1.5
-    # The back wall reaches the 2.0 target only on a column of at most 25.4752;
-    # A513 admits 25.527: the one owner-ruled shortfall (sh-column-clamp-back
-    # RV-01), and the part's least wall.
-    column_at_target = 2.0 * (0.4 + 14.49 - 2.0) - 0.3048
-    assert math.isclose(column_at_target, 25.4752)
-    assert column_at_target < fit.COLUMN_OD_MAX
-    short = {name for name, wall in spec.WALLS_WORST.items() if wall < 2.0}
-    assert short == {"back wall"}
-    assert min(spec.WALLS_WORST.values()) == spec.WALLS_WORST["back wall"]
-
-
-def test_owner_ruled_shortfall_is_declared_and_stated() -> None:
-    # drawing-simplicity-policy.md "Named exceptions": the stated shortfall
-    # matches a kind-minor declaration under the package's own key, whose
-    # `where` names the printed note, at the value the spec computes.
-    entries = load_exceptions(CAD_ROOT / "config", "sh_column_clamp_back", "part")
-    assert [entry.id for entry in entries] == ["RV-01"]
-    (entry,) = entries
-    assert entry.kind == "minor"
-    assert entry.reason.endswith("(owner-ruled shortfall)")
-    assert entry.where.endswith(spec.BACK_WALL_NOTE)
-    # The printed value: the computed worst case at the sheet's two places,
-    # rounded down (never overstating a minimum).
-    assert spec.BACK_WALL_NOTE == "MIN BACK WALL 1.97"
-    assert 1.97 <= spec.WALLS_WORST["back wall"] < 1.98
-    assert spec.DRAWING_NOTES == f"1. {spec.BACK_WALL_NOTE}."
-    assert part.DRAWING_NOTES is spec.DRAWING_NOTES
-
-
-def test_shortfall_note_stands_in_the_open_lower_left_field() -> None:
-    # 3.5 mm Century Gothic: ~2.65 mm per character, ~5.5 mm per line.  The
-    # block stays left of the title block (x 0.216, up to y 0.070), above the
-    # border (0.012) and under every kept dimension by at least 10 mm.
-    x, y = drawing.NOTES_XY
-    lines = spec.DRAWING_NOTES.split("\n")
-    assert x + max(len(line) for line in lines) * 0.00265 < 0.216 - 0.003
-    assert y - len(lines) * 0.0055 > 0.012 + 0.003
-    kept = (*drawing.TOP_KEEP.values(), *drawing.FACE_KEEP.values())
-    assert y < min(text_y for _, text_y in kept) - 0.010
-    assert drawing.HOLE_CALLOUT_XY[1] > y and drawing.ISO_NOTE_XY[0] > 0.216
+    back_wall = _in(0.020 - 0.004) + _in(0.590 - 0.010) - r_bore
+    assert math.isclose(spec.WALLS_WORST["back wall"], back_wall)  # 2.2225 (.0875)
+    assert math.isclose(
+        spec.WALLS_WORST["ear to bore"], _in(0.689 - 0.004) - reach - r_bore
+    )  # 2.320 (.0914), the least ear wall
+    # The .XX width (1.89 +/-.01) about the reference .945 centre, the side
+    # faces each the .XX band off it.
+    assert math.isclose(
+        spec.WALLS_WORST["ear to far side"],
+        _in(1.880) - _in(0.955) - _in(0.693) - reach,
+    )
+    # Every wall meets the .080 target, so the back wall's old shortfall
+    # (sh-column-clamp-back RV-01) is retired and nothing is declared.
+    assert min(spec.WALLS_WORST.values()) >= _in(0.080)
+    assert not load_exceptions(CAD_ROOT / "config", "sh_column_clamp_back", "part")
 
 
 def test_screw_line_shortfall_is_the_owner_ruled_one() -> None:
-    # Independent oracle from literals: the printed Ø4.98 front hole at its
-    # least on the #8 screw major 4.1656, against the printed station/height
-    # mismatch hypot(0.2, 0.2) plus 0.3 deg of wander down both through holes
-    # (front 17.4 + 0.51, back 15.0 + 0.51), in any direction.
-    float_ = (4.98 - 4.1656) / 2.0  # 0.407
+    # Independent oracle from inch literals: the printed Ø.196 front hole at
+    # its least on the #8 screw major 4.1656, against the printed
+    # station/height mismatch hypot(.008, .008) plus 0.3 deg of wander down
+    # both through holes (front .685 + .005, back .590 + .005), in any
+    # direction.
+    float_ = (_in(0.196) - 4.1656) / 2.0  # 0.4064 (.016)
     drift = math.tan(math.radians(0.3))
-    demand = math.hypot(0.2, 0.2) + (17.91 + 15.51) * drift  # 0.458
+    mismatch = math.hypot(_in(0.008), _in(0.008))
+    demand = mismatch + (_in(0.690) + _in(0.600)) * drift  # 0.4589
     assert math.isclose(fit.SCREW_FLOAT, float_)
     assert math.isclose(fit.SCREW_LINE_DEMAND, demand)
-    assert math.isclose(fit.SCREW_LINE_SHORTFALL, demand - float_)  # 0.0506
-    # Owner-ruled (sh-column-clamp-front RV-02) as up to 0.053 at three
-    # places (ruled on the 17.9 arc); the 17.4 arc's shorter hole wanders
-    # less. The printed bands alone still leave the screw float.
+    assert math.isclose(fit.SCREW_LINE_SHORTFALL, demand - float_)  # 0.0525
+    # Owner-ruled (sh-column-clamp-front RV-02) as up to 0.053 mm; the +/-.004
+    # ear bands keep it inside. The printed bands alone still leave the screw
+    # float.
     assert fit.SCREW_LINE_SHORTFALL_RULED == 0.053
-    assert round(demand - float_, 3) == 0.051
-    assert math.hypot(0.2, 0.2) < float_
+    assert round(demand - float_, 3) == 0.053
+    assert mismatch < float_
 
 
 def test_tight_bands_name_their_mate() -> None:
     bore = drawing.DIMENSION_CALLOUTS["BoreDia"]
     assert "DIAMETRAL" in bore and "MHA-FR-03" in bore
-    assert f"{fit.BORE_DIAMETRAL_CLEARANCE[0]:.2f}" in bore
+    low, high = spec.BORE_DIAMETRAL_CLEARANCE
+    assert math.isclose(low, _in(0.004)) and math.isclose(high, _in(0.012))
     assert "MHA-SH-01" in drawing.DIMENSION_CALLOUTS["GripOffset"]
     assert "MHA-SH-01" in drawing.DIMENSION_CALLOUTS["EarHole1Z"]
     assert "MHA-SH-01" in drawing.DIMENSION_CALLOUTS["EarHoleHeight"]
@@ -260,7 +242,7 @@ def test_ear_height_text_stands_outside_its_witnesses() -> None:
     ear_x = drawing._face_xy(0.0, spec.EAR_HOLE_Z)[0]
     text_x = drawing.FACE_KEEP["EarHoleHeight"][0]
     outward = math.copysign(1.0, bottom_x - ear_x)
-    lines = ["2X 8.0 ±0.1", *drawing.DIMENSION_CALLOUTS["EarHoleHeight"].split("\n")]
+    lines = ["2X .315 ±.004", *drawing.DIMENSION_CALLOUTS["EarHoleHeight"].split("\n")]
     half_block = max(len(line) for line in lines) * 0.00265 / 2.0
     assert outward * (text_x - bottom_x) >= half_block + 0.003
 

@@ -116,7 +116,7 @@ MATERIAL = "Plain Carbon Steel"
 BAR_LENGTH = 452.0  # ends at x +-226, ~29 past each Ø25.4 column (ch30 p002)
 
 COLUMN_X = 197.0  # frame column line (frame assembly)
-CLAMP_SCREW_DX = 17.5  # clamp screws flank each column
+CLAMP_SCREW_DX = 17.5006  # clamp screws flank each column (.689 clamp ear stations)
 # The stock 90280A201 #8-32 clamp screws pass through #8 clearance holes.
 # Their 3.9624-mm heads sit below the bar front: the right-shifted platen
 # travels across the east clamp line, so proud heads would block its slide.
