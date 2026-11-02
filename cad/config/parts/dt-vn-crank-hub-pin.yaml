@@ -5,7 +5,7 @@ dt-vn-crank-hub-pin:
   supplier_skus: [98381A487]
   material: Alloy Steel
   material_specification: "Alloy steel dowel pin, 5/32 x 1/2, Round x Chamfer ends; McMaster-Carr 98381A487"
-  finish: cut end faced, deburred, oiled
+  finish: cut end faced, oiled
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance
