@@ -262,9 +262,12 @@ def _dress_shoulder_radius(
     stop its leader at the corner and lay it out for the arc it landed on.
 
     Read back: radial (not a diameter), measuring SHOULDER_FILLET_R, the
-    native swTolMAX the part set. ``ArcExtensionLineOrOppositeSide`` False
-    keeps the leader from running on through the arc centre
-    (draw_pn_pen_rod._dress_shoulder_radius). SIDE_KEEP lays the text out for
+    native swTolMAX the part set. The text stands outside the arc's own
+    quadrant (the corner's material fills that ray), so
+    ``ArcExtensionLineOrOppositeSide`` True carries the leader on to the
+    drawn arc instead of stopping on its undrawn circle in empty paper (the
+    19efce6a4 sheet's finding); the arc centre it passes stands in open paper
+    off the shank and the head's face. SIDE_KEEP lays the text out for
     the lower arc; on the upper one UPPER_ARC_KEEP moves it and PlainDia, and
     the rebuilt arrow must still land on that corner.
     """
@@ -282,9 +285,9 @@ def _dress_shoulder_radius(
         float(dimension.SystemValue), SHOULDER_FILLET_R / 1000.0, abs_tol=1e-9
     ):
         raise RuntimeError("ShoulderRadius does not measure the shoulder fillet")
-    display.ArcExtensionLineOrOppositeSide = False
-    if display.ArcExtensionLineOrOppositeSide is not False:
-        raise RuntimeError("ShoulderRadius leader still runs to the opposite side")
+    display.ArcExtensionLineOrOppositeSide = True
+    if display.ArcExtensionLineOrOppositeSide is not True:
+        raise RuntimeError("ShoulderRadius leader does not reach the drawn arc")
     drawing_model.EditRebuild3()
     corners = {
         "upper": spt(SHOULDER_X, AXIS_Y + THREAD_HALF),
