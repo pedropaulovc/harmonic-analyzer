@@ -98,7 +98,7 @@ def test_mha024_ream_ligaments_meet_rule_12_at_the_printed_bands() -> None:
     assert geometry.SERVICE_PIN_SHOULDER_LIGAMENT_WORST_MM == pytest.approx(
         2.121, abs=1e-3
     )
-    assert geometry.SERVICE_PIN_REAR_LIGAMENT_WORST_MM == pytest.approx(3.321, abs=1e-3)
+    assert geometry.SERVICE_PIN_REAR_LIGAMENT_WORST_MM == pytest.approx(2.451, abs=1e-3)
     assert geometry.SERVICE_PIN_BARREL_WALL_WORST_MM == pytest.approx(7.901, abs=1e-3)
 
 
@@ -114,12 +114,14 @@ def test_rear_relief_clears_the_t12_chain_plates_and_keeps_its_wall() -> None:
     )
     # Title-block .XX on the clearance diameter (R9-37: 0.23 to a real #25
     # plate on the floated T12, 0.08 at .X; test_transgear_removable_seat
-    # judges that corner); the length carries the functional ±0.05 that holds
-    # the chain's floated axial air exactly at its floor, and the overall that
-    # places the rear face it is printed from carries ±0.10.
+    # judges that corner).  The length's short side carries the functional
+    # -0.05 that holds the chain's floated axial air exactly at its floor, and
+    # the overall that places the rear face it is printed from carries +0.10
+    # on its long side; each other side is the title block's (machinist review
+    # of main 31cea0b73, owner ruling 2026-10-31).
     assert geometry.RELIEF_DIA_MAX == pytest.approx(17.01)
-    assert geometry.RELIEF_LENGTH_TOL == 0.05
-    assert geometry.HUB_LENGTH_TOL == 0.10
+    assert geometry.RELIEF_LENGTH_BAND == (geometry.GENERAL_2PL_TOL_MM, -0.05)
+    assert geometry.HUB_LENGTH_BAND == (0.10, -geometry.GENERAL_2PL_TOL_MM)
     assert dt_crank_hub_spec.DRAWING_PRECISION["HubProfile"]["ReliefLength"] == 2
     assert dt_crank_hub_spec.DRAWING_PRECISION["HubProfile"]["HubLength"] == 2
     assert dt_crank_hub_spec.DRAWING_PRECISION["HubProfile"]["ReliefDia"] == 2
@@ -133,11 +135,11 @@ def test_rear_relief_clears_the_t12_chain_plates_and_keeps_its_wall() -> None:
     )
 
 
-def test_hub_overall_band_is_loosened_to_what_the_rear_face_stacks_hold() -> None:
-    # Machinist review of 19e33c6c2: 25.20 +/-0.05 was tighter than the rear
-    # face needs.  At +/-0.10 the drive-pin tips keep air to it and the wheel
-    # floated onto it stays on its pins; the title block's .XX +/-0.51 would
-    # stand the hub on the pin tips.
+def test_hub_overall_band_is_one_sided_to_what_the_rear_face_stacks_hold() -> None:
+    # Machinist reviews of 19e33c6c2 and main 31cea0b73: only the long side
+    # is functional.  At +0.10 the drive-pin tips keep air to the rear face;
+    # at the title block's -0.51 the wheel floated onto it stays on its pins.
+    # The title block's +0.51 would stand the hub on the pin tips.
     kwargs = dict(
         seat_face=dt_crankshaft_spec.SEAT_COLLAR,
         seat_face_band=dt_crankshaft_spec.SEAT_COLLAR_BAND,
@@ -147,16 +149,16 @@ def test_hub_overall_band_is_loosened_to_what_the_rear_face_stacks_hold() -> Non
     )
     air, engagement = dt_crankshaft_spec.drive_pin_front_clearances(
         dt_crankshaft_spec.DRIVE_PIN_PROUD_RANGE,
-        hub_rear_tol=geometry.HUB_LENGTH_TOL,
+        hub_rear_band=geometry.HUB_LENGTH_BAND,
         **kwargs,
     )
-    assert geometry.HUB_LENGTH_TOL == 0.10
+    assert geometry.HUB_LENGTH_BAND[0] == 0.10
     assert air == pytest.approx(0.146, abs=1e-9)
-    assert engagement == pytest.approx(1.046, abs=1e-9)
+    assert engagement == pytest.approx(0.636, abs=1e-9)
     with pytest.raises(AssertionError, match="hub's rear face"):
         dt_crankshaft_spec.drive_pin_front_clearances(
             dt_crankshaft_spec.DRIVE_PIN_PROUD_RANGE,
-            hub_rear_tol=geometry.GENERAL_2PL_TOL_MM,
+            hub_rear_band=(geometry.GENERAL_2PL_TOL_MM, -geometry.GENERAL_2PL_TOL_MM),
             **kwargs,
         )
 
@@ -255,31 +257,42 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     assert not hasattr(dt_crank_hub_spec, "DRAWING_NOTES")
     seat = dt_crank_hub_notes.SEAT_CALLOUT
     # B1 (Main 2026-09-25): turned to suit the MHA-DT-06 bore, with the press
-    # interference printed from the notes constant.
+    # interference printed from the notes constant; the bore is named as the
+    # arm's, and the seat end's acceptance is flush with the arm's front.
     low, high = dt_crank_hub_notes.SEAT_PRESS_INTERFERENCE
-    assert seat.splitlines() == [
-        "TURN TO SUIT MHA-DT-06 BORE",
-        f"FOR LIGHT PRESS: {low:.3f}-{high:.3f}",
-        "DIAMETRAL INTERFERENCE;",
-        "FACES FLUSH",
-    ]
+    assert len(seat.splitlines()) == 4
+    assert "BORE OF CRANK ARM MHA-DT-06" in _flat(seat)
+    assert f"{low:.3f}-{high:.3f} DIAMETRAL INTERFERENCE" in _flat(seat)
+    assert seat.splitlines()[-1] == "END FLUSH WITH CRANK ARM FRONT"
     assert "MATCH-FIT" not in seat
     # The arm bore is made first; the hub seat is turned to suit it, so its
     # nominal prints as a reference.
     assert dt_crank_hub_spec.REFERENCE_DIMENSIONS == {"SeatDia"}
     seam = dt_crank_hub_notes.SEAM_CALLOUT
-    assert "MHA-DT-06" in seam and "MHA-DT-VN-59" in seam and "LIGHT DRIVE FIT" in seam
+    assert "MHA-DT-06" in seam and "SEAM PIN MHA-DT-VN-59" in _flat(seam)
+    assert "LIGHT DRIVE FIT" in seam and len(seam.splitlines()) == 4
     assert "AT ASSEMBLY" in seam and "SEAM" in seam
     # Size first, then the process, in the order the work is done.
-    assert seam.splitlines()[0] == "(<MOD-DIAM>4.0) <HOLE-DEPTH> 4.0"
+    assert seam.splitlines()[0].startswith("(<MOD-DIAM>4.0) <HOLE-DEPTH> 4.0")
     assert "O'CLOCK" not in seam
+    # The blind pin makes hub and arm a permanent pair, taken apart at the
+    # taper pin (owner rulings 2026-11-01).
+    assert "PERMANENT PAIR" in _flat(seam)
+    assert "MHA-DT-09" in seam.splitlines()[-1]
+    # The seat length is the arm's, a fit-up reference whose callout names
+    # the arm (owner ruling 2026-11-01 on the r9 review).
+    assert drawing.REFERENCE_LENGTHS == ("SeatLength",)
+    assert drawing.DIMENSION_CALLOUTS["SeatLength"] == dt_crank_hub_notes.SEAT_LENGTH_CALLOUT
+    assert "CRANK ARM" in _flat(dt_crank_hub_notes.SEAT_LENGTH_CALLOUT)
     # The taper-pin cross-hole names both mates and the fit on its callout,
     # after the front face is set flush with the datum it is reamed at.
     cross_hole = dt_crank_hub_notes.CROSS_HOLE_CALLOUT
     assert "MHA-DT-09" in cross_hole and "MHA-DT-11" in cross_hole
     assert "LIGHT DRIVE FIT" in cross_hole
-    flush = cross_hole.index("FRONT FACE FLUSH")
-    assert flush < cross_hole.index("TAPER-REAM")
+    flush = cross_hole.index("CRANK-ARM END FLUSH")
+    assert flush < cross_hole.index("TAPER-REAM") and "AT ASSEMBLY" in cross_hole
+    # The pin-proud MIN names the ream it limits.
+    assert "TAPER-REAM" in dt_crank_hub_notes.PIN_PROUD_CALLOUT
     # The bore band governs; the clearance is a reference restatement.
     assert dt_crank_hub_notes.BORE_CALLOUT.splitlines()[1].startswith("(")
 
@@ -351,21 +364,24 @@ def test_side_view_lies_as_in_the_lathe_with_one_outboard_baseline() -> None:
     assert drawing.END_CENTER[0] > drawing.OUTBOARD_X  # third-angle right view
     assert drawing.END_CENTER[1] == drawing.SIDE_CENTER[1]
     # Seat from the faced end, the pin station from the shoulder (drawing-guidelines.md rule 11 (turned parts read like the lathe)
-    # ), the relief from the rear face on one row; the toleranced overall,
-    # front face to rear face, on the row below.  No chained barrel length.
+    # ), the relief from the rear face below the profile; the toleranced
+    # overall, front face to rear face, on the row below.  No chained barrel
+    # length.  The seat and station row stands above the relief's, clear of
+    # the overall's stacked band (farm run 20261031T205208603Z).
     seat_row = drawing.SIDE_KEEP["SeatLength"][1]
     assert drawing.SIDE_KEEP["ServicePinFromShoulder"][1] == seat_row
-    assert drawing.SIDE_KEEP["ReliefLength"][1] == seat_row
+    relief_row = drawing.SIDE_KEEP["ReliefLength"][1]
     overall_row = drawing.SIDE_KEEP["HubLength"][1]
-    assert seat_row < drawing.BARREL_BOTTOM and seat_row - overall_row >= 0.010
+    assert seat_row < drawing.BARREL_BOTTOM and seat_row - overall_row >= 0.016
+    assert seat_row > relief_row and relief_row - overall_row >= 0.010
     assert "BarrelLength" not in drawing.SIDE_KEEP
     printed = {
         name for names in dt_crank_hub_spec.DRAWING_DIMENSIONS.values() for name in names
     }
     assert "BarrelLength" not in printed and "HubLength" in printed
     assert drawing.SHOULDER_X > drawing.SERVICE_PIN_CENTER[0] > drawing.RELIEF_X
-    # The relief's toleranced length and the pin station share the seat row
-    # without their text meeting (~2.5 mm per character).
+    # The relief's toleranced length and the pin station sit 6 mm apart in
+    # height, so their text must not meet across (~2.5 mm per character).
     relief_right = drawing.SIDE_KEEP["ReliefLength"][0] + len("3.60±0.05") * 0.00125
     pin_left = drawing.SIDE_KEEP["ServicePinFromShoulder"][0] - len("5.60") * 0.00125
     assert relief_right < pin_left
@@ -386,9 +402,11 @@ def test_callouts_stand_clear_of_views_and_each_other() -> None:
     def half(text: str) -> float:
         return max(len(line) for line in text.splitlines()) * char_w / 2.0
 
+    # The seat Ø's text stands outside its arrows, so its block starts at its
+    # dimension line and runs right (farm run 20261101T081735465Z: 245..329
+    # mm, the line at 245.2).
     seat_x, seat_y = drawing.SIDE_KEEP["SeatDia"]
-    seat_half = half(dt_crank_hub_notes.SEAT_CALLOUT)
-    seat_block = (seat_x - seat_half, seat_x + seat_half)
+    seat_block = (seat_x, seat_x + 2.0 * half(dt_crank_hub_notes.SEAT_CALLOUT))
     hole_x, hole_y = drawing.HOLE_CALLOUT_XY
     hole_text = f"{dt_crank_hub_notes.CROSS_HOLE_CALLOUT}\n#14 DRILL 0 4.62 THRU ALL"
     hole_block = (hole_x - half(hole_text), hole_x + half(hole_text))
@@ -406,6 +424,15 @@ def test_callouts_stand_clear_of_views_and_each_other() -> None:
     # clear of the six-o'clock seam and its callout.
     assert bore_x - half(dt_crank_hub_notes.BORE_CALLOUT) > end_right
     assert bore_y < drawing.END_CENTER[1]
+    # The fit-up seat length prints right of the outboard end with its
+    # callout, short of the end view.
+    seat_len_x, _ = drawing.SIDE_KEEP["SeatLength"]
+    seat_len_half = half(dt_crank_hub_notes.SEAT_LENGTH_CALLOUT)
+    assert drawing.OUTBOARD_X < seat_len_x - seat_len_half
+    assert seat_len_x + seat_len_half < end_left
+    # Its value stands clear of the seat diameter's dimension line above.
+    value_half = len("(8.0)") * char_w / 2.0
+    assert seat_len_x - value_half - drawing.SIDE_KEEP["SeatDia"][0] > 0.002
     assert seat_block[1] < drawing.ISO_NOTE_XY[0] and end_left > drawing.OUTBOARD_X
     # Both turned diameters stand left of the inboard end, the relief's nearer,
     # their values side by side on the axis without touching.
@@ -519,3 +546,60 @@ def test_service_pin_station_reference_is_saved_hidden_and_imported_per_view() -
     assert "from _drawing_hidden_sketches import curate_view_dimensions" in source
     assert "    curate_view_dimensions,\n" not in source.replace("\r\n", "\n")
     assert "ServicePinStationReference" in dt_crank_hub_spec.DRAWING_DIMENSIONS
+
+
+def test_pin_proud_min_lands_on_the_phantom_big_end() -> None:
+    # r5 review (run 20261101T004958072Z): the 4.45 MIN's outer extension line
+    # ended in air. The reference sketch draws MHA-DT-09's proud big end as
+    # construction (phantom on the sheet) round the line's outer end: its face
+    # centred on the line's end, stubs back to the barrel's outline.
+    import dt_crank_pin_spec
+    from dt_crank_pin_ring_spec import PIN_PROUD
+
+    build = Path(drawing.__file__).with_name("build_dt_crank_hub.py").read_text(encoding="utf-8")
+    sketch = build[
+        build.index("async def _pin_proud_reference") : build.index('name_last_feature(adapter, "PinProudReference")')
+    ]
+    assert 'await adapter.add_line(-BARREL_R, 0.0, tip, 0.0)' in sketch
+    assert "(tip, PIN_BIG_END_R),\n                (tip, -PIN_BIG_END_R)," in sketch.replace("\r\n", "\n")
+    assert 'add_sketch_constraint(f"{line}.end", face, "midpoint")' in sketch
+    assert "segment.ConstructionGeometry = True" in sketch
+    assert '["PinProud", "PinProudBarrel", "PinBigEnd", "PinBigEndStub"]' in build
+    # Only the MIN prints; the outline's own dimensions stay unmarked.
+    assert dt_crank_hub_spec.DRAWING_DIMENSIONS["PinProudReference"] == {"PinProud"}
+    # The stubs leave the barrel's outline, and the face stands clear of it.
+    barrel_r = geometry.HUB_BARREL_DIA / 2.0
+    big_end_r = dt_crank_pin_spec.BIG_END_DIA / 2.0
+    stub_x = (barrel_r**2 - big_end_r**2) ** 0.5
+    assert barrel_r - 0.5 < stub_x < barrel_r
+    assert stub_x < barrel_r + PIN_PROUD
+    assert "PIN_STUB_X = math.sqrt(BARREL_R**2 - PIN_BIG_END_R**2)" in build
+
+
+def test_pin_proud_callout_names_the_pin_big_end_and_ring() -> None:
+    # r7 review (run 20261101T022045634Z): the dashed box and the ring were
+    # unnamed; rule 4 wants the mate's name with its number.  No line type is
+    # named: the outline prints in the view's dashed style, which the review
+    # of farm run 20261101T130334243Z read against "(PHANTOM)".
+    text = " ".join(dt_crank_hub_notes.PIN_PROUD_CALLOUT.split())
+    for part in ("MHA-DT-09 TAPER PIN BIG END", "KEEPER RING MHA-DT-27"):
+        assert part in text
+    assert "PHANTOM" not in text
+    lines = dt_crank_hub_notes.PIN_PROUD_CALLOUT.splitlines()
+    assert len(lines) == 4 and max(map(len, lines)) <= 29
+    # The widest line (2.5 mm a glyph) starts right of the phantom big end.
+    big_end_right = drawing.END_CENTER[0] + (geometry.HUB_BARREL_DIA / 2.0 + 4.45) * drawing._S
+    left = drawing.END_KEEP["PinProud"][0] - max(map(len, lines)) * 0.0025 / 2.0
+    assert left - big_end_right >= 0.00178
+
+
+def test_cross_hole_station_prints_its_origin_at_the_shoulder() -> None:
+    # r7 review: 5.60 read as chained from 8.0; the origin circle marks the
+    # arm shoulder it is measured from.
+    assert drawing.ORIGIN_DIMENSIONS == {"ServicePinFromShoulder": drawing.SHOULDER_X}
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = source[source.index("async def build") :]
+    assert body.index("set_reference_dimensions(adapter, annotations") < body.index(
+        "_set_dimension_origin("
+    )
+    assert "display.SetArrowHeadStyle2(False, *attempt)" in source

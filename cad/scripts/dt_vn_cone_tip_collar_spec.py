@@ -25,7 +25,6 @@ import _config
 
 from _hole_spec import HoleSpec, TAP_DRILL_MM
 from _printed_tolerance import printed_band_mm
-from cone_stack_end_play import COLLAR_FEELER
 from cone_shaft_land_bands import (
     RUNNING_DIA_BAND,
     TERMINAL_DIA_MM,
@@ -138,8 +137,10 @@ SET_SCREW_END_RADIUS = SET_SCREW_SEAT_RADIUS + SET_SCREW_LENGTH
 TAP_DRILL_DIA = TAP_DRILL_MM[SET_SCREW_THREAD]
 SET_SCREW_HOLE = HoleSpec("tapped", SET_SCREW_THREAD)
 # Internal 2B has no standard root MAX. This is an explicit manufacturing
-# limit, authored as a native MAX gauge diameter and printed beside the tap.
-# Book its rounded PRINTED maximum, not an invented ASME major maximum.
+# limit, authored as a native MAX gauge diameter and printed beside the tap,
+# so the envelope the wall budget books (WORST_WALLS_MM) is one the sheet
+# enforces (Codjiflo review of #2101; the machinist review that asked to
+# drop it is waived on this sheet).  Book its rounded PRINTED maximum.
 THREAD_ENVELOPE_DIA = math.ceil((
     0.0772 * IN + 0.64951905 * SET_SCREW_PITCH + 0.10
 ) * 100.0) / 100.0
@@ -292,13 +293,13 @@ if SCREW_LANDING_MARGIN_MM <= 0.0:
 if WORST_SOCKET_ACCESS_MM <= 0.0:
     raise AssertionError("stock screw socket is buried below the mounting flat")
 
-DRAWING_NOTES = "3/4 STEEL BAR STOCK OK."
-# The leaf is the end-play setting (cone_stack_end_play), named on this sheet
-# so the fitter need not look it up (machinist review of the stack build).
-# The bore's journal and the clearance its band gives on it are named too
-# (machinist review of the round-2 build): the land's finished limits are the
-# shaft drawing's, and the clearance is the authoritative float pair
-# (cone_shaft_land_bands.TIP_COLLAR_MIN/MAX_RADIAL_FLOAT_MM) on diameter.
+# Supply size only: the turned Ø17.48 body is the dimensioned OD.
+DRAWING_NOTES = "SUPPLY 3/4 ROUND BAR."
+# INSTALLATION_NOTES is the bore's fit statement, printed in its REAM callout
+# (rule 4: a tight band names its mate at its callout), not as a sheet note:
+# the land's finished limits are the shaft drawing's, and the clearance is the
+# authoritative float pair (cone_shaft_land_bands.TIP_COLLAR_MIN/MAX_RADIAL_FLOAT_MM)
+# on diameter. Setting the collar is MHA-DT-00 step 3 (draw_dt_drive_train_assembly).
 JOURNAL_PART_NUMBER = str(_config.parts("dt-cone-gear-shaft")["number"])
 JOURNAL_CLEARANCE_MM = (
     BORE_FINISHED_DIA_LIMITS_MM[0] - TERMINAL_FINISHED_DIA_LIMITS_MM[1],
@@ -312,15 +313,20 @@ INSTALLATION_NOTES = "\n".join((
     f"FITS {JOURNAL_PART_NUMBER} TERMINAL JOURNAL \u00d8"
     f"{TERMINAL_FINISHED_DIA_LIMITS_MM[0]:.3f} TO {TERMINAL_FINISHED_DIA_LIMITS_MM[1]:.3f};",
     f"DIAMETRAL CLEARANCE {JOURNAL_CLEARANCE_MM[0]:.3f} TO {JOURNAL_CLEARANCE_MM[1]:.3f}.",
-    f"SET WITH A {COLLAR_FEELER:.2f} FEELER OFF T006 THRUST FACE.",
-    "SEAT BOTH ENDS ON JOURNAL ROUND BACK ARC.",
-    f"SNUG {SET_SCREW_SKU} SET SCREW ON D-FLAT, THEN REMOVE LEAF.",
-    "DO NOT SWING OR RUN WITH COLLAR LOOSE.",
 ))
+BORE_CALLOUT = f"REAM THRU\n{INSTALLATION_NOTES}"
+# The .XXX width, nose length and tap station hold the tapped hole's walls to
+# the shoulder and the north face (WORST_WALLS_MM; at .XX they fall below the
+# wall floor). Each callout states that function, without numbers (rules 3, 4).
+AXIAL_FUNCTION_CALLOUTS = {
+    "NoseLength": "SHOULDER CLEAR OF TAP",
+    "CollarWidth": "FACE CLEAR OF TAP",
+    "TapStation": "TAP CLEAR OF FACES",
+}
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 RADIAL_TAP_VIEW_SCALE = (2, 1)
 BORE_VIEW_SCALE = (40, 1)
-BORE_VIEW_NOTE = f"BORE VIEW SCALE {BORE_VIEW_SCALE[0]}:{BORE_VIEW_SCALE[1]}"
+BORE_VIEW_NOTE = f"END VIEW BORE SCALE {BORE_VIEW_SCALE[0]}:{BORE_VIEW_SCALE[1]}"
 RADIAL_TAP_VIEW_NOTE = (
     f"RADIAL TAP VIEW SCALE {RADIAL_TAP_VIEW_SCALE[0]}:{RADIAL_TAP_VIEW_SCALE[1]}"
 )

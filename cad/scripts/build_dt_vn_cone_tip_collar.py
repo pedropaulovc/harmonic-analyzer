@@ -163,8 +163,9 @@ async def _ring(adapter, jobs):
     )
     jobs.extend(hole.placement_drive_jobs)
     # A manufacturing limit, not a fictional physical root cut: 2B alone has
-    # no root MAX. This source-native gauge dimension controls the tap tool's
-    # permitted envelope and is projected as MAX TAP ROOT on the drawing.
+    # no root MAX. This source-native gauge dimension bounds the tap tool's
+    # envelope the wall budget books (WORST_WALLS_MM) and is projected as MAX
+    # TAP ROOT on the drawing.
     _plane(adapter, "TapRootPlane", spec.FLAT_DISTANCE, base="Right Plane")
     check("tap root gauge sketch", await adapter.create_sketch("TapRootPlane"))
     dims = SketchDims()
@@ -374,7 +375,6 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(adapter, PART_NAME, {
         "Description": spec.BOM_DESCRIPTION,
         "Manufacturing Notes": spec.DRAWING_NOTES,
-        "Installation Notes": spec.INSTALLATION_NOTES,
         "Isometric View Note": spec.ISOMETRIC_VIEW_NOTE,
         "Radial Tap View Note": spec.RADIAL_TAP_VIEW_NOTE,
         "Bore View Note": spec.BORE_VIEW_NOTE,

@@ -23,7 +23,7 @@ from _drawing_common import (
     read_required_properties, rebuild_drawing, stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import assert_imported_precision, move_model_dimension, set_dimension_callouts
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
@@ -45,7 +45,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 SHEET_SCALE = (4, 1)
-# Keep the custom-machined sheet's views, controls and five-note contract intact.
+# Keep the custom-machined sheet's views, controls and four-note contract intact.
 SHEET_NAMES = ("COLLAR", f"{spec.SET_SCREW_SKU}-STOCK")
 STOCK_SCALE = (12, 1)
 SHEET_SCALES = {SHEET_NAMES[0]: SHEET_SCALE, SHEET_NAMES[1]: STOCK_SCALE}
@@ -70,29 +70,64 @@ SIDE_CENTER = (0.205, 0.170)
 TAP_CENTER = (0.065, 0.238)
 TAP_SCALE = spec.RADIAL_TAP_VIEW_SCALE
 ISO_CENTER = (0.345, 0.210)
-END_KEEP = {"NoseDia": (0.027, 0.165), "FlatDistance": (0.080, 0.112)}
+# Third angle: the turning view (*Front) and this end view (*Bottom, looking
+# up the axis at the nose end) both take a quarter turn clockwise
+# (_quarter_turn), so model +X, the flat's side, faces sheet DOWN in both and
+# the end view projects on the left of the turning view, which shows the nose
+# end on its left (r4 review: unturned, the end view put the flat on its
+# right, facing the turning view's reader, while the turning view drew it at
+# the bottom). FlatDistance is then vertical, axis (y 170 mm) to flat (y 142):
+# its text right of the view (x <= 115), between the views. NoseDia is
+# imported here only as the donor that moves onto the turning view.
+END_KEEP = {"NoseDia": (0.027, 0.165), "FlatDistance": (0.125, 0.156)}
+# Rule 11 (r4 review): the nose diameter across the nose on the turning view,
+# its dimension line left of the nose's south face (x 182, y 157-183), clear
+# of FlatDistance's text and below NoseLength's. Its text prints ~5.5 mm right
+# of the keep: at x 0.165 it reached x 183.3 across NoseLength's south
+# extension line at x 182 (farm run 20261101T005319353Z).
+NOSE_DIA_ON_SIDE = (0.160, SIDE_CENTER[1])
 # CollarDia is a turned-profile sketch dimension, native to the side view.
+# Farm 20261031T205208603Z: the nose spans x 182-196 mm and the body x 196-228,
+# y 135-205; NoseLength's south extension line runs x 182, y 169-213.
+# ShoulderRadius reads up-right, above the body and left of CollarDia's
+# dimension line (x 250): its leader leaves the fillet (194, 183) through the
+# body top at x ~221, left of CollarDia's top extension line (x >= 228), and
+# passes NoseLength's text at x ~230. At (165, 198) it crossed NoseLength's
+# extension line; at (282, 205), CollarDia's dimension line (main's review).
+# The function lines of CollarWidth and NoseLength
+# (spec.AXIAL_FUNCTION_CALLOUTS): CollarWidth's below its value, into the
+# open field under the view; NoseLength's ABOVE its value, out of its
+# extension lines' reach, centred between them: at x 182 its 53.5 mm block
+# ([153.6, 207.1] mm) stood 5.7 mm from the tap callout ([94.4, 150.4] x
+# [226.2, 235.3] mm), under one text height.
 SIDE_KEEP = {"CollarWidth": (0.205, 0.110), "CollarDia": (0.250, SIDE_CENTER[1]),
-             "NoseLength": (0.182, 0.218), "ShoulderRadius": (0.282, 0.205)}
-# TapStation reads under the view (above the end view's top, y 204 mm). The
-# two-line TAP ROOT gauge reads level with the tap, left of the view; its
-# leader runs straight through the circle.
+             "NoseLength": (0.189, 0.218), "ShoulderRadius": (0.262, 0.232)}
+# TapStation reads right of the tap centre's extension line, under the hole
+# callout's leader and above the end view's top (y 205 mm at x 80 mm), so its
+# function line clears both extension lines and the left border.  The
+# two-line TAP ROOT gauge reads right of the view, above the hole callout:
+# left of the view (main's place) its leader crossed TapStation's extension
+# line off the nose face (run 20261101T183557651Z).  It bounds the envelope
+# the wall budget books (spec.THREAD_ENVELOPE_DIA).
 TAP_KEEP = {
-    "TapStation": (TAP_CENTER[0] - 0.021, TAP_CENTER[1] - 0.024),
-    "TapRootLimit": (TAP_CENTER[0] - 0.030, TAP_CENTER[1]),
+    "TapStation": (TAP_CENTER[0] + 0.040, TAP_CENTER[1] - 0.024),
+    "TapRootLimit": (TAP_CENTER[0] + 0.033, TAP_CENTER[1] + 0.012),
 }
 # Right of the view: the hole callout's text starting past the view's right
 # edge. The view note goes over the view, 3.7 mm inside the top border.
 TAP_CALLOUT_XY = (TAP_CENTER[0] + 0.0553, TAP_CENTER[1] - 0.0062)
 TAP_NOTE_XY = (TAP_CENTER[0] - 0.030, TAP_CENTER[1] + 0.025)
-# Between the turning view and the isometric, clear of the title block: at
-# (350, 80) mm the 40:1 crop circle (radius 20.6 mm) ran 6.6 mm down into it,
-# over the title text (run 16 at b760a440c). BoreDia reads up-right, clear
-# of CollarDia's lower extension line (y 136 mm, x <= 251); the note under
-# the circle, centred on it.
-BORE_CENTER = (0.300, 0.110)
-BORE_KEEP = {"BoreDia": (BORE_CENTER[0] + 0.035, BORE_CENTER[1] + 0.032)}
-BORE_NOTE_XY = (BORE_CENTER[0] - 0.025, BORE_CENTER[1] - 0.026)
+# Lower left, under the end view whose bore it enlarges, in the field the
+# assembly-procedure notes left: between the isometric and the title block
+# its REAM callout pressed against the isometric's label (main's review).
+# BoreDia's five-line block (value, REAM THRU, the two-line fit statement)
+# reads right of the circle, above the title block (y 64 mm) and below
+# CollarWidth's block; the note under the circle, centred on it.
+BORE_CENTER = (0.050, 0.074)
+BORE_KEEP = {"BoreDia": (0.150, 0.083)}
+BORE_NOTE_XY = (BORE_CENTER[0] - 0.031, BORE_CENTER[1] - 0.026)
+# The one stock line, under the bore view's label.
+NOTES_XY = (0.016, 0.030)
 # swAnnotationType_e
 _NOTE = 6
 # swAnnotationOwnerType: sheet-owned, not the sheet format's template ink
@@ -227,12 +262,32 @@ def _configuration(adapter, views, name):
     rebuild_drawing(adapter, label=f"collar {name} views")
 
 
-def _horizontal_axis(adapter, view):
+def _quarter_turn(adapter, view, label):
+    """Turn ``view`` a quarter clockwise, so model +X faces sheet down."""
     native = _early_bound(view, "IView")
     native.Angle = -math.pi / 2.0
     if abs(float(native.Angle) + math.pi / 2.0) > 1e-9:
-        raise RuntimeError("collar axis is not horizontal on the turning view")
-    rebuild_drawing(adapter, label="collar turning orientation")
+        raise RuntimeError(f"collar {label} did not keep its quarter turn")
+    rebuild_drawing(adapter, label=f"collar {label} orientation")
+
+
+def _nose_dia_onto_side(adapter, end_marks, end, side):
+    """Move the end view's one NoseDia onto the turning view (rule 11: the
+    nose Ø reads where its length does). Returns the end view's remaining
+    marks and the moved Ø."""
+    donors = [a for a in end_marks if dimension_name(adapter, a) == "NoseDia"]
+    if len(donors) != 1:
+        raise RuntimeError("expected one collar nose diameter donor dimension")
+    moved = move_model_dimension(adapter, donors[0], side, NOSE_DIA_ON_SIDE, source_view=end)
+    return [a for a in end_marks if a is not donors[0]], moved
+
+
+def _side_callouts():
+    """The turning view's function lines: (below their values, above them).
+    NoseLength's reads above: below it, 3.500's two extension lines ran up
+    through the function line (r4 review)."""
+    below = _function_callouts(SIDE_KEEP)
+    return below, {"NoseLength": below.pop("NoseLength")}
 
 
 def _precision(keep):
@@ -244,6 +299,15 @@ def _precision(keep):
 # Native tolerance types the part authors: MAX 6.
 TAP_DIMENSION_TYPES = {"TapRootLimit": 6}
 SIDE_DIMENSION_TYPES = {"ShoulderRadius": 6}
+
+
+def _function_callouts(keep):
+    """The .XXX lengths' function lines, for only the names this view keeps."""
+    return {
+        name: text
+        for name, text in spec.AXIAL_FUNCTION_CALLOUTS.items()
+        if name in keep
+    }
 
 
 def _assert_functional_dimension_types(adapter, annotations, expected):
@@ -323,7 +387,7 @@ def _bore_view(adapter):
         dimensions_by_feature=spec.DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, marks, _precision(BORE_KEEP))
-    set_dimension_callouts(adapter, marks, {"BoreDia": "REAM THRU"})
+    set_dimension_callouts(adapter, marks, {"BoreDia": spec.BORE_CALLOUT})
     return view, _placed_note(adapter, "Bore View Note", *BORE_NOTE_XY)
 
 
@@ -453,9 +517,9 @@ async def build(adapter: Any) -> dict[str, str]:
     read_required_properties(adapter.currentModel, (
         "Number", "Revision", "Title", "Material Specification", "Finish",
         "Quantity", "Manufacturing Notes", "Isometric View Note",
-        "Radial Tap View Note", "Bore View Note", "Installation Notes", "Supplier Reference Title",
+        "Radial Tap View Note", "Bore View Note", "Supplier Reference Title",
     ), required=("Number", "Material Specification", "Manufacturing Notes",
-                 "Radial Tap View Note", "Bore View Note", "Installation Notes", "Supplier Reference Title"))
+                 "Radial Tap View Note", "Bore View Note", "Supplier Reference Title"))
     drawing, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout,
     )
@@ -472,26 +536,32 @@ async def build(adapter: Any) -> dict[str, str]:
     tap = place_view(adapter, str(SOURCE), "*Right", *TAP_CENTER, scale=TAP_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
     _configuration(adapter, (end, side, tap, iso), "Collar")
-    _horizontal_axis(adapter, side)
-    _horizontal_axis(adapter, tap)
+    for view, label in ((end, "end view"), (side, "turning view"), (tap, "radial tap view")):
+        _quarter_turn(adapter, view, label)
     for view in (end, side, tap, iso):
         set_hidden_lines_removed(adapter, view)
     end_marks = curate_view_dimensions(adapter, end, keep=END_KEEP,
                                       view_label="collar end", dimensions_by_feature=spec.DRAWING_DIMENSIONS)
     side_marks = curate_view_dimensions(adapter, side, keep=SIDE_KEEP,
                                        view_label="collar turning view", dimensions_by_feature=spec.DRAWING_DIMENSIONS)
-    marks = end_marks + side_marks
+    end_marks, nose_dia = _nose_dia_onto_side(adapter, end_marks, end, side)
+    marks = [*end_marks, *side_marks, nose_dia]
     assert_imported_precision(adapter, marks, _precision(END_KEEP | SIDE_KEEP))
     _assert_functional_dimension_types(adapter, side_marks, SIDE_DIMENSION_TYPES)
-    # TapRootGauge is a blanked sketch: main's hidden-owner importer shows it
-    # in this view for the import (draw_ch_rocker_arm_tl_pivot_screw).
+    side_callouts, above = _side_callouts()
+    set_dimension_callouts(adapter, side_marks, side_callouts)
+    set_dimension_callouts(adapter, side_marks, above, location="above")
+    # TapRootGauge is a blanked sketch: the hidden-owner importer shows it in
+    # this view for the import (draw_ch_rocker_arm_tl_pivot_screw).
     tap_marks = hidden_sketches.curate_view_dimensions(
         adapter, tap, keep=TAP_KEEP, view_label="collar radial process controls",
         dimensions_by_feature=spec.DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, tap_marks, _precision(TAP_KEEP))
     _assert_functional_dimension_types(adapter, tap_marks, TAP_DIMENSION_TYPES)
-    set_dimension_callouts(adapter, tap_marks, {"TapRootLimit": "TAP ROOT"})
+    set_dimension_callouts(
+        adapter, tap_marks, {**_function_callouts(TAP_KEEP), "TapRootLimit": "TAP ROOT"}
+    )
     # Source geometry is asymmetric and the views are rotated: use the native
     # model-to-sheet transform rather than assuming the view's box centre is
     # the bore origin or that world +Y still projects vertically.
@@ -505,15 +575,16 @@ async def build(adapter: Any) -> dict[str, str]:
         "collar tap outer mouth",
     )
     placed = {
-        _placed_note(adapter, "Manufacturing Notes", 0.016, 0.080),
-        _placed_note(adapter, "Installation Notes", 0.016, 0.048),
+        _placed_note(adapter, "Manufacturing Notes", *NOTES_XY),
         _placed_note(adapter, "Isometric View Note", 0.310, 0.160),
         _placed_note(adapter, "Radial Tap View Note", *TAP_NOTE_XY),
     }
     _bore, bore_note = _bore_view(adapter)
     placed = frozenset(placed | {bore_note})
-    if len(placed) != 5:
-        raise RuntimeError(f"collar notes do not have five distinct names: {sorted(placed)}")
+    if len(placed) != 4:
+        raise RuntimeError(
+            f"collar notes do not have four distinct names: {sorted(placed)}"
+        )
     # In the radial projection the tap mouth is a real circle on the flat.
     callout = add_native_hole_callout(
         adapter, tap,

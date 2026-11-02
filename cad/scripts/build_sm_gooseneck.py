@@ -34,6 +34,10 @@ draws their joint (machinist review of 3c0b5d87c), built in this order:
 6. ``StationReference``: a hidden construction sketch on the Front plane
    whose two lines lie on the leg and arm axes; its dimensions are the
    elevation's leg length and arm straight.
+7. ``OverallReference``: a hidden construction sketch on the Front plane
+   whose lines lie on the foot face, the bare leg's outer silhouette and the
+   arm's top silhouette; its dimensions are the elevation's reference overall
+   height and reach.
 
 Layout: origin at the leg's reference mid-height; leg y -330..87.1, bend
 centre (-76.2, 87.1), arm axis y 163.3, end face x ARM_END_X.
@@ -65,6 +69,7 @@ from _drawing_precision import (
     _named_dimensions,
     apply_drawing_precision,
 )
+from _drawing_prefix import set_dimension_prefix
 from _drawing_tolerances import _set_tolerance_precision
 from _extrude import extrude_at_offset
 from _feature_tree import name_last_feature
@@ -94,6 +99,9 @@ from sm_gooseneck_spec import (
     DRAWING_PRECISION_BY_NAME,
     ELEVATION_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
+    REFERENCE_DIMENSIONS,
+    TUBE_OD_REF_SPAN,
+    TUBE_OD_REF_Y,
 )
 
 # The form nominals live in sm_gooseneck_geom -- the prose-free module the
@@ -271,6 +279,217 @@ def _author_dimension_callouts(adapter) -> None:
                 display.SetText(slot, text)
                 if str(display.GetText(slot) or "").replace("\r\n", "\n") != text:
                     raise RuntimeError(f"{name}@{feature}: callout did not persist")
+
+
+@_telemetry.traced("part.reference_dimensions")
+def _author_reference_dimensions(adapter) -> None:
+    """Parenthesize the stock Ø on their source dimensions: as supplied, they
+    print as reference, untoleranced (the drawing imports them as they are)."""
+    for feature, names in REFERENCE_DIMENSIONS.items():
+        resolved = _named_dimensions(adapter, feature, set(names))
+        for name in names:
+            display, _dimension = resolved[name]
+            display.ShowParenthesis = True
+            if not bool(display.ShowParenthesis):
+                raise RuntimeError(
+                    f"{name}@{feature}: reference parentheses did not persist"
+                )
+
+
+async def _tube_od_reference(adapter) -> list[tuple[str, str]]:
+    """The tube's stock Ø on the elevation, as a reference: a hidden Front-plane
+    sketch whose line runs along the bare leg's right silhouette,
+    TUBE_OD_REF_SPAN about mid-way between the sleeve's top and the bend's entry
+    tangent, Ø-dimensioned from a centreline on the leg axis.  Returns the
+    deferred drive jobs."""
+    y0 = TUBE_OD_REF_Y - TUBE_OD_REF_SPAN / 2.0
+    y1 = TUBE_OD_REF_Y + TUBE_OD_REF_SPAN / 2.0
+    dims = SketchDims()
+    check("create_sketch tube OD reference", await adapter.create_sketch("Front"))
+    # Direct-to-DB: the lines lie on the leg's axis and silhouette, which
+    # creation-time inference would relate to the model's edges.
+    set_sketch_direct_db(adapter, True)
+    try:
+        axis = check(
+            "tube OD reference axis",
+            await adapter.add_centerline(0.0, y0, 0.0, y1),
+        )
+        edge = check(
+            "tube OD reference line",
+            await adapter.add_line(TUBE_DIA / 2.0, y0, TUBE_DIA / 2.0, y1),
+        )
+    finally:
+        set_sketch_direct_db(adapter, False)
+    for line in (axis, edge):
+        check(
+            f"tube OD reference vertical {line}",
+            await adapter.add_sketch_constraint(line, None, "vertical"),
+        )
+    for end in ("start", "end"):
+        check(
+            f"tube OD reference {end} level",
+            await adapter.add_sketch_constraint(
+                f"{axis}.{end}", f"{edge}.{end}", "horizontal_points"
+            ),
+        )
+    await anchor_point_to_origin(adapter, f"{axis}.start", 0.0, y0, "tube OD reference")
+    dims.record("TubeOdRefStation")
+    await dimension_between(
+        adapter,
+        f"{axis}.start",
+        f"{axis}.end",
+        "vertical_distance",
+        TUBE_OD_REF_SPAN,
+        "tube OD reference span",
+    )
+    dims.record("TubeOdRefSpan")
+    # The outline stays a solid line: SolidWorks makes a centreline-to-
+    # construction-line dimension plain linear, not diametric (farm run
+    # 20261031T205208603Z).  The sketch feeds no feature and is blanked.
+    await add_diametric_linear_dimension(
+        adapter, axis, edge, (TUBE_DIA / 2.0 + 4.0, TUBE_OD_REF_Y), "TubeOdRef"
+    )
+    dims.record("TubeOdRef", '"TubeDia"')
+    await ensure_fully_defined(adapter, "tube OD reference sketch")
+    check("exit_sketch tube OD reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "TubeOdReference")
+    return dims.apply(adapter, "TubeOdReference")
+
+
+# OverallReference's witness stubs: this long (1 mm on the 1:3 sheet), each on
+# a drawn edge and ending at the witness point, so the edge's own ink covers
+# the phantom.  A full-length arm line over the end piece's top outline read
+# as a stray dashed line (machinist review r8, farm run 20261101T035809796Z).
+_OVERALL_STUB = 3.0
+
+
+async def _overall_reference(adapter) -> list[tuple[str, str]]:
+    """The bent form's overall height and reach, as references: 417.1 and
+    27.16 stop at the bend's tangents, so the finished part had no size to
+    check from its faces (machinist review r5 of farm run
+    20261101T004958072Z).  A hidden Front-plane sketch of four construction
+    lines, each on a drawn edge: the foot face from the axis to the sleeve's
+    outer corner, a stub of the bare leg's outer silhouette ending at the
+    bend's entry tangent, and two stubs of the arm's top silhouette, one from
+    the end face, one ending at the bend's exit tangent.  OverallHeight runs
+    from the foot face to the arm's top, OverallReach from the end face to the
+    leg's outer side.  Returns the deferred drive jobs."""
+    top = ARM_Y + TUBE_DIA / 2.0
+    leg_x = TUBE_DIA / 2.0
+    dims = SketchDims()
+    check("create_sketch overall reference", await adapter.create_sketch("Front"))
+    # Direct-to-DB: the lines lie on the model's edges, which creation-time
+    # inference would relate them to.
+    set_sketch_direct_db(adapter, True)
+    try:
+        foot = check(
+            "overall reference foot line",
+            await adapter.add_line(0.0, LEG_BOTTOM, SLEEVE_DIA / 2.0, LEG_BOTTOM),
+        )
+        leg = check(
+            "overall reference leg stub",
+            await adapter.add_line(leg_x, LEG_TOP - _OVERALL_STUB, leg_x, LEG_TOP),
+        )
+        arm_end = check(
+            "overall reference end-face stub",
+            await adapter.add_line(ARM_END_X, top, ARM_END_X + _OVERALL_STUB, top),
+        )
+        arm_tangent = check(
+            "overall reference arm tangent stub",
+            await adapter.add_line(-BEND_R - _OVERALL_STUB, top, -BEND_R, top),
+        )
+    finally:
+        set_sketch_direct_db(adapter, False)
+    for line, relation in (
+        (foot, "horizontal"),
+        (leg, "vertical"),
+        (arm_end, "horizontal"),
+        (arm_tangent, "horizontal"),
+    ):
+        _construction(adapter, line, "overall reference")
+        check(
+            f"overall reference {relation} {line}",
+            await adapter.add_sketch_constraint(line, None, relation),
+        )
+    await anchor_point_to_origin(
+        adapter, f"{foot}.start", 0.0, LEG_BOTTOM, "overall reference foot centre"
+    )
+    dims.record("OverallFootStation", '-"LegBottom"')
+    await dimension_between(
+        adapter,
+        f"{foot}.start",
+        f"{foot}.end",
+        "horizontal_distance",
+        SLEEVE_DIA / 2.0,
+        "overall reference foot line",
+    )
+    dims.record("OverallFootRadius", '"SleeveDia" / 2')
+    await anchor_point_to_origin(
+        adapter, f"{leg}.end", leg_x, LEG_TOP, "overall reference leg top"
+    )
+    dims.record("OverallLegX", '"TubeDia" / 2')
+    dims.record("OverallLegTop", '"LegTop"')
+    await dimension_between(
+        adapter,
+        f"{leg}.start",
+        f"{leg}.end",
+        "vertical_distance",
+        _OVERALL_STUB,
+        "overall reference leg stub",
+    )
+    dims.record("OverallLegStub")
+    await dimension_between(
+        adapter,
+        f"{arm_tangent}.end",
+        "origin",
+        "horizontal_distance",
+        BEND_R,
+        "overall reference arm tangent",
+    )
+    dims.record("OverallArmTangentX", '"BendR"')
+    for stub, name in (
+        (arm_tangent, "OverallArmTangentStub"),
+        (arm_end, "OverallArmEndStub"),
+    ):
+        await dimension_between(
+            adapter,
+            f"{stub}.start",
+            f"{stub}.end",
+            "horizontal_distance",
+            _OVERALL_STUB,
+            f"overall reference {name}",
+        )
+        dims.record(name)
+    # Both arm stubs lie on the arm's top; the two printed dimensions fix
+    # that height and the end face's station.
+    check(
+        "overall reference arm stubs level",
+        await adapter.add_sketch_constraint(
+            f"{arm_end}.start", f"{arm_tangent}.end", "horizontal_points"
+        ),
+    )
+    await dimension_between(
+        adapter,
+        f"{foot}.end",
+        f"{arm_tangent}.end",
+        "vertical_distance",
+        top - LEG_BOTTOM,
+        "overall height",
+    )
+    dims.record("OverallHeight", '"ArmY" + "TubeDia" / 2 - "LegBottom"')
+    await dimension_between(
+        adapter,
+        f"{arm_end}.start",
+        f"{leg}.end",
+        "horizontal_distance",
+        leg_x - ARM_END_X,
+        "overall reach",
+    )
+    dims.record("OverallReach", '"TubeDia" / 2 - "ArmEndX"')
+    await ensure_fully_defined(adapter, "overall reference sketch")
+    check("exit_sketch overall reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "OverallReference")
+    return dims.apply(adapter, "OverallReference")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -895,6 +1114,8 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch station reference", await adapter.exit_sketch())
     name_last_feature(adapter, "StationReference")
     drive_jobs += stations.apply(adapter, "StationReference")
+    drive_jobs += await _tube_od_reference(adapter)
+    drive_jobs += await _overall_reference(adapter)
 
     # Apply the deferred drive equations now -- after the whole model + a
     # rebuild exists, so every target resolves. Each equation evaluates to the
@@ -952,10 +1173,16 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _author_dimension_callouts(adapter)
-    # The station reference owns printed dimensions and only reference lines:
-    # hide it so no assembly instance renders it (#880).  The drawing shows it
-    # per view through _drawing_hidden_sketches to import those dimensions.
+    _author_reference_dimensions(adapter)
+    # A sketch-only diametric dimension prints no Ø of its own (farm run
+    # 20261031T233549214Z printed "(12.70)"); the revolve's sleeve Ø does.
+    set_dimension_prefix(adapter, "TubeOdReference", "TubeOdRef", "<MOD-DIAM>")
+    # The reference sketches own printed dimensions and only reference lines:
+    # hide them so no assembly instance renders them (#880).  The drawing shows
+    # them per view through _drawing_hidden_sketches to import those dimensions.
     blank_sketch(adapter, "StationReference")
+    blank_sketch(adapter, "TubeOdReference")
+    blank_sketch(adapter, "OverallReference")
     apply_drawing_properties(
         adapter,
         PART_NAME,

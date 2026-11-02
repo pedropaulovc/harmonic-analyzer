@@ -265,18 +265,18 @@ def _flat_limits(adapter) -> None:
         raise RuntimeError("collar native D-flat limit precision did not persist")
 
 
-def _collar_length_reference(adapter) -> None:
-    """Save the fitted nominal as REF, never an independent size acceptance."""
-    display, dimension = _named_dimension(adapter, "BodyProfile", "CollarLength")
-    if abs(float(dimension.SystemValue) * 1000.0 - LENGTH) > 1e-6:
-        raise RuntimeError("collar body reference does not match the fitted nominal")
+def _fitted_length_reference(adapter, name: str, nominal: float) -> None:
+    """Save a fitted nominal as REF, never an independent size acceptance."""
+    display, dimension = _named_dimension(adapter, "BodyProfile", name)
+    if abs(float(dimension.SystemValue) * 1000.0 - nominal) > 1e-6:
+        raise RuntimeError(f"collar {name} reference does not match the fitted nominal")
     tolerance = dimension.Tolerance
     if tolerance is None or int(tolerance.Type) != 0:
-        raise RuntimeError("collar body has an independent size band")
+        raise RuntimeError(f"collar {name} has an independent size band")
     display.SetText(1, "(")
     display.SetText(2, ")")
     if (display.GetText(1), display.GetText(2)) != ("(", ")"):
-        raise RuntimeError("collar body reference text did not persist")
+        raise RuntimeError(f"collar {name} reference text did not persist")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -486,7 +486,8 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Actual D sizes and both entry legs carry their source-owned controls.
-    # Body length is fitted at assembly and remains REF on part and drawing.
+    # Body and pilot lengths are fitted at assembly and remain REF on part
+    # and drawing.
     set_dimension_bilateral_tolerance(
         adapter, "BodyProfile", "CollarDia", *deviations(OD_BAND)
     )
@@ -516,7 +517,8 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    _collar_length_reference(adapter)
+    _fitted_length_reference(adapter, "CollarLength", LENGTH)
+    _fitted_length_reference(adapter, "PilotLength", PILOT_LENGTH)
     resolve_faces(
         adapter.currentModel,
         {

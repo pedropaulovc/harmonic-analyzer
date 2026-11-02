@@ -87,7 +87,8 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         " __import__('sm_gooseneck_spring_screw_geom').FULL_THREAD_STATION_MAX_BAND,"
         " __import__('sm_gooseneck_spring_screw_geom').UNDERHEAD_CORNER_R_BAND,"
         " __import__('sm_gooseneck_spring_joint').COUNTERBORE_FLOOR_CORNER_R_BAND,"
-        " __import__('dt_pinion_cam_spec').THIN_WALL_MIN_BAND)",
+        " __import__('dt_pinion_cam_spec').THIN_WALL_MIN_BAND,"
+        " __import__('dt_crank_hub_spec').PIN_PROUD_MIN_BAND)",
         "each",
     ),
     # def _printed_limits(nominal, places): ... GENERAL_BAND_BY_PLACES[places]
@@ -109,7 +110,8 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     ),
     # _apply_neck_and_flat_limits passes each native LIMIT band in turn.
     ("build_pd_transgear_knob_shaft", "band"): (
-        "(FRONT_CORNER_RADIUS_BAND, CORE_FLAT_CUT_END_BAND, CORE_FLAT_TOOL_END_RADIUS_BAND)",
+        "(FRONT_RELIEF_DIA_BAND, FRONT_CORNER_RADIUS_BAND, CORE_FLAT_CUT_END_BAND,"
+        " CORE_FLAT_TOOL_END_RADIUS_BAND)",
         "each",
     ),
     # for feature, name, band_for in _BANDED_DIMENSIONS: band = band_for(teeth)
