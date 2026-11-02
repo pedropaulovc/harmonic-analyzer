@@ -131,10 +131,7 @@ OFFLINE_IMPORT_EXCLUSIONS: dict[str, str] = {}
 NOT_FIT_BANDS: dict[tuple[str, str], str] = {
     # Catalogue records for purchased oblique-trammel parts. Their sheets print
     # supplier sizes as untoleranced REF (the catalogue governs) and no fit
-    # stack reads these sizes.
-    ("ch_rocker_arm_tl_vn_oblique_pivot_screw_spec", "SHOULDER_LENGTH_BAND"): (
-        "catalogue shoulder-length record; printed as untoleranced REF"
-    ),
+    # stack reads these sizes; fit-read bands are in INDEXED_FIT_BANDS.
     ("ch_rocker_arm_tl_vn_oblique_pivot_shim_spec", "ID_BAND"): (
         "catalogue bore record; printed as untoleranced REF"
     ),
@@ -146,12 +143,6 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
     ),
     ("ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec", "ID_BAND"): (
         "catalogue bore record; printed as untoleranced REF"
-    ),
-    ("ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec", "OD_BAND"): (
-        "catalogue OD record; printed as untoleranced REF"
-    ),
-    ("ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec", "LENGTH_BAND"): (
-        "catalogue length record; printed as untoleranced REF"
     ),
     ("build_dt_drive_train_assembly", "ARBOR_PED_SOUTH_Z_BAND"): (
         "plan z extent of the south pedestal foot (clearance geometry)"
@@ -254,6 +245,18 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
 # to print or derive limits. An inverted one prints wrong limits, so they get
 # the same check as a helper-fed band.
 INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
+    ("ch_rocker_arm_tl_vn_oblique_pivot_screw_spec", "SHOULDER_LENGTH_BAND"): (
+        "catalogue shoulder-length band, indexed for the jig's "
+        "PIVOT_UNSHIMMED_GAP_RANGE; the sheet prints it as untoleranced REF"
+    ),
+    ("ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec", "LENGTH_BAND"): (
+        "catalogue length band, indexed for the jig's "
+        "PIVOT_UNSHIMMED_GAP_RANGE; the sheet prints it as untoleranced REF"
+    ),
+    ("ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec", "OD_BAND"): (
+        "catalogue OD band, upper limit indexed for the carrier's thrust-seat "
+        "chamfer-mouth check; the sheet prints it as untoleranced REF"
+    ),
     ("dt_alignment_pinion_spec", "BASE_TANGENT_SPAN_BAND"): (
         "indexed into the span-measurement note text"
     ),
