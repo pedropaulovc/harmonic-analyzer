@@ -166,12 +166,13 @@ END_KEEP = {
     "PinProud": (END_CENTER[0] + 0.072, END_CENTER[1] + 0.014),
 }
 # The MHA-DT-09 big end is construction geometry in the hub's reference
-# sketch. The default construction font prints it as even dashes, which read
-# as hidden lines of the hub (Opus review at 7fe9d97bd: a dashed box outside
-# the part). Phantom (long-short-short), thin, marks it as an adjacent part.
+# sketch. In the default construction font it prints as even dashes, which
+# read as hidden lines of the hub, and phantom prints the same way at this
+# scale (Opus reviews at 7fe9d97bd and c7115c2c3: a dashed box outside the
+# part). A thin solid outline, named by the 4.45 MIN callout, shows the pin.
 # Only this sheet's document preference changes.
 PIN_BIG_END_LINE_FONT = (
-    ("swLineFontConstructionCurvesStyle", "swLinePHANTOM"),
+    ("swLineFontConstructionCurvesStyle", "swLineCONTINUOUS"),
     ("swLineFontConstructionCurvesThickness", "swLW_THIN"),
 )
 # The cross-hole station is measured from the arm shoulder it must stay clear
@@ -240,8 +241,8 @@ def _set_callout_below(display: Any, text: str, label: str) -> None:
         raise RuntimeError(f"{label}: callout-below text did not persist: {applied!r}")
 
 
-def _construction_curves_as_phantom(model: Any) -> None:
-    """Print this drawing's construction curves (the pin's big end) in phantom."""
+def _pin_big_end_line_font(model: Any) -> None:
+    """Print this drawing's construction curves (the pin's big end) thin solid."""
     extension = _early_bound(model.Extension, "IModelDocExtension")
     option = constant("swDetailingNoOptionSpecified")
     for name, value in PIN_BIG_END_LINE_FONT:
@@ -319,7 +320,7 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
-    _construction_curves_as_phantom(drawing_model)
+    _pin_big_end_line_font(drawing_model)
     stamp_drawing_summary(
         adapter,
         drawing_model,
