@@ -170,6 +170,10 @@ def test_note_states_installed_state_and_flush_ends() -> None:
         assert fit not in text, fit
     assert "PEEN" not in text and "#746" not in text
     assert "DRILL ROD" not in text  # the title-block MATERIAL owns the stock
+    # #2136 review: the bought rod's REF prints no band and no material.
+    for row in notes.PIN_DIA_CALLOUT.splitlines():
+        assert "\u00b1" not in row and "DRILL ROD" not in row
+    assert notes.PIN_DIA_CALLOUT.splitlines()[0] == "AS SUPPLIED"
     assert '"Manufacturing Notes": DRAWING_NOTES' in _build_source()
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in _source()
 

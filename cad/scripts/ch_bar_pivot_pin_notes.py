@@ -69,12 +69,15 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 # stays narrower than the pin at 10:1, clear of both length rows' witnesses;
 # note 1 names the solid and dashed outlines.
 PIN_DIA_FRACTION_DENOMINATOR = 64  # 5/64 drill rod
-# The supplier's grind tolerance travels with the as-bought REF.
-STOCK_TOLERANCE_IN = f"\u00b1{pin.PIN_DIA_TOLERANCE / 25.4:.4f}".replace("0.", ".")
-DIAMETER_CALLOUT = (
-    f"DRILL ROD {STOCK_TOLERANCE_IN}, AS SUPPLIED\n"
-    f"PRESS FIT IN {BAR_NUMBER}\n"
-    f"RUNS IN {LEVER_NUMBER} #47 HOLE"
+# The bought rod's size is an untoleranced REF: the supplier's catalogue
+# grind governs it, and the title-block MATERIAL names the drill rod
+# (#2136 machinist review: a band on an as-supplied REF over-specifies).
+DIAMETER_CALLOUT = "\n".join(
+    (
+        "AS SUPPLIED",
+        f"PRESS FIT IN {BAR_NUMBER}",
+        f"RUNS IN {LEVER_NUMBER} #47 HOLE",
+    )
 )
 DIMENSION_CALLOUTS: dict[str, str] = {
     "PinLen": f"FLUSH WITH {BAR_NUMBER}",

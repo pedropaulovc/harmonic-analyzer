@@ -158,8 +158,7 @@ def test_print_carries_no_gdt_or_roughness() -> None:
 def test_one_note_and_the_mates_at_their_dimensions() -> None:
     """Machinist round 1 (#1305): the press/punch line was a method, the
     flush dressing assembly wording, and the mates sat away from the Ø they
-    govern; the drill-rod stock explains the tight grind band. Each now rides
-    its dimension; one note says what the views show."""
+    govern. Each now rides its dimension; one note says what the views show."""
     assert "PUNCH" not in notes.DRAWING_NOTES and "DRESS" not in notes.DRAWING_NOTES
     source = _source()
     # r1: SOLIDWORKS printed nothing of a multi-line callout above a value.
@@ -174,6 +173,11 @@ def test_one_note_and_the_mates_at_their_dimensions() -> None:
     assert drawing.FRONT_KEEP["PinDia"][1] - 4 * 0.0045 > (
         drawing.FRONT_CENTER[1] + drawing.HALF_DIA + 0.002
     )
+    # #2136 review: the bought rod's REF prints no band and no material (the
+    # supplier's catalogue grind and the title-block MATERIAL own those).
+    for row in notes.DIAMETER_CALLOUT.splitlines():
+        assert "\u00b1" not in row and "DRILL ROD" not in row
+    assert notes.DIAMETER_CALLOUT.splitlines()[0] == "AS SUPPLIED"
     assert '"Manufacturing Notes": DRAWING_NOTES' in _build_source()
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in _source()
 
