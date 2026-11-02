@@ -192,15 +192,28 @@ Which features may carry frames is a per-part adjustment: it is declared as a
 `machinist_exceptions` entry (kind `accept`) under the package's own key in
 its config YAML, carrying the functional reason, and only the reviewed
 package's own declarations reach its reviewer. Everything else carries no
-frames and no datums. A new entry needs a user ruling.
+frames and no datums. A new entry needs a user ruling or a delegated ruling
+(see "Named exceptions").
 
 ## Named exceptions
 
 A shortfall against rules 17–19 (or another numeric rule) is acceptable only
-by the user's own ruling, declared as a `machinist_exceptions` entry (kind
-`minor`) under the package's own key in its config YAML. No one else rules,
-and the thresholds are never loosened to admit a shortfall. Each entry is
-specific to the part it names; it is not precedent.
+by a ruling declared as a `machinist_exceptions` entry (kind `minor`) under
+the package's own key in its config YAML. The thresholds are never loosened to
+admit a shortfall. Each entry is specific to the part it names.
+
+A ruling is either the owner's own or delegated. A delegated ruling is made by
+the agent coordinating the work when the owner is unavailable, and it must
+follow a recorded owner precedent for the same kind of shortfall (for example,
+an earlier owner ruling accepting a wall between the floor and the target with
+no geometry escape). Its `reason` says "delegated ruling <date>", names the
+precedent it follows, and links
+[#2144](https://github.com/pedropaulovc/harmonic-analyzer/issues/2144), where
+the owner reviews it after the fact. A shortfall with no such precedent needs
+the owner. When the owner is unavailable, prefer the geometry fix. If none
+exists, the coordinator may still rule, but the `reason` says "delegated ruling
+<date>, no precedent", and the owner reviews it first on #2144. The owner may
+reverse any delegated ruling; that becomes an ordinary follow-up change.
 
 The sheet states the shortfall as a plain manufacturing fact (rule 20);
 `test_printed_text_rulings` keeps rule numbers, ruling ids and governance
