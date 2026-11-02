@@ -12,7 +12,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name,
     place_view,
 )
-from solidworks_mcp.adapters.sw_type_info import constant
 
 from _check import check
 from _com import _early_bound
@@ -46,7 +45,6 @@ from dt_crank_hub_notes import (
     BORE_CALLOUT,
     CROSS_HOLE_CALLOUT,
     HUB_LENGTH_CALLOUT,
-    PIN_PROUD_CALLOUT,
     RELIEF_LENGTH_CALLOUT,
     SEAM_CALLOUT,
     SEAT_CALLOUT,
@@ -147,36 +145,18 @@ BARREL_FACE_PICK = ((RELIEF_X + SERVICE_PIN_CENTER[0]) / 2.0, SIDE_CENTER[1] + 0
 #   light-press callout above.
 # - Cross-hole callout: above the barrel, its leader rising almost straight
 #   from the hole's top rim, clear of the barrel diameter's extension lines.
+#   It carries the ream's acceptance in words: MHA-DT-09's driven big end
+#   stands proud of the barrel (review of farm run 20261102T004131857Z: a
+#   MIN dimensioned to an outline of another part).
 # - Bore callout: right of the end view, its leader entering the bore from the
 #   right, clear of the six-o'clock seam; the seam callout below the end view.
-# - MHA-DT-09 big end's MIN proud: the pin's big end (model -X) is paper-right
-#   on the end view (*Bottom turned half a turn), on the horizontal
-#   centreline.  Its value and callout print right of the big end's extension
-#   line, above the bore callout and below the isometric's label.
 # The overall's row stands under the seat length's three-line fit-up callout,
 # which hangs right of the outboard end over the overall's text.
 _ROW_Y = (0.120, 0.090)
 _STATION_ROW_Y = _ROW_Y[0] + 0.006
 END_KEEP = {
     "BoreDia": (END_CENTER[0] + 0.070, END_CENTER[1] - 0.020),
-    # Four callout lines (r7 review: name the phantom, the pin and the ring).
-    # The block stacks up from the dimension line (farm run
-    # 20261101T035809796Z: value top at y 186.9 mm), so its height sets how
-    # close it comes to the isometric's label; 7 mm further right than the
-    # three-line block, so the wider block's left edge clears the phantom
-    # big end (x <= END_CENTER + 31.2 mm).
-    "PinProud": (END_CENTER[0] + 0.072, END_CENTER[1] + 0.014),
 }
-# The MHA-DT-09 big end is construction geometry in the hub's reference
-# sketch. In the default construction font it prints as even dashes, which
-# read as hidden lines of the hub, and phantom prints the same way at this
-# scale (Opus reviews at 7fe9d97bd and c7115c2c3: a dashed box outside the
-# part). A thin solid outline, named by the 4.45 MIN callout, shows the pin.
-# Only this sheet's document preference changes.
-PIN_BIG_END_LINE_FONT = (
-    ("swLineFontConstructionCurvesStyle", "swLineCONTINUOUS"),
-    ("swLineFontConstructionCurvesThickness", "swLW_THIN"),
-)
 # The seat length is a fit-up reference (the seat is turned to suit the arm,
 # end flush; owner ruling 2026-11-01 on the r9 review), so nothing chains
 # through it: the cross-hole station prints from the faced outboard end.
@@ -224,7 +204,6 @@ DIMENSION_CALLOUTS = {
     "SeatLength": SEAT_LENGTH_CALLOUT,
     "HubLength": HUB_LENGTH_CALLOUT,
     "ReliefLength": RELIEF_LENGTH_CALLOUT,
-    "PinProud": PIN_PROUD_CALLOUT,
 }
 
 
@@ -240,18 +219,6 @@ def _set_callout_below(display: Any, text: str, label: str) -> None:
     applied = str(display.GetText(4) or "")
     if applied.replace("\r", "") != text:
         raise RuntimeError(f"{label}: callout-below text did not persist: {applied!r}")
-
-
-def _pin_big_end_line_font(model: Any) -> None:
-    """Print this drawing's construction curves (the pin's big end) thin solid."""
-    extension = _early_bound(model.Extension, "IModelDocExtension")
-    option = constant("swDetailingNoOptionSpecified")
-    for name, value in PIN_BIG_END_LINE_FONT:
-        preference, wanted = constant(name), constant(value)
-        if not extension.SetUserPreferenceInteger(preference, option, wanted):
-            raise RuntimeError(f"failed to set crank-hub {name}")
-        if int(extension.GetUserPreferenceInteger(preference, option)) != wanted:
-            raise RuntimeError(f"crank-hub {name} readback differs")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -285,7 +252,6 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         unit=part_drawing_unit(PART_STEM),
     )
-    _pin_big_end_line_font(drawing_model)
     stamp_drawing_summary(
         adapter,
         drawing_model,
