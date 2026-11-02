@@ -1566,8 +1566,10 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "THEM; TIGHTEN."
         ),
         "lock-seats-faced": (
-            f"FACE LOCK SEATS TO {_mm_window(platen_guide.LOCK_GAP_FIT, 3)} PLATEN FLOAT; "
-            "ELSE STOP AND REPORT."
+            f"FACE THE RAIL BACKS UNDER EACH {_N['pd-guide-lock']} LOCK (THE LOCK SEATS) "
+            "TILL THE FEELER GAP BETWEEN LOCK FRONT FACE AND BAR BACK FACE, WITH THE LOCK "
+            f"SCREWS TIGHT, IS {_mm_window(platen_guide.LOCK_GAP_FIT, 3)}: THE "
+            "PLATEN'S FORE-AFT FLOAT; ELSE STOP AND REPORT."
         ),
         "latch-pin-pressed": (
             f"PRESS THE {_N['pd-vn-transgear-latch-pin']} DOWEL INTO THE "

@@ -178,7 +178,7 @@ def test_fit_up_adjustments_are_complete_and_ordered_before_installation() -> No
 
     lock_step = printed_step("lock-seats-faced")
     float_window = re.search(
-        r"\bFACE LOCK SEATS TO (\d*\.\d+-\d*\.\d+) PLATEN FLOAT\b",
+        r"\bIS (\d*\.\d+-\d*\.\d+): THE PLATEN'S FORE-AFT FLOAT\b",
         lock_step,
     )
     assert float_window is not None
