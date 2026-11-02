@@ -60,6 +60,7 @@ from dt_crank_hub_spec import (
     HUB_SEAT_LENGTH,
     REFERENCE_DIMENSIONS,
     RELIEF_STATION,
+    SEAM_DEPTH,
     SERVICE_PIN_HOLE_SPEC,
     SERVICE_PIN_STATION,
 )
@@ -113,6 +114,8 @@ OUTBOARD_X = _sheet_x(0.0)
 SHOULDER_X = _sheet_x(HUB_SEAT_LENGTH)
 INBOARD_X = _sheet_x(HUB_LENGTH)
 RELIEF_X = _sheet_x(RELIEF_STATION)
+SEAM_END_X = _sheet_x(SEAM_DEPTH)
+SEAT_BOTTOM = _sheet_y(AXIAL_PIN_RADIUS_FROM_AXIS)
 SERVICE_PIN_CENTER = (_sheet_x(SERVICE_PIN_STATION), SIDE_CENTER[1])
 SERVICE_PIN_DIA = blind_cut_dia_mm(SERVICE_PIN_HOLE_SPEC)
 SERVICE_PIN_TOP_RIM = (
@@ -183,6 +186,11 @@ SIDE_KEEP = {
     # about y 0.115 (farm run 20261101T234626714Z: .53 sat on it at 0.113)
     # (machinist review of the inch sheet: no chain through the shoulder).
     "ServicePinStation": ((OUTBOARD_X + SERVICE_PIN_CENTER[0]) / 2.0, 0.104),
+    # The seam's depth from the faced outboard end, under the notch the seam
+    # cuts in the seat's bottom edge: between that edge and the seat length's
+    # dimension line, its right extension line shared with the seat length's
+    # (Codjiflo review of 831be7869: a depth typed into the seam note).
+    "SeamDepth": ((OUTBOARD_X + SEAM_END_X) / 2.0, SEAT_BOTTOM - 0.007),
     # The toleranced .990 and its two-line callout fill the span between its
     # extension lines and sat on its own dimension line (machinist review of
     # the inch sheet, r2): they print right of the outboard face instead, the

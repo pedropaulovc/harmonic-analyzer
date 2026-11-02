@@ -58,6 +58,7 @@ from dt_crank_hub_geometry import (
     HUB_LENGTH,
     SERVICE_PIN_STATION,
 )
+from dt_crank_hub_geometry import UNIT as HUB_UNIT
 from dt_crank_hub_spec import DRAWING_PRECISION_BY_NAME as HUB_PRECISION
 from dt_crank_pin_eye_spec import ANCHOR_AIR, LOOP_ID_MIN, LOOP_INNER_R, LOOP_R
 from dt_crank_pin_eye_spec import TAIL_LEN as EYE_TAIL_LEN
@@ -131,12 +132,12 @@ ARM_Z = (0.0, ARM_THICKNESS)
 HUB_Z = (ARM_THICKNESS, HUB_LENGTH)
 PIN_Z = SERVICE_PIN_STATION
 # The hub prints the pin's station from its faced outboard end, flush with the
-# arm's outboard face (ARM_Z[0]), at ServicePinStation's places; its seat
-# length is a fit-up reference turned to suit the arm, so the arm's inboard
-# face (ARM_Z[1]) is wherever the stock's thickness puts it. At the station
-# band's arm-side limit in the thickest stock the mill ships, the pin, and the
-# ring hanging from it, sit that much nearer the arm.
-PIN_Z_BAND = printed_band_mm(HUB_PRECISION["ServicePinStation"]) + (
+# arm's outboard face (ARM_Z[0]), at ServicePinStation's places in the hub
+# sheet's unit; its seat length is a fit-up reference turned to suit the arm,
+# so the arm's inboard face (ARM_Z[1]) is wherever the stock's thickness puts
+# it. At the station band's arm-side limit in the thickest stock the mill
+# ships, the pin, and the ring hanging from it, sit that much nearer the arm.
+PIN_Z_BAND = printed_band_mm(HUB_PRECISION["ServicePinStation"], unit=HUB_UNIT) + (
     ARM_STOCK_THICKNESS_MAX - ARM_THICKNESS
 )
 PIN_Z_ARMWARD = PIN_Z - PIN_Z_BAND

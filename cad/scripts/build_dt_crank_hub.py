@@ -336,6 +336,51 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch service pin station", await adapter.exit_sketch())
     name_last_feature(adapter, "ServicePinStationReference")
     drive_jobs += station.apply(adapter, "ServicePinStationReference")
+    # Drawing-only seam depth reference on the same Right plane: a
+    # construction line along the seam's axis on the seat edge, from the faced
+    # outboard end to the groove's floor, so the side view prints the depth
+    # natively under the seam's notch (Codjiflo review of 831be7869: the
+    # depth was typed into the seam note).  Right (u, v) -> (-Z, Y): the
+    # six-o'clock seam at model +Z is u = -AXIAL_PIN_RADIUS_FROM_AXIS.
+    seam_depth = SketchDims()
+    check("create_sketch seam depth", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    seam_line = check(
+        "seam depth reference line",
+        await adapter.add_line(
+            -AXIAL_PIN_RADIUS_FROM_AXIS, 0.0, -AXIAL_PIN_RADIUS_FROM_AXIS, SEAM_DEPTH
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[seam_line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError("seam depth reference did not take construction flag")
+    check(
+        "seam depth reference vertical",
+        await adapter.add_sketch_constraint(seam_line, None, "vertical"),
+    )
+    await anchor_point_to_origin(
+        adapter,
+        f"{seam_line}.start",
+        -AXIAL_PIN_RADIUS_FROM_AXIS,
+        0.0,
+        "seam depth reference at the outboard face",
+    )
+    seam_depth.record(None, '"SeatDia" / 2')
+    await dimension_between(
+        adapter,
+        f"{seam_line}.start",
+        f"{seam_line}.end",
+        "vertical_distance",
+        SEAM_DEPTH,
+        "seam depth from the outboard face",
+    )
+    seam_depth.record("SeamDepth", '"SeamDepth"')
+    await ensure_fully_defined(adapter, "seam depth reference sketch")
+    check("exit_sketch seam depth", await adapter.exit_sketch())
+    name_last_feature(adapter, "SeamDepthReference")
+    drive_jobs += seam_depth.apply(adapter, "SeamDepthReference")
     # Axis1 is the shaft/hub axis; Axis2 is the axial seam-pin axis.
     await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "hub axis")
     seam_axis = await name_bore_axis(
@@ -397,10 +442,11 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    # The reference sketch owns printed dimensions but no geometry: hide it so
-    # no assembly instance renders it (#880).  The drawing shows it per view
-    # through _drawing_hidden_sketches to import those dimensions.
+    # The reference sketches own printed dimensions but no geometry: hide them
+    # so no assembly instance renders them (#880).  The drawing shows them per
+    # view through _drawing_hidden_sketches to import those dimensions.
     blank_sketch(adapter, "ServicePinStationReference")
+    blank_sketch(adapter, "SeamDepthReference")
     return await save_part_and_images(adapter, PART_NAME)
 
 

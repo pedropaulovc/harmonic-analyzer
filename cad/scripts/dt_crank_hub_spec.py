@@ -19,6 +19,7 @@ from dt_crank_hub_geometry import (
     RELIEF_LENGTH,
     RELIEF_LENGTH_TOL,
     RELIEF_STATION,
+    SEAM_DEPTH,
     SERVICE_PIN_STATION,
     SHAFT_CLEARANCE_MAX,
     SHAFT_CLEARANCE_MIN,
@@ -50,6 +51,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
     "BoreProfile": {"BoreDia"},
     "ServicePinStationReference": {"ServicePinStation"},
+    "SeamDepthReference": {"SeamDepth"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HubProfile": {
@@ -78,6 +80,9 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     # is what keeps the MHA-DT-09 ream's ligament to the arm shoulder over the
     # rule-17 wall (dt_crank_hub_geometry, drawing-guidelines.md rule 17 (walls and webs)).
     "ServicePinStationReference": {"ServicePinStation": 2},
+    # The seam only has to take the cut pin: the title block's .XX, printed
+    # from the faced outboard end where the match-drill enters.
+    "SeamDepthReference": {"SeamDepth": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

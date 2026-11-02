@@ -244,6 +244,17 @@ def test_drawing_registry_and_marks_are_complete() -> None:
     assert set(drawing.DIMENSION_CALLOUTS) <= marked
 
 
+def test_seam_depth_prints_natively_under_the_seam_notch() -> None:
+    # Codjiflo review of 831be7869: the seam depth was typed into the note.
+    assert dt_crank_hub_spec.DRAWING_DIMENSIONS["SeamDepthReference"] == {"SeamDepth"}
+    assert dt_crank_hub_spec.DRAWING_PRECISION_BY_NAME["SeamDepth"] == 2
+    x, y = drawing.SIDE_KEEP["SeamDepth"]
+    assert drawing.SEAM_END_X < x < drawing.OUTBOARD_X
+    # Below the seat's bottom edge, above the seat length's dimension line
+    # (about y 0.115) and the station row.
+    assert drawing.SIDE_KEEP["ServicePinStation"][1] + 0.015 < y < drawing.SEAT_BOTTOM - 0.005
+
+
 def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None:
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): no general notes; each matched fit sits on its feature.
     assert not hasattr(dt_crank_hub_spec, "DRAWING_NOTES")
@@ -263,8 +274,9 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     assert "MHA-DT-06" in seam and "SEAM PIN MHA-DT-VN-59" in _flat(seam)
     assert "LIGHT DRIVE FIT" in seam and len(seam.splitlines()) == 4
     assert "AT ASSEMBLY" in seam and "SEAM" in seam
-    # Size first, then the process, in the order the work is done.
-    assert seam.splitlines()[0].startswith("(<MOD-DIAM>.156) <HOLE-DEPTH> .17")
+    # Size first, then the process, in the order the work is done; the depth
+    # prints natively on the side view, never typed into the note.
+    assert seam.splitlines()[0] == "(<MOD-DIAM>.156) ON SEAM, MATCH-DRILL/REAM"
     assert "O'CLOCK" not in seam
     # The blind pin makes hub and arm a permanent pair, taken apart at the
     # taper pin (owner rulings 2026-11-01).

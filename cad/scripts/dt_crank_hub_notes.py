@@ -16,7 +16,6 @@ from __future__ import annotations
 from dt_crank_hub_geometry import (
     AXIAL_PIN_DIA,
     MM_PER_IN,
-    SEAM_DEPTH,
     SEAT_PRESS_INTERFERENCE,
     SHAFT_CLEARANCE_MAX,
     SHAFT_CLEARANCE_MIN,
@@ -58,20 +57,20 @@ def seat_bore_callout(mate: str) -> str:
     )
 
 
-def seam_callout(mate: str, pin: str = "SEAM PIN MHA-DT-VN-59") -> str:
+def seam_callout(mate: str, depth: str = "", pin: str = "SEAM PIN MHA-DT-VN-59") -> str:
     """MHA-DT-VN-59 seam, match-drilled with ``mate``: size first, then the process.
 
     ``mate`` and ``pin`` name the parts by name and number (rule 4; MHA-DT-06
     machinist review, 2026-09-29; review of farm run 20261101T081735465Z:
     SEAM PIN says what the pin is).  The blind pin makes hub and arm a
     permanent pair, taken apart at the MHA-DT-09 taper pin (owner rulings
-    2026-11-01; r9 review: say it plainly).  The depth only has to take the
-    cut pin, so it prints at the title block's .XX.
+    2026-11-01; r9 review: say it plainly).  The depth is never typed here:
+    the hub's side view prints it as a native dimension, and ``depth`` lets
+    the arm's sheet refer to it (Codjiflo review of 831be7869).
     """
     return "\n".join(
         (
-            f"(<MOD-DIAM>{inch_text(AXIAL_PIN_DIA, 3)}) <HOLE-DEPTH> {inch_text(SEAM_DEPTH, 2)}"
-            " ON SEAM, MATCH-DRILL/REAM",
+            f"(<MOD-DIAM>{inch_text(AXIAL_PIN_DIA, 3)}){depth} ON SEAM, MATCH-DRILL/REAM",
             f"WITH {mate} AT ASSEMBLY;",
             f"{pin} LIGHT DRIVE FIT;",
             "PERMANENT PAIR; DISASSEMBLE AT MHA-DT-09",
