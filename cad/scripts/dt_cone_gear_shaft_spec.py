@@ -437,20 +437,21 @@ SECTION_KNOBS = tuple(
 # dimensions.
 
 # Step root radius.  Each step sits inside the larger gear's bore, one
-# SEAT_STEP_SETBACK behind the smaller gear's south face, so the root can be
-# neither a sharp corner (a stress riser at the smallest section of a slender
-# shaft) nor a radius that reaches the smaller gear: the fillet stands .004
-# proud of the smaller land -- more than that gear's radial clearance on
-# either the round or the flat -- so its axial run is booked in the setback
-# (the proof below).  R.004 is the standard tool nose radius.  Modelled as
-# geometry, round root and flat root alike, and dimensioned once, not written
-# as a process note.
+# SEAT_STEP_SETBACK behind the smaller gear's south face, so the root's
+# radius must not reach the smaller gear: the fillet stands .004 proud of the
+# smaller land -- more than that gear's radial clearance on either the round
+# or the flat -- so its axial run is booked in the setback (the proof below).
+# R.004 is the standard tool nose radius.  Modelled as geometry, round root
+# and flat root alike, and dimensioned once, not written as a process note.
 FILLET_RADIUS = 0.1016  # .004
 # The setback books the root's run at its printed maximum, so the radius
-# carries its own band, R.004 +.000/-.002: never over .004 (the title block's
-# +-.005 would let a .009 root reach the smaller gear; Codjiflo P2 on #2107)
-# and never sharp.
-FILLET_R_BAND = (0.0, -0.0508)  # (upper, lower): +.000/-.002 in
+# prints as the single limit R.004 MAX (swTolMAX prints the model value, then
+# MAX): the title block's +-.005 would let a .009 root reach the smaller gear
+# (Codjiflo P2 on #2107).  Any root from sharp up to .004 is good.  The
+# stacked +.000/-.002 band this replaced named no mate at its callout and had
+# no room to (machinist review of the final7 render, 20261102T152513202Z).
+FILLET_R_BAND = (0.0, -FILLET_RADIUS)  # (upper, lower): any root up to the MAX
+FILLET_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R.004 MAX"
 # Three identical land-step roots (the collar's roots stay sharp,
 # build_dt_cone_gear_shaft), one fillet feature, one radius dimension.
 FILLET_CALLOUT = "3X"
@@ -489,12 +490,10 @@ SURFACE_FINISHES = (
 # fit those names need once, under the gear key (drawing-guidelines.md rule
 # 4; machinist review r4b, 20261018T072511131Z).
 FLAT_FIT_NOTE = "FLATS: SLIDING FIT IN THE NAMED GEARS' D-BORES."
-# The step roots' own band (FILLET_R_BAND) names what it serves once, here:
-# the root stays clear of the smaller gear seated past it and is never sharp
-# (machinist review of the final4 render, 20261102T034848049Z).  No room at
-# the radius itself: its text sits between the Ø.2500 line and section
-# A-A's arrow.
-FILLET_FUNCTION_NOTE = "STEP ROOTS: CLEAR OF THE SMALLER GEAR'S BORE, NOT SHARP."
+# What the step roots' MAX keeps clear, named once here: the smaller gear
+# seated past each step.  No room at the radius itself: its text sits
+# between the Ø.2500 line and section A-A's arrow.
+FILLET_FUNCTION_NOTE = "STEP ROOTS: CLEAR OF THE SMALLER GEAR'S BORE."
 DRAWING_NOTES = "\n".join(
     (
         f"{_gear(min(min(g) for g in SECTION_CONE_GEAR_TEETH if g))}"
