@@ -46,7 +46,10 @@ def test_tr8_bore_is_letter_c_tapped_through_at_five_turns():
     assert f"({engagement_d:.2f}D)" in exception["finding"]
     assert exception["reason"].startswith("Owner ruling 2026-11-01: thread engagement below 1.5D")
     assert (spec.BORE_X, spec.BORE_Y) == pytest.approx((0.63 * INCH, 0.38 * INCH))
-    assert spec.CALLOUTS_BELOW["BoreDia"] == "Tr8x2-7H RH THRU"
+    # Rule 20: the callout states the shortfall as a plain fact, RV-01's.
+    assert spec.TR8_ENGAGEMENT_D == pytest.approx(engagement_d)
+    assert spec.CALLOUTS_BELOW["BoreDia"] == "Tr8x2-7H RH THRU\nENGAGES .39 MIN (1.24D)"
+    assert ".39 min (1.24D)" in exception["finding"]
 
 
 def test_loose_holes_stand_2x_340_from_the_bore_and_name_their_mate():
