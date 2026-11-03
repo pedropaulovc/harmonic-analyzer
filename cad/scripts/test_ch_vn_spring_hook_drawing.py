@@ -80,23 +80,25 @@ def test_shortest_part_backed_out_keeps_two_full_threads_past_the_nut():
 
 
 def test_the_anchor_is_sized_at_the_coefficient_plate_thickness_extremes():
-    """The uniform 7.00 coefficient plate retains the lever's .XX band, so the
-    jam nut seats anywhere from 6.49 to 7.51 below its fixed top. The trim is
-    18.034 shank / 1.21 in overall, one .01 step over the worst-case 1.5875
-    full-thread floor plus the round-up to the printed grid."""
-    from sm_summing_lever_notes import LINEAR_BAND
+    """The uniform 7.00 coefficient plate retains the lever's printed band
+    (.28 ±.01 in), so the jam nut seats anywhere from 6.746 to 7.254 below its
+    fixed top. The trim is 17.78 shank / 1.20 in overall, one .01 step over
+    the worst-case 1.5875 full-thread floor plus the round-up to the grid."""
+    from _printed_tolerance import printed_band_mm
+    from sm_summing_lever_spec import UNIT
 
-    assert spec.SEAT_BAND_MM == LINEAR_BAND == pytest.approx(0.51)
-    thin, thick = 6.49, 7.51
+    band_xx = printed_band_mm(2, unit=UNIT)
+    assert spec.SEAT_BAND_MM == pytest.approx(band_xx) == pytest.approx(0.254)
+    thin, thick = 7.00 - band_xx, 7.00 + band_xx
     assert (spec.SEAT_T_MIN_MM, spec.SEAT_T_MAX_MM) == pytest.approx((thin, thick))
     assert (spec.SHANK_LENGTH_MM, spec.FINISHED_OVERALL_MM) == pytest.approx(
-        (18.034, 30.734)
+        (17.78, 30.48)
     )
     band, budget = spec.LENGTH_BAND_WORST_MM, spec.ADJUSTMENT_TRAVEL_MM
     floor = spec.PAST_NUT_FLOOR_MM
     # Thickest plate, shortest part, backed out: the floor plus the margin.
     at_thick = spec.full_threads_past_nut_mm(budget, -band, thick)
-    assert at_thick == pytest.approx(1.9652006006)
+    assert at_thick == pytest.approx(1.9672006006)
     assert at_thick >= floor + spec.PAST_NUT_MARGIN_MM
     assert spec.full_threads_past_nut_mm(budget, -band) == pytest.approx(at_thick)
     # The thinner plates only add thread.
@@ -104,15 +106,15 @@ def test_the_anchor_is_sized_at_the_coefficient_plate_thickness_extremes():
         at_thick + 2 * spec.SEAT_BAND_MM
     )
     # Deepest cut end: the longest part under the thinnest plate, still cut
-    # from the 19.05 stock (1.016 comes off).
+    # from the 19.05 stock (1.27 comes off).
     assert spec.SHANK_LENGTH_MM + band < anchor.shank_length_mm
-    assert anchor.shank_length_mm - spec.SHANK_LENGTH_MM == pytest.approx(1.016)
+    assert anchor.shank_length_mm - spec.SHANK_LENGTH_MM == pytest.approx(1.27)
     assert spec.PROTRUSION_MAX_MM == pytest.approx(
         spec.SHANK_LENGTH_MM + band - anchor.unthreaded_shank_length_mm - thin
     )
-    assert spec.PROTRUSION_MAX_MM == pytest.approx(8.623)
-    # Modelled at nominal thickness, the cut end hangs 7.859 below the plate.
-    assert spec.PROTRUSION_MM == pytest.approx(7.859)
+    assert spec.PROTRUSION_MAX_MM == pytest.approx(8.113)
+    # Modelled at nominal thickness, the cut end hangs 7.605 below the plate.
+    assert spec.PROTRUSION_MM == pytest.approx(7.605)
 
 
 def test_install_step_locks_the_anchor_with_its_jam_nut():
