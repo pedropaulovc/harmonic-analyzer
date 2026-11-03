@@ -92,8 +92,8 @@ HAND = "right"
 
 # Current primary page + live 600 mm selection verified 2026-10-21; selecting
 # that option changes the displayed SKU from HW-SC-T8x2-P to HW-SC-T8x2-600.
-# The drawing prints the stock's length, nominal major and pitch as reference
-# text in its note block, not as a gauge sketch (machinist review).
+# The drawing prints none of the stock's sizes: its thread designation and
+# the SKU identify the stock (review: a gauge sketch, then a numeric note row).
 SUPPLIER_PRODUCT_URL = (
     "https://www.zyltech.com/"
     "8mm-t8x2-trapezoidal-acme-lead-screw-w-brass-nut-pre-cut-lengths-150mm-2000mm/"

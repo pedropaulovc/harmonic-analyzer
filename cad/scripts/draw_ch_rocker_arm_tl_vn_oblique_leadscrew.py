@@ -10,8 +10,7 @@ handwheel's, the 1:2 view drawing a flat 0.36 mm deep: C carries the near
 station, E the printed flat's length and across-flat; sections A-A and B-B
 through the two KP08 stations, each carrying its 120° flat's across-flat and
 angle from clock 0, the angle's text offset outboard of its arc; the
-isometric; and a note block naming the item, its supplier and SKU, and the
-bought stock's length, nominal major and pitch as millimetre references.
+isometric; and a note block naming the item, its supplier and SKU.
 The thread is bought, not cut: it is not modelled, and a leadered callout on
 the main view names it over the full length.
 
@@ -74,7 +73,6 @@ from _purchased_title_fit import (
     source_property_expression,
 )
 from _supplier_spring_drawing import _preserve_reference_source_file
-import ch_rocker_arm_tl_vn_oblique_leadscrew_stock_spec as supplier
 import _telemetry
 from ch_rocker_arm_tl_vn_oblique_leadscrew_stock_spec import (
     DIMENSION_CONTROLS,
@@ -374,26 +372,22 @@ FLAT_CALLOUTS = {
 # The cylinder face on the axis, 50 mm right of centre: 2 mm from either
 # silhouette and clear of the dimension above.
 CENTERLINE_PICK = (MAIN_CENTER[0] + 0.050, MAIN_CENTER[1])
-# Right of the details and over the title block (top-left anchored, four
-# rows about 18 mm tall and at most 135 mm wide): under the handwheel
-# station's text (0.128) and left of the isometric.
+# Right of the details and over the title block (top-left anchored, three
+# rows about 13 mm tall and 70 mm wide): under the handwheel station's text
+# (0.128) and left of the isometric.
 NOTES_XY = (0.230, 0.105)
 # The catalogue designation in plain text: the material is the title block's
-# and the cut length is the dimension's. The bought stock's sizes are one
-# reference row in the vendor's millimetres (machinist review: a 1:10 gauge
-# sketch of them read as a confusing pseudo-view; as two rows the block ran
-# past rule 7's four lines).
+# and the cut length is the dimension's. The bought stock's sizes print
+# nowhere: the item's thread designation and the SKU identify the stock, and
+# a note row typing spec numbers no native dimension owns breaks model
+# ownership (rule 7; review of a numeric STOCK row and, before it, a 1:10
+# gauge sketch that read as a confusing pseudo-view).
 ITEM = "TR8X2 LEAD SCREW"
-STOCK_REFERENCE = (
-    f"STOCK: ({supplier.STOCK_LENGTH:g} mm) LONG, (<MOD-DIAM>{MAJOR_DIA:g} mm) MAJOR,"
-    f" ({supplier.PITCH:g} mm) PITCH"
-)
 NOTES = "\n".join(
     (
         f"ITEM: {ITEM}",
         f"SUPPLIER: {property_link('Supplier')}",
         f"SKU: {property_link('Supplier SKUs')}",
-        STOCK_REFERENCE,
     )
 )
 EXPECTED_CONTROLS = {
@@ -1122,7 +1116,6 @@ async def _build_read_only_source(
             f"ITEM: {ITEM}",
             f"SUPPLIER: {properties['Supplier']}",
             f"SKU: {properties['Supplier SKUs']}",
-            STOCK_REFERENCE,
         )
     )
     printed = str(_early_bound(note, "INote").GetText() or "")
