@@ -140,10 +140,15 @@ OD_PLACES = 3
 OD_BAND = (0.0, -0.1016)
 
 # --- Pilot on the front face, through the wheel's bore (ruling 5) ------------
-PILOT_DIA = 10.0076  # .394
-PILOT_DIA_PLACES = 3
-# The maximum keeps radial air in the wheel's drilled bore: +.000/-.004.
-PILOT_DIA_BAND = (0.0, -0.1016)
+# .39 at the title block's .XX row (Codjiflo, #2148; rule 4): the pilot only
+# clears the wheel's drilled bore, and that row serves both limits.  Its
+# maximum (.40) keeps radial air in the bore; its minimum (.38) still
+# leaves the pilot wall over the .080 target and the thumbnut's seat a wide
+# annulus outside its countersink (the checks below).
+PILOT_DIA = 9.906  # .39
+PILOT_DIA_PLACES = 2
+_PILOT_LO, _PILOT_HI = printed_deviations(PILOT_DIA, PILOT_DIA_PLACES, unit=UNIT)
+PILOT_DIA_BAND = (_PILOT_HI, _PILOT_LO)  # title-block row, never authored
 # R9-70 (N-A): the thumbnut's seat.  The fitter faces the pilot so its front
 # face stands PILOT_PROUD_RANGE proud of the wheel's front face (the plate
 # measured, the pilot faced to it plus .004 ±.002), so the wheel is free under

@@ -87,7 +87,6 @@ from pd_transgear_drive_collar_spec import (
     OD,
     OD_BAND,
     PILOT_DIA,
-    PILOT_DIA_BAND,
     PILOT_LENGTH,
     PILOT_WALL_WORST,
     PIN_CIRCLE_RADIUS,
@@ -495,9 +494,6 @@ async def build(adapter) -> dict[str, str]:
     # and drawing.
     set_dimension_bilateral_tolerance(
         adapter, "BodyProfile", "CollarDia", *deviations(OD_BAND), display_unit=UNIT
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "BodyProfile", "PilotDia", *deviations(PILOT_DIA_BAND), display_unit=UNIT
     )
     set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND), display_unit=UNIT

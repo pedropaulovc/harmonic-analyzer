@@ -297,7 +297,6 @@ def test_round_stud_must_pass_the_actual_d_flat(monkeypatch) -> None:
 def test_fits_carry_named_bands_and_the_lengths_print_their_places() -> None:
     assert model_toleranced_dimensions(part) == {
         ("BodyProfile", "CollarDia"): "*deviations(OD_BAND)",
-        ("BodyProfile", "PilotDia"): "*deviations(PILOT_DIA_BAND)",
         ("BoreProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)",
         ("RearBoreChamfer", "BoreEntryBreak"): "*deviations(BORE_ENTRY_BREAK_BAND)",
         ("PinHoleProfile", "PinPosDia"): "*deviations(PIN_HOLE_BAND)",
@@ -358,7 +357,8 @@ def test_drive_pin_rim_is_the_seat_shortfall() -> None:
 
 def test_pilot_wall_worst_and_the_one_decimal_control() -> None:
     assert spec.PILOT_WALL == pytest.approx((spec.PILOT_DIA - spec.BORE_DIA) / 2.0)
-    assert spec.PILOT_WALL_WORST == pytest.approx(2.4892)
+    assert spec.PILOT_WALL_WORST == pytest.approx(2.3622)  # .093, over .080
+    assert spec.PILOT_WALL_WORST >= 0.080 * 25.4
     assert spec.PILOT_WALL_WORST >= 2.0
     # Negative control: a pilot narrower than the D-bore leaves no wall.
     assert (spec.BORE_DIA - (spec.BORE_DIA + max(spec.BORE_DIA_BAND))) / 2.0 < 0.0
@@ -379,10 +379,12 @@ def test_drive_pin_holes_clear_the_bore_and_the_pilot() -> None:
 
 def test_bore_slides_on_the_core_and_the_pilot_in_the_wheel() -> None:
     assert spec.BORE_CORE_CLEARANCE == pytest.approx((0.0254, 0.05842))
-    # Radial: (10.3 - 10.0) / 2 and (10.3 + 0.10 - 9.49) / 2. Only the
-    # maximum is tight; the minimum is the .XX row.
-    assert spec.PILOT_DIA_BAND == pytest.approx((0.0, -0.1016))
-    assert spec.PILOT_BORE_CLEARANCE == pytest.approx((0.1462, 0.2478))
+    # Radial: (10.3 - 10.16) / 2 and (10.3 + 0.1016 - 9.652) / 2. The pilot
+    # only clears the bore, so the title block's .XX row governs both limits
+    # (Codjiflo, #2148): .39 ±.01, never an authored band.
+    assert spec.PILOT_DIA_PLACES == 2
+    assert spec.PILOT_DIA_BAND == pytest.approx((0.254, -0.254))
+    assert spec.PILOT_BORE_CLEARANCE == pytest.approx((0.07, 0.3748))
     # Negative controls: a press-type bore band binds on the core; a pilot
     # at the wheel's bore size has no air.
     press_bore = spec.BORE_DIA - 0.030 - (shaft.CORE_DIA + max(shaft.CORE_DIA_BAND))

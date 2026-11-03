@@ -10,14 +10,15 @@ assembly setting, so it is an associative model dimension, never a note.
 sketch on the assembly's Right plane (sketch u, v = machine -Z, Y): a line
 from the ring's rear face rearward along the pin, its length the floor
 (``END_FLOAT_MIN``, from the global ``GLOBAL``) toleranced +x/-0 up to the
-window's top, rounded up to the thousandth inch so every shimmed cluster passes.
+window's top.  Both limits are the fit source's own, on the four-place inch
+grid, so the print rounds neither (rule 3; Codjiflo, #2148).
 MHA-PD-00's VIEW E prints it and the shimming step cites it; the step
 prints no value of its own.  No solid or pose changes.
 """
 
 from __future__ import annotations
 
-from pd_rack_pinion_spec import inch_ceil_mm
+from pd_rack_pinion_spec import MM_PER_IN
 
 import _paper_drive_placement as placement
 import pd_transgear_pin_spec as pin
@@ -28,14 +29,20 @@ FEATURE = "ClusterFloatSetting"
 DIMENSION = "ShimmedRingGap"
 GLOBAL = "ClusterRingGap"
 DRAWING_DIMENSIONS = {FEATURE: {DIMENSION}}
-PLACES = 3
+PLACES = 4
 DRAWING_PRECISION = {FEATURE: {DIMENSION: PLACES}}
 VIEW_NAME = "VIEW E"
 
-# The printed window: the floor, and the shim's thickest step above it
-# rounded up to the thousandth inch.
+# The printed window is the fit source's: the floor, and the shim's thickest
+# step above it, each exact at PLACES.
 NOMINAL_MM = cluster.RING_FLOAT_RANGE[0]
-TOLERANCE_MM = (0.0, inch_ceil_mm(cluster.RING_FLOAT_RANGE[1] - NOMINAL_MM, PLACES))
+TOLERANCE_MM = (0.0, round(cluster.RING_FLOAT_RANGE[1] - NOMINAL_MM, 6))
+for _limit in (NOMINAL_MM, NOMINAL_MM + TOLERANCE_MM[1]):
+    _grid = _limit / MM_PER_IN * 10**PLACES
+    if abs(_grid - round(_grid)) > 1e-6:
+        raise AssertionError(
+            f"the VIEW E window limit {_limit} mm is off the .0001 grid"
+        )
 
 # The line on the pin's axis plane, at mid-height of the ring's face: from
 # the ring's rear face rearward (machine +Z, sketch -u).
