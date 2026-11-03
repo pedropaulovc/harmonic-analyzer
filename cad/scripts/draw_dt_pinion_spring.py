@@ -1188,6 +1188,10 @@ async def build(adapter: Any) -> dict[str, str]:
         label="spring pad clearance hole",
         process=HOLE_PROCESS,
     )
+    # This render-time precision write is the declared exception RV-02 in
+    # cad/config/parts/dt-pinion-spring.yaml (delegated ruling 2026-11-02,
+    # owner review #2144): a part-authored precision does not reach the
+    # callout (run 20261102T230110877Z).
     set_hole_callout_precision(
         hole_callout, {"hw-diam": HOLE_CALLOUT_PRECISION}, label="spring pad clearance hole"
     )

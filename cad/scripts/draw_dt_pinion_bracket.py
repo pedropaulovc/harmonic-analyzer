@@ -165,8 +165,10 @@ def _rim_only_bore_callouts(adapter: Any, annotations: list[Any]) -> None:
         if name not in RIM_ONLY_DIAMETERS:
             continue
         display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        display.DisplayAsLinear = False
-        display.Diametric = True
+        # The bores import as diameters; a sheet never re-solves one through
+        # Diametric (test_no_sheet_re_solves_a_model_dimension_through_diametric).
+        if bool(display.DisplayAsLinear) or not bool(display.Diametric):
+            raise RuntimeError(f"{name}: the imported bore dimension is not diametric")
         display.ArrowSide = _ARROWS_OUTSIDE
         display.SetSecondArrow(False, False)
         display.SolidLeader = False
@@ -174,9 +176,7 @@ def _rim_only_bore_callouts(adapter: Any, annotations: list[Any]) -> None:
             raise RuntimeError(f"{name}: failed to apply a broken horizontal leader")
         display.LeaderVisibility = _LEADER_LINE_NONE
         if (
-            bool(display.DisplayAsLinear)
-            or not bool(display.Diametric)
-            or int(display.ArrowSide) != _ARROWS_OUTSIDE
+            int(display.ArrowSide) != _ARROWS_OUTSIDE
             or bool(display.GetUseDocSecondArrow())
             or bool(display.GetSecondArrow())
             or bool(display.SolidLeader)
