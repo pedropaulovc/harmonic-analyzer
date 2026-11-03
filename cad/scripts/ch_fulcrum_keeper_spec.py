@@ -217,7 +217,7 @@ KEEPER_FITUP_PLACES = 2
 # datum on the receiving web): the kinematic fulcrum line off the frame's
 # column line. A literal, so the frame's recipe does not read the channel
 # kinematics; draw_ch_channel_assembly checks it against both.
-KEEPER_FITUP_X_FROM_WEB_MM = 2.9
+KEEPER_FITUP_X_FROM_WEB_MM = 2.8976  # fulcrum 199.9 - column 197.0024
 # The lug centre's own band (owner ruling X-A, 2026-10-18, on the 5d5245a48
 # machinist review): no mate needs the lateral X held tight -- the pair is
 # reamed together and set with the shaft through both, the fulcrum's gain

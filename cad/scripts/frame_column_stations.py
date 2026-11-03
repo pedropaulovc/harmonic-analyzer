@@ -14,7 +14,7 @@ importers.
 from __future__ import annotations
 
 # Frame column line (frame.SLDASM); the four columns sit at (+/-COLUMN_X, +/-Z).
-COLUMN_X = 197.0
+COLUMN_X = 197.0024  # 7.756
 
 # Blind socket the column tube enters in the base casting. Bore diameters are
 # nominal CAD geometry only: production sockets are match-fit to their assigned

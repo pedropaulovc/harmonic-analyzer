@@ -213,9 +213,9 @@ def test_the_part_notes_carry_no_assembly_step() -> None:
 @pytest.mark.parametrize(
     ("station", "machine_z"),
     [
-        (0.0, -116.4625),
-        (spec.GROOVE_STATION, -163.7065),
-        (spec.LENGTH, -167.7705),
+        (0.0, -116.4755),
+        (spec.GROOVE_STATION, -163.7195),
+        (spec.LENGTH, -167.7835),
     ],
 )
 def test_the_pin_sits_at_its_machine_stations(station: float, machine_z: float) -> None:

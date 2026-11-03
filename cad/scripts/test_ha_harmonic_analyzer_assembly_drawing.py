@@ -121,7 +121,7 @@ def test_stud_drop_text_stands_east_of_the_east_column() -> None:
     # East is -x; the text's west end (half its ~80 mm of model width at 1:5)
     # must clear the column's outer face.
     column_face = -(fr_top_frame_spec.COLUMN_X + fr_tube_frame_spec.OUTER_DIA / 2.0)
-    assert column_face == pytest.approx(-209.7)
+    assert column_face == pytest.approx(-209.7024)  # the #290 7.756 column line
     half_width = len(notes.SETTING_CALLOUTS[spec.STUD_DROP_DIMENSION]) * 2.3 * 5 / 2
     assert drawing.STUD_DIMENSION_TEXT_MODEL_X_MM + half_width < column_face - 10.0
 

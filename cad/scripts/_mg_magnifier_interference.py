@@ -41,14 +41,14 @@ _MG_CLAMP_THUMB_LIMIT = smooth_annulus_limit_mm3(*_MG_CLAMP_THUMB_TRIPLE_MM)
 _MG_ROD_THREAD_LIMIT = smooth_annulus_limit_mm3(*_MG_ROD_THREAD_TRIPLE_MM)
 
 ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
-    # 31.75 screw - 9.5 wheel bar - 17.4 front arc - 0.508 (.020) grip gap (the
-    # back arc's mating face stops short of the column axis,
-    # sh_column_clamp_back_geom.GRIP_OFFSET) = 4.342 in the back arc's tap.
+    # 31.75 screw - 9.4996 wheel bar - 17.399 front arc - 0.508 (.020) grip
+    # gap (the back arc's mating face stops short of the column axis,
+    # sh_column_clamp_back_geom.GRIP_OFFSET) = 4.3434 in the back arc's tap.
     **numbered_pairs(
         "sh-vn-clamp-screw",
         range(1, 3),
         "sh-column-clamp-back",
-        smooth_annulus_limit_mm3(4.1656, 3.454, 4.342),
+        smooth_annulus_limit_mm3(4.1656, 3.454, 4.3434),
     ),
     frozenset(("sh-vn-thumb-screw-1", "mg-magnifying-clamp-1")): _MG_CLAMP_THUMB_LIMIT,
     frozenset(

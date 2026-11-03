@@ -42,7 +42,7 @@ def test_printed_bands_match_the_bar_and_drilled_slot_limits() -> None:
     from _printed_tolerance import drilled_oversize_mm, printed_deviations
 
     # .XXX at the inch print: each band is the printed limit's furthest
-    # reach from the mm nominal, the rounding of .374 included.
+    # reach from the mm nominal (both now on the .001 grid, #290).
     for value, band in (
         (spec.BAR_HEIGHT, spec.BAR_HEIGHT_BAND),
         (BAR_DEPTH, spec.BAR_DEPTH_BAND),
@@ -50,7 +50,7 @@ def test_printed_bands_match_the_bar_and_drilled_slot_limits() -> None:
         lower, upper = printed_deviations(value, spec.BAR_BAND_PLACES, unit="in")
         assert band == max(-lower, upper)
     assert (spec.BAR_HEIGHT_BAND, spec.BAR_DEPTH_BAND) == pytest.approx(
-        (0.127, 0.1274)
+        (0.127, 0.127)
     )
     assert part.CLAMP_SLOT_WIDTH_LIMITS == (0.0, drilled_oversize_mm(unit="in"))
 
@@ -103,13 +103,13 @@ def test_row_nominals_are_the_built_holes() -> None:
     assert part.HANGER_STATIONS == pytest.approx((168.06, 291.06, 298.06))
     # Both rows read from the same (left, x = -226.06) end.
     assert part.CLAMP_ROW_START_X == left
-    assert part.CLAMP_ROW_X == (-214.5006, -179.4994, 179.4994, 214.5006)
+    assert part.CLAMP_ROW_X == (-214.503, -179.5018, 179.5018, 214.503)
     assert sorted(part.CLAMP_ROW_X) == sorted(part.CLAMP_HOLE_X)
-    assert part.CLAMP_STATIONS == pytest.approx((11.5594, 46.5606, 405.5594, 440.5606))
+    assert part.CLAMP_STATIONS == pytest.approx((11.557, 46.5582, 405.5618, 440.563))
     # END A's (east, -X) pair are round and locate the bar; the west pair are
     # the slots (owner ruling 2026-10-15, option A).
-    assert sorted(part.CLAMP_ROUND_X) == [-214.5006, -179.4994]
-    assert sorted(part.CLAMP_SLOT_X) == [179.4994, 214.5006]
+    assert sorted(part.CLAMP_ROUND_X) == [-214.503, -179.5018]
+    assert sorted(part.CLAMP_SLOT_X) == [179.5018, 214.503]
     assert sorted((*part.CLAMP_ROUND_X, *part.CLAMP_SLOT_X)) == list(part.CLAMP_ROW_X)
     # The clamp line keeps its machine height under the bar's top edge (the
     # SH column clamps), so it stands off the shortened bar's centre.
@@ -486,7 +486,7 @@ def test_slot_counterbores_leave_rule_17_walls() -> None:
         assert wall >= WALL_TARGET_MM
     # Nominally 5.806 to the end, 23.495 between.
     reach = part.CLAMP_SLOT_RUN / 2.0 + part.CLAMP_SLOT_CBORE_WIDTH / 2.0
-    assert part.BAR_LENGTH / 2.0 - max(part.CLAMP_SLOT_X) - reach == pytest.approx(5.8063)
+    assert part.BAR_LENGTH / 2.0 - max(part.CLAMP_SLOT_X) - reach == pytest.approx(5.8039)
     assert max(part.CLAMP_SLOT_X) - min(part.CLAMP_SLOT_X) - 2.0 * reach == pytest.approx(
         23.4950
     )

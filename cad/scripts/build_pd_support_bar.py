@@ -86,6 +86,7 @@ from sh_vn_clamp_screw_spec import HEAD_DIA as CLAMP_HEAD_DIA
 from sh_vn_clamp_screw_spec import HEAD_H as CLAMP_HEAD_H
 from sh_vn_clamp_screw_spec import SHANK_DIA as CLAMP_SCREW_MAJOR
 from _column_clamp_interface import BAR_DEPTH
+from frame_column_stations import COLUMN_X  # frame column line (frame assembly)
 from pd_support_bar_spec import (
     BACK_FACE_Z,
     BAR_HEIGHT,
@@ -124,10 +125,8 @@ MATERIAL = "Plain Carbon Steel"
 # unmated overall length, so it prints .X.
 BAR_LENGTH = 452.12  # 17.8
 
-# The column line (frame) and the clamp-screw spacing (the MHA-SH-02 back-arc
-# taps) are the frame's and the clamps', so they keep their millimetres and
-# the stations print rounded.
-COLUMN_X = 197.0  # frame column line (frame assembly)
+# The clamp-screw spacing (the MHA-SH-02 back-arc taps) is the clamps', so it
+# keeps its millimetres and the stations print rounded.
 CLAMP_SCREW_DX = 17.5006  # clamp screws flank each column (.689 clamp ear stations)
 # The stock 90280A201 #8-32 clamp screws pass through #8 clearance holes.
 # Their .156 heads sit below the bar front: the right-shifted platen

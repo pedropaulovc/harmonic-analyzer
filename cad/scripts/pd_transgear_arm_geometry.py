@@ -68,7 +68,7 @@ def printed_reach_mm(
 
 # The assembly's anchor for the arm: its front face on the spacer's rear
 # face, the spacer's front face on the bar's back face (the column clamp's
-# arc depth in front of the frame's front column plane): -124.4.
+# arc depth in front of the frame's front column plane): -124.413.
 FRONT_FACE_MACHINE_Z = FRAME_FRONT_COLUMN_Z - ARC_DEPTH + SPACER.LENGTH
 
 # --- Stock: 5/16 x 1 precision-ground flat bar, faces as supplied ------------

@@ -137,6 +137,7 @@ from _transforms import (
     rows_from_euler,
 )
 from _cone_axis_constants import FRAME_FRONT_COLUMN_Z, SUMMING_Z
+from frame_column_stations import COLUMN_X  # the WEST column (machine +x is west; the crank side -x is east)
 from sm_summing_lever_spec import PLATE_L
 from mg_wheel_bar_geom import WHEEL_BAR_Y
 from magnifying_bracket_joint_layout import (
@@ -153,7 +154,6 @@ BRACKET_SCREW_ROWS = ROT_X_NEG90
 # ch30 p002 front-view re-anchor (2026-07-17): the wheel
 # + bar + column clamps sit 10.7 higher than the old 565.0 -- the photo shows
 # the rim clearing the platen box top, which 565.0 left overlapped
-COLUMN_X = 197.0  # the WEST column (machine +x is west; the crank side -x is east)
 COLUMN_Z = FRAME_FRONT_COLUMN_Z
 # Depth chain -- the SAME two-piece clamp seat as the platen support bar
 # (paper-drive PR #196 E2): the front arc's front face (-129.4) carries the

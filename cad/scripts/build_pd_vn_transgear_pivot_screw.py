@@ -334,7 +334,7 @@ async def _thread_tail_acceptance(adapter) -> None:
 
 
 def _reference_length(adapter) -> None:
-    """CutLength prints as a reference, "(9.15)": no band, the fit-up sets it
+    """CutLength prints as a reference, "(9.14)": no band, the fit-up sets it
     (build_pn_pen_v_block._author_reference_dimensions' recipe)."""
     for feature, name in REFERENCE_DIMENSIONS:
         display, dimension = _named_dimension(adapter, feature, name)

@@ -225,8 +225,8 @@ def test_every_wall_is_stated_at_the_full_worst_case() -> None:
 
     import mg_wheel_bar_geom as geom
 
-    assert geom.AXLE_BORE_X == -56.0 == geom.WHEEL_X - geom.WHEEL_BAR_X0
-    assert mg_wheel_bar_spec.AXLE_BORE_STATION == 61.0
+    assert geom.AXLE_BORE_X == geom.WHEEL_X - geom.WHEEL_BAR_X0
+    assert mg_wheel_bar_spec.AXLE_BORE_STATION == pytest.approx(60.9976)
     assert (
         mg_wheel_bar_spec.AXLE_BORE_STATION == geom.AXLE_BORE_X + geom.BAR_LENGTH / 2.0
     )
