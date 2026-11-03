@@ -1442,9 +1442,9 @@ def test_kp08_row_and_stud_cut_timing_read_plainly() -> None:
     step = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("2. "))
     assert (
         "THE STUDS STAY UNCUT UNTIL STEP 13B; THERE HD3 CUTS EACH TO ITS BOM "
-        "LENGTH, 57.2 MM." in step
+        "LENGTH, 2.25." in step
     )
-    assert spec.BOM_DESCRIPTIONS[spec.HOLD_DOWN_STUD].endswith("CUT 57.2 MM")
+    assert spec.BOM_DESCRIPTIONS[spec.HOLD_DOWN_STUD].endswith("CUT 2.25 IN")
 
 
 def test_caption_names_the_cl_tip_reference() -> None:
@@ -1918,12 +1918,12 @@ def test_bonded_gauge_locator_uses_the_finished_hub_bore_and_actual_cut_overlap(
 
 
 def test_hold_down_inch_limits_lie_on_the_safe_side_of_the_kit_limits() -> None:
-    """HD2 checks with the kit's mm stud limits printed in inch: LMIN low,
-    LMAX high and the clearance high, so a passing setup passes the kit's."""
+    """HD2 checks with the kit's stud limits: LMIN low, LMAX high and the
+    clearance high, so a passing setup passes the kit's."""
     assert spec.CLAMPING_KIT_NUMBER == _config.parts(spec.CLAMPING_KIT)["number"]
     low, high = (float(text) * 25.4 for text in spec._STUD_LIMITS.split("/"))
-    assert low <= hold_down_stud.LENGTH - hold_down_stud.LENGTH_BAND
-    assert high >= hold_down_stud.LENGTH + hold_down_stud.LENGTH_BAND
+    assert low <= hold_down_stud.LENGTH_LIMITS[0] + 1e-9
+    assert high >= hold_down_stud.LENGTH_LIMITS[1] - 1e-9
     assert float(spec._STUD_CLEARANCE) * 25.4 >= hold_down_stud.CLEARANCE_MIN
 
 
