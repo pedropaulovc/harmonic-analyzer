@@ -548,17 +548,13 @@ def test_one_axis_horizontal_view_at_the_largest_fitting_scale() -> None:
         assert start + 2.5 <= section.cut_mm <= start + spec.FLAT_LENGTH - 2.5
         assert section.cut_mm != spec.FLAT_STATIONS[section.flat]
     assert [s.flat for s in draw.CLOCK_SECTIONS] == list(spec.CLOCKED_FLATS)
-    # The note block (four rows about 18 mm tall, top-left anchored; its
-    # widest printed row, the stock's, at about 2.7 mm a glyph as farm run
-    # 20261101T232956371Z printed it, under 135 mm) stands under the main
-    # view's lowest text, right of the details and over the title block,
-    # left of the isometric.
-    printed = draw.STOCK_REFERENCE.replace("<MOD-DIAM>", "Ø")
-    assert len(printed) * 0.0027 <= 0.135
+    # The note block (three rows about 13 mm tall and 70 mm wide, top-left
+    # anchored) stands under the main view's lowest text, right of the
+    # details and over the title block, left of the isometric.
     notes = (
         draw.NOTES_XY[0],
-        draw.NOTES_XY[1] - 0.018,
-        draw.NOTES_XY[0] + 0.135,
+        draw.NOTES_XY[1] - 0.013,
+        draw.NOTES_XY[0] + 0.070,
         draw.NOTES_XY[1],
     )
     assert draw._inside_sheet(notes)
@@ -991,13 +987,12 @@ def leadscrew_lifecycle(monkeypatch):
     return state
 
 
-def test_builder_prints_the_note_block_with_the_stock_reference_line(
+def test_builder_prints_the_identity_note_block(
     leadscrew_lifecycle,
 ) -> None:
     state = leadscrew_lifecycle
     assert set(state.run()) == {"drawing", "pdf", "png"}
     assert state.notes == [(draw.NOTES, draw.NOTES_XY)]
-    assert draw.NOTES.splitlines()[-1] == draw.STOCK_REFERENCE
 
 
 def test_builder_fits_the_number_once_and_checks_only_live_boundaries(
@@ -1049,8 +1044,11 @@ def test_number_after_save_refusal_keeps_primary_native_failure(
 
 def test_note_block_that_does_not_resolve_is_refused(leadscrew_lifecycle, monkeypatch) -> None:
     state = leadscrew_lifecycle
+    # The SKU link left unresolved: the printed block is not the source's.
     monkeypatch.setattr(draw, "add_note", lambda *_args: SimpleNamespace(
-        GetText=lambda: f"ITEM: {draw.ITEM}\nSUPPLIER: supplier\nSKU: sku",
+        GetText=lambda: (
+            f"ITEM: {draw.ITEM}\nSUPPLIER: supplier\nSKU: {property_link('Supplier SKUs')}"
+        ),
     ))
     with pytest.raises(RuntimeError, match="note block did not resolve"):
         state.run()
@@ -1244,15 +1242,13 @@ def test_notes_name_the_item_not_its_length_or_material() -> None:
     assert f"{spec.LENGTH:.0f}" not in draw.NOTES
     for name in ("Supplier", "Supplier SKUs"):
         assert property_link(name) in draw.NOTES
-    # Then the bought stock's sizes as one millimetre reference row (machinist
-    # review: they replaced a confusing 1:10 gauge sketch), from the spec, the
-    # block within rule 7's four lines.
-    assert draw.NOTES.splitlines()[3:] == [
-        f"STOCK: ({spec.STOCK_LENGTH:g} mm) LONG, (<MOD-DIAM>{spec.MAJOR_DIA:g} mm) MAJOR,"
-        f" ({spec.PITCH:g} mm) PITCH",
-    ]
-    assert len(draw.NOTES.splitlines()) == 4
-    assert (spec.STOCK_LENGTH, spec.MAJOR_DIA, spec.PITCH) == (600.0, 8.0, 2.0)
+    # Identity only: no stock size row. The bought stock's sizes are the
+    # thread designation's and the SKU's; a note typing spec numbers that no
+    # native dimension owns breaks model ownership (rule 7, review), and the
+    # 1:10 gauge sketch before it read as a confusing pseudo-view.
+    assert len(draw.NOTES.splitlines()) == 3
+    assert not hasattr(draw, "STOCK_REFERENCE")
+    assert re.findall(r"\d", draw.NOTES.replace("TR8X2", "")) == []
     assert not hasattr(draw, "SUPPLIER_STOCK_CAPTION")
     assert not hasattr(spec, "SUPPLIER_REFERENCE_DIMENSIONS")
     assert "Manufacturing Notes" not in draw.NOTES
