@@ -76,11 +76,11 @@ INSIDE_CORNER_R_MAX = inside_corner_radius_mm(unit=UNIT)
 
 # X, along the marker: the CG solve (pn_pen_carriage_geom) puts the carriage's
 # plan CG on the rod axis at this length, on the .XX grid.
-BLOCK_LENGTH = 27.178  # 1.07
+BLOCK_LENGTH = 26.162  # 1.03
 BLOCK_HEIGHT = 18.0  # Y; closure, prints .71
 # --- Depth (Z): neck and body, both centred on DEPTH_MID_Z ---
-# The stirrup's window passes the neck with 1.0 a side
-# (pn_pen_carriage_geom), so the neck rounds down to .70, not up to .71.
+# The stirrup's window passes the neck with .02 a side
+# (pn_pen_frame_spec), so the neck rounds down to .70, not up to .71.
 NECK_DEPTH = 17.78  # .70; z 0..NECK_DEPTH
 BODY_SIDE_STEP = 2.032  # .08; the body stands this proud of the neck each side
 BODY_Z0 = -BODY_SIDE_STEP  # the body's front face: the depth datum
@@ -459,7 +459,7 @@ if PIVOT_BORE_STEP_CLEARANCE_PRINTED_MIN < 0.0:
 # neither can move.  The step can't come toward the paper end (the stirrup
 # slides on the neck with 0.016 mm to spare, pn_pen_carriage_geom), and the
 # bore can't go toward the free end (it carries the block toward the paper:
-# 0.217 mm of the carriage's paper clearance is left at the printed worst
+# 0.212 mm of the carriage's paper clearance is left at the printed worst
 # case, pn_pen_carriage_geom).  The sheet states the
 # worst case natively, floored to the micron grid it prints at (rod's recipe).
 _TAP_THREAD_R = THREAD_MAJOR_MM[SET_SCREW_TAP_SPEC.size] / 2.0

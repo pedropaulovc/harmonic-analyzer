@@ -1936,15 +1936,15 @@ sections:
         - scaled + derived
         - low
       - - Frame (stirrup)
-        - 1.10 × 1.58 × .31 in ring; side rails .16, end rails .24; 2X R.13 on two diagonal outer vertical edges; #4-40 thumb-screw tap up through the bottom rail
+        - 1.00 × 1.58 × .31 in ring; side rails .13, end rails .24; #4-40 thumb-screw tap up through the bottom rail
         - —
-        - 'p.64–65 + t046: the ring WRAPS the v-block''s .70 × .71 end section (window .78 wide, .04 a side), flush with the block''s PAPER end face, its plane perpendicular to the block length, top rail 0.1 mm above the block top; 1.03 mm clear of the rod''s square diagonal. End rail .24 gives the thumb screw 1.5 D of thread'
+        - 'p.64–65 + t046: the ring WRAPS the v-block''s .70 × .71 end section (window .74 wide, .02 a side, the narrowest that passes the neck at both prints' limits), flush with the block''s PAPER end face, its plane perpendicular to the block length, top rail 0.1 mm above the block top; 1.03 mm clear of the rod''s square diagonal. End rail .24 gives the thumb screw 1.5 D of thread'
         - scaled
         - low
       - - V-block
-        - '1.07 in long × .71 tall (an 18 mm closure), a simplified E in plan: a .70-deep neck over x 0–.35 from the paper end (it passes the stirrup''s window) and a .86-deep body (.08 proud each side) from the step to the free end; V-groove of two flanks each 45° to the bottom face (theoretical apex 6.0 mm up, 12.0 mm wide at the bottom face, printed as the .19 / .67 mouth stations, its apex cut as a .08-wide flat (.20) up, clear over the seated grip, its two internal corners under the title block''s INSIDE CORNERS R.040 MAX) along the neck seating the marker grip, run on into a .62 × .26 flat-roofed relief slot from the step to the free end clearing the marker body; Ø.126 +.0005/0 reamed pivot bore at x .49, centred across the depth; #4-40 tap from the body''s front face (y .47) into the pivot bore for the rod set screw. Every station and size prints at the title block''s .XX from the body''s front face: relief walls .110 / .100 and V lands .090 at the printed limits; the tap''s wall to the step prints .064 MIN (RV-01)'
+        - '1.03 in long × .71 tall (an 18 mm closure), a simplified E in plan: a .70-deep neck over x 0–.35 from the paper end (it passes the stirrup''s window) and a .86-deep body (.08 proud each side) from the step to the free end; V-groove of two flanks each 45° to the bottom face (theoretical apex 6.0 mm up, 12.0 mm wide at the bottom face, printed as the .19 / .67 mouth stations, its apex cut as a .08-wide flat (.20) up, clear over the seated grip, its two internal corners under the title block''s INSIDE CORNERS R.040 MAX) along the neck seating the marker grip, run on into a .62 × .26 flat-roofed relief slot from the step to the free end clearing the marker body; Ø.126 +.0005/0 reamed pivot bore at x .49, centred across the depth; #4-40 tap from the body''s front face (y .47) into the pivot bore for the rod set screw. Every station and size prints at the title block''s .XX from the body''s front face: relief walls .110 / .100 and V lands .090 at the printed limits; the tap''s wall to the step prints .064 MIN (RV-01)'
         - —
-        - 'p.60/65 close-ups + t046 (green grip in the block, body leaving the far end; through-hole at the free end): the block HANGS on the rod''s pivot end, its length at 45° to the paper. Pivot station .49 and the 1.07 length put the carriage CG on the rod axis (pn_pen_carriage_geom.plan_cg_residual_mm 0.038 mm in plan) so the pen hangs level; the lightening bore is dropped'
+        - 'p.60/65 close-ups + t046 (green grip in the block, body leaving the far end; through-hole at the free end): the block HANGS on the rod''s pivot end, its length at 45° to the paper. Pivot station .49 and the 1.03 length put the carriage CG on the rod axis (pn_pen_carriage_geom.plan_cg_residual_mm 0.026 mm in plan) so the pen hangs level; the lightening bore is dropped'
         - scaled + derived
         - low
       - - Set screw (thumb screw)
@@ -1998,8 +1998,8 @@ sections:
       the pen wire hangs plumb onto the rod axis); shoulder y 384.2, square top
       496.2, adjuster stud head top 519.0, pen wire 56.7 up to the rim tangent at
       y 575.7. PEN_Z_MID is the 0.1 mm line the paper solve set with the
-      stirrup's then-sharp paper-side corner 0.5 off the paper front (−143.25);
-      its R.13 round now stands 1.94 off as modelled and 0.22 off with every
+      stirrup's paper-side corner 0.5 off the paper front (−143.25) on a 1.10
+      ring; the 1.00 ring now stands 1.47 off as modelled and 0.21 off with every
       printed band and the stirrup's float on the neck at its worst. V-block
       origin (−11.29, 366.2, −159.99), yawed +45° about Y (its length runs forward
       + east from the paper end): the pivot bore (local x 12.446, z 8.89) on the rod

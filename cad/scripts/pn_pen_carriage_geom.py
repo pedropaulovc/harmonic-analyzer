@@ -201,16 +201,10 @@ def machine_z(local_x: float, local_z: float) -> float:
 def paper_side_points() -> dict[str, float]:
     """Machine z of each carriage feature's paper-most point (the nib excepted)."""
     frame_z_paper = vb.DEPTH_MID_Z + frame.OUTER_WIDTH / 2.0
-    edge_r = frame.EDGE_ROUND_R
     points = {
         "v-block neck paper-end corner": machine_z(0.0, vb.NECK_DEPTH),
         "v-block body paper-side corner": machine_z(vb.RELIEF_X0, vb.BODY_Z1),
-        # The paper's normal lies inside the round's quarter (block -x .. +z),
-        # so its paper-most point stands edge_r off its axis toward the paper.
-        "stirrup paper-side round": machine_z(
-            FRAME_X0_LOCAL + edge_r, frame_z_paper - edge_r
-        )
-        + edge_r,
+        "stirrup paper-side corner": machine_z(FRAME_X0_LOCAL, frame_z_paper),
         "thumb-screw head rim": machine_z(FRAME_X_CENTER_LOCAL, vb.DEPTH_MID_Z)
         + thumb.HEAD_DIA / 2.0,
     }
@@ -235,8 +229,8 @@ def paper_side_points() -> dict[str, float]:
 # seats flush on the paper end (assembly step 3) and sits anywhere across the
 # neck its window lets it: neither its window corner radii nor the thumb
 # screw's tip on the round grip stops it, so at worst its window's front wall
-# lies on the neck's front face.  Its paper-side edge round
-# (pn_pen_frame_spec.EDGE_ROUND_R), at its printed minimum, keeps it off.
+# lies on the neck's front face.  The narrow window and thin rails
+# (pn_pen_frame_spec) are what keep its paper-side corner off the paper.
 def _printed_limits(spec: ModuleType, name: str, model: float) -> tuple[float, float]:
     """``(min, max)`` mm of ``spec``'s printed dimension ``name`` (model value
     ``model``) at the title block's limits for its places."""
@@ -266,7 +260,6 @@ def paper_side_points_printed_worst() -> dict[str, float]:
     frame_paper = (
         frame_front + _printed_limits(frame, "OuterSpanX", frame.OUTER_WIDTH)[1]
     )
-    r = _printed_limits(frame, "EdgeRoundR", frame.EDGE_ROUND_R)[0]
     # The thumb screw's axis: ScrewZ from the stirrup's rod-side face, so from
     # the paper end it stands the depth less ScrewZ.
     screw_x = (
@@ -277,7 +270,7 @@ def paper_side_points_printed_worst() -> dict[str, float]:
     return {
         "v-block neck paper-end corner": z_at(0.0, neck_back),
         "v-block body paper-side corner": z_at(step, body_back),
-        "stirrup paper-side round": z_at(r, frame_paper - r) + r,
+        "stirrup paper-side corner": z_at(0.0, frame_paper),
         "thumb-screw head rim": z_at(screw_x, screw_z) + thumb.HEAD_DIA / 2.0,
     }
 
@@ -324,8 +317,6 @@ def plan_mass_items() -> list[tuple[str, float, float, float]]:
         frame.OUTER_WIDTH * frame.OUTER_HEIGHT
         - frame.WINDOW_WIDTH * frame.WINDOW_HEIGHT
     ) * frame.FRAME_DEPTH - _cyl(frame.SET_SCREW_TAP_DRILL_DIA / 2.0, frame.RAIL_END)
-    # The two diagonal edge rounds: a pair about the ring's centre.
-    ring -= 2.0 * (1.0 - math.pi / 4.0) * frame.EDGE_ROUND_R**2 * frame.OUTER_HEIGHT
     items.append(("stirrup frame", ring * BRASS_G_PER_MM3, FRAME_X_CENTER_LOCAL, zc))
     thumb_v = (
         _cyl(thumb.TS_HEAD_R, thumb.TS_HEAD_H)
@@ -371,8 +362,8 @@ if not (
     raise AssertionError("the marker grip must span the whole V-groove seat")
 if FRAME_ROD_GAP < CLEARANCE:
     raise AssertionError(f"stirrup crowds the rod: gap {FRAME_ROD_GAP:.2f}")
-if frame.WINDOW_WIDTH < vb.NECK_DEPTH + 2.0:
-    raise AssertionError("stirrup window must pass the neck with 1.0 a side")
+if frame.WINDOW_WIDTH < vb.NECK_DEPTH + 4.0 * CLEARANCE:
+    raise AssertionError("stirrup window must pass the neck with 2 x CLEARANCE a side")
 if FRAME_X0_LOCAL + frame.FRAME_DEPTH + 4.0 * CLEARANCE > vb.RELIEF_X0:
     raise AssertionError("the stirrup must slide on the neck clear of the body's step")
 if FRAME_WINDOW_BOTTOM_LOCAL_Y > MARKER_BOTTOM_LOCAL_Y - 1.0:

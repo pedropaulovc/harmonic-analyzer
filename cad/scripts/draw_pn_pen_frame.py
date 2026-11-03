@@ -11,12 +11,11 @@ size is a native associative dimension marked on the part
 (``pn_pen_frame_spec``): the front view carries the outer envelope, the
 window's size, its lower-left corner from the left and bottom faces and the
 4X window-corner radius; the bottom view, looking up at the tapped rail,
-carries the depth, the 2X outer edge round, the hole's two coordinates from
-the outer faces, the hole's native Hole Wizard callout and the tap's stated
-far-wall minimum (the hidden TapWallReference sketch, shown in that view
-only).  No datums, no frames (drawing-guidelines.md rule 5), no note block.
-The sheet runs 2:1 in decimal inch (the part's ``drawing_unit: in``); the
-isometric stays 2:1.
+carries the depth, the hole's two coordinates from the outer faces, the
+hole's native Hole Wizard callout and the tap's stated far-wall minimum (the
+hidden TapWallReference sketch, shown in that view only).  No datums, no
+frames (drawing-guidelines.md rule 5), no note block.  The sheet runs 2:1 in
+decimal inch (the part's ``drawing_unit: in``); the isometric stays 2:1.
 
 Run with SolidWorks open::
 
@@ -67,7 +66,6 @@ from pn_pen_frame_spec import (
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    EDGE_ROUND_R,
     FRAME_DEPTH,
     OUTER_HEIGHT,
     OUTER_WIDTH,
@@ -100,16 +98,16 @@ VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]  # sheet-mm per model-mm
 
 # Sheet layout (meters).  Third angle: the bottom view projects straight
 # below the front view (model X shared); the isometric rides to the right.
-# Both orthographic views are bbox-centred: the front on the 28 x 40 ring face
-# (x 0.087..0.143, y 0.145..0.225), the bottom on the 28 x 8 underside
-# (x 0.087..0.143, y 0.097..0.113), whose centre IS the tapped hole's axis.
+# Both orthographic views are bbox-centred: the front on the 25 x 40 ring face
+# (x 0.090..0.140, y 0.145..0.225), the bottom on the 25 x 8 underside
+# (x 0.090..0.140, y 0.097..0.113), whose centre IS the tapped hole's axis.
 FRONT_CENTER = (0.115, 0.185)
 BOTTOM_CENTER = (0.115, 0.105)
-# The pictorial runs 2:1 like the sheet: at 1:1 the 2.26 tap mouth and the R1.0
+# The pictorial runs 2:1 like the sheet: at 1:1 the 2.26 tap mouth and the
 # window fillets read as polygons and banded shading (machinist review r1).
-# A true isometric of the 28 x 40 x 8 ring spans (28 + 8) cos 45 = 25.5 wide
-# and 40 x 0.816 + (28 + 8) x 0.408 = 47.3 tall, so at 2:1 about 51 x 95 mm:
-# centred at (0.320, 0.180) it fills x 0.295..0.345, y 0.133..0.228, clear of
+# A true isometric of the 25 x 40 x 8 ring spans (25 + 8) cos 45 = 23.5 wide
+# and 40 x 0.816 + (25 + 8) x 0.408 = 46.4 tall, so at 2:1 about 47 x 93 mm:
+# centred at (0.320, 0.180) it fills x 0.297..0.343, y 0.134..0.226, clear of
 # the front view's 40.0 dimension (x 0.173), its note (ends ~x 0.23), the top
 # border (0.267) and the title block (top 0.065).
 ISO_SCALE = (2, 1)
@@ -151,12 +149,10 @@ HOLE_R_SHEET = blind_cut_dia_mm(SET_SCREW_TAP_SPEC) * VIEW_SCALE / 2000.0
 CORNER_ARC_CENTER_XY = _front_xy(
     OUTER_WIDTH - RAIL_SIDE - WINDOW_CORNER_R, OUTER_HEIGHT - RAIL_END - WINDOW_CORNER_R
 )
-# The printed edge round's arc centre, at the bottom view's top right.
-EDGE_ARC_CENTER_XY = _bottom_xy(OUTER_WIDTH - EDGE_ROUND_R, FRAME_DEPTH - EDGE_ROUND_R)
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
-# text position.  Front view (ring x 0.087..0.143, y 0.145..0.225; window
-# x 0.095..0.135, y 0.157..0.213):
+# text position.  Front view (ring x 0.090..0.140, y 0.145..0.225; window
+# x 0.096..0.134, y 0.157..0.213):
 # - The 28.0 width rides above, alone: no other dimension leaves the top.
 # - The window corner's two location dims and its two sizes all leave from
 #   the window's left and bottom edges (build_pn_pen_frame's chain order), so
@@ -184,20 +180,16 @@ FRONT_KEEP = {
     "WindowCornerR": (FRONT_RIGHT_X + 0.014, FRONT_TOP_Y - 0.006),
 }
 # Bottom view: the hole's X coordinate below, its Z coordinate left, the depth
-# right; the 2X edge round's radius stands above-right of its arc, its leader
-# out at ~45 deg between the depth's dimension line and the front view, and
-# the hole callout stands below-right, its leader leaving the tap mouth down
-# and right, clear of the .55's extension line on the hole's axis.  The tap's
-# far-wall minimum (.074 MIN over TAP WALL) stands left too, outboard of the
-# .16: its reference line runs up the far wall from the thread's rim on the
-# hole's axis (sheet y ~0.108..0.112), so its extension lines run left across
-# the rail above the .16's top extension line (y 0.105, from the hole's
-# centre).
+# right; the hole callout stands above-right, between the bottom view and the
+# front view's height dimension.  The tap's far-wall minimum (.074 MIN over
+# TAP WALL) stands left too, outboard of the .16: its reference line runs up
+# the far wall from the thread's rim on the hole's axis (sheet y
+# ~0.108..0.112), so its extension lines run left across the rail above the
+# .16's top extension line (y 0.105, from the hole's centre).
 BOTTOM_KEEP = {
     "ScrewX": (_bottom_xy(OUTER_WIDTH / 4.0, 0.0)[0], BOTTOM_LOW_Y - 0.010),
     "ScrewZ": (BOTTOM_LEFT_X - 0.010, _bottom_xy(0.0, FRAME_DEPTH / 4.0)[1]),
     "Depth": (BOTTOM_RIGHT_X + 0.016, BOTTOM_CENTER[1]),
-    "EdgeRoundR": (BOTTOM_RIGHT_X + 0.012, BOTTOM_HIGH_Y + 0.010),
     "TapWallMin": (
         BOTTOM_LEFT_X - 0.020,
         _bottom_xy(0.0, TAP_WALL_START_Z + TAP_WALL_MIN_MM / 2.0)[1],
@@ -212,11 +204,11 @@ BOTTOM_KEEP = {
 TAP_WALL_TEXT_XY = (BOTTOM_LEFT_X - 0.036, BOTTOM_KEEP["TapWallMin"][1])
 _TEXT_SETTLE_M = 0.0005
 _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
-# The one printed fillet stands for all four equal window corners, the one
-# printed edge round for both.  A custom prefix replaces SolidWorks' own
-# radius "R", so it carries it (draw_pd_guide_lock: "4X 1.8" printed without).
-DIMENSION_PREFIXES = {"WindowCornerR": "4X R", "EdgeRoundR": "2X R"}
-HOLE_CALLOUT_XY = (0.165, 0.076)
+# The one printed fillet stands for all four equal window corners.  A custom
+# prefix replaces SolidWorks' own radius "R", so it carries it
+# (draw_pd_guide_lock: "4X 1.8" printed without).
+DIMENSION_PREFIXES = {"WindowCornerR": "4X R"}
+HOLE_CALLOUT_XY = (0.165, 0.128)
 HOLE_CALLOUT_PROCESS = "TAP"
 # The through-next tap's drill diameter prints .XXX, under whichever
 # drill-size variable the native callout carries (_tap_drill_variable).

@@ -9,10 +9,8 @@ screw threaded up through the bottom rail presses the barrel into the V-groove.
 
 Part frame: ring in the XY plane, origin at the bottom-left outer corner of the
 sketch (Front-plane) face, width along +X, height along +Y, depth along +Z; the
-window centred in X.  Two diagonal outer vertical edges carry EDGE_ROUND_R, so
-the ring is the same part turned a half turn about its height (Y), the only
-other way it slides onto the neck with its tap below.  The window's four
-internal corners carry WINDOW_CORNER_R.
+window centred in X.  The ring is symmetric about its X centre so it cannot be
+mounted mirrored.  The window's four internal corners carry WINDOW_CORNER_R.
 The tapped hole's axis is the named axis ``SetScrewAxis``
 (x = OUTER_WIDTH / 2, z = FRAME_DEPTH / 2, along Y).
 
@@ -39,11 +37,20 @@ from _printed_tolerance import printed_band_mm, printed_deviations
 # The registry row's drawing_unit (in) is this sheet's unit.
 UNIT = drawing_unit("parts/pn-pen-frame", _config.parts("pn-pen-frame"))
 
-# The window passes the v-block's .70-deep neck with .016 a side (the frame
+# The window passes the v-block's .70-deep neck with .02 a side (the frame
 # spec stays free of the block's spec; test_pn_pen_frame_drawing pins the copy).
 V_BLOCK_DEPTH = 17.78  # .70
-OUTER_WIDTH = 27.94  # 1.10, X (across the block depth)
-RAIL_SIDE = 4.064  # .16, side rails (local X)
+# X (across the block depth).  Yawed 45 deg to the recording paper, the
+# ring's paper-side outer edge at the block's paper end is the carriage's
+# paper-most point, and nothing but the window on the neck locates the ring
+# across it.  With every band at its limit and the ring hard over on the
+# neck, that edge stands the neck's front face less the near rail plus the
+# outer width from the rod axis: the narrowest window that still passes the
+# neck at both prints' limits (.74) and .13 rails (.10 at their printed worst,
+# over rule 17's .080 target) hold it off the paper
+# (pn_pen_carriage_geom.paper_side_points_printed_worst).
+OUTER_WIDTH = 25.4  # 1.00
+RAIL_SIDE = 3.302  # .13, side rails (local X)
 # End rails (local Y). .24 gives the #4-40 thumb screw drawing-guidelines.md
 # rule 18 (>= 1.5 D full thread) engagement: .24 less the tap's incomplete
 # lead (1.5 pitches) still leaves more than 1.5 x .112.
@@ -54,29 +61,17 @@ OUTER_HEIGHT = 40.132  # 1.58
 # Z (along the block length): the stirrup stands between the block's paper
 # end and its body step (pn_pen_carriage_geom).
 FRAME_DEPTH = 7.874  # .31
-WINDOW_WIDTH = OUTER_WIDTH - 2.0 * RAIL_SIDE  # .78
+WINDOW_WIDTH = OUTER_WIDTH - 2.0 * RAIL_SIDE  # .74
 WINDOW_HEIGHT = OUTER_HEIGHT - 2.0 * RAIL_END  # 1.10
 # The window's internal corners (drawing-guidelines.md rule 16: no sharp
 # internal corner; as large as function allows).  The window's top edge seats
-# on the v-block neck's top with .016 a side (pn_pen_carriage_geom asserts the
+# on the v-block neck's top with .02 a side (pn_pen_carriage_geom asserts the
 # side gap), so a radius over that gap would ride on the neck's top edges and
-# lift the stirrup; R.04, the gap itself, is that largest radius.
-WINDOW_CORNER_R = 1.016  # .04
+# lift the stirrup; R.02, the gap itself, is that largest radius.
+WINDOW_CORNER_R = 0.508  # .02
 # 1e-9: the gap equals the radius, up to the float subtraction.
 if WINDOW_CORNER_R > (WINDOW_WIDTH - V_BLOCK_DEPTH) / 2.0 + 1e-9:
     raise AssertionError("window corner radius rides on the v-block's top edges")
-# The outer vertical edge at x OUTER_WIDTH, z FRAME_DEPTH: on the carriage it
-# is the paper-side corner on the block's paper end, the carriage's paper-most
-# point (the block yawed 45 deg to the paper).  With every band of the stirrup
-# and the v-block at its limit and the stirrup hard over on the neck it would
-# reach the paper; rounded, it clears it (pn_pen_carriage_geom
-# paper_side_points_printed_worst).  Its twin at x 0, z 0 keeps the ring the
-# same part either way round.  Each round takes material off the paper end of
-# the carriage, so the plan balance (pn_pen_carriage_geom.plan_cg_residual_mm)
-# bounds it from above.
-EDGE_ROUND_R = 3.302  # .13
-if EDGE_ROUND_R >= min(RAIL_SIDE, FRAME_DEPTH):
-    raise AssertionError("the edge round must leave a flat on each face it meets")
 
 # The thumb screw threads INTO the bottom rail, so its hole is an exact #4-40
 # tapped Hole Wizard feature drilled up from the bottom face. THROUGH_NEXT
@@ -93,10 +88,9 @@ if SET_SCREW_RADIAL_WALL < WALL_TARGET_MM:  # drawing-guidelines.md rule 17
 # print shows.  Front view: the outer envelope, the window's size and the
 # window's lower-left corner from the left and bottom outer faces (rule 10),
 # which together fully define the ring sketch; the one printed window-corner
-# fillet stands for all four.  Bottom view: the extrude depth, the one
-# printed edge round for both, and the tapped hole's two coordinates, each
-# from a real outer face, beside the hole's wizard callout, and the tap's
-# stated far-wall minimum. ---
+# fillet stands for all four.  Bottom view: the extrude depth and the tapped
+# hole's two coordinates, each from a real outer face, beside the hole's
+# wizard callout, and the tap's stated far-wall minimum. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RingProfile": {
         "OuterSpanX",
@@ -108,7 +102,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
     "Ring": {"Depth"},
     "WindowCorner": {"WindowCornerR"},
-    "EdgeRound": {"EdgeRoundR"},
     "ScrewHole": {"ScrewX", "ScrewZ"},
     "TapWallReference": {"TapWallMin"},
 }

@@ -5,7 +5,7 @@ top rail rests on the block top, the marker barrel passes through the window
 under the block, and the #4-40 thumb screw threaded up through the bottom rail
 presses the barrel into the V-groove. Nested sketch contours (outer + inner
 rectangle) extrude directly into the ring; the window's four internal corners
-are then filleted, and two diagonal outer vertical edges rounded.
+are then filleted.
 
 Geometry and the drawing contract live in ``pn_pen_frame_spec`` (pure data,
 shared with ``pn_pen_carriage_geom`` and ``draw_pn_pen_frame``).
@@ -13,9 +13,8 @@ shared with ``pn_pen_carriage_geom`` and ``draw_pn_pen_frame``).
 Part frame (the assembly's placement contract): ring in the XY plane, origin
 at the bottom-left outer corner of the sketch (Front-plane) face, width along
 +X (0..OUTER_WIDTH), height along +Y (0..OUTER_HEIGHT), depth extruded +Z
-(0..FRAME_DEPTH). The window is centred in X, and the outer vertical edges at
-(OUTER_WIDTH, FRAME_DEPTH) and (0, 0) carry EDGE_ROUND_R, so the ring is the
-same part turned a half turn about Y. The #4-40 tapped hole is a
+(0..FRAME_DEPTH). The window is centred in X, so the ring is symmetric about
+x = OUTER_WIDTH / 2 and cannot be mounted mirrored. The #4-40 tapped hole is a
 Hole Wizard feature drilled up from the bottom face (y = 0) at
 (OUTER_WIDTH / 2, 0, FRAME_DEPTH / 2), through the bottom rail into the
 window; its axis is the named reference axis ``SetScrewAxis``. The hidden
@@ -68,7 +67,6 @@ from pn_pen_frame_spec import (
     BOTTOM_VIEW_NOTE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
-    EDGE_ROUND_R,
     FRAME_DEPTH,
     FRONT_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
@@ -102,25 +100,13 @@ _SAVED_DRAWING_PROPERTIES = (
 # Analytic volumes (mm^3): the ring is the outer rectangle less the window,
 # extruded FRAME_DEPTH; each concave window-corner fillet ADDS back its R x R
 # square less the quarter disc; the tapped hole pierces only the bottom rail
-# (y 0..RAIL_END) at the tap-drill diameter; each convex edge round takes off
-# its R x R square less the quarter disc over the full height.
+# (y 0..RAIL_END) at the tap-drill diameter.
 V_RING = (OUTER_WIDTH * OUTER_HEIGHT - WINDOW_WIDTH * WINDOW_HEIGHT) * FRAME_DEPTH
 V_WINDOW_CORNER = (
     WINDOW_CORNER_R**2 - math.pi * WINDOW_CORNER_R**2 / 4.0
 ) * FRAME_DEPTH
 V_SCREW_HOLE = math.pi * (SET_SCREW_TAP_DRILL_DIA / 2.0) ** 2 * RAIL_END
-V_EDGE_ROUND = (EDGE_ROUND_R**2 - math.pi * EDGE_ROUND_R**2 / 4.0) * OUTER_HEIGHT
-V_TAPPED = V_RING + 4.0 * V_WINDOW_CORNER - V_SCREW_HOLE
-V_FINAL = V_TAPPED - 2.0 * V_EDGE_ROUND
-# The edge rounds: (feature, dimension, (x, z) of the rounded vertical edge).
-# The printed 2X radius belongs to "EdgeRound", the round on the paper-side
-# edge alone: an imported fillet dimension attaches to its feature's first
-# edge, and that corner's arc stands at the bottom view's top right, clear of
-# the tap's location dims. Its twin is that edge turned a half turn about Y.
-ROUND_FEATURES = (
-    ("EdgeRound", "EdgeRoundR", (OUTER_WIDTH, FRAME_DEPTH)),
-    ("OtherEdgeRound", "OtherEdgeRoundR", (0.0, 0.0)),
-)
+V_FINAL = V_RING + 4.0 * V_WINDOW_CORNER - V_SCREW_HOLE
 
 
 @_telemetry.traced("sketch.pn_pen_frame_tap_wall_reference")
@@ -182,7 +168,6 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "RailEnd", f"{RAIL_END}mm")
     await set_global(adapter, "FrameDepth", f"{FRAME_DEPTH}mm")
     await set_global(adapter, "WindowCornerR", f"{WINDOW_CORNER_R}mm")
-    await set_global(adapter, "EdgeRoundR", f"{EDGE_ROUND_R}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -304,7 +289,7 @@ async def build(adapter) -> dict[str, str]:
     )
     drive_jobs += screw_cut.placement_drive_jobs
     # Loose tol for the rounding / mesh at the cut walls.
-    v_after = await volume_check(adapter, "screw hole", V_TAPPED, 15.0)
+    await volume_check(adapter, "screw hole", V_FINAL, 15.0)
 
     await name_bore_axis(
         adapter,
@@ -315,25 +300,6 @@ async def build(adapter) -> dict[str, str]:
         "thumb-screw hole",
     )
     name_last_feature(adapter, "SetScrewAxis")
-
-    # The two diagonal outer vertical edges (pn_pen_frame_spec.EDGE_ROUND_R),
-    # each a full-height convex round, after the hole so its placement still
-    # reads the sharp origin corner's faces. Edge points sit at mid-height on
-    # each vertical edge.
-    for feature, dimension, (x, z) in ROUND_FEATURES:
-        check(
-            f"fillet {feature}",
-            await adapter.add_fillet(EDGE_ROUND_R, [[x, OUTER_HEIGHT / 2.0, z]]),
-        )
-        name_last_feature(adapter, feature)
-        round_dim = name_dimensions(adapter, feature, [dimension])
-        drive_jobs.append((round_dim[0], '"EdgeRoundR"'))
-        v_after = await volume_check(
-            adapter,
-            f"ring with {feature}",
-            v_after - V_EDGE_ROUND,
-            0.1 * V_EDGE_ROUND,
-        )
     await _tap_wall_reference(adapter)
 
     # Apply the deferred drive equations after the whole model + a rebuild

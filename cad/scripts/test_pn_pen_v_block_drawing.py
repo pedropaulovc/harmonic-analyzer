@@ -1120,9 +1120,9 @@ def test_section_shows_the_tap_thread_on_a_visible_thin_layer() -> None:
 def test_analytic_volumes_match_the_carriage_mass_model() -> None:
     import pn_pen_carriage_geom as carriage
 
-    # The E: the neck .35 x .70, the body .72 x .86, 18.0 tall.
+    # The E: the neck .35 x .70, the body .68 x .86, 18.0 tall.
     assert part.V_BLOCK == pytest.approx(
-        (8.89 * 17.78 + (27.178 - 8.89) * 21.844) * 18.0
+        (8.89 * 17.78 + (26.162 - 8.89) * 21.844) * 18.0
     )
     # Cut one corner radius past the step, the V's run there lies in the slot:
     # the relief removes that much less.  The apex flat leaves its tip
@@ -1134,7 +1134,7 @@ def test_analytic_volumes_match_the_carriage_mass_model() -> None:
     # The carriage mass model cuts the relief square-cornered and leaves the
     # bore's top chamfer: both under 0.05% of the block.
     assert part.V_RELIEF + part.V_RELIEF_CORNERS + part.V_GROOVE_PAST_STEP == (
-        pytest.approx(15.748 * 6.604 * (27.178 - 8.89))
+        pytest.approx(15.748 * 6.604 * (26.162 - 8.89))
     )
     corner_r, relief_h = spec.RELIEF_CORNER_R, spec.RELIEF_HEIGHT
     assert part.V_RELIEF_CORNERS == pytest.approx(
