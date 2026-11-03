@@ -10,12 +10,12 @@ off-centre root arc, patterned at 32 physical teeth, not an ideal N32 form.
 The drum spans all 20 stations at once.
 PR7 (review item 14): ONLY the drum is brass -- the integral
 Ø6.35 stubs are retired for a separate thicker STEEL arbor
-(build_dt_pinion_arbor.py, Ø8) bonded in the drum's slip-fit through-bore;
+(build_dt_pinion_arbor.py, Ø5/16) bonded in the drum's slip-fit through-bore;
 the arbor rides the swing brackets' top bores and carries its integral turned
 grip head plus the separate MHA-DT-15 crossrod. The knurled end collars are simplified
 away.
 
-Layout: axis Z, drum z 0..143.2, Ø8 through-bore on the axis.
+Layout: axis Z, drum z 0..143.2, Ø5/16 through-bore on the axis.
 The ch30/M6.8 model carries it in the DISENGAGED rest state (p. 68
 "gap"). The native gap's half-pitch rotation keeps +X at a tooth crest.
 
@@ -131,7 +131,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     ]
 
-    # Arbor through-bore: the separate steel Ø8 arbor slides through by hand
+    # Arbor through-bore: the separate steel Ø5/16 arbor slides through by hand
     # for the assembly bond; on-axis circle, mid-plane cut spanning the drum.
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -172,15 +172,15 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven alignment pinion (equations neutral)", expected, 0.02 * v_bore
     )
     # The printed tip band rides the side-view witness, not the Front-plane
-    # blank circle that only drives the solid.  Both bands print at their
-    # nominal's places (+0.00/-0.10), authored here so the .SLDPRT is the one
-    # source the drawing imports (Codex P1 on #1647).
+    # blank circle that only drives the solid.  The bore band prints at its
+    # nominal's places; the inch tip band (0/-0.1016) needs four, so its places
+    # stay automatic (#290 batch 0).  Both are authored here so the .SLDPRT is
+    # the one source the drawing imports (Codex P1 on #1647).
     set_dimension_bilateral_tolerance(
         adapter,
         "OutsideDiaReference",
         "OutsideDia",
         *deviations(OUTSIDE_DIA_BAND),
-        places=DRAWING_PRECISION[OUTSIDE_DIA_REFERENCE]["OutsideDia"],
     )
     set_dimension_bilateral_tolerance(
         adapter,

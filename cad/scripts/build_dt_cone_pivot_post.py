@@ -90,6 +90,7 @@ from dt_cone_pivot_post_spec import (
     JOURNAL_REFERENCE_X,
     JOURNAL_REFERENCE_Z,
     PART_DATUMS,
+    JOURNAL_BORE_BAND,
     RUNNING_BORE_BAND,
     SURFACE_FINISHES,
 )
@@ -913,7 +914,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         "JournalBoreProfile",
         "JournalBoreDia",
-        *deviations(RUNNING_BORE_BAND),
+        *deviations(JOURNAL_BORE_BAND),
     )
     # The mesh band on the bore-to-bore spacing (derivation in
     # dt_cone_pivot_post_spec.CRANK_ABOVE_CONE_BAND).

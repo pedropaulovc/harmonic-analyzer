@@ -50,7 +50,8 @@ PIN_LEN_TOL = _pin.PIN_LEN_BAND
 
 ARBOR_NUMBER = "MHA-DT-22"
 STRAP_NUMBER = "MHA-DT-14"
-# Drilled Ø8 slide fit over the arbor (Ø8 -0.01/-0.10, lands -0.01/-0.03).
+# Drilled 5/16 slide fit over the 5/16 arbor (-.0004/-.0038 in, lands
+# -.0004/-.0012 in).
 # The title block's DRILLED HOLES row (+0.10/0) governs it and is NOT printed
 # on the dimension (drawing-guidelines.md rule 2 (the title block is the general specification)); the band is restated here only for the
 # stacks below, and a test pins it to title_block.yaml's drilled_hole row.
@@ -182,6 +183,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # fits (their bands ride the dimensions), one everywhere else.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CollarProfile": {"CollarOd": 1},
+    # Two places, the drill grid (drawing-guidelines rule 3); the callout
+    # names the 5/16 drill, which governs the hole (machinist review, #290
+    # batch 0: Ø7.9375 read as a precision no drill holds).
     "BoreProfile": {"BoreDia": 2},
     "Collar": {"Depth": 1},
     "PinHoleProfile": {"PinHoleDia": 2, "PinHoleCz": 1},
@@ -199,12 +203,12 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # (the MHA-DT-14 strap precedent); the hole callout names the pin it takes,
 # the same callout MHA-DT-22 prints for the same pin (PIN_NUMBER and
 # PIN_HOLE_CALLOUT come from dt_pinion_arbor_pin_spec).
-BORE_CALLOUT = f"DRILL THRU\nSLIDES ON {ARBOR_NUMBER}"
+BORE_CALLOUT = f"5/16 DRILL THRU\nSLIDES ON {ARBOR_NUMBER}"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 
 # The rig's first assembly step (Codex #860, PRRT_kwDOPHDy386mTbe7).  The
 # collar reaches the pin station only from the arbor's back crown end: its
-# Ø8 bore passes neither the Ø15 head nor a drum already bonded at the drum
+# Ø5/16 bore passes neither the Ø15 head nor a drum already bonded at the drum
 # station.  The front strap, journaled between the collar and the drum, is
 # trapped the same way, so it follows the collar on before the bond.
 COLLAR_NUMBER = "MHA-DT-33"

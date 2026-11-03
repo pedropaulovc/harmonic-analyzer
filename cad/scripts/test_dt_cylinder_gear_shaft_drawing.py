@@ -48,8 +48,8 @@ def test_shaft_band_closes_the_configured_running_fit() -> None:
         dt_arbor_pedestal_spec.BORE_DIA + bore_upper,
     )
     clearances = [
-        round(bore_limits[0] - shaft_limits[1], 3),
-        round(bore_limits[1] - shaft_limits[0], 3),
+        round(bore_limits[0] - shaft_limits[1], 5),
+        round(bore_limits[1] - shaft_limits[0], 5),
     ]
     assert clearances == list(_config.fit("shaft_in_bushing", "diametral_clearance_mm"))
 

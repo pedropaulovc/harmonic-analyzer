@@ -75,7 +75,7 @@ def seam_callout(mate: str, pin: str = "MHA-DT-VN-59") -> str:
 # reference restatement.
 BORE_CALLOUT = (
     "REAM THRU\n"
-    f"({SHAFT_CLEARANCE_MIN:.3f}-{SHAFT_CLEARANCE_MAX:.3f} DIAMETRAL\n"
+    f"({SHAFT_CLEARANCE_MIN:.4f}-{SHAFT_CLEARANCE_MAX:.4f} DIAMETRAL\n"
     "CLEARANCE ON MHA-DT-11)"
 )
 # The arm bore is made first and carries the band; this seat is turned to fit
@@ -97,36 +97,29 @@ SEAT_LENGTH_CALLOUT = "TO SUIT\nCRANK ARM,\nEND FLUSH"
 # arm front is already flush with the hub front from the seat press).  The
 # MHA-DT-00 hub step prints the same datum.  The prose reads under the native
 # #14 drill size, in the order the work is done.  The ream's acceptance is
-# the driven pin's seated position: its big end stands at least PIN_PROUD out
-# of the barrel, printed natively on the end view (PIN_PROUD_CALLOUT), so its
-# keeper ring's hole clears the barrel (machinist review of main 31cea0b73).
+# the driven pin's seated position: a deeper ream seats it deeper, and the
+# ream is deep enough while the keeper ring MHA-DT-27, hung in the pin's
+# head hole, clears this hub (machinist review of main 31cea0b73;
+# dt_crank_pin_ring_spec.PIN_PROUD books that clearance).  So the callout
+# states that fit-up condition, naming the ring and the hub (rule 4: an
+# unambiguous functional acceptance; Opus review of WIP 52c893d0c: "ring hole
+# clears barrel" named neither), the way the seat's END FLUSH does.  No
+# number: no hub dimension carries the pin's position, and a spec constant
+# typed into the text is not model-owned (drawing-simplicity-policy, Codjiflo
+# P2 on #2095).  A native MIN to an outline of the pin read as hidden hub
+# geometry in dashed, phantom and thin solid alike (Opus reviews at
+# 7fe9d97bd, c7115c2c3 and 7e2f876c7).
 FRONT_FACE_DATUM = "MHA-DT-11 DOME ROOT"
 CROSS_HOLE_CALLOUT = "\n".join(
     (
         "CRANK-ARM END FLUSH WITH CRANKSHAFT",
         "MHA-DT-11 DOME ROOT; AT ASSEMBLY,",
-        "MATCH TAPER-REAM 1:48 WITH IT FOR",
-        "TAPER PIN MHA-DT-09: LIGHT DRIVE FIT",
+        "MATCH TAPER-REAM 1:48 FOR MHA-DT-09;",
+        "DRIVEN, ITS RING MHA-DT-27 CLEARS HUB",
     )
 )
 if FRONT_FACE_DATUM not in " ".join(CROSS_HOLE_CALLOUT.split()):
     raise AssertionError("the cross-hole callout no longer names the hub datum")
-# A deeper ream seats the driven pin deeper, so its big end's MIN proud
-# limits the ream (machinist review: the acceptance read apart from it).  The
-# end view outlines that big end (dashed, the view's own line style: the
-# review of farm run 20261101T130334243Z read "(PHANTOM)" against it, so
-# the callout names no line type); the callout names it, the pin and the
-# keeper ring whose hole must clear the barrel (r7 review of farm run
-# 20261101T022045634Z: an unnamed dashed box, an unnamed ring).
-PIN_PROUD_CALLOUT = "\n".join(
-    (
-        "MHA-DT-09 TAPER PIN BIG END,",
-        "DRIVEN; LIMITS TAPER-REAM",
-        "DEPTH; KEEPER RING MHA-DT-27",
-        "HOLE CLEARS BARREL",
-    )
-)
-
 # The two axial bands state the mate they serve, under their dimensions
 # (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the overall places the rear face against the removable sprocket
 # (stack B below), the relief places the barrel's rear shoulder ahead of the

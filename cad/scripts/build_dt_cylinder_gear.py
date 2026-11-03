@@ -703,14 +703,13 @@ async def build(adapter) -> dict[str, str]:
             raise RuntimeError(
                 f"{name}@NotchProfile readback {actual!r}, expected {expected:g} mm"
             )
-    # Bilateral bands print at the nominal's places (rule 3): machinist
-    # review r1 read "0.0/-0.1" under 64.44.
+    # The inch tip band (0/-0.1016) needs four places, past the nominal's
+    # two, so its places stay automatic (#290 batch 0).
     set_dimension_bilateral_tolerance(
         adapter,
         "GearBlankProfile",
         "OutsideDia",
         *deviations(OUTSIDE_DIA_BAND),
-        places=DRAWING_PRECISION["GearBlankProfile"]["OutsideDia"],
     )
     set_dimension_symmetric_tolerance(
         adapter,

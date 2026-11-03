@@ -90,7 +90,7 @@ def test_bore_callout_names_its_journal_and_stands_clear_below_the_bore() -> Non
     assert "REAM THRU" in callout
     assert "SLIDES ON" in callout
     assert f"{shaft} JOURNAL" in callout
-    assert f"{low:.3f}-{high:.3f}" in callout
+    assert f"{low:.4f}-{high:.4f}" in callout
     assert "DIAMETRAL CLEARANCE" in callout
     assert drawing.DIMENSION_CALLOUTS["BoreDia"] == drawing.BORE_CALLOUT
     assert "PIN HOLE" not in callout
@@ -178,7 +178,7 @@ def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
         "ring": (od_min - bore_max) / 2.0,
         "rear": length_min - station - hole_r,
     }
-    assert walls["journal"] == pytest.approx((5.988 - 1.65) / 2.0, abs=1e-9)
+    assert walls["journal"] == pytest.approx((5.9873 - 1.65) / 2.0, abs=1e-9)
     assert walls["front"] == pytest.approx(3.0 - 0.10 - 0.825, abs=1e-9)
     assert walls["ring"] == pytest.approx((18.2 - 6.012) / 2.0, abs=1e-9)
     assert {k: w for k, w in walls.items() if w < spec.WALL_FLOOR} == {}
@@ -208,7 +208,7 @@ def test_the_reamed_bore_slides_on_the_journal_over_the_full_bands() -> None:
 
 
 def test_cup_bore_refuses_binding_on_the_actual_journal(monkeypatch) -> None:
-    assert spec.BORE_JOURNAL_CLEARANCE == pytest.approx((0.004, 0.024))
+    assert spec.BORE_JOURNAL_CLEARANCE == pytest.approx((0.00508, 0.0247))
     monkeypatch.setattr(knob_shaft, "JOURNAL_DIA_BAND", (0.020, 0.0))
     fresh_spec = importlib.util.spec_from_file_location("_cup_perturbed", spec.__file__)
     fresh = importlib.util.module_from_spec(fresh_spec)

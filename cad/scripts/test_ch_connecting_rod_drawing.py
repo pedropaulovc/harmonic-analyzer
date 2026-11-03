@@ -147,8 +147,8 @@ def test_pin_hole_is_the_reamed_press_hole_for_the_rod_pivot_pin() -> None:
     assert rod.PIN_HOLE_DIA is spec.PIN_HOLE_DIA
     assert rod.PIN_HOLE_BAND is spec.PIN_HOLE_BAND
     assert drawing._PIN_HOLE_DIA is spec.PIN_HOLE_DIA
-    assert spec.PIN_HOLE_DIA == 1.968
-    assert spec.PIN_HOLE_BAND == (0.010, 0.0)
+    assert spec.PIN_HOLE_DIA == 1.9558
+    assert spec.PIN_HOLE_BAND == (0.02286, 0.0127)
     assert not hasattr(spec, "PIN_HOLE_SPEC")
     assert model_toleranced_dimensions(rod)[("PinHoleProfile", "PinHoleDia")] == (
         "*deviations(PIN_HOLE_BAND)"
@@ -505,7 +505,7 @@ def test_fork_print_is_three_place_and_model_owned() -> None:
             "SlotWidth": 3,
             "RingFaceNear": 3,
         },
-        "PinHoleProfile": {"PinHoleDia": 3},
+        "PinHoleProfile": {"PinHoleDia": 4},
     }
     build = "".join(Path(rod.__file__).read_text(encoding="utf-8").split())
     assert 'name_dimensions(adapter,"ForkBoss",["ForkThick"])' in build
@@ -519,20 +519,20 @@ def test_fork_print_is_three_place_and_model_owned() -> None:
     )
 
 
-def test_reamed_pin_hole_is_a_native_three_place_dimension() -> None:
-    """PR #1292 review N1 (drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): the press hole's Ø1.968
-    +0.010/0 is the PinHoleDia model dimension -- marked, authored at three
-    places with its native band -- imported into the front view with the
+def test_reamed_pin_hole_is_a_native_four_place_dimension() -> None:
+    """PR #1292 review N1 (drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): the press hole's Ø1.9558
+    +0.02286/+0.0127 is the PinHoleDia model dimension -- marked, authored at
+    four places with its native band -- imported into the front view with the
     process beneath it, never general-note text."""
     spec = ch_connecting_rod_spec
     assert ch_connecting_rod_notes.DRAWING_DIMENSIONS["PinHoleProfile"] == {
         "PinHoleDia"
     }
     assert ch_connecting_rod_notes.DRAWING_PRECISION["PinHoleProfile"] == {
-        "PinHoleDia": 3
+        "PinHoleDia": 4
     }
-    # The band is written at three places, as the precision prints it.
-    assert all(round(d, 3) == d for d in spec.PIN_HOLE_BAND)
+    # The band is exact at five places, as the shared setter prints it.
+    assert all(round(d, 5) == d for d in spec.PIN_HOLE_BAND)
     assert model_toleranced_dimensions(rod)[("PinHoleProfile", "PinHoleDia")] == (
         "*deviations(PIN_HOLE_BAND)"
     )
@@ -556,68 +556,6 @@ def test_reamed_pin_hole_is_a_native_three_place_dimension() -> None:
     assert text_x > hole_x + 0.030 and text_y < hole_y - 0.020
     assert text_y > drawing.NOTES_XY[1] + 0.040
     assert text_x < drawing.DETAIL_KEEP["TineNear"][0] - 0.040
-
-
-def test_reamed_pin_hole_band_prints_at_the_value_s_places(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Farm render of 1b1f2f7fd printed "Ø1.968 +0.01/0.00": the shared
-    setter prints a band at the fewest places that hold it (two, for 0.010),
-    under a value authored at three.  The part build re-sets PinHoleDia's
-    tolerance places from the same DRAWING_PRECISION entry as its value's,
-    after both the band and the value places are authored."""
-    import _drawing_tolerances
-    import inspect
-
-    from _fit_deviations import deviations
-
-    spec = ch_connecting_rod_spec
-    value_places = ch_connecting_rod_notes.DRAWING_PRECISION["PinHoleProfile"][
-        "PinHoleDia"
-    ]
-    # The defect: left to the shared setter the band reads +0.01/0.00.
-    assert _drawing_tolerances._tolerance_places(
-        *deviations(spec.PIN_HOLE_BAND), display_unit="mm"
-    ) == 2
-    assert value_places == 3
-
-    calls: list[tuple[int, int, int, int]] = []
-
-    class Display:
-        tolerance_places = 2
-
-        def SetPrecision3(
-            self, primary: int, dual: int, primary_tol: int, dual_tol: int
-        ) -> int:
-            calls.append((primary, dual, primary_tol, dual_tol))
-            self.tolerance_places = primary_tol
-            return 0
-
-        def GetPrimaryTolPrecision2(self) -> int:
-            return self.tolerance_places
-
-    display = Display()
-    looked_up: list[tuple[str, str]] = []
-
-    def named_dimension(_adapter, feature: str, name: str):
-        looked_up.append((feature, name))
-        return display, None
-
-    monkeypatch.setattr(rod, "_named_dimension", named_dimension)
-    monkeypatch.setattr(rod, "_early_bound", lambda value, _type: value)
-    places = rod.tolerance_at_dimension_places(object(), "PinHoleProfile", "PinHoleDia")
-    assert looked_up == [("PinHoleProfile", "PinHoleDia")]
-    # Primary (value) places untouched; the tolerance takes the value's places.
-    assert calls == [(-1, -1, value_places, -1)]
-    assert places == display.tolerance_places == value_places
-
-    build = inspect.getsource(rod.build)
-    band = build.index('"PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_BAND)')
-    value = build.index("apply_drawing_precision(adapter, DRAWING_PRECISION)")
-    tolerance = build.index(
-        'tolerance_at_dimension_places(adapter, "PinHoleProfile", "PinHoleDia")'
-    )
-    assert band < tolerance and value < tolerance
 
 
 def test_fork_detail_takes_in_the_crown_and_the_ring_faces() -> None:

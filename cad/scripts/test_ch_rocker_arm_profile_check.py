@@ -279,7 +279,7 @@ def test_rod_slot_width_is_a_matched_fit_on_a_pin_the_shop_owns() -> None:
     # in the set would not.
     assert check.ROD_PIN_MAX < 1.994 < (check.ROD_PIN_GAUGE_IN + step) * 25.4
     clearance = (
-        check.ROD_SLOT_WIDTH - check.ROD_PIN_MAX,
+        check.ROD_SLOT_WIDTH_MIN - check.ROD_PIN_MAX,
         check.ROD_SLOT_WIDTH_MAX - check.ROD_PIN_MIN,
     )
     # The fit the shop works to: 0.001-0.017 diametral clearance on the pin.

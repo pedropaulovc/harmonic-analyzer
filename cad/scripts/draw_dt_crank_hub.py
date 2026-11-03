@@ -45,7 +45,6 @@ from dt_crank_hub_notes import (
     BORE_CALLOUT,
     CROSS_HOLE_CALLOUT,
     HUB_LENGTH_CALLOUT,
-    PIN_PROUD_CALLOUT,
     RELIEF_LENGTH_CALLOUT,
     SEAM_CALLOUT,
     SEAT_CALLOUT,
@@ -146,23 +145,15 @@ BARREL_FACE_PICK = ((RELIEF_X + SERVICE_PIN_CENTER[0]) / 2.0, SIDE_CENTER[1] + 0
 #   light-press callout above.
 # - Cross-hole callout: above the barrel, its leader rising almost straight
 #   from the hole's top rim, clear of the barrel diameter's extension lines.
+#   It carries the ream's acceptance in words: MHA-DT-09's driven big end
+#   stands proud of the barrel (Opus reviews at 7fe9d97bd, c7115c2c3 and
+#   7e2f876c7: a MIN dimensioned to an outline of another part).
 # - Bore callout: right of the end view, its leader entering the bore from the
 #   right, clear of the six-o'clock seam; the seam callout below the end view.
-# - MHA-DT-09 big end's MIN proud: the pin's big end (model -X) is paper-right
-#   on the end view (*Bottom turned half a turn), on the horizontal
-#   centreline.  Its value and callout print right of the big end's extension
-#   line, above the bore callout and below the isometric's label.
 _ROW_Y = (0.120, 0.102)
 _STATION_ROW_Y = _ROW_Y[0] + 0.006
 END_KEEP = {
     "BoreDia": (END_CENTER[0] + 0.070, END_CENTER[1] - 0.020),
-    # Four callout lines (r7 review: name the phantom, the pin and the ring).
-    # The block stacks up from the dimension line (farm run
-    # 20261101T035809796Z: value top at y 186.9 mm), so its height sets how
-    # close it comes to the isometric's label; 7 mm further right than the
-    # three-line block, so the wider block's left edge clears the phantom
-    # big end (x <= END_CENTER + 31.2 mm).
-    "PinProud": (END_CENTER[0] + 0.072, END_CENTER[1] + 0.014),
 }
 # The cross-hole station is measured from the arm shoulder it must stay clear
 # of (dt_crank_hub_geometry): its arrowhead there is the ASME
@@ -187,8 +178,10 @@ SEAM_EDGE_PICK = (
 SEAM_CALLOUT_XY = (0.303, 0.105)
 SIDE_KEEP = {
     # Right of the seat diameter's dimension line (OUTBOARD_X + 0.020), which
-    # crossed its text there (farm run 20261101T074739942Z).
-    "SeatLength": (OUTBOARD_X + 0.029, _STATION_ROW_Y),
+    # crossed its text there (farm run 20261101T074739942Z). The whole block
+    # starts right of that line, so none of it sits under the line's lower
+    # arrow (Opus review at 7fe9d97bd), and ends short of the end view.
+    "SeatLength": (OUTBOARD_X + 0.034, _STATION_ROW_Y),
     "ServicePinFromShoulder": (
         (SHOULDER_X + SERVICE_PIN_CENTER[0]) / 2.0,
         _STATION_ROW_Y,
@@ -210,7 +203,6 @@ DIMENSION_CALLOUTS = {
     "SeatLength": SEAT_LENGTH_CALLOUT,
     "HubLength": HUB_LENGTH_CALLOUT,
     "ReliefLength": RELIEF_LENGTH_CALLOUT,
-    "PinProud": PIN_PROUD_CALLOUT,
 }
 
 

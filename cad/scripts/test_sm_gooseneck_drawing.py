@@ -228,7 +228,7 @@ def test_notes_state_stock_process_and_intent_without_sizes() -> None:
     assert all(re.match(r"\d\. ", line) for line in lines)
     assert drawing.NOTES_XY[0] + 0.00242 * max(map(len, lines)) < 0.214
     notes = " ".join(spec.DRAWING_NOTES.split())
-    window = f"{joint.BRAZE_CLEARANCE_MIN:.2f}-{joint.BRAZE_CLEARANCE_MAX:.2f}"
+    window = f"{joint.BRAZE_CLEARANCE_MIN:.4f}-{joint.BRAZE_CLEARANCE_MAX:.4f}"
     for phrase in (
         "TUBE 1/2 OD X 0.065 WALL, ONLINEMETALS 7322",
         "SLEEVE 5/8 OD X 0.058 WALL, 7324",
@@ -244,10 +244,18 @@ def test_notes_state_stock_process_and_intent_without_sizes() -> None:
         assert phrase in notes, phrase
     # The shank and sleeve callouts state the joint's window on their own
     # features and name no method (rule 7: a matched fit goes on the feature).
-    assert spec.SHANK_FIT_CALLOUT == f"FIT TO TUBE BORE,\n{window} DIAMETRAL\nCLEARANCE"
-    assert (
-        spec.SLEEVE_FIT_CALLOUT == f"STOCK; FIT ON TUBE,\n{window} DIAMETRAL\nCLEARANCE"
-    )
+    shank = spec.SHANK_FIT_CALLOUT.splitlines()
+    sleeve = spec.SLEEVE_FIT_CALLOUT.splitlines()
+    assert window in shank and window in sleeve
+    assert "FIT TO TUBE BORE," in shank and "FIT ON TUBE," in sleeve
+    assert " ".join(shank[-1:]) == "DIAMETRAL CLEARANCE"
+    assert " ".join(sleeve[-2:]) == "DIAMETRAL CLEARANCE"
+    # Both blocks sit beside the narrow end view: the shank's leader shoulder
+    # ends left of it and the sleeve's parentheses fit between it and the
+    # elevation's leg (Opus reviews at 7fe9d97bd and 85e75a2b5), so the shank
+    # rows stay at the old 19-character width and the sleeve's at the window's.
+    assert max(map(len, shank)) <= 19
+    assert max(map(len, sleeve)) == len(window)
     assert spec.DIMENSION_CALLOUTS["SleeveProfile"] == {
         "SleeveDia": spec.SLEEVE_FIT_CALLOUT
     }

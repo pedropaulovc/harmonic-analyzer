@@ -74,10 +74,10 @@ TOP_NOTCH_HEIGHT = 14.0
 TOP_PIN_DROP = 0.25 * MM_PER_IN  # 6.35 hole centre below the bar top
 # The MHA-CH-11 bar pivot pin presses into this hole through both top-notch
 # cheeks and runs in the lever's #47 hole (user ruling 2026-10, press fit;
-# ch_bar_pivot_pin_spec holds the fit budget). Reamed to H7 under the 5/64
-# drill rod: the 0.0775 in stock reamer cuts inside the band.
-TOP_PIN_HOLE_DIA = 1.968
-TOP_PIN_HOLE_BAND = (0.010, 0.0)  # (upper, lower) deviations, reamed; native
+# ch_bar_pivot_pin_spec holds the fit budget). Reamed .077 +.0009/+.0005 in
+# under the 5/64 drill rod: a purchased .0775 chucking reamer cuts inside it.
+TOP_PIN_HOLE_DIA = 1.9558  # .077 in
+TOP_PIN_HOLE_BAND = (0.02286, 0.0127)  # (upper, lower) deviations, reamed; native
 
 # --- Derived. ---
 TOP_PIN_Y = BAR_LENGTH - TOP_PIN_DROP  # 801.95

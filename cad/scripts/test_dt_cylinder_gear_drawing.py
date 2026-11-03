@@ -107,7 +107,7 @@ def test_drum_prints_the_tooth_runout_the_cone_mesh_stack_books() -> None:
 
     assert notes.TOOTH_RUNOUT_TIR_MM == cone_set_stack.TOOTH_RUNOUT_TIR_MM
     assert (
-        f"TOOTH CUTTING SETUP, ACCEPT AT SETUP:  {cone_set_stack.TOOTH_RUNOUT_TIR_MM:.2f} "
+        f"TOOTH CUTTING SETUP, ACCEPT AT SETUP:  {cone_set_stack.TOOTH_RUNOUT_TIR_MM:.4f} "
         "TIR MAX TO FINISHED BORE"
     ) in notes.GEAR_DATA
 

@@ -124,24 +124,20 @@ PLUG_DIA_CALLOUT = (
 # The bend radius is the tube's centreline radius; the arrowhead lands on the
 # outer arc, so the value says which (machinist review of e487a1bb4).
 BEND_RADIUS_CALLOUT = "CLR"
-# Three short rows, so the block ends left of the end view (sheet layout,
-# draw_sm_gooseneck).  The window is the joint's, braze or retaining compound
-# (owner ruling 2026-10-27 on #1997, sm_gooseneck_spring_joint), so the
-# callout names no method; note 3 does.
-SHANK_FIT_CALLOUT = (
-    "FIT TO TUBE BORE,\n"
-    f"{BRAZE_CLEARANCE_MIN:.2f}-{BRAZE_CLEARANCE_MAX:.2f} DIAMETRAL\n"
-    "CLEARANCE"
-)
+# Three short rows, so the block and its leader shoulder end left of the end
+# view (sheet layout, draw_sm_gooseneck; Opus review at 85e75a2b5: the
+# shoulder pressed on the end view's outline).  The window is the joint's,
+# braze or retaining compound (owner ruling 2026-10-27 on #1997,
+# sm_gooseneck_spring_joint), so the callout names no method; note 3 does.
+_WINDOW = f"{BRAZE_CLEARANCE_MIN:.4f}-{math.floor(BRAZE_CLEARANCE_MAX * 1e4) / 1e4:.4f}"
+SHANK_FIT_CALLOUT = f"FIT TO TUBE BORE,\n{_WINDOW}\nDIAMETRAL CLEARANCE"
 # The sleeve's select-fit window rides its own Ø on the elevation (rule 7: a
 # matched fit goes on the feature, not in a note; codjiflo P2 on #1997), with
 # the stock it is cut from (owner ruling 2026-10-27: select-fit from stock,
-# no hone).
-SLEEVE_FIT_CALLOUT = (
-    "STOCK; FIT ON TUBE,\n"
-    f"{BRAZE_CLEARANCE_MIN:.2f}-{BRAZE_CLEARANCE_MAX:.2f} DIAMETRAL\n"
-    "CLEARANCE"
-)
+# no hone). Its rows are no wider than the window, so the block and its
+# reference parentheses fit between the end view and the elevation's leg
+# (Opus reviews at 7fe9d97bd and 85e75a2b5: wider rows crossed the end view).
+SLEEVE_FIT_CALLOUT = f"STOCK;\nFIT ON TUBE,\n{_WINDOW}\nDIAMETRAL\nCLEARANCE"
 DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
     "BendPath": {"BendRadius": BEND_RADIUS_CALLOUT},
     "SleeveProfile": {"SleeveDia": SLEEVE_FIT_CALLOUT},

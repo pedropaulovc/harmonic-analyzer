@@ -1,4 +1,4 @@
 shaft_in_bushing:        # crank / rocker / lever pivots — hand-cranked, low-speed slip fit
-  diametral_clearance_mm: [0.025, 0.075]
+  diametral_clearance_mm: [0.0254, 0.05842]  # .0010-.0023 in: REAM_H7/REAM_SLIDE on SHAFT_H
   applies_to: [crank pivots, rocker pivots, lever pivots]
 

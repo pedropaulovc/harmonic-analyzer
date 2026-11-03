@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -34,7 +35,7 @@ def test_outboard_proportions_follow_the_u29_enlargement() -> None:
 
 def test_u27_walls_hold_two_millimetres_at_the_printed_bands() -> None:
     assert geometry.WALL_TARGET_MM == 2.0
-    assert geometry.SEAM_WEB_WORST_MM == pytest.approx(2.004, abs=1e-3)
+    assert geometry.SEAM_WEB_WORST_MM == pytest.approx(2.012, abs=1e-3)
     assert geometry.ARM_CHEEK_WORST_MM == pytest.approx(2.049, abs=1e-3)
 
 
@@ -125,8 +126,8 @@ def test_rear_relief_clears_the_t12_chain_plates_and_keeps_its_wall() -> None:
     assert dt_crank_hub_spec.DRAWING_PRECISION["HubProfile"]["ReliefLength"] == 2
     assert dt_crank_hub_spec.DRAWING_PRECISION["HubProfile"]["HubLength"] == 2
     assert dt_crank_hub_spec.DRAWING_PRECISION["HubProfile"]["ReliefDia"] == 2
-    # drawing-guidelines.md rule 17 (walls and webs) wall over the bore: Ø15.99 against the Ø9.580 bore, edges broken.
-    assert geometry.RELIEF_WALL_WORST_MM == pytest.approx(2.705, abs=1e-3)
+    # drawing-guidelines.md rule 17 (walls and webs) wall over the bore: Ø15.99 against the Ø9.5631 bore, edges broken.
+    assert geometry.RELIEF_WALL_WORST_MM == pytest.approx(2.713, abs=1e-3)
     assert geometry.RELIEF_WALL_WORST_MM >= geometry.WALL_TARGET_MM
     # The MHA-DT-09 ream stays on the full barrel.
     assert (
@@ -284,15 +285,20 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     assert drawing.REFERENCE_LENGTHS == ("SeatLength",)
     assert drawing.DIMENSION_CALLOUTS["SeatLength"] == dt_crank_hub_notes.SEAT_LENGTH_CALLOUT
     assert "CRANK ARM" in _flat(dt_crank_hub_notes.SEAT_LENGTH_CALLOUT)
-    # The taper-pin cross-hole names both mates and the fit on its callout,
-    # after the front face is set flush with the datum it is reamed at.
+    # The taper-pin cross-hole names both mates on its callout, after the
+    # front face is set flush with the datum it is reamed at.
     cross_hole = dt_crank_hub_notes.CROSS_HOLE_CALLOUT
     assert "MHA-DT-09" in cross_hole and "MHA-DT-11" in cross_hole
-    assert "LIGHT DRIVE FIT" in cross_hole
     flush = cross_hole.index("CRANK-ARM END FLUSH")
     assert flush < cross_hole.index("TAPER-REAM") and "AT ASSEMBLY" in cross_hole
-    # The pin-proud MIN names the ream it limits.
-    assert "TAPER-REAM" in dt_crank_hub_notes.PIN_PROUD_CALLOUT
+    # The ream's acceptance is the driven pin's fit-up: its keeper-ring hole
+    # clears the barrel.  No MIN dimensioned to an outline of the pin, another
+    # part (Opus reviews at 7fe9d97bd, c7115c2c3 and 7e2f876c7), and no spec
+    # number typed into the text (Codjiflo P2 on #2095).
+    assert "RING MHA-DT-27 CLEARS HUB" in _flat(cross_hole)
+    assert re.search(r"\d\.\d", cross_hole.split("1:48", 1)[1]) is None
+    assert "PinProudReference" not in dt_crank_hub_spec.DRAWING_DIMENSIONS
+    assert "PinProud" not in drawing.END_KEEP
     # The bore band governs; the clearance is a reference restatement.
     assert dt_crank_hub_notes.BORE_CALLOUT.splitlines()[1].startswith("(")
 
@@ -433,6 +439,9 @@ def test_callouts_stand_clear_of_views_and_each_other() -> None:
     # Its value stands clear of the seat diameter's dimension line above.
     value_half = len("(8.0)") * char_w / 2.0
     assert seat_len_x - value_half - drawing.SIDE_KEEP["SeatDia"][0] > 0.002
+    # The whole block starts right of that line, so none of it sits under the
+    # line's lower arrow (Opus review at 7fe9d97bd).
+    assert seat_len_x - seat_len_half > drawing.SIDE_KEEP["SeatDia"][0]
     assert seat_block[1] < drawing.ISO_NOTE_XY[0] and end_left > drawing.OUTBOARD_X
     # Both turned diameters stand left of the inboard end, the relief's nearer,
     # their values side by side on the axis without touching.
@@ -546,51 +555,6 @@ def test_service_pin_station_reference_is_saved_hidden_and_imported_per_view() -
     assert "from _drawing_hidden_sketches import curate_view_dimensions" in source
     assert "    curate_view_dimensions,\n" not in source.replace("\r\n", "\n")
     assert "ServicePinStationReference" in dt_crank_hub_spec.DRAWING_DIMENSIONS
-
-
-def test_pin_proud_min_lands_on_the_phantom_big_end() -> None:
-    # r5 review (run 20261101T004958072Z): the 4.45 MIN's outer extension line
-    # ended in air. The reference sketch draws MHA-DT-09's proud big end as
-    # construction (phantom on the sheet) round the line's outer end: its face
-    # centred on the line's end, stubs back to the barrel's outline.
-    import dt_crank_pin_spec
-    from dt_crank_pin_ring_spec import PIN_PROUD
-
-    build = Path(drawing.__file__).with_name("build_dt_crank_hub.py").read_text(encoding="utf-8")
-    sketch = build[
-        build.index("async def _pin_proud_reference") : build.index('name_last_feature(adapter, "PinProudReference")')
-    ]
-    assert 'await adapter.add_line(-BARREL_R, 0.0, tip, 0.0)' in sketch
-    assert "(tip, PIN_BIG_END_R),\n                (tip, -PIN_BIG_END_R)," in sketch.replace("\r\n", "\n")
-    assert 'add_sketch_constraint(f"{line}.end", face, "midpoint")' in sketch
-    assert "segment.ConstructionGeometry = True" in sketch
-    assert '["PinProud", "PinProudBarrel", "PinBigEnd", "PinBigEndStub"]' in build
-    # Only the MIN prints; the outline's own dimensions stay unmarked.
-    assert dt_crank_hub_spec.DRAWING_DIMENSIONS["PinProudReference"] == {"PinProud"}
-    # The stubs leave the barrel's outline, and the face stands clear of it.
-    barrel_r = geometry.HUB_BARREL_DIA / 2.0
-    big_end_r = dt_crank_pin_spec.BIG_END_DIA / 2.0
-    stub_x = (barrel_r**2 - big_end_r**2) ** 0.5
-    assert barrel_r - 0.5 < stub_x < barrel_r
-    assert stub_x < barrel_r + PIN_PROUD
-    assert "PIN_STUB_X = math.sqrt(BARREL_R**2 - PIN_BIG_END_R**2)" in build
-
-
-def test_pin_proud_callout_names_the_pin_big_end_and_ring() -> None:
-    # r7 review (run 20261101T022045634Z): the dashed box and the ring were
-    # unnamed; rule 4 wants the mate's name with its number.  No line type is
-    # named: the outline prints in the view's dashed style, which the review
-    # of farm run 20261101T130334243Z read against "(PHANTOM)".
-    text = " ".join(dt_crank_hub_notes.PIN_PROUD_CALLOUT.split())
-    for part in ("MHA-DT-09 TAPER PIN BIG END", "KEEPER RING MHA-DT-27"):
-        assert part in text
-    assert "PHANTOM" not in text
-    lines = dt_crank_hub_notes.PIN_PROUD_CALLOUT.splitlines()
-    assert len(lines) == 4 and max(map(len, lines)) <= 29
-    # The widest line (2.5 mm a glyph) starts right of the phantom big end.
-    big_end_right = drawing.END_CENTER[0] + (geometry.HUB_BARREL_DIA / 2.0 + 4.45) * drawing._S
-    left = drawing.END_KEEP["PinProud"][0] - max(map(len, lines)) * 0.0025 / 2.0
-    assert left - big_end_right >= 0.00178
 
 
 def test_cross_hole_station_prints_its_origin_at_the_shoulder() -> None:
