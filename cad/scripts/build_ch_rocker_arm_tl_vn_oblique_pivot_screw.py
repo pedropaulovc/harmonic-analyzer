@@ -20,7 +20,7 @@ from _bought_revolve import stock_properties
 from _check import check
 from _com import _early_bound
 from _custom_properties import apply_custom_properties
-from _dimensions import name_dimensions
+from _dimensions import drive_dimension, name_dimensions
 from _document_units import apply_package_model_units
 from _drawing_marks import mark_dimensions_for_drawing
 from _drawing_precision import _named_dimension
@@ -88,6 +88,43 @@ def _shop_cut_dimension(adapter) -> None:
     mark_dimensions_for_drawing(adapter, part.CUT_FEATURE, {part.CUT_DIMENSION})
 
 
+async def _chamfer_dimensions(adapter) -> None:
+    """The end chamfer: its own leg and angle named and verified, and the
+    printed leg, a Right-plane carrier on the thread's upper silhouette driven
+    by the feature's leg, ".03 X 45°", marked for the drawing."""
+    names = [part.CHAMFER_LENGTH_DIMENSION, part.CHAMFER_ANGLE_DIMENSION]
+    name_dimensions(adapter, part.CHAMFER_FEATURE, names)
+    carrier = part.CHAMFER_REFERENCE_FEATURE
+    check(f"create {carrier}", await adapter.create_sketch("Right"))
+    recorded = SketchDims()
+    await _linear(adapter, recorded, part.CHAMFER_LEG_DIMENSION, part.CUT_CHAMFER, "horizontal",
+                  part.CHAMFER_LEG_START)
+    await ensure_fully_defined(adapter, carrier)
+    check(f"exit {carrier}", await adapter.exit_sketch())
+    name_last_feature(adapter, carrier)
+    recorded.apply(adapter, carrier)
+    blank_reference_sketches(adapter, (carrier,))
+    await drive_dimension(adapter, f"{part.CHAMFER_LEG_DIMENSION}@{carrier}",
+                          f'"{part.CHAMFER_LENGTH_DIMENSION}@{part.CHAMFER_FEATURE}"')
+    for feature, name, value in (
+        (part.CHAMFER_FEATURE, part.CHAMFER_LENGTH_DIMENSION, part.CUT_CHAMFER / 1000.0),
+        (part.CHAMFER_FEATURE, part.CHAMFER_ANGLE_DIMENSION, math.radians(part.CHAMFER_ANGLE)),
+        (carrier, part.CHAMFER_LEG_DIMENSION, part.CUT_CHAMFER / 1000.0),
+    ):
+        _display, native = _named_dimension(adapter, feature, name)
+        if not math.isclose(float(native.SystemValue), value, abs_tol=1e-9):
+            raise RuntimeError(f"{name}: chamfer value {native.SystemValue!r} changed")
+    display, native = _named_dimension(adapter, carrier, part.CHAMFER_LEG_DIMENSION)
+    if display.SetPrecision3(part.CHAMFER_PLACES, -1, -1, -1) != 0:
+        raise RuntimeError(part.CHAMFER_LEG_DIMENSION + ": precision rejected")
+    display.SetText(2, part.CHAMFER_SUFFIX)
+    if (int(display.GetPrimaryPrecision2()) != part.CHAMFER_PLACES
+            or str(display.GetText(2) or "") != part.CHAMFER_SUFFIX
+            or int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0):
+        raise RuntimeError(part.CHAMFER_LEG_DIMENSION + ": chamfer presentation did not persist")
+    mark_dimensions_for_drawing(adapter, carrier, {part.CHAMFER_LEG_DIMENSION})
+
+
 async def _supplier_references(adapter):
     """Right-plane construction carriers (sketch x is model -z), marked for drawing."""
     feature = part.REFERENCE_FEATURE
@@ -124,7 +161,7 @@ async def build(adapter) -> dict[str, str]:
     check("chamfer thread end", await adapter.add_chamfer(
         part.CUT_CHAMFER, [[part.THREAD_DIA / 2.0, 0.0, -part.THREAD_LENGTH]]
     ))
-    name_last_feature(adapter, "ThreadEndChamfer")
+    name_last_feature(adapter, part.CHAMFER_FEATURE)
     check("publish axis", await adapter.create_axis(CreateAxisParameters(
         mode="two_planes", planes=["Top Plane", "Right Plane"]
     )))
@@ -136,6 +173,7 @@ async def build(adapter) -> dict[str, str]:
     await apply_color(adapter, POLISHED_STEEL)
     apply_custom_properties(adapter, stock_properties(_config.parts(PART_NAME)))
     _shop_cut_dimension(adapter)
+    await _chamfer_dimensions(adapter)
     await _supplier_references(adapter)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)

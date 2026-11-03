@@ -109,7 +109,7 @@ def test_native_supplier_witness_inventory():
     assert spec.SHOULDER_DIA > spec.THREAD_DIA
 
 
-def test_cut_length_names_its_three_place_reason_and_sized_chamfer():
+def test_cut_length_names_its_three_place_reason():
     import ch_rocker_arm_tl_oblique_pivot_block_spec as block
 
     assert spec.CUT_THREAD_PLACES == 3
@@ -117,12 +117,72 @@ def test_cut_length_names_its_three_place_reason_and_sized_chamfer():
     loose = (block.PIVOT_TIP_CLEARANCE_MIN + printed_band_mm(3, unit="in")
              - printed_band_mm(2, unit="in"))
     assert loose < 0.011 * 25.4 - 1e-9 <= block.PIVOT_TIP_CLEARANCE_MIN
-    assert "CHAMFER .03 X 45°" in spec.CUT_NOTE
-    assert "MHA-CH-06-TL-22 PIVOT BLOCK" in spec.CUT_NOTE
-    # The .570 CUT dimension carries the length; the note gives its function.
-    assert ".570" not in spec.CUT_NOTE and ".011 MIN" in spec.CUT_NOTE
+    assert spec.CUT_NOTE == "TIP STAYS .011 MIN INSIDE\nMHA-CH-06-TL-22 PIVOT BLOCK"
     assert spec.CUT_CALLOUT == "CUT"
+
+
+def test_end_chamfer_prints_as_one_native_dimension():
+    import draw_ch_rocker_arm_tl_vn_oblique_pivot_screw as drawing
+
+    # ".03 X 45°": the carrier's leg at two places with the angle as its
+    # suffix; CUT_NOTE (above) carries none of it. The carrier lies on the
+    # thread's upper silhouette (Right sketch x = -z), ending at the tip.
     assert spec.CUT_CHAMFER == pytest.approx(0.03 * 25.4)
+    assert f"{spec.CUT_CHAMFER / 25.4:.{spec.CHAMFER_PLACES}f}" == "0.03"
+    assert spec.CHAMFER_SUFFIX == " X 45°"
+    assert spec.CHAMFER_LEG_START[0] + spec.CUT_CHAMFER == pytest.approx(spec.CUT_THREAD_LENGTH)
+    assert spec.CHAMFER_LEG_START[1] == spec.THREAD_DIA / 2.0
+    assert drawing._OWNERS[spec.CHAMFER_LEG_DIMENSION] == "ChamferRightReference"
+    assert drawing.SHELVES[spec.CHAMFER_LEG_DIMENSION] == (True, "right")
+
+
+def test_chamfer_leg_carrier_is_driven_by_the_feature_and_marked(monkeypatch):
+    named, marked, driven, lines, texts = [], [], [], [], {}
+    values = {
+        spec.CHAMFER_LENGTH_DIMENSION: spec.CUT_CHAMFER / 1000.0,
+        spec.CHAMFER_ANGLE_DIMENSION: math.pi / 4.0,
+        spec.CHAMFER_LEG_DIMENSION: spec.CUT_CHAMFER / 1000.0,
+    }
+    state = {}
+
+    def set_precision(places, *_):
+        state["places"] = places
+        return 0
+
+    display = SimpleNamespace(
+        SetPrecision3=set_precision, GetPrimaryPrecision2=lambda: state["places"],
+        SetText=texts.__setitem__, GetText=texts.get,
+    )
+
+    async def linear(_adapter, _recorded, name, value, orientation, start):
+        lines.append((name, value, orientation, start))
+
+    async def drive(_adapter, name, expression):
+        driven.append((name, expression))
+
+    monkeypatch.setattr(part, "name_dimensions", lambda _a, feature, names: named.append((feature, names)))
+    monkeypatch.setattr(part, "_named_dimension", lambda _a, feature, name: (
+        display, SimpleNamespace(SystemValue=values[name], Tolerance=SimpleNamespace(Type=0))))
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(part, "mark_dimensions_for_drawing",
+                        lambda _a, feature, names: marked.append((feature, names)))
+    monkeypatch.setattr(part, "_linear", linear)
+    monkeypatch.setattr(part, "drive_dimension", drive)
+    monkeypatch.setattr(part, "SketchDims", lambda: SimpleNamespace(apply=lambda *args: []))
+    monkeypatch.setattr(part, "check", lambda label, value: value)
+    monkeypatch.setattr(part, "ensure_fully_defined", AsyncMock())
+    monkeypatch.setattr(part, "name_last_feature", lambda *args: None)
+    monkeypatch.setattr(part, "blank_reference_sketches", lambda *args: None)
+    adapter = SimpleNamespace(create_sketch=AsyncMock(), exit_sketch=AsyncMock())
+    asyncio.run(part._chamfer_dimensions(adapter))
+    assert named == [("ThreadEndChamfer", ["CutChamferLength", "CutChamferAngle"])]
+    assert lines == [("CutChamferLeg", spec.CUT_CHAMFER, "horizontal", spec.CHAMFER_LEG_START)]
+    assert driven == [("CutChamferLeg@ChamferRightReference", '"CutChamferLength@ThreadEndChamfer"')]
+    assert marked == [("ChamferRightReference", {"CutChamferLeg"})]
+    assert state["places"] == 2 and texts == {2: " X 45°"}
+    values[spec.CHAMFER_ANGLE_DIMENSION] = math.pi / 6.0
+    with pytest.raises(RuntimeError, match="CutChamferAngle: chamfer value"):
+        asyncio.run(part._chamfer_dimensions(adapter))
 
 
 def test_build_uses_contract_dimensions_and_publishes_z_axis(monkeypatch):
@@ -137,6 +197,7 @@ def test_build_uses_contract_dimensions_and_publishes_z_axis(monkeypatch):
     monkeypatch.setattr(part, "blank_reference_geometry", lambda *args: None)
     monkeypatch.setattr(part, "apply_package_model_units", lambda *args, **kwargs: None)
     monkeypatch.setattr(part, "_shop_cut_dimension", lambda *args: None)
+    monkeypatch.setattr(part, "_chamfer_dimensions", AsyncMock())
     monkeypatch.setattr(part, "apply_custom_properties", lambda *args: None)
     for name in ("volume_check", "bbox_extent_check", "apply_material", "apply_color",
                  "_supplier_references", "report_mass_properties"):
