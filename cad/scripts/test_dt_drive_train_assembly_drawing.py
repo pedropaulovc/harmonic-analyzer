@@ -267,6 +267,7 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
     assert names[drawing.CHECKS_SHEET - 1] == "CHECKS + SETUP"
     assert names[drawing.CHECKS_CONTINUATION_SHEET - 1] == "CHECKS (CONT.)"
     assert names[drawing.FIT_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. + FIT"
+    assert names[drawing.BANK_SETTINGS_SHEET - 1] == "CYLINDER BANK + DRUM STATION SETTINGS"
     assert sorted(drawing.CLUSTER_SHEETS.values()) == [3, 4, 5, 6]
     assert set(drawing.SHEET_SCALES) == set(names)
     assert "BALLOONS ON SHEETS 3-6" in drawing.BOM_REFERENCE_NOTES

@@ -653,28 +653,59 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
 
 def test_drum_station_is_a_model_dimension_the_fitup_step_names() -> None:
     """Codex P1 on #814: notes never carry dimensions.  The drum station is
-    the model's own reference dimension from the head rear face, printed at
-    .XX with the "DRUM STATION" callout.  drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (Main's eye pass): the
-    drum bond is the pinion fit-up step.  Machinist review r1 of #1685: the
-    station ends on no feature of this part, so its callout names the drum
-    end it locates and when it is set; the note keeps only the corners."""
+    the model's own dimension from the head rear face, with the "DRUM
+    STATION" callout naming the drum end it locates (machinist review r1 of
+    #1685).  Farm run 20261103T022858451Z (2 of 3 reviews): at .XX it ended on
+    no arbor feature yet read as a size to cut or check.  Main's ruling (a):
+    the arbor prints it as a reference, and MHA-DT-00 carries the setting band
+    -- the one DRUM_STATION_BAND -- on its own model dimension."""
+    import dt_drum_station_setting_spec as setting
+
     assert spec.DRAWING_NOTES == "INSIDE CORNERS R.010 MAX."
-    assert spec.ASSEMBLY_STEP == (
-        "SLIDE MHA-DT-22 INTO MHA-DT-01 AND BOND WITH LOCTITE 638, DRUM FRONT "
-        "END AT MHA-DT-22 DRUM STATION; WIPE SQUEEZE-OUT OFF JOURNAL LANDS."
-    )
-    for text in (spec.DRAWING_NOTES, spec.ASSEMBLY_STEP):
+    for text in (spec.DRAWING_NOTES, spec.ASSEMBLY_STEP, spec.DRUM_STATION_CALLOUT):
         assert f"{spec.DRUM_STATION / 25.4:.2f}" not in text
+    # Still the native model dimension, at its .XX places, now a reference.
     assert spec.DRAWING_DIMENSIONS["DrumStationReference"] == {"DrumStationFromHeadRear"}
     assert spec.DRAWING_PRECISION_BY_NAME["DrumStationFromHeadRear"] == 2
+    assert "DrumStationFromHeadRear" in drawing.REFERENCE_LENGTHS
+    assert not any(
+        name == "DrumStationFromHeadRear" for _feature, name in model_toleranced_dimensions(part)
+    )
+    source = inspect.getsource(drawing.build)
+    assert "for name, label in REFERENCE_LENGTHS.items():" in source
+    assert "set_reference_dimension(adapter, matches[0], label=label)" in source
+    # The callout names what the station locates and the drawing that sets it.
     assert drawing.DIMENSION_CALLOUTS["DrumStationFromHeadRear"] is (
         spec.DRUM_STATION_CALLOUT
     )
-    assert spec.DRUM_STATION_CALLOUT == (
-        "DRUM STATION:\nMHA-DT-01 FRONT END,\nSET AT ASSEMBLY"
+    callout = spec.DRUM_STATION_CALLOUT.split("\n")
+    assert callout[0] == "DRUM STATION:"
+    assert f"{spec.DRUM_NUMBER} FRONT END" in callout[1]
+    assert spec.SETTING_DRAWING_NUMBER in callout[2]
+    assert spec.SETTING_DRAWING_NUMBER == "MHA-DT-00"
+    # The bond step works to the setting, and MHA-DT-00 -- the one sheet that
+    # prints it -- cites the sheet carrying that setting's dimension.
+    import draw_dt_drive_train_assembly as package
+
+    assert "DRUM FRONT END AT THE DRUM STATION SETTING" in spec.ASSEMBLY_STEP
+    bond = package._DRUM_BOND_STEP
+    assert bond is spec.ASSEMBLY_STEP
+    printed = package.rig_steps(pivot_blocks=2, cams=2, slotted=4)
+    sheet = package.SHEET_NAMES[package.BANK_SETTINGS_SHEET - 1]
+    assert "DRUM STATION" in sheet
+    assert (
+        f"DRUM STATION SETTING: SHEET {package.BANK_SETTINGS_SHEET}."
+        in " ".join(printed.split())
     )
-    assert "DRUM STATION" in spec.ASSEMBLY_STEP
+    # One band: the assembly setting reads the arbor's, and every stack does.
+    assert setting.DIMENSION_BANDS[setting.DIMENSION] == (
+        spec.DRUM_STATION_BAND,
+        -spec.DRUM_STATION_BAND,
+    )
     assert spec.DRUM_STATION_BAND == spec.LINEAR_XX_BAND
+    assert setting.DRUM_FRONT_END_Z - setting.HEAD_REAR_FACE_Z == pytest.approx(
+        spec.DRUM_STATION
+    )
 
 
 def test_every_station_names_the_same_head_rear_face() -> None:

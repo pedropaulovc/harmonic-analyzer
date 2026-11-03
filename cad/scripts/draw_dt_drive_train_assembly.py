@@ -111,6 +111,7 @@ from dt_crank_pinion_spec import SEAT_FEELER_MM as PINION_SEAT_FEELER
 from dt_crankshaft_spec import SHAFT_END_PROUD_RANGE as CRANK_END_PROUD_RANGE
 from dt_cylinder_end_disc_spec import WASHER_THICK as BANK_WASHER_THICK
 import dt_cylinder_gear_spec as drum
+import dt_drum_station_setting_spec as drum_station_setting
 from dt_drive_train_assembly_sheet import (
     HANDLE_FERRULE_CURE,
     LEVER_PIN_HOLE_FIT,
@@ -133,9 +134,15 @@ from dt_drive_train_assembly_spec import (
 import dt_drive_train_steps as steps
 import dt_mesh_checks as mesh_checks
 import dt_pinion_cam_geometry as cam_geometry
+from dt_pinion_arbor_geometry import (
+    HEAD_CAP_SAG as ARBOR_HEAD_CAP_SAG,
+    HEAD_FRONT_Z as ARBOR_HEAD_FRONT_Z,
+    HEAD_REAR_Z as ARBOR_HEAD_REAR_Z,
+)
 from dt_pinion_spring_section import SCREW_EAST_OF_PIVOT as SPRING_SCREW_EAST_OF_PIVOT
 import fr_harmonic_base_spec as base
 import pinion_rig_fitup as FITUP
+from pinion_rig_park_geometry import APINION_X
 import pinion_rig_tip_gap as TIP_GAP
 import rocker_bank_layout as rockers
 import dt_vn_cone_lock_knob_spec as lock_knob
@@ -183,7 +190,7 @@ SHEET_NAMES = (
     "FULL-DETAIL SIDE VIEW",
     "CHECKS + SETUP",
     "CHECKS (CONT.)",
-    "CYLINDER BANK SETTINGS",
+    "CYLINDER BANK + DRUM STATION SETTINGS",
 )
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
@@ -229,6 +236,53 @@ BANK_SPRING_DETAIL_CENTER = (0.105, 0.075)
 BANK_SPRING_CROP_RADIUS_MM = 8.0
 BANK_SETTING_KEEP = {bank_settings.STACK_DIMENSION: (0.205, 0.250)}
 BANK_SPRING_KEEP = {bank_settings.SPRING_DIMENSION: (0.165, 0.125)}
+# MHA-DT-22 prints the drum station as a reference; its setting and band live
+# on this sheet (dt_drum_station_setting_spec).  A 1:1 *Right view of the
+# arbor and drum alone, circle-cropped from the head's front crown to a short
+# run of the drum past its front end.  The 1:1 bank's outline ends at x ~305.4
+# and the frame's inner edge is at 419.1 mm (run 20261103T022858451Z sheet
+# 15), so the circle takes that column, above the title block (top 65.5 mm).
+DRUM_STATION_SETTING_SCALE = (1.0, 1.0)
+DRUM_STATION_SETTING_CENTER = (0.364, 0.150)
+DRUM_STATION_SETTING_STEMS = frozenset({"dt-pinion-arbor", "dt-alignment-pinion"})
+DRUM_STATION_DRUM_RUN_MM = 8.0
+DRUM_STATION_CROP_CLEAR_MM = 2.0
+# Machine z of the head's front crown apex, in the pose the leg is built in.
+DRUM_STATION_HEAD_TIP_Z = drum_station_setting.HEAD_REAR_FACE_Z + (
+    ARBOR_HEAD_FRONT_Z - ARBOR_HEAD_CAP_SAG - ARBOR_HEAD_REAR_Z
+)
+DRUM_STATION_CROP_Z = (
+    DRUM_STATION_HEAD_TIP_Z,
+    drum_station_setting.DRUM_FRONT_END_Z + DRUM_STATION_DRUM_RUN_MM,
+)
+DRUM_STATION_CROP_CENTRE_Z = sum(DRUM_STATION_CROP_Z) / 2.0
+DRUM_STATION_CROP_RADIUS_MM = (
+    (DRUM_STATION_CROP_Z[1] - DRUM_STATION_CROP_Z[0]) / 2.0 + DRUM_STATION_CROP_CLEAR_MM
+)
+# The value and its three callout lines hang over the circle, as the spring
+# detail's do: the text point stands 8 mm of air plus three 5.6 mm callout
+# lines above the circle top, so the block clears the boundary even if it
+# grows downward from that point.  Its x follows the leg's projected middle.
+DRUM_STATION_TEXT_Y = (
+    DRUM_STATION_SETTING_CENTER[1] + DRUM_STATION_CROP_RADIUS_MM / 1000.0 + 0.008 + 3 * 0.0056
+)
+# Sheet 15 reads back every setting spec's model-owned dimension the same way.
+SETTING_SPECS = (bank_settings, drum_station_setting)
+SETTING_DIMENSIONS = {
+    feature: names for spec in SETTING_SPECS for feature, names in spec.DRAWING_DIMENSIONS.items()
+}
+SETTING_PRECISION = {
+    name: places
+    for spec in SETTING_SPECS
+    for dimensions in spec.DRAWING_PRECISION.values()
+    for name, places in dimensions.items()
+}
+SETTING_CALLOUTS = {
+    name: text for spec in SETTING_SPECS for name, text in spec.DIMENSION_CALLOUTS.items()
+}
+SETTING_BANDS = {
+    name: band for spec in SETTING_SPECS for name, band in spec.DIMENSION_BANDS.items()
+}
 
 ASSEMBLED_SCALE = (1.0, 3.0)
 ASSEMBLED_ISO_SCALE = (1.0, 3.0)
@@ -1060,7 +1114,11 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         # MHA-DT-33 and the front strap go on first: neither passes the Ø15
         # head or a bonded drum (Codex #860, PRRT_kwDOPHDy386mTbe7).
         ("arbor-collar-pinned", _ARBOR_COLLAR_STEP),
-        ("drum-bonded", _DRUM_BOND_STEP),
+        # The drum is bonded to the setting MHA-DT-22 prints only as a REF.
+        (
+            "drum-bonded",
+            f"{_DRUM_BOND_STEP}\nDRUM STATION SETTING: SHEET {BANK_SETTINGS_SHEET}.",
+        ),
         ("handle-bonded", _HANDLE_BOND_STEP),
         ("cam-pins-bonded", _CAM_PIN_BOND_STEP),
         (
@@ -3177,11 +3235,13 @@ def _place_continuation_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     return _stack_sheet_note_fields(adapter, facts, CONTINUATION_SHEET)
 
 
-def _bank_setting_view(
-    adapter: Any, facts: SourceFacts, *, centre: tuple[float, float],
-    model_z: float, scale: tuple[float, float], label: str,
+def _setting_view(
+    adapter: Any, *, names: frozenset[str], model_point: tuple[float, float, float],
+    centre: tuple[float, float], scale: tuple[float, float], label: str,
     step: Callable[[str], None],
 ) -> Any:
+    """A *Right view of ``names`` alone, shifted so ``model_point`` (machine
+    mm) lands on ``centre``: a Right-plane setting leg is true length in it."""
     view = _early_bound(
         place_view(adapter, str(SOURCE), "*Right", *centre, scale=scale), "IView"
     )
@@ -3190,24 +3250,23 @@ def _bank_setting_view(
     step(f"{label}: set_hidden_lines_removed")
     _configure_view(adapter, view, exploded=False, label=label)
     step(f"{label}: configure_view")
-    _isolate_instances(adapter, view, frozenset(facts.clusters["cylinder-bank"]), label=label)
+    _isolate_instances(adapter, view, names, label=label)
     step(f"{label}: isolate_instances")
     projected = model_point_in_view(
-        adapter, view, (cone_line.X_DRUM / 1000.0, bank_settings.AXIS_Y / 1000.0,
-                        model_z / 1000.0), label=label
+        adapter, view, tuple(value / 1000.0 for value in model_point), label=label
     )
     _shift_view(adapter, view, (centre[0] - projected[0], centre[1] - projected[1]), label=label)
     step(f"{label}: shift_view")
     return view
 
 
-def _bank_setting_circle(
+def _setting_circle(
     adapter: Any, view: Any, centre: tuple[float, float], radius: float
 ) -> None:
     """The channel package's view-sketch circle pattern, in sheet metres."""
     name = view_name(adapter, view)
     if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(name):
-        raise RuntimeError(f"cannot activate bank setting view {name}")
+        raise RuntimeError(f"cannot activate setting view {name}")
     adapter.currentModel.ClearSelection2(True)
     sketch = _early_bound(view.GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
@@ -3225,7 +3284,7 @@ def _bank_setting_circle(
     finally:
         manager.AddToDB = previous
     if circle is None:
-        raise RuntimeError("cannot create bank setting crop circle")
+        raise RuntimeError(f"cannot create setting circle in view {name}")
 
 
 @contextmanager
@@ -3269,7 +3328,12 @@ def _bank_dimension_source_trace(
 def _place_bank_setting_sheet(
     adapter: Any, facts: SourceFacts, step: Callable[[str], None]
 ) -> Callable[[], None]:
-    """Full bank at 1:1 and a 4:1 north bearing-face detail; no scaled-down views.
+    """Full bank at 1:1, a 4:1 north bearing-face detail and a cropped 1:1
+    drum station; no scaled-down views.
+
+    MHA-DT-22 prints the drum station as a reference; the toleranced setting
+    is the assembly's (dt_drum_station_setting_spec), shown here on the arbor
+    and drum alone.
 
     Captions follow measured view outlines; the ordinary crop's identifier is
     owned by its parent view and its rendered clearance survives final rebuilds.
@@ -3283,29 +3347,61 @@ def _place_bank_setting_sheet(
     step("bank settings: activate sheet")
     _heading(adapter, BANK_SETTINGS_SHEET)
     step("bank settings: heading")
-    overall = _bank_setting_view(
-        adapter, facts, centre=BANK_SETTING_CENTER,
-        model_z=(bank.FRONT_STRAP_INNER_Z + bank.BACK_STRAP_INNER_Z) / 2.0,
+    bank_names = frozenset(facts.clusters["cylinder-bank"])
+    overall = _setting_view(
+        adapter, names=bank_names, centre=BANK_SETTING_CENTER,
+        model_point=(
+            cone_line.X_DRUM, bank_settings.AXIS_Y,
+            (bank.FRONT_STRAP_INNER_Z + bank.BACK_STRAP_INNER_Z) / 2.0,
+        ),
         scale=BANK_SETTING_SCALE, label="cylinder bank setting",
         step=step,
     )
     spring_z = sum(bank.BANK_SPRING_Z) / 2.0
-    detail = _bank_setting_view(
-        adapter, facts, centre=BANK_SPRING_DETAIL_CENTER, model_z=spring_z,
+    detail = _setting_view(
+        adapter, names=bank_names, centre=BANK_SPRING_DETAIL_CENTER,
+        model_point=(cone_line.X_DRUM, bank_settings.AXIS_Y, spring_z),
         scale=BANK_SPRING_DETAIL_SCALE, label="north spring setting",
         step=step,
     )
+    drum_instances = [
+        instance for instance in facts.instances if instance.stem in DRUM_STATION_SETTING_STEMS
+    ]
+    drum_stems = {instance.stem for instance in drum_instances}
+    if drum_stems != DRUM_STATION_SETTING_STEMS:
+        raise RuntimeError(
+            f"drum station setting needs {sorted(DRUM_STATION_SETTING_STEMS)}, "
+            f"the source has {sorted(drum_stems)}"
+        )
+    drum_names = frozenset(instance.name for instance in drum_instances)
+    drum_view = _setting_view(
+        adapter, names=drum_names, centre=DRUM_STATION_SETTING_CENTER,
+        model_point=(APINION_X, drum_station_setting.AXIS_Y, DRUM_STATION_CROP_CENTRE_Z),
+        scale=DRUM_STATION_SETTING_SCALE, label="drum station setting",
+        step=step,
+    )
+    _feature, _name, head_rear_z, drum_front_z = drum_station_setting.LEGS[0]
+    leg_middle = model_point_in_view(
+        adapter, drum_view,
+        (
+            APINION_X / 1000.0, drum_station_setting.AXIS_Y / 1000.0,
+            (head_rear_z + drum_front_z) / 2000.0,
+        ),
+        label="drum station leg",
+    )
+    drum_keep = {drum_station_setting.DIMENSION: (leg_middle[0], DRUM_STATION_TEXT_Y)}
     annotations = []
     for view, feature, keep, label in (
         (overall, bank_settings.STACK_FEATURE, BANK_SETTING_KEEP, "closed bank length"),
         (detail, bank_settings.SPRING_FEATURE, BANK_SPRING_KEEP, "north spring gap"),
+        (drum_view, drum_station_setting.FEATURE, drum_keep, "drum station"),
     ):
         _show_base_view_sketches(adapter, view, (feature,), label=label)
         step(f"{label}: show base-view sketch {feature}")
         with _bank_dimension_source_trace(adapter, step, label=f"{label} / {feature}"):
             imported = curate_view_dimensions(
                 adapter, view, keep=keep, view_label=label,
-                dimensions_by_feature=bank_settings.DRAWING_DIMENSIONS,
+                dimensions_by_feature=SETTING_DIMENSIONS,
             )
             step(f"{label}: curate_view_dimensions")
         annotations.extend(imported)
@@ -3315,10 +3411,10 @@ def _place_bank_setting_sheet(
         (cone_line.X_DRUM / 1000.0, bank_settings.AXIS_Y / 1000.0, spring_z / 1000.0),
         label="spring detail boundary",
     )
-    _bank_setting_circle(adapter, overall, parent_centre, radius)
+    _setting_circle(adapter, overall, parent_centre, radius)
     step("bank settings: overall boundary circle")
     adapter.currentModel.ClearSelection2(True)
-    _bank_setting_circle(adapter, detail, BANK_SPRING_DETAIL_CENTER, radius * 4.0)
+    _setting_circle(adapter, detail, BANK_SPRING_DETAIL_CENTER, radius * 4.0)
     step("bank settings: detail crop circle")
     status = int(detail.Crop2(False, False, 1))
     step("bank settings: detail Crop2")
@@ -3329,10 +3425,25 @@ def _place_bank_setting_sheet(
     step("bank settings: detail UpdateViewDisplayGeometry")
     if status != 1 or not bool(detail.IsCropped()):
         raise RuntimeError(f"north spring setting Crop2 failed: {status}")
+    # The drum station's crop: the same view-sketch circle, on the point the
+    # view was shifted to put the crop centre on.
+    drum_radius = DRUM_STATION_CROP_RADIUS_MM / 1000.0
+    adapter.currentModel.ClearSelection2(True)
+    _setting_circle(adapter, drum_view, DRUM_STATION_SETTING_CENTER, drum_radius)
+    step("drum station: crop circle")
+    drum_status = int(drum_view.Crop2(False, False, 1))
+    step("drum station: Crop2")
+    adapter.currentModel.ClearSelection2(True)
+    rebuild_drawing(adapter, label="drum station setting crop")
+    step("drum station: crop rebuild")
+    drum_view.UpdateViewDisplayGeometry()
+    step("drum station: UpdateViewDisplayGeometry")
+    if drum_status != 1 or not bool(drum_view.IsCropped()):
+        raise RuntimeError(f"drum station setting Crop2 failed: {drum_status}")
     # Follow the rebuilt outlines, not insertion coordinates. Centering the
     # overall caption below its view would hit the spring dimension's two-line
     # callout; its right end has clear space below the south pedestal instead.
-    # All three annotations target 8 mm, inside their 4 mm minimum-air
+    # All four annotations target 8 mm, inside their 4 mm minimum-air
     # regions. Bounded anchoring cannot promise a corner on the boundary
     # (R6's detail caption undershot); the actual 4 mm guards stay unchanged.
     placement_gap = 2.0 * VIEW_CAPTION_GAP
@@ -3340,6 +3451,7 @@ def _place_bank_setting_sheet(
     for view, text, right_aligned, label in (
         (overall, "CYLINDER BANK RIGHT 1:1", True, "bank setting caption"),
         (detail, "DETAIL A 4:1 - NORTH SPRING SET", False, "spring detail caption"),
+        (drum_view, "DRUM STATION RIGHT 1:1", False, "drum station caption"),
     ):
         view.UpdateViewDisplayGeometry()
         step(f"{label}: UpdateViewDisplayGeometry")
@@ -3419,10 +3531,7 @@ def _place_bank_setting_sheet(
         violations = bank_setting_letter_violations(extent, parent_centre, radius)
         if violations:
             raise RuntimeError(f"{'; '.join(violations)}; actual extent {extent!r}")
-        assert_imported_precision(
-            adapter, annotations,
-            {name: 2 for names in bank_settings.DRAWING_DIMENSIONS.values() for name in names},
-        )
+        assert_imported_precision(adapter, annotations, SETTING_PRECISION)
         step("bank settings settled: imported precision readback")
         for annotation in annotations:
             name = dimension_name(adapter, annotation)
@@ -3430,24 +3539,29 @@ def _place_bank_setting_sheet(
                 _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension"
             )
             # Read only: SetText on an imported dimension can dirty its source.
-            text = str(display.GetText(4) or "")  # swDimensionTextCalloutBelow
-            if text != bank_settings.DIMENSION_CALLOUTS[name]:
+            # swDimensionTextCalloutBelow; a multi-line callout reads with CRLF.
+            text = str(display.GetText(4) or "").replace("\r\n", "\n")
+            if text != SETTING_CALLOUTS[name]:
                 raise RuntimeError(
                     f"{name} lost its model-authored setting callout: {text!r}; "
                     "rebuild the source assembly"
                 )
             dimension = _early_bound(display.GetDimension2(0), "IDimension")
             tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-            upper, lower = bank_settings.DIMENSION_BANDS[name]
+            upper, lower = SETTING_BANDS[name]
             if (abs(float(tolerance.GetMaxValue()) - upper / 1000.0) > 1e-9
                     or abs(float(tolerance.GetMinValue()) - lower / 1000.0) > 1e-9):
                 raise RuntimeError(f"{name} lost its model-authored setting band")
-        names = {
-            dimension_name(adapter, _early_bound(annotation, "IAnnotation"))
-            for annotation in (detail.GetAnnotations() or ())
-        }
-        if bank_settings.SPRING_DIMENSION not in names:
-            raise RuntimeError("north spring setting dimension did not survive its crop")
+        for view, kept, label in (
+            (detail, bank_settings.SPRING_DIMENSION, "north spring setting"),
+            (drum_view, drum_station_setting.DIMENSION, "drum station setting"),
+        ):
+            names = {
+                dimension_name(adapter, _early_bound(annotation, "IAnnotation"))
+                for annotation in (view.GetAnnotations() or ())
+            }
+            if kept not in names:
+                raise RuntimeError(f"{label} dimension did not survive its crop")
         step("bank settings settled: callout, tolerance and crop readback")
 
     settled()
