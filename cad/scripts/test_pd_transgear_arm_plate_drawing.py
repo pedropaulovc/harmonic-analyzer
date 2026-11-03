@@ -220,7 +220,10 @@ def test_the_countersink_callout_names_no_hole_size() -> None:
 def test_the_three_place_section_sizes_name_their_function() -> None:
     """Rule 3: a three-place size states its function; the notch depth only
     wraps the arm's edge and prints two places."""
-    assert drawing.SECTION_CALLOUTS["ThicknessOverArm"] == "SETS SCREW\nREACH IN ARM\nMHA-PD-18"
+    # The callout names the mate whose screw reach the size sets; its wording
+    # is free (Codjiflo, #2148).
+    callout = drawing.SECTION_CALLOUTS["ThicknessOverArm"]
+    assert _config.parts("pd-transgear-arm")["number"] in callout
     assert max(map(len, drawing.SECTION_CALLOUTS["ThicknessOverArm"].splitlines())) <= 12
     assert spec.DRAWING_PRECISION_BY_NAME["ThicknessOverArm"] == 3
     assert spec.DRAWING_PRECISION_BY_NAME["NotchDepth"] == 2
