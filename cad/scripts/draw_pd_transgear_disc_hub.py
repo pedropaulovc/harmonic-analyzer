@@ -274,6 +274,7 @@ CENTER_LINE_STYLE = 4  # swLineStyles_e.swLineCENTER
 CENTER_LINE_WEIGHT = 0  # swLineWeights_e.swLW_THIN
 
 
+@_telemetry.traced("drawing.disc_hub.bolt_circle_centerline")
 def _add_bolt_circle_centerline(adapter: Any, view: Any) -> None:
     """Draw the screw holes' bolt circle as a centreline circle on the face
     view and read its centre and radius back."""

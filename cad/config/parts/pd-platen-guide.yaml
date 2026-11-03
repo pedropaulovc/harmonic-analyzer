@@ -7,3 +7,9 @@ pd-platen-guide:
   tolerance_class: machined_block
   process: "machined (steel)"
   drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "the 9X #4-40 tap pattern: WALL .060 MIN, TAPS TO EDGES (both rows, to datum B and to the top face)"
+      finding: "tap wall to the rail's edges below the .080 target at the finished worst case (rule 17)"
+      reason: "delegated ruling 2026-11-03, following the owner's approved band for thin walls between .060 and .080 (DT-35 .060, DT-08 .0602; #989) and RV-04 on MHA-PD-18 (#1379); owner review on #2144. The rail is .29 at .XX (owner ruling B2, 2026-11-01): the bottom row cannot move (the rack backer blocks the rail growing down) and the #4-40 taps receive vendor screws, so the .080 unbroken wall pays the .010 outside edge break and the .010 tap mouth break and lands at the .060 floor"

@@ -31,7 +31,7 @@ from _check import check
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
-from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+from _inch_wall_limits import WALL_FLOOR_MM
 from _part_checks import report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
@@ -51,7 +51,11 @@ from _fit_deviations import deviations
 from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
 from _holes import wizard_holes
 from _part_pmi import author_part_pmi
-from _printed_tolerance import printed_deviations
+from _printed_tolerance import (
+    edge_break_chamfer_mm,
+    edge_break_radius_mm,
+    printed_deviations,
+)
 from sh_vn_brass_fillister_screw_spec import SHANK_LEN as FILLISTER_SHANK_LEN
 from pd_vn_guide_lock_screw_spec import SHANK_LEN as LOCK_SCREW_SHANK_LEN
 from pd_vn_guide_lock_screw_spec import TAP_MOUTH_BREAK, TIP_REACH_MAX
@@ -147,17 +151,30 @@ LOCK_TAP_EXIT_WALL_MIN = (
 RECEIVER_WALL_FLOOR = WALL_FLOOR_MM
 # Owner ruling 2026-11-01 (B2): each tap row's wall to datum B and to the top
 # face at the height's printed minimum, the tap's major at its Ø.008 zone.
+# The finished worst case also pays the title block's outside edge break and
+# the tap's mouth break (Codjiflo, #2124): .080 unbroken, .060 finished.
+# Delegated ruling 2026-11-03 (pd-platen-guide.yaml RV-01): accepted at the
+# floor; the sheet states it (TAP_EDGE_WALL_TEXT, rule 20).
 _HEIGHT_DEV = printed_deviations(GUIDE_HEIGHT, GUIDE_DEPTH_PLACES, unit=UNIT)
 _TAP_REACH = THREAD_MAJOR_MM[TAPPED_HOLE_SPEC.size] / 2.0 + _POSITION_RADIAL
-TAP_EDGE_WALL_MIN = min(
-    TAP_Y - _TAP_REACH, GUIDE_HEIGHT + _HEIGHT_DEV[0] - TAP_Y - _TAP_REACH
+_EDGE_BREAK = max(edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT))
+TAP_EDGE_WALL_MIN = (
+    min(TAP_Y - _TAP_REACH, GUIDE_HEIGHT + _HEIGHT_DEV[0] - TAP_Y - _TAP_REACH)
+    - _EDGE_BREAK
+    - TAP_MOUTH_BREAK
 )
 # THREAD_MAJOR_MM rounds the #4-40's .1120 major up to 2.845 (2.8448), so the
-# .080 walls land 0.0001 under 2.032 in millimetres.
-if TAP_EDGE_WALL_MIN < WALL_TARGET_MM - 0.0005:
+# .060 walls land 0.0001 under 1.524 in millimetres.
+if TAP_EDGE_WALL_MIN < WALL_FLOOR_MM - 0.0005:
     raise AssertionError(
-        f"MHA-PD-11 platen guide tap wall {TAP_EDGE_WALL_MIN:.3f} < {WALL_TARGET_MM}"
+        f"MHA-PD-11 platen guide tap wall {TAP_EDGE_WALL_MIN:.3f} < {WALL_FLOOR_MM}"
     )
+# Printed on the tap pattern's note, floored to .001 in (after absorbing the
+# major's 0.0001 rounding).
+_TAP_EDGE_WALL_IN = math.floor(round(TAP_EDGE_WALL_MIN / 25.4, 4) * 1000) / 1000
+TAP_EDGE_WALL_TEXT = f"WALL {_TAP_EDGE_WALL_IN:.3f}".replace(" 0.", " .") + (
+    " MIN, TAPS TO EDGES"
+)
 
 if min(GUIDE_SCREW_THREAD_ENGAGEMENT, LOCK_SCREW_THREAD_ENGAGEMENT) <= 0.0:
     raise AssertionError("platen-guide screw stack has no #4-40 thread engagement")

@@ -56,6 +56,7 @@ from build_pd_platen_guide import (
     HOLE_X as REAR_X,
     ISOMETRIC_VIEW_SCALE,
     SCREW_STATION_X as FRONT_X,
+    TAP_EDGE_WALL_TEXT,
 )
 from pd_platen_guide_spec import (
     DRAWING_DIMENSIONS,
@@ -137,10 +138,12 @@ FINISH_CHAR_HEIGHT = 0.0025
 # The position frame names the parts whose holes the 9X taps must match
 # (machinist review round 3: a frame and basic table with no mating pattern
 # named read as over-specification). The note stands right of the frame, under
-# the overall length's line and above the tags over the bar.
+# the overall length's line and above the tags over the bar. It also states
+# the taps' finished wall to the edges, at the floor (rule 20; delegated
+# ruling RV-01 in pd-platen-guide.yaml).
 FCF_MATE_NOTE = (
     f"MATCHES {_config.parts('pd-platen')['number']} AND "
-    f"{_config.parts('pd-guide-lock')['number']} HOLES"
+    f"{_config.parts('pd-guide-lock')['number']} HOLES; {TAP_EDGE_WALL_TEXT}"
 )
 FCF_MATE_NOTE_XY = (0.141, 0.1285)
 # The right view's depth: its text stack (keep = its centre) left of the

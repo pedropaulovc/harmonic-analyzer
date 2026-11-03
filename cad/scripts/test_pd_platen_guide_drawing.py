@@ -14,6 +14,7 @@ import pytest
 from _drawing_common import _contact_preview_grid, render_pdf_png, sanitize_pdf_metadata
 from _drawing_notes import property_link
 import _drawing_registry
+import _config
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS, DrawingLayout
 from _gtol_frame import gtol_frame_xml as _gtol_frame_xml
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, blind_cut_dia_mm
@@ -227,6 +228,26 @@ def test_lock_through_tap_exits_clear_the_front_taps() -> None:
     assert wall == pytest.approx(3.454, abs=1e-3)
     assert wall >= WALL_FLOOR_MM
     assert guide.LOCK_TAP_EXIT_WALL_MIN == pytest.approx(wall)
+
+
+def test_tap_walls_to_the_edges_pay_both_breaks_and_print_at_the_floor() -> None:
+    # Codjiflo (#2124): .080 unbroken from each tap's major at its Ø.008 zone
+    # to datum B and to the .29 top face at its minimum, less the title
+    # block's .010 outside edge break and the tap's .010 mouth break.
+    from _inch_wall_limits import WALL_FLOOR_MM
+
+    unbroken = guide.TAP_Y - THREAD_MAJOR_MM["#4-40"] / 2.0 - 0.004 * 25.4
+    assert unbroken == pytest.approx(0.080 * 25.4, abs=1e-3)
+    assert guide.TAP_EDGE_WALL_MIN == pytest.approx(unbroken - 2.0 * 0.010 * 25.4)
+    assert guide.TAP_EDGE_WALL_MIN >= WALL_FLOOR_MM - 0.0005
+    # Rule 20: the sheet states the shortfall at the tap pattern's note, and
+    # the package declares it (delegated ruling RV-01).
+    assert guide.TAP_EDGE_WALL_TEXT == "WALL .060 MIN, TAPS TO EDGES"
+    assert drawing.FCF_MATE_NOTE.endswith(guide.TAP_EDGE_WALL_TEXT)
+    exceptions = _config.parts("pd-platen-guide")["machinist_exceptions"]
+    assert any(
+        entry["kind"] == "minor" and ".060" in entry["where"] for entry in exceptions
+    )
 
 
 def test_drawing_contract_imports_without_pywin32() -> None:

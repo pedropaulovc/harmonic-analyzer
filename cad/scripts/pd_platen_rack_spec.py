@@ -682,10 +682,12 @@ def _receiving_ceiling_text(limit_mm: float) -> str:
 
 
 # The two stock sizes carry their receiving maxima as callout text on the
-# native REF dimensions (delegated ruling 2026-11-02, Main; owner review
-# #2144): the rack-travel cut-end reserve
-# (paper_drive_geom.feed_rack_cut_end_section_maxima_mm) is paid at these
-# ceilings, so a larger section must be rejected on receipt.
+# native REF dimensions: delegated ruling 2026-11-02, following the owner's
+# precedents that a supplier size prints as untoleranced REF (#2147) and that
+# a functional acceptance rides its native callout (rule 4's DIAMETRAL
+# CLEARANCE callouts); owner review on #2144.  The rack-travel cut-end
+# reserve (paper_drive_geom.feed_rack_cut_end_section_maxima_mm) is paid at
+# these ceilings, so a larger section must be rejected on receipt.
 DIMENSION_CALLOUTS = {
     "RackHeight": _receiving_ceiling_text(quality.rack_stock_height_max_mm()),
     "RackDepth": _receiving_ceiling_text(quality.rack_face_width_max_mm()),
