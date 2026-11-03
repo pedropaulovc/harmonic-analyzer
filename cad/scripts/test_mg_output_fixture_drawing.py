@@ -1652,10 +1652,10 @@ def test_part_stamps_make_critical_properties() -> None:
     assert int(config["quantity"]) == 1
 
 
-def test_the_flats_reference_states_the_stock_and_its_supplier_band() -> None:
-    # The supplier's +/-.005 on the 7/16 flats, the band every wall proof
-    # reads, under the fraction REF.
-    assert spec.HEX_AF_CALLOUT == "HEX STOCK,\nSUPPLIER ±.005"
+def test_the_flats_reference_states_the_stock_untoleranced() -> None:
+    # The supplier's +/-.005 on the 7/16 flats governs and every wall proof
+    # reads it; the fraction REF prints untoleranced.
+    assert spec.HEX_AF_CALLOUT == "HEX STOCK"
     assert spec.HEX_STOCK_AF_BAND == pytest.approx(0.005 * 25.4)
     assert drawing.HEX_AF_REFERENCE["callout"] is spec.HEX_AF_CALLOUT
     # The REF's rows fit between the side view's turned Ø text and the hex.
@@ -3079,7 +3079,7 @@ def test_end_af_native_proof_requires_the_supplier_fraction_reference(
             "precision": 3,
             "expected_mm": geom.HEX_AF,
             "fraction_denominator": 16,
-            "callout": "HEX STOCK,\nSUPPLIER ±.005",
+            "callout": "HEX STOCK",
         }
     ]
 

@@ -7,6 +7,7 @@ from _printed_tolerance import drilled_oversize_mm, printed_deviations
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 import mg_magnifying_clamp_spec as clamp
 from mg_lever_thread_joint import (
+    CHAMFER_LEG_MAX,
     INCOMPLETE_THREAD_MAX,
     LEVER_UNIT as UNIT,
     ROD_DIA,
@@ -36,8 +37,9 @@ def _inch(mm: float) -> str:
     return f"{mm / 25.4:.3f}".replace("0.", ".", 1)
 
 
-# The sliding fit prints as limits: the stock band against the clamp sheet's
-# printed drilled lever bore.
+# The rod's REF fraction is untoleranced (the supplier's band governs); the
+# callout states the sliding fit it makes: the stock band against the clamp
+# sheet's printed drilled lever bore.
 _BORE_LIMITS = tuple(
     clamp.LEVER_BORE_DIA + deviation
     for deviation in printed_deviations(
@@ -50,7 +52,7 @@ ROD_BORE_CLEARANCE = (
     _BORE_LIMITS[1] - (ROD_DIA + ROD_DIA_BAND[1]),
 )
 ROD_DIA_CALLOUT = (
-    f"AS-SUPPLIED STOCK {_inch(ROD_DIA_BAND[0])}/{_inch(ROD_DIA_BAND[1])}\n"
+    "ROD STOCK\n"
     f"{_inch(ROD_BORE_CLEARANCE[0])}-{_inch(ROD_BORE_CLEARANCE[1])} DIAMETRAL CLEARANCE IN MHA-MG-02 CLAMP BORE"
 )
 # Retain the model's cosmetic-thread metadata; only drawing instances omit the
@@ -59,8 +61,11 @@ ROD_DIA_CALLOUT = (
 THREAD_CALLOUT = f"{THREAD} UNC-2A\nMATES MHA-MG-01 BRACKET"
 PRINT_THREAD_CALLOUT = f"{THREAD} UNC\nMATES MHA-MG-01\nBRACKET"
 # Full thread between the two incomplete ends at the printed shortest thread,
+# less the additive tip chamfer (as installation_full_overlap charges it),
 # floored to the thread length's places.
-FULL_THREAD_MIN = THREAD_LENGTH - THREAD_LENGTH_TOL - 2.0 * INCOMPLETE_THREAD_MAX
+FULL_THREAD_MIN = (
+    THREAD_LENGTH - THREAD_LENGTH_TOL - 2.0 * INCOMPLETE_THREAD_MAX - CHAMFER_LEG_MAX
+)
 _FULL_THREAD_MIN_IN = math.floor(FULL_THREAD_MIN / 25.4 * 10**THREAD_LENGTH_PLACES + 1e-9) / 10**THREAD_LENGTH_PLACES
 LEAD_CALLOUT = (
     "INCOMPLETE THREAD,\nEACH END OF THREAD\n"

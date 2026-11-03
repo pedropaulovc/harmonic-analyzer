@@ -292,9 +292,12 @@ def test_root_runout_is_wholly_outside_receiver_at_actual_printed_corners() -> N
     assert max(starts) < 0.0
     assert geom.INSTALLED_ROOT_CLEARANCE_MIN == pytest.approx(-max(starts))
     assert spec.SINGLE_LIMITS["ThreadExtent", "IncompleteLength"][0] == joint.INCOMPLETE_THREAD_MAX
-    # The shortest accepted .71 thread (.70) less both .075 incomplete ends.
-    assert spec.FULL_THREAD_MIN == pytest.approx((0.70 - 2.0 * 0.075) * 25.4)
-    assert "FULL THREAD .55 MIN" in spec.LEAD_CALLOUT
+    # The shortest accepted .71 thread (.70) less both .075 incomplete ends
+    # and the additive tip chamfer the installed overlap also charges.
+    assert spec.FULL_THREAD_MIN == pytest.approx(
+        (0.70 - 2.0 * 0.075) * 25.4 - joint.CHAMFER_LEG_MAX
+    )
+    assert "FULL THREAD .53 MIN" in spec.LEAD_CALLOUT
 
 
 def test_quarter_inch_body_has_real_drilled_slip_clearance() -> None:

@@ -209,8 +209,9 @@ def test_stock_hex_needs_no_custom_wall_or_envelope_inspection_note() -> None:
     # As-bought 1/2 hex: an exact fraction, judged at an assumed ±.005 supply.
     assert spec.HEX_AF == pytest.approx(25.4 / spec.HEX_AF_FRACTION_DENOMINATOR)
     assert spec.HEX_STOCK_AF_BAND == pytest.approx(0.005 * 25.4)
-    # The sheet prints the same supplier band the wall checks assume.
-    assert spec.HEX_AF_CALLOUT.endswith(f"<MOD-PM>{spec.HEX_STOCK_AF_BAND / 25.4:.3f}".replace("0.", "."))
+    # The REF is untoleranced: the supplier's band governs and only the walls
+    # charge it.
+    assert spec.HEX_AF_CALLOUT == "HEX STOCK"
     assert spec.LEVER_BORE_CALLOUT.splitlines() == [
         "DRILL THRU CORNERS", "SLIP ON 1/4 IN LEVER MHA-MG-03",
     ]

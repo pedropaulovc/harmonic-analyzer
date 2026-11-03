@@ -372,8 +372,8 @@ EXTENSION_START_GAP = 0.001
 # vertical stock reference, away from the tap's right-running leader.
 _END_HALF_HEIGHT = HEX_AF / 2.0 * _S / 1000.0
 _END_HALF_WIDTH = HEX_CORNER_RADIUS * _S / 1000.0
-# The flats print as the stock's fraction, (7/16"), over the callout rows
-# naming the stock and its supplier band (HEX_AF_CALLOUT); SolidWorks
+# The flats print as the stock's fraction, (7/16"), over the callout row
+# naming the stock (HEX_AF_CALLOUT); SolidWorks
 # centres the block on the keep.  The fraction's bar is a display line of
 # the dimension too: strokes wholly inside the text's box are its ink, not
 # dimension geometry.

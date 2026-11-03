@@ -39,14 +39,14 @@ def _limits(low_mm: float, high_mm: float) -> str:
     )
 
 
-# The shank's stock Ø states the drill rod's supplier limits and both of its
-# fits (drawing-guidelines.md rule 4; the matched-fit pattern: the nominal
-# stays a reference, the fit is stated on its dimension): the press in the
-# bar's reamed bore, and the wheel that runs on it, which is what the
-# journal's Ra 63 uin marks (rule 6). The press follows from the stock and
-# the bore limits; the running clearance is mg_wheel_group.HUB_RUNNING, a
-# literal so the wheel stays out of this part's recipe
-# (test_mg_wheel_axle_drawing pins it).
+# The shank's stock Ø is an untoleranced REF (the drill rod's supplier limits
+# govern); its callout states both of its fits (drawing-guidelines.md rule 4;
+# the matched-fit pattern: the nominal stays a reference, the fit is stated on
+# its dimension): the press in the bar's reamed bore, and the wheel that runs
+# on it, which is what the journal's Ra 63 uin marks (rule 6). The press
+# follows from the stock and the bore limits; the running clearance is
+# mg_wheel_group.HUB_RUNNING, a literal so the wheel stays out of this part's
+# recipe (test_mg_wheel_axle_drawing pins it).
 PIN_LIMITS = (PIN_DIA - PIN_DIA_TOL, PIN_DIA + PIN_DIA_TOL)
 PRESS_LIMITS = (
     PIN_LIMITS[0] - BAR_BORE_LIMITS[1],
@@ -57,7 +57,6 @@ if PRESS_LIMITS[0] <= 0.0:
 RUNNING_CLEARANCE_TEXT = ".0008-.0017"
 PIN_DIA_CALLOUT = "\n".join(
     (
-        f"STOCK <MOD-DIAM>{_limits(*PIN_LIMITS)};",
         f"{_limits(*PRESS_LIMITS)} DIAMETRAL INTERFERENCE IN",
         f"{BAR} <MOD-DIAM>{_limits(*BAR_BORE_LIMITS)} REAMED BORE;",
         f"{RUNNING_CLEARANCE_TEXT} RUNNING CLEARANCE IN",

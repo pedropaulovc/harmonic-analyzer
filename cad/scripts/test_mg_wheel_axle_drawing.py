@@ -226,12 +226,13 @@ def test_thread_callout_and_no_general_notes() -> None:
     assert "Manufacturing Notes" not in source
     assert not hasattr(spec, "DRAWING_NOTES")
     assert "Manufacturing Notes" not in Path(part.__file__).read_text(encoding="utf-8")
-    # The stock Ø states the drill rod's limits and both fits: the press into
-    # the bar's reamed bore, at that bore's limits, and the wheel running on
-    # the shank, each matching the wheel group's proofs.
+    # The stock Ø is an untoleranced REF (the supplier's limits govern) that
+    # states both fits: the press into the bar's reamed bore, at that bore's
+    # limits, and the wheel running on the shank, each matching the wheel
+    # group's proofs.
     words = " ".join(callouts.PIN_DIA_CALLOUT.split())
+    assert ".1873" not in words and "STOCK" not in words
     for required in (
-        ".1873-.1877",
         ".0003-.0012 DIAMETRAL INTERFERENCE",
         "MG-WHEEL-BAR <MOD-DIAM>.1865-.1870",
         ".0008-.0017 RUNNING CLEARANCE",

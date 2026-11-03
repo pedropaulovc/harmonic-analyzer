@@ -76,10 +76,9 @@ from mg_rod_clamp_joint import (  # noqa: F401 (re-export)
 # sheet; its places are the model's, unused by a fraction.
 HEX_AF_PLACES = 3
 STOCK_REFERENCE_DIMENSION = "HexAf"
-# Under the REF: the stock form and the supplier's across-flats band the wall
-# checks assume (<MOD-PM> is SolidWorks' ±).
-_STOCK_BAND_TEXT = f"{HEX_STOCK_AF_BAND / 25.4:.3f}".lstrip("0")
-HEX_AF_CALLOUT = f"HEX, AS-SUPPLIED STOCK <MOD-PM>{_STOCK_BAND_TEXT}"
+# Under the REF: the stock form only. The REF is untoleranced (the supplier's
+# band governs); the wall checks charge HEX_STOCK_AF_BAND.
+HEX_AF_CALLOUT = "HEX STOCK"
 # The drilled lever bore prints its F drill at .XXX with the DRILLED HOLES
 # +.004/0 row.
 LEVER_BORE_DIA_PLACES = 3

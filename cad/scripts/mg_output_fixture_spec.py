@@ -440,11 +440,10 @@ TAP_CALLOUT_PRECISION = {
     TAP_DRILL_DEPTH_VARIABLE: TAP_DEPTH_PLACES,
     TAP_THREAD_DEPTH_VARIABLE: TAP_DEPTH_PLACES,
 }
-# The flats' REF names the stock and the supplier's band it is bought to,
-# on the dimension itself (rule 11: notes carry no dimensions), so the sheet
-# needs no general note.
-_HEX_BAND_TEXT = f"{HEX_STOCK_AF_BAND / 25.4:.3f}".removeprefix("0")
-HEX_AF_CALLOUT = f"HEX STOCK,\nSUPPLIER ±{_HEX_BAND_TEXT}"
+# The flats' REF names the stock on the dimension itself, so the sheet needs
+# no general note. The REF is untoleranced (the supplier's band governs); the
+# shoulder and bore walls charge HEX_STOCK_AF_BAND.
+HEX_AF_CALLOUT = "HEX STOCK"
 # The thread's extent, on the callout's below row, under the thread it
 # governs (drawing-guidelines.md rule 7: a requirement of one feature reads at
 # that feature, not in a general note the shop must match to it; review r3).
