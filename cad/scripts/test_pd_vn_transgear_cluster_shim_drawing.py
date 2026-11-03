@@ -110,3 +110,12 @@ def test_installation_note_fits_the_sheet() -> None:
     lines = _config.parts(STEM)["installation_notes"].splitlines()
     assert len(lines) <= 4
     assert all(len(line) <= 70 for line in lines), lines
+
+
+def test_installation_notes_fit_the_purchased_sheet() -> None:
+    # Farm run 20261103T093232922Z: four lines failed rule 7's budget.
+    from _purchased_fastener_drawing import note_lines
+
+    row = _config.parts("pd-vn-transgear-cluster-shim")
+    lines = note_lines(row["installation_notes"], label="cluster shim")
+    assert "SPARE T18'S BORE" in " ".join(lines)
