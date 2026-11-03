@@ -873,6 +873,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="ch_rocker_arm_tl_vn_oblique_nut_dowel",
+        part="ch_rocker_arm_tl_vn_oblique_nut_dowel",
+        artifact_stem="ch-rocker-arm-tl-vn-oblique-nut-dowel",
+        script_name="draw_ch_rocker_arm_tl_vn_oblique_nut_dowel.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="ch_rocker_arm_tl_vn_oblique_leadscrew",
         part="ch_rocker_arm_tl_vn_oblique_leadscrew",
         artifact_stem="ch-rocker-arm-tl-vn-oblique-leadscrew",
