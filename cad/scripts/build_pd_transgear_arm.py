@@ -433,10 +433,16 @@ async def build(adapter: Any) -> dict[str, str]:
     name_last_feature(adapter, "PinBore")
     expected -= V_PIN_BORE
     await volume_check(adapter, "arm with pin bore", expected, 0.01 * V_PIN_BORE)
+    # Picked on the bore's +Y side: a chamfer's leg dimension imports only
+    # into a section whose plane holds its picked edge point (the crank drive
+    # gear's BoreSouthChamferSize, probe run 20260929T113615557Z), and D-D
+    # cuts the plane x = PIN_STATION.  Picked at +X, the leg reached no view
+    # (run 20261103T155747207Z: "section D-D view is missing model
+    # dimensions: ['PinMouthChamfer']").
     check(
         "pin bore rear mouth",
         await adapter.add_chamfer(
-            PIN_MOUTH_CHAMFER, [[PIN_STATION + _R_PIN_BORE, 0.0, THICKNESS]]
+            PIN_MOUTH_CHAMFER, [[PIN_STATION, _R_PIN_BORE, THICKNESS]]
         ),
     )
     name_last_feature(adapter, "PinBoreRearMouth")
