@@ -8,7 +8,7 @@ build_pd_platen_guide.py). Fastener holes:
 
 * four clip-screw #2-56 through receivers at the plate's extreme left/right
   edges (.170 in from each), matching the clips' .283-inset end holes, each
-  tapped on through a Ø.28 boss on the back face for >= 1.5D engagement,
+  tapped on through a Ø.30 boss on the back face for >= 1.5D engagement,
   each boss rounded into the face inside the title block's inside-corner limit;
 * ten #4 loose (Ø.144) counterbored guide-screw through-holes in two rows
   of 5 (ch22 front photo) at the guide rail centrelines: bottom row y 13,
@@ -262,7 +262,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "plate height (1:2 front-face ratio)", "y", PLATE_HEIGHT
     )
 
-    # Clip-screw receiver bosses: four Ø.28 integral bosses on the back face
+    # Clip-screw receiver bosses: four Ø.30 integral bosses on the back face
     # (z = PlateThickness), sketched on the front plane and extruded from that
     # offset, so the through taps below gain the boss height of thread.
     bosses = SketchDims()

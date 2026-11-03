@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the platen plate (MHA-PD-02).
 
-The platen is a 10.62 x 5.31 brass plate, .152 thick, with four Ø.28 bosses
+The platen is a 10.62 x 5.31 brass plate, .152 thick, with four Ø.30 bosses
 standing proud of its back face round the #2-56 clip-screw through taps and
 ten counterbored #4 loose through holes for the guide screws.  The sheet
 prints decimal inch (the part's ``drawing_unit: in``) and runs at 1:2: the

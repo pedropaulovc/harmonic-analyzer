@@ -463,6 +463,7 @@ def _sheet_sketch_point(sheet_xy: tuple[float, float]) -> tuple[float, float]:
     return (sheet_xy[0] / _S, sheet_xy[1] / _S)
 
 
+@_telemetry.traced("drawing.thumbnut.section_axis")
 def _add_section_axis(adapter: Any, section: Any) -> None:
     """Draw the nut's axis through section A-A, past the seat and the rim.
 

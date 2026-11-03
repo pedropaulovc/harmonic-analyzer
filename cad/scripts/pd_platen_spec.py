@@ -22,7 +22,12 @@ import _config
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import inside_corner_radius_mm, printed_deviations
+from _printed_tolerance import (
+    edge_break_chamfer_mm,
+    edge_break_radius_mm,
+    inside_corner_radius_mm,
+    printed_deviations,
+)
 from sh_vn_brass_fillister_screw_spec import HEAD_H as FILLISTER_HEAD_H
 
 UNIT = drawing_unit("parts/pd-platen", _config.parts("pd-platen"))
@@ -45,7 +50,7 @@ PLATE_THICKNESS = 3.85  # prints .152
 # nothing but the clip-screw tips rides the back.
 SOCKET_SPEC = HoleSpec("tapped", "#2-56")
 SOCKET_BOSS_DIA = (
-    7.112  # .28: wall round the #2-56 major (rule 17, SOCKET_BOSS_WALL_MIN)
+    7.62  # .30: finished wall round the #2-56 major (rule 17, SOCKET_BOSS_WALL_MIN)
 )
 # 1/4 shank - .032 clip sheet - 3.85 plate: the boss closes the stack so the
 # tip finishes flush (a closure on the kept plate thickness, so it prints
@@ -216,13 +221,21 @@ _FLOOR_MIN_IN = math.floor(CBORE_FLOOR_MIN / 25.4 * 1000.0 + 1e-9) / 1000.0
 CBORE_FLOOR_CALLOUT = (
     f"C'BORE FLOOR\n{f'{_FLOOR_MIN_IN:.3f}'.lstrip('0')} MIN WORST CASE"
 )
-# The smallest printed boss round the #2-56 major, concentric with its tap.
+# The smallest printed boss round the #2-56 major, concentric with its tap,
+# finished: the boss rim's edge break and the tap's mouth break both come off
+# it at the boss face (Codjiflo, #2124: Ø.28 held .080 only before them).
+_EDGE_BREAK = max(edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT))
 SOCKET_BOSS_WALL_MIN = (
-    SOCKET_BOSS_DIA
-    + printed_deviations(
-        SOCKET_BOSS_DIA, DRAWING_PRECISION_BY_NAME["Boss2Dia"], unit=UNIT
-    )[0]
-) / 2.0 - THREAD_MAJOR_MM[SOCKET_SPEC.size] / 2.0
+    (
+        SOCKET_BOSS_DIA
+        + printed_deviations(
+            SOCKET_BOSS_DIA, DRAWING_PRECISION_BY_NAME["Boss2Dia"], unit=UNIT
+        )[0]
+    )
+    / 2.0
+    - THREAD_MAJOR_MM[SOCKET_SPEC.size] / 2.0
+    - 2.0 * _EDGE_BREAK
+)
 if SOCKET_BOSS_WALL_MIN < WALL_TARGET_MM:
     raise AssertionError(
         f"socket boss wall {SOCKET_BOSS_WALL_MIN:.3f} under the rule-17 .080 target"

@@ -76,7 +76,12 @@ def test_boss_walls_survive_the_printed_band():
     assert spec.UNIT == "in"
     smallest_boss = _limits(spec.SOCKET_BOSS_DIA, spec.DRAWING_PRECISION_BY_NAME["Boss2Dia"])[0]
     major = THREAD_MAJOR_MM[spec.SOCKET_SPEC.size]
-    assert spec.SOCKET_BOSS_WALL_MIN == pytest.approx(smallest_boss / 2.0 - major / 2.0)
+    # Finished: the boss rim's and the tap mouth's .010 breaks (Codjiflo, #2124).
+    breaks = 2.0 * 0.010 * 25.4
+    assert spec.SOCKET_BOSS_WALL_MIN == pytest.approx(
+        smallest_boss / 2.0 - major / 2.0 - breaks
+    )
+    assert spec.SOCKET_BOSS_DIA == pytest.approx(0.30 * 25.4)
     assert spec.SOCKET_BOSS_WALL_MIN >= WALL_TARGET_MM
 
 
