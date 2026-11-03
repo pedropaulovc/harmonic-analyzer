@@ -142,10 +142,14 @@ FRONT_KEEP = {
     "AnchorZ": (0.212, 0.113),
     # Outside the west end: the pivot-centre witness runs west through the
     # lift bore to the dimension line, a conventional extension-line crossing
-    # (rule 14's list of defects is complete and does not include it).
+    # (rule 14's list of defects is complete and does not include it).  The
+    # value and its SETS PARK GAP line stand below the pivot witness and ~20
+    # mm west of the block (#2106 delta run 084519018Z: centred between the
+    # witnesses, both lines ran across them and into the outline), above the
+    # lift bore's Ra symbol.
     "LiftBoreCz": (
-        _front_x(-BLOCK_WEST) - 0.010,
-        _front_y(LIFT_BORE_RISE / 2.0),
+        _front_x(-BLOCK_WEST) - 0.0205,
+        _front_y(0.0) - 0.008,
     ),
     # Every horizontal/vertical witness from the pivot centre crosses its rim
     # at 0/90/180/270 deg.  The leader runs to the NEAR end of the text's
