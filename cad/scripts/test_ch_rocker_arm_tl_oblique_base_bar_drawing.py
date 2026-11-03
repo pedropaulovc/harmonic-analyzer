@@ -610,6 +610,61 @@ def test_metric_vendor_stations_are_model_authored_in_mm() -> None:
     assert "print_imported_metric_dimensions(" in sheet
 
 
+class _Display:
+    def __init__(self, places: int) -> None:
+        self.doc_units, self.places, self.calls = True, places, []
+
+    def GetUseDocUnits(self):
+        return self.doc_units
+
+    def GetUnits(self):
+        return -1 if self.doc_units else 0
+
+    def GetPrimaryPrecision2(self):
+        return self.places
+
+    def GetText(self, _part):
+        return " mm"
+
+    def SetUnits2(self, use_doc, *_args):
+        self.calls.append("SetUnits2")
+        self.doc_units = use_doc
+        return 0
+
+    def SetPrecision3(self, *_args):
+        self.calls.append("SetPrecision3")
+        return 0
+
+
+class _Annotation:
+    def __init__(self, name: str, display: _Display) -> None:
+        self.name, self.display = name, display
+
+    def GetSpecificAnnotation(self):
+        return self.display
+
+
+def test_metric_sheet_sets_units_but_never_rewrites_model_precision(
+    monkeypatch,
+) -> None:
+    import _drawing_metric_vendor as metric
+
+    monkeypatch.setattr(metric, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(metric, "_annotation_name", lambda _adapter, ann: ann.name)
+    good = _Display(2)
+    metric.print_imported_metric_dimensions(
+        None, [_Annotation("RailHole1X", good)], {"RailHole1X": 2}
+    )
+    assert good.calls == ["SetUnits2"]
+    # A wrong imported precision is detected, not repaired.
+    bad = _Display(3)
+    with pytest.raises(RuntimeError, match="arrived at 3 places"):
+        metric.print_imported_metric_dimensions(
+            None, [_Annotation("RailHole1X", bad)], {"RailHole1X": 2}
+        )
+    assert bad.calls == []
+
+
 def test_notes_follow_the_simplicity_policy() -> None:
     assert not re.search(r"\d", spec.DRAWING_NOTES)
     assert "REFERENCE" not in spec.DRAWING_NOTES

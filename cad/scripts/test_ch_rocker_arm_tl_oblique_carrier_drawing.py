@@ -782,3 +782,6 @@ def test_lever_tap_station_prints_its_own_two_place_band():
     assert spec.LEVER_STATION_BAND == printed_band_mm(2, unit=spec.UNIT)
     build = (Path(__file__).parent / "build_ch_rocker_arm_tl_oblique_carrier.py").read_text()
     assert '"LeverX",\n        LEVER_STATION_BAND,' in build.replace("\r\n", "\n")
+    # A1's station is the same LeverX measurement: one band in features.toml.
+    features = _features()
+    assert features["pin_hole_a1"]["station"] == features["lever_tap_1"]["station"]

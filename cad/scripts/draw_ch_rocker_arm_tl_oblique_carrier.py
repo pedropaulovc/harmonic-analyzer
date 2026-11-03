@@ -378,10 +378,11 @@ _BAND = (part_spec.POSITION_BAND, -part_spec.POSITION_BAND)
 _D1 = _printed(part_spec.D1, _CHAIN_PLACES)
 _DX = _printed(abs(part_spec.A2_DX), _CHAIN_PLACES)
 _DY = _printed(part_spec.A2_DY, _CHAIN_PLACES)
-# A1, the X datum, from the lever taps' axis (the model origin's X) at the
-# title block's .XXX band: the print's LeverX (driven equal to A1X) runs from
-# A1 to the upper lever tap, its extension line through both taps.
+# A1, the X datum, from the lever taps' axis (the model origin's X): the
+# print's LeverX (driven equal to A1X) runs from A1 to the upper lever tap,
+# its extension line through both taps, at LeverX's explicit ±.01 band.
 _A1X = _printed(abs(_A1[0]), _STATION_PLACES)
+_LEVER_STATION = (part_spec.LEVER_STATION_BAND, -part_spec.LEVER_STATION_BAND)
 
 
 def _from_a1(x: float, places: int) -> float:
@@ -391,7 +392,10 @@ def _from_a1(x: float, places: int) -> float:
 
 _CHAIN: dict[str, dict[str, tuple[Any, tuple[Any, ...]]]] = {
     "A1": {
-        "station": (_limits(abs(_A1[0]), _STATION_PLACES), ("PIN_HOLES", "STATIONS")),
+        "station": (
+            limits(_A1X, _STATION_PLACES, _LEVER_STATION),
+            ("PIN_HOLES", "LEVER_STATION_BAND"),
+        ),
         "station_nominal": (_A1X, ("PIN_HOLES", "STATIONS")),
     },
     "B1": {
@@ -531,7 +535,7 @@ for _stem, _points, _thread, _drill, _spec_name, _places, _y_places in _TAPS:
                     limits(
                         _from_a1(_x, _places),  # on its printed nominal, like _BAND
                         _places,
-                        (part_spec.LEVER_STATION_BAND, -part_spec.LEVER_STATION_BAND),
+                        _LEVER_STATION,
                     )
                     if _stem == "lever_tap"
                     else _limits(_x - _A1[0], _places),
