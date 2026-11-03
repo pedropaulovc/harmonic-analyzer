@@ -772,7 +772,37 @@ def test_real_graph_every_marked_action_dispatches_its_task_name():
     # A fresh child avoids dodo's process-wide doit patches. Every native/cache
     # effect is intercepted, and capturing the label aborts before post-build
     # stamps or recipe sidecars can be written.
+    #
+    # The child bounds itself by CPU time, not wall time: loading the real graph
+    # costs about 60 s of CPU cold and 10 s warm, while a loaded host only
+    # stretches the wall clock (a 120 s wall timeout failed in an 8 h root run).
+    # Its budget is 5x the cold cost. A child that stops consuming CPU for 300
+    # consecutive watchdog ticks is blocked, not starved (a starved process still
+    # runs between the watchdog's own wake-ups), and is dumped and killed.
     program = """
+import faulthandler
+import os
+import sys
+import threading
+import time
+
+def watchdog(cpu_budget_s=300.0, stalled_ticks=300, progress_s=0.05):
+    previous, idle = time.process_time(), 0
+    while True:
+        time.sleep(1)
+        used = time.process_time()
+        if used - previous >= progress_s:
+            previous, idle = used, 0
+        else:
+            idle += 1
+        if used > cpu_budget_s or idle >= stalled_ticks:
+            print(f'real-graph child exceeded its budget: {used:.1f} s CPU, '
+                  f'{idle} idle ticks', file=sys.stderr, flush=True)
+            faulthandler.dump_traceback(all_threads=True)
+            os._exit(3)
+
+threading.Thread(target=watchdog, daemon=True).start()
+
 import json
 from contextlib import nullcontext
 from types import SimpleNamespace
@@ -849,7 +879,6 @@ print(json.dumps({'checked': checked, 'helpers': sorted(helpers)}))
         env=env,
         capture_output=True,
         text=True,
-        timeout=120,
     )
     assert result.returncode == 0, result.stdout + result.stderr
     summary = json.loads(result.stdout.splitlines()[-1])
