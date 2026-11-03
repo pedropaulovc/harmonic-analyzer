@@ -5,10 +5,11 @@ ruling 2026-11-01 (item 4): a shop-made brass nut replaces the bought Tr8x2
 flange nut (MHA-CH-06-TL-VN-55, retired), so TL-32's lug needs no spigot
 recess and no wall exception. The nut threads on the leadscrew
 (``ch_rocker_arm_tl_vn_oblique_leadscrew_spec``, imported as ``leadscrew``)
-and two #4-40 X 3/4 SHCS (MHA-CH-06-TL-VN-66, McMaster 91251A113) hold it on
-the lug's -X face, through its two loose-clearance holes into the lug's
-#4-40 taps, tapped THRU (ruling C1). Thread the nut on the screw first, then
-tighten the screws: the clearance float aligns the nut to the screw.
+and two #4-40 X 3/4 flanged button head screws (MHA-CH-06-TL-VN-66,
+McMaster 91355A581) hold it on the lug's -X face, through its two Ø.170
+clearance holes into the lug's #4-40 taps, tapped THRU (ruling C1). Thread
+the nut on the screw first, then tighten the screws: the clearance float
+aligns the nut to the screw.
 
 Material and stock: brass 360-H02 (C36000, ASTM B16) extruded rectangle bar,
 3/4 x 1-1/4 in (OnlineMetals 1500, read live 2026-11-01: in stock, 12 in
@@ -30,23 +31,26 @@ Holes, all THRU along Z on the bore's line (Y = BORE_Y):
   tapped Tr8x2-7H RH (the Fedeas TR8X2 HSS tap's class), .63 from the -X
   side and .38 from the bottom face (the owner's "centre of both stock faces"
   on the .01 grid; ruling: bore stations .XX).
-- Two #4 loose-clearance holes, Ø.144 (ASME B18.2.8, the #27 drill), 2X
-  .340 from the bore axis, one each side (.XXX, the pair matches TL-32's
-  taps and names its mate). Each hole stands on the bore, not on the other
-  hole: the review of run 20261101T220223216Z found the chained .63 / .34 /
-  .680 stacking three bands on the far hole.
+- Two Ø.170 clearance holes (ASME B18.2.8's #6 normal size; an 11/64 drill
+  cuts it), 2X .340 from the bore axis, one each side (.XXX, the pair
+  matches TL-32's taps and names its mate). Each hole stands on the bore,
+  not on the other hole: the review of run 20261101T220223216Z found the
+  chained .63 / .34 / .680 stacking three bands on the far hole.
 
-Fit-up: the loose hole floats a #4 by ``HOLE_FLOAT`` .016, the normal-fit
+Fit-up: the hole floats a #4 by ``HOLE_FLOAT`` .029, the #4 normal-fit
 Ø.129 by ``NORMAL_HOLE_FLOAT`` .008. TL-32's spec owns the stack of both
-parts' printed stations (``feed_block.FIT_UP_RESIDUAL``, .014) and proves it
-falls between the two.
+parts' printed stations (``feed_block.FIT_UP_RESIDUAL``, .014), proves it
+falls between the two and that the screw heads seat flat at that
+eccentricity (Codjiflo P1 on #2112: a #4 SHCS's Ø.141 underhead fillet hit
+the old Ø.144 hole's mouth, and its Ø.176 head could not both clear the
+fillet and bear outside the hole; the Ø.234 flange does).
 
 Rule 17 (walls, .080 target) at the printed worst case (``WALLS_MM``): every
 station at its band, the holes at the drilled oversize, the stock at its
 supplier band, the Tr8 internal thread at its major D4 8.5 (ISO 2904).
 
 Rule 18 belongs to the screw (``SCREW_FULL_THREAD_MIN``): the shortest
-91251A113 (B18.3, -0.03 in) through the longest nut (.41) keeps 2 D of full
+91355A581 (B18.3, -0.03 in) through the longest nut (.41) keeps 2 D of full
 thread in the lug's through tap (``leadscrew.ENGAGEMENT_TARGET_D``).
 """
 
@@ -56,11 +60,11 @@ import _config
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_TARGET_MM
-from _mcmaster_91251a113 import DIMS as SCREW_DIMS
-from _mcmaster_91251a113 import FILLET_DIA_MAX as SCREW_FILLET_DIA_MAX
-from _mcmaster_91251a113 import HEAD_DIA_MIN as SCREW_HEAD_DIA_MIN
-from _mcmaster_91251a113 import LENGTH_TEXT as SCREW_LENGTH_TEXT
-from _mcmaster_91251a113 import THREAD as SCREW_THREAD
+import _mcmaster_91355a581 as _screw
+from _mcmaster_91355a581 import DIMS as SCREW_DIMS
+from _mcmaster_91355a581 import LENGTH_MIN as SCREW_LENGTH_MIN
+from _mcmaster_91355a581 import LENGTH_TEXT as SCREW_LENGTH_TEXT
+from _mcmaster_91355a581 import THREAD as SCREW_THREAD
 from _package_units import drawing_unit
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
@@ -106,10 +110,11 @@ TR8_D4 = leadscrew.SCREW_MAJOR_DIA + 0.5  # ISO 2904 internal major (2 ac 0.5 at
 if not TR8_D1 < BORE_DRILL < leadscrew.SCREW_MAJOR_DIA - 0.5 * leadscrew.SCREW_LEAD:
     raise AssertionError("the letter C drill is not a Tr8x2 tap drill")
 
-# --- The #4 loose-clearance pair ------------------------------------------------
+# --- The #4 clearance pair: Ø.170, so the screw heads seat flat --------------
 SCREW_SIZE = "#4"
-HOLE_FIT = "loose"
-HOLE_DIA = CLEARANCE_MM[(SCREW_SIZE, HOLE_FIT)]  # 3.658, .144 (#27)
+# ASME B18.2.8's #6 normal size: the #4's Ø.141 underhead fillet clears its
+# mouth at the fit-up's eccentricity (TL-32's spec proves it).
+HOLE_DIA = CLEARANCE_MM[("#6", "normal")]  # 4.318, .170
 HOLE_DIA_PLACES = 3
 HOLE_OFFSET = 0.340 * INCH  # 8.636, each hole from the bore axis
 HOLE_OFFSET_PLACES = 3
@@ -120,13 +125,17 @@ MATE_CALLOUT = "MATCHES TL-32 LUG TAPS"
 # --- The pair's float: TL-32's spec checks it against both parts' stations ---
 SCREW_MAJOR = THREAD_MAJOR_MM[SCREW_THREAD]
 HOLE_OFFSET_BAND = printed_band_mm(HOLE_OFFSET_PLACES, unit=UNIT)  # .005
-HOLE_FLOAT = (HOLE_DIA - SCREW_MAJOR) / 2.0  # .016
+HOLE_FLOAT = (HOLE_DIA - SCREW_MAJOR) / 2.0  # .029
+HOLE_R_MAX = (HOLE_DIA + DRILLED_OVERSIZE) / 2.0  # .087, the drilled hole's largest
 NORMAL_HOLE_FLOAT = (CLEARANCE_MM[(SCREW_SIZE, "normal")] - SCREW_MAJOR) / 2.0  # .008
 
-# --- The screws: 2 X #4-40 X 3/4 SHCS through the nut into the lug ---------------
+# --- The screws: 2 X #4-40 X 3/4 FLANGED BHCS through the nut into the lug -------
 SCREW_COUNT = len(HOLE_X)
 SCREW_LENGTH = SCREW_DIMS.length  # 19.05
-SCREW_HEAD_H = SCREW_DIMS.head_h
+SCREW_HEAD_H = SCREW_DIMS.head_h  # .059, the flange included
+# The seat bounds TL-32's spec checks at the fit-up's eccentricity.
+SCREW_BEARING_DIA_MIN = _screw.BEARING_DIA_MIN  # the flange's flat face, .222
+SCREW_FILLET_DIA_MAX = _screw.FILLET_DIA_MAX  # .141
 SCREW_ENGAGEMENT = SCREW_LENGTH - LENGTH  # 8.89 nominal, into the lug
 # Rule 18 at the worst case: the shortest screw through the longest nut.
 SCREW_FULL_THREAD_MIN = leadscrew.full_thread_min(
@@ -138,26 +147,24 @@ if not SCREW_FULL_THREAD_MIN >= _TARGET:
     raise AssertionError("the feed nut screws engage the lug under 2 D")
 if leadscrew.full_thread_min("5/8", LENGTH_MAX, SCREW_THREAD) >= _TARGET:
     raise AssertionError("a 5/8 nut screw would do: 3/4 is no longer the shortest")
-# The head bears flat on the brass: its underhead transition seats inside the
-# hole, its least diameter outside the largest hole (concentric).
-HEAD_BEARING_LAND_MIN = (SCREW_HEAD_DIA_MIN - (HOLE_DIA + DRILLED_OVERSIZE)) / 2.0
-if not (SCREW_FILLET_DIA_MAX < HOLE_DIA and HEAD_BEARING_LAND_MIN > 0.0):
-    raise AssertionError("a feed nut screw head does not seat flat on the nut")
+# B18.3's length band is the socket cap screw table's, the one the rule-18
+# helper charges.
+if abs(SCREW_LENGTH - SCREW_LENGTH_MIN - leadscrew.SHCS_LENGTH_TOL_MM) > 1e-9:
+    raise AssertionError("the nut screw's length band is not the rule-18 helper's")
 # The nut's reach toward the near KP08: the longest nut and the screw heads.
 REACH = LENGTH_MAX + SCREW_HEAD_H
 
 # --- Rule 17: walls at the printed worst case --------------------------------
 _STATION = printed_band_mm(BORE_PLACES, unit=UNIT)  # .01 on the bore stations
-_HOLE_R = (HOLE_DIA + DRILLED_OVERSIZE) / 2.0
 _BORE_R = TR8_D4 / 2.0
 WALLS_MM: dict[str, float] = {
-    "Tr8 major to the holes": HOLE_OFFSET - HOLE_OFFSET_BAND - _HOLE_R - _BORE_R,
-    "hole 1 to -X side": HOLE_X[0] - _STATION - HOLE_OFFSET_BAND - _HOLE_R,
+    "Tr8 major to the holes": HOLE_OFFSET - HOLE_OFFSET_BAND - HOLE_R_MAX - _BORE_R,
+    "hole 1 to -X side": HOLE_X[0] - _STATION - HOLE_OFFSET_BAND - HOLE_R_MAX,
     "hole 2 to +X side": (WIDTH - WIDTH_STOCK_BAND)
     - (HOLE_X[1] + _STATION + HOLE_OFFSET_BAND)
-    - _HOLE_R,
-    "holes to bottom face": BORE_Y - _STATION - _HOLE_R,
-    "holes to top face": (HEIGHT - HEIGHT_STOCK_BAND) - (BORE_Y + _STATION) - _HOLE_R,
+    - HOLE_R_MAX,
+    "holes to bottom face": BORE_Y - _STATION - HOLE_R_MAX,
+    "holes to top face": (HEIGHT - HEIGHT_STOCK_BAND) - (BORE_Y + _STATION) - HOLE_R_MAX,
     "Tr8 major to bottom face": BORE_Y - _STATION - _BORE_R,
     "Tr8 major to top face": (HEIGHT - HEIGHT_STOCK_BAND) - (BORE_Y + _STATION) - _BORE_R,
 }
@@ -191,12 +198,13 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked feed nut dimension needs authored places")
 REFERENCE_SKETCHES = ("HolePatternReference", "NutLengthReference")
 # Every fabricated value prints as modelled at its inch places (the hole's
-# Ø.144 is the clearance table's 3.658 mm, which prints .144).
+# Ø.170 is the clearance table's 4.318 mm).
 for _name, _value in (
     ("NutLength", LENGTH),
     ("BoreX", BORE_X),
     ("BoreY", BORE_Y),
     ("BoreDia", BORE_DRILL),
+    ("HoleDia", HOLE_DIA),
     ("Hole1Offset", HOLE_OFFSET),
     ("Hole2Offset", HOLE_OFFSET),
 ):

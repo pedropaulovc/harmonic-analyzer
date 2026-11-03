@@ -125,7 +125,7 @@ CALLOUTS_BELOW = dict(pivot.CALLOUTS_BELOW) | {
 }
 REFERENCE_SKETCHES = pivot.REFERENCE_SKETCHES + ("NutPatternReference",)
 
-# --- Fit-up: the nut's loose holes float a #4 over both parts' stations -------
+# --- Fit-up: the nut's clearance holes float a #4 over both parts' stations ----
 # The nut rides the leadscrew and the KP08s float laterally, so only each
 # screw's station from the axis and its height on the axis line must meet the
 # nut's: along the pair, the nut's .340 band and the lug's; across, the nut's
@@ -135,6 +135,20 @@ FIT_UP_Y = feed_nut.HOLE_OFFSET_BAND + NUT_TAP_OFFSET_BAND  # .010
 FIT_UP_Z = feed_nut.HOLE_OFFSET_BAND + METRIC_BAND  # .010
 FIT_UP_RESIDUAL = math.hypot(FIT_UP_Y, FIT_UP_Z)  # .014
 assert feed_nut.NORMAL_HOLE_FLOAT < FIT_UP_RESIDUAL <= feed_nut.HOLE_FLOAT
+# The heads seat flat at that eccentricity (Codjiflo P1 on #2112): each
+# screw's underhead fillet, at its largest, clears the least hole's mouth, and
+# the flange's flat bearing face, at its least, covers the largest hole with
+# land to bear on the brass.
+HEAD_FILLET_CLEARANCE = feed_nut.HOLE_DIA / 2 - (feed_nut.SCREW_FILLET_DIA_MAX / 2 + FIT_UP_RESIDUAL)
+HEAD_BEARING_LAND_MIN = feed_nut.SCREW_BEARING_DIA_MIN / 2 - (feed_nut.HOLE_R_MAX + FIT_UP_RESIDUAL)
+assert HEAD_FILLET_CLEARANCE > 0.0 and HEAD_BEARING_LAND_MIN > 0.0
+# The flanges clear the leadscrew that runs past them: each screw stands at
+# least the nut's .335 less the fit-up from the nut's (the leadscrew's) axis.
+HEAD_TO_LEADSCREW_MIN = (
+    feed_nut.HOLE_OFFSET - feed_nut.HOLE_OFFSET_BAND - FIT_UP_RESIDUAL
+    - feed_nut.SCREW_DIMS.flange_dia / 2 - lead.SCREW_MAJOR_DIA / 2
+)
+assert HEAD_TO_LEADSCREW_MIN > 0.0
 
 # --- Rule 17: lug walls at the printed worst case (.080 target) -----------------
 NUT_TAP_MAJOR = THREAD_MAJOR_MM[feed_nut.SCREW_THREAD]

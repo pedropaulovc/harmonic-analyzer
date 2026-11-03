@@ -564,7 +564,7 @@ HANDWHEEL_PLACEMENTS = (
 # The shop-made TL-27 nut seats on the integral lug's -X face, proud toward
 # the spindle, its bore on the leadscrew axis: its +X runs along the block's
 # -Y (toward the lug end), +Y up, +Z along -X; its frame's origin is the
-# seat face's -X/bottom corner. The two socket heads bear directly on its
+# seat face's -X/bottom corner. The two screw flanges bear directly on its
 # far face, each screw's +Y (head) along the block's -X.
 FEED_NUT_ROWS: Rows = ((0.0, -1.0, 0.0), (0.0, 0.0, 1.0), (-1.0, 0.0, 0.0))
 FEED_NUT_PLACEMENTS = (
@@ -1351,13 +1351,13 @@ if PIVOT_SCREW_PRELOAD_N > PIVOT_THREAD_STRIP_N / _STRIP_SAFETY:
     raise ValueError("pivot seating torque exceeds the receiver-thread basis")
 
 # --- The nut screws: their torque; the feed nut a static clamp -----------------
-# LOAD_CASES: the two #4-40 X 3/4 SHCS clamp the shop-made TL-27 brass nut to
+# LOAD_CASES: the two #4-40 X 3/4 FLANGED BHCS clamp the shop-made TL-27 brass nut to
 # the feed-block lug (owner ruling 2026-11-01, item 4). The nut's reaction to
 # the screw's turning reverses with the handwheel; its clamp friction on the
 # lug carries it with margin, so the nut never shifts in its loose holes and
 # no operating torque reaches the screws: a static clamp (rule 23's last
 # bullet), as the owner ruled for the bought nut's flange before it (TL-00
-# review jbf-r17; issue #1630): no lock. The socket heads bear on the brass.
+# review jbf-r17; issue #1630): no lock. The screws' flanges bear on the brass.
 # Engagement: worst-case full thread in the lug's THRU tap.
 _NUT_SCREW_STRIP_N = (
     0.75
@@ -1366,14 +1366,14 @@ _NUT_SCREW_STRIP_N = (
     * feed_nut.SCREW_FULL_THREAD_MIN
     * _AL_SHEAR_ULTIMATE_MPA
 )
-# Each head bears on the nut round its loose hole: the head's least diameter,
-# concentric, on the largest drilled hole. Brass 360-H02 (half hard), yield
-# 17 ksi = 117.2 MPa (SOURCED: OnlineMetals #1500 listing, 2026-11-01).
+# Each flange bears on the nut round its clearance hole: the flange's least
+# flat face round the largest drilled hole, which it covers at the fit-up's
+# eccentricity (feed_block.HEAD_BEARING_LAND_MIN). Brass 360-H02 (half
+# hard), yield 17 ksi = 117.2 MPa (SOURCED: OnlineMetals #1500 listing,
+# 2026-11-01).
 _BRASS_YIELD_MPA = 17_000.0 * 0.006894757
 _NUT_SCREW_BEARING_MM2 = (
-    math.pi
-    / 4.0
-    * (nut_screw.HEAD_DIA_MIN**2 - (feed_nut.HOLE_DIA + feed_nut.DRILLED_OVERSIZE) ** 2)
+    math.pi / 4.0 * (nut_screw.BEARING_DIA_MIN**2 - (2.0 * feed_nut.HOLE_R_MAX) ** 2)
 )
 _NUT_SCREW_PRELOAD_CAP_N = min(
     _NUT_SCREW_STRIP_N / _STRIP_SAFETY,
@@ -1392,11 +1392,11 @@ if NUT_SCREW_PRELOAD_N > _NUT_SCREW_PRELOAD_CAP_N:
         f"over the {_NUT_SCREW_PRELOAD_CAP_N:.0f} N the tap and the brass carry"
     )
 # The screw: the preload's stress on the #4-40 tensile stress area
-# (0.00604 in², ASME B1.1) stays under half the alloy steel socket screw's
-# 170,000 psi (SOURCED: McMaster-Carr 91251A listing, ASTM A574).
+# (0.00604 in², ASME B1.1) stays under half the alloy steel flanged button
+# head's 120,000 psi (SOURCED: McMaster-Carr 91355A581 page, ASTM F835).
 _NUT_SCREW_STRESS_AREA_MM2 = 0.00604 * trammel.INCH**2
-_SHCS_TENSILE_MPA = 170_000.0 * 0.006894757
-if not NUT_SCREW_PRELOAD_N / _NUT_SCREW_STRESS_AREA_MM2 < 0.5 * _SHCS_TENSILE_MPA:
+_NUT_SCREW_TENSILE_MPA = 120_000.0 * 0.006894757
+if not NUT_SCREW_PRELOAD_N / _NUT_SCREW_STRESS_AREA_MM2 < 0.5 * _NUT_SCREW_TENSILE_MPA:
     raise ValueError(f"nut screw preload {NUT_SCREW_PRELOAD_N:.0f} N overloads it")
 # The nut's torque at the 1 kN hand-abuse thrust (leadscrew LOAD_CASES):
 # T = F d2/2 tan(lead + friction), the oiled thread above.

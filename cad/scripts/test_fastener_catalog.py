@@ -69,7 +69,7 @@ _STOCK_REQUIREMENTS = {
         "MHA-CH-06-TL-VN-65",
         4,
     ),
-    "ch-rocker-arm-tl-vn-oblique-nut-screw": (("91251A113",), "MHA-CH-06-TL-VN-66", 2),
+    "ch-rocker-arm-tl-vn-oblique-nut-screw": (("91355A581",), "MHA-CH-06-TL-VN-66", 2),
     "ch-rocker-arm-tl-vn-oblique-riser-screw": (("91771A112",), "MHA-CH-06-TL-VN-67", 4),
     "ch-rocker-arm-tl-vn-oblique-clamp-screw": (("91251A541",), "MHA-CH-06-TL-VN-68", 1),
     "ch-rocker-arm-tl-vn-oblique-lever-screw": (("91251A583",), "MHA-CH-06-TL-VN-69", 2),

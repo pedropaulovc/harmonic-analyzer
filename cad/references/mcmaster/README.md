@@ -40,7 +40,6 @@ recipes:
 | 90760A140 | `sm-vn-boss-hook-jam-nut` (MHA-SM-VN-55; catalogue-only, no vendor model) | Zinc-Plated Steel Narrow-Profile Hex Nut |
 | 91247A720 | — (diagnostic recipe; a former `sm-vn-knife-hanger-stud`) | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 91251A108 | `dt-vn-cone-tip-block-screw` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
-| 91251A113 | `ch-rocker-arm-tl-vn-oblique-nut-screw` (MHA-CH-06-TL-VN-66; shop fixture; catalogue-only, live listing read 2026-11-01, product page login-walled, no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A157 | — (catalogue-only diagnostic recipe; former `sm-vn-knife-hanger-stud`) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A188 | — (retired TL-VN-63, 2026-10-23; former catalogue-only diagnostic recipe removed) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A196 | `ch-rocker-arm-tl-vn-oblique-bracket-screw` (MHA-CH-06-TL-VN-62; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
@@ -58,6 +57,7 @@ recipes:
 | 91255A148 | — (diagnostic recipe; a former `dt-vn-cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91251A150 | `ch-rocker-arm-tl-vn-oblique-kp08-screw` (MHA-CH-06-TL-VN-65; shop fixture; catalogue-only, product page login-walled, no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91290A168 | `ch-rocker-arm-tl-vn-oblique-carriage-screw` (MHA-CH-06-TL-VN-64; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
+| 91355A581 | `ch-rocker-arm-tl-vn-oblique-nut-screw` (MHA-CH-06-TL-VN-66; shop fixture; catalogue-only, product page read live 2026-11-02; the free vendor STEP (SHA-256 fb11dbce…aa7) measured for the 0.024-in flange and its Ø0.222 flat bearing face, not committed, not replica-gated) | Black-Oxide Flanged Button Head Hex-Drive Screw, Alloy Steel |
 | 90325A174 | `pd-vn-transgear-pivot-screw` (catalogue-only; CAD download refused) | 18-8 Stainless Steel Precision Shoulder Screw, hex socket |
 | 91375A105 | `pn-vn-pen-rod-set-screw` (catalogue-only; no vendor model) | Alloy Steel Cup-Tip Set Screw |
 | 91375A106 | `sh-vn-arbor-set-screw` (MHA-SH-VN-54; shared by ch and dt) | Alloy Steel Cup-Tip Set Screw |
@@ -1605,8 +1605,9 @@ replica-gate provenance. No supplier models or engineering images are tracked.
 The `block-screw` and `block-washer` rows were retired on 2026-10-23; their
 rows below preserve the dated source readings, not current jig registrations.
 So do the `nut-screw` and `leadscrew-nut` rows: on 2026-11-01 the shop-made
-TL-27 feed nut retired TL-VN-55 and TL-VN-66 became McMaster 91251A113
-(#4-40 x 3/4 SHCS, two off).
+TL-27 feed nut retired TL-VN-55 and TL-VN-66 became McMaster 91355A581
+(#4-40 x 3/4 flanged button head, two off; Codjiflo P1 on #2112: a #4 SHCS
+head could not seat flat at the nut's fit-up eccentricity).
 
 | target suffix at source date | exact SKU at source date | primary size coverage |
 |---|---|---|

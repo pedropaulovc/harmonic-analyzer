@@ -418,13 +418,13 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "91251A150",
         material="Alloy Steel",
     ),
-    # MHA-CH-06-TL-VN-66: the oblique trammel jig's #4-40 X 3/4 SHCS (the
-    # fastener table's NUT_TO_FEED_BLOCK row); shop fixture hardware,
+    # MHA-CH-06-TL-VN-66: the oblique trammel jig's #4-40 X 3/4 FLANGED BHCS
+    # (the fastener table's NUT_TO_FEED_BLOCK row); shop fixture hardware,
     # modelled so the jig assembly can mate it and run native interference.
     "ch-rocker-arm-tl-vn-oblique-nut-screw": _stock(
         "ch-rocker-arm-tl-vn-oblique-nut-screw",
-        "Black-Oxide Alloy Steel Socket Head Screw",
-        "91251A113",
+        "Black-Oxide Flanged Button Head Hex-Drive Screw",
+        "91355A581",
         material="Alloy Steel",
     ),
     # MHA-CH-06-TL-VN-67: the oblique trammel jig's #4-40 X 5/8 flat head (the
