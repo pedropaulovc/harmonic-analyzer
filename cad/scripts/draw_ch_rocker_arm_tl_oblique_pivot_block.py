@@ -174,27 +174,29 @@ VIEW_SHEET_REF_OFFSET = (-.010, -.008)
 # the clearance's .515 (x 104) and, under the lug end, the 12.400 mm height,
 # its three rows outboard left of the bottom face's extension line. Right of
 # the view, clear of its edge (x 214): each tap's (.35) REF from the axis,
-# each on its own lane. The Ø.375 clearance callout comes in from the upper
-# left, passing under the dowel hole; the dowel hole's #41 callout from
-# higher up the left, over the clearance's text; the taps' transfer callout
-# from the lower right onto tap 1's rim, under every right-hand extension
-# line, its four rows clear of the view's lower corner.
+# each on its own lane. The Ø.375 clearance callout comes in from the left,
+# low (its leader about 8 mm under the dowel hole: from the upper left it ran
+# through that hole and crossed the dowel's leader, final 20261103T152424387Z);
+# the dowel hole's #41 callout from higher up the left, its leader passing
+# right of the clearance's text; the taps' transfer callout from the upper
+# right onto tap 2's rim, over every right-hand extension line (from the
+# lower right its four rows ran into the title block, same run).
 NUT_XY, NUT_SCALE = (.190,.175), (2,1)
 NUT_KEEP = {
     'NutCentreY':(.104,.100),'NutCentreZ':(.134,.0772),
     # Arrows outside, each on its own lane, the second's lane right of the
     # first's text (feed-nut2: on one lane the runs struck the texts).
     'NutTap1Y':(.247,.1044),'NutTap2Y':(.282,.1216),
-    'NutClearanceDia':(.135,.150),
-    'NutDowelDia':(.110,.185),
+    'NutClearanceDia':(.135,.127),
+    'NutDowelDia':(.100,.185),
 }
 NUT_CAPTION = 'VIEW D'
 NUT_CAPTION_XY = (.178,.058)  # the note's left edge; centred under the view
 # TL-32's cut-face sections hang their captions 6 mm under the face.
 SECTION_CAPTION_GAP = .006
-# Under tap 1's lane's arrow run (which reaches y 89), its four rows below the
-# view's lower corner (y 87).
-NUT_CALLOUT_XY = (.255,.072)
+# Over tap 2's lane's arrow run (which reaches about y 141), wholly right of
+# the view's edge.
+NUT_CALLOUT_XY = (.268,.165)
 NUT_ISO_XY = (.380,.215)
 _ARROWS_INSIDE = 0  # swDimArrowsInside
 _ARROWS_OUTSIDE = 1  # swDimArrowsOutside
@@ -481,12 +483,12 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
         if caption is None:
             raise RuntimeError('failed to insert the VIEW D caption')
         _size_note(adapter, caption, VIEW_LETTER_HEIGHT, label='VIEW D caption')
-        # The callout reaches tap 1 (toward the lug end) from the lower
+        # The callout reaches tap 2 (away from the lug end) from the upper
         # right. The title block's THREADS row owns the class; the process
         # row says where the taps come from (TL-00 says how).
-        y,z = contract.NUT_HOLES_YZ[0]
+        y,z = contract.NUT_HOLES_YZ[1]
         rim = contract.NUT_TAP_DRILL/2/math.sqrt(2)
-        edge = _project(adapter,nut,(contract.NUT_FACE_X,y-rim,z+rim),'nut tap mouth')
+        edge = _project(adapter,nut,(contract.NUT_FACE_X,y+rim,z+rim),'nut tap mouth')
         taps = add_native_hole_callout(adapter,nut,edge_xy=edge,callout_xy=NUT_CALLOUT_XY,
                                        label='feed nut screw taps',process=contract.TRANSFER_PROCESS)
         omit_title_block_thread_class(taps, label='feed nut screw taps')

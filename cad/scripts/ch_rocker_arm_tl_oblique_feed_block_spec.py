@@ -126,7 +126,7 @@ CALLOUTS_ABOVE = dict(pivot.CALLOUTS_ABOVE) | {
 }
 CALLOUTS_BELOW = dict(pivot.CALLOUTS_BELOW) | {
     "NutClearanceDia": "LEADSCREW CLEARANCE",
-    "NutDowelDia": "TRANSFER THROUGH TL-27 AT ASSEMBLY\nSLIP FIT ON TL-VN-81 DOWEL",
+    "NutDowelDia": f"TRANSFER THROUGH {feed_nut.NUMBER}\nAT ASSEMBLY\nSLIP FIT ON MHA-CH-06-TL-VN-81",
     # r2 review: "BOTTOM" named no face a view defines; the face the
     # counterbored screws pull onto the HGH15CA carriage does.
     "NutCentreZ": "FROM CARRIAGE FACE\nON KP08 LEADSCREW AXIS",

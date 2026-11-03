@@ -78,6 +78,8 @@ def test_size_and_band_are_the_catalogues() -> None:
         math.pi * spec.DIA**2 * spec.LENGTH / 4.0
     )
     assert "+.0001/+.0003" in spec.SUPPLIER_DATA[0]
+    # The footer refuses a line over 64 characters (final 20261103T152424387Z).
+    assert all(len(line) <= 64 for line in spec.SUPPLIER_DATA)
 
 
 def test_reference_lines_lie_on_front_edges() -> None:

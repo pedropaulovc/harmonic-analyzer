@@ -52,7 +52,7 @@ def test_nut_face_carries_the_screw_clearance_two_through_taps_and_the_dowel_hol
     assert math.isclose(spec.DOWEL_DRILL,.096*INCH) and math.isclose(spec.DOWEL_SPOT_DIA,.089*INCH)
     assert spec.DOWEL_DRILL>feed_nut.DOWEL_DIA_MAX and spec.DOWEL_SPOT_DIA<feed_nut.DOWEL_HOLE_DIA
     assert spec.CALLOUTS_ABOVE['NutDowelDia']=='#41 DRILL THRU'
-    assert 'TRANSFER THROUGH TL-27' in spec.CALLOUTS_BELOW['NutDowelDia']
+    assert 'TRANSFER THROUGH MHA-CH-06-TL-27' in spec.CALLOUTS_BELOW['NutDowelDia']
     assert spec.DRAWING_PRECISION_BY_NAME['NutDowelDia']==3
     assert spec.DOWEL_YZ==(spec.NUT_AXIS_Y+feed_nut.DOWEL_DX,spec.NUT_AXIS_Z+feed_nut.DOWEL_DY)
     assert spec.SCREW_CLEARANCE_DIA-printed_band_mm(3,unit=spec.UNIT)>lead.SCREW_MAJOR_DIA
