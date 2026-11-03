@@ -993,7 +993,18 @@ async def build(adapter: Any) -> dict[str, str]:
     ]
     # Decimal places and the explicit bands are authored on the part; the
     # sheet only proves the import kept them.
-    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    # Sheet 1's imports; the rear mouth's leg lands on sheet 2 (section D-D),
+    # proved there (farm run 20261103T125508107Z: one proof over both sheets
+    # failed on sheet 1).
+    assert_imported_precision(
+        adapter,
+        annotations,
+        {
+            name: places
+            for name, places in DRAWING_PRECISION_BY_NAME.items()
+            if name not in PIN_SECTION_KEEP
+        },
+    )
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_reference_dimensions(adapter, annotations, ("PivotBoreDia",))
     _set_stock_text(adapter, annotations)
@@ -1129,7 +1140,11 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="section D-D",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    assert_imported_precision(adapter, mouth, DRAWING_PRECISION_BY_NAME)
+    assert_imported_precision(
+        adapter,
+        mouth,
+        {name: DRAWING_PRECISION_BY_NAME[name] for name in PIN_SECTION_KEEP},
+    )
     set_dimension_callouts(adapter, mouth, {"PinMouthChamfer": PIN_MOUTH_CALLOUT})
     _match_pin_section_caption(adapter, pin_section, section)
     if not auto_center_marks(adapter, pin_plan, holes=True, size=0.0025):
