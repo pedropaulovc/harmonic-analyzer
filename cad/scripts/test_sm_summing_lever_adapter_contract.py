@@ -1386,7 +1386,10 @@ def test_spring_row_readback_requires_live_equations_and_matching_system_values(
         _named_dimension=lambda adapter, owner, leaf: (
             None, SimpleNamespace(SystemValue=system[leaf] / 1000.0)
         ),
-        _telemetry=SimpleNamespace(success=lambda message: None),
+        _telemetry=SimpleNamespace(
+            success=lambda message: None,
+            traced=lambda name: lambda function: function,
+        ),
     )
     adapter = SimpleNamespace(currentModel=model)
     if mode == "live":

@@ -2116,6 +2116,7 @@ def _evaluate_drive(expression: str, values: dict[str, float]) -> float:
     return float(eval(python, {"__builtins__": {}}))
 
 
+@_telemetry.traced("part.spring_row_equations")
 def _assert_spring_row_equations(adapter, drives: list[tuple[str, str]]) -> None:
     """Native readback of the spring row's drive equations after a rebuild.
 

@@ -619,7 +619,7 @@ Live catalog verification on October 8, 2026:
   .001 in to the bracket's −0.71 mm row; matching
   bracket holes and installed screws follow, without moving the L bracket
   body, seat or threaded-lever pose. All three lever rib extrusions are now
-  **5.00 mm**, printed **.20 ±.01 in**, with end-rib inner caps **Z=±71.20 mm** and outer
+  **5.08 mm**, printed **.20 ±.01 in**, with end-rib inner caps **Z=±71.12 mm** and outer
   caps retained at **±76.20 mm**. One native **3X .20** dimension sizes them.
   The separate counter-arm leaf remains 5.08 mm.
   The **.26 ±.01 in** pilot (6.604 mm model depth) and 118° point continue into the

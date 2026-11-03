@@ -44,22 +44,21 @@ from stock_anchor_geom import ANCHOR_9489T111, trim
 from _supplier_screw_reference_names import FEATURE_BY_PLANE
 
 UNIT = drawing_unit("parts/ch-vn-spring-hook", _config.parts("ch-vn-spring-hook"))
-# The coefficient plate's thickness band is the lever's own printed .XX row.
-_LEVER_UNIT = drawing_unit("parts/sm-summing-lever", _config.parts("sm-summing-lever"))
 
 _PITCH = ANCHOR_9489T111.thread_pitch_mm
 
 # The tap is engaged over the whole coefficient-plate thickness at every
 # calibration pose.
 THREAD_ENGAGEMENT_MM = sm_summing_lever_spec.COEFFICIENT_T
-# The lever's 7.00 prints under the title block's .XX band, so its underside
-# moves the jam-nut seat (code review C10: sizing at nominal thickness left
-# only 1.09 of full thread past the nut at the thickest limit, under the
-# 1.5875 floor). The trim is sized at the thickest plate; the cut end hangs
-# deepest under the thinnest.
-SEAT_BAND_MM = printed_band_mm(2, unit=_LEVER_UNIT)
-SEAT_T_MAX_MM = THREAD_ENGAGEMENT_MM + SEAT_BAND_MM
-SEAT_T_MIN_MM = THREAD_ENGAGEMENT_MM - SEAT_BAND_MM
+# The lever's 7.00 prints .28 under the title block's .XX band, and the
+# printed nominal is authoritative (rule 3), so the jam-nut seat moves over
+# the limits .28 admits -- the lever's COEFFICIENT_T_DEVIATIONS (code review
+# C10: sizing at nominal thickness left only 1.09 of full thread past the nut
+# at the thickest limit, under the 1.5875 floor). The trim is sized at the
+# thickest plate; the cut end hangs deepest under the thinnest.
+_SEAT_T_LOWER, _SEAT_T_UPPER = sm_summing_lever_spec.COEFFICIENT_T_DEVIATIONS
+SEAT_T_MAX_MM = THREAD_ENGAGEMENT_MM + _SEAT_T_UPPER
+SEAT_T_MIN_MM = THREAD_ENGAGEMENT_MM + _SEAT_T_LOWER
 # The finished overall is a functional length (the past-nut budget reads its
 # band), so it prints .XX, never the .X row.
 OVERALL_PLACES = 2
