@@ -67,11 +67,13 @@ ISO_SCALE = (1.0, 2.0)
 FRONT_CENTER = (0.085, 0.190)
 RIGHT_CENTER = (0.170, 0.190)
 ISO_CENTER = (0.085, 0.072)
-ISO_NOTE_XY = (0.125, 0.050)
-BOM_ANCHOR = (0.225, 0.262)
-STEPS_XY = (0.225, 0.235)
-CHECKS_XY = (0.225, 0.172)
-TABLE_XY = (0.225, 0.122)
+ISO_NOTE_XY = (0.050, 0.046)
+# The BOM's template columns print 196.6 mm wide (farm r2 layout audit), so
+# its left edge sits close enough to the views to end inside the right border.
+BOM_ANCHOR = (0.219, 0.262)
+STEPS_XY = (0.219, 0.235)
+CHECKS_XY = (0.219, 0.190)
+TABLE_XY = (0.219, 0.155)
 BALLOON_MARGIN = 0.012
 
 PLATE = plate.PART_NAME
