@@ -17,11 +17,13 @@ index circles' web shortfall as a plain fact (rule 20).
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
 import _telemetry
 import dt_cone_gear_tl_index_plate_spec as part
+from dt_cone_gear_tl_index_plate_spec import GEOMETRIC_TOLERANCES_IN
 from _check import check
 from _com import _early_bound
 from _drawing_common import (
@@ -31,12 +33,19 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_basic_dimensions,
+    set_dimension_callouts,
+)
+from _drawing_gdt import add_feature_control_frame
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _gear_drawing_entities import visible_circle_edge
+from _native_axis_datum import add_native_axis_datum
 from _paths import CAD_ROOT
 from _session import run_build
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
@@ -85,7 +94,15 @@ _CENTER_MARK_HANDLES = (0, 1, 2, 3)
 # Each arm runs past the plate's rim (model metres beyond the bore's mark).
 CENTRE_LINE_OVERRUN_MM = 3.0
 
+# The index holes' position frame: its leader lands on hole 20 of the 57-hole
+# circle (lower right, clear of the circle callouts), at a rim point 45° off
+# the radial so no centre-mark arm sits under the pick; the frame and its
+# count stand below the 24-hole circle's callout, left of the title block.
+_POSITION_HOLE_DEG = 90.0 - 20 * 360.0 / 57
+POSITION_FRAME_XY = (0.222, 0.088)
 
+
+@_telemetry.traced("drawing.index_plate_bore_centre_mark")
 def _centre_mark_bore(adapter: Any, view: Any) -> None:
     """Centre-mark the bore with lines extended past the rim: the vertical
     centreline that one hole of every pattern sits on (draw_dt_cone_gear's
@@ -125,6 +142,47 @@ def _centre_mark_bore(adapter: Any, view: Any) -> None:
         + ", ".join(
             f"{float(mark.GetExtendedLength(0, h)):.4f}" for h in _CENTER_MARK_HANDLES
         )
+    )
+
+
+@_telemetry.traced("drawing.index_plate_position")
+def _position_index_holes(adapter: Any, view: Any) -> None:
+    """Datum A on the bore; every index hole's position zone to it."""
+    add_native_axis_datum(
+        adapter,
+        view,
+        entity=visible_circle_edge(adapter, view, part.BORE_DIA),
+        source_path=SOURCE,
+        radius_m=part.BORE_DIA / 2000.0,
+        datum=part.BORE_DATUM,
+        label="index plate bore axis",
+        stability_tolerance_m=0.0001,
+    )
+    centre = math.radians(_POSITION_HOLE_DEG)
+    rim = centre - math.pi / 4.0
+    pcd_r = part.RING_PCDS[57] / 2.0
+    hole_r = part.INDEX_HOLE_DIA / 2.0
+    landing = model_point_in_view(
+        adapter,
+        view,
+        (
+            (pcd_r * math.cos(centre) + hole_r * math.cos(rim)) / 1000.0,
+            (pcd_r * math.sin(centre) + hole_r * math.sin(rim)) / 1000.0,
+            part.THICKNESS / 1000.0,
+        ),
+        label="57-hole circle hole 20 rim",
+    )
+    add_feature_control_frame(
+        adapter,
+        view,
+        edge_xy=landing,
+        frame_xy=POSITION_FRAME_XY,
+        characteristic="position",
+        tolerance=GEOMETRIC_TOLERANCES_IN["index-hole position"],
+        datums=(part.BORE_DATUM,),
+        diameter=True,
+        quantity=f"{part.HOLE_COUNT}X",
+        label="index-hole position",
     )
 
 
@@ -181,7 +239,9 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, part.CALLOUTS_ABOVE, location="above")
     set_dimension_callouts(adapter, annotations, part.CALLOUTS_BELOW)
     assert_imported_precision(adapter, annotations, part.DRAWING_PRECISION_BY_NAME)
+    set_basic_dimensions(adapter, annotations, part.BASIC_DIMENSIONS)
     _centre_mark_bore(adapter, face)
+    _position_index_holes(adapter, face)
     for view in (face, edge, iso):
         set_hidden_lines_removed(adapter, view)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)

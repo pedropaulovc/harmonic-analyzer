@@ -12,3 +12,9 @@ dt-cone-gear-tl-index-plate:
   tolerance_class: machined_block
   drawing_unit: in
   process: "face owned 1/4 in 6061-T651 plate to .22; turn the Ø3.94 OD and bore Ø.829 to the BS-0 plate hub; drill the 57-, 51- and 24-hole circles and the three countersunk #8 mounting holes on the mill DRO's bolt-hole-circle function; break edges"
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "face view, the 132X index-hole callout: WEB .03 MIN"
+      finding: "webs between neighbouring holes of the 57- and 51-hole circles and between those two circles below the .060 floor (rules 17, 20)"
+      reason: "owner ruling 2026-11-02 (Pedro): accept webs down to .02 in on the 57- and 51-hole circles and between them, provisional until the #2157 measurements of the BS-0 plate and index pin land, when the pin diameter and circle radii are re-evaluated. Ø.157 pin holes on 57 and 51 holes inside the Ø3.94 plate leave about .03 at the worst drill band and position zone; there is no larger radius at the .080 edge target"

@@ -241,6 +241,7 @@ def _add_flank_reference(
     _telemetry.success(f"angular reference dim {label}: {expected_degrees:.3f} deg")
 
 
+@_telemetry.traced("part.index_plate_countersink")
 async def _countersink(
     adapter: Any, *, plane: str, x: float, y: float, x_drive: str
 ) -> list[tuple[str, str]]:

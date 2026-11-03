@@ -25,15 +25,19 @@ faces the index arm and carries the mounting screws' countersinks. One hole of
 every index circle lies on +Y (the vertical centreline); the mounting holes
 sit at 150, 270 and 30 degrees, one on that centreline at -Y.
 
-Precision: the dividing head divides any plate spacing error by its 40:1
-worm, so the hole circles need no more than the title block's three-place
-band and the DRILLED HOLES row; the pin holes are drilled, not reamed. The
-bore pilots the plate on the head's hub (+.003/0 over the measured stock
-bore) so the hole circles stay concentric with the crank.
+Precision: the three hole circles are BASIC and every index hole carries a
+position frame to the bore, datum A (``INDEX_POSITION``), so neither the
+title block's ±1° angle nor its three-place band governs the spacing; a DRO
+bolt-circle drill holds the zone, and the 40:1 worm divides what is left.
+The pin holes are drilled, not reamed. The bore pilots the plate on the
+head's hub (+.003/0 over the measured stock bore) so the hole circles stay
+concentric with the crank.
 
-Rule 17 shortfall (stated on the sheet, owner decision on #2157): Ø.157
+Rule 17 shortfall (stated on the sheet; owner ruling 2026-11-02, RV-01 in the
+part's machinist_exceptions, provisional until #2157): Ø.157
 holes on the 57- and 51-hole circles leave about .03 in between neighbouring
-holes and between those two circles, below the .060 floor. The plate's
+holes and between those two circles, at the worst case of the drill band and
+the position zone, below the .060 floor. The plate's
 3.94 OD leaves no larger radius at the .080 edge target; a smaller measured
 pin is the likely cure. The 24-hole circle stands at Ø2.700, not the brief's
 Ø2.800, so its web to the 51-hole circle meets the .080 target.
@@ -132,34 +136,48 @@ if CSK_DEPTH_MAX >= THICKNESS - _XX:
 
 
 # --- Rule 17 at the worst case of the printed bands ---------------------------
+# Each index hole's centre may stand anywhere in its Ø INDEX_POSITION zone about
+# its BASIC true position, so two neighbours close by the zone's full width.
+# The sheet's position frames print these inch zones (Ø, to datum A).
+GEOMETRIC_TOLERANCES_IN: dict[str, str] = {"index-hole position": ".004"}
+INDEX_POSITION = float(GEOMETRIC_TOLERANCES_IN["index-hole position"]) * INCH
+BORE_DATUM = "A"
+BASIC_DIMENSIONS = frozenset(f"Ring{n}Pcd" for n in RING_COUNTS)
+
+
 def _pitch(circle: int) -> float:
-    """Centre distance between neighbouring holes of ``circle`` at its
-    smallest printed bolt circle."""
-    return (RING_PCDS[circle] - _XXX) * math.sin(math.pi / circle)
+    """BASIC centre distance between neighbouring holes of ``circle``."""
+    return RING_PCDS[circle] * math.sin(math.pi / circle)
 
 
 _INDEX_R_MAX = (INDEX_HOLE_DIA + DRILLED_OVERSIZE) / 2.0
 _CSK_R_MAX = (CSK_DIA + _XX) / 2.0
 WEBS_MM: dict[str, float] = {
     **{
-        f"{n}-hole circle, between holes": _pitch(n) - 2.0 * _INDEX_R_MAX
+        f"{n}-hole circle, between holes": _pitch(n)
+        - 2.0 * _INDEX_R_MAX
+        - INDEX_POSITION
         for n in RING_COUNTS
     },
     "57-hole circle to plate edge": (PLATE_DIA - _XX) / 2.0
-    - (RING_PCDS[57] + _XXX) / 2.0
-    - _INDEX_R_MAX,
-    "57- to 51-hole circle": (RING_PCDS[57] - RING_PCDS[51] - 2.0 * _XXX) / 2.0
-    - 2.0 * _INDEX_R_MAX,
-    "51- to 24-hole circle": (RING_PCDS[51] - RING_PCDS[24] - 2.0 * _XXX) / 2.0
-    - 2.0 * _INDEX_R_MAX,
-    "24-hole circle to countersinks": (RING_PCDS[24] - MOUNT_PCD - 2.0 * _XXX) / 2.0
+    - RING_PCDS[57] / 2.0
+    - _INDEX_R_MAX
+    - INDEX_POSITION / 2.0,
+    "57- to 51-hole circle": (RING_PCDS[57] - RING_PCDS[51]) / 2.0
+    - 2.0 * _INDEX_R_MAX
+    - INDEX_POSITION,
+    "51- to 24-hole circle": (RING_PCDS[51] - RING_PCDS[24]) / 2.0
+    - 2.0 * _INDEX_R_MAX
+    - INDEX_POSITION,
+    "24-hole circle to countersinks": (RING_PCDS[24] - INDEX_POSITION) / 2.0
+    - (MOUNT_PCD + _XXX) / 2.0
     - _INDEX_R_MAX
     - _CSK_R_MAX,
     "countersinks to bore": (MOUNT_PCD - _XXX) / 2.0
     - _CSK_R_MAX
     - (BORE_DIA + BORE_DEVIATIONS[1]) / 2.0,
 }
-# The two fine circles fall short of rule 17's floor (owner decision #2157);
+# The two fine circles fall short of rule 17's floor (owner ruling RV-01);
 # every other wall meets the .080 target.
 SHORT_WEBS = frozenset(
     {
@@ -180,6 +198,10 @@ WEB_MIN_MM = min(WEBS_MM.values())
 WEB_MIN_PRINTED = math.floor(WEB_MIN_MM / INCH * 100.0) / 100.0  # .XX, rounded down
 if WEB_MIN_PRINTED <= 0.0:
     raise AssertionError("index plate web shortfall prints as zero")
+# RV-01 accepts webs down to .02 in, no thinner.
+RULED_WEB_MIN_MM = 0.02 * INCH
+if WEB_MIN_MM < RULED_WEB_MIN_MM:
+    raise AssertionError("index plate web is thinner than owner ruling RV-01 accepts")
 
 # --- Model globals: name -> value (mm); the build sets each and drives from it --
 GLOBALS: dict[str, float] = {
@@ -258,7 +280,8 @@ CALLOUTS_ABOVE: dict[str, str] = {
     **{f"Ring{n}Pcd": f"{n}X EQ SP ON" for n in RING_COUNTS},
     "MountHoleDia": f"{MOUNT_COUNT}X",
 }
-# Rule 20: the known web shortfall is stated as a plain fact at the holes.
+# Rule 20: the known web shortfall is stated as a plain fact at the holes; it
+# emits the stated shortfall of owner ruling RV-01 (machinist_exceptions).
 WEB_CALLOUT = f"WEB {inch_text(WEB_MIN_PRINTED * INCH, 2)} MIN"
 CALLOUTS_BELOW: dict[str, str] = {
     PRINTED_HOLE: f"DRILL THRU\nONE OF EACH CIRCLE\nON VERTICAL CL\n{WEB_CALLOUT}",
