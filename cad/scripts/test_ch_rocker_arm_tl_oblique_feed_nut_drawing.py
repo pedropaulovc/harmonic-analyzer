@@ -52,9 +52,11 @@ def test_tr8_bore_is_letter_c_tapped_through_at_five_turns():
     assert ".39 min (1.24D)" in exception["finding"]
 
 
-def test_loose_holes_stand_2x_340_from_the_bore_and_name_their_mate():
-    assert spec.HOLE_DIA == CLEARANCE_MM[("#4", "loose")]
-    assert round(spec.HOLE_DIA / INCH, 3) == 0.144
+def test_clearance_holes_stand_2x_340_from_the_bore_and_name_their_mate():
+    # Ø.170 (the table's #6 normal) so the flanged heads seat flat at the
+    # fit-up's eccentricity (Codjiflo P1 on #2112; feed block spec).
+    assert spec.HOLE_DIA == CLEARANCE_MM[("#6", "normal")]
+    assert round(spec.HOLE_DIA / INCH, 3) == 0.170
     # Each hole from the bore axis, one each side, never from the other hole
     # (run 20261101T220223216Z: the chained .63 / .34 / .680 stacked three
     # bands on the far hole).
@@ -66,31 +68,43 @@ def test_loose_holes_stand_2x_340_from_the_bore_and_name_their_mate():
     assert spec.CALLOUTS_BELOW["Hole1Offset"] == spec.CALLOUTS_BELOW["Hole2Offset"] == spec.MATE_CALLOUT
     assert spec.MATE_CALLOUT == "MATCHES TL-32 LUG TAPS"
     assert round(spec.HOLE_OFFSET_BAND / INCH, 4) == 0.0050
-    # The loose fit floats a #4 by .016, past the .014 stack of both parts'
+    # The Ø.170 floats a #4 by .029, past the .014 stack of both parts'
     # printed stations; the normal Ø.129's .008 would not.
-    assert round(spec.HOLE_FLOAT / INCH, 4) == 0.0160
+    assert round(spec.HOLE_FLOAT / INCH, 4) == 0.0290
     assert spec.NORMAL_HOLE_FLOAT < feed_block.FIT_UP_RESIDUAL <= spec.HOLE_FLOAT
 
 
 def test_walls_meet_the_target_at_the_printed_worst_case():
     assert min(spec.WALLS_MM.values()) >= WALL_TARGET_MM
-    assert round(min(spec.WALLS_MM.values()) / INCH, 4) == 0.0937
+    assert round(min(spec.WALLS_MM.values()) / INCH, 4) == 0.0807
 
 
 def test_screws_engage_the_lug_two_diameters_and_stop_inside_it():
     assert spec.SCREW_COUNT == nut_screw.QUANTITY == 2
-    assert nut_screw.SKU == "91251A113"
+    assert nut_screw.SKU == "91355A581"
     assert spec.SCREW_ENGAGEMENT == pytest.approx(0.35 * INCH)
     assert spec.SCREW_FULL_THREAD_MIN >= 2.0 * spec.SCREW_MAJOR
     assert spec.SCREW_TIP_REACH_MAX < feed_block.LUG_WIDTH
-    assert spec.HEAD_BEARING_LAND_MIN > 0.0
+    assert feed_block.HEAD_FILLET_CLEARANCE > 0.0 and feed_block.HEAD_BEARING_LAND_MIN > 0.0
 
 
 def test_reach_sets_the_near_kp08_gap():
     assert spec.REACH == pytest.approx(spec.LENGTH_MAX + nut_screw.DIMS.head_h)
     gaps = [gap for (name, _station), gap in feed_block.FEED_GAPS.items() if name == "KP08 near"]
-    assert round(min(gaps) / INCH, 3) == pytest.approx(3.32 / INCH, abs=1e-3)
+    assert round(min(gaps) / INCH, 3) == pytest.approx(4.66 / INCH, abs=1e-3)
     assert min(gaps) >= lead.FEED_GAP
+
+
+def test_a_one_and_a_half_d_nut_would_reach_into_the_feed_gap():
+    # RV-01's "no geometry escape": the shortest .XX nut whose least length
+    # engages 1.5 D (.49) takes the near KP08 gap under FEED_GAP.
+    length = 0.49 * INCH
+    target = 1.5 * lead.SCREW_MAJOR_DIA
+    assert length - spec.LENGTH_BAND >= target > length - 0.01 * INCH - spec.LENGTH_BAND
+    near = min(gap for (name, _station), gap in feed_block.FEED_GAPS.items() if name == "KP08 near")
+    shortened = near - (length - spec.LENGTH)
+    assert round(shortened, 2) == 2.38
+    assert shortened < lead.FEED_GAP
 
 
 def test_drawing_is_inch_and_enforced():

@@ -26,6 +26,10 @@ class ButtonHeadScrew:
     # The standard's minimum key engagement (ASME B18.3 T), where a SKU
     # records it; None keeps the family law's SOCKET_PER_HEAD_H depth.
     key_engagement: float | None = None
+    # A flanged button head: the flange's diameter and thickness. The dome
+    # stands on the flange's top face; None is the plain banded head.
+    flange_dia: float | None = None
+    flange_h: float = 0.0
 
     @property
     def flat_top_dia(self) -> float:
@@ -33,6 +37,9 @@ class ButtonHeadScrew:
 
     @property
     def band_h(self) -> float:
+        """Where the dome meets the head OD: the band's top, or the flange's."""
+        if self.flange_dia is not None:
+            return self.flange_h
         return BAND_PER_HEAD_H * self.head_h
 
     @property
@@ -72,7 +79,10 @@ class ButtonHeadScrew:
 
     @property
     def bearing_edge_r(self) -> float:
-        """Radius where the band cone meets the bearing face, before the fillet."""
+        """Outer radius of the bearing face: the flange's, or where the band
+        cone meets it, before the fillet."""
+        if self.flange_dia is not None:
+            return self.flange_dia / 2.0
         return self.head_dia / 2.0 - self.band_h * math.tan(math.radians(BAND_DEG))
 
     @property

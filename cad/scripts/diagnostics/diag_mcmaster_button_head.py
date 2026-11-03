@@ -51,7 +51,8 @@ def _rim_interior_deg(d: ButtonHeadScrew) -> float:
 
 
 def revolved_volume(d: ButtonHeadScrew) -> float:
-    """The revolve before any cut: flat-topped dome zone, band cone, shank."""
+    """The revolve before any cut: flat-topped dome zone, band cone (or the
+    flange), shank."""
     yc = d.dome_center_y
     big_r = d.dome_radius
 
@@ -59,9 +60,13 @@ def revolved_volume(d: ButtonHeadScrew) -> float:
         return big_r**2 * (y - yc) - (y - yc) ** 3 / 3.0
 
     major_r = d.major_dia / 2.0
+    if d.flange_dia is not None:
+        under_dome = math.pi * d.bearing_edge_r**2 * d.flange_h
+    else:
+        under_dome = _rev_frustum(d.band_h, d.bearing_edge_r, d.head_dia / 2.0)
     return (
         math.pi * (zone(d.head_h) - zone(d.band_h))
-        + _rev_frustum(d.band_h, d.bearing_edge_r, d.head_dia / 2.0)
+        + under_dome
         + math.pi * major_r**2 * (d.length - d.tip_chamfer)
         + _rev_frustum(d.tip_chamfer, major_r, major_r - d.tip_chamfer)
     )
@@ -142,11 +147,16 @@ async def build_button_head(adapter, d: ButtonHeadScrew) -> None:
         )
         if arc is None:
             raise RuntimeError(f"{part_no} profile: dome arc failed")
+        # The dome's foot steps down the band cone, or out over the flange.
+        if d.flange_dia is not None:
+            foot = [(d.bearing_edge_r, band_h), (d.bearing_edge_r, 0.0)]
+        else:
+            foot = [(d.bearing_edge_r, 0.0)]
         await add_line_chain(
             adapter,
             [
                 (head_r, band_h),
-                (d.bearing_edge_r, 0.0),
+                *foot,
                 (major_r, 0.0),
                 (major_r, tip + tip_ch),
                 (major_r - tip_ch, tip),
@@ -258,16 +268,17 @@ async def build_button_head(adapter, d: ButtonHeadScrew) -> None:
         adapter, "socket countersink", v - countersink_volume(d), 0.02
     )
 
-    # --- fillets on both band edges -----------------------------------------
-    check(
-        "band fillets",
-        await adapter.add_fillet(
-            d.edge_fillet_r,
-            [[d.bearing_edge_r, 0.0, 0.0], [head_r, band_h, 0.0]],
-        ),
-    )
-    name_last_feature(adapter, "BandFillets")
-    await volume_check(adapter, "band fillets", v - edge_fillet_volume(d), 0.02)
+    # --- fillets on both band edges (a flanged head keeps square edges) -----
+    if d.flange_dia is None:
+        check(
+            "band fillets",
+            await adapter.add_fillet(
+                d.edge_fillet_r,
+                [[d.bearing_edge_r, 0.0, 0.0], [head_r, band_h, 0.0]],
+            ),
+        )
+        name_last_feature(adapter, "BandFillets")
+        await volume_check(adapter, "band fillets", v - edge_fillet_volume(d), 0.02)
 
     # --- split at the bearing face (scopes the sweep) -----------------------
     body_boxes = split_at_plane(adapter, "Top Plane", "HeadSplit")
