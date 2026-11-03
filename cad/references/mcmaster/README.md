@@ -65,6 +65,7 @@ recipes:
 | 91410A540 | `fr-vn-gooseneck-set-screw` (catalogue-only; no vendor model) | Steel Square-Head Cup-Point Set Screw |
 | 91595A452 | — (retired TL-VN-53 source, 2026-10-31; now 98381A542, issue #290; diagnostic recipe removed) | Dowel Pin |
 | 98381A542 | `ch-rocker-arm-tl-vn-oblique-cl-dowel` (MHA-CH-06-TL-VN-53; shop fixture; catalogue-only, product page login-walled, vendor STEP read for dimensions, not replica-gated) | Alloy Steel Dowel Pin |
+| 98381A438 | `ch-rocker-arm-tl-vn-oblique-nut-dowel` (MHA-CH-06-TL-VN-81; shop fixture; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 91771A112 | `ch-rocker-arm-tl-vn-oblique-riser-screw` (MHA-CH-06-TL-VN-67; shop fixture; catalogue-only, same-family vendor geometry, not replica-gated) | Stainless Steel Phillips Flat Head Screw |
 | 91790A199 | `pd-vn-transgear-arm-plate-screw` (catalogue-only; populated live SKU verified; 2-D PDF offered, CAD requires login) | 18-8 Stainless Steel Oval Head Slotted Screw |
 | 91792A108 | `pd-vn-guide-lock-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Pan Head Slotted Screw |
@@ -186,6 +187,15 @@ its dimension provider and diagnostic recipe have also been removed.
   catalog-only run. It is pressed, chamfered end first, into the carrier's
   .2490-.2495 reamed CL hole, its round tip .060-.068 above the actual riser.
   It supplies `fixtures.trammel-cl-dowel`.
+- [98381A438](https://www.mcmaster.com/98381A438/) (`ch-rocker-arm-tl-vn-oblique-nut-dowel`,
+  MHA-CH-06-TL-VN-81, one: the TL-27 feed nut's anti-rotation key into the
+  TL-32 lug since November 3, 2026) was read live on November 3, 2026: alloy
+  steel dowel pin, 3/32 in diameter, diameter tolerance 0.0001 to 0.0003 in,
+  1/2 in long, 1,400 lbf double shear, Rockwell C47 minimum, ASME B18.8.2, end
+  shape "Round x Chamfer", pack of 100, $14.06; length tolerance unstated. As
+  for 98381A433, `diag_build_98381A438.py` models the plain nominal cylinder;
+  catalogue-only, no vendor model, no replica gate. It supplies
+  `fixtures.trammel-nut-dowel`.
 - [91595A452](https://www.mcmaster.com/91595A452/) (retired TL-VN-53 source,
   October 31, 2026; historical reading follows) was
   read live on October 17, 2026: 52100 alloy steel dowel pin, 6 mm diameter

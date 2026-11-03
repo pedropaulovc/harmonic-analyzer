@@ -5,7 +5,7 @@ headless browser (dt-logs transgear-evidence/mcmaster-skus.md R6): alloy
 steel, unplated, diameter +0.0001 to +0.0003 in over nominal, end shape
 "Round x Chamfer".  The pages state neither the end radius nor the chamfer.
 
-98381A433 and 98381A434 have no vendor .SLDPRT, so the recipe models them as
+98381A433, 98381A434 and 98381A438 have no vendor .SLDPRT, so the recipe models them as
 the plain nominal cylinder (the ``diag_build_98296A027`` convention for
 unstated end forms) rather than inventing either end, and their standalone
 runs (``diag_build_98381A43*.py``) are catalog-only: they build the recipe,

@@ -2318,6 +2318,18 @@
           "number": "MHA-PD-VN-68"
         }
       ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-vn-oblique-nut-dowel",
+      "old_number": null,
+      "introduced": "2026-11-03",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm-tl-oblique-jig",
+          "stem": "ch-rocker-arm-tl-vn-oblique-nut-dowel",
+          "number": "MHA-CH-06-TL-VN-81"
+        }
+      ]
     }
   ],
   "retired_identities": [

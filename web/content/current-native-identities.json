@@ -997,6 +997,13 @@
       "parent": "ch-rocker-arm-tl-oblique-jig",
       "stem": "ch-rocker-arm-tl-vn-oblique-hub-pin",
       "number": "MHA-CH-06-TL-VN-80"
+    },
+    {
+      "sourceStem": "ch-rocker-arm-tl-vn-oblique-nut-dowel",
+      "sourceNumber": null,
+      "parent": "ch-rocker-arm-tl-oblique-jig",
+      "stem": "ch-rocker-arm-tl-vn-oblique-nut-dowel",
+      "number": "MHA-CH-06-TL-VN-81"
     }
   ],
   "archivedAliases": [
@@ -1045,7 +1052,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "1da3d61fc1f7ea268de2200648472efb56aa4d2f5aa4e28a239e2ad423792c75",
+  "currentRegistryMapSha256": "c95467fd1e392a2aef9b2eae26e187323f9777cdac56692113a67efd6d13fb8b",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",

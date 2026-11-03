@@ -110,7 +110,9 @@ thread shop-cut), TL-VN-78 spacers (AluminumSpacers.com AS62-18-40), TL-VN-79
 shims (Huyett SHIM-0375-008 nominal; SHIM-0375-004/-020 fitting stock),
 and TL-VN-80 HUB gauge pin (McMaster 23065A855-23065A4 .4000 Class Z NO-GO
 plug gauge, abrasive-cut to .79, factory end up, bonded with Loctite 638);
-the TL-VN-53 CL dowel is McMaster 98381A542 (1/4 x 1). These parts belong
+the TL-VN-53 CL dowel is McMaster 98381A542 (1/4 x 1), and the TL-VN-81
+feed nut dowel, keying TL-27 to the TL-32 lug (2026-11-03), is McMaster
+98381A438 (3/32 x 1/2). These parts belong
 only to the jig, never a machine assembly. New identity-map rows use their
 canonical stem as source key, `old_number: null`, and the introduction date.
 
@@ -458,6 +460,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | new tooling vendor part (2026-10-23) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-pivot-spacer` | MHA-CH-06-TL-VN-78 |
 | new tooling vendor part (2026-10-23) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-pivot-shim` | MHA-CH-06-TL-VN-79 |
 | new tooling vendor part (2026-10-23) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-hub-pin` | MHA-CH-06-TL-VN-80 |
+| new tooling vendor part (2026-11-03) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-nut-dowel` | MHA-CH-06-TL-VN-81 |
 | retired tooling part | — | — | `ch-pivot-bracket-tl-ledge` | MHA-CH-008-TL-01 | — | MHA-CH-08-TL-01 (retired 2026-10-21; never reissued) |
 | retired tooling part | — | — | `ch-pivot-bracket-tl-angle-plate` | MHA-CH-008-TL-02 | — | MHA-CH-08-TL-02 (retired 2026-10-21; never reissued) |
 | retired tooling part | — | — | `dt-cone-pivot-post-tl-bond-cradle` | MHA-DT-005-TL-01 | — | MHA-DT-05-TL-01 (retired 2026-10-21; never reissued) |
@@ -668,3 +671,4 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | added | `dt-cone-gear-tl-indexing` | MHA-DT-03-TL-00 | 2026-11-02 one-part tooling assembly holding the index plate on the BS-0 head, so the plate belongs to a registered fixture kit; never in a machine assembly or BOM |
 | retired | `ch-rocker-arm-tl-vn-oblique-leadscrew-nut` | MHA-CH-06-TL-VN-55 | 2026-11-01 owner ruling (item 4): the shop-made TL-27 feed nut replaces the bought flange nut, so TL-32's lug needs no spigot recess; no registry, builder or drawing; Number never reissued |
 | added | `ch-rocker-arm-tl-oblique-feed-nut` | MHA-CH-06-TL-27 | 2026-11-01 shop-made Tr8x2 RH nut from brass 360-H02 3/4 × 1-1/4 in bar, faced to .40, on two TL-VN-66 screws into TL-32's lug |
+| added | `ch-rocker-arm-tl-vn-oblique-nut-dowel` | MHA-CH-06-TL-VN-81 | 2026-11-03 Main ruling on Codjiflo P1: McMaster 98381A438 3/32 x 1/2 alloy-steel dowel x1 (ASME B18.8.2, +.0001/+.0003), the TL-27 feed nut's positive anti-rotation key, slip in the nut and pressed into the TL-32 lug; bought fixture hardware modelled for the jig assembly |

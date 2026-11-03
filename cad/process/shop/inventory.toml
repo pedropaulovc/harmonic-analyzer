@@ -3742,6 +3742,17 @@ note = "Read live 2026-10-31 (category table; the detail page is login-walled): 
 cite = ["McMaster-Carr 98381A542 category table https://www.mcmaster.com/products/dowel-pins/diameter~1-4/length~1/ read live 2026-10-31: 1/4 Diameter, 1 in, +0.0001 to +0.0003, 10,000 lbf, Rockwell C47, ASME B18.8.2, pack 25, $10.55"]
 # Supersedes 91595A452 (6 x 20 mm DIN 6325-m6) with the inch jig (#290).
 
+[fixtures.trammel-nut-dowel]
+kind = "dowel_pin"
+make = "generic"
+sku = "98381A438"
+source = "https://www.mcmaster.com/98381A438/"
+present = false
+verify = true
+purchase = "1 pack of 100 McMaster-Carr 98381A438, alloy-steel 3/32 x 1/2 in dowel pins; one required to key the TL-27 feed nut to the TL-32 lug, $14.06 per pack, possession unconfirmed."
+note = "Read live 2026-11-03: distributor McMaster-Carr, manufacturer not stated; 3/32 in diameter, +0.0001/+0.0003 in (.0939-.0941), 1/2 in long, ASME B18.8.2, Rockwell C47 minimum, 1,400 lbf double shear, round x chamfer ends. Length tolerance not stated. Check the received diameter before use."
+cite = ["McMaster-Carr 98381A438 https://www.mcmaster.com/98381A438/ read live 2026-11-03: Alloy Steel, 3/32 in Diameter, 0.0001 to 0.0003 in Diameter Tolerance, 1/2 in Long, 1,400 lbf, Rockwell C47, ASME B18.8.2, Round x Chamfer, pack 100, $14.06"]
+
 # Trammel hand-feed purchases: catalogue candidates, not possession or fit proof.
 # The Tr8x2 screw and direct-fit wheel avoid turned journals and hub boring.
 [fixtures.trammel-tr8-leadscrew]
