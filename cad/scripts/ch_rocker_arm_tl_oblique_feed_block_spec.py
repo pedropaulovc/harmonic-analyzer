@@ -1,13 +1,15 @@
 """TL-32 integral feed block, rail 1; same pivot/carriage interface as TL-22.
 
-Nut holes are drilled to print, never transfer spotted. The shop-made TL-27
-feed nut (``ch_rocker_arm_tl_oblique_feed_nut_spec``, owner ruling
-2026-11-01, item 4) seats on the -X lug face, proud toward the spindle, on two
-#4-40 X 3/4 SHCS through its loose holes into the lug's two #4-40 taps,
-tapped THRU (ruling C1); all coordinates are block-local. The nut face's
-print locates the leadscrew axis from the lug end and the carriage face, and
-each tap 2X .340 from that axis, one each side (``NutPatternReference``),
-matching the nut's own stations.
+The shop-made TL-27 feed nut (``ch_rocker_arm_tl_oblique_feed_nut_spec``,
+owner ruling 2026-11-01, item 4) seats on the -X lug face, proud toward the
+spindle, on two #4-40 X 3/4 flanged BHCS through its loose holes into the
+lug's two #4-40 taps, tapped THRU (ruling C1), and one 3/32 dowel
+(MHA-CH-06-TL-VN-81) pressed into the lug through the nut; all coordinates
+are block-local. The taps and the dowel hole are transferred through TL-27 at
+TL-00 assembly, with the nut threaded on the aligned leadscrew (Main ruling
+2026-11-03, Codjiflo P1 on #2112): the sheet prints them as REF stations
+under that transfer callout. The nut face's print locates the leadscrew
+clearance from the lug end and the carriage face (``NutPatternReference``).
 
 Issue #290: the sheet prints decimal inch. The lug outline, the screw
 clearance and the taps sit on the inch grid; the axis closes on the
@@ -19,6 +21,7 @@ vendor line, so it prints exact millimetres, labelled mm (owner ruling 4,
 from __future__ import annotations
 import math
 import _config
+import ch_rocker_arm_tl_oblique_end_bracket_spec as end_bracket
 import ch_rocker_arm_tl_oblique_feed_nut_spec as feed_nut
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
@@ -48,9 +51,9 @@ LUG_LENGTH = LUG_Y1 - LUG_Y0
 NUT_FACE_X = LUG_X0
 NUT_AXIS_Y = -lead.SCREW_LATERAL
 NUT_AXIS_Z = 12.4  # the leadscrew axis over the carriage top (checked below)
-SCREW_CLEARANCE_DIA = 8.636  # .34, clears the Tr8 major
-# The nut's screw pair: 2X .340 from the axis, one each side, the nut's own
-# stations (each tap on the axis, never on the other tap).
+SCREW_CLEARANCE_DIA = 9.525  # .375, clears the Tr8 major at the vertical stack
+# The nut's screw pair and dowel, transferred from the nut: at its stations
+# from the axis (each tap on the axis, never on the other tap).
 NUT_TAP_OFFSET = feed_nut.HOLE_OFFSET
 NUT_HOLES_YZ = (
     (NUT_AXIS_Y - NUT_TAP_OFFSET, NUT_AXIS_Z),
@@ -74,9 +77,11 @@ DRAWING_VALUES = {k: v for k, v in pivot.DRAWING_VALUES.items() if k != "BlockHe
     "NutCentreZ": NUT_AXIS_Z, "NutCentreY": NUT_AXIS_Y - LUG_Y0,
     "NutTap1Y": NUT_TAP_OFFSET, "NutTap2Y": NUT_TAP_OFFSET,
 }
-# VIEW D prints the axis from the lug end and the carriage face, and each tap
-# from the axis.
+# VIEW D prints the clearance from the lug end and the carriage face, and each
+# transferred tap's station from it REF (REF_DIMENSIONS); the dowel hole's
+# transfer callout locates it.
 NUT_PATTERN_PRINTED = ("NutCentreZ", "NutCentreY", "NutTap1Y", "NutTap2Y")
+REF_DIMENSIONS = ("NutTap1Y", "NutTap2Y")
 DRAWING_DIMENSIONS = {k: v for k, v in pivot.DRAWING_DIMENSIONS.items() if k != "Block"} | {
     CBORE_FLOOR_REFERENCE: pivot.DRAWING_DIMENSIONS[CBORE_FLOOR_REFERENCE] + ("SectionBlockHeight",),
     PLAN_DATUM_REFERENCE: pivot.DRAWING_DIMENSIONS[PLAN_DATUM_REFERENCE] + ("PlanLugX", "PlanOverallY"),
@@ -86,8 +91,8 @@ DRAWING_DIMENSIONS = {k: v for k, v in pivot.DRAWING_DIMENSIONS.items() if k != 
 }
 # The axis is the leadscrew's closure (not on the .01 grid): three places;
 # its height is the KP08 vendor line's, exact millimetres with the millimetre
-# title block's three-place band (owner ruling 4). The taps' stations from
-# the axis are the nut's fixed-fastener fit: three places.
+# title block's three-place band (owner ruling 4). The transferred stations
+# print the nut's own places, REF.
 NUT_PATTERN_PLACES = 3
 NUT_TAP_OFFSET_PLACES = feed_nut.HOLE_OFFSET_PLACES
 METRIC_UNIT = "mm"
@@ -95,7 +100,7 @@ METRIC_BAND = printed_band_mm(NUT_PATTERN_PLACES, unit=METRIC_UNIT)  # 0.13
 METRIC_DIMENSIONS = {("NutPatternReference", "NutCentreZ"): (NUT_PATTERN_PLACES, METRIC_BAND)}
 # The leadscrew clearance is drilled: inch drill sizes print three places.
 THREE_PLACE_DIMENSIONS = pivot.THREE_PLACE_DIMENSIONS | {
-    "NutClearanceDia", "NutCentreZ", "NutCentreY", "NutTap1Y", "NutTap2Y",
+    "NutClearanceDia", "NutCentreZ", "NutCentreY",
 }
 DRAWING_PRECISION = {k: v for k, v in pivot.DRAWING_PRECISION.items() if k != "Block"} | {
     feature: {
@@ -113,28 +118,47 @@ assert DRAWING_PRECISION_BY_NAME["NutCentreY"] == DRAWING_PRECISION_BY_NAME["Nut
 assert DRAWING_PRECISION_BY_NAME["NutTap1Y"] == DRAWING_PRECISION_BY_NAME["NutTap2Y"] == NUT_TAP_OFFSET_PLACES
 CALLOUTS_SUFFIX = dict(pivot.CALLOUTS_SUFFIX)
 CALLOUTS_ABOVE = dict(pivot.CALLOUTS_ABOVE) | {"NutClearanceDia": "DRILL THRU"}
-NUT_MATE_TEXT = "MATCHES TL-27 FEED NUT"
 CALLOUTS_BELOW = dict(pivot.CALLOUTS_BELOW) | {
     "NutClearanceDia": "LEADSCREW CLEARANCE",
     # r2 review: "BOTTOM" named no face a view defines; the face the
     # counterbored screws pull onto the HGH15CA carriage does.
     "NutCentreZ": "FROM CARRIAGE FACE\nON KP08 LEADSCREW AXIS",
     "NutCentreY": "ON KP08 LEADSCREW AXIS",
-    "NutTap1Y": NUT_MATE_TEXT,
-    "NutTap2Y": NUT_MATE_TEXT,
 }
 REFERENCE_SKETCHES = pivot.REFERENCE_SKETCHES + ("NutPatternReference",)
+# The transferred holes' native callouts lead with where they come from
+# (MHA-FR-05's transferred seats); TL-00 says how.
+TRANSFER_PROCESS = f"TRANSFER THROUGH {feed_nut.NUMBER}\nAT ASSEMBLY;\n"
 
-# --- Fit-up: the nut's clearance holes float a #4 over both parts' stations ----
-# The nut rides the leadscrew and the KP08s float laterally, so only each
-# screw's station from the axis and its height on the axis line must meet the
-# nut's: along the pair, the nut's .340 band and the lug's; across, the nut's
-# three-place line and the lug's 12.400 ±.13 mm axis.
-NUT_TAP_OFFSET_BAND = printed_band_mm(NUT_TAP_OFFSET_PLACES, unit=UNIT)  # .005
-FIT_UP_Y = feed_nut.HOLE_OFFSET_BAND + NUT_TAP_OFFSET_BAND  # .010
-FIT_UP_Z = feed_nut.HOLE_OFFSET_BAND + METRIC_BAND  # .010
-FIT_UP_RESIDUAL = math.hypot(FIT_UP_Y, FIT_UP_Z)  # .014
-assert feed_nut.NORMAL_HOLE_FLOAT < FIT_UP_RESIDUAL <= feed_nut.HOLE_FLOAT
+# --- The dowel's hole: #42, blind, pressed (transferred with the taps) --------
+DOWEL_DRILL = 0.0935 * 25.4  # #42, 2.375: a light press on the .0939-.0941 dowel
+DOWEL_DEPTH = 0.16 * 25.4  # 4.064, .XX
+DOWEL_DEPTH_PLACES = 2
+DOWEL_YZ = (NUT_AXIS_Y + feed_nut.DOWEL_DX, NUT_AXIS_Z + feed_nut.DOWEL_DY)
+assert DOWEL_DRILL < feed_nut.DOWEL_DIA < feed_nut.DOWEL_HOLE_DIA
+
+# --- The leadscrew in the lug: the vertical stack the clearance absorbs ---------
+# The KP08s seat on TL-28's as-bought 1 in thickness (±.012) and the lug's
+# clearance stands 12.400 ±.13 mm over the carriage face, so the leadscrew may
+# run LEADSCREW_OFFSET_Z (.435 mm) off the clearance's axis vertically
+# (Codjiflo P1 on #2112); laterally the KP08s float to centre it, within the
+# clearance's own station band. The opened Ø.375 clears the Tr8's major at
+# both.
+_AXIS_Y_BAND = printed_band_mm(NUT_PATTERN_PLACES, unit=UNIT)  # .005
+LEADSCREW_OFFSET_Z = end_bracket.THICK_STOCK_BAND + METRIC_BAND  # .435 mm
+LEADSCREW_OFFSET_Y = _AXIS_Y_BAND
+LEADSCREW_OFFSET = math.hypot(LEADSCREW_OFFSET_Y, LEADSCREW_OFFSET_Z)
+LEADSCREW_RADIAL_CLEARANCE = (SCREW_CLEARANCE_DIA - lead.SCREW_MAJOR_DIA) / 2
+assert LEADSCREW_RADIAL_CLEARANCE > LEADSCREW_OFFSET, (LEADSCREW_RADIAL_CLEARANCE, LEADSCREW_OFFSET)
+
+# --- Fit-up: each tap spotted through its nut hole ------------------------------
+# A #18 drill (.1695) spots each tap through the nut's Ø.170 hole, so a screw
+# stands at most FIT_UP_RESIDUAL off its hole's axis; the #42 dowel drill
+# runs through the nut's reamed hole.
+TRANSFER_SPOT_DIA = 0.1695 * 25.4  # #18
+assert TRANSFER_SPOT_DIA < feed_nut.HOLE_DIA
+FIT_UP_RESIDUAL = (2 * feed_nut.HOLE_R_MAX - TRANSFER_SPOT_DIA) / 2  # .0023
+DOWEL_RESIDUAL = feed_nut.DOWEL_HOLE_R_MAX - DOWEL_DRILL / 2
 # The heads seat flat at that eccentricity (Codjiflo P1 on #2112): each
 # screw's underhead fillet, at its largest, clears the least hole's mouth, and
 # the flange's flat bearing face, at its least, covers the largest hole with
@@ -143,7 +167,7 @@ HEAD_FILLET_CLEARANCE = feed_nut.HOLE_DIA / 2 - (feed_nut.SCREW_FILLET_DIA_MAX /
 HEAD_BEARING_LAND_MIN = feed_nut.SCREW_BEARING_DIA_MIN / 2 - (feed_nut.HOLE_R_MAX + FIT_UP_RESIDUAL)
 assert HEAD_FILLET_CLEARANCE > 0.0 and HEAD_BEARING_LAND_MIN > 0.0
 # The flanges clear the leadscrew that runs past them: each screw stands at
-# least the nut's .335 less the fit-up from the nut's (the leadscrew's) axis.
+# least the nut's .34 less the fit-up from the nut's (the leadscrew's) axis.
 HEAD_TO_LEADSCREW_MIN = (
     feed_nut.HOLE_OFFSET - feed_nut.HOLE_OFFSET_BAND - FIT_UP_RESIDUAL
     - feed_nut.SCREW_DIMS.flange_dia / 2 - lead.SCREW_MAJOR_DIA / 2
@@ -151,15 +175,29 @@ HEAD_TO_LEADSCREW_MIN = (
 assert HEAD_TO_LEADSCREW_MIN > 0.0
 
 # --- Rule 17: lug walls at the printed worst case (.080 target) -----------------
+# Every transferred hole sits where the nut puts it: the leadscrew at its
+# offset from the clearance, the nut's station at its band, plus the spot.
 NUT_TAP_MAJOR = THREAD_MAJOR_MM[feed_nut.SCREW_THREAD]
-_AXIS_Y_BAND = printed_band_mm(NUT_PATTERN_PLACES, unit=UNIT)  # .005
+NUT_TAP_OFFSET_BAND = feed_nut.HOLE_OFFSET_BAND  # .010
 _CLEARANCE_R = (SCREW_CLEARANCE_DIA + drilled_oversize_mm(unit=UNIT)) / 2
+_TAP_SHIFT = NUT_TAP_OFFSET_BAND + FIT_UP_RESIDUAL
+_DOWEL_R = DOWEL_DRILL / 2
+_DOWEL_SHIFT = math.sqrt(2) * feed_nut.DOWEL_STATION_BAND + DOWEL_RESIDUAL
+_DOWEL_TO_TAP_2 = math.hypot(NUT_TAP_OFFSET - feed_nut.DOWEL_DX, feed_nut.DOWEL_DY)
 LUG_WALLS_MM = {
-    "taps to the leadscrew clearance": NUT_TAP_OFFSET - NUT_TAP_OFFSET_BAND - NUT_TAP_MAJOR / 2 - _CLEARANCE_R,
-    "tap 1 to the lug end": (NUT_AXIS_Y - LUG_Y0) - _AXIS_Y_BAND - NUT_TAP_OFFSET - NUT_TAP_OFFSET_BAND
+    "taps to the leadscrew clearance": NUT_TAP_OFFSET - _TAP_SHIFT - LEADSCREW_OFFSET_Y
+    - NUT_TAP_MAJOR / 2 - _CLEARANCE_R,
+    "tap 1 to the lug end": (NUT_AXIS_Y - LUG_Y0) - _AXIS_Y_BAND - LEADSCREW_OFFSET_Y
+    - NUT_TAP_OFFSET - _TAP_SHIFT - NUT_TAP_MAJOR / 2,
+    "taps to the bottom face": NUT_AXIS_Z - METRIC_BAND - LEADSCREW_OFFSET_Z - FIT_UP_RESIDUAL
     - NUT_TAP_MAJOR / 2,
-    "taps to the bottom face": NUT_AXIS_Z - METRIC_BAND - NUT_TAP_MAJOR / 2,
-    "taps to the top face": BLOCK_HEIGHT - NUT_AXIS_Z - METRIC_BAND - NUT_TAP_MAJOR / 2,
+    "taps to the top face": BLOCK_HEIGHT - NUT_AXIS_Z - METRIC_BAND - LEADSCREW_OFFSET_Z
+    - FIT_UP_RESIDUAL - NUT_TAP_MAJOR / 2,
+    "dowel hole to the leadscrew clearance": feed_nut.DOWEL_RADIUS - _DOWEL_SHIFT - LEADSCREW_OFFSET
+    - _DOWEL_R - _CLEARANCE_R,
+    "dowel hole to tap 2": _DOWEL_TO_TAP_2 - _DOWEL_SHIFT - _TAP_SHIFT - _DOWEL_R - NUT_TAP_MAJOR / 2,
+    "dowel hole to the top face": BLOCK_HEIGHT - DOWEL_YZ[1] - METRIC_BAND - LEADSCREW_OFFSET_Z
+    - _DOWEL_SHIFT - _DOWEL_R,
 }
 assert min(LUG_WALLS_MM.values()) >= WALL_TARGET_MM, LUG_WALLS_MM
 # The leadscrew clearance clears the screw at its least size.
@@ -167,6 +205,19 @@ assert SCREW_CLEARANCE_DIA - printed_band_mm(3, unit=UNIT) > lead.SCREW_MAJOR_DI
 # The nut screws' tips stop inside the THRU tap (the shortest nut, the
 # longest screw: B18.3 never long).
 assert feed_nut.SCREW_TIP_REACH_MAX < LUG_WIDTH
+# The dowel: pressed to the hole's bottom, 1.5D in the lug at the shallowest
+# hole, its top under the nut's face at the shortest nut (the length band
+# charged: ASME B18.8.2's ±.010 for hardened ground dowels, the standard the
+# 98381A438 page cites; the page itself states none).
+_DOWEL_LENGTH_BAND = 0.010 * 25.4
+_DEPTH_BAND = printed_band_mm(DOWEL_DEPTH_PLACES, unit=UNIT)
+DOWEL_PRESS_MIN = DOWEL_DEPTH - _DEPTH_BAND
+assert DOWEL_PRESS_MIN >= 1.5 * feed_nut.DOWEL_DIA_MAX, DOWEL_PRESS_MIN
+DOWEL_RECESS_MIN = feed_nut.LENGTH_MIN - (feed_nut.DOWEL_LENGTH + _DOWEL_LENGTH_BAND - DOWEL_PRESS_MIN)
+assert DOWEL_RECESS_MIN > 0.0, DOWEL_RECESS_MIN
+DOWEL_NUT_ENGAGEMENT_MIN = feed_nut.DOWEL_LENGTH - _DOWEL_LENGTH_BAND - (DOWEL_DEPTH + _DEPTH_BAND)
+assert DOWEL_NUT_ENGAGEMENT_MIN >= 1.5 * feed_nut.DOWEL_DIA_MAX
+assert DOWEL_DEPTH + _DEPTH_BAND < LUG_WIDTH
 # The nut stands within the lug's height; it overhangs the lug end by
 # NUT_OVERHANG (.105) and stays off the block body.
 NUT_Y = (NUT_AXIS_Y - (feed_nut.WIDTH - feed_nut.BORE_X), NUT_AXIS_Y + feed_nut.BORE_X)

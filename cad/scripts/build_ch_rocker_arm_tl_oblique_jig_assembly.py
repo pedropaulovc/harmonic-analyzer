@@ -133,6 +133,7 @@ _PARTS = (
     ("ch-rocker-arm-tl-vn-oblique-clamp-screw", "ch-rocker-arm-tl-vn-oblique-clamp-screw"),
     ("ch-rocker-arm-tl-vn-oblique-lever-screw", "ch-rocker-arm-tl-vn-oblique-lever-screw"),
     ("ch-rocker-arm-tl-vn-oblique-lever-washer", "ch-rocker-arm-tl-vn-oblique-lever-washer"),
+    ("ch-rocker-arm-tl-vn-oblique-nut-dowel", "ch-rocker-arm-tl-vn-oblique-nut-dowel"),
 )
 assert tuple(family for _physical, family in _PARTS) == spec.BOM_ORDER
 assert all(

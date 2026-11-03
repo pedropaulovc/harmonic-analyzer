@@ -2,11 +2,12 @@ r"""Create the drawing for the oblique-trammel jig's feed nut (MHA-CH-06-TL-27).
 
 One part, one off. A 1-1/4 x 3/4 x .40 brass block at 2:1: the face view
 (*Front, looking at the screw heads' face) carries everything but the length:
-the hole stations over it (each hole 2X .340 from the bore, one each side,
-each with its mate row outboard of its hole), the bore's .63 and the stock
-width under it, the bore's .38 and the stock height left of it, the 2X Ø.144
-callout on the +X hole and the Tr8x2 bore callout under it, both right
-of the face, each leader clear of every extension line; the side view
+the dowel hole's .270 from the bore over it; the hole stations (each hole
+.35 from the bore, one each side), the bore's .63 and the stock width under
+it; the bore's .38, the dowel's .220 over it and the stock height left of it;
+the reamed dowel callout over the face's upper left; the 2X Ø.170 callout on
+the +X hole and the Tr8x2 bore callout under it, both right of the face, each
+leader clear of every extension line; the side view
 (*Right), projected right of the face, carries the faced length over it; the
 shaded isometric rides top right at 1:1. No datums (drawing-guidelines.md
 rule 5).
@@ -53,12 +54,14 @@ from _supplier_dimensions import supplier_reference_dimension
 from ch_rocker_arm_tl_oblique_feed_nut_spec import (
     BORE_X,
     BORE_Y,
+    DOWEL_HOLE_X,
+    DOWEL_HOLE_Y,
+    DOWEL_MATE_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     HEIGHT,
     HOLE_X,
     LENGTH,
-    MATE_CALLOUT,
     STOCK_CALLOUTS,
     STOCK_FRACTION_DENOMINATORS,
     WIDTH,
@@ -112,30 +115,41 @@ def text_half_high(rows: int) -> float:
     return ((rows - 1) * ROW_PITCH + 3.5 / _S) / 2.0
 
 
-# Over the face, one lane: each hole's .340 from the bore (2X, one each
-# side). Each mate row is wider than its .340, so the text stands outboard of
-# its own hole's extension line on the dimension line run out to it (TL-32's
-# 2.44): r2 review, set between extension lines, their overshoot struck the
-# mate row.
-_OFFSET_LINE = HEIGHT + FIRST_LANE
-# Under the face: the bore's station, then the stock width, each text between
-# its extension lines, over its own line. The width's text stands right of
-# the bore's extension line, which ends at the station's line just over it
+# Over the face, one lane: the dowel hole's .270 from the bore, its text
+# between the two extension lines. Nothing else stands over the face, so the
+# dowel callout's leader comes in from the upper left fenced by no extension
+# line.
+_DOWEL_X_LINE = HEIGHT + FIRST_LANE
+# Under the face: each hole's .35 from the bore (one each side, the text
+# between its extension lines), then the bore's station, then the stock
+# width, each text over its own line. The width's text stands right of the
+# bore's extension line, which ends at the station's line just over it
 # (review of farm run 20261101T175835750Z: centred, the line struck "1").
-_BORE_X_LINE = -FIRST_LANE
+_OFFSET_LINE = -FIRST_LANE
+_BORE_X_LINE = _OFFSET_LINE - TEXT_GAP - 2.0 * text_half_high(1)
 _WIDTH_LINE = _BORE_X_LINE - TEXT_GAP - THREE_LINE_DROP - text_half_high(3)
-# Left of the face: the bore's height, then the stock height outboard.
+# Left of the face, one lane: the bore's .38 from the bottom, the dowel's
+# .220 over it from the bore; then the stock height outboard of both texts.
 _BORE_Y_LINE = -FIRST_LANE
 _BORE_Y_TEXT = _BORE_Y_LINE - TEXT_GAP - text_half(".38")
-_HEIGHT_LINE = _BORE_Y_TEXT - text_half(".38") - TEXT_GAP
+_DOWEL_Y_TEXT = _BORE_Y_LINE - TEXT_GAP - text_half(".220")
+_HEIGHT_LINE = _DOWEL_Y_TEXT - text_half(".220") - TEXT_GAP
 _HEIGHT_TEXT = _HEIGHT_LINE - TEXT_GAP - text_half(STOCK_CALLOUTS["NutHeight"])
+# The dowel's reamed callout over the face's upper left, wholly left of the
+# .270's extension line, its leader down onto the hole's upper-left rim
+# across the face's top edge (inside the face, past the stock height's
+# extension line).
+_DOWEL_CALLOUT = f"Ø.0948+.0005 REAM THRU\n{DOWEL_MATE_CALLOUT}"
 FACE_KEEP: dict[str, tuple[float, float, float]] = {
-    "Hole1Offset": (
-        HOLE_X[0] - TEXT_GAP - text_half(MATE_CALLOUT), _OFFSET_LINE + TWO_LINE_DROP, LENGTH
+    "DowelX": ((DOWEL_HOLE_X + BORE_X) / 2.0, _DOWEL_X_LINE + TEXT_DROP, LENGTH),
+    "DowelY": (_DOWEL_Y_TEXT, (BORE_Y + DOWEL_HOLE_Y) / 2.0, LENGTH),
+    "DowelDia": (
+        DOWEL_HOLE_X - 3.0 - text_half(_DOWEL_CALLOUT),
+        _DOWEL_X_LINE + 4.0 + text_half_high(2),
+        LENGTH,
     ),
-    "Hole2Offset": (
-        HOLE_X[1] + TEXT_GAP + text_half(MATE_CALLOUT), _OFFSET_LINE + TWO_LINE_DROP, LENGTH
-    ),
+    "Hole1Offset": ((HOLE_X[0] + BORE_X) / 2.0, _OFFSET_LINE + TEXT_DROP, LENGTH),
+    "Hole2Offset": ((HOLE_X[1] + BORE_X) / 2.0, _OFFSET_LINE + TEXT_DROP, LENGTH),
     "BoreX": (BORE_X / 2.0, _BORE_X_LINE + TEXT_DROP, LENGTH),
     "NutWidth": ((BORE_X + WIDTH) / 2.0, _WIDTH_LINE + THREE_LINE_DROP, LENGTH),
     "BoreY": (_BORE_Y_TEXT, BORE_Y / 2.0, LENGTH),
@@ -187,14 +201,13 @@ def _activate_view(adapter: Any, view: Any, *, label: str) -> None:
 
 
 _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
-FACE_CENTER_MARKS = 3  # the Tr8 bore and the two screw holes
+FACE_CENTER_MARKS = 4  # the Tr8 bore, the two screw holes and the dowel hole
 
 
 def _center_mark_count(view: Any) -> int:
     """The view's centre-mark annotations (a bare view answers None)."""
     return len(
-        _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION)
-        or ()
+        _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
     )
 
 

@@ -1,5 +1,6 @@
 """Physical contracts for the shop-made TL-27 Tr8x2 feed nut (owner ruling
 2026-11-01, item 4)."""
+
 from __future__ import annotations
 
 import math
@@ -28,7 +29,9 @@ def test_identity_and_stock():
     assert spec.PART_NAME.replace("-", "_") in DRAWINGS_BY_NAME
     # The bar as bought: 3/4 x 1-1/4 at the supplier's bands, faced to .40.
     assert (spec.WIDTH, spec.HEIGHT) == pytest.approx((1.25 * INCH, 0.75 * INCH))
-    assert (spec.WIDTH_STOCK_BAND, spec.HEIGHT_STOCK_BAND) == pytest.approx((0.005 * INCH, 0.0045 * INCH))
+    assert (spec.WIDTH_STOCK_BAND, spec.HEIGHT_STOCK_BAND) == pytest.approx(
+        (0.005 * INCH, 0.0045 * INCH)
+    )
     assert spec.STOCK_CALLOUTS == {"NutWidth": "STOCK", "NutHeight": "STOCK"}
     assert spec.LENGTH == pytest.approx(0.40 * INCH)
     assert spec.DRAWING_PRECISION_BY_NAME["NutLength"] == 2
@@ -45,7 +48,9 @@ def test_tr8_bore_is_letter_c_tapped_through_at_five_turns():
     (exception,) = _config.parts(spec.PART_NAME)["machinist_exceptions"]
     assert exception["id"] == "RV-01"
     assert f"({engagement_d:.2f}D)" in exception["finding"]
-    assert exception["reason"].startswith("Owner ruling 2026-11-01: thread engagement below 1.5D")
+    assert exception["reason"].startswith(
+        "Owner ruling 2026-11-01: thread engagement below 1.5D"
+    )
     assert (spec.BORE_X, spec.BORE_Y) == pytest.approx((0.63 * INCH, 0.38 * INCH))
     # Rule 20: the callout states the shortfall as a plain fact, RV-01's.
     assert spec.TR8_ENGAGEMENT_D == pytest.approx(engagement_d)
@@ -53,31 +58,65 @@ def test_tr8_bore_is_letter_c_tapped_through_at_five_turns():
     assert ".37 min (1.17D)" in exception["finding"]
 
 
-def test_clearance_holes_stand_2x_340_from_the_bore_and_name_their_mate():
-    # Ø.170 (the table's #6 normal) so the flanged heads seat flat at the
-    # fit-up's eccentricity (Codjiflo P1 on #2112; feed block spec).
+def test_clearance_holes_stand_2x_35_from_the_bore_with_no_mate_band():
+    # Ø.170 (the table's #6 normal) so the flanged heads seat flat on the
+    # transferred taps (Codjiflo P1 on #2112; feed block spec).
     assert spec.HOLE_DIA == CLEARANCE_MM[("#6", "normal")]
     assert round(spec.HOLE_DIA / INCH, 3) == 0.170
     # Each hole from the bore axis, one each side, never from the other hole
-    # (run 20261101T220223216Z: the chained .63 / .34 / .680 stacked three
-    # bands on the far hole).
-    assert spec.HOLE_OFFSET == pytest.approx(0.340 * INCH)
-    assert spec.HOLE_X == pytest.approx((spec.BORE_X - 0.340 * INCH, spec.BORE_X + 0.340 * INCH))
+    # (run 20261101T220223216Z). The lug's taps are spotted through these
+    # holes at TL-00 assembly (Main ruling 2026-11-03), so only the walls
+    # bound them: .XX, no mate row.
+    assert spec.HOLE_OFFSET == pytest.approx(0.35 * INCH)
+    assert spec.HOLE_X == pytest.approx(
+        (spec.BORE_X - 0.35 * INCH, spec.BORE_X + 0.35 * INCH)
+    )
     assert spec.HOLE_Y == spec.BORE_Y
-    assert spec.DRAWING_DIMENSIONS["HolePatternReference"] == {"Hole1Offset", "Hole2Offset"}
-    assert spec.DRAWING_PRECISION_BY_NAME["Hole1Offset"] == spec.DRAWING_PRECISION_BY_NAME["Hole2Offset"] == 3
-    assert spec.CALLOUTS_BELOW["Hole1Offset"] == spec.CALLOUTS_BELOW["Hole2Offset"] == spec.MATE_CALLOUT
-    assert spec.MATE_CALLOUT == "MATCHES TL-32 LUG TAPS"
-    assert round(spec.HOLE_OFFSET_BAND / INCH, 4) == 0.0050
-    # The Ø.170 floats a #4 by .029, past the .014 stack of both parts'
-    # printed stations; the normal Ø.129's .008 would not.
-    assert round(spec.HOLE_FLOAT / INCH, 4) == 0.0290
-    assert spec.NORMAL_HOLE_FLOAT < feed_block.FIT_UP_RESIDUAL <= spec.HOLE_FLOAT
+    assert (
+        spec.DRAWING_PRECISION_BY_NAME["Hole1Offset"]
+        == spec.DRAWING_PRECISION_BY_NAME["Hole2Offset"]
+        == 2
+    )
+    assert (
+        "Hole1Offset" not in spec.CALLOUTS_BELOW
+        and "Hole2Offset" not in spec.CALLOUTS_BELOW
+    )
+    # A #18 spot through the largest hole leaves the screw .0023 off its axis.
+    assert round(feed_block.FIT_UP_RESIDUAL / INCH, 4) == 0.0023
+
+
+def test_dowel_hole_is_a_reamed_slip_fit_clear_of_every_wall():
+    # Main ruling 2026-11-03 (Codjiflo P1 on #2112): the nut's positive stop.
+    assert spec.DOWEL_DIA == pytest.approx(3 / 32 * INCH)
+    low = spec.DOWEL_HOLE_DIA + spec.DOWEL_HOLE_BAND[1]
+    assert low == pytest.approx(0.0948 * INCH)
+    assert low > spec.DOWEL_DIA_MAX
+    assert (spec.DOWEL_DX, spec.DOWEL_DY) == pytest.approx((0.270 * INCH, 0.220 * INCH))
+    assert spec.DRAWING_DIMENSIONS["HolePatternReference"] == {
+        "Hole1Offset",
+        "Hole2Offset",
+        "DowelX",
+        "DowelY",
+    }
+    assert (
+        spec.DRAWING_PRECISION_BY_NAME["DowelX"]
+        == spec.DRAWING_PRECISION_BY_NAME["DowelY"]
+        == 3
+    )
+    assert spec.DRAWING_PRECISION_BY_NAME["DowelDia"] == 4
+    assert spec.CALLOUTS_SUFFIX["DowelDia"] == " REAM THRU"
+    assert spec.CALLOUTS_BELOW["DowelDia"] == "SLIP FIT ON MHA-CH-06-TL-VN-81"
+    for wall in (
+        "Tr8 major to the dowel hole",
+        "dowel hole to hole 1",
+        "dowel hole to top face",
+    ):
+        assert spec.WALLS_MM[wall] >= WALL_TARGET_MM
 
 
 def test_walls_meet_the_target_at_the_printed_worst_case():
     assert min(spec.WALLS_MM.values()) >= WALL_TARGET_MM
-    assert round(min(spec.WALLS_MM.values()) / INCH, 4) == 0.0807
+    assert round(min(spec.WALLS_MM.values()) / INCH, 4) == 0.0824
 
 
 def test_screws_engage_the_lug_two_diameters_and_stop_inside_it():
@@ -86,12 +125,19 @@ def test_screws_engage_the_lug_two_diameters_and_stop_inside_it():
     assert spec.SCREW_ENGAGEMENT == pytest.approx(0.35 * INCH)
     assert spec.SCREW_FULL_THREAD_MIN >= 2.0 * spec.SCREW_MAJOR
     assert spec.SCREW_TIP_REACH_MAX < feed_block.LUG_WIDTH
-    assert feed_block.HEAD_FILLET_CLEARANCE > 0.0 and feed_block.HEAD_BEARING_LAND_MIN > 0.0
+    assert (
+        feed_block.HEAD_FILLET_CLEARANCE > 0.0
+        and feed_block.HEAD_BEARING_LAND_MIN > 0.0
+    )
 
 
 def test_reach_sets_the_near_kp08_gap():
     assert spec.REACH == pytest.approx(spec.LENGTH_MAX + nut_screw.DIMS.head_h)
-    gaps = [gap for (name, _station), gap in feed_block.FEED_GAPS.items() if name == "KP08 near"]
+    gaps = [
+        gap
+        for (name, _station), gap in feed_block.FEED_GAPS.items()
+        if name == "KP08 near"
+    ]
     assert round(min(gaps) / INCH, 3) == pytest.approx(4.66 / INCH, abs=1e-3)
     assert min(gaps) >= lead.FEED_GAP
 
@@ -102,14 +148,20 @@ def test_a_one_and_a_half_d_nut_would_reach_into_the_feed_gap():
     length = 0.49 * INCH
     target = 1.5 * lead.SCREW_MAJOR_DIA
     assert length - spec.LENGTH_BAND >= target > length - 0.01 * INCH - spec.LENGTH_BAND
-    near = min(gap for (name, _station), gap in feed_block.FEED_GAPS.items() if name == "KP08 near")
+    near = min(
+        gap
+        for (name, _station), gap in feed_block.FEED_GAPS.items()
+        if name == "KP08 near"
+    )
     shortened = near - (length - spec.LENGTH)
     assert round(shortened, 2) == 2.38
     assert shortened < lead.FEED_GAP
 
 
 def test_drawing_is_inch_and_enforced():
-    source = (Path(__file__).parent / "draw_ch_rocker_arm_tl_oblique_feed_nut.py").read_text(encoding="utf-8")
+    source = (
+        Path(__file__).parent / "draw_ch_rocker_arm_tl_oblique_feed_nut.py"
+    ).read_text(encoding="utf-8")
     assert "MACHINIST_REVIEW = MachinistReviewMode.ENFORCE" in source
     assert math.isclose(spec.LENGTH_BAND, 0.01 * INCH)
 
@@ -117,7 +169,13 @@ def test_drawing_is_inch_and_enforced():
 def test_hole_callouts_name_the_drill_and_centre_marks_print_once():
     # r1 review: a callout without DRILL leaves the band unnamed; r1 layout
     # audit: the template's marks plus AutoInsertCenterMarks2 printed twice.
-    assert spec.CALLOUTS_SUFFIX == {"BoreDia": " DRILL THRU", "HoleDia": " DRILL THRU"}
-    source = (Path(__file__).parent / "draw_ch_rocker_arm_tl_oblique_feed_nut.py").read_text(encoding="utf-8")
+    assert spec.CALLOUTS_SUFFIX == {
+        "BoreDia": " DRILL THRU",
+        "HoleDia": " DRILL THRU",
+        "DowelDia": " REAM THRU",
+    }
+    source = (
+        Path(__file__).parent / "draw_ch_rocker_arm_tl_oblique_feed_nut.py"
+    ).read_text(encoding="utf-8")
     assert "if _center_mark_count(face) == 0 and not auto_center_marks(" in source
-    assert "FACE_CENTER_MARKS = 3" in source
+    assert "FACE_CENTER_MARKS = 4" in source

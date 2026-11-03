@@ -7,9 +7,13 @@ recess and no wall exception. The nut threads on the leadscrew
 (``ch_rocker_arm_tl_vn_oblique_leadscrew_spec``, imported as ``leadscrew``)
 and two #4-40 X 3/4 flanged button head screws (MHA-CH-06-TL-VN-66,
 McMaster 91355A581) hold it on the lug's -X face, through its two Ø.170
-clearance holes into the lug's #4-40 taps, tapped THRU (ruling C1). Thread
-the nut on the screw first, then tighten the screws: the clearance float
-aligns the nut to the screw.
+clearance holes into the lug's #4-40 taps, tapped THRU (ruling C1). The lug's
+taps and its dowel hole are transferred through this nut at TL-00 assembly,
+with the nut threaded on the aligned leadscrew (Main ruling 2026-11-03,
+Codjiflo P1 on #2112), so no station here has a mate band. One 3/32 dowel
+(MHA-CH-06-TL-VN-81), slip in this nut's reamed hole and pressed into the
+lug, is the nut's positive stop against the leadscrew's turning torque; the
+screws only clamp.
 
 Material and stock: brass 360-H02 (C36000, ASTM B16) extruded rectangle bar,
 3/4 x 1-1/4 in (OnlineMetals 1500, read live 2026-11-01: in stock, 12 in
@@ -32,18 +36,22 @@ Holes, all THRU along Z on the bore's line (Y = BORE_Y):
   side and .38 from the bottom face (the owner's "centre of both stock faces"
   on the .01 grid; ruling: bore stations .XX).
 - Two Ø.170 clearance holes (ASME B18.2.8's #6 normal size; an 11/64 drill
-  cuts it), 2X .340 from the bore axis, one each side (.XXX, the pair
-  matches TL-32's taps and names its mate). Each hole stands on the bore,
-  not on the other hole: the review of run 20261101T220223216Z found the
-  chained .63 / .34 / .680 stacking three bands on the far hole.
+  cuts it), 2X .35 from the bore axis, one each side (.XX: the lug's taps
+  are spotted through them, so only the walls bound them). Each hole stands
+  on the bore, not on the other hole: the review of run
+  20261101T220223216Z found chained stations stacking three bands on the
+  far hole.
+- The dowel hole, reamed Ø.0948 +.0005/-.0000 (a 3/32 slip fit on
+  MHA-CH-06-TL-VN-81), .270 toward -X and .220 above the bore axis (.XXX:
+  the walls here and in the lug, ``WALLS_MM`` and TL-32's spec, need the
+  tighter band).
 
-Fit-up: the hole floats a #4 by ``HOLE_FLOAT`` .029, the #4 normal-fit
-Ø.129 by ``NORMAL_HOLE_FLOAT`` .008. TL-32's spec owns the stack of both
-parts' printed stations (``feed_block.FIT_UP_RESIDUAL``, .014), proves it
-falls between the two and that the screw heads seat flat at that
-eccentricity (Codjiflo P1 on #2112: a #4 SHCS's Ø.141 underhead fillet hit
-the old Ø.144 hole's mouth, and its Ø.176 head could not both clear the
-fillet and bear outside the hole; the Ø.234 flange does).
+Fit-up: each lug tap is spotted through its hole with a #18 drill, so a
+screw stands at most ``feed_block.FIT_UP_RESIDUAL`` off its hole's axis;
+TL-32's spec proves the screw heads seat flat at that eccentricity (Codjiflo
+P1 on #2112: a #4 SHCS's Ø.141 underhead fillet hit the old Ø.144 hole's
+mouth, and its Ø.176 head could not both clear the fillet and bear outside
+the hole; the Ø.234 flange does).
 
 Rule 17 (walls, .080 target) at the printed worst case (``WALLS_MM``): every
 station at its band, the holes at the drilled oversize, the stock at its
@@ -66,7 +74,11 @@ from _mcmaster_91355a581 import LENGTH_MIN as SCREW_LENGTH_MIN
 from _mcmaster_91355a581 import LENGTH_TEXT as SCREW_LENGTH_TEXT
 from _mcmaster_91355a581 import THREAD as SCREW_THREAD
 from _package_units import drawing_unit
-from _printed_tolerance import drilled_oversize_mm, edge_break_chamfer_mm, printed_band_mm
+from _printed_tolerance import (
+    drilled_oversize_mm,
+    edge_break_chamfer_mm,
+    printed_band_mm,
+)
 
 INCH = 25.4
 PART_NAME = "ch-rocker-arm-tl-oblique-feed-nut"
@@ -99,7 +111,9 @@ if LENGTH < 5.0 * leadscrew.SCREW_LEAD:
 TR8_ENGAGEMENT_MIN = LENGTH_MIN - 2.0 * edge_break_chamfer_mm(unit=UNIT)
 TR8_ENGAGEMENT_D = TR8_ENGAGEMENT_MIN / leadscrew.SCREW_MAJOR_DIA
 TR8_ENGAGEMENT_TEXT = (
-    f"ENGAGES {TR8_ENGAGEMENT_MIN / INCH:.2f} MIN ({TR8_ENGAGEMENT_D:.2f}D)".replace("0.", ".", 1)
+    f"ENGAGES {TR8_ENGAGEMENT_MIN / INCH:.2f} MIN ({TR8_ENGAGEMENT_D:.2f}D)".replace(
+        "0.", ".", 1
+    )
 )
 
 # --- The Tr8x2 RH bore ------------------------------------------------------------
@@ -109,7 +123,9 @@ BORE_PLACES = 2
 BORE_DRILL = 0.242 * INCH  # letter C, 6.147
 BORE_DRILL_PLACES = 3
 BORE_THREAD = "Tr8x2-7H RH"
-TR8_D1 = leadscrew.SCREW_MAJOR_DIA - leadscrew.SCREW_LEAD  # ISO 2904 internal minor, 6.0
+TR8_D1 = (
+    leadscrew.SCREW_MAJOR_DIA - leadscrew.SCREW_LEAD
+)  # ISO 2904 internal minor, 6.0
 TR8_D4 = leadscrew.SCREW_MAJOR_DIA + 0.5  # ISO 2904 internal major (2 ac 0.5 at P 2)
 if not TR8_D1 < BORE_DRILL < leadscrew.SCREW_MAJOR_DIA - 0.5 * leadscrew.SCREW_LEAD:
     raise AssertionError("the letter C drill is not a Tr8x2 tap drill")
@@ -120,18 +136,37 @@ SCREW_SIZE = "#4"
 # mouth at the fit-up's eccentricity (TL-32's spec proves it).
 HOLE_DIA = CLEARANCE_MM[("#6", "normal")]  # 4.318, .170
 HOLE_DIA_PLACES = 3
-HOLE_OFFSET = 0.340 * INCH  # 8.636, each hole from the bore axis
-HOLE_OFFSET_PLACES = 3
-HOLE_X = (BORE_X - HOLE_OFFSET, BORE_X + HOLE_OFFSET)  # .29, .97
+HOLE_OFFSET = 0.35 * INCH  # 8.89, each hole from the bore axis
+HOLE_OFFSET_PLACES = 2
+HOLE_X = (BORE_X - HOLE_OFFSET, BORE_X + HOLE_OFFSET)  # .28, .98
 HOLE_Y = BORE_Y
-MATE_CALLOUT = "MATCHES TL-32 LUG TAPS"
 
-# --- The pair's float: TL-32's spec checks it against both parts' stations ---
+# --- The pair: TL-32's spec spots the lug taps through it --------------------
 SCREW_MAJOR = THREAD_MAJOR_MM[SCREW_THREAD]
-HOLE_OFFSET_BAND = printed_band_mm(HOLE_OFFSET_PLACES, unit=UNIT)  # .005
-HOLE_FLOAT = (HOLE_DIA - SCREW_MAJOR) / 2.0  # .029
+HOLE_OFFSET_BAND = printed_band_mm(HOLE_OFFSET_PLACES, unit=UNIT)  # .010
+HOLE_R_MIN = HOLE_DIA / 2.0
 HOLE_R_MAX = (HOLE_DIA + DRILLED_OVERSIZE) / 2.0  # .087, the drilled hole's largest
-NORMAL_HOLE_FLOAT = (CLEARANCE_MM[(SCREW_SIZE, "normal")] - SCREW_MAJOR) / 2.0  # .008
+
+# --- The dowel hole: the nut's positive stop on the lug ----------------------
+# A 3/32 alloy steel dowel (MHA-CH-06-TL-VN-81, 98381A438; the jig assembly
+# spec checks these against its own spec): slip here, pressed into the lug.
+DOWEL_DIA = 3.0 / 32.0 * INCH  # 2.381
+DOWEL_DIA_MAX = DOWEL_DIA + 0.0003 * INCH  # catalogue +.0001/+.0003
+DOWEL_LENGTH = 0.5 * INCH
+DOWEL_HOLE_DIA = 0.0948 * INCH  # 2.408, reamed
+DOWEL_HOLE_BAND = (0.0005 * INCH, 0.0)  # (upper, lower): .0948-.0953
+DOWEL_HOLE_PLACES = 4
+DOWEL_DX = 0.270 * INCH  # 6.858, toward -X from the bore axis
+DOWEL_DY = 0.220 * INCH  # 5.588, above the bore axis
+DOWEL_STATION_PLACES = 3
+DOWEL_HOLE_X = BORE_X - DOWEL_DX  # .36
+DOWEL_HOLE_Y = BORE_Y + DOWEL_DY  # .60
+DOWEL_RADIUS = (DOWEL_DX**2 + DOWEL_DY**2) ** 0.5  # .348 from the leadscrew axis
+DOWEL_STATION_BAND = printed_band_mm(DOWEL_STATION_PLACES, unit=UNIT)  # .005
+DOWEL_HOLE_R_MAX = (DOWEL_HOLE_DIA + DOWEL_HOLE_BAND[0]) / 2.0
+if not DOWEL_HOLE_DIA + DOWEL_HOLE_BAND[1] > DOWEL_DIA_MAX:
+    raise AssertionError("the reamed dowel hole does not slip on the largest dowel")
+DOWEL_MATE_CALLOUT = "SLIP FIT ON MHA-CH-06-TL-VN-81"
 
 # --- The screws: 2 X #4-40 X 3/4 FLANGED BHCS through the nut into the lug -------
 SCREW_COUNT = len(HOLE_X)
@@ -161,16 +196,34 @@ REACH = LENGTH_MAX + SCREW_HEAD_H
 # --- Rule 17: walls at the printed worst case --------------------------------
 _STATION = printed_band_mm(BORE_PLACES, unit=UNIT)  # .01 on the bore stations
 _BORE_R = TR8_D4 / 2.0
+_DOWEL_SHIFT = 2**0.5 * DOWEL_STATION_BAND  # both stations at their band
+_DOWEL_TO_HOLE_1 = ((HOLE_X[0] - DOWEL_HOLE_X) ** 2 + DOWEL_DY**2) ** 0.5
 WALLS_MM: dict[str, float] = {
+    "Tr8 major to the dowel hole": DOWEL_RADIUS
+    - _DOWEL_SHIFT
+    - DOWEL_HOLE_R_MAX
+    - _BORE_R,
+    "dowel hole to hole 1": _DOWEL_TO_HOLE_1
+    - _DOWEL_SHIFT
+    - HOLE_OFFSET_BAND
+    - DOWEL_HOLE_R_MAX
+    - HOLE_R_MAX,
+    "dowel hole to top face": (HEIGHT - HEIGHT_STOCK_BAND)
+    - (DOWEL_HOLE_Y + _STATION + DOWEL_STATION_BAND)
+    - DOWEL_HOLE_R_MAX,
     "Tr8 major to the holes": HOLE_OFFSET - HOLE_OFFSET_BAND - HOLE_R_MAX - _BORE_R,
     "hole 1 to -X side": HOLE_X[0] - _STATION - HOLE_OFFSET_BAND - HOLE_R_MAX,
     "hole 2 to +X side": (WIDTH - WIDTH_STOCK_BAND)
     - (HOLE_X[1] + _STATION + HOLE_OFFSET_BAND)
     - HOLE_R_MAX,
     "holes to bottom face": BORE_Y - _STATION - HOLE_R_MAX,
-    "holes to top face": (HEIGHT - HEIGHT_STOCK_BAND) - (BORE_Y + _STATION) - HOLE_R_MAX,
+    "holes to top face": (HEIGHT - HEIGHT_STOCK_BAND)
+    - (BORE_Y + _STATION)
+    - HOLE_R_MAX,
     "Tr8 major to bottom face": BORE_Y - _STATION - _BORE_R,
-    "Tr8 major to top face": (HEIGHT - HEIGHT_STOCK_BAND) - (BORE_Y + _STATION) - _BORE_R,
+    "Tr8 major to top face": (HEIGHT - HEIGHT_STOCK_BAND)
+    - (BORE_Y + _STATION)
+    - _BORE_R,
 }
 for _wall, _mm in WALLS_MM.items():
     if _mm < WALL_TARGET_MM:
@@ -181,16 +234,25 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "NutProfile": {"NutWidth", "NutHeight"},
     "BoreProfile": {"BoreX", "BoreY", "BoreDia"},
     "HoleProfile": {"HoleDia"},
-    "HolePatternReference": {"Hole1Offset", "Hole2Offset"},
+    "DowelProfile": {"DowelDia"},
+    "HolePatternReference": {"Hole1Offset", "Hole2Offset", "DowelX", "DowelY"},
     # The faced length: a reference sketch, not the extrusion's depth (a
     # drawing view cannot attach the depth; TL-28's BracketThickReference).
     "NutLengthReference": {"NutLength"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "NutProfile": {"NutWidth": STOCK_PLACES, "NutHeight": STOCK_PLACES},
-    "BoreProfile": {"BoreX": BORE_PLACES, "BoreY": BORE_PLACES, "BoreDia": BORE_DRILL_PLACES},
+    "BoreProfile": {
+        "BoreX": BORE_PLACES,
+        "BoreY": BORE_PLACES,
+        "BoreDia": BORE_DRILL_PLACES,
+    },
     "HoleProfile": {"HoleDia": HOLE_DIA_PLACES},
-    "HolePatternReference": dict.fromkeys(("Hole1Offset", "Hole2Offset"), HOLE_OFFSET_PLACES),
+    "DowelProfile": {"DowelDia": DOWEL_HOLE_PLACES},
+    "HolePatternReference": dict.fromkeys(
+        ("Hole1Offset", "Hole2Offset"), HOLE_OFFSET_PLACES
+    )
+    | dict.fromkeys(("DowelX", "DowelY"), DOWEL_STATION_PLACES),
     "NutLengthReference": {"NutLength": LENGTH_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -211,17 +273,23 @@ for _name, _value in (
     ("HoleDia", HOLE_DIA),
     ("Hole1Offset", HOLE_OFFSET),
     ("Hole2Offset", HOLE_OFFSET),
+    ("DowelDia", DOWEL_HOLE_DIA),
+    ("DowelX", DOWEL_DX),
+    ("DowelY", DOWEL_DY),
 ):
     _places = DRAWING_PRECISION_BY_NAME[_name]
     if abs(_value / INCH - round(_value / INCH, _places)) > 1e-9:
         raise AssertionError(f"feed nut {_name} {_value} does not print as modelled")
 # Model-owned callout rows (swDimensionTextParts_e: 1 prefix, 2 suffix, 4 below).
 CALLOUTS_PREFIX = {"HoleDia": "2X <MOD-DIAM>"}
-CALLOUTS_SUFFIX = {"BoreDia": " DRILL THRU", "HoleDia": " DRILL THRU"}
+CALLOUTS_SUFFIX = {
+    "BoreDia": " DRILL THRU",
+    "HoleDia": " DRILL THRU",
+    "DowelDia": " REAM THRU",
+}
 CALLOUTS_BELOW = {
     "BoreDia": f"{BORE_THREAD} THRU\n{TR8_ENGAGEMENT_TEXT}",
-    "Hole1Offset": MATE_CALLOUT,
-    "Hole2Offset": MATE_CALLOUT,
+    "DowelDia": DOWEL_MATE_CALLOUT,
 }
 # drawing-guidelines.md (units): an as-bought fraction is an untoleranced REF;
 # the supplier's catalogue tolerance governs.

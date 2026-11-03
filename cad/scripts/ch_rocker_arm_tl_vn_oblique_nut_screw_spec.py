@@ -11,13 +11,14 @@ flange bears directly on the brass nut. It is the fastener table's
 inventory carries no screw stock (no ``INVENTORY_ID``), and the assembly
 steps cite it by item and callout (``fasteners.callout``).
 
-Why a flanged button head (Codjiflo P1 on #2112): at the nut's .014 fit-up
-eccentricity a #4 SHCS's Ø.141 underhead fillet needs a Ø.170 hole mouth,
-and its Ø.176 head can then no longer bear outside that hole. No McMaster
-#4 flat washer clears the fillet (every #4 washer's ID is .117-.125), so a
-washer would seat on the fillet too. The flange's Ø.222 flat bearing face
-covers the Ø.174 largest hole at that eccentricity (``feed_block``'s
-``HEAD_BEARING_LAND_MIN``).
+Why a flanged button head (Codjiflo P1 on #2112): at the fit-up's
+eccentricity (each lug tap spotted through its nut hole,
+``feed_block.FIT_UP_RESIDUAL``) a #4 SHCS's Ø.141 underhead fillet needs a
+Ø.170 hole mouth, and its Ø.176 head can then no longer bear outside that
+hole. No McMaster #4 flat washer clears the fillet (every #4 washer's ID is
+.117-.125), so a washer would seat on the fillet too. The flange's Ø.222
+flat bearing face covers the Ø.174 largest hole at that eccentricity
+(``feed_block``'s ``HEAD_BEARING_LAND_MIN``).
 
 Sources:
 
@@ -59,7 +60,9 @@ SKU = PART_NO
 ROW = fasteners.NUT_TO_FEED_BLOCK
 QUANTITY = ROW.count
 PACK_QUANTITY = _catalogue.PACK_QUANTITY
-BEARING_DIA_MIN = _catalogue.BEARING_DIA_MIN  # the flange's flat face: the bearing bound
+BEARING_DIA_MIN = (
+    _catalogue.BEARING_DIA_MIN
+)  # the flange's flat face: the bearing bound
 FILLET_DIA_MAX = _catalogue.FILLET_DIA_MAX
 CALLOUT = fasteners.callout(ROW)  # "#4-40 X 3/4 FLANGED BHCS"
 
