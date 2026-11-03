@@ -130,12 +130,12 @@ def test_plan_rows_stack_smallest_nearest():
     ]
     assert draw.LEFT_EDGE_X > columns[0] > columns[1] > columns[2]
     # Each text stands past its own span's end, so no other span's dimension
-    # line runs through it: the hole row's and the screw rail's below the
-    # plan, the screw rail's lower; the spring rail's and the overall
+    # line runs through it: the screw rail's and the hole row's below the
+    # plan, the hole row's lower; the spring rail's and the overall
     # width's above it, the spring rail's in its own column inside the
     # overall width's.
-    assert draw.FRONT_KEEP["RailWidth"][1] < draw.FRONT_KEEP["LeftZ"][1]
-    assert draw.FRONT_KEEP["LeftZ"][1] < draw.BOTTOM_EDGE_Y
+    assert draw.FRONT_KEEP["LeftZ"][1] < draw.FRONT_KEEP["RailWidth"][1]
+    assert draw.FRONT_KEEP["RailWidth"][1] < draw.BOTTOM_EDGE_Y
     for name in ("SpringRailWidth", "OverallWidth"):
         assert draw.FRONT_KEEP[name][1] > draw.TOP_EDGE_Y, name
     assert columns[2] < draw.FRONT_KEEP["SpringRailWidth"][0] < draw.LEFT_EDGE_X
@@ -188,12 +188,21 @@ def test_length_line_clears_the_bridge_end_texts():
 
 def test_hole_row_names_the_tap_pattern_and_clears_the_rail_line():
     # The .XXX hole row holds the pattern float with the platen's taps; it
-    # says so, and its widest line stays right of the screw rail's line.
+    # says so.  The screw rail's line stands inside the hole row's text span
+    # (its widest line needs that column to clear the border), so the hole
+    # row's block stands under the screw rail's, where that line has stopped.
     assert "MHA-PD-02" in draw.DIMENSION_CALLOUTS["LeftZ"]
     assert "MHA-PD-02" in draw.HOLE_CALLOUT_PROCESS
-    _top, _bottom, width = _block("LeftZ")
-    hole_row_left = draw.FRONT_KEEP["LeftZ"][0] - 0.0014 - width
-    assert hole_row_left > draw.FRONT_KEEP["RailWidth"][0] + 0.003
+    hole_row_top, _bottom, _width = _block("LeftZ")
+    _top, rail_bottom, _width = _block("RailWidth")
+    assert rail_bottom > hole_row_top + 0.003
+
+
+def test_screw_rail_text_clears_the_left_border():
+    # 20261103T093232922Z review: at column .042 the "HOLE WALLS .060 MIN"
+    # line ran through the left border.
+    _top, _bottom, width = _block("RailWidth")
+    assert draw.FRONT_KEEP["RailWidth"][0] - 0.0014 - width > BORDER[0] + 0.003
 
 
 def test_hole_pattern_three_places_are_a_declared_acceptance():

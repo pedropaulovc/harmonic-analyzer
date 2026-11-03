@@ -427,6 +427,7 @@ def _add_supplier_references(adapter: Any, front: Any, top: Any) -> dict[str, An
     return authored
 
 
+@_telemetry.traced("drawing.pivot_shoulder_witnesses")
 def _blacken_shoulder_witnesses(adapter: Any, front: Any) -> None:
     """Draw the shoulder's two supplier reference lines in the outline's black.
 

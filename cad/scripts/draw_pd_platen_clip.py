@@ -154,16 +154,17 @@ HOLE_FAR_X = CLIP_LENGTH - HOLE_INSET
 # screw rail's width and the overall width stand in their own columns
 # (smallest nearest), the spring rail's width in a column of its own beside
 # its span.  Each of those texts stands past its own span's end, so no
-# dimension or extension line runs through it: the hole row's below the
-# plan, the screw rail's below that, the spring rail's and the overall
-# width's above the plan.  A vertical dimension's text stands left of its own
+# dimension or extension line runs through it: the screw rail's below the
+# plan, the hole row's below that, the spring rail's and the overall width's
+# above the plan.  A vertical dimension's text stands left of its own
 # dimension line on a shoulder that runs from the line to the text's far end
 # (r5: the hole row's "2X 3.300" spans 21 mm), so each column is its text's
-# right end: the hole row's widest line ("MHA-PD-02", ~23 mm) ends right of
-# the screw rail's line, the hole row's three-line block stands under the
-# near hole station's dimension line (r7 audit: at 0.112 that line,
-# y ~0.1132, ran 2.7 mm into it), the spring rail's right of the overall
-# width's text, and the overall width's
+# right end.  The screw rail's widest line ("HOLE WALLS .060 MIN", ~45 mm)
+# needs its column at .062 to clear the left border (20261103T093232922Z
+# review: at .042 it ran through the border); its line then falls inside
+# the hole row's text span, so the hole row's block stands under the screw
+# rail's, where the screw rail's line stops above it.  The spring rail's
+# column is right of the overall width's text, and the overall width's
 # inside the border.  The outer and the slit-side corner radii stand off the
 # right end.
 _BELOW_PLAN_ROWS = (0.116, 0.110)
@@ -173,7 +174,7 @@ _BELOW_PLAN_ROWS = (0.116, 0.110)
 # much higher.
 _ABOVE_PLAN_ROWS = (0.172, 0.178, 0.189)
 _HOLE_ROW_COLUMN = 0.0725
-_RAIL_COLUMN = 0.042
+_RAIL_COLUMN = 0.062
 _SPRING_RAIL_COLUMN = 0.066
 _OVERALL_COLUMN = 0.030
 FRONT_KEEP = {
@@ -182,8 +183,8 @@ FRONT_KEEP = {
     "BridgeX0": (_plan_x(BRIDGE_X0 / 2.0), _ABOVE_PLAN_ROWS[0]),
     "BridgeX1": (_plan_x(BRIDGE_X1 / 2.0), _ABOVE_PLAN_ROWS[1]),
     "Length": (FRONT_CENTER[0], _ABOVE_PLAN_ROWS[2]),
-    "LeftZ": (_HOLE_ROW_COLUMN, 0.1025),
-    "RailWidth": (_RAIL_COLUMN, 0.0900),
+    "LeftZ": (_HOLE_ROW_COLUMN, 0.0800),
+    "RailWidth": (_RAIL_COLUMN, 0.1025),
     "SpringRailWidth": (_SPRING_RAIL_COLUMN, 0.1652),
     "OverallWidth": (_OVERALL_COLUMN, 0.1625),
     # The slit's dimension line stands inside the slit just short of its
