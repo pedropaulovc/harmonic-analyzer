@@ -1722,3 +1722,99 @@ def test_final_native_clearance_guard_reads_rebuilt_table_and_both_leaders(
         with pytest.raises(RuntimeError, match="bom_rule_clearance"):
             drawing._assert_frame_bom_balloon_clearance(adapter, object(), landings, proof)
     assert "set" in reads and "cap" in reads
+
+
+def _isometric_mm(point: tuple[float, float, float]) -> tuple[float, float]:
+    """Model mm on a SolidWorks *Isometric, Y up: right (1, 0, -1)/sqrt 2,
+    up (-1, 2, -1)/sqrt 6, in model mm at 1:1."""
+    x, y, z = point
+    return (x - z) / math.sqrt(2.0), (2.0 * y - x - z) / math.sqrt(6.0)
+
+
+def _box_corners(x, y, z):
+    return [(a, b, c) for a in x for b in y for c in z]
+
+
+def _deck_detail_boxes():
+    """Each detail's exploded parts, as model-mm boxes from their specs."""
+    import fr_frame_explode_spec as explode
+    import fr_nameplate_spec as plate
+    from fr_harmonic_base_spec import STACK_HEIGHT
+    from fr_rocker_arm_support_spec import SUPPORT_HOLD_DOWN_XZ
+    from fr_vn_lag_screw_spec import HEAD_AF
+    from sh_vn_brass_fillister_screw_spec import HEAD_DIA, HEAD_H
+
+    head = HEAD_AF / math.sqrt(3.0)  # hex corner radius
+    screw_x = [x for x, _z in SUPPORT_HOLD_DOWN_XZ]
+    screw_z = [z for _x, z in SUPPORT_HOLD_DOWN_XZ]
+    support = _box_corners(
+        (
+            min(screw_x) - head + explode.SUPPORT_ASIDE_X,
+            max(screw_x) + head + explode.SUPPORT_ASIDE_X,
+        ),
+        (
+            STACK_HEIGHT + explode.SUPPORT_LIFT,
+            drawing._LAG_SCREW_UNDER_HEAD_Y
+            + drawing.LAG_HEAD_H
+            + explode.SUPPORT_LIFT
+            + explode.SUPPORT_SCREW_WITHDRAW,
+        ),
+        (min(screw_z) - head, max(screw_z) + head),
+    )
+    lift = explode.NAMEPLATE_LIFT
+    x0 = plate.MOUNT_POS[0] + explode.NAMEPLATE_ASIDE_X
+    z0 = plate.MOUNT_POS[2]
+    nameplate = _box_corners(
+        (x0 - plate.PLATE_HEIGHT, x0),
+        (
+            plate.MOUNT_FRONT_Y - plate.PLATE_THICKNESS + lift,
+            plate.MOUNT_FRONT_Y + HEAD_H + explode.NAMEPLATE_SCREW_WITHDRAW + lift,
+        ),
+        (z0 - plate.PLATE_WIDTH - HEAD_DIA / 2.0, z0 + HEAD_DIA / 2.0),
+    )
+    return {"C": support, "D": nameplate}
+
+
+def test_each_deck_detail_circle_holds_its_exploded_hardware() -> None:
+    boxes = _deck_detail_boxes()
+    for detail in drawing.DECK_DETAILS:
+        centre = _isometric_mm(detail.centre_xyz)
+        reach = max(
+            math.dist(_isometric_mm(corner), centre) for corner in boxes[detail.letter]
+        )
+        # The parts it enlarges, with at least 2 mm of model air to the crop.
+        assert reach <= detail.crop_radius_mm - 2.0, (detail.letter, reach)
+        # And no idle margin: the circle is no more than 20 % over its parts.
+        assert reach >= detail.crop_radius_mm / 1.2, (detail.letter, reach)
+
+
+def test_deck_details_stand_in_the_free_column_of_sheet_2() -> None:
+    # Measured on sheet 2 of run 20261103T090647187Z: the exploded view's
+    # balloons end 175 mm from the left, the inner border is at 267 mm, the
+    # BOM's bottom rule at 314 mm and the title block's top at 66 mm.
+    rows = []
+    for detail in drawing.DECK_DETAILS:
+        x, y = detail.centre
+        r = detail.radius_m
+        assert 0.185 <= x - r and x + r <= 0.267 - 0.002, detail.letter
+        assert y + r <= 0.314 - 0.010, detail.letter
+        label_bottom = detail.label_xy[1] - 3 * 0.005  # three note lines
+        assert label_bottom >= 0.066 + 0.010, detail.letter
+        rows.append((label_bottom, y + r))
+    rows.sort()
+    for (_, below_top), (above_label_bottom, _) in zip(rows, rows[1:]):
+        assert below_top + 0.005 <= above_label_bottom
+    assert {detail.letter for detail in drawing.DECK_DETAILS} == {"C", "D"}
+
+
+def test_deck_detail_labels_name_their_bom_items() -> None:
+    items = {stem: str(n) for n, stem in enumerate(drawing.BOM_COMPONENTS, 1)}
+    assert drawing.SUPPORT_DETAIL.label_text(items) == (
+        "DETAIL C\n"
+        f"ITEMS {items['fr-rocker-arm-support']} AND {items['fr-vn-lag-screw']}\n"
+        "SCALE 1:3"
+    )
+    assert drawing.NAMEPLATE_DETAIL.stems == (
+        "fr-nameplate",
+        "sh-vn-brass-fillister-screw",
+    )

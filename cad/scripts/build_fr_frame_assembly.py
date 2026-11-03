@@ -228,6 +228,7 @@ from fr_vn_tube_frame_cap_spec import (
     TOTAL_HEIGHT as CAP_TOTAL_HEIGHT,
 )
 from fr_tube_frame_spec import COLUMN_LENGTH, OUTER_DIA as COLUMN_OUTER_DIA
+import fr_frame_explode_spec as explode
 
 ASM_NAME = "fr-frame"
 FRAME_EXPLODED = "FRAME_EXPLODED"
@@ -524,13 +525,12 @@ def _create_frame_explode(adapter: Any, configuration_name: str) -> None:
         ("rear cross screws withdraw", rear, "z", 0.050),
         ("gooseneck screw withdraws", groups["fr-vn-gooseneck-set-screw"], "x", -0.050),
         ("columns clear base seats", groups["fr-tube-frame"], "y", 0.060),
-        ("support lifts from deck", [*groups["fr-rocker-arm-support"], *groups["fr-vn-lag-screw"]], "y", 0.035),
-        ("support moves beside base", [*groups["fr-rocker-arm-support"], *groups["fr-vn-lag-screw"]], "x", -0.320),
-        ("support screws withdraw", groups["fr-vn-lag-screw"], "y", 0.050),
-        # At 1:8 a 25 mm lift printed the plate as if seated in its deck pocket.
-        ("nameplate lifts from deck", [*groups["fr-nameplate"], *groups["sh-vn-brass-fillister-screw"]], "y", 0.075),
-        ("nameplate moves beside base", [*groups["fr-nameplate"], *groups["sh-vn-brass-fillister-screw"]], "x", 0.080),
-        ("nameplate screws withdraw", groups["sh-vn-brass-fillister-screw"], "y", 0.050),
+        ("support lifts from deck", [*groups["fr-rocker-arm-support"], *groups["fr-vn-lag-screw"]], "y", explode.SUPPORT_LIFT / 1000.0),
+        ("support moves beside base", [*groups["fr-rocker-arm-support"], *groups["fr-vn-lag-screw"]], "x", explode.SUPPORT_ASIDE_X / 1000.0),
+        ("support screws withdraw", groups["fr-vn-lag-screw"], "y", explode.SUPPORT_SCREW_WITHDRAW / 1000.0),
+        ("nameplate lifts from deck", [*groups["fr-nameplate"], *groups["sh-vn-brass-fillister-screw"]], "y", explode.NAMEPLATE_LIFT / 1000.0),
+        ("nameplate moves beside base", [*groups["fr-nameplate"], *groups["sh-vn-brass-fillister-screw"]], "x", explode.NAMEPLATE_ASIDE_X / 1000.0),
+        ("nameplate screws withdraw", groups["sh-vn-brass-fillister-screw"], "y", explode.NAMEPLATE_SCREW_WITHDRAW / 1000.0),
     )
     # Reuse the native assembly axes already used by component patterns. Unlike
     # manipulator indices, Mark=2 direction entities are independent of each
