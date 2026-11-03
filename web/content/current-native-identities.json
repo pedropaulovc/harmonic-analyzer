@@ -702,17 +702,6 @@
       ]
     },
     {
-      "sourceStem": "vn-pen-rod-set-screw",
-      "sourceNumber": "MHA-VN-061",
-      "identities": [
-        {
-          "parent": "pn-pen",
-          "stem": "pn-vn-pen-rod-set-screw",
-          "number": "MHA-PN-VN-52"
-        }
-      ]
-    },
-    {
       "sourceStem": "vn-pen-adjust-nut",
       "sourceNumber": "MHA-VN-062",
       "identities": [
@@ -1063,7 +1052,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "6a44805a6743d1df220fa296380daf14b1c658042f1c88373b2aa932d72e658f",
+  "currentRegistryMapSha256": "18b22485e5940eb2baf89d7f82be1466837f59c52651b023ff0bcd83528e0fff",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",
