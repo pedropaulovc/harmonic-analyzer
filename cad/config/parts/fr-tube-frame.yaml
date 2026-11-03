@@ -5,4 +5,5 @@ fr-tube-frame:
   finish: OD POLISHED; OIL AFTER INSPECTION; ID AS-PROCURED
   quantity: 4
   tolerance_class: plate_profile
+  drawing_unit: in
   process: "machined (steel)"

@@ -10,11 +10,18 @@ silently drift.
 
 from __future__ import annotations
 
+import _config
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
+from _inch_wall_limits import WALL_TARGET_MM
+from _package_units import drawing_unit
+from _printed_tolerance import printed_band_mm
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 from _cone_axis_constants import FRAME_FRONT_COLUMN_Z, FRAME_REAR_COLUMN_Z
 from frame_column_stations import COLUMN_SOCKET_DIAMETER, COLUMN_X
+
+# The sheet prints decimal inch (issue #290, ``drawing_unit: in``).
+UNIT = drawing_unit("parts/fr-harmonic-base", _config.parts("fr-harmonic-base"))
 
 MM_PER_IN = 25.4
 
@@ -23,20 +30,19 @@ BOTTOM_LENGTH = 18.0 * MM_PER_IN  # 457.2 (46 cm callout)
 BOTTOM_THICKNESS = 0.5 * MM_PER_IN  # 12.7
 TOP_LENGTH = 17.5 * MM_PER_IN  # 444.5 (0.25 in reveal per side)
 TOP_THICKNESS = 1.5 * MM_PER_IN  # 38.1
-# The pad DEPTH is set by the column stations, not by the ch6 28 cm callout.
-# The sockets sit at x = +/-197 and z = +/-112, so a pad centred on the part
-# origin leaves an EQUAL socket-to-pad-edge land on all four sides only at
-# TOP_WIDTH = TOP_LENGTH - 2 * (197 - 112) = 274.5. The former 10.5 in pad
-# (266.7) left 1.6 mm of land in Z against 5.5 in X, and the 2026-09 blind
-# machinist review rejected that asymmetry as a blocker: no tolerance stack
-# behind the hole-table coordinate scheme can hold a 1.0 MIN finished land
-# off a 1.6 mm nominal. build_fr_harmonic_base asserts the land is equal on
-# both axes and proves its worst case -- it owns COLUMN_X and the socket
-# stations, so
-# deriving TOP_WIDTH from them here would be circular.
-TOP_WIDTH = 274.5
+# The sockets sit at x = +/-COLUMN_X and z = +/-COLUMN_Z (7.756 / 4.410 once the
+# frame column snap lands; 7.7559 / 4.4094 until then), so a pad centred on
+# the part origin leaves an EQUAL socket-to-pad-edge land on all four sides at
+# TOP_WIDTH = TOP_LENGTH - 2 * (COLUMN_X - COLUMN_Z) = 10.808; the pad takes
+# the nearest .01 width, 10.81, so the lands differ by .001 (.0015 before the
+# snap). The former 10.5 in pad left 1.6 mm of land in Z against 5.5 in X, and
+# the 2026-09 blind machinist review rejected that asymmetry as a blocker: no
+# tolerance stack behind the hole-table coordinate scheme can hold the minimum
+# finished land off a 1.6 mm nominal. build_fr_harmonic_base asserts the lands
+# equal to within half a .01 step and proves each axis's worst case.
+TOP_WIDTH = 274.574  # 10.81
 # The flange keeps the same 0.25 in reveal per side that it has in X.
-BOTTOM_WIDTH = TOP_WIDTH + (BOTTOM_LENGTH - TOP_LENGTH)  # 287.2
+BOTTOM_WIDTH = TOP_WIDTH + (BOTTOM_LENGTH - TOP_LENGTH)  # 11.31
 BOTTOM_FRONT_Z = -BOTTOM_WIDTH / 2.0
 BOTTOM_REAR_Z = BOTTOM_WIDTH / 2.0
 BOTTOM_CENTER_Z = (BOTTOM_FRONT_Z + BOTTOM_REAR_Z) / 2.0
@@ -49,18 +55,18 @@ STACK_HEIGHT = BOTTOM_THICKNESS + TOP_THICKNESS  # 50.8: the deck top, overall h
 # raised machined pad DECK_RISE proud of the green casting top, centred on the
 # pad; everything on the pad top outside it is the green land at GREEN_TOP.
 # The deck top stays at STACK_HEIGHT, so nothing seated on the deck moves.
-DECK_RISE = 3.0
-GREEN_TOP = STACK_HEIGHT - DECK_RISE  # 47.8: green land, socket mouths
-DECK_LENGTH = 334.0  # x -167.0..+167.0 (the nameplate's west edge is 4.0 inside)
-DECK_LAND = 7.0  # green land in front of and behind the deck (z)
-DECK_WIDTH = TOP_WIDTH - 2.0 * DECK_LAND  # 260.5: z -130.25..+130.25
+DECK_RISE = 3.048  # .12
+GREEN_TOP = STACK_HEIGHT - DECK_RISE  # 1.88: green land, socket mouths
+DECK_LENGTH = 334.264  # 13.16 (the nameplate's west edge is .16 inside)
+DECK_LAND = 7.112  # .28 green land in front of and behind the deck (z)
+DECK_WIDTH = TOP_WIDTH - 2.0 * DECK_LAND  # 10.25
 DECK_HALF_X = DECK_LENGTH / 2.0
 DECK_HALF_Z = DECK_WIDTH / 2.0
 # Plan corners 1/4 in, the casting's rounded-corner language (the photographed
-# black panel reads round-cornered); the top edge takes a 1/32 in x 45 break,
-# half the plates' 1/16 in rim break, so 2.2 of the 3.0 step stays square.
+# black panel reads round-cornered); the top edge takes a .03 x 45 break,
+# half the plates' .06 rim break, so most of the .12 step stays square.
 DECK_CORNER_R = 0.25 * MM_PER_IN  # 6.35
-DECK_EDGE_BREAK = MM_PER_IN / 32.0  # 0.79375 legs
+DECK_EDGE_BREAK = 0.762  # .03 legs
 
 # Underside lightening (same ruling): one cored pocket from the underside
 # inside a POCKET_WALL perimeter wall, its ceiling POCKET_SKIN under the deck
@@ -68,33 +74,36 @@ DECK_EDGE_BREAK = MM_PER_IN / 32.0  # 0.79375 legs
 # RIB_RELIEF above the underside. All 18 deck seats are through-tapped through
 # the retained skin and exit into pocket air; no deck-seat islands remain.
 # Each column socket retains its full-height boss merged into the walls.
-POCKET_WALL = 12.0
-POCKET_HALF_X = TOP_LENGTH / 2.0 - POCKET_WALL  # 210.25
-POCKET_HALF_Z = TOP_WIDTH / 2.0 - POCKET_WALL  # 125.25
-# Owner-selected through-tap section: lower the pocket ceiling1mm, keeping
-# the existing .X height chain. Worst full form is13−3×0.8−2×0.25=10.10mm,
-# above the largest seat's1.5D=9.525 without changing hardware or tolerances.
-POCKET_SKIN = 13.0
-POCKET_CEILING_Y = STACK_HEIGHT - POCKET_SKIN  # 37.8: also the pocket depth
-GREEN_SKIN = GREEN_TOP - POCKET_CEILING_Y  # 10.0
-RIB_THICKNESS = 10.0
-# Whole-rib relocation, not local seat notches: the 10 mm cross rib spans
-# X=6..16, still joins both end walls and the long rib at Z=0. Its native
-# CrossRibX dimension locates the west face from the common table origin.
-CROSS_RIB_CENTER_X = 11.0
-RIB_RELIEF = 3.0  # rib bottoms clear the bench by this much
-SOCKET_BOSS_DIA = 41.5
-CROSS_TAP_LUG_BOTTOM_Y = 26.5
+POCKET_WALL = 11.938  # .47
+POCKET_HALF_X = TOP_LENGTH / 2.0 - POCKET_WALL
+POCKET_HALF_Z = TOP_WIDTH / 2.0 - POCKET_WALL
+# Owner-selected through-tap section: the pocket ceiling sits POCKET_SKIN
+# under the deck, so every through seat keeps 1.5D of full form at the
+# printed limits without changing hardware or tolerances.
+POCKET_SKIN = 12.954  # .51
+POCKET_CEILING_Y = STACK_HEIGHT - POCKET_SKIN  # 1.49: also the pocket depth
+GREEN_SKIN = GREEN_TOP - POCKET_CEILING_Y  # .39
+RIB_THICKNESS = 9.906  # .39
+# Whole-rib relocation, not local seat notches: the cross rib spans
+# X=.240 to .630, still joins both end walls and the long rib at Z=0. Its native
+# CrossRibX dimension (9.24) locates the west face from the common table origin.
+CROSS_RIB_CENTER_X = 11.049  # .435
+RIB_RELIEF = 3.048  # .12 rib bottoms clear the bench by this much
+SOCKET_BOSS_DIA = 41.402  # 1.63
+CROSS_TAP_LUG_BOTTOM_Y = 26.416  # 1.04
 CROSS_TAP_LUG_WIDTH = 27.0
-CROSS_TAP_LUG_LENGTH = 37.0
-# The cross-tap lugs retain their original inner X face (189.0), independently
-# of the removed deck-seat boss diameter.
-CROSS_TAP_LUG_INNER_X = COLUMN_X - 8.0
+# The lugs' inner faces are fabricated stations on the .01 grid (Lug1X/Lug3X
+# 1.56 / 16.44 and Lug1Y/Lug0Y 2.70 / 8.61 print them), independent of the
+# column line: inner X .316 inside the snapped column line, and the unprinted
+# length runs from the inner Z face to the column line.
+CROSS_TAP_LUG_INNER_X = 188.976  # 7.44
+CROSS_TAP_LUG_INNER_Z = 75.057  # 2.955
+CROSS_TAP_LUG_LENGTH = abs(FRAME_FRONT_COLUMN_Z) - CROSS_TAP_LUG_INNER_Z
 # ONE radius for every vertical reentrant pocket corner: the socket-boss
 # junctions (PocketFillets) and the rib/lug corners (PocketCornerFillets)
-# print as one "R6.0 MAX". Smaller radii, down to sharp, are permissible;
+# print as one "R.23 MAX". Smaller radii, down to sharp, are permissible;
 # through-seat engagement therefore never relies on fillet-added metal.
-POCKET_CORNER_FILLET_R = 6.0
+POCKET_CORNER_FILLET_R = 5.842  # .23
 # swTolMAX prints the nominal then "MAX", so the model sits at the max: any
 # smaller fillet, down to sharp, keeps every wall the proof checked.
 POCKET_FILLET_TOL_TYPE = 6  # swTolType_e.swTolMAX
@@ -110,14 +119,18 @@ if abs(BOTTOM_CENTER_Z) > 1e-12 or abs(TOP_CENTER_Z) > 1e-12:
 # The registry Finish field owns the paint and its masking, so each roughness
 # symbol carries the grade alone; there are no locally masked feet.
 SURFACE_FINISHES = (
-    SurfaceFinishControl("deck", SEAT_UM, PlanarFace((0, 1, 0), STACK_HEIGHT)),
-    SurfaceFinishControl("underside", SEAT_UM, PlanarFace((0, -1, 0), 0.0)),
+    SurfaceFinishControl(
+        "deck", SEAT_UM, PlanarFace((0, 1, 0), STACK_HEIGHT), display_unit=UNIT
+    ),
+    SurfaceFinishControl(
+        "underside", SEAT_UM, PlanarFace((0, -1, 0), 0.0), display_unit=UNIT
+    ),
 )
 
 # --- Column sockets: the frame interface this casting owns -----------------
 # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the four sockets LOCATE the frame on the base --
 # each column tube is matched to its own bore for a close hand-slip fit, and
-# the deck's Ra 3.2 stops at the deck plane -- so every bore is a seat that
+# the deck's Ra 125 uin stops at the deck plane -- so every bore is a seat that
 # MUST be cut on a casting the title block otherwise leaves as CAST/MACHINED.
 # These controls belong to the part SPEC rather than to the build recipe: a
 # sheet may only take a surface-finish control from a ``*_spec`` module, so a
@@ -151,6 +164,7 @@ SOCKET_BORE_FINISHES = tuple(
         SEAT_UM,
         CylinderFace(COLUMN_SOCKET_DIAMETER, contains_x_mm=x, contains_z_mm=z),
         production_method=SOCKET_BORE_TARGET,
+        display_unit=UNIT,
     )
     for x, z in COLUMN_SOCKET_XZ
 )
@@ -186,20 +200,20 @@ def pivot_seat_step(tag: str) -> str:
     )
 
 # Both heights are baselines from the same faced underside, never a chain
-# through the flange thickness and deck rise (#1321). Their ordinary .X
-# title-block bands stay unchanged.
+# through the flange thickness and deck rise (#1321). Both print the
+# title block's .XX band.
 HEIGHT_REFERENCE_DIMENSIONS = ("GreenTopHeight", "CrossScrewAxisHeight")
 HEIGHT_REFERENCE_CALLOUTS = {
     "GreenTopHeight": "GREEN LAND\nFROM UNDERSIDE",
     "CrossScrewAxisHeight": "CROSS-SCREW AXIS\nFROM FLANGE\nUNDERSIDE",
 }
-CROSS_SCREW_TOP_LAND_MIN_MM = 2.0
+CROSS_SCREW_TOP_LAND_MIN_MM = WALL_TARGET_MM
 
 
 def cross_screw_top_land_worst_case_mm(
     axis_height_mm: float, spotface_diameter_mm: float, linear_band_mm: float
 ) -> float:
-    """Green-land ligament above a spotface at the printed .X limits.
+    """Green-land ligament above a spotface at the printed limits.
 
     Both heights start on the faced underside. Neither the independent
     flange thickness nor the deck rise adds another height-stack term.
@@ -256,76 +270,79 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`), so the MODEL
 # owns them: build_fr_harmonic_base applies this map to the .SLDPRT and
-# draw_fr_harmonic_base only reads it back. Everything on this casting is held to
-# the title block's general .X band, except the explicitly banded dimensions.
-# The spotface depth prints the modelled plane exactly -- 4.25, two places;
-# rounding it would misstate its limits. The pedestal-to-pivot offsets also
-# retain the two-place nominal formerly printed in the setup note, with their
-# own PIVOT_SEAT_POSITION_BAND_MM on each model dimension.
+# draw_fr_harmonic_base only reads it back. Sizes, plain chamfers and the
+# underside lug/rib/pocket stations print the title block's .XX; a dimension
+# prints .XXX only where its nominal is a .001-grid frame column station (the
+# cross-tap Xs), where its own band is stated (the spotface depth) or where
+# another subsystem's band reads it (the pivot seat offsets). The spotface
+# diameter .35 prints .XX: the top-land proof already charges the .010 band.
+# No fabricated dimension prints .X.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "BottomProfile": {"BottomLen": 1, "BottomWid": 1},
-    "TopProfile": {"TopLen": 1, "TopWid": 1},
-    "BottomPlate": {"BottomThickness": 1},
-    "PadCorners": {"PadCornerRadius": 1},
-    "FlangeCorners": {"FlangeCornerRadius": 1},
-    "DeckProfile": {"DeckLen": 1, "DeckWid": 1},
-    "Deck": {"DeckRise": 1},
-    "DeckCorners": {"DeckCornerRadius": 1},
-    "DeckEdgeBreak": {"DeckEdgeChamfer": 1},
-    "HeightReference": dict.fromkeys(HEIGHT_REFERENCE_DIMENSIONS, 1),
-    "CrossTapReference": {"CrossTapX": 1, "CrossTapFarX": 1},
-    # The plan stations from X0 Y0 print their modelled nominal: the 1/4 in
-    # flange reveal makes 6.35, 13.35 and 18.35, which one place would misstate.
+    "BottomProfile": {"BottomLen": 2, "BottomWid": 2},
+    "TopProfile": {"TopLen": 2, "TopWid": 2},
+    "BottomPlate": {"BottomThickness": 2},
+    "PadCorners": {"PadCornerRadius": 2},
+    "FlangeCorners": {"FlangeCornerRadius": 2},
+    "DeckProfile": {"DeckLen": 2, "DeckWid": 2},
+    "Deck": {"DeckRise": 2},
+    "DeckCorners": {"DeckCornerRadius": 2},
+    "DeckEdgeBreak": {"DeckEdgeChamfer": 2},
+    "HeightReference": dict.fromkeys(HEIGHT_REFERENCE_DIMENSIONS, 2),
+    "CrossTapReference": {"CrossTapX": 3, "CrossTapFarX": 3},
     "PlanReference": {
         "PadX": 2,
         "PadY": 2,
-        "DeckX": 1,
+        "DeckX": 2,
         "DeckY": 2,
         "PocketX": 2,
         "PocketY": 2,
     },
-    "PivotSeatReference": dict.fromkeys(PIVOT_SEAT_DIMENSIONS, 2),
-    "TopRimBreaks": {"TopRimChamfer": 1},
-    "BottomEdgeBreak": {"BottomEdgeChamfer": 1},
-    "BaseSpotFaceRearProfile": {"SpotFaceDia": 1},
-    "BaseSpotFaceRear": {"SpotFaceDepth": 2},
-    "PocketProfile": {"PocketLen": 1, "PocketWid": 1},
-    "Pocket": {"PocketDepth": 1},
-    "SocketBossProfile": {"SocketBossDia": 1},
+    # Flow-through offsets from the MHA-DT-02 seats, with their own band.
+    "PivotSeatReference": dict.fromkeys(PIVOT_SEAT_DIMENSIONS, 3),
+    "TopRimBreaks": {"TopRimChamfer": 2},
+    "BottomEdgeBreak": {"BottomEdgeChamfer": 2},
+    "BaseSpotFaceRearProfile": {"SpotFaceDia": 2},
+    "BaseSpotFaceRear": {"SpotFaceDepth": 3},
+    "PocketProfile": {"PocketLen": 2, "PocketWid": 2},
+    "Pocket": {"PocketDepth": 2},
+    "SocketBossProfile": {"SocketBossDia": 2},
     "LongRibProfile": {
-        "LongRibThickness": 1,
-        **dict.fromkeys(UNDERSIDE_LOCATION_DIMENSIONS["LongRibProfile"], 1),
+        "LongRibThickness": 2,
+        **dict.fromkeys(UNDERSIDE_LOCATION_DIMENSIONS["LongRibProfile"], 2),
     },
     "CrossRibProfile": {
-        "CrossRibThickness": 1,
-        **dict.fromkeys(UNDERSIDE_LOCATION_DIMENSIONS["CrossRibProfile"], 1),
+        "CrossRibThickness": 2,
+        **dict.fromkeys(UNDERSIDE_LOCATION_DIMENSIONS["CrossRibProfile"], 2),
     },
-    "LongRib": {"RibRelief": 1},
+    "LongRib": {"RibRelief": 2},
     "CrossTapLugProfile": dict.fromkeys(
-        UNDERSIDE_LOCATION_DIMENSIONS["CrossTapLugProfile"], 1
+        UNDERSIDE_LOCATION_DIMENSIONS["CrossTapLugProfile"], 2
     ),
-    "CrossTapLugs": {"LugBottom": 1},
-    "PocketFillets": {"PocketFilletRadius": 1},
+    "CrossTapLugs": {"LugBottom": 2},
+    "PocketFillets": {"PocketFilletRadius": 2},
 }
+# The native hole table prints its X/Y LOC cells .XXX: the flow-through
+# stations other subsystems own are not on the .01 grid.
+HOLE_TABLE_PRECISION = 3
 
-# The overall 50.8 (GreenTopHeight + DeckRise) and the pocket skins are pure
+# The overall 2.00 (GreenTopHeight + DeckRise) and the pocket skins are pure
 # REFERENCE dimensions: read-only sums/differences of model-owned heights,
 # parenthesised, with no tolerance or model dimension of their own.
 # Their places are therefore
 # not a tolerance statement -- but they are still specification, so the PART
 # owns the digit and the sheet passes it through instead of writing a literal.
-DRAWING_REFERENCE_PRECISION = 1
+DRAWING_REFERENCE_PRECISION = 2
 
 # A spotface only has to clean the cast face under a screw head: deeper is
 # harmless, shallower leaves an unfaced ring the head would rock on, so the
-# general .X band is wrong in one direction here. The model carries the band.
-SPOTFACE_DEPTH_BAND_MM = (0.5, 0.0)  # (upper, lower) deviations, like _fit_deviations
+# general band is wrong in one direction here. The model carries the band.
+SPOTFACE_DEPTH_BAND_MM = (0.508, 0.0)  # +.020/0 (upper, lower), like _fit_deviations
 
 # The MHA-FR-01 pivot seat is located from the MHA-DT-02 pedestal seats in one
 # setup (Main ruling 2026-10-10), +- this band. cone_set_stack books the same
 # value as its pivot-seat-position term, so the sheet prints what the stack
 # assumes.
-PIVOT_SEAT_POSITION_BAND_MM = 0.05
+PIVOT_SEAT_POSITION_BAND_MM = 0.0508  # .002
 
 _PRECISION_NAMES = [
     (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
@@ -340,8 +357,13 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
+if min(DRAWING_PRECISION_BY_NAME.values()) < 2:
+    raise AssertionError("a fabricated base dimension prints .X")
+# Every location and size prints .XX or .XXX, so the .XX band bounds each
+# term of the import-time wall, land and engagement proofs.
+LINEAR_BAND_MM = printed_band_mm(2, unit=UNIT)
 
-# No Manufacturing Notes block. The one note it carried, a 1.0 MIN finished
+# No Manufacturing Notes block. The one note it carried, a minimum finished
 # land between each bore and the casting edge, put a dimension in a note; the
 # land is now a design guarantee that build_fr_harmonic_base proves at import
 # from every tolerance the sheet prints (hb-render-4 eye pass).
@@ -349,4 +371,5 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 
 # Base/frame parts carry no datums or feature-control frames under the drawing
 # simplicity policy.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {}
+GEOMETRIC_TOLERANCES_IN: dict[str, str] = {}
+GEOMETRIC_TOLERANCES_MM = {k: float(v) * MM_PER_IN for k, v in GEOMETRIC_TOLERANCES_IN.items()}

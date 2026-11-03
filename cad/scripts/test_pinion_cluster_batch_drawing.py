@@ -433,7 +433,7 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
                 "fr-frame-1/fr-top-frame-1",
             )
         )
-        assert top[pair] == pytest.approx(_annulus_limit(3.18262, 3.165, 12.0))
+        assert top[pair] == pytest.approx(_annulus_limit(3.18262, 3.1496, 11.938))
     assert not any(
         "sm-vn-knife-mount-dowel" in name for pair in summing for name in pair
     )
@@ -503,16 +503,16 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 12.4221875,
             ),
             # MHA-FR-VN-53 / 90280A837: #10-32 major 4.826, #21 drill 4.0386.
-            # The 44.45-mm shank crosses a 25.5-mm socket. Its shortest
-            # socket chord is 25.039163803929238 mm at the major envelope,
-            # leaving at most 19.410836196070765 mm in both casting walls.
+            # The 44.45-mm shank crosses a 25.5016-mm (1.004) socket. Its
+            # shortest socket chord is 25.04079324941604 mm at the major
+            # envelope, leaving at most 19.409206750583962 mm in both casting walls.
             **_expected_numbered_pairs(
                 "fr-vn-frame-cross-screw",
                 range(1, 5),
                 "fr-harmonic-base",
                 4.826,
                 4.0386,
-                19.410836196070765,
+                19.409206750583962,
             ),
             **_expected_numbered_pairs(
                 "fr-vn-frame-cross-screw",
@@ -520,7 +520,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "fr-top-frame",
                 4.826,
                 4.0386,
-                19.410836196070765,
+                19.409206750583962,
             ),
             # MHA-FR-VN-52 / 91410A540: spot face 21.0 from the bore axis to the
             # cup tip 8.15 from it (12.5 to the O17 bore wall + 0.35).
@@ -533,7 +533,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "fr-harmonic-base",
                 2.8448,
                 2.261,
-                4.85,
+                4.7498,
             ),
         },
         "mg-magnifier": {
@@ -759,7 +759,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 for number in (1, 2)
             },
             # Owner ruling 2026-10-24 (T+H3): 98381A473 at its largest
-            # (3.18262) pressed 12.0 up into the smallest Ø3.165 crossbar
+            # (3.18262) pressed .47 up into the smallest Ø.1240 crossbar
             # ream (the models are line to line); four in the one crossbar.
             # In sm-summing each pin slips in its knife mount: no pair there.
             **_expected_numbered_pairs(
@@ -767,8 +767,8 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 range(1, 5),
                 "fr-frame-1/fr-top-frame",
                 3.18262,
-                3.165,
-                12.0,
+                3.1496,
+                11.938,
             ),
             **_expected_numbered_pairs(
                 "mg-magnifier-1/mg-vn-magnifying-bracket-screw",
@@ -826,7 +826,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 2.261,
                 8.725,
             ),
-            # The unchanged pedestal screw inserts14.05, but only13.0 of
+            # The unchanged pedestal screw inserts14.05, but only12.954 of
             # retained skin overlaps; its tip protrudes into the pocket.
             **_expected_numbered_pairs(
                 "dt-drive-train-1/dt-vn-pedestal-hold-down-screw",
@@ -834,7 +834,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "fr-frame-1/fr-harmonic-base",
                 4.1656,
                 3.454,
-                13.0,
+                12.954,
             ),
             **_expected_numbered_pairs(
                 "ch-channel-1/ch-vn-frame-side-screw",

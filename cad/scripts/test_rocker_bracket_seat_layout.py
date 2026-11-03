@@ -65,16 +65,16 @@ def test_top_level_contract_literals_match_the_layout() -> None:
 
 def test_seat_stack_margins() -> None:
     # The printed worst case, restated: every margin the layout asserts.
-    assert seats.ENGAGEMENT_MIN == pytest.approx(7.959, abs=1e-3)
+    assert seats.ENGAGEMENT_MIN == pytest.approx(7.955, abs=1e-3)
     assert seats.ENGAGEMENT_MIN >= 1.5 * seats.SCREW_MAJOR_DIA
-    assert seats.SEAT_THREAD_DEPTH - seats.LINEAR_1PL - seats.SCREW_REACH_MAX == (
-        pytest.approx(0.667, abs=1e-3)
+    # Both depths print at .XX on the support's inch sheet (.46, .59).
+    assert seats.SEAT_DEPTH_BAND == seats.LINEAR_2PL == pytest.approx(0.254)
+    assert seats.SEAT_THREAD_DEPTH - seats.SEAT_DEPTH_BAND - seats.SCREW_REACH_MAX == (
+        pytest.approx(1.397, abs=1e-3)
     )
-    assert (seats.SEAT_THREAD_DEPTH, seats.SEAT_DRILL_DEPTH) == (11.5, 14.7)
+    assert seats.SEAT_THREAD_DEPTH == pytest.approx(0.46 * 25.4)
+    assert seats.SEAT_DRILL_DEPTH == pytest.approx(0.59 * 25.4)
     assert seats.SEAT_DRILL_NAME == "#29"
-    # The print carries each depth row at .X.
-    for value in (seats.SEAT_DRILL_DEPTH, seats.SEAT_THREAD_DEPTH):
-        assert round(value, 1) == value
 
 
 def test_seat_thread_keeps_the_web_wall_at_the_printed_worst_case() -> None:
@@ -86,9 +86,9 @@ def test_seat_thread_keeps_the_web_wall_at_the_printed_worst_case() -> None:
     assert support.WEB is seats.WEB
     assert 2.0 * seats.WEB == pytest.approx(12.70)  # 1/2 in
     assert (seats.WEB_PLACES, seats.TOP_FLAT_PLACES) == (2, 2)
-    assert seats.TOP_FLAT_EDGE_FROM_WEB == pytest.approx(8.4665 - 6.35)
+    assert seats.TOP_FLAT_EDGE_FROM_WEB == pytest.approx(0.08 * 25.4)
     # The support's sheet prints its flat edges and web at its .XX.
-    assert seats.TOP_FLAT_EDGE_BAND == seats.LINEAR_2PL == pytest.approx(0.51)
+    assert seats.TOP_FLAT_EDGE_BAND == seats.LINEAR_2PL == pytest.approx(0.254)
     # The hole off the foot's flush side: nearest at .64 - .01 wide and
     # .32 + .01 off the far side, farthest the other way round.
     near_hole = (16.256 - 0.254) - (8.128 + 0.254)
@@ -98,16 +98,16 @@ def test_seat_thread_keeps_the_web_wall_at_the_printed_worst_case() -> None:
     # An 11/64 transfer punch in the #8 close hole at its +.004 drilled max.
     punch = (4.572 + 0.1016 - 11.0 / 64.0 * 25.4) / 2.0
     assert seats.PUNCH_FLOAT == pytest.approx(punch, abs=1e-3)
-    # Toward the near face: the flush edge at 2.12 + 0.51 off it.
-    near = near_hole - (2.1165 + 0.51) - punch
-    # Toward the far face: the edge at 2.12 - 0.51, the web 12.70 - 0.51.
-    far = (12.70 - 0.51) - (far_hole + punch - (2.1165 - 0.51))
+    # Toward the near face: the flush edge at .08 + .01 off it.
+    near = near_hole - (2.032 + 0.254) - punch
+    # Toward the far face: the edge at .08 - .01, the web 12.70 - 0.254.
+    far = (12.70 - 0.254) - (far_hole + punch - (2.032 - 0.254))
     assert seats.SEAT_FROM_NEAR_FACE_MIN == pytest.approx(near, abs=1e-3)
     assert seats.SEAT_FROM_FAR_FACE_MIN == pytest.approx(far, abs=1e-3)
     wall = min(near, far) - seats.SCREW_MAJOR_DIA / 2.0
     assert wall == pytest.approx(seats.WEB_WALL_MIN, abs=1e-3)
-    assert wall == pytest.approx(2.76, abs=0.01)
-    assert far - seats.SCREW_MAJOR_DIA / 2.0 == pytest.approx(2.92, abs=0.01)
+    assert wall == pytest.approx(3.10, abs=0.01)
+    assert far - seats.SCREW_MAJOR_DIA / 2.0 == pytest.approx(3.35, abs=0.01)
     assert wall >= seats.RULE12_WEB_TARGET
 
 
@@ -133,14 +133,14 @@ def test_seat_thread_keeps_the_end_wall_at_the_worst_transferred_position() -> N
     transferred from the bracket's hole, whose station is given from the
     fit-up-set ear face (user, 2026-10-10, option ii), so only the station's
     band moves it -- not the foot length's -- and the end face moves by half
-    the support length's .X band. The end face is the casting's LENGTH end
+    the support length's .XX band. The end face is the casting's LENGTH end
     (SUPPORT_HALF_MACHINE_Z off its centre), not its height."""
     for x, wall in zip(seats.SEAT_LOCAL_X, seats.END_WALL_MIN, strict=True):
         assert wall == pytest.approx(
             (support_spec.SUPPORT_HALF_MACHINE_Z - abs(x))
             - seats.SCREW_MAJOR_DIA / 2.0
             - bracket.STATION_BAND
-            - seats.LINEAR_1PL / 2.0
+            - seats.LINEAR_2PL / 2.0
         )
         assert wall >= seats.RULE12_WEB_TARGET
 
@@ -214,10 +214,10 @@ def test_hold_down_station_is_given_from_the_ears_inboard_face() -> None:
 def test_one_foot_fits_both_ends_of_the_support_and_places_its_hole() -> None:
     """#1341 option A: one bracket on both sides. Its foot ends at the nearer
     (south) support end face, its length on the printed grid so it never
-    overhangs, and 1.62 short of the north one; the free run is too short
-    (.320 ears beside the 1/32 thrust washers) to centre the hole, so it sits
-    mid-way between the head-to-ear and seat end-wall limits, a window both
-    sides share."""
+    overhangs, and 1.80 short of the north one; the free run is too short
+    (.320 ears beside the 1/32 thrust washers) to centre the hole, so its
+    .49 station, held fixed on the printed grid, sits inside the window
+    between the head-to-ear and seat end-wall limits that both sides share."""
     assert sides.OUTBOARD_SIGN == {"S": -1.0, "N": 1.0}
     support_end = {
         name: support_spec.SUPPORT_WORLD_Z
@@ -233,11 +233,11 @@ def test_one_foot_fits_both_ends_of_the_support_and_places_its_hole() -> None:
         for name in sides.SIDES
     }
     assert 0.0 <= overhang_room["S"] < 0.254
-    assert round(overhang_room["N"], 2) == 1.62
+    assert round(overhang_room["N"], 2) == 1.80
+    # The fixed .49 station (#1371 review) stays inside the shared window,
+    # whose limits already charge the station and length bands.
     assert sides.HOLE_Z_MIN <= sides.HOLE_Z <= sides.HOLE_Z_MAX
-    # Mid-window, the printed station on the .XX grid (#1371 review).
-    mid = (sides.HOLE_Z_MIN + sides.HOLE_Z_MAX) / 2.0
-    assert abs(sides.HOLE_STATION - (mid - bracket.FOOT_Z0)) <= 0.127
+    assert sides.HOLE_STATION == pytest.approx(0.49 * 25.4)
     assert (round(sides.FOOT_LEN, 3), round(sides.HOLE_STATION, 3)) == (17.78, 12.446)
 
 

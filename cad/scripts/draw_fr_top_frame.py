@@ -94,6 +94,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+from _title_block_units import LENGTH_UNITS
 from build_fr_top_frame import (
     BAR_POCKET_Z,
     BAR_WEB_X0,
@@ -155,9 +156,8 @@ from fr_top_frame_spec import (
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     EDGE_CHAMFER,
-    GEOMETRIC_TOLERANCES_MM,
+    GEOMETRIC_TOLERANCES_IN,
     HANGER_CLEARANCE_DIA,
-    HANGER_CLEARANCE_DIA_BAND,
     HANGER_CLEARANCE_DIA_PLACES,
     HANGER_GRIP,
     HANGER_KNOCKOUT_CALLOUT_ABOVE,
@@ -175,10 +175,13 @@ from fr_top_frame_spec import (
     KEEPER_TAP_CALLOUT_PRECISION,
     PIN_HOLE_NEG_X,
     PIN_HOLE_X,
-    PRINTED_LINEAR_BAND_MM,
+    SCREW_AXIS_BELOW_RAIL_TOP,
+    SCREW_AXIS_Y,
     STUD_Z_FRONT,
     STUD_Z_REAR,
     SURFACE_FINISHES,
+    UNIT,
+    printed_limit,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -233,9 +236,9 @@ DETAIL_TOP_SCALE = SHEET_SCALES["HOLES-SOCKETS"]
 GEOMETRY_VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
 DETAIL_VIEW_SCALE = DETAIL_TOP_SCALE[0] / DETAIL_TOP_SCALE[1]
 
-# Plan extents including the Ø45 corner bosses: the straight rails stop
-# at x +/-214.1 / z +/-131.0, bosses at +/-219.5 / +/-134.5 -> 439 x 269.
-# The boss stack stays 47.3 tall around the unchanged 36.5 rail band.
+# Plan extents including the Ø1.77 corner bosses: the straight rails stop
+# at x +/-214.10 / z +/-131.06, bosses at +/-219.48 / +/-134.49.
+# The boss stack stays 1.87 tall around the 1.437 rail band.
 PLAN_HALF_X = COLUMN_X + BOSS_DIA / 2.0
 PLAN_HALF_Z = abs(FRONT_COLUMN_Z) + BOSS_DIA / 2.0
 GEOMETRY_PLAN_HALF_W = PLAN_HALF_X * GEOMETRY_VIEW_SCALE / 1000.0
@@ -471,7 +474,9 @@ BOSS_ABOVE_RAIL_LINE_XY = (
 )
 # Above the dimension's own upper arrow, not 51 mm below it -- see the
 # boss-height comment in the A-A recipe for what the long leader crossed.
-BOSS_ABOVE_RAIL_TEXT_XY = (BOSS_ABOVE_RAIL_LINE_XY[0] + 0.0135, 0.176)
+# Its 36.5 mm row ends 2.2 mm short of the recess depth's "+.012" (farm
+# inspect-3: 1.43 at +0.0135).
+BOSS_ABOVE_RAIL_TEXT_XY = (BOSS_ABOVE_RAIL_LINE_XY[0] + 0.0127, 0.176)
 # The A-A witnesses off the boss top, the recess floor and the rail top
 # start this far past the +Z boss's outer face, never across its cut face.
 A_A_WITNESS_STANDOFF = 0.0012
@@ -483,14 +488,13 @@ BORE_CHAMFER_TEXT_OFFSET_XY = (0.315, 0.174)
 # A-A's joint note. The near wall between the flush counterbore floor and
 # the socket bore only starts the thread; the far casting wall carries the
 # MHA-FR-VN-53 joint. drawing-guidelines.md rule 17 (walls and webs), print-worst: the stock shank, less the most
-# outboard printed floor (16.35 + band) and the largest printed socket radius.
+# outboard printed floor (.644 + band) and the largest printed socket radius.
 _SOCKET_DIA_PLACES = DRAWING_PRECISION["BoreProfile"]["B0Dia"]
 CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT = (
     CROSS_SCREW_SHANK_LEN
     - COUNTERBORE_MAX_FLOOR_OFFSET
-    - (round(BORE_DIA, _SOCKET_DIA_PLACES) + PRINTED_LINEAR_BAND_MM[_SOCKET_DIA_PLACES])
-    / 2.0
-)  # 14.4
+    - printed_limit(BORE_DIA, _SOCKET_DIA_PLACES, 1.0) / 2.0
+)
 if CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT < 1.5 * CROSS_SCREW_SHANK_DIA:
     raise AssertionError(
         "far casting wall engages MHA-FR-VN-53 under 1.5D at the printed bands"
@@ -558,7 +562,7 @@ VIEW_G_ARROW = (
 )
 HUB_LEFT_TITLE = f"VIEW {VIEW_LETTER}\nSCALE {HUB_LEFT_SCALE[0]}:{HUB_LEFT_SCALE[1]}"
 HUB_LEFT_TITLE_XY = (0.128, 0.0455)
-HUB_LEFT_NOTE = "INNER RIB BOTTOM, GUSSETS SHARP\nOUTER RIB BOTTOM BESIDE BOSS SHARP"
+HUB_LEFT_NOTE = "INNER RIB BOTTOM, GUSSETS SHARP"
 HUB_LEFT_NOTE_XY = (0.093, 0.030)
 
 # Sheet 6: the underside locator at the title block's own scale and the
@@ -574,7 +578,8 @@ HUB_BOTTOM_NOTE = "BOTTOM VIEW\nBAR/GUSSET BOTTOMS AT\nSEATS SHARP"
 HUB_DETAIL_CENTER = (0.300, 0.174)
 HUB_DETAIL_SCALE = (2, 1)
 HUB_DETAIL_CAPTION_XY = (0.300, 0.090)
-HUB_BOSS_DIA_TEXT_XY = (0.210, 0.100)
+# 5 mm right of its first stand: F-F's grip value row ends 3 mm short of it.
+HUB_BOSS_DIA_TEXT_XY = (0.215, 0.100)
 # The 28.0 rail pad, RibProfile's native width (a Top-plane sketch, so it
 # imports into this view from below), where its two faces are drawn: farm
 # run 20261027T195317391Z measured them on J at y 146.0 and 202.0 mm, x
@@ -609,7 +614,7 @@ HUB_GUSSET_T_OFFSET_XY = (0.390, 0.243)
 # downward, left of both, and passes under nothing.  The dimension line runs
 # at y 145 between them, arrows inside (8 mm), the text parked right on a jog
 # where the 73.0's block stood.
-LAND_END_TEXT_XY = (0.11317, 0.145)
+LAND_END_TEXT_XY = (0.11321, 0.145)
 LAND_TEXT_OFFSET_XY = (0.155, 0.145)
 LAND_END_CALLOUT = "4X LAND END FROM\nCROSSBAR FACE, EACH SIDE"
 # The faced underside plane's linked note C (top-left point).  The bands
@@ -654,9 +659,10 @@ def _hanger_section_xy(x: float, y: float) -> tuple[float, float]:
     )
 
 
-# Right of the profile, nested: the 36.50 grip, its text on its line 3.2 mm
-# right of the gussets' cut end, then the depth all four reams share, its
-# text beside its line clear of both (HANGER_PIN_DEPTH_OFFSET_XY).  The grip's
+# Right of the profile, nested: the 36.50 grip, its line 3.2 mm right of the
+# gussets' cut end and its text on a stub above the depth's
+# (HANGER_GRIP_OFFSET_XY), then the depth all four reams share, its text
+# beside its line clear of both (HANGER_PIN_DEPTH_OFFSET_XY).  The grip's
 # extension lines leave from its attachment beyond the profile's right end
 # (x 149.5 mm on farm run 20261027T143609236Z, when it stood left of the
 # profile and they ran across the whole underside), so on the right they no
@@ -693,20 +699,22 @@ HANGER_PIN_SPAN_TEXT_XY = _hanger_section_xy(
 )
 HANGER_PIN_SPAN_OFFSET_XY = (0.100, 0.1200)
 HANGER_PIN_SPAN_ABOVE = "2X"
-# The depth's value and its two rows (the flat floor and its corner limit,
-# codjiflo round 4) are three rows, more than its 12 mm between extension
+# The depth's value and its three rows (the flat floor and its corner limit,
+# codjiflo round 4) are four rows, more than its 12 mm between extension
 # lines holds, so they park beside its line on a level stub at the ream's
 # mid-depth.  Farm run 20261027T175429300Z measured the native form: the
 # rows centred on the offset x, the value 2.78 mm above the offset y, the
-# first row 2.78 mm under it, the last 8.33 mm under it on the underline
-# the stub meets at its near end; "CORNER R0.1 MAX" runs 41.94 mm.  With
-# the line 34.5 mm right of the gussets' cut end that block ran to x 230,
-# 14 mm into the title block (layout audit keep-out, the dimension's box
-# reaching down to its floor witness at y 50.4), so the line now stands
-# 19.6 mm right of the cut end, its upper tail 2.1 mm right of the 36.50's
-# text, and the block starts 2 mm right of it, its last row level with the
-# stub, and ends 4.8 mm short of the title block.
-HANGER_PIN_DEPTH_OFFSET_XY = (0.19025, 0.07108)
+# rows 5.56 mm apart under it from 2.78 mm, the last on the underline the
+# stub meets at its near end; "CORNER R0.1 MAX" ran 41.94 mm, so the inch
+# corner limit takes its own row ("CORNER R.003 MAX" would overrun the
+# band).  With the line 34.5 mm right of the gussets' cut end that block
+# ran to x 230, 14 mm into the title block (layout audit keep-out, the
+# dimension's box reaching down to its floor witness at y 50.4), so the line
+# now stands 19.6 mm right of the cut end, its upper tail 2.1 mm right of
+# the grip's text, and the block starts 2 mm right of it, its last row
+# level with the stub (one row higher for the fourth), and ends short of
+# the title block.
+HANGER_PIN_DEPTH_OFFSET_XY = (0.19025, 0.07664)
 HANGER_SECTION_KEEP = {
     "HangerPinHoleDepth": _hanger_section_xy(
         BAR_X1 + HANGER_SECTION_GUSSET_REACH + 19.6,
@@ -728,7 +736,10 @@ HANGER_SECTION_KEEP = {
 # farm run 20261027T143609236Z's position frames: 7.0 + 16.12 + 6.63 mm.
 HANGER_FLOOR_DATUM = "A"
 HANGER_FLOOR_DATUM_PICK_X = BAR_X0 - 7.5
-HANGER_FLOOR_DATUM_SYMBOL_XY = (0.100, 0.047)
+HANGER_FLOOR_DATUM_SYMBOL_XY = (
+    _hanger_section_xy(HANGER_FLOOR_DATUM_PICK_X, 0.0)[0],
+    0.047,
+)
 HANGER_PERP_LANDING = (PIN_HOLE_X - HANGER_PIN_HOLE_DIA / 2.0, -HALF_H + 3.0)
 HANGER_PERP_FRAME_XY = (0.14335, 0.0455)
 HANGER_PERP_FRAME_OUTLINE = (0.0, -0.0070, 0.02975, 0.0)
@@ -738,11 +749,22 @@ HANGER_PERP_FRAME_QUANTITY = "4X"
 # both from one selection).  Since the faced top, the ream sketch's
 # diameter has not reached F-F, which sees the reams edge-on, even imported
 # apart from the grip (d8fac576, leaf 20261014T212023Z-1-90af84a0).
-# The grip prints bare under the title block's .XX band (owner ruling
-# 2026-10-18: MHA-SM-VN-52 is cut to the measured grip at SM-00).
+# The grip prints under the title block's .XXX band (owner ruling
+# 2026-10-18: MHA-SM-VN-52 is cut to the measured grip at SM-00) and names
+# the bolt whose grip it is (machinist review: a three-place size states
+# its function).  Its two rows are wider than the 14.7 mm between the
+# profile and the depth's rows, so they park on a stub above the depth's
+# ".47": the native linear OffsetText form (rows centred on the offset x,
+# the value's baseline on the offset y, the underline the widest row's
+# width 5.56 mm under it) puts the 46.1 mm row at x 160.5..206.6 on
+# y 88.0, 2.3 over the ".47" and 2.9 under the boss's Ø1.18 underline, and
+# the value 4.0 under the reams' station underline (y 100.4) and 3.0 left
+# of the Ø1.18 row.  The stub climbs from the grip line's mid (x 158.15).
+HANGER_GRIP_CALLOUT = "MHA-SM-VN-52 GRIP"
+HANGER_GRIP_OFFSET_XY = (0.18355, 0.0936)
 HANGER_SECTION_CALLOUTS = {
     "HangerPinHoleDepth": HANGER_PIN_DEPTH_CALLOUT,
-    "HangerGrip": "",
+    "HangerGrip": HANGER_GRIP_CALLOUT,
 }
 HANGER_SECTION_CAPTION_XY = (0.120, 0.031)
 # Sheet 6, UNDERSIDE locator (1:3, model x right and z up from the view
@@ -1356,45 +1378,32 @@ def _set_hanger_hole_callout(display: Any) -> None:
         {"hw-diam": HANGER_CLEARANCE_DIA_PLACES},
         label="hanger clearance diameter",
     )
-    _tolerance_hanger_callout_clearance(display)
+    _clear_hanger_callout_band(display)
 
 
-def _tolerance_hanger_callout_clearance(display: Any) -> None:
-    """Publish/read back the model's unilateral band on its native variable.
+def _clear_hanger_callout_band(display: Any) -> None:
+    """The through diameter takes the title block's DRILLED HOLES band.
 
     SDK ICalloutVariable.ToleranceType, not IDimensionTolerance.Type, owns
-    multivalue-callout rendering (2016+). Length/tolerance values use native
-    SI units; the variable remains attached to the Hole Wizard diameter.
+    multivalue-callout rendering (2016+): set it to none and read it back,
+    so the callout restates no band (machinist review: rule 2).
     """
     from win32com.client.dynamic import Dispatch as dynamic_dispatch
 
     # Concrete callout interfaces alias the generic metadata DISPIDs.
     variables = [
-        (raw, dynamic_dispatch(raw._oleobj_))
+        dynamic_dispatch(raw._oleobj_)
         for raw in display.GetHoleCalloutVariables() or ()
     ]
     matches = [
-        (raw, variable) for raw, variable in variables
+        variable for variable in variables
         if str(variable.VariableName) == "hw-diam"
     ]
     if len(matches) != 1:
         raise RuntimeError("hanger callout lacks one native through-diameter variable")
-    raw, variable = matches[0]
-    lower_m, upper_m = (value/1000.0 for value in (
-        min(HANGER_CLEARANCE_DIA_BAND), max(HANGER_CLEARANCE_DIA_BAND),
-    ))
-    variable.ToleranceType = 2  # swTolType_e.swTolBILAT, +0.13/0
-    variable.ToleranceMin = lower_m
-    variable.ToleranceMax = upper_m
-    length = _early_bound(raw, "ICalloutLengthVariable")
-    length.TolerancePrecision = HANGER_CLEARANCE_DIA_PLACES
-    if (
-        int(variable.ToleranceType) != 2
-        or abs(float(variable.ToleranceMin)-lower_m) > 1e-9
-        or abs(float(variable.ToleranceMax)-upper_m) > 1e-9
-        or int(length.TolerancePrecision) != HANGER_CLEARANCE_DIA_PLACES
-    ):
-        raise RuntimeError("native hanger through-diameter callout band did not persist")
+    matches[0].ToleranceType = 0  # swTolType_e.swTolNONE
+    if int(matches[0].ToleranceType) != 0:
+        raise RuntimeError("native hanger through-diameter callout kept a band")
 
 
 def _require_model_hanger_grip(adapter: Any, dimensions: list[Any]) -> Any:
@@ -1402,7 +1411,7 @@ def _require_model_hanger_grip(adapter: Any, dimensions: list[Any]) -> Any:
 
     Read-only. The model owns the dimension -- the crossbar's full-height
     extrude depth, driven by RingHeight -- and authors no band on it: the
-    title block's .XX band governs (owner ruling 2026-10-18: MHA-SM-VN-52 is
+    title block's .XXX band governs (owner ruling 2026-10-18: MHA-SM-VN-52 is
     cut to the measured grip at SM-00).  A lost association, a drifted value
     or a band of its own raises here.
     """
@@ -1422,7 +1431,7 @@ def _require_model_hanger_grip(adapter: Any, dimensions: list[Any]) -> Any:
         raise RuntimeError(f"F-F grip reads {value_mm:.6f} mm, not {HANGER_GRIP}")
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     if int(tolerance.Type) != 0:  # swTolType_e.swTolNONE
-        raise RuntimeError("F-F grip carries a band; the title block's .XX governs")
+        raise RuntimeError("F-F grip carries a band; the title block's .XXX governs")
     return grips[0]
 
 
@@ -2155,6 +2164,7 @@ def _hub_boss_section(adapter: Any, parent_view: Any) -> Any:
     leftover construction midlines had to be hunted down and whose position
     had to be re-derived from the cropped outline.)
     """
+    _pin_sheet_scale(adapter)
     line = [
         model_point_in_view(
             adapter, parent_view, (x/1000.0, 0.0, z/1000.0),
@@ -2198,7 +2208,8 @@ def _hub_boss_section(adapter: Any, parent_view: Any) -> Any:
         (
             ((GOOSENECK_X, -HALF_H-HUB_BOSS_DROP-2.0, GOOSENECK_Z),
              (GOOSENECK_X, HALF_H+2.0, GOOSENECK_Z)),
-            ((SET_BOSS_FACE_X-2.0, 0.0, GOOSENECK_Z), (-INNER_X+2.0, 0.0, GOOSENECK_Z)),
+            ((SET_BOSS_FACE_X-2.0, SCREW_AXIS_Y, GOOSENECK_Z),
+             (-INNER_X+2.0, SCREW_AXIS_Y, GOOSENECK_Z)),
         ),
     )
     # The cut plane runs through the tap axis, so the boss face, the spot face
@@ -2275,6 +2286,7 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
     Returns the view and its imported dimensions.
     """
     z = HANGER_SECTION_Z
+    _pin_sheet_scale(adapter)
     line = [
         model_point_in_view(
             adapter, parent_view, (x/1000.0, 0.0, z/1000.0),
@@ -2364,7 +2376,11 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
     _require_model_hanger_grip(adapter, dimensions)
     set_dimension_callouts(adapter, dimensions, HANGER_SECTION_CALLOUTS)
     offset_dimension_text(
-        adapter, dimensions, {"HangerPinHoleDepth": HANGER_PIN_DEPTH_OFFSET_XY}
+        adapter, dimensions,
+        {
+            "HangerPinHoleDepth": HANGER_PIN_DEPTH_OFFSET_XY,
+            "HangerGrip": HANGER_GRIP_OFFSET_XY,
+        },
     )
     # Datum A on the faced underside's edge and the reams' perpendicularity
     # to it (HANGER_PERP_FRAME_XY): the -X frames on the locator keep B|C.
@@ -2397,7 +2413,7 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
         leader_attach_xy=_hanger_section_xy(*HANGER_PERP_LANDING),
         frame_xy=HANGER_PERP_FRAME_XY,
         characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger press ream perpendicularity"],
+        tolerance=GEOMETRIC_TOLERANCES_IN["knife-hanger press ream perpendicularity"],
         datums=(HANGER_FLOOR_DATUM,),
         diameter=True,
         quantity=HANGER_PERP_FRAME_QUANTITY,
@@ -2418,6 +2434,7 @@ def _hub_underside_detail(adapter: Any, parent_view: Any) -> Any:
     if not drawing.ActivateView(view_name(adapter, parent_view)):
         raise RuntimeError("failed to activate underside detail parent")
     draw.ClearSelection2(True)
+    _pin_sheet_scale(adapter)
     center = model_point_in_view(
         adapter, parent_view,
         (GOOSENECK_X/1000.0, (-HALF_H-HUB_BOSS_DROP)/1000.0, GOOSENECK_Z/1000.0),
@@ -2443,6 +2460,21 @@ def _hub_underside_detail(adapter: Any, parent_view: Any) -> Any:
     detail.ScaleRatio = double_array([float(value) for value in HUB_DETAIL_SCALE])
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="_hub_underside_detail")
+    # The fence's letter stands on its right quadrant, where main's print had
+    # it: the native default on the inch sheet put it on the top quadrant,
+    # on the pocket length's rear extension line (farm inspect-3 audit).
+    circles = tuple(parent.GetDetailCircles() or ())
+    if len(circles) != 1:
+        raise RuntimeError(
+            f"expected one detail fence on the underside, found {len(circles)}"
+        )
+    circle = _early_bound(circles[0], "IDetailCircle")
+    letter_xy = (center[0] + radius, center[1])
+    circle.SetLabelPosition(*letter_xy)  # VT_VOID; read back
+    rebuild_drawing(adapter, label="detail J letter")
+    letter = tuple(float(value) for value in circle.GetLabelPosition())
+    if len(letter) != 2 or math.dist(letter, letter_xy) > 1e-8:
+        raise RuntimeError(f"detail J's letter did not persist: {letter}")
     outline = tuple(float(value) for value in detail.GetOutline())
     position = tuple(float(value) for value in detail.Position)
     if len(outline) != 4 or len(position) != 2:
@@ -2479,14 +2511,15 @@ def _set_callout_text(display: Any, which: int, text: str, label: str) -> None:
         raise RuntimeError(f"{label}: callout text {which} did not persist: {applied!r}")
 
 
-_MOD_DIAM_VALUE = re.compile(r"<MOD-DIAM>(\d+(?:\.\d+)?)")
+# A printed number: an inch sheet drops the leading zero (".1240").
+_MOD_DIAM_VALUE = re.compile(r"<MOD-DIAM>(\d*\.?\d+)")
 
 
 # The whole of a definition part that is nothing but the coaxial step: its
 # diameter, optionally behind the counterbore symbol SolidWorks gives a
 # stepped hole, and, optionally, its own depth.
 _COAXIAL_STEP_PART = re.compile(
-    r"(?:<HOLE-SPOT>\s*)?<MOD-DIAM>(\d+(?:\.\d+)?)(?:\s*<HOLE-DEPTH>\s*\d+(?:\.\d+)?)?\s*"
+    r"(?:<HOLE-SPOT>\s*)?<MOD-DIAM>(\d*\.?\d+)(?:\s*<HOLE-DEPTH>\s*\d*\.?\d+)?\s*"
 )
 
 
@@ -2507,7 +2540,10 @@ def _coaxial_step_holders(
     knockout's size)."""
 
     def _is_step(value: str) -> bool:
-        return math.isclose(float(value), step_dia, abs_tol=0.006)
+        # The callout prints in the sheet's unit; ``step_dia`` is model mm.
+        return math.isclose(
+            float(value) * LENGTH_UNITS[UNIT], step_dia, abs_tol=0.006
+        )
 
     holders = []
     for part, text in definitions.items():
@@ -2787,23 +2823,76 @@ def _add_view_arrow(
     )
 
 
+def _pin_sheet_scale(adapter: Any) -> tuple[float, float]:
+    """Hold the active sheet at its printed scale before a section or detail.
+
+    Inserting model views auto-drifts the sheet scale (finalize_drawing
+    re-pins it before saving), and a native view caption carries its scale
+    field only when its view's scale differs from the sheet's AT CREATION
+    (_section_axis.position_section_caption).  On the inch sheet the drift
+    landed on E-E's own 1:4 (farm leaf b1-fr_top_frame: E-E's caption lost
+    its scale field; in mm the drift had cleared every section's scale), so
+    each caption is made against the scale the title block prints.
+    """
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
+    if sheet is None:
+        raise RuntimeError("no active sheet to pin before a section or detail")
+    name = str(adapter._get_attr_or_call(sheet, "GetName") or "")
+    scale = tuple(float(value) for value in SHEET_SCALES[name])
+    if not sheet.SetScale(scale[0], scale[1], False, False):
+        raise RuntimeError(f"failed to pin sheet {name!r} at {scale[0]:g}:{scale[1]:g}")
+    properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
+    if len(properties) < 4 or (float(properties[2]), float(properties[3])) != scale:
+        raise RuntimeError(f"sheet {name!r} scale did not persist: {properties!r}")
+    return scale
+
+
 def _position_view_caption(
     adapter: Any, view: Any, target: tuple[float, float]
 ) -> None:
-    """Move a native section/detail caption without replacing its linked fields."""
+    """Move a native section/detail caption without replacing its linked fields.
+
+    The caption is found by its label field alone, as
+    ``_section_axis.position_section_caption`` finds it.  It must carry the
+    scale field exactly when its view's scale differs from the sheet's
+    printed one (the title block states the rest; ``_pin_sheet_scale``).
+    A miss lists every note the view owns.
+    """
     view = _early_bound(view, "IView")
     if int(view.Type) not in (2, 3):  # swDrawingSectionView, swDrawingDetailView
         raise RuntimeError("caption target is not a native section or detail")
-    candidates = []
-    for raw_note in view.GetNotes() or ():
-        note = _early_bound(raw_note, "INote")
-        linked_text = str(note.PropertyLinkedText or "")
-        # GetText is blank at this point; the native view-label fields persist.
-        if all(token in linked_text for token in ("<VLNAME>", "<VLLABEL>", "<VLSCALEV>")):
-            candidates.append((note, linked_text))
+    label = view_name(adapter, view)
+    notes = [_early_bound(raw_note, "INote") for raw_note in (view.GetNotes() or ())]
+    # GetText is blank at this point; the native view-label fields persist.
+    candidates = [
+        (note, str(note.PropertyLinkedText or ""))
+        for note in notes
+        if "<VLLABEL>" in str(note.PropertyLinkedText or "")
+    ]
     if len(candidates) != 1:
-        raise RuntimeError(f"expected one native linked view caption, found {len(candidates)}")
+        texts = [
+            (str(note.PropertyLinkedText or ""), str(note.GetText() or "")) for note in notes
+        ]
+        raise RuntimeError(
+            f"expected one native linked view caption on {label!r}, found "
+            f"{len(candidates)} among its notes (linked, text) {texts!r}"
+        )
     note, linked_text = candidates[0]
+    sheet_scale = _pin_sheet_scale(adapter)
+    view_scale = tuple(float(value) for value in view.ScaleRatio)
+    differs = (
+        abs(view_scale[0] / view_scale[1] - sheet_scale[0] / sheet_scale[1]) > 1e-9
+    )
+    _telemetry.info(
+        f"{label} caption {linked_text!r} at {view_scale[0]:g}:{view_scale[1]:g} "
+        f"on a {sheet_scale[0]:g}:{sheet_scale[1]:g} sheet"
+    )
+    if differs and "<VLSCALEV>" not in linked_text:
+        raise RuntimeError(
+            f"{label} caption {linked_text!r} at {view_scale[0]:g}:{view_scale[1]:g} "
+            f"lacks the scale on a {sheet_scale[0]:g}:{sheet_scale[1]:g} sheet"
+        )
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     if not annotation.SetPosition2(*target, 0.0):
         raise RuntimeError("failed to position native view caption")
@@ -3034,7 +3123,8 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout,
+        unit=UNIT,
     )
     _set_precise_curve_quality(adapter)
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="top-frame package")
@@ -3193,6 +3283,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # profile beside an identical twin 80 mm away carrying nothing.
     cut_ends = section_cut_ends()
     rail_cut_x = cut_ends["H"][0][0]
+    _pin_sheet_scale(adapter)
     rail_cut = [
         model_point_in_view(
             adapter, geometry_top, (x/1000.0, 0.0, z/1000.0),
@@ -3285,6 +3376,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # print shows the one side rail it dimensions and the crossbar T beside
     # it, its web and flange dimensioned at the T's own station between the
     # gussets -- not the right rail's identical, unannotated twin.
+    _pin_sheet_scale(adapter)
     side_cut = [
         model_point_in_view(
             adapter, geometry_top, (x/1000.0, 0.0, z/1000.0),
@@ -3313,10 +3405,10 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_mm=WEB_T, orientation="horizontal", exact_linear=True,
         suffix="2X SIDE RAIL WEB", edges=side_section_edges,
     )
-    # The crossbar T: its web below the flange's R3 roots and above the
-    # bottom break, its flange from the top face to the sharp underside's
-    # 3.0 flat outboard of the root.
-    flange_flat_x = (BAR_X0 + BAR_WEB_X0 - ROOT_FILLET_R) / 2.0
+    # The crossbar T: its web below the flange's R.12 roots and above the
+    # bottom break, its flange from the top face to the underside's flat
+    # between its edge break and the root.
+    flange_flat_x = (BAR_X0 + EDGE_CHAMFER + BAR_WEB_X0 - ROOT_FILLET_R) / 2.0
     for p0, p1, expected, xy, offset, orientation, label, qualifier in (
         ((BAR_WEB_X0, 0.0, SIDE_SECTION_Z), (BAR_WEB_X1, 0.0, SIDE_SECTION_Z),
          WEB_T, CROSSBAR_WEB_LINE_XY, CROSSBAR_WEB_TEXT_XY, "horizontal",
@@ -3331,14 +3423,15 @@ async def build(adapter: Any) -> dict[str, str]:
             suffix=qualifier, offset_text=offset, edges=side_section_edges,
         )
     # The pockets either side of the web, as the underside's 138.0 names
-    # them: their depth from the flange underside's flat to the T's underside.
+    # them: their depth from the flange underside's flat to the T's
+    # underside, the 1.437 grip less the .32 flange -- a reference.
     pocket_depth = _checked_dimension(
         adapter, side_section,
         p0=(flange_flat_x, FLANGE_BOT_Y, SIDE_SECTION_Z), p1=(HANGER_X, -HALF_H, SIDE_SECTION_Z),
         text_xy=CROSSBAR_POCKET_DEPTH_LINE_XY, label="crossbar pocket depth",
         expected_mm=FLANGE_BOT_Y + HALF_H, orientation="vertical", exact_linear=True,
         suffix="2X POCKET", offset_text=CROSSBAR_POCKET_DEPTH_TEXT_XY,
-        edges=side_section_edges,
+        edges=side_section_edges, reference=True,
     )
     pocket_depth.ArrowSide = _DIM_ARROWS_INSIDE
     if int(pocket_depth.ArrowSide) != _DIM_ARROWS_INSIDE:
@@ -3347,7 +3440,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if add_note(
         adapter,
         "E-E: LEFT SIDE RAIL AND CROSSBAR T\nRIGHT RAIL IDENTICAL; T WEB CENTRED\n"
-        "UNDER FLANGE; CROSSBAR FLANGE UNDERSIDE SHARP",
+        "UNDER FLANGE",
         *SIDE_SECTION_NOTE_XY,
     ) is None:
         raise RuntimeError("failed to identify the cut side rail and crossbar T")
@@ -3493,7 +3586,7 @@ async def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=hanger_center_landing_xy,
         frame_xy=HANGER_CENTER_FRAME_XY,
         characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger crossbar centring"],
+        tolerance=GEOMETRIC_TOLERANCES_IN["knife-hanger crossbar centring"],
         datums=("D",), quantity=HANGER_CENTER_QUALIFIER,
         label="hanger axes on crossbar median plane",
     )
@@ -3627,6 +3720,7 @@ async def build(adapter: Any) -> dict[str, str]:
         *DETAIL_FRONT_CENTER,
         scale=DETAIL_FRONT_SCALE,
     )
+    _pin_sheet_scale(adapter)
     cut_x = model_point_in_view(
         adapter,
         detail_front,
@@ -3662,7 +3756,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _screw_axis, *bore_axes = _add_view_centerlines(
         adapter, detail_section,
         (
-            ((COLUMN_X, 0.0, -PLAN_HALF_Z), (COLUMN_X, 0.0, PLAN_HALF_Z)),
+            ((COLUMN_X, SCREW_AXIS_Y, -PLAN_HALF_Z), (COLUMN_X, SCREW_AXIS_Y, PLAN_HALF_Z)),
             ((COLUMN_X, -HALF_H-BOSS_BELOW-3.0, FRONT_COLUMN_Z),
              (COLUMN_X, HALF_H+BOSS_ABOVE+3.0, FRONT_COLUMN_Z)),
             ((COLUMN_X, -HALF_H-BOSS_BELOW-3.0, REAR_COLUMN_Z),
@@ -3807,7 +3901,7 @@ async def build(adapter: Any) -> dict[str, str]:
         center_tol_mm=1e-4, radius_tol_mm=1e-4,
     ).edge
     front_tap_edge = detail_front_edges.circle_at(
-        (COLUMN_X, 0.0, TOP_SCREW_SEAT_Z), SIDE_TAP_DRILL_DIA/2, axis=(0.0, 0.0, 1.0),
+        (COLUMN_X, SCREW_AXIS_Y, TOP_SCREW_SEAT_Z), SIDE_TAP_DRILL_DIA/2, axis=(0.0, 0.0, 1.0),
         label="front view column cross-tap circle",
     ).edge
     section_floor_edges = [
@@ -3886,20 +3980,22 @@ async def build(adapter: Any) -> dict[str, str]:
         label="front/rear column-retention taps",
         # The native "2X" is the count in THIS view (one tap per end on the
         # face shown); the process states the total once and where every
-        # depth starts.  The 46.0 thread and 49.2 drill depths are the
+        # depth starts.  The 1.81 thread and 1.94 drill depths are the
         # requirement, no tool named (machinist review r1).
         process=CROSS_TAP_CALLOUT,
     )
+    # Drill diameters print three places (.159, the #21), the depths .XX.
     set_hole_callout_precision(
-        cross_tap_callout, {"hw-tapdrldepth": 1, "hw-threaddepth": 1},
-        label="cross tap depths",
+        cross_tap_callout,
+        {"hw-tapdrldia": 3, "hw-tapdrldepth": 2, "hw-threaddepth": 2},
+        label="cross tap drill and depths",
     )
     _checked_dimension(
         adapter, detail_front,
         p0=(COLUMN_X, HALF_H+BOSS_ABOVE, REAR_COLUMN_Z),
-        p1=(COLUMN_X+SIDE_TAP_DRILL_DIA/2, 0.0, TOP_SCREW_SEAT_Z),
+        p1=(COLUMN_X+SIDE_TAP_DRILL_DIA/2, SCREW_AXIS_Y, TOP_SCREW_SEAT_Z),
         text_xy=(0.2605, 0.229), label="cross screw axis from boss top",
-        expected_mm=HALF_H+BOSS_ABOVE, orientation="vertical", center=True,
+        expected_mm=HALF_H+BOSS_ABOVE-SCREW_AXIS_Y, orientation="vertical", center=True,
         # Two taps per column end, opposed across the boss, at both ends of
         # the casting: the count a machinist sets up from is the total.
         suffix="TAP AXIS BELOW BOSS TOP",
@@ -3990,9 +4086,15 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, hub_top,
         p0=(-COLUMN_X, HALF_H+BOSS_ABOVE, FRONT_COLUMN_Z),
         p1=(GOOSENECK_X, HALF_H, GOOSENECK_Z),
-        text_xy=(0.040, 0.225), label="hub from left front socket",
+        # x 36.5, not 40: the qualifier's "MHA-SM-00" row ended 0.34 mm from
+        # view G's letter (farm 1db35fba4 read "MHA-SM-00G"); 3.5 mm left
+        # leaves 3.8 of air and 6.9 to the sheet border.
+        text_xy=(0.0365, 0.225), label="hub from left front socket",
         expected_mm=GOOSENECK_Z-FRONT_COLUMN_Z, orientation="vertical",
         center=True, entities=(left_socket_edge, gooseneck_edge),
+        # The summing axis's station, flowing through at .XXX (machinist
+        # review: a three-place location names what it serves).
+        suffix="ON MHA-SM-00\nSUMMING AXIS",
     )
     set_hidden_lines_removed(adapter, detail_left)
     detail_left_edges = scan_view_edges(detail_left, label="hub side")
@@ -4012,12 +4114,12 @@ async def build(adapter: Any) -> dict[str, str]:
         ):
             rail_top_edge = item.edge
     set_tap_edge = detail_left_edges.circle_at(
-        (tap_x, 0.0, GOOSENECK_Z), tap_radius, axis=(1.0, 0.0, 0.0),
+        (tap_x, SCREW_AXIS_Y, GOOSENECK_Z), tap_radius, axis=(1.0, 0.0, 0.0),
         label="left view set-tap circle",
     ).edge
     if rail_top_edge is None:
         raise RuntimeError("left view has no exact upper rail edge at the gooseneck station")
-    add_native_hole_callout(
+    set_tap_callout = add_native_hole_callout(
         adapter,
         detail_left,
         edge=set_tap_edge,
@@ -4035,12 +4137,26 @@ async def build(adapter: Any) -> dict[str, str]:
         label="gooseneck set-screw through-to-bore tap",
         process="TAP",
     )
+    # The #7 tap drill prints three places (.201), as drill diameters do. A
+    # through-tap callout names its drill <hw-tapdrldia> or <hw-thrutapdrldia>
+    # depending on the end condition; the callout text says which.
+    definitions = "\n".join(str(set_tap_callout.GetText(part) or "") for part in (5, 6, 7, 8))
+    drill_variables = [
+        name for name in ("hw-tapdrldia", "hw-thrutapdrldia") if f"<{name}>" in definitions
+    ]
+    if len(drill_variables) != 1:
+        raise RuntimeError(f"gooseneck set-tap callout drill variables: {drill_variables}")
+    set_hole_callout_precision(
+        set_tap_callout,
+        {drill_variables[0]: 3},
+        label="gooseneck set-tap drill",
+    )
     _checked_dimension(
         adapter, detail_left,
         p0=(-OUTER_X, HALF_H, GOOSENECK_Z),
-        p1=(tap_x, 0.0, GOOSENECK_Z+tap_radius),
+        p1=(tap_x, SCREW_AXIS_Y, GOOSENECK_Z+tap_radius),
         text_xy=(0.230, 0.1125), label="set screw axis from rail top",
-        expected_mm=HALF_H, orientation="vertical", center=True,
+        expected_mm=SCREW_AXIS_BELOW_RAIL_TOP, orientation="vertical", center=True,
         suffix="FROM RAIL TOP\nON BORE CENTRE",
         entities=(rail_top_edge, set_tap_edge), offset_text=(0.252, 0.1125),
     )
@@ -4253,7 +4369,7 @@ async def build(adapter: Any) -> dict[str, str]:
             leader_attach_xy=hanger_ream_rim(ream_centre, knee),
             frame_xy=HANGER_REAM_FRAME_XY[station],
             characteristic="position",
-            tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger press ream position"],
+            tolerance=GEOMETRIC_TOLERANCES_IN["knife-hanger press ream position"],
             datums=datums,
             translated=datums[1:],
             diameter=True,
