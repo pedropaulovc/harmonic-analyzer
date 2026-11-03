@@ -199,18 +199,22 @@ def test_settings_are_derived_from_the_placed_geometry() -> None:
     assert spec.COUNTER_SCREW_RISE == pytest.approx(
         spec.COUNTER_SCREW_POINT[1] - spec.KNIFE_POINT[1]
     )
-    # Exact boss-face travel each way at the free-rock floor, rounded up.
+    # Exact boss-face travel each way at the free-rock floor; the one gauge
+    # is read both ways, so it rounds up the larger.
     arm = (
         spec.BOSS_FACE_POINT[0] - spec.KNIFE_POINT[0],
         spec.BOSS_FACE_POINT[1] - spec.KNIFE_POINT[1],
     )
     floor = math.radians(builder.KNIFE_FREE_ROCK_FLOOR_DEG)
-    exact = min(
+    up, down = (
         abs(arm[0] * math.sin(a) + arm[1] * (math.cos(a) - 1.0))
         for a in (floor, -floor)
     )
-    assert exact <= spec.BOSS_ROCK_TRAVEL < exact + 0.01
-    assert spec.BOSS_ROCK_TRAVEL == pytest.approx(7.46)
+    assert (up, down) == pytest.approx((7.488135, 7.454717), abs=5e-6)
+    for exact in (up, down):
+        assert exact <= spec.BOSS_ROCK_TRAVEL
+    assert spec.BOSS_ROCK_TRAVEL < max(up, down) + 0.0254  # one .001 in step
+    assert spec.BOSS_ROCK_TRAVEL == pytest.approx(7.493)  # .295
     assert builder.KNIFE_FREE_ROCK_WORST_DEG >= spec.KNIFE_FREE_ROCK_FLOOR_DEG
     assert notes.LEVEL_TOLERANCE_DEG == _config.title_block("angular")["value_deg"]
 

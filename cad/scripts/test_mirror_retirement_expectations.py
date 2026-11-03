@@ -12,6 +12,7 @@ cross-checked against the restored fixed crank axis.
 from __future__ import annotations
 
 import ast
+import math
 from pathlib import Path
 
 import pytest
@@ -303,10 +304,11 @@ def test_moved_screw_row_stays_coaxial_without_moving_the_installed_bodies() -> 
             local + origin
             for local, origin in zip(clearance, joint.BRACKET_ORIGIN, strict=True)
         ))
-        assert screw[:2] == pytest.approx((
-            pilot[0] + joint.LEVER_ORIGIN_X,
-            pilot[1] + magnifier.LEVER_ROD_Y,
-        ))
+        # The lever's tap sits at the nearest .001 in to the bracket station.
+        assert math.hypot(
+            screw[0] - (pilot[0] + joint.LEVER_ORIGIN_X),
+            screw[1] - (pilot[1] + magnifier.LEVER_ROD_Y),
+        ) <= joint.LEVER_STATION_OFFSET_MAX + 1e-9
         assert pilot[2] + magnifier.SUMMING_Z == pytest.approx(joint.SEAT_PLANE_Z)
         assert screw[2] + joint.SIDE_PLATE_THICKNESS == pytest.approx(
             joint.SEAT_PLANE_Z,

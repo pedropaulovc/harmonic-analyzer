@@ -2,7 +2,7 @@
 
 The installed top face and spring row stay fixed. The matched bracket/receiver
 row is located from that actual top by the joint contract. Each positive-X rib
-flank is the common tangent of the origin-centred wrap and a concave R1
+flank is the common tangent of the origin-centred wrap and a concave R.040
 runout into its coefficient-plate face. No tangent coordinate is a design knob.
 Line/circle boundary integrals give exact areas and first moments: these are
 ideal prismatic unions, excluding native cap-root and longitudinal body fillets.
@@ -15,19 +15,25 @@ from functools import cached_property
 from itertools import product
 import math
 
+from _printed_tolerance import printed_deviations
 import magnifying_bracket_joint_layout as joint
 import sm_summing_lever_spec as spec
 
 Point = tuple[float, float]
 
 # PlateProfile.PlateTopY independently drives CoefficientTopY: unlike the old
-# centred slab, it takes the WHOLE ordinary .XX band, not half the thickness
-# band. joint.LINEAR_BAND is the printed title_block.yaml +/-0.51 mm, which
-# conservatively covers the native 0.02 in (0.508 mm). Also enclose .XX nominal
-# rounding; the current 2.54 mm native/printed top needs no extra allowance.
-PLATE_TOP_Y_ALLOWANCE = joint.LINEAR_BAND + abs(
-    round(spec.COEFFICIENT_TOP_Y, 2) - spec.COEFFICIENT_TOP_Y
+# centred slab, it takes a whole band of its own, not half the thickness band.
+# The sheet locates the top .10 (.XX) below the knife ridge, which stands half
+# the .404 (.XXX) vertex height above the axis; the boss top's .28 only
+# narrows it. The allowance is that chain's larger printed excursion.
+_RIDGE = tuple(
+    d / 2.0
+    for d in printed_deviations(spec.HEX_H, spec.KNIFE_ENVELOPE_PLACES, unit=spec.UNIT)
 )
+_RIDGE_TO_TOP = printed_deviations(
+    spec.HEX_H / 2.0 - spec.COEFFICIENT_TOP_Y, 2, unit=spec.UNIT
+)
+PLATE_TOP_Y_ALLOWANCE = max(_RIDGE_TO_TOP[1] - _RIDGE[0], _RIDGE[1] - _RIDGE_TO_TOP[0])
 
 
 @dataclass(frozen=True)
@@ -325,10 +331,11 @@ class ReceiverPilotWallBudget:
 def receiver_pilot_wall_budget() -> tuple[ReceiverPilotWallBudget, ...]:
     """Pilot walls with ordinary shape bands and correlated receiver locations.
 
-    Width, wrap and reach each take +/-0.51. The R1 MAX runout independently
-    spans 0..1. The independent PlateTopY takes PLATE_TOP_Y_ALLOWANCE and
-    thickness independently +/-0.51. The receiver row is +/-0.05 from the ACTUAL
-    top, just as each X station is from the ACTUAL free edge: their shifts
+    Width, wrap, reach and thickness each take their printed limits
+    (``spec.*_DEVIATIONS``). The R.040 MAX runout independently spans
+    0..R.040. The independent PlateTopY takes PLATE_TOP_Y_ALLOWANCE. The
+    receiver row is +/-POSITION_BAND from the ACTUAL top, just as each X
+    station is from the ACTUAL free edge: their shifts
     are shared, not charged again as independent axis motion. The radius is
     the larger native/printed pilot plus its diameter allowance and deepest
     drill wander. These are longitudinal walls within a rib's span only;
@@ -336,10 +343,7 @@ def receiver_pilot_wall_budget() -> tuple[ReceiverPilotWallBudget, ...]:
     the connected plate beyond that rib. Neither budget guarantees finished
     thread walls, native geometry or strength.
     """
-    pilot_radius = (
-        max(joint.TAP_DRILL_DIA, round(joint.TAP_DRILL_DIA, 2))
-        + joint.DRILLED_DIAMETER_PLUS
-    ) / 2.0
+    pilot_radius = joint.receiver_pilot_radius_max()
     pilot_wander = math.tan(math.radians(joint.DRILL_WANDER_DEG)) * (
         joint.DRILL_DEPTH_MAX + pilot_radius * joint.DRILL_POINT_H
     )
@@ -347,14 +351,18 @@ def receiver_pilot_wall_budget() -> tuple[ReceiverPilotWallBudget, ...]:
     points = joint.LEVER_HOLE_POINTS
     values = [[math.inf, math.inf, math.inf] for _ in points]
     witnesses = [[(), (), ()] for _ in points]
+
+    def limit(nominal: float, deviations: tuple[float, float], side: float) -> float:
+        return nominal + deviations[side > 0.0]
+
     for dr, dx, db, dw, dt, dh in product((-1.0, 1.0), repeat=6):
         top = spec.COEFFICIENT_TOP_Y + dt * PLATE_TOP_Y_ALLOWANCE
-        thickness = spec.COEFFICIENT_T + dh * joint.LINEAR_BAND
+        thickness = limit(spec.COEFFICIENT_T, spec.COEFFICIENT_T_DEVIATIONS, dh)
         profile = RibProfile(
-            wrap_radius=spec.RIB_WRAP_R + dr * joint.LINEAR_BAND,
-            reach=spec.RIB_REACH + dx * joint.LINEAR_BAND,
+            wrap_radius=limit(spec.RIB_WRAP_R, spec.RIB_WRAP_R_DEVIATIONS, dr),
+            reach=limit(spec.RIB_REACH, spec.RIB_REACH_DEVIATIONS, dx),
             blend_radius=spec.RIB_BLEND_R * (db + 1.0) / 2.0,
-            plate_width=spec.PLATE_W + dw * joint.LINEAR_BAND,
+            plate_width=limit(spec.PLATE_W, spec.PLATE_W_DEVIATIONS, dw),
             top_y=top, bottom_y=top - thickness,
         )
         for index, (nominal_x, nominal_y, _) in enumerate(points):

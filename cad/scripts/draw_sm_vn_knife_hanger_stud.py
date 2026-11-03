@@ -53,6 +53,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_serialized_note_identity import capture_serialized_note_name
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _mcmaster_92314a253 import DIMS as _SUPPLIER_DIMS
 from _layout_audit import annotation_geometry, calibrate_sheet_advance, display_box
 from _layout_geometry import Box, segment_box_distance
@@ -79,11 +80,15 @@ from sm_vn_knife_hanger_stud_spec import (
     LENGTH,
     SHANK_DIA,
     SUPPLIER_DRAWING_DIMENSIONS,
+    SUPPLIER_THREAD_MAJOR_Y,
     SUPPLIER_REFERENCE_DIMENSIONS,
     SUPPLIER_STOCK_CONFIGURATION,
     SUPPLIER_STOCK_TITLE,
     THREAD_LENGTH_MIN,
+    UNIT,
 )
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["sm_vn_knife_hanger_stud"]
 SOURCE = SPEC.source
@@ -133,6 +138,21 @@ CHAMFER_TEXT_XY = (0.157, TIP_SHEET_Y - 0.014)
 # the head-top edge, the note stands up and right in the open field.
 HEAD_PICK_MM = (HEAD_AF / 4, HEAD_TOP_Y, 0.0)
 PURCHASED_NOTE_XY = (0.130, 0.240)
+# The head AF text stands left of the hex, outside both extension lines
+# (its ~20 mm "HEAD AF" line is wider than the 16 mm head between them).
+HEAD_AF_TEXT_XY = (0.085, 0.255)
+# The three-row thread-major text stands right of the shank; its dimension
+# line runs under the lowest row, 8.23 mm below the text position (run
+# 74ae886: text at y .194 printed its line at .18577). Raising the text that
+# far above the chord's station lays the dimension line on the chord, with
+# its arrows on the thread outline and no extension lines down the shank.
+_THREAD_MAJOR_LINE_BELOW_TEXT = 0.00823
+THREAD_MAJOR_TEXT_XY = (
+    0.170,
+    TIP_SHEET_Y
+    + SUPPLIER_THREAD_MAJOR_Y * _SHEET_PER_MODEL_MM
+    + _THREAD_MAJOR_LINE_BELOW_TEXT,
+)
 # Every view and the sheet are 2:1, so the title-block SCALE is the view
 # scale and the isometric carries no scale label.
 ISO_CENTER = (0.340, 0.135)
@@ -422,7 +442,7 @@ def _add_supplier_references(adapter: Any, front: Any) -> dict[str, Any]:
         label="SupplierHeadAF",
     )
     display = add_edge_dimension(
-        adapter, front, p0=picks[0], p1=picks[1], text_xy=(0.110, 0.255),
+        adapter, front, p0=picks[0], p1=picks[1], text_xy=HEAD_AF_TEXT_XY,
         label="SupplierHeadAF", orientation="horizontal",
     )
     authored = {
@@ -433,7 +453,7 @@ def _add_supplier_references(adapter: Any, front: Any) -> dict[str, Any]:
         "SupplierHeadHeight",
     )
     references = curate_view_dimensions(
-        adapter, front, keep={"SupplierThreadMajor": (0.170, 0.194)},
+        adapter, front, keep={"SupplierThreadMajor": THREAD_MAJOR_TEXT_XY},
         view_label="nominal supplier thread-major envelope",
         dimensions_by_feature=SUPPLIER_DRAWING_DIMENSIONS,
     )
@@ -1546,7 +1566,8 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter.currentModel, required, required=required
     )
     draw, _sheet = new_project_drawing(
-        adapter, property_view=SPEC.artifact_stem, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter, property_view=SPEC.artifact_stem, scale=SHEET_SCALE, layout=SPEC.layout,
+        unit=UNIT,
     )
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="finished and original knife-hanger stock")
     if not _early_bound(draw, "IDrawingDoc").ActivateSheet(SHEET_NAMES[0]):

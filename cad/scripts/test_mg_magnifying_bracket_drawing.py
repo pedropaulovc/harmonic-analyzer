@@ -108,8 +108,8 @@ def test_overall_precision_bands_do_not_loosen_receiver_or_move_nominal_geometry
     assert mounting.SIDE_PLATE_LENGTH_DEVIATIONS == pytest.approx((-0.85, 0.75))
     assert mounting.SIDE_PLATE_HEIGHT_DEVIATIONS == pytest.approx((-0.8, 0.8))
     assert mounting.LINEAR_BAND == 0.51  # receiver/depth authority is unchanged
-    assert mounting.COUNTERBORE_END_WALL_MIN == pytest.approx(7.0)
-    assert mounting.COUNTERBORE_HEIGHT_WALL_MIN == pytest.approx(2.79)
+    assert mounting.COUNTERBORE_END_WALL_MIN == pytest.approx(6.9992)
+    assert mounting.COUNTERBORE_HEIGHT_WALL_MIN == pytest.approx(2.7892)
     assert mounting.GRIP_MIN == pytest.approx(3.045)
     assert mounting.GRIP + mounting.GRIP_BAND == pytest.approx(3.305)
 
@@ -190,8 +190,12 @@ def test_only_clearance_row_moves_with_the_matching_plate_taps() -> None:
         strict=True,
     ):
         assert clearance[0] + mounting.BRACKET_ORIGIN[0] == pytest.approx(screw[0])
-        assert pilot[0] + mounting.LEVER_ORIGIN_X == pytest.approx(screw[0])
-        assert clearance[1] == pilot[1] == mounting.RECEIVER_ROW_Y
+        # The lever's tap sits at the nearest .001 in to the bracket station.
+        assert math.hypot(
+            pilot[0] + mounting.LEVER_ORIGIN_X - screw[0],
+            pilot[1] - clearance[1],
+        ) <= mounting.LEVER_STATION_OFFSET_MAX + 1e-9
+        assert clearance[1] == mounting.RECEIVER_ROW_Y
         assert clearance[1] + mounting.BRACKET_ORIGIN[1] == pytest.approx(screw[1])
         assert clearance[2] + mounting.BRACKET_ORIGIN[2] == pytest.approx(screw[2])
 

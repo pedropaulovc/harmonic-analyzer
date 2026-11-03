@@ -549,28 +549,30 @@ are the concrete realizations of the classes above, being lifted into `tolerance
 
 - **Summing-lever conventional blind receivers: proof limits.** By explicit
   owner decision, the two **2-56 UNC 2B** taps fasten **MHA-MG-01**, with
-  native **2X Ø1.78 DRILL 6.50** and **4.95 MIN** full thread. The drill
-  retains **+0.10/0 mm** diameter and ordinary **±0.51 mm** depth bands.
+  native **2X Ø.070 DRILL .26** and **.195 MIN** full thread. The drill
+  takes the **+.004/0 in** drilled-hole row and the **.XX ±.01 in** depth band.
   The fixed-top **7.00 mm** slab stays at **Y=−4.46..+2.54 mm**. The owner
   moved only the matched mounting row down **0.71 mm**: receiver coordinates
-  are **3.25 ±0.05 mm below the actual top**, with bracket holes and screws
+  are **.128 ±.002 in (3.2512 ±0.0508 mm) below the actual top** and **1.120 / .581 ±.002 in** from the free edge,
+  the nearest .001 in to the bracket's millimetre stations (at most **0.0075 mm** off, charged
+  to the head and shank float), with bracket holes and screws
   following, while the bracket body/seat and threaded-lever pose remain fixed.
-  All three rib extrusions are **5.00 ±0.51 mm**, sized by one native
-  **3X 5.00** dimension. The drill continues beyond the rib into continuous
+  All three rib extrusions are **5.08 mm**, printed **.20 ±.01 in** by one native
+  **3X .20** dimension. The drill continues beyond the rib into continuous
   plate material; there is no rib-only drill/thread-depth requirement.
   There is no additional finished-cavity envelope or printed wall acceptance.
   `receiver_pilot_material_wall_budget` / `RECEIVER_PILOT_MATERIAL_WALL_MIN`
-  retain the independent **≥2 mm pilot-only connected-material** design floor.
-  The printed pilot radius **0.94 mm** and one deepest 0.3° wander charge
-  (**0.039662 mm**) leave approximately **2.220338 / 2.210338 mm** top/bottom walls.
+  retain the independent **≥.080 in (2.032 mm) pilot-only connected-material** design floor.
+  The printed pilot radius **0.9398 mm** and one deepest 0.3° wander charge
+  (**0.038865 mm**) leave approximately **2.221735 / 2.577335 mm** top/bottom walls.
   `sm_summing_lever_profile.receiver_pilot_wall_budget` /
   `ReceiverPilotWallBudget` bound longitudinal walls against
   `RECEIVER_PILOT_WALL_MIN` using only the printed pilot radius and drill
-  wander, with the full ordinary top/thickness bands and correlated
+  wander, with the printed top/thickness limits and correlated
   actual-top-referenced receiver position. Native trimmed-face clearance
   separately uses **TAP_DRILL_DIA/2**, with actual plate backing checked beyond
   the rib. Pilot volume, end-plane and band checks, drill-lead reserve,
-  usable engagement and screw-tip-gap guards remain. Native **4.95 ±0.05 mm**
+  usable engagement and screw-tip-gap guards remain. Native **4.95 ±0.0508 mm**
   full-thread metadata serves the screw stack, not a maximum cutting reach.
   Pilot/cosmetic-thread geometry does not prove all finished-hole wall thicknesses.
 
@@ -609,13 +611,13 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   trim, then the nut is tightened while holding eye clocking. The uniform
   **7.00 mm** coefficient plate spans local **Y=−4.46..+2.54 mm**; it is
   thickened downward, not recentered. This retains the world top **982.24 mm**,
-  nut seat **975.24 mm**, all twenty stations and the **Ø0.15 RFS** pattern.
+  nut seat **975.24 mm**, all twenty stations and the **Ø.006 RFS** pattern.
   Worst-case anchor sizing retains two full turns beyond the jam nut through
   the 6.49–7.51 mm plate limits. The counter **9490T1 #10-24** keeps its
   boss-through trim and top jam nut; neither counter anchor nor boss pose
   changes. Existing upper lever holes are retained, with no upper pins.
   View G's actual-edge boss-top/coefficient-top location is
-  **9.525−2.54 = 6.985 mm**, printed **6.99** under the ordinary `.XX` band.
+  **9.525−2.54 = 6.985 mm**, printed **.28** under the `.XX` ±.01 in band.
   The **19.05 mm** boss and **5.08 mm** web remain centered on Y=0; the web
   top is flush with the coefficient top. Neither feature is referenced to
   the asymmetric slab midplane. The existing sheet-2 isometric shows the

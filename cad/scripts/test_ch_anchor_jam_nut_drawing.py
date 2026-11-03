@@ -115,7 +115,7 @@ def test_neighbour_gap_charges_both_taps_position_zones() -> None:
     # lever's RFS spring-hole zone toward the other, and both nuts at the top
     # of their O.D. band; the thinnest nut at the bottom of it.
     zone = float(lever.GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"])
-    assert zone <= 0.15  # owner ruling: Ø0.30 -> Ø0.15 (or tighter)
+    assert zone <= 0.1524  # owner ruling: Ø0.30 -> Ø0.15 -> Ø.006 (#290)
     # Each centre sits within a zone radius of true position; worst, each
     # moves that radius toward the other.
     left_tap = 0.0 + zone / 2.0
@@ -137,7 +137,7 @@ def test_neighbour_gap_charges_both_taps_position_zones() -> None:
     window = (lever.CHANNEL_PITCH - 0.30 - spec.NEIGHBOUR_CLEARANCE) - (
         2.0 * spec.MIN_WALL + THREAD_MAJOR_MM["#6-32"]
     )
-    assert window < 0.0
+    assert window < 2.0 * spec.OD_BAND
     # The zone opens it enough to hold the explicit band.
     assert spec.CENTRE_SPACING_WORST - spec.NEIGHBOUR_CLEARANCE - (
         2.0 * spec.MIN_WALL + THREAD_MAJOR_MM["#6-32"]

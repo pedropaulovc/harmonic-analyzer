@@ -8,13 +8,19 @@ import sys
 from typing import Any
 
 import _telemetry
+from _com import _early_bound
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _supplier_nut_drawing import add_supplier_nut_dimensions
 from _supplier_screw_layout import supplier_screw_margins
+from _supplier_text_shelf import assert_supplier_shelves, shelve_supplier_text
 import sm_vn_boss_hook_jam_nut_spec as supplier
 
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["sm_vn_boss_hook_jam_nut"]
 ITEM = "#10-24 NARROW-PROFILE HEX NUT"
@@ -26,6 +32,15 @@ SUPPLIER_MARGINS = supplier_screw_margins(
     sides={"ThreadNominalMajor": "bottom"},
 )
 SUPPLIER_MARGINS["*Right"] = (0.007, 0.018, 0.007, 0.0)
+# The three-line nominal-major callout, the ACROSS FLATS line and the .109 in
+# height print as wide as or wider than their spans, struck by or touching
+# their own witnesses (8cacc84 review): shelve each text right, past its
+# witnesses, at its own height.
+SHELVES = {
+    "ThreadNominalMajor": (True, "right"),
+    "AcrossFlats": (True, "right"),
+    "Height": (True, "right"),
+}
 
 
 def _supplier_dimensions(
@@ -45,16 +60,49 @@ def _supplier_dimensions(
     )
 
 
+def _shelf_displays(views: dict[str, Any]) -> dict[str, Any]:
+    """FRONT's nominal-major chord and AF, and RIGHT's one height dimension."""
+
+    def displays(name: str) -> list[tuple[str, Any]]:
+        found = []
+        display = _early_bound(views[name], "IView").GetFirstDisplayDimension6()
+        while display is not None:
+            display = _early_bound(display, "IDisplayDimension")
+            dimension = _early_bound(display.GetDimension2(0), "IDimension")
+            found.append((str(dimension.FullName).split("@")[0], display))
+            display = display.GetNext5()
+        return found
+
+    front = displays("*Front")
+    nominal = [d for name, d in front if name == "ThreadNominalMajor"]
+    flats = [d for name, d in front if name != "ThreadNominalMajor"]
+    height = [d for _, d in displays("*Right")]
+    if len(nominal) != 1 or len(flats) != 1 or len(height) != 1:
+        raise RuntimeError("boss hook jam nut: shelved references are not unique")
+    return {
+        "ThreadNominalMajor": nominal[0],
+        "AcrossFlats": flats[0],
+        "Height": height[0],
+    }
+
+
 async def build(adapter: Any) -> dict[str, str]:
     authored_checks: list[Callable[[], None]] = []
+    stations: dict[str, Any] = {}
+    shelved_views: dict[str, Any] = {}
 
     def supplier_dimensions(target: Any, views: dict[str, Any]) -> None:
         authored_checks.append(_supplier_dimensions(target, views))
+        shelved_views.update(views)
+        stations.update(shelve_supplier_text(target, _shelf_displays(views), SHELVES))
 
     def assert_settled() -> None:
         if len(authored_checks) != 1:
             raise RuntimeError("supplier nut annotations must be authored exactly once")
         authored_checks[0]()
+        assert_supplier_shelves(
+            adapter, _shelf_displays(shelved_views), SHELVES, stations
+        )
 
     # Every purchased view is hidden-lines-removed (rule 9), which also clears
     # the dashed bore the r6/r7 reviews flagged in the TOP/RIGHT views.
@@ -65,6 +113,7 @@ async def build(adapter: Any) -> dict[str, str]:
         supplier_dimensions=supplier_dimensions,
         supplier_margins=SUPPLIER_MARGINS,
         settled_checks=(assert_settled,),
+        unit=part_drawing_unit("sm-vn-boss-hook-jam-nut"),
     )
 
 

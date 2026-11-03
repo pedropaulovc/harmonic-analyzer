@@ -7,11 +7,12 @@ under-face edge relieved for the spring's transition wire, over a plain
 screw carries no datum and no geometric-control frame (drawing-guidelines.md
 rule 5 (avoid excessive GD&T)): the body Ø, the head Ø and the head's relief
 chamfer print as the part's stacked LIMIT bands, the plain length as the part's
-single "3.60 MIN" and the full-thread station as its single "5.71 MAX", both
-from the under-head face, the under-head corner as its single "R0.5 MAX"
+single ".14 MIN" and the full-thread station as its single ".225 MAX", both
+from the under-head face, the under-head corner as its single "R.020 MAX"
 (codjiflo round 4 on #1997), and every other size is an ordinary model
 dimension at its part-authored places under the title block's band for those
-places (.X for the tip chamfer and the corner, .XX for the rest).
+places (.XX).  Decimal-inch sheet (#290); the model keeps its calibrated
+millimetre nominals, which print rounded on the inch grid.
 
 The screw axis is model +Z, so the ``*Right`` view already lays it horizontal
 as it sits in the lathe: model +Z runs to paper-LEFT, putting the head on the
@@ -51,6 +52,7 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import (
     assert_imported_precision,
     offset_dimension_text,
@@ -63,25 +65,20 @@ from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 from sm_gooseneck_spring_screw_geom import (
     BODY_DIA,
-    BODY_DIA_LOWER,
     BODY_DIA_TOL_TYPE,
-    BODY_DIA_UPPER,
     FULL_THREAD_STATION_MAX,
     FULL_THREAD_STATION_MAX_TOL_TYPE,
     HEAD_DIA,
-    HEAD_DIA_LOWER,
     HEAD_DIA_TOL_TYPE,
-    HEAD_DIA_UPPER,
     HEAD_H,
     HEAD_RELIEF_CHAMFER,
-    HEAD_RELIEF_CHAMFER_LOWER,
     HEAD_RELIEF_CHAMFER_TOL_TYPE,
-    HEAD_RELIEF_CHAMFER_UPPER,
     LENGTH,
     OVERALL_LENGTH,
     PLAIN_LENGTH_MIN,
@@ -98,6 +95,7 @@ from sm_gooseneck_spring_screw_spec import (
     DIMENSION_CALLOUTS_BY_NAME,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    PRINTED_BANDS,
     REFERENCE_DIMENSIONS,
     THREAD_CALLOUT,
 )
@@ -402,9 +400,7 @@ PRINTED_DIMENSIONS: dict[str, tuple[float, int]] = {
 # Every LIMIT row's (lower, upper) deviations, mm: a LIMIT row without its
 # band would skip the deviation readback, so the two must name the same rows.
 LIMIT_DEVIATIONS: dict[str, tuple[float, float]] = {
-    "BodyDia": (BODY_DIA_LOWER, BODY_DIA_UPPER),
-    "HeadDia": (HEAD_DIA_LOWER, HEAD_DIA_UPPER),
-    "HeadReliefChamfer": (HEAD_RELIEF_CHAMFER_LOWER, HEAD_RELIEF_CHAMFER_UPPER),
+    name: PRINTED_BANDS[name] for name in ("BodyDia", "HeadDia", "HeadReliefChamfer")
 }
 if set(LIMIT_DEVIATIONS) != {
     name for name, (_, kind) in PRINTED_DIMENSIONS.items() if kind == _TOL_LIMIT
@@ -526,6 +522,30 @@ def _dress_underhead_corner(
     )
 
 
+@_telemetry.traced(
+    "drawing.sm_gooseneck_spring_screw.shank_thread", label_param="label"
+)
+def _show_shank_thread(adapter: Any, view: Any, label: str) -> None:
+    """Import the part's one cosmetic 1/4-28 into ``view`` and hide its
+    automatic callout: the sheet's attached THREAD_CALLOUT is the one callout
+    (draw_mg_magnifying_lever._hide_other_thread_callouts)."""
+    seeds, instances = import_cosmetic_threads(adapter, view)
+    if (seeds, instances) != (1, 1):
+        raise RuntimeError(
+            f"MHA-SM-04 {label} cosmetic threads: seeds/instances="
+            f"{(seeds, instances)!r}, expected (1, 1)"
+        )
+    thread = _early_bound(_early_bound(view, "IView").GetFirstCThread(), "ICThread")
+    note = thread.ThreadCallout
+    if note is not None:
+        annotation = _early_bound(
+            _early_bound(note, "INote").GetAnnotation(), "IAnnotation"
+        )
+        annotation.Visible = 3  # swAnnotationHidden; drawing-local only
+        if annotation.Visible != 3:
+            raise RuntimeError(f"MHA-SM-04 {label}: automatic thread callout shows")
+
+
 def _verify_source_dimensions(model: Any) -> None:
     """The unprinted callout controls, read from the opened source part."""
     for full_name, expected in SOURCE_ONLY_DIMENSIONS.items():
@@ -608,7 +628,11 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _verify_source_dimensions(adapter.currentModel)
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -677,6 +701,10 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    # The shank's thread: thin minor-diameter lines on the side view and the
+    # shaded thread on the isometric (ASME Y14.6 simplified representation).
+    _show_shank_thread(adapter, side, "side view")
+    _show_shank_thread(adapter, iso, "isometric")
 
     return await finalize_drawing(
         adapter,

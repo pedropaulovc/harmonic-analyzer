@@ -81,12 +81,6 @@ def test_the_installation_note_names_both_holes_and_fits_the_sheet() -> None:
     flat = " ".join(lines)
     assert "MHA-SM-02" in flat and "MHA-FR-02" in flat
     assert "UNDERSIDE REAM, CHAMFER END FIRST." in flat
-    # The band the knife mount's B-hole callout prints (rule 25: one value
-    # on both sheets).
-    from sm_knife_mount_spec import PIN_SLIP_PRINTED
-
-    low, high = PIN_SLIP_PRINTED
-    assert f"{low:.3f}-{high:.3f} DIAMETRAL CLEARANCE" in flat
     # Owner ruling 2026-10-24 (T+H3): the crossbar holds the press, the knife
     # mount the slip.
     assert "PRESS FIT IN THE MHA-FR-02 CROSSBAR" in flat

@@ -10,10 +10,14 @@ from collections.abc import Callable
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _supplier_pin_drawing import DOWEL_SUPPLIER_MARGINS, add_supplier_dowel_dimensions
 from sm_vn_knife_mount_dowel_spec import SUPPLIER_REFERENCE
 
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["sm_vn_knife_mount_dowel"]
 # The footer's ITEM row: the catalogue designation in plain text.
@@ -35,6 +39,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, SPEC, item=ITEM, supplier_dimensions=supplier_dimensions,
         settled_checks=(assert_supplier_dimensions,),
         supplier_margins=DOWEL_SUPPLIER_MARGINS,
+        unit=part_drawing_unit("sm-vn-knife-mount-dowel"),
     )
 
 

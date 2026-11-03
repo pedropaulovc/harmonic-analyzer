@@ -12,8 +12,11 @@ from __future__ import annotations
 
 import _config
 import sm_vn_knife_mount_dowel_spec as knife_dowel
+from _assembly_contract import assembly_contract
 from _inch_fraction import inch_fraction
+from _title_block_units import LENGTH_UNITS, render_number
 from sm_summing_assembly_spec import (
+    ASM_NAME,
     BOSS_HOOK,
     BOSS_JAM_NUT,
     COUNTER_DIMENSION,
@@ -36,6 +39,8 @@ from sm_summing_assembly_spec import (
 )
 
 DRAWING_NUMBER = "MHA-SM-00"
+# Printed lengths are in the assembly contract's drawing_unit.
+UNIT = assembly_contract(ASM_NAME).drawing_unit
 # The BOM lists every family in the builder's insertion order.
 BOM_ORDER = tuple(QUANTITIES)
 # The drawing imports exactly these, each in the one view that dimensions it.
@@ -49,7 +54,13 @@ LEVEL_TOLERANCE_DEG = float(_config.title_block("angular")["value_deg"])
 if LEVEL_TOLERANCE_DEG + 1.0 >= KNIFE_FREE_ROCK_FLOOR_DEG:
     raise AssertionError("the level tolerance eats the knife edge's free rock")
 # The feeler check 1 tries round each mount's clamped top seat.
-SEAT_FEELER_MM = 0.05
+SEAT_FEELER_MM = 0.0508  # .002
+
+
+def _length(length_mm: float, places: int) -> str:
+    """A length as the sheet prints it in its drawing unit."""
+    return render_number(length_mm / LENGTH_UNITS[UNIT], UNIT, places)
+
 
 # The DESCRIPTION cell is drawing wording: the part numbers and vendor SKUs
 # print in their own columns, so no size the part drawings own is restated.
@@ -70,8 +81,8 @@ if set(BOM_DESCRIPTIONS) != set(QUANTITIES):
 
 LEVEL_CRITERION = f"LEVEL WITHIN ±{LEVEL_TOLERANCE_DEG:g}°"
 HANGER_FIT_CUT = (
-    f"{HANGER_FIT_REACH:.{HANGER_FIT_REACH_PLACES}f} "
-    f"±{HANGER_FIT_REACH_TOL:.{HANGER_FIT_REACH_PLACES}f}"
+    f"{_length(HANGER_FIT_REACH, HANGER_FIT_REACH_PLACES)} "
+    f"±{_length(HANGER_FIT_REACH_TOL, HANGER_FIT_REACH_PLACES)}"
 )
 DETAIL_TITLE = "KNIFE-EDGE DETAIL (FRONT, CROPPED)"
 # Callouts print below the value, where line breaks print.
@@ -135,8 +146,8 @@ ASSEMBLY_STEPS = (
 )
 ASSEMBLY_CHECKS = (
     "CHECKS:",
-    f"1. EACH MOUNT'S TOP SEAT IS FLAT TO THE CROSSBAR UNDERSIDE: A {SEAT_FEELER_MM:g} "
-    "FEELER ENTERS NOWHERE ROUND IT.",
+    "1. EACH MOUNT'S TOP SEAT IS FLAT TO THE CROSSBAR UNDERSIDE: A "
+    f"{_length(SEAT_FEELER_MM, 3)} FEELER ENTERS NOWHERE ROUND IT.",
     "2. COUNTER SPRING OFF, THE LEVER ROCKS FREELY ON ITS KNIFE EDGE: THE "
     "OUTER EDGE OF THE BOSS TOP FACE MOVES AT LEAST THE KNIFE-EDGE DETAIL DISTANCE UP "
     "AND DOWN FROM LEVEL "

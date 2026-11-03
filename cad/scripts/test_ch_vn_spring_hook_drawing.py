@@ -18,6 +18,18 @@ from _interference_contracts import CHANNEL_ANCHOR_NUT_THREAD
 from _hole_spec import THREAD_MAJOR_MM
 
 
+def _printed_plate_limits_mm():
+    """The coefficient plate's limits as the lever sheet prints them: the
+    model rounded to its own inch places is the nominal (rule 3), +/- that
+    row's title-block band."""
+    from _printed_tolerance import printed_band_mm
+
+    places = lever.DRAWING_PRECISION["PlateProfile"]["PlateThickness"]
+    printed = round(lever.COEFFICIENT_T / 25.4, places) * 25.4
+    band = printed_band_mm(places, unit=lever.UNIT)
+    return printed - band, printed + band
+
+
 def test_cut_end_crosses_the_plate_and_carries_the_jam_nut():
     cut_end = anchor.eye_od_mm / 2 - spec.FINISHED_OVERALL_MM
     assert cut_end == pytest.approx(spec.TRIM.shank_end_y_mm)
@@ -69,7 +81,7 @@ def test_shortest_part_backed_out_keeps_two_full_threads_past_the_nut():
     assert worst == pytest.approx(
         short_part
         - spec.ADJUSTMENT_TRAVEL_MM
-        - (lever.COEFFICIENT_T + spec.SEAT_BAND_MM)
+        - _printed_plate_limits_mm()[1]
         - jam_nut.THICKNESS_MAX
         - maximum_axial
     )
@@ -80,39 +92,38 @@ def test_shortest_part_backed_out_keeps_two_full_threads_past_the_nut():
 
 
 def test_the_anchor_is_sized_at_the_coefficient_plate_thickness_extremes():
-    """The uniform 7.00 coefficient plate retains the lever's .XX band, so the
-    jam nut seats anywhere from 6.49 to 7.51 below its fixed top. The trim is
-    18.034 shank / 1.21 in overall, one .01 step over the worst-case 1.5875
-    full-thread floor plus the round-up to the printed grid."""
-    from sm_summing_lever_notes import LINEAR_BAND
-
-    assert spec.SEAT_BAND_MM == LINEAR_BAND == pytest.approx(0.51)
-    thin, thick = 6.49, 7.51
+    """The uniform 7.00 coefficient plate prints .28 ±.01 in on the lever, and
+    the printed nominal governs (rule 3), so the jam nut seats anywhere from
+    6.858 to 7.366 below its fixed top. The trim is 17.78 shank / 1.20 in
+    overall: the worst-case 1.5875 full-thread floor, one .01 step of margin,
+    and the round-up to the grid."""
+    thin, thick = _printed_plate_limits_mm()
+    assert (thin, thick) == pytest.approx((6.858, 7.366))
     assert (spec.SEAT_T_MIN_MM, spec.SEAT_T_MAX_MM) == pytest.approx((thin, thick))
     assert (spec.SHANK_LENGTH_MM, spec.FINISHED_OVERALL_MM) == pytest.approx(
-        (18.034, 30.734)
+        (17.78, 30.48)
     )
     band, budget = spec.LENGTH_BAND_WORST_MM, spec.ADJUSTMENT_TRAVEL_MM
     floor = spec.PAST_NUT_FLOOR_MM
     # Thickest plate, shortest part, backed out: the floor plus the margin.
     at_thick = spec.full_threads_past_nut_mm(budget, -band, thick)
-    assert at_thick == pytest.approx(1.9652006006)
+    assert at_thick == pytest.approx(1.8552006006)
     assert at_thick >= floor + spec.PAST_NUT_MARGIN_MM
     assert spec.full_threads_past_nut_mm(budget, -band) == pytest.approx(at_thick)
     # The thinner plates only add thread.
     assert spec.full_threads_past_nut_mm(budget, -band, thin) == pytest.approx(
-        at_thick + 2 * spec.SEAT_BAND_MM
+        at_thick + (thick - thin)
     )
     # Deepest cut end: the longest part under the thinnest plate, still cut
-    # from the 19.05 stock (1.016 comes off).
+    # from the 19.05 stock (1.27 comes off).
     assert spec.SHANK_LENGTH_MM + band < anchor.shank_length_mm
-    assert anchor.shank_length_mm - spec.SHANK_LENGTH_MM == pytest.approx(1.016)
+    assert anchor.shank_length_mm - spec.SHANK_LENGTH_MM == pytest.approx(1.27)
     assert spec.PROTRUSION_MAX_MM == pytest.approx(
         spec.SHANK_LENGTH_MM + band - anchor.unthreaded_shank_length_mm - thin
     )
-    assert spec.PROTRUSION_MAX_MM == pytest.approx(8.623)
-    # Modelled at nominal thickness, the cut end hangs 7.859 below the plate.
-    assert spec.PROTRUSION_MM == pytest.approx(7.859)
+    assert spec.PROTRUSION_MAX_MM == pytest.approx(8.001)
+    # Modelled at nominal thickness, the cut end hangs 7.605 below the plate.
+    assert spec.PROTRUSION_MM == pytest.approx(7.605)
 
 
 def test_install_step_locks_the_anchor_with_its_jam_nut():

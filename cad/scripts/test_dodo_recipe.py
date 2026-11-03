@@ -2920,7 +2920,13 @@ def test_config_deps_are_fine_grained():
     # registry row (and with it the shared defaults) for its sheet's
     # drawing_unit (UNIT); only those rows may appear.  Cutover removes the
     # switch and this allowance.
-    drawing_unit_rows = {"parts/ch-fulcrum-keeper.yaml", "parts/_defaults.yaml"}
+    drawing_unit_rows = {
+        "parts/_defaults.yaml",
+        "parts/ch-fulcrum-keeper.yaml",
+        "parts/sm-summing-lever.yaml",
+        "parts/sm-vn-knife-hanger-stud.yaml",
+        "parts/sm-vn-knife-mount-dowel.yaml",
+    }
     assert not any(
         t.startswith("parts/") and t not in drawing_unit_rows for t in frame_recipe
     ), frame_recipe
