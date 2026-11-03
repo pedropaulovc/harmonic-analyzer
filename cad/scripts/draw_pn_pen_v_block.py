@@ -704,9 +704,9 @@ async def build(adapter: Any) -> dict[str, str]:
     omit_title_block_thread_class(tap_callout, label="rod set-screw tap")
     # Both rows end where the hole does, in the pivot bore, not through; the
     # drill row opens with its process word (rule 12).
-    _set_tap_callout_text(tap_callout)
+    drill_variable = _set_tap_callout_text(tap_callout)
     set_hole_callout_precision(
-        tap_callout, TAP_CALLOUT_PRECISION, label="rod set-screw tap"
+        tap_callout, {drill_variable: TAP_DRILL_PLACES}, label="rod set-screw tap"
     )
     rebuild_drawing(adapter, label="near-side diameter leaders")
 
@@ -736,9 +736,10 @@ async def build(adapter: Any) -> dict[str, str]:
 # r13: "Ø 2.26 INTO PIVOT BORE" carried no process word, so the drill row
 # opens with DRILL (rule 12).
 _TAP_END = "INTO PIVOT BORE"
-# The through-next tap's one Hole Wizard length variable, its drill
-# diameter, prints .XXX.
-TAP_CALLOUT_PRECISION = {"hw-tapdrldia": 3}
+# The tap's drill diameter prints .XXX, under whichever drill-size variable
+# the native callout carries (_tap_drill_variable).
+TAP_DRILL_PLACES = 3
+_TAP_DRILL_VARIABLES = ("hw-tapdrldia", "hw-thrutapdrldia")
 _THRU_TOKEN = "<hw-thru>"
 _DRILL_WORD = "DRILL"
 # The drill row's size variable: <hw-tapdrldia> (or <hw-thrutapdrldia> for a
@@ -779,6 +780,15 @@ def _tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
     return updated
 
 
+def _tap_drill_variable(definitions: dict[int, str]) -> str:
+    """The one native drill-size variable the callout carries."""
+    text = "\n".join(definitions.values())
+    found = [name for name in _TAP_DRILL_VARIABLES if f"<{name}>" in text]
+    if len(found) != 1:
+        raise RuntimeError(f"expected one tap drill-size variable: {definitions!r}")
+    return found[0]
+
+
 def _tap_callout_resolved(resolved: str) -> bool:
     """Both rows end in the bore; exactly one row, the drill's, opens DRILL."""
     drill = [row for row in resolved.split("\n") if _DRILL_WORD in row]
@@ -792,9 +802,9 @@ def _tap_callout_resolved(resolved: str) -> bool:
     )
 
 
-def _set_tap_callout_text(display: Any) -> None:
-    """Write the drill word and into-bore extent on the native callout and
-    read both back."""
+def _set_tap_callout_text(display: Any) -> str:
+    """Write the drill word and into-bore extent on the native callout, read
+    both back, and return the callout's drill-size variable."""
     native = _early_bound(display, "IDisplayDimension")
     definitions = {
         part: str(native.GetText(part) or "") for part in _DEFINITION_TO_WRITABLE
@@ -814,6 +824,7 @@ def _set_tap_callout_text(display: Any) -> None:
             "tap callout drill word / into-bore extent did not persist: "
             f"definitions={persisted!r}, resolved={resolved!r}"
         )
+    return _tap_drill_variable(persisted)
 
 
 # ASME Y14.2 runs a centreline a short, uniform distance past its feature: 3 mm

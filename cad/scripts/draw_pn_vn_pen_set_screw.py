@@ -70,7 +70,9 @@ def _assert_diameter_texts_clear(adapter: Any, displays: dict[str, Any]) -> None
         )
         for name in ("SupplierThreadDiameter", "SupplierCollarDiameter")
     )
-    low, high = (tip[1] for tip in collar["tips"])
+    # Y order, not the tips' (x, y) sort: a vertical dimension's tips may
+    # differ slightly in X.
+    low, high = sorted(tip[1] for tip in collar["tips"])
     if (
         thread["text"].ymax > low - CLEAR_GAP_M
         or collar["text"].ymin < high + CLEAR_GAP_M

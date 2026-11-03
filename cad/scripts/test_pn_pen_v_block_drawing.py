@@ -671,6 +671,11 @@ def test_tap_callout_says_drill_and_ends_in_the_pivot_bore() -> None:
         }
     )
     assert joined[8] == "DRILL <MOD-DIAM><hw-thrutapdrldia> INTO PIVOT BORE\nCOAXIAL"
+    # Precision goes to whichever drill-size variable the callout carries.
+    assert drawing._tap_drill_variable(rewritten) == "hw-tapdrldia"
+    assert drawing._tap_drill_variable(joined) == "hw-thrutapdrldia"
+    with pytest.raises(RuntimeError):
+        drawing._tap_drill_variable({5: "TAP <hw-threaddesc>", 7: "DRILL"})
     for bad in (
         {5: "TAP <hw-threaddesc> <hw-thru>", 6: "", 7: "", 8: ""},
         {5: "<hw-thru>", 6: "", 7: "<hw-thru>", 8: ""},
