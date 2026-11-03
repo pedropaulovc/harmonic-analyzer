@@ -94,7 +94,7 @@ def test_the_clear_window_is_the_flat_rods() -> None:
 def test_the_worst_station_keeps_a_spare() -> None:
     worst = max(range(bank.COUNT), key=lambda j: _station_delta(j)[1] - _station_delta(j)[0])
     assert worst == 12
-    assert _station_delta(worst) == pytest.approx((-0.5635, 0.6885), abs=1e-4)
+    assert _station_delta(worst) == pytest.approx((-0.5635, 0.6901), abs=1e-4)
 
 
 

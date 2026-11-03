@@ -1,7 +1,7 @@
 r"""Pure-data dimensional contract shared by the fulcrum shaft, its drawing and
 the channel assembly that places it.
 
-The plain Ø6.35 steel shaft the top levers rock on. It runs full length at
+The plain Ø.250 steel shaft the top levers rock on. It runs full length at
 one diameter (no journals, shoulders or steps) through the reamed bores of the
 two end keepers (MHA-CH-07, ``ch_fulcrum_keeper_spec``); each end stands
 END_PROUD past its keeper lug's outer face and finishes in a hemispherical
@@ -18,8 +18,10 @@ from __future__ import annotations
 
 from math import sqrt
 
+import _config
 from _fit_shaft_h import SHAFT_H
 from _gtol_cylinder import CylinderFace
+from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from ch_fulcrum_keeper_spec import (
@@ -42,6 +44,9 @@ from ch_vn_fulcrum_set_screw_spec import MAJOR_DIA as SET_SCREW_MAJOR_DIA
 from ch_vn_fulcrum_set_screw_spec import POINT_LENGTH as SET_SCREW_POINT_LENGTH
 
 MM_PER_IN = 25.4
+# #290: the sheet prints decimal inch (the row's ``drawing_unit``); lengths
+# stay millimetres, each the exact decimal of its printed inch value.
+UNIT = drawing_unit("parts/ch-fulcrum-shaft", _config.parts("ch-fulcrum-shaft"))
 
 SHAFT_DIA = 0.25 * MM_PER_IN
 SHAFT_DIA_BAND = SHAFT_H
@@ -50,34 +55,34 @@ if SHAFT_DIA != BORE_DIA:
 SHAFT_R = SHAFT_DIA / 2.0
 
 # --- Length: cylindrical to END_PROUD past each keeper lug's outer face, then
-# a full hemisphere (radius = shaft radius). END_PROUD is what lets the
-# tip-to-tip length print at .X and still keep both domes clear of the bores
+# a full hemisphere (radius = shaft radius). END_PROUD puts the tip-to-tip
+# length on the .XX grid and keeps both domes clear of the bores
 # (FLAT_STATION_WINDOW_MM below). ---
-END_PROUD = 1.025
-CYLINDER_HALF = KEEPER_Z_OFF + LUG_HALF_T + END_PROUD  # 80.025
+END_PROUD = 1.016  # .040
+CYLINDER_HALF = KEEPER_Z_OFF + LUG_HALF_T + END_PROUD  # 80.137
 DOME_R = SHAFT_R
-SHAFT_LENGTH = 2.0 * (CYLINDER_HALF + DOME_R)  # 166.4 tip to tip
+SHAFT_LENGTH = 2.0 * (CYLINDER_HALF + DOME_R)  # 166.624 (6.56) tip to tip
 
 # --- Set-screw flats: one per end on +Y, centred on the keeper lug mid-plane
 # (z = +-KEEPER_Z_OFF), so the crown tap's cup point lands mid-flat. Both
 # stations are baseline dimensions from the -Z dome tip (sheet left): the -Z
 # flat's outer edge FLAT_FROM_END off it and the +Z flat's inner edge
-# FLAT_BASELINE off it, so no station chains through another. 4.4 long (3.5
-# under the 6.0 lug): with the 8.0 lug's .XX bands in the chain a 3.5 flat
-# leaves no station window at all; at 4.4 both stations land on whole tenths
-# and print .X, the flat length alone .XX (FLAT_STATION_WINDOW_MM). ---
-FLAT_PITCH = 2.0 * KEEPER_Z_OFF  # 150.0 centre to centre (assembly only)
-FLAT_LENGTH = 4.4
-FLAT_DEPTH = 0.3
-FLAT_FROM_END = SHAFT_LENGTH / 2.0 - FLAT_PITCH / 2.0 - FLAT_LENGTH / 2.0  # 6.0
-FLAT_BASELINE = SHAFT_LENGTH / 2.0 + FLAT_PITCH / 2.0 - FLAT_LENGTH / 2.0  # 156.0
-ACROSS_FLAT = SHAFT_DIA - FLAT_DEPTH  # 6.05: the printed size
-FLAT_HEIGHT = SHAFT_R - FLAT_DEPTH  # 2.875: the set screw's cup seat above the axis
+# FLAT_BASELINE off it, so no station chains through another. .17 long, in
+# the .32 lug; with the lug's .XX bands in the chain both stations, the flat
+# length and the overall length print .XX (FLAT_STATION_WINDOW_MM). ---
+FLAT_PITCH = 2.0 * KEEPER_Z_OFF  # 150.114 (5.910) centre to centre (assembly only)
+FLAT_LENGTH = 4.318  # .17
+FLAT_DEPTH = 0.3048  # .012
+FLAT_FROM_END = SHAFT_LENGTH / 2.0 - FLAT_PITCH / 2.0 - FLAT_LENGTH / 2.0  # 6.096 (.24)
+FLAT_BASELINE = (
+    SHAFT_LENGTH / 2.0 + FLAT_PITCH / 2.0 - FLAT_LENGTH / 2.0
+)  # 156.21 (6.15)
+ACROSS_FLAT = SHAFT_DIA - FLAT_DEPTH  # 6.0452 (.238): the printed size
+FLAT_HEIGHT = SHAFT_R - FLAT_DEPTH  # 2.8702: the set screw's cup seat above the axis
 
-# --- Worst case of the printed bands (drawing-guidelines.md rule 17 (walls and webs); DRAWING_PRECISION
-# below). ---
-_BAND_BY_PLACES = {places: printed_band_mm(places) for places in (1, 2, 3)}
-_FLAT_LENGTH_MIN = FLAT_LENGTH - _BAND_BY_PLACES[1]
+# --- Worst case of the printed bands (drawing-guidelines.md rule 17 (walls
+# and webs); DRAWING_PRECISION below, inch title block). ---
+_BAND_BY_PLACES = {places: printed_band_mm(places, unit=UNIT) for places in (1, 2, 3)}
 _SHAFT_R_MIN = (SHAFT_DIA + SHAFT_DIA_BAND[1]) / 2.0
 # Least depth: the smallest printed shaft diameter less the largest AcrossFlat
 # (the print controls those two, never the depth itself).
@@ -91,7 +96,7 @@ if FLAT_CHORD_MIN <= SET_SCREW_MAJOR_DIA:
         f"{SET_SCREW_MAJOR_DIA} major"
     )
 # The longest flat stays inside its keeper lug, so a lever hub never rides it.
-if FLAT_LENGTH + _BAND_BY_PLACES[1] > 2.0 * LUG_HALF_T:
+if FLAT_LENGTH + _BAND_BY_PLACES[2] > 2.0 * LUG_HALF_T:
     raise AssertionError("the longest set-screw flat runs out of the keeper lug")
 if KEEPER_Z_OFF + FLAT_LENGTH / 2.0 >= CYLINDER_HALF:
     raise AssertionError("set-screw flat runs onto the domed end")
@@ -138,7 +143,9 @@ if SET_SCREW_PROUD_NOMINAL >= 0.0 or SET_SCREW_PROUD_WORST > 0.4:
     raise AssertionError("set screw stands proud of the keeper crown past the ruling")
 
 SURFACE_FINISHES = (
-    SurfaceFinishControl("bearing", MACHINED_UM, CylinderFace(SHAFT_DIA)),
+    SurfaceFinishControl(
+        "bearing", MACHINED_UM, CylinderFace(SHAFT_DIA), display_unit=UNIT
+    ),
 )
 
 # One revolved half-profile carries the diameter and the tip-to-tip length;
@@ -157,21 +164,20 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
 }
 # Decimal places are the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`); the model owns
-# them. ShaftDia carries its SHAFT_H band natively; AcrossFlat at .XXX holds
-# FLAT_CHORD_MIN above the set screw's major and its >= 1.5D engagement and
-# proud ruling. FlatFromEnd and FlatBaseline at .X, FlatLength at .XX and
-# OverallLength at .X hold FLAT_STATION_WINDOW_MM open
-# (test_ch_fulcrum_shaft_drawing pins that the flat length cannot drop a
-# place). DomeRadius is a reference: the full hemisphere follows from the
-# diameter.
+# them, in inches. ShaftDia carries its SHAFT_H band natively at four places;
+# AcrossFlat at .XXX holds FLAT_CHORD_MIN above the set screw's major and its
+# >= 1.5D engagement and proud ruling. FlatFromEnd, FlatBaseline, FlatLength
+# and OverallLength at .XX hold FLAT_STATION_WINDOW_MM open (inch .X is far
+# too loose for it). DomeRadius is a reference (.125): the full hemisphere
+# follows from the diameter.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "ShaftProfile": {"ShaftDia": 3, "OverallLength": 1},
+    "ShaftProfile": {"ShaftDia": 4, "OverallLength": 2},
     "FlatProfile": {
         "FlatLength": 2,
-        "FlatFromEnd": 1,
-        "FlatBaseline": 1,
+        "FlatFromEnd": 2,
+        "FlatBaseline": 2,
         "AcrossFlat": 3,
-        "DomeRadius": 2,
+        "DomeRadius": 3,
     },
 }
 if {
@@ -301,7 +307,7 @@ if FLAT_STATION_WINDOW_MM <= 0.0:
 BORE_OFFSET_UNPAIRED_MM = 2.0 * _band(KEEPER_PRECISION, "LugProfile", "LugRise")
 PAIRED_MIN_CLEARANCE_MM = (
     BORE_DIA_BAND[1] - SHAFT_DIA_BAND[0] - BORE_SEAT_ALLOWANCE_MM
-)  # 0.0144
+)  # 0.0103
 if BORE_OFFSET_UNPAIRED_MM <= BORE_DIA_BAND[0] - SHAFT_DIA_BAND[1]:
     raise AssertionError("the keeper bores line up unpaired: drop the pair reaming")
 if PAIRED_MIN_CLEARANCE_MM < BORE_RUNNING_MIN_CLEARANCE_MM:
@@ -322,8 +328,11 @@ SHAFT_FIT_CLEARANCE_MM = (
 SHAFT_DIA_CALLOUT = "\n".join(
     (
         "SLIDING FIT IN MHA-CH-07 BORES",
-        f"{SHAFT_FIT_CLEARANCE_MM[0]:.4f}-{SHAFT_FIT_CLEARANCE_MM[1]:.4f} "
-        "DIAMETRAL CLEARANCE",
+        "-".join(
+            f"{value / MM_PER_IN:.4f}".removeprefix("0")
+            for value in SHAFT_FIT_CLEARANCE_MM
+        )
+        + " DIAMETRAL CLEARANCE",
         "MHA-CH-02 LEVERS RUN ON IT",
     )
 )
@@ -333,7 +342,7 @@ ACROSS_FLAT_CALLOUT = "SETS MHA-CH-VN-55\nENGAGEMENT"
 DRAWING_NOTES = "\n".join(
     (
         "1/4 IN GROUND STOCK OK.",
-        "CENTRE MARKS 1.0 DEEP MAX.",
+        "CENTRE MARKS .04 DEEP MAX.",
     )
 )
 # The isometric renders at ISO_SCALE (1, 1) while the sheet/title block reads

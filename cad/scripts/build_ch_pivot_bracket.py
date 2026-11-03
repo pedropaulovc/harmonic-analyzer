@@ -6,7 +6,7 @@ the green rocker-arm support (ch14 page002_img01/img02, page002_img07
 at one END of the foot, and the foot is only as wide as the support's apex.
 #743 PR2 (Reading 1, user Q4): the bright dome on the ear is the pivot
 shaft's own domed end, not a brazed-on ball, so the ear is a plain plate
-arched EAR_W/2 over the O6.5 cross-bore, its apex EAR_TOP_Y over the seat
+arched EAR_W/2 over the O.256 cross-bore, its apex EAR_TOP_Y over the seat
 (#1371: the arch's centre stands ARCH_LIFT over the bore so the apex tap
 keeps 1.5D of full thread). The north ear's inner face is the
 rocker bank's axial datum (the north thrust washer behind hub 19 bears on
@@ -62,8 +62,10 @@ from _appearance import PANEL_BLACK, apply_color, apply_material
 from _check import check
 from _com import _early_bound, _read_member
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -119,6 +121,7 @@ from ch_pivot_bracket_spec import (
     HOLE_DIA,
     SET_SCREW_HOLE_SPEC,
     SET_SCREW_STATION_BAND,
+    UNIT,
 )
 
 
@@ -287,7 +290,7 @@ def _hide_reference_sketches(adapter) -> None:
 
 
 def _corner_radius_max_limit(adapter) -> None:
-    """CornerRadius as the single limit "R0.3 MAX" carrying the band's
+    """CornerRadius as the single limit "R.02 MAX" carrying the band's
     deviations (build_pn_pen_rod._shoulder_fillet_max_limit's recipe)."""
     lower, upper = deviations(CORNER_R_BAND)
     _, dimension = _named_dimension(adapter, "CornerFillet", "CornerRadius")
@@ -318,6 +321,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). mm suffix load-bearing (INCH document).
     await set_global(adapter, "FootW", f"{FOOT_W}mm")
@@ -404,7 +408,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "Ear")
-    # The ear thickness carries its +/-0.10 band natively: named so the band
+    # The ear thickness carries its +/-.004 band natively: named so the band
     # selects it by name (the MHA-CH-03 ForkThick idiom).
     ear_thick_dim = name_dimensions(adapter, "Ear", ["EarThick"])
     drive_jobs.append((ear_thick_dim[0], '"EarT"'))
@@ -583,21 +587,28 @@ async def build(adapter) -> dict[str, str]:
     # guidelines`); the drawing reads them back instead of rewriting them.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _corner_radius_max_limit(adapter)
-    # Two lengths carry +/-0.10 natively (ch_pivot_bracket_spec): the apex
+    # Two lengths carry +/-.004 natively (ch_pivot_bracket_spec): the apex
     # tap's station from the ear's inboard face -- the face fit-up sets and
     # the S4 hold touches Z0 on -- and the ear thickness. The foot length and
-    # the hold-down station ride the title block. The reamed bore holds the
-    # drilled-hole row's +0.10/0 its set-screw thread is counted at.
-    set_dimension_symmetric_tolerance(adapter, "Ear", "EarThick", EAR_T_BAND)
+    # the hold-down station ride the title block. The cross-bore holds the
+    # drilled-hole row's +.004/0 its set-screw thread is counted at.
     set_dimension_symmetric_tolerance(
-        adapter, "SetScrewReference", "SetScrewLocation", SET_SCREW_STATION_BAND
+        adapter, "Ear", "EarThick", EAR_T_BAND, display_unit=UNIT
+    )
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "SetScrewReference",
+        "SetScrewLocation",
+        SET_SCREW_STATION_BAND,
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
         adapter,
         "ShaftBoreProfile",
         "ShaftBoreDia",
         *deviations(BORE_DIA_BAND),
-        places=2,
+        places=3,
+        display_unit=UNIT,
     )
 
     await report_mass_properties(adapter)

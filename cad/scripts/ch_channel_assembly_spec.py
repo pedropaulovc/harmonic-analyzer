@@ -29,11 +29,12 @@ from __future__ import annotations
 
 import math
 
+from _assembly_contract import assembly_contract
+
 from ch_fulcrum_keeper_spec import (
     FOOT_TIP_X,
     FULCRUM_KEEPER_CENTRE_Z,
     KEEPER_FITUP_LOCATION_BAND_MM,
-    KEEPER_FITUP_PLACES,
     KEEPER_FITUP_X_BAND_MM,
     KEEPER_FITUP_X_FROM_WEB_MM,
     KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM,
@@ -57,6 +58,9 @@ from rocker_bank_layout import (
     STACK_L20_ACCEPT,
     STACK_L20_ACCEPT_BAND,
 )
+
+# The sheets print the assembly contract's drawing_unit (decimal inch, #290).
+UNIT = assembly_contract("ch-channel").drawing_unit
 
 # --- Settings reference sketches --------------------------------------------
 PIVOT_FEATURE = "RockerBankSettingsReference"
@@ -150,22 +154,31 @@ DRAWING_DIMENSIONS = {
         KEEPER_REAR_Z_DIMENSION,
     },
 }
+# Inch places per setting. The stations are closures the inch grid does not
+# snap (the channel pitch, the spring's installed height, the kinematic
+# fulcrum line), so each banded one prints to the places that state its exact
+# nominal within its band: four for the spring set (.0236), the closed-up
+# stack (5.5563, so the "never short" acceptance holds) and the lug inner
+# faces (1.5946, 7.1846); three for the lug centre (.114, band .004). The
+# reference lug span is on the .XX grid (5.59).
 DRAWING_PRECISION = {
-    PIVOT_FEATURE: {SPRING_SET_DIMENSION: 2, STACK_LENGTH_DIMENSION: 2},
+    PIVOT_FEATURE: {SPRING_SET_DIMENSION: 4, STACK_LENGTH_DIMENSION: 4},
     FULCRUM_FEATURE: {LUG_SPAN_DIMENSION: 2},
     KEEPER_PLAN_FEATURE: {
-        name: KEEPER_FITUP_PLACES
-        for name in (
-            KEEPER_X_DIMENSION,
-            KEEPER_FRONT_Z_DIMENSION,
-            KEEPER_REAR_Z_DIMENSION,
-        )
+        KEEPER_X_DIMENSION: 3,
+        KEEPER_FRONT_Z_DIMENSION: 4,
+        KEEPER_REAR_Z_DIMENSION: 4,
     },
 }
 DIMENSION_FEATURE = {
     name: feature for feature, names in DRAWING_DIMENSIONS.items() for name in names
 }
-TOLERANCE_PRECISION = 2
+# A tolerance prints at its nominal's places (ASME inch).
+TOLERANCE_PRECISION = {
+    name: places
+    for places_by_name in DRAWING_PRECISION.values()
+    for name, places in places_by_name.items()
+}
 # (lower, upper) deviations; the stack accepts only long (STACK_L20_ACCEPT).
 # The keeper plan's three each carry their fit-up band on their own
 # dimension (owner ruling X1+B1, 2026-10-18): each inner face off the socket
