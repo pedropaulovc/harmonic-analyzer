@@ -169,30 +169,32 @@ VIEW_SHEET_REF_OFFSET = (-.010, -.008)
 # right from the bottom face at x 165.7, Y=0 prints at y 223, the lug end
 # (Y -68) at y 87; the clearance's axis at 190.5,113, the two taps
 # transferred from TL-27 on its line at y 95.2 (tap 1, toward the lug end)
-# and 130.8, the dowel hole at 201.7,126.7. The clearance stands from the lug
-# end / carriage-face corner. Left of the view: the clearance's .515 (x 104)
-# and, under the lug end, the 12.400 mm height, its three rows outboard left
-# of the bottom face's extension line; between the .515's text and the view's
-# edge, each tap's (.35) REF from the axis on one lane (x 150), so no
-# extension line runs right of the view. Right of the view, clear of its edge
-# (x 214), top to bottom: the dowel hole's transfer callout onto its
-# upper-right rim, the Ø.375 clearance callout level with the axis, and the
-# taps' transfer callout from the lower right onto tap 1's rim, each leader
-# crossing only the view's edge.
+# and 130.8, the dowel hole at 178.8,126.7 (up and left of the axis). The
+# clearance stands from the lug end / carriage-face corner. Left of the view:
+# the clearance's .515 (x 104) and, under the lug end, the 12.400 mm height,
+# its three rows outboard left of the bottom face's extension line. Right of
+# the view, clear of its edge (x 214): each tap's (.35) REF from the axis,
+# each on its own lane. The Ø.375 clearance callout comes in from the upper
+# left, passing under the dowel hole; the dowel hole's #41 callout from
+# higher up the left, over the clearance's text; the taps' transfer callout
+# from the lower right onto tap 1's rim, under every right-hand extension
+# line, its four rows clear of the view's lower corner.
 NUT_XY, NUT_SCALE = (.190,.175), (2,1)
 NUT_KEEP = {
     'NutCentreY':(.104,.100),'NutCentreZ':(.134,.0772),
-    'NutTap1Y':(.150,.1041),'NutTap2Y':(.150,.1219),
-    'NutClearanceDia':(.245,.113),
+    # Arrows outside, each on its own lane, the second's lane right of the
+    # first's text (feed-nut2: on one lane the runs struck the texts).
+    'NutTap1Y':(.247,.1044),'NutTap2Y':(.282,.1216),
+    'NutClearanceDia':(.135,.150),
+    'NutDowelDia':(.110,.185),
 }
-# The dowel hole's callout, over the clearance's.
-NUT_DOWEL_CALLOUT_XY = (.240,.150)
 NUT_CAPTION = 'VIEW D'
 NUT_CAPTION_XY = (.178,.058)  # the note's left edge; centred under the view
 # TL-32's cut-face sections hang their captions 6 mm under the face.
 SECTION_CAPTION_GAP = .006
-# Under tap 1's lane's arrow run (which reaches y 89).
-NUT_CALLOUT_XY = (.240,.080)
+# Under tap 1's lane's arrow run (which reaches y 89), its four rows below the
+# view's lower corner (y 87).
+NUT_CALLOUT_XY = (.255,.072)
 NUT_ISO_XY = (.380,.215)
 _ARROWS_INSIDE = 0  # swDimArrowsInside
 _ARROWS_OUTSIDE = 1  # swDimArrowsOutside
@@ -466,6 +468,9 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
         set_hidden_lines_removed(adapter,nut_iso)
         nut_annotations = curate_view_dimensions(adapter,nut,keep=NUT_KEEP,view_label='nut face',
                       dimensions_by_feature=contract.DRAWING_DIMENSIONS)
+        # Held outside, read back: on their staggered lanes (NUT_KEEP) the
+        # arrow runs pass clear of the other's text.
+        _set_arrow_side(adapter, nut_annotations, ('NutTap1Y', 'NutTap2Y'), _ARROWS_OUTSIDE)
         # The taps are transferred from TL-27 at assembly: their stations
         # print REF.
         for name, display in _displays(adapter, nut_annotations, contract.REF_DIMENSIONS).items():
@@ -486,12 +491,6 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
                                        label='feed nut screw taps',process=contract.TRANSFER_PROCESS)
         omit_title_block_thread_class(taps, label='feed nut screw taps')
         set_callout_lengths_to_three_places(taps, label='feed nut screw taps')
-        # The dowel hole, from the upper right onto its upper-right rim.
-        y,z = contract.DOWEL_YZ
-        rim = contract.DOWEL_DRILL/2/math.sqrt(2)
-        edge = _project(adapter,nut,(contract.NUT_FACE_X,y+rim,z+rim),'nut dowel hole mouth')
-        add_native_hole_callout(adapter,nut,edge_xy=edge,callout_xy=NUT_DOWEL_CALLOUT_XY,
-                                label='feed nut dowel hole',process=contract.TRANSFER_PROCESS)
         rebuild_drawing(adapter, label='feed nut screw tap callout')
         annotations += nut_annotations
         sheet_scales = {sheets[0]: SHEET_SCALE, sheets[1]: NUT_SCALE}

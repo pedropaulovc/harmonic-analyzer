@@ -11,9 +11,11 @@ clearance holes into the lug's #4-40 taps, tapped THRU (ruling C1). The lug's
 taps and its dowel hole are transferred through this nut at TL-00 assembly,
 with the nut threaded on the aligned leadscrew (Main ruling 2026-11-03,
 Codjiflo P1 on #2112), so no station here has a mate band. One 3/32 dowel
-(MHA-CH-06-TL-VN-81), slip in this nut's reamed hole and pressed into the
-lug, is the nut's positive stop against the leadscrew's turning torque; the
-screws only clamp.
+(MHA-CH-06-TL-VN-81), pressed through this nut's reamed hole flush with its
+screw-head face and slipping into a blind hole in the lug, is the nut's
+positive stop against the leadscrew's turning torque; the screws only clamp.
+The press hole runs THRU, so the dowel drives back out (drawing-guidelines
+rule 16: no dowel pressed into a blind hole).
 
 Material and stock: brass 360-H02 (C36000, ASTM B16) extruded rectangle bar,
 3/4 x 1-1/4 in (OnlineMetals 1500, read live 2026-11-01: in stock, 12 in
@@ -41,10 +43,10 @@ Holes, all THRU along Z on the bore's line (Y = BORE_Y):
   on the bore, not on the other hole: the review of run
   20261101T220223216Z found chained stations stacking three bands on the
   far hole.
-- The dowel hole, reamed Ø.0948 +.0005/-.0000 (a 3/32 slip fit on
-  MHA-CH-06-TL-VN-81), .270 toward -X and .220 above the bore axis (.XXX:
-  the walls here and in the lug, ``WALLS_MM`` and TL-32's spec, need the
-  tighter band).
+- The dowel hole, reamed Ø.0930 +.0005/-.0000 THRU (the shop's .0930
+  reamer; a light press on MHA-CH-06-TL-VN-81), .27 toward -X and .23 below
+  the bore axis (.XX, Codjiflo round 4: no band tightened to rescue a wall;
+  the walls here and in the lug hold at .XX).
 
 Fit-up: each lug tap is spotted through its hole with a #18 drill, so a
 screw stands at most ``feed_block.FIT_UP_RESIDUAL`` off its hole's axis;
@@ -149,24 +151,36 @@ HOLE_R_MAX = (HOLE_DIA + DRILLED_OVERSIZE) / 2.0  # .087, the drilled hole's lar
 
 # --- The dowel hole: the nut's positive stop on the lug ----------------------
 # A 3/32 alloy steel dowel (MHA-CH-06-TL-VN-81, 98381A438; the jig assembly
-# spec checks these against its own spec): slip here, pressed into the lug.
+# spec checks these against its own spec): pressed here, slip in the lug.
 DOWEL_DIA = 3.0 / 32.0 * INCH  # 2.381
-DOWEL_DIA_MAX = DOWEL_DIA + 0.0003 * INCH  # catalogue +.0001/+.0003
+DOWEL_DIA_MIN = DOWEL_DIA + 0.0001 * INCH  # catalogue +.0001/+.0003
+DOWEL_DIA_MAX = DOWEL_DIA + 0.0003 * INCH
 DOWEL_LENGTH = 0.5 * INCH
-DOWEL_HOLE_DIA = 0.0948 * INCH  # 2.408, reamed
-DOWEL_HOLE_BAND = (0.0005 * INCH, 0.0)  # (upper, lower): .0948-.0953
+# The shop's .0930 chucking reamer (inventory reamers-inch-purchases: "the
+# 3/32 drive-pin presses"), each band assuming it cuts +.0000/+.0005.
+DOWEL_HOLE_DIA = 0.0930 * INCH  # 2.362
+DOWEL_HOLE_BAND = (0.0005 * INCH, 0.0)  # (upper, lower): .0930-.0935
 DOWEL_HOLE_PLACES = 4
-DOWEL_DX = 0.270 * INCH  # 6.858, toward -X from the bore axis
-DOWEL_DY = 0.220 * INCH  # 5.588, above the bore axis
-DOWEL_STATION_PLACES = 3
+DOWEL_INTERFERENCE = (
+    DOWEL_DIA_MIN - (DOWEL_HOLE_DIA + DOWEL_HOLE_BAND[0]),
+    DOWEL_DIA_MAX - (DOWEL_HOLE_DIA + DOWEL_HOLE_BAND[1]),
+)  # .0004-.0011 diametral
+if not 0.0 < DOWEL_INTERFERENCE[0] <= DOWEL_INTERFERENCE[1] <= 0.0012 * INCH:
+    raise AssertionError(
+        f"the dowel press in the brass is not light: {DOWEL_INTERFERENCE}"
+    )
+# Pressed over the nut's whole length (THRU, flush with the head face).
+if LENGTH_MIN < 1.5 * DOWEL_DIA_MAX:
+    raise AssertionError("the dowel's press in the nut is under 1.5 D")
+DOWEL_DX = 0.27 * INCH  # 6.858, toward -X from the bore axis
+DOWEL_DY = -0.23 * INCH  # -5.842, below the bore axis
+DOWEL_STATION_PLACES = 2
 DOWEL_HOLE_X = BORE_X - DOWEL_DX  # .36
-DOWEL_HOLE_Y = BORE_Y + DOWEL_DY  # .60
-DOWEL_RADIUS = (DOWEL_DX**2 + DOWEL_DY**2) ** 0.5  # .348 from the leadscrew axis
-DOWEL_STATION_BAND = printed_band_mm(DOWEL_STATION_PLACES, unit=UNIT)  # .005
+DOWEL_HOLE_Y = BORE_Y + DOWEL_DY  # .15
+DOWEL_RADIUS = (DOWEL_DX**2 + DOWEL_DY**2) ** 0.5  # .355 from the leadscrew axis
+DOWEL_STATION_BAND = printed_band_mm(DOWEL_STATION_PLACES, unit=UNIT)  # .010
 DOWEL_HOLE_R_MAX = (DOWEL_HOLE_DIA + DOWEL_HOLE_BAND[0]) / 2.0
-if not DOWEL_HOLE_DIA + DOWEL_HOLE_BAND[1] > DOWEL_DIA_MAX:
-    raise AssertionError("the reamed dowel hole does not slip on the largest dowel")
-DOWEL_MATE_CALLOUT = "SLIP FIT ON MHA-CH-06-TL-VN-81"
+DOWEL_MATE_CALLOUT = "PRESS FIT ON MHA-CH-06-TL-VN-81"
 
 # --- The screws: 2 X #4-40 X 3/4 FLANGED BHCS through the nut into the lug -------
 SCREW_COUNT = len(HOLE_X)
@@ -208,8 +222,13 @@ WALLS_MM: dict[str, float] = {
     - HOLE_OFFSET_BAND
     - DOWEL_HOLE_R_MAX
     - HOLE_R_MAX,
-    "dowel hole to top face": (HEIGHT - HEIGHT_STOCK_BAND)
-    - (DOWEL_HOLE_Y + _STATION + DOWEL_STATION_BAND)
+    "dowel hole to bottom face": DOWEL_HOLE_Y
+    - _STATION
+    - DOWEL_STATION_BAND
+    - DOWEL_HOLE_R_MAX,
+    "dowel hole to -X side": DOWEL_HOLE_X
+    - _STATION
+    - DOWEL_STATION_BAND
     - DOWEL_HOLE_R_MAX,
     "Tr8 major to the holes": HOLE_OFFSET - HOLE_OFFSET_BAND - HOLE_R_MAX - _BORE_R,
     "hole 1 to -X side": HOLE_X[0] - _STATION - HOLE_OFFSET_BAND - HOLE_R_MAX,

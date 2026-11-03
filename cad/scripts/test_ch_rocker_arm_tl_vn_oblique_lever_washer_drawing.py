@@ -83,20 +83,23 @@ def test_one_pair_under_each_lever_screw_head() -> None:
 
 def test_lever_screw_engagement_and_stand_out_at_the_worst_case() -> None:
     # AGENTS.md: the worst case, not the nominal. The shortest screw (ASME
-    # B18.3 -0.03 in) through the thickest lever (.XX) and pair, capped by
-    # TL-21's worst-case full thread (RV-01); the longest screw through
+    # B18.3 -0.03 in) through the thickest lever (.XX) and pair, less the
+    # tip's 0.75P chamfer and the carrier tap mouth's .010 edge break, capped
+    # by TL-21's worst-case full thread (RV-01); the longest screw through
     # the thinnest lever and pair, past the thinnest plate.
     assert screw_dims.LENGTH_MIN == pytest.approx((1.0 - 0.03) * IN)
     lever_max = feed_lever.LEVER_THICK + spec._THICK_BAND
     lever_min = feed_lever.LEVER_THICK - spec._THICK_BAND
+    tip_chamfer = 0.75 * IN / 18.0  # 5/16-18
+    assert spec.TAP_MOUTH_BREAK == pytest.approx(0.010 * IN)
+    reach = screw_dims.LENGTH_MIN - (lever_max + 0.090 * IN) - tip_chamfer - 0.010 * IN
     assert spec.ENGAGEMENT_MIN == pytest.approx(
-        min(
-            screw_dims.LENGTH_MIN - (lever_max + 0.090 * IN),
-            carrier.ENGAGEMENT_MM[carrier.LEVER_THREAD],
-        )
+        min(reach, carrier.ENGAGEMENT_MM[carrier.LEVER_THREAD])
     )
-    # the 7/8 in screw's at the same corners, no pair
-    assert spec.ENGAGEMENT_MIN > (0.875 - 0.03) * IN - lever_max
+    # The reach governs, over 1D of the 5/16 major.
+    assert spec.ENGAGEMENT_MIN == pytest.approx(reach)
+    assert round(spec.ENGAGEMENT_MIN / IN, 3) == 0.318
+    assert spec.ENGAGEMENT_MIN >= fasteners.LEVER_TO_CARRIER.major_mm
     assert spec.ENGAGEMENT_MIN <= carrier.ENGAGEMENT_MM[carrier.LEVER_THREAD]
     assert spec.ENGAGEMENT >= carrier.ENGAGEMENT_MM[carrier.LEVER_THREAD]
     assert spec.STAND_OUT_MAX == pytest.approx(

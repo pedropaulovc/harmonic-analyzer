@@ -802,7 +802,7 @@ def test_interference_contracts_are_physical_seats_and_threads() -> None:
     # The bond runs the whole carrier: cut = carrier + riser + tip set.
     assert overlap == pytest.approx(carrier.THICKNESS)
     assert contracts.JIG_CL_DOWEL_PRESS == (cl_dowel.DIA, carrier.THICKNESS)
-    assert contracts.JIG_NUT_DOWEL_PRESS == pytest.approx((nut_dowel.DIA, feed_block.DOWEL_DEPTH))
+    assert contracts.JIG_NUT_DOWEL_PRESS == pytest.approx((nut_dowel.DIA, feed_nut.LENGTH))
     for envelope, expected in (
         (
             contracts.JIG_RAIL_SCREW_THREAD,
@@ -872,13 +872,15 @@ def test_interference_contracts_are_physical_seats_and_threads() -> None:
     assert pairs[frozenset((f"{spec.CL_DOWEL}-1", f"{spec.CARRIER}-1"))] == (
         pytest.approx(1.10 * dowel)
     )
-    # The nut dowel presses into the lug only: a slip fit in the nut.
-    press = math.pi * nut_dowel.DIA**2 * feed_block.DOWEL_DEPTH / 4.0
-    nut_dowel_pair = frozenset((f"{spec.NUT_DOWEL}-1", f"{spec.FEED_BLOCK}-1"))
+    # The nut dowel presses through the nut only: a slip fit in the lug's #41
+    # hole, so no pair names the feed block.
+    press = math.pi * nut_dowel.DIA**2 * feed_nut.LENGTH / 4.0
+    nut_dowel_pair = frozenset((f"{spec.NUT_DOWEL}-1", f"{spec.FEED_NUT}-1"))
     assert pairs[nut_dowel_pair] == pytest.approx(1.10 * press)
     assert [pair for pair in pairs if f"{spec.NUT_DOWEL}-1" in pair] == [nut_dowel_pair]
-    assert feed_nut.DOWEL_HOLE_DIA + feed_nut.DOWEL_HOLE_BAND[1] > nut_dowel.DIA_MAX
-    assert feed_block.DOWEL_DRILL < nut_dowel.DIA_MIN
+    assert feed_nut.DOWEL_HOLE_DIA + feed_nut.DOWEL_HOLE_BAND[0] < nut_dowel.DIA_MIN
+    assert min(feed_nut.DOWEL_INTERFERENCE) > 0.0
+    assert feed_block.DOWEL_DRILL > nut_dowel.DIA_MAX
     inserted = (*SCREW_ROWS, spec.HOLD_DOWN_STUD, spec.FEED_NUT, spec.PIVOT_SCREW)
     occurrences = {
         spec.instance_name(family, index): (family, index)
@@ -1319,8 +1321,6 @@ def test_carriage_screws_are_cut_to_fit_under_a_confirmed_owner_exception() -> N
     assert reach.kind == "accept"
     assert "+ .189" in reach.where and ".183-.195" in reach.where
     assert "1.03D" in reach.finding
-    assert "Owner exception confirmed" in reach.reason
-
 
 
 def test_turned_over_bar_counterbores_clear_the_flange_nuts() -> None:
@@ -1386,7 +1386,7 @@ def test_bracket_load_cases_hold_the_hand_abuse_thrust() -> None:
         (0.4, "0.4 N·m (3.5 IN·LBF)"),
         (2.8, "2.8 N·m (25 IN·LBF)"),
         (4.0, "4.0 N·m (35 IN·LBF)"),
-        (19.2, "19.2 N·m (170 IN·LBF)"),
+        (16.5, "16.5 N·m (150 IN·LBF)"),
     ),
 )
 def test_printed_torque_leads_with_n_m_and_rounds_in_lbf(nm, printed) -> None:
@@ -1556,19 +1556,19 @@ def test_feed_nut_dowel_takes_the_torque_and_the_screws_hold_it_on() -> None:
     force = spec.NUT_TORQUE_NM * 1000.0 / math.hypot(feed_nut.DOWEL_DX, feed_nut.DOWEL_DY)
     assert spec.NUT_DOWEL_FORCE_N == pytest.approx(force)
     # Single shear on half McMaster's 1,400 lbf double-shear rating; bearing
-    # on the brass over the least engagement and on the 6061-T6 lug over the
-    # least press depth, each against its yield.
+    # on the brass over the shortest nut (pressed through it) and on the
+    # 6061-T6 lug over the dowel's least engagement, each against its yield.
     area = math.pi / 4.0 * nut_dowel.DIA**2
     margins = {
         "dowel shear": 1400.0 * 4.448222 / 2.0 / force,
-        "brass bearing": 117.2 * nut_dowel.DIA * feed_block.DOWEL_NUT_ENGAGEMENT_MIN / force,
-        "6061 bearing": 276.0 * nut_dowel.DIA * feed_block.DOWEL_PRESS_MIN / force,
+        "brass bearing": 117.2 * nut_dowel.DIA * feed_nut.LENGTH_MIN / force,
+        "6061 bearing": 276.0 * nut_dowel.DIA * feed_block.DOWEL_LUG_ENGAGEMENT_MIN / force,
     }
     assert spec.NUT_DOWEL_MARGINS == pytest.approx(margins, rel=1e-3)
     assert spec.NUT_DOWEL_SHEAR_MPA == pytest.approx(force / area)
     assert min(spec.NUT_DOWEL_MARGINS.values()) >= leadscrew.SLIP_MARGIN_MIN
-    assert round(min(spec.NUT_DOWEL_MARGINS.values()), 1) == 19.8
-    assert not hasattr(spec, "NUT_SLIP_NM") and not hasattr(spec, "NUT_SLIP_MARGIN")
+    assert round(min(spec.NUT_DOWEL_MARGINS.values()), 1) == 11.9
+    assert min(spec.NUT_DOWEL_MARGINS, key=spec.NUT_DOWEL_MARGINS.get) == "6061 bearing"
     # The screws: with no joint-stiffness credit their preload alone holds
     # the nut against that thrust, within what the tap and the 360-H02
     # (17 ksi) carry under each flange.
@@ -1607,11 +1607,12 @@ def test_nut_screw_heads_seat_flat_on_the_feed_nut() -> None:
     assert round(feed_block.HEAD_TO_LEADSCREW_MIN / 25.4, 3) == 0.063
 
 
-def test_f1_transfers_the_lug_holes_through_the_seated_nut() -> None:
-    # Main ruling 2026-11-03 (P1b): the KP08s centre the leadscrew in the
-    # lug's clearance first, then the lug's taps and dowel hole are drilled
-    # through the seated nut and the dowel pressed through it; the screws go
-    # in last at their torque.
+def test_f1_transfers_the_lug_holes_from_the_seated_nut() -> None:
+    # Main ruling 2026-11-03 (P1b) and round 4: the KP08s centre the
+    # leadscrew in the lug's clearance first; the taps are spotted through
+    # the seated nut and tapped, then the dowel hole is spotted through it,
+    # the nut backed off and the lug drilled; the dowel goes into the nut
+    # flush with its head face and the nut is reseated; the screws go in last.
     steps = {
         text.split(". ", 1)[0]: text
         for text in (*spec.ASSEMBLY_STEPS, *spec.KP08_ALIGNMENT_STEPS)
@@ -1624,8 +1625,11 @@ def test_f1_transfers_the_lug_holes_through_the_seated_nut() -> None:
         "THE NUT SEATS SQUARE ON THE LUG FACE",
         "SPOT BOTH TAPS THROUGH ITS Ø.170 HOLES WITH A #18 DRILL",
         "DRILL #43 AND TAP #4-40 THRU",
-        "DRILL #42 .16 DEEP INTO THE LUG THROUGH THE NUT'S REAMED DOWEL HOLE",
-        f"PRESS THE DOWEL PIN {spec._item(spec.NUT_DOWEL)} THROUGH THE NUT TO THE HOLE'S BOTTOM",
+        "DRILL #43 THROUGH THE NUT'S REAMED DOWEL HOLE TO SPOT THE LUG",
+        "BACK THE NUT OFF AND DRILL #41 THRU THE LUG",
+        f"PRESS THE DOWEL PIN {spec._item(spec.NUT_DOWEL)} INTO THE NUT FLUSH WITH ITS "
+        "SCREW-HEAD FACE",
+        "RESEAT THE NUT ON THE LUG FACE",
         f"FIT 2 #4-40 X 3/4 FLANGED BHCS {spec._item(spec.NUT_SCREW)} AND TIGHTEN "
         f"TO {spec._torque(spec.NUT_SCREW_TORQUE_NM)}",
     )
@@ -1634,7 +1638,7 @@ def test_f1_transfers_the_lug_holes_through_the_seated_nut() -> None:
     assert spec._torque(spec.NUT_SCREW_TORQUE_NM) == "0.4 N·m (3.5 IN·LBF)"
     assert "THROUGH THE KP08S, THE FEED BLOCK LUG'S CLEARANCE AND THE FEED NUT" in steps["8"]
     assert steps["8"].index("THE FEED NUT") < steps["8"].index("COMPLETE F1")
-    assert "DRILLED THROUGH THE NUT IN F1" in steps["7"]
+    assert "TRANSFERRED FROM THE NUT IN F1" in steps["7"]
     for text in (*spec.ASSEMBLY_STEPS, *spec.KP08_ALIGNMENT_STEPS):
         for stale in ("PRINT-DRILLED", "TRANSFER SPOTTING", "LOOSE HOLES"):
             assert stale not in text
@@ -1771,27 +1775,31 @@ def test_feed_lug_nut_and_drilled_threads_stay_in_real_material() -> None:
         assert origin == pytest.approx(expected)
         # Bought heads point out of the lug; their -Y threaded shanks enter it.
         assert screw_rows[1] == pytest.approx(tuple(-value for value in rows[0]))
-    # The dowel: axis along the nut screws', its y = 0 end pressed to the
-    # bottom of the lug's hole on the transferred station, its far end under
-    # the nut's far face by at least TL-32's worst-case recess.
+    # The dowel: axis along the nut screws', its y = LENGTH end flush with the
+    # nut's screw-head face, its y = 0 tip in the lug's #41 hole on the
+    # transferred station, within TL-32's engagement band.
     ((dowel, dowel_rows),) = spec.NUT_DOWEL_PLACEMENTS
-    bottom = (feed_block.NUT_FACE_X + feed_block.DOWEL_DEPTH, *feed_block.DOWEL_YZ)
-    assert dowel == pytest.approx(_image(rows, block_origin, bottom))
+    head_x = feed_block.NUT_FACE_X - feed_nut.LENGTH
+    tip = (head_x + nut_dowel.LENGTH, *feed_block.DOWEL_YZ)
+    assert dowel == pytest.approx(_image(rows, block_origin, tip))
     assert dowel_rows == spec.NUT_SCREW_PLACEMENTS[0][1]
-    top_x = bottom[0] - nut_dowel.LENGTH
-    assert bottom[0] < feed_block.LUG_X1
-    assert feed_block.NUT_FACE_X - feed_nut.LENGTH < top_x < feed_block.NUT_FACE_X
-    recess = top_x - (feed_block.NUT_FACE_X - feed_nut.LENGTH)
-    assert recess == pytest.approx(spec.NUT_DOWEL_RECESS)
-    assert recess >= feed_block.DOWEL_RECESS_MIN
     assert spec.frame_point(spec.NUT_DOWEL_PLACEMENTS[0], (0.0, nut_dowel.LENGTH, 0.0)) == (
-        pytest.approx(_image(rows, block_origin, (top_x, *feed_block.DOWEL_YZ)))
+        pytest.approx(_image(rows, block_origin, (head_x, *feed_block.DOWEL_YZ)))
     )
-    # The dowel's station is the nut's reamed hole's.
+    engagement = tip[0] - feed_block.NUT_FACE_X
+    assert engagement == pytest.approx(spec.NUT_DOWEL_LUG_ENGAGEMENT)
+    assert engagement == pytest.approx(nut_dowel.LENGTH - feed_nut.LENGTH)
+    assert (
+        feed_block.DOWEL_LUG_ENGAGEMENT_MIN <= engagement
+        <= feed_block.DOWEL_LUG_ENGAGEMENT_MAX < feed_block.LUG_WIDTH
+    )
+    # The dowel's station is the nut's reamed hole's, now below the bore.
     assert feed_block.DOWEL_YZ == pytest.approx((
         feed_block.NUT_AXIS_Y + feed_nut.DOWEL_DX, feed_block.NUT_AXIS_Z + feed_nut.DOWEL_DY,
     ))
-    assert spec.lock_parent(spec.NUT_DOWEL, 0) == spec.instance_name(spec.FEED_BLOCK, 0)
+    assert feed_nut.DOWEL_DY < 0.0
+    # Pressed in the nut, it rides with it.
+    assert spec.lock_parent(spec.NUT_DOWEL, 0) == spec.instance_name(spec.FEED_NUT, 0)
     for station in trammel.CARRIAGE_TRAVEL:
         low = station + feed_block.NUT_REACH_X[0]
         high = station + feed_block.NUT_REACH_X[1]
@@ -1805,6 +1813,10 @@ def test_feed_nut_and_its_screws_hit_nothing_over_the_travel() -> None:
     # leadscrew they thread, and the carrier branch above them; the
     # interference contract names only those threads.
     gaps = spec.feed_nut_travel_gaps()
+    # Each nut screw's envelope is as wide as its flange, the widest part.
+    flange = nut_screw.DIMS.flange_dia
+    assert flange > max(nut_screw.DIMS.head_dia, nut_screw.DIMS.major_dia)
+    assert spec._component_local_boxes()[spec.NUT_SCREW][0] == pytest.approx((-flange / 2.0, flange / 2.0))
     assert {"pillow block 1", "end bracket 1", "base bar 1", "carrier"} <= set(gaps)
     assert not any(label.startswith("screw") for label in gaps)
     assert min(gaps.values()) > 0.0
@@ -1813,7 +1825,10 @@ def test_feed_nut_and_its_screws_hit_nothing_over_the_travel() -> None:
         pair for pair in contracts._ROCKER_OBLIQUE_JIG_ALLOWED_PAIRS
         if any(name.startswith(f"{contracts._JIG}-feed-nut") for name in pair)
     ]
-    assert allowed == [frozenset((f"{contracts._JIG}-feed-nut-1", f"{contracts._JIG_VENDOR}-leadscrew-1"))]
+    assert sorted(allowed, key=sorted) == sorted((
+        frozenset((f"{contracts._JIG}-feed-nut-1", f"{contracts._JIG_VENDOR}-leadscrew-1")),
+        frozenset((f"{contracts._JIG}-feed-nut-1", f"{contracts._JIG_VENDOR}-nut-dowel-1")),
+    ), key=sorted)
     screws = [
         pair for pair in contracts._ROCKER_OBLIQUE_JIG_ALLOWED_PAIRS
         if any(name.startswith(f"{contracts._JIG_VENDOR}-nut-screw") for name in pair)

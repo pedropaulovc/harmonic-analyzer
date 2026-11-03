@@ -594,31 +594,36 @@ NUT_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
     )
     for y, z in feed_block.NUT_HOLES_YZ
 )
-# The TL-VN-81 dowel keys the nut to the lug (Main ruling 2026-11-03): pressed
-# to the bottom of the lug's hole, its axis along the leadscrew's (the nut
-# screws' rows), its y = 0 end on the hole's bottom and its other end toward
-# the nut's far face, inside the nut's reamed hole.
+# The TL-VN-81 dowel keys the nut to the lug (Main ruling 2026-11-03; round 4:
+# never pressed into a blind hole). It is pressed in the nut's reamed THRU
+# hole, flush with the nut's screw-head face, and slips into the lug's blind
+# hole. Its axis runs along the leadscrew's (the nut screws' rows): its
+# y = LENGTH end on the head face, its y = 0 end inside the lug's hole.
 if not (
     feed_nut.DOWEL_DIA == nut_dowel.DIA
     and feed_nut.DOWEL_DIA_MAX == nut_dowel.DIA_MAX
     and feed_nut.DOWEL_LENGTH == nut_dowel.LENGTH
 ):
     raise AssertionError("the feed nut's dowel is not the TL-VN-81 dowel")
-NUT_DOWEL_BOTTOM_X = feed_block.NUT_FACE_X + feed_block.DOWEL_DEPTH
+NUT_HEAD_FACE_X = feed_block.NUT_FACE_X - feed_nut.LENGTH
+NUT_DOWEL_TIP_X = NUT_HEAD_FACE_X + nut_dowel.LENGTH
 NUT_DOWEL_PLACEMENTS: tuple[Placement, ...] = (
     compose(
         FEED_BLOCK_PLACEMENTS[0],
-        (NUT_DOWEL_BOTTOM_X, *feed_block.DOWEL_YZ),
+        (NUT_DOWEL_TIP_X, *feed_block.DOWEL_YZ),
         NUT_ROWS,
     ),
 )
-# Its top stands under the nut's far face at the modelled (nominal) sizes by
-# at least the worst-case recess TL-32's spec proves.
-NUT_DOWEL_RECESS = (NUT_DOWEL_BOTTOM_X - nut_dowel.LENGTH) - (
-    feed_block.NUT_FACE_X - feed_nut.LENGTH
-)
-if NUT_DOWEL_RECESS < feed_block.DOWEL_RECESS_MIN:
-    raise AssertionError("the modelled nut dowel stands proud of the nut's far face")
+# At the modelled (nominal) sizes its tip enters the lug's #41 THRU hole
+# within TL-32's engagement band and stays inside the lug.
+NUT_DOWEL_LUG_ENGAGEMENT = NUT_DOWEL_TIP_X - feed_block.NUT_FACE_X
+if not (
+    feed_block.DOWEL_LUG_ENGAGEMENT_MIN
+    <= NUT_DOWEL_LUG_ENGAGEMENT
+    <= feed_block.DOWEL_LUG_ENGAGEMENT_MAX
+    < feed_block.LUG_WIDTH
+):
+    raise AssertionError("the modelled nut dowel misses the lug's hole or leaves the lug")
 # A KP08 block on each end bracket's top over the screw axis (bracket
 # frame), its two screws down through the foot.
 PILLOW_BLOCK_PLACEMENTS: tuple[Placement, ...] = tuple(
@@ -889,7 +894,7 @@ LOCKED_TO: dict[str, tuple[tuple[str, int], ...]] = {
     CARRIAGE_SCREW: tuple(parent for parent in _SUPPORT_PARENTS for _ in pivot_block.BOLT_POINTS),
     FEED_NUT: ((FEED_BLOCK, 0),),
     NUT_SCREW: tuple((FEED_BLOCK, 0) for _ in feed_block.NUT_HOLES_YZ),
-    NUT_DOWEL: ((FEED_BLOCK, 0),),
+    NUT_DOWEL: ((FEED_NUT, 0),),  # pressed in the nut
     RISER: ((CARRIER, 0),),
     RISER_SCREW: tuple((CARRIER, 0) for _ in trammel.RISER_SCREWS),
     HUB_PIN: ((CARRIER, 0),),
@@ -1029,7 +1034,7 @@ EXPLODE_STEPS = (
     # lifts out as the clamp screw does, clear above the lifted riser.
     ("cl dowel lifts out", (CL_DOWEL,), "z", 100.0),
     ("nut screws back out", (NUT_SCREW,), "x", 30.0),
-    # The dowel draws out through the nut's reamed hole, clear of its face.
+    # The dowel presses out of the nut's head face, clear of it.
     ("nut dowel draws out", (NUT_DOWEL,), "x", 20.0),
     ("blocks lift off", (PIVOT_BLOCK, FEED_BLOCK, *_BLOCK_RIDERS), "z", 90.0),
     ("carriage screws lift out", (CARRIAGE_SCREW,), "z", 60.0),
@@ -1480,22 +1485,23 @@ NUT_TORQUE_NM = (
     NUT_THRUST_N * _TR_PITCH_DIA / 2000.0 * math.tan(_LEAD_ANGLE + _FRICTION_ANGLE)
 )  # 1.015
 # The dowel reacts it at its station from the leadscrew axis, in single shear
-# at the nut-lug face, bearing on the brass over its least engagement in the
-# nut and on the 6061-T6 lug over its least press depth (TL-32's spec). Each
-# carries leadscrew.SLIP_MARGIN_MIN or more against its allowable.
-NUT_DOWEL_FORCE_N = NUT_TORQUE_NM * 1000.0 / feed_nut.DOWEL_RADIUS  # 115
+# at the nut-lug face, bearing on the brass over the nut's least length (it
+# is pressed through the whole nut) and on the 6061-T6 lug over its least
+# engagement in the lug's hole (TL-32's spec). Each carries
+# leadscrew.SLIP_MARGIN_MIN or more against its allowable.
+NUT_DOWEL_FORCE_N = NUT_TORQUE_NM * 1000.0 / feed_nut.DOWEL_RADIUS  # 113
 # McMaster 98381A438's double-shear breaking strength, 1,400 lbf (SOURCED:
 # the product page, read live 2026-11-03); one shear plane carries half.
 _DOWEL_DOUBLE_SHEAR_N = 1_400.0 * 4.448222
 NUT_DOWEL_SHEAR_MPA = NUT_DOWEL_FORCE_N / (math.pi / 4.0 * nut_dowel.DIA**2)
 _DOWEL_SHEAR_ALLOWABLE_MPA = _DOWEL_DOUBLE_SHEAR_N / 2.0 / (math.pi / 4.0 * nut_dowel.DIA**2)
-NUT_DOWEL_BRASS_BEARING_MPA = NUT_DOWEL_FORCE_N / (
-    nut_dowel.DIA * feed_block.DOWEL_NUT_ENGAGEMENT_MIN
-)
+NUT_DOWEL_BRASS_BEARING_MPA = NUT_DOWEL_FORCE_N / (nut_dowel.DIA * feed_nut.LENGTH_MIN)
 # 6061-T6 yield, 276 MPa (SOURCED: ASM / MatWeb 6061-T6), taken as the
 # compressive yield; the lever's wedge-lock pairs below bear on it too.
 _AL_YIELD_MPA = 276.0
-NUT_DOWEL_LUG_BEARING_MPA = NUT_DOWEL_FORCE_N / (nut_dowel.DIA * feed_block.DOWEL_PRESS_MIN)
+NUT_DOWEL_LUG_BEARING_MPA = NUT_DOWEL_FORCE_N / (
+    nut_dowel.DIA * feed_block.DOWEL_LUG_ENGAGEMENT_MIN
+)
 NUT_DOWEL_MARGINS = {
     "dowel shear": _DOWEL_SHEAR_ALLOWABLE_MPA / NUT_DOWEL_SHEAR_MPA,
     "brass bearing": _BRASS_YIELD_MPA / NUT_DOWEL_BRASS_BEARING_MPA,
@@ -1634,7 +1640,7 @@ ASSEMBLY_STEPS = (
     "BAR AT ITS CARRIAGE'S SPINDLE-END FACE, I OR O BY PASS.",
     f"7. FIT EACH KP08 {_item(PILLOW_BLOCK)} WITH 2 {_KP08_SCREW} "
     f"{_item(PILLOW_BLOCK_SCREW)}, LOOSE. THE FEED BLOCK LUG'S NUT TAPS AND "
-    "DOWEL HOLE ARE DRILLED THROUGH THE NUT IN F1.",
+    "DOWEL HOLE ARE TRANSFERRED FROM THE NUT IN F1.",
     # The Tr8 screw's stub and the hub's gap close its metric cut along the
     # KP08 stations: they print exact millimetres (owner ruling 4, 2026-11-01).
     f"8. OIL THE LEADSCREW {_item(LEADSCREW)} WITH ISO VG 32 AND THREAD IT "
@@ -1732,12 +1738,14 @@ PIVOT_SHIM_STOCK_NOTE = "\n".join((
     ) + ".",
 ))
 # F1's transfer drills, by the names the fitter asks for; TL-32's spec owns
-# their sizes (TRANSFER_SPOT_DIA, NUT_TAP_DRILL, DOWEL_DRILL).
+# their sizes (TRANSFER_SPOT_DIA, NUT_TAP_DRILL and DOWEL_SPOT_DIA, DOWEL_DRILL).
 _SPOT_DRILL = "#18"
-_TAP_DRILL = "#43"
-_DOWEL_DRILL = "#42"
+_TAP_DRILL = "#43"  # also the dowel hole's spot
+_DOWEL_DRILL = "#41"
 if NUMBER_DRILL_MM[_TAP_DRILL] != feed_block.NUT_TAP_DRILL:
     raise AssertionError("F1's tap drill is not TL-32's nut tap drill")
+if abs(NUMBER_DRILL_MM[_TAP_DRILL] - feed_block.DOWEL_SPOT_DIA) > 1e-3:
+    raise AssertionError("F1's dowel spot drill is not TL-32's")
 KP08_ALIGNMENT_STEPS = (
     "F1. WITH THE LEADSCREW THREADED THROUGH THE NUT, MOVE THE FEED "
     "CARRIAGE TO EACH TRAVEL END IN TURN AND ALIGN EACH KP08 SO THE SCREW "
@@ -1747,11 +1755,11 @@ KP08_ALIGNMENT_STEPS = (
     "THE SCREW UNTIL THE NUT SEATS SQUARE ON THE LUG FACE AND CLAMP IT THERE. "
     f"SPOT BOTH TAPS THROUGH ITS Ø{_length(feed_nut.HOLE_DIA, feed_nut.HOLE_DIA_PLACES)} "
     f"HOLES WITH A {_SPOT_DRILL} DRILL, THEN DRILL {_TAP_DRILL} AND TAP "
-    f"{feed_nut.SCREW_THREAD} THRU. DRILL {_DOWEL_DRILL} "
-    f"{_length(feed_block.DOWEL_DEPTH, feed_block.DOWEL_DEPTH_PLACES)} DEEP INTO "
-    "THE LUG THROUGH THE NUT'S REAMED DOWEL HOLE AND PRESS THE DOWEL PIN "
-    f"{_item(NUT_DOWEL)} THROUGH THE NUT TO THE HOLE'S BOTTOM. FIT 2 "
-    f"{_NUT_SCREW} {_item(NUT_SCREW)} AND TIGHTEN TO {_NUT_TORQUE}.",
+    f"{feed_nut.SCREW_THREAD} THRU. DRILL {_TAP_DRILL} THROUGH THE NUT'S REAMED "
+    f"DOWEL HOLE TO SPOT THE LUG; BACK THE NUT OFF AND DRILL {_DOWEL_DRILL} THRU "
+    f"THE LUG; PRESS THE DOWEL PIN {_item(NUT_DOWEL)} INTO THE NUT FLUSH WITH ITS "
+    "SCREW-HEAD FACE; RESEAT THE NUT ON THE LUG FACE, THE DOWEL IN ITS HOLE. "
+    f"FIT 2 {_NUT_SCREW} {_item(NUT_SCREW)} AND TIGHTEN TO {_NUT_TORQUE}.",
     "F2. WITH THE HANDWHEEL AND ALL SET SCREWS TIGHT, TURN THE HANDWHEEL "
     "TO BOTH FEED-CARRIAGE TRAVEL ENDS: NO BINDING, NUT OR LUG CONTACT WITH "
     "A KP08, AND NO MOVING PART CONTACT. REPEAT ALIGNMENT IF IT BINDS.",
@@ -1932,7 +1940,11 @@ def _component_local_boxes() -> dict[str, Box3]:
         (PILLOW_BLOCK_SCREW, kp08_screw), (NUT_SCREW, nut_screw),
         (CLAMP_SCREW, clamp_screw), (LEVER_SCREW, lever_screw),
     ):
-        boxes[stem] = _axis_y_box(max(screw.DIMS.head_dia, screw.DIMS.major_dia) / 2.0, -screw.DIMS.length, screw.DIMS.head_h)
+        # A flanged head (the nut screws') is as wide as its flange.
+        radius = max(
+            screw.DIMS.head_dia, getattr(screw.DIMS, "flange_dia", None) or 0.0, screw.DIMS.major_dia,
+        ) / 2.0
+        boxes[stem] = _axis_y_box(radius, -screw.DIMS.length, screw.DIMS.head_h)
     if set(boxes) != set(BOM_ORDER):
         raise ValueError("fixture envelope must cover every native BOM family")
     return boxes

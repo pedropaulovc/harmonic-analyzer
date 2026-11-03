@@ -115,39 +115,33 @@ def text_half_high(rows: int) -> float:
     return ((rows - 1) * ROW_PITCH + 3.5 / _S) / 2.0
 
 
-# Over the face, one lane: the dowel hole's .270 from the bore, its text
-# between the two extension lines. Nothing else stands over the face, so the
-# dowel callout's leader comes in from the upper left fenced by no extension
-# line.
-_DOWEL_X_LINE = HEIGHT + FIRST_LANE
-# Under the face: each hole's .35 from the bore (one each side, the text
-# between its extension lines), then the bore's station, then the stock
-# width, each text over its own line. The width's text stands right of the
-# bore's extension line, which ends at the station's line just over it
-# (review of farm run 20261101T175835750Z: centred, the line struck "1").
-_OFFSET_LINE = -FIRST_LANE
+# Under the face, nearest first so no extension line crosses a dimension
+# line: the dowel hole's .27 from the bore, each screw hole's .35 from the
+# bore (one each side), then the bore's station, then the stock width, each
+# text between its extension lines over its own line. The width's text stands
+# right of the bore's extension line, which ends at the station's line just
+# over it (review of farm run 20261101T175835750Z: centred, the line struck
+# "1").
+_DOWEL_X_LINE = -FIRST_LANE
+_OFFSET_LINE = _DOWEL_X_LINE - TEXT_GAP - 2.0 * text_half_high(1)
 _BORE_X_LINE = _OFFSET_LINE - TEXT_GAP - 2.0 * text_half_high(1)
 _WIDTH_LINE = _BORE_X_LINE - TEXT_GAP - THREE_LINE_DROP - text_half_high(3)
-# Left of the face, one lane: the bore's .38 from the bottom, the dowel's
-# .220 over it from the bore; then the stock height outboard of both texts.
-_BORE_Y_LINE = -FIRST_LANE
+# Left of the face, nearest first: the dowel's .23 under the bore, the bore's
+# .38 from the bottom, then the stock height, each text outboard of its line.
+_DOWEL_Y_LINE = -FIRST_LANE
+_DOWEL_Y_TEXT = _DOWEL_Y_LINE - TEXT_GAP - text_half(".23")
+_BORE_Y_LINE = _DOWEL_Y_TEXT - text_half(".23") - TEXT_GAP
 _BORE_Y_TEXT = _BORE_Y_LINE - TEXT_GAP - text_half(".38")
-_DOWEL_Y_TEXT = _BORE_Y_LINE - TEXT_GAP - text_half(".220")
-_HEIGHT_LINE = _DOWEL_Y_TEXT - text_half(".220") - TEXT_GAP
+_HEIGHT_LINE = _BORE_Y_TEXT - text_half(".38") - TEXT_GAP
 _HEIGHT_TEXT = _HEIGHT_LINE - TEXT_GAP - text_half(STOCK_CALLOUTS["NutHeight"])
-# The dowel's reamed callout over the face's upper left, wholly left of the
-# .270's extension line, its leader down onto the hole's upper-left rim
-# across the face's top edge (inside the face, past the stock height's
-# extension line).
-_DOWEL_CALLOUT = f"Ø.0948+.0005 REAM THRU\n{DOWEL_MATE_CALLOUT}"
+# The dowel's reamed callout over the face, above the bore: nothing stands
+# over the face, so its leader comes straight down into it between the -X
+# screw hole and the bore (about 2 mm clear of each) onto the dowel hole.
+_DOWEL_CALLOUT = f"Ø.0930+.0005 REAM THRU\n{DOWEL_MATE_CALLOUT}"
 FACE_KEEP: dict[str, tuple[float, float, float]] = {
     "DowelX": ((DOWEL_HOLE_X + BORE_X) / 2.0, _DOWEL_X_LINE + TEXT_DROP, LENGTH),
     "DowelY": (_DOWEL_Y_TEXT, (BORE_Y + DOWEL_HOLE_Y) / 2.0, LENGTH),
-    "DowelDia": (
-        DOWEL_HOLE_X - 3.0 - text_half(_DOWEL_CALLOUT),
-        _DOWEL_X_LINE + 4.0 + text_half_high(2),
-        LENGTH,
-    ),
+    "DowelDia": (BORE_X - 0.5, HEIGHT + FIRST_LANE + text_half_high(2), LENGTH),
     "Hole1Offset": ((HOLE_X[0] + BORE_X) / 2.0, _OFFSET_LINE + TEXT_DROP, LENGTH),
     "Hole2Offset": ((HOLE_X[1] + BORE_X) / 2.0, _OFFSET_LINE + TEXT_DROP, LENGTH),
     "BoreX": (BORE_X / 2.0, _BORE_X_LINE + TEXT_DROP, LENGTH),

@@ -104,9 +104,10 @@ CHAMFER_SUFFIX = f" X {CHAMFER_ANGLE:g}°"
 CHAMFER_REFERENCE_FEATURE = "ChamferRightReference"
 CHAMFER_LEG_DIMENSION = "CutChamferLeg"
 CHAMFER_LEG_START = (THREAD_LENGTH - CUT_CHAMFER, THREAD_DIA / 2.0)  # Right sketch (x = -z, y)
-# The note gives only the cut's function, which keeps .570 at three places;
-# the mate is named in full (machinist review).
-CUT_NOTE = "TIP STAYS .011 MIN INSIDE\nMHA-CH-06-TL-22 PIVOT BLOCK"
+# The note gives only the cut's function, which keeps .570 at three places
+# (the tip clearance is the pivot block spec's to prove, not a printed
+# figure); the mate is named in full (machinist review).
+CUT_NOTE = "TIP STAYS INSIDE\nMHA-CH-06-TL-22 PIVOT BLOCK"
 THREAD_NOTE = f"{THREAD} UNC-2A\n(AS SUPPLIED)"
 SUPPLIER_DATA = (
     "HEAD Ø.562 X .250; 3/16 HEX KEY.",

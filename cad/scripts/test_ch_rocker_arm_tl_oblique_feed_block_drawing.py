@@ -47,7 +47,13 @@ def test_nut_face_carries_the_screw_clearance_two_through_taps_and_the_dowel_hol
     assert math.isclose(spec.NUT_AXIS_Y,-lead.SCREW_LATERAL)
     assert math.isclose(trammel.CARRIAGE_TOP_Z+spec.NUT_AXIS_Z,lead.SCREW_AXIS_Z)
     assert math.isclose(spec.SCREW_CLEARANCE_DIA,.375*INCH)
-    assert math.isclose(spec.DOWEL_DRILL,.0935*INCH) and math.isclose(spec.DOWEL_DEPTH,.16*INCH)
+    # The dowel slips in a #41 THRU (Codjiflo round 4: pressed in the nut's
+    # THRU hole instead, so it drives back out), spotted with a #43.
+    assert math.isclose(spec.DOWEL_DRILL,.096*INCH) and math.isclose(spec.DOWEL_SPOT_DIA,.089*INCH)
+    assert spec.DOWEL_DRILL>feed_nut.DOWEL_DIA_MAX and spec.DOWEL_SPOT_DIA<feed_nut.DOWEL_HOLE_DIA
+    assert spec.CALLOUTS_ABOVE['NutDowelDia']=='#41 DRILL THRU'
+    assert 'TRANSFER THROUGH TL-27' in spec.CALLOUTS_BELOW['NutDowelDia']
+    assert spec.DRAWING_PRECISION_BY_NAME['NutDowelDia']==3
     assert spec.DOWEL_YZ==(spec.NUT_AXIS_Y+feed_nut.DOWEL_DX,spec.NUT_AXIS_Z+feed_nut.DOWEL_DY)
     assert spec.SCREW_CLEARANCE_DIA-printed_band_mm(3,unit=spec.UNIT)>lead.SCREW_MAJOR_DIA
     assert set(spec.DRAWING_DIMENSIONS)>={'NutClearanceProfile','NutPatternReference','LugProfile'}
@@ -79,7 +85,7 @@ def test_nut_taps_are_transferred_from_the_tl27_pair_and_print_ref():
     assert spec.CALLOUTS_BELOW['NutCentreZ']=='FROM CARRIAGE FACE\nON KP08 LEADSCREW AXIS'
     source=(Path(__file__).parent/'draw_ch_rocker_arm_tl_oblique_pivot_block.py').read_text(encoding='utf-8')
     assert "VIEW_SHEET_REF = '(SHEET 2)'" in source
-    assert source.count('process=contract.TRANSFER_PROCESS')==2
+    assert source.count('process=contract.TRANSFER_PROCESS')==1
 
 
 def test_opened_clearance_covers_the_vertical_stack():
@@ -96,14 +102,14 @@ def test_transferred_holes_seat_the_heads_and_hold_the_dowel():
     # A #18 spot through the largest Ø.170 hole: .0023 off its axis.
     assert math.isclose(spec.FIT_UP_RESIDUAL,(feed_nut.HOLE_DIA+.004*INCH-.1695*INCH)/2)
     assert spec.HEAD_FILLET_CLEARANCE>0.0 and spec.HEAD_BEARING_LAND_MIN>0.0
-    assert spec.DOWEL_PRESS_MIN>=1.5*feed_nut.DOWEL_DIA_MAX
-    assert spec.DOWEL_NUT_ENGAGEMENT_MIN>=1.5*feed_nut.DOWEL_DIA_MAX
-    assert spec.DOWEL_RECESS_MIN>0.0
+    # Flush with the nut's head face, the dowel reaches .08-.12 into the lug.
+    assert round(spec.DOWEL_LUG_ENGAGEMENT_MIN/INCH,3)==.080
+    assert round(spec.DOWEL_LUG_ENGAGEMENT_MAX/INCH,3)==.120
 
 
 def test_lug_walls_meet_the_target_at_the_printed_worst_case():
     assert min(spec.LUG_WALLS_MM.values())>=WALL_TARGET_MM
-    assert round(min(spec.LUG_WALLS_MM.values())/INCH,3)==.086
+    assert round(min(spec.LUG_WALLS_MM.values())/INCH,3)==.081
 
 
 def test_nut_screws_stop_inside_the_through_tap():

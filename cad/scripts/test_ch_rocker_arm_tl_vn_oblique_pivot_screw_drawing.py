@@ -118,7 +118,10 @@ def test_cut_length_names_its_three_place_reason():
     loose = (block.PIVOT_TIP_CLEARANCE_MIN + printed_band_mm(3, unit="in")
              - printed_band_mm(2, unit="in"))
     assert loose < 0.011 * 25.4 - 1e-9 <= block.PIVOT_TIP_CLEARANCE_MIN
-    assert spec.CUT_NOTE == "TIP STAYS .011 MIN INSIDE\nMHA-CH-06-TL-22 PIVOT BLOCK"
+    # The note states the cut's function and names the mate; the .011 floor
+    # is the block spec's proof, never a printed figure.
+    assert spec.CUT_NOTE == "TIP STAYS INSIDE\nMHA-CH-06-TL-22 PIVOT BLOCK"
+    assert not any(ch.isdigit() for ch in spec.CUT_NOTE.split("\n")[0])
     assert spec.CUT_CALLOUT == "CUT"
 
 

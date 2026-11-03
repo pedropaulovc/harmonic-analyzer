@@ -101,7 +101,7 @@ integral feed block `ch-rocker-arm-tl-oblique-feed-block`, MHA-CH-06-TL-32,
 whose spec owns the nut layout, and the shop-made brass feed nut
 `ch-rocker-arm-tl-oblique-feed-nut`, MHA-CH-06-TL-27 (owner ruling
 2026-11-01, replacing the bought TL-VN-55 flange nut). The lug's nut taps
-and dowel hole are transfer-drilled through the seated nut at TL-00 assembly
+and dowel hole are transferred from the seated nut at TL-00 assembly
 (Main ruling 2026-11-03). Both blocks use new 6061 1 × 3-1/2 in bar; TL-28 end brackets use
 owned OnlineMetals 1165 1/2 × 1 in bar on edge, raising the screw axis to
 Z52.4. The owned 1164 1/2 × 3/4 in stock is spare.

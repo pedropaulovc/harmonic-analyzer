@@ -39,12 +39,14 @@ The pair's stack took the screw from 7/8 in to the next stock length, 1 in
 (AGENTS.md: worst case, not nominal): ENGAGEMENT is 1 in less the lever and
 the modelled pair, above the 7/8 in screw's without the pair; ENGAGEMENT_MIN
 is the shorter of the shortest screw (ASME B18.3, -0.03 in) through the
-thickest lever and the thickest pair, and the carrier's worst-case full
-thread (``carrier.ENGAGEMENT_MM``, the RV-01 shortfall), above the 7/8 in
-screw's at the same corners.  STAND_OUT_MAX is how far the longest screw
-(nominal, never long) through the thinnest lever and the thinnest pair
-reaches past the thinnest plate's underside (negative: the tip stays inside
-the plate).  It must stay inside the gap from the carrier's underside to the
+thickest lever and the thickest pair, less its 0.75P tip chamfer and the
+carrier tap mouth's title-block edge break (Codjiflo on #2112), and the
+carrier's worst-case full thread (``carrier.ENGAGEMENT_MM``, the RV-01
+shortfall), above the 7/8 in screw's at the same corners.  STAND_OUT_MAX is
+how far the longest screw (nominal, never long) through the thinnest lever
+and the thinnest pair reaches past the thinnest plate's underside (negative:
+the tip stays inside the plate).  It must stay inside the gap from the
+carrier's underside to the
 pivot blocks' tops (``trammel.PIVOT_SUPPORT_HEIGHT``), the highest parts that
 pass beneath it.
 
@@ -85,7 +87,7 @@ from _mcmaster_91812a230 import (
     THICKNESS_MIN as THICKNESS_MIN,
 )
 from _package_units import drawing_unit
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm
 
 SKU = PART_NO
 ROW = fasteners.LEVER_LOCK_WASHER
@@ -132,8 +134,14 @@ DRAWING_PRECISION = {
 # --- Engagement and stand-out in TL-21, worst case ------------------------------
 _THICK_BAND = printed_band_mm(feed_lever.THICK_PLACES, unit=feed_lever.UNIT)
 ENGAGEMENT = SCREW_ROW.engagement_mm  # nominal
+# The reach past the carrier's top face loses the tip's 0.75P chamfer and the
+# tap mouth's edge break; neither carries full thread.
+TAP_MOUTH_BREAK = edge_break_chamfer_mm(unit=carrier.UNIT)
 ENGAGEMENT_MIN = min(
-    lever_screw.LENGTH_MIN - (feed_lever.LEVER_THICK + _THICK_BAND + THICKNESS_MAX),
+    lever_screw.LENGTH_MIN
+    - (feed_lever.LEVER_THICK + _THICK_BAND + THICKNESS_MAX)
+    - lever_screw.DIMS.tip_chamfer
+    - TAP_MOUTH_BREAK,
     carrier.ENGAGEMENT_MM[carrier.LEVER_THREAD],
 )
 STAND_OUT_MAX = (

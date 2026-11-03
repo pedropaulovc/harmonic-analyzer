@@ -85,13 +85,21 @@ def test_clearance_holes_stand_2x_35_from_the_bore_with_no_mate_band():
     assert round(feed_block.FIT_UP_RESIDUAL / INCH, 4) == 0.0023
 
 
-def test_dowel_hole_is_a_reamed_slip_fit_clear_of_every_wall():
-    # Main ruling 2026-11-03 (Codjiflo P1 on #2112): the nut's positive stop.
+def test_dowel_hole_is_a_reamed_through_press_clear_of_every_wall():
+    # Main ruling 2026-11-03 (Codjiflo P1 on #2112): the nut's positive stop,
+    # pressed THRU so it drives back out (rule 16: no press into a blind hole).
     assert spec.DOWEL_DIA == pytest.approx(3 / 32 * INCH)
     low = spec.DOWEL_HOLE_DIA + spec.DOWEL_HOLE_BAND[1]
-    assert low == pytest.approx(0.0948 * INCH)
-    assert low > spec.DOWEL_DIA_MAX
-    assert (spec.DOWEL_DX, spec.DOWEL_DY) == pytest.approx((0.270 * INCH, 0.220 * INCH))
+    high = spec.DOWEL_HOLE_DIA + spec.DOWEL_HOLE_BAND[0]
+    assert (low, high) == pytest.approx((0.0930 * INCH, 0.0935 * INCH))
+    # Interference at the catalogue's .0939-.0941: .00035-.00105.
+    assert spec.DOWEL_INTERFERENCE == pytest.approx(
+        (spec.DOWEL_DIA_MIN - high, spec.DOWEL_DIA_MAX - low)
+    )
+    assert spec.DOWEL_INTERFERENCE[0] > 0.0
+    assert spec.LENGTH_MIN >= 1.5 * spec.DOWEL_DIA_MAX
+    # Codjiflo round 4: .XX stations; the walls hold without a tighter band.
+    assert (spec.DOWEL_DX, spec.DOWEL_DY) == pytest.approx((0.27 * INCH, -0.23 * INCH))
     assert spec.DRAWING_DIMENSIONS["HolePatternReference"] == {
         "Hole1Offset",
         "Hole2Offset",
@@ -101,22 +109,22 @@ def test_dowel_hole_is_a_reamed_slip_fit_clear_of_every_wall():
     assert (
         spec.DRAWING_PRECISION_BY_NAME["DowelX"]
         == spec.DRAWING_PRECISION_BY_NAME["DowelY"]
-        == 3
+        == 2
     )
     assert spec.DRAWING_PRECISION_BY_NAME["DowelDia"] == 4
     assert spec.CALLOUTS_SUFFIX["DowelDia"] == " REAM THRU"
-    assert spec.CALLOUTS_BELOW["DowelDia"] == "SLIP FIT ON MHA-CH-06-TL-VN-81"
+    assert spec.CALLOUTS_BELOW["DowelDia"] == "PRESS FIT ON MHA-CH-06-TL-VN-81"
     for wall in (
         "Tr8 major to the dowel hole",
         "dowel hole to hole 1",
-        "dowel hole to top face",
+        "dowel hole to bottom face",
     ):
         assert spec.WALLS_MM[wall] >= WALL_TARGET_MM
 
 
 def test_walls_meet_the_target_at_the_printed_worst_case():
     assert min(spec.WALLS_MM.values()) >= WALL_TARGET_MM
-    assert round(min(spec.WALLS_MM.values()) / INCH, 4) == 0.0824
+    assert round(min(spec.WALLS_MM.values()) / INCH, 4) == 0.0832
 
 
 def test_screws_engage_the_lug_two_diameters_and_stop_inside_it():
