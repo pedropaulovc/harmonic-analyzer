@@ -56,6 +56,7 @@ def _origin_drop(adapter: Any, front: Any, right: Any) -> float:
     return front_y - right_y
 
 
+@_telemetry.traced("drawing.lag_screw.align_right")
 def _align_right(adapter: Any, views: dict[str, Any]):
     """FRONT's lopsided supplier margins shift it within its cell; move RIGHT
     vertically so both project from the same model origin (third angle)."""
