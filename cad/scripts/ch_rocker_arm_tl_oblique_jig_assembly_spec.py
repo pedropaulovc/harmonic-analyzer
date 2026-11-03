@@ -1540,7 +1540,7 @@ ASSEMBLY_STEPS = (
     f"HEIGHT + {_length(pivot_block.SCREW_REACH, 3)} "
     f"(+/-{_length(pivot_block.SCREW_CUT_BAND, 3)}) UNDER THE HEAD; DEBURR THE "
     "CUT END. FASTEN EACH BLOCK WITH ITS 4: EACH TIP ENGAGES "
-    f"{_length(pivot_block.ENGAGEMENT_MIN, 3)}-{_length(pivot_block.ENGAGEMENT_MAX, 3)} "
+    f"{_length(pivot_block.REACH_MIN, 3)}-{_length(pivot_block.REACH_MAX, 3)} "
     "OF THE CARRIAGE'S M4 X 5 AND NEVER BOTTOMS. "
     f"TEMPORARILY SEAT THE SHOULDER SCREWS {_item(PIVOT_SCREW)} FOR INDICATING.",
     "6. ZERO THE DRO X AND Y ON THE SPINDLE ORIGIN (SHEET 1). AT EACH "

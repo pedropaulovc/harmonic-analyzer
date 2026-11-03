@@ -1285,7 +1285,7 @@ def test_fastener_table_engagement_and_protrusion() -> None:
 
 def test_carriage_screws_are_cut_to_fit_under_a_confirmed_owner_exception() -> None:
     """Owner ruling 2026-11-01 (option A): step 5 measures each counterbore
-    floor and cuts each M4 x 20 to it; RV-05 accepts the 1.16D reach."""
+    floor and cuts each M4 x 20 to it; RV-05 accepts the 1.03D full thread."""
     from _paths import CAD_ROOT
     from machinist_exceptions import load_exceptions
 
@@ -1303,7 +1303,7 @@ def test_carriage_screws_are_cut_to_fit_under_a_confirmed_owner_exception() -> N
     reach = entries["RV-05"]
     assert reach.kind == "accept"
     assert "+ .189" in reach.where and ".183-.195" in reach.where
-    assert "1.16D" in reach.finding
+    assert "1.03D" in reach.finding
     assert "Owner exception confirmed" in reach.reason
 
 

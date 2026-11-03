@@ -32,6 +32,7 @@ from _fit_deviations import deviations
 from _fit_ream_slide import REAM_SLIDE
 from _hole_spec import TAP_DRILL_MM
 from _inch_wall_limits import WALL_TARGET_MM
+from _mcmaster_91290a168 import DIMS as CARRIAGE_SCREW
 from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
 
@@ -163,8 +164,11 @@ SCREW_REACH = 4.8006  # .189 into the carriage
 SCREW_CUT_BAND = printed_band_mm(3, unit=UNIT)  # ±.005
 SCREW_MEASURE_BAND = 0.0254  # the .001 floor reading
 SCREW_CUT_LENGTH = CBORE_FLOOR + SCREW_REACH  # .759 at the nominal floor: the model
-ENGAGEMENT_MIN = SCREW_REACH - SCREW_CUT_BAND - SCREW_MEASURE_BAND  # .183, 1.16D
-ENGAGEMENT_MAX = SCREW_REACH + SCREW_CUT_BAND + SCREW_MEASURE_BAND
+REACH_MIN = SCREW_REACH - SCREW_CUT_BAND - SCREW_MEASURE_BAND  # .183 of tip in the hole
+# Rule 18 counts full thread only: the cut screw's tip chamfer (0.75P, the
+# cut-to-fit recipe's) is incomplete thread, so it comes off the reach.
+ENGAGEMENT_MIN = REACH_MIN - CARRIAGE_SCREW.tip_chamfer  # .162, 1.03D
+REACH_MAX = SCREW_REACH + SCREW_CUT_BAND + SCREW_MEASURE_BAND
 SCREW_CUT_LENGTH_MAX = (CBORE_FLOOR + _band("CboreFloor") + SCREW_MEASURE_BAND
                         + SCREW_REACH + SCREW_CUT_BAND)
 ENGAGEMENT_TEXT = f"{math.floor(ENGAGEMENT_MIN / 25.4 * 1000.0) / 1000.0:.3f}".lstrip("0")
@@ -218,9 +222,9 @@ assert CBORE_END_WALL_MIN >= WALL_TARGET_MM
 assert CBORE_SIDE_WALL_MIN >= WALL_TARGET_MM
 # 0.045: the worst-case reach margin, the long cut on a misread floor still
 # stopping short of the carriage's M4 x 5 thread end.
-assert ENGAGEMENT_MIN <= ENGAGEMENT_MAX <= CARRIAGE_THREAD_DEPTH - 0.045
-# The owner-accepted reach (jig assembly RV-05), above the 1.1D it replaces.
-assert ENGAGEMENT_MIN >= 1.16 * 4.0
+assert ENGAGEMENT_MIN < REACH_MIN <= REACH_MAX <= CARRIAGE_THREAD_DEPTH - 0.045
+# The owner-accepted full thread (jig assembly RV-05): over 1D of the M4.
+assert ENGAGEMENT_MIN >= 1.0 * 4.0
 # Every screw a high floor needs is still cut from the shortest bought one.
 assert SCREW_CUT_LENGTH_MAX < SCREW_LENGTH - SCREW_LENGTH_TOL
 assert PIVOT_TAP_DRILL < BORE_LIMITS[0]
