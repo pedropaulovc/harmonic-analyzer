@@ -669,6 +669,24 @@ def test_schema_is_strict_structured_output() -> None:
     )
 
 
+def _freeze_monotonic(monkeypatch: pytest.MonkeyPatch, fixture: str) -> list[float]:
+    """Freeze ``time.monotonic``, which is both the asyncio loop clock and the
+    transport attempt clock, so host latency (a fixture interpreter's cold
+    start, credential/state-file I/O) cannot spend a startup or attempt
+    budget. Only the test moves ``clock[0]``. A real-time watchdog fails closed
+    if an exchange waits on the frozen clock instead."""
+    import time
+
+    clock = [100.0]
+    watchdog_deadline = time.perf_counter() + 30
+    def monotonic():
+        if time.perf_counter() >= watchdog_deadline:
+            pytest.fail(f"{fixture} stalled with its virtual clock frozen")
+        return clock[0]
+    monkeypatch.setattr(time, "monotonic", monotonic)
+    return clock
+
+
 @pytest.fixture
 def sdk_transport(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """Exercise actual SDK option/event types with a deterministic client."""
@@ -1159,8 +1177,19 @@ def test_unjudged_precheck_state_is_released_by_aggregate_lifecycle(tmp_path, sd
 def test_sdk_startup_failure_never_submits_review_and_cleans_up(
     tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch, status: str,
 ) -> None:
+    import claude_agent_sdk as sdk
+
     sdk_transport.status = status
     monkeypatch.setattr(mr, "MCP_STARTUP_TIMEOUT_S", 0.02)
+    # Credential setup shares the 1 s attempt budget; on a frozen clock only a
+    # pending status poll spends time, exactly the 0.02 s MCP startup budget.
+    clock = _freeze_monotonic(monkeypatch, "SDK startup fixture")
+    get_mcp_status = sdk.ClaudeSDKClient.get_mcp_status
+    async def poll(self):
+        if sdk_transport.status == "pending":
+            clock[0] += mr.MCP_STARTUP_TIMEOUT_S
+        return await get_mcp_status(self)
+    monkeypatch.setattr(sdk.ClaudeSDKClient, "get_mcp_status", poll)
     review = mr.review_package(
         mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
         reviewer="claude", report_dir=tmp_path / "reports", retries=0, timeout_s=1,
@@ -1753,6 +1782,9 @@ def test_omp_harness_intent_argument_does_not_void_sheet_inspection():
     assert not mr.evaluate_sheet_evidence([view, result], reviewer="claude", sheet_count=1)["inspection_proven"]
 
 
+# The RPC fixture announces each deliberate stall on stderr, so tests on a
+# frozen clock can expire the deadline it is waiting out.
+_OMP_FIXTURE_STALL = "fixture: deliberate stall"
 _OMP_RPC_FIXTURE = r'''
 import base64, hashlib, json, os, sys, time
 from pathlib import Path
@@ -1775,6 +1807,7 @@ for line in sys.stdin:
             print("not-json-protocol-canary", flush=True)
             continue
         if mode == "silent":
+            print("fixture: deliberate stall", file=sys.stderr, flush=True)
             time.sleep(20)
         names = ["mcp__sheets_view_sheet", "mcp__sheets_crop"]
         if mode == "missing": names.pop()
@@ -1843,7 +1876,9 @@ for line in sys.stdin:
             emit({"type": "agent_end", "messages": []})
         if mode == "repair_trailing_execution" and prompts > 1:
             emit({"type": "tool_execution_end", "toolName": "mcp__sheets_crop", "toolCallId": "late", "result": {}})
-if mode == "slow_shutdown": time.sleep(60)
+if mode == "slow_shutdown":
+    print("fixture: deliberate stall", file=sys.stderr, flush=True)
+    time.sleep(60)
 '''
 
 
@@ -1870,6 +1905,18 @@ def test_omp_rpc_actual_session_readiness_precedes_prompt_and_reaps_on_failure(
     monkeypatch.setenv("PI_CONFIG_FILES", "must-not-load.yml")
     monkeypatch.setenv("OMP_PROFILE", "must-not-load")
     before = dict(os.environ)
+    # The fixture is a real interpreter whose cold start alone can exceed the
+    # 1 s startup budget on a loaded host. On a frozen clock the startup and
+    # shutdown deadlines expire only when the fixture announces its stall:
+    # moving the clock by the startup budget passes the 1 s startup or 50 ms
+    # shutdown deadline, short of the 5 s outer one.
+    startup = 1
+    clock = _freeze_monotonic(monkeypatch, "OMP RPC fixture")
+    class Diagnostics(list):
+        def append(self, text):
+            super().append(text)
+            if _OMP_FIXTURE_STALL in text:
+                clock[0] += startup
     def emit(event, raw):
         if raw is not None:
             native.append(raw)
@@ -1882,7 +1929,7 @@ def test_omp_rpc_actual_session_readiness_precedes_prompt_and_reaps_on_failure(
                 config={"mcpServers": {"sheets": {"command": sys.executable, "args": []}}, "prompt": "inspect"},
                 schema={}, model="test", effort="medium", cwd=str(work),
                 remaining=lambda: 0.05 if catalog == "slow_shutdown" and (work / "completed").exists() else 5,
-                startup=1, emit=emit, diagnostics=[],
+                startup=startup, emit=emit, diagnostics=Diagnostics(),
                 provenance=provenance, continuation=continuation,
             )
     if catalog == "slow_shutdown":
@@ -1890,6 +1937,7 @@ def test_omp_rpc_actual_session_readiness_precedes_prompt_and_reaps_on_failure(
         assert provenance["shutdown"] == "forced_after_completion"
         assert provenance["image_blobs"]
         assert normalized[-1]["type"] == "result" and not normalized[-1]["is_error"]
+        assert clock[0] == 100 + startup  # The shutdown grace expired on the fixture's stall.
     elif catalog in {"valid", "trailing_valid"}:
         asyncio.run(invoke())
         assert Path(environments[0]["PI_CODING_AGENT_DIR"]).is_dir()
@@ -1938,6 +1986,10 @@ def test_omp_rpc_actual_session_readiness_precedes_prompt_and_reaps_on_failure(
     else:
         with pytest.raises(TimeoutError if catalog == "silent" else RuntimeError) as caught:
             asyncio.run(invoke())
+        if catalog == "silent":
+            assert isinstance(caught.value, transport.StartupTimeout)
+            assert caught.value.phase == "OMP sheets MCP connection"
+            assert clock[0] == 100 + startup
         if catalog == "prompt_rejected":
             assert isinstance(caught.value, transport.TransportError)
             assert caught.value.category == "protocol_error"
@@ -2002,6 +2054,8 @@ def test_omp_repairs_malformed_verdict_in_session_without_tools(
     monkeypatch.setattr(transport.asyncio, "create_subprocess_exec", spawn)
     monkeypatch.setattr(transport._telemetry, "event", lambda name, **attributes: spans.append((name, attributes)))
     provenance = {"private_home": str(home)}
+    # A real fixture interpreter's cold start must not spend the startup budget.
+    _freeze_monotonic(monkeypatch, "OMP RPC fixture")
     schema = json.loads(mr.JUDGE_SCHEMA_FILE.read_text(encoding="utf-8"))
     async def invoke():
         async with asyncio.timeout(10):
@@ -2131,6 +2185,8 @@ def test_judge_schema_enumerates_finding_ids_so_omp_repairs_an_invented_id(
         return process
     monkeypatch.setattr(transport.asyncio, "create_subprocess_exec", spawn)
     provenance = {"private_home": str(home)}
+    # A real fixture interpreter's cold start must not spend the startup budget.
+    _freeze_monotonic(monkeypatch, "OMP RPC fixture")
     async def invoke():
         async with asyncio.timeout(10):
             await transport._omp_session(
@@ -2182,6 +2238,8 @@ def test_omp_broker_reads_actual_ephemeral_url_and_reaps_its_process(
         processes.append(process)
         return process
     monkeypatch.setattr(transport.asyncio, "create_subprocess_exec", spawn)
+    # Two real fixture interpreters start inside the 3 s broker budget.
+    _freeze_monotonic(monkeypatch, "OMP broker fixture")
     async def invoke():
         async with transport._broker(sys.executable, secrets.append, lambda: 5, 3) as env:
             assert env["OMP_AUTH_BROKER_URL"] == "http://127.0.0.1:43219"
