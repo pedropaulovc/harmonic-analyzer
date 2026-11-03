@@ -288,17 +288,24 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     assert drawing.REFERENCE_LENGTHS == ("SeatLength",)
     assert drawing.DIMENSION_CALLOUTS["SeatLength"] == dt_crank_hub_notes.SEAT_LENGTH_CALLOUT
     assert "CRANK ARM" in _flat(dt_crank_hub_notes.SEAT_LENGTH_CALLOUT)
-    # The taper-pin cross-hole names both mates and the fit on its callout,
-    # after the front face is set flush with the datum it is reamed at.
+    # The taper-pin cross-hole names the mate it is matched with and the pin
+    # it takes.  Where the hub sits before the ream and when the ream is deep
+    # enough are assembly settings on the MHA-DT-00 hub step (pipeline review
+    # of 49287772c), so the callout carries neither.
     cross_hole = dt_crank_hub_notes.CROSS_HOLE_CALLOUT
     assert "MHA-DT-09" in cross_hole and "MHA-DT-11" in cross_hole
-    flush = cross_hole.index("CRANK-ARM END FLUSH")
-    assert flush < cross_hole.index("TAPER-REAM") and "AT ASSEMBLY" in cross_hole
-    # The ream's acceptance is the driven pin's fit-up: its keeper-ring hole
-    # clears the barrel.  No MIN dimensioned to an outline of the pin, another
-    # part (Opus reviews at 7fe9d97bd, c7115c2c3 and 7e2f876c7), and no spec
-    # number typed into the text (Codjiflo P2 on #2095).
-    assert "RING MHA-DT-27 CLEARS HUB" in _flat(cross_hole)
+    assert "AT ASSEMBLY" in cross_hole and "TAPER-REAM 1:48" in cross_hole
+    assert "FLUSH" not in cross_hole and "MHA-DT-27" not in cross_hole
+    assert len(cross_hole.splitlines()) == 2
+    # The ream's acceptance is the driven pin's fit-up, its keeper ring
+    # MHA-DT-27 clear of the hub, stated once on the hub step.  No MIN
+    # dimensioned to an outline of the pin, another part (Opus reviews at
+    # 7fe9d97bd, c7115c2c3 and 7e2f876c7), and no spec number typed into the
+    # text (Codjiflo P2 on #2095).
+    import draw_dt_drive_train_assembly as package
+
+    hub_step = _flat(package.CONE_CRANK_STEPS.split("\n6. ")[1].split("\n7. ")[0])
+    assert "MHA-DT-27 FROM THE PIN HEAD, CLEAR OF THE HUB" in hub_step
     assert re.search(r"\d\.\d", cross_hole.split("1:48", 1)[1]) is None
     assert "PinProudReference" not in dt_crank_hub_spec.DRAWING_DIMENSIONS
     assert "PinProud" not in drawing.END_KEEP
@@ -324,9 +331,10 @@ def test_hub_front_face_is_set_on_the_dome_root_the_model_places_it_at() -> None
     """The model seats the hub front face on the crankshaft's dome root (the
     shaft part's origin, CRANK_FACE_Z); the dome tip stands proud of it.  Set
     flush with the shaft END, the hub would sit a dome height forward and open
-    the hub/T12 air past the drive pins' proud length.  Both texts that place
-    the hub -- its cross-hole callout and the MHA-DT-00 hub step -- print the
-    one datum, and the callout sets it before the taper-ream."""
+    the hub/T12 air past the drive pins' proud length.  The MHA-DT-00 hub
+    step places the hub on that one datum before the taper-ream; the
+    cross-hole callout leaves the setting to it (pipeline review of
+    49287772c)."""
     import build_dt_drive_train_assembly as assembly
     import draw_dt_drive_train_assembly as package
 
@@ -334,10 +342,9 @@ def test_hub_front_face_is_set_on_the_dome_root_the_model_places_it_at() -> None
     assert _names_the_dome_root(datum), datum
     assert assembly.CRANK_HUB_Z0 == assembly.CRANKSHAFT_Z0 == assembly.CRANK_FACE_Z
     hub_step = package.CONE_CRANK_STEPS.split("\n6. ")[1].split("\n7. ")[0]
-    cross_hole = dt_crank_hub_notes.CROSS_HOLE_CALLOUT
-    for text in (cross_hole, hub_step):
-        assert _sets_hub_on(text, datum), text
-    assert _flat(cross_hole).index(_flat(datum)) < _flat(cross_hole).index("TAPER-REAM")
+    assert _sets_hub_on(hub_step, datum), hub_step
+    assert _flat(hub_step).index(_flat(datum)) < _flat(hub_step).index("TAPER-REAM")
+    assert not _sets_hub_on(dt_crank_hub_notes.CROSS_HOLE_CALLOUT, datum)
     # Negative controls: the shaft-END texts both once printed name no dome root.
     for old in (
         "FRONT FACE FLUSH WITH\nCRANKSHAFT MHA-DT-11 END;\nMATCH TAPER-REAM 1:48 FOR",

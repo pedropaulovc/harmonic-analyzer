@@ -887,7 +887,9 @@ CONE_CRANK_STEPS = _note_text(
         "   SHAFT; LIGHT-DRIVE MHA-DT-09, REMOVABLE BY TAP ON SMALL END. HANG",
         # Codex #1140: the keeper chain's length and topology belong on the
         # sheet; the bead count is the spec's solve, never a typed number.
-        "   MHA-DT-27 FROM THE PIN HEAD; CLAMP MHA-DT-28 UNDER MHA-SH-VN-51. CUT MHA-DT-VN-65",
+        # Pipeline review of 49287772c: the ream's acceptance (the ring clear
+        # of the hub) is an assembly setting, stated here, not on MHA-DT-31.
+        "   MHA-DT-27 FROM THE PIN HEAD, CLEAR OF THE HUB; CLAMP MHA-DT-28 UNDER MHA-SH-VN-51. CUT MHA-DT-VN-65",
         f"   TO {KEEPER_CHAIN_BEADS} BEADS; THREAD IT THROUGH THE MHA-DT-28 LOOP AND MHA-DT-27; SNAP",
         "   ONE END BEAD INTO EACH DOME OF MHA-DT-VN-66.",
         # Local review of 747487c71: the cup cures centred on the screw, or
