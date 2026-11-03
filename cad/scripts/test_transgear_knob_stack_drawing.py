@@ -36,8 +36,9 @@ ROOT_2A_MIN = PD_2A_MIN - 0.649519 * PITCH
 ENGAGEMENT_FLOOR = 1.5 * BASIC_MAJOR
 
 
-def _limits(value: float, places: int) -> tuple[float, float]:
-    band = printed_band_mm(places)
+def _limits(value: float, places: int, unit: str = "mm") -> tuple[float, float]:
+    """The printed row's limits; the knob shaft's sheet is still mm here."""
+    band = printed_band_mm(places, unit=unit)
     return value - band, value + band
 
 
@@ -205,7 +206,8 @@ def test_thumbnut_engages_one_and_a_half_diameters_over_the_travel(
     printed angle (R9-63). Least 12.16739 at the shortest fitted body."""
     tip_min = _limits(shaft.TIP_STATION, shaft.TIP_STATION_PLACES)[0]
     thread_end_max = _limits(shaft.PLAIN_CORE, _stud_places("PlainCore"))[1]
-    nut_min = _limits(nut.OVERALL_LENGTH, nut.OVERALL_LENGTH_PLACES)[0]
+    nut_min = _limits(nut.OVERALL_LENGTH, nut.OVERALL_LENGTH_PLACES, nut.UNIT)[0]
+    assert nut_min == pytest.approx(nut.OVERALL_LENGTH + nut.OVERALL_LENGTH_LO)
     pilot = (collar.PILOT_LENGTH_FITTED_MIN, collar.PILOT_LENGTH_FITTED_MAX)
     assert pilot[0] - (removable.PLATE + min(removable.PLATE_BAND)) == (
         pytest.approx(min(collar.PILOT_PROUD_RANGE))
