@@ -89,18 +89,20 @@ HEAD_HEIGHT = HEAD_LAND + HEAD_DOME_SAG  # proud of the arm's rear face
 # The inside corner where the shank meets the head's seat: the tool-nose
 # radius the print allows, a single R MAX limit (machinist review round 4: the
 # title block's .040 inside corner is wider than the .0375 step and could eat
-# the whole seat).  At .005 it sinks less than .003 into the 45-deg corner, so
-# the ream mouth's deburr clears it and the head seats flat on the arm.
+# the whole seat).  The root's fillet stands at most R off both the shank and
+# the seat, so the arm's 45-degree rear mouth clears it when its leg is at
+# least R (``ARM.PIN_MOUTH_CHAMFER_LIMITS``; Codjiflo, #2124): the head then
+# seats flat on the arm.
 SEAT_FILLET_R = 0.127  # .005 MAX
 SEAT_FILLET_PLACES = 3
 SEAT_FILLET_SUFFIX = " MAX"
-# The arm's rear face under the head: outside the ream's broken mouth, inside
-# the head's broken rim.
+# The arm's rear face under the head: outside the ream's chamfered mouth,
+# inside the head's broken rim.
 SEAT_CONTACT_WIDTH_MIN = round(
     (HEAD_DIA - printed_band_mm(2, unit=UNIT)) / 2.0
     - edge_break_chamfer_mm(unit=UNIT)
     - max(
-        ARM.PIN_BORE_DIA_MAX / 2.0 + edge_break_chamfer_mm(unit=UNIT),
+        ARM.PIN_BORE_DIA_MAX / 2.0 + ARM.PIN_MOUTH_CHAMFER_LIMITS[1],
         DIA_MAX / 2.0 + SEAT_FILLET_R,
     ),
     6,
@@ -229,6 +231,13 @@ for _ok, _what in (
         SEAT_CONTACT_WIDTH_MIN > 0.0,
         f"the head has no seat on the {ARM_NUMBER} rear face past its broken "
         f"edges and the R{inch_text(SEAT_FILLET_R, SEAT_FILLET_PLACES)} root",
+    ),
+    (
+        ARM.PIN_MOUTH_CHAMFER_LIMITS[0] >= SEAT_FILLET_R,
+        f"the R{inch_text(SEAT_FILLET_R, SEAT_FILLET_PLACES)} root stands past "
+        f"the {ARM_NUMBER} rear mouth's "
+        f"{inch_text(ARM.PIN_MOUTH_CHAMFER_LIMITS[0], 3)} chamfer: the head "
+        "stops on it short of the face",
     ),
     (
         HEAD_LAND_MIN >= HEAD_LAND_FLOOR - 1e-9,

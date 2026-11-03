@@ -285,13 +285,17 @@ if not all(
         f"MHA-PD-18 pin bore press on MHA-PD-23 is {PIN_PRESS_INTERFERENCE}, "
         "not .0003..0010"
     )
-# Three short lines under the Ø: the operation, the mating pin, the press.
+# Four short lines under the Ø: the operation, the mating pin, the press, and
+# the rear mouth's chamfer that clears the pin's seat root (its limits, as the
+# press's: a modelled feature with a minimum the title block's break lacks).
 PIN_BORE_CALLOUT = "\n".join(
     (
         "REAM THRU",
         f"PRESS FIT PIN {PIN.PIN_NUMBER}",
         f"{_inch(PIN_PRESS_INTERFERENCE[0], 4)}/{_inch(PIN_PRESS_INTERFERENCE[1], 4)}"
         " INTERFERENCE",
+        f"REAR MOUTH {_inch(ARM.PIN_MOUTH_CHAMFER_LIMITS[0], 3)}/"
+        f"{_inch(ARM.PIN_MOUTH_CHAMFER_LIMITS[1], 3)} X 45\u00b0",
     )
 )
 

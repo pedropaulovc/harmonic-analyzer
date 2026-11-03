@@ -14,7 +14,9 @@ face, +X to the square end, +Z to the rear face):
   extruded ``THICKNESS`` toward +Z as ``Arm``.
 * ``PivotBore``: the Ø4.9 running bore through at P.
 * ``PinBore``: the Ø3.874 reamed press bore through at S for the MHA-PD-23
-  pin, cut normal to the faces (the pin's head seats on the rear face).
+  pin, cut normal to the faces (the pin's head seats on the rear face), its
+  rear mouth chamfered 45 degrees as ``PinBoreRearMouth`` to clear the pin's
+  seat root.
 * ``PlateTaps``: native Hole Wizard taps through from the rear face, with
   ``PlateTapRearEntryBreaks`` and ``PlateTapFrontExitBreaks`` at 0.10 MAX.
 * ``SpotFace``: the rear spot face, a revolved cut whose profile (Top plane,
@@ -91,6 +93,7 @@ from pd_transgear_arm_geometry import (
     END_HALF_WIDTH,
     PIN_BORE_DIA,
     PIN_BORE_DIA_BAND,
+    PIN_MOUTH_CHAMFER,
     PIN_HOLE_DEPTH,
     PIN_HOLE_DIA,
     PIN_HOLE_DIA_BAND,
@@ -184,6 +187,7 @@ def _csk_volume(csk: float, r: float) -> float:
 V_ARM = _outline_area() * THICKNESS
 V_BORE = math.pi * _R_BORE**2 * THICKNESS
 V_PIN_BORE = math.pi * _R_PIN_BORE**2 * THICKNESS
+V_PIN_MOUTH = _csk_volume(PIN_MOUTH_CHAMFER, _R_PIN_BORE)
 V_PLATE = len(PLATE_TAP_STATIONS) * math.pi * _R_PLATE**2 * THICKNESS
 V_PLATE_EDGE_BREAKS = len(PLATE_TAP_STATIONS) * (
     _csk_volume(PLATE_TAP_ENTRY_BREAK_MAX_MM, _R_PLATE)
@@ -427,6 +431,17 @@ async def build(adapter: Any) -> dict[str, str]:
     name_last_feature(adapter, "PinBore")
     expected -= V_PIN_BORE
     await volume_check(adapter, "arm with pin bore", expected, 0.01 * V_PIN_BORE)
+    check(
+        "pin bore rear mouth",
+        await adapter.add_chamfer(
+            PIN_MOUTH_CHAMFER, [[PIN_STATION + _R_PIN_BORE, 0.0, THICKNESS]]
+        ),
+    )
+    name_last_feature(adapter, "PinBoreRearMouth")
+    expected -= V_PIN_MOUTH
+    await volume_check(
+        adapter, "pin bore rear mouth", expected, 0.03 * V_PIN_MOUTH + 0.05
+    )
 
     # --- Plate taps through, with ordinary rear entry/front exit breaks ----
     plate = wizard_holes(

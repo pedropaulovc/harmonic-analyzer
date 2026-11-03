@@ -239,6 +239,13 @@ PIN_BORE_DIA = 3.1496  # .124
 PIN_BORE_DIA_BAND = (0.0127, 0.0)  # (upper, lower) deviations, reamed
 PIN_BORE_DIA_MAX = round(PIN_BORE_DIA + PIN_BORE_DIA_BAND[0], 6)
 PIN_BORE_DIA_MIN = round(PIN_BORE_DIA + PIN_BORE_DIA_BAND[1], 6)
+# The MHA-PD-23 head seats on the rear face over its R.005 MAX root: the rear
+# mouth is a 45-degree chamfer at least the root's radius on the leg, so the
+# root clears it and the head lands on the face (Codjiflo, #2124). Its upper
+# limit is the title block's chamfer break; ``pd_transgear_pin_spec`` checks
+# the clearance against the pin's root.
+PIN_MOUTH_CHAMFER = 0.2032  # .008
+PIN_MOUTH_CHAMFER_LIMITS = (0.1524, 0.254)  # .006/.010
 # --- Plate taps: 2 x #8-32 THROUGH; ordinary entry/exit edge breaks ---------
 PLATE_SCREW_PITCH = 15.0
 PLATE_CENTRELINE_OFFSET = -3.375  # 1-1/4 in plate's centreline from its bore
@@ -393,7 +400,9 @@ WALLS: dict[str, tuple[float, float]] = {
         edge_half_width(PIN_STATION)
         - OUTLINE_BAND
         - REDUCER_POSITION_RADIUS
-        - PIN_BORE_DIA_MAX / 2.0,
+        - PIN_BORE_DIA_MAX / 2.0
+        - PIN_MOUTH_CHAMFER_LIMITS[1]
+        - OUTLINE_EDGE_BREAK_MAX_MM,
     ),
     "plate taps to edges": (
         edge_half_width(PLATE_TAP_STATIONS[1]) - _tap_major(PLATE_TAP_SPEC) / 2.0,
@@ -522,6 +531,16 @@ def material_properties(pivot_bore_mm: float, *, density_kg_m3: float = 7870.0) 
     bore_radius = pivot_bore_mm / 2.0
     remove(math.pi * bore_radius**2 * THICKNESS, 0.0, 0.0, THICKNESS / 2.0)
     remove(math.pi * (PIN_BORE_DIA / 2.0)**2 * THICKNESS, PIN_STATION, 0.0, THICKNESS / 2.0)
+    pin_radius, pin_leg = PIN_BORE_DIA / 2.0, PIN_MOUTH_CHAMFER
+    pin_mouth_depth = (
+        pin_leg * (4.0 * pin_radius + pin_leg) / (12.0 * (pin_radius + pin_leg / 3.0))
+    )
+    remove(
+        math.pi * pin_leg**2 * (pin_radius + pin_leg / 3.0),
+        PIN_STATION,
+        0.0,
+        THICKNESS - pin_mouth_depth,
+    )
     drill_radius = blind_cut_dia_mm(PLATE_TAP_SPEC) / 2.0
     leg = PLATE_TAP_ENTRY_BREAK_MAX_MM
     tap_volume = math.pi * drill_radius**2 * THICKNESS

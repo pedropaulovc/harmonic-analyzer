@@ -123,12 +123,23 @@ def test_the_seat_root_radius_leaves_the_head_a_flat_seat() -> None:
         (spec.HEAD_DIA - printed_band_mm(2, unit=spec.UNIT)) / 2.0
         - edge_break_chamfer_mm(unit=spec.UNIT)
         - max(
-            arm.PIN_BORE_DIA_MAX / 2.0 + edge_break_chamfer_mm(unit=spec.UNIT),
+            arm.PIN_BORE_DIA_MAX / 2.0 + arm.PIN_MOUTH_CHAMFER_LIMITS[1],
             spec.DIA_MAX / 2.0 + spec.SEAT_FILLET_R,
         )
     )
     assert spec.SEAT_CONTACT_WIDTH_MIN == pytest.approx(contact)
     assert contact > 0.0
+
+
+def test_the_arm_rear_mouth_clears_the_seat_root_at_every_limit() -> None:
+    # Codjiflo (#2124): a 45-degree mouth with a leg of at least R contains
+    # the fillet's whole spandrel (it reaches R up the shank and R out on the
+    # seat), so the head lands on the face; the title block's break has no
+    # minimum, so the arm models and prints one.
+    low, high = arm.PIN_MOUTH_CHAMFER_LIMITS
+    assert low >= spec.SEAT_FILLET_R
+    assert low < arm.PIN_MOUTH_CHAMFER < high
+    assert high == pytest.approx(edge_break_chamfer_mm(unit=spec.UNIT))
 
 
 def test_the_groove_holds_the_ring_at_every_printed_limit() -> None:
