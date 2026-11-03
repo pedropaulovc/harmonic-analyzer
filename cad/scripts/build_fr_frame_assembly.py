@@ -680,6 +680,7 @@ def _create_frame_explode(adapter: Any, configuration_name: str) -> None:
     _telemetry.success(f"{view_name}: 12 native steps verified in world space; all 29 instances restored")
 
 
+@_telemetry.traced("assembly.frame_top_axis_setting")
 async def _author_top_axis_setting(adapter: Any) -> None:
     """MHA-FR-00 step 3's controlling height: a vertical construction line on
     the Front plane (sketch u, v = machine X, Y) up the +X column's axis, from
