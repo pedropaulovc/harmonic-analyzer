@@ -50,17 +50,19 @@ def test_carriage_screws_cut_to_fit_from_the_lowered_floor():
     assert 4.0<spec.HOLE_DIA<spec.CBORE_DIA
     assert math.isclose(spec.CBORE_DEPTH,spec.BLOCK_HEIGHT-spec.CBORE_FLOOR)
     # Owner ruling 2026-11-01 (option A): floor .570, each M4 x 20 cut to its
-    # floor plus .189 (±.005 cut, .001 reading): .183 MIN (1.16D), never
+    # floor plus .189 (±.005 cut, .001 reading): the tip reaches .183 MIN,
+    # .162 MIN (1.03D) of it full thread past the 0.75P tip chamfer, never
     # bottoming in the M4 x 5, and every cut fits the shortest bought screw.
     assert math.isclose(spec.CBORE_FLOOR,.570*INCH)
     assert math.isclose(spec.SCREW_REACH,.189*INCH)
     assert math.isclose(spec.SCREW_CUT_LENGTH,(.570+.189)*INCH)
-    assert math.isclose(spec.ENGAGEMENT_MIN,.183*INCH)
-    assert spec.ENGAGEMENT_TEXT=='.183'
-    assert spec.ENGAGEMENT_MIN>=1.16*4.0
-    assert spec.ENGAGEMENT_MAX<=spec.CARRIAGE_THREAD_DEPTH-.045+1e-9
+    assert math.isclose(spec.REACH_MIN,.183*INCH)
+    assert math.isclose(spec.ENGAGEMENT_MIN,spec.REACH_MIN-.75*.7)
+    assert spec.ENGAGEMENT_TEXT=='.162'
+    assert spec.ENGAGEMENT_DIAMETERS=='1.03D'
+    assert spec.REACH_MAX<=spec.CARRIAGE_THREAD_DEPTH-.045+1e-9
     assert spec.SCREW_CUT_LENGTH_MAX<spec.SCREW_LENGTH-spec.SCREW_LENGTH_TOL
-    assert spec.CALLOUTS_BELOW['CboreFloor']=='FLOOR FOR M4 X 20 CUT\nENGAGES .183 MIN (1.16D)'
+    assert spec.CALLOUTS_BELOW['CboreFloor']=='FLOOR FOR M4 X 20 CUT\nENGAGES .162 MIN (1.03D)'
     assert spec.DRAWING_PRECISION[spec.CBORE_FLOOR_REFERENCE]['CboreFloor']==3
     assert spec.CBORE_FLOOR-printed_band_mm(3,unit=spec.UNIT)>0
 
