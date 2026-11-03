@@ -727,12 +727,12 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("pd-vn-transgear-arm-plate-screw-2", "pd-transgear-arm-plate-1")): (
                 1.10 * 0.00809042475
             ),
-            # #8-32 nut on the collar's pilot, with its rear face on actual F:
-            # 23.876 - 6.1891 (the collar's fitted length) - 2.9016 of the
+            # #8-32 nut on the collar's pilot, the collar's rear face on actual F:
+            # 23.876 - 6.1722 (the .243 nominal collar) - 2.9016 of the
             # Ø4.064 (.160) stud's thread blank.
             frozenset(
                 ("pd-transgear-thumbnut-1", "pd-transgear-knob-shaft-1")
-            ): _annulus_limit(4.064, 3.454, 23.876 - 6.1891 - 2.9016),
+            ): _annulus_limit(4.064, 3.454, 23.876 - 6.1722 - 2.9016),
             # MHA-PD-VN-54 3/32 x 3/16 dowels pressed 2.3625 into MHA-PD-22's 2.38 reams.
             **_expected_numbered_pairs(
                 "pd-vn-transgear-knob-drive-pin",
