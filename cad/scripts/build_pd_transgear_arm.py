@@ -94,6 +94,7 @@ from pd_transgear_arm_geometry import (
     PIN_BORE_DIA,
     PIN_BORE_DIA_BAND,
     PIN_MOUTH_CHAMFER,
+    PIN_MOUTH_CHAMFER_TOLERANCE,
     PIN_HOLE_DEPTH,
     PIN_HOLE_DIA,
     PIN_HOLE_DIA_BAND,
@@ -286,6 +287,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ("EndWidth", 2.0 * END_HALF_WIDTH),
         ("PivotBoreDia", PIVOT_BORE_DIA),
         ("PinBoreDia", PIN_BORE_DIA),
+        ("PinMouthChamfer", PIN_MOUTH_CHAMFER),
         ("SpotFaceDia", SPOT_FACE_DIA),
         ("SpotFaceFloor", SPOT_FACE_FLOOR_FROM_FRONT),
         ("PinStation", PIN_STATION),
@@ -438,6 +440,14 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "PinBoreRearMouth")
+    # The leg is a named, driven, toleranced model dimension (Codjiflo, #2124):
+    # section D-D imports it with its band.
+    drive_jobs += [
+        (
+            name_dimensions(adapter, "PinBoreRearMouth", ["PinMouthChamfer"])[0],
+            '"PinMouthChamfer"',
+        )
+    ]
     expected -= V_PIN_MOUTH
     await volume_check(
         adapter, "pin bore rear mouth", expected, 0.03 * V_PIN_MOUTH + 0.05
@@ -783,6 +793,10 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_bilateral_tolerance(
         adapter, "PinBoreProfile", "PinBoreDia", *deviations(PIN_BORE_DIA_BAND),
+        display_unit=UNIT,
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "PinBoreRearMouth", "PinMouthChamfer", PIN_MOUTH_CHAMFER_TOLERANCE,
         display_unit=UNIT,
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)

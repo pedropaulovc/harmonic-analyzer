@@ -44,7 +44,12 @@ def test_required_drawing_paths() -> None:
 
 def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    views = (drawing.FRONT_KEEP, drawing.SECTION_KEEP, drawing.END_KEEP)
+    views = (
+        drawing.FRONT_KEEP,
+        drawing.SECTION_KEEP,
+        drawing.END_KEEP,
+        drawing.PIN_SECTION_KEEP,
+    )
     assert set().union(*views) == marked
     assert sum(len(view) for view in views) == len(marked)
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
@@ -299,6 +304,7 @@ def test_the_explicit_bands_are_the_spot_face_and_the_reams() -> None:
         ("LocatorProfile", "f'LocatorDia{index}'"): "LOCATOR_HOLE_PRINT_TOLERANCE_MM",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_DIA_BAND)",
         ("PinBoreProfile", "PinBoreDia"): "*deviations(PIN_BORE_DIA_BAND)",
+        ("PinBoreRearMouth", "PinMouthChamfer"): "PIN_MOUTH_CHAMFER_TOLERANCE",
     }
     assert geometry.LATCH_PIN_HEIGHT_BAND == geometry.printed_reach_mm(
         geometry.PIN_HOLE_Z, spec.DRAWING_PRECISION_BY_NAME["PinHoleZ"]
@@ -366,8 +372,19 @@ def test_the_pin_bore_presses_the_mha_179_pin_at_every_limit() -> None:
     tightest = cluster_pin.DIA_MAX - geometry.PIN_BORE_DIA_MIN
     assert (loosest, tightest) == pytest.approx((0.00762, 0.0254))
     assert spec.PIN_BORE_CALLOUT.splitlines()[2] == ".0003/.0010 INTERFERENCE"
-    # The rear mouth's chamfer limits print beside the press they protect.
-    assert spec.PIN_BORE_CALLOUT.splitlines()[3] == "REAR MOUTH .006/.010 X 45\u00b0"
+    # Codjiflo (#2124): the rear mouth's band is its own native leg
+    # dimension's, imported in section D-D, not callout text.
+    assert len(spec.PIN_BORE_CALLOUT.splitlines()) == 3
+    assert "MOUTH" not in spec.PIN_BORE_CALLOUT
+    assert spec.DRAWING_DIMENSIONS["PinBoreRearMouth"] == {"PinMouthChamfer"}
+    assert set(drawing.PIN_SECTION_KEEP) == {"PinMouthChamfer"}
+    assert geometry.PIN_MOUTH_CHAMFER_LIMITS == pytest.approx(
+        (
+            geometry.PIN_MOUTH_CHAMFER - geometry.PIN_MOUTH_CHAMFER_TOLERANCE,
+            geometry.PIN_MOUTH_CHAMFER + geometry.PIN_MOUTH_CHAMFER_TOLERANCE,
+        )
+    )
+    assert spec.PIN_MOUTH_CALLOUT.startswith(" X 45\u00b0")
     assert spec.PIN_PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
     assert min(geometry.PIN_BORE_DIA_BAND) == 0.0 < max(geometry.PIN_BORE_DIA_BAND)
 
