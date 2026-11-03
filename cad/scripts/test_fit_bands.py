@@ -327,7 +327,7 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ),
     ("dt_pinion_lever_pin_spec", "PIN_DIA_BAND"): (
         "the 1/16 drill rod's supplied +/-.0003 in: indexed as the symmetric "
-        "tolerance (the pin slips into the #52 match-drilled hole)"
+        "tolerance (the pin slips into the #51 match-drilled hole)"
     ),
     ("dt_cone_swing_platform_pivot_spec", "PIVOT_HOLE_BAND"): (
         "the pivot bore reamed 6.350 H7 on the 91829A560 shoulder: indexed into "

@@ -42,8 +42,6 @@ ROD_DIA_PLACES = 2  # RodDia
 # rod, so the 1/16 drill rod pin (.0625 +/-.0003) always slips in before it is
 # peened.
 PIN_HOLE_DIA = 1.6256  # .064, match-drilled through hub and rod
-# The drill dt_drive_train_assembly_sheet names in MHA-DT-00 LEVER PIN SET.
-PIN_HOLE_DRILL = "#52"
 BORE_DEPTH = HUB_LEN - WALL_T  # .32
 PIN_HOLE_FROM_MOUTH = BORE_DEPTH / 2.0  # .16
 PIN_HOLE_Z = HUB_LEN / 2.0 - PIN_HOLE_FROM_MOUTH  # hub-local station, .04
