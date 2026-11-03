@@ -94,6 +94,8 @@ _CENTER_MARK_HANDLES = (0, 1, 2, 3)
 # Each arm runs past the plate's rim (model metres beyond the bore's mark).
 CENTRE_LINE_OVERRUN_MM = 3.0
 
+# Owner ruling RV-02 (machinist_exceptions) accepts this control: the BASIC
+# hole circles and the 132X position frame to datum A.
 # The index holes' position frame: its leader lands on hole 20 of the 57-hole
 # circle (lower right, clear of the circle callouts), at a rim point 45° off
 # the radial so no centre-mark arm sits under the pick; the frame and its

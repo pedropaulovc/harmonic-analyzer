@@ -18,3 +18,8 @@ dt-cone-gear-tl-index-plate:
       where: "face view, the 132X index-hole callout: WEB .03 MIN"
       finding: "webs between neighbouring holes of the 57- and 51-hole circles and between those two circles below the .060 floor (rules 17, 20)"
       reason: "owner ruling 2026-11-02 (Pedro): accept webs down to .02 in on the 57- and 51-hole circles and between them, provisional until the #2157 measurements of the BS-0 plate and index pin land, when the pin diameter and circle radii are re-evaluated. Ø.157 pin holes on 57 and 51 holes inside the Ø3.94 plate leave about .03 at the worst drill band and position zone; there is no larger radius at the .080 edge target"
+    - id: "RV-02"
+      kind: "accept"
+      where: "face view: the 57-, 51- and 24-hole circle diameters boxed BASIC and the 132X position frame Ø.004 to datum A (the bore axis)"
+      finding: "geometric control (position frame, datum and basic dimensions) on a shop-tooling part (rule 5)"
+      reason: "owner ruling 2026-11-02 (Pedro): the index holes' angular spacing is the plate's function; without a position control the title block's ±1° on EQ SP would let neighbouring Ø.157 holes run together, so all 132 holes are held to a Ø.004 zone about their BASIC positions from the bore that pilots the plate on the BS-0 head"
