@@ -31,9 +31,12 @@ from _supplier_pin_data import (
     REFERENCE_DIMENSIONS,
     WALL_DIMENSION,
     SupplierPinReference,
+)
+from _supplier_pin_model import (
+    _reference_contract,
+    assert_supplier_pin_model_reference,
     declares_application_hole,
 )
-from _supplier_pin_model import _reference_contract, assert_supplier_pin_model_reference
 from _supplier_text_shelf import assert_supplier_shelves, shelve_supplier_text
 
 
