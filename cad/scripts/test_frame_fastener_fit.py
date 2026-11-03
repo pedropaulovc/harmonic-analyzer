@@ -19,7 +19,9 @@ def test_cross_screws_clear_tubes_and_engage_both_casting_sides() -> None:
     assert frame.BASE_CROSS_TAP_SPEC.kind == "tapped_bottoming"
     assert frame.TOP_CROSS_TAP_SPEC.kind == "tapped_bottoming"
     assert frame.TUBE_CROSS_HOLE_DIAMETER > cross_screw.SHANK_DIA
-    assert math.isclose(frame.BASE_FAR_CASTING_ENGAGEMENT, 10.70, abs_tol=1e-9)
+    # About .42 of far casting: column line - 1.004/2 socket - (5.236 - 1.750);
+    # 10.705 at the 112.0 column line, 10.719 once it snaps to 4.410.
+    assert math.isclose(frame.BASE_FAR_CASTING_ENGAGEMENT, 10.71, abs_tol=0.015)
     assert (
         min(
             frame.BASE_FAR_CASTING_ENGAGEMENT,
@@ -27,7 +29,13 @@ def test_cross_screws_clear_tubes_and_engage_both_casting_sides() -> None:
         )
         >= cross_screw.SHANK_DIA
     )
-    assert math.isclose(frame.CROSS_SCREW_THREAD_RESERVE, 1.55, abs_tol=1e-9)
+    # 1.81 full thread past the 1.750 shank: .060.
+    assert math.isclose(frame.CROSS_SCREW_THREAD_RESERVE, 0.060 * 25.4, abs_tol=1e-9)
+
+
+def _printed_mm(value_mm: float, places: int) -> float:
+    """``value_mm`` as the inch sheet prints it at ``places``, in mm."""
+    return round(value_mm / 25.4, places) * 25.4
 
 
 def test_upper_stock_screw_keeps_casting_engagement_at_the_printed_bands() -> None:
@@ -36,21 +44,22 @@ def test_upper_stock_screw_keeps_casting_engagement_at_the_printed_bands() -> No
     ]
     bore_places = top_frame_spec.DRAWING_PRECISION["BoreProfile"]["B0Dia"]
     max_floor_offset = (
-        round(frame.TOP_SCREW_SEAT_Z - abs(frame.REAR_COLUMN_Z), floor_places)
+        _printed_mm(frame.TOP_SCREW_SEAT_Z - abs(frame.REAR_COLUMN_Z), floor_places)
         + top_frame_spec.PRINTED_LINEAR_BAND_MM[floor_places]
     )
     max_bore_radius = (
-        round(frame.COLUMN_SOCKET_DIAMETER, bore_places)
+        _printed_mm(frame.COLUMN_SOCKET_DIAMETER, bore_places)
         + top_frame_spec.PRINTED_LINEAR_BAND_MM[bore_places]
     ) / 2.0
     minimum_engagement = cross_screw.SHANK_LEN - max_floor_offset - max_bore_radius
     # drawing-guidelines.md rule 17 (walls and webs): the flush counterbore floor still leaves 1.5D of far thread.
     assert minimum_engagement >= 1.5 * cross_screw.SHANK_DIA
     full_thread = frame.TOP_CROSS_TAP_SPEC.overrides_mm["ThreadDepth"]
+    # The thread depth prints .XX (1.81): .050 of reserve past the shank tip.
     minimum_thread_reserve = (
-        full_thread - top_frame_spec.PRINTED_LINEAR_BAND_MM[1] - cross_screw.SHANK_LEN
+        full_thread - top_frame_spec.PRINTED_LINEAR_BAND_MM[2] - cross_screw.SHANK_LEN
     )
-    assert math.isclose(minimum_thread_reserve, 0.75, abs_tol=1e-9)
+    assert math.isclose(minimum_thread_reserve, 0.050 * 25.4, abs_tol=1e-9)
     assert minimum_thread_reserve >= 0.25
 
 

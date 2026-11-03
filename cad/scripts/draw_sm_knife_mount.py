@@ -61,7 +61,6 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
     offset_dimension_text,
@@ -77,6 +76,7 @@ from _drawing_gdt import (
     add_frame_datum_feature,
     assert_frame_datums_defined,
 )
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
@@ -98,7 +98,7 @@ from sm_knife_mount_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
-    GEOMETRIC_TOLERANCES_MM,
+    GEOMETRIC_TOLERANCES_IN,
     HOLE_ROW_FACE_DISTANCE,
     PIN_DEPTH_CALLOUT,
     PIN_HOLE_CALLOUT,
@@ -121,6 +121,7 @@ from sm_knife_mount_spec import (
     STUD_TAP_THREAD_DEPTH_PLACES,
     SUPPORT_Z_THICK,
     SURFACE_FINISHES,
+    UNIT,
     TAP_CALLOUT_REASON,
     TAP_DRILL_CALLOUT,
 )
@@ -188,8 +189,8 @@ def _sheet_x(model_x_mm: float) -> float:
 
 # The 29.6 height's dimension line stands at sheet x 0.024, 65.6 mm off the
 # block's -X face (its text 6 mm inside the border), and the bore's Ø, its
-# ream band and its three callout
-# rows (REAM THRU, then the knife seat's mate, BORE_CALLOUT below) sit in
+# bored band and its three callout
+# rows (BORE THRU, then the knife seat's mate, BORE_CALLOUT below) sit in
 # the band between them: the 5ff8fba5d render ran the
 # height line (then x 0.063) 3.62 mm through the Ø (text 58.5..75.3 mm).
 # BORE_DIA_TEXT_HALF_WIDTH is half the widest row, "MHA-SM-03 TRUNNION": 18
@@ -289,7 +290,7 @@ TOP_HALF_Z = SUPPORT_Z_THICK / 2.0 * SHEET_SCALE[0] / 1000.0
 PIN_CALLOUT_HALF_WIDTH = 0.039
 PIN_CALLOUT_SHOULDER_OVERHANG = 0.0016
 PIN_CALLOUT_SHOULDER_DROP = 0.0105
-PIN_CALLOUT_SHOULDER_START = (_sheet_x(BLK_HALF_X) + 0.0126, TOP_CENTER[1] - 0.036)
+PIN_CALLOUT_SHOULDER_START = (_sheet_x(BLK_HALF_X) + 0.0165, TOP_CENTER[1] - 0.036)
 # The slot's inner end, its half-round end's centre from B's axis
 # (SlotEndFromB, a model dimension), runs above the top view between the two
 # centres, where the dowel pair's BASIC span stood, its value 1 mm right of
@@ -309,13 +310,15 @@ PIN_SIDE_TEXT_XY = (
     _sheet_x(BLK_HALF_X - PIN_HOLE_SIDE_DISTANCE / 2.0),
     TOP_CENTER[1] + TOP_HALF_Z + 0.0135,
 )
-# B's axis from the front face (the view's lower edge), its line 9.6 mm right
-# of the +X face, 4.6 mm right of the A-A cutting line's arrow, its witness
-# line from B's axis riding the cutting line's end.  Left of the block the
-# datum-C slot's width and frame take the band (a vertical row dimension
-# there would cross the slot width's witness lines).
+# B's axis from the front face (the view's lower edge), its line 13.5 mm
+# right of the +X face, 8.5 mm right of the A-A cutting line's arrow, its
+# witness line from B's axis riding the cutting line's end.  The banded
+# ".275 ±.010" (21.4 mm wide) centres on its line: at 9.6 mm it ran 1 mm
+# across the +X face edge (layout audit, farm run 20261103T044301495Z).
+# Left of the block the datum-C slot's width and frame take the band (a
+# vertical row dimension there would cross the slot width's witness lines).
 ROW_FACE_TEXT_XY = (
-    _sheet_x(BLK_HALF_X) + 0.0096,
+    _sheet_x(BLK_HALF_X) + 0.0135,
     TOP_CENTER[1] - TOP_HALF_Z + HOLE_ROW_FACE_DISTANCE * SHEET_SCALE[0] / 1000.0 / 2.0,
 )
 # The slot's width (SlotWidth, a model dimension) stands left of the block.
@@ -336,6 +339,7 @@ TOP_KEEP = {
     ),
     "SlotWidth": SLOT_WIDTH_TEXT_XY,
     "SlotEndFromB": SLOT_END_TEXT_XY,
+    "HoleRowFace": ROW_FACE_TEXT_XY,
 }
 # The knife bore is reamed (Ra 1.6, +0.03/0 band): the process is stated
 # (blind machinist review, 2026-10-09: a bare THRU left drill or ream open),
@@ -347,7 +351,7 @@ TOP_KEEP = {
 # B's slip band and the slot's name their mate (owner ruling 2026-10-24,
 # T+H3); the floor depth states it holds for both.
 LEVER_NUMBER = str(_config.parts("sm-summing-lever")["number"])
-BORE_CALLOUT = "\n".join(("REAM THRU", "KNIFE SEAT FOR", f"{LEVER_NUMBER} TRUNNION"))
+BORE_CALLOUT = "\n".join(("BORE THRU", "KNIFE SEAT FOR", f"{LEVER_NUMBER} TRUNNION"))
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
@@ -450,8 +454,8 @@ TAP_CALLOUT_TOP_REACH = 0.0084
 # its frame ~5.8 mm over the lowered front view's top edge.
 TAP_CALLOUT_XY = (_sheet_x(-BLK_HALF_X) - 0.031, TOP_CENTER[1] - TOP_HALF_Z - 0.038)
 # Each native length the callout prints and its own band, (upper, lower) mm.
-# The full thread's band and the drill depth's are symmetric, +/-0.13 and
-# +/-0.05.
+# The full thread's band and the drill depth's are symmetric, +/-.005 and
+# +/-.002.
 TAP_CALLOUT_BANDS: dict[str, tuple[float, tuple[float, float]]] = {
     "hw-threaddepth": (
         STUD_TAP_THREAD_DEPTH,
@@ -462,14 +466,14 @@ TAP_CALLOUT_BANDS: dict[str, tuple[float, tuple[float, float]]] = {
         (STUD_TAP_DRILL_DEPTH_BAND, -STUD_TAP_DRILL_DEPTH_BAND),
     ),
 }
-# Both bands print their deviations at two places, ±0.13 and ±0.05.
-TAP_CALLOUT_BAND_PLACES = 2
+# Both bands print their deviations at three places, ±.005 and ±.002.
+TAP_CALLOUT_BAND_PLACES = 3
 # swTolType_e: no band of its own, bilateral, symmetric.
 _TOL_NONE = 0
 _TOL_BILATERAL = 2
 _TOL_SYMMETRIC = 4
 # The callout's places, the spec's: the full thread and the drill depth at
-# two (each its explicit band).  The pilot prints no Ø to place.
+# three (each its explicit band).  The pilot prints no Ø to place.
 TAP_CALLOUT_PLACES = {
     "hw-threaddepth": STUD_TAP_THREAD_DEPTH_PLACES,
     "hw-tapdrldepth": STUD_TAP_DRILL_DEPTH_PLACES,
@@ -985,7 +989,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=UNIT,
     )
     stamp_drawing_summary(
         adapter,
@@ -1143,10 +1151,11 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _set_sheet_precision(depth, label="block-depth overall")
 
-    # Datum B (the round slip hole) on the block's outside faces at general
-    # tolerance (blind machinist review, 2026-10-09): across X, its axis from
-    # the +X side face; across Z, from the front face.  Each face is picked
-    # off the cutting line, the hole on its upper outer rim at 45 deg.
+    # Datum B (the round slip hole) on the block's outside faces (blind
+    # machinist review, 2026-10-09): across X, its axis from the +X side face,
+    # at general tolerance; across Z, the part's own HoleRowFace (TOP_KEEP).
+    # The side face is picked off the cutting line, the hole on its upper
+    # outer rim at 45 deg.
     pin_rim_mm = PIN_HOLE_DIA / 2.0 / math.sqrt(2.0)
     b_pick = max(
         (
@@ -1186,43 +1195,6 @@ async def build(adapter: Any) -> dict[str, str]:
             f"face, expected {PIN_HOLE_SIDE_DISTANCE:g} mm"
         )
     _set_sheet_precision(side, label="dowel hole from side face")
-    front_face = model_point_in_view(
-        adapter,
-        top,
-        (
-            (BLK_HALF_X + PIN_HOLE_X) / 2.0 / 1000.0,
-            BLK_TOP / 1000.0,
-            SUPPORT_Z_THICK / 2.0 / 1000.0,
-        ),
-        label="front face",
-    )
-    row_y = model_point_in_view(
-        adapter,
-        top,
-        (PIN_HOLE_X / 1000.0, BLK_TOP / 1000.0, 0.0),
-        label="datum B axis",
-    )[1]
-    if not front_face[1] < row_y:
-        raise RuntimeError(
-            f"the front face projects at sheet y {front_face[1]:g}, not below the "
-            f"hole row ({row_y:g}): ROW_FACE_TEXT_XY assumes the top view's lower edge"
-        )
-    row = add_edge_dimension(
-        adapter,
-        top,
-        p0=front_face,
-        p1=b_pick,
-        text_xy=ROW_FACE_TEXT_XY,
-        label="hole row from front face",
-        orientation="vertical",
-    )
-    set_arc_endpoints_to_center(adapter, row, label="hole row from front face")
-    if abs(_sheet_dimension_mm(row) - HOLE_ROW_FACE_DISTANCE) > 1e-5:
-        raise RuntimeError(
-            f"datum B's hole measures {_sheet_dimension_mm(row):g} from the front "
-            f"face, expected {HOLE_ROW_FACE_DISTANCE:g} mm"
-        )
-    _set_sheet_precision(row, label="hole row from front face")
 
     # The tap axis BASIC from datum B's axis, in section A-A between owned
     # axes (TAP_STATION_TEXT_XY); the tap's axis runs on through the bore's
@@ -1335,7 +1307,7 @@ async def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=b_frame_rim,
         frame_xy=PIN_FRAME_XY,
         characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["dowel hole perpendicularity"],
+        tolerance=GEOMETRIC_TOLERANCES_IN["dowel hole perpendicularity"],
         datums=("A",),
         diameter=True,
         label="dowel hole perpendicularity",
@@ -1377,11 +1349,11 @@ async def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=slot_wall,
         frame_xy=SLOT_FRAME_XY,
         characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["dowel slot position"],
+        tolerance=GEOMETRIC_TOLERANCES_IN["dowel slot position"],
         datums=("A", "B"),
         lower_frame=(
             "perpendicularity",
-            GEOMETRIC_TOLERANCES_MM["dowel slot perpendicularity"],
+            GEOMETRIC_TOLERANCES_IN["dowel slot perpendicularity"],
             ("A",),
         ),
         label="dowel slot position",
@@ -1405,12 +1377,12 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(FRONT_CENTER[0], _front_y(BORE_CY) + R_BORE * SHEET_SCALE[0] / 1000.0),
         frame_xy=BORE_FRAME_XY,
         characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["knife-bore position"],
+        tolerance=GEOMETRIC_TOLERANCES_IN["knife-bore position"],
         datums=("A", "B", "C"),
         diameter=True,
         lower_frame=(
             "position",
-            GEOMETRIC_TOLERANCES_MM["knife-bore orientation"],
+            GEOMETRIC_TOLERANCES_IN["knife-bore orientation"],
             ("A", "B", "C"),
         ),
         composite=True,
@@ -1443,7 +1415,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=_tap_lower_rim(adapter, top, TAP_FRAME_RIM_SIDE),
         frame_xy=TAP_FRAME_XY,
         characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger tap position"],
+        tolerance=GEOMETRIC_TOLERANCES_IN["knife-hanger tap position"],
         datums=("A", "B", "C"),
         diameter=True,
         label="knife-hanger tap position",

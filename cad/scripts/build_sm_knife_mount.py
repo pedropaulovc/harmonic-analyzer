@@ -19,8 +19,9 @@ knife-edge suspension: line contact at the ridge, free to rock, replacing the
 M6.4 "diamond knife-bar in the lever tube bore" (which clashed with the lever's
 solid pivot cylinder once the bore was removed). 2026-09-02 user re-read of
 ch18 p.42: the block is an UNPAINTED HEAT-TREATED STEEL block (not brass) with
-a CLOSE bore around the trunnion -- Ø12 over the 8.080 x 10.268 hex, so the
-upper shoulders clear by ~0.86 and the lower ones by ~1.5.
+a CLOSE bore around the trunnion -- Ø.472 (#290: Ø12 on the inch grid) over
+the 8.080 x 10.268 hex, so the upper shoulders clear by ~0.86 and the lower
+ones by ~1.5.
 
 There are TWO supports, one per trunnion (placed front/back in the assembly at
 |z| ~ 87). This single part is built once and placed twice.
@@ -31,12 +32,12 @@ axis, +Y up, +X across. The bore centre sits ``R_BORE`` below the origin so the
 bore's upper inner wall lands on the ridge (with a TOP_CLEAR sliver margin). The
 block rises from below the bore up to the top-frame casting's faced underside
 (999.7), its top seat clamped flush to it: the #10-24 bolt threads into a
-9.65 +/-0.13 full-thread bottoming tap (drill 11.24) on the bore's vertical
-centreline, whose charged pilot (Ø3.927, past the accepted Ø3.7973-3.8973) at
-its sharpest accepted point leaves 2.0 of metal over the bore crown at worst
-case; the dowels' blind flat-floored round slip hole (+X, datum B) and open
-slot (-X, datum C) sit 7.632 either side of the tap axis along X, in a block
-25.4 across.
+.375 +/-.005 full-thread bottoming tap (drill .438) on the bore's vertical
+centreline, whose charged pilot (Ø3.924, past the accepted Ø3.7973-3.8989)
+at its sharpest accepted point leaves the .080 rule-17 target of metal over
+the bore crown at worst case; the dowels' blind flat-floored round slip hole
+(+X, datum B) and open slot (-X, datum C) sit .300 either side of the tap
+axis along X, in a block 1.00 across.
 
 The named "knife axis" is the contact ridge line itself (part origin); the
 assembly mates the lever's knife ridge (``Axis3@sm-summing-lever``) coincident to
@@ -56,6 +57,8 @@ import math
 import sys
 
 from _appearance import apply_color, apply_material
+from _document_units import apply_package_model_units
+from _part_properties import part_drawing_unit
 from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
@@ -68,6 +71,8 @@ from _session import run_build
 from _sketch import (
     SketchDims,
     add_line_chain,
+    anchor_point_to_origin,
+    blank_reference_sketches,
     dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
@@ -98,6 +103,9 @@ from sm_knife_mount_spec import (
     BORE_DIA_PLACES,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    HOLE_ROW_FACE_DISTANCE,
+    HOLE_ROW_FACE_PLACES,
+    HOLE_ROW_FACE_TOL,
     ISOMETRIC_VIEW_NOTE,
     PIN_HOLE_DEPTH,
     PIN_HOLE_DIA,
@@ -110,7 +118,9 @@ from sm_knife_mount_spec import (
     STUD_TAP_DRILL_DEPTH,
     STUD_TAP_SPEC,
     STUD_THREAD,
+    SUPPORT_Z_THICK,
     SURFACE_FINISHES,
+    UNIT,
 )
 import sm_knife_mount_spec
 
@@ -126,19 +136,21 @@ HARDENED_STEEL = (0.30, 0.30, 0.31)  # dark heat-treated grey, left unpainted
 RIDGE_Y = HEX_H / 2.0  # hex top vertex above the pivot/cylinder centreline (5.134)
 
 # --- bore: close around the hex trunnion, top-edge contact only ------------
-R_BORE = 6.0  # Ø12 bore (2026-09-02 ch18 p.42 re-read: a CLOSE bore, down from
-# the Ø16 of the 2026-09 page001_img01 pass); the hex is 8.080 wide x 10.268
-# tall -> ~0.86 clear at the upper shoulders, ~1.5 at the lower ones,
-# everywhere but the top vertex line
-TOP_CLEAR = 0.25  # hex top vertex hangs this far below the bore upper inner wall
+R_BORE = sm_knife_mount_spec.R_BORE  # Ø.472 bore (2026-09-02 ch18 p.42 re-read:
+# a CLOSE bore); the hex is 8.080 wide x 10.268 tall -> ~0.86 clear at the
+# upper shoulders, ~1.5 at the lower ones, everywhere but the top vertex line
+# Hex top vertex hangs this far below the bore upper inner wall: 0.261 puts
+# the bore centre's BASIC height under the top seat on the inch grid,
+# 14.866 - 0.261 + 5.9944 = 20.5994 (.811).
+TOP_CLEAR = 0.261
 # Bore centre BELOW the origin so only the upper wall reaches the ridge:
-BORE_CY = TOP_CLEAR - R_BORE  # -5.75 (bore top inner wall at local y +TOP_CLEAR)
+BORE_CY = TOP_CLEAR - R_BORE  # -5.7334 (bore top inner wall at local y +TOP_CLEAR)
 
 # --- block (bearing body, held to the crossbar) ----------------------------
-SUPPORT_Z_THICK = 14.0  # axial length straddling the trunnion mid (low)
-# BLK_HALF_X (25.4 across) is the spec's: the dowel pattern's webs size it.
-WALL = 3.0  # material below the bore
-BLK_BOT = BORE_CY - R_BORE - WALL  # -14.75
+# SUPPORT_Z_THICK (.55) and BLK_HALF_X (1.00 across) are the spec's: the
+# dowel pattern's webs size them.
+WALL = 3.1242  # material below the bore: the block 1.17 tall
+BLK_BOT = BORE_CY - R_BORE - WALL  # -14.852
 
 # Mount: the block top seat is clamped to the top-frame casting underside (the
 # integral crossbar's flush lower face, faced Ra 3.2 with the whole underside
@@ -154,14 +166,20 @@ if abs(BLK_TOP - sm_knife_mount_spec.BLK_TOP) > 0.005:
     raise AssertionError(
         f"knife-mount BLK_TOP {BLK_TOP:.4f} != spec {sm_knife_mount_spec.BLK_TOP}"
     )
+if (
+    abs(BORE_CY - sm_knife_mount_spec.BORE_CY) > 1e-9
+    or abs(BLK_BOT - sm_knife_mount_spec.BLK_BOT) > 1e-9
+):
+    raise AssertionError(
+        f"knife-mount bore centre {BORE_CY:.4f} / bottom {BLK_BOT:.4f} != spec"
+    )
 # The bore centre's BASIC height under the datum-A top seat, exactly as
-# modelled: 14.866 + 5.75 = 20.616.  The sheet prints it (draw_sm_knife_mount)
-# at the places that carry it unrounded; the spec's 14.87 mirror would print a
-# BASIC 0.004 off the part (farm run 20261009T155421516Z measured 20.616).
+# modelled: 14.866 + 5.7334 = 20.5994 (.811).  The sheet prints it
+# (draw_sm_knife_mount) at the places that carry it unrounded.
 BORE_CENTRE_DEPTH = BLK_TOP - BORE_CY
-# The spec judges the tap's web at its rounded mirror; the derived top is
-# 0.004 lower, so re-judge it here (2.0078: the charged pilot envelope,
-# Ø3.927, not the accepted Ø3.8973, at the sharpest accepted point, 117 deg).
+# The spec judges the tap's web at its mirror; re-judge it here at the
+# derived top (2.110: the charged pilot envelope, Ø3.924, not the accepted
+# Ø3.8989, at the sharpest accepted point, 117 deg).
 _TAP_WEB_WORST = sm_knife_mount_spec.tap_web_worst(
     BLK_TOP,
     sm_knife_mount_spec.STUD_TAP_DRILL_DEPTH,
@@ -188,6 +206,16 @@ V_SLOT = (
     (SLOT_INNER_X + BLK_HALF_X) * SLOT_WIDTH + math.pi * SLOT_WIDTH**2 / 8.0
 ) * PIN_HOLE_DEPTH
 V_PINS = V_PIN + V_SLOT
+
+# B's row from the front face (model +Z) prints from a hidden reference line
+# (the build_ch_channel_lever PlateOffsetReference pattern; no metal): on the
+# Top plane (sketch u = model X, v = -model Z) along datum B's axis, from the
+# axis (v = 0) to the front face (v = -SUPPORT_Z_THICK / 2).  The block is a
+# mid-plane extrude, so the value is driven from its own global, and the
+# line's dimension carries the spec's band and places natively.
+HOLE_ROW_SKETCH = "HoleRowReference"
+_HOLE_ROW_START = (PIN_HOLE_X, 0.0)
+_HOLE_ROW_END = (PIN_HOLE_X, -HOLE_ROW_FACE_DISTANCE)
 
 
 def slot_stadium_points(
@@ -227,6 +255,54 @@ async def _mass(adapter) -> tuple[float, list[float]]:
     if not res.is_success:
         raise RuntimeError(f"knife-mount mass properties failed: {res.error}")
     return float(res.data.volume), [float(c) for c in res.data.center_of_mass]
+
+
+@_telemetry.traced("part.knife_mount.hole_row_reference")
+async def hole_row_reference(adapter) -> list[tuple[str, str]]:
+    """Sketch the datum-B axis -> front-face reference line; return its drives."""
+    check(f"create_sketch {HOLE_ROW_SKETCH}", await adapter.create_sketch("Top"))
+    # Direct-to-DB: the line runs along B's axis line through the slip seat,
+    # so creation-time inference would over-define the sketch.
+    set_sketch_direct_db(adapter, True)
+    line = check(
+        f"{HOLE_ROW_SKETCH} line",
+        await adapter.add_line(
+            _HOLE_ROW_START[0], _HOLE_ROW_START[1], _HOLE_ROW_END[0], _HOLE_ROW_END[1]
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    # ConstructionGeometry is declared on ISketchSegment, not the ISketchLine
+    # the registry binds.
+    segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{line} did not take the construction flag")
+    check(
+        f"{HOLE_ROW_SKETCH} vertical",
+        await adapter.add_sketch_constraint(line, None, "vertical"),
+    )
+    await dimension_between(
+        adapter,
+        f"{line}.start",
+        f"{line}.end",
+        "vertical_distance",
+        HOLE_ROW_FACE_DISTANCE,
+        HOLE_ROW_SKETCH,
+    )
+    await anchor_point_to_origin(
+        adapter, f"{line}.start", *_HOLE_ROW_START, HOLE_ROW_SKETCH
+    )
+    await ensure_fully_defined(adapter, f"{HOLE_ROW_SKETCH} sketch")
+    check(f"exit_sketch {HOLE_ROW_SKETCH}", await adapter.exit_sketch())
+    name_last_feature(adapter, HOLE_ROW_SKETCH)
+    full = name_dimensions(adapter, HOLE_ROW_SKETCH, ["HoleRowFace", "HoleRowAnchorX"])
+    dimension = _early_bound(adapter.currentModel.Parameter(full[0]), "IDimension")
+    measured = float(dimension.SystemValue) * 1000.0
+    if abs(measured - HOLE_ROW_FACE_DISTANCE) > 1e-6:
+        raise RuntimeError(
+            f"{full[0]} measures {measured:g} mm, expected {HOLE_ROW_FACE_DISTANCE:g} mm"
+        )
+    return list(zip(full, ('"SupportZThick" / 2', '"PinHoleX"'), strict=True))
 
 
 def _open_top_seat_sketch(
@@ -298,6 +374,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): the bore radius + its top clearance,
     # the block half-width / wall / axial thickness, and the local block top. The
@@ -427,7 +504,7 @@ async def build(adapter) -> dict[str, str]:
     # coords are zero -> origin-axis relations, no placement dims). The
     # analytic expectation subtracts the nominal drill cylinder to its depth
     # plus its 118 deg point; even the charged pilot envelope at its sharpest
-    # accepted point stops _TAP_WEB_WORST (2.0078) above the bore crown, so
+    # accepted point stops _TAP_WEB_WORST (2.110) above the bore crown, so
     # none of it overlaps the bore void.
     wizard_holes(
         adapter,
@@ -607,6 +684,7 @@ async def build(adapter) -> dict[str, str]:
         f"dowel slip seats (top-seat sketch B {b_uv}, slot {inner_uv}) removed "
         f"{before - after:.2f} mm^3 (analytic {V_PINS:.2f})"
     )
+    drive_jobs += await hole_row_reference(adapter)
 
     # Named axis = the knife-edge contact ridge line (part origin, along Z). The
     # assembly mates Axis3@sm-summing-lever (the hex ridge) coincident to it.
@@ -622,6 +700,8 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven knife mount (equations neutral)", expected, 0.01 * expected
     )
+    # Saved shown, the reference line would print in every assembly render.
+    blank_reference_sketches(adapter, (HOLE_ROW_SKETCH,))
 
     await apply_material(adapter, MATERIAL)
     # ch18 p.42: heat-treated and left unpainted -- a dark grey, not the
@@ -632,7 +712,7 @@ async def build(adapter) -> dict[str, str]:
     # Explicit slip bands on datum B's Ø and datum C's width (their stations
     # and depth are governed by their places).  Each band is equal either
     # side, so it prints +/- on one row (ASME Y14.5 equal-bilateral form, the
-    # crossbar's former slip hole and slot precedent): 3.250 +/-0.02.
+    # crossbar's former slip hole and slot precedent): .1280 +/-.0007.
     for dim_name, band in (
         ("PinHoleDia", PIN_HOLE_DIA_BAND),
         ("SlotWidth", SLOT_WIDTH_BAND),
@@ -640,15 +720,28 @@ async def build(adapter) -> dict[str, str]:
         lower, upper = deviations(band)
         if lower != -upper:
             raise AssertionError(f"the knife mount's {dim_name} band must be symmetric")
-        set_dimension_symmetric_tolerance(adapter, "PinHoleProfile", dim_name, upper)
-    # The reamed knife bore's +0.03/0 band (sm_knife_mount_spec.BORE_DIA_BAND),
-    # printed at its two places: Ø12.00 +0.03/0.00 REAM THRU.
+        set_dimension_symmetric_tolerance(
+            adapter, "PinHoleProfile", dim_name, upper, display_unit=UNIT
+        )
+    # B's row from the front face: the .XX band, printed at the row's three
+    # places (.275 +/-.010), on the reference line's own dimension.
+    set_dimension_symmetric_tolerance(
+        adapter,
+        HOLE_ROW_SKETCH,
+        "HoleRowFace",
+        HOLE_ROW_FACE_TOL,
+        places=HOLE_ROW_FACE_PLACES,
+        display_unit=UNIT,
+    )
+    # The bored knife bore's +.0012/0 band (sm_knife_mount_spec.BORE_DIA_BAND),
+    # printed at its four places: Ø.4720 +.0012/.0000 THRU.
     set_dimension_bilateral_tolerance(
         adapter,
         "BoreProfile",
         "BoreDia",
         *deviations(BORE_DIA_BAND),
         places=BORE_DIA_PLACES,
+        display_unit=UNIT,
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     # Manufacturing drawing support: mark exactly the print's dimensions and

@@ -61,7 +61,7 @@ def test_side_plate_is_flush_and_matches_neck_width_without_moving_the_arm() -> 
     mount_back = (
         installation.SUMMING_Z - summing.HEX_Z_MID + knife_mount.SUPPORT_Z_THICK / 2.0
     )
-    assert front - mount_back == pytest.approx(0.6835, abs=1e-4)
+    assert front - mount_back == pytest.approx(0.6985, abs=1e-4)
     # Their plan projections may overlap; positive axial air keeps them separate.
     assert front > mount_back
 

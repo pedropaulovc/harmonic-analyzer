@@ -23,7 +23,7 @@ painted the columns black at capture scale.
 
 Length: the 994.0 visible span is extended into the base socket by 25.4,
 so the installed top station is preserved when the column origin moves down
-from the deck to Y=25.4. Two Ø5 transverse stations are drilled through both
+from the deck to Y=25.4. Two Ø.197 transverse stations are drilled through both
 Z walls at the shared lower/top cross-screw axes.
 
 Dimensions: cad/DIMENSIONS.md "Legacy part audit" - OD rederived from the
@@ -46,9 +46,11 @@ import sys
 from _appearance import POLISHED_STEEL, apply_color, apply_material
 from _check import check
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_save import save_part_and_images
+from _part_properties import part_drawing_unit
 from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import SketchDims, ensure_fully_defined, set_sketch_direct_db
@@ -113,6 +115,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs: tube OD, wall, cut length, cross-hole size/stations, and
     # the top-only cap-entry chamfer. Explicit mm is load-bearing in this inch

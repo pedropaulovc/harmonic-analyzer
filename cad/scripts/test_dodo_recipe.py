@@ -2882,6 +2882,9 @@ def test_config_deps_are_fine_grained():
         # (#290 drawing_unit) lives on their own registry rows.
         "parts/dt-cylinder-gear.yaml",
         "parts/dt-cylinder-gear-shaft.yaml",
+        # The cone reads the base casting spec, whose sheet unit (#290
+        # drawing_unit) lives on its own registry row.
+        "parts/fr-harmonic-base.yaml",
         "parts/_defaults.yaml",
         "title_block.yaml",
         "release.yaml",
@@ -2928,6 +2931,12 @@ def test_config_deps_are_fine_grained():
         "parts/_defaults.yaml",
         "parts/ch-fulcrum-keeper.yaml",
         "parts/dt-pinion-pivot-block.yaml",
+        "parts/fr-harmonic-base.yaml",
+        "parts/fr-nameplate.yaml",
+        "parts/fr-rocker-arm-support.yaml",
+        "parts/fr-top-frame.yaml",
+        "parts/fr-tube-frame.yaml",
+        "parts/sm-knife-mount.yaml",
         "parts/sm-summing-lever.yaml",
         "parts/sm-vn-knife-hanger-stud.yaml",
         "parts/sm-vn-knife-mount-dowel.yaml",

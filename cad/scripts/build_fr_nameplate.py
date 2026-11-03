@@ -5,9 +5,9 @@ The ch.26 p.71 macro shows a rounded-corner brass plate, raised polished border,
 fine notched pinstripe frame around a recessed blackened field, and engraving
 "Wm. Gaertner & Co / Chicago, U. S. A." split by a scroll cartouche. The user
 ruling of 2026-10-09 (ch.26 p.71; ch.30 p002/p003/p006) makes the traced OUTER
-edge the plate outline at 100 mm wide, rather than surrounding the artwork
-with the former 100 x 55 plate. Height is the measured DXF aspect ratio
-(``fr_nameplate_spec``), about 45.33 mm. The nearby stamped '2' is a separate
+edge the plate outline, rather than surrounding the artwork with the former
+100 x 55 plate. The #290 inch rebake scales it to 3.95 x 1.79
+(``fr_nameplate_spec``). The nearby stamped '2' is a separate
 base feature, not modelled here.
 
 The lettering, ornament AND pinstripe are traced from the photo, not a font.
@@ -16,10 +16,11 @@ offline (scratchpad ``generate_cut_dxf.py``: ezdxf resolve + shapely
 buffer/union), producing 112 closed LWPOLYLINE contours, formerly baked 88 mm
 wide and centred on a 100 x 55 plate.
 
-The 2026-10-09 one-off ezdxf rebake uniformly scales every vertex by 100/88
+The 2026-10-09 one-off ezdxf rebake uniformly scaled every vertex by 100/88
 after subtracting the measured outer-loop bbox origin
-(6.0, 7.5538435420827525); it does NOT round the measured 39.8923129158345 mm
-height. Units/header settings stay R2010 millimetres; ezdxf fixed metadata
+(6.0, 7.5538435420827525); the #290 rebake then scaled x by 3.95 in / 100 mm
+and y by 1.79 in / the measured 45.332 height, so the envelope lands on the
+.01 in grid. Units/header settings stay R2010 millimetres; ezdxf fixed metadata
 makes the exports deterministic. The outer ribbon's OUTER edge is saved as
 ``fr-nameplate-outline.dxf`` and imported for the slab. Both loops of that
 ribbon are removed from ``fr-nameplate-engraving.dxf`` (now 110 contours):
@@ -41,7 +42,7 @@ DXFs, so every import uses scale=1, position=(0,0). The remaining engraving
 cuts both directions to reach the field floor: lettering incises the sunk
 field and the pinstripe incises the raised border. The SolidWorks-free
 ``test_fr_nameplate_geometry`` guards the files, field/outline areas, and
-each clearance station's SCREW_INSET offset from its traced screw-head mark.
+each clearance station's offset from its traced screw-head mark.
 
 Mounting (2026-09-02 re-derive off ch26 p.71 ``page001_img01``): FOUR brass
 slotted round-head screws, one per corner, heads riding the pinstripe corners
@@ -87,9 +88,11 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _document_units import apply_package_model_units
 from _drawing_precision import apply_drawing_precision
 from _feature_tree import _feature_by_name, name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _paths import REFERENCES_DIR
 from _rebuild import force_rebuild
@@ -129,32 +132,32 @@ PART_NAME = "fr-nameplate"
 MATERIAL = "Brass"  # bright cast/engraved brass plate (see _appearance.apply_material)
 
 # Plate dimensions/stations live in the pure-data contract used by base and frame.
-CORNER_R = 4.020278591487471  # mm; measured circular fit, not an outline driver
+CORNER_R = 4.032846449419005  # mm; measured circular fit, not an outline driver
 OUTLINE_DXF = REFERENCES_DIR / "fr-nameplate-outline.dxf"
-OUTLINE_AREA_MM2 = 4519.182227599477
+OUTLINE_AREA_MM2 = 4547.480744565876
 
 # Recess follows the notched inner edge of the traced pinstripe, keeping the
 # screw heads on the raised border instead of sinking their bearing lands.
 FIELD_DXF = REFERENCES_DIR / "fr-nameplate-field.dxf"
-FIELD_AREA_MM2 = 3642.8558759658345
-RECESS_DEPTH = 0.4
-ENGRAVE_DEPTH = 0.3  # incise depth of the imported artwork below the field floor
+FIELD_AREA_MM2 = 3665.6669540813814
+RECESS_DEPTH = 0.4064  # .016
+ENGRAVE_DEPTH = 0.3048  # .012 incise depth of the imported artwork below the field floor
 
 # Final plate-local millimetres after the edge ribbon was retired. The reduced
 # engraving bbox includes the four head marks, not the now-separate plate outline.
 ENGRAVING_DXF = REFERENCES_DIR / "fr-nameplate-engraving.dxf"
 ENGRAVING_RAW_BBOX = (
-    1.8909717950481455,
-    1.8910093518581388,
-    98.10902819856861,
-    43.441164909264316,
+    1.8972120019718046,
+    1.896591847362169,
+    98.4327879916239,
+    43.5694086472223,
 )
 ENGRAVING_RAW_WIDTH = ENGRAVING_RAW_BBOX[2] - ENGRAVING_RAW_BBOX[0]
 ENGRAVING_RAW_CENTER = (
     (ENGRAVING_RAW_BBOX[0] + ENGRAVING_RAW_BBOX[2]) / 2.0,
     (ENGRAVING_RAW_BBOX[1] + ENGRAVING_RAW_BBOX[3]) / 2.0,
 )
-ENGRAVING_TARGET_WIDTH = 96.21805640352047
+ENGRAVING_TARGET_WIDTH = 96.53557598965209
 ENGRAVING_SCALE = ENGRAVING_TARGET_WIDTH / ENGRAVING_RAW_WIDTH
 ENGRAVING_CENTER = ENGRAVING_RAW_CENTER
 ENGRAVING_POSITION = (0.0, 0.0)  # placement was baked; never re-centre the head marks
@@ -445,6 +448,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Only the screw-coordinate globals drive geometry. The imported outline and
     # field are fixed photo contours, not editable BorderW/FieldW/FieldH rectangles.

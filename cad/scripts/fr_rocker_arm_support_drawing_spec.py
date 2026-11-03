@@ -12,11 +12,14 @@ from __future__ import annotations
 from _gtol_planar import PlanarFace
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 from fr_rocker_arm_support_section_spec import HALF_Y
+from fr_rocker_arm_support_spec import UNIT
 
 # The foot seats on harmonic-base: the one face that MUST be cut on a part the
 # title block otherwise leaves CAST/MACHINED, so it carries the seat grade.
 # PlanarFace offsets run ALONG the outward normal (point . normal), so the -Y
 # face at y = -HALF_Y sits at +HALF_Y.
 SURFACE_FINISHES = (
-    SurfaceFinishControl("mounting_face", SEAT_UM, PlanarFace((0, -1, 0), HALF_Y)),
+    SurfaceFinishControl(
+        "mounting_face", SEAT_UM, PlanarFace((0, -1, 0), HALF_Y), display_unit=UNIT
+    ),
 )

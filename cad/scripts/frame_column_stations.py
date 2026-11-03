@@ -19,10 +19,10 @@ COLUMN_X = 197.0
 # Blind socket the column tube enters in the base casting. Bore diameters are
 # nominal CAD geometry only: production sockets are match-fit to their assigned
 # actual MHA-FR-03 tubes, not to a fixed diameter band.
-# The mouth is on the green land 3.0 below the deck (user ruling 2026-10-09),
-# so 22.4 keeps the socket floor, and the seated tube end, at y 25.4.
-COLUMN_SOCKET_DEPTH = 22.4
-COLUMN_SOCKET_DIAMETER = 25.5
+# The mouth is on the green land .12 below the deck (user ruling 2026-10-09),
+# so .88 keeps the socket floor, and the seated tube end, at y 1.000.
+COLUMN_SOCKET_DEPTH = 22.352  # .88
+COLUMN_SOCKET_DIAMETER = 25.5016  # 1.004
 # Functional ceiling, not a vendor tolerance, and never printed: a slip fit
 # on a 1 in tube looser than 0.6 diametral is rejected at fit-up (it rocks,
 # where the sheet asks for a close hand-slip with no perceptible rock). It

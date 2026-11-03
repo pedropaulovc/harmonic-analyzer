@@ -87,8 +87,11 @@ SCREW_MAJOR_DIA = THREAD_MAJOR_MM[SCREW_THREAD]
 SCREW_PITCH = 25.4 / float(SCREW_THREAD.rsplit("-", 1)[1])
 SCREW_TIP_CHAMFER = 0.7 * SCREW_PITCH  # 45 deg x 0.7P point (the vendor model)
 
-SEAT_THREAD_DEPTH = 11.5  # .X
-SEAT_DRILL_DEPTH = 14.7  # .X
+SEAT_THREAD_DEPTH = 11.684  # .46
+SEAT_DRILL_DEPTH = 14.986  # .59
+# Both depths print at .XX on the support's inch sheet, so their stacks
+# charge that band.
+SEAT_DEPTH_BAND = LINEAR_2PL
 SEAT_SPEC = HoleSpec(
     "tapped_bottoming",
     SCREW_THREAD,
@@ -102,7 +105,7 @@ SEAT_DRILL_NAME = next(
     name for name, dia in NUMBER_DRILL_MM.items() if dia == SEAT_DRILL_DIA
 )  # #29, for the print's process line
 SEAT_DRILL_POINT = SEAT_DRILL_DIA / 2.0 * DRILL_POINT_H
-SEAT_DRILL_BOTTOM_MAX = SEAT_DRILL_DEPTH + LINEAR_1PL + SEAT_DRILL_POINT
+SEAT_DRILL_BOTTOM_MAX = SEAT_DRILL_DEPTH + SEAT_DEPTH_BAND + SEAT_DRILL_POINT
 
 # The central web: each window cut STARTS WEB off the mid-plane, leaving a
 # 2 * WEB web (build_fr_rocker_arm_support). The print carries its thickness at
@@ -148,18 +151,18 @@ SEAT_FROM_NEAR_FACE_MIN = (
     HOLE_FROM_FOOT_SIDE_MIN
     - (TOP_FLAT_EDGE_FROM_WEB + TOP_FLAT_EDGE_BAND)
     - PUNCH_FLOAT
-)  # 4.84
+)  # 5.18
 SEAT_FROM_FAR_FACE_MIN = (2.0 * WEB - LINEAR_2PL) - (
     HOLE_FROM_FOOT_SIDE_MAX
     + PUNCH_FLOAT
     - (TOP_FLAT_EDGE_FROM_WEB - TOP_FLAT_EDGE_BAND)
-)  # 5.01
+)  # 5.43
 # Beside the thread, to either web face, at the seat's worst offset.
 WEB_WALL_MIN = (
     min(SEAT_FROM_NEAR_FACE_MIN, SEAT_FROM_FAR_FACE_MIN) - SCREW_MAJOR_DIA / 2.0
-)  # 2.76
+)  # 3.10
 # From the thread to the support's end face on its side, at the worst
-# transferred position: the end face moves by half the support length's .X
+# transferred position: the end face moves by half the support length's .XX
 # band, the hole by the bracket's station band from the fit-up-set ear face.
 # The end faces lie SUPPORT_HALF_MACHINE_Z off the casting's centre along
 # local X (its length; the height is a different 177.8).
@@ -167,18 +170,21 @@ END_WALL_MIN = tuple(
     (SUPPORT_HALF_MACHINE_Z - abs(x))
     - SCREW_MAJOR_DIA / 2.0
     - _bracket.STATION_BAND
-    - LINEAR_1PL / 2.0
+    - LINEAR_2PL / 2.0
     for x in SEAT_LOCAL_X
-)  # S 2.61, N 4.22
+)  # S 3.06, N 4.67
 
 if ENGAGEMENT_MIN < 1.5 * SCREW_MAJOR_DIA:
     raise AssertionError(
         f"bracket screw keeps {ENGAGEMENT_MIN:.2f} of thread at worst case,"
         f" under 1.5D ({1.5 * SCREW_MAJOR_DIA:.2f})"
     )
-if SCREW_REACH_MAX + EDGE_BREAK > SEAT_THREAD_DEPTH - LINEAR_1PL:
+if SCREW_REACH_MAX + EDGE_BREAK > SEAT_THREAD_DEPTH - SEAT_DEPTH_BAND:
     raise AssertionError("bracket screw tip reaches the seat's incomplete threads")
-if SEAT_DRILL_DEPTH - LINEAR_1PL < SEAT_THREAD_DEPTH + LINEAR_1PL + 2.0 * SCREW_PITCH:
+if (
+    SEAT_DRILL_DEPTH - SEAT_DEPTH_BAND
+    < SEAT_THREAD_DEPTH + SEAT_DEPTH_BAND + 2.0 * SCREW_PITCH
+):
     raise AssertionError(
         "bracket seat drill loses the bottoming-tap lead at worst case"
     )

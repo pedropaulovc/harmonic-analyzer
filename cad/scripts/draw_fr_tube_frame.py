@@ -8,7 +8,7 @@ Dimension import and curation live in ``_drawing_dimension_import``.
 
 The tube axis runs along +Y, so the length view is the ``*Front`` orientation
 and the chamfered end view is ``*Top``, aligned above it in third-angle
-projection. The portrait sheet uses the long axis for the 1018.765 mm cut
+projection. The portrait sheet uses the long axis for the 40.109 in cut
 length at 1:5; the end view carries a 2:1 override. The isometric is pictorial only.
 
 Run with SolidWorks open::
@@ -58,6 +58,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _gtol_cone import ConeFace
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -71,6 +72,7 @@ from fr_tube_frame_spec import (
     LENGTH_FIT_CALLOUT,
     LENGTH_SUPPLY_CALLOUT,
     LOWER_CROSS_HOLE_Y,
+    OD_FIT_SUFFIX,
     OUTER_DIA,
     TOP_END_CHAMFER,
 )
@@ -91,7 +93,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 5.0)  # 1:5 whole sheet (1018.765 mm cut tube)
+SHEET_SCALE = (1.0, 5.0)  # 1:5 whole sheet (40.109 in cut tube)
 END_VIEW_SCALE = 2.0
 ISO_VIEW_SCALE = (1, 10)
 # The aligned length/end views occupy the left-centre of the portrait sheet;
@@ -102,16 +104,11 @@ ISO_CENTER = (0.220, 0.280)
 
 # Per-view survivors of the marked-dimension import.
 END_KEEP: dict[str, tuple[float, float]] = {}
-# The three station values park left of the tube, each on its own dimension
-# line, so the lines have to stand far enough apart that no value's text sits
-# in a neighbour's corridor. At 0.036/0.020 the (12.70) text was 23 mm wide
-# across lines 21 mm apart, so BOTH the cut length's and the upper station's
-# lines printed through it (native layout audit: two text-on-line findings and
-# the leader crossing between them).
+# The cut length parks left of the tube; the cross-hole callout stands right
+# of it at the lower station. Neither station prints: each is match-drilled
+# with its mate (CROSS_HOLE_MATES_SUFFIX).
 LENGTH_KEEP = {
     "Length": (LENGTH_CENTER[0] - 0.050, LENGTH_CENTER[1]),
-    "LowerHoleY": (LENGTH_CENTER[0] - 0.025, LENGTH_CENTER[1] - 0.075),
-    "UpperHoleY": (LENGTH_CENTER[0] - 0.015, LENGTH_CENTER[1] + 0.075),
     "CrossHoleDia": (
         LENGTH_CENTER[0] + 0.085,
         LENGTH_CENTER[1] - COLUMN_LENGTH / 10000.0 + LOWER_CROSS_HOLE_Y / 5000.0,
@@ -130,8 +127,8 @@ LENGTH_KEEP = {
 # shoulder at 333 mm stays 4.8 mm over the isometric's outline (328.2 mm).
 CHAMFER_TEXT_XY = (0.198, 0.3386)
 _CHAMFER_POSITION_TOLERANCE_M = 0.001
-# The chamfer dimension prints the part-authored break places (one, .X) and
-# a whole-degree angle: "0.5 X 45°".
+# The chamfer dimension prints the part-authored break places (two, .XX) and
+# a whole-degree angle: ".02 X 45°".
 CHAMFER_PLACES = DRAWING_PRECISION_BY_NAME["TopChamfer"]
 IMPORTED_PRECISION = {
     name: places
@@ -143,7 +140,7 @@ _CHAMFER_DIMENSION = 10  # swDimensionType_e.swChamferDimension
 _CHAMFER_TEXT_DIST_ANG = 2
 _CHAMFER_LENGTH = 0  # IDisplayDimension.ChamferPrecision index: length
 _CHAMFER_ANGLE = 1  # IDisplayDimension.ChamferPrecision index: angle
-# The cut length is set at assembly: the supply size rides above the (1018.8)
+# The cut length is set at assembly: the supply size rides above the (40.109)
 # reference and the cut-to-fit stack below it (rule 19), so the requirement
 # is flagged on the length itself rather than in the note block.
 ABOVE_CALLOUTS = {
@@ -154,6 +151,45 @@ BELOW_CALLOUTS = {"Length": LENGTH_FIT_CALLOUT}
 _CALLOUT_ABOVE = 3  # swDimensionTextParts_e.swDimensionTextCalloutAbove
 _CALLOUT_BELOW = 4  # swDimensionTextParts_e.swDimensionTextCalloutBelow
 _LEADER_LINE_NONE = 3  # swLeaderLineVisibility_e.swLeaderLineNone
+
+# Precision (non-faceted) HLR/HLV still draws its curves at the drawing's
+# Image Quality wireframe resolution: the 2:1 end view's circles printed as
+# ~40-sided polygons (machinist review, two rounds; the HLR loop alone did not
+# change it). draw_fr_top_frame pins the same three document options.
+_CURVE_QUALITY = (
+    ("swImageQualityWireframe", "swWireframeImageQualityCustom"),
+    ("swImageQualityWireframeValue", 100),
+)
+_CURVE_QUALITY_HIGH = "swImageQualityWireframeHighCurveQuality"
+
+
+def _set_precise_curve_quality(adapter: Any) -> None:
+    """Pin this drawing's curve resolution before any view computes geometry."""
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    option = _sw_type_info.constant("swDetailingNoOptionSpecified")
+    settings = tuple(
+        (
+            _sw_type_info.constant(name),
+            value if isinstance(value, int) else _sw_type_info.constant(value),
+        )
+        for name, value in _CURVE_QUALITY
+    )
+    high = _sw_type_info.constant(_CURVE_QUALITY_HIGH)
+    for preference, value in settings:
+        if not extension.SetUserPreferenceInteger(preference, option, value):
+            raise RuntimeError("failed to set tube drawing curve resolution")
+    if not extension.SetUserPreferenceToggle(high, option, True):
+        raise RuntimeError("failed to improve tube drawing curve quality")
+    readback = tuple(
+        int(extension.GetUserPreferenceInteger(preference, option))
+        for preference, _value in settings
+    )
+    if readback != tuple(value for _preference, value in settings) or not bool(
+        extension.GetUserPreferenceToggle(high, option)
+    ):
+        raise RuntimeError(f"tube drawing curve quality did not persist: {readback!r}")
+
+
 
 
 @_telemetry.traced("drawing.outer_diameter")
@@ -242,11 +278,7 @@ def _add_outer_diameter_reference(
         label="outer diameter reference",
         diameter=True,
     )
-    od_suffix = (
-        ")\nSOCKETS MHA-FR-01/MHA-FR-02 ARE"
-        "\nMATCH-FIT TO THIS ASSIGNED TUBE"
-        "\nCLOSE HAND-SLIP; NO PERCEPTIBLE ROCK"
-    )
+    od_suffix = OD_FIT_SUFFIX
     display.SetText(2, od_suffix)
     if str(display.GetText(2) or "") != od_suffix:
         raise RuntimeError("OD reference fit text did not persist")
@@ -413,8 +445,13 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
+    _set_precise_curve_quality(adapter)
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -431,12 +468,15 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(
         adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_VIEW_SCALE
     )
-    set_hidden_lines_removed(adapter, iso)
     # The length view shows both stations as visible circles, so dashed bore
     # lines there would say nothing (MR r2): hidden lines removed, BEFORE the
     # chamfer dimension is attached to its silhouettes, so no later display
-    # change regenerates them under it.
-    set_hidden_lines_removed(adapter, length)
+    # change regenerates them under it. The end view joins them (PR #1436
+    # invariant; machinist review: its circles printed as draft polygons):
+    # a precision-quality mode set right after placement, before its OD
+    # reference and centre marks; it ends with hidden lines visible below.
+    for view in (iso, length, end):
+        set_hidden_lines_removed(adapter, view)
 
     curate_view_dimensions(
         adapter,
@@ -537,36 +577,34 @@ async def build(adapter: Any) -> dict[str, str]:
             )
     # The part authored these places (tube_frame_spec.DRAWING_PRECISION); this
     # sheet only proves they survived the import. A silent fallback to the
-    # drawing document's two places would print the 1018.8 cut length as
-    # 1018.77 and ask for a band the match-cut note explicitly refuses.
+    # drawing document's places would print the 40.109 cut length at the
+    # wrong grid and ask for a band the match-cut note explicitly refuses.
     assert_imported_precision(adapter, dimensions, IMPORTED_PRECISION)
-    for name in ("Length", "LowerHoleY", "UpperHoleY"):
-        references = [
-            annotation
-            for annotation in dimensions
-            if dimension_name(adapter, annotation) == name
-        ]
-        if len(references) != 1:
-            raise RuntimeError(
-                f"expected one {name} reference dimension, got {len(references)}"
-            )
-        display = set_reference_dimension(
-            adapter,
-            references[0],
-            label=f"{name} reference",
+    references = [
+        annotation
+        for annotation in dimensions
+        if dimension_name(adapter, annotation) == "Length"
+    ]
+    if len(references) != 1:
+        raise RuntimeError(
+            f"expected one Length reference dimension, got {len(references)}"
         )
-        if name == "Length":
-            # The supply minimum and the cut-to-fit stack are the only place
-            # the sheet states them; a dropped SetText must fail the sheet.
-            lanes = {
-                part: str(display.GetText(part) or "").replace("\r\n", "\n")
-                for part in (_CALLOUT_ABOVE, _CALLOUT_BELOW)
-            }
-            if lanes != {
-                _CALLOUT_ABOVE: LENGTH_SUPPLY_CALLOUT,
-                _CALLOUT_BELOW: LENGTH_FIT_CALLOUT,
-            }:
-                raise RuntimeError(f"length supply/cut-to-fit callouts did not persist: {lanes!r}")
+    display = set_reference_dimension(
+        adapter,
+        references[0],
+        label="Length reference",
+    )
+    # The supply minimum and the cut-to-fit stack are the only place the
+    # sheet states them; a dropped SetText must fail the sheet.
+    lanes = {
+        part: str(display.GetText(part) or "").replace("\r\n", "\n")
+        for part in (_CALLOUT_ABOVE, _CALLOUT_BELOW)
+    }
+    if lanes != {
+        _CALLOUT_ABOVE: LENGTH_SUPPLY_CALLOUT,
+        _CALLOUT_BELOW: LENGTH_FIT_CALLOUT,
+    }:
+        raise RuntimeError(f"length supply/cut-to-fit callouts did not persist: {lanes!r}")
     # Single line: the property is the cap's fit requirement (rule 4 names
     # the mate) riding above the native chamfer value.
     cap_acceptance = " ".join(source_properties["Top End Callout"].splitlines())

@@ -126,7 +126,7 @@ if not _foot_fits(SUPPORT_LENGTH):
         f"the rocker-arm support's {SUPPORT_LENGTH:.1f} length leaves the"
         " pivot-bracket foot no hold-down station keeping its walls"
     )
-SUPPORT_END_Z = _support_end_z(SUPPORT_LENGTH)  # S 13.73, N 15.34
+SUPPORT_END_Z = _support_end_z(SUPPORT_LENGTH)  # S 13.90, N 15.51
 _NEAR_END_Z = min(SUPPORT_END_Z.values())
 FOOT_Z1 = _foot_z1(_NEAR_END_Z)
 FOOT_LEN = FOOT_Z1 - _bracket.FOOT_Z0  # .70

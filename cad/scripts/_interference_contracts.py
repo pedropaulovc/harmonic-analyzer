@@ -274,18 +274,19 @@ _FRAME_ALLOWED_PAIRS = {
         _FRAME_CROSS_GATE_LIMIT_MM3,
     ),
     # MHA-FR-VN-52 / 91410A540 1/4-20 (major 6.35, #7 drill 5.105): thread from
-    # the hub's spot face, 21.0 from the bore axis (fr_top_frame_spec
-    # HUB_SET_SPOT_FROM_AXIS), to the cup tip 8.15 from the axis (0.21 clear of
-    # the gooseneck's O15.875 sleeve): 12.5 to the O17 bore wall plus the tip's 0.35 into the bore.
+    # the hub's spot face, 21.082 from the bore axis (fr_top_frame_spec
+    # HUB_SET_SPOT_FROM_AXIS), to the cup tip 8.148 from the axis (0.21 clear of
+    # the gooseneck's O15.875 sleeve): 12.573 to the O17.018 bore wall, the only
+    # length that overlaps the casting, inside the 12.85 bound.
     frozenset(("fr-vn-gooseneck-set-screw-1", "fr-top-frame-1")): _smooth_annulus_limit_mm3(
         6.35, 5.105, 12.85
     ),
-    # Four nameplate corners: 6.35-mm stock shank through the 1.5-mm plate.
+    # Four nameplate corners: 6.35-mm stock shank through the .063 (1.6002) plate.
     **_numbered_pairs(
         "sh-vn-brass-fillister-screw",
         range(1, 5),
         "fr-harmonic-base",
-        _smooth_annulus_limit_mm3(2.8448, 2.261, 4.85),
+        _smooth_annulus_limit_mm3(2.8448, 2.261, 4.7498),
     ),
 }
 # Independent runtime oracles: importing the magnifier's fit/pose modules here
@@ -357,11 +358,11 @@ _CHANNEL_ANCHOR_THREAD_LIMIT = _smooth_annulus_limit_mm3(
 # this literal, test-pinned to build_sm_summing_assembly, to avoid broad
 # recipe cache keys.
 _KNIFE_HANGER_REACH = 8.9173
-# Each MHA-SM-VN-53 dowel pressed up to the floor of its Ø3.175 ream in the
+# Each MHA-SM-VN-53 dowel pressed up to the floor of its Ø3.1496 ream in the
 # MHA-FR-02 crossbar's faced underside (owner ruling 2026-10-24, T+H3;
-# sm_vn_knife_mount_dowel_spec.PRESS_HOLE_DIA, band +0/-0.010: smallest
-# 3.165), its largest catalogue diameter 3.18262 over its 12.0 press depth
-# (sm_vn_knife_mount_dowel_spec.DIA_MAX, PRESS_DEPTH).  All three are
+# sm_vn_knife_mount_dowel_spec.PRESS_HOLE_DIA, .1240 REAM H7 +.0005/0:
+# smallest 3.1496), its largest catalogue diameter 3.18262 over its 11.938
+# press depth (sm_vn_knife_mount_dowel_spec.DIA_MAX, PRESS_DEPTH).  All three are
 # literals, test-pinned to their owners like _KNIFE_HANGER_REACH, so a
 # crossbar or dowel edit does not re-key every assembly.  The models are line
 # to line, so this bounds the press at its print-worst: the largest catalogue
@@ -369,9 +370,9 @@ _KNIFE_HANGER_REACH = 8.9173
 # subassembly and the crossbar to the frame's, so the pairs are checked at the
 # top level (_HARMONIC_ANALYZER_ALLOWED_PAIRS); in the summing subassembly
 # each pin slips in its knife mount's round hole or slot, with no overlap.
-_KNIFE_DOWEL_HOLE_MIN = 3.165
+_KNIFE_DOWEL_HOLE_MIN = 3.1496
 _KNIFE_DOWEL_DIA_MAX = 3.18262
-_KNIFE_DOWEL_PRESS_DEPTH = 12.0
+_KNIFE_DOWEL_PRESS_DEPTH = 11.938
 _KNIFE_DOWEL_PRESS_LIMIT = _smooth_annulus_limit_mm3(
     _KNIFE_DOWEL_DIA_MAX, _KNIFE_DOWEL_HOLE_MIN, _KNIFE_DOWEL_PRESS_DEPTH
 )
