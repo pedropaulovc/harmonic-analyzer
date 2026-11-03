@@ -472,9 +472,10 @@ _GROOVE_BLOCK_HALF = 0.0165
 # under the hub, its line as far again left; the groove bottom's block up
 # between the hub and the rim bore, under the rim bore's upper extension
 # line, its line half the block and _TEXT_OFF_LINE left of the rim bore's;
-# the rim OD outermost, _TEXT_OFF_LINE left of that block, its block OUTSIDE
-# its span, over the rim, running left from its line (as the spigot's runs
-# right), so no line runs through a text.
+# the rim OD outermost, _TEXT_OFF_LINE left of that block, its block BETWEEN
+# its extension lines at the hub's height, breaking its own line, so it reads
+# with A-A and not among the front view's annotations (machinist review of
+# 84ed4d1fc: the block hung left over the rim read as a front-view size).
 _HUB_DIA_X = _section_x(HUB_BACK_Z) - _TEXT_OFF_LINE - _HUB_DIA_TEXT_HALF
 _RIM_BORE_DIA_X = _HUB_DIA_X - _HUB_DIA_TEXT_HALF - _TEXT_OFF_LINE
 _GROOVE_DIA_X = _RIM_BORE_DIA_X - _TEXT_OFF_LINE - _GROOVE_BLOCK_HALF
@@ -583,11 +584,21 @@ SECTION_KEEP = {
 }
 # The rim's two Ø, imported from the hidden DIAMETER_REFERENCE sketch in
 # A-A's plane (mg_magnifying_wheel_spec): the rim bore's between its extension
-# lines under the hub; the rim OD's block over the rim, its point the line's
-# x and the block's centre (as the spigot's), its callout under its value.
+# lines under the hub; the rim OD's between its own at the hub's height, its
+# block (value and callout, no row wider than _RIM_OD_BLOCK_HALF) clear of
+# the groove bottom's line to its right and the front view to its left.
+# The OD's .XX floor keeps the groove deeper than the pen wire
+# (mg_magnifying_wheel_spec.GROOVE_DEPTH_MIN); short rows keep the centred
+# block narrow.
+RIM_OD_CALLOUT = "HOLDS PEN\nWIRE IN\nGROOVE"
+_RIM_OD_BLOCK_HALF = (
+    max(len(row) for row in RIM_OD_CALLOUT.splitlines()) * _TEXT_CHAR / 2.0
+)
+if _RIM_OD_DIA_X + _RIM_OD_BLOCK_HALF > _GROOVE_DIA_X - _TEXT_OFF_LINE:
+    raise AssertionError("the rim OD block reaches the groove bottom's dimension line")
 SECTION_DIAMETER_KEEP = {
     "RimInnerDiaDim": (_RIM_BORE_DIA_X, SECTION_CENTER[1] - 0.030),
-    "RimOuterDiaDim": (_RIM_OD_DIA_X, SECTION_CENTER[1] + _RIM_R + 0.011),
+    "RimOuterDiaDim": (_RIM_OD_DIA_X, SECTION_CENTER[1]),
 }
 # The rim-bore round's R is a sheet radial on its cut arc: A-A cannot import
 # a fillet radius whose arc IS the cut (neither the targeted import nor
@@ -629,9 +640,7 @@ DIMENSION_CALLOUTS = {
         f"INTERFERENCE IN\nMG-WHEEL-DRUM\n{DRUM_NUMBER}"
     ),
     "GrooveBottomDia": GROOVE_CALLOUT,
-    # The OD's .XX floor keeps the groove deeper than the pen wire
-    # (mg_magnifying_wheel_spec.GROOVE_DEPTH_MIN).
-    "RimOuterDiaDim": "HOLDS PEN WIRE\nIN GROOVE",
+    "RimOuterDiaDim": RIM_OD_CALLOUT,
     "SpokeRootWidth": _ROOT_CALLOUT,
     "SpokeTipWidth": "6X TIP",
     "HubFilletR": "12X",

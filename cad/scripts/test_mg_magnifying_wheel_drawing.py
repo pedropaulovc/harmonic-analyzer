@@ -312,7 +312,13 @@ def test_linked_notes_specify_the_ties_and_the_angle_the_spokes() -> None:
     assert drawing.CALLOUTS_ABOVE["SpigotLength"] == "MG-WHEEL-DRUM MHA-MG-10 NOT PROUD"
     assert drawing.DIMENSION_CALLOUTS["Tie2HoleDia"].endswith("\nRADIAL")
     assert drawing.CALLOUTS_ABOVE["HubFrontZ"] == "GROOVE, WEB & RIM CENTER"
-    assert drawing.DIMENSION_CALLOUTS["RimOuterDiaDim"].startswith("HOLDS PEN WIRE")
+    assert " ".join(drawing.DIMENSION_CALLOUTS["RimOuterDiaDim"].split()) == "HOLDS PEN WIRE IN GROOVE"
+    # The rim OD reads between its extension lines at the hub's height, with
+    # A-A: its block clears the groove bottom's line and the front view's rim.
+    od_x, od_y = drawing.SECTION_DIAMETER_KEEP["RimOuterDiaDim"]
+    assert od_y == drawing.SECTION_CENTER[1]
+    assert od_x + drawing._RIM_OD_BLOCK_HALF < drawing._GROOVE_DIA_X - drawing._TEXT_OFF_LINE
+    assert od_x - drawing._RIM_OD_BLOCK_HALF > drawing.FRONT_CENTER[0] + drawing._RIM_R + 0.01
     # TIE 1 stands off the drum; the note says so without a number.
     assert "CLEAR OF MG-WHEEL-DRUM" in notes and "BAND" not in notes
     assert "DO NOT" not in notes and "RELEASE" not in notes
