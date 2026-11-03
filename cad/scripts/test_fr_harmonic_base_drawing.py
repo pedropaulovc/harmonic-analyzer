@@ -2832,17 +2832,93 @@ def test_review_b2_dimensions_print_xx_and_sit_on_the_01_grid() -> None:
     assert abs(part.COLUMN_SOCKET_LAND_X - part.COLUMN_SOCKET_LAND_Z) <= 0.005 * 25.4
 
 
-def test_base_tolerances_print_in_sheet_inch_at_the_nominal_places() -> None:
+def _authored_tolerance(monkeypatch, setter, *args, **kwargs):
+    """Run a real ``_drawing_tolerances`` setter on a stand-in dimension and
+    return what it authored: (tolerance type, min m, max m, places)."""
+    from types import SimpleNamespace
+
+    import _drawing_tolerances
+
+    stored: dict[str, object] = {}
+
+    def set_values(low: float, high: float) -> bool:
+        stored.update(low=low, high=high)
+        return True
+
+    tolerance = SimpleNamespace(
+        Type=0,
+        SetValues=set_values,
+        GetMinValue=lambda: stored["low"],
+        GetMaxValue=lambda: stored["high"],
+    )
+    display = SimpleNamespace(
+        SetPrecision3=lambda _a, _b, digits, _d: stored.update(places=digits),
+        GetPrimaryTolPrecision2=lambda: stored["places"],
+    )
+    dimension = SimpleNamespace(Tolerance=tolerance)
+    monkeypatch.setattr(_drawing_tolerances, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(
+        _drawing_tolerances, "_named_dimension", lambda *_a: (display, dimension)
+    )
+    setter(None, *args, **kwargs)
+    return tolerance.Type, stored["low"], stored["high"], stored["places"]
+
+
+def test_base_tolerances_print_in_sheet_inch_at_the_nominal_places(monkeypatch) -> None:
     # Review b2: ".483 +-.0020" -- the mm default gave the .002 band four places.
+    import ast
     from pathlib import Path
 
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    block = source[source.index('        "BaseSpotFaceRear",\n        "SpotFaceDepth",'):]
-    block = block[: block.index("# Every pocket corner fillet")]
-    assert block.count("display_unit=UNIT") == 2
-    assert 'places=DRAWING_PRECISION["BaseSpotFaceRear"]["SpotFaceDepth"]' in block
-    assert 'places=DRAWING_PRECISION["PivotSeatReference"][dimension_name]' in block
-    assert set(fr_harmonic_base_spec.DRAWING_PRECISION["PivotSeatReference"].values()) == {3}
+    import _drawing_tolerances
+    from _fit_deviations import deviations
+
+    spec = fr_harmonic_base_spec
+    assert part.UNIT == "in"
+    depth_places = spec.DRAWING_PRECISION["BaseSpotFaceRear"]["SpotFaceDepth"]
+    assert depth_places == 3
+    assert _authored_tolerance(
+        monkeypatch,
+        _drawing_tolerances.set_dimension_bilateral_tolerance,
+        "BaseSpotFaceRear",
+        "SpotFaceDepth",
+        *deviations(spec.SPOTFACE_DEPTH_BAND_MM),
+        places=depth_places,
+        display_unit=part.UNIT,
+    ) == (2, pytest.approx(0.0), pytest.approx(0.000508), 3)
+    for name in spec.PIVOT_SEAT_DIMENSIONS:
+        places = spec.DRAWING_PRECISION["PivotSeatReference"][name]
+        assert places == 3
+        assert _authored_tolerance(
+            monkeypatch,
+            _drawing_tolerances.set_dimension_symmetric_tolerance,
+            "PivotSeatReference",
+            name,
+            spec.PIVOT_SEAT_POSITION_BAND_MM,
+            places=places,
+            display_unit=part.UNIT,
+        ) == (4, pytest.approx(-0.0000508), pytest.approx(0.0000508), 3)
+    # Shown in mm, the same .002 band would need four places.
+    assert (
+        _drawing_tolerances._tolerance_places(
+            spec.PIVOT_SEAT_POSITION_BAND_MM, display_unit="mm"
+        )
+        == 4
+    )
+    # The builder authors both in the sheet's unit at those places.
+    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
+    calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id
+        in {"set_dimension_bilateral_tolerance", "set_dimension_symmetric_tolerance"}
+    ]
+    assert len(calls) == 2
+    for call in calls:
+        keywords = {kw.arg: ast.unparse(kw.value) for kw in call.keywords}
+        assert keywords["display_unit"] == "UNIT"
+        assert keywords["places"].startswith("DRAWING_PRECISION[")
 
 
 def _caption_section(*linked: str):
