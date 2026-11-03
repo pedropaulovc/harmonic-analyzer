@@ -40,7 +40,9 @@ ITEM = "18-8 SS SHOULDER SCREW, EXT THREAD, 3/8 X 1-1/2, 5/16-18"
 # The default "VIEWS ARE REFERENCE ONLY" line would read as overriding the one
 # shop dimension (as on the hub pin's sheet). At most the default cut line's
 # 74 characters: 99 ran to x 237 mm, past the footer's 215.5 (farm round 4).
-GENERAL_TEXT = "PURCHASED PART; CUT THREAD AND CHAMFER END AT ASSEMBLY. REST AS SUPPLIED."
+# "CUT THREAD" read as cutting a new thread (machinist review, farm run
+# 20261103T090917552Z).
+GENERAL_TEXT = "PURCHASED PART AS SUPPLIED; SHORTEN THREADED END AND CHAMFER AT ASSEMBLY."
 # The dimensioned Right view needs the standard layout's 97 mm row (tall_top's
 # 65 mm row had no room under the screw for the cut note); the undimensioned
 # Top takes the shorter cell.
@@ -56,13 +58,14 @@ DIAMETER_LANE = 0.014  # vertical diameter lines, out from the head / thread end
 LENGTH_LANE = 0.008  # horizontal length lines, out from the head's rim
 # The shoulder Ø's value and callout shelve right of its dimension line, at
 # the axis, clear of its short 9.5 mm span. The chamfer's ".03 X 45°", far
-# wider than its 0.76 mm leg, shelves right of the tip, over the shoulder Ø's
-# upper arrow and under the thread note.
+# wider than its 0.76 mm leg, shelves right of the tip, above the reach of the
+# shoulder Ø's upper arrow (at 11 mm it struck the '3', farm run
+# 20261103T090917552Z) and under the thread note.
 SHELVES = {
     "SupplierShoulderDiameter": (False, "right"),
     part.CHAMFER_LEG_DIMENSION: (True, "right"),
 }
-CHAMFER_RISE = 0.011  # the chamfer's dimension line, above the axis
+CHAMFER_RISE = 0.014  # the chamfer's text, above the axis
 # Note anchors are their text's top-left corner (farm run 20261101T194619431Z).
 # The cut note's top sits under the shoulder Ø's shelved text: under the screw
 # its leader crossed its own text and the cut's dimension line (machinist
@@ -71,7 +74,7 @@ CHAMFER_RISE = 0.011  # the chamfer's dimension line, above the axis
 # dimension line.
 CUT_NOTE_RIGHT = 0.008  # right of the thread tip
 CUT_NOTE_DROP = 0.014  # below the axis
-THREAD_NOTE_RISE = 0.019  # above the head rim
+THREAD_NOTE_RISE = 0.021  # above the head rim
 THREAD_LANDING = 0.25  # of the thread length, from the shoulder
 # Every carrier lies on a Right-view edge; construction curves print as the
 # continuous thick outline on this sheet (``_construction_line_font``), not as
