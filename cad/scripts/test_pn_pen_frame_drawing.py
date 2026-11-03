@@ -30,6 +30,7 @@ _MODEL_VALUES = {
     "LeftWall": spec.RAIL_SIDE,
     "BottomWall": spec.RAIL_END,
     "WindowCornerR": spec.WINDOW_CORNER_R,
+    "EdgeRoundR": spec.EDGE_ROUND_R,
     "Depth": spec.FRAME_DEPTH,
     "ScrewX": spec.OUTER_WIDTH / 2.0,
     "ScrewZ": spec.FRAME_DEPTH / 2.0,
@@ -75,9 +76,11 @@ def test_spec_is_the_single_source_of_geometry_and_marked_dimensions() -> None:
         "RAIL_END",
         "FRAME_DEPTH",
         "WINDOW_CORNER_R",
+        "EDGE_ROUND_R",
     ):
         assert getattr(part, name) is getattr(spec, name)
     assert drawing.WINDOW_CORNER_R is spec.WINDOW_CORNER_R
+    assert drawing.EDGE_ROUND_R is spec.EDGE_ROUND_R
     assert part.SET_SCREW_TAP_SPEC is spec.SET_SCREW_TAP_SPEC
     assert drawing.SET_SCREW_TAP_SPEC is spec.SET_SCREW_TAP_SPEC
     # The frame spec's copy of the neck depth it passes stays the block's.
@@ -97,6 +100,7 @@ def test_spec_is_the_single_source_of_geometry_and_marked_dimensions() -> None:
         "RAIL_END",
         "FRAME_DEPTH",
         "WINDOW_CORNER_R",
+        "EDGE_ROUND_R",
         "SET_SCREW_TAP_SPEC",
         "TRIM_NEAR",
     }
@@ -156,7 +160,29 @@ def test_volume_expectations_are_analytic() -> None:
     r = spec.WINDOW_CORNER_R
     corners = 4 * (r * r - math.pi * r * r / 4.0) * spec.FRAME_DEPTH
     hole = math.pi * (TAP_DRILL_MM["#4-40"] / 2.0) ** 2 * spec.RAIL_END
-    assert part.V_FINAL == pytest.approx(ring + corners - hole)
+    r = spec.EDGE_ROUND_R
+    rounds = 2 * (r * r - math.pi * r * r / 4.0) * spec.OUTER_HEIGHT
+    assert part.V_FINAL == pytest.approx(ring + corners - hole - rounds)
+
+
+def test_edge_rounds_take_the_carriage_paper_corner_and_its_half_turn_twin() -> None:
+    # Placed on the carriage, the printed round's edge is the stirrup's
+    # paper-most outer vertical edge; the other is that edge turned a half
+    # turn about the ring's height, so the stirrup slides on either way round.
+    corners = [(x, z) for x in (0.0, spec.OUTER_WIDTH) for z in (0.0, spec.FRAME_DEPTH)]
+
+    def machine_z(corner: tuple[float, float]) -> float:
+        x, z = corner
+        return sum(
+            local * row[2] for local, row in zip((x, 0.0, z), carriage.FRAME_ROWS)
+        )
+
+    (printed, dim, edge), (_, _, twin) = part.ROUND_FEATURES
+    assert (printed, dim) == ("EdgeRound", "EdgeRoundR")
+    assert edge == max(corners, key=machine_z)
+    assert twin == (spec.OUTER_WIDTH - edge[0], spec.FRAME_DEPTH - edge[1])
+    assert spec.DRAWING_DIMENSIONS["EdgeRound"] == {"EdgeRoundR"}
+    assert spec.EDGE_ROUND_R < min(spec.RAIL_SIDE, spec.FRAME_DEPTH)
 
 
 def test_tapped_hole_is_a_wizard_feature_with_a_native_callout() -> None:
@@ -377,28 +403,51 @@ def test_corner_radius_leader_leaves_through_the_right_rail_only() -> None:
         assert 10.0 < angle < 80.0, angle
         exit_y = cy + (drawing.FRONT_RIGHT_X - cx) * math.tan(math.radians(angle))
         assert exit_y < drawing.FRONT_TOP_Y - 0.002
-    assert drawing.DIMENSION_PREFIXES == {"WindowCornerR": "4X R"}
+    assert drawing.DIMENSION_PREFIXES == {"WindowCornerR": "4X R", "EdgeRoundR": "2X R"}
     assert "_set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)" in (
         inspect.getsource(drawing.build)
     )
 
 
+def test_edge_round_radius_stands_up_right_of_its_arc() -> None:
+    # The text stands above the bottom view's top right, right of the window
+    # width's right extension line and under the front view's lowest row; its
+    # radial leader lands on the printed arc (0..90 deg) and runs out over the
+    # depth's top extension line (a leader crossing an extension line is
+    # conventional, drawing-guidelines.md rule 14).
+    x, y = drawing.BOTTOM_KEEP["EdgeRoundR"]
+    half = _half_width(_printed_text("EdgeRoundR"))
+    cx, cy = drawing.EDGE_ARC_CENTER_XY
+    depth_x, _ = drawing.BOTTOM_KEEP["Depth"]
+    assert y - 0.0035 / 2.0 > drawing.BOTTOM_HIGH_Y + 0.006
+    assert y + 0.0035 / 2.0 < drawing.FRONT_KEEP["WindowWidth"][1] - 0.0035
+    assert x - half > drawing._front_xy(spec.OUTER_WIDTH - spec.RAIL_SIDE, 0)[0]
+    for tx in (x - half, x):
+        angle = math.degrees(math.atan2(y - cy, tx - cx))
+        assert 10.0 < angle < 80.0, angle
+    # Clear above the depth's dimension line, its arrow outside the view.
+    assert x - half < depth_x < x + half
+
+
 def test_hole_callout_clears_the_views_and_their_dimensions() -> None:
     x, y = drawing.HOLE_CALLOUT_XY
     assert x > drawing.BOTTOM_RIGHT_X + 0.015
-    assert drawing.BOTTOM_HIGH_Y < y < drawing.FRONT_BOTTOM_Y - 0.010
-    # Its two lines stand right of the window width's right extension line.
-    callout_left = x - _half_width("TAP 4-40 UNC THRU")
-    assert (
-        callout_left
-        > drawing._front_xy(spec.OUTER_WIDTH - spec.RAIL_SIDE, 0)[0] + 0.005
-    )
-    depth_x, _ = drawing.BOTTOM_KEEP["Depth"]
-    # The straight leader from the tap mouth passes the depth's dimension line
-    # well above the bottom view's top edge.
+    # Below-right of the bottom view, over the title block (top 0.065).
+    assert 0.065 + 0.008 < y < drawing.BOTTOM_LOW_Y - 0.015
+    # The straight leader from the tap mouth leaves the view through its
+    # bottom edge right of the .55's extension line on the hole's axis, and
+    # passes under the depth's dimension line.
     hx, hy = drawing.HOLE_SHEET_XY
+    exit_x = hx + (x - hx) * (drawing.BOTTOM_LOW_Y - hy) / (y - hy)
+    assert hx + 0.005 < exit_x < drawing.BOTTOM_RIGHT_X
+    depth_x, _ = drawing.BOTTOM_KEEP["Depth"]
     leader_y = hy + (y - hy) * (depth_x - hx) / (x - hx)
-    assert leader_y > drawing.BOTTOM_HIGH_Y + 0.008
+    assert leader_y < drawing.BOTTOM_LOW_Y - 0.010
+    # Its two lines stand right of the bottom view note.
+    note_right = (
+        drawing.BOTTOM_VIEW_NOTE_XY[0] + len(spec.BOTTOM_VIEW_NOTE) * _CHAR_WIDTH
+    )
+    assert x - _half_width("TAP 4-40 UNC THRU") > note_right + 0.010
     assert drawing.HOLE_CALLOUT_PROCESS == "TAP"
 
 

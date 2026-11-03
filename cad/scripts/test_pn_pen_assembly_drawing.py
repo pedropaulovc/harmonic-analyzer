@@ -903,17 +903,23 @@ def test_stirrup_and_thumb_screw_balloons_land_on_their_own_parts() -> None:
     """Machinist review, farm run 20261023T222629630Z: walked, balloons 5 and
     6 landed side by side on the stirrup's bottom rail."""
     right, _up, toward = spec.EXPLODED_VIEW_AXES
-    # The stirrup's: an outer vertical edge, the sheet-rightmost of the four,
-    # three quarters up.
+    # The stirrup's: on the sheet-rightmost of its four outer vertical edges,
+    # three quarters up.  That edge is rounded, so the anchor is the round's
+    # tangent edge on the face the reader sees.
     x, y, z = drawing.BALLOON_ANCHORS[spec.FRAME].point_mm
     edges = [
         (ex, ez) for ex in (0.0, frame.OUTER_WIDTH) for ez in (0.0, frame.FRAME_DEPTH)
     ]
-    assert (x, z) in edges and y == 0.75 * frame.OUTER_HEIGHT
     rows = carriage.FRAME_ROWS
-    assert (x, z) == max(
-        edges, key=lambda e: _dot(_placed(rows, (e[0], 0.0, e[1])), right)
+    corner = max(edges, key=lambda e: _dot(_placed(rows, (e[0], 0.0, e[1])), right))
+    assert corner == (frame.OUTER_WIDTH, frame.FRAME_DEPTH)
+    assert (x, y, z) == (
+        corner[0] - frame.EDGE_ROUND_R,
+        0.75 * frame.OUTER_HEIGHT,
+        corner[1],
     )
+    # The paper-end face (frame +Z) faces the reader.
+    assert _dot(_placed(rows, (0.0, 0.0, 1.0)), toward) > 0.0
     # The thumb screw's: the knob's top rim, the head chamfer's inner edge on
     # the face the collar rises from, on the side toward the reader's lower right.
     x, y, z = drawing.BALLOON_ANCHORS[spec.THUMB_SCREW].point_mm

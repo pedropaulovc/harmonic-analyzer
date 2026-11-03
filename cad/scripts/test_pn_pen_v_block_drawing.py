@@ -1261,13 +1261,14 @@ def test_set_screw_tap_wall_to_the_step_is_stated_at_its_printed_worst_case() ->
     # between the tap and the step.  The step can't come toward the paper end
     # (the stirrup slides on the neck with less slack), and moving the bore
     # toward the free end carries the stirrup toward the paper by the shift
-    # times cos(yaw), more than the paper clearance left.
+    # times cos(yaw), more than the carriage's paper clearance at its printed
+    # worst case.
     shortfall = WALL_TARGET_MM - wall
     neck_slack = spec.RELIEF_X0 - (
         carriage.FRAME_X0_LOCAL + frame.FRAME_DEPTH + 4.0 * carriage.CLEARANCE
     )
-    paper_slack = (PAPER_FRONT_Z - 2.0 * carriage.CLEARANCE) - max(
-        carriage.paper_side_points().values()
+    paper_slack = PAPER_FRONT_Z - max(
+        carriage.paper_side_points_printed_worst().values()
     )
     yaw = math.radians(carriage.PEN_BLOCK_YAW_DEG)
     assert 0.0 <= neck_slack < shortfall

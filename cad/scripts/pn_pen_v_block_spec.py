@@ -459,7 +459,8 @@ if PIVOT_BORE_STEP_CLEARANCE_PRINTED_MIN < 0.0:
 # neither can move.  The step can't come toward the paper end (the stirrup
 # slides on the neck with 0.016 mm to spare, pn_pen_carriage_geom), and the
 # bore can't go toward the free end (it carries the block toward the paper:
-# 0.071 mm of the carriage's paper clearance is left).  The sheet states the
+# 0.217 mm of the carriage's paper clearance is left at the printed worst
+# case, pn_pen_carriage_geom).  The sheet states the
 # worst case natively, floored to the micron grid it prints at (rod's recipe).
 _TAP_THREAD_R = THREAD_MAJOR_MM[SET_SCREW_TAP_SPEC.size] / 2.0
 TAP_STEP_WALL_PRINTED_MIN = (

@@ -394,7 +394,8 @@ BOM_IDENTITY_ALIASES = {number: stem for stem, number in BOM_PART_NUMBERS.items(
 # * The stirrup's and the thumb screw's: walked, both landed side by side on
 #   the stirrup's bottom rail, balloon 5's leader through the thumb screw's
 #   knob (machinist review, farm run 20261023T222629630Z). The stirrup's takes
-#   its sheet-right outer vertical edge, a silhouette, three quarters up; the
+#   the round on its sheet-right outer vertical edge, at the round's tangent
+#   edge on the face the reader sees, three quarters up; the
 #   thumb screw's the knob's top rim (the inner edge of the vendor model's
 #   HeadDia/16 head chamfer on the face the collar rises from,
 #   diagnostics/diag_build_99607A213), on the side facing the reader's lower
@@ -461,7 +462,18 @@ HANGER_ANCHOR_MM = (
 _STIRRUP_X, _STIRRUP_Z = _silhouette_corner(
     carriage.FRAME_ROWS, (frame.OUTER_WIDTH, frame.FRAME_DEPTH), label="stirrup anchor"
 )
-STIRRUP_ANCHOR_MM = (_STIRRUP_X, 0.75 * frame.OUTER_HEIGHT, _STIRRUP_Z)
+# That edge is the stirrup's paper-side round (pn_pen_frame_spec.EDGE_ROUND_R):
+# the anchor takes the round's tangent edge on the face the reader sees, the
+# paper-end face (z FRAME_DEPTH).
+if (_STIRRUP_X, _STIRRUP_Z) != (frame.OUTER_WIDTH, frame.FRAME_DEPTH) or not (
+    _in_part(carriage.FRAME_ROWS, _TOWARD)[2] > 0.0
+):
+    raise AssertionError("the stirrup anchor no longer lands on its paper-side round")
+STIRRUP_ANCHOR_MM = (
+    _STIRRUP_X - frame.EDGE_ROUND_R,
+    0.75 * frame.OUTER_HEIGHT,
+    _STIRRUP_Z,
+)
 # The thumb screw's frame: the axis along local +X from the head top (x 0) to
 # the tip; the head's base face, the collar's side, at x = TS_HEAD_H.
 KNOB_RIM_R = thumb_screw.TS_HEAD_R - thumb_screw.HEAD_DIA / 16.0

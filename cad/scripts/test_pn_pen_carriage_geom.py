@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
+import itertools
 import math
 
 import pytest
 
 import pen_driver
 import pn_pen_carriage_geom as g
+import pn_pen_frame_spec as frame
 import pn_pen_rod_spec as rod
 import pn_pen_v_block_spec as vb
 import sh_vn_music_wire_pen_geom as wire
 from _mg_wheel_rim_geometry import RIM_WIRE_R
 from mg_wheel_bar_geom import WHEEL_BAR_Y, WHEEL_X
+from _printed_tolerance import printed_band_mm
 from _recording_geometry import PAPER_FRONT_Z, PEN_ROD_X, PEN_Z_MID
 
 PAPER_LIMIT_Z = PAPER_FRONT_Z - 2.0 * g.CLEARANCE
@@ -50,6 +53,96 @@ def test_rod_line_is_the_paper_most_thou_that_clears_the_paper() -> None:
     margin = PAPER_LIMIT_Z - max(rigid.values())
     assert margin >= 0.02
     assert margin - 0.0254 < 0.02
+
+
+def _stirrup_paper_most(
+    pivot_x: float,
+    pivot_z: float,
+    neck: tuple[float, float],
+    window: float,
+    left_wall: float,
+    outer: float,
+    round_r: float,
+    shift: float,
+) -> float:
+    """Machine z of the stirrup's paper-most point, walked round its
+    paper-side corner.  Block stations: x from the paper end (the stirrup
+    flush on it), z from the body's front face; ``shift`` moves the window
+    centre off the neck's centre toward the paper."""
+    yaw = math.radians(g.PEN_BLOCK_YAW_DEG)
+    front_wall = (neck[0] + neck[1]) / 2.0 + shift - window / 2.0
+    paper_face = front_wall - left_wall + outer
+    centre = (round_r, paper_face - round_r)
+    return max(
+        PEN_Z_MID
+        + (pivot_x - (centre[0] - round_r * math.cos(a))) * math.cos(yaw)
+        + (centre[1] + round_r * math.sin(a) - pivot_z) * math.sin(yaw)
+        for a in (math.radians(d) for d in range(91))
+    )
+
+
+def _stirrup_worst(round_r: float | None, *, centred: bool = False) -> float:
+    """Every band the stirrup's stack reads, each at both printed limits, and
+    the stirrup anywhere its window lets it sit across the neck."""
+    band = printed_band_mm(2, unit=vb.UNIT)
+    assert band == printed_band_mm(2, unit=frame.UNIT)
+    neck_front, neck_back = vb.depth_station(0.0), vb.depth_station(vb.NECK_DEPTH)
+    worst = -math.inf
+    for signs in itertools.product((-1.0, 1.0), repeat=8):
+        pivot_x, pivot_z, front, back, window, left, outer, r = (
+            nominal + sign * band
+            for nominal, sign in zip(
+                (
+                    vb.PIVOT_BORE_X,
+                    vb.depth_station(vb.DEPTH_MID_Z),
+                    neck_front,
+                    neck_back,
+                    frame.WINDOW_WIDTH,
+                    frame.RAIL_SIDE,
+                    frame.OUTER_WIDTH,
+                    frame.EDGE_ROUND_R if round_r is None else round_r,
+                ),
+                signs,
+            )
+        )
+        if round_r == 0.0:
+            r = 0.0
+        gap = (window - (back - front)) / 2.0
+        for shift in (0.0,) if centred else (-gap, 0.0, gap):
+            worst = max(
+                worst,
+                _stirrup_paper_most(
+                    pivot_x, pivot_z, (front, back), window, left, outer, r, shift
+                ),
+            )
+    return worst
+
+
+def test_stirrup_clears_the_paper_at_the_printed_worst_case() -> None:
+    # Codjiflo on #2119: the printed limits let the stirrup touch the paper.
+    # No fit-up setting moves the stirrup or the block off the paper, so the
+    # bands must hold it: every one at both limits and the stirrup anywhere
+    # across the neck, its paper-side round at its printed size.
+    worst = _stirrup_worst(None)
+    guard = g.paper_side_points_printed_worst()
+    assert guard["stirrup paper-side round"] == pytest.approx(worst, abs=1e-6)
+    assert worst < PAPER_FRONT_Z
+    # The guard reads every rigid point the model checks, each no nearer the
+    # paper than its modelled place.
+    rigid = {
+        k: v for k, v in g.paper_side_points().items() if not k.startswith("marker")
+    }
+    assert guard.keys() == rigid.keys()
+    assert all(guard[k] >= rigid[k] for k in rigid)
+    assert max(guard.values()) < PAPER_FRONT_Z
+
+
+def test_without_its_round_the_stirrup_reaches_the_paper() -> None:
+    # The round is what clears it: a sharp corner reaches the paper at the
+    # printed worst case even with the stirrup centred on the neck (the
+    # review's stack), and further hard over.
+    centred = _stirrup_worst(0.0, centred=True)
+    assert PAPER_FRONT_Z < centred < _stirrup_worst(0.0)
 
 
 def test_rod_line_sits_on_the_wheel_rim_tangent() -> None:
