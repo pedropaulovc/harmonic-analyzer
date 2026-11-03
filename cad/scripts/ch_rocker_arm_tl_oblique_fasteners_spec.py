@@ -30,8 +30,8 @@ Threads are US-customary UNC except the bought carriage's M4 holes.
 The shoulder screw has its own datum-based row: treating its 1.500 shoulder
 as a conventional screw grip would report a false engagement.
 
-Only the feed lever screws use wedge-lock pairs. The two feed nut screws bear
-directly on the brass nut. Hold-down studs retain their loaded
+Only the feed lever screws use wedge-lock pairs. The two feed nut screws'
+flanges bear directly on the brass nut. Hold-down studs retain their loaded
 lower ends when shortened. These nominal fit contracts do not certify the jig.
 """
 
@@ -60,6 +60,9 @@ SHCS = "SHCS"
 # The riser's countersinks take only the B18.6.3 machine-screw head; a B18.3
 # socket flat head stands proud of them (trammel spec; Codex #1583).
 FLAT_HEAD = "B18.6.3 FLAT HEAD"
+# The feed nut's screws: a flanged button head, whose flange seats flat over
+# the nut's clearance hole at the fit-up's eccentricity (feed block spec).
+FLANGED_BHCS = "FLANGED BHCS"
 # The TL-VN-71 wedge-lock pair's stack under each feed lever screw head: the
 # 91812A230 band's 0.090 in maximum (the lever washer spec pins it).
 LEVER_LOCK_STACK = 0.090 * INCH  # 2.286
@@ -75,7 +78,7 @@ def inch_mm(length: str) -> float:
 class Fastener:
     joint: str
     thread: str  # as printed: "#8-32", "M4"
-    head: str  # SHCS or FLAT HEAD
+    head: str  # SHCS, FLANGED BHCS or FLAT HEAD
     length: str  # as printed: "3/4" (inch) or "20" (mm)
     count: int
     grip_mm: float  # under the head, before the receiving thread
@@ -182,10 +185,10 @@ KP08_TO_BRACKET = Fastener(
 NUT_TO_FEED_BLOCK = Fastener(
     "TL-27 feed nut to TL-32 feed block",
     feed_nut.SCREW_THREAD,
-    SHCS,
+    FLANGED_BHCS,
     feed_nut.SCREW_LENGTH_TEXT,
     feed_nut.SCREW_COUNT,
-    feed_nut.LENGTH,  # the head on the nut's outer face
+    feed_nut.LENGTH,  # the flange on the nut's outer face
     feed_block.LUG_WIDTH,  # tapped THRU
 )
 RISER_TO_CARRIER = Fastener(

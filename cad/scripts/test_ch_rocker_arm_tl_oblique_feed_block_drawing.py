@@ -121,9 +121,10 @@ def test_nut_and_lug_clear_both_end_blocks_at_both_travel_limits():
         lo,hi=(station+v for v in spec.NUT_REACH_X)
         for box in lead.KP08_BOXES.values():
             assert max(box[0]-hi,lo-box[1])>=lead.FEED_GAP
-    # The -X gap to the near KP08 at the longest .41 nut (3.57 nominal).
+    # The -X gap to the near KP08 at the longest .41 nut, its flanged heads
+    # .059 proud (4.91 nominal).
     near=min(gap for (name,_station),gap in spec.FEED_GAPS.items() if name=='KP08 near')
-    assert round(near,2)==3.32
+    assert round(near,2)==4.66
 
 
 def test_feed_entrypoints_use_the_native_shared_geometry_and_not_a_separate_bracket():

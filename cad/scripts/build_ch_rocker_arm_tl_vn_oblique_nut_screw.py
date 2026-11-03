@@ -1,12 +1,12 @@
-r"""Purchased MHA-CH-06-TL-VN-66 oblique-trammel feed nut screw: McMaster 91251A113.
+r"""Purchased MHA-CH-06-TL-VN-66 oblique-trammel feed nut screw: McMaster 91355A581.
 
-The ``#4-40 X 3/4 SHCS`` (``ch_rocker_arm_tl_vn_oblique_nut_screw_spec``) holds the shop-made TL-27 feed nut to the TL-32 integral feed-block lug, tapped THRU.
-The stock recipe ``diagnostics/diag_build_91251A113.py`` builds the catalogue screw on
-the 91251A family recipe (``diag_mcmaster_socket_head.build_socket_head``);
-the recipe's standalone run is catalog-only (no vendor model, no replica
-gate).
+The ``#4-40 X 3/4 FLANGED BHCS`` (``ch_rocker_arm_tl_vn_oblique_nut_screw_spec``) holds the shop-made TL-27 feed nut to the TL-32 integral feed-block lug, tapped THRU.
+The stock recipe ``diagnostics/diag_build_91355A581.py`` builds the catalogue screw on
+the button head family recipe, flanged (``diag_mcmaster_button_head.build_button_head``);
+the recipe's standalone run is catalog-only (no committed vendor model, no
+replica gate).
 
-Frame: screw axis +Y, head up, the bearing face (head underside) at y = 0,
+Frame: screw axis +Y, head up, the bearing face (flange underside) at y = 0,
 the tip at y = -length.  The axis is published as ``ScrewAxis``
 (Front ∩ Right), the stock-part mate contract.
 
@@ -25,7 +25,7 @@ from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
 from _supplier_screw_save import save_supplier_reference_part
 from ch_rocker_arm_tl_vn_oblique_nut_screw_spec import SKU
-from diagnostics.diag_build_91251A113 import build_91251A113
+from diagnostics.diag_build_91355A581 import build_91355A581
 import ch_rocker_arm_tl_vn_oblique_nut_screw_spec as supplier
 
 PART_NAME = "ch-rocker-arm-tl-vn-oblique-nut-screw"
@@ -37,7 +37,7 @@ async def build(adapter) -> dict[str, str]:
     return await build_stock_fastener(
         adapter,
         part_name=PART_NAME,
-        components=(StockComponent(sku=SKU, author=build_91251A113),),
+        components=(StockComponent(sku=SKU, author=build_91355A581),),
         material=MATERIAL,
         save_threaded_part=partial(
             save_supplier_reference_part,

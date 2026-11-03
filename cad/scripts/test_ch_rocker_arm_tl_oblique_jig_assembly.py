@@ -1199,7 +1199,7 @@ FASTENER_TABLE = {
     ),
     "KP08_TO_BRACKET": ("#6-32 X 5/8 SHCS", 4, 10.875, -14.525),
     # Past the .40 nut into the lug's THRU tap, the tip stopping inside it.
-    "NUT_TO_FEED_BLOCK": ("#4-40 X 3/4 SHCS", 2, 8.89, 8.89 - feed_block.LUG_WIDTH),
+    "NUT_TO_FEED_BLOCK": ("#4-40 X 3/4 FLANGED BHCS", 2, 8.89, 8.89 - feed_block.LUG_WIDTH),
     # The 5/8 screw past the riser grip (its head seated in the countersink);
     # the tip stops inside the carrier's THRU tap.
     "RISER_TO_CARRIER": (
@@ -1270,9 +1270,10 @@ def test_fastener_table_engagement_and_protrusion() -> None:
     assert 1.5 * fasteners.BRACKET_TO_BAR.major_mm < low < high < leadscrew.BRACKET_THICK
     assert leadscrew.KP08_FOOT_THICK == 5.0  # UNVERIFIED: verify on receipt
     assert fasteners.WASHERS == (fasteners.LEVER_LOCK_WASHER,)
-    # The nut screws' socket heads sit directly on the TL-27 brass nut (owner
-    # rulings 2026-10-20: no washers; 2026-11-01: the shop-made nut).
-    assert fasteners.NUT_TO_FEED_BLOCK.head == fasteners.SHCS
+    # The nut screws' flanges sit directly on the TL-27 brass nut (owner
+    # rulings 2026-10-20: no washers; 2026-11-01: the shop-made nut; the
+    # flange seats flat at the fit-up's eccentricity, Codjiflo P1 on #2112).
+    assert fasteners.NUT_TO_FEED_BLOCK.head == fasteners.FLANGED_BHCS
     assert fasteners.NUT_TO_FEED_BLOCK.grip_mm == pytest.approx(feed_nut.LENGTH)
     assert fasteners.LEVER_LOCK_WASHER.count == fasteners.LEVER_TO_CARRIER.count
     assert fasteners.LEVER_TO_CARRIER.grip_mm == pytest.approx(
@@ -1533,31 +1534,40 @@ def test_lever_screw_torque_is_capped_by_the_carrier_thread() -> None:
 def test_feed_nut_is_a_static_clamp() -> None:
     # The nut carries its torque by clamp friction with margin, so its two
     # #4-40 screws see no operating torque; F1 prints their torque. Each
-    # socket head bears directly on the brass round its loose hole, the
+    # flange bears directly on the brass round its clearance hole, the
     # 0.3 N·m within what the tap and the 360-H02 (17 ksi) carry.
     assert spec.NUT_SCREW_TORQUE_NM == 0.3
     assert spec.NUT_SCREW_PRELOAD_N == pytest.approx(527.2, abs=0.5)
     assert spec.NUT_SCREW_PRELOAD_N <= spec._NUT_SCREW_STRIP_N / 3.0
     assert spec._BRASS_YIELD_MPA == pytest.approx(117.2, abs=0.05)
     ring_area = math.pi / 4.0 * (
-        nut_screw.HEAD_DIA_MIN**2 - (feed_nut.HOLE_DIA + feed_nut.DRILLED_OVERSIZE) ** 2
+        nut_screw.BEARING_DIA_MIN**2 - (feed_nut.HOLE_DIA + feed_nut.DRILLED_OVERSIZE) ** 2
     )
-    assert ring_area == pytest.approx(4.594, abs=0.001)
+    assert ring_area == pytest.approx(9.631, abs=0.001)
     assert spec.NUT_SCREW_BEARING_MPA == pytest.approx(spec.NUT_SCREW_PRELOAD_N / ring_area)
     assert spec.NUT_SCREW_BEARING_MPA < spec._BRASS_YIELD_MPA
     assert spec.NUT_SCREW_PRELOAD_N <= spec._NUT_SCREW_PRELOAD_CAP_N
-    # The screw: under half its 170 ksi on the #4-40 stress area.
-    assert spec.NUT_SCREW_PRELOAD_N / (0.00604 * 25.4**2) < 0.5 * 170_000 * 0.006894757
+    # The screw: under half its 120 ksi on the #4-40 stress area.
+    assert spec.NUT_SCREW_PRELOAD_N / (0.00604 * 25.4**2) < 0.5 * 120_000 * 0.006894757
     assert spec.NUT_SLIP_NM[0] == pytest.approx(1.366, abs=0.001)
     assert spec.NUT_SLIP_MARGIN >= leadscrew.SLIP_MARGIN_MIN
 
 
 def test_nut_screw_heads_seat_flat_on_the_feed_nut() -> None:
-    assert nut_screw.FILLET_DIA_MAX < feed_nut.HOLE_DIA
-    assert feed_nut.HEAD_BEARING_LAND_MIN == pytest.approx(
-        (nut_screw.HEAD_DIA_MIN - feed_nut.HOLE_DIA - feed_nut.DRILLED_OVERSIZE) / 2.0
+    # Codjiflo P1 on #2112: at the .014 fit-up eccentricity the largest
+    # underhead fillet clears the least hole's mouth and the least flange
+    # face covers the largest hole.
+    e = feed_block.FIT_UP_RESIDUAL
+    assert feed_block.HEAD_FILLET_CLEARANCE == pytest.approx(
+        feed_nut.HOLE_DIA / 2.0 - nut_screw.FILLET_DIA_MAX / 2.0 - e
     )
-    assert feed_nut.HEAD_BEARING_LAND_MIN > 0.0
+    assert feed_block.HEAD_BEARING_LAND_MIN == pytest.approx(
+        nut_screw.BEARING_DIA_MIN / 2.0 - (feed_nut.HOLE_DIA + feed_nut.DRILLED_OVERSIZE) / 2.0 - e
+    )
+    assert feed_block.HEAD_FILLET_CLEARANCE > 0.0
+    assert round(feed_block.HEAD_BEARING_LAND_MIN / 25.4, 4) == 0.0098
+    # The flanges clear the leadscrew running past them.
+    assert round(feed_block.HEAD_TO_LEADSCREW_MIN / 25.4, 3) == 0.046
 
 
 def test_handwheel_set_screw_meets_the_leadscrew_flat() -> None:
