@@ -1,22 +1,17 @@
 """Native dimension and print contract for the full-body quarter-inch lever."""
 
-import math
-
 from _gtol_cylinder import CylinderFace
 from _printed_tolerance import drilled_oversize_mm, printed_deviations
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 import mg_magnifying_clamp_spec as clamp
 from mg_lever_thread_joint import (
-    CHAMFER_LEG_MAX,
     INCOMPLETE_THREAD_MAX,
     LEVER_UNIT as UNIT,
     ROD_DIA,
     ROD_DIA_BAND,
     ROD_LENGTH_PLACES,
     THREAD,
-    THREAD_LENGTH,
     THREAD_LENGTH_PLACES,
-    THREAD_LENGTH_TOL,
 )
 
 DRAWING_DIMENSIONS = {
@@ -60,17 +55,11 @@ ROD_DIA_CALLOUT = (
 # title-block edge break (native limits 0..max), so it carries no callout.
 THREAD_CALLOUT = f"{THREAD} UNC-2A\nMATES MHA-MG-01 BRACKET"
 PRINT_THREAD_CALLOUT = f"{THREAD} UNC\nMATES MHA-MG-01\nBRACKET"
-# Full thread between the two incomplete ends at the printed shortest thread,
-# less the additive tip chamfer (as installation_full_overlap charges it),
-# floored to the thread length's places.
-FULL_THREAD_MIN = (
-    THREAD_LENGTH - THREAD_LENGTH_TOL - 2.0 * INCOMPLETE_THREAD_MAX - CHAMFER_LEG_MAX
-)
-_FULL_THREAD_MIN_IN = math.floor(FULL_THREAD_MIN / 25.4 * 10**THREAD_LENGTH_PLACES + 1e-9) / 10**THREAD_LENGTH_PLACES
-LEAD_CALLOUT = (
-    "INCOMPLETE THREAD,\nEACH END OF THREAD\n"
-    f"FULL THREAD {_FULL_THREAD_MIN_IN:.{THREAD_LENGTH_PLACES}f} MIN".replace(" 0.", " .")
-)
+# The incomplete-thread MAX is native on IncompleteLength; its words say it
+# holds at both ends of the .71 thread. The full thread between them follows
+# from those two native sizes, so the sheet prints no derived minimum (the
+# simplicity policy: a value the sheet prints is a model dimension).
+LEAD_CALLOUT = "INCOMPLETE THREAD,\nEACH END OF THREAD"
 FREE_END_CALLOUT = "FREE END: TANGENT HEMISPHERE"
 SURFACE_FINISHES = (
     SurfaceFinishControl(

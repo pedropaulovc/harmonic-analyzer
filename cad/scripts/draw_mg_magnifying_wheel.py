@@ -938,6 +938,7 @@ def _dress_fillet_radii(adapter: Any, annotations: list[Any]) -> None:
 _WITNESS_NONE = 3  # swWitnessLineVisibility_e.swWitnessLineNone
 
 
+@_telemetry.traced("wheel.clear_section_witnesses")
 def _clear_section_witnesses(adapter: Any, annotations: list[Any]) -> None:
     """Keep SpokeAxial's and HubFrontZ's extension lines off A-A's cut faces,
     read back."""
@@ -997,6 +998,7 @@ def _clear_section_witnesses(adapter: Any, annotations: list[Any]) -> None:
     )
 
 
+@_telemetry.traced("wheel.break_out_tie2")
 def _break_out_tie2(adapter: Any, front: Any) -> None:
     """Cut TIE2_WINDOW out of the face view to the mid-plane, read back."""
     draw = adapter.currentModel

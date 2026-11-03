@@ -292,12 +292,9 @@ def test_root_runout_is_wholly_outside_receiver_at_actual_printed_corners() -> N
     assert max(starts) < 0.0
     assert geom.INSTALLED_ROOT_CLEARANCE_MIN == pytest.approx(-max(starts))
     assert spec.SINGLE_LIMITS["ThreadExtent", "IncompleteLength"][0] == joint.INCOMPLETE_THREAD_MAX
-    # The shortest accepted .71 thread (.70) less both .075 incomplete ends
-    # and the additive tip chamfer the installed overlap also charges.
-    assert spec.FULL_THREAD_MIN == pytest.approx(
-        (0.70 - 2.0 * 0.075) * 25.4 - joint.CHAMFER_LEG_MAX
-    )
-    assert "FULL THREAD .53 MIN" in spec.LEAD_CALLOUT
+    # The callout carries words only: the MAX is native, and no derived
+    # full-thread minimum prints as free text.
+    assert spec.LEAD_CALLOUT == "INCOMPLETE THREAD,\nEACH END OF THREAD"
 
 
 def test_quarter_inch_body_has_real_drilled_slip_clearance() -> None:
@@ -940,7 +937,7 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
         incomplete_xy = annotations["IncompleteLength"].GetPosition()
         tip_x = project(None, detail, (joint.ROD_LENGTH / 1000.0, 0.0, 0.0))[0]
         rows = qualifiers["IncompleteLength"].splitlines()
-        assert rows == spec.LEAD_CALLOUT.splitlines() and len(rows) == 3
+        assert rows == spec.LEAD_CALLOUT.splitlines() and len(rows) == 2
         assert incomplete_xy[0] - max(map(len, rows)) * 0.0035 / 2.0 > tip_x
         assert captured["finalize"]["layout"] is drawing.SPEC.layout
         assert captured["thread_lines"] == [(detail, "Detail A"), (front, "front")]
