@@ -210,11 +210,17 @@ def test_the_worst_case_walls_hold_at_the_printed_bands() -> None:
 def test_the_countersink_callout_names_no_hole_size() -> None:
     """The callout is fixed text on the countersink's native dimension: a
     hole size typed into it would not follow the drill's native value.  Its
-    .XXX diameter seats the screw's head, so it names the screw."""
-    assert spec.CSK_CALLOUT.splitlines() == [
-        "82\u00b0 CSK, HEAD", "SEAT FOR MHA-PD-VN-56", "COAXIAL WITH", "DRILLED HOLE",
-    ]
-    assert not any(character.isdigit() for character in spec.CSK_CALLOUT.splitlines()[-1])
+    .XXX diameter seats the screw's head, so it names the screw.  Its wording
+    is free (Codjiflo, #2148)."""
+    callout = spec.CSK_CALLOUT
+    assert f"{geometry.CSK_ANGLE_DEG:.0f}\u00b0 CSK" in callout
+    assert _config.parts("pd-vn-transgear-arm-plate-screw")["number"] in callout
+    # Only the countersink's own angle is a number: no hole size rides it.
+    assert not any(
+        character.isdigit()
+        for character in callout.replace(f"{geometry.CSK_ANGLE_DEG:.0f}\u00b0", "")
+        .replace(spec.SCREW_NUMBER, "")
+    )
 
 
 def test_the_three_place_section_sizes_name_their_function() -> None:
