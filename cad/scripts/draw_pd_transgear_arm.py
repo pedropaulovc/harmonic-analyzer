@@ -101,7 +101,6 @@ from pd_transgear_arm_spec import (
     PIN_BORE_CALLOUT,
     LOCATOR_CALLOUT,
     PIN_HOLE_CALLOUT,
-    PIN_MOUTH_CALLOUT,
     PIVOT_BORE_CALLOUT,
     PLATE_TAP_EDGE_BREAK_CALLOUT,
     PROJECTED_ZONE_DIRECTION,
@@ -360,10 +359,6 @@ PIN_SECTION_LABEL = "D"
 # together: under the sheet-2 plan's bottom edge (y 0.180) by 36 mm, over the
 # title block (top 0.065) by 41 mm with the caption between.
 PIN_SECTION_ZONE_CENTER = (FRONT_CENTER[0], 0.125)
-# The rear mouth's chamfer leg, imported with its native band (Codjiflo,
-# #2124): D-D cuts through the bore's axis, the rear face on its left, so the
-# text stands in the open field up and left of the upper cut face.
-PIN_SECTION_KEEP = {"PinMouthChamfer": (0.095, 0.150)}
 # The caption's top stands this far under the cut face.
 _PIN_CAPTION_GAP_M = 0.006
 # Half a millimetre: run 20261027T212717523Z's four moves left it 0.26 mm
@@ -993,18 +988,7 @@ async def build(adapter: Any) -> dict[str, str]:
     ]
     # Decimal places and the explicit bands are authored on the part; the
     # sheet only proves the import kept them.
-    # Sheet 1's imports; the rear mouth's leg lands on sheet 2 (section D-D),
-    # proved there (farm run 20261103T125508107Z: one proof over both sheets
-    # failed on sheet 1).
-    assert_imported_precision(
-        adapter,
-        annotations,
-        {
-            name: places
-            for name, places in DRAWING_PRECISION_BY_NAME.items()
-            if name not in PIN_SECTION_KEEP
-        },
-    )
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_reference_dimensions(adapter, annotations, ("PivotBoreDia",))
     _set_stock_text(adapter, annotations)
@@ -1133,19 +1117,6 @@ async def build(adapter: Any) -> dict[str, str]:
     pin_section = _pin_zone_section(adapter, pin_plan)
     set_hidden_lines_removed(adapter, pin_section)
     _add_projected_zone_chains(adapter, pin_section, "D-D")
-    mouth = hidden_sketches.curate_view_dimensions(
-        adapter,
-        pin_section,
-        keep=PIN_SECTION_KEEP,
-        view_label="section D-D",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    assert_imported_precision(
-        adapter,
-        mouth,
-        {name: DRAWING_PRECISION_BY_NAME[name] for name in PIN_SECTION_KEEP},
-    )
-    set_dimension_callouts(adapter, mouth, {"PinMouthChamfer": PIN_MOUTH_CALLOUT})
     _match_pin_section_caption(adapter, pin_section, section)
     if not auto_center_marks(adapter, pin_plan, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME centre marks to the pin-bore zone plan")

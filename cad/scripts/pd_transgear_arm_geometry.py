@@ -243,16 +243,9 @@ PIN_BORE_DIA_MIN = round(PIN_BORE_DIA + PIN_BORE_DIA_BAND[1], 6)
 # mouth is a 45-degree chamfer at least the root's radius on the leg, so the
 # root clears it and the head lands on the face (Codjiflo, #2124). Its upper
 # limit is the title block's chamfer break; ``pd_transgear_pin_spec`` checks
-# the clearance against the pin's root.  The band is the model's: the build
-# puts it on the chamfer's native leg dimension, which the sheet imports
-# (Codjiflo, #2124), and the limits below are that dimension's.
+# the clearance against the pin's root.
 PIN_MOUTH_CHAMFER = 0.2032  # .008
-PIN_MOUTH_CHAMFER_TOLERANCE = 0.0508  # +/-.002
-PIN_MOUTH_CHAMFER_PLACES = 3
-PIN_MOUTH_CHAMFER_LIMITS = (
-    round(PIN_MOUTH_CHAMFER - PIN_MOUTH_CHAMFER_TOLERANCE, 6),  # .006
-    round(PIN_MOUTH_CHAMFER + PIN_MOUTH_CHAMFER_TOLERANCE, 6),  # .010
-)
+PIN_MOUTH_CHAMFER_LIMITS = (0.1524, 0.254)  # .006/.010
 # --- Plate taps: 2 x #8-32 THROUGH; ordinary entry/exit edge breaks ---------
 PLATE_SCREW_PITCH = 15.0
 PLATE_CENTRELINE_OFFSET = -3.375  # 1-1/4 in plate's centreline from its bore
