@@ -346,7 +346,14 @@ BACK_COLLAR_GAP_MIN = BACK_COLLAR_LEAF_F - FEELER_SET_ERROR  # 0.80
 BACK_COLLAR_GAP_MAX = BACK_COLLAR_LEAF_F + FEELER_SET_ERROR  # 1.00
 _STRAP_T_LOWER = printed_deviations(STRAP_T, STRAP_T_PLACES, unit=STRAP_UNIT)[0]
 BACK_CAM_PIN_STATION = CAM_LEN + BACK_COLLAR_LEAF_F - STRAP_T / 2.0  # 5.404
-LEVER_SEAT_MIN = LEVER_BORE_DEPTH + BACK_COLLAR_GAP_MAX + HUB_STOP_MARGIN  # 9.378
+# The deepest printed MHA-DT-16 bore seats the hub furthest onto the rod, so
+# the seat requirement books the bore's upper .XX deviation (Codjiflo on #2106).
+_LEVER_BORE_DEPTH_UPPER = printed_deviations(
+    LEVER_BORE_DEPTH, LEVER_BORE_DEPTH_PLACES, unit=LEVER_UNIT
+)[1]
+LEVER_SEAT_MIN = (
+    LEVER_BORE_DEPTH + _LEVER_BORE_DEPTH_UPPER + BACK_COLLAR_GAP_MAX + HUB_STOP_MARGIN
+)  # 9.632
 
 
 def lift_rod_seat_stack(rod_len: float) -> dict[str, float]:
@@ -464,7 +471,7 @@ if sum(LIFT_ROD_SEAT_STACK.values()) < _LEVER_SEAT_REQUIRED - 1e-9:
         f"{_stack_text(LIFT_ROD_SEAT_STACK)} < {_LEVER_SEAT_REQUIRED}"
     )
 # The nominal rod standing proud of the front block, as built.
-LEVER_SEAT_PROUD = LIFT_ROD_LEN - 2.0 * BLOCK_DEPTH - INNER_SPAN  # 15.60
+LEVER_SEAT_PROUD = LIFT_ROD_LEN - 2.0 * BLOCK_DEPTH - INNER_SPAN  # 12.31
 LIFT_ROD_Z0 = BACK_BLOCK_OUTER_Z - LIFT_ROD_LEN
 
 # MHA-DT-24 return spring: the blade rides the back strap's flank, and its foot

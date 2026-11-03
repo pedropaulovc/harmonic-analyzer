@@ -926,11 +926,12 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
     # this, the 182.0 shaft bore 7.0 and the 192.0 rod stood 6.75 proud --
     # 1.25 short of even bottoming in the 8-deep bore; the 184.5 / 195.9 that
     # followed left out the blocks' own depth band (8.99 of bearing).
-    from dt_pinion_lever_geometry import BORE_DEPTH
+    from _printed_tolerance import printed_deviations
+    from dt_pinion_lever_geometry import BORE_DEPTH, BORE_DEPTH_PLACES, UNIT
 
     assert not hasattr(RIG, "STACK_BAND")  # the stacks name every term
     assert (RIG.TORQUE_SHAFT_LEN, RIG.LIFT_ROD_LEN) == pytest.approx(
-        (7.31 * 25.4, 7.74 * 25.4)
+        (7.31 * 25.4, 7.75 * 25.4)
     )
     assert math.isclose(RIG.BACK_COLLAR_GAP_MAX, 1.00, abs_tol=1e-9)
     bearing_min = math.inf
@@ -951,6 +952,12 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
         abs_tol=1e-9,
     )
     flush = (-RIG.FLUSH_SET_ERROR, RIG.FLUSH_SET_ERROR)  # rear end past the face
+    # The lever's printed bore-depth corners: the deepest seats the hub nearest
+    # the front block (Codjiflo on #2106).
+    bores = tuple(
+        BORE_DEPTH + dev
+        for dev in printed_deviations(BORE_DEPTH, BORE_DEPTH_PLACES, unit=UNIT)
+    )
     for inner, outer, t_b in _stack_vertices():
         for dl in (-_ROD_LEN_BAND, _ROD_LEN_BAND):
             for f in flush:
@@ -958,10 +965,11 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
                 bearing = inner - max(shaft_front, outer)
                 bearing_min = min(bearing_min, bearing)
             rod_front = RIG.BACK_BLOCK_OUTER_Z - (RIG.LIFT_ROD_LEN + dl)
-            hub_gap = outer - (rod_front + BORE_DEPTH)
-            for e in (-_LEAF_ERR, _LEAF_ERR):
-                margin = hub_gap - _back_collar_gap(e)
-                hub_margin_min = min(hub_margin_min, margin)
+            for bore in bores:
+                hub_gap = outer - (rod_front + bore)
+                for e in (-_LEAF_ERR, _LEAF_ERR):
+                    margin = hub_gap - _back_collar_gap(e)
+                    hub_margin_min = min(hub_margin_min, margin)
     assert bearing_min >= RIG.FRONT_BLOCK_MIN_BEARING + RIG.BLOCK_BEARING_MARGIN - 1e-9
     # The sweep's minimum is the layout's named-term budget, term for term.
     assert math.isclose(
@@ -1004,7 +1012,7 @@ def test_lever_station_clears_at_both_rod_extremes() -> None:
     row = drive.RIG_MARGINS["lever throw plane to the torque shaft's front end"]
     assert math.isclose(row[0], air, abs_tol=1e-9)
     assert air >= RIG.LEVER_THROW_MIN_AIR + RIG.RIG_MARGIN_SPARE - 1e-9
-    assert math.isclose(air, 2.233, abs_tol=5e-3)
+    assert math.isclose(air, 2.487, abs_tol=5e-3)
     south = sum(RIG.LEVER_SOUTH_TRAVEL_STACK.values())
     assert drive._LEV_Z[0] - south >= drive._GRIP_HEAD_Z[1] + 0.25
     hub_lo = drive.LEVER_Z - drive.LEVER_HUB_LEN / 2.0 - drive.LEVER_CAP_SAG
