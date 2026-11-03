@@ -251,8 +251,9 @@ class DeckDetail:
     draw_ch_channel_assembly enlarges its exploded end hardware: an
     *Isometric view of ``stems`` alone at ``scale``, moved so its exploded
     ``centre_xyz`` (model mm) lands on ``centre`` (sheet m) and cropped to
-    ``crop_radius_mm`` about it. The same circle, lettered toward
-    ``letter_corner`` (x, y signs), marks the cluster in the 1:8 view."""
+    ``crop_radius_mm`` about it. The same circle marks the cluster in the
+    1:8 view, lettered with its note's top-left ``letter_offset`` (sheet m)
+    from the circle's projected centre."""
 
     letter: str
     scale: tuple[int, int]
@@ -260,7 +261,7 @@ class DeckDetail:
     centre: tuple[float, float]
     stems: tuple[str, str]
     crop_radius_mm: float
-    letter_corner: tuple[int, int]
+    letter_offset: tuple[float, float]
 
     @property
     def title(self) -> str:
@@ -329,7 +330,11 @@ SUPPORT_DETAIL = DeckDetail(
     centre=(DECK_DETAIL_X, 0.270),
     stems=("fr-rocker-arm-support", "fr-vn-lag-screw"),
     crop_radius_mm=80.0,
-    letter_corner=(-1, 1),
+    # Left of the circle, just past the support casting's outer edge, clear of
+    # the casting, the front-west column and the item 3 and 4 leaders. At the
+    # circle's upper-left corner the letter sat on the casting's outline
+    # (machinist review and layout audit, run 20261103T171906452Z).
+    letter_offset=(-0.0164, 0.0025),
 )
 NAMEPLATE_DETAIL = DeckDetail(
     letter="D",
@@ -352,7 +357,10 @@ NAMEPLATE_DETAIL = DeckDetail(
     centre=(DECK_DETAIL_X, 0.168),
     stems=("fr-nameplate", "sh-vn-brass-fillister-screw"),
     crop_radius_mm=68.0,
-    letter_corner=(-1, 1),
+    # Above the circle, between the two east columns and above the deck's
+    # back edge. At the upper-left corner it sat on the deck under a column
+    # (run 20261103T171906452Z).
+    letter_offset=(-0.0014, 0.0135),
 )
 DECK_DETAILS = (SUPPORT_DETAIL, NAMEPLATE_DETAIL)
 # swCropViewErrors_e.swCropViewErrors_NoError
@@ -2262,11 +2270,10 @@ def _sketch_view_circle(
 
 
 def detail_letter_xy(
-    centre: tuple[float, float], radius: float, corner: tuple[int, int]
+    centre: tuple[float, float], offset: tuple[float, float]
 ) -> tuple[float, float]:
-    """A detail letter's note point, past its boundary toward ``corner``."""
-    offset = radius + DETAIL_LABEL_GAP_M / 2.0
-    return centre[0] + corner[0] * offset, centre[1] + corner[1] * offset
+    """A detail letter's note point, ``offset`` from its boundary's centre."""
+    return centre[0] + offset[0], centre[1] + offset[1]
 
 
 def _mark_deck_details(adapter: Any, exploded: Any) -> None:
@@ -2285,7 +2292,7 @@ def _mark_deck_details(adapter: Any, exploded: Any) -> None:
         )
         adapter.currentModel.ClearSelection2(True)
         _activate_view(adapter, exploded, label=label)
-        point = detail_letter_xy((centre[0], centre[1]), radius, detail.letter_corner)
+        point = detail_letter_xy((centre[0], centre[1]), detail.letter_offset)
         if add_note(adapter, detail.letter, *point) is None:
             raise RuntimeError(f"failed to letter the {label}")
 
