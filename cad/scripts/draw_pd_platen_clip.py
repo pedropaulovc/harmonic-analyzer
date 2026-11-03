@@ -75,6 +75,7 @@ from build_pd_platen_clip import (
     FLAT_FINGER_LENGTH,
     HOLE_CALLOUT_PRECISION,
     HOLE_DIA,
+    HOLE_WALL_TEXT,
     HOLE_INSET,
     HOLE_Y,
     REFERENCE_DIMENSIONS,
@@ -273,7 +274,8 @@ DIMENSION_AFFIXES = {
 # profile (r2 read it as a span); the rise is each bow's crest height.
 DIMENSION_CALLOUTS = {
     "LeftZ": "MATCHES\nMHA-PD-02",  # pd-platen-clip RV-01
-    "RailWidth": "SCREW RAIL",
+    # The holes' finished walls at the floor (rule 20; pd-platen-clip RV-02).
+    "RailWidth": f"SCREW RAIL\n{HOLE_WALL_TEXT}",
     "SheetDepth": "SHEET STOCK",
     "SpringRailWidth": "FULL R ENDS",
     "SlitWidth": "SLIT, FULL R END",

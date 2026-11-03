@@ -67,11 +67,17 @@ from _sketch import (
 from _sketch_circle import define_circle
 from _hole_spec import THREAD_MAJOR_MM
 from _holes import CLEARANCE_MM, HoleSpec, SharedCoordinate, wizard_holes
-from _inch_wall_limits import WALL_TARGET_MM
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _document_units import apply_package_model_units
 from _package_units import drawing_unit
 from _part_properties import part_drawing_unit
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
+from _printed_tolerance import (
+    drilled_oversize_mm,
+    edge_break_chamfer_mm,
+    edge_break_radius_mm,
+    printed_band_mm,
+    printed_deviations,
+)
 from pd_vn_platen_clip_screw_spec import (
     HEAD_DIA,
     HEAD_DIA_MIN,
@@ -480,6 +486,22 @@ if (
         f"{END_LIGAMENT_MIN:.3f}, far end {FAR_END_LIGAMENT_MIN:.3f}) under the "
         ".080 in target (drawing-guidelines.md rule 17)"
     )
+# Finished, each ligament also pays the title block's outside edge break and
+# the hole's mouth break (Codjiflo, #2124): the edge and slit ligaments land
+# at the .060 floor, the delegated minor ruling RV-02 in pd-platen-clip.yaml,
+# and the screw rail's callout states it (rule 20).
+_EDGE_BREAK = max(edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT))
+HOLE_LIGAMENT_FINISHED_MIN = (
+    min(EDGE_LIGAMENT_MIN, SLIT_LIGAMENT_MIN, END_LIGAMENT_MIN, FAR_END_LIGAMENT_MIN)
+    - 2.0 * _EDGE_BREAK
+)
+if HOLE_LIGAMENT_FINISHED_MIN < WALL_FLOOR_MM - 1e-9:
+    raise AssertionError(
+        f"platen clip finished screw-hole ligament {HOLE_LIGAMENT_FINISHED_MIN:.3f} "
+        f"under the .060 in floor (drawing-guidelines.md rule 17)"
+    )
+_HOLE_WALL_IN = math.floor(round(HOLE_LIGAMENT_FINISHED_MIN / 25.4, 4) * 1000) / 1000
+HOLE_WALL_TEXT = f"HOLE WALLS {_HOLE_WALL_IN:.3f}".replace(" 0.", " .") + " MIN"
 # The slit prints its own .XX width; its worst case keeps the floor open.
 SLIT_WIDTH_MIN = NOTCH_WIDTH - printed_band_mm(SLIT_PLACES, unit=UNIT)
 if SLIT_WIDTH_MIN < SLIT_GAP_FLOOR - 1e-9:

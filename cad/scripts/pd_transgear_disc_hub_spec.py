@@ -108,11 +108,13 @@ SCREW_HEAD_DIA_ALLOWANCE = 0.05
 
 # --- turned body ------------------------------------------------------------
 # Every turned diameter but the spigot prints .XX.  The flange is sized so
-# the screw holes' wall to its rim holds the .080 target at the .XX row on
-# both it and the bolt circle (machinist review: a .XXX flange held only to
-# rescue that wall is over-specification); the body's walls over the bore
-# and flat and the heads' air hold at .XX too.
-FLANGE_DIA = 25.654  # 1.01
+# the screw holes' finished wall to its rim, less the title block's rim break
+# and the holes' mouth break, holds the .080 target at the .XX row on both it
+# and the bolt circle (machinist review: a .XXX flange held only to rescue
+# that wall is over-specification; Codjiflo, #2124: Ø1.01 held it only
+# before the breaks); the body's walls over the bore and flat and the heads'
+# air hold at .XX too.
+FLANGE_DIA = 26.67  # 1.05
 FLANGE_DIA_PLACES = 2
 FLANGE_THICK = 2.3876  # .094
 FLANGE_THICK_PLACES = 3  # the screw-tip-to-platen stack reads it (R9-5)
@@ -393,12 +395,14 @@ def head_air_worst(bolt_circle_dia: float, hub_dia: float) -> float:
 
 
 def hole_to_rim_worst(flange_dia: float, bolt_circle_dia: float) -> float:
-    """Wall from the largest screw hole, on the circle's furthest hole
-    position, to the smallest flange's rim."""
+    """Finished wall from the largest screw hole, on the circle's furthest
+    hole position, to the smallest flange's rim: the rim's edge break and
+    the hole's mouth break both come off it at the face."""
     return (
         (flange_dia - _BAND[FLANGE_DIA_PLACES]) / 2.0
         - (bolt_circle_dia / 2.0 + BOLT_CIRCLE_POSITION_TOL)
         - _SCREW_HOLE_MAX_R
+        - 2.0 * EDGE_BREAK_MAX
     )
 
 

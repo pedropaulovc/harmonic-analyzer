@@ -109,7 +109,7 @@ def test_the_sheet_prints_the_overall_and_the_flange_never_the_hub_body() -> Non
     assert _places("FlatToAxis") == 4
     assert spec.HUB_DIA == pytest.approx(0.52 * IN) and _places("HubDia") == 2
     assert spec.SPIGOT_DIA == pytest.approx(0.501 * IN) and _places("SpigotDia") == 4
-    assert spec.FLANGE_DIA == pytest.approx(1.01 * IN) and _places("FlangeDia") == 2
+    assert spec.FLANGE_DIA == pytest.approx(1.05 * IN) and _places("FlangeDia") == 2
     assert joint.BOLT_CIRCLE_DIA == pytest.approx(0.75 * IN)
     assert joint.BOLT_CIRCLE_PLACES == 2
     assert spec.HUB_BODY_LENGTH == pytest.approx(0.301 * IN)
@@ -607,6 +607,8 @@ def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
         (spec.FLANGE_DIA - _row(_places("FlangeDia"))) / 2.0
         - (joint.BOLT_CIRCLE_DIA / 2.0 + joint.BOLT_CIRCLE_POSITION_TOL)
         - screw_r
+        # Finished: the rim's and the hole mouth's .010 breaks (Codjiflo, #2124).
+        - 2.0 * 0.010 * IN
     )
     flat_wall = (spec.HUB_DIA - _row(_places("HubDia"))) / 2.0 - (
         spec.FLAT_TO_AXIS + spec.FLAT_TO_AXIS_BAND[0]
@@ -649,7 +651,7 @@ def test_retained_outer_envelope_keeps_wall_driver_air_and_screw_margins() -> No
 
     assert spec.HUB_DIA == pytest.approx(0.520 * IN)
     assert spec.SPIGOT_DIA == pytest.approx(0.501 * IN)
-    assert spec.FLANGE_DIA == pytest.approx(1.01 * IN)
+    assert spec.FLANGE_DIA == pytest.approx(1.05 * IN)
     assert joint.BOLT_CIRCLE_DIA == pytest.approx(0.75 * IN)
     round_wall, flat_wall = spec.body_walls_worst(spec.HUB_DIA)
     assert min(round_wall, flat_wall, spec.SPIGOT_WALL_WORST) >= spec.WALL_FLOOR

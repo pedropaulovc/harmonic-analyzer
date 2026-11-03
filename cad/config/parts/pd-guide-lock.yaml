@@ -15,3 +15,9 @@ pd-guide-lock:
   tolerance_class: machined_block
   process: "cut from 1/16 in sheet: saw and file the outline, file the four corner radii, drill the screw holes (steel)"
   drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "the 2X screw-hole callout: WALL .069 MIN TO EDGES (the guide-side and left ligaments)"
+      finding: "screw-hole wall to the plate's guide-side and left edges below the .080 target at the finished worst case (rule 17)"
+      reason: "delegated ruling 2026-11-03, following the owner's approved band for thin walls between .060 and .080 (DT-35 .060, DT-08 .0602; #989), RV-04 on MHA-PD-18 (#1379) and RV-01 on MHA-PD-11 (#2124); owner review on #2144. The holes (.155 row, .157 and .709 stations) land on the platen guide's #4-40 tap pattern, whose rail walls are already at the floor (RV-01 on MHA-PD-11); the .0895 unbroken wall pays the .010 outside edge break and the .010 hole-mouth break and lands at .0695"

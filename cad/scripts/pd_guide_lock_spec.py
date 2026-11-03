@@ -17,11 +17,18 @@ run without SolidWorks in ~1 s.
 
 from __future__ import annotations
 
+import math
+
 import _config
 from _hole_spec import HoleSpec, blind_cut_dia_mm
-from _inch_wall_limits import WALL_TARGET_MM
+from _inch_wall_limits import WALL_FLOOR_MM
 from _package_units import drawing_unit
-from _printed_tolerance import drilled_oversize_mm, printed_deviations
+from _printed_tolerance import (
+    drilled_oversize_mm,
+    edge_break_chamfer_mm,
+    edge_break_radius_mm,
+    printed_deviations,
+)
 
 # #290: the sheet prints decimal inch; every nominal below is the exact
 # millimetre decimal of its printed inch value.
@@ -138,8 +145,10 @@ if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
 # drilled hole, its coordinate band, and the plate's printed outline bands.
 # The holes locate from the plate's corner (x from the left edge, y from the
 # guide-side edge), so the right and far ligaments also spend the outline's.
-# Rule 17's target: every hole wall reaches it at the printed worst case, so
-# the sheet states no shortfall.
+# Finished, each also pays the title block's outside edge break and the
+# hole's mouth break (Codjiflo, #2124): the guide-side and left walls land
+# between the .060 floor and the .080 target, the delegated minor ruling
+# RV-01 in pd-guide-lock.yaml, and the sheet states the least (rule 20).
 _HOLE_R_MAX = (blind_cut_dia_mm(HOLE_SPEC) + drilled_oversize_mm(unit=UNIT)) / 2.0
 _WIDTH_MIN = (
     LOCK_WIDTH
@@ -165,10 +174,19 @@ HOLE_LIGAMENTS_WORST: dict[str, float] = {
     - HOLE_LOCATION_BAND
     - _HOLE_R_MAX,
 }
-if min(HOLE_LIGAMENTS_WORST.values()) < WALL_TARGET_MM:
+_EDGE_BREAK = max(edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT))
+HOLE_LIGAMENTS_FINISHED = {
+    edge: ligament - 2.0 * _EDGE_BREAK
+    for edge, ligament in HOLE_LIGAMENTS_WORST.items()
+}
+if min(HOLE_LIGAMENTS_FINISHED.values()) < WALL_FLOOR_MM - 1e-9:
     raise AssertionError(
-        f"guide-lock screw-hole ligaments {HOLE_LIGAMENTS_WORST} under {WALL_TARGET_MM}"
+        f"guide-lock screw-hole ligaments {HOLE_LIGAMENTS_FINISHED} under {WALL_FLOOR_MM}"
     )
+_HOLE_WALL_IN = (
+    math.floor(round(min(HOLE_LIGAMENTS_FINISHED.values()) / 25.4, 4) * 1000) / 1000
+)
+HOLE_WALL_TEXT = f"WALL {_HOLE_WALL_IN:.3f}".replace(" 0.", " .") + " MIN TO EDGES"
 
 # The rounded corners must not reach the holes: with each hole centre (at its
 # printed worst case, from the nearest edges at their printed worst case)

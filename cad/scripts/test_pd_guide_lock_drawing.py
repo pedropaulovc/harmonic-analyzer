@@ -94,6 +94,12 @@ def test_screw_holes_reach_the_wall_target_at_the_printed_worst_case() -> None:
     worst = _ligaments(hole_y)
     assert min(worst.values()) >= WALL_TARGET_MM
     assert pd_guide_lock_spec.HOLE_LIGAMENTS_WORST == pytest.approx(worst)
+    # Finished (Codjiflo, #2124): both .010 breaks off each ligament leave the
+    # guide-side wall at .0695, between the floor and the target (RV-01).
+    finished = pd_guide_lock_spec.HOLE_LIGAMENTS_FINISHED
+    assert finished == pytest.approx({k: v - 0.020 * 25.4 for k, v in worst.items()})
+    assert min(finished.values()) == pytest.approx(0.0695 * 25.4, abs=1e-3)
+    assert pd_guide_lock_spec.HOLE_WALL_TEXT == "WALL .069 MIN TO EDGES"
     assert pd_guide_lock_spec.HOLE_PATTERN_X == pytest.approx(0.433 * 25.4)
     assert pd_guide_lock_spec.DRAWING_PRECISION_BY_NAME["Height"] == 2
     assert pd_guide_lock_spec.DRAWING_PRECISION_BY_NAME["Width"] == 2
@@ -127,8 +133,9 @@ def test_the_drill_callout_stands_between_the_plate_and_the_right_view() -> None
 def test_the_drill_callout_names_the_mate_its_location_bands_serve() -> None:
     """Machinist review ENFORCE r1-r3 (blocker): the banded hole coordinates
     named no mate.  The callout names the platen guide's taps the pattern
-    lands on and the screws its holes clear; with every wall at the 2.0
-    target it states no shortfall."""
+    lands on and the screws its holes clear, and its last row states the
+    finished wall to the edges (Codjiflo, #2124: both .010 breaks charged,
+    RV-01)."""
     import _config
 
     rows = drawing.HOLE_CALLOUT_BELOW.split("\n")
@@ -136,6 +143,7 @@ def test_the_drill_callout_names_the_mate_its_location_bands_serve() -> None:
         f"MATCHES {_config.parts('pd-platen-guide')['number']} TAPS,",
         "CLEARANCE FIT ON",
         f"{_config.parts('pd-vn-guide-lock-screw')['number']} SCREWS",
+        "WALL .069 MIN TO EDGES",
     ]
     # Each row is no wider than the native row the plate and right view
     # already bound (test above).

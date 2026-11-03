@@ -56,6 +56,7 @@ from pd_guide_lock_spec import (
     DRAWING_PRECISION_BY_NAME,
     HOLE_LOCATION_PLACES,
     HOLE_SPEC,
+    HOLE_WALL_TEXT,
     HOLE_XY,
     LOCK_HEIGHT,
     LOCK_STOCK_CALLOUT,
@@ -175,7 +176,8 @@ HOLE_CALLOUT_PROCESS = "DRILL"
 # The hole coordinates' ±.001 bands exist for the mate (rule 4): the
 # pattern must land on the platen guide's #4-40 taps with the lock-screw
 # shanks clear in their holes (pd_vn_guide_lock_screw_spec.LOCK_SET_OFFSET),
-# so the callout names both.
+# so the callout names both. Its last row states the holes' finished wall to
+# the edges, under the .080 target (rule 20; pd-guide-lock.yaml RV-01).
 # Rows stay at most 23 characters so the block keeps between the plate and
 # the right view.
 GUIDE_NUMBER = _config.parts("pd-platen-guide")["number"]
@@ -185,6 +187,7 @@ HOLE_CALLOUT_BELOW = "\n".join(
         f"MATCHES {GUIDE_NUMBER} TAPS,",
         "CLEARANCE FIT ON",
         f"{SCREW_NUMBER} SCREWS",
+        HOLE_WALL_TEXT,
     )
 )
 # The coordinates baseline both holes from the plate's corner, so the 4.000,

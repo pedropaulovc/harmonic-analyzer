@@ -199,9 +199,15 @@ def test_hole_row_names_the_tap_pattern_and_clears_the_rail_line():
 def test_hole_pattern_three_places_are_a_declared_acceptance():
     # Owner ruling 2026-10-15, option A: the hole row and stations stay .XXX
     # for pattern float (transfer-drilling rejected).
-    (entry,) = load_exceptions(CONFIG_ROOT, "pd_platen_clip", "part")
+    entry, walls = load_exceptions(CONFIG_ROOT, "pd_platen_clip", "part")
     assert (entry.id, entry.kind) == ("RV-01", "accept")
     assert clip.HOLE_FLOAT_MIN >= 2.0 * clip.PATTERN_POSITION_ZONE
+    # Codjiflo (#2124): finished, the ligaments pay both .010 breaks and land
+    # at the .060 floor, a declared minor the screw rail's callout states.
+    assert (walls.id, walls.kind) == ("RV-02", "minor")
+    assert clip.HOLE_LIGAMENT_FINISHED_MIN == pytest.approx(0.060 * 25.4)
+    assert clip.HOLE_WALL_TEXT == "HOLE WALLS .060 MIN"
+    assert draw.DIMENSION_CALLOUTS["RailWidth"].endswith(clip.HOLE_WALL_TEXT)
 
 
 def test_plan_length_says_formed_without_numbers():

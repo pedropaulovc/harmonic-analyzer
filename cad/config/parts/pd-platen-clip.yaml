@@ -13,3 +13,8 @@ pd-platen-clip:
       where: "the #2 loose hole pattern: stations .283 and 3.007 from the near end, the 2X .145 MATCHES MHA-PD-02 hole row, and the 2X Ø.116 THRU ALL callout PATTERN MATCHES MHA-PD-02 / DRILL"
       finding: "three-place hole stations and hole row on a paper-holding sheet clip read as a tight band or over-specification (rules 3, 4)"
       reason: "the screws are fixed in the platen's #2-56 taps, so the loose hole's float over the shank (.030 min) must hold both patterns' position zones; two .XXX coordinates give each pattern a .014 zone (.028 together), where .XX would need a Ø.143 hole and a pan head that pulls through; transfer-drilling the clip from its platen was rejected so any clip fits any platen (owner-accepted)"
+    - id: "RV-02"
+      kind: "minor"
+      where: "the screw rail's width callout: HOLE WALLS .060 MIN (the edge-side and slit-side ligaments)"
+      finding: "screw-hole ligament to the screw rail's edge and to the slit below the .080 target at the finished worst case (rule 17)"
+      reason: "delegated ruling 2026-11-03, following the owner's approved band for thin walls between .060 and .080 (DT-35 .060, DT-08 .0602; #989), RV-04 on MHA-PD-18 (#1379) and RV-01 on MHA-PD-11 (#2124); owner review on #2144. The hole row matches the platen's #2-56 taps (RV-01) and the rail cannot widen without narrowing the spring rail; the .080 unbroken ligament pays the .010 outside edge break and the .010 hole-mouth break and lands at the .060 floor"
