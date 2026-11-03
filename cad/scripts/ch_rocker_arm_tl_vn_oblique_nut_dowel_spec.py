@@ -45,9 +45,9 @@ __all__ = [
 ]
 
 PART_NAME = "ch-rocker-arm-tl-vn-oblique-nut-dowel"
-_ROW = _config.parts(PART_NAME)
+_ROW = _config.parts("ch-rocker-arm-tl-vn-oblique-nut-dowel")
 NUMBER = _ROW["number"]
-UNIT = drawing_unit(f"parts/{PART_NAME}", _ROW)
+UNIT = drawing_unit("parts/ch-rocker-arm-tl-vn-oblique-nut-dowel", _ROW)
 
 SKU = "98381A438"
 QUANTITY = 1
