@@ -8,7 +8,7 @@ until the rim groove's mid-plane lands on the pen-rod line
 plumb onto the pen rod (pn-pen re-derivation, user decision Option C).  Its
 length is DERIVED from that line, never a second literal: it is the one part
 of the wheel stack that moves with the pen line; the washers and the nuts are
-unchanged, and the wheel's spokes sit 4.09 off its hub's back face
+unchanged, and the wheel's spokes stand off its hub's back face
 (``mg_magnifying_wheel_geom.HUB_BACK_Z``) so the lever wire clears the rim.
 
 The spacer is not clamped: with the back washer and the wheel it floats on
@@ -25,48 +25,57 @@ z = LENGTH.  The assembly places it like the washers (local +Z onto machine
 
 from __future__ import annotations
 
-import math
-
 import _config
 import mg_vn_wheel_axle_back_washer_spec as _back
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _inch_wall_limits import WALL_TARGET_MM
+from _package_units import drawing_unit
+from _printed_tolerance import drilled_oversize_mm, printed_deviations
 from _surface_finish import SurfaceFinishControl
 from mg_magnifying_wheel_geom import HUB_BACK_Z
 from mg_wheel_bar_geom import BAR_FRONT_Z
 from _recording_geometry import PEN_Z_MID
+
+# #290: the spacer's sheet prints decimal inch.
+UNIT = drawing_unit("parts/mg-wheel-axle-spacer", _config.parts("mg-wheel-axle-spacer"))
 
 # Bar face -> spacer -> back washer -> hub back face -> spokes' mid-plane on
 # the pen-rod line.
 LENGTH = round(BAR_FRONT_Z - PEN_Z_MID - _back.MODEL_THICKNESS - HUB_BACK_Z, 6)
 if LENGTH <= 0.0:
     raise AssertionError(f"pen line {PEN_Z_MID} leaves no room for the spacer")
-# The axle's shank grows by this length and prints at .X
-# (mg_wheel_axle_spec.SHANK_LEN), so the length must sit on the 0.1 grid: keep
-# PEN_Z_MID there too.
-if not math.isclose(LENGTH * 10.0, round(LENGTH * 10.0), abs_tol=1e-6):
-    raise AssertionError(f"spacer length {LENGTH} is off the 0.1 grid")
 # It moves the hub, and so the nut stack, along the pin: the thread length
-# that keeps the locknut on full thread (mg_wheel_group) spends this band.
-LENGTH_BAND = 0.03
-LENGTH_PLACES = 2
+# that keeps the locknut on full thread (mg_wheel_group) spends this band. The
+# length closes the pen line, so it keeps its millimetre value and prints
+# rounded at .XXX; the stack reads the printed limits.
+LENGTH_BAND = 0.0254  # +/-.001
+LENGTH_PLACES = 3
+LENGTH_LIMITS = tuple(
+    LENGTH + deviation
+    for deviation in printed_deviations(
+        LENGTH, LENGTH_PLACES, (-LENGTH_BAND, LENGTH_BAND), unit=UNIT
+    )
+)
 # Two lines narrower than the 3:1 extension-line span (18.6 x 3 = 55.8 mm): the
 # one-line "MG-WHEEL-AXLE THREAD" ran into both extension lines.
 LENGTH_CALLOUT = f"SETS WHEEL STACK\nON AXLE {_config.parts('mg-wheel-axle')['number']}"
 
-# 7/16 bar as supplied (11.11) meets the .X O.D.: the washer's own O.D.
-OD = 11.0
-OD_PLACES = 1
+# 7/16 bar as supplied (.4375) meets the .44 O.D.: the washer's own O.D.
+OD = 11.176  # .44
+OD_PLACES = 2
+OD_MAX = OD + printed_deviations(OD, OD_PLACES, unit=UNIT)[1]
 # A drilled clearance bore on the 3/16 pin (mg_wheel_group proves it passes
-# the largest pin); the title block's DRILLED HOLES row governs it.
-BORE_DIA = 4.9
-BORE_PLACES = 2
+# the largest pin): a #10 drill (.1935) in the title block's DRILLED HOLES
+# row.
+BORE_DIA = 4.9022  # .193
+BORE_PLACES = 3
 BORE_CALLOUT = "DRILL THRU"
-BORE_DIA_MAX = round(BORE_DIA + drilled_oversize_mm(), 6)
+BORE_DIA_MAX = round(BORE_DIA + drilled_oversize_mm(unit=UNIT), 6)
 
-MIN_WALL = 2.0  # drawing-guidelines.md rule 17 (walls and webs) target
-WALL_WORST = (OD - printed_band_mm(OD_PLACES) - BORE_DIA_MAX) / 2.0  # 2.6
-if WALL_WORST < MIN_WALL:
-    raise AssertionError(f"MHA-MG-11 wall {WALL_WORST:.3f} < {MIN_WALL}")
+WALL_WORST = (
+    OD + printed_deviations(OD, OD_PLACES, unit=UNIT)[0] - BORE_DIA_MAX
+) / 2.0  # .111
+if WALL_WORST < WALL_TARGET_MM:
+    raise AssertionError(f"MHA-MG-11 wall {WALL_WORST / 25.4:.4f} in < .080 target")
 
 # Marked model dimensions and the places the part authors on them
 # (drawing-simplicity-policy.md `How the repository implements the

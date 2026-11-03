@@ -252,11 +252,11 @@ def _annulus_limit(major_d: float, tap_d: float, length: float) -> float:
 def _mg_clamp_thumb_limit() -> float:
     """Independent #4-40 annulus through the actual top-to-bore wall.
 
-    The top grew from 28.95 to 29.50; the 19.95 bore station and Ø6.50
-    bore stayed put. The former 5.75-mm wall is now 6.30 mm. Do not read
-    the runtime allowance or its triple to construct this oracle.
+    Top 1.16 in (29.464), the 19.95 bore station and the Ø.257 (6.5278)
+    drilled bore leave a 6.2501-mm wall. Do not read the runtime allowance
+    or its triple to construct this oracle.
     """
-    return _annulus_limit(2.8448, 2.261, 29.50 - 19.95 - 6.50 / 2.0)
+    return _annulus_limit(2.8448, 2.261, 29.464 - 19.95 - 6.5278 / 2.0)
 
 
 @pytest.mark.parametrize(
@@ -275,7 +275,7 @@ def test_clamp_thumb_allowance_bounds_the_actual_pair_and_total_volume(
     import mg_magnifying_clamp_geom as clamp
 
     assert clamp.BLOCK_HEIGHT - clamp.LEVER_BORE_Y - clamp.LEVER_BORE_DIA / 2.0 == (
-        pytest.approx(29.50 - 19.95 - 6.50 / 2.0)
+        pytest.approx(29.464 - 19.95 - 6.5278 / 2.0)
     )
     prefix = "mg-magnifier-1/" if assembly == "ha-harmonic-analyzer" else ""
     components = (
@@ -552,14 +552,14 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             # bottom tap drill, tip to relief.
             frozenset(
                 ("mg-magnifying-vertical-rod-1", "mg-magnifying-clamp-1")
-            ): _annulus_limit(2.845, 2.261, 6.0),
+            ): _annulus_limit(2.845, 2.261, 5.976),
             # MHA-MG-07 3/16 drill-rod pin pressed through the wheel bar's
             # reamed .1865 bore, the bar's 9.0 depth.
             frozenset(("mg-wheel-axle-1", "mg-wheel-bar-1")): _annulus_limit(
                 4.7625, 4.7371, 9.0
             ),
             frozenset(("sh-vn-thumb-screw-2", "mg-output-fixture-1")): _annulus_limit(
-                2.8448, 2.261, 10.1
+                2.8448, 2.261, 9.8044
             ),
             frozenset(
                 ("mg-magnifying-lever-1", "mg-magnifying-bracket-1")

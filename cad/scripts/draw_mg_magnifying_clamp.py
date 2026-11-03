@@ -1,8 +1,9 @@
 r"""Create the curated machinist drawing for the magnifying-lever clamp.
 
-A 29.50 length of 1/2 hex brass: the Ø6.50 quarter-inch lever bore drilled across
+A 1.16 length of 1/2 hex brass: the Ø.257 quarter-inch lever bore drilled across
 the corners, a #4-40 thumb-screw tap from the top face into the bore and a
-blind #4-40 rod tap from the bottom face, both on the hex axis.
+blind #4-40 rod tap from the bottom face, both on the hex axis. The sheet
+prints decimal inch (#290); each tap callout prints its drill Ø at .XXX.
 
 Views (3:1, hidden lines removed throughout, drawing-guidelines.md rule 9):
 
@@ -18,10 +19,11 @@ Views (3:1, hidden lines removed throughout, drawing-guidelines.md rule 9):
   controlled stock flats above and to the right of the top view, and each tap's
   native callout.
 * SECTION A-A, cut on the hex axis through the corners from the front: the
-  bore through the corners, both blind taps in solid lines and the floor
-  between the rod tap and the bore, under the part's material crosshatch
-  (ANSI31's continuous lines, read back) with the cosmetic threads kept off
-  it; the bottom seat carries its flag note.
+  bore through the corners, both blind taps in solid lines with their
+  cosmetic threads as thin continuous major-Ø lines (the thread lengths read
+  against the drill depths) and the floor between the rod tap and the bore,
+  under the part's material crosshatch (ANSI31's continuous lines, read
+  back); the bottom seat carries its flag note.
 * Shaded isometric, 2:1.
 
 Run with SolidWorks open::
@@ -68,6 +70,7 @@ from _drawing_notes import add_property_linked_note
 from _drawing_precision import _named_dimension
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
@@ -75,6 +78,10 @@ from _hole_callout_thread_class import omit_title_block_thread_class
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
+from _supplier_dimensions import (
+    assert_supplier_reference_dimension,
+    supplier_reference_dimension,
+)
 import _telemetry
 from build_mg_magnifying_clamp import (
     _assert_location_profiles,
@@ -97,6 +104,8 @@ from mg_magnifying_clamp_spec import (
     VISIBLE_DIMENSIONS,
     HEX_AC,
     HEX_AF,
+    HEX_AF_CALLOUT,
+    HEX_AF_FRACTION_DENOMINATOR,
     LEVER_BORE_CALLOUT,
     LEVER_BORE_DIA,
     LEVER_BORE_Y,
@@ -107,7 +116,7 @@ from mg_magnifying_clamp_spec import (
     ROD_TAP_PROCESS,
     SEAT_NOTE,
     SECTION_HATCH_PATTERN,
-    HEX_AF_PREFIX,
+    STOCK_REFERENCE_DIMENSION,
     TAP_CALLOUT_PRECISION,
     TAP_DRILL_DEPTH_VARIABLE,
     TAP_THREAD_DEPTH_VARIABLE,
@@ -130,7 +139,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A nominal 14.66 x 12.70 x 29.50 hex with one common-flat location group.
+# A nominal .577 x 1/2 x 1.16 hex with one common-flat location group.
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
 ISO_SCALE = (2, 1)
@@ -169,8 +178,8 @@ RIGHT_KEEP = {
     "LeverBoreYDim": (_RIGHT_LEFT_X - 0.012, _elev_y(RIGHT_CENTER, LEVER_BORE_Y / 2.0)),
     "LeverBoreDiaDim": (0.165, 0.145),
 }
-# Keep the ordinary HEX size outside both native witnesses/arrow tails.
-# There is no supplied-stock paragraph or independent envelope note.
+# Keep the 1/2 stock REF outside both native witnesses/arrow tails.
+# There is no independent envelope note.
 TOP_KEEP = {"HexAf": (0.152, 0.255)}
 RIGHT_LOCATION_KEEP = {
     # Move R27's whole three-row label right, away from A and the height witness.
@@ -178,8 +187,26 @@ RIGHT_LOCATION_KEEP = {
     # All three values are imported/read back; only the verified group leader prints.
     name: (0.150, 0.1755) for name in Z_FLAT_DIMENSIONS
 }
-TOP_LOCATION_KEEP = {"ThumbTapFromDiagonalFlat": (0.043, 0.186)}
-BOTTOM_KEEP = {"RodTapFromDiagonalFlat": (0.043, 0.074)}
+# Each end view's diagonal-flat location (model normal cos 30 X + sin 30 Z:
+# lower-left on the top view, upper-left on the bottom) stands on that flat's
+# normal through the tap centre: its dimension line runs from the centre
+# straight to the flat, perpendicular to it, text 7 mm outside the flat. Off
+# the normal, one extension line ran along the flat (printing it doubled) and
+# the other from the opposite corner through the centre (final2 review).
+_FLAT_NORMAL_TEXT = _HALF_AF + 0.007
+_FLAT_NORMAL = (-0.5 * _FLAT_NORMAL_TEXT, math.sqrt(3.0) / 2.0 * _FLAT_NORMAL_TEXT)
+TOP_LOCATION_KEEP = {
+    "ThumbTapFromDiagonalFlat": (
+        TOP_CENTER[0] + _FLAT_NORMAL[0],
+        TOP_CENTER[1] - _FLAT_NORMAL[1],
+    )
+}
+BOTTOM_KEEP = {
+    "RodTapFromDiagonalFlat": (
+        BOTTOM_CENTER[0] + _FLAT_NORMAL[0],
+        BOTTOM_CENTER[1] + _FLAT_NORMAL[1],
+    )
+}
 
 DIMENSION_CALLOUTS = {
     "Height": "",
@@ -216,7 +243,7 @@ PROJECTION_SLOP_M = 1e-5
 # swAnnotationType_e: swCosmeticThread, swCenterMarkSym.
 _COSMETIC_THREAD_ANNOTATION = 1
 _CENTER_MARK_ANNOTATION = 13
-_SECTION_THREAD_LAYER = "MG-CLAMP-SECTION-THREADS-HIDDEN"
+_SECTION_THREAD_LAYER = "MG-CLAMP-SECTION-THREADS"
 # The front view shows LeverBoreLocationProfile only to import its common-flat
 # dimensions (_drawing_hidden_sketches); its construction segments duplicate
 # the outline and bore circle (machinist review of 2056e3344 read them as
@@ -385,17 +412,22 @@ def _assert_material_hatch(section: Any) -> None:
     )
 
 
-def _hide_cosmetic_threads(adapter: Any, view: Any, *, label: str) -> int:
-    """Keep the taps' cosmetic-thread ink out of a section (rule 9: a section
-    never carries hidden lines); the callouts state both threads.  The
-    draw_dt_cone_tip_block hidden-layer recipe."""
+def _show_section_cosmetic_threads(adapter: Any, view: Any, *, label: str) -> int:
+    """Draw the taps' cosmetic threads in a section as thin continuous lines.
+
+    In the cut SolidWorks prints a tap's major Ø dashed, as a hidden thread
+    (rule 9: a section never carries hidden lines); a visible thin continuous
+    layer makes it the section's own thread line, so each thread length reads
+    against its drill depth. The draw_sm_knife_mount section-thread recipe:
+    layer state and every annotation's layer are read back."""
     manager = _early_bound(adapter.currentModel.GetLayerManager(), "ILayerMgr")
     layer = manager.GetLayer(_SECTION_THREAD_LAYER)
     if layer is None:
+        # COLORREF black, swLineCONTINUOUS (0), swLW_THIN (0).
         if (
             int(
                 manager.AddLayer(
-                    _SECTION_THREAD_LAYER, "clamp section thread ink hidden", 0, 0, 0
+                    _SECTION_THREAD_LAYER, "clamp section thread lines", 0, 0, 0
                 )
             )
             != 1
@@ -403,10 +435,13 @@ def _hide_cosmetic_threads(adapter: Any, view: Any, *, label: str) -> int:
             raise RuntimeError("failed to add the clamp section thread layer")
         layer = manager.GetLayer(_SECTION_THREAD_LAYER)
     layer = _early_bound(layer, "ILayer")
-    layer.Visible = False
-    if bool(layer.Visible) or bool(layer.Printable):
-        raise RuntimeError("the clamp section thread layer is not hidden")
-    hidden = 0
+    layer.Visible = True
+    if not bool(layer.Visible) or int(layer.Style) != 0 or int(layer.Width) != 0:
+        raise RuntimeError(
+            f"the clamp section thread layer is not visible thin continuous: "
+            f"visible={layer.Visible!r}, style={layer.Style!r}, width={layer.Width!r}"
+        )
+    shown = 0
     for raw_annotation in _early_bound(view, "IView").GetAnnotations() or ():
         annotation = _early_bound(raw_annotation, "IAnnotation")
         if int(annotation.GetType()) != _COSMETIC_THREAD_ANNOTATION:
@@ -414,13 +449,13 @@ def _hide_cosmetic_threads(adapter: Any, view: Any, *, label: str) -> int:
         annotation.Layer = _SECTION_THREAD_LAYER
         if str(annotation.Layer or "") != _SECTION_THREAD_LAYER:
             raise RuntimeError(
-                f"clamp {label} cosmetic thread refused the hidden layer"
+                f"clamp {label} cosmetic thread refused the section thread layer"
             )
-        hidden += 1
-    if not hidden:
-        raise RuntimeError(f"clamp {label} has no cosmetic thread to hide")
-    rebuild_drawing(adapter, label=f"hide clamp {label} cosmetic threads")
-    return hidden
+        shown += 1
+    if shown < 2:
+        raise RuntimeError(f"clamp {label} shows {shown} cosmetic thread(s), not both taps'")
+    rebuild_drawing(adapter, label=f"show clamp {label} cosmetic threads")
+    return shown
 
 
 def _front_reference_visibility(view: Any) -> Any:
@@ -515,6 +550,23 @@ def _omit_tap_thread_class(display: Any, *, label: str) -> None:
 
 
 
+# The flats as bought: the stock's exact 1/2 in fraction, a native REF the
+# supplier's tolerance governs, never a size the shop holds.
+HEX_AF_REFERENCE = {
+    "label": "MHA-MG-02 HexAf stock reference",
+    "units": "in",
+    "precision": DRAWING_PRECISION_BY_NAME[STOCK_REFERENCE_DIMENSION],
+    "expected_mm": HEX_AF,
+    "fraction_denominator": HEX_AF_FRACTION_DENOMINATOR,
+    "callout": HEX_AF_CALLOUT,
+}
+
+
+def _stock_af_display(raw_annotation: Any) -> Any:
+    annotation = _early_bound(raw_annotation, "IAnnotation")
+    return _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+
+
 def _assert_stock_af_import(adapter: Any, view: Any, raw_annotation: Any, *, stage: str) -> None:
     view = _early_bound(view, "IView")
     model = view.ReferencedDocument
@@ -523,7 +575,7 @@ def _assert_stock_af_import(adapter: Any, view: Any, raw_annotation: Any, *, sta
     source = SimpleNamespace(currentModel=model, swApp=adapter.swApp)
     _source_display, source_dimension = _assert_stock_af_source(source, stage=f"{stage}.source")
     annotation = _early_bound(raw_annotation, "IAnnotation")
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    display = _stock_af_display(annotation)
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
     _assert_stock_af(display, dimension, stage=stage)
     owner, owner_type = annotation.Owner, annotation.OwnerType
@@ -535,11 +587,12 @@ def _assert_stock_af_import(adapter: Any, view: Any, raw_annotation: Any, *, sta
         app.IsSame(source_dimension, source_dimension), app.IsSame(dimension, dimension),
         app.IsSame(dimension, source_dimension),
     )
-    dangling, prefix = annotation.IsDangling(), display.GetText(1)
+    dangling = annotation.IsDangling()
     names = (source_dimension.FullName, dimension.FullName)
-    _telemetry.info("clamp native stock AF import", operation_stage=stage, identity_codes=repr(codes), owner_type=owner_type, full_names=repr(names), dangling=dangling, hex_prefix=prefix)
-    if any(type(code) is not int or code != 1 for code in codes) or type(owner_type) is not int or owner_type != 0 or names[0] != names[1] or dangling is not False or prefix != HEX_AF_PREFIX:
-        raise RuntimeError(f"HexAf: actual source dimension/top-view ownership or ordinary HEX designation changed at {stage}")
+    _telemetry.info("clamp native stock AF import", operation_stage=stage, identity_codes=repr(codes), owner_type=owner_type, full_names=repr(names), dangling=dangling)
+    if any(type(code) is not int or code != 1 for code in codes) or type(owner_type) is not int or owner_type != 0 or names[0] != names[1] or dangling is not False:
+        raise RuntimeError(f"HexAf: actual source dimension/top-view ownership changed at {stage}")
+    assert_supplier_reference_dimension(adapter, display, **HEX_AF_REFERENCE)
 
 
 
@@ -825,7 +878,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -874,8 +931,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_hidden_lines_removed(adapter, section)
     _assert_material_hatch(section)
-    hidden = _hide_cosmetic_threads(adapter, section, label="section A-A")
-    _telemetry.info(f"hid {hidden} cosmetic thread(s) in section A-A")
+    shown = _show_section_cosmetic_threads(adapter, section, label="section A-A")
+    _telemetry.info(f"showed {shown} cosmetic thread(s) in section A-A")
 
     right_annotations = curate_view_dimensions(
         adapter,
@@ -935,6 +992,8 @@ async def build(adapter: Any) -> dict[str, str]:
     if str(height_display.GetText(4) or ""):
         raise RuntimeError("Height: removed top-tap-wall qualifier remained")
     top_by_name = {dimension_name(adapter, a): a for a in top_annotations}
+    # The as-bought 1/2 hex prints as its stock REF fraction, untoleranced.
+    supplier_reference_dimension(adapter, _stock_af_display(top_by_name["HexAf"]), **HEX_AF_REFERENCE)
     _assert_stock_af_import(adapter, top, top_by_name["HexAf"], stage="HexAf.imported")
 
     # The template marks each end view's tap; a second, scripted mark doubled

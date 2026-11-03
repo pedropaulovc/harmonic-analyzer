@@ -27,8 +27,10 @@ from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -50,6 +52,7 @@ from mg_wheel_axle_spacer_spec import (
     LENGTH_BAND,
     OD,
     SURFACE_FINISHES,
+    UNIT,
 )
 
 PART_NAME = "mg-wheel-axle-spacer"
@@ -62,6 +65,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
@@ -131,7 +136,14 @@ async def build(adapter) -> dict[str, str]:
     await report_mass_properties(adapter)
     # The length sets the wheel's station on the pin: its explicit band.  The
     # O.D. and the drilled bore take the title block's rows.
-    set_dimension_symmetric_tolerance(adapter, "Spacer", "SpacerLength", LENGTH_BAND)
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "Spacer",
+        "SpacerLength",
+        LENGTH_BAND,
+        places=DRAWING_PRECISION["Spacer"]["SpacerLength"],
+        display_unit=UNIT,
+    )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

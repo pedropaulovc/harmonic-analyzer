@@ -119,6 +119,7 @@ from _machinist_review_mode import MachinistReviewMode
 from _layout_geometry import estimate_text_box
 from _layout_audit import arrowhead_segments
 from _session import run_build
+from _mg_wheel_rim_geometry import RIM_AXIAL, RIM_OUTER_DIA
 from mg_lever_thread_joint import ROD_DIA as LEVER_ROD_DIA
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
 from mg_magnifying_vertical_rod_geom import SHOULDER_X as VROD_SHOULDER_X
@@ -485,6 +486,20 @@ LOCKNUT_BALLOON_POINT_MM = (
     0.0,
 )
 LOCKNUT_INSTANCE = "mg-vn-wheel-axle-nut-2"
+# Machinist review of run 20261101T025747277Z moved the wheel group's front
+# stack off the wheel (mg_magnifier_explode_spec) so 14's leader reaches the
+# back washer clear of the rim. The walked wheel anchor then landed on the
+# rim's right side, on the nuts' ray from the view centre, and 15's leader
+# crossed 18's (run 20261101T060719851Z). The wheel is IDENTITY in the
+# assembly, its back face (local +Z) toward the fitter isometric viewer: 15
+# takes that face's outer rim edge, a sharp edge (only the rim bore is
+# rounded), at part angle 120 deg, the top of its drawn ellipse, between the
+# front stack's leaders and the back washer's.
+WHEEL_BALLOON_POINT_MM = (
+    RIM_OUTER_DIA / 2.0 * math.cos(math.radians(120.0)),
+    RIM_OUTER_DIA / 2.0 * math.sin(math.radians(120.0)),
+    RIM_AXIAL / 2.0,
+)
 BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {
     "mg-magnifying-lever": BalloonAnchor(
         point_mm=(_LEVER_R, _LEVER_R / math.sqrt(2.0), -_LEVER_R / math.sqrt(2.0))
@@ -493,6 +508,7 @@ BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {
         point_mm=(VROD_SHOULDER_X, -_VROD_R, 0.0)
     ),
     "mg-vn-wheel-axle-front-washer": BalloonAnchor(point_mm=FRONT_WASHER_BALLOON_POINT_MM),
+    "mg-magnifying-wheel": BalloonAnchor(point_mm=WHEEL_BALLOON_POINT_MM),
     "mg-vn-wheel-axle-nut": BalloonAnchor(
         point_mm=LOCKNUT_BALLOON_POINT_MM, instance=LOCKNUT_INSTANCE
     ),
@@ -1484,7 +1500,7 @@ def _add_setting_axes(adapter: Any, view: Any) -> None:
     Machinist review r7 (run 20261016T162927333Z) read the lever setting
     chain, construction lines on these two axes in the document's long-short
     font, as hidden lines in a hidden-lines-removed view. The chain must stay
-    shown or its 50.0/60.0 hide with it (_drawing_hidden_sketches, r21), and
+    shown or its two settings hide with it (_drawing_hidden_sketches, r21), and
     r14 (run 20261016T171305106Z) proved the chain-font preference prints the
     same pattern, so each part gets its own black centreline, past its ends,
     and the chain reads as the axes it lies on.
@@ -1786,7 +1802,7 @@ def _validate_source(
 
 
 def _create_sheets(adapter: Any) -> None:
-    new_project_drawing(adapter, layout=SPEC.layout, scale=SHEET_SCALE)
+    new_project_drawing(adapter, layout=SPEC.layout, scale=SHEET_SCALE, unit=stack.UNIT)
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="magnifier package")
     for name in SHEET_NAMES:
         sheet = _activate_sheet(adapter, name)

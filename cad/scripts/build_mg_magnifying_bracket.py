@@ -2,8 +2,8 @@ r"""Build the approved blued low-carbon-steel L bracket, with no collar or press
 
 The mounting seat and threaded-lever pose stay fixed; the two clearance holes
 follow the lowered plate-tap row. The foot's right edge extends to the centred
-12.50 neck, with no rear stub or ledge. The Right-plane neck has parallel sides
-and a true concentric semicircle.
+neck, with no rear stub or ledge. The Right-plane neck has parallel sides and
+a true concentric semicircle. The part's document units are inch (#290).
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
@@ -30,6 +31,7 @@ from _gtol_planar import PlanarFace
 from _holes import wizard_holes
 from _part_checks import report_mass_properties, volume_check
 from _part_pmi import author_part_pmi
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -37,7 +39,7 @@ from _sketch import SketchDims, add_line_chain, anchor_point_to_origin, anchor_p
 from _sketch_chains import define_rectilinear_chain
 from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA, CLEARANCE_SPEC, POSITION_BAND, SIDE_PLATE_X as FLANGE_X, SIDE_PLATE_Y as FLANGE_Y, SIDE_PLATE_Z as FLANGE_Z, SIDE_PLATE_THICKNESS
 from mg_lever_thread_joint import HOLE_LOCATION_TOL, MOUTH_CHAMFER, MOUTH_CHAMFER_BAND, MOUTH_CHAMFER_MAX, NECK_HALF_X, NECK_THICKNESS, NOSE_R, NOSE_R_TOL, TAP_DRILL_DIA, TAP_SPEC
-from mg_magnifying_bracket_spec import DIMENSION_CALLOUTS, DRAWING_DIMENSIONS, DRAWING_PRECISION, FOOT_CORNER_R, FOOT_GRIP_TOL, ISOMETRIC_VIEW_NOTE
+from mg_magnifying_bracket_spec import DIMENSION_CALLOUTS, DRAWING_DIMENSIONS, DRAWING_PRECISION, FOOT_CORNER_R, ISOMETRIC_VIEW_NOTE, UNIT
 from mg_magnifying_bracket_finish_spec import SURFACE_FINISHES
 import _telemetry
 
@@ -116,7 +118,7 @@ async def _coordinates(adapter, jobs) -> None:
     name_last_feature(adapter, "MountingCoordinates")
     jobs.extend(dims.apply(adapter, "MountingCoordinates"))
     for name in ("MountingX0", "MountingX1", "MountingY0", "MountingY1"):
-        set_dimension_symmetric_tolerance(adapter, "MountingCoordinates", name, POSITION_BAND)
+        set_dimension_symmetric_tolerance(adapter, "MountingCoordinates", name, POSITION_BAND, display_unit=UNIT)
 
     # Nonzero, inspectable hole locations from the nose TIP and a neck SIDE.
     # Right coordinates (u,v)=(-Z,Y): (R,-R) is their theoretical intersection.
@@ -139,12 +141,12 @@ async def _coordinates(adapter, jobs) -> None:
     name_last_feature(adapter, "TapCoordinates")
     jobs.extend(dims.apply(adapter, "TapCoordinates"))
     for name in ("TapFromTip", "TapFromSide"):
-        set_dimension_symmetric_tolerance(adapter, "TapCoordinates", name, HOLE_LOCATION_TOL)
+        set_dimension_symmetric_tolerance(adapter, "TapCoordinates", name, HOLE_LOCATION_TOL, display_unit=UNIT)
 
 
 
 async def _round_foot_root(adapter) -> None:
-    """Solve the three incident R0.25 edges before any blend changes them."""
+    """Solve the three incident edge-break rounds before any blend changes them."""
     # Matched Y sides make these a single interacting corner treatment.
     # Do not first create the inside-root cylinder and then try to terminate
     # two new side rounds against its tangent boundary. Select only the raw
@@ -253,6 +255,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     for name, value in (("NoseR", NOSE_R), ("SeatToAxis", FLANGE_Z[1]), ("NeckThickness", NECK_THICKNESS)):
         await set_global(adapter, name, f"{value}mm")
     jobs = []
@@ -310,7 +314,7 @@ async def build(adapter) -> dict[str, str]:
     check("both tap mouth chamfers", await adapter.add_chamfer(MOUTH_CHAMFER, [[x, TAP_DRILL_DIA / 2.0, 0.0] for x in (-NECK_HALF_X, NECK_HALF_X)]))
     name_last_feature(adapter, "MouthBreak")
     name_dimensions(adapter, "MouthBreak", ["MouthChamfer"])
-    set_dimension_bilateral_tolerance(adapter, "MouthBreak", "MouthChamfer", *deviations(MOUTH_CHAMFER_BAND))
+    set_dimension_bilateral_tolerance(adapter, "MouthBreak", "MouthChamfer", *deviations(MOUTH_CHAMFER_BAND), display_unit=UNIT)
     # Width is capped natively; the joint charges the ordinary angular band
     # for the other leg rather than claiming both legs have this same maximum.
     _, chamfer_dimension = _named_dimension(adapter, "MouthBreak", "MouthChamfer")
@@ -335,8 +339,7 @@ async def build(adapter) -> dict[str, str]:
     expected = neck + foot - overlap - holes
     await volume_check(adapter, "simple L with through tap and rounded corners", expected, 10.0)
     await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "threaded lever axis")
-    set_dimension_symmetric_tolerance(adapter, "NeckProfile", "NoseR", NOSE_R_TOL)
-    set_dimension_symmetric_tolerance(adapter, "FlangeProfile", "FlangeDepth", FOOT_GRIP_TOL)
+    set_dimension_symmetric_tolerance(adapter, "NeckProfile", "NoseR", NOSE_R_TOL, display_unit=UNIT)
     _author_dimension_callouts(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)

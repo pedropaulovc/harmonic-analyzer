@@ -38,15 +38,18 @@ def test_every_carriage_point_stands_off_the_paper() -> None:
     assert nib_paper_most == pytest.approx(PAPER_FRONT_Z - g.CLEARANCE)
 
 
-def test_rod_line_is_the_paper_most_tenth_that_clears_the_paper() -> None:
-    # PEN_Z_MID sits on the 0.1 grid, and moving it 0.1 toward the paper
-    # would push the binding corner (it translates 1:1; the nib is re-solved)
-    # inside the paper stand-off.
-    assert round(PEN_Z_MID * 10.0) == pytest.approx(PEN_Z_MID * 10.0, abs=1e-9)
+def test_rod_line_is_the_paper_most_thou_that_clears_the_paper() -> None:
+    # PEN_Z_MID sits on the .001-in grid with the rigid carriage >= 0.02 inside
+    # the paper stand-off, and the next .001 line toward the paper would leave
+    # under 0.02 (the rigid points translate 1:1; the nib is re-solved).
+    thou = PEN_Z_MID / 25.4 * 1000.0
+    assert round(thou) == pytest.approx(thou, abs=1e-9)
     rigid = {
         k: v for k, v in g.paper_side_points().items() if not k.startswith("marker")
     }
-    assert max(rigid.values()) + 0.1 > PAPER_LIMIT_Z
+    margin = PAPER_LIMIT_Z - max(rigid.values())
+    assert margin >= 0.02
+    assert margin - 0.0254 < 0.02
 
 
 def test_rod_line_sits_on_the_wheel_rim_tangent() -> None:

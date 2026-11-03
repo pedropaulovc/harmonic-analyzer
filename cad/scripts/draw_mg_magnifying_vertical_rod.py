@@ -1,17 +1,16 @@
 r"""Create the curated machinist drawing for the magnifying vertical rod.
 
-A Ø5 x 132.5 brass rod (MHA-MG-04, #1559): a #4-40 threaded top end with a
+A 7/32 in brass rod (MHA-MG-04, #1559): a #4-40 threaded top end with a
 relief at the shoulder that seats on MHA-MG-02, a full hemisphere at the
 bottom. The rod axis is local +X, so the *Front view is the long side
-elevation, thread tip left.
+elevation, thread tip left. The sheet prints decimal inch (#290).
 
-Sheet: the side view at 2:1 (the rod 265 mm long) carries the Ø5, the body
-length from the shoulder (origin circle on the shoulder), the overall
-"(132.5)" reference, the dome R and the body's Ra 3.2 thumb-screw seat
-(the output fixture's screw bears wherever the fixture is set; its reason
-beside the symbol); detail A, a
+Sheet: the side view at 2:1 (the rod ~265 mm long) carries the body's
+as-bought Ø as a supplier REF fraction, the body length from the shoulder
+(origin circle on the shoulder), the overall reference and the dome R;
+detail A, a
 cropped 8:1 *Front model view (draw_pd_transgear_knob_shaft's detail-B
-recipe), carries the 7.5 threaded end: the thread length from the shoulder
+recipe), carries the threaded end: the thread length from the shoulder
 (origin circle) with the seat it guards, the relief's width, its Ø MAX and
 its two root radii (one "2X R MAX"), and the thread callout. A 1:1 shaded
 isometric shows the cosmetic thread.
@@ -51,17 +50,17 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
-from _drawing_finish import add_surface_finish
+from _supplier_dimensions import supplier_reference_dimension
 from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
-from _surface_finish import surface_finish_by_key
 from mg_magnifying_vertical_rod_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -71,10 +70,11 @@ from mg_magnifying_vertical_rod_spec import (
     RELIEF_ROOTS_CALLOUT,
     RELIEF_START_X,
     ROD_DIA,
+    ROD_DIA_CALLOUT,
+    ROD_DIA_FRACTION_DENOMINATOR,
     ROD_LENGTH,
-    SEAT_FINISH_REASON,
     SHOULDER_X,
-    SURFACE_FINISHES,
+    STOCK_REFERENCE_DIMENSION,
     THREAD_CALLOUT,
     THREAD_MAJOR,
     TIP_CHAMFER,
@@ -96,9 +96,9 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# 2:1 lays the 132.5 rod 265 mm long and its Ø5 10 mm across, above the title
-# block (top 0.066, left 0.216) on the B landscape sheet; at 1:1 the 7.5
-# threaded end would be 7.5 mm of sheet, hence detail A at 8:1.
+# 2:1 lays the ~132 mm rod 265 mm long and its body 10 mm across, above the
+# title block (top 0.066, left 0.216) on the B landscape sheet; at 1:1 the
+# 7.5 mm threaded end would be 7.5 mm of sheet, hence detail A at 8:1.
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
@@ -117,6 +117,10 @@ def _sheet_x(model_x_mm: float) -> float:
 TIP_X = _sheet_x(0.0)
 SHOULDER_SHEET_X = _sheet_x(SHOULDER_X)
 DOME_TIP_X = _sheet_x(ROD_LENGTH)
+# The dome's radius text block: its centre this far right of the tip; its
+# widest row, the TANGENT HEMISPHERE callout, measures ~45 mm.
+DOME_R_TEXT_DX = 0.032
+DOME_R_TEXT_HALF_WIDTH = 0.0225
 
 # Side view (drawing-guidelines.md rule 11, turned parts read like the lathe):
 # the body length baselines from the shoulder, its origin circle on the
@@ -127,11 +131,15 @@ SIDE_KEEP = {
     "BodyLength": ((SHOULDER_SHEET_X + DOME_TIP_X) / 2.0, SIDE_CENTER[1] - 0.012),
     "OverallLength": (_sheet_x(0.25 * ROD_LENGTH), SIDE_CENTER[1] - 0.027),
     # The Ø line crosses the body three quarters along, its value above the
-    # rod, clear of detail A's rows, of the seat's reason and of the body
-    # length's text; a plain title-block .X size, no callout.
+    # rod, clear of detail A's rows and of the body length's text; the
+    # as-bought rod's supplier REF fraction, its stock band below it.
     "RodDia": (_sheet_x(0.75 * ROD_LENGTH), SIDE_CENTER[1] + 0.020),
-    # Above-right of the dome: the leader lands on its upper quarter.
-    "DomeR": (DOME_TIP_X + 0.012, SIDE_CENTER[1] + 0.017),
+    # Right of the dome's end, the whole "R.11 / TANGENT HEMISPHERE" block
+    # right of the tip: the leader from its near end runs down-left onto the
+    # hemisphere's own upper-right quarter. Centred 12 mm right of the tip,
+    # the block's left end stood left of the dome centre and the arrow fell
+    # on an arc extension past the top tangent line (final2 review).
+    "DomeR": (DOME_TIP_X + DOME_R_TEXT_DX, SIDE_CENTER[1] + 0.014),
 }
 
 # --- Detail A: the threaded end at 8:1 ---------------------------------------
@@ -180,6 +188,14 @@ RELIEF_ROOT_CENTRE_MM = (
     SHOULDER_X - RELIEF_ROOT_R,
     -(RELIEF_DIA / 2.0 + RELIEF_ROOT_R),
 )
+# SolidWorks may instead land the inserted radius on the mirror-image upper
+# root (farm 20261031T211631726Z, 8fda8c86e: tip (0.14784, 0.20841), on the
+# upper root's circle). Its arc is the down-right quarter; text under the
+# thread would run the leader across the relief, so UPPER_ROOT_KEEP stands it
+# over the body, just right of the shoulder: the leader drops near-vertical
+# to the circle's top, ~2.4 mm left of the shoulder's top corner and ~5 mm
+# right of the Ø's line, crossing nothing.
+UPPER_RELIEF_ROOT_CENTRE_MM = (RELIEF_ROOT_CENTRE_MM[0], -RELIEF_ROOT_CENTRE_MM[1])
 ROOT_TIP_TOL_M = 0.0002
 DETAIL_KEEP = {
     # Its line rises through the relief's air to text over the crop, 0.5
@@ -192,12 +208,21 @@ DETAIL_KEEP = {
     "ReliefWidth": (DETAIL_SHOULDER_X + 0.013, _DETAIL_BOTTOM - 0.003),
     # The next row down: the thread end from the shoulder to the tip.
     "ThreadLength": (_detail_xy(SHOULDER_X / 2.0, 0.0)[0], _DETAIL_BOTTOM - 0.020),
-    # "2X / R0.2 MAX" under the thread, opposite its arc: x ~0.108-0.128,
+    # "2X / R.008 MAX" under the thread, opposite its arc: x ~0.108-0.128,
     # 22 mm under the thread's silhouette and ~7 mm over the thread length's
-    # "+0.25". Its leader rises up-right at ~51 deg through the root centre
+    # text. Its leader rises up-right at ~51 deg through the root centre
     # to the arc, crossing only the relief width's thread-end extension line
     # (y ~0.179) and passing ~3.5 mm under the Ø's lower arrow stub.
     "ReliefRootR": (DETAIL_SHOULDER_X - 0.032, _DETAIL_BOTTOM + 0.003),
+}
+# Upper root: "2X / R.008 MAX" (x ~0.146-0.168) 9 mm over the body's top
+# silhouette, its left end ~4 mm right of the Ø's line and ~12 mm under the
+# Ø's text.
+UPPER_ROOT_KEEP = {
+    "ReliefRootR": (
+        DETAIL_SHOULDER_X + 0.007,
+        _detail_xy(SHOULDER_X, ROD_DIA / 2.0)[1] + 0.009,
+    ),
 }
 # The thread callout's leader lands on the major-diameter silhouette mid-
 # thread; the note stands up and left of the crop.
@@ -216,8 +241,8 @@ DRAWING_PRECISION_BY_NAME = {
     for name, places in names.items()
 }
 # Each length names the face it reads from (drawing-guidelines.md rule 4);
-# the thread length's band names its mate at the callout: it keeps the tip
-# off the bottom of MHA-MG-02's tap so the shoulder, not the tip, seats.
+# the thread length names its mate at the callout: it keeps the tip off the
+# bottom of MHA-MG-02's tap so the shoulder, not the tip, seats.
 DIMENSION_CALLOUTS = {
     "BodyLength": "FROM SHOULDER",
     "ThreadLength": "FROM SHOULDER\nSEATS ON MHA-MG-02;\nTIP CLEARS ITS TAP",
@@ -232,23 +257,6 @@ _ORIGIN_ARROWHEAD = 4  # swArrowStyle_e.swORIGIN_ARROWHEAD
 _CLOSED_ARROWHEAD = 1  # swArrowStyle_e.swCLOSED_ARROWHEAD
 # A point on the body face, clear of the Ø dimension line.
 CENTERLINE_PICK = (_sheet_x(0.2 * ROD_LENGTH), SIDE_CENTER[1] + 0.002)
-# The thumb-screw seat's Ra 3.2 (SURFACE_FINISHES "screw_seat") lands on the
-# body's top silhouette 0.40 along, inside the fixture screw's reach; the
-# symbol stands just over it, its bent leader's shoulder left of the V, and
-# its reason reads on the symbol's own row, just right of its "Ra 3.2" (r4
-# review: a label floating near detail A did not read as the symbol's). r5
-# farm render (20261017T070700133Z) measured the symbol's ink against its
-# anchor: the "Ra 3.2" text ends 14.9 mm right of it and spans 3.7..7.0 mm
-# over it; a note's position is its top-left corner and the 16-character
-# reason prints 44.6 x 3.9 mm. So the reason starts 3 mm past the "Ra 3.2",
-# centred on its row, and ends ~228 mm, 15 mm short of the Ø value's text
-# (~244 mm); the symbol's shoulder (~161 mm) stays right of detail A's
-# shoulder extension line (150 mm) and under its thread-length row (132 mm).
-_ROD_TOP_Y = SIDE_CENTER[1] + ROD_DIA / 2.0 * _S / 1000.0
-SEAT_FINISH_PICK = (_sheet_x(0.40 * ROD_LENGTH), _ROD_TOP_Y)
-SEAT_FINISH_SYMBOL = (SEAT_FINISH_PICK[0] + 0.002, _ROD_TOP_Y + 0.014)
-SEAT_REASON_XY = (SEAT_FINISH_SYMBOL[0] + 0.018, SEAT_FINISH_SYMBOL[1] + 0.0075)
-FINISH_CHAR_HEIGHT = 0.0025
 ISO_NOTE_XY = (0.290, 0.160)
 
 
@@ -423,7 +431,7 @@ def _crop_detail_view(adapter: Any, view: Any) -> None:
         raise RuntimeError(
             f"thread detail is not cropped: Crop2 status {status}, IsCropped {cropped}"
         )
-    # Uncropped, the 8:1 view spans the whole 132.5 rod (~1060 mm of sheet),
+    # Uncropped, the 8:1 view spans the whole ~132 mm rod (~1060 mm of sheet),
     # the crop 80 mm, so a crop that took at least halves the width.
     if (
         len(outline) != 4
@@ -548,13 +556,27 @@ def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
     return matches[0]
 
 
+def _root_arrow_tip(display: Any) -> tuple[float, float]:
+    raw = display.GetDisplayData()
+    if raw is None:
+        raise RuntimeError("ReliefRootR has no rebuilt display data")
+    data = _early_bound(raw, "IDisplayData")
+    if int(data.GetArrowHeadCount()) != 1:
+        raise RuntimeError("ReliefRootR must draw exactly one radial arrow")
+    arrow = tuple(float(v) for v in data.GetArrowHeadAtIndex2(0))
+    if len(arrow) != 12 or not all(math.isfinite(v) for v in arrow):
+        raise RuntimeError("ReliefRootR has incomplete arrow-head coordinates")
+    return (arrow[0], arrow[1])
+
+
 def _dress_relief_roots(adapter: Any, detail: Any, annotations: list[Any]) -> None:
     """Prove detail A's imported ReliefRootR prints the roots' R MAX under
-    its "2X", and land its leader on the shoulder's lower root.
+    its "2X", and land its leader on the shoulder root it attached to.
 
     Read back: radial, measuring RELIEF_ROOT_R, the part's native swTolMAX
-    and the count above the value. The text stands down-left of the root,
-    opposite the arc's own (up-right) quarter. SolidWorks ends a radial
+    and the count above the value. On the lower root the text stands
+    down-left, opposite the arc's own (up-right) quarter; on the upper root
+    UPPER_ROOT_KEEP moves it over the body. SolidWorks ends a radial
     leader at the circle point facing its text and does not carry it through
     the centre (farm r4, 0676a2115), so ``ArcExtensionLineOrOppositeSide``
     True draws the arc's extension out to that point. The rebuilt arrow tip
@@ -583,32 +605,52 @@ def _dress_relief_roots(adapter: Any, detail: Any, annotations: list[Any]) -> No
     if display.ArcExtensionLineOrOppositeSide is not True:
         raise RuntimeError("ReliefRootR refused its arc extension line")
     rebuild_drawing(adapter, label="relief roots radius leader")
-    raw = display.GetDisplayData()
-    if raw is None:
-        raise RuntimeError("ReliefRootR has no rebuilt display data")
-    data = _early_bound(raw, "IDisplayData")
-    if int(data.GetArrowHeadCount()) != 1:
-        raise RuntimeError("ReliefRootR must draw exactly one radial arrow")
-    arrow = tuple(float(v) for v in data.GetArrowHeadAtIndex2(0))
-    if len(arrow) != 12 or not all(math.isfinite(v) for v in arrow):
-        raise RuntimeError("ReliefRootR has incomplete arrow-head coordinates")
-    tip = (arrow[0], arrow[1])
-    centre = model_point_in_view(
-        adapter,
-        detail,
-        (RELIEF_ROOT_CENTRE_MM[0] / 1000.0, RELIEF_ROOT_CENTRE_MM[1] / 1000.0, 0.0),
-        label="shoulder's lower relief root centre",
-    )
     radius = RELIEF_ROOT_R * _DS / 1000.0
-    off = (tip[0] - centre[0], tip[1] - centre[1])
-    if abs(math.hypot(*off) - radius) > ROOT_TIP_TOL_M or max(off) > ROOT_TIP_TOL_M:
+    centres = {
+        side: model_point_in_view(
+            adapter,
+            detail,
+            (x_mm / 1000.0, y_mm / 1000.0, 0.0),
+            label=f"shoulder's {side} relief root centre",
+        )
+        for side, (x_mm, y_mm) in (
+            ("lower", RELIEF_ROOT_CENTRE_MM),
+            ("upper", UPPER_RELIEF_ROOT_CENTRE_MM),
+        )
+    }
+
+    def root_side(tip: tuple[float, float]) -> str:
+        for side, (cx, cy) in centres.items():
+            if abs(math.hypot(tip[0] - cx, tip[1] - cy) - radius) <= ROOT_TIP_TOL_M:
+                return side
         raise RuntimeError(
-            f"ReliefRootR's arrow tip {tip} is not on the shoulder's lower root "
-            f"circle's text side (centre {centre}, R {radius})"
+            f"ReliefRootR's arrow tip {tip} is on neither shoulder root circle "
+            f"(centres {centres}, R {radius})"
+        )
+
+    tip = _root_arrow_tip(display)
+    side = root_side(tip)
+    if side == "upper":
+        if not annotation.SetPosition(*UPPER_ROOT_KEEP["ReliefRootR"], 0.0):
+            raise RuntimeError("ReliefRootR refused its upper-root position")
+        rebuild_drawing(adapter, label="relief roots radius upper-root leader")
+        tip = _root_arrow_tip(display)
+        if root_side(tip) != "upper":
+            raise RuntimeError("ReliefRootR left the upper root when moved")
+    off = (tip[0] - centres[side][0], tip[1] - centres[side][1])
+    # Lower: text down-left, so the tip is down-left of the centre; upper:
+    # text over the body, so the tip is on the circle's upper half.
+    facing = (
+        max(off) <= ROOT_TIP_TOL_M if side == "lower" else off[1] >= -ROOT_TIP_TOL_M
+    )
+    if not facing:
+        raise RuntimeError(
+            f"ReliefRootR's arrow tip {tip} is not on the shoulder's {side} root "
+            f"circle's text side (centre {centres[side]}, R {radius})"
         )
     _telemetry.info(
         f"relief roots radius: text {display.GetText(1)!r}, MAX type, count "
-        f"{callout!r}, arrow tip {tip} on the shoulder's lower root"
+        f"{callout!r}, arrow tip {tip} on the shoulder's {side} root"
     )
 
 
@@ -637,7 +679,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -646,7 +692,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Magnifying Vertical Rod Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: f"magnifying vertical rod; turned brass rod; {THREAD_CALLOUT} end",
+            3: f"magnifying vertical rod; 7/32 brass rod; {THREAD_CALLOUT} end",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -677,6 +723,24 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     annotations = [*side_annotations, *detail_annotations]
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    # The as-bought rod's Ø: a supplier REF fraction, "(Ø7/32 in)".
+    stock = _early_bound(
+        _early_bound(
+            _named(adapter, annotations, STOCK_REFERENCE_DIMENSION), "IAnnotation"
+        ).GetSpecificAnnotation(),
+        "IDisplayDimension",
+    )
+    supplier_reference_dimension(
+        adapter,
+        stock,
+        label="MHA-MG-04 rod stock reference",
+        units="in",
+        precision=DRAWING_PRECISION_BY_NAME[STOCK_REFERENCE_DIMENSION],
+        expected_mm=ROD_DIA,
+        presentation="diameter",
+        fraction_denominator=ROD_DIA_FRACTION_DENOMINATOR,
+        callout=ROD_DIA_CALLOUT,
+    )
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_dimension_callouts(
         adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
@@ -707,30 +771,10 @@ async def build(adapter: Any) -> dict[str, str]:
         label="vertical rod thread callout",
         entity_type="SILHOUETTE",
     )
-    # The seat's symbol lands by a coordinate pick too, so it goes on before
-    # the mark circle.
-    add_surface_finish(
-        adapter,
-        side,
-        edge_xy=spt(*SEAT_FINISH_PICK),
-        entity_type="SILHOUETTE",
-        symbol_xy=spt(*SEAT_FINISH_SYMBOL),
-        leader_attach_xy=spt(*SEAT_FINISH_PICK),
-        control=surface_finish_by_key(SURFACE_FINISHES, "screw_seat"),
-        label="vertical rod thumb-screw seat finish",
-        char_height=FINISH_CHAR_HEIGHT,
-    )
     # The mark and the labels go on once every pick is done, so no
     # coordinate pick in the side view meets the mark circle.
     _mark_detail_on_side(adapter, side)
     _label_detail(adapter, detail, side, spt(*PARENT_LETTER_XY))
-    _add_view_note(
-        adapter,
-        side,
-        SEAT_FINISH_REASON,
-        spt(*SEAT_REASON_XY),
-        label="screw-seat reason",
-    )
 
     add_property_linked_note(adapter, "Iso View Note", *ISO_NOTE_XY)
     # The shaded isometric shows the #4-40 the callout names; imported before

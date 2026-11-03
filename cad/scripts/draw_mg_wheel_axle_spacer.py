@@ -32,6 +32,7 @@ from _drawing_dimensions import (
 from _drawing_view_display import set_hidden_lines_removed
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from mg_wheel_axle_spacer_spec import (
     BORE_CALLOUT,
     DRAWING_DIMENSIONS,
@@ -58,7 +59,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø11 sleeve, its length set by the pen line (about 19), at 3:1: the face
+# A Ø.44 sleeve, its length set by the pen line (about .73), at 3:1: the face
 # view, the side view and the isometric on one row midway between the top
 # border and the title block (the mg-wheel-drum sheet's layout), with no
 # general note (drawing-guidelines.md rule 7 (notes: few, flagged, never a
@@ -118,7 +119,11 @@ async def build(adapter: Any) -> dict[str, str]:
         required=("Number", "Material Specification", "Finish", "Quantity"),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,

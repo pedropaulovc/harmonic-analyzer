@@ -1,15 +1,10 @@
 mg-magnifying-vertical-rod:
   number: MHA-MG-04
   material: Brass
-  material_specification: Brass
+  material_specification: "C36000 brass rod, 7/32 in; MSC Direct 32001166"
   finish: machined
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
+  drawing_unit: in
   process: "machined (brass)"
-  machinist_exceptions:
-    - id: "RV-01"
-      kind: "accept"
-      where: "main (side) view: the Ra 3.2 surface-finish symbol on the Ø5 body, reason THUMB-SCREW SEAT beside it."
-      finding: "Ra 3.2 roughness symbol on a face a thumb screw clamps; a clamp face carries no symbol (rule 6, roughness symbols only where a surface runs, slides or locates)"
-      reason: "owner ruling 2026-10-17: the body is a functional set-screw seat. The MHA-MG-06 output fixture's axial #4-40 thumb screw (MHA-SH-VN-55) locks the fixture wherever the operator sets it along the rod, so the Ø5 body is the static locating seat that screw bears on: rule 6's Ra 3.2 row, not over-specification."
