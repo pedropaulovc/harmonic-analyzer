@@ -156,6 +156,7 @@ _BROKEN_LEADER_HORIZONTAL = 2  # swDimensionBrokenLeader: horizontal shoulder
 _LEADER_LINE_NONE = 3  # swLeaderLineVisibility_e.swLeaderLineNone
 
 
+@_telemetry.traced("drawing.pinion_bracket.rim_only_bore_callouts")
 def _rim_only_bore_callouts(adapter: Any, annotations: list[Any]) -> None:
     """Leave each RIM_ONLY_DIAMETERS callout its shoulder and rim arrow only."""
     found = set()
