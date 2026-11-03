@@ -87,6 +87,8 @@ BOM_DESCRIPTIONS = {
 BOM_COMPONENT_IDENTITIES: dict[str, tuple[str, str | None]] = {PLATE: (PLATE, None)}
 BALLOON_ANCHORS = {PLATE: BalloonAnchor()}
 
+# Steps 1 and 4 reuse the head's own plate screws without a lock: owner
+# ruling RV-01 (the kit's machinist_exceptions) accepts that joint.
 ASSEMBLY_STEPS = "\n".join(
     (
         "FITTING ON THE BS-0 DIVIDING HEAD",
@@ -95,8 +97,9 @@ ASSEMBLY_STEPS = "\n".join(
         "3. TURN ITEM 1 UNTIL ITS THREE COUNTERSINKS LINE UP WITH THE",
         "   HEAD'S PLATE-SCREW TAPS.",
         "4. FIT THE SCREWS FROM STEP 1 AND TIGHTEN THEM EVENLY.",
-        "5. SET THE CRANK PIN ON THE CIRCLE THE INDEXING TABLE NAMES AND",
-        "   SPREAD THE SECTOR ARMS OVER ITS HOLES PER TOOTH.",
+        "5. SET THE CRANK PIN ON THE CIRCLE THE INDEXING TABLE NAMES. SET",
+        "   THE SECTOR ARMS TO SPAN ITS HOLE SPACES PER TOOTH: THE PIN'S",
+        "   HOLE PLUS THAT MANY MORE HOLES (10 SPACES = 11 HOLES).",
     )
 )
 ASSEMBLY_CHECKS = "\n".join(
@@ -118,7 +121,7 @@ def _indexing_rows() -> tuple[str, ...]:
         holes, remainder = divmod(plate.WORM_RATIO * count, teeth)
         if remainder or holes >= count:
             raise AssertionError(f"{teeth}T does not index on the {count}-hole circle")
-        rows.append(f"{teeth}T: {holes} HOLES ON THE {count}-HOLE CIRCLE")
+        rows.append(f"{teeth}T: {holes} HOLE SPACES ON THE {count}-HOLE CIRCLE")
     return tuple(rows)
 
 

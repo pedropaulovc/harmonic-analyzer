@@ -154,7 +154,7 @@ def test_the_indexing_kit_holds_the_plate_and_tables_each_gear() -> None:
     assert "dt_cone_gear_tl_indexing" not in bg.MACHINE_ASSEMBLIES
     assert kit.DRAWING_NUMBER == "MHA-DT-03-TL-00"
     assert kit.INDEXING_TABLE.splitlines()[1:] == [
-        "96T: 10 HOLES ON THE 24-HOLE CIRCLE",
-        "102T: 20 HOLES ON THE 51-HOLE CIRCLE",
-        "114T: 20 HOLES ON THE 57-HOLE CIRCLE",
+        "96T: 10 HOLE SPACES ON THE 24-HOLE CIRCLE",
+        "102T: 20 HOLE SPACES ON THE 51-HOLE CIRCLE",
+        "114T: 20 HOLE SPACES ON THE 57-HOLE CIRCLE",
     ]
