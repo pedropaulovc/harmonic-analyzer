@@ -14,6 +14,6 @@ ch-rocker-arm-tl-oblique-feed-nut:
     - id: "RV-01"
       kind: "minor"
       where: "the Tr8x2-7H RH THRU bore in the .40 nut"
-      finding: "Tr8 thread engagement .39 min (1.24D) through the nut, under 1.5D (rule 18)"
-      reason: "Owner ruling 2026-11-01: thread engagement below 1.5D with no geometry escape accepted as a minor exception (this package: 1.24D at the .39 minimum length, 1.27D nominal). The shortest nut that engages 1.5D (.49, .48 min) puts the #4-40 flanged heads on its -X face 2.38 mm from the near KP08 at the travel stop, inside the 2.5 mm feed gap, and the +X stop has no room; the nut carries hand feed only."
+      finding: "Tr8 full-thread engagement .37 min (1.17D): the .39 minimum nut less a .010 edge-break chamfer at each bore mouth, under 1.5D (rule 18)"
+      reason: "Owner ruling 2026-11-01: thread engagement below 1.5D with no geometry escape accepted as a minor exception (this package: 1.17D of full thread at the .39 minimum length less both mouth chamfers, 1.20D nominal). The shortest nut that engages 1.5D (.49, .48 min) puts the #4-40 flanged heads on its -X face 2.38 mm from the near KP08 at the travel stop, inside the 2.5 mm feed gap, and the +X stop has no room; the nut carries hand feed only."
   drawing_unit: in

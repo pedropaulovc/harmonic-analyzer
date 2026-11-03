@@ -59,6 +59,7 @@ the foot in the PM-30MV slot's undercut, a Ø28 x 13 flange nut on the bar.
 
 from __future__ import annotations
 
+import itertools
 import math
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -729,15 +730,14 @@ for _gap in range(_GAP_LO, _GAP_HI + 1):
         raise AssertionError(f"no shim pack fits a .{_gap:03d} unshimmed gap")
 if not _WIN_LO <= round(PIVOT_NOMINAL_RUNNING_GAP / _THOU) <= _WIN_HI:
     raise AssertionError("the nominal pack does not fit the nominal stack")
-# The thickest pack the worst case needs (.064), and the fewest stock shims
-# making it (4: three .020 and one .004; greedy is exact for .020/.008/.004).
+# The thickest nominal pack the worst case needs (.064), and the fewest stock
+# shims making it (4: three .020 and one .004; greedy is exact for
+# .020/.008/.004): the basis of the buy list below.
 _PACK_MAX_THOU = math.ceil((_GAP_HI - _WIN_HI) / _STEP) * _STEP
-PIVOT_FIT_PACK_MAX = _PACK_MAX_THOU * _THOU
 _WORST_PACK: dict[int, int] = {}  # thou -> shims
 _rest = _PACK_MAX_THOU
 for _thou in reversed(_FIT_THOU):
     _WORST_PACK[_thou], _rest = divmod(_rest, _thou)
-PIVOT_FIT_SHIMS_MAX = sum(_WORST_PACK.values())
 # Owner ruling 2026-10-27: TL-VN-79 stays one BOM identity, QTY its modeled
 # nominal pack (5 x .008 a support); the fitting stock bought with it is that
 # pack plus the worst-case pack at both supports. Each support's share of the
@@ -758,6 +758,33 @@ for _thou, _count in _BUY_THOU.items():
     }
 if not set(range(0, _PACK_MAX_THOU + 1, _STEP)) <= _BUILDABLE:
     raise AssertionError("the shim buy list cannot build every fitting pack at both supports")
+# P1's printed bound at the catalogue bands (Codjiflo P3 on #2112): with each
+# shim size at either end of its band, every unshimmed gap across the range
+# (in .00025 steps) closes into the window with a pack from one support's
+# share, and P1 prints the thickest fewest-shim pack any such fit needs.
+_SHARE = {thou: count // _SUPPORTS for thou, count in _BUY_THOU.items()}
+_PACKS = [
+    combo for combo in itertools.product(*(range(_SHARE[t] + 1) for t in _FIT_THOU)) if any(combo)
+]
+_fits: list[tuple[int, float]] = []
+for _ends in itertools.product((0, 1), repeat=len(_FIT_THOU)):
+    _actual = [
+        thou * _THOU + pivot_shim.FIT_THICKNESS_BANDS[thou][end]
+        for thou, end in zip(_FIT_THOU, _ends)
+    ]
+    for _quarter in range(4 * _GAP_LO, 4 * _GAP_HI + 1):
+        _gap = _quarter * _THOU / 4.0
+        _in_window = [
+            (sum(combo), sum(n * t for n, t in zip(combo, _actual)))
+            for combo in _PACKS
+            if PIVOT_RUNNING_GAP[0] <= _gap - sum(n * t for n, t in zip(combo, _actual)) <= PIVOT_RUNNING_GAP[1]
+        ]
+        if not _in_window and _gap > PIVOT_RUNNING_GAP[1]:
+            raise AssertionError(f"no banded shim pack fits a {_gap / trammel.INCH:.4f} gap")
+        if _in_window:
+            _fits.append(min(_in_window, key=lambda fit: (fit[0], -fit[1])))
+PIVOT_FIT_SHIMS_MAX = max(count for count, _ in _fits)  # 4
+PIVOT_FIT_PACK_MAX = math.ceil(max(pack for _, pack in _fits) / _THOU - 1e-9) * _THOU  # .066
 
 # Every instance of every logical family, in insertion order. Ordinary families
 # keep native <stem>-N names; kit instances use persisted role-local references.

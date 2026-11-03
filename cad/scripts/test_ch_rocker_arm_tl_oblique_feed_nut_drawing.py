@@ -38,8 +38,9 @@ def test_tr8_bore_is_letter_c_tapped_through_at_five_turns():
     assert spec.BORE_DRILL == pytest.approx(0.242 * INCH)
     assert spec.TR8_D1 < spec.BORE_DRILL < lead.SCREW_MAJOR_DIA - lead.SCREW_LEAD / 2
     assert spec.LENGTH >= 5 * lead.SCREW_LEAD
-    # Under rule 18's 1.5D, accepted by the owner (2026-11-01) as RV-01.
-    engagement_d = spec.LENGTH_MIN / lead.SCREW_MAJOR_DIA
+    # Under rule 18's 1.5D, accepted by the owner (2026-11-01) as RV-01: full
+    # thread is the shortest nut less a .010 edge-break chamfer at each mouth.
+    engagement_d = (spec.LENGTH_MIN - 2 * 0.010 * INCH) / lead.SCREW_MAJOR_DIA
     assert engagement_d < 1.5
     (exception,) = _config.parts(spec.PART_NAME)["machinist_exceptions"]
     assert exception["id"] == "RV-01"
@@ -48,8 +49,8 @@ def test_tr8_bore_is_letter_c_tapped_through_at_five_turns():
     assert (spec.BORE_X, spec.BORE_Y) == pytest.approx((0.63 * INCH, 0.38 * INCH))
     # Rule 20: the callout states the shortfall as a plain fact, RV-01's.
     assert spec.TR8_ENGAGEMENT_D == pytest.approx(engagement_d)
-    assert spec.CALLOUTS_BELOW["BoreDia"] == "Tr8x2-7H RH THRU\nENGAGES .39 MIN (1.24D)"
-    assert ".39 min (1.24D)" in exception["finding"]
+    assert spec.CALLOUTS_BELOW["BoreDia"] == "Tr8x2-7H RH THRU\nENGAGES .37 MIN (1.17D)"
+    assert ".37 min (1.17D)" in exception["finding"]
 
 
 def test_clearance_holes_stand_2x_340_from_the_bore_and_name_their_mate():

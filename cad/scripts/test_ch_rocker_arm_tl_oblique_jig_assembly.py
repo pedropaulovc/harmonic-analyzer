@@ -1642,7 +1642,16 @@ def test_unshimmed_gap_opens_at_every_band_and_stock_shims_fit_it() -> None:
     for gap in range(round(low / thou), round(high / thou) + 1):
         assert any(window[0] <= gap - pack <= window[1] for pack in packs), gap
     assert spec.PIVOT_FIT_PACK_MAX >= high - spec.PIVOT_RUNNING_GAP[1] - 1e-9
-    assert round(spec.PIVOT_FIT_PACK_MAX / thou) in packs
+    # Codjiflo P3 on #2112: the bound covers banded stock. At the .071 worst
+    # gap with every shim at its lower limit, three .020 and one .004 leave
+    # .0105 (outside the window); the four-shim fit three .020 + one .008
+    # (.0643) is inside the printed bound.
+    lower = {t: t * thou + pivot_shim.FIT_THICKNESS_BANDS[t][1] for t in stock}
+    assert high - (3 * lower[20] + lower[4]) > spec.PIVOT_RUNNING_GAP[1]
+    fit = 3 * lower[20] + lower[8]
+    assert spec.PIVOT_RUNNING_GAP[0] <= high - fit <= spec.PIVOT_RUNNING_GAP[1]
+    assert fit <= spec.PIVOT_FIT_PACK_MAX
+    assert spec.PIVOT_FIT_SHIMS_MAX == 4
     # Each support's share of the buy builds the worst-case pack.
     share = {
         round(thickness / thou): count // 2 for thickness, count in spec.PIVOT_SHIM_BUY.values()
