@@ -2248,6 +2248,18 @@
       ]
     },
     {
+      "old_stem": "dt-cone-gear-tl-indexing",
+      "old_number": null,
+      "introduced": "2026-11-02",
+      "new_identities": [
+        {
+          "stem": "dt-cone-gear-tl-indexing",
+          "number": "MHA-DT-03-TL-00"
+        }
+      ],
+      "kind": "assembly"
+    },
+    {
       "old_stem": "ch-rocker-arm-tl-vn-oblique-pivot-screw",
       "old_number": null,
       "introduced": "2026-10-23",

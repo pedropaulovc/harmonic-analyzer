@@ -73,7 +73,6 @@ from dt_cone_gear_tl_index_plate_spec import (
     MOUNT_SEED,
     MOUNT_X_FACTOR,
     MOUNT_Y_FACTOR,
-    PART_NAME,
     PLATE_DIA,
     RING_COUNTS,
     RING_PCDS,
@@ -81,6 +80,7 @@ from dt_cone_gear_tl_index_plate_spec import (
     UNIT,
 )
 
+PART_NAME = "dt-cone-gear-tl-index-plate"
 MATERIAL = "6061 Alloy"
 _SAVED_DRAWING_PROPERTIES = (
     "Number",

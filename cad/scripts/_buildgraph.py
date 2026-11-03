@@ -56,8 +56,9 @@ _DATA_LITERAL_RE = re.compile(r"""["']([^"']+\.(?:dxf|dwg))["']""", re.IGNORECAS
 # ``output`` is split by function into summing -> magnifier -> pen (the value
 # chain) + paper-drive; the measuring stick + its clamped stop form their own
 # sub (MS, 2026-10-09). Shop-fixture assemblies (``is_shop_fixture``: the
-# rocker's oblique-trammel jig, TL-00) build here too but never enter the
-# machine tree: ``MACHINE_ASSEMBLIES`` excludes them.
+# rocker's oblique-trammel jig and the cone gear's dividing-head indexing
+# kit, both TL-00) build here too but never enter the machine tree:
+# ``MACHINE_ASSEMBLIES`` excludes them.
 ASSEMBLY_ORDER = (
     "fr_frame",
     "dt_drive_train",
@@ -68,6 +69,7 @@ ASSEMBLY_ORDER = (
     "pd_paper_drive",
     "ms_measuring_stick",
     "ch_rocker_arm_tl_oblique_jig",
+    "dt_cone_gear_tl_indexing",
     "ha_harmonic_analyzer",
 )
 

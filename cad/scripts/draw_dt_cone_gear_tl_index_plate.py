@@ -73,7 +73,7 @@ FACE_KEEP = {
     "Ring51Pcd": (_FX + 0.115, _FY + 0.008),
     "Ring24Pcd": (_FX + 0.110, _FY - 0.040),
     "MountHoleDia": (_FX - 0.095, _FY + 0.030),
-    "BoreDia": (_FX - 0.095, _FY - 0.050),
+    "BoreDia": (_FX - 0.087, _FY - 0.050),
     "MountPcd": (_FX - 0.020, _FY - 0.100),
 }
 # Above the edge view's top, clear of its witness lines.

@@ -1526,6 +1526,14 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="dt_cone_gear_tl_indexing_assembly",
+        part="dt_cone_gear_tl_indexing",
+        artifact_stem="dt-cone-gear-tl-indexing-assembly",
+        script_name="draw_dt_cone_gear_tl_indexing_assembly.py",
+        source_kind="assembly",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="ha_harmonic_analyzer_assembly",
         part="ha_harmonic_analyzer",
         artifact_stem="ha-harmonic-analyzer-assembly",

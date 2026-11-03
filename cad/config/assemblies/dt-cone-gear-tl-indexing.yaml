@@ -1,0 +1,17 @@
+number: MHA-DT-03-TL-00
+# Cone-gear dividing-head indexing kit contract -- per-assembly build data read
+# through cad/scripts/_assembly_contract.py. A shop fixture (TL-00): it never
+# enters a machine assembly or BOM. Its one component is the custom index plate
+# dt-cone-gear-tl-index-plate (MHA-DT-03-TL-01) that fits the PM BS-0 head; the
+# head itself and its plate screws are the owner's equipment, not modelled.
+#
+# flip_invert / allowed_free_stems / required_free_stems: none, the plate is
+#   fixed at the kit origin.
+# free_dof: the plate is fixed, so 0 (verify:soundness).
+flip_invert: []
+allowed_free_stems: []
+required_free_stems: []
+free_dof: 0
+# drawing_unit: the fitter sheet, its TOL_* rows and the saved model's units
+#   are decimal inch, matching the plate drawing.
+drawing_unit: in
