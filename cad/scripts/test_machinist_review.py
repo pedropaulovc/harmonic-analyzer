@@ -669,22 +669,36 @@ def test_schema_is_strict_structured_output() -> None:
     )
 
 
-def _freeze_monotonic(monkeypatch: pytest.MonkeyPatch, fixture: str) -> list[float]:
+@pytest.fixture
+def frozen_monotonic(monkeypatch: pytest.MonkeyPatch):
     """Freeze ``time.monotonic``, which is both the asyncio loop clock and the
     transport attempt clock, so host latency (a fixture interpreter's cold
     start, credential/state-file I/O) cannot spend a startup or attempt
-    budget. Only the test moves ``clock[0]``. A real-time watchdog fails closed
-    if an exchange waits on the frozen clock instead."""
+    budget. ``frozen_monotonic(name)`` returns the clock; only the test moves
+    ``clock[0]``.
+
+    A real-time watchdog fails closed if an exchange waits on the frozen clock
+    instead. It must not raise from the clock: asyncio reads it outside any
+    task, so raising would abort the loop before the transport's kill/reap
+    cleanup runs. It jumps the clock past every pending deadline instead, so
+    the outer ``asyncio.timeout`` guards cancel and unwind normally, and the
+    failure is reported once the test has finished."""
     import time
 
-    clock = [100.0]
-    watchdog_deadline = time.perf_counter() + 30
-    def monotonic():
-        if time.perf_counter() >= watchdog_deadline:
-            pytest.fail(f"{fixture} stalled with its virtual clock frozen")
-        return clock[0]
-    monkeypatch.setattr(time, "monotonic", monotonic)
-    return clock
+    stalled = []
+    def freeze(fixture: str) -> list[float]:
+        clock = [100.0]
+        watchdog_deadline = time.perf_counter() + 30
+        def monotonic():
+            if not stalled and time.perf_counter() >= watchdog_deadline:
+                stalled.append(fixture)
+                clock[0] += 1e6
+            return clock[0]
+        monkeypatch.setattr(time, "monotonic", monotonic)
+        return clock
+    yield freeze
+    if stalled:
+        pytest.fail(f"{stalled[0]} stalled with its virtual clock frozen")
 
 
 @pytest.fixture
@@ -1175,7 +1189,7 @@ def test_unjudged_precheck_state_is_released_by_aggregate_lifecycle(tmp_path, sd
 
 @pytest.mark.parametrize("status", ["failed", "pending"])
 def test_sdk_startup_failure_never_submits_review_and_cleans_up(
-    tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch, status: str,
+    tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch, frozen_monotonic, status: str,
 ) -> None:
     import claude_agent_sdk as sdk
 
@@ -1183,7 +1197,7 @@ def test_sdk_startup_failure_never_submits_review_and_cleans_up(
     monkeypatch.setattr(mr, "MCP_STARTUP_TIMEOUT_S", 0.02)
     # Credential setup shares the 1 s attempt budget; on a frozen clock only a
     # pending status poll spends time, exactly the 0.02 s MCP startup budget.
-    clock = _freeze_monotonic(monkeypatch, "SDK startup fixture")
+    clock = frozen_monotonic("SDK startup fixture")
     get_mcp_status = sdk.ClaudeSDKClient.get_mcp_status
     async def poll(self):
         if sdk_transport.status == "pending":
@@ -1884,7 +1898,7 @@ if mode == "slow_shutdown":
 
 @pytest.mark.parametrize("catalog", ["valid", "missing", "extra", "silent", "malformed", "context", "provider", "prompt_rejected", "slow_shutdown", "footer_context", "footer_instruction", "trailing_malformed", "trailing_array", "trailing_tool", "trailing_execution", "trailing_unknown", "trailing_failure", "trailing_valid", "failure_then_malformed"])
 def test_omp_rpc_actual_session_readiness_precedes_prompt_and_reaps_on_failure(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, catalog: str,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, frozen_monotonic, catalog: str,
 ) -> None:
     import machinist_review_transport as transport
     script = tmp_path / "rpc_fixture.py"
@@ -1911,7 +1925,7 @@ def test_omp_rpc_actual_session_readiness_precedes_prompt_and_reaps_on_failure(
     # moving the clock by the startup budget passes the 1 s startup or 50 ms
     # shutdown deadline, short of the 5 s outer one.
     startup = 1
-    clock = _freeze_monotonic(monkeypatch, "OMP RPC fixture")
+    clock = frozen_monotonic("OMP RPC fixture")
     class Diagnostics(list):
         def append(self, text):
             super().append(text)
@@ -2031,7 +2045,7 @@ _OMP_REPAIRED_JUDGMENT = _OMP_MALFORMED_JUDGMENT.replace('needed."},"reason"', '
 
 @pytest.mark.parametrize("mode", ["repaired", "schema_repaired", "unrepaired", "repair_tool", "repair_trailing_tool", "repair_trailing_execution"])
 def test_omp_repairs_malformed_verdict_in_session_without_tools(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, frozen_monotonic, mode: str,
 ) -> None:
     import machinist_review_transport as transport
     repaired = json.loads(_OMP_REPAIRED_JUDGMENT.removeprefix("```json\n").removesuffix("\n```"))
@@ -2055,7 +2069,7 @@ def test_omp_repairs_malformed_verdict_in_session_without_tools(
     monkeypatch.setattr(transport._telemetry, "event", lambda name, **attributes: spans.append((name, attributes)))
     provenance = {"private_home": str(home)}
     # A real fixture interpreter's cold start must not spend the startup budget.
-    _freeze_monotonic(monkeypatch, "OMP RPC fixture")
+    frozen_monotonic("OMP RPC fixture")
     schema = json.loads(mr.JUDGE_SCHEMA_FILE.read_text(encoding="utf-8"))
     async def invoke():
         async with asyncio.timeout(10):
@@ -2153,7 +2167,7 @@ _CL_DOWEL_RECORDED_CLUSTERS = (
 
 
 def test_judge_schema_enumerates_finding_ids_so_omp_repairs_an_invented_id(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, frozen_monotonic,
 ) -> None:
     import machinist_review_transport as transport
     findings = [{"id": finding_id} for finding_id in _CL_DOWEL_FINDING_IDS]
@@ -2186,7 +2200,7 @@ def test_judge_schema_enumerates_finding_ids_so_omp_repairs_an_invented_id(
     monkeypatch.setattr(transport.asyncio, "create_subprocess_exec", spawn)
     provenance = {"private_home": str(home)}
     # A real fixture interpreter's cold start must not spend the startup budget.
-    _freeze_monotonic(monkeypatch, "OMP RPC fixture")
+    frozen_monotonic("OMP RPC fixture")
     async def invoke():
         async with asyncio.timeout(10):
             await transport._omp_session(
@@ -2211,7 +2225,7 @@ def test_judge_schema_enumerates_finding_ids_so_omp_repairs_an_invented_id(
 
 
 def test_omp_broker_reads_actual_ephemeral_url_and_reaps_its_process(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, frozen_monotonic,
 ) -> None:
     import machinist_review_transport as transport
     home = tmp_path / "home"
@@ -2239,7 +2253,7 @@ def test_omp_broker_reads_actual_ephemeral_url_and_reaps_its_process(
         return process
     monkeypatch.setattr(transport.asyncio, "create_subprocess_exec", spawn)
     # Two real fixture interpreters start inside the 3 s broker budget.
-    _freeze_monotonic(monkeypatch, "OMP broker fixture")
+    frozen_monotonic("OMP broker fixture")
     async def invoke():
         async with transport._broker(sys.executable, secrets.append, lambda: 5, 3) as env:
             assert env["OMP_AUTH_BROKER_URL"] == "http://127.0.0.1:43219"
