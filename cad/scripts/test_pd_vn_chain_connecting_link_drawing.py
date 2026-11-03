@@ -31,3 +31,45 @@ def test_one_closes_the_loop_and_matches_the_bom() -> None:
 
 def test_the_model_is_the_outer_link_stand_in() -> None:
     assert _chain_link.CONNECTING_LINK == chain.OUTER_LINK
+
+
+def test_link_builder_sets_the_package_unit_first(monkeypatch) -> None:
+    # Codjiflo (#2148): the inch package's builder sets its document units
+    # right after create_part, before any reference, sketch or feature.
+    import asyncio
+
+    calls: list[object] = []
+
+    class _Adapter:
+        async def create_part(self):
+            calls.append("create_part")
+            return "created"
+
+    class _Stop(Exception):
+        pass
+
+    def units(_adapter, unit, *, label):
+        calls.append(("units", unit, label))
+        raise _Stop
+
+    async def references(_adapter):
+        calls.append("references")
+
+    monkeypatch.setattr(_chain_link, "check", lambda _label, result: result)
+    monkeypatch.setattr(_chain_link, "apply_package_model_units", units)
+    monkeypatch.setattr(_chain_link, "author_link_references", references)
+    try:
+        asyncio.run(
+            _chain_link.build_link(
+                _Adapter(),
+                part_name="pd-vn-chain-connecting-link",
+                material="Plain Carbon Steel",
+                **_chain_link.CONNECTING_LINK,
+            )
+        )
+    except _Stop:
+        pass
+    assert calls == [
+        "create_part",
+        ("units", "in", "pd-vn-chain-connecting-link"),
+    ]

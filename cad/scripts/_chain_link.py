@@ -32,10 +32,12 @@ from _chain import LINK_COUNT, LINK_PITCH, PLATE_HALF_H, PLATE_THICK
 from _appearance import BAR_STEEL, apply_color, apply_material
 from _check import check
 from _custom_properties import apply_custom_properties
+from _document_units import apply_package_model_units
 from _drawing_marks import apply_drawing_properties
 from _extrude import extrude_at_offset
 from _feature_tree import feature_name_by_type
 from _part_checks import report_mass_properties
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import active_configuration_name
 from _saved_part_guard import require_saved_drawing_properties
@@ -246,6 +248,8 @@ async def build_link(
 ) -> dict[str, str]:
     """Build the separately purchased connecting link with the same authoring."""
     check("create_part", await adapter.create_part())
+    # The package's unit before any global, sketch or feature (Codjiflo, #2148).
+    apply_package_model_units(adapter, part_drawing_unit(part_name), label=part_name)
     await author_link_references(adapter)
     await author_link_geometry(
         adapter,
