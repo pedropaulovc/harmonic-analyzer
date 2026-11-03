@@ -112,12 +112,14 @@ def _boss_face_rise(angle: float) -> float:
 
 
 # Printed decimal-inch places (the contract's drawing_unit): the rock gauge
-# rounds up onto the .001 grid, the counter-screw reference prints .XX.
+# rounds up onto the .001 grid, the counter-screw reference prints .XX. The
+# one gauge is read each way from level, so it carries the larger of the two
+# directional travels: a fitter who sees it both ways has the floor both ways.
 ROCK_PRECISION = 3
 _ROCK_GRID_MM = 25.4 / 10**ROCK_PRECISION
 BOSS_ROCK_TRAVEL = round(
     math.ceil(
-        min(abs(_boss_face_rise(_FLOOR)), abs(_boss_face_rise(-_FLOOR))) / _ROCK_GRID_MM
+        max(abs(_boss_face_rise(_FLOOR)), abs(_boss_face_rise(-_FLOOR))) / _ROCK_GRID_MM
     )
     * _ROCK_GRID_MM,
     6,
