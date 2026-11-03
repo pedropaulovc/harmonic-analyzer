@@ -66,7 +66,7 @@ from _mcmaster_91355a581 import LENGTH_MIN as SCREW_LENGTH_MIN
 from _mcmaster_91355a581 import LENGTH_TEXT as SCREW_LENGTH_TEXT
 from _mcmaster_91355a581 import THREAD as SCREW_THREAD
 from _package_units import drawing_unit
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_tolerance import drilled_oversize_mm, edge_break_chamfer_mm, printed_band_mm
 
 INCH = 25.4
 PART_NAME = "ch-rocker-arm-tl-oblique-feed-nut"
@@ -93,10 +93,14 @@ LENGTH_MAX = LENGTH + LENGTH_BAND
 # Five turns of the Tr8x2's lead at the nominal length (ruling A1).
 if LENGTH < 5.0 * leadscrew.SCREW_LEAD:
     raise AssertionError("the feed nut is shorter than five Tr8 turns")
-# The Tr8 engages the nut's whole length: .39 min, 1.24D, under rule 18's
-# 1.5D (owner ruling 2026-11-01, RV-01). Rule 20: the callout says so.
-TR8_ENGAGEMENT_D = LENGTH_MIN / leadscrew.SCREW_MAJOR_DIA
-TR8_ENGAGEMENT_TEXT = f"ENGAGES {LENGTH_MIN / INCH:.2f} MIN ({TR8_ENGAGEMENT_D:.2f}D)".replace("0.", ".", 1)
+# The Tr8's full thread is the nut's length less the title block's edge-break
+# chamfer at both bore mouths: .37 min, 1.17D, under rule 18's 1.5D (owner
+# ruling 2026-11-01, RV-01). Rule 20: the callout says so.
+TR8_ENGAGEMENT_MIN = LENGTH_MIN - 2.0 * edge_break_chamfer_mm(unit=UNIT)
+TR8_ENGAGEMENT_D = TR8_ENGAGEMENT_MIN / leadscrew.SCREW_MAJOR_DIA
+TR8_ENGAGEMENT_TEXT = (
+    f"ENGAGES {TR8_ENGAGEMENT_MIN / INCH:.2f} MIN ({TR8_ENGAGEMENT_D:.2f}D)".replace("0.", ".", 1)
+)
 
 # --- The Tr8x2 RH bore ------------------------------------------------------------
 BORE_X = 0.63 * INCH  # 16.002 from the -X side
