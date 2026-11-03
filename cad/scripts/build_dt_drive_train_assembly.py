@@ -3490,23 +3490,27 @@ if SPRING_TO_LIFT_ROD < 0.25:
 # 20261102T205633192Z-0bb64c777ad54039bee8b67b49966c9d (#290 step 3, the
 # pinion rig on the inch grid, with the strap on the .XX grid at .36 and the
 # pivot shaft lengthened to match); the moments rose 0.16% parked and engaged.
+# Re-measured 2026-11-03 from farm run
+# 20261103T022858451Z-5246d64b8fdf4b9783273c349bf8680b (4cd6a0b1c: #2125's
+# inch drum, 143.256 face, on #2106 f1cb27ac9 with the 7.29 shaft): the
+# moments moved +0.015% parked and -0.004% engaged.
 # Install the measured basis AND frozen fingerprint together (DEVELOPING.md).
-SWING_GRAVITY_NMM = (14.415037327816785, 24.529755623146762)
-SWING_GRAVITY_CORNER_NMM = (14.69855203361545, 25.00648616964613)
+SWING_GRAVITY_NMM = (14.417201200601465, 24.528885296711817)
+SWING_GRAVITY_CORNER_NMM = (14.700792280042016, 25.005658141428334)
 # The basis those moments were computed at: part -> (count, volume mm^3,
 # density kg/m^3). The measured basis and fingerprint deliberately stay frozen:
 # the support-layout regression names both moment constants when
 # any current part's analytic volume, material or governing dimensions move.
 SWING_GRAVITY_BASIS = {
-    "dt-alignment-pinion": (1, 24311.47711833662, 8500.0),
+    "dt-alignment-pinion": (1, 24318.026182668003, 8500.0),
     "dt-pinion-arbor": (1, 13573.853062566704, 7800.0),
-    "dt-pinion-pivot-shaft": (1, 5897.57586994979, 7800.0),
+    "dt-pinion-pivot-shaft": (1, 5881.487907488445, 7800.0),
     "dt-pinion-bracket": (2, 4644.392411286894, 7800.0),
     "dt-pinion-arbor-collar": (1, 2113.391953300099, 7800.0),
     "dt-pinion-handle": (1, 2059.2591950522306, 7800.0),
     "dt-pinion-cam-pin": (2, 253.14809801839277, 7800.0),
 }
-SWING_GRAVITY_MASS_G = 467.4730120818005
+SWING_GRAVITY_MASS_G = 467.4031930214187
 # Frozen governing dimensions of the accepted native-STL calibration, never
 # live config aliases.
 SWING_GRAVITY_FINGERPRINT = {
@@ -3514,15 +3518,15 @@ SWING_GRAVITY_FINGERPRINT = {
         "TEETH": 32,
         "DIAMETRAL_PITCH": 48.0,
         "PRESSURE_ANGLE_DEG": 20.0,
-        "FACE_WIDTH": 143.2,
+        "FACE_WIDTH": 143.256,
         "BORE_DIA": 7.9375,
         "CUTTER_REFERENCE_TEETH": 26,
         "CUTTER_RADIAL_TRANSLATION_MM": 1.5874999999999986,
         "PITCH_TOOTH_THICKNESS_MM": 0.8293770709126581,
         "SUPPORT_OUTSIDE_DIA_MM": 17.979877681931494,
-        "OUTSIDE_DIA": 17.63,
-        "WHOLE_DEPTH": 1.0097916666666675,
-        "MAX_CUT_DEPTH_MM": 1.0111012137912878,
+        "OUTSIDE_DIA": 17.6276,
+        "WHOLE_DEPTH": 1.0085916666666686,
+        "MAX_CUT_DEPTH_MM": 1.0099012137912888,
         "BASE_TANGENT_SPAN": 4.141050235926491,
         "ROOT_MIN_DIA_MM": 15.607797572417423,
         "ROOT_MAX_DIA_MM": 15.610416666666664,
