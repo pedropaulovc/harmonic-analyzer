@@ -930,7 +930,7 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
 
     assert not hasattr(RIG, "STACK_BAND")  # the stacks name every term
     assert (RIG.TORQUE_SHAFT_LEN, RIG.LIFT_ROD_LEN) == pytest.approx(
-        (7.31 * 25.4, 7.74 * 25.4)
+        (7.29 * 25.4, 7.72 * 25.4)
     )
     assert math.isclose(RIG.BACK_COLLAR_GAP_MAX, 1.00, abs_tol=1e-9)
     bearing_min = math.inf

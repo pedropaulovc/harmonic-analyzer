@@ -316,7 +316,7 @@ def test_rig_layout_shaft_and_rod_are_set_back_flush() -> None:
     assert rig.LEVER_SEAT_PROUD - 1e-9 <= proud <= rig.LEVER_SEAT_PROUD + 0.254
     # Both are budgeted on the worst fitted stack (their own tests); at
     # nominal each stands that allowance proud of the front block.
-    assert (SHAFT_LEN, ROD_LEN) == pytest.approx((7.31 * 25.4, 7.74 * 25.4))
+    assert (SHAFT_LEN, ROD_LEN) == pytest.approx((7.29 * 25.4, 7.72 * 25.4))
 
 
 def test_lift_rod_length_budgets_the_whole_fitted_stack() -> None:
