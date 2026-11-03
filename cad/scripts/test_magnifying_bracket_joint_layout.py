@@ -190,7 +190,7 @@ def test_stock_screw_and_blind_tap_are_one_joint_stack() -> None:
     assert lever.RIB_T == 5.08
     assert joint.LEVER_FRONT_LOCAL_Z + lever.RIB_T == pytest.approx(-71.12)
     assert lever.RIB_T - joint.LINEAR_BAND < joint.THREAD_DEPTH
-    assert joint.SCREW_TIP_GAP_MIN == pytest.approx(0.0067)
+    assert joint.SCREW_TIP_GAP_MIN == pytest.approx(0.0097)  # .125 +/-.005 grip
     # The lever prints the drill depth .26 +/-.01 about the 6.604 model depth.
     assert joint.DRILL_DEPTH_DEVIATIONS == pytest.approx((-0.254, 0.254))
     assert joint.DRILL_DEPTH_MIN == pytest.approx(6.35)
