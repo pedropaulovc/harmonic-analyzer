@@ -431,3 +431,16 @@ def test_part_stamps_make_critical_properties() -> None:
     # No face runs or locates on a lay: the fleet's plain finish, no method.
     assert config["finish"] == "as machined"
     assert int(config["quantity"]) == 1
+
+
+def test_tap_precision_goes_to_the_drill_variable_the_callout_carries() -> None:
+    assert (
+        drawing._tap_drill_variable({7: "<MOD-DIAM><hw-tapdrldia> <hw-thru>"})
+        == "hw-tapdrldia"
+    )
+    assert (
+        drawing._tap_drill_variable({8: "<MOD-DIAM><hw-thrutapdrldia> <hw-thru>"})
+        == "hw-thrutapdrldia"
+    )
+    with pytest.raises(RuntimeError):
+        drawing._tap_drill_variable({5: "TAP <hw-threaddesc> <hw-thru>"})

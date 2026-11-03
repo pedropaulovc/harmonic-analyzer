@@ -31,6 +31,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _telemetry
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
@@ -108,6 +109,7 @@ V_SCREW_HOLE = math.pi * (SET_SCREW_TAP_DRILL_DIA / 2.0) ** 2 * RAIL_END
 V_FINAL = V_RING + 4.0 * V_WINDOW_CORNER - V_SCREW_HOLE
 
 
+@_telemetry.traced("sketch.pn_pen_frame_tap_wall_reference")
 async def _tap_wall_reference(adapter) -> None:
     """RV-01's accepted far wall, stated on the sheet natively (rule 20): a
     hidden construction line on the Top plane (the bottom face; sketch x =

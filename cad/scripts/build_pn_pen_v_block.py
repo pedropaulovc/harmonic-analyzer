@@ -797,6 +797,7 @@ async def _pivot_reference(adapter) -> list[tuple[str, str]]:
     ]
 
 
+@_telemetry.traced("sketch.pn_pen_v_block_tap_wall_reference")
 async def _tap_wall_reference(adapter) -> None:
     """RV-01's accepted wall from the set-screw tap to the step face, stated
     natively: a hidden construction line on the Front plane at the tap's

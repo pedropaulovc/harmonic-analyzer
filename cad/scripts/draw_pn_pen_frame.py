@@ -210,9 +210,21 @@ _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 DIMENSION_PREFIXES = {"WindowCornerR": "4X R"}
 HOLE_CALLOUT_XY = (0.165, 0.128)
 HOLE_CALLOUT_PROCESS = "TAP"
-# The through-next tap's one Hole Wizard length variable, its drill
-# diameter, prints .XXX.
-TAP_CALLOUT_PRECISION = {"hw-tapdrldia": 3}
+# The through-next tap's drill diameter prints .XXX, under whichever
+# drill-size variable the native callout carries (_tap_drill_variable).
+TAP_DRILL_PLACES = 3
+_TAP_DRILL_VARIABLES = ("hw-tapdrldia", "hw-thrutapdrldia")
+_CALLOUT_DEFINITION_PARTS = (5, 6, 7, 8)  # swDimensionTextParts_e definitions
+
+
+def _tap_drill_variable(definitions: dict[int, str]) -> str:
+    """The one native drill-size variable the callout carries."""
+    text = "\n".join(definitions.values())
+    found = [name for name in _TAP_DRILL_VARIABLES if f"<{name}>" in text]
+    if len(found) != 1:
+        raise RuntimeError(f"expected one tap drill-size variable: {definitions!r}")
+    return found[0]
+
 
 FRONT_VIEW_NOTE_XY = (0.175, 0.240)
 BOTTOM_VIEW_NOTE_XY = (0.070, 0.072)
@@ -374,8 +386,12 @@ async def build(adapter: Any) -> dict[str, str]:
     # The title block's THREADS row owns the 2B class (drawing-guidelines.md
     # rule 2): the callout reads TAP 4-40 UNC THRU.
     omit_title_block_thread_class(tap_callout, label="thumb-screw tapped hole")
+    native = _early_bound(tap_callout, "IDisplayDimension")
+    drill_variable = _tap_drill_variable(
+        {part: str(native.GetText(part) or "") for part in _CALLOUT_DEFINITION_PARTS}
+    )
     set_hole_callout_precision(
-        tap_callout, TAP_CALLOUT_PRECISION, label="thumb-screw tapped hole"
+        tap_callout, {drill_variable: TAP_DRILL_PLACES}, label="thumb-screw tapped hole"
     )
 
     add_property_linked_note(adapter, "Front View Note", *FRONT_VIEW_NOTE_XY)

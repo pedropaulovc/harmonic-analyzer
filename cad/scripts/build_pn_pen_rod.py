@@ -116,6 +116,7 @@ def _shoulder_fillet_max_limit(adapter) -> None:
     _telemetry.success(f"{label}: single limit {SHOULDER_FILLET_R:g} MAX")
 
 
+@_telemetry.traced("sketch.pn_pen_rod_tap_wall_reference")
 async def _tap_wall_reference(adapter) -> None:
     """RV-01's accepted tap wall, stated on the sheet natively (rule 20): a
     hidden construction line on the Top plane (the shoulder; sketch x = model
