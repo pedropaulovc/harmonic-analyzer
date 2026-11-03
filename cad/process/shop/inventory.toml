@@ -6571,7 +6571,7 @@ cite = ["OnlineMetals part 4807 https://www.onlinemetals.com/en/buy/x/pid/4807 o
 [[stock]]
 form = "round_bar"
 material = "1018 cold-finish carbon steel"
-note = "MHA-CH-12 hub: 7/16 in (11.1125 mm) round, closest listed OnlineMetals standard diameter >=11 mm (10 mm below, 12 mm above). Order 12 in length; turn the joint land and leave finish allowance per hub drawing."
+note = "MHA-CH-12 hub: 7/16 in (11.1125 mm) round, closest listed OnlineMetals standard diameter >=11 mm (10 mm below, 12 mm above). Order 12 in length; turn the joint land and leave finish allowance per hub drawing. Not ordered: the 2026-11-03 order cuts the hub from 1/2 in 1018 round (OnlineMetals 4793)."
 # Basis: OnlineMetals 20743 catalogue nominal 0.4375 x 25.4 = 11.1125 mm; 12 x 25.4 = 304.8 mm, zero offsets; not metrology.
 dia_mm = 11.1125
 length_mm = 304.8
@@ -6582,9 +6582,9 @@ cite = ["OnlineMetals part 20743 https://www.onlinemetals.com/en/buy/carbon-stee
 [[stock]]
 form = "flat_bar"
 material = "6061-T6511 aluminium"
-note = "Owned OnlineMetals 1173, 1/2 x 6 x 72 in: allocate the TL-21 carrier and both TL-20 base bars (owner ruling #2083, 2026-10-30: mill the owned bar to width, no bandsaw rip; about 56 of the 72 in). TL-21: a 21.3 in length for the 20.5 x 5.1 x .47 carrier; its process route is not yet written (#2083). TL-20: two 17.44 in blanks, the long edges milled on edge in the vise to 5.50 wide, both faces faced to .47. Purchased nominal dimensions are not receipt measurements."
+note = "Owned OnlineMetals 1173, 1/2 x 6 in, 54 in left of the original 72 in (owner-reported 2026-11-02): allocate the TL-21 carrier and one TL-20 base bar (owner ruling #2083, 2026-10-30: mill the owned bar to width, no bandsaw rip; about 39 of the 54 in). TL-21: a 21.3 in length for the 20.5 x 5.1 x .47 carrier; its process route is not yet written (#2083). TL-20: a 17.44 in blank, the long edges milled on edge in the vise to 5.50 wide, both faces faced to .47; the second base bar comes from the 18 in 1173 cut ordered 2026-11-03. Purchased nominal dimensions are not receipt measurements."
 section_mm = [152.4, 12.7]
-length_mm = 1828.8
+length_mm = 1371.6
 on_hand = true
 cite = ["Owner-reported purchased stock and allocation, oblique jig simplification 2026-10-23; OnlineMetals 1173", "https://github.com/pedropaulovc/harmonic-analyzer/issues/2083"]
 
@@ -6627,10 +6627,10 @@ cite = ["OnlineMetals part 1500 https://www.onlinemetals.com/en/buy/brass/0-75-x
 [[stock]]
 form = "flat_bar"
 material = "6061-T6511 aluminium"
-note = "New stock requirement: 1 x 3-1/2 in bar for TL-22 plain pivot block x1 and TL-32 integral feed block x1. Face to 24.3 mm high; feed-block outline spans 88 mm across the 88.9 mm stock width. Supplier, SKU and purchased length remain unselected; no purchase is claimed. Replaces the former 1 x 3 and 3/4 x 2 jig requirements."
+note = "Former stock requirement: 1 x 3-1/2 in bar for TL-22 plain pivot block x1 and TL-32 integral feed block x1, the feed-block outline spanning 88 mm across the 88.9 mm stock width. Not ordered: the 2026-11-03 order bought 1 x 3 x 12 in 6061 (OnlineMetals 1187) instead, with the 88 mm along the bar and 62 mm across the 76.2 mm width. Not owned."
 section_mm = [88.9, 25.4]
 on_hand = false
-cite = ["Owner-approved oblique jig plain-pivot and integral feed-block design, 2026-10-23"]
+cite = ["Owner-approved oblique jig plain-pivot and integral feed-block design, 2026-10-23", "Owner-approved switch to 1 x 3 stock, stock purchase 2026-11-03"]
 
 [[stock]]
 form = "rectangular_blank"
@@ -6640,3 +6640,426 @@ note = "MHA-CH-06-TL-24 riser: black acetal (Delrin) bar, 1/4 x 1-3/4 in, oversi
 section_mm = [44.45, 6.35]
 length_mm = 609.6
 cite = ["Owner stock selection 2026-11-03: McMaster 8663K55, black acetal (Delrin) bar 1/4 x 1-3/4 in, oversized tolerance, 2 ft", "Original requirement: harmonic-analyzer issue 1619 https://github.com/pedropaulovc/harmonic-analyzer/issues/1619"]
+
+# Machine-build stock order, 2026-11-03 (owner placed the orders). Each row is one order line:
+# catalogue nominal size and ordered length, not receipt metrology. on_hand stays false until
+# the bar is received; the part allocation names the MHA numbers cut from it.
+# OnlineMetals order: all lines Online Order Pickup at the Seattle, WA warehouse.
+
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "Ordered 2026-11-03: 1/2 x 2-1/4 in 1018 CF flat, 19 in (custom cut). Allocation: dt-pinion-pivot-block (MHA-DT-18), dt-cone-tip-block (MHA-DT-21), dt-pinion-lever (MHA-DT-16), mg-magnifying-bracket (MHA-MG-01)."
+section_mm = [57.15, 12.7]
+length_mm = 482.6
+on_hand = false
+cite = ["OnlineMetals part 7506 https://www.onlinemetals.com/en/buy/x/pid/7506 ordered 2026-11-03"]
+
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "Ordered 2026-11-03: 1/4 x 2-1/2 in 1018 CF flat, 36 in (standard length). Allocation: dt-cone-swing-platform (MHA-DT-20), pd-platen-guide (MHA-PD-11)."
+section_mm = [63.5, 6.35]
+length_mm = 914.4
+on_hand = false
+cite = ["OnlineMetals part 7471 https://www.onlinemetals.com/en/buy/x/pid/7471 ordered 2026-11-03"]
+
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "Ordered 2026-11-03: 1/8 x 3/4 in 1018 CF flat, 24 in (standard length). Allocation: pn-pen-hanger (MHA-PN-02)."
+section_mm = [19.05, 3.175]
+length_mm = 609.6
+on_hand = false
+cite = ["OnlineMetals part 4804 https://www.onlinemetals.com/en/buy/x/pid/4804 ordered 2026-11-03"]
+
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "Ordered 2026-11-03: 1 x 1-1/4 in 1018 CF flat, 8 in (custom cut). Allocation: dt-arbor-pedestal (MHA-DT-02)."
+section_mm = [31.75, 25.4]
+length_mm = 203.2
+on_hand = false
+cite = ["OnlineMetals part 22236 https://www.onlinemetals.com/en/buy/x/pid/22236 ordered 2026-11-03"]
+
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "Ordered 2026-11-03: 3/8 x 1-1/4 in 1018 CF flat, 72 in (standard length). Allocation: pd-support-bar (MHA-PD-07), dt-crank-arm (MHA-DT-06), dt-pinion-bracket (MHA-DT-14), mg-wheel-bar (MHA-MG-08)."
+section_mm = [31.75, 9.525]
+length_mm = 1828.8
+on_hand = false
+cite = ["OnlineMetals part 7487 https://www.onlinemetals.com/en/buy/x/pid/7487 ordered 2026-11-03"]
+
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "Ordered 2026-11-03: 5/16 x 1 in 1018 CF flat, 12 in (standard length). Allocation: pd-transgear-arm (MHA-PD-18)."
+section_mm = [25.4, 7.9375]
+length_mm = 304.8
+on_hand = false
+cite = ["OnlineMetals part 19714 https://www.onlinemetals.com/en/buy/x/pid/19714 ordered 2026-11-03"]
+
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "Ordered 2026-11-03: 5/16 x 1 in 1018 CF flat, 2 pieces x 72 in (standard length). Allocation: ch-channel-lever (MHA-CH-02)."
+section_mm = [25.4, 7.9375]
+length_mm = 1828.8
+on_hand = false
+cite = ["OnlineMetals part 19714 https://www.onlinemetals.com/en/buy/x/pid/19714 ordered 2026-11-03"]
+
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "Ordered 2026-11-03: 5/16 x 1 in 1018 CF flat, 36 in (standard length). Allocation: ch-channel-lever (MHA-CH-02)."
+section_mm = [25.4, 7.9375]
+length_mm = 914.4
+on_hand = false
+cite = ["OnlineMetals part 19714 https://www.onlinemetals.com/en/buy/x/pid/19714 ordered 2026-11-03"]
+
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "Ordered 2026-11-03: 1/4 x 2 in 1018 CF flat, 2 pieces x 72 in (standard length). Allocation: ch-connecting-rod (MHA-CH-03)."
+section_mm = [50.8, 6.35]
+length_mm = 1828.8
+on_hand = false
+cite = ["OnlineMetals part 7469 https://www.onlinemetals.com/en/buy/x/pid/7469 ordered 2026-11-03"]
+
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "Ordered 2026-11-03: 1/4 x 2 in 1018 CF flat, 36 in (standard length). Allocation: ch-connecting-rod (MHA-CH-03)."
+section_mm = [50.8, 6.35]
+length_mm = 914.4
+on_hand = false
+cite = ["OnlineMetals part 7469 https://www.onlinemetals.com/en/buy/x/pid/7469 ordered 2026-11-03"]
+
+[[stock]]
+form = "square_bar"
+material = "1018 cold-finish carbon steel"
+note = "Ordered 2026-11-03: 1/4 in 1018 CF square, 11 pieces x 72 in (standard length). Allocation: ch-amplitude-bar (MHA-CH-01)."
+section_mm = [6.35, 6.35]
+length_mm = 1828.8
+on_hand = false
+cite = ["OnlineMetals part 7088 https://www.onlinemetals.com/en/buy/x/pid/7088 ordered 2026-11-03"]
+
+[[stock]]
+form = "square_bar"
+material = "1018 cold-finish carbon steel"
+note = "Ordered 2026-11-03: 3/4 in 1018 CF square, 36 in (standard length). Allocation: ch-pivot-bracket (MHA-CH-08), ch-fulcrum-keeper (MHA-CH-07), sh-column-clamp-front (MHA-SH-01), sh-column-clamp-back (MHA-SH-02)."
+section_mm = [19.05, 19.05]
+length_mm = 914.4
+on_hand = false
+cite = ["OnlineMetals part 7177 https://www.onlinemetals.com/en/buy/x/pid/7177 ordered 2026-11-03"]
+
+[[stock]]
+form = "round_bar"
+material = "1018 cold-finish carbon steel"
+note = "Ordered 2026-11-03: 1 in 1018 CF round, 24 in (standard length). Allocation: dt-crankshaft (MHA-DT-11), dt-crank-hub (MHA-DT-31)."
+dia_mm = 25.4
+length_mm = 609.6
+on_hand = false
+cite = ["OnlineMetals part 4797 https://www.onlinemetals.com/en/buy/x/pid/4797 ordered 2026-11-03"]
+
+[[stock]]
+form = "round_bar"
+material = "1018 cold-finish carbon steel"
+note = "Ordered 2026-11-03: 1/2 in 1018 CF round, 24 in (standard length). Allocation: ch-rocker-hub (MHA-CH-12), dt-crank-handle-butt-cup (MHA-DT-35)."
+dia_mm = 12.7
+length_mm = 609.6
+on_hand = false
+cite = ["OnlineMetals part 4793 https://www.onlinemetals.com/en/buy/x/pid/4793 ordered 2026-11-03"]
+
+[[stock]]
+form = "round_bar"
+material = "1018 cold-finish carbon steel"
+note = "Ordered 2026-11-03: 1/4 in 1018 CF round, 72 in (standard length). Allocation: ch-fulcrum-shaft (MHA-CH-04), dt-pinion-lift-rod (MHA-DT-17), dt-pinion-pivot-shaft (MHA-DT-19), dt-pinion-handle (MHA-DT-15), dt-crank-pin (MHA-DT-09), pd-transgear-pin (MHA-PD-23), dt-crank-handle-pivot-screw (MHA-DT-32)."
+dia_mm = 6.35
+length_mm = 1828.8
+on_hand = false
+cite = ["OnlineMetals part 4791 https://www.onlinemetals.com/en/buy/x/pid/4791 ordered 2026-11-03"]
+
+[[stock]]
+form = "round_bar"
+material = "1018 cold-finish carbon steel"
+note = "Ordered 2026-11-03: 3/8 in 1018 CF round, 36 in (standard length). Allocation: dt-cylinder-gear-shaft (MHA-DT-13), ch-pivot-shaft (MHA-CH-05)."
+dia_mm = 9.525
+length_mm = 914.4
+on_hand = false
+cite = ["OnlineMetals part 4792 https://www.onlinemetals.com/en/buy/x/pid/4792 ordered 2026-11-03"]
+
+[[stock]]
+form = "round_bar"
+material = "1018 cold-finish carbon steel"
+note = "Ordered 2026-11-03: 5/8 in 1018 CF round, 48 in (standard length). Allocation: dt-cone-gear-shaft (MHA-DT-04), dt-pinion-arbor (MHA-DT-22), dt-pinion-arbor-collar (MHA-DT-33), dt-pinion-cam (MHA-DT-23)."
+dia_mm = 15.875
+length_mm = 1219.2
+on_hand = false
+cite = ["OnlineMetals part 4794 https://www.onlinemetals.com/en/buy/x/pid/4794 ordered 2026-11-03"]
+
+[[stock]]
+form = "round_bar"
+material = "1018 cold-finish carbon steel"
+note = "Ordered 2026-11-03: 4 in 1018 CF round, 3 in (custom cut). Allocation: mg-magnifying-wheel (MHA-MG-05)."
+dia_mm = 101.6
+length_mm = 76.2
+on_hand = false
+cite = ["OnlineMetals part 13570 https://www.onlinemetals.com/en/buy/x/pid/13570 ordered 2026-11-03"]
+
+[[stock]]
+form = "flat_bar"
+material = "6061-T6511 aluminium"
+note = "Ordered 2026-11-03: 1/2 x 1 in 6061-T6511 flat, 12 in (standard length). Allocation: ch-rocker-arm-tl-oblique-feed-lever (MHA-CH-06-TL-26)."
+section_mm = [25.4, 12.7]
+length_mm = 304.8
+on_hand = false
+cite = ["OnlineMetals part 1165 https://www.onlinemetals.com/en/buy/x/pid/1165 ordered 2026-11-03"]
+
+[[stock]]
+form = "flat_bar"
+material = "6061-T6511 aluminium"
+note = "Ordered 2026-11-03: 1 x 3 in 6061-T6511 flat, 12 in (standard length). Allocation: ch-rocker-arm-tl-oblique-feed-block (MHA-CH-06-TL-32), ch-rocker-arm-tl-oblique-pivot-block (MHA-CH-06-TL-22). Feed block (88 x 62 x 24.3 mm envelope) lies with its 88 mm along the bar; pivot block 62 x 40 x 24.3 beside it."
+section_mm = [76.2, 25.4]
+length_mm = 304.8
+on_hand = false
+cite = ["OnlineMetals part 1187 https://www.onlinemetals.com/en/buy/x/pid/1187 ordered 2026-11-03"]
+
+[[stock]]
+form = "flat_bar"
+material = "6061-T6511 aluminium"
+note = "Ordered 2026-11-03: 1/2 x 6 in 6061-T6511 flat, 18 in (custom cut). Allocation: ch-rocker-arm-tl-oblique-base-bar (MHA-CH-06-TL-20). Second TL-20 base bar: the owned 1173 remainder covers the carrier and the first bar only."
+section_mm = [152.4, 12.7]
+length_mm = 457.2
+on_hand = false
+cite = ["OnlineMetals part 1173 https://www.onlinemetals.com/en/buy/x/pid/1173 ordered 2026-11-03"]
+
+[[stock]]
+form = "flat_bar"
+material = "6061-T6511 aluminium"
+note = "Ordered 2026-11-03: 1/4 x 5 in 6061-T6511 flat, 12 in (standard length). Allocation: dt-cone-gear-tl-index-plate (MHA-DT-03-TL-01)."
+section_mm = [127.0, 6.35]
+length_mm = 304.8
+on_hand = false
+cite = ["OnlineMetals part 1148 https://www.onlinemetals.com/en/buy/x/pid/1148 ordered 2026-11-03"]
+
+[[stock]]
+form = "flat_bar"
+material = "C360 free-machining brass, H02"
+note = "Ordered 2026-11-03: 1/8 x 2-1/2 in C360 flat, 5 in (custom cut). Allocation: dt-cylinder-end-disc (MHA-DT-26)."
+section_mm = [63.5, 3.175]
+length_mm = 127.0
+on_hand = false
+cite = ["OnlineMetals part 1372 https://www.onlinemetals.com/en/buy/x/pid/1372 ordered 2026-11-03"]
+
+[[stock]]
+form = "flat_bar"
+material = "C360 free-machining brass, H02"
+note = "Ordered 2026-11-03: 1/8 x 3/8 in C360 flat, 24 in (standard length). Allocation: ms-stick (MHA-MS-01)."
+section_mm = [9.525, 3.175]
+length_mm = 609.6
+on_hand = false
+cite = ["OnlineMetals part 1358 https://www.onlinemetals.com/en/buy/x/pid/1358 ordered 2026-11-03"]
+
+[[stock]]
+form = "flat_bar"
+material = "C360 free-machining brass, H02"
+note = "Ordered 2026-11-03: 3/4 x 1-1/4 in C360 flat, 7 in (custom cut). Allocation: ch-rocker-arm-tl-oblique-feed-nut (MHA-CH-06-TL-27), ms-stop-block (MHA-MS-02), pn-pen-v-block (MHA-PN-05)."
+section_mm = [31.75, 19.05]
+length_mm = 177.8
+on_hand = false
+cite = ["OnlineMetals part 1500 https://www.onlinemetals.com/en/buy/x/pid/1500 ordered 2026-11-03"]
+
+[[stock]]
+form = "flat_bar"
+material = "C360 free-machining brass, H02"
+note = "Ordered 2026-11-03: 3/8 x 1-1/4 in C360 flat, 4 in (custom cut). Allocation: pn-pen-frame (MHA-PN-01)."
+section_mm = [31.75, 9.525]
+length_mm = 101.6
+on_hand = false
+cite = ["OnlineMetals part 1454 https://www.onlinemetals.com/en/buy/x/pid/1454 ordered 2026-11-03"]
+
+[[stock]]
+form = "square_bar"
+material = "C360 free-machining brass, H02"
+note = "Ordered 2026-11-03: 1/4 in C360 square, 12 in (standard length). Allocation: pn-pen-rod (MHA-PN-04)."
+section_mm = [6.35, 6.35]
+length_mm = 304.8
+on_hand = false
+cite = ["OnlineMetals part 1338 https://www.onlinemetals.com/en/buy/x/pid/1338 ordered 2026-11-03"]
+
+[[stock]]
+form = "hex_bar"
+material = "C360 free-machining brass, H02"
+note = "Ordered 2026-11-03: 1/2 in C360 hex (across flats), 3 in (custom cut). Allocation: mg-magnifying-clamp (MHA-MG-02)."
+dia_mm = 12.7
+length_mm = 76.2
+on_hand = false
+cite = ["OnlineMetals part 1312 https://www.onlinemetals.com/en/buy/x/pid/1312 ordered 2026-11-03"]
+
+[[stock]]
+form = "hex_bar"
+material = "C360 free-machining brass, H02"
+note = "Ordered 2026-11-03: 7/16 in C360 hex (across flats), 4 in (custom cut). Allocation: mg-output-fixture (MHA-MG-06)."
+dia_mm = 11.1125
+length_mm = 101.6
+on_hand = false
+cite = ["OnlineMetals part 7546 https://www.onlinemetals.com/en/buy/x/pid/7546 ordered 2026-11-03"]
+
+[[stock]]
+form = "round_bar"
+material = "C360 free-machining brass, H02"
+note = "Ordered 2026-11-03: 1-1/8 in C360 round, 3 in (custom cut). Allocation: pd-transgear-disc-hub (MHA-PD-17)."
+dia_mm = 28.575
+length_mm = 76.2
+on_hand = false
+cite = ["OnlineMetals part 7568 https://www.onlinemetals.com/en/buy/x/pid/7568 ordered 2026-11-03"]
+
+[[stock]]
+form = "round_bar"
+material = "C360 free-machining brass, H02"
+note = "Ordered 2026-11-03: 1/2 in C360 round, 12 in (standard length). Allocation: pd-transgear-front-bushing (MHA-PD-25), pd-transgear-rear-bushing (MHA-PD-24), pd-transgear-pivot-spacer (MHA-PD-20), mg-wheel-axle-spacer (MHA-MG-11)."
+dia_mm = 12.7
+length_mm = 304.8
+on_hand = false
+cite = ["OnlineMetals part 1261 https://www.onlinemetals.com/en/buy/x/pid/1261 ordered 2026-11-03"]
+
+[[stock]]
+form = "round_bar"
+material = "C360 free-machining brass, H02"
+note = "Ordered 2026-11-03: 1/4 in C360 round, 48 in (standard length). Allocation: mg-magnifying-lever (MHA-MG-03), mg-magnifying-vertical-rod (MHA-MG-04), pn-pen-adjust-screw (MHA-PN-07)."
+dia_mm = 6.35
+length_mm = 1219.2
+on_hand = false
+cite = ["OnlineMetals part 1257 https://www.onlinemetals.com/en/buy/x/pid/1257 ordered 2026-11-03"]
+
+[[stock]]
+form = "round_bar"
+material = "C360 free-machining brass, H02"
+note = "Ordered 2026-11-03: 5/16 in C360 round, 12 in (standard length). Allocation: ch-anchor-jam-nut (MHA-CH-14)."
+dia_mm = 7.9375
+length_mm = 304.8
+on_hand = false
+cite = ["OnlineMetals part 6848 https://www.onlinemetals.com/en/buy/x/pid/6848 ordered 2026-11-03"]
+
+[[stock]]
+form = "round_bar"
+material = "C360 free-machining brass, H02"
+note = "Ordered 2026-11-03: 5/8 in C360 round, 4 in (custom cut). Allocation: dt-crank-handle-ferrule (MHA-DT-34), pd-transgear-knob-thrust-ring (MHA-PD-15)."
+dia_mm = 15.875
+length_mm = 101.6
+on_hand = false
+cite = ["OnlineMetals part 1264 https://www.onlinemetals.com/en/buy/x/pid/1264 ordered 2026-11-03"]
+
+[[stock]]
+form = "round_bar"
+material = "C360 free-machining brass, H02"
+note = "Ordered 2026-11-03: 7/8 in C360 round, 7 in (custom cut). Allocation: pd-transgear-knob-cup (MHA-PD-16), mg-wheel-drum (MHA-MG-10), pd-transgear-drive-collar (MHA-PD-22), pd-transgear-thumbnut (MHA-PD-13)."
+dia_mm = 22.225
+length_mm = 177.8
+on_hand = false
+cite = ["OnlineMetals part 1268 https://www.onlinemetals.com/en/buy/x/pid/1268 ordered 2026-11-03"]
+
+# Metal Supermarkets Seattle (Kent) order, in-store pickup.
+
+[[stock]]
+form = "flat_bar"
+material = "C360 free-machining brass"
+note = "Ordered 2026-11-03: 0.250 x 6.000 in C360 brass flat, 11 in (cut to length). Allocation: pd-platen (MHA-PD-02) x2 and the pd-platen-rack backer (MHA-PD-05) from the leftover width."
+section_mm = [152.4, 6.35]
+length_mm = 279.4
+on_hand = false
+cite = ["Metal Supermarkets Seattle (Kent), brass-flat-bar-c360 0.250 X 6.000, ordered 2026-11-03"]
+
+[[stock]]
+form = "round_tube"
+material = "1020 DOM mild steel tube"
+note = "Ordered 2026-11-03: 1.000 in OD x 0.120 in wall 1020 DOM round tube (dia_mm is the OD), 5 pieces x 41 in (cut to length). Allocation: fr-tube-frame (MHA-FR-03)."
+dia_mm = 25.4
+length_mm = 1041.4
+on_hand = false
+cite = ["Metal Supermarkets Seattle (Kent), mild-steel-round-tube-1020-dom 1.000 X 0.120, ordered 2026-11-03"]
+
+[[stock]]
+form = "round_bar"
+material = "4140 alloy steel, cold drawn, heat treated (vendor)"
+note = "Ordered 2026-11-03: CD heat-treated 0.500 in 4140 round, 4 in (cut to length). The listing states no hardness: check it against the HRC 32 the drawing requires on receipt. Allocation: sm-gooseneck-spring-screw (MHA-SM-04)."
+dia_mm = 12.7
+length_mm = 101.6
+on_hand = false
+cite = ["Metal Supermarkets Seattle (Kent), alloy-steel-round-bar-4140 CD Heat Treated 0.500, ordered 2026-11-03"]
+
+# McMaster-Carr order.
+
+[[stock]]
+form = "round_bar"
+material = "O1 oil-hardening tool steel drill rod, annealed, precision ground"
+note = "Ordered 2026-11-03: 1/16 in (0.0625 in) tight-tolerance O1 drill rod, 3 ft. Allocation: dt-pinion-lever-pin (MHA-DT-30)."
+dia_mm = 1.5875
+length_mm = 914.4
+on_hand = false
+cite = ["McMaster-Carr 8893K115 https://www.mcmaster.com/8893K115/ ordered 2026-11-03"]
+
+[[stock]]
+form = "round_bar"
+material = "O1 oil-hardening tool steel drill rod, annealed, precision ground"
+note = "Ordered 2026-11-03: 5/64 in (0.0782 in) tight-tolerance O1 drill rod, 3 ft. Allocation: ch-bar-pivot-pin (MHA-CH-11), ch-rod-pivot-pin (MHA-CH-10)."
+dia_mm = 1.9863
+length_mm = 914.4
+on_hand = false
+cite = ["McMaster-Carr 8893K125 https://www.mcmaster.com/8893K125/ ordered 2026-11-03"]
+
+[[stock]]
+form = "round_bar"
+material = "O1 oil-hardening tool steel drill rod, annealed, precision ground"
+note = "Ordered 2026-11-03: 1/8 in (0.125 in) tight-tolerance O1 drill rod, 3 ft. Allocation: dt-crank-pinion-pin (MHA-DT-29)."
+dia_mm = 3.175
+length_mm = 914.4
+on_hand = false
+cite = ["McMaster-Carr 8893K148 https://www.mcmaster.com/8893K148/ ordered 2026-11-03"]
+
+[[stock]]
+form = "round_bar"
+material = "O1 oil-hardening tool steel drill rod, annealed, precision ground"
+note = "Ordered 2026-11-03: 5/32 in (0.1563 in) tight-tolerance O1 drill rod, 3 ft. Allocation: dt-pinion-cam-pin (MHA-DT-25)."
+dia_mm = 3.97
+length_mm = 914.4
+on_hand = false
+cite = ["McMaster-Carr 8893K162 https://www.mcmaster.com/8893K162/ ordered 2026-11-03"]
+
+[[stock]]
+form = "round_bar"
+material = "O1 oil-hardening tool steel drill rod, annealed, precision ground"
+note = "Ordered 2026-11-03: 3/16 in (0.1875 in) tight-tolerance O1 drill rod, 3 ft. Allocation: mg-wheel-axle (MHA-MG-07)."
+dia_mm = 4.7625
+length_mm = 914.4
+on_hand = false
+cite = ["McMaster-Carr 8893K178 https://www.mcmaster.com/8893K178/ ordered 2026-11-03"]
+
+[[stock]]
+form = "rectangular_blank"
+material = "260 brass sheet, H02 (half hard)"
+note = "Ordered 2026-11-03: 0.032 in 260 H02 brass sheet, 6 x 6 in. Allocation: pd-platen-clip (MHA-PD-03)."
+section_mm = [152.4, 0.8128]
+length_mm = 152.4
+on_hand = false
+cite = ["McMaster-Carr 8956K425 https://www.mcmaster.com/8956K425/ ordered 2026-11-03"]
+
+[[stock]]
+form = "rectangular_blank"
+material = "260 brass sheet, H02 (half hard)"
+note = "Ordered 2026-11-03: 0.04 in 260 H02 brass sheet, 6 x 6 in. Allocation: ms-stop-plate (MHA-MS-03)."
+section_mm = [152.4, 1.016]
+length_mm = 152.4
+on_hand = false
+cite = ["McMaster-Carr 8956K435 https://www.mcmaster.com/8956K435/ ordered 2026-11-03"]
+
+[[stock]]
+form = "rectangular_blank"
+material = "260 brass sheet, H02 (half hard)"
+note = "Ordered 2026-11-03: 0.063 in 260 H02 brass sheet, 6 x 6 in. Allocation: pd-guide-lock (MHA-PD-12), fr-nameplate (MHA-FR-04)."
+section_mm = [152.4, 1.6002]
+length_mm = 152.4
+on_hand = false
+cite = ["McMaster-Carr 8956K455 https://www.mcmaster.com/8956K455/ ordered 2026-11-03"]
