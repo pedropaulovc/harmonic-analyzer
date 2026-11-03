@@ -411,13 +411,13 @@ _SUMMING_ALLOWED_PAIRS = {
 }
 
 _PEN_ALLOWED_PAIRS = {
-    # #4-40 thumb screw through the stirrup's 6.0 bottom rail (pn_pen_frame_spec.RAIL_END).
+    # #4-40 thumb screw through the stirrup's .24 bottom rail (pn_pen_frame_spec.RAIL_END).
     frozenset(("pn-vn-pen-set-screw-1", "pn-pen-frame-1")): _smooth_annulus_limit_mm3(
-        2.8448, 2.261, 6.0
+        2.8448, 2.261, 6.096
     ),
-    # #4-40 x 3/16 rod set screw wholly in the v-block's tap (pn_vn_pen_rod_set_screw_spec.LENGTH).
-    frozenset(("pn-vn-pen-rod-set-screw-1", "pn-pen-v-block-1")): _smooth_annulus_limit_mm3(
-        2.8448, 2.261, 4.7625
+    # #4-40 x 1/4 rod set screw wholly in the v-block's tap (sh_vn_arbor_set_screw_spec.LENGTH).
+    frozenset(("sh-vn-arbor-set-screw-1", "pn-pen-v-block-1")): _smooth_annulus_limit_mm3(
+        2.8448, 2.261, 6.35
     ),
     # #0-80 adjuster stud threaded 3.2 into the rod top (pn_pen_rod_spec.STUD_ENGAGEMENT).
     frozenset(("pn-pen-adjust-screw-1", "pn-pen-rod-1")): _smooth_annulus_limit_mm3(

@@ -218,7 +218,7 @@ def test_purchased_sheet_documents_the_built_part() -> None:
     )
 
 
-@pytest.mark.parametrize("stem", [STEM, "pn-vn-pen-rod-set-screw"])
+@pytest.mark.parametrize("stem", [STEM])
 def test_installation_note_fits_the_sheet(stem: str) -> None:
     lines = _config.parts(stem)["installation_notes"].splitlines()
     assert len(lines) <= 4

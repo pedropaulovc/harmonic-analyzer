@@ -124,7 +124,7 @@ _INSERTED_SOURCES = {
     "mg_vn_wheel_axle_front_washer mg_vn_wheel_axle_nut mg_wheel_bar mg_wheel_drum",
     "pn_pen": "pn_vn_hanger_screw pn_pen_adjust_screw pn_vn_pen_adjust_nut pn_pen_frame pn_pen_hanger "
     "pn_vn_pen_hanger_jam_nut pn_vn_pen_hanger_nut pn_vn_pen_marker "
-    "pn_pen_rod pn_vn_pen_rod_set_screw pn_vn_pen_set_screw pn_pen_v_block sh_vn_music_wire",
+    "pn_pen_rod sh_vn_arbor_set_screw pn_vn_pen_set_screw pn_pen_v_block sh_vn_music_wire",
     "pd_paper_drive": "pd_vn_chain_connecting_link sh_vn_chain_link sh_vn_clamp_screw "
     "sh_column_clamp_back sh_column_clamp_front sh_vn_brass_fillister_screw pd_guide_lock pd_vn_guide_lock_screw pd_latch_hook "
     "sh_vn_fillister_screw_90280a108 pd_vn_platen_clip_screw "
@@ -170,7 +170,7 @@ def test_all_assembly_references_match_inserted_source_manifests(assembly):
         ("sh_vn_brass_fillister_screw", {"fr_frame", "dt_drive_train", "pd_paper_drive"}),
         ("sh_vn_fillister_screw_90280a108", {"dt_drive_train", "pd_paper_drive"}),
         ("sh_vn_clamp_screw", {"mg_magnifier", "pd_paper_drive"}),
-        ("sh_vn_arbor_set_screw", {"ch_channel", "dt_drive_train"}),
+        ("sh_vn_arbor_set_screw", {"ch_channel", "dt_drive_train", "pn_pen"}),
         ("sh_vn_thumb_screw", {"mg_magnifier", "ms_measuring_stick"}),
         ("sh_vn_music_wire", {"mg_magnifier", "pn_pen"}),
         ("sh_vn_clamping_kit_hardware", {"ch_rocker_arm_tl_oblique_jig"}),

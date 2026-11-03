@@ -9,8 +9,9 @@ lives in a Right-plane sketch and imports here: the thread's major diameter
 thread-limit split edge, the plain shank's diameter as a parenthesised
 reference, the head's diameter and height, the overall length, the eye's
 station from the head's faced end (the hidden EyeStationReference sketch,
-shown in this view only) and the shoulder root's fillet as a single R MAX
-limit. A shaded isometric at the sheet scale completes the package (rule 8).
+shown in this view only) and the shoulder root's fillet radius, a nominal at
+the title block's .XX. A shaded isometric at the sheet scale completes the
+package (rule 8).
 No datums, frames or roughness symbols: the stud is not on the GD&T allowlist
 (rule 5) and nothing on it runs or locates (rule 6). No general note: the
 title block says all the stud needs.
@@ -47,9 +48,10 @@ from _drawing_dimensions import (
     set_reference_dimension,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import drill_process
 from _machinist_review_mode import MachinistReviewMode
@@ -71,7 +73,6 @@ from pn_pen_adjust_screw_spec import (
     REFERENCE_DIMENSIONS,
     SHANK_LENGTH,
     SHOULDER_FILLET_R,
-    SHOULDER_FILLET_TOL_TYPE,
     THREAD_CALLOUT,
     THREAD_MAJOR,
 )
@@ -152,6 +153,37 @@ PLAIN_MID_X = sheet_x(FULL_THREAD_LENGTH + PLAIN_SHANK / 2.0)
 _ROW_1_Y = AXIS_Y - 0.032
 _ROW_2_Y = AXIS_Y - 0.050
 _ROW_ABOVE_Y = AXIS_Y + 0.035
+# The shoulder root's R.02 (rules 11 and 16). SolidWorks hangs the imported
+# fillet radius on one of the two arcs the turned corner draws (upper or lower
+# flank); which one is the seat's choice, so _dress_shoulder_radius reads the
+# arrow back and lays out for that side.  Each arc is the quarter of its
+# circle facing the corner; the text stands in the opposite quarter, so
+# SolidWorks ends the radial leader on the circle point facing the text and
+# the arc's extension line carries the arc out to it
+# (draw_sm_gooseneck_spring_screw._dress_underhead_corner).  The leader
+# leaves the circle 10 degrees off the vertical, away from the head, and its
+# bend stands RADIAL_BEND_GAP right of the text's box and RADIAL_BEND_DROP
+# under its anchor (that sheet's rendered radial leaders).
+RADIAL_BEND_GAP = 0.0016
+RADIAL_BEND_DROP = 0.0028
+_SHOULDER_R_SHEET = SHOULDER_FILLET_R * _S
+_SHOULDER_R_TEXT_WIDTH = 0.010  # "R.02", ~2.5 mm a character
+SHOULDER_LEADER_DEG = {"lower": 260.0, "upper": 100.0}
+SHOULDER_CENTRES = {
+    "lower": (SHOULDER_X - _SHOULDER_R_SHEET, AXIS_Y - THREAD_HALF - _SHOULDER_R_SHEET),
+    "upper": (SHOULDER_X - _SHOULDER_R_SHEET, AXIS_Y + THREAD_HALF + _SHOULDER_R_SHEET),
+}
+
+
+def _shoulder_radius_text_xy(side: str, anchor_y: float) -> tuple[float, float]:
+    """The R text's anchor for a radial leader leaving ``side``'s circle at
+    SHOULDER_LEADER_DEG and bending under the text's right end."""
+    cx, cy = SHOULDER_CENTRES[side]
+    bend_y = anchor_y - RADIAL_BEND_DROP
+    bend_x = cx + (bend_y - cy) / math.tan(math.radians(SHOULDER_LEADER_DEG[side]))
+    return (bend_x - RADIAL_BEND_GAP - _SHOULDER_R_TEXT_WIDTH / 2.0, anchor_y)
+
+
 SIDE_KEEP = {
     "FullThreadLength": ((THREAD_END_X + FULL_THREAD_X) / 2.0, _ROW_1_Y),
     "HeadHeight": ((SHOULDER_X + TOP_X) / 2.0, _ROW_1_Y),
@@ -160,37 +192,27 @@ SIDE_KEEP = {
     "ThreadDia": (sheet_x(6.0), AXIS_Y - 0.016),
     "PlainDia": (PLAIN_MID_X, AXIS_Y + 0.026),
     "HeadDia": (TOP_X + 0.021, AXIS_Y),
-    "ShoulderRadius": (SHOULDER_X - 0.015, AXIS_Y - 0.0435),
+    # Lower arc: under row 1, clear above the overall length's text; the
+    # leader climbs left of the head-height extension line and right of the
+    # full-thread dimension's line end.
+    "ShoulderRadius": _shoulder_radius_text_xy("lower", AXIS_Y - 0.041),
 }
-# The shoulder root's R MAX (rule 16). SolidWorks hangs the imported fillet
-# radius on one of the two arcs the turned corner draws (upper or lower
-# flank); which one is the seat's choice, so _dress_shoulder_radius reads the
-# arrow back and lays out for that side. Measured on the
-# 20261014T061028487Z sheet: FULL THREAD extension line x 0.162 (down to y
-# ~0.1264), head-height shoulder-side extension line x 0.180 (y
-# 0.1292..0.146), the 15.0's line y ~0.1275, the 26.0's text top y ~0.1166.
-# Lower arc (SIDE_KEEP): the only paper the leader can reach the lower corner
-#   through without crossing a line is the 18 mm slot between those two
-#   extension lines, so the ~18 mm "R0.2 MAX" hangs UNDER row 1, centred in
-#   the band between the 15.0's line and the 26.0's text (3 mm to each), 15 mm
-#   left of the shoulder: x ~0.156..0.174. Its leader leaves the text's right
-#   end and climbs to the corner >= 2.8 mm left of the head-height extension
-#   line, between the two rows' line ends, crossing nothing.
-# Upper arc (UPPER_ARC_KEEP): PlainDia's line (x PLAIN_MID_X, rising from the
-#   flanks to its text) would cut that leader, so the two trade sides. The R
-#   text stands up-left of the upper corner, 21 mm over the axis (x
-#   ~0.151..0.169, 11 mm left of the head, 12 mm under the eye callout's
-#   line), its leader running down-right into the corner over the
-#   bare flank; (Ø1.52)'s line drops between the two extension lines to its
-#   text in the band under row 1 (2.4 mm under the 15.0's arrow, 2.9 mm over
-#   the 26.0's text).
+# Upper arc: PlainDia's line (x PLAIN_MID_X, rising from the flanks to its
+# text) would cut that leader, so the two trade sides: the R text stands
+# up-left of the upper corner, 21 mm over the axis, and (Ø.060)'s line drops
+# between the two extension lines to its text in the band under row 1.
 UPPER_ARC_KEEP = {
-    "ShoulderRadius": (SHOULDER_X - 0.020, AXIS_Y + 0.021),
+    "ShoulderRadius": _shoulder_radius_text_xy("upper", AXIS_Y + 0.021),
     "PlainDia": (PLAIN_MID_X, AXIS_Y - 0.045),
 }
-# An arrow on the fillet arc or its extension circle stands within
-# (1 + sqrt 2) R (2.9 mm at 6:1) of the sharp corner it rounds.
-_CORNER_TOL = 0.004
+# The arrow lands on the corner's circle: within (1 + sqrt 2) R of the sharp
+# corner it rounds (7.4 mm at 6:1 for R.02); which flank it hangs on is the
+# side of the axis the arrow lands.
+_CORNER_REACH = (1.0 + math.sqrt(2.0)) * _SHOULDER_R_SHEET + 0.001
+_TOL_NONE = 0  # swTolType_e.swTolNONE
+_ARROWS_INSIDE = 0  # swDimArrowsSide_e.swDimArrowsInside
+# The native Hole Wizard Ø variable of the #54 eye's drill callout.
+EYE_CALLOUT_PRECISION = {"hw-diam": 3}
 # The eye callout stands up and LEFT of the eye, above the bare thread (the
 # old up-and-right place dropped its leader through the station dimension's
 # line, rule 14). SolidWorks hangs the leader off the text end nearer the
@@ -239,16 +261,19 @@ def _arrow_tips(display: Any) -> list[tuple[float, float]]:
 
 
 def _shoulder_arc_side(display: Any, corners: dict[str, tuple[float, float]]) -> str:
-    """Which shoulder corner ("upper"/"lower") the radius's arrow lands on."""
-    distance, side = min(
-        (math.dist(tip, corner), side)
-        for tip in _arrow_tips(display)
-        for side, corner in corners.items()
+    """Which shoulder corner ("upper"/"lower") the radius's arrow lands on:
+    the side of the turning axis (midway between the corners) it stands."""
+    axis_y = (corners["upper"][1] + corners["lower"][1]) / 2.0
+    tip = min(
+        _arrow_tips(display),
+        key=lambda t: min(math.dist(t, corner) for corner in corners.values()),
     )
-    if distance > _CORNER_TOL:
+    side = "upper" if tip[1] > axis_y else "lower"
+    distance = math.dist(tip, corners[side])
+    if distance > _CORNER_REACH:
         raise RuntimeError(
-            f"ShoulderRadius arrow lands {distance * 1000.0:.1f} mm from either "
-            "shoulder corner"
+            f"ShoulderRadius arrow lands {distance * 1000.0:.1f} mm from the "
+            f"{side} shoulder corner"
         )
     return side
 
@@ -259,15 +284,22 @@ def _dress_shoulder_radius(
     by_name: dict[str, Any],
     spt: Any,
 ) -> None:
-    """Prove the side view's imported ShoulderRadius prints the part's R MAX,
-    stop its leader at the corner and lay it out for the arc it landed on.
+    """Prove the side view's imported ShoulderRadius prints the part's
+    nominal R, land its leader on the corner's circle and lay it out for the
+    arc it landed on.
 
-    Read back: radial (not a diameter), measuring SHOULDER_FILLET_R, the
-    native swTolMAX the part set. ``ArcExtensionLineOrOppositeSide`` False
-    keeps the leader from running on through the arc centre
-    (draw_pn_pen_rod._dress_shoulder_radius). SIDE_KEEP lays the text out for
-    the lower arc; on the upper one UPPER_ARC_KEEP moves it and PlainDia, and
-    the rebuilt arrow must still land on that corner.
+    Read back: radial (not a diameter), measuring SHOULDER_FILLET_R, with no
+    tolerance of its own (the title block's .XX governs it). The text stands
+    in the quarter opposite the arc (the arc's own quarter is the corner's
+    material). With the default outside arrow SolidWorks stops the leader on
+    the undrawn circle facing the text, in empty paper, and draws no arc
+    extension (the 19efce6a4 and 323fbd889 sheets' findings). So the arrow
+    goes inside (``ArrowSide``) on the opposite side
+    (``ArcExtensionLineOrOppositeSide``): the radial leader runs from the
+    text through the open-paper centre and its arrow touches the drawn arc
+    from the concave side. SIDE_KEEP lays the text out for the lower arc; on
+    the upper one UPPER_ARC_KEEP moves it and PlainDia, and the rebuilt arrow
+    must still land on that corner.
     """
     annotation = _early_bound(by_name["ShoulderRadius"], "IAnnotation")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
@@ -275,17 +307,20 @@ def _dress_shoulder_radius(
         raise RuntimeError("the imported shoulder radius is not radial")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    if int(tolerance.Type) != SHOULDER_FILLET_TOL_TYPE:
+    if int(tolerance.Type) != _TOL_NONE:
         raise RuntimeError(
-            f"ShoulderRadius lost its native MAX type: {int(tolerance.Type)}"
+            f"ShoulderRadius carries a tolerance of its own: {int(tolerance.Type)}"
         )
     if not math.isclose(
         float(dimension.SystemValue), SHOULDER_FILLET_R / 1000.0, abs_tol=1e-9
     ):
         raise RuntimeError("ShoulderRadius does not measure the shoulder fillet")
-    display.ArcExtensionLineOrOppositeSide = False
-    if display.ArcExtensionLineOrOppositeSide is not False:
-        raise RuntimeError("ShoulderRadius leader still runs to the opposite side")
+    display.ArrowSide = _ARROWS_INSIDE
+    if int(display.ArrowSide) != _ARROWS_INSIDE:
+        raise RuntimeError("ShoulderRadius refused its inside arrow")
+    display.ArcExtensionLineOrOppositeSide = True
+    if display.ArcExtensionLineOrOppositeSide is not True:
+        raise RuntimeError("ShoulderRadius refused its opposite-side arrow")
     drawing_model.EditRebuild3()
     corners = {
         "upper": spt(SHOULDER_X, AXIS_Y + THREAD_HALF),
@@ -301,7 +336,8 @@ def _dress_shoulder_radius(
         if _shoulder_arc_side(display, corners) != "upper":
             raise RuntimeError("ShoulderRadius left the upper corner when moved")
     _telemetry.info(
-        f"shoulder radius: text {display.GetText(1)!r}, MAX type, {side} arc"
+        f"shoulder radius: text {display.GetText(1)!r}, no own band, {side} arc, "
+        f"arrow tips {_arrow_tips(display)!r}, centre {spt(*SHOULDER_CENTRES[side])!r}"
     )
 
 
@@ -328,7 +364,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -391,13 +431,17 @@ async def build(adapter: Any) -> dict[str, str]:
         face_xy=spt(*CENTERLINE_PICK),
         label="adjuster stud turning axis",
     )
-    add_native_hole_callout(
+    eye_callout = add_native_hole_callout(
         adapter,
         side,
         edge_xy=spt(*EYE_RIM_PICK),
         callout_xy=spt(*EYE_CALLOUT_XY),
         label="adjuster stud eye",
         process=drill_process(EYE_SPEC),
+    )
+    # The #54 drill's Ø prints .XXX (+.004/0 from the title block).
+    set_hole_callout_precision(
+        eye_callout, EYE_CALLOUT_PRECISION, label="adjuster stud eye"
     )
 
     # The shaded isometric shows the #0-80 the callout names; imported before

@@ -6,7 +6,7 @@ from _fastener_catalog import FASTENERS
 
 _STOCK_REQUIREMENTS = {
     # Production stock: (supplier SKUs, drawing Number, installed quantity).
-    "sh-vn-arbor-set-screw": (("91375A106",), "MHA-SH-VN-54", 4),
+    "sh-vn-arbor-set-screw": (("91375A106",), "MHA-SH-VN-54", 5),
     "sm-vn-boss-hook": (("9490T1",), "MHA-SM-VN-50", 1),
     "ch-vn-bracket-hold-down-screw": (("90280A196",), "MHA-CH-VN-57", 2),
     "sh-vn-clamp-screw": (("90280A201",), "MHA-SH-VN-53", 6),
@@ -32,7 +32,6 @@ _STOCK_REQUIREMENTS = {
     "fr-vn-lag-screw": (("92240A540",), "MHA-FR-VN-51", 4),
     "dt-vn-pedestal-hold-down-screw": (("90280A197",), "MHA-DT-VN-62", 2),
     "pn-vn-pen-set-screw": (("99607A213",), "MHA-PN-VN-51", 1),
-    "pn-vn-pen-rod-set-screw": (("91375A105",), "MHA-PN-VN-52", 1),
     "pn-vn-pen-adjust-nut": (("92671A115",), "MHA-PN-VN-53", 1),
     "pn-vn-pen-hanger-nut": (("90480A009",), "MHA-PN-VN-54", 1),
     "pn-vn-pen-hanger-jam-nut": (("90760A009",), "MHA-PN-VN-55", 1),
@@ -180,7 +179,7 @@ def test_fillister_stock_is_shared_across_the_fleet() -> None:
     assert fleet_quantity("90114A511") == 15
     assert fleet_quantity("90114A124") == 2
     assert fleet_quantity("92446A077") == 4
-    assert fleet_quantity("91375A106") == 4
+    assert fleet_quantity("91375A106") == 5
     assert fleet_quantity("91882A221") == 3
 
 

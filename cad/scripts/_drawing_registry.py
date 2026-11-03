@@ -1405,13 +1405,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="pn_vn_pen_rod_set_screw",
-        part="pn_vn_pen_rod_set_screw",
-        artifact_stem="pn-vn-pen-rod-set-screw",
-        script_name="draw_pn_vn_pen_rod_set_screw.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
         name="pn_vn_pen_adjust_nut",
         part="pn_vn_pen_adjust_nut",
         artifact_stem="pn-vn-pen-adjust-nut",

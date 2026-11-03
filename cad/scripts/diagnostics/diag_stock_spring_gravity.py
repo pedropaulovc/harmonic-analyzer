@@ -68,7 +68,7 @@ DEFAULT_STEMS = (
     "pn-vn-pen-marker",
     "pn-pen-frame",
     "pn-vn-pen-set-screw",
-    "pn-vn-pen-rod-set-screw",
+    "sh-vn-arbor-set-screw",
     "pn-pen-adjust-screw",
     "pn-vn-pen-adjust-nut",
 )
@@ -85,7 +85,7 @@ PEN_STEMS = (
     "pn-vn-pen-marker",
     "pn-pen-frame",
     "pn-vn-pen-set-screw",
-    "pn-vn-pen-rod-set-screw",
+    "sh-vn-arbor-set-screw",
     "pn-pen-adjust-screw",
     "pn-vn-pen-adjust-nut",
     "sh-vn-music-wire--PenWire",

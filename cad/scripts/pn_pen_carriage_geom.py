@@ -14,7 +14,8 @@ thumb screw. On the rod top, the adjuster stud + jam nut carry the wire eye.
 Two coupled solves fix the layout:
 
 * Paper: the nib stands PEN_PAPER_CLEARANCE_MM off the paper; every carriage
-  corner (the stirrup's paper-side corner binds) stands 2 x CLEARANCE off.
+  corner stands 2 x CLEARANCE off as modelled, and clear of the paper with
+  every printed band at its worst (``paper_side_points_printed_worst``).
 * Balance: the carriage's plan CG (v-block + marker + stirrup + thumb screw +
   rod set screw; the rod, stud and nut sit on the axis) lands on the rod axis.
   The v-block's length is the knob (``pn_pen_v_block_spec.BLOCK_LENGTH``);
@@ -30,6 +31,7 @@ local +X points forward-and-east at the yaw: machine (+sin, 0, -cos).
 from __future__ import annotations
 
 import math
+from types import ModuleType
 
 import _mcmaster_99607a213 as thumb
 import pn_pen_adjust_screw_spec as stud
@@ -37,8 +39,9 @@ import pn_pen_frame_spec as frame
 import pn_pen_rod_spec as rod
 import pn_pen_v_block_spec as vb
 import pn_vn_pen_marker_spec as marker
-import pn_vn_pen_rod_set_screw_spec as rod_set_screw
+import sh_vn_arbor_set_screw_spec as rod_set_screw
 from _hole_spec import TAP_DRILL_MM
+from _printed_tolerance import printed_deviations
 from _recording_geometry import (
     PAPER_FRONT_Z,
     PEN_BLOCK_YAW_DEG,
@@ -59,6 +62,10 @@ PAPER_MID_Y = 364.75
 
 BRASS_G_PER_MM3 = 8.5e-3
 AISI_304_G_PER_MM3 = 8.0e-3
+ALLOY_STEEL_G_PER_MM3 = 7.7e-3  # SOLIDWORKS "Alloy Steel"
+# The rod set screw's mass: the McMaster 91375A106 vendor solid's volume
+# (diagnostics/diag_build_91375A106.VENDOR_VOLUME_MM3).
+ROD_SET_SCREW_MASS_G = 25.8601 * ALLOY_STEEL_G_PER_MM3
 
 _C = math.cos(math.radians(PEN_BLOCK_YAW_DEG))
 _S = math.sin(math.radians(PEN_BLOCK_YAW_DEG))
@@ -215,6 +222,81 @@ def paper_side_points() -> dict[str, float]:
     return points
 
 
+# --- paper clearance at the printed extremes (drawing-guidelines.md rule 19) ---
+# paper_side_points() reads the model as placed, the stirrup centred on the
+# neck.  No fit-up setting moves the block or the stirrup off the paper (the
+# nib preset slides only the marker, which the final machine sets from the
+# paper by its nib), so the two prints' loose bands must hold the rigid
+# carriage off it at their worst case together.  About the rod axis (the
+# pivot bore): the block prints its length-wise stations from the paper end
+# and its depth-wise ones from the body's front face, all .XX.  The stirrup
+# seats flush on the paper end (assembly step 3) and sits anywhere across the
+# neck its window lets it: neither its window corner radii nor the thumb
+# screw's tip on the round grip stops it, so at worst its window's front wall
+# lies on the neck's front face.  The narrow window and thin rails
+# (pn_pen_frame_spec) are what keep its paper-side corner off the paper.
+def _printed_limits(spec: ModuleType, name: str, model: float) -> tuple[float, float]:
+    """``(min, max)`` mm of ``spec``'s printed dimension ``name`` (model value
+    ``model``) at the title block's limits for its places."""
+    low, high = printed_deviations(
+        model, spec.DRAWING_PRECISION_BY_NAME[name], unit=spec.UNIT
+    )
+    return model + low, model + high
+
+
+def paper_side_points_printed_worst() -> dict[str, float]:
+    """Machine z of each rigid carriage feature's paper-most point, every
+    printed band it reads at its paper-ward limit."""
+    pivot_x = _printed_limits(vb, "PivotX", vb.PIVOT_BORE_X)[1]
+    pivot_z = _printed_limits(vb, "PivotZ", vb.depth_station(vb.DEPTH_MID_Z))[0]
+
+    def z_at(x: float, z: float) -> float:
+        """Machine z of block (x from the paper end, z from the body's front
+        face) with the rod axis at the printed pivot."""
+        return PEN_Z_MID + (pivot_x - x) * _C + (z - pivot_z) * _S
+
+    neck_front = _printed_limits(vb, "NeckZ0", vb.depth_station(0.0))[1]
+    neck_back = _printed_limits(vb, "NeckZ1", vb.depth_station(vb.NECK_DEPTH))[1]
+    step = _printed_limits(vb, "ReliefX0", vb.RELIEF_X0)[0]
+    body_back = _printed_limits(vb, "Depth", vb.BODY_DEPTH)[1]
+    # The stirrup's outer faces with its window's front wall on the neck.
+    frame_front = neck_front - _printed_limits(frame, "LeftWall", frame.RAIL_SIDE)[0]
+    frame_paper = (
+        frame_front + _printed_limits(frame, "OuterSpanX", frame.OUTER_WIDTH)[1]
+    )
+    # The thumb screw's axis: ScrewZ from the stirrup's rod-side face, so from
+    # the paper end it stands the depth less ScrewZ.
+    screw_x = (
+        _printed_limits(frame, "Depth", frame.FRAME_DEPTH)[0]
+        - _printed_limits(frame, "ScrewZ", frame.FRAME_DEPTH / 2.0)[1]
+    )
+    screw_z = frame_front + _printed_limits(frame, "ScrewX", frame.OUTER_WIDTH / 2.0)[1]
+    return {
+        "v-block neck paper-end corner": z_at(0.0, neck_back),
+        "v-block body paper-side corner": z_at(step, body_back),
+        "stirrup paper-side corner": z_at(0.0, frame_paper),
+        "thumb-screw head rim": z_at(screw_x, screw_z) + thumb.HEAD_DIA / 2.0,
+    }
+
+
+def window_corner_ride_max() -> float:
+    """How far the stirrup's window corners, at the title block's INSIDE
+    CORNERS limit, can lift its top rail off the block top by riding the
+    neck's top edges, the window and the neck at their printed limits."""
+    window = _printed_limits(frame, "WindowWidth", frame.WINDOW_WIDTH)[0]
+    neck = (
+        _printed_limits(vb, "NeckZ1", vb.depth_station(vb.NECK_DEPTH))[1]
+        - _printed_limits(vb, "NeckZ0", vb.depth_station(0.0))[0]
+    )
+    if window <= neck:
+        raise AssertionError("the stirrup window must pass the neck at both prints")
+    # Nothing centres the stirrup across the neck (paper_side_points_printed_
+    # worst), so one side wall can lie on the neck's face.  That edge then
+    # meets its corner's arc where the arc leaves the side wall, a full
+    # radius under the top wall.
+    return frame.INSIDE_CORNER_R_MAX
+
+
 # --- plan balance ---------------------------------------------------------------
 def _cyl(r: float, h: float) -> float:
     return math.pi * r * r * h
@@ -269,7 +351,7 @@ def plan_mass_items() -> list[tuple[str, float, float, float]]:
     items.append(
         (
             "rod set screw",
-            rod_set_screw.MASS_G,
+            ROD_SET_SCREW_MASS_G,
             vb.PIVOT_BORE_X,
             ROD_SET_SCREW_CUP_LOCAL_Z - rod_set_screw.LENGTH / 2.0,
         )
@@ -302,11 +384,14 @@ if not (
     raise AssertionError("the marker grip must span the whole V-groove seat")
 if FRAME_ROD_GAP < CLEARANCE:
     raise AssertionError(f"stirrup crowds the rod: gap {FRAME_ROD_GAP:.2f}")
-if frame.WINDOW_WIDTH < vb.NECK_DEPTH + 2.0:
-    raise AssertionError("stirrup window must pass the neck with 1.0 a side")
+if frame.WINDOW_WIDTH < vb.NECK_DEPTH + 4.0 * CLEARANCE:
+    raise AssertionError("stirrup window must pass the neck with 2 x CLEARANCE a side")
 if FRAME_X0_LOCAL + frame.FRAME_DEPTH + 4.0 * CLEARANCE > vb.RELIEF_X0:
     raise AssertionError("the stirrup must slide on the neck clear of the body's step")
-if FRAME_WINDOW_BOTTOM_LOCAL_Y > MARKER_BOTTOM_LOCAL_Y - 1.0:
+# The thumb screw keeps its throw with the stirrup lifted by its window
+# corners at their worst.
+WINDOW_CORNER_RIDE_MAX = window_corner_ride_max()
+if FRAME_WINDOW_BOTTOM_LOCAL_Y + WINDOW_CORNER_RIDE_MAX > MARKER_BOTTOM_LOCAL_Y - 1.0:
     raise AssertionError("stirrup window leaves the thumb screw under 1.0 of throw")
 if MARKER_BOTTOM_LOCAL_Y - thumb.SHANK_LEN >= FRAME_ORIGIN_LOCAL[1]:
     raise AssertionError("the thumb screw knob must stand below the stirrup")
@@ -316,3 +401,5 @@ if not ROD_PIVOT_END_LOCAL_Y + 1.5 < vb.SET_SCREW_Y < vb.BLOCK_HEIGHT - 1.5:
     raise AssertionError("rod set screw must bear on the pivot end")
 if max(paper_side_points().values()) > (PAPER_FRONT_Z - 2.0 * CLEARANCE):
     raise AssertionError("a pen-carriage corner crowds the recording paper")
+if max(paper_side_points_printed_worst().values()) >= PAPER_FRONT_Z:
+    raise AssertionError("at the printed worst case the carriage reaches the paper")

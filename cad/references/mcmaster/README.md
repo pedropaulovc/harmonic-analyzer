@@ -57,8 +57,7 @@ recipes:
 | 91251A150 | `ch-rocker-arm-tl-vn-oblique-kp08-screw` (MHA-CH-06-TL-VN-65; shop fixture; catalogue-only, product page login-walled, no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91290A168 | `ch-rocker-arm-tl-vn-oblique-carriage-screw` (MHA-CH-06-TL-VN-64; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
 | 90325A174 | `pd-vn-transgear-pivot-screw` (catalogue-only; CAD download refused) | 18-8 Stainless Steel Precision Shoulder Screw, hex socket |
-| 91375A105 | `pn-vn-pen-rod-set-screw` (catalogue-only; no vendor model) | Alloy Steel Cup-Tip Set Screw |
-| 91375A106 | `sh-vn-arbor-set-screw` (MHA-SH-VN-54; shared by ch and dt) | Alloy Steel Cup-Tip Set Screw |
+| 91375A106 | `sh-vn-arbor-set-screw` (MHA-SH-VN-54; shared by ch, dt and pn) | Alloy Steel Cup-Tip Set Screw |
 | 91375A942 | `ch-vn-fulcrum-set-screw` (catalogue-only; no vendor model) | Alloy Steel Cup-Tip Set Screw |
 | 91410A538 | — (diagnostic recipe; `fr-vn-gooseneck-set-screw` until 2026-10-12) | Steel Square-Head Cup-Point Set Screw |
 | 91410A540 | `fr-vn-gooseneck-set-screw` (catalogue-only; no vendor model) | Steel Square-Head Cup-Point Set Screw |
@@ -1422,24 +1421,22 @@ Catalog specifications checked on September 10, 2026:
   the ID x OD annulus at the range's nominal thickness. No vendor model was
   fetched, so all three are catalogue-only: no replica gate, and their
   standalone diagnostics are catalog-only runs.
-- [91375A105](https://www.mcmaster.com/91375A105/) (`pn-vn-pen-rod-set-screw`,
-  MHA-PN-VN-52, one) locks the pen rod's turned pivot end in the MHA-PN-05
-  v-block, and [92671A115](https://www.mcmaster.com/92671A115/)
+- The shared 91375A106 (`sh-vn-arbor-set-screw`, MHA-SH-VN-54) locks the pen
+  rod's turned pivot end in the MHA-PN-05 v-block. Its 1/4 length leaves .206
+  of full thread past its chamfers, over rule 18's 1.5 D (.168); the 3/16
+  91375A105 it replaced (MHA-PN-VN-52, retired) left .144.
+  [92671A115](https://www.mcmaster.com/92671A115/)
   (`pn-vn-pen-adjust-nut`, MHA-PN-VN-53, one) jams the #0-80 adjuster stud on the
-  MHA-PN-04 pen rod's top. Both pages were read live in a browser on
-  October 13, 2026. 91375A105 is an alloy steel cup-tip set screw, black
-  oxide, 4-40 UNC Class 3A, 3/16 in long, 0.050 in hex drive, Rockwell C45,
-  ASME B18.3 / ASTM F912; it is the MHA-SH-VN-54 (then MHA-CH-VN-53 and MHA-DT-VN-64) 91375A106 cut 1/16 in shorter,
-  so `diag_build_91375A105.py` imports every length-independent law from the
-  vendor-verified `diag_build_91375A106.py` and changes only the length and
-  helix height. 92671A115 is a brass hex nut, standard profile, 0-80 UNF
+  MHA-PN-04 pen rod's top; its page was read live in a browser on
+  October 13, 2026. 92671A115 is a brass hex nut, standard profile, 0-80 UNF
   Class 2B, 5/32 in across flats, 3/64 in high; `diag_build_92671A115.py`
   extrudes the hexagon with a plain bore at the #0-80 basic major. #0-80 is
-  the stud thread because the 5 mm square rod keeps a 1.71 wall around it
-  where #2-56 leaves 1.38 and #4-40 1.05, under the 1.5 floor of
-  drawing-guidelines.md rule 17 (walls and webs). Each page offers only a
-  2-D PDF, so both are catalogue-only: no replica gate, and their standalone
-  diagnostics are catalog-only runs.
+  the stud thread because the .197 in square rod, at its .195 minimum, keeps
+  .0675 in around it (printed .067 MIN, RV-01) where #2-56 leaves .0545 and
+  #4-40 .0415, under the .060 in floor of
+  drawing-guidelines.md rule 17 (walls and webs). The page offers only a
+  2-D PDF, so it is catalogue-only: no replica gate, and its standalone
+  diagnostic is a catalog-only run.
 - [93075A199](https://www.mcmaster.com/93075A199/) (`pn-vn-hanger-screw`,
   MHA-PN-VN-50, one), [90480A009](https://www.mcmaster.com/90480A009/)
   (`pn-vn-pen-hanger-nut`, MHA-PN-VN-54, one) and
@@ -1460,9 +1457,9 @@ Catalog specifications checked on September 10, 2026:
   family screw at 1 in (8-32 UNC Class 2A, fully threaded, flat tip, 1/4 in
   head width, 7/64 in head height, ASME B18.6.3). The family lists 8-32
   lengths of 3/8, 1/2, 5/8, 3/4, 1, 1-1/4 and 1-1/2 in; 7/8 in is not
-  offered, and 3/4 in (93075A197) would leave 0.8 of full thread past the
+  offered, and 3/4 in (93075A197) would leave 0.3 of full thread past the
   jam nut, under two pitches, once its tip chamfer is excluded. At 1 in,
-  7.2 of full thread stands past the jam nut and the tip stops 3.2 short of
+  6.6 of full thread stands past the jam nut and the tip stops 3.7 short of
   the magnifying-wheel rim. `diag_build_93075A199.py` runs the shared
   hex-head family builder at the catalogue dimensions; no vendor solid is
   committed. Neither nut has a solid used here: `diag_build_90480A009.py`

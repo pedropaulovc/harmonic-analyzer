@@ -375,7 +375,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | — | — | `vn-wheel-axle-front-washer` | MHA-VN-058 | `mg-vn-wheel-axle-front-washer` | MHA-MG-VN-55 |
 | part | — | — | `vn-platen-clip-screw` | MHA-VN-059 | `pd-vn-platen-clip-screw` | MHA-PD-VN-65 |
 | part | — | — | `vn-pen-marker` | MHA-VN-065 | `pn-vn-pen-marker` | MHA-PN-VN-56 |
-| part | — | — | `vn-pen-rod-set-screw` | MHA-VN-061 | `pn-vn-pen-rod-set-screw` | MHA-PN-VN-52 |
+| retired part | — | — | `vn-pen-rod-set-screw` | MHA-VN-061 | — (replaced by the shared `sh-vn-arbor-set-screw`, MHA-SH-VN-54) | MHA-PN-VN-52 (retired; never reissued) |
 | part | — | — | `vn-pen-adjust-nut` | MHA-VN-062 | `pn-vn-pen-adjust-nut` | MHA-PN-VN-53 |
 | part | — | — | `vn-pen-hanger-nut` | MHA-VN-063 | `pn-vn-pen-hanger-nut` | MHA-PN-VN-54 |
 | part | — | — | `vn-pen-hanger-jam-nut` | MHA-VN-064 | `pn-vn-pen-hanger-jam-nut` | MHA-PN-VN-55 |
@@ -477,7 +477,7 @@ At the 2026-10-19 cutover, four category vendor families were in direct use by m
 | `sh-vn-brass-fillister-screw` | MHA-SH-VN-51 | McMaster-Carr 90114A511 | `Default` | `dt-drive-train`, `fr-frame`, `pd-paper-drive` |
 | `sh-vn-fillister-screw-90280a108` | MHA-SH-VN-52 | McMaster-Carr 90280A108 | `Default` (foot's unshifted stock frame; the swing-stop's PROUD_LEN placement and application colours live in the consuming occurrences) | `dt-drive-train` (foot and swing-stop roles), `pd-paper-drive` (latch-hook screws) |
 | `sh-vn-clamp-screw` | MHA-SH-VN-53 | McMaster-Carr 90280A201 | `Default` | `mg-magnifier`, `pd-paper-drive` |
-| `sh-vn-arbor-set-screw` | MHA-SH-VN-54 | McMaster-Carr 91375A106 | `Default` (alloy steel, Rockwell C45, black oxide, unchanged) | `ch-channel`, `dt-drive-train` |
+| `sh-vn-arbor-set-screw` | MHA-SH-VN-54 | McMaster-Carr 91375A106 | `Default` (alloy steel, Rockwell C45, black oxide, unchanged) | `ch-channel`, `dt-drive-train`, `pn-pen` (rod set screw) |
 | `sh-vn-thumb-screw` | MHA-SH-VN-55 | McMaster-Carr 91882A221 | `Default` | `mg-magnifier`, `ms-measuring-stick` |
 | `sh-vn-music-wire` | MHA-SH-VN-56 | McMaster-Carr 9666K56, one 1/4 lb coil | `LeverWire` 1; `PenWire` 1 (one-sheet purchase drawing: supplier wire Ø and SKU only; terminations, wraps and cut lengths are not modelled) | `mg-magnifier` (lever wire), `pn-pen` (pen wire) |
 | `sh-vn-clamping-kit-hardware` | MHA-SH-VN-57 | Precision Matthews 52PCCK-9/16-14mm, one kit | `HoldDownStud` 4; `TNut` 4; `FlangeNut` 4 | `ch-rocker-arm-tl-oblique-jig` only; `usage_scope: tooling`, no machine assembly or BOM, excluded from machine counts |
@@ -571,6 +571,7 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | retired | `pn-pen-marker` | MHA-PN-03 | replaced by the purchased MHA-PN-VN-56 Sharpie marker |
 | added | `pn-vn-pen-marker` | MHA-PN-VN-56 | purchased Sharpie permanent marker, fine point (regular size), used uncapped; its cap-seat grip lies in the MHA-PN-05 v-block groove |
 | added | `pn-vn-pen-rod-set-screw` | MHA-PN-VN-52 | #4-40 x 3/16 cup-point set screw in the MHA-PN-05 v-block, locking the MHA-PN-04 pen rod's pivot end |
+| retired | `pn-vn-pen-rod-set-screw` | MHA-PN-VN-52 | 2026-11-03 (#2119): its 3/16 McMaster 91375A105 left .144 of full thread, under rule 18's 1.5 D (.168); replaced by the shared MHA-SH-VN-54 #4-40 x 1/4 cup point (McMaster 91375A106, .206); no registry, builder or drawing |
 | added | `pn-vn-pen-adjust-nut` | MHA-PN-VN-53 | brass #0-80 jam nut on the MHA-PN-07 adjuster stud in the MHA-PN-04 pen rod's top |
 | added | `pn-pen-adjust-screw` | MHA-PN-07 | turned brass #0-80 eye stud in the MHA-PN-04 pen rod's top, locked by the MHA-PN-VN-53 jam nut; the pen wire (now MHA-SH-VN-56 `PenWire`, then MHA-PN-VN-57) ties through its eye |
 | added | `pn-vn-pen-hanger-nut` | MHA-PN-VN-54 | zinc-plated steel #8-32 hex nut on the strap front; holds the MHA-PN-02 pen hanger on the MHA-PN-VN-50 hanger screw through the strap's clearance hole |

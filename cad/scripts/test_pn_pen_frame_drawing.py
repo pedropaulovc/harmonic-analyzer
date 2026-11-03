@@ -16,7 +16,8 @@ import pn_pen_frame_spec as spec
 import pn_pen_v_block_spec as v_block
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, blind_cut_dia_mm
-from _printed_tolerance import printed_band_mm
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+from _printed_tolerance import printed_band_mm, printed_deviations
 
 _CHAR_WIDTH = 0.00276  # sheet m per character of 3.5-mm dimension text
 
@@ -28,10 +29,10 @@ _MODEL_VALUES = {
     "WindowHeight": spec.WINDOW_HEIGHT,
     "LeftWall": spec.RAIL_SIDE,
     "BottomWall": spec.RAIL_END,
-    "WindowCornerR": spec.WINDOW_CORNER_R,
     "Depth": spec.FRAME_DEPTH,
     "ScrewX": spec.OUTER_WIDTH / 2.0,
     "ScrewZ": spec.FRAME_DEPTH / 2.0,
+    "TapWallMin": spec.TAP_WALL_MIN_MM,
 }
 
 
@@ -40,9 +41,10 @@ def _half_width(text: str) -> float:
 
 
 def _printed_text(name: str) -> str:
+    """The decimal-inch text the sheet prints, leading zero dropped."""
     places = spec.DRAWING_PRECISION_BY_NAME[name]
-    prefix = drawing.DIMENSION_PREFIXES.get(name, "")
-    return f"{prefix}{_MODEL_VALUES[name]:.{places}f}"
+    text = f"{_MODEL_VALUES[name] / 25.4:.{places}f}"
+    return text[1:] if text.startswith("0.") else text
 
 
 def test_required_drawing_paths() -> None:
@@ -61,9 +63,7 @@ def test_spec_is_the_single_source_of_geometry_and_marked_dimensions() -> None:
     kept = set(drawing.FRONT_KEEP) | set(drawing.BOTTOM_KEEP)
     assert kept == marked == set(_MODEL_VALUES)
     assert not set(drawing.FRONT_KEEP) & set(drawing.BOTTOM_KEEP)
-    assert set(drawing.FRONT_KEEP) == (
-        spec.DRAWING_DIMENSIONS["RingProfile"] | spec.DRAWING_DIMENSIONS["WindowCorner"]
-    )
+    assert set(drawing.FRONT_KEEP) == spec.DRAWING_DIMENSIONS["RingProfile"]
     for name in (
         "OUTER_WIDTH",
         "OUTER_HEIGHT",
@@ -73,7 +73,6 @@ def test_spec_is_the_single_source_of_geometry_and_marked_dimensions() -> None:
         "WINDOW_CORNER_R",
     ):
         assert getattr(part, name) is getattr(spec, name)
-    assert drawing.WINDOW_CORNER_R is spec.WINDOW_CORNER_R
     assert part.SET_SCREW_TAP_SPEC is spec.SET_SCREW_TAP_SPEC
     assert drawing.SET_SCREW_TAP_SPEC is spec.SET_SCREW_TAP_SPEC
     # The frame spec's copy of the neck depth it passes stays the block's.
@@ -115,10 +114,9 @@ def test_part_names_every_marked_dimension_and_its_drive() -> None:
     for feature in ("RingProfile", "Ring", "SetScrewAxis"):
         assert f'name_last_feature(adapter, "{feature}")' in source
     assert 'name="ScrewHole"' in source
-    # The printed fillet is the top-right corner alone; the other three share
-    # the drive.
-    assert '("WindowCorner", "WindowCornerR", ((window_x[1], window_y[1]),))' in source
-    assert '"OtherWindowCorners"' in source
+    # One fillet on all four window corners, driven by its knob; the sheet
+    # prints no radius.
+    assert 'name_dimensions(adapter, "WindowCorners", ["WindowCornerR"])' in source
     assert "add_fillet(WINDOW_CORNER_R, edges)" in source
     assert "'\"WindowCornerR\"'" in source
     assert 'set_global(adapter, "WindowCornerR"' in source
@@ -148,7 +146,7 @@ def test_volume_expectations_are_analytic() -> None:
         spec.OUTER_HEIGHT - 2 * spec.RAIL_END
     )
     ring = (spec.OUTER_WIDTH * spec.OUTER_HEIGHT - window) * spec.FRAME_DEPTH
-    assert part.V_RING == pytest.approx(ring) == pytest.approx(4480.0)
+    assert part.V_RING == pytest.approx(ring) == pytest.approx(3891.272)
     r = spec.WINDOW_CORNER_R
     corners = 4 * (r * r - math.pi * r * r / 4.0) * spec.FRAME_DEPTH
     hole = math.pi * (TAP_DRILL_MM["#4-40"] / 2.0) ** 2 * spec.RAIL_END
@@ -195,65 +193,96 @@ def test_printed_precision_is_authored_for_every_marked_dimension() -> None:
     assert spec.DRAWING_PRECISION.keys() == spec.DRAWING_DIMENSIONS.keys()
     for feature, names in spec.DRAWING_DIMENSIONS.items():
         assert set(spec.DRAWING_PRECISION[feature]) == names
-    # Noncritical overall sizes, the window height and the corner radius print
-    # one place; the rest carry a stated reason for two (pn_pen_frame_spec).
-    one_place = {
-        name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places == 1
+    # Every rail, window and envelope size feeds a printed-worst-case stack,
+    # so nothing prints .X; everything prints .XX except the stated tap wall's
+    # limit, .XXX.
+    three_place = {
+        name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places == 3
     }
-    assert one_place == {
-        "OuterSpanX",
-        "OuterHeightDim",
-        "WindowHeight",
-        "WindowCornerR",
-    }
-    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {1, 2}
+    assert three_place == {"TapWallMin"}
+    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {2, 3}
     assert "assert_imported_precision" in inspect.getsource(drawing.build)
 
 
 def test_printed_worst_case_keeps_the_window_rails_thread_and_tap_wall() -> None:
-    one, two = printed_band_mm(1), printed_band_mm(2)
+    unit = spec.UNIT
+    one, two = (printed_band_mm(n, unit=unit) for n in (1, 2))
     # The window width prints directly: it passes the block at both parts'
     # loosest printed limits.
     assert spec.WINDOW_WIDTH_PRINTED_MIN == pytest.approx(spec.WINDOW_WIDTH - two)
     assert spec.WINDOW_WIDTH_PRINTED_MIN > v_block.NECK_WIDTH_PRINTED_MAX
-    # The unprinted right and top rails meet the rule 17 2.0 target.
+    # The unprinted right and top rails meet the rule 17 .080 target.
     assert spec.RIGHT_WALL_PRINTED_MIN == pytest.approx(
-        (spec.OUTER_WIDTH - one) - (spec.RAIL_SIDE + two) - (spec.WINDOW_WIDTH + two)
+        (spec.OUTER_WIDTH - two) - (spec.RAIL_SIDE + two) - (spec.WINDOW_WIDTH + two)
     )
-    assert spec.RIGHT_WALL_PRINTED_MIN >= 2.0
-    # At .X the window width would leave the right rail under the target.
+    assert spec.RIGHT_WALL_PRINTED_MIN >= WALL_TARGET_MM
+    # At .X the envelope would leave the right rail under the floor.
     assert (spec.OUTER_WIDTH - one) - (spec.RAIL_SIDE + two) - (
-        spec.WINDOW_WIDTH + one
-    ) < 2.0
-    assert spec.TOP_WALL_PRINTED_MIN >= 2.0
+        spec.WINDOW_WIDTH + two
+    ) < WALL_FLOOR_MM
+    assert spec.TOP_WALL_PRINTED_MIN >= WALL_TARGET_MM
     # Rule 18: 1.5D of full thread in the bottom rail, and not at .X.
     major = THREAD_MAJOR_MM[spec.SET_SCREW_TAP_SPEC.size]
     lead = 1.5 * 25.4 / 40.0
     assert spec.BOTTOM_RAIL_FULL_THREAD_MIN == pytest.approx(spec.RAIL_END - two - lead)
     assert spec.BOTTOM_RAIL_FULL_THREAD_MIN >= 1.5 * major
     assert spec.RAIL_END - one - lead < 1.5 * major
-    # Rule 17: the tap wall holds only with the depth at two places.
-    assert spec.SET_SCREW_PRINTED_WALL_MIN >= 1.5
-    depth_one_place = (
-        (spec.FRAME_DEPTH - one) - (spec.FRAME_DEPTH / 2.0 + two) - major / 2.0
-    )
-    assert depth_one_place < 1.5
+    # Rule 17: the tap station prints .16 (.XX) about the .155 mid-plane, so
+    # the near wall keeps the target and the far wall falls between the floor
+    # and the target (RV-01), stated natively as .074 MIN.
+    printed = 0.16 * 25.4
+    assert spec.SET_SCREW_NEAR_WALL_MIN == pytest.approx(printed - two - major / 2.0)
+    assert spec.SET_SCREW_NEAR_WALL_MIN >= WALL_TARGET_MM
+    far = (spec.FRAME_DEPTH - two) - (printed + two) - major / 2.0
+    assert spec.SET_SCREW_FAR_WALL_MIN == pytest.approx(far)
+    assert spec.SET_SCREW_PRINTED_WALL_MIN == pytest.approx(far)
+    assert WALL_FLOOR_MM <= far < WALL_TARGET_MM
+    assert spec.TAP_WALL_MIN_MM == pytest.approx(0.074 * 25.4)
+    assert far == pytest.approx(spec.TAP_WALL_MIN_MM, abs=0.001)
+    assert spec.TAP_WALL_MIN_TOL_TYPE == 5  # swTolType_e.swTolMIN
+    assert spec.TAP_WALL_START_Z == pytest.approx(spec.FRAME_DEPTH / 2.0 + major / 2.0)
 
 
 def test_window_height_band_keeps_the_thumb_screw_throw() -> None:
     # The stirrup hangs from the window's top edge, so a short window lifts
     # its bottom rail toward the marker: the printed band must stay inside the
-    # carriage's throw slack, with the block's own .X height band on top.
+    # carriage's throw slack, with the block's own printed height band and the
+    # window corners' worst ride on the neck (below) on top.
     slack = carriage.MARKER_BOTTOM_LOCAL_Y - 1.0 - carriage.FRAME_WINDOW_BOTTOM_LOCAL_Y
-    window_band = printed_band_mm(spec.DRAWING_PRECISION_BY_NAME["WindowHeight"])
-    assert slack >= window_band + printed_band_mm(1)
+    window_band = printed_band_mm(
+        spec.DRAWING_PRECISION_BY_NAME["WindowHeight"], unit=spec.UNIT
+    )
+    block_band = max(
+        abs(d) for d in printed_deviations(v_block.BLOCK_HEIGHT, 2, unit=v_block.UNIT)
+    )
+    assert slack >= window_band + block_band + carriage.WINDOW_CORNER_RIDE_MAX
 
 
-def test_window_corner_radius_clears_the_v_block_top_edges() -> None:
-    # The window's top edge seats on the block top; a corner radius larger
-    # than the side gap would ride on the block's top edges.
-    side_gap = (spec.WINDOW_WIDTH - v_block.NECK_DEPTH) / 2.0
-    assert spec.WINDOW_CORNER_R == pytest.approx(side_gap) == pytest.approx(1.0)
+def _corner_ride(r: float, gap: float) -> float:
+    """Lift of a radius-``r`` window corner riding a neck top edge ``gap`` in
+    from its side wall: the edge sits on the corner's arc."""
+    return 0.0 if gap >= r else r - math.sqrt(r * r - (r - gap) ** 2)
+
+
+def test_window_corners_ride_the_neck_at_most_a_full_radius() -> None:
+    # The sheet prints no window radius, so the title block's INSIDE CORNERS
+    # R.040 MAX governs it.  With the window at its printed minimum, the neck
+    # at its printed maximum and the stirrup anywhere across the neck (nothing
+    # centres it), the corners ride the neck's top edges and lift the stirrup:
+    # the carriage takes the worst lift.
+    assert spec.WINDOW_CORNER_R <= spec.INSIDE_CORNER_R_MAX
+    assert "WindowCornerR" not in spec.DRAWING_PRECISION_BY_NAME
+    r = spec.INSIDE_CORNER_R_MAX
+    band = printed_band_mm(2, unit=spec.UNIT)
+    float_total = spec.WINDOW_WIDTH - band - (v_block.NECK_DEPTH + 2.0 * band)
+    assert float_total > 0.0
+    shifts = [float_total * i / 100.0 for i in range(101)]
+    worst = max(
+        max(_corner_ride(r, s), _corner_ride(r, float_total - s)) for s in shifts
+    )
+    assert carriage.window_corner_ride_max() == pytest.approx(worst)
+    # Centred, the corners would lift it far less.
+    assert _corner_ride(r, float_total / 2.0) < worst / 1.5
 
 
 def test_views_and_scales_are_explicit() -> None:
@@ -276,7 +305,7 @@ def test_views_and_scales_are_explicit() -> None:
 def test_isometric_stays_clear_of_the_front_view_border_and_title_block() -> None:
     cx, cy = drawing.ISO_CENTER
     hx, hy = drawing.ISO_HALF_EXTENT
-    assert hx == pytest.approx(0.0255, abs=0.001)
+    assert hx == pytest.approx(0.0235, abs=0.001)
     assert hy == pytest.approx(0.0473, abs=0.001)
     # Right of the 40.0 dimension line and the front view's note.
     assert cx - hx > drawing.FRONT_KEEP["OuterHeightDim"][0] + 0.05
@@ -345,30 +374,6 @@ def test_front_dimensions_stack_smaller_nearer_the_ring() -> None:
     assert keep["LeftWall"][1] - drawing.BOTTOM_HIGH_Y > 0.010
 
 
-def test_corner_radius_leader_leaves_through_the_right_rail_only() -> None:
-    x, y = drawing.FRONT_KEEP["WindowCornerR"]
-    half = _half_width(_printed_text("WindowCornerR"))
-    cx, cy = drawing.CORNER_ARC_CENTER_XY
-    height_line_x = drawing.FRONT_KEEP["OuterHeightDim"][0]
-    # Text between the ring's right face and the 40.0's dimension line, under
-    # that dimension's top extension line.
-    assert x - half > drawing.FRONT_RIGHT_X + 0.003
-    assert x + half < height_line_x - 0.005
-    assert y + 0.0035 / 2.0 < drawing.FRONT_TOP_Y - 0.002
-    # Aimed at the text's centre or its near end, the radial leader lands on
-    # the printed arc (0..90 deg) and leaves the ring through its right face,
-    # below the top: it crosses no other dimension's extension line.
-    for tx in (x - half, x):
-        angle = math.degrees(math.atan2(y - cy, tx - cx))
-        assert 10.0 < angle < 80.0, angle
-        exit_y = cy + (drawing.FRONT_RIGHT_X - cx) * math.tan(math.radians(angle))
-        assert exit_y < drawing.FRONT_TOP_Y - 0.002
-    assert drawing.DIMENSION_PREFIXES == {"WindowCornerR": "4X R"}
-    assert "_set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)" in (
-        inspect.getsource(drawing.build)
-    )
-
-
 def test_hole_callout_clears_the_views_and_their_dimensions() -> None:
     x, y = drawing.HOLE_CALLOUT_XY
     assert x > drawing.BOTTOM_RIGHT_X + 0.015
@@ -388,6 +393,25 @@ def test_hole_callout_clears_the_views_and_their_dimensions() -> None:
     assert drawing.HOLE_CALLOUT_PROCESS == "TAP"
 
 
+def test_tap_wall_text_stands_on_a_shelf_clear_of_every_line() -> None:
+    # The wall's run is shorter than its two-row text: the text is offset on
+    # a leader, left of where its extension lines end (1 mm past its line).
+    line_x, line_y = drawing.BOTTOM_KEEP["TapWallMin"]
+    x, y = drawing.TAP_WALL_TEXT_XY
+    half = _half_width(".074 MIN")
+    assert y == line_y
+    assert x + half < line_x - 0.001 - 0.002
+    assert x - half > 0.0127  # inside the left border
+    # Its rows (value on the anchor, TAP WALL below) stand left of the .16's
+    # text and under the front view's lowest dimension row.
+    screw_x, _ = drawing.BOTTOM_KEEP["ScrewZ"]
+    assert x + half < screw_x - _half_width(_printed_text("ScrewZ")) - 0.002
+    assert y + 0.0035 < drawing.FRONT_KEEP["LeftWall"][1] - 0.0035 - 0.005
+    assert "_offset_tap_wall_text(adapter, annotations)" in inspect.getsource(
+        drawing.build
+    )
+
+
 def test_part_stamps_make_critical_properties() -> None:
     import _config
 
@@ -398,3 +422,16 @@ def test_part_stamps_make_critical_properties() -> None:
     # No face runs or locates on a lay: the fleet's plain finish, no method.
     assert config["finish"] == "as machined"
     assert int(config["quantity"]) == 1
+
+
+def test_tap_precision_goes_to_the_drill_variable_the_callout_carries() -> None:
+    assert (
+        drawing._tap_drill_variable({7: "<MOD-DIAM><hw-tapdrldia> <hw-thru>"})
+        == "hw-tapdrldia"
+    )
+    assert (
+        drawing._tap_drill_variable({8: "<MOD-DIAM><hw-thrutapdrldia> <hw-thru>"})
+        == "hw-thrutapdrldia"
+    )
+    with pytest.raises(RuntimeError):
+        drawing._tap_drill_variable({5: "TAP <hw-threaddesc> <hw-thru>"})

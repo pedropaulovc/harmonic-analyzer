@@ -243,8 +243,17 @@ RULINGS: dict[str, Ruling] = {
         granted=(
             "user, 2026-10-14, joint-specific drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads) ruling on PR #1436: "
             "no lock; the MHA-PN-VN-52 set screw is an operator adjustment and a light clamp, and the "
-            "v-block's 7.0 tap leaves no room for a jam screw. Period-faithful to the 1898 machine: "
+            "v-block's .367 tap leaves no room for a jam screw. Period-faithful to the 1898 machine: "
             "the plain 91375A105 cup point goes in bare, nothing added to its thread"
+        ),
+    ),
+    "U-MHA-PN-VN-51-no-lock": Ruling(
+        joint="pn-pen/thumb-screw-in-stirrup",
+        granted=(
+            "user, 2026-11-01, joint-specific drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads) ruling on PR #2119: "
+            "'Owner ruling 2026-11-01: MHA-PN-VN-51 knurled thumb screw is an operator adjustment, slackened "
+            "at every marker change; no lock (as U-MHA-PN-VN-52)'. The 99607A213 thumb screw stays "
+            "finger-tight and bare in the stirrup's bottom-rail tap"
         ),
     ),
     "U-MHA-MG-03-no-lock": Ruling(
@@ -586,7 +595,7 @@ def main() -> int:
 THREADED_PARTS: frozenset[str] = frozenset(
     {
         "dt_arbor_pedestal",  # #4-40 UNC-2B apex tap through the crown (receiver of MHA-SH-VN-54); its #8 ledge hole is clearance only
-        "sh_vn_arbor_set_screw",  # #4-40 x 1/4 cup point (91375A106), channel brackets and drive-train pedestals
+        "sh_vn_arbor_set_screw",  # #4-40 x 1/4 cup point (91375A106), channel brackets, drive-train pedestals and the pen v-block
         "ch_pivot_bracket",  # #4-40 UNC-2B apex tap through the ear's arch into the bore (receiver of MHA-SH-VN-54); #8 foot hole is clearance only
         "sm_vn_boss_hook",  # #10-24 UNC (McMaster 9490T1 open-eye eyebolt), member into the summing-lever boss tap
         "sh_vn_clamp_screw",  # #8-32 UNC (90280A201), magnifier and paper-drive column clamps
@@ -633,7 +642,6 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "pn_vn_pen_hanger_jam_nut",  # McMaster 90760A009 thin #8-32 hex nut (MHA-PN-VN-55), member: jammed against the hanger nut on hanger_screw
         "pn_vn_pen_hanger_nut",  # McMaster 90480A009 #8-32 hex nut (MHA-PN-VN-54), receiver of hanger_screw on the strap front
         "pn_vn_pen_set_screw",  # #4-40 UNC (McMaster 99607A213 knurled thumb screw), member into the pen-frame rail
-        "pn_vn_pen_rod_set_screw",  # #4-40 UNC x 3/16 cup-point set screw (McMaster 91375A105, MHA-PN-VN-52), member into the pen v-block's tap, cup on the rod's pivot end
         "pn_vn_pen_adjust_nut",  # McMaster 92671A115 brass #0-80 hex nut (MHA-PN-VN-53), member: jam nut on the pen rod's top adjuster stud
         "pn_pen_v_block",  # receiver: #4-40 UNC-2B Hole Wizard tap through the front face into the pivot bore, receiver of pen_rod_set_screw
         "pn_pen_rod",  # receiver: #0-80 UNF-2B blind tap in the square's top face, receiver of pen_adjust_screw
@@ -1688,6 +1696,7 @@ JOINTS: tuple[Joint, ...] = (
         lock_part="",
         lock_binds=(),
         lock_step="",
+        exception="U-MHA-PN-VN-51-no-lock",
         evidence=(
             "build_pn_pen_assembly.py: module docstring ('pn-vn-pen-set-screw (the thumb screw) threads up "
             "through its bottom rail and presses the grip into the V'), RIDERS lock_mate (CAD only); "
@@ -1698,7 +1707,7 @@ JOINTS: tuple[Joint, ...] = (
     Joint(
         id="pn-pen/rod-set-screw-in-v-block",
         assembly="pn_pen",
-        member="pn_vn_pen_rod_set_screw",
+        member="sh_vn_arbor_set_screw",
         receiver="pn_pen_v_block",
         thread="#4-40 UNC",
         quantity=1,
@@ -1711,8 +1720,8 @@ JOINTS: tuple[Joint, ...] = (
             "direction, so the load it reacts reverses every stroke"
         ),
         axial_capture=(
-            "#4-40 x 3/16 cup point (91375A105) in the block's front-face tap, recessed below the face, its "
-            "cup biting the Ø4 pivot end inside the pivot bore and carrying the hanging carriage; the "
+            "#4-40 x 1/4 cup point (91375A106, MHA-SH-VN-54) in the block's front-face tap, recessed .117 below the face, its "
+            "cup biting the Ø.126 pivot end inside the pivot bore and carrying the hanging carriage; the "
             "square's shoulder seats on the block top and sets the height"
         ),
         lock=Lock.NONE,
@@ -1723,8 +1732,8 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "pn_pen_v_block_spec.py SET_SCREW_TAP_SPEC HoleSpec('tapped', '#4-40', end='through_next'), "
             "SET_SCREW_Y/PIVOT_BORE_X; pn_pen_carriage_geom.py ROD_SET_SCREW_POS (cup on the bore wall); "
-            "build_pn_pen_assembly.py RIDERS lock_mate; pn-vn-pen-rod-set-screw.yaml (91375A105). The 7.0 "
-            "tap holds the 4.76 screw with no room for a second jam screw; the user waived "
+            "build_pn_pen_assembly.py RIDERS lock_mate; sh-vn-arbor-set-screw.yaml (91375A106). The .367 "
+            "tap holds the 6.35 screw with no room for a second jam screw; the user waived "
             "drawing-guidelines.md rule 23 for this joint (U-MHA-PN-VN-52-no-lock)"
         ),
     ),
@@ -2466,7 +2475,7 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
         "pn_pen", "build_pn_pen_assembly.py", '"pn-vn-pen-set-screw", THUMB_SCREW_POS'
     ),
     "pn-pen/rod-set-screw-in-v-block": Occurrence(
-        "pn_pen", "build_pn_pen_assembly.py", '"pn-vn-pen-rod-set-screw", ROD_SET_SCREW_POS'
+        "pn_pen", "build_pn_pen_assembly.py", '"sh-vn-arbor-set-screw", ROD_SET_SCREW_POS'
     ),
     "pn-pen/adjust-screw-in-rod": Occurrence(
         "pn_pen", "build_pn_pen_assembly.py", '"pn-pen-adjust-screw", STUD_POS'

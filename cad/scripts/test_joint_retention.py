@@ -477,7 +477,7 @@ def test_the_gooseneck_set_screw_is_waived_only_by_its_ruling() -> None:
 
 
 def test_the_pen_rod_set_screw_is_waived_only_by_its_ruling() -> None:
-    """PR #1436: the MHA-PN-VN-52 cup point is the v-block's only retention on
+    """PR #1436: the rod set screw's cup point is the v-block's only retention on
     the rod, an oscillating joint with no room for a jam screw. The user
     waived drawing-guidelines.md rule 23 for it (2026-10-14): an operator
     adjustment and light clamp, period-faithful and plain."""
@@ -485,8 +485,9 @@ def test_the_pen_rod_set_screw_is_waived_only_by_its_ruling() -> None:
     (row,) = [j for j in jr.JOINTS if j.id == joint_id]
     assert row.exposure is Exposure.OSCILLATING
     assert row.lock is Lock.NONE
-    assert "91375A105" in row.evidence
-    assert jr._config.parts("pn-vn-pen-rod-set-screw")["supplier_skus"] == ["91375A105"]
+    assert row.member == "sh_vn_arbor_set_screw"
+    assert "91375A106" in row.evidence
+    assert jr._config.parts("sh-vn-arbor-set-screw")["supplier_skus"] == ["91375A106"]
     ruling = jr.RULINGS[row.exception]
     assert ruling.joint == joint_id
     assert "2026-10-14" in ruling.granted and "PR #1436" in ruling.granted
@@ -685,7 +686,7 @@ def test_deleting_a_row_whose_parts_other_rows_name_is_omitted(
 
 def test_every_joint_the_table_names_places_its_hardware() -> None:
     # The last unplaced row (the pen v-block's rod set screw) became the
-    # placed MHA-PN-VN-52; a new UNMODELLED row must be a deliberate change here.
+    # placed rod set screw; a new UNMODELLED row must be a deliberate change here.
     unmodelled = {
         f.subject for f in jr.audit_table() if f.kind is Kind.HARDWARE_UNMODELLED
     }

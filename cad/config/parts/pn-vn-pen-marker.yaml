@@ -10,3 +10,4 @@ pn-vn-pen-marker:
   quantity: 1
   tolerance_class: visual_noncritical
   process: purchased
+  drawing_unit: in

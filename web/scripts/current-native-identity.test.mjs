@@ -69,6 +69,14 @@ retiredTooling.push(...[
   }],
   status: 'retired',
 })))
+// Machine identities retired after the cutover: the 3/16 pen-rod set screw gave
+// way to the shared MHA-SH-VN-54 1/4 cup point (#2119, rule 18 engagement).
+const retiredMachine = [{
+  old_stem: 'vn-pen-rod-set-screw',
+  old_number: 'MHA-VN-061',
+  new_identities: [{ parent: 'pn-pen', stem: 'pn-vn-pen-rod-set-screw', number: 'MHA-PN-VN-52' }],
+  status: 'retired',
+}]
 
 // Independent behavioral expectations, not values copied out of the projection table.
 const sharedCases = [
@@ -328,8 +336,19 @@ test('every active projected row equals CAD and historical-only occurrences stay
   assert.throws(() => validateCurrentNativeIdentityProjection(table, changedCad), /projection entries differ/)
 })
 
+test('a retired machine vendor has no live projection or current Number lookup', () => {
+  for (const row of retiredMachine) {
+    const current = row.new_identities[0]
+    assert.ok(!table.machineVendors.some(active => active.sourceStem === row.old_stem
+      || active.identities.some(target => target.stem === current.stem || target.number === current.number)))
+    for (const number of [row.old_number, current.number]) {
+      assert.throws(() => projectCurrentNativeNumber(number, current.stem), /unknown native identity/)
+    }
+  }
+})
+
 test('retired tooling keeps exactly its frozen old/current reservations without a current Number lookup', () => {
-  assert.deepEqual(cadMap.retired_identities, retiredTooling)
+  assert.deepEqual(cadMap.retired_identities, [...retiredTooling, ...retiredMachine])
   for (const row of retiredTooling) {
     const current = row.new_identities[0]
     assert.ok(!table.nativeIdentities.some(active => active.sourceStem === row.old_stem

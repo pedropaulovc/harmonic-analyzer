@@ -28,7 +28,7 @@ hidden Right-plane reference sketch EyeStationReference, because the wizard's
 cylindrical placement sketch carries no dimension. The thread carries a
 blind cosmetic #0-80 over the full-thread length so the isometric matches the
 callout. The shoulder's internal corner carries a modelled fillet
-(ShoulderFillet, its ShoulderRadius banded as a single MAX limit).
+(ShoulderFillet), its ShoulderRadius printed as a nominal at the .XX band.
 
 Run (SolidWorks already open)::
 
@@ -40,14 +40,15 @@ from __future__ import annotations
 import math
 import sys
 
-import _telemetry
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
 from _com import _com_invoke, _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import _feature_by_name, feature_name_by_type, name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -66,8 +67,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_precision import _named_dimension, apply_drawing_precision
-from _fit_deviations import deviations
+from _drawing_precision import apply_drawing_precision
 from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
@@ -85,9 +85,7 @@ from pn_pen_adjust_screw_spec import (
     OVERALL_LENGTH,
     PLAIN_SHANK,
     SHANK_LENGTH,
-    SHOULDER_FILLET_BAND,
     SHOULDER_FILLET_R,
-    SHOULDER_FILLET_TOL_TYPE,
     THREAD,
     THREAD_MAJOR,
 )
@@ -154,35 +152,6 @@ def _shank_face_areas(adapter) -> list[tuple[object, float]]:
                 faces.append((face, area))
             face = _early_bound(face, "IFace2").GetNextFace()
     return faces
-
-
-def _shoulder_fillet_max_limit(adapter) -> None:
-    """ShoulderRadius as a MAX single limit carrying the band's deviations
-    (build_pn_pen_rod._shoulder_fillet_max_limit's recipe)."""
-    lower, upper = deviations(SHOULDER_FILLET_BAND)
-    _, dimension = _named_dimension(adapter, "ShoulderFillet", "ShoulderRadius")
-    label = "ShoulderRadius@ShoulderFillet"
-    value = float(dimension.SystemValue)
-    if not math.isclose(value, SHOULDER_FILLET_R / 1000.0, abs_tol=1e-9):
-        raise RuntimeError(
-            f"{label}: nominal {value * 1000.0:.7f} is not the band's max "
-            f"{SHOULDER_FILLET_R}"
-        )
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = SHOULDER_FILLET_TOL_TYPE
-    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
-        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
-    if (
-        int(tolerance.Type) != SHOULDER_FILLET_TOL_TYPE
-        or not math.isclose(
-            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
-        )
-        or not math.isclose(
-            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
-        )
-    ):
-        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
-    _telemetry.success(f"{label}: single limit {SHOULDER_FILLET_R:g} MAX")
 
 
 async def _add_thread_limit(adapter) -> list[tuple[str, str]]:
@@ -293,6 +262,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
@@ -552,7 +522,6 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    _shoulder_fillet_max_limit(adapter)
     apply_drawing_properties(adapter, PART_NAME)
     # The reference sketch owns a printed dimension but no geometry: hide it
     # so no assembly instance renders it; the drawing shows it in the side

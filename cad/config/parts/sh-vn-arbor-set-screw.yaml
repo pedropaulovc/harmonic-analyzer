@@ -7,7 +7,7 @@ sh-vn-arbor-set-screw:
   material: Alloy Steel
   material_specification: "Alloy steel, black oxide, Rockwell C45; McMaster-Carr 91375A106"
   finish: black oxide
-  quantity: 4
+  quantity: 5
   default_configuration: Default
   tolerance_class: machined_block
   fit_class: fastener_clearance

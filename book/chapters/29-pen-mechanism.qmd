@@ -23,7 +23,7 @@ The one sub-assembly with no original to copy.
 | `sh-vn-music-wire` (`PenWire` configuration) | 1 | purchased | 0.031" (0.79 mm) ASTM A228 music wire (McMaster 9666K56), cut from the coil |
 | `pn-pen-hanger` | TODO | TODO | TODO |
 | `pn-vn-pen-set-screw` | TODO | TODO | TODO |
-| `pn-vn-pen-rod-set-screw` | 1 | alloy steel, black oxide | #4-40 × 4.76 mm (3/16") cup-point set screw (McMaster 91375A105) |
+| `sh-vn-arbor-set-screw` | 1 | alloy steel, black oxide | #4-40 × 6.35 mm (1/4") cup-point set screw (McMaster 91375A106) |
 | `pn-vn-pen-adjust-nut` | 1 | brass | #0-80 hex nut (McMaster 92671A115) |
 | `pn-vn-pen-hanger-nut` | 1 | steel, zinc plated | #8-32 hex nut (McMaster 90480A009) |
 | `pn-vn-pen-hanger-jam-nut` | 1 | steel, zinc plated | #8-32 thin hex jam nut (McMaster 90760A009) |

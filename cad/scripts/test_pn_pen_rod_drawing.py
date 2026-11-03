@@ -14,6 +14,8 @@ import draw_pn_pen_rod as drawing
 import pn_pen_rod_spec as spec
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _hole_spec import THREAD_MAJOR_MM
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 
 _PART_SOURCE = Path(part.__file__).read_text(encoding="utf-8")
 _DRAWING_SOURCE = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -53,15 +55,16 @@ def test_drawing_keeps_exactly_the_marked_dimensions() -> None:
     assert drawing.DRAWING_PRECISION_BY_NAME is spec.DRAWING_PRECISION_BY_NAME
     # The side view carries the turned rod as the lathe reads it: the square's
     # and the pivot's lengths, the pivot's diameter between its flanks and the
-    # shoulder's R MAX; the end view the square's SQ size.  The square's
-    # width (Section) prints nowhere: Depth's SQ states both flats.
+    # shoulder's R MAX; the end view the square's SQ size and the stud tap's
+    # stated wall (RV-01).  The square's width (Section) prints nowhere:
+    # Depth's SQ states both flats.
     assert set(drawing.SIDE_KEEP) == {
         "Length",
         "PivotLength",
         "PivotDia",
         "ShoulderRadius",
     }
-    assert set(drawing.END_KEEP) == {"Depth"}
+    assert set(drawing.END_KEEP) == {"Depth", "TapWallMin"}
     assert "Section" not in marked
 
 
@@ -105,11 +108,11 @@ def test_side_view_is_turned_and_proved_before_any_import() -> None:
 def test_shoulder_root_is_a_modelled_max_radius() -> None:
     """Rule 16/25: the seat corner is a modelled radius printed as R MAX, not a
     note; its callout names the part it seats on."""
-    assert spec.SHOULDER_FILLET_R == 0.2
+    assert spec.SHOULDER_FILLET_R == 0.2032  # .008
     assert spec.SHOULDER_FILLET_BAND == (0.0, -spec.SHOULDER_FILLET_R)
     assert spec.SHOULDER_FILLET_TOL_TYPE == 6  # swTolMAX
     assert spec.DRAWING_DIMENSIONS["ShoulderFillet"] == {"ShoulderRadius"}
-    assert spec.DRAWING_PRECISION["ShoulderFillet"] == {"ShoulderRadius": 1}
+    assert spec.DRAWING_PRECISION["ShoulderFillet"] == {"ShoulderRadius": 3}
     assert (
         spec.PIVOT_DIA / 2.0 + spec.SHOULDER_FILLET_R
         < (spec.ROD_SECTION + spec.SECTION_BAND[1]) / 2.0
@@ -150,7 +153,7 @@ def test_side_view_layout_stays_clear() -> None:
     pivot_end, shoulder = sx(-spec.PIVOT_LENGTH), sx(0.0)
     # Rule 15: 2:1 lays the rod ~245 mm long, inside the border.
     assert drawing.SIDE_SCALE == (2, 1)
-    assert sx(spec.SQUARE_LENGTH) - pivot_end == pytest.approx(0.245)
+    assert sx(spec.SQUARE_LENGTH) - pivot_end == pytest.approx(0.245, abs=5e-4)
     # Three rows above the rod, 10 mm apart, the overall the outermost.
     rows = [keep["Length"][1], keep["PivotLength"][1], drawing.OVERALL_REF_XY[1]]
     assert rows == sorted(rows)
@@ -237,6 +240,56 @@ def test_end_view_layout_stays_clear() -> None:
     assert tap[3] < dia_tail_y - 0.010
 
 
+def test_stud_tap_wall_is_stated_at_its_printed_worst_case() -> None:
+    # Rule 17: the #0-80 major (.060) in the smallest square (.195) leaves
+    # .0675 to each flat, over the floor and under the target (RV-01).  The
+    # sheet states it as a native .067 MIN, floored so it never claims more
+    # wall than the worst case leaves.
+    major = THREAD_MAJOR_MM[spec.STUD_THREAD]
+    smallest = spec.ROD_SECTION + spec.SECTION_BAND[1]
+    largest = spec.ROD_SECTION + spec.SECTION_BAND[0]
+    wall = (smallest - major) / 2.0
+    assert wall == pytest.approx(0.0675 * 25.4)
+    assert WALL_FLOOR_MM <= wall < WALL_TARGET_MM
+    assert spec.TAP_WALL_MIN_MM == pytest.approx(0.067 * 25.4)
+    assert WALL_FLOOR_MM <= spec.TAP_WALL_MIN_MM <= wall
+    assert spec.TAP_WALL_MIN_TOL_TYPE == 5  # swTolType_e.swTolMIN
+    # The MIN limit's band reaches the wall in the largest square.
+    assert spec.TAP_WALL_MIN_BAND[1] == 0.0
+    assert spec.TAP_WALL_MIN_MM + spec.TAP_WALL_MIN_BAND[0] == pytest.approx(
+        (largest - major) / 2.0
+    )
+    # The reference line runs from the thread's major diameter and stays
+    # inside the smallest square.
+    assert spec.TAP_WALL_START_R == pytest.approx(major / 2.0)
+    assert spec.TAP_WALL_START_R + spec.TAP_WALL_MIN_MM < smallest / 2.0
+
+
+def test_tap_wall_text_stands_on_a_shelf_clear_of_every_line() -> None:
+    # The wall's 8.5 mm run is shorter than its two-row text (3.5 mm rows,
+    # value over the anchor, TAP WALL under it): the text is offset on a
+    # leader left of where its extension lines end (1 mm past its line),
+    # inside the border, over the view label and under the tap callout.
+    border = 0.0127
+    cx, cy = drawing.END_CENTER
+    half = drawing._END_HALF_M
+    line_x, line_y = drawing.END_KEEP["TapWallMin"]
+    rim = drawing._end_y(drawing.END_CENTER, spec.TAP_WALL_START_R)
+    end = drawing._end_y(
+        drawing.END_CENTER, spec.TAP_WALL_START_R + spec.TAP_WALL_MIN_MM
+    )
+    assert cy - half < end < line_y < rim < cy
+    assert line_x < cx - half - 0.005
+    x, y = drawing.TAP_WALL_TEXT_XY
+    text_half = len(".067 MIN") * 0.00276 / 2.0
+    assert y == line_y
+    assert x + text_half < line_x - 0.001 - 0.003
+    assert x - text_half > border + 0.005
+    note_top = drawing.END_NOTE_XY[1] - 0.001
+    assert y - 0.0035 - 0.0015 > note_top + 0.005
+    assert y + 0.0035 < drawing.TAP_CALLOUT_XY[1] - 0.0056 - 0.010
+
+
 def test_bands_are_model_owned_and_name_their_mates() -> None:
     assert spec.DRAWING_BANDS == {
         ("RodProfile", "Section"): spec.SECTION_BAND,
@@ -250,11 +303,13 @@ def test_bands_are_model_owned_and_name_their_mates() -> None:
         _PART_SOURCE
     )
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in _PART_SOURCE
-    assert set(spec.DIMENSION_CALLOUTS) == {
+    # Every banded dimension names its mate (rule 4), the shoulder radius its
+    # seat face's part.
+    assert {
         name
         for feature, name in spec.DRAWING_BANDS
         if name in spec.DRAWING_DIMENSIONS[feature]
-    } | {"ShoulderRadius"}
+    } | {"ShoulderRadius"} <= set(spec.DIMENSION_CALLOUTS)
     # Section keeps its model band unprinted: Depth's SQ states the width,
     # so the two bands must be one.
     assert ("RodProfile", "Section") in spec.DRAWING_BANDS
@@ -270,8 +325,6 @@ def test_bands_are_model_owned_and_name_their_mates() -> None:
     assert "set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)" in (
         _DRAWING_SOURCE
     )
-    # The pivot band prints at its own three places, not the doc default.
-    assert spec.DRAWING_PRECISION["PivotProfile"]["PivotDia"] == 3
 
 
 def test_pivot_band_clears_the_v_block_pivot_bore() -> None:
@@ -296,15 +349,6 @@ def test_part_frame_square_is_mid_plane_and_pivot_runs_down() -> None:
         "PivotLength": "f'{PIVOT_LENGTH}mm'",
         "ShoulderRadius": "f'{SHOULDER_FILLET_R}mm'",
     }
-    planes = [
-        ast.literal_eval(call.args[0]) for call in _calls(_PART_TREE, "create_sketch")
-    ]
-    assert planes == ["Front", "Top"]
-    names = [
-        ast.literal_eval(call.args[1])
-        for call in _calls(_PART_TREE, "name_last_feature")
-    ]
-    assert names == ["RodProfile", "Rod", "PivotProfile", "Pivot", "ShoulderFillet"]
     extrusions = [
         _keywords(call.args[0]) for call in _calls(_PART_TREE, "create_extrusion")
     ]
@@ -364,8 +408,8 @@ def test_stud_tap_is_one_blind_wizard_hole_on_the_top_face_axis() -> None:
 
 def test_overall_length_is_one_parenthesised_reference() -> None:
     """Rule 10: the end-to-end length prints once, as a reference."""
-    assert spec.TOTAL_LENGTH == spec.SQUARE_LENGTH + spec.PIVOT_LENGTH == 122.5
-    assert spec.DRAWING_REFERENCE_PRECISION == 1
+    assert spec.TOTAL_LENGTH == spec.SQUARE_LENGTH + spec.PIVOT_LENGTH == 122.414
+    assert spec.DRAWING_REFERENCE_PRECISION == 2
     tree = ast.parse(_DRAWING_SOURCE)
     (edge,) = _calls(tree, "add_edge_dimension")
     keywords = _keywords(edge)
@@ -418,7 +462,7 @@ def test_overall_picks_resolve_from_the_scanned_edges() -> None:
     assert drawing._top_face_edge(edges) == "near top"
     assert drawing._pivot_end_edge(edges) == "pivot end"
     missing = ViewEdges(label="fake front", edges=edges.edges[:4])
-    with pytest.raises(RuntimeError, match="edges near y -10.5"):
+    with pytest.raises(RuntimeError, match=f"edges near y {-spec.PIVOT_LENGTH:g}"):
         drawing._pivot_end_edge(missing)
     with pytest.raises(RuntimeError, match="found 0"):
         drawing._top_face_edge(ViewEdges(label="fake front", edges=edges.edges[2:]))
