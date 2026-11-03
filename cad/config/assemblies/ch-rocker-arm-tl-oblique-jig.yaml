@@ -22,6 +22,7 @@ allowed_free_stems:
   - ch-rocker-arm-tl-vn-oblique-clamp-screw
   - ch-rocker-arm-tl-vn-oblique-lever-screw
   - ch-rocker-arm-tl-vn-oblique-lever-washer
+  - ch-rocker-arm-tl-vn-oblique-nut-dowel
 required_free_stems:
   - ch-rocker-arm-tl-oblique-carrier
   - ch-rocker-arm-tl-oblique-pivot-block
@@ -41,13 +42,14 @@ required_free_stems:
   - ch-rocker-arm-tl-vn-oblique-clamp-screw
   - ch-rocker-arm-tl-vn-oblique-lever-screw
   - ch-rocker-arm-tl-vn-oblique-lever-washer
+  - ch-rocker-arm-tl-vn-oblique-nut-dowel
 free_dof: 1
 machinist_exceptions:
   - id: "RV-01"
     kind: "accept"
-    where: "step 7 and F1: two #4-40 X 3/4 FLANGED BHCS through the TL-27 feed nut's clearance holes into the integral feed block, 0.3 N·m"
+    where: "F1: two #4-40 X 3/4 FLANGED BHCS through the TL-27 feed nut's clearance holes into the integral feed block, 0.4 N·m, the nut keyed by the TL-VN-81 dowel"
     finding: "no mechanical lock on the feed nut screws under reversing nut torque (rule 23)"
-    reason: "The two-screw TL-27 nut is a static clamp: its calculated friction-slip margin (1.56) exceeds 1.5 against the 1 kN hand-abuse nut torque, so no operating torque reaches the screws. The owner accepted the static clamp without washers for the bought nut's flange on 2026-10-19/20 and replaced that nut with the shop-made TL-27 on 2026-11-01 (item 4); 0.3 N·m keeps each screw flange's bearing on the brass under its 17 ksi yield. Holes are drilled to print rather than transfer spotted; the nut's clearance holes align it to the leadscrew before tightening."
+    reason: "Main ruling 2026-11-03 on #2112 Codjiflo P1: positive dowel stop; friction claim dropped. The TL-VN-81 3/32 dowel, a slip fit in TL-27 and pressed into TL-32's lug, takes the nut's reversing torque (1.02 N·m at the 1161 N crank thrust) with margins of 19 or more in shear and in bearing on the brass and the 6061, so no turning load reaches the screws: a static clamp. At 0.4 N·m the two screws' preload (703 N each) alone exceeds that thrust, so the nut never lifts off the lug, and each flange's bearing on the brass (73 MPa) stays under its 17 ksi yield. The owner accepted the static clamp without washers for the bought nut's flange on 2026-10-19/20 and replaced that nut with the shop-made TL-27 on 2026-11-01 (item 4). The lug's taps and dowel hole are transfer-drilled through the seated nut at assembly (F1)."
   - id: "RV-03"
     kind: "accept"
     where: "step 8: the handwheel and KP08 set screws on leadscrew flats, locked with Loctite 222 (low-strength purple) threadlocker"

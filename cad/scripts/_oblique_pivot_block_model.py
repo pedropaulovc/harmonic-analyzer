@@ -406,9 +406,17 @@ async def build_block_model(adapter, part) -> None:
              "feed nut screw taps (#4-40 through)",name="NutTaps",expect_dia_mm=part.NUT_TAP_DRILL,
              placement_dims=[((f"NutPlacement{i}U",None),(f"NutPlacement{i}V",None))
                              for i in range(1,len(part.NUT_HOLES_YZ)+1)])
-        # Drill-to-print pattern dimensions on the physical face; no transfer spotting.
+        # The taps and the dowel hole are transferred through TL-27 at
+        # assembly: modelled where the nominal nut puts them.
+        await _circles(adapter,"NutFace",part.NUT_FACE_X,"NutDowelProfile",
+                       [(part.DOWEL_YZ[1],part.DOWEL_YZ[0],part.DOWEL_DRILL,
+                         ("NutDowelHoleZ","NutDowelHoleY","NutDowelDia"))],side=True)
+        check("NutDowel",await adapter.create_cut_extrude(ExtrusionParameters(depth=part.DOWEL_DEPTH,reverse_direction=True)))
+        name_last_feature(adapter,"NutDowel")
+        name_dimensions(adapter,"NutDowel",["NutDowelDepth"])
         expected -= math.pi*(part.SCREW_CLEARANCE_DIA/2)**2*part.LUG_WIDTH
         expected -= len(part.NUT_HOLES_YZ)*math.pi*(part.NUT_TAP_DRILL/2)**2*part.LUG_WIDTH
+        expected -= math.pi*(part.DOWEL_DRILL/2)**2*part.DOWEL_DEPTH
         await _nut_pattern_reference(adapter, part)
     await name_bore_axis(adapter,"Right Plane",spec.BORE_X,"Top Plane",0.0,"pivot axis")
     name_last_feature(adapter,spec.PIVOT_AXIS_NAME)

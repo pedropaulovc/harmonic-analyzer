@@ -903,6 +903,9 @@ _JIG_VENDOR = "ch-rocker-arm-tl-vn-oblique"
 # leaves the .47 carrier; the 1/4 dowel spans the whole .47 carrier.
 JIG_HUB_PIN_SEAT = (10.16, 11.938)
 JIG_CL_DOWEL_PRESS = (6.35, 11.938)  # (diameter, carrier thickness)
+# The TL-VN-81 3/32 dowel pressed .16 deep into the feed block's lug; a slip
+# fit in the feed nut's reamed hole, so no pair names the nut.
+JIG_NUT_DOWEL_PRESS = (2.38125, 4.064)  # (diameter, lug hole depth)
 JIG_RAIL_SCREW_THREAD = (4.1656, 3.454, 9.35)  # #8-32 into each base bar
 JIG_BRACKET_SCREW_THREAD = (4.1656, 3.454, 8.7376)  # #8-32 into a end bracket
 JIG_CARRIAGE_SCREW_THREAD = (4.0, 3.242, 4.8006)  # M4 cut to fit .189 into each HGH15 carriage from the .570 floor
@@ -924,6 +927,9 @@ _ROCKER_OBLIQUE_JIG_ALLOWED_PAIRS = {
     ),
     frozenset((f"{_JIG_VENDOR}-cl-dowel-1", f"{_JIG}-carrier-1")): (
         1.10 * math.pi * JIG_CL_DOWEL_PRESS[0] ** 2 * JIG_CL_DOWEL_PRESS[1] / 4.0
+    ),
+    frozenset((f"{_JIG_VENDOR}-nut-dowel-1", f"{_JIG}-feed-block-1")): (
+        1.10 * math.pi * JIG_NUT_DOWEL_PRESS[0] ** 2 * JIG_NUT_DOWEL_PRESS[1] / 4.0
     ),
     **_numbered_pairs(
         f"{_JIG_VENDOR}-rail-screw",

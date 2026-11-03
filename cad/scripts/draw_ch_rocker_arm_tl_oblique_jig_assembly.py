@@ -190,6 +190,7 @@ CLUSTERS = (
             spec.BRACKET_SCREW,
             spec.PILLOW_BLOCK_SCREW,
             spec.NUT_SCREW,
+            spec.NUT_DOWEL,
         ),
         (1.0, 3.0),
         # The integral lug moves with the feed block on rail 1, fastened to
@@ -526,6 +527,9 @@ PART_ROWS = {
     ),
     "ch-rocker-arm-tl-vn-oblique-lever-washer": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-lever-washer"
+    ),
+    "ch-rocker-arm-tl-vn-oblique-nut-dowel": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-nut-dowel"
     ),
 }
 if set(PART_ROWS) != set(BOM_COMPONENTS):

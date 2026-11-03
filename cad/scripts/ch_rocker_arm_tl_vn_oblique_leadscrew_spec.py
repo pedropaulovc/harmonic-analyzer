@@ -48,8 +48,10 @@ guard them against the bought block, so a vendor swap changes the bought
 numbers only, or trips a check.
 
 The nut remains attached to the feed block during either feed mode. Align
-the KP08 blocks to the nut at both travel ends before tightening their
-floating mounting screws; no transfer spotting is required.
+the KP08 blocks at both travel ends so the screw runs centred in the feed
+lug's clearance before tightening their floating mounting screws; the lug's
+nut taps and dowel hole are then transfer-drilled through the seated nut
+(TL-00 F1).
 
 Thrust is taken on the KP08 inner-ring set screws gripping the plain thread
 (no journals; the AMPEC block has no axial or end-play rating): a hand-fed

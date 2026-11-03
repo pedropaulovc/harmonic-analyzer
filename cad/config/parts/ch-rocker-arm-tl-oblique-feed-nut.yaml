@@ -9,7 +9,7 @@ ch-rocker-arm-tl-oblique-feed-nut:
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
-  process: "saw and face to length; drill letter C and tap Tr8x2 RH through square to the faces; drill the two Ø.170 clearance holes through; break edges"
+  process: "saw and face to length; drill letter C and tap Tr8x2 RH through square to the faces; drill the two Ø.170 clearance holes through; drill and ream the 3/32 dowel hole through; break edges"
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"

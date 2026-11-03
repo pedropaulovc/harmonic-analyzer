@@ -1,4 +1,5 @@
-"""Physical contracts for TL-32's integral, drill-to-print nut lug."""
+"""Physical contracts for TL-32's integral nut lug, its taps and dowel hole
+transferred through TL-27 at assembly."""
 from __future__ import annotations
 import math
 from pathlib import Path
@@ -41,11 +42,13 @@ def test_identity_stock_and_common_pivot_interface():
     assert spec.LUG_Y1==-spec.BLOCK_WIDTH/2
 
 
-def test_nut_face_carries_only_the_screw_clearance_and_two_through_taps():
+def test_nut_face_carries_the_screw_clearance_two_through_taps_and_the_dowel_hole():
     assert spec.NUT_FACE_X==spec.LUG_X0
     assert math.isclose(spec.NUT_AXIS_Y,-lead.SCREW_LATERAL)
     assert math.isclose(trammel.CARRIAGE_TOP_Z+spec.NUT_AXIS_Z,lead.SCREW_AXIS_Z)
-    assert math.isclose(spec.SCREW_CLEARANCE_DIA,.34*INCH)
+    assert math.isclose(spec.SCREW_CLEARANCE_DIA,.375*INCH)
+    assert math.isclose(spec.DOWEL_DRILL,.0935*INCH) and math.isclose(spec.DOWEL_DEPTH,.16*INCH)
+    assert spec.DOWEL_YZ==(spec.NUT_AXIS_Y+feed_nut.DOWEL_DX,spec.NUT_AXIS_Z+feed_nut.DOWEL_DY)
     assert spec.SCREW_CLEARANCE_DIA-printed_band_mm(3,unit=spec.UNIT)>lead.SCREW_MAJOR_DIA
     assert set(spec.DRAWING_DIMENSIONS)>={'NutClearanceProfile','NutPatternReference','LugProfile'}
     assert not any('Seat' in feature for feature in spec.DRAWING_DIMENSIONS)
@@ -54,44 +57,53 @@ def test_nut_face_carries_only_the_screw_clearance_and_two_through_taps():
     assert spec.NUT_TAP_DRILL==TAP_DRILL_MM['#4-40']
 
 
-def test_nut_taps_are_the_tl27_pair_on_the_axis_line():
-    # 2X .340 from the axis, one each side, on the axis's Z line, matching the
-    # nut's loose holes; no tap stands on the other (run 20261101T220223216Z).
+def test_nut_taps_are_transferred_from_the_tl27_pair_and_print_ref():
+    # Main ruling 2026-11-03 (Codjiflo P1 on #2112): spotted through TL-27's
+    # holes at TL-00 assembly; the sheet prints each station REF from the axis
+    # under the transfer callout.
     (y1,z1),(y2,z2)=spec.NUT_HOLES_YZ
     assert z1==z2==spec.NUT_AXIS_Z
-    assert math.isclose(spec.NUT_AXIS_Y-y1,.340*INCH) and math.isclose(y2-spec.NUT_AXIS_Y,.340*INCH)
+    assert math.isclose(spec.NUT_AXIS_Y-y1,.35*INCH) and math.isclose(y2-spec.NUT_AXIS_Y,.35*INCH)
     assert spec.NUT_TAP_OFFSET==feed_nut.HOLE_OFFSET
     values=spec.DRAWING_VALUES
-    assert math.isclose(values['NutTap1Y'],.340*INCH) and math.isclose(values['NutTap2Y'],.340*INCH)
+    assert math.isclose(values['NutTap1Y'],.35*INCH) and math.isclose(values['NutTap2Y'],.35*INCH)
     assert math.isclose(values['NutCentreY'],spec.NUT_AXIS_Y-spec.LUG_Y0)
     assert spec.DRAWING_DIMENSIONS['NutPatternReference']==('NutCentreZ','NutCentreY','NutTap1Y','NutTap2Y')
+    assert spec.REF_DIMENSIONS==('NutTap1Y','NutTap2Y')
     assert {name:spec.DRAWING_PRECISION_BY_NAME[name] for name in spec.NUT_PATTERN_PRINTED}=={
-        'NutCentreZ':3,'NutCentreY':3,'NutTap1Y':3,'NutTap2Y':3}
-    assert spec.CALLOUTS_BELOW['NutTap1Y']==spec.CALLOUTS_BELOW['NutTap2Y']=='MATCHES TL-27 FEED NUT'
+        'NutCentreZ':3,'NutCentreY':3,'NutTap1Y':2,'NutTap2Y':2}
+    assert 'NutTap1Y' not in spec.CALLOUTS_BELOW and 'NutTap2Y' not in spec.CALLOUTS_BELOW
+    assert spec.TRANSFER_PROCESS=='TRANSFER THROUGH MHA-CH-06-TL-27\nAT ASSEMBLY;\n'
     # r1 review: the .515 names its mate; the D arrow says where VIEW D prints.
     assert spec.CALLOUTS_BELOW['NutCentreY']=='ON KP08 LEADSCREW AXIS'
     assert spec.CALLOUTS_BELOW['NutCentreZ']=='FROM CARRIAGE FACE\nON KP08 LEADSCREW AXIS'
     source=(Path(__file__).parent/'draw_ch_rocker_arm_tl_oblique_pivot_block.py').read_text(encoding='utf-8')
     assert "VIEW_SHEET_REF = '(SHEET 2)'" in source
-    # Each .340's arrows held outside, on staggered lanes (feed-nut2 r2 review:
-    # inside, the arrowheads touched the mate rows).
-    assert "_set_arrow_side(adapter, nut_annotations, ('NutTap1Y', 'NutTap2Y'), _ARROWS_OUTSIDE)" in source
+    assert source.count('process=contract.TRANSFER_PROCESS')==2
 
 
-def test_loose_nut_holes_absorb_both_printed_stations():
-    # Each screw sees the nut's .340 band and the lug's along the pair (.005 +
-    # .005), the nut's hole line and the lug's 12.400 ±.13 mm axis across:
-    # .014, under the Ø.144's .016 float; the normal Ø.129's .008 would not.
-    assert math.isclose(spec.FIT_UP_Y,.010*INCH)
-    assert math.isclose(spec.FIT_UP_Z,.005*INCH+printed_band_mm(3,unit='mm'))
-    assert math.isclose(spec.FIT_UP_RESIDUAL,math.hypot(spec.FIT_UP_Y,spec.FIT_UP_Z))
-    assert round(spec.FIT_UP_RESIDUAL/INCH,3)==.014
-    assert feed_nut.NORMAL_HOLE_FLOAT<spec.FIT_UP_RESIDUAL<=feed_nut.HOLE_FLOAT
+def test_opened_clearance_covers_the_vertical_stack():
+    # TL-28's as-bought 1 in (±.012) and the lug's 12.400 ±.13 mm put the
+    # leadscrew up to .435 mm off the clearance's axis (Codjiflo P1 on #2112).
+    assert math.isclose(spec.LEADSCREW_OFFSET_Z,.012*INCH+printed_band_mm(3,unit='mm'))
+    assert round(spec.LEADSCREW_OFFSET_Z,4)==.4348
+    assert spec.LEADSCREW_RADIAL_CLEARANCE>spec.LEADSCREW_OFFSET
+    # The old Ø.340 left .318: not enough.
+    assert (.34*INCH-lead.SCREW_MAJOR_DIA)/2<spec.LEADSCREW_OFFSET_Z
+
+
+def test_transferred_holes_seat_the_heads_and_hold_the_dowel():
+    # A #18 spot through the largest Ø.170 hole: .0023 off its axis.
+    assert math.isclose(spec.FIT_UP_RESIDUAL,(feed_nut.HOLE_DIA+.004*INCH-.1695*INCH)/2)
+    assert spec.HEAD_FILLET_CLEARANCE>0.0 and spec.HEAD_BEARING_LAND_MIN>0.0
+    assert spec.DOWEL_PRESS_MIN>=1.5*feed_nut.DOWEL_DIA_MAX
+    assert spec.DOWEL_NUT_ENGAGEMENT_MIN>=1.5*feed_nut.DOWEL_DIA_MAX
+    assert spec.DOWEL_RECESS_MIN>0.0
 
 
 def test_lug_walls_meet_the_target_at_the_printed_worst_case():
     assert min(spec.LUG_WALLS_MM.values())>=WALL_TARGET_MM
-    assert round(min(spec.LUG_WALLS_MM.values())/INCH,3)==.107
+    assert round(min(spec.LUG_WALLS_MM.values())/INCH,3)==.086
 
 
 def test_nut_screws_stop_inside_the_through_tap():

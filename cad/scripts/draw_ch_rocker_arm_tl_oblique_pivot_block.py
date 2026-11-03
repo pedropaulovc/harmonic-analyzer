@@ -17,7 +17,7 @@ from _check import check
 from _com import _early_bound
 from _drawing_common import (DrawingOutputs, finalize_drawing, new_project_drawing, read_required_properties, rebuild_drawing,
                              remove_notes_matching)
-from _drawing_dimensions import assert_imported_precision, dimension_name, offset_dimension_text
+from _drawing_dimensions import assert_imported_precision, dimension_name, offset_dimension_text, set_reference_dimension
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_leader_notes import add_leader_note
@@ -173,28 +173,26 @@ VIEW_SHEET_REF = '(SHEET 2)'
 VIEW_SHEET_REF_OFFSET = (-.010, -.008)
 # Nut interface, VIEW D, *Left at 2:1 on a 2:1 sheet, at .190,.175: Z runs
 # right from the bottom face at x 165.7, Y=0 prints at y 223, the lug end
-# (Y -68) at y 87; the leadscrew axis at 190.5,113, the TL-27 nut's two taps
-# on its line at y 95.7 (tap 1, toward the lug end) and 130.3. The axis
-# stands from the lug end / carriage-face corner, each tap .340 from the axis
-# (2X, one each side: no tap on the other). Left of the view: the axis's .515
-# (x 104, as before) and, under the lug end, the 12.400 mm height, its three
-# rows outboard left of the bottom face's extension line, which then stops at
-# the lug end instead of running up the view's edge. Right of the view, clear
-# of its edge (x 214): both taps' .340 on one lane, each with its mate row,
-# centred between the axis's extension line and its own tap's. The Ø.340
-# clearance callout comes in from the upper left, crossing only the view's
-# edge; the tap callout from the lower right onto tap 1's rim, under every
-# right-hand extension line.
+# (Y -68) at y 87; the clearance's axis at 190.5,113, the two taps
+# transferred from TL-27 on its line at y 95.2 (tap 1, toward the lug end)
+# and 130.8, the dowel hole at 201.7,126.7. The clearance stands from the lug
+# end / carriage-face corner. Left of the view: the clearance's .515 (x 104)
+# and, under the lug end, the 12.400 mm height, its three rows outboard left
+# of the bottom face's extension line; between the .515's text and the view's
+# edge, each tap's (.35) REF from the axis on one lane (x 150), so no
+# extension line runs right of the view. Right of the view, clear of its edge
+# (x 214), top to bottom: the dowel hole's transfer callout onto its
+# upper-right rim, the Ø.375 clearance callout level with the axis, and the
+# taps' transfer callout from the lower right onto tap 1's rim, each leader
+# crossing only the view's edge.
 NUT_XY, NUT_SCALE = (.190,.175), (2,1)
 NUT_KEEP = {
     'NutCentreY':(.104,.100),'NutCentreZ':(.134,.0772),
-    # Arrows outside, each .340 on its own lane, the second's lane right of
-    # the first's text, so neither line's arrow run reaches the other's text
-    # (feed-nut2: on one lane the runs struck the texts, and arrows inside
-    # touched them).
-    'NutTap1Y':(.247,.1044),'NutTap2Y':(.282,.1216),
-    'NutClearanceDia':(.135,.150),
+    'NutTap1Y':(.150,.1041),'NutTap2Y':(.150,.1219),
+    'NutClearanceDia':(.245,.113),
 }
+# The dowel hole's callout, over the clearance's.
+NUT_DOWEL_CALLOUT_XY = (.240,.150)
 NUT_CAPTION = 'VIEW D'
 NUT_CAPTION_XY = (.178,.058)  # the note's left edge; centred under the view
 # TL-32's cut-face sections hang their captions 6 mm under the face.
@@ -474,9 +472,10 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
         set_hidden_lines_removed(adapter,nut_iso)
         nut_annotations = curate_view_dimensions(adapter,nut,keep=NUT_KEEP,view_label='nut face',
                       dimensions_by_feature=contract.DRAWING_DIMENSIONS)
-        # Held outside, read back: on their staggered lanes (NUT_KEEP) the
-        # arrow runs pass clear of the other .340's text.
-        _set_arrow_side(adapter, nut_annotations, ('NutTap1Y', 'NutTap2Y'), _ARROWS_OUTSIDE)
+        # The taps are transferred from TL-27 at assembly: their stations
+        # print REF.
+        for name, display in _displays(adapter, nut_annotations, contract.REF_DIMENSIONS).items():
+            set_reference_dimension(adapter, display.GetAnnotation(), label=f'VIEW D {name}')
         print_imported_metric_dimensions(adapter, nut_annotations,
                                           {name: places for (_, name), (places, _) in contract.METRIC_DIMENSIONS.items()})
         caption = add_note(adapter, NUT_CAPTION, *NUT_CAPTION_XY)
@@ -484,15 +483,21 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
             raise RuntimeError('failed to insert the VIEW D caption')
         _size_note(adapter, caption, VIEW_LETTER_HEIGHT, label='VIEW D caption')
         # The callout reaches tap 1 (toward the lug end) from the lower
-        # right, under the taps' right-hand extension lines. The title
-        # block's THREADS row owns the class; each .340 names the mate.
+        # right. The title block's THREADS row owns the class; the process
+        # row says where the taps come from (TL-00 says how).
         y,z = contract.NUT_HOLES_YZ[0]
         rim = contract.NUT_TAP_DRILL/2/math.sqrt(2)
         edge = _project(adapter,nut,(contract.NUT_FACE_X,y-rim,z+rim),'nut tap mouth')
         taps = add_native_hole_callout(adapter,nut,edge_xy=edge,callout_xy=NUT_CALLOUT_XY,
-                                       label='feed nut screw taps')
+                                       label='feed nut screw taps',process=contract.TRANSFER_PROCESS)
         omit_title_block_thread_class(taps, label='feed nut screw taps')
         set_callout_lengths_to_three_places(taps, label='feed nut screw taps')
+        # The dowel hole, from the upper right onto its upper-right rim.
+        y,z = contract.DOWEL_YZ
+        rim = contract.DOWEL_DRILL/2/math.sqrt(2)
+        edge = _project(adapter,nut,(contract.NUT_FACE_X,y+rim,z+rim),'nut dowel hole mouth')
+        add_native_hole_callout(adapter,nut,edge_xy=edge,callout_xy=NUT_DOWEL_CALLOUT_XY,
+                                label='feed nut dowel hole',process=contract.TRANSFER_PROCESS)
         rebuild_drawing(adapter, label='feed nut screw tap callout')
         annotations += nut_annotations
         sheet_scales = {sheets[0]: SHEET_SCALE, sheets[1]: NUT_SCALE}

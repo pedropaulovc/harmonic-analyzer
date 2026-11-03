@@ -1,8 +1,9 @@
 r"""Build the oblique-trammel jig's feed nut (MHA-CH-06-TL-27; shop fixture).
 
 A brass 360-H02 3/4 x 1-1/4 in rectangle bar, faced to .40 long, carrying
-the Tr8x2 RH bore and the two #4 loose-clearance holes of its two screws into
-TL-32's lug (``ch_rocker_arm_tl_oblique_feed_nut_spec``).
+the Tr8x2 RH bore, the two #4 loose-clearance holes of its two screws into
+TL-32's lug and the reamed hole of its 3/32 dowel
+(``ch_rocker_arm_tl_oblique_feed_nut_spec``).
 
 Layout (the spec's model frame): ONE Front-plane rectangle from the origin
 corner, extruded +Z by the length; the bore (its letter C tap drill) and the
@@ -34,6 +35,8 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _fit_deviations import deviations
 from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
@@ -70,7 +73,8 @@ _SAVED_DRAWING_PROPERTIES = (
 V_NUT = spec.WIDTH * spec.HEIGHT * spec.LENGTH
 V_BORE = math.pi * (spec.BORE_DRILL / 2.0) ** 2 * spec.LENGTH
 V_HOLES = len(spec.HOLE_X) * math.pi * (spec.HOLE_DIA / 2.0) ** 2 * spec.LENGTH
-# Tight enough that a missing hole (about 107 mm^3) fails.
+V_DOWEL = math.pi * (spec.DOWEL_HOLE_DIA / 2.0) ** 2 * spec.LENGTH
+# Tight enough that a missing hole (the dowel's, about 46 mm^3) fails.
 _V_TOL = 10.0
 # swDimensionTextParts_e: the model owns its callout rows.
 _TEXT_PREFIX, _TEXT_SUFFIX, _TEXT_CALLOUT_BELOW = 1, 2, 4
@@ -94,7 +98,9 @@ def _as_construction(adapter, entity_id: str) -> None:
         raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
-async def _construction_circle(adapter, x: float, y: float, dia: float, label: str) -> str:
+async def _construction_circle(
+    adapter, x: float, y: float, dia: float, label: str
+) -> str:
     """One construction circle on a real hole, drawn without inference."""
     set_sketch_direct_db(adapter, True)
     try:
@@ -154,7 +160,11 @@ async def _hole_pattern_reference(adapter) -> None:
             adapter, x, spec.HOLE_Y, spec.HOLE_DIA, f"{feature} hole {index}"
         )
         await anchor_point_to_point(
-            adapter, f"{bore}.center", f"{hole}.center", abs(x - spec.BORE_X), 0.0,
+            adapter,
+            f"{bore}.center",
+            f"{hole}.center",
+            abs(x - spec.BORE_X),
+            0.0,
             f"{feature} hole {index} station",
         )
         dims.record(f"Hole{index}Offset")
@@ -163,6 +173,30 @@ async def _hole_pattern_reference(adapter) -> None:
             await adapter.add_sketch_dimension(hole, None, "diameter", spec.HOLE_DIA),
         )
         dims.record(f"RefHole{index}Dia")
+    dowel = await _construction_circle(
+        adapter,
+        spec.DOWEL_HOLE_X,
+        spec.DOWEL_HOLE_Y,
+        spec.DOWEL_HOLE_DIA,
+        f"{feature} dowel",
+    )
+    await anchor_point_to_point(
+        adapter,
+        f"{bore}.center",
+        f"{dowel}.center",
+        spec.DOWEL_DX,
+        spec.DOWEL_DY,
+        f"{feature} dowel station",
+    )
+    dims.record("DowelX")
+    dims.record("DowelY")
+    check(
+        f"{feature} dowel diameter",
+        await adapter.add_sketch_dimension(
+            dowel, None, "diameter", spec.DOWEL_HOLE_DIA
+        ),
+    )
+    dims.record("RefDowelDia")
     await ensure_fully_defined(adapter, feature)
     check(f"exit_sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
@@ -180,7 +214,9 @@ async def _length_reference(adapter) -> None:
         f"{feature} witness line", await adapter.add_line(0.0, 0.0, -spec.LENGTH, 0.0)
     )
     set_sketch_direct_db(adapter, False)
-    await anchor_point_to_origin(adapter, f"{witness}.start", 0.0, 0.0, f"{feature} foot")
+    await anchor_point_to_origin(
+        adapter, f"{witness}.start", 0.0, 0.0, f"{feature} foot"
+    )
     check(
         f"{feature} along Z",
         await adapter.add_sketch_constraint(witness, None, "horizontal"),
@@ -225,37 +261,74 @@ async def build(adapter) -> dict[str, str]:
     # --- Nut: Front-plane rectangle from the origin corner, +Z ----------------
     profile = SketchDims()
     check("create_sketch nut", await adapter.create_sketch("Front"))
-    points = [(0.0, 0.0), (spec.WIDTH, 0.0), (spec.WIDTH, spec.HEIGHT), (0.0, spec.HEIGHT)]
+    points = [
+        (0.0, 0.0),
+        (spec.WIDTH, 0.0),
+        (spec.WIDTH, spec.HEIGHT),
+        (0.0, spec.HEIGHT),
+    ]
     lines = await add_line_chain(adapter, points)
     await define_rectilinear_chain(
-        adapter, lines, points, label="nut profile", dims=profile,
+        adapter,
+        lines,
+        points,
+        label="nut profile",
+        dims=profile,
         names=["NutWidth", "NutHeight"],
     )
     await ensure_fully_defined(adapter, "nut profile")
     check("exit_sketch nut", await adapter.exit_sketch())
     name_last_feature(adapter, "NutProfile")
     profile.apply(adapter, "NutProfile")
-    check("extrude nut", await adapter.create_extrusion(ExtrusionParameters(depth=spec.LENGTH)))
+    check(
+        "extrude nut",
+        await adapter.create_extrusion(ExtrusionParameters(depth=spec.LENGTH)),
+    )
     name_last_feature(adapter, "Nut")
     name_dimensions(adapter, "Nut", ["NutDepth"])
     volume = await volume_check(adapter, "nut", V_NUT, _V_TOL)
 
     # --- The Tr8x2 bore (its letter C tap drill) and the #4 loose pair --------
     volume -= await _cut_circles(
-        adapter, "BoreProfile", "Bore",
+        adapter,
+        "BoreProfile",
+        "Bore",
         [(spec.BORE_X, spec.BORE_Y, spec.BORE_DRILL, ("BoreX", "BoreY", "BoreDia"))],
     )
     volume = await volume_check(adapter, "nut with bore", volume, _V_TOL)
     volume -= await _cut_circles(
-        adapter, "HoleProfile", "Holes",
+        adapter,
+        "HoleProfile",
+        "Holes",
         # The printed 2X Ø.144 is the +X hole's (the sheet's callout side).
         [
-            (x, spec.HOLE_Y, spec.HOLE_DIA, (f"Hole{k}X", f"Hole{k}Y", "HoleDia" if k == 2 else "Hole1Dia"))
+            (
+                x,
+                spec.HOLE_Y,
+                spec.HOLE_DIA,
+                (f"Hole{k}X", f"Hole{k}Y", "HoleDia" if k == 2 else "Hole1Dia"),
+            )
             for k, x in enumerate(spec.HOLE_X, start=1)
         ],
     )
     volume = await volume_check(adapter, "nut with screw holes", volume, _V_TOL)
-    await volume_check(adapter, "finished nut", V_NUT - V_BORE - V_HOLES, _V_TOL)
+    volume -= await _cut_circles(
+        adapter,
+        "DowelProfile",
+        "DowelHole",
+        [
+            (
+                spec.DOWEL_HOLE_X,
+                spec.DOWEL_HOLE_Y,
+                spec.DOWEL_HOLE_DIA,
+                ("DowelHoleX", "DowelHoleY", "DowelDia"),
+            )
+        ],
+    )
+    volume = await volume_check(adapter, "nut with dowel hole", volume, _V_TOL)
+    await volume_check(
+        adapter, "finished nut", V_NUT - V_BORE - V_HOLES - V_DOWEL, _V_TOL
+    )
 
     await _hole_pattern_reference(adapter)
     await _length_reference(adapter)
@@ -268,6 +341,14 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "DowelProfile",
+        "DowelDia",
+        *deviations(spec.DOWEL_HOLE_BAND),
+        places=spec.DOWEL_HOLE_PLACES,
+        display_unit=spec.UNIT,
+    )
     _set_model_callouts(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in spec.DRAWING_DIMENSIONS.items():
