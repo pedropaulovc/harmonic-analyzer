@@ -25,8 +25,8 @@ TEXT_SUFFIX = 2  # swDimensionTextSuffix
 CALLOUT_ABOVE = 3  # swDimensionTextCalloutAbove
 CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 
-BAR = "MG-WHEEL-BAR"
-WHEEL = "MG-MAGNIFYING-WHEEL"
+BAR = "MHA-MG-08"  # wheel bar
+WHEEL = "MHA-MG-05"  # magnifying wheel
 ASSEMBLY = "MHA-MG-00"
 NUT = "MHA-MG-VN-52"
 

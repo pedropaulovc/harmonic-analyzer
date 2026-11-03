@@ -213,7 +213,7 @@ def test_journal_finish_and_no_gdt() -> None:
         ("mg_axle_journal", MACHINED_UM)
     ]
     pin_words = callouts.PIN_DIA_CALLOUT.split()
-    assert "MG-MAGNIFYING-WHEEL" in pin_words and "RUNNING" in pin_words
+    assert "MHA-MG-05" in pin_words and "RUNNING" in pin_words
 
 
 def test_thread_callout_and_no_general_notes() -> None:
@@ -234,9 +234,9 @@ def test_thread_callout_and_no_general_notes() -> None:
     assert ".1873" not in words and "STOCK" not in words
     for required in (
         ".0003-.0012 DIAMETRAL INTERFERENCE",
-        "MG-WHEEL-BAR <MOD-DIAM>.1865-.1870",
+        "MHA-MG-08 <MOD-DIAM>.1865-.1870",
         ".0008-.0017 RUNNING CLEARANCE",
-        "MG-MAGNIFYING-WHEEL",
+        "MHA-MG-05 BORE",
     ):
         assert required in words, required
     assert callouts.PRESS_LIMITS == pytest.approx(group.BAR_PRESS)
