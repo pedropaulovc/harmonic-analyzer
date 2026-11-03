@@ -457,6 +457,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | retired tooling part | — | — | `dt-cone-pivot-post-tl-saw-cradle` | MHA-DT-005-TL-02 | — | MHA-DT-05-TL-02 (retired 2026-10-21; never reissued) |
 | retired tooling part | — | — | `dt-cone-pivot-post-tl-cap-jaw-button` | MHA-DT-005-TL-03 | — | MHA-DT-05-TL-03 (retired 2026-10-21; never reissued) |
 | retired tooling part | — | — | `dt-cone-pivot-post-tl-soft-jaw` | MHA-DT-005-TL-04 | — | MHA-DT-05-TL-04 (retired 2026-10-21; never reissued) |
+| new tooling part (2026-11-02) | — | — | — | — | `dt-cone-gear-tl-index-plate` | MHA-DT-03-TL-01 |
 | assembly | `frame` | MHA-A04 | `fr-frame` | MHA-FR-000 | `fr-frame` | MHA-FR-00 |
 | assembly | `drive-train` | MHA-A03 | `dt-drive-train` | MHA-DT-000 | `dt-drive-train` | MHA-DT-00 |
 | assembly | `channel` | MHA-A02 | `ch-channel` | MHA-CH-000 | `ch-channel` | MHA-CH-00 |
@@ -655,3 +656,4 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | added | `ch-rocker-arm-tl-vn-oblique-pivot-spacer` | MHA-CH-06-TL-VN-78 | McMaster 92871A359 18-8 spacer x2, 10 ID × 16 OD × 15 |
 | added | `ch-rocker-arm-tl-vn-oblique-pivot-shim` | MHA-CH-06-TL-VN-79 | McMaster 98055A118 DIN 988 shim x10 nominal (five a support), 10 × 16 × 0.2; select fitting stock 98055A117/98055A118/98055A121 for measured running gap |
 | added | `ch-rocker-arm-tl-vn-oblique-hub-pin` | MHA-CH-06-TL-VN-80 | McMaster 2281A11-6410N695 Class Z minus Ø10.2000 gauge pin x1, abrasive-cut to 20.0 and bonded |
+| added | `dt-cone-gear-tl-index-plate` | MHA-DT-03-TL-01 | 2026-11-02 BS-0 dividing-head index plate with 57-, 51- and 24-hole circles for the 114T, 102T and 96T cone gears the stock plates cannot index; best-guess sizes pending measurement (#2157) |

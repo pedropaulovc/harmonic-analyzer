@@ -1052,7 +1052,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "9cccd1baba06e969dc0fd1d5f357d5636696d041867f0cee4976f9ee87379c4a",
+  "currentRegistryMapSha256": "2255335c57f94dd03a11f7bea08ccfb3a36685cbd74ce032d4af989bf1a5d7cb",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",
@@ -2231,6 +2231,16 @@
         {
           "stem": "ch-rocker-arm-tl-oblique-feed-block",
           "number": "MHA-CH-06-TL-32"
+        }
+      ]
+    },
+    {
+      "sourceStem": "dt-cone-gear-tl-index-plate",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "dt-cone-gear-tl-index-plate",
+          "number": "MHA-DT-03-TL-01"
         }
       ]
     }

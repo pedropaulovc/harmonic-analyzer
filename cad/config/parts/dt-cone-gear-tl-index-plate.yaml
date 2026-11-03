@@ -1,0 +1,14 @@
+dt-cone-gear-tl-index-plate:
+  title: Cone Gear Dividing Head Index Plate
+  # Shop tooling: the parent MHA-DT-03 Number plus -TL-nn (subsystem-identities.md).
+  # Indexes the 96T, 102T and 114T cone gears on the PM BS-0 dividing head,
+  # whose stock plates cannot. Every size is a best guess pending the owner's
+  # measurement of his BS-0 plate (#2157).
+  number: MHA-DT-03-TL-01
+  material: 6061-T651 ALUMINUM
+  material_specification: 6061-T651 aluminum, owned 1/4 in plate
+  finish: as machined
+  quantity: 1
+  tolerance_class: machined_block
+  drawing_unit: in
+  process: "face owned 1/4 in 6061-T651 plate to .22; turn the Ø3.94 OD and bore Ø.829 to the BS-0 plate hub; drill the 57-, 51- and 24-hole circles and the three countersunk #8 mounting holes on the mill DRO's bolt-hole-circle function; break edges"
