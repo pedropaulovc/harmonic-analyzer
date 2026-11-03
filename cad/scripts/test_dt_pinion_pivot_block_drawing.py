@@ -525,11 +525,14 @@ def test_spring_blade_stays_on_the_back_strap_flank_at_every_stack() -> None:
 
 def test_screw_hole_callout_prints_the_title_block_drilled_hole_places() -> None:
     # Codjiflo on #2106: the Hole Wizard callout's drill size is the one
-    # value this sheet cannot carry as a part-side model dimension, so the
-    # drawing sets its ICalloutLengthVariable precision natively.  What it
-    # applies is the spec's contract, and that contract is the places the
-    # inch title block's DRILLED HOLES tolerance is stated at (+.004/0).
+    # value this sheet cannot carry as a part-side model dimension (a
+    # part-authored precision does not reach the callout, run
+    # 20261102T230110877Z), so the drawing sets its ICalloutLengthVariable
+    # precision natively, the declared exception RV-01.  What it applies is
+    # the spec's contract, and that contract is the places the inch title
+    # block's DRILLED HOLES tolerance is stated at (+.004/0).
     from _title_block_units import LENGTH_UNITS, quantity
+    from machinist_exceptions import load_exceptions
 
     unit = dt_pinion_pivot_block_spec.UNIT
     assert unit == "in"
@@ -541,3 +544,13 @@ def test_screw_hole_callout_prints_the_title_block_drilled_hole_places() -> None
         == dt_pinion_pivot_block_spec.SCREW_HOLE_CALLOUT_PRECISION
     )
     assert dt_pinion_pivot_block_spec.SCREW_HOLE_CALLOUT_PRECISION == digits == 3
+    (entry,) = load_exceptions(_config.CONFIG_DIR, "dt_pinion_pivot_block", "part")
+    assert (entry.id, entry.kind) == ("RV-01", "accept")
+    assert entry.reason.startswith(
+        "Delegated ruling 2026-11-02 (Main), following owner precedent"
+    )
+    assert "#2144" in entry.reason and "20261102T230110877Z" in entry.reason
+    places = dt_pinion_pivot_block_spec.SCREW_HOLE_CALLOUT_PRECISION
+    assert f"written as {places} " in entry.where
+    assert "draw_dt_pinion_pivot_block.build" in entry.where
+    assert "SCREW_HOLE_CALLOUT_PRECISION" in entry.where
