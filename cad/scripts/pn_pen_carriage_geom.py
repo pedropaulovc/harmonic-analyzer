@@ -39,7 +39,7 @@ import pn_pen_frame_spec as frame
 import pn_pen_rod_spec as rod
 import pn_pen_v_block_spec as vb
 import pn_vn_pen_marker_spec as marker
-import pn_vn_pen_rod_set_screw_spec as rod_set_screw
+import sh_vn_arbor_set_screw_spec as rod_set_screw
 from _hole_spec import TAP_DRILL_MM
 from _printed_tolerance import printed_deviations
 from _recording_geometry import (
@@ -62,6 +62,10 @@ PAPER_MID_Y = 364.75
 
 BRASS_G_PER_MM3 = 8.5e-3
 AISI_304_G_PER_MM3 = 8.0e-3
+ALLOY_STEEL_G_PER_MM3 = 7.7e-3  # SOLIDWORKS "Alloy Steel"
+# The rod set screw's mass: the McMaster 91375A106 vendor solid's volume
+# (diagnostics/diag_build_91375A106.VENDOR_VOLUME_MM3).
+ROD_SET_SCREW_MASS_G = 25.8601 * ALLOY_STEEL_G_PER_MM3
 
 _C = math.cos(math.radians(PEN_BLOCK_YAW_DEG))
 _S = math.sin(math.radians(PEN_BLOCK_YAW_DEG))
@@ -284,14 +288,13 @@ def window_corner_ride_max() -> float:
         _printed_limits(vb, "NeckZ1", vb.depth_station(vb.NECK_DEPTH))[1]
         - _printed_limits(vb, "NeckZ0", vb.depth_station(0.0))[0]
     )
-    gap = (window - neck) / 2.0
-    r = frame.INSIDE_CORNER_R_MAX
-    if gap <= 0.0:
+    if window <= neck:
         raise AssertionError("the stirrup window must pass the neck at both prints")
-    if gap >= r:
-        return 0.0
-    # The edge meets the corner's arc gap in from the side wall.
-    return r - math.sqrt(r * r - (r - gap) ** 2)
+    # Nothing centres the stirrup across the neck (paper_side_points_printed_
+    # worst), so one side wall can lie on the neck's face.  That edge then
+    # meets its corner's arc where the arc leaves the side wall, a full
+    # radius under the top wall.
+    return frame.INSIDE_CORNER_R_MAX
 
 
 # --- plan balance ---------------------------------------------------------------
@@ -348,7 +351,7 @@ def plan_mass_items() -> list[tuple[str, float, float, float]]:
     items.append(
         (
             "rod set screw",
-            rod_set_screw.MASS_G,
+            ROD_SET_SCREW_MASS_G,
             vb.PIVOT_BORE_X,
             ROD_SET_SCREW_CUP_LOCAL_Z - rod_set_screw.LENGTH / 2.0,
         )

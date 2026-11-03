@@ -60,7 +60,7 @@ from _printed_tolerance import (
 )
 import pn_pen_rod_spec as rod
 import pn_vn_pen_marker_spec as marker
-import pn_vn_pen_rod_set_screw_spec as rod_set_screw
+import sh_vn_arbor_set_screw_spec as rod_set_screw
 
 # #290: the sheet prints decimal inch (``drawing_unit: in``).  Lengths stay
 # millimetres, each the exact decimal of its printed inch value, except the
@@ -197,6 +197,15 @@ SET_SCREW_Y = 11.938  # .47
 SET_SCREW_TAP_LENGTH = round(
     DEPTH_MID_Z - BODY_Z0 - PIVOT_BORE_DIA / 2.0, 6
 )  # 9.3218: body front face to bore wall
+# The rod set screw is the shared McMaster 91375A106, #4-40 x 1/4 cup point
+# (MHA-SH-VN-54).  Its full-form thread stops one pitch short of the cup and
+# 0.75 pitch short of the socket face (the vendor replica,
+# diagnostics/diag_build_91375A106).  Cup on the bore wall, it lies wholly in
+# the tap, so all of that full thread engages.
+ROD_SET_SCREW_PITCH = 25.4 / 40.0  # #4-40 UNC
+ROD_SET_SCREW_FULL_THREAD = round(
+    rod_set_screw.LENGTH - rod_set_screw.POINT_LENGTH - 0.75 * ROD_SET_SCREW_PITCH, 6
+)  # 5.23875, .206
 
 _WALL = WALL_FLOOR_MM  # drawing-guidelines.md rule 17 (walls and webs) floor
 # The carriage hangs the marker on the block's mid-depth: the neck, the body,
@@ -233,8 +242,20 @@ if SET_SCREW_TAP_LENGTH < 1.5 * THREAD_MAJOR_MM[rod_set_screw.THREAD]:
     raise AssertionError(
         "rod set-screw tap is under drawing-guidelines.md rule 18 (1.5 D)"
     )
+# Rule 18 counts the installed screw's full thread, not the tap's capacity.
+if ROD_SET_SCREW_FULL_THREAD < 1.5 * THREAD_MAJOR_MM[rod_set_screw.THREAD]:
+    raise AssertionError(
+        "rod set screw engages under drawing-guidelines.md rule 18 (1.5 D)"
+    )
 if rod_set_screw.LENGTH > SET_SCREW_TAP_LENGTH:
     raise AssertionError("rod set screw stands proud of the front face")
+# Its hex key reaches the recessed socket down the tap: the key's corners
+# clear the tap's minor (drill) diameter.
+if (
+    rod_set_screw.HEX_AF / math.cos(math.radians(30.0))
+    >= TAP_DRILL_MM[rod_set_screw.THREAD]
+):
+    raise AssertionError("the rod set screw's hex key cannot pass the tap")
 if BLOCK_HEIGHT - SET_SCREW_Y - TAP_DRILL_MM[rod_set_screw.THREAD] / 2.0 < _WALL:
     raise AssertionError("rod set-screw tap breaks the block top")
 # The relief corners stand RELIEF_CORNER_R into the slot from each wall at the

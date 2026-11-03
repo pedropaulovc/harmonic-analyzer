@@ -16,7 +16,7 @@ the curve. Everything below the guides rides the rod:
   CrankDeg global, no force solver).
 * pn-pen-v-block -- the brass block HANGING on the rod: the rod's turned pivot
   end drops into the block's pivot bore and its square shoulder rests on the
-  block top; pn-vn-pen-rod-set-screw (front face) locks the pen's yaw, which is
+  block top; sh-vn-arbor-set-screw (front face) locks the pen's yaw, which is
   PEN_BLOCK_YAW_DEG to the paper.
 * pn-vn-pen-marker -- the purchased Sharpie Fine Point, its grip in the block's V-groove,
   nib on the paper, body running out forward and east.
@@ -250,7 +250,7 @@ RIDERS = (
     ("pn-vn-pen-marker", MARKER_POS, MARKER_ROWS),
     ("pn-pen-frame", FRAME_POS, FRAME_ROWS),
     ("pn-vn-pen-set-screw", THUMB_SCREW_POS, THUMB_SCREW_ROWS),
-    ("pn-vn-pen-rod-set-screw", ROD_SET_SCREW_POS, ROD_SET_SCREW_ROWS),
+    ("sh-vn-arbor-set-screw", ROD_SET_SCREW_POS, ROD_SET_SCREW_ROWS),
     ("pn-pen-adjust-screw", STUD_POS, IDENTITY),
     ("pn-vn-pen-adjust-nut", NUT_POS, NUT_ROWS),
     ("sh-vn-music-wire", PEN_WIRE_BOTTOM, IDENTITY),

@@ -12,7 +12,10 @@ import pn_pen_carriage_geom as g
 import pn_pen_frame_spec as frame
 import pn_pen_rod_spec as rod
 import pn_pen_v_block_spec as vb
+import sh_vn_arbor_set_screw_spec as rod_set_screw
 import sh_vn_music_wire_pen_geom as wire
+from _hole_spec import THREAD_MAJOR_MM
+from diagnostics import diag_build_91375A106 as set_screw_recipe
 from _mg_wheel_rim_geometry import RIM_WIRE_R
 from mg_wheel_bar_geom import WHEEL_BAR_Y, WHEEL_X
 from _printed_tolerance import printed_band_mm
@@ -147,6 +150,26 @@ def test_the_wider_ring_reached_the_paper() -> None:
     assert frame.WINDOW_WIDTH - band > vb.NECK_DEPTH + 2.0 * band
     narrower = frame.WINDOW_WIDTH - 25.4 / 100.0
     assert narrower - band <= vb.NECK_DEPTH + 2.0 * band + 1e-9
+
+
+def test_rod_set_screw_engages_its_full_thread_wholly_in_the_tap() -> None:
+    # Codjiflo on #2119: rule 18 counts the installed screw's full-form
+    # thread, not the tap's length.  The 3/16 91375A105 left 1.28 D; the
+    # shared 1/4 91375A106 leaves over 1.5 D, all of it in the tap.
+    recipe = set_screw_recipe
+    assert rod_set_screw.LENGTH == pytest.approx(recipe.LENGTH)
+    chamfers = recipe.POINT_CHAMFER + recipe.SOCKET_CHAMFER
+    need = 1.5 * THREAD_MAJOR_MM[rod_set_screw.THREAD]
+    assert vb.ROD_SET_SCREW_FULL_THREAD == pytest.approx(recipe.LENGTH - chamfers)
+    assert vb.ROD_SET_SCREW_FULL_THREAD >= need
+    assert 3.0 / 16.0 * 25.4 - chamfers < need
+    # Cup on the pivot-bore wall, socket face under the front face.
+    cup = g.ROD_SET_SCREW_CUP_LOCAL_Z
+    assert cup == pytest.approx(vb.DEPTH_MID_Z - vb.PIVOT_BORE_DIA / 2.0)
+    assert cup - rod_set_screw.LENGTH > vb.BODY_Z0
+    assert g.ROD_SET_SCREW_MASS_G == pytest.approx(
+        recipe.VENDOR_VOLUME_MM3 * g.ALLOY_STEEL_G_PER_MM3
+    )
 
 
 def test_rod_line_sits_on_the_wheel_rim_tangent() -> None:

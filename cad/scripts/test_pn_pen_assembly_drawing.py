@@ -17,7 +17,7 @@ import pn_pen_frame_spec as frame
 import pn_pen_rod_spec as rod
 import pn_pen_v_block_spec as v_block
 import pn_vn_pen_marker_spec as marker
-import pn_vn_pen_rod_set_screw_spec as rod_set_screw
+import sh_vn_arbor_set_screw_spec as rod_set_screw
 import _mcmaster_99607a213 as thumb_screw
 from _buildgraph import module_deps_of
 from _drawing_common import is_pictorial_orientation

@@ -1068,17 +1068,6 @@
       ]
     },
     {
-      "old_stem": "vn-pen-rod-set-screw",
-      "old_number": "MHA-VN-061",
-      "new_identities": [
-        {
-          "parent": "pn-pen",
-          "stem": "pn-vn-pen-rod-set-screw",
-          "number": "MHA-PN-VN-52"
-        }
-      ]
-    },
-    {
       "old_stem": "vn-pen-set-screw",
       "old_number": "MHA-VN-010",
       "new_identities": [
@@ -2647,6 +2636,18 @@
         {
           "stem": "ch-rocker-arm-tl-oblique-pivot-pin",
           "number": "MHA-CH-06-TL-23"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "vn-pen-rod-set-screw",
+      "old_number": "MHA-VN-061",
+      "new_identities": [
+        {
+          "parent": "pn-pen",
+          "stem": "pn-vn-pen-rod-set-screw",
+          "number": "MHA-PN-VN-52"
         }
       ],
       "status": "retired"

@@ -22,7 +22,7 @@ import pn_vn_hanger_screw_spec as hanger_screw
 import pn_vn_pen_adjust_nut_spec as stud_nut
 import pn_vn_pen_hanger_jam_nut_spec as hanger_jam_nut
 import pn_vn_pen_hanger_nut_spec as hanger_nut
-import pn_vn_pen_rod_set_screw_spec as rod_set_screw
+import sh_vn_arbor_set_screw_spec as rod_set_screw
 import _mcmaster_99607a213 as thumb_screw
 from _inch_fraction import inch_fraction
 from _assembly_contract import assembly_contract

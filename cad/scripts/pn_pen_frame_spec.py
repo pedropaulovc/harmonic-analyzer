@@ -71,10 +71,11 @@ WINDOW_HEIGHT = OUTER_HEIGHT - 2.0 * RAIL_END  # 1.10
 # The window's internal corners (drawing-guidelines.md rule 16: no sharp
 # internal corner; as large as function allows).  Nothing needs them small:
 # a corner over the neck's side gap rides the neck's top edges, which only
-# lifts the stirrup a little (pn_pen_carriage_geom guards that lift at the
-# title block's limit), so the sheet prints no radius and the title block's
-# INSIDE CORNERS R.040 MAX governs (machinist review: a bare 4X R.02 read as
-# an unexplained tightening).  The model carries the .02 side gap.
+# lifts the stirrup, by at most its radius (pn_pen_carriage_geom guards that
+# lift at the title block's limit), so the sheet prints no radius and the
+# title block's INSIDE CORNERS R.040 MAX governs (machinist review: a bare
+# 4X R.02 read as an unexplained tightening).  The model carries the .02
+# side gap.
 INSIDE_CORNER_R_MAX = inside_corner_radius_mm(unit=UNIT)
 WINDOW_CORNER_R = 0.508  # .02
 if WINDOW_CORNER_R > INSIDE_CORNER_R_MAX:

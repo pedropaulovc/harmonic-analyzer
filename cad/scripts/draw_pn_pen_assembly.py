@@ -343,7 +343,7 @@ PART_ROWS = {
     "pn-vn-pen-marker": _config.parts("pn-vn-pen-marker"),
     "pn-pen-frame": _config.parts("pn-pen-frame"),
     "pn-vn-pen-set-screw": _config.parts("pn-vn-pen-set-screw"),
-    "pn-vn-pen-rod-set-screw": _config.parts("pn-vn-pen-rod-set-screw"),
+    "sh-vn-arbor-set-screw": _config.parts("sh-vn-arbor-set-screw"),
     "pn-pen-adjust-screw": _config.parts("pn-pen-adjust-screw"),
     "pn-vn-pen-adjust-nut": _config.parts("pn-vn-pen-adjust-nut"),
     WIRE_ROW: _config.parts("sh-vn-music-wire"),

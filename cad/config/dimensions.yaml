@@ -1953,10 +1953,10 @@ sections:
         - 'p.64–65; McMaster 99607A213 knurled #4-40 thumb screw up through the stirrup''s bottom rail; its tip presses the grip into the V'
         - scaled
         - low
-      - - Rod set screw (MHA-PN-VN-52, purchased)
-        - '#4-40 × 3/16 cup point (McMaster 91375A105) in the v-block front-face tap, cup on the rod''s pivot end'
+      - - Rod set screw (MHA-SH-VN-54, purchased, shared)
+        - '#4-40 × 1/4 cup point (McMaster 91375A106) in the v-block front-face tap, cup on the rod''s pivot end; .206 of full thread engaged (rule 18: 1.5 D is .168)'
         - —
-        - 'p.60 (side set screw pins the block to the rod); tap length .367 (9.3218 mm, body front face to bore wall), screw recessed 4.56 mm below the face'
+        - 'p.60 (side set screw pins the block to the rod); tap length .367 (9.3218 mm, body front face to bore wall), screw recessed 2.97 mm (.117) below the face'
         - catalog + derived
         - med
       - - Pen-height adjuster (pn-pen-adjust-screw + MHA-PN-VN-53 jam nut)

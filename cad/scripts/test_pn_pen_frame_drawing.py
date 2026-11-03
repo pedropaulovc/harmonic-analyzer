@@ -258,22 +258,31 @@ def test_window_height_band_keeps_the_thumb_screw_throw() -> None:
     assert slack >= window_band + block_band + carriage.WINDOW_CORNER_RIDE_MAX
 
 
-def test_window_corners_may_ride_the_neck_only_a_little() -> None:
+def _corner_ride(r: float, gap: float) -> float:
+    """Lift of a radius-``r`` window corner riding a neck top edge ``gap`` in
+    from its side wall: the edge sits on the corner's arc."""
+    return 0.0 if gap >= r else r - math.sqrt(r * r - (r - gap) ** 2)
+
+
+def test_window_corners_ride_the_neck_at_most_a_full_radius() -> None:
     # The sheet prints no window radius, so the title block's INSIDE CORNERS
-    # R.040 MAX governs it.  At that radius, with the window at its printed
-    # minimum and the neck at its printed maximum, the corners ride the neck's
-    # top edges and lift the stirrup: the carriage takes that lift.
+    # R.040 MAX governs it.  With the window at its printed minimum, the neck
+    # at its printed maximum and the stirrup anywhere across the neck (nothing
+    # centres it), the corners ride the neck's top edges and lift the stirrup:
+    # the carriage takes the worst lift.
     assert spec.WINDOW_CORNER_R <= spec.INSIDE_CORNER_R_MAX
     assert "WindowCornerR" not in spec.DRAWING_PRECISION_BY_NAME
-    lift = carriage.window_corner_ride_max()
-    assert 0.0 < lift < spec.INSIDE_CORNER_R_MAX
-    # The edge then sits on the corner's arc: its distance from the arc
-    # centre is the radius.
     r = spec.INSIDE_CORNER_R_MAX
     band = printed_band_mm(2, unit=spec.UNIT)
-    neck_max = v_block.NECK_DEPTH + 2.0 * band
-    gap = (spec.WINDOW_WIDTH - band - neck_max) / 2.0
-    assert math.hypot(r - gap, r - lift) == pytest.approx(r)
+    float_total = spec.WINDOW_WIDTH - band - (v_block.NECK_DEPTH + 2.0 * band)
+    assert float_total > 0.0
+    shifts = [float_total * i / 100.0 for i in range(101)]
+    worst = max(
+        max(_corner_ride(r, s), _corner_ride(r, float_total - s)) for s in shifts
+    )
+    assert carriage.window_corner_ride_max() == pytest.approx(worst)
+    # Centred, the corners would lift it far less.
+    assert _corner_ride(r, float_total / 2.0) < worst / 1.5
 
 
 def test_views_and_scales_are_explicit() -> None:
