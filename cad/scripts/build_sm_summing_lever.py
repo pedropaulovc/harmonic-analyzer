@@ -2173,6 +2173,7 @@ def _assert_spring_row_equations(adapter, drives: list[tuple[str, str]]) -> None
     _telemetry.success(f"spring-row locators equation-driven: {system_mm}")
 
 
+@_telemetry.traced("part.spring_row_coordinates")
 async def _spring_row_coordinates(adapter) -> None:
     """Native BASIC locators of the 20X spring-tap pattern for the plan.
 
@@ -2196,23 +2197,27 @@ async def _spring_row_coordinates(adapter) -> None:
     seed = (HOLE_X, -HOLE_Z_LAST)
     second = (HOLE_X, -(HOLE_Z_LAST - CHANNEL_PITCH))
     set_sketch_direct_db(adapter, True)
-    ridge_mark = check(
-        "spring-row ridge mark",
-        await adapter.add_line(*ridge, ridge[0], ridge[1] + SPRING_ROW_MARK),
-    )
-    end_mark = check(
-        "spring-row end mark",
-        await adapter.add_line(*end, end[0] + SPRING_ROW_MARK, end[1]),
-    )
-    seed_mark = check(
-        "spring-row seed mark",
-        await adapter.add_line(*seed, seed[0] + SPRING_ROW_TAP_MARK, seed[1]),
-    )
-    second_mark = check(
-        "spring-row second mark",
-        await adapter.add_line(*second, second[0] + SPRING_ROW_TAP_MARK, second[1]),
-    )
-    set_sketch_direct_db(adapter, False)
+    try:
+        ridge_mark = check(
+            "spring-row ridge mark",
+            await adapter.add_line(*ridge, ridge[0], ridge[1] + SPRING_ROW_MARK),
+        )
+        end_mark = check(
+            "spring-row end mark",
+            await adapter.add_line(*end, end[0] + SPRING_ROW_MARK, end[1]),
+        )
+        seed_mark = check(
+            "spring-row seed mark",
+            await adapter.add_line(*seed, seed[0] + SPRING_ROW_TAP_MARK, seed[1]),
+        )
+        second_mark = check(
+            "spring-row second mark",
+            await adapter.add_line(
+                *second, second[0] + SPRING_ROW_TAP_MARK, second[1]
+            ),
+        )
+    finally:
+        set_sketch_direct_db(adapter, False)
     for mark in (ridge_mark, end_mark, seed_mark, second_mark):
         _as_construction(adapter, mark)
     check(

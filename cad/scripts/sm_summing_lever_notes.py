@@ -161,7 +161,8 @@ SPRING_ROW_LOCATORS = ("SpringRowX", "SpringStartZ", "SpringPitch")
 # Every Hole Wizard drill diameter prints .XXX, the #36 and #25 tap drills
 # too (.107, .150).  Both are THRU ALL taps, whose native drill variable is
 # <hw-thrutapdrldia>; only the blind bracket taps carry <hw-tapdrldia> and
-# the two depth lengths.
+# the two depth lengths.  A callout does not inherit the part's places, so the
+# drawing writes these: declared exception RV-04 in sm-summing-lever.yaml.
 SPRING_TAP_PRECISION = {"hw-thrutapdrldia": 3}
 COUNTER_TAP_PRECISION = {"hw-thrutapdrldia": 3}
 # The blind bracket taps' routine drill depth prints .XX (rule 3); its

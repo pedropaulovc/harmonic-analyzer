@@ -1287,10 +1287,32 @@ def _run_spring_row_sketch() -> tuple[dict, dict[str, tuple[str | None, float]],
         set_dimension_prefix=lambda *args: None,
         mark_dimensions_for_drawing=lambda *args: None,
         null_callout=lambda: None,
+        _telemetry=SimpleNamespace(traced=lambda name: lambda function: function),
     )
     asyncio.run(namespace["_spring_row_coordinates"](recorder))
     dims = {name: (drive, value) for (name, drive), value in zip(rows, emitted)}
     return namespace, dims, events
+
+
+def test_spring_row_sketch_restores_inference_when_a_line_fails() -> None:
+    """AddToDB is seat-wide state: a failed mark must not leave the next leaf
+    authoring with inference off."""
+    states: list[bool] = []
+
+    def check(label, result):
+        if label == "spring-row seed mark":
+            raise RuntimeError(label)
+        return result.data
+
+    namespace = _recipe_namespace(
+        ("_spring_row_coordinates",),
+        SketchDims=lambda: None, check=check,
+        set_sketch_direct_db=lambda adapter, value: states.append(value),
+        _telemetry=SimpleNamespace(traced=lambda name: lambda function: function),
+    )
+    with pytest.raises(RuntimeError, match="seed mark"):
+        asyncio.run(namespace["_spring_row_coordinates"](_SketchRecorder()))
+    assert states == [True, False]
 
 
 def test_spring_row_locators_are_driven_by_the_pattern_globals_and_evaluate_to_spec() -> None:
