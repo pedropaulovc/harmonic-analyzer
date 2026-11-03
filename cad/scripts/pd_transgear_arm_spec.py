@@ -190,13 +190,14 @@ if LOCATOR_PUNCH_AIR_MIN_MM <= 0.0:
     raise AssertionError("the MHA-PD-VN-64 dowel reaches the MHA-PD-18 front face")
 
 # --- Printed text -------------------------------------------------------------
-# The thickness is the stock's: it prints "5/16 ±.001 (.3125) GROUND
-# STOCK", prefix and suffix around the imported model value, which the
-# parentheses mark as reference, so the title block's rows never apply to
-# it. The stock's own band is printed because the seat tilt and the plate
-# screw's engagement are judged at it (codjiflo review of #2015).
-STOCK_THICKNESS_BAND_IN_TEXT = f"±{_inch(ARM.THICKNESS_BAND, 3)}"
-STOCK_TEXT_PREFIX = f"{STOCK_THICKNESS_IN} {STOCK_THICKNESS_BAND_IN_TEXT} ("
+# The thickness is the stock's: it prints "5/16 (.3125) GROUND STOCK REF",
+# prefix and suffix around the imported model value, which the parentheses
+# mark as reference, so the title block's rows never apply to it.  A
+# supplier size prints untoleranced and the supplier's catalogue tolerance
+# governs it (fleet supplier-REF ruling, #2147); the seat tilt and the plate
+# screw's engagement are judged at that catalogue tolerance,
+# ``pd_transgear_arm_geometry.THICKNESS_BAND`` (codjiflo review of #2015).
+STOCK_TEXT_PREFIX = f"{STOCK_THICKNESS_IN} ("
 # REF: an as-bought size with the supplier's tolerance (units guidance).
 STOCK_TEXT_SUFFIX = ") GROUND STOCK REF"
 PLATE_TAP_EDGE_BREAK_CALLOUT = (

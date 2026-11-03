@@ -73,8 +73,9 @@ FRONT_FACE_MACHINE_Z = FRAME_FRONT_COLUMN_Z - ARC_DEPTH + SPACER.LENGTH
 
 # --- Stock: 5/16 x 1 precision-ground flat bar, faces as supplied ------------
 # The arm is cut from McMaster 9517K466 (R9-6, R9-25): its thickness is the
-# stock's, ±0.001 in as supplied, not a machined band.  The sheet prints it
-# as a reference to the stock; walls, joints and the chain stack read
+# stock's, ±0.001 in as supplied (the catalogue tolerance), not a machined
+# band.  The sheet prints it as an untoleranced reference to the stock
+# (#2147); walls, joints and the chain stack read the catalogue limits,
 # THICKNESS_BAND.
 STOCK_SKU = "9517K466"
 STOCK_THICKNESS_IN = Fraction(5, 16)

@@ -129,14 +129,17 @@ def test_the_walls_were_judged_at_no_less_than_the_printed_title_block_band() ->
 
 
 def test_the_thickness_prints_as_the_ground_stock_reference() -> None:
-    """The stock's band governs the thickness, so its dimension prints in
-    parentheses after the stock's own size, which is the modelled one."""
+    """The stock's catalogue tolerance governs the thickness, so its
+    dimension prints in parentheses after the stock's own size, which is the
+    modelled one, with no band (#2147: a supplier size is untoleranced REF)."""
     prefix, suffix = spec.STOCK_TEXT_PREFIX, spec.STOCK_TEXT_SUFFIX
     assert prefix.endswith("(") and suffix.startswith(")")
-    stock, band = prefix.rstrip("( ").split()
+    (stock,) = prefix.rstrip("( ").split()
     assert float(Fraction(stock)) * 25.4 == pytest.approx(geometry.THICKNESS)
-    # The stock's thickness band, which the seat tilt is judged at, prints.
-    assert float(band.lstrip("±")) * 25.4 == pytest.approx(geometry.THICKNESS_BAND)
+    assert "±" not in prefix + suffix and "REF" in suffix
+    # The seat tilt and the screw engagement are judged at the 9517K466
+    # catalogue tolerance, ±.001 in.
+    assert geometry.THICKNESS_BAND == pytest.approx(0.001 * 25.4)
     assert "Depth" in drawing.END_KEEP
     # Machinist review r3 (rule 14): the dimension line ran along the
     # text's foot and its extension lines struck it. The text stands offset

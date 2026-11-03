@@ -795,8 +795,8 @@ def test_sheet_two_shows_and_balloons_exactly_the_transgear() -> None:
         "pd-transgear-removable-1"
     )
     # The hub lands on its flange's front rim, on the far side from the
-    # knob stack; every other family walks its own body on the instance the
-    # view shows.
+    # knob stack; the knob shaft on a 15T tooth tip at F; every other family
+    # walks its own body on the instance the view shows.
     hub_point = drawing.TRANSGEAR_BALLOON_ANCHORS["pd-transgear-disc-hub"].point_mm
     assert hub_point is not None
     assert math.hypot(hub_point[0], hub_point[1]) == pytest.approx(
@@ -804,10 +804,31 @@ def test_sheet_two_shows_and_balloons_exactly_the_transgear() -> None:
     )
     assert hub_point[2] == pytest.approx(-drawing.hub.FLANGE_THICK)
     assert hub_point[0] > 0.0 and hub_point[1] > 0.0
+    shaft = drawing.knob_shaft
+    x, y, z = drawing.TRANSGEAR_BALLOON_ANCHORS["pd-transgear-knob-shaft"].point_mm
+    assert z == 0.0  # F, the pinion's front face
+    assert math.hypot(x, y) == pytest.approx(shaft.OUTSIDE_DIA / 2.0, abs=1e-4)
+    # A tooth centre: half a pitch from the gap centred on GAP_AZIMUTH_DEG.
+    pitch = 360.0 / shaft.TEETH
+    offset = (math.degrees(math.atan2(y, x)) - shaft.GAP_AZIMUTH_DEG) % pitch
+    assert offset == pytest.approx(pitch / 2.0, abs=1e-3)
+    # *Isometric: sheet right -0.707 x + 0.707 z, up 0.408 x + 0.816 y +
+    # 0.408 z.  The tip stands lower right of the axis, more than the D-core
+    # radius off the axis's projected line, so the forward neck cannot hide it.
+    right, up = -0.7071 * x, 0.4082 * x + 0.8165 * y
+    assert right > 0.0 and up < 0.0
+    axis = (0.7071, 0.4082)
+    along = (right * axis[0] + up * axis[1]) / math.hypot(*axis)
+    assert math.sqrt(right**2 + up**2 - along**2) > shaft.CORE_DIA / 2.0
+    pinned = {
+        "pd-transgear-removable",
+        "pd-transgear-disc-hub",
+        "pd-transgear-knob-shaft",
+    }
     assert all(
         anchor == drawing.BalloonAnchor()
         for stem, anchor in drawing.TRANSGEAR_BALLOON_ANCHORS.items()
-        if stem not in {"pd-transgear-removable", "pd-transgear-disc-hub"}
+        if stem not in pinned
     )
 
 
@@ -1590,6 +1611,16 @@ def test_the_cluster_is_shimmed_to_view_e_after_it_is_hung() -> None:
     assert drawing._N["pd-transgear-rear-bushing"] in shimmed
     assert drawing.CLUSTER_FLOAT_VIEW_NAME in shimmed and "FEELER" in shimmed
     assert f"{cluster_fit.END_FLOAT_MIN:.2f}" not in shimmed
+    # Codjiflo (#2124): the BOM's QTY is the model's nominal pack; the step
+    # gives the fit-up's count range and the row supplies its worst case.
+    low_count, high_count = cluster_fit.SHIM_COUNT_RANGE
+    assert f"{low_count} TO {high_count} " in " ".join(shimmed.split())
+    assert high_count <= cluster_fit.SHIM_COUNT_MAX
+    description = drawing.BOM_DESCRIPTIONS["pd-vn-transgear-cluster-shim"]
+    assert f"SUPPLY {cluster_fit.SHIM_COUNT_MAX}," in description
+    assert drawing.TRANSGEAR_QUANTITIES["pd-vn-transgear-cluster-shim"] == (
+        cluster_fit.SHIM_COUNT_MODEL
+    )
     low = cluster_float.NOMINAL_MM
     high = low + cluster_float.TOLERANCE_MM[1]
     assert cluster_float.TOLERANCE_MM[0] == 0.0

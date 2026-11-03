@@ -589,7 +589,7 @@ def _set_tap_callout_text(display: Any, qualifier: str, *, label: str) -> None:
 
 
 def _set_stock_text(adapter: Any, annotations: list[Any]) -> None:
-    """Print the thickness as the stock's: "5/16 ±.001 (.3125) GROUND STOCK REF".
+    """Print the thickness as the stock's: "5/16 (.3125) GROUND STOCK REF".
 
     The arm is cut from 5/16 ground flat stock with its faces as supplied, so
     the stock's tolerance governs the thickness, not the .XX row.  Prefix and

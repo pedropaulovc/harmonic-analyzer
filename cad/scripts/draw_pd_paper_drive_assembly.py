@@ -930,7 +930,12 @@ BOM_DESCRIPTIONS = {
     "pd-vn-transgear-retaining-ring": (
         f"RETAINING RING, MCMASTER {_SKU['pd-vn-transgear-retaining-ring']}"
     ),
-    "pd-vn-transgear-cluster-shim": f"SHIM, MCMASTER {_SKU['pd-vn-transgear-cluster-shim']}",
+    # QTY is the model's nominal count; the fit-up takes 0 to SHIM_COUNT_MAX
+    # (VIEW E), so the row supplies the worst case (Codjiflo, #2124).
+    "pd-vn-transgear-cluster-shim": (
+        f"SHIM, SUPPLY {cluster_fit.SHIM_COUNT_MAX}, "
+        f"MCMASTER {_SKU['pd-vn-transgear-cluster-shim']}"
+    ),
     "pd-rack-pinion": (
         f"REDUCER DISC, STOCK {disc.TEETH}T {disc.DIAMETRAL_PITCH:g}DP "
         f"PA{disc.PRESSURE_ANGLE_DEG:g}"
@@ -1092,12 +1097,31 @@ HUB_BALLOON_POINT_MM = (
     round(hub.FLANGE_DIA / 2.0 * math.sin(HUB_BALLOON_ANGLE), 3),
     -hub.FLANGE_THICK,
 )
+# Sheet 3's balloon 36 walked to the journal's rear end, where the shaft
+# meets the exploded plate's knob boss in the isometric, and read as the
+# plate's (2026-11-03 ENFORCE review of #2095's run 20261103T013313660Z,
+# r1/r3). It lands instead on a 15T tooth tip at F, the pinion's front face:
+# the knob shaft is placed unrotated (FRONT_STACK_PHASE_DEG 0) with a tooth
+# centred on local +X every 24 deg, and the tooth at 192 deg projects lower
+# right of the axis in the *Isometric (sheet right -0.707 x, sheet up
+# 0.408 x + 0.816 y), on F's camera side and away from the forward neck.
+KNOB_SHAFT_BALLOON_ANGLE = math.radians(8 * 360.0 / knob_shaft.TEETH)
+if knob_shaft.FRONT_STACK_PHASE_DEG != 0.0:
+    raise AssertionError("balloon 36's tooth needs the knob shaft unrotated")
+_KNOB_TIP_R = knob_shaft.OUTSIDE_DIA / 2.0
+KNOB_SHAFT_BALLOON_POINT_MM = (
+    round(_KNOB_TIP_R * math.cos(KNOB_SHAFT_BALLOON_ANGLE), 4),
+    round(_KNOB_TIP_R * math.sin(KNOB_SHAFT_BALLOON_ANGLE), 4),
+    0.0,
+)
+_BALLOON_POINTS_MM = {
+    "pd-transgear-disc-hub": HUB_BALLOON_POINT_MM,
+    "pd-transgear-knob-shaft": KNOB_SHAFT_BALLOON_POINT_MM,
+}
 TRANSGEAR_BALLOON_ANCHORS = {
     stem: BalloonAnchor(instance=explode.KNOB_WHEEL_INSTANCE)
     if stem == "pd-transgear-removable"
-    else BalloonAnchor(point_mm=HUB_BALLOON_POINT_MM)
-    if stem == "pd-transgear-disc-hub"
-    else BalloonAnchor()
+    else BalloonAnchor(point_mm=_BALLOON_POINTS_MM.get(stem))
     for stem in TRANSGEAR_QUANTITIES
 }
 
@@ -1670,7 +1694,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "IN THE PIN GROOVE."
         ),
         "disc-cluster-shimmed": (
-            f"SHIM AT THE ARM FACE: {_N['pd-vn-transgear-cluster-shim']} SHIMS UNDER "
+            f"SHIM AT THE ARM FACE: {cluster_fit.SHIM_COUNT_RANGE[0]} TO "
+            f"{cluster_fit.SHIM_COUNT_RANGE[1]} {_N['pd-vn-transgear-cluster-shim']} SHIMS UNDER "
             f"THE {_N['pd-transgear-rear-bushing']} BUSHING TO {CLUSTER_FLOAT_VIEW_NAME} "
             f"(SHEET {SHEET_NAMES.index('ASSEMBLY AND FIT-UP (CONT.)') + 1}) END "
             "FLOAT (FEELER AT THE RING, CLUSTER REARWARD)."

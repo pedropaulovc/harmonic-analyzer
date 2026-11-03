@@ -110,6 +110,12 @@ TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep(
         "cup pin out of the cup", ("pd-vn-transgear-knob-cup-pin",), "x", -22.0
     ),
+    # The thrust ring rearward along the journal, clear of the 15T it bears
+    # on, so the shaft's teeth, the ring and the plate hub read in fitting
+    # order (2026-11-03 ENFORCE review of #2095's run 20261103T013313660Z,
+    # r1/r3: the pinion was drawn partly inside ring 38).  The ring stops
+    # well short of the plate's hub, thrown 40 mm rearward below.
+    ExplodeStep("thrust ring rearward", ("pd-transgear-knob-thrust-ring",), "z", 12.0),
     # The plate off the arm's rear face, its screws behind it and the two
     # locating dowels drawn out of the arm between them.  At 16 mm the
     # isometric drew the plate on the arm's top edge with the dowels hidden
@@ -208,14 +214,13 @@ TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("thumbnut forward", ("pd-transgear-thumbnut",), "z", -20.0),
 )
 # The arm, its pressed latch pin, the cluster's rear bushing and the knob
-# shaft with its thrust ring stay put; the moved parts read against them.
+# shaft stay put; the moved parts read against them.
 TRANSGEAR_STATIONARY_STEMS = frozenset(
     {
         "pd-transgear-arm",
         "pd-vn-transgear-latch-pin",
         "pd-transgear-rear-bushing",
         "pd-transgear-knob-shaft",
-        "pd-transgear-knob-thrust-ring",
     }
 )
 # Every family the transgear-exploded sheet shows and balloons (the knob
