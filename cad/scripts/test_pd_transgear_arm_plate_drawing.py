@@ -754,3 +754,18 @@ def test_two_sheets_label_each_face_view() -> None:
     # *Back looks at face A.
     assert geometry.REAR_FACE_Z > 0.0
     assert drawing.BACK_CENTER[0] < drawing.KNOB_SECTION_CENTER[0]
+
+
+def test_section_a_a_projects_level_with_the_face_a_view() -> None:
+    # Run 20261103T155747207Z machinist review: the section stood 4.2 mm
+    # under the view, so its bore axis did not trace across.  Each view
+    # centres its own outline: the view's spans the top corner, the
+    # section's the top edge at the cut (x = 0).
+    scale = drawing.SHEET_SCALE[0] / 1000.0
+    view_k = drawing.BACK_CENTER[1] - (drawing._TOP + drawing._BOTTOM) / 2.0 * scale
+    section_k = (
+        drawing.KNOB_SECTION_CENTER[1]
+        - (drawing._SECTION_TOP + drawing._BOTTOM) / 2.0 * scale
+    )
+    assert section_k == pytest.approx(view_k, abs=1e-9)
+    assert drawing._BACK_K[1] == pytest.approx(view_k)
