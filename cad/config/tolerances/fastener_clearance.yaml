@@ -1,19 +1,25 @@
 fastener_clearance:
-  # ASME B18.2.8 Table 2 inch series, the SolidWorks ANSI-inch Hole Wizard rows
-  # that _hole_spec.CLEARANCE_MM cuts. Each fit names the owned 115-piece drill
-  # index member (cad/process/shop/inventory.toml) that drills it.
+  # The drill that cuts each SolidWorks ANSI-inch Hole Wizard clearance row in
+  # _hole_spec.CLEARANCE_MM (the wizard-database diameters the model cuts, after
+  # ASME B18.2.8 Table 2). The drill is what the shop cuts, so each fit names
+  # the owned 115-piece drill index member (cad/process/shop/inventory.toml)
+  # whose size lands in the native nominal's drilled-hole band below: never
+  # under the nominal, so the hole meets the print's minimum and every stack
+  # sized on nominal + band covers the drill. dia_in is the drill's own size,
+  # not the native nominal. A row the index cannot land in that band, or with
+  # no wizard row, carries a note (test_hole_spec pins both).
   # The drilled-hole DRAWING tolerance (+.004/.000 in) is a title-block general
   # tolerance, not a fit class -- it lives in title_block.yaml (drilled_hole)
   # with the other $PRPSHEET-stamped tolerances, so a display edit re-stamps
   # parts without a geometry FULL rebuild.
   units: in
   sizes:
-    "#2":   {close: {drill: "3/32", dia_in: 0.0938}, normal: {drill: "#38", dia_in: 0.1015}, loose: {drill: "#32", dia_in: 0.1160}}
+    "#2":   {close: {drill: "#41", dia_in: 0.0960}, normal: {drill: "#37", dia_in: 0.1040}, loose: {drill: "#32", dia_in: 0.1160}}
     "#3":   {close: {drill: "#36", dia_in: 0.1065}, normal: {drill: "#32", dia_in: 0.1160}, loose: {drill: "#30", dia_in: 0.1285}}
     "#4":   {close: {drill: "#31", dia_in: 0.1200}, normal: {drill: "#30", dia_in: 0.1285}, loose: {drill: "#27", dia_in: 0.1440}}
-    "#6":   {close: {drill: "#23", dia_in: 0.1540}, normal: {drill: "#18", dia_in: 0.1695}, loose: {drill: "#13", dia_in: 0.1850}}
+    "#6":   {close: {drill: "#23", dia_in: 0.1540}, normal: {drill: "#17", dia_in: 0.1730}, loose: {drill: "#13", dia_in: 0.1850}}
     "#8":   {close: {drill: "#15", dia_in: 0.1800}, normal: {drill: "#9", dia_in: 0.1960}, loose: {drill: "#3", dia_in: 0.2130}}
-    "#10":  {close: {drill: "#5", dia_in: 0.2055}, normal: {drill: "#2", dia_in: 0.2210}, loose: {drill: "B", dia_in: 0.2380}}
-    "1/4":  {close: {drill: "H", dia_in: 0.2660}, normal: {drill: "K", dia_in: 0.2810}, loose: {drill: "19/64", dia_in: 0.2969}}
-    "5/16": {close: {drill: "21/64", dia_in: 0.3281}, normal: {drill: "11/32", dia_in: 0.3438}, loose: {drill: "23/64", dia_in: 0.3594}}
-    "3/8":  {free: {drill: "X", dia_in: 0.3970}}
+    "#10":  {close: {drill: "#4", dia_in: 0.2090}, normal: {drill: "#2", dia_in: 0.2210}, loose: {drill: "B", dia_in: 0.2380}}
+    "1/4":  {close: {drill: "H", dia_in: 0.2660}, normal: {drill: "K", dia_in: 0.2810}, loose: {drill: "19/64", dia_in: 0.2969, note: "no index member lands in .2970-.3010 (native 7.544 mm); 19/64 cuts .0001 under the nominal and N (.3020) over the band; no part cuts this row"}}
+    "5/16": {close: {drill: "21/64", dia_in: 0.3281}, normal: {drill: "S", dia_in: 0.3480, note: "S sits at the inch band's top (native 8.738 mm + .004); against a mm sheet's +0.10 it is 0.0012 mm over, which the feed lever's wall stack (ch_rocker_arm_tl_oblique_feed_lever_spec.WALLS_MM, 0.071 over its 2.0 floor) absorbs; 11/32 (.3438) cuts under the nominal"}, loose: {drill: "23/64", dia_in: 0.3594}}
+    "3/8":  {free: {drill: "X", dia_in: 0.3970, note: "no Hole Wizard clearance row; cut as the X letter drill (_hole_spec.LETTER_DRILL_MM)"}}
