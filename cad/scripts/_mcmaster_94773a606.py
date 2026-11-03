@@ -19,9 +19,10 @@ CATALOG_PACKAGE_QTY = 10
 THICKNESS_NOMINAL = 0.005 * MM_PER_IN  # 0.127
 DIMS = WasherDimensions(
     part_no="94773A606",
-    # The model's bore is the band's middle: the catalogue's 1/8 is its floor,
-    # line-on-line with the Ø.125 pin.
-    id=(0.125 + 0.012 / 2.0) * MM_PER_IN,  # 3.3274
+    # The model's bore, and the sheet's supplier REF, is the catalogue's
+    # nominal 1/8 (Codjiflo, #2124): the band's floor, line-on-line with the
+    # Ø.125 pin, which the assembly's interference check reads as contact.
+    id=0.125 * MM_PER_IN,  # 3.175
     od=0.25 * MM_PER_IN,  # 6.35
     thickness_min=0.0045 * MM_PER_IN,  # 0.1143
     thickness_max=0.0055 * MM_PER_IN,  # 0.1397

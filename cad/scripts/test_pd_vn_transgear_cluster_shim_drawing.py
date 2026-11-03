@@ -45,7 +45,8 @@ def test_spec_carries_the_catalogue_bands() -> None:
     )
     assert (spec.ID_MIN, spec.ID_MAX) == pytest.approx((0.125 * IN, 0.137 * IN))
     assert (spec.OD_MIN, spec.OD_MAX) == pytest.approx((0.245 * IN, 0.252 * IN))
-    assert spec.ID_MIN < spec.ID < spec.ID_MAX
+    # The model and its supplier REF carry the catalogue's nominal 1/8.
+    assert spec.ID == spec.ID_MIN == pytest.approx(0.125 * IN)
     assert spec.TOP_Y - spec.BOTTOM_Y == pytest.approx(spec.THICKNESS)
     assert spec.shim_volume() == pytest.approx(
         math.pi / 4 * (spec.OD**2 - spec.ID**2) * spec.THICKNESS

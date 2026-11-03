@@ -3,7 +3,7 @@ r"""McMaster 94773A606 -- 18-8 stainless shim, ID 1/8 x OD 1/4 x .005 in.
 Used as pd-vn-transgear-cluster-shim (MHA-PD-VN-68).  The catalogue facts and
 the part frame are ``pd_vn_transgear_cluster_shim_spec``'s.  The model is one
 Top-plane ID x OD annulus extruded blind THICKNESS (the catalogue's .005 in
-nominal) along +Y from the y = 0 face, the bore at its band's middle.
+nominal) along +Y from the y = 0 face, the bore at the catalogue's nominal 1/8.
 
 The product page is behind McMaster's login wall, so no 3-D model was
 fetched: the recipe has no replica gate, and the standalone run is

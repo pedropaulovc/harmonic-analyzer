@@ -1617,6 +1617,9 @@ def test_the_cluster_is_shimmed_to_view_e_after_it_is_hung() -> None:
     assert drawing._N["pd-vn-transgear-cluster-shim"] in shimmed
     assert drawing._N["pd-transgear-rear-bushing"] in shimmed
     assert drawing.CLUSTER_FLOAT_VIEW_NAME in shimmed and "FEELER" in shimmed
+    # Codjiflo (#2124): the gap is read with the ring on the groove's load
+    # wall, where transgear_cluster_fit puts it, not loose in its play.
+    assert "RING ON ITS GROOVE'S LOAD WALL" in " ".join(shimmed.split())
     assert f"{cluster_fit.END_FLOAT_MIN:.2f}" not in shimmed
     # Codjiflo and machinist review (#2124): the step gives the fit-up's
     # count range, and the BOM's QTY is the whole kit, the stack's nominal

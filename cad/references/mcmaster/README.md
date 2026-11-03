@@ -1338,7 +1338,7 @@ Catalog specifications checked on September 10, 2026:
   binds on the pin (line-on-line at the worst case; `transgear_cluster_fit`
   checks it). Catalogue-only: no vendor model is downloaded, so it has no
   replica gate; `diag_build_94773A606.py` draws the catalogue washer with
-  the I.D. at mid-band.
+  the I.D. at the catalogue's nominal 1/8.
 
 - [9715K43](https://www.mcmaster.com/9715K43/) (`pd-vn-transgear-pivot-spring`,
   MHA-PD-VN-63, one) sits on the MHA-PD-VN-57 pivot shoulder screw's shoulder, between

@@ -1713,7 +1713,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"{cluster_fit.SHIM_COUNT_RANGE[1]} {_N['pd-vn-transgear-cluster-shim']} SHIMS UNDER "
             f"THE {_N['pd-transgear-rear-bushing']} BUSHING TO {CLUSTER_FLOAT_VIEW_NAME} "
             f"(SHEET {SHEET_NAMES.index('ASSEMBLY AND FIT-UP (CONT.)') + 1}) END "
-            "FLOAT (FEELER AT THE RING, CLUSTER REARWARD)."
+            "FLOAT (FEELER AT THE RING, RING ON ITS GROOVE'S LOAD WALL, CLUSTER "
+            "REARWARD)."
         ),
         "collar-pins-pressed": (
             f"PRESS {TRANSGEAR_QUANTITIES['pd-vn-transgear-knob-drive-pin']} "

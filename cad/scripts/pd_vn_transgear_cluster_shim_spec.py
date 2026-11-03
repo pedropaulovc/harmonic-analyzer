@@ -38,7 +38,7 @@ BOTTOM_Y = 0.0
 TOP_Y = THICKNESS
 
 # The sheet prints the catalogue sizes as untoleranced REF (the catalogue
-# governs); the solid is the bore band's middle at the nominal thickness.
+# governs); the solid is the catalogue nominal, bore and thickness.
 SUPPLIER_UNITS = "in"
 DRAWING_REFERENCE_PRECISION = {
     "supplier outer diameter": 3,
