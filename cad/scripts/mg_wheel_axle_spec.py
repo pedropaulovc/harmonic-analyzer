@@ -93,13 +93,13 @@ if 2.0 * RELIEF_ROOT_R >= RELIEF_WIDTH_MIN:
 # Step to thread end. The step is the gauged face the nut stack hangs off,
 # so the thread reads from it (drawing-guidelines.md rule 10 (dimension from a real feature)'s functional datum) and the
 # shank's band stays out of the thread's stack. The band is the user's option
-# (c) of 2026-10-12 restated in inches: +/-.010 on .323, the shortest length
+# (c) of 2026-10-12 restated in inches: +/-.010 on .324, the shortest length
 # whose FULL thread still clears the locknut's outer face at the worst corner
 # (the spacer's, gauge's and hub's printed bands in the stack), and whose long
 # corner leaves at most .114 of thread past the locknut (the ruled 2.9,
 # floored to the inch grid; mg_wheel_group), measured from the thread end
 # (the dome's tangent), not the dome's tip.
-THREAD_LEN = 8.2042  # .323
+THREAD_LEN = 8.2296  # .324
 THREAD_LEN_BAND = (0.254, -0.254)  # +/-.010
 THREAD_LEN_PLACES = 3
 THREAD_PAST_LOCKNUT_LIMIT = 2.8956  # .114

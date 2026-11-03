@@ -493,7 +493,7 @@ _RIM_WIDTH_ROW = _SPOKE_ROW + 0.010
 # drum from standing proud (DRUM_RECESS); then the web's centre plane
 # (".61"), which the rim and its groove share, its extension line rising
 # toward the groove (_clear_section_witnesses) left of the spigot step's, so
-# the row above stops short of it; last the overall (".772 ±.003"), which
+# the row above stops short of it; last the overall (".772 ±.004"), which
 # holds the axle's nut stack, left of the back face above the A-A caption.
 # Each band's need, and the
 # plane the .61 locates, stands over its value (CALLOUTS_ABOVE), its text

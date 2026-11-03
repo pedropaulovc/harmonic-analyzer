@@ -123,7 +123,7 @@ def test_the_press_gauge_is_a_reference_accepted_at_the_nuts() -> None:
     low = stack.PRESS_GAUGE - stack.PRESS_GAUGE_TOL
     high = stack.PRESS_GAUGE + stack.PRESS_GAUGE_TOL
     assert stack.PRESS_GAUGE_LOW_LIMIT / 25.4 == pytest.approx(1.498, abs=1e-6)
-    assert stack.PRESS_GAUGE_HIGH_LIMIT / 25.4 == pytest.approx(1.505, abs=1e-6)
+    assert stack.PRESS_GAUGE_HIGH_LIMIT / 25.4 == pytest.approx(1.503, abs=1e-6)
     assert stack.PRESS_GAUGE_LOW_LIMIT <= low < high <= stack.PRESS_GAUGE_HIGH_LIMIT
     part, text = stack.SETTING_CALLOUTS[stack.FEATURE][stack.PRESS_GAUGE_DIMENSION]
     assert part == 3 and "\n" not in text

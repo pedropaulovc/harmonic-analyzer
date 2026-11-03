@@ -87,8 +87,8 @@ BORE_DIA = 4.7879  # .1885
 # Printed bands, (upper, lower) deviations.  The overall sets the axle's
 # locknut stack (mg_wheel_group reads HUB_LEN_LIMITS).
 HUB_LEN_PLACES = 3
-HUB_LEN_BAND = (0.0762, -0.0762)  # +/-.003
-HUB_LEN_LIMITS = printed_limits(HUB_LEN, HUB_LEN_PLACES, HUB_LEN_BAND)  # .769-.775
+HUB_LEN_BAND = (0.1016, -0.1016)  # +/-.004, the mm sheet's +/-0.10 restated
+HUB_LEN_LIMITS = printed_limits(HUB_LEN, HUB_LEN_PLACES, HUB_LEN_BAND)  # .768-.776
 # Spigot length plus-only against the drum's minus-only length: the drum,
 # pressed to the boss, never stands proud of the spigot face, so the front
 # washer bears on the spigot (the iron), never on the drum.  Both print .354,

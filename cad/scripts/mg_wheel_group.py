@@ -71,13 +71,13 @@ _HUB = _wheel.HUB_LEN_LIMITS
 _THREAD = (
     _pin.THREAD_LEN + _pin.THREAD_LEN_BAND[1],
     _pin.THREAD_LEN + _pin.THREAD_LEN_BAND[0],
-)  # .313 .. .333
+)  # .314 .. .334
 _FRONT = (_front.THICKNESS_MIN, _front.THICKNESS_MAX)
 _NUTS = (2.0 * _nut.THICKNESS_MIN, 2.0 * _nut.THICKNESS_MAX)
 
 # (a) The pin's shank-to-thread step stays inside the hub's front face, so the
 # wheel runs on the full shank and the front washer sits on the thread.
-STEP_INSIDE_HUB = (_SPACER[0] + _BACK[0] + _HUB[0]) - _GAUGE[1]  # .028
+STEP_INSIDE_HUB = (_SPACER[0] + _BACK[0] + _HUB[0]) - _GAUGE[1]  # .027
 # (b) The locknut sits on FULL thread (drawing-guidelines.md rule 18 (thread engagement) counts full threads only): the
 # thread less the incomplete pitch the dome cuts runs past its outer face,
 # and the first nut's inner face sits past the step's thread relief (or the
@@ -87,7 +87,7 @@ LOCKNUT_THREAD_MARGIN = (_GAUGE[0] + _THREAD[0] - _pin.TIP_INCOMPLETE) - (
 )  # .000
 NUT_RUNOUT_MARGIN = (_SPACER[0] + _BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0]) - (
     _GAUGE[1] + _pin.FULL_THREAD_FROM_STEP_MAX
-)  # .005
+)  # .004
 # (c) At most .114 of thread, incomplete pitch included, stands past the
 # locknut: the user's option (c) of 2026-10-12 (2.9 mm, floored to the inch
 # grid), superseding the rev-10 "dome + 1.3 at every corner" (the washers'
@@ -95,8 +95,8 @@ NUT_RUNOUT_MARGIN = (_SPACER[0] + _BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0])
 # exact).
 THREAD_PAST_LOCKNUT_MAX = (_GAUGE[1] + _THREAD[1]) - (
     _SPACER[0] + _BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0] + _NUTS[0]
-)  # .111
-THREAD_PAST_LOCKNUT_NOMINAL = _pin.THREAD_END_Y - LOCKNUT_FACE_D  # .066
+)  # .113
+THREAD_PAST_LOCKNUT_NOMINAL = _pin.THREAD_END_Y - LOCKNUT_FACE_D  # .067
 if STEP_INSIDE_HUB <= 0.0:
     raise AssertionError(f"pin step clears the hub front face: {STEP_INSIDE_HUB:.4f}")
 if LOCKNUT_THREAD_MARGIN < 0.0:

@@ -137,8 +137,8 @@ def test_walls_and_groove_hold_at_the_printed_bands() -> None:
     assert spec.MIN_WALL == pytest.approx(0.080 * inch)
     # TIE 1's axis may stand off by both .XX coordinates' +/-.01, and tilt by
     # the title block's 1 deg plus 0.3 deg drill wander over the boss (the
-    # hub's .775 max less the spigot's .354 min).
-    offset = math.hypot(0.01 * inch, 0.01 * inch) + (0.775 - 0.354) * inch * math.tan(
+    # hub's .776 max less the spigot's .354 min).
+    offset = math.hypot(0.01 * inch, 0.01 * inch) + (0.776 - 0.354) * inch * math.tan(
         math.radians(1.3)
     )
     assert geom.TIE1_OFFSET_MAX == pytest.approx(offset)
