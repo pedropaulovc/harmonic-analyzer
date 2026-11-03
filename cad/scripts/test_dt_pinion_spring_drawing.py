@@ -242,9 +242,13 @@ def test_pad_webs_clear_two_millimetres_at_the_printed_worst_case() -> None:
 
 
 def test_owner_exception_matches_only_the_stated_hole_web() -> None:
-    (exception,) = load_exceptions(
+    exceptions = load_exceptions(
         Path(geometry.__file__).parents[1] / "config", "dt_pinion_spring", "part"
     )
+    # RV-02 is the callout-precision exception
+    # (test_clearance_hole_callout_prints_the_title_block_drilled_hole_places).
+    assert [e.id for e in exceptions] == ["RV-01", "RV-02"]
+    exception = exceptions[0]
     assert (exception.id, exception.kind) == ("RV-01", "minor")
     assert dt_pinion_spring_spec.PAD_LEN_CALLOUT in exception.where
     assert ".076 in minimum" in exception.finding
@@ -841,10 +845,12 @@ def test_every_inside_radius_meets_the_17_7_ph_bend_minimum() -> None:
 
 def test_clearance_hole_callout_prints_the_title_block_drilled_hole_places() -> None:
     # Codjiflo on #2106: the Hole Wizard callout's drill size is the one
-    # value this sheet cannot carry as a part-side model dimension, so the
-    # drawing sets its ICalloutLengthVariable precision natively.  What it
-    # applies is the spec's contract, and that contract is the places the
-    # inch title block's DRILLED HOLES tolerance is stated at (+.004/0).
+    # value this sheet cannot carry as a part-side model dimension (a
+    # part-authored precision does not reach the callout, run
+    # 20261102T230110877Z), so the drawing sets its ICalloutLengthVariable
+    # precision natively, the declared exception RV-02.  What it applies is
+    # the spec's contract, and that contract is the places the inch title
+    # block's DRILLED HOLES tolerance is stated at (+.004/0).
     from _title_block_units import LENGTH_UNITS, quantity
 
     unit = dt_pinion_spring_spec.UNIT
@@ -854,3 +860,18 @@ def test_clearance_hole_callout_prints_the_title_block_drilled_hole_places() -> 
     assert row_unit == unit
     assert drawing.HOLE_CALLOUT_PRECISION == dt_pinion_spring_spec.HOLE_CALLOUT_PRECISION
     assert dt_pinion_spring_spec.HOLE_CALLOUT_PRECISION == digits == 3
+    exceptions = {
+        e.id: e
+        for e in load_exceptions(
+            Path(geometry.__file__).parents[1] / "config", "dt_pinion_spring", "part"
+        )
+    }
+    entry = exceptions["RV-02"]
+    assert entry.kind == "accept"
+    assert entry.reason.startswith(
+        "Delegated ruling 2026-11-02 (Main), following owner precedent"
+    )
+    assert "#2144" in entry.reason and "20261102T230110877Z" in entry.reason
+    assert f"written as {dt_pinion_spring_spec.HOLE_CALLOUT_PRECISION} " in entry.where
+    assert "draw_dt_pinion_spring.build" in entry.where
+    assert "HOLE_CALLOUT_PRECISION" in entry.where
