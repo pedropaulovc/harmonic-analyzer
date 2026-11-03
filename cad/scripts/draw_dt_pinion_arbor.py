@@ -483,6 +483,16 @@ DIMENSION_CALLOUTS = {
     "PinStationFromHeadRear": "COLLAR PIN",
     "PinHoleDia": PIN_HOLE_CALLOUT,
 }
+# Printed in parentheses as references (dimension name -> native label).  The
+# drum station ends on no feature of this part: it prints (2.40) with its
+# DRUM STATION callout, and MHA-DT-00's drum-station setting carries its band
+# (farm run 20261103T022858451Z, Main's ruling (a)).
+REFERENCE_LENGTHS = {
+    "HeadCapSagDim": "front-crown height reference",
+    "BackCapSagDim": "back-crown descriptive reference",
+    "OverallLen": "overall length reference",
+    "DrumStationFromHeadRear": "drum station reference",
+}
 # The turning axis runs the full part and this far past each crown.
 AXIS_OVERSHOOT_MM = 3.0
 # Each land's Ra symbol hangs off one flank on the land's head side of its
@@ -1281,11 +1291,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for name in ARROWS_INSIDE:
         _arrows_inside(adapter, principal_annotations, name)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    for name, label in {
-        "HeadCapSagDim": "front-crown height reference",
-        "BackCapSagDim": "back-crown descriptive reference",
-        "OverallLen": "overall length reference",
-    }.items():
+    for name, label in REFERENCE_LENGTHS.items():
         matches = [
             annotation
             for annotation in annotations

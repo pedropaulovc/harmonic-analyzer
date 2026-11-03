@@ -901,7 +901,11 @@ def test_the_package_switches_and_explodes_every_view_before_the_bom(monkeypatch
         return (1.0, 1.0)
 
     def bank_settings(_adapter, _facts, _trace):
-        for scale in (drawing.BANK_SETTING_SCALE, drawing.BANK_SPRING_DETAIL_SCALE):
+        for scale in (
+            drawing.BANK_SETTING_SCALE,
+            drawing.BANK_SPRING_DETAIL_SCALE,
+            drawing.DRUM_STATION_SETTING_SCALE,
+        ):
             reference(drawing.BANK_SETTINGS_SHEET, "*Right", scale)
         return idle
 

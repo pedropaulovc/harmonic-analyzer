@@ -112,7 +112,9 @@ HEAD_FRONT_Z = HEAD_REAR_Z - HEAD_LEN
 # their straps at nominal (to the .01 in they print at).  Each land must still cover its strap by
 # MIN_LAND_OVER_STRAP at the worst corner of every printed band (stations,
 # land length, strap thickness, drum length, drum-station band) and of the
-# drum's axial float.  The drum station prints the .XX band; no band is
+# drum's axial float.  The drum station is set at the bond to this .XX-width
+# band, which MHA-DT-00 prints on its drum-station setting
+# (dt_drum_station_setting_spec; the arbor shows the station as a reference); no band is
 # tightened to make it fit (U27, Main 2026-09-24: a longer land rather than a
 # tighter station).  #290: the land keeps its 20 mm, snapped to .79.
 # MHA-DT-14's printed thickness limits (STRAP_T_LIMITS) and the MHA-DT-01 drum length come from
@@ -135,6 +137,8 @@ DRUM_STATION = DRUM_STATION_AS_BUILT + DRUM_AFT_SHIFT
 # The MHA-DT-01 drum sheet's own printed length band (pinion_rig_layout).
 DRUM_LEN_BAND = (_DRUM_LEN_PRINTED_BAND, -_DRUM_LEN_PRINTED_BAND)
 MIN_LAND_OVER_STRAP = 0.5
+# The one drum-station band: every stack here, the collar gap, the rig's
+# advance/retreat stacks and MHA-DT-00's printed setting all read it.
 DRUM_STATION_BAND = LINEAR_XX_BAND
 # User ruling 2026-09-24 (option c): the pivot blocks locate the swing
 # cluster.  Option E-a then pins both straps to the torque shaft, which is

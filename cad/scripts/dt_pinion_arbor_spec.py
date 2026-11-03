@@ -114,9 +114,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Head": {"HeadLen"},
     "Neck": {"NeckLen"},
     "BondZoneReference": {"BondZoneDia"},
-    # Where the MHA-DT-01 drum's front end is bonded, from the head rear face
-    # at the .XX band (ruling A); an assembly station, not a turned feature,
-    # so the note names it and the sheet dimensions it.
+    # Where the MHA-DT-01 drum's front end is bonded, from the head rear face:
+    # an assembly station, not a turned feature, so it prints as a (REF).
+    # MHA-DT-00 carries the setting and its DRUM_STATION_BAND
+    # (dt_drum_station_setting_spec; machinist review of farm run
+    # 20261103T022858451Z, Main's ruling (a) under PR #1388's precedent).
     "DrumStationReference": {"DrumStationFromHeadRear"},
     "FrontCapProfile": {"HeadCapR", "HeadCapSagDim"},
     "BackCapProfile": {"BackCapR", "BackCapSagDim"},
@@ -162,9 +164,10 @@ REFERENCE_SKETCHES = (
 # sub-.001 bands print exactly), the reamed cross hole (.250 +.0015/+.0010)
 # and the 1/16 pin hole (.0625 +.0025/.0000); two (.XX) on every other
 # length, station, diameter and crown radius, because the land, drum, pin,
-# web and run-out stacks read them.  The crown sags and the overall are REFs;
-# the overall prints one place, (9.6), because its rounded chain (.05 + 8.93 +
-# .48 + (.12)) sums to 9.58 and a two-place (9.57) read as a mismatch.
+# web and run-out stacks read them.  The crown sags, the overall and the drum
+# station are REFs; the overall prints one place, (9.6), because its rounded
+# chain (.05 + 8.93 + .48 + (.12)) sums to 9.58 and a two-place (9.57) read as
+# a mismatch.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HeadProfile": {"HeadDia": 2},
     "NeckProfile": {"NeckDia": 2},
@@ -210,6 +213,8 @@ if abs(CROSS_HOLE_FROM_HEAD_REAR - CROSS_HOLE_STATION) > 1e-9:
 CROSSROD_NUMBER = "MHA-DT-15"
 STRAP_NUMBER = "MHA-DT-14"
 DRUM_NUMBER = "MHA-DT-01"
+# The assembly drawing that carries the drum station's setting band.
+SETTING_DRAWING_NUMBER = "MHA-DT-00"
 
 # Machinist review of 7f7fc1717 (blocker): "HEAD LENGTH" did not say whether
 # it meant the straight Ø15 cylinder or the whole crowned head, which put the
@@ -247,11 +252,15 @@ DRUM_BACK_END_ON_JOURNAL_MIN = (
 if min(DRUM_FRONT_END_ON_JOURNAL_MIN, DRUM_BACK_END_ON_JOURNAL_MIN) <= 0.0:
     raise AssertionError("a drum end can leave its journal; BOND_ZONE_CALLOUT lies")
 # Notes never carry dimensions (Codex P1 on #814): the drum station is the
-# model's DrumStationFromHeadRear, printed on the profile with its .XX band.
-# Machinist review r1 of #1685 (clarity): it ended on no feature of this part,
-# so its callout names what it locates -- the MHA-DT-01 drum's front end,
-# set when the drum is bonded on (drawing-guidelines.md rule 19).
-DRUM_STATION_CALLOUT = f"DRUM STATION:\n{DRUM_NUMBER} FRONT END,\nSET AT ASSEMBLY"
+# model's DrumStationFromHeadRear, printed on the profile.  Machinist review
+# r1 of #1685 (clarity): it ended on no feature of this part, so its callout
+# names what it locates -- the MHA-DT-01 drum's front end (drawing-guidelines.md
+# rule 19).  Farm run 20261103T022858451Z (clarity, 2 of 3): at .XX it still
+# read as a size to cut or check, so it prints as a reference and its callout
+# names the assembly drawing whose setting dimension carries the band.
+DRUM_STATION_CALLOUT = (
+    f"DRUM STATION:\n{DRUM_NUMBER} FRONT END,\nSET ON {SETTING_DRAWING_NUMBER}"
+)
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): assembly requirements belong on the feature callout or the
 # assembly step, never in a part's general notes.  ASSEMBLY_STEP is the
 # pinion fit-up step text (pinion_rig_fitup) that owns this joint.
@@ -264,8 +273,10 @@ INSIDE_CORNER_R_MAX = edge_break_radius_mm(unit=UNIT)  # R.010
 DRAWING_NOTES = f"INSIDE CORNERS R{INSIDE_CORNER_R_MAX / 25.4:.3f} MAX.".replace(
     "R0.", "R."
 )
+# MHA-DT-00, the only sheet that prints this step, follows it with the sheet
+# that carries the DRUM STATION SETTING (draw_dt_drive_train_assembly).
 ASSEMBLY_STEP = (
     f"SLIDE MHA-DT-22 INTO MHA-DT-01 AND BOND WITH {RETAINING_COMPOUND}, DRUM FRONT "
-    "END AT MHA-DT-22 DRUM STATION; WIPE SQUEEZE-OUT OFF JOURNAL LANDS."
+    "END AT THE DRUM STATION SETTING; WIPE SQUEEZE-OUT OFF JOURNAL LANDS."
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

@@ -156,6 +156,7 @@ from _sketch import (
     set_sketch_direct_db,
 )
 import dt_cylinder_bank_setting_spec as bank_settings
+import dt_drum_station_setting_spec as drum_station_setting
 from _rebuild import force_rebuild
 from _session import run_build
 from _printed_tolerance import drilled_oversize_mm, printed_deviations
@@ -4031,6 +4032,18 @@ for _land_z, _strap_faces, _which in (
         raise AssertionError(f"MHA-DT-22's {_which} journal land misses its strap")
 if not (ARBOR_DIA == DRUM_BORE_DIA == STRAP_ARBOR_BORE):
     raise AssertionError("arbor dia disagrees with drum and strap bores")
+# MHA-DT-00's drum-station setting (dt_drum_station_setting_spec) is a Right-
+# plane leg on the arbor axis: it is true length only while the arbor's local
+# +Z stays machine +Z, and it must end on the head rear face and the drum's
+# front end exactly where this pose puts them (the parked pose it is built in).
+if [row[2] for row in ARBOR_ROWS] != [0.0, 0.0, 1.0] or ARBOR_ROWS[2] != [0.0, 0.0, 1.0]:
+    raise AssertionError("the arbor axis left machine Z; the drum-station leg is foreshortened")
+if (
+    abs(drum_station_setting.HEAD_REAR_FACE_Z - (ARBOR_Z0 + ARBOR_HEAD_REAR_Z)) > 1e-9
+    or abs(drum_station_setting.DRUM_FRONT_END_Z - APINION_Z_FRONT) > 1e-9
+    or abs(drum_station_setting.AXIS_Y - APINION_Y) > 1e-9
+):
+    raise AssertionError("the drum-station setting leg left the placed arbor head and drum")
 # R1: the crossrod is a bonded slip fit, modelled line to line.  Its printed
 # limits (rod enters, gap inside Loctite 638) are dt_pinion_arbor_spec's asserts;
 # the assembly only needs the shared nominal it places both parts at.
@@ -4625,12 +4638,17 @@ def _require_collar_pin_in_collar_hole(adapter, pin: str, collar: str) -> None:
         raise AssertionError(f"{pin} stands {off_axis * 1000.0:.4f} mm off {collar}'s pin hole")
 
 
-async def _author_bank_settings_reference(adapter) -> None:
-    """Native, globals-driven bearing-face settings; no solids or mate edits."""
+async def _author_setting_references(adapter, settings) -> None:
+    """Native, globals-driven assembly settings; no solids or mate edits.
+
+    ``settings`` is a setting spec (dt_cylinder_bank_setting_spec,
+    dt_drum_station_setting_spec): Right-plane legs on one axis height, each
+    a symmetric-banded model dimension carrying its own below-callout.
+    """
     drives = []
-    for feature, name, south, north in bank_settings.LEGS:
+    for feature, name, south, north in settings.LEGS:
         x0, x1 = -south, -north  # Right-plane sketch x is machine -Z
-        y = bank_settings.AXIS_Y
+        y = settings.AXIS_Y
         start_global, axis_global = f"{name}StartX", f"{name}AxisY"
         await set_global(adapter, start_global, f"{abs(x0)}mm")
         await set_global(adapter, axis_global, f"{y}mm")
@@ -4660,8 +4678,8 @@ async def _author_bank_settings_reference(adapter) -> None:
         drives += dims.apply(adapter, feature)
     for name, expression in drives:
         await drive_dimension(adapter, name, expression)
-    for feature, name, _south, _north in bank_settings.LEGS:
-        upper, lower = bank_settings.DIMENSION_BANDS[name]
+    for feature, name, _south, _north in settings.LEGS:
+        upper, lower = settings.DIMENSION_BANDS[name]
         if abs(upper + lower) > 1e-12:
             raise AssertionError(f"{name} needs a centred setting band")
         set_dimension_symmetric_tolerance(adapter, feature, name, upper)
@@ -4671,17 +4689,18 @@ async def _author_bank_settings_reference(adapter) -> None:
             (lower, upper),
             display_unit="mm",
             label=name,
-            places=bank_settings.TOLERANCE_PRECISION,
+            places=settings.TOLERANCE_PRECISION,
         )
         # Imported SetText can write through to the released model (the rack
         # source-save controls); author this annotation before the assembly save.
-        text = bank_settings.DIMENSION_CALLOUTS[name]
+        text = settings.DIMENSION_CALLOUTS[name]
         display.SetText(4, text)  # swDimensionTextParts_e.swDimensionTextCalloutBelow
-        if str(display.GetText(4) or "") != text:
+        # GetText returns a multi-line callout with CRLF breaks.
+        if str(display.GetText(4) or "").replace("\r\n", "\n") != text:
             raise RuntimeError(f"{name}@{feature}: setting callout did not persist")
-    apply_drawing_precision(adapter, bank_settings.DRAWING_PRECISION)
+    apply_drawing_precision(adapter, settings.DRAWING_PRECISION)
     assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
-    for feature, names in bank_settings.DRAWING_DIMENSIONS.items():
+    for feature, names in settings.DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature, names)
         blank_sketch(adapter, feature)
         if int(_early_bound(assembly.FeatureByName(feature), "IFeature").Visible) != 1:
@@ -7099,7 +7118,8 @@ async def build(adapter) -> dict[str, str]:
             solved_adapter, collar_component=tip_collar, shaft_component=cone_shaft,
         )
 
-    await _author_bank_settings_reference(adapter)
+    for settings in (bank_settings, drum_station_setting):
+        await _author_setting_references(adapter, settings)
     # Title-block identity for the assembly drawing (draw_dt_drive_train_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
     # finalize_drawing requires without consulting the part registry;
