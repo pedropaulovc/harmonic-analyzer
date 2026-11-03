@@ -35,7 +35,6 @@ from _supplier_pin_data import (
     WALL_DIMENSION,
     WALL_FEATURE,
     SupplierPinReference,
-    declares_application_hole,
 )
 
 # Literal registration is required by the hidden-reference routing guard.
@@ -44,6 +43,20 @@ REFERENCE_SKETCHES = (
     "SupplierMatingHoleReference",
     "SupplierPinWallReference",
 )
+
+
+def declares_application_hole(source: SupplierPinReference) -> bool:
+    """Whether a spring pin carries the supplier application (mating) hole.
+
+    Both application fields or neither: a pin whose mating parts' own sheets
+    specify its holes omits the circle, which reads as a second pin feature.
+    Here, not in ``_supplier_pin_data``, which every part importing the
+    supplier pin rows reads: only the pin builders and sheets use it.
+    """
+    limits, precision = source.application_hole_limits, source.application_hole_precision
+    if (limits is None) != (precision is None):
+        raise ValueError(f"{source.sku}: incomplete supplier mating-hole reference")
+    return limits is not None
 
 
 def _reference_suffix(source: SupplierPinReference) -> str:
