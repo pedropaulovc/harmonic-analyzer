@@ -1,37 +1,58 @@
 """Seat, full-thread and wall budgets for the gooseneck's clamped spring eye.
 
 Owner rulings 2026-10-27 (#1951).  The whole gooseneck is 1/2 in tube and its
-arm ends flush in a solid Ø12.70 end piece (sm_gooseneck_geom): MHA-SM-04's
+arm ends flush in a solid Ø.500 end piece (sm_gooseneck_geom): MHA-SM-04's
 1/4-28 UNF thread runs into the end piece's blind 1/4-28 UNF-2B tap, and the
-loop of MHA-SM-VN-51 is clamped on the screw's plain Ø6.35 body between the
+loop of MHA-SM-VN-51 is clamped on the screw's plain Ø.250 body between the
 head and the end face.  The upper eye is clamped, not left free to swivel
 (user ruling 2026-09-21).  An arm-end counterbore clears the screw's die
 run-out (codjiflo P1 on #1997): its incomplete threads never enter the end
 piece's full 2B thread, even with the loop clamped to its least gap.
 
 Two owner minors (2026-10-27, #1951) stand against unchanged checks: the
-counterbore wall under rule 17's 2.0 target (cad/config/parts/sm-gooseneck.yaml
+counterbore wall under rule 17's .080 target (cad/config/parts/sm-gooseneck.yaml
 RV-01) and the Ø11.50 head's retention under the 1.0 check
 (cad/config/parts/sm-gooseneck-spring-screw.yaml RV-01).  Each check raises
-unless its declaration is present; the 1.5 wall floor and positive retention
-always hold.
+unless its declaration is present; the .060 wall floor and positive retention
+always hold.  Both parts print decimal inch (#290): every term below charges
+the limits their sheets print.
 """
 
 from __future__ import annotations
 
 import math
 
-import _config
 import sm_gooseneck_geom as gooseneck
 import sm_gooseneck_spring_screw_geom as screw
 import sm_vn_counter_spring_stock_geom as spring
 from _hole_spec import DRILL_POINT_H, HoleSpec, blind_cut_dia_mm
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+from _printed_tolerance import (
+    drilled_oversize_mm,
+    edge_break_chamfer_mm,
+    printed_band_mm,
+    printed_deviations,
+)
 
-EDGE_BREAK = float(_config.title_block("edge_break")["chamfer_max_mm"])
-PLUG_DIAMETER_BAND = printed_band_mm(2)
-PLUG_LENGTH_BAND = printed_band_mm(2)
-THREAD_AXIS_OFFSET_MAX = 0.15
+MM_PER_IN = gooseneck.MM_PER_IN
+# MHA-SM-01 prints decimal inch (#290): every gooseneck band below is the
+# inch sheet's, read through its geometry module's SHEET_UNIT.
+UNIT = gooseneck.SHEET_UNIT
+# The inch title block's .010 edge break: every budget charges it.  The
+# native counter-seat certificate (cad/config/machine/springs.yaml
+# upper_support, settled_spring_seats) records the support as calibrated,
+# under the millimetre sheet's 0.25 break; spring seats stay as calibrated
+# (#290 ruling), so the record keeps that value.
+EDGE_BREAK = edge_break_chamfer_mm(unit=UNIT)
+CALIBRATED_EDGE_BREAK = 0.25
+# The end piece's head Ø (.50) and length (.85) print at the title block's
+# .XX; the shank Ø (.363, below) at .XXX.  (lower, upper) mm about the model.
+PLUG_DIA_DEVIATIONS = printed_deviations(gooseneck.PLUG_DIA, 2, unit=UNIT)
+PLUG_HEAD_LENGTH_DEVIATIONS = printed_deviations(
+    gooseneck.PLUG_HEAD_LENGTH, 2, unit=UNIT
+)
+# The thread axis's location limit, ".006 MAX RADIAL" under the tap callout.
+THREAD_AXIS_OFFSET_MAX = 0.006 * MM_PER_IN
 # The tap drill's wander off its axis at the point: a shop-capability term
 # the wall budgets charge and the print does not carry (as the fleet's other
 # drill-wander budgets, e.g. fr_top_frame_spec.KEEPER_TAP_DRILL_WANDER_DEG).
@@ -43,7 +64,7 @@ DRILL_WANDER_MAX = 0.10
 # mating requirement.  The retained Ø band still limits the shank, and the
 # wall budget below uses its lower limit.  Owner ruling 2026-10-27 (#1997):
 # the end piece is joined BEFORE the bend, cooled or fully cured first, so the
-# solid shank, 1.16 short of the bend's exit tangent, supports the tube through
+# solid shank, .046 short of the bend's exit tangent, supports the tube through
 # the bend.  Three joints were weighed (#1997 joint-options note):
 # - Press fit: rejected.  Shigley 10e eq. 3-57/3-58 (same steel, solid shaft)
 #   caps the diametral interference at about 0.021 before the thinnest
@@ -69,9 +90,30 @@ BRAZE_CLEARANCE_MAX = 0.24892  # .0098 in
 LOCTITE_638_GAP_MAX = 0.25
 if BRAZE_CLEARANCE_MAX > LOCTITE_638_GAP_MAX:
     raise AssertionError("the end piece's joint window passes LOCTITE 638's gap fill")
-PLUG_SHANK_DIA = round(
-    gooseneck.TUBE_BORE_DIA - (BRAZE_CLEARANCE_MIN + BRAZE_CLEARANCE_MAX) / 2.0, 2
+# The shank's Ø at .XXX, on the inch grid: the tube's nominal bore less the
+# window's middle, .370 - .0069 = .363.
+PLUG_SHANK_DIA = (
+    round(
+        (gooseneck.TUBE_BORE_DIA - (BRAZE_CLEARANCE_MIN + BRAZE_CLEARANCE_MAX) / 2.0)
+        / MM_PER_IN,
+        3,
+    )
+    * MM_PER_IN
 )
+PLUG_SHANK_DIA_DEVIATIONS = printed_deviations(PLUG_SHANK_DIA, 3, unit=UNIT)
+
+# MHA-SM-04 as its inch sheet prints it (sm_gooseneck_spring_screw_geom
+# PRINTED_BANDS / PRINTED_LIMITS): every screw term below charges these.
+SCREW_LENGTH_LOWER, SCREW_LENGTH_UPPER = screw.PRINTED_BANDS["UnderHeadLength"]
+SCREW_HEAD_DIA_MIN = screw.HEAD_DIA + screw.PRINTED_BANDS["HeadDia"][0]
+SCREW_BODY_DIA_MIN = screw.BODY_DIA + screw.PRINTED_BANDS["BodyDia"][0]
+SCREW_BODY_DIA_MAX = screw.BODY_DIA + screw.PRINTED_BANDS["BodyDia"][1]
+SCREW_HEAD_RELIEF_CHAMFER_MAX = (
+    screw.HEAD_RELIEF_CHAMFER + screw.PRINTED_BANDS["HeadReliefChamfer"][1]
+)
+SCREW_PLAIN_LENGTH_MIN = screw.PRINTED_LIMITS["PlainLength"]
+SCREW_FULL_THREAD_STATION_MAX = screw.PRINTED_LIMITS["FullThread"]
+SCREW_UNDERHEAD_CORNER_R_MAX = screw.PRINTED_LIMITS["UnderHeadCornerR"]
 
 
 def owner_minor(row: dict, exception_id: str, part: str) -> None:
@@ -148,12 +190,12 @@ SCREW_TILT_MAX = math.atan(
 # screw's station along its axis matters (its run-out and its tip), this is
 # the least gap.
 LOOP_PASS_RADIUS_MAX = (
-    spring.COIL_MEAN_RADIUS_MM - (spring.EYE_ID_MM - screw.BODY_DIA_MAX) / 2.0
+    spring.COIL_MEAN_RADIUS_MM - (spring.EYE_ID_MM - SCREW_BODY_DIA_MAX) / 2.0
 )
 CLAMPED_AXIS_GAP_MIN = CLAMPED_GAP_MIN - math.tan(SCREW_TILT_MAX) * LOOP_PASS_RADIUS_MAX
 
-# The screw's own full thread starts no later than the "5.71 MAX" MHA-SM-04
-# prints (FULL_THREAD_STATION_MAX, from the head).  The run-out's incomplete
+# The screw's own full thread starts no later than the ".225 MAX" MHA-SM-04
+# prints (SCREW_FULL_THREAD_STATION_MAX, from the head).  The run-out's incomplete
 # threads are FAT (full crest, shallow root): in the end piece's full 2B
 # thread they jam before the head clamps.  They reach deepest past the end
 # face at the least gap on the screw's axis, and the tilt dips the
@@ -162,60 +204,76 @@ CLAMPED_AXIS_GAP_MIN = CLAMPED_GAP_MIN - math.tan(SCREW_TILT_MAX) * LOOP_PASS_RA
 # COUNTERBORE_RUNOUT_MARGIN_MIN.
 SCREW_RUNOUT_TILT_DIP = screw.MAJOR_DIA / 2.0 * math.sin(SCREW_TILT_MAX)
 SCREW_RUNOUT_INTRUSION_MAX = (
-    screw.FULL_THREAD_STATION_MAX - CLAMPED_AXIS_GAP_MIN + SCREW_RUNOUT_TILT_DIP
+    SCREW_FULL_THREAD_STATION_MAX - CLAMPED_AXIS_GAP_MIN + SCREW_RUNOUT_TILT_DIP
 )
 SCREW_RUNOUT_INTRUSION_FREE_MAX = (
-    screw.FULL_THREAD_STATION_MAX - gooseneck.SPRING_EYE_GAP + SCREW_RUNOUT_TILT_DIP
+    SCREW_FULL_THREAD_STATION_MAX - gooseneck.SPRING_EYE_GAP + SCREW_RUNOUT_TILT_DIP
 )
 COUNTERBORE_RUNOUT_MARGIN_MIN = 0.05
-# Printed LIMIT depth from the end face: its MIN rounded UP to the print's
-# two places, a 0.10 band, the model at mid-band.
-COUNTERBORE_DEPTH_BAND = 0.10
+# Printed LIMIT depth from the end face: its MIN rounded UP to the inch
+# sheet's .001, a .004 band.  The model stays at the calibrated 2.78 (the
+# native counter-seat certificate records it; spring seats stay as
+# calibrated, #290), inside the band.
+COUNTERBORE_DEPTH_BAND = 0.004 * MM_PER_IN
 COUNTERBORE_DEPTH_MIN = (
-    math.ceil((SCREW_RUNOUT_INTRUSION_MAX + COUNTERBORE_RUNOUT_MARGIN_MIN) * 100.0)
-    / 100.0
+    math.ceil(
+        round(
+            (SCREW_RUNOUT_INTRUSION_MAX + COUNTERBORE_RUNOUT_MARGIN_MIN)
+            / MM_PER_IN
+            * 1000.0,
+            6,
+        )
+    )
+    / 1000.0
+    * MM_PER_IN
 )
-COUNTERBORE_DEPTH_MAX = round(COUNTERBORE_DEPTH_MIN + COUNTERBORE_DEPTH_BAND, 6)
-COUNTERBORE_DEPTH = round((COUNTERBORE_DEPTH_MIN + COUNTERBORE_DEPTH_MAX) / 2.0, 6)
+COUNTERBORE_DEPTH_MAX = COUNTERBORE_DEPTH_MIN + COUNTERBORE_DEPTH_BAND
+COUNTERBORE_DEPTH = 2.78
+if not COUNTERBORE_DEPTH_MIN <= COUNTERBORE_DEPTH <= COUNTERBORE_DEPTH_MAX:
+    raise AssertionError("gooseneck counterbore model depth leaves its printed band")
 # The tilted screw's largest offset from the thread axis inside the
-# counterbore, at the end face: the deepest floor plus the receiver's 0.25
+# counterbore, at the end face: the deepest floor plus the receiver's .010
 # floor break past its first full thread.
 SCREW_FACE_OFFSET_MAX = SCREW_RADIAL_PLAY_MAX + (
     COUNTERBORE_DEPTH_MAX + EDGE_BREAK
 ) * math.tan(SCREW_TILT_MAX)
-# Ø printed as its own LIMIT band from the model's 7.00 up 0.10 (codjiflo
-# P1 on #1997: a flat-floored counterbore is milled, not drilled, so the
-# title block's DRILLED HOLES row cannot be assumed to govern it, and the
-# .XX row's -0.51 would let the run-out reach the wall).  The fat run-out
-# (basic major, at or above the body's upper limit) must clear the bore's
-# SMALLEST size with the screw and the bore each off the thread axis by
-# their full bands: the counterbore's printed axis band to the tap
-# (COUNTERBORE_AXIS_OFFSET_MAX, MHA-SM-01 note) and the tilted screw's
-# SCREW_FACE_OFFSET_MAX, its largest anywhere in the bore.
+# Ø printed as its own .004 LIMIT band (codjiflo P1 on #1997: a flat-floored
+# counterbore is milled, not drilled, so the title block's DRILLED HOLES row
+# cannot be assumed to govern it, and the .XXX row's -.005 would let the
+# run-out reach the wall), its lower limit the largest .001 under the
+# calibrated 7.00 model (.275).  The fat run-out (basic major, at or above
+# the body's upper limit) must clear the bore's SMALLEST size with the screw
+# and the bore each off the thread axis by their full bands: the
+# counterbore's printed axis band to the tap (COUNTERBORE_AXIS_OFFSET_MAX,
+# MHA-SM-01 note) and the tilted screw's SCREW_FACE_OFFSET_MAX, its largest
+# anywhere in the bore.
 COUNTERBORE_DIA = 7.00
-COUNTERBORE_DIA_BAND = 0.10
-COUNTERBORE_DIA_MAX = round(COUNTERBORE_DIA + COUNTERBORE_DIA_BAND, 6)
-COUNTERBORE_AXIS_OFFSET_MAX = 0.10
+COUNTERBORE_DIA_BAND = 0.004 * MM_PER_IN
+COUNTERBORE_DIA_MIN = (
+    math.floor(round(COUNTERBORE_DIA / MM_PER_IN * 1000.0, 6)) / 1000.0 * MM_PER_IN
+)
+COUNTERBORE_DIA_MAX = COUNTERBORE_DIA_MIN + COUNTERBORE_DIA_BAND
+COUNTERBORE_AXIS_OFFSET_MAX = 0.004 * MM_PER_IN
 RUNOUT_RADIAL_CLEARANCE_MIN = (
-    (COUNTERBORE_DIA - screw.MAJOR_DIA) / 2.0
+    (COUNTERBORE_DIA_MIN - screw.MAJOR_DIA) / 2.0
     - COUNTERBORE_AXIS_OFFSET_MAX
     - SCREW_FACE_OFFSET_MAX
 )
 # The floor's corner to the wall is a stop in the run-out's path: the title
-# block's INSIDE CORNERS R1.0 MAX would reach it (codjiflo P1 round 5 on
-# #1997), so MHA-SM-01 prints FLOOR CORNER R0.10 MAX, a native radial
+# block's INSIDE CORNERS R.040 MAX would reach it (codjiflo P1 round 5 on
+# #1997), so MHA-SM-01 prints FLOOR CORNER R.004 MAX, a native radial
 # dimension the model carries at its limit, banded from sharp up to it.
-COUNTERBORE_FLOOR_CORNER_R_MAX = 0.10
+COUNTERBORE_FLOOR_CORNER_R_MAX = 0.004 * MM_PER_IN
 # (upper, lower)
 COUNTERBORE_FLOOR_CORNER_R_BAND = (0.0, -COUNTERBORE_FLOOR_CORNER_R_MAX)
-COUNTERBORE_FLOOR_CORNER_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R0.10 MAX"
+COUNTERBORE_FLOOR_CORNER_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R.004 MAX"
 
 # Tip budgets: the free gap leaves the screw shallowest (full-thread reach),
 # the least gap on its axis drives it deepest.
 SCREW_REACH = screw.LENGTH - gooseneck.SPRING_EYE_GAP
-SCREW_REACH_MIN = SCREW_REACH + screw.LENGTH_LOWER
-SCREW_REACH_MAX = SCREW_REACH + screw.LENGTH_UPPER
-CLAMPED_SCREW_REACH_MAX = screw.LENGTH + screw.LENGTH_UPPER - CLAMPED_AXIS_GAP_MIN
+SCREW_REACH_MIN = SCREW_REACH + SCREW_LENGTH_LOWER
+SCREW_REACH_MAX = SCREW_REACH + SCREW_LENGTH_UPPER
+CLAMPED_SCREW_REACH_MAX = screw.LENGTH + SCREW_LENGTH_UPPER - CLAMPED_AXIS_GAP_MIN
 SCREW_END_INCOMPLETE_MAX = 1.5 * screw.PITCH
 FULL_THREAD_REACH_MIN = SCREW_REACH_MIN - SCREW_END_INCOMPLETE_MAX
 
@@ -228,10 +286,11 @@ FULL_THREAD_REACH_MIN = SCREW_REACH_MIN - SCREW_END_INCOMPLETE_MAX
 # first, and both printed depths run from that floor (a tap started on the
 # end face and counterbored after read back a shortened native thread depth,
 # 17.22 for 17.60, farm run 20261027T181248453Z).  From the end face, each
-# depth stacks on the counterbore's LIMIT depth.
-TAP_THREAD_DEPTH_FROM_FLOOR = 14.77
-TAP_DRILL_DEPTH_FROM_FLOOR = 17.17
-TAP_DEPTH_BAND = printed_band_mm(2)
+# depth stacks on the counterbore's LIMIT depth.  Both depths print .XX on
+# the inch sheet (.58 thread, .68 drill), modelled on that grid.
+TAP_THREAD_DEPTH_FROM_FLOOR = 0.58 * MM_PER_IN
+TAP_DRILL_DEPTH_FROM_FLOOR = 0.68 * MM_PER_IN
+TAP_DEPTH_BAND = printed_band_mm(2, unit=UNIT)
 TAP_LEAD = 1.5 * screw.PITCH
 TAP_SPEC = HoleSpec(
     "tapped_bottoming",
@@ -242,7 +301,7 @@ TAP_SPEC = HoleSpec(
     overrides_mm={"ThreadDepth": TAP_THREAD_DEPTH_FROM_FLOOR},
 )
 TAP_DRILL_DIA = blind_cut_dia_mm(TAP_SPEC)
-TAP_DRILL_DIA_MAX = TAP_DRILL_DIA + drilled_oversize_mm()
+TAP_DRILL_DIA_MAX = TAP_DRILL_DIA + drilled_oversize_mm(unit=UNIT)
 TAP_THREAD_DEPTH = COUNTERBORE_DEPTH + TAP_THREAD_DEPTH_FROM_FLOOR
 TAP_DRILL_DEPTH = COUNTERBORE_DEPTH + TAP_DRILL_DEPTH_FROM_FLOOR
 TAP_THREAD_DEPTH_MIN = (
@@ -263,7 +322,7 @@ TAP_LEAD_DRILL_MARGIN_MIN = (TAP_DRILL_DEPTH_FROM_FLOOR - TAP_DEPTH_BAND) - (
     TAP_THREAD_DEPTH_FROM_FLOOR + TAP_DEPTH_BAND + TAP_LEAD
 )
 
-# The RECEIVER's full thread, mated: from the counterbore floor (and its 0.25
+# The RECEIVER's full thread, mated: from the counterbore floor (and its .010
 # break) to the shallower of the screw's last full thread at the free gap and
 # the end piece's least full-thread depth.
 ENGAGEMENT_NOMINAL = (
@@ -278,7 +337,7 @@ ENGAGEMENT_MIN = (
 )
 
 # drawing-guidelines.md rule 17 walls, FULL worst case, every term cited:
-#  * the end piece's head OD at its lower printed limit (PLUG_DIAMETER_BAND,
+#  * the end piece's head OD at its lower printed limit (PLUG_DIA_DEVIATIONS,
 #    title-block .XX);
 #  * the tap at its basic major plus 0.025 root oversize (TAP_ROOT_OVERSIZE);
 #  * the tap's locating band, thread axis to tube axis, and its printed DRILL
@@ -286,7 +345,7 @@ ENGAGEMENT_MIN = (
 #  * 0.3 degrees of drill run-off over the deepest thread and its lead: the
 #    head OD is turned before brazing and the hole is drilled after, in a
 #    DIFFERENT setup located on the tube, so the run-off term applies;
-#  * the title-block 0.25 edge break on the tap edge (counterbore floor) and
+#  * the title-block .010 edge break on the tap edge (counterbore floor) and
 #    on the head's OD edge at a face (both counted together, although they
 #    never share a station).
 DRILL_RUNOFF_DEG = 0.3
@@ -294,37 +353,41 @@ _RUNOFF = math.tan(math.radians(DRILL_RUNOFF_DEG))
 DRILL_RUNOFF_MAX = (TAP_THREAD_DEPTH_MAX + TAP_LEAD) * _RUNOFF
 PLUG_WALL_NOMINAL = (gooseneck.PLUG_DIA - screw.MAJOR_DIA) / 2.0
 PLUG_WALL_MIN = (
-    (gooseneck.PLUG_DIA - PLUG_DIAMETER_BAND) / 2.0
+    (gooseneck.PLUG_DIA + PLUG_DIA_DEVIATIONS[0]) / 2.0
     - (screw.MAJOR_DIA + TAP_ROOT_OVERSIZE) / 2.0
     - THREAD_AXIS_OFFSET_MAX
     - DRILL_WANDER_MAX
     - DRILL_RUNOFF_MAX
     - 2.0 * EDGE_BREAK
 )
-PLUG_WALL_TARGET = 2.0
-PLUG_WALL_FLOOR = 1.5
-# The same wall at the counterbore: its largest size (DRILLED HOLES +0.10/0),
-# its location (the tap's band plus COUNTERBORE_AXIS_OFFSET_MAX), run-off over
-# its deepest floor, the two 0.25 breaks.  Under the 2.0 target: owner minor
-# sm-gooseneck RV-01 (2026-10-27, #1951); MHA-SM-01 states it, floored, as
-# COUNTERBORE_WALL_CALLOUT_MIN.
+# Rule 17 on the inch sheet: .080 target, .060 floor.
+PLUG_WALL_TARGET = WALL_TARGET_MM
+PLUG_WALL_FLOOR = WALL_FLOOR_MM
+# The same wall at the counterbore: its largest printed size, its location
+# (the tap's band plus COUNTERBORE_AXIS_OFFSET_MAX), run-off over its deepest
+# floor, the two .010 breaks.  Under the .080 target: owner minor
+# sm-gooseneck RV-01 (2026-10-27, #1951); MHA-SM-01 states it, floored to
+# .001 in, as COUNTERBORE_WALL_CALLOUT_MIN.
 COUNTERBORE_RUNOFF_MAX = COUNTERBORE_DEPTH_MAX * _RUNOFF
 COUNTERBORE_WALL_MIN = (
-    (gooseneck.PLUG_DIA - PLUG_DIAMETER_BAND) / 2.0
+    (gooseneck.PLUG_DIA + PLUG_DIA_DEVIATIONS[0]) / 2.0
     - COUNTERBORE_DIA_MAX / 2.0
     - THREAD_AXIS_OFFSET_MAX
     - COUNTERBORE_AXIS_OFFSET_MAX
     - COUNTERBORE_RUNOFF_MAX
     - 2.0 * EDGE_BREAK
 )
-COUNTERBORE_WALL_CALLOUT_MIN = math.floor(COUNTERBORE_WALL_MIN * 100.0) / 100.0
+# Inches, floored (never rounded up) to the sheet's .001.
+COUNTERBORE_WALL_CALLOUT_MIN = (
+    math.floor(round(COUNTERBORE_WALL_MIN / MM_PER_IN * 1000.0, 6)) / 1000.0
+)
 # The drill's point past the head, inside the shank: the deepest point's cone
 # is widest in the shank at the head's end, against the shank at its lower
 # printed limit, the drill's location bands and its run-off.  The head's end
 # stands PLUG_HEAD_LENGTH from the end face at its title-block .XX band, so
 # both drill envelopes take the SHORTEST head (codjiflo P1 on #1997): the
 # full-Ø drill stays inside it, and the point's cone meets the shank there.
-PLUG_HEAD_LENGTH_MIN = gooseneck.PLUG_HEAD_LENGTH - PLUG_LENGTH_BAND
+PLUG_HEAD_LENGTH_MIN = gooseneck.PLUG_HEAD_LENGTH + PLUG_HEAD_LENGTH_DEVIATIONS[0]
 _POINT_TIP_MAX = TAP_DRILL_DEPTH_MAX + DRILL_POINT_H * TAP_DRILL_DIA_MAX / 2.0
 DRILL_POINT_RADIUS_AT_SHANK = max(
     0.0,
@@ -334,7 +397,7 @@ DRILL_POINT_RADIUS_AT_SHANK = max(
     / (DRILL_POINT_H * TAP_DRILL_DIA_MAX / 2.0),
 )
 DRILL_POINT_SHANK_WALL_MIN = (
-    (PLUG_SHANK_DIA - PLUG_DIAMETER_BAND) / 2.0
+    (PLUG_SHANK_DIA + PLUG_SHANK_DIA_DEVIATIONS[0]) / 2.0
     - min(DRILL_POINT_RADIUS_AT_SHANK, TAP_DRILL_DIA_MAX / 2.0)
     - THREAD_AXIS_OFFSET_MAX
     - DRILL_WANDER_MAX
@@ -343,19 +406,17 @@ DRILL_POINT_SHANK_WALL_MIN = (
 
 # Head retention: the head's worst-case overlap of the eye's ID.  The 1.0
 # check stands; the Ø11.50 head (the reference photo's proportion) keeps
-# 0.95 at its LIMIT band's 11.40 under owner minor sm-gooseneck-spring-screw
-# RV-01 (2026-10-27, #1951).
+# 0.95 at its printed LIMIT band's .449 under owner minor
+# sm-gooseneck-spring-screw RV-01 (2026-10-27, #1951).
 HEAD_RETENTION_TARGET = 1.0
 HEAD_RETENTION = (screw.HEAD_DIA - spring.EYE_ID_MM) / 2.0
-HEAD_RETENTION_MIN = (screw.HEAD_DIA + screw.HEAD_DIA_LOWER - spring.EYE_ID_MM) / 2.0
+HEAD_RETENTION_MIN = (SCREW_HEAD_DIA_MIN - spring.EYE_ID_MM) / 2.0
 
 # The head's clamp flat.  The relief chamfer (sm_gooseneck_spring_screw_geom)
 # ends the flat under-head face at the smallest head less the largest
 # chamfer; the clamp's first pull pass, the loop's wire nearest the screw
 # axis (at most LOOP_PASS_RADIUS_MAX off it), still bears on it.
-HEAD_FLAT_RADIUS_MIN = (
-    screw.HEAD_DIA + screw.HEAD_DIA_LOWER
-) / 2.0 - screw.HEAD_RELIEF_CHAMFER_MAX
+HEAD_FLAT_RADIUS_MIN = SCREW_HEAD_DIA_MIN / 2.0 - SCREW_HEAD_RELIEF_CHAMFER_MAX
 HEAD_FLAT_BEARING_MARGIN_MIN = HEAD_FLAT_RADIUS_MIN - LOOP_PASS_RADIUS_MAX
 
 # The loop on its seat.  The clamp fixes the loop's two pull-side passes (the
@@ -416,16 +477,16 @@ def _fillet_clearance(u: float, v: float, fillet_r: float, body_r: float) -> flo
 
 
 # The plug-side pass short of the thread's earliest start, at either state.
-LOOP_PLAIN_MARGIN_MIN = screw.PLAIN_LENGTH_MIN - max(
+LOOP_PLAIN_MARGIN_MIN = SCREW_PLAIN_LENGTH_MIN - max(
     LOOP_PASS_X[1], CLAMPED_LOOP_PASS_X[1]
 )
-# The under-head fillet MHA-SM-04 prints "R0.5 MAX", against a wire bearing on
+# The under-head fillet MHA-SM-04 prints "R.020 MAX", against a wire bearing on
 # the body; the clearance grows with the station past WIRE_R, so the head-face
 # floor is the least of every state.
 LOOP_CORNER_CLEARANCE_MIN = _fillet_clearance(
-    WIRE_R, WIRE_R, screw.UNDERHEAD_CORNER_R, WIRE_R
+    WIRE_R, WIRE_R, SCREW_UNDERHEAD_CORNER_R_MAX, WIRE_R
 )
-# The counterbore floor's "R0.10 MAX" against the run-out's crest corner at
+# The counterbore floor's "R.004 MAX" against the run-out's crest corner at
 # its least axial and radial clearances (both above).
 RUNOUT_FLOOR_CORNER_CLEARANCE_MIN = _fillet_clearance(
     COUNTERBORE_DEPTH_MIN - SCREW_RUNOUT_INTRUSION_MAX,
@@ -437,7 +498,7 @@ RUNOUT_FLOOR_CORNER_CLEARANCE_MIN = _fillet_clearance(
 # The loop against the counterbore mouth.  The eye's inner surface bears on
 # the body on the pull side, so its axis stands EYE_ID/2 - BODY/2 from the
 # screw axis.  The mouth's reach from the screw axis is the counterbore's
-# largest radius, its 0.25 edge break, and both axis offsets
+# largest radius, its .010 edge break, and both axis offsets
 # (COUNTERBORE_AXIS_OFFSET_MAX and SCREW_FACE_OFFSET_MAX, as for the run-out).
 # Two facts, each at the worse body limit and the worse untilted gap:
 #  * LOOP_FACE_CONTACT_RADIUS_MIN: the wire that meets the end face is the
@@ -479,7 +540,7 @@ _FACE_CASES = tuple(
         (gooseneck.SPRING_EYE_GAP, spring.LOOP_RISE_MM),
         (CLAMPED_GAP_MAX, CLAMPED_LOOP_RISE),
     )
-    for body in (screw.BODY_DIA_MIN, screw.BODY_DIA_MAX)
+    for body in (SCREW_BODY_DIA_MIN, SCREW_BODY_DIA_MAX)
 )
 LOOP_FACE_CONTACT_RADIUS_MIN = min(case[0] for case in _FACE_CASES)
 LOOP_MOUTH_STANDOFF_MIN = min(case[1] for case in _FACE_CASES)
@@ -519,9 +580,9 @@ if HEAD_FLAT_BEARING_MARGIN_MIN <= 0.0:
     raise AssertionError("gooseneck screw's relief chamfer takes the loop off its flat")
 if min(LOOP_PLAIN_MARGIN_MIN, LOOP_CORNER_CLEARANCE_MIN) <= 0.0:
     raise AssertionError("gooseneck spring loop bears off the screw's plain body")
-if not LOOP_PASS_X[0] < LOOP_PASS_X[1] < screw.PLAIN_LENGTH_MIN:
+if not LOOP_PASS_X[0] < LOOP_PASS_X[1] < SCREW_PLAIN_LENGTH_MIN:
     raise AssertionError("gooseneck spring loop passes do not lie on the plain body")
-if not CLAMPED_LOOP_PASS_X[0] < CLAMPED_LOOP_PASS_X[1] < screw.PLAIN_LENGTH_MIN:
+if not CLAMPED_LOOP_PASS_X[0] < CLAMPED_LOOP_PASS_X[1] < SCREW_PLAIN_LENGTH_MIN:
     raise AssertionError("clamped gooseneck spring loop passes leave the plain body")
 if (
     LOOP_FACE_CONTACT_RADIUS_MIN <= COUNTERBORE_MOUTH_REACH

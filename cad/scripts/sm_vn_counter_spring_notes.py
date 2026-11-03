@@ -17,12 +17,16 @@ from sm_vn_counter_spring_spec import (
 )
 
 
+MM_PER_IN = 25.4
+N_PER_LBF = 4.4482216
+
+# The inch sheet prints the catalogue's own inch-pound figures.
 DRAWING_NOTES = "\n".join(
     (
-        f"SHOWN AT INSTALLED LENGTH ({INSTALLED_LENGTH_MM:.1f}) INSIDE LOOPS; "
-        f"FREE LENGTH ({FREE_LENGTH_MM:.1f}).",
-        f"CATALOG RATE ({SPRING_RATE_N_PER_MM:.3f} N/MM) AND INITIAL TENSION "
-        f"({INITIAL_TENSION_N:.1f} N) ARE REF;",
+        f"SHOWN AT INSTALLED LENGTH ({INSTALLED_LENGTH_MM / MM_PER_IN:.2f}) "
+        f"INSIDE LOOPS; FREE LENGTH ({FREE_LENGTH_MM / MM_PER_IN:.2f}).",
+        f"CATALOG RATE ({SPRING_RATE_N_PER_MM * MM_PER_IN / N_PER_LBF:.2f} LBF/IN) "
+        f"AND INITIAL TENSION ({INITIAL_TENSION_N / N_PER_LBF:.2f} LBF) ARE REF;",
         "THE SUPPLIER STATES NO TOLERANCE ON EITHER.",
     )
 )
