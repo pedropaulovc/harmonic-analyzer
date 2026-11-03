@@ -26,6 +26,7 @@ from dt_pinion_arbor_geometry import (
     BOND_ZONE_LAND_CLEARANCE as BOND_ZONE_LAND_CLEARANCE,
     CROSS_HOLE_DIA as CROSS_HOLE_DIA,
     CROSS_HOLE_DIA_BAND as CROSS_HOLE_DIA_BAND,
+    CROSS_HOLE_DIA_PLACES as CROSS_HOLE_DIA_PLACES,
     CROSS_HOLE_FRONT_WEB_WORST as CROSS_HOLE_FRONT_WEB_WORST,
     CROSS_HOLE_REAR_WEB_WORST as CROSS_HOLE_REAR_WEB_WORST,
     CROSS_HOLE_STATION as CROSS_HOLE_STATION,
@@ -159,8 +160,8 @@ REFERENCE_SKETCHES = (
 )
 
 # #290 decimal-inch places.  Four on the 5/16 lands and bond zone (their
-# sub-.001 bands print exactly), the reamed cross hole (.250 +.0015/+.0010)
-# and the 1/16 pin hole (.0625 +.0025/.0000); two (.XX) on every other
+# sub-.001 bands print exactly) and the 1/16 pin hole (.0625 +.0025/.0000);
+# three on the bonded cross hole (.250 +.005/+.001); two (.XX) on every other
 # length, station, diameter and crown radius, because the land, drum, pin,
 # web and run-out stacks read them.  The crown sags and the overall are REFs;
 # the overall prints one place, (9.6), because its rounded chain (.05 + 8.93 +
@@ -174,7 +175,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "DrumStationReference": {"DrumStationFromHeadRear": 2},
     "FrontCapProfile": {"HeadCapR": 2, "HeadCapSagDim": HEAD_CAP_SAG_PLACES},
     "BackCapProfile": {"BackCapR": 2, "BackCapSagDim": 2},
-    "CrossHoleProfile": {"CrossHoleDia": 4},
+    "CrossHoleProfile": {"CrossHoleDia": CROSS_HOLE_DIA_PLACES},
     "CrossHoleStationReference": {"CrossHoleFromHeadRear": CROSS_HOLE_STATION_PLACES},
     "PinHoleProfile": {"PinHoleDia": 4},
     "PinStationReference": {"PinStationFromHeadRear": 2},

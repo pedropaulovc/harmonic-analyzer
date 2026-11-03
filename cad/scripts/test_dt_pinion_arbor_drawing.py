@@ -139,10 +139,13 @@ def test_integral_head_owns_the_crossrod_interface() -> None:
 
 def test_crossrod_is_a_bonded_slip_fit_not_a_press() -> None:
     """R1 (U27 precedent): as-received bar cannot make a press, so the rod is
-    bonded.  #290: the 1/4 rod sits in the owned .2510 over reamer's hole,
-    .250 +.0015/+.0010, inside Loctite 638's gap at the bar's loosest."""
+    bonded.  #2106 final review (Main ruling): the hole's band is the joint's
+    function, .250 +.005/+.001: the largest 1/4 rod enters with .001, the
+    loosest pair stays inside Loctite 638's gap, and the owned .2510 over
+    reamer still cuts inside it."""
     assert spec.CROSS_HOLE_DIA == pytest.approx(6.35)
-    assert spec.CROSS_HOLE_DIA_BAND is _fit_ream_slide.REAM_SLIDE
+    assert spec.CROSS_HOLE_DIA_BAND == pytest.approx((0.127, 0.0254))
+    assert spec.DRAWING_PRECISION["CrossHoleProfile"]["CrossHoleDia"] == 3
     assert crossrod.ROD_DIA == pytest.approx(spec.CROSS_HOLE_DIA)  # line to line
     assert (
         model_toleranced_dimensions(part)[("CrossHoleProfile", "CrossHoleDia")]
@@ -156,9 +159,17 @@ def test_crossrod_is_a_bonded_slip_fit_not_a_press() -> None:
     )
     assert spec.CROSSROD_MIN_CLEARANCE == pytest.approx(tightest)
     assert spec.CROSSROD_MAX_CLEARANCE == pytest.approx(loosest)
-    assert tightest == pytest.approx(0.0254)  # .0010 in: the rod always enters
-    assert loosest == pytest.approx(0.0889)  # .0035 in
+    assert tightest == pytest.approx(0.0254)  # .001 in: the rod always enters
+    assert loosest == pytest.approx(0.1778)  # .007 in
     assert loosest <= spec.RETAINING_COMPOUND_MAX_GAP_MM
+    reamer = geometry.OWNED_CROSS_HOLE_REAMER_MM
+    assert (
+        spec.CROSS_HOLE_DIA + spec.CROSS_HOLE_DIA_BAND[1]
+        <= reamer
+        <= spec.CROSS_HOLE_DIA + spec.CROSS_HOLE_DIA_BAND[0]
+    )
+    # The callout names the function and the mate, never the numbers.
+    assert spec.CROSS_HOLE_CALLOUT == "REAM THRU, BONDED FIT\nON MHA-DT-15 CROSSROD"
     assert "INTO MHA-DT-22 HEAD WITH LOCTITE 638" in crossrod.ASSEMBLY_STEP
     for retired in ("MATCH-REAM", "PRESS", "INTERNAL SHOULDERS SHARP"):
         assert retired not in spec.DRAWING_NOTES
