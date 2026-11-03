@@ -523,6 +523,42 @@ def test_hidden_lines_are_off_and_helical_tangent_edges_are_dropped() -> None:
     assert "GetDisplayTangentEdges2()" in source
 
 
+@pytest.mark.parametrize("accept_display", [True, False])
+def test_cut_faces_only_checks_native_state_after_rebuild(
+    monkeypatch: pytest.MonkeyPatch, accept_display: bool
+) -> None:
+    class Section:
+        display = False
+
+        def SetDisplayOnlySurfaceCut(self, display: bool) -> None:
+            if accept_display:
+                self.display = display
+
+        def GetDisplayOnlySurfaceCut(self) -> bool:
+            return self.display
+
+    section = Section()
+
+    class View:
+        def GetSection(self) -> Section:
+            return section
+
+    rebuilds = []
+    adapter = object()
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(
+        drawing, "rebuild_drawing",
+        lambda value, *, label: rebuilds.append((value, section.display)),
+    )
+    if accept_display:
+        drawing._cut_faces_only(adapter, View())
+        assert section.display is True
+    else:
+        with pytest.raises(RuntimeError, match="kept geometry beyond the cut"):
+            drawing._cut_faces_only(adapter, View())
+    assert rebuilds == [(adapter, accept_display)]
+
+
 # Dimension text centres on its keep point. Metrics off the round-bore 3:2 64T
 # sheet of farm run 20260929T061401240Z (e0f6636): "(0.025-0.105 DIAMETRAL"
 # is 52 mm for 22 characters, the five-line bore block stands 25 mm tall, and
