@@ -82,21 +82,31 @@ REFERENCE_FORMATS = {
 # three places on the Right view (not a parenthesised supplier reference).
 CUT_FEATURE = "ThreadEnvelope"
 CUT_DIMENSION = "CutThreadLength"
-_CHAMFER_IN = f"{CUT_CHAMFER / INCH:.2f}".removeprefix("0")
 # The value and a one-word callout sit on the dimension line between the
-# shoulder and the thread end (no wider than that 14.5 mm span). The cut's
-# function, which keeps .570 at three places, and the end chamfer's size are a
-# leadered note right of the thread end (machinist review: text shelved under
-# the head read as a head size, and the mate needs its full name). At most 27
-# characters a row, so the note fits between the tip and the Right cell's edge.
+# shoulder and the thread end (no wider than that 14.5 mm span).
 CUT_CALLOUT = "CUT"
-# The .570 CUT dimension carries the length; the note does not repeat it
-# (machinist review).
-CUT_NOTE = (
-    f"CUT END: CHAMFER {_CHAMFER_IN} X 45°\n"
-    "TIP STAYS .011 MIN INSIDE\n"
-    "MHA-CH-06-TL-22 PIVOT BLOCK"
-)
+# The end chamfer prints as one native dimension, ".03 X 45°", never note text
+# (Codjiflo #2112): its axial leg, with the angle riding as the suffix (as the
+# crank handle pivot screw's tip chamfer). The build names ThreadEndChamfer's
+# own leg and angle; the printed leg is a Right-plane carrier on the thread's
+# upper silhouette, its length equated to the feature's leg (as
+# pn_pen_v_block's PivotReference). A round edge's chamfer distance does not
+# import onto the side view (farm run 20261103T000944465Z); separate leg and
+# angle dimensions struck each other's text on the 0.76 mm chamfer (machinist
+# review, run 20261103T013349829Z); and the view exposes no cone silhouette for
+# a native chamfer dimension (runs 20261103T015807618Z, 20261103T021419213Z).
+CHAMFER_FEATURE = "ThreadEndChamfer"
+CHAMFER_LENGTH_DIMENSION = "CutChamferLength"
+CHAMFER_ANGLE_DIMENSION = "CutChamferAngle"
+CHAMFER_ANGLE = 45.0
+CHAMFER_PLACES = 2  # .03
+CHAMFER_SUFFIX = f" X {CHAMFER_ANGLE:g}°"
+CHAMFER_REFERENCE_FEATURE = "ChamferRightReference"
+CHAMFER_LEG_DIMENSION = "CutChamferLeg"
+CHAMFER_LEG_START = (THREAD_LENGTH - CUT_CHAMFER, THREAD_DIA / 2.0)  # Right sketch (x = -z, y)
+# The note gives only the cut's function, which keeps .570 at three places;
+# the mate is named in full (machinist review).
+CUT_NOTE = "TIP STAYS .011 MIN INSIDE\nMHA-CH-06-TL-22 PIVOT BLOCK"
 THREAD_NOTE = f"{THREAD} UNC-2A\n(AS SUPPLIED)"
 SUPPLIER_DATA = (
     "HEAD Ø.562 X .250; 3/16 HEX KEY.",
