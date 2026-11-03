@@ -178,9 +178,18 @@ def test_front_view_locations_start_at_the_pivot_bore() -> None:
     rise_x, _ = drawing.FRONT_KEEP["LiftBoreCz"]
     assert rise_x < drawing._front_x(-dt_pinion_pivot_block_spec.BLOCK_WEST)
     # Review r2: the sheet says why the spacing is held from the pivot bore,
-    # on one line (a multi-line above-callout does not print).
-    assert set(drawing.ABOVE_CALLOUTS) == {"LiftBoreX"}
+    # on one line (a multi-line above-callout does not print); the three-place
+    # rise names its function too (#2106 final review).
+    assert set(drawing.ABOVE_CALLOUTS) == {"LiftBoreX", "LiftBoreCz"}
     assert all("\n" not in text for text in drawing.ABOVE_CALLOUTS.values())
+    three_place = {
+        name
+        for name, places in dt_pinion_pivot_block_spec.DRAWING_PRECISION[
+            "BlockProfile"
+        ].items()
+        if places == 3
+    }
+    assert three_place <= set(drawing.ABOVE_CALLOUTS)
 
 
 def test_hole_states_are_annotated() -> None:
