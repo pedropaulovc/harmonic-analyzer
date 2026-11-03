@@ -21,6 +21,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _purchased_variant_drawing import (
     build_purchased_variant_drawing,
     configure_reference_views,
@@ -94,6 +95,10 @@ END_KEEP: dict[str, tuple[float, float]] = {}
 # no duplicate imported chamfer dimension is printed in the end view.
 END_VIEW_LABEL = "CUT END VIEW"
 END_VIEW_LABEL_XY = (0.092, 0.224)
+# Sheet 1's item label, in the same top band; right of the cut-end view.
+# Sheet 1 carries the quantity, so this sheet needs no registry read.
+ITEM_LABEL = VARIANTS[0][1]
+ITEM_LABEL_XY = (0.150, 0.262)
 STOCK_NOTE_XY = (0.025, 0.077)
 THREAD_NOTE_XY = (0.065, 0.180)
 THREAD_CALLOUT = f"{stud.THREAD}\nEXISTING THREAD\nNOT MODELLED"
@@ -137,7 +142,10 @@ requirement(
     requirements=("length", "note"),
     fields={
         "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
-        "length": (limits(stud.LENGTH, stud.LENGTH_PLACES), ("LENGTH", "LENGTH_BAND")),
+        "length": (
+            limits(stud.LENGTH, stud.LENGTH_PLACES, unit=stud.UNIT),
+            ("LENGTH", "LENGTH_BAND"),
+        ),
         "length_nominal": (stud.LENGTH, ("LENGTH",)),
         "note": (stud.DIMENSION_CALLOUTS["FinishedLength"], ("DIMENSION_CALLOUTS",)),
     },
@@ -621,6 +629,8 @@ def append_stud_rework_sheets(adapter: Any) -> tuple[Callable[[], None], ...]:
     set_machining_callouts(adapter, annotations)
     if add_note(adapter, END_VIEW_LABEL, *END_VIEW_LABEL_XY) is None:
         raise RuntimeError("failed to label the permanent stud cut-end view")
+    if add_note(adapter, ITEM_LABEL, *ITEM_LABEL_XY) is None:
+        raise RuntimeError("failed to label the stud REWORK sheet's item")
     settled_notes = add_rework_notes(adapter, front)
     add_property_linked_note(
         adapter, f"{stud.CONFIGURATION} Rework Stock Note", *STOCK_NOTE_XY
@@ -1897,6 +1907,7 @@ async def build(adapter: Any) -> dict[str, str]:
         annotate_member=annotate_member,
         additional_sheet_scales={name: SHEET_SCALE for name in SHEET_NAMES},
         append_sheets=append_stud_rework_sheets,
+        unit=part_drawing_unit(PART_STEM),
     )
 
 

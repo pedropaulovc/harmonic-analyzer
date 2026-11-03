@@ -4,15 +4,16 @@ sh-column-clamp-front:
   finish: black enamel; bore, 2X drilled holes + bar-seat face (opposite the bore) masked, bare surfaces oiled
   quantity: 3
   tolerance_class: machined_block
+  drawing_unit: in
   process: "machined from solid stock or casting"
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
-      where: "the sheet note MIN EAR WALL 1.85"
-      finding: "ear-to-bore wall below the 2.0 mm target (rules 17, 20)"
-      reason: "1.85 MIN (1.850) from the drilled ear holes to the bore, on the largest A513 DOM column (25.527) at the loosest 0.30 bore clearance with 0.3 deg drill wander, above the unchanged 1.5 floor; 2.0 needs a column under its own 25.4 nominal, and the ear stations are shared with MHA-SH-02's taps (owner-ruled shortfall)"
+      where: "the sheet note MIN EAR WALL .072"
+      finding: "ear-to-bore wall below the .080 in target (rules 17, 20)"
+      reason: ".072 MIN (1.851 mm) from the drilled ear holes to the bore, on the largest A513 DOM column (1.005) at the loosest .012 bore clearance with 0.3 deg drill wander and the +/-.004 ear stations, above the .060 floor; .080 needs a column of at most .990, under its own 1.000 nominal, and the ear stations are shared with MHA-SH-02's taps; restated in inch 2026-10-31 from 1.85 mm (owner-ruled shortfall)"
     - id: "RV-02"
       kind: "minor"
-      where: "the sheet note EAR TO MHA-SH-02 TAP OFFSET UP TO 0.06 OVER #8 SCREW CLEARANCE"
+      where: "the sheet note EAR TO MHA-SH-02 TAP OFFSET UP TO .003 OVER #8 SCREW CLEARANCE"
       finding: "ear-hole-to-tap screw-line stack not held by the loose bands at the worst case, no fit-up adjustment (rules 19, 20)"
-      reason: "the printed ear stations and heights alone spend 0.283 of the #8 screw's 0.407 radial clearance in the 4.98 MIN hole; 0.3 deg drill wander through both arcs (0.096 + 0.081) brings the worst offset to 0.460, 0.053 over (stated rounded up as 0.06); no slot, oversize or match-drill is added (owner-ruled shortfall)"
+      reason: "the printed +/-.004 ear stations and heights alone spend .0113 (0.287 mm) of the #8 screw's .0160 (0.406 mm) radial clearance in the .196 MIN hole; 0.3 deg drill wander through both arcs (.0036 over the .690 MAX front depth + .0031 over the .60 MAX back depth) brings the worst offset to .0181 (0.459 mm), .0021 (0.0525 mm) over, inside the ruled 0.053 mm (stated rounded up as .003); no slot, oversize or match-drill is added (owner-ruled shortfall)"

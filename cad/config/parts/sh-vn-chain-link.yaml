@@ -15,3 +15,4 @@ sh-vn-chain-link:
     OuterLink: 32
   tolerance_class: machined_block
   process: purchased
+  drawing_unit: in

@@ -56,7 +56,7 @@ def test_clamp_holes_find_the_back_arc_taps_at_the_printed_worst_case() -> None:
     """Review of PR #1471: the clamp row printed .X (±0.8), whose 2.263
     position zone over-runs the 0.812 the #8 clearance holes float on the
     #8-32 shanks. Fixed fastener: each screw threads into an MHA-SH-02
-    back-arc tap held ±0.1 along the bar and in height (sh_column_clamp_fit),
+    back-arc tap held ±.004 along the bar and in height (sh_column_clamp_fit),
     so the bar's zone (2·√2·band) plus the tap's must stay inside the least
     hole's float; the band is the widest .XX that does. A drift in the band,
     the hole, the shank or the taps' bands breaks one of these."""
@@ -66,9 +66,9 @@ def test_clamp_holes_find_the_back_arc_taps_at_the_printed_worst_case() -> None:
     from sh_column_clamp_fit import EAR_HEIGHT_BAND, EAR_STATION_BAND
     from sh_vn_clamp_screw_spec import SHANK_DIA
 
-    # The mate: #8-32 taps in the back arc, located ±0.1 on both axes.
+    # The mate: #8-32 taps in the back arc, located ±.004 on both axes.
     assert (BACK_ARC_TAP.kind, BACK_ARC_TAP.size) == ("tapped", "#8-32")
-    assert EAR_STATION_BAND == EAR_HEIGHT_BAND == 0.1
+    assert EAR_STATION_BAND == EAR_HEIGHT_BAND == 0.1016
     tap_zone = 2.0 * math.hypot(EAR_STATION_BAND, EAR_HEIGHT_BAND)
     # The float: the least drilled #8 clearance hole over the basic major.
     assert part.CLAMP_THROUGH_HOLE_SPEC == HoleSpec("clearance", "#8")
@@ -81,14 +81,17 @@ def test_clamp_holes_find_the_back_arc_taps_at_the_printed_worst_case() -> None:
     def zone(band: float) -> float:
         return 2.0 * math.sqrt(2.0) * band
 
-    # The printed nominals are exact at .XX, so the zone is the band's alone.
+    # The stations sit 0.0006 off the .XX grid (the clamps' .689 ear
+    # stations, 17.5006), so the zone carries that rounding on the station.
     for value in (*part.CLAMP_STATIONS, part.CLAMP_ROW_HEIGHT):
-        assert round(value, 2) == value
+        assert abs(round(value, 2) - value) <= 0.0006 + 1e-9
     band = part.CLAMP_POSITION_BAND
     assert band == pytest.approx(0.18)
-    assert part.clamp_position_zone(band) == pytest.approx(zone(band))
+    assert part.clamp_position_zone(band) == pytest.approx(
+        2.0 * math.hypot(band + 0.0006, band)
+    )
     assert part.BACK_ARC_TAP_ZONE == pytest.approx(tap_zone)
-    assert zone(band) + tap_zone <= hole_float  # 0.792 <= 0.812
+    assert part.clamp_position_zone(band) + tap_zone <= hole_float  # 0.797 <= 0.812
     assert zone(band + 0.01) + tap_zone > hole_float
 
 
@@ -101,13 +104,13 @@ def test_row_nominals_are_the_built_holes() -> None:
     assert part.HANGER_STATIONS == (168.0, 291.0, 298.0)
     # Both rows read from the same (left, x = -226) end.
     assert part.CLAMP_ROW_START_X == left
-    assert part.CLAMP_ROW_X == (-214.5, -179.5, 179.5, 214.5)
+    assert part.CLAMP_ROW_X == (-214.5006, -179.4994, 179.4994, 214.5006)
     assert sorted(part.CLAMP_ROW_X) == sorted(part.CLAMP_HOLE_X)
-    assert part.CLAMP_STATIONS == (11.5, 46.5, 405.5, 440.5)
+    assert part.CLAMP_STATIONS == pytest.approx((11.4994, 46.5006, 405.4994, 440.5006))
     # END A's (east, -X) pair are round and locate the bar; the west pair are
     # the slots (owner ruling 2026-10-15, option A).
-    assert sorted(part.CLAMP_ROUND_X) == [-214.5, -179.5]
-    assert sorted(part.CLAMP_SLOT_X) == [179.5, 214.5]
+    assert sorted(part.CLAMP_ROUND_X) == [-214.5006, -179.4994]
+    assert sorted(part.CLAMP_SLOT_X) == [179.4994, 214.5006]
     assert sorted((*part.CLAMP_ROUND_X, *part.CLAMP_SLOT_X)) == list(part.CLAMP_ROW_X)
     assert part.CLAMP_ROW_HEIGHT == spec.BAR_HEIGHT / 2.0
 
@@ -399,7 +402,7 @@ def test_west_slots_take_up_the_column_pitch() -> None:
     height = 0.18 + EAR_HEIGHT_BAND
     assert part.CLAMP_POSITION_BAND == 0.18
     slack = math.sqrt(radial**2 - height**2)
-    assert slack == pytest.approx(0.2943, abs=1e-4)
+    assert slack == pytest.approx(0.2927, abs=1e-4)
     # Each slot's least travel each way: its 3.000 run at .XXX.
     assert part.CLAMP_SLOT_RUN == 2.0 * part.CLAMP_SLOT_TRAVEL == 3.0
     assert part.CLAMP_SLOT_WIDTH == part.CLAMP_HOLE_DIA == pytest.approx(4.978)
@@ -407,8 +410,8 @@ def test_west_slots_take_up_the_column_pitch() -> None:
     # Between an east and a west screw: both bar stations, both clamps' tap
     # stations and both clamps' shift on their columns.
     between = 2.0 * (0.18 + EAR_STATION_BAND + BORE_DIAMETRAL_CLEARANCE[1] / 2.0)
-    assert between == pytest.approx(0.8648)
-    for pitch, margin in ((top, 0.6488), (base, 0.1388)):
+    assert between == pytest.approx(0.8680)
+    for pitch, margin in ((top, 0.6425), (base, 0.1325)):
         left = travel + 2.0 * slack - (pitch + between)
         assert left == pytest.approx(margin, abs=5e-4)
         assert part.clamp_slot_closure_margin(pitch) == pytest.approx(left)
@@ -418,7 +421,7 @@ def test_west_slots_take_up_the_column_pitch() -> None:
     assert (3.0 - printed_band_mm(2)) / 2.0 + 2.0 * slack - (base + between) < 0.0
     # The east pair share one clamp: only their stations and taps open it.
     east = 2.0 * slack - 2.0 * (0.18 + EAR_STATION_BAND)
-    assert east == pytest.approx(0.0286, abs=1e-4)
+    assert east == pytest.approx(0.0223, abs=1e-4)
     assert part.clamp_east_pair_margin() == pytest.approx(east)
 
 
@@ -477,10 +480,12 @@ def test_slot_counterbores_leave_rule_17_walls() -> None:
     assert side == pytest.approx(9.25, abs=5e-3)
     for wall in (end_wall, web, side):
         assert wall >= 2.0
-    # Nominally 5.75 to the end, 23.5 between.
+    # Nominally 5.7494 to the end, 23.5012 between.
     reach = part.CLAMP_SLOT_RUN / 2.0 + part.CLAMP_SLOT_CBORE_WIDTH / 2.0
-    assert part.BAR_LENGTH / 2.0 - max(part.CLAMP_SLOT_X) - reach == 5.75
-    assert max(part.CLAMP_SLOT_X) - min(part.CLAMP_SLOT_X) - 2.0 * reach == 23.5
+    assert part.BAR_LENGTH / 2.0 - max(part.CLAMP_SLOT_X) - reach == pytest.approx(5.7494)
+    assert max(part.CLAMP_SLOT_X) - min(part.CLAMP_SLOT_X) - 2.0 * reach == pytest.approx(
+        23.5012
+    )
 
 
 def test_slot_views_frame_the_slots() -> None:

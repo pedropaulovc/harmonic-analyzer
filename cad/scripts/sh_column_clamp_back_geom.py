@@ -15,18 +15,18 @@ from __future__ import annotations
 
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 
-# Column axis to the back face. 15.5 (was 14.0, a 1.2 wall past the column):
-# user ruling 2026-10-14, a 2.7 nominal wall that holds 2.0 at the printed
-# worst case (sh_column_clamp_back_spec.BACK_WALL_MIN).
-DEPTH = 15.5
+# Column axis to the back face, .610 (was .551, a .047 wall past the column):
+# user ruling 2026-10-14, a .106 nominal wall that holds the .080 target at
+# the printed worst case (sh_column_clamp_back_spec.WALLS_WORST).
+DEPTH = 15.494  # .610
 # The mating face stops this far short of the column axis (user ruling
-# 2026-10-14). With both half-bores at Ø25.6 and both mating faces on the axis
-# the faces met before the bores closed on the Ø25.4 column, so the clamp
-# could not grip; the offset keeps a gap between the faces once the screws
-# seat both bores on the column (sh_column_clamp_fit.GRIP_GAP_MIN).
-GRIP_OFFSET = 0.5
-BLOCK_DEPTH = DEPTH - GRIP_OFFSET  # 15.0: mating face to back face
-# The Ø4.17 clamp-screw shanks THREAD IN here (back arc = last in the stack):
+# 2026-10-14). With both half-bores at Ø1.008 and both mating faces on the
+# axis the faces met before the bores closed on the Ø1.000 column, so the
+# clamp could not grip; the offset keeps a gap between the faces once the
+# screws seat both bores on the column (sh_column_clamp_fit.GRIP_GAP_MIN).
+GRIP_OFFSET = 0.508  # .020
+BLOCK_DEPTH = DEPTH - GRIP_OFFSET  # .590: mating face to back face
+# The Ø.164 clamp-screw shanks THREAD IN here (back arc = last in the stack):
 # tapped #8-32 through (nearest UNC to the ~Ø4 screw;
 # memory/fastener-policy-us-customary). The tapped length is BLOCK_DEPTH.
 HOLE_SPEC = HoleSpec("tapped", "#8-32")

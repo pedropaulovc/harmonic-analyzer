@@ -239,8 +239,8 @@ def test_shared_stud_features_use_actual_default_member_spec_and_rework_provenan
     assert manifest["notes"]["process"] == stud.PROCESS
     assert manifest["notes"]["manufacturing"] == stud.DRAWING_NOTES.splitlines()
     assert set(manifest["features"]) == {"finished_upper_end", "cut_end_chamfer"}
-    assert manifest["features"]["finished_upper_end"]["length"] == [56.4, 58.0]
-    assert manifest["features"]["cut_end_chamfer"]["length"] == [0.0, 1.0]
+    assert manifest["features"]["finished_upper_end"]["length"] == pytest.approx([2.24 * 25.4, 2.26 * 25.4])
+    assert manifest["features"]["cut_end_chamfer"]["length"] == [0.0, 1.016]
     assert set(exporter._cite(stud, "FINISH")) <= set(manifest["material"]["cite"])
     assert set(exporter._cite(stud, "PROCESS")) <= set(manifest["notes"]["cite"])
     registry = "harmonic-analyzer/cad/config/parts/sh-vn-clamping-kit-hardware.yaml:sh-vn-clamping-kit-hardware"

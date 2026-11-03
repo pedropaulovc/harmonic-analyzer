@@ -26,6 +26,7 @@ from _title_block_units import LENGTH_UNITS, render_number
 
 DRAWING_NUMBER = "MHA-MS-00"
 PLATE_DRAWING_NUMBER = str(_config.parts("ms-stop-plate")["number"])
+BLOCK_DRAWING_NUMBER = str(_config.parts("ms-stop-block")["number"])
 UNIT = assembly_contract(spec.ASM_NAME).drawing_unit
 
 BOM_ORDER = (spec.STICK, spec.BLOCK, spec.PLATE, spec.PLATE_SCREW, spec.THUMB_SCREW)
@@ -69,16 +70,17 @@ DRAWING_DIMENSIONS = {spec.SETTING_FEATURE: {spec.SETTING_DIMENSION}}
 # 2-5 backwards. Each line names the parts as the BOM's DESCRIPTION column
 # does. The block and its cover are a match-drilled pair (step 1): neither is
 # interchangeable.
+# The block's own tapped-hole callout states the drill and full-thread depths;
+# step 1 points to it instead of restating them.
 ASSEMBLY_STEPS = (
     "1. PLATE IS MASTER: LAY OUT STOP COVER PLATE HOLES PER "
     f"{PLATE_DRAWING_NUMBER}; LEAVE UNDRILLED. "
     f"CLAMP PLATE AND BLOCK WITH {stop.MATCH_DRILL_DATUM_ALIGNMENT}; PILOT "
-    f"DIA {_hole(stop.PLATE_TAP_DRILL_DIA)} THROUGH PLATE INTO BLOCK TO "
-    f"{_hole(stop.PLATE_TAP_DRILL_DEPTH)} CYLINDRICAL DEPTH INTO BLOCK "
-    "(DEPTH EXCLUDES PLATE). REMOVE PLATE; OPEN ITS HOLES TO "
-    f"DIA {_hole(stop.PLATE_CLEARANCE_DIA)}; BOTTOMING-TAP BLOCK "
-    f"{plate_screw.THREAD} TO {_hole(stop.PLATE_TAP_THREAD_DEPTH)} FULL THREAD "
-    "DEPTH INTO BLOCK. MARK BLOCK AND PLATE AS A PAIR.",
+    f"DIA {_hole(stop.PLATE_TAP_DRILL_DIA)} THROUGH PLATE INTO BLOCK TO THE "
+    f"{BLOCK_DRAWING_NUMBER} TAP DRILL DEPTH (DEPTH EXCLUDES PLATE). REMOVE "
+    f"PLATE; OPEN ITS HOLES TO DIA {_hole(stop.PLATE_CLEARANCE_DIA)}; "
+    f"BOTTOMING-TAP BLOCK {plate_screw.THREAD} TO THE {BLOCK_DRAWING_NUMBER} "
+    "FULL THREAD DEPTH. MARK BLOCK AND PLATE AS A PAIR.",
     f"2. START THE {thumb.THREAD} KNURLED THUMBSCREW DOWN INTO THE STOP BLOCK "
     "FROM ITS TAPPED FACE; KEEP THE TIP CLEAR OF THE WINDOW.",
     "3. LAY THE STICK IN THE OPEN WINDOW, GRADUATED FACE OPPOSITE THE THUMBSCREW.",

@@ -1545,10 +1545,20 @@ _STUD_PITCH = (
 CLAMPING_KIT_NUMBER = "MHA-SH-VN-57"
 # HD2-HD3 cut the studs to the kit drawing's REWORK sheet, its second.
 STUD_REWORK_SHEET = f"{CLAMPING_KIT_NUMBER} SHEET 2"
+# That sheet prints inch (2.25 at .XX), these steps millimetres. 25.4 adds one
+# decimal, so the inch limits are exact in mm at one place more: 56.896/57.404,
+# not 56.90/57.40, which would let HD2 pass a max-length stud short of G.
+_STUD_LIMIT_PLACES = hold_down_stud.LENGTH_PLACES + 1
+if any(
+    abs(round(limit, _STUD_LIMIT_PLACES) - limit) > 1e-9
+    for limit in hold_down_stud.LENGTH_LIMITS
+):
+    raise AssertionError("the stud's mm limits do not print exactly")
 _STUD_LIMITS = (
-    f"{hold_down_stud.LENGTH - hold_down_stud.LENGTH_BAND:.{hold_down_stud.LENGTH_PLACES}f}/"
-    f"{hold_down_stud.LENGTH + hold_down_stud.LENGTH_BAND:.{hold_down_stud.LENGTH_PLACES}f} "
-    f"ON {STUD_REWORK_SHEET}"
+    "/".join(
+        f"{limit:.{_STUD_LIMIT_PLACES}f}" for limit in hold_down_stud.LENGTH_LIMITS
+    )
+    + f" ON {STUD_REWORK_SHEET}"
 )
 HOLD_DOWN_STEPS = (
     "HD1. FOR UNCUT-STOCK OBSTRUCTIONS, ISOLATE THE SPINDLE, SUPPORT THE "

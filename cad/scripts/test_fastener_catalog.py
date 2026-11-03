@@ -151,7 +151,7 @@ _SHARED_PROPERTIES = {
     ),
     "sh-vn-clamping-kit-hardware": (
         "Plain Carbon Steel",
-        "black oxide, as supplied", "visual_noncritical", None,
+        "BLACK OXIDE AS SUPPLIED", "visual_noncritical", None,
     ),
 }
 

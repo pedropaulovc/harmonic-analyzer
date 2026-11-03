@@ -9,7 +9,7 @@ sh-vn-clamping-kit-hardware:
   material_specification: "Hardened steel"
   # Common supplied finish; only HoldDownStud receives the source-defined rework
   # and OIL BARE CUT END instruction in its native configuration properties.
-  finish: black oxide, as supplied
+  finish: BLACK OXIDE AS SUPPLIED
   # Installed members, not purchased kits. HoldDownStud starts as 3 in STOCK.
   quantity: 12
   default_configuration: HoldDownStud
@@ -20,3 +20,4 @@ sh-vn-clamping-kit-hardware:
   usage_scope: tooling
   tolerance_class: visual_noncritical
   process: purchased
+  drawing_unit: in
