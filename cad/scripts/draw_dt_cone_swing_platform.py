@@ -1234,6 +1234,7 @@ def _rewrite_hole_callout(
     print(f"{label} callout: definitions={persisted!r} resolved={resolved!r}")
 
 
+@_telemetry.traced("drawing.cone_swing_platform.pivot_band_places")
 def _print_pivot_band_exactly(display: Any) -> None:
     """Print the pivot ream's band at the places it needs, natively.
 
