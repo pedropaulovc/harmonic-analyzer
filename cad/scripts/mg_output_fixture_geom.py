@@ -48,8 +48,11 @@ HEX_CORNER_RADIUS = HEX_AF / math.sqrt(3.0)
 # --- Stations along the hex axis (local x; origin on the rod-bore axis) ----------
 # The free end's and the spigot face's stations, and the groove's station and
 # root Ø below, set the installed hook and the bracket arm's load: they keep
-# their millimetre nominals and print rounded (.209, .50, .15, .30).
-ROD_STATION = 5.30  # free end to the rod-bore axis
+# their millimetre nominals and print rounded (.50, .15, .30). The free end
+# mates nothing: it stands on the .XX grid at .22, long enough that the wall
+# over the drilled bore meets the .080 target at the title-block band (rule
+# 17: geometry, not a tighter band).
+ROD_STATION = 5.588  # .22, free end to the rod-bore axis
 FREE_END_X = -ROD_STATION
 # Spigot face back to the shoulder: the lathe's own length from the faced end.
 SPIGOT_LENGTH = 6.604  # .26

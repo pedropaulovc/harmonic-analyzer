@@ -75,7 +75,10 @@ SPIGOT_DIA = DRUM_BORE
 SPIGOT_LEN = 9.0  # the drum's .354 face sits .0003 under it; prints .354
 HUB_STEP_Z = round(HUB_BACK_Z - (HUB_LEN - SPIGOT_LEN), 6)  # -6.51, boss front face
 HUB_FRONT_Z = round(HUB_BACK_Z - HUB_LEN, 6)  # -15.51, spigot front face
-DRUM_MID_Z = round((HUB_STEP_Z + HUB_FRONT_Z) / 2.0, 6)  # -11.01, where the drum sits
+DRUM_MID_Z = round((HUB_STEP_Z + HUB_FRONT_Z) / 2.0, 6)  # -11.01, the drum wire lane
+# The drum is pressed hard against the boss: its installed centre is half its
+# own (shorter) length off the boss face, not the spigot's midpoint.
+DRUM_SEATED_MID_Z = HUB_STEP_Z - DRUM_LEN / 2.0
 # Reamed on the owned .1885 reamer to a stated running clearance on the
 # finished axle (mg_wheel_group HUB_RUNNING), so the Ø prints as a reference
 # nominal.

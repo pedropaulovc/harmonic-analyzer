@@ -88,9 +88,7 @@ def _wander(depth_mm: float) -> float:
 # fraction.
 HEX_AF_PLACES = 3
 HEX_AF_FRACTION_DENOMINATOR = 16
-# The free end's station prints .XXX: at .XX the free-end wall over the
-# drilled bore falls under the .080 target.
-ROD_STATION_PLACES = 3
+ROD_STATION_PLACES = 2
 SPIGOT_LENGTH_PLACES = 2
 BORE_STATION_PLACES = 2
 GROOVE_STATION_PLACES = 2

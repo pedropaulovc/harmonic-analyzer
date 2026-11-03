@@ -7,7 +7,7 @@ wire-centre radius sets the wheel's magnification (``mg_wheel_drum_geom``).
 
 Layout: Front-plane annulus at the origin, extruded mid-plane (the drum's own
 mid-plane on the Front plane); the assembly places it at the wheel's
-``DRUM_MID_Z``.
+``DRUM_SEATED_MID_Z``, hard against the boss.
 
 Run (SolidWorks already open)::
 

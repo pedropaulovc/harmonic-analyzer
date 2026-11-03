@@ -364,14 +364,14 @@ from sh_vn_music_wire_lever_geom import (  # noqa: E402
     WIRE_START as HUB_WIRE_START,
 )
 from mg_magnifying_wheel_geom import (  # noqa: E402
-    DRUM_MID_Z,
+    DRUM_SEATED_MID_Z,
     HUB_FRONT_Z,
     HUB_STEP_Z,
 )
 
 # The lever wire, the pen wire and the wheel stack all take the wheel plane
 # from _recording_geometry.PEN_Z_MID; mg_wheel_group asserts the stack closes on it.
-DRUM_Z = WHEEL_MID_Z + DRUM_MID_Z  # drum centre (drum frame mid-plane)
+DRUM_Z = WHEEL_MID_Z + DRUM_SEATED_MID_Z  # drum centre, seated on the boss
 
 # Transform the model-owned groove front tangent, rather than assuming an
 # x-symmetric collar: its nonzero local X must be rotated exactly once.

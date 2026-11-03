@@ -53,7 +53,7 @@ def test_no_printed_dimension_carries_its_own_band() -> None:
         assert not hasattr(spec, retired), retired
     assert {
         name: places for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places != 2
-    } == {"HexAf": 3, "GrooveRadius": 3, "RodBoreDia": 3, "RodStation": 3}
+    } == {"HexAf": 3, "GrooveRadius": 3, "RodBoreDia": 3}
     assert spec.LIMIT_BANDS == {
         "GrooveRadius": ("GrooveProfile", pytest.approx((-0.6858, 0.0), abs=1e-12)),
     }
@@ -90,7 +90,7 @@ def test_flats_and_overall_length_print_as_unbanded_references() -> None:
     turned = ast.unparse(
         _function(ast.parse(Path(part.__file__).read_text(encoding="utf-8")), "_turned_profile")
     )
-    # Driven in the part, so the sheet's (.71) is the model's own sum.
+    # Driven in the part, so the sheet's (.72) is the model's own sum.
     assert "_make_driven(adapter, overall, 'overall length')" in turned
 
 
@@ -176,7 +176,7 @@ def test_every_wall_holds_the_target_and_the_sheet_states_none() -> None:
     assert {name: worst for name, (_n, worst) in spec.WALLS.items()} == pytest.approx(
         {
             "rod bore to a flat": 2.4128,
-            "rod bore to the free end": 2.1016,
+            "rod bore to the free end": 2.254,
             "rod bore to the shoulder": 2.508,
             "groove lip to the spigot face": 2.3622,
             "groove root over the thread major": 2.1076,
@@ -226,10 +226,10 @@ def test_bore_is_centred_and_its_walls_take_the_drill_run_off() -> None:
     worst = smallest_af / 2.0 - largest_bore_r - wander
     assert worst == pytest.approx(2.4128, abs=1e-4)
     assert spec.WALLS["rod bore to a flat"] == pytest.approx((2.66065, worst), abs=1e-9)
-    # The free-end wall: one station printed .209 +/-.005, the drilled Ø, the
+    # The free-end wall: one station printed .22 +/-.01, the drilled Ø, the
     # run-off.
     assert spec.WALLS["rod bore to the free end"][1] == pytest.approx(
-        (0.209 - 0.005) * 25.4 - largest_bore_r - wander, abs=1e-9
+        (0.22 - 0.01) * 25.4 - largest_bore_r - wander, abs=1e-9
     )
     # Nothing locates the bore from a flat any longer: the hex sketch centres
     # it by equal flats.
@@ -321,7 +321,7 @@ def test_the_bore_datum_holds_the_screw_reach_and_the_rejected_datums_fail() -> 
     assert SHANK_LEN == pytest.approx(7.0 / 16.0 * 25.4)
     assert spec.SCREW_REACH_MARGIN == pytest.approx(SHANK_LEN - reach, abs=1e-9)
     assert spec.SCREW_REACH_MARGIN > 0.0
-    # r1's datums: the overall length (.71) from the free end less the rod
+    # r1's datums: the overall length (.72) from the free end less the rod
     # station, two .XX bands to the bore: the screw has less margin.
     stacked = (0.71 + 0.01) * 25.4 - (0.21 - 0.01) * 25.4 + bore_r_max - rod_min
     assert stacked > reach
@@ -468,7 +468,7 @@ def test_the_groove_holds_the_wire_and_every_wall_at_its_smallest_radius() -> No
 
 def test_the_overall_reference_is_an_accepted_exception_with_its_real_stack() -> None:
     # Owner ruling 2026-10-17 (review r4): the two-station bore location and
-    # the (.71) REF stay; the bore is the datum the rod and the thumb screw
+    # the (.72) REF stay; the bore is the datum the rod and the thumb screw
     # work off.
     import machinist_exceptions
 
@@ -476,14 +476,14 @@ def test_the_overall_reference_is_an_accepted_exception_with_its_real_stack() ->
         SCRIPTS.parent / "config", "mg_output_fixture", "part"
     )
     assert exception.id == "RV-01" and exception.kind == "accept"
-    for text in (".209", ".50", "(.71)"):
+    for text in (".22", ".50", "(.72)"):
         assert text in exception.where, text
     assert "rule 10" in exception.finding and "rule 11" in exception.finding
-    # A real .71 overall stacks the free end's station to +/-.02.
-    stacked = (0.21 - 0.02) * 25.4 - spec.ROD_BORE_R_MAX - spec.BORE_WANDER
-    assert stacked == pytest.approx(0.0687 * 25.4, abs=5e-3) and stacked < spec.WALL_TARGET
-    assert spec.WALLS["rod bore to the free end"][1] == pytest.approx(0.0827 * 25.4, abs=5e-3)
-    for number in ("±.02", ".1160", ".0053", ".0687", ".0827", "2026-10-17"):
+    # A real .72 overall stacks the free end's station to +/-.02.
+    stacked = (0.22 - 0.02) * 25.4 - spec.ROD_BORE_R_MAX - spec.BORE_WANDER
+    assert stacked == pytest.approx(0.0787 * 25.4, abs=5e-3) and stacked < spec.WALL_TARGET
+    assert spec.WALLS["rod bore to the free end"][1] == pytest.approx(0.0887 * 25.4, abs=5e-3)
+    for number in ("±.02", ".1160", ".0053", ".0787", ".0887", "2026-10-17"):
         assert number in exception.reason, number
     assert spec.REFERENCE_DIMENSIONS >= {"OverallLength"}
 
@@ -503,8 +503,8 @@ def test_the_spigot_prints_its_own_length_and_the_hex_is_the_stations_less_it() 
     assert spec.DRAWING_PRECISION_BY_NAME["SpigotLength"] == spec.SPIGOT_LENGTH_PLACES == 2
     assert spec.DRAWING_DIMENSIONS["TurnedProfile"] >= {"SpigotLength", "RodStation", "BoreStation"}
     assert geom.SPIGOT_LENGTH == pytest.approx(0.26 * 25.4)
-    assert geom.HEX_LENGTH == pytest.approx(5.30 + 12.70 - 0.26 * 25.4)
-    assert geom.OVERALL_LENGTH == pytest.approx(18.00)
+    assert geom.HEX_LENGTH == pytest.approx(0.22 * 25.4 + 12.70 - 0.26 * 25.4)
+    assert geom.OVERALL_LENGTH == pytest.approx(0.72 * 25.4)
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '"D1@Hex", \'"RodStation" + "BoreStation" - "SpigotLength"\'' in source
     turned = ast.unparse(_function(ast.parse(source), "_turned_profile"))

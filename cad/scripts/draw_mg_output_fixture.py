@@ -150,10 +150,12 @@ VIEW_SCALE = (4, 1)
 ISO_SCALE = (3, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
 # Left of the old 125 mm: the radius text now reads right of the spigot face,
-# so the two turned Ø stand further out, clear of the end view's AF.
-SIDE_CENTER = (0.115, 0.180)
-# 10 mm right of r12's 0.262: the flats' REF now carries its supplier band
-# on two callout rows, and their widest row needs the room left of the hex.
+# so the two turned Ø stand further out, clear of the end view's AF. The
+# .22 free end (5.588, was 5.30) grows the part leftward only: the centre
+# moves left by half that growth at scale, so the spigot face, groove and
+# their texts stay where r12's audit placed them.
+SIDE_CENTER = (0.115 - (-FREE_END_X - 5.30) * _S / 2000.0, 0.180)
+# 10 mm right of r12's 0.262: room for the flats' REF block left of the hex.
 END_CENTER = (0.272, SIDE_CENTER[1])
 # Low right, over the title block: the end view's tap callout runs out to
 # the right at the hole's height, above it.

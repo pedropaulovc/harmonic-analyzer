@@ -1746,8 +1746,7 @@ def test_native_thread_census_identifies_each_actual_same_and_self_reader_separa
     assert "reader_unavailable" in audit["failed"]
 
 
-@pytest.mark.parametrize("fault", (None, "refused", "snapped"))
-def test_thread_limit_and_minor_lines_are_sketched_where_the_thread_length_starts(monkeypatch, fault) -> None:
+def test_thread_limit_and_minor_lines_are_sketched_where_the_thread_length_starts(monkeypatch) -> None:
     # Simplified external thread: the limit line sits at ThreadLength's root
     # witness across the major diameter; minor lines run from it to the tip.
     limit, upper, lower = drawing.THREAD_LINES_MM
@@ -1759,50 +1758,31 @@ def test_thread_limit_and_minor_lines_are_sketched_where_the_thread_length_start
     def project(_adapter, _view, point, **_kwargs):
         return (drawing.DETAIL_CENTER[0] + (point[0] - drawing.DETAIL_FOCUS[0]) * 3.0, drawing.DETAIL_CENTER[1] + point[1] * 3.0)
 
-    class Transform:
-        def __init__(self, sign):
-            self.sign = sign
+    calls = []
+    sketched = object()
 
-        def Inverse(self):
-            return Transform(-self.sign)
+    def sketch_lines(adapter, view, sheet_ends, *, style, width, label):
+        calls.append(("sketch", dict(sheet_ends), style, width))
+        return sketched
 
-    def create_point(values):
-        def multiply(transform):
-            return SimpleNamespace(ArrayData=(values[0] - transform.sign * 0.3, values[1] - transform.sign * 0.2, values[2]))
-        return SimpleNamespace(MultiplyTransform=multiply)
+    def require_placed(adapter, lines, *, style, width, label, stage):
+        calls.append(("placed", lines, style, width))
 
-    created = []
-
-    def create_line(x0, y0, z0, x1, y1, z1):
-        if fault == "refused":
-            return None
-        nudge = 0.0001 if fault == "snapped" and not created else 0.0
-        created.append(((x0, y0), (x1, y1)))
-        start, end = SimpleNamespace(X=x0 + nudge, Y=y0, Z=z0), SimpleNamespace(X=x1, Y=y1, Z=z1)
-        return SimpleNamespace(GetStartPoint2=lambda: start, GetEndPoint2=lambda: end)
-
-    manager = SimpleNamespace(AddToDB=False, CreateLine=create_line)
-    view = SimpleNamespace(GetSketch=lambda: SimpleNamespace(ModelToSketchTransform=Transform(1.0)))
-    adapter = SimpleNamespace(
-        swApp=SimpleNamespace(GetMathUtility=lambda: SimpleNamespace(CreatePoint=create_point)),
-        currentModel=SimpleNamespace(SketchManager=manager, ClearSelection2=lambda _all: None),
-    )
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(drawing, "double_array", list)
-    monkeypatch.setattr(drawing, "_activate", lambda *_a: None)
+    view = object()
     monkeypatch.setattr(drawing, "model_point_in_view", project)
-    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
-    if fault is None:
-        drawing._sketch_thread_lines(adapter, view, label="Detail A")
-        sheet = [(x + 0.3, y + 0.2) for line in created for x, y in line]
-        root_witness_x = project(None, view, ((joint.ROD_LENGTH - joint.THREAD_LENGTH) / 1000.0, 0.0, 0.0))[0]
-        # The limit line runs across the rod at the .71's root witness.
-        assert [value for point in sheet[:2] for value in point] == pytest.approx(
-            [root_witness_x, 0.190 - 3 * joint.ROD_DIA / 2000.0, root_witness_x, 0.190 + 3 * joint.ROD_DIA / 2000.0]
-        )
-        assert [sheet[i][0] for i in (0, 2, 4)] == pytest.approx([root_witness_x] * 3)
-        assert manager.AddToDB is False
-    else:
-        with pytest.raises(RuntimeError, match="could not sketch" if fault == "refused" else "read back"):
-            drawing._sketch_thread_lines(adapter, view, label="Detail A")
-        assert manager.AddToDB is False
+    monkeypatch.setattr(drawing, "sketch_lines", sketch_lines)
+    monkeypatch.setattr(drawing, "require_placed", require_placed)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: calls.append(("rebuild",)))
+    drawing._sketch_thread_lines(object(), view, label="Detail A")
+    # Created, rebuilt, then read back black in the same thin continuous font.
+    assert [call[0] for call in calls] == ["sketch", "rebuild", "placed"]
+    (_, ends, style, width), _, (_, placed, placed_style, placed_width) = calls
+    assert (style, width) == (placed_style, placed_width) == (0, 0)
+    assert placed is sketched
+    root_witness_x = project(None, view, ((joint.ROD_LENGTH - joint.THREAD_LENGTH) / 1000.0, 0.0, 0.0))[0]
+    # The limit line runs across the rod at the .71's root witness, and both
+    # minor lines start on it.
+    assert [value for point in ends["limit"] for value in point] == pytest.approx(
+        [root_witness_x, 0.190 - 3 * joint.ROD_DIA / 2000.0, root_witness_x, 0.190 + 3 * joint.ROD_DIA / 2000.0]
+    )
+    assert [ends[name][0][0] for name in ("upper minor", "lower minor")] == pytest.approx([root_witness_x] * 2)

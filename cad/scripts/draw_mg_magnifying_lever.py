@@ -42,6 +42,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+from _transgear_zone_line import require_placed, sketch_lines
 from mg_lever_thread_joint import INCOMPLETE_THREAD_MAX, PITCH, ROD_DIA, ROD_LENGTH, THREAD_LENGTH, THREAD_ROOT_X, TIP_CHAMFER
 from mg_magnifying_lever_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, FREE_END_CALLOUT, LEAD_CALLOUT, PRINT_THREAD_CALLOUT, ROD_DIA_CALLOUT, ROD_DIA_FRACTION_DENOMINATOR, SCREW_SEAT_CALLOUT, SURFACE_FINISHES, THREAD_CALLOUT
 
@@ -98,50 +99,25 @@ def _rod_stock_reference(adapter: Any, annotations: list[Any]) -> None:
     )
 
 
+THREAD_LINE_STYLE = 0  # swLineStyles_e.swLineCONTINUOUS
+THREAD_LINE_WEIGHT = 0  # swLineWeights_e.swLW_THIN
+
+
+@_telemetry.traced("lever.thread_lines", label_param="label")
 def _sketch_thread_lines(adapter: Any, view: Any, *, label: str) -> None:
-    """Sketch THREAD_LINES_MM into ``view`` as thin lines, read back on the sheet."""
-    _activate(adapter, view)
-    native = _early_bound(view, "IView")
-    sheet_lines = [
-        tuple(model_point_in_view(adapter, view, (x / 1000.0, y / 1000.0, 0.0), label=f"{label} thread line") for x, y in line)
-        for line in THREAD_LINES_MM
-    ]
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-
-    def mapped(xyz: tuple[float, ...], transform: Any) -> tuple[float, ...]:
-        point = _early_bound(utility.CreatePoint(double_array(list(xyz))), "IMathPoint")
-        return tuple(float(value) for value in _early_bound(point.MultiplyTransform(transform), "IMathPoint").ArrayData)
-
-    to_sketch = _early_bound(_early_bound(native.GetSketch(), "ISketch").ModelToSketchTransform, "IMathTransform")
-    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
-    previous = bool(manager.AddToDB)
-    manager.AddToDB = True  # no inference snap onto the rod's edges
-    segments = []
-    try:
-        for start, end in sheet_lines:
-            segment = manager.CreateLine(*mapped((*start, 0.0), to_sketch), *mapped((*end, 0.0), to_sketch))
-            if segment is None:
-                raise RuntimeError(f"could not sketch the lever {label} thread line")
-            segments.append(segment)
-    finally:
-        manager.AddToDB = previous
-    adapter.currentModel.ClearSelection2(True)
-    rebuild_drawing(adapter, label=f"sketch lever {label} thread lines")
-    to_sheet = _early_bound(
-        _early_bound(_early_bound(native.GetSketch(), "ISketch").ModelToSketchTransform, "IMathTransform").Inverse(),
-        "IMathTransform",
-    )
-    ends = [
-        mapped((point.X, point.Y, point.Z), to_sheet)[:2]
-        for segment in segments
-        for point in (
-            _early_bound(_early_bound(segment, "ISketchLine").GetStartPoint2(), "ISketchPoint"),
-            _early_bound(_early_bound(segment, "ISketchLine").GetEndPoint2(), "ISketchPoint"),
+    """Sketch THREAD_LINES_MM into ``view`` as thin continuous lines, read
+    back after the rebuild (the shared view-sketch line core)."""
+    sheet_ends = {
+        name: tuple(
+            model_point_in_view(adapter, view, (x / 1000.0, y / 1000.0, 0.0), label=f"{label} thread line")
+            for x, y in line
         )
-    ]
-    expected = [xy for line in sheet_lines for xy in line]
-    if len(ends) != len(expected) or any(math.dist(got, want) > 1e-6 for got, want in zip(ends, expected)):
-        raise RuntimeError(f"lever {label} thread lines read back {ends}, not {expected}")
+        for name, line in zip(("limit", "upper minor", "lower minor"), THREAD_LINES_MM, strict=True)
+    }
+    font = {"style": THREAD_LINE_STYLE, "width": THREAD_LINE_WEIGHT, "label": f"lever {label} thread line"}
+    sketched = sketch_lines(adapter, view, sheet_ends, **font)
+    rebuild_drawing(adapter, label=f"sketch lever {label} thread lines")
+    require_placed(adapter, sketched, **font, stage="rebuilt")
 
 
 def _activate(adapter: Any, view: Any) -> None:
