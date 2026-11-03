@@ -11,16 +11,16 @@ bracket carries no datums and no feature-control frames, and it carries no
 manufacturing-note block either -- the outline, the hole callouts (each fitted
 bore naming its mate and fit), one roughness symbol and the title block say
 everything.  Three bands survive, one per fitted bore, each from a named fit
-class, plus the follower seat's station and the cross hole's pin band.
+class, plus the cross hole's pin band.  Decimal-inch sheet (#290).
 
 Two orthographic views at the 2:1 sheet scale, a follower-seat section, plus
 the isometric:
 
 * FRONT -- the strap face: both bores, both end radii and follower-seat height.
-* LEFT -- the seat flank, where the blind O4 seat mouth is a SOLID circle:
+* LEFT -- the seat flank, where the blind follower seat mouth is a SOLID circle:
   its size, its station through the bar and the bar thickness; plus the
-  (43.0) overall as a reference, so nobody saws the bar short of the two
-  end radii the 28.00 centre distance does not include.  The option E-a
+  overall as a reference, so nobody saws the bar short of the two end radii
+  the bore centre distance does not include.  The option E-a
   set-pin cross hole's mouth is a solid circle here too, located by its
   station from broad face A, its centre on the pivot-axis line the view draws.
 * SECTION B-B -- a cut through the follower-seat axis showing its legitimate
@@ -39,6 +39,7 @@ from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -66,6 +67,7 @@ from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -80,7 +82,6 @@ from dt_pinion_bracket_spec import (
     OVERALL_LENGTH,
     PIN_DROP,
     PIN_SEAT_DEPTH_CALLOUT,
-    PIN_SEAT_WALL_CALLOUT,
     R_END,
     SURFACE_FINISHES,
 )
@@ -138,6 +139,58 @@ def _center_mark_count(view: Any) -> int:
     return len(
         _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
     )
+
+
+# Each R.30 end radius is concentric with a bore, so its dimension line runs
+# to the bore centre, where the bore's Ø callout drew its diametral line
+# (#2106 r3 machinist review: two leaders meeting at each centre).  The radius
+# line keeps reaching the centre whatever its arrow side (r7 read-back; the
+# arbor pedestal's crown prints the same), so each Ø callout is dressed as
+# draw_fr_tube_frame's cross hole: a diametric callout on a broken, non-solid
+# leader with one outside arrow and its leader-line pair hidden, which leaves
+# the shoulder run and the arrow at the rim (measured there through
+# GetDisplayData).  Nothing but the R.30 line then reaches either centre.
+RIM_ONLY_DIAMETERS = ("ArborBoreDia", "PivotBoreDia")
+_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
+_BROKEN_LEADER_HORIZONTAL = 2  # swDimensionBrokenLeader: horizontal shoulder
+_LEADER_LINE_NONE = 3  # swLeaderLineVisibility_e.swLeaderLineNone
+
+
+@_telemetry.traced("drawing.pinion_bracket.rim_only_bore_callouts")
+def _rim_only_bore_callouts(adapter: Any, annotations: list[Any]) -> None:
+    """Leave each RIM_ONLY_DIAMETERS callout its shoulder and rim arrow only."""
+    found = set()
+    for raw_annotation in annotations:
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name not in RIM_ONLY_DIAMETERS:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        # The bores import as diameters; a sheet never re-solves one through
+        # Diametric (test_no_sheet_re_solves_a_model_dimension_through_diametric).
+        if bool(display.DisplayAsLinear) or not bool(display.Diametric):
+            raise RuntimeError(f"{name}: the imported bore dimension is not diametric")
+        display.ArrowSide = _ARROWS_OUTSIDE
+        display.SetSecondArrow(False, False)
+        display.SolidLeader = False
+        if display.SetBrokenLeader2(False, _BROKEN_LEADER_HORIZONTAL) != 0:
+            raise RuntimeError(f"{name}: failed to apply a broken horizontal leader")
+        display.LeaderVisibility = _LEADER_LINE_NONE
+        if (
+            int(display.ArrowSide) != _ARROWS_OUTSIDE
+            or bool(display.GetUseDocSecondArrow())
+            or bool(display.GetSecondArrow())
+            or bool(display.SolidLeader)
+            or bool(display.GetUseDocBrokenLeader())
+            or int(display.GetBrokenLeader2()) != _BROKEN_LEADER_HORIZONTAL
+            or int(display.LeaderVisibility) != _LEADER_LINE_NONE
+        ):
+            raise RuntimeError(f"{name}: the rim-only Ø callout did not persist")
+        found.add(name)
+    if found != set(RIM_ONLY_DIAMETERS):
+        raise RuntimeError(
+            f"strap face is missing Ø callouts {sorted(set(RIM_ONLY_DIAMETERS) - found)}"
+        )
 
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
@@ -233,13 +286,11 @@ DIMENSION_CALLOUTS = {
     # The two held locations name what they serve (rules 3 and 4): the
     # follower's height sets the drum's swing for a given cam lift
     # (DRAWING_PRECISION), and the seat's station keeps it mid-bar
-    # (PIN_SEAT_WEB_WORST, user ruling (a)).  SOLIDWORKS starts the 7.000's
-    # text at its bent dimension line, so that leg touched the leading S of
-    # SETS (r3 review, rule 14); the leading spaces stand the rows off it.
+    # (PIN_SEAT_WEB_WORST, user ruling (a)).  SOLIDWORKS starts the follower
+    # height's text at its bent dimension line, so that leg touched the leading
+    # S of SETS (r3 review, rule 14); the leading spaces stand the rows off it.
     "PinSeatCy": "   SETS FOLLOWER HEIGHT\n   ON MHA-DT-23 CAM",
-    # The station's band leaves the far-face wall under rule 17's 2.0 target.
-    # Emits the fact declared by RV-01 (owner ruling (a)), from the spec.
-    "PinSeatCz": "CENTRES MHA-DT-25\nFOLLOWER IN BAR\n" + PIN_SEAT_WALL_CALLOUT,
+    "PinSeatCz": "CENTRES MHA-DT-25\nFOLLOWER IN BAR",
 }
 
 
@@ -324,7 +375,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("dt-pinion-bracket"),
     )
     create_blank_drawing_sheets(
         adapter, SHEET_NAMES, label="pinion bracket drawing package"
@@ -415,6 +470,7 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(
         adapter, [*annotations, seat_depth], DRAWING_PRECISION_BY_NAME
     )
+    _rim_only_bore_callouts(adapter, front_annotations)
 
     for sheet_name in SHEET_NAMES:
         if not ddoc.ActivateSheet(sheet_name):

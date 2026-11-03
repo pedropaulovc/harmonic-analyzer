@@ -11,7 +11,14 @@ dt-cylinder-gear:
   # for the connecting-rod strap (cam dims/provenance in build_dt_cylinder_gear.py).
   fit_class: gear_mesh
   process: "gear cutting: 120T 48DP PA20 with the finite 55T stock form cutter and integral custom eccentric cam"
-  # OutsideDia uses the shared standard +0/-0.10 mm tip grade at .XX.
+  # OutsideDia uses the shared standard 0/-.004 in tip grade at .XXX.
   # Boston Y48120 is a pitch/count rim candidate, not this cutter-native composite:
   # face, bore/hub, actual flank and cam attachment require separate qualification.
   # Catalog selection does not establish availability or adaptation approval.
+  drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "front view, the bore callout: .072 MIN WALL TO CAM OD"
+      finding: "the crescent wall between the Ø.3760 bore and the Ø1.205 cam OD is .072 in at the printed worst case, under the .080 in target (rule 17), over the .060 in floor"
+      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions. Here (#992) the .3402 throw (the channel's kinematic gain), the owner-ruled Ø1.205 cam OD (MHA-CH-03 ring) and the .3760 running fit on MHA-DT-13 fix the wall at .072"

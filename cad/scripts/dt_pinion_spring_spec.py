@@ -16,6 +16,7 @@ read one source of truth.
 
 from __future__ import annotations
 
+from _title_block_units import LENGTH_UNITS, render_number
 from dt_pinion_spring_geometry import (
     FORMED_BAND_MM,
     FORMED_CONTACT_BANDS,
@@ -38,25 +39,27 @@ from dt_pinion_spring_geometry import (
     R_BEND as R_BEND,
     R_KINK as R_KINK,
     THICK as THICK,
+    UNIT as UNIT,
     WIDTH as WIDTH,
     WIDTH_PLACES as WIDTH_PLACES,
 )
 
-# U27 + Main's r6 ruling (c): the profile is hand-formed, so every formed
-# feature prints one place.  The five that set the crest's preload on the
-# MHA-DT-14 strap flank (dt_pinion_spring_geometry.FORMED_CONTACT_BANDS) carry
-# a +/-0.5 band -- looser than a formed leaf could ever be held to +/-0.10,
-# tighter than the .X row's +/-0.8, which the drive train's preload and stress
-# corner walk would not pass -- and their callouts name the mate (rule 4).
-# FlatLen and the kink's angle shape the flick past the contact, so they ride
-# the title-block .X and angular rows (machinist review, PR #1675).
+# U27 + Main's r6 ruling (c): the profile is hand-formed.  The five that set
+# the crest's preload on the MHA-DT-14 strap flank
+# (dt_pinion_spring_geometry.FORMED_CONTACT_BANDS) carry a +/-.020 band --
+# looser than a formed leaf could ever be held to +/-.004, tighter than a
+# general row the drive train's preload and stress corner walk would not pass
+# -- and their callouts name the mate (rule 4).  #290: they print at .XXX,
+# because their nominals are the formed spring's millimetre design, kept.
+# FlatLen shapes the flick past the contact, so it rides the title-block .XX
+# row, and the kink's angle the angular row (machinist review, PR #1675).
 FORMED_TOLERANCE_MM = FORMED_BAND_MM
 # O2 (Main, 2026-09-24): the part is modelled INSTALLED; the maker forms the
 # FREE shape.  The hidden construction-only FreeForm sketch carries the free
 # profile, and the print locates the crest and sets the kink angle on it; the
 # shape-invariant length and radii print from the installed profile.  The
 # kink angle prints in place of the tip's location, which it and FlatLen fix
-# (an offset of two .X dimensions bounded nothing: machinist review, PR #1675).
+# (an offset of two general dimensions bounded nothing: machinist review, PR #1675).
 FREE_FORM_SKETCH = "FreeForm"
 REFERENCE_SKETCHES = (FREE_FORM_SKETCH,)
 FREE_KINK_ANGLE = "FreeKinkAngle"
@@ -70,19 +73,22 @@ FORMED_BANDED_DIMENSIONS: dict[str, set[str]] = {
 }
 if set().union(*FORMED_BANDED_DIMENSIONS.values()) != set(FORMED_CONTACT_BANDS):
     raise AssertionError("every preload-setting formed dimension must carry the band")
-# The pad's bend relief prints as a single limit, R0.25 MAX (swTolMAX prints the
+# The pad's bend relief prints as a single limit, R.010 MAX (swTolMAX prints the
 # nominal, so the nominal is the limit), down to sharp: the wing, located from
 # the hole's axis, keeps either end clear of the bend at FootLen's low limit
 # (dt_pinion_spring_geometry.PAD_WING_FROM_HOLE).
 PAD_RELIEF_FEATURE = "PadRelief"
 PAD_RELIEF_DIMENSION = "PadReliefR"
 PAD_RELIEF_TOL_TYPE = 6  # swTolType_e.swTolMAX
-# The wing's length states the web it leaves the hole, under rule 17's 2.0
+# The wing's length states the web it leaves the hole, under rule 17's .080
 # target (rule 20; Codex, PR #1675).
-# RV-01: the owner-approved hole-to-relief web stays above the 1.5 floor at
-# the printed bands; the package declares the under-2.0 target in its YAML
+# RV-01: the owner-approved hole-to-relief web stays above the .060 floor at
+# the printed bands; the package declares the under-target web in its YAML
 # (coordinator Main, 2026-10-19, PR #1675 option 1).
-PAD_LEN_CALLOUT = f"HOLE WEB {PAD_HOLE_WEB_MIN:.2f} MIN"
+PAD_LEN_CALLOUT = (
+    "HOLE WEB "
+    f"{render_number(round(PAD_HOLE_WEB_MIN / LENGTH_UNITS[UNIT], 3), UNIT, 3)} MIN"
+)
 
 # Everything the print carries.  The profile is baselined from the pad hole's
 # axis (drawing-guidelines.md rule 10 (dimension from a real feature)): the
@@ -101,10 +107,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`); the model owns
 # them and the drawing reads them back.
+_FORMED_PLACES = 3  # the banded, kept millimetre nominals
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "SpringProfile": {name: 1 for name in FORMED_DIMENSIONS["SpringProfile"]},
+    "SpringProfile": {
+        name: _FORMED_PLACES if name in FORMED_CONTACT_BANDS else 2
+        for name in FORMED_DIMENSIONS["SpringProfile"]
+    },
     FREE_FORM_SKETCH: {
-        name: KINK_ANGLE_PLACES if name == FREE_KINK_ANGLE else 1
+        name: KINK_ANGLE_PLACES if name == FREE_KINK_ANGLE else _FORMED_PLACES
         for name in FORMED_DIMENSIONS[FREE_FORM_SKETCH]
     },
     "PadProfile": {"PadWidth": PAD_WIDTH_PLACES, "PadLen": PAD_LEN_PLACES},
@@ -121,6 +131,10 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked dimension must state its decimal places")
+
+# The #4 clearance Hole Wizard callout prints its drill size at the inch
+# sheet's .XXX (#290).
+HOLE_CALLOUT_PRECISION = 3
 
 # The bend coupon qualifies a blank cut along the roll's length, its bends
 # across the rolling direction (cad/docs/tolerance-policy.md); the blank also

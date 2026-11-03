@@ -27,19 +27,21 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import (
-    assert_imported_precision,
-    set_dimension_callouts,
-    set_reference_dimensions,
-)
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
+from _supplier_dimensions import supplier_reference_dimension
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
-from dt_pinion_handle_spec import DRAWING_PRECISION_BY_NAME
+from dt_pinion_handle_spec import (
+    DRAWING_PRECISION_BY_NAME,
+    ROD_DIA,
+    ROD_FRACTION_DENOMINATOR,
+)
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -138,7 +140,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("dt-pinion-handle"),
     )
     stamp_drawing_summary(
         adapter,
@@ -186,7 +192,18 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [rod_diameter, *principal_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    set_reference_dimensions(adapter, annotations, {"RodDia"})
+    # The as-bought bar's size is its stock fraction, a REF the supplier's bar
+    # governs (#290): "(Ø1/4 in)".
+    supplier_reference_dimension(
+        adapter,
+        rod_diameter.GetSpecificAnnotation(),
+        label="RodDia",
+        units="in",
+        precision=0,
+        expected_mm=ROD_DIA,
+        presentation="diameter",
+        fraction_denominator=ROD_FRACTION_DENOMINATOR,
+    )
     add_view_centerline(
         adapter,
         principal,

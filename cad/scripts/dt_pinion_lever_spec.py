@@ -12,7 +12,8 @@ part marks and drawing keeps in lockstep (``test_dt_pinion_lever_drawing.py``).
 from __future__ import annotations
 
 from _fit_ream_slide import REAM_SLIDE
-from _printed_tolerance import printed_band_mm
+from _inch_wall_limits import WALL_TARGET_MM
+from _printed_tolerance import printed_deviations
 from dt_pinion_lever_geometry import (
     BORE as BORE,
     BORE_DEPTH as BORE_DEPTH,
@@ -31,33 +32,35 @@ from dt_pinion_lever_geometry import (
     ROD_DIA_PLACES as ROD_DIA_PLACES,
     ROD_LEN as ROD_LEN,
     ROD_Y0 as ROD_Y0,
+    UNIT as UNIT,
     WALL_T as WALL_T,
 )
 
 LIFT_ROD_NUMBER = "MHA-DT-17"
 
 # U36: the pin carries the torque, so the hub only has to slide onto the h-band
-# 6.35 lift rod.  Codex P2 (#844): the former 6.35-6.40 band's minimum met the
-# rod's maximum line-to-line; REAM_SLIDE (+0.025/+0.010, the fit MHA-DT-14 and
-# MHA-DT-18 hold on the same shafts) guarantees 0.010 of clearance.
+# 1/4 in lift rod.  Codex P2 (#844): the former band's minimum met the rod's
+# maximum line-to-line; REAM_SLIDE (+.0015/+.0010, the fit MHA-DT-14 and
+# MHA-DT-18 hold on the same shafts) guarantees .0010 of clearance.
 BORE_BAND = REAM_SLIDE
-# drawing-guidelines.md rule 17 (walls 2.0 target / 1.5 floor at the worst
-# printed bands): the end wall behind the blind bore is what the two .X
+# drawing-guidelines.md rule 17 (walls .080 target / .060 floor at the worst
+# printed bands): the end wall behind the blind bore is what the two .XX
 # baselines from face B leave -- the overall length to the crown apex less
-# the bore depth.  ENFORCE r1 (#1011) struck its former own +/-0.25 band (a
-# tight band rescuing a wall, naming no mate); the deeper crown carries it.
-END_WALL_ON_AXIS_WORST = (OVERALL_FROM_B - printed_band_mm(OVERALL_FROM_B_PLACES)) - (
-    BORE_DEPTH + printed_band_mm(BORE_DEPTH_PLACES)
-)
+# the bore depth.  ENFORCE r1 (#1011) struck its former own band (a tight
+# band rescuing a wall, naming no mate); the deeper crown carries it.
+END_WALL_ON_AXIS_WORST = (
+    OVERALL_FROM_B
+    + printed_deviations(OVERALL_FROM_B, OVERALL_FROM_B_PLACES, unit=UNIT)[0]
+) - (BORE_DEPTH + printed_deviations(BORE_DEPTH, BORE_DEPTH_PLACES, unit=UNIT)[1])
 # Off the axis the dome falls away: at the floor's corner (the largest bore)
 # it drops most on the smallest printed SR.
-_CAP_R_MIN = CAP_RADIUS - printed_band_mm(1)
+_CAP_R_MIN = CAP_RADIUS + printed_deviations(CAP_RADIUS, 2, unit=UNIT)[0]
 _FLOOR_CORNER_R = BORE / 2.0 + BORE_BAND[0]
 END_WALL_AT_FLOOR_CORNER_WORST = END_WALL_ON_AXIS_WORST - (
     _CAP_R_MIN - (_CAP_R_MIN**2 - _FLOOR_CORNER_R**2) ** 0.5
 )
-# Rule 17's 2.0 target, not only its 1.5 floor, at both stations.
-if END_WALL_ON_AXIS_WORST < 2.0 or END_WALL_AT_FLOOR_CORNER_WORST < 2.0:
+# Rule 17's target, not only its floor, at both stations.
+if min(END_WALL_ON_AXIS_WORST, END_WALL_AT_FLOOR_CORNER_WORST) < WALL_TARGET_MM:
     raise AssertionError(
         f"end wall {END_WALL_ON_AXIS_WORST:.2f} on the axis, "
         f"{END_WALL_AT_FLOOR_CORNER_WORST:.2f} at the floor corner: rule 17"
@@ -65,7 +68,7 @@ if END_WALL_ON_AXIS_WORST < 2.0 or END_WALL_AT_FLOOR_CORNER_WORST < 2.0:
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarrelProfile": {"HubOd", "HubBore"},
-    # The straight grip rod prints its one diameter and its 86.0 height.
+    # The straight grip rod prints its one diameter and its 3.39 height.
     "RodProfile": {"RodTipY", "RodDia"},
     "CapProfile": {"CapR"},
     "PinHoleProfile": {"PinHoleDia"},
@@ -88,16 +91,18 @@ REFERENCE_SKETCHES = (
 )
 
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`); the part authors
-# them and the drawing reads them back.  Three on the banded bore; two on the
-# grip station (the old +/-0.10 note, now the .XX row); one everywhere a
-# turned or hand-finished feature is routine.
+# them and the drawing reads them back.  Four on the banded bore (fit F10,
+# .2500 +.0015/+.0010); three on the drilled pin hole, which takes the title
+# block's DRILLED HOLES row (Ø.064, +.004/0); two, the inch .XX row,
+# everywhere else: the rig's stacks read the grip stations, and no feature on
+# the lever is routine enough for .X.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "BarrelProfile": {"HubOd": 1, "HubBore": 3},
-    "RodProfile": {"RodTipY": 1, "RodDia": ROD_DIA_PLACES},
-    "CapProfile": {"CapR": 1},
-    "PinHoleProfile": {"PinHoleDia": 2},
+    "BarrelProfile": {"HubOd": 2, "HubBore": 4},
+    "RodProfile": {"RodTipY": 2, "RodDia": ROD_DIA_PLACES},
+    "CapProfile": {"CapR": 2},
+    "PinHoleProfile": {"PinHoleDia": 3},
     "GripStationReference": {"GripFromB": GRIP_FROM_B_PLACES},
-    "PinHoleStationReference": {"PinHoleFromB": 1},
+    "PinHoleStationReference": {"PinHoleFromB": 2},
     "BoreDepthReference": {"BoreDepthFromB": BORE_DEPTH_PLACES},
     "OverallLengthReference": {"OverallFromB": OVERALL_FROM_B_PLACES},
 }

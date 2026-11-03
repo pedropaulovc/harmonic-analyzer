@@ -39,11 +39,12 @@ from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import set_dimension_callouts
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_finish import add_surface_finish
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -61,6 +62,7 @@ from dt_pinion_pivot_block_spec import (
     LIFT_BORE_RISE,
     LIFT_BORE_SPACING,
     SCREW_HALF_SPACING,
+    SCREW_HOLE_CALLOUT_PRECISION,
     SCREW_HOLE_DIA,
     SURFACE_FINISHES,
 )
@@ -140,10 +142,14 @@ FRONT_KEEP = {
     "AnchorZ": (0.212, 0.113),
     # Outside the west end: the pivot-centre witness runs west through the
     # lift bore to the dimension line, a conventional extension-line crossing
-    # (rule 14's list of defects is complete and does not include it).
+    # (rule 14's list of defects is complete and does not include it).  The
+    # value and its SETS PARK GAP line stand below the pivot witness and ~20
+    # mm west of the block (#2106 delta run 084519018Z: centred between the
+    # witnesses, both lines ran across them and into the outline), above the
+    # lift bore's Ra symbol.
     "LiftBoreCz": (
-        _front_x(-BLOCK_WEST) - 0.010,
-        _front_y(LIFT_BORE_RISE / 2.0),
+        _front_x(-BLOCK_WEST) - 0.0205,
+        _front_y(0.0) - 0.008,
     ),
     # Every horizontal/vertical witness from the pivot centre crosses its rim
     # at 0/90/180/270 deg.  The leader runs to the NEAR end of the text's
@@ -164,8 +170,13 @@ DIMENSION_CALLOUTS = dict(BORE_CALLOUTS)
 # print): machinist review r2 (#1014) asked the sheet to say why the
 # bore-to-bore spacing is held from the pivot bore instead of the edges -- the
 # lift rod's eccentric cam must clear the strap's pivot end cap (X) and hover
-# over the follower stud at park (Y) (dt_pinion_pivot_block_geometry).
-ABOVE_CALLOUTS = {"LiftBoreX": "SETS LIFT CAM CLEARANCE AND PARK GAP"}
+# over the follower stud at park (Y) (dt_pinion_pivot_block_geometry).  The
+# rise prints three places too, so it names its function as well (#2106
+# final review: a bare .085 read as over-specified).
+ABOVE_CALLOUTS = {
+    "LiftBoreX": "SETS LIFT CAM CLEARANCE AND PARK GAP",
+    "LiftBoreCz": "SETS PARK GAP",
+}
 # Front-view locations that start at the pivot bore: name -> the sheet axis
 # each measures along (0 = x, 1 = y).
 PIVOT_ORIGIN_DIMENSIONS = {"AnchorX": 0, "LiftBoreX": 0, "AnchorZ": 1, "LiftBoreCz": 1}
@@ -249,7 +260,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -339,13 +354,20 @@ async def build(adapter: Any) -> dict[str, str]:
         _front_x(SCREW_HALF_SPACING),
         TOP_CENTER[1] + SCREW_R_SHEET,
     )
-    add_native_hole_callout(
+    screw_callout = add_native_hole_callout(
         adapter,
         top,
         edge_xy=east_screw_edge,
         callout_xy=(0.245, 0.250),
         label="hold-down screw hole",
         process="DRILL",
+    )
+    # This render-time precision write is the declared exception RV-01 in
+    # cad/config/parts/dt-pinion-pivot-block.yaml (delegated ruling
+    # 2026-11-02, owner review #2144): a part-authored precision does not
+    # reach the callout (run 20261102T230110877Z).
+    set_hole_callout_precision(
+        screw_callout, {"hw-diam": SCREW_HOLE_CALLOUT_PRECISION}, label="hold-down screw hole"
     )
     # Anchored on the bore rim at ~30 deg: the pivot centre's AnchorZ witness
     # leaves the rim at 0 deg and LiftBoreX's at 90 deg, and the diameter

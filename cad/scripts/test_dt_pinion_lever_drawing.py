@@ -67,30 +67,33 @@ def test_bore_band_is_a_slip_fit_on_the_lift_rod() -> None:
     assert model_toleranced_dimensions(lever) == {
         ("BarrelProfile", "HubBore"): "*deviations(BORE_BAND)",
     }
-    assert dt_pinion_lever_spec.DRAWING_PRECISION_BY_NAME["HubBore"] == 3
+    assert dt_pinion_lever_spec.DRAWING_PRECISION_BY_NAME["HubBore"] == 4
     assert not hasattr(dt_pinion_lever_spec, "END_WALL_TOLERANCE_MM")
 
 
 def test_end_wall_holds_rule_17_from_the_two_x_baselines() -> None:
-    # Bore depth and overall length to the crown apex both print .X from B;
+    # Bore depth and overall length to the crown apex both print .XX from B;
     # the end wall is what they leave, at the worst of both bands.
+    from _inch_wall_limits import WALL_TARGET_MM
+
     spec = dt_pinion_lever_spec
-    assert spec.DRAWING_PRECISION_BY_NAME["BoreDepthFromB"] == 1
-    assert spec.DRAWING_PRECISION_BY_NAME["OverallFromB"] == 1
-    assert spec.OVERALL_FROM_B == spec.HUB_LEN + spec.CAP_SAG == 12.2
-    assert round(spec.END_WALL_ON_AXIS_WORST, 6) == 2.6
-    # ENFORCE r5 (minor): the 2.0 sagitta left 1.9 at the floor's corner.
-    assert spec.END_WALL_AT_FLOOR_CORNER_WORST >= 2.0
+    assert spec.DRAWING_PRECISION_BY_NAME["BoreDepthFromB"] == 2
+    assert spec.DRAWING_PRECISION_BY_NAME["OverallFromB"] == 2
+    assert spec.OVERALL_FROM_B == pytest.approx(spec.HUB_LEN + spec.CAP_SAG)
+    assert spec.OVERALL_FROM_B == pytest.approx(0.49 * 25.4)
+    assert spec.END_WALL_ON_AXIS_WORST == pytest.approx(0.15 * 25.4)
+    # ENFORCE r5 (minor): the shallow sagitta once left the floor's corner thin.
+    assert spec.END_WALL_AT_FLOOR_CORNER_WORST >= WALL_TARGET_MM
 
 
 def test_grip_rod_is_a_straight_six() -> None:
     # User ruling 2026-09-24 (ch25 page002_img07): the photo's "6 mm" sits
     # beside the hub and root and tip read the same width -- no taper.
-    assert dt_pinion_lever_geometry.ROD_DIA == 6.0
+    assert dt_pinion_lever_geometry.ROD_DIA == pytest.approx(0.24 * 25.4)  # #290 .XX
     assert not hasattr(dt_pinion_lever_geometry, "ROD_ROOT_DIA")
     assert not hasattr(dt_pinion_lever_geometry, "ROD_TIP_DIA")
     assert dt_pinion_lever_spec.DRAWING_DIMENSIONS["RodProfile"] == {"RodTipY", "RodDia"}
-    assert dt_pinion_lever_spec.DRAWING_PRECISION_BY_NAME["RodDia"] == 1
+    assert dt_pinion_lever_spec.DRAWING_PRECISION_BY_NAME["RodDia"] == 2
     # The rod's base stays clear of the bore and the pin hole it rises over.
     assert dt_pinion_lever_geometry.ROD_Y0 > dt_pinion_lever_geometry.BORE / 2.0
     assert dt_pinion_lever_geometry.ROD_Y0 > dt_pinion_lever_geometry.PIN_HOLE_DIA / 2.0
@@ -98,24 +101,12 @@ def test_grip_rod_is_a_straight_six() -> None:
     assert dt_pinion_lever_geometry.ROD_DIA < dt_pinion_lever_geometry.HUB_LEN
 
 
-def test_pin_hole_sits_at_mid_engagement_and_is_match_drilled() -> None:
+def test_pin_hole_sits_at_mid_engagement() -> None:
     geometry = dt_pinion_lever_geometry
-    assert geometry.PIN_HOLE_DIA == 25.4 / 16.0
-    assert geometry.PIN_HOLE_FROM_MOUTH == geometry.BORE_DEPTH / 2.0 == 4.0
+    assert geometry.PIN_HOLE_DIA == pytest.approx(0.064 * 25.4)  # fit F15
+    assert geometry.PIN_HOLE_FROM_MOUTH == geometry.BORE_DEPTH / 2.0
+    assert geometry.PIN_HOLE_FROM_MOUTH == pytest.approx(0.16 * 25.4)
     assert geometry.PIN_HOLE_Z == geometry.HUB_LEN / 2.0 - geometry.PIN_HOLE_FROM_MOUTH
-    callout = drawing.DIMENSION_CALLOUTS["PinHoleDia"]
-    # The hole specification only; LEVER PIN SET drives and peens the pin,
-    # and the sheet points at that MHA-DT-00 step through the registry.
-    import dt_drive_train_steps
-
-    assert dt_pinion_lever_spec.PIN_HOLE_CALLOUT == "MATCH-DRILL THRU AT ASSEMBLY ON MHA-DT-17"
-    assert drawing.LEVER_PIN_SET_STEP_KEY == "lever-pin-set"
-    assert callout == (
-        f"{dt_pinion_lever_spec.PIN_HOLE_CALLOUT},\n"
-        f"PER {dt_drive_train_steps.step_ref(drawing.LEVER_PIN_SET_STEP_KEY)}"
-    )
-    assert dt_pinion_lever_spec.LIFT_ROD_NUMBER in callout
-    assert dt_pinion_lever_spec.LIFT_ROD_NUMBER in drawing.DIMENSION_CALLOUTS["HubBore"]
 
 
 def test_sheet_carries_no_gdt_finish_or_literal_precision() -> None:

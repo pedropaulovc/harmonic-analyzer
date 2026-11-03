@@ -36,6 +36,7 @@ from dt_pinion_pivot_block_geometry import (
     BLOCK_WIDTH as BLOCK_WIDTH,
     BLOCK_HEIGHT as BLOCK_HEIGHT,
     BLOCK_DEPTH as BLOCK_DEPTH,
+    BLOCK_DEPTH_PLACES as BLOCK_DEPTH_PLACES,
     BORE_UP as BORE_UP,
     BORE_DIA as BORE_DIA,
     LIFT_BORE_SPACING as LIFT_BORE_SPACING,
@@ -48,6 +49,7 @@ from dt_pinion_pivot_block_geometry import (
     FRONT_BBOX_CX as FRONT_BBOX_CX,
     FRONT_BBOX_CY as FRONT_BBOX_CY,
     SCREW_SPACING as SCREW_SPACING,
+    UNIT as UNIT,
 )
 
 # One fit per shaft (Main R2, converged-r7 review): the same REAM_SLIDE band
@@ -67,11 +69,13 @@ SURFACE_FINISHES = (
         "pivot_bore",
         MACHINED_UM,
         CylinderFace(BORE_DIA, contains_y_mm=-BORE_DIA / 2.0),
+        display_unit=UNIT,
     ),
     SurfaceFinishControl(
         "lift_bore",
         MACHINED_UM,
         CylinderFace(BORE_DIA, contains_x_mm=-LIFT_BORE_SPACING),
+        display_unit=UNIT,
     ),
 )
 
@@ -92,6 +96,36 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
     "Block": {"Depth"},
 }
+
+# #290 inch sheet: the part authors each printed dimension's places
+# (build_dt_pinion_pivot_block).  Four on the two reamed bores, whose
+# +.0015/+.0010 band needs them; three on the lift bore's spacing and rise,
+# kinematic nominals kept from the millimetre design (the cam park-gap
+# closure, named by the spacing's callout); two on the snapped envelope and
+# depth (BLOCK_DEPTH_PLACES, the row the rig's stack reads) and on the pivot
+# bore's height (AnchorZ, .66).  No check reads that height's band: it lifts
+# the whole rig (pivot, lift bore, cam) together, so the park gap holds, and
+# at the engaged pose its .010 moves the mesh centre about 1% of that.  The
+# model keeps its millimetre nominal (the bank's raised axis).
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "BlockProfile": {
+        "BlockWidth": 2,
+        "BlockHeight": 2,
+        "AnchorX": 2,
+        "AnchorZ": 2,
+        "PivotBoreDia": 4,
+        "LiftBoreX": 3,
+        "LiftBoreCz": 3,
+        "LiftBoreDia": 4,
+    },
+    "Block": {"Depth": BLOCK_DEPTH_PLACES},
+}
+if {f: set(d) for f, d in DRAWING_PRECISION.items()} != DRAWING_DIMENSIONS:
+    raise AssertionError("every marked dimension must state its decimal places")
+
+# The #8 clearance Hole Wizard callout prints its drill size at the inch
+# sheet's .XXX (#290).
+SCREW_HOLE_CALLOUT_PRECISION = 3
 
 
 def _registry_mate(row: dict) -> tuple[str, str]:

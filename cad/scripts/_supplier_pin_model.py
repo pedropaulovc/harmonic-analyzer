@@ -2,8 +2,9 @@
 
 Dowel witnesses use the exact constant that authors the solid, checked against
 its native cylindrical face. Supplier sizes carry no band: they print as
-untoleranced REF and the catalogue governs. The separate mating-hole circle is
-supplier application data (its recommended hole range), not a pin tolerance.
+untoleranced REF and the catalogue governs. A spring pin's optional
+mating-hole circle is supplier application data (its recommended hole range),
+not a pin tolerance.
 """
 
 from __future__ import annotations
@@ -44,6 +45,20 @@ REFERENCE_SKETCHES = (
 )
 
 
+def declares_application_hole(source: SupplierPinReference) -> bool:
+    """Whether a spring pin carries the supplier application (mating) hole.
+
+    Both application fields or neither: a pin whose mating parts' own sheets
+    specify its holes omits the circle, which reads as a second pin feature.
+    Here, not in ``_supplier_pin_data``, which every part importing the
+    supplier pin rows reads: only the pin builders and sheets use it.
+    """
+    limits, precision = source.application_hole_limits, source.application_hole_precision
+    if (limits is None) != (precision is None):
+        raise ValueError(f"{source.sku}: incomplete supplier mating-hole reference")
+    return limits is not None
+
+
 def _reference_suffix(source: SupplierPinReference) -> str:
     """As _supplier_dimensions: an inch sheet already reads UNIT: IN.
 
@@ -70,8 +85,8 @@ def _reference_contract(
         value, precision, presentation = source.wall_mm, source.wall_precision, "length"
         label, callout = f"{source.sku} supplier wall", "WALL"
     elif feature == MATING_HOLE_FEATURE:
-        if source.application_hole_limits is None or source.application_hole_precision is None:
-            raise ValueError(f"{source.sku}: incomplete supplier mating-hole reference")
+        if not declares_application_hole(source):
+            raise ValueError(f"{source.sku}: no supplier mating-hole reference is declared")
         name = MATING_HOLE_DIMENSION
         lower, upper = source.application_hole_limits
         value, precision = lower * source.unit_mm, source.application_hole_precision
@@ -346,9 +361,11 @@ def assert_supplier_dowel_references(
 
 @_telemetry.traced("drawing.supplier_pin_source_author")
 async def author_supplier_spring_pin_references(adapter: Any, source: SupplierPinReference) -> None:
-    """Author and fully format wall plus separate supplier-application witnesses."""
+    """Author and fully format wall plus any separate supplier-application witness."""
     _reference_contract(source, WALL_FEATURE)
-    _reference_contract(source, MATING_HOLE_FEATURE)
+    application_hole = declares_application_hole(source)
+    if application_hole:
+        _reference_contract(source, MATING_HOLE_FEATURE)
     inner_radius = source.diameter_mm / 2.0 - source.wall_mm
     outer_radius = source.diameter_mm / 2.0
     check("create supplier wall reference", await adapter.create_sketch("Right"))
@@ -366,18 +383,21 @@ async def author_supplier_spring_pin_references(adapter: Any, source: SupplierPi
     check("exit supplier wall reference", await adapter.exit_sketch())
     _finish_reference(adapter, dims, WALL_FEATURE, source)
 
-    lower = source.application_hole_limits[0]
-    check("create supplier mating-hole reference", await adapter.create_sketch("Right"))
-    dims = SketchDims()
-    circle = await define_circle(
-        adapter, *source.application_hole_center, lower * source.unit_mm / 2.0,
-        "supplier mating-hole application", dims=dims, names=(None, None, MATING_HOLE_DIMENSION),
-    )
-    _construction(adapter, circle)
-    await ensure_fully_defined(adapter, "supplier mating-hole application diagram")
-    check("exit supplier mating-hole reference", await adapter.exit_sketch())
-    _finish_reference(adapter, dims, MATING_HOLE_FEATURE, source)
-    blank_reference_sketches(adapter, (WALL_FEATURE, MATING_HOLE_FEATURE))
+    if application_hole:
+        lower = source.application_hole_limits[0]
+        check("create supplier mating-hole reference", await adapter.create_sketch("Right"))
+        dims = SketchDims()
+        circle = await define_circle(
+            adapter, *source.application_hole_center, lower * source.unit_mm / 2.0,
+            "supplier mating-hole application", dims=dims, names=(None, None, MATING_HOLE_DIMENSION),
+        )
+        _construction(adapter, circle)
+        await ensure_fully_defined(adapter, "supplier mating-hole application diagram")
+        check("exit supplier mating-hole reference", await adapter.exit_sketch())
+        _finish_reference(adapter, dims, MATING_HOLE_FEATURE, source)
+        blank_reference_sketches(adapter, (WALL_FEATURE, MATING_HOLE_FEATURE))
+    else:
+        blank_reference_sketches(adapter, (WALL_FEATURE,))
     assert_supplier_spring_pin_references(adapter, adapter.currentModel, source)
 
 
@@ -385,9 +405,12 @@ async def author_supplier_spring_pin_references(adapter: Any, source: SupplierPi
 def assert_supplier_spring_pin_references(
     adapter: Any, model: Any, source: SupplierPinReference,
 ) -> None:
-    for feature_name, name in (
-        (WALL_FEATURE, WALL_DIMENSION), (MATING_HOLE_FEATURE, MATING_HOLE_DIMENSION),
-    ):
+    references = [(WALL_FEATURE, WALL_DIMENSION)]
+    if declares_application_hole(source):
+        references.append((MATING_HOLE_FEATURE, MATING_HOLE_DIMENSION))
+    elif _early_bound(model, "IPartDoc").FeatureByName(MATING_HOLE_FEATURE) is not None:
+        raise RuntimeError(f"{source.sku}: model carries an undeclared supplier mating-hole reference")
+    for feature_name, name in references:
         feature = _early_bound(model, "IPartDoc").FeatureByName(feature_name)
         if feature is None:
             raise RuntimeError(f"{source.sku}: missing model reference {feature_name}")

@@ -10,18 +10,23 @@ from stock_form_cutter import TOOTH_FORM_NOTE
 # on the drum.
 TOOTH_RUNOUT_TIR_MM = float(_config.fit("cone_drum_oblique_mesh", "tooth_cutting_runout_tir_mm"))
 
+
+def inch_text(value_mm: float, places: int) -> str:
+    """``value_mm`` as decimal-inch print text: ``.072``, ``2.500``."""
+    text = f"{value_mm / 25.4:.{places}f}"
+    return text[1:] if text.startswith("0.") else text
+
+
 # Narrow rows (machinist review r1): the leader leaves the block's lower
 # right corner, and only a corner left of x ~0.07 m clears the cam diameter's
 # diametral line on its way down to the bore.  The worst-case wall to the cam
-# OD is under the 2.0 target, so it is stated as a plain fact (rule 20).
+# OD is under the .080 in target, so it is stated as a plain fact (rule 20).
 BORE_FIT_CALLOUT = (
-    "FINISH BORE THRU;\n"
+    "REAM THRU;\n"
     "ALL 20 GEARS\n"
-    "MATCH TO FINISHED\n"
-    "SHAFT MHA-DT-13\n"
-    f"{spec.BORE_DIAMETRAL_CLEARANCE_MM[0]:.3f}-{spec.BORE_DIAMETRAL_CLEARANCE_MM[1]:.3f}\n"
-    "DIAMETRAL CLEARANCE\n"
-    f"{spec.CAM_WALL_MIN_MM:.2f} MIN WALL\n"
+    "RUNS ON SHAFT\n"
+    "MHA-DT-13\n"
+    f"{inch_text(spec.CAM_WALL_MIN_MM, 3)} MIN WALL\n"
     "TO CAM OD"
 )
 # TODO(#744): validate the forked rod and centered channel bank in the native
@@ -37,20 +42,21 @@ GEAR_DATA = "\n".join(
         "GEAR DATA",
         f"NUMBER OF TEETH:  {spec.TEETH}",
         f"DIAMETRAL PITCH:  {spec.DIAMETRAL_PITCH:.2f}",
-        f"MODULE (mm, REF):  {spec.MODULE_MM:.3f}",
         f"PRESSURE ANGLE:  {spec.PRESSURE_ANGLE_DEG:.1f} DEG",
-        f"PITCH DIAMETER (mm, REF):  {spec.PITCH_DIA:.2f}",
+        f"PITCH DIAMETER (REF):  {inch_text(spec.PITCH_DIA, 3)}",
         # One reference value (machinist review r1): the two-micron
         # envelope read as limits.
-        f"ROOT DIAMETER (mm, REF):  {sum(spec.ROOT_ENVELOPE_DIA_MM) / 2.0:.2f}",
-        f"CUTTER PLUNGE (mm):  {spec.WHOLE_DEPTH:.{spec.WHOLE_DEPTH_PLACES}f} "
-        f"+{spec.WHOLE_DEPTH_BAND[0]:.2f}/{spec.WHOLE_DEPTH_BAND[1]:.2f}; "
+        f"ROOT DIAMETER (REF):  {inch_text(sum(spec.ROOT_ENVELOPE_DIA_MM) / 2.0, 3)}",
+        f"CUTTER PLUNGE:  {inch_text(spec.WHOLE_DEPTH, spec.WHOLE_DEPTH_PLACES)} "
+        f"+{inch_text(spec.WHOLE_DEPTH_BAND[0], spec.WHOLE_DEPTH_PLACES)}"
+        f"/{inch_text(spec.WHOLE_DEPTH_BAND[1], spec.WHOLE_DEPTH_PLACES)}; "
         "SETS BACKLASH WITH CONE GEARS MHA-DT-03",
         f"FORM CUTTER:  #{spec.CUTTER_NUMBER}, "
         f"{spec.CUTTER_TEETH_RANGE[0]}-{spec.CUTTER_TEETH_RANGE[1]}T; "
         f"{spec.CUTTER_REFERENCE_TEETH}T REFERENCE",
-        f"PITCH TOOTH THICKNESS (mm, REF):  {spec.PITCH_TOOTH_THICKNESS_MM:.3f}",
+        f"PITCH TOOTH THICKNESS (REF):  {inch_text(spec.PITCH_TOOTH_THICKNESS_MM, 4)}",
         f"TOOTH FORM:  {TOOTH_FORM_NOTE}",
-        f"TOOTH CUTTING SETUP, ACCEPT AT SETUP:  {TOOTH_RUNOUT_TIR_MM:.4f} TIR MAX TO FINISHED BORE",
+        "TOOTH CUTTING SETUP, ACCEPT AT SETUP:  "
+        f"{inch_text(TOOTH_RUNOUT_TIR_MM, 3)} TIR MAX TO FINISHED BORE",
     )
 )

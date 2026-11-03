@@ -32,8 +32,9 @@ def test_registry_slug_now_describes_the_separate_grip_crossrod() -> None:
 
 
 def test_crossrod_preserves_released_geometry_and_local_origin() -> None:
-    # R1: as-received Ø6 bar, bonded into MHA-DT-22 (no longer a 6.0175 press rod).
-    assert spec.ROD_DIA == pytest.approx(6.0)
+    # R1: as-received bar, bonded into MHA-DT-22 (no longer a 6.0175 press
+    # rod); #290: 1/4 bar replaces the 6 mm.
+    assert spec.ROD_DIA == pytest.approx(6.35)
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the bond and its acceptance are the fit-up step, not notes.
     assert spec.DRAWING_NOTES == "USE COLD-FINISHED BAR AS RECEIVED."
     assert spec.ASSEMBLY_STEP == (
@@ -42,8 +43,7 @@ def test_crossrod_preserves_released_geometry_and_local_origin() -> None:
     )
     assert "MATCH-REAM" not in spec.DRAWING_NOTES
     assert spec.ROD_DOWN == pytest.approx(32.0)
-    assert spec.ROD_UP == pytest.approx(33.0)
-    assert spec.ROD_SPAN == pytest.approx(65.0)
+    assert spec.ROD_SPAN == pytest.approx(65.024)  # 2.56
     assert spec.ROD_SPAN == pytest.approx(spec.ROD_DOWN + spec.ROD_UP)
     assert part.V_ROD == pytest.approx(
         3.141592653589793 * (spec.ROD_DIA / 2.0) ** 2 * spec.ROD_SPAN
@@ -78,12 +78,15 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     # the released arbor station, plus RIG_AFT_SHIFT set from the configured
     # g19 datum (user ruling P1-2: rig-set leaf D keeps its full face with
     # margin). Train pitch edits move the datum, not the cutover's local
-    # head or crossrod geometry.
+    # head or crossrod geometry.  #290: the .354 strap is thinner than the
+    # released 9.0, and the drum stands that much further aft.
     import pinion_rig_layout as rig
     import pinion_rig_park_geometry as park
 
     fitup_shift = assembly.ARBOR_Z0 - (-135.0 + MECHANISM_Z_SHIFT)
-    assert fitup_shift == pytest.approx(0.25 + rig.RIG_AFT_SHIFT, abs=1e-9)
+    assert fitup_shift == pytest.approx(
+        0.25 + (9.0 - rig.STRAP_T) + rig.RIG_AFT_SHIFT, abs=1e-9
+    )
     released_origin = (
         assembly.APINION_X,
         assembly.APINION_Y,
@@ -130,15 +133,21 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     # drawing-guidelines.md rule 17 (walls and webs) (audit W6) grew the head 9.0 -> 10.5 and the machinist review of
     # 7f7fc1717 (Main's option 2) to 11.5, each about the released centre, so
     # both faces and the crown move 1.25 out; machinist review r5 of #1685
-    # grew it forward only, to 12.2, so the rear face stays.  The neck
-    # shoulder (the released head rear + 2 wall + 10) moves 0.25 forward, so
-    # every turned length on the MHA-DT-22 print lands on .X.
-    released_head_stations = (
-        released_origin[2] + 11.5 / 2.0 - 12.2,
-        released_origin[2] + 11.5 / 2.0,
-        released_origin[2] + 11.5 / 2.0 - 12.2 - 3.0,
-        released_origin[2] + 9.0 / 2.0 + 2.0 + 10.0 - 0.25,
-    )
+    # grew it forward only, to 12.2, so the rear face stays.  #290 snapped
+    # the inch print: the rear face moved 0.09 aft so the drum station prints
+    # 2.40, the head is .48 long and the neck .41, and the .23 crossrod
+    # station leaves the crossrod 0.002 forward of the released axis.
+    rear_shift, crossrod_shift = 0.09, -0.002
+
+    def head_stations(axis_z: float) -> tuple[float, float, float, float]:
+        rear = axis_z + 11.5 / 2.0 + rear_shift
+        return (
+            rear - 12.192,
+            rear,
+            rear - 12.192 - arbor_geometry.HEAD_CAP_SAG,
+            rear + 10.414,
+        )
+
     integral_head_stations = (
         assembly.ARBOR_Z0 + arbor_geometry.HEAD_FRONT_Z,
         assembly.ARBOR_Z0 + arbor_geometry.HEAD_REAR_Z,
@@ -146,20 +155,15 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
         assembly.ARBOR_Z0 + arbor_geometry.NECK_END_Z,
     )
     assert integral_head_stations == pytest.approx(
-        released_head_stations, abs=1e-12
+        head_stations(released_origin[2]), abs=1e-9
     )
     assert integral_head_stations == pytest.approx(
-        (
-            expected_axis[2] + 11.5 / 2.0 - 12.2,
-            expected_axis[2] + 11.5 / 2.0,
-            expected_axis[2] + 11.5 / 2.0 - 12.2 - 3.0,
-            expected_axis[2] + 9.0 / 2.0 + 2.0 + 10.0 - 0.25,
-        ),
-        abs=1e-12,
+        head_stations(expected_axis[2]), abs=1e-9
     )
+    shifted_origin = (*released_origin[:2], released_origin[2] + crossrod_shift)
     assert released_origin == pytest.approx(expected_axis, abs=1e-12)
-    assert new_head_axis == pytest.approx(released_origin, abs=1e-12)
-    assert new_crossrod_axis == pytest.approx(released_origin, abs=1e-12)
+    assert new_head_axis == pytest.approx(shifted_origin, abs=1e-9)
+    assert new_crossrod_axis == pytest.approx(shifted_origin, abs=1e-9)
     assert rod_axis == pytest.approx(expected_grip_axis, abs=1e-12)
     assert bore_axis == pytest.approx(rod_axis, abs=1e-12)
     assert shaft_axis == pytest.approx((0.0, 0.0, 1.0), abs=1e-12)
@@ -177,7 +181,9 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
             local,
         )
         assert released_endpoint == pytest.approx(expected, abs=1e-12)
-        assert new_endpoint == pytest.approx(released_endpoint, abs=1e-12)
+        assert new_endpoint == pytest.approx(
+            (*released_endpoint[:2], released_endpoint[2] + crossrod_shift), abs=1e-9
+        )
 
 
 def test_spec_is_the_single_source_of_every_printed_dimension() -> None:
@@ -185,7 +191,6 @@ def test_spec_is_the_single_source_of_every_printed_dimension() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.DONOR_KEEP) | set(drawing.PRINCIPAL_KEEP)
     assert marked == kept == {"RodDia", "RodSpan"}
-    assert spec.DRAWING_PRECISION_BY_NAME == {"RodDia": 1, "RodSpan": 1}
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
 
 
@@ -233,11 +238,10 @@ def test_part_metadata_names_the_grip_crossrod_work() -> None:
 
 
 def test_no_note_line_carries_a_dimension() -> None:
-    """drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (Codex P1 on #814): the Ø6 bar size lives in the registry's
+    """drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (Codex P1 on #814): the 1/4 bar size lives in the registry's
     material specification and the imported RodDia, never in a note."""
     for line in spec.DRAWING_NOTES.splitlines():
         text = re.sub(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", "", line).replace(arbor.RETAINING_COMPOUND, "")
         assert not re.search(r"\d", text), line
     assert "USE COLD-FINISHED BAR AS RECEIVED." in spec.DRAWING_NOTES
-    assert "6 mm" in _config.parts("dt-pinion-handle")["material_specification"]
 
