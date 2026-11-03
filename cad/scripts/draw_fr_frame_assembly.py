@@ -96,7 +96,6 @@ from fr_frame_attachment_spec import (
     BASE_SCREW_Y,
     CAP_TOP_Y,
     CASTING_FULL_THREAD_DEPTH,
-    TOP_AXIS_HEIGHT_BAND_MM,
     TOP_AXIS_HEIGHT_DIMENSION,
     TOP_AXIS_HEIGHT_PLACES,
     TOP_AXIS_SETTING_FEATURE,
@@ -140,13 +139,12 @@ UNIT = assembly_contract("fr-frame").drawing_unit
 HEIGHT_PLACES = 3
 INSET_PLACES = 2
 # The top cross-bore axis height (fr_frame_attachment_spec TOP_AXIS_*) prints
-# four places, 40.0753, with its .XX-grade band (+/-.0100). Step 3 sets all
+# three places, 40.075, under the title block's .XXX band. Step 3 sets all
 # four corners' axes to this one absolute height from the base underside
 # before step 5 match-drills the tubes, so the frame's own .72 tap station off
-# its rail top cannot carry it. MHA-FR-02 keeps its faced underside on the
-# 999.7 plane the summing knife mounts clamp to, which leaves its rail top and
-# taps off the inch grid until the FR plane snap moves that plane with KNIFE_Y
-# and the channel FULCRUM.
+# its rail top cannot carry it. MHA-FR-02's faced underside sits on the
+# inch-grid plane (top_frame_plane, 39.358) the summing knife mounts clamp to,
+# which puts its rail top (40.795) and this axis on the .001 grid.
 # The tube match holes' finished drill, as steps 2 and 5 print it (.197).
 CROSS_HOLE_TEXT = render_number(TUBE_CROSS_HOLE_DIAMETER / 25.4, UNIT, 3)
 # Machine z stations each inset edge's ray is cast at, in turn: on both
@@ -647,7 +645,7 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
     )
 
     # The setting is the assembly's own TopAxisSetting dimension, shown in
-    # this view and imported with its band.
+    # this view and imported with its places; it carries no band of its own.
     _show_base_view_sketches(
         adapter, front, (TOP_AXIS_SETTING_FEATURE,), label="working front"
     )
@@ -678,14 +676,8 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
         _early_bound(screw_axis.GetDimension2(0), "IDimension").Tolerance,
         "IDimensionTolerance",
     )
-    band_m = TOP_AXIS_HEIGHT_BAND_MM / 1000.0
-    if (
-        int(tolerance.Type) != 4  # swTolType_e.swTolSYMMETRIC
-        or abs(float(tolerance.GetMaxValue()) - band_m) > 1e-9
-        or abs(float(tolerance.GetMinValue()) + band_m) > 1e-9
-        or int(screw_axis.GetPrimaryTolPrecision2()) != TOP_AXIS_HEIGHT_PLACES
-    ):
-        raise RuntimeError("installed top cross-screw axis height lost its band")
+    if int(tolerance.Type) != 0:  # swTolType_e.swTolNONE: the title block's .XXX
+        raise RuntimeError("installed top cross-screw axis height carries a band")
     screw_axis = _set_dimension_suffix(
         adapter,
         screw_axis,

@@ -38,8 +38,8 @@ _STATION_FAMILIES = (KNIFE_MOUNT, HANGER_WASHER, HANGER_BOLT)
 # instance; all along the assembly's global axes. Sized for the drawing's
 # *Isometric (it looks from +X+Y+Z): each mount clears its trunnion end (17.9
 # of slide).  The dowels rise DOWEL_LIFT, clear of the mounts' 7.05 slip
-# engagement, their tops still under the seated washers (1036.2): 992.65
-# lower end to 1012.65, top 1011.7 to 1031.7.
+# engagement, their tops still under the seated washers (1036.193): 992.58
+# lower end to 1012.58, top 1011.63 to 1031.63.
 DOWEL_LIFT = 20.0
 # The jam nut lifts less than the hook it is threaded on, so it explodes down
 # the shank, off its seat on the boss top face: machinist review (main and

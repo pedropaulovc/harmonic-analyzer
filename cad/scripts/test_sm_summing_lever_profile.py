@@ -20,6 +20,7 @@ from _printed_tolerance import printed_band_mm
 import magnifying_bracket_joint_layout as joint
 import sm_summing_lever_profile as profile
 import sm_summing_lever_spec as spec
+from top_frame_plane import KNIFE_Y
 
 
 def _dot(a: tuple[float, float], b: tuple[float, float]) -> float:
@@ -88,7 +89,7 @@ def test_uniform_ribs_and_relocated_row_preserve_other_installed_interfaces() ->
     assert joint.LEVER_FRONT_LOCAL_Z + spec.RIB_T == pytest.approx(-71.12)
     assert joint.DRILL_DEPTH_MIN > spec.RIB_T + spec.RIB_T_DEVIATIONS[1]
     assert joint.DRILL_DEPTH_DEVIATIONS == pytest.approx((-0.254, 0.254))
-    assert joint.BRACKET_ORIGIN == (40.0, 979.7, -173.5192)
+    assert joint.BRACKET_ORIGIN == (40.0, KNIFE_Y, -173.5192)
     assert spec.HOLE_X - (joint.TAP_DRILL_DIA + joint.RECEIVER_DRILLED_DIAMETER_PLUS) / 2.0 > spec.RIB_REACH
 
 

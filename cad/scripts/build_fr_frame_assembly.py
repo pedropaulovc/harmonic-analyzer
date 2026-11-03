@@ -42,11 +42,11 @@ flange depth -- the 27.45 cm pad is set by the column stations, not the ch. 6
   reclosed rod-pin hole 125.890 out reaches the cam centre at -52.990, rods plumb; the old
   "arbor 47.5 + 25.4 rod lever" chain died with the ch30 re-anchor).
   Inserted at its exact authored transform and locked to the fixed base.
-* top-frame x1: the green one-piece casting at mid-plane Y = 1017.9499 (side
+* top-frame x1: the green one-piece casting at mid-plane Y = 1017.9431 (side
   rails 34.2 wide / front-rear rails 38 wide x 1.437 tall, band
-  y 999.7..1036.1998; corner bosses Ø45 rise to 1040.77), bored around the
-  four columns; its east rail (-X) carries the gooseneck hub and its west
-  rail top face seats the fulcrum-keeper feet (ch-channel.SLDASM).
+  y 999.6932..1036.193 = 39.358..40.795; corner bosses Ø45 rise to 1040.765),
+  bored around the four columns; its east rail (-X) carries the gooseneck hub
+  and its west rail top face seats the fulcrum-keeper feet (ch-channel.SLDASM).
 * tube-frame-cap x4: intact stock McMaster 9275K141 push-on caps seated on the
   square tube ends, with their skirts sheltered by the top-frame recesses.
 * frame-cross-screw x8 + gooseneck-set-screw x1: four lower and four upper
@@ -104,7 +104,6 @@ from _paths import OUT_SLDPRT
 from _session import run_build
 from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _feature_tree import name_last_feature
 from _printed_tolerance import printed_deviations
 from _simplified_names import simplified_name
@@ -212,7 +211,6 @@ from fr_frame_attachment_spec import (
     CASTING_FULL_THREAD_DEPTH,
     COLUMN_BOTTOM_Y,
     COLUMN_SOCKET_DIAMETER,
-    TOP_AXIS_HEIGHT_BAND_MM,
     TOP_AXIS_HEIGHT_DIMENSION,
     TOP_AXIS_HEIGHT_PLACES,
     TOP_AXIS_SETTING_FEATURE,
@@ -685,8 +683,9 @@ async def _author_top_axis_setting(adapter: Any) -> None:
     """MHA-FR-00 step 3's controlling height: a vertical construction line on
     the Front plane (sketch u, v = machine X, Y) up the +X column's axis, from
     the base underside to the top cross-bore axis. Its length carries the
-    setting's band and places for the drawing to import. No solid or pose
-    edits; the sketch is blanked."""
+    setting's places for the drawing to import; it has no band of its own, so
+    the title block's .XXX grade governs it. No solid or pose edits; the
+    sketch is blanked."""
     dims = SketchDims()
     check("create top-axis setting sketch", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
@@ -720,14 +719,6 @@ async def _author_top_axis_setting(adapter: Any) -> None:
     check("exit top-axis setting sketch", await adapter.exit_sketch())
     name_last_feature(adapter, TOP_AXIS_SETTING_FEATURE)
     dims.apply(adapter, TOP_AXIS_SETTING_FEATURE)
-    set_dimension_symmetric_tolerance(
-        adapter,
-        TOP_AXIS_SETTING_FEATURE,
-        TOP_AXIS_HEIGHT_DIMENSION,
-        TOP_AXIS_HEIGHT_BAND_MM,
-        places=TOP_AXIS_HEIGHT_PLACES,
-        display_unit=assembly_contract(ASM_NAME).drawing_unit,
-    )
     apply_drawing_precision(
         adapter,
         {TOP_AXIS_SETTING_FEATURE: {TOP_AXIS_HEIGHT_DIMENSION: TOP_AXIS_HEIGHT_PLACES}},

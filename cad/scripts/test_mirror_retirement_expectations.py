@@ -285,21 +285,23 @@ def test_magnifying_bracket_screw_expectations_follow_live_placement() -> None:
 def test_moved_screw_row_stays_coaxial_without_moving_the_installed_bodies() -> None:
     import build_mg_magnifier_assembly as magnifier
     import magnifying_bracket_joint_layout as joint
+    from spring_mount_geom import KNIFE_CONTACT_Y
+    from top_frame_plane import KNIFE_Y
 
-    assert joint.BRACKET_ORIGIN == (40.0, 979.7, -173.5192)
+    assert joint.BRACKET_ORIGIN == (40.0, KNIFE_Y, -173.5192)
     assert (
         magnifier.BRACKET_X, magnifier.LEVER_ROD_Y, magnifier.LEVER_ROD_Z,
     ) == joint.BRACKET_ORIGIN
     assert magnifier.LEVER_X0 == 200.0
     assert magnifier.LEVER_X0 - magnifier.KNIFE_LOCAL_X == -15.0
-    assert magnifier.LEVER_ROD_Y + magnifier.KNIFE_LOCAL_Y == pytest.approx(984.834)
+    assert magnifier.LEVER_ROD_Y + magnifier.KNIFE_LOCAL_Y == pytest.approx(KNIFE_CONTACT_Y)
     for screw, clearance, pilot in zip(
         magnifier.BRACKET_SCREW_POSITIONS,
         joint.BRACKET_HOLE_POINTS,
         joint.LEVER_HOLE_POINTS,
         strict=True,
     ):
-        assert screw[1] == pytest.approx(978.99)
+        assert screw[1] == pytest.approx(KNIFE_Y - 0.71)
         assert screw == pytest.approx(tuple(
             local + origin
             for local, origin in zip(clearance, joint.BRACKET_ORIGIN, strict=True)

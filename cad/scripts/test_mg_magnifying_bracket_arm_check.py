@@ -17,6 +17,7 @@ import sh_vn_music_wire_lever_geom as wire
 import spring_force_model
 
 from mg_magnifying_wheel_geom import WIRE_RATIO
+from top_frame_plane import KNIFE_Y
 
 
 def _spring_compliance_along_wire() -> float:
@@ -82,7 +83,7 @@ def test_gravity_moment_bounds_every_accepted_free_tip_in_the_fitted_frame() -> 
 
 
 def test_relocated_row_changes_joint_reference_not_neck_hook_or_body_pose() -> None:
-    assert arm.NECK == (40.0, 979.7, -173.5192)
+    assert arm.NECK == (40.0, KNIFE_Y, -173.5192)
     assert arm.HOOK == pytest.approx((150.0 - math.hypot(8.95, 4.5), 919.7, -173.5192))
     assert joint.SIDE_PLATE_MACHINE_X == (-8.0, 46.25)
     assert joint.SIDE_PLATE_Y == (-5.5, 5.5)
@@ -92,7 +93,7 @@ def test_relocated_row_changes_joint_reference_not_neck_hook_or_body_pose() -> N
     assert (lever.KNIFE_LOCAL_X, lever.KNIFE_LOCAL_Y) == (215.0, 5.134)
     assert arm.JOINT == pytest.approx((
         sum(point[0] for point in joint.SCREW_POSITIONS) / len(joint.SCREW_POSITIONS),
-        979.7 - 0.71,
+        KNIFE_Y - 0.71,
         joint.SEAT_PLANE_Z,
     ))
     assert arm.JOINT[1] == pytest.approx(

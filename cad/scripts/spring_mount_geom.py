@@ -26,8 +26,9 @@ import sm_summing_lever_spec
 import sm_vn_boss_hook_spec
 from _hole_spec import blind_cut_dia_mm
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
+from top_frame_plane import KNIFE_Y
 
-KNIFE = (-15.0, 979.7)
+KNIFE = (-15.0, KNIFE_Y)
 KNIFE_CONTACT_Y = KNIFE[1] + sm_summing_lever_spec.HEX_H / 2.0
 COLUMN_X = -197.0
 MIN_CLEARANCE_MM = 0.25

@@ -11,6 +11,8 @@ from frame_column_stations import (
 )
 from fr_harmonic_base_spec import GREEN_TOP
 from fr_vn_tube_frame_cap_spec import TOTAL_HEIGHT as CAP_HEIGHT, WALL_THICKNESS as CAP_ROOF
+from top_frame_plane import TOP_FRAME_RAIL_TOP_Y  # noqa: F401  re-exported for importers
+from top_frame_plane import TOP_FRAME_UNDERSIDE_Y
 
 # The socket pair now lives in frame_column_stations: fr_harmonic_base_spec
 # authors the socket-bore surface finishes and so needs the bore size, but
@@ -24,26 +26,23 @@ BASE_SCREW_Y = COLUMN_BOTTOM_Y + 12.7  # .500 above the seated tube end
 BASE_SCREW_SEAT_Z = 132.9944  # 5.236
 # The top frame's insert plane (its mid plane) and its taps, .72 below its
 # rail top (MHA-FR-02 prints them at .XX off that face), .0015 below the mid
-# plane. The faced underside stays on the 999.7 plane that the summing knife
-# mounts clamp to (build_sm_knife_mount.CASTING_UNDERSIDE_Y) and the hanger
-# washers seat on, one 1.437 rail band (36.4998) below the rail top, so the mid
-# plane is half a band above it. That leaves the installed tap axis off the
-# inch grid (40.07527); the tube's upper hole is match-drilled from these taps
-# and prints no station. The plane snaps to the inch grid together with the
-# summing KNIFE_Y and the channel FULCRUM (#290 FR plane-snap PR).
-TOP_FRAME_UNDERSIDE_Y = 999.7
-TOP_FRAME_MID_Y = TOP_FRAME_UNDERSIDE_Y + 36.4998 / 2.0  # 1017.9499
-TOP_SCREW_Y = TOP_FRAME_MID_Y - 0.0381  # 1017.9118, 40.07527
+# plane. The faced underside (top_frame_plane, 39.358) is the plane the
+# summing knife mounts clamp to; the hanger washers seat on the rail top one
+# 1.437 rail band (36.4998) above it, and the mid plane is half a band above
+# it. The plane's inch-grid station puts the installed tap axis on the .001
+# grid too (40.075).
+TOP_FRAME_MID_Y = TOP_FRAME_UNDERSIDE_Y + 36.4998 / 2.0  # 1017.9431
+TOP_SCREW_Y = TOP_FRAME_MID_Y - 0.0381  # 1017.905, 40.075
+if abs(TOP_SCREW_Y / 25.4 - round(TOP_SCREW_Y / 25.4, 3)) > 1e-9:
+    raise AssertionError("the installed top cross-screw axis is off the .001 in grid")
 # MHA-FR-00 step 3 sets every corner's top cross-bore axis to one height above
 # the base underside. It is a dimension on the frame assembly's blanked
 # TopAxisSetting sketch (a construction line up the +X column's axis), which
-# the drawing imports. Off the inch grid until the plane snap, it prints four
-# places with its own band, the .XX grade the title block can't give a
-# four-place print.
+# the drawing imports. It prints three places with no band of its own, so the
+# title block's .XXX grade governs it.
 TOP_AXIS_SETTING_FEATURE = "TopAxisSetting"
 TOP_AXIS_HEIGHT_DIMENSION = "TopCrossBoreAxisHeight"
-TOP_AXIS_HEIGHT_PLACES = 4
-TOP_AXIS_HEIGHT_BAND_MM = 0.254  # +/-.010
+TOP_AXIS_HEIGHT_PLACES = 3
 # Top-frame bosses take a flush counterbore, not a spotface: the stock
 # fillister head (HEAD_H 4.572) sits below the Ø.35 mouth's lowest barrel point
 # at every printed corner, and the floor stands far enough outboard to keep

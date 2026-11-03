@@ -117,26 +117,34 @@ class Projection:
 
 def test_checked_heights_print_their_model_values() -> None:
     """The overall reference prints the cap stack's .001 grid exactly. The top
-    cross-bore axis (MHA-FR-02's taps, .72 under its rail top) is off the inch
-    grid until the FR plane snap, so it prints four places with its own
-    .XX-grade band."""
+    cross-bore axis (MHA-FR-02's taps, .72 under its rail top) sits on the
+    .001 grid too, so it prints three places under the title block's .XXX
+    band, with no band of its own."""
+    from _title_block_units import render_number
+
     cap_in = drawing.CAP_TOP_Y / 25.4
     assert cap_in == pytest.approx(round(cap_in, drawing.HEIGHT_PLACES), abs=1e-9)
     assert drawing.HEIGHT_PLACES == 3
-    assert drawing.TOP_AXIS_HEIGHT_PLACES == 4
-    assert drawing.TOP_SCREW_Y / 25.4 == pytest.approx(40.0753, abs=5e-5)
-    assert drawing.TOP_AXIS_HEIGHT_BAND_MM == pytest.approx(0.010 * 25.4)
+    assert drawing.TOP_AXIS_HEIGHT_PLACES == 3
+    axis_in = drawing.TOP_SCREW_Y / 25.4
+    assert axis_in == pytest.approx(round(axis_in, 3), abs=1e-9)
+    assert not hasattr(drawing, "TOP_AXIS_HEIGHT_BAND_MM")
+    printed = render_number(axis_in, drawing.UNIT, drawing.TOP_AXIS_HEIGHT_PLACES)
+    assert printed + drawing.TOP_AXIS_HEIGHT_SUFFIX == (
+        "40.075 TOP CROSS-BORE AXIS HEIGHT FROM BASE UNDERSIDE"
+    )
 
 
 def test_top_frame_underside_is_the_knife_mount_seat_plane() -> None:
     from build_sm_knife_mount import CASTING_UNDERSIDE_Y, MOUNT_GAP
-    from fr_frame_attachment_spec import TOP_FRAME_MID_Y
+    from fr_frame_attachment_spec import TOP_FRAME_MID_Y, TOP_FRAME_RAIL_TOP_Y
     from fr_top_frame_spec import HALF_H
 
     # The knife mounts clamp to it and the hanger washers seat on the rail
     # top one band above it: exact contact, no overlap and no gap.
     assert MOUNT_GAP == 0.0
     assert TOP_FRAME_MID_Y - HALF_H == pytest.approx(CASTING_UNDERSIDE_Y, abs=1e-9)
+    assert TOP_FRAME_MID_Y + HALF_H == pytest.approx(TOP_FRAME_RAIL_TOP_Y, abs=1e-9)
 
 
 def test_a_batch_projects_every_point_through_one_transform_read() -> None:

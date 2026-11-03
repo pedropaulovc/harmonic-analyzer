@@ -41,8 +41,19 @@ def test_geometry_matches_the_top_frame_contract() -> None:
     # seat: a .32 lug (owner ruling Q11-B) with a straight .33 foot running
     # OUTBOARD to x = .49 (Q11-B': the tip stays clear of the frame's
     # corner bosses), its screw .18 off the tip.
+    from channel_frame_geom import LEVER_FULCRUM_XY
+    from top_frame_plane import FULCRUM_KEEPER_SEAT_Y, TOP_FRAME_RAIL_TOP_Y
+
     spec = ch_fulcrum_keeper_spec
     assert spec.SHAFT_AXIS_H == 25.2
+    # #290 plane snap: the seat translates with the plane, keeping the
+    # 0.0002 float over the 1.437 rail band that Main accepted on #2127.
+    assert LEVER_FULCRUM_XY[1] - spec.SHAFT_AXIS_H == pytest.approx(
+        FULCRUM_KEEPER_SEAT_Y, abs=1e-9
+    )
+    assert FULCRUM_KEEPER_SEAT_Y - TOP_FRAME_RAIL_TOP_Y == pytest.approx(
+        0.0002, abs=1e-9
+    )
     assert 2.0 * spec.CROWN_R == spec.KEEPER_WIDTH == 13.97
     assert 2.0 * spec.LUG_HALF_T == 8.128
     assert spec.FOOT_TIP_X == pytest.approx(spec.LUG_HALF_T + spec.FOOT_L)

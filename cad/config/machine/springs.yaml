@@ -11,6 +11,11 @@
 # whole counter stack (anchor, spring, gooseneck, screw) translates rigidly,
 # so every measured contact is unchanged; the summing assembly's native
 # contact gates re-certify both seats.
+# 2026-11-01 (#290 FR plane snap): the knife and fulcrum chains translate
+# rigidly by -0.0068 mm in Y with the MHA-FR-02 underside (999.7 -> 999.6932,
+# top_frame_plane), so every channel and counter record's eye, centre and
+# gooseneck heights moved by exactly that; lengths, axes and measured contact
+# distances are unchanged, and the native contact gates re-certify every seat.
 # channels.yaml must exactly match a preset vector below. Custom stations require
 # new native calibration; builds never interpolate or search for a replacement.
 springs:
@@ -26,16 +31,16 @@ springs:
       length_mm: 64.93182556152854
       lower_eye_xy:
       - 24.850000010863738
-      - 997.4545804235844
+      - 997.4477804235844
       upper_eye_xy:
       - 24.85000012524236
-      - 1057.3572059851128
+      - 1057.3504059851127
       axis_xy:
       - 1.9094091279411433e-09
       - 1.0
       centre_xy:
       - 24.85000006805305
-      - 1027.4058932043486
+      - 1027.3990932043484
       clocking: standard
     final_distance_mm:
       lower: 1.0954974675523063e-05
@@ -45,16 +50,16 @@ springs:
       length_mm: 64.97807736022318
       lower_eye_xy:
       - 24.850000362584783
-      - 997.4545786987569
+      - 997.4477786987569
       upper_eye_xy:
       - 24.850004182999573
-      - 1057.4034560589798
+      - 1057.3966560589797
       axis_xy:
       - 6.372787881088521e-08
       - 0.999999999999998
       centre_xy:
       - 24.850002272792178
-      - 1027.4290173788684
+      - 1027.4222173788683
       clocking: standard
     final_distance_mm:
       lower: 2.841366458221472e-06
@@ -64,16 +69,16 @@ springs:
       length_mm: 64.98354080133853
       lower_eye_xy:
       - 24.850000470004215
-      - 997.4545790526678
+      - 997.4477790526678
       upper_eye_xy:
       - 24.850005422706797
-      - 1057.4089198540062
+      - 1057.402119854006
       axis_xy:
       - 8.260790655026594e-08
       - 0.9999999999999966
       centre_xy:
       - 24.850002946355506
-      - 1027.431749453337
+      - 1027.424949453337
       clocking: standard
     final_distance_mm:
       lower: 2.7171198997773264e-06
@@ -83,16 +88,16 @@ springs:
       length_mm: 64.99046807368548
       lower_eye_xy:
       - 24.85000062619838
-      - 997.4545794336644
+      - 997.4477794336644
       upper_eye_xy:
       - 24.850007225569943
-      - 1057.4158475073496
+      - 1057.4090475073494
       axis_xy:
       - 1.100605737287524e-07
       - 0.9999999999999939
       centre_xy:
       - 24.85000392588416
-      - 1027.435213470507
+      - 1027.428413470507
       clocking: standard
     final_distance_mm:
       lower: 1.2593655180891717e-05
@@ -102,16 +107,16 @@ springs:
       length_mm: 64.99953906176067
       lower_eye_xy:
       - 24.85000086450354
-      - 997.4545792322509
+      - 997.4477792322509
       upper_eye_xy:
       - 24.850009976701134
-      - 1057.4249182940107
+      - 1057.4181182940106
       axis_xy:
       - 1.5194507384414525e-07
       - 0.9999999999999883
       centre_xy:
       - 24.850005420602336
-      - 1027.4397487631309
+      - 1027.4329487631308
       clocking: standard
     final_distance_mm:
       lower: 2.1873217585211197e-07
@@ -121,16 +126,16 @@ springs:
       length_mm: 65.01192948872692
       lower_eye_xy:
       - 24.850001251911724
-      - 997.4545791538643
+      - 997.4477791538643
       upper_eye_xy:
       - 24.850014450266126
-      - 1057.4373086425899
+      - 1057.4305086425898
       axis_xy:
       - 2.2003590898063234e-07
       - 0.9999999999999757
       centre_xy:
       - 24.850007851088925
-      - 1027.4459438982271
+      - 1027.439143898227
       clocking: standard
     final_distance_mm:
       lower: 1.8266591411438412e-06
@@ -140,16 +145,16 @@ springs:
       length_mm: 65.02986830264855
       lower_eye_xy:
       - 24.85000193942461
-      - 997.4545804908984
+      - 997.4477804908984
       upper_eye_xy:
       - 24.850022392034933
-      - 1057.4552487935432
+      - 1057.448448793543
       axis_xy:
       - 3.4087304193295176e-07
       - 0.9999999999999419
       centre_xy:
       - 24.850012165729773
-      - 1027.4549146422207
+      - 1027.4481146422206
       clocking: standard
     final_distance_mm:
       lower: 1.2065522549550179e-05
@@ -159,16 +164,16 @@ springs:
       length_mm: 65.05816389822175
       lower_eye_xy:
       - 24.85000332779331
-      - 997.4545792296858
+      - 997.4477792296858
       upper_eye_xy:
       - 24.85003843829556
-      - 1057.4835431278973
+      - 1057.4767431278972
       axis_xy:
       - 5.84892691290956e-07
       - 0.9999999999998289
       centre_xy:
       - 24.850020883044436
-      - 1027.4690611787914
+      - 1027.4622611787913
       clocking: standard
     final_distance_mm:
       lower: 3.500526675098584e-06
@@ -178,16 +183,16 @@ springs:
       length_mm: 65.10941115929262
       lower_eye_xy:
       - 24.850006788480435
-      - 997.4545782232891
+      - 997.4477782232891
       upper_eye_xy:
       - 24.850078472763844
-      - 1057.534789382539
+      - 1057.5279893825389
       axis_xy:
       - 1.1931430004376318e-06
       - 0.9999999999992883
       centre_xy:
       - 24.85004263062214
-      - 1027.494683802914
+      - 1027.487883802914
       clocking: standard
     final_distance_mm:
       lower: 1.4709369362145263e-05
@@ -197,16 +202,16 @@ springs:
       length_mm: 65.23056957758205
       lower_eye_xy:
       - 24.850019804916798
-      - 997.4545794719021
+      - 997.4477794719021
       upper_eye_xy:
       - 24.850229360494904
-      - 1057.6559490491195
+      - 1057.6491490491194
       axis_xy:
       - 3.4809104772726648e-06
       - 0.9999999999939416
       centre_xy:
       - 24.850124582705853
-      - 1027.5552642605107
+      - 1027.5484642605106
       clocking: standard
     final_distance_mm:
       lower: 6.312586579669602e-07
@@ -216,16 +221,16 @@ springs:
       length_mm: 65.8700277288529
       lower_eye_xy:
       - 24.85019977696906
-      - 997.4545791018675
+      - 997.4477791018675
       upper_eye_xy:
       - 24.852336067885048
-      - 1058.2954067932149
+      - 1058.2886067932147
       axis_xy:
       - 3.5112785209141826e-05
       - 0.9999999993835461
       centre_xy:
       - 24.851267922427056
-      - 1027.8749929475412
+      - 1027.868192947541
       clocking: standard
     final_distance_mm:
       lower: 9.940099575807054e-06
@@ -258,18 +263,18 @@ springs:
           length_mm: 349.6944335598102
           lower_eye_xy:
           - -91.19999999999999
-          - 1010.3428723439919
+          - 1010.3360723439919
           upper_eye_xy:
           - -91.2
-          - 1350.5377059038021
+          - 1350.530905903802
           axis_xy:
           - -4.0755291451535194e-17
           - 1.0
           centre_xy:
           - -91.19999999999999
-          - 1180.440289123897
+          - 1180.4334891238968
           clocking: half_turn
-        gooseneck_origin_y_mm: 1188.807532596401
+        gooseneck_origin_y_mm: 1188.8007325964008
         upper_support:
           component: sm-gooseneck-spring-screw
           number: MHA-SM-04
@@ -326,18 +331,18 @@ springs:
           length_mm: 350.26533131534217
           lower_eye_xy:
           - -91.19999999999999
-          - 1010.3428723439944
+          - 1010.3360723439944
           upper_eye_xy:
           - -91.2
-          - 1351.1086036593365
+          - 1351.1018036593364
           axis_xy:
           - -4.068867282667633e-17
           - 1.0
           centre_xy:
           - -91.19999999999999
-          - 1180.7257380016654
+          - 1180.7189380016653
           clocking: half_turn
-        gooseneck_origin_y_mm: 1189.3784303519294
+        gooseneck_origin_y_mm: 1189.3716303519293
         upper_support:
           component: sm-gooseneck-spring-screw
           number: MHA-SM-04
