@@ -10,7 +10,8 @@ screw threaded up through the bottom rail presses the barrel into the V-groove.
 Part frame: ring in the XY plane, origin at the bottom-left outer corner of the
 sketch (Front-plane) face, width along +X, height along +Y, depth along +Z; the
 window centred in X.  The ring is symmetric about its X centre so it cannot be
-mounted mirrored.  The window's four internal corners carry WINDOW_CORNER_R.
+mounted mirrored.  The window's four internal corners are modelled at
+WINDOW_CORNER_R; the sheet prints none (the title block governs).
 The tapped hole's axis is the named axis ``SetScrewAxis``
 (x = OUTER_WIDTH / 2, z = FRAME_DEPTH / 2, along Y).
 
@@ -32,7 +33,11 @@ import _config
 from _hole_spec import HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import printed_band_mm, printed_deviations
+from _printed_tolerance import (
+    inside_corner_radius_mm,
+    printed_band_mm,
+    printed_deviations,
+)
 
 # The registry row's drawing_unit (in) is this sheet's unit.
 UNIT = drawing_unit("parts/pn-pen-frame", _config.parts("pn-pen-frame"))
@@ -64,14 +69,16 @@ FRAME_DEPTH = 7.874  # .31
 WINDOW_WIDTH = OUTER_WIDTH - 2.0 * RAIL_SIDE  # .74
 WINDOW_HEIGHT = OUTER_HEIGHT - 2.0 * RAIL_END  # 1.10
 # The window's internal corners (drawing-guidelines.md rule 16: no sharp
-# internal corner; as large as function allows).  The window's top edge seats
-# on the v-block neck's top with .02 a side (pn_pen_carriage_geom asserts the
-# side gap), so a radius over that gap would ride on the neck's top edges and
-# lift the stirrup; R.02, the gap itself, is that largest radius.
+# internal corner; as large as function allows).  Nothing needs them small:
+# a corner over the neck's side gap rides the neck's top edges, which only
+# lifts the stirrup a little (pn_pen_carriage_geom guards that lift at the
+# title block's limit), so the sheet prints no radius and the title block's
+# INSIDE CORNERS R.040 MAX governs (machinist review: a bare 4X R.02 read as
+# an unexplained tightening).  The model carries the .02 side gap.
+INSIDE_CORNER_R_MAX = inside_corner_radius_mm(unit=UNIT)
 WINDOW_CORNER_R = 0.508  # .02
-# 1e-9: the gap equals the radius, up to the float subtraction.
-if WINDOW_CORNER_R > (WINDOW_WIDTH - V_BLOCK_DEPTH) / 2.0 + 1e-9:
-    raise AssertionError("window corner radius rides on the v-block's top edges")
+if WINDOW_CORNER_R > INSIDE_CORNER_R_MAX:
+    raise AssertionError("the modelled window corner exceeds the title block's corner")
 
 # The thumb screw threads INTO the bottom rail, so its hole is an exact #4-40
 # tapped Hole Wizard feature drilled up from the bottom face. THROUGH_NEXT
@@ -87,8 +94,8 @@ if SET_SCREW_RADIAL_WALL < WALL_TARGET_MM:  # drawing-guidelines.md rule 17
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  Front view: the outer envelope, the window's size and the
 # window's lower-left corner from the left and bottom outer faces (rule 10),
-# which together fully define the ring sketch; the one printed window-corner
-# fillet stands for all four.  Bottom view: the extrude depth and the tapped
+# which together fully define the ring sketch; the window corners print no
+# radius (the title block governs).  Bottom view: the extrude depth and the tapped
 # hole's two coordinates, each from a real outer face, beside the hole's
 # wizard callout, and the tap's stated far-wall minimum. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -101,14 +108,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "BottomWall",
     },
     "Ring": {"Depth"},
-    "WindowCorner": {"WindowCornerR"},
     "ScrewHole": {"ScrewX", "ScrewZ"},
     "TapWallReference": {"TapWallMin"},
 }
 
 # Printed places (drawing-guidelines.md rule 3).  Every rail, window and
-# envelope size feeds a stack below, and the corner radius is bounded by the
-# neck gap, so nothing prints .X: the title block's .XX everywhere, the tap's
+# envelope size feeds a stack below, so nothing prints .X: the title block's
+# .XX everywhere, the tap's
 # depth station ScrewZ too (rule 17 forbids tightening a location band to
 # protect a wall).  The model keeps the station on the .155 mid-plane, where
 # the carriage puts the thumb screw (pn_pen_carriage_geom.FRAME_X_CENTER_LOCAL

@@ -275,6 +275,25 @@ def paper_side_points_printed_worst() -> dict[str, float]:
     }
 
 
+def window_corner_ride_max() -> float:
+    """How far the stirrup's window corners, at the title block's INSIDE
+    CORNERS limit, can lift its top rail off the block top by riding the
+    neck's top edges, the window and the neck at their printed limits."""
+    window = _printed_limits(frame, "WindowWidth", frame.WINDOW_WIDTH)[0]
+    neck = (
+        _printed_limits(vb, "NeckZ1", vb.depth_station(vb.NECK_DEPTH))[1]
+        - _printed_limits(vb, "NeckZ0", vb.depth_station(0.0))[0]
+    )
+    gap = (window - neck) / 2.0
+    r = frame.INSIDE_CORNER_R_MAX
+    if gap <= 0.0:
+        raise AssertionError("the stirrup window must pass the neck at both prints")
+    if gap >= r:
+        return 0.0
+    # The edge meets the corner's arc gap in from the side wall.
+    return r - math.sqrt(r * r - (r - gap) ** 2)
+
+
 # --- plan balance ---------------------------------------------------------------
 def _cyl(r: float, h: float) -> float:
     return math.pi * r * r * h
@@ -366,7 +385,10 @@ if frame.WINDOW_WIDTH < vb.NECK_DEPTH + 4.0 * CLEARANCE:
     raise AssertionError("stirrup window must pass the neck with 2 x CLEARANCE a side")
 if FRAME_X0_LOCAL + frame.FRAME_DEPTH + 4.0 * CLEARANCE > vb.RELIEF_X0:
     raise AssertionError("the stirrup must slide on the neck clear of the body's step")
-if FRAME_WINDOW_BOTTOM_LOCAL_Y > MARKER_BOTTOM_LOCAL_Y - 1.0:
+# The thumb screw keeps its throw with the stirrup lifted by its window
+# corners at their worst.
+WINDOW_CORNER_RIDE_MAX = window_corner_ride_max()
+if FRAME_WINDOW_BOTTOM_LOCAL_Y + WINDOW_CORNER_RIDE_MAX > MARKER_BOTTOM_LOCAL_Y - 1.0:
     raise AssertionError("stirrup window leaves the thumb screw under 1.0 of throw")
 if MARKER_BOTTOM_LOCAL_Y - thumb.SHANK_LEN >= FRAME_ORIGIN_LOCAL[1]:
     raise AssertionError("the thumb screw knob must stand below the stirrup")

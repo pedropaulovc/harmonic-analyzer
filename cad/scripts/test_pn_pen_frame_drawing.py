@@ -29,7 +29,6 @@ _MODEL_VALUES = {
     "WindowHeight": spec.WINDOW_HEIGHT,
     "LeftWall": spec.RAIL_SIDE,
     "BottomWall": spec.RAIL_END,
-    "WindowCornerR": spec.WINDOW_CORNER_R,
     "Depth": spec.FRAME_DEPTH,
     "ScrewX": spec.OUTER_WIDTH / 2.0,
     "ScrewZ": spec.FRAME_DEPTH / 2.0,
@@ -44,9 +43,8 @@ def _half_width(text: str) -> float:
 def _printed_text(name: str) -> str:
     """The decimal-inch text the sheet prints, leading zero dropped."""
     places = spec.DRAWING_PRECISION_BY_NAME[name]
-    prefix = drawing.DIMENSION_PREFIXES.get(name, "")
     text = f"{_MODEL_VALUES[name] / 25.4:.{places}f}"
-    return prefix + (text[1:] if text.startswith("0.") else text)
+    return text[1:] if text.startswith("0.") else text
 
 
 def test_required_drawing_paths() -> None:
@@ -65,9 +63,7 @@ def test_spec_is_the_single_source_of_geometry_and_marked_dimensions() -> None:
     kept = set(drawing.FRONT_KEEP) | set(drawing.BOTTOM_KEEP)
     assert kept == marked == set(_MODEL_VALUES)
     assert not set(drawing.FRONT_KEEP) & set(drawing.BOTTOM_KEEP)
-    assert set(drawing.FRONT_KEEP) == (
-        spec.DRAWING_DIMENSIONS["RingProfile"] | spec.DRAWING_DIMENSIONS["WindowCorner"]
-    )
+    assert set(drawing.FRONT_KEEP) == spec.DRAWING_DIMENSIONS["RingProfile"]
     for name in (
         "OUTER_WIDTH",
         "OUTER_HEIGHT",
@@ -77,7 +73,6 @@ def test_spec_is_the_single_source_of_geometry_and_marked_dimensions() -> None:
         "WINDOW_CORNER_R",
     ):
         assert getattr(part, name) is getattr(spec, name)
-    assert drawing.WINDOW_CORNER_R is spec.WINDOW_CORNER_R
     assert part.SET_SCREW_TAP_SPEC is spec.SET_SCREW_TAP_SPEC
     assert drawing.SET_SCREW_TAP_SPEC is spec.SET_SCREW_TAP_SPEC
     # The frame spec's copy of the neck depth it passes stays the block's.
@@ -119,10 +114,9 @@ def test_part_names_every_marked_dimension_and_its_drive() -> None:
     for feature in ("RingProfile", "Ring", "SetScrewAxis"):
         assert f'name_last_feature(adapter, "{feature}")' in source
     assert 'name="ScrewHole"' in source
-    # The printed fillet is the top-right corner alone; the other three share
-    # the drive.
-    assert '("WindowCorner", "WindowCornerR", ((window_x[1], window_y[1]),))' in source
-    assert '"OtherWindowCorners"' in source
+    # One fillet on all four window corners, driven by its knob; the sheet
+    # prints no radius.
+    assert 'name_dimensions(adapter, "WindowCorners", ["WindowCornerR"])' in source
     assert "add_fillet(WINDOW_CORNER_R, edges)" in source
     assert "'\"WindowCornerR\"'" in source
     assert 'set_global(adapter, "WindowCornerR"' in source
@@ -252,7 +246,8 @@ def test_printed_worst_case_keeps_the_window_rails_thread_and_tap_wall() -> None
 def test_window_height_band_keeps_the_thumb_screw_throw() -> None:
     # The stirrup hangs from the window's top edge, so a short window lifts
     # its bottom rail toward the marker: the printed band must stay inside the
-    # carriage's throw slack, with the block's own printed height band on top.
+    # carriage's throw slack, with the block's own printed height band and the
+    # window corners' worst ride on the neck (below) on top.
     slack = carriage.MARKER_BOTTOM_LOCAL_Y - 1.0 - carriage.FRAME_WINDOW_BOTTOM_LOCAL_Y
     window_band = printed_band_mm(
         spec.DRAWING_PRECISION_BY_NAME["WindowHeight"], unit=spec.UNIT
@@ -260,14 +255,25 @@ def test_window_height_band_keeps_the_thumb_screw_throw() -> None:
     block_band = max(
         abs(d) for d in printed_deviations(v_block.BLOCK_HEIGHT, 2, unit=v_block.UNIT)
     )
-    assert slack >= window_band + block_band
+    assert slack >= window_band + block_band + carriage.WINDOW_CORNER_RIDE_MAX
 
 
-def test_window_corner_radius_clears_the_v_block_top_edges() -> None:
-    # The window's top edge seats on the block top; a corner radius larger
-    # than the side gap would ride on the block's top edges.
-    side_gap = (spec.WINDOW_WIDTH - v_block.NECK_DEPTH) / 2.0
-    assert spec.WINDOW_CORNER_R == pytest.approx(side_gap) == pytest.approx(0.508)
+def test_window_corners_may_ride_the_neck_only_a_little() -> None:
+    # The sheet prints no window radius, so the title block's INSIDE CORNERS
+    # R.040 MAX governs it.  At that radius, with the window at its printed
+    # minimum and the neck at its printed maximum, the corners ride the neck's
+    # top edges and lift the stirrup: the carriage takes that lift.
+    assert spec.WINDOW_CORNER_R <= spec.INSIDE_CORNER_R_MAX
+    assert "WindowCornerR" not in spec.DRAWING_PRECISION_BY_NAME
+    lift = carriage.window_corner_ride_max()
+    assert 0.0 < lift < spec.INSIDE_CORNER_R_MAX
+    # The edge then sits on the corner's arc: its distance from the arc
+    # centre is the radius.
+    r = spec.INSIDE_CORNER_R_MAX
+    band = printed_band_mm(2, unit=spec.UNIT)
+    neck_max = v_block.NECK_DEPTH + 2.0 * band
+    gap = (spec.WINDOW_WIDTH - band - neck_max) / 2.0
+    assert math.hypot(r - gap, r - lift) == pytest.approx(r)
 
 
 def test_views_and_scales_are_explicit() -> None:
@@ -357,30 +363,6 @@ def test_front_dimensions_stack_smaller_nearer_the_ring() -> None:
     assert low + 0.0035 < keep["BottomWall"][1] < high - 0.0035
     # The left wall stays clear above the bottom view.
     assert keep["LeftWall"][1] - drawing.BOTTOM_HIGH_Y > 0.010
-
-
-def test_corner_radius_leader_leaves_through_the_right_rail_only() -> None:
-    x, y = drawing.FRONT_KEEP["WindowCornerR"]
-    half = _half_width(_printed_text("WindowCornerR"))
-    cx, cy = drawing.CORNER_ARC_CENTER_XY
-    height_line_x = drawing.FRONT_KEEP["OuterHeightDim"][0]
-    # Text between the ring's right face and the 40.0's dimension line, under
-    # that dimension's top extension line.
-    assert x - half > drawing.FRONT_RIGHT_X + 0.003
-    assert x + half < height_line_x - 0.005
-    assert y + 0.0035 / 2.0 < drawing.FRONT_TOP_Y - 0.002
-    # Aimed at the text's centre or its near end, the radial leader lands on
-    # the printed arc (0..90 deg) and leaves the ring through its right face,
-    # below the top: it crosses no other dimension's extension line.
-    for tx in (x - half, x):
-        angle = math.degrees(math.atan2(y - cy, tx - cx))
-        assert 10.0 < angle < 80.0, angle
-        exit_y = cy + (drawing.FRONT_RIGHT_X - cx) * math.tan(math.radians(angle))
-        assert exit_y < drawing.FRONT_TOP_Y - 0.002
-    assert drawing.DIMENSION_PREFIXES == {"WindowCornerR": "4X R"}
-    assert "_set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)" in (
-        inspect.getsource(drawing.build)
-    )
 
 
 def test_hole_callout_clears_the_views_and_their_dimensions() -> None:

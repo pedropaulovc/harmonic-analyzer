@@ -234,39 +234,21 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += [(depth_dim[0], '"FrameDepth"')]
     await volume_check(adapter, "ring", V_RING, 0.005 * V_RING)
 
-    # Window internal corners (pn_pen_frame_spec.WINDOW_CORNER_R), each concave
-    # fillet adding back its R x R square less the quarter disc. The printed 4X
-    # radius belongs to "WindowCorner", a fillet on the TOP-RIGHT window edge
-    # alone: an imported fillet dimension attaches to its feature's first edge
-    # (pd_guide_lock's farm run 20261012T061737079Z), and the top-right corner
-    # is the one no window dimension's extension line leaves from, so the
-    # sheet's radius leader runs out through the right rail without crossing
-    # one. The other three corners are one unprinted fillet driven by the same
-    # WindowCornerR. Edge points sit at mid-depth on each corner's Z edge.
+    # Window internal corners (pn_pen_frame_spec.WINDOW_CORNER_R), one fillet
+    # on all four, each concave corner adding back its R x R square less the
+    # quarter disc. The sheet prints no radius (the title block governs). Edge
+    # points sit at mid-depth on each corner's Z edge.
     window_x = (RAIL_SIDE, OUTER_WIDTH - RAIL_SIDE)
     window_y = (RAIL_END, OUTER_HEIGHT - RAIL_END)
-    corner_features = (
-        ("WindowCorner", "WindowCornerR", ((window_x[1], window_y[1]),)),
-        (
-            "OtherWindowCorners",
-            "OtherWindowCornerR",
-            (
-                (window_x[0], window_y[0]),
-                (window_x[1], window_y[0]),
-                (window_x[0], window_y[1]),
-            ),
-        ),
+    edges = [[x, y, FRAME_DEPTH / 2.0] for x in window_x for y in window_y]
+    check("fillet WindowCorners", await adapter.add_fillet(WINDOW_CORNER_R, edges))
+    name_last_feature(adapter, "WindowCorners")
+    corner_dim = name_dimensions(adapter, "WindowCorners", ["WindowCornerR"])
+    drive_jobs.append((corner_dim[0], '"WindowCornerR"'))
+    v_corners = 4.0 * V_WINDOW_CORNER
+    await volume_check(
+        adapter, "ring with WindowCorners", V_RING + v_corners, 0.1 * v_corners
     )
-    v_after = V_RING
-    for feature, dimension, corners in corner_features:
-        edges = [[x, y, FRAME_DEPTH / 2.0] for x, y in corners]
-        check(f"fillet {feature}", await adapter.add_fillet(WINDOW_CORNER_R, edges))
-        name_last_feature(adapter, feature)
-        corner_dim = name_dimensions(adapter, feature, [dimension])
-        drive_jobs.append((corner_dim[0], '"WindowCornerR"'))
-        v_corners = len(corners) * V_WINDOW_CORNER
-        v_after += v_corners
-        await volume_check(adapter, f"ring with {feature}", v_after, 0.1 * v_corners)
 
     # Thumb-screw hole: ONE native Hole Wizard #4-40 tapped feature drilled up
     # from the bottom face (y = 0, outward normal -Y). THROUGH_NEXT stops at
