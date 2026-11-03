@@ -231,6 +231,11 @@ def pytest_configure(config):
         os.environ["HARMONIC_BUILDGRAPH_CACHE"] = tempfile.mkdtemp(
             prefix="buildgraph-facts-"
         )
+    # The OpenTelemetry SDK drops every span and log record when this is set,
+    # and _telemetry builds its global providers once, at import. Telemetry
+    # tests read real records from in-memory exporters, so a shell exporting
+    # it must not reach the first import or the children that inherit it.
+    os.environ.pop("OTEL_SDK_DISABLED", None)
     # SolidWorks runs only on Windows; elsewhere there is nothing to start.
     if sys.platform == "win32" and not _guard_disabled():
         global _parent_child_log
