@@ -1069,3 +1069,23 @@ def test_part_and_sheet_take_the_registry_unit() -> None:
     assert "unit=part_drawing_unit(PART_STEM)" in draw_source
     assert "set_hole_callout_precision(\n        callout, TAP_CALLOUT_PRECISION" in draw_source
     assert drawing.TAP_CALLOUT_PRECISION == {"hw-thrutapdrldia": 3}
+
+
+def test_drawing_side_callout_precision_is_the_declared_exception() -> None:
+    # Codjiflo on #2106: a part-authored precision does not reach a Hole
+    # Wizard callout (run 20261102T230110877Z), so this sheet writes its
+    # callout places at drawing time, the declared exception RV-01.
+    from machinist_exceptions import load_exceptions
+
+    entry = {
+        e.id: e
+        for e in load_exceptions(_config.CONFIG_DIR, "dt_vn_cone_tip_collar", "part")
+    }["RV-01"]
+    assert entry.kind == "accept"
+    assert entry.reason.startswith(
+        "Delegated ruling 2026-11-02 (Main), following owner precedent"
+    )
+    assert "#2144" in entry.reason and "20261102T230110877Z" in entry.reason
+    assert "draw_dt_vn_cone_tip_collar.build" in entry.where
+    assert drawing.TAP_CALLOUT_PRECISION == {"hw-thrutapdrldia": 3}
+    assert "written as 3" in entry.where and "hw-thrutapdrldia" in entry.where

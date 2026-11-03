@@ -637,7 +637,8 @@ def test_the_one_allowlisted_frame_is_the_crank_bore_angularity() -> None:
             _config.CONFIG_DIR, "dt_cone_pivot_post", "part"
         )
     }
-    assert set(exceptions) == {"RV-01"}
+    # RV-02 is the callout-precision exception (its own test below).
+    assert set(exceptions) == {"RV-01", "RV-02"}
     exception = exceptions["RV-01"]
     assert exception.kind == "accept"
     assert "crank-bore diametral angularity frame" in exception.where
@@ -1284,3 +1285,24 @@ def test_cone_axis_height_stands_on_its_own_line_clear_of_the_spacing() -> None:
     assert foot_y + 0.010 < y < drawing.CONE_AXIS_SHEET_Y - 0.010
     # The control sheet's spacing line starts at the cone axis.
     assert drawing.CONE_AXIS_SHEET_Y == pytest.approx(_SPACING_LINE.y0, abs=5e-4)
+
+
+def test_drawing_side_callout_precision_is_the_declared_exception() -> None:
+    # Codjiflo on #2106: a part-authored precision does not reach a Hole
+    # Wizard callout (run 20261102T230110877Z), so this sheet writes its
+    # callout places at drawing time, the declared exception RV-02.
+    from machinist_exceptions import load_exceptions
+
+    entry = {
+        e.id: e
+        for e in load_exceptions(_config.CONFIG_DIR, "dt_cone_pivot_post", "part")
+    }["RV-02"]
+    assert entry.kind == "accept"
+    assert entry.reason.startswith(
+        "Delegated ruling 2026-11-02 (Main), following owner precedent"
+    )
+    assert "#2144" in entry.reason and "20261102T230110877Z" in entry.reason
+    assert "draw_dt_cone_pivot_post.build" in entry.where
+    assert (spec.MOUNT_HOLE_CALLOUT_PLACES, spec.MOUNT_CBORE_DEPTH_PLACES) == (3, 2)
+    assert "written as 3" in entry.where and "written as 2" in entry.where
+    assert all(name in entry.where for name in drawing.MOUNT_HOLE_PRECISION)
