@@ -25,10 +25,14 @@ from _drawing_tolerances import _tolerance_places
 
 SCRIPTS = Path(__file__).resolve().parent
 # Measured on run 20261103T022858451Z sheet 15 (90 dpi raster of the PDF):
-# the 1:1 bank's east pedestal ends at x 305.4 mm, the frame's inner edge is
-# at 419.1 mm and the title block's top at 65.5 mm; the DT-00 note font
-# advances ~2.43 mm a character (the 43-character spring callout ran 104.4).
-BANK_OUTLINE_RIGHT = 0.3054
+# the frame's inner edge is at 419.1 mm and the title block's top at 65.5 mm;
+# the DT-00 note font advances ~2.43 mm a character (the 43-character spring
+# callout ran 104.4).  The package's view-overlap audit reads native view
+# outlines, which pad the ink: run 20261103T063712849Z put the bank's right
+# edge at 311.0 mm with its centre at 0.205, and the drum station view's left
+# edge 58.3 mm left of its centre (305.7 at 0.364), past its 44 mm crop.
+BANK_OUTLINE_RIGHT = 0.3110 - (0.205 - drawing.BANK_SETTING_CENTER[0])
+DRUM_OUTLINE_LEFT_REACH = 0.0583
 FRAME_INNER_RIGHT = 0.4191
 FRAME_INNER_TOP = 0.2667
 TITLE_BLOCK_TOP = 0.0655
@@ -146,7 +150,7 @@ def test_the_drum_station_view_fits_beside_the_bank_above_the_title_block() -> N
     gap = drawing.VIEW_CAPTION_GAP
     x, y = drawing.DRUM_STATION_SETTING_CENTER
     radius = drawing.DRUM_STATION_CROP_RADIUS_MM / 1000.0
-    assert x - radius >= BANK_OUTLINE_RIGHT + 2 * gap
+    assert x - DRUM_OUTLINE_LEFT_REACH >= BANK_OUTLINE_RIGHT + gap
     assert x + radius <= FRAME_INNER_RIGHT - 2 * gap
     # The caption (one ~3.5 mm line, 8 mm under the circle) clears the title block.
     assert y - radius - 2 * gap - 0.0035 >= TITLE_BLOCK_TOP + gap
