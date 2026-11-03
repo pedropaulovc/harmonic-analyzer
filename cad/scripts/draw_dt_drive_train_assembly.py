@@ -230,17 +230,21 @@ CHECKS_CONTINUATION_SHEET = 14
 BANK_SETTINGS_SHEET = 15
 BANK_SETTING_SCALE = (1.0, 1.0)
 BANK_SPRING_DETAIL_SCALE = (4.0, 1.0)
-BANK_SETTING_CENTER = (0.205, 0.195)
+# 12 mm left of its first seat (0.205): run 20261103T063712849Z's native
+# outline audit put the bank's padded right edge (311.0) 5.2 mm into the drum
+# station view's (305.7); the column left of the bank is empty.
+BANK_SETTING_CENTER = (0.193, 0.195)
 BANK_SPRING_DETAIL_CENTER = (0.105, 0.075)
 BANK_SPRING_CROP_RADIUS_MM = 8.0
-BANK_SETTING_KEEP = {bank_settings.STACK_DIMENSION: (0.205, 0.250)}
+BANK_SETTING_KEEP = {bank_settings.STACK_DIMENSION: (0.193, 0.250)}
 BANK_SPRING_KEEP = {bank_settings.SPRING_DIMENSION: (0.165, 0.125)}
 # MHA-DT-22 prints the drum station as a reference; its setting and band live
 # on this sheet (dt_drum_station_setting_spec).  A 1:1 *Right view of the
 # arbor and drum alone, circle-cropped from the head's front crown to a short
-# run of the drum past its front end.  The 1:1 bank's outline ends at x ~305.4
-# and the frame's inner edge is at 419.1 mm (run 20261103T022858451Z sheet
-# 15), so the circle takes that column, above the title block (top 65.5 mm).
+# run of the drum past its front end.  The 1:1 bank's native outline ends at
+# x ~299 with its centre at 0.193 (311.0 at 0.205 in run 20261103T063712849Z)
+# and the frame's inner edge is at 419.1 mm, so the circle takes that column,
+# above the title block (top 65.5 mm).
 DRUM_STATION_SETTING_SCALE = (1.0, 1.0)
 DRUM_STATION_SETTING_CENTER = (0.364, 0.150)
 DRUM_STATION_SETTING_STEMS = frozenset({"dt-pinion-arbor", "dt-alignment-pinion"})
