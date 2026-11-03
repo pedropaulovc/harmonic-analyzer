@@ -122,8 +122,9 @@ WALL_FLOOR = WALL_FLOOR_MM
 # --- Existing body: fitted rear-face reaction, unchanged wheel-seat station --
 # .243 is the authored set length (owner/Main ruling; FR and MG planes key on
 # it), not the .244 snap of F - SEAT_FACE_Z (6.1891). The collar is faced to
-# fit, so the model leaves the 0.0169 remainder as air at F
-# (build_pd_paper_drive_assembly.KNOB_COLLAR_REAR_GAP, a distance mate).
+# fit; the assembly seats the model's rear on F and leaves the 0.0169
+# remainder as air at its front (build_pd_paper_drive_assembly
+# .KNOB_COLLAR_FRONT_GAP).
 SET_NOMINAL = 6.1722  # .243
 SEAT_MIN_FROM_F = 3.8862  # .153
 SEAT_MAX_FROM_F = 6.8834  # .271

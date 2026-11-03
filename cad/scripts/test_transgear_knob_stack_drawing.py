@@ -275,19 +275,26 @@ def test_printed_countersink_angle_reaches_the_engagement_refusal(monkeypatch) -
             _reloaded_collar(patch, nut, "REAR_THREAD_LOSS", shallow.REAR_THREAD_LOSS)
 
 
-def test_native_placement_leaves_the_faced_remainder_as_air_at_f() -> None:
+def test_native_placement_seats_the_collar_rear_on_f() -> None:
     """Saved nominal poses, not a claim that native mates have been observed.
-    The .243 collar sits on the seat face; F stands the facing's remainder
-    behind its rear, never overlapping, and the fitted body is in its window."""
+    The .243 collar's rear stands on F; the facing's remainder is air between
+    the wheel's rear and the collar's front, never an overlap, and the fitted
+    body is in its window."""
     import build_pd_paper_drive_assembly as assembly
 
-    assert assembly.KNOB_COLLAR_Z0 == pytest.approx(removable.SEAT_FACE_Z)
+    assert assembly.KNOB_COLLAR_REAR_Z == pytest.approx(assembly.KNOB_SHAFT_Z0)
     assert assembly.KNOB_COLLAR_REAR_Z == pytest.approx(
         assembly.KNOB_COLLAR_Z0 + collar.LENGTH
     )
-    assert assembly.KNOB_COLLAR_REAR_GAP == pytest.approx(0.0169)
-    assert assembly.KNOB_SHAFT_Z0 - assembly.KNOB_COLLAR_REAR_Z == pytest.approx(
-        assembly.KNOB_COLLAR_REAR_GAP
+    assert assembly.KNOB_COLLAR_SEAT_Z == pytest.approx(removable.SEAT_FACE_Z)
+    assert assembly.KNOB_COLLAR_FRONT_GAP == pytest.approx(0.0169)
+    assert assembly.KNOB_COLLAR_Z0 - removable.SEAT_FACE_Z == pytest.approx(
+        assembly.KNOB_COLLAR_FRONT_GAP
+    )
+    # The remainder comes out of the wheel's float under the nut.
+    assert assembly.THUMBNUT_AIR > 0.0
+    assert assembly.THUMBNUT_AIR == pytest.approx(
+        collar.PILOT_PROUD - assembly.KNOB_COLLAR_FRONT_GAP
     )
     assert (
         collar.LENGTH_FITTED_MIN
@@ -324,7 +331,6 @@ def test_both_retained_drive_pin_poses_follow_the_integral_shaft_clock() -> None
         assert math.hypot(
             x - assembly.KNOB_SHAFT_XY[0], y - assembly.KNOB_SHAFT_XY[1]
         ) == pytest.approx(collar.PIN_CIRCLE_RADIUS)
-    assert assembly.KNOB_DRIVE_PIN_Z0 - assembly.KNOB_PIN.LENGTH == pytest.approx(
-        removable.DRIVE_PIN_TIP_Z
-    )
-    assert assembly.REMOVABLE_Z0 < removable.DRIVE_PIN_TIP_Z < assembly.KNOB_COLLAR_Z0
+    tip_z = assembly.KNOB_DRIVE_PIN_Z0 - assembly.KNOB_PIN.LENGTH
+    assert tip_z == pytest.approx(assembly.KNOB_COLLAR_Z0 - collar.DRIVE_PIN_PROUD)
+    assert assembly.REMOVABLE_Z0 < tip_z < removable.SEAT_FACE_Z

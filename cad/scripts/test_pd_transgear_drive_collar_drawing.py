@@ -755,7 +755,9 @@ def test_native_flat_limits_refuse_missing_or_unwritten_controls(
         _native_flat_limits(monkeypatch, tolerance)
 
 
-def _capture_fixture(monkeypatch, *, length=None, rear_gap=0.0, clock_error=0.0, missing=None):
+def _capture_fixture(
+    monkeypatch, *, length=None, rear_gap=0.0, front_error=0.0, clock_error=0.0, missing=None
+):
     import build_pd_paper_drive_assembly as assembly
     import _gtol_face_resolve
 
@@ -794,11 +796,13 @@ def _capture_fixture(monkeypatch, *, length=None, rear_gap=0.0, clock_error=0.0,
                 math.cos(clock_error) * local[1],
                 assembly.KNOB_COLLAR_Z0 + local[2] + rear_gap,
             )
+        if name == "wheel":
+            return (local[0], local[1], assembly.REMOVABLE_Z0 + local[2] + front_error)
         return (local[0], local[1], assembly.KNOB_SHAFT_Z0 + local[2])
 
     monkeypatch.setattr(assembly, "world_point", world_point)
     adapter = SimpleNamespace(currentModel=native)
-    assembly._assert_knob_collar_capture(adapter, "collar", "shaft")
+    assembly._assert_knob_collar_capture(adapter, "collar", "shaft", "wheel")
     return calls
 
 
@@ -807,11 +811,15 @@ def test_actual_native_collar_rear_face_is_measured_on_f(monkeypatch) -> None:
     assert ("collar", (0.0, 0.0, spec.LENGTH)) in calls
     assert ("shaft", (0.0, 0.0, 0.0)) in calls
     assert ("collar", (0.0, -1.0, 0.0)) in calls
+    # The faced remainder stands at the collar's front, off the wheel's rear.
+    assert ("collar", (0.0, 0.0, 0.0)) in calls
+    assert ("wheel", (0.0, 0.0, removable.PLATE)) in calls
 
 
 @pytest.mark.parametrize(
     "kwargs, message",
-    [({"rear_gap": 0.01}, "gear F is not"),
+    [({"rear_gap": 0.01}, "rear is not on gear F"),
+     ({"front_error": 0.0169}, "behind the wheel"),
      ({"clock_error": math.radians(3.0)}, "not clocked"),
      ({"length": spec.LENGTH_FITTED_MIN - 0.01}, "outside"),
      ({"length": spec.LENGTH - 0.01}, "source version"),

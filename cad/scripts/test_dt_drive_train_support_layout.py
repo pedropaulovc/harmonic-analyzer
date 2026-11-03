@@ -786,10 +786,10 @@ def test_chain_shift_moves_the_crank_seat_hub_and_knob_seat_together(
     import _sprocket_seat_geometry as removable
 
     crank_seat = drive.CRANKSHAFT_Z0 + cs.SEAT_COLLAR
-    # The knob side's seat is the MHA-PD-22 drive collar's front face, its
-    # fitted length (the REF .243 faced to fit, 0.0169 air at F) in front of
-    # the knob shaft's pinion front face.
-    knob_seat = paper.KNOB_COLLAR_Z0
+    # The knob side's seat is the MHA-PD-22 drive collar's fitted front face,
+    # its fitted length (the REF .243 faced to fit; the model leaves 0.0169
+    # air at its front) in front of the knob shaft's pinion front face.
+    knob_seat = paper.KNOB_COLLAR_SEAT_Z
     assert crank_seat == pytest.approx(-154.3)
     assert knob_seat == pytest.approx(crank_seat)
     assert paper.KNOB_SHAFT_Z0 - paper.KNOB_COLLAR_FITTED_LENGTH == pytest.approx(knob_seat)

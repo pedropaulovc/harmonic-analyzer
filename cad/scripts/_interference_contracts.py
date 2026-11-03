@@ -630,14 +630,14 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         1.10 * 0.00809042475,
     ),
     # MHA-PD-13's #8-32 tap drill 3.454 on MHA-PD-08's Ø4.064 thread blank:
-    # at the model's fitted collar length 6.1891 (F to the seat face; the .243
-    # collar's remainder is air at F), the nut seats on the pilot 2.9016 in
-    # front of the wheel seat. The overlap is 23.876 - 6.1891 - 2.9016 =
-    # 14.7853, entirely on the blank, which starts 7.62 in front of F, behind
-    # the nut's seat at 9.0907.
+    # on the .243 nominal collar 6.1722, whose rear reacts on F (its faced
+    # remainder is air at its front), the nut seats on the pilot 2.9016 in
+    # front of the collar. The overlap is 23.876 - 6.1722 - 2.9016 =
+    # 14.8022, entirely on the blank, which starts 7.62 in front of F, behind
+    # the nut's seat at 9.0738.
     frozenset(
         ("pd-transgear-thumbnut-1", "pd-transgear-knob-shaft-1")
-    ): _smooth_annulus_limit_mm3(4.064, 3.454, 23.876 - 6.1891 - 2.9016),
+    ): _smooth_annulus_limit_mm3(4.064, 3.454, 23.876 - 6.1722 - 2.9016),
     # The two MHA-PD-VN-54 dowels pressed into the MHA-PD-22 collar's through reams,
     # the crank-seat twin (the collar's PIN_HOLE_DIA is the seat interface's
     # DRIVE_PIN_HOLE_DIA): the pin's length behind the seat face, 2.3625
