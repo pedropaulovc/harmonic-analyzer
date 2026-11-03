@@ -29,7 +29,8 @@ def test_catalogue_row_is_the_registered_mcmaster_shim() -> None:
     assert stock.stock_name == row["stock_name"]
     assert row["number"] == "MHA-PD-VN-68"
     assert row["drawing_unit"] == "in"
-    assert int(row["quantity"]) == fit.SHIM_COUNT_MODEL
+    # The kit: the stack's nominal shims and the spares in the spare T18's bore.
+    assert int(row["quantity"]) == fit.SHIM_COUNT_MAX
     metadata = discovered_recipes()[spec.SKU]
     assert metadata.module == recipe.__name__
     assert getattr(recipe, metadata.callable_name) is recipe.build_94773A606

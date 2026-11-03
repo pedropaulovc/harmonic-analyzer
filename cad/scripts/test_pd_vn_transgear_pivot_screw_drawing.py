@@ -84,8 +84,10 @@ def test_fitted_length_is_a_reference_set_by_the_bar() -> None:
     assert screw.REFERENCE_DIMENSIONS == (("StockTrimProfile", "CutLength"),)
     assert screw.DIMENSION_TOLERANCE_TYPES["CutLength"] == 0
     callout = screw.DIMENSION_CALLOUTS["CutLength"]
-    assert ".008-.020 BELOW MHA-PD-07" in callout
-    assert "FRONT FACE AS FITTED" in callout
+    # The fit-up's mate by name and number (machinist review of run
+    # 20261103T023833324Z: the number alone named no part).
+    assert ".008-.020 BELOW SUPPORT BAR" in callout
+    assert "MHA-PD-07 FRONT FACE AS FITTED" in callout
     # Facing only shortens: the nominal fit is inside the catalogue length,
     # and every stock length reaches the thinnest bar's deepest recess.
     assert screw.FITTED_THREAD_LEN < screw.THREAD_LEN

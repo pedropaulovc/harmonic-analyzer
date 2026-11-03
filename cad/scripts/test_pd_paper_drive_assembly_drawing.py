@@ -112,7 +112,7 @@ CONTRACT_TRANSGEAR_QUANTITIES = {
     "pd-transgear-disc-hub": 1,
     "pd-transgear-front-bushing": 1,
     "pd-vn-transgear-retaining-ring": 1,
-    "pd-vn-transgear-cluster-shim": cluster_fit.SHIM_COUNT_MODEL,
+    "pd-vn-transgear-cluster-shim": cluster_fit.SHIM_COUNT_MAX,
     "pd-rack-pinion": 1,
     "pd-vn-transgear-disc-screw": 3,
     "pd-transgear-knob-shaft": 1,
@@ -780,11 +780,18 @@ def test_the_feed_setup_reference_uses_the_selected_ratios_and_reference_pitch()
     assert "30DP" not in text and "%" not in text
 
 
+def _transgear_drawn_count(stem: str) -> int:
+    """The transgear views draw the stacked shims, not the kit's spares."""
+    if stem == "pd-vn-transgear-cluster-shim":
+        return cluster_fit.SHIM_COUNT_MODEL
+    return CONTRACT_TRANSGEAR_QUANTITIES[stem]
+
+
 def test_sheet_two_shows_and_balloons_exactly_the_transgear() -> None:
     expected = {
         f"{stem}-{index}"
-        for stem, count in CONTRACT_TRANSGEAR_QUANTITIES.items()
-        for index in range(1, count + 1)
+        for stem in CONTRACT_TRANSGEAR_QUANTITIES
+        for index in range(1, _transgear_drawn_count(stem) + 1)
         if stem != "pd-transgear-removable"
     } | {"pd-transgear-removable-1"}
     assert drawing.TRANSGEAR_INSTANCES == expected
@@ -1056,7 +1063,7 @@ def test_each_transgear_family_balloons_once_on_the_view_that_shows_it() -> None
     assert drawing.TRANSGEAR_EXPLODED_INSTANCES == {
         f"{stem}-{index}"
         for stem in exploded_stems - {"pd-transgear-removable"}
-        for index in range(1, CONTRACT_TRANSGEAR_QUANTITIES[stem] + 1)
+        for index in range(1, _transgear_drawn_count(stem) + 1)
     } | {explode.KNOB_WHEEL_INSTANCE}
     assert drawing.TRANSGEAR_EXPLODED_INSTANCES <= drawing.TRANSGEAR_INSTANCES
     # The pivot stack is SECTION A-A's; the latch hook stays on the bar.
@@ -1611,16 +1618,32 @@ def test_the_cluster_is_shimmed_to_view_e_after_it_is_hung() -> None:
     assert drawing._N["pd-transgear-rear-bushing"] in shimmed
     assert drawing.CLUSTER_FLOAT_VIEW_NAME in shimmed and "FEELER" in shimmed
     assert f"{cluster_fit.END_FLOAT_MIN:.2f}" not in shimmed
-    # Codjiflo (#2124): the BOM's QTY is the model's nominal pack; the step
-    # gives the fit-up's count range and the row supplies its worst case.
+    # Codjiflo and machinist review (#2124): the step gives the fit-up's
+    # count range, and the BOM's QTY is the whole kit, the stack's nominal
+    # shims plus the spares the model stores in the spare T18's bore.
     low_count, high_count = cluster_fit.SHIM_COUNT_RANGE
     assert f"{low_count} TO {high_count} " in " ".join(shimmed.split())
     assert high_count <= cluster_fit.SHIM_COUNT_MAX
     description = drawing.BOM_DESCRIPTIONS["pd-vn-transgear-cluster-shim"]
-    assert f"SUPPLY {cluster_fit.SHIM_COUNT_MAX}," in description
+    assert "SUPPLY" not in description
     assert drawing.TRANSGEAR_QUANTITIES["pd-vn-transgear-cluster-shim"] == (
-        cluster_fit.SHIM_COUNT_MODEL
+        cluster_fit.SHIM_COUNT_MAX
     )
+    assert len(assembly.CLUSTER_SHIM_Z0S) == cluster_fit.SHIM_COUNT_MODEL
+    spares = cluster_fit.SHIM_COUNT_MAX - cluster_fit.SHIM_COUNT_MODEL
+    assert len(assembly.SPARE_SHIM_Y0S) == len(drawing.SPARE_SHIM_INSTANCES) == spares
+    stacked = {
+        name
+        for name in drawing.TRANSGEAR_INSTANCES
+        if name.startswith("pd-vn-transgear-cluster-shim-")
+    }
+    assert len(stacked) == cluster_fit.SHIM_COUNT_MODEL
+    assert not stacked & drawing.SPARE_SHIM_INSTANCES
+    # In the spare's bore, clear of its wall.
+    import pd_transgear_removable_spec as removable
+    import pd_vn_transgear_cluster_shim_spec as shim
+
+    assert shim.OD < removable.BORE_DIA
     low = cluster_float.NOMINAL_MM
     high = low + cluster_float.TOLERANCE_MM[1]
     assert cluster_float.TOLERANCE_MM[0] == 0.0
@@ -2531,7 +2554,8 @@ def test_spare_is_hidden_edge_on_and_shown_on_the_ballooned_isometric(
     seat._native_outline_at.return_value = (
         lambda _scale: (cx - 0.001, cy - 0.001, cx + 0.001, cy + 0.001)
     )
-    names = (drawing.SPARE_INSTANCE, "pd-transgear-removable-1", "pd-platen-rack-1")
+    hidden = {drawing.SPARE_INSTANCE, *drawing.SPARE_SHIM_INSTANCES}
+    names = (*sorted(hidden), "pd-transgear-removable-1", "pd-platen-rack-1")
     views: dict[str, tuple[object, list[_DrawnInstance]]] = {}
 
     def place_view(_adapter, _path, orientation, _x, _y, *, scale):
@@ -2546,7 +2570,7 @@ def test_spare_is_hidden_edge_on_and_shown_on_the_ballooned_isometric(
     assert set(views) == {"*Front", "*Right", "*Isometric"}
     for orientation in ("*Front", "*Right"):
         shown = {drawn.instance: drawn.Visible for drawn in views[orientation][1]}
-        assert shown == {name: name != drawing.SPARE_INSTANCE for name in names}
+        assert shown == {name: name not in hidden for name in names}
     # The returned isometric is the ballooned one, its instances untouched.
     assert iso is views["*Isometric"][0]
     assert all(drawn.Visible is None for drawn in views["*Isometric"][1])

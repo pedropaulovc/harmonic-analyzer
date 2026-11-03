@@ -930,11 +930,11 @@ BOM_DESCRIPTIONS = {
     "pd-vn-transgear-retaining-ring": (
         f"RETAINING RING, MCMASTER {_SKU['pd-vn-transgear-retaining-ring']}"
     ),
-    # QTY is the model's nominal count; the fit-up takes 0 to SHIM_COUNT_MAX
-    # (VIEW E), so the row supplies the worst case (Codjiflo, #2124).
+    # QTY counts the kit: the stack's nominal shims plus the spares stored in
+    # the spare T18's bore, so the fit-up's 0 to SHIM_COUNT_MAX (VIEW E) is
+    # supplied (Codjiflo and machinist review, #2124).
     "pd-vn-transgear-cluster-shim": (
-        f"SHIM, SUPPLY {cluster_fit.SHIM_COUNT_MAX}, "
-        f"MCMASTER {_SKU['pd-vn-transgear-cluster-shim']}"
+        f"SHIM, MCMASTER {_SKU['pd-vn-transgear-cluster-shim']}"
     ),
     "pd-rack-pinion": (
         f"REDUCER DISC, STOCK {disc.TEETH}T {disc.DIAMETRAL_PITCH:g}DP "
@@ -990,8 +990,9 @@ TRANSGEAR_QUANTITIES = {
     "pd-transgear-disc-hub": 1,
     "pd-transgear-front-bushing": 1,
     "pd-vn-transgear-retaining-ring": 1,
-    # The model's nominal count; the fit-up sets the real one (VIEW E).
-    "pd-vn-transgear-cluster-shim": cluster_fit.SHIM_COUNT_MODEL,
+    # The kit: the stack's nominal count plus the spares (VIEW E sets the
+    # fitted count).
+    "pd-vn-transgear-cluster-shim": cluster_fit.SHIM_COUNT_MAX,
     "pd-rack-pinion": 1,
     "pd-vn-transgear-disc-screw": hub_geometry.SCREW_COUNT,
     "pd-transgear-knob-shaft": 1,
@@ -1031,10 +1032,19 @@ BOM_CHAIN_ORDER_NOTE = (
 BOM_SHEET_CAPTION = f"{BOM_REFERENCE_CAPTION}\n{BOM_CHAIN_ORDER_NOTE}"
 if not set(TRANSGEAR_QUANTITIES) <= set(BOM_PART_NUMBERS):
     raise AssertionError("every transgear family is a BOM row")
+# The transgear views draw the mounted knob wheel and the stacked shims; the
+# crank wheel, the spare T18 and the spare shims in its bore are sheet 1's.
 TRANSGEAR_INSTANCES = frozenset(
     f"{stem}-{index}"
     for stem, count in TRANSGEAR_QUANTITIES.items()
-    for index in range(1, (1 if stem == "pd-transgear-removable" else count) + 1)
+    for index in range(
+        1,
+        {
+            "pd-transgear-removable": 1,
+            "pd-vn-transgear-cluster-shim": cluster_fit.SHIM_COUNT_MODEL,
+        }.get(stem, count)
+        + 1,
+    )
 )
 # Sheet 2's isometric cannot reach these families' ink. Farm run
 # 20261001T051043622Z found none for the feed sleeve: its extreme-point picks
@@ -1298,6 +1308,11 @@ def _uncross_ring(
 # and the spare T18 on the base deck (the third removable inserted), whose
 # item sheet 2 balloons on the mounted knob wheel.
 SPARE_INSTANCE = "pd-transgear-removable-3"
+# The spare shims, inserted after the stack's, in the spare T18's bore.
+SPARE_SHIM_INSTANCES = frozenset(
+    f"pd-vn-transgear-cluster-shim-{index}"
+    for index in range(cluster_fit.SHIM_COUNT_MODEL + 1, cluster_fit.SHIM_COUNT_MAX + 1)
+)
 # The chain's loop stations count from the knob wheel (the builder's
 # _chain_station_point); station s is the link @<role>:s // 2 + 1, inner links
 # on even stations, and the connecting link closes the loop at the last. The
@@ -1979,7 +1994,9 @@ ASSEMBLED_CAPTIONS = {
                 textwrap.wrap(
                     f"ISOMETRIC {_scale_text(scale)}: THE "
                     f"{_N['pd-transgear-removable']} ON THE BASE DECK IS THE T18 "
-                    f"SPARE, STORED LOOSE; THE {sprocket.KNOB_CONFIG} IS ON THE KNOB, "
+                    f"SPARE, STORED LOOSE WITH THE SPARE "
+                    f"{_N['pd-vn-transgear-cluster-shim']} SHIMS IN ITS BORE; "
+                    f"THE {sprocket.KNOB_CONFIG} IS ON THE KNOB, "
                     f"THE {sprocket.CRANK_CONFIG} ON THE "
                     "CRANK. PLATEN AND SUPPORT ITEMS: SHEET "
                     f"{SHEET_NAMES.index('PLATEN AND SUPPORT') + 1}; TRANSGEAR "
@@ -2724,7 +2741,7 @@ def _place_assembled_sheet(adapter: Any) -> Any:
             # front and right views as a bare unlabelled bar; the isometric
             # shows and balloons it (eye pass of PD run 11).
             _hide_instances(
-                adapter, view, frozenset({SPARE_INSTANCE}),
+                adapter, view, frozenset({SPARE_INSTANCE, *SPARE_SHIM_INSTANCES}),
                 label=f"paper drive {orientation} spare",
             )
     label = "sheet 1 isometric"

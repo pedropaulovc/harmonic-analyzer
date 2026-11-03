@@ -53,7 +53,8 @@ real receiving and loaded-inspection data remain separately required.
 * The ANSI #25 roller chain loops both removables (native connected-linkage
   chain component pattern); the 2.8 sprocket plate fits BETWEEN the chain's
   inner plates, so only the roller<->tooth seating is intended contact.
-* Spare transgear-removable (T18 chain wheel) stored loose on the base top.
+* Spare transgear-removable (T18 chain wheel) stored loose on the base top,
+  the fit-up's spare MHA-PD-VN-68 shims stacked on the deck in its bore.
 
 Cross-subassembly fits (checked at the top level): the column-clamp arcs ride
 the O25.4 columns (fr-frame.SLDASM); the roller chain spans this sub's knob shaft
@@ -1030,6 +1031,15 @@ assert math.isclose(
 # and at X=160 the tip envelope (to X=180) straddled its 3.0 step; from 140 it
 # spans X 120..160, flat on the deck and west of the rocker-support foot.
 SPARE_GEAR_POS = (140.0, BASE_DECK_Y, -75.1)
+# The fit-up takes 0 to SHIM_COUNT_MAX shims and the model stacks
+# SHIM_COUNT_MODEL (VIEW E), so the kit's balance is stored with the spare
+# T18: flat on the deck inside its bore (Ø.406 round a Ø.250 shim), axis +Y,
+# each shim's y 0..T up from the one below. The BOM's QTY counts every shim
+# the kit carries (machinist review and Codjiflo, #2124).
+SPARE_SHIM_Y0S = tuple(
+    BASE_DECK_Y + i * CLUSTER_SHIM.THICKNESS
+    for i in range(CLUSTER.SHIM_COUNT_MAX - CLUSTER.SHIM_COUNT_MODEL)
+)
 
 # --- fasteners ----------------------------------------------------------------
 # Platen-clip screws (pd-vn-platen-clip-screw): heads on the clips' flat sheet,
@@ -3823,6 +3833,16 @@ async def build(adapter) -> dict[str, str]:
         configuration="T18",
         label="transgear-removable (spare T18)",
     )
+    # The kit's spare shims, in the spare T18's bore on the deck.
+    for shim_y0 in SPARE_SHIM_Y0S:
+        await place_component(
+            adapter,
+            "pd-vn-transgear-cluster-shim",
+            [SPARE_GEAR_POS[0], shim_y0, SPARE_GEAR_POS[2]],
+            [0.0, 0.0, 0.0],
+            IDENTITY,
+            label="transgear-cluster-shim (spare, in the spare T18's bore)",
+        )
 
     # Certify the AS-BUILT model. ONE freed operational DOF: the crank spin
     # (its drive spec recorded above, never authored), which drives the

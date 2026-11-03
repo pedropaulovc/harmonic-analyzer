@@ -157,7 +157,8 @@ DIMENSION_CALLOUTS = {
     "CutLength": (
         "SHOULDER END TO FACED TIP\n"
         f"TIP {TIP_RECESS[0] / 25.4:.3f}-{TIP_RECESS[1] / 25.4:.3f}".replace("0.", ".")
-        + " BELOW MHA-PD-07\nFRONT FACE AS FITTED"
+        + " BELOW SUPPORT BAR\n"
+        f"{_config.parts('pd-support-bar')['number']} FRONT FACE AS FITTED"
     ),
     # The native ChamferAngle prints its own 45 degrees.
     "ChamferWidth": "CUT-END CHAMFER\nPAST THE THREAD ROOT",
