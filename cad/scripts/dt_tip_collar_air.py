@@ -87,7 +87,6 @@ from dt_cone_swing_platform_checks import manufactured_p1_stop_enclosure
 Vector = tuple[float, float, float]
 
 
-
 @dataclass(frozen=True)
 class CollarTier:
     name: str
