@@ -16,3 +16,8 @@ dt-cone-pivot-post:
       where: "the crank-bore diametral angularity frame to the cone-journal bore (datum A, clocked by the foot seat datum B, plan angle basic)"
       finding: "angularity frame over-specified (rule 5)"
       reason: "the fixed-centre 16T:64T crossed mesh loses running clearance to yaw and tilt of the crank axis; the mesh must never bind (owner-ruled)"
+    - id: "RV-02"
+      kind: "accept"
+      where: "the mounting counterbores' native Hole Wizard callout only: its hw-thruholedia and hw-cbdia callout variables' decimal places, written as 3 from dt_cone_pivot_post_spec.MOUNT_HOLE_CALLOUT_PLACES, and hw-cbdepth written as 2 from dt_cone_pivot_post_spec.MOUNT_CBORE_DEPTH_PLACES, at drawing time by draw_dt_cone_pivot_post.build (ICalloutLengthVariable.Precision)"
+      finding: "a drawing script writes Hole Wizard callout places at render time instead of importing part-authored places (drawing-simplicity-policy.md model ownership, rules 3 and 4)"
+      reason: "Delegated ruling 2026-11-02 (Main), following owner precedent: drawing-side ICalloutLengthVariable precision is the established merged pattern (22 call sites on main, e.g. draw_ch_rocker_arm_tl_oblique_base_bar.py:876). Native experiment run 20261102T230110877Z: part-authored HW diameter precision 4 did not reach the callout (read -1). Owner review #2144. This accepts no other precision, band, callout or package departure."

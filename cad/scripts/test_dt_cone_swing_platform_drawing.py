@@ -2871,7 +2871,7 @@ def test_pivot_callout_precision_write_is_the_declared_exception():
         "Delegated ruling 2026-11-02 (Main), following owner precedent"
     )
     assert "#2144" in entry.reason
-    places = _tolerance_places(*part.PIVOT_HOLE_BAND, display_unit="mm")
+    places = _tolerance_places(*part.PIVOT_HOLE_BAND, display_unit=drawing.UNIT)
     assert (
         f"hw-diam callout variable's tolerance places, written as {places} "
         in entry.where
@@ -2881,3 +2881,27 @@ def test_pivot_callout_precision_write_is_the_declared_exception():
     assert (
         "RV-01" in emitter.__doc__ and "dt-cone-swing-platform.yaml" in emitter.__doc__
     )
+
+
+def test_drawing_side_callout_precision_is_the_declared_exception() -> None:
+    # Codjiflo on #2106: a part-authored precision does not reach a Hole
+    # Wizard callout (run 20261102T230110877Z), so this sheet writes its
+    # callout places at drawing time, the declared exception RV-03.
+    from machinist_exceptions import load_exceptions
+
+    entry = {
+        e.id: e
+        for e in load_exceptions(_config.CONFIG_DIR, "dt_cone_swing_platform", "part")
+    }["RV-03"]
+    assert entry.kind == "accept"
+    assert entry.reason.startswith(
+        "Delegated ruling 2026-11-02 (Main), following owner precedent"
+    )
+    assert "#2144" in entry.reason and "20261102T230110877Z" in entry.reason
+    assert "draw_dt_cone_swing_platform.build" in entry.where
+    written = {
+        **drawing.HOLDDOWN_CALLOUT_PRECISION,
+        **drawing.POST_MOUNT_CALLOUT_PRECISION,
+    }
+    assert set(written.values()) == {3} and "written as 3" in entry.where
+    assert all(name in entry.where for name in written)

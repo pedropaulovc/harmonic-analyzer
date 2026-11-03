@@ -1268,7 +1268,11 @@ def _print_pivot_band_exactly(display: Any) -> None:
     raise RuntimeError("pivot reamed bore: callout has no <hw-diam> variable")
 
 
-# Hole Wizard callouts print three inch places (#290).
+# Hole Wizard callouts print three inch places (#290). Both maps are written
+# at render time, the declared exception RV-03 in
+# cad/config/parts/dt-cone-swing-platform.yaml (delegated ruling 2026-11-02,
+# owner review #2144): a part-authored precision does not reach the callout
+# (run 20261102T230110877Z).
 HOLDDOWN_CALLOUT_PRECISION = {"hw-thruholedia": 3, "hw-cbdia": 3, "hw-cbdepth": 3}
 # The through taps' drill prints .201, not .20 (rule 3; machinist review of
 # run 20261101T085308503Z).

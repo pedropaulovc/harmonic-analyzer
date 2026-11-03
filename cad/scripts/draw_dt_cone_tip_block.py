@@ -1750,6 +1750,10 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=_adjuster_callout_xy(adjuster_center),
         label="through adjuster thread",
     )
+    # These four render-time precision writes are the declared exception
+    # RV-01 in cad/config/parts/dt-cone-tip-block.yaml (delegated ruling
+    # 2026-11-02, owner review #2144): a part-authored precision does not
+    # reach the callout (run 20261102T230110877Z).
     set_hole_callout_precision(
         adjuster_callout, THRU_TAP_DRILL_PRECISION, label="through adjuster thread"
     )
