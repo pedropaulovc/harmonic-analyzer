@@ -1242,11 +1242,12 @@ def _print_pivot_band_exactly(display: Any) -> None:
     "+0.01/0.00" (machinist review, #290 batch 0).  ``SetPrecision3`` cannot
     set a hole callout's tolerance places; ``ICalloutLengthVariable`` can.
 
-    This is the one render-time precision write the policy's model ownership
-    cannot replace: a hole callout does not inherit the part's places.  With
-    the Hole Wizard diameter's tolerance precision authored as 4 on the part
-    (read back 4), the callout's ``<hw-diam>`` still reported -1, the
-    document default (farm run 20261102T230110877Z, Codjiflo P2 on #2095).
+    This render-time precision write is the declared exception RV-01 in
+    ``cad/config/parts/dt-cone-swing-platform.yaml`` (delegated ruling
+    2026-11-02, owner review #2144): a hole callout does not inherit the
+    part's places.  With the Hole Wizard diameter's tolerance precision
+    authored as 4 on the part (read back 4), the callout's ``<hw-diam>``
+    still reported -1, the document default (farm run 20261102T230110877Z).
     The places come from the part's band, never a literal.
     """
     from win32com.client.dynamic import Dispatch as dynamic_dispatch  # noqa: PLC0415

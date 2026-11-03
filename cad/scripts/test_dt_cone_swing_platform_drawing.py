@@ -2821,3 +2821,32 @@ def test_virtual_sharp_preference_reads_sdk_metadata_with_real_adapter_constant_
     assert loads == [str(path)]
     assert writes == [(sdk_ordinal, 0, 3)]
     assert marks == list(range(4))
+
+
+def test_pivot_callout_precision_write_is_the_declared_exception():
+    from _paths import CAD_ROOT
+    from _drawing_tolerances import _tolerance_places
+    from machinist_exceptions import load_exceptions
+
+    declared = {
+        entry.id: entry
+        for entry in load_exceptions(
+            CAD_ROOT / "config", "dt_cone_swing_platform", "part"
+        )
+    }
+    entry = declared["RV-01"]
+    assert entry.kind == "accept"
+    assert entry.reason.startswith(
+        "Delegated ruling 2026-11-02 (Main), following owner precedent"
+    )
+    assert "#2144" in entry.reason
+    places = _tolerance_places(*part.PIVOT_HOLE_BAND, display_unit="mm")
+    assert (
+        f"hw-diam callout variable's tolerance places, written as {places} "
+        in entry.where
+    )
+    emitter = drawing._print_pivot_band_exactly
+    assert emitter.__name__ in entry.where
+    assert (
+        "RV-01" in emitter.__doc__ and "dt-cone-swing-platform.yaml" in emitter.__doc__
+    )

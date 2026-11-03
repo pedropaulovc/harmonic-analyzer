@@ -14,3 +14,9 @@ dt-cone-swing-platform:
   quantity: 1
   tolerance_class: machined_block
   process: "machined from supplied steel flat bar"
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "accept"
+      where: "the pivot reamed bore's native Hole Wizard callout only: its hw-diam callout variable's tolerance places, written as 4 at drawing time from PIVOT_HOLE_BAND by draw_dt_cone_swing_platform._print_pivot_band_exactly (ICalloutLengthVariable.TolerancePrecision)"
+      finding: "a drawing script writes a banded hole callout's tolerance precision at render time instead of importing part-authored places (drawing-simplicity-policy.md model ownership, rules 3 and 4)"
+      reason: "Delegated ruling 2026-11-02 (Main), following owner precedent: drawing-side ICalloutLengthVariable precision is the established merged pattern (33 uses on main, e.g. draw_ch_rocker_arm_tl_oblique_base_bar.py:876). Native experiment run 20261102T230110877Z: part-authored HW diameter precision 4 did not reach the callout (read -1). Owner review #2144. This accepts no other precision, band, callout or package departure."
