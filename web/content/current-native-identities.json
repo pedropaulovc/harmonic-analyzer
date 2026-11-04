@@ -1052,7 +1052,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "c95467fd1e392a2aef9b2eae26e187323f9777cdac56692113a67efd6d13fb8b",
+  "currentRegistryMapSha256": "e5f3e2da6695e2a446f1fc733412c139b353bacf76cb79d50c5f48a7a5e070eb",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",

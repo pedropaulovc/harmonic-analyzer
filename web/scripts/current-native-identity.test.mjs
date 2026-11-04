@@ -58,6 +58,8 @@ retiredTooling.push(...[
   ['block-screw', '43', '63', true],
   ['block-washer', '50', '70', true],
   ['pivot-pin', '23', '23', false],
+  // #2112: the shop-made TL-27 nut retires the bought Tr8 flange nut.
+  ['leadscrew-nut', '35', '55', true],
 ].map(([suffix, previousSequence, sequence, vendor, introduced]) => ({
   old_stem: `ch-rocker-arm-tl-${vendor && previousSequence === null ? 'vn-' : ''}oblique-${suffix}`,
   old_number: previousSequence === null ? null : `MHA-CH-006-TL-${previousSequence}`,

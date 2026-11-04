@@ -262,7 +262,7 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
         cad_map = json.loads((ROOT / "cad/config/current-identity-map.json").read_text(encoding="utf-8"))
         identity = CurrentNativeIdentity()
         retired = cad_map["retired_identities"]
-        self.assertEqual(len(retired), 32)
+        self.assertEqual(len(retired), 33)
         # #2119: the 3/16 pen-rod set screw gave way to the shared MHA-SH-VN-54;
         # #290: the arm's spot face took the MHA-PD-VN-67 pivot shim's room.
         machine = [row for row in retired if "-tl-" not in row["old_stem"]]
@@ -282,6 +282,8 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
             "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin": "MHA-CH-06-TL-VN-74",
             "ch-rocker-arm-tl-vn-oblique-pivot-cotter": "MHA-CH-06-TL-VN-75",
             "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire": "MHA-CH-06-TL-VN-76",
+            # #2112: the shop-made TL-27 nut retires the bought Tr8 flange nut.
+            "ch-rocker-arm-tl-vn-oblique-leadscrew-nut": "MHA-CH-06-TL-VN-55",
         }
         actual_oblique = {
             target["stem"]: target["number"]
