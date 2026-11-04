@@ -37,6 +37,7 @@ y = -length.  Mate the Top Plane to the head's seat, the TL-VN-71 pair's top.
 
 from __future__ import annotations
 
+import _config
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
 from _mcmaster_91251a583 import (
     DIMS,
@@ -46,7 +47,12 @@ from _mcmaster_91251a583 import (
     PART_NO,
     THREAD,
 )
+from _package_units import drawing_unit
 
+UNIT = drawing_unit(
+    "parts/ch-rocker-arm-tl-vn-oblique-lever-screw",
+    _config.parts("ch-rocker-arm-tl-vn-oblique-lever-screw"),
+)
 SKU = PART_NO
 ROW = fasteners.LEVER_TO_CARRIER
 QUANTITY = ROW.count
@@ -66,7 +72,7 @@ if abs(DIMS.major_dia - ROW.major_mm) > 1e-3:
 # Hidden nominal source references, not physical-edge/replica assertions.
 # The table's exact head Ø15/32 and height5/16 remain .46875/.3125 in
 # natively; only the engineering drawing's ink rounds them to .469/.313.
-# Length/head Ø/head height have three places, major Ø four; drive is 1/4.
+# Length/head Ø/head height/major Ø have three places; drive is 1/4.
 # Standard-only socket depth/length tolerances are not supplier references.
 SUPPLIER_PRODUCT_URL = "https://www.mcmaster.com/91251A583/"
 SUPPLIER_DRAWING_URL = (
@@ -84,7 +90,7 @@ SUPPLIER_REFERENCE_STARTS = {
     "SupplierLength": (DIMS.major_dia / 2.0, 0.0),
     "SupplierHeadDiameter": (-DIMS.head_dia / 2.0, 0.0),
     "SupplierHeadHeight": (DIMS.head_dia / 2.0, 0.0),
-    "SupplierThreadDiameter": (-DIMS.major_dia / 2.0, -DIMS.length / 2.0),
+    "SupplierThreadDiameter": (-DIMS.major_dia / 2.0, 0.0),  # on the bearing-face edge
     "SupplierDriveWidth": (-DIMS.socket_af / 2.0, 0.0),
 }
 SUPPLIER_REFERENCE_PLANES = {
@@ -102,6 +108,6 @@ SUPPLIER_REFERENCE_FORMATS = {
     "SupplierLength": (3, "length", None, None),
     "SupplierHeadDiameter": (3, "diameter", None, None),
     "SupplierHeadHeight": (3, "length", None, None),
-    "SupplierThreadDiameter": (4, "diameter", None, '5/16"-18'),
+    "SupplierThreadDiameter": (3, "diameter", None, '5/16"-18'),
     "SupplierDriveWidth": (0, "length", 4, None),
 }

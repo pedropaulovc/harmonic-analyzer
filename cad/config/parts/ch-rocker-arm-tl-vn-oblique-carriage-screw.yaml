@@ -7,9 +7,14 @@ ch-rocker-arm-tl-vn-oblique-carriage-screw:
   supplier_skus: ["91290A168"]
   material: Alloy Steel
   material_specification: "Alloy steel, black oxide, class 12.9, DIN 912 / ISO 4762, Rockwell C41; McMaster-Carr 91290A168"
-  finish: black oxide
+  finish: "black oxide as supplied; oil the cut end"
   # The fastener table's BLOCK_TO_CARRIAGE count (M4 X 20 SHCS).
   quantity: 8
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: purchased
+  # Each screw is cut to its own counterbore floor (owner ruling 2026-11-01);
+  # the fit-up lives in the jig assembly's step 5.
+  installation_notes: |
+    CUT EACH TO ITS OWN COUNTERBORE FLOOR PER MHA-CH-06-TL-00 STEP 5.
+  drawing_unit: mm

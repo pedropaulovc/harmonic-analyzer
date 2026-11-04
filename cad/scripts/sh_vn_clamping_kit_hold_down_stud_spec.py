@@ -81,7 +81,7 @@ THREAD_PITCH_MM = fasteners.HOLD_DOWN_STUD_PITCH_MM
 MAJOR_DIA = base_bar.HOLD_DOWN_STUD_DIA
 
 # Preserve the installed jig's member description under the shared purchase Number;
-# the cut length names its unit because the jig sheet is still millimetre.
+# the cut length names its unit, as the kit sheet prints it.
 BOM_DESCRIPTION = f"{THREAD} STUD, CUT {inch_text(LENGTH, LENGTH_PLACES)} IN"
 PROCESS = (
     "rework purchased PM 52PCCK-9/16-14mm 1/2-13 x 3 in stud stock: shorten only "

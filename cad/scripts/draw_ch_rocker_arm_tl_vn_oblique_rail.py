@@ -45,6 +45,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _purchased_fastener_drawing import (
     _box,
     _fit_number,
@@ -66,6 +67,8 @@ from ch_rocker_arm_tl_vn_oblique_rail_spec import (
     WIDTH,
 )
 
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_rail"]
 PART_STEM = SPEC.artifact_stem

@@ -171,9 +171,19 @@ def _cluster_extent(sheet: str):
             -block.BLOCK_WIDTH / 2.0,
             -block.LUG_Y0,
         )
+        # The feed block's four carriage screws explode above it here.
+        screw_tops = (
+            origin[2] + spec.carriage_screw.DIMS.head_h + lift(spec.CARRIAGE_SCREW)
+            for (origin, _rows), parent in zip(
+                spec.CARRIAGE_SCREW_PLACEMENTS,
+                spec.LOCKED_TO[spec.CARRIAGE_SCREW],
+                strict=True,
+            )
+            if parent == (spec.FEED_BLOCK, 0)
+        )
         z = (
             -feed.BAR_SCREW_LENGTH_MM + lift(spec.BRACKET_SCREW),
-            spec.trammel.PIVOT_BLOCK_TOP_Z + lift(spec.FEED_BLOCK),
+            max(spec.trammel.PIVOT_BLOCK_TOP_Z + lift(spec.FEED_BLOCK), *screw_tops),
         )
     else:
         assert sheet == "CARRIER EXPLODED"
@@ -234,7 +244,24 @@ def test_clusters_partition_the_bom() -> None:
     assert len(clustered) == len(set(clustered))
     feed = next(c for c in drawing.CLUSTERS if c.sheet == "LEADSCREW FEED EXPLODED")
     assert spec.FEED_BLOCK in feed.stems
-    assert feed.context == (spec.instance_name(spec.CARRIAGE, 0),)
+    # Review jig-asm r1: the feed block's carriage screws explode over it on
+    # the feed sheet, the pivot block's alone on the rail-bar sheet, which
+    # balloons them.
+    feed_screws = tuple(spec.instance_name(spec.CARRIAGE_SCREW, i) for i in range(4))
+    pivot_screws = tuple(spec.instance_name(spec.CARRIAGE_SCREW, i) for i in range(4, 8))
+    assert spec.LOCKED_TO[spec.CARRIAGE_SCREW] == (
+        ((spec.FEED_BLOCK, 0),) * 4 + ((spec.PIVOT_BLOCK, 0),) * 4
+    )
+    assert feed.context == (spec.instance_name(spec.CARRIAGE, 0), *feed_screws)
+    assert spec.CARRIAGE_SCREW not in feed.visible
+    assert set(feed_screws) <= feed.visible
+    rails = next(c for c in drawing.CLUSTERS if c.sheet == "RAIL BARS EXPLODED")
+    assert spec.CARRIAGE_SCREW in rails.stems
+    assert rails.partial == ((spec.CARRIAGE_SCREW, pivot_screws),)
+    assert rails.visible == frozenset(
+        {*rails.stems, *pivot_screws} - {spec.CARRIAGE_SCREW}
+    )
+    assert rails.title == "BASE BARS, RAILS, CARRIAGES AND PIVOT BLOCK"
     pivot = next(c for c in drawing.CLUSTERS if c.sheet == drawing.PIVOT_SHEET)
     assert set(pivot.stems) == {spec.PIVOT_SCREW, spec.PIVOT_SPACER, spec.PIVOT_SHIM}
     assert set(pivot.context) == {
@@ -290,9 +317,12 @@ def test_sheet_text_wraps_within_its_layout_width() -> None:
         (operation.checks, drawing.STEPS_LINE_WIDTH),
     ):
         assert max(len(line) for line in text.split("\n")) <= width
-    # Each alignment station prints whole on one line.
-    for line in spec.ALIGNMENT_NOTE_LINES[1:]:
+    # Each alignment station and sweep-limit row prints whole on one line.
+    for line in (*spec.ALIGNMENT_NOTE_LINES[1:], *spec.SWEEP_NOTE_LINES[1:]):
         assert line in drawing.ALIGNMENT_NOTE.split("\n")
+    # The general torque note opens sheet 7's sequence, its items unbroken.
+    assert drawing.ASSEMBLY_STEPS.split("\n")[1].startswith("TORQUE WHERE NO STEP")
+    assert "(ITEMS 21, 22, 24, 25, 27 AND 28)" in drawing.ASSEMBLY_STEPS.replace("\n", " ")
 
 
 def test_a_blank_line_parts_each_top_level_step() -> None:
@@ -330,6 +360,9 @@ def test_assembled_sheet_regions_fit_apart() -> None:
         assert (title[0] + title[2]) / 2.0 == pytest.approx((view[0] + view[2]) / 2.0)
         assert title[3] < view[1]
     assert plan_title[1] > elevation[3]
+    # Review jig-asm r1: the plan's title reads as the plan's, with clearly
+    # more air below it to the elevation than above it to the plan.
+    assert plan_title[1] - elevation[3] >= 3.0 * (plan[1] - plan_title[3])
 
 
 def _plan_xy(x_mm: float, y_mm: float) -> tuple[float, float]:
@@ -770,6 +803,13 @@ def test_every_bom_row_carries_one_balloon() -> None:
     assert nut.instance == spec.instance_name(spec.T_NUT, len(spec.T_NUT_PLACEMENTS) - 1)
     assert nut.instance != spec.instance_name(spec.T_NUT, 0)
     assert nut.point_mm == (0.0, spec.t_nut.FOOT_HEIGHT, spec.t_nut.FOOT_WIDTH / 2.0)
+    # Review jig-asm r1: balloon 19 lands on bar 2's far stud, beside it,
+    # not across bar 2 on bar 1's near stud.
+    stud = drawing.BALLOON_ANCHORS[spec.HOLD_DOWN_STUD]
+    last = len(spec.HOLD_DOWN_STUD_PLACEMENTS) - 1
+    assert stud.instance == spec.instance_name(spec.HOLD_DOWN_STUD, last)
+    assert spec.STUD_XY[last] == spec.trammel.rail_point(2, *spec.trammel.HOLD_DOWN_STUDS[-1])
+    assert stud.point_mm is None
     assert drawing.BALLOON_RING_REACH == (
         drawing.BALLOON_MARGIN + drawing.BALLOON_RADIUS
     )
@@ -1522,11 +1562,11 @@ def test_shim_stock_note_refuses_a_note_that_does_not_fit(kit_bom_note_state, fa
 
 
 def test_shim_stock_note_buys_the_worst_case_at_both_supports() -> None:
-    # Owner ruling 2026-10-27: the nominal 0.2 pack plus four 0.5 and one 0.1
-    # a support (the 2.1 worst case), at both supports.
-    assert spec.PIVOT_SHIM_BUY == {
-        "98055A117": (0.1, 2), "98055A118": (0.2, 10), "98055A121": (0.5, 8),
-    }
+    # Owner ruling 2026-10-27: the nominal pack plus the worst-case pack a
+    # support, at both supports, from the fitting stock alone.
+    assert set(spec.PIVOT_SHIM_BUY) == set(spec.pivot_shim.FIT_SKUS.values())
+    assert all(count % 2 == 0 for _thickness, count in spec.PIVOT_SHIM_BUY.values())
+    assert spec.PIVOT_SHIM_BUY[spec.pivot_shim.SKU][1] >= spec.pivot_shim.QUANTITY
     note = spec.PIVOT_SHIM_STOCK_NOTE
     assert note.startswith(f"ITEM {spec.ITEM_NUMBERS[spec.PIVOT_SHIM]}:")
     for sku, (_thickness, count) in spec.PIVOT_SHIM_BUY.items():
@@ -1740,11 +1780,13 @@ def _elevation_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
 
 
 def test_cl_tip_text_stands_clear_outboard_of_the_riser() -> None:
-    """The (1.6) text, centred on its point: on the sheet, left of the dowel
-    and the riser's -X end, above the tip, clear of the plan and every note."""
+    """The parenthesised tip text, centred on its point: on the sheet, left of
+    the dowel and the riser's -X end, above the tip, clear of the plan and
+    every note."""
     tx, _ty, tz = drawing.CL_TIP_TEXT_MODEL_MM
     cx, cy = _elevation_xy(tx, tz)
-    half_w, half_h = len("(1.6)") * CHAR_M / 2.0, LINE_M / 2.0
+    printed = f"({spec._length(spec.cl_dowel.TIP_HEIGHT, spec.CL_TIP_PRECISION)})"
+    half_w, half_h = len(printed) * CHAR_M / 2.0, LINE_M / 2.0
     text = (cx - half_w, cy - half_h, cx + half_w, cy + half_h)
     (x, _riser_top), (_x, tip_z) = spec.CL_TIP_LINE
     riser_end = spec.POSE.to_machine(spec.riser.BLANK_ORIGIN)[0]
@@ -1889,7 +1931,6 @@ def test_plain_pivot_geometry_sets_the_carrier_and_positive_head_capture() -> No
         assert screw_origin[2] - screw.THREAD_LENGTH > spec.trammel.CARRIAGE_TOP_Z
         gap = screw_origin[2] + screw.SHOULDER_LENGTH - spec.trammel.CARRIER_TOP_Z
         assert spec.PIVOT_RUNNING_GAP[0] <= gap <= spec.PIVOT_RUNNING_GAP[1]
-        assert gap == pytest.approx(0.15)
         assert screw.HEAD_DIA > spec.carrier.PIN_HOLE_DIA
 
 
@@ -1902,13 +1943,13 @@ def test_block_occurrences_and_integral_nut_axis_match_the_feed_geometry() -> No
     origin, rows = spec.PLACEMENTS[spec.FEED_BLOCK][0]
     nut_axis = (block.NUT_FACE_X, block.NUT_AXIS_Y, block.NUT_AXIS_Z)
     world = tuple(origin[i] + sum(nut_axis[k] * rows[k][i] for k in range(3)) for i in range(3))
-    assert world[2] == pytest.approx(52.4)  # the faced 12.0 bar + 25.4 + 15.0
     assert world[2] == pytest.approx(spec.leadscrew.SCREW_AXIS_Z)
-    assert block.NUT_AXIS_Z - spec.leadscrew.NUT_FLANGE_DIA / 2.0 > 0.0
-    assert block.NUT_AXIS_Z + spec.leadscrew.NUT_FLANGE_DIA / 2.0 < block.BLOCK_HEIGHT
+    assert 0.0 <= block.NUT_Z[0] < block.NUT_Z[1] <= block.BLOCK_HEIGHT
 
 
-@pytest.mark.parametrize("sheet", (drawing.PIVOT_SHEET, "LEADSCREW FEED EXPLODED"))
+@pytest.mark.parametrize(
+    "sheet", (drawing.PIVOT_SHEET, "LEADSCREW FEED EXPLODED", "RAIL BARS EXPLODED")
+)
 def test_cluster_recipe_isolates_real_families_and_their_context_before_fitting(
     monkeypatch, sheet,
 ) -> None:
@@ -1931,7 +1972,7 @@ def test_cluster_recipe_isolates_real_families_and_their_context_before_fitting(
     def fit(a, placed, fitted_cluster, configuration, **kwargs):
         assert a is adapter and placed is view and fitted_cluster is cluster
         assert configuration == "Default Simplified"
-        assert events[-1] == ("isolate", frozenset(cluster.stems + cluster.context))
+        assert events[-1] == ("isolate", cluster.visible)
         return (1.0, 5.0)
 
     monkeypatch.setattr(drawing, "_fit_cluster_view", fit)

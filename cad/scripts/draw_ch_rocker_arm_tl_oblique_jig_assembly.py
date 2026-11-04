@@ -119,14 +119,37 @@ class Cluster:
     # Instances shown for what the families mate to, ballooned on their own
     # family's sheet, not here.
     context: tuple[str, ...] = ()
+    # A family this sheet shows only some instances of, (family, instances);
+    # it is still ballooned here, on one of those.
+    partial: tuple[tuple[str, tuple[str, ...]], ...] = ()
+
+    @property
+    def visible(self) -> frozenset[str]:
+        """The families and instances the view shows."""
+        partial = dict(self.partial)
+        shown = [stem for stem in self.stems if stem not in partial]
+        shown += [name for names in partial.values() for name in names]
+        return frozenset((*shown, *self.context))
+
+
+def _carriage_screws(block: str) -> tuple[str, ...]:
+    """The carriage screws that fasten ``block`` to its carriage."""
+    return tuple(
+        spec.instance_name(spec.CARRIAGE_SCREW, index)
+        for index, parent in enumerate(spec.LOCKED_TO[spec.CARRIAGE_SCREW])
+        if parent == (block, 0)
+    )
 
 
 # Each family belongs to exactly one ballooned cluster. Context occurrences
 # show the actual mating blocks without duplicating their BOM balloons.
+# Review jig-asm r1: the feed block's four carriage screws float over an
+# empty carriage on sheet 3 (the block is on sheet 5), so they explode over
+# it on sheet 5; sheet 3 keeps, and balloons, the pivot block's four.
 CLUSTERS = (
     Cluster(
         "RAIL BARS EXPLODED",
-        "BASE BARS, RAILS, CARRIAGES AND PIVOT BLOCKS",
+        "BASE BARS, RAILS, CARRIAGES AND PIVOT BLOCK",
         (
             spec.BASE_BAR,
             spec.PIVOT_BLOCK,
@@ -139,6 +162,7 @@ CLUSTERS = (
             spec.CARRIAGE_SCREW,
         ),
         (1.0, 5.0),
+        partial=((spec.CARRIAGE_SCREW, _carriage_screws(spec.PIVOT_BLOCK)),),
     ),
     Cluster(
         PIVOT_SHEET,
@@ -161,16 +185,21 @@ CLUSTERS = (
             spec.END_BRACKET,
             spec.FEED_BLOCK,
             spec.LEADSCREW,
-            spec.LEADSCREW_NUT,
+            spec.FEED_NUT,
             spec.PILLOW_BLOCK,
             spec.HANDWHEEL,
             spec.BRACKET_SCREW,
             spec.PILLOW_BLOCK_SCREW,
             spec.NUT_SCREW,
+            spec.NUT_DOWEL,
         ),
         (1.0, 3.0),
-        # The integral lug moves with the feed block on rail 1.
-        context=(spec.instance_name(spec.CARRIAGE, 0),),
+        # The integral lug moves with the feed block on rail 1, fastened to
+        # its carriage by its four carriage screws.
+        context=(
+            spec.instance_name(spec.CARRIAGE, 0),
+            *_carriage_screws(spec.FEED_BLOCK),
+        ),
     ),
     Cluster(
         "CARRIER EXPLODED",
@@ -274,12 +303,15 @@ TITLE_BLOCK = (
 # vertical, right of the pose caption; the alignment targets under the
 # elevation, left of the title block. At 1:4 the plan is about 241 x 106 and
 # the elevation 241 x 31 (the handwheel and the screw heads included). Each
-# view's title stands centred under it.
+# view's title stands centred under it. Review jig-asm r1 (2026-11-02): the
+# plan's title sat as close to the elevation as to the plan, so the
+# elevation and the targets under it drop 12 mm into the open room above
+# the border.
 PLAN_CENTER = (0.274, 0.205)
-ELEVATION_CENTER = (0.274, 0.125)
+ELEVATION_CENTER = (0.274, 0.113)
 CAPTION_XY = (0.018, 0.255)
 CAPTION_WIDTH = 46  # characters; default-format note text, left of the plan
-ALIGNMENT_XY = (0.018, 0.105)
+ALIGNMENT_XY = (0.018, 0.093)
 ALIGNMENT_WIDTH = 68  # characters; stops left of the title block
 # Default-format note text: about 2.9 mm a character on the farm's templates.
 NOTE_CHAR_M = 0.0029
@@ -304,7 +336,7 @@ ELEVATION_LABEL_XY = _label_under(
 # The elevation's one dimension: the CL dowel's round tip above the riser top
 # (``spec.CL_TIP_LINE``), imported from the builder's hidden CL_TIP_FEATURE
 # and parenthesised as a reference; step 11 sets the tip against the actual
-# riser. Its 1.6 is 0.4 mm on the sheet at 1:4, too short to hold its text.
+# riser. Its short line is under 1 mm on the sheet at 1:4, too short to hold its text.
 # Offset the imported text independently of its dimension/witness lines:
 # 80 model mm left and 28 above the tip gives it a clear lane above the
 # left pivot, below the plan, rather than across the shoulder-screw geometry.
@@ -452,8 +484,8 @@ PART_ROWS = {
     "ch-rocker-arm-tl-vn-oblique-leadscrew": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-leadscrew"
     ),
-    "ch-rocker-arm-tl-vn-oblique-leadscrew-nut": _config.parts(
-        "ch-rocker-arm-tl-vn-oblique-leadscrew-nut"
+    "ch-rocker-arm-tl-oblique-feed-nut": _config.parts(
+        "ch-rocker-arm-tl-oblique-feed-nut"
     ),
     "ch-rocker-arm-tl-vn-oblique-pillow-block": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-pillow-block"
@@ -497,6 +529,9 @@ PART_ROWS = {
     "ch-rocker-arm-tl-vn-oblique-lever-washer": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-lever-washer"
     ),
+    "ch-rocker-arm-tl-vn-oblique-nut-dowel": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-nut-dowel"
+    ),
 }
 if set(PART_ROWS) != set(BOM_COMPONENTS):
     raise AssertionError("BOM registry rows must cover exactly the assembly families")
@@ -537,6 +572,14 @@ BALLOON_ANCHORS[spec.T_NUT] = BalloonAnchor(
     point_mm=(0.0, spec.t_nut.FOOT_HEIGHT, spec.t_nut.FOOT_WIDTH / 2.0),
     instance=spec.instance_name(spec.T_NUT, len(spec.T_NUT_PLACEMENTS) - 1),
 )
+# Review jig-asm r1: balloon 19 crossed rail 2's bar to reach bar 1's near
+# stud; it lands on rail 2's far stud, the one beside it (STUD_XY order:
+# bar 1 near and far, then bar 2).
+BALLOON_ANCHORS[spec.HOLD_DOWN_STUD] = BalloonAnchor(
+    instance=spec.instance_name(
+        spec.HOLD_DOWN_STUD, len(spec.HOLD_DOWN_STUD_PLACEMENTS) - 1
+    ),
+)
 
 EXPLODED_VIEW_NAMES = {
     ASSEMBLY_VIEW_CONFIGURATION: spec.EXPLODED_VIEW_NAME,
@@ -546,10 +589,11 @@ if spec.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
     raise AssertionError("the jig explode is authored in Default")
 
 
-# Glues an item citation ("ITEM 22") and a value with its unit ("3.5 N·m",
-# "25 IN·LBF") into one word while wrapping, so the fitter never reads "ITEM"
-# or a number at a line end and what it belongs to on the next.
-_UNBROKEN = re.compile(r"\bITEM (?=\d)|(?<=\d) (?=N·m|IN·LBF)")
+# Glues an item citation ("ITEM 22", "ITEMS 21") and a value with its unit
+# ("3.5 N·m", "25 IN·LBF", "2.0 MM") into one word while wrapping, so the
+# fitter never reads "ITEM" or a number at a line end and what it belongs to
+# on the next.
+_UNBROKEN = re.compile(r"\bITEMS? (?=\d)|(?<=\d) (?=N·m|IN·LBF|MM\b)")
 _GLUE = "\x00"
 # A step's label: its number, or a sub-step's ("7A").
 _STEP_LABEL = re.compile(r"\d+[A-Z]?")
@@ -605,7 +649,7 @@ def _wrapped(
 
 ASSEMBLED_CAPTION = _wrapped((spec.ASSEMBLED_CAPTION,), width=CAPTION_WIDTH)
 ALIGNMENT_NOTE = _wrapped(
-    (*spec.ALIGNMENT_NOTE_LINES, spec.SWEEP_NOTE_LINE), width=ALIGNMENT_WIDTH
+    (*spec.ALIGNMENT_NOTE_LINES, *spec.SWEEP_NOTE_LINES), width=ALIGNMENT_WIDTH
 )
 
 
@@ -683,7 +727,7 @@ def assembly_and_fit_layouts(
 
 
 STEPS_LAYOUT, FIT_LAYOUT = assembly_and_fit_layouts(
-    spec.ASSEMBLY_STEPS,
+    (spec.GENERAL_TORQUE_NOTE, *spec.ASSEMBLY_STEPS),
     spec.ASSEMBLY_CHECKS,
     (*spec.PIVOT_FIT_STEPS, "KP08 ALIGNMENT:", *spec.KP08_ALIGNMENT_STEPS),
 )
@@ -2300,7 +2344,7 @@ def _place_cluster_view(
     isolate_drawing_view_components(
         adapter,
         view,
-        visible_stems=frozenset(cluster.stems + cluster.context),
+        visible_stems=cluster.visible,
         label=label,
     )
     return view, _fit_cluster_view(adapter, view, cluster, configuration, label=label)
@@ -2393,7 +2437,7 @@ def _append_template_sheet(adapter: Any, target: Any, *, name: str) -> None:
     donor_title = ""
     try:
         donor, donor_sheet = new_project_drawing(
-            adapter, layout=SHEET_LAYOUTS[name], scale=SHEET_SCALES[name]
+            adapter, layout=SHEET_LAYOUTS[name], scale=SHEET_SCALES[name], unit=spec.UNIT
         )
         donor = _early_bound(donor, "IModelDoc2")
         donor_sheet = _early_bound(donor_sheet, "ISheet")
@@ -2445,6 +2489,7 @@ def _create_package_sheets(adapter: Any) -> None:
         adapter,
         layout=SHEET_LAYOUTS[SHEET_NAMES[0]],
         scale=SHEET_SCALES[SHEET_NAMES[0]],
+        unit=spec.UNIT,
     )
     target = _early_bound(target, "IModelDoc2")
     initial = _early_bound(initial, "ISheet")

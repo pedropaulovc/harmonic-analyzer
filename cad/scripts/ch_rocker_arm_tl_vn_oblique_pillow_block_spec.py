@@ -121,11 +121,41 @@ BORE_AREA = math.pi * (BORE_DIA / 2.0) ** 2
 HOLE_VOLUME = math.pi * (HOLE_DIA / 2.0) ** 2 * FOOT_THICK
 VOLUME_MM3 = WIDTH * (BASE_AREA + BOSS_UPPER_AREA - BORE_AREA) - 2.0 * HOLE_VOLUME
 
-# The bolt holes are the interface: check them against the end bracket's
-# tapped holes, named by drawing number.
+# The bolt holes are the interface: on receipt, the end bracket's screws must
+# pass both holes into its taps (the pass condition; machinist review), the
+# bracket named by drawing number.
 DRAWING_NOTES = (
-    "ENVELOPE MODEL: CHECK THE BOLT HOLES AGAINST MHA-CH-06-TL-28 ON RECEIPT."
+    f"ENVELOPE MODEL: {leadscrew.KP08_SCREW} SCREWS MUST PASS BOTH HOLES INTO"
+    " MHA-CH-06-TL-28 TAPS."
 )
+
+# Reference sizes on the plan view (the Front Plane, sketch (u, v) = model
+# (X, Y)): the listing's bolt-hole spacing and C4's bolt hole, the receipt
+# check's interface. The chords lie on the bolt holes' centreline (y = 0,
+# through both centre marks) and the -X hole's vertical centre-mark arm; laid
+# along the foot's edges they printed as dashed residue over the outline
+# (machinist review). The overall length would need a second chord on that
+# same centreline or an edge, so it stays in the listing (no clean carrier).
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("SupplierBoltSpacing", BOLT_SPACING, "horizontal"),
+    ("SupplierBoltHoleDiameter", HOLE_DIA, "vertical"),
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "SupplierBoltSpacing": (HOLE_X[0], 0.0),
+    "SupplierBoltHoleDiameter": (HOLE_X[0], -HOLE_DIA / 2.0),
+}
+SUPPLIER_REFERENCE_PLANES: dict[str, str] = {}
+SUPPLIER_REFERENCE_SIDES = {
+    "SupplierBoltSpacing": "top",
+    "SupplierBoltHoleDiameter": "left",
+}
+SUPPLIER_REFERENCE_FORMATS = {
+    "SupplierBoltSpacing": (0, "length", None, None),
+    "SupplierBoltHoleDiameter": (1, "diameter", None, "2X"),
+}
+SUPPLIER_REFERENCE_UNITS = {
+    name: "mm" for name, _, _ in SUPPLIER_REFERENCE_DIMENSIONS
+}
 
 # --- Import-time checks --------------------------------------------------------------
 if not BOSS_RADIUS < LENGTH / 2.0:

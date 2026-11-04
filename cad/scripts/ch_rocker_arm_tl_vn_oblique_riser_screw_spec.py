@@ -47,13 +47,19 @@ from __future__ import annotations
 
 import math
 
+import _config
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_riser_spec as riser
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 from _mcmaster_91771a112 import DIMS, LENGTH_TEXT, PART_NO, THREAD
+from _package_units import drawing_unit
 
+UNIT = drawing_unit(
+    "parts/ch-rocker-arm-tl-vn-oblique-riser-screw",
+    _config.parts("ch-rocker-arm-tl-vn-oblique-riser-screw"),
+)
 SKU = PART_NO
 ROW = fasteners.RISER_TO_CARRIER
 QUANTITY = ROW.count
@@ -82,34 +88,35 @@ if DIMS.head_dia > trammel.RISER_SCREW_HEAD_DIA:
 
 # --- Nominal seat (the model and the assembly) ------------------------------------
 # The catalogue head's 82 deg cone on the riser's 82 deg countersink: the flat
-# top sits where the countersink is Ø0.212 in, (6.3 - 5.3848) / (2 tan 41°)
-# = 0.526 below the riser top.  Nominal geometry only: the catalogue gives no
-# head-angle tolerance and none is assumed, so this is the modelled seat, not
-# a worst-case bound.  The fastener table's grip is the riser less this seat.
+# top (Ø.212 in) sits where the countersink narrows to it,
+# (riser.CSK_DIA - Ø.212) / (2 tan 41°) below the riser top.  Nominal geometry
+# only: the catalogue gives no head-angle tolerance and none is assumed, so this
+# is the modelled seat, not a worst-case bound.  The fastener table's grip is the
+# riser less this seat.
 HEAD_RECESS_NOMINAL = DIMS.seated_recess(riser.CSK_DIA, riser.CSK_ANGLE)
 # The assembly's placement datum: the Top Plane this far below the riser top.
 HEAD_TOP_BELOW_RISER_TOP = HEAD_RECESS_NOMINAL
 if abs(ROW.grip_mm - (riser.THICKNESS - HEAD_RECESS_NOMINAL)) > 1e-9:
     raise AssertionError(f"{ROW.joint}: the grip is not the head's nominal seat")
-TIP_BELOW_RISER_TOP_NOMINAL = HEAD_TOP_BELOW_RISER_TOP + DIMS.length  # 16.401
+TIP_BELOW_RISER_TOP_NOMINAL = HEAD_TOP_BELOW_RISER_TOP + DIMS.length
 # Nominal faced parts clear the bought tip: it stops inside the carrier.
 TIP_ABOVE_CARRIER_UNDERSIDE_NOMINAL = (
     riser.THICKNESS + carrier.THICKNESS - TIP_BELOW_RISER_TOP_NOMINAL
-)  # 1.599
+)
 if TIP_ABOVE_CARRIER_UNDERSIDE_NOMINAL <= 0.0:
     raise AssertionError(f"{SKU} stands out of the nominal carrier's underside")
 
 # --- Full-thread engagement, rule 18 (finished .X plate bands, #1619) -----------
 # Screw side: the shortest catalogue screw seated no deeper than flush (no
 # recess credit) in the thickest riser, less the carrier tap's mouth break
-# and the B18.6.3 2P maximum point: 15.113 - 6.8 - 0.25 - 1.27 = 6.793.
+# and the B18.6.3 2P maximum point.
 # Receiver side: the thinnest carrier's full thread (carrier.ENGAGEMENT_MM,
 # its own mouth and lead losses).  Engagement is the smaller of the two;
 # the screw's point and the receiver's losses are separate, not summed.
 LENGTH_MIN = DIMS.length - 0.03 * trammel.INCH
 POINT_CHAMFER_LENGTH_MAX = 2.0 * DIMS.pitch
 ENGAGEMENT_REQUIRED = 1.5 * ROW.major_mm
-RECEIVER_FULL_THREAD_MIN = carrier.ENGAGEMENT_MM[carrier.RISER_THREAD]  # 10.315
+RECEIVER_FULL_THREAD_MIN = carrier.ENGAGEMENT_MM[carrier.RISER_THREAD]
 SCREW_FULL_THREAD_REACH_MIN = (
     LENGTH_MIN
     - (riser.THICKNESS + riser.THICKNESS_BAND)
@@ -121,19 +128,20 @@ if ENGAGEMENT_MIN < ENGAGEMENT_REQUIRED:
     raise AssertionError(f"{SKU}: {ENGAGEMENT_MIN:.3f} full thread is under 1.5D")
 
 # --- Below the carrier: the factory tip is never trimmed ------------------------
-# The longest screw at the nominal seat in the thinnest plates reaches this
-# far past the carrier underside (+0.001; 1.599 short of it on nominal
-# plates). No tip is shortened. The checks below cover the pivot-block
-# footprints; they are not a whole-fixture clearance proof. The retention
-# caps sit above the block tops, and the assembly's complete material
-# envelopes and installed tooling acceptance remain authoritative.
+# The longest screw at the nominal seat in the thinnest plates may reach just
+# past the carrier underside; on nominal plates it stops short of it
+# (TIP_ABOVE_CARRIER_UNDERSIDE_NOMINAL). No tip is shortened. The checks below
+# cover the pivot-block footprints; they are not a whole-fixture clearance
+# proof. The retention caps sit above the block tops, and the assembly's
+# complete material envelopes and installed tooling acceptance remain
+# authoritative.
 STAND_OUT_MAX_NOMINAL_SEAT = (
     DIMS.length
     + HEAD_RECESS_NOMINAL
     - (riser.THICKNESS - riser.THICKNESS_BAND)
     - (carrier.THICKNESS - carrier.THICKNESS_BAND)
 )
-# A block's plan corner farthest from its bore (the pin axis): 55.714.
+# A block's plan corner farthest from its bore (the pin axis).
 PIVOT_BLOCK_PLAN_RADIUS = max(
     math.hypot(x - pivot_block.BORE_X, pivot_block.BLOCK_WIDTH / 2.0)
     for x in (pivot_block.BLOCK_X0, pivot_block.BLOCK_X1)
@@ -146,7 +154,7 @@ PIVOT_BLOCK_PLAN_CLEARANCE = (
     )
     - PIVOT_BLOCK_PLAN_RADIUS
     - DIMS.major_dia / 2.0
-)  # 54.469
+)
 if PIVOT_BLOCK_PLAN_CLEARANCE <= 0.0:
     raise AssertionError(f"{SKU}: a riser screw tip lies over a pivot block")
 if STAND_OUT_MAX_NOMINAL_SEAT >= trammel.CARRIER_TO_RAIL_GAP:
@@ -156,10 +164,13 @@ if STAND_OUT_MAX_NOMINAL_SEAT >= trammel.PIVOT_SUPPORT_HEIGHT:
 
 # Exact-current product table and engineering drawing read 2026-10-21.
 # Hidden nominal source references, not physical-edge/replica assertions.
-# Head height is the source's thread-top depth, not the ideal sharp cone's
-# junction depth. Length is OVERALL from head top Y=0 to the factory tip.
-# Source decimals have three places and the included angle whole degrees.
-# Phillips No. 1 is nonnumeric metadata; no recess size/depth is invented.
+# Only the sizes needed to buy a replacement: length (OVERALL, from head top
+# Y=0 to the factory tip), head diameter (the riser countersink's fit) and
+# thread. The 82 deg head angle and head height follow from the B18.6.3 flat
+# head in the callout; they are not authored, because the drawing view shows
+# every reference line it dimensions from, printed or not.
+# Source decimals have three places. Phillips No. 1 is nonnumeric metadata;
+# no recess size/depth is invented.
 SUPPLIER_PRODUCT_URL = "https://www.mcmaster.com/91771A112/"
 SUPPLIER_DRAWING_URL = (
     "https://www.mcmaster.com/mvC/Library/CAD2/20260324/D7F7176D/"
@@ -168,29 +179,22 @@ SUPPLIER_DRAWING_URL = (
 SUPPLIER_REFERENCE_DIMENSIONS = (
     ("SupplierLength", -DIMS.length, "vertical"),
     ("SupplierHeadDiameter", DIMS.head_dia, "horizontal"),
-    ("SupplierHeadHeight", -DIMS.thread_top_depth, "vertical"),
     ("SupplierThreadDiameter", DIMS.major_dia, "horizontal"),
-    ("SupplierHeadAngle", DIMS.head_angle_deg, "angle"),
 )
 SUPPLIER_REFERENCE_STARTS = {
     "SupplierLength": (DIMS.major_dia / 2.0, 0.0),
     "SupplierHeadDiameter": (-DIMS.head_dia / 2.0, 0.0),
-    "SupplierHeadHeight": (-DIMS.head_dia / 2.0, 0.0),
-    "SupplierThreadDiameter": (-DIMS.major_dia / 2.0, -DIMS.length / 2.0),
-    "SupplierHeadAngle": (0.0, -DIMS.thread_top_depth),
+    # On the head cone's edge with the major, not across the shank.
+    "SupplierThreadDiameter": (-DIMS.major_dia / 2.0, -DIMS.junction_depth),
 }
 SUPPLIER_REFERENCE_PLANES = {"SupplierHeadDiameter": "Top"}
 SUPPLIER_REFERENCE_SIDES = {
     "SupplierLength": "right",
     "SupplierHeadDiameter": "top",
-    "SupplierHeadHeight": "left",
     "SupplierThreadDiameter": "bottom",
-    "SupplierHeadAngle": "left",
 }
 SUPPLIER_REFERENCE_FORMATS = {
     "SupplierLength": (3, "length", None, None),
     "SupplierHeadDiameter": (3, "diameter", None, "PHILLIPS NO. 1"),
-    "SupplierHeadHeight": (3, "length", None, None),
-    "SupplierThreadDiameter": (3, "diameter", None, "4-40"),
-    "SupplierHeadAngle": (0, "angle", None, None),
+    "SupplierThreadDiameter": (3, "diameter", None, "#4-40"),
 }

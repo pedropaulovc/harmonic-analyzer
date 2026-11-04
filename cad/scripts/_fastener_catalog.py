@@ -370,8 +370,17 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     # fixture hardware modelled for native mates and interference).
     "ch-rocker-arm-tl-vn-oblique-cl-dowel": _stock(
         "ch-rocker-arm-tl-vn-oblique-cl-dowel",
-        "52100 Alloy Steel Dowel Pin, Ø6 x 20 mm",
-        "91595A452",
+        "Alloy Steel Dowel Pin, 1/4 x 1 in",
+        "98381A542",
+        material="Alloy Steel",
+    ),
+    # MHA-CH-06-TL-VN-81: the oblique trammel jig's feed nut dowel, keying the
+    # TL-27 nut to the TL-32 lug against rotation (shop fixture hardware
+    # modelled for native mates and interference).
+    "ch-rocker-arm-tl-vn-oblique-nut-dowel": _stock(
+        "ch-rocker-arm-tl-vn-oblique-nut-dowel",
+        "Alloy Steel Dowel Pin, 3/32 x 1/2 in",
+        "98381A438",
         material="Alloy Steel",
     ),
     # MHA-CH-06-TL-VN-61: the oblique trammel jig's #8-32 X 3/4 SHCS (the
@@ -410,16 +419,14 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "91251A150",
         material="Alloy Steel",
     ),
-    # MHA-CH-06-TL-VN-66: the oblique trammel jig's #4-40 X 1/2 BHCS (the
-    # fastener table's NUT_TO_FEED_BLOCK row), Olander 4C50BHCA; shop fixture
-    # hardware, modelled so the jig assembly can mate it and run native
-    # interference.
+    # MHA-CH-06-TL-VN-66: the oblique trammel jig's #4-40 X 3/4 FLANGED BHCS
+    # (the fastener table's NUT_TO_FEED_BLOCK row); shop fixture hardware,
+    # modelled so the jig assembly can mate it and run native interference.
     "ch-rocker-arm-tl-vn-oblique-nut-screw": _stock(
         "ch-rocker-arm-tl-vn-oblique-nut-screw",
-        "Alloy Steel Button Head Socket Cap Screw",
-        "4C50BHCA",
+        "Black-Oxide Flanged Button Head Hex-Drive Screw",
+        "91355A581",
         material="Alloy Steel",
-        supplier="Olander",
     ),
     # MHA-CH-06-TL-VN-67: the oblique trammel jig's #4-40 X 5/8 flat head (the
     # fastener table's RISER_TO_CARRIER row), installed as bought; shop
@@ -461,33 +468,36 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         material="AISI 304",  # native library stand-in; purchased grade is 316
     ),
     # AISI 304 below is a native-library surrogate for appearance/approximate
-    # mass only. Supplier authority for both purchases is 18-8 stainless,
-    # not a certified 304 grade; each YAML material_specification owns it.
+    # mass only. Supplier authority for the screw is 18-8 stainless, not a
+    # certified 304 grade; the YAML material_specification owns it.
     "ch-rocker-arm-tl-vn-oblique-pivot-screw": _stock(
         "ch-rocker-arm-tl-vn-oblique-pivot-screw",
-        "18-8 Stainless Steel Precision Shoulder Screw, 10 mm x 35 mm, M8 x 1.25",
-        "90323A492",
+        "18-8 Stainless Steel Precision Shoulder Screw, Extended Thread, 3/8 x 1-1/2 in, 5/16-18",
+        "BLTS40-0375-1500188P",
         material="AISI 304",
+        supplier="Huyett",
     ),
     "ch-rocker-arm-tl-vn-oblique-pivot-spacer": _stock(
         "ch-rocker-arm-tl-vn-oblique-pivot-spacer",
-        "18-8 Stainless Steel Round Spacer, 10 mm ID x 16 mm OD x 15 mm",
-        "92871A359",
-        material="AISI 304",
+        "6061 Aluminum Round Spacer, .382 ID x .625 OD x .625 in",
+        "AS62-18-40",
+        material="6061 Alloy",
+        supplier="AluminumSpacers.com",
     ),
-    # DIN 988 spring-steel shims: the library's plain carbon steel (default).
+    # Full-hard low-carbon steel shims: the library's plain carbon steel (default).
+    # The .004/.020 fitting stock is named on the sheet's FITTING STOCK line and
+    # bought by the jig's buy list, not as this part.
     "ch-rocker-arm-tl-vn-oblique-pivot-shim": _stock(
         "ch-rocker-arm-tl-vn-oblique-pivot-shim",
-        "DIN 988 Spring Steel Shim, 10 mm ID x 16 mm OD x 0.2 mm",
-        "98055A118",
-        "98055A117",
-        "98055A121",
+        "Steel Shim, 3/8 ID x 5/8 OD x .008 in",
+        "SHIM-0375-008",
+        supplier="Huyett",
     ),
     # Hardened tool-steel gauge pin: the library's Alloy Steel stand-in.
     "ch-rocker-arm-tl-vn-oblique-hub-pin": _stock(
         "ch-rocker-arm-tl-vn-oblique-hub-pin",
-        "Class Z Minus Gauge Pin, size 10.2000 mm, 2 in supply, cut to 20.0 mm",
-        "2281A11-6410N695",
+        "Class Z Plug Gauge, NO-GO, size .4000 in, 2 in supply, cut to .79 in",
+        "23065A855-23065A4",
         material="Alloy Steel",
     ),
 }

@@ -1,13 +1,12 @@
-r"""Purchased MHA-CH-06-TL-VN-66 oblique-trammel leadscrew nut screw: Olander 4C50BHCA.
+r"""Purchased MHA-CH-06-TL-VN-66 oblique-trammel feed nut screw: McMaster 91355A581.
 
-The ``#4-40 X 1/2 BHCS`` (``ch_rocker_arm_tl_vn_oblique_nut_screw_spec``) holds the Tr8 flanged leadscrew nut to the TL-32 integral feed-block lug, into a blind tap.
-The stock recipe ``diagnostics/diag_build_4C50BHCA.py`` builds the
-catalogue screw on the shared button-head recipe
-(``diag_mcmaster_button_head.build_button_head``) plus its nominal underhead
-fillet; the recipe's standalone run is catalog-only (no vendor model, no
+The ``#4-40 X 3/4 FLANGED BHCS`` (``ch_rocker_arm_tl_vn_oblique_nut_screw_spec``) holds the shop-made TL-27 feed nut to the TL-32 integral feed-block lug, tapped THRU.
+The stock recipe ``diagnostics/diag_build_91355A581.py`` builds the catalogue screw on
+the button head family recipe, flanged (``diag_mcmaster_button_head.build_button_head``);
+the recipe's standalone run is catalog-only (no committed vendor model, no
 replica gate).
 
-Frame: screw axis +Y, head up, the bearing face (head underside) at y = 0,
+Frame: screw axis +Y, head up, the bearing face (flange underside) at y = 0,
 the tip at y = -length.  The axis is published as ``ScrewAxis``
 (Front ∩ Right), the stock-part mate contract.
 
@@ -19,14 +18,14 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import sys
+from functools import partial
 
 from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
-from _supplier_screw_reference import add_supplier_reference_sketch
-from _simplified_part import save_simplified_part
+from _supplier_screw_save import save_supplier_reference_part
 from ch_rocker_arm_tl_vn_oblique_nut_screw_spec import SKU
-from diagnostics.diag_build_4C50BHCA import build_4C50BHCA
+from diagnostics.diag_build_91355A581 import build_91355A581
 import ch_rocker_arm_tl_vn_oblique_nut_screw_spec as supplier
 
 PART_NAME = "ch-rocker-arm-tl-vn-oblique-nut-screw"
@@ -34,24 +33,18 @@ SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 
 
-async def _save_supplier_part(adapter, part_name, suppressed_features) -> dict[str, str]:
-    await add_supplier_reference_sketch(
-        adapter,
-        supplier.SUPPLIER_REFERENCE_DIMENSIONS,
-        starts=supplier.SUPPLIER_REFERENCE_STARTS,
-        planes=supplier.SUPPLIER_REFERENCE_PLANES,
-    )
-    # Supplier sizes print as untoleranced REF; the catalogue governs.
-    return await save_simplified_part(adapter, part_name, suppressed_features)
-
-
 async def build(adapter) -> dict[str, str]:
     return await build_stock_fastener(
         adapter,
         part_name=PART_NAME,
-        components=(StockComponent(sku=SKU, author=build_4C50BHCA),),
+        components=(StockComponent(sku=SKU, author=build_91355A581),),
         material=MATERIAL,
-        save_threaded_part=_save_supplier_part,
+        save_threaded_part=partial(
+            save_supplier_reference_part,
+            dimensions=supplier.SUPPLIER_REFERENCE_DIMENSIONS,
+            starts=supplier.SUPPLIER_REFERENCE_STARTS,
+            planes=supplier.SUPPLIER_REFERENCE_PLANES,
+        ),
         screw_axis_planes=("Front Plane", "Right Plane"),
     )
 

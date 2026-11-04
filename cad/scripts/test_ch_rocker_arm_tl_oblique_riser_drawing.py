@@ -5,15 +5,26 @@ from __future__ import annotations
 import math
 import re
 
+import pytest
+
 import _config
 import build_ch_rocker_arm_tl_oblique_riser as part
+import ch_rocker_arm_tl_oblique_carrier_spec as carrier_spec
 import ch_rocker_arm_tl_oblique_riser_spec as spec
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
+import ch_rocker_arm_tl_vn_oblique_hub_pin_spec as hub_pin
 import draw_ch_rocker_arm_tl_oblique_riser as drawing
 import export_features
 from _drawing_contract import model_toleranced_dimensions
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 
 STEM = "ch_rocker_arm_tl_oblique_riser"
+INCH = 25.4
+
+
+def _on_inch_grid(value_mm: float, places: int) -> bool:
+    inches = value_mm / INCH
+    return abs(inches - round(inches, places)) < 1e-9
 
 
 def _features() -> dict:
@@ -70,20 +81,23 @@ def test_the_model_globals_are_the_spec_stations() -> None:
 
 
 def test_blank_and_holes_are_the_part_sheet() -> None:
-    assert (
-        (spec.BLANK_LENGTH, spec.BLANK_WIDTH, spec.THICKNESS)
-        == (
-            trammel.RISER_BLANK_LENGTH,
-            trammel.RISER_BLANK_WIDTH,
-            trammel.RISER_THICK,
-        )
-        == (340.0, 40.0, 6.0)
+    assert (spec.BLANK_LENGTH, spec.BLANK_WIDTH, spec.THICKNESS) == (
+        trammel.RISER_BLANK_LENGTH,
+        trammel.RISER_BLANK_WIDTH,
+        trammel.RISER_THICK,
     )
-    assert spec.HUB_DIA == 12.0 and spec.CLAMP_DIA == 6.6
+    for name, value in (
+        ("BlankLength", spec.BLANK_LENGTH),
+        ("BlankWidth", spec.BLANK_WIDTH),
+        ("BlankThick", spec.THICKNESS),
+        ("HubDia", spec.HUB_DIA),
+        ("ClampDia", spec.CLAMP_DIA),
+    ):
+        assert _on_inch_grid(value, spec.DRAWING_PRECISION_BY_NAME[name]), name
     assert spec.SCREW_SPEC.kind == "clearance" and spec.SCREW_SPEC.size == "#4"
     assert trammel.RISER_SCREW == "#4-40"
-    # The HUB clearance passes the HUB pin's Ø10.20 section.
-    assert spec.HUB_DIA > 10.20
+    # The HUB clearance passes the bonded HUB gauge pin.
+    assert spec.HUB_DIA > hub_pin.DIA + max(hub_pin.DIA_BAND)
 
 
 def test_blank_sizes_are_finished_native_dimensions_not_stock() -> None:
@@ -92,7 +106,11 @@ def test_blank_sizes_are_finished_native_dimensions_not_stock() -> None:
     assert dimensions <= marked
     assert not dimensions & spec.REFERENCE_DIMENSIONS
     assert not dimensions & set(spec.CALLOUTS_BELOW)
-    assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 1 for name in dimensions)
+    for name in dimensions:
+        assert spec.DRAWING_PRECISION_BY_NAME[name] in (
+            spec.BLANK_PLACES,
+            spec.THICKNESS_PLACES,
+        ), name
     assert not {
         (feature, name)
         for feature, name in model_toleranced_dimensions(part)
@@ -109,17 +127,15 @@ def test_flat_head_sinks_and_countersink_stays_in_the_blank() -> None:
 
 
 def test_the_screw_hole_has_one_callout_naming_its_countersink() -> None:
-    """Review r5: one callout, Ø3.26 at 2 places (the DRILLED HOLES row bands
-    it) with the countersink below it."""
-    assert spec.SCREW_DIA_PRINTED == 3.26 and spec.SCREW_DIA_PLACES == 2
+    """Review r5: one callout, the #30 drill printed exactly at its places
+    (the DRILLED HOLES row bands it), the countersink below it."""
+    assert _on_inch_grid(spec.SCREW_DIA_PRINTED, spec.SCREW_DIA_PLACES)
     assert spec.GLOBALS["ScrewDia"] == spec.SCREW_DIA_PRINTED
     lo, hi = _features()["screw_hole_1"]["dia"]
     assert lo <= spec.SCREW_DIA <= hi
     assert spec.CALLOUTS_ABOVE["ScrewDia"] == "4X"
-    assert spec.CALLOUTS_BELOW["ScrewDia"].split("\n")[:2] == [
-        "DRILL THRU",
-        "CSK<MOD-DIAM>6.30 X 82°",
-    ]
+    rows = spec.CALLOUTS_BELOW["ScrewDia"].split("\n")
+    assert rows[0] == "DRILL THRU" and rows[1] == spec.CSK_CALLOUT
     assert "CskDia" not in set().union(*spec.DRAWING_DIMENSIONS.values())
 
 
@@ -148,12 +164,41 @@ def test_hole_locations_are_reference_values_from_the_carrier() -> None:
             assert "station" not in feature and "width" not in feature, name
 
 
-def test_clamp_holes_pass_their_mates_and_hold_the_band_walls() -> None:
+def test_clamp_holes_pass_their_mates_and_state_the_band_wall_shortfall() -> None:
+    """Owner ruling 6 (2026-11-01): the CL/CR holes are spotted through
+    TL-21's, so the band walls take the carrier stations' error about the
+    cut's centre; the outer wall falls under the .080 target, over the .060
+    floor, and the CL/CR callout states it as plain fact (RV-01)."""
     lo, _hi = _features()["cl_hole"]["dia"]
-    assert lo > spec.CL_DOWEL_MAX == 6.012
-    assert lo > spec.CR_SCREW_MAJOR == 6.35
+    assert spec.CL_DOWEL_MAX == carrier_spec.CL_DOWEL_DIA + max(
+        carrier_spec.CL_DOWEL_BAND
+    )
+    assert lo > spec.CL_DOWEL_MAX
+    assert lo > spec.CR_SCREW_MAJOR
+    # The carrier's 3-place CL station (±.005 each way, X also half the D1
+    # band from A1 to the cut's centre), resolved along the radius to CL.
+    centre = trammel.ARC_CENTRE
+    radius = math.dist(trammel.CL, centre)
+    cos_x = abs(trammel.CL[0] - centre[0]) / radius
+    cos_y = abs(trammel.CL[1] - centre[1]) / radius
+    station = 0.005 * INCH
+    error = cos_x * (station + carrier_spec.POSITION_BAND / 2.0) + cos_y * station
+    assert spec.CLAMP_STATION_ERROR == pytest.approx(error)
+    assert 0.14 < spec.CLAMP_STATION_ERROR < 0.16
+    hole_r = (spec.CLAMP_DIA + spec.DRILLED_BAND[0]) / 2.0
     inner, outer = spec.CLAMP_BAND_WALLS
-    assert f"{outer:.3f}" == "2.019" and inner > outer >= 2.0
+    assert inner == pytest.approx(radius - hole_r - error - trammel.RISER_INNER_RADIUS)
+    assert outer == pytest.approx(trammel.RISER_OUTER_RADIUS - radius - hole_r - error)
+    assert inner >= WALL_TARGET_MM
+    assert WALL_FLOOR_MM < outer < WALL_TARGET_MM
+    # Stated floored to three places: a MIN never rounds up.
+    assert outer / INCH == pytest.approx(0.0749, abs=0.0001)
+    assert spec.CLAMP_WALL_MIN_TEXT == "WALL .074 MIN TO CUT EDGE"
+    rows = spec.CALLOUTS_BELOW["ClampDia"].split("\n")
+    assert rows[:3] == ["DRILL THRU", "CL AND CR HOLES", spec.CLAMP_WALL_MIN_TEXT]
+    exceptions = _config.parts("ch-rocker-arm-tl-oblique-riser")["machinist_exceptions"]
+    assert [(e["id"], e["kind"]) for e in exceptions] == [("RV-01", "minor")]
+    assert spec.CLAMP_WALL_MIN_TEXT in exceptions[0]["where"]
 
 
 def test_each_row_count_matches_the_holes_on_that_row() -> None:
@@ -243,8 +288,8 @@ def test_x_stack_rows_leave_air_and_the_section_letters_clear() -> None:
 
 
 def test_walls_hold_rule_17_at_worst_case() -> None:
-    assert min(spec.WALLS_MM.values()) >= 2.0
-    assert min(trammel.RISER_SCREW_WALLS) >= 2.0
+    assert min(spec.WALLS_MM.values()) >= WALL_TARGET_MM
+    assert min(trammel.RISER_SCREW_WALLS) >= WALL_TARGET_MM
 
 
 def test_drilled_holes_carry_the_title_block_band_only() -> None:
@@ -276,6 +321,7 @@ def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
 
 
 def test_every_exported_band_endpoint_is_a_printed_value() -> None:
+    """Each band endpoint and nominal is a value the inch sheet prints."""
     checked = 0
     for name, feature in _features().items():
         for requirement in feature["requirements"]:
@@ -284,11 +330,11 @@ def test_every_exported_band_endpoint_is_a_printed_value() -> None:
                 continue
             places = feature["precision"][requirement]
             for end in band:
-                assert abs(end - round(end, places)) < 1e-9, (name, requirement)
+                assert _on_inch_grid(end, places), (name, requirement)
             nominal = feature.get(f"{requirement}_nominal")
             if nominal is not None:
                 assert band[0] <= nominal <= band[1], (name, requirement)
-                assert abs(nominal - round(nominal, places)) < 1e-9, (name, requirement)
+                assert _on_inch_grid(nominal, places), (name, requirement)
             checked += 1
     assert checked
 

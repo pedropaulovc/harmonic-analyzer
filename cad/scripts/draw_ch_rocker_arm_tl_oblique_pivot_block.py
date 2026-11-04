@@ -1,10 +1,12 @@
 """Manufacturing sheets for the plain shoulder-screw pivot blocks.
 
-All sizes import native model dimensions; no bearing/cartridge sheets survive.
+Both sheets print decimal inch (each part's ``drawing_unit``). All sizes
+import native model dimensions; no bearing/cartridge sheets survive.
 Plan X locations run from the -X (left) edge through the hidden
-``PlanDatumReference`` sketch; Y from the Ø10 seat axis. Section B-B shows
-the floor from the carriage seat, not a competing counterbore-depth tolerance
-chain. TL-32's nut face is VIEW D on its own 2:1 sheet, its arrow on the plan.
+``PlanDatumReference`` sketch; Y from the shoulder seat's axis. Section B-B
+shows the floor from the carriage seat, not a competing counterbore-depth
+tolerance chain. TL-32's nut face is VIEW D on its own 2:1 sheet, its arrow on
+the plan. The layout notes below give sheet millimetres.
 """
 from __future__ import annotations
 import argparse

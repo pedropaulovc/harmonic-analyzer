@@ -4,14 +4,23 @@ ch-rocker-arm-tl-oblique-base-bar:
   number: MHA-CH-06-TL-20
   description: "BASE BAR"
   # The bar only carries tapped rail holes, counterbored clearance holes and
-  # hold-down slots, keeps its stock width and is faced to 12.0 on both large
-  # faces (owner ruling 2026-10-30, the seats): no grade or temper
-  # is functional, so the title block names the aluminium flat-bar family
-  # (rule 2; machinist review ENFORCE); OnlineMetals 17666 6061-T6511 is the
-  # source, the widest listed bar that fits the 6 in vise's stock hard jaws.
-  material: ALUMINUM FLAT BAR 1/2 x 5-1/2 in
-  material_specification: Aluminum flat bar (e.g. 6061-T6 or 6082-T6; OnlineMetals 17666 6061-T6511), 1/2 x 5-1/2 in; width as supplied, both large faces faced to 12.0
+  # hold-down slots, is faced to .47 on both large faces (owner ruling
+  # 2026-10-30, the seats) and milled to 5.50 wide on edge in the vise, no
+  # bandsaw rip (owner ruling #2083): no grade or temper is functional, so
+  # the title block names the aluminium flat-bar family (rule 2; machinist
+  # review ENFORCE); the owned OnlineMetals 1173 6061-T6511 1/2 x 6 bar is
+  # the source. The title-block cell holds one line, so the material names
+  # the bar it is cut from; the milled 5.50 width prints on the sheet.
+  material: ALUMINUM FLAT BAR 1/2 x 6 in
+  material_specification: Aluminum flat bar milled from 1/2 x 6 in (e.g. 6061-T6511, owned OnlineMetals 1173); both large faces faced to .47, width milled to 5.50
   finish: as machined
   quantity: 2
   tolerance_class: machined_block
-  process: "saw and face to length; face both large faces to thickness; drill and tap the seven #8-32 rail holes through; drill the eight #8 bracket holes through and counterbore them from the underside; mill the two hold-down slots through; break edges"
+  process: "saw and face to length; face both large faces to thickness; mill to width on edge in the vise (no bandsaw rip); drill and tap the seven #8-32 rail holes through; drill the eight #8 bracket holes through and counterbore them from the underside; mill the two hold-down slots through; break edges"
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "front view: the HGR15R rail-hole row (40.00 ... 400.00 ±.08 mm) and the 8X TL-28 bracket-hole stations 57.00 ±.13 mm and 428.00 ±.13 mm"
+      finding: "metric vendor-mating hole stations print in millimetres on an inch sheet, beside inch dimensions from the same left end"
+      reason: "owner ruling 2026-11-01 (ruling 4B), relayed by Main: the KP08 pillow block, HGR15R rail and Tr8 nut are metric-only vendor lines, so the stations that mate with their holes keep the vendor's exact millimetres, printed in mm with the unit label and an explicit mm band (drawing-simplicity-policy.md, supplier-unit exception), not rounded inch conversions"
+  drawing_unit: in

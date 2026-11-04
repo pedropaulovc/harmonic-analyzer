@@ -1,15 +1,34 @@
-"""Purchased reference sheet for the oblique-trammel pivot screw."""
+"""Purchased reference sheet for the oblique-trammel pivot screw.
+
+The sheet prints decimal inch and dimensions the screw on its RIGHT view, axis
+horizontal as it lies in the lathe. Its shop dimensions are the cut thread
+length from the shoulder face (the thread envelope's own depth), plain at three
+places, and the end chamfer's leg with its angle (.03 X 45°); every supplier
+size prints as a parenthesised reference, and a leader names the supplied
+thread.
+"""
 from __future__ import annotations
 
 import argparse
+import math
 import sys
+
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name, iter_views
 
 import _telemetry
 import ch_rocker_arm_tl_vn_oblique_pivot_screw_spec as part
+from _com import _early_bound
+from _construction_line_font import _construction_curves_as_outline
+from _drawing_centerline import add_view_centerline
+from _drawing_edges import scan_view_edges
+from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_leader_notes import add_attached_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import NumberFit, build_purchased_fastener_drawing
 from _session import run_build
-from _supplier_screw_dimensions import annotate_supplier_screw, assert_supplier_screw
+from _supplier_dimensions import assert_supplier_reference_dimension, supplier_reference_dimension
 from _supplier_unbanded import assert_supplier_screw_unbanded
 from _supplier_text_shelf import assert_supplier_shelves, shelve_supplier_text
 from _machinist_review_mode import MachinistReviewMode
@@ -17,26 +36,208 @@ from _machinist_review_mode import MachinistReviewMode
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_pivot_screw"]
-ITEM = '18-8 SS PRECISION SHOULDER SCREW, 10 MM X 35 MM, M8 X 1.25'
-# tall_top's 96 mm Top cell holds the 52.5 mm screw at 1:1 (standard's 64 mm: 1:4).
-VIEW_LAYOUT = "tall_top"
-# Every text shelves right of its own witnesses, clear of the lines: the head
-# Ø on the Front's bottom lane, the shoulder Ø on the Top's top lane (past the
-# thread end), the shoulder length beside the Top. Front and Top reserve the
-# same left/right space so the fit centres them on one projection line; the
-# Front's equal top/bottom keeps it level with the unannotated Right.
+ITEM = "18-8 SS SHOULDER SCREW, EXT THREAD, 3/8 X 1-1/2, 5/16-18"
+# The default "VIEWS ARE REFERENCE ONLY" line would read as overriding the one
+# shop dimension (as on the hub pin's sheet). At most the default cut line's
+# 74 characters: 99 ran to x 237 mm, past the footer's 215.5 (farm round 4).
+# "CUT THREAD" read as cutting a new thread (machinist review, farm run
+# 20261103T090917552Z).
+GENERAL_TEXT = "PURCHASED PART AS SUPPLIED; SHORTEN THREADED END AND CHAMFER AT ASSEMBLY."
+# The dimensioned Right view needs the standard layout's 97 mm row (tall_top's
+# 65 mm row had no room under the screw for the cut note); the undimensioned
+# Top takes the shorter cell.
+VIEW_LAYOUT = "standard"
+# The Right view carries every dimension: the head Ø left of the head, the
+# shoulder Ø right of the thread end, the shoulder length above, the cut
+# (.570 CUT) on its own line under the thread, the end chamfer (.03 X 45°) on
+# the thread's upper silhouette, the cut note right of the thread end under
+# the shoulder Ø with a short leader to the tip's end face, the thread
+# leader above-right.
+SUPPLIER_MARGINS = {"*Right": (0.020, 0.020, 0.060, 0.012)}
+DIAMETER_LANE = 0.014  # vertical diameter lines, out from the head / thread end
+LENGTH_LANE = 0.008  # horizontal length lines, out from the head's rim
+# The shoulder Ø's value and callout shelve right of its dimension line, at
+# the axis, clear of its short 9.5 mm span. The chamfer's ".03 X 45°", far
+# wider than its 0.76 mm leg, shelves right of the tip, above the reach of the
+# shoulder Ø's upper arrow (at 11 mm it struck the '3', farm run
+# 20261103T090917552Z) and under the thread note.
 SHELVES = {
-    "SupplierShoulderDiameter": (True, "right"),
-    "SupplierHeadDiameter": (True, "right"),
-    "SupplierShoulderLength": (False, "right"),
+    "SupplierShoulderDiameter": (False, "right"),
+    part.CHAMFER_LEG_DIMENSION: (True, "right"),
 }
-# The Top reserves only the shoulder Ø shelf's ~19 mm of ink over its thread
-# end, and no bottom lane (its caption sits under the cell): 72 mm of tall_top's
-# 96 mm stays for the 1:1 outline, which fit in 76 mm. 30 mm forced 1:2.
-SUPPLIER_MARGINS = {
-    "*Front": (0.010, 0.018, 0.060, 0.018),
-    "*Top": (0.010, 0.004, 0.060, 0.020),
+CHAMFER_RISE = 0.014  # the chamfer's text, above the axis
+# Note anchors are their text's top-left corner (farm run 20261101T194619431Z).
+# The cut note's top sits under the shoulder Ø's shelved text: under the screw
+# its leader crossed its own text and the cut's dimension line (machinist
+# review, run 20261101T201250784Z). The thread note's rows stay above the
+# chamfer's text, its left edge just past the shoulder step, so its leader
+# drops almost straight onto the thread next to the shoulder, left of the
+# chamfer's dimension line: from above-right of the tip it crossed that line
+# (machinist review, farm run 20261104T171030064Z).
+CUT_NOTE_RIGHT = 0.008  # right of the thread tip
+CUT_NOTE_DROP = 0.014  # below the axis
+THREAD_NOTE_RIGHT = 0.002  # right of the shoulder step
+THREAD_NOTE_RISE = 0.021  # above the head rim
+THREAD_LANDING = 0.2  # of the thread length, from the shoulder
+# Every carrier lies on a Right-view edge; construction curves print as the
+# continuous thick outline on this sheet (``_construction_line_font``), not as
+# a grey chain over the edge.
+_REFERENCES = {
+    name: {
+        "label": f"{name}@{part.REFERENCE_FEATURE}", "units": "in",
+        "precision": part.REFERENCE_FORMATS[name][0], "expected_mm": value,
+        "presentation": part.REFERENCE_FORMATS[name][1],
+        "callout": part.REFERENCE_FORMATS[name][3],
+    }
+    for name, value, _ in part.REFERENCE_DIMENSIONS
 }
+# Shop sizes: owner feature, model value (m), places, suffix, callout below.
+_SHOP = {
+    part.CUT_DIMENSION: (part.CUT_FEATURE, part.CUT_THREAD_LENGTH / 1000.0,
+                         part.CUT_THREAD_PLACES, "", part.CUT_CALLOUT),
+    part.CHAMFER_LEG_DIMENSION: (part.CHAMFER_REFERENCE_FEATURE, part.CUT_CHAMFER / 1000.0,
+                                 part.CHAMFER_PLACES, part.CHAMFER_SUFFIX, ""),
+}
+_OWNERS = {
+    **{name: part.REFERENCE_FEATURE for name in _REFERENCES},
+    **{name: row[0] for name, row in _SHOP.items()},
+}
+
+
+def _assert_shop_dimension(name, display) -> None:
+    """A shop size: the model's plain value at its places, no reference marks."""
+    _feature, value, places, suffix, callout = _SHOP[name]
+    display = _early_bound(display, "IDisplayDimension")
+    native = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(native.Tolerance, "IDimensionTolerance")
+    if (
+        not math.isclose(abs(float(native.SystemValue)), value, rel_tol=0.0, abs_tol=1e-9)
+        or display.GetOverride() or not display.ShowDimensionValue
+        or display.ShowParenthesis
+        or int(display.GetPrimaryPrecision2()) != places
+        or str(display.GetText(1) or "") or str(display.GetText(2) or "") != suffix
+        or str(display.GetText(4) or "").replace("\r\n", "\n") != callout
+        or int(tolerance.Type) != 0
+    ):
+        raise RuntimeError(f"{name}: shop dimension lost its plain presentation")
+
+
+def _assert_dimensions(adapter, displays) -> None:
+    for name, display in displays.items():
+        if name in _SHOP:
+            _assert_shop_dimension(name, display)
+            continue
+        assert_supplier_reference_dimension(adapter, display, **_REFERENCES[name])
+        assert_supplier_screw_unbanded({name: display})
+
+
+def _right_stations(adapter, right):
+    """Sheet points on the axis: head end, head underside, step, thread tip."""
+    stations = {
+        key: model_point_in_view(adapter, right, (0.0, 0.0, z / 1000.0), label=f"pivot screw {key}")
+        for key, z in (("head", part.LENGTH), ("joint", part.SHOULDER_LENGTH),
+                       ("step", 0.0), ("tip", -part.THREAD_LENGTH))
+    }
+    scale = tuple(float(value) for value in _early_bound(right, "IView").ScaleRatio)
+    return stations, scale[0] / scale[1]
+
+
+def _place_dimensions(adapter, right) -> dict[str, object]:
+    """Import the three supplier references, the cut and the chamfer leg into the Right view."""
+    view = _early_bound(right, "IView")
+    view.UpdateViewDisplayGeometry()
+    at, scale = _right_stations(adapter, view)
+    axis_y = at["step"][1]
+    rim = part.HEAD_DIA / 2000.0 * scale
+    keep = {
+        "SupplierHeadDiameter": (at["head"][0] - DIAMETER_LANE, axis_y),
+        "SupplierShoulderDiameter": (at["tip"][0] + DIAMETER_LANE, axis_y),
+        "SupplierShoulderLength": ((at["joint"][0] + at["step"][0]) / 2.0, axis_y + rim + LENGTH_LANE),
+        part.CUT_DIMENSION: ((at["step"][0] + at["tip"][0]) / 2.0, axis_y - rim - LENGTH_LANE),
+        part.CHAMFER_LEG_DIMENSION: (at["tip"][0], axis_y + CHAMFER_RISE),
+    }
+    by_feature = {
+        part.REFERENCE_FEATURE: tuple(_REFERENCES),
+        part.CUT_FEATURE: (part.CUT_DIMENSION,),
+        part.CHAMFER_REFERENCE_FEATURE: (part.CHAMFER_LEG_DIMENSION,),
+    }
+    displays = {}
+    for raw in curate_view_dimensions(
+        adapter, view, keep=keep, view_label="pivot screw RIGHT", dimensions_by_feature=by_feature,
+    ):
+        name = dimension_name(adapter, raw)
+        display = _early_bound(
+            _early_bound(raw, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension"
+        )
+        if name in _REFERENCES:
+            display = supplier_reference_dimension(adapter, display, **_REFERENCES[name])
+        displays[name] = display
+    if set(displays) != set(keep):
+        raise RuntimeError(f"pivot screw RIGHT dimensions incomplete: {sorted(displays)}")
+    return displays
+
+
+def _add_notes(adapter, right) -> None:
+    """Lead the cut note to the tip's end face and the thread note to the thread.
+
+    The cut note attaches to the end face's rim by entity, landing on its
+    edge-on line below the axis: sheet-point silhouette picks at the chamfer
+    and on the lower thread silhouette missed (farm runs 20261103T022442930Z,
+    20261103T045336518Z).
+    """
+    at, scale = _right_stations(adapter, right)
+    rim = part.HEAD_DIA / 2000.0 * scale
+    end_radius = part.THREAD_DIA / 2.0 - part.CUT_CHAMFER
+    end_rim = scan_view_edges(right, label="pivot screw end rim").circle_at(
+        (0.0, 0.0, -part.THREAD_LENGTH), end_radius,
+        axis=(0.0, 0.0, 1.0), label="pivot screw end rim",
+    ).edge
+    landing = model_point_in_view(
+        adapter, right, (0.0, -end_radius / 2000.0, -part.THREAD_LENGTH / 1000.0),
+        label="pivot screw end face",
+    )
+    add_attached_note(
+        adapter, right, text=part.CUT_NOTE, entity=end_rim, leader_attach_xy=landing,
+        note_xy=(at["tip"][0] + CUT_NOTE_RIGHT, at["tip"][1] - CUT_NOTE_DROP),
+        label="pivot screw cut",
+    )
+    thread = model_point_in_view(
+        adapter, right,
+        (0.0, part.THREAD_DIA / 2000.0, -part.THREAD_LENGTH * THREAD_LANDING / 1000.0),
+        label="pivot screw thread silhouette",
+    )
+    add_attached_note(
+        adapter, right, text=part.THREAD_NOTE, entity_xy=thread,
+        note_xy=(at["step"][0] + THREAD_NOTE_RIGHT, at["step"][1] + rim + THREAD_NOTE_RISE),
+        label="pivot screw thread", entity_type="SILHOUETTE",
+    )
+
+
+def _settled_right(adapter):
+    """Reacquire the Right view's owned dimensions and its one thread note."""
+    rights = [view for view in iter_views(adapter) if str(view.GetOrientationName()) == "*Right"]
+    if len(rights) != 1:
+        raise RuntimeError("pivot screw settled sheet has no single Right view")
+    view = _early_bound(rights[0], "IView")
+    found: dict[str, list] = {}
+    display = view.GetFirstDisplayDimension6()
+    while display is not None:
+        display = _early_bound(display, "IDisplayDimension")
+        name, _, feature = str(
+            _early_bound(display.GetDimension2(0), "IDimension").FullName
+        ).partition("@")
+        if _OWNERS.get(name) == feature.partition("@")[0]:
+            found.setdefault(name, []).append(display)
+        display = display.GetNext5()
+    if set(found) != set(_OWNERS) or any(len(rows) != 1 for rows in found.values()):
+        raise RuntimeError(f"pivot screw RIGHT dimensions changed: { {k: len(v) for k, v in found.items()} }")
+    texts = [
+        str(_early_bound(note, "INote").GetText()).replace("\r\n", "\n")
+        for note in view.GetNotes() or ()
+    ]
+    if texts.count(part.THREAD_NOTE) != 1 or texts.count(part.CUT_NOTE) != 1:
+        raise RuntimeError("pivot screw RIGHT view must carry the cut and thread notes once")
+    return {name: rows[0] for name, rows in found.items()}
 
 
 async def build(adapter) -> dict[str, str]:
@@ -45,26 +246,33 @@ async def build(adapter) -> dict[str, str]:
     def supplier_dimensions(adapter, views):
         if proofs:
             raise RuntimeError("supplier reference callback repeated")
-        displays = annotate_supplier_screw(
-            adapter, views, dimensions=part.SUPPLIER_REFERENCE_DIMENSIONS,
-            formats=part.SUPPLIER_REFERENCE_FORMATS,
-            starts=part.SUPPLIER_REFERENCE_STARTS,
-            planes=part.SUPPLIER_REFERENCE_PLANES,
-            sides=part.SUPPLIER_REFERENCE_SIDES,
-            units=part.SUPPLIER_REFERENCE_UNITS,
-        )
-        assert_supplier_screw_unbanded(displays)
+        line_font = _construction_curves_as_outline(adapter)
+        right = views["*Right"]
+        displays = _place_dimensions(adapter, right)
+        _assert_dimensions(adapter, displays)
+        _add_notes(adapter, right)
+        # Both side views carry the axis as a native centerline, picked on the
+        # shoulder face at mid-length.
+        for orientation, normal in (("*Top", (0.0, 1.0)), ("*Right", (1.0, 0.0))):
+            view = views[orientation]
+            add_view_centerline(
+                adapter, view, label=f"pivot screw {orientation[1:].upper()} axis",
+                face_xy=model_point_in_view(
+                    adapter, view,
+                    (normal[0] * part.SHOULDER_DIA / 2000.0, normal[1] * part.SHOULDER_DIA / 2000.0,
+                     part.SHOULDER_LENGTH / 2000.0),
+                    label=f"pivot screw {orientation[1:].upper()} shoulder face",
+                ),
+            )
+        # Shelve last, after the note and centerline rebuilds: the retained
+        # stations are the ones the settled sheet keeps.
         stations = shelve_supplier_text(adapter, displays, SHELVES)
 
         def assert_references():
-            fresh = assert_supplier_screw(
-                adapter, views, dimensions=part.SUPPLIER_REFERENCE_DIMENSIONS,
-                formats=part.SUPPLIER_REFERENCE_FORMATS,
-                planes=part.SUPPLIER_REFERENCE_PLANES,
-                units=part.SUPPLIER_REFERENCE_UNITS,
-            )
-            assert_supplier_screw_unbanded(fresh)
-            assert_supplier_shelves(adapter, fresh, SHELVES, stations)
+            line_font()
+            settled = _settled_right(adapter)
+            _assert_dimensions(adapter, settled)
+            assert_supplier_shelves(adapter, settled, SHELVES, stations)
 
         proofs.append(assert_references)
 
@@ -75,10 +283,11 @@ async def build(adapter) -> dict[str, str]:
 
     return await build_purchased_fastener_drawing(
         adapter, SPEC, item=ITEM, number_fit=NumberFit.SHRINK_TO_CELL,
-        cut_to_suit=False, view_layout=VIEW_LAYOUT,
+        general_text=GENERAL_TEXT, view_layout=VIEW_LAYOUT,
         supplier_dimensions=supplier_dimensions,
         supplier_margins=SUPPLIER_MARGINS,
         settled_checks=(assert_supplier_dimensions,), supplier_data=part.SUPPLIER_DATA,
+        unit=part_drawing_unit(part.PART_NAME),
     )
 
 

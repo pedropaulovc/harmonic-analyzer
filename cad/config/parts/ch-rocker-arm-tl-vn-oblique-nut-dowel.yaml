@@ -1,0 +1,21 @@
+ch-rocker-arm-tl-vn-oblique-nut-dowel:
+  title: Rocker Oblique Trammel Feed Nut Dowel
+  # Shop fixture: the parent MHA-CH-06 Number plus -TL-VN-nn (subsystem-identities.md).
+  number: MHA-CH-06-TL-VN-81
+  stock_name: Alloy Steel Dowel Pin, 3/32 x 1/2 in
+  supplier: McMaster-Carr
+  supplier_skus: ["98381A438"]
+  material: Alloy Steel
+  material_specification: "Alloy steel, Rockwell C47 min; ASME B18.8.2 (McMaster 98381A438)"
+  finish: as supplied
+  quantity: 1
+  tolerance_class: machined_block
+  process: purchased
+  # Function only: the holes and the fitting procedure live on TL-27, TL-32
+  # and the jig assembly MHA-CH-06-TL-00.
+  # One line ran out of the note's reserved space (final 20261103T204944360Z).
+  installation_notes: |-
+    KEYS THE MHA-CH-06-TL-27 FEED NUT TO THE
+    MHA-CH-06-TL-32 FEED-BLOCK LUG AGAINST ROTATION;
+    FIT PER MHA-CH-06-TL-00.
+  drawing_unit: in

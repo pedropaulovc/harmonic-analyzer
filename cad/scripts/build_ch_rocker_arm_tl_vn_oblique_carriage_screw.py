@@ -4,7 +4,8 @@ The ``M4 X 20 SHCS`` (``ch_rocker_arm_tl_vn_oblique_carriage_screw_spec``) that 
 The stock recipe ``diagnostics/diag_build_91290A168.py`` builds the catalogue screw on
 the 91251A family recipe (``diag_mcmaster_socket_head.build_socket_head``);
 the recipe's standalone run is catalog-only (no replica gate, user ruling
-2026-10-17).
+2026-10-17).  Each screw is cut to fit at assembly (owner ruling 2026-11-01),
+so the recipe draws it at ``CUT_LENGTH`` under the head.
 
 Frame: screw axis +Y, head up, the bearing face (head underside) at y = 0,
 the tip at y = -length.  The axis is published as ``ScrewAxis``
@@ -37,7 +38,13 @@ async def build(adapter) -> dict[str, str]:
     return await build_stock_fastener(
         adapter,
         part_name=PART_NAME,
-        components=(StockComponent(sku=SKU, author=build_91290A168),),
+        components=(
+            StockComponent(
+                sku=SKU,
+                author=build_91290A168,
+                parameters={"cut_length": supplier.CUT_LENGTH},
+            ),
+        ),
         material=MATERIAL,
         save_threaded_part=partial(
             save_supplier_reference_part,

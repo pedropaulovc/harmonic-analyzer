@@ -31,6 +31,7 @@ from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _part_properties import part_drawing_unit
 from _printed_limits import limits
 from _section_axis import position_section_caption
 from _session import run_build
@@ -49,7 +50,6 @@ from ch_rocker_arm_tl_oblique_riser_spec import (
     REFERENCE_DIMENSIONS,
     ROW_COUNTS,
     SCREW_DIA,
-    SCREW_DIA_PLACES,
     SCREW_DIA_PRINTED,
     SCREW_HOLES,
     THICKNESS,
@@ -162,6 +162,14 @@ SECTION_KEEP: dict[str, tuple[float, float, float]] = {
 
 _UP = [0.0, 0.0, 1.0]
 _CALC = "ch_rocker_arm_tl_oblique_trammel_spec"
+_UNIT = part_spec.UNIT
+
+
+def _limits(model: float, places: int) -> list[float]:
+    """A general-band dimension's acceptance limits on the inch sheet: the
+    title block's band about the value printed at ``places``."""
+    return limits(model, places, unit=_UNIT)
+
 
 part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME",))
 
@@ -176,14 +184,27 @@ requirement(
             {"frame": "model", "axis": "z", "value": part_spec.THICKNESS},
             ("THICKNESS",),
         ),
-        "height": (limits(part_spec.THICKNESS, 1), ("THICKNESS",)),
+        "height": (
+            _limits(part_spec.THICKNESS, part_spec.THICKNESS_PLACES),
+            ("THICKNESS",),
+        ),
         "height_nominal": (part_spec.THICKNESS, ("THICKNESS",)),
-        "length": (limits(part_spec.BLANK_LENGTH, 1), ("BLANK_LENGTH",)),
+        "length": (
+            _limits(part_spec.BLANK_LENGTH, part_spec.BLANK_PLACES),
+            ("BLANK_LENGTH",),
+        ),
         "length_nominal": (part_spec.BLANK_LENGTH, ("BLANK_LENGTH",)),
-        "width": (limits(part_spec.BLANK_WIDTH, 1), ("BLANK_WIDTH",)),
+        "width": (
+            _limits(part_spec.BLANK_WIDTH, part_spec.BLANK_PLACES),
+            ("BLANK_WIDTH",),
+        ),
         "width_nominal": (part_spec.BLANK_WIDTH, ("BLANK_WIDTH",)),
     },
-    precision={"height": 1, "length": 1, "width": 1},
+    precision={
+        "height": part_spec.THICKNESS_PLACES,
+        "length": part_spec.BLANK_PLACES,
+        "width": part_spec.BLANK_PLACES,
+    },
 )
 
 requirement(
@@ -194,16 +215,19 @@ requirement(
     fields={
         "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
         "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
-        "height": (limits(part_spec.THICKNESS, 1), ("THICKNESS",)),
+        "height": (
+            _limits(part_spec.THICKNESS, part_spec.THICKNESS_PLACES),
+            ("THICKNESS",),
+        ),
     },
-    precision={"height": 1},
+    precision={"height": part_spec.THICKNESS_PLACES},
 )
 
 
 _SCREW_SOURCES = ("SCREW_HOLES", "BLANK_ORIGIN", (_CALC, "RISER_SCREWS"))
 _SCREW_DIA_SOURCES = ("SCREW_DIA_PRINTED", "SCREW_DIA", "SCREW_SPEC", "SCREW_BODY_DIA")
 # (name, xy, cut dia, printed dia, station sources, dia sources): the wizard
-# cuts the #4 clearance at 3.264, inside its printed Ø3.26 DRILLED HOLES band.
+# cuts the #4 clearance (#30 drill) inside its printed Ø.1285 DRILLED HOLES band.
 _HOLE_ROWS = (
     *(
         (
@@ -233,7 +257,11 @@ _HOLE_ROWS = (
     ),
 )
 for name, (x, y), cut_dia, dia, sources, dia_sources in _HOLE_ROWS:
-    dia_places = SCREW_DIA_PLACES if name.startswith("screw") else 2
+    dia_places = DRAWING_PRECISION_BY_NAME[
+        {"hub_hole": "HubDia", "cl_hole": "ClampDia", "cr_hole": "ClampDia"}.get(
+            name, "ScrewDia"
+        )
+    ]
     requirement(
         name,
         kind="hole",
@@ -268,7 +296,7 @@ for index, (x, _y) in enumerate(SCREW_HOLES, start=1):
                 ("SCREW_DIA", ("draw_ch_rocker_arm_tl_oblique_riser", "build")),
             ),
             "dia": (
-                limits(part_spec.CSK_DIA, part_spec.CSK_PLACES),
+                _limits(part_spec.CSK_DIA, part_spec.CSK_PLACES),
                 ("CSK_DIA", "SCREW_HEAD_DIA_MAX", "CSK_DEPTH_MAX", "CSK_CALLOUT"),
             ),
             "dia_nominal": (part_spec.CSK_DIA, ("CSK_DIA",)),
@@ -331,7 +359,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter.currentModel, ("Revision", "Title", *required), required=required
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,

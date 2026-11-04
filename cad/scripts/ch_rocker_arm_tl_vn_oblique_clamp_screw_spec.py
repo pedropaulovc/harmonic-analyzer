@@ -11,7 +11,7 @@ own row on the jig's BOM; the shop inventory carries no screw stock (no
 (``fasteners.callout``).
 
 Used as bought, full length: the tip runs through TL-21's THRU tap and stands
-below the carrier's underside (``STAND_OUT_MAX``, 3.35 worst case).  That is
+below the carrier's underside (``STAND_OUT_MAX`` worst case).  That is
 functional: over both passes' whole sweep the tip stays on the machine's +X
 (rail 2) side, away from the leadscrew feed on rail 1 (``TIP_MACHINE_X_MIN``),
 and in plan clear of both pivot blocks (``TIP_PLAN_CLEARANCE``), so below the
@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import math
 
+import _config
 import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
@@ -53,13 +54,18 @@ import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_riser_spec as riser
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 from _mcmaster_91251a541 import DIMS, LENGTH_TEXT, PART_NO, THREAD
+from _package_units import drawing_unit
 
+UNIT = drawing_unit(
+    "parts/ch-rocker-arm-tl-vn-oblique-clamp-screw",
+    _config.parts("ch-rocker-arm-tl-vn-oblique-clamp-screw"),
+)
 SKU = PART_NO
 ROW = fasteners.CR_CLAMP
 QUANTITY = ROW.count
 PACK_QUANTITY = 50  # McMaster sells 91251A541 in packs of 50
 CALLOUT = fasteners.callout(ROW)  # "1/4-20 X 7/8 SHCS"
-LENGTH = DIMS.length  # 22.225, modelled as bought
+LENGTH = DIMS.length  # 7/8 in, modelled as bought
 
 if (THREAD, LENGTH_TEXT, fasteners.SHCS) != (ROW.thread, ROW.length, ROW.head):
     raise AssertionError(f"{SKU} is not the screw of {ROW.joint}")
@@ -93,8 +99,8 @@ LENGTH_MIN = LENGTH - 0.03 * trammel.INCH
 TIP_INCOMPLETE_LENGTH = 1.5 * DIMS.pitch
 SCREW_FULL_THREAD_MIN = (
     LENGTH_MIN - GRIP_MAX - carrier.TAP_MOUTH_BREAK - TIP_INCOMPLETE_LENGTH
-)  # 9.983
-RECEIVER_FULL_THREAD = carrier.ENGAGEMENT_MM[carrier.CR_THREAD]  # 9.68
+)
+RECEIVER_FULL_THREAD = carrier.ENGAGEMENT_MM[carrier.CR_THREAD]
 ENGAGEMENT_MIN = min(SCREW_FULL_THREAD_MIN, RECEIVER_FULL_THREAD)
 if ENGAGEMENT_MIN < 1.5 * DIMS.major_dia:
     raise AssertionError(
@@ -104,8 +110,8 @@ if ENGAGEMENT_MIN < 1.5 * DIMS.major_dia:
 # --- The tip below the carrier ------------------------------------------------
 # Nominal and worst-case (longest screw, thinnest grip and carrier) stand-out
 # below the carrier's underside.
-STAND_OUT_NOMINAL = LENGTH - ROW.grip_mm - carrier.THICKNESS  # 1.725
-STAND_OUT_MAX = LENGTH - GRIP_MIN - CARRIER_MIN  # 3.35
+STAND_OUT_NOMINAL = LENGTH - ROW.grip_mm - carrier.THICKNESS
+STAND_OUT_MAX = LENGTH - GRIP_MIN - CARRIER_MIN
 # In plan: a circle about each pin hole bounds its pivot block at any yaw
 # (the block's farthest corner from its bore); the CR axis's nearest pin hole
 # keeps the whole tip outside every such circle.
@@ -115,9 +121,9 @@ BLOCK_PLAN_RADIUS = math.hypot(
         abs(pivot_block.BLOCK_X1 - pivot_block.BORE_X),
     ),
     pivot_block.BLOCK_WIDTH / 2.0,
-)  # 55.714
+)
 CR_TO_PIN_MIN = min(math.dist(trammel.CR, hole) for hole in trammel.PIN_HOLES.values())
-TIP_PLAN_CLEARANCE = CR_TO_PIN_MIN - BLOCK_PLAN_RADIUS - DIMS.major_dia / 2.0  # 11.678
+TIP_PLAN_CLEARANCE = CR_TO_PIN_MIN - BLOCK_PLAN_RADIUS - DIMS.major_dia / 2.0
 if not TIP_PLAN_CLEARANCE > 0.0:
     raise AssertionError(f"{SKU}: the tip reaches over a pivot block")
 # Swept, closed form.  ``trammel.carrier_pose`` turns the carrier by
@@ -134,7 +140,7 @@ for _name, _sweep in trammel.SWEEP.items():
     if not (0.0 < _beta - _sweep / 2.0 and _beta + _sweep / 2.0 < math.pi):
         raise AssertionError(f"{SKU}: the CR sweep is not monotone in machine X")
     _TIP_X_MIN.append(_CR_X * math.cos(_sweep / 2.0) - _k * math.sin(_sweep / 2.0))
-TIP_MACHINE_X_MIN = min(_TIP_X_MIN) - DIMS.major_dia / 2.0  # 2.368
+TIP_MACHINE_X_MIN = min(_TIP_X_MIN) - DIMS.major_dia / 2.0
 # The tip's whole sweep stays at machine +X, rail 2's side; the leadscrew
 # feed stands on rail 1 at -X.  Beneath the tip stand only rail 2's parts:
 # pivot block 2 (clear above), carriage 2 under it, rail 2's studs (out of
@@ -148,7 +154,7 @@ if ROW.tip_clearance_mm != trammel.CARRIER_TO_RAIL_GAP:
 
 # Exact-current product table and engineering drawing read 2026-10-21.
 # Hidden nominal source references, not physical-edge/replica assertions.
-# Drawing precision: length/head Ø/head height .XXX, major Ø .XXXX,
+# Drawing precision: length/head Ø/head height/major Ø .XXX,
 # drive an exact 3/16 fraction. The standard-only socket depth is omitted.
 SUPPLIER_PRODUCT_URL = "https://www.mcmaster.com/91251A541/"
 SUPPLIER_DRAWING_URL = (
@@ -166,7 +172,7 @@ SUPPLIER_REFERENCE_STARTS = {
     "SupplierLength": (DIMS.major_dia / 2.0, 0.0),
     "SupplierHeadDiameter": (-DIMS.head_dia / 2.0, 0.0),
     "SupplierHeadHeight": (DIMS.head_dia / 2.0, 0.0),
-    "SupplierThreadDiameter": (-DIMS.major_dia / 2.0, -DIMS.length / 2.0),
+    "SupplierThreadDiameter": (-DIMS.major_dia / 2.0, 0.0),  # on the bearing-face edge
     "SupplierDriveWidth": (-DIMS.socket_af / 2.0, 0.0),
 }
 SUPPLIER_REFERENCE_PLANES = {
@@ -184,6 +190,6 @@ SUPPLIER_REFERENCE_FORMATS = {
     "SupplierLength": (3, "length", None, None),
     "SupplierHeadDiameter": (3, "diameter", None, None),
     "SupplierHeadHeight": (3, "length", None, None),
-    "SupplierThreadDiameter": (4, "diameter", None, '1/4"-20'),
+    "SupplierThreadDiameter": (3, "diameter", None, '1/4"-20'),
     "SupplierDriveWidth": (0, "length", 16, None),
 }

@@ -1,6 +1,6 @@
 r"""Build the oblique-trammel jig's end bracket (MHA-CH-06-TL-28; shop fixture).
 
-A 6061-T6511 1/2 x 1 in flat on edge, 68.9 long, two off: each carries one of the
+A 6061-T6511 1/2 x 1 in flat on edge, 2.71 long, two off: each carries one of the
 leadscrew feed's KP08 pillow blocks on base bar 1's top
 (``ch_rocker_arm_tl_oblique_end_bracket_spec``).
 
@@ -8,9 +8,10 @@ Layout (the spec's model frame, +Z up): ONE Front-plane rectangle from the
 inner end face (model x 0) about the mid-width line, extruded +Z by the stock
 thickness; the four #8-32 UNC base-bar taps and the two #6-32 UNC KP08 taps are
 two native Hole Wizard features tapped THRU from the top face on the row y 0.
-The row's printed station (6.35 from the -Y side face) lives on a hidden
+The row's printed station (.250 from the -Y side face) lives on a hidden
 reference sketch, ``HoleRowReference`` (build_ch_rocker_arm_tl_oblique_base_bar's
-``RailRowReference``).
+``RailRowReference``); the stock thickness the end view prints lives on another,
+``BracketThickReference`` (a drawing view cannot attach the extrusion's depth).
 
 Run (SolidWorks already open)::
 
@@ -32,9 +33,13 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import apply_drawing_precision
+from _drawing_tolerances import set_dimension_symmetric_tolerance
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _holes import wizard_holes
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
+from _metric_vendor_dimension import set_metric_vendor_units
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _saved_part_guard import require_saved_drawing_properties
@@ -44,6 +49,7 @@ from _sketch import (
     add_line_chain,
     anchor_point_to_origin,
     blank_sketch,
+    dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
 )
@@ -63,6 +69,7 @@ from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     KP08_TAP_DRILL,
     KP08_TAP_SPEC,
     KP08_TAP_X,
+    METRIC_DIMENSIONS,
 )
 
 PART_NAME = "ch-rocker-arm-tl-oblique-end-bracket"
@@ -82,15 +89,6 @@ V_KP08_TAPS = len(KP08_TAP_X) * math.pi * (KP08_TAP_DRILL / 2.0) ** 2 * BRACKET_
 _V_TOL = 20.0
 
 
-def _as_construction(adapter, entity_id: str) -> None:
-    """Flag a registered sketch line as construction geometry (rebind to the
-    base ISketchSegment, which declares ``ConstructionGeometry``)."""
-    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
-    segment.ConstructionGeometry = True
-    if not bool(segment.ConstructionGeometry):
-        raise RuntimeError(f"{entity_id} did not take the construction flag")
-
-
 def _require_one_solid_body(adapter, *, label: str) -> None:
     bodies = tuple(
         _early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, False) or ()
@@ -105,6 +103,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # The mm suffix is load-bearing: the equation manager reads bare numbers
     # in document units.
@@ -146,8 +146,10 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=BRACKET_THICK)),
     )
     name_last_feature(adapter, "Bracket")
+    # The depth stays off the print: the stock thickness prints from
+    # BracketThickReference (below), which a drawing view can attach to.
     drive_jobs.append(
-        (name_dimensions(adapter, "Bracket", ["BracketThick"])[0], '"BracketThick"')
+        (name_dimensions(adapter, "Bracket", ["BracketDepth"])[0], '"BracketThick"')
     )
     volume = await volume_check(adapter, "bracket", V_BRACKET, _V_TOL)
 
@@ -193,8 +195,11 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # --- The row's station: a reference sketch -------------------------------
-    # One construction line down the inner end face from the origin to the -Y
-    # side, driven by the width that side itself reads.
+    # One line down the inner end face from the origin to the -Y side, driven
+    # by the width that side itself reads. It lies on the end face's edge and
+    # stays a plain sketch line: a construction line prints its dash font
+    # over the drawing's outline (machinist review mr4: the end view's bottom
+    # edge printed broken).
     row_station = SketchDims()
     check("create_sketch hole row reference", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
@@ -202,7 +207,6 @@ async def build(adapter) -> dict[str, str]:
         "hole row station line", await adapter.add_line(0.0, 0.0, 0.0, -HOLE_ROW_Y)
     )
     set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, row_line)
     await anchor_point_to_origin(adapter, f"{row_line}.start", 0.0, 0.0, "hole row")
     await anchor_point_to_origin(
         adapter, f"{row_line}.end", 0.0, -HOLE_ROW_Y, "hole row station HoleRowY"
@@ -212,6 +216,44 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch hole row reference", await adapter.exit_sketch())
     name_last_feature(adapter, "HoleRowReference")
     drive_jobs += row_station.apply(adapter, "HoleRowReference")
+
+    # --- The stock thickness: a reference sketch ------------------------------
+    # Farm r1 (#290): the extrusion's imported depth has no sound drawing-view
+    # attachment, so _supplier_dimensions refuses to dress it as the STOCK
+    # reference; a sketch dimension attaches to its witness line (the base
+    # bar's BarWidth, _supplier_washer_model's thickness witness). One plain
+    # sketch line up the inner end face's -Y edge on the Right plane (on the
+    # edge, as the row's line), sketch (u, v) = model (-Z, Y)
+    # (_oblique_pivot_block_model), the end view's plane.
+    thick = SketchDims()
+    check("create_sketch thickness reference", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    witness = check(
+        "thickness witness line",
+        await adapter.add_line(0.0, -HALF_WIDTH, -BRACKET_THICK, -HALF_WIDTH),
+    )
+    set_sketch_direct_db(adapter, False)
+    await anchor_point_to_origin(
+        adapter, f"{witness}.start", 0.0, -HALF_WIDTH, "thickness witness foot"
+    )
+    thick.record("ThickWitnessY", '"BracketWidth" / 2')
+    check(
+        "thickness witness along Z",
+        await adapter.add_sketch_constraint(witness, None, "horizontal"),
+    )
+    await dimension_between(
+        adapter,
+        f"{witness}.start",
+        f"{witness}.end",
+        "distance",
+        BRACKET_THICK,
+        "BracketThick",
+    )
+    thick.record("BracketThick", '"BracketThick"')
+    await ensure_fully_defined(adapter, "thickness reference sketch")
+    check("exit_sketch thickness reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "BracketThickReference")
+    drive_jobs += thick.apply(adapter, "BracketThickReference")
     _require_one_solid_body(adapter, label="end bracket")
 
     await force_rebuild(adapter)
@@ -224,21 +266,28 @@ async def build(adapter) -> dict[str, str]:
     _require_one_solid_body(adapter, label="driven end bracket")
 
     # Every model edit -- material, marked set, model-owned places -- precedes
-    # the save. No model band: the stations and row print at three places, so
-    # the title block's ±0.13 governs them (spec module docstring).
+    # the save. The bar taps and row print at three places, so the title
+    # block's ±.005 governs them; the KP08 taps print exact millimetres with
+    # their own band (owner ruling 4; spec module docstring).
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    for (feature_name, dimension_name), (places, band) in METRIC_DIMENSIONS.items():
+        set_dimension_symmetric_tolerance(
+            adapter, feature_name, dimension_name, band, display_unit="mm"
+        )
+        set_metric_vendor_units(adapter, feature_name, dimension_name, places=places)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
-    # The reference sketch owns a printed dimension but no geometry: hide it
-    # so no assembly renders it; the drawing shows it in the plan that
-    # imports its dimension (_drawing_hidden_sketches).
+    # The reference sketches own printed dimensions but no geometry: hide
+    # them so no assembly renders them; the drawing shows each in the view
+    # that imports its dimension (_drawing_hidden_sketches).
     blank_sketch(adapter, "HoleRowReference")
+    blank_sketch(adapter, "BracketThickReference")
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts

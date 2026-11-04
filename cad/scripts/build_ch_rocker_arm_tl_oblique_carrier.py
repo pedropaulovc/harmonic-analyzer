@@ -21,9 +21,10 @@ Z, model Z = -carrier Y, so a Top-plane sketch reads carrier (X, Y)):
 * ``StationReference``, a hidden Top-plane sketch of points, carries every
   printed X station as a baseline from A1's axis (rule 10); the spot and tap
   placements below stay origin-based, driven from it;
-* the HUB and CL centre-drill spots are 90 degree cones, each revolved on a
-  plane through its axis parallel to the Front plane (the plane's offset is
-  the spot's Y station) as the pivot plate's seat cone;
+* the CL centre-drill spot is a 90 degree cone, revolved on a plane through
+  its axis parallel to the Front plane (the plane's offset is the spot's Y
+  station) as the pivot plate's seat cone; the HUB is not on this part (it is
+  drilled in situ at assembly, owner ruling 5);
 * the CR, riser and feed-lever taps are UNC Hole Wizard features from the
   top face, through;
 * each pin hole carries a hidden reference axis (``PIN_HOLE_AXES``), two
@@ -42,6 +43,8 @@ from collections.abc import Callable
 from typing import Any
 
 from _appearance import apply_material
+from _document_units import apply_package_model_units
+from _part_properties import part_drawing_unit
 from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
@@ -110,6 +113,7 @@ from ch_rocker_arm_tl_oblique_carrier_spec import (
     SPOT_FLANK_ANGLE,
     SPOT_REFERENCE,
     SPOTS,
+    LEVER_STATION_BAND,
     STATION_REFERENCE,
     STATIONS,
     THICKNESS,
@@ -119,6 +123,7 @@ from ch_rocker_arm_tl_oblique_carrier_spec import (
     SECTION_REFERENCE,
     STOCK_REFERENCE_DX,
     PIN_CHAMFER_TOL_TYPE,
+    UNIT,
 )
 
 PART_NAME = "ch-rocker-arm-tl-oblique-carrier"
@@ -338,30 +343,21 @@ async def _spot(
 
 
 async def _spot_reference(adapter) -> list[tuple[str, str]]:
-    """The hidden reference sketch that carries the spots' printed heights
-    and their one Ø3 (drawing-simplicity-policy: a value the sheet prints but
-    no importable feature dimension carries). A Top-plane sketch reads carrier
-    (X, Y): HUB on the centreline (one Y), CL by X and Y, each a Ø3 circle on
-    the spot's mouth; CL's diameter is driven equal to HUB's and its X from
-    its printed station from A1 (``STATION_REFERENCE``)."""
+    """The hidden reference sketch that carries the spot's printed height and
+    Ø3 (drawing-simplicity-policy: a value the sheet prints but no importable
+    feature dimension carries). A Top-plane sketch reads carrier (X, Y): CL by
+    X and Y, a Ø3 circle on the spot's mouth, its X driven from its printed
+    station from A1 (``STATION_REFERENCE``)."""
     ref = SketchDims()
     check("create_sketch spot reference", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter,
-        *SPOTS["Hub"],
-        _R_SPOT,
-        "HUB spot reference",
-        dims=ref,
-        names=(None, "HubY", "SpotDia"),
-    )
     await define_circle(
         adapter,
         *SPOTS["Cl"],
         _R_SPOT,
         "CL spot reference",
         dims=ref,
-        names=("ClXOrigin", "ClY", "SpotDiaCl"),
-        drives=(_origin_x("ClX"), None, f'"SpotDia@{SPOT_REFERENCE}"'),
+        names=("ClXOrigin", "ClY", "SpotDia"),
+        drives=(_origin_x("ClX"), None, None),
     )
     await ensure_fully_defined(adapter, "spot reference sketch")
     check("exit_sketch spot reference", await adapter.exit_sketch())
@@ -405,9 +401,9 @@ async def _station_reference(adapter) -> list[tuple[str, str]]:
     point stands on its feature's centre (the left end's on the -X/-Y corner),
     so its extension line leaves the feature: X from the A1 point (printed,
     the owner the feature placements are driven from), Y from it too (not
-    printed; driven where a printed Y has a name, else the spec's). HubX is
-    the tap axis's printed station, driven equal to A1X: the HUB spot and the
-    lever taps stand on the origin's X, so it cannot disagree with them."""
+    printed; driven where a printed Y has a name, else the spec's). LeverX is
+    the lever taps' printed station, driven equal to A1X: the taps stand on
+    the origin's X, so it cannot disagree with them."""
     stations = SketchDims()
     check("create_sketch station reference", await adapter.create_sketch("Top"))
     a1 = PIN_HOLES["A1"]
@@ -416,12 +412,11 @@ async def _station_reference(adapter) -> list[tuple[str, str]]:
     stations.record("StationA1X", _pin_dim("A1X"))
     x_drives = {
         "EdgeX": '"PlateHalfLength@PlateProfile" - ' + _pin_dim("A1X"),
-        "HubX": _pin_dim("A1X"),
+        "LeverX": _pin_dim("A1X"),
     }
     y_drives = {
         "EdgeX": '"PlateNearY@PlateProfile"',
         "ClX": f'"ClY@{SPOT_REFERENCE}"',
-        "HubX": f'"HubY@{SPOT_REFERENCE}"',
     }
     for name, point in STATIONS.items():
         target = _add_point(adapter, point, f"{name} station")
@@ -681,6 +676,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # --- Plate: Top-plane rectangle, extruded down by the stock -------------
     plate = SketchDims()
@@ -751,11 +747,11 @@ async def build(adapter) -> dict[str, str]:
         adapter, "pin chamfers", volume - V_PIN_CHAMFER, 0.05 * V_PIN_CHAMFER + 0.05
     )
 
-    # --- X stations from A1, then the HUB and CL centre-drill spots ----------
+    # --- X stations from A1, then the CL centre-drill spot -------------------
     # The printed baselines first: the hidden sketch of points that drives
     # every spot and tap X placement, ahead of them in the tree. Then the
-    # spots' printed heights and Ø3: the hidden reference sketch that drives
-    # each spot plane and cone, ahead of them in the tree.
+    # spot's printed height and Ø3: the hidden reference sketch that drives
+    # its plane and cone, ahead of them in the tree.
     drive_jobs += await _station_reference(adapter)
     drive_jobs += await _spot_reference(adapter)
     for prefix, point in SPOTS.items():
@@ -844,14 +840,31 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    # Rule 4: the reamed H7 pin holes and the +/-0.02 pin-position chain.
+    # Rule 4: the reamed pin holes and the pin-position chain; the bands are
+    # millimetres, UNIT prints them in inches.
     set_dimension_bilateral_tolerance(
-        adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_BAND)
+        adapter,
+        "PinHoleProfile",
+        "PinHoleDia",
+        *deviations(PIN_HOLE_BAND),
+        display_unit=UNIT,
     )
     for dimension_name in POSITION_BANDED:
         set_dimension_symmetric_tolerance(
-            adapter, "PinHoleProfile", dimension_name, POSITION_BAND
+            adapter,
+            "PinHoleProfile",
+            dimension_name,
+            POSITION_BAND,
+            display_unit=UNIT,
         )
+    # The lever taps' station: its own .XX band on the 3-place axis.
+    set_dimension_symmetric_tolerance(
+        adapter,
+        STATION_REFERENCE,
+        "LeverX",
+        LEVER_STATION_BAND,
+        display_unit=UNIT,
+    )
     _pin_chamfer_min_limit(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)

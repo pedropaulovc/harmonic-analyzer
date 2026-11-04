@@ -141,6 +141,9 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
     ("ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec", "ID_BAND"): (
         "catalogue bore record; printed as untoleranced REF"
     ),
+    ("ch_rocker_arm_tl_vn_oblique_nut_dowel_spec", "DIA_BAND"): (
+        "catalogue diameter record; the jig reads DIA_MAX, printed as REF"
+    ),
     ("build_dt_drive_train_assembly", "ARBOR_PED_SOUTH_Z_BAND"): (
         "plan z extent of the south pedestal foot (clearance geometry)"
     ),
@@ -247,8 +250,8 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
 # the same check as a helper-fed band.
 INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("ch_rocker_arm_tl_vn_oblique_pivot_screw_spec", "SHOULDER_LENGTH_BAND"): (
-        "catalogue shoulder-length band, indexed for the jig's "
-        "PIVOT_UNSHIMMED_GAP_RANGE; the sheet prints it as untoleranced REF"
+        "assumed shoulder-length envelope (the page states none), indexed for "
+        "the jig's PIVOT_UNSHIMMED_GAP_RANGE; the sheet prints it as untoleranced REF"
     ),
     ("ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec", "LENGTH_BAND"): (
         "catalogue length band, indexed for the jig's "
