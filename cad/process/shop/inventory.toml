@@ -6644,7 +6644,7 @@ cite = ["Owner stock selection 2026-11-03: McMaster 8663K55, black acetal (Delri
 # Machine-build stock order, 2026-11-03 (owner placed the orders). Each row is one order line:
 # catalogue nominal size and ordered length, not receipt metrology. on_hand stays false until
 # the bar is received; the part allocation names the MHA numbers cut from it.
-# OnlineMetals order: all lines Online Order Pickup at the Seattle, WA warehouse.
+# OnlineMetals order 1021751700: all lines Online Order Pickup at the Seattle, WA warehouse.
 
 [[stock]]
 form = "flat_bar"
@@ -6961,7 +6961,7 @@ length_mm = 177.8
 on_hand = false
 cite = ["OnlineMetals part 1268 https://www.onlinemetals.com/en/buy/x/pid/1268 ordered 2026-11-03"]
 
-# Metal Supermarkets Seattle (Kent) order, in-store pickup.
+# Metal Supermarkets Seattle (Kent) order EC234347, in-store pickup.
 
 [[stock]]
 form = "flat_bar"
@@ -6990,7 +6990,7 @@ length_mm = 101.6
 on_hand = false
 cite = ["Metal Supermarkets Seattle (Kent), alloy-steel-round-bar-4140 CD Heat Treated 0.500, ordered 2026-11-03"]
 
-# McMaster-Carr order.
+# McMaster-Carr order 1103PCAMPOS.
 
 [[stock]]
 form = "round_bar"
@@ -7063,3 +7063,12 @@ section_mm = [152.4, 1.6002]
 length_mm = 152.4
 on_hand = false
 cite = ["McMaster-Carr 8956K455 https://www.mcmaster.com/8956K455/ ordered 2026-11-03"]
+
+[[stock]]
+form = "flat_bar"
+material = "black Delrin acetal resin (homopolymer)"
+note = "Ordered 2026-11-03: 1/4 x 1-3/4 in black Delrin acetal bar, oversized tolerance, 2 ft. Allocation: ch-rocker-arm-tl-oblique-riser (MHA-CH-06-TL-24), blank 1.60 x 13.40 in."
+section_mm = [44.45, 6.35]
+length_mm = 609.6
+on_hand = false
+cite = ["McMaster-Carr 8663K55 https://www.mcmaster.com/8663K55/ ordered 2026-11-03"]
