@@ -48,6 +48,40 @@ def test_seat_spigot_rim_is_the_recorded_shortfall() -> None:
     assert seat_geometry.SEAT_SPIGOT_RIM == pytest.approx(rim)
 
 
+def test_one_drive_pin_hole_serves_both_seats_at_the_d14_press() -> None:
+    # #290 fit row D14: .0930 REAM_H7 (.0930/.0935) for the 98381A 3/32
+    # dowel (+.0001/+.0003), a .00035 to .00105 press.
+    hole = seat_geometry.DRIVE_PIN_HOLE_DIA + min(seat_geometry.DRIVE_PIN_HOLE_BAND)
+    hole_max = seat_geometry.DRIVE_PIN_HOLE_DIA + max(seat_geometry.DRIVE_PIN_HOLE_BAND)
+    assert (hole / 25.4, hole_max / 25.4) == pytest.approx((0.0930, 0.0935))
+    assert (
+        crank.DRIVE_PIN_HOLE_DIA
+        == collar.PIN_HOLE_DIA
+        == seat_geometry.DRIVE_PIN_HOLE_DIA
+    )
+    assert (
+        crank.DRIVE_PIN_HOLE_BAND
+        == collar.PIN_HOLE_BAND
+        == seat_geometry.DRIVE_PIN_HOLE_BAND
+    )
+    assert crank.HOLE_CALLOUT_PLACES == collar.PIN_HOLE_PLACES == 4
+    press = tuple(value / 25.4 for value in crank.DRIVE_PIN_PRESS_INTERFERENCE)
+    assert press == pytest.approx((0.00035, 0.00105))
+    # Each pin centre .2756 +/-.0009 on both shafts and in the wheel.
+    assert crank.DRIVE_PIN_OFFSET_TOL == collar.PIN_OFFSET_TOL == spec.PIN_LOCATION_TOL
+    assert seat_geometry.DRIVE_PIN_OFFSET_TOL == pytest.approx(0.0009 * 25.4)
+    assert seat_geometry.DRIVE_PIN_OFFSET_PLACES == 4
+    # The wheel's drilled bore and pin holes are the seat's (.406, .098).
+    assert (spec.BORE_DIA, spec.PIN_HOLE_DIA) == (
+        seat_geometry.BORE_DIA,
+        seat_geometry.PIN_HOLE_DIA,
+    )
+    assert (
+        seat_geometry.BORE_DIA / 25.4,
+        seat_geometry.PIN_HOLE_DIA / 25.4,
+    ) == pytest.approx((0.406, 0.098))
+
+
 @pytest.mark.parametrize(
     ("plate_height", "inner_r"),
     [(spec.ANSI_PLATE_HEIGHT, 8.928), (4.8, 9.449)],

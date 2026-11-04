@@ -221,7 +221,7 @@ _DRIVE_TRAIN_ALLOWED_PAIRS = {
         second_number=None,
     ),
     # The two MHA-DT-VN-67 dowels pressed into MHA-DT-11's seat-collar holes
-    # (ø2.38125 pin in a ø2.38 ream over the press depth): the press fit.
+    # (ø2.38125 pin in a ø2.3622 (.0930) ream over the press depth): the press fit.
     **_numbered_pairs(
         "dt-vn-crank-seat-drive-pin",
         range(1, 3),

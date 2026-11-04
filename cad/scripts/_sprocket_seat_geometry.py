@@ -7,6 +7,8 @@ read this interface independently of the removable sprocket's tooth model.
 
 from __future__ import annotations
 
+from _fit_ream_h7 import REAM_H7
+
 _MM_PER_IN = 25.4
 
 # A bought chain's axial envelope (PEER Chain 25R size chart, read
@@ -40,17 +42,18 @@ def chain_reach_rear(plate: float) -> float:
 
 
 CHAIN_REACH_REAR_WORST = chain_reach_rear(PLATE + min(PLATE_BAND))  # 3.587
-BORE_DIA = 10.3  # 13/32 in, 0.39 radial clear of the Ø9.525 shaft/pilot
-PIN_HOLE_DIA = 2.5  # slip over the Ø2.38 drive pins (0.06 radial)
+# The removable's bore and pin holes are drilled (#290: .406 on a 13/32 drill,
+# .098 on a #40, the title block's DRILLED HOLES row governing both).
+BORE_DIA = 10.3124  # .406, 0.39 radial clear of the Ø9.525 shaft/pilot
+PIN_HOLE_DIA = 2.4892  # .098, slip over the Ø2.38 drive pins (0.05 radial)
 PIN_CIRCLE_DIA = 14.0
 PIN_CIRCLE_RADIUS = PIN_CIRCLE_DIA / 2.0
 # Two holes at 180 deg on the part's (and the shafts') +/-Y: 12 and 6 o'clock.
 PIN_HOLE_ANGLES_DEG = (90.0, 270.0)
-# Each drive pin and wheel hole is located +/-0.025 from the axis at .XXX.
-# Their 0.119 diametral clearance absorbs both parts' spacing error, each
-# spending half of it.
-DRIVE_PIN_OFFSET_PLACES = 3
-DRIVE_PIN_OFFSET_TOL = 0.025
+# Each drive pin and wheel hole is located .2756 +/-.0009 from the axis.
+# Their 0.100 diametral slip clearance absorbs both parts' spacing error.
+DRIVE_PIN_OFFSET_PLACES = 4
+DRIVE_PIN_OFFSET_TOL = 0.02286  # .0009
 
 # Bore <-> pin-hole web, photo-faithful to the p.56 catalogue view: below the
 # 1.5 wall floor, pending ruling #1377.  The printed worst case reads the
@@ -69,12 +72,11 @@ CHAIN_MID_Z = SEAT_FACE_Z - PLATE / 2.0  # -155.7, the ONE chain plane
 DRIVE_PIN_DIA = 3.0 / 32.0 * _MM_PER_IN  # 2.38125
 DRIVE_PIN_PROUD = 2.4
 DRIVE_PIN_TIP_Z = SEAT_FACE_Z - DRIVE_PIN_PROUD  # -156.7
-DRIVE_PIN_HOLE_DIA = 2.38  # reamed for the press (3/32 nominal)
-# Light press of the hardened 3/32 dowel; the shafts retain their own
-# catalogue-diameter and interference checks.  On the inch grid the
-# crankshaft's sheet prints (+.0000/-.0004; #290, after the PD batch #2124
-# left the crankshaft its only reader).
-DRIVE_PIN_HOLE_BAND = (0.0, -0.01016)
+# Reamed for a light press of the hardened 3/32 dowel: .0930 REAM_H7
+# (.0930/.0935, #290 fit row D14, the .0930 reamer), one hole for the crank
+# seat and the drive collar.  The crankshaft spec checks the press window.
+DRIVE_PIN_HOLE_DIA = 2.3622  # .0930
+DRIVE_PIN_HOLE_BAND = REAM_H7  # +.0005/-.0000
 # The shared 98381A stock dowel family's +/-0.010 in length grade.
 DRIVE_PIN_LENGTH_GRADE = 0.010 * _MM_PER_IN
 
@@ -88,4 +90,4 @@ SPIGOT_DIA_BAND = (0.0, -0.1016)  # +.000/-.004 (#290, fit row D2s)
 # Pin hole to the spigot's rim: under the 1.5 wall floor (pending ruling #991).
 SEAT_SPIGOT_RIM = (
     SEAT_SPIGOT_DIA / 2.0 - PIN_CIRCLE_RADIUS - DRIVE_PIN_HOLE_DIA / 2.0
-)  # 0.56
+)  # 0.57

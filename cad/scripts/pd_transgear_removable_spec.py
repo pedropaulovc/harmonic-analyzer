@@ -179,16 +179,13 @@ PLATE_PLACES = 3
 PLATE_PRINTED_BAND = (0.0, -0.0762)  # (upper, lower): +.000/-.003
 # Each pin centre prints .2756 (the shared 7.0 at four places) +/-.0009, the
 # shared +/-DRIVE_PIN_OFFSET_TOL the crank seat's pins also carry.
-PIN_LOCATION_PLACES = 4
-PIN_LOCATION_TOL = 0.02286  # .0009
+PIN_LOCATION_PLACES = seat.DRIVE_PIN_OFFSET_PLACES
+PIN_LOCATION_TOL = seat.DRIVE_PIN_OFFSET_TOL
 # The drills the bore and the pin holes are cut with, and their diameters (in).
 BORE_DRILL = ("13/32", 13.0 / 32.0)
 PIN_HOLE_DRILL = ("#40", 0.098)
-# Local inch copies of seat.BORE_DIA / PIN_HOLE_DIA / DRIVE_PIN_OFFSET_TOL
-# (above) while the crank and drive-collar sheets print mm; the #290
-# knob-stack PR collapses them into _sprocket_seat_geometry.
-BORE_DIA = 10.3124  # .406
-PIN_HOLE_DIA = 2.4892  # .098
+BORE_DIA = seat.BORE_DIA  # .406
+PIN_HOLE_DIA = seat.PIN_HOLE_DIA  # .098
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlankProfile": {"BlankDia", "BlankWidth"},
     "BorePinsProfile": {"BoreDiaDim", "PinPosDia", "PinPosY", "PinNegY"},

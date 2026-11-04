@@ -334,10 +334,9 @@ SPIGOT_END = SEAT_COLLAR + SPIGOT_LENGTH  # the body's front face, -148.5
 if seat_geometry.PIN_HOLE_ANGLES_DEG != (90.0, 270.0):
     raise AssertionError("the drive-pin holes are laid out on local +/-Z only")
 DRIVE_PIN_CIRCLE_RADIUS = seat_geometry.PIN_CIRCLE_RADIUS
-# #290: each pin located .2756 +/-.0009 from the axis (the PD batch moves the
-# shared DRIVE_PIN_OFFSET_TOL to the same value; this reads it once it lands).
-DRIVE_PIN_OFFSET_TOL = 0.02286
-DRIVE_PIN_OFFSET_PLACES = 4
+# #290: each pin located .2756 +/-.0009 from the axis, the shared band.
+DRIVE_PIN_OFFSET_TOL = seat_geometry.DRIVE_PIN_OFFSET_TOL
+DRIVE_PIN_OFFSET_PLACES = seat_geometry.DRIVE_PIN_OFFSET_PLACES
 DRIVE_PIN_HOLE_DIA = seat_geometry.DRIVE_PIN_HOLE_DIA
 DRIVE_PIN_DEPTH = dt_vn_crank_seat_drive_pin_spec.PRESS_DEPTH  # 3.95
 DRIVE_PIN_FLOOR = SEAT_COLLAR + DRIVE_PIN_DEPTH
@@ -377,13 +376,13 @@ SPIGOT_LENGTH_PLACES = 3
 SPIGOT_LENGTH_TOL = 0.0508
 # The drive-pin holes print through a native callout on their cut-extrude
 # (size and depth stay the model's), not as marked dimensions.  The shared
-# 2.38 hole needs four inch places to print its limits truthfully
-# (.0937/.0933); a cut-extrude callout takes the sheet's document places, so
-# draw_dt_crankshaft opens the sheet at these.
+# .0930 REAM_H7 hole needs four inch places to print its limits truthfully
+# (.0930 +.0005/.0000); a cut-extrude callout takes the sheet's document
+# places, so draw_dt_crankshaft opens the sheet at these.
 HOLE_CALLOUT_PLACES = 4
 DRIVE_PIN_DEPTH_TOL = 0.1016
-# The shared hole's band, on the inch grid this sheet prints.
-DRIVE_PIN_HOLE_BAND = seat_geometry.DRIVE_PIN_HOLE_BAND  # +.0000/-.0004
+# The shared hole's band: .0930 REAM_H7 (#290 fit row D14).
+DRIVE_PIN_HOLE_BAND = seat_geometry.DRIVE_PIN_HOLE_BAND  # +.0005/-.0000
 # Local (dome-root) deviations of the seat face as (upper, lower): a station
 # printed from the far end moves by its own printed band (its model value is
 # the chain plane's, so it prints rounded) plus the Depth's.  The drive
@@ -408,6 +407,15 @@ DRIVE_PIN_PRESS_INTERFERENCE = (
 )
 if min(DRIVE_PIN_PRESS_INTERFERENCE) <= 0.0:
     raise AssertionError("the drive-pin hole band loses the press at its upper limit")
+# #290 fit row D14: the 98381A dowel (+.0001/+.0003) in the .0930 REAM_H7
+# hole presses .00035 to .00105.
+if not all(
+    abs(have - want * dt_vn_crank_seat_drive_pin_spec.MM_PER_IN) <= 1e-6
+    for have, want in zip(DRIVE_PIN_PRESS_INTERFERENCE, (0.00035, 0.00105))
+):
+    raise AssertionError(
+        f"the drive-pin press {DRIVE_PIN_PRESS_INTERFERENCE} mm left the D14 window"
+    )
 # A dowel pressed into a blind hole has no way out (drawing-guidelines.md
 # rule 16 (design for the cutter)): each drive-pin hole's floor is pierced by
 # a #54 knockout drilled through from the collar's rear face, so a 3/64 pin
@@ -447,8 +455,8 @@ if DRIVE_PIN_SPIGOT_RIM_WORST >= WALL_FLOOR_MM:
     raise AssertionError("the rim meets the floor now: retire RV-02")
 if DRIVE_PIN_SPIGOT_RIM_WORST <= 0.0:
     raise AssertionError("the drive-pin holes break out of the spigot at print-worst")
-# Pin spacing errors: this shaft's two centres at its band, the wheel's two
-# holes at the wheel's own band (until the shared band moves, they differ).
+# Pin spacing errors: this shaft's two centres and the wheel's two holes,
+# each pair at the shared location band.
 DRIVE_PIN_SPACING_ERROR_MAX = 2.0 * DRIVE_PIN_OFFSET_TOL
 _WHEEL_SPACING_ERROR_MAX = 2.0 * seat_geometry.DRIVE_PIN_OFFSET_TOL
 if (

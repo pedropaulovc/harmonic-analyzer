@@ -367,9 +367,9 @@ def test_pilot_wall_worst_and_the_one_decimal_control() -> None:
 
 def test_drive_pin_holes_clear_the_bore_and_the_pilot() -> None:
     # The unchanged dowel circle clears the smaller D-bore and pilot.
-    assert spec.BORE_PIN_WALL_WORST == pytest.approx(3.34239)
+    assert spec.BORE_PIN_WALL_WORST == pytest.approx(3.34494)
     assert spec.BORE_PIN_WALL_WORST >= spec.WALL_FLOOR
-    assert spec.PIN_HOLE_INNER_R_MIN == pytest.approx(5.78714)
+    assert spec.PIN_HOLE_INNER_R_MIN == pytest.approx(5.78969)
     assert spec.PIN_HOLE_INNER_R_MIN > spec.PILOT_R_MAX
     # Negative controls: holes on a 6.0 radius break into the pilot; on the
     # pilot's own 5.0 radius they leave 0.605 to the bore.
@@ -379,12 +379,12 @@ def test_drive_pin_holes_clear_the_bore_and_the_pilot() -> None:
 
 def test_bore_slides_on_the_core_and_the_pilot_in_the_wheel() -> None:
     assert spec.BORE_CORE_CLEARANCE == pytest.approx((0.0254, 0.05842))
-    # Radial: (10.3 - 10.16) / 2 and (10.3 + 0.1016 - 9.652) / 2. The pilot
+    # Radial: (10.3124 - 10.16) / 2 and (10.3124 + 0.1016 - 9.652) / 2. The pilot
     # only clears the bore, so the title block's .XX row governs both limits
     # (Codjiflo, #2148): .39 ±.01, never an authored band.
     assert spec.PILOT_DIA_PLACES == 2
     assert spec.PILOT_DIA_BAND == pytest.approx((0.254, -0.254))
-    assert spec.PILOT_BORE_CLEARANCE == pytest.approx((0.07, 0.3748))
+    assert spec.PILOT_BORE_CLEARANCE == pytest.approx((0.0762, 0.381))
     # Negative controls: a press-type bore band binds on the core; a pilot
     # at the wheel's bore size has no air.
     press_bore = spec.BORE_DIA - 0.030 - (shaft.CORE_DIA + max(shaft.CORE_DIA_BAND))
@@ -946,7 +946,7 @@ def test_native_rear_entry_has_both_actual_legs_on_both_d_edges(monkeypatch) -> 
     assert spec.BORE_ENTRY_AXIAL_SPAN_MIN == pytest.approx(3.8862)
     assert spec.BORE_ENTRY_PROFILE_DEPTH_MIN == pytest.approx(0.26924)
     assert spec.BORE_ENTRY_BREAK_GEOMETRY_MAX == pytest.approx(0.26924)
-    assert spec.BORE_ENTRY_WALL_WORST == pytest.approx(3.079365300297)
+    assert spec.BORE_ENTRY_WALL_WORST == pytest.approx(3.081915300297)
     assert spec.NECK_CORNER_D_BORE_AIR_MIN == pytest.approx(0.144630969281)
     assert spec.D_DRIVE_AREA_MIN == pytest.approx(6.991639285135)
     assert spec.D_SUPPORT_LENGTH_MIN == pytest.approx(4.020550600594)

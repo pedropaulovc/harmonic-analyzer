@@ -18,7 +18,7 @@ float under the nut.
 
 Decimal inch (#290): nominals are the exact millimetres of their printed
 inch values, except the shared seat interface's (``_sprocket_seat_geometry``)
-which print rounded until D14 converts that interface.
+Ø17.5 seat and 14.0 pin circle, which print rounded (.689, .2756).
 
 The rear D-entry nominal is the actual shaft corner envelope plus one full
 entry-tolerance span. Both legs retain the explicit manufacturing band;
@@ -92,12 +92,16 @@ from _sprocket_seat_geometry import BORE_DIA as WHEEL_BORE_DIA
 from pd_transgear_removable_spec import CRANK_CONFIG, KNOB_CONFIG
 from pd_transgear_removable_spec import UNIT as WHEEL_UNIT
 from _sprocket_seat_geometry import (
+    DRIVE_PIN_HOLE_BAND,
     DRIVE_PIN_HOLE_DIA,
+    DRIVE_PIN_OFFSET_PLACES,
+    DRIVE_PIN_OFFSET_TOL,
     DRIVE_PIN_PROUD,
     PLATE,
     PLATE_BAND,
     SEAT_SPIGOT_DIA,
     SEAT_SPIGOT_RIM,
+    SPIGOT_DIA_BAND,
 )
 from _sprocket_seat_geometry import PIN_CIRCLE_RADIUS as _WHEEL_PIN_CIRCLE_RADIUS
 from pd_transgear_thumbnut_spec import CSK_DIA as NUT_CSK_DIA
@@ -136,9 +140,8 @@ BODY_BLANK_LENGTH_MIN = 7.4168  # .292
 OD = SEAT_SPIGOT_DIA  # the crank spigot's seat, printed .689
 OD_PLACES = 3
 # The removables swap between shafts: the crank spigot's maximum keeps the
-# #25 plates wrapping a T12 clear of this seat.  +.000/-.004 on the inch
-# grid (the crank's own copy, dt_crankshaft_spec on #2105; D14 shares it).
-OD_BAND = (0.0, -0.1016)
+# #25 plates wrapping a T12 clear of this seat: the shared +.000/-.004.
+OD_BAND = SPIGOT_DIA_BAND
 
 # --- Pilot on the front face, through the wheel's bore (ruling 5) ------------
 # .39 at the title block's .XX row (Codjiflo, #2148; rule 4): the pilot only
@@ -277,14 +280,12 @@ FRONT_BEARING_AREA_MIN = min(
 # --- Drive-pin holes: reamed THROUGH for the MHA-PD-VN-54 press (the crank's twin) -
 PIN_CIRCLE_RADIUS = _WHEEL_PIN_CIRCLE_RADIUS  # ±Y
 PIN_HOLE_DIA = DRIVE_PIN_HOLE_DIA  # the shared 3/32 press hole
-# The shared hole's (0/-.010) band on the inch grid this sheet prints, and
-# each centre's location band, as the crank's inch sheet copies them
-# (dt_crankshaft_spec on #2105); D14 converts the shared hole and removes
-# both copies.
-PIN_HOLE_BAND = (0.0, -0.01016)  # +.0000/-.0004
+# The shared .0930 REAM_H7 hole and each centre's .2756 +/-.0009, at the
+# four places the crank's sheet prints them too.
+PIN_HOLE_BAND = DRIVE_PIN_HOLE_BAND  # +.0005/-.0000
 PIN_HOLE_PLACES = 4
-PIN_OFFSET_TOL = 0.02286  # ±.0009 each centre
-PIN_OFFSET_PLACES = 4
+PIN_OFFSET_TOL = DRIVE_PIN_OFFSET_TOL  # ±.0009 each centre
+PIN_OFFSET_PLACES = DRIVE_PIN_OFFSET_PLACES
 PIN_HOLE_DEPTH = LENGTH  # through the body
 
 # --- Native D construction and the existing drive-hole carriers ------------

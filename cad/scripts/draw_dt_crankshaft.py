@@ -319,7 +319,7 @@ CALLOUTS_ABOVE = {
     "SpigotDiaDim": SPIGOT_AIR,
     "NeckDiaDim": NECKS,
 }
-# Each drive-pin location names the mate its +/-0.025 serves
+# Each drive-pin location names the mate its +/-.0009 serves
 # (crankshaft_notes), in the clear field under its text; the spigot's length
 # names the chain it keeps clear, between the cross-hole's and the collar
 # seat's extension lines.  Each banded diameter names its mate under its
