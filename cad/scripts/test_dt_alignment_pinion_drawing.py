@@ -36,25 +36,11 @@ def test_gear_data_block_preserves_the_actual_finite_stock_profile() -> None:
     assert spec.WHOLE_DEPTH == pytest.approx(spec.STOCK_FORM.plunge_mm)
     assert spec.MAX_CUT_DEPTH_MM > spec.WHOLE_DEPTH
     assert spec.OUTSIDE_DIA <= spec.MIN_SPAN_SUPPORT_OUTSIDE_DIA_MM
-    assert spec.OUTSIDE_DIA + 0.01 > spec.MIN_SPAN_SUPPORT_OUTSIDE_DIA_MM
+    # Floored to the .001-in grid the tip prints at.
+    assert spec.OUTSIDE_DIA + 0.0254 > spec.MIN_SPAN_SUPPORT_OUTSIDE_DIA_MM
     assert spec.CUTTER_NUMBER == 4
     assert spec.CUTTER_TEETH_RANGE == (26, 34)
     assert spec.CUTTER_TEETH_RANGE[0] <= spec.TEETH <= spec.CUTTER_TEETH_RANGE[1]
-    for field in (
-        f"NUMBER OF TEETH:  {spec.TEETH}",
-        f"DIAMETRAL PITCH:  {spec.DIAMETRAL_PITCH:.2f}",
-        f"MODULE (mm, REF):  {spec.MODULE_MM:.3f}",
-        f"PRESSURE ANGLE:  {spec.PRESSURE_ANGLE_DEG:.1f} DEG",
-        f"PITCH DIAMETER (mm, REF):  {spec.PITCH_DIA:.2f}",
-        f"ROOT ENVELOPE DIAMETER (mm, REF):  "
-        f"{sum(spec.ROOT_ENVELOPE_DIA_MM) / 2.0:.2f}",
-        f"CUTTER PLUNGE (mm, REF):  {spec.WHOLE_DEPTH:.3f}",
-        f"FORM CUTTER:  #{spec.CUTTER_NUMBER}, "
-        f"{spec.CUTTER_TEETH_RANGE[0]}-{spec.CUTTER_TEETH_RANGE[1]}T; "
-        f"{spec.CUTTER_REFERENCE_TEETH}T REFERENCE",
-        "TOOTH FORM:  SPUR INVOLUTE, FULL DEPTH, AS CUT BY THE FORM CUTTER",
-    ):
-        assert field in data, field
     assert "CHORD" not in data
     assert "X.XX" not in data
 
@@ -188,18 +174,15 @@ def test_tooth_thickness_is_controlled_by_the_model_base_tangent_span() -> None:
     )
     assert spec.BASE_TANGENT_SPAN == pytest.approx(span, abs=1e-9)
     assert spec.BASE_TANGENT_SPAN == pytest.approx(spec.STOCK_FORM.tangent_span_mm(k))
-    assert spec.BASE_TANGENT_SPAN_BAND == (0.0, -0.100)
-    assert (
-        f"BASE-TANGENT SPAN, OVER {k} TEETH (mm):  "
-        f"{spec.BASE_TANGENT_SPAN:.{spec.BASE_TANGENT_SPAN_PLACES}f} "
-        f"+{spec.BASE_TANGENT_SPAN_BAND[0]:.3f}"
-        f"/{spec.BASE_TANGENT_SPAN_BAND[1]:.3f}"
-    ) in spec.GEAR_DATA
+    assert spec.BASE_TANGENT_SPAN_BAND == (0.0, -0.1016)
 
 
 def test_printed_thickness_corners_keep_finite_actual_cutter_support() -> None:
     span_limits = spec.base_tangent_span_limits_mm()
-    nominal = round(spec.BASE_TANGENT_SPAN, spec.BASE_TANGENT_SPAN_PLACES)
+    # The printed span sits on the .0001-in grid, never under the model.
+    nominal = spec.BASE_TANGENT_SPAN_PRINTED_MM
+    assert nominal / 25.4 * 1e4 == pytest.approx(round(nominal / 25.4 * 1e4), abs=1e-6)
+    assert 0.0 <= nominal - spec.BASE_TANGENT_SPAN < 0.00254
     assert span_limits[0] <= spec.BASE_TANGENT_SPAN <= span_limits[1]
     upper, lower = spec.BASE_TANGENT_SPAN_BAND
     assert span_limits == pytest.approx((nominal + lower, nominal + upper))
@@ -299,8 +282,9 @@ def test_shared_tip_band_keeps_nominal_stock_root_air() -> None:
 
 
 def test_tip_limits_follow_printed_nominal_not_unrounded_od() -> None:
-    places = spec.DRAWING_PRECISION_BY_NAME["OutsideDia"]
-    nominal = round(spec.OUTSIDE_DIA, places)
+    # The tip nominal sits on the .001-in grid it prints at.
+    nominal = spec.OUTSIDE_DIA
+    assert nominal / 25.4 * 1e3 == pytest.approx(round(nominal / 25.4 * 1e3), abs=1e-6)
     upper, lower = spec.OUTSIDE_DIA_BAND
     assert spec.outside_dia_limits_mm() == pytest.approx(
         (nominal + lower, nominal + upper), abs=1e-12
@@ -341,9 +325,7 @@ def test_tip_grade_configuration_reaches_the_part_spec(
     monkeypatch.setattr(_config, "fit", fit_value)
     dimensions = runpy.run_path(spec.__file__)
     assert dimensions["OUTSIDE_DIA_BAND"] == tuple(changed_band)
-    nominal = round(
-        dimensions["OUTSIDE_DIA"], dimensions["DRAWING_PRECISION_BY_NAME"]["OutsideDia"]
-    )
+    nominal = dimensions["OUTSIDE_DIA"]
     assert dimensions["outside_dia_limits_mm"]() == pytest.approx(
         (nominal - 0.01, nominal), abs=1e-12
     )

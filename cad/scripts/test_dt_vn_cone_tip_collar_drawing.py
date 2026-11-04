@@ -18,9 +18,20 @@ import dt_vn_cone_tip_collar_spec as spec
 import dt_tip_collar_air as air
 import _native_tip_collar_air as native_air
 from _fastener_catalog import FASTENERS
-from _printed_tolerance import printed_band_mm
+from _part_properties import part_drawing_unit
+from _printed_tolerance import (
+    edge_break_chamfer_mm,
+    printed_band_mm,
+    printed_deviations,
+)
 from _test_stock_recipes import discovered_recipes
 from gear_seat_fit import GEAR_SEAT_CLEARANCE, seat_bore_band
+
+
+def _worst_printed_band(nominal_mm: float, places: int) -> float:
+    """The worst side of the inch sheet's band about the number it prints."""
+    lower, upper = printed_deviations(nominal_mm, places, unit="in")
+    return max(-lower, upper)
 
 
 def test_one_actual_terminal_reader_preserves_named_classes():
@@ -66,7 +77,7 @@ def test_stock_flat_point_overlaps_the_d_flat_at_every_printed_limit():
     float_max = (spec.BORE_FINISHED_DIA_LIMITS_MM[1] - lands.TERMINAL_FINISHED_DIA_LIMITS_MM[0]) / 2.0
     terms = spec.SCREW_POINT_LATERAL_OFFSETS_MM
     assert set(terms) == {"tap centring", "tap angle", "screw thread play", "collar float"}
-    assert terms["tap centring"] == printed_band_mm(2)
+    assert terms["tap centring"] == printed_band_mm(2, unit="in")
     assert terms["collar float"] == pytest.approx(float_max)
     assert spec.TAP_ANGLE_RAD == pytest.approx(math.radians(1.0))
     assert spec.SCREW_POINT_RADIUS_MIN_MM == pytest.approx(0.039 * 25.4 / 2.0)
@@ -87,7 +98,7 @@ def test_stock_flat_point_overlaps_the_d_flat_at_every_printed_limit():
 
 
 def test_terminal_web_guard_reads_current_cutter_floor(monkeypatch):
-    assert gears.TERMINAL_WEB_REQUIREMENTS_MM == {6: 0.62, 12: 2.0}
+    assert gears.TERMINAL_WEB_REQUIREMENTS_MM == {6: 0.62, 12: 2.02438}
     for teeth, minimum in gears.TERMINAL_WEB_REQUIREMENTS_MM.items():
         assert gears.terminal_web_mm(teeth) >= minimum
     previous = gears.terminal_web_mm(6)
@@ -105,10 +116,15 @@ def test_terminal_web_guard_reads_current_cutter_floor(monkeypatch):
 
 
 def test_custom_wall_target_uses_printed_bands():
-    routine = printed_band_mm(2)
-    axial = printed_band_mm(3)
+    routine = printed_band_mm(2, unit="in")
+    width, nose, station = (
+        _worst_printed_band(value, 3)
+        for value in (spec.WIDTH, spec.NOSE_LENGTH, spec.TAP_STATION)
+    )
     assert spec.ROUTINE_BAND_MM == routine
-    assert spec.WIDTH_BAND_MM == spec.AXIAL_BAND_MM == spec.TAP_STATION_BAND_MM == axial
+    assert (spec.WIDTH_BAND_MM, spec.NOSE_LENGTH_BAND_MM, spec.TAP_STATION_BAND_MM) == (
+        width, nose, station,
+    )
     assert spec.OUTER_DIA < spec.STOCK_DIA
     assert min(spec.WORST_WALLS_MM.values()) >= spec.WALL_TARGET_MM == 2.0
     envelope = spec.THREAD_ENVELOPE_DIA
@@ -117,11 +133,11 @@ def test_custom_wall_target_uses_printed_bands():
     od_max_r = (spec.OUTER_DIA + routine) / 2.0
     drift = math.tan(math.radians(1.0)) * (spec.FLAT_DISTANCE + routine + od_max_r)
     assert spec.WORST_WALLS_MM["tap to south shoulder"] == pytest.approx(
-        spec.TAP_STATION - axial - spec.NOSE_LENGTH - axial
+        spec.TAP_STATION - station - spec.NOSE_LENGTH - nose
         - envelope / 2.0 - spec.EDGE_BREAK - drift,
     )
     assert spec.WORST_WALLS_MM["tap to north face"] == pytest.approx(
-        spec.WIDTH - axial - spec.TAP_STATION - axial
+        spec.WIDTH - width - spec.TAP_STATION - station
         - envelope / 2.0 - spec.EDGE_BREAK - drift,
     )
     assert spec.WORST_WALLS_MM["nose bore to round OD"] == pytest.approx(
@@ -377,9 +393,11 @@ def test_collar_deletes_only_the_notes_it_did_not_place(monkeypatch):
 
 def test_shoulder_root_prints_max_and_the_air_stack_books_it():
     """Machinist review of the r3 build asked about R0.25 0.00/-0.25: it is a
-    tool-nose root, sharp to 0.25 all good, so it prints R0.25 MAX."""
+    tool-nose root, sharp to 0.25 all good, so it prints MAX (R.01 MAX on the
+    inch sheet)."""
     assert drawing.SIDE_DIMENSION_TYPES == {"ShoulderRadius": 6}
     assert not hasattr(spec, "SHOULDER_ROOT_BAND")
+    assert spec.SHOULDER_ROOT_RADIUS == pytest.approx(0.01 * 25.4)
     nose = air.TIERS[0]
     assert nose.north_upper_mm >= spec.SHOULDER_ROOT_RADIUS
 
@@ -408,9 +426,9 @@ def test_stepped_air_tiers_include_native_tool_root_and_stock_screw():
     assert {tier.name for tier in air.TIERS} == {"nose", "body", "screw"}
     nose, body, screw = air.TIERS
     assert nose.north_mm == body.south_mm == air.PARTITION_STATION_MM
-    assert nose.north_upper_mm == spec.AXIAL_BAND_MM + spec.SHOULDER_ROOT_RADIUS
+    assert nose.north_upper_mm == spec.NOSE_LENGTH_BAND_MM + spec.SHOULDER_ROOT_RADIUS
     assert nose.radius_mm + nose.radius_upper_mm == (spec.NOSE_DIA + spec.ROUTINE_BAND_MM) / 2.0
-    assert body.south_lower_mm == -spec.AXIAL_BAND_MM
+    assert body.south_lower_mm == -spec.NOSE_LENGTH_BAND_MM
     assert body.north_mm + body.north_upper_mm == spec.WIDTH + spec.WIDTH_BAND_MM
     screw_reach = spec.SET_SCREW_LENGTH + spec.SET_SCREW_LENGTH_BAND_MM
     assert screw.south_lower_mm == pytest.approx(
@@ -688,7 +706,8 @@ def test_native_cylinder_positive_control_uses_actual_property_and_finite_axis(m
 def test_custom_body_is_smallest_printed_od_retaining_existing_wall_target():
     required = 2.0*max(spec.BODY_RADIUS_REQUIREMENTS_MM.values())+spec.ROUTINE_BAND_MM
     assert spec.OUTER_DIA >= required
-    assert spec.OUTER_DIA-0.01 < required
+    # The least size on the inch sheet's .XX grid.
+    assert spec.OUTER_DIA-0.01*25.4 < required
     assert spec.WALL_TARGET_MM == 2.0
     assert min(spec.WORST_WALLS_MM.values()) >= spec.WALL_TARGET_MM
 
@@ -704,15 +723,15 @@ def test_coupled_body_shift_has_one_source_and_keeps_radial_and_body_process_env
     assert spec.WIDTH-spec.NOSE_LENGTH == 8.0
     assert spec.TAP_STATION-spec.NOSE_LENGTH == 4.0
     assert spec.WIDTH-spec.TAP_STATION == 4.0
-    assert spec.NOSE_DIA == 6.40
-    assert lands.TERMINAL_FLAT_AF_MM == 0.420
+    assert spec.NOSE_DIA == pytest.approx(0.25 * 25.4)
+    assert lands.TERMINAL_FLAT_AF_MM == 0.4318
 
 
 def test_printed_physical_limits_keep_exact_native_model_and_real_fit_distinct():
-    assert lands.TERMINAL_FINISHED_DIA_LIMITS_MM == pytest.approx((0.77368, 0.794))
-    assert spec.BORE_FINISHED_DIA_LIMITS_MM == pytest.approx((0.8194, 0.8702))
-    assert lands.TERMINAL_DIA_MM == pytest.approx(0.79375)
-    assert spec.BORE_MODEL_DIA_MM == pytest.approx(0.8448)
+    assert lands.TERMINAL_FINISHED_DIA_LIMITS_MM == pytest.approx((0.76708, 0.7874))
+    assert spec.BORE_FINISHED_DIA_LIMITS_MM == pytest.approx((0.8128, 0.8636))
+    assert lands.TERMINAL_DIA_MM == pytest.approx(0.7874)
+    assert spec.BORE_MODEL_DIA_MM == pytest.approx(0.8382)
     minimum = (spec.BORE_FINISHED_DIA_LIMITS_MM[0]-lands.TERMINAL_FINISHED_DIA_LIMITS_MM[1])/2.0
     maximum = (spec.BORE_FINISHED_DIA_LIMITS_MM[1]-lands.TERMINAL_FINISHED_DIA_LIMITS_MM[0])/2.0
     assert (minimum, maximum) == pytest.approx((lands.TIP_COLLAR_MIN_RADIAL_FLOAT_MM, lands.TIP_COLLAR_MAX_RADIAL_FLOAT_MM))
@@ -723,18 +742,18 @@ def test_original_journal_span_pays_north_withdrawal_once():
     import dt_cone_gear_shaft_spec as shaft
     import dt_cone_pivot_post_spec as post
     expected = min(
-        post.CONE_BOSS_LENGTH-printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"])-2.0*shaft.THRUST_EDGE_BREAK_MAX,
-        shaft.JOURNAL_END-shaft.printed_band("Sec0End")-shaft.JOURNAL_FREE_END_BREAK_MAX_MM-shaft.THRUST_EDGE_BREAK_MAX-SHAFT_END_PLAY[1],
+        post.CONE_BOSS_LENGTH-printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"], unit=post.UNIT)-2.0*shaft.THRUST_EDGE_BREAK_MAX,
+        shaft.JOURNAL_END+shaft.printed_length_deviations("Sec0End")[0]-shaft.JOURNAL_FREE_END_BREAK_MAX_MM-shaft.THRUST_EDGE_BREAK_MAX-SHAFT_END_PLAY[1],
     )
     assert shaft.JOURNAL_SUPPORT_SPAN_MIN_MM == pytest.approx(expected)
 
 
-@pytest.mark.parametrize("section,native", [(0, 12.2555), (1, 9.525), (2, 6.35), (3, 3.175), (4, 0.79375)])
+@pytest.mark.parametrize("section,native", [(0, 12.2555), (1, 9.525), (2, 6.35), (3, 3.175), (4, 0.7874)])
 def test_all_land_physical_limit_readers_share_native_print_precision(section, native):
     import dt_cone_gear_shaft_spec as shaft
     assert shaft.DRAWING_PRECISION[f"Sec{section}Profile"][f"Sec{section}Dia"] == lands.LAND_DIA_PLACES[section]
     upper, lower = lands.SECTION_DIA_BANDS[section]
-    nominal = round(native, lands.LAND_DIA_PLACES[section])
+    nominal = round(native / 25.4, lands.LAND_DIA_PLACES[section]) * 25.4
     assert lands.land_finished_dia_limits_mm(native, section) == pytest.approx((nominal+lower, nominal+upper))
     if section:
         assert shaft.DRAWING_PRECISION[f"Sec{section}FlatProfile"][f"Sec{section}AF"] == lands.LAND_AF_PLACES[section]
@@ -764,7 +783,8 @@ def test_tap_root_limit_bounds_the_envelope_the_walls_book() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME["TapRootLimit"] == 2
     assert {"TapRootGauge", "TapRootPlane"} <= set(part.COLLAR_FEATURES)
     assert drawing.TAP_DIMENSION_TYPES == {"TapRootLimit": 6}
-    assert round(spec.THREAD_ENVELOPE_DIA, 2) == spec.THREAD_ENVELOPE_DIA
+    envelope_in = spec.THREAD_ENVELOPE_DIA / 25.4
+    assert round(envelope_in, 2) == pytest.approx(envelope_in)
     assert spec.WORST_WALLS_MM["tap to north face"] == pytest.approx(
         spec.WIDTH
         - spec.WIDTH_BAND_MM
@@ -889,9 +909,17 @@ def test_three_place_lengths_state_their_function() -> None:
     side = drawing._function_callouts(drawing.SIDE_KEEP)
     tap = drawing._function_callouts(drawing.TAP_KEEP)
     assert side.keys() | tap.keys() == three_place
-    loosen = 2.0 * (printed_band_mm(2) - spec.AXIAL_BAND_MM)
-    for wall in ("tap to south shoulder", "tap to north face"):
-        assert spec.WORST_WALLS_MM[wall] - loosen < 1.5
+    # At .XX on the inch sheet (each mm nominal with its own rounding) the
+    # two tap walls fall below the wall target.
+    south = spec.WORST_WALLS_MM["tap to south shoulder"] - (
+        _worst_printed_band(spec.TAP_STATION, 2) - spec.TAP_STATION_BAND_MM
+        + _worst_printed_band(spec.NOSE_LENGTH, 2) - spec.NOSE_LENGTH_BAND_MM
+    )
+    north = spec.WORST_WALLS_MM["tap to north face"] - (
+        _worst_printed_band(spec.WIDTH, 2) - spec.WIDTH_BAND_MM
+        + _worst_printed_band(spec.TAP_STATION, 2) - spec.TAP_STATION_BAND_MM
+    )
+    assert south < spec.WALL_TARGET_MM and north < spec.WALL_TARGET_MM
 
 
 def test_installation_notes_name_the_journal_and_its_clearance() -> None:
@@ -907,11 +935,19 @@ def test_installation_notes_name_the_journal_and_its_clearance() -> None:
         (2.0 * lands.TIP_COLLAR_MIN_RADIAL_FLOAT_MM, 2.0 * lands.TIP_COLLAR_MAX_RADIAL_FLOAT_MM)
     )
     lines = spec.INSTALLATION_NOTES.splitlines()
+
+    def inch(value_mm: float) -> str:
+        return f"{value_mm / 25.4:.4f}".removeprefix("0")
+
     assert lines[:2] == [
-        f"FITS {shaft} TERMINAL JOURNAL \u00d8{land_low:.5f} TO {land_high:.5f};",
-        f"DIAMETRAL CLEARANCE {bore_low - land_high:.5f} TO {bore_high - land_low:.5f}.",
+        f"FITS {shaft} TERMINAL JOURNAL \u00d8{inch(land_low)} TO {inch(land_high)};",
+        f"DIAMETRAL CLEARANCE {inch(bore_low - land_high)} TO "
+        f"{inch(bore_high - land_low)}.",
     ]
-    assert lines[1] == "DIAMETRAL CLEARANCE 0.02540 TO 0.09652."
+    assert lines == [
+        "FITS MHA-DT-04 TERMINAL JOURNAL \u00d8.0302 TO .0310;",
+        "DIAMETRAL CLEARANCE .0010 TO .0038.",
+    ]
     assert bore_low - land_high > 0.0
     # The longest line the notes box has printed (the old supply line).
     assert max(map(len, lines)) <= 55
@@ -980,3 +1016,76 @@ def test_final_stock_set_screw_references_accept_an_unlabelled_native_length(mon
         "stock set-screw ScrewMajorDia": spec.SET_SCREW_THREAD,
         "stock set-screw SocketAF": "HEX SOCKET AF",
     }
+
+
+def test_shaft_owned_axial_stations_book_their_inch_rounding() -> None:
+    """#290: the cone stack owns the 11.5/3.5/7.5 mm width, nose and station,
+    which sit off the inch sheet's .XXX grid; each band adds its rounding."""
+    assert spec.UNIT == lands.TIP_COLLAR_UNIT == "in"
+    assert not hasattr(spec, "AXIAL_BAND_MM")
+    xxx = printed_band_mm(3, unit="in")
+    for nominal, band in (
+        (spec.WIDTH, spec.WIDTH_BAND_MM),
+        (spec.NOSE_LENGTH, spec.NOSE_LENGTH_BAND_MM),
+        (spec.TAP_STATION, spec.TAP_STATION_BAND_MM),
+    ):
+        rounding = abs(round(nominal / 25.4, 3) * 25.4 - nominal)
+        assert rounding > 1e-6
+        assert band >= xxx
+        assert band == pytest.approx(xxx + rounding)
+        assert band == _worst_printed_band(nominal, 3)
+    assert lands.TIP_COLLAR_WIDTH_BAND_MM == spec.WIDTH_BAND_MM
+
+
+def test_collar_owned_sizes_and_title_rows_are_the_inch_sheets() -> None:
+    assert part_drawing_unit("dt-vn-cone-tip-collar") == "in"
+    assert spec.ROUTINE_BAND_MM == printed_band_mm(2, unit="in")
+    assert spec.EDGE_BREAK == lands.TIP_COLLAR_FREE_EDGE_BREAK_MAX_MM
+    assert spec.EDGE_BREAK == edge_break_chamfer_mm(unit="in")
+    # Each collar-owned size prints exactly its model at its places.
+    for name, value in (
+        ("NoseDia", spec.NOSE_DIA),
+        ("CollarDia", spec.OUTER_DIA),
+        ("FlatDistance", spec.FLAT_DISTANCE),
+        ("ShoulderRadius", spec.SHOULDER_ROOT_RADIUS),
+        ("TapRootLimit", spec.THREAD_ENVELOPE_DIA),
+        ("BoreDia", spec.BORE_MODEL_DIA_MM),
+    ):
+        places = spec.DRAWING_PRECISION_BY_NAME[name]
+        deviations = printed_deviations(value, places, (0.0, 0.0), unit="in")
+        assert deviations == pytest.approx((0.0, 0.0), abs=1e-9), name
+    assert spec.BORE_PRINTED_DIA_MM == pytest.approx(spec.BORE_MODEL_DIA_MM)
+    # The tap root MAX stays above the largest 2B pitch diameter's root.
+    assert spec.THREAD_ENVELOPE_DIA >= (0.0772 + 0.64951905 / 56.0) * 25.4
+
+
+def test_part_and_sheet_take_the_registry_unit() -> None:
+    build_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert (
+        "apply_package_model_units(adapter, part_drawing_unit(PART_NAME)" in build_source
+    )
+    assert "display_unit=spec.UNIT" in build_source
+    draw_source = Path(drawing.__file__).read_text(encoding="utf-8").replace("\r", "")
+    assert "unit=part_drawing_unit(PART_STEM)" in draw_source
+    assert "set_hole_callout_precision(\n        callout, TAP_CALLOUT_PRECISION" in draw_source
+    assert drawing.TAP_CALLOUT_PRECISION == {"hw-thrutapdrldia": 3}
+
+
+def test_drawing_side_callout_precision_is_the_declared_exception() -> None:
+    # Codjiflo on #2106: a part-authored precision does not reach a Hole
+    # Wizard callout (run 20261102T230110877Z), so this sheet writes its
+    # callout places at drawing time, the declared exception RV-01.
+    from machinist_exceptions import load_exceptions
+
+    entry = {
+        e.id: e
+        for e in load_exceptions(_config.CONFIG_DIR, "dt_vn_cone_tip_collar", "part")
+    }["RV-01"]
+    assert entry.kind == "accept"
+    assert entry.reason.startswith(
+        "Delegated ruling 2026-11-02 (Main), following owner precedent"
+    )
+    assert "#2144" in entry.reason and "20261102T230110877Z" in entry.reason
+    assert "draw_dt_vn_cone_tip_collar.build" in entry.where
+    assert drawing.TAP_CALLOUT_PRECISION == {"hw-thrutapdrldia": 3}
+    assert "written as 3" in entry.where and "hw-thrutapdrldia" in entry.where

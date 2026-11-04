@@ -78,6 +78,7 @@ from _fit_deviations import deviations
 from _layout_audit import arc_segments
 from _layout_geometry import Box, Segment, segment_box_distance
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _pdf_ink import PageInk, read_pdf_ink
 from _session import run_build
@@ -89,8 +90,12 @@ from dt_cone_gear_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
+    FORM_PLACES,
+    WEB_REFERENCE_ANGLE_DEG,
+    WEB_REFERENCE_TEETH,
     bore_dia_mm,
     blank_dia_band,
+    inch_text,
     tooth_thickness_band,
     bore_flat_offset_mm,
     floor_limits_mm,
@@ -341,8 +346,8 @@ def form_plot_labels() -> list[tuple[str, tuple[float, float]]]:
              FORM_PLOT_ORIGIN[1] + 0.002),
         ),
         (
-            f"X0 Y0 ON CL AT ROOT R{template.root_radius_mm:.3f}\n"
-            f"GEAR AXIS {template.root_radius_mm:.3f} BELOW Y0 ON CL",
+            f"X0 Y0 ON CL AT ROOT R{inch_text(template.root_radius_mm, 4)}\n"
+            f"GEAR AXIS {inch_text(template.root_radius_mm, 4)} BELOW Y0 ON CL",
             (FORM_PLOT_ORIGIN[0] + FORM_PLOT_ORIGIN_NOTE_OFFSET[0],
              FORM_PLOT_ORIGIN[1] + FORM_PLOT_ORIGIN_NOTE_OFFSET[1]),
         ),
@@ -352,7 +357,7 @@ def form_plot_labels() -> list[tuple[str, tuple[float, float]]]:
             *form_plot_station_mm(radius, FORM_PLOT_STATION_REACH_MM[key])
         )
         labels.append((
-            f"R{radius:.3f}",
+            f"R{inch_text(radius, 4)}",
             (x + FORM_PLOT_STATION_LABEL_OFFSET[0], y + FORM_PLOT_STATION_LABEL_OFFSET[1]),
         ))
     return labels
@@ -411,7 +416,7 @@ def _draw_form_plot(adapter: Any) -> None:
                 *form_plot_station_mm(radius, FORM_PLOT_STATION_REACH_MM[key])
             )
             arc = manager.CreateArc(*axis, 0.0, *start, 0.0, *end, 0.0, 1)
-            created.append((f"R{radius:.3f} station", arc))
+            created.append((f"R{inch_text(radius, 4)} station", arc))
             if arc is not None:
                 _early_bound(arc, "ISketchSegment").ConstructionGeometry = True
     finally:
@@ -439,7 +444,7 @@ def cutter_grind_data() -> str:
     equations with 17-digit floats, which no shop grinds to (eye pass of
     run 20261010T051729717Z). Then it printed reference chords, which left
     the relief undefined (machinist review of the stack build). It gives the
-    form point by point at 3 places, read from the same profile the native
+    form point by point at four inch places, read from the same profile the native
     cut uses (dt_cone_gear_spec.custom_six_form_points_mm), says how the
     points connect (the round-2 review: points alone let templates differ
     between them), and gives a one-sided form tolerance.
@@ -462,17 +467,19 @@ def cutter_grind_data() -> str:
     root = template.root_radius_mm
     junction = template.relief_junction_radius_mm
     return "\n".join((
-        "T006 TOOTH SPACE FORM, mm",
+        "T006 TOOTH SPACE FORM, INCH",
         "SYMMETRIC ABOUT THE SPACE CENTERLINE (CL):",
         "X ACROSS CL, Y ALONG CL FROM THE ROOT,",
         "AT RADIUS R FROM THE GEAR AXIS",
         *(
-            f"R{radius:.3f}   X{x:.3f}   Y{y:.3f}"
+            f"R{inch_text(radius, FORM_PLACES)}   X{inch_text(x, FORM_PLACES)}"
+            f"   Y{inch_text(y, FORM_PLACES)}"
             for radius, x, y in custom_six_form_points_mm()
         ),
-        f"ROOT: ARC R{root:.3f} ABOUT GEAR AXIS",
-        f"ROOT ARC TO R{junction:.3f}: STRAIGHT LINES ROW TO ROW",
-        f"ABOVE R{junction:.3f}: INVOLUTE, BASE R{template.base_radius_mm:.3f}",
+        f"ROOT: ARC R{inch_text(root, FORM_PLACES)} ABOUT GEAR AXIS",
+        f"ROOT ARC TO R{inch_text(junction, FORM_PLACES)}: STRAIGHT LINES ROW TO ROW",
+        f"ABOVE R{inch_text(junction, FORM_PLACES)}: INVOLUTE, "
+        f"BASE R{inch_text(template.base_radius_mm, FORM_PLACES)}",
         CUSTOM_SIX_FORM_TOLERANCE_NOTE,
         f"WIDE ONLY: SETS BACKLASH WITH {CYLINDER_MATE}",
         # The space depth is the root and blank rows' difference, and Gear
@@ -513,6 +520,9 @@ DIMENSION_CALLOUTS = {
     # The cone set is a solid stack on the shaft; each gear's width sets the
     # stations (user ruling 2026-09-28, spec FACE_WIDTH).
     "FaceWidth": f"20-GEAR STACK\nON {SHAFT_MATE}",
+    # RV-03's accepted T012 web (cad/config/parts/dt-cone-gear.yaml): what the
+    # single limit bounds, at the value.
+    "WebMin": "WEB, BORE TO ROOT",
 }
 
 
@@ -640,9 +650,25 @@ def _assert_dimension_arrow_length(drawing: Any) -> None:
     _telemetry.info(f"drawing arrow length {live * 1000.0:.3f} mm")
 
 
+# RV-03's T012 web text sits on its own dimension line, carried outboard past
+# the tip circle by this much (sheet metres).  Offset square to the line
+# (r3, r4 reviews), the extension lines ran through the text.
+WEB_MIN_TEXT_OUTBOARD = 0.012
+
+
+def web_min_text_xy() -> tuple[float, float]:
+    """Sheet point of the T012 web text: on its radial line, outside the teeth."""
+    reach = rendered_half_od(WEB_REFERENCE_TEETH) + WEB_MIN_TEXT_OUTBOARD
+    angle = math.radians(WEB_REFERENCE_ANGLE_DEG)
+    return (
+        FRONT_CENTER[0] + reach * math.cos(angle),
+        FRONT_CENTER[1] + reach * math.sin(angle),
+    )
+
+
 def front_keep(teeth: int) -> dict[str, tuple[float, float]]:
     half_od = rendered_half_od(teeth)
-    return {
+    keep = {
         "FloorDia": (FRONT_CENTER[0] + half_od + FLOOR_DIA_GAP_X, floor_dia_y(teeth)),
         "BlankDia": (
             FRONT_CENTER[0] - BLANK_DIA_SHIFT_X,
@@ -657,6 +683,10 @@ def front_keep(teeth: int) -> dict[str, tuple[float, float]]:
             FRONT_CENTER[1] - half_od - 0.0225,
         ),
     }
+    # Only the T012 sheet states RV-03's web; no other sheet shows its sketch.
+    if teeth == WEB_REFERENCE_TEETH:
+        keep["WebMin"] = web_min_text_xy()
+    return keep
 
 
 def tooth_thickness_shelf(teeth: int) -> tuple[float, float]:
@@ -1515,7 +1545,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("dt-cone-gear"),
     )
     _assert_dimension_arrow_length(drawing_model)
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="cone-gear batch")
@@ -1612,9 +1646,17 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label=f"{configuration} right",
         )
         annotations = [*bore_annotations, *front_annotations, *right_annotations]
-        set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+        # RV-03's web dimension shows on the T012 sheet only (front_keep).
+        callouts = {
+            name: text for name, text in DIMENSION_CALLOUTS.items()
+            if name != "WebMin" or teeth == WEB_REFERENCE_TEETH
+        }
+        set_dimension_callouts(adapter, annotations, callouts)
         set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
-        assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+        assert_imported_precision(adapter, annotations, {
+            name: places for name, places in DRAWING_PRECISION_BY_NAME.items()
+            if name != "WebMin" or teeth == WEB_REFERENCE_TEETH
+        })
         _center_mark_bore(adapter, front, teeth, label=f"{configuration} front")
         _center_mark_bore(adapter, bore_view, teeth, label=f"{configuration} bore view")
         sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")

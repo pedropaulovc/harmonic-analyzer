@@ -9,6 +9,8 @@ from typing import Any
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _supplier_screw_dimensions import annotate_supplier_screw
 from _supplier_screw_layout import supplier_screw_margins
@@ -21,6 +23,7 @@ from _mcmaster_94025a164 import (
 )
 
 
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 SPEC = DRAWINGS_BY_NAME["dt_vn_cone_tip_adjuster"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "#10-32 x 3/8 SLOTTED SET SCREW, CUP POINT"
@@ -65,6 +68,7 @@ async def build(adapter: Any) -> dict[str, str]:
             planes=SUPPLIER_REFERENCE_PLANES,
             sides=SUPPLIER_REFERENCE_SIDES,
         ),
+        unit=part_drawing_unit("dt-vn-cone-tip-adjuster"),
     )
 
 

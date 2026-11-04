@@ -3697,6 +3697,9 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # per-sheet test_*_drawing.py suffix, so enroll them explicitly.
         SCRIPTS_DIR / "test_drawing_marks.py",
         SCRIPTS_DIR / "test_cone_drawing_batch_contract.py",
+        # The two cone tip screws' supplier reference lines lie under their
+        # own extension lines (one file for both sheets' shared builders).
+        SCRIPTS_DIR / "test_dt_vn_cone_tip_screw_reference_lines.py",
         # The title block's unit-explicit general tolerances: one reader that
         # returns mm bands, one renderer for the TOL_* text (#290).
         SCRIPTS_DIR / "test_printed_tolerance.py",

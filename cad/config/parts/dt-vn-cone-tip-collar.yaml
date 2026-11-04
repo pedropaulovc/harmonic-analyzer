@@ -9,4 +9,11 @@ dt-vn-cone-tip-collar:
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance
-  process: "turn source-selected diameter 17.48 body, width 11.500, with diameter 6.40 south nose length 3.500 and tap station 7.500; the single 0.50 coupled shift in cone_shaft_land_bands moves large collar material, shaft tip, tip block and platform pivot together while retaining engaged gear/post/crank stations; preserve native shoulder root and free-edge breaks, full printed 2.0 wall target, ordinary bands, radial tap/flat grades, full thread and socket reach; finish the same retained round-bore limits (native in-band representative prints diameter 0.849 +/-0.030, not a zero-clearance shaft-sized hole); mill radial tap face; tap #2-56 2B through at the printed station; fit the supplied flat-point screw unaltered"
+  process: "turn source-selected diameter .66 body, width .453, with diameter .25 south nose length .138 and tap station .295 (inch sheet); the single 0.50 coupled shift in cone_shaft_land_bands moves large collar material, shaft tip, tip block and platform pivot together while retaining engaged gear/post/crank stations; preserve native shoulder root and free-edge breaks, full printed 2.0 wall target, ordinary bands, radial tap/flat grades, full thread and socket reach; finish the same retained round-bore limits (native in-band representative prints diameter .0330 +/-.0010, not a zero-clearance shaft-sized hole); mill radial tap face; tap #2-56 2B through at the printed station; fit the supplied flat-point screw unaltered"
+  drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "accept"
+      where: "the set screw tap's native Hole Wizard callout only: its hw-thrutapdrldia callout variable's decimal places, written as 3 at drawing time from draw_dt_vn_cone_tip_collar.TAP_CALLOUT_PRECISION by draw_dt_vn_cone_tip_collar.build (ICalloutLengthVariable.Precision)"
+      finding: "a drawing script writes Hole Wizard callout places at render time instead of importing part-authored places (drawing-simplicity-policy.md model ownership, rules 3 and 4)"
+      reason: "Delegated ruling 2026-11-02 (Main), following owner precedent: drawing-side ICalloutLengthVariable precision is the established merged pattern (22 call sites on main, e.g. draw_ch_rocker_arm_tl_oblique_base_bar.py:876). Native experiment run 20261102T230110877Z: part-authored HW diameter precision 4 did not reach the callout (read -1). Owner review #2144. This accepts no other precision, band, callout or package departure."

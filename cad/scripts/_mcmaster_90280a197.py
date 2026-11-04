@@ -23,5 +23,5 @@ SUPPLIER_REFERENCE_FORMATS = {
     "SupplierLength": (2, "length", None, None),
     "SupplierHeadHeight": (3, "length", None, None),
     "SupplierHeadDiameter": (2, "diameter", None, None),
-    "SupplierThreadDiameter": (3, "diameter", None, "8-32"),
+    "SupplierThreadDiameter": (3, "diameter", None, "#8-32"),
 }

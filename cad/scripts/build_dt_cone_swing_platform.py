@@ -57,10 +57,12 @@ from _appearance import PANEL_BLACK, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound, _read_member
+from _document_units import apply_package_model_units
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
+from _part_properties import part_drawing_unit
 from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import (
@@ -135,6 +137,7 @@ from dt_cone_swing_platform_spec import (
     POST_MOUNT_STATION_TOL_MM,
     POST_MOUNT_TAP_DIA,
     SURFACE_FINISHES,
+    UNIT,
 )
 from dt_cone_swing_platform_pivot_spec import (
     PIVOT_HOLE_BAND,
@@ -374,6 +377,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
@@ -811,10 +815,15 @@ async def build(adapter) -> dict[str, str]:
     # Hole Wizard owns the pivot-hole precision and native size callout.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     # The tip-block stacks run through the hold-down stations and the post
-    # taps, so those placement dimensions carry +/-0.10 instead of .XX.
+    # taps, so those placement dimensions carry explicit bands instead of the
+    # general grade.
     for dimension_name in ("HoldDownX", "HoldDownZ"):
         set_dimension_symmetric_tolerance(
-            adapter, "HoldDownHole", dimension_name, HOLDDOWN_STATION_TOL_MM
+            adapter,
+            "HoldDownHole",
+            dimension_name,
+            HOLDDOWN_STATION_TOL_MM,
+            display_unit=UNIT,
         )
     for dimension_name in (
         "PostMountWestX",
@@ -823,7 +832,11 @@ async def build(adapter) -> dict[str, str]:
         "PostMountEastZ",
     ):
         set_dimension_symmetric_tolerance(
-            adapter, "PostMountHoles", dimension_name, POST_MOUNT_STATION_TOL_MM
+            adapter,
+            "PostMountHoles",
+            dimension_name,
+            POST_MOUNT_STATION_TOL_MM,
+            display_unit=UNIT,
         )
     await volume_check(
         adapter, "driven platform (equations neutral)", volume, 0.01 * v_hole

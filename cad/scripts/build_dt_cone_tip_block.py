@@ -37,10 +37,12 @@ from _appearance import PANEL_BLACK, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
+from _document_units import apply_package_model_units
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
+from _part_properties import part_drawing_unit
 from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import (
@@ -83,6 +85,7 @@ from dt_cone_tip_block_spec import (
     SLIT_DEPTH,
     SLIT_W,
     SURFACE_FINISHES,
+    UNIT,
     WORST_SCREW_ENVELOPE_GAP_MM,
     WORST_SLIT_MOUTH_WEB_MM,
     WORST_TOP_LIGAMENT_MM,
@@ -253,6 +256,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
@@ -532,7 +536,7 @@ async def build(adapter) -> dict[str, str]:
         dimension_name="FootTapZ",
         drive_expression='"FootTapZ"',
     )
-    # The width may only come in from its 17.0 (the +X face's containment
+    # The width may only come in from its nominal (the +X face's containment
     # over the plate's west edge, dt_cone_tip_block_spec.BLOCK_WIDTH_BAND).
     set_dimension_bilateral_tolerance(
         adapter,
@@ -540,6 +544,7 @@ async def build(adapter) -> dict[str, str]:
         "Width",
         *deviations(BLOCK_WIDTH_BAND),
         places=BLOCK_WIDTH_PLACES,
+        display_unit=UNIT,
     )
     # Model-owned places are applied only after the reference sketches exist.
     apply_drawing_precision(adapter, DRAWING_PRECISION)

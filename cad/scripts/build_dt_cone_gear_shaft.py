@@ -80,12 +80,14 @@ from _sketch import (
     ensure_fully_defined,
 )
 from _sketch_circle import define_circle
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _document_units import apply_package_model_units
 from _fit_deviations import deviations
 from _gear import volume_check
 from _part_pmi import author_part_pmi
+from _part_properties import part_drawing_unit
 from _visibility import blank_reference_geometry
 from dt_cone_gear_shaft_spec import (
     COLLAR_DIA,
@@ -96,6 +98,8 @@ from dt_cone_gear_shaft_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     FILLET_RADIUS,
+    FILLET_R_BAND,
+    FILLET_R_TOL_TYPE,
     FLAT_AF_BAND,
     FLAT_LANDS,
     FLAT_OFFSETS,
@@ -107,6 +111,7 @@ from dt_cone_gear_shaft_spec import (
     SECTION_ORIGINS,
     SECTIONS,
     SURFACE_FINISHES,
+    UNIT,
     validate_gear_loading_clearances,
 )
 from solidworks_mcp.adapters.com_variant import double_array
@@ -153,6 +158,8 @@ async def build(adapter) -> dict[str, str]:
 
     validate_gear_loading_clearances()
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): one diameter + one end station per
     # section. The mm suffix is load-bearing -- this is an INCH document and the
@@ -376,13 +383,16 @@ async def build(adapter) -> dict[str, str]:
     await report_mass_properties(adapter)
     # The five turned diameters and the four across-flats carry their fit on
     # the MODEL dimension, so SolidWorks renders the limits and re-renders
-    # them on a unit change.
+    # them on a unit change.  The bands are millimetres; UNIT prints them in
+    # decimal inch at the nominal's places.
     for section, band in enumerate(SECTION_DIA_BANDS):
         set_dimension_bilateral_tolerance(
             adapter,
             f"Sec{section}Profile",
             f"Sec{section}Dia",
             *deviations(band),
+            places=DRAWING_PRECISION[f"Sec{section}Profile"][f"Sec{section}Dia"],
+            display_unit=UNIT,
         )
     for land in FLAT_LANDS:
         set_dimension_bilateral_tolerance(
@@ -390,7 +400,22 @@ async def build(adapter) -> dict[str, str]:
             f"Sec{land}FlatProfile",
             f"Sec{land}AF",
             *deviations(FLAT_AF_BAND),
+            places=DRAWING_PRECISION[f"Sec{land}FlatProfile"][f"Sec{land}AF"],
+            display_unit=UNIT,
         )
+    # The step roots' single limit R.004 MAX: the band (0/-R) stays on the
+    # native tolerance as the model's record; swTolMAX prints the model value
+    # then MAX, so the setback books the printed maximum
+    # (build_dt_cylinder_gear._notch_width_max_limit's recipe).
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "ShoulderFillets",
+        "ShoulderR",
+        *deviations(FILLET_R_BAND),
+        places=DRAWING_PRECISION["ShoulderFillets"]["ShoulderR"],
+        display_unit=UNIT,
+    )
+    _shoulder_root_max_limit(adapter)
     # Display precision is model-owned too (drawing-simplicity-policy.md `How the repository implements the guidelines`).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
@@ -401,6 +426,17 @@ async def build(adapter) -> dict[str, str]:
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
     return await save_part_and_images(adapter, PART_NAME)
+
+
+@_telemetry.traced("part.cone_gear_shaft.shoulder_root_max")
+def _shoulder_root_max_limit(adapter: Any) -> None:
+    """ShoulderR as the single limit "R.004 MAX" (dt_cone_gear_shaft_spec.
+    FILLET_R_TOL_TYPE): swTolMAX prints the model value then MAX."""
+    _, dimension = _named_dimension(adapter, "ShoulderFillets", "ShoulderR")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = FILLET_R_TOL_TYPE
+    if int(tolerance.Type) != FILLET_R_TOL_TYPE:
+        raise RuntimeError("ShoulderR@ShoulderFillets: swTolMAX did not persist")
 
 
 def _flat_start_station(land: int) -> float:

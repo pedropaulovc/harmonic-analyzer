@@ -24,8 +24,8 @@ cutting_data = "../shop/cutting-data.toml"
 form = "round_bar"
 material = "unknown" # source only pins ferrous_noncritical, not a purchased grade
 on_hand = false # inventory stock=[]; this is a procurement candidate, not an inventory item
- dia_mm = 110.0 # AUTHOR'S CHOICE: radius55 covers hypot(50.6591,21.93/2)=51.8322
-length_mm = 128.732 # AUTHOR'S CHOICE: BLOCK_HEIGHT + foot allowance6 + sacrificial grip28
+ dia_mm = 110.0 # AUTHOR'S CHOICE: radius55 covers hypot(50.6591,21.844/2)=51.8231
+length_mm = 128.742 # AUTHOR'S CHOICE: BLOCK_HEIGHT + foot allowance6 + sacrificial grip28
 north_allowance_mm = 6.0 # AUTHOR'S CHOICE: exposed foot-facing allowance
 south_grip_mm = 28.0 # AUTHOR'S CHOICE: beyond the finished BLOCK_HEIGHT
 note = "AUTHOR'S CHOICE: bar parallel model Y. The complete crank boss reach fits inside radius55; no Ø45 envelope is claimed. Keep both integral journal pads during roughing. Catalogue identity and material grade unknown; M4 swept-envelope/clearance proof not supplied."
@@ -87,7 +87,7 @@ binding = "unknown"
 note = "AUTHOR'S CHOICE: crank boss north face Z0; depth goes into boss along negative setup Z."
 cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:49-57"]
 
-# S1 only turns BELOW the inclined pad (lowest pad Y38.1-17.2/2=29.5).
+# S1 only turns BELOW the inclined pad (lowest pad Y38.1-17.272/2=29.464).
 # Do not turn the full body/head and thereby remove either integral boss.
 [[setups]]
 id = "S1"
@@ -100,14 +100,14 @@ deburr_cite = ["harmonic-analyzer/cad/config/title_block.yaml:edge_break.radius_
 [setups.stock_state]
 od_mm = 110.0 # AUTHOR'S CHOICE: declared blank OD, not a measurement
 north_end_z = 6.0 # AUTHOR'S CHOICE: foot allowance in T1
-south_end_z = -122.732 # AUTHOR'S CHOICE: BLOCK_HEIGHT + sacrificial grip28 behind foot
+south_end_z = -122.742 # AUTHOR'S CHOICE: BLOCK_HEIGHT + sacrificial grip28 behind foot
 note = "AUTHOR'S CHOICE: jaws end at the finished head top; stock extends another28mm along model +Y."
 [setups.hold]
 fixture = "chuck-4jaw-6-d1-4"
 support = "none" # AUTHOR'S CHOICE: unsupported route; shop ratio remains unknown
  grip_on = "sacrificial upper28mm past the final head top"
 grip_mm = 28.0
-stickout_mm = 100.732 # AUTHOR'S CHOICE: exposed foot allowance6 + BLOCK_HEIGHT
+stickout_mm = 100.742 # AUTHOR'S CHOICE: exposed foot allowance6 + BLOCK_HEIGHT
 fixed_jaw = "not_applicable"
 jaws_along = "not_applicable"
 parallels = "not_applicable"
@@ -182,12 +182,12 @@ coolant = "CRC cutting oil brushed on"
 deburr_mm = 0.25
 deburr_cite = ["harmonic-analyzer/cad/config/title_block.yaml:edge_break.radius_mm", "harmonic-analyzer/cad/config/title_block.yaml:edge_break.chamfer_max_mm"]
 [setups.stock_state]
-top_z = 122.732 # AUTHOR'S CHOICE: BLOCK_HEIGHT + sacrificial grip28 before removal
+top_z = 122.742 # AUTHOR'S CHOICE: BLOCK_HEIGHT + sacrificial grip28 before removal
 bottom_z = 0.0
 note = "AUTHOR'S CHOICE: nominal foot-down placement; toolpaths around both integral pads and real clamping contacts are unproven."
 [setups.stock_state.local_thickness]
-mount_west = 94.732 # current BLOCK_HEIGHT; drill after the head is faced
-mount_east = 94.732
+mount_west = 94.742 # current BLOCK_HEIGHT; drill after the head is faced
+mount_east = 94.742
 [setups.hold]
 fixture = "unknown" # no suitable full-envelope integral-blank nest is recorded
 support = "unknown"
@@ -233,7 +233,7 @@ do = "face"
 feature = "head"
 tool = "unknown"
 holder = "unknown"
-to_z = 94.732 # current BLOCK_HEIGHT; removes AUTHOR'S CHOICE28mm grip
+to_z = 94.742 # current BLOCK_HEIGHT; removes AUTHOR'S CHOICE28mm grip
  direction = "positive_setup_x"
 note = "AUTHOR'S CHOICE: remove sacrificial grip; reach and fixture/tool identities remain unknown."
 [setups.ops.checks]

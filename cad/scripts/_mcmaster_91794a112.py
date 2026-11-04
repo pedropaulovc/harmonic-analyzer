@@ -19,14 +19,29 @@ SUPPLIER_REFERENCE_DIMENSIONS = (
     ("SupplierHeadDiameter", HEAD_DIA, "horizontal"),
     ("SupplierThreadDiameter", SHANK_DIA, "horizontal"),
 )
+# The shown construction lines print grey over model edges but under dimension
+# extension lines of the same width, so each lies under one of this sheet's
+# own extension lines (FRONT 1:1; gap ~0.76 mm):
+# - the thread chord on the head underside edge (y=0), under the length's
+#   upper extension line, which runs left from x=+SHANK_DIA/2;
+# - the length on the right crest line, under the thread diameter's right
+#   extension line, which runs down from y=0 to the bottom lane.
+# Bare: the chord's right ~0.76 mm (inside the head underside edge), the
+# length's top ~0.76 mm, and the head height on the head's right silhouette
+# (no extension line covers it; above the cylinder band it is beside the dome).
 SUPPLIER_REFERENCE_STARTS = {
     "SupplierLength": (SHANK_DIA / 2.0, 0.0),
-    "SupplierHeadHeight": (-HEAD_DIA / 2.0, 0.0),
+    "SupplierHeadHeight": (HEAD_DIA / 2.0, 0.0),
     "SupplierHeadDiameter": (-HEAD_DIA / 2.0, 0.0),
-    "SupplierThreadDiameter": (-SHANK_DIA / 2.0, -SHANK_LEN / 2.0),
+    "SupplierThreadDiameter": (-SHANK_DIA / 2.0, 0.0),
 }
 SUPPLIER_REFERENCE_PLANES = {"SupplierHeadDiameter": "Top"}
-SUPPLIER_REFERENCE_SIDES = {"SupplierThreadDiameter": "bottom"}
+SUPPLIER_REFERENCE_SIDES = {
+    "SupplierLength": "left",
+    "SupplierHeadHeight": "right",
+    "SupplierHeadDiameter": "top",
+    "SupplierThreadDiameter": "bottom",
+}
 SUPPLIER_REFERENCE_FORMATS = {
     "SupplierLength": (3, "length", None, None),
     "SupplierHeadHeight": (3, "length", None, None),

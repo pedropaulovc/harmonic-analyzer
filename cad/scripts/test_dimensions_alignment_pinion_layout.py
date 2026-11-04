@@ -111,7 +111,7 @@ def _expected_fragments() -> list[str]:
         f"drum radius {dt.TIP_DRUM120:.3f}, pinion radius {dt.TIP_APINION:.3f} "
         f"and parked gap {dt.APINION_GAP}",
         f"Drum z {_mm(dt.APINION_Z_FRONT)}..+{dt.APINION_Z_BACK:.3f}",
-        f"({dt.APINION_Z_BACK - dt.APINION_Z_FRONT:.1f} face",
+        f"({dt.APINION_Z_BACK - dt.APINION_Z_FRONT:.3f} face",
         f"root z {_mm(dt.ARBOR_Z0)}..+{dt.ARBOR_Z0 + ARBOR_LEN:.3f}",
         f"head/crossrod axis z {_mm(dt.HANDLE_Z)}",
         f"crossrod at +{dt.HANDLE_TILT_DEG:g}°",
@@ -317,14 +317,23 @@ def test_current_drive_train_record_matches_the_selected_production_specs() -> N
 
     collar_row = gen_dimensions.find_row(record, "Chapter 13", "`dt-vn-cone-tip-collar`")
     assert collar_row is not None
+    # #290: the collar's sheet prints inch; its shaft-owned axial stations stay
+    # in mm and print rounded at .XXX.
+    from _printed_tolerance import printed_band_mm
+
+    text = tip_collar.length_text
     body_places = tip_collar.DRAWING_PRECISION_BY_NAME["CollarDia"]
+    axial = tip_collar.AXIAL_PLACES
     for fragment in (
         f"McMaster {tip_collar.SET_SCREW_SKU}",
-        f"body OD{tip_collar.OUTER_DIA:.{body_places}f} ±{tip_collar.ROUTINE_BAND_MM:.2f} mm",
-        f"width {tip_collar.WIDTH:.3f} at the title-block ±{tip_collar.WIDTH_BAND_MM:.2f} band",
-        f"south nose length {tip_collar.NOSE_LENGTH:.3f}",
-        f"tap station {tip_collar.TAP_STATION:.3f}",
-        f"Ø{tip_collar.NOSE_DIA:.2f} nose",
+        f"body OD {text(tip_collar.OUTER_DIA, body_places)} "
+        f"±{text(tip_collar.ROUTINE_BAND_MM, 2)} in",
+        f"width {tip_collar.WIDTH:g}, south nose length {tip_collar.NOSE_LENGTH:g} "
+        f"and tap station {tip_collar.TAP_STATION:g} mm",
+        f"printed {text(tip_collar.WIDTH, axial)}/{text(tip_collar.NOSE_LENGTH, axial)}/"
+        f"{text(tip_collar.TAP_STATION, axial)} at the title-block "
+        f"±{text(printed_band_mm(axial, unit=tip_collar.UNIT), axial)}",
+        f"Ø{text(tip_collar.NOSE_DIA, tip_collar.DRAWING_PRECISION_BY_NAME['NoseDia'])} nose",
         "fitted as supplied",
         "SCREW_LANDING_MARGIN_MM",
         "not a frozen purchased-collar diameter or native/full-P1 acceptance",

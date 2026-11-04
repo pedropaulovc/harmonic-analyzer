@@ -14,10 +14,10 @@ from __future__ import annotations
 import pytest
 
 
-def test_post_fillisters_engage_the_plate_tap_at_least_090d() -> None:
+def test_post_fillisters_engage_the_plate_tap_at_least_087d() -> None:
     """I22: each MHA-DT-VN-61 seats on the post's counterbore floor and runs into
     the MHA-DT-20 tap by its cut length past the post's grip -- never proud of
-    the plate underside, and 0.90D of thread after the tap's edge break."""
+    the plate underside, and 0.87D of thread after the tap's edge break."""
     import build_dt_drive_train_assembly as bdt
     import dt_cone_swing_platform_spec as platform
     import dt_vn_post_mount_screw_spec as screw
@@ -28,8 +28,8 @@ def test_post_fillisters_engage_the_plate_tap_at_least_090d() -> None:
     )
     assert bdt.POST_SCREW_INTO_PLATE <= platform.PLATE_THICKNESS
     thread = bdt.POST_SCREW_INTO_PLATE - 2.0 * platform.POST_MOUNT_TAP_EDGE_BREAK
-    assert thread >= 0.90 * platform.POST_MOUNT_THREAD_DIA
-    assert platform.POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS >= 0.90
+    assert thread >= 0.87 * platform.POST_MOUNT_THREAD_DIA
+    assert platform.POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS >= 0.87
 
 
 
@@ -71,13 +71,13 @@ def test_block_plus_x_face_is_held_against_the_plates_west_edge() -> None:
 
 def test_block_width_one_sided_band_holds_containment() -> None:
     """The width's band may only bring the +X face in (machinist review of
-    83e3370f9, rules 4 and 19): its 17.0 upper limit keeps the print-worst
-    margin over the plate's narrow west edge, where a symmetric .X or .XX
-    band would let the face overhang it."""
+    83e3370f9, rules 4 and 19): its upper limit, the nominal, keeps the
+    print-worst margin over the plate's narrow west edge, where a symmetric
+    .X or .XX band would let the face overhang it."""
     import build_dt_drive_train_assembly as bdt
     import dt_cone_tip_block_spec as block
 
-    assert block.BLOCK_WIDTH_BAND == (0.0, -0.5)
+    assert block.BLOCK_WIDTH_BAND == (0.0, -0.508)
     assert block.BLOCK_WIDTH_LIMITS[1] == pytest.approx(block.BLOCK_X)
     bdt.tip_block_print_worst_containment_mm(bdt.TIP_WORST_HALF_WIDTHS_MM)
     for places in (1, 2):
@@ -126,7 +126,7 @@ def test_pinch_screw_head_faces_the_blocks_plus_x_clearance_face() -> None:
 
 def test_pivot_head_keeps_its_air_to_the_block_north_face() -> None:
     """The pivot-screw head clears the block's north face by PIVOT_HEAD_AIR
-    at the printed limits; with HoldDownZ at the .XX band it would not."""
+    at the printed limits; with HoldDownZ at the inch .X band it would not."""
     import build_dt_drive_train_assembly as bdt
     import dt_cone_tip_block_spec as block
 
@@ -134,7 +134,7 @@ def test_pivot_head_keeps_its_air_to_the_block_north_face() -> None:
     band = (
         bdt.TIP_NORTH_FACE_BAND_MM
         - bdt.PLAT_HOLDDOWN_STATION_TOL_MM
-        + block.printed_band_mm(2)
+        + block.printed_band_mm(1)
     )
     with pytest.raises(AssertionError, match="pivot-screw head"):
         bdt.tip_pivot_head_worst_gap_mm(band)
@@ -168,40 +168,43 @@ def test_stack_collar_never_touches_the_block() -> None:
 
 
 def _loosened(tight_mm: float) -> float:
-    """How much a band grows when a +/-0.10 or .XXX grade falls back to .XX."""
+    """How much a band grows when an explicit or .XXX grade falls back to the
+    inch .X (#290: the inch .XX closes these stacks too)."""
     import dt_cone_tip_block_spec as block
 
-    return block.printed_band_mm(2) - tight_mm
+    return block.printed_band_mm(1) - tight_mm
 
 
 def test_cone_boss_length_at_one_place_opens_the_embed_band() -> None:
-    """ConeBossLen prints .XX (user ruling 2026-09-29): the shaft collar bears
-    on the boss's north face, half its band off the post centre, and at .X
-    the adjuster's shallow extreme leaves its window."""
+    """ConeBossLen prints .XXX, the shared 1.654 (user ruling 2026-09-29 put
+    it at .XX): the shaft collar bears on the boss's north face, half its band
+    off the post centre, and at .X the adjuster's shallow extreme leaves its
+    window."""
     import build_dt_drive_train_assembly as bdt
     import dt_cone_pivot_post_spec as post
     import dt_cone_tip_block_spec as block
 
-    assert post.DRAWING_PRECISION["ConeShaftBoss"]["ConeBossLen"] == 2
-    grown = (block.printed_band_mm(1) - block.printed_band_mm(2)) / 2.0
+    places = post.DRAWING_PRECISION["ConeShaftBoss"]["ConeBossLen"]
+    assert places == 3
+    grown = (block.printed_band_mm(1) - block.printed_band_mm(places)) / 2.0
     with pytest.raises(AssertionError, match="adjuster embed"):
         bdt.tip_embed_worst_mm(bdt.TIP_EMBED_BAND_MM + grown)
 
 
 def test_post_mount_stations_need_their_explicit_band() -> None:
-    """The platform's post-mount taps (+/-0.10) move the collar face; at .XX
-    the adjuster's embed leaves its window."""
+    """The platform's post-mount taps (explicit band) move the collar face; at
+    the inch .X the adjuster's embed leaves its window."""
     import build_dt_drive_train_assembly as bdt
 
-    assert bdt.PLAT_POST_MOUNT_STATION_TOL_MM == pytest.approx(0.10)
+    assert bdt.PLAT_POST_MOUNT_STATION_TOL_MM == pytest.approx(0.1016)
     grown = _loosened(bdt.PLAT_POST_MOUNT_STATION_TOL_MM)
     with pytest.raises(AssertionError, match="adjuster embed"):
         bdt.tip_embed_worst_mm(bdt.TIP_EMBED_BAND_MM + grown)
 
 
 def test_foot_tap_stations_need_three_places() -> None:
-    """FootTapZ at .XX moves the north face past the pivot head's air;
-    FootTapX at .XX moves the adjuster axis past the post's take-up."""
+    """FootTapZ at the inch .X moves the north face past the pivot head's
+    air; FootTapX at .X moves the adjuster axis past the post's take-up."""
     import build_dt_drive_train_assembly as bdt
 
     grown = _loosened(bdt.TIP_FOOT_TAP_STATION_TOL_MM)
@@ -218,7 +221,7 @@ def test_passage_centre_needs_three_places_for_the_lateral_take_up() -> None:
     import dt_cone_tip_block_spec as block
 
     assert bdt.TIP_PASSAGE_CENTER_PLACES == 3
-    grown = block.printed_band_mm(2) - block.printed_band_mm(3)
+    grown = block.printed_band_mm(1) - block.printed_band_mm(3)
     with pytest.raises(AssertionError, match="lateral error"):
         bdt.require_tip_lateral_take_up(
             bdt.TIP_LATERAL_ERROR_MM + grown, bdt.TIP_LATERAL_CAPACITY_MM
@@ -227,7 +230,7 @@ def test_passage_centre_needs_three_places_for_the_lateral_take_up() -> None:
 
 def test_post_turn_takes_up_the_tip_lateral_error() -> None:
     """Turning the post on its screws covers the adjuster axis's lateral
-    error; with HoldDownX at the .XX band it would not."""
+    error; with HoldDownX at the inch .X band it would not."""
     import build_dt_drive_train_assembly as bdt
     import dt_cone_tip_block_spec as block
 
@@ -235,7 +238,7 @@ def test_post_turn_takes_up_the_tip_lateral_error() -> None:
     error = (
         bdt.TIP_LATERAL_ERROR_MM
         - bdt.PLAT_HOLDDOWN_STATION_TOL_MM
-        + block.printed_band_mm(2)
+        + block.printed_band_mm(1)
     )
     with pytest.raises(AssertionError, match="lateral error"):
         bdt.require_tip_lateral_take_up(error, bdt.TIP_LATERAL_CAPACITY_MM)

@@ -10,7 +10,8 @@ from types import SimpleNamespace
 import pytest
 
 import _config
-from _printed_tolerance import printed_band_mm
+from _package_units import drawing_unit
+from _printed_tolerance import edge_break_chamfer_mm, printed_deviations
 import build_dt_vn_post_mount_screw as part
 import dt_cone_pivot_post_spec as post
 import dt_cone_swing_platform_spec as platform
@@ -51,7 +52,7 @@ def test_nominal_end_sits_short_of_the_platform_underside() -> None:
     short = GRIP + platform.PLATE_THICKNESS - part.SHANK_LEN
     assert 0.0 <= short <= spec.POST_SCREW_CUT_TO_FIT_SHORT
     engagement = part.SHANK_LEN - GRIP
-    assert engagement / part.SHANK_DIA >= 0.90
+    assert engagement / part.SHANK_DIA >= 0.87
 
 
 def test_supplied_stock_reaches_longest_raised_post_corner() -> None:
@@ -66,22 +67,20 @@ def test_supplied_stock_reaches_longest_raised_post_corner() -> None:
 def test_no_fixed_cut_length_fits_both_in_band_corners() -> None:
     """U27, geometry first: across the printed post and plate bands, the
     never-proud corner (lowest counterbore floor, thin plate) caps a fixed
-    length below what the 0.90D corner (highest floor, after both edge
+    length below what the 0.87D corner (highest floor, after both edge
     breaks) needs.  So no band can go on the print."""
-    one = printed_band_mm(1)
-    two = printed_band_mm(2)
-    low = (round(post.BLOCK_HEIGHT, 1) - one) - (
-        round(post.ATTACHMENT_CBORE_DEPTH, 2) + two
-    )
-    high = (round(post.BLOCK_HEIGHT, 1) + one) - (
-        round(post.ATTACHMENT_CBORE_DEPTH, 2) - two
-    )
+    unit = drawing_unit("parts/dt-cone-pivot-post", _config.parts("dt-cone-pivot-post"))
+    places = post.DRAWING_PRECISION_BY_NAME["MainBodyHt"]
+    height_lo, height_hi = printed_deviations(post.BLOCK_HEIGHT, places, unit=unit)
+    depth_lo, depth_hi = printed_deviations(post.ATTACHMENT_CBORE_DEPTH, 2, unit=unit)
+    low = (post.BLOCK_HEIGHT + height_lo) - (post.ATTACHMENT_CBORE_DEPTH + depth_hi)
+    high = (post.BLOCK_HEIGHT + height_hi) - (post.ATTACHMENT_CBORE_DEPTH + depth_lo)
     assert (spec.FLOOR_LOW_MM, spec.FLOOR_HIGH_MM) == pytest.approx((low, high))
     thin = platform.PLATE_THICKNESS - spec.PLATE_STOCK_BAND_MM
     assert spec.FIXED_LENGTH_FLUSH_MAX_MM == pytest.approx(low + thin)
     need = (
         high
-        + 0.90 * part.SHANK_DIA
+        + 0.87 * part.SHANK_DIA
         + spec.POST_MOUNT_TAP_EDGE_BREAK
         + spec.CUT_END_BREAK_MAX_MM
     )
@@ -90,19 +89,32 @@ def test_no_fixed_cut_length_fits_both_in_band_corners() -> None:
     assert spec.FIXED_CUT_LENGTH_EXISTS is False
 
 
+def test_only_the_factory_thread_reaches_the_tapped_plate() -> None:
+    """MSC threads 1.500 in up from the supplied tip; the shank above is plain.
+    Even on the lowest floor the plate's tapped hole lies below the thread
+    start, so the engagement chain counts full thread only."""
+    assert spec.FACTORY_THREAD_START_MM == pytest.approx((4.000 - 1.500) * IN)
+    assert spec.FACTORY_THREAD_START_MM < spec.FLOOR_LOW_MM
+    assert spec.FACTORY_THREAD_START_MM < spec.CUT_LENGTH_MM
+
+
 def test_cut_length_prints_as_a_reference_without_a_band() -> None:
     """No fixed length exists, so the model's spec-derived length prints in
     parentheses without a band; the callout carries fit-to-hole acceptance."""
     assert spec.CUT_LENGTH_MM == part.SHANK_LEN
     places = spec.DRAWING_PRECISION_BY_NAME[spec.CUT_LENGTH_DIMENSION]
-    assert spec.CUT_LENGTH_MM == round(
-        GRIP + platform.PLATE_THICKNESS - spec.POST_SCREW_CUT_TO_FIT_SHORT / 2.0,
-        places,
+    # The model's length sits on the inch grid it prints at (#290).
+    assert spec.CUT_LENGTH_MM / IN * 10**places == pytest.approx(
+        round(spec.CUT_LENGTH_MM / IN * 10**places), abs=1e-6
+    )
+    assert 0.0 <= GRIP + platform.PLATE_THICKNESS - spec.CUT_LENGTH_MM
+    assert GRIP + platform.PLATE_THICKNESS - spec.CUT_LENGTH_MM <= (
+        spec.POST_SCREW_CUT_TO_FIT_SHORT
     )
     callout = drawing.DIMENSION_CALLOUTS["CutLength"]
     # The callout still promises no fixed length: never the modelled cut
     # length, never a band on it.
-    assert f"{spec.CUT_LENGTH_MM:.1f}" not in callout
+    assert spec.inch_text(spec.CUT_LENGTH_MM, places) not in callout
     assert "±" not in callout and "+" not in callout
 
 
@@ -111,16 +123,16 @@ def test_cut_to_fit_acceptance_prints_on_the_delegating_callout() -> None:
     MHA-DT-00 step stated the acceptance the 0.90D worst case depends on.  The
     acceptance is a spec band -- upper 0 (never proud), lower the most a
     screw may be cut short -- and the callout prints it, generated from that
-    band at the cut length's places, not a literal."""
+    band at its own places, not a literal."""
     lower, upper = deviations(spec.POST_SCREW_CUT_TO_FIT_BAND)
     assert upper == 0.0
     assert spec.POST_SCREW_CUT_TO_FIT_SHORT == -lower
-    places = spec.DRAWING_PRECISION_BY_NAME["CutLength"]
+    places = spec.CUT_TO_FIT_SHORT_PLACES
     callout = drawing.DIMENSION_CALLOUTS["CutLength"]
     assert callout == spec.CUT_TO_FIT_CALLOUT
     flat = " ".join(callout.split())
     assert flat.startswith("CUT TO FIT AT ASSEMBLY")
-    assert f"FLUSH TO {-lower:.{places}f} SHORT OF MHA-DT-20 UNDERSIDE" in flat
+    assert f"FLUSH TO {spec.inch_text(-lower, places)} SHORT OF MHA-DT-20 UNDERSIDE" in flat
     assert "NEVER PROUD" in flat
     # The printed allowance is the one the named exception's worst case
     # spends: thinnest plate, full allowance, both breaks at their maximum.
@@ -154,6 +166,17 @@ def test_engagement_minimum_prints_on_the_cut_length_callout() -> None:
     assert callout.splitlines()[-1] == fact
 
 
+def test_engagement_shortfall_is_declared_for_the_blind_reviewer() -> None:
+    """A stated shortfall with no package-local declaration gates like a
+    blocker; RV-01 names the fact the sheet prints, as a minor."""
+    from machinist_exceptions import load_exceptions
+
+    (entry,) = load_exceptions(_config.CONFIG_DIR, "dt_vn_post_mount_screw", "part")
+    assert (entry.id, entry.kind) == ("RV-01", "minor")
+    assert f"ENGAGEMENT {spec.POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN" in entry.where
+    assert "rule 18" in entry.finding
+
+
 # Words that cite the exception's LABEL rather than state its fact (Main's
 # fleet ruling on the Codex P2): no rule, ruling, policy or exception words,
 # and no user-ruling ids such as "U37c".
@@ -167,8 +190,6 @@ def _mha142_printed_strings() -> dict[str, str]:
     printed = {
         "CutLength callout": drawing.DIMENSION_CALLOUTS["CutLength"],
         "manufacturing notes": spec.MANUFACTURING_NOTES,
-        "tip view label": drawing.TIP_VIEW_LABEL,
-        "tip letter": drawing.TIP_LETTER,
     }
     for index, text in drawing.DRAWING_SUMMARY.items():
         printed[f"summary {index}"] = text
@@ -213,38 +234,33 @@ def test_mha142_prints_no_exception_label() -> None:
 
 def test_cut_to_fit_allowance_is_exported_once() -> None:
     """The per-hole allowance MHA-DT-00 and the platform stack consume."""
-    assert spec.POST_SCREW_CUT_TO_FIT_SHORT == 0.3
+    assert spec.POST_SCREW_CUT_TO_FIT_SHORT == 0.127  # .005 in
 
 
 
 
-def test_cut_end_break_is_a_model_owned_deburr_of_at_most_0_1() -> None:
-    """Main's engagement ruling: the cut end's break is 0.1 max (a deburr,
-    not the title block's 0.25).  The model's CutEndBreak carries the band's
-    deviations natively as a MAX-limit dimension; the note stays digit-free."""
-    lower, upper = deviations(spec.CUT_END_BREAK_BAND)
-    assert spec.CUT_END_BREAK_MM + upper <= 0.1 + 1e-12
-    assert spec.CUT_END_BREAK_MM + lower >= 0.0
-    assert spec.CUT_END_BREAK_MAX_MM == spec.CUT_END_BREAK_MM + upper
-    assert spec.POST_MOUNT_TAP_EDGE_BREAK <= 0.1
+def test_cut_end_break_is_the_title_block_edge_break() -> None:
+    """Main's run-7 and 2026-11-01 rulings: no part-local break limit at either
+    end; the engagement stack spends the title block's general chamfer at the
+    screw's cut end and at the platform's tap."""
+    assert spec.CUT_END_BREAK_MAX_MM == edge_break_chamfer_mm(unit="in")
+    assert spec.POST_MOUNT_TAP_EDGE_BREAK == edge_break_chamfer_mm(unit="in")
 
 
 def test_worst_case_engagement_holds_the_named_minimum() -> None:
     """Cut to fit, the plate limits engagement: thinnest stock, the full
-    fit-to-hole allowance, the tap's entry deburr and the cut end's break,
-    both at their maximum.  Recomputed here from the chain: 5.72 = 0.90D."""
-    lower, upper = deviations(spec.CUT_END_BREAK_BAND)
+    fit-to-hole allowance, the tap's entry deburr and the cut end's general
+    edge break, both at their maximum, recomputed here from the chain."""
     worst = (
         platform.PLATE_THICKNESS
         - spec.PLATE_STOCK_BAND_MM
         - spec.POST_SCREW_CUT_TO_FIT_SHORT
         - spec.POST_MOUNT_TAP_EDGE_BREAK
-        - (spec.CUT_END_BREAK_MM + upper)
+        - edge_break_chamfer_mm(unit="in")
     )
     assert spec.POST_MOUNT_ENGAGEMENT_WORST == pytest.approx(worst)
-    assert worst == pytest.approx(5.72)
-    assert worst / part.SHANK_DIA >= 0.90
-    assert spec.POST_MOUNT_ENGAGEMENT_PRINTED >= 0.90
+    assert worst / part.SHANK_DIA >= 0.87
+    assert spec.POST_MOUNT_ENGAGEMENT_PRINTED >= 0.87
 
 
 def test_catalog_row_is_the_supplied_stock_and_only_the_part_is_cut() -> None:
@@ -260,8 +276,8 @@ def test_catalog_row_is_the_supplied_stock_and_only_the_part_is_cut() -> None:
     assert spec.STOCK_LENGTH_MM - 0.5 * IN < spec.FIXED_LENGTH_ENGAGEMENT_MIN_MM
 
 
-def _independent_removal() -> tuple[float, float]:
-    """Brute-force the two removed volumes (midpoint rule, 20k slices):
+def _independent_removal() -> float:
+    """Brute-force the trim's removed volume (midpoint rule, 2k slices):
     at radius r the groove takes w(r)/P of the circumference, w(r) the
     cutter's axial width, P/8 at the root, widening 2 tan 30 per mm."""
     radius, pitch = part.SHANK_DIA / 2.0, part.THREAD_PITCH
@@ -285,35 +301,17 @@ def _independent_removal() -> tuple[float, float]:
         metal(radius - tip + (i + 0.5) * height) * height for i in range(slices)
     )
     trim += metal(radius) * (stock - tip - cut)
-    brk = spec.CUT_END_BREAK_MM
-    height = brk / slices
-    deburr = sum(
-        (metal(radius) - metal(radius - brk + (i + 0.5) * height)) * height
-        for i in range(slices)
-    )
-    return trim, deburr
+    return trim
 
 
-def test_analytic_removal_volumes_match_a_brute_force_integral() -> None:
-    trim, deburr = _independent_removal()
-    assert spec.TRIM_REMOVED_MM3 == pytest.approx(trim, rel=1e-4)
-    assert spec.CUT_END_DEBURR_REMOVED_MM3 == pytest.approx(deburr, rel=1e-3)
-    assert spec.CUT_END_DEBURR_REMOVED_MM3 == pytest.approx(0.0153, abs=1e-4)
+def test_analytic_removal_volume_matches_a_brute_force_integral() -> None:
+    assert spec.TRIM_REMOVED_MM3 == pytest.approx(_independent_removal(), rel=1e-4)
 
 
 def test_cut_end_features_are_driven_by_the_model_dimensions() -> None:
-    """The trim follows CutLength and the 45 deg break's legs follow
-    CutEndBreak, by equation; the build proves the end face's rim sits at
-    the major radius less CutEndBreak."""
+    """The trim follows CutLength by equation."""
     assert part.TRIM_DRIVES == {"TrimAt": '"CutLength@CutLengthReference"'}
-    assert part.DEBURR_DRIVES["CutEnd"] == '"CutLength@CutLengthReference"'
-    assert part.DEBURR_DRIVES["CutterMargin"] == '"CutEndDeburrMargin"'
-    assert part.DEBURR_DRIVES["CutterRise"] == (
-        '"CutEndBreak@CutEndDeburrProfile" + "CutEndDeburrMargin"'
-    )
-    # CutEndBreak itself is the cutter's driving dimension: no equation.
-    assert "CutEndBreak" not in part.DEBURR_DRIVES
-    assert (part.TRIM_FEATURE, part.DEBURR_FEATURE) == ("CutToLength", "CutEndDeburr")
+    assert part.TRIM_FEATURE == "CutToLength"
     # The trimmed tip cannot reach into what the stock carries: the cut
     # clears the factory tip, and the volume gate outruns the sweep's slack.
     assert spec.STOCK_LENGTH_MM - spec.FACTORY_TIP_CHAMFER_MM > spec.CUT_LENGTH_MM
@@ -326,9 +324,9 @@ def test_cut_end_features_are_driven_by_the_model_dimensions() -> None:
 
 def _printed_cut_short_allowance() -> float:
     """The acceptance the sheet prints: "END FLUSH TO <x> SHORT"."""
-    match = re.search(r"END FLUSH TO (\d+(?:\.\d+)?) SHORT", spec.CUT_TO_FIT_CALLOUT)
+    match = re.search(r"END FLUSH TO (\d*\.\d+) SHORT", spec.CUT_TO_FIT_CALLOUT)
     assert match, spec.CUT_TO_FIT_CALLOUT
-    return float(match.group(1))
+    return round(float(match.group(1)) * IN, 9)
 
 
 def _short_of_underside(length_mm: float) -> float:
@@ -350,19 +348,20 @@ def test_the_modelled_length_is_a_cut_the_sheet_accepts() -> None:
     assert not accepted(spec.FLUSH_LENGTH_MM - allowance - 0.01)
     assert accepted(spec.CUT_LENGTH_MM)
     places = spec.DRAWING_PRECISION_BY_NAME[spec.CUT_LENGTH_DIMENSION]
-    assert spec.CUT_LENGTH_MM == round(
-        _short_of_underside(0.0) - allowance / 2.0, places
+    middle = (_short_of_underside(0.0) - allowance / 2.0) / IN
+    assert spec.CUT_LENGTH_MM / IN == pytest.approx(
+        math.floor(middle * 10**places + 0.5) / 10**places
     )
     assert part.SHANK_LEN == spec.CUT_LENGTH_MM
 
 
 def test_engagement_exception_is_held_by_the_model() -> None:
-    """The rule-18 shortfall pending #1019 (0.90D) is a model assert on the chain;
-    the sheet prints it on the cut-length callout
+    """The rule-18 shortfall pending #1019 (floor 0.87D) is a model assert on the
+    chain; the sheet prints it on the cut-length callout
     (test_engagement_minimum_prints_on_the_cut_length_callout)."""
-    assert spec.MIN_ENGAGEMENT_DIAMETERS == 0.90
+    assert spec.MIN_ENGAGEMENT_DIAMETERS == 0.87
     assert spec.ENGAGEMENT_NOMINAL_MM == spec.CUT_LENGTH_MM - GRIP
-    assert spec.ENGAGEMENT_NOMINAL_MM / part.SHANK_DIA >= 0.90
+    assert spec.ENGAGEMENT_NOMINAL_MM / part.SHANK_DIA >= 0.87
 
 
 def test_sheet_layout_keeps_notes_clear_of_the_view() -> None:
@@ -416,110 +415,6 @@ def test_sheet_passes_the_drawing_owned_precision_rule() -> None:
 
 
 
-
-def test_break_is_smaller_than_the_allowed_trim_volume_residual() -> None:
-    """The tiny deburr is below the trim gate's current volume allowance.
-    Its presence must be proved by the end-face rim, not a smaller mass
-    reading: the original #857 leaf's broken screw read slightly larger."""
-    assert 0.0 < spec.CUT_END_DEBURR_REMOVED_MM3 < part.TRIM_VOLUME_TOL_MM3
-
-
-def test_break_gate_decides_on_the_rim_before_and_after() -> None:
-    """The leaf's break was right (profile r 3.075..3.675 at y -86); the gate
-    must accept it from the exact rim reads, and still reject a break that
-    cut nothing or cut the wrong depth."""
-    major, brk = spec.MAJOR_RADIUS_MM, spec.CUT_END_BREAK_MM
-    assert part.assert_break_removed_metal(major, major - brk, brk) == pytest.approx(brk)
-    with pytest.raises(RuntimeError, match="removed no metal"):
-        part.assert_break_removed_metal(major, major, brk)
-    with pytest.raises(RuntimeError, match="less the"):
-        part.assert_break_removed_metal(major, major - brk / 2.0, brk)
-    with pytest.raises(RuntimeError, match="is not the major"):
-        part.assert_break_removed_metal(major - brk, major - brk, brk)
-
-
-# --- Main's MHA-DT-VN-61 eye pass on #857: the cut-end break callout -----------
-# A 0.1 dimension at 1:1 printed "0.0" stacked over "0.1 -0.1": illegible,
-# and +0/-0.1 read as permitting no break.  The note says DEBURR, the Front
-# view drops the break, and a 10:1 tip detail prints the single limit.
-
-
-
-
-
-
-def test_tip_view_prints_the_band_max_as_a_single_limit() -> None:
-    """The tip view's dimension reads the spec band's max at its places, as a
-    swTolMAX single limit; the seat read-back composes the same text."""
-    lower, upper = deviations(spec.CUT_END_BREAK_BAND)
-    places = spec.DRAWING_PRECISION_BY_NAME["CutEndBreak"]
-    expected = f"{spec.CUT_END_BREAK_MM + upper:.{places}f} MAX"
-    assert spec.CUT_END_BREAK_TEXT == expected == "0.1 MAX"
-    assert spec.CUT_END_BREAK_TOL_TYPE == 6  # swTolType_e.swTolMAX
-    # swTolMAX prints the nominal, so the nominal must be the band's max.
-    assert spec.CUT_END_BREAK_MM == spec.CUT_END_BREAK_MAX_MM
-    # Tighter than the title block's general chamfer, or it would not print.
-    general = float(_config.title_block("edge_break")["chamfer_max_mm"])
-    assert spec.TITLE_BLOCK_CHAMFER_MAX_MM == general
-    assert spec.CUT_END_BREAK_MAX_MM < general
-    # The seat composes the rendered text from the read-back parts.
-    assert drawing.break_text(spec.CUT_END_BREAK_MAX_MM, places, 6, "", "") == expected
-    assert drawing.break_text(spec.CUT_END_BREAK_MAX_MM, places, 2, "", "") != expected
-    assert drawing.break_text(spec.CUT_END_BREAK_MAX_MM, places, 6, "(", ")") != expected
-
-
-def test_tip_detail_geometry_keeps_the_break_inside_its_crop() -> None:
-    """A detail drops any dimension whose reference lies outside its crop:
-    both ends of the break's radial leg must sit inside the fence."""
-    assert drawing.DETAIL_SCALE == (10.0, 1.0)
-    reference_y = -spec.CUT_LENGTH_MM + drawing.DETAIL_OFFSET_MM
-    assert drawing.TIP_DETAIL.detail_reference_mm == (0.0, reference_y, 0.0)
-    for radius in (spec.MAJOR_RADIUS_MM, spec.MAJOR_RADIUS_MM - spec.CUT_END_BREAK_MM):
-        reach = math.hypot(radius, -spec.CUT_LENGTH_MM - reference_y)
-        assert reach < drawing.DETAIL_FENCE_MM - 0.25
-
-
-# Named margins for the sheet-local layout of the tip detail.
-DETAIL_BORDER_MARGIN = 0.013  # sheet edge to the inner frame, plus clearance
-DETAIL_VIEW_GAP = 0.010  # detail circle to any other view's ink
-DETAIL_NOTE_GAP = 0.008  # detail circle or label to the note block
-
-
-def test_tip_detail_layout_is_clear() -> None:
-    from _drawing_registry import DRAWING_TEMPLATES
-
-    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
-    cx, cy = drawing.DETAIL_CENTER
-    r = drawing.DETAIL_RADIUS
-    assert r == pytest.approx(drawing.DETAIL_FENCE_MM * 10.0 / 1000.0)
-    # Inside the frame.
-    assert cy + r < template.height_m - DETAIL_BORDER_MARGIN
-    # Right of the Front view's head, left of the isometric's head.
-    assert cx - r > drawing.FRONT_CENTER[0] + part.HEAD_DIA / 2000.0 + DETAIL_VIEW_GAP
-    assert cx + r < drawing.ISO_CENTER[0] - part.HEAD_DIA / 2000.0 - DETAIL_VIEW_GAP
-    # Above the title block and the note block.
-    assert cy - r > template.title_block_top_m + DETAIL_VIEW_GAP
-    notes_top = drawing.NOTES_XY[1] + 0.004
-    assert cy - r > notes_top + DETAIL_NOTE_GAP
-    label_x, label_y = drawing.TIP_DETAIL.detail_label_xy
-    assert label_y > notes_top + DETAIL_NOTE_GAP
-    assert label_y > template.title_block_top_m + DETAIL_NOTE_GAP
-    assert label_x < template.title_block_left_m or label_y > template.title_block_top_m
-    # The break's text sits inside the detail's column, below the end face.
-    text_x, text_y = drawing.DETAIL_KEEP["CutEndBreak"]
-    rim_x, rim_y = drawing.BREAK_RIM_XY
-    assert text_y < rim_y
-    assert cx - r < text_x < drawing.ISO_CENTER[0] - part.HEAD_DIA / 2000.0 - DETAIL_VIEW_GAP
-    assert text_y > label_y + DETAIL_NOTE_GAP / 2.0
-
-
-
-
-# --- The tip view is a CROPPED 10:1 MODEL VIEW, not a detail ----------------
-# b6552f13b (diag/mha142-bisect, farm worker swmaker000008): no detail child
-# of the Front offered CutEndBreak to the import, under 10:1 HLR, 10:1 HLV,
-# 5:1 and 2:1, imported before or after the Front's own import; a standalone
-# 10:1 *Front model view, moved to the tip and cropped, imported it twice.
 
 
 class _Point:
@@ -579,39 +474,6 @@ class _Note:
         return self.text
 
 
-class _SeatView:
-    """IView stand-in whose tip reference sits 0.4 m below its Position."""
-
-    def __init__(self, name: str, seat: "_Seat", *, cropped: bool = True) -> None:
-        self.name = name
-        self.seat = seat
-        self.cropped = cropped
-        self.ScaleRatio = (10.0, 1.0)
-        self.Position = (0.2, 0.6)
-
-    def SetViewPosition(self, position, move_children):
-        _require_double_array(position, "SetViewPosition")
-        self.seat.log.append(("move", self.name, tuple(position), move_children))
-        self.Position = tuple(position)
-        return True
-
-    def GetSketch(self):
-        return _Sketch()
-
-    def Crop2(self, jagged, no_outline, intensity):
-        self.seat.log.append(("crop2", self.name, jagged, no_outline, intensity))
-        return 1  # swCropViewErrors_NoError
-
-    def IsCropped(self):
-        return self.cropped
-
-    def GetOutline(self):
-        return (0.15, 0.13, 0.23, 0.22)
-
-    def GetNotes(self):
-        return tuple(note for note in self.seat.notes if note.owner == self.name)
-
-
 class _Seat:
     """IModelDoc2 + IDrawingDoc + ISketchManager + adapter, recorded."""
 
@@ -655,356 +517,6 @@ class _Seat:
             cx, cy, radius = cx + dx, cy + dy, radius * factor
         return _Arc((cx, cy, cz), radius)
 
-    def CreateDetailViewAt4(self, *args):
-        raise AssertionError("the tip must not be a detail view")
-
-
-def _tip_seat(monkeypatch, *, cropped: bool = True):
-    seat = _Seat()
-    tip = _SeatView("Drawing View3", seat, cropped=cropped)
-    front = _SeatView("Drawing View1", seat)
-    placed: list[tuple] = []
-
-    def place(adapter, source, orientation, x, y, *, scale=None):
-        placed.append((orientation, x, y, scale))
-        return tip
-
-    def point_in_view(adapter, view, xyz, *, label):
-        assert xyz == tuple(v / 1000 for v in drawing.TIP_DETAIL.detail_reference_mm)
-        return (view.Position[0], view.Position[1] - 0.4)
-
-    def note(adapter, text, x, y, **_kwargs):
-        made = _Note(text, seat.active)
-        seat.notes.append(made)
-        seat.log.append(("note", seat.active, text, round(x, 9), round(y, 9)))
-        return made
-
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
-    monkeypatch.setattr(drawing, "double_array", lambda values: _DoubleArray(values))
-    monkeypatch.setattr(drawing, "place_view", place)
-    monkeypatch.setattr(drawing, "model_point_in_view", point_in_view)
-    monkeypatch.setattr(drawing, "view_name", lambda adapter, view: view.name)
-    monkeypatch.setattr(drawing, "add_note", note)
-    return seat, tip, front, placed
-
-
-def test_tip_view_is_a_cropped_10_to_1_model_view_not_a_detail(monkeypatch) -> None:
-    seat, tip, _front, placed = _tip_seat(monkeypatch)
-    view = drawing.cropped_tip_view(seat)
-    assert view is tip
-    assert placed == [("*Front", *drawing.DETAIL_CENTER, drawing.DETAIL_SCALE)]
-    # Moved so the tip reference lands where the detail sat.
-    moves = [entry for entry in seat.log if entry[0] == "move"]
-    assert len(moves) == 1
-    assert moves[0][2] == pytest.approx(
-        (drawing.DETAIL_CENTER[0], drawing.DETAIL_CENTER[1] + 0.4)
-    )
-    # The crop circle is sketched in the tip view itself, centred on the tip,
-    # at the fence's sheet radius, and Crop2 runs straight after it (the new
-    # circle must still be the selection).
-    kinds = [entry[0] for entry in seat.log]
-    assert kinds[-3:] == ["activate", "circle", "crop2"]
-    assert seat.log[-3] == ("activate", "Drawing View3")
-    _, owner, xyz = seat.log[-2]
-    assert owner == "Drawing View3"
-    cx, cy, _, px, py, _ = (v / 1000.0 for v in xyz)
-    assert (cx, cy) == pytest.approx(drawing.DETAIL_CENTER)
-    assert math.dist((cx, cy), (px, py)) == pytest.approx(drawing.DETAIL_RADIUS)
-    assert seat.log[-1] == ("crop2", "Drawing View3", False, False, 5)
-
-
-def test_tip_view_raises_when_the_crop_did_not_take(monkeypatch) -> None:
-    seat, _tip, _front, _placed = _tip_seat(monkeypatch, cropped=False)
-    with pytest.raises(RuntimeError, match="not cropped"):
-        drawing.cropped_tip_view(seat)
-
-
-def test_tip_view_imports_the_break_by_feature(monkeypatch) -> None:
-    """Targeted import: only the deburr cutter's profile is selected; the
-    entire-model import is never called."""
-    import _drawing_dimension_import
-
-    break_annotation = object()
-    calls: list[str] = []
-
-    def targeted(adapter, view, features):
-        calls.append(f"features:{list(features)}")
-        return [("CutEndBreak", break_annotation)]
-
-    def entire(adapter, view):
-        raise AssertionError("the tip view must not import the entire model")
-
-    monkeypatch.setattr(_drawing_dimension_import, "insert_feature_dimensions", targeted)
-    monkeypatch.setattr(_drawing_dimension_import, "insert_marked_dimensions", entire)
-    monkeypatch.setattr(
-        _drawing_dimension_import,
-        "dimension_name",
-        lambda adapter, item: "CutEndBreak" if item is break_annotation else "",
-    )
-    monkeypatch.setattr(
-        _drawing_dimension_import,
-        "curate_dimensions",
-        lambda adapter, items, delete=(), reposition=None: list(items),
-    )
-    # The stub places nothing, so there is no position to read back.
-    monkeypatch.setattr(_drawing_dimension_import, "_reposition_rerun_reason", lambda *a, **k: "none")
-    curated = drawing._curate_tip_view(object(), object())
-    assert curated == [break_annotation]
-    assert calls == ["features:['CutEndDeburrProfile']"]
-
-
-# The 857-b835 render of detail A: the 1 mm (0.1 at 10:1) break between two
-# vertical extension lines, arrows outside pointing in, and "0.1 max." centred
-# almost on the lines, so it overprints both and the inner arrowheads.
-_B835_EXTENSION_X = (0.2000, 0.2010)
-_B835_ARROW_WIDTH = 0.003
-_B835_TEXT = "0.1 max."
-_B835_TEXT_HEIGHT = 0.0035
-_B835_TEXT_XY = (0.1995, 0.155)
-
-
-class _BreakData:
-    """IDisplayData of the break: lines, arrowheads, one centred text run."""
-
-    def __init__(self, annotation: "_BreakAnnotation") -> None:
-        self._annotation = annotation
-        left, right = _B835_EXTENSION_X
-        self._lines = [
-            (0, 0, 0, 0, left, 0.150, 0.0, left, 0.160, 0.0),
-            (0, 0, 0, 0, right, 0.150, 0.0, right, 0.160, 0.0),
-            (0, 0, 0, 0, 0.190, 0.152, 0.0, 0.215, 0.152, 0.0),
-        ]
-        self._arrows = [
-            (left, 0.152, 0.0, 1.0, 0.0, 0.0, _B835_ARROW_WIDTH, 0.001, 1, 0, 0, 1),
-            (right, 0.152, 0.0, -1.0, 0.0, 0.0, _B835_ARROW_WIDTH, 0.001, 1, 0, 0, 1),
-        ]
-
-    def GetLineCount(self):
-        return len(self._lines)
-
-    def GetLineAtIndex2(self, index):
-        return self._lines[index]
-
-    def GetArrowHeadCount(self):
-        return len(self._arrows)
-
-    def GetArrowHeadAtIndex2(self, index):
-        return self._arrows[index]
-
-    def GetTextCount(self):
-        return 1
-
-    def GetTextAtIndex(self, index):
-        return _B835_TEXT
-
-    def GetTextPositionAtIndex(self, index):
-        x, y = self._annotation.text_xy
-        return (x, y, 0.0)
-
-    def GetTextHeightAtIndex(self, index):
-        return _B835_TEXT_HEIGHT
-
-    def GetTextRefPositionAtIndex(self, index):
-        return 2  # swTextPosition_e.swCENTER
-
-    def GetTextAngleAtIndex(self, index):
-        return 0.0
-
-
-class _BreakDisplay:
-    def __init__(self, annotation: "_BreakAnnotation") -> None:
-        self._annotation = annotation
-        self.ArrowSide = 2  # swDimArrowsSmart
-        self.CenterText = True
-
-    def GetDisplayData(self):
-        return _BreakData(self._annotation)
-
-
-class _BreakAnnotation:
-    def __init__(self, *, text_offset=(0.0, 0.0)) -> None:
-        self.position = _B835_TEXT_XY
-        self.text_offset = text_offset
-        self.display = _BreakDisplay(self)
-        self.moves: list[tuple[float, float]] = []
-
-    @property
-    def text_xy(self):
-        return (
-            self.position[0] + self.text_offset[0],
-            self.position[1] + self.text_offset[1],
-        )
-
-    def GetSpecificAnnotation(self):
-        return self.display
-
-    def GetPosition(self):
-        return (*self.position, 0.0)
-
-    def SetPosition2(self, x, y, z):
-        self.position = (x, y)
-        self.moves.append((x, y))
-        return True
-
-
-class _RebuildSeat:
-    def __init__(self) -> None:
-        self.rebuilds = 0
-        self.currentModel = self
-
-    def EditRebuild3(self):
-        self.rebuilds += 1
-        return True
-
-
-def _break_seat(monkeypatch, **kwargs):
-    annotation = _BreakAnnotation(**kwargs)
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
-    monkeypatch.setattr(
-        drawing,
-        "dimension_name",
-        lambda adapter, item: "CutEndBreak" if item is annotation else "",
-    )
-    return _RebuildSeat(), annotation
-
-
-def test_b835_break_text_overprints_both_extension_lines(monkeypatch) -> None:
-    """Planted from the 857-b835 render: the read-back sees the text box
-    across both extension lines, and the check refuses it."""
-    _seat, annotation = _break_seat(monkeypatch)
-    ink = drawing.read_break_ink(annotation)
-    assert ink.extension_x == _B835_EXTENSION_X
-    assert ink.text == _B835_TEXT
-    assert ink.text_box.xmin < _B835_EXTENSION_X[0]
-    assert ink.text_box.xmax > _B835_EXTENSION_X[1]
-    with pytest.raises(RuntimeError, match="extension line"):
-        drawing.assert_break_text_outside(ink)
-
-
-def test_break_text_moves_left_of_both_extension_lines(monkeypatch) -> None:
-    """Arrows outside pointing in, text not centred, and the text's right
-    edge a gap clear of the left arrow's tail -- so left of both lines."""
-    seat, annotation = _break_seat(monkeypatch)
-    ink = drawing.place_break_text_outside(seat, [object(), annotation])
-    assert annotation.display.ArrowSide == drawing.ARROWS_OUTSIDE == 1
-    assert annotation.display.CenterText is False
-    assert len(annotation.moves) == 1
-    # The text moves along the dimension line only.
-    assert annotation.moves[0][1] == pytest.approx(_B835_TEXT_XY[1])
-    arrow_tail = _B835_EXTENSION_X[0] - _B835_ARROW_WIDTH
-    assert ink.arrow_left_x == pytest.approx(arrow_tail)
-    assert ink.text_box.xmax == pytest.approx(arrow_tail - drawing.BREAK_TEXT_GAP_M)
-    assert ink.text_box.xmax < _B835_EXTENSION_X[0]
-    # The minimum form: the centred anchor sits left of the left extension
-    # line by at least half the text's width.
-    half = ink.text_box.width / 2.0
-    assert annotation.text_xy[0] <= _B835_EXTENSION_X[0] - half
-    drawing.assert_break_text_outside(ink)
-    assert seat.rebuilds >= 2
-
-
-def test_break_ink_refuses_text_off_the_sheet_frame(monkeypatch) -> None:
-    """GetTextPositionAtIndex is an offset from the display data's origin; if
-    that is not the sheet, no clearance can be read from it."""
-    _seat, annotation = _break_seat(monkeypatch, text_offset=(0.2, 0.0))
-    with pytest.raises(RuntimeError, match="sheet"):
-        drawing.read_break_ink(annotation)
-
-
-def test_break_ink_needs_exactly_two_extension_lines(monkeypatch) -> None:
-    _seat, annotation = _break_seat(monkeypatch)
-    data = _BreakData(annotation)
-    data._lines = data._lines[1:]
-    annotation.display.GetDisplayData = lambda: data
-    with pytest.raises(RuntimeError, match="two extension lines"):
-        drawing.read_break_ink(annotation)
-
-
-def test_break_ink_refuses_an_arrowhead_wider_than_one(monkeypatch) -> None:
-    """GetArrowHeadAtIndex2 is unread on the seat: a width in another unit
-    must fail loud, not park the text far left."""
-    _seat, annotation = _break_seat(monkeypatch)
-    data = _BreakData(annotation)
-    tip = list(data._arrows[0])
-    tip[6] = 3.0  # millimetres, not metres
-    data._arrows[0] = tuple(tip)
-    annotation.display.GetDisplayData = lambda: data
-    with pytest.raises(RuntimeError, match="arrowhead"):
-        drawing.read_break_ink(annotation)
-
-
-def test_break_text_move_is_bounded(monkeypatch) -> None:
-    seat, annotation = _break_seat(monkeypatch)
-    annotation.position = (_B835_TEXT_XY[0] + 0.05, _B835_TEXT_XY[1])
-    monkeypatch.setattr(drawing, "_TEXT_FRAME_TOLERANCE_M", 1.0)
-    with pytest.raises(RuntimeError, match="would move"):
-        drawing.place_break_text_outside(seat, [annotation])
-    assert annotation.moves == []
-
-
-
-
-def test_tip_view_label_is_owned_by_the_tip_view(monkeypatch) -> None:
-    seat, tip, _front, _placed = _tip_seat(monkeypatch)
-    assert drawing.TIP_VIEW_LABEL == "DETAIL A  SCALE 10:1"
-    drawing.label_tip_view(seat, tip)
-    assert [(n.owner, n.text) for n in seat.notes] == [
-        ("Drawing View3", "DETAIL A  SCALE 10:1")
-    ]
-    x, y = drawing.TIP_DETAIL.detail_label_xy
-    assert (
-        "note", "Drawing View3", "DETAIL A  SCALE 10:1", round(x, 9), round(y, 9)
-    ) in seat.log
-
-
-def test_tip_view_label_tolerates_another_note_on_the_view(monkeypatch) -> None:
-    """Whether the template gives a model view a native label of its own is
-    unread on the seat, so only OUR label is counted, never the total."""
-    seat, tip, _front, _placed = _tip_seat(monkeypatch)
-    seat.notes.append(_Note("DRAWING VIEW3", "Drawing View3"))
-    drawing.label_tip_view(seat, tip)
-    texts = [n.text for n in seat.notes if n.owner == "Drawing View3"]
-    assert texts.count("DETAIL A  SCALE 10:1") == 1
-
-
-
-
-def test_tip_view_label_raises_when_it_lands_elsewhere(monkeypatch) -> None:
-    seat, tip, _front, _placed = _tip_seat(monkeypatch)
-    monkeypatch.setattr(seat, "ActivateView", lambda name: True)  # stays inactive
-    with pytest.raises(RuntimeError, match="label"):
-        drawing.label_tip_view(seat, tip)
-
-
-def test_front_marks_the_tip_with_a_circle_and_letter(monkeypatch) -> None:
-    seat, _tip, front, _placed = _tip_seat(monkeypatch)
-    drawing.mark_tip_on_front(seat, front)
-    circles = [entry for entry in seat.log if entry[0] == "circle"]
-    assert len(circles) == 1 and circles[0][1] == "Drawing View1"
-    cx, cy, _, px, py, _ = (v / 1000.0 for v in circles[0][2])
-    tip = (front.Position[0], front.Position[1] - 0.4)
-    assert (cx, cy) == pytest.approx(tip)
-    # The fence's 1:1 radius: the circle bounds exactly what the tip view shows.
-    assert math.dist((cx, cy), (px, py)) == pytest.approx(drawing.DETAIL_FENCE_MM / 1000.0)
-    assert [(n.owner, n.text) for n in seat.notes] == [("Drawing View1", "A")]
-    note = next(entry for entry in seat.log if entry[0] == "note")
-    offset = drawing.TIP_DETAIL.parent_letter_offset
-    assert note[3:] == (round(tip[0] + offset[0], 9), round(tip[1] + offset[1], 9))
-
-
-def test_tip_label_and_letter_agree() -> None:
-    assert drawing.TIP_LETTER == "A"
-    assert drawing.TIP_VIEW_LABEL.startswith(f"DETAIL {drawing.TIP_LETTER} ")
-    num, den = drawing.DETAIL_SCALE
-    assert drawing.TIP_VIEW_LABEL.endswith(f"SCALE {num:g}:{den:g}")
-
-
-
-
-
-
-
-
 
 def test_activate_front_for_notes_activates_the_front_by_name(monkeypatch) -> None:
     activated: list[str] = []
@@ -1023,33 +535,6 @@ def test_activate_front_for_notes_activates_the_front_by_name(monkeypatch) -> No
     assert activated == ["Drawing View1"]
     with pytest.raises(RuntimeError, match="Front view"):
         drawing.activate_front_for_notes(_Adapter(), "Detail View A (10 : 1)")
-
-
-def test_front_tip_mark_is_sketched_with_inference_off(monkeypatch) -> None:
-    """r857-6e65 (docstring-only change) drew the Front's tip mark at ~1.5 mm
-    radius on the cut end; eae5 drew it at the 3.6 mm fence, 1 mm above.
-    Nothing read it back.  The circle goes straight to the sketch database
-    (AddToDB), the prior setting comes back, and the made circle is read."""
-    seat, _tip, front, _placed = _tip_seat(monkeypatch)
-    seat.snap = (0.0, -1.0, 0.43)
-    seat.AddToDB = False
-    drawing.mark_tip_on_front(seat, front)
-    assert seat.add_to_db_seen == [True]
-    assert seat.AddToDB is False
-
-
-def test_a_circle_the_seat_moved_raises(monkeypatch) -> None:
-    seat, _tip, front, _placed = _tip_seat(monkeypatch)
-    seat.snap = (0.0, -1.0, 0.43)
-    seat.honours_add_to_db = False
-    with pytest.raises(RuntimeError, match="Front tip mark circle"):
-        drawing.mark_tip_on_front(seat, front)
-    assert seat.AddToDB is False
-    seat, _tip, _front, _placed = _tip_seat(monkeypatch)
-    seat.snap = (0.5, 0.0, 1.0)
-    seat.honours_add_to_db = False
-    with pytest.raises(RuntimeError, match="tip view crop circle"):
-        drawing.cropped_tip_view(seat)
 
 
 # The supplier diagram lives in a rotated, translated MODEL sketch.  The
@@ -1619,7 +1104,7 @@ def test_final_supplier_labels_accept_native_line_endings_but_not_changed_text(m
         contract["configuration"] == drawing.SUPPLIER_STOCK_CONFIGURATION
         for _, contract in seat.presentations
     )
-    seat.state.text = seat.state.text.replace("NO SOLID GEOMETRY", "SOLID GEOMETRY")
+    seat.state.text = seat.state.text.replace("REFERENCE ONLY", "REFERENCE")
     with pytest.raises(RuntimeError, match="source label changed"):
         drawing._check_supplier_stock(seat.adapter, *seat.views, seat.notes, seat.capture)
 
@@ -3185,7 +2670,7 @@ def _readonly_msc_build(monkeypatch, tmp_path):
             UpdateViewDisplayGeometry=lambda: None,
         )
 
-    full, head, tip = (view(name) for name in ("full", "head", "tip"))
+    full, head = (view(name) for name in ("full", "head"))
     placed = []
 
     def opened(actual_adapter, path, *, label):
@@ -3247,11 +2732,6 @@ def _readonly_msc_build(monkeypatch, tmp_path):
         state.dirty = True  # Actual imported SetText is known to do this.
         state.events.append(("front-presentation",))
 
-    def create_tip(_adapter):
-        assert state.sheet == drawing.SHEET_NAMES[0] and state.captured
-        state.events.append(("tip-presentation",))
-        return tip
-
     def supplier_presentation(_adapter, actual_full, actual_head):
         assert (actual_full, actual_head) == (full, head)
         assert (
@@ -3305,13 +2785,7 @@ def _readonly_msc_build(monkeypatch, tmp_path):
     monkeypatch.setattr(drawing, "assert_imported_precision", lambda *_args: None)
     monkeypatch.setattr(drawing, "_reference_cut_length", lambda *_args: None)
     monkeypatch.setattr(drawing, "set_dimension_callouts", front_presentation)
-    monkeypatch.setattr(drawing, "cropped_tip_view", create_tip)
-    monkeypatch.setattr(drawing, "_curate_tip_view", lambda *_args: [])
     for name in (
-        "place_break_text_outside",
-        "_verify_tip_view",
-        "label_tip_view",
-        "mark_tip_on_front",
         "activate_front_for_notes",
         "add_property_linked_note",
     ):
@@ -3337,7 +2811,6 @@ def _readonly_msc_build(monkeypatch, tmp_path):
         placed=placed,
         full=full,
         head=head,
-        tip=tip,
     )
 
 
@@ -3357,7 +2830,6 @@ def test_msc_readonly_build_captures_clean_before_any_presentation(
         < kinds.index("capture")
         < kinds.index("front-import")
         < kinds.index("front-presentation")
-        < kinds.index("tip-presentation")
         < kinds.index("supplier-presentation")
         < kinds.index("finalize")
         < kinds.index("finished-check")

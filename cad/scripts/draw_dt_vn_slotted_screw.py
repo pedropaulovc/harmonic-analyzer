@@ -9,6 +9,8 @@ from typing import Any
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _supplier_screw_dimensions import annotate_supplier_screw
 from _supplier_screw_layout import supplier_screw_margins
@@ -22,6 +24,7 @@ from _mcmaster_90280a203 import (
 
 
 SPEC = DRAWINGS_BY_NAME["dt_vn_slotted_screw"]
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "#8-32 x 1-1/2 NARROW FILLISTER HEAD SLOTTED SCREW"
 
@@ -62,6 +65,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         supplier_dimensions=supplier_dimensions,
         settled_checks=(assert_supplier_dimensions_settled,),
+        unit=part_drawing_unit("dt-vn-slotted-screw"),
     )
 
 

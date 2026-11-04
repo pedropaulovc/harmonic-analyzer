@@ -158,7 +158,7 @@ from _sketch import (
 import dt_cylinder_bank_setting_spec as bank_settings
 from _rebuild import force_rebuild
 from _session import run_build
-from _printed_tolerance import drilled_oversize_mm, printed_deviations
+from _printed_tolerance import angular_band_deg, drilled_oversize_mm, printed_deviations
 from _transforms import ROT_X_NEG90, ROT_Y_180, compose_rows, euler_from_rows
 from channel_frame_geom import (
     CAM_SHAFT_XY,
@@ -1047,7 +1047,7 @@ from dt_cone_swing_platform_spec import (  # noqa: E402
     POST_MOUNT_STATION_TOL_MM as PLAT_POST_MOUNT_STATION_TOL_MM,
     POST_MOUNT_TAP_EDGE_BREAK,
     POST_MOUNT_THREAD_DIA,
-
+    UNIT as PLAT_UNIT,
 )
 from dt_cone_swing_platform_pivot_spec import (  # noqa: E402
     PIVOT_HOLE_BAND as PLAT_PIVOT_HOLE_BAND,
@@ -1290,6 +1290,7 @@ from dt_cone_pivot_post_spec import (  # noqa: E402
     ATTACHMENT_THRU_DIA as POST_ATTACHMENT_THRU_DIA,
     DRAWING_PRECISION_BY_NAME as POST_DRAWING_PRECISION,
     JOURNAL_AXIS_HEIGHT_TOLERANCE_MM as POST_JOURNAL_AXIS_HEIGHT_TOLERANCE_MM,
+    UNIT as POST_UNIT,
 )
 import crank_boss_rim  # noqa: E402
 import gear64_post_measure  # noqa: E402
@@ -1358,6 +1359,7 @@ from dt_cone_gear_shaft_spec import (  # noqa: E402
     TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET as SHAFT_TIP_BLOCK_NORTH_OFFSET,
     TIP_COLLAR_END_STATION as SHAFT_TIP_COLLAR_END,
     TIP_COLLAR_START_STATION as SHAFT_TIP_COLLAR_START,
+    UNIT as SHAFT_UNIT,
     printed_band as shaft_printed_band,
 )
 import dt_cone_gear_stack  # noqa: E402
@@ -1443,8 +1445,9 @@ if any(
     )
 # U30 post mount (I22): each MHA-DT-VN-61 seats on the MHA-DT-05 counterbore floor and
 # is cut to fit into the MHA-DT-20 tap: never proud of the plate underside, and
-# at least 0.90D of thread (pending exception ruling #1019) both at the
-# modelled cut length and at the platform spec's printed worst case.
+# at least 0.87D of thread (owner ruling 2026-11-01, MHA-DT-VN-61's RV-01;
+# #1019's 0.90D target is not met) both at the modelled cut length and at the
+# platform spec's printed worst case.
 _require_tapped_thread("cone-post mount", POST_SCREW_THREAD, POST_MOUNT_SPEC)
 POST_SCREW_SEAT = POST_BLOCK_HEIGHT - POST_CBORE_DEPTH  # above PlateTop
 POST_SCREW_INTO_PLATE = POST_SCREW_LEN - POST_SCREW_SEAT
@@ -1452,10 +1455,10 @@ if POST_SCREW_INTO_PLATE > PLAT_T:
     raise AssertionError("MHA-DT-VN-61 stands proud of the MHA-DT-20 underside")
 if (
     POST_SCREW_INTO_PLATE - 2.0 * POST_MOUNT_TAP_EDGE_BREAK
-    < 0.90 * POST_MOUNT_THREAD_DIA
-    or POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS < 0.90
+    < 0.87 * POST_MOUNT_THREAD_DIA
+    or POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS < 0.87
 ):
-    raise AssertionError("MHA-DT-VN-61 engages the MHA-DT-20 tap under 0.90D")
+    raise AssertionError("MHA-DT-VN-61 engages the MHA-DT-20 tap under 0.87D")
 # The shaft is placed by its front stub end; keep the station in lockstep with
 # the part's FRONT_STUB.
 if abs(SHAFT_FRONT_STATION + SHAFT_FRONT_STUB) > 1e-9:
@@ -1554,7 +1557,7 @@ def tip_block_print_worst_containment_mm(half_widths: dict[str, float]) -> float
 # closes by print tolerance.  The screw floats in its drilled close-clearance
 # hole; the hole's two stations from the pivot bore (HoldDownX, HoldDownZ)
 # and the tap's two stations carry explicit +/-0.10 bands.
-_DRILLED_HOLE_PLUS_MM = drilled_oversize_mm()
+_DRILLED_HOLE_PLUS_MM = drilled_oversize_mm(unit=PLAT_UNIT)
 HOLDDOWN_SCREW_FLOAT_MM = (
     PLAT_HOLDDOWN_CLEARANCE_DIA + _DRILLED_HOLE_PLUS_MM - HOLDDOWN_SHANK_DIA
 ) / 2.0
@@ -1879,20 +1882,21 @@ _PINION_TURNED_DIA_BAND = printed_deviations(
 # Only the turned band's largest radius can close on T120.
 _PINION_TURNED_RADIUS_UP = _PINION_TURNED_DIA_BAND[1] / 2.0
 _BOSS_NORTH_BAND = printed_deviations(
-    POST_CRANK_BOSS_NORTH_FACE, POST_DRAWING_PRECISION["CrankBossStartZ"]
+    POST_CRANK_BOSS_NORTH_FACE, POST_DRAWING_PRECISION["CrankBossStartZ"], unit=POST_UNIT
 )
 _CONE_BOSS_NORTH_BAND = tuple(
     d / 2.0
-    for d in printed_deviations(POST_CONE_BOSS_LENGTH, POST_DRAWING_PRECISION["ConeBossLen"])
+    for d in printed_deviations(POST_CONE_BOSS_LENGTH, POST_DRAWING_PRECISION["ConeBossLen"], unit=POST_UNIT)
 )
 _COLLAR_WIDTH_BAND = printed_deviations(
-    SHAFT_COLLAR_THICKNESS, SHAFT_DRAWING_PRECISION["CollarWidth"]
+    SHAFT_COLLAR_THICKNESS, SHAFT_DRAWING_PRECISION["CollarWidth"], unit=SHAFT_UNIT
 )
 _GEAR64_FACE_LIMITS = deviations(GEAR64_FACE_WIDTH_BAND)
 _CRANK_HEIGHT_BAND = printed_deviations(
     POST_CRANK_ABOVE_CONE,
     POST_DRAWING_PRECISION["CrankAboveCone"],
     deviations(POST_CRANK_ABOVE_CONE_BAND),
+    unit=POST_UNIT,
 )
 # The crank's end play: set on the feeler, or run south onto the boss.
 PINION_END_PLAY = (-PINION_SEAT_FEELER, 0.0)
@@ -2673,7 +2677,7 @@ TIP_COLLAR_WORST_AIR = tip_collar_worst_air_mm(TIP_COLLAR_AIR_BAND_MM)
 # post turns on its screws' clearance until the tip sits in the cup: that
 # capacity must cover the whole error.
 _POST_TO_TIP = TIP_BLOCK_STATION - POST_STATION
-_ANGULAR_DEG = float(_config.title_block("angular")["value_deg"])
+_ANGULAR_DEG = angular_band_deg(unit=POST_UNIT)
 TIP_LATERAL_ERROR_MM = (
     PLAT_POST_MOUNT_STATION_TOL_MM
     + _POST_TO_TIP
@@ -3497,23 +3501,27 @@ if SPRING_TO_LIFT_ROD < 0.25:
 # 20261102T205633192Z-0bb64c777ad54039bee8b67b49966c9d (#290 step 3, the
 # pinion rig on the inch grid, with the strap on the .XX grid at .36 and the
 # pivot shaft lengthened to match); the moments rose 0.16% parked and engaged.
+# Re-measured 2026-11-03 from farm run
+# 20261103T022858451Z-5246d64b8fdf4b9783273c349bf8680b (4cd6a0b1c: #2125's
+# inch drum, 143.256 face, on #2106 f1cb27ac9 with the 7.29 shaft): the
+# moments moved +0.015% parked and -0.004% engaged.
 # Install the measured basis AND frozen fingerprint together (DEVELOPING.md).
-SWING_GRAVITY_NMM = (14.415037327816785, 24.529755623146762)
-SWING_GRAVITY_CORNER_NMM = (14.69855203361545, 25.00648616964613)
+SWING_GRAVITY_NMM = (14.417201200601465, 24.528885296711817)
+SWING_GRAVITY_CORNER_NMM = (14.700792280042016, 25.005658141428334)
 # The basis those moments were computed at: part -> (count, volume mm^3,
 # density kg/m^3). The measured basis and fingerprint deliberately stay frozen:
 # the support-layout regression names both moment constants when
 # any current part's analytic volume, material or governing dimensions move.
 SWING_GRAVITY_BASIS = {
-    "dt-alignment-pinion": (1, 24311.47711833662, 8500.0),
+    "dt-alignment-pinion": (1, 24318.026182668003, 8500.0),
     "dt-pinion-arbor": (1, 13573.853062566704, 7800.0),
-    "dt-pinion-pivot-shaft": (1, 5897.57586994979, 7800.0),
+    "dt-pinion-pivot-shaft": (1, 5881.487907488445, 7800.0),
     "dt-pinion-bracket": (2, 4644.392411286894, 7800.0),
     "dt-pinion-arbor-collar": (1, 2113.391953300099, 7800.0),
     "dt-pinion-handle": (1, 2059.2591950522306, 7800.0),
     "dt-pinion-cam-pin": (2, 253.14809801839277, 7800.0),
 }
-SWING_GRAVITY_MASS_G = 467.4730120818005
+SWING_GRAVITY_MASS_G = 467.4031930214187
 # Frozen governing dimensions of the accepted native-STL calibration, never
 # live config aliases.
 SWING_GRAVITY_FINGERPRINT = {
@@ -3521,15 +3529,15 @@ SWING_GRAVITY_FINGERPRINT = {
         "TEETH": 32,
         "DIAMETRAL_PITCH": 48.0,
         "PRESSURE_ANGLE_DEG": 20.0,
-        "FACE_WIDTH": 143.2,
+        "FACE_WIDTH": 143.256,
         "BORE_DIA": 7.9375,
         "CUTTER_REFERENCE_TEETH": 26,
         "CUTTER_RADIAL_TRANSLATION_MM": 1.5874999999999986,
         "PITCH_TOOTH_THICKNESS_MM": 0.8293770709126581,
         "SUPPORT_OUTSIDE_DIA_MM": 17.979877681931494,
-        "OUTSIDE_DIA": 17.63,
-        "WHOLE_DEPTH": 1.0097916666666675,
-        "MAX_CUT_DEPTH_MM": 1.0111012137912878,
+        "OUTSIDE_DIA": 17.6276,
+        "WHOLE_DEPTH": 1.0085916666666686,
+        "MAX_CUT_DEPTH_MM": 1.0099012137912888,
         "BASE_TANGENT_SPAN": 4.141050235926491,
         "ROOT_MIN_DIA_MM": 15.607797572417423,
         "ROOT_MAX_DIA_MM": 15.610416666666664,
@@ -3811,7 +3819,9 @@ def _lower(value: float, places: int) -> float:
 
 ARBOR_SOUTH_TRAVEL_STACK = {
     **RIG.DRUM_BACK_ADVANCE_STACK,
-    "MHA-DT-01 drum length .X (longest)": _upper(RIG.DRUM_LEN, RIG.DRUM_LEN_PLACES),
+    "MHA-DT-01 drum length .XX (longest)": printed_deviations(
+        RIG.DRUM_LEN, RIG.DRUM_LEN_PLACES, unit=RIG.DRUM_LEN_UNIT
+    )[1],
     "MHA-DT-22 drum station .X (deepest)": ARBOR_DRUM_STATION_BAND,
 }
 ARBOR_NORTH_TRAVEL_STACK = {

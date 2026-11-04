@@ -13,11 +13,12 @@ dt-cone-gear:
   tolerance_class: machined_block
   fit_class: gear_mesh
   process: "gear cutting: 48DP PA20 cutter-native cone family; actual specified finite stock/custom tool authority governs blank and plunge"
+  drawing_unit: in
   # The current spec owns the actual cutter support, tip and floor geometry;
   # no ideal upper-flank continuation is a manufacturing substitute.
   # Earlier changed-profile studies refused 42/48/54T and other root/backlash cases.
   # T006 is cut by the custom DT6-FORM1 N6PA20 tool, option (a) (user ruling
-  # 2026-10-10): root R1.10 with a drum-tip trochoid relief, on the 1/32 in
+  # 2026-10-10): root R1.10 with a drum-tip trochoid relief, on the .031 in
   # journal; it is the named contact-ratio exception (dt_cone_gear_spec,
   # test_standard_mesh_checks). The R1.491 tool with root MIN 2.346 is retired.
   # TODO(#1649): RV-01 is pending owner confirmation. The geometry follows
@@ -28,11 +29,21 @@ dt-cone-gear:
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
-      where: "sheets T006 and T012, BORE PROFILE: the Ø0.794 +0.055/+0.025 bore (BoreCutDia) with 0.420 +0.02/+0.01 across the flat (BoreAF), through the face"
-      finding: "the T006/T012 D-bore, ~0.8 mm across with its flat ~0.02 past the centre and held to 0.01 through the face, has no plausible hobby-shop route to cut or check"
-      reason: "the bore is fixed by owner rulings, not chosen on this sheet: the 1/32 in terminal land of MHA-DT-04 that T012 and T006 slide on (user ruling U40, 2026-09-23, https://github.com/pedropaulovc/harmonic-analyzer/issues/971#issuecomment-6151646064; DT6-FORM1 option (a), 2026-10-10) and one D-flat on every gear land, run out through the tip, phasing every gear to the shaft (user ruling 2026-09-28, recorded in dt_cone_gear_shaft_spec FLAT_OFFSETS); the sliding fit is 0.025-0.075 diametral and 0.010-0.030 across the flat on that land; the geometry decision is open with the owner at https://github.com/pedropaulovc/harmonic-analyzer/issues/1649"
+      where: "sheets T006 and T012, BORE PROFILE: the Ø.0310 +.0018/+.0010 bore (BoreCutDia) with .0170 +.0008/+.0004 across the flat (BoreAF), through the face"
+      finding: "the T006/T012 D-bore, ~.031 across with its flat ~.0015 past the centre and held to .0004 through the face, has no plausible hobby-shop route to cut or check"
+      reason: "the bore is fixed by owner rulings, not chosen on this sheet: the .031 in terminal land of MHA-DT-04 that T012 and T006 slide on (user ruling U40, 2026-09-23, https://github.com/pedropaulovc/harmonic-analyzer/issues/971#issuecomment-6151646064; DT6-FORM1 option (a), 2026-10-10; #290 moved the land from 1/32 to .031 for the .0320 micro reamer) and one D-flat on every gear land, run out through the tip, phasing every gear to the shaft (user ruling 2026-09-28, recorded in dt_cone_gear_shaft_spec FLAT_OFFSETS); the sliding fit is .0010-.0026 diametral and .0004-.0012 across the flat on that land; the geometry decision is open with the owner at https://github.com/pedropaulovc/harmonic-analyzer/issues/1649"
     - id: "RV-02"
       kind: "accept"
       where: "every gear sheet, BORE PROFILE: the D-bore diameter callout 'Ø… THRU' (BoreCutDia)"
       finding: "the bore callout gives no process word such as REAM or BORE (rule 12)"
       reason: "owner ruling 2026-09-29 took the process word off both D-bores (MHA-DT-03 and MHA-DT-07): a through reamer would cut away the flat, the dimensions define the D-profile, and the route belongs in the book, not on the print (https://github.com/pedropaulovc/harmonic-analyzer/commit/7b9ed689199b72c7b0b9db70bfee9ca4fd497e4f)"
+    - id: "RV-03"
+      kind: "minor"
+      where: "sheet T012, front view: the root-to-bore web stated by the native .0797 MIN dimension (WebMin) from the Ø.0310 +.0018/+.0010 bore to the root envelope MIN"
+      finding: "the T012 web is .0797 in (2.0244 mm) at the printed worst case (largest bore .0328, smallest root envelope .1922): .0003 in under the .080 in target (rule 17), .0197 in over the .060 in floor"
+      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions. Here the .031 terminal land (cut by the .0320 micro reamer) and the cutter-native T012 root fix the web at .0797; anything thinner must be ruled again"
+    - id: "RV-04"
+      kind: "minor"
+      where: "sheet T006, GEAR DATA: WEB MIN (REF): .0256"
+      finding: "the T006 root-to-bore web is .0256 in at the printed worst case (largest bore .0328, smallest root envelope .0840), under the .060 in floor (rule 17)"
+      reason: "Owner ruling 2026-11-01: accepted until #1649. The .031 terminal land and its D-bore (RV-01) and the cutter-native T006 root (DT6-FORM1) fix the web; #1649's tip-land geometry pick replaces it"

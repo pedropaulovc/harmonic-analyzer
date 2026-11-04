@@ -25,6 +25,9 @@ import sys
 from typing import Any
 
 import _config
+from _document_units import apply_package_model_units
+from _part_properties import part_drawing_unit
+from _single_limit_tolerance import set_single_limit
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_dimension_insert import add_angular_reference_dimension
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
@@ -65,6 +68,11 @@ from dt_cone_gear_spec import (
     SIMPLIFIED_FEATURES_BY_CONFIGURATION,
     TOOTH_REFERENCE_SKETCH,
     TOOTH_THICKNESS_BAND,
+    UNIT,
+    WEB_MIN_TOL_TYPE,
+    WEB_REFERENCE_ANGLE_DEG,
+    WEB_REFERENCE_SKETCH,
+    web_reference_mm,
     bore_dia_mm,
     bore_flat_af_mm,
     bore_flat_offset_mm,
@@ -91,6 +99,7 @@ from _rebuild import assert_saved_configurations_regenerate, force_rebuild
 from _session import run_build
 from _sketch import (
     SketchDims,
+    anchor_point_to_origin,
     blank_sketch,
     dimension_between,
     ensure_fully_defined,
@@ -249,6 +258,53 @@ async def _author_gap_floor_reference(adapter: Any) -> SketchDims:
     return floor
 
 
+@_telemetry.traced("part.cone_gear.t012_web_reference")
+async def _author_web_reference(adapter: Any) -> None:
+    """RV-03's accepted T012 web, stated natively (rule 20): a construction
+    ray from the axis to the largest printed T012 bore, then the web itself,
+    collinear, out to the smallest printed root envelope along a T012 gap
+    bisector.  The web line's driving length prints ".0797 MIN" once
+    set_single_limit types it.  T012 geometry in every configuration: only
+    the T012 sheet imports it, and the part saves the sketch hidden."""
+    start, web, _band = web_reference_mm()
+    angle = math.radians(WEB_REFERENCE_ANGLE_DEG)
+    ux, uy = math.cos(angle), math.sin(angle)
+    check("create_sketch web reference", await adapter.create_sketch("Front"))
+    # Direct-to-DB: creation-time inference would snap the ray to the
+    # sketch's other references.
+    set_sketch_direct_db(adapter, True)
+    ray = check(
+        "web reference ray",
+        await adapter.add_line(0.0, 0.0, start * ux, start * uy),
+    )
+    line = check(
+        "web reference line",
+        await adapter.add_line(start * ux, start * uy, (start + web) * ux, (start + web) * uy),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, ray)
+    _as_construction(adapter, line)
+    await anchor_point_to_origin(adapter, f"{ray}.start", 0.0, 0.0, "web reference axis")
+    await anchor_point_to_origin(
+        adapter, f"{ray}.end", start * ux, start * uy, "web reference bore point"
+    )
+    check(
+        "web reference line starts on the bore point",
+        await adapter.add_sketch_constraint(f"{line}.start", f"{ray}.end", "coincident"),
+    )
+    check(
+        "web reference line on the ray",
+        await adapter.add_sketch_constraint(line, ray, "collinear"),
+    )
+    await dimension_between(
+        adapter, f"{line}.start", f"{line}.end", "distance", web, "T012 web"
+    )
+    await ensure_fully_defined(adapter, "web reference sketch")
+    check("exit_sketch web reference", await adapter.exit_sketch())
+    name_last_feature(adapter, WEB_REFERENCE_SKETCH)
+    name_dimensions(adapter, WEB_REFERENCE_SKETCH, ["WebBoreX", "WebBoreY", "WebMin"])
+
+
 def _set_gap_floor_limits(adapter: Any) -> None:
     """Store each configuration's printed floor limits on FloorDia (LIMIT).
 
@@ -313,7 +369,7 @@ def _set_configuration_bands(adapter: Any) -> None:
 
 
 def _blank_reference_sketches(adapter: Any) -> None:
-    """Save the two authoring sketches hidden, and prove it.
+    """Save the authoring sketches hidden, and prove it.
 
     Shown, they render in the part's images and in every assembly that places
     a gear; the sheet's front view shows them again for their dimensions
@@ -489,6 +545,8 @@ async def build(adapter) -> dict[str, str]:
     require_complete_stock_family()
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     # Configuration-scoped equation updates only work for rows created by
     # IEquationMgr.Add3. A one-configuration model makes the adapter fall back
     # to Add2, whose rows later appeared to update transiently but reopened as
@@ -745,6 +803,7 @@ async def build(adapter) -> dict[str, str]:
     floor_sketch = name_last_feature(adapter, GAP_FLOOR_SKETCH)
     floor_dim = f"FloorDia@{floor_sketch}"
     drive_jobs += floor_reference.apply(adapter, floor_sketch)
+    await _author_web_reference(adapter)
 
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
@@ -1030,17 +1089,34 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    # The bands are physical millimetres; UNIT prints them in decimal inch, at
+    # the nominal's places so a T006 band's fourth place is never dropped.
+    places = {
+        name: decimals for names in DRAWING_PRECISION.values() for name, decimals in names.items()
+    }
     set_dimension_bilateral_tolerance(
-        adapter, "BlankProfile", "BlankDia", *deviations(BLANK_DIA_BAND)
+        adapter, "BlankProfile", "BlankDia", *deviations(BLANK_DIA_BAND),
+        places=places["BlankDia"], display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "Blank", "FaceWidth", *deviations(FACE_WIDTH_BAND)
+        adapter, "Blank", "FaceWidth", *deviations(FACE_WIDTH_BAND),
+        places=places["FaceWidth"], display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "BoreCutDia", *deviations(BORE_DIA_BAND)
+        adapter, "BoreProfile", "BoreCutDia", *deviations(BORE_DIA_BAND),
+        places=places["BoreCutDia"], display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "BoreAF", *deviations(BORE_AF_BAND)
+        adapter, "BoreProfile", "BoreAF", *deviations(BORE_AF_BAND),
+        places=places["BoreAF"], display_unit=UNIT,
+    )
+    set_dimension_bilateral_tolerance(
+        adapter,
+        TOOTH_REFERENCE_SKETCH,
+        "ToothThickness",
+        *deviations(TOOTH_THICKNESS_BAND),
+        places=places["ToothThickness"],
+        display_unit=UNIT,
     )
     set_dimension_symmetric_angular_tolerance(
         adapter,
@@ -1049,11 +1125,14 @@ async def build(adapter) -> dict[str, str]:
         FLAT_CLOCK_TOLERANCE_DEG,
         require_driven=True,
     )
-    set_dimension_bilateral_tolerance(
+    _start, web_min, web_band = web_reference_mm()
+    set_single_limit(
         adapter,
-        TOOTH_REFERENCE_SKETCH,
-        "ToothThickness",
-        *deviations(TOOTH_THICKNESS_BAND),
+        WEB_REFERENCE_SKETCH,
+        "WebMin",
+        limit=web_min,
+        band=web_band,
+        tol_type=WEB_MIN_TOL_TYPE,
     )
     _set_configuration_bands(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)

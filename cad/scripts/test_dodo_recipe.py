@@ -2878,10 +2878,15 @@ def test_config_deps_are_fine_grained():
         "tolerances/cone_drum_oblique_mesh.yaml",
         "tolerances/gear_tip.yaml",
         "parts/dt-cone-gear.yaml",
-        # cone_set_stack reads the drum and arbor specs, whose sheet unit
-        # (#290 drawing_unit) lives on their own registry rows.
+        # cone_set_stack reads the drum, arbor and pedestal specs, whose sheet
+        # unit (#290 drawing_unit) lives on their own registry rows.
         "parts/dt-cylinder-gear.yaml",
         "parts/dt-cylinder-gear-shaft.yaml",
+        "parts/dt-arbor-pedestal.yaml",
+        # The cone shaft's land bands read its own row's drawing_unit, and the
+        # collar's row for the collar bands they own (#290).
+        "parts/dt-cone-gear-shaft.yaml",
+        "parts/dt-vn-cone-tip-collar.yaml",
         # The cone reads the base casting spec, whose sheet unit (#290
         # drawing_unit) lives on its own registry row.
         "parts/fr-harmonic-base.yaml",
@@ -2930,6 +2935,7 @@ def test_config_deps_are_fine_grained():
     drawing_unit_rows = {
         "parts/_defaults.yaml",
         "parts/ch-fulcrum-keeper.yaml",
+        "parts/dt-arbor-pedestal.yaml",
         "parts/dt-crank-hub.yaml",
         "parts/dt-crank-pin-ring.yaml",
         "parts/dt-crank-pin.yaml",

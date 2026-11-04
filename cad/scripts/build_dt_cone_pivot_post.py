@@ -3,9 +3,10 @@ r"""Reproduce the v2 cone pivot post and integrated crank pedestal.
 The v2 casting supplies the retained diameters, cone-axis, foot and mounting
 datums.  Its original 86 mm height came from the ch30 eight-view; this
 normal-24DP crank variant grows the actual body to ``BLOCK_HEIGHT``
-(dt_cone_pivot_post_spec, from dt_post_mount_stack) and keeps the 26.6 mm
-head so the raised crank boss remains inside the host outline.  The body,
-head and boss proportions otherwise retain the harvested feature geometry.
+(dt_cone_pivot_post_spec, from dt_post_mount_stack) and keeps the head height
+so the raised crank boss remains inside the host outline.  The body, head and
+boss proportions otherwise retain the harvested feature geometry, snapped to
+the inch sheet's printed grid (#290).
 
 The v2 coordinate frame is also authoritative: the body stands on Top at y=0,
 the crank bore runs straight along +Z, and the cone journal itself is yawed
@@ -32,9 +33,11 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
+from _part_properties import part_drawing_unit
 from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import (
@@ -85,7 +88,6 @@ from dt_cone_pivot_post_spec import (
     HEAD_DIA,
     HEAD_HEIGHT,
     INCLINE_DEG,
-    JOURNAL_AXIS_HEIGHT_TOLERANCE_MM,
     JOURNAL_REFERENCE_LENGTH,
     JOURNAL_REFERENCE_X,
     JOURNAL_REFERENCE_Z,
@@ -93,6 +95,7 @@ from dt_cone_pivot_post_spec import (
     JOURNAL_BORE_BAND,
     RUNNING_BORE_BAND,
     SURFACE_FINISHES,
+    UNIT,
 )
 
 PART_NAME = "dt-cone-pivot-post"
@@ -183,8 +186,8 @@ def _head_surface_z(x: float) -> float:
 MAIN_BODY_MM3 = math.pi * BLOCK_RADIUS**2 * BLOCK_HEIGHT
 HEAD_SHELL_MM3 = math.pi * (HEAD_RADIUS**2 - BLOCK_RADIUS**2) * HEAD_HEIGHT
 #
-# Crank boss: a Ø21.93 cylinder from the head's tangent plane
-# (z = -CRANK_BOSS_NORTH_FACE) to +50.6591 minus the part of it already inside
+# Crank boss: a CRANK_BOSS_DIA cylinder from the head's tangent plane
+# (z = -CRANK_BOSS_NORTH_FACE) to CRANK_BOSS_END_Z minus the part of it already inside
 # the head -- at each x the head spans |z| <= s(x), and the boss starts at the
 # station, so the overlap column is s + min(station, s).
 CRANK_BOSS_OUTSIDE_HEAD_MM3 = (
@@ -194,11 +197,11 @@ CRANK_BOSS_OUTSIDE_HEAD_MM3 = (
         lambda x: _head_surface_z(x) + min(-CRANK_BOSS_START_Z, _head_surface_z(x)),
     )
 )
-# Crank bore: the full Ø11.438 cylinder from the station through the boss
+# Crank bore: the full CRANK_BORE_DIA cylinder from the station through the boss
 # end; nothing stands proud of the tangent plane inside the boss disc, so
 # everything on that path is solid.
 CRANK_BORE_MM3 = math.pi * CRANK_BORE_RADIUS**2 * CRANK_BOSS_LENGTH
-# Cone pads: a Ø17.2 mid-plane cylinder of total length 42.011 whose axis is
+# Cone pads: a CONE_BOSS_DIA mid-plane cylinder of total length CONE_BOSS_LENGTH whose axis is
 # yawed about Y and passes through the post axis, so a point at axial t and
 # radial p (in the yaw plane) sits at post radius sqrt(t² + p²) whatever the
 # yaw -- the body clips each column to |t| <= sqrt(R² - p²).
@@ -313,6 +316,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    # IPS before any global, sketch or feature (#290).
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Retain the harvested reference topology, but give the vertical axis the
     # semantic name the assembly consumes instead of relying on Axis<N> order.
@@ -371,7 +376,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # 1. Main O42.011 body, from the unchanged foot to BLOCK_HEIGHT.
+    # 1. Main BLOCK_DIA body, from the unchanged foot to BLOCK_HEIGHT.
     main = SketchDims()
     check("create sketch MainBodyProfile", await adapter.create_sketch("Top"))
     await define_circle(
@@ -517,7 +522,7 @@ async def build(adapter: Any) -> dict[str, str]:
     volume -= CRANK_BORE_MM3
     await volume_check(adapter, "v2 crank bore", volume, 0.001 * volume)
 
-    # 4. O17.2 flush pads and O12.2808 journal on the inclined v2 axis.  Both
+    # 4. O17.2 pads and O12.2808 journal on the inclined v2 axis.  Both
     # are mid-plane extrusions from the harvested ConeShaftNormal reference
     # (material on both sides of the plane, so no cut-direction question).
     # Do not substitute an on-axis revolve here: that SolidWorks topology is
@@ -908,13 +913,18 @@ async def build(adapter: Any) -> dict[str, str]:
     # and head diameters, boss diameters, boss extents, mounting-hole
     # stations -- runs at the title block's general grade.
     set_dimension_bilateral_tolerance(
-        adapter, "CrankBoreProfile", "CrankBoreDia", *deviations(RUNNING_BORE_BAND)
+        adapter,
+        "CrankBoreProfile",
+        "CrankBoreDia",
+        *deviations(RUNNING_BORE_BAND),
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
         adapter,
         "JournalBoreProfile",
         "JournalBoreDia",
         *deviations(JOURNAL_BORE_BAND),
+        display_unit=UNIT,
     )
     # The mesh band on the bore-to-bore spacing (derivation in
     # dt_cone_pivot_post_spec.CRANK_ABOVE_CONE_BAND).
@@ -923,14 +933,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "BoreSpacingReference",
         "CrankAboveCone",
         *deviations(CRANK_ABOVE_CONE_BAND),
-    )
-    # The cup-capture band on the cone-axis height (derivation in
-    # dt_cone_pivot_post_spec.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM).
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "ConeBossProfile",
-        "JournalAxisY",
-        JOURNAL_AXIS_HEIGHT_TOLERANCE_MM,
+        display_unit=UNIT,
     )
     # The collar thrust face's station from the post axis: the half
     # face-to-face band the drive-train stacks book (derivation in
@@ -940,6 +943,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "ConeBossStationReference",
         "ConeBossNorthZ",
         CONE_BOSS_NORTH_STATION_TOLERANCE_MM,
+        display_unit=UNIT,
     )
 
     # Semantic, name-selected assembly references.  The journal axis is taken
