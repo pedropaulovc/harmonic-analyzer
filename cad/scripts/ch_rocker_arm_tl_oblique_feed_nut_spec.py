@@ -68,6 +68,7 @@ from __future__ import annotations
 
 import _config
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
+from _fit_ream_h7 import REAM_H7
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_TARGET_MM
 import _mcmaster_91355a581 as _screw
@@ -156,10 +157,10 @@ DOWEL_DIA = 3.0 / 32.0 * INCH  # 2.381
 DOWEL_DIA_MIN = DOWEL_DIA + 0.0001 * INCH  # catalogue +.0001/+.0003
 DOWEL_DIA_MAX = DOWEL_DIA + 0.0003 * INCH
 DOWEL_LENGTH = 0.5 * INCH
-# The shop's .0930 chucking reamer (inventory reamers-inch-purchases: "the
-# 3/32 drive-pin presses"), each band assuming it cuts +.0000/+.0005.
+# #290 fit row D14, the shared 3/32 dowel press: the shop's .0930 chucking
+# reamer (inventory reamers-inch-purchases), REAM_H7.
 DOWEL_HOLE_DIA = 0.0930 * INCH  # 2.362
-DOWEL_HOLE_BAND = (0.0005 * INCH, 0.0)  # (upper, lower): .0930-.0935
+DOWEL_HOLE_BAND = REAM_H7  # (upper, lower): .0930-.0935
 DOWEL_HOLE_PLACES = 4
 DOWEL_INTERFERENCE = (
     DOWEL_DIA_MIN - (DOWEL_HOLE_DIA + DOWEL_HOLE_BAND[0]),
