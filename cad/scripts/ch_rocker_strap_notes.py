@@ -58,14 +58,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Strap": {"StrapThickness"},
 }
 # The hole at four places with its press band; the thickness at three with
-# its band; both edges at two with their one-sided bands; the radius at one
+# its band; both edges at three with their one-sided bands, the .315 the
+# finished MHA-CH-06 prints (at two places the 8 mm nominal rounds to .31 and
+# shifts each edge's limits .005 off the rocker's profile zone); the radius at one
 # (a noncritical size: a .1 radius error moves the 5.76 half-chord's sagitta
 # .002); the offsets and the land at two (the title block's .XX).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "StrapProfile": {
         "HoleDia": 4,
-        "TopAbovePivot": 2,
-        "BottomBelowPivot": 2,
+        "TopAbovePivot": 3,
+        "BottomBelowPivot": 3,
         "TopRadius": 1,
         "TailTipX": 2,
         "RodTipX": 2,

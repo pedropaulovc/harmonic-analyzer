@@ -83,8 +83,8 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     assert not set(drawing.FRONT_KEEP) & set(drawing.RIGHT_KEEP)
     assert set(notes.DIMENSION_CALLOUTS) <= marked
     assert notes.DRAWING_PRECISION_BY_NAME["StrapThickness"] == 3
-    assert notes.DRAWING_PRECISION_BY_NAME["TopAbovePivot"] == 2
-    assert notes.DRAWING_PRECISION_BY_NAME["BottomBelowPivot"] == 2
+    assert notes.DRAWING_PRECISION_BY_NAME["TopAbovePivot"] == 3
+    assert notes.DRAWING_PRECISION_BY_NAME["BottomBelowPivot"] == 3
     # The R816 follows from the R800 and both edges: never a stacking size.
     assert "BottomRadius" not in marked
     # TailTipLen is the RodTipLen's mirror: it prints once, as 2X.
@@ -93,6 +93,33 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "set_dimension_precision" not in source
     assert "assert_imported_precision(" in source
+
+
+def test_printed_edge_limits_are_the_finished_rockers() -> None:
+    # The strap's outline is finished here, so each edge's PRINTED inch limits
+    # must be the finished MHA-CH-06's: the .315 BASIC height with its .020
+    # one-sided zone, above the pivot and (mirrored) below it.
+    def limits(nominal_mm: float, places: int, band: tuple[float, float]):
+        nominal = round(nominal_mm / 25.4, places)
+        upper, lower = (round(d / 25.4, 3) for d in band)
+        return round(nominal + lower, 3), round(nominal + upper, 3)
+
+    arm_places = rocker_notes.DRAWING_PRECISION["TopEdgeReference"]["TopAbovePivot"]
+    zone = round(rocker.TOP_EDGE_BAND[0] / 25.4, 3)
+    arm_height = round(rocker.TOP_EDGE_ABOVE_PIVOT / 25.4, arm_places)
+    assert (arm_height, zone) == (0.315, 0.020)
+    top = limits(
+        spec.TOP_EDGE_ABOVE_PIVOT,
+        notes.DRAWING_PRECISION_BY_NAME["TopAbovePivot"],
+        spec.TOP_EDGE_BAND,
+    )
+    bottom = limits(
+        spec.BOTTOM_EDGE_BELOW_PIVOT,
+        notes.DRAWING_PRECISION_BY_NAME["BottomBelowPivot"],
+        spec.BOTTOM_EDGE_BAND,
+    )
+    assert top == (arm_height, round(arm_height + zone, 3)) == (0.315, 0.335)
+    assert bottom == (round(arm_height - zone, 3), arm_height) == (0.295, 0.315)
 
 
 def test_every_band_is_native_and_names_its_mate() -> None:
