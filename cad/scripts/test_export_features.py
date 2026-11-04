@@ -450,9 +450,9 @@ def test_rocker_land_clock_is_the_printed_two_place_basic_nominal(monkeypatch) -
 def test_rocker_bands_respect_native_nominals_and_displayed_general_rows() -> None:
     manifest = exporter.requirement_manifest("ch-rocker-arm")
     features = manifest["features"]
-    assert manifest["general_tolerances"]["linear_1pl"] == 0.8
-    assert manifest["general_tolerances"]["linear_2pl"] == 0.51
-    assert manifest["general_tolerances"]["linear_3pl"] == 0.13
+    assert manifest["general_tolerances"]["linear_1pl"] == pytest.approx(2.54)
+    assert manifest["general_tolerances"]["linear_2pl"] == pytest.approx(0.254)
+    assert manifest["general_tolerances"]["linear_3pl"] == pytest.approx(0.127)
     assert features["hub_od"]["dia"] == [9.906, 10.414]
     assert features["hub_faces"]["length"] == [7.0565, 7.1073]
     assert features["hub_faces"]["length_nominal"] == 7.0565
@@ -709,14 +709,16 @@ def test_cone_general_limits_are_the_inch_sheets_printed_limits() -> None:
     assert manifest["notes"]["edge_break"] == "REMOVE BURRS AND BREAK SHARP EDGES R.010 OR CHAMFER .010 MAX"
 
 
-def test_millimetre_package_keeps_its_millimetre_general_rows() -> None:
+def test_rocker_arm_general_rows_follow_its_inch_sheet() -> None:
+    # The rocker arm was the last supported package on the millimetre sheet;
+    # it now prints decimal inch (#290), so its general rows are the inch ones.
     manifest = exporter.requirement_manifest("ch_rocker_arm")
     general = manifest["general_tolerances"]
-    assert [general[key] for key in ("linear_1pl", "linear_2pl", "linear_3pl", "drilled_hole_plus", "edge_break_r", "chamfer_max")] == [
-        0.8, 0.51, 0.13, 0.1, 0.25, 0.25,
-    ]
-    assert general["cite"]["linear_2pl"] == ["harmonic-analyzer/cad/config/title_block.yaml:linear_2pl.band_mm"]
-    assert manifest["notes"]["edge_break"] == "REMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX"
+    assert [general[key] for key in ("linear_1pl", "linear_2pl", "linear_3pl", "drilled_hole_plus", "edge_break_r", "chamfer_max")] == pytest.approx(
+        [2.54, 0.254, 0.127, 0.1016, 0.254, 0.254]
+    )
+    assert "harmonic-analyzer/cad/config/title_block.yaml:in.linear_2pl.band_in" in general["cite"]["linear_2pl"]
+    assert manifest["notes"]["edge_break"] == "REMOVE BURRS AND BREAK SHARP EDGES R.010 OR CHAMFER .010 MAX"
 
 
 def test_shaft_axial_extents_tile_the_turned_axis() -> None:
