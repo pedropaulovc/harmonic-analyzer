@@ -33,12 +33,14 @@ HG Series > Rail, HGR15R440C, downloaded 2026-10-17 ~03:55 UTC; sha256
 FreeCAD 1.1.4 harvest: volume 81085.4038 mm^3, one solid, bbox 440 x 15 x 15;
 profile read from its analytic faces (``vendor-cad/HGR15R.dims.md``).
 
-UNVERIFIED for the kit rail, checked at receipt (``DRAWING_NOTES``): the hole
-stations and both end distances (the base bar is tapped to the received rail
-if they differ). Also UNVERIFIED: the HIWIN reference profile and hole sizes
-the kit rail is assumed to share; the counterbored holes are proved when the
-rail is laid on the tapped bar and all eight #8-32 screws start by hand
-(base-bar process plan, inspect op 40).
+UNVERIFIED for the kit rail, checked at receipt (``DRAWING_NOTES``): the eight
+hole stations from the end fitted flush. Each within the base bar's
+``RAIL_RECEIPT_BAND`` (0.4 mm) of nominal is accepted and the bar is tapped
+to the received rail; outside it the fitter stops and reports, since the
+bar's rail-tap walls are proved only inside that band. Also UNVERIFIED: the
+HIWIN reference profile and hole sizes the kit rail is assumed to share; the
+counterbored holes are proved when the rail is laid on the tapped bar and all
+eight #8-32 screws start by hand (base-bar process plan, inspect op 40).
 
 Source of each number:
 
@@ -96,6 +98,7 @@ from __future__ import annotations
 
 import math
 
+import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 
 SUPPLIER = "Amazon (sold by XIQI)"
@@ -288,14 +291,18 @@ DRAWING_PRECISION = {
 # The one printed pitch stands for every gap between the holes.
 HOLE_PITCH_CALLOUT = f"{HOLE_COUNT - 1}X"
 # The listing gives no pattern, so the received rail is measured before the
-# base bar's taps go in, and the bar follows the rail if they differ. The bar
-# is named by its drawing number (machinist review mr1: a bare "TL-20" named
-# no drawing).
+# base bar's taps go in. The bar follows the received rail only inside the
+# base bar's receipt band, which its rail-tap walls carry (Codjiflo P2, PR
+# #2187: an unbounded "follow the rail" accepted E 17/13, the last tap 0.85
+# from the bar's end); outside it the fitter stops. The bar is named by its
+# drawing number (machinist review mr1: a bare "TL-20" named no drawing).
+RECEIPT_BAND = base_bar.RAIL_RECEIPT_BAND
+RECEIPT_TEXT = f"±{RECEIPT_BAND:.1f} MM"
 DRAWING_NOTES = "\n".join(
     (
         "KIT RAIL, USED UNCUT. BEFORE TAPPING MHA-CH-06-TL-20 BASE BAR, MEASURE",
-        "THE RECEIVED HOLE STATIONS AND BOTH END DISTANCES; IF THEY DIFFER",
-        "FROM THIS SHEET, TAP THE BAR TO THE RECEIVED RAIL.",
+        f"EVERY HOLE STATION FROM THE END FITTED FLUSH. EACH WITHIN {RECEIPT_TEXT} OF",
+        "THIS SHEET: TAP THE BAR TO THE RAIL. OTHERWISE STOP AND REPORT.",
     )
 )
 if abs(LENGTH - (2.0 * HOLE_END + (HOLE_COUNT - 1) * HOLE_PITCH)) > 1e-9:

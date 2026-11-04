@@ -207,9 +207,10 @@ BRACKET_THICK = 1.0 * INCH  # OnlineMetals 1165 half-by-one bar, on edge
 KP08_BASE_Z = trammel.BASE_BAR_THICK + BRACKET_THICK  # 37.338
 SCREW_AXIS_Z = KP08_BASE_Z + KP08_AXIS_HEIGHT  # 52.338
 # Far KP08 outer face to the handwheel's hub end: the 410 screw's far end then
-# stands 12.5 into the wheel's bore, past the grub and the banded far end of
-# its flat, and 1.5 short of the hub's guaranteed bore depth.
-HUB_GAP = 11.5
+# stands 13 into the wheel's bore, past the grub and its flat with an end land
+# on the flat at the printed bands (leadscrew_stock.HANDWHEEL_FLAT_END_LAND),
+# and 1 short of the hub's guaranteed bore depth.
+HUB_GAP = 11.0
 # The drilled parts fix the KP08 stations and the screw length; a vendor swap
 # must not move them. The self-checks below guard them against the bought
 # block: a swap that trips one is a redesign decision.
@@ -311,7 +312,7 @@ KP08_FACE_S = (
 HUB_END_S = KP08_FACE_S[1] + HUB_GAP
 SCREW_NEAR_END_S = KP08_FACE_S[0] - NEAR_STUB
 SCREW_FAR_END_S = SCREW_NEAR_END_S + SCREW_LENGTH
-HANDWHEEL_ENGAGEMENT = SCREW_FAR_END_S - HUB_END_S  # 12.5
+HANDWHEEL_ENGAGEMENT = SCREW_FAR_END_S - HUB_END_S  # 13
 HANDWHEEL_STUB = SCREW_FAR_END_S - KP08_FACE_S[1]  # screw past the far KP08: 24
 HANDWHEEL_S = (HUB_END_S, HUB_END_S + HANDWHEEL_LENGTH)
 WHEEL_S = (

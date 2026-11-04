@@ -75,8 +75,14 @@ def test_receipt_limits_bracket_the_image_and_print_in_f1() -> None:
         f"FLANGE {spec.FLANGE_THICK_MIN:.1f}-{spec.FLANGE_THICK_MAX:.1f} MM THICK, "
         f"BODY Ø{spec.BODY_DIA_MAX:.1f} MM MAX, 4 HOLES "
         f"Ø{spec.HOLE_DIA_MIN:.2f}-{spec.HOLE_DIA_MAX:.2f} MM ON A Ø16 "
-        f"±{spec.HOLE_PCD_BAND:.1f} MM PCD, FACED LENGTH {spec.LENGTH_MAX:.1f} MM MAX"
+        f"±{spec.HOLE_PCD_BAND:.1f} MM PCD"
     )
+    # The faced-length limit is checked only after the facing pass: the
+    # supplied nut, its spigot still on, is longer than it.
+    assert spec.FACED_LENGTH_TEXT == f"{spec.LENGTH_MAX:.1f} MM LONG MAX"
+    assert spec.SUPPLIED_LENGTH > spec.LENGTH_MAX
+    assert f"{spec.LENGTH_MAX:.1f}" not in spec.RECEIPT_TEXT
+    assert "LENGTH" not in spec.RECEIPT_TEXT and "LONG" not in spec.RECEIPT_TEXT
     # The #29 transfer spot enters the least hole; the largest hole at its
     # worst station still leaves brass between it and the largest body.
     assert feed_block.TRANSFER_SPOT_DIA < spec.HOLE_DIA_MIN

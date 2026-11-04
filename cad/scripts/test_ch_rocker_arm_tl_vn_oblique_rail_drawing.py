@@ -177,7 +177,13 @@ def test_centroid_sits_on_the_centre_plane_at_mid_length() -> None:
 def test_spec_is_pure_data() -> None:
     source = Path(spec.__file__).read_text(encoding="utf-8")
     imports = set(re.findall(r"^(?:from|import) (\S+)", source, re.MULTILINE))
-    assert imports <= {"__future__", "math", "ch_rocker_arm_tl_oblique_trammel_spec"}
+    # The base bar spec (pure data) carries the receipt band the note prints.
+    assert imports <= {
+        "__future__",
+        "math",
+        "ch_rocker_arm_tl_oblique_trammel_spec",
+        "ch_rocker_arm_tl_oblique_base_bar_spec",
+    }
 
 
 def test_docstring_marks_every_source() -> None:
@@ -417,18 +423,25 @@ def test_views_and_captions_fit_the_sheet() -> None:
         assert draw.caption_text(label, scale).startswith(label)
 
 
-def test_note_is_the_receipt_check_without_dimensions() -> None:
+def test_note_is_the_bounded_receipt_check() -> None:
     from _purchased_fastener_drawing import note_lines
+
+    import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 
     bar = _config.parts("ch-rocker-arm-tl-oblique-base-bar")
     # Rule 7: the length and hole pattern are FRONT's dimensions; the note's
-    # only number is the base bar's drawing number.
+    # only numbers are the base bar's drawing number and the receipt band.
+    assert spec.RECEIPT_BAND == base_bar.RAIL_RECEIPT_BAND
     assert bar["number"] in spec.DRAWING_NOTES
-    assert not re.search(r"\d", spec.DRAWING_NOTES.replace(bar["number"], ""))
+    assert spec.RECEIPT_TEXT == f"±{base_bar.RAIL_RECEIPT_BAND:.1f} MM"
+    rest = spec.DRAWING_NOTES.replace(bar["number"], "").replace(spec.RECEIPT_TEXT, "")
+    assert not re.search(r"\d", rest)
     lines = note_lines(spec.DRAWING_NOTES, label=NAME)
     assert len(lines) == 3
     assert all(len(line) <= 70 for line in lines), lines
-    # The kit rail is used uncut and the bar follows the received rail.
+    # The kit rail is used uncut and the bar follows the received rail only
+    # inside the band the bar's rail-tap walls are proved for (Codjiflo P2).
     note = " ".join(lines)
     assert "USED UNCUT" in note and "SPECIAL ORDER" not in note
-    assert "TAP THE BAR TO THE RECEIVED RAIL" in note
+    assert f"EACH WITHIN {spec.RECEIPT_TEXT} OF THIS SHEET" in note
+    assert "TAP THE BAR TO THE RAIL. OTHERWISE STOP AND REPORT." in note

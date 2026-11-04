@@ -153,21 +153,78 @@ def test_walls_meet_rule_17() -> None:
     assert min(spec.SIDE_WALL_WORST, spec.NEAR_END_WALL_WORST) >= WALL_TARGET_MM
     # The kit rail's end taps: 15 from the spindle end, 4.93 from the far end
     # of the 17.32 bar (option B), so the far end governs. The end wall reads
-    # the station's band (and the length's at the far end), the slot walls
-    # the slots' stations and rises at .XX.
+    # the station's band, the rail's receipt band (the bar is tapped to the
+    # received rail) and the length's band at the far end; the slot walls the
+    # slots' stations and rises at .XX.
     xx_station = printed_band_mm(2, unit="in")
     tap_r = THREAD_MAJOR_MM[spec.RAIL_SCREW] / 2.0
     far_nominal = spec.BAR_LENGTH - spec.RAIL_HOLE_X[-1] - tap_r
     assert far_nominal / 25.4 == pytest.approx(0.112, abs=5e-4)
-    assert spec.RAIL_TAP_END_WALL_WORST == pytest.approx(
-        far_nominal - xx_station - spec.RAIL_HOLE_BAND
-    )
-    assert spec.RAIL_TAP_END_WALL_WORST < spec.RAIL_HOLE_X[0] - spec.RAIL_HOLE_BAND - tap_r
+    spread = spec.RAIL_HOLE_BAND + spec.RAIL_RECEIPT_BAND
+    assert spec.RAIL_TAP_END_WALL_WORST == pytest.approx(far_nominal - xx_station - spread)
+    assert spec.RAIL_TAP_END_WALL_WORST < spec.RAIL_HOLE_X[0] - spread - tap_r
     assert spec.RAIL_TAP_END_WALL_WORST >= WALL_TARGET_MM
     assert spec.RAIL_TAP_SLOT_WALL_WORST >= WALL_TARGET_MM
     build = BUILD.read_text(encoding="utf-8")
     assert "high_corner" not in build
     assert "adapter, low_corner, FAR_SLOT_X, FAR_SLOT_Y, FAR_SLOT_RISE" in build
+
+
+def test_receipt_band_bounds_the_received_rail_pattern() -> None:
+    """Codjiflo P2 (PR #2187): 'tap the bar to the received rail' accepted any
+    pattern on the unchanged 17.32 bar. The rail sheet accepts each received
+    station within RAIL_RECEIPT_BAND of nominal and stops outside it; every
+    received pattern inside the band keeps the far-end wall at rule 17's
+    target, and the reviewer's E 17/13 example falls outside it."""
+    band = spec.RAIL_RECEIPT_BAND
+    tap_r = THREAD_MAJOR_MM[spec.RAIL_SCREW] / 2.0
+    length_low = spec.BAR_LENGTH - printed_band_mm(2, unit="in")
+
+    def far_wall(stations: tuple[float, ...]) -> float:
+        return length_low - (max(stations) + spec.RAIL_HOLE_BAND) - tap_r
+
+    def accepted(stations: tuple[float, ...]) -> bool:
+        return all(
+            abs(x - nominal) <= band + 1e-9
+            for x, nominal in zip(stations, spec.RAIL_HOLE_X, strict=True)
+        )
+
+    count = len(spec.RAIL_HOLE_X)
+    # Received near E and pitch on a grid round the nominal 15 / 60.
+    grid = [
+        tuple(e + k * p for k in range(count))
+        for e in (14.0 + 0.05 * i for i in range(41))
+        for p in (59.8 + 0.01 * j for j in range(41))
+    ]
+    inside = [stations for stations in grid if accepted(stations)]
+    assert inside
+    assert min(far_wall(s) for s in inside) >= WALL_TARGET_MM
+    # The band is a whole 0.1 inside the widest the far end allows (0.48).
+    assert spec.RAIL_RECEIPT_BAND_MAX == pytest.approx(
+        far_wall(tuple(spec.RAIL_HOLE_X)) - WALL_TARGET_MM, abs=1e-9
+    )
+    assert spec.RAIL_RECEIPT_BAND_MAX == pytest.approx(0.479, abs=1e-3)
+    assert band == round(band, 1) and band <= spec.RAIL_RECEIPT_BAND_MAX < band + 0.1
+    # The review's example, E 17/13 at P 60: the last tap 0.85 from the end,
+    # under the floor, and the receipt check rejects it.
+    e17 = tuple(17.0 + 60.0 * k for k in range(count))
+    assert spec.BAR_LENGTH - e17[-1] - tap_r == pytest.approx(0.845, abs=1e-3)
+    assert spec.BAR_LENGTH - e17[-1] - tap_r < WALL_FLOOR_MM
+    assert not accepted(e17)
+    # The bracket holes' rail-tap wall carries the band too.
+    walls = spec.bracket_hole_walls(leadscrew.BASE_BAR_HOLES)
+    assert walls["rail tap"] >= WALL_FLOOR_MM
+    # The base-bar plan prints the same acceptance and the same stations.
+    plan = (
+        Path(__file__).resolve().parents[1]
+        / "process"
+        / "ch_rocker_arm_tl_oblique_base_bar"
+        / "plan.toml"
+    ).read_text(encoding="utf-8")
+    stations = ", ".join(f"{x:g}" for x in spec.RAIL_HOLE_X)
+    assert f"within +/-{band:.1f} of {stations}, drill each rail hole" in plan
+    assert f"outside +/-{band:.1f}, stop and report" in plan
+
 
 
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
@@ -233,9 +290,24 @@ def test_rail_holes_hold_a_baseline_band_that_names_its_mate() -> None:
     )
     assert spec.RAIL_PATTERN_ALLOWANCE > 0.0
     # The mate rides the outermost station, the one lane no extension line
-    # crosses; no other station carries a callout.
-    assert drawing.CALLOUTS_BELOW["RailHole8X"] == "MATCHES HGR15 RAIL HOLES"
+    # crosses; no other station carries a callout. The stations are the
+    # received rail's (tapped to it inside the rail sheet's receipt band), so
+    # the callout names the band and the rail's drawing number, and each
+    # printed ±0.08 holds about its received station.
+    rail_number = _config.parts("ch-rocker-arm-tl-vn-oblique-rail")["number"]
+    assert drawing.CALLOUTS_BELOW["RailHole8X"] == spec.RAIL_MATE_CALLOUT
+    assert spec.RAIL_MATE_CALLOUT == (
+        f"MATCHES RECEIVED HGR15 RAIL, ±{spec.RAIL_RECEIPT_BAND:.1f} MM PER {rail_number}"
+    )
+    assert "\n" not in spec.RAIL_MATE_CALLOUT
     assert not (stations - {"RailHole8X"}) & set(drawing.CALLOUTS_BELOW)
+    # One line at about 2.6 mm a glyph, centred under the 435.00's text, stays
+    # between the end face's and hole 8's extension lines, the only lines in
+    # that gap.
+    half = len(spec.RAIL_MATE_CALLOUT) * 0.0026 / 2.0
+    centre = drawing.FRONT_KEEP["RailHole8X"][0]
+    assert centre - half >= drawing._LEFT + 0.002
+    assert centre + half <= drawing._sheet_x(drawing.FRONT_CENTER, spec.RAIL_HOLE_X[-1]) - 0.002
 
 
 def test_rail_row_is_located_from_the_faced_low_side() -> None:

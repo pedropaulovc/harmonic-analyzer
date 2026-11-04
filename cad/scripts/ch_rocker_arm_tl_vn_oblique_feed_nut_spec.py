@@ -38,8 +38,10 @@ Datasheet-built: no vendor CAD obtained. Sources:
   lug's taps are transferred): the ``*_MIN`` / ``*_MAX`` limits below. Each
   is the bound a check in this jig reads: the flange thickness (the screws'
   engagement and seat), the body diameter (the heads' clearance, TL-32's
-  spec), the hole size (the transfer spot's residual), the hole PCD (the lug
-  walls) and the faced length (the near-KP08 feed gap). F2 calipers
+  spec), the hole size (the transfer spot's residual) and the hole PCD (the
+  lug walls), measured as received (``RECEIPT_TEXT``); and the faced length
+  (the near-KP08 feed gap), measured after the facing pass
+  (``FACED_LENGTH_TEXT``), since the supplied nut is 1.5 longer. F2 calipers
   each nut screw's head against ``SCREW_HEAD_DIA_MAX``.
 
 Part frame. The axis is +Y and is published as ``ScrewAxis`` (Front ∩
@@ -110,13 +112,15 @@ HOLE_PCD_BAND = 0.1  # ± on the diameter, so ±0.05 on each hole's station
 LENGTH_MAX = 13.8  # faced, seat face to body end
 HOLE_R_MAX = HOLE_DIA_MAX / 2.0
 HOLE_STATION_BAND = HOLE_PCD_BAND / 2.0
-# F1 prints the limits in the nut's own millimetres (owner ruling 4, 2026-11-01).
+# F1 prints the limits in the nut's own millimetres (owner ruling 4, 2026-11-01):
+# the incoming ones before the spigot is faced, the faced length after it.
 RECEIPT_TEXT = (
     f"FLANGE {FLANGE_THICK_MIN:.1f}-{FLANGE_THICK_MAX:.1f} MM THICK, BODY "
     f"Ø{BODY_DIA_MAX:.1f} MM MAX, {len(HOLE_ANGLES_DEG)} HOLES "
     f"Ø{HOLE_DIA_MIN:.2f}-{HOLE_DIA_MAX:.2f} MM ON A Ø{HOLE_PCD:.0f} "
-    f"±{HOLE_PCD_BAND:.1f} MM PCD, FACED LENGTH {LENGTH_MAX:.1f} MM MAX"
+    f"±{HOLE_PCD_BAND:.1f} MM PCD"
 )
+FACED_LENGTH_TEXT = f"{LENGTH_MAX:.1f} MM LONG MAX"
 
 # --- FIT-UP: the 82° countersinks for the four TL-VN-67 flat heads ------------
 SCREW_COUNT = len(HOLE_ANGLES_DEG)

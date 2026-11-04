@@ -283,14 +283,14 @@ _NEAR_XY = (0.043, DETAIL_ROW_Y)
 # view's.
 _FAR_CENTRE_MM = FLAT_STATIONS["FarKP08"]
 _FAR_XY = (0.091, DETAIL_ROW_Y)
-# E: the handwheel's flat and the far end (400.5 .. 410), the printed flat's
+# E: the handwheel's flat and the far end (400.0 .. 410), the printed flat's
 # length under the fence, right of the flat, and its across-flat left of it,
 # square to the axis:
 # its extension line off the flat runs back along the flat and out of the
-# fence over 2.25 mm of thread (right of it, it would run along the 1.5 mm of
-# unflatted thread to the far end, reading as the flat running out there).
-# The fence's radius 7 holds the flat's start corners and the far end's
-# (each 6.21 off its centre) whole.
+# fence over 2 mm of thread (right of it, it would run along the 2 mm of
+# unflatted thread, the flat's end land, to the far end, reading as the flat
+# running out there). The fence's radius 7 holds the flat's start corners and
+# the far end's (each 6.40 off its centre) whole.
 # The across-flat's text (its widest row, "C, D, E", about 15 mm wide, centred
 # on its dimension line) stands between D's fence and E's.
 _WHEEL_CENTRE_MM = (FLAT_STATIONS["Handwheel"] - FLAT_LENGTH / 2.0 + LENGTH) / 2.0

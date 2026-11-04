@@ -31,9 +31,10 @@ Sources:
   list 1 x T8x2 600mm lead screw, 1 x T8x2 brass nut. The listing states no
   thread hand, straightness or length tolerance.
 - DECIDED (owner/C4 layout decision 2026-10-16): cut to 410, deburr and
-  lightly chamfer the cut end. The print uses the title block's .X band
-  (``LENGTH_TOLERANCE``): the self-checks below show the feed absorbs it, so
-  the cut needs no band of its own.
+  lightly chamfer the cut end. The print uses the title block's .XX band
+  (``LENGTH_TOLERANCE``): the self-checks below show the feed absorbs it and
+  the handwheel flat keeps its end land at the shortest cut, so the cut
+  needs no band of its own.
 - FROM the bought-parts contract: the Tr8x2 thread minor diameter is 6.0, a
   modelled simplification of the ISO 2904 root (below).
 - DECIDED: both ends are broken 0.25 x 45°, the title block's edge break
@@ -108,10 +109,11 @@ HAND = "right"  # UNVERIFIED: not stated on the listing; receipt check
 # the SKU identify the stock (review: a gauge sketch, then a numeric note row).
 SUPPLIER_PRODUCT_URL = "https://www.amazon.com/dp/B085DDHJTW"
 
-# The cut length prints as a native one-place dimension (410.0), so the title
-# block's .X row is its band; the self-checks below show the feed absorbs it.
-LENGTH_PLACES = 1
-LENGTH_TOLERANCE = printed_band_mm(LENGTH_PLACES)  # ±0.8, the title block's .X
+# The cut length prints as a native two-place dimension (410.00), so the
+# title block's .XX row is its band: at .X (±0.8) the shortest cut would run
+# the handwheel flat out through the screw's end (``HANDWHEEL_FLAT_END_LAND``).
+LENGTH_PLACES = 2
+LENGTH_TOLERANCE = printed_band_mm(LENGTH_PLACES)  # ±0.51, the title block's .XX
 MINOR_DIA = 6.0  # Tr8x2 thread minor (contract; the nut bore's model value)
 
 # --- DECIDED: the title block's edge break --------------------------------------
@@ -151,12 +153,13 @@ FLAT_LENGTH = feed.SCREW_FLAT_LENGTH  # 8, along the axis, centred on the set sc
 FLAT_AF = MAJOR_DIA - FLAT_DEPTH  # 7.28, across the flat to the far crest
 FLAT_AF_PLACES = 2
 FLAT_AF_TOLERANCE = printed_band_mm(FLAT_AF_PLACES)  # ±0.51, the title block's .XX
-# The flats' stations print at one place, the cut length's row. Their length
-# prints at two: each station locates its flat's near edge (rule 10: to a
-# feature's edge, not its unmarked middle), so the length's band stacks onto
-# the far edge's, and the far side of the set screw needs the tighter one.
+# The flats' stations print at two places, the cut length's row. Their length
+# prints at two as well: each station locates its flat's near edge (rule 10:
+# to a feature's edge, not its unmarked middle), so the length's band stacks
+# onto the far edge's. Both bands, with the cut length's, set the handwheel
+# flat's end land; at one place on any of the three the land is lost.
 FLAT_PLACES = LENGTH_PLACES
-FLAT_TOLERANCE = printed_band_mm(FLAT_PLACES)  # ±0.8
+FLAT_TOLERANCE = printed_band_mm(FLAT_PLACES)  # ±0.51
 FLAT_LENGTH_PLACES = 2
 FLAT_LENGTH_TOLERANCE = printed_band_mm(FLAT_LENGTH_PLACES)  # ±0.51
 KP08_SET_SCREW_SPACING_DEG = 120.0  # UNVERIFIED: the KP08 series' clock; receipt check
@@ -176,7 +179,7 @@ HANDWHEEL_GRUB_COVER = (
     - FLAT_TOLERANCE
     - FLAT_LENGTH_TOLERANCE
     - HANDWHEEL_SET_SCREW_MAJOR / 2.0
-)  # 0.19
+)  # 0.48
 
 # Each set screw's station, part frame (from the near end), from C4's layout.
 FLAT_STATIONS = {
@@ -184,12 +187,18 @@ FLAT_STATIONS = {
     "FarKP08": feed.KP08_S[1] - feed.SCREW_NEAR_END_S,  # 379.5
     "Handwheel": (
         feed.HUB_END_S + feed.HANDWHEEL_GRUB_FROM_HUB - feed.SCREW_NEAR_END_S
-    ),  # 404.5
+    ),  # 404.0
 }
 # Each flat's near edge, from the near end: what the print dimensions.
 FLAT_STARTS = {
     name: station - FLAT_LENGTH / 2.0 for name, station in FLAT_STATIONS.items()
-}  # 4.5, 375.5, 400.5
+}  # 4.5, 375.5, 400.0
+# The handwheel flat's closed end: from its far edge, at its station's and
+# length's bands, to the shortest cut's far end less its edge break. Detail E
+# shows this land; it must stay positive at every printed limit.
+HANDWHEEL_FLAT_END_LAND = (LENGTH - LENGTH_TOLERANCE - END_CHAMFER) - (
+    FLAT_STARTS["Handwheel"] + FLAT_TOLERANCE + FLAT_LENGTH + FLAT_LENGTH_TOLERANCE
+)  # 0.22
 # What each flat sits under, as station spans on the rail (C4's s): the KP08
 # blocks' widths, and the screw's length inside the handwheel's hub.
 FLAT_HOUSINGS = {
@@ -333,8 +342,13 @@ if set(FLAT_HOUSINGS) != set(FLAT_STATIONS) or not set(CLOCKED_FLATS) < set(
     )
 for _name, _start in FLAT_STARTS.items():
     _end = _start + FLAT_LENGTH
-    # Clear of the end breaks, inside the screw.
-    if not (END_CHAMFER < _start and _end < LENGTH - END_CHAMFER):
+    # Clear of the end breaks at the printed bands: the near end is the
+    # stations' datum; the far end is the shortest cut's.
+    _far_edge_max = _end + FLAT_TOLERANCE + FLAT_LENGTH_TOLERANCE
+    if not (
+        END_CHAMFER < _start - FLAT_TOLERANCE
+        and _far_edge_max < LENGTH - LENGTH_TOLERANCE - END_CHAMFER
+    ):
         raise AssertionError(f"the {_name} flat runs onto an end of the screw")
     # Under its KP08 block, or inside the handwheel's hub, at its bands.
     _housing = tuple(s - feed.SCREW_NEAR_END_S for s in FLAT_HOUSINGS[_name])
@@ -343,3 +357,5 @@ for _name, _start in FLAT_STARTS.items():
         and _end + FLAT_TOLERANCE + FLAT_LENGTH_TOLERANCE <= _housing[1]
     ):
         raise AssertionError(f"the {_name} flat leaves its housing")
+if not HANDWHEEL_FLAT_END_LAND > 0.0:
+    raise AssertionError("the handwheel flat runs out through the screw's far end")

@@ -1816,7 +1816,9 @@ def test_f1_f2_prepare_seat_and_transfer_from_the_nut() -> None:
     clock = f"{feed_block.NUT_CLOCK_DEG:.0f}°"
     order = (
         f"BEFORE STEP 8, MEASURE THE FEED NUT {spec._item(spec.FEED_NUT)}: {feed_nut.RECEIPT_TEXT}",
-        "FACE ITS SPIGOT OFF",
+        "REJECT ONE OUTSIDE THESE",
+        "FACE ITS SPIGOT OFF FLUSH WITH THE FLANGE IN ONE LATHE PASS",
+        f"THEN MEASURE IT: {feed_nut.FACED_LENGTH_TEXT}, REJECT ONE OVER",
         f"COUNTERSINK ITS {feed_nut.SCREW_COUNT} HOLES {feed_nut.CSK_ANGLE:.0f}° TO "
         f"Ø{feed_nut.CSK_DIA:.1f} ±{feed_nut.CSK_DIA_BAND:.1f} MM",
         f"NO LARGER THAN Ø{feed_nut.CSK_CUTTER_TEXT}",
@@ -1830,6 +1832,14 @@ def test_f1_f2_prepare_seat_and_transfer_from_the_nut() -> None:
     )
     positions = [f1.index(phrase) for phrase in order]
     assert positions == sorted(positions)
+    # Rule 25: a supplied nut (its spigot on, SUPPLIED_LENGTH long) passes the
+    # incoming checks; the faced-length limit, which it exceeds, is printed
+    # once, after the facing pass.
+    faced = f"{feed_nut.LENGTH_MAX:.1f} MM"
+    assert feed_nut.SUPPLIED_LENGTH > feed_nut.LENGTH_MAX
+    assert faced not in feed_nut.RECEIPT_TEXT
+    assert f1.count(faced) == 1
+    assert f1.index("FACE ITS SPIGOT OFF") < f1.index(faced)
     # F2's drills are TL-32's: the spot enters the least nut hole, the tap
     # drill is the lug's.
     assert spec.NUMBER_DRILL_MM[spec._SPOT_DRILL] == pytest.approx(feed_block.TRANSFER_SPOT_DIA, abs=1e-3)
