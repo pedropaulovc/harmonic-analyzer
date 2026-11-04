@@ -7,6 +7,7 @@ ch-connecting-rod:
   tolerance_class: machined_block
   fit_class: cam_follower_contact
   process: "machined from 1018 steel plate"
+  drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
@@ -15,11 +16,11 @@ ch-connecting-rod:
       reason: "a coordinate plus/minus would let the 20 channels scatter; at most one control per channel part (owner-accepted channel-consistency class)"
     - id: "RV-02"
       kind: "minor"
-      where: "sheet note 1, TINE WALL 1.65 MIN"
-      finding: "fork tine wall below the 2.0 mm target (rules 17, 20)"
-      reason: "each gap between neighbouring 2.5 rocker arms at the 7.0565 channel pitch holds one tine of each adjacent rod, so the tine is pitch-bound; 1.65 MIN at the worst printed limits stays above the 1.5 floor (owner-ruled shortfall)"
+      where: "DETAIL C, the near tine .067 ±.002 (2X), its callout naming the TINE WALL"
+      finding: "fork tine wall .065 at its printed lower limit, below the .080 in target (rules 17, 20)"
+      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions. each gap between neighbouring .098 rocker arms at the .2778 channel pitch holds one tine of each adjacent rod, so the tine is pitch-bound; .065 MIN at the worst printed limits stays above the .060 floor"
     - id: "RV-03"
       kind: "accept"
-      where: "front view, boxed 4.00 BASIC from datum A (the bore axis) to datum B (the shank's left flank)"
+      where: "front view, boxed .16 BASIC from datum A (the bore axis) to datum B (the shank's left flank)"
       finding: "basic A-to-B tie without a geometric control or acceptance tolerance on datum feature B (rules 5, 10)"
-      reason: "owner ruling 2026-10-24 (#1980): the basic tie is the frame's origin across the shank; B's offset is bounded in practice by the 8.00 width and the title block, so no further control is added (RV-01 stands) (owner-accepted)"
+      reason: "owner ruling 2026-10-24 (#1980): the basic tie is the frame's origin across the shank; B's offset is bounded in practice by the .32 width and the title block, so no further control is added (RV-01 stands) (owner-accepted)"

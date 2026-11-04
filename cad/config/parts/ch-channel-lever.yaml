@@ -1,14 +1,16 @@
 ch-channel-lever:
   number: MHA-CH-02
-  # Owner ruling 2026-10-15: the book's levers are cast iron, so gray iron is
-  # the material, not an alternative. Hot alkaline black oxide (MIL-DTL-13924
-  # Class 1) covers cast irons and adds no build-up on the banded faces.
-  material: GRAY CAST IRON
-  material_specification: GRAY CAST IRON, ASTM A48 CLASS 30
+  # Owner ruling 2026-11-03 (stock order #2173): 1018 cold-finish steel,
+  # machined from the bought 5/16 x 1 in flat, supersedes the 2026-10-15
+  # gray cast iron ruling. Hot alkaline black oxide (MIL-DTL-13924 Class 1)
+  # covers carbon steel and adds no build-up on the banded faces.
+  material: LOW-CARBON STEEL, E.G. 1018 CF
+  material_specification: LOW-CARBON STEEL, E.G. 1018 CF
   finish: matte black oxide per MIL-DTL-13924 Class 1, oil sealed
   quantity: 20
   tolerance_class: machined_block
-  process: "cast in gray iron, then machined: hub and plate faces, the reamed fulcrum bore and the drilled holes"
+  process: "machined from 5/16 x 1 in 1018 cold-finish flat: hub and plate faces, the reamed fulcrum bore and the drilled holes"
+  drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
@@ -17,6 +19,6 @@ ch-channel-lever:
       reason: "a coordinate plus/minus would let the 20 channels scatter; at most one control per channel part (owner-accepted channel-consistency class)"
     - id: "RV-02"
       kind: "accept"
-      where: "the hub width 7.06 +0.03/0 (20 HUBS STACK; SETS STATION PITCH)"
+      where: "the hub width .278 +.001/.000 (20 HUBS STACK; SETS STATION PITCH)"
       finding: "20-hub face-to-face stack with no fit-up allowance or shim (rule 19)"
       reason: "the hubs set the station pitch with no shim by design; the stack's end float is proven at the channel assembly, not on this part (owner-accepted)"

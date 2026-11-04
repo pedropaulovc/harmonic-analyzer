@@ -2,7 +2,7 @@ r"""Rocker strap (MHA-CH-13): the flat strap of the built-up rocker arm.
 
 PURE DATA, no SolidWorks/COM imports. MHA-CH-06 may be built up
 (``ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE``): the turned hub MHA-CH-12
-is pressed into this strap's Ø10.20 H7 hole (``ch_rocker_hub_fit``). The
+is pressed into this strap's Ø.400 reamed hole (``ch_rocker_hub_fit``). The
 strap's outline, faces and thickness are FINISHED here and never cut again;
 only the #47 rod-pin hole is added after joining (it is located from the
 joined part's reamed bore, so it is not on this detail).
@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import math
 
+import _config
+from _package_units import drawing_unit
 from _rocker_interface import ARM_DEPTH, CENTER_Y, CURVE_RADIUS, PIVOT_MID_Y, R_BOTTOM
 from ch_rocker_arm_spec import (
     ARM_THICKNESS,
@@ -59,6 +61,7 @@ __all__ = [
     "TOP_EDGE_BAND",
     "TOP_END_X",
     "TOP_END_Y",
+    "UNIT",
     "strap_area",
 ]
 
@@ -66,7 +69,10 @@ NUMBER = "MHA-CH-13"
 HUB_NUMBER = "MHA-CH-12"
 ROCKER_NUMBER = "MHA-CH-06"
 
-# The hub hole: the finished hub O.D.'s nominal, H7 (ch_rocker_hub_fit).
+# #290: the registry row's drawing_unit (in) is this sheet's unit.
+UNIT = drawing_unit("parts/ch-rocker-strap", _config.parts("ch-rocker-strap"))
+
+# The hub hole: the finished hub O.D.'s nominal, reamed (ch_rocker_hub_fit).
 HOLE_DIA = HUB_DIA
 
 # The bottom edge's depth under the hole, on the mirror axis -- the
@@ -74,14 +80,13 @@ HOLE_DIA = HUB_DIA
 # wholly in material, U0) said as a +/- from the hole the hub fills. It may
 # only come out shallow, the top edge only high: the arcs' radial width is
 # held from the hole, not stacked from two radii (r1 machinist review: two
-# one-place radii left a 0.79 worst-case wall under the hole).
+# one-place radii left a .031 worst-case wall under the hole).
 BOTTOM_EDGE_BELOW_PIVOT = PIVOT_MID_Y
 BOTTOM_EDGE_BAND = (TOP_EDGE_BAND[1], -TOP_EDGE_BAND[0])  # (upper, lower)
 
 # The sheet's one pure reference dimension: the parenthesised overall length
-# across both tip corners, a band-free restatement of the two 146.25 offsets.
-# One place, a noncritical overall size (drawing-guidelines.md): 292.51 next
-# to 146.25 + 146.25 would read as an arithmetic error.
+# across both tip corners, a band-free restatement of the two 5.76 offsets.
+# One place, a noncritical overall size (drawing-guidelines.md).
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {"OverallLength": 1}
 
 # The two vertices the spec does not export, from the same construction as

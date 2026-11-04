@@ -17,14 +17,14 @@ the jig sheets (MHA-CH-06-TL-20 to TL-26 and the TL-00 jig assembly) from:
 
 * the strap's edge radii and the hub-to-top-edge aim, read from
   ``ch_rocker_arm_spec`` (R800/R816; ``TOP_EDGE_ABOVE_PIVOT`` (the strap's
-  ``PIVOT_MID_Y``) plus the mid-point of ``TOP_EDGE_BAND`` = 8.25);
+  ``PIVOT_MID_Y``) plus the mid-point of ``TOP_EDGE_BAND`` = 8.254);
 * the two cutters, both on hand in inventory ``tools.endmills-lms-6784``:
   the 3/8 in four-flute end mill for the part and the 9/16 in one for the
   riser (``test_ch_rocker_arm_tl_oblique_trammel_spec`` checks both against
   the inventory's size list, so this module never reads the inventory and
   an unrelated inventory edit does not rebuild the jig);
 * ``ALPHA_DEG``, kept at the brief's 16.4405 degrees;
-* the 350 mm blank (strap stock 1018 3 x 40 mm, OnlineMetals #22381);
+* the 350 x 1-1/2 in blank (strap stock 1018 cold-finish 1/8 x 1-1/2 in, OnlineMetals 4807);
 * the bought hardware the jig is built round (HIWIN HGR15 rail cut to 440,
   HGH15CA Z0 carriage, shoulder screws and loose spacers) and the PM-30MV table (maker manual,
   macclab.com PM-30MV-v3-2020-10: table 33 x 8-1/4 in, three 14 mm T-slots at
@@ -243,11 +243,21 @@ RISER_BAND_Y = (
 )
 
 # --- Blank, tip lands, CL/CR ⚙ ------------------------------------------------
+# The strap blank is sawn from the 1/8 x 1-1/2 in 1018 cold-finish flat bought
+# 2026-11-03 (#2173; shop inventory ``[[stock]]`` "Rocker route v3 stock
+# purchases", OnlineMetals 4807, section_mm [38.1, 3.175]; untoleranced
+# catalogue nominals) and faced to the strap's STRAP_THICK before it goes on
+# the jig. Its width is the as-bought 1-1/2 in.
 BLANK_LENGTH = 350.0
-BLANK_WIDTH = 40.0
+BLANK_WIDTH = round(1.5 * INCH, 9)  # 38.1
 # The tip lands are radial lines through the top arc's ends.
 TIP_ANGLE = (rocker.TOP_ARC_LEN / 2.0) / rocker.R_TOP
-# CL (a 6 mm dowel in a tooling hole) and CR (the clamp screw) sit in the
+# The strap's radial extent across the blank (carrier Y): from the R800 edge's
+# ends at the tip lands to the R816 edge at the apex. The blank's width covers
+# it with at least the .080 wall of waste beyond each edge.
+STRAP_SPAN_Y = (R_INNER * math.cos(TIP_ANGLE) - H1, R_OUTER - H1)
+BLANK_EDGE_WASTE = (BLANK_WIDTH - (STRAP_SPAN_Y[1] - STRAP_SPAN_Y[0])) / 2.0
+# CL (a 1/4 in dowel in a tooling hole) and CR (the clamp screw) sit in the
 # blank's end waste on the hub radius, angularly midway between the tip land
 # and the blank's square end, so the saw cut that drops the waste has room on
 # both sides of the hole.
@@ -409,7 +419,7 @@ CARRIER_THICK_BAND = printed_band_mm(CARRIER_THICK_PLACES, unit=CARRIER_UNIT)
 RISER_THICK = 6.096  # .24
 RISER_THICK_PLACES = 2
 RISER_THICK_BAND = printed_band_mm(RISER_THICK_PLACES, unit=RISER_UNIT)
-# The strap is faced to its finished 2.5 (S0) before it goes on the jig (T3).
+# The strap is faced to its finished .098 (S0) before it goes on the jig (T3).
 STRAP_THICK = rocker.ARM_THICKNESS
 RAIL_SEAT_Z = BASE_BAR_THICK
 CARRIAGE_TOP_Z = RAIL_SEAT_Z + CARRIAGE_HEIGHT
@@ -526,3 +536,5 @@ if not (
     and RISER_BAND_Y[1] <= RISER_BLANK_ORIGIN[1] + RISER_BLANK_WIDTH - 5.0
 ):
     raise AssertionError("the riser's nominal band runs within 5 of a blank edge")
+if BLANK_EDGE_WASTE < WALL_TARGET_MM:
+    raise AssertionError("the strap blank leaves under .080 of waste beyond an edge")

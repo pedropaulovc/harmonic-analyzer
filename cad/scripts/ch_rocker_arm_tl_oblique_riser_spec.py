@@ -5,8 +5,8 @@ is screwed flat on the carrier top (MHA-CH-06-TL-21) under the strap blank,
 so the cutter that profiles the strap runs out into acetal rather than the
 aluminium carrier.
 
-Material and stock: 1/4 in acetal (Delrin), supplier and stock width/length
-unselected. Face to .24 (``RISER_THICK``) and mill the blank to 1.60 x 13.40
+Material and stock: black acetal (Delrin), McMaster 8663K55, 1/4 x 1-3/4 in
+bar (owner selection 2026-11-03). Face to .24 (``RISER_THICK``) and mill the blank to 1.60 x 13.40
 (``RISER_BLANK_WIDTH`` x ``RISER_BLANK_LENGTH``) at the .XX title-block band:
 the rule-17 walls below read the blank's edges.
 

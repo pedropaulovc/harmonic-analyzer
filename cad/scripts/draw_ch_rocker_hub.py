@@ -1,9 +1,10 @@
 r"""Create the manufacturing drawing for the rocker hub (MHA-CH-12).
 
-Under ``cad/docs/drawing-guidelines.md``: the turned hub of the built-up rocker
-arm MHA-CH-06 as SUPPLIED to the joint (``ch_rocker_hub_spec``), on three
-native model dimensions: the Ø10.200 land with its r6 band and the press fit
-it makes in the MHA-CH-13 strap hole below it (rule 4), the supply bore with
+Under ``cad/docs/drawing-guidelines.md``, in decimal inch (the part's
+``drawing_unit: in``): the turned hub of the built-up rocker arm MHA-CH-06 as
+SUPPLIED to the joint (``ch_rocker_hub_spec``), on three native model
+dimensions: the Ø.4000 land with its press band and the press fit it makes in
+the MHA-CH-13 strap hole below it (rule 4), the supply bore with
 the title block's DRILLED HOLES row, and the supply length as a single MIN
 limit (rule 19). The face view carries the bore; the side view, where a
 turned part's diameter sits beside its length (rule 11), carries the land and
@@ -47,6 +48,7 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
+from _part_properties import part_drawing_unit
 from _session import run_build
 from ch_rocker_hub_notes import (
     DRAWING_DIMENSIONS,
@@ -71,7 +73,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø10.2 x 8.2 hub at 4:1: the face view, the side view and the land's
+# A Ø.400 x .32 hub at 4:1: the face view, the side view and the land's
 # two-row callout right of it share one row midway between the top border and
 # the title block; the isometric stands above-right of that callout.
 SHEET_SCALE = (4.0, 1.0)
@@ -81,8 +83,8 @@ RIGHT_CENTER = (0.160, 0.175)  # side view: the hub along its axis
 ISO_CENTER = (0.360, 0.205)
 NOTES_XY = (0.020, 0.090)  # left of the title block, below the views
 _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0
-HALF_DIA = LAND_DIA / 2.0 * _S  # 0.0204
-HALF_LEN = SUPPLY_LENGTH_MIN / 2.0 * _S  # 0.0164
+HALF_DIA = LAND_DIA / 2.0 * _S  # 0.0203
+HALF_LEN = SUPPLY_LENGTH_MIN / 2.0 * _S  # 0.0163
 
 # Both diameters import on the face view, where every diameter line runs
 # through the centre: two would cross there. The bore keeps the face view, its
@@ -94,7 +96,7 @@ FRONT_KEEP = {
     "SupplyBore": (FRONT_CENTER[0] + 0.040, FRONT_CENTER[1] + HALF_DIA + 0.022),
     "LandDia": (FRONT_CENTER[0] - 0.030, FRONT_CENTER[1] - HALF_DIA - 0.020),
 }
-# "SUPPLY 8.2 min." (~45 mm) outruns the 33 mm hub: centred (r1) it sat on
+# "SUPPLY .32 MIN" outruns the 33 mm hub: centred (r1) it sat on
 # both extension lines, so it stands right of the right one, the dimension
 # line carried out to it, below the land's lower extension line.
 RIGHT_KEEP = {
@@ -135,7 +137,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("ch-rocker-hub"),
     )
     stamp_drawing_summary(
         adapter,

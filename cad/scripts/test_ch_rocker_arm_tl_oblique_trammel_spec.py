@@ -107,12 +107,62 @@ def test_jig_stock_requirements_preserve_finished_geometry_without_claiming_owne
     assert carrier["on_hand"] is True
     assert "on_hand" not in riser
     import ch_rocker_arm_tl_oblique_carrier_spec as carrier_spec
+    import ch_rocker_arm_tl_oblique_riser_spec as riser_spec
 
     assert carrier["section_mm"][0] >= carrier_spec.PLATE_WIDTH
     assert carrier["section_mm"][1] > carrier_spec.THICKNESS
     assert carrier["length_mm"] >= carrier_spec.PLATE_LENGTH
-    # No selected riser blank envelope or possession claim is fabricated.
-    assert not {"section_mm", "length_mm", "dia_mm"} & set(riser)
+    # The owner-selected riser bar (McMaster 8663K55, 2026-11-03) covers the
+    # faced and milled blank; selected, not claimed bought.
+    assert "8663K55" in riser["note"]
+    assert riser["section_mm"][0] > riser_spec.BLANK_WIDTH
+    assert riser["section_mm"][1] > riser_spec.THICKNESS
+    assert riser["length_mm"] > riser_spec.BLANK_LENGTH
+
+
+def test_strap_blank_is_the_bought_one_and_a_half_inch_strap_stock() -> None:
+    """Owner order 2026-11-03 (#2173): the MHA-CH-13 strap comes from 1/8 x
+    1-1/2 in 1018 flat. The jig takes the blank at the as-bought width and the
+    strap faced to its finished thickness; the strap, its CL/CR holes and the
+    CR clamp screw's head seat all stay on the narrower blank, over the riser."""
+    import ch_rocker_arm_tl_oblique_carrier_spec as carrier_spec
+
+    inventory = tomllib.loads(
+        (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_bytes().decode()
+    )
+    (strap,) = [
+        row
+        for row in inventory["stock"]
+        if "(MHA-CH-13)" in row.get("note", "") and "BLANK_WIDTH" in row.get("note", "")
+    ]
+    width, thick = strap["section_mm"]
+    assert trammel.BLANK_WIDTH == width == pytest.approx(1.5 * 25.4)
+    assert thick > trammel.STRAP_THICK == rocker.ARM_THICKNESS
+    # Five blanks in each 72 in length, short by four 1/8 in cut bands.
+    assert 5 * trammel.BLANK_LENGTH + 4 * 0.125 * 25.4 < strap["length_mm"]
+    # The strap spans R800's tip-land ends to R816's apex across the blank,
+    # and the blank leaves at least the .080 wall of waste beyond each edge.
+    low, high = trammel.STRAP_SPAN_Y
+    assert low == pytest.approx(
+        trammel.R_INNER * math.cos(trammel.TIP_ANGLE) + trammel.ARC_CENTRE[1]
+    )
+    assert high == pytest.approx(trammel.R_OUTER + trammel.ARC_CENTRE[1])
+    assert trammel.BLANK_EDGE_WASTE == pytest.approx(
+        (trammel.BLANK_WIDTH - (high - low)) / 2.0
+    )
+    assert trammel.BLANK_EDGE_WASTE >= WALL_TARGET_MM
+    # The blank, centred on that span, carries the CL dowel's hole and the CR
+    # clamp screw's head seat (its widest head) with the .080 wall to an edge.
+    edge_low = low - trammel.BLANK_EDGE_WASTE
+    edge_high = high + trammel.BLANK_EDGE_WASTE
+    cl_hole_r = (carrier_spec.CL_DOWEL_DIA + max(carrier_spec.CL_HOLE_BAND)) / 2.0
+    head_r = carrier_spec.CR_HEAD_DIA_MAX / 2.0
+    for y, radius in ((trammel.CL[1], cl_hole_r), (trammel.CR[1], head_r)):
+        assert edge_low + WALL_TARGET_MM <= y - radius
+        assert y + radius <= edge_high - WALL_TARGET_MM
+    # The strap's whole span lies over the riser blank it is clamped onto.
+    riser_low = trammel.RISER_BLANK_ORIGIN[1]
+    assert riser_low < low < high < riser_low + trammel.RISER_BLANK_WIDTH
 
 
 def test_both_cutter_circles_share_the_arc_centre() -> None:

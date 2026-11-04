@@ -26,7 +26,7 @@ preloads it with a keeper spring, reversing #743 Q4 (Reading 1, "no keeper"):
   ROCKER_SPRING_SET blade, and the MHA-CH-VN-54 wave spring
   (``ch_vn_rocker_bank_spring_spec``) squeezed in that gap holds the stack north
   on the datum ear: the bank has no end play.
-* Each hub's length is +0.05/0 on its print, and a fit-up acceptance on the
+* Each hub's length is +.002/0 in on its print, and a fit-up acceptance on the
   measured 20-arm stack caps the cumulative excess (STACK_L20_ACCEPT,
   +.004/0 in, #948 ruling R).
 * The shaft is a plain rod whose cylinder spans both ears' outer faces, each

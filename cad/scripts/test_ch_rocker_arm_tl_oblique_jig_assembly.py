@@ -1404,7 +1404,7 @@ def test_step_10_states_the_in_situ_hub_fit_up() -> None:
     sets it from the spindle origin (the apex) by the carrier's printed
     offset and band, then names its size, band and mating part (rule 19)."""
     step = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("10. "))
-    assert "THE DRO READS X 0, Y .5123 ±.0005" in step
+    assert "THE DRO READS X 0, Y .5125 ±.0005" in step
     assert "MATCH-DRILL AND REAM THE HUB THERE" in step
     hub_pin = f"HUB LOCATOR PIN (ITEM {spec.ITEM_NUMBERS[spec.HUB_PIN]})"
     assert f"HUB Ø.4000-.4005 THRU, FOR THE {hub_pin}, BONDED AT STEP 11" in step

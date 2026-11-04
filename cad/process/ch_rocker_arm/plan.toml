@@ -128,17 +128,17 @@ rod_hole = 7.9375                 # raw bar at the arm tip
 
 [setups.hold]
 fixture = "rocker-riser-blocks"
-pose = { origin_mm = [0.0, 0.0, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
+pose = { origin_mm = [0.0, 0.0, -2.72415], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
 # AUTHOR'S CHOICE: retain each toe position but point the straps outwards.
 # The stud is 38.1 behind its toe; these unit axes put both stud centres on
 # the table's centre T-slot, Y+/-6.8 after the hold pose is applied (manual p6).
 clamps = [
   { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-mill-raised", restraint = "press", pose = { origin_mm = [-164.0, 6.65, 7.9375], x = [-0.9999922499544683, 0.003937007874015734, 0.0], z = [0.0, 0.0, 1.0] }, note = "4 in stud; T-nut seated for the shim-raised work" },
   { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-mill-raised", restraint = "press", pose = { origin_mm = [164.0, 6.65, 7.9375], x = [0.9999922499544683, 0.003937007874015734, 0.0], z = [0.0, 0.0, 1.0] }, note = "4 in stud; T-nut seated for the shim-raised work" },
-  { ref = "strap-shim-stack", restraint = "locate", note = "under the left blank end, below its clamp; seats the work at Z0 (prechips#184: locate, not none)", pose = { origin_mm = [-158.0, 6.65, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
-  { ref = "strap-shim-stack", restraint = "locate", note = "under the bar at X-60", pose = { origin_mm = [-60.0, 6.65, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
-  { ref = "strap-shim-stack", restraint = "locate", note = "under the bar at X+60", pose = { origin_mm = [60.0, 6.65, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
-  { ref = "strap-shim-stack", restraint = "locate", note = "under the right blank end, below its clamp", pose = { origin_mm = [158.0, 6.65, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "strap-shim-stack", restraint = "locate", note = "under the left blank end, below its clamp; seats the work at Z0 (prechips#184: locate, not none)", pose = { origin_mm = [-158.0, 6.65, -2.72415], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "strap-shim-stack", restraint = "locate", note = "under the bar at X-60", pose = { origin_mm = [-60.0, 6.65, -2.72415], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "strap-shim-stack", restraint = "locate", note = "under the bar at X+60", pose = { origin_mm = [60.0, 6.65, -2.72415], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "strap-shim-stack", restraint = "locate", note = "under the right blank end, below its clamp", pose = { origin_mm = [158.0, 6.65, -2.72415], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
 ]
 clamp_order = [1, 2]
 fixed_jaw = "not_applicable"
@@ -248,7 +248,7 @@ faces = ["HAF_HUB_OD__P02"]
 tool = "endmills-lms-6784/3-8in-4fl"
 holder = "r8-collets-lms-4860/3-8in"
 direction = "climb"
-to_z = 5.21875
+to_z = 5.21335
 doc_mm = 1.0
 approach_mm = 5.0
 # AUTHOR'S CHOICE: stairs (one handwheel moves at a time) at 0 allowance down to datum B:
@@ -394,7 +394,7 @@ faces = ["HAF_HUB_OD__P01"]
 tool = "endmills-lms-6784/3-8in-4fl"
 holder = "r8-collets-lms-4860/3-8in"
 direction = "climb"
-to_z = 5.21875
+to_z = 5.21335
 doc_mm = 1.0
 approach_mm = 5.0
 # AUTHOR'S CHOICE: as S1 op 20, stairs at 0 allowance, the 0.15 cusp left for the S6 file.
@@ -499,10 +499,10 @@ feature = "strap_datum_b"
 tool = "endmills-lms-6784/3-8in-4fl"
 holder = "r8-collets-lms-4860/3-8in"
 direction = "climb"
-to_z = 5.21875
+to_z = 5.21335
 doc_mm = 1.0
 approach_mm = 5.0
-stock_removal_bounds = { x = [-156.2, 156.2], y = [-17.3, 30.5], z = [5.21875, 8.5] }
+stock_removal_bounds = { x = [-156.2, 156.2], y = [-17.3, 30.5], z = [5.21335, 8.5] }
 contour = { method = "linear_table", step_mm = 9.0, sweep_frame = "model", sweep_bounds = { x = [-146.6, 146.6], y = [-4.4, 33.7], z = [1.25, 3.96875] }, keep_out = [{ at = [0.0, 8.0], dia_mm = 11.0 }] }
 
 [[setups.ops]]
@@ -617,10 +617,10 @@ feature = "strap_faces"
 tool = "endmills-lms-6784/3-8in-4fl"
 holder = "r8-collets-lms-4860/3-8in"
 direction = "climb"
-to_z = 5.21875
+to_z = 5.21335
 doc_mm = 1.0
 approach_mm = 5.0
-stock_removal_bounds = { x = [-156.2, 156.2], y = [-30.5, 17.3], z = [5.21875, 8.5] }
+stock_removal_bounds = { x = [-156.2, 156.2], y = [-30.5, 17.3], z = [5.21335, 8.5] }
 contour = { method = "linear_table", step_mm = 9.0, sweep_frame = "model", sweep_bounds = { x = [-146.6, 146.6], y = [-4.4, 33.7], z = [-3.96875, -1.25] }, keep_out = [{ at = [0.0, 8.0], dia_mm = 11.0 }] }
 
 # ---------------------------------------------------------------------------------------
@@ -937,14 +937,14 @@ feature = ["top_edge", "profile_outer", "tip_land_pos_x", "tip_land_neg_x"]
 checks = { surface_profile = "dti" }
 [setups.ops.inspection_methods]
 surface_profile = [
-  "Both printed profile zones, read against the arm outline template (gauges.arm-outline-template) pinned in datums A and C: the top edge (0.5, all outside the R800 BASIC arc) and the lower outline J to K (0.5, all inside the BASIC outline: the R816 arc, both tapers and both tip lands, so the tip_land_pos_x and tip_land_neg_x zones are read here too). Done on the granite surface plate (gauges.granite-surface-plate), off the rest plate.",
+  "Both printed profile zones, read against the arm outline template (gauges.arm-outline-template) pinned in datums A and C: the top edge (0.508, all outside the R800 BASIC arc) and the lower outline J to K (0.508, all inside the BASIC outline: the R816 arc, both tapers and both tip lands, so the tip_land_pos_x and tip_land_neg_x zones are read here too). Done on the granite surface plate (gauges.granite-surface-plate), off the rest plate.",
   "Clean the arm, the template and both pins and leave them on the granite for 30 min to reach its temperature.",
   "Lay the template flat on the granite, the face that is laid on the arm up.",
   "Seating: lower the arm onto it with strap datum B (the +Z strap face) down, so its +Z hub face rests on the template and the rod-pin hole sits over the rod slot. Datum A: push the 0.2558 in Class X pin (gauges.vermont-class-x-2558-minus) down through the pivot bore and the template's pivot hole to the granite. Datum C: push the 0.0780 in pin (gauges.pin-gauges) down through the rod-pin hole into the slot to the granite. Press on the hub: the arm must not rock; if it does, clean and reseat.",
   "Gauge: the DTI (gauges.dti) on the height gauge's scriber (gauges.height-gauge), stylus horizontal, its ball approaching each edge square to it from outside the part. A higher reading is an edge standing farther out. The DTI reads inches: o (mm) = reading x 25.4.",
   "Stations (20; each at least 1 mm from a corner, placed by eye): each arc on the mirror line, halfway out and 2 mm short of each end (5 per arc); each tip land a third and two thirds along (2 per land); each tapered end 2 mm from each corner and halfway (3 per taper).",
   "At each station, zero: set the slider so the ball is 1.6 mm above the granite (the template's mid-thickness), slide the gauge base in until the dial has turned half its travel (0.015 in) and set the bezel to zero. Read: without moving the base, raise only the slider to 6.7 mm (the strap's mid-plane), letting the ball ride onto the arm's edge, and copy {o}. Lower it back to 1.6 mm: if the dial is not back at zero within one division, redo the station.",
-  "Decide each station with its segment's window, o in mm: the R800 top arc (top_edge): accept -0.07 to +0.08, reject below -0.42 or above +0.43; each tip land (tip_land_pos_x, tip_land_neg_x): accept -0.17 to +0.17, reject below -0.33 or above +0.33; each tapered end (profile_outer): accept -0.10 to +0.10, reject below -0.40 or above +0.40; the R816 bottom arc (profile_outer): accept -0.09 to +0.08, reject below -0.42 or above +0.41. Between accept and reject, or off the dial either way, the station is indeterminate: re-check on a CMM. The profile is accepted only when every station accepts.",
+  "Decide each station with its segment's window, o in mm: the R800 top arc (top_edge): accept -0.07 to +0.08, reject below -0.43 or above +0.43; each tip land (tip_land_pos_x, tip_land_neg_x): accept -0.17 to +0.17, reject below -0.33 or above +0.33; each tapered end (profile_outer): accept -0.10 to +0.10, reject below -0.40 or above +0.41; the R816 bottom arc (profile_outer): accept -0.09 to +0.08, reject below -0.42 or above +0.42. Between accept and reject, or off the dial either way, the station is indeterminate: re-check on a CMM. The profile is accepted only when every station accepts.",
   "AUTHOR'S CHOICE guard (ch_rocker_arm_profile_check): each window is the zone, offset by where the template's edge sits in it, shrunk at every point by the template's clocking_error (its own 0.03 mm profile acceptance plus the pins' registration, at most 0.159 mm) and the DTI's 0.0127 mm resolution, rounded inward to 0.01 mm. The template's acceptance and the pin plays are #1413 placeholders, not a calibration; remeasure them before shop acceptance.",
 ]
 

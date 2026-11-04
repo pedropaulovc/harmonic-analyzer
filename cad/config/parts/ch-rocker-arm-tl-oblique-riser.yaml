@@ -5,7 +5,7 @@ ch-rocker-arm-tl-oblique-riser:
   # Acetal machines clean and spares the cutter where the jig cuts its own
   # band in place (SolidWorks material POM Acetal Copolymer).
   material: ACETAL (DELRIN)
-  material_specification: 1/4 in acetal (Delrin) stock; supplier and stock width/length unselected
+  material_specification: black acetal (Delrin), McMaster 8663K55, 1/4 x 1-3/4 bar
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
