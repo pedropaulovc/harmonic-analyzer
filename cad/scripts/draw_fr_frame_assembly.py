@@ -2276,6 +2276,7 @@ def detail_letter_xy(
     return centre[0] + offset[0], centre[1] + offset[1]
 
 
+@_telemetry.traced("drawing.frame_deck_detail_marks")
 def _mark_deck_details(adapter: Any, exploded: Any) -> None:
     """Each enlarged cluster's boundary in the 1:8 exploded view, about its
     exploded centre as that view projects it, lettered outside it. Drawn
