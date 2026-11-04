@@ -70,12 +70,15 @@ CHAMFER_RISE = 0.014  # the chamfer's text, above the axis
 # The cut note's top sits under the shoulder Ø's shelved text: under the screw
 # its leader crossed its own text and the cut's dimension line (machinist
 # review, run 20261101T201250784Z). The thread note's rows stay above the
-# chamfer's text; its leader lands near the shoulder, clear of the chamfer's
-# dimension line.
+# chamfer's text, its left edge just past the shoulder step, so its leader
+# drops almost straight onto the thread next to the shoulder, left of the
+# chamfer's dimension line: from above-right of the tip it crossed that line
+# (machinist review, farm run 20261104T171030064Z).
 CUT_NOTE_RIGHT = 0.008  # right of the thread tip
 CUT_NOTE_DROP = 0.014  # below the axis
+THREAD_NOTE_RIGHT = 0.002  # right of the shoulder step
 THREAD_NOTE_RISE = 0.021  # above the head rim
-THREAD_LANDING = 0.25  # of the thread length, from the shoulder
+THREAD_LANDING = 0.2  # of the thread length, from the shoulder
 # Every carrier lies on a Right-view edge; construction curves print as the
 # continuous thick outline on this sheet (``_construction_line_font``), not as
 # a grey chain over the edge.
@@ -205,7 +208,7 @@ def _add_notes(adapter, right) -> None:
     )
     add_attached_note(
         adapter, right, text=part.THREAD_NOTE, entity_xy=thread,
-        note_xy=(at["tip"][0] + 0.004, at["tip"][1] + rim + THREAD_NOTE_RISE),
+        note_xy=(at["step"][0] + THREAD_NOTE_RIGHT, at["step"][1] + rim + THREAD_NOTE_RISE),
         label="pivot screw thread", entity_type="SILHOUETTE",
     )
 
