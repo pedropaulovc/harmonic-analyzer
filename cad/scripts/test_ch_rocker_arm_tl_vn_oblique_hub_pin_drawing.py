@@ -10,7 +10,8 @@ import pytest
 import _config
 import build_ch_rocker_arm_tl_vn_oblique_hub_pin as part
 import ch_rocker_arm_tl_vn_oblique_hub_pin_spec as spec
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 from _fastener_catalog import FASTENERS
 from _supplier_screw_reference_names import FEATURE_BY_PLANE
 

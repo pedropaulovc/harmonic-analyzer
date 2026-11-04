@@ -17,7 +17,8 @@ import joint_retention
 import ch_vn_spring_hook_spec
 import ms_measuring_stick_assembly_spec as ms
 from _assembly_contract import assembly_contract
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
 
 
 def test_registry_outputs_and_sheet_templates() -> None:

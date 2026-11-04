@@ -93,7 +93,7 @@ from _assembly import (
     save_assembly_and_images,
 )
 from _transforms import IDENTITY, euler_from_rows, rows_from_euler
-from _interference_contracts import allowed_interference_pairs
+from _ha_harmonic_analyzer_interference import ALLOWED_PAIRS
 from _chain_mounts import mounted_wheels
 
 import _telemetry
@@ -312,7 +312,7 @@ async def build(adapter) -> dict[str, str]:
     assert_components_fully_defined(adapter)
     check_no_interference(
         adapter,
-        allowed_pairs=allowed_interference_pairs(ASM_NAME),
+        allowed_pairs=ALLOWED_PAIRS,
         chain_mounts=mounted_wheels(),
     )
     await _author_integration_settings(adapter)

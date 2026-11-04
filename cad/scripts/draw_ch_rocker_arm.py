@@ -89,7 +89,8 @@ from _drawing_layout_collect import check_drawing_layout
 from _drawing_leader_notes import add_leader_note
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_notes import add_property_linked_note
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 from _drawing_projection import model_points_in_view
 from _drawing_selection import _select_view_entity
 from _drawing_sheet_region import sheet_drawable_region

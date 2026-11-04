@@ -36,7 +36,8 @@ from _drawing_layout_check import LeaderSegment
 from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
-from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 from _drawing_view_display import set_hidden_lines_removed
 from _part_properties import part_drawing_unit
 from _hole_callout_thread_class import omit_title_block_thread_class

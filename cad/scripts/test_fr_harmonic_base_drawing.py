@@ -1317,7 +1317,7 @@ def test_callout_check_treats_the_sheet_frame_and_title_block_as_obstacles() -> 
 
     import draw_fr_harmonic_base as sheet
     from _drawing_layout_check import DrawableRegion
-    from _drawing_registry import DRAWING_TEMPLATES
+    from _drawing_types import DRAWING_TEMPLATES
 
     template = DRAWING_TEMPLATES[sheet.SPEC.layout]
     margin = 0.0127  # the template's ISheet::GetZoneMargin, 0.5 in each side
@@ -4198,12 +4198,12 @@ def test_through_cut_volume_integrates_skin_full_rib_and_half_rib_without_drill_
 
 
 def test_pedestal_thread_interference_budget_stops_at_actual_retained_skin() -> None:
-    import _interference_contracts as contracts
+    import _ha_harmonic_analyzer_interference as contracts
 
     assert fr_harmonic_base_fasteners.PEDESTAL_SCREW_ENGAGEMENT == pytest.approx(13.97)
     for xz in part.PEDESTAL_SCREW_XZ:
         assert fr_harmonic_base_fasteners.retained_material_segments_mm(*xz)[0] == pytest.approx((0.0, 12.954))
-    allowed = contracts.allowed_interference_pairs("ha-harmonic-analyzer")
+    allowed = contracts.ALLOWED_PAIRS
     expected = 1.10 * math.pi / 4.0 * (4.1656**2 - 3.454**2) * 12.954
     obsolete = 1.10 * math.pi / 4.0 * (4.1656**2 - 3.454**2) * 14.05
     for number in (1, 2):

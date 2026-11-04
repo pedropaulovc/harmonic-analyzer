@@ -858,14 +858,22 @@ def isolated_drawing_keys(tmp_path, monkeypatch):
         monkeypatch.setattr(dodo, "_recipe_files", lambda _stem: [str(native_recipe)])
         monkeypatch.setattr(dodo, "references_of", lambda _stem: ())
 
-        def reload_registry():
-            path = scripts / "_drawing_registry.py"
-            module = ModuleType("_isolated_drawing_registry")
+        def load_isolated(path: Path, name: str) -> ModuleType:
+            module = ModuleType(name)
             module.__file__ = str(path)
             monkeypatch.setitem(sys.modules, module.__name__, module)
             # Compile current bytes directly: same-size, same-second row edits
             # must not be hidden by Python's timestamp-based .pyc cache.
             exec(compile(path.read_bytes(), str(path), "exec"), module.__dict__)
+            return module
+
+        def reload_registry():
+            # The copied row schema roots every spec path in the checkout; the
+            # copied registry imports it under its real name.
+            load_isolated(scripts / "_drawing_types.py", "_drawing_types")
+            module = load_isolated(
+                scripts / "_drawing_registry.py", "_isolated_drawing_registry"
+            )
             monkeypatch.setattr(dodo, "DRAWINGS_BY_NAME", module.DRAWINGS_BY_NAME)
 
         reload_registry()
@@ -908,6 +916,176 @@ def isolated_drawing_keys(tmp_path, monkeypatch):
         yield checkout
     finally:
         clear_closure()
+
+
+def _drawing_closure(bg, spec) -> list[Path]:
+    script = spec.script.resolve()
+    return [script, *(Path(path) for path in bg.module_deps_of(script))]
+
+
+def test_only_draw_scripts_import_the_drawing_row_table():
+    """#2164: shared drawing helpers import the row schema and templates from
+    _drawing_types, never the row table, so a row edit cannot reach every
+    drawing through them."""
+    import _buildgraph as bg
+
+    dodo = _load_dodo()
+    importers = {
+        source.name
+        for spec in dodo.DRAWINGS_BY_NAME.values()
+        for source in _drawing_closure(bg, spec)
+        if "_drawing_registry" in bg._direct_local_imports(source)
+        and not source.name.startswith("draw_")
+    }
+    assert not importers, f"import _drawing_types instead: {sorted(importers)}"
+
+
+def test_every_drawing_closure_reads_only_its_own_registry_row():
+    """#2164 (a): every drawing's whole closure is classified as reading only
+    its own row, so dodo folds the projected row, not the registry file. A
+    helper reading DRAWINGS, another row, or an unclassified access fails here
+    by name."""
+    import _buildgraph as bg
+
+    dodo = _load_dodo()
+    registry = (dodo.SCRIPTS_DIR / "_drawing_registry.py").resolve()
+    whole_file = {}
+    for stem, spec in dodo.DRAWINGS_BY_NAME.items():
+        closure = _drawing_closure(bg, spec)
+        if registry not in closure:
+            continue
+        readers = [
+            source.name
+            for source in closure
+            if source != registry
+            and (rows := bg._drawing_registry_reads(bg.read_source(source))) != frozenset()
+            and rows != frozenset({stem})
+        ]
+        if readers:
+            whole_file[stem] = readers
+    assert not whole_file
+
+
+def test_one_registry_row_change_rekeys_only_that_drawing():
+    """#2164 (a), fleet-wide: appending a row changes no drawing's projected
+    registry recipe; editing one row changes only that drawing's."""
+    import _buildgraph as bg
+
+    dodo = _load_dodo()
+    source = (dodo.SCRIPTS_DIR / "_drawing_registry.py").read_text(encoding="utf-8")
+    marker = ")\n\nDRAWINGS_BY_NAME"
+    assert source.count(marker) == 1
+    added = source.replace(
+        marker,
+        '    DrawingSpec("zz_new", "zz_new", "zz-new", "draw_zz_new.py",'
+        " DrawingLayout.LANDSCAPE),\n" + marker,
+    )
+    edited = source.replace(
+        'artifact_stem="pd-platen-guide"', 'artifact_stem="pd-platen-guide-revised"'
+    )
+    assert len({source, added, edited}) == 3
+    changed = set()
+    for stem, spec in dodo.DRAWINGS_BY_NAME.items():
+        before = bg.drawing_registry_recipe(source, spec)
+        assert bg.drawing_registry_recipe(added, spec) == before, stem
+        if bg.drawing_registry_recipe(edited, spec) != before:
+            changed.add(stem)
+    assert changed == {"pd_platen_guide"}
+
+
+# Assembly drawings whose closure reaches a contract by a runtime stem, and so
+# keep the whole cad/config/assemblies family (#2164):
+_WHOLE_CONTRACT_FAMILY_DRAWINGS = {
+    # BOM_PART_NUMBERS reads every BOM component's contract number in a loop.
+    "ha_harmonic_analyzer_assembly",
+    # _pd_paper_drive_explode -> _assembly_patterns -> _assembly, whose
+    # title/number/free-stem helpers take the stem as a parameter.
+    "pd_paper_drive_assembly",
+}
+
+
+def test_assembly_drawings_fold_only_the_contracts_they_read(tmp_path, monkeypatch):
+    """#2164 (b): a drawing folds exactly the assembly contracts its closure
+    names by literal stem, so adding a kit's contract re-keys no other sheet
+    except the documented whole-family readers."""
+    import shutil
+
+    import _buildgraph as bg
+
+    dodo = _load_dodo()
+
+    def contract_deps():
+        out = {}
+        for stem, spec in dodo.DRAWINGS_BY_NAME.items():
+            folded = {
+                Path(path).name
+                for path in dodo._config_deps(spec.script, spec.part, "drawing")
+                if Path(path).parent == bg.ASSEMBLY_CONTRACT_DIR.resolve()
+            }
+            if folded:
+                out[stem] = folded
+        return out
+
+    contracts = tmp_path / "assemblies"
+    shutil.copytree(bg.ASSEMBLY_CONTRACT_DIR, contracts)
+    monkeypatch.setattr(bg, "ASSEMBLY_CONTRACT_DIR", contracts)
+    before = contract_deps()
+    for stem, folded in before.items():
+        spec = dodo.DRAWINGS_BY_NAME[stem]
+        if stem in _WHOLE_CONTRACT_FAMILY_DRAWINGS:
+            assert len(folded) > 1, stem
+        else:
+            assert spec.source_kind == "assembly", stem
+            assert folded == {f"{spec.part.replace('_', '-')}.yaml"}, stem
+    assert _WHOLE_CONTRACT_FAMILY_DRAWINGS <= before.keys()
+    (contracts / "zz-new-kit.yaml").write_text("number: MHA-ZZ-00\n", encoding="utf-8")
+    after = contract_deps()
+    rekeyed = {stem for stem in before if after.get(stem) != before[stem]}
+    assert rekeyed == _WHOLE_CONTRACT_FAMILY_DRAWINGS
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ('from _assembly_contract import assembly_contract\nU = assembly_contract("pn-pen")\n', {"pn-pen"}),
+        ("from _assembly_contract import AssemblyContract\nX: AssemblyContract\n", set()),
+        ("from _assembly_contract import assembly_contract\nU = assembly_contract(NAME)\n", None),
+        ("from _assembly_contract import contract_files\nALL = contract_files()\n", None),
+        ("import _assembly_contract\nU = _assembly_contract.assembly_contract('pn-pen')\n", None),
+        ("from _assembly_contract import assembly_contract as load\n", None),
+        ("from _assembly import assembly_contract\n", None),
+        ("import importlib\nm = importlib.import_module('_assembly_contract')\n", None),
+        ("def f(s):\n    return vars()\n", None),
+    ],
+    ids=[
+        "literal", "type-only", "runtime-stem", "family", "module", "alias",
+        "re-export", "dynamic-import", "namespace",
+    ],
+)
+def test_assembly_contract_read_classifier(source, expected):
+    import _buildgraph as bg
+
+    reads = bg._assembly_contract_reads(source)
+    assert (None if reads is None else set(reads)) == expected
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ("from _drawing_registry import DRAWINGS_BY_NAME\nS = DRAWINGS_BY_NAME['x']\n", {"x"}),
+        # The schema moved to _drawing_types; the row table no longer exports it.
+        ("from _drawing_registry import DrawingLayout\n", None),
+        ("import spec_module as spec\nNS = vars(spec)\n", set()),
+        ("from _drawing_registry import DRAWINGS_BY_NAME\nNS = vars()\n", None),
+        ("from _drawing_registry import DRAWINGS_BY_NAME\nNS = vars(DRAWINGS_BY_NAME)\n", None),
+    ],
+    ids=["own-row", "stale-schema-import", "module-vars", "bare-vars", "registry-vars"],
+)
+def test_drawing_registry_read_classifier(source, expected):
+    import _buildgraph as bg
+
+    reads = bg._drawing_registry_reads(source)
+    assert (None if reads is None else set(reads)) == expected
 
 
 def test_drawing_registry_projection_accepts_only_declarative_layout_members():
@@ -1078,7 +1256,8 @@ def test_purchased_configuration_changes_invalidate_only_own_drawing(
 
 
 @pytest.mark.parametrize(
-    "member", ["shared_registry", "transitive_helper", "template", "revision"]
+    "member",
+    ["shared_registry", "drawing_types", "transitive_helper", "template", "revision"],
 )
 def test_shared_drawing_inputs_invalidate_freshness_and_cache_keys(
     isolated_drawing_keys, member
@@ -1088,13 +1267,22 @@ def test_shared_drawing_inputs_invalidate_freshness_and_cache_keys(
     scripts = root / "cad" / "scripts"
     if member == "shared_registry":
         path = scripts / "_drawing_registry.py"
-        path.write_text(
-            path.read_text(encoding="utf-8").replace(
-                'f"{self.artifact_stem}_drawing.png"',
-                'f"{self.artifact_stem}_preview.png"',
-            ),
-            encoding="utf-8",
+        text = path.read_text(encoding="utf-8")
+        changed = text.replace(
+            '"drawing registry contains duplicate task names"',
+            '"drawing registry repeats a task name"',
         )
+        assert changed != text
+        path.write_text(changed, encoding="utf-8")
+    elif member == "drawing_types":
+        path = scripts / "_drawing_types.py"
+        text = path.read_text(encoding="utf-8")
+        changed = text.replace(
+            'f"{self.artifact_stem}_drawing.png"',
+            'f"{self.artifact_stem}_preview.png"',
+        )
+        assert changed != text
+        path.write_text(changed, encoding="utf-8")
     elif member == "revision":
         dodo.RELEASE_VERSION_FILE.write_text("next_revision: v999\n", encoding="utf-8")
     else:

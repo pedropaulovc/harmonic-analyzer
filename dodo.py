@@ -119,6 +119,7 @@ from _buildgraph import (  # noqa: E402
     artefact_for,
     assembly_contract_file,
     assembly_contract_files,
+    assembly_contract_reads,
     config_files_of,
     data_deps_of,
     dict_table_entries,
@@ -126,6 +127,7 @@ from _buildgraph import (  # noqa: E402
     drawing_registry_reads_selected,
     drawing_registry_recipe,
     fastener_rows_selected,
+    interference_contract_file,
     is_racy_mtime,
     machine_family_files,
     tolerance_family_files,
@@ -158,10 +160,8 @@ import _sw_lifecycle  # noqa: E402  (SolidWorks autostart/recover; lazy-imports 
 import _telemetry  # noqa: E402  (observability spine: console logging + tracing)
 import _local_check  # noqa: E402  (host-wide local check admission)
 from _yaml_digest import yaml_digest as _yaml_content_digest  # noqa: E402
-from _drawing_registry import (  # noqa: E402
-    DRAWING_TEMPLATES,
-    DRAWINGS_BY_NAME,
-)
+from _drawing_registry import DRAWINGS_BY_NAME  # noqa: E402
+from _drawing_types import DRAWING_TEMPLATES  # noqa: E402
 from _machinist_review_mode import (  # noqa: E402
     MachinistReviewMode,
     mode_for_drawing,
@@ -1129,13 +1129,23 @@ def _expand_title_block_token(kind: str | None, script: Path) -> list[str]:
     return [str(_resolved(CONFIG_DIR / "title_block.yaml"))]
 
 
-def _expand_assembly_contracts_token(stem: str | None, kind: str | None) -> list[str]:
+def _expand_assembly_contracts_token(
+    stem: str | None, kind: str | None, script: Path
+) -> list[str]:
     """Per-task expansion of the ``"assemblies/*"`` token (any closure reaching
     ``_assembly_contract``). An ASSEMBLY task reads only its OWN contract -- the
     build activates its own stem -- so a sibling's seed or free-stem edit never
-    re-keys it; any other consumer keeps the whole family (conservative)."""
+    re-keys it. A DRAWING task reads exactly the contracts its closure names by
+    literal stem (``_buildgraph.assembly_contract_reads``), so a new kit's
+    contract never re-keys an unrelated sheet. Any other consumer, or a drawing
+    closure that reaches a contract by a runtime value, keeps the whole family
+    (conservative)."""
     if kind == "assembly" and stem is not None:
         return [assembly_contract_file(stem)]
+    if kind == "drawing":
+        reads = assembly_contract_reads(script)
+        if reads is not None:
+            return [assembly_contract_file(read) for read in sorted(reads)]
     return assembly_contract_files()
 
 
@@ -1163,7 +1173,7 @@ def _config_deps(script, stem: str | None = None, kind: str | None = None) -> li
         elif tok == "title_block":
             out.update(_expand_title_block_token(kind, script))
         elif tok == ASSEMBLY_CONTRACTS_TOKEN:
-            out.update(_expand_assembly_contracts_token(stem, kind))
+            out.update(_expand_assembly_contracts_token(stem, kind, script))
         else:
             out.add(str(_resolved(CONFIG_DIR / tok)))
     return sorted(out)
@@ -1388,11 +1398,6 @@ VERIFY_PY = (SCRIPTS_DIR / "verify.py").resolve()
 # Verify/preflight gate logic that is NOT on any assembly's build closure (so it
 # does not ride a .SLDASM digest) -> a direct file_dep of verify:/preflight tasks.
 POSTBUILD_PY = (SCRIPTS_DIR / "_assembly_postbuild.py").resolve()
-# Interference-acceptance contract read by verify.py's soundness gate. Like
-# POSTBUILD_PY it decides gate OUTCOMES, so a change to it must re-run soundness
-# even when no geometry moved; the part-geometry it imports already rides each
-# assembly's execution token (codex #359).
-INTERFERENCE_CONTRACTS_PY = (SCRIPTS_DIR / "_interference_contracts.py").resolve()
 BANK_RETENTION_PY = (SCRIPTS_DIR / "_native_bank_retention.py").resolve()
 EXPORT_PY = (SCRIPTS_DIR / "export_models.py").resolve()
 RELEASE_PY = (SCRIPTS_DIR / "cut_release.py").resolve()
@@ -2053,12 +2058,18 @@ def _soundness_file_deps(stem: str) -> list[str]:
     """One assembly's soundness-gate inputs: verify.py, the gate logic that lives
     outside every build closure, the native retention gate's source/config
     closure, the assembly's OWN contract (its free-DOF sets decide the verdict,
-    and verify.py is not run through ``_config_deps``), and the assembly itself
-    with its execution token."""
+    and verify.py is not run through ``_config_deps``), the assembly's OWN
+    allowed-interference table with its import closure (verify.py resolves it
+    by name at run time, so no import edge exposes it; it decides gate
+    OUTCOMES, so an edit must re-run this gate even when no geometry moved,
+    while another assembly's table never does), and the assembly itself with
+    its execution token."""
+    interference = interference_contract_file(stem)
     deps = [
         str(VERIFY_PY),
         str(POSTBUILD_PY),
-        str(INTERFERENCE_CONTRACTS_PY),
+        interference,
+        *_helper_deps(interference),
         *_bank_retention_file_deps(),
         assembly_contract_file(stem),
         _sldasm(stem),
@@ -3612,6 +3623,9 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # Per-assembly contracts stay per-assembly (no stem-keyed tables in
         # _assembly.py; each recipe carries its own contract only).
         SCRIPTS_DIR / "test_assembly_contract.py",
+        # Per-assembly allowed-interference tables re-key only their own
+        # assembly, its containers, their drawings and soundness gates.
+        SCRIPTS_DIR / "test_assembly_interference_modules.py",
         SCRIPTS_DIR / "test_cut_release_version.py",
         SCRIPTS_DIR / "test_drawing_diff.py",
         SCRIPTS_DIR / "test_release_drawing_diff.py",
@@ -3742,7 +3756,7 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         SCRIPTS_DIR / "test_summing_hanger_stack.py",
         SCRIPTS_DIR / "test_sm_vn_knife_hanger_hardware.py",
         # The paper-drive interference rows re-derived from their owner specs
-        # (_interference_contracts writes them as literals).
+        # (_pd_paper_drive_interference writes them as literals).
         SCRIPTS_DIR / "test_pd_paper_drive_interference_contracts.py",
         # Closed-form AGMA-style gates for the 12T:120T reducer and the feed
         # pinion on the rack, plus one numeric flank-stepping cross-check.

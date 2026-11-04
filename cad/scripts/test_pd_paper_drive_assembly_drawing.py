@@ -19,7 +19,8 @@ import _component_references
 import _drawing_balloons
 import _drawing_tables
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 import build_pd_paper_drive_assembly as assembly
 import draw_pd_paper_drive_assembly as drawing
 import dt_drive_train_steps

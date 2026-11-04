@@ -12,7 +12,8 @@ import pytest
 import _config
 import build_pd_vn_transgear_pivot_spring as part
 import pd_vn_transgear_pivot_spring_spec as spec
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 from _fastener_catalog import FASTENERS
 from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_9715K43 as recipe

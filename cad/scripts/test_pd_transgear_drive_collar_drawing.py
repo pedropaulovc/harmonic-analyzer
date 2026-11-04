@@ -20,7 +20,8 @@ import pd_transgear_knob_shaft_spec as shaft
 import _sprocket_seat_geometry as removable
 from _assembly_contract import assembly_contract
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
 from _printed_tolerance import printed_band_mm
 
 # Default-format note text, measured on r743-rocker-fix3's render, as

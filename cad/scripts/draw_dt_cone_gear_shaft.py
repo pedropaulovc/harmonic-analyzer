@@ -84,7 +84,8 @@ from _drawing_leaders import (
 )
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_points_in_view
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed

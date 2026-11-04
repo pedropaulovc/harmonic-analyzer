@@ -157,10 +157,11 @@ def test_restated_lever_bar_swing_brackets_the_solved_loop() -> None:
 
 
 def test_the_assembly_press_allowance_is_this_joint() -> None:
-    """_interference_contracts restates the modelled press as literals (every
-    assembly imports it); they must be the nominal pin, the reamed hole and
-    the two cheeks, and name channel j's pin with channel j's bar only."""
-    import _interference_contracts as ic
+    """_ch_channel_interference restates the modelled press as literals (the
+    channel's table stays off the pin spec); they must be the nominal pin, the
+    reamed hole and the two cheeks, and name channel j's pin with channel j's
+    bar only."""
+    import _ch_channel_interference as ic
 
     pin_dia, hole_dia, engaged = ic.BAR_PIVOT_PIN_PRESS
     assert pin_dia == pytest.approx(pin.PIN_DIA, abs=1e-9)
@@ -170,7 +171,7 @@ def test_the_assembly_press_allowance_is_this_joint() -> None:
     # the union to exactly the two pin joints).
     pairs = {
         pair: limit
-        for pair, limit in ic.allowed_interference_pairs("ch-channel").items()
+        for pair, limit in ic.ALLOWED_PAIRS.items()
         if any(name.startswith("ch-bar-pivot-pin-") for name in pair)
     }
     assert set(pairs) == {

@@ -77,7 +77,8 @@ import _drawing_hidden_sketches as hidden_sketches
 from _drawing_detail_crop import native_circle_geometry, _transform_point
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_points_in_view
-from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _drawing_view_display import set_hidden_lines_removed

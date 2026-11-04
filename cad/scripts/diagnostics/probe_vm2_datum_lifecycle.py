@@ -276,7 +276,7 @@ def main():
     from _com import _early_bound
     from _drawing_common import render_pdf_png
     from _drawing_projection import model_point_in_view
-    from _drawing_registry import DrawingLayout
+    from _drawing_types import DrawingLayout
     from _gear_drawing_entities import visible_circle_edge
     from diagnostics._owned_native_session import run_owned_diagnostic
 

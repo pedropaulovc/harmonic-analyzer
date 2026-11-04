@@ -14,7 +14,8 @@ import build_ch_rocker_arm_tl_vn_oblique_handwheel as part
 import ch_rocker_arm_tl_vn_oblique_handwheel_spec as spec
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as feed
 import draw_ch_rocker_arm_tl_vn_oblique_handwheel as draw
-from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DrawingLayout
 from _holes import cross_hole_volume_mm3
 
 STEM = "ch-rocker-arm-tl-vn-oblique-handwheel"

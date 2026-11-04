@@ -22,7 +22,8 @@ import mg_wheel_axle_spacer_spec
 import mg_wheel_axle_spec
 import mg_wheel_group
 from _drawing_common import is_pictorial_orientation
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
 from _title_block_units import render_number
 
 # The LANDSCAPE sheet's free field right of the isometric: inside the border

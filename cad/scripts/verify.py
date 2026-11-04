@@ -60,11 +60,13 @@ from __future__ import annotations
 
 import argparse
 import csv
+import importlib
 import json
 import math
 import os
 import re
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path, PureWindowsPath
 from typing import Any, Callable
@@ -104,7 +106,6 @@ from _assembly_postbuild import (
 )
 from _chain_mounts import mounted_wheels
 from _component_references import REFERENCE_IDENTITIES, bind_component_selectors
-from _interference_contracts import allowed_interference_pairs
 from _native_spring_contact import assert_assembly_spring_contacts
 from _native_bank_retention import measure as measure_bank_retention
 # component iteration helpers (read-only)
@@ -115,6 +116,15 @@ from _com import _early_bound, _read_member
 # the gear-ratio gate reads them through the same helper the kinematic driver
 # uses. Read-only -- it walks the MateGroup and returns numerators/denominators.
 from solidworks_mcp.adapters.solidworks.assembly import _gear_mate_links
+
+
+def _allowed_pairs(name: str) -> Mapping[frozenset[str], float]:
+    """``name``'s own allowed-interference table, never another assembly's
+    (its module is a direct file_dep of verify_soundness:<stem>)."""
+    from _buildgraph import interference_module  # local: keep top-level import light
+
+    return importlib.import_module(interference_module(name)).ALLOWED_PAIRS
+
 
 REST = "Default"  # the deterministic, fully-defined, render/photo-gated pose
 OVER_CONSTRAINED = 4  # swConstrainedStatus_e
@@ -986,7 +996,7 @@ def _run_soundness_battery(
         f"{name}:interference-free",
         lambda: check_no_interference(
             adapter,
-            allowed_pairs=allowed_interference_pairs(name),
+            allowed_pairs=_allowed_pairs(name),
             chain_mounts=_soundness_chain_mounts(name),
         ),
     )
@@ -1137,7 +1147,7 @@ async def _verify_static_one(
         f"{name}:interference-free",
         lambda: check_no_interference(
             adapter,
-            allowed_pairs=allowed_interference_pairs(name),
+            allowed_pairs=_allowed_pairs(name),
             chain_mounts=_soundness_chain_mounts(name),
         ),
     )
@@ -1393,7 +1403,7 @@ async def _walk_pass_sweep(adapter: Any, name: str) -> list[str]:
             if pose["check"]:
                 try:
                     check_no_interference(
-                        adapter, allowed_pairs=allowed_interference_pairs(name)
+                        adapter, allowed_pairs=_allowed_pairs(name)
                     )
                 except Exception as exc:  # noqa: BLE001 -- collect, gate below
                     failures.append(f"{where}: {exc}")
@@ -1535,7 +1545,7 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
             _rebuild(adapter)
             try:
                 check_no_interference(
-                    adapter, allowed_pairs=allowed_interference_pairs(name)
+                    adapter, allowed_pairs=_allowed_pairs(name)
                 )
             except Exception as exc:  # noqa: BLE001 -- collect, gate below
                 interference.append((theta, str(exc)))

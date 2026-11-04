@@ -28,10 +28,11 @@ Sources:
 Model diameter: nominal Ø6.000, the vendor's.  The carrier models CL as its
 Ø3 x 90 deg centre-drill spot only (finished in place, like HUB), so the
 assembly's press-fit allowance for this pair is the dowel's own volume in the
-plate, as ``_interference_contracts.JIG_HUB_PIN_SEAT`` bounds the HUB pin:
-``PRESS_ALLOWANCE_MM3`` below (1.10 x a Ø6 x 12 carrier cylinder), which the
-modelled overlap (only pin metal inside the carrier, less its centre spot)
-stays under. The small lower crown outside the carrier is excluded.
+plate, as ``_ch_rocker_arm_tl_oblique_jig_interference.JIG_HUB_PIN_SEAT``
+bounds the HUB pin: ``PRESS_ALLOWANCE_MM3`` below (1.10 x a Ø6 x 12 carrier
+cylinder), which the modelled overlap (only pin metal inside the carrier, less
+its centre spot) stays under. The small lower crown outside the carrier is
+excluded.
 
 Part frame: pin axis local +Y through the origin, published as ``ScrewAxis``
 (Front ∩ Right); the chamfered end's tip at y = 0 (the Top Plane), the round

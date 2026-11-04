@@ -113,7 +113,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from _drawing_common import is_pictorial_orientation  # noqa: E402
 from _drawing_layout_check import DrawableRegion  # noqa: E402
-from _drawing_registry import DRAWING_TEMPLATES  # noqa: E402
+from _drawing_types import DRAWING_TEMPLATES  # noqa: E402
 from _layout_audit import (
     classify_segments as classify_callout_segments,  # noqa: E402
     replace_text,  # noqa: E402
@@ -655,7 +655,7 @@ def _sheet_region(adapter: Any, sheet: Any, *, width: float, height: float):
 def _keep_outs(width: float, height: float) -> tuple[tuple[str, Box], ...]:
     """The title-block keep-out for whichever checked-in template this sheet is.
 
-    Matched by sheet size against ``_drawing_registry.DRAWING_TEMPLATES`` -- the
+    Matched by sheet size against ``_drawing_types.DRAWING_TEMPLATES`` -- the
     same template data ``_drawing_layout_collect.collect_layout_elements`` reserves --
     so a sheet from a foreign template simply gets no keep-out instead of a
     fabricated one.
@@ -932,7 +932,7 @@ def _attach(adapter: Any, path: Path) -> Any:
         import _script_paths  # noqa: F401
     from _com import _early_bound
 
-    pythoncom = __import__("pythoncom")
+    import pythoncom
     pythoncom.CoInitialize()
     app = _early_bound(
         win32com.client.GetActiveObject("SldWorks.Application"), "ISldWorks"

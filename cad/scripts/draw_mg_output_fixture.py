@@ -80,7 +80,8 @@ from _supplier_dimensions import (
 )
 from _title_block_units import render_number
 from _drawing_leaders import Segment, dimension_segments, distance_to_point, segments_cross
-from _drawing_registry import DRAWINGS_BY_NAME, layout_report_path
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import layout_report_path
 from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode

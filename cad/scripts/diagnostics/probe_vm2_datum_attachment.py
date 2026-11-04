@@ -87,7 +87,7 @@ def main():
     from _buildgraph import module_deps_of
     from _com import _early_bound
     import _drawing_common
-    from _drawing_registry import DrawingLayout
+    from _drawing_types import DrawingLayout
     import _drawing_selection
     from _gear_drawing_entities import visible_circle_edge
     import _telemetry

@@ -11,7 +11,8 @@ import dt_arbor_pedestal_spec
 import build_dt_arbor_pedestal as part
 import draw_dt_arbor_pedestal as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 from _hole_spec import blind_cut_dia_mm
 
 

@@ -23,7 +23,7 @@ from solidworks_mcp.adapters.sw_type_info import constant
 import _telemetry
 from _com import _early_bound, _read_member
 from _drawing_layout_audit import annotation_display
-from _drawing_registry import DRAWING_TEMPLATES
+from _drawing_types import DRAWING_TEMPLATES
 from _drawing_scan import _zoomed_on
 from _layout_audit import display_box
 from _part_properties import title_block_properties

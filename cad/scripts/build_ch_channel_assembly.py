@@ -105,7 +105,7 @@ reading back the origin and re-adding flipped. Saved state: every
 component fixed, fully defined or coupled-free, zero interference
 (face-flush and tangent contacts allowed; the rod and bar pivot pins'
 modelled press in their reamed holes and the apex set screws' threads in
-the ears' taps are the volume-bounded exceptions, _interference_contracts).
+the ears' taps are the volume-bounded exceptions, _ch_channel_interference).
 
 Only the SEED channels are authored mate-by-mate: channel 0 (the global
 Z anchor) plus the first channel >= 1 of each distinct amplitude value.
@@ -203,7 +203,7 @@ from _assembly import (
     write_dof_manifest,
 )
 from _native_spring_contact import assert_assembly_spring_contacts
-from _interference_contracts import allowed_interference_pairs
+from _ch_channel_interference import ALLOWED_PAIRS
 from _cwm import (
     component_constrained_status,
     component_mate_count,
@@ -1487,7 +1487,7 @@ async def build(adapter) -> dict[str, str]:
         await _locate_to_datum(adapter, mount)
     # Apex set screws (MHA-SH-VN-54): one per ear, on its mid-plane, cup down on
     # the shaft's flat. Placed in the brackets' order (south first), so screw
-    # n is in bracket n (_interference_contracts names the pairs).
+    # n is in bracket n (_ch_channel_interference names the pairs).
     for name in _bracket_sides.SIDES:
         screw_z = _bracket_sides.MOUNT_Z[name]
         set_screw = await place_component(
@@ -2304,7 +2304,7 @@ async def build(adapter) -> dict[str, str]:
     # pressed in the fork tines and runs in the arm's #47 hole with the rod,
     # adding no DOF. It reads under-constrained with its free rod
     # (ch-channel.yaml allowed_free_stems). Channel j's pin is the (j + 1)th
-    # instance, like its rod, so _interference_contracts can name each
+    # instance, like its rod, so _ch_channel_interference can name each
     # modelled press pair exactly.
     for j in range(CHANNELS):
         rod = rod_by_channel[j]
@@ -2358,7 +2358,7 @@ async def build(adapter) -> dict[str, str]:
     # origin = the bore's mid-width point) and lock-mated to the bar: it rides
     # the bar's free amplitude DOF and adds none. It reads under-constrained
     # with its bar (ch-channel.yaml allowed_free_stems). Channel j's pin is the
-    # (j + 1)th instance, like its bar, so _interference_contracts can name
+    # (j + 1)th instance, like its bar, so _ch_channel_interference can name
     # each modelled press pair exactly.
     for j in range(CHANNELS):
         bar = bar_by_channel[j]
@@ -2479,7 +2479,7 @@ async def build(adapter) -> dict[str, str]:
     write_dof_manifest(ASM_NAME)
     # The pins' modelled press in their reams and the set screws' threads in
     # the ears' taps are the intended overlaps.
-    check_no_interference(adapter, allowed_pairs=allowed_interference_pairs(ASM_NAME))
+    check_no_interference(adapter, allowed_pairs=ALLOWED_PAIRS)
     await _author_settings_reference(adapter)
     # Title-block identity for the assembly drawing (draw_ch_channel_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells

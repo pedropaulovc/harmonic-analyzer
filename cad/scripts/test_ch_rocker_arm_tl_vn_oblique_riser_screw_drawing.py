@@ -16,7 +16,8 @@ import ch_rocker_arm_tl_oblique_jig_assembly_spec as assembly
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_vn_oblique_riser_screw_spec as spec
 import ch_rocker_arm_tl_oblique_riser_spec as riser
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 from _fastener_catalog import FASTENERS
 from _stock_recipe import recipe_declaration
 from diagnostics import diag_build_91771A112 as recipe

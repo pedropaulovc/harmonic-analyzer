@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-import _interference_contracts
+import _ha_harmonic_analyzer_interference
+from _interference_common import smooth_annulus_limit_mm3
 import build_ch_channel_assembly as channel
 import build_ch_pivot_bracket as bracket_build
 import build_ch_vn_bracket_hold_down_screw as hold_down_build
@@ -35,7 +36,7 @@ def test_channel_places_one_screw_per_seat() -> None:
 
 
 def test_top_level_contract_literals_match_the_layout() -> None:
-    pairs = _interference_contracts.allowed_interference_pairs("ha-harmonic-analyzer")
+    pairs = _ha_harmonic_analyzer_interference.ALLOWED_PAIRS
     limits = {
         limit
         for pair, limit in pairs.items()
@@ -55,7 +56,7 @@ def test_top_level_contract_literals_match_the_layout() -> None:
     }
     (limit,) = limits
     assert limit == pytest.approx(
-        _interference_contracts._smooth_annulus_limit_mm3(
+        smooth_annulus_limit_mm3(
             hold_down.SHANK_DIA,
             seats.SEAT_DRILL_DIA,
             seats.SCREW_LENGTH - bracket.FOOT_H,

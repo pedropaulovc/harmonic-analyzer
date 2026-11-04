@@ -27,7 +27,7 @@ from _drawing_layout_check import (
     audit_layout,
     format_findings,
 )
-from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
+from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
 from _drawing_sheet_region import sheet_drawable_region
 from _layout_audit import display_box, estimated_text_runs, line_segment
 import _telemetry

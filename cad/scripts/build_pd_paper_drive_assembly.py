@@ -162,7 +162,7 @@ from _assembly_patterns import (
     PatternDirection,
 )
 from _chain_mounts import mounted_wheels
-from _interference_contracts import allowed_interference_pairs
+from _pd_paper_drive_interference import ALLOWED_PAIRS
 from _visibility import blank_reference_geometry, visible_reference_geometry
 from _transforms import (  # noqa: E402
     IDENTITY,
@@ -2570,7 +2570,7 @@ async def _insert_roller_chain(adapter) -> None:
     link and the connecting link are seated at the two closing stations, the
     same way as the seeds. The connecting link's forward pin is the seed's
     pin 0 on the T24, so it meshes there like the outer link it replaces; the
-    gate bounds that one pair in _interference_contracts.
+    gate bounds that one pair in _pd_paper_drive_interference.
 
     The path MUST be one connected segment: SolidWorks never treats the 3-arc +
     taut-line contour as connected (the segments share coordinates but carry no
@@ -3882,7 +3882,7 @@ async def build(adapter) -> dict[str, str]:
     _assert_native_rack_operating_pose(adapter, rack_operating_domain, rack, running_pin)
     check_no_interference(
         adapter,
-        allowed_pairs=allowed_interference_pairs(ASM_NAME),
+        allowed_pairs=ALLOWED_PAIRS,
         chain_mounts=mounted_wheels(),
     )
     # K's DRO setting from S, for MHA-PD-00's VIEW K (hidden sketch only).

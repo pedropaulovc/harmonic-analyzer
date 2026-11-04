@@ -21,7 +21,8 @@ from _drawing_contract import (
     drawing_specification_violations,
     model_toleranced_dimensions,
 )
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 from _layout_audit import TEXT_CLEARANCE_HEIGHTS
 from _layout_geometry import ARROW_TEXT_CLEARANCE_M, Box, estimate_text_box
 from _gear_quality import (

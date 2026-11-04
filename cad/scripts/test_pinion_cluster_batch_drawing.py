@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import importlib
 import math
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -11,7 +12,6 @@ import pytest
 
 import _assembly
 import _config
-import _interference_contracts
 import dt_crank_handle_spec
 import dt_pinion_bracket_spec
 import dt_pinion_cam_pin_spec
@@ -24,13 +24,20 @@ import dt_pinion_pivot_block_geometry
 import dt_pinion_spring_spec
 import dt_vn_post_mount_screw_spec
 import dt_vn_slotted_screw_spec
-from _buildgraph import module_deps_of
+import _ch_channel_interference
+import _ch_rocker_arm_tl_oblique_jig_interference
+from _buildgraph import ASSEMBLY_ORDER, interference_module, module_deps_of
 from test_assembly_chain_mesh import (
     _Adapter as InterferenceAdapter,
     _Component as InterferenceComponent,
     _Interference as InterferenceBody,
     observations as observations,
 )
+
+
+def _allowed(assembly: str) -> Mapping[frozenset[str], float]:
+    """``assembly``'s own table, resolved as verify.py and refresh do."""
+    return importlib.import_module(interference_module(assembly)).ALLOWED_PAIRS
 
 
 SHEETS = (
@@ -314,7 +321,7 @@ def test_clamp_thumb_allowance_bounds_the_actual_pair_and_total_volume(
         adapter.currentModel.GetComponents = lambda top_level_only: (
             roots if top_level_only else (*roots, *references, *components)
         )
-    allowed = _interference_contracts.allowed_interference_pairs(assembly)
+    allowed = _allowed(assembly)
     if rejected:
         with pytest.raises(RuntimeError, match="interference"):
             _assembly.check_no_interference(adapter, allowed_pairs=allowed)
@@ -361,7 +368,7 @@ def _expected_numbered_pairs(
 
 
 def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
-    paper_drive = _interference_contracts.allowed_interference_pairs("pd-paper-drive")
+    paper_drive = _allowed("pd-paper-drive")
     clamp_receivers = {1: 2, 2: 2, 3: 1, 4: 1}
     for screw_number, back_number in clamp_receivers.items():
         pair = frozenset(
@@ -397,7 +404,7 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
         )
         assert paper_drive[pair] == pytest.approx(20.440626113418)
 
-    summing = _interference_contracts.allowed_interference_pairs("sm-summing")
+    summing = _allowed("sm-summing")
     assert summing == pytest.approx(
         {
             # Cut 92314A253 #10-24 in the #25 drill over 8.9173 nominal reach.
@@ -425,7 +432,7 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
     # the one MHA-FR-02 crossbar, so the back mount's pair (dowels 3-4) pairs
     # with fr-top-frame-1, not a second crossbar, and no dowel pairs with a
     # knife mount (each slips in its round hole or slot).
-    top = _interference_contracts.allowed_interference_pairs("ha-harmonic-analyzer")
+    top = _allowed("ha-harmonic-analyzer")
     for dowel_number in range(1, 5):
         pair = frozenset(
             (
@@ -894,7 +901,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
         "pd-paper-drive": cup_pin_pairs | {connecting_link_pair},
     }
     for name, expected_threaded in threaded_by_assembly.items():
-        allowed = _interference_contracts.allowed_interference_pairs(name)
+        allowed = _allowed(name)
         # Exact pair equality also forbids tube/screw and cap/tube exemptions.
         assert set(allowed) == set(expected_threaded) | special_pairs.get(name, set())
         for pair, expected_limit in expected_threaded.items():
@@ -903,11 +910,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             )
         assert all(limit >= 0.0 and math.isfinite(limit) for limit in allowed.values())
 
-    drive_train_allowed = _interference_contracts.allowed_interference_pairs(
-        "dt-drive-train"
-    )
+    drive_train_allowed = _allowed("dt-drive-train")
     assert not cam_pairs & set(drive_train_allowed)
-    crank_allowed = _interference_contracts.allowed_interference_pairs("dt-drive-train")
+    crank_allowed = _allowed("dt-drive-train")
     hub_pair = frozenset(("dt-crank-pin-1", "dt-crank-hub-1"))
     shaft_pair = frozenset(("dt-crank-pin-1", "dt-crankshaft-1"))
     # The CONTRACT-crank hub barrel (Ø.88 since #290; Ø22.25 at R9-38) sets
@@ -928,7 +933,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     # MHA-CH-VN-55: each #1-72 x 5/32 keeper set screw in its own keeper's
     # crown tap (#53 drill). MHA-CH-VN-51: each #6-32 anchor's thread in its
     # MHA-CH-14 jam nut's #36 tap drill over the nut's thickness.
-    channel_allowed = _interference_contracts.allowed_interference_pairs("ch-channel")
+    channel_allowed = _allowed("ch-channel")
     assert channel_allowed == pytest.approx(
         {
             **{
@@ -946,7 +951,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             **{
                 frozenset(
                     (f"sh-vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}")
-                ): _interference_contracts.PIVOT_EAR_SET_SCREW_LIMIT
+                ): _ch_channel_interference.PIVOT_EAR_SET_SCREW_LIMIT
                 for n in (1, 2)
             },
             **{
@@ -958,16 +963,20 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             **{
                 frozenset(
                     (f"ch-vn-spring-hook-{n}", f"ch-anchor-jam-nut-{n}")
-                ): _annulus_limit(*_interference_contracts.CHANNEL_ANCHOR_NUT_THREAD)
+                ): _annulus_limit(*_ch_channel_interference.CHANNEL_ANCHOR_NUT_THREAD)
                 for n in range(1, 21)
             },
         }
     )
-    assert _interference_contracts.allowed_interference_pairs("unknown") == {}
+    # Every assembly resolves its own table; only the indexing fixture, which
+    # has no intended fit, allows nothing.
+    assert {stem for stem in ASSEMBLY_ORDER if not _allowed(stem)} == {
+        "dt_cone_gear_tl_indexing"
+    }
 
 
 def test_converged_stock_uses_distinct_semantic_base_joint_pairs() -> None:
-    allowed = _interference_contracts.allowed_interference_pairs("ha-harmonic-analyzer")
+    allowed = _allowed("ha-harmonic-analyzer")
     base = "fr-frame-1/fr-harmonic-base-1"
     foot = frozenset(("dt-drive-train-1/@FootScrew:1", base))
     stop = frozenset(("dt-drive-train-1/@SwingStopScrew:1", base))
@@ -982,9 +991,7 @@ def test_converged_stock_uses_distinct_semantic_base_joint_pairs() -> None:
 
 
 def test_kit_fit_pairs_keep_member_roles_and_four_physical_instances() -> None:
-    allowed = _interference_contracts.allowed_interference_pairs(
-        "ch-rocker-arm-tl-oblique-jig"
-    )
+    allowed = _allowed("ch-rocker-arm-tl-oblique-jig")
     kit = {
         pair: limit
         for pair, limit in allowed.items()
@@ -993,8 +1000,8 @@ def test_kit_fit_pairs_keep_member_roles_and_four_physical_instances() -> None:
     assert len(kit) == 8
     for number in range(1, 5):
         for role, triple in (
-            ("TNut", _interference_contracts.JIG_T_NUT_THREAD),
-            ("FlangeNut", _interference_contracts.JIG_FLANGE_NUT_THREAD),
+            ("TNut", _ch_rocker_arm_tl_oblique_jig_interference.JIG_T_NUT_THREAD),
+            ("FlangeNut", _ch_rocker_arm_tl_oblique_jig_interference.JIG_FLANGE_NUT_THREAD),
         ):
             pair = frozenset((f"@HoldDownStud:{number}", f"@{role}:{number}"))
             assert kit[pair] == pytest.approx(_annulus_limit(*triple))

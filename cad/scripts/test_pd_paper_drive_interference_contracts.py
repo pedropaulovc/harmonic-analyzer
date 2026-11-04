@@ -1,7 +1,7 @@
 """The paper-drive transgear interference rows follow their owner specs.
 
-``_interference_contracts`` writes every transgear size as a literal so no
-assembly re-keys on a transgear spec edit; these tests re-derive each row from
+``_pd_paper_drive_interference`` writes every transgear size as a literal so the
+paper drive's table does not re-key on a transgear spec edit; these tests re-derive each row from
 the owners, so a spec change that moves a fit fails here instead of passing
 a stale bound (the MHA-DT-32 precedent in test_dt_crank_handle_pivot_screw_drawing).
 """
@@ -10,12 +10,13 @@ from __future__ import annotations
 
 import importlib
 import math
+from collections.abc import Mapping
 
 import pytest
 
 import _chain
 import _holes
-import _interference_contracts
+import _pd_paper_drive_interference
 import pd_latch_hook_bracket_screw_spec as bracket_screw
 import pd_latch_hook_geometry as hook
 import pd_rack_pinion_spec as disc
@@ -41,8 +42,8 @@ import pd_transgear_thumbnut_spec as thumbnut
 from _hole_spec import TAP_DRILL_MM
 
 
-def _allowed() -> dict[frozenset[str], float]:
-    return _interference_contracts.allowed_interference_pairs("pd-paper-drive")
+def _allowed() -> Mapping[frozenset[str], float]:
+    return _pd_paper_drive_interference.ALLOWED_PAIRS
 
 
 def _annulus(major_d: float, tap_d: float, length: float) -> float:
@@ -126,7 +127,7 @@ def test_ring_row_is_the_free_state_grip_on_its_prong_arcs() -> None:
     assert ring.THICKNESS + ring.THICKNESS_TOL <= pin.GROOVE_WIDTH
     pair = _pair("pd-vn-transgear-retaining-ring-1", "pd-transgear-pin-1")
     assert _allowed()[pair] == pytest.approx(
-        _interference_contracts._RING_PRONG_SHARE
+        _pd_paper_drive_interference._RING_PRONG_SHARE
         * _annulus(pin.GROOVE_DIA, ring.FREE_DIA, ring.THICKNESS)
     )
 

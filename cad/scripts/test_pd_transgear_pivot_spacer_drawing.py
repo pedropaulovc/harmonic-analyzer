@@ -15,7 +15,8 @@ from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import edge_break_chamfer_mm, edge_break_radius_mm, printed_band_mm
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 import _drawing_edges
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
 import _gtol_face
 from _layout_geometry import Box, estimate_text_box
 from _surface_finish import MACHINED_UM, SEAT_UM

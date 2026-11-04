@@ -1182,7 +1182,9 @@ assembly's recipe: one drive-train seed there used to re-key all eight
 assemblies and every gate behind them) or `verify.py` (on every soundness
 gate's). Any closure reaching `_assembly_contract`
 gets the `assemblies/*` token; `dodo._config_deps` narrows it to the task's OWN
-file for an assembly task, and `_soundness_file_deps` adds the gate's own file.
+file for an assembly task and, for a drawing task, to the contracts its closure
+names as `assembly_contract("<literal stem>")` (`_buildgraph.assembly_contract_reads`;
+a runtime stem keeps the family), and `_soundness_file_deps` adds the gate's own file.
 Each `build_<stem>_assembly.build()` opens with
 `activate_assembly_contract(ASM_NAME)` — the file its seeds come from is the file
 its recipe depends on. A signature two assemblies both query goes in BOTH files
@@ -1191,6 +1193,21 @@ queries, and the save chokepoint's `audit_flip_seeds` logs them and warns on
 entries no mate queried. `check:recipe` (`test_assembly_contract.py`) pins all of
 this. The accessor is deliberately not in `_config.py`: editing that re-keys
 every part.
+
+**Per-assembly allowed-interference tables — `cad/scripts/_<stem>_interference.py`.**
+Each assembly's intended-fit pairs and maximum overlap volumes live in its own
+module exporting `ALLOWED_PAIRS` (`_buildgraph.interference_module(stem)` /
+`interference_contract_file(stem)` name it), importing only the specs its own
+pairs need; pure helpers shared by several tables (`smooth_annulus_limit_mm3`,
+`numbered_pairs`) live in `_interference_common.py`, which re-keys every
+assembly, so nothing assembly-specific goes there. Each builder imports its own
+table statically; `verify.py` and `refresh_assembly.py` resolve their stem's
+table through `interference_module` (never a central lookup), and
+`dodo._soundness_file_deps` folds that table plus its import closure, so a
+table edit re-runs only its own assembly, the assemblies that contain it (the
+top table imports the magnifier/summing limits it shares), their drawings and
+soundness gates. A subassembly table never imports a sibling's.
+`check:recipe` (`test_assembly_interference_modules.py`) pins this.
 
 ## Three-tier submodule digest (part vs assembly vs drawing)
 

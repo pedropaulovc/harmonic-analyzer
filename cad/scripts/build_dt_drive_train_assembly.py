@@ -231,7 +231,7 @@ from _assembly_patterns import (
     grid_component_pattern,
     PatternDirection,
 )
-from _interference_contracts import allowed_interference_pairs
+from _dt_drive_train_interference import ALLOWED_PAIRS
 from _dt_drive_train_explode import create_drive_train_explode
 from dt_drive_train_assembly_spec import COLLAR_PIN_ROLE
 
@@ -5349,7 +5349,7 @@ async def build(adapter) -> dict[str, str]:
     # the hub's -X face; the brass keeper ring hangs from the head cross-hole.
     # The hub #14 and shaft #9 pilots are match-reamed together to the pin's
     # 1:48 taper, so those two overlaps alone are volume-bounded allowed pairs
-    # in _interference_contracts.
+    # in _dt_drive_train_interference.
     pin = await place_component(
         adapter,
         "dt-crank-pin",
@@ -7097,7 +7097,7 @@ async def build(adapter) -> dict[str, str]:
         )
         check_no_interference(
             solved_adapter,
-            allowed_pairs=allowed_interference_pairs(ASM_NAME),
+            allowed_pairs=ALLOWED_PAIRS,
         )
         # The positive control for crank_boss_rim's analytic 64T clearances.
         gear64_post_measure.measure(

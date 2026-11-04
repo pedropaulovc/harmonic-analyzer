@@ -13,7 +13,7 @@ from typing import Any, Callable
 from _com import _early_bound
 from _drawing_layout_audit import annotation_display
 from _drawing_notes import property_link
-from _drawing_registry import DrawingSpec
+from _drawing_types import DrawingSpec
 from _drawing_scan import _zoomed_on
 from _purchased_fastener_drawing import _box, _inside, _number_state, _rebuild
 import _telemetry

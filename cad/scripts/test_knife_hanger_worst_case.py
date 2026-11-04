@@ -14,7 +14,8 @@ import math
 
 import pytest
 
-import _interference_contracts
+import _ha_harmonic_analyzer_interference as top_interference
+import _sm_summing_interference as summing_interference
 import build_fr_top_frame
 import build_sm_knife_mount
 import build_sm_summing_assembly as asm
@@ -850,22 +851,23 @@ def test_the_knife_edge_keeps_five_degrees_of_rock_at_the_worst_case() -> None:
 
 
 def test_the_summing_interference_rows_match_their_owners() -> None:
-    # _interference_contracts keeps the knife-mount-owned terms as literals.
+    # _sm_summing_interference (reach) and _ha_harmonic_analyzer_interference
+    # (dowel press) keep the knife-mount-owned terms as literals.
     # The literal stays on the 36.50 grip the stud's cut length reads
     # (sm_vn_knife_hanger_stud_spec); the 1.437 grip moves the reach 0.0002.
-    assert _interference_contracts._KNIFE_HANGER_REACH == pytest.approx(
+    assert summing_interference._KNIFE_HANGER_REACH == pytest.approx(
         asm.HANGER_REACH, abs=5e-4
     )
     # Owner ruling 2026-10-24 (T+H3): the dowel press row is the crossbar
     # ream's (smallest Ø.1240, .47 deep), checked at the top level.
-    assert _interference_contracts._KNIFE_DOWEL_HOLE_MIN == pytest.approx(
+    assert top_interference._KNIFE_DOWEL_HOLE_MIN == pytest.approx(
         dowel.PRESS_HOLE_DIA + min(dowel.PRESS_HOLE_DIA_BAND)
     )
-    assert _interference_contracts._KNIFE_DOWEL_DIA_MAX == pytest.approx(dowel.DIA_MAX)
-    assert _interference_contracts._KNIFE_DOWEL_PRESS_DEPTH == pytest.approx(
+    assert top_interference._KNIFE_DOWEL_DIA_MAX == pytest.approx(dowel.DIA_MAX)
+    assert top_interference._KNIFE_DOWEL_PRESS_DEPTH == pytest.approx(
         dowel.PRESS_DEPTH
     )
-    assert _interference_contracts._KNIFE_DOWEL_PRESS_DEPTH == pytest.approx(
+    assert top_interference._KNIFE_DOWEL_PRESS_DEPTH == pytest.approx(
         top_frame.HANGER_PIN_HOLE_DEPTH
     )
     assert screw.THREAD == knife_mount.STUD_THREAD == "#10-24"

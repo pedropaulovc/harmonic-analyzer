@@ -30,7 +30,7 @@ Manufacturing drawings select one of two ASME B templates:
 
 Both templates contain their border and zone geometry, title block, tolerance
 block, and third-angle projection symbol. The sheet formats are embedded, so
-there is no separate `.slddrt`. `_drawing_registry.DRAWING_TEMPLATES` owns each
+there is no separate `.slddrt`. `_drawing_types.DRAWING_TEMPLATES` owns each
 template's path, physical dimensions, raster dimensions, and title-block
 keep-out. Every `DrawingSpec` selects a `DrawingLayout` explicitly; production
 drawings use both orientations. Changing a row's layout switches its template

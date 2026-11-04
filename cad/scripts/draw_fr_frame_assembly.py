@@ -69,7 +69,8 @@ from _drawing_ray_pick import (
     _to_model,
     _to_part,
 )
-from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DrawingLayout
 from _drawing_scan import _zoomed_on
 from _drawing_selection import _select_view_entity
 from _drawing_sections import create_section_view

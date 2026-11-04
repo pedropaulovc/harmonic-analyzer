@@ -793,22 +793,22 @@ def test_loop_wire_clears_the_counterbore_mouth_at_full_worst_case() -> None:
 
 
 def test_shared_interference_contract_inputs_match_their_owners() -> None:
-    # _interference_contracts keeps the end-piece pair's inputs narrow (shared
+    # _sm_summing_interference keeps the end-piece pair's inputs narrow (shared
     # thread tables and a literal threaded length) so screw or gooseneck edits
-    # do not re-key every assembly; pin them to their owners here.  The model
+    # do not re-key the summing table; pin them to their owners here.  The model
     # seats the screw at the free gap: its thread overlaps the blind tap drill
     # from the counterbore floor to its tip, short of the full thread's end.
-    import _interference_contracts
+    import _sm_summing_interference
     from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
 
     size = joint.TAP_SPEC.size
     assert screw.THREAD.split()[0] == size == "1/4-28"
     assert joint.SCREW_REACH < joint.TAP_THREAD_DEPTH < joint.TAP_DRILL_DEPTH
     engaged = min(joint.SCREW_REACH, joint.TAP_THREAD_DEPTH) - joint.COUNTERBORE_DEPTH
-    assert _interference_contracts._GOOSENECK_THREAD_LENGTH == pytest.approx(
+    assert _sm_summing_interference._GOOSENECK_THREAD_LENGTH == pytest.approx(
         round(engaged, 2)
     )
-    assert _interference_contracts._GOOSENECK_THREAD_LENGTH >= engaged
+    assert _sm_summing_interference._GOOSENECK_THREAD_LENGTH >= engaged
     assert TAP_DRILL_MM[size] == pytest.approx(joint.TAP_DRILL_DIA) == 5.410
     assert THREAD_MAJOR_MM[size] == pytest.approx(screw.MAJOR_DIA, abs=1e-3)
     assert THREAD_MAJOR_MM[size] < joint.COUNTERBORE_DIA

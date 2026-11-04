@@ -11,7 +11,8 @@ import _mcmaster_91251a583 as dims
 import build_ch_rocker_arm_tl_vn_oblique_lever_screw as part
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
 import ch_rocker_arm_tl_vn_oblique_lever_screw_spec as spec
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 from _fastener_catalog import FASTENERS
 from _socket_head_dimensions import SocketHeadScrew
 from _stock_recipe import recipe_declaration

@@ -22,7 +22,7 @@ from _drawing_contract import (
     drawing_specification_violations,
 )
 from _test_stubbed_build import offline_adapter, stub_seat
-from _drawing_registry import DrawingLayout
+from _drawing_types import DrawingLayout
 from _printed_tolerance import printed_deviations
 from pd_platen_spec import PLATE_WIDTH
 

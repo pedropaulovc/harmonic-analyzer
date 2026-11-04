@@ -61,7 +61,7 @@ from _sketch import (
     ensure_fully_defined, set_sketch_direct_db,
 )
 from _simplified_names import simplified_name
-from _interference_contracts import allowed_interference_pairs
+from _ms_measuring_stick_interference import ALLOWED_PAIRS
 from _transforms import euler_from_rows
 
 ASM_NAME = "ms-measuring-stick"
@@ -389,7 +389,7 @@ async def build(adapter) -> dict[str, str]:
     # the tip contact and the cover's seat are faces, not volume.
     check_no_interference(
         adapter,
-        allowed_pairs=allowed_interference_pairs(ASM_NAME),
+        allowed_pairs=ALLOWED_PAIRS,
     )
 
     # Title-block identity for the fitter drawing

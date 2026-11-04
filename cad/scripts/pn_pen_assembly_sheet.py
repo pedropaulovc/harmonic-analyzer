@@ -28,7 +28,6 @@ from _inch_fraction import inch_fraction
 from _assembly_contract import assembly_contract
 from _column_clamp_interface import BAR_DEPTH as WHEEL_BAR_DEPTH
 from pn_pen_assembly_spec import (
-    ASM_NAME,
     BOM_ORDER,
     CARRIAGE_END_MACHINE,
     FRAME,
@@ -62,7 +61,9 @@ from pn_pen_explode_spec import EXPLODE_STEPS
 from sh_vn_music_wire_pen_spec import BOM_DESCRIPTION as _WIRE_BOM_DESCRIPTION
 
 DRAWING_NUMBER = "MHA-PN-00"
-UNIT = assembly_contract(ASM_NAME).drawing_unit
+# A literal stem: the build graph narrows this drawing's assemblies/*
+# dependency to exactly the contracts its closure names.
+UNIT = assembly_contract("pn-pen").drawing_unit
 # A top-level BOM numbers its rows in the builder's insertion order
 # (pn_pen_assembly_spec.BOM_ORDER); the drawing proves each row against this
 # and the steps cite it.

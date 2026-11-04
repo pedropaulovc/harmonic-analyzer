@@ -280,7 +280,7 @@ def test_finish_extent_uses_the_template_rules(
 
 def _landscape_sheet() -> tuple[object, tuple]:
     from _drawing_layout_check import DrawableRegion
-    from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
+    from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
     from diagnostics.drawing_layout_audit import _keep_outs
     from test_drawing_layout_check import ZONE_MARGINS
 

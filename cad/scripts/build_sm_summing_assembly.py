@@ -107,7 +107,7 @@ from _assembly import (
     write_dof_manifest,
 )
 from _native_spring_contact import assert_assembly_spring_contacts
-from _interference_contracts import allowed_interference_pairs
+from _sm_summing_interference import ALLOWED_PAIRS
 from _transforms import IDENTITY, ROT_X_NEG90, ROT_Y_180, ROT_Y_POS90, euler_from_rows
 from _cone_axis_constants import SUMMING_Z
 import fr_top_frame_spec as top_frame
@@ -1027,7 +1027,7 @@ async def build(adapter) -> dict[str, str]:
     write_dof_manifest(ASM_NAME)
     check_no_interference(
         adapter,
-        allowed_pairs=allowed_interference_pairs(ASM_NAME),
+        allowed_pairs=ALLOWED_PAIRS,
     )
     await _author_settings(adapter)
     # Title-block identity for the assembly drawing (draw_sm_summing_assembly.py):

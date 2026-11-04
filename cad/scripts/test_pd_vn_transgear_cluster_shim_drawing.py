@@ -11,7 +11,8 @@ import build_pd_vn_transgear_cluster_shim as part
 import pd_transgear_rear_bushing_spec as rear_bushing
 import pd_vn_transgear_cluster_shim_spec as spec
 import transgear_cluster_fit as fit
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 from _fastener_catalog import FASTENERS
 from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_94773A606 as recipe

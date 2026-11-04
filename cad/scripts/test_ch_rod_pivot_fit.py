@@ -221,20 +221,20 @@ def test_opposed_neighbour_forks_clear_at_every_band_corner() -> None:
 
 
 def test_the_assembly_press_allowance_is_this_joint() -> None:
-    """_interference_contracts restates the modelled press as literals (every
-    assembly imports it); they must be the nominal pin, the fork's reamed
+    """_ch_channel_interference restates the modelled press as literals (the
+    channel's table stays off the pin spec); they must be the nominal pin, the fork's reamed
     hole and the two tines, and name channel j's pin with channel j's rod
     only. The channel's only other press pairs are the bar pins', and its
     thread pairs are the two apex set screws' in the bracket ears, the two
     fulcrum set screws' modelled thread in their keepers and each anchor's
     thread in its jam nut."""
-    import _interference_contracts as ic
+    import _ch_channel_interference as ic
 
     pin_dia, hole_dia, engaged = ic.ROD_PIVOT_PIN_PRESS
     assert pin_dia == pytest.approx(pin.PIN_DIA, abs=1e-9)
     assert hole_dia == rod.PIN_HOLE_DIA
     assert engaged == pytest.approx(rod.FORK_THICKNESS - rod.FORK_SLOT_WIDTH, abs=1e-9)
-    pairs = ic.allowed_interference_pairs("ch-channel")
+    pairs = ic.ALLOWED_PAIRS
     rod_pairs = {
         frozenset((f"ch-rod-pivot-pin-{n}", f"ch-connecting-rod-{n}"))
         for n in range(1, 21)

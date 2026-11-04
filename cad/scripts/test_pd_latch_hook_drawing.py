@@ -17,7 +17,8 @@ import draw_pd_latch_hook as drawing
 import pd_latch_hook_geometry as geom
 import pd_latch_hook_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 
 
 def test_required_drawing_paths() -> None:

@@ -23,7 +23,8 @@ from _drawing_edges import scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_layout_audit import _Reader, _dump_annotation
 from _drawing_projection import model_points_in_view
-from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import (
     assert_supplier_view_fits,

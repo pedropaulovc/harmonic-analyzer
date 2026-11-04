@@ -1432,9 +1432,9 @@ def test_mha145_pins_carry_no_interference_exemption() -> None:
     # pin row and read neither the rig layout nor the pin spec.
     import inspect
 
-    import _interference_contracts as ic
+    import _dt_drive_train_interference as ic
 
-    pairs = ic.allowed_interference_pairs("dt-drive-train")
+    pairs = ic.ALLOWED_PAIRS
     assert not [p for p in pairs if any(n.startswith("dt-vn-pinion-strap-pin") for n in p)]
     assert not [p for p in pairs if any(n.startswith("dt-pinion-bracket") for n in p)]
     source = inspect.getsource(ic)

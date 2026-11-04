@@ -25,7 +25,7 @@ by the sheet's own view):
 
 The dumps are audited by the SolidWorks-free ``_layout_audit.audit_dump`` and
 written, with every finding, to the drawing's report
-(``_drawing_registry.layout_report_path``), a declared task target that rides
+(``_drawing_types.layout_report_path``), a declared task target that rides
 the remote cache: the offline calibration and tests replay exactly what the
 building seat saw, whether the leaf was built or restored.
 """
@@ -39,7 +39,7 @@ from typing import Any, Callable, Mapping
 
 import _telemetry
 from _com import _early_bound
-from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
+from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
 from _pdf_ink import PageInk, page_ink, read_pdf_ink
 from _layout_audit import (
     DUMP_SCHEMA,

@@ -36,7 +36,7 @@ from _com import _early_bound
 from _drawing_common import new_project_drawing
 from _drawing_edges import visible_view_entities
 from _drawing_hole_callout import add_native_hole_callout
-from _drawing_registry import DrawingLayout
+from _drawing_types import DrawingLayout
 from _hole_spec import HoleSpec
 from _holes import blind_hole_volume_mm3, wizard_holes
 from _session import run_build

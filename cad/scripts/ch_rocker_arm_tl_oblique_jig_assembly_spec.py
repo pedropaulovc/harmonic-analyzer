@@ -40,7 +40,7 @@ never drives. The build writes ``sweep_sidecar``: both passes' poses
 (``sweep_poses``, the end stops at ``trammel.END_STOPS`` ⚙), which verify.py's
 ``pass-sweep-interference-free`` gate drives through, running SolidWorks'
 own interference check at each pose against the exact press fits and thread
-envelopes of ``_interference_contracts``. Discrete native poses do not prove
+envelopes of ``_ch_rocker_arm_tl_oblique_jig_interference``. Discrete native poses do not prove
 intersample clearance or certify the actual installed tooling.
 
 The analytic clearance check (``clearance_report``) keeps what the model

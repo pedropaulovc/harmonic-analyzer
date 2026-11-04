@@ -137,13 +137,16 @@ def test_thumb_head_envelope_clears_rail_at_the_contact_angle_bound() -> None:
 
 
 def test_new_overlap_pairs_are_exact_and_shared_with_top_assembly() -> None:
-    from _interference_contracts import (
+    from _ha_harmonic_analyzer_interference import (
+        ALLOWED_PAIRS as top,
         _MG_BRACKET_SCREW_TRIPLE_MM,
+    )
+    from _mg_magnifier_interference import (
+        ALLOWED_PAIRS as pairs,
         _MG_CLAMP_THUMB_TRIPLE_MM,
         _MG_FIXTURE_THREAD_TRIPLE_MM,
         _MG_LEVER_THREAD_TRIPLE_MM,
         _MG_ROD_THREAD_TRIPLE_MM,
-        allowed_interference_pairs,
     )
     from _hole_spec import TAP_DRILL_MM
     from sh_vn_thumb_screw_spec import SHANK_DIA
@@ -153,7 +156,7 @@ def test_new_overlap_pairs_are_exact_and_shared_with_top_assembly() -> None:
     from mg_lever_thread_joint import NECK_THICKNESS, ROD_DIA as LEVER_DIA, TAP_DRILL_DIA
 
     # Shared runtime contracts must stay independent of the pose-bearing owners.
-    # Pin the literals here instead of importing those owners into every assembly.
+    # Pin the literals here instead of importing those owners into the tables.
     owned_thread = (SHANK_DIA, TAP_DRILL_MM["#4-40"], fixture.TAP_LENGTH)
     owned_lever_thread = (LEVER_DIA, TAP_DRILL_DIA, NECK_THICKNESS)
     owned_clamp_thumb = (SHANK_DIA, clamp.ROD_TAP_DRILL_DIA, clamp.THUMB_TAP_LENGTH)
@@ -178,8 +181,6 @@ def test_new_overlap_pairs_are_exact_and_shared_with_top_assembly() -> None:
             math.isclose(a, b, rel_tol=0.0, abs_tol=1e-12)
             for a, b in zip(literal, owned, strict=True)
         )
-    pairs = allowed_interference_pairs("mg-magnifier")
-    top = allowed_interference_pairs("ha-harmonic-analyzer")
     expected = {
         pair: 1.10 * math.pi * (major**2 - bore**2) * length / 4.0
         for pair, (major, bore, length) in (
