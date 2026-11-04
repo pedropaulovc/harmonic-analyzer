@@ -417,6 +417,23 @@ def test_pin_offset_basic_runs_on_the_shank_below_the_ream_callout() -> None:
     assert text_x < drawing.DATUM_B_EDGE[0] - 0.015
 
 
+def test_basic_centre_distance_prints_inside_the_pin_position_zone() -> None:
+    places = drawing.CENTRE_DISTANCE_PLACES
+    closure_in = ch_connecting_rod_spec.CENTER_DISTANCE / 25.4
+    printed = round(closure_in, places)
+    assert printed == 6.235
+    zone_radius_in = (
+        float(ch_connecting_rod_spec.GEOMETRIC_TOLERANCES_IN["rocker pin hole position"])
+        / 2.0
+    )
+    assert abs(printed - closure_in) < zone_radius_in / 10.0
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    block = source[source.index('label="rod centre distance",\n    )') :]
+    block = block[: block.index('set_basic_dimension(adapter, centre_distance')]
+    assert "CENTRE_DISTANCE_PLACES" in block
+    assert "expected_mm=CENTER_DISTANCE" in block
+
+
 def test_datum_b_is_basic_from_datum_a() -> None:
     """ENFORCE review: nothing placed datum B (the shank's left flank)
     sideways from datum A (the bore axis), so the frame was incomplete. A

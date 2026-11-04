@@ -481,7 +481,7 @@ def test_rocker_bands_respect_native_nominals_and_displayed_general_rows() -> No
         assert features[name]["precision"]["thickness"] == 3
     assert features["rod_hole"]["dia"] == [1.994, 2.0956]
     assert features["rod_hole"]["nominal_dia"] == 1.994
-    assert features["rod_hole"]["precision"]["dia"] == 3
+    assert features["rod_hole"]["precision"]["dia"] == 4
     assert features["pivot_bore"]["dia"] == [6.5024, 6.5278]
     assert features["rod_hole"]["at"] == pytest.approx([133.06740213488345, 16.456064115939025, 0.0])
 

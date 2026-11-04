@@ -120,6 +120,20 @@ def test_printed_edge_limits_are_the_finished_rockers() -> None:
     )
     assert top == (arm_height, round(arm_height + zone, 3)) == (0.315, 0.335)
     assert bottom == (round(arm_height - zone, 3), arm_height) == (0.295, 0.315)
+    # Each edge's tolerance prints at its nominal's places (.315 +.020/.000).
+    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
+    places = {
+        call.args[2].value: ast.unparse(keyword.value)
+        for call in ast.walk(tree)
+        if isinstance(call, ast.Call)
+        and getattr(call.func, "id", None) == "set_dimension_bilateral_tolerance"
+        for keyword in call.keywords
+        if keyword.arg == "places"
+    }
+    assert places == {
+        name: f"DRAWING_PRECISION_BY_NAME['{name}']"
+        for name in ("TopAbovePivot", "BottomBelowPivot")
+    }
 
 
 def test_every_band_is_native_and_names_its_mate() -> None:

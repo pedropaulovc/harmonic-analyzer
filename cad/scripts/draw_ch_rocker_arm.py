@@ -168,8 +168,10 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1.0, 2.0)  # 1:2
 
 _ROD_HOLE_DIA = blind_cut_dia_mm(ROD_HOLE_SPEC)
-# Hole Wizard drill diameters print three places on the inch sheet (rule 3).
-_DRILL_P = 3
+# The #47 drill prints its exact decimal, .0785 (four places): at three the
+# callout read .079, so its +.004/0 limits rejected the hole the drill makes
+# and disagreed with the exported limits.
+_DRILL_P = 4
 _DRILLED_BAND = (drilled_oversize_mm(unit=UNIT), -drilled_undersize_mm(unit=UNIT))
 # Geometric-frame zones print three places.
 _FRAME_P = 3

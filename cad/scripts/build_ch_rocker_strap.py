@@ -64,6 +64,7 @@ from ch_rocker_strap_notes import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
+    DRAWING_PRECISION_BY_NAME,
     ISOMETRIC_VIEW_NOTE,
     TIP_LAND_PREFIX,
 )
@@ -311,6 +312,8 @@ async def build(adapter) -> dict[str, str]:
         "StrapProfile",
         "TopAbovePivot",
         *deviations(TOP_EDGE_BAND),
+        # Y14.5 inch: the tolerance carries the nominal's places (.315 +.020/.000).
+        places=DRAWING_PRECISION_BY_NAME["TopAbovePivot"],
         display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
@@ -318,6 +321,8 @@ async def build(adapter) -> dict[str, str]:
         "StrapProfile",
         "BottomBelowPivot",
         *deviations(BOTTOM_EDGE_BAND),
+        # Y14.5 inch: the tolerance carries the nominal's places (.315 +.020/.000).
+        places=DRAWING_PRECISION_BY_NAME["BottomBelowPivot"],
         display_unit=UNIT,
     )
     set_dimension_prefix(adapter, "StrapProfile", "RodTipLen", TIP_LAND_PREFIX)

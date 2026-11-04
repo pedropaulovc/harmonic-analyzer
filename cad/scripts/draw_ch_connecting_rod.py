@@ -55,6 +55,7 @@ from _drawing_dimensions import (
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import face_silhouettes_through
 from _drawing_finish import add_surface_finish
+from _drawing_precision import set_dimension_display_precision
 from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
@@ -106,6 +107,9 @@ PNG = OUTPUTS.png
 _PIN_HOLE_DIA = PIN_HOLE_DIA
 
 SHEET_SCALE = (1.0, 1.0)  # 1:1
+# The BASIC centre distance (6.235): three inch places hold the printed value
+# within .0005 of the closure, well inside the pin's Ø.008 position zone.
+CENTRE_DISTANCE_PLACES = 3
 
 # Front-view model bbox: X symmetric about 0, Y from the ring bottom up to the
 # fork crown.  The left view shares it (Z symmetric about the mid-plane).
@@ -612,6 +616,22 @@ async def build(adapter: Any) -> dict[str, str]:
         p1=pin_rim,
         text_xy=(0.125, FRONT_CENTER[1]),
         label="rod centre distance",
+    )
+    assert_dimension_measures(
+        adapter,
+        centre_distance,
+        expected_mm=CENTER_DISTANCE,
+        label="rod centre distance",
+    )
+    # A sheet-made dimension takes the document's two places (6.24, .005 in
+    # off the closure, outside the pin's Ø.008 position zone); it prints at
+    # CENTRE_DISTANCE_PLACES, read back.
+    set_dimension_display_precision(
+        adapter,
+        "front view",
+        "rod centre distance",
+        CENTRE_DISTANCE_PLACES,
+        display=centre_distance,
     )
     set_basic_dimension(adapter, centre_distance, label="rod centre distance")
 
