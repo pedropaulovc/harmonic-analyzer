@@ -39,7 +39,8 @@ def test_each_strand_reaches_the_withdrawn_pin() -> None:
 
 
 def _band(places: int) -> float:
-    return printed_band_mm(places)
+    """The hub's printed band at ``places``, read in the hub sheet's unit."""
+    return printed_band_mm(places, unit=hub_geometry.UNIT)
 
 
 def _corner_air(
@@ -72,12 +73,15 @@ def _flat_side_air(swing_deg: float, mean_r: float, crown: float) -> float:
 
 
 def test_pin_station_reads_the_hub_print() -> None:
-    station = hub.DRAWING_PRECISION["ServicePinStationReference"]
-    places = station["ServicePinFromShoulder"]
-    shoulder = arm.ARM_THICKNESS  # the hub's shoulder is the arm's inboard face
-    from_shoulder = hub_geometry.SERVICE_PIN_FROM_SHOULDER
-    assert chain.PIN_Z == pytest.approx(shoulder + from_shoulder)
-    assert chain.PIN_Z_ARMWARD == pytest.approx(chain.PIN_Z - _band(places))
+    # The hub prints the station from its faced outboard end, flush with the
+    # arm's outboard face (z 0); the arm's inboard face sits wherever the
+    # thickest 5/16 stock puts it, so the arm-side corner adds that excess.
+    places = hub.DRAWING_PRECISION["ServicePinStationReference"]["ServicePinStation"]
+    assert chain.PIN_Z == pytest.approx(hub_geometry.SERVICE_PIN_STATION)
+    thick = hub_geometry.ARM_STOCK_THICKNESS_MAX - arm.ARM_THICKNESS
+    assert chain.PIN_Z_ARMWARD == pytest.approx(chain.PIN_Z - _band(places) - thick)
+    # The inch sheet's .XX: +/-.01 in (Codjiflo review of 831be7869).
+    assert _band(places) == pytest.approx(0.254)
 
 
 def test_ring_crowned_hub_side_clears_the_arm_at_the_adverse_corner() -> None:
@@ -332,7 +336,7 @@ def keeper_sheet(monkeypatch):
     def curate(actual_adapter, view, *, keep, view_label, dimensions_by_feature):
         assert actual_adapter is adapter
         assert view is views["*Front"]
-        assert keep == {_NAME: (0.156, 0.166)}
+        assert keep == {_NAME: pytest.approx((0.016, 0.150))}
         assert view_label == "keeper catalogue bead diameter"
         assert dimensions_by_feature == {"SeedProfile": {_NAME}}
         view.annotations = [_Annotation(_Display())]

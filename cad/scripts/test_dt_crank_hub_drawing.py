@@ -23,111 +23,103 @@ def test_outboard_proportions_follow_the_u29_enlargement() -> None:
     assert scale == 1.3
     assert geometry.PHOTO_HUB_SEAT_DIA == 19.5
     assert geometry.PHOTO_HUB_SEAT_DIA == pytest.approx(2.60 * unit * scale, abs=0.05)
-    # Named deviation: 0.1 under the photograph keeps the U29 cheek at 2.0.
-    assert geometry.HUB_SEAT_DIA == 19.4
-    # Stock sizes: the pin is the dowel just under 1.3x, the arm is 1-in bar.
-    assert geometry.AXIAL_PIN_DIA == 4.0 < 0.59 * unit * scale
+    # Named deviation: the .76 seat under the photograph keeps the U29 cheek
+    # and the seam web over the rule-17 wall.
+    assert geometry.HUB_SEAT_DIA == pytest.approx(0.76 * 25.4)
+    assert geometry.HUB_SEAT_DIA < geometry.PHOTO_HUB_SEAT_DIA
+    # Stock sizes: the pin is the 5/32 dowel just under 1.3x, the arm is 1-in bar.
+    assert geometry.AXIAL_PIN_DIA == pytest.approx(5 / 32 * 25.4)
+    assert geometry.AXIAL_PIN_DIA < 0.59 * unit * scale
     assert geometry.ARM_WIDTH == pytest.approx(25.4)
     # Named ratio deviation from the photograph (U29).
-    assert geometry.ARM_TO_HUB_RATIO == pytest.approx(1.309, abs=1e-3)
+    assert geometry.ARM_TO_HUB_RATIO == pytest.approx(1.316, abs=1e-3)
     assert geometry.PHOTO_ARM_TO_HUB_RATIO == pytest.approx(1.208, abs=1e-3)
 
 
-def test_u27_walls_hold_two_millimetres_at_the_printed_bands() -> None:
-    assert geometry.WALL_TARGET_MM == 2.0
-    assert geometry.SEAM_WEB_WORST_MM == pytest.approx(2.012, abs=1e-3)
-    assert geometry.ARM_CHEEK_WORST_MM == pytest.approx(2.049, abs=1e-3)
+def test_u27_walls_hold_the_inch_wall_target_at_the_printed_bands() -> None:
+    assert geometry.WALL_TARGET_MM == pytest.approx(0.080 * 25.4)
+    assert geometry.SEAM_WEB_WORST_MM == pytest.approx(2.247, abs=1e-3)
+    assert geometry.ARM_CHEEK_WORST_MM == pytest.approx(2.362, abs=1e-3)
+    assert min(geometry.SEAM_WEB_WORST_MM, geometry.ARM_CHEEK_WORST_MM) >= (
+        geometry.WALL_TARGET_MM
+    )
 
 
 def test_arm_shoulder_keeps_its_land_over_the_largest_matched_seat() -> None:
     """Codex P2 on 16146c26f: the arm is pressed to the barrel's front face,
     and the seat is turned to whatever MHA-DT-06 bore it meets.  At the printed
-    limits the largest bore (.X) plus the tightest press stands inside the
+    limits the largest bore (.XX) plus the tightest press stands inside the
     smallest barrel the sheet allows; after the arm bore's and the barrel
     corner's edge breaks a land at least one edge break wide must be left."""
-    one_place = round(float(_config.title_block("linear_1pl")["value_in"]) * 25.4, 1)
-    two_place = round(float(_config.title_block("linear_2pl")["value_in"]) * 25.4, 2)
-    edge_break = float(_config.title_block("edge_break")["chamfer_max_mm"])
-    band = {1: one_place, 2: two_place}
-    seat_max = (
-        geometry.HUB_SEAT_DIA
-        + band[dt_crank_hub_spec.DRAWING_PRECISION_BY_NAME["SeatDia"]]
-        + 0.030
-    )
-    assert seat_max == pytest.approx(20.23)
-    barrel_places = dt_crank_hub_spec.DRAWING_PRECISION_BY_NAME["BarrelDia"]
-    barrel_min = geometry.HUB_BARREL_DIA - band[barrel_places]
+    two_place = 0.01 * 25.4
+    edge_break = geometry.EDGE_BREAK_MAX_MM
+    assert dt_crank_hub_spec.DRAWING_PRECISION_BY_NAME["SeatDia"] == 2
+    assert dt_crank_hub_spec.DRAWING_PRECISION_BY_NAME["BarrelDia"] == 2
+    seat_max = geometry.HUB_SEAT_DIA + two_place + 0.0012 * 25.4
+    assert geometry.HUB_SEAT_DIA_MAX_MATCHED == pytest.approx(seat_max)
+    barrel_min = geometry.HUB_BARREL_DIA - two_place
     land = (barrel_min - seat_max) / 2.0 - 2.0 * edge_break
     assert land >= edge_break
     assert geometry.HUB_SHOULDER_LAND_WORST_MM == pytest.approx(land)
     assert geometry.SHOULDER_LAND_WORST_MIN == edge_break
-    assert geometry.SEAT_PRESS_INTERFERENCE[1] == 0.030
-    # The same barrel at the title block's .X leaves a 0.11 sliver.
-    with pytest.raises(AssertionError, match="shoulder land 0.110"):
-        geometry.shoulder_land(geometry.HUB_BARREL_DIA - one_place, seat_max)
+    # A barrel at the seat's own size leaves no land.
+    with pytest.raises(AssertionError, match="shoulder land"):
+        geometry.shoulder_land(geometry.HUB_SEAT_DIA + two_place, seat_max)
 
 
 def test_mha024_ream_ligaments_meet_rule_12_at_the_printed_bands() -> None:
-    # CONTRACT-crank MHA-DT-31: 8 seat + 17.2 of hub behind the shoulder (19
-    # until the seat face moved 1.8 forward, ruling 2026-09-30), the ream
-    # station unchanged 5.6 from the shoulder at .XX.  The rear 3.85 is the
-    # chain-plate relief (Main, 2026-09-30; lengthened from 3.6 for the
-    # floated wheel, PR1 Codex review 2), so the barrel is 13.35.  R9-38 took
-    # it Ø20.6 -> Ø22.25 at .XX for the arm shoulder's land.
-    assert geometry.HUB_BARREL_DIA == 22.25
-    assert geometry.HUB_LENGTH == pytest.approx(25.2)
-    assert geometry.HUB_BARREL_LENGTH == pytest.approx(13.35)
-    assert geometry.SERVICE_PIN_FROM_SHOULDER == 5.6
-    assert geometry.SERVICE_PIN_STATION == pytest.approx(13.6)
+    # CONTRACT-crank MHA-DT-31 in decimal inch (#290): the 5/16 seat, a .990
+    # overall, the ream station .53 from the faced outboard end and the .16
+    # chain-plate relief at the rear (lengthened for the floated wheel, PR1
+    # Codex review 2).  R9-38 sized the barrel at .XX for the arm shoulder's
+    # land.
+    assert geometry.HUB_BARREL_DIA == pytest.approx(0.88 * 25.4)
+    assert geometry.HUB_LENGTH == pytest.approx(0.99 * 25.4)
+    assert geometry.SERVICE_PIN_STATION == pytest.approx(0.53 * 25.4)
+    assert geometry.HUB_BARREL_LENGTH == pytest.approx(
+        geometry.HUB_LENGTH - geometry.HUB_SEAT_LENGTH - geometry.RELIEF_LENGTH
+    )
     assert dt_crank_hub_spec.DRAWING_PRECISION["ServicePinStationReference"] == {
-        "ServicePinFromShoulder": 2
+        "ServicePinStation": 2
     }
-    # The contract's nominal walls and ligaments.
-    ream_r = geometry.SERVICE_PIN_REAM_RADIUS_MAX
-    rear_from_shoulder = geometry.HUB_BARREL_LENGTH - geometry.SERVICE_PIN_FROM_SHOULDER
-    assert (geometry.HUB_SEAT_DIA - geometry.HUB_BORE_DIA) / 2 == pytest.approx(
-        4.92, abs=0.01
-    )
-    assert geometry.HUB_BARREL_DIA / 2 - ream_r == pytest.approx(8.155, abs=0.01)
-    assert geometry.SERVICE_PIN_FROM_SHOULDER - ream_r == pytest.approx(2.63, abs=0.01)
-    # The ream ends at the relief shoulder, not the rear face.
-    assert rear_from_shoulder - ream_r == pytest.approx(4.78, abs=0.01)
-    # Worst case at the printed bands (drawing-guidelines.md rule 17 (walls and webs)): the shoulder side governs.
-    # Behind the ream the relief shoulder is placed from the front face by
-    # the .XX overall less the .XX relief, the ream by the .X seat length and
-    # the .XX station: 21.25 - 8.8 - 6.11 - 2.97.
+    # Worst case at the printed bands (drawing-guidelines.md rule 17 (walls
+    # and webs)): the shoulder side governs.  The ream is placed from the
+    # front face by the .XX station; the arm shoulder by the arm itself (the
+    # seat length is a fit-up reference), at most the thickest 5/16 stock.
+    # Behind the ream the relief shoulder is placed from the front face by the
+    # .XX overall less the .XX relief.
     assert geometry.SERVICE_PIN_SHOULDER_LIGAMENT_WORST_MM == pytest.approx(
-        2.121, abs=1e-3
+        2.200, abs=1e-3
     )
-    assert geometry.SERVICE_PIN_REAR_LIGAMENT_WORST_MM == pytest.approx(2.451, abs=1e-3)
-    assert geometry.SERVICE_PIN_BARREL_WALL_WORST_MM == pytest.approx(7.901, abs=1e-3)
+    assert geometry.SERVICE_PIN_REAR_LIGAMENT_WORST_MM == pytest.approx(3.889, abs=1e-3)
+    assert geometry.SERVICE_PIN_BARREL_WALL_WORST_MM == pytest.approx(8.080, abs=1e-3)
+    assert min(
+        geometry.SERVICE_PIN_SHOULDER_LIGAMENT_WORST_MM,
+        geometry.SERVICE_PIN_REAR_LIGAMENT_WORST_MM,
+        geometry.SERVICE_PIN_BARREL_WALL_WORST_MM,
+    ) >= geometry.WALL_TARGET_MM
 
 
 def test_rear_relief_clears_the_t12_chain_plates_and_keeps_its_wall() -> None:
-    # Ruling 2026-09-30 (bought ANSI #25 chain at print-worst): Ø16.5 x 3.85,
-    # rear face at station 25.2 (machine -157.8, 0.7 in front of the T12
-    # after the seat face moved 1.8 forward), barrel shoulder at 21.35
-    # (machine -161.65).
-    assert (geometry.RELIEF_DIA, geometry.RELIEF_LENGTH) == (16.5, 3.85)
-    assert geometry.RELIEF_STATION == pytest.approx(21.35)
+    # Bought ANSI #25 chain at print-worst: Ø.65 x .16, the barrel shoulder
+    # where the seat and barrel end.
+    assert geometry.RELIEF_DIA == pytest.approx(0.65 * 25.4)
+    assert geometry.RELIEF_LENGTH == pytest.approx(0.16 * 25.4)
     assert geometry.RELIEF_STATION == pytest.approx(
         geometry.HUB_SEAT_LENGTH + geometry.HUB_BARREL_LENGTH
     )
-    # Title-block .XX on the clearance diameter (R9-37: 0.23 to a real #25
-    # plate on the floated T12, 0.08 at .X; test_transgear_removable_seat
-    # judges that corner).  The length's short side carries the functional
-    # -0.05 that holds the chain's floated axial air exactly at its floor, and
-    # the overall that places the rear face it is printed from carries +0.10
-    # on its long side; each other side is the title block's (machinist review
-    # of main 31cea0b73, owner ruling 2026-10-31).
-    assert geometry.RELIEF_DIA_MAX == pytest.approx(17.01)
-    assert geometry.RELIEF_LENGTH_BAND == (geometry.GENERAL_2PL_TOL_MM, -0.05)
-    assert geometry.HUB_LENGTH_BAND == (0.10, -geometry.GENERAL_2PL_TOL_MM)
+    # Title-block .XX on the clearance diameter and on the relief length (its
+    # short side still holds the chain's floated air); the overall that
+    # places the rear face it is printed from carries +.004 on its long side
+    # (owner ruling 2026-10-31).
+    assert geometry.RELIEF_DIA_MAX == pytest.approx(geometry.RELIEF_DIA + 0.254)
+    assert geometry.RELIEF_LENGTH_TOL == geometry.GENERAL_2PL_TOL_MM
+    assert geometry.HUB_LENGTH_BAND == (0.1016, -geometry.GENERAL_2PL_TOL_MM)
     assert dt_crank_hub_spec.DRAWING_PRECISION["HubProfile"]["ReliefLength"] == 2
-    assert dt_crank_hub_spec.DRAWING_PRECISION["HubProfile"]["HubLength"] == 2
+    assert dt_crank_hub_spec.DRAWING_PRECISION["HubProfile"]["HubLength"] == 3
     assert dt_crank_hub_spec.DRAWING_PRECISION["HubProfile"]["ReliefDia"] == 2
-    # drawing-guidelines.md rule 17 (walls and webs) wall over the bore: Ø15.99 against the Ø9.5631 bore, edges broken.
-    assert geometry.RELIEF_WALL_WORST_MM == pytest.approx(2.713, abs=1e-3)
+    # drawing-guidelines.md rule 17 (walls and webs) wall over the bore, edges broken.
+    assert geometry.RELIEF_WALL_WORST_MM == pytest.approx(2.838, abs=1e-3)
     assert geometry.RELIEF_WALL_WORST_MM >= geometry.WALL_TARGET_MM
     # The MHA-DT-09 ream stays on the full barrel.
     assert (
@@ -138,9 +130,9 @@ def test_rear_relief_clears_the_t12_chain_plates_and_keeps_its_wall() -> None:
 
 def test_hub_overall_band_is_one_sided_to_what_the_rear_face_stacks_hold() -> None:
     # Machinist reviews of 19e33c6c2 and main 31cea0b73: only the long side
-    # is functional.  At +0.10 the drive-pin tips keep air to the rear face;
-    # at the title block's -0.51 the wheel floated onto it stays on its pins.
-    # The title block's +0.51 would stand the hub on the pin tips.
+    # is functional.  At +.004 the drive-pin tips keep air to the rear face;
+    # at the title block's -.010 the wheel floated onto it stays on its pins.
+    # The title block's +.010 would all but close the tip air.
     kwargs = dict(
         seat_face=dt_crankshaft_spec.SEAT_COLLAR,
         seat_face_band=dt_crankshaft_spec.SEAT_COLLAR_BAND,
@@ -153,15 +145,14 @@ def test_hub_overall_band_is_one_sided_to_what_the_rear_face_stacks_hold() -> No
         hub_rear_band=geometry.HUB_LENGTH_BAND,
         **kwargs,
     )
-    assert geometry.HUB_LENGTH_BAND[0] == 0.10
-    assert air == pytest.approx(0.1381, abs=1e-9)
-    assert engagement == pytest.approx(0.6311, abs=1e-9)
-    with pytest.raises(AssertionError, match="hub's rear face"):
-        dt_crankshaft_spec.drive_pin_front_clearances(
-            dt_crankshaft_spec.DRIVE_PIN_PROUD_RANGE,
-            hub_rear_band=(geometry.GENERAL_2PL_TOL_MM, -geometry.GENERAL_2PL_TOL_MM),
-            **kwargs,
-        )
+    assert air == pytest.approx(0.1905, abs=1e-9)
+    assert engagement == pytest.approx(0.8331, abs=1e-9)
+    title_block_air, _ = dt_crankshaft_spec.drive_pin_front_clearances(
+        dt_crankshaft_spec.DRIVE_PIN_PROUD_RANGE,
+        hub_rear_band=(geometry.GENERAL_2PL_TOL_MM, -geometry.GENERAL_2PL_TOL_MM),
+        **kwargs,
+    )
+    assert title_block_air < 0.05
 
 
 def _stack_a(relief_length: float) -> dict[str, float]:
@@ -177,25 +168,25 @@ def test_chain_clears_the_relief_shoulder_with_the_wheel_floated_onto_the_hub() 
     # its front face meets the hub rear face (the pin check admits it).  The
     # thinnest wheel there, with the shortest relief, brings a bought chain's
     # frontmost envelope nearest the barrel shoulder; the old 3.6 relief let
-    # it cut 0.0365 into the shoulder while the seated check passed.  (With the
-    # hub's +/-0.10 the seated pose also closes on 3.6, so the seat is set 1.0
-    # aft here to leave the floated pose, which ignores it, as the only fault.)
-    with pytest.raises(AssertionError, match="floated_worst -0.0365"):
+    # it cut into the shoulder while the seated check passed.  (The seat is
+    # set 1.0 aft here to leave the floated pose, which ignores it, as the
+    # only fault.)
+    with pytest.raises(AssertionError, match="floated_worst"):
         geometry.chain_shoulder_axial_air(
             relief_length=3.6,
             seat_face=dt_crankshaft_spec.SEAT_COLLAR + 1.0,
             seat_face_band=dt_crankshaft_spec.SEAT_COLLAR_BAND,
         )
     airs = _stack_a(geometry.RELIEF_LENGTH)
-    assert airs["floated_worst"] == pytest.approx(0.2135, abs=1e-9)
-    assert airs["floated"] == pytest.approx(0.3635, abs=1e-9)
-    assert airs["seated_worst"] == pytest.approx(0.4075, abs=1e-9)
-    assert airs["seated"] == pytest.approx(1.0635, abs=1e-9)
+    assert airs["floated_worst"] == pytest.approx(0.2235, abs=1e-9)
+    assert airs["floated"] == pytest.approx(0.5775, abs=1e-9)
+    assert airs["seated_worst"] == pytest.approx(0.4699, abs=1e-9)
+    assert airs["seated"] == pytest.approx(1.3315, abs=1e-9)
     # The floated pose governs, and the relief is the shortest .XX length
     # that holds the floor there.
     assert airs["floated_worst"] < airs["seated_worst"]
     with pytest.raises(AssertionError, match="floated_worst"):
-        _stack_a(geometry.RELIEF_LENGTH - 0.01)
+        _stack_a(geometry.RELIEF_LENGTH - 0.254)
 
 
 def test_floated_stack_a_ignores_the_seat_and_hub_stations() -> None:
@@ -242,7 +233,8 @@ def test_hub_shoulder_and_pin_stations_preserve_removal_topology() -> None:
     assert geometry.HUB_SEAT_LENGTH == geometry.ARM_THICKNESS
     assert geometry.HUB_SHOULDER_STATION < geometry.SERVICE_PIN_STATION
     assert geometry.SERVICE_PIN_STATION < geometry.HUB_LENGTH
-    assert geometry.AXIAL_PIN_LENGTH == geometry.ARM_THICKNESS / 2.0
+    # The cut pin seats flush before it can bottom in the match-reamed seam.
+    assert geometry.SEAM_DEPTH > geometry.AXIAL_PIN_LENGTH
 
 
 def test_drawing_registry_and_marks_are_complete() -> None:
@@ -253,17 +245,27 @@ def test_drawing_registry_and_marks_are_complete() -> None:
     assert set(drawing.DIMENSION_CALLOUTS) <= marked
 
 
+def test_seam_depth_prints_natively_under_the_seam_notch() -> None:
+    # Codjiflo review of 831be7869: the seam depth was typed into the note.
+    assert dt_crank_hub_spec.DRAWING_DIMENSIONS["SeamDepthReference"] == {"SeamDepth"}
+    assert dt_crank_hub_spec.DRAWING_PRECISION_BY_NAME["SeamDepth"] == 2
+    x, y = drawing.SIDE_KEEP["SeamDepth"]
+    assert drawing.SEAM_END_X < x < drawing.OUTBOARD_X
+    # Below the seat's bottom edge, above the seat length's dimension line
+    # (about y 0.115) and the station row.
+    assert drawing.SIDE_KEEP["ServicePinStation"][1] + 0.015 < y < drawing.SEAT_BOTTOM - 0.005
+
+
 def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None:
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): no general notes; each matched fit sits on its feature.
     assert not hasattr(dt_crank_hub_spec, "DRAWING_NOTES")
     seat = dt_crank_hub_notes.SEAT_CALLOUT
-    # B1 (Main 2026-09-25): turned to suit the MHA-DT-06 bore, with the press
-    # interference printed from the notes constant; the bore is named as the
-    # arm's, and the seat end's acceptance is flush with the arm's front.
-    low, high = dt_crank_hub_notes.SEAT_PRESS_INTERFERENCE
+    # B1 (Main 2026-09-25): turned to suit the MHA-DT-06 bore, with the F10
+    # press interference printed in inch; the bore is named as the arm's, and
+    # the seat end's acceptance is flush with the arm's front.
     assert len(seat.splitlines()) == 4
     assert "BORE OF CRANK ARM MHA-DT-06" in _flat(seat)
-    assert f"{low:.3f}-{high:.3f} DIAMETRAL INTERFERENCE" in _flat(seat)
+    assert ".0004-.0012 DIAMETRAL INTERFERENCE" in _flat(seat)
     assert seat.splitlines()[-1] == "END FLUSH WITH CRANK ARM FRONT"
     assert "MATCH-FIT" not in seat
     # The arm bore is made first; the hub seat is turned to suit it, so its
@@ -273,8 +275,9 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     assert "MHA-DT-06" in seam and "SEAM PIN MHA-DT-VN-59" in _flat(seam)
     assert "LIGHT DRIVE FIT" in seam and len(seam.splitlines()) == 4
     assert "AT ASSEMBLY" in seam and "SEAM" in seam
-    # Size first, then the process, in the order the work is done.
-    assert seam.splitlines()[0].startswith("(<MOD-DIAM>4.0) <HOLE-DEPTH> 4.0")
+    # Size first, then the process, in the order the work is done; the depth
+    # prints natively on the side view, never typed into the note.
+    assert seam.splitlines()[0] == "(<MOD-DIAM>.156) ON SEAM, MATCH-DRILL/REAM"
     assert "O'CLOCK" not in seam
     # The blind pin makes hub and arm a permanent pair, taken apart at the
     # taper pin (owner rulings 2026-11-01).
@@ -285,17 +288,24 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     assert drawing.REFERENCE_LENGTHS == ("SeatLength",)
     assert drawing.DIMENSION_CALLOUTS["SeatLength"] == dt_crank_hub_notes.SEAT_LENGTH_CALLOUT
     assert "CRANK ARM" in _flat(dt_crank_hub_notes.SEAT_LENGTH_CALLOUT)
-    # The taper-pin cross-hole names both mates on its callout, after the
-    # front face is set flush with the datum it is reamed at.
+    # The taper-pin cross-hole names the mate it is matched with and the pin
+    # it takes.  Where the hub sits before the ream and when the ream is deep
+    # enough are assembly settings on the MHA-DT-00 hub step (pipeline review
+    # of 49287772c), so the callout carries neither.
     cross_hole = dt_crank_hub_notes.CROSS_HOLE_CALLOUT
     assert "MHA-DT-09" in cross_hole and "MHA-DT-11" in cross_hole
-    flush = cross_hole.index("CRANK-ARM END FLUSH")
-    assert flush < cross_hole.index("TAPER-REAM") and "AT ASSEMBLY" in cross_hole
-    # The ream's acceptance is the driven pin's fit-up: its keeper-ring hole
-    # clears the barrel.  No MIN dimensioned to an outline of the pin, another
-    # part (Opus reviews at 7fe9d97bd, c7115c2c3 and 7e2f876c7), and no spec
-    # number typed into the text (Codjiflo P2 on #2095).
-    assert "RING MHA-DT-27 CLEARS HUB" in _flat(cross_hole)
+    assert "AT ASSEMBLY" in cross_hole and "TAPER-REAM 1:48" in cross_hole
+    assert "FLUSH" not in cross_hole and "MHA-DT-27" not in cross_hole
+    assert len(cross_hole.splitlines()) == 2
+    # The ream's acceptance is the driven pin's fit-up, its keeper ring
+    # MHA-DT-27 clear of the hub, stated once on the hub step.  No MIN
+    # dimensioned to an outline of the pin, another part (Opus reviews at
+    # 7fe9d97bd, c7115c2c3 and 7e2f876c7), and no spec number typed into the
+    # text (Codjiflo P2 on #2095).
+    import draw_dt_drive_train_assembly as package
+
+    hub_step = _flat(package.CONE_CRANK_STEPS.split("\n6. ")[1].split("\n7. ")[0])
+    assert "MHA-DT-27 FROM THE PIN HEAD, CLEAR OF THE HUB" in hub_step
     assert re.search(r"\d\.\d", cross_hole.split("1:48", 1)[1]) is None
     assert "PinProudReference" not in dt_crank_hub_spec.DRAWING_DIMENSIONS
     assert "PinProud" not in drawing.END_KEEP
@@ -321,9 +331,10 @@ def test_hub_front_face_is_set_on_the_dome_root_the_model_places_it_at() -> None
     """The model seats the hub front face on the crankshaft's dome root (the
     shaft part's origin, CRANK_FACE_Z); the dome tip stands proud of it.  Set
     flush with the shaft END, the hub would sit a dome height forward and open
-    the hub/T12 air past the drive pins' proud length.  Both texts that place
-    the hub -- its cross-hole callout and the MHA-DT-00 hub step -- print the
-    one datum, and the callout sets it before the taper-ream."""
+    the hub/T12 air past the drive pins' proud length.  The MHA-DT-00 hub
+    step places the hub on that one datum before the taper-ream; the
+    cross-hole callout leaves the setting to it (pipeline review of
+    49287772c)."""
     import build_dt_drive_train_assembly as assembly
     import draw_dt_drive_train_assembly as package
 
@@ -331,10 +342,9 @@ def test_hub_front_face_is_set_on_the_dome_root_the_model_places_it_at() -> None
     assert _names_the_dome_root(datum), datum
     assert assembly.CRANK_HUB_Z0 == assembly.CRANKSHAFT_Z0 == assembly.CRANK_FACE_Z
     hub_step = package.CONE_CRANK_STEPS.split("\n6. ")[1].split("\n7. ")[0]
-    cross_hole = dt_crank_hub_notes.CROSS_HOLE_CALLOUT
-    for text in (cross_hole, hub_step):
-        assert _sets_hub_on(text, datum), text
-    assert _flat(cross_hole).index(_flat(datum)) < _flat(cross_hole).index("TAPER-REAM")
+    assert _sets_hub_on(hub_step, datum), hub_step
+    assert _flat(hub_step).index(_flat(datum)) < _flat(hub_step).index("TAPER-REAM")
+    assert not _sets_hub_on(dt_crank_hub_notes.CROSS_HOLE_CALLOUT, datum)
     # Negative controls: the shaft-END texts both once printed name no dome root.
     for old in (
         "FRONT FACE FLUSH WITH\nCRANKSHAFT MHA-DT-11 END;\nMATCH TAPER-REAM 1:48 FOR",
@@ -369,16 +379,18 @@ def test_side_view_lies_as_in_the_lathe_with_one_outboard_baseline() -> None:
     assert drawing._sheet_y(geometry.AXIAL_PIN_RADIUS_FROM_AXIS) < drawing.SIDE_CENTER[1]
     assert drawing.END_CENTER[0] > drawing.OUTBOARD_X  # third-angle right view
     assert drawing.END_CENTER[1] == drawing.SIDE_CENTER[1]
-    # Seat from the faced end, the pin station from the shoulder (drawing-guidelines.md rule 11 (turned parts read like the lathe)
-    # ), the relief from the rear face below the profile; the toleranced
-    # overall, front face to rear face, on the row below.  No chained barrel
-    # length.  The seat and station row stands above the relief's, clear of
-    # the overall's stacked band (farm run 20261031T205208603Z).
+    # The pin station from the faced end (drawing-guidelines.md rule 11
+    # (turned parts read like the lathe); machinist review of the inch
+    # sheet: no chain through the shoulder), on its own row under the seat
+    # length's; the relief from the rear face below the profile; the
+    # toleranced overall, front face to rear face, on the lowest row.  No
+    # chained barrel length.
     seat_row = drawing.SIDE_KEEP["SeatLength"][1]
-    assert drawing.SIDE_KEEP["ServicePinFromShoulder"][1] == seat_row
+    station_row = drawing.SIDE_KEEP["ServicePinStation"][1]
     relief_row = drawing.SIDE_KEEP["ReliefLength"][1]
     overall_row = drawing.SIDE_KEEP["HubLength"][1]
     assert seat_row < drawing.BARREL_BOTTOM and seat_row - overall_row >= 0.016
+    assert seat_row > station_row > overall_row
     assert seat_row > relief_row and relief_row - overall_row >= 0.010
     assert "BarrelLength" not in drawing.SIDE_KEEP
     printed = {
@@ -386,10 +398,10 @@ def test_side_view_lies_as_in_the_lathe_with_one_outboard_baseline() -> None:
     }
     assert "BarrelLength" not in printed and "HubLength" in printed
     assert drawing.SHOULDER_X > drawing.SERVICE_PIN_CENTER[0] > drawing.RELIEF_X
-    # The relief's toleranced length and the pin station sit 6 mm apart in
-    # height, so their text must not meet across (~2.5 mm per character).
-    relief_right = drawing.SIDE_KEEP["ReliefLength"][0] + len("3.60±0.05") * 0.00125
-    pin_left = drawing.SIDE_KEEP["ServicePinFromShoulder"][0] - len("5.60") * 0.00125
+    # The relief's toleranced length and the pin station must not meet across
+    # (~2.5 mm per character).
+    relief_right = drawing.SIDE_KEEP["ReliefLength"][0] + len(".16") * 0.00125
+    pin_left = drawing.SIDE_KEEP["ServicePinStation"][0] - len(".53") * 0.00125
     assert relief_right < pin_left
     # The relief's mate callout reads under its text, on the overall's row;
     # it must end short of the rear face, where that row's dimension line
@@ -437,7 +449,7 @@ def test_callouts_stand_clear_of_views_and_each_other() -> None:
     assert drawing.OUTBOARD_X < seat_len_x - seat_len_half
     assert seat_len_x + seat_len_half < end_left
     # Its value stands clear of the seat diameter's dimension line above.
-    value_half = len("(8.0)") * char_w / 2.0
+    value_half = len("(.31)") * char_w / 2.0
     assert seat_len_x - value_half - drawing.SIDE_KEEP["SeatDia"][0] > 0.002
     # The whole block starts right of that line, so none of it sits under the
     # line's lower arrow (Opus review at 7fe9d97bd).
@@ -464,7 +476,7 @@ def test_station_reference_sketch_lies_in_the_side_view_plane() -> None:
     head = source[: source.index('name_last_feature(adapter, "ServicePinStationReference")')]
     last_sketch = head[head.rindex("create_sketch(") :].split(")", 1)[0]
     assert last_sketch == 'create_sketch("Right"'
-    assert "ServicePinFromShoulder" in drawing.SIDE_KEEP
+    assert "ServicePinStation" in drawing.SIDE_KEEP
     assert '"*Right", *SIDE_CENTER' in Path(drawing.__file__).read_text(encoding="utf-8")
 
 
@@ -525,19 +537,19 @@ def test_every_generated_callout_stays_within_four_lines(name: str, text: str) -
 def test_u29_walls_hold_at_the_seat_bores_printed_limits() -> None:
     # Main 2026-09-25: the arm is 1-in CF flat, held to 0.004 in on width
     # (OnlineMetals, Speedy Metals), not 0.003; and the cheek must come from
-    # the seat bore's REAL limits. MHA-DT-06 bores the seat first at .X; the
+    # the seat bore's REAL limits. MHA-DT-06 bores the seat first at .XX; the
     # MHA-DT-31 seat is turned to suit it for a press, so it is never smaller.
     mm = 25.4
     assert geometry.ARM_WIDTH_STOCK_MINUS == pytest.approx(0.004 * mm)
-    bore_max = geometry.HUB_SEAT_DIA + geometry.GENERAL_1PL_TOL_MM
-    bore_min = geometry.HUB_SEAT_DIA - geometry.GENERAL_1PL_TOL_MM
+    bore_max = geometry.HUB_SEAT_DIA + 0.01 * mm
+    bore_min = geometry.HUB_SEAT_DIA - 0.01 * mm
     cheek = geometry.wall_after_edge_break(
         geometry.ARM_WIDTH - geometry.ARM_WIDTH_STOCK_MINUS, bore_max
     )
     web = geometry.wall_after_edge_break(
         bore_min - geometry.AXIAL_PIN_DIA_STOCK_MAX, geometry.HUB_BORE_DIA_MAX
     )
-    assert cheek >= geometry.WALL_TARGET_MM == 2.0
+    assert cheek >= geometry.WALL_TARGET_MM
     assert web >= geometry.WALL_TARGET_MM
     assert geometry.ARM_CHEEK_WORST_MM == pytest.approx(cheek)
     assert geometry.SEAM_WEB_WORST_MM == pytest.approx(web)
@@ -555,15 +567,3 @@ def test_service_pin_station_reference_is_saved_hidden_and_imported_per_view() -
     assert "from _drawing_hidden_sketches import curate_view_dimensions" in source
     assert "    curate_view_dimensions,\n" not in source.replace("\r\n", "\n")
     assert "ServicePinStationReference" in dt_crank_hub_spec.DRAWING_DIMENSIONS
-
-
-def test_cross_hole_station_prints_its_origin_at_the_shoulder() -> None:
-    # r7 review: 5.60 read as chained from 8.0; the origin circle marks the
-    # arm shoulder it is measured from.
-    assert drawing.ORIGIN_DIMENSIONS == {"ServicePinFromShoulder": drawing.SHOULDER_X}
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source[source.index("async def build") :]
-    assert body.index("set_reference_dimensions(adapter, annotations") < body.index(
-        "_set_dimension_origin("
-    )
-    assert "display.SetArrowHeadStyle2(False, *attempt)" in source

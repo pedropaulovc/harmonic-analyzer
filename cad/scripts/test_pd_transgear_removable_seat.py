@@ -11,7 +11,6 @@ from _package_units import drawing_unit
 from _printed_tolerance import drilled_oversize_mm
 import build_dt_drive_train_assembly as bdt
 import dt_crank_hub_geometry as hub
-import dt_crank_hub_spec
 import dt_vn_crank_seat_drive_pin_spec as crank_pin
 import dt_crankshaft_spec as crank
 import pd_transgear_drive_collar_spec as collar
@@ -91,11 +90,6 @@ def _plate_edge_reach(teeth: int, plate_height: float, wheel_offset: float) -> f
     return best
 
 
-def _printed_band(places: int) -> float:
-    row = {1: "linear_1pl", 2: "linear_2pl"}[places]
-    return round(float(_config.title_block(row)["value_in"]) * 25.4, places)
-
-
 def _wheel_float(hole_dia: float) -> float:
     """The wheel's worst offset from the shaft axis riding on its two pins:
     the holes drilled to their largest over the smallest stock dowel, plus
@@ -127,8 +121,7 @@ def test_chain_on_the_floated_crank_wheel_keeps_its_radial_air() -> None:
     assert (seat_geometry.BORE_DIA - hub.SHAFT_DIA) / 2.0 > wheel
     hub_float = (hub.HUB_BORE_DIA_MAX - (hub.SHAFT_DIA + hub.SHAFT_DIA_BAND[1])) / 2.0
     spigot_max = crank.SPIGOT_DIA + max(seat_geometry.SPIGOT_DIA_BAND)
-    relief_places = dt_crank_hub_spec.DRAWING_PRECISION_BY_NAME["ReliefDia"]
-    relief_max = hub.RELIEF_DIA + _printed_band(relief_places)
+    relief_max = hub.RELIEF_DIA_MAX
     for height, spigot_air, relief_air in (
         (
             spec.ANSI_PLATE_HEIGHT,
@@ -247,8 +240,8 @@ _CRANK_SEAT = dict(
 
 def test_crank_pin_tips_are_checked_against_the_hub_rear_face() -> None:
     # Hand check, dome-root stations: the seat at its forward printed limit,
-    # the longest tip in front of it, hub rear long 25.2 + 0.10; floated onto
-    # the short hub (25.2 - 0.51, the title block's side) the thinnest wheel
+    # the longest tip in front of it, hub rear long .990 + .004; floated onto
+    # the short hub (.990 - .010, the title block's side) the thinnest wheel
     # moves off the seat by the seat's rear printed limit less the wheel and
     # the short hub.
     air, engagement = crank.drive_pin_front_clearances(
@@ -256,8 +249,8 @@ def test_crank_pin_tips_are_checked_against_the_hub_rear_face() -> None:
     )
     least, most = crank.DRIVE_PIN_PROUD_RANGE
     seat_low, seat_high = (crank.SEAT_COLLAR + d for d in sorted(crank.SEAT_COLLAR_BAND))
-    assert air == pytest.approx(seat_low - most - 25.30)
-    assert engagement == pytest.approx(least - (seat_high - 2.7 - 24.69))
+    assert air == pytest.approx(seat_low - most - (25.146 + 0.1016))
+    assert engagement == pytest.approx(least - (seat_high - 2.7 - (25.146 - 0.254)))
     assert (air, engagement) == (
         crank.DRIVE_PIN_HUB_AIR_WORST,
         crank.DRIVE_PIN_ENGAGEMENT_WORST,
@@ -285,12 +278,16 @@ def test_crank_pin_check_refuses_a_hub_the_old_plate_check_passed() -> None:
 
 def test_moved_seat_refuses_the_hub_it_left_behind() -> None:
     # Ruling 2026-09-30: the seat face came 1.8 forward (30.5 -> 28.7 from
-    # the dome root) and the hub shortened with it (27.0 -> 25.2).
+    # the dome root) and the hub shortened with it (27.0 -> 25.2; .990 since
+    # #290).
     proud = crank.DRIVE_PIN_PROUD_RANGE
-    assert (crank.SEAT_COLLAR, crank.HUB_LENGTH) == pytest.approx((28.7, 25.2))
+    assert crank.SEAT_COLLAR == pytest.approx(28.7)
+    assert crank.HUB_LENGTH == pytest.approx(0.99 * 25.4)
     first = dict(_CRANK_SEAT, seat_face=30.5)
-    # The first pair passed with the same air: only the offset matters.
-    air, _ = crank.drive_pin_front_clearances(proud, hub_rear=27.0, **first)
+    # A pair moved together keeps the same air: only the offset matters.
+    air, _ = crank.drive_pin_front_clearances(
+        proud, hub_rear=crank.HUB_LENGTH + 1.8, **first
+    )
     assert air == pytest.approx(crank.DRIVE_PIN_HUB_AIR_WORST)
     # Negative control: the first hub under the moved seat meets the pins.
     with pytest.raises(AssertionError, match="hub's rear face"):

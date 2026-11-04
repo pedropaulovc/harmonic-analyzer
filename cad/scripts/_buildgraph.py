@@ -2365,7 +2365,6 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "dt_tip_collar_air",
         # Angular row sets the through tap's angle in the screw landing gate.
         "dt_vn_cone_tip_collar_spec",
-        "dt_crank_hub_geometry",
         # Drilled-hole row bounds the rocker's #47 hole the rod-slot pin enters.
         "ch_rocker_arm_profile_check",
         # Drilled-hole row bounds the hub's supply bore under the Ø6.50 ream.
