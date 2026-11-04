@@ -6,10 +6,10 @@ sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 
 The support is a painted gray-iron frame with a trapezoidal wall, two opposed
-pockets leaving a 12.70 central web, a through cavity, a chamfered window rim,
+pockets leaving a .50 central web, a through cavity, a chamfered window rim,
 four 5/16 clearance holes through its mounting foot, and the rocker brackets'
 two #8-32 seats in its top face, transferred from the set brackets at
-assembly. The sheet runs 1:2, with each view's scale pinned explicitly.
+assembly. The sheet runs 1:2 in decimal inch, with each view's scale pinned explicitly.
 
 Run with SolidWorks open::
 
@@ -24,6 +24,7 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.sw_type_info import constant
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
@@ -58,9 +59,10 @@ from _drawing_hidden_sketches import (
     curate_view_dimensions as curate_hidden_owner_dimensions,
     part_sketches_shown,
 )
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_point_in_view
+from _part_properties import part_drawing_unit
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_tables import create_view_theoretical_datum, insert_hole_table
@@ -81,6 +83,8 @@ from build_fr_rocker_arm_support import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     HALF_Y,
+    HOLD_DOWN_LOCAL_HALF_X,
+    HOLD_DOWN_LOCAL_HALF_Z,
     HOLE_DIA,
     HOLES,
     NARROW,
@@ -171,7 +175,7 @@ FRONT_KEEP = {
 }
 # The cavity corner CornerFillet's dimension attaches to, as sheet signs.
 CAVITY_RADIUS_CORNER = (1, 1)
-# RimChamfer is ONE model feature: 1.27 x 45 on every edge of the two slant
+# RimChamfer is ONE model feature: .06 x 45 on every edge of the two slant
 # faces and the two end faces (all twelve outside edges plus both pocket
 # rims) and on the cavity rims on both web faces. Its one size sits on an
 # outside corner, so the caption names everything else it governs; drawn
@@ -202,15 +206,17 @@ DIMENSION_CALLOUTS = {
 # stations' and the locations' are the PART's
 # (build_fr_rocker_arm_support.DRAWING_PRECISION): read back
 # (PART_PRECISION), never set here.
+# Decimal inch: every size .XX (the 7.12 length's half locates the cavity
+# and the pockets at .XX).
 DIMENSION_PRECISION = {
-    "Depth": 1,
-    "WinWidth": 1,
-    "CavWidth": 1,
+    "Depth": 2,
+    "WinWidth": 2,
+    "CavWidth": 2,
     "PocketRadius": 2,
-    "CavityRadius": 1,
-    "WallHeight": 1,
-    "FootSpan": 1,
-    # A held thickness, 12.70 at the routine ±0.51: the seats' thread-wall
+    "CavityRadius": 2,
+    "WallHeight": 2,
+    "FootSpan": 2,
+    # A held thickness, .50 at the routine ±.01: the seats' thread-wall
     # stack reads the same places (rocker_bracket_seat_layout).
     "WebThickness": WEB_PLACES,
     "FootThickness": 2,
@@ -255,6 +261,12 @@ def _assert_part_precision(adapter: Any, annotations: list[Any], kept: Any) -> N
 SEAT_CALLOUT_PROCESS = (
     f"TRANSFER FROM {_config.parts('ch-pivot-bracket')['number']}\nAT ASSEMBLY;\n"
 )
+# The tap drill prints .XXX (.136); both depths .XX (.46 thread, .59 drill).
+SEAT_CALLOUT_PRECISION = {
+    "hw-tapdrldia": 3,
+    "hw-tapdrldepth": 2,
+    "hw-threaddepth": 2,
+}
 SEAT_CALLOUT_X_MM = max(SEAT_LOCAL_X)
 # The seats are drilled from the rail top, which no principal view shows, so
 # they get VIEW B (Main's ruling): a partial top view of the rail strip,
@@ -349,19 +361,31 @@ HOLE_TABLE_DATUM_XZ_MM = (-BOSS_DEPTH / 2.0, -WIDE)
 # 4.6 mm hole-to-tag gap plus the 5.8 mm tag width, measured on A4 there.
 RIGHT_END_HOLE_TAGS = ("A3", "A4")
 HOLE_TAG_MIRROR_SHIFT = -0.0150
-EXPECTED_HOLE_TABLE_LOCATIONS_MM = (
-    (150.57, 49.21),
-    (29.93, 49.21),
-    (150.57, 14.29),
-    (29.93, 14.29),
+# The LOC cells print .XXX in the sheet's inch: X from the -X end face
+# (3.56 -/+ 2.375), Y from the -Z foot edge (1.250 +/- .687). The table
+# check converts them back to these millimetres.
+EXPECTED_HOLE_TABLE_LOCATIONS_MM = tuple(
+    (BOSS_DEPTH / 2.0 + sx * HOLD_DOWN_LOCAL_HALF_X, WIDE + sz * HOLD_DOWN_LOCAL_HALF_Z)
+    for sz in (1, -1)
+    for sx in (1, -1)
 )
 # The SIZE cells are generated from FootClearanceHoles and are not
-# text-editable, so they print "Ø 7.94 THRU ALL" with no process; the
+# text-editable, so they print "Ø .313 THRU ALL" with no process; the
 # machinist could not tell whether the title block's DRILLED HOLES row or the
-# .XX band governs them (ENFORCE review, rule 12). The header names the
-# process, so each row reads DRILL Ø7.94 THRU ALL; size and depth stay native.
+# .XXX band governs them (ENFORCE review, rule 12). The header names the
+# process, so each row reads DRILL Ø.313 THRU ALL; size and depth stay native.
 HOLE_TABLE_SIZE_COLUMN = 3
 HOLE_TABLE_SIZE_HEADING = "DRILL"
+# The four foot clearances match the base's hold-down taps (machinist review
+# b2: the .XXX table named no mate). MHA-FR-01's own hole table tags those
+# taps C2-C5 at the same 4.750 x 1.374 pattern. A free note anchors at its
+# text's top-left (inspect-3: at x 392 the 39.4 mm block crossed the right
+# border), so it starts 23 mm right of the seat callout's last character,
+# its top 4.7 mm under the table, above the title block.
+HOLE_PATTERN_NOTE = (
+    f"HOLE PATTERN\nMATCHES\n{_config.parts('fr-harmonic-base')['number']} C2-C5"
+)
+HOLE_PATTERN_NOTE_XY = (0.355, 0.092)
 
 
 @_telemetry.traced("drawing.rocker_support.hole_table_process")
@@ -382,6 +406,36 @@ def _name_hole_table_process(adapter: Any, table: Any) -> None:
     if len(sizes) != 1 or "THRU" not in next(iter(sizes)).upper():
         raise RuntimeError(f"hole-table DRILL column holds unexpected sizes: {sizes!r}")
     _telemetry.info(f"hole-table process header {heading!r} over sizes {sizes!r}")
+
+
+# Inch sheets drop the leading zero (ASME Y14.5); the hole table's own
+# document option followed the template and printed 0.563 (machinist review,
+# non-gating). Document Properties > Tables > Hole > Leading zeroes.
+HOLE_TABLE_LEADING_ZERO = "swLeadingZero_DoNotShow"
+HOLE_TABLE_LOC_COLUMNS = (1, 2)
+
+
+def _drop_hole_table_leading_zeros(adapter: Any) -> None:
+    """Set the drawing's hole-table leading-zero option before the table exists."""
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    preference = constant("swDetailingLeadingZero")
+    option = constant("swDetailingHoleTable")
+    value = constant(HOLE_TABLE_LEADING_ZERO)
+    if not extension.SetUserPreferenceInteger(preference, option, value):
+        raise RuntimeError("failed to drop the hole table's leading zeros")
+    if int(extension.GetUserPreferenceInteger(preference, option)) != value:
+        raise RuntimeError("hole-table leading-zero option did not persist")
+
+
+def _assert_no_leading_zero_locations(table: Any) -> None:
+    """Read every LOC cell back: none prints a leading zero."""
+    cells = [
+        str(table.DisplayedText2(row, column, False) or "")
+        for row in range(1, int(table.RowCount))
+        for column in HOLE_TABLE_LOC_COLUMNS
+    ]
+    if any(cell.startswith(("0.", "-0.")) for cell in cells):
+        raise RuntimeError(f"hole-table LOC cells kept a leading zero: {cells!r}")
 
 
 def _bottom_sheet_xy(hole_xz: tuple[float, float]) -> tuple[float, float]:
@@ -724,8 +778,15 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
         ),
     )
+    # Three document places: the native hole table's LOC and SIZE cells print
+    # them (the .XXX stations and the 5/16 drill as .313).
     drawing_model, sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        decimals=3,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -908,9 +969,11 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rocker-arm-support lower-left theoretical corner",
     )
     # No position frame on this part (drawing-guidelines.md rule 5 (avoid excessive GD&T)), so the hole
-    # coordinates are ordinary two-place dimensions under the title block's
-    # ±0.51 — NOT basic: a basic dimension is toleranced only by the frame it
-    # feeds, and without one it has no tolerance at all.
+    # coordinates are ordinary .XXX dimensions under the title block's
+    # ±.005, the base's matching pattern named beside the table — NOT basic:
+    # a basic dimension is toleranced only by the frame it feeds, and
+    # without one it has no tolerance at all.
+    _drop_hole_table_leading_zeros(adapter)
     hole_table = insert_hole_table(
         adapter,
         bottom,
@@ -921,12 +984,17 @@ async def build(adapter: Any) -> dict[str, str]:
         hole_points=tuple(_bottom_sheet_xy(hole) for hole in HOLES),
         datum_point=datum_point,
         expected_locations_mm=EXPECTED_HOLE_TABLE_LOCATIONS_MM,
+        unit=part_drawing_unit(PART_STEM),
+        location_places=3,
         datum_axes=datum_axes,
         anchor_xy=HOLE_TABLE_ANCHOR,
         basic_locations=False,
         label="rocker-arm-support",
     )
     _name_hole_table_process(adapter, hole_table)
+    _assert_no_leading_zero_locations(hole_table)
+    if add_note(adapter, HOLE_PATTERN_NOTE, *HOLE_PATTERN_NOTE_XY) is None:
+        raise RuntimeError("failed to name the foot holes' mating pattern")
     _mirror_right_end_hole_tags(bottom)
     # The drawing-sketch datum and hole table leave the bottom view's edge set
     # stale, so regenerate it before export.
@@ -955,13 +1023,16 @@ async def build(adapter: Any) -> dict[str, str]:
     if add_note(adapter, VIEW_B_CAPTION, *VIEW_B_CAPTION_XY) is None:
         raise RuntimeError("failed to caption VIEW B")
     _add_view_b_arrow(adapter, front)
-    add_native_hole_callout(
+    seat_callout = add_native_hole_callout(
         adapter,
         view_b,
         edge=_seat_entry_edge(view_b),
         callout_xy=SEAT_CALLOUT_XY,
         label="rocker-bracket transfer seats",
         process=SEAT_CALLOUT_PROCESS,
+    )
+    set_hole_callout_precision(
+        seat_callout, SEAT_CALLOUT_PRECISION, label="rocker-bracket transfer seats"
     )
 
     # Materialize the iso's cosmetic threads before the strict final note

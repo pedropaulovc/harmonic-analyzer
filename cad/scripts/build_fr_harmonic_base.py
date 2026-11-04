@@ -44,13 +44,16 @@ import numpy as np
 from _appearance import CASTING_GREEN, PANEL_BLACK, apply_color, apply_material
 from _check import check
 from _com import _early_bound
+from _document_units import apply_package_model_units
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _extrude import extrude_at_offset
 from _feature_tree import name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _paths import OUT_PNG, REFERENCES_DIR
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import edge_break_chamfer_mm, edge_break_radius_mm
+from _inch_wall_limits import WALL_TARGET_MM
 from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import (
@@ -98,11 +101,14 @@ from fr_harmonic_base_spec import (
     DECK_WIDTH,
     CROSS_TAP_LUG_BOTTOM_Y,
     CROSS_TAP_LUG_INNER_X,
+    CROSS_TAP_LUG_INNER_Z,
     CROSS_TAP_LUG_LENGTH,
     CROSS_TAP_LUG_WIDTH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     GREEN_TOP,
+    LINEAR_BAND_MM,
+    MM_PER_IN,
     PART_SURFACE_FINISHES,
     PIVOT_SEAT_DIMENSIONS,
     PIVOT_SEAT_POSITION_BAND_MM,
@@ -122,6 +128,7 @@ from fr_harmonic_base_spec import (
     TOP_THICKNESS,
     TOP_WIDTH,
     UNDERSIDE_LOCATION_PREFIXES,
+    UNIT,
 )
 import fr_nameplate_spec
 from _cone_axis_constants import (
@@ -204,8 +211,6 @@ from fr_frame_attachment_spec import (
 from frame_column_stations import COLUMN_SOCKET_MATCH_BORE_MAX
 from _visibility import blank_reference_geometry
 
-import _config
-
 import _telemetry
 
 
@@ -248,10 +253,11 @@ MATERIAL = "Gray Cast Iron"  # see _appearance.apply_material docstring
 # = 18.1 x 11.0 in (annotated); the length keeps the legacy 18.0 in and the
 # thicknesses come from the legacy HarmonicBase.cs (photo-verify M2 note). The
 # DEPTH deliberately no longer follows the 28 cm callout: fr_harmonic_base_spec
-# widens the pad to 274.5 (slab 287.2, same 0.25 in reveal per side) so the
-# socket-to-pad-edge land is equal on both axes -- asserted below, because
-# only this module knows the column stations.
+# widens the pad to 10.81 (slab 11.31, same 0.25 in reveal per side) so the
+# socket-to-pad-edge land is equal on both axes to half a .01 step -- asserted below.
 IN = 25.4
+# The minimum land between neighbouring cavities, bores and edges (.040).
+LAND_FLOOR_MM = 1.016
 
 # The four column sockets, their stations and their bore surface finishes now
 # live in fr_harmonic_base_spec: the sheet may only source a surface-finish
@@ -269,26 +275,26 @@ if BASE_SPOTFACE_DEPTH <= 0.0:
 
 HOLE_XZ = SUPPORT_HOLD_DOWN_XZ
 
-# Edge finishing (chamfer external, fillet internal; legacy 1/8-1/16 sizes).
+# Edge finishing (chamfer external, fillet internal).
 # The machined plate gets 45-degree edge breaks on every external edge: the
-# vertical plan corners at 1/8 in legs, the exposed top rims and the
-# underside rim at 1/16 in (single-pass mill/file breaks). The one internal
+# exposed top rims and the underside rim at .06 legs (single-pass mill/file
+# breaks). The one internal
 # wall junction -- the pad side walls meeting the flange top face -- carries a
 # 0.5 root fillet, which is NOT a print requirement: a 0.5 mm internal root
 # cannot be measured with hobby-shop kit (it needs an optical comparator or a
 # radius gauge under magnification), so the sheet carries no radius callout
 # and the deck cutter's own corner defines it (2026-09 review). Every
 # mechanism hole sits >= 26 from every plate edge; the closest seats to a deck
-# edge are the nameplate taps (NAMEPLATE_SCREW_XZ), Ø2.26 about 8 inside the
-# deck's west edge -- clear of its 0.79 break, so no break touches a seat.
+# edge are the nameplate taps (NAMEPLATE_SCREW_XZ), about .3 inside the
+# deck's west edge -- clear of its .03 break, so no break touches a seat.
 # Plan corners are ROUNDED, not chamfered (2026-09 photo re-derive): every
 # ch30 plate (p002/p003 front corners, p006 rear) shows the casting's vertical
 # corners as one large radius running the full height, flange and pad
-# together. 7/8 in on the flange; the pad's radius is 1/4 in smaller so the
-# two arcs stay concentric across the 1/4 in reveal.
-FLANGE_CORNER_R = 0.875 * IN  # 22.225
-PAD_CORNER_R = FLANGE_CORNER_R - (BOTTOM_LENGTH - TOP_LENGTH) / 2.0  # 15.875
-RIM_CHAMFER = 0.0625 * IN  # 1.5875 legs, top rims + underside rim
+# together. .88 on the flange; the pad's radius is .25 smaller so the
+# two arcs stay concentric across the .25 reveal.
+FLANGE_CORNER_R = 22.352  # .88
+PAD_CORNER_R = FLANGE_CORNER_R - (BOTTOM_LENGTH - TOP_LENGTH) / 2.0  # .63
+RIM_CHAMFER = 1.524  # .06 legs, top rims + underside rim
 PAD_ROOT_R = 0.5  # pad-to-flange root fillet; modelled, never called out
 
 # Black deck + green land (user ruling 2026-10-09; ch11 p.21, ch13 p.25 and
@@ -303,13 +309,14 @@ PAD_ROOT_R = 0.5  # pad-to-flange root fillet; modelled, never called out
 # "2" on the deck. Cut from the vendored closed-region DXF
 # (gen_base_serial_dxf.py regenerates it from these constants) on a plane at
 # the deck top, SERIAL_DEPTH deep. Since the 2026-10-09 ruling it sits in the
-# deck's north-west (+X, +Z) corner, SERIAL_INSET in from both deck edges --
-# clear of the nameplate on the deck's west end and of the corner's break.
+# deck's north-west (+X, +Z) corner, about 6 mm (.24) in from both deck edges
+# -- clear of the nameplate on the deck's west end and of the corner's break.
+# The stamp prints APPROX AS SHOWN, so its station stays put (and its DXF
+# unchanged) rather than following the deck's inch edges.
 SERIAL_TEXT = "2"
 SERIAL_HEIGHT_MM = 3.5  # p.70 macro: a small hand stamp
 SERIAL_DEPTH = 0.3  # a stamp, not an engraving
-SERIAL_INSET = 6.0
-SERIAL_XZ = (DECK_HALF_X - SERIAL_INSET, DECK_HALF_Z - SERIAL_INSET)  # (161.0, 124.25)
+SERIAL_XZ = (161.0, 124.25)
 # Top-sketch (sx, sy) maps to model (sx, STACK_HEIGHT, -sy), and native *Top
 # projects model (X, Z) to paper (X, -Z). Keep glyph +Y along sketch +Y:
 # the native R7 PDF confirmed the former setting vertically reflected the "2".
@@ -390,8 +397,8 @@ if fr_nameplate_spec.MOUNT_NORMAL != (0.0, 1.0, 0.0):
         f"nameplate front normal {fr_nameplate_spec.MOUNT_NORMAL} is not the deck's +Y"
     )
 # The whole plate (its bounding corners, both faces) must lie flat on the
-# raised deck, inside its edge break by >= 1.0, or a corner would overhang the
-# step down to the green land (user ruling 2026-10-09: 4.0 inside the west edge).
+# raised deck, inside its edge break by >= .040, or a corner would overhang the
+# step down to the green land (user ruling 2026-10-09: .16 inside the west edge).
 _NAMEPLATE_CORNERS_XZ = tuple(
     (pt[0], pt[2])
     for pt in (
@@ -403,11 +410,11 @@ _NAMEPLATE_CORNERS_XZ = tuple(
 NAMEPLATE_DECK_CLEARANCE = min(
     min(DECK_HALF_X - abs(x), DECK_HALF_Z - abs(z)) for x, z in _NAMEPLATE_CORNERS_XZ
 )
-if NAMEPLATE_DECK_CLEARANCE - DECK_EDGE_BREAK < 1.0:
+if NAMEPLATE_DECK_CLEARANCE - DECK_EDGE_BREAK < LAND_FLOOR_MM:
     raise AssertionError(
         f"nameplate footprint {_NAMEPLATE_CORNERS_XZ} sits only "
-        f"{NAMEPLATE_DECK_CLEARANCE:.2f} inside the deck edge (need >= 1.0 past "
-        f"its {DECK_EDGE_BREAK:.2f} break)"
+        f"{NAMEPLATE_DECK_CLEARANCE:.3f} mm inside the deck edge (need >= "
+        f"{LAND_FLOOR_MM} past its {DECK_EDGE_BREAK:.4f} break)"
     )
 
 # Native tapped seats. Physical thread compatibility is carried by each named
@@ -427,7 +434,7 @@ FOOT_SCREW_HOLE_DIA = blind_cut_dia_mm(FOOT_SEAT_SPEC)
 PEDESTAL_SCREW_HOLE_DIA = blind_cut_dia_mm(PEDESTAL_SEAT_SPEC)
 NAMEPLATE_SCREW_HOLE_DIA = blind_cut_dia_mm(NAMEPLATE_SEAT_SPEC)
 
-# Socket cylinders occupy Y=25.4..47.8, overlapping the deepest vertical-seat
+# Socket cylinders occupy Y=1.00..1.88, overlapping the deepest vertical-seat
 # envelopes. Check plan walls against every known base cavity, not just the
 # visually nearest nameplate holes.
 COLUMN_SOCKET_NEAREST_OCCUPANT_WALL = min(
@@ -445,16 +452,16 @@ COLUMN_SOCKET_NEAREST_OCCUPANT_WALL = min(
     )
     for occupant in occupants
 )
-if COLUMN_SOCKET_NEAREST_OCCUPANT_WALL < 1.0:
+if COLUMN_SOCKET_NEAREST_OCCUPANT_WALL < LAND_FLOOR_MM:
     raise AssertionError(
-        "base column socket leaves less than 1 mm wall to another base cavity"
+        "base column socket leaves less than .040 wall to another base cavity"
     )
 # Nominal model-space land from each bore to the pad edge, on the green top
 # the sockets open on (user ruling 2026-10-09). Its worst case is proven
-# below. TOP_WIDTH is sized so this land is EQUAL on both axes: the 2026-09
-# blind machinist review rejected the former 10.5 in pad, whose land in Z
-# could not survive the coordinate stack while every table dimension stayed
-# in tolerance.
+# below. TOP_WIDTH is sized so this land is EQUAL on both axes to half a .01
+# step (.005): the 2026-09 blind machinist review rejected the former 10.5 in
+# pad, whose land in Z could not survive the coordinate stack while every
+# table dimension stayed in tolerance.
 COLUMN_SOCKET_LAND_X = min(
     TOP_LENGTH / 2.0 - abs(x) - COLUMN_SOCKET_DIAMETER / 2.0
     for x, _z in COLUMN_SOCKET_XZ
@@ -463,7 +470,7 @@ COLUMN_SOCKET_LAND_Z = min(
     TOP_WIDTH / 2.0 - abs(z) - COLUMN_SOCKET_DIAMETER / 2.0
     for _x, z in COLUMN_SOCKET_XZ
 )
-if abs(COLUMN_SOCKET_LAND_X - COLUMN_SOCKET_LAND_Z) > 1e-9:
+if abs(COLUMN_SOCKET_LAND_X - COLUMN_SOCKET_LAND_Z) > 0.005 * MM_PER_IN:
     raise AssertionError(
         "base socket land is not equal on both axes: "
         f"x={COLUMN_SOCKET_LAND_X}, z={COLUMN_SOCKET_LAND_Z}"
@@ -477,29 +484,28 @@ COLUMN_SOCKET_DECK_GAP = min(
     )
     for x, z in COLUMN_SOCKET_XZ
 )
-if COLUMN_SOCKET_DECK_GAP < 1.0:
+if COLUMN_SOCKET_DECK_GAP < LAND_FLOOR_MM:
     raise AssertionError("base column socket crowds the raised deck")
 
 # The finished land between each bore and the pad edge's break must stay
-# 1.0 wide and continuous (2026-09 blind machinist review). It used to be
-# a sheet note ("1.0 MIN ... AFTER MATCHING AND EDGE BREAK"), which put a
+# .040 wide and continuous (2026-09 blind machinist review). It used to be
+# a sheet note ("MIN ... AFTER MATCHING AND EDGE BREAK"), which put a
 # dimension in a note (hb-render-4 eye pass); the stack below proves every
 # in-tolerance part meets it, so the sheet needs no note.
-COLUMN_SOCKET_LAND_MIN = 1.0
+COLUMN_SOCKET_LAND_MIN = LAND_FLOOR_MM
 
 
 def _general_band_mm() -> float:
-    """The title block's .X band: the loosest general tolerance it defines.
+    """The .XX band: the loosest general tolerance the sheet prints.
 
-    The lengths print one place; the hole-table coordinates
-    print at least one, so this band bounds every location term.
+    Every length and plan station prints .XX or .XXX and the hole-table
+    coordinates print .XXX, so this band bounds every location term.
     """
-    return printed_band_mm(1)
+    return LINEAR_BAND_MM
 
 
 def _edge_break_mm() -> float:
-    row = _config.title_block("edge_break")
-    return max(float(row["radius_mm"]), float(row["chamfer_max_mm"]))
+    return max(edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT))
 
 
 def column_socket_land_stack(nominal: float) -> dict[str, float]:
@@ -561,7 +567,7 @@ for _axis, _stack in COLUMN_SOCKET_LAND_STACKS.items():
 
 
 # These lengths stay tied to the unchanged perimeter walls.
-# Ribs and lugs end mid-wall, so a +-0.8 shift of the pocket outline never
+# Ribs and lugs end mid-wall, so a band shift of the pocket outline never
 # opens a slot between them and the wall.
 RIB_HALF_LENGTH_X = POCKET_HALF_X + POCKET_WALL / 2.0
 RIB_HALF_LENGTH_Z = POCKET_HALF_Z + POCKET_WALL / 2.0
@@ -569,10 +575,8 @@ RIB_HALF_LENGTH_Z = POCKET_HALF_Z + POCKET_WALL / 2.0
 
 # Per-hole material is established below after the retained footprint shapes.
 # Horizontal frame cross taps retain their lugs and blind end conditions.
-# Dimensions live in the pure casting spec, independently of removed seats.
-CROSS_TAP_LUG_INNER_Z = abs(FRAME_FRONT_COLUMN_Z) - CROSS_TAP_LUG_LENGTH
 _CROSS_TAP_MAJOR = THREAD_MAJOR_MM[BASE_CROSS_TAP_SPEC.size]
-# The print specifies 49 MIN, not a maximum blind-drill depth. Tip/past-tip
+# The print specifies a MIN drill depth, not a maximum blind-drill depth. Tip/past-tip
 # checks therefore cover the nominal native drill only, not an unbounded
 # manufactured deep end. The finite backing envelope is checked separately.
 CROSS_TAP_TIP_Z = (
@@ -588,15 +592,15 @@ CROSS_TAP_LUG_WALLS = {
     "beside drill": COLUMN_X - CROSS_TAP_LUG_INNER_X - BASE_CROSS_TAP_DRILL_DIA / 2.0,
 }
 if not (
-    POCKET_HALF_X + 1.0
+    POCKET_HALF_X + LAND_FLOOR_MM
     < CROSS_TAP_LUG_INNER_X + CROSS_TAP_LUG_WIDTH
-    < TOP_LENGTH / 2.0 - 1.0
+    < TOP_LENGTH / 2.0 - LAND_FLOOR_MM
 ):
     raise AssertionError("cross-tap lug must end inside the pocket wall")
 if CROSS_TAP_LUG_WALLS["past tip"] < 1.5 * _CROSS_TAP_MAJOR:
     raise AssertionError("cross-tap lug ends less than 1.5D past the drill tip")
-if min(CROSS_TAP_LUG_WALLS.values()) - 1.5 * _general_band_mm() < 2.0:
-    raise AssertionError("cross-tap nominal drill/lug wall allowance falls under 2.0")
+if min(CROSS_TAP_LUG_WALLS.values()) - 1.5 * _general_band_mm() < WALL_TARGET_MM:
+    raise AssertionError("cross-tap nominal drill/lug wall allowance falls under .080")
 
 # The socket bosses: 1/2 x (boss - bore) of wall round each bore, and the
 # boss swallows the pocket's plan corner, so the pocket needs no corner radius.
@@ -605,9 +609,9 @@ if (
     SOCKET_BOSS_WALL
     - (COLUMN_SOCKET_MATCH_BORE_MAX - COLUMN_SOCKET_DIAMETER) / 2.0
     - _general_band_mm()
-    < 2.0
+    < WALL_TARGET_MM
 ):
-    raise AssertionError("socket boss wall thins under 2.0 at the worst case")
+    raise AssertionError("socket boss wall thins under .080 at the worst case")
 for _x, _z in COLUMN_SOCKET_XZ:
     if (
         math.hypot(POCKET_HALF_X - abs(_x), POCKET_HALF_Z - abs(_z))
@@ -617,11 +621,11 @@ for _x, _z in COLUMN_SOCKET_XZ:
 
 
 def cross_tap_backing_margins_mm(band_mm: float) -> dict[str, float]:
-    """Conservative 2 mm backing margins, without optional fillet credit.
+    """Conservative .080 backing margins, without optional fillet credit.
 
     The lug joins the skin at the same ceiling plane, wherever that plane
     falls relative to the cross-tap axis. Erode the guaranteed lug, socket
-    and wall footprints by 2 mm and require their intervals to overlap.
+    and wall footprints by .080 and require their intervals to overlap.
     Socket-bore air and the open spotface entrance are intentional; neither
     is credited as thread material. The printed MIN drill has no deep limit.
     """
@@ -631,25 +635,29 @@ def cross_tap_backing_margins_mm(band_mm: float) -> dict[str, float]:
         SOCKET_BOSS_DIA / 2.0
         - band_mm / 2.0
         - math.sqrt(2.0) * band_mm
-        - 2.0
+        - WALL_TARGET_MM
     )
     socket_half_z = math.sqrt(socket_radius**2 - axis_x_radius**2)
     return {
         "lug/skin join": POCKET_CEILING_Y - CROSS_TAP_LUG_BOTTOM_Y - 2.0 * band_mm,
-        "green skin": GREEN_TOP - POCKET_CEILING_Y - 2.0 * band_mm - 2.0,
+        "green skin": GREEN_TOP - POCKET_CEILING_Y - 2.0 * band_mm - WALL_TARGET_MM,
         "below thread": (
-            BASE_SCREW_Y - radius - CROSS_TAP_LUG_BOTTOM_Y - 2.0 * band_mm - 2.0
+            BASE_SCREW_Y - radius - CROSS_TAP_LUG_BOTTOM_Y - 2.0 * band_mm - WALL_TARGET_MM
         ),
-        "above thread": GREEN_TOP - BASE_SCREW_Y - radius - 2.0 * band_mm - 2.0,
-        "lug inner X": COLUMN_X - axis_x_radius - CROSS_TAP_LUG_INNER_X - band_mm - 2.0,
+        "above thread": GREEN_TOP - BASE_SCREW_Y - radius - 2.0 * band_mm - WALL_TARGET_MM,
+        "lug inner X": (
+            COLUMN_X - axis_x_radius - CROSS_TAP_LUG_INNER_X - band_mm - WALL_TARGET_MM
+        ),
         "lug outer X": (
             CROSS_TAP_LUG_INNER_X + CROSS_TAP_LUG_WIDTH
-            - 2.0 * band_mm - COLUMN_X - axis_x_radius - 2.0
+            - 2.0 * band_mm - COLUMN_X - axis_x_radius - WALL_TARGET_MM
         ),
-        "wall outer X": TOP_LENGTH / 2.0 - band_mm - COLUMN_X - axis_x_radius - 2.0,
-        "lug/socket join": socket_half_z - band_mm - 2.0,
+        "wall outer X": (
+            TOP_LENGTH / 2.0 - band_mm - COLUMN_X - axis_x_radius - WALL_TARGET_MM
+        ),
+        "lug/socket join": socket_half_z - band_mm - WALL_TARGET_MM,
         "socket/wall join": min(
-            abs(z) + socket_half_z - POCKET_HALF_Z - band_mm - 2.0
+            abs(z) + socket_half_z - POCKET_HALF_Z - band_mm - WALL_TARGET_MM
             for _, z in COLUMN_SOCKET_XZ
         ),
     }
@@ -726,10 +734,10 @@ for _tag, _clearances in THROUGH_SEAT_POCKET_CLEARANCES.items():
     for _i, _gaps in enumerate(_clearances):
         if min(_gaps.values()) <= 0.0:
             raise AssertionError(f"{_tag}[{_i}]: interrupted through exit {_gaps}")
-        # The relocation specifically requires 2 mm around the block seats;
+        # The relocation specifically requires .080 around the block seats;
         # other unchanged hardware retains its existing wall/fillet contracts.
-        if _tag == "BlockScrewHoles" and min(_gaps.values()) < 2.0:
-            raise AssertionError(f"{_tag}[{_i}]: block-seat air falls below 2 mm {_gaps}")
+        if _tag == "BlockScrewHoles" and min(_gaps.values()) < WALL_TARGET_MM:
+            raise AssertionError(f"{_tag}[{_i}]: block-seat air falls below .080 {_gaps}")
         _segments = THROUGH_SEAT_MATERIAL[_tag][_i].nominal_segments_mm
         if len(_segments) != 1 or max(
             abs(_segments[0][0]), abs(_segments[0][1] - (STACK_HEIGHT - POCKET_CEILING_Y)),
@@ -1664,6 +1672,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): the two plate footprints + thicknesses.
     # The mm suffix is load-bearing -- this is an INCH document and the equation
@@ -2150,7 +2159,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "PocketCornerFillets")
     v_corner_fillets = _pocket_corner_fillet_volume(POCKET_CORNER_FILLET_R)
-    # 2 % + 5 (about 78 mm^3 at R6): a dropped rib corner (about 269 mm^3)
+    # 2 % + 5 (about 77 mm^3 at R.23): a dropped rib corner (about 255 mm^3)
     # fails the step; check() on add_fillet guards the shallower corners.
     after = await volume_check(
         adapter,
@@ -2833,17 +2842,26 @@ async def build(adapter) -> dict[str, str]:
     # dimension whose band is not the title block's: a spotface may run deep,
     # never shallow, or the screw head rocks on an unfaced ring.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    # Tolerances print in the sheet's inch at the nominal's places: in mm a
+    # .002 band needs four (0.0508), which printed ".483 +-.0020".
     set_dimension_bilateral_tolerance(
         adapter,
         "BaseSpotFaceRear",
         "SpotFaceDepth",
         *deviations(SPOTFACE_DEPTH_BAND_MM),
+        places=DRAWING_PRECISION["BaseSpotFaceRear"]["SpotFaceDepth"],
+        display_unit=UNIT,
     )
     for dimension_name in PIVOT_SEAT_DIMENSIONS:
         set_dimension_symmetric_tolerance(
-            adapter, "PivotSeatReference", dimension_name, PIVOT_SEAT_POSITION_BAND_MM
+            adapter,
+            "PivotSeatReference",
+            dimension_name,
+            PIVOT_SEAT_POSITION_BAND_MM,
+            places=DRAWING_PRECISION["PivotSeatReference"][dimension_name],
+            display_unit=UNIT,
         )
-    # Every pocket corner fillet prints as one single limit, "R6.0 MAX":
+    # Every pocket corner fillet prints as one single limit, "R.23 MAX":
     # swTolMAX prints the nominal then MAX, so the modelled radius IS the max.
     _display, fillet_radius = _named_dimension(
         adapter, "PocketFillets", "PocketFilletRadius"
