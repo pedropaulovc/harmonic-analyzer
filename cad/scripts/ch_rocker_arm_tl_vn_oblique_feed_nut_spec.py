@@ -275,10 +275,13 @@ HOLE_VOLUME_MM3 = math.pi * (HOLE_DIA / 2.0) ** 2 * FLANGE_THICK
 CSK_VOLUME_MM3 = countersink_volume(CSK_DIA, HOLE_DIA)
 VOLUME_MM3 = BODY_VOLUME_MM3 - SCREW_COUNT * (HOLE_VOLUME_MM3 + CSK_VOLUME_MM3)
 
-# The sheet's footer note: what the fit-up did to the bought nut, by mate.
+# The sheet's footer note: the fit-up work on the bought nut, one line that
+# fits the purchased footer row (_NOTE_X to _FOOTER_RIGHT in
+# _purchased_fastener_drawing). The general line says the part is cut at
+# assembly per this note.
 DRAWING_NOTES = (
-    "AS FITTED (MHA-CH-06-TL-00 STEP F1): SPIGOT FACED OFF; HOLES COUNTERSUNK"
-    " FOR MHA-CH-06-TL-VN-67 FLAT HEADS."
+    f"FACE ITS SPIGOT OFF AND COUNTERSINK ITS {SCREW_COUNT} HOLES PER "
+    "MHA-CH-06-TL-00 STEP F1."
 )
 
 # --- Supplier reference sizes (the dimension image's, mm) ---------------------------

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import math
 from pathlib import Path
 
@@ -209,6 +210,33 @@ def test_supplier_references_are_the_dimension_image() -> None:
     )
     assert spec.SUPPLIER_REFERENCE_STARTS["SupplierHolePitchDiameter"] == (0.0, -spec.HOLE_PCD / 2.0)
     assert spec.SUPPLIER_PRODUCT_URL == f"https://www.amazon.com/dp/{spec.SKU}"
+
+
+def test_footer_note_fits_one_purchased_row_and_reads_cut_at_assembly() -> None:
+    import _purchased_fastener_drawing as footer
+    import draw_ch_rocker_arm_tl_vn_oblique_feed_nut as drawing
+
+    # The note is one footer row: at the repo's widest 2.36 mm a character
+    # (the ITEM row's budget basis) it stops at _FOOTER_RIGHT, clear of the
+    # title block. The farm proof of 2026-11-04 measured the former
+    # 107-character note 0.227 m wide, past it.
+    lines = footer.note_lines(spec.DRAWING_NOTES, label=STEM)
+    budget = math.floor((footer._FOOTER_RIGHT - footer._NOTE_X) / 0.00236)
+    assert len(lines) == 1 and budget == 83
+    assert all(len(line) <= budget for line in lines)
+    # One row keeps the bottom captions at their floor, so the tall_top cells
+    # the supplier lane budget assumes do not shrink.
+    assert footer.view_band_bottom(spec.DRAWING_NOTES, label=STEM) == footer._LOWEST_CAPTION_Y
+    # The builder writes the note where the sheet reads it, and the note is
+    # fit-up work, so the sheet's general line reads cut at assembly.
+    assert part.DRAWING_NOTES is spec.DRAWING_NOTES
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    [call] = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and getattr(node.func, "id", "") == "build_purchased_part_drawing"
+    ]
+    keywords = {keyword.arg: keyword.value for keyword in call.keywords}
+    assert isinstance(keywords["cut_to_suit"], ast.Constant) and keywords["cut_to_suit"].value is True
 
 
 def test_purchased_sheet_documents_the_built_part() -> None:

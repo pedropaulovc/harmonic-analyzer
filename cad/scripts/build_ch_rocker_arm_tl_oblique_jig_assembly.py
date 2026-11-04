@@ -47,7 +47,7 @@ from __future__ import annotations
 import json
 import math
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -339,6 +339,43 @@ def jig_exploded_view_name(configuration: str) -> str:
     )
 
 
+def explode_step_components(
+    label: str,
+    selectors: Sequence[str],
+    groups: Mapping[str, Sequence[Any]],
+    by_name: Mapping[str, Any],
+    kit_names: Mapping[str, str],
+) -> list[Any]:
+    """The native components one ``spec.EXPLODE_STEPS`` entry moves.
+
+    A family selector moves its whole identity group. An instance selector
+    (``spec.instance_name``; the riser and nut screws share a family but
+    explode apart) moves the one occurrence it names: a kit occurrence by its
+    persisted role reference (``kit_names``), any other by the Name2
+    ``_place_family`` proved equal to its selector.
+    """
+    moved: dict[str, Any] = {}
+    for selector in selectors:
+        if selector in groups:
+            members = tuple(groups[selector])
+        else:
+            try:
+                (occurrence,) = spec.explode_occurrences(selector)
+            except ValueError as error:
+                raise RuntimeError(
+                    f"{label}: unknown explode selector {selector!r}"
+                ) from error
+            name = kit_names.get(occurrence, occurrence)
+            if name not in by_name:
+                raise RuntimeError(
+                    f"{label}: explode occurrence {selector!r} has no component {name!r}"
+                )
+            members = (by_name[name],)
+        for component in members:
+            moved.setdefault(str(component.Name2), component)
+    return list(moved.values())
+
+
 def _presentation_transform(component: Any) -> tuple[float, ...]:
     transform = _early_bound(component.GetTotalTransform(True), "IMathTransform")
     if transform is None:
@@ -440,7 +477,7 @@ def _create_jig_explode(adapter: Any, configuration_name: str) -> None:
         _early_bound(component, "IComponent2")
         for component in (assembly.GetComponents(True) or ())
     )
-    component_reference_names(model, spec.KIT_COMPONENT_REFERENCES)
+    kit_names = component_reference_names(model, spec.KIT_COMPONENT_REFERENCES)
     groups: dict[str, list[Any]] = {family: [] for family in spec.QUANTITIES}
     for component in components:
         identity = component_identity(component)
@@ -462,6 +499,7 @@ def _create_jig_explode(adapter: Any, configuration_name: str) -> None:
     }
     if len(baseline) != sum(spec.QUANTITIES.values()):
         raise RuntimeError(f"{view_name}: duplicate component identities")
+    by_name = {str(component.Name2): component for component in components}
     expected = {name: [0.0, 0.0, 0.0] for name in baseline}
     axes = _global_axes(adapter, assembly, view_name)
 
@@ -478,12 +516,7 @@ def _create_jig_explode(adapter: Any, configuration_name: str) -> None:
         for step_index, (label, selectors, key, distance_mm) in enumerate(
             spec.EXPLODE_STEPS, 1
         ):
-            moved = []
-            for selector in selectors:
-                if selector in groups:
-                    moved.extend(groups[selector])
-                else:
-                    raise RuntimeError(f"{label}: unknown explode selector {selector!r}")
+            moved = explode_step_components(label, selectors, groups, by_name, kit_names)
             distance = distance_mm / 1000.0
             with _telemetry.span(
                 "assembly.jig_explode.step", label=label, moved=len(moved)

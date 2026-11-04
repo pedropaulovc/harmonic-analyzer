@@ -125,11 +125,14 @@ async def build(adapter: Any) -> dict[str, str]:
         proofs[0]()
 
     # The 18-character registry number overruns the template's DWG. NO.
-    # cell into REV; fit it there, measured.
+    # cell into REV; fit it there, measured. The footer note is fit-up work,
+    # so the general line reads cut at assembly per it, as for the carriage
+    # screws.
     return await build_purchased_part_drawing(
         adapter,
         SPEC,
         item=ITEM,
+        cut_to_suit=True,
         number_fit=NumberFit.SHRINK_TO_CELL,
         supplier_dimensions=supplier_dimensions,
         supplier_margins=SUPPLIER_MARGINS,

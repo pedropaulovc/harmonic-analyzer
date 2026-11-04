@@ -17,10 +17,11 @@ jig uses two. They are generic HIWIN-style HGH15CA blocks, NUIBBYED-branded,
 not genuine HIWIN, with no maker part number. The listing states no carriage
 dimension, preload or accuracy class. The owner's acceptance (``DRAWING_NOTES``)
 replaces the earlier Z0 preload requirement: Z0 preload and C accuracy are not
-required, and the pair is accepted at fit-up by its lateral play,
-``trammel.CARRIAGE_PLAY_TIR_MAX`` TIR at the pivot (the trammel spec's
-docstring carries the radius budget). Of the four kit carriages the two
-tightest are kept, one per rail.
+required, and the pair is accepted at the MHA-CH-06-TL-00 fit-up by its
+lateral play: the carrier rocked by hand sideways to the rail, at most
+``trammel.CARRIAGE_PLAY_TIR_MAX`` TIR read at the shoulder-screw head (the
+trammel spec's docstring carries the radius budget). Of the four kit
+carriages the two tightest are kept, one per rail.
 
 REFERENCE GEOMETRY. Every number here is HIWIN's HGH15CA, the style the kit
 copies; HIWIN is not the supplier. The first pass was datasheet-built: no
@@ -339,13 +340,20 @@ CAP_INTERNAL_MM3 = (A_CAP_OUTLINE - REFERENCE_CHANNEL_MM2) * 2.0 * CAP_LENGTH - 
 # The owner's description note for the kit carriages (#2177), the rail named
 # by its drawing number from the registry and the play acceptance read from
 # the trammel calculator. Rule 7: a matched-fit statement with its mate and
-# acceptance, three lines beside the footer's general line.
+# acceptance, three lines beside the footer's general line. The style
+# designation (HGH15CA) prints in the ITEM row. The check names its home, the
+# TL-00 jig where the carriage is fitted, how the carrier is rocked and where
+# the indicator reads (machinist review 20261104T194839817Z: the sheet draws
+# no pivot).
 RAIL_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-rail")["number"]
-PLAY_ACCEPTANCE = f"{trammel.CARRIAGE_PLAY_TIR_MAX:.2f} MM TIR MAX AT PIVOT"
+JIG_NUMBER = "MHA-CH-06-TL-00"
+PLAY_ACCEPTANCE = (
+    f"ROCK SIDEWAYS, {trammel.CARRIAGE_PLAY_TIR_MAX:.2f} MM TIR MAX AT SHOULDER SCREW"
+)
 DRAWING_NOTES = "\n".join(
     (
-        f"GENERIC HIWIN-STYLE {STYLE}, NUIBBYED-BRANDED, NOT GENUINE HIWIN;",
-        f"MATCHED KIT WITH RAIL {RAIL_NUMBER}. Z0 PRELOAD AND C ACCURACY",
-        f"NOT REQUIRED; ACCEPT BY FIT-UP PLAY CHECK, {PLAY_ACCEPTANCE}.",
+        "GENERIC HIWIN-STYLE, NUIBBYED-BRANDED, NOT GENUINE HIWIN; MATCHED KIT",
+        f"WITH RAIL {RAIL_NUMBER}. Z0 PRELOAD, C ACCURACY NOT REQUIRED.",
+        f"IN {JIG_NUMBER}: {PLAY_ACCEPTANCE}.",
     )
 )

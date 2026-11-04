@@ -1088,29 +1088,37 @@ if (
 # The riser must clear the HUB pin's locator before it moves sideways.
 if explode_lift(RISER) - explode_lift(CARRIER) <= HUB_PIN_TOP_Z - trammel.CARRIER_TOP_Z:
     raise AssertionError("the exploded riser does not clear the HUB pin")
-_instances = {
+# Every occurrence's selector, ``instance_name`` by family and index.
+INSTANCE_NAMES = frozenset(
     instance_name(family, index)
     for family in BOM_ORDER
     for index in range(QUANTITIES[family])
+)
+
+
+def explode_occurrences(selector: str) -> tuple[str, ...]:
+    """The occurrences an explode selector moves: a family's every instance,
+    or the one ``instance_name`` occurrence it names (the riser and nut
+    screws share a family but explode apart)."""
+    if selector in QUANTITIES:
+        return tuple(instance_name(selector, index) for index in range(QUANTITIES[selector]))
+    if selector in INSTANCE_NAMES:
+        return (selector,)
+    raise ValueError(f"unknown explode selector: {selector}")
+
+
+_moved = {
+    occurrence
+    for _label, _selectors, _axis, _distance in EXPLODE_STEPS
+    for _selector in _selectors
+    for occurrence in explode_occurrences(_selector)
 }
-_moved: set[str] = set()
-for _label, _selectors, _axis, _distance in EXPLODE_STEPS:
-    for _selector in _selectors:
-        if _selector in QUANTITIES:
-            _moved.update(
-                instance_name(_selector, index)
-                for index in range(QUANTITIES[_selector])
-            )
-        elif _selector in _instances:
-            _moved.add(_selector)
-        else:
-            raise AssertionError(f"unknown explode selector: {_selector}")
 _static = {
     instance_name(family, index)
     for family in EXPLODE_STATIC
     for index in range(QUANTITIES[family])
 }
-if _moved & _static or _moved | _static != _instances:
+if _moved & _static or _moved | _static != INSTANCE_NAMES:
     raise AssertionError("every occurrence is exploded or deliberately static, not both")
 _RAIL_SCREW_TOP_EXPLODED = RAIL_TOP_Z + explode_lift(RAIL_SCREW)
 if _RAIL_SCREW_TOP_EXPLODED > CARRIAGE_UNDERSIDE_Z + explode_lift(CARRIAGE):

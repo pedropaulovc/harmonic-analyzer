@@ -11,6 +11,7 @@ import _config
 import build_ch_rocker_arm_tl_vn_oblique_carriage as part
 import ch_rocker_arm_tl_vn_oblique_carriage_spec as spec
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
+import ch_rocker_arm_tl_oblique_jig_assembly_spec as jig
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_vn_oblique_rail_spec as rail
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
@@ -372,24 +373,33 @@ def test_sheet_is_the_registered_purchased_part_reference(monkeypatch) -> None:
 def test_note_is_the_owner_kit_description_and_play_acceptance() -> None:
     """The owner's description (#2177): generic, not genuine HIWIN, a matched
     kit with the rail named by its registry drawing number, no Z0 preload or
-    C accuracy, accepted by the fit-up play check at the trammel's TIR."""
+    C accuracy, accepted by the play check at the trammel's TIR. The check
+    names its home (the TL-00 jig), how the carrier is rocked and where the
+    indicator reads: the 20261104T194839817Z review found 'AT PIVOT' named a
+    feature this sheet never draws."""
     number = _config.parts("ch-rocker-arm-tl-vn-oblique-rail")["number"]
     assert spec.RAIL_NUMBER == number
+    assert spec.JIG_NUMBER == jig.DRAWING_NUMBER
     lines = note_lines(spec.DRAWING_NOTES, label=NAME)
     assert len(lines) == 3
     assert all(len(line) <= 70 for line in lines), lines
     note = " ".join(lines)
     for fact in (
-        "GENERIC HIWIN-STYLE HGH15CA",
+        "GENERIC HIWIN-STYLE",
+        "NUIBBYED-BRANDED",
         "NOT GENUINE HIWIN",
         f"MATCHED KIT WITH RAIL {number}",
-        "Z0 PRELOAD AND C ACCURACY NOT REQUIRED",
-        "FIT-UP PLAY CHECK",
+        "Z0 PRELOAD, C ACCURACY NOT REQUIRED",
+        f"IN {jig.DRAWING_NUMBER}: ROCK SIDEWAYS",
+        "AT SHOULDER SCREW",
     ):
         assert fact in note, fact
+    assert "PIVOT" not in note
+    # The style the note leaves out prints in the ITEM row beside it.
+    assert spec.STYLE in draw.ITEM and "GENERIC HIWIN-STYLE" in draw.ITEM
     # The acceptance is the trammel calculator's, the budget it was sized to.
     assert trammel.CARRIAGE_PLAY_TIR_MAX == 0.05
-    assert f"{trammel.CARRIAGE_PLAY_TIR_MAX:.2f} MM TIR MAX AT PIVOT" in note
+    assert f"{trammel.CARRIAGE_PLAY_TIR_MAX:.2f} MM TIR MAX AT SHOULDER SCREW" in note
     source = Path(spec.__file__).read_text(encoding="utf-8")
     note_source = source[source.index("RAIL_NUMBER = ") :]
     assert '_config.parts("ch-rocker-arm-tl-vn-oblique-rail")["number"]' in note_source

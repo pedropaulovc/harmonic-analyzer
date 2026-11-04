@@ -461,6 +461,61 @@ def test_explode_source_refuses_incomplete_or_static_motion_coverage(failure: st
         _assert_explode_source_guards(steps)
 
 
+def test_explode_selectors_resolve_to_the_placed_occurrences() -> None:
+    # The jig_explode leaf resolves every step's selectors against the placed
+    # components: a family moves its identity group, an instance selector
+    # (the riser and nut screws share TL-VN-67 but explode apart) its own
+    # occurrence, a kit occurrence through its persisted role reference.
+    import build_ch_rocker_arm_tl_oblique_jig_assembly as builder
+
+    kit_names = {
+        selector: f"kit-member-{index}"
+        for index, selector in enumerate(spec.KIT_COMPONENT_REFERENCES)
+    }
+    groups = {family: [] for family in spec.QUANTITIES}
+    by_name = {}
+    for family, quantity in spec.QUANTITIES.items():
+        for index in range(quantity):
+            selector = spec.instance_name(family, index)
+            component = types.SimpleNamespace(Name2=kit_names.get(selector, selector))
+            groups[family].append(component)
+            by_name[component.Name2] = component
+    assert {kit_names.get(name, name) for name in spec.INSTANCE_NAMES} == set(by_name)
+    for label, selectors, _axis, _distance in spec.EXPLODE_STEPS:
+        moved = [
+            component.Name2
+            for component in builder.explode_step_components(
+                label, selectors, groups, by_name, kit_names
+            )
+        ]
+        expected = {
+            kit_names.get(occurrence, occurrence)
+            for selector in selectors
+            for occurrence in spec.explode_occurrences(selector)
+        }
+        assert len(moved) == len(set(moved)) and set(moved) == expected, label
+    steps = {label: selectors for label, selectors, _axis, _distance in spec.EXPLODE_STEPS}
+
+    def names(label: str) -> list[str]:
+        return [
+            component.Name2
+            for component in builder.explode_step_components(
+                label, steps[label], groups, by_name, kit_names
+            )
+        ]
+
+    assert names("riser screws lift out") == [f"{spec.RISER_SCREW}-{n}" for n in range(1, 5)]
+    assert names("nut screws back out") == [f"{spec.RISER_SCREW}-{n}" for n in range(5, 9)]
+    with pytest.raises(RuntimeError, match="unknown explode selector"):
+        builder.explode_step_components(
+            "past the family", (f"{spec.RISER_SCREW}-9",), groups, by_name, kit_names
+        )
+    with pytest.raises(RuntimeError, match="has no component"):
+        builder.explode_step_components(
+            "not placed", spec.NUT_SCREW_INSTANCES[:1], groups, {}, kit_names
+        )
+
+
 
 def test_named_views_are_the_machine_frame() -> None:
     axes = spec.VIEW_AXES
