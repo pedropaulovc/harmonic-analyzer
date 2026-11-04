@@ -41,13 +41,23 @@ def test_catalogue_row_is_the_registered_mcmaster_dowel() -> None:
     assert metadata.threaded is False
 
 
+def test_drawing_is_enforced() -> None:
+    source = (
+        Path(__file__).parent / "draw_ch_rocker_arm_tl_vn_oblique_nut_dowel.py"
+    ).read_text(encoding="utf-8")
+    assert "MACHINIST_REVIEW = MachinistReviewMode.ENFORCE" in source
+
+
 def test_installation_note_names_function_and_mates_only() -> None:
     note = _config.parts(STEM)["installation_notes"]
     for mate in ("MHA-CH-06-TL-27", "MHA-CH-06-TL-32", "MHA-CH-06-TL-00"):
         assert mate in note
     # The holes and the press belong to the mates and the assembly sheet.
-    for procedure in ("DRILL", "REAM", "PRESS", "#42"):
+    for procedure in ("DRILL", "REAM", "PRESS", "#41"):
         assert procedure not in note
+    # Each line stays inside the note's reserved space, as the hub pin's 72
+    # characters do (one 113-character line ran out, final 20261103T204944360Z).
+    assert max(len(line) for line in note.splitlines()) <= 72
 
 
 def test_standalone_recipe_run_is_catalog_only() -> None:
@@ -85,7 +95,11 @@ def test_size_and_band_are_the_catalogues() -> None:
 def test_reference_lines_lie_on_front_edges() -> None:
     assert set(spec.SUPPLIER_REFERENCE_PLANES.values()) == {"Front"}
     names = {name for name, _value, _orientation in spec.SUPPLIER_REFERENCE_DIMENSIONS}
-    assert names == set(spec.SUPPLIER_REFERENCE_STARTS) == set(spec.SUPPLIER_REFERENCE_FORMATS)
+    assert (
+        names
+        == set(spec.SUPPLIER_REFERENCE_STARTS)
+        == set(spec.SUPPLIER_REFERENCE_FORMATS)
+    )
     for x, y in spec.SUPPLIER_REFERENCE_STARTS.values():
         assert x == pytest.approx(-spec.DIA / 2.0)  # the silhouette
         assert y in (0.0, spec.LENGTH)  # an end face's edge

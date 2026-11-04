@@ -23,8 +23,8 @@ from _part_properties import part_drawing_unit
 import ch_rocker_arm_tl_vn_oblique_nut_dowel_spec as part
 from _machinist_review_mode import MachinistReviewMode
 
-# Cached machinist review leaf, LEARN while the new sheet is screened.
-MACHINIST_REVIEW = MachinistReviewMode.LEARN
+# Cached machinist review leaf, enforced: the final on #2112 must SHIP it.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_nut_dowel"]
 # The footer's ITEM row: the catalogue designation in plain text.

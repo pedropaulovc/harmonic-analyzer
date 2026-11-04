@@ -1626,10 +1626,10 @@ def test_f1_transfers_the_lug_holes_from_the_seated_nut() -> None:
         "SPOT BOTH TAPS THROUGH ITS Ø.170 HOLES WITH A #18 DRILL",
         "DRILL #43 AND TAP #4-40 THRU",
         "DRILL #43 THROUGH THE NUT'S REAMED DOWEL HOLE TO SPOT THE LUG",
-        "BACK THE NUT OFF AND DRILL #41 THRU THE LUG",
+        "TURN THE NUT OFF AND DRILL #41 THRU THE LUG",
         f"PRESS THE DOWEL PIN {spec._item(spec.NUT_DOWEL)} INTO THE NUT FLUSH WITH ITS "
         "SCREW-HEAD FACE",
-        "RESEAT THE NUT ON THE LUG FACE",
+        "TURN THE NUT BACK ONTO THE LUG FACE",
         f"FIT 2 #4-40 X 3/4 FLANGED BHCS {spec._item(spec.NUT_SCREW)} AND TIGHTEN "
         f"TO {spec._torque(spec.NUT_SCREW_TORQUE_NM)}",
     )
@@ -1638,6 +1638,9 @@ def test_f1_transfers_the_lug_holes_from_the_seated_nut() -> None:
     assert spec._torque(spec.NUT_SCREW_TORQUE_NM) == "0.4 N·m (3.5 IN·LBF)"
     assert "THROUGH THE KP08S, THE FEED BLOCK LUG'S CLEARANCE AND THE FEED NUT" in steps["8"]
     assert steps["8"].index("THE FEED NUT") < steps["8"].index("COMPLETE F1")
+    # Machinist review (final 20261103T204944360Z): F1 turns the screw, never
+    # slides it, so step 8's stub length holds until the set screws lock it.
+    assert "TURN IT, NEVER SLIDE IT" in f1 and "2.0 MM PAST THE NEAR BLOCK" in f1
     assert "TRANSFERRED FROM THE NUT IN F1" in steps["7"]
     for text in (*spec.ASSEMBLY_STEPS, *spec.KP08_ALIGNMENT_STEPS):
         for stale in ("PRINT-DRILLED", "TRANSFER SPOTTING", "LOOSE HOLES"):
