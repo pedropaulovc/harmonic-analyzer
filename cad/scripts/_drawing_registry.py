@@ -705,6 +705,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="dt_cone_gear_tl_index_plate",
+        part="dt_cone_gear_tl_index_plate",
+        artifact_stem="dt-cone-gear-tl-index-plate",
+        script_name="draw_dt_cone_gear_tl_index_plate.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="dt_crank_drive_gear",
         part="dt_crank_drive_gear",
         artifact_stem="dt-crank-drive-gear",
@@ -1515,6 +1522,14 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="ch_rocker_arm_tl_oblique_jig",
         artifact_stem="ch-rocker-arm-tl-oblique-jig-assembly",
         script_name="draw_ch_rocker_arm_tl_oblique_jig_assembly.py",
+        source_kind="assembly",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="dt_cone_gear_tl_indexing_assembly",
+        part="dt_cone_gear_tl_indexing",
+        artifact_stem="dt-cone-gear-tl-indexing-assembly",
+        script_name="draw_dt_cone_gear_tl_indexing_assembly.py",
         source_kind="assembly",
         layout=DrawingLayout.LANDSCAPE,
     ),

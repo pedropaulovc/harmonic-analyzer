@@ -50,6 +50,7 @@ PRECISION_MIGRATED_DRAWINGS = frozenset(
         "draw_dt_arbor_pedestal.py",
         "draw_dt_cone_gear.py",
         "draw_dt_cone_gear_shaft.py",
+        "draw_dt_cone_gear_tl_index_plate.py",
         "draw_dt_cone_pivot_post.py",
         "draw_dt_cone_swing_platform.py",
         "draw_dt_cone_tip_block.py",
