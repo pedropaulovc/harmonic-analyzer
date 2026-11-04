@@ -131,7 +131,9 @@ def test_strap_blank_is_the_bought_one_and_a_half_inch_strap_stock() -> None:
         (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_bytes().decode()
     )
     (strap,) = [
-        row for row in inventory["stock"] if "MHA-CH-13 strap" in row.get("note", "")
+        row
+        for row in inventory["stock"]
+        if "(MHA-CH-13)" in row.get("note", "") and "BLANK_WIDTH" in row.get("note", "")
     ]
     width, thick = strap["section_mm"]
     assert trammel.BLANK_WIDTH == width == pytest.approx(1.5 * 25.4)
