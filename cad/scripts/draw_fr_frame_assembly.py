@@ -41,6 +41,7 @@ from _drawing_balloons import (
     add_component_bom_balloons,
     assert_balloon_landings,
     drawing_viewport_pixel_size,
+    isolate_drawing_view_components,
     position_bom_balloon,
 )
 from _drawing_common import (
@@ -96,15 +97,25 @@ from fr_frame_attachment_spec import (
     BASE_SCREW_Y,
     CAP_TOP_Y,
     CASTING_FULL_THREAD_DEPTH,
-    TOP_AXIS_HEIGHT_BAND_MM,
     TOP_AXIS_HEIGHT_DIMENSION,
     TOP_AXIS_HEIGHT_PLACES,
     TOP_AXIS_SETTING_FEATURE,
     TOP_SCREW_Y,
     TUBE_CROSS_HOLE_DIAMETER,
 )
-from fr_harmonic_base_spec import BOTTOM_WIDTH, DECK_HALF_X
-from fr_nameplate_spec import MOUNT_POS as NAMEPLATE_MOUNT_POS
+from fr_harmonic_base_spec import BOTTOM_WIDTH, DECK_HALF_X, STACK_HEIGHT
+import fr_frame_explode_spec as explode
+from fr_frame_setting_bands import TOP_AXIS_HEIGHT_BAND_MM
+from fr_nameplate_spec import (
+    MOUNT_POS as NAMEPLATE_MOUNT_POS,
+    PLATE_HEIGHT as NAMEPLATE_PLATE_HEIGHT,
+    PLATE_THICKNESS as NAMEPLATE_PLATE_THICKNESS,
+    PLATE_WIDTH as NAMEPLATE_PLATE_WIDTH,
+)
+from fr_rocker_arm_support_section_spec import FOOT_THICKNESS as SUPPORT_FOOT_THICKNESS
+from fr_rocker_arm_support_spec import SUPPORT_WORLD_X, SUPPORT_WORLD_Z
+from fr_vn_lag_screw_spec import BEARING_OFFSET as LAG_BEARING_OFFSET, HEAD_H as LAG_HEAD_H
+from sh_vn_brass_fillister_screw_spec import HEAD_H as NAMEPLATE_SCREW_HEAD_H
 from fr_vn_frame_cross_screw_spec import (
     SHANK_DIA as CROSS_SCREW_SHANK_DIA,
     SHANK_LEN as CROSS_SCREW_SHANK_LEN,
@@ -140,13 +151,12 @@ UNIT = assembly_contract("fr-frame").drawing_unit
 HEIGHT_PLACES = 3
 INSET_PLACES = 2
 # The top cross-bore axis height (fr_frame_attachment_spec TOP_AXIS_*) prints
-# four places, 40.0753, with its .XX-grade band (+/-.0100). Step 3 sets all
+# three places, 40.075, with its .XX-grade band (+/-.010). Step 3 sets all
 # four corners' axes to this one absolute height from the base underside
 # before step 5 match-drills the tubes, so the frame's own .72 tap station off
-# its rail top cannot carry it. MHA-FR-02 keeps its faced underside on the
-# 999.7 plane the summing knife mounts clamp to, which leaves its rail top and
-# taps off the inch grid until the FR plane snap moves that plane with KNIFE_Y
-# and the channel FULCRUM.
+# its rail top cannot carry it. MHA-FR-02's faced underside sits on the
+# inch-grid plane (top_frame_plane, 39.358) the summing knife mounts clamp to,
+# which puts its rail top (40.795) and this axis on the .001 grid.
 # The tube match holes' finished drill, as steps 2 and 5 print it (.197).
 CROSS_HOLE_TEXT = render_number(TUBE_CROSS_HOLE_DIAMETER / 25.4, UNIT, 3)
 # Machine z stations each inset edge's ray is cast at, in turn: on both
@@ -234,6 +244,129 @@ BOM_ANCHOR = (0.018, 0.414)
 # Keep the complete set-screw balloon below the measured BOM, not its nominal
 # row heights: shared-SKU descriptions can wrap and lower the bottom rule.
 _BOM_BALLOON_CLEARANCE_M = 0.003
+
+
+@dataclass(frozen=True)
+class DeckDetail:
+    """One enlarged, exploded base-deck cluster on sheet 2, the way
+    draw_ch_channel_assembly enlarges its exploded end hardware: an
+    *Isometric view of ``stems`` alone at ``scale``, moved so its exploded
+    ``centre_xyz`` (model mm) lands on ``centre`` (sheet m) and cropped to
+    ``crop_radius_mm`` about it. The same circle marks the cluster in the
+    1:8 view, lettered with its note's top-left ``letter_offset`` (sheet m)
+    from the circle's projected centre."""
+
+    letter: str
+    scale: tuple[int, int]
+    centre_xyz: tuple[float, float, float]
+    centre: tuple[float, float]
+    stems: tuple[str, str]
+    crop_radius_mm: float
+    letter_offset: tuple[float, float]
+
+    @property
+    def title(self) -> str:
+        return f"DETAIL {self.letter}"
+
+    @property
+    def mm(self) -> float:
+        """Sheet metres per model millimetre."""
+        return self.scale[0] / self.scale[1] / 1000.0
+
+    @property
+    def model_centre_m(self) -> tuple[float, float, float]:
+        x, y, z = self.centre_xyz
+        return (x / 1000.0, y / 1000.0, z / 1000.0)
+
+    @property
+    def radius_m(self) -> float:
+        """The crop circle's sheet radius."""
+        return self.crop_radius_mm * self.mm
+
+    def label_text(self, items: dict[str, str]) -> str:
+        """Title, the BOM items the detail enlarges, scale."""
+        first, second = (items[stem] for stem in self.stems)
+        return "\n".join(
+            (
+                self.title,
+                f"ITEMS {first} AND {second}",
+                f"SCALE {self.scale[0]}:{self.scale[1]}",
+            )
+        )
+
+    @property
+    def label_xy(self) -> tuple[float, float]:
+        """The label's note point, under the circle from its left edge."""
+        return (
+            self.centre[0] - self.radius_m,
+            self.centre[1] - self.radius_m - DETAIL_LABEL_GAP_M,
+        )
+
+
+# At 1:8 the base deck's small hardware prints as specks and the support
+# stands behind a column (machinist review, run 20261103T090647187Z), so the
+# column between the BOM and the right border enlarges both deck clusters,
+# exploded and isolated. Each circle is centred on its cluster's exploded
+# mid-height and holds the projected box of the parts it enlarges: the
+# support's feet and its four lifted hold-down screws (the support's upper
+# frame runs off the circle), and the nameplate under its four lifted screws.
+DECK_DETAIL_X = 0.230
+DETAIL_LABEL_GAP_M = 0.004
+_LAG_SCREW_UNDER_HEAD_Y = STACK_HEIGHT + SUPPORT_FOOT_THICKNESS + LAG_BEARING_OFFSET
+SUPPORT_DETAIL = DeckDetail(
+    letter="C",
+    scale=(1, 3),
+    centre_xyz=(
+        SUPPORT_WORLD_X + explode.SUPPORT_ASIDE_X,
+        (
+            STACK_HEIGHT
+            + _LAG_SCREW_UNDER_HEAD_Y
+            + LAG_HEAD_H
+            + explode.SUPPORT_SCREW_WITHDRAW
+        )
+        / 2.0
+        + explode.SUPPORT_LIFT,
+        SUPPORT_WORLD_Z,
+    ),
+    centre=(DECK_DETAIL_X, 0.270),
+    stems=("fr-rocker-arm-support", "fr-vn-lag-screw"),
+    crop_radius_mm=80.0,
+    # Left of the circle, just past the support casting's outer edge, clear of
+    # the casting, the front-west column and the item 3 and 4 leaders. At the
+    # circle's upper-left corner the letter sat on the casting's outline
+    # (machinist review and layout audit, run 20261103T171906452Z).
+    letter_offset=(-0.0164, 0.0025),
+)
+NAMEPLATE_DETAIL = DeckDetail(
+    letter="D",
+    scale=(1, 2),
+    centre_xyz=(
+        NAMEPLATE_MOUNT_POS[0]
+        - NAMEPLATE_PLATE_HEIGHT / 2.0
+        + explode.NAMEPLATE_ASIDE_X,
+        (
+            NAMEPLATE_MOUNT_POS[1]
+            - NAMEPLATE_PLATE_THICKNESS
+            + NAMEPLATE_MOUNT_POS[1]
+            + NAMEPLATE_SCREW_HEAD_H
+            + explode.NAMEPLATE_SCREW_WITHDRAW
+        )
+        / 2.0
+        + explode.NAMEPLATE_LIFT,
+        NAMEPLATE_MOUNT_POS[2] - NAMEPLATE_PLATE_WIDTH / 2.0,
+    ),
+    centre=(DECK_DETAIL_X, 0.168),
+    stems=("fr-nameplate", "sh-vn-brass-fillister-screw"),
+    crop_radius_mm=68.0,
+    # Above the circle, between the two east columns and above the deck's
+    # back edge. At the upper-left corner it sat on the deck under a column
+    # (run 20261103T171906452Z).
+    letter_offset=(-0.0014, 0.0135),
+)
+DECK_DETAILS = (SUPPORT_DETAIL, NAMEPLATE_DETAIL)
+# swCropViewErrors_e.swCropViewErrors_NoError
+_CROP_NO_ERROR = 1
+_VIEW_POSITION_TOL_M = 1e-4
 
 # Drawing-selection coordinate only. The manufacturing column pitch remains
 # defined by the released source assembly and the part drawings.
@@ -2103,6 +2236,120 @@ def _reattach_frame_balloons(
     )
 
 
+def _activate_view(adapter: Any, view: Any, *, label: str) -> None:
+    name = view_name(adapter, view)
+    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(name):
+        raise RuntimeError(f"failed to activate the {label} {name!r}")
+    adapter.currentModel.ClearSelection2(True)
+
+
+def _sketch_view_circle(
+    adapter: Any,
+    view: Any,
+    centre: tuple[float, float],
+    radius_m: float,
+    *,
+    label: str,
+) -> None:
+    """Sketch a circle (sheet m) in ``view``'s own sketch, left selected
+    (draw_ch_channel_assembly._sketch_in_view)."""
+    view = _early_bound(view, "IView")
+    _activate_view(adapter, view, label=label)
+    sketch = _early_bound(view.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (centre, (centre[0] + radius_m, centre[1])):
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    previous = bool(manager.AddToDB)
+    manager.AddToDB = False
+    try:
+        circle = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous
+    if circle is None:
+        raise RuntimeError(f"failed to sketch the {label} circle")
+
+
+def detail_letter_xy(
+    centre: tuple[float, float], offset: tuple[float, float]
+) -> tuple[float, float]:
+    """A detail letter's note point, ``offset`` from its boundary's centre."""
+    return centre[0] + offset[0], centre[1] + offset[1]
+
+
+@_telemetry.traced("drawing.frame_deck_detail_marks")
+def _mark_deck_details(adapter: Any, exploded: Any) -> None:
+    """Each enlarged cluster's boundary in the 1:8 exploded view, about its
+    exploded centre as that view projects it, lettered outside it. Drawn
+    after the balloons, so no boundary is picked as a component's edge."""
+    numerator, denominator = EXPLODED_ISO_SCALE
+    for detail in DECK_DETAILS:
+        label = f"frame exploded {detail.title} boundary"
+        centre = model_point_in_view(
+            adapter, exploded, detail.model_centre_m, label=label
+        )
+        radius = detail.crop_radius_mm * numerator / denominator / 1000.0
+        _sketch_view_circle(
+            adapter, exploded, (centre[0], centre[1]), radius, label=label
+        )
+        adapter.currentModel.ClearSelection2(True)
+        _activate_view(adapter, exploded, label=label)
+        point = detail_letter_xy((centre[0], centre[1]), detail.letter_offset)
+        if add_note(adapter, detail.letter, *point) is None:
+            raise RuntimeError(f"failed to letter the {label}")
+
+
+@_telemetry.traced("drawing.frame_deck_detail", label_param="label")
+def _place_deck_detail(
+    adapter: Any, detail: DeckDetail, items: dict[str, str], *, label: str
+) -> Any:
+    """One enlarged, exploded base-deck cluster: placed with its exploded
+    centre on its spot, isolated to its families, cropped to its circle and
+    labelled under it (draw_ch_channel_assembly._exploded_detail)."""
+    view = _early_bound(
+        place_view(
+            adapter, str(SOURCE), "*Isometric", *detail.centre, scale=detail.scale
+        ),
+        "IView",
+    )
+    set_high_quality_shaded_with_edges(adapter, view, label=label)
+    _configure_view(adapter, view, exploded=True, label=label)
+    centre = model_point_in_view(adapter, view, detail.model_centre_m, label=label)
+    position = tuple(float(value) for value in view.Position)
+    target = [position[axis] + detail.centre[axis] - centre[axis] for axis in range(2)]
+    if not view.SetViewPosition(double_array(target), False):
+        raise RuntimeError(f"failed to move {label} onto its spot")
+    adapter.currentModel.EditRebuild3()
+    centre = model_point_in_view(adapter, view, detail.model_centre_m, label=label)
+    if max(abs(a - b) for a, b in zip(centre, detail.centre)) > _VIEW_POSITION_TOL_M:
+        raise RuntimeError(f"{label} centre sits at {centre!r}, not {detail.centre!r}")
+    isolate_drawing_view_components(
+        adapter, view, visible_stems=frozenset(detail.stems), label=label
+    )
+    _sketch_view_circle(adapter, view, detail.centre, detail.radius_m, label=label)
+    status = int(view.Crop2(False, False, 1))
+    adapter.currentModel.ClearSelection2(True)
+    adapter.currentModel.EditRebuild3()
+    view.UpdateViewDisplayGeometry()
+    cropped = bool(view.IsCropped())
+    _telemetry.annotate(crop_status=status, cropped=cropped)
+    if status != _CROP_NO_ERROR or not cropped:
+        raise RuntimeError(
+            f"{label} is not cropped: Crop2 status {status}, IsCropped {cropped}"
+        )
+    _activate_view(adapter, view, label=label)
+    _add_note_block(
+        adapter, detail.label_text(items), detail.label_xy, label=f"{label} label"
+    )
+    return view
+
+
 def _place_package(adapter: Any) -> Callable[[], None]:
     """Place every sheet; return the check that proves every balloon again
     after the last rebuild (:func:`_assert_frame_balloons_settled`)."""
@@ -2195,6 +2442,13 @@ def _place_package(adapter: Any) -> Callable[[], None]:
         (0.045, 0.075),
         label="exploded-view caption",
     )
+    # The enlarged deck details, lettered in the 1:8 view after its balloons.
+    _mark_deck_details(adapter, exploded)
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    items = dict(balloon_items)
+    for detail in DECK_DETAILS:
+        _place_deck_detail(adapter, detail, items, label=f"frame {detail.title}")
+        _activate_sheet(adapter, SHEET_NAMES[1])
 
     _activate_sheet(adapter, SHEET_NAMES[2])
     instruction_iso = place_view(

@@ -13,6 +13,8 @@ this module, so drawing data here would re-key them on every sheet edit.
 from __future__ import annotations
 import math
 
+from top_frame_plane import FULCRUM_KEEPER_SEAT_Y
+
 
 MM_PER_IN = 25.4
 
@@ -36,10 +38,11 @@ def _straddle_minimum(plate: float, tolerance: float) -> float:
 
 
 # --- Nominal geometry (DIMENSIONS.md "Chapter 15"). ---
-BAR_LENGTH = 32.0 * MM_PER_IN - 4.5  # 808.3: legacy 32" (~80 cm) SHORTENED 4.5
-# at the TOP by the 2026-08-02 top-frame rederive (fulcrum chain -4.5: bar top
-# 1072.25 -> 1067.75, top pin 1065.9 -> 1061.4; the foot/arc contact at the
-# rocker is UNCHANGED, preserving the level d=0 rest pose)
+# Legacy 32" (~80 cm) SHORTENED at the TOP by the fulcrum keepers' drop from
+# the legacy frame top 1040.7 (the 2026-08-02 top-frame rederive: 4.5 to the
+# 1036.2 keeper seat; #290 plane snap: 1036.1932, top_frame_plane). The foot/arc
+# contact at the rocker is UNCHANGED, so the d=0 rest pose is preserved.
+BAR_LENGTH = 32.0 * MM_PER_IN - (1040.7 - FULCRUM_KEEPER_SEAT_Y)  # 808.2932
 BAR_WIDTH = 0.25 * MM_PER_IN  # 6.35 square section, 1/4 in cold-finished bar
 BAR_DEPTH = 0.25 * MM_PER_IN  # 6.35
 # 1/4 in cold-finished square bar: ASTM A108/A29 size tolerance +0/-0.002 in.
@@ -80,7 +83,7 @@ TOP_PIN_HOLE_DIA = 1.9558  # .077 in
 TOP_PIN_HOLE_BAND = (0.02286, 0.0127)  # (upper, lower) deviations, reamed; native
 
 # --- Derived. ---
-TOP_PIN_Y = BAR_LENGTH - TOP_PIN_DROP  # 801.95
+TOP_PIN_Y = BAR_LENGTH - TOP_PIN_DROP  # 801.9432
 # Each notch is centred on the width, so each end has its own ledge.
 BOTTOM_NOTCH_OFFSET = (BAR_WIDTH - BOTTOM_NOTCH_WIDTH) / 2.0  # 1.62
 TOP_NOTCH_OFFSET = (BAR_WIDTH - TOP_NOTCH_WIDTH) / 2.0  # 1.60

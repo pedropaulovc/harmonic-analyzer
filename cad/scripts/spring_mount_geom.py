@@ -26,9 +26,14 @@ import sm_summing_lever_spec
 import sm_vn_boss_hook_spec
 from _hole_spec import blind_cut_dia_mm
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
+from top_frame_plane import KNIFE_Y
 
-KNIFE = (-15.0, 979.7)
+KNIFE = (-15.0, KNIFE_Y)
 KNIFE_CONTACT_Y = KNIFE[1] + sm_summing_lever_spec.HEX_H / 2.0
+# The gooseneck's column station stays the -197.0 its native counter-seat
+# calibration (springs.yaml) was measured at: frame_column_stations' #290
+# snap to 197.0024 would move the counter spring's upper eye off the lever
+# anchor's plumb line and need both counter seats recalibrated natively.
 COLUMN_X = -197.0
 MIN_CLEARANCE_MM = 0.25
 # The uniform coefficient slab grows downward from its fixed spring top.

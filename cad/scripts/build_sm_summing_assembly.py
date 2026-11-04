@@ -140,11 +140,11 @@ HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
 # with no bedding allowance. Each dowel (local Y=0 its lower end, axis +Y)
 # is pressed up to the floor of its crossbar ream (owner ruling 2026-10-24,
 # T+H3) and hangs into the knife mount's slip hole or slot.
-KNIFE_MOUNT_TOP_Y = CASTING_UNDERSIDE_Y - MOUNT_GAP  # 999.7: clamped, gap 0
-CROSSBAR_TOP_Y = CASTING_UNDERSIDE_Y + top_frame.RING_HEIGHT  # 1036.2, faced
-HANGER_WASHER_Y = CASTING_UNDERSIDE_Y + top_frame.HANGER_GRIP  # 1036.2, local Y=0
-HANGER_UNDERHEAD_Y = HANGER_WASHER_Y + hanger_washer.THICKNESS  # 1037.4827
-HANGER_STUD_Y = HANGER_UNDERHEAD_Y - hanger_screw.LENGTH  # 990.7827 (cut tip)
+KNIFE_MOUNT_TOP_Y = CASTING_UNDERSIDE_Y - MOUNT_GAP  # 999.6932: clamped, gap 0
+CROSSBAR_TOP_Y = CASTING_UNDERSIDE_Y + top_frame.RING_HEIGHT  # 1036.193, faced
+HANGER_WASHER_Y = CASTING_UNDERSIDE_Y + top_frame.HANGER_GRIP  # 1036.193, local Y=0
+HANGER_UNDERHEAD_Y = HANGER_WASHER_Y + hanger_washer.THICKNESS  # 1037.4759
+HANGER_STUD_Y = HANGER_UNDERHEAD_Y - hanger_screw.LENGTH  # 990.7759 (cut tip)
 HANGER_REACH = KNIFE_MOUNT_TOP_Y - HANGER_STUD_Y  # 8.9173, the modelled nominal
 # Worst-case stack (drawing-guidelines.md rules 18–19): MHA-SM-00 step 4
 # cuts each bolt to the crossbar-underside-to-washer-top height measured at

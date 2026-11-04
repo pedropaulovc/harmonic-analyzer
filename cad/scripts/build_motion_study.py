@@ -66,6 +66,7 @@ from _assembly import (
     component_named_ref,
     named_ref,
 )
+from ch_amplitude_bar_spec import TOP_PIN_Y as BAR_TOP_PIN_Y
 
 # A point on the connecting-rod's Ø51 ring-bore circular edge (part-local mm); its
 # arc centre is the ring centre = the rod origin (the cam pin point). See the
@@ -87,7 +88,7 @@ ROCKER_PIVOT_LOCAL = [0.0, 8.0, 0.0]  # pivot bore = rocker Axis1
 # Amplitude-bar foot axis (build_ch_channel_assembly BAR_FOOT_LOCAL = bar Axis2) and
 # top-pin (bar Axis1, the swing pivot, BAR_TOP_PIN_LOCAL); part-local mm.
 BAR_FOOT_LOCAL = [3.175, 0.0, 3.175]
-BAR_TOP_PIN_LOCAL = [3.175, 801.95, 3.175]  # 808.3 bar - 6.35 pin drop
+BAR_TOP_PIN_LOCAL = [3.175, BAR_TOP_PIN_Y, 3.175]  # bar length - 6.35 pin drop
 
 # ---- study constants --------------------------------------------------------
 ASM = "ha-harmonic-analyzer"

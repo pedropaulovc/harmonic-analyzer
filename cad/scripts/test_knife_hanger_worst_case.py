@@ -165,10 +165,10 @@ def test_the_retired_half_inch_tap_fails_the_same_web_formula() -> None:
 def test_the_screw_reach_holds_engagement_and_stays_in_the_thread() -> None:
     asm._assert_knife_hanger_stack()
     assert asm.MOUNT_GAP == 0.0
-    assert asm.CROSSBAR_TOP_Y == pytest.approx(1036.2)
-    assert asm.HANGER_WASHER_Y == pytest.approx(1036.2)
-    assert asm.HANGER_UNDERHEAD_Y == pytest.approx(1037.4827)
-    assert asm.HANGER_STUD_Y == pytest.approx(990.7827)
+    assert asm.CROSSBAR_TOP_Y == pytest.approx(top_frame.TOP_FRAME_RAIL_TOP_Y)
+    assert asm.HANGER_WASHER_Y == pytest.approx(top_frame.TOP_FRAME_RAIL_TOP_Y)
+    assert asm.HANGER_UNDERHEAD_Y == pytest.approx(1037.4757)
+    assert asm.HANGER_STUD_Y == pytest.approx(990.7757)
     assert asm.HANGER_REACH == pytest.approx(8.9175)
     # MHA-SM-00 cuts each bolt to its measured stack plus .351 +/-.006 in.
     assert asm.HANGER_REACH_MIN == pytest.approx(8.763)

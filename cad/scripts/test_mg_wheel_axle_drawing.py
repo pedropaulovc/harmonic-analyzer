@@ -304,17 +304,17 @@ def test_part_stamps_make_critical_properties() -> None:
 
 def test_wheel_group_stack_fits_the_pin() -> None:
     # Every corner at the printed limits (inch): the step inside the hub...
-    assert group.STEP_INSIDE_HUB == pytest.approx(0.027 * 25.4, abs=1e-6)
+    assert group.STEP_INSIDE_HUB == pytest.approx(0.026 * 25.4, abs=1e-6)
     # (b) on FULL thread: the dome's incomplete pitch is not counted, and the
     # first nut stays clear of the step's relief.
     assert group.LOCKNUT_THREAD_MARGIN >= 0.0
-    assert group.NUT_RUNOUT_MARGIN == pytest.approx(0.004 * 25.4, abs=1e-6)
+    assert group.NUT_RUNOUT_MARGIN == pytest.approx(0.003 * 25.4, abs=1e-6)
     # (c) the ruled 2.9 floored to .114, and the long corner under it.
     assert spec.THREAD_PAST_LOCKNUT_LIMIT == pytest.approx(0.114 * 25.4)
     assert spec.THREAD_PAST_LOCKNUT_LIMIT <= 2.9
-    assert group.THREAD_PAST_LOCKNUT_MAX == pytest.approx(0.113 * 25.4, abs=1e-6)
+    assert group.THREAD_PAST_LOCKNUT_MAX == pytest.approx(0.114 * 25.4, abs=1e-6)
     assert group.THREAD_PAST_LOCKNUT_MAX <= spec.THREAD_PAST_LOCKNUT_LIMIT
-    assert group.THREAD_PAST_LOCKNUT_NOMINAL == pytest.approx(1.706, abs=0.005)
+    assert group.THREAD_PAST_LOCKNUT_NOMINAL == pytest.approx(1.719, abs=0.005)
     # Pressed to the gauge, the shank lands the back end sunk in the bore at
     # every corner; nothing stands behind it there.
     assert spec.BACK_END_SUNK_MIN == pytest.approx(0.008 * 25.4, abs=1e-6)

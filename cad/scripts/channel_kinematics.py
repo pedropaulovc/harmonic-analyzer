@@ -112,7 +112,7 @@ def solve_state(amplitude: float = 0.0) -> dict[str, float]:
     ``amplitude`` is the foot-axis X offset from the rocker pivot (mm), the
     Fourier coefficient a_j (channels.yaml ``amplitude_mm``); 0 reproduces the
     neutral pose bit-exactly. The mechanism is a 4-bar loop: the bar top pin
-    rides the lever's 127 mm crank, the rigid bar (801.95 mm) hangs to the foot,
+    rides the lever's 127 mm crank, the rigid bar (801.9432 mm) hangs to the foot,
     and the foot-notch roof rests on the rocker's R800 top-edge arc. Positive
     amplitude slides the foot +X along the arc (the machine-frame lifting side,
     clear of the pivot shaft; the mirror of the pre-#151 -X side), tilting the

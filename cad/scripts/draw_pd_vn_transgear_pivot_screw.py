@@ -202,7 +202,7 @@ if not math.isclose(SHOULDER_END_Y - FITTED_THREAD_LEN, TIP_Y, abs_tol=1e-9):
 
 
 def _verify_reference_length(adapter: Any, annotation: Any) -> None:
-    """The fit-up length prints "(9.15)" with no band (rule 19)."""
+    """The fit-up length prints "(9.14)" with no band (rule 19)."""
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")

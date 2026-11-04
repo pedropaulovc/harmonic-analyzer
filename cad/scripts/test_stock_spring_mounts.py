@@ -13,21 +13,24 @@ import spring_mount_geom
 import sm_summing_lever_spec as lever
 from _cone_axis_constants import SUMMING_Z
 from stock_anchor_geom import ANCHOR_9489T111 as anchor
+from top_frame_plane import KNIFE_Y, TOP_FRAME_UNDERSIDE_Y
 
 
 def test_uniform_plate_preserves_anchor_and_nut_installation_coordinates() -> None:
     """Preserve local taps and their installed world-frame anchor/nut seats."""
-    assert spring_mount_geom.KNIFE == (-15.0, 979.7)
-    assert spring_mount_geom.PLATE_TOP_Y == pytest.approx(982.24)
-    assert spring_mount_geom.PLATE_BOTTOM_Y == pytest.approx(975.24)
+    # The knife line hangs 20.0 under the top frame's faced underside.
+    assert spring_mount_geom.KNIFE == (-15.0, KNIFE_Y)
+    assert KNIFE_Y == pytest.approx(TOP_FRAME_UNDERSIDE_Y - 20.0)
+    assert spring_mount_geom.PLATE_TOP_Y == pytest.approx(KNIFE_Y + 2.54)
+    assert spring_mount_geom.PLATE_BOTTOM_Y == pytest.approx(KNIFE_Y - 4.46)
     assert (
         spring_mount_geom.PLATE_TOP_Y - spring_mount_geom.PLATE_BOTTOM_Y
     ) == pytest.approx(lever.COEFFICIENT_T)
-    assert spring_mount_geom.CHANNEL_ANCHOR_XY == pytest.approx((24.85, 991.765))
+    assert spring_mount_geom.CHANNEL_ANCHOR_XY == pytest.approx((24.85, KNIFE_Y + 12.065))
     assert (
         spring_mount_geom.CHANNEL_ANCHOR_XY[1] + anchor.thread_start_y_mm
     ) == pytest.approx(spring_mount_geom.PLATE_TOP_Y)
-    assert channel.CHANNEL_ANCHOR_NUT_XY == pytest.approx((24.85, 975.24))
+    assert channel.CHANNEL_ANCHOR_NUT_XY == pytest.approx((24.85, KNIFE_Y - 4.46))
     # The nut's bearing face is local z=0; +Z must still point downward.
     assert channel.CHANNEL_ANCHOR_NUT_ROWS[2] == [0.0, -1.0, 0.0]
     assert lever.HOLE_COUNT == 20

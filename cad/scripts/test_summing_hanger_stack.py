@@ -52,9 +52,9 @@ def test_cut_hex_bolt_seats_on_the_new_washer_and_faced_crossbar_top() -> None:
     assert asm.HANGER_STUD_Y + hanger_screw.UNDERHEAD_LEN == pytest.approx(
         asm.HANGER_UNDERHEAD_Y
     )
-    assert asm.HANGER_WASHER_Y == pytest.approx(1036.2)
-    assert asm.HANGER_UNDERHEAD_Y == pytest.approx(1037.4827)
-    assert asm.HANGER_STUD_Y == pytest.approx(990.7827)
+    assert asm.HANGER_WASHER_Y == pytest.approx(top_frame.TOP_FRAME_RAIL_TOP_Y)
+    assert asm.HANGER_UNDERHEAD_Y == pytest.approx(1037.4757)
+    assert asm.HANGER_STUD_Y == pytest.approx(990.7757)
 
 
 def test_reach_extrema_are_the_fit_up_cut_band_alone() -> None:
@@ -96,7 +96,11 @@ def test_reach_extrema_are_the_fit_up_cut_band_alone() -> None:
         ("HANGER_CUT_LENGTH_MAX", 49.8, "without removing its factory end"),
         # Owner ruling 2026-10-24 (T+H3): the dowel's free end, hanging from
         # the crossbar ream, on the knife mount's slip-hole floor.
-        ("KNIFE_DOWEL_END_Y", 999.7 - 9.5, "bottoms the knife mount's slip hole"),
+        (
+            "KNIFE_DOWEL_END_Y",
+            CASTING_UNDERSIDE_Y - 9.5,
+            "bottoms the knife mount's slip hole",
+        ),
     ],
 )
 def test_stack_rejects_unseated_bearing_faces_or_insufficient_inspected_tail(
@@ -280,8 +284,8 @@ def test_knife_dowels_hang_pressed_end_up_from_the_crossbar_reams() -> None:
     assert asm.KNIFE_DOWEL_Y == pytest.approx(
         CASTING_UNDERSIDE_Y + top_frame.HANGER_PIN_HOLE_DEPTH
     )
-    assert asm.KNIFE_DOWEL_Y == pytest.approx(1011.638)
-    assert asm.KNIFE_DOWEL_END_Y == pytest.approx(992.588)
+    assert asm.KNIFE_DOWEL_Y == pytest.approx(1011.6312)
+    assert asm.KNIFE_DOWEL_END_Y == pytest.approx(992.5812)
 
 
 def test_crossbar_hanger_stations_are_the_assemblys_knife_mount_stations() -> None:

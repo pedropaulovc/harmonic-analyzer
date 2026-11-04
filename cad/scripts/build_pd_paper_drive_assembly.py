@@ -174,6 +174,7 @@ from _transforms import (  # noqa: E402
     rot_z_rows,
 )
 from _cone_axis_constants import FRAME_FRONT_COLUMN_Z
+from frame_column_stations import COLUMN_X
 from fr_harmonic_base_spec import STACK_HEIGHT as BASE_DECK_Y
 from _pd_paper_drive_explode import create_paper_drive_explode
 
@@ -203,7 +204,6 @@ from sh_column_clamp_back_geom import (  # noqa: E402
     HOLE_SPEC as CLAMP_RECEIVER_SPEC,
 )
 
-COLUMN_X = 197.0
 COLUMN_Z = FRAME_FRONT_COLUMN_Z
 # Depth chain: the front arc's front face (-129.4) carries the bar's back
 # face; the bar's front face (-138.9) carries the platen's back face.
@@ -620,6 +620,7 @@ KNOB_COLLAR_SEAT_Z = seat_geometry.SEAT_FACE_Z  # -154.3, the wheel's rear
 KNOB_COLLAR_FITTED_LENGTH = KNOB_SHAFT_Z0 - KNOB_COLLAR_SEAT_Z
 KNOB_COLLAR_Z0 = KNOB_SHAFT_Z0 - COLLAR.LENGTH  # the REF nominal's front
 KNOB_COLLAR_REAR_Z = KNOB_COLLAR_Z0 + COLLAR.LENGTH  # on F
+# 0.0039 since the #290 column snap moved F 0.013 forward (0.0169 before).
 KNOB_COLLAR_FRONT_GAP = KNOB_COLLAR_Z0 - KNOB_COLLAR_SEAT_Z
 if KNOB_COLLAR_FRONT_GAP < -1e-9:
     raise AssertionError(

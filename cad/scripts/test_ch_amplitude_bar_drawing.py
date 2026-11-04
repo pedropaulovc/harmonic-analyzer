@@ -47,7 +47,7 @@ def test_notes_module_is_the_single_source_of_the_marked_dimension_set() -> None
 
 
 def test_part_geometry_matches_the_spec() -> None:
-    assert ch_amplitude_bar_spec.BAR_LENGTH == bar.BAR_LENGTH
+    assert bar.BAR_LENGTH is ch_amplitude_bar_spec.BAR_LENGTH
     assert ch_amplitude_bar_spec.BAR_WIDTH == bar.BAR_WIDTH
     assert bar.TOP_PIN_HOLE_DIA is ch_amplitude_bar_spec.TOP_PIN_HOLE_DIA
     assert bar.TOP_PIN_HOLE_BAND is ch_amplitude_bar_spec.TOP_PIN_HOLE_BAND

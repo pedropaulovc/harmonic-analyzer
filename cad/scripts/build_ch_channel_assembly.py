@@ -18,7 +18,7 @@ the M6.8 mirror layer is gone).
   north ear, the bank's datum; south, on rocker 0's hub) +
   ch-vn-rocker-bank-spring x1 (MHA-CH-VN-54, the wave disc spring between the
   south washer and the south ear that preloads the bank north; #948 ruling R)
-  + fulcrum-shaft x1 (lever bank at (199.9, 1061.4); plain Ø6.35 x 166.4,
+  + fulcrum-shaft x1 (lever bank at (199.9, 1061.3932); plain Ø6.35 x 166.4,
   domed 1.025 proud of each keeper lug, set-screw flats up)
 * pivot-bracket x2 (2026-09 photo re-derive, ch14 page002_img01/img07: the
   black foot-and-ear brackets on the rocker-arm-support's top, at the
@@ -358,7 +358,7 @@ RING_CENTER = (
 # so a copy here could drift from what check:budget certifies.
 from ch_amplitude_bar_spec import (  # noqa: E402
     BAR_WIDTH,  # 6.35 square section
-    TOP_PIN_Y as BAR_TOP_PIN_Y,  # 801.95
+    TOP_PIN_Y as BAR_TOP_PIN_Y,  # 801.9432
 )
 from ch_bar_pivot_pin_spec import PIN_INSTALLED_LENGTH as BAR_PIN_LENGTH  # noqa: E402
 
@@ -370,7 +370,7 @@ if abs(BAR_PIN_LENGTH - BAR_WIDTH) > 1e-9:
     )
 
 # --- lever bank -------------------------------------------------------------
-# FULCRUM (199.9, 1061.4): the lever fulcrum shaft axis -- imported from channel_frame_geom.
+# FULCRUM (199.9, 1061.3932): the lever fulcrum shaft axis -- imported from channel_frame_geom.
 # The lever's two transfer arms -- imported, NOT copied, for the budget's sake
 # (ch_channel_lever_spec is what error_budget.nominal() reads).
 from ch_channel_lever_spec import (  # noqa: E402
@@ -547,9 +547,10 @@ if [z for _x, z in BRACKET_SCREW_XZ] != [
     _bracket_sides.HOLE_MACHINE_Z[name] for name in _bracket_sides.SIDES
 ]:
     raise AssertionError("the hold-down screws are not over the brackets' holes")
-RAIL_TOP_Y = 1036.2  # new top-frame casting top face (was 1040.7; the rederive
-# dropped the rail top 4.5 -- the keeper seats and the whole fulcrum chain
-# follow)
+# The keepers seat 0.0002 above MHA-FR-02's rail top (1036.1932; the float
+# Main accepted on #2127, derived from the plane in top_frame_plane).
+from top_frame_plane import FULCRUM_KEEPER_SEAT_Y as RAIL_TOP_Y  # noqa: E402
+
 # The fulcrum shaft and both end keepers centre on the lever bank's mid-plane
 # (ch_fulcrum_keeper_spec, one source with the top frame's keeper taps).
 FULCRUM_SHAFT_Z = FULCRUM_KEEPER_CENTRE_Z
@@ -589,6 +590,12 @@ KEEPER_SCREW_SEAT_H = KEEPER_FOOT_H - KEEPER_CBORE_DEPTH
 SET_SCREW_SEAT_Y = FULCRUM[1] + FULCRUM_FLAT_HEIGHT
 if abs(FULCRUM[1] - (RAIL_TOP_Y + KEEPER_SHAFT_AXIS_H)) > 1e-9:
     raise AssertionError("keeper shaft axis is not on the lever fulcrum line")
+# The amplitude bar shortens with the keepers (ch_amplitude_bar_spec), so the
+# fulcrum keeps the 2026-08-02 contract's 259.45 rise over the bar's foot axis
+# (1061.4 - 801.95): the d=0 rest pose, and every channel spring seat with it,
+# translates rigidly with the top-frame plane.
+if abs(FULCRUM[1] - BAR_TOP_PIN_Y - 259.45) > 1e-9:
+    raise AssertionError("the amplitude bar's top pin no longer tracks the fulcrum")
 if abs(FULCRUM_FLAT_PITCH / 2.0 - KEEPER_Z_OFF) > 1e-9:
     raise AssertionError("fulcrum shaft flats are not under the keeper crown taps")
 
@@ -646,7 +653,7 @@ BAR_TOP_PIN_LOCAL = [
     BAR_WIDTH / 2.0,
     BAR_TOP_PIN_Y,
     BAR_WIDTH / 2.0,
-]  # bar Axis1 (swing pivot; 808.3 - 6.35)
+]  # bar Axis1 (swing pivot; 808.2932 - 6.35)
 BAR_FOOT_LOCAL = [
     BAR_WIDTH / 2.0,
     0.0,
@@ -1455,7 +1462,7 @@ async def build(adapter) -> dict[str, str]:
     )
     await _locate_to_datum(adapter, fulcrum)
     pivot_w = (PIVOT[0], PIVOT[1])  # (72.9, 253.8) machine world
-    fulc_w = (FULCRUM[0], FULCRUM[1])  # (199.9, 1061.4) machine world
+    fulc_w = (FULCRUM[0], FULCRUM[1])  # (199.9, 1061.3932) machine world
     # The rockers and levers ride the shafts' named axes.  A point on a shaft's
     # O.D. is a view-dependent pick (#916): in the standard views it grazes the
     # silhouette, 0.075 mm from the bores' edges, and a hub at z = 0 (channel 9)

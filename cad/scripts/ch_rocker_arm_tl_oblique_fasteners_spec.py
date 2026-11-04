@@ -52,7 +52,6 @@ import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import ch_rocker_arm_tl_vn_oblique_pivot_screw_spec as pivot_screw
 from _hole_spec import THREAD_MAJOR_MM
 from _mcmaster_91771a112 import DIMS as _RISER_SCREW
-from _printed_tolerance import printed_band_mm
 
 INCH = trammel.INCH
 RAILS = 2  # one rail, one base bar, one carriage, one pivot block per side
@@ -275,8 +274,6 @@ HOLD_DOWN_STUD_THREAD = "1/2-13"
 HOLD_DOWN_STUD_STOCK_LENGTH = "3"
 HOLD_DOWN_STUD_STOCK_LENGTH_MM = inch_mm(HOLD_DOWN_STUD_STOCK_LENGTH)
 HOLD_DOWN_STUD_LENGTH_MM = 57.15  # 2.25
-HOLD_DOWN_STUD_LENGTH_PLACES = 1
-HOLD_DOWN_STUD_LENGTH_BAND = printed_band_mm(HOLD_DOWN_STUD_LENGTH_PLACES)
 HOLD_DOWN_STUD_CLEARANCE_MIN = 3.0
 HOLD_DOWN_STUD_COMPLETE_PROJECTION_PITCHES = 1.0
 HOLD_DOWN_STUD_PITCH_MM = INCH / int(HOLD_DOWN_STUD_THREAD.rsplit("-", 1)[1])

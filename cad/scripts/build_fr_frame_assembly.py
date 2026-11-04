@@ -42,11 +42,11 @@ flange depth -- the 27.45 cm pad is set by the column stations, not the ch. 6
   reclosed rod-pin hole 125.890 out reaches the cam centre at -52.990, rods plumb; the old
   "arbor 47.5 + 25.4 rod lever" chain died with the ch30 re-anchor).
   Inserted at its exact authored transform and locked to the fixed base.
-* top-frame x1: the green one-piece casting at mid-plane Y = 1017.9499 (side
+* top-frame x1: the green one-piece casting at mid-plane Y = 1017.9431 (side
   rails 34.2 wide / front-rear rails 38 wide x 1.437 tall, band
-  y 999.7..1036.1998; corner bosses Ø45 rise to 1040.77), bored around the
-  four columns; its east rail (-X) carries the gooseneck hub and its west
-  rail top face seats the fulcrum-keeper feet (ch-channel.SLDASM).
+  y 999.6932..1036.193 = 39.358..40.795; corner bosses Ø45 rise to 1040.765),
+  bored around the four columns; its east rail (-X) carries the gooseneck hub
+  and its west rail top face seats the fulcrum-keeper feet (ch-channel.SLDASM).
 * tube-frame-cap x4: intact stock McMaster 9275K141 push-on caps seated on the
   square tube ends, with their skirts sheltered by the top-frame recesses.
 * frame-cross-screw x8 + gooseneck-set-screw x1: four lower and four upper
@@ -212,7 +212,6 @@ from fr_frame_attachment_spec import (
     CASTING_FULL_THREAD_DEPTH,
     COLUMN_BOTTOM_Y,
     COLUMN_SOCKET_DIAMETER,
-    TOP_AXIS_HEIGHT_BAND_MM,
     TOP_AXIS_HEIGHT_DIMENSION,
     TOP_AXIS_HEIGHT_PLACES,
     TOP_AXIS_SETTING_FEATURE,
@@ -228,6 +227,8 @@ from fr_vn_tube_frame_cap_spec import (
     TOTAL_HEIGHT as CAP_TOTAL_HEIGHT,
 )
 from fr_tube_frame_spec import COLUMN_LENGTH, OUTER_DIA as COLUMN_OUTER_DIA
+import fr_frame_explode_spec as explode
+from fr_frame_setting_bands import TOP_AXIS_HEIGHT_BAND_MM
 
 ASM_NAME = "fr-frame"
 FRAME_EXPLODED = "FRAME_EXPLODED"
@@ -524,13 +525,12 @@ def _create_frame_explode(adapter: Any, configuration_name: str) -> None:
         ("rear cross screws withdraw", rear, "z", 0.050),
         ("gooseneck screw withdraws", groups["fr-vn-gooseneck-set-screw"], "x", -0.050),
         ("columns clear base seats", groups["fr-tube-frame"], "y", 0.060),
-        ("support lifts from deck", [*groups["fr-rocker-arm-support"], *groups["fr-vn-lag-screw"]], "y", 0.035),
-        ("support moves beside base", [*groups["fr-rocker-arm-support"], *groups["fr-vn-lag-screw"]], "x", -0.320),
-        ("support screws withdraw", groups["fr-vn-lag-screw"], "y", 0.050),
-        # At 1:8 a 25 mm lift printed the plate as if seated in its deck pocket.
-        ("nameplate lifts from deck", [*groups["fr-nameplate"], *groups["sh-vn-brass-fillister-screw"]], "y", 0.075),
-        ("nameplate moves beside base", [*groups["fr-nameplate"], *groups["sh-vn-brass-fillister-screw"]], "x", 0.080),
-        ("nameplate screws withdraw", groups["sh-vn-brass-fillister-screw"], "y", 0.050),
+        ("support lifts from deck", [*groups["fr-rocker-arm-support"], *groups["fr-vn-lag-screw"]], "y", explode.SUPPORT_LIFT / 1000.0),
+        ("support moves beside base", [*groups["fr-rocker-arm-support"], *groups["fr-vn-lag-screw"]], "x", explode.SUPPORT_ASIDE_X / 1000.0),
+        ("support screws withdraw", groups["fr-vn-lag-screw"], "y", explode.SUPPORT_SCREW_WITHDRAW / 1000.0),
+        ("nameplate lifts from deck", [*groups["fr-nameplate"], *groups["sh-vn-brass-fillister-screw"]], "y", explode.NAMEPLATE_LIFT / 1000.0),
+        ("nameplate moves beside base", [*groups["fr-nameplate"], *groups["sh-vn-brass-fillister-screw"]], "x", explode.NAMEPLATE_ASIDE_X / 1000.0),
+        ("nameplate screws withdraw", groups["sh-vn-brass-fillister-screw"], "y", explode.NAMEPLATE_SCREW_WITHDRAW / 1000.0),
     )
     # Reuse the native assembly axes already used by component patterns. Unlike
     # manipulator indices, Mark=2 direction entities are independent of each

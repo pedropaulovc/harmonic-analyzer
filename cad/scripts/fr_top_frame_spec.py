@@ -47,6 +47,7 @@ from fr_frame_attachment_spec import (
     CAP_RECESS_DEPTH,
     COLUMN_SOCKET_DIAMETER,
     TOP_FRAME_MID_Y,
+    TOP_FRAME_RAIL_TOP_Y,
     TOP_FRAME_UNDERSIDE_Y,
     TOP_SCREW_Y,
 )
@@ -66,8 +67,11 @@ FRONT_COLUMN_Z = FRAME_FRONT_COLUMN_Z  # -112.014
 REAR_COLUMN_Z = FRAME_REAR_COLUMN_Z  # +112.014
 RING_HEIGHT = 36.4998  # 1.437 rail band (ch30 p002 36.7 / p006 37.0 / ch19 img03 35.6)
 HALF_H = RING_HEIGHT / 2.0  # 18.2499; band local y -18.2499..+18.2499
-if abs(TOP_FRAME_MID_Y - HALF_H - TOP_FRAME_UNDERSIDE_Y) > 1e-9:
-    raise AssertionError("the rail band does not span the attachment's underside")
+if (
+    abs(TOP_FRAME_MID_Y - HALF_H - TOP_FRAME_UNDERSIDE_Y) > 1e-9
+    or abs(TOP_FRAME_MID_Y + HALF_H - TOP_FRAME_RAIL_TOP_Y) > 1e-9
+):
+    raise AssertionError("the rail band does not span the attachment's underside..top")
 HANGER_CROSSBAR_WIDTH = 25.146  # .99
 HANGER_CROSSBAR_WIDTH_PLACES = 2
 FLANGE_THICKNESS_MM = 8.128  # .32 final top flange, including the faced right rail top

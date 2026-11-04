@@ -13,6 +13,7 @@ from __future__ import annotations
 import _config
 from _column_clamp_interface import BAR_FRONT_DEPTH
 from _cone_axis_constants import FRAME_FRONT_COLUMN_Z
+from frame_column_stations import COLUMN_X
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
@@ -43,17 +44,19 @@ BAR_LENGTH = 234.0  # clamped end 29 past the west column + free end (photo, med
 
 # --- hole stations (local X; the bores run along Z, the front-back axis) --------
 SCREW_HOLE_X = -112.0  # pen-hanger screw hole: 5 mm from the fixed free end
-# Clamp-screw holes flanking the column line at +88, on the column clamps'
-# .689 ear stations (_clamp_arc.EAR_HOLE_Z, 17.5006).
+COLUMN_LOCAL_X = 88.0  # the west column's line on the bar
+# Clamp-screw holes flanking the column line at COLUMN_LOCAL_X, on the column
+# clamps' .689 ear stations (_clamp_arc.EAR_HOLE_Z, 17.5006).
 CLAMP_HOLE_X = (70.4994, 105.5006)
 # The print reads every station from the left end (the bar is modelled centred).
 LEFT_END_X = -BAR_LENGTH / 2.0
 HANGER_STATION = SCREW_HOLE_X - LEFT_END_X  # 5.0
 CLAMP_STATIONS = tuple(x - LEFT_END_X for x in CLAMP_HOLE_X)  # (187.4994, 222.5006)
 
-# Fixed photographic registration, shared by the bar placement and hanger tap
-# (build_pn_pen_hanger places its strap tap on this machine x).
-WHEEL_BAR_X0 = 109.0
+# Registration: the bar's column line sits on the west column, shared by the
+# bar placement and hanger tap (build_pn_pen_hanger places its strap tap on
+# this machine x).
+WHEEL_BAR_X0 = COLUMN_X - COLUMN_LOCAL_X  # 109.0024
 WHEEL_BAR_Y = 575.7  # ch30 p002 re-anchor (was 565.0)
 HANGER_SCREW_MACHINE_X = WHEEL_BAR_X0 + SCREW_HOLE_X
 

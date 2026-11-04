@@ -550,7 +550,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "sh-column-clamp-back",
                 4.1656,
                 3.454,
-                4.342,
+                4.3434,
             ),
             frozenset(("sh-vn-thumb-screw-1", "mg-magnifying-clamp-1")): (
                 _mg_clamp_thumb_limit()
@@ -682,10 +682,10 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 3.454,
                 7.9375,
             ),
-            # MHA-PD-VN-57 through the bar's through tap: the fitted 9.1444 thread
+            # MHA-PD-VN-57 through the bar's through tap: the fitted 9.144 thread
             # less the 1.1938 neck flat.
             frozenset(("pd-vn-transgear-pivot-screw-1", "pd-support-bar-1")): _annulus_limit(
-                4.1656, 3.454, 7.9506
+                4.1656, 3.454, 7.9502
             ),
             **_expected_numbered_pairs(
                 "sh-vn-fillister-screw-90280a108",

@@ -7,9 +7,10 @@ MHA-CH-11 bar pivot pin pressed through the top pin hole (M6.3 layout: bars
 run UP the spine from the rocker bank to the top-lever bank).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 15" — width 6.35 mm is book-annotated,
-length legacy 32" = 812.8 mm SHORTENED 4.5 at the top to 808.3 by the
-2026-08-02 top-frame rederive (fulcrum chain -4.5: bar top 1067.75, top pin
-1061.4; foot/arc contact unchanged, level d=0 rest pose preserved);
+length legacy 32" = 812.8 mm SHORTENED at the top by the fulcrum keepers' drop
+from the legacy frame top (2026-08-02 top-frame rederive: 4.5, to 808.3; #290
+plane snap: 808.2932, ch_amplitude_bar_spec); foot/arc contact unchanged,
+d=0 rest pose preserved;
 notch sizes are uncontradicted legacy values; top pin hole derived (M6.3).
 Audit verdict: PASS.
 
@@ -64,6 +65,7 @@ from _visibility import blank_reference_geometry
 from ch_amplitude_bar_drawing_spec import SURFACE_FINISHES
 from ch_amplitude_bar_notes import DRAWING_DIMENSIONS, DRAWING_PRECISION
 from ch_amplitude_bar_spec import (
+    BAR_LENGTH,
     BOTTOM_NOTCH_DEPTH_BAND,
     BOTTOM_NOTCH_OFFSET,
     BOTTOM_NOTCH_WIDTH,
@@ -82,9 +84,6 @@ import _telemetry
 PART_NAME = "ch-amplitude-bar"
 MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
-BAR_LENGTH = 32.0 * IN - 4.5  # 808.3: legacy 32" minus the 4.5 top-frame-rederive
-# top trim (fulcrum chain -4.5, 2026-08-02; foot end untouched). MUST equal
-# ch_amplitude_bar_spec.BAR_LENGTH.
 BAR_WIDTH = 0.25 * IN  # 6.35   DIMENSIONS.md ch15: annotated (high)
 BAR_DEPTH = 0.25 * IN  # 6.35   DIMENSIONS.md ch15: legacy, square section (med)
 # Notch widths: ch_amplitude_bar_spec derives each from the plate it straddles
@@ -372,7 +371,7 @@ async def build(adapter) -> dict[str, str]:
     # direct, view-independent proof of the book-sourced overall length.
     await bbox_extent_check(
         adapter,
-        "bar length (32 in - 4.5 top trim = 808.3)",
+        "bar length (32 in less the keeper drop = 808.2932)",
         "y",
         BAR_LENGTH,
     )

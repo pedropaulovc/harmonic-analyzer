@@ -23,6 +23,7 @@ from mg_magnifying_bracket_spec import DRAWING_PRECISION, FOOT_GRIP_TOL, MOUNTIN
 from mg_magnifying_bracket_spec import UNIT as BRACKET_UNIT
 from mg_lever_thread_joint import NOSE_R
 import sm_summing_lever_spec as lever
+from top_frame_plane import KNIFE_Y
 
 SCREW_SKU = "91794A078"
 SCREW_THREAD = "#2-56"
@@ -36,7 +37,7 @@ SCREW_HEAD_DIA = 3.556
 SCREW_HEAD_HEIGHT = 2.1082
 SCREW_PITCH = 25.4 / 56.0
 
-BRACKET_ORIGIN = (40.0, 979.7, -173.5192)  # threaded nose in the drum's wire lane
+BRACKET_ORIGIN = (40.0, KNIFE_Y, -173.5192)  # threaded nose in the drum's wire lane
 LEVER_ORIGIN_X = -15.0
 LEVER_FRONT_LOCAL_Z = -76.2
 SEAT_PLANE_Z = -73.11241221957347

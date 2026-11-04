@@ -68,7 +68,7 @@ R_BORE = 5.9944  # Ø.472 knife-bearing bore (2026-09-02 ch18 p.42 re-read: clos
 BLK_HALF_X = 12.7
 SUPPORT_Z_THICK = 13.97  # .55 axial depth straddling the trunnion mid
 # Local block top (clamped to the top-frame casting underside): the summing
-# assembly's knife-edge station, 999.7 - (979.7 + HEX_H / 2), exact.
+# assembly's knife-edge station, 20.0 - HEX_H / 2 under it (top_frame_plane), exact.
 BLK_TOP = 14.866
 BLK_BOT = -14.852  # local block bottom: 1.17 tall (BORE_CY - R_BORE - 3.1242 wall)
 BORE_CY = -5.7334  # bore centre below the ridge origin (TopClear 0.261 - R_BORE)

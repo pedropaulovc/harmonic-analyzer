@@ -39,7 +39,7 @@ Seven features (the six .cs features + the hex knife edge):
    tangent lines per side meeting two coradial arcs that wrap the cylinder.
 
 Part-local frame: origin = the knife-edge line, placed IDENTITY at machine
-(-15, 979.7, 0), so local axes ARE machine axes: +X = the channel-spring
+(-15, 979.6932, 0), so local axes ARE machine axes: +X = the channel-spring
 (coefficients-plate) arm (machine west), -X = the counter-spring
 (summation-anchor) arm (machine east), +Y up, +Z along the knife edge
 (channel direction). The spring holes sit at their registered local
@@ -198,10 +198,6 @@ SUM_CURV = 0.3 * IN  # summation plate side curvature                7.62
 ANCHOR_R = 0.375 * IN  # summation anchor outer radius               9.525
 # ANCHOR_H (19.05, the boss height and the counter anchor's engagement) is the
 # pure spec's -- build_sm_vn_boss_hook trims the purchased shank to it.
-
-# The coefficient plate's fixed local top registers at machine Y982.24.
-# Thickness grows downward, never through a changed installation transform.
-PLATE_TOP_Y = 982.24
 
 # --- hex knife-edge protrusions (NEW; LOW confidence -- tune vs ch30) -------
 # TWO trunnion stubs, one PROTRUDING BEYOND each body end (not flush inside):
@@ -405,7 +401,8 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     hole.)
 
     Machine-y registration (the M6.4 plate-top-at-998 convention) is set at
-    PLACEMENT, not baked here -- see PLATE_TOP_Y and the Phase 2/3 plan."""
+    PLACEMENT, not baked here -- see spring_mount_geom.PLATE_TOP_Y and the
+    Phase 2/3 plan."""
     from solidworks_mcp.adapters.base import (
         ExtrusionParameters,
         LinearPatternParameters,

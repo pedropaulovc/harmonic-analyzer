@@ -137,6 +137,7 @@ from _transforms import (
     rows_from_euler,
 )
 from _cone_axis_constants import FRAME_FRONT_COLUMN_Z, SUMMING_Z
+from frame_column_stations import COLUMN_X  # the WEST column (machine +x is west; the crank side -x is east)
 from sm_summing_lever_spec import PLATE_L
 from mg_wheel_bar_geom import WHEEL_BAR_Y
 from magnifying_bracket_joint_layout import (
@@ -153,7 +154,6 @@ BRACKET_SCREW_ROWS = ROT_X_NEG90
 # ch30 p002 front-view re-anchor (2026-07-17): the wheel
 # + bar + column clamps sit 10.7 higher than the old 565.0 -- the photo shows
 # the rim clearing the platen box top, which 565.0 left overlapped
-COLUMN_X = 197.0  # the WEST column (machine +x is west; the crank side -x is east)
 COLUMN_Z = FRAME_FRONT_COLUMN_Z
 # Depth chain -- the SAME two-piece clamp seat as the platen support bar
 # (paper-drive PR #196 E2): the front arc's front face (-129.4) carries the
@@ -180,12 +180,12 @@ assert math.isclose(BAR_FRONT_Z, WHEEL_BAR_FRONT_Z, abs_tol=1e-9), (
 )
 
 # --- magnifying group --------------------------------------------------------
-# Rod at the plate centreline (979.7 -- the whole summing chain dropped 10.3
-# with the one-piece top-frame casting, crossbar underside 1010 -> 999.7) so it
-# stays coplanar with the coefficients plate; the bracket flange butts the
-# plate front face. The clamp + vertical rod ride with it (CLAMP_POS and
-# VROD_TOP_Y derive from LEVER_ROD_Y).
-LEVER_ROD_Y = 979.7
+# Rod at the plate centreline, the summing knife line (top_frame_plane
+# KNIFE_Y, 979.6932) so it stays coplanar with the coefficients plate; the
+# bracket flange butts the plate front face. The clamp + vertical rod ride
+# with it (CLAMP_POS and VROD_TOP_Y derive from LEVER_ROD_Y). It stays a
+# literal for the AST reader (below), asserted against the knife-edge ridge.
+LEVER_ROD_Y = 979.6932
 # DEPTH (option A1, #1559): the ch30 p.4 side view is a TRUE PLUMB PLANE -- the
 # lever rod, the clamp's thumb screw, the vertical rod, the fixture's wire hook
 # and the drum's wire lane all lie in one plane, so WIRE 1 runs straight down
@@ -237,8 +237,9 @@ from sh_vn_thumb_screw_spec import (  # noqa: E402
     TIP_FLAT_R as THUMB_TIP_FLAT_R,
 )
 from mg_magnifying_clamp_geom import THUMB_CONTACT_ANGLE_MAX  # noqa: E402
+from top_frame_plane import TOP_FRAME_UNDERSIDE_Y  # noqa: E402
 
-TOP_FRAME_RAIL_UNDERSIDE_Y = 999.7
+TOP_FRAME_RAIL_UNDERSIDE_Y = TOP_FRAME_UNDERSIDE_Y
 _MIN_THUMB_RAIL_CLEARANCE = 0.25
 THUMB_SCREW_TIP_Y = LEVER_ROD_Y + LEVER_ROD_DIA / 2.0
 THUMB_SCREW_OUTER_FACE_Y = THUMB_SCREW_TIP_Y + THUMB_SHANK_LEN + THUMB_HEAD_STACK_LEN
@@ -279,7 +280,7 @@ CLAMP_POS = (CLAMP_X, LEVER_ROD_Y - CLAMP_BORE_Y, LEVER_ROD_Z)
 VROD_Z = LEVER_ROD_Z  # coaxial with the clamp and its thumb screw
 # Thread tip: the shoulder seats on the clamp's bottom face. A literal for the
 # same AST reader as LEVER_ROD_Z, asserted against its derivation.
-VROD_TOP_Y = 967.25
+VROD_TOP_Y = 967.2432
 assert math.isclose(
     VROD_TOP_Y, LEVER_ROD_Y - CLAMP_BORE_Y + VROD_SHOULDER_X, abs_tol=1e-9
 ), "vertical-rod thread tip drifted from the clamp's bottom face + SHOULDER_X"
