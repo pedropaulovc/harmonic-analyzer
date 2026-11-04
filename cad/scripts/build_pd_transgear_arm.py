@@ -14,7 +14,9 @@ face, +X to the square end, +Z to the rear face):
   extruded ``THICKNESS`` toward +Z as ``Arm``.
 * ``PivotBore``: the Ø4.9 running bore through at P.
 * ``PinBore``: the Ø3.874 reamed press bore through at S for the MHA-PD-23
-  pin, cut normal to the faces (the pin's head seats on the rear face).
+  pin, cut normal to the faces (the pin's head seats on the rear face), its
+  rear mouth chamfered 45 degrees as ``PinBoreRearMouth`` to clear the pin's
+  seat root.
 * ``PlateTaps``: native Hole Wizard taps through from the rear face, with
   ``PlateTapRearEntryBreaks`` and ``PlateTapFrontExitBreaks`` at 0.10 MAX.
 * ``SpotFace``: the rear spot face, a revolved cut whose profile (Top plane,
@@ -74,21 +76,24 @@ from _drawing_tolerances import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
+from _document_units import apply_package_model_units
 from _fit_deviations import deviations
 from _hole_spec import blind_cut_dia_mm
 from _holes import find_planar_face, wizard_holes
 from _part_pmi import author_part_pmi
+from _part_properties import part_drawing_unit
 from _native_projected_zone import require_saved_projected_gtols
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
 from pd_transgear_arm_geometry import (
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
-    LOCATOR_HOLE_BAND_MM,
+    LOCATOR_HOLE_DIA_BAND,
     EDGE_LEAN,
     END_HALF_WIDTH,
     PIN_BORE_DIA,
     PIN_BORE_DIA_BAND,
+    PIN_MOUTH_CHAMFER,
     PIN_HOLE_DEPTH,
     PIN_HOLE_DIA,
     PIN_HOLE_DIA_BAND,
@@ -118,6 +123,7 @@ from pd_transgear_arm_spec import (
     PIVOT_BORE_CALLOUT,
     SPOT_FACE_DIA_BAND,
     SPOT_FACE_FLOOR_TOLERANCE,
+    UNIT,
 )
 
 PART_NAME = "pd-transgear-arm"
@@ -181,6 +187,7 @@ def _csk_volume(csk: float, r: float) -> float:
 V_ARM = _outline_area() * THICKNESS
 V_BORE = math.pi * _R_BORE**2 * THICKNESS
 V_PIN_BORE = math.pi * _R_PIN_BORE**2 * THICKNESS
+V_PIN_MOUTH = _csk_volume(PIN_MOUTH_CHAMFER, _R_PIN_BORE)
 V_PLATE = len(PLATE_TAP_STATIONS) * math.pi * _R_PLATE**2 * THICKNESS
 V_PLATE_EDGE_BREAKS = len(PLATE_TAP_STATIONS) * (
     _csk_volume(PLATE_TAP_ENTRY_BREAK_MAX_MM, _R_PLATE)
@@ -266,6 +273,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations).  The mm suffix is load-bearing: this
     # is an INCH document and the equation manager reads bare numbers in
@@ -422,6 +431,17 @@ async def build(adapter: Any) -> dict[str, str]:
     name_last_feature(adapter, "PinBore")
     expected -= V_PIN_BORE
     await volume_check(adapter, "arm with pin bore", expected, 0.01 * V_PIN_BORE)
+    check(
+        "pin bore rear mouth",
+        await adapter.add_chamfer(
+            PIN_MOUTH_CHAMFER, [[PIN_STATION + _R_PIN_BORE, 0.0, THICKNESS]]
+        ),
+    )
+    name_last_feature(adapter, "PinBoreRearMouth")
+    expected -= V_PIN_MOUTH
+    await volume_check(
+        adapter, "pin bore rear mouth", expected, 0.03 * V_PIN_MOUTH + 0.05
+    )
 
     # --- Plate taps through, with ordinary rear entry/front exit breaks ----
     plate = wizard_holes(
@@ -738,29 +758,30 @@ async def build(adapter: Any) -> dict[str, str]:
     # Explicit bands (contract §3.1 / §12); every other printed dimension is
     # governed by its places (the spec's DRAWING_PRECISION).
     set_dimension_bilateral_tolerance(
-        adapter, "SpotFaceProfile", "SpotFaceDia", *deviations(SPOT_FACE_DIA_BAND)
+        adapter, "SpotFaceProfile", "SpotFaceDia", *deviations(SPOT_FACE_DIA_BAND),
+        display_unit=UNIT,
     )
     set_dimension_symmetric_tolerance(
-        adapter, "SpotFaceProfile", "FloorDepth", SPOT_FACE_FLOOR_TOLERANCE
+        adapter, "SpotFaceProfile", "FloorDepth", SPOT_FACE_FLOOR_TOLERANCE,
+        display_unit=UNIT,
     )
-    # The locating ream's band is symmetric, so it prints ± on one line and
-    # the six-line callout under it stays inside the sheet's upper border.
-    if abs(sum(LOCATOR_HOLE_BAND_MM)) > 1e-9:
-        raise AssertionError("the locating ream's band is no longer symmetric")
+    # The locating ream prints the .0930 reamer's own band.
     for index in (1, 2):
-        set_dimension_symmetric_tolerance(
+        set_dimension_bilateral_tolerance(
             adapter, "LocatorProfile", f"LocatorDia{index}",
-            round(deviations(LOCATOR_HOLE_BAND_MM)[1], 6),
+            *deviations(LOCATOR_HOLE_DIA_BAND), display_unit=UNIT,
         )
     for feature_name, dimension_name in BASIC_REDUCER_DIMENSIONS:
         set_dimension_basic_tolerance(adapter, feature_name, dimension_name)
     # PinHoleZ carries no explicit band: its .XXX title-block row governs
     # (coordinator ruling (a), #2019).
     set_dimension_bilateral_tolerance(
-        adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_DIA_BAND)
+        adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_DIA_BAND),
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "PinBoreProfile", "PinBoreDia", *deviations(PIN_BORE_DIA_BAND)
+        adapter, "PinBoreProfile", "PinBoreDia", *deviations(PIN_BORE_DIA_BAND),
+        display_unit=UNIT,
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _author_pivot_fit_annotation(adapter)

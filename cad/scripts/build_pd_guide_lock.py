@@ -6,9 +6,9 @@ platen cannot fall off it: the plate overlaps the guide on one long edge
 (the 2 screw holes) and cantilevers past the bar's back face on the other.
 
 Layout: width along +X, height along +Y from the origin corner, thickness
-extruded +Z; the y = 0 edge is the guide-side edge (screw holes 2.5 above
+extruded +Z; the y = 0 edge is the guide-side edge (screw holes .155 above
 it), and its four plan corners are rounded. Bottom-rail copies mount as
-authored and bridge UP across the 1.0 running clearance onto the bar;
+authored and bridge UP across the running clearance onto the bar;
 top-rail copies are flipped Rz180 by the assembly and hang DOWN over the bar
 the top rail rides on.
 
@@ -25,8 +25,10 @@ import sys
 from _appearance import PANEL_BLACK, apply_color, apply_material
 from _check import check
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -54,8 +56,8 @@ from pd_guide_lock_spec import (
     ISOMETRIC_VIEW_NOTE,
     LOCK_HEIGHT,
     LOCK_THICK,
-    LOCK_THICK_BAND,
     LOCK_WIDTH,
+    UNIT,
 )
 from pd_vn_guide_lock_screw_spec import SHANK_DIA as LOCK_SCREW_SHANK_DIA
 
@@ -65,12 +67,12 @@ MATERIAL = "Plain Carbon Steel"
 # LOCK_WIDTH/LOCK_HEIGHT/LOCK_THICK/HOLE_XY live in pd_guide_lock_spec.py (the
 # dimensional contract shared with draw_pd_guide_lock.py; re-exported here for
 # build_pd_paper_drive_assembly). One plate serves both rails (user ruling
-# 2026-10-11): R9-59's 1.2 lip past the rail's outer edge (the screw holes'
-# edge wall) + 5 rail + the overlap behind the bar. The 28-tall bar
-# (pd_support_bar_spec) closes the old 7 open channel to a 1.0 running
-# clearance over the bottom rail and carries the top rail on its top edge, so
-# the 9.8 plate overlaps the bar 2.6 at the bottom stations and 3.6 at the
-# top (2026-07-07 field report: a 12-tall plate across the 7 channel topped
+# 2026-10-11): R9-59's lip past the rail's outer edge (the screw holes'
+# edge wall) + the .29 rail + the overlap behind the bar. The bar
+# (pd_support_bar_spec) closes the channel to a running clearance over the
+# bottom rail and carries the top rail on its top edge, so the .45 plate
+# overlaps the bar ~2.7 at the bottom stations and ~3.9 at the top
+# (2026-07-07 field report: a 12-tall plate across the old 7 channel topped
 # out AT the bar's bottom edge and retained nothing at the bottom stations;
 # its 15.65 successor stood 9.65 over the bar at the top, toward the latch
 # hook).
@@ -88,6 +90,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). mm suffix load-bearing (INCH document;
     # the equation manager reads bare numbers in document units). (The old
@@ -198,16 +202,21 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven lock (equations neutral)", v_final, 0.005 * v_plate
     )
 
-    # Manufacturing drawing support: the sheet thickness's and the hole
-    # coordinates' explicit bands and every printed dimension's places live
-    # on the model (drawing-simplicity-policy.md `How the repository implements the guidelines`; the paper-drive lock-station sweep and the
-    # screw set window read the same constants), then mark exactly the print's
-    # dimensions (the drawing recipe imports the marked set and must find
-    # every one of these), and stamp the make-critical title-block properties.
-    set_dimension_symmetric_tolerance(adapter, "Lock", "Depth", LOCK_THICK_BAND)
+    # Manufacturing drawing support: the hole coordinates' explicit bands and
+    # every printed dimension's places live on the model
+    # (drawing-simplicity-policy.md `How the repository implements the
+    # guidelines`; the paper-drive lock-station sweep and the screw set window
+    # read the same constants), then mark exactly the print's dimensions (the
+    # drawing recipe imports the marked set and must find every one of these),
+    # and stamp the make-critical title-block properties. The sheet thickness
+    # carries no band: it prints as its stock fraction, REF (#290).
     for dimension_name in sorted(HOLE_LOCATION_DIMENSIONS):
         set_dimension_symmetric_tolerance(
-            adapter, "ScrewHoles", dimension_name, HOLE_LOCATION_BAND
+            adapter,
+            "ScrewHoles",
+            dimension_name,
+            HOLE_LOCATION_BAND,
+            display_unit=UNIT,
         )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)

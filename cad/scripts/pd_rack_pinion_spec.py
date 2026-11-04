@@ -5,8 +5,8 @@ driven 15:150 by the knob shaft's finite #7/reference-14 PA20 48DP form (#2034:
 15:150 replaced 12:120 at the same 1:10 feed) and
 screwed to the brass hub's flange (MHA-PD-17, ``pd_transgear_disc_hub_spec``) by three #0-80 fillister
 screws (MHA-PD-VN-55, McMaster 91794A055; the joint is
-``pd_transgear_disc_hub_geometry``'s).  Its Ø13.1 H7 bore pilots on the hub's
-Ø13.1 h6 spigot, which passes it and seats on the pinion sleeve's (MHA-PD-10)
+``pd_transgear_disc_hub_geometry``'s).  Its Ø.501 REAM_H7 bore pilots on the
+hub's Ø.501 SHAFT_H spigot, which passes it and seats on the pinion sleeve's (MHA-PD-10)
 step face; its front face, clamped by the hub's flange, stands the spigot's
 length ahead of that step, and its rear face stands in air ahead of the
 sleeve's 12T, radially clear of its tips (R9-68).
@@ -23,25 +23,31 @@ flange are match-marked.
 The model places the taps on the flange's bolt circle (the one authority);
 the sheet prints the tap, its mouth breaks and the transfer, never the
 bolt-circle position.
+
+Decimal inch (#290): fabricated nominals are the exact millimetre values of
+their printed inch sizes; the tooth form, its blank limits, span and centre
+distance keep their gear-derived values and print with enough places.
 """
 
 from __future__ import annotations
 
 import math
 
+import _config
 from _fit_deviations import deviations
+from _fit_ream_h7 import REAM_H7
+from _gear_fit_limits import gear_tip_band_mm
 from _gear_quality import toothspace_runout_tir_mm
-from _gtol_cylinder import CylinderFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
-from _printed_tolerance import printed_band_mm
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _inch_wall_limits import WALL_TARGET_MM
+from _package_units import drawing_unit
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _mcmaster_91794a055 import FILLISTER_SIZE
 from paper_drive_stock_inspection import GaugeContact, toothspace_gauge_contact_mm
 from pd_transgear_disc_hub_geometry import (
     BOLT_CIRCLE_DIA,
     BOLT_CIRCLE_POSITION_TOL,
     SCREW_COUNT,
-    SCREW_HOLE_DIA,
     SCREW_THREAD,
     SPIGOT_DIA,
     SPIGOT_DIA_BAND,
@@ -54,6 +60,25 @@ from stock_form_cutter import (
 )
 
 MM_PER_IN = 25.4
+
+UNIT = drawing_unit("parts/pd-rack-pinion", _config.parts("pd-rack-pinion"))
+
+
+def inch_text(value_mm: float, places: int) -> str:
+    """``value_mm`` as decimal-inch print text: ``.0019``, ``3.1650``."""
+    text = f"{value_mm / MM_PER_IN:.{places}f}"
+    return text[1:] if text.startswith("0.") else text
+
+
+def inch_floor_mm(value_mm: float, places: int) -> float:
+    """``value_mm`` floored onto the ``places``-place inch grid, in mm."""
+    return math.floor(value_mm / MM_PER_IN * 10**places + 1e-9) / 10**places * MM_PER_IN
+
+
+def inch_ceil_mm(value_mm: float, places: int) -> float:
+    """``value_mm`` raised onto the ``places``-place inch grid, in mm."""
+    return math.ceil(value_mm / MM_PER_IN * 10**places - 1e-9) / 10**places * MM_PER_IN
+
 
 # --- gear ----------------------------------------------------------------------
 TEETH = 150
@@ -76,7 +101,8 @@ RADIAL_SETTING = 3.969  # axis-total rigid tool translation, NOT profile shift x
 _SPAN_DESIGN_SETTING_BAND = (0.010, -0.010)
 SPAN_TEETH = 17  # physical indexed teeth, never the cutter's reference count
 SPAN_PLACES = 4
-OUTSIDE_DIA_BAND = (0.0, -0.10)  # (upper, lower), finite-supported blank
+OUTSIDE_DIA_BAND = gear_tip_band_mm("standard")  # (upper, lower), finite-supported blank
+OUTSIDE_DIA_PLACES = 4
 _SUPPORT_PROFILE = StockFormProfile(
     TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, RADIAL_SETTING
 )
@@ -101,11 +127,10 @@ _SPAN_CORNERS = tuple(
     )
     for profile in _SPAN_DESIGN_PROFILES
 )
+# Outward onto the printed .0001 in grid.
 SPAN_LIMITS = (
-    math.floor(min(row[0] for row in _SPAN_CORNERS) * 10**SPAN_PLACES)
-    / 10**SPAN_PLACES,
-    math.ceil(max(row[1] for row in _SPAN_CORNERS) * 10**SPAN_PLACES)
-    / 10**SPAN_PLACES,
+    inch_floor_mm(min(row[0] for row in _SPAN_CORNERS), SPAN_PLACES),
+    inch_ceil_mm(max(row[1] for row in _SPAN_CORNERS), SPAN_PLACES),
 )
 SPAN_BAND = (SPAN_LIMITS[1] - SPAN_NOMINAL, SPAN_LIMITS[0] - SPAN_NOMINAL)
 SPAN_DEVIATIONS = deviations(SPAN_BAND)
@@ -113,7 +138,7 @@ SPAN_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
 SPAN_PREFIX = f"SPAN {SPAN_TEETH} TEETH "
 _SPAN_SENSITIVITY = 2.0 * math.sin(math.pi * SPAN_TEETH / TEETH)
 _SPAN_ROUNDING_ALLOWANCE = (
-    10**-SPAN_PLACES + 4.0 * _SPAN_GEOMETRY_ERROR
+    10**-SPAN_PLACES * MM_PER_IN + 4.0 * _SPAN_GEOMETRY_ERROR
 ) / _SPAN_SENSITIVITY
 _SPAN_INVERSE_BOUNDS = (
     RADIAL_SETTING + _SPAN_DESIGN_SETTING_BAND[1] - _SPAN_ROUNDING_ALLOWANCE,
@@ -140,15 +165,14 @@ _MIN_SETTING_SUPPORT = StockFormProfile(
 )
 SUPPORT_OUTSIDE_DIA_MM = 2.0 * _MIN_SETTING_SUPPORT.support_radius_max_mm
 # The finite translated tip VECTOR, not T + the reference tip radius, caps
-# the blank. Floor after paying numerical error at the lowest accepted T.
-OUTSIDE_DIA = math.floor(
-    (
-        SUPPORT_OUTSIDE_DIA_MM
-        - 2.0 * _MIN_SETTING_SUPPORT.geometry_error_bound_mm
-        - OUTSIDE_DIA_BAND[0]
-    )
-    * 100.0
-) / 100.0
+# the blank. Floor onto the printed inch grid after paying numerical error
+# at the lowest accepted T.
+OUTSIDE_DIA = inch_floor_mm(
+    SUPPORT_OUTSIDE_DIA_MM
+    - 2.0 * _MIN_SETTING_SUPPORT.geometry_error_bound_mm
+    - OUTSIDE_DIA_BAND[0],
+    OUTSIDE_DIA_PLACES,
+)
 STOCK_PROFILE = StockFormProfile(
     TEETH, CUTTER_TEMPLATE, OUTSIDE_DIA / 2.0, RADIAL_SETTING
 )
@@ -169,7 +193,6 @@ ROOT_ENVELOPE_DIA_MM = (
     2.0 * STOCK_PROFILE.root_radius_min_mm,
     2.0 * STOCK_PROFILE.root_radius_max_mm,
 )
-ROOT_DIA_PLACES = 3
 ROOT_DIA_MIN = min(2.0 * profile.root_radius_min_mm for profile in _PROFILE_CORNERS)
 ROOT_DEPTH_X_MIN = min(
     profile.root_point(profile.root_half_angle_rad)[0]
@@ -193,8 +216,10 @@ for _profile in _PROFILE_CORNERS:
 
 # One certified pin, re-seated in every physical space, measures pattern
 # eccentricity on a radial indicator. A freely translated span cannot do so.
-TOOTH_SPACE_GAUGE_PIN_DIA_MM = 1.0  # nominal; use the actual certified diameter
+TOOTH_SPACE_GAUGE_PIN_DIA_MM = 1.016  # .040 nominal; use the actual certified diameter
 TOOTH_SPACE_RUNOUT_TIR_MM = toothspace_runout_tir_mm()  # assembled cluster, inclusive of pilot float
+# The printed limit never exceeds the booked one: floored to four inch places.
+TOOTH_SPACE_RUNOUT_TIR_TEXT = inch_text(inch_floor_mm(TOOTH_SPACE_RUNOUT_TIR_MM, 4), 4)
 
 
 def tooth_space_gauge_contacts(actual_pin_dia_mm: float) -> tuple[GaugeContact, ...]:
@@ -246,20 +271,20 @@ STANDARD_CENTRE_DISTANCE = (TEETH + MESH_PINION_TEETH) * MODULE_MM / 2.0
 CENTRE_EXTENSION = CENTRE_DISTANCE - STANDARD_CENTRE_DISTANCE
 
 # --- disc body -----------------------------------------------------------------
-FACE_WIDTH = 3.0
+FACE_WIDTH = 2.9972  # .118
 # Printed .XXX, functional (R9-5): the hub may never stand proud of the
 # sleeve nose, and that stack reads the disc thickness.
 FACE_WIDTH_PLACES = 3
-BORE_DIA = SPIGOT_DIA  # 13.1
-# Pilots on the hub's spigot (MHA-PD-17, pd_transgear_disc_hub_geometry): one ISO
-# fit, the bore reamed H7 at 10-18 mm over the spigot's h6, a locational
-# clearance that assembles by hand, so the disc never binds and sits at most
-# 0.0145 off the hub's axis while its taps are spotted.
-BORE_BAND = (0.018, 0.0)  # (upper, lower) deviations, H7
+BORE_DIA = SPIGOT_DIA  # .501
+# Pilots on the hub's spigot (MHA-PD-17, pd_transgear_disc_hub_geometry): the
+# bore reamed .501 REAM_H7 (an owned .5010 reamer) over the spigot's SHAFT_H,
+# a locational clearance that assembles by hand, so the disc never binds and
+# sits at most .0007 off the hub's axis while its taps are spotted.
+BORE_BAND = REAM_H7  # (upper, lower) deviations: +.0005/0
 BORE_DEVIATIONS = deviations(BORE_BAND)
-BORE_PLACES = 3
+BORE_PLACES = 4
 
-_BAND = {places: printed_band_mm(places) for places in (1, 2, 3)}
+_BAND = {places: printed_band_mm(places, unit=UNIT) for places in (1, 2, 3)}
 FACE_WIDTH_MIN = FACE_WIDTH - _BAND[FACE_WIDTH_PLACES]
 FACE_WIDTH_MAX = FACE_WIDTH + _BAND[FACE_WIDTH_PLACES]
 BORE_DIA_MIN = BORE_DIA + BORE_BAND[1]
@@ -271,25 +296,26 @@ BORE_DIA_MAX = BORE_DIA + BORE_BAND[0]
 # flange.
 SPIGOT_DIA_MIN = SPIGOT_DIA + SPIGOT_DIA_BAND[1]
 SPIGOT_DIA_MAX = SPIGOT_DIA + SPIGOT_DIA_BAND[0]
-# (least, greatest) diametral clearance: 0.000 .. 0.029.
+# (least, greatest) diametral clearance: .0000 .. .0013.
 SPIGOT_DIAMETRAL_CLEARANCE = (
-    round(BORE_DIA_MIN - SPIGOT_DIA_MAX, 3),
-    round(BORE_DIA_MAX - SPIGOT_DIA_MIN, 3),
+    round(BORE_DIA_MIN - SPIGOT_DIA_MAX, 6),
+    round(BORE_DIA_MAX - SPIGOT_DIA_MIN, 6),
 )
 if SPIGOT_DIAMETRAL_CLEARANCE[0] < 0.0:
     raise AssertionError(
         f"MHA-PD-06 bore binds on the MHA-PD-17 spigot: {SPIGOT_DIAMETRAL_CLEARANCE}"
     )
 DISC_OFFSET_MAX = SPIGOT_DIAMETRAL_CLEARANCE[1] / 2.0
-# The rear face stands in air (the hub's flange locates the front face), so
-# the bore's rear edge takes the title block's break.  The front edge is
-# chamfered past the spigot-to-flange corner's R0.1 so the front face seats
-# on the flange (pd_transgear_disc_hub_spec checks the pair).
-BORE_FRONT_CHAMFER_LIMITS = (0.15, 0.25)  # 45 deg
-BORE_FRONT_CHAMFER_NOTE = (
-    f"BORE FRONT EDGE CHAMFER {BORE_FRONT_CHAMFER_LIMITS[0]:.2f}-"
-    f"{BORE_FRONT_CHAMFER_LIMITS[1]:.2f} X 45\u00b0."
-)
+# The rear face stands in air (the hub's flange locates the front face, datum
+# B), so the bore's rear edge takes the title block's break.  The front edge
+# is chamfered past the spigot-to-flange corner's R.004 so the front face
+# seats on the flange (pd_transgear_disc_hub_spec checks the pair): a plain
+# .XXX chamfer on the title block's row, flagged at the bore with its reason.
+BORE_FRONT_CHAMFER = 0.254  # .010, 45 deg
+BORE_FRONT_CHAMFER_LIMITS = (
+    BORE_FRONT_CHAMFER - _BAND[3],
+    BORE_FRONT_CHAMFER + _BAND[3],
+)  # .005-.015
 
 # --- screw (MHA-PD-VN-55) -------------------------------------------------------------
 SCREW_MAJOR_DIA, SCREW_LENGTH, _HEAD_H, _HEAD_DIA, SCREW_PITCH = FILLISTER_SIZE
@@ -307,11 +333,11 @@ TAP_MAJOR_ALLOWANCE = 0.05
 TAP_COUNT = SCREW_COUNT
 TAP_CENTRES = screw_centres()
 
-# No countersink (R9-63): a 90° countersink opening past the 1.524 major
-# costs at least (1.524 - 1.191) / 2 = 0.167 of full thread at its mouth on
-# the 3.0 disc, so both mouths carry a burr break only (not modelled).  Full
+# No countersink (R9-63): a 90° countersink opening past the .060 major
+# costs at least (.060 - .047) / 2 = .0065 of full thread at its mouth on
+# the .118 disc, so both mouths carry a burr break only (not modelled).  Full
 # thread starts where the break's 45° leg meets the tap drill.
-MOUTH_BREAK_MAX = 0.10
+MOUTH_BREAK_MAX = 0.1016  # .004
 
 # --- the tap's thread losses (contract §7) -------------------------------------
 # The MHA-PD-VN-55 screws are cut to fit at assembly (R9-47): their tips stop
@@ -323,11 +349,11 @@ MOUTH_THREAD_LOSS = MOUTH_BREAK_MAX
 # --- tap to bore wall (contract §8) ---------------------------------------------
 # The disc prints no tap position, so its worst case is the transfer chain:
 # the flange hole's bolt-circle band (MHA-PD-17), the spot's centring in that
-# hole (a Ø1.7 spotting tool in the Ø1.7 +0.10/0 hole), and the disc's offset
-# on the spigot while it is spotted.
-SPOT_CENTRING_TOL = (SCREW_HOLE_DIA + 0.10 - SCREW_HOLE_DIA) / 2.0
+# hole (a #51 spotting tool in the #51 drilled hole, +.004/0), and the disc's
+# offset on the spigot while it is spotted.
+SPOT_CENTRING_TOL = drilled_oversize_mm(unit=UNIT) / 2.0
 TAP_POSITION_ERROR = BOLT_CIRCLE_POSITION_TOL + SPOT_CENTRING_TOL + DISC_OFFSET_MAX
-WALL_FLOOR = 2.0
+WALL_FLOOR = WALL_TARGET_MM
 TAP_TO_BORE_WALL = BOLT_CIRCLE_DIA / 2.0 - TAP_MAJOR / 2.0 - BORE_DIA / 2.0
 TAP_TO_BORE_WALL_WORST = (
     BOLT_CIRCLE_DIA / 2.0
@@ -343,46 +369,57 @@ if TAP_TO_BORE_WALL_WORST < WALL_FLOOR - 1e-9:
 # --- sheet -------------------------------------------------------------------------
 HUB_NUMBER = "MHA-PD-17"
 HUB_NAME = "HUB"
-# Lines appended under the native "#0-80 UNF-2B THRU" hole callout.
+SCREW_NUMBER = "MHA-PD-VN-55"
+# Lines appended under the native "#0-80 UNF THRU" hole callout (the title
+# block's thread row carries the 2B class).  The .004 mouth breaks are
+# tighter than the title block's .010 because the MHA-PD-VN-55 engagement
+# (pd_vn_transgear_disc_screw_spec) spends them; the callout names that
+# screw, so no loose note repeats it.
 TAP_CALLOUT_LINES = (
-    f"BREAK EDGE {MOUTH_BREAK_MAX:.2f} MAX BOTH SIDES",
-    f"SPOT THRU {HUB_NUMBER} FLANGE HOLES AT ASSY,",
-    "THEN DRILL AND TAP; MATCH-MARK DISC AND FLANGE",
+    f"BREAK EDGE {inch_text(MOUTH_BREAK_MAX, 3)} MAX BOTH SIDES,",
+    f"KEEPS {SCREW_NUMBER} ENGAGEMENT",
+    f"SPOT THRU {HUB_NUMBER} FLANGE",
+    "HOLES AT ASSY, THEN DRILL",
+    "AND TAP; MATCH-MARK BOTH",
 )
 TAP_CALLOUT_QUALIFIER = "\n".join(TAP_CALLOUT_LINES)
-# Reamed: the bore carries the Ra 1.6 finish and pilots on the hub's spigot.
-# The bore's native limits print with the dimension; the fit note names the
-# mate.
+# The .XXX thickness is the screw engagement's: its least is the tapped
+# length (pd_vn_transgear_disc_screw_spec), and .XX would cut that below
+# 1.5D.
+FACE_WIDTH_CALLOUT = f"SETS {SCREW_NUMBER}\nENGAGEMENT"
+# Reamed: the bore pilots on the hub's spigot, clamped to the flange, so it
+# is a static seat and carries no finish symbol (rule 6).  The bore's native
+# limits print with the dimension; the fit note names the mate, and the
+# front-edge chamfer the spigot root it clears.
 BORE_CALLOUT = "THRU - REAM"
 BORE_FIT_CALLOUT = "\n".join(
     (
         "BORE LIMITS GOVERN",
         f"MATE {HUB_NAME} {HUB_NUMBER} SPIGOT",
-        f"(\N{DIAMETER SIGN}{SPIGOT_DIA:.3f} +{SPIGOT_DIA_BAND[0]:.3f}/"
-        f"{SPIGOT_DIA_BAND[1]:.3f})",
-        f"(DIA CLR {SPIGOT_DIAMETRAL_CLEARANCE[0]:.3f}-"
-        f"{SPIGOT_DIAMETRAL_CLEARANCE[1]:.3f} mm)",
+        f"(\N{DIAMETER SIGN}{inch_text(SPIGOT_DIA, 4)} "
+        f"+{inch_text(SPIGOT_DIA_BAND[0], 4)}/-{inch_text(-SPIGOT_DIA_BAND[1], 4)})",
+        f"(DIA CLR {inch_text(SPIGOT_DIAMETRAL_CLEARANCE[0], 4)}-"
+        f"{inch_text(SPIGOT_DIAMETRAL_CLEARANCE[1], 4)})",
+        f"CHAMFER {inch_text(BORE_FRONT_CHAMFER, 3)} X 45\u00b0 AT B,",
+        f"CLEARS {HUB_NUMBER} SPIGOT ROOT",
     )
 )
 
-SURFACE_FINISHES = (SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA)),)
-
 # Marked native model dimensions: the disc thickness, finite blank, bore
-# and controlling actual-flank span. Root-envelope data are axis references;
-# neither OD touch-off nor free span variation certifies tooth-space runout.
+# and controlling actual-flank span.  No root diameter prints: the gear data
+# gives the whole depth (REF), and a third diameter line through the bore
+# crowded the bore's leader (machinist review).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
     "GearBlankProfile": {"OutsideDia"},
     "BoreProfile": {"BoreDia"},
     "SpanProfile": {"ToothSpan"},
-    "RootInspectionProfile": {"RootEnvelope"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "GearBlank": {"FaceWidth": FACE_WIDTH_PLACES},
-    "GearBlankProfile": {"OutsideDia": 2},
+    "GearBlankProfile": {"OutsideDia": OUTSIDE_DIA_PLACES},
     "BoreProfile": {"BoreDia": BORE_PLACES},
     "SpanProfile": {"ToothSpan": SPAN_PLACES},
-    "RootInspectionProfile": {"RootEnvelope": ROOT_DIA_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -406,8 +443,8 @@ GEAR_DATA = gear_data_note(
         ("NUMBER OF TEETH", f"{TEETH}"),
         ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
-        ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
-        ("WHOLE DEPTH (mm, REF)", f"{WHOLE_DEPTH:.3f}"),
+        ("PITCH DIAMETER (REF)", inch_text(PITCH_DIA, 4)),
+        ("WHOLE DEPTH (REF)", inch_text(WHOLE_DEPTH, 4)),
         (
             "CUTTER",
             # #1 is open-ended (135T to rack): print the catalogue's range.
@@ -417,35 +454,36 @@ GEAR_DATA = gear_data_note(
         ),
         (
             f"SPAN OVER {SPAN_TEETH} TEETH",
-            f"{min(SPAN_LIMITS):.{SPAN_PLACES}f}-{max(SPAN_LIMITS):.{SPAN_PLACES}f}",
+            f"{inch_text(min(SPAN_LIMITS), SPAN_PLACES)}-{inch_text(max(SPAN_LIMITS), SPAN_PLACES)}",
         ),
         ("MATES WITH", f"KNOB SHAFT {KNOB_NUMBER}, {MESH_PINION_TEETH}T"),
     ]
 )
 
-# The teeth are stated by the gear data block; the build appends the disc
-# screw's engagement line (pd_vn_transgear_disc_screw_spec imports this module).
-# A shop note states the requirement, not the measuring method or the design
-# history (Main ruling 2026-10-10).
-DRAWING_NOTES = BORE_FRONT_CHAMFER_NOTE
+# The tip and span bands are the mesh's: each names the mating pinion at its
+# dimension (rule 4).
+MESH_CALLOUT = f"MESHES {KNOB_NUMBER} {MESH_PINION_TEETH}T"
+# The blank's, stacked to stay narrow beside the edge view.
+MESH_CALLOUT_STACKED = f"MESHES\n{KNOB_NUMBER} {MESH_PINION_TEETH}T"
 
 # Spacing is held by the dividing head and is not inspected; one pin in
 # every space on a radial indicator catches eccentricity and gross slips.
 # The disc's own control is to its pilot datum A, accepted at the tooth
 # cutting setup (the drive-train gears' convention). The mesh stack books
-# 0.05 TIR about the assembled running axis. MHA-PD-00's disc-transfer step
+# the shared tooth-space TIR about the assembled running axis (the print
+# floors it to the .0001 in grid). MHA-PD-00's disc-transfer step
 # reaches it by tapping the disc central on the feed pinion's bore, and
 # accepts it there. That tap can only move the disc within the spigot
 # clearance, and the clearance may be zero. So a disc whose teeth run out
 # more than the assembled budget about its own pilot cannot be centred to
-# it. The part therefore takes the same 0.05: the loosest limit that cannot
+# it. The part therefore takes the same limit: the loosest that cannot
 # send a disc to assembly that the transfer step must reject.
 TOOTH_SPACE_CALLOUT_PROPERTY = "Tooth Space Inspection"
 TOOTH_SPACE_CALLOUT = "\n".join(
     (
-        f"TOOTH SPACE RUNOUT {TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO A, "
+        f"TOOTH SPACE RUNOUT {TOOTH_SPACE_RUNOUT_TIR_TEXT} TIR TO A, "
         "ACCEPT AT CUTTING SETUP",
-        f"\u00d8{TOOTH_SPACE_GAUGE_PIN_DIA_MM:.3f} PIN, ALL {TEETH} SPACES",
+        f"\u00d8{inch_text(TOOTH_SPACE_GAUGE_PIN_DIA_MM, 3)} PIN, ALL {TEETH} SPACES",
     )
 )
 
@@ -454,7 +492,11 @@ TOOTH_SPACE_CALLOUT = "\n".join(
 # hub's flange clamps the front face (datum B), so the rear face, toward the
 # platen, is held parallel to it (the paper-drive assembly's platen air reads
 # it). Tooth-space runout is to the pilot datum A (TOOTH_SPACE_CALLOUT).
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "disc rear face parallelism to front": "0.05",
+# The frame prints GEOMETRIC_TOLERANCES_IN; readers take the derived mm.
+GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
+    "disc rear face parallelism to front": ".002",
+}
+GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
+    key: float(value) * MM_PER_IN for key, value in GEOMETRIC_TOLERANCES_IN.items()
 }
 FRONT_FACE_DATUM = "B"

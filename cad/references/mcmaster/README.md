@@ -89,18 +89,20 @@ recipes:
 | 93585A190 | `dt-vn-cone-lock-knob` | Stainless Steel High-Profile Knurled-Head Thumb Screw |
 | 94025A150 | — (diagnostic recipe; `dt-vn-cone-tip-adjuster` until drawing-guidelines.md rule 18 (thread engagement) E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94025A164 | `dt-vn-cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
-| 93600A189 | `pd-vn-transgear-arm-plate-locating-pin` (catalogue-only; no vendor model) | Passivated 316 Stainless Steel ISO 2338-m6 Dowel Pin |
+| 94773A606 | `pd-vn-transgear-cluster-shim` (MHA-PD-VN-68; catalogue-only, no vendor model) | Shim for Shortening Screw Shoulders, 18-8 Stainless Steel, 1/8" Shoulder |
+| 93600A189 | — (retired 2026-11-02, #290: MHA-PD-VN-64 takes 98381A435; recipe removed) | Passivated 316 Stainless Steel ISO 2338-m6 Dowel Pin |
 | 9666K56 | `sh-vn-music-wire` (MHA-SH-VN-56; `LeverWire` and `PenWire` configurations cut from one coil; catalogue-only, no vendor model) | Lubricated 1080 Spring Steel Wire, 0.031 in, 1/4 lb coil |
 | 9714K24 | `ch-vn-rocker-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
 | 9714K392 | `dt-vn-cylinder-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
 | 9715K43 | `pd-vn-transgear-pivot-spring` (catalogue-only; no vendor model) | Curved Disc Spring |
-| 97431A260 | `pd-vn-transgear-retaining-ring` | Side-Mount External Retaining Ring |
-| 98055A098 | `pd-vn-transgear-pivot-shim` (MHA-PD-VN-67; catalogue-only, no vendor model) | DIN 988 Shim, Stress-Resistant Spring Steel |
+| 97431A240 | `pd-vn-transgear-retaining-ring` (catalogue-only; CAD download refused) | Side-Mount External Retaining Ring |
+| 97431A260 | — (retired 2026-10-31, #290: the 1/8 in pin takes 97431A240; replica recipe removed) | Side-Mount External Retaining Ring |
 | 98296A026 | — (diagnostic recipe; former `vn-transgear-collar-cross-pin`, MHA-VN-037 retired) | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A027 | `dt-vn-pinion-strap-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A031 | `pd-vn-transgear-knob-cup-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98381A433 | `pd-vn-transgear-knob-drive-pin` (catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A434 | `dt-vn-crank-seat-drive-pin` (crank only; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
+| 98381A435 | `pd-vn-transgear-arm-plate-locating-pin` (MHA-PD-VN-64; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A473 | `sm-vn-knife-mount-dowel` | Alloy Steel Dowel Pin |
 | 98381A474 | `pd-vn-transgear-latch-pin` (catalogue-only; no vendor model; SKU not yet read live) | Alloy Steel Dowel Pin |
 | 99607A213 | `pn-vn-pen-set-screw` | Stainless Steel Flared-Collar Knurled-Head Thumb Screw |
@@ -1109,22 +1111,24 @@ Catalog specifications checked on September 10, 2026:
   long, end shape "Round x Chamfer". As for 98381A434, `diag_build_98381A433.py`
   models the plain nominal cylinder; catalogue-only, no vendor model, no
   replica gate.
-- [93600A189](https://www.mcmaster.com/93600A189/), MHA-PD-VN-64, quantity two,
-  was read live on October 9, 2026 in isolated Chromium (HTTP 200): passivated
-  316 stainless, ISO 2338-m6, diameter 2.002–2.008 mm, nominal length 6 mm,
-  both ends chamfered. The supplier does not publish a length or chamfer
-  band. [ISO 2338:1997 Table 1](https://cdn.standards.iteh.ai/samples/20001/5b26cece48c448b782c0de1eccb5b16c/ISO-2338-1997.pdf)
-  bounds nominal 6-mm stock to 5.75–6.25 mm;
-  [c≈0.35 mm](https://fullerfasteners.com/tech/iso-2338-specifications-parallel-pins/)
-  is approximate, not a hard end limit or full-cylinder certificate.
-  `_transgear_arm_plate_locating_interface.py` owns the arm/plate hole limits,
-  proud set, blind depth and mouth breaks.
-  `pd_vn_transgear_arm_plate_locating_pin_spec.py` retains purchased-pin data and
-  the fit, insertion and bottom-air calculations. The whole standard length
-  family has at least 0.17 mm bottom air in the custom arm blind hole.
-  `diag_build_93600A189.py` uses the
-  existing nominal-cylinder recipe: catalogue-only, no vendor model, no
-  replica gate and no new commodity receiving procedure.
+- 93600A189 (MHA-PD-VN-64 until #290) was a passivated 316 ISO 2338-m6
+  2 x 6 mm dowel, read live on October 9, 2026. Retired 2026-11-02: the
+  metric dowel went to inch (owner ruling 2026-10-30) and its recipe and
+  dimension module were removed.
+- [98381A435](https://www.mcmaster.com/98381A435/) (`pd-vn-transgear-arm-plate-locating-pin`,
+  MHA-PD-VN-64, quantity two) was read live on November 2, 2026 from the
+  family table (the product page asks for a login),
+  https://www.mcmaster.com/products/dowel-pins/system-of-measurement~inch/diameter~3-32/length~5-16/:
+  High-Strength Alloy Steel, 3/32 in diameter (+0.0001 to +0.0003 in), 5/16
+  in long, 1,400 lbf double shear, Rockwell C47 minimum, ASME B18.8.2,
+  package of 100. The #290 ruling named 98381A434, but that is the crank's
+  MHA-DT-VN-67, so the PD pair takes the next free length rather than a
+  Shared identity. `_transgear_arm_plate_locating_interface.py` owns the
+  arm's .093 press and the plate's .0945 slip ream, the proud set and the
+  mouth breaks; `pd_vn_transgear_arm_plate_locating_pin_spec.py` keeps the
+  purchased-pin data and the fit and insertion arithmetic.
+  `diag_build_98381A435.py` models the plain nominal cylinder; catalogue-only,
+  no vendor model, no replica gate.
 - [98381A473](https://www.mcmaster.com/98381A473/) (`sm-vn-knife-mount-dowel`,
   MHA-SM-VN-53, two; formerly `pd-vn-transgear-latch-pin`) was read live on
   September 30, 2026:
@@ -1298,27 +1302,50 @@ Catalog specifications checked on September 10, 2026:
   replica gate, and its standalone diagnostic is a catalog-only run. Lost:
   316 stainless 93923A353 (same head and length, 80 ksi, three times the
   price).
-- [97431A260](https://www.mcmaster.com/97431A260/) (`pd-vn-transgear-retaining-ring`,
+- [97431A240](https://www.mcmaster.com/97431A240/) (`pd-vn-transgear-retaining-ring`,
   MHA-PD-VN-61, R9-68) is pushed sideways into the MHA-PD-23 pin's groove in front
-  of the MHA-PD-25 front bushing and closes the disc cluster's float. Its page
-  was read live (user-pasted) on October 2, 2026: side-mount external ring
-  for a 5/32 in shaft, phosphate-coated carbon steel, Rockwell C47 min,
-  groove Ø0.116 in, ring O.D. 0.282 in, thickness 0.025 in ±0.002. The
-  user-supplied vendor model was harvested on amet on October 2, 2026
-  (`cad/out/reports/mcmaster-97431A260-dump.json`): one Right-plane outline
-  (outer arc, three prongs on the Ø2.8956 "Free Diameter" circle, two
-  relief arcs), one mid-plane extrude and two fillet sets (R0.4445 at the
-  gap, R0.22225 at the prongs). `diag_build_97431A260.py` replays it and
-  passed the replica gate on October 2, 2026: volume 13.3124 vs 13.3124 mm³,
-  area 64.1486 vs 64.1486 mm², 26 faces each with the same face-area
-  multiset (largest per-face delta 0.0000 mm²), centre of mass on the
-  vendor's (`cad/out/reference/97431A260-replica-report.json`).
-  Evidence SHA-256: native SLDPRT
-  `dc3d0f8549d8851713aa234e24f338e9f0d41dbc96550669c281c99c3d9f4cff`.
+  of the MHA-PD-25 front bushing and closes the disc cluster's float. It
+  replaced 97431A260 (5/32 in shaft) when #290 took the pin from 3.9 mm to
+  1/8 in (owner ruling 2026-10-30). Its page was read live on October 31,
+  2026: side-mount E-style external ring for a 1/8 in shaft,
+  phosphate-coated carbon steel, Rockwell C47, groove Ø0.095 in 0/+0.002,
+  groove width 0.020 in 0/+0.002, ring O.D. 0.230 in, thickness 0.015 in
+  ±0.002, 60 lbf thrust. The CAD download and the 2-D PDF were refused
+  (HTTP 403), so it is catalogue-only with no replica gate. The page's
+  drawing (`97431A240_RingsX.GIF`, SHA-256
+  `439a4768c3d8a643a51fb30e74de18dfb79313963d196b126cc9130fb1643206`) gives
+  the free diameter 0.094 in; measured at 1582 px/in its relief radius,
+  prong radius, gap-corner angle and gap slope match the 97431A260 replica's
+  outline law (harvested on amet October 2, 2026, native SLDPRT SHA-256
+  `dc3d0f8549d8851713aa234e24f338e9f0d41dbc96550669c281c99c3d9f4cff`), so
+  `diag_build_97431A240.py` draws that law on this ring's catalogue circles.
+
+- [94773A606](https://www.mcmaster.com/94773A606/) (`pd-vn-transgear-cluster-shim`,
+  MHA-PD-VN-68, two in the model, 0 to 5 at fit-up; the family table's
+  caution that a stack of more than four may shift is for loose shims on a
+  screw shoulder, and these are captured on the pin) goes on the MHA-PD-23
+  pin between the MHA-PD-18 arm's front face and the MHA-PD-24 rear bushing;
+  the fitter stacks them until the ring gap matches the MHA-PD-00 setting
+  dimension, so no disc-cluster part is faced to fit (owner ruling
+  2026-11-01, #2124). The product page is login-walled; the values were read
+  live from the family table
+  (<https://www.mcmaster.com/products/arbor-shims/shoulder-diameter~1-8/>,
+  "Shims for Shortening Screw Shoulders", for a 1/8 in shoulder) on
+  November 1, 2026: 18-8 stainless steel, thickness 0.005 in ±0.0005,
+  I.D. 1/8 in 0/+0.012, O.D. 1/4 in −0.005/+0.002, Rockwell B70 minimum,
+  for No. 4 screws, pack of 10. Same-size alternates in that table: 90792A209
+  (316 stainless) and 91124A112 (spring steel, Rockwell C40). The 3/16 in O.D.
+  arbor shims (99040A305, 98126A019, 97022A873, 3088A143) were rejected:
+  they bear on a ring only about 0.02 in wide. The 1/8 in minimum I.D. is
+  the MHA-PD-23 pin's largest shank (.1250, +.0000/−.0002), so no shim
+  binds on the pin (line-on-line at the worst case; `transgear_cluster_fit`
+  checks it). Catalogue-only: no vendor model is downloaded, so it has no
+  replica gate; `diag_build_94773A606.py` draws the catalogue washer with
+  the I.D. at the catalogue's nominal 1/8.
 
 - [9715K43](https://www.mcmaster.com/9715K43/) (`pd-vn-transgear-pivot-spring`,
   MHA-PD-VN-63, one) sits on the MHA-PD-VN-57 pivot shoulder screw's shoulder, between
-  the MHA-PD-VN-67 shim under its head and the floor of the MHA-PD-18 arm's spot face, and
+  its head and the floor of the MHA-PD-18 arm's spot face, and
   preloads the arm forward onto the MHA-PD-20 spacer. Its page was read live on
   October 2, 2026 ("Curved Disc Springs, for 0.190" Shaft Diameter, 0.200"
   ID, 0.423" OD, 0.0113" Thick"): for a 0.190 in shaft, ID 0.200 in, OD
@@ -1339,19 +1366,6 @@ Catalog specifications checked on September 10, 2026:
   SolidWorks model is offered on the page, but none was fetched or kept here,
   so it is catalogue-only: no replica gate, and its standalone diagnostic is
   a catalog-only run.
-- [98055A098](https://www.mcmaster.com/products/din-988-shims/thickness~0-5-mm/shims-1~~/shims-4~performance~stress-resistant/)
-  (`pd-vn-transgear-pivot-shim`, MHA-PD-VN-67, one) sits on the MHA-PD-VN-57 shoulder
-  under its head, on the MHA-PD-VN-63 spring. The 9.5 support bar grew rearward
-  0.5 (user ruling B, 2026-10-15), which carried the shoulder's end and the
-  head 0.5 rearward; the shim takes that back so the spring keeps its room:
-  0.80 nominal, 0.70 min, 1.0008 max against the spring's 0.6858 working and
-  1.1938 free heights, a preload of 15.2-38.9 N. The page was read live on
-  October 15, 2026: DIN 988 shim, stress-resistant spring steel, 5 mm ID x
-  10 mm OD x 0.5 mm thick, thickness -0.05/0, ID 5.03-5.40, OD 9.53-9.96;
-  pack of 50, $6.90. 98089A331 was rejected: its ±0.064 thickness leaves a
-  0.636 minimum room, under the spring's working height.
-  `diag_build_98055A098.py` models the annulus at nominal; no supplier CAD
-  was harvested, so it is catalogue-only: no replica gate.
 
 - [9714K392](https://www.mcmaster.com/9714K392/) (`dt-vn-cylinder-bank-spring`,
   MHA-DT-VN-68, one) sits on the MHA-DT-13 arbor directly between gear 19's

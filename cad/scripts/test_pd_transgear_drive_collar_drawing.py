@@ -56,13 +56,16 @@ def test_turned_diameters_and_lengths_print_on_the_side_view() -> None:
     assert body == {"CollarDia", "CollarLength", "PilotDia", "PilotLength"}
     assert body <= set(drawing.SIDE_KEEP)
     assert spec.OVERALL_LENGTH == pytest.approx(spec.LENGTH + spec.PILOT_LENGTH)
-    # Both lengths share one row under the section, above the native
-    # "SECTION A-A" label (16.6 mm under the view); the overall reads above.
+    # Both lengths share one row under the section; the native "SECTION A-A"
+    # caption is moved under the row's dimension line (machinist review of
+    # bcdc09b35: the line struck "SECTION"); the overall reads above.
     rows = {drawing.SIDE_KEEP[n][1] for n in ("CollarLength", "PilotLength")}
     assert len(rows) == 1
     (row,) = rows
     view_bottom = drawing.SIDE_CENTER[1] - drawing.HALF_OD
     assert view_bottom - 0.016 < row < view_bottom
+    assert drawing.SECTION_CAPTION_XY[1] < row - 0.012
+    assert drawing.SECTION_CAPTION_XY[1] - 0.015 > drawing.NOTES_XY[1]
     assert drawing.OVERALL_TEXT_XY[1] > drawing.SIDE_CENTER[1] + drawing.HALF_OD
     # The pilot's length text stands right of its own short span.
     assert drawing.SIDE_KEEP["PilotLength"][0] > drawing._PILOT_X + 0.0145
@@ -254,14 +257,14 @@ def test_end_view_leaders_run_straight_in_without_crossing() -> None:
 def test_true_d_sizes_are_not_a_full_round_hole_or_an_unlocated_flat() -> None:
     assert spec.DRAWING_DIMENSIONS["BoreProfile"] == {"BoreDia", "FlatToAxis"}
     assert {"BoreDia", "FlatToAxis"} <= set(drawing.END_KEEP)
-    assert spec.BORE_DIA == pytest.approx(4.860)
+    assert spec.BORE_DIA == pytest.approx(4.8768)  # .192
     assert spec.BORE_DIA_BAND == pytest.approx((0.0127, 0.0))
-    assert spec.FLAT_TO_AXIS == pytest.approx(2.1525)
-    assert spec.FLAT_LIMITS == pytest.approx((2.145, 2.160))
-    assert spec.FLAT_BAND == pytest.approx((0.0075, -0.0075))
+    assert spec.FLAT_TO_AXIS == pytest.approx(2.16154)
+    assert spec.FLAT_LIMITS == pytest.approx((2.15392, 2.16916))
+    assert spec.FLAT_BAND == pytest.approx((0.00762, -0.00762))
     assert spec.FLAT_TOL_TYPE == 3
-    assert spec.FLAT_CLEARANCE == pytest.approx((0.020, 0.050))
-    assert spec.STUD_D_BORE_AIR == pytest.approx(0.07363)
+    assert spec.FLAT_CLEARANCE == pytest.approx((0.02032, 0.0508))
+    assert spec.STUD_D_BORE_AIR == pytest.approx(0.08255)
     # The source gate, not a test-only reimplementation, refuses a round
     # stud which fits the diameter but cannot pass the retained D-flat.
     assert 2.0 * (spec.FLAT_TO_AXIS + min(spec.FLAT_BAND)) < spec.BORE_DIA
@@ -275,8 +278,8 @@ def _fresh_collar_spec():
 
 
 def test_d_fit_refuses_round_and_flat_binding_independently(monkeypatch) -> None:
-    assert _fresh_collar_spec().BORE_CORE_CLEARANCE == pytest.approx((0.010, 0.0307))
-    monkeypatch.setattr(shaft, "CORE_DIA_BAND", (0.020, 0.0))
+    assert _fresh_collar_spec().BORE_CORE_CLEARANCE == pytest.approx((0.0254, 0.05842))
+    monkeypatch.setattr(shaft, "CORE_DIA_BAND", (0.030, 0.0))
     with pytest.raises(AssertionError, match="bore binds"):
         _fresh_collar_spec()
     monkeypatch.undo()
@@ -294,7 +297,6 @@ def test_round_stud_must_pass_the_actual_d_flat(monkeypatch) -> None:
 def test_fits_carry_named_bands_and_the_lengths_print_their_places() -> None:
     assert model_toleranced_dimensions(part) == {
         ("BodyProfile", "CollarDia"): "*deviations(OD_BAND)",
-        ("BodyProfile", "PilotDia"): "*deviations(PILOT_DIA_BAND)",
         ("BoreProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)",
         ("RearBoreChamfer", "BoreEntryBreak"): "*deviations(BORE_ENTRY_BREAK_BAND)",
         ("PinHoleProfile", "PinPosDia"): "*deviations(PIN_HOLE_BAND)",
@@ -306,8 +308,8 @@ def test_fits_carry_named_bands_and_the_lengths_print_their_places() -> None:
     assert spec.OD == removable.SEAT_SPIGOT_DIA
     assert spec.PIN_CIRCLE_RADIUS == removable.PIN_CIRCLE_RADIUS
     assert spec.PIN_HOLE_DIA == removable.DRIVE_PIN_HOLE_DIA
-    assert spec.DRAWING_PRECISION_BY_NAME["CollarLength"] == 2
-    assert spec.DRAWING_PRECISION_BY_NAME["PinPosY"] == 3
+    assert spec.DRAWING_PRECISION_BY_NAME["CollarLength"] == 3
+    assert spec.DRAWING_PRECISION_BY_NAME["PinPosY"] == 4
 
 
 def test_every_tight_band_names_its_registered_mate_at_its_callout() -> None:
@@ -329,38 +331,34 @@ def test_every_tight_band_names_its_registered_mate_at_its_callout() -> None:
         assert fit in callout, name
     assert "KNOB SHAFT" in spec.BORE_CALLOUT and "KNOB SHAFT" in spec.FLAT_CALLOUT
     assert "DOWEL" in spec.PIN_HOLE_CALLOUT
-    # The D-bore's diametral clearance moved intact from the former note 2.
-    clearance = f"{spec.BORE_CORE_CLEARANCE[0]:.4f}-{spec.BORE_CORE_CLEARANCE[1]:.4f}"
-    assert f"{clearance}\nCLEARANCE ON DIA." in spec.BORE_CALLOUT
+    # The D-bore's diametral clearance prints at its callout.
+    assert "CLEARANCE ON DIA." in spec.BORE_CALLOUT
     assert spec.BORE_CALLOUT.splitlines()[0] == "TRUE D THRU"
     # The D's acute inside corners take their limit from the shaft they
     # slide on, not the title block's inside-corner radius (r10 review).
     assert "CORNERS CLEAR D-CORE" in " ".join(spec.BORE_CALLOUT.split())
     assert spec.PIN_HOLE_CALLOUT.splitlines()[0] == "2X REAM THROUGH"
-    # The locations' tight band is the sprocket's own: the dowels must enter
-    # its drilled holes, each part spending half the 0.119 clearance.
-    assert spec.PIN_OFFSET_TOL == removable.DRIVE_PIN_OFFSET_TOL
-    assert spec.PIN_OFFSET_TOL < printed_band_mm(3)
+    # The locations' tight band is the sprocket's own (until D14 carries the
+    # shared interface in inch, no looser than it): the dowels must enter its
+    # drilled holes, each part spending half the 0.119 clearance.
+    assert spec.PIN_OFFSET_TOL <= removable.DRIVE_PIN_OFFSET_TOL
+    assert spec.PIN_OFFSET_TOL < printed_band_mm(3, unit=spec.UNIT)
 
 
-def test_drive_pin_rim_is_the_seat_shortfall_and_needs_three_place_offsets() -> None:
+def test_drive_pin_rim_is_the_seat_shortfall() -> None:
     # 17.5 / 2 - 7.0 - 2.38 / 2 = 0.56, the seat interface's recorded rim.
     assert spec.DRIVE_PIN_COLLAR_RIM == pytest.approx(removable.SEAT_SPIGOT_RIM)
-    # The O.D. keeps only the spigot's maximum; its minimum is the .XX row,
-    # never tightened to rescue the rim: 8.495 - 7.0 - 0.025 - 1.19 = 0.28.
-    assert spec.OD_BAND == pytest.approx(
-        (max(removable.SPIGOT_DIA_BAND), -printed_band_mm(spec.OD_PLACES))
-    )
-    assert spec.DRIVE_PIN_COLLAR_RIM_WORST == pytest.approx(0.28)
+    # The O.D. keeps only the spigot's maximum; its minimum is held to -.004
+    # to keep the rim (owner ruling 2026-11-01).
+    assert spec.OD_BAND == pytest.approx((max(removable.SPIGOT_DIA_BAND), -0.1016))
+    assert spec.DRIVE_PIN_COLLAR_RIM_WORST == pytest.approx(0.4826)  # .019
     assert spec.DRIVE_PIN_COLLAR_RIM_WORST > 0.0
-    # Negative control: the offsets at the .XX row (±0.51) leave no rim.
-    at_xx = 8.495 - 7.0 - printed_band_mm(2) - 1.19
-    assert at_xx <= 1e-9
 
 
 def test_pilot_wall_worst_and_the_one_decimal_control() -> None:
-    assert spec.PILOT_WALL == pytest.approx((10.0 - 4.860) / 2.0)
-    assert spec.PILOT_WALL_WORST == pytest.approx(2.30)
+    assert spec.PILOT_WALL == pytest.approx((spec.PILOT_DIA - spec.BORE_DIA) / 2.0)
+    assert spec.PILOT_WALL_WORST == pytest.approx(2.3622)  # .093, over .080
+    assert spec.PILOT_WALL_WORST >= 0.080 * 25.4
     assert spec.PILOT_WALL_WORST >= 2.0
     # Negative control: a pilot narrower than the D-bore leaves no wall.
     assert (spec.BORE_DIA - (spec.BORE_DIA + max(spec.BORE_DIA_BAND))) / 2.0 < 0.0
@@ -369,9 +367,9 @@ def test_pilot_wall_worst_and_the_one_decimal_control() -> None:
 
 def test_drive_pin_holes_clear_the_bore_and_the_pilot() -> None:
     # The unchanged dowel circle clears the smaller D-bore and pilot.
-    assert spec.BORE_PIN_WALL_WORST == pytest.approx(3.34865)
+    assert spec.BORE_PIN_WALL_WORST == pytest.approx(3.34239)
     assert spec.BORE_PIN_WALL_WORST >= spec.WALL_FLOOR
-    assert spec.PIN_HOLE_INNER_R_MIN == pytest.approx(5.785)
+    assert spec.PIN_HOLE_INNER_R_MIN == pytest.approx(5.78714)
     assert spec.PIN_HOLE_INNER_R_MIN > spec.PILOT_R_MAX
     # Negative controls: holes on a 6.0 radius break into the pilot; on the
     # pilot's own 5.0 radius they leave 0.605 to the bore.
@@ -380,14 +378,16 @@ def test_drive_pin_holes_clear_the_bore_and_the_pilot() -> None:
 
 
 def test_bore_slides_on_the_core_and_the_pilot_in_the_wheel() -> None:
-    assert spec.BORE_CORE_CLEARANCE == pytest.approx((0.010, 0.0307))
-    # Radial: (10.3 - 10.0) / 2 and (10.3 + 0.10 - 9.49) / 2. Only the
-    # maximum is tight; the minimum is the .XX row.
-    assert spec.PILOT_DIA_BAND == pytest.approx((0.0, -printed_band_mm(2)))
-    assert spec.PILOT_BORE_CLEARANCE == pytest.approx((0.15, 0.455))
+    assert spec.BORE_CORE_CLEARANCE == pytest.approx((0.0254, 0.05842))
+    # Radial: (10.3 - 10.16) / 2 and (10.3 + 0.1016 - 9.652) / 2. The pilot
+    # only clears the bore, so the title block's .XX row governs both limits
+    # (Codjiflo, #2148): .39 ±.01, never an authored band.
+    assert spec.PILOT_DIA_PLACES == 2
+    assert spec.PILOT_DIA_BAND == pytest.approx((0.254, -0.254))
+    assert spec.PILOT_BORE_CLEARANCE == pytest.approx((0.07, 0.3748))
     # Negative controls: a press-type bore band binds on the core; a pilot
     # at the wheel's bore size has no air.
-    press_bore = spec.BORE_DIA - 0.020 - (shaft.CORE_DIA + max(shaft.CORE_DIA_BAND))
+    press_bore = spec.BORE_DIA - 0.030 - (shaft.CORE_DIA + max(shaft.CORE_DIA_BAND))
     assert press_bore < 0.0
     assert (removable.BORE_DIA - removable.BORE_DIA) / 2.0 <= 0.0
 
@@ -405,24 +405,29 @@ def test_the_pilot_is_faced_to_stand_proud_of_the_knob_wheel_from_the_blank() ->
         plate_hi + max(spec.PILOT_PROUD_RANGE)
     )
     assert (spec.PILOT_LENGTH_FITTED_MIN, spec.PILOT_LENGTH_FITTED_MAX) == (
-        pytest.approx((2.75, 2.95))
+        pytest.approx((2.7508, 2.9524))
     )
     assert (
         spec.PILOT_LENGTH_FITTED_MIN
         <= spec.PILOT_LENGTH
         <= spec.PILOT_LENGTH_FITTED_MAX
     )
-    assert spec.PILOT_LENGTH == pytest.approx(2.8 + 0.10)
+    assert spec.PILOT_LENGTH == pytest.approx(2.9016)
     assert (
         spec.PILOT_BLANK_LENGTH_MIN
         >= spec.PILOT_LENGTH_FITTED_MAX + spec.FACING_ALLOWANCE - 1e-9
     )
-    assert f"{spec.PILOT_BLANK_LENGTH_MIN:.2f} MIN" in drawing.FIT_NOTES
-    fitted = f"{spec.PILOT_LENGTH_FITTED_MIN:.2f}-{spec.PILOT_LENGTH_FITTED_MAX:.2f}"
+    assert f"{_in(spec.PILOT_BLANK_LENGTH_MIN)} MIN" in drawing.FIT_NOTES
+    fitted = steps.inch_window((spec.PILOT_LENGTH_FITTED_MIN, spec.PILOT_LENGTH_FITTED_MAX), 3)
     assert f"FACED TO {fitted}" in drawing.FIT_NOTES
     assert drawing.DIMENSION_CALLOUTS_BELOW["PilotLength"] == (
         f"SEE NOTE {drawing.PILOT_NOTE}"
     )
+
+
+def _in(value_mm: float) -> str:
+    """A length in the sheet's three-place inches."""
+    return f"{value_mm / 25.4:.3f}".removeprefix("0")
 
 
 def _note(number: int) -> str:
@@ -450,7 +455,8 @@ def test_the_pilot_length_callout_points_at_its_facing_step() -> None:
 
 def test_the_thumbnut_bears_on_the_pilot_and_the_knob_wheel_floats() -> None:
     # The nut's rear countersink leaves a real annulus on the pilot.
-    assert spec.NUT_PILOT_BEARING_WORST == pytest.approx((9.49 - 4.6) / 2.0)
+    pilot_min = spec.PILOT_DIA + min(spec.PILOT_DIA_BAND)
+    assert spec.NUT_PILOT_BEARING_WORST == pytest.approx((pilot_min - 4.572) / 2.0)
     assert spec.NUT_PILOT_BEARING_WORST > 0.0
     assert min(spec.KNOB_FLOAT_RANGE) > 0.0
     # Negative control: a pilot faced flush with the wheel leaves no float.
@@ -458,8 +464,8 @@ def test_the_thumbnut_bears_on_the_pilot_and_the_knob_wheel_floats() -> None:
 
 
 def test_body_rear_face_reacts_at_f_over_the_whole_fitted_domain() -> None:
-    assert spec.LENGTH == pytest.approx(6.2)
-    assert (spec.LENGTH_FITTED_MIN, spec.LENGTH_FITTED_MAX) == pytest.approx((3.87, 6.9))
+    assert spec.LENGTH == pytest.approx(6.1722)
+    assert (spec.LENGTH_FITTED_MIN, spec.LENGTH_FITTED_MAX) == pytest.approx((3.8862, 6.8834))
     assert spec.BODY_REAR_FACE_FROM_F == 0.0
     assert spec.BODY_BLANK_LENGTH_MIN >= spec.LENGTH_FITTED_MAX + spec.FACING_ALLOWANCE
     assert drawing.BODY_FIT_STEP_KEY == "collar-rear-faced-to-fit"
@@ -470,8 +476,8 @@ def test_body_rear_face_reacts_at_f_over_the_whole_fitted_domain() -> None:
     assert spec.BODY_LENGTH_CALLOUT.replace("\n", ", ") in note
     assert note.endswith(f"PER {steps.step_ref(drawing.BODY_FIT_STEP_KEY)}.")
     assert "SEATED ON MHA-PD-08 15T FRONT FACE" in note
-    assert f"{spec.BODY_BLANK_LENGTH_MIN:.2f} MIN" in note
-    assert "FITTED 3.87-6.90" in note
+    assert f"{_in(spec.BODY_BLANK_LENGTH_MIN)} MIN" in note
+    assert f"FITTED {steps.inch_window((spec.LENGTH_FITTED_MIN, spec.LENGTH_FITTED_MAX), 3)}" in note
     assert spec.THUMBNUT_ENGAGEMENT_WORST >= shaft.ENGAGEMENT_FLOOR_D * shaft.THREAD_MAJOR
     assert spec.FRONT_BEARING_AREA_MIN > 0.0
     assert spec.NUT_CORE_STEP_AIR > 0.0
@@ -479,8 +485,8 @@ def test_body_rear_face_reacts_at_f_over_the_whole_fitted_domain() -> None:
 
 def test_notes_and_recipe_have_no_obsolete_front_pin_or_slot() -> None:
     notes = f"{spec.DRAWING_NOTES}\n{drawing.FIT_NOTES}"
-    assert f"{spec.DRIVE_PIN_COLLAR_RIM_WORST:.2f} MIN" in notes
-    assert f"{spec.BODY_BLANK_LENGTH_MIN:.2f} MIN" in notes
+    assert f"{_in(spec.DRIVE_PIN_COLLAR_RIM_WORST)} MIN" in notes
+    assert f"{_in(spec.BODY_BLANK_LENGTH_MIN)} MIN" in notes
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method):
     # three numbered notes on at most four lines, no method words in the
     # bore callout; the D-bore's fit prints at its own callout.
@@ -708,7 +714,7 @@ class _LimitTolerance:
 
 class _LimitsDisplay:
     def SetPrecision3(self, primary: int, dual: int, tolerance: int, dual_tol: int) -> int:
-        assert (primary, dual, tolerance, dual_tol) == (3, -1, 3, -1)
+        assert (primary, dual, tolerance, dual_tol) == (4, -1, 4, -1)
         self.tolerance_precision = tolerance
         return 0
 
@@ -749,7 +755,9 @@ def test_native_flat_limits_refuse_missing_or_unwritten_controls(
         _native_flat_limits(monkeypatch, tolerance)
 
 
-def _capture_fixture(monkeypatch, *, length=None, rear_gap=0.0, clock_error=0.0, missing=None):
+def _capture_fixture(
+    monkeypatch, *, length=None, rear_gap=0.0, front_error=0.0, clock_error=0.0, missing=None
+):
     import build_pd_paper_drive_assembly as assembly
     import _gtol_face_resolve
 
@@ -788,11 +796,13 @@ def _capture_fixture(monkeypatch, *, length=None, rear_gap=0.0, clock_error=0.0,
                 math.cos(clock_error) * local[1],
                 assembly.KNOB_COLLAR_Z0 + local[2] + rear_gap,
             )
+        if name == "wheel":
+            return (local[0], local[1], assembly.REMOVABLE_Z0 + local[2] + front_error)
         return (local[0], local[1], assembly.KNOB_SHAFT_Z0 + local[2])
 
     monkeypatch.setattr(assembly, "world_point", world_point)
     adapter = SimpleNamespace(currentModel=native)
-    assembly._assert_knob_collar_capture(adapter, "collar", "shaft")
+    assembly._assert_knob_collar_capture(adapter, "collar", "shaft", "wheel")
     return calls
 
 
@@ -801,11 +811,15 @@ def test_actual_native_collar_rear_face_is_measured_on_f(monkeypatch) -> None:
     assert ("collar", (0.0, 0.0, spec.LENGTH)) in calls
     assert ("shaft", (0.0, 0.0, 0.0)) in calls
     assert ("collar", (0.0, -1.0, 0.0)) in calls
+    # The faced remainder stands at the collar's front, off the wheel's rear.
+    assert ("collar", (0.0, 0.0, 0.0)) in calls
+    assert ("wheel", (0.0, 0.0, removable.PLATE)) in calls
 
 
 @pytest.mark.parametrize(
     "kwargs, message",
-    [({"rear_gap": 0.01}, "not on gear F"),
+    [({"rear_gap": 0.01}, "rear is not on gear F"),
+     ({"front_error": 0.0169}, "behind the wheel"),
      ({"clock_error": math.radians(3.0)}, "not clocked"),
      ({"length": spec.LENGTH_FITTED_MIN - 0.01}, "outside"),
      ({"length": spec.LENGTH - 0.01}, "source version"),
@@ -902,7 +916,7 @@ def test_native_rear_entry_has_both_actual_legs_on_both_d_edges(monkeypatch) -> 
     assert (
         spec.BORE_ENTRY_BREAK + min(spec.BORE_ENTRY_BREAK_BAND),
         spec.BORE_ENTRY_BREAK + max(spec.BORE_ENTRY_BREAK_BAND),
-    ) == pytest.approx((0.150, 0.250))
+    ) == pytest.approx((0.1524, 0.254))
     assert spec.DRAWING_DIMENSIONS["RearBoreChamfer"] == {"BoreEntryBreak"}
     callout = drawing.DIMENSION_CALLOUTS_BELOW["BoreEntryBreak"]
     assert callout == spec.BORE_ENTRY_BREAK_CALLOUT
@@ -917,26 +931,26 @@ def test_native_rear_entry_has_both_actual_legs_on_both_d_edges(monkeypatch) -> 
     assert max(map(len, callout.splitlines())) <= 21
     assert spec.BORE_ENTRY_BREAK_ANGLE_BAND_DEG == _config.title_block("angular")["value_deg"]
     assert spec.BORE_ENTRY_BREAK_ANGLE_LIMITS == pytest.approx((44.0, 46.0))
-    assert spec.BORE_ENTRY_BREAK_LEG_MIN == pytest.approx(0.144853316221)
-    assert spec.BORE_ENTRY_BREAK_LEG_MAX == pytest.approx(0.258882578448)
+    assert spec.BORE_ENTRY_BREAK_LEG_MIN == pytest.approx(0.14717096928059806)
+    assert spec.BORE_ENTRY_BREAK_LEG_MAX == pytest.approx(0.2630246997028047)
     # The single native width and read-back 45-degree angle bound both legs.
     assert spec.BORE_ENTRY_BREAK == pytest.approx(
         shaft.FRONT_CORNER_RADIUS_MAX
         + max(spec.BORE_ENTRY_BREAK_BAND) - min(spec.BORE_ENTRY_BREAK_BAND)
     )
-    # The knob's neck prints Ø3.95 MAX (its machinist review r8), so the
-    # neck crown sits 0.085 under the core-flat plane.
-    assert spec.BORE_ENTRY_BREAK_REQUIRED_MIN == pytest.approx(0.015)
-    assert spec.BORE_ENTRY_FLAT_EDGE_MIN == pytest.approx(2.226477037834)
-    assert spec.BORE_ENTRY_ARC_EDGE_MIN == pytest.approx(12.890700407832)
-    assert spec.BORE_ENTRY_AXIAL_SPAN_MIN == pytest.approx(3.870)
-    assert spec.BORE_ENTRY_PROFILE_DEPTH_MIN == pytest.approx(0.270)
-    assert spec.BORE_ENTRY_BREAK_GEOMETRY_MAX == pytest.approx(0.270)
-    assert spec.BORE_ENTRY_WALL_WORST == pytest.approx(3.089767421552)
-    assert spec.NECK_CORNER_D_BORE_AIR_MIN == pytest.approx(0.129853316221)
-    assert spec.D_DRIVE_AREA_MIN == pytest.approx(6.654325210394)
-    assert spec.D_SUPPORT_LENGTH_MIN == pytest.approx(3.692234843105)
-    assert spec.D_AXIS_AT_F_FROM_JOURNAL_MAX == pytest.approx(0.060796633879)
+    # The knob's neck prints its inch MAX, so the neck crown sits just under
+    # the core-flat plane and the break need only clear .0001.
+    assert spec.BORE_ENTRY_BREAK_REQUIRED_MIN == pytest.approx(0.00254)
+    assert spec.BORE_ENTRY_FLAT_EDGE_MIN == pytest.approx(2.227590136807)
+    assert spec.BORE_ENTRY_ARC_EDGE_MIN == pytest.approx(12.941675093412)
+    assert spec.BORE_ENTRY_AXIAL_SPAN_MIN == pytest.approx(3.8862)
+    assert spec.BORE_ENTRY_PROFILE_DEPTH_MIN == pytest.approx(0.26924)
+    assert spec.BORE_ENTRY_BREAK_GEOMETRY_MAX == pytest.approx(0.26924)
+    assert spec.BORE_ENTRY_WALL_WORST == pytest.approx(3.079365300297)
+    assert spec.NECK_CORNER_D_BORE_AIR_MIN == pytest.approx(0.144630969281)
+    assert spec.D_DRIVE_AREA_MIN == pytest.approx(6.991639285135)
+    assert spec.D_SUPPORT_LENGTH_MIN == pytest.approx(4.020550600594)
+    assert spec.D_AXIS_AT_F_FROM_JOURNAL_MAX == pytest.approx(0.081883365847)
     assert spec.BORE_ENTRY_BREAK_LEG_MIN > spec.BORE_ENTRY_BREAK_REQUIRED_MIN
     assert spec.BORE_ENTRY_BREAK_LEG_MAX < spec.BORE_ENTRY_BREAK_GEOMETRY_MAX
     for width in (spec.BORE_ENTRY_BREAK_MIN, spec.BORE_ENTRY_BREAK_MAX):

@@ -675,10 +675,10 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 3.454,
                 7.9375,
             ),
-            # MHA-PD-VN-57 through the bar's through tap: the fitted 9.15 thread
+            # MHA-PD-VN-57 through the bar's through tap: the fitted 9.1444 thread
             # less the 1.1938 neck flat.
             frozenset(("pd-vn-transgear-pivot-screw-1", "pd-support-bar-1")): _annulus_limit(
-                4.1656, 3.454, 7.9562
+                4.1656, 3.454, 7.9506
             ),
             **_expected_numbered_pairs(
                 "sh-vn-fillister-screw-90280a108",
@@ -686,39 +686,39 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "pd-support-bar",
                 2.8448,
                 2.261,
-                8.725,
+                8.7122,
             ),
             frozenset(("pd-transgear-pin-1", "pd-transgear-arm-1")): _annulus_limit(
-                3.9, 3.874, 7.9375
+                3.175, 3.1496, 7.9375
             ),
-            # MHA-PD-VN-64 Ø2.0 dowels pressed into the arm's Ø1.995 through reams,
-            # 6.0 long less 1.70 proud.
+            # MHA-PD-VN-64 3/32 (Ø2.38125) dowels pressed into the arm's Ø2.3622
+            # through reams, the 5/16 stock less the 1.7018 proud set.
             **_expected_numbered_pairs(
                 "pd-vn-transgear-arm-plate-locating-pin",
                 range(1, 3),
                 "pd-transgear-arm",
-                2.0,
-                1.995,
-                6.0 - 1.70,
+                2.38125,
+                2.3622,
+                7.9375 - 1.7018,
             ),
-            # R9-71: MHA-PD-20's Ø4.727 ream pressed on MHA-PD-VN-57's Ø4.7625
+            # R9-71: MHA-PD-20's Ø.1850 ream pressed on MHA-PD-VN-57's Ø4.7625
             # shoulder over its 5.0 length.
             frozenset(("pd-transgear-pivot-spacer-1", "pd-vn-transgear-pivot-screw-1")): (
-                _annulus_limit(4.7625, 4.727, 5.0)
+                _annulus_limit(4.7625, 4.699, 5.0)
             ),
             # MHA-PD-VN-61's three prong arcs, atan(3/4) of the turn each, at the
-            # Ø2.8956 free diameter inside the MHA-PD-23 Ø2.9464 groove floor.
+            # Ø2.3876 free diameter inside the MHA-PD-23 Ø2.413 groove floor.
             frozenset(("pd-vn-transgear-retaining-ring-1", "pd-transgear-pin-1")): (
                 3.0 * math.atan(0.75) / (2.0 * math.pi)
             )
-            * _annulus_limit(2.9464, 2.8956, 0.635),
+            * _annulus_limit(2.413, 2.3876, 0.381),
             **_expected_numbered_pairs(
                 "pd-vn-transgear-disc-screw",
                 range(1, 4),
                 "pd-rack-pinion",
                 1.524,
                 1.191,
-                2.9,
+                2.8956,
             ),
             # R9-35: flush-head seat slivers, observed + 10 %.
             frozenset(("pd-vn-transgear-arm-plate-screw-1", "pd-transgear-arm-plate-1")): (
@@ -727,11 +727,12 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("pd-vn-transgear-arm-plate-screw-2", "pd-transgear-arm-plate-1")): (
                 1.10 * 0.00809042475
             ),
-            # #8-32 nut on the collar's pilot, with its rear face on actual F:
-            # 23.9 - 6.2 - 2.9 of the Ø4.070 stud's thread blank.
+            # #8-32 nut on the collar's pilot, the collar's rear face on actual F:
+            # 23.876 - 6.1722 (the .243 nominal collar) - 2.9016 of the
+            # Ø4.064 (.160) stud's thread blank.
             frozenset(
                 ("pd-transgear-thumbnut-1", "pd-transgear-knob-shaft-1")
-            ): _annulus_limit(4.070, 3.454, 14.8),
+            ): _annulus_limit(4.064, 3.454, 23.876 - 6.1722 - 2.9016),
             # MHA-PD-VN-54 3/32 x 3/16 dowels pressed 2.3625 into MHA-PD-22's 2.38 reams.
             **_expected_numbered_pairs(
                 "pd-vn-transgear-knob-drive-pin",

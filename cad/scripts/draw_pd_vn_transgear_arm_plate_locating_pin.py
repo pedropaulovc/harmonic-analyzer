@@ -1,4 +1,4 @@
-"""Purchased reference drawing for MHA-PD-VN-64 McMaster 93600A189."""
+"""Purchased reference drawing for MHA-PD-VN-64 McMaster 98381A435."""
 from __future__ import annotations
 
 import argparse
@@ -6,16 +6,21 @@ import sys
 from typing import Any
 from collections.abc import Callable
 
+from _machinist_review_mode import MachinistReviewMode
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _supplier_pin_drawing import DOWEL_SUPPLIER_MARGINS, add_supplier_dowel_dimensions
 from pd_vn_transgear_arm_plate_locating_pin_spec import SUPPLIER_REFERENCE
 
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
+
 SPEC = DRAWINGS_BY_NAME["pd_vn_transgear_arm_plate_locating_pin"]
 # The footer's ITEM row: the catalogue designation in plain text.
-ITEM = "DOWEL PIN, ISO 2338 m6"
+ITEM = "Ø3/32 x 5/16 DOWEL PIN"
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -33,6 +38,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, SPEC, item=ITEM, supplier_dimensions=supplier_dimensions,
         settled_checks=(assert_supplier_dimensions,),
         supplier_margins=DOWEL_SUPPLIER_MARGINS,
+        unit=part_drawing_unit(SPEC.artifact_stem),
     )
 
 

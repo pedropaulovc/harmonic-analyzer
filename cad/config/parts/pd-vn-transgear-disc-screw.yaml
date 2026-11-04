@@ -11,7 +11,8 @@ pd-vn-transgear-disc-screw:
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: purchased
+  drawing_unit: in
   installation_notes: |-
     INSTALLATION - THROUGH MHA-PD-17 INTO THE MHA-PD-06 DISC THRU TAP.
-    CUT EACH TIP 0.00-0.20 BELOW THE MHA-PD-06 DISC REAR FACE AT
-    ASSEMBLY; BREAK THE CUT END 0.1 MAX.
+    CUT EACH TIP .000-.008 BELOW THE MHA-PD-06 DISC REAR FACE AT
+    ASSEMBLY.

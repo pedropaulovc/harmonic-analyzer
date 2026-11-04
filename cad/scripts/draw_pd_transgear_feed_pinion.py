@@ -5,7 +5,7 @@ in the section's direction and an isometric at 3:1 (the section takes B: A
 names the bore datum). The end view looks at the rear face (*Back), the
 third-angle left view of the section, whose rear face stands left (the
 2026-10-27 ENFORCE review: a nose view there broke the projection). It
-carries the genuine native two-tooth span, bore fit note, finish and datum
+carries the genuine native two-tooth span, finish and datum
 A; the captioned rear-face view below carries the toothspace inspection
 callout on a full-depth flank and the root's MIN across two gap floors; the
 outside view carries the cutter's full-depth station and run-out limit from
@@ -17,7 +17,8 @@ the bore, all imported natively from the part with the places, bands and
 callout text the part authored (``pd_transgear_feed_pinion_spec``,
 ``pd_transgear_feed_pinion_callouts``).  The oil hole is drilled through the
 seated hub at assembly, so the section carries only its one-line drill note;
-its station belongs to the hub's sheet.
+its station belongs to the hub's sheet.  Decimal-inch sheet (#290); the
+model keeps its millimetre nominals.
 """
 
 from __future__ import annotations
@@ -62,23 +63,24 @@ from _gear_drawing_entities import visible_circle_edge
 from _native_axis_datum import add_native_axis_datum
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _part_properties import part_drawing_unit
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 import pd_transgear_feed_pinion_callouts as callouts
 from paper_drive_stock_drawing import add_toothspace_callout, require_source_control
+from pd_rack_pinion_spec import inch_text
 from pd_transgear_disc_hub_spec import OIL_HOLE_DIA, OIL_HOLE_SLEEVE_Z
 from pd_transgear_feed_pinion_spec import (
     BORE_DATUM,
     BORE_DIA,
-    BORE_FIT_CALLOUT,
     BOSS_DIA,
     CUTTER_RUNOUT_MAX,
     DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
-    GEOMETRIC_TOLERANCES_MM,
+    GEOMETRIC_TOLERANCES_IN,
     HUB_NUMBER,
     OUTSIDE_DIA,
     OVERALL_LENGTH,
@@ -111,8 +113,8 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
-# The end view's section line stands right of the bore fit note's leader.
-# It looks at the rear face (*Back): the section looks along model +X with
+# The end view looks at the rear face (*Back): the section looks along
+# model +X with
 # the rear face left, so its third-angle left view sees the rear face.
 END_VIEW_ORIENTATION = "*Back"
 FRONT_CENTER = (0.080, 0.160)
@@ -171,8 +173,8 @@ def _side_x(z_mm: float) -> float:
     return RIGHT_CENTER[0] + (z_mm - OVERALL_LENGTH / 2.0) * VIEW_SCALE[0] / 1000.0
 
 
-# The end view is pictorial and carries its center mark, the bore fit note,
-# the bore finish and the two-tooth span (its rack mate under its limits).
+# The end view is pictorial and carries its center mark, the bore finish
+# and the two-tooth span (its rack mate under its limits).
 # On the section, the tip and boss diameters print inline on the axis,
 # between their own extension lines and off the part (the crank hub's and
 # the disc hub's layout): the tip left of the rear face, where its witness
@@ -180,8 +182,10 @@ def _side_x(z_mm: float) -> float:
 # under its value.  The flat's distance from the axis hangs below the
 # section right of the nose, its mate under it: the four rows are taller
 # than the flat's depth.  The bore keeps its shelf above-left of the rear
-# face, which holds its two-row band and process callout clear of its own
-# extension lines.  The lengths stay baseline-stacked below from the rear
+# face, which holds its two-row band, process and fit callout clear of its
+# own extension lines (the fit there, not on a separate end-view note: run
+# 20261101T054343686Z's note overlapped the oil hole note's leader extent).
+# The lengths stay baseline-stacked below from the rear
 # face, shortest innermost, so no extension line crosses an inner row; the
 # tooth length's and the flat end's texts, wider than their spans with their
 # mates, stand left of the rear face, clear of every station's extension
@@ -332,7 +336,7 @@ REAR_KEEP: dict[str, tuple[float, float]] = {
 # (2026-10-27 ENFORCE review, r1-r3: the match drill named no locating part).
 OIL_HOLE_NOTE = "\n".join(
     (
-        f"\u00d8{OIL_HOLE_DIA:.1f} OIL HOLE THRU HUB AND BOSS",
+        f"\u00d8{inch_text(OIL_HOLE_DIA, 3)} OIL HOLE THRU HUB AND BOSS",
         f"DRILL AT ASSY WITH {HUB_NUMBER}; POSITION SET BY {HUB_NUMBER}",
     )
 )
@@ -346,15 +350,9 @@ OIL_HOLE_CALLOUT = (OIL_HOLE_EDGE[0] - 0.008 - _OIL_HOLE_NOTE_WIDTH, _SIDE_TOP +
 NOTE_HEIGHT = 0.0025
 
 _BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / 2000.0
-# The finite-form data block uses the upper-left lane; the bore-fit note
-# remains within the air above the end view, preserving its leader.  It
-# stands 17 mm higher than at the 2026-10-24 review, whose crop showed its
-# last row's ")" struck by the 11 o'clock tooth, and clear above the section
-# line's upper "B", which the rear-face end view turns left, under the note.
+# The finite-form data block uses the upper-left lane.
 GEAR_DATA_XY = (0.016, 0.262)
 GEAR_DATA_CHAR_HEIGHT = 0.0025
-BORE_FIT_NOTE = (0.016, 0.211)
-BORE_FIT_CHAR_HEIGHT = 0.0022
 # Separate radial-runout and relative-index controls share one source-linked
 # callout on the real finite tooth flank, not the OD. Its three rows use the
 # standard 3.5 mm font; at x 50 mm its lower-right corner stands up-left of
@@ -378,10 +376,6 @@ TOOTH_EDGE_ATTACH = (
 )
 NOTES_XY = (0.016, TOOTH_EDGE_NOTE_XY[1] - 0.0100)
 TOOTH_SPACE_CALLOUT_CHAR_HEIGHT = 0.0035
-BORE_FIT_ATTACH = (
-    FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(135.0)),
-    FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(135.0)),
-)
 # The section's native caption, placed by its top centre, sits below the
 # stacked lengths, the overall's two-row callout the lowest.
 SECTION_CAPTION = (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.0548)
@@ -396,17 +390,18 @@ SECTION_CAPTION = (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.0548)
 # from its insertion point in proportion to its text, so its text keeps the
 # note height: at the document's 6.35 mm default (run 20261002T153039266Z)
 # "Ra 1.6" printed 13.5-37.4 mm right of and 10.8-17.2 mm above the point,
-# over the teeth and across the bore fit leader's landing at 135 degrees.  At
-# 2.5 mm the symbol's ink tops out 9 mm below that landing and its text ends
-# 7 mm left of the tip circle.  The leader lands on the bore's 180° point:
+# over the teeth.  At 2.5 mm the symbol's ink stands well below the bore
+# centre and its text ends
+# 7 mm left of the tip circle.  The leader lands on the bore's 170° point:
 # the nose view once ran the two-tooth span's extension lines along the
 # lower-left diagonal (machinist review, stack6: a -135° finish leader
-# crossed them); the rear-face view mirrors them lower right.  The symbol
-# stands 10 mm below the centre, so the shallower leader still passes right
-# of its own text.
+# crossed them); the rear-face view mirrors them lower right.  On the .125
+# bore (#290) the 180° point stood too near that diagonal, so the landing
+# climbs 10°, still shallow enough to pass right of the symbol's own text.
+# The symbol stands 10 mm below the centre.
 FINISH_ATTACH = (
-    FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(180.0)),
-    FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(180.0)),
+    FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(170.0)),
+    FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(170.0)),
 )
 FINISH_SYMBOL = (FRONT_CENTER[0] - HALF_OD - 0.022, FRONT_CENTER[1] - 0.010)
 FINISH_CHAR_HEIGHT = 0.0025
@@ -809,7 +804,11 @@ async def build(adapter: Any) -> dict[str, str]:
         label="feed pinion toothspace/index control",
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("pd-transgear-feed-pinion"),
     )
     stamp_drawing_summary(
         adapter,
@@ -820,7 +819,8 @@ async def build(adapter: Any) -> dict[str, str]:
             2: "Harmonic Analyzer Project",
             3: (
                 f"transgear pinion sleeve; steel; {TEETH}T {DIAMETRAL_PITCH:g}DP "
-                f"PA{PRESSURE_ANGLE_DEG:g} finite stock form s={RADIAL_SETTING:.3f} mm; D-flat boss"
+                f"PA{PRESSURE_ANGLE_DEG:g} finite stock form s={inch_text(RADIAL_SETTING, 4)} in; "
+                "D-flat boss"
             ),
             4: "Generated from the project-owned ASME B drawing standard",
         },
@@ -885,18 +885,8 @@ async def build(adapter: Any) -> dict[str, str]:
         view=right,
         height=NOTE_HEIGHT,
     )
-    bore_fit = add_leader_note(
-        adapter,
-        BORE_FIT_CALLOUT,
-        text_xy=BORE_FIT_NOTE,
-        attach_xy=BORE_FIT_ATTACH,
-        label="sleeve bore fit",
-        view=front,
-        height=BORE_FIT_CHAR_HEIGHT,
-    )
     adapter.currentModel.GraphicsRedraw2()
     _assert_note_inside_border(oil_note, "oil hole note")
-    _assert_note_inside_border(bore_fit, "bore fit note")
     # The bore is the part's one running surface: its finish is authored on
     # the part and read back here (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
     add_surface_finish(
@@ -928,7 +918,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=STEP_FACE_EDGE,
         frame_xy=STEP_FRAME,
         characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["step face perpendicularity to bore"],
+        tolerance=GEOMETRIC_TOLERANCES_IN["step face perpendicularity to bore"],
         datums=(BORE_DATUM,),
         label="step face perpendicularity",
     )

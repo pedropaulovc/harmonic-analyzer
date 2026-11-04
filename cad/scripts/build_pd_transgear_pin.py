@@ -6,11 +6,12 @@ from the rear.  Dimensions and the derived fit facts live in
 
 Layout: one stepped revolve about local +Z on the Right plane, origin at the
 head's underside (the seat on the arm's rear face, the Front Plane).  From
-the rear: the Ø5.0 head land, the Ø3.900 turned shank, the MHA-PD-VN-61 ring
+the rear: the Ø.20 head land, the Ø.125 turned shank, the MHA-PD-VN-61 ring
 groove (its FRONT wall, the load wall, at ``GROOVE_STATION`` from the seat)
 and the plain land in front of it.  The two spherical ends are separate
 revolves on the same plane.  The named plane ``GrooveLoadWall`` and
-``Axis1`` serve the assembly mates.
+``Axis1`` serve the assembly mates.  #290: the part saves in inch units
+(the row's ``drawing_unit``); its globals stay millimetre values.
 
 Run (SolidWorks already open)::
 
@@ -27,8 +28,10 @@ from _appearance import POLISHED_STEEL, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -74,9 +77,11 @@ from pd_transgear_pin_spec import (
     HEAD_LAND,
     ISOMETRIC_VIEW_NOTE,
     OVERALL_LENGTH,
+    SEAT_FILLET_R,
     SURFACE_FINISHES,
     TIP_DOME_R,
     TIP_DOME_SAG,
+    UNIT,
 )
 
 PART_NAME = "pd-transgear-pin"
@@ -101,7 +106,16 @@ def _cap_volume(sag: float, sphere_r: float) -> float:
 
 V_HEAD_DOME = _cap_volume(HEAD_DOME_SAG, HEAD_DOME_R)
 V_TIP_DOME = _cap_volume(TIP_DOME_SAG, TIP_DOME_R)
-V_TOTAL = V_PROFILE + V_HEAD_DOME + V_TIP_DOME
+# Pappus: the seat root's spandrel r^2 (1 - pi/4), its centroid
+# r (10 - 3 pi) / (3 (4 - pi)) out from the shank, revolved about the axis.
+V_SEAT_FILLET = (
+    2.0
+    * math.pi
+    * (R_SHANK + SEAT_FILLET_R * (10.0 - 3.0 * math.pi) / (3.0 * (4.0 - math.pi)))
+    * SEAT_FILLET_R**2
+    * (1.0 - math.pi / 4.0)
+)
+V_TOTAL = V_PROFILE + V_HEAD_DOME + V_TIP_DOME + V_SEAT_FILLET
 
 
 class StationAnchor(Enum):
@@ -226,6 +240,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, RevolveParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     # The mm suffix is load-bearing: the equation manager reads bare numbers in
     # document units (see build_dt_crankshaft).
     for name, value in (
@@ -238,6 +254,7 @@ async def build(adapter) -> dict[str, str]:
         ("FrontLand", FRONT_LAND),
         ("HeadDomeSag", HEAD_DOME_SAG),
         ("TipDomeSag", TIP_DOME_SAG),
+        ("SeatRadius", SEAT_FILLET_R),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -345,6 +362,20 @@ async def build(adapter) -> dict[str, str]:
         adapter, "stepped pin with its groove", V_PROFILE, 0.005 * V_PROFILE
     )
 
+    # --- Seat root: the tool-nose radius the print allows (R MAX) ---------------
+    # Picked on the circular edge where the shank meets the seat face at
+    # z = 0: the only edge through that point.
+    check(
+        "fillet seat root",
+        await adapter.add_fillet(SEAT_FILLET_R, [[R_SHANK, 0.0, 0.0]]),
+    )
+    name_last_feature(adapter, "SeatFillet")
+    fillet_dim = name_dimensions(adapter, "SeatFillet", ["SeatRadius"])
+    drive_jobs.append((fillet_dim[0], '"SeatRadius"'))
+    volume = await volume_check(
+        adapter, "seat root fillet", volume + V_SEAT_FILLET, 0.005 * V_PROFILE
+    )
+
     # --- Spherical ends ----------------------------------------------------------
     for (
         prefix,
@@ -442,16 +473,28 @@ async def build(adapter) -> dict[str, str]:
     # groove station, a disc-cluster stack term at the cluster's band.  The
     # front land prints .XX and the title block governs it.
     set_dimension_bilateral_tolerance(
-        adapter, "PinProfile", "ShankDia", *deviations(DIA_BAND)
+        adapter, "PinProfile", "ShankDia", *deviations(DIA_BAND), display_unit=UNIT
     )
     set_dimension_bilateral_tolerance(
-        adapter, "PinProfile", "GrooveDia", *deviations(GROOVE_DIA_BAND)
+        adapter,
+        "PinProfile",
+        "GrooveDia",
+        *deviations(GROOVE_DIA_BAND),
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "PinProfile", "GrooveWidth", *deviations(GROOVE_WIDTH_BAND)
+        adapter,
+        "PinProfile",
+        "GrooveWidth",
+        *deviations(GROOVE_WIDTH_BAND),
+        display_unit=UNIT,
     )
     set_dimension_symmetric_tolerance(
-        adapter, "PinProfile", "GrooveStation", GROOVE_STATION_BAND
+        adapter,
+        "PinProfile",
+        "GrooveStation",
+        GROOVE_STATION_BAND,
+        display_unit=UNIT,
     )
 
     await apply_material(adapter, MATERIAL)

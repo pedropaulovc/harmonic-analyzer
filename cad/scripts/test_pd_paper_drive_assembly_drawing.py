@@ -59,6 +59,8 @@ NOTE_LINE_PITCH = 0.0045
 # its two rows 9.2 mm on run 20261028T000650671Z's sheet 5.
 DIM_CHAR_WIDTH = 0.0031
 DIM_LINE_PITCH = 0.0047
+# The BOM table's rows: one per BOM entry under one header row.
+BOM_ROWS = len(drawing.BOM_PART_NUMBERS) + 1
 
 
 def _segment_distance(
@@ -101,7 +103,6 @@ CONTRACT_TRANSGEAR_QUANTITIES = {
     "pd-transgear-pivot-spacer": 1,
     "pd-vn-transgear-pivot-screw": 1,
     "pd-vn-transgear-pivot-spring": 1,
-    "pd-vn-transgear-pivot-shim": 1,
     "pd-vn-transgear-latch-pin": 1,
     "sh-vn-fillister-screw-90280a108": 2,
     "pd-latch-hook": 1,
@@ -111,6 +112,7 @@ CONTRACT_TRANSGEAR_QUANTITIES = {
     "pd-transgear-disc-hub": 1,
     "pd-transgear-front-bushing": 1,
     "pd-vn-transgear-retaining-ring": 1,
+    "pd-vn-transgear-cluster-shim": cluster_fit.SHIM_COUNT_MAX,
     "pd-rack-pinion": 1,
     "pd-vn-transgear-disc-screw": 3,
     "pd-transgear-knob-shaft": 1,
@@ -410,7 +412,7 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
         cursor = located.index(token, cursor)
     # The step cites the view's model dimensions and types no value of its own.
     for value in (knob_setting.K_FROM_S_ALONG_MM, knob_setting.K_FROM_S_ACROSS_MM):
-        assert f"{value:.{knob_setting.PLACES}f}" not in located
+        assert disc.inch_text(value, knob_setting.PLACES) not in located
     # S is the arm's reamed bore, not the pin's head (no drawing control
     # holds the head to the shank): the pin goes in after the plate is set.
     assert "NO PIN YET" in located
@@ -433,9 +435,9 @@ def test_view_k_carries_the_set_coordinates_as_assembly_model_dimensions() -> No
     ps = (s[0] - p[0], s[1] - p[1])
     assert sq[0] * qk[0] + sq[1] * qk[1] == pytest.approx(0.0, abs=1e-9)
     assert sq[0] * ps[1] - sq[1] * ps[0] == pytest.approx(0.0, abs=1e-9)
-    # K is the DRO count nearest the middle of the set band, about the
-    # mid-band point on the nominal S-K line: each coordinate a whole count
-    # within a count of that point, so K is within a count's diagonal of it.
+    # K is the DRO count nearest the middle of the set band, among the nine
+    # counts about the mid-band point on the nominal S-K line: each
+    # coordinate a whole count within a count and a half of that point.
     low, high = disc.CENTRE_DISTANCE_WINDOW
     count = knob_setting.DRO_COUNT_MM
     nominal = (
@@ -445,24 +447,23 @@ def test_view_k_carries_the_set_coordinates_as_assembly_model_dimensions() -> No
     setting = (knob_setting.K_FROM_S_ALONG_MM, knob_setting.K_FROM_S_ACROSS_MM)
     for value, aim in zip(setting, knob_setting.K_AIM_FROM_S_MM):
         assert value / count == pytest.approx(round(value / count), abs=1e-9)
-        assert abs(value - aim) < count
-    diagonal = count * math.sqrt(2.0)
+        assert abs(value - aim) < 1.5 * count
+    reach = 1.5 * count * math.sqrt(2.0)
     off_line = abs((k[0] - s[0]) * nominal[1] - (k[1] - s[1]) * nominal[0]) / low
-    assert off_line < diagonal
-    assert abs(math.dist(s, k) - (low + high) / 2.0) < diagonal
+    assert off_line < reach
+    assert abs(math.dist(s, k) - (low + high) / 2.0) < reach
     # N, the nominal centre, is on S-K at the band's low end, beside the
     # model's knob axis by K's count off the nominal line; S to N carries the
     # set band itself, +x/-0.
-    assert math.dist(knob_setting.N_XY, placement.KNOB_SHAFT_XY) < diagonal
+    assert math.dist(knob_setting.N_XY, placement.KNOB_SHAFT_XY) < reach
     assert math.dist(s, knob_setting.N_XY) == pytest.approx(disc.CENTRE_DISTANCE)
     assert (k[0] - s[0]) * (knob_setting.N_XY[1] - s[1]) - (k[1] - s[1]) * (
         knob_setting.N_XY[0] - s[0]
     ) == pytest.approx(0.0, abs=1e-9)
-    assert knob_setting.CENTRE_TOLERANCE_MM == pytest.approx((0.0, high - low))
-    assert disc.CENTRE_DISTANCE_SET_TEXT == (
-        f"{disc.CENTRE_DISTANCE:.{knob_setting.PLACES}f} "
-        f"+{knob_setting.CENTRE_TOLERANCE_MM[1]:.{knob_setting.PLACES}f}/-0"
-    )
+    # The printed +x/-0 band stays inside the mesh window, within one
+    # .0001 count of it.
+    assert knob_setting.CENTRE_TOLERANCE_MM[0] == 0.0
+    assert high - low - 0.00254 < knob_setting.CENTRE_TOLERANCE_MM[1] <= high - low
     # The view marks the band and the two settings, at the places the model
     # owns; only the settings are references.
     assert knob_setting.DRAWING_DIMENSIONS == {
@@ -674,11 +675,13 @@ def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> Non
     assert radial_err == pytest.approx(0.0135, abs=1e-4)
     # The printed values are the display's own counts: the operator dials
     # exactly what VIEW K prints.
-    count = mill["resolution_mm"]["value"]
-    assert knob_setting.DRO_COUNT_MM == count
+    # The 5 um scale's inch-mode count, .0002.
+    count = round(mill["resolution_mm"]["value"] / 25.4, 4) * 25.4
+    assert knob_setting.DRO_COUNT_MM == pytest.approx(count)
     x, y = knob_setting.K_FROM_S_ALONG_MM, knob_setting.K_FROM_S_ACROSS_MM
-    assert round(round(x, knob_setting.PLACES) / count) * count == pytest.approx(x)
-    assert round(round(y, knob_setting.PLACES) / count) * count == pytest.approx(y)
+    for value in (x, y):
+        printed = round(value / 25.4, knob_setting.PLACES) * 25.4
+        assert round(printed / count) * count == pytest.approx(value)
 
     def margins(point):
         radial = math.hypot(*point) - low
@@ -707,8 +710,7 @@ def test_the_matched_plate_is_refitted_on_its_dowels_and_re_read() -> None:
     located = _step_body("arm-plate-located")
     assert (
         "DOWELS INTO THE ARM FROM THE REAR, "
-        f"{plate_locating_interface.PROUD_LIMITS_MM[0]:.2f} TO "
-        f"{plate_locating_interface.PROUD_LIMITS_MM[1]:.2f} PROUD;"
+        f"{steps.inch_window(plate_locating_interface.PROUD_LIMITS_MM, 3, ' TO ')} PROUD;"
     ) in located
     assert "MATCH-MARK ARM AND PLATE" in located
     fitted = _step_body("arm-plate-fitted")
@@ -718,7 +720,7 @@ def test_the_matched_plate_is_refitted_on_its_dowels_and_re_read() -> None:
     assert "PUSH AND ROCK THE PLATE BY HAND: NO SHAKE ON THE DOWELS" in fitted
     assert "RE-CHECK AFTER EVERY REMOVAL" in fitted
     # The setting step's own coordinates fix K; the refit only checks shake.
-    assert f"{knob_setting.K_FROM_S_ALONG_MM:.3f}" not in fitted
+    assert disc.inch_text(knob_setting.K_FROM_S_ALONG_MM, knob_setting.PLACES) not in fitted
     assert drawing.KNOB_SETTING_VIEW_NAME not in fitted
     for method in ("RFS", "UNCERTAINTY", "QUALIFIED", "ACTUAL"):
         assert method not in fitted
@@ -762,11 +764,11 @@ def test_the_feed_setup_reference_uses_the_selected_ratios_and_reference_pitch()
     )
     assert paper_geometry.NET_RACK_TRAVEL_PER_CRANK_REV == pytest.approx(expected)
     text = steps.PAPER_FEED_REFERENCE_TEXT
-    match = re.search(r"PLATEN TRAVEL (\d+\.\d+) PER CRANK REV \(REF\)", text)
+    match = re.search(r"PLATEN TRAVEL (\d*\.\d+) PER CRANK REV \(REF\)", text)
     assert match
     places = steps.PAPER_FEED_REFERENCE_PLACES
     assert len(match[1].split(".")[1]) == places
-    assert float(match[1]) == pytest.approx(expected, abs=0.5 * 10.0**-places)
+    assert float(match[1]) * 25.4 == pytest.approx(expected, abs=0.5 * 10.0**-places * 25.4)
     assert f"{sprocket.CRANK_CONFIG} CRANK" in text
     assert f"{sprocket.KNOB_CONFIG} KNOB" in text
     for caption in drawing.ASSEMBLED_CAPTIONS.values():
@@ -778,11 +780,18 @@ def test_the_feed_setup_reference_uses_the_selected_ratios_and_reference_pitch()
     assert "30DP" not in text and "%" not in text
 
 
+def _transgear_drawn_count(stem: str) -> int:
+    """The transgear views draw the stacked shims, not the kit's spares."""
+    if stem == "pd-vn-transgear-cluster-shim":
+        return cluster_fit.SHIM_COUNT_MODEL
+    return CONTRACT_TRANSGEAR_QUANTITIES[stem]
+
+
 def test_sheet_two_shows_and_balloons_exactly_the_transgear() -> None:
     expected = {
         f"{stem}-{index}"
-        for stem, count in CONTRACT_TRANSGEAR_QUANTITIES.items()
-        for index in range(1, count + 1)
+        for stem in CONTRACT_TRANSGEAR_QUANTITIES
+        for index in range(1, _transgear_drawn_count(stem) + 1)
         if stem != "pd-transgear-removable"
     } | {"pd-transgear-removable-1"}
     assert drawing.TRANSGEAR_INSTANCES == expected
@@ -793,8 +802,8 @@ def test_sheet_two_shows_and_balloons_exactly_the_transgear() -> None:
         "pd-transgear-removable-1"
     )
     # The hub lands on its flange's front rim, on the far side from the
-    # knob stack; every other family walks its own body on the instance the
-    # view shows.
+    # knob stack; the knob shaft on a 15T tooth tip at F; every other family
+    # walks its own body on the instance the view shows.
     hub_point = drawing.TRANSGEAR_BALLOON_ANCHORS["pd-transgear-disc-hub"].point_mm
     assert hub_point is not None
     assert math.hypot(hub_point[0], hub_point[1]) == pytest.approx(
@@ -802,10 +811,31 @@ def test_sheet_two_shows_and_balloons_exactly_the_transgear() -> None:
     )
     assert hub_point[2] == pytest.approx(-drawing.hub.FLANGE_THICK)
     assert hub_point[0] > 0.0 and hub_point[1] > 0.0
+    shaft = drawing.knob_shaft
+    x, y, z = drawing.TRANSGEAR_BALLOON_ANCHORS["pd-transgear-knob-shaft"].point_mm
+    assert z == 0.0  # F, the pinion's front face
+    assert math.hypot(x, y) == pytest.approx(shaft.OUTSIDE_DIA / 2.0, abs=1e-4)
+    # A tooth centre: half a pitch from the gap centred on GAP_AZIMUTH_DEG.
+    pitch = 360.0 / shaft.TEETH
+    offset = (math.degrees(math.atan2(y, x)) - shaft.GAP_AZIMUTH_DEG) % pitch
+    assert offset == pytest.approx(pitch / 2.0, abs=1e-3)
+    # *Isometric: sheet right -0.707 x + 0.707 z, up 0.408 x + 0.816 y +
+    # 0.408 z.  The tip stands lower right of the axis, more than the D-core
+    # radius off the axis's projected line, so the forward neck cannot hide it.
+    right, up = -0.7071 * x, 0.4082 * x + 0.8165 * y
+    assert right > 0.0 and up < 0.0
+    axis = (0.7071, 0.4082)
+    along = (right * axis[0] + up * axis[1]) / math.hypot(*axis)
+    assert math.sqrt(right**2 + up**2 - along**2) > shaft.CORE_DIA / 2.0
+    pinned = {
+        "pd-transgear-removable",
+        "pd-transgear-disc-hub",
+        "pd-transgear-knob-shaft",
+    }
     assert all(
         anchor == drawing.BalloonAnchor()
         for stem, anchor in drawing.TRANSGEAR_BALLOON_ANCHORS.items()
-        if stem not in {"pd-transgear-removable", "pd-transgear-disc-hub"}
+        if stem not in pinned
     )
 
 
@@ -995,9 +1025,10 @@ HIDDEN_BY_THE_ISOMETRIC = {
     "pd-transgear-pin",
     "pd-transgear-front-bushing",
     "pd-vn-transgear-retaining-ring",
+    "pd-vn-transgear-cluster-shim",
 }
-# Hidden in the arm's counterbore from the isometric; Section A-A balloons them.
-BALLOONED_BY_SECTION_A_A = {"pd-vn-transgear-pivot-spring", "pd-vn-transgear-pivot-shim"}
+# Hidden in the arm's counterbore from the isometric; Section A-A balloons it.
+BALLOONED_BY_SECTION_A_A = {"pd-vn-transgear-pivot-spring"}
 
 
 def test_each_transgear_family_balloons_once_on_the_view_that_shows_it() -> None:
@@ -1032,7 +1063,7 @@ def test_each_transgear_family_balloons_once_on_the_view_that_shows_it() -> None
     assert drawing.TRANSGEAR_EXPLODED_INSTANCES == {
         f"{stem}-{index}"
         for stem in exploded_stems - {"pd-transgear-removable"}
-        for index in range(1, CONTRACT_TRANSGEAR_QUANTITIES[stem] + 1)
+        for index in range(1, _transgear_drawn_count(stem) + 1)
     } | {explode.KNOB_WHEEL_INSTANCE}
     assert drawing.TRANSGEAR_EXPLODED_INSTANCES <= drawing.TRANSGEAR_INSTANCES
     # The pivot stack is SECTION A-A's; the latch hook stays on the bar.
@@ -1067,16 +1098,25 @@ def test_the_transgear_explode_views_fit_their_fields_at_the_bom_configuration()
     assert knob[2] < cluster[0]
     assert knob[1] > template.title_block_top_m
     # Run 20261024T025815061Z's 1:1 knob-stack outline (its projected box,
-    # 247.3 x 226.8 mm) and the cluster's box from the builder's stations
-    # (137.6 x 132.0 mm), at the sheet's scale with both rings, fit.
+    # 247.3 x 226.8 mm) and the cluster's width from the builder's stations
+    # (137.6 mm), each grown by the pin's rearward throw along the
+    # isometric's Z (1/sqrt(2) across, 1/sqrt(6) up: the pin's head is the
+    # view's rearmost point).  The cluster's height is native: round 12 read
+    # its ring 147.4 mm tall (to 0.1 mm) at a 12 mm throw, so the throw now
+    # must leave the ring a millimetre short of its field.
     scale = drawing.TRANSGEAR_EXPLODED_SCALE[0] / drawing.TRANSGEAR_EXPLODED_SCALE[1]
     reach = 2 * drawing.BALLOON_RING_REACH
-    for (width, height), (left, bottom, right, top) in (
-        ((0.2473, 0.2268), knob),
-        ((0.1376, 0.1320), cluster),
+    pin_throw = sum(
+        step.distance_mm for step in explode.TRANSGEAR_STEPS
+        if "pd-transgear-pin" in step.stems
+    ) / 1000.0
+    cluster_height = (0.14745 - reach) / scale + (pin_throw - 0.012) / math.sqrt(6.0)
+    for (width, height), (left, bottom, right, top), margin in (
+        ((0.2473, 0.2268), knob, 0.0),
+        ((0.1376 + pin_throw / math.sqrt(2.0), cluster_height), cluster, 0.001),
     ):
-        assert width * scale + reach < right - left
-        assert height * scale + reach < top - bottom
+        assert width * scale + reach < right - left - margin
+        assert height * scale + reach < top - bottom - margin
     for group in drawing.TRANSGEAR_EXPLODED_GROUPS:
         left, bottom, right, top = group.ring_limits
         assert left < group.center[0] < right and bottom < group.center[1] < top
@@ -1189,13 +1229,13 @@ def test_the_pivot_screw_is_staked_and_the_spacer_pressed_as_made() -> None:
     front face and staked there, shown in the pivot view; threadlocker is
     optional. R9-6 never faces MHA-PD-20.  R9-71: the spacer is pressed on
     the shoulder flush with its end, and the MHA-PD-VN-63 spring under the
-    MHA-PD-VN-67 shim holds the arm on it."""
+    head holds the arm on it."""
     body = _step_body("hanger-pivoted")
-    low, high = pivot_screw.TIP_RECESS
+    window = steps.inch_window(pivot_screw.TIP_RECESS, 3, " TO ")
     assert "THREADLOCKER OPTIONAL" in body
     assert "BLIND" not in body
     assert "THROUGH TAP" in body
-    assert f"{low:.2f} TO {high:.2f} BELOW THE BAR'S FRONT FACE" in body
+    assert f"{window} BELOW THE BAR'S FRONT FACE" in body
     assert "STAKE THE FRONT TAP MOUTH ONTO THE TIP AT 2 OPPOSITE POINTS" in body
     # The screw is chosen by its unfaced tip before the arm's bore is reamed
     # to it, so the fitter never meets a matched screw that fails the check.
@@ -1207,9 +1247,6 @@ def test_the_pivot_screw_is_staked_and_the_spacer_pressed_as_made() -> None:
     assert face < body.index("CHOSEN BEFORE REAMING")
     assert "ANOTHER SCREW" not in body
     assert drawing.PIVOT_VIEW_REF in body
-    assert body.index(_number("pd-vn-transgear-pivot-shim")) < body.index(
-        _number("pd-vn-transgear-pivot-spring")
-    )
     assert _number("pd-vn-transgear-pivot-screw") in body
     assert _number("pd-transgear-pivot-spacer") in body
     assert _number("pd-vn-transgear-pivot-spring") in body
@@ -1230,7 +1267,7 @@ def test_the_fitup_acceptance_prints_the_contract_bands() -> None:
     body = _step_body("fitup-accepted")
     for text in (
         f"{steps.OFFSET_ACCEPT_TEXT} FORWARD",
-        f"{expected_float[0]:.2f} TO {expected_float[1]:.2f}",
+        steps.inch_window(expected_float, 3, " TO "),
         steps.COLLAR_DISC_AIR_TEXT,
         f"{sprocket.KNOB_CONFIG} FREE UNDER THE NUT",
     ):
@@ -1280,7 +1317,7 @@ def test_the_pivot_section_and_its_locator_keep_to_sheet_two_left_field() -> Non
     assert drawing.PIVOT_VIEW_INSTANCES >= {
         "pd-support-bar-1",
         "pd-vn-transgear-pivot-screw-1",
-        "pd-vn-transgear-pivot-shim-1",
+        "pd-vn-transgear-pivot-spring-1",
     }
 
 
@@ -1289,9 +1326,9 @@ def test_each_pivot_section_balloon_points_into_its_own_cut_face() -> None:
     assert set(tips) == {
         name.rsplit("-", 1)[0] for name in drawing.PIVOT_VIEW_INSTANCES
     }
-    shim, spring, spacer = joints.SHIM, joints.SPRING, joints.SPACER
+    spring, spacer = joints.SPRING, joints.SPACER
     arm_geometry = joints.ARM
-    floor = -(shim.THICKNESS + spring.MODEL_HEIGHT)
+    floor = -spring.MODEL_HEIGHT
     arm_front = -(pivot_screw.SHOULDER_LEN - spacer.LENGTH)
     # (y span along the axis, r span off it) of each part's cut face, in the
     # screw's frame, head underside y 0.
@@ -1300,9 +1337,8 @@ def test_each_pivot_section_balloon_points_into_its_own_cut_face() -> None:
             (0.0, pivot_screw.HEAD_H),
             (pivot_screw.SOCKET_AF / math.sqrt(3.0), pivot_screw.HEAD_DIA / 2.0),
         ),
-        "pd-vn-transgear-pivot-shim": ((-shim.THICKNESS, 0.0), (shim.ID / 2, shim.OD / 2)),
         "pd-vn-transgear-pivot-spring": (
-            (floor, -shim.THICKNESS),
+            (floor, 0.0),
             (spring.ID / 2, spring.OD / 2),
         ),
         "pd-transgear-arm": (
@@ -1327,11 +1363,11 @@ def test_each_pivot_section_balloon_points_into_its_own_cut_face() -> None:
         assert math.hypot(r, y - centre_y) < drawing.PIVOT_FRAME_RADIUS_MM, stem
     # The spring's tip is on its cone's diagonal, inside its thin wall.
     _side, y, r = tips["pd-vn-transgear-pivot-spring"]
-    assert y == pytest.approx((floor - shim.THICKNESS) / 2.0)
+    assert y == pytest.approx(floor / 2.0)
     assert r == pytest.approx((spring.ID + spring.OD) / 4.0)
     # Down the stack the tips alternate sides.
     order = sorted(tips.values(), key=lambda tip: -tip[1])
-    assert [side for side, _y, _r in order] == ["right", "left"] * 3
+    assert [side for side, _y, _r in order] == ["left", "right", "left", "right", "left"]
 
 
 def test_the_pivot_stake_note_points_at_the_front_mouth_clear_of_the_balloons() -> None:
@@ -1472,9 +1508,9 @@ def test_the_rear_cup_is_pinned_and_the_nut_seats_on_the_faced_pilot() -> None:
     """R9-70's rear cup and wheel-float fit remain; the front drive is a true D."""
     knob = _step_body("knob-stack-fitted")
     for text in (
-        f"{knob_shaft.END_FLOAT:.1f} FEELER AT THE BOSS",
+        f"{disc.inch_text(knob_shaft.END_FLOAT, 3)} FEELER AT THE BOSS",
         cup_pin.HOLE_TEXT,
-        f"{cup.PIN_HOLE_FROM_FRONT:.1f} FROM THE CUP FRONT",
+        f"{disc.inch_text(cup.PIN_HOLE_FROM_FRONT, 3)} FROM THE CUP FRONT",
     ):
         assert text in knob, text
     seq = steps.SEQUENCE
@@ -1559,18 +1595,83 @@ def test_the_collar_is_faced_and_shoulder_seated_before_stud_cut_and_acceptance(
 
 def test_the_cluster_float_and_pin_bands_print_their_spec_ranges() -> None:
     accepted = _step_body("fitup-accepted")
-    assert f"DISC END FLOAT {drawing.DISC_END_FLOAT_TEXT}" in accepted
-    # Rounded outward: every cluster inside its printed bands passes.
-    low, high = drawing.DISC_END_FLOAT_ACCEPT
-    assert low <= cluster_fit.END_FLOAT_RANGE[0] < low + 0.01
-    assert high - 0.01 < cluster_fit.END_FLOAT_RANGE[1] <= high
-    assert low >= cluster_fit.END_FLOAT_MIN
+    assert f"RING GAP PER {drawing.CLUSTER_FLOAT_VIEW_NAME}" in accepted
     assert "DISC TURNS FREE" in accepted
     for key, bounds in (
         ("collar-pins-pressed", drive_pin.PROUD_RANGE),
         ("latch-pin-pressed", joints.LATCH_PIN_PROUD_RANGE),
     ):
-        assert f"{bounds[0]:.2f} TO {bounds[1]:.2f} PROUD" in _step_body(key)
+        assert f"{steps.inch_window(bounds, 3, ' TO ')} PROUD" in _step_body(key)
+
+
+def test_the_cluster_is_shimmed_to_view_e_after_it_is_hung() -> None:
+    """#2124: the ring gap is set with shims under the rear bushing to VIEW
+    E's model dimension; the step prints no value, and the window passes
+    every shimmed cluster and holds the floor."""
+    import pd_paper_drive_cluster_float_spec as cluster_float
+
+    assert steps.step_number("disc-cluster-hung") + 1 == steps.step_number(
+        "disc-cluster-shimmed"
+    )
+    shimmed = _step_body("disc-cluster-shimmed")
+    assert drawing._N["pd-vn-transgear-cluster-shim"] in shimmed
+    assert drawing._N["pd-transgear-rear-bushing"] in shimmed
+    assert drawing.CLUSTER_FLOAT_VIEW_NAME in shimmed and "FEELER" in shimmed
+    # Codjiflo (#2124): the gap is read with the ring on the groove's load
+    # wall, where transgear_cluster_fit puts it, not loose in its play.
+    assert "RING ON ITS GROOVE'S LOAD WALL" in " ".join(shimmed.split())
+    assert disc.inch_text(cluster_fit.END_FLOAT_MIN, 3) not in shimmed
+    # Codjiflo and machinist review (#2124): the step gives the fit-up's
+    # count range, and the BOM's QTY is the whole kit, the stack's nominal
+    # shims plus the spares the model stores in the spare T18's bore.
+    low_count, high_count = cluster_fit.SHIM_COUNT_RANGE
+    assert f"{low_count} TO {high_count} " in " ".join(shimmed.split())
+    assert high_count <= cluster_fit.SHIM_COUNT_MAX
+    description = drawing.BOM_DESCRIPTIONS["pd-vn-transgear-cluster-shim"]
+    assert "SUPPLY" not in description
+    assert drawing.TRANSGEAR_QUANTITIES["pd-vn-transgear-cluster-shim"] == (
+        cluster_fit.SHIM_COUNT_MAX
+    )
+    assert len(assembly.CLUSTER_SHIM_Z0S) == cluster_fit.SHIM_COUNT_MODEL
+    spares = cluster_fit.SHIM_COUNT_MAX - cluster_fit.SHIM_COUNT_MODEL
+    assert len(assembly.SPARE_SHIM_Y0S) == len(drawing.SPARE_SHIM_INSTANCES) == spares
+    stacked = {
+        name
+        for name in drawing.TRANSGEAR_INSTANCES
+        if name.startswith("pd-vn-transgear-cluster-shim-")
+    }
+    assert len(stacked) == cluster_fit.SHIM_COUNT_MODEL
+    assert not stacked & drawing.SPARE_SHIM_INSTANCES
+    # In the spare's bore, clear of its wall.
+    import pd_transgear_removable_spec as removable
+    import pd_vn_transgear_cluster_shim_spec as shim
+
+    assert shim.OD < removable.BORE_DIA
+    low = cluster_float.NOMINAL_MM
+    high = low + cluster_float.TOLERANCE_MM[1]
+    assert cluster_float.TOLERANCE_MM[0] == 0.0
+    assert low == cluster_fit.END_FLOAT_MIN == cluster_fit.RING_FLOAT_RANGE[0]
+    assert (
+        cluster_fit.RING_FLOAT_RANGE[1] <= high < cluster_fit.RING_FLOAT_RANGE[1] + 0.0254
+    )
+    assert cluster_float.DRAWING_DIMENSIONS == {
+        cluster_float.FEATURE: {cluster_float.DIMENSION}
+    }
+
+
+def test_view_e_text_stands_forward_of_the_ring_over_the_bare_pin() -> None:
+    """The ring gap's text sits ahead of the ring (machine -Z), above the
+    ring's rim, where only the pin's shank runs below it: no bushing outline,
+    chamfer or extension line crosses it.  The circle still frames it."""
+    import pd_paper_drive_cluster_float_spec as cluster_float
+    import pd_vn_transgear_retaining_ring_spec as ring
+
+    _, y, z = cluster_float.TEXT_POINT
+    assert z < cluster_fit.RING_FRONT_Z - 2.0
+    assert y - cluster_float.AXIS_XY[1] > ring.OD / 2.0 + 0.5
+    reach = math.dist((y, z), drawing.CLUSTER_FLOAT_MODEL_CENTRE[1:])
+    assert reach * drawing._CLUSTER_FLOAT_M_PER_MM < drawing.CLUSTER_FLOAT_RADIUS
+
 
 
 def test_nothing_in_the_disc_cluster_is_faced_at_assembly() -> None:
@@ -1596,7 +1697,7 @@ def test_nothing_in_the_disc_cluster_is_faced_at_assembly() -> None:
         for number in (hub, *bushings):
             assert f"FACE THE {number}" not in body, key
     hung = _step_body("disc-cluster-hung")
-    assert "BUSHINGS AS MADE" in hung
+    assert "OIL THE PIN" in hung
     for number in bushings:
         assert number in hung
     assert "ON THE NOSE TRAPS HUB AND DISC" in hung
@@ -1615,11 +1716,10 @@ def test_the_disc_is_centred_to_its_running_bore_before_transfer_and_match_mark(
         f"MANDREL IN THE {drawing._N['pd-transgear-feed-pinion']} BORE" in transferred
     )
     assert (
-        f"WITH A \u00d8{disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM:.3f} GAUGE PIN IN EACH "
+        f"WITH A \u00d8{disc.inch_text(disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM, 3)} GAUGE PIN IN EACH "
         f"{drawing._N['pd-rack-pinion']} TOOTH SPACE IN TURN"
     ) in transferred
-    tir = drawing.quality.toothspace_runout_tir_mm()
-    assert f"TILL THE DIAL READS {tir:.2f} TIR MAX" in transferred
+    assert f"TILL THE DIAL READS {disc.TOOTH_SPACE_RUNOUT_TIR_TEXT} TIR MAX" in transferred
     for method in ("CERTIFIED", "RUNNING-BORE", "INDICATOR STATION", "INSPECTION"):
         assert method not in transferred
     ordered_actions = (
@@ -1650,16 +1750,13 @@ def test_the_plate_screws_are_cut_to_the_limit_the_lock_sweep_clears() -> None:
         f"TAKE BOTH {_number('pd-vn-transgear-arm-plate-screw')} SCREWS OUT"
     )
     assert "REFIT THE SAME SCREWS IN THE SAME HOLES BEFORE PIVOTING THE HANGER" in body
-    limit = f"FLUSH TO {joints.PLATE_SCREW_CUT_PROUD_MAX:.2f} PROUD"
+    limit = f"FLUSH TO {disc.inch_text(joints.PLATE_SCREW_CUT_PROUD_MAX, 3)} PROUD"
     assert limit in body
-    assert f"BREAK THE CUT EDGE {plate_screw.CUT_END_BREAK_TEXT}" in body
     assert joints.PLATE_SCREW_TIP_PROUD_MAX == joints.PLATE_SCREW_CUT_PROUD_MAX
     row = _config.parts("pd-vn-transgear-arm-plate-screw")
     assert " ".join(row["installation_notes"].split()) == (
         " ".join(plate_screw.PURCHASED_STOCK_NOTE.split())
     )
-    assert f"PROUD {joints.PLATE_SCREW_CUT_PROUD_MAX:g} MAX" in plate_screw.PURCHASED_STOCK_NOTE
-    assert f"CUT-END BREAK {plate_screw.CUT_END_BREAK_TEXT}" in plate_screw.PURCHASED_STOCK_NOTE
     # Positive control: the fit step itself does not mention the cut.
     assert "CUT" not in _step_body("arm-plate-fitted")
 
@@ -1826,13 +1923,25 @@ def test_the_exploded_sheet_balloons_exactly_the_platen_group() -> None:
     assert drawing.SHEET_NAMES[3] == "PLATEN AND SUPPORT"
     assert drawing.SHEET_NAMES[2] == "TRANSGEAR EXPLODED"
     assert not explode.SHOWN_STEMS & explode.TRANSGEAR_SHOWN_STEMS
-    # Balloon 8 lands on a bottom lock plate, the one hanging free of the bar.
+    # Balloon 8 lands on a bottom lock plate, the one hanging free of the bar;
+    # balloon 7 on the top guide (the bottom one stands behind the platen),
+    # on its top edge, between a screw station and a lock station.
     pinned = {
         stem: anchor.instance
         for stem, anchor in drawing.PLATEN_BALLOON_ANCHORS.items()
         if anchor.instance is not None
     }
-    assert pinned == {"pd-guide-lock": "pd-guide-lock-2"}
+    assert pinned == {
+        "pd-guide-lock": "pd-guide-lock-2",
+        "pd-platen-guide": "pd-platen-guide-2",
+    }
+    x, y, z = drawing.PLATEN_GUIDE_BALLOON_POINT_MM
+    from build_pd_platen_guide import HOLE_X, SCREW_STATION_X
+    from pd_platen_guide_spec import GUIDE_HEIGHT
+
+    assert (y, z) == (GUIDE_HEIGHT, 0.0)
+    stations = sorted((*HOLE_X, *SCREW_STATION_X))
+    assert any(a + 10.0 < x < b - 10.0 for a, b in zip(stations, stations[1:]))
 
 
 def _explode_instances() -> list[explode.Instance]:
@@ -1878,6 +1987,28 @@ def test_the_transgear_explode_moves_the_knob_wheel_but_not_the_crank_wheel() ->
         assert step.axis == ("x" if step.stems == ("pd-vn-transgear-knob-cup-pin",) else "z")
 
 
+def test_the_cluster_explode_spreads_pin_shims_bushing_and_sleeve_in_order() -> None:
+    """Round 11: along the pin, rear to front, the pin's head, the shims,
+    the rear bushing and the sleeve each stand a clear gap from the next."""
+
+    def throw(stem: str) -> float:
+        return sum(s.distance_mm for s in explode.TRANSGEAR_STEPS if stem in s.stems)
+
+    head = cluster_fit.ARM_REAR_Z + throw("pd-transgear-pin")
+    shims = throw("pd-vn-transgear-cluster-shim")
+    shims_rear = cluster_fit.SHIM_REAR_Z + shims
+    shims_front = cluster_fit.SHIM_REAR_Z - cluster_fit.SHIM_STACK_MODEL + shims
+    bushing = throw("pd-transgear-rear-bushing")
+    bushing_rear = cluster_fit.REAR_BUSHING_REAR_Z + bushing
+    bushing_front = cluster_fit.SLEEVE_REAR_Z + bushing
+    sleeve_rear = cluster_fit.SLEEVE_REAR_Z + throw("pd-transgear-feed-pinion")
+    gaps = (head - shims_rear, shims_front - bushing_rear, bushing_front - sleeve_rear)
+    assert all(gap >= 5.0 for gap in gaps), gaps
+    # The disc and everything ahead of it keep their places off the sleeve.
+    assert throw("pd-rack-pinion") == -26.0
+    assert throw("pd-vn-transgear-retaining-ring") == -72.0
+
+
 def test_the_explode_refuses_a_model_missing_a_shown_family() -> None:
     instances = [i for i in _explode_instances() if i.stem != "pd-vn-platen-clip-screw"]
     with pytest.raises(ValueError, match="pd-vn-platen-clip-screw"):
@@ -1901,7 +2032,7 @@ def test_the_platen_group_is_built_and_hung_before_its_locks_are_set() -> None:
     order = ["bar-clamped", "rack-soldered", "guides-screwed", "clips-fitted"]
     order += ["platen-hung", "guide-locks-set", "lock-seats-faced"]
     assert list(steps.SEQUENCE[: len(order)]) == order
-    assert f"{steps.BAR_TOP_ABOVE_DECK:.1f} ABOVE THE BASE DECK" in _step_body(
+    assert f"{steps.BAR_TOP_ABOVE_DECK_TEXT} ABOVE THE BASE DECK" in _step_body(
         "bar-clamped"
     )
     # The round pair locates the bar before the slotted pair is tightened;
@@ -1976,7 +2107,7 @@ def test_the_setting_and_the_acceptance_offsets_are_told_apart() -> None:
     assert f"STEP {steps.step_number('collar-rear-faced-to-fit')}'S SETTING" in accepted
     behind = steps.OFFSET_ACCEPT_TOL - collar.FIT_UP_OFFSET_TARGET
     assert behind > 0.0
-    assert f"UP TO {behind:.2f} BEHIND PASSES" in accepted
+    assert f"UP TO {disc.inch_text(behind, 3)} BEHIND PASSES" in accepted
 
 
 def test_the_knob_wheel_is_read_held_back_on_its_seat() -> None:
@@ -2127,8 +2258,9 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
     assert "FEED STUD AXIS" in window
     for axis_word in ("-X", "+X", "MACHINE X", " MM"):
         assert axis_word not in mesh
-    low, high = domain.axis_from_left_end_limits_mm
-    assert f"ENGAGED FEED: {low:.2f} TO {high:.2f} FROM" in mesh
+    assert window.startswith(
+        f"ENGAGED FEED: {steps.inch_window(domain.axis_from_left_end_limits_mm, 3, ' TO ')} FROM"
+    )
     assert "RUN THAT WINDOW: NO TIGHT SPOT, SHAKE AT EVERY TOOTH" in mesh
     assert "STOP BEFORE EITHER END LIMIT" in mesh
     assert "RESET ONLY WITH FEED DISENGAGED" in mesh
@@ -2173,11 +2305,11 @@ def test_the_reducer_is_clocked_once_with_an_ordinary_limit() -> None:
     body = _step_body("fitup-pose-set")
     assert body.startswith("HANGER LATCHED.")
     assert steps.KNOB_HELD_BACK_TEXT in body
-    clock = drawing.quality.reducer_setup_clock_deviation_mm()
+    clock = steps.inch_floor_mm(drawing.quality.reducer_setup_clock_deviation_mm(), 4)
     assert (
         "TURN THE DISC SO, ON THE LINE THROUGH THE KNOB AND CLUSTER AXES, A "
         f"{disc.TEETH}T TOOTH STANDS CENTRED IN A {knob_shaft.TEETH}T GAP, "
-        f"WITHIN {clock:.2f} AT THE PITCH CIRCLE"
+        f"WITHIN {disc.inch_text(clock, 4)} AT THE PITCH CIRCLE"
     ) in body
     assert body.endswith("TURN THE KNOB: NO TIGHT SPOT, SHAKE AT EVERY TOOTH.")
     for method in ("UNCERTAINTY", "RE-ZERO", "RE-CLOCK", "ABSOLUTE", "REJECT"):
@@ -2425,7 +2557,8 @@ def test_spare_is_hidden_edge_on_and_shown_on_the_ballooned_isometric(
     seat._native_outline_at.return_value = (
         lambda _scale: (cx - 0.001, cy - 0.001, cx + 0.001, cy + 0.001)
     )
-    names = (drawing.SPARE_INSTANCE, "pd-transgear-removable-1", "pd-platen-rack-1")
+    hidden = {drawing.SPARE_INSTANCE, *drawing.SPARE_SHIM_INSTANCES}
+    names = (*sorted(hidden), "pd-transgear-removable-1", "pd-platen-rack-1")
     views: dict[str, tuple[object, list[_DrawnInstance]]] = {}
 
     def place_view(_adapter, _path, orientation, _x, _y, *, scale):
@@ -2440,7 +2573,7 @@ def test_spare_is_hidden_edge_on_and_shown_on_the_ballooned_isometric(
     assert set(views) == {"*Front", "*Right", "*Isometric"}
     for orientation in ("*Front", "*Right"):
         shown = {drawn.instance: drawn.Visible for drawn in views[orientation][1]}
-        assert shown == {name: name != drawing.SPARE_INSTANCE for name in names}
+        assert shown == {name: name not in hidden for name in names}
     # The returned isometric is the ballooned one, its instances untouched.
     assert iso is views["*Isometric"][0]
     assert all(drawn.Visible is None for drawn in views["*Isometric"][1])
@@ -3179,11 +3312,11 @@ def test_pd_consumer_refuses_hidden_physical_rows(monkeypatch, hidden_row, durin
             adapter, table, counts, configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION
         )
     assert table.RowHidden(hidden_row) is True
-    assert table.RowCount == table.TotalRowCount == 44
+    assert table.RowCount == table.TotalRowCount == BOM_ROWS
     assert tuple(tuple(row) for row in cells) == before
 
 
-@pytest.mark.parametrize("row", (-1, 44, 45))
+@pytest.mark.parametrize("row", (-1, BOM_ROWS, BOM_ROWS + 1))
 def test_pd_native_row_visibility_refuses_nonexistent_rows(monkeypatch, row):
     _model, _components, table, _adapter, _cells, _keys = _pd_bom_fixture(monkeypatch)
     with pytest.raises(IndexError):
@@ -3416,7 +3549,7 @@ def test_pd_all_visible_authoring_preserves_visible_quantities_and_native_snapsh
     table = scene.insert()
     before = _drawing_tables.validate_bom_number_property(
         table, configuration=configuration, label="paper-drive",
-        expected_rows=44, occurrence_quantities=True,
+        expected_rows=BOM_ROWS, occurrence_quantities=True,
     )
     before_identities = tuple(
         (id(component), component.GetPathName(), component.ReferencedConfiguration,
@@ -3444,7 +3577,7 @@ def test_pd_all_visible_authoring_preserves_visible_quantities_and_native_snapsh
     ) == before_identities
     snapshot = _drawing_tables.validate_bom_number_property(
         table, configuration=configuration, label="paper-drive",
-        expected_rows=44, occurrence_quantities=True,
+        expected_rows=BOM_ROWS, occurrence_quantities=True,
     )
     assert snapshot == before
     proof_by_row = {row[0]: row for row in snapshot}
@@ -3463,8 +3596,8 @@ def test_pd_all_visible_authoring_preserves_visible_quantities_and_native_snapsh
         assert proof_by_row[row][2:] == (drawing.BOM_PART_NUMBERS[key], str(count))
         assert sum(identity[2] for identity in proof_by_row[row][1]) == count
     assert items["sh-vn-chain-link--InnerLink"] != items["sh-vn-chain-link--OuterLink"]
-    heights = tuple(table.GetRowHeight(row) for row in range(44))
-    assert heights == (drawing.BOM_ROW_HEIGHT,) * 44
+    heights = tuple(table.GetRowHeight(row) for row in range(BOM_ROWS))
+    assert heights == (drawing.BOM_ROW_HEIGHT,) * BOM_ROWS
     split_after = drawing.bom_split_row(heights, 1)
     for anchor, height in (
         (drawing.BOM_ANCHOR, sum(heights[:split_after + 1])),
@@ -3789,7 +3922,7 @@ def test_bom_insertion_retains_grouped_native_members_through_pd_consumer(
         assert table.GetColumnCustomProperty(1) == "Number"
         assert table.BomFeature.PartConfigurationGrouping == 3
         assert table.BomFeature.DisplayAsOneItem is False
-        assert table.RowCount == table.TotalRowCount == len(scene.keys) + 1 == 44
+        assert table.RowCount == table.TotalRowCount == len(scene.keys) + 1 == BOM_ROWS
         quantity_column = visible - 1
         assert table.GetColumnType3(quantity_column, True) == (203, None, 0)
         assert table.GetColumnType3(quantity_column, False) == (203, None, 0)
@@ -3805,10 +3938,10 @@ def test_bom_insertion_retains_grouped_native_members_through_pd_consumer(
         assert table.GetColumnType3(visible + 1, True) == (-1, None, 0)
         assert table.ColumnHidden(visible + latent_before + 1) is False
         snapshot = _drawing_tables.validate_bom_number_property(
-            table, configuration=configuration, label="paper-drive", expected_rows=44,
+            table, configuration=configuration, label="paper-drive", expected_rows=BOM_ROWS,
             occurrence_quantities=True,
         )
-        assert tuple(row[0] for row in snapshot) == tuple(range(1, 44))
+        assert tuple(row[0] for row in snapshot) == tuple(range(1, BOM_ROWS))
         proof_by_row = {row[0]: row for row in snapshot}
         assert proof_by_row[gear_row][2:] == (
             drawing.BOM_PART_NUMBERS["pd-transgear-removable"], "3"
@@ -3872,7 +4005,7 @@ def test_pd_hidden_native_property_collision_accepts_zero_width_without_losing_v
         assert table.InsertColumn2(3, 2, "PURCHASE SKU", 0) is True
     before = _drawing_tables.validate_bom_number_property(
         table, configuration=configuration, label="paper-drive",
-        expected_rows=44, occurrence_quantities=True,
+        expected_rows=BOM_ROWS, occurrence_quantities=True,
     )
     native_column = len(scene.state.columns) - 1
     scene.state.columns[native_column].width = 0.0
@@ -3882,7 +4015,7 @@ def test_pd_hidden_native_property_collision_accepts_zero_width_without_losing_v
     assert _drawing_tables._bom_physical_columns(table, label="paper-drive")[-1] == (201, True)
     assert _drawing_tables.validate_bom_number_property(
         table, configuration=configuration, label="paper-drive",
-        expected_rows=44, occurrence_quantities=True,
+        expected_rows=BOM_ROWS, occurrence_quantities=True,
     ) == before
 
 
@@ -3982,7 +4115,9 @@ def test_bom_refuses_plain_description_without_row_text(monkeypatch, configurati
     descriptions = {
         key: text for key, text in drawing.BOM_DESCRIPTIONS.items() if key != "pd-platen"
     }
-    with pytest.raises(RuntimeError, match="DESCRIPTION column left 1 of 43 rows blank"):
+    with pytest.raises(
+        RuntimeError, match=f"DESCRIPTION column left 1 of {BOM_ROWS - 1} rows blank"
+    ):
         _drawing_tables.insert_bom_table(
             scene.adapter, scene.view, anchor_xy=drawing.BOM_ANCHOR,
             expected_components=tuple(drawing.BOM_PART_NUMBERS),
@@ -4062,7 +4197,7 @@ def test_default_bom_hides_native_column_without_materializing_latent_quantity(m
     ]
     _drawing_tables.validate_bom_number_property(
         table, configuration=configuration, label="paper-drive",
-        expected_rows=44, occurrence_quantities=True,
+        expected_rows=BOM_ROWS, occurrence_quantities=True,
     )
 
     # The former index materializes the latent Quantity; the census refuses it.
@@ -4153,7 +4288,7 @@ def test_pd_consumer_refuses_wrong_visible_projection_despite_unchanged_physical
         drawing._validate_bom(scene.adapter, table, counts, configuration=configuration)
     assert tuple(tuple(row) for row in scene.cells) == before_cells
     assert tuple(tuple(group) for group in scene.state.native_rows) == before_members
-    assert table.RowCount == table.TotalRowCount == 44
+    assert table.RowCount == table.TotalRowCount == BOM_ROWS
     assert native_identities() == before_identities
     for row, quantity in retained_quantities:
         assert len(table.GetComponents2(row, configuration)) == quantity
@@ -4285,7 +4420,7 @@ def test_place_bom_sheet_preserves_native_grouped_quantities_with_visible_number
     assert table.GetComponents2(1, drawing.SIMPLIFIED_VIEW_CONFIGURATION) == ()
     drawing._assert_bom_balloon_items(_landings, items)
     assert set(items) == set(drawing.BOM_PART_NUMBERS)
-    assert table.RowCount == table.TotalRowCount == 44
+    assert table.RowCount == table.TotalRowCount == BOM_ROWS
     assert _drawing_tables._bom_physical_columns(table, label="paper-drive") == (
         (202, False), (204, False), (204, False), (203, False), (201, True)
     )
@@ -4391,7 +4526,7 @@ def test_bom_insertion_refuses_noncustom_inserted_column(monkeypatch, kind):
         scene.insert()
     assert scene.state.columns[1].kind == kind
     assert scene.table.GetColumnCustomProperty(1) == ""
-    assert scene.table.RowCount == scene.table.TotalRowCount == 44
+    assert scene.table.RowCount == scene.table.TotalRowCount == BOM_ROWS
     assert tuple(tuple(group) for group in scene.state.native_rows) == before_members
     assert tuple(row[3] for row in scene.cells) == before_quantities
 
@@ -4412,7 +4547,7 @@ def test_bom_insertion_refuses_nonbool_property_setter_success(monkeypatch, resu
     with pytest.raises(RuntimeError):
         scene.insert()
     assert scene.table.GetColumnCustomProperty(1) == "Number"
-    assert scene.table.RowCount == scene.table.TotalRowCount == 44
+    assert scene.table.RowCount == scene.table.TotalRowCount == BOM_ROWS
     assert tuple(tuple(group) for group in scene.state.native_rows) == before_members
     assert tuple(row[3] for row in scene.cells) == before_quantities
 
@@ -4523,7 +4658,7 @@ def test_bom_column_census_accepts_matching_complete_empty_native_fingerprints(
         configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
     ))
     assert set(items) == set(drawing.BOM_PART_NUMBERS)
-    assert scene.table.RowCount == scene.table.TotalRowCount == 44
+    assert scene.table.RowCount == scene.table.TotalRowCount == BOM_ROWS
 
 
 @pytest.mark.parametrize(
@@ -5078,7 +5213,7 @@ def test_pd_build_settled_checks_reject_native_item_drift_with_good_attachments(
     for name in (
         "_validate_persisted_explode", "_create_sheets", "_place_assembled_sheet",
         "_place_pivot_view", "_place_fitup_sheets", "_place_knob_setting_view",
-        "assert_full_detail_view",
+        "_place_cluster_float_view", "assert_full_detail_view",
     ):
         monkeypatch.setattr(drawing, name, lambda *_, **__: None)
     monkeypatch.setattr(drawing, "_place_bom_sheet", lambda *_: (
@@ -5100,7 +5235,7 @@ def test_pd_build_settled_checks_reject_native_item_drift_with_good_attachments(
         assert asyncio.run(drawing.build(adapter)) == {"settled": "passed"}
         with pytest.raises(RuntimeError, match="no native components"):
             drawing._assert_bom_pieces(
-                pieces, header_count=1, total_rows=44,
+                pieces, header_count=1, total_rows=BOM_ROWS,
                 configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION, expected_snapshot=snapshot,
             )
     else:

@@ -1,7 +1,7 @@
 r"""Reproduction script: transgear disc hub (MHA-PD-17; ch. 23; 1 used).
 
 The turned brass hub and flange whose bore slides on the pinion sleeve's
-(MHA-PD-10) h6 boss and drives through its D-flat. Its rear spigot passes the
+(MHA-PD-10) boss and drives through its D-flat. Its rear spigot passes the
 reducer disc's (MHA-PD-06) bore, which pilots on it, and seats on the sleeve's
 step; the flange's rear face clamps the disc's front face and three #0-80
 fillister screws (MHA-PD-VN-55) hold them.  Nothing fastens the hub to the
@@ -17,13 +17,13 @@ z = -FLANGE_THICK..0 and the hub body forward to the hub front face, so
 ``Front Plane`` (z = 0) is the flange's rear face, the one that clamps the
 disc, and the spigot's and flange's printed lengths run from it.  The
 overall, spigot end to hub front face, is printed, as is the spigot length,
-both terms of the disc cluster stack (#2038).  The bore
+both terms of the disc cluster stack.  The bore
 is two Front-plane cuts: the D-bore (its flat on local -Y) forward through
 flange and body, and the round bore back through the spigot.  The three
 screw holes lie on a construction bolt circle whose driving diameter is the
-printed Ø19.  The radial oil hole is a Top-plane cut toward +Y through one
-wall, centred on the hub body by a construction station line from the hub
-front face (R9-60).  ``Axis1`` is the gear axis (Top Plane ∩ Right Plane);
+printed Ø.75.  The radial oil hole is a Top-plane cut toward +Y through one
+wall, at its printed station from the hub front face by a construction
+station line (R9-60).  ``Axis1`` is the gear axis (Top Plane ∩ Right Plane);
 the paper-drive assembly mates it to the sleeve's axis and the Front Plane
 to the disc's front face, unrotated.
 
@@ -42,8 +42,10 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -77,7 +79,6 @@ from pd_transgear_disc_hub_spec import (
     BORE_DEVIATIONS,
     BORE_DIA,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     FLANGE_DIA,
     FLANGE_THICK,
@@ -95,6 +96,7 @@ from pd_transgear_disc_hub_spec import (
     SPIGOT_DIA_DEVIATIONS,
     SPIGOT_LENGTH,
     SPIGOT_LENGTH_BAND,
+    UNIT,
 )
 
 PART_NAME = "pd-transgear-disc-hub"
@@ -258,6 +260,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
@@ -274,6 +277,7 @@ async def build(adapter) -> dict[str, str]:
         ("BoltCircleDia", BOLT_CIRCLE_DIA),
         ("ScrewHoleDia", SCREW_HOLE_DIA),
         ("OilHoleDia", OIL_HOLE_DIA),
+        ("OilHoleStation", OIL_HOLE_STATION),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -477,9 +481,8 @@ async def build(adapter) -> dict[str, str]:
 
     # Radial oil hole on +Y, one wall to the bore.  Top-plane sketch (u, v) =
     # model (X, -Z): a construction line on the axis from the hub front face
-    # to the hole centre carries the station, half the hub body (R9-60: the
-    # sheet prints no station; the hole is centred at fit-up); the circle's
-    # centre sits on its end.
+    # to the hole centre carries the printed station (R9-60: match-drilled
+    # at assembly at that station); the circle's centre sits on its end.
     oil = SketchDims()
     check("create_sketch oil hole", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
@@ -505,7 +508,7 @@ async def build(adapter) -> dict[str, str]:
         OIL_HOLE_STATION,
         "oil hole station from the hub front face",
     )
-    oil.record("OilHoleStation", '("HubLength" - "SpigotLength" - "FlangeThick") / 2')
+    oil.record("OilHoleStation", '"OilHoleStation"')
     sketch_mgr = adapter.currentSketchManager
     prev_add_to_db = bool(sketch_mgr.AddToDB)
     sketch_mgr.AddToDB = True
@@ -562,32 +565,36 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    # The bore carries both its bands on the model: the round's H7 and the
-    # flat's band, which together set the fit on the sleeve's boss and flat;
-    # the spigot carries its h6, the disc's pilot.  The overall and spigot
+    # The bore carries both its bands on the model: the round's and the
+    # flat's, which together set the fit on the sleeve's boss and flat; the
+    # spigot carries its SHAFT_H, the disc's pilot.  The overall and spigot
     # lengths carry the disc cluster stack's printed band.  Every other size
     # is governed by its places, the holes by the title block's DRILLED HOLES
-    # row (the spec's DRAWING_PRECISION).
+    # row (the spec's DRAWING_PRECISION).  All print in inches.
     set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "BoreDia", *BORE_DEVIATIONS
+        adapter, "BoreProfile", "BoreDia", *BORE_DEVIATIONS, display_unit=UNIT
     )
     set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "FlatToAxis", *FLAT_TO_AXIS_DEVIATIONS
+        adapter,
+        "BoreProfile",
+        "FlatToAxis",
+        *FLAT_TO_AXIS_DEVIATIONS,
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "HubProfile", "SpigotDia", *SPIGOT_DIA_DEVIATIONS
+        adapter, "HubProfile", "SpigotDia", *SPIGOT_DIA_DEVIATIONS, display_unit=UNIT
     )
     set_dimension_symmetric_tolerance(
-        adapter, "HubProfile", "HubLength", HUB_LENGTH_BAND
+        adapter, "HubProfile", "HubLength", HUB_LENGTH_BAND, display_unit=UNIT
     )
     set_dimension_symmetric_tolerance(
-        adapter, "HubProfile", "SpigotLength", SPIGOT_LENGTH_BAND
+        adapter, "HubProfile", "SpigotLength", SPIGOT_LENGTH_BAND, display_unit=UNIT
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
+    apply_drawing_properties(adapter, PART_NAME)
     return await save_part_and_images(adapter, PART_NAME)
 
 

@@ -25,6 +25,13 @@ flip_invert:
   # disc" in the PR #196 real-train rework; same mate, same learned side.
   # Latent until 2026-07-07's full paper-drive rebuild re-keyed it.)
   - reducer disc axial
+  # The .243 collar's 0.0169 air, now at its front with the rear seated on F
+  # (#290, #2148). The same plane pair as the retired rear-gap mate (a
+  # behind part's Front Plane against the part ahead's +Z RearFace, the
+  # behind part moving), whose sign-rule side run 20261102T151544062Z showed
+  # lands 0.0169 inside, under the 0.5 mm flip-miss gate;
+  # _assert_knob_collar_capture checks the side.
+  - drive collar front behind the knob wheel rear face
 allowed_free_stems:
   - sh-vn-brass-fillister-screw
   - pd-vn-platen-clip-screw  # MHA-PD-VN-65 clip screws ride the platen
@@ -59,6 +66,9 @@ free_dof: 1
 # carries_chain: wraps the roller chain, so verify:soundness's interference
 #   gate gets the authored wheel mounts, as the assembly build does (541011de0).
 carries_chain: true
+# drawing_unit: the fitter sheet, its TOL_* rows and the saved model's units
+#   are decimal inch (#290).
+drawing_unit: in
 # machinist_exceptions: the fitter package's owner-declared machinist-review
 #   exceptions (drawing-simplicity-policy.md "Named exceptions"); read by
 #   machinist_exceptions.load_exceptions for pd_paper_drive_assembly,

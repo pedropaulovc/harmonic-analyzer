@@ -5,13 +5,14 @@ pd-vn-transgear-arm-plate-screw:
   supplier: McMaster-Carr
   supplier_skus: [91790A199]
   material: 18-8 stainless steel
-  material_specification: "18-8 stainless steel, slotted standard oval head, nominal 82°, #8-32 UNC Class 2A right-hand fully threaded, 1 in (25.40 mm) stock; McMaster-Carr 91790A199"
-  finish: "as supplied; finish not stated"
+  material_specification: "18-8 stainless steel, slotted standard oval head, nominal 82°, #8-32 UNC Class 2A right-hand fully threaded, 1 in stock; McMaster-Carr 91790A199"
+  finish: "as supplied"
   quantity: 2
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: purchased
+  drawing_unit: in
   installation_notes: |-
-    1 IN (25.40) STOCK. CUT LENGTH AT ASSEMBLY (MHA-PD-00, BEFORE THE
-    GUIDE-LOCK SWEEP): TIP FLUSH OR PROUD 0.2 MAX OF THE MHA-PD-18 ARM
-    FRONT FACE; CUT-END BREAK 0.1 MAX.
+    CUT TO LENGTH AND BREAK THE CUT END AT ASSEMBLY (MHA-PD-00 CUT STEP,
+    BEFORE THE GUIDE-LOCK SWEEP), SO THE TIP CLEARS THE SWEEP AND THE
+    THREAD STAYS FULLY ENGAGED IN THE MHA-PD-18 ARM. VIEWS SHOW IT AS CUT.

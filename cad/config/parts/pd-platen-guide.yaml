@@ -6,3 +6,15 @@ pd-platen-guide:
   quantity: 2
   tolerance_class: machined_block
   process: "machined (steel)"
+  drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "the 9X #4-40 tap pattern: WALL .060 MIN, TAPS TO EDGES (both rows, to datum B and to the top face)"
+      finding: "tap wall to the rail's edges below the .080 target at the finished worst case (rule 17)"
+      reason: "delegated ruling 2026-11-03, following the owner's approved band for thin walls between .060 and .080 (DT-35 .060, DT-08 .0602; #989) and RV-04 on MHA-PD-18 (#1379); owner review on #2144. The rail is .29 at .XX (owner ruling B2, 2026-11-01): the bottom row cannot move (the rack backer blocks the rail growing down) and the #4-40 taps receive vendor screws, so the .080 unbroken wall pays the .010 outside edge break and the .010 tap mouth break and lands at the .060 floor"
+    - id: "RV-02"
+      kind: "accept"
+      where: "the 9X #4-40 tap pattern's position frame to datums A, B and C (MATCHES MHA-PD-02 AND MHA-PD-12 HOLES)"
+      finding: "position frame and datum features on a rail (rule 5)"
+      reason: "delegated ruling 2026-11-03 under rule 5's mating-pattern class: the taps receive screws fixed in two other parts, the platen's counterbored guide holes and the guide lock's drilled holes, so the pattern must match both and a coordinate plus/minus would stack each tap's error into both clearances; following the owner-accepted position controls on MHA-PD-18's locating pattern (RV-01) and the owner-accepted matched-pattern float on MHA-PD-02/MHA-PD-03 (RV-01); owner review on #2144"

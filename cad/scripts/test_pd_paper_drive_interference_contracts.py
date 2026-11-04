@@ -117,29 +117,17 @@ def test_disc_cluster_rows_follow_the_pin_hub_and_disc() -> None:
 
 
 def test_ring_row_is_the_free_state_grip_on_its_prong_arcs() -> None:
-    """MHA-PD-VN-61 is the replica-gated vendor body at its free diameter, so its
-    prongs grip inside the MHA-PD-23 groove floor; the overlap is the prong
-    arcs' share of the groove-to-free annulus over the ring's thickness."""
-    from diagnostics import diag_build_97431A260 as recipe
-
+    """MHA-PD-VN-61 is modelled at its free diameter, so its prongs grip
+    inside the MHA-PD-23 groove floor; the overlap is the prong arcs' share
+    of the groove-to-free annulus over the ring's thickness."""
     assert pin.GROOVE_DIA == ring.GROOVE_DIA
     assert ring.FREE_DIA < pin.GROOVE_DIA
-    # The ring sits wholly in the groove, off the Ø3.9 land.
+    # The ring sits wholly in the groove, off the shank.
     assert ring.THICKNESS + ring.THICKNESS_TOL <= pin.GROOVE_WIDTH
-    sweeps = []
-    for segment in recipe.outline():
-        if isinstance(segment, recipe.Line):
-            continue
-        if math.hypot(*segment.start) != pytest.approx(ring.FREE_DIA / 2.0):
-            continue
-        start = math.atan2(segment.start[1], segment.start[0])
-        end = math.atan2(segment.end[1], segment.end[0])
-        sweeps.append((end - start) % (2.0 * math.pi))
-    assert len(sweeps) == 3
-    share = sum(sweeps) / (2.0 * math.pi)
     pair = _pair("pd-vn-transgear-retaining-ring-1", "pd-transgear-pin-1")
     assert _allowed()[pair] == pytest.approx(
-        share * _annulus(pin.GROOVE_DIA, ring.FREE_DIA, ring.THICKNESS)
+        _interference_contracts._RING_PRONG_SHARE
+        * _annulus(pin.GROOVE_DIA, ring.FREE_DIA, ring.THICKNESS)
     )
 
 
@@ -161,9 +149,9 @@ def test_knob_stack_rows_follow_the_shaft_cup_collar_and_nut() -> None:
     assert allowed[pair] == pytest.approx(1.10 * (tube - in_journal), rel=1e-4)
     assert not any("knob-retaining-screw" in name for p in allowed for name in p)
 
-    # Stud tip less the nut's pilot seat at the nominal fitted body length.
-    # The collar's rear face reacts directly on F, so no gap or transverse
-    # pin supplies axial capture; the nominal overlap is all on the blank.
+    # Stud tip less the nut's pilot seat on the .243 nominal collar, whose
+    # rear reacts on F (its faced remainder is air at its front). The nominal
+    # overlap is all on the blank.
     collar = _collar()
     nut_engaged = shaft.TIP_STATION - collar.LENGTH - collar.PILOT_LENGTH
     assert collar.PILOT_LENGTH == pytest.approx(removable.PLATE + collar.PILOT_PROUD)

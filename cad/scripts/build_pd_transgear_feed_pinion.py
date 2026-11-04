@@ -3,9 +3,10 @@ r"""Reproduction script: translational-gearing feed-pinion sleeve (book ch. 23).
 The independent feed stage has 12 teeth and a finite standard 32DP PA20
 stock #8 master translated rigidly, not a generated profile shift. The
 teeth mesh the matching platen rack and are integral with the rear end of
-one turned steel sleeve (MHA-PD-10), running on the MHA-PD-23 pin's Ø3.9
-shank. Ahead of the teeth, the Ø8.2 h6 boss carries the brass hub and drives
-it through its unchanged D-flat; the hub's spigot seats on the step.
+one turned steel sleeve (MHA-PD-10), running on the MHA-PD-23 pin's 1/8
+shank. Ahead of the teeth, the Ø.313 boss carries the brass hub and drives
+it through its D-flat; the hub's spigot seats on the step.  The part builds
+in an inch document (#290); the model keeps millimetre globals.
 
 Layout: origin at the sleeve's rear face, +Z toward the machine front.
 The actual finite gap is cut straight only to FULL_DEPTH. Behind that
@@ -34,8 +35,10 @@ from _appearance import apply_material
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import _feature_by_name, name_last_feature
 from _part_checks import report_mass_properties
+from _part_properties import part_drawing_unit
 from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import (
@@ -110,6 +113,7 @@ from pd_transgear_feed_pinion_spec import (
     GEAR_DATA,
     OUTSIDE_DIA,
     OUTSIDE_DIA_DEVIATIONS,
+    OUTSIDE_DIA_PLACES,
     OVERALL_LENGTH,
     OVERALL_LENGTH_BAND,
     PRESSURE_ANGLE_DEG,  # noqa: F401 - the drawing test reads it off the part
@@ -128,9 +132,11 @@ from pd_transgear_feed_pinion_spec import (
     TOOTH_SPACE_CALLOUT,
     TOOTH_SPACE_CALLOUT_PROPERTY,
     TOOTH_SPACE_INSPECTION_PHASE_RAD,
+    UNIT,
     endcut_volume_bounds_mm3,
 )
 import pd_transgear_feed_pinion_callouts as callouts
+from pd_rack_pinion_spec import inch_text
 from pd_transgear_disc_hub_spec import OIL_HOLE_DIA, OIL_HOLE_SLEEVE_Z
 
 PART_NAME = "pd-transgear-feed-pinion"
@@ -150,7 +156,7 @@ V_OIL_HOLE = (
 ) / 2.0
 _R_BOSS = BOSS_DIA / 2.0
 # The D-flat: the boss's circular segment beyond the flat plane, nose to its
-# end wall (the bore, 1.95 off the axis, stays under the 3.5 flat).
+# end wall (the bore, .063 off the axis, stays under the .138 flat).
 V_FLAT = (
     _R_BOSS**2 * math.acos(FLAT_TO_AXIS / _R_BOSS)
     - FLAT_TO_AXIS * math.sqrt(_R_BOSS**2 - FLAT_TO_AXIS**2)
@@ -405,7 +411,7 @@ def _single_limit(
         raise RuntimeError(f"{label}: single-limit tolerance readback changed")
     if limit_places is not None:
         _set_tolerance_precision(
-            display, limit_deviations, display_unit="mm", label=label, places=limit_places
+            display, limit_deviations, display_unit=UNIT, label=label, places=limit_places
         )
     _telemetry.success(f"{label}: limit {printed}")
 
@@ -470,6 +476,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): every length carries the load-bearing
     # mm suffix (INCH document). TEETH/DP stay module constants -- the tooth
@@ -663,7 +670,7 @@ async def build(adapter) -> dict[str, str]:
     volume = await check_one_solid_body_volume(adapter, "boss", volume + V_BOSS, 0.01 * V_BOSS)
 
     volume, end_features = await _stock_cutter_endcut(adapter, drive_jobs)
-    await author_span(adapter, STOCK_PROFILE, SPAN_TEETH, places=SPAN_PLACES)
+    await author_span(adapter, STOCK_PROFILE, SPAN_TEETH, places=SPAN_PLACES, unit=UNIT)
     await _root_profile(adapter, drive_jobs)
 
     # Bore through (centre 0,0): define_circle emits only the diameter dim.
@@ -762,13 +769,13 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven feed-pinion sleeve (equations neutral)", volume, 0.01 * V_BORE
     )
 
-    # Bands (pd_transgear_feed_pinion_spec): the overall length ±0.05 (R9-5),
-    # the reamed bore, the boss's h6 under the disc's and hub's H7 bores, the
-    # flat's (0, -0.015) under the hub's flat, the standard tip class, the
-    # root as a physical MIN floor, the flat's end wall as LIMITS between the
-    # step and the hub's flat; the cutter's full depth as a MIN (it covers
-    # the rack) and its run-out as a MAX limit (R9-67).  The tooth length and
-    # the overall are disc-cluster stack terms at the cluster's band.
+    # Bands (pd_transgear_feed_pinion_spec), printed in inches: the reamed
+    # bore, the boss's SHAFT_H under the hub's bore, the flat's 0/-.0006
+    # under the hub's flat, the standard tip class, the root as a physical
+    # MIN floor, the flat's end wall as LIMITS between the step and the hub's
+    # flat; the cutter's full depth as a MIN (it covers the rack) and its
+    # run-out as a MAX limit (R9-67).  The tooth length and the overall are
+    # disc-cluster stack terms at the cluster's band.
     _single_limit(
         adapter,
         "FlatProfile",
@@ -776,24 +783,32 @@ async def build(adapter) -> dict[str, str]:
         FLAT_END_STATION,
         FLAT_END_DEVIATIONS,
         FLAT_END_TOL_TYPE,
-        f"{FLAT_END_STATION:.{FLAT_END_PLACES}f}/{FLAT_END_MIN:.{FLAT_END_PLACES}f}",
+        f"{inch_text(FLAT_END_STATION, FLAT_END_PLACES)}/"
+        f"{inch_text(FLAT_END_MIN, FLAT_END_PLACES)}",
         limit_places=FLAT_END_PLACES,
     )
     set_dimension_symmetric_tolerance(
-        adapter, "SleeveProfile", "OverallLength", OVERALL_LENGTH_BAND
+        adapter, "SleeveProfile", "OverallLength", OVERALL_LENGTH_BAND, display_unit=UNIT
     )
-    set_dimension_symmetric_tolerance(adapter, "GearBlank", "FaceWidth", FACE_WIDTH_BAND)
-    set_dimension_bilateral_tolerance(
-        adapter, "SleeveProfile", "BoreDia", *BORE_DEVIATIONS
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "SleeveProfile", "BossDia", *BOSS_DIA_DEVIATIONS
+    set_dimension_symmetric_tolerance(
+        adapter, "GearBlank", "FaceWidth", FACE_WIDTH_BAND, display_unit=UNIT
     )
     set_dimension_bilateral_tolerance(
-        adapter, "FlatProfile", "FlatToAxis", *FLAT_TO_AXIS_DEVIATIONS
+        adapter, "SleeveProfile", "BoreDia", *BORE_DEVIATIONS, display_unit=UNIT
     )
     set_dimension_bilateral_tolerance(
-        adapter, "SleeveProfile", "OutsideDia", *OUTSIDE_DIA_DEVIATIONS
+        adapter, "SleeveProfile", "BossDia", *BOSS_DIA_DEVIATIONS, display_unit=UNIT
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "FlatProfile", "FlatToAxis", *FLAT_TO_AXIS_DEVIATIONS, display_unit=UNIT
+    )
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "SleeveProfile",
+        "OutsideDia",
+        *OUTSIDE_DIA_DEVIATIONS,
+        places=OUTSIDE_DIA_PLACES,
+        display_unit=UNIT,
     )
     _single_limit(
         adapter,
@@ -802,7 +817,7 @@ async def build(adapter) -> dict[str, str]:
         ROOT_DIA_MIN,
         ROOT_DIA_DEVIATIONS,
         ROOT_DIA_TOL_TYPE,
-        f"{ROOT_DIA_MIN:.{ROOT_DIA_PLACES}f} MIN",
+        f"{inch_text(ROOT_DIA_MIN, ROOT_DIA_PLACES)} MIN",
     )
     _single_limit(
         adapter,
@@ -811,7 +826,7 @@ async def build(adapter) -> dict[str, str]:
         CUTTER_RUNOUT_MAX,
         CUTTER_RUNOUT_DEVIATIONS,
         CUTTER_RUNOUT_TOL_TYPE,
-        f"{CUTTER_RUNOUT_MAX:.{CUTTER_RUNOUT_PLACES}f} MAX",
+        f"{inch_text(CUTTER_RUNOUT_MAX, CUTTER_RUNOUT_PLACES)} MAX",
     )
     _single_limit(
         adapter,
@@ -820,11 +835,11 @@ async def build(adapter) -> dict[str, str]:
         FULL_DEPTH,
         FULL_DEPTH_DEVIATIONS,
         FULL_DEPTH_TOL_TYPE,
-        f"{FULL_DEPTH:.{FULL_DEPTH_PLACES}f} MIN",
+        f"{inch_text(FULL_DEPTH, FULL_DEPTH_PLACES)} MIN",
     )
     apply_span_limits(
         adapter, nominal_mm=SPAN_NOMINAL, deviations=SPAN_DEVIATIONS,
-        places=SPAN_PLACES, prefix=SPAN_PREFIX,
+        places=SPAN_PLACES, prefix=SPAN_PREFIX, unit=UNIT,
     )
     # Every mate, stack and station name prints at its own callout, authored
     # here (pd_transgear_feed_pinion_callouts).

@@ -76,6 +76,7 @@ from _layout_geometry import (
 from _machinist_review_mode import MachinistReviewMode
 from _native_axis_datum import _readback as read_native_datum
 from _native_axis_datum import _validate_source_edge as validate_source_axis_edge
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -87,7 +88,7 @@ from pd_transgear_pivot_spacer_spec import (
     BORE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    GEOMETRIC_TOLERANCES_MM,
+    GEOMETRIC_TOLERANCES_IN,
     ISOMETRIC_VIEW_SCALE,
     LENGTH,
     OD,
@@ -733,7 +734,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit("pd-transgear-pivot-spacer"),
     )
     stamp_drawing_summary(
         adapter,
@@ -852,7 +857,7 @@ async def build(adapter: Any) -> dict[str, str]:
             leader_attach_xy=landing,
             frame_xy=frame_position(mark, landing),
             characteristic="perpendicularity",
-            tolerance=GEOMETRIC_TOLERANCES_MM[key],
+            tolerance=GEOMETRIC_TOLERANCES_IN[key],
             datums=(BORE_DATUM,),
             label=mark.label,
         )
@@ -869,7 +874,7 @@ async def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=_od_runout_landing(adapter, profile),
         frame_xy=OD_RUNOUT_FRAME,
         characteristic="circular_runout",
-        tolerance=GEOMETRIC_TOLERANCES_MM["o.d. circular runout to bore"],
+        tolerance=GEOMETRIC_TOLERANCES_IN["o.d. circular runout to bore"],
         datums=(BORE_DATUM,),
         label=OD_RUNOUT_LABEL,
     )

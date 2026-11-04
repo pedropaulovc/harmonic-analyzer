@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import itertools
 import math
+import re
 from pathlib import Path
 
 import pytest
@@ -26,9 +27,12 @@ from _layout_geometry import ARROW_TEXT_CLEARANCE_M, Box, estimate_text_box
 from _gear_quality import (
     toothspace_runout_tir_mm,
 )
-from _printed_tolerance import printed_band_mm
-from _drawing_tolerances import _tolerance_places
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND, STACK_NAME
+from _printed_tolerance import (
+    edge_break_chamfer_mm,
+    inside_corner_radius_mm,
+    printed_band_mm,
+)
+from pd_cluster_stack_band import FIT_LENGTH_BAND_IN, STACK_NAME
 from paper_drive_stock_inspection import (
     span_contact_points_mm,
     toothspace_gauge_contact_mm,
@@ -67,7 +71,9 @@ def test_part_authors_every_callout_on_a_marked_dimension() -> None:
         name: text
         for (_feature, name), text in callouts.CALLOUTS[callouts.CALLOUT_BELOW].items()
     }
-    assert below["BoreDia"] == spec.BORE_PROCESS_CALLOUT
+    assert below["BoreDia"] == spec.BORE_CALLOUT
+    assert spec.BORE_CALLOUT.startswith(spec.BORE_PROCESS_CALLOUT)
+    assert spec.BORE_CALLOUT.endswith(spec.BORE_FIT_CALLOUT)
     for name in ("BossDia", "FlatToAxis", "FaceWidth", "FlatEnd", "OverallLength"):
         assert spec.HUB_NUMBER in below[name], name
     for name in ("OutsideDia", "ToothSpan"):
@@ -99,18 +105,14 @@ def test_bands_come_from_named_spec_constants() -> None:
         ("SleeveProfile", "OutsideDia"): "*OUTSIDE_DIA_DEVIATIONS",
     }
     # A band tighter than its printed row needs a functional reason (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)):
-    # the disc cluster stack's ±0.02, the tip class, boss h6 and flat
-    # 0/-0.015 bands have functional reasons tighter than their printed rows.
-    assert spec.OVERALL_LENGTH_BAND == spec.FACE_WIDTH_BAND == PRINTED_LENGTH_BAND
-    assert spec.OVERALL_LENGTH_BAND < printed_band_mm(spec.STATION_PLACES)
-    assert spec.FACE_WIDTH_BAND < printed_band_mm(spec.FACE_WIDTH_PLACES)
+    # the disc cluster stack's +/-.001 lengths at three places, the tip
+    # class, the boss's and the flat's bands at four, where the inch title
+    # block has no row, so each carries its own explicit band.
+    assert spec.OVERALL_LENGTH_BAND == spec.FACE_WIDTH_BAND == FIT_LENGTH_BAND_IN
     by_name = spec.DRAWING_PRECISION_BY_NAME
-    for name, band in (
-        ("OutsideDia", spec.OUTSIDE_DIA_BAND),
-        ("BossDia", spec.BOSS_DIA_BAND),
-        ("FlatToAxis", spec.FLAT_TO_AXIS_BAND),
-    ):
-        assert band[0] - band[1] < printed_band_mm(by_name[name]), name
+    assert spec.STATION_PLACES == spec.FACE_WIDTH_PLACES == 3
+    for name in ("OutsideDia", "BossDia", "FlatToAxis"):
+        assert by_name[name] == 4, name
 
 
 def test_root_prints_as_the_cutter_depth_floor() -> None:
@@ -120,7 +122,8 @@ def test_root_prints_as_the_cutter_depth_floor() -> None:
     expected_root = 2.0 * spec.STOCK_PROFILE.root_radius_min_mm
     corners = spec.manufactured_profiles()
     minimum = min(2.0 * profile.root_radius_min_mm for profile in corners)
-    expected_floor = math.floor(minimum * 10**places) / 10**places
+    # The MIN is floored on the printed inch grid, never rounded up.
+    expected_floor = math.floor(minimum / 25.4 * 10**places) / 10**places * 25.4
     assert spec.ROOT_DIA == pytest.approx(expected_root)
     assert spec.ROOT_DIA_MIN == pytest.approx(expected_floor)
     assert spec.ROOT_DIA_MIN <= minimum <= spec.ROOT_DIA
@@ -139,7 +142,7 @@ def test_disc_front_stands_a_spigot_length_ahead_of_the_step() -> None:
     import pd_transgear_disc_hub_spec as hub
 
     assert spec.DISC_FRONT_STATION == pytest.approx(spec.FACE_WIDTH + hub.SPIGOT_LENGTH)
-    assert spec.DISC_FRONT_STATION == pytest.approx(17.25)
+    assert spec.DISC_FRONT_STATION == pytest.approx((0.535 + 0.144) * 25.4)
     assert spec.DISC_FRONT_STATION_BAND == pytest.approx(
         spec.FACE_WIDTH_BAND + hub.SPIGOT_LENGTH_BAND
     )
@@ -164,10 +167,10 @@ def test_step_face_is_square_to_the_bore() -> None:
     to the bore (datum A) over the tip circle; the frame prints the spec's
     value."""
     assert spec.BORE_DATUM == "A"
-    assert spec.STEP_FACE_PERPENDICULARITY == 0.005
+    assert spec.STEP_FACE_PERPENDICULARITY == pytest.approx(0.0002 * 25.4)
     assert spec.STEP_FACE_PERPENDICULARITY_ZONE_DIA == spec.OUTSIDE_DIA
-    assert spec.GEOMETRIC_TOLERANCES_MM == {
-        "step face perpendicularity to bore": "0.005"
+    assert spec.GEOMETRIC_TOLERANCES_IN == {
+        "step face perpendicularity to bore": ".0002"
     }
     # The frame's leader lands on the step face's edge-on line in the
     # section, between the boss and the tip on the +Y tooth.
@@ -187,9 +190,7 @@ def test_full_depth_covers_the_racks_worst_reach() -> None:
 
     reach = assembly.RACK_FRONT_FROM_SLEEVE_REAR_WORST
     assert spec.FULL_DEPTH_MIN >= reach
-    assert spec.FULL_DEPTH_MIN < spec.FACE_WIDTH - printed_band_mm(
-        spec.FACE_WIDTH_PLACES
-    )
+    assert spec.FULL_DEPTH_MIN < spec.FACE_WIDTH - spec.FACE_WIDTH_BAND
     # The platen stands between the rack's front face and the disc's rear
     # face, so the rack never reaches within the platen's thickness of it in
     # the limit that sets its reach: the disc at its furthest forward on the
@@ -209,7 +210,7 @@ def test_cutter_run_out_ends_inside_its_limit_clear_of_the_disc() -> None:
     assert spec.DISC_REAR_MIN == pytest.approx(
         spec.DISC_FRONT_STATION - spec.DISC_FRONT_STATION_BAND - disc.FACE_WIDTH_MAX
     )
-    assert spec.RUNOUT_DISC_CLEARANCE == 0.05
+    assert spec.RUNOUT_DISC_CLEARANCE == pytest.approx(0.002 * 25.4)
     limit = spec.DISC_REAR_MIN - spec.RUNOUT_DISC_CLEARANCE
     assert spec.CUTTER_RUNOUT_END_WORST <= spec.CUTTER_RUNOUT_MAX <= limit
     # The physical cutter radius is located by deepest ground X, not the
@@ -236,15 +237,17 @@ def test_cutter_stations_are_native_banded_model_dimensions() -> None:
     frozen into note text (drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 12 (hole and slot callouts say what to do))."""
     assert {"FullDepth", "CutterRunout"} <= spec.DRAWING_DIMENSIONS["SleeveProfile"]
     places = spec.DRAWING_PRECISION_BY_NAME
-    assert places["FullDepth"] == spec.FULL_DEPTH_PLACES == 2
-    assert places["CutterRunout"] == spec.CUTTER_RUNOUT_PLACES == 2
+    assert places["FullDepth"] == spec.FULL_DEPTH_PLACES == 3
+    assert places["CutterRunout"] == spec.CUTTER_RUNOUT_PLACES == 3
     # The full depth covers the rack, a one-sided need, so it prints as a
     # MIN at the modelled station (2026-10-27 review, r1, r3); the run-out
     # MAX (swTolType_e.swTolMAX) caps it.  Each nominal is the limit it
     # prints.
     assert spec.FULL_DEPTH_TOL_TYPE == 5  # swTolType_e.swTolMIN
     assert spec.FULL_DEPTH_MIN == spec.FULL_DEPTH
-    assert round(spec.FULL_DEPTH, spec.FULL_DEPTH_PLACES) == spec.FULL_DEPTH
+    assert round(spec.FULL_DEPTH / 25.4, spec.FULL_DEPTH_PLACES) * 25.4 == pytest.approx(
+        spec.FULL_DEPTH
+    )
     # codjiflo P2 (0247213): a smaller cutter or shallower profile runs out
     # sooner, so over every accepted part only the run-out MAX bounds the
     # full depth and the cutter's end.
@@ -256,7 +259,10 @@ def test_cutter_stations_are_native_banded_model_dimensions() -> None:
     assert spec.CUTTER_RUNOUT_MAX + lower == pytest.approx(spec.FULL_DEPTH_MIN)
     # No number the model owns is retyped into the notes.
     lines = spec.DRAWING_NOTES.splitlines()
-    for value in (f"{spec.FULL_DEPTH:.2f}", f"{spec.CUTTER_RUNOUT_MAX:.2f}"):
+    for value in (
+        f"{spec.FULL_DEPTH / 25.4:.3f}".lstrip("0"),
+        f"{spec.CUTTER_RUNOUT_MAX / 25.4:.3f}".lstrip("0"),
+    ):
         assert value not in spec.DRAWING_NOTES, value
     # A shop note states requirements only: the cutter is method.  The
     # tooth-edge exception is flagged at the teeth by a leader (rule 7), so
@@ -295,7 +301,7 @@ def test_flat_end_mill_reaches_the_end_wall_clear_of_the_hub() -> None:
     # codjiflo P1 on 65a022125: the printed MIN keeps the wall off the step
     # the spigot seats on (longest tooth length plus the title block's edge
     # break) and off the cutter's run-out.
-    edge_break = float(_config.title_block("edge_break")["chamfer_max_mm"])
+    edge_break = edge_break_chamfer_mm(unit="in")
     assert spec._TITLE_BLOCK_EDGE_BREAK == edge_break
     assert spec.FLAT_END_MIN >= (
         spec.FACE_WIDTH + spec.FACE_WIDTH_BAND + edge_break
@@ -307,7 +313,7 @@ def test_flat_end_mill_reaches_the_end_wall_clear_of_the_hub() -> None:
     )
     # Looser than the title block's row at the limits' places.
     assert spec.FLAT_END_STATION - spec.FLAT_END_MIN > 2.0 * printed_band_mm(
-        spec.FLAT_END_PLACES
+        spec.FLAT_END_PLACES, unit="in"
     )
     worst = (
         spec.FACE_WIDTH
@@ -321,7 +327,7 @@ def test_flat_end_mill_reaches_the_end_wall_clear_of_the_hub() -> None:
     # flat's floor meet the wall in an inside corner up to its ceiling.  Where
     # the hub's flat starts, that corner's blend must stay under the flats'
     # minimum clearance, or the hub cannot seat.
-    corner = float(_config.title_block("inside_corner")["radius_mm"])
+    corner = inside_corner_radius_mm(unit="in")
     gap = hub.FLAT_END_CLEARANCE_WORST
     rise = corner - math.sqrt(corner**2 - (corner - gap) ** 2) if gap < corner else 0.0
     assert rise < hub.FLAT_CLEARANCE[0], (gap, rise)
@@ -367,11 +373,14 @@ def test_walls_meet_the_target_worst_case() -> None:
         assert worst >= spec.WALL_TARGET, name
         assert nominal >= worst, name
     # The wall under the flat is the one held to the floor, not the target,
-    # and the sheet prints its worst case floored at two places.
+    # and the sheet prints its worst case floored on the .001 in grid.
     assert spec.WALL_FLOOR <= spec.FLAT_WALL_WORST < spec.WALL_TARGET
     assert spec.FLAT_WALL_WORST <= spec.FLAT_WALL
     assert spec.FLAT_WALL_PRINTED <= spec.FLAT_WALL_WORST
-    assert f"{spec.FLAT_WALL_PRINTED:.2f} MIN" in spec.FLAT_WALL_NOTE
+    assert spec.FLAT_WALL_WORST - spec.FLAT_WALL_PRINTED < 0.001 * 25.4
+    printed = re.search(r"(\d*\.\d+) MIN", spec.FLAT_WALL_NOTE)
+    assert printed is not None
+    assert float(printed.group(1)) * 25.4 == pytest.approx(spec.FLAT_WALL_PRINTED)
     assert spec.FLAT_WALL_NOTE in spec.DRAWING_NOTES.splitlines()
 
 
@@ -389,13 +398,15 @@ def test_sheet_text_names_the_right_parts() -> None:
         assert _config.parts(stem)["number"] == number, stem
     note = drawing.OIL_HOLE_NOTE
     hole, drill = note.split("\n")
-    assert hole.startswith(f"\u00d8{hub.OIL_HOLE_DIA:.1f} OIL HOLE")
+    printed = re.match(r"\u00d8(\d*\.\d+) OIL HOLE", hole)
+    assert printed is not None
+    assert float(printed.group(1)) * 25.4 == pytest.approx(hub.OIL_HOLE_DIA)
     # The leader leaves the last row's end, so that row is the longer.
     assert len(hole) < len(drill) <= 70
     assert f"WITH {spec.HUB_NUMBER}" in drill
-    # The hub's sheet locates the match-drilled hole (CENTRED ON HUB BODY).
+    # The hub's sheet locates the match-drilled hole at its printed station.
     assert drill.endswith(f"POSITION SET BY {spec.HUB_NUMBER}")
-    assert "CENTRED ON HUB BODY" in hub.OIL_HOLE_CALLOUT_BELOW
+    assert "OilHoleStation" in hub.DRAWING_PRECISION_BY_NAME
     assert f"MATE PIN {spec.PIN_NUMBER}" in spec.BORE_FIT_CALLOUT
     assert _config.parts("pd-transgear-front-bushing")["number"] == "MHA-PD-25"
 
@@ -439,7 +450,7 @@ _DEVIATION_PLACES = {
     "BoreDia": spec.BORE_PLACES,
     "BossDia": spec.BOSS_DIA_PLACES,
     "FlatToAxis": spec.FLAT_TO_AXIS_PLACES,
-    "OutsideDia": _tolerance_places(*spec.OUTSIDE_DIA_DEVIATIONS, display_unit="mm"),
+    "OutsideDia": spec.OUTSIDE_DIA_PLACES,
 }
 # The disc-cluster stack terms' symmetric bands; the other lengths print bare
 # under the title block's rows.
@@ -449,12 +460,18 @@ _STATIONS = {
 }
 
 
+def _inch(value_mm: float, places: int, *, sign: bool = False) -> str:
+    """``value_mm`` as the inch sheet prints it (no leading zero)."""
+    text = f"{value_mm / 25.4:{'+' if sign else ''}.{places}f}"
+    return text.replace("0.", ".", 1) if abs(value_mm) < 25.4 else text
+
+
 def _printed_text(name: str) -> str:
     """A kept dimension's whole text as the sheet prints it, padded with the
     space SolidWorks prints either side: its part-authored prefix and value,
     then the root's MIN, a station's band, or a stacked band, then the
     part-authored callout below."""
-    value = f"{_NOMINAL[name]:.{spec.DRAWING_PRECISION_BY_NAME[name]}f}"
+    value = _inch(_NOMINAL[name], spec.DRAWING_PRECISION_BY_NAME[name])
     lanes = callouts.authored_by_name().get(name, {})
     if callouts.TEXT_PREFIX in lanes:
         # An authored prefix replaces SolidWorks' own diameter symbol.
@@ -464,21 +481,24 @@ def _printed_text(name: str) -> str:
     if name == "ToothSpan":
         lower, upper = spec.SPAN_LIMITS
         rows = [
-            f"{spec.SPAN_PREFIX}{upper:.{spec.SPAN_PLACES}f}",
-            f"{lower:.{spec.SPAN_PLACES}f}",
+            f"{spec.SPAN_PREFIX}{_inch(upper, spec.SPAN_PLACES)}",
+            _inch(lower, spec.SPAN_PLACES),
         ]
     elif name in ("RootDia", "FullDepth"):
         rows = [f"{value} min."]
     elif name == "FlatEnd":
-        rows = [value, f"{spec.FLAT_END_MIN:.{spec.FLAT_END_PLACES}f}"]
+        rows = [value, _inch(spec.FLAT_END_MIN, spec.FLAT_END_PLACES)]
     elif name == "CutterRunout":
         rows = [f"{value} max."]
     elif name in _DEVIATIONS:
         lower, upper = _DEVIATIONS[name]
         places = _DEVIATION_PLACES[name]
-        rows = [f"{upper:+.{places}f}", f"{value} {lower:+.{places}f}"]
+        rows = [
+            _inch(upper, places, sign=True),
+            f"{value} {_inch(lower, places, sign=True)}",
+        ]
     elif name in _STATIONS:
-        rows = [f"{value} \u00b1{_STATIONS[name]:.2f}"]
+        rows = [f"{value} \u00b1{_inch(_STATIONS[name], 4)}"]
     else:
         rows = [value]
     if callouts.CALLOUT_BELOW in lanes:
@@ -587,9 +607,6 @@ def test_section_values_and_bands_print_clear_of_each_other() -> None:
     boxes = {name: _printed_box(name, xy) for name, xy in keeps.items()}
     boxes["oil hole note"] = _note_box(
         drawing.OIL_HOLE_NOTE, drawing.OIL_HOLE_CALLOUT, height=drawing.NOTE_HEIGHT
-    )
-    boxes["bore fit note"] = _note_box(
-        spec.BORE_FIT_CALLOUT, drawing.BORE_FIT_NOTE, height=drawing.BORE_FIT_CHAR_HEIGHT
     )
     boxes["toothspace callout"] = _note_box(
         spec.TOOTH_SPACE_CALLOUT, drawing.TOOTH_SPACE_CALLOUT_XY,
@@ -735,7 +752,9 @@ def test_root_reads_across_two_gap_floors_on_the_rear_view() -> None:
     offset = (angle - pitch / 2.0) % pitch
     assert min(offset, pitch - offset) < 1e-9
     assert math.hypot(x - cx, y - cy) > drawing.HALF_OD + 0.015
-    assert _printed_text("RootDia").strip() == f"ROOT ENVELOPE \u00d8{spec.ROOT_DIA_MIN:.2f} min."
+    assert _printed_text("RootDia").strip() == (
+        f"ROOT ENVELOPE \u00d8{_inch(spec.ROOT_DIA_MIN, spec.ROOT_DIA_PLACES)} min."
+    )
 
 
 # The finish symbol's ink from its insertion point, measured with 2.5 mm text
@@ -792,18 +811,6 @@ def test_finish_leader_stays_above_the_span_extension_lines() -> None:
         assert ((y - cy) - (x - cx)) / math.sqrt(2.0) > 0.0027 + 0.001
 
 
-def test_bore_fit_leader_passes_clear_of_the_finish() -> None:
-    """Run 20261002T153039266Z's bore fit leader ran through the finish's "Ra
-    1.6" (leader-through-text).  The note stands above its landing, so its
-    leader never dips below the landing, and the finish's whole ink stands
-    several millimetres below it."""
-    landing_y = drawing.BORE_FIT_ATTACH[1]
-    note = _note_box(spec.BORE_FIT_CALLOUT, drawing.BORE_FIT_NOTE)
-    assert note.ymin > landing_y
-    _, _, _, ink_top = _finish_ink()
-    assert landing_y - ink_top >= 0.005
-
-
 def test_finite_gear_data_and_model_consume_one_tooth_system() -> None:
     from _gear_fit_limits import gear_tip_band_mm
 
@@ -826,14 +833,17 @@ def test_finite_gear_data_and_model_consume_one_tooth_system() -> None:
         ("NUMBER OF TEETH", f"{spec.TEETH}"),
         ("DIAMETRAL PITCH", f"{spec.DIAMETRAL_PITCH:.2f}"),
         ("PRESSURE ANGLE", f"{spec.PRESSURE_ANGLE_DEG:.1f} DEG"),
-        ("PITCH DIAMETER (mm, REF)", f"{spec.PITCH_DIA:.3f}"),
-        ("WHOLE DEPTH (mm, REF)", f"{spec.WHOLE_DEPTH:.3f}"),
+        ("PITCH DIAMETER (REF)", _inch(spec.PITCH_DIA, 4)),
+        ("WHOLE DEPTH (REF)", _inch(spec.WHOLE_DEPTH, 4)),
         (
             "CUTTER",
             f"#{spec.CUTTER_NUMBER}, "
             f"{spec.CUTTER_TOOTH_RANGE[0]}-{spec.CUTTER_TOOTH_RANGE[1]}T",
         ),
-        (f"SPAN OVER {spec.SPAN_TEETH} TEETH", f"{lower:.4f}-{upper:.4f}"),
+        (
+            f"SPAN OVER {spec.SPAN_TEETH} TEETH",
+            f"{_inch(lower, spec.SPAN_PLACES)}-{_inch(upper, spec.SPAN_PLACES)}",
+        ),
         ("MATES WITH", f"PLATEN RACK {spec.RACK_NUMBER}"),
     ):
         assert f"{label}:  {value}" in spec.GEAR_DATA
@@ -916,9 +926,11 @@ def test_toothspace_control_is_source_owned_and_feature_local() -> None:
     assert part.TOOTH_SPACE_CALLOUT_PROPERTY == spec.TOOTH_SPACE_CALLOUT_PROPERTY
     assert drawing.TOOTH_SPACE_CALLOUT_PROPERTY == spec.TOOTH_SPACE_CALLOUT_PROPERTY
     assert spec.TOOTH_SPACE_CALLOUT.splitlines() == [
-        f"TOOTH SPACE RUNOUT {grade:.2f} TIR TO {spec.BORE_DATUM}",
-        f"\u00d8{spec.TOOTHSPACE_GAUGE_DIA_IN:.4f} in PIN, ALL {spec.TEETH} SPACES",
+        f"TOOTH SPACE RUNOUT {spec.TOOTH_SPACE_RUNOUT_TIR_TEXT} TIR TO {spec.BORE_DATUM}",
+        f"\u00d8{_inch(spec.TOOTHSPACE_GAUGE_DIA_MM, 4)} PIN, ALL {spec.TEETH} SPACES",
     ]
+    # The printed TIR never exceeds the grade it controls.
+    assert float(spec.TOOTH_SPACE_RUNOUT_TIR_TEXT) * 25.4 <= grade
     # Indexing is held by the dividing head; no index inspection is printed.
     assert max(map(len, spec.TOOTH_SPACE_CALLOUT.splitlines())) <= 70
     assert "CANDIDATE" not in spec.TOOTH_SPACE_CALLOUT

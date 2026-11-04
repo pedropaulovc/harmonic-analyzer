@@ -4,30 +4,35 @@ PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  The part build, its sheet, the paper-drive assembly and the hanger
 joints (``transgear_hanger_joints``) all read the hook from here.
 
-One 0.8 (0.032 in) 1095 spring-steel blank, formed annealed, then hardened
-and tempered blue.  It replaces the old edgewise strip, its riveted L
-bracket and the two rivets:
+One .032 in 1095 spring-steel blank (McMaster 9043K43, bought annealed),
+formed annealed, then hardened and tempered blue.  It replaces the old
+edgewise strip, its riveted L bracket and the two rivets:
 
 * the BASE lies flat on the MHA-PD-07 support bar's back face (machine z
-  -129.4) in the bar's lock-free band (y 299.2..307.2) and takes the two
+  -129.4) in the bar's lock-free band (y 292.2..314.2) and takes the two
   MHA-SH-VN-52 #4-40 screws into the bar's through taps (x 65.0 / 72.0,
   y 303.234);
-* at the base's +X end a 90 deg bend (inside R1.2) raises the EAR rearward
-  (+Z) in the machine YZ plane, x 76.8305..77.6305, to z -113.9;
-* the ARM hangs from the ear's lower edge (y 299.2), a strip ARM_W wide in
-  machine Z (z -123.9..-113.9) with its 0.8 thickness in machine XY.  Its
-  mid-plane runs down at x 77.2305, then rolls R80 FLATWISE (about the
-  strip's width axis, machine Z) 32.558 deg toward -X, so that the straight
-  run through the pin hole lies square to the latch pin: the strip's face
-  normal there is the hanger arm's direction U;
+* at the base's +X end a 90 deg bend (inside R.05) raises the EAR rearward
+  (+Z) in the machine YZ plane to EAR_HEIGHT above the bar;
+* the ARM hangs from the ear's lower edge, a strip ARM_W wide in machine Z
+  with its thickness in machine XY.  Its mid-plane runs down at X_C, then
+  rolls FLATWISE (about the strip's width axis, machine Z) 32.558 deg
+  toward -X, so that the straight run through the pin hole lies square to
+  the latch pin: the strip's face normal there is the hanger arm's
+  direction U;
 * the straight runs RUN_ABOVE_HOLE above the pin hole and RUN_BELOW_HOLE
-  below it, then the FINGER TAB rolls R10 TAB_TURN_DEG toward +U (away
+  below it, then the FINGER TAB rolls TAB_R TAB_TURN_DEG toward +U (away
   from the hanger arm) and ends in a full round across the band;
 * below the guide-lock sweep (y < TAPER_Y[0]) the front edge tapers out
-  over ~10 of strip length from z -123.9 to -125.4 and holds there
+  over ~10 of strip length from Z_FRONT to Z_FRONT_LOW and holds there
   through the hole and the tab, so the pin hole keeps a full wall to it.
-  Above TAPER_Y[0] the front edge stays 1.5 clear of the guide-lock
-  screw heads' z -125.40.
+  Above TAPER_Y[0] the front edge stays 1.588 (.0625 in) clear of the
+  guide-lock screw heads' z -125.40.
+
+Every printed nominal is the exact millimetre decimal of its inch value
+(``# .61``); the screw holes' X follows the bar's taps and the arm's
+closure (the pin's station and the hanger angle), so those print at .XXX
+off the grid with the rounding counted in the stack.
 
 Latch action.  Latched, the MHA-PD-VN-58 pin on the hanger arm's end stands
 through the pin hole and the hanger RESTS on the hole's lower (-N) edge with
@@ -62,22 +67,26 @@ from __future__ import annotations
 import math
 
 from _cone_axis_constants import FRAME_FRONT_COLUMN_Z
-from pd_support_bar_spec import BRACKET_TAP_X, HANGER_TAP_Y, PIVOT_TAP_X
+from pd_support_bar_spec import BAR_HEIGHT, BRACKET_TAP_X, HANGER_TAP_Y, PIVOT_TAP_X
 from _column_clamp_interface import ARC_DEPTH
 from pd_transgear_arm_geometry import ARM_ANGLE_DEG, PIN_MACHINE_Z
 from pd_vn_transgear_latch_pin_spec import DIA_MAX as PIN_DIA_MAX
 
 # --- Stock ---------------------------------------------------------------------
-SHEET_T = 0.8  # 0.032 in 1095 spring steel, bought annealed
-SHEET_T_PLUS = 0.03  # stock band: the thickest sheet a buyer receives
-SHEET_T_MINUS = 0.03  # stock band: the thinnest
+# McMaster 9043K43, formable 1095 spring-steel sheet, annealed, ASTM A684:
+# .032 thick, -.002 to +.002 (live page https://www.mcmaster.com/9043K43/,
+# read 2026-10-31).
+SHEET_T = 0.8128  # .032
+SHEET_T_PLUS = 0.0508  # +.002: the thickest sheet a buyer receives
+SHEET_T_MINUS = 0.0508  # -.002: the thinnest
 HALF_T = SHEET_T / 2.0
 
 # --- Machine anchors -------------------------------------------------------------
 # The support bar sits unrotated with its back face on the front clamp arcs
 # (z -129.4, pd_support_bar_spec's frame), so a bar-frame X is a machine X and
-# a bar-frame Y is BAR_CENTRE_Y above.
-BAR_CENTRE_Y = 303.734
+# a bar-frame Y is BAR_CENTRE_Y above: the bar's top edge carries the platen's
+# top rail at machine y 317.734.
+BAR_CENTRE_Y = 317.734 - BAR_HEIGHT / 2.0
 BAR_BACK_FACE_Z = FRAME_FRONT_COLUMN_Z - ARC_DEPTH
 # The hanger's pivot P and its latched direction U (the arm geometry's
 # ARM_ANGLE_DEG, set by the pressed stud's station); N = U turned +90 deg.
@@ -95,29 +104,34 @@ def on_arm(station: float, offset: float = 0.0) -> tuple[float, float]:
 
 
 # --- Machine z bands -------------------------------------------------------------
-Z_REAR = -113.9  # the ear's top and the arm's rear edge
-Z_FRONT = -123.9  # the arm's front edge across the guide-lock sweep
-Z_FRONT_LOW = -125.4  # the front edge below the taper, through hole and tab
-ARM_W = Z_REAR - Z_FRONT  # 10.0
-LOW_W = Z_REAR - Z_FRONT_LOW  # 11.5
-# Machine y where the front edge leaves z -123.9 and where it reaches -125.4,
-# linear in y between (the taper is cut square to the ear's plane).  The
-# lower guide-lock plate's sweep band ends at y 282.734.
+# Heights above the base's underside (the bar's back face).  The sheet prints
+# the ear height and the arm's two strip widths from the ear's top, all .XX.
+EAR_HEIGHT = 15.494  # .61: the ear's top, the arm's rear edge
+Z_REAR = BAR_BACK_FACE_Z + EAR_HEIGHT
+Z_FRONT = BAR_BACK_FACE_Z + 5.588  # the arm's front edge in the lock sweep
+Z_FRONT_LOW = BAR_BACK_FACE_Z + 4.064  # below the taper, hole and tab
+ARM_W = Z_REAR - Z_FRONT  # 9.906 (.39)
+LOW_W = Z_REAR - Z_FRONT_LOW  # 11.43 (.45)
+# Machine y where the front edge leaves Z_FRONT and where it reaches
+# Z_FRONT_LOW, linear in y between (the taper is cut square to the ear's
+# plane).  The lower guide-lock plate's sweep band ends at y 282.734.
 TAPER_Y = (280.0, 270.0)
 
 # --- Base and ear ----------------------------------------------------------------
-BASE_Y = (299.2, 307.2)  # inside the bar's lock-free band 292.2..314.2
-WIDTH = BASE_Y[1] - BASE_Y[0]  # 8.0
-BASE_X0 = 61.0  # the base's -X end
 SCREW_X = tuple(float(x) for x in BRACKET_TAP_X)  # (65.0, 72.0)
 SCREW_Y = BAR_CENTRE_Y + HANGER_TAP_Y  # 303.234
-SCREW_HOLE_DIA = 3.2  # #4 clearance, as the retired bracket's
-INSIDE_BEND_R = 1.2  # annealed 1095 at 1.5 T
+SCREW_HOLE_Y = 4.0386  # .159: the screws' row above the base's low-Y edge
+WIDTH = 8.128  # .32
+# Inside the bar's lock-free band 294.8..313.8 (the .45 lock plates on the .29
+# rails; build_pd_paper_drive_assembly's lock-station sweep proves the air).
+BASE_Y = (SCREW_Y - SCREW_HOLE_Y, SCREW_Y - SCREW_HOLE_Y + WIDTH)
+BASE_LENGTH = 16.764  # .66: the base's -X end to the ear's outer face
+SCREW_HOLE_DIA = 3.2512  # .128 +.004/0: a #30 drill (.1285), #4 clearance
+INSIDE_BEND_R = 1.27  # .05: annealed 1095 at 1.56 T (1.5 T the floor)
 OUTSIDE_BEND_R = INSIDE_BEND_R + SHEET_T
-INSIDE_BEND_R_MAX = 1.5
 # The arm's front edge meets the ear's lower edge in a relief radius: the arm
 # flexes hardest at its root.
-ROOT_R = 2.0
+ROOT_R = 2.032  # .08
 
 # --- Arm centreline (machine XY, the strip's mid-plane) ----------------------------
 # The pin crosses the strip's mid-plane at machine x 58.2, where it crossed
@@ -126,10 +140,11 @@ PIN_CROSSING_X = 58.2
 HOLE_STATION = (PIN_CROSSING_X - PIVOT_XY[0]) / ARM_U[0]  # 137.867 from P
 PIN_AXIS_XY = on_arm(HOLE_STATION)  # (58.2, 229.0396)
 RUN_ABOVE_HOLE = 12.0  # straight run from the roll's end down to the hole
-RUN_BELOW_HOLE = 15.0  # straight run from the hole down to the tab
-ROLL_R = 80.0
+STRAIGHT_LEN = 27.0002  # 1.063: the whole straight, roll to tab
+RUN_BELOW_HOLE = STRAIGHT_LEN - RUN_ABOVE_HOLE  # from the hole down to the tab
+ROLL_R = 79.6036 + HALF_T  # the mid-plane; the inside (printed) radius 3.134
 ROLL_TURN_DEG = -ARM_ANGLE_DEG  # vertical -> square to U
-TAB_R = 10.0
+TAB_R = 9.6012 + HALF_T  # the mid-plane; the inside (concave) radius .378
 TAB_TURN_DEG = 35.0
 
 ROLL_END = (  # E: the roll's lower tangent, RUN_ABOVE_HOLE up N from the pin
@@ -138,8 +153,9 @@ ROLL_END = (  # E: the roll's lower tangent, RUN_ABOVE_HOLE up N from the pin
 )
 ROLL_C = (ROLL_END[0] - ROLL_R * ARM_U[0], ROLL_END[1] - ROLL_R * ARM_U[1])
 ROLL_START = (ROLL_C[0] + ROLL_R, ROLL_C[1])  # the vertical's lower tangent
-X_C = ROLL_START[0]  # the vertical's mid-plane, machine x 77.2305
-X_B = X_C + HALF_T  # the ear's outer face, machine x 77.6305
+X_C = ROLL_START[0]  # the vertical's mid-plane, machine x 77.2324
+X_B = X_C + HALF_T  # the ear's outer face, machine x 77.6388
+BASE_X0 = X_B - BASE_LENGTH  # the base's -X end
 TAB_START = (
     PIN_AXIS_XY[0] - RUN_BELOW_HOLE * ARM_N[0],
     PIN_AXIS_XY[1] - RUN_BELOW_HOLE * ARM_N[1],
@@ -162,37 +178,41 @@ TIP_Y = ROUND_C_YZ[0] - ROUND_R  # the part's lowest point, machine y
 # pin bears on the hole's lower edge at the drawn pose (the retired strip's
 # PIN_BEARING_LIFT intent: a hole centred on the pin let the hanger drop the
 # hole's play, opening the feed mesh).
-PIN_HOLE_DIA = 3.3
+PIN_HOLE_DIA = 3.2512  # .128 +.004/0: a #30 drill (.1285)
 PIN_BEARING_LIFT = (PIN_HOLE_DIA - PIN_DIA_MAX) / 2.0
 PIN_HOLE_XY = (
     PIN_AXIS_XY[0] + PIN_BEARING_LIFT * ARM_N[0],
     PIN_AXIS_XY[1] + PIN_BEARING_LIFT * ARM_N[1],
 )
-PIN_HOLE_Z = PIN_MACHINE_Z  # -120.43125
+PIN_HOLE_Z = PIN_MACHINE_Z  # the arm's pin axis height
 # The strip's faces along U at the hole: the near (pin-side, -U) face and the
 # far (+U) face, as stations from P.
 NEAR_FACE_STATION = HOLE_STATION - HALF_T
 FAR_FACE_STATION = HOLE_STATION + HALF_T
 
 # --- Developed (flat) blank ---------------------------------------------------------
-# The 90 deg bend's allowance at K 0.4 (R/T 1.5); the R80 roll and the R10
-# tab (R/T 100 and 12.5) develop on the mid-plane.
+# The 90 deg bend's allowance at K 0.4 (R/T 1.5); the roll and the tab
+# (R/T ~98 and ~12) develop on the mid-plane.
 K_BEND = 0.4
 BEND_ALLOWANCE = math.pi / 2.0 * (INSIDE_BEND_R + K_BEND * SHEET_T)
-BASE_LENGTH = X_B - BASE_X0  # formed, to the ear's outer face: 16.6305
-EAR_HEIGHT = Z_REAR - BAR_BACK_FACE_Z  # formed, to the base's underside: 16.0
 FLAT_BASE = BASE_LENGTH - SHEET_T - INSIDE_BEND_R  # flat to the bend's start
 FLAT_EAR = EAR_HEIGHT - SHEET_T - INSIDE_BEND_R  # flat from the bend's end
 FLAT_LENGTH = FLAT_BASE + BEND_ALLOWANCE + FLAT_EAR  # the blank across the bend
 _ROLL_TURN = math.radians(ROLL_TURN_DEG)
 _TAB_TURN = math.radians(TAB_TURN_DEG)
-# Arm stations along the mid-plane from the ear's lower edge (y 299.2).
+# Arm stations along the mid-plane from the ear's lower edge (BASE_Y[0]).
 DEV_ROLL_START = BASE_Y[0] - ROLL_START[1]
 DEV_ROLL_END = DEV_ROLL_START + ROLL_R * _ROLL_TURN
 DEV_HOLE = DEV_ROLL_END + RUN_ABOVE_HOLE
 DEV_TAB_START = DEV_HOLE + RUN_BELOW_HOLE
 DEV_TAB_END = DEV_TAB_START + TAB_R * _TAB_TURN
 DEV_TIP = DEV_TAB_END - ROUND_TRIM  # the arm's developed length to the round's tip
+# The flat pattern's bend centrelines: the 90 deg bend's from the ear's top
+# edge; the roll's and the tab's from the ear's lower edge (the tab's lies in
+# the full round, which trims the tab's end).
+FLAT_BEND_C = FLAT_EAR + BEND_ALLOWANCE / 2.0
+DEV_ROLL_C = (DEV_ROLL_START + DEV_ROLL_END) / 2.0
+DEV_TAB_C = (DEV_TAB_START + DEV_TAB_END) / 2.0
 
 
 def _dev_at_y(y: float) -> float:
@@ -204,9 +224,9 @@ def _dev_at_y(y: float) -> float:
 
 
 DEV_TAPER = (_dev_at_y(TAPER_Y[0]), _dev_at_y(TAPER_Y[1]))
-# The blank's front edge (z -123.9) and the lip it widens to: in the flat the
+# The blank's front edge (Z_FRONT) and the lip it widens to: in the flat the
 # arm's front edge steps out LOW_W - ARM_W over DEV_TAPER.
-LIP_W = LOW_W - ARM_W  # 1.5
+LIP_W = LOW_W - ARM_W  # 1.524
 
 # --- Local part frame ----------------------------------------------------------------
 PART_ORIGIN_MACHINE = (X_B, BASE_Y[0], BAR_BACK_FACE_Z)
@@ -258,16 +278,15 @@ OUTER_TAB_R = TAB_R - HALF_T
 INNER_TAB_R = TAB_R + HALF_T
 PIN_HOLE_L = to_local(*PIN_HOLE_XY)
 PIN_HOLE_ZL = z_local(PIN_HOLE_Z)
-SCREW_HOLE_X = tuple(round(x - X_B, 6) for x in SCREW_X)  # (-12.6305, -5.6305)
-SCREW_HOLE_Y = round(SCREW_Y - BASE_Y[0], 6)  # 4.034
-ARM_Z0 = z_local(Z_FRONT_LOW)  # the arm's extrusion: 4.5 .. 16.0 above Front
+SCREW_HOLE_X = tuple(round(x - X_B, 6) for x in SCREW_X)  # (-12.6388, -5.6388)
+ARM_Z0 = z_local(Z_FRONT_LOW)  # the arm's extrusion: 4.064 .. 15.494 above Front
 ARM_Z1 = z_local(Z_REAR)
 TAPER_L = (TAPER_Y[0] - BASE_Y[0], TAPER_Y[1] - BASE_Y[0])
 ROUND_C_L = (ROUND_C_YZ[0] - BASE_Y[0], z_local(ROUND_C_YZ[1]))
 
 # --- Areas and volumes (for the build's gates) ----------------------------------
 # The L section across the bend (Top plane): base and ear plates less their
-# overlap at the corner, with the R1.2 / R2.0 bend fillets.
+# overlap at the corner, with the inside and outside bend fillets.
 _L_AREA = (
     BASE_LENGTH * SHEET_T
     + EAR_HEIGHT * SHEET_T
@@ -304,7 +323,7 @@ def _front_edge_z(y: float) -> float:
 
 def _taper_cut_volume(n: int = 4000) -> float:
     """What the taper cut removes from the arm prism below the ear: the strip's
-    0.8 x ds slab times the band cut off its front, y TAPER_Y[1]..BASE_Y[0]."""
+    sheet x ds slab times the band cut off its front, y TAPER_Y[1]..BASE_Y[0]."""
     y0, y1 = TAPER_Y[1], BASE_Y[0]
     h = (y1 - y0) / n
     total = 0.0
@@ -317,7 +336,7 @@ def _taper_cut_volume(n: int = 4000) -> float:
 V_TAPER_CUT = _taper_cut_volume()
 # The full round at the tip, seen along X: the two corners the round takes
 # off a band LOW_W wide, ROUND_TRIM of square end above them included.  The
-# tab's end runs within 2.5 deg of -Y, so the slab is 0.8 x dy to 0.1 %.
+# tab's end runs within 2.5 deg of -Y, so the slab is sheet x dy to 0.1 %.
 V_ROUND_CUT = SHEET_T * ((2.0 - math.pi / 2.0) * ROUND_R**2 + ROUND_TRIM * LOW_W)
 # The root's relief radius fills the inside corner across the strip.
 V_ROOT_FILL = (1.0 - math.pi / 4.0) * ROOT_R**2 * SHEET_T
@@ -364,7 +383,7 @@ if (
     abs(math.dist(ROLL_C, ROLL_END) - ROLL_R) > _TOL
     or abs(ROLL_START[1] - ROLL_C[1]) > _TOL
 ):
-    raise AssertionError("the R80 roll does not leave the vertical tangent")
+    raise AssertionError("the roll does not leave the vertical tangent")
 # The roll's lower tangent is square to U: its radius runs along U.
 if abs((ROLL_END[0] - ROLL_C[0]) / ROLL_R - ARM_U[0]) > _TOL:
     raise AssertionError("the roll does not end square to the latch pin")

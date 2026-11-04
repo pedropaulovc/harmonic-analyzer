@@ -34,6 +34,9 @@ behind the disc never meets a screw.  The model is that installed screw,
 
 import math
 
+import _config
+from _package_units import drawing_unit
+import _mcmaster_91794a055 as _supplier
 from _mcmaster_91794a055 import (
     HEAD_DIA,
     HEAD_H,
@@ -44,15 +47,21 @@ from _mcmaster_91794a055 import (
     SKU,
     THREAD as THREAD,
 )
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm
 from pd_rack_pinion_spec import (
     ENGAGEMENT_FLOOR_D,
     FACE_WIDTH,
     FACE_WIDTH_MAX,
     FACE_WIDTH_MIN,
     MOUTH_THREAD_LOSS,
+    inch_text,
 )
 from pd_transgear_disc_hub_spec import FLANGE_THICK, FLANGE_THICK_PLACES
+from pd_transgear_disc_hub_spec import UNIT as HUB_UNIT
+
+UNIT = drawing_unit(
+    "parts/pd-vn-transgear-disc-screw", _config.parts("pd-vn-transgear-disc-screw")
+)
 
 
 # --- head (Revolve1 / Sketch2) ----------------------------------------------
@@ -131,30 +140,34 @@ if TIP_CHAMFER > FIRST_THREAD_LOSS:
     raise ValueError(f"{SKU}: the tip chamfer runs past the first thread")
 
 # --- as installed: cut to fit (R9-47) ------------------------------------------
-# The platen slides close behind the 120T disc, and the longest stock on the
-# thinnest flange and disc stands STOCK_TIP_PROUD_MAX (1.21) proud of the
+# The platen slides close behind the 150T disc, and the longest stock on the
+# thinnest flange and disc stands STOCK_TIP_PROUD_MAX (.048) proud of the
 # disc's rear face.  So each tip is cut at assembly to sit this far under
-# the rear face, (min, max), the cut end broken 45 deg CUT_END_BREAK_MAX at
-# most.  A stock tip already inside the window stays uncut.
-TIP_BELOW_REAR_FACE = (0.0, 0.2)
-TIP_BELOW_REAR_FACE_TEXT = f"{TIP_BELOW_REAR_FACE[0]:.2f}-{TIP_BELOW_REAR_FACE[1]:.2f}"
-CUT_END_BREAK_MAX = 0.1
-# What the A06 cut step and the part sheet print for it.
-CUT_END_BREAK_TEXT = f"{CUT_END_BREAK_MAX:.1f} MAX"
+# the rear face, (min, max), and the cut end broken.  A stock tip already
+# inside the window stays uncut.
+TIP_BELOW_REAR_FACE = (0.0, 0.2032)  # .000-.008
+TIP_BELOW_REAR_FACE_TEXT = (
+    f"{inch_text(TIP_BELOW_REAR_FACE[0], 3)}-{inch_text(TIP_BELOW_REAR_FACE[1], 3)}"
+)
+# The cut end's break is the title block's (.010 chamfer max): the worst
+# engagement holds 1.5D with it (machinist review r6: a tighter .004 had no
+# reason), so the sheet states no limit of its own.  The model and the
+# engagement stack carry that maximum.
+CUT_END_BREAK_MAX = edge_break_chamfer_mm(unit="in")
 # The model is the installed screw, its tip mid-window under the nominal
-# flange and disc: 2.4 + 3.0 - 0.1 = 5.3.  Placement, interference and the
-# assembly's tip checks read LENGTH.
+# flange and disc: .094 + .118 - .004 = .208.  Placement, interference and
+# the assembly's tip checks read LENGTH.
 TIP_BELOW_REAR_FACE_MODEL = sum(TIP_BELOW_REAR_FACE) / 2.0
 CUT_LENGTH = FLANGE_THICK + FACE_WIDTH - TIP_BELOW_REAR_FACE_MODEL
 LENGTH = CUT_LENGTH
 
-_FLANGE_BAND = printed_band_mm(FLANGE_THICK_PLACES)
+_FLANGE_BAND = printed_band_mm(FLANGE_THICK_PLACES, unit=HUB_UNIT)
 # The longest stock on the thinnest flange and disc, before the cut.
 STOCK_TIP_PROUD_MAX = (
     SHANK_LEN + STOCK_LENGTH_BAND[0] - (FLANGE_THICK - _FLANGE_BAND) - FACE_WIDTH_MIN
 )
 # The shortest stock on the thickest flange and disc stops this far inside
-# the rear face uncut (0.072): already in the window, so every stock screw
+# the rear face uncut (.002): already in the window, so every stock screw
 # reaches it and none is ever too short.
 STOCK_TIP_INSIDE_REAR_MAX = (
     FLANGE_THICK + _FLANGE_BAND + FACE_WIDTH_MAX - (SHANK_LEN - STOCK_LENGTH_BAND[1])
@@ -194,4 +207,33 @@ if ENGAGEMENT_WORST_D < ENGAGEMENT_FLOOR_D - 1e-9:
         f"MHA-PD-VN-55 disc screw in the MHA-PD-06 disc tap: worst engagement "
         f"{ENGAGEMENT_WORST:.3f} ({ENGAGEMENT_WORST_D:.3f}D) under "
         f"{ENGAGEMENT_FLOOR_D}D"
+    )
+
+# --- supplier references the part carries and the sheet prints -------------
+# The supplier's references less its stock length: the screw is drawn as
+# cut, so a .25 stock length landed in air below the drawn tip on a witness
+# line that belonged to no feature (machinist review r7, all runs).  The
+# ITEM row's "#0-80 x 1/4" names the stock; the installation note the cut.
+_STOCK_LENGTH = "SupplierStockLength"
+SUPPLIER_REFERENCE_DIMENSIONS = tuple(
+    row for row in _supplier.SUPPLIER_REFERENCE_DIMENSIONS if row[0] != _STOCK_LENGTH
+)
+SUPPLIER_REFERENCE_STARTS = {
+    name: start
+    for name, start in _supplier.SUPPLIER_REFERENCE_STARTS.items()
+    if name != _STOCK_LENGTH
+}
+SUPPLIER_REFERENCE_FORMATS = {
+    name: row
+    for name, row in _supplier.SUPPLIER_REFERENCE_FORMATS.items()
+    if name != _STOCK_LENGTH
+}
+SUPPLIER_REFERENCE_PLANES = _supplier.SUPPLIER_REFERENCE_PLANES
+SUPPLIER_REFERENCE_SIDES = _supplier.SUPPLIER_REFERENCE_SIDES
+if (
+    len(SUPPLIER_REFERENCE_DIMENSIONS)
+    != len(_supplier.SUPPLIER_REFERENCE_DIMENSIONS) - 1
+):
+    raise AssertionError(
+        "MHA-PD-VN-55: the supplier stock length reference is not dropped"
     )

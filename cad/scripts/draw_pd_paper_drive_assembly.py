@@ -69,6 +69,7 @@ from _drawing_balloons import (
     assert_balloon_landings,
     isolate_drawing_view_components,
 )
+from _assembly_contract import assembly_contract
 from _drawing_common import (
     _SW_SHADED_EDGES,
     DrawingOutputs,
@@ -115,6 +116,7 @@ import pd_latch_hook_geometry as hook_geometry
 import paper_drive_rack_setup as rack_setup
 import pd_paper_drive_assembly_steps as steps
 import pd_paper_drive_knob_setting_spec as knob_setting
+import pd_paper_drive_cluster_float_spec as cluster_float
 import pd_paper_drive_explode_spec as explode
 import pd_platen_guide_spec as platen_guide
 import pd_platen_spec as platen
@@ -249,8 +251,8 @@ BALLOON_RING_REACH = BALLOON_MARGIN + 0.005
 # clear of the isometric's field (SHEET_TWO_RING_LIMITS[0]). A 1:1 *Top
 # locator, cropped to a circle on the MHA-PD-VN-57 axis and showing only the
 # pivot stack, carries cutting line A-A along that axis. SECTION A-A at 2:1
-# shows every part of the stack cut (the shim and spring under the head and
-# arm too, so no hidden lines are needed) and balloons each part. It is cropped
+# shows every part of the stack cut (the spring under the head and the arm
+# too, so no hidden lines are needed) and balloons each part. It is cropped
 # to a circle in the same way. A *Top view puts machine -Z (the bar's front face) down
 # the sheet, so the cutting line runs vertically through the circle's centre.
 # Points are in the screw's part frame (mm): the head's underside at y 0, the
@@ -286,7 +288,6 @@ PIVOT_VIEW_INSTANCES = frozenset(
     {
         "pd-support-bar-1",
         PIVOT_SCREW_INSTANCE,
-        "pd-vn-transgear-pivot-shim-1",
         "pd-vn-transgear-pivot-spring-1",
         "pd-transgear-pivot-spacer-1",
         "pd-transgear-arm-1",
@@ -304,30 +305,25 @@ if (pivot_screw.HEAD_H - PIVOT_FRONT_FACE_Y) / 2.0 + 1.0 > PIVOT_FRAME_RADIUS_MM
 # inside that part's own cut face. The stack is coaxial, so every tip is
 # written in the screw's part frame (mm), (y along the axis, r off it), on the
 # section plane:
-# head underside y 0; shim; spring (a cone from its ID rim under the shim to
-# its OD rim on the spot-face floor); the arm from that floor to its front face
-# on the spacer; the spacer on the shoulder; and the bar from its back face at
+# head underside y 0; spring (a cone from its ID rim under the head to its OD
+# rim on the spot-face floor); the arm from that floor to its front face on the
+# spacer; the spacer on the shoulder; and the bar from its back face at
 # -SHOULDER_LEN to its front face. Sides alternate down the stack, so each
-# column's leaders are in the same order as their tips.
-_PIVOT_FLOOR_Y = -(joints.SHIM.THICKNESS + spring.MODEL_HEIGHT)
+# column's leaders are in the same order as their tips. The bar's balloon
+# stays left, clear of the stake note right of the axis at the front face.
+_PIVOT_FLOOR_Y = -spring.MODEL_HEIGHT
 _PIVOT_ARM_FRONT_Y = -(pivot_screw.SHOULDER_LEN - joints.SPACER.LENGTH)
 PIVOT_BALLOON_TIPS = (
     (
         "pd-vn-transgear-pivot-screw",
-        "right",
+        "left",
         pivot_screw.HEAD_H / 2.0,
         (pivot_screw.SOCKET_AF / math.sqrt(3.0) + pivot_screw.HEAD_DIA / 2.0) / 2.0,
     ),
     (
-        "pd-vn-transgear-pivot-shim",
-        "left",
-        -joints.SHIM.THICKNESS / 2.0,
-        (joints.SHIM.ID + joints.SHIM.OD) / 4.0,
-    ),
-    (
         "pd-vn-transgear-pivot-spring",
         "right",
-        -joints.SHIM.THICKNESS - spring.MODEL_HEIGHT / 2.0,
+        -spring.MODEL_HEIGHT / 2.0,
         (spring.ID + spring.OD) / 4.0,
     ),
     (
@@ -464,6 +460,7 @@ CLUSTER_STEMS = frozenset(
         "pd-vn-transgear-disc-screw",
         "pd-transgear-front-bushing",
         "pd-vn-transgear-retaining-ring",
+        "pd-vn-transgear-cluster-shim",
     }
 )
 if not CLUSTER_STEMS < explode.TRANSGEAR_SHOWN_STEMS:
@@ -639,6 +636,50 @@ for _point in (knob_setting.S_XY, knob_setting.K_XY, KNOB_SETTING_TAP_XY):
     ) / 1000.0 >= KNOB_SETTING_RADIUS:
         raise AssertionError("the knob setting circle must frame S, T and K")
 
+# Sheet 6's VIEW E: the cluster's shimmed ring gap, the assembly's hidden
+# ClusterFloatSetting line (pd_paper_drive_cluster_float_spec) between the
+# MHA-PD-VN-61 ring and the MHA-PD-25 front bushing on the pin, seen from the
+# side at 5:1 and cropped to a circle on the gap. It stands in sheet 6's left
+# field, under the knob stack's column and over the reference isometric's
+# caption; the shimming step on sheet 5 cites it.
+CLUSTER_FLOAT_VIEW_NAME = cluster_float.VIEW_NAME
+CLUSTER_FLOAT_ORIENTATION = "*Right"
+CLUSTER_FLOAT_SCALE = (5.0, 1.0)
+CLUSTER_FLOAT_CENTER = (0.110, 0.135)
+CLUSTER_FLOAT_RADIUS = 0.030
+# The crop's model centre (mm): on the gap, a little above the pin's axis.
+CLUSTER_FLOAT_MODEL_CENTRE = (
+    cluster_float.AXIS_XY[0],
+    cluster_float.LINE_Y,
+    cluster_fit.RING_REAR_Z + cluster_float.NOMINAL_MM / 2.0,
+)
+CLUSTER_FLOAT_INSTANCES = frozenset(
+    {
+        "pd-transgear-pin-1",
+        "pd-vn-transgear-retaining-ring-1",
+        "pd-transgear-front-bushing-1",
+        "pd-transgear-feed-pinion-1",
+    }
+)
+CLUSTER_FLOAT_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
+CLUSTER_FLOAT_CAPTION = "\n".join(
+    (
+        f"{CLUSTER_FLOAT_VIEW_NAME}, 5:1 (STEP {steps.step_number('disc-cluster-shimmed')})",
+        "RING TO FRONT BUSHING, CLUSTER REARWARD",
+    )
+)
+CLUSTER_FLOAT_CAPTION_XY = (
+    CLUSTER_FLOAT_CENTER[0] - CLUSTER_FLOAT_RADIUS,
+    CLUSTER_FLOAT_CENTER[1] - CLUSTER_FLOAT_RADIUS - 0.004,
+)
+_CLUSTER_FLOAT_TEXT_REACH_MM = math.dist(
+    (cluster_float.TEXT_POINT[1], cluster_float.TEXT_POINT[2]),
+    (CLUSTER_FLOAT_MODEL_CENTRE[1], CLUSTER_FLOAT_MODEL_CENTRE[2]),
+)
+_CLUSTER_FLOAT_M_PER_MM = CLUSTER_FLOAT_SCALE[0] / CLUSTER_FLOAT_SCALE[1] / 1000.0
+if _CLUSTER_FLOAT_TEXT_REACH_MM * _CLUSTER_FLOAT_M_PER_MM >= CLUSTER_FLOAT_RADIUS:
+    raise AssertionError("VIEW E's circle must frame the ring gap's text")
+
 
 def knob_setting_letters(
     s: tuple[float, float],
@@ -759,7 +800,6 @@ BOM_PART_NUMBERS = {
     "pd-transgear-pivot-spacer": _config.parts("pd-transgear-pivot-spacer")["number"],
     "pd-vn-transgear-pivot-screw": _config.parts("pd-vn-transgear-pivot-screw")["number"],
     "pd-vn-transgear-pivot-spring": _config.parts("pd-vn-transgear-pivot-spring")["number"],
-    "pd-vn-transgear-pivot-shim": _config.parts("pd-vn-transgear-pivot-shim")["number"],
     "pd-vn-transgear-latch-pin": _config.parts("pd-vn-transgear-latch-pin")["number"],
     "sh-vn-fillister-screw-90280a108": _config.parts("sh-vn-fillister-screw-90280a108")["number"],
     "pd-latch-hook": _config.parts("pd-latch-hook")["number"],
@@ -769,6 +809,7 @@ BOM_PART_NUMBERS = {
     "pd-transgear-disc-hub": _config.parts("pd-transgear-disc-hub")["number"],
     "pd-transgear-front-bushing": _config.parts("pd-transgear-front-bushing")["number"],
     "pd-vn-transgear-retaining-ring": _config.parts("pd-vn-transgear-retaining-ring")["number"],
+    "pd-vn-transgear-cluster-shim": _config.parts("pd-vn-transgear-cluster-shim")["number"],
     "pd-rack-pinion": _config.parts("pd-rack-pinion")["number"],
     "pd-vn-transgear-disc-screw": _config.parts("pd-vn-transgear-disc-screw")["number"],
     "pd-transgear-knob-shaft": _config.parts("pd-transgear-knob-shaft")["number"],
@@ -811,15 +852,15 @@ _SKU = {
     "pd-vn-transgear-pivot-spring": _config.parts("pd-vn-transgear-pivot-spring")["supplier_skus"][
         0
     ],
-    "pd-vn-transgear-pivot-shim": _config.parts("pd-vn-transgear-pivot-shim")[
-        "supplier_skus"
-    ][0],
     "pd-vn-transgear-latch-pin": _config.parts("pd-vn-transgear-latch-pin")["supplier_skus"][0],
     "sh-vn-fillister-screw-90280a108": _config.parts("sh-vn-fillister-screw-90280a108")[
         "supplier_skus"
     ][0],
     "pd-vn-transgear-disc-screw": _config.parts("pd-vn-transgear-disc-screw")["supplier_skus"][0],
     "pd-vn-transgear-retaining-ring": _config.parts("pd-vn-transgear-retaining-ring")[
+        "supplier_skus"
+    ][0],
+    "pd-vn-transgear-cluster-shim": _config.parts("pd-vn-transgear-cluster-shim")[
         "supplier_skus"
     ][0],
     "pd-vn-transgear-knob-drive-pin": _config.parts("pd-vn-transgear-knob-drive-pin")[
@@ -874,7 +915,6 @@ BOM_DESCRIPTIONS = {
     "pd-vn-transgear-pivot-spring": (
         f"CURVED DISC SPRING, MCMASTER {_SKU['pd-vn-transgear-pivot-spring']}"
     ),
-    "pd-vn-transgear-pivot-shim": f"SHIM WASHER, MCMASTER {_SKU['pd-vn-transgear-pivot-shim']}",
     "pd-vn-transgear-latch-pin": f"DOWEL PIN, MCMASTER {_SKU['pd-vn-transgear-latch-pin']}",
     "sh-vn-fillister-screw-90280a108": (
         f"FILLISTER SCREW, MCMASTER {_SKU['sh-vn-fillister-screw-90280a108']}"
@@ -890,6 +930,12 @@ BOM_DESCRIPTIONS = {
     "pd-transgear-front-bushing": "TRANSGEAR FRONT BUSHING",
     "pd-vn-transgear-retaining-ring": (
         f"RETAINING RING, MCMASTER {_SKU['pd-vn-transgear-retaining-ring']}"
+    ),
+    # QTY counts the kit: the stack's nominal shims plus the spares stored in
+    # the spare T18's bore, so the fit-up's 0 to SHIM_COUNT_MAX (VIEW E) is
+    # supplied (Codjiflo and machinist review, #2124).
+    "pd-vn-transgear-cluster-shim": (
+        f"SHIM, MCMASTER {_SKU['pd-vn-transgear-cluster-shim']}"
     ),
     "pd-rack-pinion": (
         f"REDUCER DISC, STOCK {disc.TEETH}T {disc.DIAMETRAL_PITCH:g}DP "
@@ -936,7 +982,6 @@ TRANSGEAR_QUANTITIES = {
     "pd-transgear-pivot-spacer": 1,
     "pd-vn-transgear-pivot-screw": 1,
     "pd-vn-transgear-pivot-spring": spring.COUNT,
-    "pd-vn-transgear-pivot-shim": 1,
     "pd-vn-transgear-latch-pin": 1,
     "sh-vn-fillister-screw-90280a108": len(hook_geometry.SCREW_X),
     "pd-latch-hook": 1,
@@ -946,6 +991,9 @@ TRANSGEAR_QUANTITIES = {
     "pd-transgear-disc-hub": 1,
     "pd-transgear-front-bushing": 1,
     "pd-vn-transgear-retaining-ring": 1,
+    # The kit: the stack's nominal count plus the spares (VIEW E sets the
+    # fitted count).
+    "pd-vn-transgear-cluster-shim": cluster_fit.SHIM_COUNT_MAX,
     "pd-rack-pinion": 1,
     "pd-vn-transgear-disc-screw": hub_geometry.SCREW_COUNT,
     "pd-transgear-knob-shaft": 1,
@@ -985,10 +1033,19 @@ BOM_CHAIN_ORDER_NOTE = (
 BOM_SHEET_CAPTION = f"{BOM_REFERENCE_CAPTION}\n{BOM_CHAIN_ORDER_NOTE}"
 if not set(TRANSGEAR_QUANTITIES) <= set(BOM_PART_NUMBERS):
     raise AssertionError("every transgear family is a BOM row")
+# The transgear views draw the mounted knob wheel and the stacked shims; the
+# crank wheel, the spare T18 and the spare shims in its bore are sheet 1's.
 TRANSGEAR_INSTANCES = frozenset(
     f"{stem}-{index}"
     for stem, count in TRANSGEAR_QUANTITIES.items()
-    for index in range(1, (1 if stem == "pd-transgear-removable" else count) + 1)
+    for index in range(
+        1,
+        {
+            "pd-transgear-removable": 1,
+            "pd-vn-transgear-cluster-shim": cluster_fit.SHIM_COUNT_MODEL,
+        }.get(stem, count)
+        + 1,
+    )
 )
 # Sheet 2's isometric cannot reach these families' ink. Farm run
 # 20261001T051043622Z found none for the feed sleeve: its extreme-point picks
@@ -1013,20 +1070,19 @@ ISO_HIDDEN_STEMS = frozenset(
         "pd-transgear-pin",
         "pd-transgear-front-bushing",
         "pd-vn-transgear-retaining-ring",
+        "pd-vn-transgear-cluster-shim",
     }
 )
 if not explode.TRANSGEAR_SHOWN_STEMS <= set(TRANSGEAR_QUANTITIES):
     raise AssertionError("the transgear explode shows transgear families only")
 if not ISO_HIDDEN_STEMS < explode.TRANSGEAR_SHOWN_STEMS:
     raise AssertionError("the explode shows every family the isometric cannot")
-# The pivot's spring and shim sit in the arm's counterbore under the shoulder
-# screw's head, hidden from the isometric: the ENFORCE review of farm run
-# 20261024T090600202Z-8e9ffbb4 found their leaders on the spacer's edge and
-# the arm's face. Section A-A on the same sheet cuts through them and
-# balloons both (PIVOT_BALLOON_TIPS), so the isometric leaves them out.
-ISO_SECTION_ONLY_STEMS = frozenset(
-    {"pd-vn-transgear-pivot-spring", "pd-vn-transgear-pivot-shim"}
-)
+# The pivot's spring sits in the arm's counterbore under the shoulder screw's
+# head, hidden from the isometric: the ENFORCE review of farm run
+# 20261024T090600202Z-8e9ffbb4 found its leader on the spacer's edge and the
+# arm's face. Section A-A on the same sheet cuts through it and balloons it
+# (PIVOT_BALLOON_TIPS), so the isometric leaves it out.
+ISO_SECTION_ONLY_STEMS = frozenset({"pd-vn-transgear-pivot-spring"})
 if not ISO_SECTION_ONLY_STEMS <= {stem for stem, *_ in PIVOT_BALLOON_TIPS}:
     raise AssertionError("Section A-A balloons every family the isometric leaves to it")
 if ISO_SECTION_ONLY_STEMS & explode.TRANSGEAR_SHOWN_STEMS:
@@ -1052,12 +1108,31 @@ HUB_BALLOON_POINT_MM = (
     round(hub.FLANGE_DIA / 2.0 * math.sin(HUB_BALLOON_ANGLE), 3),
     -hub.FLANGE_THICK,
 )
+# Sheet 3's balloon 36 walked to the journal's rear end, where the shaft
+# meets the exploded plate's knob boss in the isometric, and read as the
+# plate's (2026-11-03 ENFORCE review of #2095's run 20261103T013313660Z,
+# r1/r3). It lands instead on a 15T tooth tip at F, the pinion's front face:
+# the knob shaft is placed unrotated (FRONT_STACK_PHASE_DEG 0) with a tooth
+# centred on local +X every 24 deg, and the tooth at 192 deg projects lower
+# right of the axis in the *Isometric (sheet right -0.707 x, sheet up
+# 0.408 x + 0.816 y), on F's camera side and away from the forward neck.
+KNOB_SHAFT_BALLOON_ANGLE = math.radians(8 * 360.0 / knob_shaft.TEETH)
+if knob_shaft.FRONT_STACK_PHASE_DEG != 0.0:
+    raise AssertionError("balloon 36's tooth needs the knob shaft unrotated")
+_KNOB_TIP_R = knob_shaft.OUTSIDE_DIA / 2.0
+KNOB_SHAFT_BALLOON_POINT_MM = (
+    round(_KNOB_TIP_R * math.cos(KNOB_SHAFT_BALLOON_ANGLE), 4),
+    round(_KNOB_TIP_R * math.sin(KNOB_SHAFT_BALLOON_ANGLE), 4),
+    0.0,
+)
+_BALLOON_POINTS_MM = {
+    "pd-transgear-disc-hub": HUB_BALLOON_POINT_MM,
+    "pd-transgear-knob-shaft": KNOB_SHAFT_BALLOON_POINT_MM,
+}
 TRANSGEAR_BALLOON_ANCHORS = {
     stem: BalloonAnchor(instance=explode.KNOB_WHEEL_INSTANCE)
     if stem == "pd-transgear-removable"
-    else BalloonAnchor(point_mm=HUB_BALLOON_POINT_MM)
-    if stem == "pd-transgear-disc-hub"
-    else BalloonAnchor()
+    else BalloonAnchor(point_mm=_BALLOON_POINTS_MM.get(stem))
     for stem in TRANSGEAR_QUANTITIES
 }
 
@@ -1234,6 +1309,11 @@ def _uncross_ring(
 # and the spare T18 on the base deck (the third removable inserted), whose
 # item sheet 2 balloons on the mounted knob wheel.
 SPARE_INSTANCE = "pd-transgear-removable-3"
+# The spare shims, inserted after the stack's, in the spare T18's bore.
+SPARE_SHIM_INSTANCES = frozenset(
+    f"pd-vn-transgear-cluster-shim-{index}"
+    for index in range(cluster_fit.SHIM_COUNT_MODEL + 1, cluster_fit.SHIM_COUNT_MAX + 1)
+)
 # The chain's loop stations count from the knob wheel (the builder's
 # _chain_station_point); station s is the link @<role>:s // 2 + 1, inner links
 # on even stations, and the connecting link closes the loop at the last. The
@@ -1274,9 +1354,24 @@ ASSEMBLED_BALLOON_ANCHORS = {
 # (machinist review of run 20261024T082548908Z-cf4349b5). The bottom plate
 # hangs free under the bar.
 PLATEN_GUIDE_LOCK_INSTANCE = "pd-guide-lock-2"
+# The guides: the builder places the bottom rail first, so pd-platen-guide-1
+# exploded still stands behind the platen, only its end showing past the
+# platen's edge, where the default landing put balloon 7 beside the bar's
+# front clamp screw, its leader through that head and onto balloon 4's
+# arrowhead (machinist review of the final-head run 20261101T135807943Z).
+# The top rail, -2, explodes clear above the platen; its balloon lands on
+# its top edge on the platen-mating face (part frame: x along the rail,
+# y = height, z = 0), mid-span between the A4 and A5 screw stations and
+# clear of both lock stations' plates and screws.
+PLATEN_GUIDE_INSTANCE = "pd-platen-guide-2"
+PLATEN_GUIDE_BALLOON_POINT_MM = (110.0, platen_guide.GUIDE_HEIGHT, 0.0)
 PLATEN_BALLOON_ANCHORS = {
     stem: BalloonAnchor(instance=PLATEN_GUIDE_LOCK_INSTANCE)
     if stem == "pd-guide-lock"
+    else BalloonAnchor(
+        point_mm=PLATEN_GUIDE_BALLOON_POINT_MM, instance=PLATEN_GUIDE_INSTANCE
+    )
+    if stem == "pd-platen-guide"
     else BalloonAnchor()
     for stem in explode.SHOWN_STEMS
 }
@@ -1423,15 +1518,6 @@ KNOB_END_FLOAT_RANGE = (
     knob_shaft.END_FLOAT - knob_shaft.END_FLOAT_SET_TOL,
     knob_shaft.END_FLOAT + knob_shaft.END_FLOAT_SET_TOL,
 )
-# The disc's end float as the fitter accepts it: the printed stack's worst
-# case (transgear_cluster_fit.END_FLOAT_RANGE, 0.2013-0.5537) rounded outward
-# to the hundredth, so every cluster made inside its printed bands passes
-# (CodeRabbit on cdf418a1c: printed 0.55, it refused a good one).
-DISC_END_FLOAT_ACCEPT = (
-    math.floor(cluster_fit.END_FLOAT_RANGE[0] * 100.0 + 1e-9) / 100.0,
-    math.ceil(cluster_fit.END_FLOAT_RANGE[1] * 100.0 - 1e-9) / 100.0,
-)
-DISC_END_FLOAT_TEXT = f"{DISC_END_FLOAT_ACCEPT[0]:.2f}-{DISC_END_FLOAT_ACCEPT[1]:.2f}"
 # The platen's screw stations (platen_spec): its front counterbores take the
 # guide screws, its through-taps the clip screws.
 GUIDE_SCREWS = len(platen.GUIDE_HOLE_X) * len(platen.GUIDE_HOLE_Y)
@@ -1449,12 +1535,12 @@ ENGAGED_FEED_DATUM_TEXT = (
 
 
 def engaged_feed_text(domain: RackOperatingDomain) -> str:
-    """The window the hanger step prints, in the title block's millimetres."""
-    low, high = domain.axis_from_left_end_limits_mm
-    return (
-        f"ENGAGED FEED: {low:.{OPERATING_LIMIT_PLACES}f} TO "
-        f"{high:.{OPERATING_LIMIT_PLACES}f} {ENGAGED_FEED_DATUM_TEXT}."
+    """The window the hanger step prints, in the title block's inches,
+    rounded inward."""
+    window = steps.inch_window(
+        domain.axis_from_left_end_limits_mm, OPERATING_LIMIT_PLACES + 1, " TO "
     )
+    return f"ENGAGED FEED: {window} {ENGAGED_FEED_DATUM_TEXT}."
 
 
 def _stack_text() -> str:
@@ -1464,16 +1550,16 @@ def _stack_text() -> str:
 
 
 def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
-    pin_lo, pin_hi = joints.LATCH_PIN_PROUD_RANGE
-    drive_lo, drive_hi = drive_pin.PROUD_RANGE
-    knob_lo, knob_hi = KNOB_END_FLOAT_RANGE
+    pin_window = steps.inch_window(joints.LATCH_PIN_PROUD_RANGE, 3, " TO ")
+    drive_window = steps.inch_window(drive_pin.PROUD_RANGE, 3, " TO ")
+    knob_window = steps.inch_window(KNOB_END_FLOAT_RANGE, 3, " TO ")
     teeth = f"{KNOB_TEETH}T"
     return {
         "bar-clamped": (
             f"CLAMP THE {_N['pd-support-bar']} BAR TO BOTH COLUMNS, EACH BETWEEN A "
             f"{_N['sh-column-clamp-front']} FRONT AND A {_N['sh-column-clamp-back']} BACK "
             f"ARC, WITH THE {_N['sh-vn-clamp-screw']} SCREWS FROM THE BAR FRONT. SET "
-            f"THE BAR TOP {steps.BAR_TOP_ABOVE_DECK:.1f} ABOVE THE BASE DECK AT "
+            f"THE BAR TOP {steps.BAR_TOP_ABOVE_DECK_TEXT} ABOVE THE BASE DECK AT "
             # Rule 19 fit-up for the slotted west pair (owner ruling
             # 2026-10-15, #1471 option A): the round pair locates.  Named by
             # its holes, not the bar sheet's END A, which no package sheet
@@ -1510,13 +1596,15 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "THEM; TIGHTEN."
         ),
         "lock-seats-faced": (
-            f"FACE LOCK SEATS TO {platen_guide.LOCK_GAP_FIT_TEXT} PLATEN FLOAT; "
-            "ELSE STOP AND REPORT."
+            f"FACE THE RAIL BACKS UNDER EACH {_N['pd-guide-lock']} LOCK (THE LOCK SEATS) "
+            "TILL THE FEELER GAP BETWEEN LOCK FRONT FACE AND BAR BACK FACE, WITH THE LOCK "
+            f"SCREWS TIGHT, IS {steps.inch_window(platen_guide.LOCK_GAP_FIT, 3)}: THE "
+            "PLATEN'S FORE-AFT FLOAT; ELSE STOP AND REPORT."
         ),
         "latch-pin-pressed": (
             f"PRESS THE {_N['pd-vn-transgear-latch-pin']} DOWEL INTO THE "
             f"{_N['pd-transgear-arm']} ARM'S REAMED HOLE TO THE HOLE FLOOR, "
-            f"{pin_lo:.2f} TO {pin_hi:.2f} PROUD."
+            f"{pin_window} PROUD."
         ),
         "pin-pressed": (
             f"PRESS THE {_N['pd-transgear-pin']} PIN INTO THE {_N['pd-transgear-arm']} "
@@ -1538,8 +1626,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"PRESS {TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-locating-pin']} "
             f"{_N['pd-vn-transgear-arm-plate-locating-pin']} DOWELS INTO THE ARM "
             "FROM THE REAR, "
-            f"{plate_locating_interface.PROUD_LIMITS_MM[0]:.2f} TO "
-            f"{plate_locating_interface.PROUD_LIMITS_MM[1]:.2f} PROUD; "
+            f"{steps.inch_window(plate_locating_interface.PROUD_LIMITS_MM, 3, ' TO ')} "
+            "PROUD; "
             "MATCH-MARK ARM AND PLATE."
         ),
         "arm-plate-fitted": (
@@ -1552,22 +1640,24 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         ),
         "arm-plate-screws-cut": (
             f"TAKE BOTH {_N['pd-vn-transgear-arm-plate-screw']} SCREWS OUT; CUT THEIR "
-            f"TIPS FLUSH TO {joints.PLATE_SCREW_CUT_PROUD_MAX:.2f} PROUD OF THE ARM'S "
-            f"FRONT FACE; BREAK THE CUT EDGE {plate_screw.CUT_END_BREAK_TEXT}. "
+            "TIPS FLUSH TO "
+            f"{steps.inch_text(joints.PLATE_SCREW_CUT_PROUD_MAX, 3)} PROUD OF THE ARM'S "
+            "FRONT FACE; BREAK THE CUT EDGE "
+            f"{steps.inch_max_text(plate_screw.CUT_END_BREAK_MAX, 3)}. "
             "REFIT THE SAME SCREWS IN THE SAME HOLES BEFORE PIVOTING THE HANGER."
         ),
         # R9-71: the spacer is pressed on the shoulder, so its faces' tilt is
         # fixed in the bar; the MHA-PD-VN-63 spring holds the arm on it. The
         # screw's tip is faced below the bar's front face, where the platen
-        # slides, and staked there (rule 23); MHA-PD-VN-67 restores the spring
-        # room the 9.5 bar took (transgear_hanger_joints).
+        # slides, and staked there (rule 23); the spot-face floor sets the
+        # spring room (transgear_hanger_joints).
         "hanger-pivoted": (
             f"ON THE {_N['pd-vn-transgear-pivot-screw']} SHOULDER SCREW FROM THE REAR: "
-            f"{_N['pd-vn-transgear-pivot-shim']} SHIM, {_N['pd-vn-transgear-pivot-spring']} "
+            f"{_N['pd-vn-transgear-pivot-spring']} "
             f"SPRING, THEN ARM; PRESS THE {_N['pd-transgear-pivot-spacer']} SPACER, AS "
             "MADE, ON THE SHOULDER, FLUSH WITH ITS END ON A FLAT. FACE THE SCREW'S "
             f"TIP SO THAT, SEATED IN THE {_N['pd-support-bar']} BAR'S THROUGH TAP, IT "
-            f"STANDS {pivot_screw.TIP_RECESS[0]:.2f} TO {pivot_screw.TIP_RECESS[1]:.2f} "
+            f"STANDS {steps.inch_window(pivot_screw.TIP_RECESS, 3, ' TO ')} "
             "BELOW THE BAR'S FRONT FACE. THE ARM'S PIVOT BORE WAS REAMED TO THIS "
             "SCREW, CHOSEN BEFORE REAMING SO ITS UNFACED TIP REACHES THAT WINDOW: KEEP "
             "THEM TOGETHER. SEAT IT, THREADLOCKER OPTIONAL (LOW STRENGTH ONLY); THE "
@@ -1583,9 +1673,9 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         "disc-taps-transferred": (
             "MOUNT THE CLUSTER ON A MANDREL IN THE "
             f"{_N['pd-transgear-feed-pinion']} BORE. WITH A "
-            f"\u00d8{disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM:.3f} GAUGE PIN IN EACH "
+            f"\u00d8{steps.inch_text(disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM, 3)} GAUGE PIN IN EACH "
             f"{_N['pd-rack-pinion']} TOOTH SPACE IN TURN, TAP THE DISC CENTRAL, FACE SQUARE, "
-            f"TILL THE DIAL READS {quality.toothspace_runout_tir_mm():.2f} TIR MAX. "
+            f"TILL THE DIAL READS {disc.TOOTH_SPACE_RUNOUT_TIR_TEXT} TIR MAX. "
             "SPOT-DRILL THE DISC THROUGH THE "
             f"{hub_geometry.SCREW_COUNT} FLANGE HOLES; DRILL AND TAP {disc_screw.THREAD}. "
             f"FIX WITH {hub_geometry.SCREW_COUNT} {_N['pd-vn-transgear-disc-screw']} SCREWS. "
@@ -1595,26 +1685,35 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         "disc-screws-cut": (
             f"CUT {_N['pd-vn-transgear-disc-screw']} TIPS "
             f"{disc_screw.TIP_BELOW_REAR_FACE_TEXT} BELOW DISC REAR FACE; "
-            f"BREAK {disc_screw.CUT_END_BREAK_TEXT}."
+            "BREAK THE CUT END."
         ),
         "oil-hole-drilled": (
-            f"DRILL THE \u00d8{hub.OIL_HOLE_DIA:.1f} OIL HOLE CENTRED ON THE HUB BODY, "
+            f"DRILL THE \u00d8{steps.inch_text(hub.OIL_HOLE_DIA, hub.OIL_HOLE_PLACES)} OIL "
+            "HOLE CENTRED ON THE HUB BODY, "
             "THROUGH HUB AND "
             f"SLEEVE IN ONE OPERATION AS {_N['pd-transgear-disc-hub']} SHOWS; "
             "DEBURR THE BORE."
         ),
         "disc-cluster-hung": (
-            "OIL THE PIN (LIGHT MACHINE OIL); BUSHINGS AS MADE: "
+            "OIL THE PIN (LIGHT MACHINE OIL); "
             f"{_N['pd-transgear-rear-bushing']} BUSHING ON THE PIN, CLUSTER ON, "
             f"PINION REARWARD; {_N['pd-transgear-front-bushing']} BUSHING ON THE NOSE "
             f"TRAPS HUB AND DISC; {_N['pd-vn-transgear-retaining-ring']} RING SIDEWAYS "
             "IN THE PIN GROOVE."
         ),
+        "disc-cluster-shimmed": (
+            f"SHIM AT THE ARM FACE: {cluster_fit.SHIM_COUNT_RANGE[0]} TO "
+            f"{cluster_fit.SHIM_COUNT_RANGE[1]} {_N['pd-vn-transgear-cluster-shim']} SHIMS UNDER "
+            f"THE {_N['pd-transgear-rear-bushing']} BUSHING TO {CLUSTER_FLOAT_VIEW_NAME} "
+            f"(SHEET {SHEET_NAMES.index('ASSEMBLY AND FIT-UP (CONT.)') + 1}) END "
+            "FLOAT (FEELER AT THE RING, RING ON ITS GROOVE'S LOAD WALL, CLUSTER "
+            "REARWARD)."
+        ),
         "collar-pins-pressed": (
             f"PRESS {TRANSGEAR_QUANTITIES['pd-vn-transgear-knob-drive-pin']} "
             f"{_N['pd-vn-transgear-knob-drive-pin']} DOWELS INTO THE "
-            f"{_N['pd-transgear-drive-collar']} COLLAR TO A STOP, {drive_lo:.2f} TO "
-            f"{drive_hi:.2f} PROUD OF ITS FRONT FACE."
+            f"{_N['pd-transgear-drive-collar']} COLLAR TO A STOP, {drive_window} "
+            "PROUD OF ITS FRONT FACE."
         ),
         "pilot-faced-to-fit": (
             f"FACE THE COLLAR'S PILOT {collar.PILOT_PROUD_TEXT} PROUD OF EACH "
@@ -1624,9 +1723,9 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         "knob-stack-fitted": (
             f"KNOB STACK, FRONT TO REAR: {_stack_text()}. SHAFT THROUGH THE LOOSE "
             "RING INTO THE PLATE BORE FROM THE FRONT, PUSHED REARWARD. CUP ON THE "
-            f"JOURNAL ON A {knob_shaft.END_FLOAT:.1f} FEELER AT THE BOSS; "
+            f"JOURNAL ON A {steps.inch_text(knob_shaft.END_FLOAT, 3)} FEELER AT THE BOSS; "
             f"MATCH-DRILL {cup_pin.HOLE_TEXT} THROUGH BOTH "
-            f"{knob_cup.PIN_HOLE_FROM_FRONT:.1f} FROM THE CUP FRONT; PRESS THE PIN "
+            f"{steps.inch_text(knob_cup.PIN_HOLE_FROM_FRONT, 3)} FROM THE CUP FRONT; PRESS THE PIN "
             "IN, CENTRED. COLLAR ON THE CORE UNPINNED, PINS FORWARD. THIS SHAFT IS "
             "THE KNOB; ITS GRIP IS THE COLLAR: HOLD OR TURN THE KNOB BY IT TILL "
             f"STEP {steps.step_number('chain-closed')}, THEN TURN THE CRANK."
@@ -1678,7 +1777,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"{steps.KNOB_HELD_BACK_TEXT}. TURN THE DISC SO, ON THE LINE THROUGH THE "
             f"KNOB AND CLUSTER AXES, A {disc.TEETH}T TOOTH STANDS CENTRED IN A "
             f"{teeth} GAP, WITHIN "
-            f"{quality.reducer_setup_clock_deviation_mm():.2f} AT THE PITCH CIRCLE. "
+            f"{steps.inch_text(steps.inch_floor_mm(quality.reducer_setup_clock_deviation_mm(), 4), 4)}"
+            " AT THE PITCH CIRCLE. "
             "TURN THE KNOB: NO TIGHT SPOT, SHAKE AT EVERY TOOTH."
         ),
         "collar-rear-faced-to-fit": (
@@ -1690,7 +1790,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"FINISHED BODY WITHIN {_N['pd-transgear-drive-collar']}'S FITTED LIMITS; "
             f"ELSE REPORT. STEP {steps.step_number('fitup-accepted')} RE-CHECKS. "
             "THE SETTING LEAVES ROOM FOR END FLOAT AND THE WHEEL'S FLOAT UNDER THE "
-            f"NUT: IN SERVICE THE WHEELS RUN WITHIN {collar.CHAIN_OFFSET_LIMIT:.1f} "
+            "NUT: IN SERVICE THE WHEELS RUN WITHIN "
+            f"{steps.inch_text(steps.inch_floor_mm(collar.CHAIN_OFFSET_LIMIT, 3), 3)} "
             "OF IN LINE, THE #25 CHAIN'S LIMIT."
         ),
         "collar-shoulder-seated": (
@@ -1717,11 +1818,11 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"OF THE {sprocket.CRANK_CONFIG} FRONT FACE "
             f"(STEP {steps.step_number('collar-rear-faced-to-fit')}'S SETTING, WIDENED "
             f"FOR REFITTING AND GAUGE SPREAD: THE {sprocket.KNOB_CONFIG} UP TO "
-            f"{steps.OFFSET_ACCEPT_TOL - collar.FIT_UP_OFFSET_TARGET:.2f} BEHIND "
-            f"PASSES); KNOB END FLOAT {knob_lo:.2f} TO {knob_hi:.2f}; "
+            f"{steps.inch_text(steps.OFFSET_ACCEPT_TOL - collar.FIT_UP_OFFSET_TARGET, 3)} "
+            f"BEHIND PASSES); KNOB END FLOAT {knob_window}; "
             f"{sprocket.KNOB_CONFIG} FREE "
-            "UNDER THE NUT; THE HANGER FREE; DISC END FLOAT "
-            f"{DISC_END_FLOAT_TEXT} AND THE DISC TURNS FREE; COLLAR TO DISC "
+            "UNDER THE NUT; THE HANGER FREE; RING GAP PER "
+            f"{CLUSTER_FLOAT_VIEW_NAME} AND THE DISC TURNS FREE; COLLAR TO DISC "
             f"AIR PER STEP {steps.step_number('collar-disc-air-inspected')}, "
             f"{steps.COLLAR_DISC_AIR_TEXT} AT OVERLAP AFTER REFITTING AND LATCHING. "
             "ELSE REPORT: NO FACING OR FITTING."
@@ -1889,7 +1990,9 @@ ASSEMBLED_CAPTIONS = {
                 textwrap.wrap(
                     f"ISOMETRIC {_scale_text(scale)}: THE "
                     f"{_N['pd-transgear-removable']} ON THE BASE DECK IS THE T18 "
-                    f"SPARE, STORED LOOSE; THE {sprocket.KNOB_CONFIG} IS ON THE KNOB, "
+                    f"SPARE, STORED LOOSE WITH THE SPARE "
+                    f"{_N['pd-vn-transgear-cluster-shim']} SHIMS IN ITS BORE; "
+                    f"THE {sprocket.KNOB_CONFIG} IS ON THE KNOB, "
                     f"THE {sprocket.CRANK_CONFIG} ON THE "
                     "CRANK. PLATEN AND SUPPORT ITEMS: SHEET "
                     f"{SHEET_NAMES.index('PLATEN AND SUPPORT') + 1}; TRANSGEAR "
@@ -2025,7 +2128,10 @@ def _validate_persisted_explode(model: Any) -> None:
 
 
 def _create_sheets(adapter: Any) -> None:
-    new_project_drawing(adapter, layout=SPEC.layout, scale=ASSEMBLED_SCALE)
+    new_project_drawing(
+        adapter, layout=SPEC.layout, scale=ASSEMBLED_SCALE,
+        unit=assembly_contract("pd-paper-drive").drawing_unit,
+    )
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="paper-drive package")
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     for name in SHEET_NAMES:
@@ -2634,7 +2740,7 @@ def _place_assembled_sheet(adapter: Any) -> Any:
             # front and right views as a bare unlabelled bar; the isometric
             # shows and balloons it (eye pass of PD run 11).
             _hide_instances(
-                adapter, view, frozenset({SPARE_INSTANCE}),
+                adapter, view, frozenset({SPARE_INSTANCE, *SPARE_SHIM_INSTANCES}),
                 label=f"paper drive {orientation} spare",
             )
     label = "sheet 1 isometric"
@@ -3388,6 +3494,80 @@ def _place_knob_setting_view(adapter: Any) -> None:
     )
 
 
+def _place_cluster_float_view(adapter: Any) -> None:
+    """Sheet 6's VIEW E: the pin's front end from the side at 5:1, cropped on
+    the ring gap, carrying the assembly's shimmed ring-gap window
+    (pd_paper_drive_cluster_float_spec) that the shimming step cites."""
+    label = "cluster float view"
+    _activate_sheet(adapter, SHEET_NAMES[5])
+    view = _early_bound(
+        place_view(
+            adapter,
+            str(SOURCE),
+            CLUSTER_FLOAT_ORIENTATION,
+            *CLUSTER_FLOAT_CENTER,
+            scale=CLUSTER_FLOAT_SCALE,
+        ),
+        "IView",
+    )
+    apply_view_configuration(adapter, view, label=label)
+    _isolate_instances(adapter, view, CLUSTER_FLOAT_INSTANCES, label=label)
+    model = tuple(
+        tuple(value / 1000.0 for value in point)
+        for point in (CLUSTER_FLOAT_MODEL_CENTRE, cluster_float.TEXT_POINT)
+    )
+    names = ("ring gap centre", "ring gap text")
+    centre = model_points_in_view(adapter, view, model[:1], label=label, names=names[:1])[0]
+    _shift_view(
+        adapter,
+        view,
+        (CLUSTER_FLOAT_CENTER[0] - centre[0], CLUSTER_FLOAT_CENTER[1] - centre[1]),
+        label=f"{label} centre",
+    )
+    centre, text = model_points_in_view(adapter, view, model, label=label, names=names)
+    if math.dist(centre, CLUSTER_FLOAT_CENTER) > 1e-4:
+        raise RuntimeError(f"{label}: the ring gap sits at {centre!r}")
+    _crop_to_circle(
+        adapter, view, CLUSTER_FLOAT_CENTER, CLUSTER_FLOAT_RADIUS, label=label
+    )
+    set_hidden_lines_removed(adapter, view)
+    _show_base_view_sketches(adapter, view, (cluster_float.FEATURE,), label=label)
+    annotations = curate_view_dimensions(
+        adapter,
+        view,
+        keep={cluster_float.DIMENSION: text},
+        view_label=label,
+        dimensions_by_feature=cluster_float.DRAWING_DIMENSIONS,
+    )
+    assert_imported_precision(
+        adapter, annotations, cluster_float.DRAWING_PRECISION[cluster_float.FEATURE]
+    )
+    imported = [
+        dimension_name(adapter, _early_bound(annotation, "IAnnotation"))
+        for annotation in annotations
+    ]
+    if imported != [cluster_float.DIMENSION]:
+        raise RuntimeError(
+            f"{label} imported {imported}, not {cluster_float.DIMENSION}"
+        )
+    # The gap is about a millimetre on the sheet: arrows outside.
+    display = _early_bound(
+        _early_bound(annotations[0], "IAnnotation").GetSpecificAnnotation(),
+        "IDisplayDimension",
+    )
+    display.ArrowSide = CLUSTER_FLOAT_ARROWS_OUTSIDE
+    if int(display.ArrowSide) != CLUSTER_FLOAT_ARROWS_OUTSIDE:
+        raise RuntimeError(f"{label}: the ring gap kept its arrows inside")
+    rebuild_drawing(adapter, label=f"{label} arrows")
+    _place_sheet_note(
+        adapter,
+        SHEET_NAMES[5],
+        CLUSTER_FLOAT_CAPTION,
+        CLUSTER_FLOAT_CAPTION_XY,
+        label=f"{label} caption",
+    )
+
+
 def _place_fitup_sheets(adapter: Any, step_notes: StepNotes) -> None:
     for sheet_name, notes in (
         (SHEET_NAMES[4], step_notes.fitup_notes),
@@ -3455,6 +3635,7 @@ async def build(adapter: Any) -> dict[str, str]:
     landings += _place_exploded_sheet(adapter, table, items, notes)
     _place_fitup_sheets(adapter, notes)
     _place_knob_setting_view(adapter)
+    _place_cluster_float_view(adapter)
     assert_full_detail_view(adapter, label="paper-drive assembly")
 
     return await finalize_drawing(

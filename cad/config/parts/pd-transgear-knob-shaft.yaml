@@ -6,6 +6,7 @@ pd-transgear-knob-shaft:
   finish: oiled
   quantity: 1
   tolerance_class: machined_block
+  drawing_unit: in
   fit_class: shaft_in_bushing
   # Selected stock cutter: TTC 10-289-487, 48DP PA20 #7 (14–16T); in stock 2026-10-27.
   # https://www.travers.com/product/ttc-10-289-487-involute-style-gear-cutter-10-289-487

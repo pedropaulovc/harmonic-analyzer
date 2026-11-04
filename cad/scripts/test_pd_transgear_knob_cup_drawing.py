@@ -22,7 +22,7 @@ from _printed_tolerance import printed_band_mm
 
 def _band(places: int) -> float:
     """The +/- the title block prints for ``places`` (what the shop reads)."""
-    return printed_band_mm(places)
+    return printed_band_mm(places, unit=spec.UNIT)
 
 
 def test_required_drawing_paths() -> None:
@@ -90,7 +90,7 @@ def test_bore_callout_names_its_journal_and_stands_clear_below_the_bore() -> Non
     assert "REAM THRU" in callout
     assert "SLIDES ON" in callout
     assert f"{shaft} JOURNAL" in callout
-    assert f"{low:.4f}-{high:.4f}" in callout
+    assert f"{low / 25.4:.4f}-{high / 25.4:.4f}".replace("0.", ".") in callout
     assert "DIAMETRAL CLEARANCE" in callout
     assert drawing.DIMENSION_CALLOUTS["BoreDia"] == drawing.BORE_CALLOUT
     assert "PIN HOLE" not in callout
@@ -158,15 +158,15 @@ def test_only_the_bore_carries_a_model_band() -> None:
     assert model_toleranced_dimensions(part) == {
         ("CupProfile", "BoreDia"): "*deviations(BORE_BAND)",
     }
-    assert spec.BORE_DIA == pytest.approx(6.000)
-    assert spec.BORE_BAND == pytest.approx((0.012, 0.0))
+    assert spec.BORE_DIA == pytest.approx(6.3246)  # .249
+    assert spec.BORE_BAND == pytest.approx((0.0127, 0.0))
     assert min(spec.BORE_BAND) == 0.0
 
 
 def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
     """Every wall round the assembly-drilled pin hole, recomputed from the
     printed bands, stays at or above the 2.0 mm floor."""
-    hole_r = (pin.HOLE_DIA + max(pin.HOLE_BAND)) / 2.0  # 0.825
+    hole_r = (pin.HOLE_DIA + max(pin.HOLE_BAND)) / 2.0  # .0325
     station = spec.PIN_HOLE_FROM_FRONT + spec.PIN_HOLE_STATION_TOL
     od_min = spec.OD - _band(spec.OD_PLACES)
     length_min = spec.LENGTH - _band(spec.LENGTH_PLACES)
@@ -178,9 +178,9 @@ def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
         "ring": (od_min - bore_max) / 2.0,
         "rear": length_min - station - hole_r,
     }
-    assert walls["journal"] == pytest.approx((5.9873 - 1.65) / 2.0, abs=1e-9)
-    assert walls["front"] == pytest.approx(3.0 - 0.10 - 0.825, abs=1e-9)
-    assert walls["ring"] == pytest.approx((18.2 - 6.012) / 2.0, abs=1e-9)
+    assert walls["journal"] == pytest.approx((6.3119 - 1.651) / 2.0, abs=1e-9)
+    assert walls["front"] == pytest.approx(3.048 - 0.1016 - 0.8255, abs=1e-9)
+    assert walls["ring"] == pytest.approx((18.796 - 6.3373) / 2.0, abs=1e-9)
     assert {k: w for k, w in walls.items() if w < spec.WALL_FLOOR} == {}
     assert spec.JOURNAL_PIN_WALL_WORST == pytest.approx(walls["journal"])
     assert spec.FRONT_PIN_WALL_WORST == pytest.approx(walls["front"])
@@ -208,7 +208,7 @@ def test_the_reamed_bore_slides_on_the_journal_over_the_full_bands() -> None:
 
 
 def test_cup_bore_refuses_binding_on_the_actual_journal(monkeypatch) -> None:
-    assert spec.BORE_JOURNAL_CLEARANCE == pytest.approx((0.00508, 0.0247))
+    assert spec.BORE_JOURNAL_CLEARANCE == pytest.approx((0.00508, 0.0254))
     monkeypatch.setattr(knob_shaft, "JOURNAL_DIA_BAND", (0.020, 0.0))
     fresh_spec = importlib.util.spec_from_file_location("_cup_perturbed", spec.__file__)
     fresh = importlib.util.module_from_spec(fresh_spec)

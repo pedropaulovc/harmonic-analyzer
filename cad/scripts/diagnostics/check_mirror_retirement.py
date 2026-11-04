@@ -893,19 +893,21 @@ p._assert_chain_layout()
 _telemetry.debug("OK  paper-drive module layout asserts")
 
 PD = "pd-paper-drive"
-expect(PD, "pd-support-bar-1", [0.0, p.BAR_CY, p.BAR_Z], IDENTITY, "pd-support-bar")
+# The sealed golden dump predates the 1.010 bar (owner ruling 2026-11-01, B2):
+# its bar centred on the clamp line, which the shortened bar keeps (CLAMP_Y).
+expect(PD, "pd-support-bar-1", [0.0, p.CLAMP_Y, p.BAR_Z], IDENTITY, "pd-support-bar")
 for i, sx in enumerate((1.0, -1.0)):
     expect(
         PD,
         f"sh-column-clamp-front-{i + 1}",
-        [sx * p.COLUMN_X, p.BAR_CY, p.COLUMN_Z],
+        [sx * p.COLUMN_X, p.CLAMP_Y, p.COLUMN_Z],
         p.ROT_Y_POS90,
         f"column-clamp-front x{sx * p.COLUMN_X:+.0f}",
     )
     expect(
         PD,
         f"sh-column-clamp-back-{i + 1}",
-        [sx * p.COLUMN_X, p.BAR_CY, p.COLUMN_Z],
+        [sx * p.COLUMN_X, p.CLAMP_Y, p.COLUMN_Z],
         p.ROT_Y_POS90,
         f"column-clamp-back x{sx * p.COLUMN_X:+.0f}",
     )
@@ -913,7 +915,7 @@ for i, x in enumerate(p.CLAMP_HOLE_X):
     expect(
         PD,
         f"mg-vn-clamp-screw-{i + 1}",
-        [-x, p.BAR_CY, p.BAR_FRONT_Z],
+        [-x, p.CLAMP_Y, p.BAR_FRONT_Z],
         IDENTITY,
         f"clamp-screw x{-x:+.1f}",
     )
@@ -1027,9 +1029,6 @@ expect(
 )
 expect(
     PD, "pd-vn-transgear-pivot-spring-1", [*_P, p.PIVOT_SPRING_Z0], IDENTITY, "pivot spring"
-)
-expect(
-    PD, "pd-vn-transgear-pivot-shim-1", [*_P, p.PIVOT_SHIM_Z0], p.ROT_X_POS90, "pivot shim"
 )
 _K = [p.KNOB_SHAFT_XY[0], p.KNOB_SHAFT_XY[1]]
 expect(PD, "pd-transgear-arm-plate-1", [*_K, p.PLATE_Z0], _arm_rows, "arm plate")

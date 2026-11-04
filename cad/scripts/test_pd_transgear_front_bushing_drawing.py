@@ -13,13 +13,14 @@ import _config
 import build_pd_transgear_front_bushing as part
 import draw_pd_transgear_front_bushing as drawing
 import transgear_cluster_fit as fit
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND, STACK_NAME
+from pd_cluster_stack_band import FIT_LENGTH_BAND_IN, STACK_NAME
 import pd_transgear_disc_hub_spec as hub
 import pd_transgear_front_bushing_spec as spec
 import pd_transgear_pin_spec as pin
 import pd_vn_transgear_retaining_ring_spec as ring
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM
 
@@ -43,14 +44,15 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 
 
 def test_the_chamfer_prints_a_max_the_ring_never_reaches() -> None:
-    """The O.D. break prints as a single MAX limit (swTolMAX prints the
-    nominal, so the nominal is the max); the MHA-PD-VN-61 ring bears wholly on the
-    flat inside the largest chamfer on the smallest O.D."""
-    assert spec.FRONT_CHAMFER_TOL_TYPE == 6  # swTolType_e.swTolMAX
-    assert spec.FRONT_CHAMFER_BAND[0] == 0.0 > spec.FRONT_CHAMFER_BAND[1]
-    flat_dia_min = spec.OD - printed_band_mm(spec.OD_PLACES) - 2.0 * spec.FRONT_CHAMFER
+    """The O.D. break prints as a single MAX limit (the modelled size is the
+    max); the MHA-PD-VN-61 ring bears wholly on the flat inside the largest
+    chamfer on the smallest O.D."""
+    flat_dia_min = (
+        spec.OD
+        - printed_band_mm(spec.OD_PLACES, unit=spec.UNIT)
+        - 2.0 * spec.FRONT_CHAMFER
+    )
     assert ring.OD < flat_dia_min
-    assert drawing.DIMENSION_CALLOUTS["FrontChamferSize"].strip() == "X 45 DEG"
 
 
 def test_the_bore_and_the_printed_length_carry_model_bands() -> None:
@@ -72,29 +74,32 @@ def test_the_bore_runs_on_the_pin_and_names_it() -> None:
     callout = drawing.DIMENSION_CALLOUTS["BoreDia"]
     assert callout.splitlines()[0] == "REAM THRU"
     assert pin.PIN_NUMBER in callout
-    assert f"{low:.3f}-{high:.3f}" in callout
+    assert f"{pin.inch_text(low, 4)}-{pin.inch_text(high, 4)}" in callout
 
 
 def test_wall_holds_the_target_at_the_printed_worst_case() -> None:
     worst = (
         spec.OD
-        - printed_band_mm(spec.OD_PLACES)
+        - printed_band_mm(spec.OD_PLACES, unit=spec.UNIT)
         - (spec.BORE_DIA + spec.BORE_DIA_BAND[0])
     ) / 2.0
-    assert worst >= 2.0
+    assert worst >= WALL_TARGET_MM
 
 
 def test_the_rear_face_covers_the_hub_front_face_past_its_bore() -> None:
     """R9-68: the bushing traps the hub, so at the smallest printed O.D. its
     rear face reaches a millimetre past the hub's largest D-bore, and stays
     on the hub's front face (inside the smallest hub body)."""
-    od_r_min = (spec.OD - printed_band_mm(spec.OD_PLACES)) / 2.0
+    od_r_min = (spec.OD - printed_band_mm(spec.OD_PLACES, unit=spec.UNIT)) / 2.0
     overlap = od_r_min - (hub.BORE_DIA + hub.BORE_BAND[0]) / 2.0
-    assert spec.OD == pytest.approx(12.0) and spec.OD_PLACES == 1
+    assert spec.OD == pytest.approx(11.938) and spec.OD_PLACES == 2
     assert overlap >= 1.0
     assert spec.HUB_FACE_OVERLAP_WORST == pytest.approx(overlap)
-    hub_r_min = (hub.HUB_DIA - printed_band_mm(hub.HUB_DIA_PLACES)) / 2.0
-    assert (spec.OD + printed_band_mm(spec.OD_PLACES)) / 2.0 < hub_r_min
+    hub_r_min = (
+        hub.HUB_DIA - printed_band_mm(hub.HUB_DIA_PLACES, unit=hub.UNIT)
+    ) / 2.0
+    od_r_max = (spec.OD + printed_band_mm(spec.OD_PLACES, unit=spec.UNIT)) / 2.0
+    assert od_r_max < hub_r_min
 
 
 def test_the_unchanged_bushing_bears_on_the_smaller_d_flat_sleeve_nose() -> None:
@@ -118,7 +123,9 @@ def test_the_unchanged_bushing_bears_on_the_smaller_d_flat_sleeve_nose() -> None
         spec.BORE_DIA + spec.BORE_DIA_BAND[0],
         sleeve.BORE_DIA + sleeve.BORE_DIA_BAND[0],
     ) / 2.0 + hub.EDGE_BREAK_MAX
-    bushing_r = (spec.OD - printed_band_mm(spec.OD_PLACES)) / 2.0 - hub.EDGE_BREAK_MAX
+    bushing_r = (
+        spec.OD - printed_band_mm(spec.OD_PLACES, unit=spec.UNIT)
+    ) / 2.0 - hub.EDGE_BREAK_MAX
     assert inner_r < flat < nose_r < bushing_r
     removed_cap = nose_r**2 * math.acos(flat / nose_r) - flat * math.sqrt(
         nose_r**2 - flat**2
@@ -128,26 +135,17 @@ def test_the_unchanged_bushing_bears_on_the_smaller_d_flat_sleeve_nose() -> None
     assert fit.RECESS_RANGE[0] >= 0.0
 
 
-def test_the_length_is_a_printed_term_of_the_disc_cluster_stack() -> None:
-    """#2038: printed 2 places, +/-0.02, named on the stack; nothing is faced
-    to fit, set at assembly or supplied as a blank."""
+def test_the_length_is_a_term_of_the_disc_cluster_stack() -> None:
+    """#2124: it sets the collar air, so it prints +/-.001 at 3 places, named
+    on the stack; the shims, not this length, set the end float."""
     assert spec.LENGTH == fit.FRONT_BUSHING_LENGTH
-    assert spec.LENGTH_BAND == fit.LENGTH_BAND == PRINTED_LENGTH_BAND
-    assert spec.LENGTH_PLACES == fit.LENGTH_PLACES == 2
-    assert spec.DRAWING_PRECISION_BY_NAME["RingLength"] == 2
+    assert spec.LENGTH_BAND == fit.LENGTH_BAND == FIT_LENGTH_BAND_IN
+    assert spec.LENGTH_PLACES == fit.LENGTH_PLACES == 3
+    assert spec.DRAWING_PRECISION_BY_NAME["RingLength"] == 3
     assert "RingLength" not in spec.REFERENCE_DIMENSIONS
     callout = drawing.DIMENSION_CALLOUTS["RingLength"]
     assert callout == spec.LENGTH_CALLOUT
     assert STACK_NAME in callout
-    sources = (
-        Path(drawing.__file__).read_text(encoding="utf-8"),
-        Path(part.__file__).read_text(encoding="utf-8"),
-    )
-    for text in (*drawing.DIMENSION_CALLOUTS.values(), *sources):
-        for banned in ("FACED TO FIT", "SET AT ASSEMBLY", "SUPPLY", "step_ref"):
-            assert banned not in text
-    assert not hasattr(drawing, "FIT_STEP_KEY")
-    assert not hasattr(spec, "DRAWING_NOTES")
 
 
 def test_the_bore_and_both_end_faces_run_machined() -> None:

@@ -19,6 +19,8 @@ live proof.
 
 from __future__ import annotations
 
+from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
+
 import dt_drive_train_steps
 import pd_transgear_drive_collar_spec as collar
 import paper_drive_mesh_check as mesh_check
@@ -73,8 +75,8 @@ SEQUENCE: tuple[str, ...] = (
     "hanger-pivoted",
     # Disc cluster, on the bench (R9-68: the disc on the sleeve's seat
     # shoulder, the hub's D-bore on its D-flat; R9-8, R9-9). Hub and bushings
-    # are printed lengths (#2038 owner ruling 2026-10-28; transgear_cluster_fit):
-    # nothing in the cluster is faced at assembly.
+    # are printed lengths (transgear_cluster_fit); nothing is faced: the float
+    # is shimmed at assembly (owner ruling 2026-11-01, #2124).
     # Centre and seat the disc to the sleeve's actual running-bore datum
     # before transfer-spotting; lock, re-indicate every space, then match-mark.
     "disc-cluster-assembled",
@@ -85,6 +87,9 @@ SEQUENCE: tuple[str, ...] = (
     "oil-hole-drilled",
     # R9-68: on the pin between the two bushings, as made, the ring last.
     "disc-cluster-hung",
+    # #2124: the ring gap read on a feeler, cluster rearward, and closed into
+    # VIEW E's window with MHA-PD-VN-68 shims under the rear bushing.
+    "disc-cluster-shimmed",
     # Knob stack, front to rear (contract §1). R9-70 (N-A): the collar's pilot
     # faced on the bench to stand proud of every removable wheel, the
     # thumbnut's seat (pd_transgear_drive_collar_spec.PILOT_PROUD_RANGE); R9-70
@@ -143,15 +148,33 @@ def knob_setting_ref() -> str:
     return f"{DRAWING_NUMBER} {KNOB_SETTING_VIEW_NAME}"
 
 
+def inch_window(limits_mm: tuple[float, float], places: int, joiner: str = "-") -> str:
+    """A (min, max) window in this inch sheet's units, rounded inward so the
+    printed window never admits a value the part spec refuses."""
+    low = inch_ceil_mm(limits_mm[0], places)
+    high = inch_floor_mm(limits_mm[1], places)
+    return f"{inch_text(low, places)}{joiner}{inch_text(high, places)}"
+
+
+def inch_max_text(limit_mm: float, places: int) -> str:
+    """A maximum in inches, rounded down so the printed limit never admits a
+    value the part spec refuses."""
+    return f"{inch_text(inch_floor_mm(limit_mm, places), places)} MAX"
+
+
+def inch_min_text(limit_mm: float, places: int) -> str:
+    """A minimum in inches, rounded up for the same reason."""
+    return f"{inch_text(inch_ceil_mm(limit_mm, places), places)} MIN"
+
+
 # --- Values the procedure owns (CONTRACT-paper-drive.md §13.2) --------------
 # A reference operating quantity, not a second gear-data block. The current
 # travel law uses the reference pitch circle. A finite cutter's setting
 # changes the tooth boundary, not the feed per revolution. A reference value
-# prints to three places (machinist review: six read as a demanded precision).
-PAPER_FEED_REFERENCE_PLACES = 3
-PAPER_TRAVEL_PER_CRANK_TEXT = format(
-    paper_geometry.NET_RACK_TRAVEL_PER_CRANK_REV,
-    f".{PAPER_FEED_REFERENCE_PLACES}f",
+# prints to four inch places (machinist review: six read as a demanded precision).
+PAPER_FEED_REFERENCE_PLACES = 4
+PAPER_TRAVEL_PER_CRANK_TEXT = inch_text(
+    paper_geometry.NET_RACK_TRAVEL_PER_CRANK_REV, PAPER_FEED_REFERENCE_PLACES
 )
 PAPER_FEED_REFERENCE_TEXT = (
     f"FEED SETUP: {removable.CRANK_CONFIG} CRANK / "
@@ -162,27 +185,28 @@ PAPER_FEED_REFERENCE_TEXT = (
 # The bar's top above the base deck: the builder's BAR_TOP_Y less the deck's
 # BASE_DECK_Y. Its height affects the chain's centre distance, not the feed
 # ratio; the fixed-centre loop's slack is solved by _chain from the current
-# knob and crank axes. The title block's .X band holds the height
-# (Main, 2026-10-01).
+# knob and crank axes. The title block's .XX band holds the height
+# (Main, 2026-10-01), printed rounded from the builder's model value.
 BAR_TOP_ABOVE_DECK = 266.934
+BAR_TOP_ABOVE_DECK_TEXT = inch_text(BAR_TOP_ABOVE_DECK, 2)
 # The rack's crests below the platen's bottom edge (the builder's PLATE_Y0
 # less RACK_TIP_Y). The hook's pin hole is match-drilled wherever the meshed
 # hanger puts the pin, but a rack set off this band swings the latched hanger
 # and moves the pin along the hook's straight run, so the band is held at the
 # solder joint. The feed mesh's datum pitch-line distance sets the crest drop.
 RACK_CREST_DROP = paper_placement.RACK_CREST_DROP
-RACK_CREST_TOL = 0.05
+RACK_CREST_TOL = 0.0508  # .002
 # The feed rack's datum setup band and its gates are the builder's too:
 # paper_drive_rack_setup owns them; this module only prints them.
 RACK_ROOT_CLEARANCE_FLOOR = mesh_check.RACK_ROOT_CLEARANCE_FLOOR_MM
 
 # The collar is set to pd_transgear_drive_collar_spec.FIT_UP_OFFSET_SET_TEXT and
 # accepted within OFFSET_ACCEPT_TOL of the same target at the re-check
-# (procedure (8): "-0.05 ±0.10" in machine z, forward is -z).  Both readings
+# (procedure (8), in machine z, forward is -z).  Both readings
 # take the knob wheel held back on its collar seat ("fitup-pose-set"): it floats
 # KNOB_FLOAT_RANGE forward under the nut; reading it floated forward
 # would set and accept the pair up to that float off.
-OFFSET_ACCEPT_TOL = 0.10
+OFFSET_ACCEPT_TOL = 0.1016  # .004
 # What the acceptance passes, in service: the seated front faces within the
 # accepted band, the mid-planes a half plate band either way (both chain
 # wheels are MHA-PD-09 plates); then the crank's end play, the knob's end
@@ -215,14 +239,13 @@ if max(map(abs, ACCEPTED_CHAIN_OFFSET_IN_SERVICE)) > collar.CHAIN_OFFSET_LIMIT:
 COLLAR_DISC_AIR_MIN = collar.COLLAR_DISC_AIR_MIN
 
 # The printed forms of those bands: a drawing script only places them.
-OFFSET_ACCEPT_TEXT = f"{collar.FIT_UP_OFFSET_TARGET:.2f} \u00b1{OFFSET_ACCEPT_TOL:.2f}"
+OFFSET_ACCEPT_TEXT = (
+    f"{inch_text(collar.FIT_UP_OFFSET_TARGET, 3)} \u00b1{inch_text(OFFSET_ACCEPT_TOL, 3)}"
+)
 # The knob wheel floats collar.KNOB_FLOAT_RANGE forward of its seat (the collar's
 # front face) under the thumbnut; the setting and its acceptance read it
 # held back on that seat, the pose ACCEPTED_CHAIN_OFFSET_IN_SERVICE assumes.
 KNOB_HELD_BACK_TEXT = f"{removable.KNOB_CONFIG} HELD BACK ON ITS SEAT"
-COLLAR_DISC_AIR_TEXT = f"{COLLAR_DISC_AIR_MIN:.2f} MIN"
-RACK_CREST_TEXT = f"{RACK_CREST_DROP:.2f} \u00b1{RACK_CREST_TOL:.2f}"
-RACK_DATUM_BACKLASH_TEXT = (
-    f"{rack_setup.RACK_DATUM_BACKLASH_RANGE[0]:.2f} TO "
-    f"{rack_setup.RACK_DATUM_BACKLASH_RANGE[1]:.2f}"
-)
+COLLAR_DISC_AIR_TEXT = inch_min_text(COLLAR_DISC_AIR_MIN, 3)
+RACK_CREST_TEXT = f"{inch_text(RACK_CREST_DROP, 3)} \u00b1{inch_text(RACK_CREST_TOL, 3)}"
+RACK_DATUM_BACKLASH_TEXT = inch_window(rack_setup.RACK_DATUM_BACKLASH_RANGE, 4, " TO ")

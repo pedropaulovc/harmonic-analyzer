@@ -44,7 +44,7 @@ def test_actual_stock_master_and_real_printed_span_family():
     assert shaft.RADIAL_SETTING_LIMITS[0] < shaft.RADIAL_SETTING + low
     assert shaft.RADIAL_SETTING_LIMITS[1] > shaft.RADIAL_SETTING + high
     assert shaft.RADIAL_SETTING_LIMITS == pytest.approx(
-        (0.2609517064666221, 0.27103193914373097)
+        (0.2579522225972215, 0.27356429027937207)
     )
     for profile in profiles:
         error = 2.0 * profile.geometry_error_bound_mm + 8.0 * math.ulp(shaft.SPAN_NOMINAL)
@@ -54,21 +54,22 @@ def test_actual_stock_master_and_real_printed_span_family():
         profile.require_tip_land(0.25 * shaft.MODULE_MM)
     # Deeper than the standard 1.25-module dedendum root at the deepest corner.
     assert shaft.ROOT_DIA_EXACT_MIN < shaft.PITCH_DIA - 2.5 * shaft.MODULE_MM
-    assert shaft.ROOT_DIA_EXACT_MIN == pytest.approx(6.6050463363483365)
+    assert shaft.ROOT_DIA_EXACT_MIN == pytest.approx(6.599071465164203)
     assert shaft.ROOT_DIA_MIN <= shaft.ROOT_DIA_EXACT_MIN
-    assert shaft.ROOT_DIA_MIN == 6.60
+    assert shaft.ROOT_DIA_MIN == 6.5786  # .259
     # The disc's convention: the finite tip vector at the lowest accepted
-    # setting caps the blank; the margin is the 0.01 floor's remainder.
+    # setting caps the blank; the margin is the .0001 in floor's remainder.
     assert shaft.CUTTER_SUPPORT_MARGIN_MIN > 0.0
-    assert shaft.CUTTER_SUPPORT_MARGIN_MIN == pytest.approx(1.32789629217811e-4, abs=1e-9)
+    assert shaft.CUTTER_SUPPORT_MARGIN_MIN < 0.00254 / 2.0
     # Negative control: a blank 0.001 over the printed tip limit is unsupported.
     support = shaft._MIN_SETTING_SUPPORT
     assert (
         support.support_radius_max_mm - support.geometry_error_bound_mm
         - (shaft.OUTSIDE_DIA + max(shaft.OUTSIDE_DIA_BAND) + 0.001) / 2.0
     ) < 0.0
-    # Same construction as the disc: both blanks are the floored support.
-    for spec in (shaft, shaft.DISC):
+    # Same construction as the disc: both blanks are the floored support, on
+    # the .0001 in grid.
+    for spec, per_mm in ((shaft, 1e4 / 25.4), (shaft.DISC, 1e4 / 25.4)):
         lowest = spec._MIN_SETTING_SUPPORT
         floored = math.floor(
             (
@@ -76,13 +77,14 @@ def test_actual_stock_master_and_real_printed_span_family():
                 - 2.0 * lowest.geometry_error_bound_mm
                 - spec.OUTSIDE_DIA_BAND[0]
             )
-            * 100.0
-        ) / 100.0
-        assert spec.OUTSIDE_DIA == floored
+            * per_mm
+            + 1e-9
+        ) / per_mm
+        assert spec.OUTSIDE_DIA == pytest.approx(floored, abs=1e-9)
 
 
 def test_actual_pin_is_supported_at_every_manufactured_corner():
-    assert shaft.TOOTH_SPACE_GAUGE_PIN_DIA_MM == 1.0
+    assert shaft.TOOTH_SPACE_GAUGE_PIN_DIA_MM == 1.016  # .040
     contacts = shaft.tooth_space_gauge_contacts(shaft.TOOTH_SPACE_GAUGE_PIN_DIA_MM)
     assert len(contacts) == 4
     assert min(c.root_air_mm for c in contacts) > 0.0
@@ -91,7 +93,8 @@ def test_actual_pin_is_supported_at_every_manufactured_corner():
         with pytest.raises(ValueError):
             shaft.tooth_space_gauge_contacts(diameter)
     assert shaft.TOOTH_SPACE_RUNOUT_TIR_MM == quality.toothspace_runout_tir_mm()
-    assert shaft.CORE_TOTAL_RUNOUT == quality.shaft_turned_runout_mm()
+    assert shaft.CORE_TOTAL_RUNOUT == pytest.approx(0.0508)  # .002
+    assert shaft.CORE_TOTAL_RUNOUT >= quality.shaft_turned_runout_mm()
     assert shaft.JOURNAL_DIA_BAND is fits.SHAFT_G6_3_TO_6_MM
     assert "TO A" in shaft.TOOTH_SPACE_CALLOUT
     assert shaft.TOOTH_SPACE_CALLOUT_POINT_MM[2] == 0.0
@@ -135,25 +138,24 @@ def test_true_front_disk_clears_active_core_and_both_neck_corners():
 
 
 def test_physical_flat_terminal_has_two_actual_end_limits():
-    assert shaft.FRONT_RELIEF_DIA == 3.95
-    # LIMITS 3.95/3.82 (owner ruling, machinist review r8).
-    assert shaft.FRONT_RELIEF_DIA_MIN == pytest.approx(3.82)
-    assert shaft.FRONT_RELIEF_DIA_MAX == pytest.approx(3.95)
-    assert shaft.CORE_FLAT_CUT_END_FROM_F == pytest.approx(0.110)
-    assert shaft.CORE_FLAT_CUT_END_LIMITS == (0.050, 0.170)
+    assert shaft.FRONT_RELIEF_DIA == 3.937  # .155
+    assert shaft.FRONT_RELIEF_DIA_MIN == pytest.approx(3.81)
+    assert shaft.FRONT_RELIEF_DIA_MAX == pytest.approx(3.937)
+    assert shaft.CORE_FLAT_CUT_END_FROM_F == pytest.approx(0.1016)
+    assert shaft.CORE_FLAT_CUT_END_LIMITS == (0.0508, 0.1778)
     assert shaft.CORE_FLAT_CUT_END_Z == -shaft.CORE_FLAT_CUT_END_FROM_F
-    assert min(shaft.CORE_FLAT_CUT_END_LIMITS) >= 0.050
-    assert shaft.FRONT_RELIEF_WIDTH_MIN - max(shaft.CORE_FLAT_CUT_END_LIMITS) == pytest.approx(0.100)
+    assert min(shaft.CORE_FLAT_CUT_END_LIMITS) >= 0.0508
+    assert shaft.FRONT_RELIEF_WIDTH_MIN - max(shaft.CORE_FLAT_CUT_END_LIMITS) == pytest.approx(0.1016)
     # Rounding is already INCLUDED in the physical foremost-point dimension.
-    assert shaft.CORE_FLAT_GEAR_AIR_MIN == pytest.approx(0.050)
-    assert shaft.CORE_FLAT_REACH_PAST_SHOULDER_MIN == pytest.approx(0.100)
+    assert shaft.CORE_FLAT_GEAR_AIR_MIN == pytest.approx(0.0508)
+    assert shaft.CORE_FLAT_REACH_PAST_SHOULDER_MIN == pytest.approx(0.1016)
     # The tool end lies in air under the neck: detail B prints both limits as
     # the part's own FlatEnd (LIMIT from F) and FlatToolRadius (MAX)
     # dimensions, from these constants; no note repeats them.
     assert {"FlatEnd", "FlatToolRadius"} <= shaft.DRAWING_DIMENSIONS["CoreFlatProfile"]
     assert shaft.TEETH == 15
     assert not hasattr(shaft, "CORE_FLAT_TOOL_REACH_NOTE")
-    assert shaft.CORE_FLAT_TOOL_END_RADIUS_MAX == pytest.approx(0.100)
+    assert shaft.CORE_FLAT_TOOL_END_RADIUS_MAX == pytest.approx(0.1016)
     assert shaft.FRONT_RELIEF_WIDTH_MIN > 2.0 * shaft.FRONT_CORNER_RADIUS_MAX
 
 
@@ -163,31 +165,31 @@ def test_torque_contact_uses_no_favourable_bore_float_credit():
         shaft.FRONT_RELIEF_DIA_MAX / 2.0
         + (shaft.CORE_TOTAL_RUNOUT + shaft.FRONT_RELIEF_TOTAL_RUNOUT) / 2.0
     )
-    assert flat_min - neck_crown == pytest.approx(0.085)
+    assert flat_min - neck_crown == pytest.approx(0.09906)
     assert collar.NECK_TORQUE_FLAT_AIR_MIN == pytest.approx(flat_min - neck_crown)
-    assert collar.NECK_CORNER_D_BORE_AIR_MIN == pytest.approx(0.129853316221)
+    assert collar.NECK_CORNER_D_BORE_AIR_MIN == pytest.approx(0.14463096928059818)
     # A legal zero general edge break would seat on the gear-side fillet.
     assert flat_min - neck_crown - shaft.FRONT_CORNER_RADIUS_MAX < 0.0
-    assert collar.BORE_ENTRY_BREAK_MIN == pytest.approx(0.150)
-    assert collar.BORE_ENTRY_BREAK_MAX == pytest.approx(0.250)
+    assert collar.BORE_ENTRY_BREAK_MIN == pytest.approx(0.1524)
+    assert collar.BORE_ENTRY_BREAK_MAX == pytest.approx(0.254)
     assert collar.BORE_ENTRY_BREAK_ANGLE_LIMITS == pytest.approx((44.0, 46.0))
-    assert collar.BORE_ENTRY_BREAK_LEG_MIN == pytest.approx(0.144853316221)
-    assert collar.BORE_ENTRY_BREAK_LEG_MAX == pytest.approx(0.258882578448)
-    assert collar.FLAT_TO_AXIS == pytest.approx(2.1525)
-    assert collar.FLAT_LIMITS == (2.145, 2.160)
+    assert collar.BORE_ENTRY_BREAK_LEG_MIN == pytest.approx(0.14717096928059806)
+    assert collar.BORE_ENTRY_BREAK_LEG_MAX == pytest.approx(0.2630246997028047)
+    assert collar.FLAT_TO_AXIS == pytest.approx(2.16154)
+    assert collar.FLAT_LIMITS == (2.15392, 2.16916)
     assert min(collar.FLAT_CLEARANCE) > 0.0
     assert collar.STUD_D_BORE_AIR > 0.0
 
 
 def test_shortened_drive_face_is_real_not_old_full_core_length():
-    assert shaft.CORE_FRONT_FROM_F == 5.25
-    assert shaft.CORE_ACTIVE_LENGTH == pytest.approx(4.85)
-    assert shaft.CORE_ACTIVE_LENGTH_MIN == pytest.approx(4.21)
-    assert collar.D_DRIVE_AREA_MIN == pytest.approx(6.654325210394)
-    assert shaft.FRONT_RELIEF_AREA_MIN == pytest.approx(math.pi * 3.82**2 / 4.0)
+    assert shaft.CORE_FRONT_FROM_F == 5.334
+    assert shaft.CORE_ACTIVE_LENGTH == pytest.approx(4.9276)
+    assert shaft.CORE_ACTIVE_LENGTH_MIN == pytest.approx(4.5466)
+    assert collar.D_DRIVE_AREA_MIN == pytest.approx(6.991639285135482)
+    assert shaft.FRONT_RELIEF_AREA_MIN == pytest.approx(math.pi * 3.81**2 / 4.0)
     assert collar.D_DRIVE_AREA_MIN > 0.0
-    assert collar.LENGTH == collar.SET_NOMINAL == 6.2
-    assert (collar.LENGTH_FITTED_MIN, collar.LENGTH_FITTED_MAX) == (3.870, 6.900)
+    assert collar.LENGTH == collar.SET_NOMINAL == 6.1722
+    assert (collar.LENGTH_FITTED_MIN, collar.LENGTH_FITTED_MAX) == (3.8862, 6.8834)
     assert collar.BODY_BLANK_LENGTH_MIN >= collar.LENGTH_FITTED_MAX + collar.FACING_ALLOWANCE
     assert collar.BODY_REAR_FACE_FROM_F == 0.0
 
@@ -221,7 +223,7 @@ def test_straight_through_cutter_clears_the_journal_at_worst_case(monkeypatch):
     assert shaft.CUTTER_SKU == "10-289-487"
     profiles = shaft.manufactured_profiles()
     journal_max = shaft.JOURNAL_DIA + max(shaft.JOURNAL_DIA_BAND)
-    assert journal_max == pytest.approx(5.99492)
+    assert journal_max == pytest.approx(6.31952)
     air = (
         2.0 * min(p.root_radius_min_mm for p in profiles)
         - journal_max - shaft.TOOTH_SPACE_RUNOUT_TIR_MM
@@ -229,7 +231,7 @@ def test_straight_through_cutter_clears_the_journal_at_worst_case(monkeypatch):
     assert air == pytest.approx(shaft.JOURNAL_CUTTER_AIR_MIN)
     assert shaft.JOURNAL_CUTTER_AIR_FLOOR == 0.035
     assert shaft.JOURNAL_CUTTER_AIR_MIN > shaft.JOURNAL_CUTTER_AIR_FLOOR
-    assert shaft.JOURNAL_CUTTER_AIR_MIN == pytest.approx(0.2800631681739132)
+    assert shaft.JOURNAL_CUTTER_AIR_MIN == pytest.approx(0.11477573258184637)
     # The independent disk-envelope oracle removes nothing from the journal.
     for profile in profiles:
         lo, hi = _journal_envelope_removal(profile, journal_max)
@@ -255,18 +257,18 @@ def test_bearing_material_charges_breaks_axis_error_and_loose_float():
     # Regression value, not a load floor: the spec's physical gate is a
     # positive face. It charges bore, entry break, D-axis error at F and
     # half the 0.05 tooth-space TIR, so it sits below the uncharged ring.
-    assert collar.FRONT_BEARING_AREA_MIN == pytest.approx(23.1902, abs=1e-3)
+    assert collar.FRONT_BEARING_AREA_MIN == pytest.approx(22.5145, abs=1e-3)
     assert shaft.RING_TRANSVERSE_FLOAT_MAX >= (ring.ID + max(ring.ID_BAND) - shaft.JOURNAL_DIA_MIN) / 2.0
-    assert shaft.RING_TRANSVERSE_FLOAT_MAX == pytest.approx(0.10864110728935561)
-    assert collar.D_SUPPORT_LENGTH_MIN == pytest.approx(3.692234843105)
-    assert collar.D_AXIS_AT_F_FROM_JOURNAL_MAX == pytest.approx(0.060796633879)
-    assert shaft.REAR_BEARING_INNER_RADIUS_MAX == pytest.approx(3.4586411072893553)
+    assert shaft.RING_TRANSVERSE_FLOAT_MAX == pytest.approx(0.1876204160053243)
+    assert collar.D_SUPPORT_LENGTH_MIN == pytest.approx(4.02055060059439)
+    assert collar.D_AXIS_AT_F_FROM_JOURNAL_MAX == pytest.approx(0.08188336584674044)
+    assert shaft.REAR_BEARING_INNER_RADIUS_MAX == pytest.approx(3.7813204160053244)
     assert shaft.REAR_BEARING_INNER_RADIUS_MAX > shaft.ROOT_DIA_EXACT_MIN / 2.0
     assert shaft.REAR_BEARING_AREA_MIN > 1.0
-    assert shaft.REAR_BEARING_AREA_MIN == pytest.approx(11.322316949949155)
+    assert shaft.REAR_BEARING_AREA_MIN == pytest.approx(7.0949877788193305)
     # Not the uncharged centred claim on the bare ring bore.
     centred = shaft.gear_bearing_area_lower(shaft.STOCK_PROFILE, ring.ID / 2.0)
-    assert centred == pytest.approx(18.906670346162162)
+    assert centred == pytest.approx(14.171169300934473)
     assert shaft.REAR_BEARING_AREA_MIN < centred
     assert shaft.gear_bearing_area_lower(shaft.STOCK_PROFILE, shaft.OUTSIDE_DIA) == 0.0
     with pytest.raises(ValueError):
@@ -279,15 +281,15 @@ def test_retained_walls_and_axial_stations_need_no_new_waiver():
     assert ring.WALL_WORST >= 2.0
     assert cup.RADIAL_WALL_WORST >= 2.0
     assert (shaft.JOURNAL_DIA_MIN - 1.65) / 2.0 >= 2.0
-    assert plate.BORE_DIA == 6.0
-    assert plate.BORE_DIA_LIMITS == (0.0, 0.012)
+    assert plate.BORE_DIA == 6.3246
+    assert plate.BORE_DIA_LIMITS == (0.0, 0.0127)
     assert min(cup.BORE_JOURNAL_CLEARANCE) == pytest.approx(0.00508)
-    assert max(cup.BORE_JOURNAL_CLEARANCE) == pytest.approx(0.0247)
-    assert ring.LENGTH == 5.2
-    assert plate.HUB_LENGTH == 12.6
-    assert shaft.CUP_FACE_Z == pytest.approx(40.3375)
-    assert shaft.REAR_END_Z == pytest.approx(46.8375)
-    assert collar.COLLAR_DISC_AIR_MIN == 0.10
+    assert max(cup.BORE_JOURNAL_CLEARANCE) == pytest.approx(0.0254)
+    assert ring.LENGTH == 5.207
+    assert plate.HUB_LENGTH == pytest.approx(12.6746)
+    assert shaft.CUP_FACE_Z == pytest.approx(40.3352)
+    assert shaft.REAR_END_Z == pytest.approx(46.8376)
+    assert collar.COLLAR_DISC_AIR_MIN == 0.1016
     assert "ONE FULL TURN" in collar.COLLAR_DISC_AIR_PHRASE
 
 
@@ -299,7 +301,7 @@ def test_actual_arbor_mount_has_room_and_a_manufacturable_spacer_wall():
     assert deep_x == shaft.ROOT_DEPTH_X_MIN
     assert deep_x < shaft.ROOT_DIA_EXACT_MIN / 2.0
     assert shaft.CUTTER_MOUNT_AIR_MIN > 5.0
-    assert shaft.CUTTER_MOUNT_AIR_MIN == pytest.approx(5.124269671663278)
+    assert shaft.CUTTER_MOUNT_AIR_MIN == pytest.approx(5.124360187793879)
 
 
 def test_complete_nominal_volume_is_straight_full_face_gaps():

@@ -60,7 +60,9 @@ from _drawing_tolerances import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
+from _document_units import apply_package_model_units
 from _fit_deviations import deviations
+from _part_properties import part_drawing_unit
 from _gtol_planar import PlanarFace
 from _gtol_face_resolve import resolve_faces
 from _visibility import blank_reference_geometry
@@ -85,7 +87,6 @@ from pd_transgear_drive_collar_spec import (
     OD,
     OD_BAND,
     PILOT_DIA,
-    PILOT_DIA_BAND,
     PILOT_LENGTH,
     PILOT_WALL_WORST,
     PIN_CIRCLE_RADIUS,
@@ -94,6 +95,7 @@ from pd_transgear_drive_collar_spec import (
     PIN_HOLE_DIA,
     PIN_OFFSET_TOL,
     PIN_REAR_INSET_WORST,
+    UNIT,
 )
 
 PART_NAME = "pd-transgear-drive-collar"
@@ -287,6 +289,8 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     # The mm suffix is load-bearing: the equation manager reads bare numbers in
     # document units (see build_dt_crankshaft).
     for name, value in (
@@ -489,26 +493,24 @@ async def build(adapter) -> dict[str, str]:
     # Body and pilot lengths are fitted at assembly and remain REF on part
     # and drawing.
     set_dimension_bilateral_tolerance(
-        adapter, "BodyProfile", "CollarDia", *deviations(OD_BAND)
+        adapter, "BodyProfile", "CollarDia", *deviations(OD_BAND), display_unit=UNIT
     )
     set_dimension_bilateral_tolerance(
-        adapter, "BodyProfile", "PilotDia", *deviations(PILOT_DIA_BAND)
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)
+        adapter, "BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND), display_unit=UNIT
     )
     _flat_limits(adapter)
     set_dimension_bilateral_tolerance(
-        adapter, "RearBoreChamfer", "BoreEntryBreak", *deviations(BORE_ENTRY_BREAK_BAND)
+        adapter, "RearBoreChamfer", "BoreEntryBreak", *deviations(BORE_ENTRY_BREAK_BAND),
+        display_unit=UNIT,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "PinHoleProfile", "PinPosDia", *deviations(PIN_HOLE_BAND)
+        adapter, "PinHoleProfile", "PinPosDia", *deviations(PIN_HOLE_BAND), display_unit=UNIT
     )
     set_dimension_symmetric_tolerance(
-        adapter, "PinHoleProfile", "PinPosY", PIN_OFFSET_TOL
+        adapter, "PinHoleProfile", "PinPosY", PIN_OFFSET_TOL, display_unit=UNIT
     )
     set_dimension_symmetric_tolerance(
-        adapter, "PinHoleProfile", "PinNegY", PIN_OFFSET_TOL
+        adapter, "PinHoleProfile", "PinNegY", PIN_OFFSET_TOL, display_unit=UNIT
     )
 
     await apply_material(adapter, MATERIAL)

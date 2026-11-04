@@ -4,7 +4,8 @@ The long front/top/end group is aligned at 1:1. A separately labelled 4:1
 end view defines the stepped brass section and soft-solder seam in solid
 lines. The standard shaded-with-edges isometric supplements those views.
 All sizes, decimal places and note contents come from the saved part and
-its pure-data spec; this recipe owns only placement.
+its pure-data spec; this recipe owns only placement. The sheet prints decimal
+inch (the part's ``drawing_unit: in``).
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from _check import check
 from _com import _early_bound
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _drawing_common import (
@@ -27,13 +29,14 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimensions import assert_imported_precision
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edge_dimensions import assert_dimension_measures
 from _drawing_notes import add_property_linked_note
 from _drawing_view_display import set_hidden_lines_removed
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from pd_platen_rack_spec import (
+    DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_NOMINALS_MM,
     DRAWING_PRECISION_BY_NAME,
@@ -71,14 +74,14 @@ END_KEEP = {
     "RackInset": (0.375, 0.095),
     "SeamHeight": (0.321, 0.112),
 }
-INCOMING_INSPECTION_XY = (0.020, 0.263)
 GEAR_DATA_XY = (0.020, 0.254)
 # Under the isometric's label (y ~0.077, run 9 touched its first line), left
 # of the title block (x 0.216) and above the border.
 NOTES_XY = (0.020, 0.064)
 # Centred under the 4:1 end view (axis x ~0.355), between the BackerDepth
-# dimension line (y ~0.0795) and the title block top (y 0.066).
-END_NOTE_XY = (0.330, 0.074)
+# dimension line (y ~0.0795) and the title block top (y 0.066); left-anchored,
+# its ~62 mm "ENLARGED RIGHT END VIEW" line starts 31 mm left of the axis.
+END_NOTE_XY = (0.324, 0.074)
 ISO_NOTE_XY = (0.104, 0.077)
 
 
@@ -139,7 +142,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Gear Data",
-            "Incoming Rack Inspection",
             "Manufacturing Notes",
             "Isometric View Note",
             "Enlarged End View Note",
@@ -150,7 +152,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Gear Data",
-            "Incoming Rack Inspection",
             "Manufacturing Notes",
             "Isometric View Note",
             "Enlarged End View Note",
@@ -161,6 +162,7 @@ async def build(adapter: Any) -> dict[str, str]:
         property_view=PART_STEM,
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -196,10 +198,11 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
     ]
+    # Above the value: the end view's outline sits just under both REF lines.
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="above")
     # Showing EndStockProfile prints the section's real stock outline and seam;
     # it remains hidden in the source part and in the isometric/assembly views.
     for property_name, position in (
-        ("Incoming Rack Inspection", INCOMING_INSPECTION_XY),
         ("Gear Data", GEAR_DATA_XY),
         ("Manufacturing Notes", NOTES_XY),
         ("Enlarged End View Note", END_NOTE_XY),

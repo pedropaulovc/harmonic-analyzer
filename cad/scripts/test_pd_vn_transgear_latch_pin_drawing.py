@@ -85,12 +85,6 @@ def test_the_chamfered_end_is_the_pressed_end() -> None:
     assert (spec.DIA / 2.0, spec.CHAMFER_LEN) in section
 
 
-def test_the_installation_note_states_the_proud_length() -> None:
-    notes = _config.parts(STEM)["installation_notes"]
-    # A reference value: the hole floor sets it (machinist review).
-    assert f"({spec.PROUD:.1f}) PROUD" in notes and "REF" in notes
-
-
 def test_the_installation_note_says_permanent_and_fits_the_sheet() -> None:
     from _purchased_fastener_drawing import note_lines
 

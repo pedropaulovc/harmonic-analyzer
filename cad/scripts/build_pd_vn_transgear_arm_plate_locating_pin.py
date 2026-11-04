@@ -1,4 +1,4 @@
-"""Purchased MHA-PD-VN-64: two McMaster 93600A189 arm/plate locating dowels.
+"""Purchased MHA-PD-VN-64: two McMaster 98381A435 arm/plate locating dowels.
 
 Catalogue-only nominal cylinder, not a vendor end-form replica.
 Axis +Y, first end y=0; ScrewAxis is the existing stock mate convention.
@@ -13,16 +13,16 @@ from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
 from _supplier_pin_model import author_supplier_dowel_references
-from diagnostics.diag_build_93600A189 import build_93600A189
+from diagnostics.diag_build_98381A435 import build_98381A435
 from pd_vn_transgear_arm_plate_locating_pin_spec import SKU, SUPPLIER_REFERENCE
 
 PART_NAME = "pd-vn-transgear-arm-plate-locating-pin"
 SPEC = fastener(PART_NAME)
 
 
-@wraps(build_93600A189)
+@wraps(build_98381A435)
 async def _build_pin_with_supplier_references(adapter, truth=None):
-    await build_93600A189(adapter, truth)
+    await build_98381A435(adapter, truth)
     await author_supplier_dowel_references(adapter, SUPPLIER_REFERENCE)
 
 

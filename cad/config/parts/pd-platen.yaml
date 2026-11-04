@@ -6,14 +6,15 @@ pd-platen:
   quantity: 1
   tolerance_class: plate_profile
   process: "machined (brass)"
+  drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
-      where: "the clip-screw #2-56 through-tap stations 2X 4.500 and 2X 265.140 from the left edge and 2X 58.510 and 2X 127.630 from the bottom edge, with the TAP 2-56 UNC THRU ALL callout PATTERN MATCHES MHA-PD-03"
+      where: "the clip-screw #2-56 through-tap stations 2X .170 and 2X 10.446 from the left edge and 2X 2.301 and 2X 5.025 from the bottom edge, with the TAP 2-56 UNC THRU ALL callout PATTERN MATCHES MHA-PD-03"
       finding: "three-place tap stations read as a tight band or over-specification (rules 3, 4)"
-      reason: "the clip screws are fixed in these taps and float only in the clip's #2 loose holes (0.76 min over the shank); that float holds the clip's and these taps' position zones (0.37 each, 0.74 together) only with both patterns at .XXX; transfer-drilling the clips from the platen was rejected so any clip fits any platen (owner-accepted)"
+      reason: "the clip screws are fixed in these taps and float only in the clip's #2 loose holes (.030 min over the shank); that float holds the clip's and these taps' position zones (.014 each, .028 together) only with both patterns at .XXX; transfer-drilling the clips from the platen was rejected so any clip fits any platen (owner-accepted)"
     - id: "RV-02"
       kind: "minor"
-      where: "section A-A, the counterbore floor reference (0.93) C'BORE FLOOR 0.67 MIN WORST CASE"
-      finding: "counterbore floor below the 1.5 mm wall floor (rule 17)"
-      reason: "0.67 MIN at the worst printed limits (0.93 nominal) under each #4 guide-screw head; the plate is brass and the screws are hand-tight, so the floor's shear ring under the head (about 7.7 mm^2) carries only that clamp, with the plate thickness and the sub-flush head recess unchanged (owner-ruled shortfall)"
+      where: "section A-A, the counterbore floor reference (.037) C'BORE FLOOR .027 MIN WORST CASE"
+      finding: "counterbore floor below the .060 in wall floor (rule 17)"
+      reason: ".027 MIN at the worst printed limits (.037 nominal) under each #4 guide-screw head; the plate is brass and the screws are hand-tight, so the floor's shear ring under the head (about .012 in^2) carries only that clamp, with the plate thickness and the sub-flush head recess unchanged (owner-ruled shortfall, restated in inch 2026-10-31)"

@@ -18,6 +18,8 @@ from pd_transgear_pin_spec import (
     PRESS_INTERFERENCE,
     RING_NUMBER,
     RUNNING_MATES,
+    SEAT_FILLET_SUFFIX,
+    inch_text,
 )
 
 TEXT_PREFIX = 1  # swDimensionTextPrefix
@@ -33,18 +35,19 @@ GROOVE_CALLOUT = f"FOR {RING_NUMBER} RING, McMASTER {RING.SKU}"
 GROOVE_WIDTH_CALLOUT = f"FOR {RING_NUMBER} RING"
 # The shank's band names its two fits at the Ø (rule 4, review of 6de7230aa
 # and the 2026-10-23 ENFORCE review): the press in the arm's ream and the
-# running bores whose bearing surface the Ra 1.6 marks.
+# running bores whose bearing surface the Ra 63 marks.
 SHANK_CALLOUT = "\n".join(
     (
         f"PRESS FIT IN {ARM_NUMBER} REAM,",
-        f"{PRESS_INTERFERENCE[0]:.3f}-{PRESS_INTERFERENCE[1]:.3f} "
+        f"{inch_text(PRESS_INTERFERENCE[0], 4)}-{inch_text(PRESS_INTERFERENCE[1], 4)} "
         "DIAMETRAL INTERFERENCE;",
         f"RUNS IN {', '.join(RUNNING_MATES)}",
     )
 )
-# The .XXX ±band station names the stack it serves (rule 4): a term of the
-# disc cluster's printed stack (``transgear_cluster_fit.GS``).
-GROOVE_STATION_CALLOUT = f"TO RING LOAD WALL;\n{STACK_NAME}"
+# The +/-.001 station names the stack it serves and what it sets (rule 4): a
+# term of the disc cluster's stack (``transgear_cluster_fit.GS``) that sets
+# the collar-to-disc air; the end float is shimmed at assembly.
+GROOVE_STATION_CALLOUT = f"TO RING LOAD WALL;\n{STACK_NAME},\nSETS COLLAR TO DISC AIR"
 
 # lane -> (feature, dimension) -> text.
 CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
@@ -54,13 +57,18 @@ CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
         ("PinProfile", "GrooveStation"): GROOVE_STATION_CALLOUT,
         ("PinProfile", "GrooveWidth"): GROOVE_WIDTH_CALLOUT,
     },
+    # The root radius is a single limit, its own one-line "R.005 MAX" (a
+    # local MAX under the title block's inside corner needs no reason): the
+    # modelled size IS the max, and the part authors the MAX (SolidWorks'
+    # native swTolMAX prints "max.").
+    TEXT_SUFFIX: {("SeatFillet", "SeatRadius"): SEAT_FILLET_SUFFIX},
 }
 if any("\n" in text for text in CALLOUTS[CALLOUT_ABOVE].values()):
     raise AssertionError("an above-callout with a line break never prints")
 
 # The dome heights follow from each radius on its land's Ø, and the land
 # ahead of the groove from the tip apex's station, the load wall's and the
-# tip dome: all three print as REFERENCES, "(0.8)", "(1.5)", "(2.60)"
+# tip dome: all three print as REFERENCES, "(.03)", "(.04)", "(.12)"
 # (rules 10 and 11: the land ends at the dome's junction, which the shop
 # cannot pick up).
 REFERENCE_TEXT: dict[tuple[str, str], dict[int, str]] = {

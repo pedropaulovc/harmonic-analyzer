@@ -41,6 +41,7 @@ def gtol_frame_xml(
     projected_zone_height_mm: float | None = None,
     translated: Sequence[str] = (),
     outside_disposition: str | None = None,
+    projection_unit: str = "mm",
 ) -> str:
     """Build the SOLIDWORKS-2022+ feature-control-frame XML payload, using the
     repository's mm annotation convention.
@@ -73,6 +74,8 @@ def gtol_frame_xml(
         or projected_zone_height_mm <= 0.0
     ):
         raise ValueError("projected zone height must be finite and positive in mm")
+    if projection_unit not in ("mm", "in"):
+        raise ValueError(f"unsupported projection unit: {projection_unit!r}")
     if not set(translated) <= set(datums) or (datums and datums[0] in translated):
         raise ValueError(
             f"translation modifier on {tuple(translated)!r} must name a "
@@ -90,9 +93,14 @@ def gtol_frame_xml(
         feature_info = ElementTree.SubElement(root, "FeatureInfo")
         ElementTree.SubElement(feature_info, "ProjectedToleranceZone").text = "true"
         # The native XSD uses xs:decimal, whose lexical form excludes exponents.
-        ElementTree.SubElement(feature_info, "Projection").text = format(
-            Decimal(str(projected_zone_height_mm)), "f"
+        # The value prints verbatim, so an inch sheet (#290) gets the mm
+        # height in inches at three places, leading zero suppressed.
+        projection = (
+            format(projected_zone_height_mm / 25.4, ".3f").removeprefix("0")
+            if projection_unit == "in"
+            else format(Decimal(str(projected_zone_height_mm)), "f")
         )
+        ElementTree.SubElement(feature_info, "Projection").text = projection
     if outside_disposition is not None:
         offset = ElementTree.SubElement(root, "OffsetZoneInfo")
         profile = ElementTree.SubElement(offset, "UnequallyDisposedProfile")

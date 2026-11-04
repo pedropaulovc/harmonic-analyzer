@@ -13,3 +13,4 @@ pd-vn-transgear-pivot-spring:
   quantity: 1
   tolerance_class: machined_block
   process: purchased
+  drawing_unit: in

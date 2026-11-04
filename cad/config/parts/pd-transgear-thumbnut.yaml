@@ -6,4 +6,5 @@ pd-transgear-thumbnut:
   finish: bright machined, oiled
   quantity: 1
   tolerance_class: machined_block
+  drawing_unit: in
   process: "turned from bar (brass): straight-knurl the head, turn the waist and flange, dish the front face, tap #8-32 through, countersink both ends"

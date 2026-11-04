@@ -1,15 +1,16 @@
-"""The disc cluster's two air stacks: collar to disc, and disc to platen (#2038).
+"""The disc cluster's two air stacks: collar to disc, and disc to platen.
 
-Owner ruling 2026-10-28 on #2038: the cluster's lengths print
-(``transgear_cluster_fit``) and its air stacks use the repository's air-stack
-method (machining-dfm.md, ``dt_tip_collar_air`` precedent): worst-case
-arithmetic over every source if both stacks clear; otherwise, for both, the
-nominal air minus the arithmetic sum of the in-service clearances (the parts
-can take them all up together) minus the root sum of squares of the
-independent printed manufacturing and set tolerances.  Every source is in
-exactly one class; an unclassified source is refused.  The projections of
-one error are summed into that one source.  The disc's end float and the
-hub's recess stay worst case (``transgear_cluster_fit``).
+The cluster's lengths print (``transgear_cluster_fit``; its end float is
+shimmed at assembly, owner ruling 2026-11-01, #2124) and its air stacks use
+the repository's air-stack method (machining-dfm.md, ``dt_tip_collar_air``
+precedent): worst-case arithmetic over every source if both stacks clear;
+otherwise, for both, the nominal air minus the arithmetic sum of the
+in-service clearances (the parts can take them all up together) minus the
+root sum of squares of the independent printed manufacturing and set
+tolerances (the shim fit-up's window is one).  Every source is in exactly
+one class; an unclassified source is refused.  The projections of one error
+are summed into that one source.  The disc's end float and the hub's recess
+stay worst case (``transgear_cluster_fit``).
 
 Collar air: the MHA-PD-22 drive collar's rear face (seated on F) to the MHA-PD-06
 disc's front face where they overlap, cluster, hub and disc forward and the
@@ -32,7 +33,6 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-import _config
 import paper_drive_arm_registration as REGISTRATION
 import pd_rack_pinion_spec as DISC
 import pd_transgear_arm_plate_geometry as ARM_PLATE
@@ -44,7 +44,7 @@ import pd_transgear_knob_shaft_spec as KNOB_SHAFT
 import pd_transgear_knob_thrust_ring_spec as KNOB_RING
 import pd_transgear_pin_spec as PIN
 import transgear_cluster_fit as FIT
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm
 
 COLLAR_AIR_MIN = COLLAR.COLLAR_DISC_AIR_MIN  # 0.10
 PLATEN_AIR_MIN = 0.03  # R9-68
@@ -82,6 +82,7 @@ _LENGTHS = (
 INDEPENDENT_TOLERANCES = frozenset(
     {
         *(label for label, _, _ in _LENGTHS),
+        FIT.SHIM_WINDOW_LABEL,
         "sleeve step face perpendicularity",
         "hub spigot end perpendicularity",
         "hub flange rear face perpendicularity",
@@ -150,7 +151,9 @@ class AirStack:
 
 
 # --- the governing point and the stops' edges ------------------------------------
-EDGE_BREAK_MAX = float(_config.title_block("edge_break")["chamfer_max_mm"])
+# The cluster's parts print inch, whose .010 edge break also covers the
+# metric knob ring's 0.25.
+EDGE_BREAK_MAX = edge_break_chamfer_mm(unit=PIN.UNIT)
 DISC_TIP_R = DISC.OUTSIDE_DIA / 2.0
 COLLAR_RIM_R = (COLLAR.OD + max(COLLAR.OD_BAND)) / 2.0  # 8.75
 # Q: the disc's tip under the collar's rim (the rim reaches past the tips).
@@ -162,8 +165,9 @@ Q_FROM_DISC_AXIS = min(DISC_TIP_R, DISC.CENTRE_DISTANCE + COLLAR_RIM_R)
 # The disc's tilts pivot on the least of these edges.
 HUB_FACE_STOP_R = (
     min(
-        HUB.HUB_DIA - printed_band_mm(HUB.HUB_DIA_PLACES),
-        FRONT_BUSHING.OD - printed_band_mm(FRONT_BUSHING.OD_PLACES),
+        HUB.HUB_DIA - printed_band_mm(HUB.HUB_DIA_PLACES, unit=HUB.UNIT),
+        FRONT_BUSHING.OD
+        - printed_band_mm(FRONT_BUSHING.OD_PLACES, unit=FRONT_BUSHING.UNIT),
     )
     / 2.0
     - EDGE_BREAK_MAX

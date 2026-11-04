@@ -4,11 +4,11 @@ PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  The nut runs on the #8-32 stud of the knob shaft (MHA-PD-08) and
 seats on the drive collar's (MHA-PD-22) pilot, faced at assembly to stand
 0.05-0.15 proud of the removable chain wheel's (MHA-PD-09, T24) front face, so
-the wheel floats free under it (R9-70, N-A).  Contract §1.6 (round 10):
-knurled head Ø20.5 × 8.7 with a dished front face (a cone from Ø15 at the
-rim to a flat Ø9 floor 1.0 deep), a Ø11 waist × 2.4 (ruling 5), a Ø12.4
-flange to the seat face, 16.1 long, #8-32 UNC-2B through with an entry
-countersink at each end.  The stud's
+the wheel floats free under it (R9-70, N-A).  Contract §1.6 (round 10),
+printed in decimal inch (#290): knurled head Ø.81 x .34 with a dished front
+face (a cone from Ø.59 at the rim to a flat Ø.35 floor .04 deep), a Ø.43
+waist x .09 (ruling 5), a Ø.49 flange to the seat face, .63 long, #8-32
+UNC-2B through with an entry countersink at each end.  The stud's
 side of the engagement (tip station, tip chamfer, cut-to-fit) is MHA-PD-08's;
 this module owns only the nut's side of it.
 
@@ -27,37 +27,52 @@ from __future__ import annotations
 
 import math
 
+import _config
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
+from _inch_wall_limits import WALL_TARGET_MM
+from _package_units import drawing_unit
 from _printed_tolerance import angular_band_deg, printed_deviations
 
+# #290: the sheet prints decimal inch; every turned size below is the exact
+# millimetre value of its printed .XX inch size.
+UNIT = drawing_unit(
+    "parts/pd-transgear-thumbnut", _config.parts("pd-transgear-thumbnut")
+)
+MM_PER_IN = 25.4
+
 # --- Turned outline (contract §1.6) -------------------------------------------
-HEAD_DIA = 20.5  # knurl crests: the diameter over the knurl
-HEAD_LENGTH = 8.7
-# Straight knurl DIN 82 RAA 1.0 (R9-57): a 90° V at 1.0 pitch, so 64 teeth
-# round the Ø20.5 (pitch 1.006 at the crest) and a 0.5 deep tooth; the
-# sketch's 128-point star puts crests on HEAD_DIA, roots on KNURL_ROOT_DIA.
+HEAD_DIA = 20.574  # .81, knurl crests: the diameter over the knurl
+# Straight knurl, 25 TPI with a 90° tooth: the inch wheel's pitch is stated
+# in its own unit (machinist review round 2 found the metric "DIN 82-RAA 1.0"
+# pitch unlabelled, and an inch sheet prints no mm).  64 teeth round the Ø.81
+# (pitch 1.010 mm at the crest, 0.6 % off the wheel's 1.016) and a 0.5 mm
+# deep tooth; the sketch's 128-point star puts crests on HEAD_DIA, roots on
+# KNURL_ROOT_DIA.
 KNURL_TEETH = 64
-KNURL_ROOT_DIA = 19.5
-KNURL_DESIGNATION = "DIN 82-RAA 1.0"
-KNURL_PITCH = 1.0
+KNURL_ROOT_DIA = HEAD_DIA - 1.0  # 19.574, not printed
+KNURL_TPI = 25
+KNURL_DESIGNATION = f"{KNURL_TPI} TPI"  # the standard wheel's 90° tooth
+KNURL_PITCH = MM_PER_IN / KNURL_TPI
 KNURL_FLANK_ANGLE_DEG = 90.0
-WAIST_DIA = 11.0
-FLANGE_DIA = 12.4
-OVERALL_LENGTH = 16.1
+WAIST_DIA = 10.922  # .43
+FLANGE_DIA = 12.446  # .49
+OVERALL_LENGTH = 16.002  # .63
 # The flange length and the head's rear face print from the faced seat face
 # (drawing-guidelines.md rules 10 and 11), baseline with the overall length;
 # the waist is the remainder between them, so it does not print.
-FLANGE_LENGTH = 5.0
-WAIST_LENGTH = OVERALL_LENGTH - HEAD_LENGTH - FLANGE_LENGTH  # 2.4, not printed
+FLANGE_LENGTH = 5.08  # .20
+HEAD_REAR_Y = 7.366  # .29, the head's rear face from the seat face
+HEAD_LENGTH = OVERALL_LENGTH - HEAD_REAR_Y  # 8.636 (.34), not printed
+WAIST_LENGTH = HEAD_REAR_Y - FLANGE_LENGTH  # 2.286 (.09), not printed
 # Dished front face: a conical recess from the rim's Ø down to a flat floor,
 # centred on the axis; the front countersink is cut in that floor.  The
 # machinist review of 6de7230aa found the earlier spherical cap (chord 15,
 # sagitta 1.2 to a point on the axis inside the tap drill) ended on the
 # countersink at no definite Ø: the floor gives the recess a definite inner
 # edge and its depth a real surface.
-DISH_DIA = 15.0  # at the rim
-DISH_FLOOR_DIA = 9.0  # the floor's outer edge, where the cone ends
-DISH_DEPTH = 1.0  # rim to the floor
+DISH_DIA = 14.986  # .59, at the rim
+DISH_FLOOR_DIA = 8.89  # .35, the floor's outer edge, where the cone ends
+DISH_DEPTH = 1.016  # .04, rim to the floor
 
 
 def knurl_tooth_angle_deg(crest_dia: float, root_dia: float, teeth: int) -> float:
@@ -81,7 +96,7 @@ def knurl_tooth_angle_deg(crest_dia: float, root_dia: float, teeth: int) -> floa
 # The modelled knurl is the designated one: its crest pitch within 1 % of
 # the wheel's (the wheel tracks the circumference), its V within 2° of 90°,
 # and an even tooth count so the section plane cuts a crest on both sides.
-KNURL_CREST_PITCH = math.pi * HEAD_DIA / KNURL_TEETH  # 1.006
+KNURL_CREST_PITCH = math.pi * HEAD_DIA / KNURL_TEETH  # 1.010
 KNURL_TOOTH_ANGLE_DEG = knurl_tooth_angle_deg(HEAD_DIA, KNURL_ROOT_DIA, KNURL_TEETH)
 if (
     abs(KNURL_CREST_PITCH - KNURL_PITCH) > 0.01 * KNURL_PITCH
@@ -96,7 +111,8 @@ if (
 
 # --- Stations along the axis (local y) ----------------------------------------
 SEAT_FACE_Y = 0.0
-HEAD_REAR_Y = OVERALL_LENGTH - HEAD_LENGTH
+if abs(OVERALL_LENGTH - HEAD_LENGTH - HEAD_REAR_Y) > 1e-9:
+    raise AssertionError("MHA-PD-13 head rear face off the seat-face station")
 RIM_Y = OVERALL_LENGTH
 DISH_FLOOR_Y = OVERALL_LENGTH - DISH_DEPTH
 # The dish profile's two corners (radius from the axis, local y): the depth
@@ -115,23 +131,31 @@ THREAD_MAJOR = THREAD_MAJOR_MM[THREAD]
 # https://itpbolt.com/wp-content/uploads/2015/08/Class-2B-Internal-Threads.pdf
 # Where the nut stands over the shaft's relief, its crests must clear it.
 TAP_MINOR_2B_MIN = 0.130 * 25.4
-# 90° entry countersink at each end, opened at least 0.2 a side past the
+# 90° entry countersink at each end, opened at least 0.2 mm a side past the
 # thread major so the first thread starts full rather than on a feather
-# edge.  The sheet prints it as a one-place MAX (a thread-entry chamfer
+# edge.  The sheet prints it as a two-place MAX (a thread-entry chamfer
 # needs no more places, drawing-guidelines.md rule 3): the size rounds UP
-# to that place (Ø4.6 on the #8-32), and the thread it removes never
+# to that place (Ø.18 on the #8-32), and the thread it removes never
 # exceeds the losses below.
-CSK_DIA_PLACES = 1
+CSK_DIA_PLACES = 2
 _CSK_SCALE = 10**CSK_DIA_PLACES
-CSK_DIA = math.ceil((THREAD_MAJOR + 2.0 * 0.2) * _CSK_SCALE) / _CSK_SCALE
-CSK_DIA_TOL_TYPE = 6  # swTolType_e.swTolMAX
-CSK_DIA_DEVIATIONS = (THREAD_MAJOR - CSK_DIA, 0.0)
+CSK_DIA = (
+    math.ceil((THREAD_MAJOR + 2.0 * 0.2) / MM_PER_IN * _CSK_SCALE - 1e-9)
+    / _CSK_SCALE
+    * MM_PER_IN
+)  # 4.572 (.18)
+# A single limit, the modelled size IS the max: no native tolerance, and the
+# part authors " MAX" as the value's suffix (pd_transgear_pin's seat root),
+# since SolidWorks' native swTolMAX prints a lowercase "max." (machinist
+# review round 6).
+CSK_DIA_TOL_TYPE = 0  # swTolType_e.swTolNONE
+CSK_DIA_SUFFIX = " MAX"
 # The sheet prints the cone's 45° half-angle at the title block's angular
 # row: no mate seats in these thread-entry cones, so no tighter band.
 CSK_INCLUDED_ANGLE_DEG = 90.0
 CSK_HALF_ANGLE_DEG = CSK_INCLUDED_ANGLE_DEG / 2.0
 CSK_HALF_ANGLE_PLACES = 1
-CSK_HALF_ANGLE_MIN = CSK_HALF_ANGLE_DEG - angular_band_deg()
+CSK_HALF_ANGLE_MIN = CSK_HALF_ANGLE_DEG - angular_band_deg()  # shared by both units
 if CSK_DIA <= THREAD_MAJOR:
     raise AssertionError("MHA-PD-13 countersink ends inside the thread major")
 CSK_QUALIFIER = "CSK, BOTH ENDS"
@@ -147,36 +171,39 @@ REAR_FULL_THREAD_Y = REAR_CSK_APEX_Y - TAP_DRILL_DIA / 2.0
 FRONT_FULL_THREAD_Y = FRONT_CSK_APEX_Y + TAP_DRILL_DIA / 2.0
 
 # --- Places each printed dimension carries (drawing-guidelines.md rule 3 (decimal places carry the tolerance), contract §12) ----
-# The diameters over the thread at .XX (walls); the overall length, the
-# knurl, the head's rear face and the flange length (both from the seat
-# face) and the dish at .X.  The stud is
-# cut to fit the nut's rim at assembly, so the engagement stack takes the
-# shortest .X nut (pd_transgear_drive_collar_spec.thumbnut_engagement).
-HEAD_DIA_PLACES = 1
-HEAD_REAR_Y_PLACES = 1
-OVERALL_LENGTH_PLACES = 1
+# Every turned size at .XX: the diameters over the thread hold walls, the
+# knurl's root wall, the dish's floor margins and the head's rear-face wall
+# read the others, and the stud is cut to fit the nut's rim at assembly, so
+# the engagement stack takes the shortest .XX nut
+# (pd_transgear_drive_collar_spec.thumbnut_engagement).
+HEAD_DIA_PLACES = 2
+HEAD_REAR_Y_PLACES = 2
+OVERALL_LENGTH_PLACES = 2
 FLANGE_DIA_PLACES = 2
-FLANGE_LENGTH_PLACES = 1
+FLANGE_LENGTH_PLACES = 2
 WAIST_DIA_PLACES = 2
-DISH_DIA_PLACES = 1
-DISH_FLOOR_DIA_PLACES = 1
-DISH_DEPTH_PLACES = 1
+DISH_DIA_PLACES = 2
+DISH_FLOOR_DIA_PLACES = 2
+DISH_DEPTH_PLACES = 2
 
-WALL_FLOOR = 2.0
+WALL_FLOOR = WALL_TARGET_MM  # .080 (rule 17 target)
 # A tap cuts up to 0.05 over the basic major: half of it on a wall.
 _TAP_OVERSIZE_R = 0.025
 
-_HEAD_LO, _ = printed_deviations(HEAD_DIA, HEAD_DIA_PLACES)
-_HEAD_REAR_LO, _HEAD_REAR_HI = printed_deviations(HEAD_REAR_Y, HEAD_REAR_Y_PLACES)
-_FLANGE_LEN_LO, _FLANGE_LEN_HI = printed_deviations(FLANGE_LENGTH, FLANGE_LENGTH_PLACES)
-_WAIST_LO, _ = printed_deviations(WAIST_DIA, WAIST_DIA_PLACES)
-_FLANGE_LO, _ = printed_deviations(FLANGE_DIA, FLANGE_DIA_PLACES)
-_DISH_LO, _ = printed_deviations(DISH_DIA, DISH_DIA_PLACES)
-_DISH_FLOOR_LO, _DISH_FLOOR_HI = printed_deviations(
-    DISH_FLOOR_DIA, DISH_FLOOR_DIA_PLACES
-)
-_DISH_DEPTH_LO, _DISH_DEPTH_HI = printed_deviations(DISH_DEPTH, DISH_DEPTH_PLACES)
-OVERALL_LENGTH_LO, OVERALL_LENGTH_HI = printed_deviations(
+
+def _deviations(model: float, places: int) -> tuple[float, float]:
+    return printed_deviations(model, places, unit=UNIT)
+
+
+_HEAD_LO, _ = _deviations(HEAD_DIA, HEAD_DIA_PLACES)
+_HEAD_REAR_LO, _HEAD_REAR_HI = _deviations(HEAD_REAR_Y, HEAD_REAR_Y_PLACES)
+_FLANGE_LEN_LO, _FLANGE_LEN_HI = _deviations(FLANGE_LENGTH, FLANGE_LENGTH_PLACES)
+_WAIST_LO, _ = _deviations(WAIST_DIA, WAIST_DIA_PLACES)
+_FLANGE_LO, _ = _deviations(FLANGE_DIA, FLANGE_DIA_PLACES)
+_DISH_LO, _ = _deviations(DISH_DIA, DISH_DIA_PLACES)
+_DISH_FLOOR_LO, _DISH_FLOOR_HI = _deviations(DISH_FLOOR_DIA, DISH_FLOOR_DIA_PLACES)
+_DISH_DEPTH_LO, _DISH_DEPTH_HI = _deviations(DISH_DEPTH, DISH_DEPTH_PLACES)
+OVERALL_LENGTH_LO, OVERALL_LENGTH_HI = _deviations(
     OVERALL_LENGTH, OVERALL_LENGTH_PLACES
 )
 _THREAD_R_MAX = THREAD_MAJOR / 2.0 + _TAP_OVERSIZE_R
@@ -211,10 +238,10 @@ for _name, (_nominal, _worst) in WALLS.items():
             f"under the {WALL_FLOOR} floor"
         )
 
-# The Ø11 waist keeps a real length at every printed corner: the head's rear
+# The Ø.43 waist keeps a real length at every printed corner: the head's rear
 # face at its lowest and the flange's shoulder at its highest, both read
-# from the seat face (codjiflo on 11fe6c440: chained from the rim's 8.7 and
-# the seat's 5.0, the waist could close to nothing).
+# from the seat face (codjiflo on 11fe6c440: chained from the rim's head
+# length and the seat's flange length, the waist could close to nothing).
 WAIST_LENGTH_WORST = (HEAD_REAR_Y + _HEAD_REAR_LO) - (FLANGE_LENGTH + _FLANGE_LEN_HI)
 if WAIST_LENGTH_WORST <= 0.0:
     raise AssertionError(
@@ -263,13 +290,17 @@ for _name, _margin in DISH_FLOOR_MARGINS.items():
 REAR_THREAD_LOSS = REAR_CSK_BREAK / math.tan(math.radians(CSK_HALF_ANGLE_MIN))
 FRONT_THREAD_LOSS = DISH_DEPTH + _DISH_DEPTH_HI + REAR_THREAD_LOSS
 
-# The Ø20.5 dimension is the diameter over the knurl; the designation gives
-# the pitch and the 90° tooth, so no tooth count prints (R9-57).  One line:
-# it prints in the dimension's above-callout compartment, and SolidWorks
-# keeps a two-line above callout in the document but prints none of it (run
+# The Ø.81 dimension is the diameter over the knurl; the designation gives
+# the pitch, and a standard inch straight-knurl wheel forms the 90° tooth,
+# so no tooth count prints (R9-57).  One line above: SolidWorks keeps a
+# two-line above callout in the document but prints none of it (run
 # 20261001T154021634Z: "...\nDIA OVER KNURL" read back over Ø20.5 and was
-# missing from the PDF).
-KNURL_CALLOUT = f"STRAIGHT KNURL {KNURL_DESIGNATION}; DIA OVER KNURL"
+# missing from the PDF).  It fits inside the Ø.81's extension lines, and
+# "OVER KNURL" rides the value as its suffix: the one-line callout wider
+# than the span ran the dimension line out under its text past the left
+# extension line (machinist review round 3).
+KNURL_CALLOUT = f"STRAIGHT KNURL {KNURL_DESIGNATION}"
+KNURL_DIA_SUFFIX = " OVER KNURL"
 
 # No roughness symbol: the seat face clamps the wheel (a clamp face, not a
 # running, sliding or locating surface; drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).

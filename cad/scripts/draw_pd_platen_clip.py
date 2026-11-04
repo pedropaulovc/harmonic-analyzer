@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the platen clip (MHA-PD-03).
 
-The clip is one 0.8 brass sheet, 83.5 long: a flat screw rail carrying the two
+The clip is one .032 brass sheet, 3.29 long: a flat screw rail carrying the two
 #2 loose screw holes, an open-ended slit from each end, and a spring rail
 joined to the screw rail only at the centre bridge, formed into two shallow
 bows.  The sheet runs at 3:1: the plan (front view) is the formed part seen
@@ -13,7 +13,8 @@ references, the four stations where the bows leave and rejoin the flat, their
 radius, the developed finger and the sheet stock; a 2:1 isometric shows the
 form.
 
-Every printed dimension is an associative model dimension whose places the
+The sheet prints decimal inch (the part's ``drawing_unit: in``).  Every
+printed dimension is an associative model dimension whose places the
 part authors (``build_pd_platen_clip.DRAWING_PRECISION``); the overall width,
 the rise, the stations and the developed finger live in hidden reference
 sketches the views show to import them (``_drawing_hidden_sketches``).  The
@@ -57,6 +58,7 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -73,6 +75,7 @@ from build_pd_platen_clip import (
     FLAT_FINGER_LENGTH,
     HOLE_CALLOUT_PRECISION,
     HOLE_DIA,
+    HOLE_WALL_TEXT,
     HOLE_INSET,
     HOLE_Y,
     REFERENCE_DIMENSIONS,
@@ -151,16 +154,17 @@ HOLE_FAR_X = CLIP_LENGTH - HOLE_INSET
 # screw rail's width and the overall width stand in their own columns
 # (smallest nearest), the spring rail's width in a column of its own beside
 # its span.  Each of those texts stands past its own span's end, so no
-# dimension or extension line runs through it: the hole row's below the
-# plan, the screw rail's below that, the spring rail's and the overall
-# width's above the plan.  A vertical dimension's text stands left of its own
+# dimension or extension line runs through it: the screw rail's below the
+# plan, the hole row's below that, the spring rail's and the overall width's
+# above the plan.  A vertical dimension's text stands left of its own
 # dimension line on a shoulder that runs from the line to the text's far end
 # (r5: the hole row's "2X 3.300" spans 21 mm), so each column is its text's
-# right end: the hole row's widest line ("MHA-PD-02", ~23 mm) ends right of
-# the screw rail's line, the hole row's three-line block stands under the
-# near hole station's dimension line (r7 audit: at 0.112 that line,
-# y ~0.1132, ran 2.7 mm into it), the spring rail's right of the overall
-# width's text, and the overall width's
+# right end.  The screw rail's widest line ("HOLE WALLS .060 MIN", ~45 mm)
+# needs its column at .062 to clear the left border (20261103T093232922Z
+# review: at .042 it ran through the border); its line then falls inside
+# the hole row's text span, so the hole row's block stands under the screw
+# rail's, where the screw rail's line stops above it.  The spring rail's
+# column is right of the overall width's text, and the overall width's
 # inside the border.  The outer and the slit-side corner radii stand off the
 # right end.
 _BELOW_PLAN_ROWS = (0.116, 0.110)
@@ -170,7 +174,7 @@ _BELOW_PLAN_ROWS = (0.116, 0.110)
 # much higher.
 _ABOVE_PLAN_ROWS = (0.172, 0.178, 0.189)
 _HOLE_ROW_COLUMN = 0.0725
-_RAIL_COLUMN = 0.042
+_RAIL_COLUMN = 0.062
 _SPRING_RAIL_COLUMN = 0.066
 _OVERALL_COLUMN = 0.030
 FRONT_KEEP = {
@@ -179,8 +183,8 @@ FRONT_KEEP = {
     "BridgeX0": (_plan_x(BRIDGE_X0 / 2.0), _ABOVE_PLAN_ROWS[0]),
     "BridgeX1": (_plan_x(BRIDGE_X1 / 2.0), _ABOVE_PLAN_ROWS[1]),
     "Length": (FRONT_CENTER[0], _ABOVE_PLAN_ROWS[2]),
-    "LeftZ": (_HOLE_ROW_COLUMN, 0.1025),
-    "RailWidth": (_RAIL_COLUMN, 0.0900),
+    "LeftZ": (_HOLE_ROW_COLUMN, 0.0800),
+    "RailWidth": (_RAIL_COLUMN, 0.1025),
     "SpringRailWidth": (_SPRING_RAIL_COLUMN, 0.1652),
     "OverallWidth": (_OVERALL_COLUMN, 0.1625),
     # The slit's dimension line stands inside the slit just short of its
@@ -211,14 +215,14 @@ _STATION_ROWS = tuple(
     PROFILE_BOTTOM_Y - 0.0075 - _STATION_ROW_PITCH * index
     for index in range(len(DRAWN_TANGENT_STATIONS))
 )
-# A reference station's printed width ("(76.310)": 16.4 mm, r4's audit) and
-# the air between its right end and its own station.
+# A reference station's printed width ("(3.007)", r4's audit) and the air
+# between its right end and its own station.
 _STATION_CHAR_WIDTH = 0.00205
 _STATION_TEXT_GAP = 0.001
 
 
 def _station_text_x(name: str, x: float) -> float:
-    text = f"({x:.{DRAWING_PRECISION_BY_NAME[name]}f})"
+    text = f"({x / 25.4:.{DRAWING_PRECISION_BY_NAME[name]}f})".replace("(0.", "(.")
     return _plan_x(x) - _STATION_TEXT_GAP - len(text) * _STATION_CHAR_WIDTH / 2.0
 
 
@@ -271,7 +275,8 @@ DIMENSION_AFFIXES = {
 # profile (r2 read it as a span); the rise is each bow's crest height.
 DIMENSION_CALLOUTS = {
     "LeftZ": "MATCHES\nMHA-PD-02",  # pd-platen-clip RV-01
-    "RailWidth": "SCREW RAIL",
+    # The holes' finished walls at the floor (rule 20; pd-platen-clip RV-02).
+    "RailWidth": f"SCREW RAIL\n{HOLE_WALL_TEXT}",
     "SheetDepth": "SHEET STOCK",
     "SpringRailWidth": "FULL R ENDS",
     "SlitWidth": "SLIT, FULL R END",
@@ -396,7 +401,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,

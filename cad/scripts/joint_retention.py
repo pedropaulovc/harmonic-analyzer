@@ -747,13 +747,13 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "pd_vn_transgear_arm_plate_locating_pin",  # MHA-PD-VN-64 2 mm dowels pressed into the arm's through reams
         "pd_transgear_pivot_spacer",  # MHA-PD-20 brass spacer, reamed bore pressed on the pivot shoulder (locating, R9-71); no thread
         "pd_vn_transgear_pivot_spring",  # MHA-PD-VN-63 disc spring on the pivot shoulder; no thread
-        "pd_vn_transgear_pivot_shim",  # MHA-PD-VN-67 DIN 988 shim on the pivot shoulder under the head; no thread
         "dt_vn_cylinder_bank_spring",  # MHA-DT-VN-68 wave spring loose on the MHA-DT-13 arbor; no thread
         "ch_vn_rocker_bank_spring",  # MHA-CH-VN-54 wave spring loose on the MHA-CH-05 shaft; no thread
         "pd_transgear_pin",  # MHA-PD-23 plain steel pin pressed into the arm's reamed hole, ring groove at the front; no thread
         "pd_transgear_rear_bushing",  # MHA-PD-24 brass bushing, printed length, reamed bore on the pin; no thread
         "pd_transgear_removable",  # O12 plain bore + 2 drive-pin holes, no thread (build_pd_transgear_removable)
-        "pd_vn_transgear_retaining_ring",  # MHA-PD-VN-61 external retaining ring (McMaster 97431A260) in the pin's groove
+        "pd_vn_transgear_retaining_ring",  # MHA-PD-VN-61 external retaining ring (McMaster 97431A240) in the pin's groove
+        "pd_vn_transgear_cluster_shim",  # MHA-PD-VN-68 shims (McMaster 94773A606) on the pin under the rear bushing; no thread
         "pd_vn_transgear_knob_drive_pin",  # MHA-PD-VN-54 dowel pressed into plain holes, no thread
         "fr_tube_frame",  # columns: socket slip fit; cross holes enlarged so the MHA-FR-VN-53 shank passes "WITHOUT THREAD CONTACT" (MHA-FR-00 STEP 2/5)
         "fr_vn_tube_frame_cap",  # McMaster 9275K141 push-on cap (MHA-FR-00 STEP 7)
@@ -781,8 +781,8 @@ UNTHREADED_STOCK: dict[str, str] = {
     "pd_vn_transgear_latch_pin": "dowel pin pressed into a reamed hole",
     "pd_vn_transgear_arm_plate_locating_pin": "dowel pin pressed into the arm's through ream",
     "pd_vn_transgear_retaining_ring": "external retaining ring fitted sideways in a groove",
+    "pd_vn_transgear_cluster_shim": "shim ring loose on the pin under the rear bushing; no thread",
     "pd_vn_transgear_pivot_spring": "disc spring on the pivot shoulder; no thread",
-    "pd_vn_transgear_pivot_shim": "shim ring on the pivot shoulder under the head; no thread",
     "dt_vn_cylinder_bank_spring": "wave disc spring loose on the arbor; no thread",
     "ch_vn_rocker_bank_spring": "wave disc spring loose on the pivot shaft; no thread",
     "ch_vn_rocker_thrust_washer": "ring shim loose on the pivot shaft; no thread",
@@ -2203,8 +2203,8 @@ JOINTS: tuple[Joint, ...] = (
         ),
         axial_capture=(
             "shoulder bottomed on the bar's back face with the MHA-PD-20 spacer pressed on it flush; the "
-            "MHA-PD-VN-63 spring under the MHA-PD-VN-67 shim and the head holds the arm on the spacer "
-            "(room 0.70-1.00, transgear_hanger_joints.SPRING_ROOM_MIN/MAX); thread through the bar's "
+            "MHA-PD-VN-63 spring under the head holds the arm on the spacer "
+            "(room 0.70-0.95, transgear_hanger_joints.SPRING_ROOM_MIN/MAX); thread through the bar's "
             "#8-32 through tap, the tip faced 0.20-0.50 below the front face at fit-up "
             "(worst-case engagement ~1.52 D, transgear_hanger_joints.PIVOT_ENGAGEMENT_WORST_D)"
         ),
@@ -2255,20 +2255,20 @@ JOINTS: tuple[Joint, ...] = (
         assembly="pd_paper_drive",
         member="pd_transgear_knob_cup",
         receiver="pd_transgear_knob_shaft",
-        thread="none: Ø6 reamed slip fit, cross-pinned (R9-70 replaced the rear screw)",
+        thread="none: Ø.249 reamed slip fit, cross-pinned (R9-70 replaced the rear screw)",
         installed_at="knob-stack-fitted",
         exposure=Exposure.ROTATING_DRAG,
         exposure_reason=(
             "the cup rides the rear end of the knob shaft's journal, which spins in the arm plate "
             "bore with the chain-driven T24 and reverses when the paper is wound back. The cup's "
-            "front face runs 0.2 behind the plate's rear boss and is the rear stop of the knob's end "
+            "front face runs .008 behind the plate's rear boss and is the rear stop of the knob's end "
             "float, so whenever the knob is drawn forward the cup rubs the stationary boss about the "
             "shaft axis"
         ),
         axial_capture=(
             "the MHA-PD-VN-62 1/16 x 5/8 slotted spring pin pressed through the cup and the journal, "
-            "3.0 from the cup's front face, in a Ø1.6 +0.05/0 hole match-drilled with the cup set "
-            "on a 0.2 feeler at the boss; the pin carries the end-float thrust and the drag in "
+            ".120 from the cup's front face, in a Ø.062 +.003/0 hole match-drilled with the cup set "
+            "on a .008 feeler at the boss; the pin carries the end-float thrust and the drag in "
             "shear, its ends inside the cup's O.D."
         ),
         lock=Lock.CROSS_PIN,
@@ -2318,7 +2318,7 @@ JOINTS: tuple[Joint, ...] = (
         installed_at="collar-shoulder-seated",
         exposure=Exposure.OSCILLATING,
         exposure_reason=(
-            "the nut seats on the drive collar's pilot, faced 0.05-0.15 proud of the T24's front "
+            "the nut seats on the drive collar's pilot, faced .002-.006 proud of the T24's front "
             "face, so its axial clamp passes through the collar's rear face onto the shaft's "
             "actual pinion front face F while the T24 floats free under its flange. The drive "
             "goes T24 -> the two pressed drive pins -> collar -> D-flat -> shaft; the free T24 "

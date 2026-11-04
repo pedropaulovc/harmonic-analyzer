@@ -36,7 +36,7 @@ ALONG_DIMENSION = "KnobSetAlong"
 ACROSS_DIMENSION = "KnobSetAcross"
 CENTRE_DIMENSION = "KnobSetCentre"
 DRAWING_DIMENSIONS = {FEATURE: {ALONG_DIMENSION, ACROSS_DIMENSION, CENTRE_DIMENSION}}
-PLACES = 3
+PLACES = 4
 DRAWING_PRECISION = {
     FEATURE: {
         ALONG_DIMENSION: PLACES,
@@ -44,16 +44,17 @@ DRAWING_PRECISION = {
         CENTRE_DIMENSION: PLACES,
     }
 }
-# The set band on S to N, as (lower, upper) deviations: +x/-0.
+# The set band on S to N, as (lower, upper) deviations: +x/-0, floored onto
+# the sheet's .XXXX grid so the printed band stays inside the mesh window.
 CENTRE_TOLERANCE_MM = (
     disc.CENTRE_DISTANCE_SET_BAND[1],
-    disc.CENTRE_DISTANCE_SET_BAND[0],
+    disc.inch_floor_mm(disc.CENTRE_DISTANCE_SET_BAND[0], PLACES),
 )
 
-# The installed mill DRO's display count (shop inventory
-# machines.PM-30MV.resolution_mm; test_pd_paper_drive_assembly_drawing
-# holds the two equal).
-DRO_COUNT_MM = 0.005
+# The installed mill DRO's display count in inch mode: its 5 um scale reads
+# .0002 (shop inventory machines.PM-30MV.resolution_mm;
+# test_pd_paper_drive_assembly_drawing holds the two equal).
+DRO_COUNT_MM = 0.00508
 # K aimed at the band's middle, on the nominal S-K line.
 K_SET_CENTRE_DISTANCE_MM = sum(disc.CENTRE_DISTANCE_WINDOW) / 2.0
 _S_TO_K = (arm.KNOB_BORE_STATION - arm.PIN_STATION, arm.KNOB_BORE_OFFSET)

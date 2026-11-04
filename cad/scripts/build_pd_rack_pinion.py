@@ -4,21 +4,22 @@ The large thin brass reducer disc carries 150 physical teeth (#2034: 15:150
 replaced the narrated 12:120 at the same 1:10 feed), cut by the finite PA20
 48DP stock #1/reference-135 master. It does not touch the rack: the finite
 stock #7/reference-14 knob pinion drives it 15:150.
-Its bore pilots on the brass hub's Ø13.1 spigot, and three #0-80 fillister
+Its bore pilots on the brass hub's Ø.501 spigot, and three #0-80 fillister
 screws (MHA-PD-VN-55) clamp it to that hub's flange (MHA-PD-17).
 
 Every size is ``pd_rack_pinion_spec``'s; the screw pattern is
 ``pd_transgear_disc_hub_geometry``'s (the one authority the flange shares).
 
 Layout (part frame): gear axis = Z through the origin; the Front plane is
-the disc's FRONT face (z = 0, the flange seat), the body runs z = 0..3 and
-+Z is machine rearward.
+the disc's FRONT face (z = 0, the flange seat), the body runs
+z = 0..FACE_WIDTH and +Z is machine rearward.  The part builds in an inch
+document (#290); the model keeps millimetre globals.
 
 Features: ``GearBlank`` / ``GearBlankProfile`` (the toothed disc's blank,
 renamed so its depth prints as ``FaceWidth``), the tooth gap + pattern,
 ``BoreProfile`` / ``Bore`` (hub-spigot bore through) and ``DiscTaps`` (native Hole
 Wizard #0-80 taps through, placed from the rear face on the bolt circle; no
-countersink, each mouth's 0.10 burr break is not modelled, R9-63).
+countersink, each mouth's .004 burr break is not modelled, R9-63).
 
 Run (SolidWorks already open)::
 
@@ -35,8 +36,10 @@ from _appearance import apply_material
 from _check import check
 from _com import _early_bound, _read_member
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import feature_name_by_type, name_last_feature
 from _part_checks import report_mass_properties
+from _part_properties import part_drawing_unit
 from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import SketchDims, ensure_fully_defined
@@ -48,28 +51,22 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_tolerances import set_dimension_bilateral_tolerance
-from _drawing_prefix import set_dimension_prefix
 from _simplified_part import save_simplified_part
 from _fit_deviations import deviations
 from _gear import build_stock_form_gear, volume_check
 from _holes import wizard_holes
-from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
-from paper_drive_stock_native import (
-    apply_span_limits,
-    author_root_envelope,
-    author_span,
-)
+from paper_drive_stock_native import apply_span_limits, author_span
 from pd_rack_pinion_spec import (
     BORE_DEVIATIONS,
     BORE_DIA,
     DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     FACE_WIDTH,
     GEAR_DATA,
     OUTSIDE_DIA_BAND,
+    OUTSIDE_DIA_PLACES,
     PRESSURE_ANGLE_DEG,  # noqa: F401 - the drawing test reads it off the part
     SPAN_DEVIATIONS,
     SPAN_NOMINAL,
@@ -77,7 +74,6 @@ from pd_rack_pinion_spec import (
     SPAN_PREFIX,
     SPAN_TEETH,
     STOCK_PROFILE,
-    SURFACE_FINISHES,
     TAP_CENTRES,
     TAP_DRILL_DIA,
     TAP_SPEC,
@@ -85,6 +81,7 @@ from pd_rack_pinion_spec import (
     TEETH,  # noqa: F401 - the drawing test reads it off the part
     TOOTH_SPACE_CALLOUT,
     TOOTH_SPACE_CALLOUT_PROPERTY,
+    UNIT,
 )
 from pd_transgear_disc_hub_geometry import (
     BOLT_CIRCLE_DIA,
@@ -92,18 +89,6 @@ from pd_transgear_disc_hub_geometry import (
     BOLT_CIRCLE_Y_FACTOR,
 )
 from pd_vn_transgear_disc_screw_spec import ENGAGEMENT_WORST_D
-
-# The MHA-PD-VN-55 screw's worst full-thread engagement in the through taps (the
-# tap's lead runs out of the rear face; the losses are the mouths' burr
-# breaks and the cut tip), floored so the MIN never rounds up.
-ENGAGEMENT_WORST_D_PRINTED = math.floor(ENGAGEMENT_WORST_D * 100.0) / 100.0
-MANUFACTURING_NOTES = "\n".join(
-    (
-        DRAWING_NOTES,
-        "#0-80 TAPS FULL THREAD THRU; MHA-PD-VN-55 SCREW ENGAGEMENT "
-        f"{ENGAGEMENT_WORST_D_PRINTED:.2f}D MIN.",
-    )
-)
 
 PART_NAME = "pd-rack-pinion"
 MATERIAL = "Brass"  # ch. 23 photos: brass
@@ -159,6 +144,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreateAxisParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
@@ -243,11 +229,7 @@ async def build(adapter) -> dict[str, str]:
     ).name
     # Hidden but still selectable by name for the assembly's mates.
     blank_reference_geometry(adapter, ((gear_axis, "AXIS"),))
-    await author_span(adapter, STOCK_PROFILE, SPAN_TEETH, places=SPAN_PLACES)
-    await author_root_envelope(adapter, STOCK_PROFILE)
-    set_dimension_prefix(
-        adapter, "RootInspectionProfile", "RootEnvelope", "AXIS ROOT "
-    )
+    await author_span(adapter, STOCK_PROFILE, SPAN_TEETH, places=SPAN_PLACES, unit=UNIT)
     await volume_check(adapter, "inspection sketches neutral", expected, 0.01 * V_BORE)
 
     await apply_material(adapter, MATERIAL)
@@ -260,11 +242,16 @@ async def build(adapter) -> dict[str, str]:
     # Functional bore, supported blank and controlling span bands live on
     # native model dimensions; the drawing only imports their authored ink.
     set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "BoreDia", *BORE_DEVIATIONS
+        adapter, "BoreProfile", "BoreDia", *BORE_DEVIATIONS, display_unit=UNIT
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     set_dimension_bilateral_tolerance(
-        adapter, "GearBlankProfile", "OutsideDia", *deviations(OUTSIDE_DIA_BAND)
+        adapter,
+        "GearBlankProfile",
+        "OutsideDia",
+        *deviations(OUTSIDE_DIA_BAND),
+        places=OUTSIDE_DIA_PLACES,
+        display_unit=UNIT,
     )
     apply_span_limits(
         adapter,
@@ -272,17 +259,16 @@ async def build(adapter) -> dict[str, str]:
         deviations=SPAN_DEVIATIONS,
         places=SPAN_PLACES,
         prefix=SPAN_PREFIX,
+        unit=UNIT,
     )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,
         {
             "Gear Data": GEAR_DATA,
-            "Manufacturing Notes": MANUFACTURING_NOTES,
             TOOTH_SPACE_CALLOUT_PROPERTY: TOOTH_SPACE_CALLOUT,
         },
     )

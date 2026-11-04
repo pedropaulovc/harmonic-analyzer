@@ -6,9 +6,11 @@ import argparse
 import sys
 from typing import Any
 
+from _machinist_review_mode import MachinistReviewMode
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _supplier_screw_dimensions import annotate_supplier_screw
 from _supplier_screw_layout import supplier_screw_margins
@@ -20,6 +22,9 @@ from pd_vn_transgear_arm_plate_screw_spec import (
     SUPPLIER_REFERENCE_FORMATS,
 )
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_vn_transgear_arm_plate_screw"]
 # The footer's ITEM row: the catalogue designation in plain text.
@@ -86,6 +91,7 @@ async def build(adapter: Any) -> dict[str, str]:
         supplier_margins=supplier_screw_margins(dimensions, planes=planes, sides=sides),
         supplier_dimensions=supplier_dimensions,
         settled_checks=(assert_supplier_dimensions_settled,),
+        unit=part_drawing_unit(SPEC.artifact_stem),
     )
 
 
