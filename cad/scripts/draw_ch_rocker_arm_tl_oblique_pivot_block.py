@@ -88,9 +88,11 @@ ROW_DIMENSIONS = ('CarriageDrills3Y','CarriageDrills4Y')
 # 84.55. On TL-22 the tap's dimension line stands 6 mm under the bottom face
 # (its last row underlined ~8 mm under the text anchor), its extension lines
 # dropping from the tap's walls: inside the full section it crossed the
-# hatching (review of farm run 20261027T201345346Z). TL-32, whose sheet
-# shipped with it, keeps it on the tap-only band near the bottom face, its
-# extension lines (which would rise through the Ø10 seat) hidden. The
+# hatching (review of farm run 20261027T201345346Z). TL-32 does the same,
+# its line 3 mm under the bottom face so the A-A caption (which starts ~6 mm
+# under it) stays clear: on the bottom face with its extension lines hidden,
+# its arrows ran along the part's edge (machinist review, #2119's final
+# 20261103T190306489Z). The
 # 7.650 seat depth keeps its line at x .120, arrows inside so the line is
 # drawn for the text leader to land on, and stands its text, with the stack
 # it sets, off to the upper left in the empty band under the plan's
@@ -152,7 +154,7 @@ FEED_PLAN_KEEP = PLAN_KEEP | {
 }
 FEED_FLOOR_CUT_END_Y = -100
 FEED_SIDE_XY = (.170,.060)
-FEED_SIDE_KEEP = {'TopBoreDepth':(.120,.068),'TapDrillDia':(.084,.058)}
+FEED_SIDE_KEEP = {'TopBoreDepth':(.120,.068),'TapDrillDia':(.084,.053)}
 FEED_SEAT_DEPTH_TEXT_XY = (.078,.084)
 FEED_ISO_XY, FEED_ISO_SCALE = (.360,.225), (1,2)
 # VIEW D looks at the lug's -X (nut) face: its letter's leader is the viewing
@@ -200,7 +202,6 @@ NUT_CALLOUT_XY = (.268,.165)
 NUT_ISO_XY = (.380,.215)
 _ARROWS_INSIDE = 0  # swDimArrowsInside
 _ARROWS_OUTSIDE = 1  # swDimArrowsOutside
-_WITNESS_NONE = 3  # swWitnessLineVisibility_e.swWitnessLineNone
 _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 
 
@@ -228,14 +229,6 @@ def _set_arrow_side(adapter, annotations, names, side) -> None:
         if int(display.ArrowSide) != side:
             raise RuntimeError(f'{name}: arrows did not move to side {side}')
     rebuild_drawing(adapter, label=f'arrow side {side}')
-
-
-def _hide_witness_lines(adapter, annotations, name) -> None:
-    display = _displays(adapter, annotations, (name,))[name]
-    display.WitnessVisibility = _WITNESS_NONE
-    if int(display.WitnessVisibility) != _WITNESS_NONE:
-        raise RuntimeError(f'{name}: extension lines still shown')
-    rebuild_drawing(adapter, label='tap drill extension lines hidden')
 
 
 def _size_note(adapter, note, height: float, *, label: str) -> None:
@@ -429,8 +422,6 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     set_hidden_lines_removed(adapter,side)
     side_annotations = curate_view_dimensions(adapter,side,keep=side_keep,view_label='pivot section direction',
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)
-    if is_feed:
-        _hide_witness_lines(adapter, side_annotations, 'TapDrillDia')
     _set_arrow_side(adapter, side_annotations, ('TopBoreDepth',), _ARROWS_INSIDE)
     offset_dimension_text(adapter, side_annotations, {'TopBoreDepth': seat_text_xy})
     offset_dimension_text(adapter, plan_annotations, {'BlockLength': BLOCK_LENGTH_TEXT_XY})
