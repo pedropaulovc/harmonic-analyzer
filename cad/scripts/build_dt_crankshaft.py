@@ -30,8 +30,10 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound, _read_member
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _document_units import apply_package_model_units
 from _feature_tree import _feature_by_name, name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -58,11 +60,6 @@ from dt_crank_pinion_spec import (
     PIN_DIA as PINION_PIN_DIA,
     PIN_HOLE_SPEC as PINION_PIN_HOLE_SPEC,
 )
-from _sprocket_seat_geometry import (
-    DRIVE_PIN_HOLE_BAND,
-    DRIVE_PIN_OFFSET_TOL,
-    SPIGOT_DIA_BAND,
-)
 from dt_crankshaft_spec import (
     COLLAR_DIA,
     COLLAR_LENGTH,
@@ -75,10 +72,12 @@ from dt_crankshaft_spec import (
     DRIVE_PIN_DEPTH,
     DRIVE_PIN_DEPTH_TOL,
     DRIVE_PIN_FLOOR,
+    DRIVE_PIN_HOLE_BAND,
     DRIVE_PIN_HOLE_DIA,
     DRIVE_PIN_KNOCKOUT_DIA,
     DRIVE_PIN_KNOCKOUT_LENGTH,
     DRIVE_PIN_KNOCKOUT_SPEC,
+    DRIVE_PIN_OFFSET_TOL,
     DRIVE_PIN_SPIGOT_RIM,
     DRIVE_PIN_SPIGOT_RIM_WORST,
     FIDUCIAL_MODEL_DEPTH,
@@ -97,6 +96,8 @@ from dt_crankshaft_spec import (
     PIN_HOLE_HEIGHT,
     PINION_SEAT_DIA,
     PINION_SEAT_DIA_BAND,
+    NECK_DIA_PLACES,
+    NECK_DIA_TOL,
     SEAT_COLLAR,
     SEAT_STEP,
     SHAFT_DIA,
@@ -107,10 +108,12 @@ from dt_crankshaft_spec import (
     SHAFT_LENGTH,
     SHAFT_LENGTH_BAND,
     SPIGOT_DIA,
+    SPIGOT_DIA_BAND,
     SPIGOT_END,
     SPIGOT_LENGTH,
     SPIGOT_LENGTH_TOL,
     SURFACE_FINISHES,
+    UNIT,
 )
 from crank_native_acceptance import assert_signed_circle_center
 
@@ -393,6 +396,8 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): shaft and seat dimensions. The
     # mm suffix is load-bearing -- this is an
@@ -411,6 +416,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PinionSeatStep", f"{SEAT_STEP}mm")
     await set_global(adapter, "PinHoleHeight", f"{PIN_HOLE_HEIGHT}mm")
     await set_global(adapter, "PinionPinStation", f"{PINION_PIN_STATION_Y}mm")
+    await set_global(adapter, "PinionPinDia", f"{PINION_PIN_DIA}mm")
     await set_global(adapter, "DomeHeight", f"{SHAFT_DOME_HEIGHT}mm")
     await set_global(adapter, "FiducialDia", f"{FIDUCIAL_MODEL_DIA}mm")
     await set_global(adapter, "FiducialDepth", f"{FIDUCIAL_MODEL_DEPTH}mm")
@@ -934,8 +940,21 @@ async def build(adapter) -> dict[str, str]:
             -SHAFT_DOME_HEIGHT,
         ),
     )
+    # The 16T retention-pin cross-hole's size: a witness across the hole's
+    # span along the axis, on the seat's printed-up silhouette (no ink), so its
+    # REF Ø prints natively over the hole (a Hole Wizard callout cannot bind
+    # the clocked hole's saddle rim).
+    pin_witness = check(
+        "pinion pin-hole reference line",
+        await adapter.add_line(
+            -PINION_SEAT_DIA / 2.0,
+            PINION_PIN_STATION_Y - PINION_PIN_DIA / 2.0,
+            -PINION_SEAT_DIA / 2.0,
+            PINION_PIN_STATION_Y + PINION_PIN_DIA / 2.0,
+        ),
+    )
     set_sketch_direct_db(adapter, False)
-    for entity in (overall_line, *station_lines.values(), dome_arc):
+    for entity in (overall_line, *station_lines.values(), dome_arc, pin_witness):
         segment = _early_bound(adapter._sketch_entities[entity], "ISketchSegment")
         segment.ConstructionGeometry = True
         if not bool(segment.ConstructionGeometry):
@@ -969,11 +988,17 @@ async def build(adapter) -> dict[str, str]:
         "dome radius reference starts at the dome root",
         await adapter.add_sketch_constraint(f"{dome_arc}.start", "origin", "horizontal_points"),
     )
+    check(
+        "pinion pin-hole reference vertical",
+        await adapter.add_sketch_constraint(pin_witness, None, "vertical"),
+    )
     # Dimensions in creation order; SketchDims renames them by that order.
+    # Every anchor is named so its drive equation is applied (an unnamed
+    # record drives nothing): the references follow the globals they restate.
     await anchor_point_to_origin(
         adapter, f"{overall_line}.start", 0.0, -SHAFT_DOME_HEIGHT, "dome tip reference"
     )
-    stations.record(None, '"DomeHeight"')
+    stations.record("DomeTipReference", '"DomeHeight"')
     await dimension_between(
         adapter,
         f"{overall_line}.start",
@@ -1002,6 +1027,24 @@ async def build(adapter) -> dict[str, str]:
         '("ShaftDia" / 2 * "ShaftDia" / 2 + "DomeHeight" * "DomeHeight") '
         '/ (2 * "DomeHeight")',
     )
+    await anchor_point_to_origin(
+        adapter,
+        f"{pin_witness}.start",
+        -PINION_SEAT_DIA / 2.0,
+        PINION_PIN_STATION_Y - PINION_PIN_DIA / 2.0,
+        "pinion pin-hole reference start",
+    )
+    stations.record("PinionPinWitnessRadius", '"PinionSeatDia" / 2')
+    stations.record("PinionPinWitnessStart", '"PinionPinStation" - "PinionPinDia" / 2')
+    await dimension_between(
+        adapter,
+        f"{pin_witness}.start",
+        f"{pin_witness}.end",
+        "vertical_distance",
+        PINION_PIN_DIA,
+        "pinion pin-hole reference",
+    )
+    stations.record("PinionPinHoleDia", '"PinionPinDia"')
     await ensure_fully_defined(adapter, "station reference sketch")
     check("exit_sketch station reference", await adapter.exit_sketch())
     name_last_feature(adapter, "StationReference")
@@ -1026,21 +1069,27 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     set_dimension_bilateral_tolerance(
-        adapter, "ShaftProfile", "ShaftDiaDim", *deviations(SHAFT_DIA_BAND)
+        adapter, "ShaftProfile", "ShaftDiaDim", *deviations(SHAFT_DIA_BAND), display_unit=UNIT
     )
     set_dimension_bilateral_tolerance(
-        adapter, "JournalProfile", "JournalDiaDim", *deviations(JOURNAL_DIA_BAND)
+        adapter, "JournalProfile", "JournalDiaDim", *deviations(JOURNAL_DIA_BAND), display_unit=UNIT
     )
     set_dimension_bilateral_tolerance(
         adapter,
         "PinionSeatProfile",
         "PinionSeatDiaDim",
         *deviations(PINION_SEAT_DIA_BAND),
+        display_unit=UNIT,
+    )
+    # Both bare necks (2X): the core's .375 at an explicit loose ±.010.
+    set_dimension_symmetric_tolerance(
+        adapter, "PinionSeatProfile", "NeckDiaDim", NECK_DIA_TOL,
+        places=NECK_DIA_PLACES, display_unit=UNIT,
     )
     # The length is unilateral (dt_crankshaft_spec.SHAFT_LENGTH_BAND, the hub
     # air); it prints from the model on the far-end-to-dome-root Depth.
     set_dimension_bilateral_tolerance(
-        adapter, "Shaft", "Depth", *deviations(SHAFT_LENGTH_BAND)
+        adapter, "Shaft", "Depth", *deviations(SHAFT_LENGTH_BAND), display_unit=UNIT
     )
     # The seat collar's functional bands (dt_crankshaft_spec, drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the two
     # far-end stations, the body OD, the seat spigot's diameter and its length
@@ -1048,27 +1097,29 @@ async def build(adapter) -> dict[str, str]:
     # depth.
     for name in ("CollarSeatStation", "CollarRearStation"):
         set_dimension_symmetric_tolerance(
-            adapter, "StationReference", name, COLLAR_STATION_TOL
+            adapter, "StationReference", name, COLLAR_STATION_TOL, display_unit=UNIT
         )
-    # The collar body's Ø20.6 takes the title block's .X band (no mate).
+    # The collar body's Ø.81 takes the title block's .XX band (no mate).
     set_dimension_bilateral_tolerance(
-        adapter, "SpigotProfile", "SpigotDiaDim", *deviations(SPIGOT_DIA_BAND)
+        adapter, "SpigotProfile", "SpigotDiaDim", *deviations(SPIGOT_DIA_BAND), display_unit=UNIT
     )
     set_dimension_symmetric_tolerance(
-        adapter, "Spigot", "SpigotLength", SPIGOT_LENGTH_TOL
+        adapter, "Spigot", "SpigotLength", SPIGOT_LENGTH_TOL, display_unit=UNIT
     )
     for index in (1, 2):
         set_dimension_symmetric_tolerance(
-            adapter, "DrivePinProfile", f"DrivePinOffset{index}", DRIVE_PIN_OFFSET_TOL
+            adapter, "DrivePinProfile", f"DrivePinOffset{index}", DRIVE_PIN_OFFSET_TOL,
+            display_unit=UNIT,
         )
         set_dimension_bilateral_tolerance(
             adapter,
             "DrivePinProfile",
             f"DrivePinHoleDia{index}",
             *deviations(DRIVE_PIN_HOLE_BAND),
+            display_unit=UNIT,
         )
     set_dimension_symmetric_tolerance(
-        adapter, "DrivePinHoles", "DrivePinDepth", DRIVE_PIN_DEPTH_TOL
+        adapter, "DrivePinHoles", "DrivePinDepth", DRIVE_PIN_DEPTH_TOL, display_unit=UNIT
     )
     await volume_check(adapter, "driven crankshaft (equations neutral)", v_final, 50.0)
 

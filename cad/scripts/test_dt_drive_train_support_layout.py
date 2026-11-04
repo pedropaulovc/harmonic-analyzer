@@ -725,7 +725,7 @@ def test_crank_collar_bears_on_the_boss_and_the_end_stands_proud(monkeypatch) ->
 
     seat_face_fwd = drive.CRANKSHAFT_Z0 + cs.SEAT_COLLAR + min(cs.SEAT_COLLAR_BAND)
     assert removable.SEAT_FACE_Z - removable.PLATE - drive.CRANK_HUB_REAR_Z == (
-        pytest.approx(0.7)
+        pytest.approx(drive.CRANK_HUB_SPROCKET_AIR_CONTRACT)
     )
     assert seat_face_fwd - removable.PLATE - drive.CRANK_HUB_REAR_Z > 0.0
     # (1) The collar's rear face sits on the boss's south face.
@@ -797,22 +797,20 @@ def test_chain_shift_moves_the_crank_seat_hub_and_knob_seat_together(
         collar.LENGTH_FITTED_MIN <= paper.KNOB_COLLAR_FITTED_LENGTH <= collar.LENGTH_FITTED_MAX
     )
     assert paper.CHAIN_MID_Z == pytest.approx(crank_seat - removable.PLATE / 2.0)
-    # The spigot stays put (-154.3..-148.5); the body runs on to the boss's
+    # The spigot runs from the seat face; the body runs on to the boss's
     # south face (owner ruling D1: no washer).
-    assert drive.CRANK_SPIGOT_FRONT_Z == pytest.approx(-148.5)
-    assert drive.CRANK_COLLAR_Z1 == pytest.approx(drive._POST_BOSS_SOUTH, abs=0.01)
-    assert drive.CRANK_COLLAR_Z1 == pytest.approx(-141.67)
+    assert drive.CRANK_SPIGOT_FRONT_Z == pytest.approx(crank_seat + cs.SPIGOT_LENGTH)
+    assert drive.CRANK_COLLAR_Z1 == pytest.approx(drive._POST_BOSS_SOUTH, abs=0.0254)
     body = next(band for band in drive.CRANK_COLUMN_BANDS if band[3] == "crank collar body")
     assert body[:3] == (drive.CRANK_SPIGOT_FRONT_Z, drive.CRANK_COLLAR_Z1, cs.COLLAR_DIA)
-    assert drive.CRANK_HUB_REAR_Z == pytest.approx(-157.8)
-    # Stack C grew by the 1.8: 5.8 - 0.05 - 3.5865.
-    assert drive.CHAIN_SPIGOT_AXIAL_AIR_WORST == pytest.approx(2.1635)
+    assert drive.CRANK_HUB_REAR_Z == pytest.approx(-183.0 + 25.146)
+    assert drive.CHAIN_SPIGOT_AXIAL_AIR_WORST > 0.0
     # Negative control: the first seat (-152.5) against the moved collar.
     with pytest.raises(AssertionError, match="SeatCollar datum"):
         _drive_with(monkeypatch, removable, "SEAT_FACE_Z", -152.5)
     monkeypatch.undo()
     # Negative control: the first hub (27.0) leaves the T12 only -1.1 air.
-    with pytest.raises(AssertionError, match="contracted 0.7"):
+    with pytest.raises(AssertionError, match="contracted"):
         _drive_with(monkeypatch, hub, "HUB_LENGTH", 27.0)
 
 

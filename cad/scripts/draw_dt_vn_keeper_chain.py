@@ -37,7 +37,9 @@ async def build(adapter: Any) -> dict[str, str]:
     return await build_purchased_part_drawing(
         adapter, SPEC, item=ITEM, cut_to_suit=True,
         supplier_dimensions=add_dimensions,
-        supplier_margins={"*Front": (0.0, 0.0, 0.040, 0.020)},
+        # The catalogue bead size stands left of the front view
+        # (_supplier_keeper_dimensions): its text block is about 52 mm wide.
+        supplier_margins={"*Front": (0.060, 0.0, 0.0, 0.0)},
         settled_checks=settled_checks,
         unit=part_drawing_unit(PART_STEM),
     )

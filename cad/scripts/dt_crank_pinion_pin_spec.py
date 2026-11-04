@@ -19,15 +19,15 @@ from dt_crank_pinion_spec import PIN_DIA as PIN_DIA  # noqa: PLC0414  # re-expor
 # can never drift from the hole it was cut for.
 if PIN_LENGTH != BOSS_DIA:
     raise AssertionError("retention pin is defined flush with the boss")
-PIN_LEN = PIN_LENGTH  # 13.51
+PIN_LEN = PIN_LENGTH  # .56 in
 
 # Marked model dimensions: the two the print carries, both on the revolve's
 # half-profile so both import into the side view (drawing-guidelines.md rule 11 (turned parts read like the lathe): a turned part's
-# diameter sits beside its length). The diameter is a routine turned / cut
-# size at the title block's .XX general grade -- the match-drilled hole sets
-# the fit (a drill-size pin in its own drill's hole is a light drive fit).
-# The length has no function beyond "not proud": one place, the .X grade
-# (codex machinist review, 2026-09-21: two places claimed a need it lacks).
+# diameter sits beside its length). The diameter is the as-bought 1/8 in
+# rod's, so the sheet prints it as a fraction reference (#290: the supplier's
+# tolerance governs; the match-drilled hole sets the fit -- a drill-size pin
+# in its own drill's hole is a light drive fit). The length is flush with
+# the boss's .XX diameter, so it prints at the same .XX grade.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {"PinDia", "PinLen"},
 }
@@ -36,8 +36,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # ``build_dt_crank_pinion_pin`` applies this natively and ``draw_dt_crank_pinion_pin``
 # reads it back.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "PinProfile": {"PinDia": 2, "PinLen": 1},
+    "PinProfile": {"PinDia": 3, "PinLen": 2},
 }
+# The diameter's as-bought fraction: 1/8 in.
+PIN_DIA_FRACTION_DENOMINATOR = 8
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: decimals
     for dimensions in DRAWING_PRECISION.values()
@@ -51,6 +53,14 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
     DRAWING_PRECISION_BY_NAME
 ):
     raise AssertionError("every marked pin dimension needs authored places")
+
+# Under the fraction: the stock's own diameter tolerance governs, quoted as
+# reference for each stock the MATERIAL cell allows (machinist review: the
+# two differ). Drill rod is ground to ±.0002 (ch_rod_pivot_pin_spec's figure);
+# 1018 cold-drawn rounds to 1 1/2 in are +.000/-.002 (ASTM A108).
+PIN_DIA_CALLOUT = (
+    "STOCK, AS SUPPLIED; SUPPLIER TOL. (REF):\nDRILL ROD ±.0002, 1018 CF +.000/-.002"
+)
 
 # No manufacturing note (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): the title-block MATERIAL "AISI 1018 CF or
 # drill rod, 1/8 in" is the one statement of the stock, and the faced ends are

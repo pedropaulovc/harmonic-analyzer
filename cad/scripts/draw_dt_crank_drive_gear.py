@@ -16,7 +16,8 @@ peaks too. The decimal places are the PART's
 (``crank_drive_gear_spec.DRAWING_PRECISION``, applied natively by
 ``build_crank_drive_gear``); this script only reads them back off the sheet.
 
-Drawn 3:2 so the face view's 64 teeth read as teeth on the B sheet.
+Drawn 3:2 so the face view's 64 teeth read as teeth on the B sheet. The
+sheet prints decimal inch (the part's ``drawing_unit: in``).
 """
 
 from __future__ import annotations
@@ -58,6 +59,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -69,6 +71,7 @@ from dt_crank_drive_gear_spec import (
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
     OUTSIDE_DIA,
+    inch_text,
 )
 from gear_seat_fit import FLAT_AF_CLEARANCE
 
@@ -160,7 +163,7 @@ SECTION_KEEP = {
     "FaceWidth": (SECTION_CENTER[0] - 0.040, SECTION_CENTER[1] + HALF_OD + 0.016),
     "BoreSouthChamferSize": (SECTION_CENTER[0] - 0.028, SECTION_CENTER[1] - 0.005),
 }
-# The face width's +/-0.025 is the gear's term in the solid cone-gear stack
+# The face width's +/-.001 is the gear's term in the solid cone-gear stack
 # on the cone gear shaft (dt_cone_gear_stack); rule 4 asks that the stack be
 # named where the band prints. Below the value: r3 of #1641 set it above, and
 # the above lane neither broke its lines nor printed (layout audit
@@ -177,12 +180,12 @@ FACE_WIDTH_CALLOUT = "SETS CONE GEAR STACK\nON MHA-DT-04"
 SHAFT_MATE_NAME = "CONE GEAR SHAFT"
 BORE_CALLOUT = (
     "THRU\n"
-    f"({BORE_DIAMETRAL_CLEARANCE[0]:.4f}-{BORE_DIAMETRAL_CLEARANCE[1]:.4f} DIAMETRAL\n"
+    f"({inch_text(BORE_DIAMETRAL_CLEARANCE[0], 4)}-{inch_text(BORE_DIAMETRAL_CLEARANCE[1], 4)} DIAMETRAL\n"
     f"CLEARANCE ON\n{SHAFT_MATE_NAME} {SHAFT_MATE_NUMBER})"
 )
 AF_CALLOUT = (
     "BORE ACROSS FLAT\n"
-    f"({FLAT_AF_CLEARANCE[0]:.4f}-{FLAT_AF_CLEARANCE[1]:.4f} AF CLEARANCE\n"
+    f"({inch_text(FLAT_AF_CLEARANCE[0], 4)}-{inch_text(FLAT_AF_CLEARANCE[1], 4)} AF CLEARANCE\n"
     f"ON {SHAFT_MATE_NAME} {SHAFT_MATE_NUMBER})"
 )
 DIMENSION_CALLOUTS = {
@@ -423,7 +426,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,

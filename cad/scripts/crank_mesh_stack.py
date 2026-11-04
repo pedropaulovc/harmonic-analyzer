@@ -47,7 +47,7 @@ CRANK_SUPPORT_NORTH_MIN = (
     - shaft.JOURNAL_INBOARD_STATION - shaft.STATION_ROW
 )
 _FACE_UPPER = pinion.printed_deviations(
-    pinion.FACE_WIDTH, pinion.FACE_WIDTH_PLACES, pinion.FACE_WIDTH_LIMITS
+    pinion.FACE_WIDTH, pinion.FACE_WIDTH_PLACES, pinion.FACE_WIDTH_LIMITS, unit=pinion.UNIT
 )[1]
 PINION_HALF_FACE_MAX = (pinion.FACE_WIDTH + _FACE_UPPER) / 2.0
 CRANK_OVERHANG = (
@@ -59,7 +59,12 @@ MESH_LEVER = post.CRANK_BOSS_NORTH_FACE + pinion.SEAT_GAP_MAX_MM + PINION_HALF_F
 POST_ANGLE_DEG = post.CRANK_BORE_ANGLE_LIMIT_DEG
 TOOTH_RUNOUT_TIR_MM = gear64.TOOTH_RUNOUT_TIR_MM
 TIP_ROOT_BAND_RADIAL = max(pinion.OUTSIDE_DIA_TOLERANCE_MM, gear64.OUTSIDE_DIA_TOLERANCE_MM) / 2.0
-SPACING_PRINTED = round(post.CRANK_ABOVE_CONE, post.DRAWING_PRECISION_BY_NAME["CrankAboveCone"])
+SPACING_PRINTED = post.CRANK_ABOVE_CONE + pinion.printed_deviations(
+    post.CRANK_ABOVE_CONE,
+    post.DRAWING_PRECISION_BY_NAME["CrankAboveCone"],
+    (0.0, 0.0),
+    unit=shaft.POST_UNIT,
+)[0]
 if not (CRANK_BEARING_LENGTH > 0 and CRANK_SUPPORT_NORTH_MIN > 0 and CRANK_OVERHANG >= 0):
     raise AssertionError("crankshaft journal must support the 16T mesh plane")
 if abs(SPACING_PRINTED - FRAME_DY) >= 0.01:

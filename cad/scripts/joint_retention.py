@@ -690,7 +690,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "dt_crank_handle_butt_cup",  # bonded in the handle butt; pocket bored for the MHA-DT-32 head, no thread
         "dt_crank_handle_ferrule",  # bonded (epoxy) to the handle tenon
         "dt_crank_hub",  # pressed into crank_arm, seam-pinned, taper-pinned to crankshaft
-        "dt_vn_crank_hub_pin",  # 4 m6 dowel, ISO 2338
+        "dt_vn_crank_hub_pin",  # 5/32 dowel (McMaster 98381A487), driven into the blind seam
         "dt_crank_pin",  # 1:48 taper pin, light drive
         "dt_crank_pin_eye",  # formed brass eye, clamped under fillister_screw (no thread of its own)
         "dt_vn_crank_seat_drive_pin",  # MHA-DT-VN-67 dowel pressed into match-drilled holes, no thread

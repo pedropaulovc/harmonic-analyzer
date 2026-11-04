@@ -2930,7 +2930,11 @@ def test_config_deps_are_fine_grained():
     drawing_unit_rows = {
         "parts/_defaults.yaml",
         "parts/ch-fulcrum-keeper.yaml",
+        "parts/dt-crank-hub.yaml",
+        "parts/dt-crank-pin-ring.yaml",
+        "parts/dt-crank-pin.yaml",
         "parts/dt-pinion-pivot-block.yaml",
+        "parts/dt-vn-crank-seat-drive-pin.yaml",
         "parts/fr-harmonic-base.yaml",
         "parts/fr-nameplate.yaml",
         "parts/fr-rocker-arm-support.yaml",
@@ -2940,9 +2944,6 @@ def test_config_deps_are_fine_grained():
         "parts/sm-summing-lever.yaml",
         "parts/sm-vn-knife-hanger-stud.yaml",
         "parts/sm-vn-knife-mount-dowel.yaml",
-        "parts/dt-crank-pin.yaml",
-        "parts/dt-crank-pin-ring.yaml",
-        "parts/_defaults.yaml",
     }
     assert not any(
         t.startswith("parts/") and t not in drawing_unit_rows for t in frame_recipe

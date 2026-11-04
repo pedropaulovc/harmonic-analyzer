@@ -7,3 +7,4 @@ dt-crank-hub:
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
   process: "turned stepped through hub; matched light press in crank arm"
+  drawing_unit: in
