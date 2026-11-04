@@ -21,7 +21,7 @@ import yaml
 
 import _buildgraph as bg
 import _config
-import _interference_contracts as contracts
+import _ch_rocker_arm_tl_oblique_jig_interference as contracts
 from _inch_wall_limits import WALL_TARGET_MM
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_vn_oblique_carriage_spec as carriage
@@ -1825,7 +1825,7 @@ def test_feed_nut_and_its_screws_hit_nothing_over_the_travel() -> None:
     assert min(gaps.values()) > 0.0
     assert min(gaps.values()) == pytest.approx(gaps["pillow block 1"])
     allowed = [
-        pair for pair in contracts._ROCKER_OBLIQUE_JIG_ALLOWED_PAIRS
+        pair for pair in contracts.ALLOWED_PAIRS
         if any(name.startswith(f"{contracts._JIG}-feed-nut") for name in pair)
     ]
     assert sorted(allowed, key=sorted) == sorted((
@@ -1833,7 +1833,7 @@ def test_feed_nut_and_its_screws_hit_nothing_over_the_travel() -> None:
         frozenset((f"{contracts._JIG}-feed-nut-1", f"{contracts._JIG_VENDOR}-nut-dowel-1")),
     ), key=sorted)
     screws = [
-        pair for pair in contracts._ROCKER_OBLIQUE_JIG_ALLOWED_PAIRS
+        pair for pair in contracts.ALLOWED_PAIRS
         if any(name.startswith(f"{contracts._JIG_VENDOR}-nut-screw") for name in pair)
     ]
     assert sorted(screws, key=sorted) == [

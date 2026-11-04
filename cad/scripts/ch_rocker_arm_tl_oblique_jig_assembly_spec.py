@@ -108,7 +108,7 @@ ASM_NAME = "ch-rocker-arm-tl-oblique-jig"
 DRAWING_NUMBER = "MHA-CH-06-TL-00"
 # The sheet's unit (the contract's ``drawing_unit``); every printed length
 # below goes through ``_length``.
-UNIT = assembly_contract(ASM_NAME).drawing_unit
+UNIT = assembly_contract("ch-rocker-arm-tl-oblique-jig").drawing_unit
 
 
 def _length(value_mm: float, places: int) -> str:

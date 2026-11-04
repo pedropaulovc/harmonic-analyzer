@@ -12,7 +12,7 @@ reference (the .0001 class band controls nothing the shop makes).
 
 Issue #290: the sheet prints decimal inch. The cut length closes the inch stack:
 bottom flush with the carrier underside, top TIP_SET above the riser, so the bonded
-length is the whole .47 carrier (``_interference_contracts.JIG_HUB_PIN_SEAT``).
+length is the whole .47 carrier (the jig interference table's ``JIG_HUB_PIN_SEAT``).
 """
 
 from __future__ import annotations

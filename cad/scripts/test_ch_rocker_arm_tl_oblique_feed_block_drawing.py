@@ -83,7 +83,7 @@ def test_nut_taps_are_transferred_from_the_tl27_pair_and_print_ref():
     # r1 review: the .515 names its mate; the D arrow says where VIEW D prints.
     assert spec.CALLOUTS_BELOW['NutCentreY']=='ON KP08 LEADSCREW AXIS'
     assert spec.CALLOUTS_BELOW['NutCentreZ']=='FROM CARRIAGE FACE\nON KP08 LEADSCREW AXIS'
-    source=(Path(__file__).parent/'draw_ch_rocker_arm_tl_oblique_pivot_block.py').read_text(encoding='utf-8')
+    source=(Path(__file__).parent/'_oblique_block_drawing.py').read_text(encoding='utf-8')
     assert "VIEW_SHEET_REF = '(SHEET 2)'" in source
     assert source.count('process=contract.TRANSFER_PROCESS')==1
 
