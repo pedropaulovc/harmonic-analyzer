@@ -132,7 +132,11 @@ UNSHIMMED_FLOAT_RANGE = (
     round(UNSHIMMED_FLOAT_NOMINAL - UNSHIMMED_FLOAT_BAND, 6),
     round(UNSHIMMED_FLOAT_NOMINAL + UNSHIMMED_FLOAT_BAND, 6),
 )
-END_FLOAT_MIN = 0.20  # R9-5: the disc runs free, at the worst case
+# R9-5: the disc runs free, at the worst case.  The floor is authored on the
+# inch sheet's grid (.0080, a hair over the former 0.20 mm), so MHA-PD-00
+# VIEW E prints the window's limits exactly at four places: .0080 and the
+# shim's .0055 catalogue maximum above it (Codjiflo, #2148; rule 3).
+END_FLOAT_MIN = round(0.0080 * 25.4, 6)  # 0.2032
 
 # --- shim fit-up (owner ruling 2026-11-01, #2124) ----------------------------------
 # Shims go on under the rear bushing while the ring gap less the next shim

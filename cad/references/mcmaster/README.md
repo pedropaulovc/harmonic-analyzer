@@ -90,7 +90,7 @@ recipes:
 | 94025A150 | — (diagnostic recipe; `dt-vn-cone-tip-adjuster` until drawing-guidelines.md rule 18 (thread engagement) E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94025A164 | `dt-vn-cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94773A606 | `pd-vn-transgear-cluster-shim` (MHA-PD-VN-68; catalogue-only, no vendor model) | Shim for Shortening Screw Shoulders, 18-8 Stainless Steel, 1/8" Shoulder |
-| 93600A189 | `pd-vn-transgear-arm-plate-locating-pin` (catalogue-only; no vendor model) | Passivated 316 Stainless Steel ISO 2338-m6 Dowel Pin |
+| 93600A189 | — (retired 2026-11-02, #290: MHA-PD-VN-64 takes 98381A435; recipe removed) | Passivated 316 Stainless Steel ISO 2338-m6 Dowel Pin |
 | 9666K56 | `sh-vn-music-wire` (MHA-SH-VN-56; `LeverWire` and `PenWire` configurations cut from one coil; catalogue-only, no vendor model) | Lubricated 1080 Spring Steel Wire, 0.031 in, 1/4 lb coil |
 | 9714K24 | `ch-vn-rocker-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
 | 9714K392 | `dt-vn-cylinder-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
@@ -102,6 +102,7 @@ recipes:
 | 98296A031 | `pd-vn-transgear-knob-cup-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98381A433 | `pd-vn-transgear-knob-drive-pin` (catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A434 | `dt-vn-crank-seat-drive-pin` (crank only; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
+| 98381A435 | `pd-vn-transgear-arm-plate-locating-pin` (MHA-PD-VN-64; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A473 | `sm-vn-knife-mount-dowel` | Alloy Steel Dowel Pin |
 | 98381A474 | `pd-vn-transgear-latch-pin` (catalogue-only; no vendor model; SKU not yet read live) | Alloy Steel Dowel Pin |
 | 99607A213 | `pn-vn-pen-set-screw` | Stainless Steel Flared-Collar Knurled-Head Thumb Screw |
@@ -1110,22 +1111,24 @@ Catalog specifications checked on September 10, 2026:
   long, end shape "Round x Chamfer". As for 98381A434, `diag_build_98381A433.py`
   models the plain nominal cylinder; catalogue-only, no vendor model, no
   replica gate.
-- [93600A189](https://www.mcmaster.com/93600A189/), MHA-PD-VN-64, quantity two,
-  was read live on October 9, 2026 in isolated Chromium (HTTP 200): passivated
-  316 stainless, ISO 2338-m6, diameter 2.002–2.008 mm, nominal length 6 mm,
-  both ends chamfered. The supplier does not publish a length or chamfer
-  band. [ISO 2338:1997 Table 1](https://cdn.standards.iteh.ai/samples/20001/5b26cece48c448b782c0de1eccb5b16c/ISO-2338-1997.pdf)
-  bounds nominal 6-mm stock to 5.75–6.25 mm;
-  [c≈0.35 mm](https://fullerfasteners.com/tech/iso-2338-specifications-parallel-pins/)
-  is approximate, not a hard end limit or full-cylinder certificate.
-  `_transgear_arm_plate_locating_interface.py` owns the arm/plate hole limits,
-  proud set, blind depth and mouth breaks.
-  `pd_vn_transgear_arm_plate_locating_pin_spec.py` retains purchased-pin data and
-  the fit, insertion and bottom-air calculations. The whole standard length
-  family has at least 0.17 mm bottom air in the custom arm blind hole.
-  `diag_build_93600A189.py` uses the
-  existing nominal-cylinder recipe: catalogue-only, no vendor model, no
-  replica gate and no new commodity receiving procedure.
+- 93600A189 (MHA-PD-VN-64 until #290) was a passivated 316 ISO 2338-m6
+  2 x 6 mm dowel, read live on October 9, 2026. Retired 2026-11-02: the
+  metric dowel went to inch (owner ruling 2026-10-30) and its recipe and
+  dimension module were removed.
+- [98381A435](https://www.mcmaster.com/98381A435/) (`pd-vn-transgear-arm-plate-locating-pin`,
+  MHA-PD-VN-64, quantity two) was read live on November 2, 2026 from the
+  family table (the product page asks for a login),
+  https://www.mcmaster.com/products/dowel-pins/system-of-measurement~inch/diameter~3-32/length~5-16/:
+  High-Strength Alloy Steel, 3/32 in diameter (+0.0001 to +0.0003 in), 5/16
+  in long, 1,400 lbf double shear, Rockwell C47 minimum, ASME B18.8.2,
+  package of 100. The #290 ruling named 98381A434, but that is the crank's
+  MHA-DT-VN-67, so the PD pair takes the next free length rather than a
+  Shared identity. `_transgear_arm_plate_locating_interface.py` owns the
+  arm's .093 press and the plate's .0945 slip ream, the proud set and the
+  mouth breaks; `pd_vn_transgear_arm_plate_locating_pin_spec.py` keeps the
+  purchased-pin data and the fit and insertion arithmetic.
+  `diag_build_98381A435.py` models the plain nominal cylinder; catalogue-only,
+  no vendor model, no replica gate.
 - [98381A473](https://www.mcmaster.com/98381A473/) (`sm-vn-knife-mount-dowel`,
   MHA-SM-VN-53, two; formerly `pd-vn-transgear-latch-pin`) was read live on
   September 30, 2026:

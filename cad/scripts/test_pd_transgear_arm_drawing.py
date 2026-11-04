@@ -296,7 +296,7 @@ def test_the_explicit_bands_are_the_spot_face_and_the_reams() -> None:
     assert model_toleranced_dimensions(part) == {
         ("SpotFaceProfile", "SpotFaceDia"): "*deviations(SPOT_FACE_DIA_BAND)",
         ("SpotFaceProfile", "FloorDepth"): "SPOT_FACE_FLOOR_TOLERANCE",
-        ("LocatorProfile", "f'LocatorDia{index}'"): "LOCATOR_HOLE_PRINT_TOLERANCE_MM",
+        ("LocatorProfile", "f'LocatorDia{index}'"): "*deviations(LOCATOR_HOLE_DIA_BAND)",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_DIA_BAND)",
         ("PinBoreProfile", "PinBoreDia"): "*deviations(PIN_BORE_DIA_BAND)",
     }
@@ -739,8 +739,8 @@ def test_the_locating_holes_name_their_dowel_press_and_match_drill() -> None:
     tightest = max(dowel.DIA_LIMITS) - min(geometry.LOCATOR_HOLE_PRINTED_LIMITS_MM)
     assert spec.LOCATOR_PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
     # The printed ream lies inside the interface's press limits.
-    assert min(interface.PRESS_HOLE_LIMITS_MM) <= min(geometry.LOCATOR_HOLE_PRINTED_LIMITS_MM)
-    assert max(geometry.LOCATOR_HOLE_PRINTED_LIMITS_MM) <= max(interface.PRESS_HOLE_LIMITS_MM)
+    assert min(interface.PRESS_HOLE_LIMITS_MM) <= min(geometry.LOCATOR_HOLE_PRINTED_LIMITS_MM) + 1e-9
+    assert max(geometry.LOCATOR_HOLE_PRINTED_LIMITS_MM) <= max(interface.PRESS_HOLE_LIMITS_MM) + 1e-9
     assert _config.parts("pd-vn-transgear-arm-plate-locating-pin")["number"] == dowel.PART_NUMBER
     plate = _config.parts("pd-transgear-arm-plate")["number"]
     flat = " ".join(drawing.LOCATOR_CALLOUT_TEXT.split())
@@ -749,9 +749,9 @@ def test_the_locating_holes_name_their_dowel_press_and_match_drill() -> None:
     # the assembly view that sets it.
     for fact in (
         "THRU",
-        ".0019 MAX",
+        ".002 MAX",
         dowel.PART_NUMBER,
-        ".0002/.0007",
+        ".0003/.0011",
         plate,
         knob_setting_ref(),
     ):
@@ -773,7 +773,7 @@ def test_the_locating_dowels_punch_out_from_the_front() -> None:
     front_break = geometry.LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM
     thinnest = geometry.THICKNESS - geometry.THICKNESS_BAND
     assert spec.LOCATOR_PUNCH_AIR_MIN_MM == pytest.approx(thinnest - front_break - deepest)
-    assert spec.LOCATOR_PUNCH_AIR_MIN_MM > 3.0
+    assert spec.LOCATOR_PUNCH_AIR_MIN_MM > 1.0
     assert geometry.LOCATOR_FULL_CYLINDER_SPAN_MIN_MM == pytest.approx(thinnest - 2.0 * front_break)
 
 

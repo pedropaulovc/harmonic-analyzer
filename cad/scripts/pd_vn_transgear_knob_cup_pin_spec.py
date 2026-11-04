@@ -24,8 +24,10 @@ publishes as ``ScrewAxis`` (Front Plane x Top Plane).
 
 from __future__ import annotations
 
+import _config
 from _mcmaster_98296a031 import SPRING_PIN_SIZE
 from _mcmaster_98296a031 import WALL_T as _CATALOGUE_WALL
+from _package_units import drawing_unit
 from _supplier_pin_data import SupplierPinReference
 
 INCH = 25.4
@@ -38,14 +40,14 @@ PIN_LEN_BAND = 0.015 * INCH
 PIN_LEN_MIN = PIN_LEN - PIN_LEN_BAND
 PIN_LEN_MAX = PIN_LEN + PIN_LEN_BAND
 
-# Actual cup/journal match-drilled hole, inside the catalogue 1/16 pin's
-# recommended window and smaller than its minimum free diameter.
+# Actual cup/journal match-drilled hole: B18.8.2's recommended window for
+# the 1/16 pin, drilled with the owned 1/16 drill (#290 fit D15).
 HOLE_WINDOW = (0.062 * INCH, 0.065 * INCH)
-HOLE_DIA = 1.6
-HOLE_BAND = (0.05, 0.0)
+HOLE_DIA = 1.5748  # .062
+HOLE_BAND = (0.0762, 0.0)  # +.003/0
 HOLE_MAX = HOLE_DIA + HOLE_BAND[0]
 # The match-drilled hole as the A06 knob-stack step prints it.
-HOLE_TEXT = f"\u00d8{HOLE_DIA:.1f} +{HOLE_BAND[0]:.2f}/0"
+HOLE_TEXT = "\u00d8.062 +.003/0"
 FREE_DIA_MIN = 0.066 * INCH
 if not (HOLE_WINDOW[0] <= HOLE_DIA and HOLE_MAX <= HOLE_WINDOW[1]):
     raise AssertionError("the cup pin hole's band leaves B18.8.2's recommended hole")
@@ -66,5 +68,8 @@ SUPPLIER_REFERENCE = SupplierPinReference(
     wall_mm=WALL_T,
     wall_precision=3,
     application_hole_limits=(0.062, 0.065),
+    sheet_unit=drawing_unit(
+        "parts/pd-vn-transgear-knob-cup-pin", _config.parts("pd-vn-transgear-knob-cup-pin")
+    ),
     application_hole_precision=3,
 )

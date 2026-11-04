@@ -86,14 +86,14 @@ def test_match_drilled_hole_band_grips_the_pin() -> None:
 
 
 def test_pin_ends_stay_inside_the_cup_od() -> None:
-    """The pin crosses the Ø19 cup diametrally; even the longest pin in the
+    """The pin crosses the Ø.75 cup diametrally; even the longest pin in the
     smallest cup keeps both ends under the O.D."""
     import pd_transgear_knob_cup_spec as cup
 
     worst = (cup.OD_MIN - spec.PIN_LEN_MAX) / 2.0
     assert worst > 0.0
     assert cup.PIN_END_INSIDE_OD_WORST == pytest.approx(worst)
-    assert (cup.OD - spec.PIN_LEN) / 2.0 == pytest.approx(1.5625)
+    assert (cup.OD - spec.PIN_LEN) / 2.0 == pytest.approx(1.5875)
     # Negative control: a 3/4 pin stands proud of the smallest cup.
     three_quarters = 0.75 * spec.INCH
     assert (cup.OD_MIN - three_quarters - spec.PIN_LEN_BAND) / 2.0 < 0.0

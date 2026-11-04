@@ -412,7 +412,7 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
         cursor = located.index(token, cursor)
     # The step cites the view's model dimensions and types no value of its own.
     for value in (knob_setting.K_FROM_S_ALONG_MM, knob_setting.K_FROM_S_ACROSS_MM):
-        assert f"{value:.{knob_setting.PLACES}f}" not in located
+        assert disc.inch_text(value, knob_setting.PLACES) not in located
     # S is the arm's reamed bore, not the pin's head (no drawing control
     # holds the head to the shank): the pin goes in after the plate is set.
     assert "NO PIN YET" in located
@@ -435,9 +435,9 @@ def test_view_k_carries_the_set_coordinates_as_assembly_model_dimensions() -> No
     ps = (s[0] - p[0], s[1] - p[1])
     assert sq[0] * qk[0] + sq[1] * qk[1] == pytest.approx(0.0, abs=1e-9)
     assert sq[0] * ps[1] - sq[1] * ps[0] == pytest.approx(0.0, abs=1e-9)
-    # K is the DRO count nearest the middle of the set band, about the
-    # mid-band point on the nominal S-K line: each coordinate a whole count
-    # within a count of that point, so K is within a count's diagonal of it.
+    # K is the DRO count nearest the middle of the set band, among the nine
+    # counts about the mid-band point on the nominal S-K line: each
+    # coordinate a whole count within a count and a half of that point.
     low, high = disc.CENTRE_DISTANCE_WINDOW
     count = knob_setting.DRO_COUNT_MM
     nominal = (
@@ -447,24 +447,23 @@ def test_view_k_carries_the_set_coordinates_as_assembly_model_dimensions() -> No
     setting = (knob_setting.K_FROM_S_ALONG_MM, knob_setting.K_FROM_S_ACROSS_MM)
     for value, aim in zip(setting, knob_setting.K_AIM_FROM_S_MM):
         assert value / count == pytest.approx(round(value / count), abs=1e-9)
-        assert abs(value - aim) < count
-    diagonal = count * math.sqrt(2.0)
+        assert abs(value - aim) < 1.5 * count
+    reach = 1.5 * count * math.sqrt(2.0)
     off_line = abs((k[0] - s[0]) * nominal[1] - (k[1] - s[1]) * nominal[0]) / low
-    assert off_line < diagonal
-    assert abs(math.dist(s, k) - (low + high) / 2.0) < diagonal
+    assert off_line < reach
+    assert abs(math.dist(s, k) - (low + high) / 2.0) < reach
     # N, the nominal centre, is on S-K at the band's low end, beside the
     # model's knob axis by K's count off the nominal line; S to N carries the
     # set band itself, +x/-0.
-    assert math.dist(knob_setting.N_XY, placement.KNOB_SHAFT_XY) < diagonal
+    assert math.dist(knob_setting.N_XY, placement.KNOB_SHAFT_XY) < reach
     assert math.dist(s, knob_setting.N_XY) == pytest.approx(disc.CENTRE_DISTANCE)
     assert (k[0] - s[0]) * (knob_setting.N_XY[1] - s[1]) - (k[1] - s[1]) * (
         knob_setting.N_XY[0] - s[0]
     ) == pytest.approx(0.0, abs=1e-9)
-    assert knob_setting.CENTRE_TOLERANCE_MM == pytest.approx((0.0, high - low))
-    assert disc.CENTRE_DISTANCE_SET_TEXT == (
-        f"{disc.CENTRE_DISTANCE:.{knob_setting.PLACES}f} "
-        f"+{knob_setting.CENTRE_TOLERANCE_MM[1]:.{knob_setting.PLACES}f}/-0"
-    )
+    # The printed +x/-0 band stays inside the mesh window, within one
+    # .0001 count of it.
+    assert knob_setting.CENTRE_TOLERANCE_MM[0] == 0.0
+    assert high - low - 0.00254 < knob_setting.CENTRE_TOLERANCE_MM[1] <= high - low
     # The view marks the band and the two settings, at the places the model
     # owns; only the settings are references.
     assert knob_setting.DRAWING_DIMENSIONS == {
@@ -676,11 +675,13 @@ def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> Non
     assert radial_err == pytest.approx(0.0135, abs=1e-4)
     # The printed values are the display's own counts: the operator dials
     # exactly what VIEW K prints.
-    count = mill["resolution_mm"]["value"]
-    assert knob_setting.DRO_COUNT_MM == count
+    # The 5 um scale's inch-mode count, .0002.
+    count = round(mill["resolution_mm"]["value"] / 25.4, 4) * 25.4
+    assert knob_setting.DRO_COUNT_MM == pytest.approx(count)
     x, y = knob_setting.K_FROM_S_ALONG_MM, knob_setting.K_FROM_S_ACROSS_MM
-    assert round(round(x, knob_setting.PLACES) / count) * count == pytest.approx(x)
-    assert round(round(y, knob_setting.PLACES) / count) * count == pytest.approx(y)
+    for value in (x, y):
+        printed = round(value / 25.4, knob_setting.PLACES) * 25.4
+        assert round(printed / count) * count == pytest.approx(value)
 
     def margins(point):
         radial = math.hypot(*point) - low
@@ -709,8 +710,7 @@ def test_the_matched_plate_is_refitted_on_its_dowels_and_re_read() -> None:
     located = _step_body("arm-plate-located")
     assert (
         "DOWELS INTO THE ARM FROM THE REAR, "
-        f"{plate_locating_interface.PROUD_LIMITS_MM[0]:.2f} TO "
-        f"{plate_locating_interface.PROUD_LIMITS_MM[1]:.2f} PROUD;"
+        f"{steps.inch_window(plate_locating_interface.PROUD_LIMITS_MM, 3, ' TO ')} PROUD;"
     ) in located
     assert "MATCH-MARK ARM AND PLATE" in located
     fitted = _step_body("arm-plate-fitted")
@@ -720,7 +720,7 @@ def test_the_matched_plate_is_refitted_on_its_dowels_and_re_read() -> None:
     assert "PUSH AND ROCK THE PLATE BY HAND: NO SHAKE ON THE DOWELS" in fitted
     assert "RE-CHECK AFTER EVERY REMOVAL" in fitted
     # The setting step's own coordinates fix K; the refit only checks shake.
-    assert f"{knob_setting.K_FROM_S_ALONG_MM:.3f}" not in fitted
+    assert disc.inch_text(knob_setting.K_FROM_S_ALONG_MM, knob_setting.PLACES) not in fitted
     assert drawing.KNOB_SETTING_VIEW_NAME not in fitted
     for method in ("RFS", "UNCERTAINTY", "QUALIFIED", "ACTUAL"):
         assert method not in fitted
@@ -764,11 +764,11 @@ def test_the_feed_setup_reference_uses_the_selected_ratios_and_reference_pitch()
     )
     assert paper_geometry.NET_RACK_TRAVEL_PER_CRANK_REV == pytest.approx(expected)
     text = steps.PAPER_FEED_REFERENCE_TEXT
-    match = re.search(r"PLATEN TRAVEL (\d+\.\d+) PER CRANK REV \(REF\)", text)
+    match = re.search(r"PLATEN TRAVEL (\d*\.\d+) PER CRANK REV \(REF\)", text)
     assert match
     places = steps.PAPER_FEED_REFERENCE_PLACES
     assert len(match[1].split(".")[1]) == places
-    assert float(match[1]) == pytest.approx(expected, abs=0.5 * 10.0**-places)
+    assert float(match[1]) * 25.4 == pytest.approx(expected, abs=0.5 * 10.0**-places * 25.4)
     assert f"{sprocket.CRANK_CONFIG} CRANK" in text
     assert f"{sprocket.KNOB_CONFIG} KNOB" in text
     for caption in drawing.ASSEMBLED_CAPTIONS.values():
@@ -1231,11 +1231,11 @@ def test_the_pivot_screw_is_staked_and_the_spacer_pressed_as_made() -> None:
     the shoulder flush with its end, and the MHA-PD-VN-63 spring under the
     head holds the arm on it."""
     body = _step_body("hanger-pivoted")
-    low, high = pivot_screw.TIP_RECESS
+    window = steps.inch_window(pivot_screw.TIP_RECESS, 3, " TO ")
     assert "THREADLOCKER OPTIONAL" in body
     assert "BLIND" not in body
     assert "THROUGH TAP" in body
-    assert f"{low:.2f} TO {high:.2f} BELOW THE BAR'S FRONT FACE" in body
+    assert f"{window} BELOW THE BAR'S FRONT FACE" in body
     assert "STAKE THE FRONT TAP MOUTH ONTO THE TIP AT 2 OPPOSITE POINTS" in body
     # The screw is chosen by its unfaced tip before the arm's bore is reamed
     # to it, so the fitter never meets a matched screw that fails the check.
@@ -1267,7 +1267,7 @@ def test_the_fitup_acceptance_prints_the_contract_bands() -> None:
     body = _step_body("fitup-accepted")
     for text in (
         f"{steps.OFFSET_ACCEPT_TEXT} FORWARD",
-        f"{expected_float[0]:.2f} TO {expected_float[1]:.2f}",
+        steps.inch_window(expected_float, 3, " TO "),
         steps.COLLAR_DISC_AIR_TEXT,
         f"{sprocket.KNOB_CONFIG} FREE UNDER THE NUT",
     ):
@@ -1508,9 +1508,9 @@ def test_the_rear_cup_is_pinned_and_the_nut_seats_on_the_faced_pilot() -> None:
     """R9-70's rear cup and wheel-float fit remain; the front drive is a true D."""
     knob = _step_body("knob-stack-fitted")
     for text in (
-        f"{knob_shaft.END_FLOAT:.1f} FEELER AT THE BOSS",
+        f"{disc.inch_text(knob_shaft.END_FLOAT, 3)} FEELER AT THE BOSS",
         cup_pin.HOLE_TEXT,
-        f"{cup.PIN_HOLE_FROM_FRONT:.1f} FROM THE CUP FRONT",
+        f"{disc.inch_text(cup.PIN_HOLE_FROM_FRONT, 3)} FROM THE CUP FRONT",
     ):
         assert text in knob, text
     seq = steps.SEQUENCE
@@ -1601,7 +1601,7 @@ def test_the_cluster_float_and_pin_bands_print_their_spec_ranges() -> None:
         ("collar-pins-pressed", drive_pin.PROUD_RANGE),
         ("latch-pin-pressed", joints.LATCH_PIN_PROUD_RANGE),
     ):
-        assert f"{bounds[0]:.2f} TO {bounds[1]:.2f} PROUD" in _step_body(key)
+        assert f"{steps.inch_window(bounds, 3, ' TO ')} PROUD" in _step_body(key)
 
 
 def test_the_cluster_is_shimmed_to_view_e_after_it_is_hung() -> None:
@@ -1620,7 +1620,7 @@ def test_the_cluster_is_shimmed_to_view_e_after_it_is_hung() -> None:
     # Codjiflo (#2124): the gap is read with the ring on the groove's load
     # wall, where transgear_cluster_fit puts it, not loose in its play.
     assert "RING ON ITS GROOVE'S LOAD WALL" in " ".join(shimmed.split())
-    assert f"{cluster_fit.END_FLOAT_MIN:.2f}" not in shimmed
+    assert disc.inch_text(cluster_fit.END_FLOAT_MIN, 3) not in shimmed
     # Codjiflo and machinist review (#2124): the step gives the fit-up's
     # count range, and the BOM's QTY is the whole kit, the stack's nominal
     # shims plus the spares the model stores in the spare T18's bore.
@@ -1652,7 +1652,7 @@ def test_the_cluster_is_shimmed_to_view_e_after_it_is_hung() -> None:
     assert cluster_float.TOLERANCE_MM[0] == 0.0
     assert low == cluster_fit.END_FLOAT_MIN == cluster_fit.RING_FLOAT_RANGE[0]
     assert (
-        cluster_fit.RING_FLOAT_RANGE[1] <= high < cluster_fit.RING_FLOAT_RANGE[1] + 0.01
+        cluster_fit.RING_FLOAT_RANGE[1] <= high < cluster_fit.RING_FLOAT_RANGE[1] + 0.0254
     )
     assert cluster_float.DRAWING_DIMENSIONS == {
         cluster_float.FEATURE: {cluster_float.DIMENSION}
@@ -1716,11 +1716,10 @@ def test_the_disc_is_centred_to_its_running_bore_before_transfer_and_match_mark(
         f"MANDREL IN THE {drawing._N['pd-transgear-feed-pinion']} BORE" in transferred
     )
     assert (
-        f"WITH A \u00d8{disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM:.3f} GAUGE PIN IN EACH "
+        f"WITH A \u00d8{disc.inch_text(disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM, 3)} GAUGE PIN IN EACH "
         f"{drawing._N['pd-rack-pinion']} TOOTH SPACE IN TURN"
     ) in transferred
-    tir = drawing.quality.toothspace_runout_tir_mm()
-    assert f"TILL THE DIAL READS {tir:.2f} TIR MAX" in transferred
+    assert f"TILL THE DIAL READS {disc.TOOTH_SPACE_RUNOUT_TIR_TEXT} TIR MAX" in transferred
     for method in ("CERTIFIED", "RUNNING-BORE", "INDICATOR STATION", "INSPECTION"):
         assert method not in transferred
     ordered_actions = (
@@ -1751,7 +1750,7 @@ def test_the_plate_screws_are_cut_to_the_limit_the_lock_sweep_clears() -> None:
         f"TAKE BOTH {_number('pd-vn-transgear-arm-plate-screw')} SCREWS OUT"
     )
     assert "REFIT THE SAME SCREWS IN THE SAME HOLES BEFORE PIVOTING THE HANGER" in body
-    limit = f"FLUSH TO {joints.PLATE_SCREW_CUT_PROUD_MAX:.2f} PROUD"
+    limit = f"FLUSH TO {disc.inch_text(joints.PLATE_SCREW_CUT_PROUD_MAX, 3)} PROUD"
     assert limit in body
     assert joints.PLATE_SCREW_TIP_PROUD_MAX == joints.PLATE_SCREW_CUT_PROUD_MAX
     row = _config.parts("pd-vn-transgear-arm-plate-screw")
@@ -2033,7 +2032,7 @@ def test_the_platen_group_is_built_and_hung_before_its_locks_are_set() -> None:
     order = ["bar-clamped", "rack-soldered", "guides-screwed", "clips-fitted"]
     order += ["platen-hung", "guide-locks-set", "lock-seats-faced"]
     assert list(steps.SEQUENCE[: len(order)]) == order
-    assert f"{steps.BAR_TOP_ABOVE_DECK:.1f} ABOVE THE BASE DECK" in _step_body(
+    assert f"{steps.BAR_TOP_ABOVE_DECK_TEXT} ABOVE THE BASE DECK" in _step_body(
         "bar-clamped"
     )
     # The round pair locates the bar before the slotted pair is tightened;
@@ -2108,7 +2107,7 @@ def test_the_setting_and_the_acceptance_offsets_are_told_apart() -> None:
     assert f"STEP {steps.step_number('collar-rear-faced-to-fit')}'S SETTING" in accepted
     behind = steps.OFFSET_ACCEPT_TOL - collar.FIT_UP_OFFSET_TARGET
     assert behind > 0.0
-    assert f"UP TO {behind:.2f} BEHIND PASSES" in accepted
+    assert f"UP TO {disc.inch_text(behind, 3)} BEHIND PASSES" in accepted
 
 
 def test_the_knob_wheel_is_read_held_back_on_its_seat() -> None:
@@ -2259,8 +2258,9 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
     assert "FEED STUD AXIS" in window
     for axis_word in ("-X", "+X", "MACHINE X", " MM"):
         assert axis_word not in mesh
-    low, high = domain.axis_from_left_end_limits_mm
-    assert f"ENGAGED FEED: {low:.2f} TO {high:.2f} FROM" in mesh
+    assert window.startswith(
+        f"ENGAGED FEED: {steps.inch_window(domain.axis_from_left_end_limits_mm, 3, ' TO ')} FROM"
+    )
     assert "RUN THAT WINDOW: NO TIGHT SPOT, SHAKE AT EVERY TOOTH" in mesh
     assert "STOP BEFORE EITHER END LIMIT" in mesh
     assert "RESET ONLY WITH FEED DISENGAGED" in mesh
@@ -2305,11 +2305,11 @@ def test_the_reducer_is_clocked_once_with_an_ordinary_limit() -> None:
     body = _step_body("fitup-pose-set")
     assert body.startswith("HANGER LATCHED.")
     assert steps.KNOB_HELD_BACK_TEXT in body
-    clock = drawing.quality.reducer_setup_clock_deviation_mm()
+    clock = steps.inch_floor_mm(drawing.quality.reducer_setup_clock_deviation_mm(), 4)
     assert (
         "TURN THE DISC SO, ON THE LINE THROUGH THE KNOB AND CLUSTER AXES, A "
         f"{disc.TEETH}T TOOTH STANDS CENTRED IN A {knob_shaft.TEETH}T GAP, "
-        f"WITHIN {clock:.2f} AT THE PITCH CIRCLE"
+        f"WITHIN {disc.inch_text(clock, 4)} AT THE PITCH CIRCLE"
     ) in body
     assert body.endswith("TURN THE KNOB: NO TIGHT SPOT, SHAKE AT EVERY TOOTH.")
     for method in ("UNCERTAINTY", "RE-ZERO", "RE-CLOCK", "ABSOLUTE", "REJECT"):

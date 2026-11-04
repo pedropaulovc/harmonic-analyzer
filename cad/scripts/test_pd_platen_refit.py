@@ -422,17 +422,18 @@ def test_clip_screw_bosses_sweep_clear_of_the_bar_and_hanger(
 @pytest.mark.parametrize(
     ("deviation", "looser", "collides"),
     [
-        # A rail printed at the plain .XX row stands the heads into the plate.
+        # A rail printed at the .X row stands the lock plates into the arm
+        # (the inch arm plate's .XX notch leaves the arm the closest section).
         (
             "_GUIDE_DEPTH_DEV",
-            printed_deviations(assembly.GUIDE_DEPTH, 2, unit=assembly.GUIDE_UNIT),
-            "heads .* into the arm plate as",
+            printed_deviations(assembly.GUIDE_DEPTH, 1, unit=assembly.GUIDE_UNIT),
+            "lock plates .* into the arm as",
         ),
-        # So does a lock plate whose thickness prints .XX, not its sheet band...
+        # So does a lock plate whose thickness prints .X, not its sheet band...
         (
             "_LOCK_THICK_DEV",
-            printed_deviations(assembly.LOCK_THICK, 2),
-            "heads .* into the arm plate as",
+            printed_deviations(assembly.LOCK_THICK, 1),
+            "heads .* into the arm as",
         ),
         # ...and an arm plate whose notch depth prints .X.
         (
@@ -462,8 +463,9 @@ def test_chain_wheels_share_the_spec_band_and_the_chain_straddles_it() -> None:
     assert assembly.CHAIN_MID_Z == band.CHAIN_MID_Z
     # Both selected wheels sit on the one band: front face at
     # the band front, rear face on the seat face (the knob side's is the
-    # MHA-PD-22 drive collar's front face, set in front of the 12T's face F).
-    knob_seat_z = assembly.KNOB_COLLAR_Z0
+    # MHA-PD-22 drive collar's fitted front face, set in front of the 12T's
+    # face F).
+    knob_seat_z = assembly.KNOB_COLLAR_SEAT_Z
     assert math.isclose(knob_seat_z, band.SEAT_FACE_Z)
     # F stands the fitted collar body behind the seat, inside its facing window.
     assert (
@@ -475,9 +477,10 @@ def test_chain_wheels_share_the_spec_band_and_the_chain_straddles_it() -> None:
     assert math.isclose(
         (assembly.REMOVABLE_Z0 + knob_seat_z) / 2.0, assembly.CHAIN_MID_Z
     )
-    # The knob drive pins end inside the wheel plate, short of its front face.
+    # The knob drive pins end inside the wheel plate, short of its front face
+    # (the collar's faced remainder sets them that much behind the band's).
     tip_z = assembly.KNOB_DRIVE_PIN_Z0 - assembly.KNOB_PIN.LENGTH
-    assert math.isclose(tip_z, band.DRIVE_PIN_TIP_Z)
+    assert math.isclose(tip_z, band.DRIVE_PIN_TIP_Z + assembly.KNOB_COLLAR_FRONT_GAP)
     assert assembly.REMOVABLE_Z0 < tip_z < knob_seat_z
     # The chain's inner plates straddle the plate with running air each side,
     # and its rollers span the whole plate.
@@ -499,11 +502,13 @@ def test_knob_drive_collar_sits_between_the_seat_and_the_12t(
     assert math.isclose(
         assembly.KNOB_COLLAR_REAR_Z, assembly.KNOB_COLLAR_Z0 + collar.LENGTH
     )
-    # The nominal collar never overlaps F; the facing takes up the gap.
-    assert assembly.KNOB_SHAFT_Z0 - assembly.KNOB_COLLAR_REAR_Z >= 0.0
+    # The nominal collar's rear seats on F; the facing's remainder stands at
+    # its front, never overlapping the wheel.
+    assert math.isclose(assembly.KNOB_COLLAR_REAR_Z, assembly.KNOB_SHAFT_Z0)
+    assert assembly.KNOB_COLLAR_Z0 - assembly.KNOB_COLLAR_SEAT_Z >= 0.0
     assert (
         collar.SEAT_MIN_FROM_F
-        <= assembly.KNOB_SHAFT_Z0 - assembly.KNOB_COLLAR_Z0
+        <= assembly.KNOB_SHAFT_Z0 - assembly.KNOB_COLLAR_SEAT_Z
         <= collar.SEAT_MAX_FROM_F
     )
     assert assembly.DISC_Z0 - assembly.KNOB_SHAFT_Z0 > 0.0

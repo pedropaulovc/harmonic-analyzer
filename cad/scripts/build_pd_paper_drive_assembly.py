@@ -123,6 +123,8 @@ from _sketch import (
 )
 import pd_paper_drive_knob_setting_spec as KNOB_SETTING
 import pd_paper_drive_cluster_float_spec as CLUSTER_FLOAT
+from _assembly_contract import assembly_contract
+from _document_units import apply_package_model_units
 from _assembly import (
     _rebuilt_component_name,
     activate_assembly_contract,
@@ -605,19 +607,24 @@ if seat_geometry.PIN_HOLE_ANGLES_DEG != (90.0, 270.0):
 
 # Knob stack on K (front -> back): thumbnut | knob wheel | drive collar | the
 # shaft's 15T | thrust ring | arm-plate hub | plate | boss | knob cup.
-# The front collar seat stays on the wheel rear; the knob train stands on
-# the arm chain's F (transgear_cluster_fit.F_Z), and the collar's rear is
-# faced at fit-up to meet it (step collar-rear-faced-to-fit). The model
-# collar is its REF nominal, so the facing's remainder shows as a gap at its
-# rear, never an overlap, and the fitted body stays in its window.
-KNOB_COLLAR_Z0 = seat_geometry.SEAT_FACE_Z  # -154.3
+# The front collar seat is the wheel's rear; the knob train stands on the
+# arm chain's F (transgear_cluster_fit.F_Z), and the collar's rear is faced
+# at fit-up to meet it (step collar-rear-faced-to-fit). The model collar is
+# its REF nominal seated on F, so its rear carries the thumbnut's clamp into
+# the gear shoulder (step collar-shoulder-seated); the facing's remainder
+# shows as air between the wheel's rear and the collar's front, inside the
+# wheel's float under the nut, never an overlap, and the fitted body stays
+# in its window.
 KNOB_SHAFT_Z0 = CLUSTER.F_Z  # F
-KNOB_COLLAR_REAR_Z = KNOB_COLLAR_Z0 + COLLAR.LENGTH  # the REF nominal rear
-KNOB_COLLAR_FITTED_LENGTH = KNOB_SHAFT_Z0 - KNOB_COLLAR_Z0
-KNOB_COLLAR_REAR_GAP = KNOB_SHAFT_Z0 - KNOB_COLLAR_REAR_Z
-if KNOB_COLLAR_REAR_GAP < -1e-9:
+KNOB_COLLAR_SEAT_Z = seat_geometry.SEAT_FACE_Z  # -154.3, the wheel's rear
+KNOB_COLLAR_FITTED_LENGTH = KNOB_SHAFT_Z0 - KNOB_COLLAR_SEAT_Z
+KNOB_COLLAR_Z0 = KNOB_SHAFT_Z0 - COLLAR.LENGTH  # the REF nominal's front
+KNOB_COLLAR_REAR_Z = KNOB_COLLAR_Z0 + COLLAR.LENGTH  # on F
+KNOB_COLLAR_FRONT_GAP = KNOB_COLLAR_Z0 - KNOB_COLLAR_SEAT_Z
+if KNOB_COLLAR_FRONT_GAP < -1e-9:
     raise AssertionError(
-        f"the drive collar's nominal rear overlaps F by {-KNOB_COLLAR_REAR_GAP:.4f}"
+        f"the drive collar's nominal front overlaps the knob wheel by "
+        f"{-KNOB_COLLAR_FRONT_GAP:.4f}"
     )
 if not COLLAR.LENGTH_FITTED_MIN <= KNOB_COLLAR_FITTED_LENGTH <= COLLAR.LENGTH_FITTED_MAX:
     raise AssertionError(
@@ -626,9 +633,17 @@ if not COLLAR.LENGTH_FITTED_MIN <= KNOB_COLLAR_FITTED_LENGTH <= COLLAR.LENGTH_FI
     )
 # The two MHA-PD-VN-54 dowels pressed through the collar's holes (Rx-90: pin +Y ->
 # -Z), rounded ends DRIVE_PIN_PROUD in front of it, in the wheel's pin holes.
-KNOB_DRIVE_PIN_Z0 = seat_geometry.DRIVE_PIN_TIP_Z + KNOB_PIN.LENGTH  # -151.9375
-if abs(KNOB_COLLAR_Z0 - seat_geometry.DRIVE_PIN_TIP_Z - COLLAR.DRIVE_PIN_PROUD) > 1e-9:
-    raise AssertionError("knob drive-pin tips are off the collar's DRIVE_PIN_PROUD")
+KNOB_DRIVE_PIN_TIP_Z = KNOB_COLLAR_Z0 - COLLAR.DRIVE_PIN_PROUD
+KNOB_DRIVE_PIN_Z0 = KNOB_DRIVE_PIN_TIP_Z + KNOB_PIN.LENGTH  # -151.9206
+if (
+    abs(KNOB_COLLAR_SEAT_Z - seat_geometry.DRIVE_PIN_TIP_Z - COLLAR.DRIVE_PIN_PROUD)
+    > 1e-9
+):
+    raise AssertionError(
+        "the wheel seat's drive-pin tips are off the collar's DRIVE_PIN_PROUD"
+    )
+if not KNOB_DRIVE_PIN_TIP_Z < KNOB_COLLAR_SEAT_Z:
+    raise AssertionError("knob drive-pin tips stand clear of the knob wheel's pin holes")
 if abs(KNOB_PIN.DIA - seat_geometry.DRIVE_PIN_DIA) > 1e-12:
     raise AssertionError("transgear-knob-drive-pin is not the removable's drive pin")
 if COLLAR.PIN_CIRCLE_RADIUS != seat_geometry.PIN_CIRCLE_RADIUS:
@@ -641,7 +656,7 @@ KNOB_RING_Z0 = KNOB_SHAFT_Z0 + KNOB_SPEC.FACE_WIDTH  # -142.2
 if abs(KNOB_RING_Z0 + RING.LENGTH - (PLATE_Z0 + ARM_PLATE.HUB_FACE_Z)) > 1e-9:
     raise AssertionError("the thrust ring does not reach the arm plate's hub face")
 KNOB_CUP_Z0 = KNOB_SHAFT_Z0 + KNOB_SPEC.CUP_FACE_Z  # -107.7625
-KNOB_CUP_REAR_Z = KNOB_CUP_Z0 + CUP.LENGTH  # -99.7625
+KNOB_CUP_REAR_Z = KNOB_CUP_Z0 + CUP.LENGTH  # -99.6355
 KNOB_SHAFT_REAR_Z = KNOB_SHAFT_Z0 + KNOB_SPEC.REAR_END_Z  # -101.2625
 KNOB_CUP_PIN_Z0 = KNOB_CUP_Z0 + CUP.PIN_HOLE_FROM_FRONT  # -104.7625
 if not KNOB_CUP_Z0 < KNOB_SHAFT_REAR_Z < KNOB_CUP_REAR_Z:
@@ -893,8 +908,9 @@ if KNOB_COLLAR_R_WORST + dt_crankshaft_spec.WHEEL_SEAT_FLOAT >= KNOB_CHAIN_INNER
 # face, so the wheel floats free under the flange (R9-70, N-A). Rx(-90): local
 # +Y -> -Z, so the nut spans THUMBNUT_Z0 .. THUMBNUT_Z0 - THUMBNUT_LEN (the
 # knurled head at the front).
-THUMBNUT_AIR = COLLAR.PILOT_PROUD  # 0.10, nominal
-THUMBNUT_Z0 = REMOVABLE_Z0 - THUMBNUT_AIR  # -157.2 (the flange's seat face)
+THUMBNUT_Z0 = KNOB_COLLAR_Z0 - COLLAR.PILOT_LENGTH  # -157.1847 (the flange's seat face)
+# The nominal proud, less the faced remainder at the collar's front.
+THUMBNUT_AIR = REMOVABLE_Z0 - THUMBNUT_Z0  # 0.0847
 THUMBNUT_FRONT_Z = THUMBNUT_Z0 - THUMBNUT_LEN  # -173.3 (the rim)
 KNOB_SHAFT_FRONT_Z = KNOB_SHAFT_Z0 - KNOB_SPEC.TIP_STATION  # -172.0, the stud tip
 THUMBNUT_ENGAGEMENT = THUMBNUT_Z0 - KNOB_SHAFT_FRONT_Z  # 14.8
@@ -902,8 +918,6 @@ if THUMBNUT_THREAD != KNOB_SPEC.THREAD:
     raise AssertionError(
         f"thumbnut tap {THUMBNUT_THREAD} is not the knob shaft's {KNOB_SPEC.THREAD}"
     )
-if abs(THUMBNUT_Z0 - (KNOB_COLLAR_Z0 - COLLAR.PILOT_LENGTH)) > 1e-9:
-    raise AssertionError("thumbnut seat is not on the drive collar's pilot face")
 if not THUMBNUT_AIR > 0.0:
     raise AssertionError("the thumbnut clamps the knob wheel: its pilot is not proud")
 if not (THUMBNUT_FRONT_Z < KNOB_SHAFT_FRONT_Z < THUMBNUT_Z0):
@@ -917,7 +931,7 @@ if THUMBNUT_FLANGE_DIA < seat_geometry.BORE_DIA + 1.0:
     raise AssertionError(
         "thumbnut flange slips into the removable's bore -- retains nothing"
     )
-if seat_geometry.DRIVE_PIN_TIP_Z - THUMBNUT_Z0 <= 0.0:
+if KNOB_DRIVE_PIN_TIP_Z - THUMBNUT_Z0 <= 0.0:
     raise AssertionError("knob drive-pin tips reach the thumbnut flange")
 # Front furniture: nothing in this sub sits in front of the knob wheel but the
 # chain, whose plates straddle the wheel (z CHAIN_MID_Z +- pin reach) and
@@ -1167,7 +1181,7 @@ CHAIN_PLANE_ENVELOPES = (
             "knob drive pin",
             xy,
             KNOB_PIN.DIA / 2.0,
-            seat_geometry.DRIVE_PIN_TIP_Z,
+            KNOB_DRIVE_PIN_TIP_Z,
             KNOB_DRIVE_PIN_Z0,
         )
         for xy in KNOB_DRIVE_PIN_XY
@@ -1407,7 +1421,7 @@ def _assert_fastener_stacks() -> None:
     # Knob stack: the thumbnut on the shaft's front thread, seated on the
     # collar's pilot (R9-70); the cup is pinned, not screwed.
     raw_thumbnut = (
-        KNOB_SPEC.TIP_STATION - KNOB_COLLAR_FITTED_LENGTH - COLLAR.PILOT_LENGTH
+        KNOB_SPEC.TIP_STATION - COLLAR.LENGTH - COLLAR.PILOT_LENGTH
     )
     if abs(THUMBNUT_ENGAGEMENT - raw_thumbnut) > 1e-9:
         raise AssertionError("thumbnut engagement is off the collar/pilot stack")
@@ -1556,10 +1570,12 @@ _LOCK_THICK_DEV = (-LOCK_THICK_BAND, LOCK_THICK_BAND)  # the sheet's mill band
 _LOCK_HEIGHT_DEV = printed_deviations(LOCK_HEIGHT, LOCK_PRECISION["Height"], unit=LOCK_UNIT)
 _SPACER_LENGTH_DEV = (-SPACER.LENGTH_BAND, SPACER.LENGTH_BAND)
 _NOTCH_DEPTH_DEV = printed_deviations(
-    ARM_PLATE.NOTCH_DEPTH, ARM_PLATE_SPEC.NOTCH_DEPTH_PLACES
+    ARM_PLATE.NOTCH_DEPTH, ARM_PLATE_SPEC.NOTCH_DEPTH_PLACES, unit=ARM_PLATE.UNIT
 )
-_PLATE_OUTLINE_BAND = ARM_PLATE_SPEC.BAND_BY_PLACES[ARM_PLATE_SPEC.OUTLINE_PLACES]
-_HUB_DIA_DEV = printed_deviations(ARM_PLATE.HUB_DIA, ARM_PLATE_SPEC.HUB_DIA_PLACES)
+_PLATE_OUTLINE_BAND = ARM_PLATE.OUTLINE_BAND
+_HUB_DIA_DEV = printed_deviations(
+    ARM_PLATE.HUB_DIA, ARM_PLATE_SPEC.HUB_DIA_PLACES, unit=ARM_PLATE.UNIT
+)
 
 
 def _grown(
@@ -1693,7 +1709,7 @@ def _assert_lock_station_sweep() -> None:
             "arm",
             _grown(
                 (tip_y - ARM.TIP_END_R, py + ARM.PIVOT_END_R, ARM_Z0, PLATE_Z0),
-                ARM.BAND_X + ARM.TIP_STATION_BAND + pivot_tap,
+                ARM.OUTLINE_BAND + ARM.TIP_STATION_BAND + pivot_tap,
                 arm_forward,
                 0.0,
             ),
@@ -2433,7 +2449,7 @@ async def _author_knob_setting_reference(adapter) -> None:
     # associative model dimension, never a note (#1388).
     set_dimension_bilateral_tolerance(
         adapter, spec.FEATURE, spec.CENTRE_DIMENSION, *KNOB_SETTING.CENTRE_TOLERANCE_MM,
-        places=spec.PLACES,
+        places=spec.PLACES, display_unit=assembly_contract(ASM_NAME).drawing_unit,
     )
     for name in sorted(spec.REFERENCE_DIMENSIONS):
         # A reference value through the native prefix/suffix channel (the
@@ -2516,7 +2532,7 @@ async def _author_cluster_float_reference(adapter) -> None:
     # associative model dimension, never a note (#1388).
     set_dimension_bilateral_tolerance(
         adapter, spec.FEATURE, spec.DIMENSION, *CLUSTER_FLOAT.TOLERANCE_MM,
-        places=spec.PLACES,
+        places=spec.PLACES, display_unit=assembly_contract(ASM_NAME).drawing_unit,
     )
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     mark_dimensions_for_drawing(
@@ -2782,8 +2798,12 @@ async def _sprocket_revolute(adapter, name: str, label: str) -> None:
     )
 
 
-def _assert_knob_collar_capture(adapter, collar: str, shaft: str) -> None:
-    """Observe native fitted metal on F and D-clock; lock mates cannot stand in."""
+def _assert_knob_collar_capture(adapter, collar: str, shaft: str, wheel: str) -> None:
+    """Observe native fitted metal on F and D-clock; lock mates cannot stand in.
+
+    The collar's rear must touch gear front F (the thumbnut's clamp reacts
+    there), and the facing's remainder must stand at its front, off the
+    knob wheel's rear face."""
     from _gtol_planar import PlanarFace
     from _gtol_face_resolve import resolve_faces
 
@@ -2817,10 +2837,14 @@ def _assert_knob_collar_capture(adapter, collar: str, shaft: str) -> None:
     })
     rear = world_point(adapter, collar, [0.0, 0.0, length])
     front = world_point(adapter, shaft, [0.0, 0.0, 0.0])
-    # F stands KNOB_COLLAR_REAR_GAP behind the nominal collar's rear (+Z), on axis.
-    if math.dist((rear[0], rear[1], rear[2] + KNOB_COLLAR_REAR_GAP), front) > 1e-5:
+    if math.dist(rear, front) > 1e-5:
+        raise RuntimeError(f"knob collar rear is not on gear F: {rear=}, {front=}")
+    collar_front = world_point(adapter, collar, [0.0, 0.0, 0.0])
+    wheel_rear = world_point(adapter, wheel, [0.0, 0.0, seat_geometry.PLATE])
+    if abs(collar_front[2] - wheel_rear[2] - KNOB_COLLAR_FRONT_GAP) > 1e-5:
         raise RuntimeError(
-            f"gear F is not {KNOB_COLLAR_REAR_GAP:.4f} behind the collar rear: {rear=}, {front=}"
+            f"knob collar front is not {KNOB_COLLAR_FRONT_GAP:.4f} behind the wheel "
+            f"rear: {collar_front=}, {wheel_rear=}"
         )
     collar_o = world_point(adapter, collar, [0.0, 0.0, 0.0])
     collar_flat = world_point(adapter, collar, [0.0, -1.0, 0.0])
@@ -2928,6 +2952,7 @@ async def build(adapter) -> dict[str, str]:
     # call: each freed DOF is recorded (never authored) and persisted below.
     reset_dof_manifest()
     check("create_assembly", await adapter.create_assembly())
+    apply_package_model_units(adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME)
 
     # --- support bar + two-piece clamps ---------------------------------------
     # The bar is FIRST so the auto-fixed seed is structure, not the mated platen.
@@ -3562,13 +3587,25 @@ async def build(adapter) -> dict[str, str]:
         label="drive collar coaxial with the mounted knob wheel",
         verify=(collar, collar_o),
     )
-    await coincident_mate(
-        adapter,
-        named_ref(f"Front Plane@{collar}", "PLANE"),
-        named_ref(f"RearFace@{knob_wheel}", "PLANE"),
-        label="drive collar front face on the knob wheel rear face",
-        verify=(collar, collar_o),
-    )
+    # The nominal collar seats on F (below), so the fit-up facing's remainder
+    # stands as air between the wheel's rear and the collar's front.
+    if KNOB_COLLAR_FRONT_GAP > 1e-9:
+        await distance_driver(
+            adapter,
+            named_ref(f"Front Plane@{collar}", "PLANE"),
+            named_ref(f"RearFace@{knob_wheel}", "PLANE"),
+            KNOB_COLLAR_FRONT_GAP,
+            label="drive collar front behind the knob wheel rear face",
+            verify=(collar, collar_o),
+        )
+    else:
+        await coincident_mate(
+            adapter,
+            named_ref(f"Front Plane@{collar}", "PLANE"),
+            named_ref(f"RearFace@{knob_wheel}", "PLANE"),
+            label="drive collar front face on the knob wheel rear face",
+            verify=(collar, collar_o),
+        )
     # The collar origin sits ON the spin axis, so only an off-axis witness (a
     # drive-pin station) separates the two parallel solutions.
     await parallel_mate(
@@ -3618,30 +3655,20 @@ async def build(adapter) -> dict[str, str]:
         label="integral knob D-core coaxial with collar",
         verify=(knob_shaft, shaft_o),
     )
-    # F on the arm chain: the nominal collar's rear stands KNOB_COLLAR_REAR_GAP
-    # in front of it (the fit-up facing's remainder).
-    if KNOB_COLLAR_REAR_GAP > 1e-9:
-        await distance_driver(
-            adapter, named_ref(f"Front Plane@{knob_shaft}", "PLANE"),
-            named_ref(f"RearFace@{collar}", "PLANE"),
-            KNOB_COLLAR_REAR_GAP,
-            label="gear front F behind the nominal collar rear",
-            verify=(knob_shaft, shaft_o),
-        )
-    else:
-        await coincident_mate(
-            adapter, named_ref(f"Front Plane@{knob_shaft}", "PLANE"),
-            named_ref(f"RearFace@{collar}", "PLANE"),
-            label="actual collar rear reaction face on gear front F",
-            verify=(knob_shaft, shaft_o),
-        )
+    # F on the arm chain: the collar's rear reacts on it.
+    await coincident_mate(
+        adapter, named_ref(f"Front Plane@{knob_shaft}", "PLANE"),
+        named_ref(f"RearFace@{collar}", "PLANE"),
+        label="actual collar rear reaction face on gear front F",
+        verify=(knob_shaft, shaft_o),
+    )
     await parallel_mate(
         adapter, named_ref(f"Right Plane@{knob_shaft}", "PLANE"),
         named_ref(f"Right Plane@{collar}", "PLANE"),
         label="integral knob D-flat clocked to actual collar flat",
         verify=(knob_shaft, shaft_o), witness_local=[0.0, -1.0, 0.0],
     )
-    _assert_knob_collar_capture(adapter, collar, knob_shaft)
+    _assert_knob_collar_capture(adapter, collar, knob_shaft, knob_wheel)
 
     async def _lock_to_shaft(name: str, label: str) -> None:
         await lock_mate(

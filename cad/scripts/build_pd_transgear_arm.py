@@ -88,7 +88,7 @@ from _visibility import blank_reference_geometry
 from pd_transgear_arm_geometry import (
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
-    LOCATOR_HOLE_PRINT_TOLERANCE_MM,
+    LOCATOR_HOLE_DIA_BAND,
     EDGE_LEAN,
     END_HALF_WIDTH,
     PIN_BORE_DIA,
@@ -765,13 +765,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, "SpotFaceProfile", "FloorDepth", SPOT_FACE_FLOOR_TOLERANCE,
         display_unit=UNIT,
     )
-    # The locating ream prints ± on one line (the geometry module's print
-    # inside the interface's press limits), so the six-line callout under it
-    # stays inside the sheet's upper border.
+    # The locating ream prints the .0930 reamer's own band.
     for index in (1, 2):
-        set_dimension_symmetric_tolerance(
+        set_dimension_bilateral_tolerance(
             adapter, "LocatorProfile", f"LocatorDia{index}",
-            LOCATOR_HOLE_PRINT_TOLERANCE_MM, display_unit=UNIT,
+            *deviations(LOCATOR_HOLE_DIA_BAND), display_unit=UNIT,
         )
     for feature_name, dimension_name in BASIC_REDUCER_DIMENSIONS:
         set_dimension_basic_tolerance(adapter, feature_name, dimension_name)

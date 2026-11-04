@@ -233,9 +233,12 @@ FRONT_KEEP = {
     # they crowded the sockets and line B).
     "LocatorY1": (_LOCATOR_OFFSET_X, _front_y(PIVOT_END_R) + 0.0045),
     "LocatorY2": (_LOWER_OFFSET_X, _front_y(-PIVOT_END_R) - 0.0045),
-    # Six callout lines under the value: the block centres low enough that
-    # its top stays inside the upper border, right of the tap callout.
-    "LocatorDia1": (0.262, _front_y(PIVOT_END_R) + 0.0157),
+    # Five callout lines under the stacked-band value (six ran the block
+    # from the border to the arm's top edge: machinist review of
+    # 2cb922430). SOLIDWORKS centres the block on this point, so the dropped
+    # line frees about 1.4 mm at each end; 0.5 mm lower splits it, about
+    # 1.9 mm under the border and 0.9 mm over the edge.
+    "LocatorDia1": (0.262, _front_y(PIVOT_END_R) + 0.0144),
 }
 # The true overall (review of 19e33c6c2: the 128.90 from the bore axis read
 # as one), a reference under the stations: picked on the pivot round's upper

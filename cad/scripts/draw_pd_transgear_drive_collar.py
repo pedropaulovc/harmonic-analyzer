@@ -46,6 +46,8 @@ from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _part_properties import part_drawing_unit
+from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
 from pd_paper_drive_assembly_steps import step_ref
@@ -130,9 +132,11 @@ END_KEEP = {
     "PinPosY": (END_CENTER[0] - HALF_OD - 0.025, END_CENTER[1] + PIN_R * 0.65),
     "PinNegY": (END_CENTER[0] - HALF_OD - 0.025, END_CENTER[1] - PIN_R * 0.35 - 0.006),
 }
-# SolidWorks prints "SECTION A-A / SCALE 4:1" under the section, its top
-# 16.6 mm under the view's lower edge and centred on it (measured on run
-# 20261009T224545531Z's sheet), so nothing tall may stand there. The two
+# SolidWorks put "SECTION A-A / SCALE 4:1" just under the section, where the
+# fitted-length row's dimension line (about 11 mm under the view, under its
+# two-line text) ran through "SECTION" (machinist review of bcdc09b35): the
+# caption, top-centre anchored, now stands 19 mm under the view, clear of
+# that line and above the notes block. The two
 # fitted lengths share one row just under the section, each with only a
 # pointer to its sheet note: the pilot's text right of its short span, the
 # body's left of the rear witness, which struck it inside its own span
@@ -146,6 +150,7 @@ END_KEEP = {
 # under the bore callout's shelf (206.7 mm). Both diameters read right of the
 # pilot face, each mate callout clear of the other.
 _LENGTH_ROW_Y = SIDE_CENTER[1] - HALF_OD - 0.006
+SECTION_CAPTION_XY = (SIDE_CENTER[0], SIDE_CENTER[1] - HALF_OD - 0.019)
 _BORE_EDGE_Y = SIDE_CENTER[1] + BORE_DIA * _S / 2000.0
 SIDE_KEEP = {
     "PilotLength": (_PILOT_X + 0.019, _LENGTH_ROW_Y),
@@ -311,7 +316,8 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,
@@ -334,6 +340,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="collar axial D-flat section",
     )
     _orient_section(adapter, side)
+    position_section_caption(
+        adapter, side, SECTION_CAPTION_XY, label="collar section A-A"
+    )
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     for view in (end, side, iso):
         set_hidden_lines_removed(adapter, view)

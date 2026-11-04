@@ -2255,20 +2255,20 @@ JOINTS: tuple[Joint, ...] = (
         assembly="pd_paper_drive",
         member="pd_transgear_knob_cup",
         receiver="pd_transgear_knob_shaft",
-        thread="none: Ø6 reamed slip fit, cross-pinned (R9-70 replaced the rear screw)",
+        thread="none: Ø.249 reamed slip fit, cross-pinned (R9-70 replaced the rear screw)",
         installed_at="knob-stack-fitted",
         exposure=Exposure.ROTATING_DRAG,
         exposure_reason=(
             "the cup rides the rear end of the knob shaft's journal, which spins in the arm plate "
             "bore with the chain-driven T24 and reverses when the paper is wound back. The cup's "
-            "front face runs 0.2 behind the plate's rear boss and is the rear stop of the knob's end "
+            "front face runs .008 behind the plate's rear boss and is the rear stop of the knob's end "
             "float, so whenever the knob is drawn forward the cup rubs the stationary boss about the "
             "shaft axis"
         ),
         axial_capture=(
             "the MHA-PD-VN-62 1/16 x 5/8 slotted spring pin pressed through the cup and the journal, "
-            "3.0 from the cup's front face, in a Ø1.6 +0.05/0 hole match-drilled with the cup set "
-            "on a 0.2 feeler at the boss; the pin carries the end-float thrust and the drag in "
+            ".120 from the cup's front face, in a Ø.062 +.003/0 hole match-drilled with the cup set "
+            "on a .008 feeler at the boss; the pin carries the end-float thrust and the drag in "
             "shear, its ends inside the cup's O.D."
         ),
         lock=Lock.CROSS_PIN,
@@ -2318,7 +2318,7 @@ JOINTS: tuple[Joint, ...] = (
         installed_at="collar-shoulder-seated",
         exposure=Exposure.OSCILLATING,
         exposure_reason=(
-            "the nut seats on the drive collar's pilot, faced 0.05-0.15 proud of the T24's front "
+            "the nut seats on the drive collar's pilot, faced .002-.006 proud of the T24's front "
             "face, so its axial clamp passes through the collar's rear face onto the shaft's "
             "actual pinion front face F while the T24 floats free under its flange. The drive "
             "goes T24 -> the two pressed drive pins -> collar -> D-flat -> shaft; the free T24 "

@@ -75,6 +75,7 @@ from _gear_drawing_entities import visible_circle_edge
 from _machinist_review_mode import MachinistReviewMode
 from _native_projected_zone import require_saved_projected_gtols
 from _paths import CAD_ROOT
+from _part_properties import part_drawing_unit
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 from _section_axis import position_section_caption
@@ -125,6 +126,7 @@ from pd_transgear_arm_plate_spec import (
     SCREW_ZONE_HEIGHT,
     SHEET_NAMES,
     SURFACE_FINISHES,
+    THICKNESS_CALLOUT,
 )
 
 # Machinist review gates this sheet: the build fails on a FIX verdict.
@@ -163,12 +165,14 @@ ISO_NOTE_XY = (0.285, 0.252)
 # 20261027T180704579Z).
 SCREW_SECTION_CENTER = (0.305, 0.140)
 REAR_LABEL_XY = (0.093, 0.032)
-BACK_CENTER = (0.135, 0.153)
-# 5 mm under the face-A view's line since #2034: on it the hub-to-boss
-# text crossed the upper border by 3.7 (preview run 20261028T064655627Z);
-# its row cannot drop, its callout lines would meet the hub-face station's
-# value (run 20261028T070651235Z at a 1 mm lower row: 1.3 mm air).
-KNOB_SECTION_CENTER = (0.298, BACK_CENTER[1] - 0.005)
+# Section A-A stands 5 mm under its old line since #2034: there the
+# hub-to-boss text crossed the upper border by 3.7 (preview run
+# 20261028T064655627Z); its row cannot drop, its callout lines would meet
+# the hub-face station's value (run 20261028T070651235Z at a 1 mm lower row:
+# 1.3 mm air).  The face-A view drops to it (BACK_CENTER below), so the
+# section's bore axis, boss and plate edges project straight across from the
+# view (machinist review, run 20261103T155747207Z: they stood 4.2 mm apart).
+KNOB_SECTION_CENTER = (0.298, 0.148)
 # Section A-A's native caption, its annotation position: SOLIDWORKS hangs
 # it 17 mm under the section, on the title block since #2034 (same run);
 # here it stands 6 mm under the thrust-face captions, 3 mm over the title
@@ -176,13 +180,20 @@ KNOB_SECTION_CENTER = (0.298, BACK_CENTER[1] - 0.005)
 # thrust-face caption (at x 0.279 the box centred at 0.260, under that
 # caption: run 20261028T070651235Z).
 KNOB_SECTION_CAPTION_XY = (0.309, 0.0835)
-# 4 mm under the side widths' extension-line ends since #2034, whose taller
-# face put them through this label (same run).
-FRONT_LABEL_XY = (0.110, 0.077)
 
 _TOP = TOP_LEFT[1]  # the plate's highest point (the top edge's -X corner)
 _SECTION_TOP = arm_upper_edge_y(0.0)
 _BOTTOM = -END_R
+# The face-A view centres its outline, _BOTTOM.._TOP about K; section A-A's
+# cuts the top edge at x = 0, _SECTION_TOP, lower than the corner.  The view
+# stands that half-difference above the section's centre, so K is level in
+# both; its label keeps its 4 mm under the side widths' extension-line ends
+# (#2034, whose taller face put them through it).
+BACK_CENTER = (
+    0.135,
+    KNOB_SECTION_CENTER[1] + (_TOP - _SECTION_TOP) / 2.0 * SHEET_SCALE[0] / 1000.0,
+)
+FRONT_LABEL_XY = (0.110, BACK_CENTER[1] - 0.076)
 _Z_PLAN = BOSS_FACE_Z
 _SCREW_Y = SCREW_HOLES[0][1]
 
@@ -278,7 +289,12 @@ BACK_KEEP: dict[str, tuple[float, float, float]] = {
 # read as naming the hub (machinist review, run 20261027T152452686Z); its
 # witness lines stop short of the hub face, not on through the hatched hub
 # to the profile line's far end at the rear face (run 20261027T180704579Z).
-# The boss diameter stands beyond the boss face's caption.
+# The boss diameter stands beyond the boss face's caption.  The over-arm
+# thickness's value and its three-line callout (about 20 mm of model wide at
+# 2:1) stand centred 13 mm right of the boss face, so the whole block clears
+# the hub-to-boss dimension's boss-face witness line (at +6 that line ran
+# through the text: machinist review of ae9ed661a), in the open sheet above
+# the boss; between the plate's own witness lines they would cross face A's.
 # The hub station's callout takes three lines (it also sets the disc
 # cluster's collar air, #2038).  SOLIDWORKS centres the value-and-callout
 # block on its position, so the third line raised the value half a line: at
@@ -288,7 +304,7 @@ BACK_KEEP: dict[str, tuple[float, float, float]] = {
 HUB_DIA_TEXT_STANDOFF_MM = 25.5
 HUB_DIA_WITNESS_MAX_M = (HUB_DIA_TEXT_STANDOFF_MM * SHEET_SCALE[0] - 1.0) / 1000.0
 SECTION_KEEP: dict[str, tuple[float, float, float]] = {
-    "ThicknessOverArm": (0.0, _SECTION_TOP + 5.0, REAR_FACE_Z / 2.0),
+    "ThicknessOverArm": (0.0, _SECTION_TOP + 5.0, BOSS_FACE_Z + 13.0),
     "NotchDepth": (0.0, _SECTION_TOP + 10.0, FRONT_FACE_Z / 2.0),
     "HubFaceToMounting": (0.0, _SECTION_TOP + 17.9, HUB_FACE_Z / 2.0),
     "HubToBoss": (0.0, _SECTION_TOP + 28.0, (HUB_FACE_Z + BOSS_FACE_Z) / 2.0),
@@ -367,6 +383,7 @@ PLAN_CALLOUTS_ABOVE = {
     "CskDia": HOLE_COUNT_CALLOUT,
 }
 SECTION_CALLOUTS = {
+    "ThicknessOverArm": THICKNESS_CALLOUT,
     "HubFaceToMounting": HUB_STATION_CALLOUT,
     "HubToBoss": HUB_TO_BOSS_CALLOUT,
 }
@@ -790,7 +807,8 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,

@@ -16,7 +16,7 @@ import draw_pd_transgear_knob_thrust_ring as drawing
 import pd_transgear_knob_thrust_ring_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
-from pd_cluster_stack_band import PRINTED_LENGTH_BAND, STACK_NAME
+from pd_cluster_stack_band import FIT_LENGTH_BAND_IN, STACK_NAME
 
 
 def test_required_drawing_paths() -> None:
@@ -63,7 +63,7 @@ def test_the_float_stop_carries_its_band_and_the_bore_takes_the_drilled_row() ->
     assert model_toleranced_dimensions(part) == {
         ("Ring", "RingLength"): "LENGTH_TOL",
     }
-    assert spec.ID_BAND == (_printed_tolerance.drilled_oversize_mm(), 0.0)
+    assert spec.ID_BAND == (_printed_tolerance.drilled_oversize_mm(unit=spec.UNIT), 0.0)
 
 
 def test_the_banded_length_names_the_stack_it_serves() -> None:
@@ -71,7 +71,9 @@ def test_the_banded_length_names_the_stack_it_serves() -> None:
     the mating parts it serves, by drawing number."""
     shaft = _config.parts("pd-transgear-knob-shaft")["number"]
     plate = _config.parts("pd-transgear-arm-plate")["number"]
-    assert spec.LENGTH_TOL < _printed_tolerance.printed_band_mm(spec.LENGTH_PLACES)
+    assert spec.LENGTH_TOL < _printed_tolerance.printed_band_mm(
+        spec.LENGTH_PLACES, unit=spec.UNIT
+    )
     assert spec.DIMENSION_CALLOUTS["Ring"] == {"RingLength": spec.LENGTH_CALLOUT}
     assert shaft in spec.LENGTH_CALLOUT and plate in spec.LENGTH_CALLOUT
     assert STACK_NAME in spec.LENGTH_CALLOUT
@@ -98,10 +100,10 @@ def test_the_length_text_stands_clear_of_its_extension_lines() -> None:
 
 
 def test_ring_bore_and_opposed_axial_faces_consume_the_new_interface() -> None:
-    assert spec.ID == pytest.approx(6.05)
-    assert spec.ID_BAND == pytest.approx((0.10, 0.0))
-    assert spec.LENGTH == pytest.approx(5.2)
-    assert spec.LENGTH_TOL == pytest.approx(PRINTED_LENGTH_BAND) == pytest.approx(0.02)
+    assert spec.ID == pytest.approx(6.5278)  # .257
+    assert spec.ID_BAND == pytest.approx((0.1016, 0.0))
+    assert spec.LENGTH == pytest.approx(5.207)  # .205
+    assert spec.LENGTH_TOL == pytest.approx(FIT_LENGTH_BAND_IN)
     assert part.V_RING == pytest.approx(
         math.pi * ((spec.OD / 2.0) ** 2 - (spec.ID / 2.0) ** 2) * spec.LENGTH
     )
@@ -115,7 +117,7 @@ def test_ring_bore_and_opposed_axial_faces_consume_the_new_interface() -> None:
 def test_wall_holds_at_the_worst_case_the_sheet_prints() -> None:
     """drawing-guidelines.md rule 17 (walls and webs): the smallest O.D. its printed row accepts over the
     largest bore its band accepts."""
-    od_band = _printed_tolerance.printed_band_mm(spec.OD_PLACES)
+    od_band = _printed_tolerance.printed_band_mm(spec.OD_PLACES, unit=spec.UNIT)
     worst = ((spec.OD - od_band) - (spec.ID + max(spec.ID_BAND))) / 2.0
     assert worst >= spec.WALL_FLOOR
     assert spec.WALL_WORST == pytest.approx(worst, abs=0.01)
@@ -135,17 +137,17 @@ def test_the_wall_gate_refuses_a_coarser_printed_row(monkeypatch) -> None:
     assert _ring_spec_fresh().WALL_WORST == pytest.approx(spec.WALL_WORST)
     # Negative control: an O.D. row loose enough to thin the wall under 2.0.
     monkeypatch.setattr(
-        _printed_tolerance, "printed_deviations", lambda _value, _places: (-4.0, 4.0)
+        _printed_tolerance, "printed_deviations", lambda _value, _places, **_: (-4.0, 4.0)
     )
     with pytest.raises(AssertionError, match="floor"):
         _ring_spec_fresh()
 
 
 def test_the_od_prints_at_the_coarsest_row_its_wall_allows() -> None:
-    """drawing-guidelines.md rule 17 (walls and webs): nothing fits on the O.D., so it prints at the title
-    block's .X row once the wall holds there."""
-    assert spec.worst_wall(1) >= spec.WALL_FLOOR
-    assert spec.OD_PLACES == 1
+    """drawing-guidelines.md rule 17 (walls and webs): nothing fits on the O.D., so it prints at the
+    inch title block's loosest .XX row once the wall holds there."""
+    assert spec.worst_wall(2) >= spec.WALL_FLOOR
+    assert spec.OD_PLACES == 2
 
 
 def test_the_od_is_dimensioned_on_the_side_view_beside_the_rear_face() -> None:

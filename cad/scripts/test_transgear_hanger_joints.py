@@ -226,10 +226,12 @@ def test_cut_plate_screws_hold_one_and_a_half_d_in_the_thinnest_arm(
 
 def test_plate_notch_face_clears_the_arm_edge_at_every_limit(monkeypatch) -> None:
     """Reference-pose graded clearance; the notch does not locate."""
+    # The corners print .XX with nominals that follow the arm's mm edges:
+    # judged at their printed limits' reach, never less than the .XX row.
     import pd_transgear_arm_plate_spec as plate_spec
 
-    corner_band = plate_spec.BAND_BY_PLACES[plate_spec.NOTCH_PLACES]
-    worst = (plate.NOTCH_RELIEF - corner_band) * math.cos(arm.EDGE_LEAN) - arm.OUTLINE_BAND
+    assert plate.NOTCH_BAND >= plate_spec.BAND_BY_PLACES[plate_spec.NOTCH_PLACES]
+    worst = (plate.NOTCH_RELIEF - plate.NOTCH_BAND) * math.cos(arm.EDGE_LEAN) - arm.OUTLINE_BAND
     assert worst > 0.0
     assert joints.NOTCH_REFERENCE_AIR_WORST_MM == pytest.approx(worst)
     # Each corner still sits on the relieved line parallel to the arm edge.

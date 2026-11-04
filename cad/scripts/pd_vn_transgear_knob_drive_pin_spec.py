@@ -16,11 +16,13 @@ face at y = 0, the rounded lead end at y = LENGTH.
 
 from __future__ import annotations
 
+import _config
 from _mcmaster_98381a433 import (
     DIA_BAND_IN,  # noqa: F401 -- re-exported: catalogue diameter tolerance (in)
     DOWEL_SIZE,
     MM_PER_IN,  # noqa: F401 -- re-exported with the inch band
 )
+from _package_units import drawing_unit
 from _sprocket_seat_geometry import DRIVE_PIN_DIA, DRIVE_PIN_PROUD, PLATE, PLATE_BAND
 from _supplier_pin_data import SupplierPinReference
 
@@ -30,12 +32,19 @@ if abs(DIA - DRIVE_PIN_DIA) > 1e-12:
     raise AssertionError(f"{SKU} is not the seat interface's drive pin")
 
 # No floor sets the depth in a through hole: the fitter presses each pin in
-# from the seat face onto a stop that leaves it DRIVE_PIN_PROUD out, to
-# +/-PROUD_SET_TOL (the installation note on the MHA-PD-VN-54 sheet prints the
-# range).  The stop sets the tip, so the dowel's length grade moves only the
-# pressed end, inside the collar (pd_transgear_drive_collar_spec checks it).
-PROUD_SET_TOL = 0.10
-PROUD_RANGE = (DRIVE_PIN_PROUD - PROUD_SET_TOL, DRIVE_PIN_PROUD + PROUD_SET_TOL)
+# from the seat face onto a stop that leaves it DRIVE_PIN_PROUD out, within
+# PROUD_RANGE (the installation note on the MHA-PD-VN-54 sheet prints it):
+# .091-.098, the inch limits inside DRIVE_PIN_PROUD +/-.004.  The stop sets
+# the tip, so the dowel's length grade moves only the pressed end, inside the
+# collar (pd_transgear_drive_collar_spec checks it).
+PROUD_SET_TOL = 0.1016  # .004
+PROUD_RANGE = (2.3114, 2.4892)  # .091 .. .098
+if not (
+    DRIVE_PIN_PROUD - PROUD_SET_TOL <= PROUD_RANGE[0] < DRIVE_PIN_PROUD
+    < PROUD_RANGE[1] <= DRIVE_PIN_PROUD + PROUD_SET_TOL
+):
+    raise AssertionError("the printed proud range leaves the seat's set band")
+PROUD_TEXT = ".091-.098"
 # The nominal pin's pressed end stands this far behind the seat face, inside
 # the MHA-PD-22 collar's through hole: the press fit's engaged length.
 PRESS_DEPTH = LENGTH - DRIVE_PIN_PROUD  # 2.3625
@@ -74,4 +83,7 @@ SUPPLIER_REFERENCE = SupplierPinReference(
     length_mm=LENGTH,
     diameter_precision=4,
     length_precision=3,
+    sheet_unit=drawing_unit(
+        "parts/pd-vn-transgear-knob-drive-pin", _config.parts("pd-vn-transgear-knob-drive-pin")
+    ),
 )

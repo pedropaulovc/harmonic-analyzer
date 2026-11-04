@@ -392,6 +392,10 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the title-block DRILLED HOLES +0.10/0 tap-pilot diameter: indexed into "
         "accepted limits, without a redundant explicit callout band"
     ),
+    ("pd_transgear_drive_collar_spec", "PILOT_DIA_BAND"): (
+        "the title block's .XX row on the .39 pilot (no authored band): indexed "
+        "for the wheel-bore air, the pilot wall and the thumbnut's seat"
+    ),
 }
 
 KNOWN_BAD: dict[str, pytest.MarkDecorator] = {}

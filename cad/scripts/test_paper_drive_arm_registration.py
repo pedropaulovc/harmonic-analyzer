@@ -165,7 +165,7 @@ def test_three_accessible_rear_indicator_sites_bound_every_tilt_direction() -> N
         px, py = x - plate.BORE_STATION, y - plate.BORE_OFFSET
         assert min(px - plate.EDGE_MINUS_X, plate.EDGE_PLUS_X - px,
                    (plate.arm_upper_edge_y(px) - py) * math.cos(arm.EDGE_LEAN),
-                   (py - plate.notch_face_y(px)) * math.cos(arm.EDGE_LEAN)) - plate.BAND_X - footprint - 0.1 > 0.0
+                   (py - plate.notch_face_y(px)) * math.cos(arm.EDGE_LEAN)) - max(plate.OUTLINE_BAND, plate.NOTCH_BAND) - footprint - 0.1 > 0.0
         for hx, hy in plate.SCREW_HOLES:
             assert math.hypot(px - hx, py - hy) > (plate.CSK_DIA + plate.CSK_DIA_BAND) / 2.0 + footprint + 0.15
         for hx, hy in plate.LOCATOR_SITES_MM:
@@ -176,10 +176,10 @@ def test_three_accessible_rear_indicator_sites_bound_every_tilt_direction() -> N
 
 def test_native_controls_reference_actual_bores_and_project_past_real_chain_plane() -> None:
     # The arm's pattern is located from S (Ø.0019, inside the 0.05 stack
-    # zone); the plate's from its own knob bore K, so it carries K's Ø0.100
+    # zone); the plate's from its own knob bore K, so it carries K's Ø.0039
     # setting circle about S.
     for spec, geometry, prefix, zone in (
-        (arm_spec, arm, "arm", ".0019"), (plate_spec, plate, "plate", "0.100"),
+        (arm_spec, arm, "arm", ".0019"), (plate_spec, plate, "plate", ".0039"),
     ):
         controls = {control.key: control for control in spec.GEOMETRIC_CONTROLS}
         for index, xy in enumerate(geometry.LOCATOR_SITES_MM, 1):
@@ -195,7 +195,7 @@ def test_native_controls_reference_actual_bores_and_project_past_real_chain_plan
     plate_control = next(control for control in plate_spec.GEOMETRIC_CONTROLS if control.key == "knob_projected_axis")
     for control, datum_z, height, zone in (
         (arm_control, registration.ARM_FRONT_MACHINE_Z_MM, registration.S_PROJECTED_HEIGHT_MM, ".0019"),
-        (plate_control, registration.PLATE_MOUNT_MACHINE_Z_MM, registration.K_PROJECTED_HEIGHT_MM, "0.050"),
+        (plate_control, registration.PLATE_MOUNT_MACHINE_Z_MM, registration.K_PROJECTED_HEIGHT_MM, ".0019"),
     ):
         assert control.projected_zone_height_mm == height
         assert control.tolerance == zone and control.datums == ("A",)
@@ -216,7 +216,7 @@ def test_clamp_axes_have_real_projected_zones_and_each_countersink_rides_its_hol
         assert hole.projected_zone_height_mm == plate.CLAMP_PLATE_PROJECTED_HEIGHT_MM
         assert isinstance(hole.face, CylinderFace)
         assert (hole.face.contains_x_mm, hole.face.contains_y_mm) == (x, y)
-        for control, zone in ((tap, ".0019"), (hole, "0.100")):
+        for control, zone in ((tap, ".0019"), (hole, ".0039")):
             assert control.datums == ("A", "B", "C")
             assert control.tolerance == zone and control.tolerance_zone == "diametral"
 

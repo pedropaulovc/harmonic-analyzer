@@ -6,17 +6,18 @@ pd-transgear-arm-plate:
   finish: bright machined; protect with ISO VG 32 machine-oil film
   quantity: 1
   tolerance_class: machined_block
+  drawing_unit: in
   process: >-
     Mill the outline from 1-1/2 in bar and step the notch; turn the front hub
     and rear boss on the bore axis; ream the bore; drill and countersink the
     two clamp screw holes. Clamp the plate on the rear face of MHA-PD-18
     (before its MHA-PD-23 pin is pressed) and, on the mill DRO, set the
     knob bore at the MHA-PD-00 VIEW K coordinates from the arm's pin bore,
-    indicated true. Drill the two common 1.80 locating pilots
+    indicated true. Drill the two common #44 (.086) locating pilots
     through the plate and through the arm in that setting.
-    Finish plate holes 2.010–2.020 through and arm holes 1.990–2.000
+    Ream plate holes .0945 through and arm holes .0930
     separately; never pass the larger plate reamer into an arm press seat.
-    Mouth breaks 0.05 MAX. Reassemble the original matched pair and inspect
+    Mouth breaks .002 MAX. Reassemble the original matched pair and inspect
     the actual hole positions, S-K setting and complete loaded
     free-motion envelope; do not accept an arbitrary as-made bolted pose.
   installation_notes: |-

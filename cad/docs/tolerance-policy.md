@@ -89,7 +89,7 @@ chain; a limit that cannot cite each step is a habit, not a requirement.
 Gear tips take `fits.gear_tip` in `tolerances/gear_tip.yaml` (read through
 `_gear_fit_limits.gear_tip_band_mm`), not the routine title-block band: an oversize
 tip eats root air and an undersize tip shortens the path of contact.
-`standard` (+0.00/−0.10 mm) is the default. `contact_critical` (+0.00/−0.02 mm)
+`standard` (+.0000/−.0040 in) is the default. `contact_critical` (+.0000/−.0008 in)
 is kept only where a mesh gate needs it: the knob-shaft pinion. It was set for
 the 12T:120T reducer, whose contact ratio at the nominal centre was 1.207 at
 Ø7.38 (floor 1.2). The 15T:150T reducer (#2034) reaches 1.305 at its nominal

@@ -1,12 +1,12 @@
 r"""Reproduction script: transgear knob cup (MHA-PD-16; ch. 23; 1 used).
 
 The brass ring pinned on the knob shaft's rear journal by the MHA-PD-VN-62 spring
-pin, pressed through a Ø1.6 hole match-drilled through cup and journal at
+pin, pressed through a hole match-drilled through cup and journal at
 assembly (not modelled); its front face runs behind the arm plate's rear
 boss, the rear stop of the knob's end float (``pd_transgear_knob_cup_spec``).
 
 Layout: one turned half-section on the Front plane, revolved about local +Y:
-the ring from the reamed Ø6 H7 bore out to the O.D., so the O.D., the bore
+the ring from the reamed H7 bore out to the O.D., so the O.D., the bore
 and the length are its driving dimensions and all three print on the
 drawing's axial section.  The front face is the Top Plane (y = 0), the rear
 face y = LENGTH.  ``Axis1`` is the cup axis
@@ -47,8 +47,10 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _document_units import apply_package_model_units
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
+from _part_properties import part_drawing_unit
 from pd_transgear_knob_cup_spec import (
     BORE_BAND,
     BORE_DIA,
@@ -57,6 +59,7 @@ from pd_transgear_knob_cup_spec import (
     LENGTH,
     OD,
     SURFACE_FINISHES,
+    UNIT,
 )
 
 PART_NAME = "pd-transgear-knob-cup"
@@ -72,6 +75,8 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import RevolveParameters
 
     check("create_part", await adapter.create_part())
+    # #290: the row's inch calculation units, before the first global.
+    apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
@@ -165,7 +170,7 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     set_dimension_bilateral_tolerance(
-        adapter, "CupProfile", "BoreDia", *deviations(BORE_BAND)
+        adapter, "CupProfile", "BoreDia", *deviations(BORE_BAND), display_unit=UNIT,
     )
     # Every other printed dimension is governed by its places (the spec's
     # DRAWING_PRECISION): no model band.

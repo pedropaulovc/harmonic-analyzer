@@ -16,10 +16,11 @@ import pd_transgear_rear_bushing_spec as REAR_BUSHING
 import pd_vn_transgear_cluster_shim_spec as SHIM
 import transgear_cluster_fit as FIT
 from _printed_tolerance import printed_band_mm
-from pd_cluster_stack_band import FIT_LENGTH_BAND_IN, PRINTED_LENGTH_BAND
+from pd_cluster_stack_band import FIT_LENGTH_BAND_IN
 
-KNOB_TRAIN = (FIT.PH, FIT.TR, FIT.FW)
-FIT_LENGTHS = (FIT.GS, FIT.OL, FIT.TL, FIT.SP, FIT.LHUB, FIT.LFB)
+FIT_LENGTHS = (
+    FIT.PH, FIT.TR, FIT.FW, FIT.GS, FIT.OL, FIT.TL, FIT.SP, FIT.LHUB, FIT.LFB,
+)
 
 
 def _worst(chain, sign):
@@ -27,13 +28,10 @@ def _worst(chain, sign):
 
 
 def test_stack_lengths_print_their_bands():
-    """The knob train keeps the 0.02 cluster band; the lengths that set the
-    collar air or the recess print +/-.001; the rear bushing, which only
-    feeds the shimmed end float, prints at the title block."""
-    assert PRINTED_LENGTH_BAND == pytest.approx(0.02)
+    """The knob train and the lengths that set the collar air or the recess
+    print +/-.001; the rear bushing, which only feeds the shimmed end float,
+    prints at the title block."""
     assert FIT_LENGTH_BAND_IN == pytest.approx(0.0254)  # .001 in
-    for label, _, band in KNOB_TRAIN:
-        assert band == pytest.approx(PRINTED_LENGTH_BAND), label
     for label, _, band in FIT_LENGTHS:
         assert band == pytest.approx(FIT_LENGTH_BAND_IN), label
     assert FIT.LRB[2] == printed_band_mm(3, unit=REAR_BUSHING.UNIT)
