@@ -4,7 +4,7 @@ ch-rocker-strap:
   # Component of the built-up MHA-CH-06 (ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE);
   # test_part_coverage counts it reachable through that part.
   component_of: ch-rocker-arm
-  material: Plain Carbon Steel
+  material: LOW-CARBON STEEL, E.G. 1018 CF
   material_specification: AISI 1018 CF flat, 1/8 x 1-1/2 REF
   # Stock: OnlineMetals 4807, 1/8 x 1-1/2 in 1018 cold-finish flat, 4 x 72 in,
   # bought in the 2026-11-03 machine stock order (#2173); it replaces the

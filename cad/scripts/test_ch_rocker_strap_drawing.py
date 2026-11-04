@@ -264,6 +264,8 @@ def test_registry_row() -> None:
     assert row["number"] == spec.NUMBER == "MHA-CH-13"
     assert row["component_of"] == "ch-rocker-arm"
     assert int(row["quantity"]) == int(_config.parts("ch-rocker-arm")["quantity"])
+    # Owner ruling 2026-11-03: the title-block MATERIAL row names the grade.
+    assert row["material"] == "LOW-CARBON STEEL, E.G. 1018 CF"
     assert "1018" in str(row["material_specification"])
     assert len(str(row["material_specification"])) <= 36
     assert len(str(row["finish"])) <= 36
