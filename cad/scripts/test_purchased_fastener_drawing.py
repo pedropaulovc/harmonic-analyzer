@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import math
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -474,6 +475,49 @@ def test_configuration_cells_refuse_invalid_panel_count_or_index(index, count) -
         configured.configuration_view_cells(index, count)
 
 
+@pytest.mark.parametrize("count", (2, 3))
+@pytest.mark.parametrize("turns", (-2, -1, 0, 1, 2, 3))
+def test_turned_member_cells_keep_third_angle_projection(count, turns) -> None:
+    # IView.Angle turns a view counter-clockwise (draw_mg_wheel_axle's -pi/2
+    # carries model +Y to paper right), so the sheet direction of "above" and
+    # "right of" Front turns with the views: Top's cell must lie along the
+    # turned up axis and Right's along the turned right axis, sharing Front's
+    # row or column exactly.
+    angle = turns * math.pi / 2.0
+    up = (-math.sin(angle), math.cos(angle))
+    across = (math.cos(angle), math.sin(angle))
+    for index in range(count):
+        cells = configured.configuration_view_cells(index, count, angle)
+        plain = configured.configuration_view_cells(index, count)
+        assert [name for name, _, _ in cells] == ["*Front", "*Top", "*Right", "*Isometric"]
+        assert sorted(cell for _, _, cell in cells) == sorted(cell for _, _, cell in plain)
+        centres = {name: centre for name, centre, _ in cells}
+        front = centres["*Front"]
+        for name, direction in (("*Top", up), ("*Right", across)):
+            offset = tuple(centres[name][axis] - front[axis] for axis in (0, 1))
+            cross = offset[0] * direction[1] - offset[1] * direction[0]
+            dot = offset[0] * direction[0] + offset[1] * direction[1]
+            assert cross == pytest.approx(0.0, abs=1e-12)
+            assert dot > 0.0
+
+
+def test_rolled_member_puts_its_end_view_beside_front_and_lateral_below() -> None:
+    cells = {
+        name: cell
+        for name, _, cell in configured.configuration_view_cells(0, 2, -math.pi / 2)
+    }
+    front, end, lateral = cells["*Front"], cells["*Top"], cells["*Right"]
+    assert end[1::2] == front[1::2] and end[0] > front[2]
+    assert lateral[0::2] == front[0::2] and lateral[3] < front[1]
+
+
+@pytest.mark.parametrize("angle", (math.pi / 4.0, 0.1, math.inf, math.nan))
+def test_turned_member_cells_refuse_non_quarter_turns(angle) -> None:
+    with pytest.raises(ValueError, match="quarter turn"):
+        configured.configuration_view_cells(0, 2, angle)
+
+
+
 def _variant_sheet(monkeypatch, tmp_path, variants, quantities, total):
     """Only model paths, native view fields and note extents; never real COM."""
     source = tmp_path / "configured-stock.SLDPRT"
@@ -528,17 +572,32 @@ def _variant_sheet(monkeypatch, tmp_path, variants, quantities, total):
         views=[],
         finalized=False,
         before_settle=lambda: None,
+        active=[variants[0][0]],
+        transitions=[],
     )
     draw = _Drawing()
 
-    async def open_model(path):
+    def open_read_only(adapter, path, *, label):
         state.opens.append(path)
-        return True
+        return adapter.currentModel
 
-    state.adapter.open_model = open_model
+    monkeypatch.setattr(configured, "_open_supplier_source_read_only", open_read_only)
+    monkeypatch.setattr(
+        configured, "active_configuration_name", lambda _adapter, _model: state.active[0]
+    )
+
+    def show(_adapter, _model, name, *, label):
+        state.transitions.append(name)
+        state.active[0] = name
+
+    monkeypatch.setattr(configured, "_show_reference_configuration", show)
+    monkeypatch.setattr(
+        configured,
+        "_activate_reference_document",
+        lambda _adapter, _model, *, label: state.transitions.append("activate source"),
+    )
     monkeypatch.setattr(configured._config, "parts", lambda _stem: row)
     monkeypatch.setattr(configured, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(configured, "check", lambda _label, result: result)
     monkeypatch.setattr(configured, "double_array", tuple)
 
     def required_properties(_model, names, *, required):
@@ -758,6 +817,163 @@ def test_configured_sheet_accepts_complete_consistent_native_members(
         )
     )
     assert state.finalized
+
+
+_MEMBERS = (("InnerLink", "INNER"), ("OuterLink", "OUTER"))
+_MEMBER_QUANTITIES = {"InnerLink": 34, "OuterLink": 33}
+_FINALIZE_STAGES = (
+    "before_drawing_save",
+    "after_drawing_save",
+    "before_pdf_save",
+    "after_pdf_save",
+    "before_drawing_close",
+    "after_drawing_close",
+)
+
+
+def _guarded_finalize(monkeypatch, state, mutate=None):
+    """finalize_drawing's settled checks, then its save/close checkpoints."""
+    stages = []
+
+    async def finalize(_adapter, outputs, *, settled_checks, checkpoint, **_kwargs):
+        state.before_settle()
+        for settled in settled_checks:
+            settled()
+        for stage in _FINALIZE_STAGES:
+            if mutate is not None:
+                mutate(stage)
+            checkpoint(stage)
+            stages.append(stage)
+        state.finalized = True
+        return {"pdf": str(outputs.pdf)}
+
+    monkeypatch.setattr(configured, "finalize_drawing", finalize)
+    return stages
+
+
+@pytest.mark.parametrize(
+    "drift",
+    (None, "dirty", "settled-bytes", "writable", "configuration", "saved-bytes"),
+)
+def test_configured_sheet_keeps_its_source_read_only_clean_and_unchanged(
+    monkeypatch, tmp_path, drift
+):
+    state = _variant_sheet(monkeypatch, tmp_path, _MEMBERS, _MEMBER_QUANTITIES, 67)
+    model = state.adapter.currentModel
+    source = state.spec.source
+
+    def mutate(stage):
+        if drift == "saved-bytes" and stage == "after_drawing_save":
+            source.write_bytes(b"drawing saved the referenced part")
+
+    stages = _guarded_finalize(monkeypatch, state, mutate)
+    if drift == "dirty":
+        model.GetSaveFlag = lambda: True
+    elif drift == "settled-bytes":
+        state.before_settle = lambda: source.write_bytes(b"dimension text wrote through")
+    elif drift == "writable":
+        state.before_settle = lambda: setattr(model, "IsOpenedReadOnly", lambda: False)
+    elif drift == "configuration":
+        state.before_settle = lambda: state.active.__setitem__(0, "OuterLink")
+
+    def build():
+        return asyncio.run(
+            configured.build_purchased_variant_drawing(
+                state.adapter,
+                state.spec,
+                variants=_MEMBERS,
+                item="PURCHASED PRODUCT",
+                purchase_unit="ONE PRODUCT",
+            )
+        )
+
+    if drift is None:
+        build()
+        assert state.finalized
+        assert stages == list(_FINALIZE_STAGES)
+        assert state.opens == [source]
+        assert state.transitions == []
+        return
+    message = "clean before the drawing exists" if drift == "dirty" else "source state changed"
+    with pytest.raises(RuntimeError, match=message):
+        build()
+    assert not state.finalized
+    if drift == "dirty":
+        assert state.views == []
+    if drift == "saved-bytes":
+        assert stages == ["before_drawing_save"]
+
+
+@pytest.mark.parametrize("drift", (None, "reverted", "other"))
+def test_configured_sheet_holds_exactly_the_declared_source_member(
+    monkeypatch, tmp_path, drift
+):
+    state = _variant_sheet(monkeypatch, tmp_path, _MEMBERS, _MEMBER_QUANTITIES, 67)
+    stages = _guarded_finalize(monkeypatch, state)
+    seen = []
+    placed = []
+    place_view = configured.place_view
+
+    def place(*args, **kwargs):
+        placed.append(state.active[0])
+        return place_view(*args, **kwargs)
+
+    monkeypatch.setattr(configured, "place_view", place)
+
+    def annotate(_adapter, configuration, _cells, _views):
+        seen.append((configuration, state.active[0]))
+        return ()
+
+    if drift is not None:
+        state.before_settle = lambda: state.active.__setitem__(
+            0, "InnerLink" if drift == "reverted" else "Default"
+        )
+
+    def build():
+        return asyncio.run(
+            configured.build_purchased_variant_drawing(
+                state.adapter,
+                state.spec,
+                variants=_MEMBERS,
+                item="PURCHASED PRODUCT",
+                purchase_unit="ONE PRODUCT",
+                annotate_member=annotate,
+                source_configuration="OuterLink",
+            )
+        )
+
+    if drift is None:
+        build()
+        assert stages == list(_FINALIZE_STAGES)
+    else:
+        with pytest.raises(RuntimeError, match="expected='OuterLink'"):
+            build()
+        assert not state.finalized
+    # Active before the first view, for every view and annotation, then the
+    # saved member again.
+    assert placed == ["OuterLink"] * 8
+    assert seen == [("InnerLink", "OuterLink"), ("OuterLink", "OuterLink")]
+    assert state.transitions == ["OuterLink", "activate source", "InnerLink"]
+    assert state.active == ["InnerLink"]
+
+
+def test_configured_sheet_refuses_an_undepicted_source_member_before_opening(
+    monkeypatch, tmp_path
+):
+    state = _variant_sheet(monkeypatch, tmp_path, _MEMBERS, _MEMBER_QUANTITIES, 67)
+    with pytest.raises(ValueError, match="depicted member"):
+        asyncio.run(
+            configured.build_purchased_variant_drawing(
+                state.adapter,
+                state.spec,
+                variants=_MEMBERS,
+                item="PURCHASED PRODUCT",
+                purchase_unit="ONE PRODUCT",
+                source_configuration="Default",
+            )
+        )
+    assert state.opens == []
+
 
 
 @pytest.mark.parametrize("drift", [None, "reference-view", "reference-activation"])

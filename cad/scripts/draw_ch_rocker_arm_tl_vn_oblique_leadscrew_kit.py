@@ -135,7 +135,8 @@ GENERAL_TEXT = (
 )
 ADDITIONAL_SHEETS_TITLE = "Member Rework"
 # The 410 screw lies along its cell's width: no project scale fits it
-# standing in the 52 mm row.
+# standing in the 52 mm row. Its cells turn with it, so the end view sits
+# beside Front on its axis and the lengthwise Right below it.
 VIEW_ANGLES = {leadscrew.CONFIGURATION: -math.pi / 2.0}
 # The only member carrying supplier references. The source part stays active
 # in it while the package is drawn (see require_source_configuration).

@@ -14,7 +14,7 @@ from types import MappingProxyType
 
 SOURCE_MAP_SHA256 = "1ee9084204cab7025783c5bf0fa98e040cfaa3e4e8200f0d61e58e8dd32c3bfd"
 TABLE_PATH = Path(__file__).resolve().parents[1] / "content/current-native-identities.json"
-CURRENT_NATIVE_IDENTITY_MAP_SHA256 = "b965c15ca6a96d22da14b8bb1d1e4f5cdc6be289d040aa11bd4a23411f32403e"
+CURRENT_NATIVE_IDENTITY_MAP_SHA256 = "0794a0859c76b52ee2142f99b488ca306641596df0bf70916507029a741966d2"
 CURRENT_NATIVE_OCCURRENCE_NAMESPACE = "archive-role-local"
 CURRENT_NATIVE_IDENTITY_PROJECTION = MappingProxyType({
     "kind": "current-native-identity-projection",

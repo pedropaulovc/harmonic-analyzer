@@ -2136,8 +2136,8 @@ def test_supplier_references_are_proven_only_in_the_active_source_member(monkeyp
         draw.annotate_member(None, member, cells, views)
 
 
-def test_build_activates_the_supplier_member_before_the_drawing_exists(
-    monkeypatch, tmp_path
+def test_build_activates_the_nut_and_keeps_the_rolled_leadscrew_in_projection(
+    monkeypatch,
 ):
     import _purchased_variant_drawing as variant_drawing
 
@@ -2149,81 +2149,25 @@ def test_build_activates_the_supplier_member_before_the_drawing_exists(
 
     monkeypatch.setattr(draw, "build_purchased_variant_drawing", capture)
     asyncio.run(draw.build(None))
+    # The shared builder activates this member in the read-only source before
+    # the drawing exists and requires it in every source check.
     assert captured["source_configuration"] == draw.SUPPLIER_REFERENCE_CONFIGURATION
-
-    # The shared helper activates it in the open part before it creates the
-    # drawing, so every view and every settled check sees that member active.
-    source = tmp_path / f"{spec.PART_NAME}.SLDPRT"
-    source.write_bytes(b"")
-    row = _config.parts(spec.PART_NAME)
-    model = SimpleNamespace(GetPathName=lambda: str(source))
-    adapter = SimpleNamespace(currentModel=model)
-    events = []
-
-    async def open_model(path):
-        events.append(("open", Path(path)))
-        return SimpleNamespace(is_success=True)
-
-    adapter.open_model = open_model
-    monkeypatch.setattr(variant_drawing, "check", lambda _label, _result: None)
-    monkeypatch.setattr(variant_drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(
-        variant_drawing,
-        "read_required_properties",
-        lambda _model, _names, required: {
-            "Number": str(row["number"]),
-            "Title": spec.PART_NAME,
-            "Stock Name": str(row["stock_name"]),
-            "Supplier": str(row["supplier"]),
-            "Supplier SKUs": ", ".join(row["supplier_skus"]),
-            "Material Specification": str(row["material_specification"]),
-            "Finish": str(row["finish"]),
-        },
-    )
-    monkeypatch.setattr(
-        variant_drawing,
-        "_show_reference_configuration",
-        lambda _adapter, shown, name, label: events.append(("activate", shown, name)),
-    )
-
-    class DrawingCreated(Exception):
-        pass
-
-    def new_drawing(*_args, **_kwargs):
-        events.append(("drawing",))
-        raise DrawingCreated
-
-    monkeypatch.setattr(variant_drawing, "new_project_drawing", new_drawing)
-    fake_spec = SimpleNamespace(
-        source=source,
-        source_kind="part",
-        artifact_stem=spec.PART_NAME,
-        layout=draw.SPEC.layout,
-    )
-    with pytest.raises(DrawingCreated):
-        asyncio.run(
-            variant_drawing.build_purchased_variant_drawing(
-                adapter,
-                fake_spec,
-                variants=draw.VARIANTS,
-                item=draw.ITEM,
-                purchase_unit=draw.PURCHASE_UNIT,
-                source_configuration=draw.SUPPLIER_REFERENCE_CONFIGURATION,
+    angles = captured["view_angles"]
+    assert set(angles) == {spec.CONFIGURATION}
+    members = [configuration for configuration, _ in captured["variants"]]
+    for index, configuration in enumerate(members):
+        cells = {
+            name: cell
+            for name, _, cell in variant_drawing.configuration_view_cells(
+                index, len(members), angles.get(configuration, 0.0)
             )
-        )
-    assert events == [
-        ("open", source),
-        ("activate", model, draw.SUPPLIER_REFERENCE_CONFIGURATION),
-        ("drawing",),
-    ]
-    with pytest.raises(ValueError, match="depicted member"):
-        asyncio.run(
-            variant_drawing.build_purchased_variant_drawing(
-                adapter,
-                fake_spec,
-                variants=draw.VARIANTS,
-                item=draw.ITEM,
-                purchase_unit=draw.PURCHASE_UNIT,
-                source_configuration="AsSupplied",
-            )
-        )
+        }
+        front, end, lateral = cells["*Front"], cells["*Top"], cells["*Right"]
+        if configuration == spec.CONFIGURATION:
+            # Axis horizontal: the end-on Top beside Front on its axis, the
+            # lengthwise Right under it in Front's column.
+            assert end[1::2] == front[1::2] and end[0] > front[2]
+            assert lateral[0::2] == front[0::2] and lateral[3] < front[1]
+        else:
+            assert end[0::2] == front[0::2] and end[1] > front[3]
+            assert lateral[1::2] == front[1::2] and lateral[0] > front[2]

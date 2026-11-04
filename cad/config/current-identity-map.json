@@ -2851,6 +2851,32 @@
       "neutral_export_configuration": "HoldDownStud"
     }
   ],
+  "configured_kits": [
+    {
+      "parent": "ch-rocker-arm-tl-oblique-jig",
+      "stem": "ch-rocker-arm-tl-vn-oblique-rail-kit",
+      "number": "MHA-CH-06-TL-VN-83",
+      "supplier": "Amazon (sold by XIQI)",
+      "supplier_sku": "B0C4DJNL33",
+      "configurations": [
+        "Rail",
+        "Carriage"
+      ],
+      "neutral_export_configuration": "Rail"
+    },
+    {
+      "parent": "ch-rocker-arm-tl-oblique-jig",
+      "stem": "ch-rocker-arm-tl-vn-oblique-leadscrew-kit",
+      "number": "MHA-CH-06-TL-VN-84",
+      "supplier": "Amazon (sold by ReliaBot)",
+      "supplier_sku": "B085DDHJTW",
+      "configurations": [
+        "LeadScrew",
+        "FeedNut"
+      ],
+      "neutral_export_configuration": "LeadScrew"
+    }
+  ],
   "current_source_files": [
     {
       "current_path": "cad/scripts/sh_vn_music_wire_lever_geom.py",
