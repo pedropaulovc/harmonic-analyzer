@@ -79,20 +79,21 @@ PLAN_KEEP = {
     'BlockWidth':(.2595,.203),'BlockSideY':(.231,.220),
     'CarriageDrills3Y':(.222,.1985),'CarriageDrills4Y':(.222,.2115),
     'BoreDia':(.078,.196),'CarriageDrills1Dia':(.085,.168),'CarriageCounterbores3Dia':(.245,.150),
+    # The tap's Ø on its circle at the seat's floor, from high on the upper
+    # left: the leader enters the plan's left edge under the length stack's
+    # extension lines and passes over the A-A arrow's letter. In A-A its
+    # extension lines rose from the top face through the empty Ø.3750 seat
+    # (machinist review, delta 20261104T040714425Z); on the bottom face with
+    # them hidden, its arrows ran along the edge (#2119's final
+    # 20261103T190306489Z).
+    'TapDrillDia':(.071,.2455),
 }
 BLOCK_LENGTH_TEXT_XY = (.240,.2585)
 ROW_DIMENSIONS = ('CarriageDrills3Y','CarriageDrills4Y')
 # Section A-A looks up the sheet (third-angle: placed below the plan, its
 # arrows point away from it, review of farm run 20261024T133158704Z), so the
 # top face prints on top: Z 0..24.3 at y 67.9..92.2, the seat floor at y
-# 84.55. On TL-22 the tap's dimension line stands 6 mm under the bottom face
-# (its last row underlined ~8 mm under the text anchor), its extension lines
-# dropping from the tap's walls: inside the full section it crossed the
-# hatching (review of farm run 20261027T201345346Z). TL-32 does the same,
-# its line 3 mm under the bottom face so the A-A caption (which starts ~6 mm
-# under it) stays clear: on the bottom face with its extension lines hidden,
-# its arrows ran along the part's edge (machinist review, #2119's final
-# 20261103T190306489Z). The
+# 84.55. The tap's Ø prints on the plan (PLAN_KEEP). The
 # 7.650 seat depth keeps its line at x .120, arrows inside so the line is
 # drawn for the text leader to land on, and stands its text, with the stack
 # it sets, off to the upper left in the empty band under the plan's
@@ -102,7 +103,7 @@ ROW_DIMENSIONS = ('CarriageDrills3Y','CarriageDrills4Y')
 # A-A is centred on its cut span (X -46..+24), the block's own centre, so its
 # -X face lands at x 139 under the plan's.
 SIDE_XY = (.170,.080)
-SIDE_KEEP = {'TopBoreDepth':(.120,.088),'TapDrillDia':(.084,.070)}
+SIDE_KEEP = {'TopBoreDepth':(.120,.088)}
 # TL-22 prints the block height (the Block extrusion's depth) on a standard
 # Right view level with the plan: neither its B-B nor its A-A ever imported a
 # full-height dimension (farm rounds 1 to 9), though TL-32's B-B does. Top
@@ -154,7 +155,7 @@ FEED_PLAN_KEEP = PLAN_KEEP | {
 }
 FEED_FLOOR_CUT_END_Y = -100
 FEED_SIDE_XY = (.170,.060)
-FEED_SIDE_KEEP = {'TopBoreDepth':(.120,.068),'TapDrillDia':(.084,.053)}
+FEED_SIDE_KEEP = {'TopBoreDepth':(.120,.068)}
 FEED_SEAT_DEPTH_TEXT_XY = (.078,.084)
 FEED_ISO_XY, FEED_ISO_SCALE = (.360,.225), (1,2)
 # VIEW D looks at the lug's -X (nut) face: its letter's leader is the viewing
