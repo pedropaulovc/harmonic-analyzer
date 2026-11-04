@@ -6703,7 +6703,7 @@ cite = ["OnlineMetals part 19714 https://www.onlinemetals.com/en/buy/x/pid/19714
 [[stock]]
 form = "flat_bar"
 material = "1018 cold-finish carbon steel"
-note = "Ordered 2026-11-03: 5/16 x 1 in 1018 CF flat, 2 pieces x 72 in (standard length). Allocation: ch-channel-lever (MHA-CH-02)."
+note = "Ordered 2026-11-03: 5/16 x 1 in 1018 CF flat, 2 pieces x 72 in (standard length). Allocation: ch-channel-lever (MHA-CH-02). Owner ruling 2026-11-03: 1018 steel supersedes the package's gray cast iron; the package material change lands in #2136."
 section_mm = [25.4, 7.9375]
 length_mm = 1828.8
 on_hand = false
@@ -6712,7 +6712,7 @@ cite = ["OnlineMetals part 19714 https://www.onlinemetals.com/en/buy/x/pid/19714
 [[stock]]
 form = "flat_bar"
 material = "1018 cold-finish carbon steel"
-note = "Ordered 2026-11-03: 5/16 x 1 in 1018 CF flat, 36 in (standard length). Allocation: ch-channel-lever (MHA-CH-02)."
+note = "Ordered 2026-11-03: 5/16 x 1 in 1018 CF flat, 36 in (standard length). Allocation: ch-channel-lever (MHA-CH-02). Owner ruling 2026-11-03: 1018 steel supersedes the package's gray cast iron; the package material change lands in #2136."
 section_mm = [25.4, 7.9375]
 length_mm = 914.4
 on_hand = false
@@ -6966,7 +6966,7 @@ cite = ["OnlineMetals part 1268 https://www.onlinemetals.com/en/buy/x/pid/1268 o
 [[stock]]
 form = "flat_bar"
 material = "C360 free-machining brass"
-note = "Ordered 2026-11-03: 0.250 x 6.000 in C360 brass flat, 11 in (cut to length). Allocation: pd-platen (MHA-PD-02) x2 and the pd-platen-rack backer (MHA-PD-05) from the leftover width."
+note = "Ordered 2026-11-03: 0.250 x 6.000 in C360 brass flat, 11 in (cut to length). Allocation: pd-platen (MHA-PD-02), one, and the pd-platen-rack backer (MHA-PD-05) from the leftover width."
 section_mm = [152.4, 6.35]
 length_mm = 279.4
 on_hand = false
