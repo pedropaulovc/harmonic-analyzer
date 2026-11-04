@@ -3202,7 +3202,11 @@ def test_config_deps_recipe_digest_skips_unread_yaml():
         "frame must not FULL on an active_count edit"
     )
     frame_modules = {Path(path).name for path in dodo._recipe_files("fr_frame")}
-    assert "dt_post_mount_stack.py" in frame_modules, frame_modules
+    # The post-mount penetration is the drive train's interference row only
+    # (#2181): the frame's recipe no longer folds it.
+    assert "dt_post_mount_stack.py" not in frame_modules, frame_modules
+    drive_modules = {Path(path).name for path in dodo._recipe_files("dt_drive_train")}
+    assert "dt_post_mount_stack.py" in drive_modules, drive_modules
     assert not frame_modules & {
         "dt_vn_post_mount_screw_spec.py",
         "dt_cone_swing_platform_spec.py",

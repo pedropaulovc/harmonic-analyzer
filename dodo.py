@@ -3329,6 +3329,7 @@ _MACHINIST_REVIEW_MODULES = (
     "machinist_review_credentials.py",
     "machinist_review_sheets_mcp.py",
     "machinist_exceptions.py",
+    "_paths.py",
 )
 
 
