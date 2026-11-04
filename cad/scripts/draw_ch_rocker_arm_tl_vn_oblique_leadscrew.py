@@ -1,4 +1,4 @@
-"""Create the cut-to-length drawing for ZYLtech HW-SC-T8x2-600, the TL-VN-54 Tr8x2 lead screw.
+"""Create the cut-to-length drawing for the ReliaBot 600 mm T8 screw (Amazon B085DDHJTW), the TL-VN-54 Tr8x2 lead screw.
 
 The shop cuts the bought 600 mm screw to length and mills a set-screw flat
 under each set screw that locks it, so the sheet is a modified-stock
@@ -283,16 +283,18 @@ _NEAR_XY = (0.043, DETAIL_ROW_Y)
 # view's.
 _FAR_CENTRE_MM = FLAT_STATIONS["FarKP08"]
 _FAR_XY = (0.091, DETAIL_ROW_Y)
-# E: the handwheel's flat and the far end (394.5 .. 410), the printed flat's
+# E: the handwheel's flat and the far end (400.5 .. 410), the printed flat's
 # length under the fence, right of the flat, and its across-flat left of it,
 # square to the axis:
 # its extension line off the flat runs back along the flat and out of the
-# fence over 0.6 mm of thread (right of it, it would run 7.5 mm along the
+# fence over 2.25 mm of thread (right of it, it would run along the 1.5 mm of
 # unflatted thread to the far end, reading as the flat running out there).
+# The fence's radius 7 holds the flat's start corners and the far end's
+# (each 6.21 off its centre) whole.
 # The across-flat's text (its widest row, "C, D, E", about 15 mm wide, centred
 # on its dimension line) stands between D's fence and E's.
 _WHEEL_CENTRE_MM = (FLAT_STATIONS["Handwheel"] - FLAT_LENGTH / 2.0 + LENGTH) / 2.0
-_WHEEL_RADIUS_MM = 9.0
+_WHEEL_RADIUS_MM = 7.0
 _WHEEL_XY = (0.1615, DETAIL_ROW_Y)
 # The across-flat runs from the far crest (clock 180, radius -4) to the flat
 # (FLAT_AF - 4 toward clock 0): its middle stands at half their sum.
@@ -1076,7 +1078,7 @@ async def _build_read_only_source(
             0: PDF_TITLE,
             1: "Manufacturing controls for modified purchased stock",
             2: "Harmonic Analyzer Project",
-            3: "MHA-CH-06-TL-VN-54; ZYLtech HW-SC-T8x2-600",
+            3: "MHA-CH-06-TL-VN-54; ReliaBot T8 Tr8x2 (Amazon B085DDHJTW)",
             4: "Native dimension-driven cut length and set-screw flats",
         },
     )

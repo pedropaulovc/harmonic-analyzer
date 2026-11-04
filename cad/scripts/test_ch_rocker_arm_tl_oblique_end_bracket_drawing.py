@@ -119,7 +119,8 @@ def test_both_patterns_fit_their_mates_at_three_places() -> None:
     band = printed_band_mm(spec.HOLE_PLACES, unit="in")
     assert spec.POSITION_RADIUS >= math.hypot(band, band)
     assert spec.POSITION_RADIUS <= math.hypot(band + 0.0127, band)
-    assert spec.KP08_SCREW_FLOAT == pytest.approx(0.4975)
+    # The uxcell block's listed Ø5 holes about the #6-32's 3.505 major.
+    assert spec.KP08_SCREW_FLOAT == pytest.approx(0.7475)
     assert spec.KP08_PATTERN_ALLOWANCE > 0.0
     assert spec.BAR_HOLE_DIA == pytest.approx(4.978)
     assert spec.BAR_PATTERN_ALLOWANCE > 0.0

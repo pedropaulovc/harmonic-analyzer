@@ -1,10 +1,11 @@
-"""Create the purchased-reference sheet for the HIWIN HGR15R linear rail cut to 440 (MHA-CH-06-TL-VN-50).
+"""Create the purchased-reference sheet for the HIWIN-style HGR15 linear rail, 450 as supplied (MHA-CH-06-TL-VN-50).
 
-The rail is bought cut to length with a special-order hole pattern, so its
-receipt check is dimensioned on the hole face: the cut length, the first
-hole from the -X end face and one pitch for all six gaps. Each is the rail
-part's own native model dimension, parenthesised as reference (the rail is
-used as supplied), and the note only says the pattern is a special order.
+The rail is a generic kit rail used uncut, and its listing states no hole
+pattern, so its receipt check is dimensioned on the hole face: the length,
+the first hole from the -X end face and one pitch for all seven gaps. Each
+is the rail part's own native model dimension, parenthesised as reference
+(the rail is used as supplied), and the note says to measure the received
+rail before the base bar is tapped.
 
 The shared purchased-part builder lays four views by itself and prints no
 dimension, so this sheet keeps its title block, captions and footer (as
@@ -85,15 +86,15 @@ SOURCE_PROPERTIES = (
     "Supplier SKUs",
     "Manufacturing Notes",
 )
-# The footer's ITEM row: the catalogue designation in plain text. The cut
-# length is the FRONT view's dimension, not the item's.
-ITEM = "HIWIN HGR15R LINEAR GUIDEWAY RAIL, CUT TO LENGTH"
+# The footer's ITEM row: the style designation in plain text. The length is
+# the FRONT view's dimension, not the item's.
+ITEM = "GENERIC HIWIN-STYLE HGR15 LINEAR GUIDE RAIL, NUIBBYED KIT"
 
 # Sheet maths, ASME B landscape 431.8 x 279.4, all in sheet metres. The
 # border is 12.7 mm in; the title block fills x >= 215.9 mm below y = 65.1
-# mm; the purchased footer's one note line tops out at 61 mm.
+# mm; the purchased footer's three note lines top out at 70 mm.
 #
-# The 440 rail is 220 mm long at 1:2, the largest project scale whose
+# The 450 rail is 225 mm long at 1:2, the largest project scale whose
 # length fits the drawable width with the profile beside it.
 SHEET_SCALE = (1, 2)
 # The 15 x 15 profile prints 30 mm square at 2:1 (7.5 mm at the sheet's 1:2,
@@ -116,7 +117,8 @@ _CELL_SLACK = 0.002  # reserved cell beyond the expected outline, each side
 # Model-box half-extents on the sheet. FRONT looks down on the hole face
 # (length x width), TOP at the flank (length x height), RIGHT along the rail
 # at the end profile (width x height). The isometric's box is the r9 sheet's
-# 1:4 pictorial (about 81 x 48 mm) read off its PDF, with slack.
+# 1:4 pictorial of the 440 rail (about 81 x 48 mm) read off its PDF; the 450
+# rail adds about 2 mm along it, inside the slack.
 _FRONT_HALF = (
     LENGTH / 2.0 * _sheet_mm(SHEET_SCALE),
     WIDTH / 2.0 * _sheet_mm(SHEET_SCALE),
@@ -131,11 +133,11 @@ _RIGHT_HALF = (
 )
 _ISO_HALF = (0.045, 0.028)
 
-# View centres. FRONT spans x 40..260 mm with its two dimension rows and its
-# caption under it (caption top 89 mm, 28 mm over the footer's note). TOP
-# stands over FRONT, in projection with it. RIGHT stands level with FRONT,
-# 44 mm right of its end; the isometric fills the upper right, clear of the
-# border and over RIGHT's caption.
+# View centres. FRONT spans x 37.5..262.5 mm with its two dimension rows and
+# its caption under it (caption top 91 mm, 21 mm over the footer's notes).
+# TOP stands over FRONT, in projection with it. RIGHT stands level with
+# FRONT, 45 mm right of its end; the isometric fills the upper right, clear
+# of the border and over RIGHT's caption.
 FRONT_CENTER = (0.150, 0.130)
 TOP_CENTER = (FRONT_CENTER[0], 0.195)
 RIGHT_CENTER = (0.330, FRONT_CENTER[1])
@@ -163,9 +165,10 @@ def view_cell(
 
 
 # FRONT's dimensions, under the rail (rule 10: from the -X end face): the
-# end distance and the one pitch in the row nearest the part, the cut
-# length in the row under it. Each text's centre stands this far under the
-# rail's centreline, between its extension lines.
+# end distance and the one pitch in the row nearest the part, the length in
+# the row under it. Each text's centre stands this far under the rail's
+# centreline, between its extension lines, except where ``TEXT_OUTSIDE_START``
+# moves it.
 HOLE_ROW_DROP = 0.016
 LENGTH_ROW_DROP = 0.029
 # The printed pitch is the first gap's (HOLE_X[0] .. HOLE_X[1]).
@@ -174,10 +177,15 @@ RECEIPT_DIMENSIONS = {
     "HolePitch": (HOLE_X[0], HOLE_X[1], HOLE_ROW_DROP),
     "Length": (0.0, LENGTH, LENGTH_ROW_DROP),
 }
+# The 15 end distance spans 7.5 mm at 1:2, narrower than its "(15)" text
+# (about 10 mm): the text stands outside the span, left of the -X end face,
+# its centre this far (sheet metres) from the face's extension line, and
+# clear of the pitch's text on the other side.
+TEXT_OUTSIDE_START = {"HoleEnd": 0.009}
 DIMENSION_PREFIXES = {"HolePitch": HOLE_PITCH_CALLOUT}
-# Smart arrows put the 20 mm and 30 mm spans' arrows outside, where the end
-# distance's and the pitch's met at the first hole (r1); both spans hold their
-# value and arrows inside.
+# Smart arrows put short spans' arrows outside, where the end distance's and
+# the pitch's met at the first hole (r1); both spans keep their arrows inside
+# (the 7.5 mm end-distance span holds two arrows; its text stands outside).
 ARROWS_INSIDE = ("HoleEnd", "HolePitch")
 _DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
 FRONT_DIMENSION_PRECISION = {
@@ -232,9 +240,25 @@ def _center_outline(view: Any, name: str, center: tuple[float, float]) -> None:
         raise RuntimeError(f"{name}: failed to position the view")
 
 
+def receipt_text_point(
+    name: str,
+    start: tuple[float, float],
+    end: tuple[float, float],
+    drop: float,
+) -> tuple[float, float]:
+    """A receipt dimension's text point from the sheet points of the two
+    stations it spans: centred between them, or ``TEXT_OUTSIDE_START`` left
+    of the start, its row's drop under the rail's centreline."""
+    y = (start[1] + end[1]) / 2.0 - drop
+    outside = TEXT_OUTSIDE_START.get(name)
+    if outside is not None:
+        return start[0] - outside, y
+    return (start[0] + end[0]) / 2.0, y
+
+
 def _receipt_positions(adapter: Any, front: Any) -> dict[str, tuple[float, float]]:
-    """Each receipt dimension's text point: centred between the two model
-    stations it spans on the rail's centreline, its row's drop under it."""
+    """Each receipt dimension's text point (``receipt_text_point``) from its
+    model stations on the rail's centreline."""
     stations = sorted(
         {x for start, end, _ in RECEIPT_DIMENSIONS.values() for x in (start, end)}
     )
@@ -252,17 +276,14 @@ def _receipt_positions(adapter: Any, front: Any) -> dict[str, tuple[float, float
         )
     )
     return {
-        name: (
-            (points[start][0] + points[end][0]) / 2.0,
-            (points[start][1] + points[end][1]) / 2.0 - drop,
-        )
+        name: receipt_text_point(name, points[start], points[end], drop)
         for name, (start, end, drop) in RECEIPT_DIMENSIONS.items()
     }
 
 
 @_telemetry.traced("drawing.rail_receipt_dimensions")
 def _receipt_dimensions(adapter: Any, front: Any) -> list[Any]:
-    """Import the order's three model dimensions into FRONT, as reference."""
+    """Import the rail's three model dimensions into FRONT, as reference."""
     annotations = curate_view_dimensions(
         adapter,
         front,

@@ -1,4 +1,4 @@
-r"""Pure-data envelope of the bought Tr8x2 leadscrew, ZYLtech HW-SC-T8x2-600 (MHA-CH-06-TL-VN-54).
+r"""Pure-data envelope of the bought Tr8x2 leadscrew, ReliaBot 600 mm T8 (Amazon B085DDHJTW) (MHA-CH-06-TL-VN-54).
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure: ``build_ch_rocker_arm_tl_vn_oblique_leadscrew`` revolves ``PROFILE``.
@@ -6,55 +6,69 @@ The module is named ``..._leadscrew_stock_spec`` because the pattern-D name
 ``ch_rocker_arm_tl_vn_oblique_leadscrew_spec`` already belongs to C4's feed-layout
 contract, which this module imports.
 
-The item is the shop-inventory ``fixtures.trammel-tr8-leadscrew``: a ZYLtech
-600 mm pre-cut T8x2 lead screw (304 stainless, single start, right hand,
-pitch and lead 2) that the shop cuts to the installed length. The ends are
-broken, and no journals are turned. The KP08 inner rings' two set screws each
-and the handwheel's one set screw bear on milled flats, not on the thread's
-crests (``FLAT_STATIONS``).
+The item is the shop-inventory ``fixtures.trammel-tr8-leadscrew``: a ReliaBot
+600 mm T8 lead screw (SUS304 stainless, single start, pitch and lead 2) that
+the shop cuts to the installed length. The ends are broken, and no journals
+are turned. The KP08 inner rings' two set screws each and one of the
+handwheel's set screws bear on milled flats, not on the thread's crests
+(``FLAT_STATIONS``). The listing's brass flange nut is used too: with its
+spigot faced off it is the feed nut, MHA-CH-06-TL-VN-82 (owner ruling
+2026-11-04, option B), modelled as its own part.
 
-Datasheet-built: no vendor CAD obtained (ZYLtech publishes no STEP, IGES, STL
-or drawing download on the product page, checked 2026-10-17 UTC; see
-``C:/src/dt-logs/trammel-bought/vendor-cad/HW-SC-T8x2-600.provenance.md``).
+Datasheet-built: no vendor CAD obtained (the listing offers no CAD
+download; its dimension image gives the screw's 600 length and the nut's
+envelope only, checked 2026-11-04).
 
 Sources:
 
 - FROM C4 (imported from ``ch_rocker_arm_tl_vn_oblique_leadscrew_spec``, never
   retyped): the Ø8 major diameter, the lead 2, the 600 stock length and the
   installed length ``SCREW_LENGTH`` 410.
-- SOURCED, https://www.zyltech.com/8mm-t8x2-trapezoidal-acme-lead-screw-w-brass-nut-pre-cut-lengths-150mm-2000mm/
-  (read 2026-10-16; evidence in
-  ``C:/src/dt-logs/trammel-leadscrew/zyltech/zyltech-tr8x2.md``): "T8x2 single
-  start, Pitch: 2mm, Lead per turn: 2mm, Right handed trapezoidal Lead Screw,
-  Material: 304 Stainless Steel", SKU HW-SC-T8x2-600.
-- SOURCED, shop inventory ``fixtures.trammel-tr8-leadscrew`` (owner/C4 layout
-  decision 2026-10-16): cut to 410 ±0.5, deburr and lightly chamfer the cut end.
-  The print uses the title block's .X band instead (``LENGTH_TOLERANCE``): the
-  self-checks below show the feed absorbs it, so the cut needs no band of its own.
-- FROM the bought-parts contract: the Tr8x2 thread minor diameter is 6.0. The
-  Ooznest Tr8x2 vendor STEP (cross-reference only) has the same Ø6.0 root.
+- SOURCED, https://www.amazon.com/dp/B085DDHJTW (read 2026-11-04): "ReliaBot
+  600mm T8 Tr8x2 Lead Screw and Brass Nut (Acme Thread, 2mm Pitch, 1 Start,
+  2mm Lead)"; "Lead screw diameter 8mm, length 600mm, SUS304 stainless
+  steel"; "Screw pitch: 2mm; Number of Thread/Start:1; Lead: 2mm"; packing
+  list 1 x T8x2 600mm lead screw, 1 x T8x2 brass nut. The listing states no
+  thread hand, straightness or length tolerance.
+- DECIDED (owner/C4 layout decision 2026-10-16): cut to 410, deburr and
+  lightly chamfer the cut end. The print uses the title block's .X band
+  (``LENGTH_TOLERANCE``): the self-checks below show the feed absorbs it, so
+  the cut needs no band of its own.
+- FROM the bought-parts contract: the Tr8x2 thread minor diameter is 6.0, a
+  modelled simplification of the ISO 2904 root (below).
 - DECIDED: both ends are broken 0.25 x 45°, the title block's edge break
   ("BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX") at its limit, so they print
-  nothing. The inventory's "lightly chamfer the cut end" asks no more.
+  nothing. The layout decision's "lightly chamfer the cut end" asks no more.
 - DECIDED (user ruling on the machinist review's rule 23, lock threaded
   joints): a set-screw flat ``FLAT_DEPTH`` deep and ``FLAT_LENGTH`` long under
   each set screw, stationed from C4's layout: each KP08's axial centre
   ``KP08_S`` and the handwheel's set screw, ``HANDWHEEL_GRUB_FROM_HUB`` into
-  its hub. Each KP08 takes two flats ``KP08_SET_SCREW_SPACING_DEG`` apart, as
-  its two set screws are (``ch_rocker_arm_tl_vn_oblique_pillow_block_spec``,
-  SOURCED from the KP08 listing: "two set screws 120 degrees apart on the
-  inner ring"); the handwheel ships with one set screw
-  (``ch_rocker_arm_tl_vn_oblique_handwheel_spec``). The flats' clock round the
-  axis is set at assembly: each KP08 ring and the handwheel turn to them.
+  its hub. Each KP08 takes two flats ``KP08_SET_SCREW_SPACING_DEG`` apart, one
+  per inner-ring set screw. The handwheel comes with two set screws
+  (``ch_rocker_arm_tl_vn_oblique_handwheel_spec``); the one opposite the
+  handle bears on the handwheel flat, the other on the plain thread past the
+  feed nut's travel. The flats' clock round the axis is set at assembly: each
+  KP08 ring and the handwheel turn to them.
 - SOURCED, ISO 4029: an M5 cup point is 2.5 across at most
   (``SET_SCREW_POINT_DIA``), the handwheel's set screw.
 - SOURCED, ISO 2904: the Tr8x2 external thread's root d3 = d - 2 h3, h3 =
   P/2 + ac with ac = 0.25, is Ø5.5 (``SCREW_ROOT_DIA``). The flats' depth
   check uses it; the contract's Ø6.0 minor stays the modelled nut bore.
-- UNVERIFIED (verify on receipt): where across each KP08's width its inner
-  ring carries the set screws (the series photographs show the ring proud of
-  the housing on its set-screw side; the flats sit at the block's axial
-  centre), and the KP08 set screws' size (unpublished).
+- UNVERIFIED (verify on receipt, each with its check):
+  - the thread hand (``HAND``; the listing does not state it). Check: the
+    screw and its nut are right-hand before the screw is cut or fitted (the
+    feed's handwheel sense and the assembly steps assume it).
+  - the KP08 set screws: two on each inner ring, 120° apart (the KP08
+    series' arrangement; the uxcell listing states neither count nor clock,
+    its photographs show one hole), their size, and where across the block's
+    width the ring carries them (the flats sit at the block's axial centre).
+    Check: count and clock both rings' set screws before the clock flats are
+    milled.
+  - the handwheel's set-screw station (its spec). Check: its axis stands
+    ``HANDWHEEL_GRUB_FROM_HUB`` from the hub end within
+    ``HANDWHEEL_GRUB_COVER``, so the handwheel flat at its printed bands
+    still runs past the screw both sides; outside that, the hub gap is reset
+    at fitting so the screw lands on the flat, inside the engagement margins.
 
 Thread: not modelled (bought-parts modelling rule). The body is a plain
 cylinder at the major diameter, so it overstates the real screw by the thread
@@ -73,8 +87,8 @@ import math
 from _printed_tolerance import angular_band_deg, printed_band_mm
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as feed
 
-SUPPLIER = "ZYLtech Engineering"
-SKU = "HW-SC-T8x2-600"
+SUPPLIER = "Amazon (sold by ReliaBot)"
+SKU = "B085DDHJTW"
 INVENTORY_ID = feed.SCREW_ID  # fixtures.trammel-tr8-leadscrew
 QUANTITY = 1
 MATERIAL = "AISI 304"
@@ -85,25 +99,20 @@ LEAD = feed.SCREW_LEAD  # 2
 STOCK_LENGTH = feed.SCREW_STOCK_LENGTH  # 600, as bought
 LENGTH = feed.SCREW_LENGTH  # 410, installed (shop-cut)
 
-# --- SOURCED: product page / inventory / contract ---------------------------------
+# --- SOURCED: listing / layout decision / contract --------------------------------
 PITCH = 2.0  # single start: the pitch equals the lead
 STARTS = 1
-HAND = "right"
+HAND = "right"  # UNVERIFIED: not stated on the listing; receipt check
 
-# Current primary page + live 600 mm selection verified 2026-10-21; selecting
-# that option changes the displayed SKU from HW-SC-T8x2-P to HW-SC-T8x2-600.
 # The drawing prints none of the stock's sizes: its thread designation and
 # the SKU identify the stock (review: a gauge sketch, then a numeric note row).
-SUPPLIER_PRODUCT_URL = (
-    "https://www.zyltech.com/"
-    "8mm-t8x2-trapezoidal-acme-lead-screw-w-brass-nut-pre-cut-lengths-150mm-2000mm/"
-)
+SUPPLIER_PRODUCT_URL = "https://www.amazon.com/dp/B085DDHJTW"
 
 # The cut length prints as a native one-place dimension (410.0), so the title
 # block's .X row is its band; the self-checks below show the feed absorbs it.
 LENGTH_PLACES = 1
 LENGTH_TOLERANCE = printed_band_mm(LENGTH_PLACES)  # ±0.8, the title block's .X
-MINOR_DIA = 6.0  # Tr8x2 thread minor (contract; the Ooznest STEP's root)
+MINOR_DIA = 6.0  # Tr8x2 thread minor (contract; the nut bore's model value)
 
 # --- DECIDED: the title block's edge break --------------------------------------
 END_CHAMFER = 0.25  # 0.25 x 45°, both ends: "CHAMFER 0.25 MAX", printed by none
@@ -150,7 +159,7 @@ FLAT_PLACES = LENGTH_PLACES
 FLAT_TOLERANCE = printed_band_mm(FLAT_PLACES)  # ±0.8
 FLAT_LENGTH_PLACES = 2
 FLAT_LENGTH_TOLERANCE = printed_band_mm(FLAT_LENGTH_PLACES)  # ±0.51
-KP08_SET_SCREW_SPACING_DEG = 120.0  # SOURCED: the KP08 listing (pillow-block spec)
+KP08_SET_SCREW_SPACING_DEG = 120.0  # UNVERIFIED: the KP08 series' clock; receipt check
 CLOCK_PLACES = 0
 CLOCK_TOLERANCE_DEG = angular_band_deg()  # ±1, the title block's angular row
 SET_SCREW_POINT_DIA = 2.5  # SOURCED, ISO 4029: the M5 cup point's dp max
@@ -159,6 +168,15 @@ SET_SCREW_POINT_DIA = 2.5  # SOURCED, ISO 4029: the M5 cup point's dp max
 # simplification of the root, kept for the nut bore and the groove estimate.
 SCREW_ROOT_DIA = 5.5
 HANDWHEEL_SET_SCREW_MAJOR = float(feed.HANDWHEEL_GRUB.removeprefix("M"))  # 5
+# How far the handwheel's set-screw axis may stand off its 7 (UNVERIFIED)
+# station with the flat still past the screw both sides at the flat's
+# printed bands: the receipt check's window, ± this.
+HANDWHEEL_GRUB_COVER = (
+    FLAT_LENGTH / 2.0
+    - FLAT_TOLERANCE
+    - FLAT_LENGTH_TOLERANCE
+    - HANDWHEEL_SET_SCREW_MAJOR / 2.0
+)  # 0.19
 
 # Each set screw's station, part frame (from the near end), from C4's layout.
 FLAT_STATIONS = {
@@ -166,12 +184,12 @@ FLAT_STATIONS = {
     "FarKP08": feed.KP08_S[1] - feed.SCREW_NEAR_END_S,  # 379.5
     "Handwheel": (
         feed.HUB_END_S + feed.HANDWHEEL_GRUB_FROM_HUB - feed.SCREW_NEAR_END_S
-    ),  # 398.5
+    ),  # 404.5
 }
 # Each flat's near edge, from the near end: what the print dimensions.
 FLAT_STARTS = {
     name: station - FLAT_LENGTH / 2.0 for name, station in FLAT_STATIONS.items()
-}  # 4.5, 375.5, 394.5
+}  # 4.5, 375.5, 400.5
 # What each flat sits under, as station spans on the rail (C4's s): the KP08
 # blocks' widths, and the screw's length inside the handwheel's hub.
 FLAT_HOUSINGS = {
@@ -282,9 +300,10 @@ if (feed.NEAR_STUB - feed.NEAR_STUB_MIN) + (
     feed.HANDWHEEL_ENGAGEMENT - feed.HANDWHEEL_ENGAGEMENT_MIN
 ) < LENGTH_TOLERANCE:
     raise AssertionError("a short cut loses the near stub or the handwheel grip")
-# A long cut at the nominal near stub: the far end stays inside the wheel.
-if not feed.SCREW_FAR_END_S + LENGTH_TOLERANCE < feed.WHEEL_S[1]:
-    raise AssertionError("a long cut stands proud of the handwheel")
+# A long cut at the nominal near stub: the far end stays inside the handwheel's
+# guaranteed (hub-deep) bore.
+if not feed.SCREW_FAR_END_S + LENGTH_TOLERANCE < feed.HUB_END_S + feed.HANDWHEEL_BORE_LENGTH:
+    raise AssertionError("a long cut reaches past the handwheel's guaranteed bore")
 if not 0.0 < END_CHAMFER < MAJOR_DIA / 2.0:
     raise AssertionError("the end chamfer is not inside the screw")
 if abs(PITCH * STARTS - LEAD) > 1e-9:
@@ -298,10 +317,7 @@ if not flat_chord(FLAT_DEPTH - FLAT_AF_TOLERANCE) >= SET_SCREW_POINT_DIA:
     raise AssertionError("a shallow set-screw flat is narrower than the cup point")
 # A flat off station by its band, and short by its length's band, still runs
 # past the set screw both sides: the far side takes both bands.
-if not (
-    FLAT_LENGTH / 2.0 - FLAT_TOLERANCE - FLAT_LENGTH_TOLERANCE
-    >= HANDWHEEL_SET_SCREW_MAJOR / 2.0
-):
+if not HANDWHEEL_GRUB_COVER >= 0.0:
     raise AssertionError("a flat off station leaves the set screw on the thread")
 # A KP08's two flats, both at their deepest and the angle at its band, keep a
 # full round between them.

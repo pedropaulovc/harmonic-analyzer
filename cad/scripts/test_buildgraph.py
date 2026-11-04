@@ -145,16 +145,15 @@ _INSERTED_SOURCES = {
     "ch_rocker_arm_tl_oblique_pivot_block ch_rocker_arm_tl_oblique_riser "
     "ch_rocker_arm_tl_vn_oblique_rail ch_rocker_arm_tl_vn_oblique_carriage "
     "ch_rocker_arm_tl_vn_oblique_cl_dowel ch_rocker_arm_tl_vn_oblique_leadscrew "
-    "ch_rocker_arm_tl_oblique_feed_nut ch_rocker_arm_tl_vn_oblique_pillow_block "
+    "ch_rocker_arm_tl_vn_oblique_feed_nut ch_rocker_arm_tl_vn_oblique_pillow_block "
     "ch_rocker_arm_tl_vn_oblique_handwheel sh_vn_clamping_kit_hardware "
     "ch_rocker_arm_tl_vn_oblique_rail_screw ch_rocker_arm_tl_vn_oblique_bracket_screw "
     "ch_rocker_arm_tl_vn_oblique_carriage_screw "
-    "ch_rocker_arm_tl_vn_oblique_kp08_screw ch_rocker_arm_tl_vn_oblique_nut_screw "
+    "ch_rocker_arm_tl_vn_oblique_kp08_screw "
     "ch_rocker_arm_tl_vn_oblique_riser_screw ch_rocker_arm_tl_vn_oblique_clamp_screw "
     "ch_rocker_arm_tl_vn_oblique_lever_screw ch_rocker_arm_tl_vn_oblique_lever_washer "
     "ch_rocker_arm_tl_vn_oblique_pivot_screw ch_rocker_arm_tl_vn_oblique_pivot_spacer "
-    "ch_rocker_arm_tl_vn_oblique_pivot_shim ch_rocker_arm_tl_vn_oblique_hub_pin "
-    "ch_rocker_arm_tl_vn_oblique_nut_dowel",
+    "ch_rocker_arm_tl_vn_oblique_pivot_shim ch_rocker_arm_tl_vn_oblique_hub_pin",
     "dt_cone_gear_tl_indexing": "dt_cone_gear_tl_index_plate",
     "ha_harmonic_analyzer": "fr_frame dt_drive_train ch_channel sm_summing mg_magnifier pn_pen "
     "pd_paper_drive ms_measuring_stick",

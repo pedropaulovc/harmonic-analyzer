@@ -60,6 +60,11 @@ retiredTooling.push(...[
   ['pivot-pin', '23', '23', false],
   // #2112: the shop-made TL-27 nut retires the bought Tr8 flange nut.
   ['leadscrew-nut', '35', '55', true],
+  // #2177 option B (2026-11-04): the ReliaBot screw's own flange nut retires
+  // the shop-made nut, its dowel and its two screws.
+  ['feed-nut', null, '27', false, '2026-11-01'],
+  ['nut-dowel', null, '81', true, '2026-11-03'],
+  ['nut-screw', '46', '66', true],
 ].map(([suffix, previousSequence, sequence, vendor, introduced]) => ({
   old_stem: `ch-rocker-arm-tl-${vendor && previousSequence === null ? 'vn-' : ''}oblique-${suffix}`,
   old_number: previousSequence === null ? null : `MHA-CH-006-TL-${previousSequence}`,

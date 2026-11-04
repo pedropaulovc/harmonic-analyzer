@@ -103,7 +103,6 @@ PRECISION_MIGRATED_DRAWINGS = frozenset(
         "draw_ch_rocker_arm_tl_oblique_riser.py",
         "draw_ch_rocker_arm_tl_oblique_feed_lever.py",
         "draw_ch_rocker_arm_tl_oblique_end_bracket.py",
-        "draw_ch_rocker_arm_tl_oblique_feed_nut.py",
         "draw_ch_rocker_arm_tl_oblique_feed_block.py",
         "draw_ch_rocker_arm_tl_vn_oblique_leadscrew.py",
         "draw_ch_rocker_arm_tl_vn_oblique_handwheel.py",

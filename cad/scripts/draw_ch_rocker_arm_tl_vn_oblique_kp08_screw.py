@@ -22,7 +22,7 @@ MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_kp08_screw"]
 # The footer's ITEM row: the fastener table's callout for the screw.
-ITEM = "#6-32 X 5/8 SHCS"
+ITEM = "#6-32 X 5/8 BHCS"
 
 
 async def build(adapter: Any) -> dict[str, str]:

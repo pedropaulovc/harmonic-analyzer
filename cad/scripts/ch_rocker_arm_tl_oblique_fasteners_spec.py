@@ -30,9 +30,10 @@ Threads are US-customary UNC except the bought carriage's M4 holes.
 The shoulder screw has its own datum-based row: treating its 1.500 shoulder
 as a conventional screw grip would report a false engagement.
 
-Only the feed lever screws use wedge-lock pairs. The two feed nut screws'
-flanges bear directly on the brass nut. Hold-down studs retain their loaded
-lower ends when shortened. These nominal fit contracts do not certify the jig.
+Only the feed lever screws use wedge-lock pairs. The four feed nut screws'
+flat heads seat in 82° countersinks cut in the brass nut's flange at fit-up.
+Hold-down studs retain their loaded lower ends when shortened. These nominal
+fit contracts do not certify the jig.
 """
 
 from __future__ import annotations
@@ -44,7 +45,7 @@ import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_oblique_feed_lever_spec as feed_lever
 import ch_rocker_arm_tl_oblique_feed_block_spec as feed_block
-import ch_rocker_arm_tl_oblique_feed_nut_spec as feed_nut
+import ch_rocker_arm_tl_vn_oblique_feed_nut_spec as feed_nut
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_riser_spec as riser
@@ -59,9 +60,8 @@ SHCS = "SHCS"
 # The riser's countersinks take only the B18.6.3 machine-screw head; a B18.3
 # socket flat head stands proud of them (trammel spec; Codex #1583).
 FLAT_HEAD = "B18.6.3 FLAT HEAD"
-# The feed nut's screws: a flanged button head, whose flange seats flat over
-# the nut's clearance hole at the fit-up's eccentricity (feed block spec).
-FLANGED_BHCS = "FLANGED BHCS"
+# The KP08 screws: a button head on each pillow block's cast foot.
+BHCS = "BHCS"
 # The TL-VN-71 wedge-lock pair's stack under each feed lever screw head: the
 # 91812A230 band's 0.090 in maximum (the lever washer spec pins it).
 LEVER_LOCK_STACK = 0.090 * INCH  # 2.286
@@ -77,7 +77,7 @@ def inch_mm(length: str) -> float:
 class Fastener:
     joint: str
     thread: str  # as printed: "#8-32", "M4"
-    head: str  # SHCS, FLANGED BHCS or FLAT HEAD
+    head: str  # SHCS, BHCS or FLAT HEAD
     length: str  # as printed: "3/4" (inch) or "20" (mm)
     count: int
     grip_mm: float  # under the head, before the receiving thread
@@ -133,7 +133,7 @@ class Washer:
     thickness_mm: float  # the installed stack under one head
 
 
-_METRIC_PITCH = {"M4": "0.7"}  # the carriage's vendor-cut M4 only
+_METRIC_PITCH = {"M4": "0.7"}  # the carriage's M4 only
 
 
 def callout(fastener: Fastener) -> str:
@@ -143,11 +143,11 @@ def callout(fastener: Fastener) -> str:
 
 # --- The table: one row per joint ---------------------------------------------------
 RAIL_TO_BAR = Fastener(
-    "HGR15R rail to TL-20 base bar",
+    "HGR15 rail to TL-20 base bar",
     trammel.RAIL_SCREW,
     SHCS,
     "3/4",
-    trammel.RAIL_HOLE_COUNT * RAILS,  # 7 rail holes x 2 rails
+    trammel.RAIL_HOLE_COUNT * RAILS,  # 8 rail holes x 2 rails
     trammel.RAIL_SCREW_SEAT_ABOVE_BASE,  # head on the rail's counterbore floor
     base_bar.BAR_THICK,  # tapped THRU
 )
@@ -169,25 +169,25 @@ BLOCK_TO_CARRIAGE = Fastener(
     pivot_block.CBORE_FLOOR,
     pivot_block.CARRIAGE_THREAD_DEPTH,  # the carriage's M4 x 5
     min_engagement_d=1.1,
-    note="the carriage maker's M4 x 5 holes limit the engagement",
+    note="the HGH15CA-style carriage's M4 x 5 holes limit the engagement",
     cut_length_mm=pivot_block.SCREW_CUT_LENGTH,  # owner ruling 2026-11-01
 )
 KP08_TO_BRACKET = Fastener(
     "KP08 pillow block to TL-28 end bracket",
     leadscrew.KP08_SCREW,
-    SHCS,
+    BHCS,
     leadscrew.KP08_SCREW_LENGTH,
     2 * leadscrew.END_BRACKET_QUANTITY,
     leadscrew.KP08_FOOT_THICK,  # UNVERIFIED foot thickness
     leadscrew.BRACKET_THICK,  # tapped THRU
 )
 NUT_TO_FEED_BLOCK = Fastener(
-    "TL-27 feed nut to TL-32 feed block",
+    "TL-VN-82 feed nut to TL-32 feed block",
     feed_nut.SCREW_THREAD,
-    FLANGED_BHCS,
+    FLAT_HEAD,
     feed_nut.SCREW_LENGTH_TEXT,
     feed_nut.SCREW_COUNT,
-    feed_nut.LENGTH,  # the flange on the nut's outer face
+    feed_nut.SCREW_GRIP,  # head seated nominally in the flange's countersink
     feed_block.LUG_WIDTH,  # tapped THRU
 )
 RISER_TO_CARRIER = Fastener(

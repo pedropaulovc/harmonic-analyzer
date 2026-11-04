@@ -118,7 +118,7 @@ _PARTS = (
     ("ch-rocker-arm-tl-vn-oblique-carriage", "ch-rocker-arm-tl-vn-oblique-carriage"),
     ("ch-rocker-arm-tl-vn-oblique-cl-dowel", "ch-rocker-arm-tl-vn-oblique-cl-dowel"),
     ("ch-rocker-arm-tl-vn-oblique-leadscrew", "ch-rocker-arm-tl-vn-oblique-leadscrew"),
-    ("ch-rocker-arm-tl-oblique-feed-nut", "ch-rocker-arm-tl-oblique-feed-nut"),
+    ("ch-rocker-arm-tl-vn-oblique-feed-nut", "ch-rocker-arm-tl-vn-oblique-feed-nut"),
     ("ch-rocker-arm-tl-vn-oblique-pillow-block", "ch-rocker-arm-tl-vn-oblique-pillow-block"),
     ("ch-rocker-arm-tl-vn-oblique-handwheel", "ch-rocker-arm-tl-vn-oblique-handwheel"),
     ("sh-vn-clamping-kit-hardware", "sh-vn-clamping-kit-hardware--HoldDownStud"),
@@ -128,12 +128,10 @@ _PARTS = (
     ("ch-rocker-arm-tl-vn-oblique-bracket-screw", "ch-rocker-arm-tl-vn-oblique-bracket-screw"),
     ("ch-rocker-arm-tl-vn-oblique-carriage-screw", "ch-rocker-arm-tl-vn-oblique-carriage-screw"),
     ("ch-rocker-arm-tl-vn-oblique-kp08-screw", "ch-rocker-arm-tl-vn-oblique-kp08-screw"),
-    ("ch-rocker-arm-tl-vn-oblique-nut-screw", "ch-rocker-arm-tl-vn-oblique-nut-screw"),
     ("ch-rocker-arm-tl-vn-oblique-riser-screw", "ch-rocker-arm-tl-vn-oblique-riser-screw"),
     ("ch-rocker-arm-tl-vn-oblique-clamp-screw", "ch-rocker-arm-tl-vn-oblique-clamp-screw"),
     ("ch-rocker-arm-tl-vn-oblique-lever-screw", "ch-rocker-arm-tl-vn-oblique-lever-screw"),
     ("ch-rocker-arm-tl-vn-oblique-lever-washer", "ch-rocker-arm-tl-vn-oblique-lever-washer"),
-    ("ch-rocker-arm-tl-vn-oblique-nut-dowel", "ch-rocker-arm-tl-vn-oblique-nut-dowel"),
 )
 assert tuple(family for _physical, family in _PARTS) == spec.BOM_ORDER
 assert all(

@@ -20,7 +20,7 @@ from _check import check
 from _com import _early_bound
 from _drawing_common import (DrawingOutputs, finalize_drawing, new_project_drawing, read_required_properties, rebuild_drawing,
                              remove_notes_matching)
-from _drawing_dimensions import assert_imported_precision, dimension_name, offset_dimension_text, set_reference_dimension
+from _drawing_dimensions import assert_imported_precision, dimension_name, offset_dimension_text
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_leader_notes import add_leader_note
@@ -170,39 +170,29 @@ VIEW_SHEET_REF = '(SHEET 2)'
 VIEW_SHEET_REF_OFFSET = (-.010, -.008)
 # Nut interface, VIEW D, *Left at 2:1 on a 2:1 sheet, at .190,.175: Z runs
 # right from the bottom face at x 165.7, Y=0 prints at y 223, the lug end
-# (Y -68) at y 87; the clearance's axis at 190.5,113, the two taps
-# transferred from TL-27 on its line at y 95.2 (tap 1, toward the lug end)
-# and 130.8, the dowel hole at 178.8,126.7 (up and left of the axis). The
-# clearance stands from the lug end / carriage-face corner. Left of the view:
-# the clearance's .515 (x 104) and, under the lug end, the 12.400 mm height,
-# its three rows outboard left of the bottom face's extension line. Right of
-# the view, clear of its edge (x 214): each tap's (.35) REF from the axis,
-# each on its own lane. The Ø.375 clearance callout comes in from the left,
-# low (its leader about 8 mm under the dowel hole: from the upper left it ran
-# through that hole and crossed the dowel's leader, final 20261103T152424387Z);
-# the dowel hole's #41 callout from higher up the left, its leader passing
-# right of the clearance's text; the taps' transfer callout from the upper
-# right onto tap 2's rim, over every right-hand extension line (from the
-# lower right its four rows ran into the title block, same run).
+# (Y -68) at y 87; the clearance's axis at 190.5,113, the four taps
+# transferred from TL-VN-82 on its diagonals at x 179.2 / 201.8, y 101.7 /
+# 124.3. The clearance stands from the lug end / carriage-face corner. Left
+# of the view: the clearance's .515 (x 104) and, under the lug end, the
+# 12.400 mm height, its three rows outboard left of the bottom face's
+# extension line. The Ø.351 clearance callout comes in from the left, its
+# four rows over the .515's axis extension line (y 113) and its leader under
+# the upper-left tap; the taps' transfer callout from the upper right onto
+# the upper-right tap's rim, wholly right of the view's edge (x 214; from
+# the lower right its rows ran into the title block, final
+# 20261103T152424387Z).
 NUT_XY, NUT_SCALE = (.190,.175), (2,1)
 NUT_KEEP = {
     'NutCentreY':(.104,.100),'NutCentreZ':(.134,.0772),
-    # Arrows outside, each on its own lane, the second's lane right of the
-    # first's text (feed-nut2: on one lane the runs struck the texts).
-    'NutTap1Y':(.247,.1044),'NutTap2Y':(.282,.1216),
-    'NutClearanceDia':(.135,.127),
-    'NutDowelDia':(.100,.185),
+    'NutClearanceDia':(.135,.133),
 }
 NUT_CAPTION = 'VIEW D'
 NUT_CAPTION_XY = (.178,.058)  # the note's left edge; centred under the view
 # TL-32's cut-face sections hang their captions 6 mm under the face.
 SECTION_CAPTION_GAP = .006
-# Over tap 2's lane's arrow run (which reaches about y 141), wholly right of
-# the view's edge.
 NUT_CALLOUT_XY = (.268,.165)
 NUT_ISO_XY = (.380,.215)
 _ARROWS_INSIDE = 0  # swDimArrowsInside
-_ARROWS_OUTSIDE = 1  # swDimArrowsOutside
 _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 
 
@@ -462,23 +452,16 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
         set_hidden_lines_removed(adapter,nut_iso)
         nut_annotations = curate_view_dimensions(adapter,nut,keep=NUT_KEEP,view_label='nut face',
                       dimensions_by_feature=contract.DRAWING_DIMENSIONS)
-        # Held outside, read back: on their staggered lanes (NUT_KEEP) the
-        # arrow runs pass clear of the other's text.
-        _set_arrow_side(adapter, nut_annotations, ('NutTap1Y', 'NutTap2Y'), _ARROWS_OUTSIDE)
-        # The taps are transferred from TL-27 at assembly: their stations
-        # print REF.
-        for name, display in _displays(adapter, nut_annotations, contract.REF_DIMENSIONS).items():
-            set_reference_dimension(adapter, display.GetAnnotation(), label=f'VIEW D {name}')
         print_imported_metric_dimensions(adapter, nut_annotations,
                                           {name: places for (_, name), (places, _) in contract.METRIC_DIMENSIONS.items()})
         caption = add_note(adapter, NUT_CAPTION, *NUT_CAPTION_XY)
         if caption is None:
             raise RuntimeError('failed to insert the VIEW D caption')
         _size_note(adapter, caption, VIEW_LETTER_HEIGHT, label='VIEW D caption')
-        # The callout reaches tap 2 (away from the lug end) from the upper
+        # The callout reaches the upper-right tap (+Y, +Z) from the upper
         # right. The title block's THREADS row owns the class; the process
         # row says where the taps come from (TL-00 says how).
-        y,z = contract.NUT_HOLES_YZ[1]
+        y,z = contract.NUT_HOLES_YZ[3]
         rim = contract.NUT_TAP_DRILL/2/math.sqrt(2)
         edge = _project(adapter,nut,(contract.NUT_FACE_X,y+rim,z+rim),'nut tap mouth')
         taps = add_native_hole_callout(adapter,nut,edge_xy=edge,callout_xy=NUT_CALLOUT_XY,

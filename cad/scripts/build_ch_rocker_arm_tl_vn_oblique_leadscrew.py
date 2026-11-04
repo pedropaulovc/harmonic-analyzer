@@ -1,4 +1,4 @@
-r"""Bought Tr8x2 leadscrew: ZYLtech HW-SC-T8x2-600 cut to length (MHA-CH-06-TL-VN-54).
+r"""Bought Tr8x2 leadscrew: ReliaBot 600 mm T8 (Amazon B085DDHJTW) cut to length (MHA-CH-06-TL-VN-54).
 
 The oblique trammel jig's feed screw as installed: a plain Ø8 cylinder at
 the thread's major diameter (the thread is not modelled), shop-cut to C4's

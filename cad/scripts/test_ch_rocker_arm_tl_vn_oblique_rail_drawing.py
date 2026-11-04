@@ -1,4 +1,4 @@
-"""HIWIN HGR15R rail cut to 440 (MHA-CH-06-TL-VN-50) contracts, SolidWorks-free."""
+"""HIWIN-style HGR15 kit rail, 450 as supplied (MHA-CH-06-TL-VN-50) contracts, SolidWorks-free."""
 
 from __future__ import annotations
 
@@ -32,18 +32,26 @@ def _shoelace(points):
     )
 
 
-def test_registry_row_is_the_purchased_hiwin_rail() -> None:
+def test_registry_row_is_the_purchased_kit_rail() -> None:
     assert ROW["number"] == "MHA-CH-06-TL-VN-50"
     assert ROW["process"] == "purchased"
-    assert ROW["supplier"] == spec.SUPPLIER == "Motion Constrained"
-    assert ROW["supplier_skus"] == [spec.SKU] == ["172270559990"]
+    assert ROW["supplier"] == spec.SUPPLIER == "Amazon (sold by XIQI)"
+    # The kit's ASIN: one kit supplies both rails and both carriages.
+    assert ROW["supplier_skus"] == [spec.SKU] == ["B0C4DJNL33"]
+    assert spec.SOURCE_URL.endswith(f"/dp/{spec.SKU}")
+    carriage_row = _config.parts("ch-rocker-arm-tl-vn-oblique-carriage")
+    assert carriage_row["supplier_skus"] == ROW["supplier_skus"]
+    assert carriage_row["supplier"] == ROW["supplier"]
     assert ROW["material"] == spec.MATERIAL == "Alloy Steel"
     assert ROW["tolerance_class"] == "machined_block"
     assert "fit_class" not in ROW
-    assert spec.MAKER_PART in ROW["stock_name"]
+    # The style designation, never a HIWIN order code: the rail is not HIWIN's.
+    assert spec.STYLE == "HGR15" and spec.STYLE in ROW["stock_name"]
+    assert not hasattr(spec, "MAKER_PART")
+    assert "HGR15R" not in ROW["stock_name"]
     # One line in the title block's MATERIAL cell; the provenance is the spec's.
     assert len(ROW["material_specification"]) <= 36
-    assert spec.VENDOR_STEP in (spec.__doc__ or "")
+    assert spec.REFERENCE_STEP in (spec.__doc__ or "")
     assert part.PART_NAME == STEM
     assert part.STOCK_PROPERTIES == {
         "Stock Name": ROW["stock_name"],
@@ -59,12 +67,12 @@ def test_quantity_is_one_rail_per_side() -> None:
 
 
 def test_calculator_values_are_imported_not_retyped() -> None:
-    assert spec.LENGTH == trammel.RAIL_LENGTH == 440.0
+    assert spec.LENGTH == trammel.RAIL_LENGTH == 450.0
     assert spec.WIDTH == trammel.RAIL_WIDTH == 15.0
     assert spec.HEIGHT == trammel.RAIL_HEIGHT == 15.0
     assert spec.HOLE_PITCH == trammel.RAIL_HOLE_PITCH == 60.0
-    assert spec.HOLE_COUNT == trammel.RAIL_HOLE_COUNT == 7
-    assert spec.HOLE_END == trammel.RAIL_HOLE_END == 40.0
+    assert spec.HOLE_COUNT == trammel.RAIL_HOLE_COUNT == 8
+    assert spec.HOLE_END == trammel.RAIL_HOLE_END == 15.0
     source = Path(spec.__file__).read_text(encoding="utf-8")
     for name, value in (
         ("LENGTH", "RAIL_LENGTH"),
@@ -80,24 +88,28 @@ def test_calculator_values_are_imported_not_retyped() -> None:
     )
 
 
-def test_calculator_agrees_with_the_catalogue_and_vendor_rail() -> None:
+def test_calculator_agrees_with_the_catalogue_and_reference_rail() -> None:
     # The calculator's counterbore floor is the catalogue's h 5.3.
     assert math.isclose(spec.CBORE_DEPTH, spec.CATALOGUE_CBORE_DEPTH)
     assert (spec.HOLE_DIA, spec.CBORE_DIA) == (4.5, 7.5)
-    # The special order: the vendor's standard 440 is 8 holes at E 10 on the
-    # same pitch, ours 7 at E 40; both patterns are symmetric on the length.
-    vendor_span = (spec.VENDOR_HOLE_COUNT - 1) * spec.HOLE_PITCH
-    assert math.isclose(2 * spec.VENDOR_HOLE_END + vendor_span, spec.LENGTH)
+    # The reference model is HIWIN's standard 440, 8 holes at E 10; the kit
+    # rail is 450 with 8 holes at E 15 on the same pitch. Both patterns are
+    # symmetric on their lengths.
+    reference_span = (spec.REFERENCE_HOLE_COUNT - 1) * spec.HOLE_PITCH
+    assert math.isclose(
+        2 * spec.REFERENCE_HOLE_END + reference_span, spec.REFERENCE_LENGTH
+    )
+    assert spec.REFERENCE_HOLE_COUNT == spec.HOLE_COUNT
     assert math.isclose(spec.HOLE_X[0] + spec.HOLE_X[-1], spec.LENGTH)
-    assert spec.HOLE_X == (40.0, 100.0, 160.0, 220.0, 280.0, 340.0, 400.0)
+    assert spec.HOLE_X == (15.0, 75.0, 135.0, 195.0, 255.0, 315.0, 375.0, 435.0)
 
 
-def test_section_is_the_vendor_profile_in_the_part_frame() -> None:
+def test_section_is_the_reference_profile_in_the_part_frame() -> None:
     ys = [y for y, _ in spec.SECTION]
     zs = [z for _, z in spec.SECTION]
     assert (min(ys), max(ys)) == (-spec.WIDTH / 2.0, spec.WIDTH / 2.0)
     assert (min(zs), max(zs)) == (0.0, spec.HEIGHT)
-    assert len(spec.SECTION) == 2 * len(spec.VENDOR_HALF_PROFILE)
+    assert len(spec.SECTION) == 2 * len(spec.REFERENCE_HALF_PROFILE)
     # Mirror-symmetric about the centre plane, counter-clockwise from +X.
     assert sorted(spec.SECTION) == sorted((-y, z) for y, z in spec.SECTION)
     area = _shoelace(spec.SECTION)
@@ -105,7 +117,7 @@ def test_section_is_the_vendor_profile_in_the_part_frame() -> None:
     assert math.isclose(area, spec.SECTION_AREA, rel_tol=1e-12)
     # The 0.7 x 45 deg foot chamfer clears the catalogue's r1 0.5 max fillet
     # at the base bar's locating shoulder.
-    seat_end, chamfer_top = spec.VENDOR_HALF_PROFILE[:2]
+    seat_end, chamfer_top = spec.REFERENCE_HALF_PROFILE[:2]
     assert chamfer_top[0] - seat_end[0] > spec.SHOULDER_FILLET_MAX
 
 
@@ -125,25 +137,29 @@ def test_section_edges_never_cross() -> None:
             ), (i, j)
 
 
-def test_closed_form_volume_matches_the_vendor_step() -> None:
+def test_closed_form_volume_matches_the_reference_step() -> None:
     hole = math.pi * 2.25**2 * (spec.HEIGHT - spec.CBORE_DEPTH)
     cbore = math.pi * 3.75**2 * spec.CBORE_DEPTH
     expected = _shoelace(spec.SECTION) * spec.LENGTH - spec.HOLE_COUNT * (hole + cbore)
     assert math.isclose(spec.VOLUME_MM3, expected, rel_tol=1e-12)
-    # The vendor solid (8 holes) re-drilled to 7, plus the closed-form chord
-    # fill of the raceway grooves less the R1 blends; what is left is the
-    # vendor's ten R0.4 blends, its 0.1 deep logo and the dims' rounding.
+    # The reference solid (440, 8 holes) lengthened to 450 in its true
+    # section (the chord section less the groove fill), plus the closed-form
+    # chord fill of the raceway grooves less the R1 blends over the whole
+    # length; what is left is the reference's ten R0.4 blends, its 0.1 deep
+    # logo and the dims' rounding.
+    extra = spec.LENGTH - spec.REFERENCE_LENGTH
+    assert extra == 10.0
     assert math.isclose(
-        spec.VENDOR_EQUIVALENT_VOLUME_MM3,
-        spec.VENDOR_VOLUME_MM3 + hole + cbore,
+        spec.REFERENCE_EQUIVALENT_VOLUME_MM3,
+        spec.REFERENCE_VOLUME_MM3 + (spec.SECTION_AREA - spec.GROOVE_FILL_MM2) * extra,
         rel_tol=1e-12,
     )
     residual = (
         spec.VOLUME_MM3
-        - spec.VENDOR_EQUIVALENT_VOLUME_MM3
+        - spec.REFERENCE_EQUIVALENT_VOLUME_MM3
         - spec.GROOVE_FILL_MM2 * spec.LENGTH
     )
-    assert abs(residual) < spec.VENDOR_VOLUME_ALLOWANCE_MM3 == 44.0
+    assert abs(residual) < spec.REFERENCE_VOLUME_ALLOWANCE_MM3 == 45.0
     # The groove fill is small against the section: the chords are faithful.
     assert 0.0 < spec.GROOVE_FILL_MM2 < 0.01 * spec.SECTION_AREA
 
@@ -166,12 +182,20 @@ def test_spec_is_pure_data() -> None:
 
 def test_docstring_marks_every_source() -> None:
     doc = spec.__doc__ or ""
-    for mark in ("VENDOR STEP", "SOURCED", "FROM THE CALCULATOR", "VENDOR-CHECKED"):
+    for mark in (
+        "KIT LISTING",
+        "REFERENCE GEOMETRY",
+        "REFERENCE STEP",
+        "SOURCED",
+        "FROM THE CALCULATOR",
+        "UNVERIFIED",
+    ):
         assert mark in doc, mark
-    assert spec.VENDOR_STEP in doc
-    assert "datasheet-built: no vendor CAD obtained" in doc
-    assert re.fullmatch(r"[0-9a-f]{64}", spec.VENDOR_STEP_SHA256)
-    assert spec.VENDOR_DOWNLOADED == "2026-10-17"
+    assert spec.REFERENCE_STEP in doc
+    assert spec.SOURCE_URL in doc or spec.SKU in doc
+    assert "HIWIN is not the supplier" in doc
+    assert re.fullmatch(r"[0-9a-f]{64}", spec.REFERENCE_STEP_SHA256)
+    assert spec.REFERENCE_DOWNLOADED == "2026-10-17"
 
 
 def test_build_extrudes_the_section_then_drills_and_counterbores() -> None:
@@ -208,8 +232,8 @@ def test_build_names_and_marks_the_receipt_dimensions() -> None:
         "Rail": {"Length": 0},
         "BoltHoleProfile": {"HoleEnd": 0, "HolePitch": 0},
     }
-    # The one printed pitch counts every gap between the seven holes.
-    assert spec.HOLE_PITCH_CALLOUT == f"{spec.HOLE_COUNT - 1}X" == "6X"
+    # The one printed pitch counts every gap between the eight holes.
+    assert spec.HOLE_PITCH_CALLOUT == f"{spec.HOLE_COUNT - 1}X" == "7X"
 
 
 class _Result:
@@ -277,7 +301,7 @@ def test_hole_sketch_places_the_end_distance_then_one_pitch_per_gap(
         if kind == "horizontal_distance"
     ]
     # The first hole from the origin (the -X end face), each next one from
-    # the hole before it: the chain the drawing prints as 40 and 6X 60.
+    # the hole before it: the chain the drawing prints as 15 and 7X 60.
     assert distances[0] == ("circle1.center", "origin", spec.HOLE_END)
     assert distances[1:] == [
         (f"circle{k}.center", f"circle{k + 1}.center", spec.HOLE_PITCH)
@@ -303,8 +327,9 @@ def test_sheet_is_the_registered_purchased_part_reference() -> None:
     )
     assert sheet.layout is DrawingLayout.LANDSCAPE
     assert sheet.source_kind == "part"
-    assert "HGR15R" in draw.ITEM
-    # The cut length is the FRONT view's dimension, never the item's text.
+    assert spec.STYLE in draw.ITEM and "HGR15R" not in draw.ITEM
+    assert "GENERIC" in draw.ITEM
+    # The length is the FRONT view's dimension, never the item's text.
     assert f"{spec.LENGTH:.0f}" not in draw.ITEM
     assert {name for name, *_ in draw.VIEWS} == {
         "*Front",
@@ -339,6 +364,30 @@ def test_receipt_dimensions_are_the_marked_model_dimensions() -> None:
     assert draw.FRONT_CENTER[1] - draw.HOLE_ROW_DROP + 0.003 < rail_edge
 
 
+def test_end_distance_text_stands_outside_its_short_span() -> None:
+    """At 1:2 the 15 end distance spans 7.5 mm, under its "(15)" text: the
+    text stands left of the -X end face, clear of it and inside the border;
+    the pitch's text stays centred in its 30 mm span."""
+    per_mm = draw._sheet_mm(draw.SHEET_SCALE)
+    end_face_x = draw.FRONT_CENTER[0] - draw._FRONT_HALF[0]
+
+    def sheet(x_mm: float) -> tuple[float, float]:
+        return end_face_x + x_mm * per_mm, draw.FRONT_CENTER[1]
+
+    text_half = 0.005  # "(15)" at the 3.5 mm dimension font, about 10 mm wide
+    span = spec.HOLE_END * per_mm
+    assert span < 2.0 * text_half
+    start, end, drop = draw.RECEIPT_DIMENSIONS["HoleEnd"]
+    x, y = draw.receipt_text_point("HoleEnd", sheet(start), sheet(end), drop)
+    assert y == draw.FRONT_CENTER[1] - drop
+    assert x + text_half + 0.002 <= end_face_x
+    assert x - text_half >= 0.0127 + 0.005  # the border, with air
+    start, end, drop = draw.RECEIPT_DIMENSIONS["HolePitch"]
+    x, _ = draw.receipt_text_point("HolePitch", sheet(start), sheet(end), drop)
+    assert x == (sheet(start)[0] + sheet(end)[0]) / 2.0
+    assert set(draw.TEXT_OUTSIDE_START) == {"HoleEnd"}
+
+
 def test_views_and_captions_fit_the_sheet() -> None:
     from _purchased_fastener_drawing import footer_top
 
@@ -368,12 +417,18 @@ def test_views_and_captions_fit_the_sheet() -> None:
         assert draw.caption_text(label, scale).startswith(label)
 
 
-def test_note_says_special_order_without_its_dimensions() -> None:
+def test_note_is_the_receipt_check_without_dimensions() -> None:
     from _purchased_fastener_drawing import note_lines
 
     bar = _config.parts("ch-rocker-arm-tl-oblique-base-bar")
-    # Rule 7: the cut length and hole pattern are FRONT's dimensions; the
-    # note's only number is the base bar's drawing number.
+    # Rule 7: the length and hole pattern are FRONT's dimensions; the note's
+    # only number is the base bar's drawing number.
+    assert bar["number"] in spec.DRAWING_NOTES
     assert not re.search(r"\d", spec.DRAWING_NOTES.replace(bar["number"], ""))
-    assert len(note_lines(spec.DRAWING_NOTES, label=NAME)) == 1
-    assert len(spec.DRAWING_NOTES) <= 80
+    lines = note_lines(spec.DRAWING_NOTES, label=NAME)
+    assert len(lines) == 3
+    assert all(len(line) <= 70 for line in lines), lines
+    # The kit rail is used uncut and the bar follows the received rail.
+    note = " ".join(lines)
+    assert "USED UNCUT" in note and "SPECIAL ORDER" not in note
+    assert "TAP THE BAR TO THE RECEIVED RAIL" in note

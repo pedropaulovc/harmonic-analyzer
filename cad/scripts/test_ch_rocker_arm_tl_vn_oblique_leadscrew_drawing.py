@@ -1,4 +1,4 @@
-"""ZYLtech HW-SC-T8x2-600 feed leadscrew (MHA-CH-06-TL-VN-54) contracts, SolidWorks-free."""
+"""ReliaBot T8 Tr8x2 feed leadscrew (MHA-CH-06-TL-VN-54) contracts, SolidWorks-free."""
 
 from __future__ import annotations
 
@@ -34,11 +34,12 @@ NAME = "ch_rocker_arm_tl_vn_oblique_leadscrew"
 ROW = _config.parts(STEM)
 
 
-def test_registry_row_is_the_purchased_zyltech_screw() -> None:
+def test_registry_row_is_the_purchased_reliabot_screw() -> None:
     assert ROW["number"] == "MHA-CH-06-TL-VN-54"
     assert ROW["process"] == "purchased"
-    assert ROW["supplier"] == spec.SUPPLIER
-    assert ROW["supplier_skus"] == [spec.SKU] == ["HW-SC-T8x2-600"]
+    assert ROW["supplier"] == spec.SUPPLIER == "Amazon (sold by ReliaBot)"
+    assert ROW["supplier_skus"] == [spec.SKU] == ["B085DDHJTW"]
+    assert spec.SUPPLIER_PRODUCT_URL == f"https://www.amazon.com/dp/{spec.SKU}"
     assert ROW["material"] == spec.MATERIAL
     assert int(ROW["quantity"]) == spec.QUANTITY == 1
     # One line in the title block's MATERIAL cell; the provenance is the spec's.
@@ -124,22 +125,37 @@ def test_flat_stations_are_c4s_set_screw_positions() -> None:
         "Handwheel": feed.HUB_END_S + feed.HANDWHEEL_GRUB_FROM_HUB - near,
     }
     assert spec.FLAT_STATIONS == pytest.approx(
-        {"NearKP08": 8.5, "FarKP08": 379.5, "Handwheel": 398.5}
+        {"NearKP08": 8.5, "FarKP08": 379.5, "Handwheel": 404.5}
     )
-    # Each KP08 locks with two set screws 120° apart; the handwheel with one.
+    # Each KP08 locks with two set screws 120° apart; the handwheel with one of
+    # its two (the other bears on the plain thread past the nut's travel).
     assert spec.CLOCKED_FLATS == ("NearKP08", "FarKP08")
     assert spec.KP08_SET_SCREW_SPACING_DEG == 120.0
     assert spec.FLAT_COUNT == 5
     assert spec.HANDWHEEL_SET_SCREW_MAJOR == 5.0
     # Review bought-r15 (rule 10): the print stations each flat's near edge.
     assert spec.FLAT_STARTS == pytest.approx(
-        {"NearKP08": 4.5, "FarKP08": 375.5, "Handwheel": 394.5}
+        {"NearKP08": 4.5, "FarKP08": 375.5, "Handwheel": 400.5}
     )
     for name, start in spec.FLAT_STARTS.items():
         lo, hi = (s - near for s in spec.FLAT_HOUSINGS[name])
         assert lo <= start - spec.FLAT_TOLERANCE
         end_max = start + spec.FLAT_LENGTH + spec.FLAT_TOLERANCE
         assert end_max + spec.FLAT_LENGTH_TOLERANCE <= hi
+    # The handwheel's set screw may stand off its station by the cover and
+    # still have flat both sides at the printed bands; the screw's far end
+    # stays inside the handwheel's guaranteed bore at a long cut.
+    cover = (
+        spec.FLAT_LENGTH / 2.0
+        - spec.FLAT_TOLERANCE
+        - spec.FLAT_LENGTH_TOLERANCE
+        - spec.HANDWHEEL_SET_SCREW_MAJOR / 2.0
+    )
+    assert spec.HANDWHEEL_GRUB_COVER == pytest.approx(cover) == pytest.approx(0.19)
+    assert (
+        feed.SCREW_FAR_END_S + spec.LENGTH_TOLERANCE
+        < feed.HUB_END_S + feed.HANDWHEEL_BORE_LENGTH
+    )
 
 
 def test_flats_hold_the_set_screws_at_the_band_limits() -> None:
@@ -237,12 +253,12 @@ def test_flats_sketch_records_every_dimension_it_emits(monkeypatch) -> None:
         # From the flat's near end: the rectangle's first vertex.
         assert station[0].endswith("_0.start")
     # The printed pair is on the handwheel's rectangle: its station's chains.
-    handwheel = [points for points in chains if points[0][1] == 398.5 - 4.0]
+    handwheel = [points for points in chains if points[0][1] == 404.5 - 4.0]
     assert handwheel and by_name["FlatLength"][0].startswith(
         f"L{chains.index(handwheel[0]) + 1}_"
     )
     offset = spec.MAJOR_DIA / 2.0 - spec.FLAT_DEPTH  # 3.28
-    assert [(offset, 394.5), (offset, 402.5), (5.0, 402.5), (5.0, 394.5)] in chains
+    assert [(offset, 400.5), (offset, 408.5), (5.0, 408.5), (5.0, 400.5)] in chains
 
 
 def test_clock_flat_sketch_is_defined_by_its_angle(monkeypatch) -> None:
@@ -515,7 +531,7 @@ def test_one_axis_horizontal_view_at_the_largest_fitting_scale() -> None:
         draw.MAIN_KEEP[f"{name}FlatStation"][1] for name in ("FarKP08", "Handwheel")
     ]
     assert len(set(rows)) == 2 and max(rows) < main[1] - 0.015
-    assert draw.sheet_x(spec.FLAT_STATIONS["Handwheel"]) == pytest.approx(0.29175)
+    assert draw.sheet_x(spec.FLAT_STATIONS["Handwheel"]) == pytest.approx(0.29475)
     # The cut length's dimension line (its text about 2.7 mm over it) stands
     # over the sections' letters, 1.7 .. 7.9 mm past the cutting lines' reach.
     assert text_y - 0.0027 > draw.MAIN_CENTER[1] + draw.SECTION_REACH + 0.0079 + 0.004

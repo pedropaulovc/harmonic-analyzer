@@ -274,6 +274,26 @@ def test_sensitivities_match_the_brief() -> None:
     )
 
 
+def test_carriage_play_and_shoulder_clearance_share_half_the_top_edge_band() -> None:
+    """The kit carriages are accepted by a fit-up play check, not by preload:
+    the play the check admits moves the cut radius 1:1, and with the shoulder
+    clearance it must stay inside half the strap's top-edge band (the hub aims
+    at its middle)."""
+    assert trammel.CARRIAGE_PLAY_TIR_MAX == 0.05
+    assert trammel.CARRIAGE_PLAY_RADIUS_PER_PLAY == 1.0
+    assert trammel.CARRIAGE_PLAY_RADIUS == pytest.approx(
+        1.0 * trammel.CARRIAGE_PLAY_TIR_MAX
+    )
+    low, high = sorted(rocker.TOP_EDGE_BAND)
+    half_band = (high - low) / 2.0
+    assert trammel.TOP_EDGE_HALF_BAND == pytest.approx(half_band) == 0.25
+    assert trammel.CARRIAGE_PLAY_RADIUS <= trammel.RADIUS_FROM_SHOULDER_CLEARANCE
+    budget = trammel.CARRIAGE_PLAY_RADIUS + trammel.RADIUS_FROM_SHOULDER_CLEARANCE
+    assert budget <= half_band
+    # 0.050 + 0.112 leaves 0.088 of the 0.25 half band.
+    assert half_band - budget == pytest.approx(0.088, abs=5e-4)
+
+
 def test_plain_pivot_stack_sets_the_carrier_height() -> None:
     # Each fabricated height prints exactly on its inch grid (#290).
     for height, places in (

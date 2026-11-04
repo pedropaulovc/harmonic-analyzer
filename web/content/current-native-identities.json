@@ -936,13 +936,6 @@
       "number": "MHA-CH-06-TL-VN-65"
     },
     {
-      "sourceStem": "ch-rocker-arm-tl-oblique-nut-screw",
-      "sourceNumber": "MHA-CH-006-TL-46",
-      "parent": "ch-rocker-arm-tl-oblique-jig",
-      "stem": "ch-rocker-arm-tl-vn-oblique-nut-screw",
-      "number": "MHA-CH-06-TL-VN-66"
-    },
-    {
       "sourceStem": "ch-rocker-arm-tl-oblique-riser-screw",
       "sourceNumber": "MHA-CH-006-TL-47",
       "parent": "ch-rocker-arm-tl-oblique-jig",
@@ -999,11 +992,11 @@
       "number": "MHA-CH-06-TL-VN-80"
     },
     {
-      "sourceStem": "ch-rocker-arm-tl-vn-oblique-nut-dowel",
+      "sourceStem": "ch-rocker-arm-tl-vn-oblique-feed-nut",
       "sourceNumber": null,
       "parent": "ch-rocker-arm-tl-oblique-jig",
-      "stem": "ch-rocker-arm-tl-vn-oblique-nut-dowel",
-      "number": "MHA-CH-06-TL-VN-81"
+      "stem": "ch-rocker-arm-tl-vn-oblique-feed-nut",
+      "number": "MHA-CH-06-TL-VN-82"
     }
   ],
   "archivedAliases": [
@@ -1052,7 +1045,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "e5f3e2da6695e2a446f1fc733412c139b353bacf76cb79d50c5f48a7a5e070eb",
+  "currentRegistryMapSha256": "eb553831cff2ef3f3e76ddba524fd8dbf62ae4fcd6da69bb04aacddce572fe15",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",
@@ -2254,16 +2247,6 @@
         }
       ],
       "kind": "assembly"
-    },
-    {
-      "sourceStem": "ch-rocker-arm-tl-oblique-feed-nut",
-      "sourceNumber": null,
-      "identities": [
-        {
-          "stem": "ch-rocker-arm-tl-oblique-feed-nut",
-          "number": "MHA-CH-06-TL-27"
-        }
-      ]
     }
   ],
   "archivedNumbers": [

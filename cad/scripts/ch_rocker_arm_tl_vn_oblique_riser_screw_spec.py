@@ -5,9 +5,15 @@ closure.  Shop fixture hardware (cad/docs/subsystem-identities.md), modelled
 so the jig assembly can mate it and run native interference: the
 ``#4-40 X 5/8 FLAT HEAD`` that holds the TL-24 riser to the TL-21 carrier,
 tapped THRU; the head seats on the riser's 82 deg countersink.  It is the C4
-fastener table's ``RISER_TO_CARRIER`` row.  It is its own row on the jig's
-BOM; the shop inventory carries no screw stock (no ``INVENTORY_ID``), and the
-assembly steps cite it by item and callout (``fasteners.callout``).
+fastener table's ``RISER_TO_CARRIER`` row.  The same screw is the
+``NUT_TO_FEED_BLOCK`` row: four more hold the TL-VN-82 brass feed nut to the
+TL-32 lug, their heads seated in the 82 deg countersinks cut in the nut's
+flange at fit-up (owner ruling 2026-11-04, relayed by Main: a screw the repo
+already uses; ``ch_rocker_arm_tl_vn_oblique_feed_nut_spec`` owns that seat
+and its engagement).  It is one row on the jig's BOM, ``QUANTITY`` both
+rows' count; the shop inventory carries no screw stock (no
+``INVENTORY_ID``), and the assembly steps cite it by item and callout
+(``fasteners.callout``).
 
 Sources:
 
@@ -62,12 +68,14 @@ UNIT = drawing_unit(
 )
 SKU = PART_NO
 ROW = fasteners.RISER_TO_CARRIER
-QUANTITY = ROW.count
+NUT_ROW = fasteners.NUT_TO_FEED_BLOCK
+QUANTITY = ROW.count + NUT_ROW.count  # 4 riser + 4 feed nut
 PACK_QUANTITY = 100  # McMaster sells 91771A112 in packs of 100
 CALLOUT = fasteners.callout(ROW)  # "#4-40 X 5/8 B18.6.3 FLAT HEAD"
 
-if (THREAD, LENGTH_TEXT, fasteners.FLAT_HEAD) != (ROW.thread, ROW.length, ROW.head):
-    raise AssertionError(f"{SKU} is not the screw of {ROW.joint}")
+for _row in (ROW, NUT_ROW):
+    if (THREAD, LENGTH_TEXT, fasteners.FLAT_HEAD) != (_row.thread, _row.length, _row.head):
+        raise AssertionError(f"{SKU} is not the screw of {_row.joint}")
 if abs(DIMS.length - ROW.length_mm) > 1e-9:
     raise AssertionError(f"{SKU}: {DIMS.length} long, the row prints {ROW.length_mm}")
 if abs(DIMS.major_dia - ROW.major_mm) > 1e-3:

@@ -36,6 +36,9 @@ z = "up"
 # One 443 mm blank per bar from the owned 1/2 x 6 bar (#2083): about 1.5 over the 439.928 length at
 # each end, the zero edge about 1.0 proud of the finished -Y side, about 0.35 on each big
 # face. These placements are the author's route choice, not measurements of a sawn blank.
+# Owner ruling 2026-11-04 (#2177 option B): the bar keeps its 439.928 length; the 450 kit rail
+# goes on uncut, flush at the zero end, and overhangs the far end by 10.07, so the bar takes the
+# rail's eight #8-32 taps at 15 .. 435 (the last 4.93 from the far end).
 [stock]
 form = "flat_bar"
 form_verify = false
@@ -761,6 +764,7 @@ rail_hole_4 = 0.0
 rail_hole_5 = 0.0
 rail_hole_6 = 0.0
 rail_hole_7 = 0.0
+rail_hole_8 = 0.0
 bracket_hole_1 = 0.0
 bracket_hole_2 = 0.0
 bracket_hole_3 = 0.0
@@ -780,6 +784,7 @@ rail_hole_4 = 11.938
 rail_hole_5 = 11.938
 rail_hole_6 = 11.938
 rail_hole_7 = 11.938
+rail_hole_8 = 11.938
 bracket_hole_1 = 11.938
 bracket_hole_2 = 11.938
 bracket_hole_3 = 11.938
@@ -858,7 +863,7 @@ coolant = "cutting oil, brushed on"
 deburr_mm = 0.25
 deburr_cite = "features.toml general_tolerances edge_break R0.25"
 stock_in = "A0"
-note = "Same clamping as A0: do not unclamp. Drill only over open air: every hole is clear of the parallels, but look before every hole anyway. Brush on oil, peck every 3 mm, stop exactly on each DRO number. The seven rail holes are the only tight feature (+/-0.08 along X)."
+note = "Same clamping as A0: do not unclamp. Drill only over open air: every hole is clear of the parallels, but look before every hole anyway. Brush on oil, peck every 3 mm, stop exactly on each DRO number. The eight rail holes are the only tight feature (+/-0.08 along X). Before the first rail hole, the kit rail's receipt check (MHA-CH-06-TL-VN-50 sheet) must have found its holes at 15 and every 60 to 435 from either end; if it found other stations, stop: the rail holes go at the received rail's stations."
 
 [setups.stock_state]
 top_feature = "underside_seat"
@@ -874,6 +879,7 @@ rail_hole_4 = 0.0
 rail_hole_5 = 0.0
 rail_hole_6 = 0.0
 rail_hole_7 = 0.0
+rail_hole_8 = 0.0
 bracket_hole_1 = 0.0
 bracket_hole_2 = 0.0
 bracket_hole_3 = 0.0
@@ -893,6 +899,7 @@ rail_hole_4 = 11.938
 rail_hole_5 = 11.938
 rail_hole_6 = 11.938
 rail_hole_7 = 11.938
+rail_hole_8 = 11.938
 bracket_hole_1 = 11.938
 bracket_hole_2 = 11.938
 bracket_hole_3 = 11.938
@@ -1027,6 +1034,16 @@ approach_mm = 3.0
 op = 80
 do = "spot"
 feature = "rail_hole_7"
+tool = "center-drills-lms-4859/2"
+holder = "drill-chuck-r8"
+depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 85
+do = "spot"
+feature = "rail_hole_8"
 tool = "center-drills-lms-4859/2"
 holder = "drill-chuck-r8"
 depth_mm = 2.86                   # pilot 1.98 + (3.0 - 1.982) / 2 / tan 30: a 3 mm cone (inventory #2 facts)
@@ -1184,6 +1201,16 @@ rpm = 3000.0
 approach_mm = 3.0
 
 [[setups.ops]]
+op = 255
+do = "drill"
+feature = "rail_hole_8"
+tool = "drill-index-115/#29"
+holder = "drill-chuck-r8"
+exit_mm = 3.0                     # stop about 3 mm past breakthrough
+rpm = 3000.0
+approach_mm = 3.0
+
+[[setups.ops]]
 op = 260
 do = "drill"
 feature = "bracket_hole_1"
@@ -1327,6 +1354,16 @@ note = "Spindle power OFF at the switch. Tap in the drill chuck, tapping fluid; 
 op = 420
 do = "hand_tap"
 feature = "rail_hole_7"
+tool = "taps-unc-hand/8-32-plug"
+holder = "tap-wrench-t-1-16-1-4"
+depth_mm = 16.0                   # all the way through the 11.94 plus the plug lead
+approach_mm = 3.0
+note = "Spindle power OFF at the switch. Tap in the drill chuck, tapping fluid; light quill pressure, turn the chuck clockwise by hand about 3 turns, then finish with the T-handle wrench: one turn in, half back, all the way through. Stiff: back out a full turn and add fluid."
+
+[[setups.ops]]
+op = 425
+do = "hand_tap"
+feature = "rail_hole_8"
 tool = "taps-unc-hand/8-32-plug"
 holder = "tap-wrench-t-1-16-1-4"
 depth_mm = 16.0                   # all the way through the 11.94 plus the plug lead
@@ -1558,12 +1595,12 @@ checks = { length = "calipers-18in" }
 [[setups.ops]]
 op = 40
 do = "inspect"
-feature = ["rail_hole_1", "rail_hole_2", "rail_hole_3", "rail_hole_4", "rail_hole_5", "rail_hole_6", "rail_hole_7"]
+feature = ["rail_hole_1", "rail_hole_2", "rail_hole_3", "rail_hole_4", "rail_hole_5", "rail_hole_6", "rail_hole_7", "rail_hole_8"]
 checks = { dia = "pin-gauges", thru = "pin-gauges", station = "calipers-18in", height = "calipers-18in", thread = "unknown", note = "unknown" }
 inspection_methods.height = "On the top face (no counterbores): put the largest plain pin gauge that enters the hole, diameter D; calipers from the zero edge to the near side of the pin, plus D/2."
 inspection_methods.station = "On the top face: largest pin gauge that enters, diameter D; calipers from the zero end to the near side of the pin, plus D/2, for each hole."
 inspection_methods.thread = "An 8-32 screw turns in all the way with your fingers."
-inspection_methods.note = "The real test: lay the HGR15R rail on the un-marked face, ends flush; all seven #8-32 x 3/4 socket screws start by hand without pushing the rail sideways."
+inspection_methods.note = "The real test: lay the HGR15 kit rail on the un-marked face, its end flush with the zero end (it overhangs the far end by about 10); all eight #8-32 x 3/4 socket screws start by hand without pushing the rail sideways."
 
 [[setups.ops]]
 op = 50

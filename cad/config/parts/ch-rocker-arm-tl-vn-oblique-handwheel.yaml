@@ -2,12 +2,14 @@ ch-rocker-arm-tl-vn-oblique-handwheel:
   title: Rocker Oblique Trammel Handwheel
   # Shop fixture: the parent MHA-CH-06 Number plus -TL-VN-nn (subsystem-identities.md).
   number: MHA-CH-06-TL-VN-57
-  stock_name: MISUMI Aluminum Knurled Handwheel D40, revolving grip, HC8 bore
-  supplier: MISUMI
-  supplier_skus: ["HOK40-HC8"]
+  stock_name: HARFINGTON 50 mm aluminium handwheel, 8 mm bore, rotating handle
+  supplier: Amazon (sold by HARFINGTON)
+  supplier_skus: ["B0DJ3DZT86"]
+  # SOLIDWORKS library stand-in: the listing says aluminum alloy, grade not stated;
+  # the handle's material is not stated either.
   material: 6061 Alloy
-  material_specification: "5056 aluminium, nylon 6 grip"
-  finish: black anodize
+  material_specification: "Aluminium alloy, grade not stated"
+  finish: anodized, silver tone (as supplied)
   quantity: 1
   tolerance_class: visual_noncritical
   process: purchased

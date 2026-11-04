@@ -310,10 +310,9 @@ async def _plan_datum_reference(adapter, part) -> None:
 
 async def _nut_pattern_reference(adapter, part) -> None:
     """The hidden nut-face sketch that carries VIEW D's locations: a
-    construction line ON the lug end, the leadscrew axis (a circle ON the
-    screw clearance) from that end and the bottom face, and each tap (a
-    circle ON its drill) from the axis, one each side, so the pair prints as
-    the TL-27 nut's (2X .340, no chain)."""
+    construction line ON the lug end and the leadscrew axis (a circle ON the
+    screw clearance) from that end and the bottom face. The feed nut's taps
+    are located by their transfer callout, not here."""
     feature = "NutPatternReference"
     check(f"create_sketch {feature}", await adapter.create_sketch("NutFace"))
     to_sketch = _sketch_mapper(adapter, u_axis=2, v_axis=1, label=feature)
@@ -332,11 +331,8 @@ async def _nut_pattern_reference(adapter, part) -> None:
                             part.BLOCK_HEIGHT, f"{feature} lug end length")
     dims.record("NutEndLength")
     axis_uv = at(part.NUT_AXIS_Y, part.NUT_AXIS_Z)
-    axis = await _construction_circle(adapter, dims, f"{end}.start", end_start, axis_uv, part.SCREW_CLEARANCE_DIA,
-                                      ("NutCentreZ", "NutCentreY", "NutCentreDia"), f"{feature} nut axis")
-    for i, (y, z) in enumerate(part.NUT_HOLES_YZ, 1):
-        await _construction_circle(adapter, dims, f"{axis}.center", axis_uv, at(y, z), part.NUT_TAP_DRILL,
-                                   (f"NutTap{i}Z", f"NutTap{i}Y", f"NutTap{i}Dia"), f"{feature} tap {i}")
+    await _construction_circle(adapter, dims, f"{end}.start", end_start, axis_uv, part.SCREW_CLEARANCE_DIA,
+                               ("NutCentreZ", "NutCentreY", "NutCentreDia"), f"{feature} nut axis")
     await ensure_fully_defined(adapter, feature)
     check(f"exit_sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
@@ -406,17 +402,10 @@ async def build_block_model(adapter, part) -> None:
              "feed nut screw taps (#4-40 through)",name="NutTaps",expect_dia_mm=part.NUT_TAP_DRILL,
              placement_dims=[((f"NutPlacement{i}U",None),(f"NutPlacement{i}V",None))
                              for i in range(1,len(part.NUT_HOLES_YZ)+1)])
-        # The taps and the dowel hole are transferred through TL-27 at
-        # assembly: modelled where the nominal nut puts them.
-        await _circles(adapter,"NutFace",part.NUT_FACE_X,"NutDowelProfile",
-                       [(part.DOWEL_YZ[1],part.DOWEL_YZ[0],part.DOWEL_DRILL,
-                         ("NutDowelHoleZ","NutDowelHoleY","NutDowelDia"))],side=True)
-        check("NutDowel",await adapter.create_cut_extrude(ExtrusionParameters(depth=part.LUG_WIDTH*2,reverse_direction=True)))
-        name_last_feature(adapter,"NutDowel")
-        name_dimensions(adapter,"NutDowel",["NutDowelDepth"])
+        # The taps are transferred through the TL-VN-82 nut at assembly:
+        # modelled where the nominal nut puts them.
         expected -= math.pi*(part.SCREW_CLEARANCE_DIA/2)**2*part.LUG_WIDTH
         expected -= len(part.NUT_HOLES_YZ)*math.pi*(part.NUT_TAP_DRILL/2)**2*part.LUG_WIDTH
-        expected -= math.pi*(part.DOWEL_DRILL/2)**2*part.LUG_WIDTH
         await _nut_pattern_reference(adapter, part)
     await name_bore_axis(adapter,"Right Plane",spec.BORE_X,"Top Plane",0.0,"pivot axis")
     name_last_feature(adapter,spec.PIVOT_AXIS_NAME)

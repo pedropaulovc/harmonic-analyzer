@@ -4,57 +4,62 @@ PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure: ``build_ch_rocker_arm_tl_vn_oblique_pillow_block`` extrudes the section
 below and the jig assembly mates its ``ScrewAxis`` and foot.
 
-The item is an AMPEC KP08 bought from Bearings Direct (two off, the near and
-far blocks of the oblique-trammel jig's leadscrew feed): a mini zinc-alloy
-pillow block round a set-screw-locking insert ball bearing, 8 mm bore. Each
-stands on a TL-28 end bracket; its inner-ring set screws grip the Tr8
-screw's plain thread.
+The item is a uxcell KP08 from a 6-pack bought on Amazon (two used, the near
+and far blocks of the oblique-trammel jig's leadscrew feed): a mini pillow
+block round an insert ball bearing, 8 mm bore. Each stands on a TL-28 end
+bracket; its inner-ring set screws grip the Tr8 screw's set-screw flats.
 
-datasheet-built: no vendor CAD obtained (AMPEC publishes none: the Bearings
-Direct listing and its AMPEC brand page carry no CAD/STEP/PDF/DWG link,
-checked 2026-10-17 UTC). Other makers' KP08 models and drawings exist; none is
-AMPEC's and none of their values is used here.
+datasheet-built: no vendor CAD obtained (the listing offers no CAD
+download, checked 2026-11-04).
 
-Evidence (read 2026-10-17 UTC):
+Evidence (read 2026-11-04):
 
-- Bearings Direct, AMPEC KP08,
-  https://bearingsdirect.com/8mm-bore-kp08-mini-zinc-pillow-set-screw-block-bearing-kp8uu/ :
-  inner diameter 8 mm, overall height 29 mm, overall length 55 mm, bolt hole
-  to bolt hole 42 mm, base to centre 15 mm, zinc-alloy housing, SAE 52100
-  chrome-steel bearing, two set screws 120 degrees apart on the inner ring.
-  No axial width, foot thickness, bolt-hole diameter or set-screw size.
-- The listing's six photographs are the series' stock photographs (the
-  housing is cast "P005" and the insert "K005", the 25 mm-bore size), so they
-  show the KP shape only: a round boss concentric with the bore whose sides
-  run straight down to a two-hole foot, no grease fitting, and the insert's
-  inner ring standing proud of the housing face on its set-screw side.
+- uxcell, https://www.amazon.com/dp/B0D2L8M4QR : "uxcell 6 Pcs KP08 Pillow
+  Block Bearing 8mm Bore Zinc Alloy Inner Ball Mounted Bearing Block Insert
+  Bearing Self-Alignment"; "Overall Size: 55 x 13 x 28mm (L*W*H)"; "Holes
+  Centre Distance: 42mm"; "Width of Bearing: 12mm"; "Installation Hole
+  Diameter: 5mm"; "Bore Diameter: 8mm"; Model KP08. The title says zinc
+  alloy; the description says "Bearing housings are made of cast iron while
+  bearings are made of zinc alloy". The two contradict each other and both
+  are recorded, unverified. No centre (axis) height, foot thickness or
+  set-screw size or count.
+- The listing's photographs and dimension image show the KP shape: a round
+  boss concentric with the bore whose sides run straight down to a two-hole
+  foot (cast "P08"), no grease fitting, and the insert's inner ring standing
+  proud of the housing face, one set-screw hole visible in it.
 
 Source of each number:
 
 - SOURCED (the listing above), FROM C4 (imported from
   ``ch_rocker_arm_tl_vn_oblique_leadscrew_spec``, never retyped):
-  ``AXIS_HEIGHT`` 15, ``BOLT_SPACING`` 42, ``LENGTH`` 55, ``HEIGHT`` 29,
-  ``BORE_DIA`` 8.
-- UNVERIFIED, FROM C4 (verify on receipt): ``WIDTH`` 13, the axial width;
-  ``HOLE_DIA`` 4.5, the smallest hole the M4 screw passes; ``FOOT_THICK`` 5.
-- DERIVED (shape ESTIMATED from the series photographs): the boss is round
-  and concentric with the bore, its crown the overall height, so
+  ``LENGTH`` 55, ``WIDTH`` 13 (the overall W: the whole envelope's axial
+  width; the bearing's own 12 sits inside it), ``HEIGHT`` 28,
+  ``BOLT_SPACING`` 42, ``HOLE_DIA`` 5, ``BORE_DIA`` 8.
+- UNVERIFIED, FROM C4 (verify on receipt): ``AXIS_HEIGHT`` 15, the KP08
+  series' base-to-centre height (check: the bore axis stands 15 over the
+  foot's bottom face, measured with an Ø8 pin in the bore; the leadscrew
+  axis height is set by it), and ``FOOT_THICK`` 5 (check: the foot under the
+  bolt holes is 5 thick or thinner, so the #6-32 screw's engagement in TL-28
+  holds at least its rule-18 minimum).
+- DERIVED (shape ESTIMATED from the photographs): the boss is round and
+  concentric with the bore, its crown the overall height, so
   ``BOSS_RADIUS`` = ``HEIGHT`` - ``AXIS_HEIGHT``; its sides drop straight to
   the foot, so the pedestal under it is ``2 * BOSS_RADIUS`` wide.
 - No other dimension is introduced.
 
-Envelope (Main ruling): the axial width is unpublished, so the block is ONE
-conservative solid of the full ``WIDTH``, symmetric about its axial
-mid-plane: housing, foot and the insert's outer and inner rings together.
-The photographed inner ring stands proud of the housing face on its set-screw
-side; whether 13 also bounds that ring, and the housing's own width, are
-verify-on-receipt items, as are the bolt-hole diameter and the foot
-thickness.
+Envelope (Main ruling): one conservative solid of the full ``WIDTH``,
+symmetric about its axial mid-plane: housing, foot and the insert's outer
+and inner rings together. Whether the 13 overall also bounds the
+photographed inner ring where it stands proud is a verify-on-receipt item.
 
-Omitted, each documented: the two inner-ring set screws and their tapped
-holes (AMPEC publishes no size; another maker's is not transferred), the
-foot's cored underside pockets, the casting fillets and the seal/ring steps:
-the envelope is solid.
+Fit of the TL-28 screws (unchanged by the swap): the listing's Ø5 holes at
+42 centres float a #6-32 (major 3.505, 0.75 radial clearance), on the
+same 42 the TL-28 #6-32 taps are drilled at, so the screws and taps carry
+over.
+
+Omitted, each documented: the inner-ring set screws and their tapped holes
+(size and count unpublished), the foot's hex recesses round the bolt holes,
+the casting fillets and the seal/ring steps: the envelope is solid.
 
 Part frame: the origin is on the foot's bottom face, on the bore axis's
 vertical plane and the block's axial mid-plane. +Z is up (the bore axis at
@@ -70,8 +75,8 @@ extruded ``WIDTH``; the two bolt holes each remove a ``HOLE_DIA`` cylinder
 ``FOOT_THICK`` long.
 
 Material: the native envelope takes "Plain Carbon Steel" (SOLIDWORKS library)
-as a stand-in for the zinc-alloy housing round its 52100 insert; the jig uses
-no mass from it.
+as a stand-in for the zinc-alloy or cast-iron housing round its insert; the
+jig uses no mass from it.
 """
 
 from __future__ import annotations
@@ -80,23 +85,23 @@ import math
 
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 
-SUPPLIER = "Bearings Direct (AMPEC)"
-SKU = "KP08"
-SOURCE_URL = "https://bearingsdirect.com/8mm-bore-kp08-mini-zinc-pillow-set-screw-block-bearing-kp8uu/"
-MATERIAL = "Plain Carbon Steel"  # library stand-in: zinc-alloy housing, 52100 insert
+SUPPLIER = "Amazon (sold by uxcell)"
+SKU = "B0D2L8M4QR"  # the 6-pack's ASIN
+SOURCE_URL = "https://www.amazon.com/dp/B0D2L8M4QR"
+MATERIAL = "Plain Carbon Steel"  # library stand-in: zinc-alloy or cast-iron housing
 QUANTITY = len(leadscrew.KP08_S)  # the near and far blocks
 
 # --- From C4 (leadscrew_spec's bought-items block) ---------------------------------
-AXIS_HEIGHT = leadscrew.KP08_AXIS_HEIGHT  # base to centre
-BOLT_SPACING = leadscrew.KP08_BOLT_SPACING  # bolt hole to bolt hole
+AXIS_HEIGHT = leadscrew.KP08_AXIS_HEIGHT  # base to centre, UNVERIFIED
+BOLT_SPACING = leadscrew.KP08_BOLT_SPACING  # "Holes Centre Distance: 42mm"
 LENGTH = leadscrew.KP08_LENGTH  # overall, across the axis
 HEIGHT = leadscrew.KP08_HEIGHT  # overall
 BORE_DIA = leadscrew.KP08_BORE
-WIDTH = leadscrew.KP08_WIDTH  # UNVERIFIED: the whole envelope's axial width
-HOLE_DIA = leadscrew.KP08_HOLE_DIA  # UNVERIFIED
+WIDTH = leadscrew.KP08_WIDTH  # the whole envelope's axial width
+HOLE_DIA = leadscrew.KP08_HOLE_DIA  # "Installation Hole Diameter: 5mm"
 FOOT_THICK = leadscrew.KP08_FOOT_THICK  # UNVERIFIED
 
-# --- Derived shape (series photographs) --------------------------------------------
+# --- Derived shape (listing photographs) -------------------------------------------
 BOSS_RADIUS = HEIGHT - AXIS_HEIGHT  # round boss on the bore axis, crown at HEIGHT
 HOLE_X = (-BOLT_SPACING / 2.0, BOLT_SPACING / 2.0)
 
@@ -130,7 +135,7 @@ DRAWING_NOTES = (
 )
 
 # Reference sizes on the plan view (the Front Plane, sketch (u, v) = model
-# (X, Y)): the listing's bolt-hole spacing and C4's bolt hole, the receipt
+# (X, Y)): the listing's bolt-hole spacing and bolt hole, the receipt
 # check's interface. The chords lie on the bolt holes' centreline (y = 0,
 # through both centre marks) and the -X hole's vertical centre-mark arm; laid
 # along the foot's edges they printed as dashed residue over the outline
@@ -166,3 +171,6 @@ if not BOLT_SPACING / 2.0 - HOLE_DIA / 2.0 > BOSS_RADIUS:
     raise ValueError("KP08: the bolt holes must clear the pedestal")
 if not BOLT_SPACING / 2.0 + HOLE_DIA / 2.0 < LENGTH / 2.0:
     raise ValueError("KP08: the bolt holes must lie inside the foot")
+# The TL-28 screw floats in the listing's hole.
+if not HOLE_DIA > leadscrew.THREAD_MAJOR_MM[leadscrew.KP08_SCREW]:
+    raise ValueError("KP08: the TL-28 screw does not pass the bolt hole")

@@ -1,6 +1,6 @@
 r"""Purchased MHA-CH-06-TL-VN-61 oblique-trammel rail screw: McMaster 91251A197.
 
-The ``#8-32 X 3/4 SHCS`` (``ch_rocker_arm_tl_vn_oblique_rail_screw_spec``) that holds an HGR15R rail to its TL-20 base bar, tapped THRU.
+The ``#8-32 X 3/4 SHCS`` (``ch_rocker_arm_tl_vn_oblique_rail_screw_spec``) that holds an HGR15 kit rail to its TL-20 base bar, tapped THRU.
 The stock recipe ``diagnostics/diag_build_91251A197.py`` builds the catalogue screw on
 the 91251A family recipe (``diag_mcmaster_socket_head.build_socket_head``);
 the recipe's standalone run is catalog-only (no replica gate, user ruling

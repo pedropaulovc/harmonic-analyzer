@@ -3,7 +3,7 @@ r"""MHA-CH-06-TL-VN-61 oblique-trammel rail screw: McMaster 91251A197.
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  Shop fixture hardware (cad/docs/subsystem-identities.md), modelled
 so the jig assembly can mate it and run native interference: the
-``#8-32 X 3/4 SHCS`` that holds an HGR15R rail to its TL-20 base bar, tapped THRU; the head seats on the rail's counterbore floor.
+``#8-32 X 3/4 SHCS`` that holds an HGR15 kit rail to its TL-20 base bar, tapped THRU; the head seats on the rail's counterbore floor.
 It is the C4 fastener table's ``RAIL_TO_BAR`` row.  It is its own row on the
 jig's BOM; the shop inventory carries no screw stock (no ``INVENTORY_ID``),
 and the assembly steps cite it by item and callout (``fasteners.callout``).

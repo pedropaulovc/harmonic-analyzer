@@ -1,8 +1,9 @@
-r"""Purchased HIWIN HGH15CA Z0 carriage (MHA-CH-06-TL-VN-51).
+r"""Purchased HIWIN-style HGH15CA carriage (MHA-CH-06-TL-VN-51).
 
-The oblique trammel jig's two carriages (vendor-checked against HIWIN's own
-HGH15CAZ0C STEP; ``ch_rocker_arm_tl_vn_oblique_carriage_spec`` records every
-source), one solid body:
+The oblique trammel jig's two carriages, generic NUIBBYED kit blocks modelled
+on HIWIN's HGH15CAZ0C reference STEP
+(``ch_rocker_arm_tl_vn_oblique_carriage_spec`` records every source), one
+solid body:
 
 1. ``EndCaps``: ``CAP_OUTLINE`` on the Right plane, mid-plane over L 61.4
    (the end caps and seals' section).

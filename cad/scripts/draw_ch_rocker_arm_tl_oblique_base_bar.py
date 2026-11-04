@@ -13,7 +13,7 @@ centreline, carries the faced thickness and both faced seats' Ra 125 µin
 under their one reason; the shaded isometric rides bottom left under the
 plan's stack, left of the title block. The sheet prints decimal inch
 (#290); the model keeps its millimetre nominals. The rail holes' and the
-brackets' stations belong to metric vendor lines (HGR15R, KP08) and print
+brackets' stations belong to metric vendor lines (HGR15, KP08) and print
 exact millimetres, labelled mm (owner ruling 4, 2026-11-01).
 
 Run with SolidWorks open::
@@ -109,36 +109,45 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
 # A 17.32 x 5.50 x .47 bar: 1:2 puts the 220-wide plan on the B sheet, its end
 # view projected right of it on the same centreline (third angle). The
-# vertical budget: the rail-hole stack tops out at about 265 under the 267
+# vertical budget: the rail-hole stack tops out at about 264 under the 267
 # border. The plan sits right of centre so the three side lanes (the row's
 # three-line callout the widest) and the width's text clear the left
 # border (about 12); r3 moved plan and end view 8 right, r4 another 3.5 (the
 # row's block measured wider than estimated). C4: the bracket holes' callout
 # takes the bottom-right corner under the end view, so the 1:5 iso and its
-# note move to the free bottom-left corner, under the plan's six-lane stack
-# and left of the title block (x from about 216). The 2026-10-17 widening
-# (1/2 x 4 to 1/2 x 6, ruling A′) grew the plan and the end view 25.4 taller
-# and the iso about 8: the plan drops 11.0, as far as the rail-hole stack
-# allows, so the iso (about 66 x 62) and its note still fit under the stack;
-# its four bracket rows (two before A′) take three lanes right of the plan,
-# so the end view moves 21.5 right to clear the outermost row's text, and
-# 5 more for the far slot's rise outside them (c3-r6). c4-r8 read the
-# 400.00 block's top line touching the border: the plan and end view drop
-# 3, the iso staying put, its top 7 under the length's text. The 2026-10-30
-# narrowing to 5.50 shortens the plan and end view 12.7 at the +Y side.
-# #290 moved the plan and end view 3 right for the stock width's "(5-1/2 in)"
-# reference; #2083 mills the width and prints a bare 5.50 there instead.
+# note move to the free bottom-left corner, under the plan's stack and left
+# of the title block (x from about 216). The 2026-10-17 widening (1/2 x 4 to
+# 1/2 x 6, ruling A′) grew the plan and the end view 25.4 taller and the iso
+# about 8: the plan drops 11.0, as far as the rail-hole stack allows, so the
+# iso (about 66 x 62) still fits under the stack; its four bracket rows (two
+# before A′) take three lanes right of the plan, so the end view moves 21.5
+# right to clear the outermost row's text, and 5 more for the far slot's
+# rise outside them (c3-r6). c4-r8 read the 400.00 block's top line touching
+# the border: the plan and end view drop 3, the iso staying put, its top 7
+# under the length's text. The 2026-10-30 narrowing to 5.50 shortens the
+# plan and end view 12.7 at the +Y side. #290 moved the plan and end view 3
+# right for the stock width's "(5-1/2 in)" reference; #2083 mills the width
+# and prints a bare 5.50 there instead. The kit rail (#2177, option B: the
+# 450 rail on the same 17.32 bar) adds an eighth station lane: the plan and
+# end view drop 6, one lane, so the stack's top keeps its air under the
+# border; the iso drops 5 and its note moves beside it, right of the iso
+# along its foot, so the iso keeps 7 under the length's text.
 SHEET_SCALE = (1.0, 2.0)
 VIEW_SCALE = (1, 2)
 ISO_SCALE = (1, 5)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
-FRONT_CENTER = (0.1865, 0.1695)
+FRONT_CENTER = (0.1865, 0.1635)
 END_CENTER = (0.366, FRONT_CENTER[1])
-ISO_CENTER = (0.090, 0.056)
-ISO_NOTE_XY = (0.060, 0.022)
+ISO_CENTER = (0.090, 0.051)
 # The r3 sheet measured 0.033 x 0.027 for the 101.6 bar; the widening adds
 # 0.816 x 50.8 / 5 to the iso's height.
 ISO_HALF = (0.033, 0.031)
+# The iso note's top-left: right of the iso, its foot level with the iso's.
+ISO_NOTE_HEIGHT = 0.0042
+ISO_NOTE_XY = (
+    ISO_CENTER[0] + ISO_HALF[0] + 0.005,
+    ISO_CENTER[1] - ISO_HALF[1] + ISO_NOTE_HEIGHT,
+)
 
 
 def _sheet_x(center: tuple[float, float], model_x_mm: float) -> float:
@@ -195,12 +204,13 @@ def _below_line(k: int) -> float:
 
 
 # The plan: the rail-hole stations stack above it from the end face, nearest
-# first (DRO absolutes), each in its own lane; the outermost (400.00 ±0.08 mm)
+# first (DRO absolutes), each in its own lane; the outermost (435.00 ±0.08 mm)
 # carries the mate on a second line, the only lane no extension line crosses.
-# The 40.00 span is shorter than its text, so its text sits outside it. The
-# millimetre label (owner ruling 4) left it too wide for the gap between holes
-# 1 and 2, so it stands left of the end face's extension line, where no other
-# line runs (r1 printed it across that line).
+# A station whose span is shorter than its text with a gap each side (the
+# 15.00 and 75.00: the millimetre label, owner ruling 4, makes them wider
+# than 37.5 on the sheet) prints left of the end face's extension line, where
+# no other line runs (r1 printed the 40.00 across that line), each on its own
+# lane; the rest print mid-span.
 #
 # Below it, nearest first: the near slot's width (its extension lines then
 # cross no other dimension), the near slot's station, the near bracket row's
@@ -238,12 +248,13 @@ _SLOT_WIDTH_TEXT_HALF = 0.017  # "2X .53 THRU", 11 glyphs at r4's 2.6
 _NEAR_SLOT_X_TEXT_HALF = 0.0045  # ".87"
 _SLOT_RUN_TEXT_HALF = 0.008  # "2X .16"
 _FAR_RISE_TEXT_HALF = 0.0055  # "4.90": the r6 sheet's "23.0" was 8.8 wide
-# "FOR HGR15R RAIL", its widest line (15 glyphs): 38.8 wide on the r4 sheet.
-_RAIL_ROW_TEXT_HALF = 0.0195
+# "FOR HGR15 RAIL", its widest line (14 glyphs): "FOR HGR15R RAIL" was 38.8
+# wide on the r4 sheet, 2.59 a glyph.
+_RAIL_ROW_TEXT_HALF = 0.0182
 # "5.50", four glyphs at 2.6 (the #290 "(5-1/2 in)" over "STOCK" was 0.0104).
 _BAR_WIDTH_TEXT_HALF = 0.0055
 # The metric vendor stations at about 2.6 a glyph (owner ruling 4).
-_RAIL_HOLE_1_TEXT_HALF = 0.0182  # "40.00 ±0.08 mm", 14 glyphs
+_RAIL_HOLE_TEXT_HALF = 0.0182  # "15.00 ±0.08 mm", 14 glyphs
 _BRACKET_NEAR_X_TEXT_HALF = 0.0195  # "57.000 ±0.13 mm", 15 glyphs
 _BRACKET_ROW_TEXT_HALF = 0.0070  # "2.425": "61.400" was 13.9 wide on the c4-r9 sheet
 _BRACKET_OUTER_TEXT_BELOW = 0.004  # "6.400"'s centre under the bar's -Y edge
@@ -298,9 +309,13 @@ _BRACKET_ROW_TEXT_Y = (
     *(_sheet_y(FRONT_CENTER, (LOW_SIDE_Y + y) / 2.0) for y in BRACKET_ROW_Y[1:-1]),
 )
 _LAST_HOLE = len(RAIL_HOLE_X)
-_HOLE_TEXT_X = (
-    -(_TEXT_GAP + _RAIL_HOLE_1_TEXT_HALF) * 1000.0 / _S,  # left of the end face
-    *(x / 2.0 for x in RAIL_HOLE_X[1:]),
+# Each station's text centre (model x): left of the end face, or mid-span.
+_HOLE_TEXT_LEFT = -(_TEXT_GAP + _RAIL_HOLE_TEXT_HALF) * 1000.0 / _S
+_HOLE_TEXT_X = tuple(
+    _HOLE_TEXT_LEFT
+    if x * _S / 1000.0 < 2.0 * (_RAIL_HOLE_TEXT_HALF + _TEXT_GAP)
+    else x / 2.0
+    for x in RAIL_HOLE_X
 )
 FRONT_KEEP = {
     **{
@@ -393,13 +408,15 @@ CALLOUTS_BELOW = {
     "RailRowY": RAIL_ROW_CALLOUT,
 }
 # The tap callout's two lines, centred about here, clear the 267 border by
-# about 6 (r3 printed its first line touching it).
-TAP_CALLOUT_XY = (0.318, 0.256)
+# about 6 (r3 printed its first line touching it), and stand 10 right of the
+# outermost station's extension line (hole 8, 4.93 mm in from the far end).
+TAP_CALLOUT_XY = (0.327, 0.256)
 # The bracket callout's four lines (two process, two native), centred about
 # here: right of the length's extension line, under the end view, above the
 # title block (the widening dropped the end view's foot 13, so the block
-# drops 20 and moves 10 right to keep its leader under the 6.400's text).
-BRACKET_CALLOUT_XY = (0.345, 0.105)
+# drops 20 and moves 10 right to keep its leader under the 6.400's text; it
+# drops 6 more with the views for the kit rail's eighth station lane).
+BRACKET_CALLOUT_XY = (0.345, 0.099)
 
 part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME",))
 

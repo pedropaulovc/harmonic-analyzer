@@ -8,7 +8,7 @@ ch-rocker-arm-tl-oblique-feed-block:
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
-  process: "Integral rail-1 nut lug; drill the leadscrew clearance to print; the feed-nut taps and dowel hole are transferred through TL-27 at TL-00 assembly. Keep carriage counterbore floors .570 above the bottom; pivot seat reamed .3760-.3765, .359 deep from top with a 5/16-18 tapped through hole below."
+  process: "Integral rail-1 nut lug; drill the leadscrew clearance to print; the four feed-nut taps are transferred through MHA-CH-06-TL-VN-82 at TL-00 assembly. Keep carriage counterbore floors .570 above the bottom; pivot seat reamed .3760-.3765, .359 deep from top with a 5/16-18 tapped through hole below."
   machinist_exceptions:
     - id: "RV-02"
       kind: "minor"
@@ -19,5 +19,10 @@ ch-rocker-arm-tl-oblique-feed-block:
       kind: "minor"
       where: "Section B-B, the .570 counterbore floor callout: ENGAGES .162 MIN (1.03D)"
       finding: "M4 carriage screw full-thread engagement .162 min (4.12 mm, 1.03D): the tip reaches .183 and its 0.75P chamfer is not full thread; under rule 18's 1.5D, stated as a plain fact"
-      reason: "The bought HGH15CA carriage's vendor M4 holes are 5 mm deep, so no M4 reaches 1.5D (6.0 mm). Owner ruling 2026-11-01, option A (the jig's RV-05): the counterbore floor drops .614 to .570 and each screw is cut to fit its own floor at assembly (rule 19), so the reach carries only the ±.005 cut and the .001 reading: .183 of tip reach, 1.03D of full thread once the 0.75P tip chamfer is deducted Owner exception confirmed 2026-11-01 (relayed by Main) at 1.16D. Delegated ruling 2026-11-03 (Main), following the owner option-A ruling of 2026-11-01: the recount charges the 0.75P tip chamfer, .162 MIN (1.03D), same geometry, shop-fixture load; owner review #2144."
+      reason: "The HGH15CA-style carriage's M4 holes are 5 mm deep (the HIWIN reference geometry, checked on the kit carriage at receipt), so no M4 reaches 1.5D (6.0 mm). Owner ruling 2026-11-01, option A (the jig's RV-05): the counterbore floor drops .614 to .570 and each screw is cut to fit its own floor at assembly (rule 19), so the reach carries only the ±.005 cut and the .001 reading: .183 of tip reach, 1.03D of full thread once the 0.75P tip chamfer is deducted Owner exception confirmed 2026-11-01 (relayed by Main) at 1.16D. Delegated ruling 2026-11-03 (Main), following the owner option-A ruling of 2026-11-01: the recount charges the 0.75P tip chamfer, .162 MIN (1.03D), same geometry, shop-fixture load; owner review #2144."
+    - id: "RV-04"
+      kind: "minor"
+      where: "VIEW D, the Ø.351 leadscrew clearance callout: WALL .060 MIN TO TAPS"
+      finding: "wall from the leadscrew clearance to the four transferred #4-40 taps .060 in (1.53 mm) at the printed worst case (the drill at its +.004, the leadscrew at its .453 mm stack offset, the nut's holes at their ±0.05 station and the #29 spot's 0.073 residual, the nut clocked 45° ±5°), under the .080 in target and over the .060 in floor (rule 17)"
+      reason: "Owner ruling 2026-11-04 (#2177 option B, relayed by Main): Ø.351 leadscrew clearance, wall .060 in (1.53 mm) at the printed worst case, .083 nominal, accepted below the .080 target and above the .060 floor; the KP08 axis height behind the stack is UNVERIFIED (#2184)."
   drawing_unit: in

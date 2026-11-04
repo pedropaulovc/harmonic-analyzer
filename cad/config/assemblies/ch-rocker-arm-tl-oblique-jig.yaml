@@ -15,14 +15,12 @@ allowed_free_stems:
   - ch-rocker-arm-tl-oblique-feed-lever
   - ch-rocker-arm-tl-vn-oblique-carriage
   - ch-rocker-arm-tl-vn-oblique-cl-dowel
-  - ch-rocker-arm-tl-oblique-feed-nut
+  - ch-rocker-arm-tl-vn-oblique-feed-nut
   - ch-rocker-arm-tl-vn-oblique-carriage-screw
-  - ch-rocker-arm-tl-vn-oblique-nut-screw
   - ch-rocker-arm-tl-vn-oblique-riser-screw
   - ch-rocker-arm-tl-vn-oblique-clamp-screw
   - ch-rocker-arm-tl-vn-oblique-lever-screw
   - ch-rocker-arm-tl-vn-oblique-lever-washer
-  - ch-rocker-arm-tl-vn-oblique-nut-dowel
 required_free_stems:
   - ch-rocker-arm-tl-oblique-carrier
   - ch-rocker-arm-tl-oblique-pivot-block
@@ -35,21 +33,19 @@ required_free_stems:
   - ch-rocker-arm-tl-oblique-feed-lever
   - ch-rocker-arm-tl-vn-oblique-carriage
   - ch-rocker-arm-tl-vn-oblique-cl-dowel
-  - ch-rocker-arm-tl-oblique-feed-nut
+  - ch-rocker-arm-tl-vn-oblique-feed-nut
   - ch-rocker-arm-tl-vn-oblique-carriage-screw
-  - ch-rocker-arm-tl-vn-oblique-nut-screw
   - ch-rocker-arm-tl-vn-oblique-riser-screw
   - ch-rocker-arm-tl-vn-oblique-clamp-screw
   - ch-rocker-arm-tl-vn-oblique-lever-screw
   - ch-rocker-arm-tl-vn-oblique-lever-washer
-  - ch-rocker-arm-tl-vn-oblique-nut-dowel
 free_dof: 1
 machinist_exceptions:
   - id: "RV-01"
     kind: "accept"
-    where: "F1: two #4-40 X 3/4 FLANGED BHCS through the TL-27 feed nut's clearance holes into the integral feed block, 0.4 N·m, the nut keyed by the TL-VN-81 dowel"
+    where: "F2: four #4-40 X 5/8 B18.6.3 flat heads (TL-VN-67) through the TL-VN-82 bought brass flange nut's countersunk holes into the integral feed block's transferred taps, 0.3 N·m, crosswise in 2 stages"
     finding: "no mechanical lock on the feed nut screws under reversing nut torque (rule 23)"
-    reason: "Main ruling 2026-11-03 on #2112 Codjiflo P1: positive dowel stop; friction claim dropped. The TL-VN-81 3/32 dowel, pressed in TL-27 flush with its screw-head face and a slip fit in TL-32's lug, takes the nut's reversing torque (1.02 N·m at the 1161 N crank thrust) with margins of 11 or more in shear and in bearing on the brass and the 6061, so no turning load reaches the screws: a static clamp. At 0.4 N·m the two screws' preload (703 N each) alone exceeds that thrust, so the nut never lifts off the lug, and each flange's bearing on the brass (73 MPa) stays under its 17 ksi yield. The owner accepted the static clamp without washers for the bought nut's flange on 2026-10-19/20 and replaced that nut with the shop-made TL-27 on 2026-11-01 (item 4). The lug's taps and dowel hole are transferred from the seated nut at assembly (F1)."
+    reason: "Owner ruling 2026-11-04 on #2177 (option B) replaced the shop-made TL-27 nut and its TL-VN-81 dowel with the ReliaBot leadscrew's own brass flange nut, its spigot faced off. Main ruling 2026-11-03 on #2112 Codjiflo P1 still holds: a positive stop, no friction counted on. The four flat heads, seated in the nut's 82° countersinks and threaded into TL-32's lug, key the nut: its reversing torque (1.19 N·m at the 1361 N crank thrust) puts 37 N on each head at the 16 mm PCD, a margin of 30 on the #4-40 minor section in shear, so no turning load loosens the screws: a static clamp. At 0.3 N·m the four screws' preload (527 N each) is 1.55 x that thrust, so the nut never lifts off the lug, and each head's bearing on the brass (102 MPa) stays under the 117 MPa (17 ksi) yield of 360-H02, taken because the listing states no alloy. The owner accepted the static clamp without washers for the bought nut's flange on 2026-10-19/20. The lug's taps are transferred from the seated, clocked nut at assembly (F1-F2)."
   - id: "RV-03"
     kind: "accept"
     where: "step 8: the handwheel and KP08 set screws on leadscrew flats, locked with Loctite 222 (low-strength purple) threadlocker"
@@ -64,6 +60,6 @@ machinist_exceptions:
     kind: "accept"
     where: "Step 5: each M4 X 20 SHCS cut to its own counterbore floor height + .189, engaging .183-.195 of the HGH15CA carriage's M4 x 5"
     finding: "carriage screw full-thread engagement .162 min (4.12 mm, 1.03D; the tip reaches .183, less its 0.75P chamfer), under rule 18's 1.5D"
-    reason: "The bought HGH15CA carriage's vendor M4 holes are 5 mm deep, so no M4 reaches 1.5D (6.0 mm). Owner ruling 2026-11-01, option A: the TL-22/TL-32 counterbore floor drops .614 to .570 and each screw is cut to fit its own floor at assembly (rule 19), so the reach carries only the ±.005 cut and the .001 reading: .183 of tip reach against the .151 the uncut screw left, 1.03D of full thread once the 0.75P tip chamfer is deducted Owner exception confirmed 2026-11-01 (relayed by Main) at 1.16D. Delegated ruling 2026-11-03 (Main), following the owner option-A ruling of 2026-11-01: the recount charges the 0.75P tip chamfer, .162 MIN (1.03D), same geometry, shop-fixture load; owner review #2144."
+    reason: "The HGH15CA-style kit carriage's M4 holes are 5 mm deep (HIWIN reference geometry, checked at receipt), so no M4 reaches 1.5D (6.0 mm). Owner ruling 2026-11-01, option A: the TL-22/TL-32 counterbore floor drops .614 to .570 and each screw is cut to fit its own floor at assembly (rule 19), so the reach carries only the ±.005 cut and the .001 reading: .183 of tip reach against the .151 the uncut screw left, 1.03D of full thread once the 0.75P tip chamfer is deducted Owner exception confirmed 2026-11-01 (relayed by Main) at 1.16D. Delegated ruling 2026-11-03 (Main), following the owner option-A ruling of 2026-11-01: the recount charges the 0.75P tip chamfer, .162 MIN (1.03D), same geometry, shop-fixture load; owner review #2144."
 # drawing_unit: the jig sheet, its TOL_* rows and the saved model's units (#290).
 drawing_unit: in

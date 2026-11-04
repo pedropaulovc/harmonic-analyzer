@@ -1,4 +1,4 @@
-r"""Pure-data envelope of the purchased HIWIN HGH15CA Z0 carriage (MHA-CH-06-TL-VN-51).
+r"""Pure-data envelope of the purchased HIWIN-style HGH15CA carriage (MHA-CH-06-TL-VN-51).
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure: ``build_ch_rocker_arm_tl_vn_oblique_carriage`` extrudes ``CAP_OUTLINE``
@@ -6,25 +6,43 @@ over the length over the seals and ``BODY_OUTLINE`` over the steel body, cuts
 the rail ``CHANNEL`` through, cuts the four M4 bores, and adds the grease
 nipple and the opposite end's port plug.
 
-Two carriages, one on each HGR15R rail (MHA-CH-06-TL-VN-50), each carrying a
+Two carriages, one on each HGR15 rail (MHA-CH-06-TL-VN-50), each carrying a
 pivot block (MHA-CH-06-TL-22) on its four M4 holes. Shop inventory
-``fixtures.trammel-hgh15ca-carriages``: HIWIN HGH-15-CA-Z0-C, DigiKey
-Marketplace / Midwest Machine Tool Supply 4433-HGH-15-CA-Z0-C.
+``fixtures.trammel-hgh15ca-carriages``.
 
-VENDOR-CHECKED. The first pass was datasheet-built: no vendor CAD obtained
-(HIWIN's CAD download needs a member login and CAPTCHA, 2026-10-17). The user
-then downloaded HIWIN's own model through his logged-in session:
-``HGH15CAZ0C_GW202610023079.stp`` (HIWIN configurator, HG Series > Block,
-HGH15CAZ0C with the M4x0.7 grease nipple, downloaded 2026-10-17 ~04:10 UTC;
-sha256 ``VENDOR_STEP_SHA256``; local only at
+KIT LISTING (``rail.SOURCE_URL``, read 2026-11-04, owner decisions on issue
+#2177): the carriages come in the rail's kit, Amazon ASIN B0C4DJNL33 (NUIBBYED,
+sold by XIQI), 2 rails and 4 HGH15CA carriages, two shipped on each rail; the
+jig uses two. They are generic HIWIN-style HGH15CA blocks, NUIBBYED-branded,
+not genuine HIWIN, with no maker part number. The listing states no carriage
+dimension, preload or accuracy class. The owner's acceptance (``DRAWING_NOTES``)
+replaces the earlier Z0 preload requirement: Z0 preload and C accuracy are not
+required, and the pair is accepted at fit-up by its lateral play,
+``trammel.CARRIAGE_PLAY_TIR_MAX`` TIR at the pivot (the trammel spec's
+docstring carries the radius budget). Of the four kit carriages the two
+tightest are kept, one per rail.
+
+REFERENCE GEOMETRY. Every number here is HIWIN's HGH15CA, the style the kit
+copies; HIWIN is not the supplier. The first pass was datasheet-built: no
+vendor CAD obtained (HIWIN's CAD download needs a member login and CAPTCHA,
+2026-10-17). The user then downloaded HIWIN's own model through his
+logged-in session: ``HGH15CAZ0C_GW202610023079.stp`` (HIWIN configurator,
+HG Series > Block, HGH15CAZ0C with the M4x0.7 grease nipple, downloaded
+2026-10-17 ~04:10 UTC; sha256 ``REFERENCE_STEP_SHA256``; local only at
 ``C:/src/dt-logs/trammel-bought/vendor-cad/HGH15CA.step``, never committed).
 FreeCAD 1.1.4 harvest: 7 solids (steel body, two end caps, two end seals,
 grease nipple, port plug), 36856.0037 mm^3 (``vendor-cad/HGH15CA.dims.md``,
 ``HGH15CA.harvest.json`` ``per_solid``).
 
+UNVERIFIED for the kit carriage, checked at receipt before the TL-22 pivot
+block goes on: the jig reads H 28, H1 4.3, W 34, L 61.4 and the 26 x 26 M4
+pattern (the mounting face's height sets the carrier stack with the selected
+shims, and the pivot block's screws must find the M4 holes); the nipple's and
+plug's stand-off is an envelope only.
+
 Source of each number:
 
-- VENDOR STEP (read 2026-10-17): ``BODY_OUTLINE`` (34 wide; the 1 x 45 deg
+- REFERENCE STEP (read 2026-10-17): ``BODY_OUTLINE`` (34 wide; the 1 x 45 deg
   top and 1.3 x 45 deg bottom chamfers; the two 0.5 deep top grooves; the
   0.3 relief on the -Y reference side), ``CAP_OUTLINE`` (end caps and seals
   share it: 32.4 wide, offset 0.043 to +Y, top 24.174), ``CAP_LENGTH``
@@ -33,7 +51,7 @@ Source of each number:
   drill point (``DRILL_POINT_HALF_ANGLE``), the nipple (Ø6 ball head,
   ``NIPPLE_PROUD`` 6.66 beyond the seal on the axis 5.05 above the rail
   top) and the opposite port's plug (Ø7.51 head, ``PLUG_PROUD`` 1.7), and
-  the per-solid ``VENDOR_*_VOLUME_MM3``.
+  the per-solid ``REFERENCE_*_VOLUME_MM3``.
 - SOURCED: HIWIN "Linear Guideway Technical Information", catalogue
   G99TE23-2203, https://www.hiwin.com/wp-content/uploads/Linear_Guideway-E-1.pdf
   (read 2026-10-16; sha256 9ded6606...b800733103). Section 2-1-13 (1)
@@ -43,8 +61,8 @@ Source of each number:
   (``NIPPLE_BELOW_TOP``), H3 7.7, C 14.7 kN, C0 23.47 kN, block 0.18 kg
   (``MASS_KG``). Section 2-1-7 (printed page 29): HG15 grease nipple
   M4x0.7P, part no. 34310002. Table 2-1-17 (printed page 34): HG15 end seal
-  t1 3. The vendor STEP agrees with every catalogue value except G: its
-  nipple stands 6.66 proud, not 5.3 (the vendor envelope governs).
+  t1 3. The reference STEP agrees with every catalogue value except G: its
+  nipple stands 6.66 proud, not 5.3 (the reference envelope governs).
 - FROM THE CALCULATOR (imported, ``ch_rocker_arm_tl_oblique_trammel_spec``):
   ``CARRIAGE_HEIGHT`` 28 (H, the mounting face above the rail seat),
   ``CARRIAGE_UNDER`` 4.3 (H1, the underside), ``CARRIAGE_WIDTH`` 34 (W),
@@ -52,11 +70,11 @@ Source of each number:
   ``CARRIAGE_BOLT`` "M4". From ``ch_rocker_arm_tl_oblique_pivot_block_spec``:
   ``CARRIAGE_THREAD_DEPTH`` 5 (the l of M4 x 5). From
   ``ch_rocker_arm_tl_vn_oblique_rail_spec``: the rail ``SECTION``, its height
-  and the polygon helpers. The vendor STEP agrees with every one of these.
+  and the polygon helpers. The reference STEP agrees with every one of these.
   The registry quantity 2 is C4's
   ``ch_rocker_arm_tl_oblique_fasteners_spec.RAILS`` (asserted by the test).
 - DERIVED: ``BORE_DIA`` 3.242, the ISO 68-1 basic minor diameter of M4x0.7
-  (D1 = D - 1.082532 P), which is also the vendor's modelled bore. M4 is
+  (D1 = D - 1.082532 P), which is also the reference's modelled bore. M4 is
   not in ``_hole_spec.TAP_DRILL_MM`` and the hole wizard here is ANSI-inch
   only, so each M4 x 5 hole is a plain flat-bottomed bore at the thread
   minor diameter (CONTRACT.md modelling rule), not a wizard tapped hole.
@@ -66,7 +84,7 @@ Source of each number:
   jig's native interference check sees a true gap instead of coincident
   faces. HIWIN publishes no running clearance.
 
-Modelling departures from the vendor solids, each closed-form or bounded:
+Modelling departures from the reference solids, each closed-form or bounded:
 
 - Channel: the 0.1 offset of the rail's chord polygon, against HIWIN's exact
   rail profile; ``CHANNEL_EXCESS_MM2`` (closed form) over the length.
@@ -74,10 +92,10 @@ Modelling departures from the vendor solids, each closed-form or bounded:
   (``V_DRILL_POINTS``) stay solid.
 - End caps and seals are solid prisms of ``CAP_OUTLINE``: their lube
   passages, ports, recirculation turnarounds and seal lips stay solid,
-  ``CAP_INTERNAL_MM3`` (measured from the vendor per-solid volumes, about
+  ``CAP_INTERNAL_MM3`` (measured from the reference per-solid volumes, about
   7 % of the cap and seal volume).
 - Nipple and plug are cylinder envelopes of their outside parts (the
-  vendor's hex, ball head and domed plug inside them); their shanks in
+  reference's hex, ball head and domed plug inside them); their shanks in
   the end ports are not separate.
 - One body in "Alloy Steel": the native mass overstates the catalogue
   0.18 kg because the plastic caps count as steel; the steel body alone is
@@ -89,9 +107,9 @@ carriage's z 0 is the rail's z 0); +X along the rail, +Z up, Y across.
 Mounting face at z ``MOUNTING_FACE_Z`` 28, underside at ``UNDERSIDE_Z`` 4.3,
 the four M4 bores at (+-13, +-13). Front (XY) is the rail seat level, Top
 (XZ) the centre plane, Right (YZ) the mid-length plane, so the carriage's
-Right to the rail's Right is the free slide. The vendor STEP's frame is
-centred on the length with y 0 on the rail top: part z = vendor y + 15,
-part Y = vendor Z. HIWIN fits the nipple on its -X end by default; the
+Right to the rail's Right is the free slide. The reference STEP's frame is
+centred on the length with y 0 on the rail top: part z = reference y + 15,
+part Y = reference Z. HIWIN fits the nipple on its -X end by default; the
 port is the same at both ends, and here it sits on the +X end:
 ``ch_rocker_arm_tl_oblique_pivot_block_spec`` puts +X away from the
 spindle and the pivot block overhangs the -X end (X -50), so +X is the
@@ -109,10 +127,11 @@ import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 from ch_rocker_arm_tl_oblique_pivot_block_spec import CARRIAGE_THREAD_DEPTH
 from ch_rocker_arm_tl_vn_oblique_rail_spec import clip_above, polygon_area_centroid
 
-SUPPLIER = "DigiKey Marketplace (Midwest Machine Tool Supply)"
-SKU = "HGH-15-CA-Z0-C"  # Midwest part; DigiKey 4433-HGH-15-CA-Z0-C
-MAKER_PART = "HGH15CAZ0C"  # HIWIN order code: HG, H square, 15, C heavy, A top, Z0
-MATERIAL = "Alloy Steel"  # SOLIDWORKS library steel for the hardened block
+# One kit (``rail.SKU``) supplies both rails and both carriages.
+SUPPLIER = rail.SUPPLIER
+SKU = rail.SKU
+STYLE = "HGH15CA"  # the HIWIN-style designation the kit copies; no maker part number
+MATERIAL = "Alloy Steel"  # SOLIDWORKS library steel for the bearing-steel block
 
 # --- Calculator (imported) -------------------------------------------------------
 MOUNTING_FACE_Z = trammel.CARRIAGE_HEIGHT  # H 28
@@ -130,7 +149,7 @@ BORE_DEPTH = CARRIAGE_THREAD_DEPTH  # l of M4 x 5
 
 # --- Catalogue (SOURCED, G99TE23-2203) ----------------------------------------------
 BODY_LENGTH = 39.4  # L1, steel body
-CATALOGUE_NIPPLE_PROUD = 5.3  # G; the vendor model's nipple stands 6.66
+CATALOGUE_NIPPLE_PROUD = 5.3  # G; the reference model's nipple stands 6.66
 NIPPLE_BELOW_TOP = 7.95  # H2, block top to the nipple axis
 THREAD_MAJOR = 4.0  # M4
 THREAD_PITCH = 0.7  # M4x0.7 (coarse), also the HG15 nipple thread
@@ -140,20 +159,20 @@ LOAD_C_KN = 14.7
 LOAD_C0_KN = 23.47
 MASS_KG = 0.18
 
-# --- Vendor STEP (HGH15CAZ0C_GW202610023079.stp, HGH15CA.dims.md) -------------------
-VENDOR_STEP = "HGH15CAZ0C_GW202610023079.stp"
-VENDOR_STEP_SHA256 = "ae98aba826779b0ed633593b809734ba738473c0786e78092a6ef3f5b7e448ea"
-VENDOR_DOWNLOADED = "2026-10-17"
-VENDOR_VOLUME_MM3 = 36856.0037  # all 7 solids
-VENDOR_BODY_VOLUME_MM3 = 26020.9973
-VENDOR_CAP_VOLUME_MM3 = 3826.3593  # each end
-VENDOR_SEAL_VOLUME_MM3 = 1462.2354  # each end
-VENDOR_NIPPLE_VOLUME_MM3 = 199.5971
-VENDOR_PLUG_VOLUME_MM3 = 58.2201
-# Vendor-frame bounding box (x along, y up from the rail top, z across), mm:
+# --- Reference STEP (HGH15CAZ0C_GW202610023079.stp, HGH15CA.dims.md) ----------------
+REFERENCE_STEP = "HGH15CAZ0C_GW202610023079.stp"
+REFERENCE_STEP_SHA256 = "ae98aba826779b0ed633593b809734ba738473c0786e78092a6ef3f5b7e448ea"
+REFERENCE_DOWNLOADED = "2026-10-17"
+REFERENCE_VOLUME_MM3 = 36856.0037  # all 7 solids
+REFERENCE_BODY_VOLUME_MM3 = 26020.9973
+REFERENCE_CAP_VOLUME_MM3 = 3826.3593  # each end
+REFERENCE_SEAL_VOLUME_MM3 = 1462.2354  # each end
+REFERENCE_NIPPLE_VOLUME_MM3 = 199.5971
+REFERENCE_PLUG_VOLUME_MM3 = 58.2201
+# Reference-frame bounding box (x along, y up from the rail top, z across), mm:
 # nipple tip at -37.36, plug dome at +32.4.
-VENDOR_BBOX_MIN = (-37.36, -10.7, -17.0)
-VENDOR_BBOX_MAX = (32.4, 13.0, 17.0)
+REFERENCE_BBOX_MIN = (-37.36, -10.7, -17.0)
+REFERENCE_BBOX_MAX = (32.4, 13.0, 17.0)
 END_CAP_THICK = 8.0
 CAP_LENGTH = (LENGTH - BODY_LENGTH) / 2.0  # 11 = 8 cap + 3 seal, each end
 DRILL_POINT_HALF_ANGLE = 59.0  # deg, 118 deg point
@@ -289,14 +308,14 @@ CENTROID = (
 # (well under one M4 bore, 41 mm^3).
 VOLUME_TOL_MM3 = 5e-4 * VOLUME_MM3
 
-# --- Against the vendor solids ------------------------------------------------------
+# --- Against the reference solids ---------------------------------------------------
 # HIWIN's channel is the rail's true profile above the underside: the chord
 # polygon less its groove segments (all four grooves lie above the underside).
-VENDOR_CHANNEL_MM2 = (
+REFERENCE_CHANNEL_MM2 = (
     polygon_area_centroid(clip_above(rail.SECTION, UNDERSIDE_Z))[0]
     - rail.GROOVE_SEGMENTS_MM2
 )
-CHANNEL_EXCESS_MM2 = A_CHANNEL - VENDOR_CHANNEL_MM2
+CHANNEL_EXCESS_MM2 = A_CHANNEL - REFERENCE_CHANNEL_MM2
 _R_BORE = BORE_DIA / 2.0
 V_DRILL_POINTS = len(BOLT_POINTS) * (
     math.pi
@@ -305,20 +324,28 @@ V_DRILL_POINTS = len(BOLT_POINTS) * (
     / 3.0
 )
 # The steel body as HIWIN models it, from this outline: the residual against
-# VENDOR_BODY_VOLUME_MM3 is the channel's eight R0.4 blend chords (each
+# REFERENCE_BODY_VOLUME_MM3 is the channel's eight R0.4 blend chords (each
 # segment under 0.01 mm^2).
-VENDOR_BODY_MODEL_MM3 = (
-    (A_BODY_OUTLINE - VENDOR_CHANNEL_MM2) * BODY_LENGTH - V_BORES - V_DRILL_POINTS
+REFERENCE_BODY_MODEL_MM3 = (
+    (A_BODY_OUTLINE - REFERENCE_CHANNEL_MM2) * BODY_LENGTH - V_BORES - V_DRILL_POINTS
 )
-VENDOR_BODY_ALLOWANCE_MM3 = 0.1 * BODY_LENGTH
+REFERENCE_BODY_ALLOWANCE_MM3 = 0.1 * BODY_LENGTH
 # Cap and seal internals (lube passages, ports, recirculation turnarounds,
-# seal lips), solid in the model: the vendor caps' prism less their volume.
-CAP_INTERNAL_MM3 = (A_CAP_OUTLINE - VENDOR_CHANNEL_MM2) * 2.0 * CAP_LENGTH - 2.0 * (
-    VENDOR_CAP_VOLUME_MM3 + VENDOR_SEAL_VOLUME_MM3
+# seal lips), solid in the model: the reference caps' prism less their volume.
+CAP_INTERNAL_MM3 = (A_CAP_OUTLINE - REFERENCE_CHANNEL_MM2) * 2.0 * CAP_LENGTH - 2.0 * (
+    REFERENCE_CAP_VOLUME_MM3 + REFERENCE_SEAL_VOLUME_MM3
 )
 
-# The note names the rail by its drawing number, read from the registry.
+# The owner's description note for the kit carriages (#2177), the rail named
+# by its drawing number from the registry and the play acceptance read from
+# the trammel calculator. Rule 7: a matched-fit statement with its mate and
+# acceptance, three lines beside the footer's general line.
 RAIL_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-rail")["number"]
-DRAWING_NOTES = (
-    f"MOUNT ON THE OBLIQUE TRAMMEL RAIL {RAIL_NUMBER}; GREASE THROUGH THE END NIPPLE."
+PLAY_ACCEPTANCE = f"{trammel.CARRIAGE_PLAY_TIR_MAX:.2f} MM TIR MAX AT PIVOT"
+DRAWING_NOTES = "\n".join(
+    (
+        f"GENERIC HIWIN-STYLE {STYLE}, NUIBBYED-BRANDED, NOT GENUINE HIWIN;",
+        f"MATCHED KIT WITH RAIL {RAIL_NUMBER}. Z0 PRELOAD AND C ACCURACY",
+        f"NOT REQUIRED; ACCEPT BY FIT-UP PLAY CHECK, {PLAY_ACCEPTANCE}.",
+    )
 )

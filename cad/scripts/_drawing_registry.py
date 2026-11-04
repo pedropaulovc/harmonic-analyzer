@@ -744,13 +744,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="ch_rocker_arm_tl_oblique_feed_nut",
-        part="ch_rocker_arm_tl_oblique_feed_nut",
-        artifact_stem="ch-rocker-arm-tl-oblique-feed-nut",
-        script_name="draw_ch_rocker_arm_tl_oblique_feed_nut.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
         name="ch_rocker_arm_tl_oblique_feed_block",
         part="ch_rocker_arm_tl_oblique_feed_block",
         artifact_stem="ch-rocker-arm-tl-oblique-feed-block",
@@ -779,17 +772,17 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="ch_rocker_arm_tl_vn_oblique_nut_dowel",
-        part="ch_rocker_arm_tl_vn_oblique_nut_dowel",
-        artifact_stem="ch-rocker-arm-tl-vn-oblique-nut-dowel",
-        script_name="draw_ch_rocker_arm_tl_vn_oblique_nut_dowel.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
         name="ch_rocker_arm_tl_vn_oblique_leadscrew",
         part="ch_rocker_arm_tl_vn_oblique_leadscrew",
         artifact_stem="ch-rocker-arm-tl-vn-oblique-leadscrew",
         script_name="draw_ch_rocker_arm_tl_vn_oblique_leadscrew.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="ch_rocker_arm_tl_vn_oblique_feed_nut",
+        part="ch_rocker_arm_tl_vn_oblique_feed_nut",
+        artifact_stem="ch-rocker-arm-tl-vn-oblique-feed-nut",
+        script_name="draw_ch_rocker_arm_tl_vn_oblique_feed_nut.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
@@ -832,13 +825,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="ch_rocker_arm_tl_vn_oblique_kp08_screw",
         artifact_stem="ch-rocker-arm-tl-vn-oblique-kp08-screw",
         script_name="draw_ch_rocker_arm_tl_vn_oblique_kp08_screw.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
-        name="ch_rocker_arm_tl_vn_oblique_nut_screw",
-        part="ch_rocker_arm_tl_vn_oblique_nut_screw",
-        artifact_stem="ch-rocker-arm-tl-vn-oblique-nut-screw",
-        script_name="draw_ch_rocker_arm_tl_vn_oblique_nut_screw.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

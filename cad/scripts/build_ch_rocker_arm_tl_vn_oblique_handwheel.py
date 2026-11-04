@@ -1,25 +1,24 @@
-r"""Bought feed handwheel: MISUMI HOK40-HC8 (MHA-CH-06-TL-VN-57).
+r"""Bought feed handwheel: HARFINGTON 50 mm, Amazon B0DJ3DZT86 (MHA-CH-06-TL-VN-57).
 
-The Ø40 knurled handwheel with its revolving grip, on the far end of the
+The Ø50 knurled handwheel with its rotating handle, on the far end of the
 oblique trammel jig's Tr8 leadscrew. It is one solid, built from
 ``ch_rocker_arm_tl_vn_oblique_handwheel_spec``, and the spec records each value's
-source. The build:
+source (several are UNVERIFIED envelope values). The build:
 
-- revolves the hub and rim round the Ø8 through bore (``WheelProfile`` ->
-  ``Wheel``) and rounds the hub's end edge and its corner with the rim
-  (``HubEndFillet``, ``HubCornerFillet``);
-- revolves the grip about its own axis on the Front plane, fused to the rim
-  face (``GripProfile`` -> ``Grip``), and rounds its end (``GripEndRound``);
+- revolves the hub and rim round the blind Ø8 bore, about the axis edge
+  behind the bore's bottom (``WheelProfile`` -> ``Wheel``); no edge breaks
+  are modelled (none is published);
+- revolves the handle's envelope cylinder about its own axis on the Front
+  plane, fused to the rim face (``GripProfile`` -> ``Grip``);
 - revolve-cuts the two radial M5 set-screw taps at the thread's minor
   diameter, from the hub OD into the bore (``SetScrewTap`` along -X, opposite
-  the grip, which takes the supplied screw; ``SetScrewTapQuarter`` along +Z).
-  The set screw is not modelled.
+  the handle, the one on the leadscrew's flat; ``SetScrewTapQuarter`` along
+  +Z). The set screws are not modelled.
 
-Vendor-checked against MISUMI's STEP ``HOK40-HC8.step`` (sha256 a9c2c04c...,
-downloaded 2026-10-17 UTC).
+Datasheet-built: no vendor CAD obtained.
 
 Frame: the axis is +Y and is published as ``ScrewAxis`` (Front ∩ Right).
-y = 0 is the hub end face, where the bore opens. The grip's axis is at
+y = 0 is the hub end face, where the bore opens. The handle's axis is at
 x = GRIP_OFFSET, z = 0.
 
 Run (SolidWorks already open)::
@@ -32,10 +31,9 @@ from __future__ import annotations
 import sys
 
 import _config
-from _appearance import PANEL_BLACK, apply_color, apply_material
+from _appearance import POLISHED_STEEL, apply_color, apply_material
 from _bought_revolve import (
     SAVED_PROPERTIES,
-    fillet_edge,
     publish_screw_axis,
     revolve_profile,
     stock_properties,
@@ -49,24 +47,14 @@ from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
 from ch_rocker_arm_tl_vn_oblique_handwheel_spec import (
     DRAWING_NOTES,
-    GRIP_DIA,
-    GRIP_END_ROUND,
-    GRIP_END_ROUND_MM3,
     GRIP_OFFSET,
     GRIP_PROFILE,
     GRIP_VOLUME_MM3,
-    HUB_CORNER_FILLET_MM3,
-    HUB_DIA,
-    HUB_END_FILLET_MM3,
-    HUB_FILLET,
-    HUB_LENGTH,
-    LENGTH,
     MATERIAL,
     SET_SCREW_DIRECTIONS,
     TAP_PROFILE,
     TAP_VOLUME_MM3,
     VOLUME_MM3,
-    WHEEL_FACE_Y,
     WHEEL_PROFILE,
     WHEEL_VOLUME_MM3,
 )
@@ -89,59 +77,29 @@ def wheel_points() -> list[tuple[float, float]]:
 
 
 def grip_points() -> list[tuple[float, float]]:
-    """``GRIP_PROFILE`` on the Front plane about the grip axis x = GRIP_OFFSET."""
+    """``GRIP_PROFILE`` on the Front plane about the handle axis x = GRIP_OFFSET."""
     return [(GRIP_OFFSET + r, y) for r, y in GRIP_PROFILE]
 
 
 async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
 
-    # Hub and rim round the through bore; the bore's centerline is free.
+    # Hub and rim round the blind bore; the closing edge on the axis is the
+    # revolve's centerline.
     await revolve_profile(
-        adapter,
-        "Front",
-        "hub and rim",
-        wheel_points(),
-        ("WheelProfile", "Wheel"),
-        free_axis_length=WHEEL_FACE_Y,
+        adapter, "Front", "hub and rim", wheel_points(), ("WheelProfile", "Wheel")
     )
     expected = WHEEL_VOLUME_MM3
     await volume_check(adapter, "hub and rim", expected, 0.002 * expected)
-    hub_r = HUB_DIA / 2.0
-    await fillet_edge(
-        adapter, "hub end edge", HUB_FILLET, (0.0, 0.0, -hub_r), "HubEndFillet"
-    )
-    expected -= HUB_END_FILLET_MM3
-    await volume_check(adapter, "hub end fillet", expected, 0.1 * HUB_END_FILLET_MM3)
-    await fillet_edge(
-        adapter,
-        "hub-to-rim corner",
-        HUB_FILLET,
-        (0.0, HUB_LENGTH, -hub_r),
-        "HubCornerFillet",
-    )
-    expected += HUB_CORNER_FILLET_MM3
-    await volume_check(
-        adapter, "hub corner fillet", expected, 0.1 * HUB_CORNER_FILLET_MM3
-    )
 
-    # The grip, on its own axis, fused to the rim face.
+    # The handle's envelope, on its own axis, fused to the rim face.
     await revolve_profile(
-        adapter, "Front", "grip", grip_points(), ("GripProfile", "Grip")
+        adapter, "Front", "handle", grip_points(), ("GripProfile", "Grip")
     )
     expected += GRIP_VOLUME_MM3
     await volume_check(
-        adapter, "grip fused to the rim face", expected, 0.002 * expected
+        adapter, "handle fused to the rim face", expected, 0.002 * expected
     )
-    await fillet_edge(
-        adapter,
-        "grip end",
-        GRIP_END_ROUND,
-        (GRIP_OFFSET, LENGTH, -GRIP_DIA / 2.0),
-        "GripEndRound",
-    )
-    expected -= GRIP_END_ROUND_MM3
-    await volume_check(adapter, "grip end round", expected, 0.1 * GRIP_END_ROUND_MM3)
 
     # The two M5 set-screw taps at the minor diameter (M5 has no pinned tap
     # drill): each a rectangle revolved about its own axis, from the wheel
@@ -173,7 +131,7 @@ async def build(adapter) -> dict[str, str]:
     await publish_screw_axis(adapter)
 
     await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, PANEL_BLACK)  # black anodise
+    await apply_color(adapter, POLISHED_STEEL)  # the listing photos' silver anodize
     apply_custom_properties(adapter, STOCK_PROPERTIES)
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
     await report_mass_properties(adapter)

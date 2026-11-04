@@ -1,7 +1,8 @@
-"""Create the four-view purchased-reference sheet for the HIWIN HGH15CAZ0C carriage (MHA-CH-06-TL-VN-51).
+"""Create the four-view purchased-reference sheet for the HIWIN-style HGH15CA carriage (MHA-CH-06-TL-VN-51).
 
 Identification only: the part as installed, its stock and ordering SKU, and
-its cut-length or fitting note; no fabrication dimensions.
+its note (the owner's kit description and fit-up play acceptance); no
+fabrication dimensions.
 """
 
 from __future__ import annotations
@@ -21,8 +22,8 @@ MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_carriage"]
 PART_STEM = SPEC.artifact_stem
-# The footer's ITEM row: the catalogue designation in plain text.
-ITEM = "HIWIN HGH15CAZ0C LINEAR GUIDEWAY BLOCK, Z0 PRELOAD"
+# The footer's ITEM row: the style designation in plain text.
+ITEM = "GENERIC HIWIN-STYLE HGH15CA LINEAR GUIDE CARRIAGE, NUIBBYED KIT"
 
 
 async def build(adapter: Any) -> dict[str, str]:

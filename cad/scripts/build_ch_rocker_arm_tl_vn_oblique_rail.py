@@ -1,12 +1,13 @@
-r"""Purchased HIWIN HGR15R linear rail, cut to 440 (MHA-CH-06-TL-VN-50).
+r"""Purchased HIWIN-style HGR15 linear rail, 450 as supplied (MHA-CH-06-TL-VN-50).
 
-The oblique trammel jig's two rails (vendor-checked against HIWIN's own
-HGR15R440C STEP; ``ch_rocker_arm_tl_vn_oblique_rail_spec`` records every source):
-the end-face ``SECTION`` on the Right plane extruded 440 along +X, then the
-seven Ø4.5 holes through and their Ø7.5 counterbores down from the top. Each
-hole sketch places its first hole from the -X end face and every next one a
-pitch on from the one before; the extrusion's ``Length`` and the bolt holes'
-``HoleEnd`` and ``HolePitch`` are marked for the drawing's receipt check.
+The oblique trammel jig's two rails, generic NUIBBYED kit rails modelled on
+HIWIN's HGR15R440C reference STEP (``ch_rocker_arm_tl_vn_oblique_rail_spec``
+records every source): the end-face ``SECTION`` on the Right plane extruded
+450 along +X, then the eight Ø4.5 holes through and their Ø7.5 counterbores
+down from the top. Each hole sketch places its first hole from the -X end
+face and every next one a pitch on from the one before; the extrusion's
+``Length`` and the bolt holes' ``HoleEnd`` and ``HolePitch`` are marked for
+the drawing's receipt check.
 
 Frame: origin at the -X end face, on the seat (bottom) face, on the rail
 centreline; +X along the rail, +Z up. The Right plane's sketch reads model
@@ -303,7 +304,7 @@ async def build(adapter) -> dict[str, str]:
     await bbox_extent_check(adapter, "rail height", "z", HEIGHT)
     _require_one_solid_body(adapter, label="rail")
 
-    # The drawing's receipt check of the special order (the spec's
+    # The drawing's receipt check of the kit rail (the spec's
     # DRAWING_DIMENSIONS): whole millimetres, imported into the hole face.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     for feature_name, names in DRAWING_DIMENSIONS.items():

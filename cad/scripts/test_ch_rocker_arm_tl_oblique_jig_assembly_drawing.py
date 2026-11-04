@@ -252,9 +252,23 @@ def test_clusters_partition_the_bom() -> None:
     assert spec.LOCKED_TO[spec.CARRIAGE_SCREW] == (
         ((spec.FEED_BLOCK, 0),) * 4 + ((spec.PIVOT_BLOCK, 0),) * 4
     )
-    assert feed.context == (spec.instance_name(spec.CARRIAGE, 0), *feed_screws)
+    # The feed nut's four flat heads are riser-screw instances (option B,
+    # 2026-11-04): shown over the nut on the feed sheet, ballooned with the
+    # riser's four on the carrier sheet.
+    assert feed.context == (
+        spec.instance_name(spec.CARRIAGE, 0), *feed_screws, *spec.NUT_SCREW_INSTANCES,
+    )
     assert spec.CARRIAGE_SCREW not in feed.visible
-    assert set(feed_screws) <= feed.visible
+    assert set(feed_screws) | set(spec.NUT_SCREW_INSTANCES) <= feed.visible
+    assert spec.FEED_NUT in feed.stems and spec.RISER_SCREW not in feed.stems
+    carrier_sheet = next(c for c in drawing.CLUSTERS if c.sheet == "CARRIER EXPLODED")
+    assert carrier_sheet.partial == ((spec.RISER_SCREW, spec.RISER_SCREW_INSTANCES),)
+    assert not set(spec.RISER_SCREW_INSTANCES) & set(spec.NUT_SCREW_INSTANCES)
+    assert len(spec.RISER_SCREW_INSTANCES) + len(spec.NUT_SCREW_INSTANCES) == (
+        spec.QUANTITIES[spec.RISER_SCREW]
+    )
+    assert set(spec.RISER_SCREW_INSTANCES) <= carrier_sheet.visible
+    assert not set(spec.NUT_SCREW_INSTANCES) & carrier_sheet.visible
     rails = next(c for c in drawing.CLUSTERS if c.sheet == "RAIL BARS EXPLODED")
     assert spec.CARRIAGE_SCREW in rails.stems
     assert rails.partial == ((spec.CARRIAGE_SCREW, pivot_screws),)
@@ -322,7 +336,7 @@ def test_sheet_text_wraps_within_its_layout_width() -> None:
         assert line in drawing.ALIGNMENT_NOTE.split("\n")
     # The general torque note opens sheet 7's sequence, its items unbroken.
     assert drawing.ASSEMBLY_STEPS.split("\n")[1].startswith("TORQUE WHERE NO STEP")
-    assert "(ITEMS 21, 22, 24, 25, 27 AND 28)" in drawing.ASSEMBLY_STEPS.replace("\n", " ")
+    assert "(ITEMS 21, 22, 24, 26 AND 27)" in drawing.ASSEMBLY_STEPS.replace("\n", " ")
 
 
 def test_a_blank_line_parts_each_top_level_step() -> None:
@@ -1194,7 +1208,7 @@ def test_package_settled_checks_reread_native_bom_without_mutating_layout(
     )
     seat._place_assembled_sheet.return_value = lambda: None
     seat._place_kit_bom_note.return_value = lambda: None
-    seat._place_shim_stock_note.return_value = lambda: None
+    seat._place_bom_note.return_value = lambda: None
     seat._place_notes_reference_views.return_value = {
         name: drawing.NOTES_REFERENCE_SCALE for name in drawing.NOTES_REFERENCE_REGIONS
     }
@@ -1534,11 +1548,11 @@ def test_kit_bom_key_refuses_a_native_note_that_does_not_fit(kit_bom_note_state,
         drawing._place_kit_bom_note(_ADAPTER, state.table, state.reference)
 
 
-def test_shim_stock_note_sits_under_the_bom_left_of_the_title(kit_bom_note_state):
+def test_bom_note_sits_under_the_bom_left_of_the_title(kit_bom_note_state):
     state = kit_bom_note_state
-    settled = drawing._place_shim_stock_note(_ADAPTER, state.table)
+    settled = drawing._place_bom_note(_ADAPTER, state.table)
     [note] = state.notes
-    assert note.text == spec.PIVOT_SHIM_STOCK_NOTE
+    assert note.text == spec.BOM_NOTE
     extent = drawing._kit_bom_note_extent(note)
     bom = drawing._bom_bounds(state.table)
     assert extent[0] == pytest.approx(bom[0])  # flush with the table, by its ink
@@ -1551,23 +1565,23 @@ def test_shim_stock_note_sits_under_the_bom_left_of_the_title(kit_bom_note_state
 
 
 @pytest.mark.parametrize("fault", ("oversized", "ignored", "refused"))
-def test_shim_stock_note_refuses_a_note_that_does_not_fit(kit_bom_note_state, fault):
+def test_bom_note_refuses_a_note_that_does_not_fit(kit_bom_note_state, fault):
     state = kit_bom_note_state
     if fault == "oversized":
         state.width = 0.250
     else:
         state.move = fault
     with pytest.raises(RuntimeError):
-        drawing._place_shim_stock_note(_ADAPTER, state.table)
+        drawing._place_bom_note(_ADAPTER, state.table)
 
 
-def test_shim_stock_note_buys_the_worst_case_at_both_supports() -> None:
+def test_bom_note_buys_the_worst_case_at_both_supports() -> None:
     # Owner ruling 2026-10-27: the nominal pack plus the worst-case pack a
     # support, at both supports, from the fitting stock alone.
     assert set(spec.PIVOT_SHIM_BUY) == set(spec.pivot_shim.FIT_SKUS.values())
     assert all(count % 2 == 0 for _thickness, count in spec.PIVOT_SHIM_BUY.values())
     assert spec.PIVOT_SHIM_BUY[spec.pivot_shim.SKU][1] >= spec.pivot_shim.QUANTITY
-    note = spec.PIVOT_SHIM_STOCK_NOTE
+    note = spec.BOM_NOTE
     assert note.startswith(f"ITEM {spec.ITEM_NUMBERS[spec.PIVOT_SHIM]}:")
     for sku, (_thickness, count) in spec.PIVOT_SHIM_BUY.items():
         assert f"{sku} " in note and f"X{count}" in note

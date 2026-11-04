@@ -242,9 +242,9 @@ _COMPONENT_BAND = {
     # the thumbscrew.
     "ms-measuring-stick": (5, 7),  # expected 6
     # The rocker's oblique-trammel jig (shop fixture, TL-00; never under the
-    # top): its 9 made parts (13 instances) and its 20 bought families, every
+    # top): its 7 made parts (9 instances) and its 22 bought families, every
     # screw, stud, nut and bearing inserted (jig spec QUANTITIES).
-    "ch-rocker-arm-tl-oblique-jig": (81, 83),  # expected 82
+    "ch-rocker-arm-tl-oblique-jig": (94, 96),  # expected 95
     "ha-harmonic-analyzer": (
         7,
         9,

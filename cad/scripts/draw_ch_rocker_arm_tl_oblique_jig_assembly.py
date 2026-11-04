@@ -190,15 +190,15 @@ CLUSTERS = (
             spec.HANDWHEEL,
             spec.BRACKET_SCREW,
             spec.PILLOW_BLOCK_SCREW,
-            spec.NUT_SCREW,
-            spec.NUT_DOWEL,
         ),
         (1.0, 3.0),
         # The integral lug moves with the feed block on rail 1, fastened to
-        # its carriage by its four carriage screws.
+        # its carriage by its four carriage screws. The feed nut's four flat
+        # heads are riser screws, ballooned on the carrier's sheet.
         context=(
             spec.instance_name(spec.CARRIAGE, 0),
             *_carriage_screws(spec.FEED_BLOCK),
+            *spec.NUT_SCREW_INSTANCES,
         ),
     ),
     Cluster(
@@ -216,6 +216,7 @@ CLUSTERS = (
             spec.LEVER_LOCK_WASHER,
         ),
         (1.0, 5.0),
+        partial=((spec.RISER_SCREW, spec.RISER_SCREW_INSTANCES),),
     ),
 )
 SHEET_NAMES = (
@@ -484,8 +485,8 @@ PART_ROWS = {
     "ch-rocker-arm-tl-vn-oblique-leadscrew": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-leadscrew"
     ),
-    "ch-rocker-arm-tl-oblique-feed-nut": _config.parts(
-        "ch-rocker-arm-tl-oblique-feed-nut"
+    "ch-rocker-arm-tl-vn-oblique-feed-nut": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-feed-nut"
     ),
     "ch-rocker-arm-tl-vn-oblique-pillow-block": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-pillow-block"
@@ -514,9 +515,6 @@ PART_ROWS = {
     "ch-rocker-arm-tl-vn-oblique-kp08-screw": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-kp08-screw"
     ),
-    "ch-rocker-arm-tl-vn-oblique-nut-screw": _config.parts(
-        "ch-rocker-arm-tl-vn-oblique-nut-screw"
-    ),
     "ch-rocker-arm-tl-vn-oblique-riser-screw": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-riser-screw"
     ),
@@ -528,9 +526,6 @@ PART_ROWS = {
     ),
     "ch-rocker-arm-tl-vn-oblique-lever-washer": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-lever-washer"
-    ),
-    "ch-rocker-arm-tl-vn-oblique-nut-dowel": _config.parts(
-        "ch-rocker-arm-tl-vn-oblique-nut-dowel"
     ),
 }
 if set(PART_ROWS) != set(BOM_COMPONENTS):
@@ -729,7 +724,7 @@ def assembly_and_fit_layouts(
 STEPS_LAYOUT, FIT_LAYOUT = assembly_and_fit_layouts(
     (spec.GENERAL_TORQUE_NOTE, *spec.ASSEMBLY_STEPS),
     spec.ASSEMBLY_CHECKS,
-    (*spec.PIVOT_FIT_STEPS, "KP08 ALIGNMENT:", *spec.KP08_ALIGNMENT_STEPS),
+    (*spec.PIVOT_FIT_STEPS, "FEED NUT AND KP08 FIT-UP:", *spec.FEED_FIT_STEPS),
 )
 ASSEMBLY_STEPS = STEPS_LAYOUT.steps
 ASSEMBLY_STEPS_CONTINUED = STEPS_LAYOUT.continued
@@ -1244,7 +1239,7 @@ def _place_kit_bom_note(adapter: Any, table: Any, reference: Any) -> Callable[[]
     return settled
 
 
-def shim_stock_note_region(
+def bom_note_region(
     bom: tuple[float, float, float, float],
 ) -> tuple[float, float, float, float]:
     """Room under the BOM, flush with its left edge, left of the title block."""
@@ -1256,12 +1251,13 @@ def shim_stock_note_region(
     )
 
 
-def _place_shim_stock_note(adapter: Any, table: Any) -> Callable[[], None]:
-    """Seat item 7's fitting-stock buy list under the BOM (owner ruling
-    2026-10-27), then recheck its text and clearance."""
-    label = "jig shim fitting-stock note"
-    text = spec.PIVOT_SHIM_STOCK_NOTE
-    region = shim_stock_note_region(_bom_bounds(table))
+def _place_bom_note(adapter: Any, table: Any) -> Callable[[], None]:
+    """Seat the BOM note under the BOM: item 7's fitting-stock buy list (owner
+    ruling 2026-10-27) and the kit rails' and carriages' description note
+    (#2177), then recheck its text and clearance."""
+    label = "jig BOM note"
+    text = spec.BOM_NOTE
+    region = bom_note_region(_bom_bounds(table))
     if region[0] >= region[2] or region[1] >= region[3]:
         raise RuntimeError(f"{label} has no clear note field: {region!r}")
     note = _add_note_block(adapter, BOM_SHEET, text, (region[0], region[3]), label=label)
@@ -1292,7 +1288,7 @@ def _place_shim_stock_note(adapter: Any, table: Any) -> Callable[[], None]:
             raise RuntimeError(f"{label} is not a visible sheet-owned note")
         if int(annotation.GetLeaderCount()) != 0:
             raise RuntimeError(f"{label} unexpectedly has a leader")
-        field = shim_stock_note_region(_bom_bounds(table))
+        field = bom_note_region(_bom_bounds(table))
         extent = _kit_bom_note_extent(note, label=label)
         tolerance = 1e-6  # the note's position read-back, not a paper allowance
         if not (
@@ -2548,7 +2544,7 @@ def _place_package(
         occurrence_quantities=True,
     )
     kit_note_settled = _place_kit_bom_note(adapter, table, reference)
-    shim_note_settled = _place_shim_stock_note(adapter, table)
+    bom_note_settled = _place_bom_note(adapter, table)
     bom_name = _bom_feature_name(table)
     landings: list[BalloonLanding] = []
     for cluster, view, scale in placed:
@@ -2587,7 +2583,7 @@ def _place_package(
         lambda: assert_balloon_landings(adapter, landings),
         cl_tip_settled,
         kit_note_settled,
-        shim_note_settled,
+        bom_note_settled,
     )
 
 

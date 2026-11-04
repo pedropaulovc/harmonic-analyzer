@@ -1,4 +1,4 @@
-"""Create the four-view purchased-reference sheet for the AMPEC KP08 pillow block (MHA-CH-06-TL-VN-56).
+"""Create the four-view purchased-reference sheet for the uxcell KP08 pillow block (MHA-CH-06-TL-VN-56).
 
 Identification and its receipt-check reference sizes: the part as installed,
 its stock and ordering SKU, and the bolt-hole spacing and bolt hole on the
@@ -32,7 +32,7 @@ SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_pillow_block"]
 PART_STEM = SPEC.artifact_stem
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "KP08 PILLOW BLOCK, 8 MM BORE, SET-SCREW INSERT BEARING"
-# The bolt hole's two-line text is wider than its 9 mm span at 2:1; centred
+# The bolt hole's two-line text is wider than its 10 mm span at 2:1; centred
 # on its line it would sit across its own witnesses, so it shelves left.
 SHELVES = {
     "SupplierBoltHoleDiameter": (False, "left"),

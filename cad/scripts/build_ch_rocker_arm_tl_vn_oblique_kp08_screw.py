@@ -1,10 +1,10 @@
-r"""Purchased MHA-CH-06-TL-VN-65 oblique-trammel pillow block screw: McMaster 91251A150.
+r"""Purchased MHA-CH-06-TL-VN-65 oblique-trammel pillow block screw: McMaster 91255A150.
 
-The ``#6-32 X 5/8 SHCS`` (``ch_rocker_arm_tl_vn_oblique_kp08_screw_spec``) that holds a KP08 pillow block to its TL-28 end bracket, tapped THRU.
-The stock recipe ``diagnostics/diag_build_91251A150.py`` builds the catalogue screw on
-the 91251A family recipe (``diag_mcmaster_socket_head.build_socket_head``);
+The ``#6-32 X 5/8 BHCS`` (``ch_rocker_arm_tl_vn_oblique_kp08_screw_spec``) that holds a KP08 pillow block to its TL-28 end bracket, tapped THRU.
+The stock recipe ``diagnostics/diag_build_91255A150.py`` builds the catalogue screw on
+the button-head recipe (``diag_mcmaster_button_head.build_button_head``);
 the recipe's standalone run is catalog-only (no vendor model, no replica
-gate).
+gate of its own).
 
 Frame: screw axis +Y, head up, the bearing face (head underside) at y = 0,
 the tip at y = -length.  The axis is published as ``ScrewAxis``
@@ -25,7 +25,7 @@ from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
 from _supplier_screw_save import save_supplier_reference_part
 from ch_rocker_arm_tl_vn_oblique_kp08_screw_spec import SKU
-from diagnostics.diag_build_91251A150 import build_91251A150
+from diagnostics.diag_build_91255A150 import build_91255A150
 import ch_rocker_arm_tl_vn_oblique_kp08_screw_spec as supplier
 
 PART_NAME = "ch-rocker-arm-tl-vn-oblique-kp08-screw"
@@ -37,7 +37,7 @@ async def build(adapter) -> dict[str, str]:
     return await build_stock_fastener(
         adapter,
         part_name=PART_NAME,
-        components=(StockComponent(sku=SKU, author=build_91251A150),),
+        components=(StockComponent(sku=SKU, author=build_91255A150),),
         material=MATERIAL,
         save_threaded_part=partial(
             save_supplier_reference_part,

@@ -1,34 +1,54 @@
-r"""Pure-data envelope of the purchased HIWIN HGR15R rail, cut to 440 (MHA-CH-06-TL-VN-50).
+r"""Pure-data envelope of the purchased HIWIN-style HGR15 rail, 450 as supplied (MHA-CH-06-TL-VN-50).
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure: ``build_ch_rocker_arm_tl_vn_oblique_rail`` extrudes ``SECTION`` and cuts
-the seven counterbored holes, and the carriage spec reads ``SECTION`` for its
+the eight counterbored holes, and the carriage spec reads ``SECTION`` for its
 running clearance.
 
 Two rails, one per base bar (MHA-CH-06-TL-20), each carrying one HGH15CA
-carriage (MHA-CH-06-TL-VN-51). Shop inventory ``fixtures.trammel-hgr15-rails``:
-Motion Constrained part 172270559990 (HIWIN HGR15R, any length; the 440 cut
-and its hole pattern are a special order, confirmed on the vendor quote).
+carriage (MHA-CH-06-TL-VN-51). Shop inventory ``fixtures.trammel-hgr15-rails``.
 
-VENDOR-CHECKED. The first pass was datasheet-built: no vendor CAD obtained
-(HIWIN's CAD download needs a member login and CAPTCHA, 2026-10-17). The user
-then downloaded HIWIN's own model through his logged-in session:
-``HGR15R440C_GW202610023056.stp`` (HIWIN configurator, HG Series > Rail,
-HGR15R440C, downloaded 2026-10-17 ~03:55 UTC; sha256 ``VENDOR_STEP_SHA256``;
-local only at ``C:/src/dt-logs/trammel-bought/vendor-cad/HGR15R.step``, never
-committed). FreeCAD 1.1.4 harvest: volume 81085.4038 mm^3, one solid,
-bbox 440 x 15 x 15; profile read from its analytic faces
-(``vendor-cad/HGR15R.dims.md``).
+KIT LISTING (``SOURCE_URL``, read 2026-11-04, owner decisions on issue #2177):
+Amazon ASIN B0C4DJNL33, variant "450MM / HGR15", "450MM Linear Rail 2PCS
+HGR15 Linear Guide Rail HGH15 Linear Slide Rail with 4PCS HGH15CA Carriage
+Slider Block CNC Kit"; brand and manufacturer NUIBBYED, sold by XIQI and
+shipped by Amazon, USD 48.99 a kit. One kit (2 rails, 4 carriages) supplies both
+rails and both carriages of the jig. The rail is a generic HIWIN-style HGR15,
+NUIBBYED-branded, not genuine HIWIN; the ASIN is a retailer SKU and no maker
+part number exists. The listing states only the 450 length and the bearing
+steel ("Anti-rust surface treatment"): no hole pitch, end distance, profile
+or hole size. Its photos show 8 counterbored holes a 450 rail, two carriages
+shipped on each rail, plastic false rails (loading arbors), grease nipples,
+hole caps and socket screws. 8 holes on the HGR15's 60 pitch over 450 give
+the symmetric 15 end distance the calculator uses.
+
+REFERENCE GEOMETRY. Every profile and hole size here is HIWIN's, the style the
+kit copies; HIWIN is not the supplier. The first pass was datasheet-built: no
+vendor CAD obtained (HIWIN's CAD download needs a member login and CAPTCHA,
+2026-10-17). The user then downloaded HIWIN's own model through his
+logged-in session: ``HGR15R440C_GW202610023056.stp`` (HIWIN configurator,
+HG Series > Rail, HGR15R440C, downloaded 2026-10-17 ~03:55 UTC; sha256
+``REFERENCE_STEP_SHA256``; local only at
+``C:/src/dt-logs/trammel-bought/vendor-cad/HGR15R.step``, never committed).
+FreeCAD 1.1.4 harvest: volume 81085.4038 mm^3, one solid, bbox 440 x 15 x 15;
+profile read from its analytic faces (``vendor-cad/HGR15R.dims.md``).
+
+UNVERIFIED for the kit rail, checked at receipt (``DRAWING_NOTES``): the hole
+stations and both end distances (the base bar is tapped to the received rail
+if they differ). Also UNVERIFIED: the HIWIN reference profile and hole sizes
+the kit rail is assumed to share; the counterbored holes are proved when the
+rail is laid on the tapped bar and all eight #8-32 screws start by hand
+(base-bar process plan, inspect op 40).
 
 Source of each number:
 
-- VENDOR STEP (HGR15R.dims.md, read 2026-10-17): the end-face profile
-  ``VENDOR_HALF_PROFILE`` (flats, 45 deg flanks and chamfers, the R1.62
+- REFERENCE STEP (HGR15R.dims.md, read 2026-10-17): the end-face profile
+  ``REFERENCE_HALF_PROFILE`` (flats, 45 deg flanks and chamfers, the R1.62
   raceway grooves ``GROOVE_*``, the R1 lower blend), the hole Ø4.5, the
-  counterbore Ø7.5 x 5.3, and ``VENDOR_VOLUME_MM3``. The vendor model is
-  HIWIN's standard drilling for a 440 rail, 8 holes at E 10
-  (``VENDOR_HOLE_COUNT``, ``VENDOR_HOLE_END``); ours is the calculator's
-  special-order 7 holes at E 40 on the same 60 pitch and hole geometry.
+  counterbore Ø7.5 x 5.3, and ``REFERENCE_VOLUME_MM3``. The reference model
+  is HIWIN's standard drilling for a 440 rail (``REFERENCE_LENGTH``), 8 holes
+  at E 10 (``REFERENCE_HOLE_COUNT``, ``REFERENCE_HOLE_END``); the kit rail is
+  450 with 8 holes at E 15 on the same 60 pitch and hole geometry.
 - SOURCED: HIWIN "Linear Guideway Technical Information", catalogue
   G99TE23-2203, https://www.hiwin.com/wp-content/uploads/Linear_Guideway-E-1.pdf
   (read 2026-10-16; sha256 9ded6606...b800733103). Section 2-1-13 (1)
@@ -36,39 +56,40 @@ Source of each number:
   WR 15, HR 15, D 7.5, h 5.3, d 4.5, P 60, E 20, rail bolt M4x16, rail
   weight 1.45 kg/m (``MASS_KG_PER_M``). Table 2-1-24 (printed page 37), row
   HG15: shoulder height beside the rail E1 3, shoulder fillet r1 0.5 max.
-  The vendor STEP agrees with every catalogue rail dimension.
+  The reference STEP agrees with every catalogue rail dimension.
 - FROM THE CALCULATOR (imported, ``ch_rocker_arm_tl_oblique_trammel_spec``):
-  ``RAIL_LENGTH`` 440, ``RAIL_WIDTH`` 15, ``RAIL_HEIGHT`` 15,
-  ``RAIL_HOLE_PITCH`` 60, ``RAIL_HOLE_COUNT`` 7, ``RAIL_HOLE_END`` 40, and
+  ``RAIL_LENGTH`` 450, ``RAIL_WIDTH`` 15, ``RAIL_HEIGHT`` 15,
+  ``RAIL_HOLE_PITCH`` 60, ``RAIL_HOLE_COUNT`` 8, ``RAIL_HOLE_END`` 15, and
   ``RAIL_SCREW_SEAT_ABOVE_BASE`` 9.7 (the counterbore floor, so
-  ``CBORE_DEPTH`` = 15 - 9.7 = the vendor's 5.3). The registry quantity 2
+  ``CBORE_DEPTH`` = 15 - 9.7 = the reference's 5.3). The registry quantity 2
   is C4's ``ch_rocker_arm_tl_oblique_fasteners_spec.RAILS`` (asserted by
   the test, not imported here, so the fastener table may import this spec
   without a cycle).
 
-Modelling departures from the vendor solid, each closed-form in
-``GROOVE_FILL_MM2`` or bounded by ``VENDOR_VOLUME_ALLOWANCE_MM3``:
+Modelling departures from the reference solid, each closed-form in
+``GROOVE_FILL_MM2`` or bounded by ``REFERENCE_VOLUME_ALLOWANCE_MM3``:
 
 - Each R1.62 raceway groove (two per side) is spanned by its chord, which
   fills the groove's circular segment; the R1 lower blend is cut by its
   chord, which removes its segment. ``GROOVE_FILL_MM2`` is the net, 1.522
-  mm^2 of section, 670 mm^3 over the length. The carriage channel never
+  mm^2 of section, 685 mm^3 over the length. The carriage channel never
   reaches into a groove, so the fill changes no clearance.
 - Ten R0.4 edge blends are replaced by chords and the 0.1 deep HIWIN logo
-  engraved on the top face is omitted; with the dims' 3-decimal rounding
-  these stay inside ``VENDOR_VOLUME_ALLOWANCE_MM3`` (44 mm^3, ten segments
-  under 0.01 mm^2 each; measured residual 5.4 mm^3).
-- The holes follow the calculator's 7 / E 40, not the vendor model's
-  8 / E 10: ``VENDOR_EQUIVALENT_VOLUME_MM3`` adds the eighth hole back.
+  engraved on the reference's top face is omitted; with the dims' 3-decimal
+  rounding these stay inside ``REFERENCE_VOLUME_ALLOWANCE_MM3`` (45 mm^3,
+  ten segments under 0.01 mm^2 each; measured residual 5.4 mm^3).
+- The rail is 450 with 8 holes at E 15, the reference 440 with 8 at E 10:
+  ``REFERENCE_EQUIVALENT_VOLUME_MM3`` adds the extra 10 of the reference's
+  true section (the chord section less the groove fill) to its volume.
 
 Part frame (CONTRACT.md, the jig assembly mates on the default planes):
 origin at one end face, on the bottom (seat) face, on the rail centreline;
-+X along the 440 length, +Z up (height 15), Y across. Front (XY) is the seat
++X along the 450 length, +Z up (height 15), Y across. Front (XY) is the seat
 face, Top (XZ) the centre plane, Right (YZ) the end face. Holes at
 ``RAIL_HOLE_END + k * RAIL_HOLE_PITCH``. ``SECTION`` lists (y, z) vertices
-of the end-face section, counter-clockwise seen from +X. The vendor STEP's
+of the end-face section, counter-clockwise seen from +X. The reference STEP's
 own frame is centred on the length with +Y up from the top face (y 0 top,
--15 seat) and Z across; ``_vendor_to_part`` maps it.
+-15 seat) and Z across; ``_reference_to_part`` maps it.
 """
 
 from __future__ import annotations
@@ -77,36 +98,38 @@ import math
 
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 
-SUPPLIER = "Motion Constrained"
-SKU = "172270559990"  # Motion Constrained part: HIWIN HGR15R rail, cut to length
-MAKER_PART = "HGR15R440C"  # HIWIN order code: size 15, R (top mount), 440, C normal
-MATERIAL = "Alloy Steel"  # SOLIDWORKS library steel for the hardened rail
+SUPPLIER = "Amazon (sold by XIQI)"
+SKU = "B0C4DJNL33"  # Amazon ASIN of the NUIBBYED 450MM / HGR15 kit, a retailer SKU
+SOURCE_URL = "https://www.amazon.com/dp/B0C4DJNL33"
+STYLE = "HGR15"  # the HIWIN-style designation the kit copies; no maker part number
+MATERIAL = "Alloy Steel"  # SOLIDWORKS library steel for the bearing-steel rail
 
 # --- Calculator (imported) -------------------------------------------------------
-LENGTH = trammel.RAIL_LENGTH  # 440
+LENGTH = trammel.RAIL_LENGTH  # 450, as supplied
 WIDTH = trammel.RAIL_WIDTH  # WR 15
 HEIGHT = trammel.RAIL_HEIGHT  # HR 15
 HOLE_PITCH = trammel.RAIL_HOLE_PITCH  # P 60
-HOLE_COUNT = trammel.RAIL_HOLE_COUNT  # 7
-HOLE_END = trammel.RAIL_HOLE_END  # 40, special order
+HOLE_COUNT = trammel.RAIL_HOLE_COUNT  # 8, the kit photos
+HOLE_END = trammel.RAIL_HOLE_END  # 15, unverified until receipt
 HOLE_X: tuple[float, ...] = tuple(HOLE_END + k * HOLE_PITCH for k in range(HOLE_COUNT))
 CBORE_DEPTH = HEIGHT - trammel.RAIL_SCREW_SEAT_ABOVE_BASE  # h 5.3
 
 # --- Catalogue (SOURCED, G99TE23-2203) ----------------------------------------------
-HOLE_DIA = 4.5  # d, through (vendor STEP R2.25)
-CBORE_DIA = 7.5  # D (vendor STEP R3.75)
-CATALOGUE_CBORE_DEPTH = 5.3  # h (vendor STEP floor 5.3 below the top)
+HOLE_DIA = 4.5  # d, through (reference STEP R2.25)
+CBORE_DIA = 7.5  # D (reference STEP R3.75)
+CATALOGUE_CBORE_DEPTH = 5.3  # h (reference STEP floor 5.3 below the top)
 MASS_KG_PER_M = 1.45
 SHOULDER_BESIDE_RAIL = 3.0  # E1, Table 2-1-24
 SHOULDER_FILLET_MAX = 0.5  # r1, Table 2-1-24
 
-# --- Vendor STEP (HGR15R440C_GW202610023056.stp, HGR15R.dims.md) -------------------
-VENDOR_STEP = "HGR15R440C_GW202610023056.stp"
-VENDOR_STEP_SHA256 = "7c56abc87b2b76ec2e70b497ca0ed7b16542f92ef32f59b12f9e6583caa1af95"
-VENDOR_DOWNLOADED = "2026-10-17"
-VENDOR_VOLUME_MM3 = 81085.4038  # FreeCAD harvest, 8 holes, logo engraved
-VENDOR_HOLE_COUNT = 8
-VENDOR_HOLE_END = 10.0
+# --- Reference STEP (HGR15R440C_GW202610023056.stp, HGR15R.dims.md) ----------------
+REFERENCE_STEP = "HGR15R440C_GW202610023056.stp"
+REFERENCE_STEP_SHA256 = "7c56abc87b2b76ec2e70b497ca0ed7b16542f92ef32f59b12f9e6583caa1af95"
+REFERENCE_DOWNLOADED = "2026-10-17"
+REFERENCE_VOLUME_MM3 = 81085.4038  # FreeCAD harvest, 8 holes, logo engraved
+REFERENCE_LENGTH = 440.0
+REFERENCE_HOLE_COUNT = 8
+REFERENCE_HOLE_END = 10.0
 # Raceway grooves: radius, and each centre as (across, from the top face).
 GROOVE_RADIUS = 1.62
 UPPER_GROOVE_CENTRE = (6.923, -0.064)
@@ -128,7 +151,7 @@ def _groove_across(centre: tuple[float, float], height: float) -> float:
 # +side profile in the vendor frame, (across, height below the top face),
 # from the seat corner up to the top face. Groove arcs and blends run between
 # consecutive points as chords.
-VENDOR_HALF_PROFILE: tuple[tuple[float, float], ...] = (
+REFERENCE_HALF_PROFILE: tuple[tuple[float, float], ...] = (
     (6.8, -15.0),  # seat flat end; 0.7 x 45 deg foot chamfer
     (7.5, -14.3),
     (7.5, -11.757),  # lower side flat top, R1 blend tangent
@@ -149,12 +172,12 @@ VENDOR_HALF_PROFILE: tuple[tuple[float, float], ...] = (
 )
 
 
-def _vendor_to_part(across: float, height: float) -> tuple[float, float]:
-    """Vendor (across, y from the top face) to the part's (y, z)."""
+def _reference_to_part(across: float, height: float) -> tuple[float, float]:
+    """Reference (across, y from the top face) to the part's (y, z)."""
     return round(across, 9), round(HEIGHT + height, 9)
 
 
-_HALF = tuple(_vendor_to_part(a, h) for a, h in VENDOR_HALF_PROFILE)
+_HALF = tuple(_reference_to_part(a, h) for a, h in REFERENCE_HALF_PROFILE)
 # (y, z) end-face section, counter-clockwise seen from +X: the +Y half up
 # from the seat, then its mirror back down the -Y side.
 SECTION: tuple[tuple[float, float], ...] = _HALF + tuple(
@@ -204,7 +227,7 @@ def circular_segment_area(
     return radius**2 / 2.0 * (theta - math.sin(theta))
 
 
-_P = VENDOR_HALF_PROFILE
+_P = REFERENCE_HALF_PROFILE
 # Both sides: the four groove chords fill their segments (all above the
 # carriage underside), the two R1 blend chords cut theirs away (below it).
 GROOVE_SEGMENTS_MM2 = 2.0 * (
@@ -222,13 +245,17 @@ V_PRISM = SECTION_AREA * LENGTH
 V_HOLES = HOLE_COUNT * V_ONE_HOLE
 V_CBORES = HOLE_COUNT * V_ONE_CBORE
 VOLUME_MM3 = V_PRISM - V_HOLES - V_CBORES
-# The vendor solid re-drilled to our 7 holes, and what the chords add to it.
-VENDOR_EQUIVALENT_VOLUME_MM3 = VENDOR_VOLUME_MM3 + (VENDOR_HOLE_COUNT - HOLE_COUNT) * (
-    V_ONE_HOLE + V_ONE_CBORE
+# The reference solid as the kit rail: the extra length in the reference's
+# true section (the chord section less the groove fill), the hole-count
+# difference re-drilled (none: both carry 8).
+REFERENCE_EQUIVALENT_VOLUME_MM3 = (
+    REFERENCE_VOLUME_MM3
+    + (SECTION_AREA - GROOVE_FILL_MM2) * (LENGTH - REFERENCE_LENGTH)
+    + (REFERENCE_HOLE_COUNT - HOLE_COUNT) * (V_ONE_HOLE + V_ONE_CBORE)
 )
 # Ten R0.4 blend chords (each segment under 0.01 mm^2 at these spans), the
 # 0.1 deep top-face logo, and the dims' 3-decimal rounding.
-VENDOR_VOLUME_ALLOWANCE_MM3 = 0.1 * LENGTH
+REFERENCE_VOLUME_ALLOWANCE_MM3 = 0.1 * LENGTH
 # The holes sit symmetric about mid-length, so the centroid stays at x = L/2.
 CENTROID = (
     LENGTH / 2.0,
@@ -244,26 +271,32 @@ CENTROID = (
 # mass-property evaluation (well under one through hole, 154 mm^3).
 VOLUME_TOL_MM3 = 5e-4 * VOLUME_MM3
 
-# The special order's receipt check: the received rail must land on the
+# The receipt check of the kit rail: the received rail must land on the
 # TL-20 base bar's tapped holes. The print states it as native model
 # dimensions on the hole face, parenthesised as reference (the rail is used
-# as supplied): the cut length is the Rail extrusion's depth, and the hole
+# as supplied, uncut): the length is the Rail extrusion's depth, and the hole
 # sketch places the first hole from the -X end face and each next one a
 # pitch on from the one before, so one pitch prints for all of them.
 DRAWING_DIMENSIONS = {
     "Rail": {"Length"},
     "BoltHoleProfile": {"HoleEnd", "HolePitch"},
 }
-# Whole millimetres: the order's own values.
+# Whole millimetres: the listing's length and the HGR15 pattern.
 DRAWING_PRECISION = {
     feature: dict.fromkeys(names, 0) for feature, names in DRAWING_DIMENSIONS.items()
 }
 # The one printed pitch stands for every gap between the holes.
 HOLE_PITCH_CALLOUT = f"{HOLE_COUNT - 1}X"
-# The pattern suits the base bar's rail taps: its drawing number and name
-# (machinist review mr1: a bare "TL-20" named no drawing).
-DRAWING_NOTES = (
-    "SPECIAL ORDER CUT LENGTH AND HOLE PATTERN, TO SUIT MHA-CH-06-TL-20 BASE BAR."
+# The listing gives no pattern, so the received rail is measured before the
+# base bar's taps go in, and the bar follows the rail if they differ. The bar
+# is named by its drawing number (machinist review mr1: a bare "TL-20" named
+# no drawing).
+DRAWING_NOTES = "\n".join(
+    (
+        "KIT RAIL, USED UNCUT. BEFORE TAPPING MHA-CH-06-TL-20 BASE BAR, MEASURE",
+        "THE RECEIVED HOLE STATIONS AND BOTH END DISTANCES; IF THEY DIFFER",
+        "FROM THIS SHEET, TAP THE BAR TO THE RECEIVED RAIL.",
+    )
 )
 if abs(LENGTH - (2.0 * HOLE_END + (HOLE_COUNT - 1) * HOLE_PITCH)) > 1e-9:
     raise AssertionError("the rail's hole pattern is not symmetric on its length")

@@ -1,4 +1,4 @@
-"""HIWIN HGH15CA Z0 carriage (MHA-CH-06-TL-VN-51) contracts, SolidWorks-free."""
+"""HIWIN-style HGH15CA kit carriage (MHA-CH-06-TL-VN-51) contracts, SolidWorks-free."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_vn_oblique_carriage as draw
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DrawingLayout
+from _purchased_fastener_drawing import check_item, note_lines
 
 STEM = "ch-rocker-arm-tl-vn-oblique-carriage"
 NAME = "ch_rocker_arm_tl_vn_oblique_carriage"
@@ -91,18 +92,25 @@ def _simple(points) -> bool:
     return True
 
 
-def test_registry_row_is_the_purchased_hiwin_carriage() -> None:
+def test_registry_row_is_the_purchased_kit_carriage() -> None:
     assert ROW["number"] == "MHA-CH-06-TL-VN-51"
     assert ROW["process"] == "purchased"
-    assert ROW["supplier"] == spec.SUPPLIER
-    assert ROW["supplier_skus"] == [spec.SKU] == ["HGH-15-CA-Z0-C"]
+    # The rail's kit supplies the carriages: one supplier, one ASIN.
+    assert ROW["supplier"] == spec.SUPPLIER == rail.SUPPLIER
+    assert ROW["supplier_skus"] == [spec.SKU] == [rail.SKU] == ["B0C4DJNL33"]
+    source = Path(spec.__file__).read_text(encoding="utf-8")
+    assert re.search(r"^SUPPLIER = rail\.SUPPLIER$", source, re.M)
+    assert re.search(r"^SKU = rail\.SKU$", source, re.M)
     assert ROW["material"] == spec.MATERIAL == "Alloy Steel"
     assert ROW["tolerance_class"] == "machined_block"
     assert "fit_class" not in ROW
-    assert spec.MAKER_PART in ROW["stock_name"]
+    # The style designation, never a HIWIN order code or its preload class.
+    assert spec.STYLE == "HGH15CA" and spec.STYLE in ROW["stock_name"]
+    assert not hasattr(spec, "MAKER_PART")
+    assert "Z0" not in ROW["stock_name"]
     # One line in the title block's MATERIAL cell; the provenance is the spec's.
     assert len(ROW["material_specification"]) <= 36
-    assert spec.VENDOR_STEP in (spec.__doc__ or "")
+    assert spec.REFERENCE_STEP in (spec.__doc__ or "")
     assert part.PART_NAME == STEM
     assert part.STOCK_PROPERTIES == {
         "Stock Name": ROW["stock_name"],
@@ -157,21 +165,21 @@ def test_frame_puts_face_underside_and_bolts_where_the_jig_expects() -> None:
     groove_edge = max(abs(y) for y, z in spec.BODY_OUTLINE if z == 27.5) + 0.5
     for _, y in spec.BOLT_POINTS:
         assert abs(y) - spec.BORE_DIA / 2.0 > groove_edge
-    # Nipple axis H - H2, the vendor's 5.05 above the rail top.
+    # Nipple axis H - H2, the reference's 5.05 above the rail top.
     assert math.isclose(spec.NIPPLE_Z, 20.05)
     assert math.isclose(spec.NIPPLE_Z - rail.HEIGHT, 5.05)
     assert spec.NIPPLE_FACE_X == spec.LENGTH / 2.0 == -spec.PLUG_FACE_X
 
 
-def test_vendor_bounding_box_maps_onto_the_part_frame() -> None:
-    lo, hi = spec.VENDOR_BBOX_MIN, spec.VENDOR_BBOX_MAX
+def test_reference_bounding_box_maps_onto_the_part_frame() -> None:
+    lo, hi = spec.REFERENCE_BBOX_MIN, spec.REFERENCE_BBOX_MAX
     # Along: the seal faces at +-L/2 plus the nipple and the plug.
     assert math.isclose(
         hi[0] - lo[0], spec.LENGTH + spec.NIPPLE_PROUD + spec.PLUG_PROUD
     )
     assert math.isclose(-lo[0] - spec.LENGTH / 2.0, spec.NIPPLE_PROUD)
     assert math.isclose(hi[0] - spec.LENGTH / 2.0, spec.PLUG_PROUD)
-    # Up: part z = vendor y + rail height.
+    # Up: part z = reference y + rail height.
     assert math.isclose(lo[1] + rail.HEIGHT, spec.UNDERSIDE_Z)
     assert math.isclose(hi[1] + rail.HEIGHT, spec.MOUNTING_FACE_Z)
     # Across.
@@ -241,47 +249,47 @@ def test_closed_form_volume_and_centroid() -> None:
     assert spec.UNDERSIDE_Z < spec.CENTROID[2] < spec.MOUNTING_FACE_Z
 
 
-def test_steel_body_matches_the_vendor_solid() -> None:
+def test_steel_body_matches_the_reference_solid() -> None:
     # HIWIN's body from this outline: its channel on the rail's true profile,
     # the bores with their 118 deg drill points.
     true_rail = _shoelace(rail.clip_above(rail.SECTION, spec.UNDERSIDE_Z))
     assert math.isclose(
-        spec.VENDOR_CHANNEL_MM2, true_rail - rail.GROOVE_SEGMENTS_MM2, rel_tol=1e-12
+        spec.REFERENCE_CHANNEL_MM2, true_rail - rail.GROOVE_SEGMENTS_MM2, rel_tol=1e-12
     )
     cone = math.pi * 1.621**2 * (1.621 / math.tan(math.radians(59.0))) / 3.0
     assert math.isclose(spec.V_DRILL_POINTS, 4 * cone, rel_tol=1e-3)
-    residual = spec.VENDOR_BODY_MODEL_MM3 - spec.VENDOR_BODY_VOLUME_MM3
+    residual = spec.REFERENCE_BODY_MODEL_MM3 - spec.REFERENCE_BODY_VOLUME_MM3
     # Eight R0.4 blend chords (each under 0.01 mm^2 of section).
-    assert abs(residual) < spec.VENDOR_BODY_ALLOWANCE_MM3
+    assert abs(residual) < spec.REFERENCE_BODY_ALLOWANCE_MM3
 
 
-def test_caps_and_seals_bound_the_vendor_solids() -> None:
-    vendor = 2.0 * (spec.VENDOR_CAP_VOLUME_MM3 + spec.VENDOR_SEAL_VOLUME_MM3)
+def test_caps_and_seals_bound_the_reference_solids() -> None:
+    vendor = 2.0 * (spec.REFERENCE_CAP_VOLUME_MM3 + spec.REFERENCE_SEAL_VOLUME_MM3)
     # Solid prisms: their lube passages, ports, turnarounds and seal lips
-    # are the only volume they add, under 8 % of the vendor caps and seals.
+    # are the only volume they add, under 8 % of the reference caps and seals.
     assert 0.0 < spec.CAP_INTERNAL_MM3 < 0.08 * vendor
 
 
-def test_native_volume_against_the_vendor_step() -> None:
+def test_native_volume_against_the_reference_step() -> None:
     explained = (
         -spec.CHANNEL_EXCESS_MM2 * spec.LENGTH
         + spec.V_DRILL_POINTS
         + spec.CAP_INTERNAL_MM3
         + spec.V_NIPPLE
-        - spec.VENDOR_NIPPLE_VOLUME_MM3
+        - spec.REFERENCE_NIPPLE_VOLUME_MM3
         + spec.V_PLUG
-        - spec.VENDOR_PLUG_VOLUME_MM3
+        - spec.REFERENCE_PLUG_VOLUME_MM3
     )
-    difference = spec.VOLUME_MM3 - spec.VENDOR_VOLUME_MM3
-    # Every departure is closed form or vendor-measured; the body's blend
+    difference = spec.VOLUME_MM3 - spec.REFERENCE_VOLUME_MM3
+    # Every departure is closed form or reference-measured; the body's blend
     # chords are the residual.
-    assert abs(difference - explained) < spec.VENDOR_BODY_ALLOWANCE_MM3
-    assert abs(difference) < 0.02 * spec.VENDOR_VOLUME_MM3
+    assert abs(difference - explained) < spec.REFERENCE_BODY_ALLOWANCE_MM3
+    assert abs(difference) < 0.02 * spec.REFERENCE_VOLUME_MM3
     # The 0.1 running clearance is the channel's excess over HIWIN's.
-    assert 0.0 < spec.CHANNEL_EXCESS_MM2 < 0.1 * spec.VENDOR_CHANNEL_MM2
+    assert 0.0 < spec.CHANNEL_EXCESS_MM2 < 0.1 * spec.REFERENCE_CHANNEL_MM2
 
 
-def test_nipple_and_plug_envelope_the_vendor_parts() -> None:
+def test_nipple_and_plug_envelope_the_reference_parts() -> None:
     # Ball head Ø6 (hex AF5 across corners 5.77), domed plug Ø7.513.
     assert spec.NIPPLE_DIA >= 5.0 / math.cos(math.radians(30.0))
     assert spec.PLUG_DIA >= 2.0 * 3.7566
@@ -305,12 +313,19 @@ def test_spec_is_pure_data() -> None:
 
 def test_docstring_marks_every_source() -> None:
     doc = spec.__doc__ or ""
-    for mark in ("VENDOR STEP", "SOURCED", "FROM THE CALCULATOR", "VENDOR-CHECKED"):
+    for mark in (
+        "KIT LISTING",
+        "REFERENCE GEOMETRY",
+        "REFERENCE STEP",
+        "SOURCED",
+        "FROM THE CALCULATOR",
+        "UNVERIFIED",
+    ):
         assert mark in doc, mark
-    assert spec.VENDOR_STEP in doc
-    assert "datasheet-built: no vendor CAD obtained" in doc
-    assert re.fullmatch(r"[0-9a-f]{64}", spec.VENDOR_STEP_SHA256)
-    assert spec.VENDOR_DOWNLOADED == "2026-10-17"
+    assert spec.REFERENCE_STEP in doc
+    assert "HIWIN is not the supplier" in doc
+    assert re.fullmatch(r"[0-9a-f]{64}", spec.REFERENCE_STEP_SHA256)
+    assert spec.REFERENCE_DOWNLOADED == "2026-10-17"
 
 
 def test_build_unions_caps_and_body_then_cuts_channel_and_bores() -> None:
@@ -349,19 +364,34 @@ def test_sheet_is_the_registered_purchased_part_reference(monkeypatch) -> None:
     adapter = object()
     assert asyncio.run(draw.build(adapter)) == {"pdf": "x"}
     assert calls == [(adapter, sheet, draw.ITEM, False)]
-    assert spec.MAKER_PART in draw.ITEM
+    assert spec.STYLE in draw.ITEM and "GENERIC" in draw.ITEM
+    assert "Z0" not in draw.ITEM and "PRELOAD" not in draw.ITEM
+    assert check_item(draw.ITEM, label=NAME) == draw.ITEM
 
 
-def test_note_names_the_rail_by_its_registry_drawing_number() -> None:
-    """Machinist review: the mounting note named the rail only in words."""
+def test_note_is_the_owner_kit_description_and_play_acceptance() -> None:
+    """The owner's description (#2177): generic, not genuine HIWIN, a matched
+    kit with the rail named by its registry drawing number, no Z0 preload or
+    C accuracy, accepted by the fit-up play check at the trammel's TIR."""
     number = _config.parts("ch-rocker-arm-tl-vn-oblique-rail")["number"]
     assert spec.RAIL_NUMBER == number
-    assert spec.DRAWING_NOTES == (
-        f"MOUNT ON THE OBLIQUE TRAMMEL RAIL {number}; GREASE THROUGH THE END NIPPLE."
-    )
-    # The number is the only digits the note carries, read from the registry.
-    assert not re.search(r"\d", spec.DRAWING_NOTES.replace(number, ""))
+    lines = note_lines(spec.DRAWING_NOTES, label=NAME)
+    assert len(lines) == 3
+    assert all(len(line) <= 70 for line in lines), lines
+    note = " ".join(lines)
+    for fact in (
+        "GENERIC HIWIN-STYLE HGH15CA",
+        "NOT GENUINE HIWIN",
+        f"MATCHED KIT WITH RAIL {number}",
+        "Z0 PRELOAD AND C ACCURACY NOT REQUIRED",
+        "FIT-UP PLAY CHECK",
+    ):
+        assert fact in note, fact
+    # The acceptance is the trammel calculator's, the budget it was sized to.
+    assert trammel.CARRIAGE_PLAY_TIR_MAX == 0.05
+    assert f"{trammel.CARRIAGE_PLAY_TIR_MAX:.2f} MM TIR MAX AT PIVOT" in note
     source = Path(spec.__file__).read_text(encoding="utf-8")
     note_source = source[source.index("RAIL_NUMBER = ") :]
     assert '_config.parts("ch-rocker-arm-tl-vn-oblique-rail")["number"]' in note_source
+    assert "trammel.CARRIAGE_PLAY_TIR_MAX" in note_source
     assert number not in note_source
