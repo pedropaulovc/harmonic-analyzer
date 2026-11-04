@@ -3605,8 +3605,8 @@ solids = [
 # work. Candidate purchases only: not owned, no receipt metrology.
 # Shortlist (read 2026-10-16/17): 3M 444 film tape is the only tape with published
 # static shear: 3M's typical test held 1000 g on 13 x 25 mm (3.0 N/cm2) for 813 min
-# at 23 C. Scaled by area over the drawn 350 x 50.8 strip (177.8 cm2) that is about 530 N,
-# 5.9-8.9x the 60-90 N design load. The scaling is an unvalidated estimate, not a rated
+# at 23 C. Scaled by area over the drawn 350 x 38.1 strip (133.4 cm2) that is about 400 N,
+# 4.4-6.7x the 60-90 N design load. The scaling is an unvalidated estimate, not a rated
 # hold: it does not cover peel or uplift, temperature, cutting oil or surface prep.
 # Design load: the HSS face row in cutting-data.toml (fz 0.0254 mm under 1/2 in) on a
 # 3/8 in 4-flute end mill at ae 7 mm and ap 0.25 mm in 1018 gives hm 0.018 mm (118 deg
@@ -3648,7 +3648,7 @@ solids = [
   { name = "table slot 3 neck", shape = "box", void = true, cuts = ["table"], at_mm = [-420.1, 56.5, -23.625], size_mm = [840.2, 14.0, 15.0], note = "PM-30MV manual p6 slot section", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "manual nominal; verify slot section and centres on the table" } },
   { name = "table slot 3 undercut", shape = "box", void = true, cuts = ["table"], at_mm = [-420.1, 51.0, -33.625], size_mm = [840.2, 25.0, 10.0], note = "PM-30MV manual p6 slot section", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "manual nominal; verify slot section and centres on the table" } },
   { name = "plate", supply = "bought", shape = "box", at_mm = [-304.8, -76.2, -9.625], size_mm = [609.6, 152.4, 9.525], note = "MIC-6 3/8 x 6 x 24 in, drawn at catalogue thickness; the in-place skim thins it by the cleanup depth, recorded at commissioning", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "catalogue nominal; measure thickness with micrometers and the skimmed top with a DTI" } },
-  { name = "tape", supply = "bought", shape = "box", at_mm = [-175.0, -25.4, -0.1], size_mm = [350.0, 50.8, 0.1], locates = "work underside", bears = "face", note = "3M 444 strip cut to the work's outline (drawn: 350 x 50.8, the 2 in strap stock); 0.10 mm TDS nominal", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "TDS nominal; measure the strip with 0-25 mm micrometers on receipt" } },
+  { name = "tape", supply = "bought", shape = "box", at_mm = [-175.0, -19.05, -0.1], size_mm = [350.0, 38.1, 0.1], locates = "work underside", bears = "face", note = "3M 444 strip cut to the work's outline (drawn: 350 x 38.1, the 1-1/2 in strap stock); 0.10 mm TDS nominal", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "TDS nominal; measure the strip with 0-25 mm micrometers on receipt" } },
   { name = "clamp +X strap", supply = "bought", shape = "box", at_mm = [279.4, -12.7, -0.1], size_mm = [76.2, 25.4, 12.7], note = "kit strap; overlaps the plate end by 25.4 mm, toe contact centred 12.7 mm in", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "generic catalogue-size estimate (kit member strap-pad); replace with caliper readings" } },
   { name = "clamp +X stud slot", shape = "box", void = true, cuts = ["clamp +X strap"], at_mm = [315.2, -6.75, -1.1], size_mm = [30.0, 13.5, 14.7], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "generic clearance-slot estimate; replace with caliper readings" } },
   { name = "clamp +X stud", supply = "bought", shape = "cylinder", at_mm = [330.2, 0.0, -31.625], axis = [0.0, 0.0, 1.0], dia_mm = 12.7, length_mm = 76.2, fastener = "1/2-13", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "3 in stud nominal; verify with calipers" } },
@@ -6561,12 +6561,12 @@ cite = ["Online Metals pid 24273 https://www.onlinemetals.com/en/buy/aluminum/0-
 [[stock]]
 form = "flat_bar"
 material = "1018 cold-finish carbon steel"
-note = "MHA-CH-13 strap: 1/8 x 2 in 1018 cold-finish flat, 60 in cut length (+/-1/8 in). Require 1018 material certification on purchase. Four 350 mm blanks fit in the length; mill to drawing thickness after receipt."
-# Basis: OnlineMetals 4808 catalogue nominal .125 x 2 in = [50.8, 3.175] mm and 60 x 25.4 = 1524 mm, zero offsets; not metrology.
-section_mm = [50.8, 3.175]
-length_mm = 1524.0
+note = "MHA-CH-13 strap: 1/8 x 1-1/2 in 1018 cold-finish flat, 4 pieces x 72 in standard length (ordered 2026-11-03, #2173). Five 350 mm blanks fit in each length; mill to drawing thickness after receipt."
+# Basis: OnlineMetals 4807 catalogue nominal .125 x 1.5 in = [38.1, 3.175] mm and 72 x 25.4 = 1828.8 mm, zero offsets; not metrology.
+section_mm = [38.1, 3.175]
+length_mm = 1828.8
 on_hand = false
-cite = ["OnlineMetals part 4808 https://www.onlinemetals.com/en/buy/carbon-steel/0-125-x-2-carbon-steel-rectangle-bar-1018-cold-finish/pid/4808 read live 2026-10-31"]
+cite = ["2026-11-03 machine stock order, harmonic-analyzer #2173: OnlineMetals 4807, 1/8 x 1-1/2 in 1018 cold-finish flat, 4 x 72 in"]
 
 [[stock]]
 form = "round_bar"
@@ -6635,5 +6635,8 @@ cite = ["Owner-approved oblique jig plain-pivot and integral feed-block design, 
 [[stock]]
 form = "rectangular_blank"
 material = "Acetal (Delrin)"
-note = "MHA-CH-06-TL-24 riser requirement: 1/4 in (.250 nominal) acetal stock, faced to .24 and milled to finished 1.60 x 13.40. Supplier, SKU and starting width/length remain unselected; no stock is claimed purchased or owned. Blank envelope dimensions are intentionally omitted until sourcing is selected."
-cite = ["Unsourced stock requirement, harmonic-analyzer issue 1619 https://github.com/pedropaulovc/harmonic-analyzer/issues/1619"]
+note = "MHA-CH-06-TL-24 riser: black acetal (Delrin) bar, 1/4 x 1-3/4 in, oversized tolerance, 2 ft (McMaster 8663K55, selected by the owner 2026-11-03). Face to .24 and mill to the finished 1.60 x 13.40 blank. Selected stock only; no stock is claimed purchased or owned."
+# Basis: catalogue nominals 1/4 x 1-3/4 in x 24 in = [44.45, 6.35] x 609.6 mm; oversized tolerance, so the faced and milled blank sizes are the ones that count. Not metrology.
+section_mm = [44.45, 6.35]
+length_mm = 609.6
+cite = ["Owner stock selection 2026-11-03: McMaster 8663K55, black acetal (Delrin) bar 1/4 x 1-3/4 in, oversized tolerance, 2 ft", "Original requirement: harmonic-analyzer issue 1619 https://github.com/pedropaulovc/harmonic-analyzer/issues/1619"]

@@ -1,14 +1,15 @@
 ch-channel-lever:
   number: MHA-CH-02
-  # Owner ruling 2026-10-15: the book's levers are cast iron, so gray iron is
-  # the material, not an alternative. Hot alkaline black oxide (MIL-DTL-13924
-  # Class 1) covers cast irons and adds no build-up on the banded faces.
-  material: GRAY CAST IRON
-  material_specification: GRAY CAST IRON, ASTM A48 CLASS 30
+  # Owner ruling 2026-11-03 (stock order #2173): 1018 cold-finish steel,
+  # machined from the bought 5/16 x 1 in flat, supersedes the 2026-10-15
+  # gray cast iron ruling. Hot alkaline black oxide (MIL-DTL-13924 Class 1)
+  # covers carbon steel and adds no build-up on the banded faces.
+  material: LOW-CARBON STEEL, E.G. 1018 CF
+  material_specification: LOW-CARBON STEEL, E.G. 1018 CF
   finish: matte black oxide per MIL-DTL-13924 Class 1, oil sealed
   quantity: 20
   tolerance_class: machined_block
-  process: "cast in gray iron, then machined: hub and plate faces, the reamed fulcrum bore and the drilled holes"
+  process: "machined from 5/16 x 1 in 1018 cold-finish flat: hub and plate faces, the reamed fulcrum bore and the drilled holes"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"

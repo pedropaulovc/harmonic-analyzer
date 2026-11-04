@@ -164,12 +164,13 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     import _config
 
     part = _config.parts("ch-channel-lever")
-    # Owner ruling 2026-10-15: gray cast iron is the material, and its
-    # build-up-free conversion coat is the cast-iron class of black oxide.
-    assert part["material_specification"] == "GRAY CAST IRON, ASTM A48 CLASS 30"
-    assert part["material"] == "GRAY CAST IRON"
+    # Owner ruling 2026-11-03 (stock order #2173): 1018 steel from the bought
+    # 5/16 x 1 in flat supersedes the 2026-10-15 gray cast iron.
+    assert part["material_specification"] == "LOW-CARBON STEEL, E.G. 1018 CF"
+    assert part["material"] == "LOW-CARBON STEEL, E.G. 1018 CF"
     assert "material_family" not in part
-    assert lever.MATERIAL == "Gray Cast Iron"
+    assert lever.MATERIAL == "Plain Carbon Steel"
+    assert "5/16 x 1 in 1018" in part["process"]
     # A conversion coat, not paint: the hub faces, plate faces and bores
     # keep their bands with nothing masked (as the rocker arms, MHA-CH-06).
     assert part["finish"] == "matte black oxide per MIL-DTL-13924 Class 1, oil sealed"

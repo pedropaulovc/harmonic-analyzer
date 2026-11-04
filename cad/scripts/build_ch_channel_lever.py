@@ -1,6 +1,6 @@
 r"""Reproduction script: channel (top) lever (book ch. 17, pp. 38-41).
 
-One of the 20 cast third-class levers at the top of the machine: fulcrum
+One of the 20 third-class levers at the top of the machine: fulcrum
 pivot at one end (Ø6.5 hole riding the common Ø6.35 fulcrum shaft - the
 p.40 ball clevis is the shaft's END mount, mirroring the rocker-pivot
 design), channel-spring pull from its rounded end (Ø4 hook hole at
@@ -9,7 +9,8 @@ design), channel-spring pull from its rounded end (Ø4 hook hole at
 pitch cap the thickness (the M2 12.5 "width" violated the pitch), and
 3.0 lets the bar's 3.15 top slot straddle the lever at the pin. The
 height was 9.5; the owner ruled the lever gray cast iron and its arm
-deepened in-plane while staying under the O12 hub (2026-10-15).
+deepened in-plane while staying under the O12 hub (2026-10-15); the
+2026-11-03 ruling makes it 1018 steel from 5/16 x 1 in flat at that depth.
 
 The earlier 254 (10", "clean 2:1") length is REFUTED by the calibrated
 ch. 30 front view: the lever bank ends at x ~ -30 (not +54), the
@@ -113,7 +114,7 @@ from ch_channel_lever_spec import (
 )
 
 PART_NAME = "ch-channel-lever"
-MATERIAL = "Gray Cast Iron"  # see _appearance.apply_material docstring
+MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
 # Every nominal above comes from ch_channel_lever_spec -- the ONE source the
 # drawing reads too (DIMENSIONS.md ch17; the reach is set by the plumb spring

@@ -240,7 +240,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Channel Lever Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "channel lever; cast iron; third-class lever",
+            3: "channel lever; 1018 steel; third-class lever",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

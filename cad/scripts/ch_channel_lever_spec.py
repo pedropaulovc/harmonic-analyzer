@@ -35,12 +35,13 @@ UNIT = drawing_unit("parts/ch-channel-lever", _config.parts("ch-channel-lever"))
 # below the +/-0.10 hook-arm allocation (error_budget.yaml), hence the flat
 # nominal.  Was 177.8 (7"), which left the spring leaning 2.75 mm off plumb.
 LEVER_SPRING_X = 175.05  # fulcrum -> spring-hole c2c, plumb over the anchor
-# Bar height, full length; the end carries the spring hole. The lever is
-# gray cast iron (owner ruling 2026-10-15: "device levers are clearly cast
-# iron"), so the arm is deepened in its own plane from 9.5 for strength while
-# staying under the Ø.47 hub. Its lower edge clears the bar's top-notch roof
-# (ch_bar_pivot_pin_spec notch_roof_clearance_min) and the spring's coil
-# under the full-round tip (build_ch_channel_assembly._assert_spring_mount).
+# Bar height, full length; the end carries the spring hole. The arm was
+# deepened in its own plane from 9.5 for strength under the 2026-10-15 gray
+# iron ruling, and keeps that depth in the 1018 steel that superseded it
+# (owner ruling 2026-11-03), staying under the Ø.47 hub. Its lower edge clears
+# the bar's top-notch roof (ch_bar_pivot_pin_spec notch_roof_clearance_min)
+# and the spring's coil under the full-round tip
+# (build_ch_channel_assembly._assert_spring_mount).
 BAR_TALL = 10.922  # .43
 # .118: ch_amplitude_bar_spec restates it for the top notch (it follows when
 # the bar converts).

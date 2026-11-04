@@ -24,7 +24,7 @@ the jig sheets (MHA-CH-06-TL-20 to TL-26 and the TL-00 jig assembly) from:
   the inventory's size list, so this module never reads the inventory and
   an unrelated inventory edit does not rebuild the jig);
 * ``ALPHA_DEG``, kept at the brief's 16.4405 degrees;
-* the 350 x 2 in blank (strap stock 1018 cold-finish 1/8 x 2 in, OnlineMetals 4808);
+* the 350 x 1-1/2 in blank (strap stock 1018 cold-finish 1/8 x 1-1/2 in, OnlineMetals 4807);
 * the bought hardware the jig is built round (HIWIN HGR15 rail cut to 440,
   HGH15CA Z0 carriage, shoulder screws and loose spacers) and the PM-30MV table (maker manual,
   macclab.com PM-30MV-v3-2020-10: table 33 x 8-1/4 in, three 14 mm T-slots at
@@ -243,12 +243,13 @@ RISER_BAND_Y = (
 )
 
 # --- Blank, tip lands, CL/CR ⚙ ------------------------------------------------
-# The strap blank is sawn from the 1/8 x 2 in 1018 cold-finish flat (shop
-# inventory ``[[stock]]`` "Rocker route v3 stock purchases", OnlineMetals 4808,
-# section_mm [50.8, 3.175]; untoleranced catalogue nominals) and faced to the
-# strap's STRAP_THICK before it goes on the jig. Its width is the as-bought 2 in.
+# The strap blank is sawn from the 1/8 x 1-1/2 in 1018 cold-finish flat bought
+# 2026-11-03 (#2173; shop inventory ``[[stock]]`` "Rocker route v3 stock
+# purchases", OnlineMetals 4807, section_mm [38.1, 3.175]; untoleranced
+# catalogue nominals) and faced to the strap's STRAP_THICK before it goes on
+# the jig. Its width is the as-bought 1-1/2 in.
 BLANK_LENGTH = 350.0
-BLANK_WIDTH = round(2.0 * INCH, 9)  # 50.8
+BLANK_WIDTH = round(1.5 * INCH, 9)  # 38.1
 # The tip lands are radial lines through the top arc's ends.
 TIP_ANGLE = (rocker.TOP_ARC_LEN / 2.0) / rocker.R_TOP
 # The strap's radial extent across the blank (carrier Y): from the R800 edge's
