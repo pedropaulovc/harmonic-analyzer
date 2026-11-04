@@ -34,10 +34,16 @@ ROW_PITCH_M = 0.00615
 ISO = math.sqrt(2.0 / 3.0)  # an isometric view's foreshortening
 
 
+def _ink_height(text: str) -> float:
+    """The taller of the layout's flat line pitch and the farm-measured ink
+    (a first line's box plus a pitch a further line)."""
+    return max(_lines(text) * LINE_M, drawing.note_ink_height(text))
+
+
 def _note_box(text: str, xy: tuple[float, float]) -> tuple[float, float, float, float]:
     lines = text.split("\n")
     width = max(len(line) for line in lines) * CHAR_M
-    return xy[0], xy[1] - len(lines) * LINE_M, xy[0] + width, xy[1]
+    return xy[0], xy[1] - _ink_height(text), xy[0] + width, xy[1]
 
 
 def _view_box(center, width_mm, height_mm, scale, margin=0.0):
@@ -658,11 +664,9 @@ def _assert_steps_sheet_fits(layout) -> None:
     for index, a in enumerate(boxes):
         for b in boxes[index + 1 :]:
             assert not _overlap(a, b)
-    # The left column ends over its floor at the farm's measured line pitch.
-    steps_lines = _lines(layout.steps)
-    assert drawing.STEPS_XY[1] - steps_lines * drawing.NOTE_LINE_M >= (
-        drawing.STEPS_FLOOR
-    )
+    # The left column's ink ends over its floor at the layout pitch and at
+    # the farm-measured ink height.
+    assert drawing.STEPS_XY[1] - _ink_height(layout.steps) >= drawing.STEPS_FLOOR
 
 
 def _lines(text: str) -> int:
@@ -1448,13 +1452,16 @@ def test_kit_bom_key_uses_registry_identity_and_native_item_mapping(
 
 
 class _KitBomNote:
-    """Native-style note geometry with a nonzero insertion-to-extent offset."""
+    """Native-style note geometry with a nonzero insertion-to-extent offset;
+    ``drift`` moves its ink once it has been seated."""
 
-    def __init__(self, text, xy, *, width, move):
+    def __init__(self, text, xy, *, width, move, drift=(0.0, 0.0)):
         self.text = text
         self.position = (*xy, 0.0)
         self.width = width
         self.move = move
+        self.drift = (0.0, 0.0)
+        self.seat_drift = drift
         self.OwnerType = 1
         self.Visible = 1
         self.leaders = 0
@@ -1467,6 +1474,7 @@ class _KitBomNote:
 
     def GetExtent(self):
         x, y, _z = self.position
+        x, y = x + self.drift[0], y + self.drift[1]
         return x + 0.005, y - 0.036, 0.0, x + 0.005 + self.width, y + 0.002, 0.0
 
     def GetText(self):
@@ -1480,6 +1488,7 @@ class _KitBomNote:
             return False
         if self.move != "ignored":
             self.position = position
+            self.drift = self.seat_drift
         return True
 
 
@@ -1497,6 +1506,7 @@ def kit_bom_note_state(monkeypatch, native_bom_bindings):
         notes=[],
         width=0.145,
         move="applied",
+        drift=(0.0, 0.0),
         active=None,
     )
     state.reference = SimpleNamespace(
@@ -1506,7 +1516,9 @@ def kit_bom_note_state(monkeypatch, native_bom_bindings):
 
     def add_native_note(_adapter, text, x, y):
         assert state.active == drawing.BOM_SHEET
-        note = _KitBomNote(text, (x, y), width=state.width, move=state.move)
+        note = _KitBomNote(
+            text, (x, y), width=state.width, move=state.move, drift=state.drift
+        )
         state.notes.append(note)
         return note
 
@@ -1555,13 +1567,70 @@ def test_bom_note_sits_under_the_bom_left_of_the_title(kit_bom_note_state):
     assert note.text == spec.BOM_NOTE
     extent = drawing._kit_bom_note_extent(note)
     bom = drawing._bom_bounds(state.table)
-    assert extent[0] == pytest.approx(bom[0])  # flush with the table, by its ink
-    assert bom[1] - extent[3] == pytest.approx(drawing.REGION_GAP)
+    # Seated by its ink, the allowance inside the table's left edge and
+    # inside REGION_GAP under its last row.
+    assert extent[0] - bom[0] == pytest.approx(drawing.NOTE_SEAT_ALLOWANCE)
+    assert bom[1] - extent[3] == pytest.approx(
+        drawing.REGION_GAP + drawing.NOTE_SEAT_ALLOWANCE
+    )
     assert extent[2] < drawing.TITLE_BLOCK_KEEP_OUT[0] and _inside_sheet(extent)
     settled()
     state.notes[0].text = "ITEM 7: SOMETHING ELSE"
     with pytest.raises(RuntimeError, match="text changed"):
         settled()
+
+
+def test_bom_note_seat_absorbs_the_farm_measured_ink_drift(kit_bom_note_state):
+    # Farm 20261104T203420333Z: seated flush, the note's ink then read
+    # 0.19 mm over its field's top and 0.05 mm right of where it was seated,
+    # and the settle check refused it.
+    state = kit_bom_note_state
+    farm = (0.01804789062499998 - 0.018, 0.079484140625 - 0.07929453150272764)
+    state.drift = farm
+    settled = drawing._place_bom_note(_ADAPTER, state.table)
+    settled()
+    # Drift past the allowance, either way, is still refused.
+    for drift in (
+        (0.0, drawing.NOTE_SEAT_ALLOWANCE + 1e-5),
+        (-(drawing.NOTE_SEAT_ALLOWANCE + 1e-5), 0.0),
+    ):
+        state.drift = drift
+        with pytest.raises(RuntimeError, match="leaves its clear field"):
+            drawing._place_bom_note(_ADAPTER, state.table)
+
+
+def test_bom_note_ink_model_reproduces_the_farm_and_fits_its_native_field(
+    kit_bom_note_state, monkeypatch,
+):
+    def block(lines: int) -> str:
+        return "\n".join("X" * lines for _ in range(lines))
+
+    # The two farm measurements the model is fitted to, at their 0.01 mm.
+    assert drawing.note_ink_height(block(8)) == pytest.approx(0.0365596, abs=1e-5)
+    assert drawing.note_ink_height(block(47)) == pytest.approx(0.21233, abs=1e-5)
+    # Farm 20261104T203420333Z's field under the native BOM, whose rows grew
+    # to 5.82 mm on average: the note, seated the allowance under its top,
+    # inks above its floor.
+    field = (0.018, 0.0187, 0.207, 0.07929453150272764)
+    native_bom = (field[0], field[3] + drawing.REGION_GAP, 0.208, drawing.BOM_ANCHOR[1])
+    assert drawing.bom_note_region(native_bom) == pytest.approx(field)
+    top = field[3] - drawing.NOTE_SEAT_ALLOWANCE
+    assert top - drawing.note_ink_height(spec.BOM_NOTE) >= field[1]
+    # A note too tall for its field is refused before it is placed.
+    state = kit_bom_note_state
+    region = drawing.bom_note_region(drawing._bom_bounds(state.table))
+    lines = 1
+    while drawing.note_ink_height(block(lines)) + drawing.NOTE_SEAT_ALLOWANCE <= (
+        region[3] - region[1]
+    ):
+        lines += 1
+    monkeypatch.setattr(drawing.spec, "BOM_NOTE", "\n".join(["ITEM 7"] * lines))
+    with pytest.raises(RuntimeError, match="inks about"):
+        drawing._place_bom_note(_ADAPTER, state.table)
+    assert state.notes == []
+    monkeypatch.setattr(drawing.spec, "BOM_NOTE", "\n".join(["ITEM 7"] * (lines - 1)))
+    drawing._place_bom_note(_ADAPTER, state.table)
+    assert len(state.notes) == 1
 
 
 @pytest.mark.parametrize("fault", ("oversized", "ignored", "refused"))

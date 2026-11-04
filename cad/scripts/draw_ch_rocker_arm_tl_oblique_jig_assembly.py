@@ -376,6 +376,10 @@ BOM_ROW_HEIGHT = 0.0055
 BOM_SHEET_CLEARANCE = 0.003  # visible air at the border and title block
 BOM_ANCHOR = (0.018, 0.260)
 REGION_GAP = 0.006  # between a view's room and the text beside it
+# Farm 20261104T203420333Z: the BOM note, seated with its ink flush on its
+# field's top-left corner, read 0.19 mm higher and 0.05 mm further right at
+# its settle check. It is now seated this far inside its field's top and left.
+NOTE_SEAT_ALLOWANCE = 0.0005
 # The reference fits the right column with its native top aligned to the BOM,
 # leaving the lower blank area for the measured configured-kit key.
 REFERENCE_REGION = (
@@ -429,6 +433,13 @@ STEPS_XY = (0.018, 0.262)
 # The left column ends 4 mm over the inner border at the 4.525 mm pitch; farm
 # r17's sheet 6 printed this note at 4.34 mm a line, so the real gap is wider.
 STEPS_FLOOR = SHEET_INNER_BORDER[1] + 0.004
+# Default-format note ink as measured on the farm: this package's 8-line BOM
+# note printed 36.56 mm tall (20261104T203420333Z) and
+# draw_dt_drive_train_assembly's 47 lines 212.33 mm. The first line's box is
+# 5.011 mm and each further line adds 4.507, so NOTE_LINE_M's flat 4.525
+# runs under a short block's ink (by 0.36 mm at 8 lines) and over a long one's.
+NOTE_INK_FIRST_LINE_M = 0.005011
+NOTE_INK_PITCH_M = 0.004507
 STEPS_CONTINUED_XY = (0.220, 0.262)
 NOTES_REFERENCE_MIN_HEIGHT = 0.075
 if STEPS_XY[0] + STEPS_LINE_WIDTH * NOTE_CHAR_M >= min(
@@ -650,6 +661,12 @@ ALIGNMENT_NOTE = _wrapped(
 
 def _note_height(text: str) -> float:
     return (text.count("\n") + 1) * NOTE_LINE_M if text else 0.0
+
+
+def note_ink_height(text: str) -> float:
+    """A native note's ink height from its line count (the farm measurements)."""
+    lines = text.count("\n") + 1 if text else 0
+    return NOTE_INK_FIRST_LINE_M + (lines - 1) * NOTE_INK_PITCH_M if lines else 0.0
 
 
 @dataclass(frozen=True)
@@ -1260,6 +1277,11 @@ def _place_bom_note(adapter: Any, table: Any) -> Callable[[], None]:
     region = bom_note_region(_bom_bounds(table))
     if region[0] >= region[2] or region[1] >= region[3]:
         raise RuntimeError(f"{label} has no clear note field: {region!r}")
+    height = note_ink_height(text)
+    if region[3] - NOTE_SEAT_ALLOWANCE - height < region[1]:
+        raise RuntimeError(
+            f"{label} inks about {height * 1000.0:.2f} mm, over its field {region!r}"
+        )
     note = _add_note_block(adapter, BOM_SHEET, text, (region[0], region[3]), label=label)
     rebuild_drawing(adapter, label=f"measure {label}")
     adapter.currentModel.GraphicsRedraw2()
@@ -1268,11 +1290,11 @@ def _place_bom_note(adapter: Any, table: Any) -> Callable[[], None]:
     position = tuple(float(value) for value in (annotation.GetPosition() or ()))
     if len(position) != 3 or not all(map(math.isfinite, position)):
         raise RuntimeError(f"{label} has unreadable native note position")
-    # Measured ink, not the insertion point: left on the BOM's edge, top
-    # REGION_GAP under its last row.
+    # Measured ink, not the insertion point: NOTE_SEAT_ALLOWANCE inside the
+    # BOM's left edge and inside REGION_GAP under its last row.
     if not annotation.SetPosition2(
-        position[0] + region[0] - box[0],
-        position[1] + region[3] - box[3],
+        position[0] + region[0] + NOTE_SEAT_ALLOWANCE - box[0],
+        position[1] + region[3] - NOTE_SEAT_ALLOWANCE - box[3],
         position[2],
     ):
         raise RuntimeError(f"{label} native note placement failed")

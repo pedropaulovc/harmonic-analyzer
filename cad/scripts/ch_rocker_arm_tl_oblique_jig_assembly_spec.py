@@ -1774,8 +1774,10 @@ PIVOT_FIT_STEPS = (
 )
 # Sheet 2, under the BOM: what item 7's QTY counts and the fitting stock to
 # buy, and the owner's description note for the kit rails and carriages
-# (#2177, 2026-11-04). No line is longer than the shim buy list's 75
-# characters, the widest the field under the BOM already prints.
+# (#2177, 2026-11-04), in three lines; the rail and carriage registry
+# records and inventory entries carry it word for word. No line is longer
+# than the shim buy list's 75 characters, the widest the field under the BOM
+# already prints.
 BOM_NOTE = "\n".join((
     f"ITEM {ITEM_NUMBERS[PIVOT_SHIM]}: SHIM FITTING STOCK, SELECTED PER P1.",
     f"BOM QTY. {pivot_shim.QUANTITY} IS THE NOMINAL PACK, {pivot_shim.PER_SUPPORT} X "
@@ -1785,11 +1787,10 @@ BOM_NOTE = "\n".join((
         f"{sku} ({_length(thickness, 3)}) X{count}"
         for sku, (thickness, count) in PIVOT_SHIM_BUY.items()
     ) + ".",
-    f"ITEMS {ITEM_NUMBERS[RAIL]}-{ITEM_NUMBERS[CARRIAGE]}: GENERIC HIWIN-STYLE "
-    f"{guide_rail.STYLE} RAIL / {carriage.STYLE} CARRIAGE;",
-    "NUIBBYED-BRANDED, NOT GENUINE HIWIN. SUPPLIED AS A MATCHED",
-    "RAIL/CARRIAGE KIT. Z0 PRELOAD AND C ACCURACY NOT REQUIRED;",
-    "ACCEPT BY FIT-UP PLAY CHECK "
+    f"ITEMS {ITEM_NUMBERS[RAIL]}-{ITEM_NUMBERS[CARRIAGE]}: HIWIN-STYLE "
+    f"{guide_rail.STYLE} RAIL / {carriage.STYLE} CARRIAGE, A MATCHED KIT,",
+    "NUIBBYED-BRANDED, NOT GENUINE HIWIN. Z0 PRELOAD AND C ACCURACY NOT",
+    "REQUIRED; ACCEPT BY FIT-UP PLAY CHECK "
     f"({trammel.CARRIAGE_PLAY_TIR_MAX:.2f} MM TIR MAX AT THE PIVOT).",
 ))
 if int(ITEM_NUMBERS[CARRIAGE]) != int(ITEM_NUMBERS[RAIL]) + 1:

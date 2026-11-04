@@ -1776,13 +1776,12 @@ def test_kit_rails_and_carriages_carry_the_owner_note_and_the_play_check() -> No
     rail_item, carriage_item = spec.ITEM_NUMBERS[spec.RAIL], spec.ITEM_NUMBERS[spec.CARRIAGE]
     note = spec.BOM_NOTE.split("\n")
     kit = note.index(
-        f"ITEMS {rail_item}-{carriage_item}: GENERIC HIWIN-STYLE "
-        f"{guide_rail.STYLE} RAIL / {carriage.STYLE} CARRIAGE;"
+        f"ITEMS {rail_item}-{carriage_item}: HIWIN-STYLE "
+        f"{guide_rail.STYLE} RAIL / {carriage.STYLE} CARRIAGE, A MATCHED KIT,"
     )
     assert note[kit + 1:] == [
-        "NUIBBYED-BRANDED, NOT GENUINE HIWIN. SUPPLIED AS A MATCHED",
-        "RAIL/CARRIAGE KIT. Z0 PRELOAD AND C ACCURACY NOT REQUIRED;",
-        f"ACCEPT BY FIT-UP PLAY CHECK ({tir} AT THE PIVOT).",
+        "NUIBBYED-BRANDED, NOT GENUINE HIWIN. Z0 PRELOAD AND C ACCURACY NOT",
+        f"REQUIRED; ACCEPT BY FIT-UP PLAY CHECK ({tir} AT THE PIVOT).",
     ]
     # The kit lines print no wider than the shim buy list above them.
     assert max(map(len, note[kit:])) <= len(note[kit - 1])

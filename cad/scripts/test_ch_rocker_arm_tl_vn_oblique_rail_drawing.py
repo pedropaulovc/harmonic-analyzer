@@ -433,15 +433,17 @@ def test_note_is_the_bounded_receipt_check() -> None:
     # only numbers are the base bar's drawing number and the receipt band.
     assert spec.RECEIPT_BAND == base_bar.RAIL_RECEIPT_BAND
     assert bar["number"] in spec.DRAWING_NOTES
-    assert spec.RECEIPT_TEXT == f"±{base_bar.RAIL_RECEIPT_BAND:.1f} MM"
+    assert spec.RECEIPT_TEXT == f"±{base_bar.RAIL_RECEIPT_BAND:.2f} MM" == "±0.08 MM"
     rest = spec.DRAWING_NOTES.replace(bar["number"], "").replace(spec.RECEIPT_TEXT, "")
     assert not re.search(r"\d", rest)
     lines = note_lines(spec.DRAWING_NOTES, label=NAME)
     assert len(lines) == 3
     assert all(len(line) <= 70 for line in lines), lines
-    # The kit rail is used uncut and the bar follows the received rail only
-    # inside the band the bar's rail-tap walls are proved for (Codjiflo P2).
+    # The kit rail is used uncut; the bar is drilled to its print, so the rail
+    # is accepted only inside the fit's allowance and stopped outside it
+    # (Codjiflo P2; farm review 20261104T203420333Z).
     note = " ".join(lines)
     assert "USED UNCUT" in note and "SPECIAL ORDER" not in note
-    assert f"EACH WITHIN {spec.RECEIPT_TEXT} OF THIS SHEET" in note
-    assert "TAP THE BAR TO THE RAIL. OTHERWISE STOP AND REPORT." in note
+    assert f"EACH WITHIN {spec.RECEIPT_TEXT} OF THIS SHEET, OR STOP AND REPORT" in note
+    assert "THE BAR IS DRILLED AS DRAWN" in note
+    assert "TAP THE BAR TO THE RAIL" not in note

@@ -54,13 +54,12 @@ pattern, printed ``15.00 ±0.08 mm`` .. ``435.00 ±0.08 mm``). The kit rail
 the symmetric E = 15 end distance is the HGR15's 60 pitch over the 450
 length with the 8 holes its photos show: an unverified vendor value. The
 last tap sits 4.93 from the bar's far end (wall .112 nominal to the thread
-major). The rail sheet's receipt check measures all eight received stations
-from the end fitted flush before these taps go in: each within
-``RAIL_RECEIPT_BAND`` 0.4 mm of nominal is accepted and the bar is tapped to
-the received rail; outside it the fitter stops and reports. The band is
-carried into every rail-tap wall (``RAIL_TAP_END_WALL_WORST``, the far end's
-.083 worst at the band's edge, governs; ``RAIL_RECEIPT_BAND_MAX`` 0.48 is the
-widest band rule 17's target allows). The rail's Ø4.5 mm holes take #8 socket
+major). The bar is drilled at these printed stations, never at measured
+ones. The rail sheet's receipt check accepts a received rail only if its
+pattern fits a bar drilled to this print: every station, measured from the
+end fitted flush, within ``RAIL_RECEIPT_BAND`` of nominal, the fit's own
+allowance (below); otherwise the fitter stops and reports before the bar is
+tapped. The rail's Ø4.5 mm holes take #8 socket
 screws (⚙ ``RAIL_SCREW``); a 3/4 in screw seats ⚙ 9.7 mm above the rail base,
 so .368 engages the bar (rule 18: at least 1.5D).
 
@@ -77,11 +76,11 @@ the rail is indicated in). All eight holes are cut at the one DRO Y setting,
 so the row's band moves the whole row: only the station band scatters the
 holes, ``RAIL_HOLE_POSITION_RADIUS`` from nominal (the stations print exact,
 so no rounding adds to it), leaving ``RAIL_PATTERN_ALLOWANCE`` for the rail's
-own hole positions (an unverified vendor value). The outermost station
-carries the mate on a second line, "MATCHES RECEIVED HGR15 RAIL, ±0.4 MM
-PER MHA-CH-06-TL-VN-50" (``RAIL_MATE_CALLOUT``): the stations are the
-received rail's, inside the rail sheet's receipt band, and each ±0.08 holds
-about its received station. The row's
+own hole positions (an unverified vendor value, checked at receipt:
+``RAIL_RECEIPT_BAND``, the allowance floored to the stations' 2 places, ±0.08
+mm). The outermost station carries the mate and its fit-up acceptance on a
+second line, "MATCHES HGR15 RAIL MHA-CH-06-TL-VN-50; ALL 8 SCREWS START BY
+HAND" (``RAIL_MATE_CALLOUT``). The row's
 3.50 carries its reason (``RAIL_ROW_CALLOUT``).
 
 Hold-down slots: two through slots ⚙ ``HOLD_DOWN_SLOT_WIDTH`` .53 wide, axis
@@ -200,14 +199,22 @@ RAIL_HOLE_POSITION_RADIUS = max(
 RAIL_PATTERN_ALLOWANCE = RAIL_SCREW_CLEARANCE - RAIL_HOLE_POSITION_RADIUS
 if RAIL_PATTERN_ALLOWANCE <= 0.0:
     raise AssertionError("the rail-hole position bands bind the rail screws")
-# The kit rail's receipt band (``RAIL_RECEIPT_BAND``, carried into the walls
-# below): the bar is tapped to the received rail's stations, each accepted
-# within the band of nominal on the rail sheet, so the printed ±0.08 holds
-# about the received station. The callout says so and names the sheet.
-RAIL_RECEIPT_BAND = 0.4
+# The kit rail's receipt band: the rail sheet accepts a received rail only if
+# every station, measured from the end fitted flush, lies within the fit's own
+# allowance of nominal, floored to the stations' printed places; a bar drilled
+# to this print then takes it (farm review 20261104T203420333Z: tapping to the
+# received rail contradicted the printed ±0.08).
+RAIL_RECEIPT_BAND = math.floor(RAIL_PATTERN_ALLOWANCE * 10**RAIL_HOLE_PLACES) / (
+    10**RAIL_HOLE_PLACES
+)
+if not 0.0 < RAIL_RECEIPT_BAND <= RAIL_PATTERN_ALLOWANCE:
+    raise AssertionError("the rail's receipt band is not inside the fit's allowance")
 RAIL_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-rail")["number"]
+# The mate and its fit-up acceptance (rule 7: a matched fit names its mate
+# and how it is accepted).
 RAIL_MATE_CALLOUT = (
-    f"MATCHES RECEIVED HGR15 RAIL, ±{RAIL_RECEIPT_BAND:.1f} MM PER {RAIL_NUMBER}"
+    f"MATCHES HGR15 RAIL {RAIL_NUMBER}; "
+    f"ALL {len(RAIL_HOLE_X)} SCREWS START BY HAND"
 )
 RAIL_ROW_CALLOUT = "HOLES IN LINE\nFOR HGR15 RAIL"
 # Rule 18: the screw's thread in the bar at least 1.5 major diameters.
@@ -280,30 +287,21 @@ if SLOT_LATERAL - SLOT_RUN / 2.0 - _R_MAX <= trammel.RAIL_WIDTH / 2.0:
 # 17.32 bar, the last 4.93 from the far end (40 at both ends before #2177):
 # rule 17 from each tap's thread major to the end face and to the hold-down
 # slots, at the printed bands (the station's ±0.08, the row's .XX, the
-# length's .XX, the slots' stations and rises at .XX).
-#
-# Receipt window (Codjiflo P2, PR #2187): the kit rail's stations are
-# unverified and the bar is tapped to the received rail's, so each wall also
-# carries ``RAIL_RECEIPT_BAND``: every received station, measured from the end
-# fitted flush at the spindle end, within that band of its nominal (the rail
-# sheet's receipt note). Outside it these walls are not proved, so the fitter
-# stops and reports. ``RAIL_RECEIPT_BAND_MAX`` is the widest band the walls
-# allow at rule 17's target; the far end governs. The bracket holes' "rail
-# tap" wall (``bracket_hole_walls``) carries the band too.
+# length's .XX, the slots' stations and rises at .XX). The bar is drilled to
+# print; a received rail outside the receipt band is stopped, not followed.
 _RAIL_TAP_RADIUS = THREAD_MAJOR_MM[RAIL_SCREW] / 2.0
-_RAIL_STATION_SPREAD = RAIL_HOLE_BAND + RAIL_RECEIPT_BAND
 RAIL_TAP_END_WALL_WORST = (
     min(
-        RAIL_HOLE_X[0] - _RAIL_STATION_SPREAD,
+        RAIL_HOLE_X[0] - RAIL_HOLE_BAND,
         BAR_LENGTH
         - _deviation(BAR_LENGTH, STATION_PLACES)
-        - (RAIL_HOLE_X[-1] + _RAIL_STATION_SPREAD),
+        - (RAIL_HOLE_X[-1] + RAIL_HOLE_BAND),
     )
     - _RAIL_TAP_RADIUS
 )
 RAIL_TAP_SLOT_WALL_WORST = min(
     math.hypot(x - sx, max(0.0, abs(sy) - SLOT_RUN / 2.0))
-    - math.hypot(_RAIL_STATION_SPREAD, _XX)
+    - math.hypot(RAIL_HOLE_BAND, _XX)
     - math.hypot(_deviation(sx, STATION_PLACES), _XX)
     - _R_MAX
     - _RAIL_TAP_RADIUS
@@ -316,10 +314,6 @@ for _label, _worst in (
 ):
     if _worst < WALL_TARGET_MM:
         raise AssertionError(f"base bar wall {_label}: {_worst:.3f} worst")
-# Each wall shrinks at most 1:1 with the band, so its slack bounds the band.
-RAIL_RECEIPT_BAND_MAX = RAIL_RECEIPT_BAND + (
-    min(RAIL_TAP_END_WALL_WORST, RAIL_TAP_SLOT_WALL_WORST) - WALL_TARGET_MM
-)
 
 # --- End bracket holes (PR C4) -------------------------------------------
 # The two TL-28 brackets' #8-32 x 5/8 SHCS, fitted up through the bar before it
@@ -410,10 +404,9 @@ def bracket_hole_walls(holes: tuple[tuple[float, float], ...]) -> dict[str, floa
     def position(x: float, y: float) -> float:
         return math.hypot(station(x), row(y))  # a hole's corner of its square
 
-    # A rail tap's station holds its band, widened by the rail's receipt band
-    # (tapped to the received rail), but its row only the title block's .XX
-    # (c3-r7): the row moves all eight taps against these holes' rows.
-    rail_position = math.hypot(RAIL_HOLE_POSITION_RADIUS + RAIL_RECEIPT_BAND, _XX)
+    # A rail tap's station holds its band but its row only the title block's
+    # .XX (c3-r7): the row moves all eight taps against these holes' rows.
+    rail_position = math.hypot(RAIL_HOLE_POSITION_RADIUS, _XX)
     radius = BRACKET_CBORE_RADIUS_MAX
     # Both slots: station and rise at .XX from the -Y side, as the holes' rows.
     slots = (

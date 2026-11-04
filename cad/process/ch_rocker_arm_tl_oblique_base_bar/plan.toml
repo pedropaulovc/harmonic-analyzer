@@ -863,7 +863,7 @@ coolant = "cutting oil, brushed on"
 deburr_mm = 0.25
 deburr_cite = "features.toml general_tolerances edge_break R0.25"
 stock_in = "A0"
-note = "Same clamping as A0: do not unclamp. Drill only over open air: every hole is clear of the parallels, but look before every hole anyway. Brush on oil, peck every 3 mm, stop exactly on each DRO number. The eight rail holes are the only tight feature (+/-0.08 along X). Before the first rail hole, read the kit rail's receipt check (MHA-CH-06-TL-VN-50 sheet): its eight holes measured from the end that sits flush at X 0. If every one is within +/-0.4 of 15, 75, 135, 195, 255, 315, 375, 435, drill each rail hole at the received rail's station; if any is outside +/-0.4, stop and report: the bar's end and slot walls are proved only inside that band."
+note = "Same clamping as A0: do not unclamp. Drill only over open air: every hole is clear of the parallels, but look before every hole anyway. Brush on oil, peck every 3 mm, stop exactly on each DRO number. The eight rail holes are the only tight feature (+/-0.08 along X). Before the first rail hole, read the kit rail's receipt check (MHA-CH-06-TL-VN-50 sheet): its eight holes measured from the end that sits flush at X 0 must each be within +/-0.08 of 15, 75, 135, 195, 255, 315, 375, 435; if any is outside +/-0.08, stop and report before drilling. Drill every rail hole at its printed station, never at a measured one."
 
 [setups.stock_state]
 top_feature = "underside_seat"
