@@ -84,7 +84,8 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         " __import__('sm_gooseneck_spring_joint').COUNTERBORE_FLOOR_CORNER_R_BAND,"
         " __import__('dt_pinion_cam_spec').THIN_WALL_MIN_BAND,"
         " __import__('pn_pen_frame_spec').TAP_WALL_MIN_BAND,"
-        " __import__('pn_pen_rod_spec').TAP_WALL_MIN_BAND)",
+        " __import__('pn_pen_rod_spec').TAP_WALL_MIN_BAND,"
+        " __import__('dt_crank_handle_pivot_screw_spec').TIP_CHAMFER_BAND)",
         "each",
     ),
     # def _printed_limits(nominal, places): ... GENERAL_BAND_BY_PLACES[places]

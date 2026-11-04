@@ -6,4 +6,5 @@ dt-crank-pinion-pin:
   finish: bright, oiled
   quantity: 1
   tolerance_class: machined_block
+  drawing_unit: in
   process: "plain 1/8 in straight pin cut from stock drill rod (stock 1/8 in drill rod acceptable), ends faced"

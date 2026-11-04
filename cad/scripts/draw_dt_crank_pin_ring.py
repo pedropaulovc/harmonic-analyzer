@@ -42,6 +42,7 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -94,8 +95,10 @@ TOP_KEEP = {
     "RingID": (TOP_CENTER[0] - HALF_OD - 0.012, TOP_CENTER[1] + HALF_OD + 0.008),
     "JointDia": (TOP_CENTER[0] + HALF_OD + 0.022, TOP_CENTER[1] - HALF_OD - 0.012),
 }
+# The wire's callout block (18-character rows) stands up and left, clear of
+# the edge view's left end.
 FRONT_KEEP = {
-    "WireDia": (FRONT_CENTER[0] - HALF_OD - 0.022, FRONT_CENTER[1] + 0.012),
+    "WireDia": (FRONT_CENTER[0] - HALF_OD - 0.032, FRONT_CENTER[1] + 0.018),
 }
 
 
@@ -124,7 +127,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=part_drawing_unit(PART_STEM),
     )
     stamp_drawing_summary(
         adapter,

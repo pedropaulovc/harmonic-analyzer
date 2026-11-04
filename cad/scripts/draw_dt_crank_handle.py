@@ -3,7 +3,7 @@ r"""Create the curated machinist drawing for the crank handle.
 A turned, ebonized oak pear grip (book ch. 11).  User ruling 2026-09-29: the
 brass ferrule MHA-DT-34 and the steel butt cup MHA-DT-35 are separate parts, so
 this sheet prints only the oak -- a tenon for the ferrule at the crank end, a
-flared waist, an S-curve swell to the Ø21 max, and a domed butt whose end
+flared waist, an S-curve swell to the maximum, and a domed butt whose end
 round crests on a flat oak end round the cup bonded into its counterbore
 (user rulings 2026-09-30, concept v4).
 
@@ -17,13 +17,14 @@ size prints there.  The stations stack above it in a baseline from the tenon
 end face, with the tangency-fixed radii as references beneath them; the
 diameters are dimensioned across their own cut, their text on shelves clear of
 the section; the fitted tenon and counterbore carry their mates and clearances
-as callouts, and the counterbore's floor corner its R0.3 MAX single limit with
+as callouts, and the counterbore's floor corner its R.012 MAX single limit with
 the cup that seats on it.  The tenon root's relief cut into the ferrule
 shoulder (owner ruling 2026-10-24, #1900) prints in detail B, an 8:1 native
 detail of the section: the 45-degree relief's band with the ferrule it serves
-and the root's R0.3 MAX, each on its own leader (MHA-DT-08 machinist review of
+and the root's R.012 MAX, each on its own leader (MHA-DT-08 machinist review of
 3de09b959: at 4:1 the two crowded one tiny corner).  The end view stands on
-the section's axis and carries the cutting plane.
+the section's axis and carries the cutting plane.  The sheet prints decimal
+inch (#290, ``drawing_unit: in``).
 
 Run with SolidWorks open::
 
@@ -86,12 +87,12 @@ from dt_crank_handle_spec import (
     INSIDE_CORNER_R_TOL_TYPE,
     OAK_END_X,
     PEAK_X,
-    PIVOT_BORE_CALLOUT,
     REFERENCE_DIMENSIONS,
     REFERENCE_RADII,
     S_CONCAVE_CENTER,
     S_CONVEX_CENTER,
     S_CONVEX_R,
+    SCREW_NUMBER,
     SHOULDER_R,
     SHOULDER_X,
     TANGENT_POINT_DIAMETERS,
@@ -103,6 +104,21 @@ from dt_crank_handle_spec import (
     TENON_ROOT_ROUND_REACH,
     TENON_X0,
     WAIST_X,
+    UNIT,
+    inch_text,
+)
+from dt_crank_handle_pivot_screw_spec import (
+    DIAMETRAL_CLEARANCE_MAX,
+    DIAMETRAL_CLEARANCE_MIN,
+)
+
+# The reamed bore prints as a reference over the running clearance its model
+# band gives on the MHA-DT-32 shoulder's band, at the places that hold it
+# exactly (#290 fit F12: .0050-.0075).
+PIVOT_BORE_CALLOUT = (
+    f"REAM THRU; {inch_text(DIAMETRAL_CLEARANCE_MIN, 4)}-"
+    f"{inch_text(DIAMETRAL_CLEARANCE_MAX, 4)}\n"
+    f"DIAMETRAL CLEARANCE ON\n{SCREW_NUMBER} SHOULDER"
 )
 
 
@@ -212,10 +228,11 @@ FRONT_KEEP = {
     # tenon's block.
     "InflectionDia": (_front_x(INFLECTION[0]) + _SHELF, _BELOW - 0.007),
     "TenonDia": (_front_x(TENON_X0) + 4.0 * _SHELF, _CALLOUT_ROW),
-    # The reamed bore's dimension line stands 12 mm right of the tangent
-    # point's, clear of its text, and the block's right edge stays 12 mm left
-    # of the title block.
-    "PivotBoreDia": (0.152, 0.068),
+    # The reamed bore's dimension line stands 22 mm right of the tangent
+    # point's, 5 mm clear of its text; the four-line block and its leader
+    # shoulder end about 6 mm left of the title block (machinist review of
+    # 4cde83cb6: at 0.152 the shoulder touched the title block's edge).
+    "PivotBoreDia": (0.146, 0.068),
     "CounterboreDia": (
         _front_x(OAK_END_X - COUNTERBORE_DEPTH) + 0.0055,
         _CALLOUT_ROW + 0.0015,
@@ -552,7 +569,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+        unit=UNIT,
     )
     stamp_drawing_summary(
         adapter,

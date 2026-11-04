@@ -2930,7 +2930,11 @@ def test_config_deps_are_fine_grained():
     drawing_unit_rows = {
         "parts/_defaults.yaml",
         "parts/ch-fulcrum-keeper.yaml",
+        "parts/dt-crank-hub.yaml",
+        "parts/dt-crank-pin-ring.yaml",
+        "parts/dt-crank-pin.yaml",
         "parts/dt-pinion-pivot-block.yaml",
+        "parts/dt-vn-crank-seat-drive-pin.yaml",
         "parts/fr-harmonic-base.yaml",
         "parts/fr-nameplate.yaml",
         "parts/fr-rocker-arm-support.yaml",

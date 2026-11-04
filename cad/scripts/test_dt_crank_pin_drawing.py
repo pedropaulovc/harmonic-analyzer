@@ -28,17 +28,18 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 def test_cross_hole_prints_natively_not_in_a_note() -> None:
     """Rule 7: the keeper-ring hole's size and station are model dimensions
-    at two places (a drilled hole and a routine station), not note text."""
+    (a drilled hole at three places, a routine station at two), not note
+    text."""
     spec = dt_crank_pin_spec
     assert spec.DRAWING_DIMENSIONS["RingHoleProfile"] == {"RingHoleX", "RingHoleDia"}
     assert spec.DRAWING_PRECISION["RingHoleProfile"] == {
         "RingHoleX": 2,
-        "RingHoleDia": 2,
+        "RingHoleDia": 3,
     }
-    assert spec.DIMENSION_CALLOUTS["RingHoleDia"].splitlines()[0] == "DRILL THRU"
     for value in (spec.RING_HOLE_DIA, spec.RING_HOLE_X, spec.PIN_LENGTH):
-        assert f"{value:.2f}" not in spec.DRAWING_NOTES
-        assert f"{value:.1f}" not in spec.DRAWING_NOTES
+        inch = value / 25.4
+        for places in (2, 3):
+            assert f"{inch:.{places}f}".lstrip("0") not in spec.DRAWING_NOTES
 
 
 def test_cross_hole_station_text_clears_its_extension_lines() -> None:
@@ -61,11 +62,10 @@ def test_cross_hole_station_text_clears_its_extension_lines() -> None:
 
 def test_end_diameters_are_drawing_native_true_diameter_callouts() -> None:
     """The model's end dims are half-profile radii, so the print measures the
-    projected end-face circles instead — one Ø dimension per pin end."""
+    projected big-end circle; the length and the 1:48 ratio give the small end."""
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("_add_end_diameter(") >= 3  # definition + both ends
     assert 'below="BIG END"' in source
-    assert 'below="SMALL END"' in source
+    assert 'below="SMALL END"' not in source
     # Custom 1:48 taper over 45 mm -> 0.9375 on diameter.
     taper_on_dia = dt_crank_pin_spec.BIG_END_DIA - dt_crank_pin_spec.SMALL_END_DIA
     assert round(taper_on_dia, 4) == round(dt_crank_pin_spec.PIN_LENGTH / 48.0, 4)
@@ -142,19 +142,29 @@ def test_crank_keeper_ring_threads_the_pin_hole_clear_of_the_arm() -> None:
     # smallest printed ring through the fattest printed pin section.
     assert ring.HOLE_AIR >= ring.RING_HOLE_AIR
     assert ring.HOLE_AIR_WORST >= ring.RING_HOLE_AIR
-    # The side web is a named exception (under the 2.0 target): at the printed
-    # worst case it holds the 1.5 floor, and the sheet states that value.
+    # The side web is a named exception (under the .080 target): at the
+    # printed worst case it holds the .060 floor, and the sheet states that
+    # value, never more than the limits give.
+    from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+    from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+
+    unit = dt_crank_pin_spec.UNIT
+    drilled = drilled_oversize_mm(unit=unit)
     worst_web = (
-        dt_crank_pin_spec.PIN_DIA_AT_RING_HOLE_MIN - dt_crank_pin_spec.RING_HOLE_DIA - 0.10
+        dt_crank_pin_spec.PIN_DIA_AT_RING_HOLE_MIN
+        - dt_crank_pin_spec.RING_HOLE_DIA
+        - drilled
     ) / 2.0
-    assert worst_web >= 1.5
-    assert dt_crank_pin_spec.CROSS_HOLE_WEB_MIN <= worst_web < dt_crank_pin_spec.CROSS_HOLE_WEB_MIN + 0.01
-    web = dt_crank_pin_spec.CROSS_HOLE_WEB_MIN
-    assert dt_crank_pin_spec.CROSS_HOLE_WEB_CALLOUT == f"WEB {web:.2f} MIN"
-    # The ligament to the big-end face meets the 2.0 target at the worst case
-    # of the printed bands (.XX station, DRILLED HOLES +0.10).
-    ligament = dt_crank_pin_spec.RING_HOLE_X - 0.51 - (dt_crank_pin_spec.RING_HOLE_DIA + 0.10) / 2.0
-    assert ligament >= 2.0
+    assert worst_web >= WALL_FLOOR_MM
+    assert worst_web - 0.0254 < dt_crank_pin_spec.CROSS_HOLE_WEB_MIN <= worst_web
+    # The ligament to the big-end face meets the .080 target at the worst case
+    # of the printed bands (.XX station off the .XX length, DRILLED HOLES).
+    ligament = (
+        dt_crank_pin_spec.RING_HOLE_X
+        - 2.0 * printed_band_mm(2, unit=unit)
+        - (dt_crank_pin_spec.RING_HOLE_DIA + drilled) / 2.0
+    )
+    assert ligament >= WALL_TARGET_MM
     # It reaches clear of the pin: the ring's inside edge past the pin surface.
     pin_radius = ring.PIN_DIA_AT_HOLE / 2.0
     assert ring.RING_FAR_X - ring.WIRE_DIA / 2.0 - pin_radius >= 3.0

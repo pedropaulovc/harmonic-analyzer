@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import dt_crank_drive_gear_notes as mate_notes
 import dt_crank_pinion_spec as spec
+from dt_crank_drive_gear_spec import inch_text
 from stock_form_cutter import TOOTH_FORM_NOTE
 
 
@@ -24,28 +25,30 @@ GEAR_DATA = mate_notes.gear_data_note(
             f"#{spec.CUTTER_NUMBER}, {spec.CUTTER_TEETH_RANGE[0]}-{spec.CUTTER_TEETH_RANGE[1]}T; "
             f"{spec.CUTTER_TEMPLATE.reference_teeth}T REFERENCE",
         ),
-        ("MODULE (mm, REF)", f"{spec.MODULE_MM:.3f}"),
         ("PRESSURE ANGLE, NORMAL = TRANSVERSE", f"{spec.PRESSURE_ANGLE_DEG:.1f} DEG"),
-        ("PITCH DIAMETER (mm, REF)", f"{spec.PITCH_DIA:.2f}"),
+        ("PITCH DIAMETER (REF)", inch_text(spec.PITCH_DIA, 3)),
         (
-            "ACTUAL ROOT DIA MIN-MAX / MAX CUT DEPTH (mm, REF)",
-            f"{spec.ROOT_DIA_MIN:.3f}-{spec.ROOT_DIA_MAX:.3f} / {spec.WHOLE_DEPTH:.3f}",
+            "ACTUAL ROOT DIA MIN-MAX / MAX CUT DEPTH (REF)",
+            f"{inch_text(spec.ROOT_DIA_MIN, 4)}-{inch_text(spec.ROOT_DIA_MAX, 4)} / "
+            f"{inch_text(spec.WHOLE_DEPTH, 4)}",
         ),
-        ("NORMAL TOOL PLUNGE (mm, REF)", f"{spec.TOOL_PLUNGE_MM:.3f}"),
+        ("NORMAL TOOL PLUNGE (REF)", inch_text(spec.TOOL_PLUNGE_MM, 4)),
         (
-            f"BASE TANGENT SPAN OVER {spec.BASE_TANGENT_SPAN_TEETH} TEETH (mm), ACCEPT ON THIS PART",
-            f"{spec.BASE_TANGENT_SPAN_LIMITS_MM[0]:.{spec.BASE_TANGENT_SPAN_PLACES}f} TO "
-            f"{spec.BASE_TANGENT_SPAN_LIMITS_MM[1]:.{spec.BASE_TANGENT_SPAN_PLACES}f}",
+            f"BASE TANGENT SPAN OVER {spec.BASE_TANGENT_SPAN_TEETH} TEETH, ACCEPT ON THIS PART",
+            mate_notes.accept_limits_text(spec.BASE_TANGENT_SPAN_LIMITS_MM, 4),
         ),
         (
-            "ACTUAL CIRCULAR PITCH THICKNESS (mm, REF)",
-            f"{spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS:.3f}",
+            "ACTUAL CIRCULAR PITCH THICKNESS (REF)",
+            inch_text(spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS, 4),
         ),
         (
             "TOOTH CUTTING SETUP, ACCEPT AT SETUP",
-            f"{spec.TOOTH_RUNOUT_TIR_MM:.2f} TIR MAX TO FINISHED BORE",
+            f"{inch_text(spec.TOOTH_RUNOUT_TIR_MM, 3)} TIR MAX TO FINISHED BORE",
         ),
         ("TOOTH FORM", TOOTH_FORM_NOTE),
+        # The title block's edge break would erase these fine teeth; the
+        # requirement is a tooth fact, so it reads with them, as on the 64T.
+        ("TOOTH EDGES", "DO NOT BREAK OR CHAMFER FLANKS, TIPS OR ROOTS"),
         ("MATES WITH", "CRANK DRIVE GEAR MHA-DT-07, 64T RIGHT-HAND HELICAL"),
     ]
 )

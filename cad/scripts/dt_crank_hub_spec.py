@@ -7,7 +7,6 @@ from _surface_finish import SurfaceFinishControl
 from dt_crank_hub_geometry import (
     ARM_THICKNESS,
     AXIAL_PIN_DIA,
-    AXIAL_PIN_LENGTH,
     AXIAL_PIN_RADIUS_FROM_AXIS,
     HUB_BARREL_DIA,
     HUB_BARREL_LENGTH,
@@ -20,7 +19,7 @@ from dt_crank_hub_geometry import (
     RELIEF_LENGTH,
     RELIEF_LENGTH_TOL,
     RELIEF_STATION,
-    SERVICE_PIN_FROM_SHOULDER,
+    SEAM_DEPTH,
     SERVICE_PIN_STATION,
     SHAFT_CLEARANCE_MAX,
     SHAFT_CLEARANCE_MIN,
@@ -31,8 +30,6 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
 if HUB_SEAT_LENGTH != ARM_THICKNESS:
     raise AssertionError("through hub cannot finish flush with both arm faces")
-if AXIAL_PIN_LENGTH != ARM_THICKNESS / 2.0:
-    raise AssertionError("MHA-DT-VN-59 length is not half the arm thickness")
 if AXIAL_PIN_RADIUS_FROM_AXIS != HUB_SEAT_DIA / 2.0:
     raise AssertionError("MHA-DT-VN-59 axis is not on the arm/hub seam")
 # The printed chain -- seat from the front face, the overall to the rear
@@ -53,34 +50,39 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "ReliefDia",
     },
     "BoreProfile": {"BoreDia"},
-    "ServicePinStationReference": {"ServicePinFromShoulder"},
+    "ServicePinStationReference": {"ServicePinStation"},
+    "SeamDepthReference": {"SeamDepth"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HubProfile": {
-        "SeatLength": 1,
-        # Two places: front face to rear face, +0.10 on its long side
-        # (HUB_LENGTH_BAND).  The front face is set flush with the
-        # crankshaft's dome root before the MHA-DT-09 ream, so this length
-        # places the rear face against the removable.
-        "HubLength": 2,
-        # Two places: printed from the rear face, -0.05 on its short side
-        # (RELIEF_LENGTH_BAND), the length that keeps the #25 plates clear of
-        # the barrel's rear shoulder.
+        # The seat end is set flush with the arm's front face (the seat
+        # callout's acceptance), so its length matches the 5/16 stock.
+        "SeatLength": 2,
+        # Three places, .990 +.004/-.010 (HUB_LENGTH_BAND): an inch nominal
+        # carries its tolerance's places.  The front face is set flush with
+        # the crankshaft's dome root before the MHA-DT-09 ream, so this
+        # length places the rear face against the removable.
+        "HubLength": 3,
+        # Two places: printed from the rear face, its short side what keeps
+        # the #25 plates clear of the barrel's rear shoulder.
         "ReliefLength": 2,
-        "SeatDia": 1,
+        "SeatDia": 2,
         # The arm's shoulder at the title block's .XX: HUB_BARREL_DIA_MIN, what
         # the shoulder land over the largest matched seat reads.
         "BarrelDia": 2,
         # A clearance diameter at the title block's .XX: RELIEF_DIA_MAX, what
-        # the drive train's chain-plate air reads (0.23 to a real #25 plate
-        # on the floated T12; 0.08 at .X).
+        # the drive train's chain-plate air reads.
         "ReliefDia": 2,
     },
-    # Four places: the .376 in nominal is 9.5504 mm, off the mm grid.
-    "BoreProfile": {"BoreDia": 4},
-    # Two places: the .XX band is what keeps the MHA-DT-09 ream's ligament to
-    # the arm shoulder at 2.1 mm (dt_crank_hub_geometry, drawing-guidelines.md rule 17 (walls and webs)).
-    "ServicePinStationReference": {"ServicePinFromShoulder": 2},
+    "BoreProfile": {"BoreDia": 4},  # 9.5504, .376 in
+    # Two places from the faced outboard end: the .XX band, with the thickest
+    # arm stock placing the shoulder (the seat length is a fit-up reference),
+    # is what keeps the MHA-DT-09 ream's ligament to the arm shoulder over the
+    # rule-17 wall (dt_crank_hub_geometry, drawing-guidelines.md rule 17 (walls and webs)).
+    "ServicePinStationReference": {"ServicePinStation": 2},
+    # The seam only has to take the cut pin: the title block's .XX, printed
+    # from the faced outboard end where the match-drill enters.
+    "SeamDepthReference": {"SeamDepth": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

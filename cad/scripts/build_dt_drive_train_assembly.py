@@ -336,6 +336,7 @@ from dt_crank_drive_gear_spec import (  # noqa: E402
     SOUTH_FACE_SHIFT_NORTH as GEAR64_SOUTH_FACE_SHIFT_NORTH,
 )
 from dt_crank_pinion_spec import FACE_WIDTH as PINION_FACE  # noqa: E402
+from dt_crank_pinion_spec import UNIT as PINION_UNIT  # noqa: E402
 
 # Mesh anchor: X_PITCH is every cone gear's pitch-section x at the
 # contact azimuth. The oblique crossing dives (DRUM_FACE/2)*tan(i) past
@@ -490,7 +491,6 @@ PINION_SEED_DEG = tooth_in_gap_seed_deg(PITCH_ALPHA64, PITCH_ALPHA16) + _config.
 # ARBOR_SOUTH_Z / ARBOR_LENGTH (the cylinder arbor) follow from the pedestal
 # strap faces and are defined with them below (U34b/U34c).
 from dt_crank_hub_geometry import (  # noqa: E402
-    AXIAL_PIN_LENGTH,
     AXIAL_PIN_RADIUS_FROM_AXIS,
     HUB_BARREL_DIA,
     HUB_LENGTH,
@@ -564,14 +564,17 @@ if abs((CRANKSHAFT_Z0 + SEAT_COLLAR) - seat_geometry.SEAT_FACE_Z) > 1e-9:
         "crankshaft SeatCollar datum off _sprocket_seat_geometry.SEAT_FACE_Z"
     )
 # The hub rear face is what stops the removable walking forward once the
-# taper pin is in: the contract's 0.7 axial air, derived from both parts.
-# The seat station's functional band moves the wheel against the hub; at its
+# taper pin is in: the contract's axial air, derived from both parts (0.7 at
+# the 25.2 metric hub; 0.754 at the .990 inch hub, #290).  The seat
+# station's functional band moves the wheel against the hub; at its
 # most-forward limit the air must still be open.
+CRANK_HUB_SPROCKET_AIR_CONTRACT = 0.754
 CRANK_HUB_SPROCKET_AIR = seat_geometry.BAND_FRONT_Z - CRANK_HUB_REAR_Z
 CRANK_HUB_SPROCKET_AIR_WORST = CRANK_HUB_SPROCKET_AIR + min(SEAT_COLLAR_BAND)
-if abs(CRANK_HUB_SPROCKET_AIR - 0.7) > 1e-9:
+if abs(CRANK_HUB_SPROCKET_AIR - CRANK_HUB_SPROCKET_AIR_CONTRACT) > 1e-9:
     raise AssertionError(
-        f"crank hub rear/sprocket air {CRANK_HUB_SPROCKET_AIR:.3f} left the contracted 0.7"
+        f"crank hub rear/sprocket air {CRANK_HUB_SPROCKET_AIR:.3f} left the contracted "
+        f"{CRANK_HUB_SPROCKET_AIR_CONTRACT}"
     )
 if CRANK_HUB_SPROCKET_AIR_WORST <= 0.0:
     raise AssertionError(
@@ -877,8 +880,6 @@ if abs((CRANKSHAFT_Z0 + PIN_HOLE_HEIGHT) - CRANK_PIN_Z) > 1e-6:
     raise AssertionError("shaft and hub MHA-DT-09 stations do not coincide")
 if CRANK_PIN_X0 + CRANK_PIN_LENGTH < X_CRANK + HUB_BARREL_DIA / 2.0 + 2.0:
     raise AssertionError("crank pin does not run out the far side of the hub")
-if abs(AXIAL_PIN_LENGTH - ARM_THICKNESS / 2.0) > 1e-9:
-    raise AssertionError("MHA-DT-VN-59 no longer has half-arm-thickness engagement")
 # Keeper-ring anchor (ch11 p.14): the arm's front (south, machine -z) face is
 # CRANK_ARM_Z0; arm local (x, y) -> machine (X_CRANK - y, Y_CRANK - x) (the
 # placed rows: local +x -> -Y, local +y -> -X). The brass eyelet's tail lies
@@ -1853,9 +1854,12 @@ from gear_seat_fit import GEAR_SEAT_CLEARANCE  # noqa: E402
 
 # (lower, upper) deviation of each moving surface from the model; + is north
 # (crank +Z, cone +station), or up for the crank height.
-_PINION_FACE_BAND = printed_deviations(PINION_FACE, PINION_FACE_WIDTH_PLACES, PINION_FACE_LIMITS)
+_PINION_FACE_BAND = printed_deviations(
+    PINION_FACE, PINION_FACE_WIDTH_PLACES, PINION_FACE_LIMITS, unit=PINION_UNIT
+)
 _PINION_SHOULDER_BAND = printed_deviations(
-    PINION_SHOULDER_LENGTH, PINION_DRAWING_PRECISION["ShoulderLength"], PINION_SHOULDER_LIMITS
+    PINION_SHOULDER_LENGTH, PINION_DRAWING_PRECISION["ShoulderLength"], PINION_SHOULDER_LIMITS,
+    unit=PINION_UNIT,
 )
 _PINION_TIP_RADIUS_BAND = tuple(
     d / 2.0
@@ -1863,12 +1867,14 @@ _PINION_TIP_RADIUS_BAND = tuple(
         PINION_OUTSIDE_DIA,
         PINION_DRAWING_PRECISION["OutsideDia"],
         (-PINION_OUTSIDE_DIA_TOLERANCE, PINION_OUTSIDE_DIA_TOLERANCE),
+        unit=PINION_UNIT,
     )
 )
 _PINION_TURNED_DIA_BAND = printed_deviations(
     PINION_TURNED_DIA,
     PINION_DRAWING_PRECISION["TurnedDia"],
     (-PINION_TURNED_DIA_TOLERANCE, PINION_TURNED_DIA_TOLERANCE),
+    unit=PINION_UNIT,
 )
 # Only the turned band's largest radius can close on T120.
 _PINION_TURNED_RADIUS_UP = _PINION_TURNED_DIA_BAND[1] / 2.0
@@ -2293,7 +2299,9 @@ _PINION_NORTH_Z_MIN = (
     + PINION_SEAT_FEELER
     + min(PINION_END_PLAY)
     + PINION_OVERALL_LENGTH
-    + min(printed_deviations(PINION_OVERALL_LENGTH, PINION_OVERALL_LENGTH_PLACES))
+    + min(
+        printed_deviations(PINION_OVERALL_LENGTH, PINION_OVERALL_LENGTH_PLACES, unit=PINION_UNIT)
+    )
 )
 CRANK_SHAFT_END_RADIUS_MAX = (CS_PINION_SEAT_DIA + max(CS_PINION_SEAT_DIA_BAND)) / 2.0
 _END_SHIFT, _END_DY = _cone_corners(_CONE_FLOATS, _CRANK_HEIGHT_BAND)

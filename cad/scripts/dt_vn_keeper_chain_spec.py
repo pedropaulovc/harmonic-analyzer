@@ -52,7 +52,13 @@ import math
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from dt_crank_arm_spec import ANCHOR_SCREW_X, ANCHOR_SCREW_Y, ARM_C2C
 from dt_crank_arm_spec import ARM_THICKNESS, HALF_WIDTH
-from dt_crank_hub_geometry import HUB_BARREL_DIA, HUB_LENGTH, SERVICE_PIN_STATION
+from dt_crank_hub_geometry import (
+    ARM_STOCK_THICKNESS_MAX,
+    HUB_BARREL_DIA,
+    HUB_LENGTH,
+    SERVICE_PIN_STATION,
+)
+from dt_crank_hub_geometry import UNIT as HUB_UNIT
 from dt_crank_hub_spec import DRAWING_PRECISION_BY_NAME as HUB_PRECISION
 from dt_crank_pin_eye_spec import ANCHOR_AIR, LOOP_ID_MIN, LOOP_INNER_R, LOOP_R
 from dt_crank_pin_eye_spec import TAIL_LEN as EYE_TAIL_LEN
@@ -63,6 +69,7 @@ from dt_crank_pin_ring_spec import RING_CENTRE_X, RING_FAR_X, RING_ID_MAX, RING_
 from dt_crank_pin_ring_spec import WIRE_DIA as RING_WIRE_DIA
 from dt_crank_pin_spec import BIG_END_DIA, PIN_LENGTH, RING_HOLE_DIA
 from dt_crank_pin_spec import RING_HOLE_X, SMALL_END_DIA
+from dt_crank_pin_spec import UNIT as PIN_UNIT
 from sh_vn_brass_fillister_screw_spec import HEAD_DIA as SCREW_HEAD_DIA
 from sh_vn_brass_fillister_screw_spec import HEAD_H as SCREW_HEAD_H
 from sh_vn_brass_fillister_screw_spec import SHANK_DIA as SCREW_SHANK_DIA
@@ -124,11 +131,15 @@ HUB_R = HUB_BARREL_DIA / 2.0
 ARM_Z = (0.0, ARM_THICKNESS)
 HUB_Z = (ARM_THICKNESS, HUB_LENGTH)
 PIN_Z = SERVICE_PIN_STATION
-# The hub prints the pin's station from its arm shoulder, which is the arm's
-# inboard face (ARM_Z[1]), at ServicePinFromShoulder's places. At the band's
-# arm-side limit the pin, and the ring hanging from it, sit that much nearer
-# the arm.
-PIN_Z_BAND = printed_band_mm(HUB_PRECISION["ServicePinFromShoulder"])
+# The hub prints the pin's station from its faced outboard end, flush with the
+# arm's outboard face (ARM_Z[0]), at ServicePinStation's places in the hub
+# sheet's unit; its seat length is a fit-up reference turned to suit the arm,
+# so the arm's inboard face (ARM_Z[1]) is wherever the stock's thickness puts
+# it. At the station band's arm-side limit in the thickest stock the mill
+# ships, the pin, and the ring hanging from it, sit that much nearer the arm.
+PIN_Z_BAND = printed_band_mm(HUB_PRECISION["ServicePinStation"], unit=HUB_UNIT) + (
+    ARM_STOCK_THICKNESS_MAX - ARM_THICKNESS
+)
 PIN_Z_ARMWARD = PIN_Z - PIN_Z_BAND
 PIN_X0 = -HUB_R - PIN_PROUD  # the pin's big end
 RING_X = PIN_X0 + RING_HOLE_X  # the ring's through leg and plane
@@ -284,13 +295,15 @@ if RING_ARM_AIR_NOMINAL < RING_ARM_AIR:
 # * No clamp: at the adverse printed corner every ring the title block accepts
 #   has a pose clear of the arm (ring_clear_pose_air), so the arm is a
 #   one-sided stop the ring can always leave and the pin seats with the ring
-#   held clear. The corner: the pin at ServicePinFromShoulder's arm-side limit
+#   held clear. The corner: the pin at ServicePinStation's arm-side limit in
+#   the thickest arm stock
 #   (PIN_Z_ARMWARD), the hole at its station's hub-side limit, the pin's
 #   fattest printed section through it, and the hole drilled to size (the
 #   least room to slide in). The arm's hub end cannot grow past the
 #   as-supplied bar's half-width. Crowned against the hole's hub-side wall
-#   there, the largest ring touches the arm even in the A1 plane; slid
-#   outboard as far as the hole's edges let it, it clears.
+#   there, the worst crown, the largest .43-ID ring still clears the arm in
+#   the A1 plane; slid outboard as far as the hole's edges let it, it clears
+#   more.
 
 
 def _ring_stop_swing() -> float:
@@ -312,7 +325,7 @@ if ring_arm_air(90.0, MEAN_R, ARC_SAGITTA / 2.0, RING_X, PIN_Z) >= 0.0:
     )
 RING_STOP_SWING_DEG = _ring_stop_swing()
 
-_HOLE_R_MAX = (RING_HOLE_DIA + drilled_oversize_mm()) / 2.0
+_HOLE_R_MAX = (RING_HOLE_DIA + drilled_oversize_mm(unit=PIN_UNIT)) / 2.0
 _HOLE_X_HUBWARD = RING_X + PIN_BAND
 RING_REACH_X_MAX = _HOLE_X_HUBWARD + _HOLE_R_MAX
 if RING_REACH_X_MAX >= 0.0:
@@ -779,8 +792,9 @@ def link_volume(steps: int = 72) -> float:
 
 # The purchased-part identification sheets (build_purchased_part_drawing).
 # One short line each: the sheet reserves ~0.19 m for the note (the first cut,
-# 94 characters, ran 0.204 m and failed drawing:keeper_chain).
-CHAIN_DRAWING_NOTES = f"CUT TO {BEAD_COUNT} BEADS ({CHAIN_LENGTH:.0f} MM); CLOSED BY MHA-DT-VN-66."
+# 94 characters, ran 0.204 m and failed drawing:keeper_chain).  The bead count
+# is the cut; the note carries no dimension (#290).
+CHAIN_DRAWING_NOTES = f"CUT TO {BEAD_COUNT} BEADS; CLOSED BY MHA-DT-VN-66."
 LINK_DRAWING_NOTES = "JOINS THE MHA-DT-VN-65 ENDS: ONE BEAD PER DOME."
 
 # The chain part's own frame: machine axes, origin on its first bead (the

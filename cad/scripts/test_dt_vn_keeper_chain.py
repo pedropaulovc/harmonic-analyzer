@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 import _config
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 import _supplier_keeper_dimensions as keeper_dimensions
 import dt_crank_arm_spec as arm
 import dt_crank_hub_geometry as hub_geometry
@@ -39,7 +39,8 @@ def test_each_strand_reaches_the_withdrawn_pin() -> None:
 
 
 def _band(places: int) -> float:
-    return printed_band_mm(places)
+    """The hub's printed band at ``places``, read in the hub sheet's unit."""
+    return printed_band_mm(places, unit=hub_geometry.UNIT)
 
 
 def _corner_air(
@@ -72,29 +73,32 @@ def _flat_side_air(swing_deg: float, mean_r: float, crown: float) -> float:
 
 
 def test_pin_station_reads_the_hub_print() -> None:
-    station = hub.DRAWING_PRECISION["ServicePinStationReference"]
-    places = station["ServicePinFromShoulder"]
-    shoulder = arm.ARM_THICKNESS  # the hub's shoulder is the arm's inboard face
-    from_shoulder = hub_geometry.SERVICE_PIN_FROM_SHOULDER
-    assert chain.PIN_Z == pytest.approx(shoulder + from_shoulder)
-    assert chain.PIN_Z_ARMWARD == pytest.approx(chain.PIN_Z - _band(places))
+    # The hub prints the station from its faced outboard end, flush with the
+    # arm's outboard face (z 0); the arm's inboard face sits wherever the
+    # thickest 5/16 stock puts it, so the arm-side corner adds that excess.
+    places = hub.DRAWING_PRECISION["ServicePinStationReference"]["ServicePinStation"]
+    assert chain.PIN_Z == pytest.approx(hub_geometry.SERVICE_PIN_STATION)
+    thick = hub_geometry.ARM_STOCK_THICKNESS_MAX - arm.ARM_THICKNESS
+    assert chain.PIN_Z_ARMWARD == pytest.approx(chain.PIN_Z - _band(places) - thick)
+    # The inch sheet's .XX: +/-.01 in (Codjiflo review of 831be7869).
+    assert _band(places) == pytest.approx(0.254)
 
 
-def test_ring_crowned_hub_side_touches_the_arm_at_the_adverse_corner() -> None:
-    # Codex xhigh, PR #1466 round 3: the largest accepted ring, crowned 0.50
-    # hub-side in a hole at its station's hub-side limit, on a pin at the
-    # hub's arm-side station limit, meets the arm's corner in the A1 plane.
+def test_ring_crowned_hub_side_clears_the_arm_at_the_adverse_corner() -> None:
+    # Codex xhigh, PR #1466 round 3: the largest accepted ring, crowned against
+    # the hole's hub-side wall in a hole at its station's hub-side limit, on a
+    # pin at the hub's arm-side station limit, is the worst pose in the A1
+    # plane.  The #290 inch ring (.43 ID) clears the arm's corner even there.
     mean_r = (ring.RING_ID_MAX + ring.WIRE_DIA) / 2.0
-    hole_x = chain.RING_X + _band(2)
-    air, nearest = _corner_air(hole_x, chain.PIN_Z_ARMWARD, mean_r, 0.50)
+    crown = pin.RING_HOLE_DIA / 2.0 - ring.WIRE_DIA / 2.0
+    hole_x = chain.RING_X + ring.PIN_BAND
+    air, nearest = _corner_air(hole_x, chain.PIN_Z_ARMWARD, mean_r, crown)
     # The nearest wire point is outboard of the arm and above its face, so the
     # corner edge is the arm's nearest point and the closed form is exact.
     assert nearest[0] < -arm.HALF_WIDTH and nearest[1] > arm.ARM_THICKNESS
-    assert air < 0.0
-    helper = chain.ring_arm_air(0.0, mean_r, 0.50, hole_x, chain.PIN_Z_ARMWARD)
-    assert helper == pytest.approx(air, abs=1e-3)
-    # At the nominal station the same ring clears: the station is what bites.
-    assert _corner_air(hole_x, chain.PIN_Z, mean_r, 0.50)[0] > 0.0
+    assert air >= 0.0
+    helper = chain.ring_arm_air(0.0, mean_r, crown, hole_x, chain.PIN_Z_ARMWARD)
+    assert helper == pytest.approx(air, abs=2.5e-3)  # the helper samples the arc
 
 
 def test_every_printed_ring_has_a_pose_clear_of_the_arm() -> None:
@@ -117,13 +121,14 @@ def test_every_printed_ring_has_a_pose_clear_of_the_arm() -> None:
     crown = high
     # The hole admits that pose: the hub-side edges stay outside the arc.
     assert math.hypot(mean_r - crown + hole_r, pin_r) - mean_r >= wire_r
-    hole_x = chain.RING_X + _band(2)
+    hole_x = chain.RING_X + ring.PIN_BAND
     air, nearest = _corner_air(hole_x, chain.PIN_Z_ARMWARD, mean_r, crown)
     assert nearest[0] < -arm.HALF_WIDTH and nearest[1] > arm.ARM_THICKNESS
     assert air >= 0.0
     assert chain.RING_FREE_AIR_WORST == pytest.approx(air, abs=5e-3)
-    # Crowned against the hub-side wall instead it touches: the slide is the proof.
-    assert _corner_air(hole_x, chain.PIN_Z_ARMWARD, mean_r, hole_r - wire_r)[0] < 0.0
+    # Crowned against the hub-side wall it keeps less air: the slide is the
+    # better pose, and the witness never claims more than it.
+    assert _corner_air(hole_x, chain.PIN_Z_ARMWARD, mean_r, hole_r - wire_r)[0] < air
 
 
 def test_arm_is_the_ring_swing_stop_and_withdrawal_lifts_it_off() -> None:
@@ -139,8 +144,8 @@ def test_arm_is_the_ring_swing_stop_and_withdrawal_lifts_it_off() -> None:
     # No accepted ring reaches the arm's mid-plane x = 0: its hub-most point is
     # the oversize hole's hub-side wall at the station's hub-side limit. So
     # the arm's outward normal at any contact points -X or along its face.
-    drilled_plus = float(_config.title_block("drilled_hole")["plus_mm"])
-    reach = chain.RING_X + _band(2) + (pin.RING_HOLE_DIA + drilled_plus) / 2.0
+    drilled_plus = drilled_oversize_mm(unit=pin.UNIT)
+    reach = chain.RING_X + ring.PIN_BAND + (pin.RING_HOLE_DIA + drilled_plus) / 2.0
     assert chain.RING_REACH_X_MAX == pytest.approx(reach)
     assert reach < 0.0
 
@@ -331,7 +336,7 @@ def keeper_sheet(monkeypatch):
     def curate(actual_adapter, view, *, keep, view_label, dimensions_by_feature):
         assert actual_adapter is adapter
         assert view is views["*Front"]
-        assert keep == {_NAME: (0.156, 0.166)}
+        assert keep == {_NAME: pytest.approx((0.016, 0.150))}
         assert view_label == "keeper catalogue bead diameter"
         assert dimensions_by_feature == {"SeedProfile": {_NAME}}
         view.annotations = [_Annotation(_Display())]

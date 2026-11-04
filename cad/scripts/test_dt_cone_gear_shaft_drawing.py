@@ -2207,6 +2207,7 @@ def test_the_64t_build_hands_the_stock_helper_its_profile_and_sweep_bound(monkey
 
     monkeypatch.setattr(crank, "check", MagicMock())
     monkeypatch.setattr(crank, "set_global", AsyncMock())
+    monkeypatch.setattr(crank, "apply_package_model_units", MagicMock())
     monkeypatch.setattr(crank, "build_stock_form_gear", stock_form_gear)
     with pytest.raises(Reached):
         asyncio.run(crank.build(AsyncMock()))

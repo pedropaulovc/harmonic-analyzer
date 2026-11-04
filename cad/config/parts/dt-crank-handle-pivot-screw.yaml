@@ -9,3 +9,4 @@ dt-crank-handle-pivot-screw:
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
   process: "turned slotted shoulder screw; die-cut #4-40 thread"
+  drawing_unit: in

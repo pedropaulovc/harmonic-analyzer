@@ -7,8 +7,8 @@ the drive train and the keeper chain import the spec, so prose there would
 re-key them on every drawing edit. Imported ONLY by
 ``build_dt_crank_pin_eye``, ``draw_dt_crank_pin_eye`` and the offline tests.
 
-The eye is ``visual_noncritical``: every printed value takes the title
-block's one-place band (drawing-guidelines.md rule 3). The loop's inside
+The eye is ``visual_noncritical``: on its decimal-inch sheet (#290) the loop and
+tail take the title block's .XX band (drawing-guidelines.md rule 3). The loop's inside
 diameter and the tail's length from the loop centre live on the blanked
 ``EyeReference`` sketch in the eye's own plane, because a torus has no edge to
 dimension (drawing-simplicity-policy.md: a value no feature dimension carries
@@ -39,8 +39,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "EyeReference": {"LoopID", "TailLen"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "WireProfile": {"WireDia": 1},
-    "EyeReference": {"LoopID": eye.LOOP_ID_PLACES, "TailLen": 1},
+    "WireProfile": {"WireDia": 3},
+    "EyeReference": {"LoopID": eye.LOOP_ID_PLACES, "TailLen": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: decimals
@@ -48,8 +48,10 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for name, decimals in dimensions.items()
 }
 REFERENCE_DIMENSIONS = frozenset({"WireDia"})
+# The wire is bought stock: an untoleranced reference whose supplier tolerance
+# governs (owner rule; #290 reviews asked for a printed band).
 DIMENSION_CALLOUTS: dict[str, str] = {
-    "WireDia": "WIRE",
+    "WireDia": "WIRE AS SUPPLIED;\nSUPPLIER TOLERANCE",
     "LoopID": "MHA-DT-VN-65 BEAD CHAIN PASSES FREELY",
 }
 if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
@@ -62,7 +64,7 @@ if not REFERENCE_DIMENSIONS <= set(DRAWING_PRECISION_BY_NAME):
 DRAWING_NOTES = "\n".join(
     (
         "1. LOOP CLOSED ON THE TAIL; LOOP AND TAIL IN ONE PLANE.",
-        "2. TAIL CLAMPED FLAT ON THE MHA-DT-06 ARM FACE"
-        " UNDER THE MHA-SH-VN-51 SCREW HEAD.",
+        "2. TAIL STRAIGHT AND FLAT; CLAMPS UNDER THE MHA-SH-VN-51 HEAD"
+        " ON THE MHA-DT-06 ARM.",
     )
 )

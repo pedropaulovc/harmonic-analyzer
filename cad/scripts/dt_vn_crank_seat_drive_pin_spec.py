@@ -17,13 +17,21 @@ face at y = 0, the rounded lead end at y = LENGTH.
 
 from __future__ import annotations
 
+import _config
 from _mcmaster_98381a434 import (
     DIA_BAND_IN,  # noqa: F401 -- re-exported: catalogue diameter tolerance (in)
     DOWEL_SIZE,
     MM_PER_IN,  # noqa: F401 -- re-exported with the inch band
 )
+from _package_units import drawing_unit
 from _sprocket_seat_geometry import DRIVE_PIN_DIA, DRIVE_PIN_PROUD
 from _supplier_pin_data import SupplierPinReference
+
+# #290: the registry row's drawing_unit (in) is this sheet's unit; it drops
+# the supplier REFs' inch suffix.
+UNIT = drawing_unit(
+    "parts/dt-vn-crank-seat-drive-pin", _config.parts("dt-vn-crank-seat-drive-pin")
+)
 
 SKU = "98381A434"
 DIA, LENGTH = DOWEL_SIZE  # 2.38125 x 6.35
@@ -33,10 +41,9 @@ PRESS_DEPTH = LENGTH - DRIVE_PIN_PROUD  # 3.95
 if abs(DIA - DRIVE_PIN_DIA) > 1e-12:
     raise AssertionError(f"{SKU} is not the seat interface's drive pin")
 
-# McMaster engineering drawing inspected 2026-10-19. Its .0937 nominal
-# differs from exact 3/32 stock geometry: print equivalent .0938/.0940
-# native reference limits rather than rounding or moving the cylinder.
-# The catalogue-derived DIA_BAND_IN and all fit controls remain unchanged.
+# McMaster engineering drawing inspected 2026-10-19. Its sizes print as
+# untoleranced REF (#2147): the catalogue tolerance governs. The
+# catalogue-derived DIA_BAND_IN and all fit controls remain unchanged.
 SUPPLIER_REFERENCE = SupplierPinReference(
     sku=SKU,
     units="in",
@@ -44,4 +51,5 @@ SUPPLIER_REFERENCE = SupplierPinReference(
     length_mm=LENGTH,
     diameter_precision=4,
     length_precision=2,
+    sheet_unit=UNIT,
 )
