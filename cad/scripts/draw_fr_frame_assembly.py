@@ -105,6 +105,7 @@ from fr_frame_attachment_spec import (
 )
 from fr_harmonic_base_spec import BOTTOM_WIDTH, DECK_HALF_X, STACK_HEIGHT
 import fr_frame_explode_spec as explode
+from fr_frame_setting_bands import TOP_AXIS_HEIGHT_BAND_MM
 from fr_nameplate_spec import (
     MOUNT_POS as NAMEPLATE_MOUNT_POS,
     PLATE_HEIGHT as NAMEPLATE_PLATE_HEIGHT,
@@ -150,7 +151,7 @@ UNIT = assembly_contract("fr-frame").drawing_unit
 HEIGHT_PLACES = 3
 INSET_PLACES = 2
 # The top cross-bore axis height (fr_frame_attachment_spec TOP_AXIS_*) prints
-# three places, 40.075, under the title block's .XXX band. Step 3 sets all
+# three places, 40.075, with its .XX-grade band (+/-.010). Step 3 sets all
 # four corners' axes to this one absolute height from the base underside
 # before step 5 match-drills the tubes, so the frame's own .72 tap station off
 # its rail top cannot carry it. MHA-FR-02's faced underside sits on the
@@ -779,7 +780,7 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
     )
 
     # The setting is the assembly's own TopAxisSetting dimension, shown in
-    # this view and imported with its places; it carries no band of its own.
+    # this view and imported with its band.
     _show_base_view_sketches(
         adapter, front, (TOP_AXIS_SETTING_FEATURE,), label="working front"
     )
@@ -810,8 +811,14 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
         _early_bound(screw_axis.GetDimension2(0), "IDimension").Tolerance,
         "IDimensionTolerance",
     )
-    if int(tolerance.Type) != 0:  # swTolType_e.swTolNONE: the title block's .XXX
-        raise RuntimeError("installed top cross-screw axis height carries a band")
+    band_m = TOP_AXIS_HEIGHT_BAND_MM / 1000.0
+    if (
+        int(tolerance.Type) != 4  # swTolType_e.swTolSYMMETRIC
+        or abs(float(tolerance.GetMaxValue()) - band_m) > 1e-9
+        or abs(float(tolerance.GetMinValue()) + band_m) > 1e-9
+        or int(screw_axis.GetPrimaryTolPrecision2()) != TOP_AXIS_HEIGHT_PLACES
+    ):
+        raise RuntimeError("installed top cross-screw axis height lost its band")
     screw_axis = _set_dimension_suffix(
         adapter,
         screw_axis,

@@ -104,6 +104,7 @@ from _paths import OUT_SLDPRT
 from _session import run_build
 from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
 from _drawing_precision import apply_drawing_precision
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _feature_tree import name_last_feature
 from _printed_tolerance import printed_deviations
 from _simplified_names import simplified_name
@@ -227,6 +228,7 @@ from fr_vn_tube_frame_cap_spec import (
 )
 from fr_tube_frame_spec import COLUMN_LENGTH, OUTER_DIA as COLUMN_OUTER_DIA
 import fr_frame_explode_spec as explode
+from fr_frame_setting_bands import TOP_AXIS_HEIGHT_BAND_MM
 
 ASM_NAME = "fr-frame"
 FRAME_EXPLODED = "FRAME_EXPLODED"
@@ -683,9 +685,8 @@ async def _author_top_axis_setting(adapter: Any) -> None:
     """MHA-FR-00 step 3's controlling height: a vertical construction line on
     the Front plane (sketch u, v = machine X, Y) up the +X column's axis, from
     the base underside to the top cross-bore axis. Its length carries the
-    setting's places for the drawing to import; it has no band of its own, so
-    the title block's .XXX grade governs it. No solid or pose edits; the
-    sketch is blanked."""
+    setting's band and places for the drawing to import. No solid or pose
+    edits; the sketch is blanked."""
     dims = SketchDims()
     check("create top-axis setting sketch", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
@@ -719,6 +720,14 @@ async def _author_top_axis_setting(adapter: Any) -> None:
     check("exit top-axis setting sketch", await adapter.exit_sketch())
     name_last_feature(adapter, TOP_AXIS_SETTING_FEATURE)
     dims.apply(adapter, TOP_AXIS_SETTING_FEATURE)
+    set_dimension_symmetric_tolerance(
+        adapter,
+        TOP_AXIS_SETTING_FEATURE,
+        TOP_AXIS_HEIGHT_DIMENSION,
+        TOP_AXIS_HEIGHT_BAND_MM,
+        places=TOP_AXIS_HEIGHT_PLACES,
+        display_unit=assembly_contract(ASM_NAME).drawing_unit,
+    )
     apply_drawing_precision(
         adapter,
         {TOP_AXIS_SETTING_FEATURE: {TOP_AXIS_HEIGHT_DIMENSION: TOP_AXIS_HEIGHT_PLACES}},

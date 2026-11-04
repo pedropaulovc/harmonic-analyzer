@@ -118,8 +118,8 @@ class Projection:
 def test_checked_heights_print_their_model_values() -> None:
     """The overall reference prints the cap stack's .001 grid exactly. The top
     cross-bore axis (MHA-FR-02's taps, .72 under its rail top) sits on the
-    .001 grid too, so it prints three places under the title block's .XXX
-    band, with no band of its own."""
+    .001 grid too, so it prints three places, with the .XX-grade band the
+    setting needs rather than the title block's .XXX."""
     from _title_block_units import render_number
 
     cap_in = drawing.CAP_TOP_Y / 25.4
@@ -128,7 +128,7 @@ def test_checked_heights_print_their_model_values() -> None:
     assert drawing.TOP_AXIS_HEIGHT_PLACES == 3
     axis_in = drawing.TOP_SCREW_Y / 25.4
     assert axis_in == pytest.approx(round(axis_in, 3), abs=1e-9)
-    assert not hasattr(drawing, "TOP_AXIS_HEIGHT_BAND_MM")
+    assert drawing.TOP_AXIS_HEIGHT_BAND_MM == pytest.approx(0.010 * 25.4)
     printed = render_number(axis_in, drawing.UNIT, drawing.TOP_AXIS_HEIGHT_PLACES)
     assert printed + drawing.TOP_AXIS_HEIGHT_SUFFIX == (
         "40.075 TOP CROSS-BORE AXIS HEIGHT FROM BASE UNDERSIDE"
