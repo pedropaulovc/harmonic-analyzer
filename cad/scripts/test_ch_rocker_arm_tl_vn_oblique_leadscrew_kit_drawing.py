@@ -2088,3 +2088,142 @@ def test_untyped_native_annotation_keeps_control_identity_and_value_guards(
     else:
         with pytest.raises(RuntimeError, match=message):
             verify()
+
+
+def _source_view(*, shown: str, active: str) -> SimpleNamespace:
+    """A drawing view whose source part is active in ``active``."""
+    document = SimpleNamespace(
+        ConfigurationManager=SimpleNamespace(
+            ActiveConfiguration=SimpleNamespace(Name=active)
+        )
+    )
+    return SimpleNamespace(ReferencedConfiguration=shown, ReferencedDocument=document)
+
+
+def test_supplier_references_are_proven_only_in_the_active_source_member(monkeypatch):
+    # Farm run 20261104T222143958Z: the FeedNut supplier references were
+    # imported into a FeedNut view while the part was active in its saved
+    # LeadScrew default; every attachment failed IsSame against the source
+    # sketch. The member that carries supplier references is the one the
+    # source is activated in, and it is not the saved default.
+    member = draw.SUPPLIER_REFERENCE_CONFIGURATION
+    default = _config.parts(spec.PART_NAME)["default_configuration"]
+    assert member == nut.CONFIGURATION != default
+    assert member in dict(draw.VARIANTS)
+    # The LeadScrew member carries none, so it needs no source transition.
+    assert draw.annotate_member(None, default, (), []) == ()
+
+    draw.require_source_configuration(None, _source_view(shown=member, active=member), member)
+    with pytest.raises(RuntimeError, match=f"active in '{default}'"):
+        draw.require_source_configuration(
+            None, _source_view(shown=member, active=default), member
+        )
+    with pytest.raises(RuntimeError, match="another member"):
+        draw.require_source_configuration(
+            None, _source_view(shown=default, active=member), member
+        )
+
+    def imported(*_args, **_kwargs):
+        raise AssertionError("supplier references imported against the wrong member")
+
+    monkeypatch.setattr(draw, "annotate_supplier_screw", imported)
+    cells = tuple(
+        (name, (0.0, 0.0), (0.0, 0.0, 1.0, 1.0))
+        for name in ("*Front", "*Top", "*Right", "*Isometric")
+    )
+    views = [_source_view(shown=member, active=default) for _ in cells]
+    with pytest.raises(RuntimeError, match=f"active in '{default}'"):
+        draw.annotate_member(None, member, cells, views)
+
+
+def test_build_activates_the_supplier_member_before_the_drawing_exists(
+    monkeypatch, tmp_path
+):
+    import _purchased_variant_drawing as variant_drawing
+
+    captured = {}
+
+    async def capture(_adapter, _spec, **kwargs):
+        captured.update(kwargs)
+        return {}
+
+    monkeypatch.setattr(draw, "build_purchased_variant_drawing", capture)
+    asyncio.run(draw.build(None))
+    assert captured["source_configuration"] == draw.SUPPLIER_REFERENCE_CONFIGURATION
+
+    # The shared helper activates it in the open part before it creates the
+    # drawing, so every view and every settled check sees that member active.
+    source = tmp_path / f"{spec.PART_NAME}.SLDPRT"
+    source.write_bytes(b"")
+    row = _config.parts(spec.PART_NAME)
+    model = SimpleNamespace(GetPathName=lambda: str(source))
+    adapter = SimpleNamespace(currentModel=model)
+    events = []
+
+    async def open_model(path):
+        events.append(("open", Path(path)))
+        return SimpleNamespace(is_success=True)
+
+    adapter.open_model = open_model
+    monkeypatch.setattr(variant_drawing, "check", lambda _label, _result: None)
+    monkeypatch.setattr(variant_drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(
+        variant_drawing,
+        "read_required_properties",
+        lambda _model, _names, required: {
+            "Number": str(row["number"]),
+            "Title": spec.PART_NAME,
+            "Stock Name": str(row["stock_name"]),
+            "Supplier": str(row["supplier"]),
+            "Supplier SKUs": ", ".join(row["supplier_skus"]),
+            "Material Specification": str(row["material_specification"]),
+            "Finish": str(row["finish"]),
+        },
+    )
+    monkeypatch.setattr(
+        variant_drawing,
+        "_show_reference_configuration",
+        lambda _adapter, shown, name, label: events.append(("activate", shown, name)),
+    )
+
+    class DrawingCreated(Exception):
+        pass
+
+    def new_drawing(*_args, **_kwargs):
+        events.append(("drawing",))
+        raise DrawingCreated
+
+    monkeypatch.setattr(variant_drawing, "new_project_drawing", new_drawing)
+    fake_spec = SimpleNamespace(
+        source=source,
+        source_kind="part",
+        artifact_stem=spec.PART_NAME,
+        layout=draw.SPEC.layout,
+    )
+    with pytest.raises(DrawingCreated):
+        asyncio.run(
+            variant_drawing.build_purchased_variant_drawing(
+                adapter,
+                fake_spec,
+                variants=draw.VARIANTS,
+                item=draw.ITEM,
+                purchase_unit=draw.PURCHASE_UNIT,
+                source_configuration=draw.SUPPLIER_REFERENCE_CONFIGURATION,
+            )
+        )
+    assert events == [
+        ("open", source),
+        ("activate", model, draw.SUPPLIER_REFERENCE_CONFIGURATION),
+        ("drawing",),
+    ]
+    with pytest.raises(ValueError, match="depicted member"):
+        asyncio.run(
+            variant_drawing.build_purchased_variant_drawing(
+                adapter,
+                fake_spec,
+                variants=draw.VARIANTS,
+                item=draw.ITEM,
+                purchase_unit=draw.PURCHASE_UNIT,
+                source_configuration="AsSupplied",
+            )
+        )

@@ -49,6 +49,7 @@ from _purchased_fastener_drawing import (
     add_purchased_footer,
 )
 from _purchased_title_fit import fit_purchased_title_block
+from _supplier_spring_drawing import _show_reference_configuration
 
 
 def configuration_view_cells(index: int, count: int) -> tuple:
@@ -125,6 +126,7 @@ async def build_purchased_variant_drawing(
     notes: str = "",
     title_fit: bool = False,
     view_angles: Mapping[str, float] | None = None,
+    source_configuration: str | None = None,
     unit: str = "mm",
 ) -> dict[str, str]:
     """Draw purchased-member references, with separately scoped rework sheets.
@@ -149,6 +151,12 @@ async def build_purchased_variant_drawing(
     (``fit_purchased_title_block``) and re-proves them settled.
     ``view_angles`` turns all four views of a named member by one native
     angle (radians) before fitting; other members stay unturned.
+    ``source_configuration`` activates that member in the open source part,
+    in memory, before the drawing exists. Supplier-reference attachment
+    proofs (``_supplier_screw_dimensions``) read the source part's ACTIVE
+    configuration, so a member that carries them must be the active one
+    while it is annotated and settled. The drawing saves only itself, so
+    the part file keeps its saved default.
     """
     if (additional_sheet_scales is None) != (append_sheets is None):
         raise ValueError("additional sheets require both scales and an author")
@@ -164,6 +172,8 @@ async def build_purchased_variant_drawing(
     view_angles = dict(view_angles or {})
     if set(view_angles) - set(configurations):
         raise ValueError("reference view angles must name depicted configurations")
+    if source_configuration is not None and source_configuration not in configurations:
+        raise ValueError("the active source configuration must be a depicted member")
     source = spec.source
     if spec.source_kind != "part" or not source.is_file():
         raise FileNotFoundError(
@@ -198,6 +208,11 @@ async def build_purchased_variant_drawing(
             raise RuntimeError(
                 f"{spec.artifact_stem}: stale {name} {properties[name]!r} != {value!r}"
             )
+    if source_configuration is not None:
+        # The just-opened part is the active document, as the transition requires.
+        _show_reference_configuration(
+            adapter, model, source_configuration, label=spec.artifact_stem
+        )
 
     draw, sheet = new_project_drawing(adapter, layout=spec.layout, unit=unit)
     reference_sheet_name = None

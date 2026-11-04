@@ -28,6 +28,7 @@ import draw_ch_rocker_arm_tl_vn_oblique_rail_kit as draw
 import test_ch_rocker_arm_tl_oblique_adapter_contract as contract
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DrawingLayout
+from _layout_geometry import estimate_text_box
 from _part_configuration_exports import member_configurations
 from _purchased_fastener_drawing import check_item, footer_top, note_lines
 from _purchased_part_variants import _member_properties
@@ -449,7 +450,7 @@ def test_rail_receipt_note_points_at_the_stations() -> None:
     # bar's drawing number.
     assert not re.search(r"\d", note.replace(bar["number"], ""))
     assert rail.RECEIPT_TEXT not in note
-    assert "RECEIPT CHECK" in note and "RECEIPT CHECK" in rail.RECEIPT_CALLOUT
+    assert "RECEIPT CHECK" in note and "RECEIPT CHECK" in rail.RECEIPT_FLAG
     assert "STOP AND REPORT" in note and "THE BAR IS DRILLED AS DRAWN" in note
     assert "USED UNCUT" in note and "TAP THE BAR TO THE RAIL" not in note
 
@@ -661,8 +662,8 @@ def test_receipt_dimensions_are_the_marked_model_dimensions() -> None:
     marked = set().union(*rail.DRAWING_DIMENSIONS.values())
     assert set(draw.RECEIPT_DIMENSIONS) == marked
     assert set(draw.FRONT_DIMENSION_PRECISION) == marked
-    assert draw.RECEIPT_CALLOUTS == {"Station8": rail.RECEIPT_CALLOUT}
-    assert draw.ARROWS_INSIDE == ("Station1",)
+    # Every station keeps its arrows inside, under its own text.
+    assert draw.ARROWS_INSIDE == rail.STATION_DIMENSIONS
     assert draw.RECEIPT_DIMENSIONS["Length"][:2] == (0.0, rail.LENGTH)
     offsets = []
     for name, x in zip(rail.STATION_DIMENSIONS, rail.HOLE_X, strict=True):
@@ -676,31 +677,105 @@ def test_receipt_dimensions_are_the_marked_model_dimensions() -> None:
     rail_edge = draw._FRONT_HALF[1]
     assert -offsets[0] - 0.003 > rail_edge
     assert draw.RECEIPT_DIMENSIONS["Length"][2] - 0.003 > rail_edge
+    # The pitch leaves a row's text CLEAR_GAP_M under the nearer row's
+    # extension-line overrun, which ends over the 75 and 135 values.
+    text_top = draw.TEXT_OVER_LINE + draw.DIMENSION_TEXT_HEIGHT / 2.0
+    assert draw.STATION_ROW_PITCH - text_top - _EXTENSION_GAP >= draw.CLEAR_GAP_M + 0.0005
 
 
-def _station_texts():
-    """Each receipt text's sheet box at the dimension font (3.5 mm, about
-    2.5 mm a character), the station value and its ±band."""
+_EXTENSION_GAP = 0.0016  # extension lines start off, and overrun, by this much
+
+
+def _stack_ink(*, pitch=None, lift=None):
+    """The receipt stack as SolidWorks printed run 20261104T222143958Z's:
+    each text centred at its requested point, its dimension line
+    ``TEXT_OVER_LINE`` under it, the extension lines from the part to just
+    past the line. ``pitch`` re-spaces the station rows; ``lift`` raises
+    named texts off their lines (sheet metres)."""
     per_mm = draw._sheet_mm(draw.SHEET_SCALE)
+    center_y = draw.FRONT_CENTER[1]
     end_face_x = draw.FRONT_CENTER[0] - draw._FRONT_HALF[0]
+    edge = draw._FRONT_HALF[1]
 
     def sheet(x_mm: float) -> tuple[float, float]:
-        return end_face_x + x_mm * per_mm, draw.FRONT_CENTER[1]
+        return end_face_x + x_mm * per_mm, center_y
 
-    boxes = {}
+    inks = {}
     for name, (start, end, offset) in draw.RECEIPT_DIMENSIONS.items():
+        if pitch is not None and name != "Length":
+            offset = -(draw.STATION_FIRST_DROP + rail.STATION_DIMENSIONS.index(name) * pitch)
         x, y = draw.receipt_text_point(name, sheet(start), sheet(end), offset)
+        line_y = y - draw.TEXT_OVER_LINE
+        y += (lift or {}).get(name, 0.0)
         if name == "Length":
             text = f"({rail.LENGTH:.0f})"
         else:
             text = f"{end:.{rail.RECEIPT_PLACES}f} {rail.RECEIPT_TEXT}"
-        half = len(text) * 0.0025 / 2.0
-        boxes[name] = (x - half, y - 0.00175, x + half, y + 0.00175)
-    return end_face_x, per_mm, boxes
+        box = estimate_text_box(
+            text, anchor=(x, y), height=draw.DIMENSION_TEXT_HEIGHT, reference=2
+        )
+        text_box = (box.xmin, box.ymin, box.xmax, box.ymax)
+        x0, x1 = sheet(start)[0], sheet(end)[0]
+        segments = [((x0, line_y), (x1, line_y))]
+        if name in draw.TEXT_OUTSIDE_START:  # the leg under the outside text
+            segments.append(((text_box[0], line_y), (x0, line_y)))
+        down = line_y < center_y
+        part_side = center_y - edge - _EXTENSION_GAP if down else center_y + edge + _EXTENSION_GAP
+        overrun = line_y - _EXTENSION_GAP if down else line_y + _EXTENSION_GAP
+        segments += [((x0, part_side), (x0, overrun)), ((x1, part_side), (x1, overrun))]
+        inks[name] = (text_box, segments)
+    flag = estimate_text_box(
+        rail.RECEIPT_FLAG,
+        anchor=draw.RECEIPT_FLAG_XY,
+        height=draw.DIMENSION_TEXT_HEIGHT,
+        reference=5,
+    )
+    return end_face_x, per_mm, inks, (flag.xmin, flag.ymin, flag.xmax, flag.ymax)
+
+
+def test_receipt_stack_keeps_each_value_on_its_own_line_clear_of_the_others() -> None:
+    _, _, inks, flag = _stack_ink()
+    assert draw.receipt_stack_findings(inks, flag) == []
+    assert _inside_box(flag, draw.RECEIPT_FLAG_CELL)
+
+
+def test_receipt_stack_rule_refuses_run_20261104T222143958Z() -> None:
+    """The farm's FIX: the callout under 435.00 lifted that value 2.5 mm,
+    onto 375.00's text and its line, off its own (5.5 mm rows)."""
+    _, _, inks, flag = _stack_ink(pitch=0.0055, lift={"Station8": 0.0025})
+    findings = draw.receipt_stack_findings(inks, flag)
+    assert "Station8 text foot stands 3.35 mm off its own line" in findings
+    assert "Station7 text and Station8 text overlap" in findings
+    assert "Station7 line runs within 2 mm of Station8 text" in findings
+
+
+def test_receipt_stack_rule_refuses_a_row_pitch_under_the_gap() -> None:
+    # 5.5 mm rows leave each text 1.15 mm under the next row's line.
+    _, _, inks, flag = _stack_ink(pitch=0.0055)
+    findings = draw.receipt_stack_findings(inks, flag)
+    assert "Station1 line runs within 2 mm of Station2 text" in findings
+    assert len([f for f in findings if "line runs within" in f]) >= 7
+
+
+def test_receipt_stack_rule_refuses_a_flag_on_the_stack() -> None:
+    _, _, inks, flag = _stack_ink()
+    last_line = inks["Station8"][1][0][0][1]
+    raised = (flag[0], last_line - 0.001, flag[2], last_line + 0.0025)
+    findings = draw.receipt_stack_findings(inks, raised)
+    assert "the flag is not under the last station line" in findings
+    assert "Station8 line runs into the flag" in findings
+
+
+def _inside_box(inner, outer) -> bool:
+    return (
+        outer[0] <= inner[0] and outer[1] <= inner[1]
+        and inner[2] <= outer[2] and inner[3] <= outer[3]
+    )
 
 
 def test_receipt_texts_fit_their_spans_rows_and_the_border() -> None:
-    end_face_x, per_mm, boxes = _station_texts()
+    end_face_x, per_mm, inks, _ = _stack_ink()
+    boxes = {name: text for name, (text, _) in inks.items()}
     first = boxes["Station1"]
     # The 15 station spans 7.5 mm: its text stands left of the end face's
     # extension line, clear of it and inside the border with air.
@@ -710,25 +785,17 @@ def test_receipt_texts_fit_their_spans_rows_and_the_border() -> None:
     for name, x in zip(rail.STATION_DIMENSIONS[1:], rail.HOLE_X[1:], strict=True):
         box = boxes[name]
         # Between its own extension lines, clear of the end face's.
-        assert end_face_x + 0.002 <= box[0] and box[2] <= end_face_x + x * per_mm, name
-        # Clear of every farther station's extension line through its row.
-        for farther in rail.HOLE_X:
-            if farther > x:
-                assert box[2] + 0.002 <= end_face_x + farther * per_mm, (name, farther)
-    names = sorted(boxes)
-    for i, a in enumerate(names):
-        for b in names[i + 1 :]:
-            assert not _overlaps(boxes[a], boxes[b]), (a, b)
-    # The flagged last row's callout sits over the FRONT caption.
-    callout_bottom = boxes["Station8"][1] - 0.0045
-    assert draw.CAPTIONS[0][2] < callout_bottom - 0.001
+        assert end_face_x + 0.002 <= box[0] and box[2] + 0.002 <= end_face_x + x * per_mm, name
 
 
 def test_receipt_sheet_views_captions_and_notes_fit() -> None:
     footer = footer_top(rail.DRAWING_NOTES, label=NAME)
     assert draw.RECEIPT_NOTE_TOP == footer
     cells = {name: draw.view_cell(center, half) for name, center, half, _ in draw.VIEWS}
-    _, _, texts = _station_texts()
+    _, _, inks, _ = _stack_ink()
+    texts = {name: text for name, (text, _) in inks.items()}
+    flag = draw.RECEIPT_FLAG_CELL
+    texts["flag"] = flag
     for name, cell in cells.items():
         assert BORDER[0] <= cell[0] and cell[2] <= BORDER[2], name
         assert footer < cell[1] and cell[3] <= BORDER[3], name
@@ -741,14 +808,23 @@ def test_receipt_sheet_views_captions_and_notes_fit() -> None:
             assert not _overlaps(cells[first], cells[second]), (first, second)
     assert draw.TOP_CENTER[0] == draw.FRONT_CENTER[0]
     assert draw.RIGHT_CENTER[1] == draw.FRONT_CENTER[1]
+    caption_boxes = {}
     for label, x, y, scale in draw.CAPTIONS:
         cell = cells[f"*{label.title()}"]
         assert y < cell[1] and cell[0] < x < cell[2], label
         assert y - 0.006 > footer, label
         assert draw.caption_text(label, scale).startswith(label)
         box = (x - draw._CAPTION_HALF_WIDTH, y - 0.006, x + draw._CAPTION_HALF_WIDTH, y + 0.001)
+        caption_boxes[label] = box
         for text_name, text in texts.items():
             assert not _overlaps(box, text), (label, text_name)
+        for other, cell in cells.items():
+            assert not _overlaps(box, cell), (label, other)
+    # The flag stands between the stack and FRONT's caption, in the run of
+    # the end face and last station's extension lines.
+    end_face_x = draw.FRONT_CENTER[0] - draw._FRONT_HALF[0]
+    assert end_face_x < flag[0] and flag[2] < end_face_x + rail.HOLE_X[-1] * 0.0005
+    assert caption_boxes["FRONT"][3] < flag[1]
     label = draw.ITEM_LABEL_CELL
     assert all(not _overlaps(label, cell) for cell in cells.values())
     assert BORDER[1] < label[1] and label[3] <= BORDER[3]
@@ -802,7 +878,7 @@ def _receipt_annotations():
             name,
             _Display(
                 x,
-                {4: rail.RECEIPT_CALLOUT} if name == "Station8" else {},
+                {},
                 _Tolerance(4, -band, band),
             ),
         )
@@ -822,8 +898,7 @@ def _receipt_annotations():
         "bilateral",
         "places",
         "parenthesised",
-        "no-flag",
-        "flag-moved",
+        "callout",
         "length-bare",
         "missing",
         "arrows",
@@ -844,16 +919,14 @@ def test_receipt_controls_readback_refuses_every_drift(monkeypatch, fault) -> No
         by_name["Station3"].places = 1
     elif fault == "parenthesised":
         by_name["Station5"].texts = {1: "(", 2: ")"}
-    elif fault == "no-flag":
-        by_name["Station8"].texts = {}
-    elif fault == "flag-moved":
-        by_name["Station1"].texts = {4: rail.RECEIPT_CALLOUT}
+    elif fault == "callout":
+        by_name["Station8"].texts = {4: rail.RECEIPT_FLAG}
     elif fault == "length-bare":
         by_name["Length"].texts = {}
     elif fault == "missing":
         annotations = annotations[1:]
     elif fault == "arrows":
-        by_name["Station1"].ArrowSide = 1
+        by_name["Station5"].ArrowSide = 1
     elif fault == "nominal":
         by_name["Station6"].dimension.SystemValue += 0.0001
     if fault is None:

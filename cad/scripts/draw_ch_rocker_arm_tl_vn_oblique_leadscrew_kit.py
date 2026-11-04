@@ -76,6 +76,7 @@ from _purchased_variant_drawing import (
     build_purchased_variant_drawing,
     configure_reference_views,
 )
+from _rebuild import active_configuration_name
 from _session import run_build
 from _stock_trim_drawing import verify_machining_controls
 from _supplier_screw_dimensions import annotate_supplier_screw
@@ -136,6 +137,9 @@ ADDITIONAL_SHEETS_TITLE = "Member Rework"
 # The 410 screw lies along its cell's width: no project scale fits it
 # standing in the 52 mm row.
 VIEW_ANGLES = {leadscrew.CONFIGURATION: -math.pi / 2.0}
+# The only member carrying supplier references. The source part stays active
+# in it while the package is drawn (see require_source_configuration).
+SUPPLIER_REFERENCE_CONFIGURATION = feed_nut.CONFIGURATION
 # The retired TL-VN-55 sheet's shelves for the same nut: every chord's
 # horizontal text is wider than its span or crosses its own vertical
 # dimension line, so each text slides sideways, just past all of its own line
@@ -1374,6 +1378,28 @@ def _assert_hidden_lines_removed(views: Mapping[str, Any]) -> None:
             raise RuntimeError(f"{name}: nut view is not hidden-lines-removed ({mode})")
 
 
+def require_source_configuration(adapter: Any, view: Any, configuration: str) -> None:
+    """The supplier-reference proof reads the source part's active configuration.
+
+    ``_supplier_screw_dimensions`` resolves ``SupplierReference`` through
+    ``IView.ReferencedDocument``, whose features and sketch points belong to
+    the part's ACTIVE configuration. A FeedNut view proven against the saved
+    LeadScrew default maps every attachment to a different native point
+    (farm run 20261104T222143958Z: IsSame 0 for all, source in LeadScrew).
+    """
+    native = _early_bound(view, "IView")
+    if str(native.ReferencedConfiguration) != configuration:
+        raise RuntimeError(f"{configuration}: supplier view shows another member")
+    active = active_configuration_name(
+        adapter, _early_bound(native.ReferencedDocument, "IModelDoc2")
+    )
+    if active != configuration:
+        raise RuntimeError(
+            f"{configuration}: source part is active in {active!r}; its supplier "
+            "attachments cannot be proven against another configuration"
+        )
+
+
 def annotate_member(
     adapter: Any,
     configuration: str,
@@ -1381,12 +1407,13 @@ def annotate_member(
     views: list[Any],
 ) -> tuple[Callable[[], None], ...]:
     """The FeedNut panel's listing sizes; the LeadScrew's views stay plain."""
-    if configuration != feed_nut.CONFIGURATION:
+    if configuration != SUPPLIER_REFERENCE_CONFIGURATION:
         return ()
     by_orientation = {
         orientation: view for view, (orientation, _, _) in zip(views, cells, strict=True)
     }
     checks: list[Callable[[], None]] = []
+    require_source_configuration(adapter, by_orientation["*Front"], configuration)
     displays = annotate_supplier_screw(
         adapter,
         by_orientation,
@@ -1404,6 +1431,7 @@ def annotate_member(
     def assert_references() -> None:
         # The final check reacquires every native reference, then re-proves
         # the shelves against the stations measured here.
+        require_source_configuration(adapter, by_orientation["*Front"], configuration)
         assert_supplier_shelves(adapter, settled_references(), SHELVES, stations)
         _assert_hidden_lines_removed(by_orientation)
 
@@ -1427,6 +1455,7 @@ async def build(adapter: Any) -> dict[str, str]:
         additional_sheets_title=ADDITIONAL_SHEETS_TITLE,
         title_fit=True,
         view_angles=VIEW_ANGLES,
+        source_configuration=SUPPLIER_REFERENCE_CONFIGURATION,
         unit=part_drawing_unit(PART_STEM),
     )
 

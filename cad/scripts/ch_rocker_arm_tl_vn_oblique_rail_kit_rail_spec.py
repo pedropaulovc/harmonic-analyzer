@@ -317,8 +317,8 @@ RECEIPT_BAND = base_bar.RAIL_RECEIPT_BAND
 RECEIPT_TEXT = f"±{RECEIPT_BAND:.{RECEIPT_PLACES}f}"
 # The kit drawing's sheet that prints the receipt check; citations name it.
 RECEIPT_SHEET = 2
-# The callout under the stations' last row flags them as the note's check.
-RECEIPT_CALLOUT = "RECEIPT CHECK: ALL STATIONS, SEE NOTE"
+# The flag, a note of its own under the station stack, names the note's check.
+RECEIPT_FLAG = "RECEIPT CHECK: ALL STATIONS ABOVE, SEE NOTE"
 DRAWING_NOTES = "\n".join(
     (
         "RECEIPT CHECK BEFORE TAPPING MHA-CH-06-TL-20 BASE BAR: MEASURE THE",

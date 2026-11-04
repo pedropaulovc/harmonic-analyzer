@@ -10,8 +10,9 @@ hole pattern, so the received rail is measured before the base bar is
 tapped: every hole station is the Rail member's own native model dimension
 from the -X end face (rule 10, baseline), each carrying the base bar's
 receipt band as its native tolerance, the length a parenthesised reference.
-The callout under the stations flags them as the note's check, and the note
-says what to do when one is out of band. FRONT (the hole face) and TOP stand
+Each value sits on its own dimension line, clear of every other line; a note
+under the stack flags them as the note's check, and the note says what to
+do when one is out of band. FRONT (the hole face) and TOP stand
 at the sheet's 1:2, the RIGHT end profile at 2:1 so its raceway grooves read,
 and the isometric at 1:4.
 """
@@ -36,18 +37,21 @@ import _telemetry
 import ch_rocker_arm_tl_vn_oblique_rail_kit_carriage_spec as carriage
 import ch_rocker_arm_tl_vn_oblique_rail_kit_rail_spec as rail
 from _com import _early_bound
+from _drawing_annotation_extent import CLEAR_GAP_M, boxes_clear
 from _drawing_common import read_required_properties
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
-    set_dimension_callouts,
     set_reference_dimension,
 )
+from _drawing_layout_check import LeaderSegment, _segment_crosses_box
+from _drawing_leaders import Box, Segment, dimension_segments
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_types import DRAWING_TEMPLATES
 from _drawing_view_display import set_hidden_lines_removed
+from _layout_geometry import estimate_text_box
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import (
@@ -68,7 +72,6 @@ from _purchased_variant_drawing import (
     configure_reference_views,
 )
 from _session import run_build
-
 
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
@@ -154,14 +157,15 @@ _ISO_HALF = (0.045, 0.028)
 
 # View centres. FRONT spans x 57.5..282.5 mm: its -X end stands 45 mm in
 # from the border so the first station's text fits left of the end face. Its
-# eight station rows and the FRONT caption stand under it, the length row
-# over it; TOP stands over FRONT, in projection with it. RIGHT stands level
-# with FRONT, right of its end; the isometric fills the upper right, clear of
-# TOP's end and over RIGHT's caption.
-FRONT_CENTER = (0.170, 0.140)
-TOP_CENTER = (FRONT_CENTER[0], 0.195)
+# eight station rows, the receipt flag and the FRONT caption stand under it,
+# down to the footer, the length row over it; TOP stands over FRONT, in
+# projection with it. RIGHT stands level with FRONT, right of its end; the
+# isometric fills the upper right, clear of TOP's end and over RIGHT's
+# outline.
+FRONT_CENTER = (0.170, 0.160)
+TOP_CENTER = (FRONT_CENTER[0], 0.203)
 RIGHT_CENTER = (0.340, FRONT_CENTER[1])
-ISO_CENTER = (0.345, 0.215)
+ISO_CENTER = (0.345, 0.230)
 VIEWS = (
     ("*Front", FRONT_CENTER, _FRONT_HALF, SHEET_SCALE),
     ("*Top", TOP_CENTER, _TOP_HALF, SHEET_SCALE),
@@ -189,8 +193,23 @@ def view_cell(
 # further out, so no extension line crosses a dimension line or a text.
 # Each text's centre stands its row's drop under the rail's centreline,
 # between its extension lines, except where ``TEXT_OUTSIDE_START`` moves it.
-STATION_FIRST_DROP = 0.0135
-STATION_ROW_PITCH = 0.0055
+#
+# SolidWorks prints a linear dimension's text over its dimension line, the
+# text at the requested point: on run 20261104T222143958Z each station's
+# 3.5 mm text centre stood 2.6 mm over its line, its foot 0.85 mm over it.
+DIMENSION_TEXT_HEIGHT = 0.0035
+TEXT_OVER_LINE = 0.0026
+# A text's foot this close over its own line reads as sitting on it; the 435
+# value that stood 6.6 mm off its line on that run fails.
+TEXT_ON_LINE_MAX = 0.002
+# Every text clears every other dimension's lines and texts by CLEAR_GAP_M.
+# A row's text tops out TEXT_OVER_LINE plus half a text height over its own
+# line, 4.35 mm; a nearer row's extension lines overrun its line by about
+# 1.6 mm, over the next row's text where that text spans them (the 75 and
+# 135 values span the 15 and 75 stations). The pitch leaves 2.55 mm over
+# that, the next row's line 4.15 mm.
+STATION_FIRST_DROP = 0.008
+STATION_ROW_PITCH = 0.0085
 # The overall length, a reference, over the part.
 LENGTH_ROW_RISE = 0.016
 RECEIPT_DIMENSIONS = {
@@ -202,15 +221,14 @@ RECEIPT_DIMENSIONS = {
 RECEIPT_DIMENSIONS["Length"] = (0.0, rail.LENGTH, LENGTH_ROW_RISE)
 STATION_NOMINALS = dict(zip(rail.STATION_DIMENSIONS, rail.HOLE_X, strict=True))
 # The first station spans 7.5 mm at 1:2, narrower than its "15.00 ±0.08"
-# text (about 28 mm): the text stands outside the span, left of the -X end
-# face, its centre this far (sheet metres) from the face's extension line.
-TEXT_OUTSIDE_START = {rail.STATION_DIMENSIONS[0]: 0.016}
-# Smart arrows put a short span's arrows outside, onto the end face's
-# extension line; the 7.5 mm first span keeps two arrows inside.
-ARROWS_INSIDE = (rail.STATION_DIMENSIONS[0],)
+# text (about 24 mm): the text stands outside the span, left of the -X end
+# face and of FRONT's cell, its centre this far (sheet metres) from the
+# face's extension line, so its row can stand nearest the part.
+TEXT_OUTSIDE_START = {rail.STATION_DIMENSIONS[0]: 0.020}
+# Smart arrows put the 75 span's arrows outside, over the 15 row (run
+# 20261104T222143958Z); every station keeps its arrows inside, under its text.
+ARROWS_INSIDE = rail.STATION_DIMENSIONS
 _DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
-# The flag: under the outermost station row, naming the note's check.
-RECEIPT_CALLOUTS = {rail.STATION_DIMENSIONS[-1]: rail.RECEIPT_CALLOUT}
 _CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 _TOL_SYMMETRIC = 4  # swTolType_e.swTolSYMMETRIC
 FRONT_DIMENSION_PRECISION = {
@@ -218,16 +236,27 @@ FRONT_DIMENSION_PRECISION = {
     for places_by_name in rail.DRAWING_PRECISION.values()
     for name, places in places_by_name.items()
 }
-# FRONT's caption tops out under the last station row and its callout line.
-_FRONT_CAPTION_DROP = (
-    STATION_FIRST_DROP + (len(rail.STATION_DIMENSIONS) - 1) * STATION_ROW_PITCH + 0.0095
+# The flag: a note of its own, centred under the stack (a callout on the last
+# station stacked that value onto the row over it, the same run). Its top
+# stands 4 mm under the last row's line, under its extension lines' overrun.
+_LAST_ROW_LINE_DROP = (
+    STATION_FIRST_DROP
+    + (len(rail.STATION_DIMENSIONS) - 1) * STATION_ROW_PITCH
+    + TEXT_OVER_LINE
+)
+RECEIPT_FLAG_XY = (FRONT_CENTER[0], FRONT_CENTER[1] - _LAST_ROW_LINE_DROP - 0.004)
+RECEIPT_FLAG_CELL = (
+    RECEIPT_FLAG_XY[0] - 0.052,
+    RECEIPT_FLAG_XY[1] - 0.0065,
+    RECEIPT_FLAG_XY[0] + 0.052,
+    RECEIPT_FLAG_XY[1] + 0.001,
 )
 
 # View captions (3 mm text, top edge at y, centred on the view): each under
-# its view's outline, FRONT's under its dimensions.
+# its view's outline, FRONT's under its stack's flag.
 _CAPTION_GAP = 0.0027
 CAPTIONS = (
-    ("FRONT", FRONT_CENTER[0], FRONT_CENTER[1] - _FRONT_CAPTION_DROP, SHEET_SCALE),
+    ("FRONT", FRONT_CENTER[0], RECEIPT_FLAG_CELL[1] - 0.002, SHEET_SCALE),
     (
         "TOP",
         TOP_CENTER[0],
@@ -324,8 +353,8 @@ def _display(annotation: Any) -> Any:
 
 def assert_receipt_controls(adapter: Any, annotations: list[Any]) -> None:
     """Every station reads its nominal, the receipt band at the receipt
-    places and no reference brackets; the length reads parenthesised; the
-    last station carries the flag. Never repairs native state."""
+    places, no reference brackets and no callout (the flag is its own note);
+    the length reads parenthesised. Never repairs native state."""
     found = {}
     for annotation in annotations:
         found[dimension_name(adapter, annotation)] = _display(annotation)
@@ -359,7 +388,7 @@ def assert_receipt_controls(adapter: Any, annotations: list[Any]) -> None:
             or int(display.GetPrimaryTolPrecision2()) != rail.RECEIPT_PLACES
             or "(" in brackets[0]
             or ")" in brackets[1]
-            or callout != RECEIPT_CALLOUTS.get(name, "")
+            or callout
         ):
             raise RuntimeError(
                 f"rail {name}: value {value!r} (nominal {STATION_NOMINALS[name]!r}), "
@@ -388,12 +417,132 @@ def _receipt_dimensions(adapter: Any, front: Any) -> list[Any]:
         if name == "Length":
             set_reference_dimension(adapter, annotation, label=name)
             continue
-        if name in ARROWS_INSIDE:
-            display = _display(annotation)
-            display.ArrowSide = _DIM_ARROWS_INSIDE
-    set_dimension_callouts(adapter, annotations, RECEIPT_CALLOUTS, location="below")
+        display = _display(annotation)
+        display.ArrowSide = _DIM_ARROWS_INSIDE
     assert_receipt_controls(adapter, annotations)
     return annotations
+
+
+def _horizontal(segment: Segment) -> bool:
+    return abs(segment[0][1] - segment[1][1]) < 1e-6
+
+
+def _vertical(segment: Segment) -> bool:
+    return abs(segment[0][0] - segment[1][0]) < 1e-6
+
+
+def _crosses(segment: Segment, box: Box, *, gap: float) -> bool:
+    """``segment`` passes within ``gap`` of ``box``."""
+    (x0, y0), (x1, y1) = segment
+    return _segment_crosses_box(
+        LeaderSegment("", "dim", x0, y0, x1, y1), box, inset=-gap
+    )
+
+
+def receipt_stack_findings(
+    inks: dict[str, tuple[Box, list[Segment]]], flag: Box
+) -> list[str]:
+    """What breaks the receipt stack's spacing rule, from each dimension's
+    text box and lines (sheet metres) and the flag note's box.
+
+    Each text sits on its own dimension line: its foot at most
+    ``TEXT_ON_LINE_MAX`` over that line, inside the line's run. Its own
+    extension lines stay out of it. Every other dimension's text and lines,
+    extension lines included, and the flag stay ``CLEAR_GAP_M`` clear of it.
+    The station lines step outward from the part in station order, and the
+    flag stands under the last one, clear of every line.
+    """
+    findings = []
+    line_y = {}
+    for name, (text, segments) in inks.items():
+        horizontal = [segment for segment in segments if _horizontal(segment)]
+        if not horizontal:
+            findings.append(f"{name} has no dimension line")
+            continue
+        line = max(horizontal, key=lambda s: abs(s[1][0] - s[0][0]))
+        y = line[0][1]
+        line_y[name] = y
+        # The line's run: every horizontal of its own at its height, so the
+        # leg under an outside text counts.
+        run = [
+            x for segment in horizontal if abs(segment[0][1] - y) < 1e-6
+            for x in (segment[0][0], segment[1][0])
+        ]
+        foot = text[1] - y
+        if not -0.0005 <= foot <= TEXT_ON_LINE_MAX:
+            findings.append(
+                f"{name} text foot stands {foot * 1000:.2f} mm off its own line"
+            )
+        if text[2] <= min(run) or text[0] >= max(run):
+            findings.append(f"{name} text is not over its own line")
+        for segment in segments:
+            length = math.dist(*segment)
+            if _vertical(segment) and length > 0.003 and _crosses(segment, text, gap=0.0):
+                findings.append(f"{name} text sits on its own extension line")
+        for other, (other_text, other_segments) in inks.items():
+            if other == name:
+                continue
+            if name < other and not boxes_clear(text, other_text):
+                findings.append(f"{name} text and {other} text overlap")
+            if any(_crosses(s, text, gap=CLEAR_GAP_M) for s in other_segments):
+                findings.append(f"{other} line runs within {CLEAR_GAP_M * 1000:.0f} mm of {name} text")
+        if not boxes_clear(text, flag):
+            findings.append(f"{name} text and the flag overlap")
+        if any(_crosses(segment, flag, gap=0.001) for segment in segments):
+            findings.append(f"{name} line runs into the flag")
+    stations = [line_y[name] for name in rail.STATION_DIMENSIONS if name in line_y]
+    if any(b >= a - CLEAR_GAP_M for a, b in zip(stations, stations[1:])):
+        findings.append(f"station lines do not step outward: {stations}")
+    if stations and flag[3] >= stations[-1]:
+        findings.append("the flag is not under the last station line")
+    return findings
+
+
+def _receipt_ink(annotation: Any, *, label: str) -> tuple[Box, list[Segment]]:
+    """A receipt dimension's rendered text block, boxed from every text run it
+    draws (value, tolerance) by the layout audit's estimator, and its lines."""
+    data = _early_bound(_display(annotation).GetDisplayData(), "IDisplayData")
+    boxes = []
+    for index in range(int(data.GetTextCount())):
+        text = str(data.GetTextAtIndex(index) or "")
+        if not text.strip():
+            continue
+        anchor = [float(value) for value in data.GetTextPositionAtIndex(index)]
+        reference = int(data.GetTextRefPositionAtIndex(index))
+        box = estimate_text_box(
+            text,
+            anchor=(anchor[0], anchor[1]),
+            height=float(data.GetTextHeightAtIndex(index)),
+            reference=reference if 0 <= reference <= 5 else 0,
+            angle=float(data.GetTextAngleAtIndex(index)),
+        )
+        if box is not None:
+            boxes.append(box)
+    if not boxes:
+        raise RuntimeError(f"rail {label} draws no text to measure")
+    text_box = (
+        min(box.xmin for box in boxes),
+        min(box.ymin for box in boxes),
+        max(box.xmax for box in boxes),
+        max(box.ymax for box in boxes),
+    )
+    segments = dimension_segments(annotation)
+    _telemetry.info(
+        f"rail {label} ink: text=({', '.join(f'{v:.4f}' for v in text_box)}) "
+        f"lines={[tuple(round(v, 4) for p in s for v in p) for s in segments]}"
+    )
+    return text_box, segments
+
+
+def assert_receipt_stack_clear(adapter: Any, annotations: list[Any], flag: Box) -> None:
+    """The rendered stack obeys ``receipt_stack_findings``. Never moves ink."""
+    inks = {}
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        inks[name] = _receipt_ink(annotation, label=name)
+    findings = receipt_stack_findings(inks, flag)
+    if findings:
+        raise RuntimeError("rail receipt stack: " + "; ".join(findings))
 
 
 def _source_properties(model: Any) -> dict[str, str]:
@@ -451,20 +600,21 @@ def append_rail_receipt_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
 
     notes = []
     with _telemetry.span("drawing.rail_annotations"):
-        for label, x, y, scale in CAPTIONS:
-            text = caption_text(label, scale)
+        centred = [
+            (caption_text(label, scale), x, y, (
+                x - _CAPTION_HALF_WIDTH, y - 0.006, x + _CAPTION_HALF_WIDTH, y + 0.001
+            ))
+            for label, x, y, scale in CAPTIONS
+        ]
+        centred.append((rail.RECEIPT_FLAG, *RECEIPT_FLAG_XY, RECEIPT_FLAG_CELL))
+        for text, x, y, box in centred:
             note = _literal_note(adapter, text, x, y)
             bounds = _box(note.GetExtent(), label=text, kind="note")
             annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
             if not annotation.SetPosition(2 * x - (bounds[0] + bounds[2]) / 2, y, 0.0):
-                raise RuntimeError(f"{text}: failed to centre view caption")
-            box = (
-                x - _CAPTION_HALF_WIDTH,
-                y - 0.006,
-                x + _CAPTION_HALF_WIDTH,
-                y + 0.001,
-            )
+                raise RuntimeError(f"{text}: failed to centre the note")
             notes.append((note, text, text, box))
+        flag_note = notes[-1][0]
         note = _literal_note(adapter, ITEM_LABEL, *ITEM_LABEL_XY)
         notes.append((note, ITEM_LABEL, ITEM_LABEL, ITEM_LABEL_CELL))
         note = _literal_note(adapter, rail.DRAWING_NOTES, _NOTE_X, RECEIPT_NOTE_TOP)
@@ -524,6 +674,11 @@ def append_rail_receipt_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
                     f"rail note leaves its reserved space/border: {linked_text!r}: {box!r}"
                 )
         title_fit()
+        assert_receipt_stack_clear(
+            adapter,
+            annotations,
+            _box(flag_note.GetExtent(), label=rail.RECEIPT_FLAG, kind="note"),
+        )
 
     settled()
     return (settled,)
