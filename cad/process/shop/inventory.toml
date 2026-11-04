@@ -6635,11 +6635,12 @@ cite = ["Owner-approved oblique jig plain-pivot and integral feed-block design, 
 [[stock]]
 form = "rectangular_blank"
 material = "Acetal (Delrin)"
-note = "MHA-CH-06-TL-24 riser: black acetal (Delrin) bar, 1/4 x 1-3/4 in, oversized tolerance, 2 ft (McMaster 8663K55, selected by the owner 2026-11-03). Face to .24 and mill to the finished 1.60 x 13.40 blank. Selected stock only; no stock is claimed purchased or owned."
+note = "MHA-CH-06-TL-24 riser: black acetal (Delrin) bar, 1/4 x 1-3/4 in, oversized tolerance, 2 ft (McMaster 8663K55, selected by the owner and ordered 2026-11-03). Face to .24 and mill to the finished 1.60 x 13.40 blank."
 # Basis: catalogue nominals 1/4 x 1-3/4 in x 24 in = [44.45, 6.35] x 609.6 mm; oversized tolerance, so the faced and milled blank sizes are the ones that count. Not metrology.
 section_mm = [44.45, 6.35]
 length_mm = 609.6
-cite = ["Owner stock selection 2026-11-03: McMaster 8663K55, black acetal (Delrin) bar 1/4 x 1-3/4 in, oversized tolerance, 2 ft", "Original requirement: harmonic-analyzer issue 1619 https://github.com/pedropaulovc/harmonic-analyzer/issues/1619"]
+on_hand = false
+cite = ["McMaster-Carr 8663K55 https://www.mcmaster.com/8663K55/ ordered 2026-11-03", "Original requirement: harmonic-analyzer issue 1619 https://github.com/pedropaulovc/harmonic-analyzer/issues/1619"]
 
 # Machine-build stock order, 2026-11-03 (owner placed the orders). Each row is one order line:
 # catalogue nominal size and ordered length, not receipt metrology. on_hand stays false until
@@ -6703,7 +6704,7 @@ cite = ["OnlineMetals part 19714 https://www.onlinemetals.com/en/buy/x/pid/19714
 [[stock]]
 form = "flat_bar"
 material = "1018 cold-finish carbon steel"
-note = "Ordered 2026-11-03: 5/16 x 1 in 1018 CF flat, 2 pieces x 72 in (standard length). Allocation: ch-channel-lever (MHA-CH-02). Owner ruling 2026-11-03: 1018 steel supersedes the package's gray cast iron; the package material change lands in #2136."
+note = "Ordered 2026-11-03: 5/16 x 1 in 1018 CF flat, 2 pieces x 72 in (standard length). Allocation: ch-channel-lever (MHA-CH-02). Owner ruling 2026-11-03: 1018 steel supersedes the package's gray cast iron (package material changed in #2136)."
 section_mm = [25.4, 7.9375]
 length_mm = 1828.8
 on_hand = false
@@ -6712,7 +6713,7 @@ cite = ["OnlineMetals part 19714 https://www.onlinemetals.com/en/buy/x/pid/19714
 [[stock]]
 form = "flat_bar"
 material = "1018 cold-finish carbon steel"
-note = "Ordered 2026-11-03: 5/16 x 1 in 1018 CF flat, 36 in (standard length). Allocation: ch-channel-lever (MHA-CH-02). Owner ruling 2026-11-03: 1018 steel supersedes the package's gray cast iron; the package material change lands in #2136."
+note = "Ordered 2026-11-03: 5/16 x 1 in 1018 CF flat, 36 in (standard length). Allocation: ch-channel-lever (MHA-CH-02). Owner ruling 2026-11-03: 1018 steel supersedes the package's gray cast iron (package material changed in #2136)."
 section_mm = [25.4, 7.9375]
 length_mm = 914.4
 on_hand = false
@@ -7063,12 +7064,3 @@ section_mm = [152.4, 1.6002]
 length_mm = 152.4
 on_hand = false
 cite = ["McMaster-Carr 8956K455 https://www.mcmaster.com/8956K455/ ordered 2026-11-03"]
-
-[[stock]]
-form = "flat_bar"
-material = "black Delrin acetal resin (homopolymer)"
-note = "Ordered 2026-11-03: 1/4 x 1-3/4 in black Delrin acetal bar, oversized tolerance, 2 ft. Allocation: ch-rocker-arm-tl-oblique-riser (MHA-CH-06-TL-24), blank 1.60 x 13.40 in."
-section_mm = [44.45, 6.35]
-length_mm = 609.6
-on_hand = false
-cite = ["McMaster-Carr 8663K55 https://www.mcmaster.com/8663K55/ ordered 2026-11-03"]
