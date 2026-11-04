@@ -59,7 +59,8 @@ from _drawing_view_configuration import (
 )
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
 from _drawing_hidden_sketches import _show_base_view_sketches
 from _simplified_names import SIMPLIFIED_SUFFIX, simplified_name
 from fr_frame_attachment_spec import TOP_SCREW_Y

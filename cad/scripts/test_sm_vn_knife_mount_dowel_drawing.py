@@ -11,7 +11,8 @@ import pytest
 import _config
 import build_sm_vn_knife_mount_dowel as part
 import sm_vn_knife_mount_dowel_spec as spec
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 from _fastener_catalog import FASTENERS
 from _stock_recipe import recipe_declaration
 from diagnostics import diag_build_98381A473 as recipe

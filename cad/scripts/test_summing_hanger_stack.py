@@ -7,7 +7,8 @@ from pathlib import Path
 
 import pytest
 
-import _interference_contracts
+import _ha_harmonic_analyzer_interference
+import _sm_summing_interference
 import build_sm_summing_assembly as asm
 import fr_top_frame_spec as top_frame
 import sm_summing_assembly_spec as asm_spec
@@ -219,10 +220,8 @@ def test_new_washers_add_two_instances_to_the_thirteen_component_recipe() -> Non
 
 
 def test_washer_seat_pairs_allow_exact_contacts_but_no_solid_overlap() -> None:
-    summing = _interference_contracts.allowed_interference_pairs("sm-summing")
-    harmonic = _interference_contracts.allowed_interference_pairs(
-        "ha-harmonic-analyzer"
-    )
+    summing = _sm_summing_interference.ALLOWED_PAIRS
+    harmonic = _ha_harmonic_analyzer_interference.ALLOWED_PAIRS
     for number in (1, 2):
         pair = frozenset(
             (f"sm-vn-knife-hanger-stud-{number}", f"sm-vn-knife-hanger-washer-{number}")

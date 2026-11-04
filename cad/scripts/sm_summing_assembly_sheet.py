@@ -16,7 +16,6 @@ from _assembly_contract import assembly_contract
 from _inch_fraction import inch_fraction
 from _title_block_units import LENGTH_UNITS, render_number
 from sm_summing_assembly_spec import (
-    ASM_NAME,
     BOSS_HOOK,
     BOSS_JAM_NUT,
     COUNTER_DIMENSION,
@@ -40,7 +39,9 @@ from sm_summing_assembly_spec import (
 
 DRAWING_NUMBER = "MHA-SM-00"
 # Printed lengths are in the assembly contract's drawing_unit.
-UNIT = assembly_contract(ASM_NAME).drawing_unit
+# A literal stem: the build graph narrows this drawing's assemblies/*
+# dependency to exactly the contracts its closure names.
+UNIT = assembly_contract("sm-summing").drawing_unit
 # The BOM lists every family in the builder's insertion order.
 BOM_ORDER = tuple(QUANTITIES)
 # The drawing imports exactly these, each in the one view that dimensions it.

@@ -15,7 +15,8 @@ import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_vn_oblique_rail_spec as rail
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_vn_oblique_carriage as draw
-from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DrawingLayout
 
 STEM = "ch-rocker-arm-tl-vn-oblique-carriage"
 NAME = "ch_rocker_arm_tl_vn_oblique_carriage"

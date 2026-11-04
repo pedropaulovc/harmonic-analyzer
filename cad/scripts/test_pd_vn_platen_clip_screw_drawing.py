@@ -12,7 +12,8 @@ import build_pd_platen_clip as clip
 import build_pd_vn_platen_clip_screw as part
 import pd_platen_spec
 import pd_vn_platen_clip_screw_spec as spec
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 from _fastener_catalog import FASTENERS
 from _hole_spec import THREAD_MAJOR_MM
 from _stock_fastener import RigidTransform

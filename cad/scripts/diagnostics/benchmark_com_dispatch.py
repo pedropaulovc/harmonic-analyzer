@@ -147,7 +147,7 @@ async def _run(
                 started = time.perf_counter()
                 if workload == "layout":
                     import _drawing_layout_collect
-                    from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
+                    from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
 
                     layout = DrawingLayout(layout_name)
                     elements, _leaders, _region = (

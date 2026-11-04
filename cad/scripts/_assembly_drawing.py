@@ -14,7 +14,7 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
 )
-from _drawing_registry import DrawingLayout
+from _drawing_types import DrawingLayout
 from _drawing_view_configuration import (
     ViewRole,
     apply_view_configuration,

@@ -27,7 +27,9 @@ from _title_block_units import LENGTH_UNITS, render_number
 DRAWING_NUMBER = "MHA-MS-00"
 PLATE_DRAWING_NUMBER = str(_config.parts("ms-stop-plate")["number"])
 BLOCK_DRAWING_NUMBER = str(_config.parts("ms-stop-block")["number"])
-UNIT = assembly_contract(spec.ASM_NAME).drawing_unit
+# A literal stem: the build graph narrows this drawing's assemblies/*
+# dependency to exactly the contracts its closure names.
+UNIT = assembly_contract("ms-measuring-stick").drawing_unit
 
 BOM_ORDER = (spec.STICK, spec.BLOCK, spec.PLATE, spec.PLATE_SCREW, spec.THUMB_SCREW)
 

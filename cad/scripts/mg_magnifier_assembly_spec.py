@@ -37,7 +37,9 @@ from _assembly_contract import assembly_contract
 from _title_block_units import LENGTH_UNITS, render_number
 
 ASM_NAME = "mg-magnifier"
-UNIT = assembly_contract(ASM_NAME).drawing_unit
+# A literal stem: the build graph narrows this drawing's assemblies/*
+# dependency to exactly the contracts its closure names.
+UNIT = assembly_contract("mg-magnifier").drawing_unit
 
 # Native saved-view contract, captured before rebasing standard Front to -Z.
 # These preserve the fitter package's physical projections, not sheet wording.

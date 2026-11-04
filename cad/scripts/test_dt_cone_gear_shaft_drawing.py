@@ -26,7 +26,8 @@ import draw_dt_cone_gear_shaft as drawing
 import pytest
 from _drawing_annotation_extent import CLEAR_GAP_M
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 
 
 # Which NAMED band each land rides (U27, 2026-09-23): the two running lands

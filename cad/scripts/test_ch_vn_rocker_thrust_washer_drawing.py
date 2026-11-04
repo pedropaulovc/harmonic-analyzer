@@ -12,7 +12,8 @@ import pytest
 import _config
 import build_ch_vn_rocker_thrust_washer as part
 import ch_vn_rocker_thrust_washer_spec as spec
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 from _fastener_catalog import FASTENERS
 from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_3088A429 as recipe

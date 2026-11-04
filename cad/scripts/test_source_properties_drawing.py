@@ -446,6 +446,14 @@ def _required(draw: Path) -> set[str]:
     # The non-fastener purchased builder reads the spring builder's set.
     if "build_purchased_part_drawing" in imported:
         return set(purchased._PROPERTIES) | _SPRING_EXTRA
+    # The oblique jig's block sheets share draw_block, whose default reads the
+    # source properties unless the sheet passes its own reader (TL-32 does).
+    if "draw_block" in imported and not any(
+        isinstance(node, ast.Call)
+        and getattr(node.func, "id", getattr(node.func, "attr", "")) == "read_required_properties"
+        for node in ast.walk(tree)
+    ):
+        return _read_required(_tree(SCRIPTS / "_oblique_block_drawing.py"), {})
     return _read_required(tree, {})
 
 

@@ -19,7 +19,8 @@ import pd_transgear_front_bushing_spec as spec
 import pd_transgear_pin_spec as pin
 import pd_vn_transgear_retaining_ring_spec as ring
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
-from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DrawingLayout
 from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM

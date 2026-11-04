@@ -71,7 +71,8 @@ from _drawing_layout_check import DrawableRegion
 from _drawing_layout_collect import _iter_tables, _iter_view_annotations
 from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_point_in_view, model_points_in_view
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 from _drawing_sections import create_section_view
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_sheets import create_blank_drawing_sheets

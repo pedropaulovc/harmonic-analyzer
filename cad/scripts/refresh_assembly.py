@@ -32,6 +32,7 @@ from __future__ import annotations
 import importlib
 import sys
 
+from _buildgraph import interference_module
 from _session import run_build
 from _assembly import refresh_assembly
 from _refresh_tier import RefreshTier, explode_plan
@@ -42,13 +43,15 @@ USAGE = (
 )
 
 
-async def _refresh_parts(adapter, asm_name: str) -> dict[str, str]:
+def _allowed_pairs(asm_name: str):
     # The press-fit allowance lookup lives HERE (the entrypoint dodo invokes,
-    # outside every assembly's recipe closure) so _interference_contracts and
-    # its pinion geometry imports invalidate only the builders that import
-    # them directly (codex #359).
-    from _interference_contracts import allowed_interference_pairs
+    # outside every assembly's recipe closure) and resolves only this
+    # assembly's own table, so _<stem>_interference invalidates only the
+    # builder that imports it directly (and the assemblies that contain it).
+    return importlib.import_module(interference_module(asm_name)).ALLOWED_PAIRS
 
+
+async def _refresh_parts(adapter, asm_name: str) -> dict[str, str]:
     native_contact_check = None
     if asm_name in ("ch-channel", "sm-summing"):
         from _native_spring_contact import assert_assembly_spring_contacts
@@ -58,7 +61,7 @@ async def _refresh_parts(adapter, asm_name: str) -> dict[str, str]:
     artefacts = await refresh_assembly(
         adapter,
         asm_name,
-        allowed_pairs=allowed_interference_pairs(asm_name),
+        allowed_pairs=_allowed_pairs(asm_name),
         native_contact_check=native_contact_check,
     )
     if asm_name == "ha-harmonic-analyzer":

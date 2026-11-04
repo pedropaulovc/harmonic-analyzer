@@ -17,7 +17,8 @@ import dt_pinion_arbor_geometry as arbor_geometry
 import dt_pinion_arbor_spec as arbor
 import dt_pinion_handle_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
-from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DrawingLayout
 from _cone_axis_constants import MECHANISM_Z_SHIFT
 
 

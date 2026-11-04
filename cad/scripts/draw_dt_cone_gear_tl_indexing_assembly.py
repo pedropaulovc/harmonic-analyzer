@@ -34,7 +34,8 @@ from _drawing_common import (
     read_required_properties,
     set_high_quality_shaded_with_edges,
 )
-from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DrawingLayout
 from _drawing_tables import insert_bom_table
 from _drawing_view_configuration import (
     ViewRole,

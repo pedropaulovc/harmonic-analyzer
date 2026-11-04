@@ -1766,11 +1766,23 @@ with no COM work; another artifact misses and rebuilds/refreshes once. Assembly
 tokens propagate the guarantee through subassembly levels to the top model.
 
 Drawing recipes include the selected `_drawing_registry.py` row and the shared
-registry implementation, recorded under `cad/out/.drawing-registry/`. Adding or
-editing another row does not invalidate an independent drawing. Shared helper,
-template, schema and source-model identity changes still invalidate it. Consumers
-that read other rows or use an unclassified registry access retain the full
-registry dependency.
+registry implementation, recorded under `cad/out/.drawing-registry/`. The row
+schema (`DrawingSpec`, `DrawingLayout`), `DRAWING_TEMPLATES` and
+`layout_report_path` live in `_drawing_types.py`: shared drawing helpers import
+that module and never the row table, and only draw scripts read their own row
+as `DRAWINGS_BY_NAME["<own name>"]`. Adding or editing another row does not
+invalidate an independent drawing; `check:recipe` pins this for every drawing.
+Shared helper, template, schema and source-model identity changes still
+invalidate it. Consumers that read other rows or use an unclassified registry
+access retain the full registry dependency.
+
+Assembly contracts narrow the same way for drawings: a drawing folds only the
+`cad/config/assemblies/<stem>.yaml` files its closure names as
+`assembly_contract("<literal stem>")` (`_buildgraph.assembly_contract_reads`),
+so a new kit's contract re-keys no unrelated sheet. A closure that passes a
+runtime stem keeps the whole family: today the top-level assembly drawing (its
+BOM reads every component's number in a loop) and the paper-drive assembly
+drawing (its explode module reaches `_assembly`).
 
 Switching to these per-drawing dependencies changes existing drawing cache keys
 once. It does not reuse legacy keys; subsequent unrelated row changes stay

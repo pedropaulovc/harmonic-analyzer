@@ -23,7 +23,7 @@ import _drawing_dimensions as drawing_dimensions
 import _drawing_edge_dimensions as drawing_edge_dimensions
 import _drawing_projection as drawing_projection
 import _hole_spec
-import _interference_contracts as contracts
+import _ms_measuring_stick_interference as contracts
 import build_ha_harmonic_analyzer_assembly as top
 import draw_ms_measuring_stick_assembly as drawing
 import joint_retention
@@ -255,7 +255,7 @@ def test_thread_allowances_are_the_spec_values() -> None:
             plate_screw.LENGTH - stop.PLATE_THICKNESS,
         )
     )
-    pairs = contracts.allowed_interference_pairs(spec.ASM_NAME)
+    pairs = contracts.ALLOWED_PAIRS
     assert set(pairs) == {
         frozenset(("sh-vn-thumb-screw-1", "ms-stop-block-1")),
         frozenset(("ms-vn-stop-plate-screw-1", "ms-stop-block-1")),

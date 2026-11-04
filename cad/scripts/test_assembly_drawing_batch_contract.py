@@ -11,7 +11,8 @@ import _config
 import pytest
 import _assembly_drawing
 from _drawing_common import DrawingOutputs
-from _drawing_registry import DRAWINGS, DrawingLayout
+from _drawing_registry import DRAWINGS
+from _drawing_types import DrawingLayout
 from _drawing_view_configuration import (
     ASSEMBLY_VIEW_CONFIGURATION,
     SIMPLIFIED_VIEW_CONFIGURATION,

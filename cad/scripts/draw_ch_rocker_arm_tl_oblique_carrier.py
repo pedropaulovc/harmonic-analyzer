@@ -702,7 +702,7 @@ _ARROWS_INSIDE = 0  # swDimArrowsInside
 
 def _arrows_inside(adapter: Any, annotations: list[Any], name: str) -> None:
     """Hold one short dimension's arrows inside its extension lines, read
-    back (draw_ch_rocker_arm_tl_oblique_pivot_block). Machinist review of
+    back (_oblique_block_drawing). Machinist review of
     07a678696 (r1-r3 clarity): SolidWorks put the 34.9's arrows outside its
     17.5 sheet mm span, and its dimension line ran on past the left end into
     the REAM leader."""

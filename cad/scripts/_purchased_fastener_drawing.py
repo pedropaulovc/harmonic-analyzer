@@ -58,7 +58,7 @@ from _drawing_common import (
 from _drawing_layout_audit import annotation_display
 from _drawing_notes import add_property_linked_note, property_link
 from _drawing_projection import model_point_in_view
-from _drawing_registry import (
+from _drawing_types import (
     DRAWING_TEMPLATES,
     DrawingLayout,
     DrawingSpec,

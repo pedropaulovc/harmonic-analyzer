@@ -157,7 +157,7 @@ from fr_harmonic_base_fasteners import (
     require_through_seat_fit,
     through_seat_material,
 )
-from _interference_contracts import allowed_interference_pairs
+from _fr_frame_interference import ALLOWED_PAIRS
 from _cone_axis_constants import (
     FRAME_FRONT_COLUMN_Z,
     FRAME_REAR_COLUMN_Z,
@@ -1030,7 +1030,7 @@ async def build(adapter) -> dict[str, str]:
     assert_components_fully_defined(adapter)
     check_no_interference(
         adapter,
-        allowed_pairs=allowed_interference_pairs(ASM_NAME),
+        allowed_pairs=ALLOWED_PAIRS,
     )
     await _author_top_axis_setting(adapter)
     # Title-block identity for the assembly drawing (draw_fr_frame_assembly.py):

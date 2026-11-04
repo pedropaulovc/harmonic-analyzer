@@ -29,7 +29,7 @@ from _com import _early_bound, _read_member
 import _config
 from _custom_properties import apply_custom_properties
 from _drawing_layout_audit import run_layout_audit
-from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout, layout_report_path
+from _drawing_types import DRAWING_TEMPLATES, DrawingLayout, layout_report_path
 import _seat_forensics
 from _session import _visible_document_paths
 from _source_identity import _build_id

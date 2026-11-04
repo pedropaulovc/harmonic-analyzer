@@ -80,7 +80,7 @@ from _custom_properties import apply_custom_properties
 from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
 from _drawing_precision import apply_drawing_precision
 from _feature_tree import name_last_feature
-from _interference_contracts import allowed_interference_pairs
+from _ch_rocker_arm_tl_oblique_jig_interference import ALLOWED_PAIRS
 from _named_views import octant_rotation
 from _session import run_build
 from _simplified_names import simplified_name
@@ -835,10 +835,10 @@ async def build(adapter) -> dict[str, str]:
     )
     # This pose's check; verify.py's pass-sweep-interference-free walks both
     # passes. The allowed pairs are the jig's exact press fits and thread
-    # envelopes (_interference_contracts).
+    # envelopes (_ch_rocker_arm_tl_oblique_jig_interference).
     check_no_interference(
         adapter,
-        allowed_pairs=allowed_interference_pairs(ASM_NAME),
+        allowed_pairs=ALLOWED_PAIRS,
     )
     # The CL dowel's tip-above-riser reference, after the poses and the
     # interference check (it touches no component, mate or pose).

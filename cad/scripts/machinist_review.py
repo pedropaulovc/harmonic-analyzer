@@ -118,7 +118,8 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 import _telemetry  # noqa: E402
-from _drawing_registry import DRAWINGS, DRAWINGS_BY_NAME, CAD_ROOT  # noqa: E402
+from _drawing_registry import DRAWINGS, DRAWINGS_BY_NAME  # noqa: E402
+from _paths import CAD_ROOT  # noqa: E402
 from machinist_exceptions import load_exceptions as _load_exceptions  # noqa: E402
 import machinist_review_config as review_config  # noqa: E402
 import machinist_review_transport as _claude_transport  # noqa: E402

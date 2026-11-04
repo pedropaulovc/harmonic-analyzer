@@ -122,7 +122,7 @@ SIDE_LANE = 8.0 / _S  # first side-dimension line off the part
 # One 3.5 mm capital's advance: the c4-r2 readback measured 2.43 .. 2.74
 # sheet mm ("MATCHES KP08 BLOCK HOLES" the widest); take the widest.
 GLYPH = 2.75 / _S
-ROW_PITCH = 5.56 / _S  # text rows (draw_ch_rocker_arm_tl_oblique_pivot_block)
+ROW_PITCH = 5.56 / _S  # text rows (_oblique_block_drawing)
 # The layout audit reads two blocks stacked closer than its 5.66 mm row pitch
 # as one ([merged-blocks], c4-r8).
 STACK_PITCH = 5.66 / _S

@@ -173,7 +173,7 @@ def test_crank_keeper_ring_threads_the_pin_hole_clear_of_the_arm() -> None:
     )
     # One pin station everywhere: the drive train places the pin, and the
     # interference contract sizes the pin's allowed overlaps, at that value.
-    import _interference_contracts as contracts
+    import _dt_drive_train_interference as contracts
 
     assert drive.PIN_PROUD == ring.PIN_PROUD
     assert contracts._PIN_PROUD == ring.PIN_PROUD

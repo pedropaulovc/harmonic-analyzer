@@ -15,7 +15,8 @@ import dt_crank_handle_spec as handle
 import dt_crank_hub_geometry as geometry
 import draw_dt_crank_handle_pivot_screw as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
-from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DrawingLayout
 from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import drilled_oversize_mm, edge_break_chamfer_mm, printed_band_mm
 from _surface_finish import MACHINED_UM
@@ -561,14 +562,16 @@ def test_quarter_inch_arm_stock_fails_the_1_5d_rule(monkeypatch) -> None:
 
 
 def test_arm_interference_allowance_follows_the_thread_size() -> None:
-    # _interference_contracts names the size rather than importing this spec
-    # (every assembly imports it); the allowance must still be this thread's.
-    import _interference_contracts as contracts
+    # _dt_drive_train_interference names the size rather than importing this
+    # spec (its table stays off the handle specs); the allowance must still be
+    # this thread's.
+    import _dt_drive_train_interference as contracts
     from _hole_spec import TAP_DRILL_MM
+    from _interference_common import smooth_annulus_limit_mm3
 
     pair = frozenset(("dt-crank-handle-pivot-screw-1", "dt-crank-arm-1"))
-    assert contracts._DRIVE_TRAIN_ALLOWED_PAIRS[pair] == pytest.approx(
-        contracts._smooth_annulus_limit_mm3(
+    assert contracts.ALLOWED_PAIRS[pair] == pytest.approx(
+        smooth_annulus_limit_mm3(
             THREAD_MAJOR_MM[spec.THREAD_SIZE], TAP_DRILL_MM[spec.THREAD_SIZE], 7.0
         )
     )

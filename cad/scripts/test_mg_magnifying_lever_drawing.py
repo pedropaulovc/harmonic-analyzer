@@ -21,7 +21,7 @@ import mg_magnifying_lever_spec as spec
 import _drawing_leader_notes as leader_notes
 import _drawing_dimension_import as dimension_import
 from _drawing_layout_check import DrawableRegion
-from _drawing_registry import DRAWING_TEMPLATES
+from _drawing_types import DRAWING_TEMPLATES
 from _layout_audit import (
     find_leader_across_lines,
     find_leader_through_text,

@@ -13,7 +13,7 @@ from collections.abc import Callable, Sequence
 from typing import Any, Literal
 
 from _drawing_common import read_required_properties
-from _drawing_registry import DrawingSpec
+from _drawing_types import DrawingSpec
 from _purchased_fastener_drawing import (
     NumberFit,
     SupplierDimensions,

@@ -30,7 +30,7 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_registry import DRAWING_TEMPLATES, DrawingSpec
+from _drawing_types import DRAWING_TEMPLATES, DrawingSpec
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed

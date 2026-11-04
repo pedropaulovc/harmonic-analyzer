@@ -65,7 +65,8 @@ from _drawing_view_configuration import (
 )
 from _drawing_view_display import set_hidden_lines_removed
 from solidworks_mcp.adapters.solidworks.drawing import visible_component_entities
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
 from _drawing_hidden_sketches import _show_base_view_sketches
 from _simplified_names import simplified_name
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
@@ -1068,7 +1069,7 @@ def _append_template_sheet(adapter: Any, target: Any, *, name: str) -> None:
     try:
         donor, donor_sheet = new_project_drawing(
             adapter, layout=SHEET_LAYOUTS[name], scale=SHEET_SCALES[name],
-            unit=assembly_contract(spec.ASM_NAME).drawing_unit,
+            unit=assembly_contract("ms-measuring-stick").drawing_unit,
         )
         donor = _early_bound(donor, "IModelDoc2")
         donor_sheet = _early_bound(donor_sheet, "ISheet")
@@ -1114,7 +1115,7 @@ def _create_mixed_package_sheets(adapter: Any) -> None:
     """Use native template copies, not a metadata-only portrait declaration."""
     target, initial = new_project_drawing(
         adapter, layout=SHEET_LAYOUTS[SHEET_NAMES[0]], scale=SHEET_SCALES[SHEET_NAMES[0]],
-        unit=assembly_contract(spec.ASM_NAME).drawing_unit,
+        unit=assembly_contract("ms-measuring-stick").drawing_unit,
     )
     target = _early_bound(target, "IModelDoc2")
     initial = _early_bound(initial, "ISheet")

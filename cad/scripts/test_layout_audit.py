@@ -888,7 +888,8 @@ def test_every_drawing_task_targets_and_caches_its_layout_report():
     import importlib.util
     from pathlib import Path
 
-    from _drawing_registry import DRAWINGS, LAYOUT_REPORT_DIR
+    from _drawing_registry import DRAWINGS
+    from _drawing_types import LAYOUT_REPORT_DIR
 
     root = Path(__file__).resolve().parents[2]
     spec = importlib.util.spec_from_file_location("dodo", root / "dodo.py")

@@ -21,7 +21,7 @@ import yaml
 
 import _buildgraph as bg
 import _config
-import _interference_contracts as contracts
+import _ch_rocker_arm_tl_oblique_jig_interference as contracts
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_vn_oblique_carriage_spec as carriage
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
@@ -827,7 +827,7 @@ def test_interference_contracts_are_physical_seats_and_threads() -> None:
     ):
         # The literals carry the thread majors to 4 places, the specs to 3.
         assert envelope == pytest.approx(expected, abs=1e-3)
-    pairs = contracts.allowed_interference_pairs(spec.ASM_NAME)
+    pairs = contracts.ALLOWED_PAIRS
     names = {
         spec.instance_name(stem, index)
         for stem, count in spec.QUANTITIES.items()
@@ -1441,7 +1441,7 @@ def test_plain_pivot_radial_fits_are_not_interference_allowances() -> None:
         assert (diameter + band[1] - shaft_high, diameter + band[0] - shaft_low) == pytest.approx((0.0, 0.040))
     assert pivot_spacer.ID + pivot_spacer.ID_BAND[1] >= shaft_high
     assert pivot_shim.ID + pivot_shim.ID_BAND[1] > shaft_high
-    allowed = contracts.allowed_interference_pairs(spec.ASM_NAME)
+    allowed = contracts.ALLOWED_PAIRS
     for family in PIVOT_FAMILIES:
         for index in range(PIVOT_FAMILIES[family]):
             name = spec.instance_name(family, index)

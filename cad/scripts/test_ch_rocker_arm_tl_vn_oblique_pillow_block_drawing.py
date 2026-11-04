@@ -13,7 +13,8 @@ import build_ch_rocker_arm_tl_vn_oblique_pillow_block as part
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_vn_oblique_pillow_block_spec as spec
 import draw_ch_rocker_arm_tl_vn_oblique_pillow_block as draw
-from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DrawingLayout
 
 STEM = "ch-rocker-arm-tl-vn-oblique-pillow-block"
 NAME = STEM.replace("-", "_")

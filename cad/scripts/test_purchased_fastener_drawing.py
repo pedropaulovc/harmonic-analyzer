@@ -11,7 +11,7 @@ import pytest
 
 import _purchased_fastener_drawing as purchased
 import _purchased_variant_drawing as configured
-from _drawing_registry import DrawingLayout
+from _drawing_types import DrawingLayout
 
 
 @pytest.fixture(autouse=True)

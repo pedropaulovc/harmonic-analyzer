@@ -68,7 +68,7 @@ import sm_gooseneck_geom  # noqa: E402
 import spring_mount_geom as spring_mounts  # noqa: E402
 import settled_spring_seats  # noqa: E402
 from _counter_spring_hang import assert_counter_spring_top_hang  # noqa: E402
-from _interference_contracts import allowed_interference_pairs  # noqa: E402
+from _sm_summing_interference import ALLOWED_PAIRS as SUMMING_ALLOWED_PAIRS  # noqa: E402
 from _assembly import (  # noqa: E402
     assert_pose_ledger,
     check_no_interference,
@@ -499,7 +499,7 @@ async def _calibrate_counter(
         check_no_interference(
             adapter,
             allowed_pairs={
-                screw_pair: allowed_interference_pairs("sm-summing")[production_pair]
+                screw_pair: SUMMING_ALLOWED_PAIRS[production_pair]
             },
         )
         actual_centre = component_origin(adapter, counter)

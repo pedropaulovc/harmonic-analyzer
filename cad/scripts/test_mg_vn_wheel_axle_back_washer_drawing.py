@@ -12,7 +12,8 @@ import pytest
 import _config
 import build_mg_vn_wheel_axle_back_washer as part
 import mg_vn_wheel_axle_back_washer_spec as spec
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 from _fastener_catalog import FASTENERS
 from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_92916A480 as recipe

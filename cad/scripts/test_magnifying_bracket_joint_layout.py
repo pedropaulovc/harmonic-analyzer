@@ -9,7 +9,9 @@ from pathlib import Path
 import pytest
 
 from _column_clamp_interface import BAR_DEPTH
-import _interference_contracts as interference
+import _ha_harmonic_analyzer_interference as top_interference
+import _mg_magnifier_interference as magnifier_interference
+from _interference_common import smooth_annulus_limit_mm3
 import build_mg_magnifier_assembly as magnifier
 import build_mg_magnifying_bracket as bracket
 import build_sm_summing_assembly as summing
@@ -579,7 +581,7 @@ def test_real_jam_nut_footprint_stays_clear_of_every_rib_at_ordinary_bands() -> 
 
 
 def test_only_top_level_thread_overlap_is_allowed() -> None:
-    pairs = interference.allowed_interference_pairs("ha-harmonic-analyzer")
+    pairs = top_interference.ALLOWED_PAIRS
     lever_path = "sm-summing-1/sm-summing-lever-1"
     expected = {
         frozenset((f"mg-magnifier-1/mg-vn-magnifying-bracket-screw-{index}", lever_path))
@@ -591,11 +593,11 @@ def test_only_top_level_thread_overlap_is_allowed() -> None:
         if any("mg-vn-magnifying-bracket-screw-" in name for name in pair)
     }
     assert actual == expected
-    limit = interference._smooth_annulus_limit_mm3(
+    limit = smooth_annulus_limit_mm3(
         joint.SCREW_MAJOR_DIA, joint.TAP_DRILL_DIA, joint.ENGAGEMENT
     )
     assert all(pairs[pair] == pytest.approx(limit) for pair in expected)
-    local = interference.allowed_interference_pairs("mg-magnifier")
+    local = magnifier_interference.ALLOWED_PAIRS
     assert not any(
         "mg-vn-magnifying-bracket-screw" in name for pair in local for name in pair
     )
@@ -613,11 +615,11 @@ def test_wheel_pin_press_pair_pins_the_pin_and_bar_bore() -> None:
     import mg_wheel_axle_spec as pin
     import mg_wheel_bar_geom as bar
 
-    pairs = interference.allowed_interference_pairs("mg-magnifier")
+    pairs = magnifier_interference.ALLOWED_PAIRS
     limit = pairs[frozenset(("mg-wheel-axle-1", "mg-wheel-bar-1"))]
     # The pin stands in the bore over its nominal 8.91 (back end 0.59 inside
     # the 9.5 bar), inside the contract's 9.0.
     assert -pin.BACK_Y <= 9.0 < BAR_DEPTH
     assert limit == pytest.approx(
-        interference._smooth_annulus_limit_mm3(pin.PIN_DIA, bar.AXLE_BORE_DIA, 9.0)
+        smooth_annulus_limit_mm3(pin.PIN_DIA, bar.AXLE_BORE_DIA, 9.0)
     )

@@ -1274,10 +1274,10 @@ def test_the_set_screw_engagement_needs_no_declaration() -> None:
 
 
 def test_the_set_screw_interference_allowance_is_the_ear_tap() -> None:
-    """_interference_contracts restates the ear's apex height over the bore
-    and the bore as literals (every assembly imports it); they must be the
-    bracket spec's, and the screws' thread its apex tap's."""
-    import _interference_contracts as ic
+    """_ch_channel_interference restates the ear's apex height over the bore
+    and the bore as literals (the channel's table stays off the bracket spec);
+    they must be the bracket spec's, and the screws' thread its apex tap's."""
+    import _ch_channel_interference as ic
     import ch_pivot_bracket_spec as bracket_spec
     import sh_vn_arbor_set_screw_spec as screw_spec
 
@@ -1286,7 +1286,7 @@ def test_the_set_screw_interference_allowance_is_the_ear_tap() -> None:
         bracket_spec.BORE_DIA,
     )
     assert screw_spec.THREAD == bracket_spec.SET_SCREW_THREAD
-    pairs = ic.allowed_interference_pairs("ch-channel")
+    pairs = ic.ALLOWED_PAIRS
     for n in (1, 2):
         pair = frozenset((f"sh-vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}"))
         assert pairs[pair] == ic.PIVOT_EAR_SET_SCREW_LIMIT

@@ -12,7 +12,8 @@ import _config
 import build_mg_vn_magnifying_bracket_screw as part
 import magnifying_bracket_joint_layout as joint
 import mg_vn_magnifying_bracket_screw_spec as spec
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 from _fastener_catalog import FASTENERS
 from _stock_fastener import RigidTransform
 from _test_stock_recipes import discovered_recipes

@@ -13,7 +13,8 @@ import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
 import ch_rocker_arm_tl_vn_oblique_rail_spec as spec
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_vn_oblique_rail as draw
-from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DrawingLayout
 
 STEM = "ch-rocker-arm-tl-vn-oblique-rail"
 NAME = "ch_rocker_arm_tl_vn_oblique_rail"

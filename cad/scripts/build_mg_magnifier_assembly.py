@@ -124,7 +124,7 @@ from _assembly_patterns import (
     linear_component_pattern,
     PatternDirection,
 )
-from _interference_contracts import allowed_interference_pairs
+from _mg_magnifier_interference import ALLOWED_PAIRS
 from _mg_magnifier_explode import create_mg_magnifier_explode
 from _transforms import (
     IDENTITY,
@@ -1260,7 +1260,7 @@ async def build(adapter) -> dict[str, str]:
     write_dof_manifest(ASM_NAME)
     check_no_interference(
         adapter,
-        allowed_pairs=allowed_interference_pairs(ASM_NAME),
+        allowed_pairs=ALLOWED_PAIRS,
     )
     await _author_axle_stack_reference(adapter)
     await _author_lever_setting_reference(adapter, lever_name=ml, bracket_name=bracket)

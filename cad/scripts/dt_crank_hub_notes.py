@@ -1,7 +1,7 @@
 r"""Crank-hub drawing prose -- the feature callouts only its sheet prints.
 
 Split OUT of ``crank_hub_geometry`` / ``crank_hub_spec`` (codex #361): every
-crank part recipe and every assembly (through ``_interference_contracts``)
+crank part recipe and the drive train's table (``_dt_drive_train_interference``)
 imports those modules, so callout prose living there made a wording edit
 rebuild all five crank parts.  This module is imported ONLY by the hub and arm
 drawing scripts (the arm through ``crank_arm_notes``) and their offline tests,

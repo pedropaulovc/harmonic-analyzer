@@ -70,7 +70,8 @@ from _drawing_layout_collect import (
 )
 from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_point_in_view
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_tables import insert_bom_table
 from _drawing_view_configuration import (

@@ -14,7 +14,8 @@ import ch_rocker_arm_tl_vn_oblique_leadscrew_nut_spec as spec
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as feed
 import ch_rocker_arm_tl_oblique_feed_block_spec as feed_block
 import draw_ch_rocker_arm_tl_vn_oblique_leadscrew_nut as draw
-from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DrawingLayout
 
 STEM = "ch-rocker-arm-tl-vn-oblique-leadscrew-nut"
 NAME = "ch_rocker_arm_tl_vn_oblique_leadscrew_nut"

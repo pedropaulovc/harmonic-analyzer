@@ -14,7 +14,7 @@ import sm_summing_lever_spec as lever
 from _hole_spec import TAP_DRILL_MM
 from stock_anchor_geom import ANCHOR_9489T111 as anchor
 import ch_anchor_jam_nut_spec as jam_nut
-from _interference_contracts import CHANNEL_ANCHOR_NUT_THREAD
+from _ch_channel_interference import CHANNEL_ANCHOR_NUT_THREAD
 from _hole_spec import THREAD_MAJOR_MM
 
 

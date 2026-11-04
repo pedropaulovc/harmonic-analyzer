@@ -92,7 +92,9 @@ def test_drawing_has_only_pivot_and_carriage_sections_under_enforcement():
     tree=ast.parse(source)
     # Machinist review ENFORCE (#1974) carries over to the simplified block.
     assert any(isinstance(n,ast.Assign) and [t.id for t in n.targets if isinstance(t,ast.Name)]==['MACHINIST_REVIEW'] and ast.unparse(n.value)=='MachinistReviewMode.ENFORCE' for n in tree.body)
-    assert 'carriage counterbore floor' in source
-    assert 'pivot shoulder seat' in source
-    assert 'add_feature_control_frame' not in source
-    assert 'create_section_view' in source
+    # The sheet's views come from the builder it shares with TL-32.
+    builder=Path(__file__).with_name('_oblique_block_drawing.py').read_text()
+    assert 'carriage counterbore floor' in builder
+    assert 'pivot shoulder seat' in builder
+    assert 'add_feature_control_frame' not in builder
+    assert 'create_section_view' in builder

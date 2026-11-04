@@ -26,7 +26,8 @@ import ch_rocker_arm_tl_vn_oblique_leadscrew_stock_spec as spec
 import draw_ch_rocker_arm_tl_vn_oblique_leadscrew as draw
 from _drawing_contract import drawing_specification_violations
 from _drawing_notes import property_link
-from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DrawingLayout
 from _printed_tolerance import printed_band_mm
 from _supplier_screw_layout import supplier_screw_lane_plan
 

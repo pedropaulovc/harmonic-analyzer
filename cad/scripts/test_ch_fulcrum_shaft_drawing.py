@@ -323,11 +323,11 @@ def test_precision_matches_the_marked_dimensions() -> None:
 
 
 def test_interference_literals_track_the_set_screw_and_keeper() -> None:
-    import _interference_contracts
+    import _ch_channel_interference
     import ch_vn_fulcrum_set_screw_spec as set_screw
     from _hole_spec import TAP_DRILL_MM
 
-    assert _interference_contracts.FULCRUM_SET_SCREW_THREAD == (
+    assert _ch_channel_interference.FULCRUM_SET_SCREW_THREAD == (
         set_screw.MAJOR_DIA,
         TAP_DRILL_MM[set_screw.THREAD],
         set_screw.LENGTH,

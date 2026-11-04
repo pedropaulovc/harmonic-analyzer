@@ -50,7 +50,7 @@ import _drawing_layout_collect
 import _drawing_notes
 import _drawing_ray_pick
 from _drawing_ray_pick import RayPick
-from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
+from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
 import _drawing_view_display
 import _layout_audit
 import _telemetry

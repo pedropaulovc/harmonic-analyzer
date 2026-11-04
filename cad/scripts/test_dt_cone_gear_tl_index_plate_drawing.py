@@ -11,7 +11,8 @@ import build_dt_cone_gear_tl_index_plate as part
 import dt_cone_gear_tl_index_plate_spec as spec
 import draw_dt_cone_gear_tl_index_plate as drawing
 from _drawing_contract import model_toleranced_dimensions
-from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DrawingLayout
 
 INCH = 25.4
 

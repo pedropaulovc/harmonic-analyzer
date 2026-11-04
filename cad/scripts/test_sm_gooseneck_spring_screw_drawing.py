@@ -16,7 +16,8 @@ import sm_gooseneck_spring_joint as joint
 import sm_gooseneck_spring_screw_geom as geom
 import sm_gooseneck_spring_screw_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
-from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DrawingLayout
 
 
 def test_registry_paths_and_part_name() -> None:

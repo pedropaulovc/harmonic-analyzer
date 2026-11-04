@@ -5,7 +5,7 @@ import sys
 from _drawing_common import read_required_properties
 from _drawing_registry import DRAWINGS_BY_NAME
 from _session import run_build
-from draw_ch_rocker_arm_tl_oblique_pivot_block import draw_block
+from _oblique_block_drawing import draw_block
 import ch_rocker_arm_tl_oblique_feed_block_spec as part
 from _machinist_review_mode import MachinistReviewMode
 

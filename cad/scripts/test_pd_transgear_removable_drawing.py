@@ -333,12 +333,13 @@ def test_the_pin_locations_name_exactly_the_parts_the_drive_pins_press_into() ->
     location names each host by number.  Hosts are the assemblies' press-fit
     pairs: MHA-DT-VN-67 in the crankshaft, MHA-PD-VN-54 in the knob's drive
     collar (not the shaft)."""
-    from _interference_contracts import allowed_interference_pairs
+    from _dt_drive_train_interference import ALLOWED_PAIRS as drive_train
+    from _pd_paper_drive_interference import ALLOWED_PAIRS as paper_drive
 
     pins = {"dt-vn-crank-seat-drive-pin", "pd-vn-transgear-knob-drive-pin"}
     hosts: set[str] = set()
-    for assembly in ("dt-drive-train", "pd-paper-drive"):
-        for pair in allowed_interference_pairs(assembly):
+    for table in (drive_train, paper_drive):
+        for pair in table:
             stems = {name.rsplit("-", 1)[0] for name in pair}
             if stems & pins:
                 hosts |= stems - pins

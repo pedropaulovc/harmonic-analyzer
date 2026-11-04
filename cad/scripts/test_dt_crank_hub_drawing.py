@@ -507,7 +507,7 @@ def test_callout_prose_stays_out_of_every_part_recipe() -> None:
         "build_dt_crankshaft",
         "build_dt_crank_handle_pivot_screw",
         "build_dt_drive_train_assembly",
-        "_interference_contracts",
+        "_dt_drive_train_interference",
     ):
         assert not reached(stem) & notes, stem
     assert "dt_crank_hub_notes" in reached("draw_dt_crank_hub")

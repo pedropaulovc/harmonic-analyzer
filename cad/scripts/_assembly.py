@@ -3802,9 +3802,9 @@ async def refresh_assembly(
         assert_manifest_dof_state(adapter, asm_name, resolve=False)
         # allowed_pairs is threaded in by the refresh ENTRYPOINT
         # (refresh_assembly.py) rather than looked up here: importing
-        # _interference_contracts in this common helper would fold the press-fit
-        # contract module (and the pinion geometry constants it pulls in) into
-        # every assembly script's recipe closure (codex #359).
+        # any _<stem>_interference table in this common helper would fold the
+        # press-fit contract modules (and the geometry constants they pull in)
+        # into every assembly script's recipe closure (codex #359).
         check_no_interference(adapter, allowed_pairs=allowed_pairs)
         assert_model_healthy(adapter, label=asm_name, deep=True, rebuilt=True)
     else:

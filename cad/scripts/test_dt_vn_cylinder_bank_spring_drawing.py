@@ -13,7 +13,8 @@ import pytest
 import _config
 import build_dt_vn_cylinder_bank_spring as part
 import dt_vn_cylinder_bank_spring_spec as spec
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 from _fastener_catalog import FASTENERS
 from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_9714K392 as recipe

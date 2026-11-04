@@ -77,7 +77,8 @@ def test_drawing_registry_projection_rejects_executable_row_declarations(declara
 
 
 def test_drawing_registry_projection_tracks_new_selected_dataclass_fields():
-    from _drawing_registry import DRAWINGS_BY_NAME, DrawingSpec
+    from _drawing_registry import DRAWINGS_BY_NAME
+    from _drawing_types import DrawingSpec
 
     source = (SCRIPTS_DIR / "_drawing_registry.py").read_text(encoding="utf-8")
     extended_spec = make_dataclass(
@@ -253,7 +254,8 @@ def test_plain_pivot_components_are_first_class_jig_only_targets() -> None:
     import _config
     from _assembly_contract import assembly_contract
     from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
-    from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+    from _drawing_registry import DRAWINGS_BY_NAME
+    from _drawing_types import DrawingLayout
 
     identities = {
         "ch_rocker_arm_tl_oblique_feed_block": ("MHA-CH-06-TL-32", 1),
@@ -1944,7 +1946,7 @@ def test_library_modules_reach_no_builder():
     numbers a sibling needs move into the part's pure spec."""
     library = _library_modules()
     names = {path.name for path in library}
-    assert {"fr_harmonic_base_fasteners.py", "_interference_contracts.py"} <= names
+    assert {"fr_harmonic_base_fasteners.py", "_dt_drive_train_interference.py"} <= names
     assert {
         "dt_cone_swing_platform_geometry.py", "sh_vn_brass_fillister_screw_spec.py",
     } <= names
@@ -3011,20 +3013,26 @@ def test_every_catalog_consumer_in_the_tree_is_classified():
     assert unclassified == []
 
 
-def test_interference_contracts_do_not_depend_on_the_crankshaft_spec() -> None:
-    # Every assembly imports _interference_contracts, so a crankshaft length or
-    # station edit must not re-key them all (W15, Main 2026-09-25): the shaft
+def test_drive_train_interference_does_not_depend_on_the_crankshaft_spec() -> None:
+    # The drive train's table rides its soundness gate, so a crankshaft length
+    # or station edit must not re-key it (W15, Main 2026-09-25): the shaft
     # diameter comes from its owner, crank_hub_geometry.
-    closure = _helper_names("_interference_contracts.py")
+    closure = _helper_names("_dt_drive_train_interference.py")
     assert "dt_crank_hub_geometry" in closure
     assert "dt_crankshaft_spec" not in closure
 
 
-def test_interference_contracts_do_not_depend_on_magnifier_fit_or_pose() -> None:
-    # Shared interference oracles restate pinned literals; importing either
-    # magnifier owner would re-key unrelated assemblies on a fixture/fit edit.
-    closure = _helper_names("_interference_contracts.py")
-    assert "_hole_spec" in closure
+@pytest.mark.parametrize(
+    "table", ["_mg_magnifier_interference.py", "_ha_harmonic_analyzer_interference.py"]
+)
+def test_magnifier_interference_does_not_depend_on_magnifier_fit_or_pose(
+    table: str,
+) -> None:
+    # The magnifier and top tables restate pinned literals; importing either
+    # magnifier owner would re-key both tables and their soundness gates on a
+    # fixture/fit edit.
+    closure = _helper_names(table)
+    assert "_interference_common" in closure
     assert "mg_output_fixture_geom" not in closure
 
 

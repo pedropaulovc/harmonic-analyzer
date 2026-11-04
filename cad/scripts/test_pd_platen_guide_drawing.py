@@ -13,9 +13,10 @@ import pytest
 
 from _drawing_common import _contact_preview_grid, render_pdf_png, sanitize_pdf_metadata
 from _drawing_notes import property_link
-import _drawing_registry
+import _drawing_types
 import _config
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS, DrawingLayout
+from _drawing_registry import DRAWINGS
+from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
 from _gtol_frame import gtol_frame_xml as _gtol_frame_xml
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, blind_cut_dia_mm
 import build_pd_platen_guide as guide
@@ -73,7 +74,7 @@ def test_five_page_contact_preview_preserves_aspect_and_unused_cell(
         resolution=72,
     )
     monkeypatch.setitem(
-        _drawing_registry.DRAWING_TEMPLATES,
+        _drawing_types.DRAWING_TEMPLATES,
         DrawingLayout.LANDSCAPE,
         replace(
             DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE],
@@ -111,7 +112,7 @@ def test_portrait_raster_crops_pdfium_width_rounding(
     writer.add_blank_page(width=793, height=1224)
     writer.write(pdf)
     monkeypatch.setitem(
-        _drawing_registry.DRAWING_TEMPLATES,
+        _drawing_types.DRAWING_TEMPLATES,
         DrawingLayout.PORTRAIT,
         replace(
             DRAWING_TEMPLATES[DrawingLayout.PORTRAIT],

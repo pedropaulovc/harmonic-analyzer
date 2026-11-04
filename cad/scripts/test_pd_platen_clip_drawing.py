@@ -10,7 +10,8 @@ import pytest
 import build_pd_platen_clip as clip
 import draw_pd_platen_clip as draw
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
-from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DrawingLayout
 from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm
 from machinist_exceptions import load_exceptions

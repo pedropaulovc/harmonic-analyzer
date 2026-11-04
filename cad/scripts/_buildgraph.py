@@ -1534,14 +1534,9 @@ def _drawing_registry_reads(text: str) -> frozenset[str] | None:
         id(child): node for node in nodes for child in ast.iter_child_nodes(node)
     }
     registry_names = {"_drawing_registry", "DRAWINGS", "DRAWINGS_BY_NAME"}
-    allowed_exports = {
-        "DrawingLayout",
-        "DrawingSpec",
-        "DRAWING_TEMPLATES",
-        "DRAWINGS_BY_NAME",
-        # Row-independent: a path from the artefact stem the caller already has.
-        "layout_report_path",
-    }
+    # The row schema, templates and report paths live in _drawing_types; the
+    # row table exports nothing else a consumer may import and still narrow.
+    allowed_exports = {"DRAWINGS_BY_NAME"}
     for node in nodes:
         if (
             isinstance(node, ast.Constant)
@@ -1579,6 +1574,12 @@ def _drawing_registry_reads(text: str) -> frozenset[str] | None:
             return None
         if not isinstance(node, ast.Name):
             continue
+        if node.id == "vars" and _vars_of_plain_name(
+            parents.get(id(node)), node, registry_names
+        ):
+            # ``vars(module)`` is ``module.__dict__``: no wider than the
+            # attribute reads above. Bare ``vars()`` is the caller's namespace.
+            continue
         if node.id in {
             "eval",
             "exec",
@@ -1605,10 +1606,24 @@ def _drawing_registry_reads(text: str) -> frozenset[str] | None:
     return frozenset(rows)
 
 
+def _vars_of_plain_name(
+    call: ast.AST | None, func: ast.Name, registry_names: set[str]
+) -> bool:
+    """Whether ``func`` is the callee of ``vars(<name>)`` on a non-registry name."""
+    return (
+        isinstance(call, ast.Call)
+        and call.func is func
+        and not call.keywords
+        and len(call.args) == 1
+        and isinstance(call.args[0], ast.Name)
+        and call.args[0].id not in registry_names
+    )
+
+
 def drawing_registry_reads_selected(texts: tuple[str, ...], stem: str) -> bool:
     """Whether a complete consumer closure uses only the selected registry row.
 
-    Only the current schema/template imports and literal selected index lookups
+    Only the row table's ``DRAWINGS_BY_NAME`` import and literal selected index lookups
     can narrow. Module imports, aliases, re-exports and unclassified uses retain
     the full file; this deliberately does not attempt general Python dataflow.
     """
@@ -1617,6 +1632,114 @@ def drawing_registry_reads_selected(texts: tuple[str, ...], stem: str) -> bool:
         if rows is None or any(name != stem for name in rows):
             return False
     return True
+
+
+_CONTRACT_MODULE = "_assembly_contract"
+# Everything _assembly_contract exports that reaches a contract file by a
+# runtime value (or the whole family): no consumer may bind or call these.
+_CONTRACT_DYNAMIC_NAMES = frozenset(
+    {_CONTRACT_MODULE, "contract_path", "contract_files", "CONTRACT_DIR"}
+)
+
+
+@functools.lru_cache(maxsize=512)
+@_persisted_facts("assembly_contract_reads")
+def _assembly_contract_reads(text: str) -> frozenset[str] | None:
+    """The dashed stems one source passes to ``assembly_contract("<literal>")``.
+
+    ``None`` denotes an unclassified use: a module import, an alias, a
+    re-export, a non-literal stem, a dynamic import or a namespace escape.
+    Importing the ``AssemblyContract`` type reads no contract.
+    """
+    nodes = tuple(ast.walk(ast.parse(text)))
+    parents = {
+        id(child): node for node in nodes for child in ast.iter_child_nodes(node)
+    }
+    guarded = {"assembly_contract", *_CONTRACT_DYNAMIC_NAMES}
+    for node in nodes:
+        if (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and node.value.rsplit(".", 1)[-1] == _CONTRACT_MODULE
+        ):
+            return None  # string aliases can escape the static import graph
+        if isinstance(node, ast.Import):
+            if any(a.name.rsplit(".", 1)[-1] == _CONTRACT_MODULE for a in node.names):
+                return None
+        elif isinstance(node, ast.ImportFrom):
+            contract = (
+                node.module is not None
+                and node.module.rsplit(".", 1)[-1] == _CONTRACT_MODULE
+            )
+            for alias in node.names:
+                if alias.name in {"*", "import_module"} or (
+                    node.module == "sys" and alias.name == "modules"
+                ):
+                    return None
+                if contract:
+                    if alias.asname is not None or alias.name not in {
+                        "assembly_contract",
+                        "AssemblyContract",
+                    }:
+                        return None
+                elif alias.name in guarded or alias.asname in guarded:
+                    return None
+    stems = set()
+    for node in nodes:
+        if isinstance(node, ast.Attribute) and (
+            node.attr in guarded or node.attr in {"import_module", "modules"}
+        ):
+            return None
+        if not isinstance(node, ast.Name):
+            continue
+        if node.id == "vars" and _vars_of_plain_name(
+            parents.get(id(node)), node, guarded
+        ):
+            continue
+        if node.id in {
+            "eval",
+            "exec",
+            "globals",
+            "locals",
+            "vars",
+            "__import__",
+            "import_module",
+        } or node.id in _CONTRACT_DYNAMIC_NAMES:
+            return None
+        if node.id != "assembly_contract":
+            continue
+        call = parents.get(id(node))
+        if (
+            isinstance(call, ast.Call)
+            and call.func is node
+            and not call.keywords
+            and len(call.args) == 1
+            and isinstance(call.args[0], ast.Constant)
+            and isinstance(call.args[0].value, str)
+        ):
+            stems.add(call.args[0].value)
+            continue
+        return None
+    return frozenset(stems)
+
+
+def assembly_contract_reads(script: Path) -> frozenset[str] | None:
+    """The assembly contracts ``script``'s whole closure reads, as dashed stems.
+
+    ``None`` when any source in the closure (the accessor module itself
+    excepted) uses ``_assembly_contract`` unclassifiably: that consumer keeps
+    the whole ``assemblies/*`` family. Like the drawing-registry narrowing,
+    this does not attempt general Python dataflow: only literal stems count.
+    """
+    stems: set[str] = set()
+    for source in (_resolved(script), *(Path(p) for p in module_deps_of(script))):
+        if _resolved(source) == ASSEMBLY_CONTRACT_PY:
+            continue
+        reads = _assembly_contract_reads(read_source(source))
+        if reads is None:
+            return None
+        stems |= reads
+    return frozenset(stems)
 
 
 @functools.lru_cache(maxsize=32)
@@ -2165,6 +2288,20 @@ def assembly_contract_file(stem: str) -> str:
     or not it exists, so a missing contract fails the task loud."""
     dashed = stem.replace("_", "-")
     return str((ASSEMBLY_CONTRACT_DIR / f"{dashed}.yaml").resolve())
+
+
+def interference_module(stem: str) -> str:
+    """The dotted name of one assembly's allowed-interference table module
+    (``stem`` dashed or underscored): ``_<stem>_interference``, exporting
+    ``ALLOWED_PAIRS``. Its builder imports it statically; verify.py and
+    refresh_assembly.py resolve their own stem's module through this name."""
+    return f"_{stem.replace('-', '_')}_interference"
+
+
+def interference_contract_file(stem: str) -> str:
+    """Resolved path of :func:`interference_module`'s source. Listed whether
+    or not it exists, so a missing table fails the task loud."""
+    return str((SCRIPTS_DIR / f"{interference_module(stem)}.py").resolve())
 
 
 def assembly_contract_files() -> list[str]:

@@ -82,7 +82,8 @@ from _drawing_common import (
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_points_in_view
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision
 from _drawing_hidden_sketches import _show_base_view_sketches

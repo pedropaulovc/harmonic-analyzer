@@ -46,7 +46,7 @@ from _drawing_hidden_sketches import _show_hidden_owners, curate_view_dimensions
 from _drawing_layout_audit import annotation_display
 from _drawing_leaders import set_near_side_diameter
 from _drawing_projection import model_point_in_view
-from _drawing_registry import DRAWING_TEMPLATES, DrawingSpec
+from _drawing_types import DRAWING_TEMPLATES, DrawingSpec
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_view_display import set_hidden_lines_removed
 from _layout_audit import display_box

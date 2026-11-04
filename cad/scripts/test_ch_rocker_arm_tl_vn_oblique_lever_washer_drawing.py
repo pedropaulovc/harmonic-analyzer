@@ -18,7 +18,8 @@ import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
 import ch_rocker_arm_tl_oblique_feed_lever_spec as feed_lever
 import ch_rocker_arm_tl_vn_oblique_lever_washer_spec as spec
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 from _fastener_catalog import FASTENERS
 from _stock_recipe import recipe_declaration
 from diagnostics import diag_build_91812A230 as recipe

@@ -50,7 +50,7 @@ Fix-all strategy (M6.2): the hanger inserted at its exact final transform and
 fixed; the rod left free and constrained by mates (its Y-travel recorded into
 the DOF manifest, never authored); the carriage parts placed on-solution and
 lock-mated to the rod; transforms asserted by read-back; zero interference
-beyond the thread-envelope allowances in ``_interference_contracts``.
+beyond the thread-envelope allowances in ``_pn_pen_interference``.
 
 Fitter package (draw_pn_pen_assembly.py, MHA-PN-00): the three carriage
 settings -- stud height, pen yaw and nib preset -- are blanked construction
@@ -117,7 +117,7 @@ from _assembly import (
     write_dof_manifest,
 )
 from _transforms import IDENTITY, euler_from_rows
-from _interference_contracts import allowed_interference_pairs
+from _pn_pen_interference import ALLOWED_PAIRS
 from pn_vn_hanger_screw_spec import SHANK_LEN as HANGER_SHANK_LEN
 from pn_vn_hanger_screw_spec import THREAD_PITCH as HANGER_THREAD_PITCH
 from pn_vn_hanger_screw_spec import TIP_CHAMFER as HANGER_TIP_CHAMFER
@@ -559,7 +559,7 @@ async def build(adapter) -> dict[str, str]:
     write_dof_manifest(ASM_NAME)
     check_no_interference(
         adapter,
-        allowed_pairs=allowed_interference_pairs(ASM_NAME),
+        allowed_pairs=ALLOWED_PAIRS,
     )
     # The fitter drawing's settings: driving, toleranced model dimensions on
     # blanked construction sketches, authored once the as-built model is
