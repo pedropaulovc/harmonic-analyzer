@@ -11,7 +11,8 @@ import _config
 import _mcmaster_98381a438 as dims
 import build_ch_rocker_arm_tl_vn_oblique_nut_dowel as part
 import ch_rocker_arm_tl_vn_oblique_nut_dowel_spec as spec
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_types import DRAWING_TEMPLATES
 from _fastener_catalog import FASTENERS
 from _stock_recipe import recipe_declaration
 from diagnostics import diag_build_98381A438 as recipe
