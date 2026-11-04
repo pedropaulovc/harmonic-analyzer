@@ -13,6 +13,7 @@ from __future__ import annotations
 import ast
 import json
 import math
+import re
 import types
 from pathlib import Path
 
@@ -24,7 +25,7 @@ import _config
 import _ch_rocker_arm_tl_oblique_jig_interference as contracts
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
-import ch_rocker_arm_tl_vn_oblique_carriage_spec as carriage
+import ch_rocker_arm_tl_vn_oblique_rail_kit_carriage_spec as carriage
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_vn_oblique_cl_dowel_spec as cl_dowel
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
@@ -35,9 +36,9 @@ import sh_vn_clamping_kit_hold_down_stud_spec as hold_down_stud
 import ch_rocker_arm_tl_vn_oblique_hub_pin_spec as hub_pin
 import ch_rocker_arm_tl_oblique_jig_assembly_spec as spec
 import ch_rocker_arm_tl_oblique_end_bracket_spec as end_bracket
-import ch_rocker_arm_tl_vn_oblique_feed_nut_spec as feed_nut
+import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_feed_nut_spec as feed_nut
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
-import ch_rocker_arm_tl_vn_oblique_leadscrew_stock_spec as leadscrew_stock
+import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec as leadscrew_stock
 import ch_rocker_arm_tl_vn_oblique_lever_washer_spec as lever_washer
 import ch_rocker_arm_tl_oblique_feed_block_spec as feed_block
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
@@ -48,7 +49,7 @@ import ch_rocker_arm_tl_oblique_riser_spec as riser
 import sh_vn_clamping_kit_t_nut_spec as t_nut
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import ch_rocker_arm_tl_vn_oblique_kp08_screw_spec as kp08_screw
-import ch_rocker_arm_tl_vn_oblique_rail_spec as guide_rail
+import ch_rocker_arm_tl_vn_oblique_rail_kit_rail_spec as guide_rail
 import draw_ch_rocker_arm_tl_oblique_jig_assembly as drawing
 
 
@@ -297,7 +298,7 @@ def test_feed_nut_closes_on_the_leadscrew_axis_over_the_lug_taps() -> None:
     ))
     assert bore[2] == pytest.approx(leadscrew.SCREW_AXIS_Z)
     assert feed_block.NUT_FACE_X == feed_block.LUG_X0
-    # The TL-VN-82 nut's axis lands on the leadscrew axis at the lug face,
+    # The TL-VN-84 FeedNut's axis lands on the leadscrew axis at the lug face,
     # its seat face on the lug and its body end toward the spindle.
     nut = spec.FEED_NUT_PLACEMENTS[0]
     assert spec.frame_point(nut, (0.0, 0.0, 0.0)) == pytest.approx(bore)
@@ -404,16 +405,20 @@ def test_kit_occurrence_shift_uses_configured_role_local_references(
     monkeypatch, family: str,
 ) -> None:
     first = spec.instance_name(family, 0)
-    second = spec.instance_name(family, 1)
     common = spec.explode_shift(family, "z")
     monkeypatch.setattr(
         spec, "EXPLODE_STEPS",
         (*spec.EXPLODE_STEPS, ("one kit occurrence", (first,), "z", 1.0)),
     )
     assert spec.explode_shift(first, "z") == pytest.approx(common + 1.0)
-    assert spec.explode_shift(second, "z") == pytest.approx(common)
-    with pytest.raises(ValueError, match="nonuniform"):
-        spec.explode_shift(family, "z")
+    if spec.QUANTITIES[family] == 1:
+        # LeadScrew and FeedNut: the one occurrence is the whole family.
+        assert spec.explode_shift(family, "z") == pytest.approx(common + 1.0)
+    else:
+        second = spec.instance_name(family, 1)
+        assert spec.explode_shift(second, "z") == pytest.approx(common)
+        with pytest.raises(ValueError, match="nonuniform"):
+            spec.explode_shift(family, "z")
 
     physical, configuration = spec.KIT_IDENTITIES[family]
     for selector in (
@@ -631,15 +636,21 @@ def test_builder_places_exactly_the_inventory() -> None:
     # TL-20 remains unconfigured; heterogeneous kit members must be explicit.
     assert spec.COMPONENT_IDENTITIES[spec.BASE_BAR] == (spec.BASE_BAR, None)
     assert spec.KIT_IDENTITIES == {
+        spec.RAIL: ("ch-rocker-arm-tl-vn-oblique-rail-kit", "Rail"),
+        spec.CARRIAGE: ("ch-rocker-arm-tl-vn-oblique-rail-kit", "Carriage"),
+        spec.LEADSCREW: ("ch-rocker-arm-tl-vn-oblique-leadscrew-kit", "LeadScrew"),
+        spec.FEED_NUT: ("ch-rocker-arm-tl-vn-oblique-leadscrew-kit", "FeedNut"),
         spec.HOLD_DOWN_STUD: ("sh-vn-clamping-kit-hardware", "HoldDownStud"),
         spec.T_NUT: ("sh-vn-clamping-kit-hardware", "TNut"),
         spec.FLANGE_NUT: ("sh-vn-clamping-kit-hardware", "FlangeNut"),
     }
     assert set(bg.references_of(JIG)) == PART_STEMS
+    # 29 logical rows from 25 native parts: two kits of two members, one of three.
     assert len(manifest) == len(spec.BOM_ORDER) == 29
-    assert len(PART_STEMS) == 27
-    # Option B (2026-11-04): the bought nut takes the retired TL-27's row.
-    assert spec.FEED_NUT == feed_nut.PART_NAME
+    assert len(PART_STEMS) == 25
+    # Option B (2026-11-04): the bought nut takes the retired TL-27's row,
+    # now as the TL-VN-84 FeedNut member.
+    assert spec.KIT_IDENTITIES[spec.FEED_NUT] == (feed_nut.PART_NAME, feed_nut.CONFIGURATION)
     assert spec.ITEM_NUMBERS[spec.FEED_NUT] == "16"
 
 
@@ -663,21 +674,42 @@ def test_actual_builder_sources_resolve_every_physical_producer(source_kind) -> 
                 node.func.id = "_excluded_source_sink"
         source = ast.unparse(tree)
     assert bg._AssemblySources(source).collect() == expected
-    assert len(expected) == 27
+    assert len(expected) == 25
 
 
 def test_kit_selectors_are_role_local_not_native_instance_indices() -> None:
     assert spec.instance_name(spec.BASE_BAR, 0) == spec.BASE_BAR + "-1"
     assert spec.KIT_COMPONENT_REFERENCES == {
         f"@{configuration}:{index}": (physical, configuration)
-        for physical, configuration in spec.KIT_IDENTITIES.values()
-        for index in range(1, 5)
+        for family, (physical, configuration) in spec.KIT_IDENTITIES.items()
+        for index in range(1, spec.QUANTITIES[family] + 1)
     }
     for family, (physical, configuration) in spec.KIT_IDENTITIES.items():
-        assert spec.QUANTITIES[family] == 4
         assert spec.component_family(physical, configuration) == family
     with pytest.raises(ValueError, match="no unique family"):
         spec.component_family(spec.CLAMPING_KIT, "Default")
+
+
+def test_kit_member_quantities_are_the_registry_configuration_quantities() -> None:
+    """Each kit's installed members, per configuration, are what the jig places;
+    the default configuration is a member and the kit quantity is their sum."""
+    kits: dict[str, dict[str, int]] = {}
+    for family, (physical, configuration) in spec.KIT_IDENTITIES.items():
+        kits.setdefault(physical, {})[configuration] = spec.QUANTITIES[family]
+    assert kits == {
+        "ch-rocker-arm-tl-vn-oblique-rail-kit": {"Rail": 2, "Carriage": 2},
+        "ch-rocker-arm-tl-vn-oblique-leadscrew-kit": {"LeadScrew": 1, "FeedNut": 1},
+        "sh-vn-clamping-kit-hardware": {"HoldDownStud": 4, "TNut": 4, "FlangeNut": 4},
+    }
+    for physical, members in kits.items():
+        row = _config.parts(physical)
+        assert {name: int(count) for name, count in row["configuration_quantities"].items()} == members
+        assert int(row["quantity"]) == sum(members.values())
+        assert row["default_configuration"] in members
+    assert _config.parts(spec.RAIL_KIT)["default_configuration"] == "Rail"
+    assert _config.parts(spec.LEADSCREW_KIT)["default_configuration"] == "LeadScrew"
+    # Both rails and the two selected carriages, one per rail.
+    assert spec.QUANTITIES[spec.RAIL] == spec.QUANTITIES[spec.CARRIAGE] == len(spec.RAILS)
 
 
 @pytest.fixture
@@ -685,64 +717,93 @@ def kit_placement_scene(monkeypatch):
     import build_ch_rocker_arm_tl_oblique_jig_assembly as builder
     import _component_references as references
 
-    components, batches = [], []
+    components, batches, singles = [], [], []
     model = types.SimpleNamespace(GetComponents=lambda _top_only: tuple(reversed(components)))
     adapter = types.SimpleNamespace(currentModel=model)
+
+    def insert(part, configuration, component_reference, name):
+        components.append(types.SimpleNamespace(
+            Name2=name,
+            ComponentReference=component_reference,
+            ReferencedConfiguration=configuration,
+            GetPathName=lambda part=part: f"C:/native/{part}.SLDPRT",
+        ))
+        return name
 
     async def batch(_adapter, rows, *, label):
         assert _adapter is adapter
         batches.append((label, rows))
-        names = []
-        for suffix, row in zip((41, 7, 103, 28), rows, strict=True):
-            name = f"{row['part']}-{suffix + 200 * len(batches)}"
-            components.append(types.SimpleNamespace(
-                Name2=name,
-                ComponentReference=row["component_reference"],
-                ReferencedConfiguration=row["configuration"],
-                GetPathName=lambda part=row["part"]: f"C:/native/{part}.SLDPRT",
-            ))
-            names.append(name)
-        return names
+        return [
+            insert(row["part"], row["configuration"], row["component_reference"],
+                   f"{row['part']}-{suffix + 200 * len(batches)}")
+            for suffix, row in zip((41, 7, 103, 28), rows, strict=True)
+        ]
 
-    async def individual(*_args, **_kwargs):
-        raise AssertionError("each kit member's four occurrences must remain batched")
+    async def individual(_adapter, part, origin, _euler, rows, *, ground,
+                         configuration, component_reference, label):
+        assert _adapter is adapter
+        singles.append((label, {
+            "part": part, "position": origin, "rows": rows, "ground": ground,
+            "configuration": configuration, "component_reference": component_reference,
+        }))
+        # Native suffixes run across the shared file, not by member ordinal.
+        return insert(part, configuration, component_reference, f"{part}-{900 - len(singles)}")
 
     monkeypatch.setattr(builder, "place_components_batch", batch)
     monkeypatch.setattr(builder, "place_component", individual)
     monkeypatch.setattr(references, "_early_bound", lambda value, _interface: value)
-    return builder, adapter, components, batches
+    return builder, adapter, components, (batches, singles)
 
 
 def _place_kit(scene):
     import asyncio
 
-    builder, adapter, _components, _batches = scene
+    builder, adapter, _components, _inserts = scene
     names = {}
     for family, (physical, _configuration) in spec.KIT_IDENTITIES.items():
         names.update(asyncio.run(builder._place_family(adapter, physical, family)))
     return names
 
 
-def test_builder_batches_each_member_with_explicit_native_identity(kit_placement_scene):
-    builder, adapter, _components, batches = kit_placement_scene
+def test_builder_places_each_member_with_explicit_native_identity(kit_placement_scene):
+    builder, adapter, _components, (batches, singles) = kit_placement_scene
     names = _place_kit(kit_placement_scene)
-    assert len(names) == 12
-    for family, rows in batches:
+    assert len(names) == sum(spec.QUANTITIES[family] for family in spec.KIT_IDENTITIES) == 18
+    # The clamping kit's members come four at a time and go in one batch each;
+    # the rail and leadscrew kits' members (1 or 2) go in one at a time.
+    assert [family for family, _rows in batches] == [
+        spec.HOLD_DOWN_STUD, spec.T_NUT, spec.FLANGE_NUT,
+    ]
+    assert [label for label, _row in singles] == [
+        spec.instance_name(family, index)
+        for family in (spec.RAIL, spec.CARRIAGE, spec.LEADSCREW, spec.FEED_NUT)
+        for index in range(spec.QUANTITIES[family])
+    ]
+    inserted = [(family, rows) for family, rows in batches] + [
+        (spec.component_family(row["part"], row["configuration"]), [row])
+        for _label, row in singles
+    ]
+    for family, rows in inserted:
         physical, configuration = spec.KIT_IDENTITIES[family]
-        assert len(rows) == 4
-        for index, row in enumerate(rows):
+        for row in rows:
+            index = int(row["component_reference"].rsplit(":", 1)[1]) - 1
             origin, rotation = spec.PLACEMENTS[family][index]
             assert row == {
                 "part": physical,
                 "position": list(origin),
                 "rows": [list(axis) for axis in rotation],
-                "ground": True,
+                "ground": family not in spec.MOVING,
                 "configuration": configuration,
                 "component_reference": f"{configuration}:{index + 1}",
             }
-        offset = 200 * (list(spec.KIT_IDENTITIES).index(family) + 1)
-        assert names[f"@{configuration}:1"] == f"{physical}-{41 + offset}"
-        assert names[f"@{configuration}:4"] == f"{physical}-{28 + offset}"
+    # The carriages and the feed nut ride the feed; rails and leadscrew stay put.
+    assert {family for family in spec.KIT_IDENTITIES if family in spec.MOVING} == {
+        spec.CARRIAGE, spec.FEED_NUT,
+    }
+    for offset, (family, _rows) in enumerate(batches, start=1):
+        physical, configuration = spec.KIT_IDENTITIES[family]
+        assert names[f"@{configuration}:1"] == f"{physical}-{41 + 200 * offset}"
+        assert names[f"@{configuration}:4"] == f"{physical}-{28 + 200 * offset}"
     builder._verify_kit_references(adapter, names)
 
 
@@ -803,8 +864,14 @@ def test_one_free_dof_slides_the_carriages_and_what_rides_them() -> None:
     contract = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert contract["number"] == spec.DRAWING_NUMBER
     assert contract["free_dof"] == 1
-    assert contract["allowed_free_stems"] == list(spec.MOVING)
-    assert contract["required_free_stems"] == list(spec.MOVING)
+    # The free-DOF gate reads native file stems: a moving kit member (Carriage,
+    # FeedNut) lists its kit's physical stem, once.
+    assert contract["allowed_free_stems"] == list(spec.MOVING_STEMS)
+    assert contract["required_free_stems"] == list(spec.MOVING_STEMS)
+    assert list(spec.MOVING_STEMS) == list(dict.fromkeys(
+        spec.COMPONENT_IDENTITIES[stem][0] for stem in spec.MOVING
+    ))
+    assert {spec.RAIL_KIT, spec.LEADSCREW_KIT} <= set(spec.MOVING_STEMS)
     assert contract["flip_invert"] == []
     assert spec.SLIDE_KEY == "carriage_slide"
     assert set(spec.MOVING) == {spec.CARRIAGE, spec.CARRIER, *spec.LOCKED_TO}
@@ -952,8 +1019,10 @@ def test_interference_contracts_are_physical_seats_and_threads() -> None:
     # The nut screws pass the flange's Ø3.5 holes: only the lug's taps and
     # the leadscrew's thread name the nut's neighbours.
     assert feed_nut.HOLE_DIA_MIN > fasteners.NUT_TO_FEED_BLOCK.major_mm
-    assert [pair for pair in pairs if f"{spec.FEED_NUT}-1" in pair] == [
-        frozenset((f"{spec.FEED_NUT}-1", f"{spec.LEADSCREW}-1"))
+    nut = spec.instance_name(spec.FEED_NUT, 0)
+    assert nut == "@FeedNut:1"
+    assert [pair for pair in pairs if nut in pair] == [
+        frozenset((nut, spec.instance_name(spec.LEADSCREW, 0)))
     ]
     inserted = (*SCREW_ROWS, spec.HOLD_DOWN_STUD, spec.FEED_NUT, spec.PIVOT_SCREW)
     occurrences = {
@@ -992,12 +1061,21 @@ def test_bom_rows_name_every_made_and_bought_item() -> None:
 
 
 def test_kit_bom_descriptions_use_native_member_authority() -> None:
-    for family, member in (
-        (spec.HOLD_DOWN_STUD, hold_down_stud),
-        (spec.T_NUT, t_nut),
-        (spec.FLANGE_NUT, flange_nut),
-    ):
+    members = {
+        spec.RAIL: guide_rail,
+        spec.CARRIAGE: carriage,
+        spec.LEADSCREW: leadscrew_stock,
+        spec.FEED_NUT: feed_nut,
+        spec.HOLD_DOWN_STUD: hold_down_stud,
+        spec.T_NUT: t_nut,
+        spec.FLANGE_NUT: flange_nut,
+    }
+    assert set(members) == set(spec.KIT_IDENTITIES)
+    for family, member in members.items():
         assert spec.BOM_DESCRIPTIONS[family] == member.BOM_DESCRIPTION
+    # The Amazon kits' members also carry their configuration names.
+    for family in (spec.RAIL, spec.CARRIAGE, spec.LEADSCREW, spec.FEED_NUT):
+        assert spec.KIT_IDENTITIES[family][1] == members[family].CONFIGURATION
 
 
 def test_bom_follows_the_part_registry() -> None:
@@ -1291,7 +1369,7 @@ FASTENER_TABLE = {
         pivot_block.SCREW_REACH - pivot_block.CARRIAGE_THREAD_DEPTH,
     ),
     "KP08_TO_BRACKET": ("#6-32 X 5/8 BHCS", 4, 10.875, -14.525),
-    # The 5/8 screw past the TL-VN-82 flange (its head seated in the
+    # The 5/8 screw past the TL-VN-84 FeedNut flange (its head seated in the
     # countersink) into the lug's THRU tap, the tip stopping inside it.
     "NUT_TO_FEED_BLOCK": (
         "#4-40 X 5/8 B18.6.3 FLAT HEAD", 4,
@@ -1368,7 +1446,7 @@ def test_fastener_table_engagement_and_protrusion() -> None:
     assert 1.5 * fasteners.BRACKET_TO_BAR.major_mm < low < high < leadscrew.BRACKET_THICK
     assert leadscrew.KP08_FOOT_THICK == 5.0  # UNVERIFIED: verify on receipt
     assert fasteners.WASHERS == (fasteners.LEVER_LOCK_WASHER,)
-    # The nut screws' flat heads seat in the TL-VN-82 flange's countersinks
+    # The nut screws' flat heads seat in the TL-VN-84 FeedNut's countersinks
     # (owner ruling 2026-11-04, option B; no washers): the grip is the flange
     # plus the head's nominal stand-proud above it.
     assert fasteners.NUT_TO_FEED_BLOCK.head == fasteners.RISER_TO_CARRIER.head
@@ -1490,16 +1568,20 @@ def test_step_10_states_the_in_situ_hub_fit_up() -> None:
     step = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("10. "))
     assert "THE DRO READS X 0, Y .5125 ±.0005" in step
     assert "MATCH-DRILL AND REAM THE HUB THERE" in step
-    hub_pin = f"HUB LOCATOR PIN (ITEM {spec.ITEM_NUMBERS[spec.HUB_PIN]})"
-    assert f"HUB Ø.4000-.4005 THRU, FOR THE {hub_pin}, BONDED AT STEP 11" in step
+    hub_pin_cited = f"{spec.BOM_DESCRIPTIONS[spec.HUB_PIN]} (ITEM {spec.ITEM_NUMBERS[spec.HUB_PIN]})"
+    assert f"HUB Ø.4000-.4005 THRU, FOR THE {hub_pin_cited}, BONDED AT STEP 11" in step
     assert "THEIR SPOTS" not in step and "THE CL HOLE OFF ITS SPOT" in step
     assert spec.carrier.HUB_RADIAL_STACK < 0.25
 
 
 def test_steps_10_and_11_name_item_9_as_its_bom_row() -> None:
-    """Review jig-asm r2/r3: one name for item 9 across BOM and steps."""
-    assert spec.BOM_DESCRIPTIONS[spec.HUB_PIN] == "HUB LOCATOR PIN"
-    cited = f"HUB LOCATOR PIN (ITEM {spec.ITEM_NUMBERS[spec.HUB_PIN]})"
+    """Review jig-asm r2/r3: one name for item 9 across BOM and steps; the
+    TL-00 review (farm 20261104T210601055Z) adds the pin's size to its row."""
+    assert spec.BOM_DESCRIPTIONS[spec.HUB_PIN] == "HUB LOCATOR PIN Ø.4000 X 2.00" == (
+        f"HUB LOCATOR PIN Ø{spec._length(hub_pin.DIA, 4)} X "
+        f"{spec._length(hub_pin.SUPPLY_LENGTH, 2)}"
+    )
+    cited = f"{spec.BOM_DESCRIPTIONS[spec.HUB_PIN]} (ITEM {spec.ITEM_NUMBERS[spec.HUB_PIN]})"
     for number in ("10. ", "11. "):
         step = next(text for text in spec.ASSEMBLY_STEPS if text.startswith(number))
         assert cited in step
@@ -1548,7 +1630,7 @@ def test_general_torque_note_covers_every_fastener_no_step_torques() -> None:
         spec.BRACKET_SCREW: "1. ",
         spec.LEVER_SCREW: "12. ",
         spec.PIVOT_SCREW: "P2. ",
-        spec.PILLOW_BLOCK_SCREW: "F1. ",
+        spec.PILLOW_BLOCK_SCREW: "F1B. ",
     }
     steps = (*spec.ASSEMBLY_STEPS, *spec.PIVOT_FIT_STEPS, *spec.FEED_FIT_STEPS)
     for label in torqued.values():
@@ -1729,7 +1811,7 @@ def _lens_area(r1: float, r2: float, d: float, steps: int = 200_000) -> float:
 
 
 def test_kp08_screws_torque_inside_the_foot_thread_and_screw_budgets() -> None:
-    # F1 tightens each KP08's two #6-32 X 5/8 button heads (TL-VN-65) to
+    # F1B tightens each KP08's two #6-32 X 5/8 button heads (TL-VN-65) to
     # 1.0 N·m: the foot taken as Zamak 3 (208 MPa), bearing round its Ø5 hole
     # with the block floated fully to one side; TL-28's tap at its worst-case
     # full thread; the screw under half its 140 ksi; and under Holo-Krome's
@@ -1754,9 +1836,9 @@ def test_kp08_screws_torque_inside_the_foot_thread_and_screw_budgets() -> None:
     assert min(margins.values()) > 1.0
     assert spec.KP08_SCREW_ENGAGEMENT_MIN >= 2.0 * row.major_mm
     assert spec.KP08_SCREW_TORQUE_NM < 15.0 * 0.112984829
-    # Step 7 fits them loose; F1 tightens them once the KP08s are aligned.
+    # Step 7 fits them loose; F1B tightens them once the KP08s are aligned.
     assert spec.PILLOW_BLOCK_SCREW not in spec.SNUG_FASTENERS
-    f1 = next(text for text in spec.FEED_FIT_STEPS if text.startswith("F1. "))
+    f1 = next(text for text in spec.FEED_FIT_STEPS if text.startswith("F1B. "))
     assert f"TIGHTEN THE KP08 SCREWS TO {spec._torque(spec.KP08_SCREW_TORQUE_NM)}" in f1
     seven = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("7. "))
     assert f"{spec._item(spec.PILLOW_BLOCK_SCREW)}, LOOSE" in seven
@@ -1801,27 +1883,83 @@ def test_kit_rails_and_carriages_carry_the_owner_note_and_the_play_check() -> No
     assert "ONLY ONTO A KIT FALSE RAIL" in three
 
 
-def test_f1_f2_prepare_seat_and_transfer_from_the_nut() -> None:
-    # Owner ruling 2026-11-04 (option B) and Main's tightening procedure: F1
-    # measures and prepares the nut before step 8 threads it, aligns the
-    # KP08s, then clocks and seats the nut on the leadscrew; F2 transfers the
-    # taps through it and screws it down with the leadscrew still in it.
-    steps = {
+# The feed fit-up's one linear order (TL-00 review, farm 20261104T210601055Z,
+# blocker: step 8 and F1 sent the fitter to each other).
+_FEED_SEQUENCE = ("7", "F1A", "8A", "F1B", "F2", "8B", "F3", "9")
+_STEP_REFERENCE = re.compile(r"\b(F\d[A-Z]?|\d+[A-Z])\b")
+
+
+def _feed_steps() -> dict[str, str]:
+    return {
         text.split(". ", 1)[0]: text
         for text in (*spec.ASSEMBLY_STEPS, *spec.FEED_FIT_STEPS)
     }
-    f1, f2 = steps["F1"], steps["F2"]
+
+
+def test_feed_fit_up_reads_in_one_order_with_one_way_references() -> None:
+    steps = _feed_steps()
+    assert [label for label in steps if label.startswith("F")] == ["F1A", "F1B", "F2", "F3"]
+    order = {label: index for index, label in enumerate(_FEED_SEQUENCE)}
+    seen = set()
+    for label in _FEED_SEQUENCE:
+        body = steps[label].split(". ", 1)[1]
+        for match in _STEP_REFERENCE.finditer(body):
+            target = match[1]
+            before = body[:match.start()]
+            seen.add((label, target))
+            assert target in order, (label, target)
+            if before.endswith("AFTER STEP "):
+                assert order[target] < order[label], (label, target)
+            elif before.endswith(("BEFORE STEP ", "GO TO STEP ")):
+                assert order[target] > order[label], (label, target)
+            elif before.endswith(("REPEAT ", "REPEAT F1B-")):
+                # F3's failure path only: redo the seat and transfer.
+                assert label == "F3" and target in ("F1B", "F2"), (label, target)
+            elif before == "COMPLETE ":
+                # A prerequisite opening the step: done before it.
+                assert order[target] < order[label], (label, target)
+            else:
+                # A hand-off ("COMPLETE F1B-F2."): the next steps in order.
+                assert order[target] > order[label], (label, target)
+    # Every hand-off and position marker that makes the chain, and no others.
+    assert seen == {
+        ("F1A", "8A"),
+        ("8A", "F1A"), ("8A", "F1B"), ("8A", "F2"),
+        ("F1B", "8A"),
+        ("F2", "F3"), ("F2", "8B"),
+        ("8B", "F3"),
+        ("F3", "8B"), ("F3", "F1B"), ("F3", "F2"),
+    }
+
+
+def test_f1_f2_prepare_seat_and_transfer_from_the_nut() -> None:
+    # Owner ruling 2026-11-04 (option B) and Main's tightening procedure: F1A
+    # measures and reworks the nut before step 8A threads it; F1B aligns the
+    # KP08s, then clocks and seats the nut on the leadscrew; F2 transfers the
+    # taps through it and screws it down with the leadscrew still in it.
+    steps = _feed_steps()
+    f1a, f1b, f2 = steps["F1A"], steps["F1B"], steps["F2"]
     clearance = spec._length(feed_block.SCREW_CLEARANCE_DIA, feed_block.NUT_PATTERN_PLACES)
     clock = f"{feed_block.NUT_CLOCK_DEG:.0f}°"
     order = (
-        f"BEFORE STEP 8, MEASURE THE FEED NUT {spec._item(spec.FEED_NUT)}: {feed_nut.RECEIPT_TEXT}",
+        f"BEFORE STEP 8A, MEASURE THE FEED NUT {spec._item(spec.FEED_NUT)}: {feed_nut.RECEIPT_TEXT}",
         "REJECT ONE OUTSIDE THESE",
-        "FACE ITS SPIGOT OFF FLUSH WITH THE FLANGE IN ONE LATHE PASS",
+        f"FACE AND COUNTERSINK IT PER {feed_nut.REWORK_SHEET_REFERENCE}",
         f"THEN MEASURE IT: {feed_nut.FACED_LENGTH_TEXT}, REJECT ONE OVER",
-        f"COUNTERSINK ITS {feed_nut.SCREW_COUNT} HOLES {feed_nut.CSK_ANGLE:.0f}° TO "
-        f"Ø{feed_nut.CSK_DIA:.1f} ±{feed_nut.CSK_DIA_BAND:.1f} MM",
-        f"NO LARGER THAN Ø{feed_nut.CSK_CUTTER_TEXT}",
-        "AFTER STEP 8",
+    )
+    positions = [f1a.index(phrase) for phrase in order]
+    assert positions == sorted(positions)
+    assert feed_nut.REWORK_SHEET_REFERENCE == f"{feed_nut.NUMBER} SHEET {feed_nut.REWORK_SHEET}"
+    # Codjiflo P2: the rework limits are the kit sheet's native dimensions,
+    # not TL-00 text; the 13.8 long max stays the fit-up's own acceptance.
+    for typed in (
+        f"Ø{feed_nut.CSK_DIA:.1f}", f"{feed_nut.FLANGE_THICK_MIN:.1f}",
+        f"{feed_nut.FLANGE_THICK_MAX:.1f}", feed_nut.CSK_CUTTER_TEXT,
+        f"{feed_nut.CSK_ANGLE:.0f}°", "LATHE", "SPIGOT",
+    ):
+        assert typed not in f1a, typed
+    order = (
+        "AFTER STEP 8A",
         f"ALIGN EACH KP08 SO THE SCREW RUNS CENTRED IN THE LUG'S Ø{clearance} CLEARANCE",
         f"TIGHTEN THE KP08 SCREWS TO {spec._torque(spec.KP08_SCREW_TORQUE_NM)}",
         f"{leadscrew.NEAR_STUB:.1f} MM PAST THE NEAR BLOCK",
@@ -1829,23 +1967,23 @@ def test_f1_f2_prepare_seat_and_transfer_from_the_nut() -> None:
         f"{clock} ±{feed_block.NUT_CLOCK_TOL_DEG:.0f}°",
         "TURN THE SCREW, NEVER SLIDE IT, UNTIL THE NUT SEATS FLAT ON THE LUG FACE",
     )
-    positions = [f1.index(phrase) for phrase in order]
+    positions = [f1b.index(phrase) for phrase in order]
     assert positions == sorted(positions)
     # Rule 25: a supplied nut (its spigot on, SUPPLIED_LENGTH long) passes the
     # incoming checks; the faced-length limit, which it exceeds, is printed
-    # once, after the facing pass.
+    # once, after the rework.
     faced = f"{feed_nut.LENGTH_MAX:.1f} MM"
     assert feed_nut.SUPPLIED_LENGTH > feed_nut.LENGTH_MAX
     assert faced not in feed_nut.RECEIPT_TEXT
-    assert f1.count(faced) == 1
-    assert f1.index("FACE ITS SPIGOT OFF") < f1.index(faced)
+    assert f1a.count(faced) == 1 and faced not in f1b
+    assert f1a.index("FACE AND COUNTERSINK") < f1a.index(faced)
     # F2's drills are TL-32's: the spot enters the least nut hole, the tap
     # drill is the lug's.
     assert spec.NUMBER_DRILL_MM[spec._SPOT_DRILL] == pytest.approx(feed_block.TRANSFER_SPOT_DIA, abs=1e-3)
     assert spec.NUMBER_DRILL_MM[spec._TAP_DRILL] == feed_block.NUT_TAP_DRILL
     # Owner ruling 2026-11-04 (#2177 option 3): F2 calipers the nut screws'
     # heads to the limit TL-32's head-to-body stack-up is built on, before
-    # they go in; oversize heads stop the fit-up, the nut body is never cut.
+    # they go in; an oversize head is replaced, the nut body is never cut.
     head_limit = spec._bound(feed_nut.SCREW_HEAD_DIA_MAX, 3, up=False)
     assert head_limit == ".212"
     assert feed_block.HEAD_TO_BODY_TERMS["head radius (F2 limit Ø.212, the catalogue's)"] == (
@@ -1858,27 +1996,34 @@ def test_f1_f2_prepare_seat_and_transfer_from_the_nut() -> None:
         f"CALIPER {feed_nut.SCREW_COUNT} FLAT HEADS {spec._item(spec.RISER_SCREW)}: "
         f"HEAD Ø{head_limit} MAX, AS B18.6.3'S MAX "
         f"{spec._length(feed_block.HEAD_DIA_SHARP_MAX, 3)} REACHES THE NUT BODY",
-        "REJECT ONE OVER",
-        "IF THEY RUN OVERSIZE, STOP AND REPORT; NEVER MACHINE THE NUT BODY",
-        "FIT THEM; WITH THE SCREW A FEW TURNS IN THE NUT",
+        "REJECT ONE OVER AND FIT A REPLACEMENT THAT PASSES; NEVER MACHINE THE NUT BODY",
+        "WITH THE SCREW A FEW TURNS IN THE NUT",
         f"CROSSWISE IN 2 STAGES TO {spec._torque(spec.NUT_SCREW_TORQUE_NM)}",
-        f"OPEN THE COUNTERSINKS TO Ø{feed_nut.CSK_DIA_OPEN_MAX:.2f} MM MAX AND REPORT IT",
+        f"OPEN THE COUNTERSINKS TO Ø{feed_nut.CSK_DIA_OPEN_MAX:.2f} MM MAX; F3 ACCEPTS THEM",
+        "GO TO STEP 8B",
     )
     positions = [f2.index(phrase) for phrase in order]
     assert positions == sorted(positions)
     assert "B18.6.3'S MAX .225" in f2
     assert spec._torque(spec.NUT_SCREW_TORQUE_NM) == "0.3 N·m (2.7 IN·LBF)"
-    # Step 8 threads the prepared nut, completes F1-F2, then the handwheel
-    # goes on and F3 checks the travel.
-    eight = steps["8"]
+    # The fit-up acts on what it finds; it never stops to report.
+    for text in (steps["7"], steps["8A"], steps["8B"], *spec.FEED_FIT_STEPS):
+        assert "REPORT" not in text and "STOP" not in text
+    # 8A threads the reworked nut and hands off to F1B-F2; 8B fits the
+    # handwheel and hands off to F3, which checks the travel.
+    eight_a, eight_b = steps["8A"], steps["8B"]
     assert (
-        eight.index(f"THE FEED NUT {spec._item(spec.FEED_NUT)} PREPARED PER F1")
-        < eight.index("COMPLETE F1-F2")
-        < eight.index(f"PUSH THE HANDWHEEL {spec._item(spec.HANDWHEEL)} ON")
-        < eight.index("THEN COMPLETE F3")
+        eight_a.index("COMPLETE F1A (SHEET 8)")
+        < eight_a.index(f"THREAD THE LEADSCREW {spec._item(spec.LEADSCREW)}")
+        < eight_a.index(f"THE FEED NUT {spec._item(spec.FEED_NUT)}")
+        < eight_a.index("COMPLETE F1B-F2")
     )
-    assert steps["F3"].startswith("F3. WITH THE HANDWHEEL AND ALL SET SCREWS TIGHT")
-    assert "TRANSFERRED FROM THE NUT IN F2" in steps["7"]
+    assert eight_b.index(f"PUSH THE HANDWHEEL {spec._item(spec.HANDWHEEL)} ON") < eight_b.index(
+        "COMPLETE F3"
+    )
+    assert steps["F3"].startswith("F3. AFTER STEP 8B, WITH THE HANDWHEEL AND ALL SET SCREWS TIGHT")
+    assert "NO BINDING" in steps["F3"]
+    assert steps["7"].endswith(f"{spec._item(spec.PILLOW_BLOCK_SCREW)}, LOOSE.")
     for text in (*spec.ASSEMBLY_STEPS, *spec.FEED_FIT_STEPS):
         for stale in ("PRINT-DRILLED", "TRANSFER SPOTTING", "LOOSE HOLES", "DOWEL PIN", "FLANGED"):
             assert stale not in text
@@ -2042,13 +2187,8 @@ def test_feed_nut_and_its_screws_hit_nothing_over_the_travel() -> None:
     assert not any(label.startswith("screw") for label in gaps)
     assert min(gaps.values()) > 0.0
     assert min(gaps.values()) == pytest.approx(gaps["pillow block 1"])
-    allowed = [
-        pair for pair in contracts.ALLOWED_PAIRS
-        if any(name.startswith(f"{contracts._JIG_VENDOR}-feed-nut") for name in pair)
-    ]
-    assert allowed == [
-        frozenset((f"{contracts._JIG_VENDOR}-feed-nut-1", f"{contracts._JIG_VENDOR}-leadscrew-1")),
-    ]
+    allowed = [pair for pair in contracts.ALLOWED_PAIRS if "@FeedNut:1" in pair]
+    assert allowed == [frozenset(("@FeedNut:1", "@LeadScrew:1"))]
     screws = [
         pair for pair in contracts.ALLOWED_PAIRS
         if any(name in spec.NUT_SCREW_INSTANCES for name in pair)

@@ -1,0 +1,26 @@
+ch-rocker-arm-tl-vn-oblique-leadscrew-kit:
+  title: Rocker Oblique Trammel Leadscrew Kit
+  # Shop fixture: the parent MHA-CH-06 Number plus -TL-VN-nn (subsystem-identities.md).
+  # Owner ruling 2026-11-04 (#2187): the ReliaBot screw and its brass nut are one
+  # native model with the LeadScrew and FeedNut members as configurations. It
+  # replaces TL-VN-54 (screw) and the unreleased TL-VN-82 (nut).
+  number: MHA-CH-06-TL-VN-84
+  stock_name: ReliaBot T8 Tr8x2 lead screw, 600 mm, with brass flange nut
+  supplier: Amazon (sold by ReliaBot)
+  supplier_skus: ["B085DDHJTW"]
+  # The default LeadScrew member's SOLIDWORKS library material. The FeedNut
+  # member carries Brass in its own configuration (its member spec).
+  material: AISI 304
+  # Kit-level wording for the reference sheet. Each member's REWORK sheet
+  # prints its own: SUS304 stainless steel; brass, alloy not stated.
+  material_specification: "SUS304 screw; brass nut"
+  finish: as supplied
+  # Installed members, not purchased kits: one screw and one nut per listing.
+  quantity: 2
+  default_configuration: LeadScrew
+  configuration_quantities:
+    LeadScrew: 1
+    FeedNut: 1
+  tolerance_class: visual_noncritical
+  process: purchased
+  drawing_unit: mm

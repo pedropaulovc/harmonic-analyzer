@@ -27,6 +27,10 @@ REFERENCE_IDENTITIES: dict[str, tuple[str, str]] = {
     "HoldDownStud": ("sh-vn-clamping-kit-hardware", "HoldDownStud"),
     "TNut": ("sh-vn-clamping-kit-hardware", "TNut"),
     "FlangeNut": ("sh-vn-clamping-kit-hardware", "FlangeNut"),
+    "Rail": ("ch-rocker-arm-tl-vn-oblique-rail-kit", "Rail"),
+    "Carriage": ("ch-rocker-arm-tl-vn-oblique-rail-kit", "Carriage"),
+    "LeadScrew": ("ch-rocker-arm-tl-vn-oblique-leadscrew-kit", "LeadScrew"),
+    "FeedNut": ("ch-rocker-arm-tl-vn-oblique-leadscrew-kit", "FeedNut"),
     "FootScrew": ("sh-vn-fillister-screw-90280a108", "Default"),
     "SwingStopScrew": ("sh-vn-fillister-screw-90280a108", "Default"),
 }

@@ -126,7 +126,8 @@ uv run python -m doit list --all
 uv run python -m doit clean
 ```
 
-The heterogeneous shared vendor parts preserve **every member's STEP and
+The heterogeneous shared vendor parts, and the oblique jig's two parent-scoped
+multi-form kits, preserve **every member's STEP and
 isometric PNG** in their own `part:<stem>` task, alongside their one native
 SLDPRT. The registry's `configuration_quantities` and `default_configuration`
 are the sole member inventory:
@@ -136,6 +137,8 @@ are the sole member inventory:
 | `sh-vn-chain-link` | `InnerLink` | `OuterLink` |
 | `sh-vn-music-wire` | `LeverWire` | `PenWire` |
 | `sh-vn-clamping-kit-hardware` | `HoldDownStud` | `TNut`, `FlangeNut` |
+| `ch-rocker-arm-tl-vn-oblique-rail-kit` | `Rail` | `Carriage` |
+| `ch-rocker-arm-tl-vn-oblique-leadscrew-kit` | `LeadScrew` | `FeedNut` |
 
 For example, `step/sh-vn-chain-link.STEP` and
 `png/sh-vn-chain-link/sh-vn-chain-link_isometric.png` depict **InnerLink only**.

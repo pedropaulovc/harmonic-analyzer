@@ -54,7 +54,7 @@ def test_quantity_thread_and_length_are_the_fastener_tables() -> None:
     row = fasteners.RISER_TO_CARRIER
     nut_row = fasteners.NUT_TO_FEED_BLOCK
     assert spec.ROW is row and spec.NUT_ROW is nut_row
-    # One BOM row: 4 riser screws and the 4 that hold the TL-VN-82 feed nut.
+    # One BOM row: 4 riser screws and the 4 that hold the TL-VN-84 FeedNut.
     assert int(_config.parts(STEM)["quantity"]) == spec.QUANTITY == row.count + nut_row.count == 8
     for joint in (row, nut_row):
         assert (dims.THREAD, dims.LENGTH_TEXT, fasteners.FLAT_HEAD) == (

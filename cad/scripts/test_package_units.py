@@ -43,14 +43,14 @@ def test_pilot_parts_print_inches_and_stamp_inch_rows(part):
     assert part_properties(part)["TOL_LIN_XX"] == "±.01"
 
 
-def test_the_metric_supplier_rail_and_unconverted_parts_stay_millimetres():
+def test_the_metric_supplier_rail_kit_and_unconverted_parts_stay_millimetres():
     for part in (
-        "ch-rocker-arm-tl-vn-oblique-rail",
+        "ch-rocker-arm-tl-vn-oblique-rail-kit",
         "pd-platen-paper",
         "no-such-part",
     ):
         assert part_drawing_unit(part) == "mm"
-    assert part_properties("ch-rocker-arm-tl-vn-oblique-rail")["TOL_LIN_XX"] == "±0.51"
+    assert part_properties("ch-rocker-arm-tl-vn-oblique-rail-kit")["TOL_LIN_XX"] == "±0.51"
 
 
 def test_every_assembly_declares_inches():

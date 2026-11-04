@@ -30,7 +30,7 @@ JIG_BRACKET_SCREW_THREAD = (4.1656, 3.454, 8.7376)  # #8-32 into a end bracket
 JIG_CARRIAGE_SCREW_THREAD = (4.0, 3.242, 4.8006)  # M4 cut to fit .189 into each HGH15 carriage from the .570 floor
 JIG_PILLOW_BLOCK_SCREW_THREAD = (3.5052, 2.705, 10.875)  # #6-32 BHCS into an end bracket
 # The four #4-40 flat heads (riser screw family, occurrences 5-8) past the
-# TL-VN-82 nut's 3.5 flange and their heads' 0.45 stand-proud into the lug.
+# TL-VN-84 kit FeedNut's 3.5 flange and their heads' 0.45 stand-proud into the lug.
 JIG_NUT_SCREW_THREAD = (2.8448, 2.261, 11.923595)
 JIG_RISER_SCREW_THREAD = (2.8448, 2.261, 10.334168)  # #4-40 into the carrier past the .24 riser's Ø.25 CSK
 JIG_CLAMP_SCREW_THREAD = (6.35, 5.105, 11.938)  # 1/4-20 through the .47 carrier
@@ -38,9 +38,10 @@ JIG_LEVER_SCREW_THREAD = (7.9375, 6.528, 10.414)  # 5/16-18 into the carrier
 JIG_PIVOT_SCREW_THREAD = (7.9375, 6.528, 14.478)  # 5/16-18 cut to .570 below shoulder-end floor
 JIG_T_NUT_THREAD = (12.7, 10.716, 14.0)  # 1/2-13 stud in its T-nut
 JIG_FLANGE_NUT_THREAD = (12.7, 10.716, 13.0)  # 1/2-13 stud in its flange nut
-# The Tr8 screw in the TL-VN-82 nut's Ø6.0 minor-diameter bore, 13.5 long as
+# The Tr8 screw in the FeedNut's Ø6.0 minor-diameter bore, 13.5 long as
 # fitted. Over the carriage's travel the nut touches nothing else (the jig
-# spec's ``feed_nut_travel_gaps``), so only the leadscrew names the nut.
+# spec's ``feed_nut_travel_gaps``), so only the LeadScrew names the nut. Both
+# are TL-VN-84 kit members, named by their role references.
 JIG_FEED_NUT_THREAD = (8.0, 6.0, 13.5)
 ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
     frozenset((f"{_JIG_VENDOR}-hub-pin-1", f"{_JIG}-carrier-1")): (
@@ -78,13 +79,13 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
     **numbered_pairs(
         f"{_JIG_VENDOR}-carriage-screw",
         range(1, 5),
-        f"{_JIG_VENDOR}-carriage",
+        "@Carriage:",
         smooth_annulus_limit_mm3(*JIG_CARRIAGE_SCREW_THREAD),
     ),
     **numbered_pairs(
         f"{_JIG_VENDOR}-carriage-screw",
         range(5, 9),
-        f"{_JIG_VENDOR}-carriage",
+        "@Carriage:",
         smooth_annulus_limit_mm3(*JIG_CARRIAGE_SCREW_THREAD),
         second_number=2,
     ),
@@ -140,9 +141,9 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
         second_number=None,
     ),
     **numbered_pairs(
-        f"{_JIG_VENDOR}-feed-nut",
+        "@FeedNut:",
         range(1, 2),
-        f"{_JIG_VENDOR}-leadscrew",
+        "@LeadScrew:",
         smooth_annulus_limit_mm3(*JIG_FEED_NUT_THREAD),
     ),
     **numbered_pairs(

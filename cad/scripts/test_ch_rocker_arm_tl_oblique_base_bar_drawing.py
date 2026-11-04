@@ -309,7 +309,7 @@ def test_rail_holes_hold_a_baseline_band_that_names_its_mate() -> None:
     # print, so the callout names the mate by its drawing number and the
     # fit-up acceptance (farm review 20261104T203420333Z: a received-rail
     # band contradicted the printed ±0.08, and the match had no acceptance).
-    rail_number = _config.parts("ch-rocker-arm-tl-vn-oblique-rail")["number"]
+    rail_number = _config.parts("ch-rocker-arm-tl-vn-oblique-rail-kit")["number"]
     assert drawing.CALLOUTS_BELOW["RailHole8X"] == spec.RAIL_MATE_CALLOUT
     assert spec.RAIL_MATE_CALLOUT == (
         f"MATCHES HGR15 RAIL {rail_number}; ALL 8 SCREWS START BY HAND"

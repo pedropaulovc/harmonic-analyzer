@@ -1,5 +1,5 @@
 """Physical contracts for TL-32's integral nut lug and its four taps,
-transferred through the TL-VN-82 brass flange nut at assembly."""
+transferred through the TL-VN-84 kit's brass flange nut (FeedNut) at assembly."""
 from __future__ import annotations
 import ast
 import math
@@ -8,7 +8,7 @@ import _config
 import ch_rocker_arm_tl_oblique_feed_block_spec as spec
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
-import ch_rocker_arm_tl_vn_oblique_feed_nut_spec as feed_nut
+import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_feed_nut_spec as feed_nut
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as lead
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
@@ -79,7 +79,7 @@ def test_four_taps_sit_on_the_nut_pcd_on_the_lug_diagonals_and_are_transferred()
         quadrants.add((dy>0,dz>0))
     assert len(quadrants)==4
     assert spec.NUT_CLOCK_DEG==45.0 and spec.NUT_CLOCK_TOL_DEG==5.0
-    assert spec.TRANSFER_PROCESS=='TRANSFER THROUGH MHA-CH-06-TL-VN-82\nAT ASSEMBLY;\n'
+    assert spec.TRANSFER_PROCESS=='TRANSFER THROUGH MHA-CH-06-TL-VN-84\nFEED NUT AT ASSEMBLY;\n'
     assert spec.DRAWING_DIMENSIONS['NutPatternReference']==spec.NUT_PATTERN_PRINTED==('NutCentreZ','NutCentreY')
     values=spec.DRAWING_VALUES
     assert math.isclose(values['NutCentreY'],spec.NUT_AXIS_Y-spec.LUG_Y0)

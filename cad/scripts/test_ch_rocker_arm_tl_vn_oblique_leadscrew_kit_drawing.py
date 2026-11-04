@@ -1,48 +1,80 @@
-"""ReliaBot T8 Tr8x2 feed leadscrew (MHA-CH-06-TL-VN-54) contracts, SolidWorks-free."""
+"""ReliaBot T8 kit (MHA-CH-06-TL-VN-84): LeadScrew and FeedNut members, SolidWorks-free."""
 
 from __future__ import annotations
 
+import ast
 import asyncio
-import hashlib
 import json
 import math
 import re
-from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 import _config
-import _drawing_common as drawing_common
-import _purchased_title_fit as title_fit
+import _purchased_fastener_drawing as footer
+import _purchased_part_variants as variants
 import _supplier_screw_dimensions as supplier_dimensions
-import _supplier_spring_drawing as supplier_drawing
 import _stock_trim_drawing as trim_drawing
-import build_ch_rocker_arm_tl_vn_oblique_leadscrew as part
+import build_ch_rocker_arm_tl_vn_oblique_leadscrew_kit as part
+import ch_rocker_arm_tl_oblique_feed_block_spec as feed_block
+import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_feed_nut_spec as nut
+import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec as spec
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as feed
-import ch_rocker_arm_tl_vn_oblique_leadscrew_stock_spec as spec
-import draw_ch_rocker_arm_tl_vn_oblique_leadscrew as draw
-from _drawing_contract import drawing_specification_violations
+import draw_ch_rocker_arm_tl_vn_oblique_leadscrew_kit as draw
+from _drawing_contract import drawing_specification_violations, model_toleranced_dimensions
 from _drawing_notes import property_link
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DrawingLayout
+from _machinist_review_mode import MachinistReviewMode
+from _mcmaster_91771a112 import DIMS as SCREW_DIMS
 from _printed_tolerance import printed_band_mm
 
-STEM = "ch-rocker-arm-tl-vn-oblique-leadscrew"
-NAME = "ch_rocker_arm_tl_vn_oblique_leadscrew"
+STEM = "ch-rocker-arm-tl-vn-oblique-leadscrew-kit"
+NAME = "ch_rocker_arm_tl_vn_oblique_leadscrew_kit"
 ROW = _config.parts(STEM)
+SCRIPTS = Path(__file__).resolve().parent
+RETIRED = (
+    "ch-rocker-arm-tl-vn-oblique-leadscrew",  # MHA-CH-06-TL-VN-54
+    "ch-rocker-arm-tl-vn-oblique-feed-nut",  # MHA-CH-06-TL-VN-82, never released
+    "ch-rocker-arm-tl-oblique-feed-nut",  # MHA-CH-06-TL-27
+    "ch-rocker-arm-tl-vn-oblique-nut-dowel",  # MHA-CH-06-TL-VN-81
+    "ch-rocker-arm-tl-vn-oblique-nut-screw",  # MHA-CH-06-TL-VN-66
+)
 
 
-def test_registry_row_is_the_purchased_reliabot_screw() -> None:
-    assert ROW["number"] == "MHA-CH-06-TL-VN-54"
+def test_kit_row_has_one_configuration_per_member() -> None:
+    assert ROW["number"] == spec.NUMBER == nut.NUMBER == "MHA-CH-06-TL-VN-84"
+    assert spec.PART_NAME == nut.PART_NAME == part.PART_NAME == STEM
     assert ROW["process"] == "purchased"
-    assert ROW["supplier"] == spec.SUPPLIER == "Amazon (sold by ReliaBot)"
-    assert ROW["supplier_skus"] == [spec.SKU] == ["B085DDHJTW"]
+    assert ROW["drawing_unit"] == "mm"
+    assert ROW["supplier"] == spec.SUPPLIER == nut.SUPPLIER == "Amazon (sold by ReliaBot)"
+    assert ROW["supplier_skus"] == [spec.SKU] == [nut.SKU] == ["B085DDHJTW"]
     assert spec.SUPPLIER_PRODUCT_URL == f"https://www.amazon.com/dp/{spec.SKU}"
-    assert ROW["material"] == spec.MATERIAL
-    assert int(ROW["quantity"]) == spec.QUANTITY == 1
-    # One line in the title block's MATERIAL cell; the provenance is the spec's.
+    # One member per configuration, LeadScrew the default, each its own
+    # installed quantity; the kit's quantity is their sum.
+    assert ROW["default_configuration"] == spec.CONFIGURATION == "LeadScrew"
+    assert part.CONFIGURATIONS == (spec.CONFIGURATION, nut.CONFIGURATION)
+    assert part.CONFIGURATIONS == ("LeadScrew", "FeedNut")
+    assert variants.require_member_configurations(STEM, part.CONFIGURATIONS) == (
+        part.CONFIGURATIONS
+    )
+    assert ROW["configuration_quantities"] == {
+        spec.CONFIGURATION: spec.QUANTITY,
+        nut.CONFIGURATION: nut.QUANTITY,
+    } == {"LeadScrew": 1, "FeedNut": 1}
+    assert int(ROW["quantity"]) == sum(ROW["configuration_quantities"].values()) == 2
+    assert tuple(name for name, _label in draw.VARIANTS) == part.CONFIGURATIONS
+    # Each member its own library material and its own BOM grouping key.
+    assert part.MATERIALS == {"LeadScrew": spec.MATERIAL, "FeedNut": nut.MATERIAL}
+    assert part.MATERIALS == {"LeadScrew": "AISI 304", "FeedNut": "Brass"}
+    assert part.MEMBER_DESCRIPTIONS == {
+        "LeadScrew": spec.BOM_DESCRIPTION,
+        "FeedNut": nut.BOM_DESCRIPTION,
+    }
+    assert spec.BOM_DESCRIPTION == f"TR8X2 LEADSCREW, {spec.LENGTH:.0f} MM LONG"
+    # One line in the title block's MATERIAL cell; the provenance is the specs'.
     assert len(ROW["material_specification"]) <= 36
     assert spec.SKU in (spec.__doc__ or "")
     assert "Datasheet-built" in (spec.__doc__ or "")
@@ -52,6 +84,99 @@ def test_registry_row_is_the_purchased_reliabot_screw() -> None:
         "Supplier SKUs": spec.SKU,
     }
     assert spec.INVENTORY_ID == "fixtures.trammel-tr8-leadscrew"
+
+
+def test_retired_identities_left_no_registry_producer_or_sheet() -> None:
+    root = SCRIPTS.parent
+    for stem in RETIRED:
+        name = stem.replace("-", "_")
+        assert not (root / "config" / "parts" / f"{stem}.yaml").exists(), stem
+        assert name not in DRAWINGS_BY_NAME, stem
+        for script in (f"build_{name}.py", f"draw_{name}.py", f"test_{name}_drawing.py"):
+            assert not (SCRIPTS / script).exists(), script
+    for module in (
+        "ch_rocker_arm_tl_vn_oblique_leadscrew_stock_spec",
+        "ch_rocker_arm_tl_vn_oblique_feed_nut_spec",
+    ):
+        assert not (SCRIPTS / f"{module}.py").exists(), module
+    # TL-VN-54 is never reissued and TL-VN-82 stays reserved.
+    numbers = {str(row.get("number")) for row in _config.parts().values()}
+    assert "MHA-CH-06-TL-VN-84" in numbers
+    assert not numbers & {"MHA-CH-06-TL-VN-54", "MHA-CH-06-TL-VN-82"}
+
+
+def test_member_features_partition_the_model() -> None:
+    """Each feature belongs to one member, parents first; the shared
+    ScrewAxis belongs to neither."""
+    lead = part.MEMBER_FEATURES[spec.CONFIGURATION]
+    fitted = part.MEMBER_FEATURES[nut.CONFIGURATION]
+    assert set(part.MEMBER_FEATURES) == set(part.CONFIGURATIONS)
+    assert len(set(lead)) == len(lead) and len(set(fitted)) == len(fitted)
+    assert not set(lead) & set(fitted)
+    assert "ScrewAxis" not in {*lead, *fitted}
+    assert set(spec.DRAWING_DIMENSIONS) | set(part.CLOCK_PLANES) <= set(lead)
+    assert set(nut.DRAWING_DIMENSIONS) <= set(fitted)
+    assert {"SupplierReference", "SupplierTopReference"} <= set(fitted)
+    assert lead[:4] == ("ScrewProfile", "Screw", "FlatProfile", "Flats")
+    for name in spec.CLOCKED_FLATS:
+        plane, profile, flat = (
+            lead.index(f"{name}{suffix}")
+            for suffix in ("ClockPlane", "ClockProfile", "ClockFlat")
+        )
+        assert plane < profile < flat
+    assert fitted[:4] == ("NutProfile", "Nut", "FlangeHoleSketch", "FlangeHoles")
+    for index in range(1, len(nut.COUNTERSINK_AXES) + 1):
+        assert fitted.index(f"Countersink{index}Profile") + 1 == fitted.index(
+            f"Countersink{index}"
+        )
+    # Each member's notes say where its work is drawn.
+    assert part.MEMBER_NOTE_PROPERTIES == {
+        "LeadScrew Manufacturing Notes": spec.DRAWING_NOTES,
+        "FeedNut Manufacturing Notes": nut.DRAWING_NOTES,
+    }
+    for configuration, member in part.MEMBER_SPECS.items():
+        assert part.MEMBER_PROPERTIES[configuration]["Manufacturing Notes"] == (
+            member.DRAWING_NOTES
+        )
+    assert spec.DRAWING_NOTES.endswith(f"SHEET {spec.MODIFIED_STOCK_SHEET}.")
+    assert nut.DRAWING_NOTES.endswith(f"SHEET {nut.REWORK_SHEET}.")
+
+
+def test_save_takes_one_library_material_per_member() -> None:
+    assert variants._member_materials(part.CONFIGURATIONS, part.MATERIALS) == (
+        part.MATERIALS
+    )
+    assert variants._member_materials(("A", "B"), "Brass") == {"A": "Brass", "B": "Brass"}
+    with pytest.raises(ValueError, match="differ from members"):
+        variants._member_materials(part.CONFIGURATIONS, {"LeadScrew": "AISI 304"})
+    with pytest.raises(ValueError, match="differ from members"):
+        variants._member_materials(("LeadScrew",), part.MATERIALS)
+    calls = []
+    adapter = object()
+    original = variants.require_material_in_every_configuration
+    try:
+        variants.require_material_in_every_configuration = (
+            lambda _adapter, name, material, members: calls.append(
+                (name, material, tuple(members))
+            )
+        )
+        variants._require_member_materials(
+            adapter, STEM, {"LeadScrew": "AISI 304", "FeedNut": "Brass", "X": "Brass"}
+        )
+    finally:
+        variants.require_material_in_every_configuration = original
+    assert calls == [
+        (STEM, "AISI 304", ("LeadScrew",)),
+        (STEM, "Brass", ("FeedNut", "X")),
+    ]
+    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
+    [save] = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and getattr(node.func, "id", "") == "save_member_part"
+    ]
+    keywords = {keyword.arg: ast.unparse(keyword.value) for keyword in save.keywords}
+    assert keywords["material"] == "MATERIALS"
 
 
 def test_c4_values_are_imported_not_retyped() -> None:
@@ -98,7 +223,7 @@ def test_volume_is_the_blank_less_five_flat_segments() -> None:
 
 
 def test_build_sketches_the_spec_profile() -> None:
-    points = part.profile_points()
+    points = part.screw_profile_points()
     # The same outline, walked up the axis from the origin vertex first.
     assert sorted(points) == sorted(spec.PROFILE)
     assert points[:2] == [(0.0, 0.0), (0.0, spec.LENGTH)]
@@ -422,9 +547,9 @@ def test_cut_length_is_the_axis_edge_driving_dimension() -> None:
             return ok
 
     lines = [f"L{i}" for i in range(len(spec.PROFILE))]
-    dims = asyncio.run(part.define_profile(Adapter(), lines))
+    dims = asyncio.run(part.define_screw_profile(Adapter(), lines))
     names = [name for name, _drive in dims._rows]
-    assert names == list(part.PROFILE_DIMENSIONS)
+    assert names == list(part.SCREW_PROFILE_DIMENSIONS)
     assert len(emitted) == len(names)
     by_name = dict(zip(names, emitted, strict=True))
     assert by_name["CutLength"] == (
@@ -503,18 +628,40 @@ def test_spec_is_pure_data() -> None:
     }
 
 
-def test_sheet_is_the_registered_modified_stock_drawing() -> None:
+def test_package_is_the_registered_kit_drawing() -> None:
     sheet = DRAWINGS_BY_NAME[NAME]
+    assert draw.SPEC is sheet
     assert (sheet.part, sheet.artifact_stem, sheet.script_name) == (
         NAME,
         STEM,
         f"draw_{NAME}.py",
     )
     assert sheet.layout is DrawingLayout.LANDSCAPE
+    assert sheet.source_kind == "part"
     assert sheet.artifact_stem == part.PART_NAME
+    assert draw.MACHINIST_REVIEW is MachinistReviewMode.ENFORCE
     source = Path(draw.__file__).read_text(encoding="utf-8")
-    assert "build_purchased_part_drawing" not in source
     assert drawing_specification_violations(source) == ()
+    # One package: sheet 1 the members' references, then each member's sheet.
+    tree = ast.parse(source)
+    [call] = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and getattr(node.func, "id", "") == "build_purchased_variant_drawing"
+    ]
+    keywords = {keyword.arg: ast.unparse(keyword.value) for keyword in call.keywords}
+    assert keywords["variants"] == "VARIANTS"
+    assert keywords["append_sheets"] == "append_member_sheets"
+    assert keywords["view_angles"] == "VIEW_ANGLES"
+    assert keywords["title_fit"] == "True"
+    assert draw.SHEET_NAMES == ("LEADSCREW", "FEED NUT REWORK")
+    appended = source[source.index("def append_member_sheets") :]
+    assert appended.index("_append_leadscrew_sheet(") < appended.index(
+        "_append_feed_nut_rework_sheet("
+    )
+    # The 410 screw lies along its cell; the nut stands as modelled.
+    assert draw.VIEW_ANGLES == {spec.CONFIGURATION: -math.pi / 2.0}
 
 
 def test_one_axis_horizontal_view_at_the_largest_fitting_scale() -> None:
@@ -618,678 +765,504 @@ def test_one_axis_horizontal_view_at_the_largest_fitting_scale() -> None:
     assert notes[0] > detail_right + 0.015
 
 
-@pytest.fixture
-def number_title_native(monkeypatch):
-    """Native-shaped notes/rules and the real canonical fitter, without COM.
+# --- FeedNut: the brass flange nut as fitted ---------------------------------------
 
-    Only the initial horizontal envelope is seeded from bb179's measured PDF.
-    Font heights and height-to-width response below are synthetic controls,
-    not evidence that a particular native rung will repair the actual sheet.
-    """
-    state = SimpleNamespace(
-        properties={"Number": ROW["number"], "Material": "ALLOY STEEL"},
-        notes=[], fit_calls=[], writes=[], rebuilds=[], measurements=[],
-        bindings=[], walks=[], closed=False, rows=1, width=0.061989821,
-        initial_height=0.0048, extent_override=None,
+
+def test_feed_nut_sourced_envelope_and_the_faced_length() -> None:
+    # The listing's dimension image: spigot, flange and body make its 15
+    # overall; the fitter faces the 1.5 spigot off, leaving 13.5.
+    assert (nut.FLANGE_DIA, nut.FLANGE_THICK) == (22.0, 3.5)
+    assert (nut.HOLE_DIA, nut.HOLE_PCD, len(nut.HOLE_ANGLES_DEG)) == (3.5, 16.0, 4)
+    assert (nut.BODY_DIA, nut.BODY_LENGTH, nut.SPIGOT_LENGTH) == (10.2, 10.0, 1.5)
+    assert nut.SPIGOT_LENGTH + nut.LENGTH == nut.SUPPLIED_LENGTH == 15.0
+    assert nut.LENGTH == nut.FLANGE_THICK + nut.BODY_LENGTH == 13.5
+    assert nut.LENGTH >= 5.0 * spec.LEAD
+    # The thread is modelled as a plain bore at the Tr8x2 minor diameter.
+    assert nut.BORE_DIA == spec.MINOR_DIA == 6.0
+    assert nut.LEAD == spec.LEAD
+    assert nut.SUPPLIER_PRODUCT_URL == f"https://www.amazon.com/dp/{nut.SKU}"
+
+
+def test_feed_nut_receipt_limits_bracket_the_image_and_leave_rework_to_sheet_3() -> None:
+    # UNVERIFIED nominals: F1A measures the nut against these before the lug's
+    # taps are transferred, in the nut's own millimetres.
+    assert nut.FLANGE_THICK_MIN < nut.FLANGE_THICK < nut.FLANGE_THICK_MAX
+    assert nut.HOLE_DIA_MIN < nut.HOLE_DIA < nut.HOLE_DIA_MAX
+    assert nut.BODY_DIA < nut.BODY_DIA_MAX
+    assert nut.FLANGE_DIA < nut.FLANGE_DIA_MAX
+    assert nut.LENGTH < nut.LENGTH_MAX
+    assert nut.HOLE_STATION_BAND == nut.HOLE_PCD_BAND / 2.0
+    assert nut.RECEIPT_TEXT == (
+        f"BODY Ø{nut.BODY_DIA_MAX:.1f} MM MAX, 4 HOLES "
+        f"Ø{nut.HOLE_DIA_MIN:.2f}-{nut.HOLE_DIA_MAX:.2f} MM ON A Ø16 "
+        f"±{nut.HOLE_PCD_BAND:.1f} MM PCD"
+    )
+    # Codjiflo P2: F1A types none of the rework limits; sheet 3 carries them.
+    for value in (nut.FLANGE_THICK_MIN, nut.FLANGE_THICK_MAX, nut.CSK_DIA):
+        assert f"{value:.1f}" not in nut.RECEIPT_TEXT
+    assert "FLANGE" not in nut.RECEIPT_TEXT and "CSK" not in nut.RECEIPT_TEXT
+    # The faced-length limit stays F1A's acceptance (the near-KP08 feed gap's
+    # reach), checked only after the facing pass.
+    assert nut.FACED_LENGTH_TEXT == f"{nut.LENGTH_MAX:.1f} MM LONG MAX"
+    assert nut.SUPPLIED_LENGTH > nut.LENGTH_MAX
+    assert f"{nut.LENGTH_MAX:.1f}" not in nut.RECEIPT_TEXT
+    assert "LENGTH" not in nut.RECEIPT_TEXT and "LONG" not in nut.RECEIPT_TEXT
+    # The #29 transfer spot enters the least hole; the largest hole at its
+    # worst station still leaves brass between it and the largest body.
+    assert feed_block.TRANSFER_SPOT_DIA < nut.HOLE_DIA_MIN
+    assert nut.HOLE_PCD / 2.0 - nut.HOLE_STATION_BAND - nut.HOLE_DIA_MAX / 2.0 > (
+        nut.BODY_DIA_MAX / 2.0
+    )
+    assert nut.REACH == nut.LENGTH_MAX
+    assert feed_block.NUT_REACH_X[0] == pytest.approx(
+        feed_block.NUT_FACE_X - nut.LENGTH_MAX
     )
 
-    def live():
-        assert not state.closed, "Number check touched closed native handles"
 
-    class Annotation:
-        def __init__(self):
-            self.position = (0.310763482, 0.028775844, 0.0)
-            self.format = SimpleNamespace(
-                CharHeight=state.initial_height, TypeFaceName="Arial", LineLength=0.2,
-            )
-            self.use_doc = True
-
-        def GetPosition(self):
-            live()
-            return self.position
-
-        def GetTextFormat(self, index):
-            live()
-            assert index == 0
-            return SimpleNamespace(**vars(self.format))
-
-        def SetTextFormat(self, index, use_doc, text_format):
-            live()
-            assert index == 0 and use_doc is False
-            self.format = SimpleNamespace(**vars(text_format))
-            self.use_doc = use_doc
-            state.writes.append(vars(self.format).copy())
-            return True
-
-        def GetUseDocTextFormat(self, index):
-            live()
-            assert index == 0
-            return self.use_doc
-
-    class Note:
-        def __init__(self, key, link, text):
-            self.key, self.link, self.text = key, link, text
-            self.annotation = Annotation() if key == "Number" else None
-
-        @property
-        def PropertyLinkedText(self):
-            live()
-            return self.link
-
-        def GetText(self):
-            live()
-            assert self.key == "Number", "non-Number resolved text was inspected"
-            return self.text
-
-        def GetNext(self):
-            live()
-            state.walks.append(self.key)
-            index = state.notes.index(self) + 1
-            return state.notes[index] if index < len(state.notes) else None
-
-        def GetAnnotation(self):
-            live()
-            assert self.key == "Number", "non-Number note was fitted"
-            return self.annotation
-
-        def GetExtent(self):
-            live()
-            if state.extent_override is not None:
-                return state.extent_override
-            x, y, z = self.annotation.position
-            height = self.annotation.format.CharHeight
-            return (
-                x, y - height, z,
-                x + state.width * height / state.initial_height, y, z,
-            )
-
-    # Material deliberately uses this drawing's property, not the all-fields
-    # fitter's Material Specification contract. Equal literal text is a decoy.
-    state.notes = [
-        Note("Name", property_link("SW-Title(Title)"), STEM),
-        Note("Material", property_link("Material"), state.properties["Material"]),
-        Note("literal", state.properties["Number"], state.properties["Number"]),
-        Note("Number", property_link("Number"), state.properties["Number"]),
-        Note("REV", property_link("Revision"), "44"),
+def test_feed_nut_rework_is_native_banded_controls_on_sheet_3() -> None:
+    """Codjiflo P2: the flange's thickness a LIMIT, the countersink's
+    diameter a ±, both at the band's one place; the 82° held by the apex
+    depth and printed in the callout; TL-00 cites the sheet."""
+    nominal, lower, upper, places = nut.REWORK_CONTROLS["FlangeThick"]
+    assert nominal == nut.FLANGE_THICK
+    assert (nominal + lower, nominal + upper) == pytest.approx(
+        (nut.FLANGE_THICK_MIN, nut.FLANGE_THICK_MAX)
+    )
+    assert (nut.FLANGE_THICK_MIN, nut.FLANGE_THICK_MAX) == (3.3, 3.7)
+    assert places == 1
+    assert nut.REWORK_CONTROLS["CskDia"] == (4.6, -0.1, 0.1, 1)
+    assert nut.CSK_DIA_BAND == 0.1
+    # swTolLIMIT and swTolSYMMETRIC.
+    assert nut.DIMENSION_TOLERANCE_TYPES == {"FlangeThick": 3, "CskDia": 4}
+    assert nut.DRAWING_DIMENSIONS == {
+        "NutProfile": {"FlangeThick"},
+        "Countersink1Profile": {"CskDia"},
+    }
+    assert nut.DRAWING_PRECISION == {
+        "NutProfile": {"FlangeThick": 1},
+        "Countersink1Profile": {"CskDia": 1},
+    }
+    assert nut.CSK_PREFIX == f"{nut.SCREW_COUNT}X " == "4X "
+    assert nut.CSK_ANGLE == 82.0
+    assert nut.CSK_CALLOUT == "82° CSK"
+    assert nut.CSK_APEX_DEPTH * math.tan(math.radians(41.0)) == pytest.approx(
+        nut.CSK_DIA / 2.0
+    )
+    # The printed names are the flange's rim edge and countersink 1's.
+    assert nut.NUT_PROFILE_DIMENSIONS[3] == "FlangeThick"
+    assert nut.countersink_dimensions(1)[3:5] == ("CskDia", "CskApexDepth")
+    names = [
+        name
+        for index in range(1, len(nut.COUNTERSINK_AXES) + 1)
+        for name in nut.countersink_dimensions(index)
     ]
-    state.number = state.notes[3]
-    state.new_number = lambda: Note(
-        "Number", property_link("Number"), state.properties["Number"],
+    assert len(names) == len(set(names)) == 6 * len(nut.COUNTERSINK_AXES)
+    # Countersink 1 is the +X hole on Front, the plane section F-F cuts.
+    assert nut.COUNTERSINK_AXES[0] == ("Front", nut.HOLE_PCD / 2.0)
+    assert nut.REWORK_SHEET_REFERENCE == "MHA-CH-06-TL-VN-84 SHEET 3"
+    assert nut.REWORK_SHEET_REFERENCE == f"{nut.NUMBER} SHEET {nut.REWORK_SHEET}"
+    assert draw.SHEET_NAMES.index(draw.REWORK_SHEET_NAME) + 2 == nut.REWORK_SHEET
+    assert draw.SHEET_NAMES.index(draw.LEADSCREW_SHEET_NAME) + 2 == (
+        spec.MODIFIED_STOCK_SHEET
     )
-    state.rule_points = (
-        ((0.3083506, 0.021), (0.372310091, 0.021)),
-        ((0.3083506, 0.035906), (0.372310091, 0.035906)),
-        ((0.3083506, 0.021), (0.3083506, 0.035906)),
-        ((0.372310091, 0.021), (0.372310091, 0.035906)),
-    )
+    assert draw.REWORK_EXPECTED == {
+        "FlangeThick": pytest.approx((0.0035, -0.0002, 0.0002)),
+        "CskDia": pytest.approx((0.0046, -0.0001, 0.0001)),
+    }
+    assert draw.REWORK_PRECISION == {"FlangeThick": 1, "CskDia": 1}
+    assert draw.REWORK_CALLOUTS == {"CskDia": nut.CSK_CALLOUT}
 
-    def line(start, end):
-        return SimpleNamespace(
-            GetType=lambda: 0,
-            GetStartPoint2=lambda: SimpleNamespace(X=start[0], Y=start[1]),
-            GetEndPoint2=lambda: SimpleNamespace(X=end[0], Y=end[1]),
-        )
 
-    segments = tuple(line(*points) for points in state.rule_points)
-    state.sheet = SimpleNamespace(
-        name="ActualLeadSheet",
-        GetTemplateSketch=lambda: SimpleNamespace(GetSketchSegments=lambda: segments),
-    )
-    state.sheet.GetName = lambda: state.sheet.name
-    state.current_sheet = state.sheet
-    state.sheet_view = SimpleNamespace(
-        GetFirstNote2=lambda: state.notes[0] if state.notes else None,
-    )
+def test_rework_tolerances_live_only_in_the_feed_nut_member() -> None:
+    """The banded controls are authored on FeedNut-owned features, only
+    while the FeedNut member is authored; the LeadScrew's controls stay
+    under the title block's general rows."""
+    fitted = set(part.MEMBER_FEATURES[nut.CONFIGURATION])
+    lead = set(part.MEMBER_FEATURES[spec.CONFIGURATION])
+    assert set(nut.DRAWING_DIMENSIONS) <= fitted
+    assert not set(nut.DRAWING_DIMENSIONS) & lead
+    assert model_toleranced_dimensions(part) == {
+        ("Countersink1Profile", "CskDia"): "feed_nut.CSK_DIA_BAND"
+    }
+    assert set(spec.DIMENSION_TOLERANCE_TYPES.values()) == {11}  # swTolGeneral
+    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
+    functions = {
+        node.name: node
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
 
-    def rebuild():
-        live()
-        state.rebuilds.append(state.number.annotation.format.CharHeight)
-        return True
-
-    state.drawing = SimpleNamespace(
-        GetCurrentSheet=lambda: state.current_sheet,
-        GetFirstView=lambda: state.sheet_view, EditRebuild3=rebuild,
-    )
-    state.adapter = SimpleNamespace(currentModel=state.drawing)
-
-    def early_bound(value, kind):
-        state.bindings.append((value, kind))
-        return value
-
-    def display(adapter, annotation):
-        live()
-        assert adapter is state.adapter and annotation is state.number.annotation
-        state.measurements.append(annotation.format.CharHeight)
+    def calls(function: str) -> set[str]:
         return {
-            "texts": [{"pos": (0.0, row * 0.004)} for row in range(state.rows)],
-        }, []
+            getattr(node.func, "id", None) or getattr(node.func, "attr", "")
+            for node in ast.walk(functions[function])
+            if isinstance(node, ast.Call)
+        }
 
-    def fit(adapter, drawing, sheet, note, **kwargs):
-        state.fit_calls.append((adapter, drawing, sheet, note, kwargs))
-        return title_fit._fit_title_note(adapter, drawing, sheet, note, **kwargs)
+    def callers(name: str) -> set[str]:
+        return {function for function in functions if name in calls(function)}
 
-    monkeypatch.setattr(draw, "_early_bound", early_bound)
-    monkeypatch.setattr(title_fit, "_early_bound", early_bound)
-    monkeypatch.setattr(title_fit, "_zoomed_on", lambda *_args: nullcontext())
-    monkeypatch.setattr(title_fit, "annotation_display", display)
-    monkeypatch.setattr(title_fit, "_number_state", lambda *_args: "synthetic native state")
-    monkeypatch.setattr(title_fit._telemetry, "event", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(title_fit._telemetry, "info", lambda *_args: None)
-    monkeypatch.setattr(draw, "_fit_title_note", fit)
-    state.run = lambda: draw._fit_number_title_note(
-        state.adapter, expected_number=state.properties["Number"],
+    banded = {"set_dimension_symmetric_tolerance", "set_dimension_prefix"}
+    assert callers("set_dimension_symmetric_tolerance") == {"_feed_nut_rework"}
+    assert callers("set_dimension_prefix") == {"_feed_nut_rework"}
+    assert callers("_author_flange_limits") == {"_feed_nut_rework"}
+    assert callers("_feed_nut_rework") == {"_author_feed_nut"}
+    assert not banded & calls("_author_lead_screw")
+    limits = ast.unparse(functions["_author_flange_limits"])
+    assert "feed_nut.TOL_LIMIT" in limits and "'NutProfile', 'FlangeThick'" in limits
+    # build pairs each author with its own member, active and alone.
+    source = ast.unparse(functions["build"])
+    assert "(LEAD_SCREW_CONFIGURATION, _author_lead_screw)" in source
+    assert "(FEED_NUT_CONFIGURATION, _author_feed_nut)" in source
+    assert source.index("activate_member(adapter, configuration)") < source.index(
+        "await author(adapter)"
     )
-    return state
 
 
-@pytest.mark.parametrize("font_prefix", ("", "<FONT size=15PTS>"))
-def test_number_title_fits_only_existing_number_with_canonical_contract(
-    number_title_native, font_prefix,
-):
-    state = number_title_native
-    state.number.link = font_prefix + property_link("Number")
-    properties, rules = state.properties.copy(), state.rule_points
-    links = tuple((note.link, note.text) for note in state.notes)
-    assert state.number.GetExtent()[3] > rules[3][0][0]
-    settled = state.run()
-    assert state.fit_calls == [(
-        state.adapter, state.drawing, state.sheet, state.number,
-        {"label": "Number", "minimum": 0.003},
-    )]
-    assert state.walks == ["Name", "Material", "literal", "Number", "REV"]
-    assert (state.number, "INote") in state.bindings
-    assert [row["CharHeight"] for row in state.writes] == pytest.approx([0.0048, 0.0047])
-    assert state.number.GetExtent()[3] <= rules[3][0][0] - 0.0006
-    expected_length = rules[3][0][0] - 0.0006 - state.number.annotation.position[0] - 0.0003
-    assert all(row["LineLength"] == pytest.approx(expected_length) for row in state.writes)
-    assert all(row["TypeFaceName"] == "Arial" for row in state.writes)
-    authored = (len(state.writes), len(state.rebuilds))
-    for _ in range(4):
-        settled()
-    assert (len(state.writes), len(state.rebuilds)) == authored
-    assert state.properties == properties and state.rule_points == rules
-    assert tuple((note.link, note.text) for note in state.notes) == links
-    assert state.current_sheet is state.sheet
-
-
-def test_number_title_uses_already_read_full_source_value_not_literal_identity(
-    number_title_native,
-):
-    state = number_title_native
-    state.number.text = state.properties["Number"] = "COMPLETE-ALTERNATE-SOURCE-NUMBER"
-    state.run()()
-    assert state.number.text == "COMPLETE-ALTERNATE-SOURCE-NUMBER"
-    assert len(state.fit_calls) == 1
-
-
-@pytest.mark.parametrize("fault", ("missing", "duplicate"))
-def test_number_title_requires_exactly_one_owned_property_note(number_title_native, fault):
-    state = number_title_native
-    if fault == "missing":
-        state.notes.remove(state.number)
-    else:
-        state.notes.append(state.new_number())
-    with pytest.raises(RuntimeError, match="requires exactly one source-linked note"):
-        state.run()
-    assert state.fit_calls == state.writes == state.rebuilds == []
-
-
-@pytest.mark.parametrize("link", (
-    '$PRP:"Number"', '$PRPSHEET:"Other"', 'NUMBER $PRPSHEET:"Number"',
-    '$PRPSHEET:"Number" suffix', '$PRPSHEET:"Number"$PRPSHEET:"Material"',
-    '<FONT size=0PTS>$PRPSHEET:"Number"', ROW["number"],
-))
-def test_number_title_rejects_wrong_expression_even_with_exact_resolved_number(
-    number_title_native, link,
-):
-    state = number_title_native
-    state.number.link = link
-    with pytest.raises(RuntimeError, match="requires exactly one source-linked note"):
-        state.run()
-    assert state.fit_calls == state.writes == []
-
-
-@pytest.mark.parametrize("value", (
-    "MHA-CH-06-TL-VN-5", "MHA-CH-06-TL-VN-54 ", "mha-ch-06-tl-vn-54", "",
-))
-def test_number_title_rejects_incomplete_or_changed_resolved_value(number_title_native, value):
-    state = number_title_native
-    state.number.text = value
-    with pytest.raises(RuntimeError, match="source property expression or complete value changed"):
-        state.run()
-    assert state.fit_calls == state.writes == []
-
-
-@pytest.mark.parametrize("fault", ("sheet", "view", "sheet_name", "null_sheet_name"))
-def test_number_title_refuses_missing_native_context(number_title_native, fault):
-    state = number_title_native
-    if fault == "sheet":
-        state.current_sheet = None
-    elif fault == "view":
-        state.sheet_view = None
-    elif fault == "sheet_name":
-        state.sheet.name = ""
-    else:
-        state.sheet.name = None
-    with pytest.raises(RuntimeError, match="has no native sheet"):
-        state.run()
-    assert state.fit_calls == state.writes == []
-
-
-@pytest.mark.parametrize("missing", (False, True))
-def test_number_title_settled_refuses_wrong_sheet_before_reading_number(
-    number_title_native, missing,
-):
-    state = number_title_native
-    settled = state.run()
-    state.current_sheet = None if missing else SimpleNamespace(GetName=lambda: "OtherSheet")
-    counts = (len(state.measurements), len(state.writes), len(state.rebuilds))
-    with pytest.raises(RuntimeError, match="current sheet changed"):
-        settled()
-    assert (len(state.measurements), len(state.writes), len(state.rebuilds)) == counts
-    assert state.current_sheet is not state.sheet  # No silent activation.
-
-
-@pytest.mark.parametrize("fault", (
-    "expression", "resolved", "height", "line_length", "face", "doc_format",
-    "anchor", "overflow", "rows",
-))
-def test_number_title_canonical_settled_check_is_pure_and_rejects_drift(
-    number_title_native, fault,
-):
-    state = number_title_native
-    settled = state.run()
-    annotation = state.number.annotation
-    if fault == "expression":
-        state.number.link = '$PRP:"Number"'
-    elif fault == "resolved":
-        state.number.text = state.number.text[:-1]
-    elif fault == "height":
-        annotation.format.CharHeight = 0.003
-    elif fault == "line_length":
-        annotation.format.LineLength = 0.2
-    elif fault == "face":
-        annotation.format.TypeFaceName = "Other Face"
-    elif fault == "doc_format":
-        annotation.use_doc = True
-    elif fault == "anchor":
-        annotation.position = (0.310863482, 0.028775844, 0.0)
-    elif fault == "overflow":
-        state.extent_override = (0.311, 0.024, 0.0, 0.3724, 0.029, 0.0)
-    else:
-        state.rows = 2
-    authored = (len(state.writes), len(state.rebuilds))
-    with pytest.raises(RuntimeError, match=(
-        "source property expression or complete value changed"
-        if fault in ("expression", "resolved") else "linked title-cell fit did not persist"
-    )):
-        settled()
-    assert (len(state.writes), len(state.rebuilds)) == authored
-
-
-def test_number_title_cannot_fit_below_unchanged_three_mm_floor(number_title_native):
-    state = number_title_native
-    state.width = 0.1
-    properties, rules = state.properties.copy(), state.rule_points
-    with pytest.raises(RuntimeError, match="readable floor 0.003"):
-        state.run()
-    assert state.writes[-1]["CharHeight"] == 0.003
-    assert min(row["CharHeight"] for row in state.writes) == 0.003
-    assert state.properties == properties and state.rule_points == rules
-    assert state.number.link == property_link("Number")
-    assert state.number.text == properties["Number"]
-
-
-@pytest.fixture
-def leadscrew_lifecycle(monkeypatch):
-    """Drive the real builder through a native-shaped finalizer; spy the Number."""
-    state = SimpleNamespace(
-        lifecycle=[], number_calls=[], notes=[], number_mutate_at=None,
-        number_changed=False, save_failure=None, closed=False,
-        primary=RuntimeError("native save primary"),
-        properties={
-            "Number": ROW["number"], "Supplier": "supplier", "Supplier SKUs": "sku",
-        },
+def test_feed_nut_countersinks_seat_the_flat_heads_proud_and_off_the_body() -> None:
+    tan = math.tan(math.radians(nut.CSK_ANGLE / 2.0))
+    assert nut.CSK_ANGLE == SCREW_DIMS.head_angle_deg == 82.0
+    # The head's cone meets each mouth below its top Ø, so it stands proud at
+    # the least, nominal and largest (opened) countersink alike.
+    for mouth, proud in (
+        (nut.CSK_DIA_MIN, nut.HEAD_PROUD_MAX),
+        (nut.CSK_DIA, nut.HEAD_PROUD_NOMINAL),
+        (nut.CSK_DIA_OPEN_MAX, nut.HEAD_PROUD_MIN),
+    ):
+        assert proud == pytest.approx((SCREW_DIMS.head_dia - mouth) / (2.0 * tan))
+        assert proud > 0.0
+    assert nut.CSK_DIA_OPEN_MAX == nut.CSK_CUTTER_DIA_MAX == pytest.approx(
+        3.0 / 16.0 * 25.4
     )
-    source = SimpleNamespace(
-        GetSaveFlag=lambda: False,
-        GetPathName=lambda: str(draw.SOURCE),
-        IsOpenedReadOnly=lambda: True,
-    )
-    drawing = SimpleNamespace(EditRebuild3=lambda: True)
-    adapter = SimpleNamespace(currentModel=drawing)
+    assert nut.CSK_DIA + nut.CSK_DIA_BAND < nut.CSK_DIA_OPEN_MAX
+    # F2's head limit is the catalogue head the proud and body checks use.
+    assert nut.SCREW_HEAD_DIA_MAX == SCREW_DIMS.head_dia == pytest.approx(0.212 * 25.4)
+    # The countersink never runs through the thinnest flange.
+    assert nut.CSK_DEPTH == pytest.approx((nut.CSK_DIA - nut.HOLE_DIA) / (2.0 * tan))
+    assert nut.CSK_DEPTH < nut.FLANGE_THICK_MIN
 
-    def mutate(stage):
-        if state.number_mutate_at == stage:
-            state.number_changed = True
-
-    def step(name):
-        def record(*_args, **_kwargs):
-            state.lifecycle.append(name)
-            return []
-
-        return record
-
-    def note(_adapter, text, *xy):
-        state.notes.append((text, xy))
-        printed = text.replace(property_link("Supplier SKUs"), "sku").replace(
-            property_link("Supplier"), "supplier"
+    # The Ø3/16 cutter's cone stays off the largest body at the worst hole
+    # station; a Ø1/4 cutter would gouge it.
+    def cutter_to_body(cutter: float) -> float:
+        return (
+            nut.HOLE_PCD / 2.0 - nut.HOLE_STATION_BAND - nut.CSK_ECCENTRICITY_MAX
+            - cutter / 2.0 - nut.BODY_DIA_MAX / 2.0
         )
-        return SimpleNamespace(GetText=lambda: printed.replace("\n", "\r\n"))
 
-    def fit_number(actual, *, expected_number):
-        assert actual is adapter
-        assert expected_number == state.properties["Number"]
-        state.number_calls.append(("fit", tuple(state.lifecycle)))
-
-        def pure():
-            assert not state.closed, "Number check touched closed COM"
-            state.number_calls.append(("check", tuple(state.lifecycle)))
-            if state.number_changed:
-                raise RuntimeError("Number presentation drift")
-
-        return pure
-
-    async def finalize(_adapter, outputs, *, settled_checks, checkpoint, **_kwargs):
-        state.lifecycle.append("finalizer")
-        mutate("finalizer")
-        for check in settled_checks:
-            check()
-        for kind in ("drawing", "pdf"):
-            with drawing_common._drawing_checkpoint(checkpoint, f"{kind}_save"):
-                state.lifecycle.append(f"{kind} save")
-                mutate(kind)
-                if state.save_failure == kind:
-                    raise state.primary
-        mutate("beforeclose")
-        with drawing_common._drawing_checkpoint(checkpoint, "drawing_close"):
-            state.lifecycle.append("close")
-            state.closed = True
-        return {"drawing": str(outputs.slddrw), "pdf": str(outputs.pdf), "png": str(outputs.png)}
-
-    monkeypatch.setattr(draw, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(draw, "active_configuration_name", lambda *_args: "Installed")
-    monkeypatch.setattr(
-        draw, "read_required_properties", lambda *_args, **_kwargs: state.properties,
+    assert nut.CSK_CUTTER_TO_BODY == pytest.approx(cutter_to_body(nut.CSK_CUTTER_DIA_MAX))
+    assert nut.CSK_CUTTER_TO_BODY > 0.0
+    assert cutter_to_body(0.25 * 25.4) < 0.0
+    # The heads bear on each cone between the underhead fillet and the least
+    # mouth.
+    assert nut.CSK_BEARING_INNER_DIA == max(nut.HOLE_DIA_MAX, nut.SCREW_FILLET_DIA_MAX)
+    assert nut.CSK_BEARING_AREA_MIN == pytest.approx(
+        math.pi / 4.0 * (nut.CSK_DIA_MIN**2 - nut.CSK_BEARING_INNER_DIA**2)
     )
-    monkeypatch.setattr(draw, "new_project_drawing", lambda *_args, **_kwargs: (
-        drawing, object(),
-    ))
-    monkeypatch.setattr(draw, "stamp_drawing_summary", lambda *_args: None)
-    monkeypatch.setattr(
-        draw, "place_view", lambda *_args, **_kwargs: SimpleNamespace(Angle=0.0),
+    assert nut.CSK_BEARING_AREA_MIN > 0.0
+
+
+def test_feed_nut_flat_heads_engage_the_lug_at_rule_18_and_stop_inside_it() -> None:
+    assert nut.SCREW_COUNT == len(nut.HOLE_ANGLES_DEG) == 4
+    assert nut.SCREW_LENGTH == SCREW_DIMS.length == pytest.approx(0.625 * 25.4)
+    assert nut.SCREW_GRIP == pytest.approx(nut.FLANGE_THICK + nut.HEAD_PROUD_NOMINAL)
+    assert nut.SCREW_ENGAGEMENT == pytest.approx(nut.SCREW_LENGTH - nut.SCREW_GRIP)
+    full = (
+        nut.SCREW_LENGTH - 0.03 * 25.4
+        - (nut.FLANGE_THICK_MAX + nut.HEAD_PROUD_MAX)
+        - feed.TAP_MOUTH_BREAK
+        - 2.0 * SCREW_DIMS.pitch
     )
-    monkeypatch.setattr(draw, "_center_view", lambda *_args: None)
-    monkeypatch.setattr(draw, "set_hidden_lines_removed", lambda *_args: None)
-    monkeypatch.setattr(draw, "curate_view_dimensions", step("main controls"))
-    monkeypatch.setattr(draw, "_add_clock_sections", step("sections"))
-    monkeypatch.setattr(draw, "_add_end_details", step("details"))
-    monkeypatch.setattr(draw, "verify_machining_controls", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(draw, "set_dimension_callouts", lambda *_args: None)
-    monkeypatch.setattr(draw, "add_view_centerline", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(draw, "add_note", note)
-    monkeypatch.setattr(draw, "add_leader_note", lambda *_args, **_kwargs: SimpleNamespace(
-        GetText=lambda: draw.THREAD_CALLOUT,
-    ))
-    monkeypatch.setattr(draw, "_fit_number_title_note", fit_number)
-    monkeypatch.setattr(draw, "finalize_drawing", finalize)
-    state.run = lambda: asyncio.run(
-        draw._build_read_only_source(adapter, source, "Installed")
-    )
-    return state
+    assert nut.SCREW_FULL_THREAD_MIN == pytest.approx(full)
+    assert full >= feed.ENGAGEMENT_TARGET_D * nut.SCREW_MAJOR
+    reach = nut.SCREW_LENGTH - nut.FLANGE_THICK_MIN - nut.HEAD_PROUD_MIN
+    assert nut.SCREW_TIP_REACH_MAX == pytest.approx(reach)
+    assert reach < feed_block.LUG_WIDTH
+    # The heads stand short of the body's end, inside the nut's own reach.
+    assert nut.FLANGE_THICK_MAX + nut.HEAD_PROUD_MAX < nut.LENGTH
 
 
-def test_builder_prints_the_identity_note_block(
-    leadscrew_lifecycle,
-) -> None:
-    state = leadscrew_lifecycle
-    assert set(state.run()) == {"drawing", "pdf", "png"}
-    assert state.notes == [(draw.NOTES, draw.NOTES_XY)]
-
-
-def test_builder_fits_the_number_once_and_checks_only_live_boundaries(
-    leadscrew_lifecycle,
-) -> None:
-    state = leadscrew_lifecycle
-    state.run()
-    assert [kind for kind, _events in state.number_calls] == ["fit"] + ["check"] * 5
-    assert state.number_calls[0][1] == ("main controls", "sections", "details")
-    snapshots = [events for kind, events in state.number_calls if kind == "check"]
-    # The settled check, before and after the drawing save, after the PDF
-    # save and before close; never once the drawing is closed.
-    assert [events[-1] for events in snapshots] == [
-        "finalizer", "finalizer", "drawing save", "pdf save", "pdf save",
+def test_feed_nut_profile_holes_and_countersinks_follow_the_envelope() -> None:
+    r_bore, r_body, r_flange = nut.BORE_DIA / 2.0, nut.BODY_DIA / 2.0, nut.FLANGE_DIA / 2.0
+    assert part.nut_profile_points() == [
+        (r_bore, 0.0), (r_flange, 0.0), (r_flange, nut.FLANGE_THICK),
+        (r_body, nut.FLANGE_THICK), (r_body, nut.LENGTH), (r_bore, nut.LENGTH),
     ]
-    assert all("close" not in events for events in snapshots)
-    assert state.closed and state.lifecycle[-1] == "close"
-
-
-@pytest.mark.parametrize("stage", ("finalizer", "drawing", "pdf", "beforeclose"))
-def test_number_drift_refuses_at_each_boundary_without_refit(
-    leadscrew_lifecycle, stage,
-) -> None:
-    state = leadscrew_lifecycle
-    state.number_mutate_at = stage
-    with pytest.raises(RuntimeError, match="Number presentation drift"):
-        state.run()
-    assert [kind for kind, _events in state.number_calls].count("fit") == 1
-    assert "close" not in state.lifecycle
-
-
-@pytest.mark.parametrize("kind", ("drawing", "pdf"))
-def test_number_after_save_refusal_keeps_primary_native_failure(
-    leadscrew_lifecycle, kind,
-) -> None:
-    state = leadscrew_lifecycle
-    state.save_failure = state.number_mutate_at = kind
-    with pytest.raises(RuntimeError) as refused:
-        state.run()
-    assert refused.value is state.primary
-    assert any(
-        f"after_{kind}_save checkpoint also failed" in note
-        and "Number presentation drift" in note
-        for note in refused.value.__notes__
+    for (x, z), angle in zip(nut.HOLE_CENTRES, nut.HOLE_ANGLES_DEG, strict=True):
+        assert math.hypot(x, z) == pytest.approx(nut.HOLE_PCD / 2.0)
+        assert math.degrees(math.atan2(z, x)) % 360.0 == pytest.approx(angle)
+    assert part.hole_sketch_points() == [(x, -z) for x, z in nut.HOLE_CENTRES]
+    # One countersink per hole: Front's u is model x, Right's is -z.
+    axes = sorted(
+        (u, 0.0) if plane == "Front" else (0.0, -u) for plane, u in nut.COUNTERSINK_AXES
     )
-    assert [event for event, _events in state.number_calls].count("fit") == 1
-    assert "close" not in state.lifecycle
+    assert axes == pytest.approx(sorted(nut.HOLE_CENTRES))
+    tan = math.tan(math.radians(nut.CSK_ANGLE / 2.0))
+    for _plane, u in nut.COUNTERSINK_AXES:
+        apex, mouth, outer, top = nut.countersink_points(u)
+        assert apex == (u, nut.CSK_APEX_Y) and top == (u, nut.CSK_TOP_Y)
+        # The mouth lies on the head face at the countersink's diameter, on
+        # the 82° cone from the apex; the wall rises square from it.
+        assert mouth[1] == nut.FLANGE_THICK
+        assert abs(mouth[0] - u) == pytest.approx(nut.CSK_DIA / 2.0)
+        assert (nut.FLANGE_THICK - nut.CSK_APEX_Y) * tan == pytest.approx(
+            nut.CSK_DIA / 2.0
+        )
+        assert outer == (mouth[0], nut.CSK_TOP_Y)
+        # The mouth's side faces away from the nut's axis; the wall clears
+        # the modelled body.
+        assert abs(mouth[0]) > abs(u)
+        assert abs(u) - nut.CSK_DIA / 2.0 > r_body
 
 
-def test_note_block_that_does_not_resolve_is_refused(leadscrew_lifecycle, monkeypatch) -> None:
-    state = leadscrew_lifecycle
-    # The SKU link left unresolved: the printed block is not the source's.
-    monkeypatch.setattr(draw, "add_note", lambda *_args: SimpleNamespace(
-        GetText=lambda: (
-            f"ITEM: {draw.ITEM}\nSUPPLIER: supplier\nSKU: {property_link('Supplier SKUs')}"
-        ),
-    ))
-    with pytest.raises(RuntimeError, match="note block did not resolve"):
-        state.run()
-    assert state.number_calls == []
+def test_feed_nut_volume_is_the_revolved_profile_less_holes_and_countersinks() -> None:
+    tan = math.tan(math.radians(nut.CSK_ANGLE / 2.0))
+    flange = math.pi / 4.0 * (nut.FLANGE_DIA**2 - nut.BORE_DIA**2) * nut.FLANGE_THICK
+    body = math.pi / 4.0 * (nut.BODY_DIA**2 - nut.BORE_DIA**2) * nut.BODY_LENGTH
+    assert nut.BODY_VOLUME_MM3 == pytest.approx(flange + body)
+    hole = math.pi / 4.0 * nut.HOLE_DIA**2 * nut.FLANGE_THICK
+    r_m, r_h = nut.CSK_DIA / 2.0, nut.HOLE_DIA / 2.0
+    depth = (r_m - r_h) / tan
+    frustum = math.pi * depth / 3.0 * (r_m**2 + r_m * r_h + r_h**2)
+    countersink = frustum - math.pi * r_h**2 * depth
+    assert nut.CSK_VOLUME_MM3 == pytest.approx(countersink)
+    assert nut.VOLUME_MM3 == pytest.approx(flange + body - 4 * (hole + countersink))
+    assert nut.VOLUME_MM3 == pytest.approx(1622.7, abs=0.1)
 
 
-@pytest.fixture
-def readonly_leadscrew_build(monkeypatch, tmp_path):
-    """Only run the real build as far as its first main-dimension import."""
-    source_path = tmp_path / "leadscrew-source.SLDPRT"
-    source_path.write_bytes(b"original leadscrew source")
-    state = SimpleNamespace(
-        configuration="Installed", dirty=False, read_only=True,
-        path=str(source_path), events=[], presentation_hook=None,
-        primary=RuntimeError("stop at first main formatting"),
+def test_feed_nut_supplier_references_are_the_dimension_image() -> None:
+    values = {name: value for name, value, _orientation in nut.SUPPLIER_REFERENCE_DIMENSIONS}
+    assert values == {
+        "SupplierBodyLength": nut.BODY_LENGTH,
+        "SupplierFlangeThickness": nut.FLANGE_THICK,
+        "SupplierFlangeDiameter": nut.FLANGE_DIA,
+        "SupplierBodyDiameter": nut.BODY_DIA,
+        "SupplierMountingHoleDiameter": nut.HOLE_DIA,
+        "SupplierHolePitchDiameter": nut.HOLE_PCD,
+    }
+    assert set(nut.SUPPLIER_REFERENCE_UNITS.values()) == {"mm"}
+    assert set(nut.SUPPLIER_REFERENCE_STARTS) == set(values) == set(
+        nut.SUPPLIER_REFERENCE_FORMATS
     )
-    source = SimpleNamespace(
-        GetSaveFlag=lambda: state.dirty,
-        GetPathName=lambda: state.path,
-        IsOpenedReadOnly=lambda: state.read_only,
+    assert nut.SUPPLIER_REFERENCE_FORMATS["SupplierMountingHoleDiameter"][3] == "4X"
+    assert nut.SUPPLIER_REFERENCE_FORMATS["SupplierHolePitchDiameter"][3] == "PCD"
+    # The hole chord starts on the +X hole's edge, the PCD chord on the -Z hole.
+    assert nut.SUPPLIER_REFERENCE_STARTS["SupplierMountingHoleDiameter"] == (
+        nut.HOLE_CENTRES[0][0], -nut.HOLE_DIA / 2.0,
     )
-    drawing = SimpleNamespace(EditRebuild3=lambda: True)
-    adapter = SimpleNamespace(currentModel=None)
-
-    def sha256(path):
-        assert path == source_path
-        value = hashlib.sha256(path.read_bytes()).hexdigest()
-        state.events.append(("hash", value))
-        return value
-
-    def opened(actual_adapter, path, **_kwargs):
-        assert actual_adapter is adapter and path == source_path
-        state.events.append(("open",))
-        adapter.currentModel = source
-        return source
-
-    def new_drawing(actual_adapter, **_kwargs):
-        assert actual_adapter.currentModel is source
-        state.events.append(("drawing",))
-        adapter.currentModel = drawing
-        return drawing, object()
-
-    def placed(_adapter, path, orientation, *_args, **_kwargs):
-        assert path == str(source_path) and not state.dirty
-        assert state.configuration == "Installed"
-        state.events.append(("view", orientation))
-        return SimpleNamespace(Angle=0.0)
-
-    def first_format(_adapter, _view, **_kwargs):
-        assert not state.dirty
-        state.events.append(("main format",))
-        state.dirty = True
-        if state.presentation_hook is not None:
-            state.presentation_hook()
-        raise state.primary
-
-    monkeypatch.setattr(draw, "SOURCE", source_path)
-    monkeypatch.setattr(draw, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(
-        draw, "active_configuration_name", lambda *_args: state.configuration
+    assert nut.SUPPLIER_REFERENCE_STARTS["SupplierHolePitchDiameter"] == (
+        0.0, -nut.HOLE_PCD / 2.0,
     )
-    monkeypatch.setattr(draw._telemetry, "info", lambda _message: None)
-    monkeypatch.setattr(draw, "_source_file_sha256", sha256)
-    monkeypatch.setattr(supplier_drawing, "_source_file_sha256", sha256)
-    monkeypatch.setattr(draw, "_open_supplier_source_read_only", opened)
-    monkeypatch.setattr(draw, "read_required_properties", lambda *_args, **_kwargs: {})
-    monkeypatch.setattr(draw, "new_project_drawing", new_drawing)
-    monkeypatch.setattr(draw, "stamp_drawing_summary", lambda *_args: None)
-    monkeypatch.setattr(draw, "place_view", placed)
-    monkeypatch.setattr(draw, "_center_view", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(draw, "set_hidden_lines_removed", lambda *_args: None)
-    monkeypatch.setattr(draw, "curate_view_dimensions", first_format)
-    return SimpleNamespace(
-        adapter=adapter, state=state, source=source, path=source_path,
+    # Sheet 1's FeedNut panel prints them, each text on its shelf; the
+    # LeadScrew's panel carries none.
+    assert set(draw.SHELVES) == set(values)
+    assert draw.annotate_member(None, spec.CONFIGURATION, (), []) == ()
+
+
+def test_member_specs_are_pure_data() -> None:
+    allowed = {
+        spec: {
+            "__future__",
+            "math",
+            "_printed_tolerance",
+            "ch_rocker_arm_tl_vn_oblique_leadscrew_spec",
+        },
+        nut: {
+            "__future__",
+            "math",
+            "fractions",
+            "ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec",
+            "ch_rocker_arm_tl_vn_oblique_leadscrew_spec",
+            "_hole_spec",
+            "_mcmaster_91771a112",
+        },
+    }
+    for module, names in allowed.items():
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        imports = re.findall(r"^(?:from|import) (\S+)", source, re.MULTILINE)
+        assert set(imports) <= names, module.__name__
+
+
+# --- Builder sketches: every emitted dimension named ------------------------------
+
+
+class _SketchAdapter:
+    """Records sketch dimensions; every other native step succeeds."""
+
+    def __init__(self) -> None:
+        self.emitted: list[tuple] = []
+        self.revolves: list = []
+        self.planes: list[str] = []
+        self._ok = SimpleNamespace(is_success=True, data="C0", error=None)
+
+    async def create_sketch(self, plane):
+        self.planes.append(plane)
+        return self._ok
+
+    async def add_centerline(self, *_points):
+        return self._ok
+
+    async def add_sketch_constraint(self, *_args):
+        return self._ok
+
+    async def add_sketch_dimension(self, ref1, ref2, kind, value):
+        self.emitted.append((ref1, ref2, kind, value))
+        return self._ok
+
+    async def exit_sketch(self):
+        return self._ok
+
+    async def create_revolve(self, params):
+        self.revolves.append(params)
+        return self._ok
+
+
+def _patch_sketching(monkeypatch, applied: dict, chains: list) -> None:
+    async def chain(_adapter, points, close=True):
+        chains.append(list(points))
+        count = len(points) if close else len(points) - 1
+        return [f"L{len(chains)}_{i}" for i in range(count)]
+
+    async def defined(*_args, **_kwargs):
+        return None
+
+    def apply(self, _adapter, feature):
+        applied[feature] = [name for name, _ in self._rows]
+        return []
+
+    monkeypatch.setattr(part, "add_line_chain", chain)
+    monkeypatch.setattr(part, "set_sketch_direct_db", lambda *_args: None)
+    monkeypatch.setattr(part, "ensure_fully_defined", defined)
+    monkeypatch.setattr(part, "name_last_feature", lambda *_args: None)
+    monkeypatch.setattr(part.SketchDims, "apply", apply)
+
+
+def test_nut_profile_names_the_flange_thickness_it_emits(monkeypatch) -> None:
+    applied, chains = {}, []
+    _patch_sketching(monkeypatch, applied, chains)
+    adapter = _SketchAdapter()
+    asyncio.run(part._revolve_nut(adapter))
+    names = applied["NutProfile"]
+    assert names == list(nut.NUT_PROFILE_DIMENSIONS)
+    assert len(adapter.emitted) == len(names)
+    by_name = dict(zip(names, adapter.emitted, strict=True))
+    assert by_name["NutAxisLength"] == ("C0", None, "linear", nut.LENGTH)
+    # The flange's rim edge, seat face to head face: the printed LIMIT.
+    assert by_name["FlangeThick"][2:] == ("vertical_distance", nut.FLANGE_THICK)
+    assert by_name["FlangeThick"][:2] == ("L1_1.start", "L1_1.end")
+    assert by_name["BodyLength"][3] == nut.BODY_LENGTH
+    assert chains == [part.nut_profile_points()]
+    assert adapter.planes == ["Front"] and not adapter.revolves[0].is_cut
+
+
+@pytest.mark.parametrize("index", range(1, 5))
+def test_countersink_profile_names_every_dimension_it_emits(monkeypatch, index) -> None:
+    """Six drivers per countersink: the 82° held by the apex depth below the
+    mouth, never an angular dimension; countersink 1 carries the printed
+    names."""
+    applied, chains, diameters = {}, [], []
+    _patch_sketching(monkeypatch, applied, chains)
+
+    async def diametric(adapter, centerline, line, text_xy, label):
+        diameters.append((centerline, line, text_xy))
+        adapter.emitted.append((centerline, line, "diametric", nut.CSK_DIA))
+
+    monkeypatch.setattr(part, "add_diametric_linear_dimension", diametric)
+    adapter = _SketchAdapter()
+    plane, u = nut.COUNTERSINK_AXES[index - 1]
+    asyncio.run(part._countersink(adapter, index, plane, u))
+    names = applied[f"Countersink{index}Profile"]
+    assert names == list(nut.countersink_dimensions(index))
+    assert len(adapter.emitted) == len(names)
+    by_kind = dict(zip(names, adapter.emitted, strict=True))
+    assert by_kind[names[1]][2:] == ("horizontal_distance", abs(u))
+    assert by_kind[names[2]][2:] == ("vertical_distance", nut.FLANGE_THICK)
+    assert by_kind[names[3]][1:] == ("L1_1", "diametric", nut.CSK_DIA)
+    assert by_kind[names[4]] == (
+        "L1_0.start", "L1_1.start", "vertical_distance", nut.CSK_APEX_DEPTH,
     )
+    assert by_kind[names[5]][2:] == ("vertical_distance", nut.CSK_OVERRUN)
+    assert not any(kind == "angle" for *_refs, kind, _value in adapter.emitted)
+    assert chains == [nut.countersink_points(u)]
+    # The diameter's text stands outboard of the wall, away from the axis.
+    assert abs(diameters[0][2][0]) > abs(chains[0][1][0])
+    assert adapter.planes == [plane] and adapter.revolves[0].is_cut
 
 
-def test_leadscrew_build_creates_views_from_the_clean_source_before_formatting(
-    readonly_leadscrew_build,
-) -> None:
-    seat = readonly_leadscrew_build
-    with pytest.raises(RuntimeError, match="stop at first main formatting") as error:
-        asyncio.run(draw.build(seat.adapter))
-    assert error.value is seat.state.primary
-    assert [event[0] for event in seat.state.events] == [
-        "hash", "open", "drawing", "view", "view", "main format", "hash"
+# --- The package: text fit and the REWORK sheet's layout -------------------------
+
+
+def test_footer_and_labels_fit_their_rows() -> None:
+    assert footer.check_item(draw.ITEM, label=STEM) == draw.ITEM
+    budget = math.floor((footer._FOOTER_RIGHT - footer._NOTE_X) / 0.00236)
+    assert budget == 83
+    assert len(draw.GENERAL_TEXT) <= budget
+    assert f"SHEET {spec.MODIFIED_STOCK_SHEET}" in draw.GENERAL_TEXT
+    assert f"SHEET {nut.REWORK_SHEET}" in draw.GENERAL_TEXT
+    # The REWORK sheet's item label stays in its band at 2.36 mm a character.
+    cell = draw.ITEM_LABEL_CELL
+    assert draw.ITEM_LABEL_XY[0] + 0.00236 * len(draw.REWORK_ITEM) < cell[2]
+    assert cell[0] < draw.ITEM_LABEL_XY[0] and cell[1] < draw.ITEM_LABEL_XY[1] - 0.004
+    assert draw.ITEM_LABEL_XY[1] <= cell[3] and draw._inside_sheet(cell)
+    # Each member sheet's item carries sheet 1's member number.
+    for item, (_configuration, label) in zip(
+        (draw.LEADSCREW_ITEM, draw.REWORK_ITEM), draw.VARIANTS, strict=True
+    ):
+        assert item.split()[0] == label.split()[0]
+    for member in (spec, nut):
+        assert len(member.DRAWING_NOTES) <= budget
+
+
+def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
+    scale = draw._REWORK_PER_MODEL_MM
+    assert draw.REWORK_SCALE == (4.0, 1.0)
+    radius = nut.FLANGE_DIA / 2.0 * scale
+    end = (
+        draw.REWORK_END_CENTER[0] - radius,
+        draw.REWORK_END_CENTER[1] - radius,
+        draw.REWORK_END_CENTER[0] + radius,
+        draw.REWORK_END_CENTER[1] + radius,
+    )
+    half_length = nut.LENGTH / 2.0 * scale
+    section = (
+        draw.REWORK_SECTION_CENTER[0] - half_length,
+        draw.REWORK_SECTION_CENTER[1] - radius,
+        draw.REWORK_SECTION_CENTER[0] + half_length,
+        draw.REWORK_SECTION_CENTER[1] + radius,
+    )
+    reach = radius + draw.REWORK_SECTION_OVERRUN
+    cut = (end[0], draw.REWORK_END_CENTER[1] - reach, end[2], draw.REWORK_END_CENTER[1] + reach)
+    for box in (end, section, cut):
+        assert draw._inside_sheet(box), box
+    assert not draw._overlaps(cut, section)
+    assert cut[3] < draw.ITEM_LABEL_CELL[1]
+    # The texts stand clear of the section's ink: the flange's beyond the rim,
+    # the countersink's beside the body, past the head face, inside the rim.
+    flange_r, flange_y = draw.FLANGE_THICK_TEXT_MM
+    assert flange_r > nut.FLANGE_DIA / 2.0 + 2.0 and 0.0 < flange_y < nut.FLANGE_THICK
+    csk_r, csk_y = draw.CSK_DIA_TEXT_MM
+    assert nut.BODY_DIA / 2.0 + 2.0 < csk_r < nut.FLANGE_DIA / 2.0
+    assert nut.FLANGE_THICK + 3.0 < csk_y < nut.LENGTH
+    assert draw.REWORK_END_ANGLE == math.pi / 2.0
+    # One letter per cut in the package: sheet 2's A to E, sheet 3's F.
+    letters = [
+        *(section.label for section in draw.CLOCK_SECTIONS),
+        *(detail.label for detail in draw.END_DETAILS),
+        draw.REWORK_SECTION_LABEL,
     ]
-    assert seat.state.events[0] == seat.state.events[-1]
-
-
-def test_leadscrew_refuses_noninstalled_saved_source_before_creating_views(
-    readonly_leadscrew_build,
-) -> None:
-    seat = readonly_leadscrew_build
-    seat.state.configuration = ""
-    with pytest.raises(RuntimeError, match="without an installed configuration active"):
-        asyncio.run(draw.build(seat.adapter))
-    assert [event[0] for event in seat.state.events] == ["hash", "open", "hash"]
-
-
-def test_leadscrew_refuses_dirty_source_before_view_creation(
-    readonly_leadscrew_build,
-) -> None:
-    seat = readonly_leadscrew_build
-    seat.state.dirty = True
-    with pytest.raises(RuntimeError, match="must be clean before view creation"):
-        asyncio.run(draw.build(seat.adapter))
-    assert [event[0] for event in seat.state.events] == ["hash", "open", "hash"]
-
-
-@pytest.mark.parametrize("fault", ("configuration", "read_only", "path", "bytes"))
-def test_leadscrew_source_exit_guards_preserve_primary_refusal(
-    readonly_leadscrew_build, fault,
-) -> None:
-    seat = readonly_leadscrew_build
-
-    def changed():
-        if fault == "configuration":
-            seat.state.configuration = "OtherConfiguration"
-        elif fault == "read_only":
-            seat.state.read_only = False
-        elif fault == "path":
-            seat.state.path = str(seat.path.with_name("wrong-source.SLDPRT"))
-        else:
-            seat.path.write_bytes(b"mutated source bytes")
-
-    seat.state.presentation_hook = changed
-    with pytest.raises(RuntimeError, match="stop at first main formatting") as error:
-        asyncio.run(draw.build(seat.adapter))
-    assert error.value is seat.state.primary
-    notes = error.value.__notes__
-    assert any(
-        ("source file preservation also failed" if fault == "bytes"
-         else "source integrity check also failed") in note
-        for note in notes
-    )
-    assert seat.state.events[-1][0] == "hash"
-
-
-@pytest.mark.parametrize("fault", (None, "configuration", "bytes"))
-def test_leadscrew_success_path_still_checks_source_on_lifecycle_exit(
-    readonly_leadscrew_build, monkeypatch, fault,
-) -> None:
-    seat = readonly_leadscrew_build
-
-    async def completed(_adapter, source_model, installed_configuration):
-        assert source_model is seat.source and installed_configuration == "Installed"
-        if fault == "configuration":
-            seat.state.configuration = "OtherConfiguration"
-        elif fault == "bytes":
-            seat.path.write_bytes(b"mutated source on success")
-        return {"drawing": "complete"}
-
-    monkeypatch.setattr(draw, "_build_read_only_source", completed)
-    if fault is None:
-        assert asyncio.run(draw.build(seat.adapter)) == {"drawing": "complete"}
-    else:
-        with pytest.raises(RuntimeError, match=(
-            "installed source state changed" if fault == "configuration"
-            else "source part bytes changed"
-        )):
-            asyncio.run(draw.build(seat.adapter))
-    assert seat.state.events[-1][0] == "hash"
-
-
-def test_leadscrew_hash_guard_covers_read_only_open_failure(
-    readonly_leadscrew_build, monkeypatch,
-) -> None:
-    seat = readonly_leadscrew_build
-
-    def failed_open(*_args, **_kwargs):
-        seat.path.write_bytes(b"mutated during failed source open")
-        raise seat.state.primary
-
-    monkeypatch.setattr(draw, "_open_supplier_source_read_only", failed_open)
-    with pytest.raises(RuntimeError, match="stop at first main formatting") as error:
-        asyncio.run(draw.build(seat.adapter))
-    assert error.value is seat.state.primary
-    assert any(
-        "source file preservation also failed" in note
-        for note in error.value.__notes__
-    )
-    assert [event[0] for event in seat.state.events] == ["hash", "hash"]
+    assert letters == ["A", "B", "C", "D", "E", "F"]
+    source = Path(draw.__file__).read_text(encoding="utf-8")
+    rework = source[source.index("def _append_feed_nut_rework_sheet") :]
+    assert "configure_reference_views(adapter, feed_nut.CONFIGURATION, [end])" in rework
+    assert "_require_axis_horizontal(adapter, section" in rework
+    assert rework.index("curate_view_dimensions(") < rework.index(
+        "verify_machining_controls("
+    ) < rework.index("set_dimension_callouts(")
 
 
 def test_notes_name_the_item_not_its_length_or_material() -> None:
     # The cut length is the dimension's, the material the title block's, and
     # no line prescribes a method (rule 7).
-    assert draw.ITEM == "TR8X2 LEAD SCREW"
+    assert draw.LEADSCREW_ITEM == "[1] TR8X2 LEAD SCREW"
     assert "STAINLESS" not in draw.NOTES.upper()
     assert f"{spec.LENGTH:.0f}" not in draw.NOTES
     for name in ("Supplier", "Supplier SKUs"):
@@ -1300,19 +1273,10 @@ def test_notes_name_the_item_not_its_length_or_material() -> None:
     # 1:10 gauge sketch before it read as a confusing pseudo-view.
     assert len(draw.NOTES.splitlines()) == 3
     assert not hasattr(draw, "STOCK_REFERENCE")
-    assert re.findall(r"\d", draw.NOTES.replace("TR8X2", "")) == []
-    assert not hasattr(draw, "SUPPLIER_STOCK_CAPTION")
+    assert re.findall(r"\d", draw.NOTES.replace("TR8X2", "").replace("[1]", "")) == []
     assert not hasattr(spec, "SUPPLIER_REFERENCE_DIMENSIONS")
     assert "Manufacturing Notes" not in draw.NOTES
-    assert not hasattr(spec, "DRAWING_NOTES")
-    assert "Manufacturing Notes" not in part.SAVED_PROPERTIES_NO_NOTE
-    assert set(part.SAVED_PROPERTIES) - set(part.SAVED_PROPERTIES_NO_NOTE) == {
-        "Manufacturing Notes"
-    }
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties(adapter, PART_NAME)\n" in source.replace(
-        "\r\n", "\n"
-    )
+    assert set(part.MEMBER_NOTE_PROPERTIES) <= set(part.SAVED_DRAWING_PROPERTIES)
 
 
 def test_sections_print_hidden_lines_removed_and_text_off_their_lines() -> None:
@@ -1327,7 +1291,7 @@ def test_sections_print_hidden_lines_removed_and_text_off_their_lines() -> None:
     )
     details = source[source.index("def _add_end_details") :]
     assert "set_hidden_lines_removed(adapter, view)" in details
-    build = source[source.index("async def build") :]
+    build = source[source.index("def _append_leadscrew_sheet") :]
     assert "FLAT_AF_TEXT_XY" not in source
     assert build.index("_add_end_details(adapter, main)") < build.index(
         "verify_machining_controls("
@@ -1466,7 +1430,7 @@ def test_thread_is_called_out_on_the_main_view() -> None:
     cuts = [draw.sheet_x(section.cut_mm) for section in draw.CLOCK_SECTIONS]
     assert min(cuts) + 0.025 < text_x and text_x + 0.060 < max(cuts) - 0.015
     source = Path(draw.__file__).read_text(encoding="utf-8")
-    build = source[source.index("async def build") :]
+    build = source[source.index("def _append_leadscrew_sheet") :]
     assert "add_leader_note(" in build and "view=main," in build
 
 

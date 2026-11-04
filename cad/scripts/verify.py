@@ -894,9 +894,8 @@ def _shared_reference_counts(name: str) -> dict[str, dict[str, int]]:
 
         return {
             "": {
-                "HoldDownStud": jig.QUANTITIES[jig.HOLD_DOWN_STUD],
-                "TNut": jig.QUANTITIES[jig.T_NUT],
-                "FlangeNut": jig.QUANTITIES[jig.FLANGE_NUT],
+                member: jig.QUANTITIES[family]
+                for family, (_physical, member) in jig.KIT_IDENTITIES.items()
             }
         }
     roles = {
@@ -1389,8 +1388,14 @@ async def _walk_pass_sweep(adapter: Any, name: str) -> list[str]:
                 f"{walk['pass']} pass, theta {math.degrees(pose['theta_rad']):+.3f} deg "
                 f"(slide {pose['drive_mm']:.3f} mm)"
             )
+            carriages = bind_component_selectors(
+                adapter.currentModel, pose["carriages"]
+            )
             for carriage, origin in pose["carriages"].items():
-                at = [v * 1000.0 for v in component_transform(adapter, carriage)[9:12]]
+                at = [
+                    v * 1000.0
+                    for v in component_transform(adapter, carriages[carriage])[9:12]
+                ]
                 off = math.dist(at, origin)
                 if off > tolerance:
                     failures.append(

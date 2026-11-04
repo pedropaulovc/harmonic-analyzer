@@ -1,12 +1,14 @@
-r"""Pure-data envelope of the purchased HIWIN-style HGR15 rail, 450 as supplied (MHA-CH-06-TL-VN-50).
+r"""Pure-data envelope of the kit's ``Rail`` member: the HIWIN-style HGR15 rail, 450 as supplied (MHA-CH-06-TL-VN-83).
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure: ``build_ch_rocker_arm_tl_vn_oblique_rail`` extrudes ``SECTION`` and cuts
-the eight counterbored holes, and the carriage spec reads ``SECTION`` for its
-running clearance.
+closure: ``build_ch_rocker_arm_tl_vn_oblique_rail_kit`` extrudes ``SECTION``
+and cuts the eight counterbored holes in the ``Rail`` configuration, and the
+carriage member spec reads ``SECTION`` for its running clearance.
 
 Two rails, one per base bar (MHA-CH-06-TL-20), each carrying one HGH15CA
-carriage (MHA-CH-06-TL-VN-51). Shop inventory ``fixtures.trammel-hgr15-rails``.
+carriage, the kit's ``Carriage`` member
+(``ch_rocker_arm_tl_vn_oblique_rail_kit_carriage_spec``). Shop inventory
+``fixtures.trammel-hgr15-rails``.
 
 KIT LISTING (``SOURCE_URL``, read 2026-11-04, owner decisions on issue #2177):
 Amazon ASIN B0C4DJNL33, variant "450MM / HGR15", "450MM Linear Rail 2PCS
@@ -33,12 +35,13 @@ HG Series > Rail, HGR15R440C, downloaded 2026-10-17 ~03:55 UTC; sha256
 FreeCAD 1.1.4 harvest: volume 81085.4038 mm^3, one solid, bbox 440 x 15 x 15;
 profile read from its analytic faces (``vendor-cad/HGR15R.dims.md``).
 
-UNVERIFIED for the kit rail, checked at receipt (``DRAWING_NOTES``): the eight
-hole stations from the end fitted flush. The base bar is drilled to its own
-printed stations, never to measured ones, so a received rail is accepted
-only if every station lies within the base bar's ``RAIL_RECEIPT_BAND``
-(±0.08 mm, the fit's own allowance) of nominal; otherwise the fitter stops
-and reports before the bar is tapped. Also UNVERIFIED: the
+UNVERIFIED for the kit rail, checked at receipt (``DRAWING_NOTES``, the kit
+drawing's ``RECEIPT_SHEET``): the eight hole stations from the end fitted
+flush. The base bar is drilled to its own printed stations, never to measured
+ones, so a received rail is accepted only if every station lies within the
+base bar's ``RAIL_RECEIPT_BAND`` (±0.08 mm, the fit's own allowance) of
+nominal; otherwise the fitter stops and reports before the bar is tapped. Also
+UNVERIFIED: the
 HIWIN reference profile and hole sizes the kit rail is assumed to share; the
 counterbored holes are proved when the rail is laid on the tapped bar and all
 eight #8-32 screws start by hand (base-bar process plan, inspect op 40).
@@ -107,6 +110,11 @@ SKU = "B0C4DJNL33"  # Amazon ASIN of the NUIBBYED 450MM / HGR15 kit, a retailer 
 SOURCE_URL = "https://www.amazon.com/dp/B0C4DJNL33"
 STYLE = "HGR15"  # the HIWIN-style designation the kit copies; no maker part number
 MATERIAL = "Alloy Steel"  # SOLIDWORKS library steel for the bearing-steel rail
+# The kit's default member, its member-specific material and its item tag on
+# the kit drawing's reference sheet.
+CONFIGURATION = "Rail"
+MATERIAL_SPECIFICATION = "Hardened bearing steel"
+ITEM_TAG = "[1]"
 
 # --- Calculator (imported) -------------------------------------------------------
 LENGTH = trammel.RAIL_LENGTH  # 450, as supplied
@@ -276,21 +284,28 @@ CENTROID = (
 VOLUME_TOL_MM3 = 5e-4 * VOLUME_MM3
 
 # The receipt check of the kit rail: the received rail must land on the
-# TL-20 base bar's tapped holes. The print states it as native model
-# dimensions on the hole face, parenthesised as reference (the rail is used
-# as supplied, uncut): the length is the Rail extrusion's depth, and the hole
-# sketch places the first hole from the -X end face and each next one a
-# pitch on from the one before, so one pitch prints for all of them.
+# TL-20 base bar's tapped holes. The receipt sheet states it as native model
+# dimensions on the hole face. The hole sketch places every hole from the -X
+# end face (rule 10: baseline from one datum, never chained), so each station
+# prints with its own receipt band, the acceptance itself: a chained pitch
+# band would let the stations walk (farm run 20261104T210601055Z: the band
+# lived only in the note, the plain (15) and 7X (60) did not carry it). The
+# length is the Rail extrusion's depth, parenthesised as reference (the rail
+# is used as supplied, uncut).
+STATION_DIMENSIONS: tuple[str, ...] = tuple(
+    f"Station{k}" for k in range(1, HOLE_COUNT + 1)
+)
 DRAWING_DIMENSIONS = {
     "Rail": {"Length"},
-    "BoltHoleProfile": {"HoleEnd", "HolePitch"},
+    "BoltHoleProfile": set(STATION_DIMENSIONS),
 }
-# Whole millimetres: the listing's length and the HGR15 pattern.
+# The length in whole millimetres, the listing's; the stations at the base
+# bar's own places for its rail holes, so the band prints whole.
+RECEIPT_PLACES = base_bar.RAIL_HOLE_PLACES
 DRAWING_PRECISION = {
-    feature: dict.fromkeys(names, 0) for feature, names in DRAWING_DIMENSIONS.items()
+    "Rail": {"Length": 0},
+    "BoltHoleProfile": dict.fromkeys(STATION_DIMENSIONS, RECEIPT_PLACES),
 }
-# The one printed pitch stands for every gap between the holes.
-HOLE_PITCH_CALLOUT = f"{HOLE_COUNT - 1}X"
 # The listing gives no pattern, so the received rail is measured before the
 # base bar's taps go in. The bar is drilled to its print; the rail is accepted
 # only inside the base bar's receipt band, the fit's own allowance (Codjiflo
@@ -299,13 +314,19 @@ HOLE_PITCH_CALLOUT = f"{HOLE_COUNT - 1}X"
 # rail contradicted the bar's printed ±0.08). The bar is named by its drawing
 # number (machinist review mr1: a bare "TL-20" named no drawing).
 RECEIPT_BAND = base_bar.RAIL_RECEIPT_BAND
-RECEIPT_TEXT = f"±{RECEIPT_BAND:.{base_bar.RAIL_HOLE_PLACES}f} MM"
+RECEIPT_TEXT = f"±{RECEIPT_BAND:.{RECEIPT_PLACES}f}"
+# The kit drawing's sheet that prints the receipt check; citations name it.
+RECEIPT_SHEET = 2
+# The callout under the stations' last row flags them as the note's check.
+RECEIPT_CALLOUT = "RECEIPT CHECK: ALL STATIONS, SEE NOTE"
 DRAWING_NOTES = "\n".join(
     (
-        "KIT RAIL, USED UNCUT. BEFORE TAPPING MHA-CH-06-TL-20 BASE BAR, MEASURE",
-        f"EVERY HOLE STATION FROM THE END FITTED FLUSH: EACH WITHIN {RECEIPT_TEXT} OF",
-        "THIS SHEET, OR STOP AND REPORT. THE BAR IS DRILLED AS DRAWN.",
+        "RECEIPT CHECK BEFORE TAPPING MHA-CH-06-TL-20 BASE BAR: MEASURE THE",
+        "STATIONS FROM THE END FITTED FLUSH. ANY OUT OF BAND: STOP AND REPORT.",
+        "KIT RAIL, USED UNCUT. THE BAR IS DRILLED AS DRAWN.",
     )
 )
+# The member's native BOM row under the kit's one Number.
+BOM_DESCRIPTION = f"{STYLE} RAIL, {LENGTH:.0f} MM, KIT, UNCUT"
 if abs(LENGTH - (2.0 * HOLE_END + (HOLE_COUNT - 1) * HOLE_PITCH)) > 1e-9:
     raise AssertionError("the rail's hole pattern is not symmetric on its length")

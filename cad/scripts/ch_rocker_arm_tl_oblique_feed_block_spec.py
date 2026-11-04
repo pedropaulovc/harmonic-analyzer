@@ -1,7 +1,7 @@
 """TL-32 integral feed block, rail 1; same pivot/carriage interface as TL-22.
 
-The bought brass flange nut supplied with the lead screw
-(MHA-CH-06-TL-VN-82, ``ch_rocker_arm_tl_vn_oblique_feed_nut_spec``; owner
+The bought brass flange nut supplied with the lead screw (the FeedNut of
+leadscrew kit MHA-CH-06-TL-VN-84, ``ch_rocker_arm_tl_vn_oblique_leadscrew_kit_feed_nut_spec``; owner
 ruling 2026-11-04, #2177 option B) seats flat on the lug's -X face, its
 spigot faced off, so the lug needs no recess. Four #4-40 X 5/8 flat heads
 (MHA-CH-06-TL-VN-67) pass through the nut's countersunk flange holes into
@@ -27,7 +27,7 @@ import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_oblique_end_bracket_spec as end_bracket
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
-import ch_rocker_arm_tl_vn_oblique_feed_nut_spec as feed_nut
+import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_feed_nut_spec as feed_nut
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as lead
 from _hole_spec import HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
@@ -59,7 +59,7 @@ NUT_AXIS_Z = 12.4  # the leadscrew axis over the carriage top (checked below)
 SCREW_CLEARANCE_DIA = 0.351 * 25.4  # 8.915
 # The nut is turned 45° about its axis, so its four holes sit on the lug's
 # diagonals (the owner's option-B sketch, 2026-11-04). The fitter sets that
-# by eye to NUT_CLOCK_TOL_DEG (TL-00 step F1); the walls below charge it.
+# by eye to NUT_CLOCK_TOL_DEG (TL-00 step F1B); the walls below charge it.
 NUT_CLOCK_DEG = 45.0
 NUT_CLOCK_TOL_DEG = 5.0
 _TAP_DIAGONAL = feed_nut.HOLE_PCD / 2 * math.cos(math.radians(NUT_CLOCK_DEG))
@@ -123,7 +123,7 @@ assert DRAWING_PRECISION_BY_NAME["NutCentreY"] == DRAWING_PRECISION_BY_NAME["Nut
 REFERENCE_SKETCHES = pivot.REFERENCE_SKETCHES + ("NutPatternReference",)
 # The transferred taps' native callout leads with where they come from
 # (MHA-FR-05's transferred seats); TL-00 says how.
-TRANSFER_PROCESS = f"TRANSFER THROUGH {feed_nut.NUMBER}\nAT ASSEMBLY;\n"
+TRANSFER_PROCESS = f"TRANSFER THROUGH {feed_nut.NUMBER}\nFEED NUT AT ASSEMBLY;\n"
 
 # --- The leadscrew in the lug: the vertical stack the clearance absorbs ---------
 # The KP08s seat on TL-28's as-bought 1 in thickness (±.012) and the lug's

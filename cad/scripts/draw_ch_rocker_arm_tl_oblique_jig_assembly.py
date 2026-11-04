@@ -486,18 +486,20 @@ PART_ROWS = {
     "ch-rocker-arm-tl-oblique-feed-block": _config.parts(
         "ch-rocker-arm-tl-oblique-feed-block"
     ),
-    "ch-rocker-arm-tl-vn-oblique-rail": _config.parts("ch-rocker-arm-tl-vn-oblique-rail"),
-    "ch-rocker-arm-tl-vn-oblique-carriage": _config.parts(
-        "ch-rocker-arm-tl-vn-oblique-carriage"
+    "ch-rocker-arm-tl-vn-oblique-rail-kit--Rail": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-rail-kit"
+    ),
+    "ch-rocker-arm-tl-vn-oblique-rail-kit--Carriage": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-rail-kit"
     ),
     "ch-rocker-arm-tl-vn-oblique-cl-dowel": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-cl-dowel"
     ),
-    "ch-rocker-arm-tl-vn-oblique-leadscrew": _config.parts(
-        "ch-rocker-arm-tl-vn-oblique-leadscrew"
+    "ch-rocker-arm-tl-vn-oblique-leadscrew-kit--LeadScrew": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-leadscrew-kit"
     ),
-    "ch-rocker-arm-tl-vn-oblique-feed-nut": _config.parts(
-        "ch-rocker-arm-tl-vn-oblique-feed-nut"
+    "ch-rocker-arm-tl-vn-oblique-leadscrew-kit--FeedNut": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-leadscrew-kit"
     ),
     "ch-rocker-arm-tl-vn-oblique-pillow-block": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-pillow-block"
@@ -585,6 +587,16 @@ BALLOON_ANCHORS[spec.HOLD_DOWN_STUD] = BalloonAnchor(
     instance=spec.instance_name(
         spec.HOLD_DOWN_STUD, len(spec.HOLD_DOWN_STUD_PLACEMENTS) - 1
     ),
+)
+# TL-00 review (farm 20261104T210601055Z, balloon 22): the default walk landed
+# on rail 1's spindle-end screw, mid-sheet, so the leader from the left ring
+# crossed the left T-nut, bar 1 and its rail. It lands on the screw nearest
+# that side instead: rail 1's last hole, the bar's outboard end (sheet top
+# left), on its head's top rim, outboard (part +X, toward the rail's far end),
+# where nothing stands between it and the ring.
+BALLOON_ANCHORS[spec.RAIL_SCREW] = BalloonAnchor(
+    point_mm=(spec.rail_screw.DIMS.head_dia / 2.0, spec.rail_screw.DIMS.head_h, 0.0),
+    instance=spec.instance_name(spec.RAIL_SCREW, len(spec.guide_rail.HOLE_X) - 1),
 )
 
 EXPLODED_VIEW_NAMES = {
@@ -1054,7 +1066,8 @@ def _validate_bom(
 ) -> tuple[tuple[str, str], ...]:
     """Prove native rows, associative Numbers, item order, descriptions and counts.
 
-    The visible Number is not a row key: all three kit members print SH-VN-57.
+    The visible Number is not a row key: every member of a kit prints its kit's
+    one Number (TL-VN-83, TL-VN-84 or SH-VN-57).
     No cell text override may replace the native Number-property association.
     """
     table = _early_bound(table, "ITableAnnotation")
@@ -1141,13 +1154,20 @@ def _validate_bom(
     return tuple((stem, BOM_ITEM_NUMBERS[stem]) for stem in BOM_COMPONENTS)
 
 
+# The key's characters a line: its field's width (the reference column, less
+# the seat's inset) at the default note format's 2.9 mm a character.
+KIT_KEY_LINE_WIDTH = int(
+    (REFERENCE_REGION[2] - REGION_GAP - REFERENCE_REGION[0] - BOM_SHEET_CLEARANCE)
+    / NOTE_CHAR_M
+)
+
+
 def _kit_bom_note_text(table: Any, *, configuration: str) -> str:
-    """Resolve kit item citations from native members, never the repeated Number."""
-    registry = PART_ROWS[spec.HOLD_DOWN_STUD]
-    skus = registry["supplier_skus"]
-    if len(skus) != 1:
-        raise RuntimeError("jig kit key requires its one authoritative supplier SKU")
-    number = str(registry["number"])
+    """Resolve kit item citations from native members, never the repeated Number.
+
+    One block per purchased kit, in ``spec.KIT_IDENTITIES`` order: its Number,
+    supplier and SKU, then its members' native item citations packed into the
+    key's line width."""
     contents = _bom_cells(table)
     columns = _bom_columns(contents[0])
     native_rows = bom_row_identities(
@@ -1155,18 +1175,38 @@ def _kit_bom_note_text(table: Any, *, configuration: str) -> str:
         configuration=configuration,
         component_identities=BOM_COMPONENT_IDENTITIES,
     )
-    lines = [
-        f"PURCHASED KIT IDENTITY: {number}",
-        f"{str(registry['supplier']).upper()} SKU {skus[0]}",
-        "MEMBER CONFIGURATIONS (INSTALLED QTY.):",
-    ]
-    for family, (_physical, member) in spec.KIT_IDENTITIES.items():
-        row = contents[native_rows[family]]
-        quantity = str(registry["configuration_quantities"][member])
-        if row[columns["part"]] != number or row[columns["quantity"]] != quantity:
-            raise RuntimeError(f"jig kit key disagrees with native BOM row for {member}")
-        lines.append(f"ITEM {row[columns['item']]}: {member} ({quantity})")
+    kits: dict[str, list[str]] = {}
+    for family, (physical, _member) in spec.KIT_IDENTITIES.items():
+        kits.setdefault(physical, []).append(family)
+    lines = ["PURCHASED KITS, MEMBER CONFIGURATIONS (INSTALLED QTY.):"]
+    for families in kits.values():
+        registry = PART_ROWS[families[0]]
+        skus = registry["supplier_skus"]
+        if len(skus) != 1:
+            raise RuntimeError("jig kit key requires each kit's one authoritative SKU")
+        number = str(registry["number"])
+        lines.append(f"{number}, {str(registry['supplier']).upper()} SKU {skus[0]}:")
+        citations = []
+        for family in sorted(families, key=lambda family: native_rows[family]):
+            member = spec.KIT_IDENTITIES[family][1]
+            row = contents[native_rows[family]]
+            quantity = str(registry["configuration_quantities"][member])
+            if row[columns["part"]] != number or row[columns["quantity"]] != quantity:
+                raise RuntimeError(
+                    f"jig kit key disagrees with native BOM row for {member}"
+                )
+            citations.append(f"ITEM {row[columns['item']]}: {member} ({quantity})")
+        packed = citations[0]
+        for citation in citations[1:]:
+            if len(f"{packed}; {citation}") <= KIT_KEY_LINE_WIDTH:
+                packed = f"{packed}; {citation}"
+            else:
+                lines.append(packed)
+                packed = citation
+        lines.append(packed)
     lines.append("BOM QTY. COUNTS MEMBERS, NOT KITS.")
+    if max(map(len, lines)) > KIT_KEY_LINE_WIDTH:
+        raise RuntimeError("jig kit key line overruns its field")
     return "\n".join(lines)
 
 

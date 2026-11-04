@@ -79,8 +79,8 @@ so no rounding adds to it), leaving ``RAIL_PATTERN_ALLOWANCE`` for the rail's
 own hole positions (an unverified vendor value, checked at receipt:
 ``RAIL_RECEIPT_BAND``, the allowance floored to the stations' 2 places, ±0.08
 mm). The outermost station carries the mate and its fit-up acceptance on a
-second line, "MATCHES HGR15 RAIL MHA-CH-06-TL-VN-50; ALL 8 SCREWS START BY
-HAND" (``RAIL_MATE_CALLOUT``). The row's
+second line, "MATCHES HGR15 RAIL MHA-CH-06-TL-VN-83; ALL 8 SCREWS START BY
+HAND" (``RAIL_MATE_CALLOUT``; the rail kit's Number, its Rail member). The row's
 3.50 carries its reason (``RAIL_ROW_CALLOUT``).
 
 Hold-down slots: two through slots ⚙ ``HOLD_DOWN_SLOT_WIDTH`` .53 wide, axis
@@ -209,7 +209,8 @@ RAIL_RECEIPT_BAND = math.floor(RAIL_PATTERN_ALLOWANCE * 10**RAIL_HOLE_PLACES) / 
 )
 if not 0.0 < RAIL_RECEIPT_BAND <= RAIL_PATTERN_ALLOWANCE:
     raise AssertionError("the rail's receipt band is not inside the fit's allowance")
-RAIL_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-rail")["number"]
+# The rail kit's Number: the rail is its Rail configuration.
+RAIL_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-rail-kit")["number"]
 # The mate and its fit-up acceptance (rule 7: a matched fit names its mate
 # and how it is accepted).
 RAIL_MATE_CALLOUT = (

@@ -460,7 +460,7 @@ test('shared vendors still resolve by their immediate parent and reject unsuppor
 test('two-digit Numbers preserve geometry/configuration qualifiers and purchased tooling scope', () => {
   assert.equal(projectCurrentNativeNumber('MHA-DT-003-T006', 'dt-cone-gear'), 'MHA-DT-03-T006')
   assert.equal(projectCurrentNativeNumber('MHA-HA-000', 'ha-harmonic-analyzer'), 'MHA-HA-00')
-  assert.equal(projectCurrentNativeNumber('MHA-CH-006-TL-30', 'ch-rocker-arm-tl-oblique-rail', 'ch-rocker-arm-tl-oblique-jig'), 'MHA-CH-06-TL-VN-50')
+  assert.equal(projectCurrentNativeNumber('MHA-CH-006-TL-30', 'ch-rocker-arm-tl-oblique-rail', 'ch-rocker-arm-tl-oblique-jig'), 'MHA-CH-06-TL-VN-83')
   assert.equal(projectCurrentNativeNumber('MHA-VN-006', 'vn-fillister-screw', 'fr-frame'), 'MHA-SH-VN-51')
   assert.equal(projectCurrentNativeNumber('MHA-VN-006', 'vn-fillister-screw', 'pd-paper-drive'), 'MHA-SH-VN-51')
   assert.equal(projectCurrentNativeNumber('MHA-MG-009', 'mg-lever-wire', 'mg-magnifier'), 'MHA-SH-VN-56')
@@ -470,6 +470,36 @@ test('two-digit Numbers preserve geometry/configuration qualifiers and purchased
     path('dt-drive-train', 'dt-cone-gear--T006-1@upper'))
   assert.equal(projectCurrentNativePath(path('mg-magnifier', 'mg-lever-wire--T006-1@upper')),
     path('mg-magnifier', 'sh-vn-music-wire--LeverWire--T006-1@upper'))
+})
+
+// #2187 owner ruling: each multi-member Amazon kit is one parent-scoped native
+// part with its members as configurations; the members' former identities stay
+// prior identities and are never reissued.
+const jigKitMembers = [
+  ['ch-rocker-arm-tl-oblique-rail', 'ch-rocker-arm-tl-vn-oblique-rail', 'MHA-CH-06-TL-VN-50', 'ch-rocker-arm-tl-vn-oblique-rail-kit', 'MHA-CH-06-TL-VN-83', 'Rail'],
+  ['ch-rocker-arm-tl-oblique-carriage', 'ch-rocker-arm-tl-vn-oblique-carriage', 'MHA-CH-06-TL-VN-51', 'ch-rocker-arm-tl-vn-oblique-rail-kit', 'MHA-CH-06-TL-VN-83', 'Carriage'],
+  ['ch-rocker-arm-tl-oblique-leadscrew', 'ch-rocker-arm-tl-vn-oblique-leadscrew', 'MHA-CH-06-TL-VN-54', 'ch-rocker-arm-tl-vn-oblique-leadscrew-kit', 'MHA-CH-06-TL-VN-84', 'LeadScrew'],
+  ['ch-rocker-arm-tl-vn-oblique-feed-nut', 'ch-rocker-arm-tl-vn-oblique-feed-nut', 'MHA-CH-06-TL-VN-82', 'ch-rocker-arm-tl-vn-oblique-leadscrew-kit', 'MHA-CH-06-TL-VN-84', 'FeedNut'],
+]
+
+test('jig kit members project to configuration-qualified parent-scoped kits and stay unique', () => {
+  const jig = 'ch-rocker-arm-tl-oblique-jig'
+  const rows = table.toolingVendors.filter(row => /-(?:rail|leadscrew)-kit$/.test(row.stem))
+  assert.deepEqual(rows.map(row => [row.sourceStem, row.priorStem, row.priorNumber, row.stem, row.number, row.configuration]).sort(),
+    [...jigKitMembers].sort())
+  for (const [sourceStem, priorStem, priorNumber, stem, number, configuration] of jigKitMembers) {
+    const occurrence = path(jig, `${stem}--${configuration}-2`)
+    if (sourceStem !== priorStem) assert.equal(projectCurrentNativePath(path(jig, `${sourceStem}-2`)), occurrence)
+    assert.equal(projectCurrentNativePath(path(jig, `${priorStem}-2`)), occurrence)
+    assert.equal(projectCurrentNativePath(occurrence), occurrence)
+    assert.equal(projectCurrentNativeNumber(priorNumber, `${priorStem}-2`, jig), number)
+    assert.equal(projectCurrentNativeNumber(number, `${stem}--${configuration}-2`, jig), number)
+  }
+  assert.throws(() => projectCurrentNativePath(path(jig, 'ch-rocker-arm-tl-vn-oblique-rail-kit-1')), /no unique immediate parent/)
+  assert.throws(() => projectCurrentNativePath(path(jig, 'ch-rocker-arm-tl-vn-oblique-rail-kit--FeedNut-1')), /no unique immediate parent/)
+  // Never reissued: no current identity carries a member's former Number.
+  const active = cadMap.parts_and_assemblies.flatMap(row => row.new_identities.map(target => target.number))
+  for (const [, , priorNumber] of jigKitMembers) assert.ok(!active.includes(priorNumber), priorNumber)
 })
 
 test('all 457 archived native paths project uniquely without moving geometry across parents', () => {

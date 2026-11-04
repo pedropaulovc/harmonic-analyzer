@@ -115,6 +115,45 @@ def test_fixed8_exact_members_and_all19_prior_current_aliases(stem, number, neut
         }
 
 
+# The oblique jig's parent-scoped Amazon kits (#2187): one stem per kit, one
+# member per configuration, each prior stem paired with its member only.
+JIG_KITS = {
+    "ch-rocker-arm-tl-vn-oblique-rail-kit": {
+        "ch-rocker-arm-tl-vn-oblique-rail": "Rail",
+        "ch-rocker-arm-tl-vn-oblique-carriage": "Carriage",
+    },
+    "ch-rocker-arm-tl-vn-oblique-leadscrew-kit": {
+        "ch-rocker-arm-tl-vn-oblique-leadscrew": "LeadScrew",
+        "ch-rocker-arm-tl-vn-oblique-feed-nut": "FeedNut",
+    },
+}
+
+
+@pytest.mark.parametrize("stem", sorted(JIG_KITS))
+def test_parent_scoped_kit_members_pair_by_configuration(stem):
+    mapping = load_identity_map()
+    assert stem not in mapping.shared_groups
+    prior_members = JIG_KITS[stem]
+    current = [mesh_key(stem, configuration) for configuration in prior_members.values()]
+    assert paired_keys(prior_members, current, mapping) == {
+        mesh_key(stem, configuration): (prior,) for prior, configuration in prior_members.items()
+    }
+    for prior, configuration in prior_members.items():
+        assert canonical_keys(prior, mapping) == (mesh_key(stem, configuration),)
+
+
+def test_kit_member_configuration_is_one_identity(tmp_path):
+    payload = json.loads(IDENTITY_MAP.read_text(encoding="utf-8"))
+    rows = payload["parts_and_assemblies"]
+    rail = next(row for row in rows if row["old_stem"] == "ch-rocker-arm-tl-oblique-rail")
+    carriage = next(row for row in rows if row["old_stem"] == "ch-rocker-arm-tl-oblique-carriage")
+    carriage["new_identities"][0]["configuration"] = rail["new_identities"][0]["configuration"]
+    current = tmp_path / "current.json"
+    current.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="conflicting kit member identity"):
+        load_identity_map(current, HISTORICAL_IDENTITY_MAP)
+
+
 @pytest.mark.parametrize("extension", [".step", ".STL", ".pdf", ".SLDPRT", ".SLDDRW"])
 def test_all_current_and_archived_artifact_aliases_compose_without_mutating_maps(extension):
     current_bytes, historical_bytes = IDENTITY_MAP.read_bytes(), HISTORICAL_IDENTITY_MAP.read_bytes()

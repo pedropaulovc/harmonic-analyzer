@@ -14,7 +14,7 @@ from types import MappingProxyType
 
 SOURCE_MAP_SHA256 = "1ee9084204cab7025783c5bf0fa98e040cfaa3e4e8200f0d61e58e8dd32c3bfd"
 TABLE_PATH = Path(__file__).resolve().parents[1] / "content/current-native-identities.json"
-CURRENT_NATIVE_IDENTITY_MAP_SHA256 = "a90296d57c9998ee787c617b7b00f4a30e65b543d9df504367f2c5eb848a4ed0"
+CURRENT_NATIVE_IDENTITY_MAP_SHA256 = "b965c15ca6a96d22da14b8bb1d1e4f5cdc6be289d040aa11bd4a23411f32403e"
 CURRENT_NATIVE_OCCURRENCE_NAMESPACE = "archive-role-local"
 CURRENT_NATIVE_IDENTITY_PROJECTION = MappingProxyType({
     "kind": "current-native-identity-projection",
@@ -86,6 +86,17 @@ class CurrentNativeIdentity:
                 self.targets.setdefault((identity.get("parent"), stem), []).append(record)
                 if identity.get("priorStem"):
                     self.prior_targets.setdefault(identity["priorStem"], []).append(record)
+        # Named-configuration members: shared SKU groups and parent-scoped kits
+        # such as the jig's rail and leadscrew kits (#2187).
+        self.member_configurations = {
+            row["stem"]: list(row["configurations"]) for row in mapping["sharedVendors"]}
+        for records in self.targets.values():
+            for _, identity in records:
+                configuration = identity.get("configuration")
+                if configuration and identity["stem"] not in self.shared:
+                    known = self.member_configurations.setdefault(identity["stem"], [])
+                    if configuration not in known:
+                        known.append(configuration)
         self.stems = sorted(set(self.sources) | set(self.aliases) | set(self.prior_targets)
                             | {stem for _, stem in self.targets}, key=len, reverse=True)
 
@@ -116,8 +127,8 @@ class CurrentNativeIdentity:
             if role:
                 records = [(source, identity) for source, identity in records
                            if identity.get("role") == role[1]]
-            if (configuration and stem in self.shared
-                    and "Default" not in self.shared[stem]["configurations"]):
+            configurations = self.member_configurations.get(stem)
+            if configuration and configurations and "Default" not in configurations:
                 records = [(source, identity) for source, identity in records
                            if identity.get("configuration") == configuration[1]]
         identities = {_context(identity): identity for _, identity in records}
@@ -127,9 +138,9 @@ class CurrentNativeIdentity:
         role = re.match(r"__([A-Za-z][A-Za-z0-9]*)", suffix)
         if role and role[1] != identity.get("role"):
             raise ValueError(f"Wrong role for {stem}")
-        group = self.shared.get(identity["stem"])
+        configurations = self.member_configurations.get(identity["stem"])
         configuration = re.match(r"--([A-Za-z][A-Za-z0-9_.]*)", suffix)
-        if (group and configuration and configuration[1] in group["configurations"]
+        if (configurations and configuration and configuration[1] in configurations
                 and configuration[1] != identity["configuration"]):
             raise ValueError(f"Wrong configuration for {stem}")
         return records, identity

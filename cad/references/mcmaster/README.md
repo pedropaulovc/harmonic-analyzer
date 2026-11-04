@@ -58,7 +58,7 @@ recipes:
 | 91255A150 | `ch-rocker-arm-tl-vn-oblique-kp08-screw` (MHA-CH-06-TL-VN-65, 4 in the jig since 2026-11-04; shop fixture; catalogue-only, product page read live 2026-11-04) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91251A150 | — (retired TL-VN-65 source, 2026-11-04; now 91255A150, whose larger head covers the uxcell KP08's Ø5 hole; diagnostic recipe removed) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91290A168 | `ch-rocker-arm-tl-vn-oblique-carriage-screw` (MHA-CH-06-TL-VN-64; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
-| 91355A581 | — (retired TL-VN-66 source, 2026-11-04: TL-VN-66 retired; the TL-VN-82 feed nut uses TL-VN-67's 91771A112; diagnostic recipe removed) | Black-Oxide Flanged Button Head Hex-Drive Screw, Alloy Steel |
+| 91355A581 | — (retired TL-VN-66 source, 2026-11-04: TL-VN-66 retired; the TL-VN-84 kit's feed nut uses TL-VN-67's 91771A112; diagnostic recipe removed) | Black-Oxide Flanged Button Head Hex-Drive Screw, Alloy Steel |
 | 90325A174 | `pd-vn-transgear-pivot-screw` (catalogue-only; CAD download refused) | 18-8 Stainless Steel Precision Shoulder Screw, hex socket |
 | 91375A106 | `sh-vn-arbor-set-screw` (MHA-SH-VN-54; shared by ch, dt and pn) | Alloy Steel Cup-Tip Set Screw |
 | 91375A942 | `ch-vn-fulcrum-set-screw` (catalogue-only; no vendor model) | Alloy Steel Cup-Tip Set Screw |
@@ -66,7 +66,7 @@ recipes:
 | 91410A540 | `fr-vn-gooseneck-set-screw` (catalogue-only; no vendor model) | Steel Square-Head Cup-Point Set Screw |
 | 91595A452 | — (retired TL-VN-53 source, 2026-10-31; now 98381A542, issue #290; diagnostic recipe removed) | Dowel Pin |
 | 98381A542 | `ch-rocker-arm-tl-vn-oblique-cl-dowel` (MHA-CH-06-TL-VN-53; shop fixture; catalogue-only, product page login-walled, vendor STEP read for dimensions, not replica-gated) | Alloy Steel Dowel Pin |
-| 98381A438 | — (retired TL-VN-81, 2026-11-04; owner option B: the bought ReliaBot feed nut TL-VN-82 needs no dowel; diagnostic recipe removed) | Alloy Steel Dowel Pin |
+| 98381A438 | — (retired TL-VN-81, 2026-11-04; owner option B: the bought ReliaBot feed nut, TL-VN-84 `FeedNut`, needs no dowel; diagnostic recipe removed) | Alloy Steel Dowel Pin |
 | 91771A112 | `ch-rocker-arm-tl-vn-oblique-riser-screw` (MHA-CH-06-TL-VN-67, 8 in the jig: 4 riser and, since 2026-11-04, 4 feed nut; shop fixture; catalogue-only, same-family vendor geometry, not replica-gated) | Stainless Steel Phillips Flat Head Screw |
 | 91790A199 | `pd-vn-transgear-arm-plate-screw` (catalogue-only; populated live SKU verified; 2-D PDF offered, CAD requires login) | 18-8 Stainless Steel Oval Head Slotted Screw |
 | 91792A108 | `pd-vn-guide-lock-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Pan Head Slotted Screw |
@@ -191,7 +191,7 @@ its dimension provider and diagnostic recipe have also been removed.
 - [98381A438](https://www.mcmaster.com/98381A438/) (retired
   `ch-rocker-arm-tl-vn-oblique-nut-dowel`, MHA-CH-06-TL-VN-81, November 4,
   2026: owner option B replaced the shop-made TL-27 feed nut it keyed into the
-  TL-32 lug with the ReliaBot screw's own flange nut, TL-VN-82, held by four
+  TL-32 lug with the ReliaBot screw's own flange nut (TL-VN-84 `FeedNut`), held by four
   screws and no dowel; historical reading follows) was read live on November
   3, 2026: alloy steel dowel pin, 3/32 in diameter, diameter tolerance 0.0001
   to 0.0003 in, 1/2 in long, 1,400 lbf double shear, Rockwell C47 minimum,
@@ -366,7 +366,7 @@ lug became integral with TL-32. The following describes the former joint.
 - [91771A112](https://www.mcmaster.com/91771A112/)
   (`ch-rocker-arm-tl-vn-oblique-riser-screw`, MHA-CH-06-TL-VN-67, 8 in the oblique
   trammel jig: four in the fastener table's `RISER_TO_CARRIER` row and, since
-  November 4, 2026, four holding the TL-VN-82 feed nut to TL-32's lug in Ø4.6
+  November 4, 2026, four holding the TL-VN-84 kit's feed nut to TL-32's lug in Ø4.6
   82 deg countersinks at 0.3 N·m, replacing retired TL-VN-66) was read live on
   October 19, 2026: 18-8 stainless steel, passivated, Phillips No. 1 drive,
   standard 82 deg flat head Ø0.212 x 0.067 in, #4-40 UNC class 2A, 5/8 in
@@ -1653,7 +1653,10 @@ head could not seat flat at the nut's fit-up eccentricity). On 2026-11-04
 Amazon listing B085DDHJTW, whose included brass flange nut, spigot faced off,
 is TL-VN-82; TL-27 and TL-VN-81 retired. TL-VN-66 retired the same day: the
 nut's four screws are TL-VN-67's 91771A112, and TL-VN-65 became 91255A150
-(#6-32 x 5/8 button head). The ZYLtech and 91251A150 rows are historical.
+(#6-32 x 5/8 button head). Also on 2026-11-04 (owner ruling, #2187 comment
+4473182209) the screw and nut became one leadscrew kit, TL-VN-84, with
+`LeadScrew` and `FeedNut` configurations (TL-VN-54 retired, TL-VN-82 never
+released). The ZYLtech and 91251A150 rows are historical.
 
 | target suffix at source date | exact SKU at source date | primary size coverage |
 |---|---|---|

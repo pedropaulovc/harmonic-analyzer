@@ -1,26 +1,32 @@
-"""Create the cut-to-length drawing for the ReliaBot 600 mm T8 screw (Amazon B085DDHJTW), the TL-VN-54 Tr8x2 lead screw.
+"""Draw the ReliaBot T8 kit (Amazon B085DDHJTW), MHA-CH-06-TL-VN-84: three sheets.
 
-The shop cuts the bought 600 mm screw to length and mills a set-screw flat
-under each set screw that locks it, so the sheet is a modified-stock
-drawing: one view of the screw lying axis-horizontal, as it sits in the saw
-and the mill, carrying the native ``CutLength`` and the far two flats'
-stations (the title block's band for each one's places governs it); details
-C, D and E at 3:1 of the near end's station, the far KP08's and the
-handwheel's, the 1:2 view drawing a flat 0.36 mm deep: C carries the near
+Sheet 1 is the configured purchased-part reference: the LeadScrew and FeedNut
+members' four views each, their installed quantities and the kit's supplier
+footer. The 410 screw's views are turned axis-horizontal so it fits its cell.
+The FeedNut panel carries the listing's nominal sizes as supplier references.
+
+Sheet 2 (LEADSCREW) is the LeadScrew member's modified-stock content: the
+shop cuts the bought 600 mm screw to length and mills a set-screw flat under
+each set screw that locks it. One view of the screw lies axis-horizontal, as
+it sits in the saw and the mill, carrying the native ``CutLength`` and the
+far two flats' stations (the title block's band for each one's places governs
+it); details C, D and E at 3:1 of the near end's station, the far KP08's and
+the handwheel's, the 1:2 view drawing a flat 0.36 mm deep: C carries the near
 station, E the printed flat's length and across-flat; sections A-A and B-B
 through the two KP08 stations, each carrying its 120° flat's across-flat and
 angle from clock 0, the angle's text offset outboard of its arc; the
-isometric; and a note block naming the item, its supplier and SKU.
-The thread is bought, not cut: it is not modelled, and a leadered callout on
-the main view names it over the full length.
+isometric; and a note block naming the item, its supplier and SKU. The thread
+is bought, not cut: it is not modelled, and a leadered callout on the main
+view names it over the full length.
 
-The existing source-linked Number alone uses the canonical native title-cell
-fit before finalization; read-only checks retain its complete value, original
-sheet and fitted presentation through rebuild, save, PDF export and close.
+Sheet 3 (FEED NUT REWORK) is the FeedNut member's rework (Codjiflo P2 on
+#2187): an end view and section F-F through two countersunk holes, carrying
+the native ``FlangeThick`` LIMIT and the ``CskDia`` ± with its 82° callout.
+TL-00's F1A cites this sheet (``feed_nut.REWORK_SHEET_REFERENCE``).
 
 Run with SolidWorks open::
 
-    uv run python cad\\scripts\\draw_ch_rocker_arm_tl_vn_oblique_leadscrew.py ch-rocker-arm-tl-vn-oblique-leadscrew
+    uv run python cad\\scripts\\draw_ch_rocker_arm_tl_vn_oblique_leadscrew_kit.py ch-rocker-arm-tl-vn-oblique-leadscrew-kit
 """
 
 from __future__ import annotations
@@ -28,6 +34,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Callable, NamedTuple
 
@@ -36,20 +43,14 @@ from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     dimension_name,
+    iter_views,
     place_view,
     view_name,
 )
 
 from _com import _early_bound, _read_member
 from _drawing_centerline import add_view_centerline
-from _drawing_common import (
-    DrawingOutputs,
-    finalize_drawing,
-    new_project_drawing,
-    read_required_properties,
-    rebuild_drawing,
-    stamp_drawing_summary,
-)
+from _drawing_common import read_required_properties, rebuild_drawing
 from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import offset_dimension_text, set_dimension_callouts
@@ -57,24 +58,32 @@ from _drawing_leader_notes import add_leader_note
 from _drawing_notes import property_link
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
-from _machinist_review_mode import MachinistReviewMode
 from _drawing_sections import create_section_view
-from _drawing_view_display import set_hidden_lines_removed
-from _rebuild import active_configuration_name
+from _drawing_sheet_region import sheet_drawable_region
+from _drawing_types import DRAWING_TEMPLATES
+from _drawing_view_display import _SW_HLR, set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
+from _part_properties import part_drawing_unit
+from _purchased_fastener_drawing import (
+    _box,
+    _inside,
+    _literal_note,
+    _purchased_title_block,
+    _rebuild,
+)
+from _purchased_title_fit import fit_purchased_title_block
+from _purchased_variant_drawing import (
+    build_purchased_variant_drawing,
+    configure_reference_views,
+)
 from _session import run_build
 from _stock_trim_drawing import verify_machining_controls
-from _purchased_fastener_drawing import (
-    _open_supplier_source_read_only,
-    _source_file_sha256,
-)
-from _purchased_title_fit import (
-    _fit_title_note,
-    assert_linked_value,
-    source_property_expression,
-)
-from _supplier_spring_drawing import _preserve_reference_source_file
+from _supplier_screw_dimensions import annotate_supplier_screw
+from _supplier_text_shelf import assert_supplier_shelves, shelve_supplier_text
 import _telemetry
-from ch_rocker_arm_tl_vn_oblique_leadscrew_stock_spec import (
+import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_feed_nut_spec as feed_nut
+import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec as leadscrew
+from ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec import (
     DIMENSION_CONTROLS,
     DIMENSION_PRECISION,
     DIMENSION_TOLERANCE_TYPES,
@@ -93,16 +102,63 @@ from ch_rocker_arm_tl_vn_oblique_leadscrew_stock_spec import (
 
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
-SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_leadscrew"]
+SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_leadscrew_kit"]
 PART_STEM = SPEC.artifact_stem
 SOURCE = SPEC.source
-OUTPUTS = DrawingOutputs(**SPEC.outputs)
 
+# --- Sheet 1: the configured purchased reference -----------------------------
+# The footer's ITEM row: the listing's designation in plain text.
+ITEM = "TR8X2 LEAD SCREW, 600 MM, WITH BRASS FLANGE NUT"
+# Literal, so the source-property contract can read it without importing.
+VARIANTS = (
+    ("LeadScrew", "[1] LEADSCREW"),
+    ("FeedNut", "[2] FEED NUT"),
+)
+if tuple(name for name, _label in VARIANTS) != (
+    leadscrew.CONFIGURATION,
+    feed_nut.CONFIGURATION,
+):
+    raise AssertionError("sheet 1's members are not the specs' configurations")
+PURCHASE_UNIT = "ONE KIT"
+LEADSCREW_SHEET_NAME = "LEADSCREW"
+REWORK_SHEET_NAME = "FEED NUT REWORK"
+# Sheet 1 is the reference sheet; these follow it in order.
+SHEET_NAMES = (LEADSCREW_SHEET_NAME, REWORK_SHEET_NAME)
+if SHEET_NAMES.index(LEADSCREW_SHEET_NAME) + 2 != leadscrew.MODIFIED_STOCK_SHEET:
+    raise AssertionError("the LeadScrew's notes cite another sheet")
+if SHEET_NAMES.index(REWORK_SHEET_NAME) + 2 != feed_nut.REWORK_SHEET:
+    raise AssertionError("TL-00's rework reference cites another sheet")
+GENERAL_TEXT = (
+    f"REFERENCE VIEWS; [1] CUT PER SHEET {leadscrew.MODIFIED_STOCK_SHEET}; "
+    f"[2] REWORK PER SHEET {feed_nut.REWORK_SHEET}."
+)
+ADDITIONAL_SHEETS_TITLE = "Member Rework"
+# The 410 screw lies along its cell's width: no project scale fits it
+# standing in the 52 mm row.
+VIEW_ANGLES = {leadscrew.CONFIGURATION: -math.pi / 2.0}
+# The retired TL-VN-55 sheet's shelves for the same nut: every chord's
+# horizontal text is wider than its span or crosses its own vertical
+# dimension line, so each text slides sideways, just past all of its own line
+# ink on its free side; the native tips, witnesses and lines stay put.
+SHELVES = {
+    name: (orientation == "horizontal", side)
+    for (name, _value, orientation), side in zip(
+        feed_nut.SUPPLIER_REFERENCE_DIMENSIONS,
+        ("right", "left", "right", "right", "right", "left"),
+        strict=True,
+    )
+}
+
+# --- Sheets 2 and 3: shared sheet frame -----------------------------------------
 # ASME B landscape, sheet metres: 431.8 x 279.4 with the inner border 12.7 in
 # from each edge, so 406.4 mm of drawable width. The title block spans
 # x >= 0.2159 below y = 0.0651.
 BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
 TITLE_BLOCK = (0.2159, 0.0127, 0.4191, 0.0651)
+ITEM_LABEL_XY = (0.025, 0.262)
+ITEM_LABEL_CELL = (0.015, 0.250, 0.200, 0.264)
+
+# --- Sheet 2: the LeadScrew --------------------------------------------------------
 # The 410 screw overruns the 406.4 mm border at 1:1; 1:2, the next project
 # scale down, lays it 205 mm long and Ø8 4 mm across.
 SHEET_SCALE = (1.0, 2.0)
@@ -384,10 +440,10 @@ NOTES_XY = (0.230, 0.105)
 # a note row typing spec numbers no native dimension owns breaks model
 # ownership (rule 7; review of a numeric STOCK row and, before it, a 1:10
 # gauge sketch that read as a confusing pseudo-view).
-ITEM = "TR8X2 LEAD SCREW"
+LEADSCREW_ITEM = "[1] TR8X2 LEAD SCREW"
 NOTES = "\n".join(
     (
-        f"ITEM: {ITEM}",
+        f"ITEM: {LEADSCREW_ITEM}",
         f"SUPPLIER: {property_link('Supplier')}",
         f"SKU: {property_link('Supplier SKUs')}",
     )
@@ -398,7 +454,43 @@ EXPECTED_CONTROLS = {
         (name, control_si(name)) for name in DIMENSION_CONTROLS
     )
 }
-PDF_TITLE = "Rocker Oblique Trammel Leadscrew — Modified Stock Drawing"
+
+# --- Sheet 3: the FeedNut REWORK ------------------------------------------------
+# 4:1 lays the Ø22 flange 88 mm across and its 3.5 thickness 14 mm.
+REWORK_SCALE = (4.0, 1.0)
+_REWORK_PER_MODEL_MM = REWORK_SCALE[0] / REWORK_SCALE[1] / 1000.0
+# The end view looks down the body onto the head face, turned so model +X runs
+# up the sheet: section F-F's vertical cutting line then crosses the two
+# countersinks on X, the holes whose profiles (Front) own the printed
+# controls, and the section beside it lies axis-horizontal (rule 11). The
+# letter F, since sheet 2 already uses A to E.
+REWORK_END_ANGLE = math.pi / 2.0
+REWORK_END_CENTER = (0.110, 0.160)
+REWORK_SECTION_LABEL = "F"
+REWORK_SECTION_CENTER = (0.280, 0.160)
+# The cutting line runs this far past the flange rim each side (sheet).
+REWORK_SECTION_OVERRUN = 0.008
+# Text points, model mm (radius toward +X, station from the seat face): the
+# flange's thickness beyond its rim; the countersink's diameter beside the
+# body, past the head face, clear of the body (Ø10.2) and the rim.
+FLANGE_THICK_TEXT_MM = (feed_nut.FLANGE_DIA / 2.0 + 4.0, feed_nut.FLANGE_THICK / 2.0)
+CSK_DIA_TEXT_MM = (feed_nut.HOLE_PCD / 2.0 + 1.0, feed_nut.FLANGE_THICK + 5.0)
+REWORK_CALLOUTS = {"CskDia": feed_nut.CSK_CALLOUT}
+REWORK_EXPECTED = {
+    name: (nominal / 1000.0, lower / 1000.0, upper / 1000.0)
+    for name, (nominal, lower, upper, _places) in feed_nut.REWORK_CONTROLS.items()
+}
+REWORK_PRECISION = {
+    name: places for name, (_n, _l, _u, places) in feed_nut.REWORK_CONTROLS.items()
+}
+REWORK_ITEM = f"[2] {feed_nut.BOM_DESCRIPTION}"
+SOURCE_PROPERTIES = (
+    "Number",
+    "Material Specification",
+    "Finish",
+    "Supplier",
+    "Supplier SKUs",
+)
 
 
 def _overlaps(box: tuple[float, ...], other: tuple[float, ...]) -> bool:
@@ -483,6 +575,15 @@ def _center_view(
             )
 
 
+def _turn_view(adapter: Any, view: Any, angle: float, label: str) -> None:
+    """Turn a placed view by a native angle and prove it held."""
+    native = _early_bound(view, "IView")
+    native.Angle = angle
+    if abs(math.remainder(float(native.Angle) - angle, 2.0 * math.pi)) > 1e-9:
+        raise RuntimeError(f"failed to turn the {label}")
+    rebuild_drawing(adapter, label=f"turn {label}")
+
+
 def _axis_point(
     station_mm: float, radius_mm: float = 0.0, clock_deg: float = 0.0
 ) -> tuple[float, float, float]:
@@ -494,6 +595,31 @@ def _axis_point(
         station_mm / 1000.0,
         radius_mm * math.sin(clock) / 1000.0,
     )
+
+
+def _settle_view_point(
+    adapter: Any,
+    view: Any,
+    point: tuple[float, float, float],
+    target: tuple[float, float],
+    *,
+    label: str,
+) -> None:
+    """Stand a model point of a view on its layout point: a section's outline
+    is no measure of its ink (draw_dt_cone_gear_shaft._section_face), so the
+    point is projected and the view moved by the error."""
+    bound = _early_bound(view, "IView")
+    for _attempt in range(3):
+        (landed,) = model_points_in_view(adapter, view, (point,), label=label)
+        error = (target[0] - landed[0], target[1] - landed[1])
+        if max(abs(error[0]), abs(error[1])) < SECTION_SETTLE_M:
+            return
+        position = tuple(float(value) for value in bound.Position)
+        moved = [position[0] + error[0], position[1] + error[1]]
+        if not bound.SetViewPosition(double_array(moved), False):
+            raise RuntimeError(f"{label}: failed to position the view")
+        rebuild_drawing(adapter, label=f"centre {label}")
+    raise RuntimeError(f"{label} stayed at {landed}, not {target}")
 
 
 def _cut_endpoints(
@@ -564,31 +690,6 @@ def _prepare_section(adapter: Any, view: Any, section: ClockSection) -> None:
             raise RuntimeError(f"section {section.label} cut direction did not persist")
         if _looks_far(adapter, view, section) != section.looks_far:
             raise RuntimeError(f"section {section.label} would not turn to the layout")
-
-
-def _centre_section(adapter: Any, view: Any, section: ClockSection) -> None:
-    """Stand the section's axis on its layout point: a section's outline is no
-    measure of its ink (draw_dt_cone_gear_shaft._section_face), so the axis
-    is projected and the view moved by the error."""
-    bound = _early_bound(view, "IView")
-    for _attempt in range(3):
-        (axis,) = model_points_in_view(
-            adapter,
-            view,
-            (_axis_point(section.cut_mm),),
-            label=f"section {section.label} axis",
-        )
-        error = (section.centre[0] - axis[0], section.centre[1] - axis[1])
-        if max(abs(error[0]), abs(error[1])) < SECTION_SETTLE_M:
-            return
-        position = tuple(float(value) for value in bound.Position)
-        target = [position[0] + error[0], position[1] + error[1]]
-        if not bound.SetViewPosition(double_array(target), False):
-            raise RuntimeError(f"section {section.label}: failed to position the view")
-        rebuild_drawing(adapter, label=f"centre section {section.label}")
-    raise RuntimeError(
-        f"section {section.label} axis stayed at {axis}, not {section.centre}"
-    )
 
 
 def _trim_centre_mark(adapter: Any, view: Any, section: ClockSection) -> None:
@@ -716,7 +817,13 @@ def _add_clock_sections(adapter: Any, main: Any) -> list[Any]:
         # Precision display, not draft: the hidden-lines-removed transition is
         # a real mode change (draw_fr_nameplate's section A-A).
         set_hidden_lines_removed(adapter, view)
-        _centre_section(adapter, view, section)
+        _settle_view_point(
+            adapter,
+            view,
+            _axis_point(section.cut_mm),
+            section.centre,
+            label=f"section {section.label} axis",
+        )
         angle = f"{section.flat}ClockAngle"
         af_text, arc, angle_text, *extension_ends = model_points_in_view(
             adapter,
@@ -945,152 +1052,108 @@ def _add_end_details(adapter: Any, main: Any) -> list[Any]:
     return annotations
 
 
-def _fit_number_title_note(
-    adapter: Any, *, expected_number: str,
-) -> Callable[[], None]:
-    """Fit only the existing source Number; never edit its link or ruled cell."""
-    draw = _early_bound(adapter.currentModel, "IModelDoc2")
-    ddoc = _early_bound(draw, "IDrawingDoc")
-    sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
-    sheet_view = _early_bound(ddoc.GetFirstView(), "IView")
-    if sheet is None or sheet_view is None:
-        raise RuntimeError("leadscrew Number has no native sheet or sheet view")
-    sheet_name = str(sheet.GetName() or "")
-    if not sheet_name.strip():
-        raise RuntimeError("leadscrew Number has no native sheet name")
-    expression = property_link("Number")
-    found = []
-    note = sheet_view.GetFirstNote2()
-    while note is not None:
-        note = _early_bound(note, "INote")
-        if source_property_expression(str(note.PropertyLinkedText)) == expression:
-            found.append(note)
-        note = note.GetNext()
-    if len(found) != 1:
-        raise RuntimeError(
-            f"leadscrew Number requires exactly one source-linked note; got {len(found)}"
-        )
-    number = found[0]
-    assert_linked_value(
-        expression, expected_number, str(number.PropertyLinkedText),
-        str(number.GetText()), label="Number",
-    )
-    number_check = _fit_title_note(
-        adapter, draw, sheet, number, label="Number", minimum=0.003,
+# --- Shared member-sheet plumbing -------------------------------------------------
+
+
+def _activate(document: Any, sheet_name: str) -> Any:
+    if not document.ActivateSheet(sheet_name):
+        raise RuntimeError(f"failed to activate sheet {sheet_name!r}")
+    return _early_bound(document.GetCurrentSheet(), "ISheet")
+
+
+def _source_properties(model: Any) -> dict[str, str]:
+    return read_required_properties(
+        model, SOURCE_PROPERTIES, required=SOURCE_PROPERTIES
     )
 
-    def settled() -> None:
-        current = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
-        actual_name = str(current.GetName()) if current is not None else None
-        if actual_name != sheet_name:
-            raise RuntimeError(
-                f"leadscrew Number current sheet changed: "
-                f"{actual_name!r} != {sheet_name!r}"
-            )
-        number_check()
 
-    return settled
-
-
-def _assert_installed_source_state(
-    adapter: Any, source_model: Any, installed_configuration: str, *, stage: str
-) -> None:
-    """Observe the still-live source, never closed drawing/view handles."""
-    configuration = active_configuration_name(adapter, source_model)
-    read_only = source_model.IsOpenedReadOnly()
-    path = str(source_model.GetPathName())
-    if (
-        configuration != installed_configuration
-        or read_only is not True
-        or SOURCE.resolve() != Path(path).resolve()
-    ):
-        raise RuntimeError(
-            f"leadscrew source {stage}: installed source state changed: "
-            f"configuration={configuration!r}; expected={installed_configuration!r}; "
-            f"read_only={read_only!r}; path={path!r}"
-        )
-
-
-async def build(adapter: Any) -> dict[str, str]:
-    """Preserve source bytes and installed configuration on success or refusal."""
-    if not SOURCE.is_file():
-        raise FileNotFoundError(f"source part is missing: {SOURCE}")
-    source_sha256 = _source_file_sha256(SOURCE)
-    with _preserve_reference_source_file(
-        SOURCE, source_sha256, label="leadscrew modified-stock drawing"
-    ):
-        source_model = _open_supplier_source_read_only(
-            adapter, SOURCE, label="open cut leadscrew"
-        )
-        installed_configuration = active_configuration_name(adapter, source_model)
-        if not installed_configuration:
-            raise RuntimeError(
-                "leadscrew source was saved without an installed configuration active"
-            )
-        primary = None
-        try:
-            return await _build_read_only_source(
-                adapter, source_model, installed_configuration
-            )
-        except BaseException as error:
-            primary = error
-            raise
-        finally:
-            try:
-                _assert_installed_source_state(
-                    adapter, source_model, installed_configuration,
-                    stage="drawing lifecycle exit",
-                )
-            except BaseException as integrity_error:
-                if primary is None:
-                    raise
-                primary.add_note(
-                    f"leadscrew source integrity check also failed: {integrity_error}"
-                )
-
-
-async def _build_read_only_source(
-    adapter: Any, source_model: Any, installed_configuration: str
-) -> dict[str, str]:
-    if source_model.GetSaveFlag() is not False:
-        raise RuntimeError("leadscrew source must be clean before view creation/capture")
-    _assert_installed_source_state(
-        adapter, source_model, installed_configuration, stage="before view creation"
-    )
-    required = (
-        "Number",
-        "Material Specification",
-        "Finish",
-        "Quantity",
-        "Supplier",
-        "Supplier SKUs",
-    )
-    properties = read_required_properties(
-        adapter.currentModel, required, required=required
-    )
-    draw, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
-    )
-    stamp_drawing_summary(
+def _member_title_block(
+    adapter: Any, draw: Any, properties: Mapping[str, str]
+) -> tuple[list[tuple[Any, str, str]], Callable[[], None]]:
+    """Link this sheet's MATERIAL/FINISH cells as sheet 1's, then fit its
+    Name, Material and DWG. NO. in their native cells."""
+    title_notes = _purchased_title_block(
         adapter,
         draw,
-        {
-            0: PDF_TITLE,
-            1: "Manufacturing controls for modified purchased stock",
-            2: "Harmonic Analyzer Project",
-            3: "MHA-CH-06-TL-VN-54; ReliaBot T8 Tr8x2 (Amazon B085DDHJTW)",
-            4: "Native dimension-driven cut length and set-screw flats",
-        },
+        material=properties["Material Specification"],
+        finish=properties["Finish"],
+        material_property="Material Specification",
     )
-    main = place_view(adapter, str(SOURCE), "*Front", *MAIN_CENTER, scale=SHEET_SCALE)
-    native = _early_bound(main, "IView")
-    native.Angle = MAIN_VIEW_ANGLE
-    if abs(math.remainder(float(native.Angle) - MAIN_VIEW_ANGLE, 2.0 * math.pi)) > 1e-9:
-        raise RuntimeError("failed to turn the leadscrew view axis-horizontal")
-    draw.EditRebuild3()
+    _rebuild(draw, phase="member sheet title block")
+    return title_notes, fit_purchased_title_block(adapter, spec=SPEC)
+
+
+def _assert_member_sheet(
+    adapter: Any,
+    sheet: Any,
+    configuration: str,
+    view_count: int,
+    title_notes: list[tuple[Any, str, str]],
+    notes: list[tuple[Any, str, str, tuple[float, ...]]],
+    *,
+    label: str,
+) -> None:
+    """Every view on the active member sheet shows the member from this
+    source; the title block and notes resolve inside their cells."""
+    views = tuple(iter_views(adapter))
+    if len(views) != view_count:
+        raise RuntimeError(f"{label}: expected {view_count} views, found {len(views)}")
+    for view in views:
+        if (
+            str(view.ReferencedConfiguration) != configuration
+            or Path(view.GetReferencedModelName()).resolve() != SOURCE.resolve()
+        ):
+            raise RuntimeError(f"{label}: a view left the {configuration} member")
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    region = sheet_drawable_region(
+        adapter, sheet, width=template.width_m, height=template.height_m
+    )
+    border = (region.xmin, region.ymin, region.xmax, region.ymax)
+    for note, linked_text, resolved_text in title_notes:
+        if (
+            note.PropertyLinkedText != linked_text
+            or note.GetText().replace("\r\n", "\n") != resolved_text
+        ):
+            raise RuntimeError(f"{label}: title-block link did not resolve: {linked_text!r}")
+    for note, linked_text, resolved_text, cell in notes:
+        if (
+            note.PropertyLinkedText != linked_text
+            or note.GetText().replace("\r\n", "\n") != resolved_text
+        ):
+            raise RuntimeError(f"{label}: note did not resolve: {linked_text!r}")
+        box = _box(note.GetExtent(), label=linked_text, kind="note")
+        if not _inside(box, cell) or not _inside(box, border):
+            raise RuntimeError(
+                f"{label}: note leaves its reserved space/border: {linked_text!r}: {box!r}"
+            )
+
+
+# --- Sheet 2 -----------------------------------------------------------------------
+
+
+@_telemetry.traced("drawing.leadscrew_sheet")
+def _append_leadscrew_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
+    """Author LEADSCREW: the LeadScrew member's cut length and flats."""
+    draw = adapter.currentModel
+    document = _early_bound(draw, "IDrawingDoc")
+    sheet = _activate(document, LEADSCREW_SHEET_NAME)
+    if not sheet.SetScale(*SHEET_SCALE, False, False):
+        raise RuntimeError("cannot pin the LEADSCREW sheet's scale")
+    main = _early_bound(
+        place_view(adapter, str(SOURCE), "*Front", *MAIN_CENTER, scale=SHEET_SCALE),
+        "IView",
+    )
+    configure_reference_views(adapter, leadscrew.CONFIGURATION, [main])
+    _turn_view(adapter, main, MAIN_VIEW_ANGLE, "leadscrew view axis-horizontal")
     _center_view(draw, main, MAIN_CENTER, "leadscrew view")
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    iso = _early_bound(
+        place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE),
+        "IView",
+    )
+    configure_reference_views(adapter, leadscrew.CONFIGURATION, [iso])
     _center_view(draw, iso, ISO_CENTER, "leadscrew isometric")
+    sheet.CustomPropertyView = view_name(adapter, main)
+    properties = _source_properties(_early_bound(main.ReferencedDocument, "IModelDoc2"))
     for view in (main, iso):
         set_hidden_lines_removed(adapter, view)
     annotations = curate_view_dimensions(
@@ -1115,7 +1178,7 @@ async def _build_read_only_source(
         raise RuntimeError("failed to add the leadscrew note block")
     resolved = "\n".join(
         (
-            f"ITEM: {ITEM}",
+            f"ITEM: {LEADSCREW_ITEM}",
             f"SUPPLIER: {properties['Supplier']}",
             f"SKU: {properties['Supplier SKUs']}",
         )
@@ -1134,44 +1197,247 @@ async def _build_read_only_source(
     callout = str(_early_bound(thread, "INote").GetText() or "")
     if callout.replace("\r\n", "\n").replace("\r", "\n") != THREAD_CALLOUT:
         raise RuntimeError(f"leadscrew thread callout did not print: {callout!r}")
-    number_check = _fit_number_title_note(
-        adapter, expected_number=properties["Number"],
-    )
+    title_notes, title_fit = _member_title_block(adapter, draw, properties)
+    view_count = 2 + len(CLOCK_SECTIONS) + len(END_DETAILS)
 
-    def checkpoint(stage: str) -> None:
-        if stage in (
-            "before_drawing_save", "after_drawing_save",
-            "after_pdf_save", "before_drawing_close",
-        ):
-            number_check()
-        # An after-event observes an attempted operation, not a successful save.
-        # The finalizer preserves any primary operation failure independently.
-        if stage != "after_drawing_close":
-            _assert_installed_source_state(
-                adapter, source_model, installed_configuration, stage=stage,
-            )
+    def settled() -> None:
+        current = _activate(document, LEADSCREW_SHEET_NAME)
+        _assert_member_sheet(
+            adapter,
+            current,
+            leadscrew.CONFIGURATION,
+            view_count,
+            title_notes,
+            [],
+            label=LEADSCREW_SHEET_NAME,
+        )
+        verify_machining_controls(
+            annotations,
+            expected=EXPECTED_CONTROLS,
+            tolerance_types=DIMENSION_TOLERANCE_TYPES,
+            precision=DIMENSION_PRECISION,
+        )
+        title_fit()
 
-    artifacts = await finalize_drawing(
+    settled()
+    return (settled,)
+
+
+# --- Sheet 3 -----------------------------------------------------------------------
+
+
+def _nut_point(radius_mm: float, station_mm: float) -> tuple[float, float, float]:
+    """Model metres: ``radius_mm`` toward +X at ``station_mm`` from the seat
+    face, in the Front plane (section F-F's)."""
+    return (radius_mm / 1000.0, station_mm / 1000.0, 0.0)
+
+
+def _require_axis_horizontal(adapter: Any, view: Any, *, label: str) -> None:
+    """The section lies axis-horizontal at the sheet's scale (rule 11)."""
+    origin, along = model_points_in_view(
         adapter,
-        OUTPUTS,
-        pdf_title=PDF_TITLE,
-        scale=SHEET_SCALE,
-        layout=SPEC.layout,
-        settled_checks=(
-            number_check,
-            lambda: _assert_installed_source_state(
-                adapter, source_model, installed_configuration,
-                stage="settled before drawing save",
-            ),
-        ),
-        checkpoint=checkpoint,
+        view,
+        (_nut_point(0.0, 0.0), _nut_point(0.0, 1.0)),
+        label=f"{label} axis",
+        names=("seat face", "1 mm up the axis"),
     )
-    return artifacts
+    step = (along[0] - origin[0], along[1] - origin[1])
+    if (
+        abs(step[1]) > DETAIL_ORIENTATION_TOL
+        or abs(abs(step[0]) - _REWORK_PER_MODEL_MM) > DETAIL_ORIENTATION_TOL
+    ):
+        raise RuntimeError(f"{label} does not lie axis-horizontal: {step!r}")
+
+
+@_telemetry.traced("drawing.feed_nut_rework_sheet")
+def _append_feed_nut_rework_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
+    """Author FEED NUT REWORK: the FeedNut's native flange and countersink
+    limits in section F-F, cut through the two countersinks on X."""
+    draw = adapter.currentModel
+    document = _early_bound(draw, "IDrawingDoc")
+    sheet = _activate(document, REWORK_SHEET_NAME)
+    if not sheet.SetScale(*REWORK_SCALE, False, False):
+        raise RuntimeError("cannot pin the FEED NUT REWORK sheet's scale")
+    end = _early_bound(
+        place_view(adapter, str(SOURCE), "*Top", *REWORK_END_CENTER, scale=REWORK_SCALE),
+        "IView",
+    )
+    configure_reference_views(adapter, feed_nut.CONFIGURATION, [end])
+    _turn_view(adapter, end, REWORK_END_ANGLE, "feed nut end view")
+    _center_view(draw, end, REWORK_END_CENTER, "feed nut end view")
+    set_hidden_lines_removed(adapter, end)
+    sheet.CustomPropertyView = view_name(adapter, end)
+    properties = _source_properties(_early_bound(end.ReferencedDocument, "IModelDoc2"))
+    reach_mm = feed_nut.FLANGE_DIA / 2.0 + REWORK_SECTION_OVERRUN / _REWORK_PER_MODEL_MM
+    first, second = model_points_in_view(
+        adapter,
+        end,
+        (_nut_point(-reach_mm, 0.0), _nut_point(reach_mm, 0.0)),
+        label="section F-F cutting line",
+        names=("-X end", "+X end"),
+    )
+    if abs(first[0] - second[0]) > DETAIL_ORIENTATION_TOL:
+        raise RuntimeError(f"section F-F's cutting line is not vertical: {first}, {second}")
+    section = _early_bound(
+        create_section_view(
+            adapter,
+            end,
+            line_start=first,
+            line_end=second,
+            view_xy=REWORK_SECTION_CENTER,
+            section_label=REWORK_SECTION_LABEL,
+            scale=(int(REWORK_SCALE[0]), int(REWORK_SCALE[1])),
+            partial=False,
+            label="feed nut countersink section",
+        ),
+        "IView",
+    )
+    set_hidden_lines_removed(adapter, section)
+    rebuild_drawing(adapter, label="feed nut section")
+    _require_axis_horizontal(adapter, section, label="section F-F")
+    _settle_view_point(
+        adapter,
+        section,
+        _nut_point(0.0, feed_nut.LENGTH / 2.0),
+        REWORK_SECTION_CENTER,
+        label="section F-F axis",
+    )
+    flange_text, csk_text = model_points_in_view(
+        adapter,
+        section,
+        (_nut_point(*FLANGE_THICK_TEXT_MM), _nut_point(*CSK_DIA_TEXT_MM)),
+        label="section F-F texts",
+        names=("flange thickness", "countersink diameter"),
+    )
+    annotations = curate_view_dimensions(
+        adapter,
+        section,
+        keep={"FlangeThick": flange_text, "CskDia": csk_text},
+        view_label="section F-F rework",
+        dimensions_by_feature=feed_nut.DRAWING_DIMENSIONS,
+    )
+    verify_machining_controls(
+        annotations,
+        expected=REWORK_EXPECTED,
+        tolerance_types=feed_nut.DIMENSION_TOLERANCE_TYPES,
+        precision=REWORK_PRECISION,
+    )
+    set_dimension_callouts(adapter, annotations, REWORK_CALLOUTS)
+    note = _literal_note(adapter, REWORK_ITEM, *ITEM_LABEL_XY)
+    notes = [(note, REWORK_ITEM, REWORK_ITEM, ITEM_LABEL_CELL)]
+    title_notes, title_fit = _member_title_block(adapter, draw, properties)
+
+    def settled() -> None:
+        current = _activate(document, REWORK_SHEET_NAME)
+        _assert_member_sheet(
+            adapter,
+            current,
+            feed_nut.CONFIGURATION,
+            2,
+            title_notes,
+            notes,
+            label=REWORK_SHEET_NAME,
+        )
+        _require_axis_horizontal(adapter, section, label="section F-F")
+        verify_machining_controls(
+            annotations,
+            expected=REWORK_EXPECTED,
+            tolerance_types=feed_nut.DIMENSION_TOLERANCE_TYPES,
+            precision=REWORK_PRECISION,
+        )
+        title_fit()
+
+    settled()
+    return (settled,)
+
+
+def append_member_sheets(adapter: Any) -> tuple[Callable[[], None], ...]:
+    """Sheets 2 and 3, in package order."""
+    return (
+        *_append_leadscrew_sheet(adapter),
+        *_append_feed_nut_rework_sheet(adapter),
+    )
+
+
+# --- Sheet 1: the FeedNut panel's supplier references ---------------------------
+
+
+def _assert_hidden_lines_removed(views: Mapping[str, Any]) -> None:
+    """The orthographic views print no hidden edges after the final rebuild.
+
+    The reference chords show in their views as construction lines; they lie
+    on the axis or on visible edges, never as dashed edges across a face.
+    """
+    for name in ("*Front", "*Top", "*Right"):
+        mode = int(_early_bound(views[name], "IView").GetDisplayMode2())
+        if mode != _SW_HLR:
+            raise RuntimeError(f"{name}: nut view is not hidden-lines-removed ({mode})")
+
+
+def annotate_member(
+    adapter: Any,
+    configuration: str,
+    cells: tuple,
+    views: list[Any],
+) -> tuple[Callable[[], None], ...]:
+    """The FeedNut panel's listing sizes; the LeadScrew's views stay plain."""
+    if configuration != feed_nut.CONFIGURATION:
+        return ()
+    by_orientation = {
+        orientation: view for view, (orientation, _, _) in zip(views, cells, strict=True)
+    }
+    checks: list[Callable[[], None]] = []
+    displays = annotate_supplier_screw(
+        adapter,
+        by_orientation,
+        dimensions=feed_nut.SUPPLIER_REFERENCE_DIMENSIONS,
+        formats=feed_nut.SUPPLIER_REFERENCE_FORMATS,
+        starts=feed_nut.SUPPLIER_REFERENCE_STARTS,
+        planes=feed_nut.SUPPLIER_REFERENCE_PLANES,
+        sides=feed_nut.SUPPLIER_REFERENCE_SIDES,
+        units=feed_nut.SUPPLIER_REFERENCE_UNITS,
+        settled_checks=checks,
+    )
+    stations = shelve_supplier_text(adapter, displays, SHELVES)
+    [settled_references] = checks
+
+    def assert_references() -> None:
+        # The final check reacquires every native reference, then re-proves
+        # the shelves against the stations measured here.
+        assert_supplier_shelves(adapter, settled_references(), SHELVES, stations)
+        _assert_hidden_lines_removed(by_orientation)
+
+    return (assert_references,)
+
+
+async def build(adapter: Any) -> dict[str, str]:
+    return await build_purchased_variant_drawing(
+        adapter,
+        SPEC,
+        variants=VARIANTS,
+        item=ITEM,
+        purchase_unit=PURCHASE_UNIT,
+        general_text=GENERAL_TEXT,
+        annotate_member=annotate_member,
+        additional_sheet_scales={
+            LEADSCREW_SHEET_NAME: SHEET_SCALE,
+            REWORK_SHEET_NAME: REWORK_SCALE,
+        },
+        append_sheets=append_member_sheets,
+        additional_sheets_title=ADDITIONAL_SHEETS_TITLE,
+        title_fit=True,
+        view_angles=VIEW_ANGLES,
+        unit=part_drawing_unit(PART_STEM),
+    )
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("part", choices=[PART_STEM])
+    return parser.parse_args()
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("part", choices=[PART_STEM])
-    parser.parse_args()
+    _parse_args()
     _telemetry.set_service("drawing-export")
     sys.exit(run_build(build))

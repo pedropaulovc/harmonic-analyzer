@@ -1,19 +1,20 @@
-r"""Pure-data envelope of the bought Tr8x2 leadscrew, ReliaBot 600 mm T8 (Amazon B085DDHJTW) (MHA-CH-06-TL-VN-54).
+r"""LeadScrew member of the ReliaBot T8 kit, Amazon B085DDHJTW (MHA-CH-06-TL-VN-84).
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure: ``build_ch_rocker_arm_tl_vn_oblique_leadscrew`` revolves ``PROFILE``.
-The module is named ``..._leadscrew_stock_spec`` because the pattern-D name
-``ch_rocker_arm_tl_vn_oblique_leadscrew_spec`` already belongs to C4's feed-layout
-contract, which this module imports.
+closure: ``build_ch_rocker_arm_tl_vn_oblique_leadscrew_kit`` revolves
+``PROFILE`` and mills the flats in the kit's ``LeadScrew`` configuration.
+The name ``ch_rocker_arm_tl_vn_oblique_leadscrew_spec`` belongs to C4's
+feed-layout contract, which this module imports.
 
 The item is the shop-inventory ``fixtures.trammel-tr8-leadscrew``: a ReliaBot
 600 mm T8 lead screw (SUS304 stainless, single start, pitch and lead 2) that
 the shop cuts to the installed length. The ends are broken, and no journals
 are turned. The KP08 inner rings' two set screws each and one of the
 handwheel's set screws bear on milled flats, not on the thread's crests
-(``FLAT_STATIONS``). The listing's brass flange nut is used too: with its
-spigot faced off it is the feed nut, MHA-CH-06-TL-VN-82 (owner ruling
-2026-11-04, option B), modelled as its own part.
+(``FLAT_STATIONS``). The listing's brass flange nut is the kit's other
+member, ``FeedNut`` (``ch_rocker_arm_tl_vn_oblique_leadscrew_kit_feed_nut_spec``).
+Owner ruling 2026-11-04 (#2187): screw and nut are one native model, one
+configuration each, under one Number; this replaces the retired TL-VN-54.
 
 Datasheet-built: no vendor CAD obtained (the listing offers no CAD
 download; its dimension image gives the screw's 600 length and the nut's
@@ -88,17 +89,26 @@ import math
 from _printed_tolerance import angular_band_deg, printed_band_mm
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as feed
 
+PART_NAME = "ch-rocker-arm-tl-vn-oblique-leadscrew-kit"
+NUMBER = "MHA-CH-06-TL-VN-84"
+CONFIGURATION = "LeadScrew"
 SUPPLIER = "Amazon (sold by ReliaBot)"
 SKU = "B085DDHJTW"
 INVENTORY_ID = feed.SCREW_ID  # fixtures.trammel-tr8-leadscrew
 QUANTITY = 1
 MATERIAL = "AISI 304"
+# The kit package's sheet for this member's cut and flats.
+MODIFIED_STOCK_SHEET = 2
+# The member's Manufacturing Notes: where its work is drawn, no method.
+DRAWING_NOTES = f"CUT AND MILL FLATS PER SHEET {MODIFIED_STOCK_SHEET}."
 
 # --- FROM C4 (imported) ---------------------------------------------------------
 MAJOR_DIA = feed.SCREW_MAJOR_DIA  # 8
 LEAD = feed.SCREW_LEAD  # 2
 STOCK_LENGTH = feed.SCREW_STOCK_LENGTH  # 600, as bought
 LENGTH = feed.SCREW_LENGTH  # 410, installed (shop-cut)
+# The member's native BOM description under the kit's one Number.
+BOM_DESCRIPTION = f"TR8X2 LEADSCREW, {LENGTH:.0f} MM LONG"
 
 # --- SOURCED: listing / layout decision / contract --------------------------------
 PITCH = 2.0  # single start: the pitch equals the lead

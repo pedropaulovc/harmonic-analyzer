@@ -1,13 +1,15 @@
-r"""Pure-data envelope of the purchased HIWIN-style HGH15CA carriage (MHA-CH-06-TL-VN-51).
+r"""Pure-data envelope of the kit's ``Carriage`` member: the HIWIN-style HGH15CA carriage (MHA-CH-06-TL-VN-83).
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure: ``build_ch_rocker_arm_tl_vn_oblique_carriage`` extrudes ``CAP_OUTLINE``
-over the length over the seals and ``BODY_OUTLINE`` over the steel body, cuts
-the rail ``CHANNEL`` through, cuts the four M4 bores, and adds the grease
-nipple and the opposite end's port plug.
+closure: ``build_ch_rocker_arm_tl_vn_oblique_rail_kit`` extrudes
+``CAP_OUTLINE`` over the length over the seals and ``BODY_OUTLINE`` over the
+steel body, cuts the rail ``CHANNEL`` through, cuts the four M4 bores, and
+adds the grease nipple and the opposite end's port plug, all in the
+``Carriage`` configuration.
 
-Two carriages, one on each HGR15 rail (MHA-CH-06-TL-VN-50), each carrying a
-pivot block (MHA-CH-06-TL-22) on its four M4 holes. Shop inventory
+Two carriages, one on each HGR15 rail (the kit's ``Rail`` member,
+``ch_rocker_arm_tl_vn_oblique_rail_kit_rail_spec``), each carrying a pivot
+block (MHA-CH-06-TL-22) on its four M4 holes. Shop inventory
 ``fixtures.trammel-hgh15ca-carriages``.
 
 KIT LISTING (``rail.SOURCE_URL``, read 2026-11-04, owner decisions on issue
@@ -70,9 +72,9 @@ Source of each number:
   ``CARRIAGE_LENGTH`` 61.4 (L), ``CARRIAGE_BOLT_SPAN`` (26, 26) (C, B),
   ``CARRIAGE_BOLT`` "M4". From ``ch_rocker_arm_tl_oblique_pivot_block_spec``:
   ``CARRIAGE_THREAD_DEPTH`` 5 (the l of M4 x 5). From
-  ``ch_rocker_arm_tl_vn_oblique_rail_spec``: the rail ``SECTION``, its height
-  and the polygon helpers. The reference STEP agrees with every one of these.
-  The registry quantity 2 is C4's
+  ``ch_rocker_arm_tl_vn_oblique_rail_kit_rail_spec``: the rail ``SECTION``, its
+  height and the polygon helpers. The reference STEP agrees with every one of
+  these. The registry Carriage quantity 2 is C4's
   ``ch_rocker_arm_tl_oblique_fasteners_spec.RAILS`` (asserted by the test).
 - DERIVED: ``BORE_DIA`` 3.242, the ISO 68-1 basic minor diameter of M4x0.7
   (D1 = D - 1.082532 P), which is also the reference's modelled bore. M4 is
@@ -122,17 +124,23 @@ from __future__ import annotations
 
 import math
 
-import _config
-import ch_rocker_arm_tl_vn_oblique_rail_spec as rail
+import ch_rocker_arm_tl_vn_oblique_rail_kit_rail_spec as rail
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 from ch_rocker_arm_tl_oblique_pivot_block_spec import CARRIAGE_THREAD_DEPTH
-from ch_rocker_arm_tl_vn_oblique_rail_spec import clip_above, polygon_area_centroid
+from ch_rocker_arm_tl_vn_oblique_rail_kit_rail_spec import (
+    clip_above,
+    polygon_area_centroid,
+)
 
 # One kit (``rail.SKU``) supplies both rails and both carriages.
 SUPPLIER = rail.SUPPLIER
 SKU = rail.SKU
 STYLE = "HGH15CA"  # the HIWIN-style designation the kit copies; no maker part number
 MATERIAL = "Alloy Steel"  # SOLIDWORKS library steel for the bearing-steel block
+# The kit's second member and its member-specific material: one body, the
+# plastic end caps counted in the steel (see the modelling departures).
+CONFIGURATION = "Carriage"
+MATERIAL_SPECIFICATION = "Bearing steel, plastic end caps"
 
 # --- Calculator (imported) -------------------------------------------------------
 MOUNTING_FACE_Z = trammel.CARRIAGE_HEIGHT  # H 28
@@ -338,22 +346,24 @@ CAP_INTERNAL_MM3 = (A_CAP_OUTLINE - REFERENCE_CHANNEL_MM2) * 2.0 * CAP_LENGTH - 
 )
 
 # The owner's description note for the kit carriages (#2177), the rail named
-# by its drawing number from the registry and the play acceptance read from
-# the trammel calculator. Rule 7: a matched-fit statement with its mate and
-# acceptance, three lines beside the footer's general line. The style
+# by its item on the kit drawing's reference sheet and the play acceptance
+# read from the trammel calculator. Rule 7: a matched-fit statement with its
+# mate and acceptance, three lines beside the footer's general line. The style
 # designation (HGH15CA) prints in the ITEM row. The check names its home, the
 # TL-00 jig where the carriage is fitted, how the carrier is rocked and where
 # the indicator reads (machinist review 20261104T194839817Z: the sheet draws
 # no pivot).
-RAIL_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-rail")["number"]
+ITEM_TAG = "[2]"
 JIG_NUMBER = "MHA-CH-06-TL-00"
 PLAY_ACCEPTANCE = (
     f"ROCK SIDEWAYS, {trammel.CARRIAGE_PLAY_TIR_MAX:.2f} MM TIR MAX AT SHOULDER SCREW"
 )
 DRAWING_NOTES = "\n".join(
     (
-        "GENERIC HIWIN-STYLE, NUIBBYED-BRANDED, NOT GENUINE HIWIN; MATCHED KIT",
-        f"WITH RAIL {RAIL_NUMBER}. Z0 PRELOAD, C ACCURACY NOT REQUIRED.",
+        f"{ITEM_TAG} GENERIC HIWIN-STYLE, NUIBBYED-BRANDED, NOT GENUINE HIWIN;",
+        f"MATCHED KIT WITH RAIL {rail.ITEM_TAG}. Z0 PRELOAD, C ACCURACY NOT REQUIRED.",
         f"IN {JIG_NUMBER}: {PLAY_ACCEPTANCE}.",
     )
 )
+# The member's native BOM row under the kit's one Number.
+BOM_DESCRIPTION = f"{STYLE} CARRIAGE, KIT"

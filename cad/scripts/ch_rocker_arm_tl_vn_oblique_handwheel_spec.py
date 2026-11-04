@@ -180,8 +180,9 @@ GRIP_VOLUME_MM3 = revolved_volume(GRIP_PROFILE)
 TAP_VOLUME_MM3 = tap_volume(SET_SCREW_MINOR_DIA)
 VOLUME_MM3 = WHEEL_VOLUME_MM3 + GRIP_VOLUME_MM3 - SET_SCREW_COUNT * TAP_VOLUME_MM3
 
-# The note names the leadscrew by its drawing number, read from the registry.
-LEADSCREW_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-leadscrew")["number"]
+# The note names the leadscrew by its kit's drawing number, read from the
+# registry: the screw is the leadscrew kit's LeadScrew configuration.
+LEADSCREW_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-leadscrew-kit")["number"]
 DRAWING_NOTES = (
     f"SLIDE ONTO LEADSCREW {LEADSCREW_NUMBER} FAR END; LOCK A SET SCREW ON ITS FLAT."
 )

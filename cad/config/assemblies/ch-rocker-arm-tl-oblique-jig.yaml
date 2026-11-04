@@ -2,6 +2,10 @@ number: MHA-CH-06-TL-00
 # Shop fixture: one carriage-slide DOF. Rail 1 carries the integral feed block,
 # rail 2 the plain pivot block. Both purchased shoulder-screw stacks and every
 # carrier rider move with the linkage; the raised leadscrew/KP08s stay fixed.
+# The free stems are native files (the spec's MOVING_STEMS): the rail kit
+# (MHA-CH-06-TL-VN-83) for its Carriage members and the leadscrew kit
+# (MHA-CH-06-TL-VN-84) for its FeedNut; their Rail and LeadScrew stay fixed,
+# and the build requires each moving kit occurrence itself to read free.
 flip_invert: []
 allowed_free_stems:
   - ch-rocker-arm-tl-oblique-carrier
@@ -13,9 +17,9 @@ allowed_free_stems:
   - ch-rocker-arm-tl-oblique-riser
   - ch-rocker-arm-tl-vn-oblique-hub-pin
   - ch-rocker-arm-tl-oblique-feed-lever
-  - ch-rocker-arm-tl-vn-oblique-carriage
+  - ch-rocker-arm-tl-vn-oblique-rail-kit
   - ch-rocker-arm-tl-vn-oblique-cl-dowel
-  - ch-rocker-arm-tl-vn-oblique-feed-nut
+  - ch-rocker-arm-tl-vn-oblique-leadscrew-kit
   - ch-rocker-arm-tl-vn-oblique-carriage-screw
   - ch-rocker-arm-tl-vn-oblique-riser-screw
   - ch-rocker-arm-tl-vn-oblique-clamp-screw
@@ -31,9 +35,9 @@ required_free_stems:
   - ch-rocker-arm-tl-oblique-riser
   - ch-rocker-arm-tl-vn-oblique-hub-pin
   - ch-rocker-arm-tl-oblique-feed-lever
-  - ch-rocker-arm-tl-vn-oblique-carriage
+  - ch-rocker-arm-tl-vn-oblique-rail-kit
   - ch-rocker-arm-tl-vn-oblique-cl-dowel
-  - ch-rocker-arm-tl-vn-oblique-feed-nut
+  - ch-rocker-arm-tl-vn-oblique-leadscrew-kit
   - ch-rocker-arm-tl-vn-oblique-carriage-screw
   - ch-rocker-arm-tl-vn-oblique-riser-screw
   - ch-rocker-arm-tl-vn-oblique-clamp-screw
@@ -43,12 +47,12 @@ free_dof: 1
 machinist_exceptions:
   - id: "RV-01"
     kind: "accept"
-    where: "F2: four #4-40 X 5/8 B18.6.3 flat heads (TL-VN-67) through the TL-VN-82 bought brass flange nut's countersunk holes into the integral feed block's transferred taps, 0.3 N·m, crosswise in 2 stages"
+    where: "F2: four #4-40 X 5/8 B18.6.3 flat heads (TL-VN-67) through the countersunk holes of the bought brass flange nut (MHA-CH-06-TL-VN-84, FeedNut) into the integral feed block's transferred taps, 0.3 N·m, crosswise in 2 stages"
     finding: "no mechanical lock on the feed nut screws under reversing nut torque (rule 23)"
-    reason: "Owner ruling 2026-11-04 on #2177 (option B) replaced the shop-made TL-27 nut and its TL-VN-81 dowel with the ReliaBot leadscrew's own brass flange nut, its spigot faced off. Main ruling 2026-11-03 on #2112 Codjiflo P1 still holds: a positive stop, no friction counted on. The four flat heads, seated in the nut's 82° countersinks and threaded into TL-32's lug, key the nut: its reversing torque (1.19 N·m at the 1361 N crank thrust) puts 37 N on each head at the 16 mm PCD, a margin of 30 on the #4-40 minor section in shear, so no turning load loosens the screws: a static clamp. At 0.3 N·m the four screws' preload (527 N each) is 1.55 x that thrust, so the nut never lifts off the lug, and each head's bearing on the brass (102 MPa) stays under the 117 MPa (17 ksi) yield of 360-H02, taken because the listing states no alloy. The owner accepted the static clamp without washers for the bought nut's flange on 2026-10-19/20. The lug's taps are transferred from the seated, clocked nut at assembly (F1-F2)."
+    reason: "Owner ruling 2026-11-04 on #2177 (option B) replaced the shop-made TL-27 nut and its TL-VN-81 dowel with the ReliaBot leadscrew's own brass flange nut, its spigot faced off. Main ruling 2026-11-03 on #2112 Codjiflo P1 still holds: a positive stop, no friction counted on. The four flat heads, seated in the nut's 82° countersinks and threaded into TL-32's lug, key the nut: its reversing torque (1.19 N·m at the 1361 N crank thrust) puts 37 N on each head at the 16 mm PCD, a margin of 30 on the #4-40 minor section in shear, so no turning load loosens the screws: a static clamp. At 0.3 N·m the four screws' preload (527 N each) is 1.55 x that thrust, so the nut never lifts off the lug, and each head's bearing on the brass (102 MPa) stays under the 117 MPa (17 ksi) yield of 360-H02, taken because the listing states no alloy. The owner accepted the static clamp without washers for the bought nut's flange on 2026-10-19/20. The lug's taps are transferred from the seated, clocked nut at assembly (F1B-F2)."
   - id: "RV-03"
     kind: "accept"
-    where: "step 8: the handwheel and KP08 set screws on leadscrew flats, locked with Loctite 222 (low-strength purple) threadlocker"
+    where: "step 8B: the handwheel and KP08 set screws on leadscrew flats, locked with Loctite 222 (low-strength purple) threadlocker"
     finding: "set screws on a hand-cranked reversing shaft use threadlocker without a mechanical lock (rule 23)"
     reason: "Owner ruling 2026-10-18 retains bought low-strength threadlocker on each set screw; the shaft flats carry the hand-crank torque."
   - id: "RV-04"

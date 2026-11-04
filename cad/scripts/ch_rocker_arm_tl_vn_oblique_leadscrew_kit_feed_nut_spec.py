@@ -1,19 +1,32 @@
-r"""Pure-data envelope of the bought Tr8x2 brass flange nut, as fitted (MHA-CH-06-TL-VN-82).
+r"""FeedNut member of the ReliaBot T8 kit: the brass flange nut, as fitted (MHA-CH-06-TL-VN-84).
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure: ``build_ch_rocker_arm_tl_vn_oblique_feed_nut`` revolves ``PROFILE``,
-cuts the flange holes and revolve-cuts the countersinks from here.
+closure: ``build_ch_rocker_arm_tl_vn_oblique_leadscrew_kit`` revolves
+``PROFILE``, cuts the flange holes and revolve-cuts the countersinks from here,
+in the kit's ``FeedNut`` configuration.
 
 Owner ruling 2026-11-04 (#2177, option B): the brass flange nut supplied with
-the ReliaBot lead screw (MHA-CH-06-TL-VN-54, Amazon B085DDHJTW) drives
-TL-32's integral lug. It replaces the shop-made MHA-CH-06-TL-27 nut and its
-MHA-CH-06-TL-VN-81 dowel, both retired and never reissued. At TL-00 fit-up
-(step F1) the fitter faces the nut's 1.5 spigot off in one lathe pass, so
-the flange seats flat on the lug's -X face with no recess, and countersinks
-the four flange holes 82° for four #4-40 X 5/8 flat heads
-(MHA-CH-06-TL-VN-67, McMaster 91771A112; owner ruling relayed by Main
-2026-11-04: a screw the repo already uses). The lug's four taps are
-transferred through the seated nut. The model is the nut as fitted.
+the ReliaBot lead screw (Amazon B085DDHJTW) drives TL-32's integral lug. It
+replaces the shop-made MHA-CH-06-TL-27 nut and its MHA-CH-06-TL-VN-81 dowel,
+both retired and never reissued. Owner ruling 2026-11-04 (#2187): the screw
+and the nut are one native model, MHA-CH-06-TL-VN-84, with ``LeadScrew`` and
+``FeedNut`` configurations; the nut's own TL-VN-82 was never released and
+stays reserved. Before the TL-00 feed fit-up (step F1A) the nut's 1.5 spigot
+is faced off, so the flange seats flat on the lug's -X face with no recess,
+and the four flange holes are countersunk 82° for four
+#4-40 X 5/8 flat heads (MHA-CH-06-TL-VN-67, McMaster 91771A112; owner ruling
+relayed by Main 2026-11-04: a screw the repo already uses). The lug's four
+taps are transferred through the seated nut. The model is the nut as fitted.
+
+Codjiflo P2 on #2187: the rework limits are native model tolerances in the
+FeedNut configuration, printed on the kit's REWORK sheet
+(``REWORK_SHEET_REFERENCE``): ``FlangeThick`` (LIMIT ``FLANGE_THICK_MIN`` /
+``FLANGE_THICK_MAX``) and ``CskDia`` (Ø``CSK_DIA`` ±``CSK_DIA_BAND``). The
+82° is held by the driving apex depth ``CskApexDepth``, as on
+build_pd_transgear_arm_plate (an angular sketch dimension there read the
+139° supplement and flipped the cone, run 20261001T011714683Z). The angle
+prints in the countersink's callout under the title block's angular band.
+TL-00 cites that sheet and types none of these limits.
 
 Datasheet-built: no vendor CAD obtained. Sources:
 
@@ -31,20 +44,22 @@ Datasheet-built: no vendor CAD obtained. Sources:
   contract.
 - FIT-UP (this jig's work, not the vendor's): the spigot faced off, so
   ``LENGTH`` is 13.5 as fitted, and four 82° countersinks Ø``CSK_DIA``
-  ±``CSK_DIA_BAND`` cut with an 82° countersink no larger than
-  ``CSK_CUTTER_DIA_MAX`` (Ø3/16). A Ø1/4 cutter's cone would reach the
-  Ø10.2 body about 0.6 above the flange face and gouge it.
-- RECEIPT ACCEPTANCE (UNVERIFIED until the nut is measured in F1, before the
+  ±``CSK_DIA_BAND``, cut with an 82° countersink no larger than
+  ``CSK_CUTTER_DIA_MAX`` (Ø3/16; a method, so TL-00 states it). A Ø1/4
+  cutter's cone would reach the Ø10.2 body about 0.6 above the flange face
+  and gouge it.
+- RECEIPT ACCEPTANCE (UNVERIFIED until the nut is measured in F1A, before the
   lug's taps are transferred): the ``*_MIN`` / ``*_MAX`` limits below. Each
   is the bound a check in this jig reads: the flange thickness (the screws'
-  engagement and seat), the body diameter (the heads' clearance, TL-32's
-  spec), the hole size (the transfer spot's residual) and the hole PCD (the
-  lug walls), measured as received (``RECEIPT_TEXT``); and the faced length
-  (the near-KP08 feed gap), measured after the facing pass
-  (``FACED_LENGTH_TEXT``), since the supplied nut is 1.5 longer. F2 calipers
-  each nut screw's head against ``SCREW_HEAD_DIA_MAX``.
+  engagement and seat; the REWORK sheet's ``FlangeThick`` prints it), the
+  body diameter (the heads' clearance, TL-32's spec), the hole size (the
+  transfer spot's residual) and the hole PCD (the lug walls), measured as
+  received (``RECEIPT_TEXT``); and the faced length (the near-KP08 feed gap),
+  measured after the facing pass (``FACED_LENGTH_TEXT``), since the supplied
+  nut is 1.5 longer. F2 calipers each nut screw's head against
+  ``SCREW_HEAD_DIA_MAX``.
 
-Part frame. The axis is +Y and is published as ``ScrewAxis`` (Front ∩
+Part frame. The axis is +Y and is the kit's shared ``ScrewAxis`` (Front ∩
 Right). y = 0 is the faced seat face (on the lug); the flange spans
 y 0 .. FLANGE_THICK and the body FLANGE_THICK .. LENGTH. The holes sit at
 azimuths 0°, 90°, 180° and 270° about +Y, measured from +X toward +Z, at
@@ -60,8 +75,8 @@ from __future__ import annotations
 import math
 from fractions import Fraction
 
+import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec as leadscrew_stock
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
-import ch_rocker_arm_tl_vn_oblique_leadscrew_stock_spec as leadscrew_stock
 from _hole_spec import THREAD_MAJOR_MM
 from _mcmaster_91771a112 import DIMS as SCREW_DIMS
 from _mcmaster_91771a112 import LENGTH_TEXT as SCREW_LENGTH_TEXT
@@ -69,15 +84,24 @@ from _mcmaster_91771a112 import PART_NO as SCREW_SKU
 from _mcmaster_91771a112 import THREAD as SCREW_THREAD
 
 INCH = 25.4
-PART_NAME = "ch-rocker-arm-tl-vn-oblique-feed-nut"
-NUMBER = "MHA-CH-06-TL-VN-82"
+PART_NAME = leadscrew_stock.PART_NAME  # the kit's one native model
+NUMBER = leadscrew_stock.NUMBER  # MHA-CH-06-TL-VN-84
+CONFIGURATION = "FeedNut"
 SUPPLIER = leadscrew_stock.SUPPLIER  # Amazon (sold by ReliaBot)
 SKU = leadscrew_stock.SKU  # the nut ships with the screw; not bought apart
 SUPPLIER_PRODUCT_URL = leadscrew_stock.SUPPLIER_PRODUCT_URL
 SUPPLIER_DRAWING_IMAGE = "31zvVr4yFvL"  # the listing's dimension image
 QUANTITY = 1
 MATERIAL = "Brass"
+# The member's native BOM description under the kit's one Number.
+BOM_DESCRIPTION = "TR8X2 BRASS FLANGE NUT, SPIGOT FACED"
 LEAD = leadscrew_stock.LEAD  # 2, single start
+# The kit package: sheet 1 the members' reference views, sheet 2 the
+# LeadScrew's cut and flats, sheet 3 this member's REWORK. TL-00 cites it.
+REWORK_SHEET = 3
+REWORK_SHEET_REFERENCE = f"{NUMBER} SHEET {REWORK_SHEET}"
+# The member's Manufacturing Notes: where its rework is drawn, no method.
+DRAWING_NOTES = f"FACE AND COUNTERSINK PER SHEET {REWORK_SHEET}."
 
 # --- SOURCED: the listing's dimension image -----------------------------------
 FLANGE_DIA = 22.0
@@ -101,7 +125,7 @@ LENGTH = FLANGE_THICK + BODY_LENGTH  # 13.5, seat face to body end
 if LENGTH < 5.0 * LEAD:
     raise AssertionError("the fitted nut is shorter than five Tr8 turns")
 
-# --- RECEIPT ACCEPTANCE: UNVERIFIED nominals, measured in F1 ------------------
+# --- RECEIPT ACCEPTANCE: UNVERIFIED nominals, measured in F1A -----------------
 FLANGE_DIA_MAX = 22.2
 FLANGE_THICK_MIN = 3.3
 FLANGE_THICK_MAX = 3.7
@@ -112,11 +136,11 @@ HOLE_PCD_BAND = 0.1  # ± on the diameter, so ±0.05 on each hole's station
 LENGTH_MAX = 13.8  # faced, seat face to body end
 HOLE_R_MAX = HOLE_DIA_MAX / 2.0
 HOLE_STATION_BAND = HOLE_PCD_BAND / 2.0
-# F1 prints the limits in the nut's own millimetres (owner ruling 4, 2026-11-01):
-# the incoming ones before the spigot is faced, the faced length after it.
+# F1A prints the as-received limits in the nut's own millimetres (owner ruling
+# 4, 2026-11-01), the faced length after the facing pass. The flange's band is
+# the REWORK sheet's FlangeThick (Codjiflo P2), so F1A does not type it.
 RECEIPT_TEXT = (
-    f"FLANGE {FLANGE_THICK_MIN:.1f}-{FLANGE_THICK_MAX:.1f} MM THICK, BODY "
-    f"Ø{BODY_DIA_MAX:.1f} MM MAX, {len(HOLE_ANGLES_DEG)} HOLES "
+    f"BODY Ø{BODY_DIA_MAX:.1f} MM MAX, {len(HOLE_ANGLES_DEG)} HOLES "
     f"Ø{HOLE_DIA_MIN:.2f}-{HOLE_DIA_MAX:.2f} MM ON A Ø{HOLE_PCD:.0f} "
     f"±{HOLE_PCD_BAND:.1f} MM PCD"
 )
@@ -223,6 +247,20 @@ PROFILE: tuple[tuple[float, float], ...] = (
     (_BODY_R, LENGTH),
     (_BORE_R, LENGTH),
 )
+# NutProfile's dimensions in creation order: the free revolve axis's length,
+# then define_polygon_chain's for ``PROFILE`` anchored at its first vertex
+# (the anchor's radius, then one per axis-parallel segment; the bore edge
+# closing on the anchor is the closure's). The flange's rim edge, seat face to
+# head face, is the REWORK sheet's FlangeThick.
+NUT_PROFILE_DIMENSIONS = (
+    "NutAxisLength",
+    "BoreRadius",
+    "SeatWidth",
+    "FlangeThick",
+    "HeadFaceWidth",
+    "BodyLength",
+    "BodyEndWidth",
+)
 # Flange-hole centres in model (x, z).
 HOLE_CENTRES: tuple[tuple[float, float], ...] = tuple(
     (
@@ -231,18 +269,21 @@ HOLE_CENTRES: tuple[tuple[float, float], ...] = tuple(
     )
     for a in HOLE_ANGLES_DEG
 )
-# Each countersink is a triangle revolved about its hole's axis, on the plane
-# that holds that axis: on Front, sketch u = model x; on Right, u = -model z;
-# v = model y on both. Its top edge stands CSK_OVERRUN above the head face so
-# the cut leaves no sliver there; that overrun cone still clears the body.
+# Each countersink is revolved about its hole's axis on the plane that holds
+# it (build_pd_transgear_arm_plate's profile): the apex on the axis, the cone
+# up to the mouth on the head face, a wall CSK_OVERRUN above the face so the
+# cut leaves no sliver there, and back along the axis. On Front, sketch
+# u = model x; on Right, u = -model z; v = model y on both. The overrun wall
+# stands at the mouth's radius, clear of the body.
 CSK_OVERRUN = 0.25
 CSK_TOP_Y = FLANGE_THICK + CSK_OVERRUN
-CSK_APEX_Y = FLANGE_THICK - CSK_DIA / 2.0 / _TAN
-_CSK_TOP_R = CSK_DIA / 2.0 + CSK_OVERRUN * _TAN
-if not HOLE_PCD / 2.0 - _CSK_TOP_R > _BODY_R:
-    raise AssertionError("the countersink's overrun cone reaches the modelled body")
+CSK_APEX_DEPTH = CSK_DIA / 2.0 / _TAN  # below the head face: fixes the 82°
+CSK_APEX_Y = FLANGE_THICK - CSK_APEX_DEPTH
+if not HOLE_PCD / 2.0 - CSK_DIA / 2.0 > _BODY_R:
+    raise AssertionError("the countersink's overrun wall reaches the modelled body")
 # (plane, sketch u of the hole axis), one per hole: Front's x = +8 and -8,
-# Right's u = -z for z = +8 and -8.
+# Right's u = -z for z = +8 and -8. Countersink 1 (+X, on Front) carries the
+# printed controls; section A-A on the REWORK sheet cuts Front through it.
 COUNTERSINK_AXES: tuple[tuple[str, float], ...] = (
     ("Front", HOLE_PCD / 2.0),
     ("Front", -HOLE_PCD / 2.0),
@@ -252,11 +293,32 @@ COUNTERSINK_AXES: tuple[tuple[str, float], ...] = (
 
 
 def countersink_points(u: float) -> list[tuple[float, float]]:
-    """The countersink triangle for the hole axis at sketch ``u``: the axis
-    top, the outer top corner (away from the nut axis) and the apex. The
-    closing edge, apex to axis top, lies on the hole axis: the revolve axis."""
+    """The countersink profile for the hole axis at sketch ``u``: the apex,
+    the mouth on the head face, the overrun wall's top and the axis top. The
+    closing edge, axis top to apex, lies on the hole axis: the revolve axis."""
     side = 1.0 if u > 0.0 else -1.0
-    return [(u, CSK_TOP_Y), (u + side * _CSK_TOP_R, CSK_TOP_Y), (u, CSK_APEX_Y)]
+    mouth = u + side * CSK_DIA / 2.0
+    return [
+        (u, CSK_APEX_Y),
+        (mouth, FLANGE_THICK),
+        (mouth, CSK_TOP_Y),
+        (u, CSK_TOP_Y),
+    ]
+
+
+def countersink_dimensions(index: int) -> tuple[str, ...]:
+    """A countersink sketch's dimensions in creation order. Countersink 1's
+    diameter and apex depth carry the printed names; the others are the same
+    sizes, numbered."""
+    printed = index == 1
+    return (
+        f"Csk{index}AxisLength",
+        f"Csk{index}Station",
+        f"Csk{index}Seat",
+        "CskDia" if printed else f"Csk{index}Dia",
+        "CskApexDepth" if printed else f"Csk{index}ApexDepth",
+        f"Csk{index}Overrun",
+    )
 
 
 def revolved_volume(profile: tuple[tuple[float, float], ...]) -> float:
@@ -269,7 +331,8 @@ def revolved_volume(profile: tuple[tuple[float, float], ...]) -> float:
 
 def countersink_volume(mouth_dia: float, hole_dia: float) -> float:
     """Brass one 82° countersink removes round its hole: the cone from the
-    hole's edge up to the mouth, less the hole it surrounds."""
+    hole's edge up to the mouth, less the hole it surrounds. Above the head
+    face its overrun wall cuts only air."""
     r_m, r_h = mouth_dia / 2.0, hole_dia / 2.0
     return math.pi / (3.0 * _TAN) * (r_m**3 - r_h**3) - math.pi * r_h**2 * (r_m - r_h) / _TAN
 
@@ -279,23 +342,39 @@ HOLE_VOLUME_MM3 = math.pi * (HOLE_DIA / 2.0) ** 2 * FLANGE_THICK
 CSK_VOLUME_MM3 = countersink_volume(CSK_DIA, HOLE_DIA)
 VOLUME_MM3 = BODY_VOLUME_MM3 - SCREW_COUNT * (HOLE_VOLUME_MM3 + CSK_VOLUME_MM3)
 
-# The sheet's footer note: the fit-up work on the bought nut, one line that
-# fits the purchased footer row (_NOTE_X to _FOOTER_RIGHT in
-# _purchased_fastener_drawing). The general line says the part is cut at
-# assembly per this note.
-DRAWING_NOTES = (
-    f"FACE ITS SPIGOT OFF AND COUNTERSINK ITS {SCREW_COUNT} HOLES PER "
-    "MHA-CH-06-TL-00 STEP F1."
-)
+# --- REWORK: native controls in the FeedNut configuration only (Codjiflo P2) ---
+# name -> (nominal, lower deviation, upper deviation, places), mm. FlangeThick
+# is a LIMIT (it prints 3.7/3.3); CskDia a symmetric ±. Both print at one
+# place, the band's. The 82° prints in CskDia's callout under the title
+# block's angular band; CskApexDepth drives it and does not print.
+TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
+TOL_SYMMETRIC = 4  # swTolType_e.swTolSYMMETRIC
+REWORK_CONTROLS = {
+    "FlangeThick": (
+        FLANGE_THICK, FLANGE_THICK_MIN - FLANGE_THICK, FLANGE_THICK_MAX - FLANGE_THICK, 1,
+    ),
+    "CskDia": (CSK_DIA, -CSK_DIA_BAND, CSK_DIA_BAND, 1),
+}
+DIMENSION_TOLERANCE_TYPES = {"FlangeThick": TOL_LIMIT, "CskDia": TOL_SYMMETRIC}
+DRAWING_DIMENSIONS = {
+    "NutProfile": {"FlangeThick"},
+    "Countersink1Profile": {"CskDia"},
+}
+DRAWING_PRECISION = {
+    feature: {name: REWORK_CONTROLS[name][3] for name in names}
+    for feature, names in DRAWING_DIMENSIONS.items()
+}
+# One printed countersink stands for all four.
+CSK_PREFIX = f"{SCREW_COUNT}X "
+CSK_CALLOUT = f"{CSK_ANGLE:.0f}° CSK"
 
 # --- Supplier reference sizes (the dimension image's, mm) ---------------------------
-# The sheet is 1:1 in the purchased layout's ``tall_top`` cells (Front
-# 180 x 73 mm, Top, the end view, 180 x 96 mm), the retired TL-VN-55 sheet's
-# lane budget for the same nut: Front carries only the two vertical lengths
-# (the flange on its silhouette, the body on the axis), and every diameter is
-# read on the end view: the flange OD above it, the body's below, the hole
-# and the bolt pattern to the sides. Hidden construction chords print where
-# an edge or a centreline already is, never across a face.
+# Drawn in the FeedNut panel of the kit's reference sheet: Front carries only
+# the two vertical lengths (the flange on its silhouette, the body on the
+# axis), and every diameter is read on the end view: the flange OD above it,
+# the body's below, the hole and the bolt pattern to the sides. Hidden
+# construction chords print where an edge or a centreline already is, never
+# across a face.
 SUPPLIER_REFERENCE_DIMENSIONS = (
     ("SupplierBodyLength", BODY_LENGTH, "vertical"),
     ("SupplierFlangeThickness", FLANGE_THICK, "vertical"),

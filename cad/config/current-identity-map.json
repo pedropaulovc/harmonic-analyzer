@@ -62,8 +62,12 @@
       "new_identities": [
         {
           "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-leadscrew",
-          "number": "MHA-CH-06-TL-VN-54"
+          "stem": "ch-rocker-arm-tl-vn-oblique-leadscrew-kit",
+          "number": "MHA-CH-06-TL-VN-84",
+          "prior_stem": "ch-rocker-arm-tl-vn-oblique-leadscrew",
+          "prior_number": "MHA-CH-06-TL-VN-54",
+          "configuration": "LeadScrew",
+          "role": "LeadScrew"
         }
       ]
     },
@@ -174,8 +178,12 @@
       "new_identities": [
         {
           "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-carriage",
-          "number": "MHA-CH-06-TL-VN-51"
+          "stem": "ch-rocker-arm-tl-vn-oblique-rail-kit",
+          "number": "MHA-CH-06-TL-VN-83",
+          "prior_stem": "ch-rocker-arm-tl-vn-oblique-carriage",
+          "prior_number": "MHA-CH-06-TL-VN-51",
+          "configuration": "Carriage",
+          "role": "Carriage"
         }
       ]
     },
@@ -1986,8 +1994,12 @@
       "new_identities": [
         {
           "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-rail",
-          "number": "MHA-CH-06-TL-VN-50"
+          "stem": "ch-rocker-arm-tl-vn-oblique-rail-kit",
+          "number": "MHA-CH-06-TL-VN-83",
+          "prior_stem": "ch-rocker-arm-tl-vn-oblique-rail",
+          "prior_number": "MHA-CH-06-TL-VN-50",
+          "configuration": "Rail",
+          "role": "Rail"
         }
       ]
     },
@@ -2304,8 +2316,12 @@
       "new_identities": [
         {
           "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-feed-nut",
-          "number": "MHA-CH-06-TL-VN-82"
+          "stem": "ch-rocker-arm-tl-vn-oblique-leadscrew-kit",
+          "number": "MHA-CH-06-TL-VN-84",
+          "prior_stem": "ch-rocker-arm-tl-vn-oblique-feed-nut",
+          "prior_number": "MHA-CH-06-TL-VN-82",
+          "configuration": "FeedNut",
+          "role": "FeedNut"
         }
       ]
     }

@@ -282,15 +282,20 @@ async def save_member_part(
     part_name: str,
     configurations: Sequence[str],
     *,
-    material: str,
+    material: str | Mapping[str, str],
     readback: Callable[[Any, str], Awaitable[None]],
 ) -> dict[str, str]:
-    """Publish only a saved part whose actual member caches and metadata read clean."""
+    """Publish only a saved part whose actual member caches and metadata read clean.
+
+    ``material`` is one library material for every member, or a mapping that
+    names each member's own (a screw and its brass nut in one kit).
+    """
     names = require_member_configurations(part_name, configurations)
+    materials = _member_materials(names, material)
     for name in names:
         await activate_member(adapter, name)
         await readback(adapter, name)
-    require_material_in_every_configuration(adapter, part_name, material, names)
+    _require_member_materials(adapter, part_name, materials)
     await activate_member(adapter, names[0])
     artefacts = await save_part_and_images(adapter, part_name)
     _close_part(adapter)
@@ -309,7 +314,30 @@ async def save_member_part(
     for name in names:
         await activate_member(adapter, name)
         await readback(adapter, name)
-    require_material_in_every_configuration(adapter, part_name, material, names)
+    _require_member_materials(adapter, part_name, materials)
     await activate_member(adapter, names[0])
     await export_member_configurations(adapter, part_name, names)
     return artefacts
+
+
+def _member_materials(
+    names: Sequence[str], material: str | Mapping[str, str]
+) -> dict[str, str]:
+    if isinstance(material, str):
+        return dict.fromkeys(names, material)
+    if set(material) != set(names):
+        raise ValueError(
+            f"member materials {sorted(material)!r} differ from members {list(names)!r}"
+        )
+    return {name: material[name] for name in names}
+
+
+def _require_member_materials(
+    adapter: Any, part_name: str, materials: Mapping[str, str]
+) -> None:
+    """Read each member's material back, grouped by the material it must carry."""
+    by_material: dict[str, list[str]] = {}
+    for name, material in materials.items():
+        by_material.setdefault(material, []).append(name)
+    for material, names in by_material.items():
+        require_material_in_every_configuration(adapter, part_name, material, names)

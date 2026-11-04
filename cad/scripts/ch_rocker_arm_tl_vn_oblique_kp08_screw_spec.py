@@ -12,7 +12,7 @@ callout (``fasteners.callout``).
 
 Why a button head (owner ruling 2026-11-04, option b): the uxcell KP08's
 foot hole is the listing's Ø5, and the KP08 floats on its screws by
-``HOLE_FLOAT`` (0.75) while F1 aligns it.  The former #6-32 SHCS head
+``HOLE_FLOAT`` (0.75) while F1B aligns it.  The former #6-32 SHCS head
 (Ø.226) covered the hole by only 0.37 mm radially; the button head's Ø.262
 covers it by ``HEAD_OVER_HOLE`` (0.83), so it still bears on the foot at
 full float.
@@ -66,7 +66,7 @@ if abs(DIMS.major_dia - ROW.major_mm) > 1e-3:
     )
 
 # --- The head on the KP08 foot at full float -----------------------------------
-# The KP08 floats on its screws by the hole's radial clearance while F1
+# The KP08 floats on its screws by the hole's radial clearance while F1B
 # aligns it; the head's OD still covers the hole at that float. Its flat
 # bearing annulus (``DIMS.bearing_edge_r``, inside the band and its fillet)
 # reaches the hole's far edge at that float less HEAD_LAND_AT_FULL_FLOAT,

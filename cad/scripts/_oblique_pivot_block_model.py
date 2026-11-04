@@ -402,7 +402,7 @@ async def build_block_model(adapter, part) -> None:
              "feed nut screw taps (#4-40 through)",name="NutTaps",expect_dia_mm=part.NUT_TAP_DRILL,
              placement_dims=[((f"NutPlacement{i}U",None),(f"NutPlacement{i}V",None))
                              for i in range(1,len(part.NUT_HOLES_YZ)+1)])
-        # The taps are transferred through the TL-VN-82 nut at assembly:
+        # The taps are transferred through the TL-VN-84 FeedNut at assembly:
         # modelled where the nominal nut puts them.
         expected -= math.pi*(part.SCREW_CLEARANCE_DIA/2)**2*part.LUG_WIDTH
         expected -= len(part.NUT_HOLES_YZ)*math.pi*(part.NUT_TAP_DRILL/2)**2*part.LUG_WIDTH

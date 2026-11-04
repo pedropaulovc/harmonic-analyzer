@@ -96,7 +96,7 @@ def load_identity_map(path=IDENTITY_MAP, historical_path=HISTORICAL_IDENTITY_MAP
 
     aliases, identities, old_stems = {}, {}, set()
     prior_identities, prior_numbers = {}, {}
-    row_numbers = set()
+    row_numbers, kit_members = set(), {}
     contexts = {}
 
     def assign(alias, targets, generation, prior_stems):
@@ -128,17 +128,27 @@ def load_identity_map(path=IDENTITY_MAP, historical_path=HISTORICAL_IDENTITY_MAP
             if ((stem in identities and identities[stem] != number)
                     or (number is not None and number in numbers and numbers[number] != stem)):
                 raise ValueError(f"duplicate or conflicting current identity: {identity!r}")
-            if stem in identities and stem not in groups:
+            configuration = identity.get("configuration")
+            # A shared group's members, and a parent-scoped kit's configured
+            # members (the oblique jig's rail and leadscrew kits, #2187), share
+            # one stem, one member per configuration.
+            if stem in groups:
+                if (number != groups[stem]["number"]
+                        or configuration not in groups[stem]["configurations"]):
+                    raise ValueError(f"conflicting shared member identity: {identity!r}")
+            elif configuration is not None:
+                members = kit_members.setdefault(stem, set())
+                if ((stem in identities and not members) or configuration in members
+                        or not isinstance(configuration, str) or not configuration):
+                    raise ValueError(f"conflicting kit member identity: {identity!r}")
+                members.add(configuration)
+            elif stem in identities:
                 raise ValueError(f"duplicate current identity: {identity!r}")
             identities[stem] = number
             if number is not None:
                 numbers[number] = stem
-            configuration = None
-            if stem in groups:
-                group = groups[stem]
-                configuration = identity.get("configuration")
-                if (number != group["number"] or configuration not in group["configurations"]
-                        or not identity.get("prior_number") or not identity.get("role")):
+            if configuration is not None:
+                if not identity.get("prior_number") or not identity.get("role"):
                     raise ValueError(f"conflicting shared member identity: {identity!r}")
                 prior = identity.get("prior_stem")
                 _check_stems(prior)

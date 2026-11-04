@@ -7,6 +7,7 @@ configuration's quantity is never interpreted as a number of chains or kits.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
@@ -47,6 +48,7 @@ from _purchased_fastener_drawing import (
     _purchased_title_block,
     add_purchased_footer,
 )
+from _purchased_title_fit import fit_purchased_title_block
 
 
 def configuration_view_cells(index: int, count: int) -> tuple:
@@ -79,6 +81,32 @@ def configure_reference_views(
             )
 
 
+def turn_reference_views(
+    adapter: Any, configuration: str, views: list[Any], angle: float
+) -> None:
+    """Turn every view of one member by the same native angle before fitting.
+
+    A member longer than its cell lies along the cell's width instead: the
+    four views keep one common turn, so they still read as one member.
+    """
+    if not math.isfinite(angle):
+        raise ValueError(f"{configuration}: reference view angle must be finite")
+    for view in views:
+        view.Angle = angle
+    rebuild_drawing(adapter, label=f"{configuration} reference view turn")
+    require_reference_view_angle(configuration, views, angle)
+
+
+def require_reference_view_angle(
+    configuration: str, views: list[Any], angle: float
+) -> None:
+    for view in views:
+        if abs(math.remainder(float(view.Angle) - angle, 2.0 * math.pi)) > 1e-9:
+            raise RuntimeError(
+                f"{configuration}: native reference view angle did not persist"
+            )
+
+
 async def build_purchased_variant_drawing(
     adapter: Any,
     spec: DrawingSpec,
@@ -93,6 +121,10 @@ async def build_purchased_variant_drawing(
     ] | None = None,
     additional_sheet_scales: Mapping[str, tuple[float, float]] | None = None,
     append_sheets: Callable[[Any], tuple[Callable[[], None], ...]] | None = None,
+    additional_sheets_title: str = "Member Rework",
+    notes: str = "",
+    title_fit: bool = False,
+    view_angles: Mapping[str, float] | None = None,
     unit: str = "mm",
 ) -> dict[str, str]:
     """Draw purchased-member references, with separately scoped rework sheets.
@@ -110,6 +142,13 @@ async def build_purchased_variant_drawing(
     follow (and never replace) the complete purchased-reference sheet checks.
     ``general_text`` overrides only the footer's general line, retaining its
     native text/extent checks; None keeps the ``cut_to_suit``-selected default.
+    ``notes`` prints a member note in the footer's notes lines (rule 7's
+    budget); ``additional_sheets_title`` names what the appended sheets carry
+    in the PDF title and summary. ``title_fit`` fits the reference sheet's
+    Name, Material and DWG. NO. in their native cells
+    (``fit_purchased_title_block``) and re-proves them settled.
+    ``view_angles`` turns all four views of a named member by one native
+    angle (radians) before fitting; other members stay unturned.
     """
     if (additional_sheet_scales is None) != (append_sheets is None):
         raise ValueError("additional sheets require both scales and an author")
@@ -122,6 +161,9 @@ async def build_purchased_variant_drawing(
         configuration: configuration_view_cells(index, len(variants))
         for index, (configuration, _) in enumerate(variants)
     }
+    view_angles = dict(view_angles or {})
+    if set(view_angles) - set(configurations):
+        raise ValueError("reference view angles must name depicted configurations")
     source = spec.source
     if spec.source_kind != "part" or not source.is_file():
         raise FileNotFoundError(
@@ -178,7 +220,8 @@ async def build_purchased_variant_drawing(
     )
     title = (
         f"{row['title']} — Configured Purchased Part Reference"
-        f"{' and Member Rework' if append_sheets is not None else ''} Drawing"
+        f"{f' and {additional_sheets_title}' if append_sheets is not None else ''}"
+        " Drawing"
     )
     stamp_drawing_summary(
         adapter,
@@ -186,7 +229,8 @@ async def build_purchased_variant_drawing(
         {
             0: title,
             1: (
-                "Harmonic Analyzer purchased-part identification and member rework"
+                "Harmonic Analyzer purchased-part identification and "
+                f"{additional_sheets_title.lower()}"
                 if append_sheets is not None
                 else "Harmonic Analyzer purchased-part identification; reference only"
             ),
@@ -209,6 +253,10 @@ async def build_purchased_variant_drawing(
             for orientation, center, _ in cells
         ]
         configure_reference_views(adapter, configuration, views)
+        if configuration in view_angles:
+            turn_reference_views(
+                adapter, configuration, views, view_angles[configuration]
+            )
         for view in views:
             set_hidden_lines_removed(adapter, view)
         groups.append((configuration, label, cells, views))
@@ -295,6 +343,7 @@ async def build_purchased_variant_drawing(
             draw,
             properties,
             item=item,
+            notes=notes,
             cut_to_suit=cut_to_suit,
             general_text=general_text,
             label=spec.artifact_stem,
@@ -316,6 +365,11 @@ async def build_purchased_variant_drawing(
         False,
     )
     sheet.CustomPropertyView = first_view_name
+    title_check = None
+    if title_fit:
+        # The title links resolve, and their extents are measurable, after rebuild.
+        rebuild_drawing(adapter, label=f"{spec.artifact_stem} title-block fit")
+        title_check = fit_purchased_title_block(adapter, spec=spec)
 
     def assert_reference_sheet() -> None:
         if reference_sheet_name is not None and not _early_bound(
@@ -358,6 +412,10 @@ async def build_purchased_variant_drawing(
                 or tuple(view.ScaleRatio) != scale
             ):
                 raise RuntimeError(f"{configuration}: configured source/scale changed")
+            if configuration in view_angles:
+                require_reference_view_angle(
+                    configuration, [view], view_angles[configuration]
+                )
             box = _box(view.GetOutline(), label=configuration)
             if not _inside(box, cell) or not _inside(box, border):
                 raise RuntimeError(
@@ -385,6 +443,8 @@ async def build_purchased_variant_drawing(
                     f"configured purchased note leaves its reserved space: {linked!r}; "
                     f"extent_m={box!r}, reserved_m={cell!r}, border_m={border!r}"
                 )
+        if title_check is not None:
+            title_check()
 
     additional_checks = ()
     if append_sheets is not None:

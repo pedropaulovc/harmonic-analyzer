@@ -171,7 +171,7 @@ VIEW_SHEET_REF_OFFSET = (-.010, -.008)
 # Nut interface, VIEW D, *Left at 2:1 on a 2:1 sheet, at .190,.175: Z runs
 # right from the bottom face at x 165.7, Y=0 prints at y 223, the lug end
 # (Y -68) at y 87; the clearance's axis at 190.5,113, the four taps
-# transferred from TL-VN-82 on its diagonals at x 179.2 / 201.8, y 101.7 /
+# transferred from the TL-VN-84 FeedNut on its diagonals at x 179.2 / 201.8, y 101.7 /
 # 124.3. The clearance stands from the lug end / carriage-face corner. Left
 # of the view: the clearance's .515 (x 104) and, under the lug end, the
 # 12.400 mm height, its three rows outboard left of the bottom face's
@@ -248,7 +248,7 @@ def _cut_face_only(adapter, view, letter: str, anchor: tuple[float, float, float
     """Print only the cut face (rule 9): on TL-32 a line run past the part
     also printed the lug or the block beyond the plane, 88 mm tall (farm run
     20261027T190843112Z). R2026x declares the setter void; only its bool
-    getter is truth-tested (draw_ch_rocker_arm_tl_vn_oblique_leadscrew).
+    getter is truth-tested (draw_ch_rocker_arm_tl_vn_oblique_leadscrew_kit).
     The view keeps the place SolidWorks centred on the larger outline, and
     the centre mark of a hole beyond the plane (farm run
     20261027T192802646Z), so the marks go and the view moves until the model
@@ -289,7 +289,7 @@ def _place_caption(adapter, view, target, letter: str, sheet_scale) -> None:
     """Move the section's native caption so its box's top centre lands on
     ``target``: it kept its place under the larger outline, on the title
     block (farm run 20261027T195248081Z). The sheet scale is pinned first so
-    finalization cannot move it after (draw_ch_rocker_arm_tl_vn_oblique_leadscrew
+    finalization cannot move it after (draw_ch_rocker_arm_tl_vn_oblique_leadscrew_kit
     ``_place_view_caption``)."""
     label = f'section {letter} caption'
     sheet = _early_bound(_early_bound(adapter.currentModel, 'IDrawingDoc').GetCurrentSheet(), 'ISheet')

@@ -6,10 +6,11 @@ so the jig assembly can mate it and run native interference: the
 ``#4-40 X 5/8 FLAT HEAD`` that holds the TL-24 riser to the TL-21 carrier,
 tapped THRU; the head seats on the riser's 82 deg countersink.  It is the C4
 fastener table's ``RISER_TO_CARRIER`` row.  The same screw is the
-``NUT_TO_FEED_BLOCK`` row: four more hold the TL-VN-82 brass feed nut to the
-TL-32 lug, their heads seated in the 82 deg countersinks cut in the nut's
-flange at fit-up (owner ruling 2026-11-04, relayed by Main: a screw the repo
-already uses; ``ch_rocker_arm_tl_vn_oblique_feed_nut_spec`` owns that seat
+``NUT_TO_FEED_BLOCK`` row: four more hold the brass feed nut (the TL-VN-84
+leadscrew kit's FeedNut) to the TL-32 lug, their heads seated in the 82 deg
+countersinks cut in the nut's flange at fit-up (owner ruling 2026-11-04,
+relayed by Main: a screw the repo already uses;
+``ch_rocker_arm_tl_vn_oblique_leadscrew_kit_feed_nut_spec`` owns that seat
 and its engagement).  It is one row on the jig's BOM, ``QUANTITY`` both
 rows' count; the shop inventory carries no screw stock (no
 ``INVENTORY_ID``), and the assembly steps cite it by item and callout

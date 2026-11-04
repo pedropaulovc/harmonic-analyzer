@@ -45,7 +45,7 @@ import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_oblique_feed_lever_spec as feed_lever
 import ch_rocker_arm_tl_oblique_feed_block_spec as feed_block
-import ch_rocker_arm_tl_vn_oblique_feed_nut_spec as feed_nut
+import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_feed_nut_spec as feed_nut
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_riser_spec as riser
@@ -182,7 +182,7 @@ KP08_TO_BRACKET = Fastener(
     leadscrew.BRACKET_THICK,  # tapped THRU
 )
 NUT_TO_FEED_BLOCK = Fastener(
-    "TL-VN-82 feed nut to TL-32 feed block",
+    "TL-VN-84 FeedNut to TL-32 feed block",
     feed_nut.SCREW_THREAD,
     FLAT_HEAD,
     feed_nut.SCREW_LENGTH_TEXT,

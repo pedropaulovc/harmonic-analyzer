@@ -1996,7 +1996,7 @@ build):
 
 **Vendor-part builds are actionable.** An actual vendor-part `part:` build (its
 stem contains `_vn_`, such as `part:sm_vn_counter_spring` or
-`part:ch_rocker_arm_tl_vn_oblique_rail`) emits a
+`part:ch_rocker_arm_tl_vn_oblique_rail_kit`) emits a
 `!!` / OTel `WARN` immediately before its COM execution, with structured `label`
 and `cache.key` (the 12-character prefix shared with phase spans and the console),
 plus the full `key_full` for correlation with cache events and recipe manifests.

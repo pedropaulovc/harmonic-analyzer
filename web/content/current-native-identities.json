@@ -836,15 +836,23 @@
       "sourceStem": "ch-rocker-arm-tl-oblique-rail",
       "sourceNumber": "MHA-CH-006-TL-30",
       "parent": "ch-rocker-arm-tl-oblique-jig",
-      "stem": "ch-rocker-arm-tl-vn-oblique-rail",
-      "number": "MHA-CH-06-TL-VN-50"
+      "stem": "ch-rocker-arm-tl-vn-oblique-rail-kit",
+      "number": "MHA-CH-06-TL-VN-83",
+      "configuration": "Rail",
+      "role": "Rail",
+      "priorStem": "ch-rocker-arm-tl-vn-oblique-rail",
+      "priorNumber": "MHA-CH-06-TL-VN-50"
     },
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-carriage",
       "sourceNumber": "MHA-CH-006-TL-31",
       "parent": "ch-rocker-arm-tl-oblique-jig",
-      "stem": "ch-rocker-arm-tl-vn-oblique-carriage",
-      "number": "MHA-CH-06-TL-VN-51"
+      "stem": "ch-rocker-arm-tl-vn-oblique-rail-kit",
+      "number": "MHA-CH-06-TL-VN-83",
+      "configuration": "Carriage",
+      "role": "Carriage",
+      "priorStem": "ch-rocker-arm-tl-vn-oblique-carriage",
+      "priorNumber": "MHA-CH-06-TL-VN-51"
     },
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-cl-dowel",
@@ -857,8 +865,12 @@
       "sourceStem": "ch-rocker-arm-tl-oblique-leadscrew",
       "sourceNumber": "MHA-CH-006-TL-34",
       "parent": "ch-rocker-arm-tl-oblique-jig",
-      "stem": "ch-rocker-arm-tl-vn-oblique-leadscrew",
-      "number": "MHA-CH-06-TL-VN-54"
+      "stem": "ch-rocker-arm-tl-vn-oblique-leadscrew-kit",
+      "number": "MHA-CH-06-TL-VN-84",
+      "configuration": "LeadScrew",
+      "role": "LeadScrew",
+      "priorStem": "ch-rocker-arm-tl-vn-oblique-leadscrew",
+      "priorNumber": "MHA-CH-06-TL-VN-54"
     },
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-pillow-block",
@@ -995,8 +1007,12 @@
       "sourceStem": "ch-rocker-arm-tl-vn-oblique-feed-nut",
       "sourceNumber": null,
       "parent": "ch-rocker-arm-tl-oblique-jig",
-      "stem": "ch-rocker-arm-tl-vn-oblique-feed-nut",
-      "number": "MHA-CH-06-TL-VN-82"
+      "stem": "ch-rocker-arm-tl-vn-oblique-leadscrew-kit",
+      "number": "MHA-CH-06-TL-VN-84",
+      "configuration": "FeedNut",
+      "role": "FeedNut",
+      "priorStem": "ch-rocker-arm-tl-vn-oblique-feed-nut",
+      "priorNumber": "MHA-CH-06-TL-VN-82"
     }
   ],
   "archivedAliases": [
@@ -1045,7 +1061,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "eb553831cff2ef3f3e76ddba524fd8dbf62ae4fcd6da69bb04aacddce572fe15",
+  "currentRegistryMapSha256": "c2b0e7d88dec54abcab0a1881fea27df07d1974b3b32afffa5ab3195ebab4733",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",

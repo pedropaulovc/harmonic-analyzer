@@ -101,7 +101,7 @@ ASM_NAME = "ch-rocker-arm-tl-oblique-jig"
 assert ASM_NAME == spec.ASM_NAME, (ASM_NAME, spec.ASM_NAME)
 # Literal (physical filename, logical family) rows: the build graph reads the
 # first field syntactically, never through a spec-derived or generated filename.
-# Repeated kit files are one producer and three separately configured BOM rows.
+# A repeated kit file is one producer with one configured BOM row per member.
 _PARTS = (
     ("ch-rocker-arm-tl-oblique-base-bar", "ch-rocker-arm-tl-oblique-base-bar"),
     ("ch-rocker-arm-tl-oblique-carrier", "ch-rocker-arm-tl-oblique-carrier"),
@@ -114,11 +114,11 @@ _PARTS = (
     ("ch-rocker-arm-tl-vn-oblique-hub-pin", "ch-rocker-arm-tl-vn-oblique-hub-pin"),
     ("ch-rocker-arm-tl-oblique-feed-lever", "ch-rocker-arm-tl-oblique-feed-lever"),
     ("ch-rocker-arm-tl-oblique-end-bracket", "ch-rocker-arm-tl-oblique-end-bracket"),
-    ("ch-rocker-arm-tl-vn-oblique-rail", "ch-rocker-arm-tl-vn-oblique-rail"),
-    ("ch-rocker-arm-tl-vn-oblique-carriage", "ch-rocker-arm-tl-vn-oblique-carriage"),
+    ("ch-rocker-arm-tl-vn-oblique-rail-kit", "ch-rocker-arm-tl-vn-oblique-rail-kit--Rail"),
+    ("ch-rocker-arm-tl-vn-oblique-rail-kit", "ch-rocker-arm-tl-vn-oblique-rail-kit--Carriage"),
     ("ch-rocker-arm-tl-vn-oblique-cl-dowel", "ch-rocker-arm-tl-vn-oblique-cl-dowel"),
-    ("ch-rocker-arm-tl-vn-oblique-leadscrew", "ch-rocker-arm-tl-vn-oblique-leadscrew"),
-    ("ch-rocker-arm-tl-vn-oblique-feed-nut", "ch-rocker-arm-tl-vn-oblique-feed-nut"),
+    ("ch-rocker-arm-tl-vn-oblique-leadscrew-kit", "ch-rocker-arm-tl-vn-oblique-leadscrew-kit--LeadScrew"),
+    ("ch-rocker-arm-tl-vn-oblique-leadscrew-kit", "ch-rocker-arm-tl-vn-oblique-leadscrew-kit--FeedNut"),
     ("ch-rocker-arm-tl-vn-oblique-pillow-block", "ch-rocker-arm-tl-vn-oblique-pillow-block"),
     ("ch-rocker-arm-tl-vn-oblique-handwheel", "ch-rocker-arm-tl-vn-oblique-handwheel"),
     ("sh-vn-clamping-kit-hardware", "sh-vn-clamping-kit-hardware--HoldDownStud"),
@@ -228,14 +228,15 @@ def _verify_kit_references(adapter: Any, placed_names: dict[str, str]) -> None:
         )
 
 
-async def _mate_carriages(adapter: Any) -> None:
+async def _mate_carriages(adapter: Any, names: dict[str, str]) -> None:
     """Each carriage rides its rail (Front and Top planes coincident: the
     frames coincide by construction). Carriage 1's slide is the sweep's one
     DOF: recorded for verify's replays, never authored; carriage 2's is
-    driven through the carrier."""
+    driven through the carrier. ``names`` maps each selector to the native
+    name its placement returned (kit members are role references)."""
     for index, (origin, _carriage_rows) in enumerate(spec.CARRIAGE_PLACEMENTS):
-        carriage = spec.instance_name(spec.CARRIAGE, index)
-        rail = spec.instance_name(spec.RAIL, index)
+        carriage = names[spec.instance_name(spec.CARRIAGE, index)]
+        rail = names[spec.instance_name(spec.RAIL, index)]
         for plane in ("Front Plane", "Top Plane"):
             await coincident_mate(
                 adapter,
@@ -245,10 +246,10 @@ async def _mate_carriages(adapter: Any) -> None:
                 verify=(carriage, list(origin)),
             )
     index = spec.RAILS.index(spec.SLIDE_RAIL)
-    carriage = spec.instance_name(spec.CARRIAGE, index)
+    carriage = names[spec.instance_name(spec.CARRIAGE, index)]
     await distance_driver(
         adapter,
-        named_ref(f"Right Plane@{spec.instance_name(spec.RAIL, index)}", "PLANE"),
+        named_ref(f"Right Plane@{names[spec.instance_name(spec.RAIL, index)]}", "PLANE"),
         named_ref(f"Right Plane@{carriage}", "PLANE"),
         spec.slide_distance(spec.CARRIAGE_STATION),
         label=f"carriage {spec.SLIDE_RAIL} slide on rail {spec.SLIDE_RAIL}",
@@ -257,12 +258,14 @@ async def _mate_carriages(adapter: Any) -> None:
     )
 
 
-async def _lock_families(adapter: Any, families: list[str]) -> None:
+async def _lock_families(
+    adapter: Any, families: list[str], names: dict[str, str]
+) -> None:
     """Lock-mate every instance of ``families`` to what carries it."""
     for stem in families:
         for index in range(spec.QUANTITIES[stem]):
-            child = spec.instance_name(stem, index)
-            parent = spec.lock_parent(stem, index)
+            child = names[spec.instance_name(stem, index)]
+            parent = names[spec.lock_parent(stem, index)]
             await lock_mate(
                 adapter,
                 named_ref(f"Front Plane@{child}", "PLANE"),
@@ -834,20 +837,23 @@ async def build(adapter) -> dict[str, str]:
     # The carriages on their rails; what rides a carriage, a pivot block or
     # the nut bracket locked to it; the carrier on the pins; its riders
     # locked to it.
-    await _mate_carriages(adapter)
+    await _mate_carriages(adapter, placed_names)
     def _rides_carrier(parents: tuple[tuple[str, int], ...]) -> bool:
         return any(parent == spec.CARRIER for parent, _n in parents)
 
     carried = [stem for stem, parents in spec.LOCKED_TO.items() if not _rides_carrier(parents)]
     riders = [stem for stem, parents in spec.LOCKED_TO.items() if _rides_carrier(parents)]
-    await _lock_families(adapter, carried)
+    await _lock_families(adapter, carried, placed_names)
     await _mate_carrier(adapter)
-    await _lock_families(adapter, riders)
+    await _lock_families(adapter, riders, placed_names)
     # The mates solved in place: every moving instance is still at its pose.
     for moving in spec.MOVING:
         for index, (origin, rows) in enumerate(spec.PLACEMENTS[moving]):
             assert_component_placed(
-                adapter, spec.instance_name(moving, index), list(origin), _rows(rows)
+                adapter,
+                placed_names[spec.instance_name(moving, index)],
+                list(origin),
+                _rows(rows),
             )
     _telemetry.info(
         f"jig at the {spec.PASS} pass, theta {spec.THETA:g}: pins at station "
@@ -857,11 +863,19 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # One free DOF, the sweep: every moving family reads under-constrained
-    # (a rider a mate silently fixed fails) and nothing else does.
+    # (a rider a mate silently fixed fails) and nothing else does. A moving
+    # kit member shares its file with a fixed one (Carriage with Rail, FeedNut
+    # with LeadScrew), so each of its own occurrences must read free too.
     assert_free_dof_necessity(
         adapter,
         1,
-        required_stems=spec.MOVING,
+        required_stems=spec.MOVING_STEMS,
+        required_instances=tuple(
+            placed_names[spec.instance_name(family, index)]
+            for family in spec.MOVING
+            if family in spec.KIT_IDENTITIES
+            for index in range(spec.QUANTITIES[family])
+        ),
         allowed_stems=allowed_free_stems(ASM_NAME),
     )
     write_dof_manifest(ASM_NAME)

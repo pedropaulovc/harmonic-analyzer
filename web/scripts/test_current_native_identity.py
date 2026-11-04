@@ -333,6 +333,45 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
         self.assertEqual(project_current_native_path(PREFIX + "pd-paper-drive/vn-latch-hook-rivet-1"),
                          PREFIX + "pd-paper-drive/pd-vn-latch-hook-rivet-1")
 
+    def test_jig_kit_members_project_to_configured_parent_scoped_kits(self):
+        # #2187 owner ruling: one parent-scoped native part per multi-member
+        # Amazon kit; the members' former Numbers stay prior and never return.
+        jig = "ch-rocker-arm-tl-oblique-jig"
+        cases = (
+            ("ch-rocker-arm-tl-oblique-rail", "MHA-CH-006-TL-30", "ch-rocker-arm-tl-vn-oblique-rail",
+             "MHA-CH-06-TL-VN-50", "ch-rocker-arm-tl-vn-oblique-rail-kit", "MHA-CH-06-TL-VN-83", "Rail"),
+            ("ch-rocker-arm-tl-oblique-carriage", "MHA-CH-006-TL-31", "ch-rocker-arm-tl-vn-oblique-carriage",
+             "MHA-CH-06-TL-VN-51", "ch-rocker-arm-tl-vn-oblique-rail-kit", "MHA-CH-06-TL-VN-83", "Carriage"),
+            ("ch-rocker-arm-tl-oblique-leadscrew", "MHA-CH-006-TL-34", "ch-rocker-arm-tl-vn-oblique-leadscrew",
+             "MHA-CH-06-TL-VN-54", "ch-rocker-arm-tl-vn-oblique-leadscrew-kit", "MHA-CH-06-TL-VN-84", "LeadScrew"),
+            ("ch-rocker-arm-tl-vn-oblique-feed-nut", None, "ch-rocker-arm-tl-vn-oblique-feed-nut",
+             "MHA-CH-06-TL-VN-82", "ch-rocker-arm-tl-vn-oblique-leadscrew-kit", "MHA-CH-06-TL-VN-84", "FeedNut"),
+        )
+        cad_map = json.loads((ROOT / "cad/config/current-identity-map.json").read_text(encoding="utf-8"))
+        mapped = sorted(
+            (row["old_stem"], row["old_number"], target["prior_stem"], target["prior_number"],
+             target["stem"], target["number"], target["configuration"])
+            for row in cad_map["parts_and_assemblies"] for target in row["new_identities"]
+            if target["stem"].endswith(("-rail-kit", "-leadscrew-kit")))
+        self.assertEqual(mapped, sorted(cases))
+        active = {target["number"] for row in cad_map["parts_and_assemblies"]
+                  for target in row["new_identities"]}
+        identity = CurrentNativeIdentity()
+        for source, source_number, prior, prior_number, kit, number, configuration in cases:
+            with self.subTest(member=configuration):
+                self.assertNotIn(prior_number, active)
+                expected = PREFIX + jig + "/" + kit + "--" + configuration + "-2"
+                for stem in (source, prior, kit + "--" + configuration):
+                    self.assertEqual(identity.project_path(PREFIX + jig + "/" + stem + "-2"), expected)
+                for value, stem in ((source_number, source), (prior_number, prior),
+                                    (number, kit + "--" + configuration + "-2")):
+                    if value is not None:
+                        self.assertEqual(identity.project_number(value, stem, jig), number)
+        for ambiguous in ("ch-rocker-arm-tl-vn-oblique-rail-kit-1",
+                          "ch-rocker-arm-tl-vn-oblique-rail-kit--FeedNut-1"):
+            with self.assertRaises(ValueError):
+                identity.project_path(PREFIX + jig + "/" + ambiguous)
+
     def test_all_five_default_shared_groups_keep_native_variants_idempotently(self):
         default_numbers = {"MHA-SH-VN-51", "MHA-SH-VN-52", "MHA-SH-VN-53",
                            "MHA-SH-VN-54", "MHA-SH-VN-55"}

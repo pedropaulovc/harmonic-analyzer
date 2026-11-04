@@ -798,7 +798,7 @@ def test_every_bom_row_carries_one_balloon() -> None:
     walked = {
         stem: anchor
         for stem, anchor in drawing.BALLOON_ANCHORS.items()
-        if stem not in {spec.BASE_BAR, spec.RAIL} and stem not in spec.KIT_IDENTITIES
+        if stem not in {spec.BASE_BAR, spec.RAIL_SCREW} and stem not in spec.KIT_IDENTITIES
     }
     assert all(
         anchor.instance is None and anchor.point_mm is None
@@ -828,6 +828,22 @@ def test_every_bom_row_carries_one_balloon() -> None:
     assert stud.instance == spec.instance_name(spec.HOLD_DOWN_STUD, last)
     assert spec.STUD_XY[last] == spec.trammel.rail_point(2, *spec.trammel.HOLD_DOWN_STUDS[-1])
     assert stud.point_mm is None
+    # TL-00 review (farm 20261104T210601055Z): balloon 22 lands on rail 1's
+    # outboard-end screw, the last hole's, on its head's top rim (the
+    # screw's part frame: head up +Y, bearing face at 0), not across the
+    # T-nut, bar and rail on the spindle-end screw.
+    screw = drawing.BALLOON_ANCHORS[spec.RAIL_SCREW]
+    last_hole = len(spec.guide_rail.HOLE_X) - 1
+    assert screw.instance == spec.instance_name(spec.RAIL_SCREW, last_hole)
+    origin, _rows = spec.RAIL_SCREW_PLACEMENTS[last_hole]
+    assert origin == pytest.approx(spec.compose(
+        spec.RAIL_PLACEMENTS[0],
+        (spec.guide_rail.HOLE_X[-1], 0.0, spec.trammel.RAIL_SCREW_SEAT_ABOVE_BASE),
+        spec.UPRIGHT_ROWS,
+    )[0])
+    dims = spec.rail_screw.DIMS
+    x, y, z = screw.point_mm
+    assert (x, y, z) == (dims.head_dia / 2.0, dims.head_h, 0.0)
     assert drawing.BALLOON_RING_REACH == (
         drawing.BALLOON_MARGIN + drawing.BALLOON_RADIUS
     )
@@ -871,8 +887,17 @@ def test_bom_identity_is_the_registry() -> None:
         assert drawing.BOM_PART_NUMBERS[stem] == _config.parts(physical)["number"]
     assert set(drawing.BOM_PART_NUMBERS) == set(spec.BOM_ORDER)
     assert drawing.BOM_COMPONENT_IDENTITIES == spec.COMPONENT_IDENTITIES
-    assert {drawing.BOM_PART_NUMBERS[family] for family in spec.KIT_IDENTITIES} == {
-        "MHA-SH-VN-57"
+    # Every member of a kit prints its kit's one Number.
+    assert {
+        family: drawing.BOM_PART_NUMBERS[family] for family in spec.KIT_IDENTITIES
+    } == {
+        spec.RAIL: "MHA-CH-06-TL-VN-83",
+        spec.CARRIAGE: "MHA-CH-06-TL-VN-83",
+        spec.LEADSCREW: "MHA-CH-06-TL-VN-84",
+        spec.FEED_NUT: "MHA-CH-06-TL-VN-84",
+        spec.HOLD_DOWN_STUD: "MHA-SH-VN-57",
+        spec.T_NUT: "MHA-SH-VN-57",
+        spec.FLANGE_NUT: "MHA-SH-VN-57",
     }
     assert drawing.BOM_ITEM_NUMBERS == {
         stem: str(item) for item, stem in enumerate(spec.BOM_ORDER, 1)
@@ -1316,11 +1341,19 @@ def test_bom_prints_registry_numbers_one_line_a_row(
     assert set(table.association_configurations) == {
         drawing.SIMPLIFIED_VIEW_CONFIGURATION
     }
-    kit_rows = [
-        table.cells[int(spec.ITEM_NUMBERS[family])] for family in spec.KIT_IDENTITIES
-    ]
-    assert [row[1] for row in kit_rows] == ["MHA-SH-VN-57"] * 3
-    assert [row[3] for row in kit_rows] == ["4"] * 3
+    kit_rows = {
+        family: table.cells[int(spec.ITEM_NUMBERS[family])][1::2]
+        for family in spec.KIT_IDENTITIES
+    }
+    assert kit_rows == {
+        spec.RAIL: ["MHA-CH-06-TL-VN-83", "2"],
+        spec.CARRIAGE: ["MHA-CH-06-TL-VN-83", "2"],
+        spec.LEADSCREW: ["MHA-CH-06-TL-VN-84", "1"],
+        spec.FEED_NUT: ["MHA-CH-06-TL-VN-84", "1"],
+        spec.HOLD_DOWN_STUD: ["MHA-SH-VN-57", "4"],
+        spec.T_NUT: ["MHA-SH-VN-57", "4"],
+        spec.FLANGE_NUT: ["MHA-SH-VN-57", "4"],
+    }
     assert attrs["anchor_mm"] == pytest.approx(
         tuple(value * 1000.0 for value in drawing.BOM_ANCHOR)
     )
@@ -1433,27 +1466,44 @@ def test_bom_refuses_native_row_growth_past_the_bottom_border(
 def test_kit_bom_key_uses_registry_identity_and_native_item_mapping(
     native_bom_bindings,
 ):
-    # Reversed native rows prove the citations are not copied from spec item 18-20.
+    # Reversed native rows prove the citations are not copied from spec items.
     order = tuple(reversed(spec.BOM_ORDER))
     table = _Table(order)
     text = drawing._kit_bom_note_text(
         table, configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION
     )
-    registry = _config.parts(spec.CLAMPING_KIT)
-    assert registry["number"] in text
-    assert str(registry["supplier"]).upper() in text
-    assert all(sku in text for sku in registry["supplier_skus"])
-    for family, (_physical, member) in spec.KIT_IDENTITIES.items():
-        [citation] = [line for line in text.splitlines() if member in line]
-        assert f"ITEM {order.index(family) + 1}:" in citation
-        assert f"({registry['configuration_quantities'][member]})" in citation
-    assert "CONFIGURATIONS" in text and "INSTALLED QTY." in text
-    assert "MEMBERS, NOT KITS" in text
+    lines = text.splitlines()
+    assert lines[0] == "PURCHASED KITS, MEMBER CONFIGURATIONS (INSTALLED QTY.):"
+    assert lines[-1] == "BOM QTY. COUNTS MEMBERS, NOT KITS."
+    assert max(map(len, lines)) <= drawing.KIT_KEY_LINE_WIDTH
+    kits: dict[str, list[tuple[str, str]]] = {}
+    for family, (physical, member) in spec.KIT_IDENTITIES.items():
+        kits.setdefault(physical, []).append((family, member))
+    assert list(kits) == [spec.RAIL_KIT, spec.LEADSCREW_KIT, spec.CLAMPING_KIT]
+    # One block per kit: its Number, supplier and SKU, then its members.
+    starts = []
+    for physical in kits:
+        registry = _config.parts(physical)
+        [sku] = registry["supplier_skus"]
+        starts.append(lines.index(
+            f"{registry['number']}, {str(registry['supplier']).upper()} SKU {sku}:"
+        ))
+    assert starts[0] == 1 and starts == sorted(starts)
+    for (physical, members), start, end in zip(kits.items(), starts, [*starts[1:], len(lines) - 1]):
+        quantities = _config.parts(physical)["configuration_quantities"]
+        cited = "; ".join(lines[start + 1:end]).split("; ")
+        assert sorted(cited) == sorted(
+            f"ITEM {order.index(family) + 1}: {member} ({quantities[member]})"
+            for family, member in members
+        )
+    # The two Amazon kits and the clamping kit each print their own SKU.
+    assert "B0C4DJNL33" in text and "B085DDHJTW" in text and "52PCCK-9/16-14mm" in text
 
 
 class _KitBomNote:
-    """Native-style note geometry with a nonzero insertion-to-extent offset;
-    ``drift`` moves its ink once it has been seated."""
+    """Native-style note geometry with a nonzero insertion-to-extent offset and
+    the farm-measured ink height of its line count; ``drift`` moves its ink
+    once it has been seated."""
 
     def __init__(self, text, xy, *, width, move, drift=(0.0, 0.0)):
         self.text = text
@@ -1475,7 +1525,8 @@ class _KitBomNote:
     def GetExtent(self):
         x, y, _z = self.position
         x, y = x + self.drift[0], y + self.drift[1]
-        return x + 0.005, y - 0.036, 0.0, x + 0.005 + self.width, y + 0.002, 0.0
+        bottom = y + 0.002 - drawing.note_ink_height(self.text)
+        return x + 0.005, bottom, 0.0, x + 0.005 + self.width, y + 0.002, 0.0
 
     def GetText(self):
         return self.text.replace("\n", "\r\n")
@@ -1535,6 +1586,8 @@ def test_kit_bom_key_measured_extent_clears_native_neighbors(kit_bom_note_state)
     state = kit_bom_note_state
     settled = drawing._place_kit_bom_note(_ADAPTER, state.table, state.reference)
     [note] = state.notes
+    # Three kits: a heading, three blocks of two lines and the closing line.
+    assert len(note.text.splitlines()) == 9
     extent = drawing._kit_bom_note_extent(note)
     bom = drawing._bom_bounds(state.table)
     field = drawing.kit_bom_note_region(bom, state.outline)
@@ -1546,7 +1599,8 @@ def test_kit_bom_key_measured_extent_clears_native_neighbors(kit_bom_note_state)
     settled()
     for family in spec.KIT_IDENTITIES:
         row = state.table.cells[int(spec.ITEM_NUMBERS[family])]
-        assert row[1] == drawing.BOM_PART_NUMBERS[family] and row[3] == "4"
+        assert row[1] == drawing.BOM_PART_NUMBERS[family]
+        assert row[3] == str(spec.QUANTITIES[family])
 
 
 @pytest.mark.parametrize("fault", ("oversized", "ignored", "refused"))

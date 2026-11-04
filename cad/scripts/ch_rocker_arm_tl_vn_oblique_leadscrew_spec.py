@@ -217,7 +217,7 @@ HUB_GAP = 11.0
 FEED_GAP = 2.5  # feed lug/nut to KP08 envelope at a travel stop (TL-32 checks)
 NEAR_STUB = 2.0  # screw past the near KP08's outer face, as fitted (step 7)
 NEAR_STUB_MIN = 1.0  # at least
-# The screw's set-screw flat, centred on the handwheel's grub (TL-VN-54).
+# The screw's set-screw flat, centred on the handwheel's grub (TL-VN-84 LeadScrew).
 SCREW_FLAT_LENGTH = 8.0
 HANDWHEEL_GRUB_MAJOR = float(HANDWHEEL_GRUB.removeprefix("M"))
 # The screw in the handwheel's bore, at least: past the grub's far flank and
