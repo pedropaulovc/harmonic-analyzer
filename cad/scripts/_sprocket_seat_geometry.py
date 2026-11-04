@@ -71,8 +71,10 @@ DRIVE_PIN_PROUD = 2.4
 DRIVE_PIN_TIP_Z = SEAT_FACE_Z - DRIVE_PIN_PROUD  # -156.7
 DRIVE_PIN_HOLE_DIA = 2.38  # reamed for the press (3/32 nominal)
 # Light press of the hardened 3/32 dowel; the shafts retain their own
-# catalogue-diameter and interference checks.
-DRIVE_PIN_HOLE_BAND = (0.000, -0.010)
+# catalogue-diameter and interference checks.  On the inch grid the
+# crankshaft's sheet prints (+.0000/-.0004; #290, after the PD batch #2124
+# left the crankshaft its only reader).
+DRIVE_PIN_HOLE_BAND = (0.0, -0.01016)
 # The shared 98381A stock dowel family's +/-0.010 in length grade.
 DRIVE_PIN_LENGTH_GRADE = 0.010 * _MM_PER_IN
 
@@ -82,7 +84,7 @@ DRIVE_PIN_LENGTH_GRADE = 0.010 * _MM_PER_IN
 SEAT_SPIGOT_DIA = 17.5
 # Both seats share the crank spigot's functional diameter band: the
 # removables must swap between shafts without changing their radial air.
-SPIGOT_DIA_BAND = (0.0, -0.10)
+SPIGOT_DIA_BAND = (0.0, -0.1016)  # +.000/-.004 (#290, fit row D2s)
 # Pin hole to the spigot's rim: under the 1.5 wall floor (pending ruling #991).
 SEAT_SPIGOT_RIM = (
     SEAT_SPIGOT_DIA / 2.0 - PIN_CIRCLE_RADIUS - DRIVE_PIN_HOLE_DIA / 2.0

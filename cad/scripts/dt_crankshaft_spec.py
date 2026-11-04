@@ -314,10 +314,10 @@ PIN_HOLE_HEIGHT = SERVICE_PIN_STATION
 # air to the body at the spigot's print-worst length (the drive train asserts
 # it, with the radial air for the CAD link and a real ANSI plate).  The seat
 # diameter is the interface both shafts share, so the pure provider owns it.
-# #290: .689 +.000/-.004 (fit row D2s); the shared provider takes the same
-# inch values in the PD batch, so these two read it once that lands.
+# #290: .689 +.000/-.004 (fit row D2s); the shared provider carries the
+# band in inch, and this sheet reads it.
 SPIGOT_DIA = 17.5006  # .689, seat_geometry.SEAT_SPIGOT_DIA
-SPIGOT_DIA_BAND = (0.0, -0.1016)  # seat_geometry.SPIGOT_DIA_BAND
+SPIGOT_DIA_BAND = seat_geometry.SPIGOT_DIA_BAND
 # User ruling 2026-09-30: the seat face moved 1.8 forward with the shared
 # band and the body's front face stayed put, so the spigot grew.  Owner
 # ruling D1 (2026-10-15) deleted the crank-seat washer and ran the body back
@@ -382,10 +382,8 @@ SPIGOT_LENGTH_TOL = 0.0508
 # draw_dt_crankshaft opens the sheet at these.
 HOLE_CALLOUT_PLACES = 4
 DRIVE_PIN_DEPTH_TOL = 0.1016
-# The shared hole's (0/-.010) band on the inch grid this sheet prints; the
-# mm sheets keep the shared constant.  D14 (#290's final step) converts the
-# shared hole and removes this copy.
-DRIVE_PIN_HOLE_BAND = (0.0, -0.01016)  # +.0000/-.0004
+# The shared hole's band, on the inch grid this sheet prints.
+DRIVE_PIN_HOLE_BAND = seat_geometry.DRIVE_PIN_HOLE_BAND  # +.0000/-.0004
 # Local (dome-root) deviations of the seat face as (upper, lower): a station
 # printed from the far end moves by its own printed band (its model value is
 # the chain plane's, so it prints rounded) plus the Depth's.  The drive

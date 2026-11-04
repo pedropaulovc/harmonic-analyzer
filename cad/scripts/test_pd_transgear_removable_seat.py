@@ -7,6 +7,8 @@ import math
 import pytest
 
 import _config
+from _package_units import drawing_unit
+from _printed_tolerance import drilled_oversize_mm
 import build_dt_drive_train_assembly as bdt
 import dt_crank_hub_geometry as hub
 import dt_crank_hub_spec
@@ -99,7 +101,11 @@ def _wheel_float(hole_dia: float) -> float:
     the holes drilled to their largest over the smallest stock dowel, plus
     a pin centre and its hole centre each at their location limit, opposite
     ways along the pins' line."""
-    hole_max = hole_dia + float(_config.title_block("drilled_hole")["plus_mm"])
+    # The holes are drilled to the wheel's own sheet, in its unit (#2124).
+    wheel_unit = drawing_unit(
+        "parts/pd-transgear-removable", _config.parts("pd-transgear-removable")
+    )
+    hole_max = hole_dia + drilled_oversize_mm(unit=wheel_unit)
     dowel_min = crank_pin.DIA + dowel_spec.DIA_BAND_IN[0] * dowel_spec.MM_PER_IN
     return (
         (hole_max - dowel_min) / 2.0
