@@ -4,7 +4,7 @@ Owner rulings 2026-10-27 (#1951): MHA-SM-04's 1/4-28 UNF thread runs into
 the BLIND 1/4-28 UNF-2B tap in the solid Ø.500 end piece of MHA-SM-01's 1/2
 in arm, and the MHA-SM-VN-51 loop is clamped on the screw's plain Ø.250 body.
 The 2026-09-21 clamp rulings stand.  The arm-end counterbore clears the
-screw's die run-out with the loop clamped coil-bound (codjiflo P1 on #1997).
+screw's thread run-out with the loop clamped coil-bound (codjiflo P1 on #1997).
 Two owner minors stand against unchanged checks: the counterbore wall
 (sm-gooseneck RV-01) and the head's retention (sm-gooseneck-spring-screw
 RV-01).  Both sheets print decimal inch (#290): every term is charged at the
@@ -522,7 +522,7 @@ def test_loop_passes_bear_on_the_plain_body_free_and_clamped() -> None:
     assert joint.LOOP_PLAIN_MARGIN_MIN == pytest.approx(margin)
     assert margin == pytest.approx(0.413, abs=5e-4)
     assert joint.LOOP_PLAIN_MARGIN_MIN > 0.0
-    # No step: the blank lies inside the 2A major band, so the die's crests
+    # No step: the blank lies inside the 2A major band, so the thread's crests
     # stand at the blank and the body is one diameter wherever a wire bears.
     assert screw.THREAD_MAJOR_2A_MIN <= SCREW_BODY_DIA_MIN
     assert SCREW_BODY_DIA_MAX <= screw.THREAD_MAJOR_2A_MAX

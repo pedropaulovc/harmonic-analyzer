@@ -5,8 +5,8 @@ arm ends flush in a solid Ø.500 end piece (sm_gooseneck_geom): MHA-SM-04's
 1/4-28 UNF thread runs into the end piece's blind 1/4-28 UNF-2B tap, and the
 loop of MHA-SM-VN-51 is clamped on the screw's plain Ø.250 body between the
 head and the end face.  The upper eye is clamped, not left free to swivel
-(user ruling 2026-09-21).  An arm-end counterbore clears the screw's die
-run-out (codjiflo P1 on #1997): its incomplete threads never enter the end
+(user ruling 2026-09-21). An arm-end counterbore clears the screw's thread
+run-out (codjiflo P1 on #1997; single-pointed per Pedro, 2026-11-05): its incomplete threads never enter the end
 piece's full 2B thread, even with the loop clamped to its least gap.
 
 Two owner minors (2026-10-27, #1951) stand against unchanged checks: the
@@ -428,8 +428,8 @@ HEAD_FLAT_BEARING_MARGIN_MIN = HEAD_FLAT_RADIUS_MIN - LOOP_PASS_RADIUS_MAX
 # coil-bound loop rises CLAMPED_LOOP_RISE in CLAMPED_GAP_MAX.
 #
 # Rocked states.  A rocked loop's passes can reach anywhere between the faces,
-# but the screw offers them one diameter there: the body is the die's blank,
-# and a die-cut run-out's crests stand at that blank, never above it, so no
+# but the screw offers them one diameter there: the body is the thread blank,
+# and the cut thread's crests stand at that blank, never above it, so no
 # held or rocked state meets a step it could wedge on (the 45-degree lead of
 # the #8-32 shoulder screw is gone, and with it the held-state filter codjiflo
 # questioned on #1997).  The screw's reaction on the wire is radial in every
