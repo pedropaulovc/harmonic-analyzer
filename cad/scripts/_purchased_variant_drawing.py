@@ -7,7 +7,6 @@ configuration's quantity is never interpreted as a number of chains or kits.
 
 from __future__ import annotations
 
-import math
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
@@ -60,61 +59,44 @@ from _reference_source_lifecycle import (
 
 # Third-angle slots (column, row) in a member panel's 2 x 2 grid: Top above
 # Front, Right beside it, the Isometric in the free corner.
-_PROJECTION_OFFSETS = {"*Top": (0, 1), "*Right": (1, 0)}
+_SLOTS = {"*Front": (0, 0), "*Top": (0, 1), "*Right": (1, 0), "*Isometric": (1, 1)}
+_PANEL_ROWS = ((0.127, 0.179), (0.194, 0.244))
 
 
-def projection_slots(angle: float = 0.0) -> dict[str, tuple[int, int]]:
-    """Grid slots that keep third-angle projection after a quarter turn.
-
-    ``IView.Angle`` turns each view counter-clockwise about its own centre, so
-    Top's and Right's offsets from Front turn with it: at -pi/2 the end view
-    (Top) sits right of Front on its horizontal axis and the lateral view
-    (Right) sits below it.
-    """
-    turns = angle / (math.pi / 2.0)
-    if not math.isfinite(turns) or abs(turns - round(turns)) > 1e-9:
-        raise ValueError(f"reference view turn must be a quarter turn: {angle!r}")
-    cos, sin = round(math.cos(angle)), round(math.sin(angle))
-    offsets = {
-        name: (x * cos - y * sin, x * sin + y * cos)
-        for name, (x, y) in _PROJECTION_OFFSETS.items()
-    }
-    front = tuple(
-        1 if any(offset[axis] < 0 for offset in offsets.values()) else 0
-        for axis in (0, 1)
-    )
-    slots = {"*Front": front} | {
-        name: (front[0] + x, front[1] + y) for name, (x, y) in offsets.items()
-    }
-    (slots["*Isometric"],) = {(0, 0), (0, 1), (1, 0), (1, 1)} - set(slots.values())
-    return slots
-
-
-def configuration_view_cells(index: int, count: int, angle: float = 0.0) -> tuple:
-    """Four third-angle reference cells in one of two or three member panels.
-
-    Returned in Front, Top, Right, Isometric order; ``angle`` is the member's
-    view turn (``projection_slots``).
-    """
+def _panel(index: int, count: int) -> tuple[float, float]:
+    """One of two or three member panels' left and right edges."""
     if count not in (2, 3) or not 0 <= index < count:
         raise ValueError(f"invalid purchased-member panel {index} of {count}")
     width = (0.396 - 0.008 * (count - 1)) / count
     left = 0.018 + index * (width + 0.008)
-    middle = left + width / 2.0
-    right = left + width
+    return left, left + width
+
+
+def configuration_view_cells(index: int, count: int) -> tuple:
+    """Four third-angle reference cells in one of two or three member panels.
+
+    Returned in Front, Top, Right, Isometric order.
+    """
+    left, right = _panel(index, count)
+    middle = (left + right) / 2.0
     columns = ((left, middle - 0.004), (middle + 0.004, right))
-    rows = ((0.127, 0.179), (0.194, 0.244))
-    slots = projection_slots(angle)
     return tuple(
         _cell(
             name,
-            columns[slots[name][0]][0],
-            rows[slots[name][1]][0],
-            columns[slots[name][0]][1],
-            rows[slots[name][1]][1],
+            columns[_SLOTS[name][0]][0],
+            _PANEL_ROWS[_SLOTS[name][1]][0],
+            columns[_SLOTS[name][0]][1],
+            _PANEL_ROWS[_SLOTS[name][1]][1],
         )
         for name in ("*Front", "*Top", "*Right", "*Isometric")
     )
+
+
+def isometric_view_cells(index: int, count: int) -> tuple:
+    """One Isometric cell over a whole member panel: a member whose own sheet
+    carries its orthographic views."""
+    left, right = _panel(index, count)
+    return (_cell("*Isometric", left, _PANEL_ROWS[0][0], right, _PANEL_ROWS[1][1]),)
 
 
 def configure_reference_views(
@@ -128,32 +110,6 @@ def configure_reference_views(
         if str(view.ReferencedConfiguration) != configuration:
             raise RuntimeError(
                 f"{configuration}: native view configuration did not persist"
-            )
-
-
-def turn_reference_views(
-    adapter: Any, configuration: str, views: list[Any], angle: float
-) -> None:
-    """Turn every view of one member by the same native angle before fitting.
-
-    A member longer than its cell lies along the cell's width instead: the
-    four views keep one common turn, so they still read as one member.
-    """
-    if not math.isfinite(angle):
-        raise ValueError(f"{configuration}: reference view angle must be finite")
-    for view in views:
-        view.Angle = angle
-    rebuild_drawing(adapter, label=f"{configuration} reference view turn")
-    require_reference_view_angle(configuration, views, angle)
-
-
-def require_reference_view_angle(
-    configuration: str, views: list[Any], angle: float
-) -> None:
-    for view in views:
-        if abs(math.remainder(float(view.Angle) - angle, 2.0 * math.pi)) > 1e-9:
-            raise RuntimeError(
-                f"{configuration}: native reference view angle did not persist"
             )
 
 
@@ -174,7 +130,7 @@ async def build_purchased_variant_drawing(
     additional_sheets_title: str = "Member Rework",
     notes: str = "",
     title_fit: bool = False,
-    view_angles: Mapping[str, float] | None = None,
+    isometric_only: Mapping[str, int] | None = None,
     source_configuration: str | None = None,
     unit: str = "mm",
 ) -> dict[str, str]:
@@ -198,9 +154,11 @@ async def build_purchased_variant_drawing(
     in the PDF title and summary. ``title_fit`` fits the reference sheet's
     Name, Material and DWG. NO. in their native cells
     (``fit_purchased_title_block``) and re-proves them settled.
-    ``view_angles`` turns all four views of a named member by one quarter
-    turn (radians) before fitting, and turns that member's projection cells
-    with them (``configuration_view_cells``); other members stay unturned.
+    ``isometric_only`` names members whose own appended sheet carries their
+    orthographic views, each with that sheet's number: such a member shows
+    only its isometric, over its whole panel at the largest scale that fits,
+    its header pointing at the sheet ("SEE SHEET n"). Other members keep
+    their four views.
     ``source_configuration`` activates that member in the open source part,
     in memory, before the drawing exists. Supplier-reference attachment
     proofs (``_supplier_screw_dimensions``) read the source part's ACTIVE
@@ -223,13 +181,20 @@ async def build_purchased_variant_drawing(
     configurations = tuple(configuration for configuration, _ in variants)
     if len(set(configurations)) != len(configurations):
         raise ValueError("purchased-member configurations must be unique")
-    view_angles = dict(view_angles or {})
-    if set(view_angles) - set(configurations):
-        raise ValueError("reference view angles must name depicted configurations")
+    isometric_only = dict(isometric_only or {})
+    if set(isometric_only) - set(configurations):
+        raise ValueError("isometric-only members must be depicted configurations")
+    last_sheet = 1 + len(additional_sheet_scales or {})
+    if any(
+        type(number) is not int or not 2 <= number <= last_sheet
+        for number in isometric_only.values()
+    ):
+        raise ValueError("an isometric-only member must cite an appended sheet")
     cells_by_configuration = {
-        configuration: configuration_view_cells(
-            index, len(variants), view_angles.get(configuration, 0.0)
-        )
+        configuration: (
+            isometric_view_cells if configuration in isometric_only
+            else configuration_view_cells
+        )(index, len(variants))
         for index, (configuration, _) in enumerate(variants)
     }
     if source_configuration is not None and source_configuration not in configurations:
@@ -280,7 +245,7 @@ async def build_purchased_variant_drawing(
                 configurations=configurations,
                 row=row,
                 cells_by_configuration=cells_by_configuration,
-                view_angles=view_angles,
+                isometric_only=isometric_only,
                 item=item,
                 purchase_unit=purchase_unit,
                 cut_to_suit=cut_to_suit,
@@ -355,7 +320,7 @@ async def _draw_purchased_variants(
     configurations: tuple[str, ...],
     row: Mapping[str, Any],
     cells_by_configuration: Mapping[str, tuple],
-    view_angles: Mapping[str, float],
+    isometric_only: Mapping[str, int],
     item: str,
     purchase_unit: str,
     cut_to_suit: bool,
@@ -444,10 +409,6 @@ async def _draw_purchased_variants(
             for orientation, center, _ in cells
         ]
         configure_reference_views(adapter, configuration, views)
-        if configuration in view_angles:
-            turn_reference_views(
-                adapter, configuration, views, view_angles[configuration]
-            )
         for view in views:
             set_hidden_lines_removed(adapter, view)
         groups.append((configuration, label, cells, views))
@@ -464,18 +425,20 @@ async def _draw_purchased_variants(
     placed = []
     configured_views = []
     member_checks = []
-    sheet_scale = (1, 1)
-    for index, (configuration, label, cells, views) in enumerate(groups):
+    sheet_scale = None
+    for configuration, label, cells, views in groups:
         scales = _fit_views(draw, views, cells)
         center_marks = _center_marks_without_lines(views, cells)
-        if index == 0:
+        # The sheet's scale is the first orthographic member's.
+        if sheet_scale is None and "*Front" in scales:
             sheet_scale = scales["*Front"]
         if annotate_member is not None:
             member_checks.extend(annotate_member(adapter, configuration, cells, views))
-        # A turned member's cells are remapped, so span the whole panel.
         left = min(cell[0] for _, _, cell in cells)
         right = max(cell[2] for _, _, cell in cells)
         caption = f"{label}  QTY {int(quantities[configuration])} INSTALLED"
+        if configuration in isometric_only:
+            caption += f", SEE SHEET {isometric_only[configuration]}"
         caption_cell = (left, 0.255, right, 0.264)
         note = _literal_note(adapter, caption, left, 0.262)
         # The insertion point is not an extent edge. Seat the measured text box
@@ -527,6 +490,8 @@ async def _draw_purchased_variants(
                 )
             )
             configured_views.append((view, configuration, scale, cell))
+    if sheet_scale is None:  # every member isometric-only: the first one's
+        sheet_scale = configured_views[0][2]
     purchase_note = f"QTY {total} INSTALLED MEMBERS; PURCHASE UNIT: {purchase_unit}."
     note = _literal_note(adapter, purchase_note, 0.018, 0.113)
     placed.append((note, purchase_note, purchase_note, (0.015, 0.107, 0.415, 0.114)))
@@ -605,10 +570,6 @@ async def _draw_purchased_variants(
                 or tuple(view.ScaleRatio) != scale
             ):
                 raise RuntimeError(f"{configuration}: configured source/scale changed")
-            if configuration in view_angles:
-                require_reference_view_angle(
-                    configuration, [view], view_angles[configuration]
-                )
             box = _box(view.GetOutline(), label=configuration)
             if not _inside(box, cell) or not _inside(box, border):
                 raise RuntimeError(

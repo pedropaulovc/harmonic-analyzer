@@ -654,15 +654,16 @@ def test_package_is_the_registered_kit_drawing() -> None:
     keywords = {keyword.arg: ast.unparse(keyword.value) for keyword in call.keywords}
     assert keywords["variants"] == "VARIANTS"
     assert keywords["append_sheets"] == "append_member_sheets"
-    assert keywords["view_angles"] == "VIEW_ANGLES"
+    assert keywords["isometric_only"] == "ISOMETRIC_ONLY"
     assert keywords["title_fit"] == "True"
     assert draw.SHEET_NAMES == ("LEADSCREW", "FEED NUT REWORK")
     appended = source[source.index("def append_member_sheets") :]
     assert appended.index("_append_leadscrew_sheet(") < appended.index(
         "_append_feed_nut_rework_sheet("
     )
-    # The 410 screw lies along its cell; the nut stands as modelled.
-    assert draw.VIEW_ANGLES == {spec.CONFIGURATION: -math.pi / 2.0}
+    # Sheet 1 shows the screw's isometric only; its sheet 2 draws its views.
+    assert draw.ISOMETRIC_ONLY == {spec.CONFIGURATION: spec.MODIFIED_STOCK_SHEET}
+    assert draw.SHEET_NAMES.index(draw.LEADSCREW_SHEET_NAME) + 2 == spec.MODIFIED_STOCK_SHEET
 
 
 def test_one_axis_horizontal_view_at_the_largest_fitting_scale() -> None:
@@ -2769,11 +2770,9 @@ def test_supplier_references_are_proven_only_in_the_active_source_member(monkeyp
         draw.annotate_member(None, member, cells, views)
 
 
-def test_build_activates_the_nut_and_keeps_the_rolled_leadscrew_in_projection(
+def test_build_activates_the_nut_and_shows_the_leadscrew_as_its_isometric(
     monkeypatch,
 ):
-    import _purchased_variant_drawing as variant_drawing
-
     captured = {}
 
     async def capture(_adapter, _spec, **kwargs):
@@ -2785,25 +2784,11 @@ def test_build_activates_the_nut_and_keeps_the_rolled_leadscrew_in_projection(
     # The shared builder activates this member in the read-only source before
     # the drawing exists and requires it in every source check.
     assert captured["source_configuration"] == draw.SUPPLIER_REFERENCE_CONFIGURATION
-    angles = captured["view_angles"]
-    assert set(angles) == {spec.CONFIGURATION}
-    members = [configuration for configuration, _ in captured["variants"]]
-    for index, configuration in enumerate(members):
-        cells = {
-            name: cell
-            for name, _, cell in variant_drawing.configuration_view_cells(
-                index, len(members), angles.get(configuration, 0.0)
-            )
-        }
-        front, end, lateral = cells["*Front"], cells["*Top"], cells["*Right"]
-        if configuration == spec.CONFIGURATION:
-            # Axis horizontal: the end-on Top beside Front on its axis, the
-            # lengthwise Right under it in Front's column.
-            assert end[1::2] == front[1::2] and end[0] > front[2]
-            assert lateral[0::2] == front[0::2] and lateral[3] < front[1]
-        else:
-            assert end[0::2] == front[0::2] and end[1] > front[3]
-            assert lateral[1::2] == front[1::2] and lateral[0] > front[2]
+    # The screw (sheet 2 draws it) shows only its isometric; the nut, which
+    # carries the supplier references on its four views, is not isometric-only.
+    assert captured["isometric_only"] == {spec.CONFIGURATION: 2}
+    assert draw.SUPPLIER_REFERENCE_CONFIGURATION not in captured["isometric_only"]
+    assert set(captured["additional_sheet_scales"]) == set(draw.SHEET_NAMES)
 
 
 def _floor2(value: float) -> str:

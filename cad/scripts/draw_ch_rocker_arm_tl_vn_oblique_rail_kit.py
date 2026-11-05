@@ -1,9 +1,11 @@
 """Draw the two installed members of one NUIBBYED HGR15 rail kit (MHA-CH-06-TL-VN-83).
 
-Sheet 1 is the configured purchased-part reference: four native views of
-each member (``[1] RAIL`` and ``[2] CARRIAGE``), its installed quantity, the
-kit as the purchase unit, and the carriage's note (the owner's kit
-description and the fit-up play acceptance in MHA-CH-06-TL-00).
+Sheet 1 is the configured purchased-part reference: ``[1] RAIL`` as its
+isometric only, its header pointing at sheet 2 (at 1:8 its orthographic
+views read as a bar and dots, farm run 20261105T035724094Z), ``[2]
+CARRIAGE`` in four native views; each member's installed quantity, the kit
+as the purchase unit, and the carriage's note (the owner's kit description
+and the fit-up play acceptance in MHA-CH-06-TL-00).
 
 Sheet 2, RAIL RECEIPT, is the rail's receipt check. The listing states no
 hole pattern, so the received rail is measured before the base bar is
@@ -98,6 +100,8 @@ RECEIPT_SHEET_NAME = "RAIL RECEIPT"
 SHEET_NAMES = (RECEIPT_SHEET_NAME,)
 if SHEET_NAMES.index(RECEIPT_SHEET_NAME) + 2 != rail.RECEIPT_SHEET:
     raise AssertionError("the rail's receipt citations name the wrong sheet")
+# Sheet 2 draws the rail's orthographic views; sheet 1 shows its isometric.
+ISOMETRIC_ONLY = {rail.CONFIGURATION: rail.RECEIPT_SHEET}
 GENERAL_TEXT = (
     f"REFERENCE VIEWS; {rail.ITEM_TAG} RECEIPT CHECK PER SHEET {rail.RECEIPT_SHEET}; "
     f"{carriage.ITEM_TAG} AS SUPPLIED."
@@ -697,6 +701,7 @@ async def build(adapter: Any) -> dict[str, str]:
         append_sheets=append_rail_receipt_sheet,
         additional_sheets_title="Rail Receipt Check",
         title_fit=True,
+        isometric_only=ISOMETRIC_ONLY,
         unit=part_drawing_unit(PART_STEM),
     )
 

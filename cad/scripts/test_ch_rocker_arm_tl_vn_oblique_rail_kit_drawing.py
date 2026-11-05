@@ -656,6 +656,19 @@ def test_package_is_the_registered_configured_reference_with_a_receipt_sheet(
     assert kwargs["append_sheets"] is draw.append_rail_receipt_sheet
     assert kwargs["title_fit"] is True
     assert kwargs["unit"] == "mm"
+    # Sheet 1's rail is its isometric, its header citing the receipt sheet
+    # (at 1:8 its orthographic views read as a bar and dots); the carriage
+    # keeps its four views.
+    assert kwargs["isometric_only"] == {"Rail": rail.RECEIPT_SHEET} == {"Rail": 2}
+    import _purchased_variant_drawing as variant_drawing
+
+    for index, (configuration, label) in enumerate(draw.VARIANTS):
+        header = f"{label}  QTY {ROW['configuration_quantities'][configuration]} INSTALLED"
+        if configuration in kwargs["isometric_only"]:
+            header += f", SEE SHEET {kwargs['isometric_only'][configuration]}"
+        cells = variant_drawing.configuration_view_cells(index, len(draw.VARIANTS))
+        width = cells[2][2][2] - cells[0][2][0]
+        assert len(header) * 0.0025 <= width, header
 
 
 def test_receipt_dimensions_are_the_marked_model_dimensions() -> None:

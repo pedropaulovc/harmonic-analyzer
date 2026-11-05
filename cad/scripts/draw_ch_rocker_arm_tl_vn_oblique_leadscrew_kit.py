@@ -1,9 +1,10 @@
 """Draw the ReliaBot T8 kit (Amazon B085DDHJTW), MHA-CH-06-TL-VN-84: three sheets.
 
-Sheet 1 is the configured purchased-part reference: the LeadScrew and FeedNut
-members' four views each, their installed quantities and the kit's supplier
-footer. The 410 screw's views are turned axis-horizontal so it fits its cell.
-The FeedNut panel carries the listing's nominal sizes as supplier references.
+Sheet 1 is the configured purchased-part reference: the LeadScrew member as
+its isometric only, its header pointing at sheet 2 (at 1:8 its orthographic
+views were unreadable, farm run 20261105T035724094Z), the FeedNut member in
+four views carrying the listing's nominal sizes as supplier references, the
+installed quantities and the kit's supplier footer.
 
 Sheet 2 (LEADSCREW) is the LeadScrew member's modified-stock content: the
 shop cuts the bought 600 mm screw to length and mills a set-screw flat under
@@ -147,10 +148,8 @@ GENERAL_TEXT = (
     f"[2] REWORK PER SHEET {feed_nut.REWORK_SHEET}."
 )
 ADDITIONAL_SHEETS_TITLE = "Member Rework"
-# The 410 screw lies along its cell's width: no project scale fits it
-# standing in the 52 mm row. Its cells turn with it, so the end view sits
-# beside Front on its axis and the lengthwise Right below it.
-VIEW_ANGLES = {leadscrew.CONFIGURATION: -math.pi / 2.0}
+# Sheet 2 draws the LeadScrew's views; sheet 1 shows its isometric.
+ISOMETRIC_ONLY = {leadscrew.CONFIGURATION: leadscrew.MODIFIED_STOCK_SHEET}
 # The only member carrying supplier references. The source part stays active
 # in it while the package is drawn (see require_source_configuration).
 SUPPLIER_REFERENCE_CONFIGURATION = feed_nut.CONFIGURATION
@@ -1949,7 +1948,7 @@ async def build(adapter: Any) -> dict[str, str]:
         append_sheets=append_member_sheets,
         additional_sheets_title=ADDITIONAL_SHEETS_TITLE,
         title_fit=True,
-        view_angles=VIEW_ANGLES,
+        isometric_only=ISOMETRIC_ONLY,
         source_configuration=SUPPLIER_REFERENCE_CONFIGURATION,
         unit=part_drawing_unit(PART_STEM),
     )
