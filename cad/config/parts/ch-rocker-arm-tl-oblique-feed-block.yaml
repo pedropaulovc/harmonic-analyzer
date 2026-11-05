@@ -23,6 +23,6 @@ ch-rocker-arm-tl-oblique-feed-block:
     - id: "RV-04"
       kind: "minor"
       where: "VIEW D, the Ø.351 leadscrew clearance callout: WALL .060 MIN TO TAPS"
-      finding: "wall from the leadscrew clearance to the four transferred #4-40 taps .060 in (1.53 mm) at the printed worst case (the drill at its +.004, the leadscrew at its .453 mm stack offset, the nut's holes at their ±0.05 station and the #29 spot's 0.073 residual, the nut clocked 45° ±5°), under the .080 in target and over the .060 in floor (rule 17)"
+      finding: "wall from the leadscrew clearance to the four transferred #4-40 taps .060 in (1.53 mm) at the printed worst case (the drill at its +.004, the leadscrew at its .453 mm stack offset, the nut's holes at their ±0.05 station and the #29 spot's 0.073 residual, every tap anywhere in VIEW D's 4X 45° ±5° clocking), under the .080 in target and over the .060 in floor (rule 17)"
       reason: "Owner ruling 2026-11-04 (#2177 option B, relayed by Main): Ø.351 leadscrew clearance, wall .060 in (1.53 mm) at the printed worst case, .083 nominal, accepted below the .080 target and above the .060 floor; the KP08 axis height behind the stack is UNVERIFIED (#2184)."
   drawing_unit: in

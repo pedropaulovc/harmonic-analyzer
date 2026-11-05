@@ -1942,6 +1942,7 @@ def test_f1_f2_prepare_seat_and_transfer_from_the_nut() -> None:
     f1a, f1b, f2 = steps["F1A"], steps["F1B"], steps["F2"]
     clearance = spec._length(feed_block.SCREW_CLEARANCE_DIA, feed_block.NUT_PATTERN_PLACES)
     clock = f"{feed_block.NUT_CLOCK_DEG:.0f}°"
+    band = f"±{feed_block.NUT_CLOCK_TOL_DEG:.0f}°"
     order = (
         f"BEFORE STEP 8A, MEASURE THE FEED NUT {spec._item(spec.FEED_NUT)} TO THE "
         f"RECEIPT LIMITS ON {feed_nut.REWORK_SHEET_REFERENCE}",
@@ -1974,12 +1975,18 @@ def test_f1_f2_prepare_seat_and_transfer_from_the_nut() -> None:
         f"ALIGN EACH KP08 SO THE SCREW RUNS CENTRED IN THE LUG'S Ø{clearance} CLEARANCE",
         f"TIGHTEN THE KP08 SCREWS TO {spec._torque(spec.KP08_SCREW_TORQUE_NM)}",
         f"{leadscrew.NEAR_STUB:.1f} MM PAST THE NEAR BLOCK",
-        f"LAY A {clock} SQUARE ON THE LUG'S TOP EDGE",
-        f"{clock} ±{feed_block.NUT_CLOCK_TOL_DEG:.0f}°",
+        f"TURN THE NUT UNTIL ALL {feed_nut.SCREW_COUNT} HOLES CENTRE WITHIN THE TAP "
+        f"CLOCKING ON {feed_block.NUT_CLOCK_REFERENCE}",
+        "MITRE SQUARE ON THE LUG'S TOP EDGE THROUGH THE SCREW AXIS",
+        f"REJECT A NUT WHOSE {feed_nut.SCREW_COUNT} HOLES CANNOT ALL BE SET WITHIN IT",
         "TURN THE SCREW, NEVER SLIDE IT, UNTIL THE NUT SEATS FLAT ON THE LUG FACE",
     )
     positions = [f1b.index(phrase) for phrase in order]
     assert positions == sorted(positions)
+    # Codjiflo 4477879822 and 4477879826 on #2187: every hole, not one, is
+    # set within TL-32's native NutClock, which F1B cites and never types.
+    assert feed_block.NUT_CLOCK_REFERENCE == f"{feed_block.NUMBER} SHEET 2 VIEW D"
+    assert clock not in f1b and band not in f1b
     # Rule 25: a supplied nut (its spigot on, SUPPLIED_LENGTH long) passes the
     # incoming checks; the faced-length limit, which it exceeds, is checked
     # once, after the rework.

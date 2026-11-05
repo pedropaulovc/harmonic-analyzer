@@ -155,6 +155,11 @@ HOLE_PCD_BAND = 0.1  # ± on the diameter, so ±0.05 on each hole's station
 LENGTH_MAX = 13.8  # faced, seat face to body end
 HOLE_R_MAX = HOLE_DIA_MAX / 2.0
 HOLE_STATION_BAND = HOLE_PCD_BAND / 2.0
+# The listing gives the holes no angular stations (HOLE_ANGLES_DEG is the
+# modelled pattern), so receipt bounds each hole's radius only. Their angles
+# are bounded at fit-up instead (Codjiflo 4477879822 on #2187): TL-00 F1B sets
+# all four holes within TL-32's tap clocking (its NutClock) before a tap is
+# transferred, and rejects a nut whose four cannot all be set there.
 if not SUPPLIED_LENGTH > LENGTH_MAX > LENGTH:
     raise AssertionError("the faced-length limit does not reject an unfaced nut")
 
@@ -173,7 +178,9 @@ CSK_DIA_PLACES = 2
 CSK_CUTTER_TEXT = "3/16"
 CSK_CUTTER_DIA_MAX = float(Fraction(CSK_CUTTER_TEXT)) * INCH  # 4.7625
 CSK_DIA_MIN = 4.50
-CSK_DIA_MAX = math.floor(CSK_CUTTER_DIA_MAX * 10**CSK_DIA_PLACES) / 10**CSK_DIA_PLACES  # 4.76
+CSK_DIA_MAX = (
+    math.floor(CSK_CUTTER_DIA_MAX * 10**CSK_DIA_PLACES) / 10**CSK_DIA_PLACES
+)  # 4.76
 if not CSK_DIA_MIN < CSK_DIA < CSK_DIA_MAX <= CSK_CUTTER_DIA_MAX:
     raise AssertionError("the countersink band is not inside the cutter's reach")
 # ASSUMPTION: each countersink runs on its hole's axis to within 0.02 (an 82°
@@ -195,8 +202,11 @@ if not SCREW_HEAD_DIA_MIN < SCREW_HEAD_DIA_MAX:
 _TAN = math.tan(math.radians(CSK_ANGLE / 2.0))
 CSK_DEPTH = (CSK_DIA - HOLE_DIA) / (2.0 * _TAN)  # below the head face, nominal
 CSK_CUTTER_TO_BODY = (
-    HOLE_PCD / 2.0 - HOLE_STATION_BAND - CSK_ECCENTRICITY_MAX
-    - CSK_CUTTER_DIA_MAX / 2.0 - BODY_DIA_MAX / 2.0
+    HOLE_PCD / 2.0
+    - HOLE_STATION_BAND
+    - CSK_ECCENTRICITY_MAX
+    - CSK_CUTTER_DIA_MAX / 2.0
+    - BODY_DIA_MAX / 2.0
 )  # 0.40
 if CSK_CUTTER_TO_BODY <= 0.0:
     raise AssertionError("the countersink cutter reaches the nut body")
@@ -275,16 +285,24 @@ if not BORE_DIA < BODY_DIA:
 # rounded down.
 WALL_FLOOR = 1.5
 CSK_WALL_TO_BODY = HOLE_PCD / 2.0 - _CSK_SHIFT - CSK_DIA_MAX / 2.0 - _BODY_R_MAX  # 0.40
-CSK_WALL_TO_OD = FLANGE_DIA_MIN / 2.0 - HOLE_PCD / 2.0 - _CSK_SHIFT - CSK_DIA_MAX / 2.0  # 0.45
+CSK_WALL_TO_OD = (
+    FLANGE_DIA_MIN / 2.0 - HOLE_PCD / 2.0 - _CSK_SHIFT - CSK_DIA_MAX / 2.0
+)  # 0.45
 HOLE_WALL_TO_BODY = HOLE_PCD / 2.0 - HOLE_DIA / 2.0 - BODY_DIA / 2.0  # 1.15, nominal
 HOLE_WALL_TO_OD = FLANGE_DIA / 2.0 - HOLE_PCD / 2.0 - HOLE_DIA / 2.0  # 1.25, nominal
-HOLE_WALL_TO_BODY_MIN = HOLE_PCD / 2.0 - HOLE_STATION_BAND - HOLE_R_MAX - _BODY_R_MAX  # 1.00
-HOLE_WALL_TO_OD_MIN = FLANGE_DIA_MIN / 2.0 - HOLE_PCD / 2.0 - HOLE_STATION_BAND - HOLE_R_MAX  # 1.05
+HOLE_WALL_TO_BODY_MIN = (
+    HOLE_PCD / 2.0 - HOLE_STATION_BAND - HOLE_R_MAX - _BODY_R_MAX
+)  # 1.00
+HOLE_WALL_TO_OD_MIN = (
+    FLANGE_DIA_MIN / 2.0 - HOLE_PCD / 2.0 - HOLE_STATION_BAND - HOLE_R_MAX
+)  # 1.05
 if not 0.0 < CSK_WALL_TO_BODY < CSK_WALL_TO_OD < WALL_FLOOR:
     raise AssertionError("the countersink walls are not the stated shortfall")
 if not max(HOLE_WALL_TO_BODY, HOLE_WALL_TO_OD) < WALL_FLOOR:
     raise AssertionError("a supplied hole meets the wall floor; revisit RV-01")
-if not (HOLE_WALL_TO_BODY_MIN < HOLE_WALL_TO_BODY and HOLE_WALL_TO_OD_MIN < HOLE_WALL_TO_OD):
+if not (
+    HOLE_WALL_TO_BODY_MIN < HOLE_WALL_TO_BODY and HOLE_WALL_TO_OD_MIN < HOLE_WALL_TO_OD
+):
     raise AssertionError("the receipt limits do not thin the supplied holes' walls")
 
 
@@ -416,7 +434,10 @@ def countersink_volume(mouth_dia: float, hole_dia: float) -> float:
     hole's edge up to the mouth, less the hole it surrounds. Above the head
     face its overrun wall cuts only air."""
     r_m, r_h = mouth_dia / 2.0, hole_dia / 2.0
-    return math.pi / (3.0 * _TAN) * (r_m**3 - r_h**3) - math.pi * r_h**2 * (r_m - r_h) / _TAN
+    return (
+        math.pi / (3.0 * _TAN) * (r_m**3 - r_h**3)
+        - math.pi * r_h**2 * (r_m - r_h) / _TAN
+    )
 
 
 BODY_VOLUME_MM3 = revolved_volume(PROFILE)
@@ -462,10 +483,16 @@ REWORK_CONTROLS = {
 RECEIPT_CONTROLS = {
     "ReceiptFlangeDia": (FLANGE_DIA, -FLANGE_DIA_BAND, FLANGE_DIA_BAND, 1),
     "ReceiptBodyDia": (
-        BODY_DIA, _deviation(BODY_DIA_MIN - BODY_DIA), _deviation(BODY_DIA_MAX - BODY_DIA), 1,
+        BODY_DIA,
+        _deviation(BODY_DIA_MIN - BODY_DIA),
+        _deviation(BODY_DIA_MAX - BODY_DIA),
+        1,
     ),
     "ReceiptHoleDia": (
-        HOLE_DIA, _deviation(HOLE_DIA_MIN - HOLE_DIA), _deviation(HOLE_DIA_MAX - HOLE_DIA), 2,
+        HOLE_DIA,
+        _deviation(HOLE_DIA_MIN - HOLE_DIA),
+        _deviation(HOLE_DIA_MAX - HOLE_DIA),
+        2,
     ),
     "ReceiptHolePcd": (HOLE_PCD, -HOLE_PCD_BAND, HOLE_PCD_BAND, 1),
 }
@@ -588,6 +615,4 @@ SUPPLIER_REFERENCE_FORMATS = {
     "SupplierMountingHoleDiameter": (1, "diameter", None, "4X"),
     "SupplierHolePitchDiameter": (0, "diameter", None, "PCD"),
 }
-SUPPLIER_REFERENCE_UNITS = {
-    name: "mm" for name, _, _ in SUPPLIER_REFERENCE_DIMENSIONS
-}
+SUPPLIER_REFERENCE_UNITS = {name: "mm" for name, _, _ in SUPPLIER_REFERENCE_DIMENSIONS}

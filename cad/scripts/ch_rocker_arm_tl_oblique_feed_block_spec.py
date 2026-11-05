@@ -58,10 +58,19 @@ NUT_AXIS_Z = 12.4  # the leadscrew axis over the carriage top (checked below)
 # vertical stack (LEADSCREW_RADIAL_CLEARANCE, below).
 SCREW_CLEARANCE_DIA = 0.351 * 25.4  # 8.915
 # The nut is turned 45° about its axis, so its four holes sit on the lug's
-# diagonals (the owner's option-B sketch, 2026-11-04). The fitter sets that
-# by eye to NUT_CLOCK_TOL_DEG (TL-00 step F1B); the walls below charge it.
+# diagonals (the owner's option-B sketch, 2026-11-04). The band binds EVERY
+# tap, not one (Codjiflo 4477879822 on #2187): the supplier gives the holes
+# no angular stations, so TL-00 step F1B sets all four holes within it before
+# any tap is transferred and rejects a nut whose four cannot all be set there.
+# The walls below charge each tap anywhere in the band. The band is a native
+# angular dimension, NutClock on NutPatternReference (4477879826): from the
+# centreline through the axis along +Z (square to the carriage face) to the
+# (-Y, +Z) tap, VIEW D prints it 4X, and F1B cites that view.
 NUT_CLOCK_DEG = 45.0
 NUT_CLOCK_TOL_DEG = 5.0
+NUT_CLOCK_DIMENSION = "NutClock"
+NUT_CLOCK_TAP = 1  # NUT_HOLES_YZ's (-Y, +Z) tap, VIEW D's lower right
+NUT_CLOCK_VIEW = "VIEW D"
 _TAP_DIAGONAL = feed_nut.HOLE_PCD / 2 * math.cos(math.radians(NUT_CLOCK_DEG))
 # The taps at the nominal nut, ordered (-Y, -Z), (-Y, +Z), (+Y, -Z), (+Y, +Z).
 NUT_HOLES_YZ = tuple(
@@ -86,9 +95,9 @@ DRAWING_VALUES = {k: v for k, v in pivot.DRAWING_VALUES.items() if k != "BlockHe
     "NutClearanceDia": SCREW_CLEARANCE_DIA,
     "NutCentreZ": NUT_AXIS_Z, "NutCentreY": NUT_AXIS_Y - LUG_Y0,
 }
-# VIEW D prints the clearance from the lug end and the carriage face; the
-# taps' transfer callout locates them.
-NUT_PATTERN_PRINTED = ("NutCentreZ", "NutCentreY")
+# VIEW D prints the clearance from the lug end and the carriage face, and the
+# taps' clocking band; the taps' transfer callout locates them.
+NUT_PATTERN_PRINTED = ("NutCentreZ", "NutCentreY", NUT_CLOCK_DIMENSION)
 DRAWING_DIMENSIONS = {k: v for k, v in pivot.DRAWING_DIMENSIONS.items() if k != "Block"} | {
     CBORE_FLOOR_REFERENCE: pivot.DRAWING_DIMENSIONS[CBORE_FLOOR_REFERENCE] + ("SectionBlockHeight",),
     PLAN_DATUM_REFERENCE: pivot.DRAWING_DIMENSIONS[PLAN_DATUM_REFERENCE] + ("PlanLugX", "PlanOverallY"),
@@ -109,7 +118,10 @@ THREE_PLACE_DIMENSIONS = pivot.THREE_PLACE_DIMENSIONS | {
 }
 DRAWING_PRECISION = {k: v for k, v in pivot.DRAWING_PRECISION.items() if k != "Block"} | {
     feature: {
-        name: (3 if name in THREE_PLACE_DIMENSIONS else 2)
+        name: (
+            0 if name == NUT_CLOCK_DIMENSION
+            else 3 if name in THREE_PLACE_DIMENSIONS else 2
+        )
         for name in DRAWING_DIMENSIONS[feature]
     }
     for feature in (CBORE_FLOOR_REFERENCE, PLAN_DATUM_REFERENCE, "LugProfile",
@@ -124,6 +136,14 @@ REFERENCE_SKETCHES = pivot.REFERENCE_SKETCHES + ("NutPatternReference",)
 # The transferred taps' native callout leads with where they come from
 # (MHA-FR-05's transferred seats); TL-00 says how.
 TRANSFER_PROCESS = f"TRANSFER THROUGH {feed_nut.NUMBER}\nFEED NUT AT ASSEMBLY;\n"
+# NutClock's two construction rays from the axis on NutPatternReference: the
+# baseline along +Z and the ray to the NUT_CLOCK_TAP tap's centre, each the
+# PCD radius long (unprinted), with the angle between them driving. Its count
+# says the band holds at every tap; TL-00's F1B cites it by view.
+NUT_CLOCK_RAY = feed_nut.HOLE_PCD / 2
+CALLOUTS_PREFIX = {NUT_CLOCK_DIMENSION: f"{feed_nut.SCREW_COUNT}X "}
+NUT_CLOCK_SHEET = 2  # VIEW D's, the 'Nut interface' sheet
+NUT_CLOCK_REFERENCE = f"{NUMBER} SHEET {NUT_CLOCK_SHEET} {NUT_CLOCK_VIEW}"
 
 # --- The leadscrew in the lug: the vertical stack the clearance absorbs ---------
 # The KP08s seat on TL-28's as-bought 1 in thickness (±.012) and the lug's
@@ -192,33 +212,48 @@ if HEAD_TO_BODY_SHARP_CENTRED >= 0.0:
 # --- Rule 17: lug walls at the printed worst case (.080 target) -----------------
 # Every transferred tap sits where the nut puts it: the leadscrew at its
 # offset from the clearance, the nut's hole at its station band, the spot's
-# residual, and the nut clocked anywhere within NUT_CLOCK_TOL_DEG. The
-# clearance wall is radial, so it takes the offset's largest component along
-# a tap's direction; each face wall takes the tap's largest reach toward it.
+# residual, and that tap's own clocking anywhere in NutClock's band, each
+# tap independently (F1B sets all four holes in it; the supplier bounds no
+# hole's angular station). The clearance wall is radial, so it takes the
+# offset's largest component along a tap's direction; each face wall takes
+# a tap's largest reach toward it. NutClock measures from +Z, the angle a
+# below from Y: the band is symmetric about 45°, so the two are the same
+# set, and |cos|, |sin| put the same set in every quadrant.
 NUT_TAP_MAJOR = THREAD_MAJOR_MM[feed_nut.SCREW_THREAD]
 _CLEARANCE_R = (SCREW_CLEARANCE_DIA + drilled_oversize_mm(unit=UNIT)) / 2
 _TAP_RADIUS = feed_nut.HOLE_PCD / 2 + feed_nut.HOLE_STATION_BAND + FIT_UP_RESIDUAL
 _TAP_RADIUS_MIN = feed_nut.HOLE_PCD / 2 - feed_nut.HOLE_STATION_BAND - FIT_UP_RESIDUAL
-_CLOCKINGS = tuple(
-    math.radians(NUT_CLOCK_DEG + side * NUT_CLOCK_TOL_DEG) for side in (-1, 0, 1)
-)
-# A tap at angle a from the lug's Y axis: its Y and Z reach from the axis.
-_TAP_REACH_Y = max(_TAP_RADIUS * abs(math.cos(a)) for a in _CLOCKINGS)
-_TAP_REACH_Z = max(_TAP_RADIUS * abs(math.sin(a)) for a in _CLOCKINGS)
-_OFFSET_TOWARD_TAP = max(
-    LEADSCREW_OFFSET_Y * abs(math.cos(a)) + LEADSCREW_OFFSET_Z * abs(math.sin(a))
-    for a in _CLOCKINGS
-)
-LUG_WALLS_MM = {
-    "taps to the leadscrew clearance": _TAP_RADIUS_MIN - _OFFSET_TOWARD_TAP
-    - NUT_TAP_MAJOR / 2 - _CLEARANCE_R,
-    "taps to the lug end": (NUT_AXIS_Y - LUG_Y0) - _AXIS_Y_BAND - LEADSCREW_OFFSET_Y
-    - _TAP_REACH_Y - NUT_TAP_MAJOR / 2,
-    "taps to the bottom face": NUT_AXIS_Z - METRIC_BAND - LEADSCREW_OFFSET_Z
-    - _TAP_REACH_Z - NUT_TAP_MAJOR / 2,
-    "taps to the top face": BLOCK_HEIGHT - NUT_AXIS_Z - METRIC_BAND - LEADSCREW_OFFSET_Z
-    - _TAP_REACH_Z - NUT_TAP_MAJOR / 2,
-}
+_CLOCK_STEPS = 100  # 0.1° across the ±5° band; both limits included
+
+
+def lug_walls_mm(clock_tol_deg: float = NUT_CLOCK_TOL_DEG) -> dict[str, float]:
+    """The lug's tap walls, mm, with every tap anywhere within
+    ``NUT_CLOCK_DEG`` ± ``clock_tol_deg`` (a wider band is the test's
+    negative control)."""
+    clockings = tuple(
+        math.radians(NUT_CLOCK_DEG + clock_tol_deg * (2 * k / _CLOCK_STEPS - 1))
+        for k in range(_CLOCK_STEPS + 1)
+    )
+    # A tap at angle a from the lug's Y axis: its Y and Z reach from the axis.
+    reach_y = max(_TAP_RADIUS * abs(math.cos(a)) for a in clockings)
+    reach_z = max(_TAP_RADIUS * abs(math.sin(a)) for a in clockings)
+    offset_toward_tap = max(
+        LEADSCREW_OFFSET_Y * abs(math.cos(a)) + LEADSCREW_OFFSET_Z * abs(math.sin(a))
+        for a in clockings
+    )
+    return {
+        "taps to the leadscrew clearance": _TAP_RADIUS_MIN - offset_toward_tap
+        - NUT_TAP_MAJOR / 2 - _CLEARANCE_R,
+        "taps to the lug end": (NUT_AXIS_Y - LUG_Y0) - _AXIS_Y_BAND - LEADSCREW_OFFSET_Y
+        - reach_y - NUT_TAP_MAJOR / 2,
+        "taps to the bottom face": NUT_AXIS_Z - METRIC_BAND - LEADSCREW_OFFSET_Z
+        - reach_z - NUT_TAP_MAJOR / 2,
+        "taps to the top face": BLOCK_HEIGHT - NUT_AXIS_Z - METRIC_BAND - LEADSCREW_OFFSET_Z
+        - reach_z - NUT_TAP_MAJOR / 2,
+    }
+
+
+LUG_WALLS_MM = lug_walls_mm()
 # Owner ruling 2026-11-04 (#2177, option B): the clearance-to-tap wall's
 # shortfall under the .080 target, over the .060 floor, is accepted and
 # stated as plain fact on the clearance callout, floored to three places (a

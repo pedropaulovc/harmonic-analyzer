@@ -80,17 +80,19 @@ def test_four_taps_sit_on_the_nut_pcd_on_the_lug_diagonals_and_are_transferred()
     assert len(quadrants)==4
     assert spec.NUT_CLOCK_DEG==45.0 and spec.NUT_CLOCK_TOL_DEG==5.0
     assert spec.TRANSFER_PROCESS=='TRANSFER THROUGH MHA-CH-06-TL-VN-84\nFEED NUT AT ASSEMBLY;\n'
-    assert spec.DRAWING_DIMENSIONS['NutPatternReference']==spec.NUT_PATTERN_PRINTED==('NutCentreZ','NutCentreY')
+    assert spec.DRAWING_DIMENSIONS['NutPatternReference']==spec.NUT_PATTERN_PRINTED==(
+        'NutCentreZ','NutCentreY','NutClock')
     values=spec.DRAWING_VALUES
     assert math.isclose(values['NutCentreY'],spec.NUT_AXIS_Y-spec.LUG_Y0)
     assert {name:spec.DRAWING_PRECISION_BY_NAME[name] for name in spec.NUT_PATTERN_PRINTED}=={
-        'NutCentreZ':3,'NutCentreY':3}
+        'NutCentreZ':3,'NutCentreY':3,'NutClock':0}
     # r1 review: the .515 names its mate; the D arrow says where VIEW D prints.
     assert spec.CALLOUTS_BELOW['NutCentreY']=='ON KP08 LEADSCREW AXIS'
     assert spec.CALLOUTS_BELOW['NutCentreZ']=='FROM CARRIAGE FACE\nON KP08 LEADSCREW AXIS'
     import _oblique_block_drawing as drawing
-    assert drawing.VIEW_SHEET_REF=='(SHEET 2)'
-    assert set(drawing.NUT_KEEP)=={'NutCentreY','NutCentreZ','NutClearanceDia'}
+    assert drawing.VIEW_SHEET_REF==f'(SHEET {spec.NUT_CLOCK_SHEET})'
+    assert drawing.NUT_CAPTION==spec.NUT_CLOCK_VIEW
+    assert set(drawing.NUT_KEEP)=={'NutCentreY','NutCentreZ','NutClearanceDia','NutClock'}
     source=(FOLDER/'_oblique_block_drawing.py').read_text(encoding='utf-8')
     assert source.count('process=contract.TRANSFER_PROCESS')==1
     # The callout lands on the tap at the view's upper right (+Y, +Z).
@@ -175,6 +177,29 @@ def test_clearance_to_tap_wall_is_the_stated_shortfall_and_every_face_wall_meets
     assert spec.CALLOUTS_ABOVE['NutClearanceDia']=='DRILL THRU'
 
 
+def test_every_tap_is_bound_by_the_native_clocking_band_the_walls_charge():
+    # Codjiflo 4477879822 on #2187: one clocked hole bounds no other, so the
+    # band binds every tap, as NutClock's 4X prints; the walls take each tap
+    # anywhere in it, sampled through the band, not at its ends only.
+    assert spec.CALLOUTS_PREFIX=={'NutClock':f'{feed_nut.SCREW_COUNT}X '}
+    assert spec.LUG_WALLS_MM==spec.lug_walls_mm(spec.NUT_CLOCK_TOL_DEG)
+    y,z=spec.NUT_HOLES_YZ[spec.NUT_CLOCK_TAP]
+    assert (y<spec.NUT_AXIS_Y,z>spec.NUT_AXIS_Z)==(True,True)  # VIEW D's lower right
+    assert math.isclose(math.degrees(math.atan2(spec.NUT_AXIS_Y-y,z-spec.NUT_AXIS_Z)),spec.NUT_CLOCK_DEG)
+    assert math.isclose(spec.NUT_CLOCK_RAY,feed_nut.HOLE_PCD/2)
+    # Negative control: a tap free to sit 10° off its diagonal, as an
+    # unequally spaced nut clocked by one hole could leave it, takes the
+    # clearance wall under the .060 floor.
+    assert spec.lug_walls_mm(spec.NUT_CLOCK_TOL_DEG+10.0)['taps to the leadscrew clearance']<WALL_FLOOR_MM
+    # The band is a native driving angle on the hidden NutPatternReference,
+    # toleranced on the model, never typed.
+    shared=(FOLDER/'_oblique_pivot_block_model.py').read_text(encoding='utf-8')
+    assert 'dims.record(part.NUT_CLOCK_DIMENSION)' in shared
+    assert 'set_dimension_symmetric_angular_tolerance(adapter,"NutPatternReference",part.NUT_CLOCK_DIMENSION,' in shared
+    assert 'NutPatternReference' in spec.REFERENCE_SKETCHES
+
+
+
 def test_nut_screws_stop_inside_the_through_tap():
     assert feed_nut.SCREW_TIP_REACH_MAX<spec.LUG_WIDTH
 
@@ -214,9 +239,11 @@ def test_reference_lines_on_the_printed_outline_are_plain_sketch_lines():
 
     assert '_as_construction' not in {call.func.id for call in calls(functions['_drawn'])}
     assert '_as_construction' in {call.func.id for call in calls(functions['_construction'])}
-    for name,lines in (('_plan_datum_reference',2),('_nut_pattern_reference',1)):
+    # NutClock's two rays are construction lines off every outline.
+    for name,expected in (('_plan_datum_reference',['_drawn']*2),
+                          ('_nut_pattern_reference',['_drawn','_construction','_construction'])):
         wrappers=[call.func.id for call in calls(functions[name]) if creates(call,'add_line')]
-        assert wrappers==['_drawn']*lines, (name,wrappers)
+        assert wrappers==expected, (name,wrappers)
     circles=[call.func.id for call in calls(functions['_construction_circle']) if creates(call,'add_circle')]
     assert circles==['_construction']
 

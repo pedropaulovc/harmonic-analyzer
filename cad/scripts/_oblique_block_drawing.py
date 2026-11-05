@@ -180,11 +180,15 @@ VIEW_SHEET_REF_OFFSET = (-.010, -.008)
 # the upper-left tap; the taps' transfer callout from the upper right onto
 # the upper-right tap's rim, wholly right of the view's edge (x 214; from
 # the lower right its rows ran into the title block, final
-# 20261103T152424387Z).
+# 20261103T152424387Z). The taps' clocking, 4X 45° ±5° from the axis's +Z
+# centreline to the lower-right (-Y, +Z) tap, reads on the wedge's bisector
+# 45 mm out (at 2:1), wholly right of the lug's top face (x 214.5) and above
+# the title block: its arc runs 222-236 x, 81-113 y, outside the lug's
+# corner (214.5, 87) by 10 mm.
 NUT_XY, NUT_SCALE = (.190,.175), (2,1)
 NUT_KEEP = {
     'NutCentreY':(.104,.100),'NutCentreZ':(.134,.0772),
-    'NutClearanceDia':(.135,.133),
+    'NutClearanceDia':(.135,.133),'NutClock':(.2321,.0958),
 }
 NUT_CAPTION = 'VIEW D'
 NUT_CAPTION_XY = (.178,.058)  # the note's left edge; centred under the view

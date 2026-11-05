@@ -1862,6 +1862,11 @@ if NUMBER_DRILL_MM[_TAP_DRILL] != feed_block.NUT_TAP_DRILL:
 # 2026-11-04, #2177 option 3): a head over feed_nut.SCREW_HEAD_DIA_MAX is
 # rejected and replaced, and the nut body is never cut (TL-32 spec,
 # HEAD_TO_BODY_*).
+# F1B sets all four of the nut's holes within TL-32's native tap clocking
+# (NutClock, printed 4X on its VIEW D) and cites it by view, typing no angle
+# (Codjiflo 4477879822 and 4477879826 on #2187): the supplier gives the holes
+# no angular stations, so one clocked hole bounds no other, and TL-32's lug
+# walls charge each tap anywhere in that band.
 _HEAD_LIMIT = _bound(feed_nut.SCREW_HEAD_DIA_MAX, 3, up=False)
 _HEAD_SHARP_MAX = _length(feed_block.HEAD_DIA_SHARP_MAX, 3)
 FEED_FIT_STEPS = (
@@ -1875,9 +1880,10 @@ FEED_FIT_STEPS = (
     f"Ø{_length(feed_block.SCREW_CLEARANCE_DIA, feed_block.NUT_PATTERN_PLACES)} "
     f"CLEARANCE WITHOUT FORCING IT; TIGHTEN THE KP08 SCREWS TO {_KP08_TORQUE}, "
     f"THE SCREW STILL {leadscrew.NEAR_STUB:.1f} MM PAST THE NEAR BLOCK. "
-    f"LAY A {feed_block.NUT_CLOCK_DEG:.0f}° SQUARE ON THE LUG'S TOP EDGE AND TURN "
-    "THE NUT UNTIL ONE HOLE CENTRES ON ITS BLADE THROUGH THE SCREW AXIS, "
-    f"{feed_block.NUT_CLOCK_DEG:.0f}° ±{feed_block.NUT_CLOCK_TOL_DEG:.0f}°; HOLD IT "
+    f"TURN THE NUT UNTIL ALL {feed_nut.SCREW_COUNT} HOLES CENTRE WITHIN THE TAP "
+    f"CLOCKING ON {feed_block.NUT_CLOCK_REFERENCE}, EACH CHECKED WITH A MITRE "
+    "SQUARE ON THE LUG'S TOP EDGE THROUGH THE SCREW AXIS; REJECT A NUT WHOSE "
+    f"{feed_nut.SCREW_COUNT} HOLES CANNOT ALL BE SET WITHIN IT. HOLD IT "
     "THERE AND TURN THE SCREW, NEVER SLIDE IT, UNTIL THE NUT SEATS FLAT ON THE "
     "LUG FACE; CLAMP IT.",
     f"F2. SPOT THE {feed_nut.SCREW_COUNT} TAPS THROUGH THE NUT'S HOLES WITH A "
