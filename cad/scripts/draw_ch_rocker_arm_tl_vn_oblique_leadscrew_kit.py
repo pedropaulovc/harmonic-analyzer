@@ -66,7 +66,6 @@ from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import offset_dimension_text, set_dimension_callouts
 import _drawing_hidden_sketches as hidden_sketches
-from _drawing_layout_check import LeaderSegment, _segment_crosses_box
 from _drawing_leader_notes import add_leader_note
 from _drawing_leaders import dimension_text_points, set_near_side_diameter
 from _drawing_notes import property_link
@@ -1439,8 +1438,15 @@ def _callout_block(adapter: Any, annotation: Any, label: str) -> tuple[Any, tupl
 # A callout's text must not be crossed by a line (run 20261105T023247678Z's
 # gating findings): its own dimension, extension or leader lines, or a part
 # outline of either view. The outlines are the spec's geometry projected into
-# each view; a leader ends ON its shoulder, hence the inset.
+# each view; a leader ends ON its shoulder, hence the inset. A callout's own
+# line may also END just inside its text: run 20261105T030845448Z's CskDia
+# extension line ran 1.0 mm past its dimension line, which the text abuts
+# (0.2690 .. 0.3160 at y 0.2012, text from x 0.3150), as run 11 printed
+# unflagged. So an own line counts only where it runs more than
+# _OWN_LINE_TOUCH_M inside the text; run 11's faced-length line and witness
+# ran 27.7 and 8.5 mm.
 _TEXT_LINE_INSET = 0.0005
+_OWN_LINE_TOUCH_M = 0.0015
 # End view: (model centre (x, y, z) mm, radius mm); the countersinks' mouths
 # and the holes ring each hole centre.
 END_VIEW_CIRCLES_MM = {
@@ -1477,22 +1483,38 @@ def _circle_crosses_box(circle: tuple[float, float, float], box: tuple[float, ..
     return near < radius < far
 
 
+def _length_inside(line: tuple[float, float, float, float], box: tuple[float, ...]) -> float:
+    """How far ``line`` runs inside ``box`` (Liang-Barsky clip), sheet metres."""
+    x0, y0, x1, y1 = line
+    dx, dy = x1 - x0, y1 - y0
+    t0, t1 = 0.0, 1.0
+    for p, q in ((-dx, x0 - box[0]), (dx, box[2] - x0), (-dy, y0 - box[1]), (dy, box[3] - y0)):
+        if p == 0.0:
+            if q < 0.0:
+                return 0.0
+            continue
+        t = q / p
+        if p < 0.0:
+            t0 = max(t0, t)
+        else:
+            t1 = min(t1, t)
+    return max(0.0, t1 - t0) * math.hypot(dx, dy)
+
+
 def text_crossings(
     box: tuple[float, ...],
     *,
     lines: Mapping[str, tuple[float, float, float, float]],
     circles: Mapping[str, tuple[float, float, float]],
+    touch: float = 0.0,
 ) -> list[str]:
     """Which of ``lines`` ((x0, y0, x1, y1)) and ``circles`` ((cx, cy, r)),
-    sheet metres, run through ``box`` shrunk by ``_TEXT_LINE_INSET``."""
+    sheet metres, run through ``box`` shrunk by ``_TEXT_LINE_INSET``; a line
+    counts only where it runs more than ``touch`` inside."""
     inset = _TEXT_LINE_INSET
     inner = (box[0] + inset, box[1] + inset, box[2] - inset, box[3] - inset)
     return [
-        *(
-            name
-            for name, line in lines.items()
-            if _segment_crosses_box(LeaderSegment(name, "line", *line, ""), box, inset=inset)
-        ),
+        *(name for name, line in lines.items() if _length_inside(line, inner) > touch),
         *(name for name, circle in circles.items() if _circle_crosses_box(circle, inner)),
     ]
 
@@ -1566,17 +1588,26 @@ def _assert_rework_ink(
             continue
         require_leader_clear(inks[name], others)
         # Own lines against the shoulder's box, whose lower-left corner the
-        # leader ends on; outlines against the whole text block.
+        # leader ends on, each allowed to end just inside it; outlines against
+        # the whole text block.
         own = {
-            f"own line {index}": (segment.x0, segment.y0, segment.x1, segment.y1)
+            f"own line {index} {_fmt_line(segment)}": (
+                segment.x0, segment.y0, segment.x1, segment.y1,
+            )
             for index, segment in enumerate(inks[name].leader)
         }
         crossed = [
-            *text_crossings(inks[name].text, lines=own, circles={}),
+            *text_crossings(
+                inks[name].text, lines=own, circles={}, touch=_OWN_LINE_TOUCH_M
+            ),
             *text_crossings(box, lines=outline_lines, circles=outline_circles),
         ]
         if crossed:
             raise RuntimeError(f"{name} callout text {box!r} is crossed by {crossed}")
+
+
+def _fmt_line(segment: Any) -> str:
+    return f"({segment.x0:.4f}, {segment.y0:.4f}, {segment.x1:.4f}, {segment.y1:.4f})"
 
 
 def _add_spigot_note(adapter: Any, section: Any) -> tuple[Any, tuple[float, float]]:

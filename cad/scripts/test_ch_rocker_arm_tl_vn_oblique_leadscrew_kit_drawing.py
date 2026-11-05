@@ -1649,10 +1649,11 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
             for x in faced_span
         },
     }
-    assert sorted(draw.text_crossings(run11["faced"][0], lines=faced_own, circles={})) == [
-        "line", f"witness {faced_span[1]:.4f}",
-    ]
-    assert draw.text_crossings(faced_text, lines=faced_own, circles={}) == []
+    touch = draw._OWN_LINE_TOUCH_M
+    assert sorted(
+        draw.text_crossings(run11["faced"][0], lines=faced_own, circles={}, touch=touch)
+    ) == ["line", f"witness {faced_span[1]:.4f}"]
+    assert draw.text_crossings(faced_text, lines=faced_own, circles={}, touch=touch) == []
     # callout_ink takes the longest horizontal stroke for the shoulder: the
     # mate's row, even at run 9's measured pitch, outruns the dimension line.
     assert width(faced_callout, dim_char_measured) > faced_span[1] - faced_span[0]
@@ -1800,6 +1801,95 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
         )
     ]
     assert steps == sorted(steps)
+
+
+# Run 20261105T030845448Z's logged callout ink on sheet 3: (shoulder box,
+# display lines), sheet metres. Its readback refused CskDia for "own line 1",
+# the upper extension line, which runs 1.0 mm past the dimension line into
+# the text that abuts it, as run 11 printed it, unflagged.
+_RUN12_INK = {
+    "CskDia": (
+        (0.3150, 0.1924, 0.3971, 0.2236),
+        [
+            (0.2690, 0.1828, 0.3160, 0.1828),
+            (0.2690, 0.2012, 0.3160, 0.2012),
+            (0.3971, 0.1924, 0.3150, 0.1924),
+            (0.3150, 0.1924, 0.3150, 0.2012),
+            (0.3150, 0.1828, 0.3150, 0.1765),
+        ],
+    ),
+    "FacedLength": (
+        (0.3182, 0.0861, 0.3822, 0.1027),
+        [
+            (0.2530, 0.1386, 0.2530, 0.1050),
+            (0.3082, 0.1386, 0.3082, 0.1050),
+            (0.2530, 0.1060, 0.2467, 0.1060),
+            (0.2530, 0.1060, 0.3082, 0.1060),
+            (0.3082, 0.1060, 0.3146, 0.1060),
+            (0.2806, 0.1060, 0.3182, 0.0861),
+            (0.3182, 0.0861, 0.3822, 0.0861),
+        ],
+    ),
+    "ReceiptBodyDia": (
+        (0.1796, 0.2091, 0.2288, 0.2259),
+        [(0.1268, 0.1719, 0.1796, 0.2091), (0.1796, 0.2091, 0.2288, 0.2091)],
+    ),
+    "ReceiptHolePcd": (
+        (0.1775, 0.1866, 0.2309, 0.2034),
+        [(0.1398, 0.1717, 0.1775, 0.1866), (0.1775, 0.1866, 0.2309, 0.1866)],
+    ),
+    "ReceiptHoleDia": (
+        (0.1690, 0.1494, 0.2394, 0.1696),
+        [(0.1485, 0.1574, 0.1690, 0.1494), (0.1690, 0.1494, 0.2394, 0.1494)],
+    ),
+}
+
+
+def test_callout_text_crossings_pass_run_12_and_refuse_run_11() -> None:
+    """The readback's crossing rule on measured ink: a callout's own line may
+    end just inside its text (run 12's CskDia extension line, 1.0 mm), but a
+    line or witness through it (run 11's faced length) and a part outline
+    through it (run 11's hole callout) refuse."""
+    scale = draw._REWORK_PER_MODEL_MM
+    cx, cy = draw.REWORK_END_CENTER
+    circles = {
+        name: (cx + z * scale, cy + x * scale, radius * scale)
+        for name, ((x, _y, z), radius) in draw.END_VIEW_CIRCLES_MM.items()
+    }
+    sx, sy = draw.REWORK_SECTION_CENTER
+
+    def section_point(radius, station):
+        return (sx + (station - nut.LENGTH / 2.0) * scale, sy + radius * scale)
+
+    lines = {
+        name: (*section_point(*start), *section_point(*end))
+        for name, (start, end) in draw.SECTION_OUTLINE_MM.items()
+    }
+    touch = draw._OWN_LINE_TOUCH_M
+    for name, (text, ink) in _RUN12_INK.items():
+        # callout_ink's leader: every line but the shoulder under the text.
+        own = {
+            str(index): line
+            for index, line in enumerate(
+                line for line in ink if not (line[1] == line[3] == text[1])
+            )
+        }
+        assert len(own) == len(ink) - 1, name
+        assert draw.text_crossings(text, lines=own, circles={}, touch=touch) == [], name
+        assert draw.text_crossings(text, lines=lines, circles=circles) == [], name
+    # The pass is the touch allowance: the extension line does end inside.
+    text, ink = _RUN12_INK["CskDia"]
+    assert draw.text_crossings(text, lines={"extension": ink[1]}, circles={}) == ["extension"]
+    # Run 11's faced length: its line and far witness through the text.
+    faced = (0.2803, 0.0980, 0.3448, 0.1135)
+    _text, ink = _RUN12_INK["FacedLength"]
+    witnesses = {"line": ink[3], "far witness": ink[1], "near witness": ink[0]}
+    assert draw.text_crossings(faced, lines=witnesses, circles={}, touch=touch) == [
+        "line", "far witness",
+    ]
+    # Run 11's hole callout: the flange's Ø22 and the +Z countersink.
+    crossed = draw.text_crossings((0.1467, 0.1499, 0.1954, 0.1699), lines=lines, circles=circles)
+    assert "flange OD" in crossed and any(name.startswith("countersink") for name in crossed)
 
 
 def test_notes_name_the_item_not_its_length_or_material() -> None:
