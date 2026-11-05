@@ -3211,7 +3211,9 @@ def test_concurrent_local_publications_use_unique_temps_and_converge(
     backend, root = archive_store.backend, archive_store.root
     key, payload = "f" * 64, b"same canonical archive" * 8
     _put_bytes(backend, key, payload)
-    barrier = threading.Barrier(2)
+    both_missed = threading.Event()
+    misses_lock = threading.Lock()
+    misses = []
     lookup = cache._local_archive
     replace = cache.os.replace
     publications = []
@@ -3219,8 +3221,19 @@ def test_concurrent_local_publications_use_unique_temps_and_converge(
     def simultaneous(*args):
         result = lookup(*args)
         assert result == (None, "miss")
-        barrier.wait(timeout=10)
+        with misses_lock:
+            misses.append(result)
+            if len(misses) == 2:
+                both_missed.set()
+        both_missed.wait()
         return result
+
+    def get_bytes(_index):
+        try:
+            return _get_bytes(backend, key)
+        finally:
+            # Release a waiting peer even if this worker fails before its lookup.
+            both_missed.set()
 
     def record_replace(source, destination):
         publications.append(Path(source))
@@ -3229,7 +3242,8 @@ def test_concurrent_local_publications_use_unique_temps_and_converge(
     monkeypatch.setattr(cache, "_local_archive", simultaneous)
     monkeypatch.setattr(cache.os, "replace", record_replace)
     with concurrent.futures.ThreadPoolExecutor(2) as pool:
-        results = list(pool.map(lambda _index: _get_bytes(backend, key), range(2)))
+        results = list(pool.map(get_bytes, range(2)))
+    assert len(misses) == 2
     assert results == [payload, payload]
     assert len(publications) == len(set(publications)) == 1
     [path] = (root / "objects").iterdir()
