@@ -90,6 +90,8 @@ OUTPUTS = DrawingOutputs(
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
+# The fitter sheets print decimal inch (ha-harmonic-analyzer.yaml ``drawing_unit``).
+UNIT = assembly_contract(spec.ASM_NAME).drawing_unit
 
 SHEET_NAMES = (
     "ASSEMBLED",
@@ -162,10 +164,11 @@ BAR_DIMENSION_TEXT_DX = -0.016  # left of the front view's outline
 # lines carried across the column to it (r3: beside the rod it sat across the
 # rod and the wheel rim; r4: inside the frame, pressed against the pen
 # hanger). Model x of the text centre: the east column's outer face is at
-# x = -(197 + 12.7) (fr_top_frame_spec.COLUMN_X, fr_tube_frame_spec.OUTER_DIA;
-# pinned by the test); the 7-character callout is ~80 mm of model wide at 1:5,
-# so its west end clears the column by ~15 mm of model (3 mm of sheet) and its
-# east end stays ~10 mm of sheet short of the crank-side view's crank handle.
+# x = -(197.0024 + 12.7), the 7.756 column line (fr_top_frame_spec.COLUMN_X,
+# fr_tube_frame_spec.OUTER_DIA; pinned by the test); the 7-character callout
+# is ~80 mm of model wide at 1:5, so its west end clears the column by ~15 mm
+# of model (3 mm of sheet) and its east end stays ~10 mm of sheet short of the
+# crank-side view's crank handle.
 STUD_DIMENSION_TEXT_MODEL_X_MM = -265.0
 # The bar-height setting's construction line lies on the west front column's
 # axis (ha_harmonic_analyzer_assembly_spec.BAR_HEIGHT_X), shown in the front
@@ -1106,7 +1109,7 @@ def _append_template_sheet(adapter: Any, target: Any, *, name: str) -> None:
     donor_title = ""
     try:
         donor, donor_sheet = new_project_drawing(
-            adapter, layout=SHEET_LAYOUTS[name], scale=SHEET_SCALES[name]
+            adapter, layout=SHEET_LAYOUTS[name], scale=SHEET_SCALES[name], unit=UNIT
         )
         donor = _early_bound(donor, "IModelDoc2")
         donor_sheet = _early_bound(donor_sheet, "ISheet")
@@ -1158,6 +1161,7 @@ def _create_mixed_package_sheets(adapter: Any) -> None:
         adapter,
         layout=SHEET_LAYOUTS[SHEET_NAMES[0]],
         scale=SHEET_SCALES[SHEET_NAMES[0]],
+        unit=UNIT,
     )
     target = _early_bound(target, "IModelDoc2")
     initial = _early_bound(initial, "ISheet")

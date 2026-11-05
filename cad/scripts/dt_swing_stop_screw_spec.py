@@ -91,4 +91,10 @@ MIN_USEFUL_ENGAGEMENT_SOURCE = (
     "Functional installation inspection: full-form stop thread engagement "
     "at least 1.5D, rounded upward to 0.01 mm; head fully seated"
 )
-MIN_USEFUL_ENGAGEMENT_TEXT = f"{MIN_USEFUL_ENGAGEMENT_MM:.2f} MIN"
+# MHA-DT-00 prints decimal inch (#290): the 1.5D rule rounded up to .001 in,
+# never over MIN_USEFUL_ENGAGEMENT_MM, which the stacks guarantee.
+MIN_USEFUL_ENGAGEMENT_TEXT = (
+    f"{ceil(1.5 * SHANK_DIA / 25.4 * 1000.0 - 1e-9) / 1000.0:.3f}".removeprefix("0") + " MIN"
+)
+if float(MIN_USEFUL_ENGAGEMENT_TEXT.split()[0]) * 25.4 > MIN_USEFUL_ENGAGEMENT_MM + 1e-9:
+    raise AssertionError("the printed stop engagement minimum exceeds the guaranteed one")

@@ -134,7 +134,11 @@ def plan_explode(
 SETTING_FEATURE = "IntegrationSettings"
 BAR_HEIGHT_DIMENSION = "WheelBarTopAboveDeck"
 STUD_DROP_DIMENSION = "StudHeadBelowWheelBar"
-SETTING_PRECISION = 1
+# The sheet prints decimal inch (ha-harmonic-analyzer.yaml ``drawing_unit``).
+# Both are functional settings, so they print at .XX (title block +/-.01),
+# never the inch .X row reserved for non-functional sizes (title_block.yaml),
+# which would loosen the old mm .X row's +/-0.8 to +/-2.54 (#290).
+SETTING_PRECISION = 2
 DRAWING_DIMENSIONS = {SETTING_FEATURE: {BAR_HEIGHT_DIMENSION, STUD_DROP_DIMENSION}}
 DRAWING_PRECISION = {
     SETTING_FEATURE: {

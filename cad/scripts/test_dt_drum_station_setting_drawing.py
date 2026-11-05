@@ -64,12 +64,17 @@ def test_one_band_feeds_every_drum_station_stack() -> None:
     for stack in (assembly.ARBOR_SOUTH_TRAVEL_STACK, assembly.ARBOR_NORTH_TRAVEL_STACK):
         bands = [value for key, value in stack.items() if "drum station" in key]
         assert bands == [arbor.DRUM_STATION_BAND]
-    # ±.010 in is ±0.254 mm: the mm sheet prints it whole only at three places.
+    # ±.010 in is ±0.254 mm: the inch sheet prints it exactly, and the nominal
+    # (on the .001 grid) at the band's three places.
     assert upper == pytest.approx(0.254)
-    assert _tolerance_places(lower, upper, display_unit="mm") == setting.TOLERANCE_PRECISION
-    # The nominal prints exactly at its two places (2.40 in).
-    assert setting.DRAWING_PRECISION == {setting.FEATURE: {setting.DIMENSION: 2}}
-    assert round(arbor.DRUM_STATION, 2) == pytest.approx(arbor.DRUM_STATION, abs=1e-9)
+    assert _tolerance_places(lower, upper, display_unit="in") <= setting.TOLERANCE_PRECISION
+    assert setting.DRAWING_PRECISION == {
+        setting.FEATURE: {setting.DIMENSION: setting.TOLERANCE_PRECISION}
+    }
+    places = setting.TOLERANCE_PRECISION
+    assert round(arbor.DRUM_STATION / 25.4, places) * 25.4 == pytest.approx(
+        arbor.DRUM_STATION, abs=1e-9
+    )
     assert setting.DRAWING_DIMENSIONS == {setting.FEATURE: {setting.DIMENSION}}
 
 
@@ -105,7 +110,9 @@ def test_build_authors_both_settings_through_one_globals_driven_recipe() -> None
         "set_global(adapter, axis_global",
         "set_global(adapter, name,",
         "drive_dimension(adapter, name, expression)",
-        "set_dimension_symmetric_tolerance(adapter, feature, name, upper)",
+        "set_dimension_symmetric_tolerance(\n            adapter, feature, name, upper,\n"
+        "            display_unit=assembly_contract(ASM_NAME).drawing_unit,",
+        "display_unit=assembly_contract(ASM_NAME).drawing_unit,\n            label=name,",
         "display.SetText(4, text)",
         "mark_dimensions_for_drawing(adapter, feature, names)",
         "blank_sketch(adapter, feature)",
@@ -169,13 +176,13 @@ def test_the_drum_station_view_fits_beside_the_bank_above_the_title_block() -> N
 
 def test_the_settings_sheet_reads_back_the_drum_setting_like_the_bank() -> None:
     assert drawing.SETTING_DIMENSIONS[setting.FEATURE] == {setting.DIMENSION}
-    assert drawing.SETTING_PRECISION[setting.DIMENSION] == 2
+    assert drawing.SETTING_PRECISION[setting.DIMENSION] == setting.TOLERANCE_PRECISION
     assert drawing.SETTING_CALLOUTS[setting.DIMENSION] is (
         setting.DIMENSION_CALLOUTS[setting.DIMENSION]
     )
     assert drawing.SETTING_BANDS[setting.DIMENSION] == setting.DIMENSION_BANDS[setting.DIMENSION]
     for name in (bank_settings.STACK_DIMENSION, bank_settings.SPRING_DIMENSION):
-        assert drawing.SETTING_PRECISION[name] == 2
+        assert drawing.SETTING_PRECISION[name] == bank_settings.TOLERANCE_PRECISION
         assert drawing.SETTING_BANDS[name] == bank_settings.DIMENSION_BANDS[name]
     source = inspect.getsource(drawing._place_bank_setting_sheet)
     for fragment in (

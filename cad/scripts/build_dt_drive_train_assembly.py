@@ -157,6 +157,8 @@ from _sketch import (
 )
 import dt_cylinder_bank_setting_spec as bank_settings
 import dt_drum_station_setting_spec as drum_station_setting
+from _assembly_contract import assembly_contract
+from _document_units import apply_package_model_units
 from _rebuild import force_rebuild
 from _session import run_build
 from _printed_tolerance import angular_band_deg, drilled_oversize_mm, printed_deviations
@@ -4693,12 +4695,15 @@ async def _author_setting_references(adapter, settings) -> None:
         upper, lower = settings.DIMENSION_BANDS[name]
         if abs(upper + lower) > 1e-12:
             raise AssertionError(f"{name} needs a centred setting band")
-        set_dimension_symmetric_tolerance(adapter, feature, name, upper)
+        set_dimension_symmetric_tolerance(
+            adapter, feature, name, upper,
+            display_unit=assembly_contract(ASM_NAME).drawing_unit,
+        )
         display, _ = _named_dimension(adapter, feature, name)
         _set_tolerance_precision(
             display,
             (lower, upper),
-            display_unit="mm",
+            display_unit=assembly_contract(ASM_NAME).drawing_unit,
             label=name,
             places=settings.TOLERANCE_PRECISION,
         )
@@ -4768,6 +4773,7 @@ async def build(adapter) -> dict[str, str]:
     for line in rig_margin_lines():
         _telemetry.info(f"rig margin {line}")
     check("create_assembly", await adapter.create_assembly())
+    apply_package_model_units(adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME)
 
     # =================== structure (static lock + moving joints) ===========
     # The stationary arbor is the reference frame the moving train mates

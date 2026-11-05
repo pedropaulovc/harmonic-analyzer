@@ -65,6 +65,8 @@ import fr_harmonic_base_spec
 import ha_harmonic_analyzer_assembly_spec as spec
 import ms_measuring_stick_assembly_spec as ms
 from _check import check
+from _assembly_contract import assembly_contract
+from _document_units import apply_package_model_units
 from _custom_properties import apply_custom_properties
 from _paths import OUT_PNG, OUT_SLDASM
 from _session import run_build
@@ -270,6 +272,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_assembly", await adapter.create_assembly())
+    apply_package_model_units(adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME)
 
     for name in SUBASSEMBLIES:
         data = check(

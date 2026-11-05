@@ -9,6 +9,8 @@ text: writing it through an imported display dimension can dirty the source.
 
 from __future__ import annotations
 
+import math
+
 import cylinder_bank_layout as bank
 from cone_line import Y_DRIVE
 
@@ -24,12 +26,30 @@ LEGS = (
 )
 AXIS_Y = Y_DRIVE
 DRAWING_DIMENSIONS = {feature: {name} for feature, name, _south, _north in LEGS}
-DRAWING_PRECISION = {feature: {name: 2} for feature, name, _south, _north in LEGS}
+# The package prints decimal inch (#290).  Both settings carry a ±0.10 fit-up
+# band, printed ±.003 at three inch places: floored onto the printed grid so
+# the sheet never admits a stack or gap the bank layout's budget refuses
+# (±.004 would, by 0.0016), the nominal (5.556, .037) at the band's places
+# (drawing-guidelines rule 3).  Four places (±.0039) read as a converted mm
+# band, not a deliberate inch one.
+PLACES = 3
+DRAWING_PRECISION = {feature: {name: PLACES} for feature, name, _south, _north in LEGS}
+
+
+def _inward(band_mm: float) -> float:
+    """``band_mm`` floored onto the ``PLACES``-place inch grid, in mm."""
+    return math.floor(band_mm / 25.4 * 10**PLACES + 1e-9) / 10**PLACES * 25.4
+
+
 DIMENSION_BANDS = {
-    STACK_DIMENSION: bank.STACK_L20_ACCEPT_BAND,
-    SPRING_DIMENSION: (bank.BANK_SPRING_SET_BAND, -bank.BANK_SPRING_SET_BAND),
+    STACK_DIMENSION: (
+        _inward(bank.STACK_L20_ACCEPT_BAND[0]), -_inward(-bank.STACK_L20_ACCEPT_BAND[1])
+    ),
+    SPRING_DIMENSION: (
+        _inward(bank.BANK_SPRING_SET_BAND), -_inward(bank.BANK_SPRING_SET_BAND)
+    ),
 }
-TOLERANCE_PRECISION = 2
+TOLERANCE_PRECISION = PLACES
 DIMENSION_CALLOUTS = {
     STACK_DIMENSION: "CLOSED GEAR STACK",
     SPRING_DIMENSION: "GEAR 19 TO NORTH PEDESTAL / SET WITH BLADE",

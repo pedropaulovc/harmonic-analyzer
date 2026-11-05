@@ -560,8 +560,12 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     import cone_set_stack as set_stack
 
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
-    t012 = f"{set_stack.feeler_gap_mm(12):.2f} AT T012"
-    t120 = f"{set_stack.feeler_gap_mm(120):.2f} AT T120"
+
+    def feeler(value: float) -> str:
+        return drawing.inch_text(value, drawing.FEELER_PLACES)
+
+    t012 = f"{feeler(set_stack.feeler_gap_mm(12))} AT T012"
+    t120 = f"{feeler(set_stack.feeler_gap_mm(120))} AT T120"
     order = [
         check.index("TO THE MHA-SH-VN-52 STOP, CLEAR OF EVERY MHA-DT-12"),
         check.index("(MHA-DT-VN-62) TO SNUG-LOOSE"),
@@ -571,7 +575,7 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
         # CodeRabbit on #1272: the shims block the swing, so they come out
         # before the T120 feeler set.
         check.index("SWING OUT AND REMOVE THE SHIMS"),
-        check.index(f"{set_stack.feeler_gap_mm(120):.2f} FEELER IS SNUG T120 TIP TO ROOT"),
+        check.index(f"{feeler(set_stack.feeler_gap_mm(120))} FEELER IS SNUG T120 TIP TO ROOT"),
         check.index("TIGHTEN MHA-DT-VN-51"),
     ]
     assert order == sorted(order), check
@@ -585,8 +589,14 @@ def test_cone_swing_check_requires_installed_stop_inspection_and_seating() -> No
     import dt_swing_stop_screw_spec as stop_screw
 
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
-    minimum = f"{stop_screw.MIN_USEFUL_ENGAGEMENT_MM:.2f}"
-    assert f"VERIFY THE MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT {minimum} MIN" in check
+    printed = re.search(
+        r"VERIFY THE MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT (\.\d{3}) MIN", check
+    )
+    assert printed is not None
+    # The inch minimum is the 1.5D rule rounded up, never over the guarantee.
+    minimum = float(printed.group(1)) * 25.4
+    assert 1.5 * stop_screw.SHANK_DIA - 1e-9 <= minimum
+    assert minimum <= stop_screw.MIN_USEFUL_ENGAGEMENT_MM + 1e-9
     assert "HEAD FULLY SEATED" in check
     assert "MHA-DT-20 REMAINS SEATED THROUGH P1" in check
 
@@ -596,8 +606,12 @@ def test_cone_swing_check_requires_pivot_thread_engagement() -> None:
     import dt_vn_cone_pivot_screw_spec as pivot_screw
 
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
-    minimum = f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_MM:.2f}"
-    assert f"VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT {minimum} MIN" in check
+    printed = re.search(r"VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT (\.\d{3}) MIN", check)
+    assert printed is not None
+    # The inch minimum is the 1D floor rounded up, never over the guarantee.
+    minimum = float(printed.group(1)) * 25.4
+    assert pivot_screw.THREAD_SOLID_DIA - 1e-9 <= minimum
+    assert minimum <= pivot_screw.MIN_USEFUL_ENGAGEMENT_MM + 1e-9
     assert "SHOULDER FULLY SEATED" in check
 
 
@@ -620,7 +634,7 @@ def test_rig_is_located_by_its_parked_tip_gap() -> None:
     import dt_drive_train_steps as steps
     import pinion_rig_tip_gap as tip_gap
 
-    feeler = f"{tip_gap.TIP_GAP_FEELER:.2f} FEELER"
+    feeler = f"{tip_gap.TIP_GAP_SETTING_TEXT} FEELER"
     located = _rig_step_body("rig-located")
     for phrase in ("TRANSFERRED", tip_gap.TIP_GAP_FEELER_TEXT, tip_gap.TIP_GAP_ACCEPT_TEXT):
         assert phrase in located, phrase
@@ -630,6 +644,11 @@ def test_rig_is_located_by_its_parked_tip_gap() -> None:
         f"{tip_gap.TIP_GAP_ACCEPT_TEXT} (SHEET {drawing.FIT_SHEET}, "
         f"STEP {steps.step_number('rig-located')})"
     ) in check
+    # The inch acceptance rounds inward, inside the spec's window.
+    printed = re.search(r"ACCEPT (\.\d{3})-(\.\d{3})", tip_gap.TIP_GAP_ACCEPT_TEXT)
+    assert printed is not None
+    low, high = (float(value) * 25.4 for value in printed.groups())
+    assert tip_gap.TIP_GAP_ACCEPT[0] - 1e-9 <= low < high <= tip_gap.TIP_GAP_ACCEPT[1] + 1e-9
     assert f"SEE SHEET {drawing.CHECKS_SHEET}" in drawing.ASSEMBLED_HEADING
     assert f"PINION RIG: CONT. ON SHEET {drawing.FIT_SHEET}." in drawing.BANK_STEPS
     # The seats are spotted after RIG SET, and drilled per the base's own
@@ -710,9 +729,14 @@ def test_the_tip_gap_feeler_is_the_rest_gap_in_gage_leaves() -> None:
             tip_gap.TIP_GAP_FEELER + tip_gap.TIP_GAP_ACCEPT_BAND,
         )
     )
-    printed = re.search(r"\(([\d.+ ]+) STARRETT 66MA LEAVES\)", tip_gap.TIP_GAP_FEELER_TEXT)
+    # The inch sheet prints the setting to the thousandth, then the leaves
+    # by their stamped metric size.
+    printed = re.search(
+        r"^(\.\d{3}) FEELER \(([\d.+ ]+) MM STARRETT 66MA LEAVES\)$", tip_gap.TIP_GAP_FEELER_TEXT
+    )
     assert printed is not None
-    leaves = [float(leaf) for leaf in printed.group(1).split(" + ")]
+    assert float(printed.group(1)) * 25.4 == pytest.approx(tip_gap.TIP_GAP_FEELER, abs=0.0127)
+    leaves = [float(leaf) for leaf in printed.group(2).split(" + ")]
     assert math.isclose(sum(leaves), tip_gap.TIP_GAP_FEELER, abs_tol=1e-9)
     assert set(leaves) <= set(fitup.FEELER_GAGE_LEAVES_MM)
 
@@ -738,9 +762,10 @@ def test_the_spring_is_stationed_east_west_where_its_preload_is_gated() -> None:
 
     located = _rig_step_body("rig-located")
     assert drawing.SPRING_EAST_WEST in located
-    printed = re.search(r"FOOT HOLE CENTRE ([\d.]+) EAST OF THE MHA-DT-19 AXIS", located)
+    printed = re.search(r"FOOT HOLE CENTRE (\d*\.\d+) EAST OF THE MHA-DT-19 AXIS", located)
     assert printed is not None
-    assert float(printed.group(1)) == pytest.approx(SCREW_EAST_OF_PIVOT, abs=0.05)
+    # The inch sheet's .XX: within half a hundredth of the gated station.
+    assert float(printed.group(1)) * 25.4 == pytest.approx(SCREW_EAST_OF_PIVOT, abs=0.127)
     assert "CREST BEARING ON THE PARKED BACK MHA-DT-14 FLANK" in located
     assert "TERMINAL FLAT" not in _flat(RIG_STEPS)
     assert "TERMINAL FLAT" not in Path(drawing.__file__).read_text(encoding="utf-8")

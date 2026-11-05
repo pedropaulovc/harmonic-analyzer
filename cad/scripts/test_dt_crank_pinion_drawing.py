@@ -1061,6 +1061,7 @@ def test_t120_fit_up_closes_and_both_sheets_state_it() -> None:
     # corner of the same stack; the minimum band is an actual size.
     import build_dt_drive_train_assembly as bdt
     import draw_dt_drive_train_assembly as drawing
+    import dt_drive_train_assembly_sheet as sheet
     import dt_drive_train_steps
 
     feeler = spec.T120_FITUP_FEELER_MM
@@ -1076,7 +1077,8 @@ def test_t120_fit_up_closes_and_both_sheets_state_it() -> None:
     )
     # The part sheet permits the turn-down to its floor, on the turned
     # diameter's own callout.
-    turn_down = f"Ø{spec.TURNED_DIA_FITUP_MIN:.2f} MIN"  # the mm assembly sheet
+    # Both sheets print decimal inch; the assembly's minimum rounds up.
+    turn_down = f"Ø{sheet.inch_min_text(spec.TURNED_DIA_FITUP_MIN, 3)} MIN"
     assert (
         f"Ø{spec.inch_text(spec.TURNED_DIA_FITUP_MIN, spec.TURNED_DIA_PLACES)} MIN"
         in spec.TURNED_DIA_FITUP_CALLOUT
@@ -1085,7 +1087,7 @@ def test_t120_fit_up_closes_and_both_sheets_state_it() -> None:
     number = dt_drive_train_steps.step_number("crank-mesh-checked")
     step = drawing.CONE_CRANK_STEPS.split(f"\n{number}. ", 1)[1]
     step = " ".join(step.split(f"\n{number + 1}. ")[0].split())
-    check = step.index(f"{feeler:.2f} FEELER")
+    check = step.index(f"{sheet.T120_FITUP_FEELER_TEXT} FEELER")
     drill = step.index("MATCH-DRILL")
     # The push names both parts the check closes on, before the reading; the
     # wording around them is free (Codex P3 on #1154, review 4).
@@ -1094,7 +1096,8 @@ def test_t120_fit_up_closes_and_both_sheets_state_it() -> None:
     assert all(part in sentence for part in spec.T120_FITUP_PUSHED)
     assert push < check < drill
     assert check < step.index(turn_down) < drill
-    assert check < step.index(f"{spec.SHOULDER_LENGTH_FITUP_MIN:.2f} MIN") < drill
+    shoulder = f"{sheet.inch_min_text(spec.SHOULDER_LENGTH_FITUP_MIN, 3)} MIN"
+    assert check < step.index(shoulder) < drill
 
 
 def test_t120_fit_up_stops_a_band_that_would_pass_and_then_close() -> None:
@@ -1258,13 +1261,14 @@ def test_crank_step_runs_free_only_after_the_t120_check_closes() -> None:
     # (-0.10 / -0.12).  The seat is set and the check closed first; the
     # free-running revolution follows, then the match-drill.
     import draw_dt_drive_train_assembly as drawing
+    import dt_drive_train_assembly_sheet as sheet
 
     step = " ".join(_crank_step().split())
-    seat = step.index(f"{drawing.PINION_SEAT_FEELER:.2f} OFF")
-    check = step.index(f"{spec.T120_FITUP_FEELER_MM:.2f} FEELER")
+    seat = step.index(f"{sheet.inch_text(drawing.PINION_SEAT_FEELER, sheet.FEELER_PLACES)} OFF")
+    check = step.index(f"{sheet.T120_FITUP_FEELER_TEXT} FEELER")
     cuts = max(
-        step.index(f"Ø{spec.TURNED_DIA_FITUP_MIN:.2f} MIN"),
-        step.index(f"{spec.SHOULDER_LENGTH_FITUP_MIN:.2f} MIN"),
+        step.index(f"Ø{sheet.inch_min_text(spec.TURNED_DIA_FITUP_MIN, 3)} MIN"),
+        step.index(f"{sheet.inch_min_text(spec.SHOULDER_LENGTH_FITUP_MIN, 3)} MIN"),
     )
     free = step.index("BIND")
     assert seat < check < cuts < free < step.index("MATCH-DRILL")

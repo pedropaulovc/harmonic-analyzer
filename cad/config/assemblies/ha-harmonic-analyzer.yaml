@@ -25,6 +25,9 @@ free_dof: 0
 # carries_chain: wraps the roller chain, so verify:soundness's interference
 #   gate gets the authored wheel mounts, as the assembly build does (541011de0).
 carries_chain: true
+# drawing_unit: the fitter sheets, their TOL_* rows and the saved model's units
+#   are decimal inch (#290).
+drawing_unit: in
 # machinist_exceptions: the fitter package's owner-declared machinist-review
 #   exceptions (drawing-simplicity-policy.md "Named exceptions"); read by
 #   machinist_exceptions.load_exceptions for ha_harmonic_analyzer_assembly,
