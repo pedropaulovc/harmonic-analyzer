@@ -179,12 +179,14 @@ individual PR or stack does not need a successful full `build` before merging.
    or has an issue, file a GitHub issue in `vezzadev/codjiflo-reviewer` with
    failure evidence, then use `@codex review` as the fallback; its approval
    must cover the latest push too.
-   **At most two Codjiflo rounds per PR, except for P1.** A round is one
-   review request. After the second round, fix any P1 finding and request
-   another review only to clear P1s. Log every remaining P2/P3 finding as a
-   GitHub issue in this repository, link the issue from its review thread and
-   resolve the thread. Those findings no longer block the merge. The other
-   gates still apply to the final head.
+   **At most two code-review rounds per PR, except for P1.** This applies to
+   all code reviewers combined: Codjiflo, the Codex fallback, CodeRabbit, and
+   any other bot or agent reviewer. A round is one review request. After the
+   second round, fix any P1 finding and request another review only to clear
+   P1s. Log every remaining P2/P3 finding as a GitHub issue in this
+   repository, link the issue from its review thread and resolve the thread.
+   Those findings no longer block the merge. The other gates still apply to
+   the final head.
 3. **Visual inspection of renders** — an eye pass over the rendered PNGs of
    every part/assembly the PR touched (regenerate them if stale or hard to
    read; move the camera off the standard axes when needed). The CAD gates
@@ -230,7 +232,7 @@ farm builds and machinist review may run in parallel, in any order the author
 prefers: request `@codjiflo review` without waiting for a farm run, and launch
 native proof or machinist review while code review is pending. The merge bar is
 unchanged: every gate must cover the final head. A push reopens each gate it
-affects (Codjiflo while the PR still has review rounds left, or while a P1 is
+affects (code review while the PR still has review rounds left, or while a P1 is
 open; proof and sheet review when their inputs re-key), so batch fixes into
 one push per round.
 
