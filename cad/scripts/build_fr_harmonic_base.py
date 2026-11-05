@@ -182,6 +182,7 @@ from dt_arbor_pedestal_spec import (
 )
 from fr_rocker_arm_support_spec import SUPPORT_HOLD_DOWN_XZ
 from fr_harmonic_base_fasteners import (
+    BASE_CROSS_CLEARANCE_SPEC,
     BASE_CROSS_TAP_DRILL_DIA,
     BASE_CROSS_TAP_SPEC,
     ThroughSeatMaterial,
@@ -194,6 +195,9 @@ from fr_harmonic_base_fasteners import (
     NAMEPLATE_SCREW_XZ,
     PEDESTAL_INSERTION_MIN_MM,
     PEDESTAL_INSERTION_MAX_MM,
+    BASE_NEAR_WALL_CLEARANCE_DEPTH,
+    NEAR_WALL_CLEARANCE_DIAMETER,
+    near_wall_hole_volume_mm3,
     retained_material_segments_mm,
     through_seat_material,
     through_seat_pocket_clearances_mm,
@@ -574,7 +578,7 @@ RIB_HALF_LENGTH_Z = POCKET_HALF_Z + POCKET_WALL / 2.0
 
 
 # Per-hole material is established below after the retained footprint shapes.
-# Horizontal frame cross taps retain their lugs and blind end conditions.
+# The far-wall cross taps retain their lugs and blind end conditions.
 _CROSS_TAP_MAJOR = THREAD_MAJOR_MM[BASE_CROSS_TAP_SPEC.size]
 # The print specifies a MIN drill depth, not a maximum blind-drill depth. Tip/past-tip
 # checks therefore cover the nominal native drill only, not an unbounded
@@ -2326,8 +2330,10 @@ async def build(adapter) -> dict[str, str]:
         adapter, "column sockets", after - v_sockets, 0.005 * v_sockets + 10.0
     )
 
-    # Ø9 spot seats on the front/rear pad faces, then bottoming-tapped paths
-    # continue through the near casting, interrupted socket, and far casting.
+    # Ø9 spot seats on the front/rear pad faces. From each floor a bottoming
+    # tap is cut first across the near casting, the interrupted socket and the
+    # far casting; the #10 close clearance then opens the near wall, so only
+    # the far wall keeps thread (owner ruling 2026-11-05).
     v_spot = math.pi * (SCREW_SPOTFACE_DIAMETER / 2.0) ** 2 * BASE_SPOTFACE_DEPTH
     for side, sign, reverse in BASE_SCREW_FACES:
         spot_plane = check(
@@ -2411,6 +2417,26 @@ async def build(adapter) -> dict[str, str]:
             f"base cross taps {side}",
             after - 2.0 * v_cross,
             0.015 * v_cross + 3.0,
+        )
+        wizard_holes(
+            adapter,
+            BASE_CROSS_CLEARANCE_SPEC,
+            tap_points,
+            (0.0, 0.0, sign),
+            f"base frame cross near-wall clearance {side}",
+            name=f"BaseCrossClearance{side.capitalize()}",
+            expect_dia_mm=NEAR_WALL_CLEARANCE_DIAMETER,
+        )
+        v_clear = near_wall_hole_volume_mm3(
+            NEAR_WALL_CLEARANCE_DIAMETER, BASE_NEAR_WALL_CLEARANCE_DEPTH
+        ) - near_wall_hole_volume_mm3(
+            BASE_CROSS_TAP_DRILL_DIA, BASE_NEAR_WALL_CLEARANCE_DEPTH
+        )
+        after = await volume_check(
+            adapter,
+            f"base cross near-wall clearance {side}",
+            after - 2.0 * v_clear,
+            0.05 * v_clear + 2.0,
         )
 
     # Plan corners: one full-height radius per plate. The pad FIRST (one side

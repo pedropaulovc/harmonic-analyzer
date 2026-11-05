@@ -2617,9 +2617,22 @@ def test_hole_sheet_callout_check_runs_on_every_callout_before_finalize() -> Non
         and getattr(node.value.func, "id", None) == "add_native_hole_callout"
     ]
     assert not unassigned  # every callout is kept, so every one is checked
-    assert callout_names == placed == {
-        "block_callout", "pedestal_callout", "spring_callout", "nameplate_callout",
-        "tap_callout",
+    assert (
+        callout_names
+        == placed
+        == {
+            "block_callout",
+            "pedestal_callout",
+            "spring_callout",
+            "nameplate_callout",
+            "tap_callout",
+            "clearance_callout",
+        }
+    )
+    assert {ast.unparse(value) for value in keywords["views"].values} == {
+        "hole_top",
+        "hole_side",
+        "section",
     }
     assert {ast.unparse(value) for value in keywords["views"].values} == {
         "hole_top", "hole_side", "section"
@@ -2634,7 +2647,7 @@ def test_hole_sheet_callout_check_runs_on_every_callout_before_finalize() -> Non
         ("TRANSFER_BLOCK_CALLOUT", f"TRANSFER FROM MHA-DT-18\nAFTER {step_ref('rig-set')};\n"),
         ("TRANSFER_PEDESTAL_CALLOUT", "TRANSFER FROM MHA-DT-02\nAT ASSEMBLY;\n"),
         ("TRANSFER_SPRING_CALLOUT", f"TRANSFER FROM MHA-DT-24\nAFTER {step_ref('rig-set')};\n"),
-        ("CROSS_TAP_PROCESS", "COMMON THREAD LEAD IN BOTH WALLS\n"),
+        ("CROSS_TAP_PROCESS", "FAR WALL ONLY\n"),
     ],
 )
 def test_base_callout_prefix_is_the_shared_helpers(
@@ -2726,7 +2739,7 @@ def test_cross_tap_callout_carries_hole_facts_only() -> None:
 
     import draw_fr_harmonic_base as sheet
 
-    assert sheet.CROSS_TAP_PROCESS == "COMMON THREAD LEAD IN BOTH WALLS\n"
+    assert sheet.CROSS_TAP_PROCESS == "FAR WALL ONLY\n"
     assert "THRU" not in sheet.CROSS_TAP_PROCESS
     source = inspect.getsource(sheet)
     for gone in ("DEPTHS FROM SPOTFACE FLOOR\n", "ON A1-A4 X CENTRES\n", "2 EACH FRONT/REAR FACE"):
@@ -2734,6 +2747,36 @@ def test_cross_tap_callout_carries_hole_facts_only() -> None:
     # The Hole Wizard seats the taps on the spotface floor, so its depths
     # already run from there.
     assert part.BASE_SPOTFACE_PLANE_Z - part.BASE_SPOTFACE_DEPTH == part.BASE_SCREW_SEAT_Z
+
+
+def test_cross_near_wall_clearance_callout_drills_to_the_socket() -> None:
+    # Owner ruling 2026-11-05: the near wall is #10 close clearance drilled
+    # into the socket, so the 10-32 is threaded in the far wall only.
+    import draw_fr_harmonic_base as sheet
+    import fr_harmonic_base_fasteners as fasteners
+
+    spec = fasteners.BASE_CROSS_CLEARANCE_SPEC
+    assert (spec.kind, spec.size, spec.fit, spec.end) == (
+        "clearance",
+        "#10",
+        "close",
+        "blind",
+    )
+    # Seat .826 off the socket axis: the drill stops once it opens the socket.
+    assert spec.depth_mm == pytest.approx(part.BASE_SCREW_SEAT_Z - 112.014)
+    assert sheet.CROSS_TAP_PROCESS == "FAR WALL ONLY\n"
+    native = {
+        5: "",
+        6: "",
+        7: "<NUM_INST>X <MOD-DIAM><hw-diam> <HOLE-DEPTH> <hw-depth>",
+        8: "",
+    }
+    updated = sheet._cross_clearance_callout_definitions(native)
+    assert updated[7] == "4X <MOD-DIAM><hw-diam> \nDRILL TO SOCKET"
+    with pytest.raises(RuntimeError, match="no single count and blind depth"):
+        sheet._cross_clearance_callout_definitions(
+            {**native, 7: "<MOD-DIAM><hw-diam> THRU"}
+        )
 
 
 def test_cross_tap_xs_are_baselines_from_the_flange_edge_on_the_front_view() -> None:

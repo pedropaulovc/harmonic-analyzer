@@ -805,9 +805,9 @@ JOINTS: tuple[Joint, ...] = (
         installed_at="MHA-FR-00 STEP 6",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason="retains a tube_frame column in its base socket; base and columns never move relative to each other and no operating member bears on or turns about the horizontal screw axis (the screw passes clearance holes in both tube walls)",
-        axial_capture="narrow fillister head seated on the Ø9 spotface of the base pad; thread engages near and far casting segments of the interrupted 46 mm bottoming tap",
+        axial_capture="narrow fillister head seated on the Ø9 spotface of the base pad; the shank clears the near casting wall (#10 close) and engages only the far casting wall's blind 46 mm bottoming tap",
         lock=Lock.NONE,
-        evidence="build_fr_frame_assembly.py:build (lower cross screws, BASE_SCREW_Y/BASE_SCREW_SEAT_Z) + module asserts; fr_harmonic_base_fasteners.py:BASE_CROSS_TAP_SPEC; draw_fr_frame_assembly.py ASSEMBLY_STEPS 2, 6 ('TIGHTEN ONLY UNTIL EVERY HEAD SEATS'), ASSEMBLY_CHECKS 2",
+        evidence="build_fr_frame_assembly.py:build (lower cross screws, BASE_SCREW_Y/BASE_SCREW_SEAT_Z) + module asserts; fr_harmonic_base_fasteners.py:BASE_CROSS_TAP_SPEC, BASE_CROSS_CLEARANCE_SPEC, BASE_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT; draw_fr_frame_assembly.py ASSEMBLY_STEPS 2, 6 ('TIGHTEN ONLY UNTIL EVERY HEAD SEATS'), ASSEMBLY_CHECKS 2",
     ),
     Joint(
         id="fr-frame/cross-screw-in-top-frame",

@@ -3,7 +3,9 @@
 Deck holes are native through taps. Depths below are material intervals measured
 DOWN from the finished deck, not drilling/thread-depth requirements. The native
 builder independently reads those intervals back before and after cutting.
-Horizontal frame cross taps retain their original blind manufacturing contract.
+Horizontal frame cross screws clear the near casting wall and thread into the
+far wall only (owner ruling 2026-11-05, MHA-FR-01 only; MHA-FR-02 keeps its
+shared fr_frame_attachment_spec contract); the far-wall tap stays blind.
 Swing-stop receiver validation and its platform thickness allowance live here;
 the screw's sourced stock limits and inspection data remain in its application spec.
 """
@@ -18,7 +20,12 @@ from _printed_tolerance import (
     drilled_oversize_mm, edge_break_chamfer_mm, edge_break_radius_mm, printed_band_mm,
 )
 import fr_nameplate_spec
-from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
+from _hole_spec import CLEARANCE_MM, TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
+from _mcmaster_90280a837 import (
+    PITCH as CROSS_SCREW_PITCH,
+    SHANK_DIA as CROSS_SCREW_MAJOR,
+    SHANK_LEN as CROSS_SCREW_LENGTH,
+)
 from dt_arbor_pedestal_spec import FOOT_HEIGHT as PEDESTAL_FLANGE_THICKNESS
 from dt_vn_pedestal_hold_down_screw_spec import (
     LENGTH_SHORT_ALLOWANCE_MM as PEDESTAL_LENGTH_SHORT_ALLOWANCE,
@@ -31,13 +38,39 @@ from fr_vn_lag_screw_spec import (
 )
 from fr_rocker_arm_support_section_spec import FOOT_THICKNESS as SUPPORT_FOOT_THICKNESS
 from fr_rocker_arm_support_spec import UNIT as SUPPORT_UNIT
-from fr_frame_attachment_spec import CASTING_FULL_THREAD_DEPTH, CASTING_TAP_DRILL_DEPTH
+from fr_frame_attachment_spec import (
+    BASE_SCREW_SEAT_Z,
+    CASTING_FULL_THREAD_DEPTH,
+    CASTING_TAP_DRILL_DEPTH,
+    SCREW_SPOTFACE_DIAMETER,
+    TUBE_CROSS_HOLE_DIAMETER,
+)
+from frame_column_stations import (
+    COLUMN_SOCKET_DIAMETER,
+    COLUMN_SOCKET_MATCH_BORE_MAX,
+)
 from fr_harmonic_base_spec import (
-    LINEAR_BAND_MM, UNIT,
-    COLUMN_SOCKET_XZ, CROSS_RIB_CENTER_X, CROSS_TAP_LUG_BOTTOM_Y, CROSS_TAP_LUG_INNER_X,
-    CROSS_TAP_LUG_LENGTH, CROSS_TAP_LUG_WIDTH, DECK_HALF_X, DECK_HALF_Z,
-    POCKET_CEILING_Y, POCKET_CORNER_FILLET_R, POCKET_HALF_X,
-    POCKET_HALF_Z, RIB_RELIEF, RIB_THICKNESS, SOCKET_BOSS_DIA, STACK_HEIGHT,
+    DRAWING_PRECISION,
+    HOLE_TABLE_PRECISION,
+    LINEAR_BAND_MM,
+    SPOTFACE_DEPTH_BAND_MM,
+    UNIT,
+    COLUMN_SOCKET_XZ,
+    CROSS_RIB_CENTER_X,
+    CROSS_TAP_LUG_BOTTOM_Y,
+    CROSS_TAP_LUG_INNER_X,
+    CROSS_TAP_LUG_LENGTH,
+    CROSS_TAP_LUG_WIDTH,
+    DECK_HALF_X,
+    DECK_HALF_Z,
+    POCKET_CEILING_Y,
+    POCKET_CORNER_FILLET_R,
+    POCKET_HALF_X,
+    POCKET_HALF_Z,
+    RIB_RELIEF,
+    RIB_THICKNESS,
+    SOCKET_BOSS_DIA,
+    STACK_HEIGHT,
 )
 
 IN = 25.4
@@ -62,6 +95,139 @@ if CASTING_TAP_DRILL_DEPTH - (
     CASTING_FULL_THREAD_DEPTH + printed_band_mm(2, unit=UNIT)
 ) < 2.0 * IN / 32.0 - 1e-9:
     raise AssertionError("base cross tap lacks two-pitch bottoming-tap lead")
+
+# Near-wall clearance (#5 drill, .206). It passes the standard 10-32 tap's
+# .194 shank, so a standard long-shank tap reaches the far wall through it,
+# and it is no smaller than the tube's .197 match drill it guides at
+# assembly (MHA-FR-00 step 2).
+NEAR_WALL_CLEARANCE_SIZE = "#10"
+NEAR_WALL_CLEARANCE_FIT = "close"
+NEAR_WALL_CLEARANCE_DIAMETER = CLEARANCE_MM[
+    (NEAR_WALL_CLEARANCE_SIZE, NEAR_WALL_CLEARANCE_FIT)
+]
+STANDARD_10_32_TAP_SHANK_DIAMETER = 0.194 * IN
+if not (
+    NEAR_WALL_CLEARANCE_DIAMETER > STANDARD_10_32_TAP_SHANK_DIAMETER
+    and NEAR_WALL_CLEARANCE_DIAMETER >= TUBE_CROSS_HOLE_DIAMETER
+    and NEAR_WALL_CLEARANCE_DIAMETER > CROSS_SCREW_MAJOR
+):
+    raise AssertionError(
+        "near-wall clearance must pass the tap shank, tube drill and screw"
+    )
+# The clearance's model depth runs from the seat to the socket axis: past the
+# near wall it cuts only socket air, and its drill point stops far short of
+# the far wall. The sheet prints DRILL TO SOCKET, not this depth.
+BASE_NEAR_WALL_CLEARANCE_DEPTH = BASE_SCREW_SEAT_Z - abs(
+    COLUMN_SOCKET_XZ[0][1]
+)  # 20.980
+
+# Far-wall engagement (drawing-guidelines.md rule 18), in the convention of
+# require_through_seat_fit below: the stock screw's least length and tip loss
+# against the deepest guaranteed start of full female thread. ASME B18.6.3
+# machine screws, sizes 0-12 over 1 to 2 in long, are -.06 on length. The
+# tip allowance is the nominal 0.7-pitch chamfer the swing-stop joint books
+# (dt_swing_stop_screw_spec.TIP_CHAMFER), not a qualified supplier bound:
+# as there, the installed joint is accepted by inspection: MHA-FR-00 check 2
+# (CROSS_SCREW_ENGAGEMENT_CHECK) asks for full-form far-wall engagement of at
+# least 1.5 screw diameters with the head fully seated -- a ratio of the
+# purchased screw, so no dimension lives in the note. At a 1.5-pitch tip the
+# print-worst stack would give 6.87 mm (1.42D), so a short-tipped screw is
+# caught there.
+CROSS_SCREW_LENGTH_SHORT_ALLOWANCE_MM = 0.06 * IN
+CROSS_SCREW_TIP_LOSS_MM = 0.7 * CROSS_SCREW_PITCH
+CROSS_SCREW_ENGAGEMENT_DIAMETERS = 1.5
+FAR_WALL_ENGAGEMENT_FLOOR_MM = CROSS_SCREW_ENGAGEMENT_DIAMETERS * CROSS_SCREW_MAJOR
+CROSS_SCREW_ENGAGEMENT_CHECK = (
+    "FULL-FORM THREAD ENGAGEMENT OF AT LEAST "
+    f"{CROSS_SCREW_ENGAGEMENT_DIAMETERS:g} SCREW DIAMETERS"
+)
+
+
+def far_wall_full_thread_min_mm(far_wall_start_max_mm: float) -> float:
+    """Least full-thread overlap in the far wall, measured from the seat.
+
+    ``far_wall_start_max_mm`` is the deepest the far wall's full female
+    thread can start below the seat at the printed limits (the socket wall
+    plus its mouth's edge break). The screw seats on the face every tap
+    depth runs from; the printed full thread reaches past its tip.
+    """
+    external_end = (
+        CROSS_SCREW_LENGTH
+        - CROSS_SCREW_LENGTH_SHORT_ALLOWANCE_MM
+        - CROSS_SCREW_TIP_LOSS_MM
+    )
+    return external_end - far_wall_start_max_mm
+
+
+def near_wall_hole_volume_mm3(hole_dia_mm: float, seat_to_axis_mm: float) -> float:
+    """Casting a cross hole of ``hole_dia_mm`` removes between its seat and
+    the nominal column socket, ``seat_to_axis_mm`` off the socket's axis."""
+    hole_r = hole_dia_mm / 2.0
+    socket_r = COLUMN_SOCKET_DIAMETER / 2.0
+    step = 0.001
+    volume = 0.0
+    x = -hole_r + step / 2.0
+    while x < hole_r:
+        chord = 2.0 * math.sqrt(max(0.0, hole_r * hole_r - x * x))
+        volume += (
+            chord * (seat_to_axis_mm - math.sqrt(socket_r * socket_r - x * x)) * step
+        )
+        x += step
+    return volume
+
+
+# The near wall is drilled #10 close clearance from the spotface floor into
+# the column socket; the tap above, cut first from the same floor, threads
+# only the far wall. The clearance's printed size plus DRILLED HOLES stays
+# inside the Ø.35 spotface, so the spotface's green-land proof
+# (cross_screw_top_land_worst_case_mm) also covers the near-wall hole.
+BASE_CROSS_CLEARANCE_SPEC = HoleSpec(
+    "clearance",
+    NEAR_WALL_CLEARANCE_SIZE,
+    end="blind",
+    depth_mm=BASE_NEAR_WALL_CLEARANCE_DEPTH,
+    fit=NEAR_WALL_CLEARANCE_FIT,
+)
+if (
+    NEAR_WALL_CLEARANCE_DIAMETER + drilled_oversize_mm(unit=UNIT)
+    >= SCREW_SPOTFACE_DIAMETER
+):
+    raise AssertionError("base near-wall clearance outgrows its spotface")
+
+
+def base_cross_screw_far_wall_start_max_mm(*, front: bool) -> float:
+    """Deepest start of full far-wall thread below the spotface floor.
+
+    The print locates each socket by its hole-table Y LOC and each pad face
+    from the same flange corner: the rear face by PadY, the front face by
+    PadY + TopWid. The spotface depth's band only deepens the seat, toward
+    the socket. The socket may be match-bored to its Ø26.0 ceiling, and the
+    far wall's mouth takes the title block's edge break.
+    """
+    pad_bands = printed_band_mm(DRAWING_PRECISION["PlanReference"]["PadY"], unit=UNIT)
+    if front:
+        pad_bands += printed_band_mm(
+            DRAWING_PRECISION["TopProfile"]["TopWid"], unit=UNIT
+        )
+    seat_to_axis_max = (
+        BASE_SCREW_SEAT_Z
+        - abs(COLUMN_SOCKET_XZ[0][1])
+        - SPOTFACE_DEPTH_BAND_MM[1]
+        + pad_bands
+        + printed_band_mm(HOLE_TABLE_PRECISION, unit=UNIT)
+    )
+    return seat_to_axis_max + COLUMN_SOCKET_MATCH_BORE_MAX / 2.0 + EDGE_BREAK_MAX_MM
+
+
+BASE_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT = min(
+    far_wall_full_thread_min_mm(base_cross_screw_far_wall_start_max_mm(front=front))
+    for front in (True, False)
+)
+if BASE_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT < FAR_WALL_ENGAGEMENT_FLOOR_MM:
+    raise AssertionError(
+        f"base far casting wall engages MHA-FR-VN-53 "
+        f"{BASE_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT:.3f} mm < 1.5D at the printed bands"
+    )
 
 HOLD_DOWN_THREAD = "1/4-20"
 HOLD_DOWN_THREAD_CLASS = "2B"
