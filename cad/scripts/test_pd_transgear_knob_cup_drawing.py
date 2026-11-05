@@ -177,7 +177,9 @@ def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
         # The journal's rear-end rim takes MHA-PD-08's title-block break; the
         # match-drilled crosshole's mouths stay buried in the cup, unbroken.
         "end": (
-            knob_shaft.JOURNAL_REAR_EXTENSION_MIN - station - hole_r
+            knob_shaft.JOURNAL_REAR_EXTENSION_MIN
+            - station
+            - hole_r
             - knob_shaft.EDGE_BREAK_MAX
         ),
         "ring": (od_min - bore_max) / 2.0,
