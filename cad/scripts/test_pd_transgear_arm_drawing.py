@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import ast
 import itertools
 import math
@@ -9,10 +10,12 @@ import re
 import runpy
 from fractions import Fraction
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 import _config
+import _drawing_dimensions
 import build_pd_transgear_arm as part
 import draw_pd_transgear_arm as drawing
 import pd_latch_hook_geometry as hook
@@ -409,6 +412,98 @@ def test_the_rear_mouth_prints_its_modelled_band_on_its_native_leg_in_d_d() -> N
     assert box[1] <= mouth_y <= box[1] + _LINE_PITCH
     assert box[1] > 0.065 + 0.005
     assert box[3] < drawing._front_y(-geometry.PIVOT_END_R) - 0.010
+
+
+@pytest.mark.parametrize("dropped", (None, "arm sheet", "section D-D"))
+def test_each_import_phase_proves_the_precision_of_the_dimensions_it_imports(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, dropped: str | None
+) -> None:
+    """Run 20261105T023327427Z: sheet 1's guard demanded the whole package's
+    places, D-D's PinMouthChamfer among them, before sheet 2 existed, and
+    failed a sound import.  The real guard runs at each phase on what that
+    phase's views import; together the phases cover every marked dimension,
+    and a dimension a phase fails to import still fails the build."""
+    sheet_one_names = [*drawing.FRONT_KEEP, *drawing.SECTION_KEEP, *drawing.END_KEEP]
+    lost = {
+        None: None,
+        "arm sheet": sheet_one_names[0],
+        "section D-D": "PinMouthChamfer",
+    }[dropped]
+
+    def annotation(name: str) -> SimpleNamespace:
+        places = spec.DRAWING_PRECISION_BY_NAME[name]
+        display = SimpleNamespace(GetPrimaryPrecision2=lambda: places)
+        return SimpleNamespace(name=name, GetSpecificAnnotation=lambda: display)
+
+    def curate(_adapter, _view, *, keep, view_label, dimensions_by_feature):
+        assert dimensions_by_feature is spec.DRAWING_DIMENSIONS
+        return [annotation(name) for name in keep if name != lost]
+
+    guarded: list[tuple[set[str], dict[str, int]]] = []
+
+    def guard(adapter, annotations, precision):
+        annotations = list(annotations)
+        guarded.append(({a.name for a in annotations}, dict(precision)))
+        _drawing_dimensions.assert_imported_precision(adapter, annotations, precision)
+
+    async def open_model(_path):
+        return True
+
+    async def finalize(*_args, **_kwargs):
+        return {"drawing": "arm.SLDDRW"}
+
+    source = tmp_path / "pd-transgear-arm.SLDPRT"
+    source.write_bytes(b"")
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    monkeypatch.setattr(drawing.hidden_sketches, "curate_view_dimensions", curate)
+    monkeypatch.setattr(drawing, "assert_imported_precision", guard)
+    monkeypatch.setattr(_drawing_dimensions, "dimension_name", lambda _adapter, a: a.name)
+    monkeypatch.setattr(
+        _drawing_dimensions._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
+    )
+    sheets = SimpleNamespace(ActivateSheet=lambda _name: True)
+    returns = {
+        "new_project_drawing": (object(), object()),
+        "_early_bound": sheets,
+        "place_view": object(),
+        "create_section_view": object(),
+        "_rim_point": (0.0, 0.0),
+        "_wall_point": (0.0, 0.0),
+        "model_point_in_view": (0.0, 0.0),
+        "auto_center_marks": True,
+        "add_native_hole_callout": object(),
+        "_rear_rim": object(),
+        "_pin_zone_section": object(),
+    }
+    for name in (
+        "check", "read_required_properties", "create_blank_drawing_sheets",
+        "stamp_drawing_summary", "set_hidden_lines_removed", "set_dimension_callouts",
+        "set_reference_dimensions", "_set_stock_text", "_end_radius_to_arc",
+        "offset_dimension_text", "project_part_pmi", "_add_projected_zone_chains",
+        "_overall_reference", "_set_tap_callout_text", "set_hole_callout_precision",
+        "_match_pin_section_caption", "add_property_linked_note",
+        "require_saved_projected_gtols", *returns,
+    ):
+        monkeypatch.setattr(
+            drawing, name, lambda *_a, _r=returns.get(name), **_k: _r
+        )
+    monkeypatch.setattr(drawing, "finalize_drawing", finalize)
+    adapter = SimpleNamespace(
+        open_model=open_model, currentModel=object(), _attempt=lambda fn: fn()
+    )
+
+    if lost is not None:
+        with pytest.raises(RuntimeError, match=rf"never reached the sheet: \['{lost}'\]"):
+            asyncio.run(drawing.build(adapter))
+        return
+    assert asyncio.run(drawing.build(adapter)) == {"drawing": "arm.SLDDRW"}
+    assert [set(precision) for _names, precision in guarded] == [
+        set(sheet_one_names),
+        set(drawing.PIN_SECTION_KEEP),
+    ]
+    assert all(names == set(precision) for names, precision in guarded)
+    assert guarded[0][1].keys().isdisjoint(guarded[1][1])
+    assert guarded[0][1] | guarded[1][1] == spec.DRAWING_PRECISION_BY_NAME
 
 
 def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:

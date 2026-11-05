@@ -386,6 +386,17 @@ _PIN_MOUTH_Y = PIN_SECTION_ZONE_CENTER[1] + (
     PIN_BORE_DIA / 2.0 + PIN_MOUTH_CHAMFER / 2.0
 ) * _S / 1000.0
 PIN_SECTION_KEEP = {"PinMouthChamfer": (PIN_SECTION_REAR_X - 0.006, _PIN_MOUTH_Y)}
+# Each import phase proves the precision of exactly the dimensions its views
+# import: sheet 1's front, A-A and end views every marked dimension but the
+# rear mouth's leg, which only section D-D on sheet 2 imports (run
+# 20261105T023327427Z: the whole-package map failed sheet 1 on
+# PinMouthChamfer before D-D existed).  Together they cover the package.
+PIN_SECTION_PRECISION = {name: DRAWING_PRECISION_BY_NAME[name] for name in PIN_SECTION_KEEP}
+ARM_SHEET_PRECISION = {
+    name: places
+    for name, places in DRAWING_PRECISION_BY_NAME.items()
+    if name not in PIN_SECTION_KEEP
+}
 # The value and its three callout lines (~18 mm tall, ~48 mm wide), the
 # block's right end 4 mm short of the dimension line.
 PIN_MOUTH_TEXT_XY = (PIN_SECTION_REAR_X - 0.010 - 0.024, _PIN_MOUTH_Y + 0.008)
@@ -1018,7 +1029,7 @@ async def build(adapter: Any) -> dict[str, str]:
     ]
     # Decimal places and the explicit bands are authored on the part; the
     # sheet only proves the import kept them.
-    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    assert_imported_precision(adapter, annotations, ARM_SHEET_PRECISION)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_reference_dimensions(adapter, annotations, ("PivotBoreDia",))
     _set_stock_text(adapter, annotations)
@@ -1154,7 +1165,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="section D-D",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    assert_imported_precision(adapter, mouth, DRAWING_PRECISION_BY_NAME)
+    assert_imported_precision(adapter, mouth, PIN_SECTION_PRECISION)
     set_dimension_callouts(adapter, mouth, {"PinMouthChamfer": PIN_MOUTH_CALLOUT})
     offset_dimension_text(adapter, mouth, {"PinMouthChamfer": PIN_MOUTH_TEXT_XY})
     _match_pin_section_caption(adapter, pin_section, section)

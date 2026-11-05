@@ -196,7 +196,7 @@ def _on(point: tuple[float, float], u: float, n: float = 0.0) -> tuple[float, fl
 # Per-view survivors of the marked-dimension import: name -> sheet position.
 # Front: the screw X pair stacked above the base, their texts right of the
 # ear's outer face (its extension line crossed them between the arrows,
-# review 4), their Y and size left of it; the roll start and the far face's
+# review 4), their Y left of it; the roll start and the far face's
 # Y right of the arm, the roll start inside so its text clears the far
 # face's dimension line; the far face's X
 # and the tab end's X stacked below it; the straight's length on the arm's
@@ -207,12 +207,20 @@ def _on(point: tuple[float, float], u: float, n: float = 0.0) -> tuple[float, fl
 # the inside roll radius in the roll's concave side, the tab radius outside
 # the tab, its leader radial through the middle of the tab's 35 deg arc
 # (147-182 deg about its centre), clear of the end face and its X.
+# The screws' size and its five-row callout stand far left and low, ~3 mm
+# over the roll radius's break: SolidWorks centres the block on this point
+# and runs the leader from the last row's underline, 1/16 in past the widest
+# row (LOCATE ... TAPS), straight at the far hole's centre.  From (-25, -8)
+# that line climbed 25 deg off vertical through the S of TAPS (farm run
+# 20261105T023327427Z, layout audit dim-line-through-own-text); here it
+# rises 7 deg off vertical, ~0.7 mm clear of TAPS, the block's left end
+# 3 mm inside the border and its 2X 18 mm under ScrewY's extension.
 _TAB_LEADER_DEG = 165.0
 FRONT_KEEP = {
     "ScrewX2": _front(11.0, 12.5),
     "ScrewX1": _front(11.0, 17.5),
     "ScrewY": _front(-32.0, SCREW_HOLE_Y / 2.0),
-    "ScrewDia": _front(-25.0, -11.0),  # wall-callout stack below ScrewY's extension
+    "ScrewDia": _front(-30.8, -21.0),
     "RollStart": _front(14.0, OUTER_ROLL_START[1] / 2.0),
     "FaceY": _front(24.0, FAR_FACE_POINT[1] / 2.0),
     "FaceX": _front(FAR_FACE_POINT[0] / 2.0, -96.0),
