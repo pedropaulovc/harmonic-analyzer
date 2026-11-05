@@ -105,9 +105,7 @@ def test_census_covers_both_families_and_every_allowlisted_package():
     absent = sorted(set(METRIC_PACKAGES) - set(rows))
     assert not absent, f"METRIC_PACKAGES names packages with no YAML row: {absent}"
     absent = sorted(_undrawn_parts() - set(rows))
-    assert not absent, (
-        f"PART_DRAWING_EXEMPTIONS names parts with no YAML row: {absent}"
-    )
+    assert not absent, f"PART_DRAWING_EXEMPTIONS names parts with no YAML row: {absent}"
     for package, reason in METRIC_PACKAGES.items():
         skus = [str(sku) for sku in rows[package].get("supplier_skus") or []]
         assert any(sku in reason for sku in skus), (
