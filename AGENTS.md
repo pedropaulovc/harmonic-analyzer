@@ -172,12 +172,24 @@ individual PR or stack does not need a successful full `build` before merging.
    Record the checked commit, commands, results and native artifacts in the PR.
    Focused proof must exercise the changed behavior; compilation or a cache hit
    alone does not establish a new native side-effect.
-2. **Remote reviewer approved** — Codjiflo approved the latest push
-   (no findings, or its findings were addressed and re-reviewed clean).
+2. **Remote reviewer approved**: Codjiflo approved the latest push
+   (no findings, or its findings were addressed and re-reviewed clean), or
+   the PR has used its two completed review rounds and has no open P0/P1, as
+   described below.
    Request `@codjiflo review` in a new PR comment. If Codjiflo is unavailable
    or has an issue, file a GitHub issue in `vezzadev/codjiflo-reviewer` with
    failure evidence, then use `@codex review` as the fallback; its approval
    must cover the latest push too.
+   **At most two code-review rounds per PR, except for P0/P1.** This applies to
+   all code reviewers combined: Codjiflo, the Codex fallback, CodeRabbit, and
+   any other bot or agent reviewer. A round is one completed review that
+   returned a verdict. A failed, rejected or still-pending request does not use
+   up a round, and it does not count toward the exemption. After the second
+   completed round, fix any P0/P1 finding and request another review only to
+   clear P0/P1s. Log every remaining P2/P3 finding as a GitHub issue in this
+   repository, link the issue from its review thread and resolve the thread.
+   Those findings no longer block the merge. Open P0/P1 findings always block.
+   The other gates still apply to the final head.
 3. **Visual inspection of renders** — an eye pass over the rendered PNGs of
    every part/assembly the PR touched (regenerate them if stale or hard to
    read; move the camera off the standard axes when needed). The CAD gates
@@ -223,14 +235,15 @@ farm builds and machinist review may run in parallel, in any order the author
 prefers: request `@codjiflo review` without waiting for a farm run, and launch
 native proof or machinist review while code review is pending. The merge bar is
 unchanged: every gate must cover the final head. A push reopens each gate it
-affects (Codjiflo always; proof and sheet review when their inputs re-key), so
-batch fixes into one push per round.
+affects (code review while the PR still has review rounds left, or while a
+P0/P1 is open; proof and sheet review when their inputs re-key), so batch
+fixes into one push per round.
 
 **Stacked PRs may share focused native proof and render inspection** when the
 tested top commit contains every covered change and the evidence identifies the
 covered commits and artifacts. A stack does not require a full build to merge.
-Each PR still needs its own clean Codjiflo review (or Codex fallback as described
-above) of its latest push;
+Each PR still needs its own Codjiflo review (or Codex fallback as described
+above) of its latest push, under the same two-round cap;
 code review is not shared. Drawing reviews retain the direct/indirect sheet
 requirements linked above and count only for the exact sheet version merged.
 Order the stack so the riskiest change sits on top;
