@@ -61,6 +61,45 @@ def test_butt_callouts_clear_ruling_b_native_text_envelopes() -> None:
     assert end_view_left - crest_text_right >= 0.0035
 
 
+def test_section_callouts_keep_clean_lanes_on_farm_envelopes() -> None:
+    # MHA-DT-08 machinist review of 1bdd4e8d7, envelopes measured on its farm
+    # r1 sheet: the fitted tenon's six-row block is 32.4 mm tall centred on
+    # its keep, under the shoulder and waist shelves' shoulder lines (2.9 mm
+    # under their keeps); the caption hangs from its top, the 1:1 isometric
+    # reaches 15.2 mm above its centre.
+    keep = drawing.FRONT_KEEP
+    shelf_line = drawing._BELOW - 0.0029
+    assert keep["ShoulderDia"][1] == keep["WaistDia"][1] == drawing._BELOW
+    tenon_top = keep["TenonDia"][1] + 0.0162
+    tenon_bottom = keep["TenonDia"][1] - 0.0162
+    assert shelf_line - tenon_top >= 0.0035
+    assert tenon_bottom - drawing.CAPTION_XY[1] >= 0.0035
+    assert tenon_bottom - (drawing.ISO_CENTER[1] + 0.0152) >= 0.0035
+    # The counterbore floor's 25.4 x 14.5 mm block centres on its keep; its
+    # leader leaves the shoulder line's right end for the corner arc, whose
+    # span is the upper-left quarter about its centre.  It stands left of the
+    # peak station's extension line and the swell diameter's line, and its
+    # leader runs under the swell's top there, never along the depth's
+    # extension line rising from the corner.
+    spec = dt_crank_handle_spec
+    r = spec.INSIDE_CORNER_R_MAX
+    cx = drawing._front_x(spec.COUNTERBORE_FLOOR_X + r)
+    cy = drawing._front_y(spec.COUNTERBORE_R - r)
+    fx, fy = keep["CounterboreFloorRadius"]
+    sx, sy = fx + 0.0127, fy - 0.0077
+    angle = math.degrees(math.atan2(sy - cy, sx - cx))
+    assert 120.0 < angle < 160.0
+    assert drawing.INSIDE_CORNER_ARC_EXTENSION["CounterboreFloorRadius"] is False
+    peak_x = drawing._front_x(spec.PEAK_X)
+    peak_top = drawing._front_y(spec.PEAK_R)
+    assert peak_x - sx >= 0.010
+    assert keep["PeakDia"][0] > peak_x
+    assert peak_top - (cy + (peak_x - cx) * (sy - cy) / (sx - cx)) >= 0.0025
+    assert sy - peak_top >= 0.005
+    # The convex arc's "(R2.29)" (15 x 4.6 mm, centred) stands left of it.
+    assert (fx - 0.0127) - (keep["SConvexR"][0] + 0.0075) >= 0.008
+
+
 def test_every_profile_size_is_a_model_dimension() -> None:
     # MHA-DT-08 machinist review of 2026-10-18: the profile's sizes print as
     # dimensions on the section, not in a note; the bore revolves with it.
@@ -73,7 +112,7 @@ def test_every_profile_size_is_a_model_dimension() -> None:
     assert "_make_driven(adapter, reference, name)" in build_source
     assert "PivotBoreProfile" not in build_source
     assert drawing.PIVOT_BORE_CALLOUT.startswith("REAM THRU")
-    assert "MHA-DT-32" in drawing.PIVOT_BORE_CALLOUT
+    assert "PIVOT SCREW MHA-DT-32 SHOULDER" in drawing.PIVOT_BORE_CALLOUT.replace("\n", " ")
     # The fitted sizes and the small corner features print at three places,
     # the routine contour at the title block's two.
     three = {
