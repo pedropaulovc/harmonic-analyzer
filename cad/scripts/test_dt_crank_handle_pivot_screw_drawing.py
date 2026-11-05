@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
+import re
 
 import pytest
 
@@ -52,12 +53,15 @@ def test_part_registry_row_is_the_made_screw() -> None:
 def test_spec_is_the_single_source_of_marked_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.SIDE_KEEP) | set(drawing.END_KEEP) == marked
-    assert not set(drawing.SIDE_KEEP) & set(drawing.END_KEEP)
+    keeps = (drawing.SIDE_KEEP, drawing.END_KEEP, drawing.DETAIL_KEEP)
+    assert set().union(*map(set, keeps)) == marked
+    assert sum(map(len, keeps)) == len(marked)
     # The threaded section is defined by its callout, not a Ø4.826 dimension.
     assert "ThreadDia" not in marked
     # The slot width is only true-size in the head-end view.
     assert set(drawing.END_KEEP) == {"SlotWidth"}
+    # The 45-degree lead's leg prints in detail A alone (#2172).
+    assert set(drawing.DETAIL_KEEP) == {"ReliefLead"}
 
 
 def test_model_owns_places_and_bands() -> None:
@@ -75,6 +79,7 @@ def test_model_owns_places_and_bands() -> None:
         "ThreadLength": 2,
         "ReliefDia": 3,
         "ReliefWidth": 2,
+        "ReliefLead": 3,
         "TipChamfer": 3,
         "SlotWidth": 2,
         "SlotDepth": 2,
@@ -176,7 +181,7 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     )
     assert spec.THREAD_MINOR_2A_MIN_EST == pytest.approx(1.937, abs=1e-3)
     assert spec.RELIEF_DIA_MAX <= spec.THREAD_MINOR_2A_MIN_EST
-    # The printed limits are the model band's (Codex P2 on #1139).
+    # The worst-case checks read the model band's limits (Codex P2 on #1139).
     assert spec.RELIEF_LEAD_LIMITS == pytest.approx(
         (spec.RELIEF_LEAD - spec.RELIEF_LEAD_TOL, spec.RELIEF_LEAD + spec.RELIEF_LEAD_TOL)
     )
@@ -227,11 +232,12 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     assert spec.NECK_AREA == pytest.approx(math.pi / 4.0 * spec.RELIEF_DIA**2)
     assert spec.TENSILE_STRESS_AREA == pytest.approx(3.90, abs=0.01)
     assert spec.NECK_TO_STRESS_AREA == pytest.approx(0.64, abs=0.01)
-    # The lead's band is model-owned and prints as limits in its callout, and
-    # the tip chamfer carries its own band (MHA-DT-32 re-review: at .X either
-    # could print as nothing).  The relief width (.XX) and diameter (.XXX)
-    # are routine: the floor past the longest lead keeps 1.5 #4-40 pitches
-    # (machinist review of crank-v4-16; local review of 20dac9d3f).
+    # The lead's band is model-owned and prints on its imported dimension
+    # (#2172: a note typed the limits), and the tip chamfer carries its own
+    # band (MHA-DT-32 re-review: at .X either could print as nothing).  The
+    # relief width (.XX) and diameter (.XXX) are routine: the floor past the
+    # longest lead keeps 1.5 #4-40 pitches (machinist review of crank-v4-16;
+    # local review of 20dac9d3f).
     toleranced = {name for _, name in model_toleranced_dimensions(part)}
     assert "ReliefLead" in toleranced
     assert not {"ReliefWidth", "ReliefDia"} & toleranced
@@ -241,7 +247,70 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
         spec.RELIEF_WIDTH_MIN - spec.RELIEF_LEAD_LIMITS[1]
     )
     assert spec.RELIEF_FLOOR_MIN >= 1.5 * 25.4 / 40.0
-    assert "ReliefLead" not in set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert "ReliefLead" in spec.DRAWING_DIMENSIONS["ScrewProfile"]
+
+
+def test_relief_lead_prints_its_model_band_with_words_only() -> None:
+    # #2172 (Codjiflo round 2 on #2102): the limits came from spec constants
+    # typed into a note, so a model-only edit left them behind.  The native
+    # dimension prints the nominal and band; its callout carries words only.
+    assert not hasattr(spec, "RELIEF_LEAD_NOTE")
+    assert spec.RELIEF_LEAD_CALLOUT.replace("\n", " ") == (
+        "X 45 DEG LEAD, INSIDE MHA-DT-06 THREAD"
+    )
+    assert not re.search(r"\.\d", spec.RELIEF_LEAD_CALLOUT)
+    for limit in spec.RELIEF_LEAD_LIMITS:
+        assert spec.inch_text(limit, 3) not in spec.RELIEF_LEAD_CALLOUT
+    assert max(map(len, spec.RELIEF_LEAD_CALLOUT.splitlines())) <= 18
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '"ReliefLead": RELIEF_LEAD_CALLOUT' in source
+    assert "RELIEF_LEAD_NOTE" not in source
+    for retired in ("LEAD_PICK", "LEAD_NOTE_XY", "LEAD_NOTE_WIDTH"):
+        assert not hasattr(drawing, retired)
+    # The detail is curated before its parent: a native detail imported
+    # nothing after its parent's import and deletions (draw_dt_crank_handle).
+    assert source.index("keep=DETAIL_KEEP") < source.index("keep=SIDE_KEEP")
+    assert "CreateDetailViewAt4(" in source
+
+
+def test_detail_a_fence_shows_the_lead_and_clears_the_side_view() -> None:
+    # A detail imports only a dimension whose references it shows: both ends
+    # of the lead (and the seat-face corner, for the reader) stand inside the
+    # fence by its margin, and the fence stays above the axis.
+    focus = drawing.DETAIL_FOCUS_MM
+    reach = drawing.DETAIL_RADIUS_MM - drawing._FENCE_MARGIN_MM
+    relief_r = spec.RELIEF_DIA / 2.0
+    for point in (
+        (spec.SEAT_STATION, relief_r + spec.RELIEF_LEAD),
+        (spec.SEAT_STATION + spec.RELIEF_LEAD, relief_r),
+        (spec.SEAT_STATION, spec.SHOULDER_DIA / 2.0),
+    ):
+        assert math.dist(focus, point) <= reach
+    assert focus[1] > drawing.DETAIL_RADIUS_MM
+    # On the 3:1 side view the fence stays right of the relief Ø's dimension
+    # line on the floor.
+    fence_radius = drawing.DETAIL_RADIUS_MM * drawing.SHEET_SCALE[0] / 1000.0
+    fence_left = drawing._sheet_x(focus[0]) - fence_radius
+    assert fence_left - drawing.SIDE_KEEP["ReliefDia"][0] >= 0.0005
+    # The detail's own coordinates follow the side view's: +Z runs left.
+    foot_x, foot_y = drawing._detail_xy(spec.SEAT_STATION + spec.RELIEF_LEAD, relief_r)
+    start_x, start_y = drawing._detail_xy(spec.SEAT_STATION, relief_r + spec.RELIEF_LEAD)
+    scale = drawing.DETAIL_SCALE[0] / drawing.DETAIL_SCALE[1]
+    assert start_x - foot_x == pytest.approx(spec.RELIEF_LEAD * scale / 1000.0)
+    assert start_y - foot_y == pytest.approx(spec.RELIEF_LEAD * scale / 1000.0)
+    # The lead's block stands up-left of the circle: its dimension line over
+    # the circle's top, its right edge left of the foot's extension line.
+    text_x, text_y = drawing.DETAIL_KEEP["ReliefLead"]
+    line_y = text_y - drawing.RELIEF_LEAD_LINE_DROP
+    assert line_y - (drawing.DETAIL_CENTER[1] + drawing.DETAIL_CROP_RADIUS) >= 0.003
+    assert foot_x - (text_x + drawing.RELIEF_LEAD_TEXT_WIDTH / 2.0) >= 0.003
+    # The label hangs under the circle.
+    assert drawing.DETAIL_LABEL_XY[0] == drawing.DETAIL_CENTER[0]
+    assert drawing.DETAIL_LABEL_XY[1] < drawing.DETAIL_CENTER[1] - drawing.DETAIL_CROP_RADIUS
+    # The letter stands left of the relief width's left extension line, over
+    # the thread.
+    assert drawing.DETAIL_LETTER_XY[0] < drawing.RELIEF_END_X
+    assert drawing.DETAIL_LETTER_XY[1] > drawing.THREAD_TOP_Y
 
 
 def test_engagement_meets_the_1_5d_rule_governed_by_the_stock_arm() -> None:
@@ -328,7 +397,7 @@ def test_cup_wall_follows_ruling_b_without_changing_the_head_or_fit() -> None:
     assert spec.CUP_POCKET_CLEARANCE == cup.POCKET_CLEARANCE
     assert spec.POCKET_MAX == pytest.approx(cup.POCKET_DIA_MAX)
     assert spec.CUP_POCKET_WALL_FLOOR_MM == cup.POCKET_WALL_FLOOR_MM
-    assert spec.CUP_POCKET_WALL_MIN == cup.POCKET_WALL_MIN
+    assert spec.CUP_POCKET_WALL_MIN == cup.POCKET_STRAIGHT_WALL_MIN
     assert spec.CUP_POCKET_WALL_MIN >= spec.CUP_POCKET_WALL_FLOOR_MM
 
 
@@ -433,6 +502,10 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         (drawing.TIP_X, drawing.SIDE_CENTER[1]),
         *drawing.SIDE_KEEP.values(),
         *drawing.END_KEEP.values(),
+        *drawing.DETAIL_KEEP.values(),
+        drawing.DETAIL_CENTER,
+        drawing.DETAIL_LABEL_XY,
+        drawing.DETAIL_LETTER_XY,
     ]
     for x, y in points:
         assert inner[0] < x < inner[2] and inner[1] < y < inner[3]

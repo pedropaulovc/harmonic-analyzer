@@ -4,7 +4,9 @@ The SLDPRT remains authoritative.  A screw carries no datum and no
 geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the running-fit shoulder keeps its
 native size band and one bearing-surface finish, the shoulder and thread
 lengths keep their native bands, and every other size is an ordinary model
-dimension at its part-authored places.
+dimension at its part-authored places.  The thread relief's 45-degree lead
+prints its native band in DETAIL A, a 10:1 native detail of the seat corner
+(#2172).
 
 The screw axis is model +Z, so the ``*Right`` view already lays it horizontal
 as it sits in the lathe: model +Z runs to paper-LEFT, putting the thread tip on
@@ -21,16 +23,19 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
+    view_name,
 )
 
-from _com import _early_bound
+from _com import _early_bound, _read_member
 from _check import check
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
@@ -50,6 +55,7 @@ from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
@@ -71,7 +77,7 @@ from dt_crank_handle_pivot_screw_spec import (
     RELIEF_DIA,
     RELIEF_END_STATION,
     RELIEF_LEAD,
-    RELIEF_LEAD_NOTE,
+    RELIEF_LEAD_CALLOUT,
     SEAT_EDGE_NOTE,
     SEAT_STATION,
     SHOULDER_DIA,
@@ -168,8 +174,8 @@ SIDE_KEEP = {
     "HeadDia": (HEAD_FACE_X + 0.014, SIDE_CENTER[1] + 0.032),
     # The thread-relief groove against the seat face.  Its width from the seat
     # face reads above it alone; its Ø reads below it, the dimension line
-    # standing on the floor so nothing crosses.  The 45-degree lead has its
-    # own leader note (LEAD_NOTE_XY).
+    # standing on the floor so nothing crosses.  The 45-degree lead's own
+    # dimension reads in detail A (DETAIL_KEEP).
     "ReliefWidth": (RELIEF_MID_X, SIDE_CENTER[1] + 0.022),
     "ReliefDia": (RELIEF_FLOOR_MID_X, SIDE_CENTER[1] - 0.016),
     # The tip chamfer's axial leg reads below-left of the tip, clear of the
@@ -204,23 +210,82 @@ END_KEEP = {
 }
 # The thread callout lands on the full thread's lower silhouette just in from
 # the tip chamfer, from below: above the thread, its leader ran through where
-# the relief lead's note now stands (#290 review of b28d38a16).  Its
+# the relief lead's note stood (#290 review of b28d38a16).  Its
 # 9-character text (23.5 mm on farm r10 of 4e4991e0a) stands 15 mm below the
 # axis between the chamfer's extension line and the seat face's, which it
 # crossed when it started 5.6 mm in from the thread start (r10).
 THREAD_PICK = (THREAD_START_X + 0.0015, THREAD_BOTTOM_Y)
 THREAD_NOTE_XY = (THREAD_START_X + 0.0021, SIDE_CENTER[1] - 0.015)
-# The 45-degree relief lead's own note (#290 review of b28d38a16), on the
-# lead's upper silhouette.  The lead faces up and left, so the note stands up
-# and left with its 18-character rows (46 mm) ending 15 mm left of the relief
-# end: its leader passes under the relief width's left arrow and over the
-# thread, crossing only that dimension's extension line.
-LEAD_PICK = (
-    SEAT_X - RELIEF_LEAD * _S / 2000.0,
-    _sheet_y(RELIEF_DIA / 2.0 + RELIEF_LEAD / 2.0),
+# DETAIL A (#2172): the 45-degree relief lead is 0.9 mm of sheet at 3:1, and
+# the groove already carries the relief width above it and the Ø below it
+# (the #2102 review found it too crowded for a third dimension), so a 10:1
+# native detail carries the lead's model dimension, its band and its words,
+# as MHA-DT-08's detail B carries its tenon-root relief.  A detail imports
+# only a dimension whose references it shows, so the fence takes in both ends
+# of the lead and the seat-face corner.  It stays above the axis (no ink of
+# the turning axis or the station reference line along it), and on the side
+# view its 2.7-mm circle stays right of the relief Ø's dimension line.
+DETAIL_LETTER = "A"
+DETAIL_SCALE = (10, 1)
+_DS = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
+# (model station z, radius): mid-lead, halfway from the floor to the shoulder.
+DETAIL_FOCUS_MM = (
+    SEAT_STATION + RELIEF_LEAD / 2.0,
+    (RELIEF_DIA + SHOULDER_DIA) / 4.0,
 )
-LEAD_NOTE_WIDTH = 0.046
-LEAD_NOTE_XY = (RELIEF_END_X - 0.0147 - LEAD_NOTE_WIDTH, SIDE_CENTER[1] + 0.022)
+DETAIL_RADIUS_MM = 0.9
+_FENCE_MARGIN_MM = 0.3
+_LEAD_START = (SEAT_STATION, RELIEF_DIA / 2.0 + RELIEF_LEAD)
+_LEAD_FOOT = (SEAT_STATION + RELIEF_LEAD, RELIEF_DIA / 2.0)
+_SEAT_CORNER = (SEAT_STATION, SHOULDER_DIA / 2.0)
+if (
+    any(
+        math.dist(DETAIL_FOCUS_MM, point) > DETAIL_RADIUS_MM - _FENCE_MARGIN_MM
+        for point in (_LEAD_START, _LEAD_FOOT, _SEAT_CORNER)
+    )
+    or DETAIL_FOCUS_MM[1] <= DETAIL_RADIUS_MM
+):
+    raise AssertionError(
+        "detail A's fence must take in the relief lead's ends and the seat-face "
+        "corner, and stay above the axis"
+    )
+# Lower left, the sheet's one open field, under the groove: the circle spans
+# x 0.096..0.114, y 0.041..0.059, and the lead's block above it (DETAIL_KEEP)
+# tops out near y 0.083, 18 mm under the overall's row and left of the title
+# block.
+DETAIL_CENTER = (0.105, 0.050)
+DETAIL_CROP_RADIUS = DETAIL_RADIUS_MM * _DS
+# The label hangs from its top centre 5 mm under the circle.
+DETAIL_LABEL_XY = (DETAIL_CENTER[0], DETAIL_CENTER[1] - DETAIL_CROP_RADIUS - 0.005)
+# The circle's letter on the side view stands up-left of the fence, where the
+# lead's note stood: 3 mm over the thread, left of the relief width's left
+# extension line and under its dimension line.
+DETAIL_LETTER_XY = (RELIEF_END_X - 0.005, SIDE_CENTER[1] + 0.0095)
+
+
+def _detail_xy(model_z_mm: float, radius_mm: float) -> tuple[float, float]:
+    """Sheet point of a model point in detail A (as the side view: +Z left)."""
+    return (
+        DETAIL_CENTER[0] + (DETAIL_FOCUS_MM[0] - model_z_mm) * _DS,
+        DETAIL_CENTER[1] + (radius_mm - DETAIL_FOCUS_MM[1]) * _DS,
+    )
+
+
+# The lead's horizontal dimension prints its value, then its three callout
+# rows, with the dimension line under the last row (the tip chamfer's block
+# on farm run 20261104T070839859Z: value 5.1 mm over its keep, the first row
+# on it, rows 5.5 mm apart, the line 2.5 mm under the last).  The block stands
+# up-left of the circle: its line 4 mm over the circle's top, its 16-character
+# rows (41 mm at 2.55 mm a character) ending 4 mm left of the lead foot's
+# extension line, so the line runs to the arrows over open sheet.
+RELIEF_LEAD_TEXT_WIDTH = 0.041
+RELIEF_LEAD_LINE_DROP = 0.0135
+DETAIL_KEEP = {
+    "ReliefLead": (
+        _detail_xy(*_LEAD_FOOT)[0] - 0.004 - RELIEF_LEAD_TEXT_WIDTH / 2.0,
+        DETAIL_CENTER[1] + DETAIL_CROP_RADIUS + 0.004 + RELIEF_LEAD_LINE_DROP,
+    ),
+}
 # The running shoulder's upper flank, right of the Ø dimension line and its
 # callout block (farm r1 of eb22a22f1: at x - 0.050 the leader ran through
 # the block's right end).
@@ -239,8 +304,8 @@ CENTERLINE_PICK = (UNDERHEAD_X - 0.025, SIDE_CENTER[1] + 0.003)
 SEAT_EDGE_PICK = (SEAT_X + 0.0025, SHOULDER_TOP_Y)
 SEAT_EDGE_NOTE_XY = (SEAT_X + 0.024, SIDE_CENTER[1] + 0.060)
 # The relief Ø's arrows stand inside the groove: outside, the upper arrow's
-# stub stood above the floor where the lead note's leader passes (#290 review
-# of f166646c4).
+# stub stood above the floor, where the old lead note's leader passed (#290
+# review of f166646c4), beside detail A's fence.
 _ARROWS_INSIDE = 0  # swDimArrowsSide_e.swDimArrowsInside
 ISO_NOTE_XY = (0.352, 0.200)
 
@@ -254,6 +319,123 @@ def _set_relief_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
     display.ArrowSide = _ARROWS_INSIDE
     if int(display.ArrowSide) != _ARROWS_INSIDE:
         raise RuntimeError("MHA-DT-32 ReliefDia did not keep its arrows inside")
+
+
+def _relief_lead_detail(adapter: Any, side: Any) -> Any:
+    """Native 10:1 detail A of the relief lead on the side view
+    (draw_dt_crank_handle._ferrule_seat_detail): fence, scale, outline, label
+    and letter each read back."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    parent = _early_bound(side, "IView")
+    if not drawing.ActivateView(view_name(adapter, side)):
+        raise RuntimeError("failed to activate detail A's parent side view")
+    draw.ClearSelection2(True)
+    # The profile lies on the Right plane: model (x, y, z) = (0, radius, station).
+    center = model_point_in_view(
+        adapter,
+        side,
+        (0.0, DETAIL_FOCUS_MM[1] / 1000.0, DETAIL_FOCUS_MM[0] / 1000.0),
+        label="detail A fence centre",
+    )
+    sheet_xy = [center[:2], (center[0] + DETAIL_RADIUS_MM * _S / 1000.0, center[1])]
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in sheet_xy:
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    # Straight to the database: an inferred circle snaps onto nearby edges
+    # (draw_dt_pinion_lever r2), and this one sits on the seat-face corner,
+    # so the fence is read back before use.
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        fence = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if fence is None:
+        raise RuntimeError("failed to create detail A's fence")
+    arc = _early_bound(fence, "ISketchArc")
+    placed = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
+    placed_centre = [float(adapter._get_attr_or_call(placed, axis)) for axis in "XY"]
+    if math.dist(placed_centre, points[0][:2]) > 1e-9 or not math.isclose(
+        float(arc.GetRadius()), math.dist(points[0][:2], points[1][:2]), abs_tol=1e-9
+    ):
+        raise RuntimeError("detail A's fence moved from where it was placed")
+    draw.ClearSelection2(True)
+    if not _early_bound(fence, "ISketchSegment").Select4(False, None):
+        raise RuntimeError("failed to select detail A's fence")
+    detail = drawing.CreateDetailViewAt4(
+        *DETAIL_CENTER,
+        0.0,
+        0,  # swDetViewSTANDARD
+        *DETAIL_SCALE,
+        DETAIL_LETTER,
+        1,  # swDetCircleCIRCLE
+        True,
+        False,
+        False,
+        5,
+    )
+    if detail is None:
+        raise RuntimeError("CreateDetailViewAt4 returned no detail A")
+    detail = _early_bound(detail, "IView")
+    detail.ScaleRatio = double_array([float(value) for value in DETAIL_SCALE])
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    ratio = tuple(float(value) for value in detail.ScaleRatio)
+    if len(ratio) != 2 or not math.isclose(
+        ratio[0] / ratio[1], DETAIL_SCALE[0] / DETAIL_SCALE[1]
+    ):
+        raise RuntimeError(f"detail A scale {ratio!r}, expected {DETAIL_SCALE!r}")
+    outline = tuple(float(value) for value in detail.GetOutline())
+    position = tuple(float(value) for value in detail.Position)
+    if len(outline) != 4 or len(position) != 2:
+        raise RuntimeError("detail A has invalid bounds")
+    span = 2.0 * DETAIL_CROP_RADIUS
+    _telemetry.info(
+        f"detail A outline {outline[2] - outline[0]:.5f} x "
+        f"{outline[3] - outline[1]:.5f} m (fence {span:.5f})"
+    )
+    if min(outline[2] - outline[0], outline[3] - outline[1]) < 0.95 * span:
+        raise RuntimeError(f"detail A is smaller than its fence: {outline}")
+    target = [
+        position[axis] + DETAIL_CENTER[axis] - (outline[axis] + outline[axis + 2]) / 2.0
+        for axis in range(2)
+    ]
+    if not detail.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to position detail A")
+    draw.EditRebuild3()
+    notes = tuple(_read_member(detail, "GetNotes") or ())
+    if len(notes) != 1:
+        raise RuntimeError(f"expected one native detail A label, found {len(notes)}")
+    note = _early_bound(notes[0], "INote")
+    annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
+    label_xyz = (*DETAIL_LABEL_XY, 0.0)
+    if not annotation.SetPosition2(*label_xyz):
+        raise RuntimeError("failed to position detail A's label")
+    draw.EditRebuild3()
+    actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
+    if math.dist(actual, label_xyz) > 1e-8:
+        raise RuntimeError(f"detail A's label position did not persist: {actual}")
+    circles = tuple(_read_member(parent, "GetDetailCircles") or ())
+    if len(circles) != 1:
+        raise RuntimeError(
+            f"expected one detail circle on the side view, found {len(circles)}"
+        )
+    circle = _early_bound(circles[0], "IDetailCircle")
+    circle.SetLabelPosition(*DETAIL_LETTER_XY)
+    draw.EditRebuild3()
+    letter = tuple(float(value) for value in circle.GetLabelPosition())
+    if len(letter) != 2 or math.dist(letter, DETAIL_LETTER_XY) > 1e-8:
+        raise RuntimeError(f"detail A's letter did not persist: {letter}")
+    return detail
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -305,6 +487,21 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (side, end, iso):
         set_hidden_lines_removed(adapter, view)
 
+    # Detail A first (draw_dt_crank_handle, after draw_ch_amplitude_bar
+    # r743-6): a dimension already on the sheet is never imported again while
+    # a deleted one is, and a native detail imported nothing after its
+    # parent's import and deletions.  The detail keeps the lead and deletes
+    # whatever else its fence shows; the side view's import then takes those
+    # back and skips the lead.
+    detail = _relief_lead_detail(adapter, side)
+    set_hidden_lines_removed(adapter, detail)
+    detail_annotations = curate_view_dimensions(
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="relief lead detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
     side_annotations = curate_view_dimensions(
         adapter,
         side,
@@ -319,7 +516,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="head-end",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    annotations = [*side_annotations, *end_annotations]
+    annotations = [*side_annotations, *end_annotations, *detail_annotations]
     set_dimension_callouts(
         adapter, annotations, {"ReliefDia": RELIEF_CALLOUT}, location="below"
     )
@@ -332,6 +529,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "ShoulderDia": SHOULDER_FIT_CALLOUT,
             "HeadDia": HEAD_DIA_CALLOUT,
             "HeadLength": HEAD_LENGTH_CALLOUT,
+            "ReliefLead": RELIEF_LEAD_CALLOUT,
         },
         location="below",
     )
@@ -363,15 +561,6 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_xy=THREAD_PICK,
         note_xy=THREAD_NOTE_XY,
         label="MHA-DT-32 thread callout",
-        entity_type="SILHOUETTE",
-    )
-    add_attached_note(
-        adapter,
-        side,
-        text=RELIEF_LEAD_NOTE,
-        entity_xy=LEAD_PICK,
-        note_xy=LEAD_NOTE_XY,
-        label="MHA-DT-32 relief lead",
         entity_type="SILHOUETTE",
     )
     add_attached_note(

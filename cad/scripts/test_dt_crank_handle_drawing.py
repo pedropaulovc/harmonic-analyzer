@@ -203,7 +203,7 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     assert spec.SHOULDER_R == pytest.approx(ferrule.INSTALLED_OUTER_DIA / 2.0)
     assert spec.BORE_ECCENTRICITY == pytest.approx(0.004 * IN)
     assert spec.FERRULE_SEAT_RADIAL_MIN >= spec.FERRULE_SEAT_RADIAL_FLOOR == 0.5
-    assert spec.TENON_WALL_MIN >= WALL_FLOOR_MM
+    assert spec.TENON_STRAIGHT_WALL_MIN >= WALL_FLOOR_MM
     assert spec.WAIST_WALL_MIN >= WALL_FLOOR_MM
     # The ring is skimmed with the shoulder, so its stock OD carries no band
     # (user ruling 2026-10-01).
@@ -336,6 +336,23 @@ def test_root_relief_prints_in_an_enlarged_detail_with_separate_leaders() -> Non
     assert drawing.INSIDE_CORNER_ARC_EXTENSION["TenonRootRadius"] is False
 
 
+def test_tenon_wall_charges_both_breaks_at_its_free_end() -> None:
+    # Codjiflo on #2102 (#2171): at the tenon's free end the outside edge and
+    # the pivot bore's mouth each take the title block's break, as the glue
+    # length charges the end break; the governing wall is the straight one
+    # less both, and the fit note prints that, not the straight wall.
+    spec = dt_crank_handle_spec
+    brk = spec.EDGE_BREAK_MAX_MM
+    assert brk == pytest.approx(0.010 * IN)
+    assert spec.TENON_STRAIGHT_WALL_MIN == pytest.approx(
+        (spec.TENON_DIA_MIN - spec.PIVOT_BORE_FIT_MAX) / 2.0 - spec.BORE_ECCENTRICITY
+    )
+    assert spec.TENON_WALL_MIN == pytest.approx(spec.TENON_STRAIGHT_WALL_MIN - 2.0 * brk)
+    assert spec.TENON_GLUE_LENGTH_MIN <= spec.TENON_LENGTH - brk
+    printed = math.floor(spec.TENON_WALL_MIN / 0.0254) * 0.0254
+    assert spec.TENON_FIT_NOTE.splitlines()[-1] == f"WALL {spec.inch_text(printed, 3)} MIN"
+
+
 def test_tenon_root_relief_clears_the_ferrule_seat_and_keeps_the_tenon() -> None:
     # Owner ruling 2026-10-24 (#1900, option 4): a 45-degree relief cut into
     # the shoulder at the tenon root, so MHA-DT-34's seat mouth needs only the
@@ -355,7 +372,7 @@ def test_tenon_root_relief_clears_the_ferrule_seat_and_keeps_the_tenon() -> None
     )
     assert spec.TENON_ROOT_RELIEF_MIN - step < spec.TENON_ROOT_ROUND_REACH
     assert spec.FERRULE_SEAT_RADIAL_MIN - step < spec.FERRULE_SEAT_RADIAL_FLOOR
-    assert spec.TENON_WALL_MIN >= spec.TENON_WALL_FLOOR_MM
+    assert spec.TENON_STRAIGHT_WALL_MIN >= spec.TENON_WALL_FLOOR_MM
     assert "TenonRootRelief" in spec.DRAWING_DIMENSIONS["HandleProfile"]
     assert spec.DRAWING_PRECISION_BY_NAME["TenonRootRelief"] == 3
     assert (

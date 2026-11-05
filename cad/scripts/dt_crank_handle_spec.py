@@ -255,9 +255,9 @@ FERRULE_SEAT_RADIAL_FLOOR = 0.5
 # cut into the SHOULDER at the root, its leg the same along the shoulder face
 # from the tenon OD and along the tenon behind the face.  A groove in the
 # tenon cannot do it: the smallest fitted tenon keeps only a hair of oak over
-# its rule-17 floor round the pivot bore (TENON_WALL_MIN), far less than the
-# depth that would swallow the root round, while a shoulder relief leaves the
-# tenon whole.  The R.012 MAX root round sits in the relief's 45-degree
+# its rule-17 floor round the pivot bore (TENON_STRAIGHT_WALL_MIN), far less
+# than the depth that would swallow the root round, while a shoulder relief
+# leaves the tenon whole.  The R.012 MAX root round sits in the relief's 45-degree
 # corner, tangent R (1 + sqrt 2) back from it along the tenon, so the leg's
 # minimum keeps that whole round behind the seat face (no oak at the ferrule's
 # mouth, whatever its break).  Its maximum leaves the ferrule its flat
@@ -356,7 +356,11 @@ TENON_END_GAP_MIN = round(
 # SHOULDER_DIA_MAX + DIAMETRAL_CLEARANCE_MAX.
 PIVOT_BORE_FIT_MAX = 4.1529  # .1635
 # Oak between the smallest tenon and the largest fitted pivot bore.
-TENON_WALL_MIN = (TENON_DIA_MIN - PIVOT_BORE_FIT_MAX) / 2.0 - BORE_ECCENTRICITY
+TENON_STRAIGHT_WALL_MIN = (TENON_DIA_MIN - PIVOT_BORE_FIT_MAX) / 2.0 - BORE_ECCENTRICITY
+# The governing tenon wall, at its free end: the outside edge and the pivot
+# bore's mouth are both exposed there and each takes the title block's break,
+# as TENON_GLUE_LENGTH_MIN charges the end break (codjiflo on #2102, #2171).
+TENON_WALL_MIN = round(TENON_STRAIGHT_WALL_MIN - 2.0 * EDGE_BREAK_MAX_MM, 6)
 # Oak at the waist over the largest bore, the waist turned its .XX band small.
 WAIST_WALL_MIN = (
     (2.0 * WAIST_R - _GENERAL_2PL) - PIVOT_BORE_FIT_MAX
@@ -377,7 +381,7 @@ for _ok, _what in (
         f"{FERRULE_SEAT_RADIAL_FLOOR:g} of shoulder for the ferrule",
     ),
     (
-        TENON_WALL_MIN >= TENON_WALL_FLOOR_MM,
+        TENON_STRAIGHT_WALL_MIN >= TENON_WALL_FLOOR_MM,
         "the smallest fitted tenon leaves under .060 over the bore",
     ),
     (
@@ -515,9 +519,9 @@ CUP_NAME = "BUTT CUP"
 # The matched fits, each flagged on its feature (drawing-guidelines.md rules 4
 # and 7): the mate by name and number, and the acceptance.  Short lines keep
 # each block narrow beside its neighbours on the sheet.
-# The tenon's oak over the pivot bore sits between the rule-17 floor and the
-# target, so its callout states it as a plain fact (rule 20; #290 review of
-# b28d38a16), rounded down to the printed thousandth.
+# The tenon's governing oak wall, at its broken free end (#2171), is under the
+# rule-17 target, so its callout states it as a plain fact (rule 20; #290
+# review of b28d38a16), rounded down to the printed thousandth.
 TENON_FIT_NOTE = (
     f"TURN TO SUIT {FERRULE_NAME}\n"
     f"{FERRULE_NUMBER} BORE, {inch_text(TENON_GLUE_LINE[0], 3)}-"

@@ -393,8 +393,8 @@ async def build(adapter) -> dict[str, str]:
     # Model-owned bands (drawing-simplicity-policy.md `How the repository
     # implements the guidelines`): the running-fit shoulder, the relief
     # diameter that keeps the die's run-out under the thread root and a flat
-    # seat (Codex P1 on #1139), the relief lead that prints as limits in its
-    # leader note (the model owning its band all the same, Codex P2), and the
+    # seat (Codex P1 on #1139), the relief lead whose imported dimension prints
+    # this band in the drawing's detail A (Codex P2; #2172), and the
     # thread length that must engage the arm.  The tip chamfer prints as the
     # single limit .015 MAX (#290 review of b28d38a16).  The head and slot
     # sizes print under the title block's bands.

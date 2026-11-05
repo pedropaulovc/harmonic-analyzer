@@ -105,6 +105,15 @@ def test_sheet_carries_no_manufacturing_note() -> None:
     assert "Manufacturing Notes" not in _source()
 
 
+def test_stock_reference_prints_no_supplier_tolerance() -> None:
+    # #2175: the as-bought fraction is an untoleranced REF; quoting each
+    # stock's catalogue band repeated MATERIAL and over-specified the REF.
+    assert spec.PIN_DIA_CALLOUT == "STOCK, AS SUPPLIED"
+    for token in ("\u00b1", "TOL", "DRILL ROD", "1018", "+.", "-."):
+        assert token not in spec.PIN_DIA_CALLOUT, token
+    assert "callout=PIN_DIA_CALLOUT" in _source()
+
+
 def test_sheet_runs_at_8_to_1_with_every_view_at_sheet_scale() -> None:
     assert drawing.SHEET_SCALE == (8.0, 1.0)
     assert drawing.VIEW_SCALE == (8, 1)

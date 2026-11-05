@@ -39,8 +39,9 @@ BODY_FIT_CALLOUT = f"EPOXY FIT IN {HANDLE_NUMBER}"
 # Matched fit on the first-made MHA-DT-32 head: name and number and the
 # diametral clearance (rule 4; r1 finding 2).  The largest head plus the
 # widest clearance is the largest bore, so no separate cap prints (#290 review
-# of eb22a22f1 called a Ø MAX row over-specification); the wall it leaves
-# inside the smallest body is stated as a plain fact (rule 20).
+# of eb22a22f1 called a Ø MAX row over-specification); the governing wall it
+# leaves, at the face with both edges broken (#2170), is stated as a plain
+# fact (rule 20).
 POCKET_FIT_CALLOUT = "\n".join(
     (
         f"BORE TO SUIT {SCREW_NUMBER}",

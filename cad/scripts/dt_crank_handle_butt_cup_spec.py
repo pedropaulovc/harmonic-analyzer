@@ -39,7 +39,11 @@ from __future__ import annotations
 import _config
 from _inch_wall_limits import WALL_FLOOR_MM
 from _package_units import drawing_unit
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import (
+    drilled_oversize_mm,
+    edge_break_chamfer_mm,
+    printed_band_mm,
+)
 
 UNIT = drawing_unit(
     "parts/dt-crank-handle-butt-cup", _config.parts("dt-crank-handle-butt-cup")
@@ -88,7 +92,26 @@ FLOOR_THICKNESS = OVERALL_LENGTH - POCKET_DEPTH
 
 GENERAL_2PL_MM = printed_band_mm(2, unit=UNIT)
 FLOOR_THICKNESS_MIN = round(FLOOR_THICKNESS - GENERAL_2PL_MM - POCKET_DEPTH_TOL, 6)
-POCKET_WALL_MIN = round(((BODY_DIA - BODY_DIA_TOL) - POCKET_DIA_MAX) / 2.0, 6)
+# The straight wall: the smallest body over the largest pocket.
+POCKET_STRAIGHT_WALL_MIN = round(((BODY_DIA - BODY_DIA_TOL) - POCKET_DIA_MAX) / 2.0, 6)
+# The title block's break, on every exposed edge (it is not modelled).
+EDGE_BREAK_MAX_MM = edge_break_chamfer_mm(unit=UNIT)
+# The governing pocket wall, at the outer face: the pocket mouth and the
+# body's OD edge are both exposed there (the face is left flat, not skimmed
+# with the oak) and each takes the break, so the face plane keeps the straight
+# wall less both (codjiflo on #2102, #2170).
+POCKET_WALL_MIN = round(POCKET_STRAIGHT_WALL_MIN - 2.0 * EDGE_BREAK_MAX_MM, 6)
+# The floor at the floor hole's lip, both of the hole's mouths broken.
+FLOOR_AT_HOLE_MIN = round(FLOOR_THICKNESS_MIN - 2.0 * EDGE_BREAK_MAX_MM, 6)
+# The bottom face's ring round the floor hole: the smallest body less the
+# longest chamfer leg, over the largest drilled hole and its mouth's break.
+FLOOR_HOLE_WALL_MIN = round(
+    (BODY_DIA - BODY_DIA_TOL) / 2.0
+    - BODY_CHAMFER_MAX
+    - (FLOOR_HOLE_DIA + drilled_oversize_mm(unit=UNIT)) / 2.0
+    - EDGE_BREAK_MAX_MM,
+    6,
+)
 # Owner ruling B on #1375: 1/2-in cold-finished rod leaves a cleanup cut over
 # the largest body.
 STOCK_DIA = 0.5 * 25.4
@@ -96,8 +119,16 @@ STOCK_DIA = 0.5 * 25.4
 for _ok, _what in (
     (FLOOR_THICKNESS_MIN >= WALL_FLOOR_MM, "cup floor is under .060 at its limits"),
     (
-        POCKET_WALL_MIN >= POCKET_WALL_FLOOR_MM,
-        "pocket wall is under .060 at its limits (owner ruling B on #1375)",
+        FLOOR_AT_HOLE_MIN >= WALL_FLOOR_MM,
+        "cup floor is under .060 at the floor hole's broken mouths",
+    ),
+    (
+        FLOOR_HOLE_WALL_MIN >= WALL_FLOOR_MM,
+        "the bottom face's ring round the floor hole is under .060",
+    ),
+    (
+        POCKET_STRAIGHT_WALL_MIN >= POCKET_WALL_FLOOR_MM,
+        "straight pocket wall is under .060 at its limits (owner ruling B on #1375)",
     ),
     (FLOOR_HOLE_DIA < POCKET_DIA, "floor hole leaves no floor"),
     (BODY_DIA + BODY_DIA_TOL < STOCK_DIA - 0.2, "body is not turnable from 1/2-in rod"),
