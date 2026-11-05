@@ -294,9 +294,10 @@ LAG_BASE_THREAD_FITS = tuple(
 # --- Frame cross-screw stack -------------------------------------------------
 # The stock screw origin is its under-head seat and its shank runs along local
 # -Y. Front placements rotate it toward +Z; rear placements toward -Z. Each
-# 1.750-in shank crosses the near casting, both Ø.197 tube walls, and at least
-# one major diameter of far casting while retaining .060 of full thread beyond
-# the tip in the 1.81-deep interrupted tap.
+# 1.750-in shank crosses both Ø.197 tube walls and the near casting -- tapped
+# on MHA-FR-02, a #10 close clearance on MHA-FR-01 (owner ruling 2026-11-05)
+# -- and at least one major diameter of far casting while retaining .060 of
+# full thread beyond the tip in the 1.81-deep tap.
 COLUMN_RADIUS = COLUMN_OUTER_DIA / 2.0
 SOCKET_RADIUS = COLUMN_SOCKET_DIAMETER / 2.0
 BASE_CROSS_SCREW_TIP_Z = BASE_SCREW_SEAT_Z - CROSS_SCREW_SHANK_LEN

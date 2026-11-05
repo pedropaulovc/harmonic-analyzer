@@ -118,8 +118,10 @@ from dt_drive_train_steps import step_ref
 from fr_frame_attachment_spec import (
     BASE_SCREW_SEAT_Z,
     BASE_SCREW_Y,
+    CASTING_TAP_DRILL_DEPTH,
     SCREW_SPOTFACE_DIAMETER,
 )
+from fr_harmonic_base_fasteners import NEAR_WALL_CLEARANCE_DIAMETER
 from fr_harmonic_base_spec import (
     BOTTOM_FRONT_Z,
     BOTTOM_LENGTH,
@@ -263,6 +265,10 @@ PEDESTAL_CALLOUT_XY = (0.200, 0.252)
 BLOCK_CALLOUT_XY = (0.272, 0.252)
 SPRING_CALLOUT_XY = (0.315, 0.1428)
 CROSS_TAP_CALLOUT_XY = (0.285, 0.117)
+# The near-wall clearance callout stands right of the cross-tap block, on its
+# row, short of section A-A: its leader drops onto the same +X entry the tap
+# leader reaches from the left.
+CROSS_CLEARANCE_CALLOUT_XY = (0.342, 0.117)
 # The nameplate callout (#628): three rows, its top row level with the block
 # callout's, right of it in the band above the plan and high over section
 # arrow A's head and letter. Its near, left shoulder end stands over the
@@ -548,13 +554,14 @@ def _hole_rim(x_mm: float, z_mm: float, diameter_mm: float) -> tuple[float, floa
     return _plan_xy(x_mm + diameter_mm / 2.0, z_mm, center=HOLE_TOP_CENTER)
 
 
-@_telemetry.traced("drawing.base_cross_tap_edge")
-def _cross_tap_edge(view: Any, *, x_mm: float = COLUMN_X) -> Any:
-    """Pick the tap entry itself, not the nearby larger spotface circle."""
-    center = (x_mm / 1000.0, BASE_SCREW_Y / 1000.0, BASE_SCREW_SEAT_Z / 1000.0)
-    radius = BASE_CROSS_TAP_DRILL_DIA / 2000.0
+def _cross_hole_circle(
+    view: Any, *, z_mm: float, radius_mm: float, x_mm: float, label: str
+) -> Any:
+    """The one visible cross-screw circle of ``radius_mm`` at ``z_mm``."""
+    center = (x_mm / 1000.0, BASE_SCREW_Y / 1000.0, z_mm / 1000.0)
+    radius = radius_mm / 1000.0
     matches = []
-    for raw in visible_view_entities(view, 1, label="base cross-tap entry"):
+    for raw in visible_view_entities(view, 1, label=label):
         edge = _early_bound(raw, "IEdge")
         curve = _early_bound(edge.GetCurve(), "ICurve")
         if not curve.IsCircle():
@@ -568,10 +575,135 @@ def _cross_tap_edge(view: Any, *, x_mm: float = COLUMN_X) -> Any:
             continue
         matches.append(edge)
     if len(matches) != 1:
-        raise RuntimeError(
-            f"expected one base cross-tap entry edge, found {len(matches)}"
-        )
+        raise RuntimeError(f"expected one {label} edge, found {len(matches)}")
     return matches[0]
+
+
+# The Hole Wizard's own feature names (build_fr_harmonic_base).
+CROSS_TAP_FEATURES = ("BaseCrossTapsFront", "BaseCrossTapsRear")
+
+
+@_telemetry.traced("drawing.base_cross_tap_edge")
+def _cross_tap_edge(view: Any, *, x_mm: float = COLUMN_X) -> Any:
+    """Pick the far-wall tap where its drill meets the drill point.
+
+    The near-wall clearance consumes the tap's entry rim on the spotface
+    floor, and looking down the axis the drill-bottom circle projects onto the
+    far wall's mouth, which hides it from the view's visible-edge list (leaf
+    20261105T200327Z found none). So the circle comes from the tap feature's
+    own cylinder in the referenced part and is mapped into the view.
+    """
+    center = (
+        x_mm / 1000.0,
+        BASE_SCREW_Y / 1000.0,
+        (BASE_SCREW_SEAT_Z - CASTING_TAP_DRILL_DEPTH) / 1000.0,
+    )
+    radius = BASE_CROSS_TAP_DRILL_DIA / 2000.0
+    part = _early_bound(_early_bound(view, "IView").ReferencedDocument, "IPartDoc")
+    matches = []
+    for name in CROSS_TAP_FEATURES:
+        feature = part.FeatureByName(name)
+        if feature is None:
+            raise RuntimeError(f"base cross-tap feature {name!r} is missing")
+        for raw_face in _early_bound(feature, "IFeature").GetFaces() or ():
+            face = _early_bound(raw_face, "IFace2")
+            if not _early_bound(face.GetSurface(), "ISurface").IsCylinder():
+                continue
+            for raw_edge in face.GetEdges() or ():
+                edge = _early_bound(raw_edge, "IEdge")
+                curve = _early_bound(edge.GetCurve(), "ICurve")
+                if not curve.IsCircle():
+                    continue
+                values = tuple(float(value) for value in curve.CircleParams)
+                if (
+                    abs(values[6] - radius) <= 1e-7
+                    and all(abs(values[i] - center[i]) <= 1e-7 for i in range(3))
+                    and abs(abs(values[5]) - 1.0) <= 1e-7
+                ):
+                    matches.append(edge)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"expected one base cross-tap drill-bottom edge, found {len(matches)}"
+        )
+    corresponding = _early_bound(view, "IView").GetCorrespondingEntity(matches[0])
+    if corresponding is None:
+        raise RuntimeError("base cross-tap drill-bottom edge has no view entity")
+    return corresponding
+
+
+@_telemetry.traced("drawing.base_cross_clearance_edge")
+def _cross_clearance_edge(view: Any, *, x_mm: float = COLUMN_X) -> Any:
+    """Pick the near-wall clearance entry, not the larger spotface circle."""
+    return _cross_hole_circle(
+        view,
+        z_mm=BASE_SCREW_SEAT_Z,
+        radius_mm=NEAR_WALL_CLEARANCE_DIAMETER / 2.0,
+        x_mm=x_mm,
+        label="base cross near-wall clearance entry",
+    )
+
+
+# The near-wall clearance is drilled full diameter until it opens into the
+# socket: its native blind depth ("<HOLE-DEPTH> <hw-depth>") becomes that
+# instruction on its own row, the count aggregates both two-hole features
+# like the cross-tap's, and the diameter stays the Hole Wizard variable.
+CROSS_CLEARANCE_EXTENT_TEXT = "DRILL TO SOCKET"
+CROSS_CLEARANCE_PRECISION = {"hw-diam": 3}
+_BLIND_DEPTH_TOKENS = re.compile(r"<HOLE-DEPTH>\s*<hw-depth>")
+
+
+def _cross_clearance_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """Aggregate the count and swap the one blind depth for DRILL TO SOCKET."""
+    if set(definitions) != {5, 6, 7, 8}:
+        raise RuntimeError(f"unexpected cross clearance callout parts: {definitions!r}")
+    depths = {
+        part: len(_BLIND_DEPTH_TOKENS.findall(text))
+        for part, text in definitions.items()
+    }
+    counts = {part: text.count("<NUM_INST>") for part, text in definitions.items()}
+    if sorted(depths.values()) != [0, 0, 0, 1] or sorted(counts.values()) != [
+        0,
+        0,
+        0,
+        1,
+    ]:
+        raise RuntimeError(
+            f"cross clearance callout has no single count and blind depth: {definitions!r}"
+        )
+    quantity = str(len(COLUMN_SOCKET_XZ))
+    updated = {
+        part: _BLIND_DEPTH_TOKENS.sub(
+            f"\n{CROSS_CLEARANCE_EXTENT_TEXT}", text.replace("<NUM_INST>", quantity)
+        )
+        for part, text in definitions.items()
+    }
+    rewritten = "\n".join(updated.values())
+    if "<hw-depth>" in rewritten or "<HOLE-DEPTH>" in rewritten:
+        raise RuntimeError(f"cross clearance rewrite left a depth: {updated!r}")
+    return updated
+
+
+def _set_cross_clearance_callout_text(display: Any) -> None:
+    """State 4X and DRILL TO SOCKET without severing the diameter variable."""
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    updated = _cross_clearance_callout_definitions(definitions)
+    for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
+        if updated[definition_part] != definitions[definition_part]:
+            display.SetText(writable_part, updated[definition_part])
+    persisted = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    resolved = "\n".join(str(display.GetText(part) or "") for part in (1, 2, 3, 4))
+    diameter = f"{NEAR_WALL_CLEARANCE_DIAMETER / 25.4:.3f}".lstrip("0")
+    if (
+        persisted != updated
+        or resolved.count(CROSS_CLEARANCE_EXTENT_TEXT) != 1
+        or f"{len(COLUMN_SOCKET_XZ)}X " not in resolved
+        or "<HOLE-DEPTH>" in resolved
+        or diameter not in resolved
+    ):
+        raise RuntimeError(
+            "cross clearance count or DRILL TO SOCKET did not persist: "
+            f"definitions={persisted!r}, resolved={resolved!r}"
+        )
 
 
 @_telemetry.traced("drawing.base_cross_tap_readback")
@@ -1130,8 +1262,10 @@ PIVOT_SEAT_NOTE_XY = (0.020, 0.100)
 # seats each tap ON the spotface floor (build_harmonic_base places it at
 # BASE_SCREW_SEAT_Z), and its depths run from that face. "ON A1-A4 X
 # CENTRES" was a location, now the CrossTapX/CrossTapFarX dimensions, and
-# the spotface callout's 4X FRONT/REAR already counts the faces.
-CROSS_TAP_PROCESS = "COMMON THREAD LEAD IN BOTH WALLS\n"
+# the spotface callout's 4X FRONT/REAR already counts the faces. The near
+# wall is the ⌀.206 clearance (owner ruling 2026-11-05), called out on its
+# own, so the thread is the far wall's only.
+CROSS_TAP_PROCESS = "FAR WALL ONLY\n"
 TRANSFER_HOLES = (
     *TRANSFER_BLOCK_HOLES,
     TRANSFER_SPRING_HOLE,
@@ -1142,8 +1276,8 @@ TRANSFER_HOLES = (
 # One row per native Hole Wizard tapped-seat FEATURE build_harmonic_base cuts
 # down into the deck (its SupportHoldDownSeats call plus its seat-group loop),
 # in hole-table order: later seat groups stay after the earlier mounting-seat
-# groups. The front/rear BaseCrossTaps features are side-face taps outside
-# the table and outside this list.
+# groups. The front/rear BaseCrossTaps and BaseCrossClearance features are
+# side-face holes outside the table and outside this list.
 DECK_TAPPED_SEAT_FEATURES = (
     ("SupportHoldDownSeats", HOLE_XZ, HOLD_DOWN_TAP_DRILL_DIA),
     ("PivotSeat", (PIVOT_SCREW_XZ,), PIVOT_SCREW_HOLE_DIA),
@@ -2502,6 +2636,19 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hole_callout_precision(
         tap_callout, CROSS_TAP_CALLOUT_PRECISION, label="base cross-tap drill depth"
     )
+    clearance_callout = add_native_hole_callout(
+        adapter,
+        hole_side,
+        edge=_cross_clearance_edge(hole_side),
+        callout_xy=CROSS_CLEARANCE_CALLOUT_XY,
+        label="base cross near-wall clearances",
+    )
+    set_hole_callout_precision(
+        clearance_callout,
+        CROSS_CLEARANCE_PRECISION,
+        label="base cross near-wall clearance diameter",
+    )
+    _set_cross_clearance_callout_text(clearance_callout)
     for label, display in (
         ("pinion-block transfer seats", block_callout),
         ("arbor-pedestal transfer seats", pedestal_callout),
@@ -2699,6 +2846,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "MHA-DT-24 spring transfer": spring_callout,
         "MHA-FR-04 nameplate transfer": nameplate_callout,
         "MHA-FR-VN-53 cross-tap": tap_callout,
+        "MHA-FR-VN-53 near-wall clearance": clearance_callout,
     }
     if not ddoc.ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("failed to activate the holes sheet for the leader sides")

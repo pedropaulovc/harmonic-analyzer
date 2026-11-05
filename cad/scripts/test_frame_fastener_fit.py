@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 
 import build_fr_frame_assembly as frame
+import fr_harmonic_base_fasteners as base_fasteners
 import fr_top_frame_spec as top_frame_spec
 import fr_vn_frame_cross_screw_spec as cross_screw
 from fr_vn_tube_frame_cap_spec import INSIDE_HEIGHT, TOTAL_HEIGHT
@@ -31,6 +32,27 @@ def test_cross_screws_clear_tubes_and_engage_both_casting_sides() -> None:
     )
     # 1.81 full thread past the 1.750 shank: .060.
     assert math.isclose(frame.CROSS_SCREW_THREAD_RESERVE, 0.060 * 25.4, abs_tol=1e-9)
+
+
+def test_base_cross_screws_clear_the_near_wall_and_engage_the_far_wall() -> None:
+    # Owner ruling 2026-11-05 (MHA-FR-01 only): the near casting wall is #10
+    # close clearance, wide enough for a standard 10-32 tap shank to reach
+    # the far wall and to guide the tube's match drill.
+    assert base_fasteners.NEAR_WALL_CLEARANCE_DIAMETER == 5.232
+    assert (
+        base_fasteners.NEAR_WALL_CLEARANCE_DIAMETER
+        > base_fasteners.STANDARD_10_32_TAP_SHANK_DIAMETER
+    )
+    assert base_fasteners.NEAR_WALL_CLEARANCE_DIAMETER >= frame.TUBE_CROSS_HOLE_DIAMETER
+    # Front and rear differ by the front chain's .XX top width; the front
+    # starts the far wall farther out and governs at 7.50 (1.55D).
+    front = base_fasteners.base_cross_screw_far_wall_start_max_mm(front=True)
+    rear = base_fasteners.base_cross_screw_far_wall_start_max_mm(front=False)
+    assert front > rear
+    engagement = base_fasteners.far_wall_full_thread_min_mm(front)
+    assert engagement == base_fasteners.BASE_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT
+    assert engagement >= 1.5 * cross_screw.SHANK_DIA
+    assert math.isclose(engagement, 7.501, abs_tol=0.005)
 
 
 def _printed_mm(value_mm: float, places: int) -> float:

@@ -123,13 +123,20 @@ its first-root position; no second general note restates that location.
   `.X` ±0.8 mm bands, the minimum ligament above the Ø9.0 spotface is
   `(47.8 − 0.8) − (38.1 + 0.8) − (9.0 + 0.8)/2 = 3.2 mm`.
   This changes the dimensioning scheme, not the casting or its interfaces.
-  The #10-32 cross tap is one continuous lead through both casting walls,
-  interrupted by the matched column socket; engagement counts both threaded
-  segments, not only the near wall. Even allowing a 0.762 mm stock-screw length
-  reduction, a Ø26.0 matched socket and two 1.5-pitch end losses, total engagement
-  is `44.45 − 0.762 − 26.0 − 3 × 25.4/32 = 15.31 mm`, above 1.5D = 7.24 mm.
-  The drawing states `COMMON THREAD LEAD IN BOTH WALLS`: the seat remains blind,
-  and its associative full-thread and minimum-drill depth tokens are unchanged.
+  Owner ruling **2026-11-05** removed the long-reach reduced-shank #10-32 tap
+  from the four MHA-FR-01 cross-screw paths: the near casting wall is a
+  **#10 close clearance, Ø.206** (`DRILL TO SOCKET`), wide enough for a
+  standard-shank 10-32 tap to pass and to guide the tube's Ø.197 match drill,
+  and only the far wall is threaded. Depths still run from the spotface floor.
+  Engagement counts the far wall alone, at the shortest stock screw (B18.6.3
+  −.06 length), 0.7P tip loss, the most outboard printed seat, a Ø26.0 matched
+  socket and the far mouth's .010 edge break: **7.50 mm (1.55D)** of full
+  thread (6.87 mm, 1.42D, if a 1.5P tip loss is assumed instead), above the
+  1.5D = 7.24 mm floor. The tap keeps its bottoming lead (`↧ 1.93 MIN` drill;
+  the lug's past-tip guard leaves no room for a plug lead). The callout reads
+  `FAR WALL ONLY`, and its associative full-thread and minimum-drill depth
+  tokens are unchanged. MHA-FR-02 is not yet converted: its taps still thread
+  both walls in phase.
   The native pedestal-to-pivot X/Y dimensions locate the pivot from the actual
   near pedestal axis with the existing ±0.05 mm functional band. Both carry
   one-line ABOVE `SEE NOTE 1` flags to numbered free note 1 in the B4 notes

@@ -493,7 +493,8 @@ def _seat_radius(size: str, drill_dia: float) -> float:
 
 @cache
 def pocket_holes() -> tuple[VerticalHole | CrossTap, ...]:
-    """All eighteen through deck seats, four sockets and four cross taps."""
+    """All eighteen through deck seats, four sockets, four far-wall cross taps
+    and their four near-wall clearances."""
     holes: list[VerticalHole | CrossTap] = []
     for tag, seat, stations, envelope in base.THROUGH_SEAT_GROUPS:
         for xz, material in zip(stations, base.THROUGH_SEAT_MATERIAL[tag], strict=True):
@@ -534,6 +535,27 @@ def pocket_holes() -> tuple[VerticalHole | CrossTap, ...]:
                 base.BASE_SCREW_Y,
                 tuple(span),
                 tap_radius,
+                _HOLE_SHIFT,
+                _BAND,
+            )
+        )
+    clearance_radius = fasteners.NEAR_WALL_CLEARANCE_DIAMETER / 2.0 + _DRILL_OVERSIZE_R
+    for x, z in base.COLUMN_SOCKET_XZ:
+        sign = math.copysign(1.0, z)
+        span = sorted(
+            (
+                sign * base.BASE_SCREW_SEAT_Z,
+                sign
+                * (base.BASE_SCREW_SEAT_Z - fasteners.BASE_NEAR_WALL_CLEARANCE_DEPTH),
+            )
+        )
+        holes.append(
+            CrossTap(
+                f"cross near-wall clearance {_at((x, z))}",
+                x,
+                base.BASE_SCREW_Y,
+                tuple(span),
+                clearance_radius,
                 _HOLE_SHIFT,
                 _BAND,
             )
@@ -816,7 +838,7 @@ def test_holes_cover_every_seat_group_socket_and_cross_tap() -> None:
         len(stations) for _tag, _seat, stations, _bounds in base.THROUGH_SEAT_GROUPS
     )
     assert seats == 18
-    assert len(holes) == seats + 2 * len(base.COLUMN_SOCKET_XZ)
+    assert len(holes) == seats + 3 * len(base.COLUMN_SOCKET_XZ)
     assert {tag for tag, _seat, _stations, _bounds in base.THROUGH_SEAT_GROUPS} == {
         "SupportHoldDownSeats",
         "PivotSeat",
