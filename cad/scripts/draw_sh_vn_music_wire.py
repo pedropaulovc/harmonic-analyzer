@@ -41,7 +41,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
 from _session import run_build
-from _supplier_spring_drawing import _preserve_reference_source_file
+from _reference_source_lifecycle import _preserve_reference_source_file
 from _supplier_wire_stock_drawing import STOCK_FIELD, STOCK_SCALE, add_wire_section
 from sh_vn_music_wire_pen_geom import CONFIGURATION as ISO_CONFIGURATION
 from _machinist_review_mode import MachinistReviewMode

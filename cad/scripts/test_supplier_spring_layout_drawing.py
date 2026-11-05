@@ -15,6 +15,7 @@ import pytest
 
 import _drawing_projection
 import _purchased_fastener_drawing as purchased
+import _reference_source_lifecycle as source_lifecycle
 import _supplier_chain_dimensions as chain_dimensions
 import _supplier_spring_drawing as supplier_drawing
 from _supplier_reference_geometry import NativeSketchGeometry
@@ -1447,12 +1448,12 @@ def test_reference_finalization_guard_checks_actual_source_bytes(tmp_path, chang
         with pytest.raises(
             RuntimeError, match="source part bytes changed during drawing finalization"
         ):
-            with supplier_drawing._preserve_reference_source_file(
+            with source_lifecycle._preserve_reference_source_file(
                 source, expected, label="supplier"
             ):
                 finalize_fake()
     else:
-        with supplier_drawing._preserve_reference_source_file(
+        with source_lifecycle._preserve_reference_source_file(
             source, expected, label="supplier"
         ):
             finalize_fake()
@@ -1469,7 +1470,7 @@ def test_reference_finalization_guard_preserves_primary_and_notes_changed_bytes(
     expected = supplier_drawing._source_file_sha256(source)
     primary = error_type("drawing finalization failed")
     with pytest.raises(error_type, match="drawing finalization failed") as caught:
-        with supplier_drawing._preserve_reference_source_file(
+        with source_lifecycle._preserve_reference_source_file(
             source, expected, label="supplier"
         ):
             if changed:
@@ -1495,7 +1496,7 @@ def test_reference_finalization_hash_failure_is_not_swallowed_by_outer_handler(
         raise RuntimeError("unrelated outer exception")
     except RuntimeError as outer:
         with pytest.raises(RuntimeError, match="source part bytes changed"):
-            with supplier_drawing._preserve_reference_source_file(
+            with source_lifecycle._preserve_reference_source_file(
                 source, expected, label="supplier"
             ):
                 source.write_bytes(b"changed source bytes")

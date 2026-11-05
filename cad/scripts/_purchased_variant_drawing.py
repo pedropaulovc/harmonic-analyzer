@@ -51,7 +51,7 @@ from _purchased_fastener_drawing import (
 )
 from _purchased_title_fit import fit_purchased_title_block
 from _rebuild import active_configuration_name
-from _supplier_spring_drawing import (
+from _reference_source_lifecycle import (
     _activate_reference_document,
     _preserve_reference_source_file,
     _show_reference_configuration,
