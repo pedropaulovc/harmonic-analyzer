@@ -155,7 +155,8 @@ FIT_UP_RESIDUAL = (feed_nut.HOLE_DIA_MAX - TRANSFER_SPOT_DIA) / 2  # 0.073
 # first, the thread holds the screw on the second. So the head stands at most
 # the larger of the two inward of its hole, not their sum; tap squareness is
 # not charged. The 82° seat leaves every head proud of the flange
-# (feed_nut.HEAD_PROUD_MIN, 0.36 at F2's opened mouth), so the head's full top
+# (feed_nut.HEAD_PROUD_MIN, 0.05: B18.6.3's least head in the band's Ø4.76
+# mouth), so the head's full top
 # Ø stands beside the body's cylinder and the seat depth takes nothing off the
 # gap. The body's root corner is modelled sharp (the listing gives no fillet).
 _HEAD_OFF_HOLE = max(FIT_UP_RESIDUAL, feed_nut.CSK_ECCENTRICITY_MAX)

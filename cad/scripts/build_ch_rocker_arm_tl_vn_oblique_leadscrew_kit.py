@@ -29,11 +29,15 @@ round the Ø6.0 thread-minor bore (``NutProfile`` -> ``Nut``), the four plain
 82° countersink revolve-cut about the hole's own axis, on Front for the two
 holes on X and on Right for the two on Z (``Countersink1`` ..
 ``Countersink4``, not patterned: circular patterns of cuts fail on stepped
-revolved bodies, ``_features.py``). Its rework controls (Codjiflo P2) are
-native and authored only here: ``FlangeThick`` (seat face to head face at
-the rim) with a LIMIT band, ``CskDia`` with a symmetric band and a "4X"
-prefix, the 82° held by the driving ``CskApexDepth``. y = 0 is the faced seat
-face. The listing's nominal sizes are hidden supplier references.
+revolved bodies, ``_features.py``). Its native controls (Codjiflo P2 and
+4475311251) are authored only here, from ``feed_nut.NATIVE_CONTROLS``: on the
+features, ``FlangeThick`` (seat face to head face at the rim) and ``CskDia``
+as LIMITs, the latter with a "4X Ø" prefix, the 82° held by the driving
+``CskApexDepth``; on two hidden reference sketches, the values no feature
+dimension holds: ``FacedLengthReference`` (Front) the faced length's MAX, and
+``ReceiptReference`` (Top) the flange OD, body, hole and PCD receipt limits.
+y = 0 is the faced seat face. The listing's nominal sizes are hidden supplier
+references.
 
 Datasheet-built: no vendor CAD obtained. Saving, reopening and per-member
 export ownership are delegated to ``save_member_part``; its readback callback
@@ -85,10 +89,12 @@ from _purchased_part_variants import (
 )
 from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
+from _single_limit_tolerance import set_single_limit
 from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
+    blank_reference_sketches,
     dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
@@ -165,6 +171,7 @@ MEMBER_FEATURES = {
             for index in range(1, len(feed_nut.COUNTERSINK_AXES) + 1)
             for feature in (f"Countersink{index}Profile", f"Countersink{index}")
         ),
+        *feed_nut.REFERENCE_SKETCHES,
         "SupplierReference",
         "SupplierTopReference",
     ),
@@ -888,16 +895,78 @@ async def _countersink(adapter, index: int, plane: str, u: float) -> None:
     name_last_feature(adapter, f"Countersink{index}")
 
 
-def _author_flange_limits(adapter) -> None:
-    """FlangeThick's band as native LIMITs (build_pd_platen_guide._depth_limits):
-    3.7/3.3, the flange after the facing pass, seat face to head face."""
-    nominal, lower, upper, places = feed_nut.REWORK_CONTROLS["FlangeThick"]
-    label = "FlangeThick@NutProfile"
-    display, dimension = _named_dimension(adapter, "NutProfile", "FlangeThick")
+async def _receipt_reference(adapter) -> None:
+    """``RECEIPT_CONTROLS``' hidden carrier on Top (sketch (x, -z), the end
+    view's): ``feed_nut.RECEIPT_CIRCLES`` as construction circles, each driven
+    by its diameter. The +Z hole's station off the origin does not print."""
+    dims = SketchDims()
+    check("create_sketch receipt reference", await adapter.create_sketch("Top"))
+    for name, diameter, (x, y) in feed_nut.RECEIPT_CIRCLES:
+        circle = await define_circle(
+            adapter,
+            x,
+            y,
+            diameter / 2.0,
+            f"receipt {name}",
+            dims=dims,
+            names=(None, feed_nut.RECEIPT_HOLE_STATION, name),
+        )
+        _as_construction(adapter, circle)
+    await ensure_fully_defined(adapter, "receipt reference")
+    check("exit_sketch receipt reference", await adapter.exit_sketch())
+    name_last_feature(adapter, feed_nut.RECEIPT_SKETCH)
+    dims.apply(adapter, feed_nut.RECEIPT_SKETCH)
+
+
+async def _faced_length_reference(adapter) -> None:
+    """``FacedLength``'s hidden carrier on Front (section F-F's): a
+    construction line from the seat face along the body's -X silhouette, as
+    long as the printed maximum, so its driving dimension prints "13.8 MAX"
+    once set_single_limit types it (build_pn_pen_rod's _tap_wall_reference)."""
+    start = feed_nut.FACED_LENGTH_START
+    dims = SketchDims()
+    check("create_sketch faced length reference", await adapter.create_sketch("Front"))
+    # Direct-to-DB: the line starts on the seat face's edge, where creation-time
+    # inference would snap it.
+    set_sketch_direct_db(adapter, True)
+    line = check(
+        "faced length line",
+        await adapter.add_line(*start, start[0], start[1] + feed_nut.LENGTH_MAX),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, line)
+    check("faced length vertical", await adapter.add_sketch_constraint(line, None, "vertical"))
+    await dimension_between(
+        adapter, f"{line}.start", f"{line}.end", "vertical_distance", feed_nut.LENGTH_MAX,
+        "faced length",
+    )
+    dims.record("FacedLength")
+    await anchor_point_to_origin(adapter, f"{line}.start", *start, "faced length start")
+    dims.record("FacedLengthStart")
+    await ensure_fully_defined(adapter, "faced length reference")
+    check("exit_sketch faced length reference", await adapter.exit_sketch())
+    name_last_feature(adapter, feed_nut.FACED_LENGTH_SKETCH)
+    dims.apply(adapter, feed_nut.FACED_LENGTH_SKETCH)
+
+
+def _control_feature(name: str) -> str:
+    """The feature whose dimension ``name`` is."""
+    (feature,) = (
+        feature for feature, names in feed_nut.DRAWING_DIMENSIONS.items() if name in names
+    )
+    return feature
+
+
+def _author_limits(adapter, feature: str, name: str) -> None:
+    """``name@feature``'s band as native LIMITs (build_pd_platen_guide.
+    _depth_limits): the two limits print, at the band's places."""
+    nominal, lower, upper, places = feed_nut.NATIVE_CONTROLS[name]
+    label = f"{name}@{feature}"
+    display, dimension = _named_dimension(adapter, feature, name)
     if int(dimension.DrivenState) != 2 or not math.isclose(
         float(dimension.SystemValue), nominal / 1000.0, abs_tol=1e-9
     ):
-        raise RuntimeError(f"{label}: not the driving flange thickness")
+        raise RuntimeError(f"{label}: not the driving {nominal:g}")
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     tolerance.Type = feed_nut.TOL_LIMIT
     if tolerance.SetValues(lower / 1000.0, upper / 1000.0) is not True:
@@ -914,16 +983,24 @@ def _author_flange_limits(adapter) -> None:
 
 
 def _feed_nut_rework(adapter) -> None:
-    """The FeedNut's native rework controls (Codjiflo P2), authored while it
-    is the active member on its own features: the flange LIMIT, the
-    countersink's ± and its "4X Ø" prefix, both at the band's one place, then
-    marked for the REWORK sheet."""
-    _author_flange_limits(adapter)
-    _, lower, upper, places = feed_nut.REWORK_CONTROLS["CskDia"]
-    set_dimension_symmetric_tolerance(
-        adapter, "Countersink1Profile", "CskDia", feed_nut.CSK_DIA_BAND, places=places
-    )
-    set_dimension_prefix(adapter, "Countersink1Profile", "CskDia", feed_nut.CSK_PREFIX)
+    """The FeedNut's native controls (Codjiflo P2, 4475311251), authored while
+    it is the active member on its own features and reference sketches: each
+    band in its native type at its places (a LIMIT's two limits, a MAX's
+    nominal as the limit, a ±), the prefixes, then marked for the REWORK
+    sheet."""
+    for name, (nominal, lower, upper, places) in feed_nut.NATIVE_CONTROLS.items():
+        feature = _control_feature(name)
+        kind = feed_nut.DIMENSION_TOLERANCE_TYPES[name]
+        if kind == feed_nut.TOL_LIMIT:
+            _author_limits(adapter, feature, name)
+        elif kind == feed_nut.TOL_MAX:
+            set_single_limit(
+                adapter, feature, name, limit=nominal, band=(upper, lower), tol_type=kind
+            )
+        else:
+            set_dimension_symmetric_tolerance(adapter, feature, name, upper, places=places)
+    for (feature, name), prefix in feed_nut.DIMENSION_PREFIXES.items():
+        set_dimension_prefix(adapter, feature, name, prefix)
     apply_drawing_precision(adapter, feed_nut.DRAWING_PRECISION)
     for feature, names in feed_nut.DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature, names)
@@ -931,14 +1008,10 @@ def _feed_nut_rework(adapter) -> None:
 
 
 def _assert_feed_nut_rework(adapter) -> None:
-    """Read the rework controls back: driving at nominal, their native band
-    type and deviations, the prefix, and the apex depth that holds the 82°."""
-    for name, (nominal, lower, upper, _places) in feed_nut.REWORK_CONTROLS.items():
-        feature = next(
-            feature
-            for feature, names in feed_nut.DRAWING_DIMENSIONS.items()
-            if name in names
-        )
+    """Read the native controls back: driving at nominal, their native band
+    type and deviations, the prefixes, and the apex depth that holds the 82°."""
+    for name, (nominal, lower, upper, _places) in feed_nut.NATIVE_CONTROLS.items():
+        feature = _control_feature(name)
         _, dimension = _named_dimension(adapter, feature, name)
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
         if (
@@ -948,12 +1021,11 @@ def _assert_feed_nut_rework(adapter) -> None:
             or abs(float(tolerance.GetMinValue()) - lower / 1000.0) > 1e-9
             or abs(float(tolerance.GetMaxValue()) - upper / 1000.0) > 1e-9
         ):
-            raise RuntimeError(f"{name}@{feature}: FeedNut rework control changed")
-    display, _ = _named_dimension(adapter, "Countersink1Profile", "CskDia")
-    if str(_early_bound(display, "IDisplayDimension").GetText(1) or "") != (
-        feed_nut.CSK_PREFIX
-    ):
-        raise RuntimeError("CskDia@Countersink1Profile: prefix changed")
+            raise RuntimeError(f"{name}@{feature}: FeedNut native control changed")
+    for (feature, name), prefix in feed_nut.DIMENSION_PREFIXES.items():
+        display, _ = _named_dimension(adapter, feature, name)
+        if str(_early_bound(display, "IDisplayDimension").GetText(1) or "") != prefix:
+            raise RuntimeError(f"{name}@{feature}: prefix changed")
     _, depth = _named_dimension(adapter, "Countersink1Profile", "CskApexDepth")
     if int(depth.DrivenState) != 2 or not math.isclose(
         float(depth.SystemValue), feed_nut.CSK_APEX_DEPTH / 1000.0, abs_tol=1e-9
@@ -999,6 +1071,9 @@ async def _author_feed_nut(adapter) -> None:
     await volume_check(
         adapter, "fitted nut", feed_nut.VOLUME_MM3, 0.002 * feed_nut.VOLUME_MM3
     )
+    await _faced_length_reference(adapter)
+    await _receipt_reference(adapter)
+    blank_reference_sketches(adapter, feed_nut.REFERENCE_SKETCHES)
     _feed_nut_rework(adapter)
     await add_supplier_reference_sketch(
         adapter,

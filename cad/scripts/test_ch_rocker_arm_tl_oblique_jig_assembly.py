@@ -1791,8 +1791,9 @@ def test_nut_screw_heads_seat_in_the_countersinks_clear_of_the_body() -> None:
         feed_block.HEAD_TO_BODY_CENTRED - (e - feed_nut.CSK_ECCENTRICITY_MAX)
     )
     assert feed_block.HEAD_TO_BODY_MIN > 0.0
-    # The countersink cutter, at its largest, stays off the body too.
-    assert feed_nut.CSK_DIA_OPEN_MAX == feed_nut.CSK_CUTTER_DIA_MAX
+    # The countersink cutter, at its largest, stays off the body too, and the
+    # sheet's mouth band never exceeds it.
+    assert feed_nut.CSK_DIA_MAX <= feed_nut.CSK_CUTTER_DIA_MAX
     assert feed_nut.CSK_CUTTER_TO_BODY > 0.0
 
 
@@ -1926,7 +1927,7 @@ def test_feed_fit_up_reads_in_one_order_with_one_way_references() -> None:
         ("F1A", "8A"),
         ("8A", "F1A"), ("8A", "F1B"), ("8A", "F2"),
         ("F1B", "8A"),
-        ("F2", "F3"), ("F2", "8B"),
+        ("F2", "8B"),
         ("8B", "F3"),
         ("F3", "8B"), ("F3", "F1B"), ("F3", "F2"),
     }
@@ -1942,19 +1943,29 @@ def test_f1_f2_prepare_seat_and_transfer_from_the_nut() -> None:
     clearance = spec._length(feed_block.SCREW_CLEARANCE_DIA, feed_block.NUT_PATTERN_PLACES)
     clock = f"{feed_block.NUT_CLOCK_DEG:.0f}°"
     order = (
-        f"BEFORE STEP 8A, MEASURE THE FEED NUT {spec._item(spec.FEED_NUT)}: {feed_nut.RECEIPT_TEXT}",
-        "REJECT ONE OUTSIDE THESE",
-        f"FACE AND COUNTERSINK IT PER {feed_nut.REWORK_SHEET_REFERENCE}",
-        f"THEN MEASURE IT: {feed_nut.FACED_LENGTH_TEXT}, REJECT ONE OVER",
+        f"BEFORE STEP 8A, MEASURE THE FEED NUT {spec._item(spec.FEED_NUT)} TO THE "
+        f"RECEIPT LIMITS ON {feed_nut.REWORK_SHEET_REFERENCE}",
+        "REJECT ONE OUTSIDE THEM",
+        "FACE AND COUNTERSINK IT PER THAT SHEET",
+        "REJECT ONE OVER ITS FACED LENGTH",
     )
     positions = [f1a.index(phrase) for phrase in order]
     assert positions == sorted(positions)
     assert feed_nut.REWORK_SHEET_REFERENCE == f"{feed_nut.NUMBER} SHEET {feed_nut.REWORK_SHEET}"
-    # Codjiflo P2: the rework limits are the kit sheet's native dimensions,
-    # not TL-00 text; the 13.8 long max stays the fit-up's own acceptance.
+    # Codjiflo P2 and 4475311251: every receipt and rework limit is the kit
+    # sheet's native dimension, not TL-00 text; F1A types none of them.
+    limits = {
+        f"{round(nominal + deviation, 6):.{places}f}"
+        for nominal, lower, upper, places in feed_nut.NATIVE_CONTROLS.values()
+        for deviation in (lower, upper)
+    }
+    assert limits == {
+        "3.3", "3.7", "4.50", "4.76", "13.5", "13.8", "21.8", "22.2",
+        "10.2", "10.3", "3.46", "3.60", "15.9", "16.1",
+    }
     for typed in (
-        f"Ø{feed_nut.CSK_DIA:.1f}", f"{feed_nut.FLANGE_THICK_MIN:.1f}",
-        f"{feed_nut.FLANGE_THICK_MAX:.1f}", feed_nut.CSK_CUTTER_TEXT,
+        *limits,
+        f"Ø{feed_nut.CSK_DIA:.1f}", feed_nut.CSK_CUTTER_TEXT,
         f"{feed_nut.CSK_ANGLE:.0f}°", "LATHE", "SPIGOT",
     ):
         assert typed not in f1a, typed
@@ -1970,13 +1981,11 @@ def test_f1_f2_prepare_seat_and_transfer_from_the_nut() -> None:
     positions = [f1b.index(phrase) for phrase in order]
     assert positions == sorted(positions)
     # Rule 25: a supplied nut (its spigot on, SUPPLIED_LENGTH long) passes the
-    # incoming checks; the faced-length limit, which it exceeds, is printed
+    # incoming checks; the faced-length limit, which it exceeds, is checked
     # once, after the rework.
-    faced = f"{feed_nut.LENGTH_MAX:.1f} MM"
     assert feed_nut.SUPPLIED_LENGTH > feed_nut.LENGTH_MAX
-    assert faced not in feed_nut.RECEIPT_TEXT
-    assert f1a.count(faced) == 1 and faced not in f1b
-    assert f1a.index("FACE AND COUNTERSINK") < f1a.index(faced)
+    assert f1a.count("FACED LENGTH") == 1 and "FACED LENGTH" not in f1b
+    assert f1a.index("FACE AND COUNTERSINK") < f1a.index("FACED LENGTH")
     # F2's drills are TL-32's: the spot enters the least nut hole, the tap
     # drill is the lug's.
     assert spec.NUMBER_DRILL_MM[spec._SPOT_DRILL] == pytest.approx(feed_block.TRANSFER_SPOT_DIA, abs=1e-3)
@@ -1999,11 +2008,15 @@ def test_f1_f2_prepare_seat_and_transfer_from_the_nut() -> None:
         "REJECT ONE OVER AND FIT A REPLACEMENT THAT PASSES; NEVER MACHINE THE NUT BODY",
         "WITH THE SCREW A FEW TURNS IN THE NUT",
         f"CROSSWISE IN 2 STAGES TO {spec._torque(spec.NUT_SCREW_TORQUE_NM)}",
-        f"OPEN THE COUNTERSINKS TO Ø{feed_nut.CSK_DIA_OPEN_MAX:.2f} MM MAX; F3 ACCEPTS THEM",
+        f"OPEN THE COUNTERSINKS PER {feed_nut.REWORK_SHEET_REFERENCE}",
         "GO TO STEP 8B",
     )
     positions = [f2.index(phrase) for phrase in order]
     assert positions == sorted(positions)
+    # 4475311242: the opening stays within the sheet's CskDia band, typed
+    # nowhere in TL-00.
+    remedy = f2[f2.index("OPEN THE COUNTERSINKS") :]
+    assert not re.search(r"\d\.\d", remedy.replace(feed_nut.REWORK_SHEET_REFERENCE, ""))
     assert "B18.6.3'S MAX .225" in f2
     assert spec._torque(spec.NUT_SCREW_TORQUE_NM) == "0.3 N·m (2.7 IN·LBF)"
     # The fit-up acts on what it finds; it never stops to report.

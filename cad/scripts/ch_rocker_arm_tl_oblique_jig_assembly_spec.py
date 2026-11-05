@@ -1838,9 +1838,12 @@ if NUMBER_DRILL_MM[_TAP_DRILL] != feed_block.NUT_TAP_DRILL:
 # transfers its taps and screws it down with the leadscrew in it, so it takes
 # its centre from the screw, not from the countersinks; step 8B fits the
 # handwheel and F3 checks the travel (TL-00 review, farm
-# 20261104T210601055Z). The facing and countersinks are the leadscrew kit
-# drawing's FeedNut REWORK sheet (feed_nut.REWORK_SHEET_REFERENCE, Codjiflo P2
-# on #2187); F1A keeps only the as-faced length, the feed gap's acceptance.
+# 20261104T210601055Z). The receipt limits, the facing, the countersinks and
+# the faced length are native dimensions on the leadscrew kit drawing's FeedNut
+# REWORK sheet (feed_nut.REWORK_SHEET_REFERENCE; Codjiflo P2, 4475311251 on
+# #2187): F1A and F2 cite that sheet and type none of its limits. F2 opens a
+# binding nut's countersinks within the sheet's CskDia band (4475311242), so
+# the opened nut is a conforming one and F3 needs no concession for it.
 # F2 calipers the nut screws' heads before they go in (owner ruling
 # 2026-11-04, #2177 option 3): a head over feed_nut.SCREW_HEAD_DIA_MAX is
 # rejected and replaced, and the nut body is never cut (TL-32 spec,
@@ -1848,10 +1851,10 @@ if NUMBER_DRILL_MM[_TAP_DRILL] != feed_block.NUT_TAP_DRILL:
 _HEAD_LIMIT = _bound(feed_nut.SCREW_HEAD_DIA_MAX, 3, up=False)
 _HEAD_SHARP_MAX = _length(feed_block.HEAD_DIA_SHARP_MAX, 3)
 FEED_FIT_STEPS = (
-    f"F1A. BEFORE STEP 8A, MEASURE THE FEED NUT {_item(FEED_NUT)}: "
-    f"{feed_nut.RECEIPT_TEXT}; REJECT ONE OUTSIDE THESE. FACE AND COUNTERSINK "
-    f"IT PER {feed_nut.REWORK_SHEET_REFERENCE}, THEN MEASURE IT: "
-    f"{feed_nut.FACED_LENGTH_TEXT}, REJECT ONE OVER.",
+    f"F1A. BEFORE STEP 8A, MEASURE THE FEED NUT {_item(FEED_NUT)} TO THE "
+    f"RECEIPT LIMITS ON {feed_nut.REWORK_SHEET_REFERENCE}; REJECT ONE OUTSIDE "
+    "THEM. FACE AND COUNTERSINK IT PER THAT SHEET; REJECT ONE OVER ITS FACED "
+    "LENGTH.",
     "F1B. AFTER STEP 8A, NUT SEAT FACE "
     "TOWARD THE LUG, MOVE THE FEED CARRIAGE TO EACH TRAVEL END IN TURN AND "
     "ALIGN EACH KP08 SO THE SCREW RUNS CENTRED IN THE LUG'S "
@@ -1871,8 +1874,8 @@ FEED_FIT_STEPS = (
     "REPLACEMENT THAT PASSES; NEVER MACHINE THE NUT BODY. WITH THE "
     "SCREW A FEW TURNS IN THE NUT, TIGHTEN THEM CROSSWISE IN 2 STAGES TO "
     f"{_NUT_TORQUE}. IF THE SCREW BINDS, LOOSEN, RE-CENTRE AND RETIGHTEN; IF IT "
-    "STILL BINDS, OPEN THE COUNTERSINKS TO "
-    f"Ø{feed_nut.CSK_DIA_OPEN_MAX:.2f} MM MAX; F3 ACCEPTS THEM. GO TO STEP 8B.",
+    "STILL BINDS, OPEN THE COUNTERSINKS PER "
+    f"{feed_nut.REWORK_SHEET_REFERENCE}. GO TO STEP 8B.",
     "F3. AFTER STEP 8B, WITH THE HANDWHEEL AND ALL SET SCREWS TIGHT, TURN THE "
     "HANDWHEEL TO BOTH FEED-CARRIAGE TRAVEL ENDS: NO BINDING, NUT OR LUG "
     "CONTACT WITH A KP08, AND NO MOVING PART CONTACT. REPEAT F1B-F2 IF IT BINDS.",

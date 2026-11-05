@@ -19,10 +19,13 @@ isometric; and a note block naming the item, its supplier and SKU. The thread
 is bought, not cut: it is not modelled, and a leadered callout on the main
 view names it over the full length.
 
-Sheet 3 (FEED NUT REWORK) is the FeedNut member's rework (Codjiflo P2 on
-#2187): an end view and section F-F through two countersunk holes, carrying
-the native ``FlangeThick`` LIMIT and the ``CskDia`` ± with its 82° callout.
-TL-00's F1A cites this sheet (``feed_nut.REWORK_SHEET_REFERENCE``).
+Sheet 3 (FEED NUT REWORK) is the FeedNut member's rework and receipt (Codjiflo
+P2 and 4475311251 on #2187): section F-F through two countersunk holes,
+carrying the native ``FlangeThick`` and ``CskDia`` LIMITs, the countersink's
+82° callout and the faced length's MAX; and the end view, carrying the native
+receipt limits: the flange OD, the body's MAX, the holes and their PCD. TL-00's
+F1A cites this sheet (``feed_nut.REWORK_SHEET_REFERENCE``) and types none of
+them.
 
 Run with SolidWorks open::
 
@@ -50,13 +53,21 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 from _com import _early_bound, _read_member
 import _config
-from _drawing_annotation_extent import callout_ink, require_inside, sheet_region
+from _drawing_annotation_extent import (
+    callout_ink,
+    require_clear,
+    require_inside,
+    require_leader_clear,
+    sheet_region,
+)
 from _drawing_centerline import add_view_centerline
 from _drawing_common import read_required_properties, rebuild_drawing
 from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import offset_dimension_text, set_dimension_callouts
+import _drawing_hidden_sketches as hidden_sketches
 from _drawing_leader_notes import add_leader_note
+from _drawing_leaders import dimension_text_points, set_near_side_diameter
 from _drawing_notes import property_link
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -485,14 +496,46 @@ REWORK_SECTION_OVERRUN = 0.008
 # 0.419), so the point sits just clear of the body's end.
 FLANGE_THICK_TEXT_MM = (feed_nut.FLANGE_DIA / 2.0 + 6.0, feed_nut.FLANGE_THICK / 2.0)
 CSK_DIA_TEXT_MM = (feed_nut.FLANGE_DIA / 2.0 + 1.0, feed_nut.LENGTH + 2.0)
+# The faced length's line stands 2.5 mm under the flange's rim, its witnesses
+# down from the body's -X silhouette, over the section's caption (run 9:
+# SECTION F-F at y 0.090 .. 0.098); its text is offset onto a leader 1.2 mm
+# right of the far witness, its block right of the caption (to x 0.306).
+FACED_LENGTH_LINE_MM = (-(feed_nut.FLANGE_DIA / 2.0 + 2.5), feed_nut.LENGTH_MAX / 2.0)
+FACED_LENGTH_TEXT_MM = (FACED_LENGTH_LINE_MM[0], feed_nut.LENGTH_MAX + 1.2)
+# The receipt limits on the end view (4475311251): four diameters, each a
+# leadered callout whose block runs right from its text point, rows centred on
+# its height (the CskDia block's run-9 shape). Each one's arrow lands on its
+# circle's near side (set_near_side_diameter), its leader radial from the
+# circle's centre toward the block's shoulder, so no two leaders from the
+# shared centre cross. Three stack in the gap between the end view and the
+# section, under the FlangeThick row (run 9: its limits from y 0.2220) and
+# over the spigot note's extent (to y 0.1440): the body's from 38° (over the
+# top hole's countersink by 24 mm), the bolt circle's from 22.5° (its arrow 3
+# mm outside the +Z countersink), the +Z hole's from its lower right. Each
+# block starts right of the end view's horizontal centreline (to x 0.164).
+# The flange OD's leaves its rim at -47°, right of the cutting line's lower F
+# (x 0.126 .. 0.132), for a block under the spigot note.
+RECEIPT_TEXT_XY = {
+    "ReceiptBodyDia": (0.171, 0.2175),
+    "ReceiptHolePcd": (0.171, 0.1950),
+    "ReceiptHoleDia": (0.171, 0.1595),
+    "ReceiptFlangeDia": (0.185, 0.093),
+}
+# The receipt callouts' hole is the +Z one: the end view must lay it right of
+# its centre, on the centre's height, for the layout above.
+RECEIPT_HOLE_MODEL = (0.0, 0.0, feed_nut.HOLE_PCD / 2000.0)
 # Rule 4: each band tighter than the title block's names its mate. The faced
 # seat bears on TL-32's lug face and the flange is the four nut screws' grip;
 # the countersinks seat those screws' 82° heads, which stand proud of the
-# head face at every countersink in the band (the spec's HEAD_PROUD_MIN).
+# head face at every countersink in the band (the spec's HEAD_PROUD_MIN). The
+# faced length keeps the nut clear of the KP08 at the travel end; the flange
+# OD sits within the lug face; the body clears the screws' heads; the holes
+# and their PCD match the lug's transferred taps.
 # Rule 17: the countersink's callout states its walls as a plain fact
 # (RV-01, as dt-cone-gear-tl-index-plate prints WEB .03 MIN).
 FEED_BLOCK_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-feed-block")["number"]
 NUT_SCREW_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-riser-screw")["number"]
+KP08_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-pillow-block")["number"]
 if feed_nut.SCREW_SKU not in _config.parts("ch-rocker-arm-tl-vn-oblique-riser-screw")[
     "supplier_skus"
 ]:
@@ -515,9 +558,22 @@ CSK_SCREW_CALLOUT = (
 REWORK_CALLOUTS = {
     "FlangeThick": ("above", FLANGE_THICK_CALLOUT),
     "CskDia": ("below", CSK_SCREW_CALLOUT),
+    "FacedLength": ("below", f"CLEARS KP08 AT TRAVEL END\n{KP08_NUMBER}"),
+}
+RECEIPT_CALLOUTS = {
+    "ReceiptFlangeDia": ("below", f"WITHIN {FEED_BLOCK_NUMBER}\nLUG FACE"),
+    "ReceiptBodyDia": (
+        "below", f"CLEARS HEADS OF {feed_nut.SCREW_COUNT}X\n{NUT_SCREW_NUMBER}",
+    ),
+    "ReceiptHoleDia": ("below", f"MATCHES TAPS IN\n{FEED_BLOCK_NUMBER} LUG"),
+    "ReceiptHolePcd": ("below", f"PCD, MATCHES TAPS IN\n{FEED_BLOCK_NUMBER} LUG"),
 }
 _CALLOUT_TEXT_PARTS = {"above": 3, "below": 4}
-if any("\n" in text for lane, text in REWORK_CALLOUTS.values() if lane == "above"):
+if any(
+    "\n" in text
+    for lane, text in (*REWORK_CALLOUTS.values(), *RECEIPT_CALLOUTS.values())
+    if lane == "above"
+):
     raise AssertionError("an above-callout with a line break does not print")
 # The faced face: the spigot stood on the seat face, inside the Ø10.2; its
 # tip lands midway across that annulus, on the -X half below the axis. The
@@ -535,6 +591,15 @@ REWORK_EXPECTED = {
 REWORK_PRECISION = {
     name: places for name, (_n, _l, _u, places) in feed_nut.REWORK_CONTROLS.items()
 }
+RECEIPT_EXPECTED = {
+    name: (nominal / 1000.0, lower / 1000.0, upper / 1000.0)
+    for name, (nominal, lower, upper, _places) in feed_nut.RECEIPT_CONTROLS.items()
+}
+RECEIPT_PRECISION = {
+    name: places for name, (_n, _l, _u, places) in feed_nut.RECEIPT_CONTROLS.items()
+}
+if set(RECEIPT_TEXT_XY) != set(RECEIPT_CALLOUTS) or set(RECEIPT_TEXT_XY) != set(RECEIPT_EXPECTED):
+    raise AssertionError("the end view's receipt dimensions are not the spec's")
 REWORK_ITEM = f"[2] {feed_nut.BOM_DESCRIPTION}"
 SOURCE_PROPERTIES = (
     "Number",
@@ -1301,7 +1366,9 @@ def _require_axis_horizontal(adapter: Any, view: Any, *, label: str) -> None:
         raise RuntimeError(f"{label} does not lie axis-horizontal: {step!r}")
 
 
-def _assert_rework_callouts(adapter: Any, annotations: list[Any]) -> None:
+def _assert_callouts(
+    adapter: Any, annotations: list[Any], callouts: Mapping[str, tuple[str, str]]
+) -> None:
     """Each banded control still prints its mate in its own callout lane."""
     printed = {}
     for raw in annotations:
@@ -1309,41 +1376,84 @@ def _assert_rework_callouts(adapter: Any, annotations: list[Any]) -> None:
             raw, "IAnnotation", "GetSpecificAnnotation"
         )
         name = dimension_name(adapter, annotation)
-        if name not in REWORK_CALLOUTS:
+        if name not in callouts:
             continue
-        lane, text = REWORK_CALLOUTS[name]
+        lane, text = callouts[name]
         display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
         actual = str(display.GetText(_CALLOUT_TEXT_PARTS[lane]) or "")
         printed[name] = actual.replace("\r\n", "\n").replace("\r", "\n")
         if printed[name] != text:
             raise RuntimeError(f"{name}: callout reads {printed[name]!r}, not {text!r}")
-    if set(printed) != set(REWORK_CALLOUTS):
-        raise RuntimeError(
-            f"rework callouts missing: {sorted(set(REWORK_CALLOUTS) - set(printed))}"
-        )
+    if set(printed) != set(callouts):
+        raise RuntimeError(f"callouts missing: {sorted(set(callouts) - set(printed))}")
 
 
-def _assert_rework_ink_inside(adapter: Any, annotations: list[Any], spigot: Any) -> None:
-    """The countersink's leadered callout block and the spigot note, as
-    SolidWorks draws them, stay inside the sheet's zone frame. (No readback
-    shows whether an ABOVE callout printed; its one-line guard stands in.)"""
-    rebuild_drawing(adapter, label="feed nut rework ink")
-    region = sheet_region(adapter)
-    leadered = [
-        annotation
-        for annotation in annotations
-        if dimension_name(
+def _set_callouts(
+    adapter: Any, annotations: list[Any], callouts: Mapping[str, tuple[str, str]]
+) -> None:
+    for lane in ("below", "above"):
+        texts = {name: text for name, (where, text) in callouts.items() if where == lane}
+        if texts:
+            set_dimension_callouts(adapter, annotations, texts, location=lane)
+    _assert_callouts(adapter, annotations, callouts)
+
+
+# The sheet's leadered dimension callouts, each read back as SolidWorks draws
+# it: the countersink's and the faced length's in section F-F, the receipt
+# limits' on the end view.
+LEADERED = ("CskDia", "FacedLength", *RECEIPT_TEXT_XY)
+
+
+def _named(adapter: Any, annotations: list[Any]) -> dict[str, Any]:
+    named: dict[str, Any] = {}
+    for annotation in annotations:
+        name = dimension_name(
             adapter,
             _sw_type_info.early_bound_or_flag(annotation, "IAnnotation", "GetSpecificAnnotation"),
         )
-        == "CskDia"
-    ]
-    if len(leadered) != 1:
-        raise RuntimeError(f"section F-F holds {len(leadered)} CskDia dimensions")
-    ink = callout_ink(adapter, leadered[0], label="CskDia callout")
-    require_inside("CskDia callout", ink.text, region)
+        if name in named:
+            raise RuntimeError(f"sheet 3 holds two {name} dimensions")
+        named[name] = annotation
+    return named
+
+
+def _callout_block(adapter: Any, annotation: Any, label: str) -> tuple[Any, tuple[float, ...]]:
+    """A leadered callout's ink and its whole text block: ``callout_ink`` boxes
+    the text from its shoulder, and the text positions widen that box to every
+    line, so a callout row hung below the shoulder counts
+    (draw_dt_cone_gear_shaft's collar recipe)."""
+    ink = callout_ink(adapter, annotation, label=label)
+    points = dimension_text_points(annotation)
+    xs = [ink.text[0], ink.text[2], *(x for x, _y in points)]
+    ys = [ink.text[1], ink.text[3], *(y for _x, y in points)]
+    return ink, (min(xs), min(ys), max(xs), max(ys))
+
+
+def _assert_rework_ink(adapter: Any, annotations: list[Any], spigot: Any) -> None:
+    """Every leadered callout block and the spigot note, as SolidWorks draws
+    them, stay inside the sheet's zone frame and clear of each other, and no
+    callout's leader runs through another callout's text. The note's native
+    extent spans its own leader down to the seat face, where the faced length's
+    witness starts, so leaders are checked against the callouts' text alone.
+    (No readback shows whether an ABOVE callout printed; its one-line guard
+    stands in.)"""
+    rebuild_drawing(adapter, label="feed nut rework ink")
+    region = sheet_region(adapter)
+    named = _named(adapter, annotations)
+    missing = sorted(set(LEADERED) - set(named))
+    if missing:
+        raise RuntimeError(f"sheet 3 is missing its leadered callouts {missing}")
+    inks = {}
+    boxes = {}
+    for name in LEADERED:
+        inks[name], boxes[name] = _callout_block(adapter, named[name], f"{name} callout")
     note = _box(_early_bound(spigot, "INote").GetExtent(), label="spigot note", kind="note")
-    require_inside("spigot facing note", note, region)
+    for name, box in {**boxes, "spigot note": note}.items():
+        require_inside(name, box, region)
+        others = {other: value for other, value in boxes.items() if other != name}
+        require_clear(name, box, others)
+        if name in inks:
+            require_leader_clear(inks[name], others)
 
 
 def _add_spigot_note(adapter: Any, section: Any) -> tuple[Any, tuple[float, float]]:
@@ -1405,10 +1515,54 @@ def _assert_spigot_note(adapter: Any, note: Any, tip: tuple[float, float]) -> No
         )
 
 
+def _receipt_dimensions(adapter: Any, end: Any) -> list[Any]:
+    """Import the receipt limits onto the end view as near-side leadered
+    diameters, each naming its mate below its limits (4475311251)."""
+    centre, hole = model_points_in_view(
+        adapter,
+        end,
+        (_nut_point(0.0, 0.0), RECEIPT_HOLE_MODEL),
+        label="feed nut end view receipt",
+        names=("axis", "+Z hole centre"),
+    )
+    pcd_radius = feed_nut.HOLE_PCD / 2.0 * _REWORK_PER_MODEL_MM
+    if (
+        abs(hole[0] - centre[0] - pcd_radius) > DETAIL_ORIENTATION_TOL
+        or abs(hole[1] - centre[1]) > DETAIL_ORIENTATION_TOL
+    ):
+        raise RuntimeError(
+            f"the end view lays the +Z hole at {hole!r}, not right of its axis {centre!r}"
+        )
+    shift = (centre[0] - REWORK_END_CENTER[0], centre[1] - REWORK_END_CENTER[1])
+    receipt = hidden_sketches.curate_view_dimensions(
+        adapter,
+        end,
+        keep={name: (x + shift[0], y + shift[1]) for name, (x, y) in RECEIPT_TEXT_XY.items()},
+        view_label="feed nut end view receipt",
+        dimensions_by_feature=feed_nut.DRAWING_DIMENSIONS,
+    )
+    for annotation in receipt:
+        name = dimension_name(
+            adapter,
+            _sw_type_info.early_bound_or_flag(annotation, "IAnnotation", "GetSpecificAnnotation"),
+        )
+        set_near_side_diameter(annotation, f"{name} near-side diameter")
+    rebuild_drawing(adapter, label="feed nut receipt diameters")
+    verify_machining_controls(
+        receipt,
+        expected=RECEIPT_EXPECTED,
+        tolerance_types=feed_nut.DIMENSION_TOLERANCE_TYPES,
+        precision=RECEIPT_PRECISION,
+    )
+    _set_callouts(adapter, receipt, RECEIPT_CALLOUTS)
+    return receipt
+
+
 @_telemetry.traced("drawing.feed_nut_rework_sheet")
 def _append_feed_nut_rework_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
-    """Author FEED NUT REWORK: the FeedNut's native flange and countersink
-    limits in section F-F, cut through the two countersinks on X."""
+    """Author FEED NUT REWORK: the FeedNut's native flange, countersink and
+    faced-length limits in section F-F, cut through the two countersinks on X,
+    and its native receipt limits on the end view."""
     draw = adapter.currentModel
     document = _early_bound(draw, "IDrawingDoc")
     sheet = _activate(document, REWORK_SHEET_NAME)
@@ -1423,7 +1577,8 @@ def _append_feed_nut_rework_sheet(adapter: Any) -> tuple[Callable[[], None], ...
     _center_view(draw, end, REWORK_END_CENTER, "feed nut end view")
     set_hidden_lines_removed(adapter, end)
     sheet.CustomPropertyView = view_name(adapter, end)
-    properties = _source_properties(_early_bound(end.ReferencedDocument, "IModelDoc2"))
+    source_model = _early_bound(end.ReferencedDocument, "IModelDoc2")
+    properties = _source_properties(source_model)
     reach_mm = feed_nut.FLANGE_DIA / 2.0 + REWORK_SECTION_OVERRUN / _REWORK_PER_MODEL_MM
     first, second = model_points_in_view(
         adapter,
@@ -1434,58 +1589,74 @@ def _append_feed_nut_rework_sheet(adapter: Any) -> tuple[Callable[[], None], ...
     )
     if abs(first[0] - second[0]) > DETAIL_ORIENTATION_TOL:
         raise RuntimeError(f"section F-F's cutting line is not vertical: {first}, {second}")
-    section = _early_bound(
-        create_section_view(
+    # FacedLengthReference lies in F-F's cutting plane (Front), saved hidden:
+    # the section takes it from the part as it stands when it is cut and
+    # selects it through the end view, so F-F is cut and curated while the part
+    # shows it (draw_fr_nameplate's recipe). In the end view it stands end-on.
+    with hidden_sketches.part_sketches_shown(
+        adapter,
+        source_model,
+        (feed_nut.FACED_LENGTH_SKETCH,),
+        label="section F-F faced length",
+        base_view=end,
+    ):
+        section = _early_bound(
+            create_section_view(
+                adapter,
+                end,
+                line_start=first,
+                line_end=second,
+                view_xy=REWORK_SECTION_CENTER,
+                section_label=REWORK_SECTION_LABEL,
+                scale=(int(REWORK_SCALE[0]), int(REWORK_SCALE[1])),
+                partial=False,
+                label="feed nut countersink section",
+            ),
+            "IView",
+        )
+        set_hidden_lines_removed(adapter, section)
+        rebuild_drawing(adapter, label="feed nut section")
+        _require_axis_horizontal(adapter, section, label="section F-F")
+        _settle_view_point(
             adapter,
-            end,
-            line_start=first,
-            line_end=second,
-            view_xy=REWORK_SECTION_CENTER,
-            section_label=REWORK_SECTION_LABEL,
-            scale=(int(REWORK_SCALE[0]), int(REWORK_SCALE[1])),
-            partial=False,
-            label="feed nut countersink section",
-        ),
-        "IView",
-    )
-    set_hidden_lines_removed(adapter, section)
-    rebuild_drawing(adapter, label="feed nut section")
-    _require_axis_horizontal(adapter, section, label="section F-F")
-    _settle_view_point(
-        adapter,
-        section,
-        _nut_point(0.0, feed_nut.LENGTH / 2.0),
-        REWORK_SECTION_CENTER,
-        label="section F-F axis",
-    )
-    flange_text, csk_text = model_points_in_view(
-        adapter,
-        section,
-        (_nut_point(*FLANGE_THICK_TEXT_MM), _nut_point(*CSK_DIA_TEXT_MM)),
-        label="section F-F texts",
-        names=("flange thickness", "countersink diameter"),
-    )
-    annotations = curate_view_dimensions(
-        adapter,
-        section,
-        keep={"FlangeThick": flange_text, "CskDia": csk_text},
-        view_label="section F-F rework",
-        dimensions_by_feature=feed_nut.DRAWING_DIMENSIONS,
-    )
+            section,
+            _nut_point(0.0, feed_nut.LENGTH / 2.0),
+            REWORK_SECTION_CENTER,
+            label="section F-F axis",
+        )
+        flange_text, csk_text, faced_line, faced_text = model_points_in_view(
+            adapter,
+            section,
+            (
+                _nut_point(*FLANGE_THICK_TEXT_MM),
+                _nut_point(*CSK_DIA_TEXT_MM),
+                _nut_point(*FACED_LENGTH_LINE_MM),
+                _nut_point(*FACED_LENGTH_TEXT_MM),
+            ),
+            label="section F-F texts",
+            names=(
+                "flange thickness",
+                "countersink diameter",
+                "faced length line",
+                "faced length text",
+            ),
+        )
+        annotations = hidden_sketches.curate_view_dimensions(
+            adapter,
+            section,
+            keep={"FlangeThick": flange_text, "CskDia": csk_text, "FacedLength": faced_line},
+            view_label="section F-F rework",
+            dimensions_by_feature=feed_nut.DRAWING_DIMENSIONS,
+        )
+    offset_dimension_text(adapter, annotations, {"FacedLength": faced_text})
     verify_machining_controls(
         annotations,
         expected=REWORK_EXPECTED,
         tolerance_types=feed_nut.DIMENSION_TOLERANCE_TYPES,
         precision=REWORK_PRECISION,
     )
-    for lane in ("below", "above"):
-        set_dimension_callouts(
-            adapter,
-            annotations,
-            {name: text for name, (where, text) in REWORK_CALLOUTS.items() if where == lane},
-            location=lane,
-        )
-    _assert_rework_callouts(adapter, annotations)
+    _set_callouts(adapter, annotations, REWORK_CALLOUTS)
+    receipt = _receipt_dimensions(adapter, end)
     spigot, spigot_tip = _add_spigot_note(adapter, section)
     note = _literal_note(adapter, REWORK_ITEM, *ITEM_LABEL_XY)
     notes = [(note, REWORK_ITEM, REWORK_ITEM, ITEM_LABEL_CELL)]
@@ -1509,9 +1680,16 @@ def _append_feed_nut_rework_sheet(adapter: Any) -> tuple[Callable[[], None], ...
             tolerance_types=feed_nut.DIMENSION_TOLERANCE_TYPES,
             precision=REWORK_PRECISION,
         )
-        _assert_rework_callouts(adapter, annotations)
+        verify_machining_controls(
+            receipt,
+            expected=RECEIPT_EXPECTED,
+            tolerance_types=feed_nut.DIMENSION_TOLERANCE_TYPES,
+            precision=RECEIPT_PRECISION,
+        )
+        _assert_callouts(adapter, annotations, REWORK_CALLOUTS)
+        _assert_callouts(adapter, receipt, RECEIPT_CALLOUTS)
         _assert_spigot_note(adapter, spigot, spigot_tip)
-        _assert_rework_ink_inside(adapter, annotations, spigot)
+        _assert_rework_ink(adapter, [*annotations, *receipt], spigot)
         title_fit()
 
     settled()

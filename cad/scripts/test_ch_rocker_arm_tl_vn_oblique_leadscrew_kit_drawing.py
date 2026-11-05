@@ -23,6 +23,7 @@ import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_feed_nut_spec as nut
 import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec as spec
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as feed
 import draw_ch_rocker_arm_tl_vn_oblique_leadscrew_kit as draw
+from _drawing_annotation_extent import CLEAR_GAP_M, boxes_clear
 from _drawing_contract import drawing_specification_violations, model_toleranced_dimensions
 from _drawing_notes import property_link
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -783,30 +784,59 @@ def test_feed_nut_sourced_envelope_and_the_faced_length() -> None:
     assert nut.SUPPLIER_PRODUCT_URL == f"https://www.amazon.com/dp/{nut.SKU}"
 
 
-def test_feed_nut_receipt_limits_bracket_the_image_and_leave_rework_to_sheet_3() -> None:
+def test_feed_nut_receipt_limits_are_native_dimensions_on_sheet_3() -> None:
+    """4475311251: F1A's receipt limits are the FeedNut's own native
+    dimensions, each at its band's places in its native type, imported onto
+    sheet 3's end view; the faced length's MAX joins the rework in F-F."""
     # UNVERIFIED nominals: F1A measures the nut against these before the lug's
     # taps are transferred, in the nut's own millimetres.
     assert nut.FLANGE_THICK_MIN < nut.FLANGE_THICK < nut.FLANGE_THICK_MAX
     assert nut.HOLE_DIA_MIN < nut.HOLE_DIA < nut.HOLE_DIA_MAX
     assert nut.BODY_DIA < nut.BODY_DIA_MAX
-    assert nut.FLANGE_DIA < nut.FLANGE_DIA_MAX
-    assert nut.LENGTH < nut.LENGTH_MAX
+    assert nut.FLANGE_DIA_MIN < nut.FLANGE_DIA < nut.FLANGE_DIA_MAX
+    assert (nut.FLANGE_DIA_MIN, nut.FLANGE_DIA_MAX) == (21.8, 22.2)
+    assert nut.LENGTH < nut.LENGTH_MAX < nut.SUPPLIED_LENGTH
     assert nut.HOLE_STATION_BAND == nut.HOLE_PCD_BAND / 2.0
-    assert nut.RECEIPT_TEXT == (
-        f"BODY Ø{nut.BODY_DIA_MAX:.1f} MM MAX, 4 HOLES "
-        f"Ø{nut.HOLE_DIA_MIN:.2f}-{nut.HOLE_DIA_MAX:.2f} MM ON A Ø16 "
-        f"±{nut.HOLE_PCD_BAND:.1f} MM PCD"
+    # (nominal, lower, upper, places): each band's limits are the spec's.
+    limits = {
+        name: (round(nominal + lower, 6), round(nominal + upper, 6), places)
+        for name, (nominal, lower, upper, places) in nut.RECEIPT_CONTROLS.items()
+    }
+    assert limits == {
+        "ReceiptFlangeDia": (nut.FLANGE_DIA_MIN, nut.FLANGE_DIA_MAX, 1),
+        "ReceiptBodyDia": (nut.BODY_DIA, nut.BODY_DIA_MAX, 1),
+        "ReceiptHoleDia": (nut.HOLE_DIA_MIN, nut.HOLE_DIA_MAX, 2),
+        "ReceiptHolePcd": (
+            nut.HOLE_PCD - nut.HOLE_PCD_BAND, nut.HOLE_PCD + nut.HOLE_PCD_BAND, 1,
+        ),
+    }
+    nominal, lower, upper, places = nut.REWORK_CONTROLS["FacedLength"]
+    assert (nominal, round(nominal + lower, 6), upper, places) == (
+        nut.LENGTH_MAX, nut.LENGTH, 0.0, 1,
     )
-    # Codjiflo P2: F1A types none of the rework limits; sheet 3 carries them.
-    for value in (nut.FLANGE_THICK_MIN, nut.FLANGE_THICK_MAX, nut.CSK_DIA):
-        assert f"{value:.1f}" not in nut.RECEIPT_TEXT
-    assert "FLANGE" not in nut.RECEIPT_TEXT and "CSK" not in nut.RECEIPT_TEXT
-    # The faced-length limit stays F1A's acceptance (the near-KP08 feed gap's
-    # reach), checked only after the facing pass.
-    assert nut.FACED_LENGTH_TEXT == f"{nut.LENGTH_MAX:.1f} MM LONG MAX"
-    assert nut.SUPPLIED_LENGTH > nut.LENGTH_MAX
-    assert f"{nut.LENGTH_MAX:.1f}" not in nut.RECEIPT_TEXT
-    assert "LENGTH" not in nut.RECEIPT_TEXT and "LONG" not in nut.RECEIPT_TEXT
+    # swTolLIMIT 3, swTolSYMMETRIC 4, swTolMAX 6: a MAX prints its nominal.
+    assert {
+        name: nut.DIMENSION_TOLERANCE_TYPES[name]
+        for name in (*nut.RECEIPT_CONTROLS, "FacedLength")
+    } == {
+        "ReceiptFlangeDia": 3,
+        "ReceiptBodyDia": 6,
+        "ReceiptHoleDia": 3,
+        "ReceiptHolePcd": 4,
+        "FacedLength": 6,
+    }
+    assert nut.RECEIPT_CONTROLS["ReceiptBodyDia"][0] == nut.BODY_DIA_MAX
+    # Each receipt control is the driving diameter of its own construction
+    # circle on the hidden Top-plane carrier, at the control's nominal; the
+    # faced length is a Front-plane line LENGTH_MAX long from the seat face.
+    assert {name: value for name, value, _centre in nut.RECEIPT_CIRCLES} == {
+        name: control[0] for name, control in nut.RECEIPT_CONTROLS.items()
+    }
+    hole = {name: centre for name, _value, centre in nut.RECEIPT_CIRCLES}
+    assert hole["ReceiptHoleDia"] == (0.0, -nut.HOLE_PCD / 2.0)  # +Z: sketch y is -z
+    assert {centre for name, centre in hole.items() if name != "ReceiptHoleDia"} == {(0.0, 0.0)}
+    assert nut.REFERENCE_SKETCHES == (nut.RECEIPT_SKETCH, nut.FACED_LENGTH_SKETCH)
+    assert set(nut.REFERENCE_SKETCHES) <= set(part.MEMBER_FEATURES[nut.CONFIGURATION])
     # The #29 transfer spot enters the least hole; the largest hole at its
     # worst station still leaves brass between it and the largest body.
     assert feed_block.TRANSFER_SPOT_DIA < nut.HOLE_DIA_MIN
@@ -820,9 +850,10 @@ def test_feed_nut_receipt_limits_bracket_the_image_and_leave_rework_to_sheet_3()
 
 
 def test_feed_nut_rework_is_native_banded_controls_on_sheet_3() -> None:
-    """Codjiflo P2: the flange's thickness a LIMIT, the countersink's
-    diameter a ±, both at the band's one place; the 82° held by the apex
-    depth and printed in the callout; TL-00 cites the sheet."""
+    """Codjiflo P2 and 4475311242: the flange's thickness and the
+    countersink's mouth are LIMITs, the mouth's at the two places its 4.76
+    needs; the 82° held by the apex depth and printed in the callout; TL-00
+    cites the sheet."""
     nominal, lower, upper, places = nut.REWORK_CONTROLS["FlangeThick"]
     assert nominal == nut.FLANGE_THICK
     assert (nominal + lower, nominal + upper) == pytest.approx(
@@ -830,19 +861,44 @@ def test_feed_nut_rework_is_native_banded_controls_on_sheet_3() -> None:
     )
     assert (nut.FLANGE_THICK_MIN, nut.FLANGE_THICK_MAX) == (3.3, 3.7)
     assert places == 1
-    assert nut.REWORK_CONTROLS["CskDia"] == (4.6, -0.1, 0.1, 1)
-    assert nut.CSK_DIA_BAND == 0.1
-    # swTolLIMIT and swTolSYMMETRIC.
-    assert nut.DIMENSION_TOLERANCE_TYPES == {"FlangeThick": 3, "CskDia": 4}
+    # The mouth's band runs to the 3/16 cutter F2 may open it with, rounded
+    # down to the band's places so the printed maximum never exceeds it.
+    assert nut.REWORK_CONTROLS["CskDia"] == (4.6, -0.1, 0.16, 2)
+    assert (nut.CSK_DIA_MIN, nut.CSK_DIA_MAX) == (4.50, 4.76)
+    assert nut.CSK_DIA_MIN < nut.CSK_DIA < nut.CSK_DIA_MAX <= nut.CSK_CUTTER_DIA_MAX
+    assert nut.CSK_CUTTER_DIA_MAX - nut.CSK_DIA_MAX < 0.01
+    # swTolLIMIT 3, swTolSYMMETRIC 4, swTolMAX 6.
+    assert nut.DIMENSION_TOLERANCE_TYPES == {
+        "FlangeThick": 3,
+        "CskDia": 3,
+        "FacedLength": 6,
+        "ReceiptFlangeDia": 3,
+        "ReceiptBodyDia": 6,
+        "ReceiptHoleDia": 3,
+        "ReceiptHolePcd": 4,
+    }
     assert nut.DRAWING_DIMENSIONS == {
         "NutProfile": {"FlangeThick"},
         "Countersink1Profile": {"CskDia"},
+        "FacedLengthReference": {"FacedLength"},
+        "ReceiptReference": {
+            "ReceiptFlangeDia", "ReceiptBodyDia", "ReceiptHoleDia", "ReceiptHolePcd",
+        },
     }
     assert nut.DRAWING_PRECISION == {
         "NutProfile": {"FlangeThick": 1},
-        "Countersink1Profile": {"CskDia": 1},
+        "Countersink1Profile": {"CskDia": 2},
+        "FacedLengthReference": {"FacedLength": 1},
+        "ReceiptReference": {
+            "ReceiptFlangeDia": 1, "ReceiptBodyDia": 1, "ReceiptHoleDia": 2, "ReceiptHolePcd": 1,
+        },
     }
-    # "4X Ø4.6 ±0.1": the count, then SolidWorks' own diameter token, once.
+    # The hole count prints once, before the hole circle's own Ø.
+    assert nut.DIMENSION_PREFIXES == {
+        ("Countersink1Profile", "CskDia"): "4X <MOD-DIAM>",
+        ("ReceiptReference", "ReceiptHoleDia"): "4X ",
+    }
+    # "4X Ø4.76/4.50": the count, then SolidWorks' own diameter token, once.
     # CskDia is the mouth's diameter (REWORK_CONTROLS' 4.6), printed in the
     # section as a linear size, which adds no Ø of its own (run 6 printed
     # "4X 4.6"); the callout lines below carry none either.
@@ -873,16 +929,29 @@ def test_feed_nut_rework_is_native_banded_controls_on_sheet_3() -> None:
     )
     assert draw.REWORK_EXPECTED == {
         "FlangeThick": pytest.approx((0.0035, -0.0002, 0.0002)),
-        "CskDia": pytest.approx((0.0046, -0.0001, 0.0001)),
+        "CskDia": pytest.approx((0.0046, -0.0001, 0.00016)),
+        "FacedLength": pytest.approx((0.0138, -0.0003, 0.0)),
     }
-    assert draw.REWORK_PRECISION == {"FlangeThick": 1, "CskDia": 1}
+    assert draw.REWORK_PRECISION == {"FlangeThick": 1, "CskDia": 2, "FacedLength": 1}
     assert set(draw.REWORK_CALLOUTS) == set(nut.REWORK_CONTROLS)
+    assert draw.RECEIPT_EXPECTED == {
+        "ReceiptFlangeDia": pytest.approx((0.022, -0.0002, 0.0002)),
+        "ReceiptBodyDia": pytest.approx((0.0103, -0.0001, 0.0)),
+        "ReceiptHoleDia": pytest.approx((0.0035, -0.00004, 0.0001)),
+        "ReceiptHolePcd": pytest.approx((0.016, -0.0001, 0.0001)),
+    }
+    assert draw.RECEIPT_PRECISION == {
+        "ReceiptFlangeDia": 1, "ReceiptBodyDia": 1, "ReceiptHoleDia": 2, "ReceiptHolePcd": 1,
+    }
+    assert set(draw.RECEIPT_CALLOUTS) == set(draw.RECEIPT_TEXT_XY) == set(nut.RECEIPT_CONTROLS)
 
 
 def test_rework_bands_name_their_mates_at_their_callouts() -> None:
-    """Rule 4 (run 20261104T230444981Z): the flange's 3.3/3.7 names the lug
-    the faced seat bears on and the screws it grips; the countersink's ±0.1
-    names the flat head that seats in it and how it seats."""
+    """Rule 4 (run 20261104T230444981Z, 4475311251): the flange's 3.3/3.7
+    names the lug the faced seat bears on and the screws it grips; the
+    countersink's band names the flat head that seats in it and how it seats;
+    the faced length names the KP08 it clears; each receipt limit names what
+    it fits."""
     import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
 
     lane, flange = draw.REWORK_CALLOUTS["FlangeThick"]
@@ -922,6 +991,25 @@ def test_rework_bands_name_their_mates_at_their_callouts() -> None:
     # The faced face is named where it is: the seat face the lug bears on.
     assert draw.SPIGOT_NOTE.replace("\n", " ") == "SPIGOT FACED FLUSH WITH FLANGE SEAT FACE"
     assert nut.LENGTH == nut.FLANGE_THICK + nut.BODY_LENGTH  # no spigot left
+    # The faced length's MAX is the near KP08's feed gap: it names that KP08.
+    lane, faced = draw.REWORK_CALLOUTS["FacedLength"]
+    kp08 = _config.parts("ch-rocker-arm-tl-vn-oblique-pillow-block")["number"]
+    assert lane == "below" and draw.KP08_NUMBER == kp08
+    assert faced.splitlines()[-1] == kp08
+    # The receipt limits print once, natively; each callout below them names
+    # its mate by its registry number, with no number of its own.
+    mates = {}
+    for name, (lane, text) in draw.RECEIPT_CALLOUTS.items():
+        assert lane == "below" and not re.search(r"\d\.\d", text)
+        mates[name] = text.splitlines()[-1]
+    assert mates == {
+        "ReceiptFlangeDia": "LUG FACE",
+        "ReceiptBodyDia": screw_row["number"],
+        "ReceiptHoleDia": f"{feed_block.NUMBER} LUG",
+        "ReceiptHolePcd": f"{feed_block.NUMBER} LUG",
+    }
+    assert draw.RECEIPT_CALLOUTS["ReceiptFlangeDia"][1].startswith(f"WITHIN {feed_block.NUMBER}\n")
+    assert f"{nut.SCREW_COUNT}X" in draw.RECEIPT_CALLOUTS["ReceiptBodyDia"][1]
 
 
 def test_rework_tolerances_live_only_in_the_feed_nut_member() -> None:
@@ -932,9 +1020,9 @@ def test_rework_tolerances_live_only_in_the_feed_nut_member() -> None:
     lead = set(part.MEMBER_FEATURES[spec.CONFIGURATION])
     assert set(nut.DRAWING_DIMENSIONS) <= fitted
     assert not set(nut.DRAWING_DIMENSIONS) & lead
-    assert model_toleranced_dimensions(part) == {
-        ("Countersink1Profile", "CskDia"): "feed_nut.CSK_DIA_BAND"
-    }
+    # Each native control's tolerance is set in one loop over the spec's
+    # NATIVE_CONTROLS, on the feature that owns it.
+    assert model_toleranced_dimensions(part) == {("feature", "name"): "upper"}
     assert set(spec.DIMENSION_TOLERANCE_TYPES.values()) == {11}  # swTolGeneral
     tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
     functions = {
@@ -953,14 +1041,29 @@ def test_rework_tolerances_live_only_in_the_feed_nut_member() -> None:
     def callers(name: str) -> set[str]:
         return {function for function in functions if name in calls(function)}
 
-    banded = {"set_dimension_symmetric_tolerance", "set_dimension_prefix"}
+    banded = {"set_dimension_symmetric_tolerance", "set_dimension_prefix", "set_single_limit"}
     assert callers("set_dimension_symmetric_tolerance") == {"_feed_nut_rework"}
+    assert callers("set_single_limit") == {"_feed_nut_rework"}
     assert callers("set_dimension_prefix") == {"_feed_nut_rework"}
-    assert callers("_author_flange_limits") == {"_feed_nut_rework"}
+    assert callers("_author_limits") == {"_feed_nut_rework"}
     assert callers("_feed_nut_rework") == {"_author_feed_nut"}
     assert not banded & calls("_author_lead_screw")
-    limits = ast.unparse(functions["_author_flange_limits"])
-    assert "feed_nut.TOL_LIMIT" in limits and "'NutProfile', 'FlangeThick'" in limits
+    rework = ast.unparse(functions["_feed_nut_rework"])
+    assert "feed_nut.NATIVE_CONTROLS.items()" in rework
+    assert "_control_feature(name)" in rework
+    assert "feed_nut.DIMENSION_TOLERANCE_TYPES[name]" in rework
+    # The reference sketches are drawn, then blanked, before the controls.
+    author = ast.unparse(functions["_author_feed_nut"])
+    order = [
+        author.index(call)
+        for call in (
+            "_faced_length_reference(adapter)",
+            "_receipt_reference(adapter)",
+            "blank_reference_sketches(adapter, feed_nut.REFERENCE_SKETCHES)",
+            "_feed_nut_rework(adapter)",
+        )
+    ]
+    assert order == sorted(order)
     # build pairs each author with its own member, active and alone.
     source = ast.unparse(functions["build"])
     assert "(LEAD_SCREW_CONFIGURATION, _author_lead_screw)" in source
@@ -974,20 +1077,32 @@ def test_feed_nut_countersinks_seat_the_flat_heads_proud_and_off_the_body() -> N
     tan = math.tan(math.radians(nut.CSK_ANGLE / 2.0))
     assert nut.CSK_ANGLE == SCREW_DIMS.head_angle_deg == 82.0
     # The head's cone meets each mouth below its top Ø, so it stands proud at
-    # the least, nominal and largest (opened) countersink alike.
-    for mouth, proud in (
-        (nut.CSK_DIA_MIN, nut.HEAD_PROUD_MAX),
-        (nut.CSK_DIA, nut.HEAD_PROUD_NOMINAL),
-        (nut.CSK_DIA_OPEN_MAX, nut.HEAD_PROUD_MIN),
-    ):
-        assert proud == pytest.approx((SCREW_DIMS.head_dia - mouth) / (2.0 * tan))
-        assert proud > 0.0
-    assert nut.CSK_DIA_OPEN_MAX == nut.CSK_CUTTER_DIA_MAX == pytest.approx(
-        3.0 / 16.0 * 25.4
+    # every mouth in the band, for the largest and the least B18.6.3 head
+    # (4475311242): the least head in the band's largest mouth governs.
+    def proud(head: float, mouth: float) -> float:
+        return (head - mouth) / (2.0 * tan)
+
+    assert nut.HEAD_PROUD_MAX == pytest.approx(proud(nut.SCREW_HEAD_DIA_MAX, nut.CSK_DIA_MIN))
+    assert nut.HEAD_PROUD_NOMINAL == pytest.approx(proud(SCREW_DIMS.head_dia, nut.CSK_DIA))
+    assert nut.HEAD_PROUD_AT_MOUTH_MAX == pytest.approx(
+        proud(nut.SCREW_HEAD_DIA_MAX, nut.CSK_DIA_MAX)
     )
-    assert nut.CSK_DIA + nut.CSK_DIA_BAND < nut.CSK_DIA_OPEN_MAX
-    # F2's head limit is the catalogue head the proud and body checks use.
+    assert nut.HEAD_PROUD_MIN == pytest.approx(proud(nut.SCREW_HEAD_DIA_MIN, nut.CSK_DIA_MAX))
+    least = min(
+        proud(head, mouth)
+        for head in (nut.SCREW_HEAD_DIA_MIN, nut.SCREW_HEAD_DIA_MAX)
+        for mouth in (nut.CSK_DIA_MIN, nut.CSK_DIA_MAX)
+    )
+    assert nut.HEAD_PROUD_MIN == pytest.approx(least) and least > 0.0
+    assert nut.HEAD_PROUD_MIN == pytest.approx(0.053, abs=5e-4)
+    assert nut.HEAD_PROUD_MAX == pytest.approx(0.509, abs=5e-4)
+    # F2 opens the countersinks only within the band, whose maximum is the
+    # 3/16 cutter's diameter rounded down to the band's places.
+    assert nut.CSK_DIA_MAX <= nut.CSK_CUTTER_DIA_MAX == pytest.approx(3.0 / 16.0 * 25.4)
+    # F2's head limit is the catalogue head the body check uses; B18.6.3's
+    # least head (.191) is the proud check's.
     assert nut.SCREW_HEAD_DIA_MAX == SCREW_DIMS.head_dia == pytest.approx(0.212 * 25.4)
+    assert nut.SCREW_HEAD_DIA_MIN == pytest.approx(0.191 * 25.4)
     # The countersink never runs through the thinnest flange.
     assert nut.CSK_DEPTH == pytest.approx((nut.CSK_DIA - nut.HOLE_DIA) / (2.0 * tan))
     assert nut.CSK_DEPTH < nut.FLANGE_THICK_MIN
@@ -1239,6 +1354,72 @@ def test_countersink_profile_names_every_dimension_it_emits(monkeypatch, index) 
     assert adapter.planes == [plane] and adapter.revolves[0].is_cut
 
 
+class _ReferenceAdapter(_SketchAdapter):
+    """Also records the construction entities a reference sketch draws."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.currentSketchManager = SimpleNamespace(AddToDB=False)
+        self.entities: list[tuple] = []
+
+    def _entity(self, prefix: str, *geometry) -> SimpleNamespace:
+        self.entities.append((prefix, *geometry))
+        return SimpleNamespace(is_success=True, data=f"{prefix}{len(self.entities)}", error=None)
+
+    async def add_circle(self, x, y, radius):
+        return self._entity("C", x, y, radius)
+
+    async def add_line(self, x0, y0, x1, y1):
+        return self._entity("L", x0, y0, x1, y1)
+
+
+def _patch_reference(monkeypatch) -> tuple[dict, list, _ReferenceAdapter]:
+    applied, construction = {}, []
+    _patch_sketching(monkeypatch, applied, [])
+    monkeypatch.setattr(part, "_as_construction", lambda _a, entity: construction.append(entity))
+    return applied, construction, _ReferenceAdapter()
+
+
+def test_receipt_reference_names_every_dimension_it_emits(monkeypatch) -> None:
+    """4475311251: one Top-plane construction circle per receipt control,
+    each driven by the control's diameter; the +Z hole's station is the only
+    other driver."""
+    applied, construction, adapter = _patch_reference(monkeypatch)
+    asyncio.run(part._receipt_reference(adapter))
+    names = applied[nut.RECEIPT_SKETCH]
+    assert names == list(nut.RECEIPT_DIMENSIONS)
+    assert len(adapter.emitted) == len(names)
+    by_name = dict(zip(names, adapter.emitted, strict=True))
+    for name, value, _centre in nut.RECEIPT_CIRCLES:
+        assert by_name[name][2:] == ("diameter", pytest.approx(value)), name
+    assert by_name[nut.RECEIPT_HOLE_STATION][1:] == (
+        "origin", "vertical_distance", nut.HOLE_PCD / 2.0,
+    )
+    assert adapter.entities == [
+        ("C", *centre, pytest.approx(value / 2.0)) for _name, value, centre in nut.RECEIPT_CIRCLES
+    ]
+    assert construction == ["C1", "C2", "C3", "C4"]
+    assert adapter.planes == ["Top"]
+
+
+def test_faced_length_reference_names_every_dimension_it_emits(monkeypatch) -> None:
+    """The faced length's MAX is a Front-plane construction line from the
+    seat face, LENGTH_MAX long, its start held on the body's -X silhouette."""
+    applied, construction, adapter = _patch_reference(monkeypatch)
+    asyncio.run(part._faced_length_reference(adapter))
+    names = applied[nut.FACED_LENGTH_SKETCH]
+    assert names == list(nut.FACED_LENGTH_DIMENSIONS)
+    by_name = dict(zip(names, adapter.emitted, strict=True))
+    assert by_name["FacedLength"] == ("L1.start", "L1.end", "vertical_distance", nut.LENGTH_MAX)
+    x, y = nut.FACED_LENGTH_START
+    assert (x, y) == (-nut.BODY_DIA / 2.0, 0.0)
+    assert by_name["FacedLengthStart"] == (
+        "L1.start", "origin", "horizontal_distance", nut.BODY_DIA / 2.0,
+    )
+    assert adapter.entities == [("L", x, y, x, y + nut.LENGTH_MAX)]
+    assert construction == ["L1"] and adapter.planes == ["Front"]
+
+
 # --- The package: text fit and the REWORK sheet's layout -------------------------
 
 
@@ -1320,9 +1501,10 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
     def width(text, per_char=char):
         return per_char * max(len(row) for row in text.splitlines())
 
-    def leadered_block(point, text):
+    def leadered_block(point, text, value_rows=1):
         # The shoulder's stroke starts a hair left of the point (run 9: 0.5 mm).
-        rows = 1 + len(text.splitlines())
+        # A LIMIT's value stacks its two limits in two rows.
+        rows = value_rows + len(text.splitlines())
         return (
             point[0] - 0.001,
             point[1] - rows * dim_line / 2.0,
@@ -1363,7 +1545,8 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
     csk_point = sheet_point(*draw.CSK_DIA_TEXT_MM)
     lane, callout = draw.REWORK_CALLOUTS["CskDia"]
     assert lane == "below"
-    csk_text = leadered_block(csk_point, callout)
+    # A LIMIT now (4475311242): its value stacks 4.76 over 4.50.
+    csk_text = leadered_block(csk_point, callout, value_rows=2)
     seat_x = sheet_point(0.0, 0.0)[0]
     flange_ink = (
         seat_x,
@@ -1411,13 +1594,116 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
     # The countersink's dimension line stands at its text point, its lower
     # arrow hanging past the body's top: clear of the body's end.
     assert csk_text[0] > body_ink[2] + 0.004
-    texts = (flange_limits, flange_text, csk_text, noted)
-    for index, text in enumerate(texts):
+    # The faced length's MAX (13.8, one row) and its mate, offset right of the
+    # far witness, over the title block and right of the section's caption
+    # (run 9: SECTION F-F read 0.259..0.306 by 0.0904..0.0975 m).
+    caption = (0.259, 0.0904, 0.306, 0.0975)
+    lane, faced_callout = draw.REWORK_CALLOUTS["FacedLength"]
+    assert lane == "below"
+    faced_text = leadered_block(sheet_point(*draw.FACED_LENGTH_TEXT_MM), faced_callout)
+    faced_line_y = sheet_point(*draw.FACED_LENGTH_LINE_MM)[1]
+    faced_span = (seat_x, seat_x + nut.LENGTH_MAX * scale)
+    assert caption[3] < faced_line_y < flange_ink[1]
+    assert faced_text[0] > max(faced_span[1], caption[2])
+    assert faced_text[1] > draw.TITLE_BLOCK[3]
+    # callout_ink takes the longest horizontal stroke for the shoulder: the
+    # mate's row, even at run 9's measured pitch, outruns the dimension line.
+    assert width(faced_callout, dim_char_measured) > faced_span[1] - faced_span[0]
+    # The receipt limits on the end view (4475311251), the +Z hole right of
+    # its centre: each block runs right from its text point, its leader radial
+    # from its circle's centre to the block's shoulder (its lower-left corner).
+    cx, cy = draw.REWORK_END_CENTER
+    hole_centre = (cx + nut.HOLE_PCD / 2.0 * scale, cy)
+    top_hole = (cx, cy + nut.HOLE_PCD / 2.0 * scale)
+    csk_r = nut.CSK_DIA_MAX / 2.0 * scale
+    circles = {
+        "ReceiptFlangeDia": ((cx, cy), nut.FLANGE_DIA / 2.0),
+        "ReceiptBodyDia": ((cx, cy), nut.BODY_DIA_MAX / 2.0),
+        "ReceiptHolePcd": ((cx, cy), nut.HOLE_PCD / 2.0),
+        "ReceiptHoleDia": (hole_centre, nut.HOLE_DIA / 2.0),
+    }
+    assert set(circles) == set(draw.RECEIPT_TEXT_XY)
+    receipt, leaders = {}, {}
+    for name, point in draw.RECEIPT_TEXT_XY.items():
+        lane, text = draw.RECEIPT_CALLOUTS[name]
+        stacked = nut.DIMENSION_TOLERANCE_TYPES[name] == nut.TOL_LIMIT
+        block = leadered_block(point, text, value_rows=2 if stacked else 1)
+        (ox, oy), r_mm = circles[name]
+        shoulder = (block[0], block[1])
+        dx, dy = shoulder[0] - ox, shoulder[1] - oy
+        length = math.hypot(dx, dy)
+        arrow = (ox + r_mm * scale * dx / length, oy + r_mm * scale * dy / length)
+        assert shoulder[0] > arrow[0], name  # the text runs right, off its circle
+        receipt[name], leaders[name] = block, (arrow, shoulder)
+
+    def along(segment, steps=400):
+        (x0, y0), (x1, y1) = segment
+        return [
+            (x0 + (x1 - x0) * k / steps, y0 + (y1 - y0) * k / steps)
+            for k in range(1, steps)
+        ]
+
+    def through(segment, box):
+        return any(box[0] < x < box[2] and box[1] < y < box[3] for x, y in along(segment))
+
+    def off(segment, centre, radius):
+        return min(math.hypot(x - centre[0], y - centre[1]) for x, y in along(segment)) > radius
+
+    # Three stack between the end view and the section, under the FlangeThick
+    # row and over the spigot note's run-7 extent; the flange OD's goes under
+    # the end view, right of the cutting line's lower letter.
+    letters_f = [(0.1257, y - 0.002, 0.1317, y + 0.004) for y in (0.2117, 0.1077)]
+    for name in ("ReceiptBodyDia", "ReceiptHolePcd", "ReceiptHoleDia"):
+        assert end[2] < receipt[name][0] and receipt[name][2] < section[0], name
+        assert run7[3] + CLEAR_GAP_M <= receipt[name][1], name
+        assert receipt[name][3] + CLEAR_GAP_M <= flange_text[1], name
+    assert receipt["ReceiptFlangeDia"][3] + CLEAR_GAP_M <= run7[1]
+    assert receipt["ReceiptFlangeDia"][3] < end[1]
+    # Each block clears every other text by the readback's gap; each leader
+    # runs through no text, its arrow off the countersinks it passes, and the
+    # hole's under the end view's horizontal centreline.
+    texts = {
+        "flange limits": flange_limits,
+        "flange callout": flange_text,
+        "countersink": csk_text,
+        "faced length": faced_text,
+        "spigot note": noted,
+        "spigot extent": run7,
+        "caption": caption,
+        **receipt,
+    }
+    for name, block in receipt.items():
+        assert draw._inside_sheet(block), name
+        assert not draw._overlaps(block, draw.ITEM_LABEL_CELL)
+        assert not draw._overlaps(block, draw.TITLE_BLOCK)
+        for other, box in texts.items():
+            if other != name:
+                assert boxes_clear(block, box), (name, other)
+        for other, box in {**texts, "F1": letters_f[0], "F2": letters_f[1]}.items():
+            if other != name:
+                assert not through(leaders[name], box), (name, other)
+        for other, segment in leaders.items():
+            if other != name:
+                assert not any(
+                    math.hypot(x - u, y - v) < 0.001
+                    for x, y in along(segment, 100)
+                    for u, v in along(leaders[name], 100)
+                ), (name, other)
+    for name in ("ReceiptBodyDia", "ReceiptHolePcd"):
+        for hole in (hole_centre, top_hole):
+            assert off(leaders[name], hole, csk_r + 0.002), name
+    assert max(y for _x, y in along(leaders["ReceiptHoleDia"])) < cy
+    for name, block in {"faced length": faced_text}.items():
+        for other, box in texts.items():
+            if other != name:
+                assert boxes_clear(block, box), (name, other)
+    texts_old = (flange_limits, flange_text, csk_text, noted, faced_text)
+    for index, text in enumerate(texts_old):
         assert draw._inside_sheet(text), text
         assert not draw._overlaps(text, draw.ITEM_LABEL_CELL)
         for ink in (flange_ink, body_ink, end, cut):
             assert not draw._overlaps(text, ink), (text, ink)
-        for other in texts[index + 1 :]:
+        for other in texts_old[index + 1 :]:
             assert not draw._overlaps(text, other), (text, other)
     assert draw.REWORK_END_ANGLE == math.pi / 2.0
     # One letter per cut in the package: sheet 2's A to E, sheet 3's F.
@@ -1431,9 +1717,32 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
     rework = source[source.index("def _append_feed_nut_rework_sheet") :]
     assert "configure_reference_views(adapter, feed_nut.CONFIGURATION, [end])" in rework
     assert "_require_axis_horizontal(adapter, section" in rework
-    assert rework.index("curate_view_dimensions(") < rework.index(
-        "verify_machining_controls("
-    ) < rework.index("set_dimension_callouts(")
+    # F-F is cut and curated while the part shows the faced length's hidden
+    # carrier; the receipt diameters follow on the end view.
+    steps = [
+        rework.index(call)
+        for call in (
+            "hidden_sketches.part_sketches_shown(",
+            "create_section_view(",
+            "hidden_sketches.curate_view_dimensions(",
+            "offset_dimension_text(adapter, annotations",
+            "verify_machining_controls(",
+            "_set_callouts(adapter, annotations, REWORK_CALLOUTS)",
+            "_receipt_dimensions(adapter, end)",
+        )
+    ]
+    assert steps == sorted(steps)
+    receipt_source = source[source.index("def _receipt_dimensions") :]
+    steps = [
+        receipt_source.index(call)
+        for call in (
+            "hidden_sketches.curate_view_dimensions(",
+            "set_near_side_diameter(",
+            "verify_machining_controls(",
+            "_set_callouts(adapter, receipt, RECEIPT_CALLOUTS)",
+        )
+    ]
+    assert steps == sorted(steps)
 
 
 def test_notes_name_the_item_not_its_length_or_material() -> None:
@@ -2355,25 +2664,24 @@ def _floor2(value: float) -> str:
 
 
 def test_countersink_walls_are_the_worst_case_the_package_allows() -> None:
-    # Every allowance a MIN must cover: the hole off station (receipt band),
-    # the countersink off the hole, the mouth opened to F2's Ø3/16 cutter
-    # (past the band's Ø4.7) and the body at its receipt maximum; the flange
-    # OD has no receipt minimum, so the listing's Ø22.
+    # Every allowance a MIN must cover (4475311242, 4475311247): the hole off
+    # station (receipt band), the countersink off the hole, the mouth at its
+    # band's Ø4.76 maximum (all F2 may open it to), the body at its receipt
+    # maximum and the flange at its receipt minimum.
     shift = nut.HOLE_STATION_BAND + nut.CSK_ECCENTRICITY_MAX
     assert (nut.HOLE_STATION_BAND, nut.CSK_ECCENTRICITY_MAX) == (0.05, 0.02)
-    mouth = nut.CSK_DIA_OPEN_MAX
-    assert mouth == pytest.approx(3.0 / 16.0 * 25.4) and mouth > nut.CSK_DIA + nut.CSK_DIA_BAND
-    assert nut.BODY_DIA_MAX == 10.3
+    mouth = nut.CSK_DIA_MAX
+    assert mouth == 4.76 == round(nut.CSK_DIA + nut.REWORK_CONTROLS["CskDia"][2], 6)
+    assert nut.BODY_DIA_MAX == 10.3 and nut.FLANGE_DIA_MIN == 21.8
     assert nut.CSK_WALL_TO_BODY == pytest.approx(
         nut.HOLE_PCD / 2.0 - shift - mouth / 2.0 - nut.BODY_DIA_MAX / 2.0
-    ) == pytest.approx(0.39875)
+    ) == pytest.approx(0.40)
     assert nut.CSK_WALL_TO_OD == pytest.approx(
-        nut.FLANGE_DIA / 2.0 - nut.HOLE_PCD / 2.0 - shift - mouth / 2.0
-    ) == pytest.approx(0.54875)
-    # Thinner than at the band's Ø4.7 with everything nominal (0.55, 0.65).
-    band_mouth = nut.CSK_DIA + nut.CSK_DIA_BAND
-    assert nut.CSK_WALL_TO_BODY < nut.HOLE_PCD / 2.0 - band_mouth / 2.0 - nut.BODY_DIA / 2.0
-    assert nut.CSK_WALL_TO_OD < nut.FLANGE_DIA / 2.0 - nut.HOLE_PCD / 2.0 - band_mouth / 2.0
+        nut.FLANGE_DIA_MIN / 2.0 - nut.HOLE_PCD / 2.0 - shift - mouth / 2.0
+    ) == pytest.approx(0.45)
+    # Thinner than at the modelled mouth with everything nominal.
+    assert nut.CSK_WALL_TO_BODY < nut.HOLE_PCD / 2.0 - nut.CSK_DIA / 2.0 - nut.BODY_DIA / 2.0
+    assert nut.CSK_WALL_TO_OD < nut.FLANGE_DIA / 2.0 - nut.HOLE_PCD / 2.0 - nut.CSK_DIA / 2.0
     assert 0.0 < nut.CSK_WALL_TO_BODY < nut.CSK_WALL_TO_OD < nut.WALL_FLOOR == 1.5
     # The supplied holes alone already miss the floor, nominal and at receipt.
     assert nut.HOLE_WALL_TO_BODY == pytest.approx(1.15)
@@ -2382,11 +2690,12 @@ def test_countersink_walls_are_the_worst_case_the_package_allows() -> None:
         nut.HOLE_PCD / 2.0 - nut.HOLE_STATION_BAND - nut.HOLE_DIA_MAX / 2.0 - nut.BODY_DIA_MAX / 2.0
     ) == pytest.approx(1.00)
     assert nut.HOLE_WALL_TO_OD_MIN == pytest.approx(
-        nut.FLANGE_DIA / 2.0 - nut.HOLE_PCD / 2.0 - nut.HOLE_STATION_BAND - nut.HOLE_DIA_MAX / 2.0
-    ) == pytest.approx(1.15)
+        nut.FLANGE_DIA_MIN / 2.0 - nut.HOLE_PCD / 2.0 - nut.HOLE_STATION_BAND
+        - nut.HOLE_DIA_MAX / 2.0
+    ) == pytest.approx(1.05)
     assert max(nut.HOLE_WALL_TO_BODY, nut.HOLE_WALL_TO_OD) < nut.WALL_FLOOR
     # Printed rounded down, so a MIN never overstates the wall.
-    assert nut.CSK_WALL_TEXT == "MIN WALL 0.39 TO BODY, 0.54 TO OD"
+    assert nut.CSK_WALL_TEXT == "MIN WALL 0.40 TO BODY, 0.45 TO OD"
     for printed, wall in zip(
         re.findall(r"\d+\.\d\d", nut.CSK_WALL_TEXT),
         (nut.CSK_WALL_TO_BODY, nut.CSK_WALL_TO_OD),
@@ -2406,10 +2715,12 @@ def test_countersink_wall_shortfall_is_a_declared_provisional_minor() -> None:
     assert (wall.id, wall.kind) == ("RV-01", "minor")
     # "where" quotes the printed callout: the prefix's Ø token as printed,
     # the band, the angle and the wall line, exactly.
+    # LIMIT prints the maximum over the minimum at the band's two places.
     printed = (
-        f"{nut.CSK_PREFIX.replace('<MOD-DIAM>', 'Ø')}{nut.CSK_DIA:.1f} "
-        f"±{nut.CSK_DIA_BAND:.1f} {nut.CSK_CALLOUT}"
+        f"{nut.CSK_PREFIX.replace('<MOD-DIAM>', 'Ø')}{nut.CSK_DIA_MAX:.2f}/"
+        f"{nut.CSK_DIA_MIN:.2f} {nut.CSK_CALLOUT}"
     )
+    assert printed == "4X Ø4.76/4.50 82° CSK"
     label = draw.REWORK_SECTION_LABEL
     assert wall.where == (
         f"sheet {nut.REWORK_SHEET}, Section {label}-{label}, the {printed} callout: "
@@ -2418,13 +2729,14 @@ def test_countersink_wall_shortfall_is_a_declared_provisional_minor() -> None:
     worst = (
         f"each hole ±{nut.HOLE_STATION_BAND:.2f} off its station on the "
         f"Ø{nut.HOLE_PCD:.0f} PCD, the countersink {nut.CSK_ECCENTRICITY_MAX:.2f} off "
-        f"its hole, the mouth opened to the Ø{nut.CSK_DIA_OPEN_MAX:.2f} F2 cutter, the "
-        f"body at its Ø{nut.BODY_DIA_MAX:.1f} receipt maximum"
+        f"its hole, the mouth at its Ø{nut.CSK_DIA_MAX:.2f} band maximum, the "
+        f"body at its Ø{nut.BODY_DIA_MAX:.1f} receipt maximum, the flange at its "
+        f"Ø{nut.FLANGE_DIA_MIN:.1f} receipt minimum"
     )
     assert f"({worst})" in wall.finding
     assert (
         f"leave {_floor2(nut.CSK_WALL_TO_BODY)} mm to the body and "
-        f"{_floor2(nut.CSK_WALL_TO_OD)} mm to the Ø{nut.FLANGE_DIA:.0f} flange OD, "
+        f"{_floor2(nut.CSK_WALL_TO_OD)} mm to the flange OD, "
         f"below the {nut.WALL_FLOOR:.1f} mm metric wall floor"
     ) in wall.finding
     assert wall.reason.startswith("provisional: option A auto-selected")

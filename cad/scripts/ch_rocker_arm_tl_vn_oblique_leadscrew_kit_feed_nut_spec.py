@@ -18,15 +18,20 @@ and the four flange holes are countersunk 82° for four
 relayed by Main 2026-11-04: a screw the repo already uses). The lug's four
 taps are transferred through the seated nut. The model is the nut as fitted.
 
-Codjiflo P2 on #2187: the rework limits are native model tolerances in the
-FeedNut configuration, printed on the kit's REWORK sheet
-(``REWORK_SHEET_REFERENCE``): ``FlangeThick`` (LIMIT ``FLANGE_THICK_MIN`` /
-``FLANGE_THICK_MAX``) and ``CskDia`` (Ø``CSK_DIA`` ±``CSK_DIA_BAND``). The
-82° is held by the driving apex depth ``CskApexDepth``, as on
-build_pd_transgear_arm_plate (an angular sketch dimension there read the
-139° supplement and flipped the cone, run 20261001T011714683Z). The angle
-prints in the countersink's callout under the title block's angular band.
-TL-00 cites that sheet and types none of these limits.
+Codjiflo P2 on #2187 (and 4475311251): every limit the nut is made and
+accepted to is a native model tolerance in the FeedNut configuration, printed
+on the kit's REWORK sheet (``REWORK_SHEET_REFERENCE``). Section F-F carries
+``REWORK_CONTROLS``: ``FlangeThick`` (LIMIT ``FLANGE_THICK_MIN`` /
+``FLANGE_THICK_MAX``), ``CskDia`` (LIMIT ``CSK_DIA_MIN`` / ``CSK_DIA_MAX``)
+and ``FacedLength`` (``LENGTH_MAX`` MAX); the end view carries
+``RECEIPT_CONTROLS``: the flange OD, body, hole and PCD limits. Values no
+feature dimension holds are the driving dimensions of hidden reference
+sketches (``REFERENCE_SKETCHES``). The 82° is held by the driving apex depth
+``CskApexDepth``, as on build_pd_transgear_arm_plate (an angular sketch
+dimension there read the 139° supplement and flipped the cone, run
+20261001T011714683Z). The angle prints in the countersink's callout under the
+title block's angular band. TL-00 cites that sheet and types none of these
+limits.
 
 Datasheet-built: no vendor CAD obtained. Sources:
 
@@ -43,21 +48,20 @@ Datasheet-built: no vendor CAD obtained. Sources:
   cylinder, so the assembly carries a volume-bounded thread-engagement
   contract.
 - FIT-UP (this jig's work, not the vendor's): the spigot faced off, so
-  ``LENGTH`` is 13.5 as fitted, and four 82° countersinks Ø``CSK_DIA``
-  ±``CSK_DIA_BAND``, cut with an 82° countersink no larger than
-  ``CSK_CUTTER_DIA_MAX`` (Ø3/16; a method, so TL-00 states it). A Ø1/4
-  cutter's cone would reach the Ø10.2 body about 0.6 above the flange face
-  and gouge it.
+  ``LENGTH`` is 13.5 as fitted, and four 82° countersinks within
+  ``CSK_DIA_MIN`` .. ``CSK_DIA_MAX``, cut with an 82° countersink no larger
+  than ``CSK_CUTTER_DIA_MAX`` (Ø3/16, a method; the band's maximum is its
+  full diameter, rounded down). A Ø1/4 cutter's cone would reach the Ø10.2
+  body about 0.6 above the flange face and gouge it.
 - RECEIPT ACCEPTANCE (UNVERIFIED until the nut is measured in F1A, before the
   lug's taps are transferred): the ``*_MIN`` / ``*_MAX`` limits below. Each
-  is the bound a check in this jig reads: the flange thickness (the screws'
-  engagement and seat; the REWORK sheet's ``FlangeThick`` prints it), the
-  body diameter (the heads' clearance, TL-32's spec), the hole size (the
-  transfer spot's residual) and the hole PCD (the lug walls), measured as
-  received (``RECEIPT_TEXT``); and the faced length (the near-KP08 feed gap),
-  measured after the facing pass (``FACED_LENGTH_TEXT``), since the supplied
-  nut is 1.5 longer. F2 calipers each nut screw's head against
-  ``SCREW_HEAD_DIA_MAX``.
+  is the bound a check in this jig reads: the flange OD (the lug face and the
+  countersinks' OD wall), the flange thickness (the screws' engagement and
+  seat), the body diameter (the heads' clearance, TL-32's spec), the hole size
+  (the transfer spot's residual) and the hole PCD (the lug walls), measured as
+  received; and the faced length (the near-KP08 feed gap), measured after the
+  facing pass, since the supplied nut is 1.5 longer. F2 calipers each nut
+  screw's head against ``SCREW_HEAD_DIA_MAX``.
 
 Part frame. The axis is +Y and is the kit's shared ``ScrewAxis`` (Front ∩
 Right). y = 0 is the faced seat face (on the lug); the flange spans
@@ -128,7 +132,17 @@ if LENGTH < 5.0 * LEAD:
     raise AssertionError("the fitted nut is shorter than five Tr8 turns")
 
 # --- RECEIPT ACCEPTANCE: UNVERIFIED nominals, measured in F1A -----------------
-FLANGE_DIA_MAX = 22.2
+# Every limit below is a native dimension of the FeedNut configuration
+# (Codjiflo 4475311251 on #2187), printed on the REWORK sheet: the flange OD,
+# body Ø, hole size and PCD on its end view (``RECEIPT_CONTROLS``), the flange
+# thickness and the faced length in its section (``REWORK_CONTROLS``). TL-00's
+# F1A cites the sheet and types none of them.
+# The flange OD takes the listing's Ø22 at the ±0.2 its 3.5 thickness takes
+# (FLANGE_THICK_MIN/MAX): the maximum keeps the flange within TL-32's lug
+# face, the minimum bounds the countersinks' OD wall (CSK_WALL_TO_OD).
+FLANGE_DIA_BAND = 0.2
+FLANGE_DIA_MIN = round(FLANGE_DIA - FLANGE_DIA_BAND, 6)  # 21.8
+FLANGE_DIA_MAX = round(FLANGE_DIA + FLANGE_DIA_BAND, 6)  # 22.2
 FLANGE_THICK_MIN = 3.3
 FLANGE_THICK_MAX = 3.7
 BODY_DIA_MAX = 10.3
@@ -138,29 +152,27 @@ HOLE_PCD_BAND = 0.1  # ± on the diameter, so ±0.05 on each hole's station
 LENGTH_MAX = 13.8  # faced, seat face to body end
 HOLE_R_MAX = HOLE_DIA_MAX / 2.0
 HOLE_STATION_BAND = HOLE_PCD_BAND / 2.0
-# F1A prints the as-received limits in the nut's own millimetres (owner ruling
-# 4, 2026-11-01), the faced length after the facing pass. The flange's band is
-# the REWORK sheet's FlangeThick (Codjiflo P2), so F1A does not type it.
-RECEIPT_TEXT = (
-    f"BODY Ø{BODY_DIA_MAX:.1f} MM MAX, {len(HOLE_ANGLES_DEG)} HOLES "
-    f"Ø{HOLE_DIA_MIN:.2f}-{HOLE_DIA_MAX:.2f} MM ON A Ø{HOLE_PCD:.0f} "
-    f"±{HOLE_PCD_BAND:.1f} MM PCD"
-)
-FACED_LENGTH_TEXT = f"{LENGTH_MAX:.1f} MM LONG MAX"
+if not SUPPLIED_LENGTH > LENGTH_MAX > LENGTH:
+    raise AssertionError("the faced-length limit does not reject an unfaced nut")
 
 # --- FIT-UP: the 82° countersinks for the four TL-VN-67 flat heads ------------
 SCREW_COUNT = len(HOLE_ANGLES_DEG)
 SCREW_MAJOR = THREAD_MAJOR_MM[SCREW_THREAD]
 CSK_ANGLE = SCREW_DIMS.head_angle_deg  # 82, the head's
-CSK_DIA = 4.6
-CSK_DIA_BAND = 0.1
-CSK_DIA_MIN = CSK_DIA - CSK_DIA_BAND
-# The cutter: no larger than Ø3/16, so its cone stays off the body. F2's
-# remedy for a nut that binds opens the countersinks (Main, 2026-11-04), never
-# past this cutter's full diameter.
+CSK_DIA = 4.6  # the modelled mouth, inside the band
+CSK_DIA_PLACES = 2
+# The cutter: no larger than Ø3/16, so its cone stays off the body
+# (CSK_CUTTER_TO_BODY). The band's maximum is its full diameter rounded down
+# to the band's places, so a conforming countersink is one that cutter can
+# cut. F2's remedy for a nut that binds opens the countersinks within this
+# band (Codjiflo 4475311242 on #2187), so every check below runs at its
+# limits and F2 types none of them.
 CSK_CUTTER_TEXT = "3/16"
 CSK_CUTTER_DIA_MAX = float(Fraction(CSK_CUTTER_TEXT)) * INCH  # 4.7625
-CSK_DIA_OPEN_MAX = CSK_CUTTER_DIA_MAX
+CSK_DIA_MIN = 4.50
+CSK_DIA_MAX = math.floor(CSK_CUTTER_DIA_MAX * 10**CSK_DIA_PLACES) / 10**CSK_DIA_PLACES  # 4.76
+if not CSK_DIA_MIN < CSK_DIA < CSK_DIA_MAX <= CSK_CUTTER_DIA_MAX:
+    raise AssertionError("the countersink band is not inside the cutter's reach")
 # ASSUMPTION: each countersink runs on its hole's axis to within 0.02 (an 82°
 # countersink centred in the drilled hole); TL-32's head-to-body stack-up
 # charges it.
@@ -170,6 +182,13 @@ CSK_ECCENTRICITY_MAX = 0.02
 # sharp-edge Ø.225 maximum reaches the nut body (TL-32 spec, HEAD_TO_BODY_*).
 # Oversize heads stop the fit-up for a report; the nut body is never cut.
 SCREW_HEAD_DIA_MAX = SCREW_DIMS.head_dia  # 5.3848, .212
+# SOURCED: ASME B18.6.3 #4 82° flat head, edge rounded or flat, Ø.212 max and
+# Ø.191 min (RC Fastener's B18.6.3-2002 flat-head table, read 2026-11-04:
+# https://www.rcfastener.com/documents/RC_Specs/Machine_Screw_Flat_Head_Dimensions.pdf).
+# McMaster's .212 is that maximum; any head F2 accepts lies between them.
+SCREW_HEAD_DIA_MIN = 0.191 * INCH  # 4.8514
+if not SCREW_HEAD_DIA_MIN < SCREW_HEAD_DIA_MAX:
+    raise AssertionError("the flat head's band is inverted")
 _TAN = math.tan(math.radians(CSK_ANGLE / 2.0))
 CSK_DEPTH = (CSK_DIA - HOLE_DIA) / (2.0 * _TAN)  # below the head face, nominal
 CSK_CUTTER_TO_BODY = (
@@ -178,14 +197,17 @@ CSK_CUTTER_TO_BODY = (
 )  # 0.40
 if CSK_CUTTER_TO_BODY <= 0.0:
     raise AssertionError("the countersink cutter reaches the nut body")
-# The flat head stands proud of every mouth: its top Ø (the catalogue .212)
-# exceeds the largest mouth, so the cone seats and the head top never meets
-# the countersink's rim.
+# The flat head stands proud of every mouth the band allows: its top Ø exceeds
+# the largest mouth even at B18.6.3's least head, so the cone seats and the
+# head top never meets the countersink's rim. Most proud: the largest head in
+# the least mouth; least proud: the least head in the largest mouth (at the
+# catalogue head, HEAD_PROUD_AT_MOUTH_MAX).
 HEAD_PROUD_NOMINAL = (SCREW_DIMS.head_dia - CSK_DIA) / (2.0 * _TAN)  # 0.45
-HEAD_PROUD_MAX = (SCREW_DIMS.head_dia - CSK_DIA_MIN) / (2.0 * _TAN)  # 0.51
-HEAD_PROUD_MIN = (SCREW_DIMS.head_dia - CSK_DIA_OPEN_MAX) / (2.0 * _TAN)  # 0.36
+HEAD_PROUD_MAX = (SCREW_HEAD_DIA_MAX - CSK_DIA_MIN) / (2.0 * _TAN)  # 0.51
+HEAD_PROUD_AT_MOUTH_MAX = (SCREW_HEAD_DIA_MAX - CSK_DIA_MAX) / (2.0 * _TAN)  # 0.36
+HEAD_PROUD_MIN = (SCREW_HEAD_DIA_MIN - CSK_DIA_MAX) / (2.0 * _TAN)  # 0.05
 if HEAD_PROUD_MIN <= 0.0:
-    raise AssertionError("a flat head sinks past an opened countersink's mouth")
+    raise AssertionError("a flat head sinks past the largest countersink's mouth")
 if CSK_DEPTH >= FLANGE_THICK_MIN:
     raise AssertionError("the countersink runs through the thinnest flange")
 # The head's cone bears on the countersink from the screw's underhead
@@ -216,7 +238,7 @@ SCREW_FULL_THREAD_MIN = (
 if SCREW_FULL_THREAD_MIN < leadscrew.ENGAGEMENT_TARGET_D * SCREW_MAJOR:
     raise AssertionError("the feed nut screws engage the lug under 2 D")
 # The longest reach past the lug face: the thinnest flange, the head least proud.
-SCREW_TIP_REACH_MAX = SCREW_LENGTH - FLANGE_THICK_MIN - HEAD_PROUD_MIN  # 12.2
+SCREW_TIP_REACH_MAX = SCREW_LENGTH - FLANGE_THICK_MIN - HEAD_PROUD_MIN  # 12.5
 # The nut's reach toward the near KP08 from the lug face: the body end. The
 # heads stand at most HEAD_PROUD_MAX above the flange, well short of it.
 REACH = LENGTH_MAX
@@ -228,9 +250,9 @@ _BODY_R_MAX = BODY_DIA_MAX / 2.0
 if not HOLE_PCD / 2.0 - HOLE_STATION_BAND - HOLE_R_MAX > _BODY_R_MAX:
     raise AssertionError("a flange hole breaks into the body")
 _CSK_SHIFT = HOLE_STATION_BAND + CSK_ECCENTRICITY_MAX
-if not HOLE_PCD / 2.0 + _CSK_SHIFT + CSK_DIA_OPEN_MAX / 2.0 < FLANGE_DIA / 2.0:
+if not HOLE_PCD / 2.0 + _CSK_SHIFT + CSK_DIA_MAX / 2.0 < FLANGE_DIA_MIN / 2.0:
     raise AssertionError("a countersink breaks out of the flange rim")
-if not HOLE_PCD / 2.0 - _CSK_SHIFT - CSK_DIA_OPEN_MAX / 2.0 > _BODY_R_MAX:
+if not HOLE_PCD / 2.0 - _CSK_SHIFT - CSK_DIA_MAX / 2.0 > _BODY_R_MAX:
     raise AssertionError("a countersink breaks into the body")
 if not BORE_DIA < BODY_DIA:
     raise AssertionError("the bore is wider than the body")
@@ -240,21 +262,21 @@ if not BORE_DIA < BODY_DIA:
 # timeout; the kit's machinist_exceptions RV-01, provisional): the Ø4.6
 # countersinks stay. A printed MIN covers everything the package allows: each
 # hole ±HOLE_STATION_BAND off its station on the Ø16 PCD (receipt), its
-# countersink CSK_ECCENTRICITY_MAX off the hole, the mouth opened to F2's
-# Ø3/16 cutter (CSK_DIA_OPEN_MAX, past the band's Ø4.7) and the body at its
-# receipt Ø10.3 maximum. The flange OD has no receipt minimum, so the OD wall
-# is taken to the listing's Ø22. Both are under the metric packages' 1.5
-# floor (drawing-guidelines rule 17). The supplied Ø3.5 holes alone already
-# leave less than the floor, nominal and at the receipt limits, so no
-# countersink on this bought nut meets it. CskDia's callout prints both
-# countersink walls, rounded down.
+# countersink CSK_ECCENTRICITY_MAX off the hole, the mouth at the band's
+# Ø4.76 maximum (CSK_DIA_MAX, where F2's opening stops), the body at its
+# receipt Ø10.3 maximum and the flange at its receipt Ø21.8 minimum
+# (FLANGE_DIA_MIN). Both are under the metric packages' 1.5 floor
+# (drawing-guidelines rule 17). The supplied Ø3.5 holes alone already leave
+# less than the floor, nominal and at the receipt limits, so no countersink on
+# this bought nut meets it. CskDia's callout prints both countersink walls,
+# rounded down.
 WALL_FLOOR = 1.5
-CSK_WALL_TO_BODY = HOLE_PCD / 2.0 - _CSK_SHIFT - CSK_DIA_OPEN_MAX / 2.0 - _BODY_R_MAX  # 0.399
-CSK_WALL_TO_OD = FLANGE_DIA / 2.0 - HOLE_PCD / 2.0 - _CSK_SHIFT - CSK_DIA_OPEN_MAX / 2.0  # 0.549
+CSK_WALL_TO_BODY = HOLE_PCD / 2.0 - _CSK_SHIFT - CSK_DIA_MAX / 2.0 - _BODY_R_MAX  # 0.40
+CSK_WALL_TO_OD = FLANGE_DIA_MIN / 2.0 - HOLE_PCD / 2.0 - _CSK_SHIFT - CSK_DIA_MAX / 2.0  # 0.45
 HOLE_WALL_TO_BODY = HOLE_PCD / 2.0 - HOLE_DIA / 2.0 - BODY_DIA / 2.0  # 1.15, nominal
 HOLE_WALL_TO_OD = FLANGE_DIA / 2.0 - HOLE_PCD / 2.0 - HOLE_DIA / 2.0  # 1.25, nominal
 HOLE_WALL_TO_BODY_MIN = HOLE_PCD / 2.0 - HOLE_STATION_BAND - HOLE_R_MAX - _BODY_R_MAX  # 1.00
-HOLE_WALL_TO_OD_MIN = FLANGE_DIA / 2.0 - HOLE_PCD / 2.0 - HOLE_STATION_BAND - HOLE_R_MAX  # 1.15
+HOLE_WALL_TO_OD_MIN = FLANGE_DIA_MIN / 2.0 - HOLE_PCD / 2.0 - HOLE_STATION_BAND - HOLE_R_MAX  # 1.05
 if not 0.0 < CSK_WALL_TO_BODY < CSK_WALL_TO_OD < WALL_FLOOR:
     raise AssertionError("the countersink walls are not the stated shortfall")
 if not max(HOLE_WALL_TO_BODY, HOLE_WALL_TO_OD) < WALL_FLOOR:
@@ -382,33 +404,122 @@ HOLE_VOLUME_MM3 = math.pi * (HOLE_DIA / 2.0) ** 2 * FLANGE_THICK
 CSK_VOLUME_MM3 = countersink_volume(CSK_DIA, HOLE_DIA)
 VOLUME_MM3 = BODY_VOLUME_MM3 - SCREW_COUNT * (HOLE_VOLUME_MM3 + CSK_VOLUME_MM3)
 
-# --- REWORK: native controls in the FeedNut configuration only (Codjiflo P2) ---
-# name -> (nominal, lower deviation, upper deviation, places), mm. FlangeThick
-# is a LIMIT (it prints 3.7/3.3); CskDia a symmetric ±. Both print at one
-# place, the band's. The 82° prints in CskDia's callout under the title
-# block's angular band; CskApexDepth drives it and does not print.
+# --- Native controls in the FeedNut configuration only (Codjiflo P2) ------------
+# name -> (nominal, lower deviation, upper deviation, places), mm. A LIMIT
+# prints its two limits; a MAX prints its nominal, which IS the limit, then
+# MAX (``_single_limit_tolerance``), the deviation below it the model's record
+# of the modelled size; a symmetric band prints ±. Each prints at its band's
+# places. The 82° prints in CskDia's callout under the title block's angular
+# band; CskApexDepth drives it and does not print.
 TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
 TOL_SYMMETRIC = 4  # swTolType_e.swTolSYMMETRIC
+TOL_MAX = 6  # swTolType_e.swTolMAX
+
+
+def _deviation(value: float) -> float:
+    return round(value, 6)
+
+
+# REWORK, in section F-F: the flange after facing (3.7/3.3), the countersink
+# mouth (4.76/4.50) and the faced length (13.8 MAX).
 REWORK_CONTROLS = {
     "FlangeThick": (
-        FLANGE_THICK, FLANGE_THICK_MIN - FLANGE_THICK, FLANGE_THICK_MAX - FLANGE_THICK, 1,
+        FLANGE_THICK,
+        _deviation(FLANGE_THICK_MIN - FLANGE_THICK),
+        _deviation(FLANGE_THICK_MAX - FLANGE_THICK),
+        1,
     ),
-    "CskDia": (CSK_DIA, -CSK_DIA_BAND, CSK_DIA_BAND, 1),
+    "CskDia": (
+        CSK_DIA,
+        _deviation(CSK_DIA_MIN - CSK_DIA),
+        _deviation(CSK_DIA_MAX - CSK_DIA),
+        CSK_DIA_PLACES,
+    ),
+    "FacedLength": (LENGTH_MAX, _deviation(LENGTH - LENGTH_MAX), 0.0, 1),
 }
-DIMENSION_TOLERANCE_TYPES = {"FlangeThick": TOL_LIMIT, "CskDia": TOL_SYMMETRIC}
+# RECEIPT, on the end view: the flange OD (22.2/21.8), the body (10.3 MAX),
+# the holes (3.60/3.46) and their PCD (16.0 ±0.1), as F1A measures them.
+RECEIPT_CONTROLS = {
+    "ReceiptFlangeDia": (FLANGE_DIA, -FLANGE_DIA_BAND, FLANGE_DIA_BAND, 1),
+    "ReceiptBodyDia": (BODY_DIA_MAX, _deviation(BODY_DIA - BODY_DIA_MAX), 0.0, 1),
+    "ReceiptHoleDia": (
+        HOLE_DIA, _deviation(HOLE_DIA_MIN - HOLE_DIA), _deviation(HOLE_DIA_MAX - HOLE_DIA), 2,
+    ),
+    "ReceiptHolePcd": (HOLE_PCD, -HOLE_PCD_BAND, HOLE_PCD_BAND, 1),
+}
+NATIVE_CONTROLS = {**REWORK_CONTROLS, **RECEIPT_CONTROLS}
+DIMENSION_TOLERANCE_TYPES = {
+    "FlangeThick": TOL_LIMIT,
+    "CskDia": TOL_LIMIT,
+    "FacedLength": TOL_MAX,
+    "ReceiptFlangeDia": TOL_LIMIT,
+    "ReceiptBodyDia": TOL_MAX,
+    "ReceiptHoleDia": TOL_LIMIT,
+    "ReceiptHolePcd": TOL_SYMMETRIC,
+}
+if set(DIMENSION_TOLERANCE_TYPES) != set(NATIVE_CONTROLS):
+    raise AssertionError("a native control has no tolerance type")
+for _name, (_nominal, _lower, _upper, _places) in NATIVE_CONTROLS.items():
+    if DIMENSION_TOLERANCE_TYPES[_name] == TOL_MAX and _upper != 0.0:
+        raise AssertionError(f"{_name}: a MAX's nominal is not its limit")
+
+# --- The carriers no feature dimension holds: hidden reference sketches ---------
+# The profile's dimensions are widths from the bore and the holes stand at
+# stations from the axis, so neither the receipt diameters nor the faced
+# length's limit is a feature dimension. Each is the driving dimension of its
+# own hidden construction entity (drawing-simplicity-policy, model
+# ownership); the entities' stations off the origin do not print.
+# ``ReceiptReference`` on Top (sketch (x, -z), the end view's): the flange OD,
+# the body at its maximum, the bolt circle and the +Z hole as construction
+# circles, each driven by its diameter. The hole's centre stands
+# ``ReceiptHoleStation`` off the origin, which does not print.
+RECEIPT_SKETCH = "ReceiptReference"
+# (diameter dimension, its value, centre in sketch (x, -z)), in creation order.
+RECEIPT_CIRCLES = (
+    ("ReceiptFlangeDia", FLANGE_DIA, (0.0, 0.0)),
+    ("ReceiptBodyDia", BODY_DIA_MAX, (0.0, 0.0)),
+    ("ReceiptHolePcd", HOLE_PCD, (0.0, 0.0)),
+    ("ReceiptHoleDia", HOLE_DIA, (0.0, -HOLE_PCD / 2.0)),  # the +Z hole
+)
+RECEIPT_HOLE_STATION = "ReceiptHoleStation"
+RECEIPT_DIMENSIONS = (
+    "ReceiptFlangeDia",
+    "ReceiptBodyDia",
+    "ReceiptHolePcd",
+    RECEIPT_HOLE_STATION,
+    "ReceiptHoleDia",
+)
+if {name for name, _, _ in RECEIPT_CIRCLES} != set(RECEIPT_CONTROLS) or any(
+    RECEIPT_CONTROLS[name][0] != value for name, value, _ in RECEIPT_CIRCLES
+):
+    raise AssertionError("the receipt circles are not the receipt controls")
+# ``FacedLengthReference`` on Front (section F-F's): a line from the seat face
+# along the body's -X silhouette, LENGTH_MAX long.
+FACED_LENGTH_SKETCH = "FacedLengthReference"
+FACED_LENGTH_START = (-BODY_DIA / 2.0, 0.0)
+FACED_LENGTH_DIMENSIONS = ("FacedLength", "FacedLengthStart")
+REFERENCE_SKETCHES = (RECEIPT_SKETCH, FACED_LENGTH_SKETCH)
+
 DRAWING_DIMENSIONS = {
     "NutProfile": {"FlangeThick"},
     "Countersink1Profile": {"CskDia"},
+    FACED_LENGTH_SKETCH: {"FacedLength"},
+    RECEIPT_SKETCH: set(RECEIPT_CONTROLS),
 }
 DRAWING_PRECISION = {
-    feature: {name: REWORK_CONTROLS[name][3] for name in names}
+    feature: {name: NATIVE_CONTROLS[name][3] for name in names}
     for feature, names in DRAWING_DIMENSIONS.items()
 }
 # One printed countersink stands for all four. The section shows the mouth
 # as a linear size, so the Ø is the native <MOD-DIAM> token in the prefix,
 # as build_sm_gooseneck / build_mg_magnifying_wheel print their diameters.
+# The hole circle's diameter prints its own Ø.
 CSK_PREFIX = f"{SCREW_COUNT}X <MOD-DIAM>"
 CSK_CALLOUT = f"{CSK_ANGLE:.0f}° CSK"
+DIMENSION_PREFIXES = {
+    ("Countersink1Profile", "CskDia"): CSK_PREFIX,
+    (RECEIPT_SKETCH, "ReceiptHoleDia"): f"{SCREW_COUNT}X ",
+}
 
 # --- Supplier reference sizes (the dimension image's, mm) ---------------------------
 # Drawn in the FeedNut panel of the kit's reference sheet: Front carries only
