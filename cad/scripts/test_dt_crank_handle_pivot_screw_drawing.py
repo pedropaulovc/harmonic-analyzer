@@ -397,7 +397,7 @@ def test_cup_wall_follows_ruling_b_without_changing_the_head_or_fit() -> None:
     assert spec.CUP_POCKET_CLEARANCE == cup.POCKET_CLEARANCE
     assert spec.POCKET_MAX == pytest.approx(cup.POCKET_DIA_MAX)
     assert spec.CUP_POCKET_WALL_FLOOR_MM == cup.POCKET_WALL_FLOOR_MM
-    assert spec.CUP_POCKET_WALL_MIN == cup.POCKET_STRAIGHT_WALL_MIN
+    assert spec.CUP_POCKET_WALL_MIN == cup.POCKET_WALL_MIN
     assert spec.CUP_POCKET_WALL_MIN >= spec.CUP_POCKET_WALL_FLOOR_MM
 
 

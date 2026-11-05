@@ -321,6 +321,7 @@ def _set_relief_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError("MHA-DT-32 ReliefDia did not keep its arrows inside")
 
 
+@_telemetry.traced("crank_handle_pivot_screw.relief_lead_detail")
 def _relief_lead_detail(adapter: Any, side: Any) -> Any:
     """Native 10:1 detail A of the relief lead on the side view
     (draw_dt_crank_handle._ferrule_seat_detail): fence, scale, outline, label

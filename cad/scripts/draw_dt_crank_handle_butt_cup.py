@@ -96,7 +96,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# Ø9.6 x 8.1 at 5:1 reads 48 x 41 on the sheet.
+# Ø10.72 x 8.64 at 5:1 reads 54 x 43 on the sheet.
 SHEET_SCALE = (5.0, 1.0)
 VIEW_SCALE = (5, 1)
 ISO_SCALE = (4, 1)

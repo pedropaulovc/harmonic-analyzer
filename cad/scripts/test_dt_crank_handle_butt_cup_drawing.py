@@ -75,7 +75,7 @@ def test_floor_and_pocket_wall_hold_their_floors_at_the_printed_limits() -> None
     assert spec.FLOOR_THICKNESS_MIN >= spec.WALL_FLOOR_MM
     assert spec.POCKET_WALL_FLOOR_MM == spec.WALL_FLOOR_MM == WALL_FLOOR_MM
     assert spec.POCKET_WALL_MIN >= spec.POCKET_WALL_FLOOR_MM
-    assert screw.CUP_POCKET_WALL_MIN == spec.POCKET_STRAIGHT_WALL_MIN
+    assert screw.CUP_POCKET_WALL_MIN == spec.POCKET_WALL_MIN
     assert screw.POCKET_MAX <= spec.POCKET_DIA_MAX
     assert spec.BODY_DIA - spec.BODY_DIA_TOL >= (
         spec.POCKET_DIA_MAX

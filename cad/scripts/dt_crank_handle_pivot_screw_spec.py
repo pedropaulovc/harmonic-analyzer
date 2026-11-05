@@ -287,9 +287,15 @@ HEAD_RECESS_WORST = round(
     6,
 )
 # The pocket is bored to suit the actual head, so its wall is judged at the
-# largest head plus the widest clearance, inside the smallest cup body.
+# largest head plus the widest clearance, inside the smallest cup body, at the
+# cup's outer face, where the pocket mouth and the body's face edge each take
+# the cup sheet's edge break (#2170).
 POCKET_MAX = HEAD_DIA + HEAD_DIA_TOL + CUP_POCKET_CLEARANCE[1]
-CUP_POCKET_WALL_MIN = round(((CUP_BODY_DIA - CUP_BODY_DIA_TOL) - POCKET_MAX) / 2.0, 6)
+CUP_POCKET_WALL_MIN = round(
+    ((CUP_BODY_DIA - CUP_BODY_DIA_TOL) - POCKET_MAX) / 2.0
+    - 2.0 * edge_break_chamfer_mm(unit=CUP_UNIT),
+    6,
+)
 # The slot's worst-case web: the shortest head under the deepest slot.
 SLOT_WEB_MIN = round(
     HEAD_LENGTH - HEAD_LENGTH_TOL - (SLOT_DEPTH + SLOT_DEPTH_TOL), 6
@@ -490,7 +496,8 @@ for _ok, _what in (
     (
         # Owner ruling B on #1375: the cup body grows; the head and fit stay unchanged.
         CUP_POCKET_WALL_MIN >= CUP_POCKET_WALL_FLOOR_MM,
-        "the MHA-DT-35 pocket bored to suit the largest head leaves under its .060 wall",
+        "the MHA-DT-35 pocket bored to suit the largest head leaves under its .060 "
+        "wall at the cup's broken face",
     ),
     (HEAD_BEARING_RADIAL_MIN >= 0.1, "under 0.1 mm of under-head bearing on the cup floor"),
     (
