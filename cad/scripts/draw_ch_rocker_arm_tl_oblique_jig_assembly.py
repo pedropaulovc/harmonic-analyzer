@@ -31,7 +31,7 @@ import _telemetry
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_jig_assembly_spec as spec
 from _check import check
-from _com import _early_bound
+from _com import _com_invoke, _early_bound
 from _component_references import component_identity, component_reference_names
 from _session import run_build
 from _drawing_common import (
@@ -44,9 +44,13 @@ from _drawing_common import (
 )
 from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_balloons import (
+    _BALLOON_CLEARANCE_M,
     BalloonAnchor,
     BalloonLanding,
+    _leaf_pose,
     _spread_balloons,
+    _view_component_leaves,
+    _view_explode_offsets,
     add_component_bom_balloons,
     assert_balloon_landings,
     isolate_drawing_view_components,
@@ -78,6 +82,7 @@ from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
+from _drawing_ray_pick import ViewRayCaster
 from _simplified_names import simplified_name
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 from solidworks_mcp.adapters.com_variant import double_array
@@ -580,14 +585,6 @@ BALLOON_ANCHORS[spec.T_NUT] = BalloonAnchor(
     point_mm=(0.0, spec.t_nut.FOOT_HEIGHT, spec.t_nut.FOOT_WIDTH / 2.0),
     instance=spec.instance_name(spec.T_NUT, len(spec.T_NUT_PLACEMENTS) - 1),
 )
-# Review jig-asm r1: balloon 19 crossed rail 2's bar to reach bar 1's near
-# stud; it lands on rail 2's far stud, the one beside it (STUD_XY order:
-# bar 1 near and far, then bar 2).
-BALLOON_ANCHORS[spec.HOLD_DOWN_STUD] = BalloonAnchor(
-    instance=spec.instance_name(
-        spec.HOLD_DOWN_STUD, len(spec.HOLD_DOWN_STUD_PLACEMENTS) - 1
-    ),
-)
 # TL-00 review (farm 20261104T210601055Z, balloon 22): the default walk landed
 # on rail 1's spindle-end screw, mid-sheet, so the leader from the left ring
 # crossed the left T-nut, bar 1 and its rail. It lands on the screw nearest
@@ -598,6 +595,153 @@ BALLOON_ANCHORS[spec.RAIL_SCREW] = BalloonAnchor(
     point_mm=(spec.rail_screw.DIMS.head_dia / 2.0, spec.rail_screw.DIMS.head_h, 0.0),
     instance=spec.instance_name(spec.RAIL_SCREW, len(spec.guide_rail.HOLE_X) - 1),
 )
+# TL-00 review (farm 20261105T054045952Z, sheet 5): three leadscrew-feed walks
+# landed on junctions. Balloon 4's took the feed block's lower corner, where
+# the block, the HGH15CA carriage's top and the leadscrew meet, its leader
+# run up through the carriage (item 13, ballooned on sheet 3), so the
+# carriage read as item 4; balloon 15's took the leadscrew's near end inside
+# the near KP08's bore, and 17's the KP08 foot on its bracket. Each now lands
+# on a clear edge of its own part, its leader leaving along a declared open
+# route (BALLOON_APPROACH_DEG):
+# - the feed block's spindle-end (part -X) face, on its edge with the lug-side
+#   (-Y) face a quarter up: below the nut and its screws, clear of the
+#   carriage and the leadscrew below; out to the upper right, above 25's;
+# - the leadscrew's far end, which stands past the far KP08 where the
+#   handwheel slid off: its end chamfer's outer circle on the operator's
+#   side (part -Z; the handwheel set screw's flat is on +X and ends short
+#   of it); out to the lower left, under the handwheel and clear of the far
+#   KP08 and its screws;
+# - the near KP08's spindle-side face (part -Y), on its boss rim 60 degrees
+#   up from the outboard (+X) side: off the bore and the screw end in it,
+#   above the foot and the bracket; out to the right, under its lifted
+#   outboard screw.
+BALLOON_ANCHORS[spec.FEED_BLOCK] = BalloonAnchor(
+    point_mm=(
+        spec.feed_block.BLOCK_X0,
+        -spec.feed_block.BLOCK_WIDTH / 2.0,
+        spec.feed_block.BLOCK_HEIGHT / 4.0,
+    )
+)
+BALLOON_ANCHORS[spec.LEADSCREW] = BalloonAnchor(
+    point_mm=(
+        0.0,
+        spec.leadscrew_stock.LENGTH - spec.leadscrew_stock.END_CHAMFER,
+        -spec.leadscrew_stock.MAJOR_DIA / 2.0,
+    ),
+    instance=spec.instance_name(spec.LEADSCREW, 0),
+)
+KP08_RIM_DEG = 60.0
+BALLOON_ANCHORS[spec.PILLOW_BLOCK] = BalloonAnchor(
+    point_mm=(
+        spec.pillow_block.BOSS_RADIUS * math.cos(math.radians(KP08_RIM_DEG)),
+        -spec.pillow_block.WIDTH / 2.0,
+        spec.pillow_block.AXIS_HEIGHT
+        + spec.pillow_block.BOSS_RADIUS * math.sin(math.radians(KP08_RIM_DEG)),
+    ),
+    instance=spec.instance_name(spec.PILLOW_BLOCK, 0),
+)
+# The same run's replay of every walked leader on sheets 3-6 (the spec's
+# exploded poses and part envelopes, ray-cast frontmost) found seven more
+# crossing or landing against another part. Each is frozen the same way:
+# - 25 (KP08 screw) ran over the near KP08's boss to the screw end in its
+#   foot: it lands on that KP08's lifted outboard screw (kp08-screw-2, alone
+#   in white space), its head's flat-top rim on the sheet-right side; out to
+#   the upper right, between 17's and 4's;
+# - 11 (end bracket) crossed a bracket screw to the bracket's foot corner:
+#   it lands on the near bracket's outboard (+X) end, on its edge with the
+#   spindle-side (-Y) face, mid-height, under the KP08's foot; out to the
+#   lower right, over the bracket screws;
+# - 3 (pivot block, sheet 3) landed on the block's bottom corner over bar 2:
+#   it lands on the block's outboard (+X, +Y) vertical edge, mid-height, the
+#   corner nearest the ring, with white paper behind it; out to the lower
+#   right;
+# - 19 (hold-down stud, sheet 3) crossed bar 2's front edge to rail 2's far
+#   stud: it lands on bar 2's near stud (the bars' junction), on its upper
+#   cut-end chamfer boundary on the side away from the bar; out to the upper
+#   right, past the flange nut;
+# - 7 (pivot shim, sheet 4) ran across the feed block's top to the shims
+#   stacked on its lug: it lands on the pivot block's stack instead, on the
+#   top shim's outer top rim, the far side from the block; out to the upper
+#   right;
+# - 8 (riser, sheet 6) landed on the riser's end corner on the carrier: it
+#   lands on the riser's back top long edge, 60 from its end, between its
+#   screws; straight up, right of the CL dowel's leader;
+# - 10 (feed lever, sheet 6) crossed the riser to the lever's inner end: it
+#   lands on the lever's top front long edge near the grip end, where the
+#   lever stands past the carrier; out to the left.
+# Balloons 28 and 29 (the lever screws and their lock washers) stay walked:
+# the explode leaves both inside the riser's outline on the sheet, so every
+# rim of theirs is within LANDING_CLEARANCE_M of the riser and every route
+# out crosses it.
+BALLOON_ANCHORS[spec.PILLOW_BLOCK_SCREW] = BalloonAnchor(
+    point_mm=(
+        spec.kp08_screw.DIMS.flat_top_dia / 2.0 * math.cos(math.radians(45.0)),
+        spec.kp08_screw.DIMS.head_h,
+        spec.kp08_screw.DIMS.flat_top_dia / 2.0 * math.sin(math.radians(45.0)),
+    ),
+    instance=spec.instance_name(spec.PILLOW_BLOCK_SCREW, 1),
+)
+BALLOON_ANCHORS[spec.END_BRACKET] = BalloonAnchor(
+    point_mm=(
+        spec.leadscrew.BRACKET_LENGTH,
+        -spec.leadscrew.BRACKET_WIDTH / 2.0,
+        spec.leadscrew.BRACKET_THICK / 2.0,
+    ),
+    instance=spec.instance_name(spec.END_BRACKET, 0),
+)
+BALLOON_ANCHORS[spec.PIVOT_BLOCK] = BalloonAnchor(
+    point_mm=(
+        spec.pivot_block.BLOCK_X1,
+        spec.pivot_block.BLOCK_WIDTH / 2.0,
+        spec.pivot_block.BLOCK_HEIGHT / 2.0,
+    )
+)
+STUD_RIM_DEG = 210.0
+BALLOON_ANCHORS[spec.HOLD_DOWN_STUD] = BalloonAnchor(
+    point_mm=(
+        spec.hold_down_stud.RADIUS * math.cos(math.radians(STUD_RIM_DEG)),
+        spec.hold_down_stud.LENGTH - spec.hold_down_stud.CUT_END_CHAMFER_MAX,
+        spec.hold_down_stud.RADIUS * math.sin(math.radians(STUD_RIM_DEG)),
+    ),
+    instance=spec.instance_name(spec.HOLD_DOWN_STUD, 2),
+)
+SHIM_RIM_DEG = 150.0
+BALLOON_ANCHORS[spec.PIVOT_SHIM] = BalloonAnchor(
+    point_mm=(
+        spec.pivot_shim.OD / 2.0 * math.cos(math.radians(SHIM_RIM_DEG)),
+        spec.pivot_shim.OD / 2.0 * math.sin(math.radians(SHIM_RIM_DEG)),
+        spec.pivot_shim.THICKNESS,
+    ),
+    instance=spec.instance_name(spec.PIVOT_SHIM, len(spec.PLACEMENTS[spec.PIVOT_SHIM]) - 1),
+)
+BALLOON_ANCHORS[spec.RISER] = BalloonAnchor(
+    point_mm=(60.0, spec.riser.BLANK_WIDTH, spec.riser.THICKNESS)
+)
+BALLOON_ANCHORS[spec.FEED_LEVER] = BalloonAnchor(
+    point_mm=(280.0, spec.feed_lever.LEVER_THICK, -spec.feed_lever.LEVER_WIDTH)
+)
+# The sheet direction, degrees anticlockwise from the sheet's +X, in which a
+# declared balloon's leader leaves its landing: _ring_balloons sets the
+# balloon where that ray meets the ring, and _assert_declared_leaders_clear
+# proves the settled leader crosses no other shown component and lands at
+# least LANDING_CLEARANCE_M from one. Undeclared balloons keep the ring's
+# attachment-angle slots.
+BALLOON_APPROACH_DEG = {
+    # Sheet 3.
+    spec.PIVOT_BLOCK: -20.0,
+    spec.HOLD_DOWN_STUD: 40.0,
+    # Sheet 4.
+    spec.PIVOT_SHIM: 35.0,
+    # Sheet 5.
+    spec.FEED_BLOCK: 20.0,
+    spec.LEADSCREW: 225.0,
+    spec.PILLOW_BLOCK: 10.0,
+    spec.PILLOW_BLOCK_SCREW: 35.0,
+    spec.END_BRACKET: -30.0,
+    # Sheet 6.
+    spec.RISER: 90.0,
+    spec.FEED_LEVER: 180.0,
+}
 
 EXPLODED_VIEW_NAMES = {
     ASSEMBLY_VIEW_CONFIGURATION: spec.EXPLODED_VIEW_NAME,
@@ -1773,19 +1917,84 @@ def uncrossed_ring_slots(
     )
 
 
+def approach_ring_centre(
+    outline: tuple[float, float, float, float],
+    attachment: tuple[float, float],
+    degrees: float,
+    *,
+    margin: float = BALLOON_MARGIN,
+) -> tuple[float, float]:
+    """Where the ray from ``attachment`` at ``degrees`` (anticlockwise from
+    the sheet's +X) meets the ellipse ``_spread_balloons`` rings circle
+    centres on: ``margin`` outside ``outline``, about its centre."""
+    x0, y0, x1, y1 = outline
+    rx, ry = (x1 - x0) / 2.0 + margin, (y1 - y0) / 2.0 + margin
+    ax = (attachment[0] - (x0 + x1) / 2.0) / rx
+    ay = (attachment[1] - (y0 + y1) / 2.0) / ry
+    dx, dy = math.cos(math.radians(degrees)), math.sin(math.radians(degrees))
+    bx, by = dx / rx, dy / ry
+    a, b, c = bx * bx + by * by, 2.0 * (ax * bx + ay * by), ax * ax + ay * ay - 1.0
+    if c >= 0.0:
+        raise ValueError(f"attachment {attachment!r} is not inside the balloon ring")
+    t = (-b + math.sqrt(b * b - 4.0 * a * c)) / (2.0 * a)
+    return (attachment[0] + t * dx, attachment[1] + t * dy)
+
+
+def approached_ring_slots(
+    centres: Sequence[tuple[float, float]],
+    attachments: Sequence[tuple[float, float]],
+    approaches: Mapping[int, float],
+    *,
+    outline: tuple[float, float, float, float],
+    radius: float,
+    names: Sequence[str],
+) -> tuple[list[tuple[float, float]], list[int]]:
+    """The ring with each declared balloon (index -> approach degrees) moved
+    to where its approach meets the ring, and :func:`uncrossed_ring_slots`
+    over it. Refused: a declared circle whose box (the audit's, see
+    ``_drawing_balloons._min_angular_gap``) comes within
+    ``_BALLOON_CLEARANCE_M`` of another's, and an uncrossing that would move
+    a declared balloon off its approach."""
+    placed = list(centres)
+    for index, degrees in approaches.items():
+        placed[index] = approach_ring_centre(outline, attachments[index], degrees)
+    gap = 2.0 * radius + _BALLOON_CLEARANCE_M
+    for index in approaches:
+        for other, centre in enumerate(placed):
+            dx = abs(centre[0] - placed[index][0])
+            dy = abs(centre[1] - placed[index][1])
+            if other != index and max(dx, dy) < gap:
+                raise RuntimeError(
+                    f"balloon ring: {names[index]}'s approach puts it "
+                    f"{max(dx, dy) * 1000.0:.1f} mm from {names[other]}'s, "
+                    f"under {gap * 1000.0:.1f} mm"
+                )
+    slots = uncrossed_ring_slots(placed, attachments)
+    crossed = [names[index] for index in approaches if slots[index] != index]
+    if crossed:
+        raise RuntimeError(
+            f"balloon ring: declared approaches of {crossed} cross another leader"
+        )
+    return placed, slots
+
+
 def _ring_balloons(
     adapter: Any, view: Any, landings: Sequence[BalloonLanding], *, label: str
 ) -> None:
     """Ring every one of ``view``'s balloons together, ``BALLOON_MARGIN``
-    outside its outline, then move them between their own ring slots until no
-    two leaders cross (:func:`uncrossed_ring_slots`); attachments stay."""
+    outside its outline, set each declared one (``BALLOON_APPROACH_DEG``)
+    where its approach meets that ring, then move them between their own ring
+    slots until no two leaders cross (:func:`approached_ring_slots`);
+    attachments stay."""
+    # _spread_balloons rings on the outline it reads first: read it the same.
+    outline = _view_outline(view, label=label)
     _spread_balloons(
         adapter, view, [landing.note for landing in landings], margin=BALLOON_MARGIN
     )
     rebuild_drawing(adapter, label=f"{label} ring")
-    annotations, centres, offsets, attachments = [], [], [], []
+    annotations, centres, offsets, attachments, radii = [], [], [], [], []
     for landing in landings:
-        x, y, _radius = rendered_balloon_circle(landing.note, label=label)
+        x, y, radius = rendered_balloon_circle(landing.note, label=label)
         annotation = _early_bound(
             _early_bound(landing.note, "INote").GetAnnotation(), "IAnnotation"
         )
@@ -1799,9 +2008,26 @@ def _ring_balloons(
         centres.append((x, y))
         offsets.append((anchor[0] - x, anchor[1] - y))
         attachments.append((points[-3], points[-2]))
-    slots = uncrossed_ring_slots(centres, attachments)
-    moved = [index for index, slot in enumerate(slots) if slot != index]
-    for index in moved:
+        radii.append(radius)
+    approaches = {
+        index: BALLOON_APPROACH_DEG[landing.stem]
+        for index, landing in enumerate(landings)
+        if landing.stem in BALLOON_APPROACH_DEG
+    }
+    names = [landing.instance for landing in landings]
+    try:
+        centres, slots = approached_ring_slots(
+            centres,
+            attachments,
+            approaches,
+            outline=outline,
+            radius=max(radii),
+            names=names,
+        )
+    except RuntimeError as error:
+        raise RuntimeError(f"{label}: {error}") from error
+    swapped = [index for index, slot in enumerate(slots) if slot != index]
+    for index in sorted({*swapped, *approaches}):
         x, y = centres[slots[index]]
         if not annotations[index].SetPosition(
             x + offsets[index][0], y + offsets[index][1], 0.0
@@ -1809,15 +2035,207 @@ def _ring_balloons(
             raise RuntimeError(
                 f"{label}: failed to move {landings[index].instance} balloon"
             )
-    if moved:
+    if approaches:
         _telemetry.info(
-            f"{label}: swapped ring slots to uncross leaders: "
+            f"{label}: set on their approaches: "
             + ", ".join(
-                f"{landings[index].instance} -> {landings[slots[index]].instance}'s"
-                for index in moved
+                f"{names[index]} at {degrees:.0f} deg"
+                for index, degrees in approaches.items()
             )
         )
+    if swapped:
+        _telemetry.info(
+            f"{label}: swapped ring slots to uncross leaders: "
+            + ", ".join(f"{names[index]} -> {names[slots[index]]}'s" for index in swapped)
+        )
+    if swapped or approaches:
         rebuild_drawing(adapter, label=f"{label} uncrossed")
+
+
+# A declared balloon's settled leader is probed every LEADER_PROBE_STEP_M
+# from its balloon to its landing, and round its landing at LANDING_PROBES
+# points LANDING_CLEARANCE_M out, by the balloon anchors' own ray caster
+# (_drawing_ray_pick.ViewRayCaster): wherever the view draws a component in
+# front, that component must be the balloon's own. The narrowest ink on the
+# leadscrew feed sheet, a #4-40 nut screw at 1:3, is 0.95 mm across, wider
+# than either spacing (0.25 and 0.26 mm), so no component slips between two
+# probes.
+LEADER_PROBE_STEP_M = 2.5e-4
+LANDING_CLEARANCE_M = 1.0e-3
+LANDING_PROBES = 24
+# Each probe's model point stands this far behind the sheet plane through the
+# model origin, so every body on its line of sight lies in front of it and
+# the caster lists them all, nearest the viewer first.
+_PROBE_DEPTH_M = 10.0
+
+
+def leader_probe_points(
+    leader: Sequence[tuple[float, float]], *, step: float = LEADER_PROBE_STEP_M
+) -> list[tuple[float, float]]:
+    """Sheet points no more than ``step`` apart along ``leader`` (its balloon
+    end first), both ends included."""
+    points = [leader[0]]
+    for start, end in zip(leader, leader[1:]):
+        count = max(1, math.ceil(math.dist(start, end) / step))
+        points += [
+            (
+                start[0] + (end[0] - start[0]) * k / count,
+                start[1] + (end[1] - start[1]) * k / count,
+            )
+            for k in range(1, count + 1)
+        ]
+    return points
+
+
+def landing_probe_points(
+    landing: tuple[float, float],
+    *,
+    radius: float = LANDING_CLEARANCE_M,
+    count: int = LANDING_PROBES,
+) -> list[tuple[float, float]]:
+    """``count`` sheet points on the circle ``radius`` round ``landing``."""
+    return [
+        (
+            landing[0] + radius * math.cos(2.0 * math.pi * k / count),
+            landing[1] + radius * math.sin(2.0 * math.pi * k / count),
+        )
+        for k in range(count)
+    ]
+
+
+def leader_clearance_failures(
+    what: str,
+    own: str,
+    route: Sequence[tuple[float, float]],
+    route_drawn: Sequence[str | None],
+    ring: Sequence[tuple[float, float]],
+    ring_drawn: Sequence[str | None],
+) -> list[str]:
+    """How a leader fails its clearance: ``route_drawn`` and ``ring_drawn``
+    name the instance the view draws in front at each point of its
+    ``route`` and of the ``ring`` round its landing (None: nothing). Any but
+    ``own`` is a crossing on the route and a junction on the ring."""
+    failures = []
+    for where, points, drawn in (
+        ("crosses", route, route_drawn),
+        (f"lands within {LANDING_CLEARANCE_M * 1000.0:.1f} mm of", ring, ring_drawn),
+    ):
+        if len(points) != len(drawn):
+            raise ValueError(f"{what}: one drawn instance per probe point")
+        foreign: dict[str, tuple[float, float]] = {}
+        for point, name in zip(points, drawn):
+            if name is not None and name.casefold() != own.casefold():
+                foreign.setdefault(name, point)
+        failures += [
+            f"{what} {where} {name} at ({x * 1000.0:.1f}, {y * 1000.0:.1f}) mm"
+            for name, (x, y) in sorted(foreign.items())
+        ]
+    return failures
+
+
+def sheet_point_in_model(
+    values: Sequence[float],
+    normal: Sequence[float],
+    xy: tuple[float, float],
+    *,
+    depth: float = _PROBE_DEPTH_M,
+) -> tuple[float, float, float]:
+    """A model point the view draws at sheet ``xy``, ``depth`` behind the
+    sheet plane through the model origin along the view's ``normal``.
+
+    ``values`` is ``IView::ModelToViewTransform``'s ``ArrayData``: sheet =
+    scale * (x * row 0 + y * row 1 + z * row 2) + translation, rows 0-8,
+    translation 9-11, scale 12 (``_drawing_ray_pick._to_model``'s layout).
+    Solved by Cramer's rule, so a scale folded into the rows inverts too."""
+    r0, r1, r2 = values[0:3], values[3:6], values[6:9]
+    q = (
+        (xy[0] - values[9]) / values[12],
+        (xy[1] - values[10]) / values[12],
+        0.0,  # the model origin's own sheet depth, values[11]
+    )
+
+    def triple(a: Sequence[float], b: Sequence[float], c: Sequence[float]) -> float:
+        return (
+            a[0] * (b[1] * c[2] - b[2] * c[1])
+            - a[1] * (b[0] * c[2] - b[2] * c[0])
+            + a[2] * (b[0] * c[1] - b[1] * c[0])
+        )
+
+    det = triple(r0, r1, r2)
+    if abs(det) < 1e-12:
+        raise RuntimeError("drawing view's model-to-sheet transform is singular")
+    point = (triple(q, r1, r2) / det, triple(r0, q, r2) / det, triple(r0, r1, q) / det)
+    return tuple(point[i] - normal[i] * depth for i in range(3))
+
+
+def _assert_declared_leaders_clear(
+    adapter: Any, view: Any, landings: Sequence[BalloonLanding], *, label: str
+) -> None:
+    """Prove each declared balloon's settled leader crosses no other shown
+    component and lands at least ``LANDING_CLEARANCE_M`` from one.
+
+    What the view draws in front at a sheet point is read as the balloon
+    anchors read it (``add_component_bom_balloons``): the view's shown
+    leaves posed with their explode, one ``RayIntersections`` per body. Run
+    with the explode's configuration active on the source
+    (``_source_configuration_active``), after the ring's last move."""
+    leaves = _view_component_leaves(adapter, view, label=label)
+    offsets = _view_explode_offsets(adapter, view, label=label)
+    caster = ViewRayCaster(
+        adapter,
+        view,
+        leaves,
+        lambda leaf: _leaf_pose(adapter, leaf, offsets, label=label),
+        label=label,
+    )
+    transform = _com_invoke(view, "IView", "ModelToViewTransform")
+    values = tuple(
+        float(value)
+        for value in (_com_invoke(transform, "IMathTransform", "ArrayData") or ())
+    )
+    if len(values) < 13 or values[12] == 0.0:
+        raise RuntimeError(f"{label}: unreadable model-to-sheet transform {values!r}")
+    probes = []
+    for landing in landings:
+        annotation = _early_bound(
+            _early_bound(landing.note, "INote").GetAnnotation(), "IAnnotation"
+        )
+        raw = tuple(
+            float(value) for value in (annotation.GetLeaderPointsAtIndex(0) or ())
+        )
+        if len(raw) < 6 or len(raw) % 3:
+            raise RuntimeError(f"{label}: {landing.instance} balloon leader is unreadable")
+        leader = [(raw[k], raw[k + 1]) for k in range(0, len(raw), 3)]
+        probes.append(
+            (landing, leader_probe_points(leader), landing_probe_points(leader[-1]))
+        )
+    candidates = [
+        (landing.instance, sheet_point_in_model(values, caster.normal, point))
+        for landing, route, ring in probes
+        for point in (*route, *ring)
+    ]
+    drawn = [
+        pick.covered_by[0] if pick.covered_by else None
+        for pick in caster.probe(candidates, label=f"{label} leader clearance")
+    ]
+    failures, start = [], 0
+    for landing, route, ring in probes:
+        middle, end = start + len(route), start + len(route) + len(ring)
+        failures += leader_clearance_failures(
+            f"{landing.stem} balloon",
+            landing.instance,
+            route,
+            drawn[start:middle],
+            ring,
+            drawn[middle:end],
+        )
+        start = end
+    if failures:
+        raise RuntimeError(f"{label}: " + "; ".join(failures))
+    _telemetry.info(
+        f"{label}: {', '.join(landing.instance for landing, _r, _g in probes)} "
+        f"leaders clear over {len(candidates)} probes"
+    )
 
 
 # ring_fit_shift, ring_keep_out_shift_x, cluster_ring_fit and the ladder walk
@@ -2415,7 +2833,8 @@ def _balloon_cluster(
     items: Sequence[tuple[str, str]],
     bom_name: str,
 ) -> list[BalloonLanding]:
-    """One BOM-linked ring with one real-edge balloon per family."""
+    """One BOM-linked ring with one real-edge balloon per family; each
+    declared balloon's leader proven clear once the ring is placed."""
     _activate_sheet(adapter, cluster.sheet)
     label = f"jig {cluster.sheet.lower()}"
     _link_view_to_bom(view, bom_name, label=label)
@@ -2437,6 +2856,12 @@ def _balloon_cluster(
             f"{sorted(landing.stem for landing in landings)!r}, "
             f"expected one for each of {sorted(cluster.stems)!r}"
         )
+    declared = [landing for landing in landings if landing.stem in BALLOON_APPROACH_DEG]
+    if declared:
+        with _source_configuration_active(view, label=label):
+            _assert_declared_leaders_clear(
+                adapter, view, declared, label=f"{label} leaders"
+            )
     return landings
 
 

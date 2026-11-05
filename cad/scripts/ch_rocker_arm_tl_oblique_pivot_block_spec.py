@@ -85,9 +85,9 @@ CBORE_FLOOR_REFERENCE = "CboreFloorReference"
 CARRIAGE_THREAD_DEPTH = 5.0  # the HGH15CA's M4 x 5 (vendor)
 CBORE_SECTION_PLANE = "CboreSectionPlane"
 CBORE_SECTION_X = BOLT_X  # B-B cuts the +X hole column
-# Hidden construction sketch on the top face: a line on the -X edge and
-# circles on the bore and one hole per column, so the plan's X ordinates start
-# on that edge (rule 10) while staying model dimensions.
+# Hidden reference sketch on the top face: a plain line on the -X edge and
+# construction circles on the bore and one hole per column, so the plan's X
+# ordinates start on that edge (rule 10) while staying model dimensions.
 PLAN_DATUM_REFERENCE = "PlanDatumReference"
 PLAN_DATUM_HOLES = ((-BOLT_X, BOLT_Y), (BOLT_X, BOLT_Y))
 DRAWING_VALUES = {

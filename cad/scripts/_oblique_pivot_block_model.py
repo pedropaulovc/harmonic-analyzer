@@ -230,15 +230,26 @@ async def _circles(adapter, plane, z, profile, circles, *, side=False):
     dims.apply(adapter, profile)
 
 
-async def _construction(adapter, create, label: str) -> str:
-    """One construction entity, drawn without inference (no snap to the
-    model edges it lies on), so only the dimensions below define it.
-    ``create`` is the un-awaited adapter call; it runs inside the mode."""
+async def _drawn(adapter, create, label: str) -> str:
+    """One sketch entity, drawn without inference (no snap to the model
+    edges it lies on), so only the dimensions below define it. ``create``
+    is the un-awaited adapter call; it runs inside the mode.
+
+    A line ON a printed outline stays a plain sketch line, as the base bar's
+    and end bracket's reference lines do: shown in its view, a construction
+    line's dash font prints over the outline, which then reads broken by
+    dashes (TL-32 machinist review, farm run 20261105T054045952Z: the plan's
+    -X edge and lug -X face, VIEW D's lug end; TL-22's -X edge the same)."""
     set_sketch_direct_db(adapter, True)
     try:
-        entity = check(label, await create)
+        return check(label, await create)
     finally:
         set_sketch_direct_db(adapter, False)
+
+
+async def _construction(adapter, create, label: str) -> str:
+    """One construction entity, drawn as :func:`_drawn`."""
+    entity = await _drawn(adapter, create, label)
     _as_construction(adapter, entity)
     return entity
 
@@ -265,18 +276,18 @@ async def _construction_circle(adapter, dims, base, base_uv, uv, dia, names, lab
 
 async def _plan_datum_reference(adapter, part) -> None:
     """The hidden top-face sketch that carries the plan's X ordinates from
-    the -X edge (rule 10): a construction line ON that edge, construction
-    circles ON the shoulder seat and one carriage hole per column, and on
-    TL-32 a line ON the lug's -X face, which also carries the overall from the
-    top (+Y) edge. Shown in the plan view, every entity overlies a real edge."""
+    the -X edge (rule 10): a plain line ON that edge, construction circles ON
+    the shoulder seat and one carriage hole per column, and on TL-32 a plain
+    line ON the lug's -X face, which also carries the overall from the top
+    (+Y) edge. Shown in the plan view, every entity overlies a real edge."""
     feature = spec.PLAN_DATUM_REFERENCE
     z = part.BLOCK_HEIGHT
     check(f"create_sketch {feature}", await adapter.create_sketch("TopFace"))
     at = _xy_mapper(adapter, z, feature)
     dims = SketchDims()
     edge_start, edge_end = at(part.BLOCK_X0, -part.BLOCK_WIDTH / 2), at(part.BLOCK_X0, part.BLOCK_WIDTH / 2)
-    edge = await _construction(adapter, adapter.add_line(edge_start[0], edge_start[1], edge_end[0], edge_end[1]),
-                               f"{feature} -X edge")
+    edge = await _drawn(adapter, adapter.add_line(edge_start[0], edge_start[1], edge_end[0], edge_end[1]),
+                        f"{feature} -X edge")
     check(f"{feature} -X edge vertical", await adapter.add_sketch_constraint(edge, None, "vertical"))
     await anchor_point_to_origin(adapter, f"{edge}.start", *edge_start, f"{feature} -X edge foot")
     dims.record("PlanEdgeX")
@@ -293,8 +304,8 @@ async def _plan_datum_reference(adapter, part) -> None:
                                    f"{feature} carriage hole column {i}")
     if hasattr(part, "LUG_WIDTH"):
         lug_top, lug_end = at(part.LUG_X0, part.LUG_Y1), at(part.LUG_X0, part.LUG_Y0)
-        lug = await _construction(adapter, adapter.add_line(lug_top[0], lug_top[1], lug_end[0], lug_end[1]),
-                                  f"{feature} lug -X face")
+        lug = await _drawn(adapter, adapter.add_line(lug_top[0], lug_top[1], lug_end[0], lug_end[1]),
+                           f"{feature} lug -X face")
         check(f"{feature} lug face vertical", await adapter.add_sketch_constraint(lug, None, "vertical"))
         await _offset_point(adapter, dims, f"{edge}.start", f"{lug}.start",
                             abs(lug_top[0] - edge_start[0]), abs(lug_top[1] - edge_start[1]),
@@ -309,8 +320,8 @@ async def _plan_datum_reference(adapter, part) -> None:
 
 
 async def _nut_pattern_reference(adapter, part) -> None:
-    """The hidden nut-face sketch that carries VIEW D's locations: a
-    construction line ON the lug end and the leadscrew axis (a circle ON the
+    """The hidden nut-face sketch that carries VIEW D's locations: a plain
+    line ON the lug end and the leadscrew axis (a construction circle ON the
     screw clearance) from that end and the bottom face. The feed nut's taps
     are located by their transfer callout, not here."""
     feature = "NutPatternReference"
@@ -322,8 +333,8 @@ async def _nut_pattern_reference(adapter, part) -> None:
 
     dims = SketchDims()
     end_start, end_end = at(part.LUG_Y0, 0.0), at(part.LUG_Y0, part.BLOCK_HEIGHT)
-    end = await _construction(adapter, adapter.add_line(end_start[0], end_start[1], end_end[0], end_end[1]),
-                              f"{feature} lug end")
+    end = await _drawn(adapter, adapter.add_line(end_start[0], end_start[1], end_end[0], end_end[1]),
+                       f"{feature} lug end")
     check(f"{feature} lug end horizontal", await adapter.add_sketch_constraint(end, None, "horizontal"))
     await anchor_point_to_origin(adapter, f"{end}.start", *end_start, f"{feature} lug end corner")
     dims.record("NutEndY")

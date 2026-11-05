@@ -261,8 +261,8 @@ if not BORE_DIA < BODY_DIA:
     raise AssertionError("the bore is wider than the body")
 
 # --- The countersinks' walls: a stated rule-17 shortfall ----------------------
-# Ruling relayed by Main 2026-11-04, option A (auto-selected after an owner
-# timeout; the kit's machinist_exceptions RV-01, provisional): the Ø4.6
+# Owner ruling 2026-11-04 (PR #2187 comment 6651067089, "Accept as owner
+# exception"; the kit's machinist_exceptions RV-01): the Ø4.6
 # countersinks stay. A printed MIN covers everything the package allows: each
 # hole ±HOLE_STATION_BAND off its station on the Ø16 PCD (receipt), its
 # countersink CSK_ECCENTRICITY_MAX off the hole, the mouth at the band's

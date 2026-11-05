@@ -55,6 +55,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 from _com import _early_bound, _read_member
 import _config
 from _drawing_annotation_extent import (
+    CLEAR_GAP_M,
     callout_ink,
     require_clear,
     require_inside,
@@ -496,14 +497,25 @@ REWORK_SECTION_OVERRUN = 0.008
 FLANGE_THICK_TEXT_MM = (feed_nut.FLANGE_DIA / 2.0 + 6.0, feed_nut.FLANGE_THICK / 2.0)
 CSK_DIA_TEXT_MM = (feed_nut.FLANGE_DIA / 2.0 + 1.0, feed_nut.LENGTH + 2.0)
 # The faced length's line stands 2.5 mm under the flange's rim, its witnesses
-# down from the body's -X silhouette, over the section's caption (run 9:
-# SECTION F-F at y 0.090 .. 0.098). Its offset text block is CENTRED on its
-# point (run 20261105T023247678Z: point (0.313, 0.106) printed 0.280 .. 0.345
-# by 0.098 .. 0.114, its own line and far witness through it), so the point
+# down from the body's -X silhouette, over the section's caption
+# (REWORK_CAPTION_TOP). Its offset text block is CENTRED on its point (run
+# 20261105T023247678Z: point (0.313, 0.106) printed 0.280 .. 0.345 by
+# 0.098 .. 0.114, its own line and far witness through it), so the point
 # stands right of the far witness and under the line: the block clears both
 # and the caption, over the title block.
 FACED_LENGTH_LINE_MM = (-(feed_nut.FLANGE_DIA / 2.0 + 2.5), feed_nut.LENGTH_MAX / 2.0)
 FACED_LENGTH_TEXT_MM = (-(feed_nut.FLANGE_DIA / 2.0 + 5.4), feed_nut.LENGTH_MAX + 10.5)
+# Section F-F's native caption (SECTION F-F over SCALE 4 : 1): its box's top
+# centre. Where SolidWorks hung it (run 20261105T054045952Z: printed 0.2586 ..
+# 0.3014 by 0.0833 .. 0.0975), the faced length's leader, from its dimension
+# line's middle (0.2806, 0.1060) to its shoulder (0.3182, 0.0861), ran through
+# the second F (gating review). The leader starts over the caption's span, so
+# its shoulder would have to stand 84 mm right of that start to clear the
+# caption by the readback's gap, running the text past the border (0.419).
+# The caption drops instead, centred under the section: its top 3.5 mm under
+# the leader's height (0.0915) at the caption's padded right edge (0.308), its
+# two rows (14.2 mm printed) over the title block (0.0651).
+REWORK_CAPTION_TOP = (REWORK_SECTION_CENTER[0], 0.086)
 # The receipt limits on the end view (4475311251): four diameters, each a
 # leadered callout whose block is CENTRED on its text point (run
 # 20261105T023247678Z: the body's point (0.171, 0.2175) printed 0.147 .. 0.195
@@ -845,15 +857,21 @@ def _trim_centre_mark(adapter: Any, view: Any, section: ClockSection) -> None:
 
 
 def _place_view_caption(
-    adapter: Any, view: Any, target: tuple[float, float], *, label: str
+    adapter: Any,
+    view: Any,
+    target: tuple[float, float],
+    *,
+    label: str,
+    sheet_scale: tuple[float, float],
 ) -> None:
     """Move a view's native caption so its box's top centre lands on
     ``target``, its linked fields intact (draw_dt_cone_gear_shaft's
     ``_place_view_caption``: the move is measured by ``INote.GetExtent``, the
-    sheet scale pinned first so finalization cannot move it after)."""
+    sheet's ``sheet_scale`` pinned first so finalization cannot move it
+    after)."""
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
-    if not sheet.SetScale(*SHEET_SCALE, False, False):
+    if not sheet.SetScale(*sheet_scale, False, False):
         raise RuntimeError(f"cannot pin sheet scale before {label} placement")
     notes = tuple(_read_member(_early_bound(view, "IView"), "GetNotes") or ())
     if len(notes) != 1:
@@ -991,6 +1009,7 @@ def _add_clock_sections(adapter: Any, main: Any) -> list[Any]:
             view,
             (section.centre[0], lowest - SECTION_CAPTION_GAP),
             label=f"section {section.label} caption",
+            sheet_scale=SHEET_SCALE,
         )
     return annotations
 
@@ -1177,6 +1196,7 @@ def _add_end_details(adapter: Any, main: Any) -> list[Any]:
             view,
             (detail.centre[0], DETAIL_CAPTION_TOP),
             label=f"detail {detail.label} caption",
+            sheet_scale=SHEET_SCALE,
         )
     return annotations
 
@@ -1563,17 +1583,50 @@ def _rework_outlines(
     return lines, circles
 
 
+def view_captions(views: Mapping[str, Any]) -> dict[str, tuple[float, float, float, float]]:
+    """Each view's native caption box (``INote.GetExtent``), by view label:
+    the notes carrying the linked view-label field (draw_pd_support_bar's
+    section caption), so a note the view owns, such as the spigot note on
+    section F-F, is not one."""
+    captions = {}
+    for label, view in views.items():
+        notes = [
+            _early_bound(raw, "INote")
+            for raw in _read_member(_early_bound(view, "IView"), "GetNotes") or ()
+        ]
+        found = [note for note in notes if "<VLLABEL>" in str(note.PropertyLinkedText or "")]
+        for index, note in enumerate(found, start=1):
+            name = f"{label} caption" if len(found) == 1 else f"{label} caption {index}"
+            captions[name] = _box(note.GetExtent(), label=name, kind="note")
+    return captions
+
+
+def caption_leader_keepouts(
+    captions: Mapping[str, tuple[float, float, float, float]],
+) -> dict[str, tuple[float, float, float, float]]:
+    """The boxes a leader must stay out of: each caption grown by the
+    readback's gap, so a leader grazing a letter of it refuses too (run
+    20261105T054045952Z's faced-length leader across F-F's second F)."""
+    gap = CLEAR_GAP_M
+    return {
+        name: (box[0] - gap, box[1] - gap, box[2] + gap, box[3] + gap)
+        for name, box in captions.items()
+    }
+
+
 def _assert_rework_ink(
     adapter: Any, annotations: list[Any], spigot: Any, end: Any, section: Any
 ) -> None:
-    """Every leadered callout block and the spigot note, as SolidWorks draws
-    them, stay inside the sheet's zone frame and clear of each other; no
-    callout's leader runs through another callout's text; and no callout's
-    text is crossed by its own dimension, extension or leader lines or by
-    either view's part outline. The note's native extent spans its own leader
-    down to the seat face, where the faced length's witness starts, so leaders
-    are checked against the callouts' text alone. (No readback shows whether
-    an ABOVE callout printed; its one-line guard stands in.)"""
+    """Every leadered callout block, the spigot note and each view's caption,
+    as SolidWorks draws them, stay inside the sheet's zone frame, off the
+    title block and clear of each other; no callout's leader runs through
+    another callout's text or within the readback's gap of a view caption;
+    and no callout's text is crossed by its own dimension, extension or
+    leader lines or by either view's part outline. The note's native extent
+    spans its own leader down to the seat face, where the faced length's
+    witness starts, so leaders are checked against the callouts' text and the
+    captions alone. (No readback shows whether an ABOVE callout printed; its
+    one-line guard stands in.)"""
     rebuild_drawing(adapter, label="feed nut rework ink")
     region = sheet_region(adapter)
     named = _named(adapter, annotations)
@@ -1585,14 +1638,23 @@ def _assert_rework_ink(
     for name in LEADERED:
         inks[name], boxes[name] = _callout_block(adapter, named[name], f"{name} callout")
     note = _box(_early_bound(spigot, "INote").GetExtent(), label="spigot note", kind="note")
+    captions = view_captions({"end view": end, "section F-F": section})
+    if "section F-F caption" not in captions:
+        raise RuntimeError(f"section F-F's caption did not read back: {sorted(captions)}")
+    keepouts = caption_leader_keepouts(captions)
     outline_lines, outline_circles = _rework_outlines(adapter, end, section)
-    for name, box in {**boxes, "spigot note": note}.items():
+    for name, box in {**boxes, "spigot note": note, **captions}.items():
         require_inside(name, box, region)
+        if _overlaps(box, TITLE_BLOCK):
+            raise RuntimeError(f"{name} {box!r} runs onto the title block {TITLE_BLOCK!r}")
         others = {other: value for other, value in boxes.items() if other != name}
+        if name in captions:
+            require_clear(name, box, {**others, "spigot note": note})
+            continue
         require_clear(name, box, others)
         if name not in inks:
             continue
-        require_leader_clear(inks[name], others)
+        require_leader_clear(inks[name], {**others, **keepouts})
         # Own lines against the shoulder's box, whose lower-left corner the
         # leader ends on, each allowed to end just inside it; outlines against
         # the whole text block.
@@ -1809,6 +1871,15 @@ def _append_feed_nut_rework_sheet(adapter: Any) -> tuple[Callable[[], None], ...
             dimensions_by_feature=feed_nut.DRAWING_DIMENSIONS,
         )
     offset_dimension_text(adapter, annotations, {"FacedLength": faced_text})
+    # Before the spigot note joins the section's notes: the caption must be
+    # its one note.
+    _place_view_caption(
+        adapter,
+        section,
+        REWORK_CAPTION_TOP,
+        label="section F-F caption",
+        sheet_scale=REWORK_SCALE,
+    )
     verify_machining_controls(
         annotations,
         expected=REWORK_EXPECTED,

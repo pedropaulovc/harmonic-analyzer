@@ -23,8 +23,9 @@ import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_feed_nut_spec as nut
 import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec as spec
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as feed
 import draw_ch_rocker_arm_tl_vn_oblique_leadscrew_kit as draw
-from _drawing_annotation_extent import CLEAR_GAP_M, boxes_clear
+from _drawing_annotation_extent import CLEAR_GAP_M, CalloutInk, boxes_clear
 from _drawing_contract import drawing_specification_violations, model_toleranced_dimensions
+from _drawing_layout_check import DrawableRegion, LeaderSegment
 from _drawing_notes import property_link
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DrawingLayout
@@ -1637,9 +1638,14 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
     assert csk_text[0] > body_ink[2] + 0.004
     # The faced length's MAX (13.8, one row) and its mate, offset right of the
     # far witness and under its line, over the title block and right of the
-    # section's caption (run 9: SECTION F-F read 0.259..0.306 by
-    # 0.0904..0.0975 m).
-    caption = (0.259, 0.0904, 0.306, 0.0975)
+    # section's caption. The caption hangs its native box's top centre at
+    # REWORK_CAPTION_TOP: run 20261105T054045952Z printed its two rows
+    # (SECTION F-F, SCALE 4 : 1) 0.2586..0.3014 by 0.0833..0.0975 m and run 9
+    # read its native extent 47 mm wide, so the model takes 50 by 16 mm.
+    caption_x, caption_top = draw.REWORK_CAPTION_TOP
+    assert caption_x == draw.REWORK_SECTION_CENTER[0]
+    caption = (caption_x - 0.025, caption_top - 0.016, caption_x + 0.025, caption_top)
+    assert draw._inside_sheet(caption)
     lane, faced_callout = draw.REWORK_CALLOUTS["FacedLength"]
     assert lane == "below"
     faced_text = centred_block(sheet_point(*draw.FACED_LENGTH_TEXT_MM), faced_callout)
@@ -1908,6 +1914,86 @@ def test_callout_text_crossings_pass_run_12_and_refuse_run_11() -> None:
     # Run 11's hole callout: the flange's Ø22 and the +Z countersink.
     crossed = draw.text_crossings((0.1467, 0.1499, 0.1954, 0.1699), lines=lines, circles=circles)
     assert "flange OD" in crossed and any(name.startswith("countersink") for name in crossed)
+
+
+# Run 20261105T054045952Z's sheet 3 (150 dpi): section F-F's caption where
+# SolidWorks hung it, its two rows' printed ink, and the faced length's ink
+# where run 12 logged it (_RUN12_INK; the render's leader runs 0.2806, 0.1061
+# to 0.3180, 0.0862), the leader across the caption's second F.
+_RUN17_FF_CAPTION = (0.2586, 0.0833, 0.3014, 0.0975)
+_RUN7_SPIGOT_EXTENT = (0.17157912374581938, 0.12111382608695656, 0.25259577926421395, 0.14398911705685621)
+
+
+def _rework_readback(monkeypatch, caption):
+    """Sheet 3 as ``_assert_rework_ink`` reads it, the faced length its one
+    leadered callout: section F-F owns its native caption (the linked
+    view-label field) and the spigot note (literal text); the end view owns
+    no note. Returns the readback's arguments after the annotations and the
+    faced length's ink."""
+
+    def extent(box):
+        return (box[0], box[1], 0.0, box[2], box[3], 0.0)
+
+    spigot = SimpleNamespace(
+        PropertyLinkedText=draw.SPIGOT_NOTE, GetExtent=lambda: extent(_RUN7_SPIGOT_EXTENT)
+    )
+    native_caption = SimpleNamespace(
+        PropertyLinkedText="<VLNAME> <VLLABEL>\r\n<VLSCALE><VLSCALEV>",
+        GetExtent=lambda: extent(caption),
+    )
+    section = SimpleNamespace(GetNotes=lambda: (native_caption, spigot))
+    end = SimpleNamespace(GetNotes=lambda: ())
+    text, lines = _RUN12_INK["FacedLength"]
+    label = "FacedLength callout"
+    ink = CalloutInk(
+        label,
+        text,
+        tuple(
+            LeaderSegment(label, "dim", *line)
+            for line in lines
+            if not (line[1] == line[3] == text[1])
+        ),
+    )
+    monkeypatch.setattr(draw, "LEADERED", ("FacedLength",))
+    monkeypatch.setattr(draw, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(draw, "sheet_region", lambda _adapter: DrawableRegion(*draw.BORDER))
+    monkeypatch.setattr(draw, "_named", lambda _adapter, _annotations: {"FacedLength": "dim"})
+    monkeypatch.setattr(draw, "_callout_block", lambda _adapter, _dim, _label: (ink, text))
+    monkeypatch.setattr(draw, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(draw, "_rework_outlines", lambda _adapter, _end, _section: ({}, {}))
+    return (spigot, end, section), ink
+
+
+def test_rework_readback_keeps_leaders_off_the_view_captions(monkeypatch) -> None:
+    """Section F-F's caption counts as text a leader must clear by the
+    readback's gap: where run 17 printed it the faced length's leader ran
+    through it, 1 mm lower the leader grazes it, and at REWORK_CAPTION_TOP
+    (the 50 x 16 mm model of its native box) it clears. The spigot note the
+    section also owns is no caption, and the caption stays off the title
+    block."""
+    args, ink = _rework_readback(monkeypatch, _RUN17_FF_CAPTION)
+    assert draw.view_captions({"end view": args[1], "section F-F": args[2]}) == {
+        "section F-F caption": _RUN17_FF_CAPTION,
+    }
+    with pytest.raises(RuntimeError, match=r"leader runs through \['section F-F caption'\]"):
+        draw._assert_rework_ink(None, [], *args)
+    # The leader passes 1 mm over this box's top right corner: clear of the
+    # printed letters, inside the gap.
+    left, _bottom, right, top = _RUN17_FF_CAPTION
+    corner_y = 0.1060 - (right - 0.2806) * (0.1060 - 0.0861) / (0.3182 - 0.2806)
+    grazed = (left, corner_y - 0.001 - (top - _bottom), right, corner_y - 0.001)
+    draw.require_leader_clear(ink, {"caption": grazed})
+    args, _ink = _rework_readback(monkeypatch, grazed)
+    with pytest.raises(RuntimeError, match="leader runs through"):
+        draw._assert_rework_ink(None, [], *args)
+    x, y = draw.REWORK_CAPTION_TOP
+    args, _ink = _rework_readback(monkeypatch, (x - 0.025, y - 0.016, x + 0.025, y))
+    draw._assert_rework_ink(None, [], *args)
+    # Dropped onto the title block, the caption refuses.
+    low = (x - 0.025, draw.TITLE_BLOCK[3] - 0.006, x + 0.025, draw.TITLE_BLOCK[3] + 0.010)
+    args, _ink = _rework_readback(monkeypatch, low)
+    with pytest.raises(RuntimeError, match="section F-F caption .* runs onto the title block"):
+        draw._assert_rework_ink(None, [], *args)
 
 
 def test_notes_name_the_item_not_its_length_or_material() -> None:
@@ -2855,7 +2941,7 @@ def test_countersink_walls_are_the_worst_case_the_package_allows() -> None:
     assert draw.CSK_SCREW_CALLOUT.splitlines()[-1] == nut.CSK_WALL_TEXT
 
 
-def test_countersink_wall_shortfall_is_a_declared_provisional_minor() -> None:
+def test_countersink_wall_shortfall_is_a_declared_owner_ruled_minor() -> None:
     """A printed shortfall with no declaration gates the machinist review."""
     import ch_rocker_arm_tl_oblique_jig_assembly_spec as jig
     from machinist_exceptions import load_exceptions
@@ -2888,9 +2974,12 @@ def test_countersink_wall_shortfall_is_a_declared_provisional_minor() -> None:
         f"{_floor2(nut.CSK_WALL_TO_OD)} mm to the flange OD, "
         f"below the {nut.WALL_FLOOR:.1f} mm metric wall floor"
     ) in wall.finding
-    # No owner or delegated ruling exists yet: the reason must say so, not claim one.
-    assert wall.reason.startswith("owner ruling pending")
-    assert "delegated" not in wall.reason
+    # The owner's ruling must cover the walls the package declares, no thinner.
+    assert wall.reason.startswith("owner ruling 2026-11-04 (Pedro, PR #2187 comment ")
+    assert (
+        f"{_floor2(nut.CSK_WALL_TO_BODY)} mm (to body) / "
+        f"{_floor2(nut.CSK_WALL_TO_OD)} mm (to flange OD) walls"
+    ) in wall.reason
     assert (
         f"Ø{nut.HOLE_DIA:.1f} holes on the Ø{nut.HOLE_PCD:.0f} PCD already leave "
         f"{nut.HOLE_WALL_TO_BODY:.2f} mm to the body and {nut.HOLE_WALL_TO_OD:.2f} mm "
@@ -2921,9 +3010,9 @@ def test_thread_body_wall_is_the_real_thread_at_the_least_body() -> None:
     assert draw.RECEIPT_CALLOUTS["ReceiptBodyDia"][1].splitlines()[-1] == nut.THREAD_WALL_TEXT
 
 
-def test_thread_wall_shortfall_is_a_declared_provisional_minor() -> None:
+def test_thread_wall_shortfall_is_a_declared_owner_ruled_minor() -> None:
     """RV-02, on RV-01's pattern: where quotes the printed callout, finding
-    the worst case, reason the pending owner ruling and the load facts."""
+    the worst case, reason the owner's ruling and the load facts."""
     import ch_rocker_arm_tl_oblique_jig_assembly_spec as jig
     from machinist_exceptions import load_exceptions
 
@@ -2944,11 +3033,11 @@ def test_thread_wall_shortfall_is_a_declared_provisional_minor() -> None:
         f"{_floor2(nut.THREAD_BODY_WALL_MIN)} mm"
     ) in wall.finding
     assert f"below the {nut.WALL_FLOOR:.1f} mm metric wall floor" in wall.finding
-    # The same pending-ruling opening as RV-01, then the facts.
-    opening = csk.reason.split(" (option A")[0]
-    assert opening.startswith("owner ruling pending — see #2187 owner-decision comment https://")
-    assert wall.reason.startswith(opening + ". ")
-    assert "delegated" not in wall.reason
+    # The same owner ruling as RV-01, covering exactly the declared wall.
+    opening = csk.reason.split('"Accept as owner exception"')[0]
+    assert opening.startswith("owner ruling 2026-11-04 (Pedro, PR #2187 comment ")
+    assert wall.reason.startswith(opening + '"Accept as owner exception"')
+    assert f"{_floor2(nut.THREAD_BODY_WALL_MIN)} mm thread-to-body wall" in wall.reason
     assert "a supplied, unmachined feature of the bought nut" in wall.reason
     assert f"Ø{nut.BODY_DIA:.1f} body leaves {_floor2((nut.BODY_DIA - nut.THREAD_MAJOR_DIA) / 2.0)} mm" in wall.reason
     # The load facts are the jig spec's nut-thrust numbers.

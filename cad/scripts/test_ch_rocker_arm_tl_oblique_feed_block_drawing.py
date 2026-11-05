@@ -197,6 +197,31 @@ def test_plan_ordinates_start_on_the_left_edge():
     assert not {'BlockEndX','BoreX','LugEndX','LugEndY','LugLength'}&set(spec.DRAWING_PRECISION_BY_NAME)
 
 
+def test_reference_lines_on_the_printed_outline_are_plain_sketch_lines():
+    # Shown in the plan and VIEW D, the reference sketches' lines lie on the
+    # -X edge, the lug's -X face and the lug end; as construction lines their
+    # dash font printed over those outlines (machinist review, farm run
+    # 20261105T054045952Z). The circles on the holes stay construction.
+    tree=ast.parse((FOLDER/'_oblique_pivot_block_model.py').read_text(encoding='utf-8'))
+    functions={node.name:node for node in tree.body if isinstance(node,ast.AsyncFunctionDef)}
+
+    def calls(node):
+        return [call for call in ast.walk(node) if isinstance(call,ast.Call) and isinstance(call.func,ast.Name)]
+
+    def creates(call,method):
+        return any(isinstance(arg,ast.Call) and isinstance(arg.func,ast.Attribute) and arg.func.attr==method
+                   for arg in call.args)
+
+    assert '_as_construction' not in {call.func.id for call in calls(functions['_drawn'])}
+    assert '_as_construction' in {call.func.id for call in calls(functions['_construction'])}
+    for name,lines in (('_plan_datum_reference',2),('_nut_pattern_reference',1)):
+        wrappers=[call.func.id for call in calls(functions[name]) if creates(call,'add_line')]
+        assert wrappers==['_drawn']*lines, (name,wrappers)
+    circles=[call.func.id for call in calls(functions['_construction_circle']) if creates(call,'add_circle')]
+    assert circles==['_construction']
+
+
+
 def test_nut_and_lug_clear_both_end_blocks_at_both_travel_limits():
     assert math.isclose(spec.NUT_REACH_X[0],spec.NUT_FACE_X-feed_nut.REACH)
     assert feed_nut.REACH==feed_nut.LENGTH_MAX
