@@ -585,13 +585,15 @@ CROSS_TAP_FEATURES = ("BaseCrossTapsFront", "BaseCrossTapsRear")
 
 @_telemetry.traced("drawing.base_cross_tap_edge")
 def _cross_tap_edge(view: Any, *, x_mm: float = COLUMN_X) -> Any:
-    """Pick the far-wall tap where its drill meets the drill point.
+    """Pick the far-wall tap's mouth where its drill breaks into the socket.
 
     The near-wall clearance consumes the tap's entry rim on the spotface
-    floor, and looking down the axis the drill-bottom circle projects onto the
-    far wall's mouth, which hides it from the view's visible-edge list (leaf
-    20261105T200327Z found none). So the circle comes from the tap feature's
-    own cylinder in the referenced part and is mapped into the view.
+    floor. Looking down the axis, the drill-bottom circle projects onto the
+    far mouth and is hidden behind it: the view lists no such circle (leaf
+    20261105T200327Z) and maps none (20261105T203243Z). The mouth itself, the
+    tap cylinder's intersection with the socket bore, is the visible edge --
+    the one a radial hole in a shaft shows. It is found on the tap feature's
+    far-wall cylinder, the face that ends at the drill-bottom circle.
     """
     center = (
         x_mm / 1000.0,
@@ -600,7 +602,7 @@ def _cross_tap_edge(view: Any, *, x_mm: float = COLUMN_X) -> Any:
     )
     radius = BASE_CROSS_TAP_DRILL_DIA / 2000.0
     part = _early_bound(_early_bound(view, "IView").ReferencedDocument, "IPartDoc")
-    matches = []
+    far_walls = []
     for name in CROSS_TAP_FEATURES:
         feature = part.FeatureByName(name)
         if feature is None:
@@ -609,8 +611,8 @@ def _cross_tap_edge(view: Any, *, x_mm: float = COLUMN_X) -> Any:
             face = _early_bound(raw_face, "IFace2")
             if not _early_bound(face.GetSurface(), "ISurface").IsCylinder():
                 continue
-            for raw_edge in face.GetEdges() or ():
-                edge = _early_bound(raw_edge, "IEdge")
+            edges = [_early_bound(raw, "IEdge") for raw in face.GetEdges() or ()]
+            for edge in edges:
                 curve = _early_bound(edge.GetCurve(), "ICurve")
                 if not curve.IsCircle():
                     continue
@@ -620,15 +622,24 @@ def _cross_tap_edge(view: Any, *, x_mm: float = COLUMN_X) -> Any:
                     and all(abs(values[i] - center[i]) <= 1e-7 for i in range(3))
                     and abs(abs(values[5]) - 1.0) <= 1e-7
                 ):
-                    matches.append(edge)
-    if len(matches) != 1:
-        raise RuntimeError(
-            f"expected one base cross-tap drill-bottom edge, found {len(matches)}"
-        )
-    corresponding = _early_bound(view, "IView").GetCorrespondingEntity(matches[0])
-    if corresponding is None:
-        raise RuntimeError("base cross-tap drill-bottom edge has no view entity")
-    return corresponding
+                    far_walls.append(edges)
+                    break
+    # The kernel may split the cylinder (and its bottom circle) at a seam.
+    if not far_walls:
+        raise RuntimeError("found no base cross-tap far-wall cylinder")
+    mouths = []
+    for edge in (edge for edges in far_walls for edge in edges):
+        curve = _early_bound(edge.GetCurve(), "ICurve")
+        if curve.IsCircle() or curve.IsLine():
+            continue
+        shown = _early_bound(view, "IView").GetCorrespondingEntity(edge)
+        if shown is not None:
+            start = tuple(round(float(v), 7) for v in tuple(edge.GetCurveParams2())[:3])
+            mouths.append((start, shown))
+    if not mouths:
+        raise RuntimeError("base cross-tap far mouth has no visible view edge")
+    _telemetry.info(f"base cross-tap far mouth: {len(mouths)} visible edge(s)")
+    return min(mouths, key=lambda item: item[0])[1]
 
 
 @_telemetry.traced("drawing.base_cross_clearance_edge")
