@@ -46,6 +46,7 @@ from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
+import _telemetry
 from _sketch import (
     SketchDims,
     add_line_chain,
@@ -109,6 +110,7 @@ _THRU_ALL = 1
 _BLIND = 0
 
 
+@_telemetry.traced("feature.thread_from_face", label_param="label")
 def _thread_from_face(adapter, feature_name: str, *, label: str) -> None:
     """Stop a THRU tap's thread ``FULL_THREAD_DEPTH`` from its wizard face;
     its tap drill stays THRU ALL.
