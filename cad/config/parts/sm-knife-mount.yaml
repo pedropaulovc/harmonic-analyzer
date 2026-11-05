@@ -5,7 +5,8 @@ sm-knife-mount:
   finish: 58-60 HRC, unpainted; sizes apply after hardening
   quantity: 2
   tolerance_class: machined_block
-  process: "machined (steel)"
+  # Pedro's owner ruling, 2026-11-05 (coordinator session): tap annealed, inspect hardened.
+  process: "machined in the annealed condition; one blind #10-24 thread per mount (two mounts total), cut with a bottoming tap before hardening, then thread-gauge checked after heat treatment; all thread sizes apply after hardening"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"

@@ -361,7 +361,7 @@ def test_head_and_relief_bands_name_the_wire_they_clear() -> None:
 
 def test_body_limit_band_is_the_thread_blank_inside_the_2a_major() -> None:
     # The LIMIT band 6.32/6.20 sits inside the 1/4-28 UNF-2A major band
-    # (0.2490/0.2425 in), so the die cuts a 2A crest on the loop's seat.
+    # (0.2490/0.2425 in), so the finished 2A crest shares the loop's seat blank.
     assert (geom.BODY_DIA_LOWER, geom.BODY_DIA_UPPER) == pytest.approx((-0.15, -0.03))
     assert (geom.BODY_DIA_MIN, geom.BODY_DIA_MAX) == pytest.approx((6.20, 6.32))
     assert geom.THREAD_MAJOR_2A_MIN == pytest.approx(6.1595)
@@ -381,17 +381,15 @@ def test_body_limit_band_is_the_thread_blank_inside_the_2a_major() -> None:
 
 def test_plain_length_and_full_thread_limits_print_on_the_part() -> None:
     # "3.60 MIN" plain under the head (the loop's seat), "5.71 MAX" to the
-    # first full thread, both from the under-head face, with room between
-    # them for the die's chamfered start.
+    # first full thread, both from the under-head face. Single-pointing retains
+    # these functional limits without a die-lead allowance (owner 2026-11-05).
     assert geom.PLAIN_LENGTH_MIN == 3.60
     assert geom.FULL_THREAD_STATION_MAX == 5.71
-    assert geom.FULL_THREAD_STATION_MAX - geom.PLAIN_LENGTH_MIN >= (
-        geom.FULL_THREAD_DIE_ROOM_MIN
-    )
-    with pytest.raises(AssertionError, match="no room for its chamfer"):
-        geom.require_body_form(
-            full_thread_station_max=geom.PLAIN_LENGTH_MIN + geom.PITCH
-        )
+    assert geom.FULL_THREAD_STATION_MAX > geom.PLAIN_LENGTH_MIN
+    # A shorter single-point transition is valid; reversed stations are not.
+    geom.require_body_form(full_thread_station_max=geom.PLAIN_LENGTH_MIN + geom.PITCH)
+    with pytest.raises(AssertionError, match="must follow the plain-body limit"):
+        geom.require_body_form(full_thread_station_max=geom.PLAIN_LENGTH_MIN)
     # The plain length names its mate below the value; the full-thread limit
     # stands ABOVE its value, which alone takes the dimension line.
     assert spec.DIMENSION_CALLOUTS["StationReference"] == {
