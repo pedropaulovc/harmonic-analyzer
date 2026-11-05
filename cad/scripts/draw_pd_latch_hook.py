@@ -212,7 +212,7 @@ FRONT_KEEP = {
     "ScrewX2": _front(11.0, 12.5),
     "ScrewX1": _front(11.0, 17.5),
     "ScrewY": _front(-32.0, SCREW_HOLE_Y / 2.0),
-    "ScrewDia": _front(-25.0, -8.0),  # its mate line clear of the arm
+    "ScrewDia": _front(-25.0, -11.0),  # wall-callout stack below ScrewY's extension
     "RollStart": _front(14.0, OUTER_ROLL_START[1] / 2.0),
     "FaceY": _front(24.0, FAR_FACE_POINT[1] / 2.0),
     "FaceX": _front(FAR_FACE_POINT[0] / 2.0, -96.0),

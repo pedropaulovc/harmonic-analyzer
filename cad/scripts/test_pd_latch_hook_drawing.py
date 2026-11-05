@@ -775,6 +775,20 @@ def test_the_screw_hole_callout_names_the_taps_its_bands_serve() -> None:
     assert "MATCH" not in drawing.CALLOUTS_BELOW["ScrewDia"]
 
 
+def test_the_native_screw_callout_stack_clears_the_hole_row_extension() -> None:
+    # Farm 20261105T023327427Z: native multiline text centres the whole block,
+    # moving 2X up when the WALL line is added. Budget its observed 5.6 mm
+    # line pitch conservatively at 6 mm, rather than treating xy as the value.
+    rows = (
+        len(drawing.CALLOUTS_ABOVE["ScrewDia"].splitlines())
+        + 1
+        + len(drawing.CALLOUTS_BELOW["ScrewDia"].splitlines())
+    )
+    top = drawing.FRONT_KEEP["ScrewDia"][1] + (rows - 1) * 0.006 / 2.0 + 0.0035 / 2.0
+    extension_y = drawing._front(0.0, 0.0)[1]
+    assert extension_y - top >= 0.00178
+
+
 class _Display:
     """A drawing dimension stub: its value, the precision put on it."""
 
