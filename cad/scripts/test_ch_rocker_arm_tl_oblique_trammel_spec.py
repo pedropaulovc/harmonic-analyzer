@@ -90,9 +90,7 @@ def test_both_cutters_are_on_hand_as_four_flute_end_mills() -> None:
     assert trammel.RISER_CUTTER_DIA == pytest.approx(0.5625 * 25.4)
 
 
-def test_jig_stock_requirements_preserve_finished_geometry_without_claiming_ownership() -> (
-    None
-):
+def test_jig_stock_covers_finished_geometry_carrier_on_hand_riser_ordered() -> None:
     inventory = tomllib.loads(
         (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_bytes().decode()
     )
@@ -105,16 +103,17 @@ def test_jig_stock_requirements_preserve_finished_geometry_without_claiming_owne
         row for row in inventory["stock"] if "MHA-CH-06-TL-24" in row.get("note", "")
     ]
     assert carrier["on_hand"] is True
-    assert "on_hand" not in riser
     import ch_rocker_arm_tl_oblique_carrier_spec as carrier_spec
     import ch_rocker_arm_tl_oblique_riser_spec as riser_spec
 
     assert carrier["section_mm"][0] >= carrier_spec.PLATE_WIDTH
     assert carrier["section_mm"][1] > carrier_spec.THICKNESS
     assert carrier["length_mm"] >= carrier_spec.PLATE_LENGTH
-    # The owner-selected riser bar (McMaster 8663K55, 2026-11-03) covers the
-    # faced and milled blank; selected, not claimed bought.
+    # The owner-selected riser bar (McMaster 8663K55) was ordered 2026-11-03 and
+    # covers the faced and milled blank. It is not on hand until received (#2173).
     assert "8663K55" in riser["note"]
+    assert "ordered 2026-11-03" in riser["note"]
+    assert riser["on_hand"] is False
     assert riser["section_mm"][0] > riser_spec.BLANK_WIDTH
     assert riser["section_mm"][1] > riser_spec.THICKNESS
     assert riser["length_mm"] > riser_spec.BLANK_LENGTH
