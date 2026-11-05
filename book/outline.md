@@ -60,7 +60,7 @@ Each chapter ends with **"Now make:"** — a real part from the machine.
 | 11 | Parting off to a length tolerance | the 19 `pivot-bushing` + 19 `lever-bushing` sets — **length sets the 7.0565 mm channel pitch** |
 | 12 | Slender work: steadies and followers | `dt-cone-gear-shaft` (Ø0.79375 mm (1/32 in) slender terminal land; mill four co-clocked gear-land flats, with the smallest continuing through the tip) |
 | 13 | Milling: squaring, profiling, edges | `ch-rocker-arm` (R800 concave top edge as a 2D profile, ×20) |
-| 14 | Hole patterns and tapping | `fr-rocker-arm-support` (4× 1/2-13 UNC-2B, `cad/scripts/build_fr_rocker_arm_support.py`), the 20 Ø2.0 spring holes |
+| 14 | Hole patterns and tapping | `fr-rocker-arm-support` (4× 5/16 drilled foot clearances, `cad/scripts/fr_rocker_arm_support_spec.py`), the 20 Ø2.0 spring holes |
 | 15 | Indexing and the dividing head | `dt-cylinder-gear` 0.4 mm alignment notches, co-phased |
 | 16 | **Making your own gear cutters** | the DT6-FORM1 ground form tool for the `dt-cone-gear` T006, the one gear outside the stock 48DP 20° cutter ranges; Law's button-tool method (ch. 12) for shop-made form cutters |
 | 17 | **Cutting the gears** | first `dt-cone-gear` (T120, the easy end) |

@@ -27,7 +27,7 @@ Everything else hangs off this. Build it first, and build it square.
 
 ## What will fight you
 
-The rocker-arm support is modelled as a cast iron casting with 6.35 mm shell walls and R12.7-relieved internal corners; cutting it from bar is a benign substitution. Its four foot holes are 1/2-13 UNC-2B through the 6.35 mm foot, with a Ø10.716 mm tap drill (Ø10.72 displayed; 27/64 in). The dimensions and thread class come from `cad/scripts/build_fr_rocker_arm_support.py` and `cad/scripts/_holes.py`.
+The rocker-arm support is modelled as a cast iron casting with 6.35 mm shell walls and R12.7-relieved internal corners; cutting it from bar is a benign substitution. Its four foot holes are 5/16 in drilled clearances through the .25 in (6.35 mm) foot, printed Ø .313 THRU ALL in the sheet's hole table; 1/4-20 hex-head screws pass down through them into tapped seats in the base. The dimensions and drill size come from `cad/scripts/build_fr_rocker_arm_support.py`, `cad/scripts/fr_rocker_arm_support_spec.py` and `cad/scripts/draw_fr_rocker_arm_support.py`.
 
 ## Making each part
 
