@@ -272,6 +272,7 @@ def _open_end_face_sketch(adapter: Any) -> tuple[float, float, bool]:
     return u, v, w_out > 0.0
 
 
+@_telemetry.traced("part.pin_section_sketch")
 def _pin_section_sketch(
     adapter: Any,
 ) -> tuple[Callable[[float, float], tuple[float, float]], bool]:
@@ -322,6 +323,7 @@ def _pin_section_sketch(
     if axis_of(along_y) == axial:
         raise RuntimeError("pin bore rear mouth: model Y and Z map to one sketch axis")
 
+    @_telemetry.traced("part.pin_section_map")
     def to_sketch(y_mm: float, z_mm: float) -> tuple[float, float]:
         u, v, _w = raw(y_mm, z_mm)
         return (0.0 if abs(u) < 1e-9 else u, 0.0 if abs(v) < 1e-9 else v)
