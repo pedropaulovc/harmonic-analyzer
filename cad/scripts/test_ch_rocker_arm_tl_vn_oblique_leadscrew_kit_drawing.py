@@ -1284,10 +1284,22 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
         assert draw._inside_sheet(box), box
     assert not draw._overlaps(cut, section)
     assert cut[3] < draw.ITEM_LABEL_CELL[1]
-    # Text fit, at 2.8 mm a character and 5.5 mm a line (the farm render's
-    # 4:1 sheet): each control's value and callout lanes, and the spigot
-    # note, stand clear of the section's ink, the end view and each other.
+    # Text fit. Calibration, run 20261105T002852195Z's native extents: the
+    # 3 mm member caption "[2] FEED NUT  QTY 1 INSTALLED" read 57.2 mm wide
+    # and 3.81 mm tall, 1.97 mm a character and 1.27 x its height a line;
+    # the two-line spigot note read 8.9 mm from its anchor down, 4.45 mm a
+    # line, so a 3.5 mm default note height (4.45 / 1.27) and 2.30 mm a
+    # character. ASSUMPTION: the dimension texts print no larger (run 7
+    # logged no dimension extents). Each estimate below covers these with
+    # margin.
+    caption = "[2] FEED NUT  QTY 1 INSTALLED"
+    caption_extent = (0.21971254849498326, 0.2583655719063545, 0.2769007759197324, 0.2621781204013378)
+    measured_char = (caption_extent[2] - caption_extent[0]) / len(caption) * 3.5 / 3.0
+    measured_line = (draw.SPIGOT_NOTE_XY[1] - 0.12111382608695656) / 2.0
+    assert measured_char == pytest.approx(0.0023, abs=0.00005)
+    assert measured_line == pytest.approx(0.00445, abs=0.00005)
     char, line = 0.0028, 0.0055
+    assert char > 1.15 * measured_char and line > 1.15 * measured_line
 
     def sheet_point(radius_mm, station_mm):
         return (
@@ -1339,7 +1351,30 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
         note_y,
     )
     assert draw._inside(note, draw.SPIGOT_NOTE_CELL)
-    texts = (flange_text, csk_text, draw.SPIGOT_NOTE_CELL)
+    # The spigot note's leader lands on the seat face, inside the annulus the
+    # faced spigot stood on, just right of its cell.
+    tip_r, tip_station = draw.SPIGOT_TIP_MM
+    assert tip_station == 0.0
+    assert nut.BORE_DIA / 2.0 < abs(tip_r) < nut.BODY_DIA / 2.0
+    tip = sheet_point(tip_r, tip_station)
+    assert tip[0] == pytest.approx(seat_x)
+    assert draw.SPIGOT_NOTE_CELL[2] < tip[0] < draw.SPIGOT_NOTE_CELL[2] + 0.015
+    assert draw.SPIGOT_NOTE_CELL[1] < tip[1] < draw.REWORK_SECTION_CENTER[1]
+    # The note's native extent spans its leader: run 7 read this box, which
+    # leaves the text cell, so the check bounds the cell widened to the tip.
+    run7 = (0.17157912374581938, 0.12111382608695656, 0.25259577926421395, 0.14398911705685621)
+    assert not draw._inside(run7, draw.SPIGOT_NOTE_CELL)
+    bounds = draw.spigot_note_bounds(tip)
+    assert draw._inside(run7, bounds)
+    assert run7[0] < draw.SPIGOT_NOTE_CELL[2] and run7[2] >= tip[0] - draw._LEADER_TIP_MARGIN
+    noted = (
+        min(note[0], tip[0]),
+        min(note[1], tip[1]),
+        max(note[2], tip[0]),
+        max(note[3], tip[1]),
+    )
+    assert draw._inside(noted, bounds)
+    texts = (flange_text, csk_text, noted)
     for index, text in enumerate(texts):
         assert draw._inside_sheet(text), text
         assert not draw._overlaps(text, draw.ITEM_LABEL_CELL)
@@ -1347,14 +1382,6 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
             assert not draw._overlaps(text, ink), (text, ink)
         for other in texts[index + 1 :]:
             assert not draw._overlaps(text, other), (text, other)
-    # The spigot note's leader lands on the seat face, inside the annulus the
-    # faced spigot stood on, just right of its cell.
-    tip_r, tip_station = draw.SPIGOT_TIP_MM
-    assert tip_station == 0.0
-    assert nut.BORE_DIA / 2.0 < abs(tip_r) < nut.BODY_DIA / 2.0
-    tip = sheet_point(tip_r, tip_station)
-    assert draw.SPIGOT_NOTE_CELL[2] < tip[0] < draw.SPIGOT_NOTE_CELL[2] + 0.015
-    assert draw.SPIGOT_NOTE_CELL[1] < tip[1] < draw.REWORK_SECTION_CENTER[1]
     assert draw.REWORK_END_ANGLE == math.pi / 2.0
     # One letter per cut in the package: sheet 2's A to E, sheet 3's F.
     letters = [

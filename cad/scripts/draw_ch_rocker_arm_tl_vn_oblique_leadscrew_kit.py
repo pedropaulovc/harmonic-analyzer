@@ -514,11 +514,13 @@ REWORK_CALLOUTS = {
 _CALLOUT_TEXT_PARTS = {"above": 3, "below": 4}
 # The faced face: the spigot stood on the seat face, inside the Ø10.2; its
 # tip lands midway across that annulus, on the -X half below the axis. The
-# note sits left of the section, between it and the end view.
+# note's text sits left of the section, between it and the end view, its
+# upper-left at SPIGOT_NOTE_XY; its native extent also spans the leader.
 SPIGOT_NOTE = "SPIGOT FACED FLUSH\nWITH FLANGE SEAT FACE"
 SPIGOT_TIP_MM = (-(feed_nut.BORE_DIA + feed_nut.BODY_DIA) / 4.0, 0.0)
 SPIGOT_NOTE_XY = (0.172, 0.130)
 SPIGOT_NOTE_CELL = (0.165, 0.108, 0.248, 0.136)
+_LEADER_TIP_MARGIN = 0.001
 REWORK_EXPECTED = {
     name: (nominal / 1000.0, lower / 1000.0, upper / 1000.0)
     for name, (nominal, lower, upper, _places) in feed_nut.REWORK_CONTROLS.items()
@@ -1314,7 +1316,7 @@ def _assert_rework_callouts(adapter: Any, annotations: list[Any]) -> None:
         )
 
 
-def _add_spigot_note(adapter: Any, section: Any) -> Any:
+def _add_spigot_note(adapter: Any, section: Any) -> tuple[Any, tuple[float, float]]:
     """Name the faced face: a leader to the seat face where the spigot stood."""
     (tip,) = model_points_in_view(
         adapter,
@@ -1336,18 +1338,41 @@ def _add_spigot_note(adapter: Any, section: Any) -> Any:
         label="feed nut spigot facing",
         view=section,
     )
-    _assert_spigot_note(adapter, note)
-    return note
+    _assert_spigot_note(adapter, note, tip)
+    return note, tip
 
 
-def _assert_spigot_note(adapter: Any, note: Any) -> None:
+def spigot_note_bounds(tip: tuple[float, float]) -> tuple[float, float, float, float]:
+    """Where the note's native extent may reach: its text cell, widened to the
+    leader's tip. ``INote.GetExtent`` spans the leader too (run
+    20261105T002852195Z: (0.1716, 0.1211, 0.2526, 0.1440), the tip at the
+    seat face 0.253 and 0.1438), and the leader runs through clear sheet left
+    of the seat face."""
+    left, bottom, right, top = SPIGOT_NOTE_CELL
+    return (
+        left,
+        min(bottom, tip[1] - _LEADER_TIP_MARGIN),
+        max(right, tip[0] + _LEADER_TIP_MARGIN),
+        max(top, tip[1] + _LEADER_TIP_MARGIN),
+    )
+
+
+def _assert_spigot_note(adapter: Any, note: Any, tip: tuple[float, float]) -> None:
     native = _early_bound(note, "INote")
     text = str(native.GetText() or "").replace("\r\n", "\n").replace("\r", "\n")
     if text != SPIGOT_NOTE:
         raise RuntimeError(f"spigot facing note reads {text!r}")
     box = _box(native.GetExtent(), label="spigot facing note", kind="note")
-    if not _inside(box, SPIGOT_NOTE_CELL):
-        raise RuntimeError(f"spigot facing note leaves its cell: {box!r}")
+    bounds = spigot_note_bounds(tip)
+    # The text starts in its cell, and the leader reaches the seat face.
+    if (
+        not _inside(box, bounds)
+        or box[0] > SPIGOT_NOTE_CELL[2]
+        or box[2] < tip[0] - _LEADER_TIP_MARGIN
+    ):
+        raise RuntimeError(
+            f"spigot facing note leaves its cell and leader: {box!r}; bounds {bounds!r}"
+        )
 
 
 @_telemetry.traced("drawing.feed_nut_rework_sheet")
@@ -1431,7 +1456,7 @@ def _append_feed_nut_rework_sheet(adapter: Any) -> tuple[Callable[[], None], ...
             location=lane,
         )
     _assert_rework_callouts(adapter, annotations)
-    spigot = _add_spigot_note(adapter, section)
+    spigot, spigot_tip = _add_spigot_note(adapter, section)
     note = _literal_note(adapter, REWORK_ITEM, *ITEM_LABEL_XY)
     notes = [(note, REWORK_ITEM, REWORK_ITEM, ITEM_LABEL_CELL)]
     title_notes, title_fit = _member_title_block(adapter, draw, properties)
@@ -1455,7 +1480,7 @@ def _append_feed_nut_rework_sheet(adapter: Any) -> tuple[Callable[[], None], ...
             precision=REWORK_PRECISION,
         )
         _assert_rework_callouts(adapter, annotations)
-        _assert_spigot_note(adapter, spigot)
+        _assert_spigot_note(adapter, spigot, spigot_tip)
         title_fit()
 
     settled()
