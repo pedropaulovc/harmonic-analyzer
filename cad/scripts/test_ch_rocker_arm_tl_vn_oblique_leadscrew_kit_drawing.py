@@ -893,10 +893,11 @@ def test_feed_nut_rework_is_native_banded_controls_on_sheet_3() -> None:
             "ReceiptFlangeDia": 1, "ReceiptBodyDia": 1, "ReceiptHoleDia": 2, "ReceiptHolePcd": 1,
         },
     }
-    # The hole count prints once, before the hole circle's own Ø.
+    # A set prefix replaces a diameter's own Ø (run 20261105T023247678Z
+    # printed "4X 3.60/3.46"), so the hole's count carries the token too.
     assert nut.DIMENSION_PREFIXES == {
         ("Countersink1Profile", "CskDia"): "4X <MOD-DIAM>",
-        ("ReceiptReference", "ReceiptHoleDia"): "4X ",
+        ("ReceiptReference", "ReceiptHoleDia"): "4X <MOD-DIAM>",
     }
     # "4X Ø4.76/4.50": the count, then SolidWorks' own diameter token, once.
     # CskDia is the mouth's diameter (REWORK_CONTROLS' 4.6), printed in the
@@ -1512,6 +1513,37 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
             point[1] + rows * dim_line / 2.0,
         )
 
+    def centred_block(point, text, value_rows=1):
+        # A near-side diameter's and an offset text's block is centred on its
+        # point, both ways (run 20261105T023247678Z, below).
+        rows = value_rows + len(text.splitlines())
+        half = width(text, dim_char) / 2.0
+        return (
+            point[0] - half,
+            point[1] - rows * dim_line / 2.0,
+            point[0] + half,
+            point[1] + rows * dim_line / 2.0,
+        )
+
+    # Run 20261105T023247678Z's sheet 3 (200 dpi): each measured block sits
+    # inside the model's block for the point and text that printed it.
+    run11 = {
+        "body": (
+            (0.1471, 0.2093, 0.1947, 0.2252), (0.171, 0.2175),
+            f"CLEARS HEADS OF 4X\n{draw.NUT_SCREW_NUMBER}", 1,
+        ),
+        "hole": (
+            (0.1467, 0.1499, 0.1954, 0.1699), (0.171, 0.1595),
+            f"MATCHES TAPS IN\n{feed_block.NUMBER} LUG", 2,
+        ),
+        "faced": (
+            (0.2803, 0.0980, 0.3448, 0.1135), (0.313, 0.106),
+            draw.REWORK_CALLOUTS["FacedLength"][1], 1,
+        ),
+    }
+    for name, (measured, point, text, value_rows) in run11.items():
+        assert draw._inside(measured, centred_block(point, text, value_rows)), name
+
     # Run 9's text point and wall row: the model holds the measured block and
     # crosses the border, as the render did.
     run9_text = (
@@ -1595,22 +1627,37 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
     # arrow hanging past the body's top: clear of the body's end.
     assert csk_text[0] > body_ink[2] + 0.004
     # The faced length's MAX (13.8, one row) and its mate, offset right of the
-    # far witness, over the title block and right of the section's caption
-    # (run 9: SECTION F-F read 0.259..0.306 by 0.0904..0.0975 m).
+    # far witness and under its line, over the title block and right of the
+    # section's caption (run 9: SECTION F-F read 0.259..0.306 by
+    # 0.0904..0.0975 m).
     caption = (0.259, 0.0904, 0.306, 0.0975)
     lane, faced_callout = draw.REWORK_CALLOUTS["FacedLength"]
     assert lane == "below"
-    faced_text = leadered_block(sheet_point(*draw.FACED_LENGTH_TEXT_MM), faced_callout)
+    faced_text = centred_block(sheet_point(*draw.FACED_LENGTH_TEXT_MM), faced_callout)
     faced_line_y = sheet_point(*draw.FACED_LENGTH_LINE_MM)[1]
     faced_span = (seat_x, seat_x + nut.LENGTH_MAX * scale)
     assert caption[3] < faced_line_y < flange_ink[1]
     assert faced_text[0] > max(faced_span[1], caption[2])
     assert faced_text[1] > draw.TITLE_BLOCK[3]
+    # Its own line and witnesses (each 1.5 mm past the line): run 11's block
+    # was crossed by both, the placed one by neither.
+    body_y = draw.REWORK_SECTION_CENTER[1] - nut.BODY_DIA / 2.0 * scale
+    faced_own = {
+        "line": (faced_span[0], faced_line_y, faced_span[1], faced_line_y),
+        **{
+            f"witness {x:.4f}": (x, body_y, x, faced_line_y - 0.0015)
+            for x in faced_span
+        },
+    }
+    assert sorted(draw.text_crossings(run11["faced"][0], lines=faced_own, circles={})) == [
+        "line", f"witness {faced_span[1]:.4f}",
+    ]
+    assert draw.text_crossings(faced_text, lines=faced_own, circles={}) == []
     # callout_ink takes the longest horizontal stroke for the shoulder: the
     # mate's row, even at run 9's measured pitch, outruns the dimension line.
     assert width(faced_callout, dim_char_measured) > faced_span[1] - faced_span[0]
     # The receipt limits on the end view (4475311251), the +Z hole right of
-    # its centre: each block runs right from its text point, its leader radial
+    # its centre: each block centred on its text point, its leader radial
     # from its circle's centre to the block's shoulder (its lower-left corner).
     cx, cy = draw.REWORK_END_CENTER
     hole_centre = (cx + nut.HOLE_PCD / 2.0 * scale, cy)
@@ -1623,11 +1670,21 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
         "ReceiptHoleDia": (hole_centre, nut.HOLE_DIA / 2.0),
     }
     assert set(circles) == set(draw.RECEIPT_TEXT_XY)
+    # The end view's outline as the readback projects it: model +X up the
+    # sheet, +Z to the right. Run 11's hole block crossed the flange's Ø22
+    # and the +Z hole's countersink; the placed blocks cross nothing.
+    outline = {
+        name: (cx + z * scale, cy + x * scale, radius * scale)
+        for name, ((x, _y, z), radius) in draw.END_VIEW_CIRCLES_MM.items()
+    }
+    crossed = draw.text_crossings(run11["hole"][0], lines={}, circles=outline)
+    assert "flange OD" in crossed and any(name.startswith("countersink") for name in crossed)
     receipt, leaders = {}, {}
     for name, point in draw.RECEIPT_TEXT_XY.items():
         lane, text = draw.RECEIPT_CALLOUTS[name]
         stacked = nut.DIMENSION_TOLERANCE_TYPES[name] == nut.TOL_LIMIT
-        block = leadered_block(point, text, value_rows=2 if stacked else 1)
+        block = centred_block(point, text, value_rows=2 if stacked else 1)
+        assert draw.text_crossings(block, lines={}, circles=outline) == [], name
         (ox, oy), r_mm = circles[name]
         shoulder = (block[0], block[1])
         dx, dy = shoulder[0] - ox, shoulder[1] - oy

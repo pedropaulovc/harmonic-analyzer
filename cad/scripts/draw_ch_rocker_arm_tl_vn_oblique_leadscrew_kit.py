@@ -66,6 +66,7 @@ from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import offset_dimension_text, set_dimension_callouts
 import _drawing_hidden_sketches as hidden_sketches
+from _drawing_layout_check import LeaderSegment, _segment_crosses_box
 from _drawing_leader_notes import add_leader_note
 from _drawing_leaders import dimension_text_points, set_near_side_diameter
 from _drawing_notes import property_link
@@ -498,27 +499,30 @@ FLANGE_THICK_TEXT_MM = (feed_nut.FLANGE_DIA / 2.0 + 6.0, feed_nut.FLANGE_THICK /
 CSK_DIA_TEXT_MM = (feed_nut.FLANGE_DIA / 2.0 + 1.0, feed_nut.LENGTH + 2.0)
 # The faced length's line stands 2.5 mm under the flange's rim, its witnesses
 # down from the body's -X silhouette, over the section's caption (run 9:
-# SECTION F-F at y 0.090 .. 0.098); its text is offset onto a leader 1.2 mm
-# right of the far witness, its block right of the caption (to x 0.306).
+# SECTION F-F at y 0.090 .. 0.098). Its offset text block is CENTRED on its
+# point (run 20261105T023247678Z: point (0.313, 0.106) printed 0.280 .. 0.345
+# by 0.098 .. 0.114, its own line and far witness through it), so the point
+# stands right of the far witness and under the line: the block clears both
+# and the caption, over the title block.
 FACED_LENGTH_LINE_MM = (-(feed_nut.FLANGE_DIA / 2.0 + 2.5), feed_nut.LENGTH_MAX / 2.0)
-FACED_LENGTH_TEXT_MM = (FACED_LENGTH_LINE_MM[0], feed_nut.LENGTH_MAX + 1.2)
+FACED_LENGTH_TEXT_MM = (-(feed_nut.FLANGE_DIA / 2.0 + 5.4), feed_nut.LENGTH_MAX + 10.5)
 # The receipt limits on the end view (4475311251): four diameters, each a
-# leadered callout whose block runs right from its text point, rows centred on
-# its height (the CskDia block's run-9 shape). Each one's arrow lands on its
-# circle's near side (set_near_side_diameter), its leader radial from the
-# circle's centre toward the block's shoulder, so no two leaders from the
-# shared centre cross. Three stack in the gap between the end view and the
-# section, under the FlangeThick row (run 9: its limits from y 0.2220) and
-# over the spigot note's extent (to y 0.1440): the body's from 38° (over the
-# top hole's countersink by 24 mm), the bolt circle's from 22.5° (its arrow 3
-# mm outside the +Z countersink), the +Z hole's from its lower right. Each
-# block starts right of the end view's horizontal centreline (to x 0.164).
-# The flange OD's leaves its rim at -47°, right of the cutting line's lower F
-# (x 0.126 .. 0.132), for a block under the spigot note.
+# leadered callout whose block is CENTRED on its text point (run
+# 20261105T023247678Z: the body's point (0.171, 0.2175) printed 0.147 .. 0.195
+# by 0.209 .. 0.225, and the hole's crossed the flange's Ø22 outline and the
+# +Z hole). Each one's arrow lands on its circle's near side
+# (set_near_side_diameter), its leader radial from the circle's centre to the
+# block's shoulder (its lower-left corner), so no two leaders from the shared
+# centre cross. Three stack in the gap between the end view's rim (x 0.154)
+# and the section (x 0.253), under the FlangeThick callout row (run 11: from
+# y 0.232) and over the spigot note's extent (to y 0.144): the body's, the
+# bolt circle's and the +Z hole's. The flange OD's leaves its rim at its
+# lower right, right of the cutting line's lower F, for a block under the
+# spigot note.
 RECEIPT_TEXT_XY = {
-    "ReceiptBodyDia": (0.171, 0.2175),
-    "ReceiptHolePcd": (0.171, 0.1950),
-    "ReceiptHoleDia": (0.171, 0.1595),
+    "ReceiptBodyDia": (0.205, 0.2175),
+    "ReceiptHolePcd": (0.205, 0.1950),
+    "ReceiptHoleDia": (0.205, 0.1595),
     "ReceiptFlangeDia": (0.185, 0.093),
 }
 # The receipt callouts' hole is the +Z one: the end view must lay it right of
@@ -565,7 +569,10 @@ RECEIPT_CALLOUTS = {
     "ReceiptBodyDia": (
         "below", f"CLEARS HEADS OF {feed_nut.SCREW_COUNT}X\n{NUT_SCREW_NUMBER}",
     ),
-    "ReceiptHoleDia": ("below", f"MATCHES TAPS IN\n{FEED_BLOCK_NUMBER} LUG"),
+    # The supplied holes are received, not cut (the band feeds RV-01's walls).
+    "ReceiptHoleDia": (
+        "below", f"AS SUPPLIED, MATCHES TAPS IN\n{FEED_BLOCK_NUMBER} LUG",
+    ),
     "ReceiptHolePcd": ("below", f"PCD, MATCHES TAPS IN\n{FEED_BLOCK_NUMBER} LUG"),
 }
 _CALLOUT_TEXT_PARTS = {"above": 3, "below": 4}
@@ -1429,14 +1436,116 @@ def _callout_block(adapter: Any, annotation: Any, label: str) -> tuple[Any, tupl
     return ink, (min(xs), min(ys), max(xs), max(ys))
 
 
-def _assert_rework_ink(adapter: Any, annotations: list[Any], spigot: Any) -> None:
+# A callout's text must not be crossed by a line (run 20261105T023247678Z's
+# gating findings): its own dimension, extension or leader lines, or a part
+# outline of either view. The outlines are the spec's geometry projected into
+# each view; a leader ends ON its shoulder, hence the inset.
+_TEXT_LINE_INSET = 0.0005
+# End view: (model centre (x, y, z) mm, radius mm); the countersinks' mouths
+# and the holes ring each hole centre.
+END_VIEW_CIRCLES_MM = {
+    "flange OD": ((0.0, 0.0, 0.0), feed_nut.FLANGE_DIA / 2.0),
+    "body": ((0.0, 0.0, 0.0), feed_nut.BODY_DIA / 2.0),
+    "bore": ((0.0, 0.0, 0.0), feed_nut.BORE_DIA / 2.0),
+    **{
+        f"{kind} {index}": ((x, 0.0, z), diameter / 2.0)
+        for index, (x, z) in enumerate(feed_nut.HOLE_CENTRES, start=1)
+        for kind, diameter in (("hole", feed_nut.HOLE_DIA), ("countersink", feed_nut.CSK_DIA))
+    },
+}
+# Section F-F's outer outline, (radius toward +X, station) mm segments.
+_R, _B = feed_nut.FLANGE_DIA / 2.0, feed_nut.BODY_DIA / 2.0
+SECTION_OUTLINE_MM = {
+    "seat face": ((-_R, 0.0), (_R, 0.0)),
+    "body end": ((-_B, feed_nut.LENGTH), (_B, feed_nut.LENGTH)),
+    **{
+        f"{edge} {side}": ((sign * a, s0), (sign * b, s1))
+        for side, sign in (("+X", 1.0), ("-X", -1.0))
+        for edge, (a, s0), (b, s1) in (
+            ("flange rim", (_R, 0.0), (_R, feed_nut.FLANGE_THICK)),
+            ("head face", (_R, feed_nut.FLANGE_THICK), (_B, feed_nut.FLANGE_THICK)),
+            ("body", (_B, feed_nut.FLANGE_THICK), (_B, feed_nut.LENGTH)),
+        )
+    },
+}
+
+
+def _circle_crosses_box(circle: tuple[float, float, float], box: tuple[float, ...]) -> bool:
+    cx, cy, radius = circle
+    near = math.hypot(min(max(cx, box[0]), box[2]) - cx, min(max(cy, box[1]), box[3]) - cy)
+    far = max(math.hypot(x - cx, y - cy) for x in (box[0], box[2]) for y in (box[1], box[3]))
+    return near < radius < far
+
+
+def text_crossings(
+    box: tuple[float, ...],
+    *,
+    lines: Mapping[str, tuple[float, float, float, float]],
+    circles: Mapping[str, tuple[float, float, float]],
+) -> list[str]:
+    """Which of ``lines`` ((x0, y0, x1, y1)) and ``circles`` ((cx, cy, r)),
+    sheet metres, run through ``box`` shrunk by ``_TEXT_LINE_INSET``."""
+    inset = _TEXT_LINE_INSET
+    inner = (box[0] + inset, box[1] + inset, box[2] - inset, box[3] - inset)
+    return [
+        *(
+            name
+            for name, line in lines.items()
+            if _segment_crosses_box(LeaderSegment(name, "line", *line, ""), box, inset=inset)
+        ),
+        *(name for name, circle in circles.items() if _circle_crosses_box(circle, inner)),
+    ]
+
+
+def _rework_outlines(
+    adapter: Any, end: Any, section: Any
+) -> tuple[dict[str, tuple[float, float, float, float]], dict[str, tuple[float, float, float]]]:
+    """Both views' part outlines on the sheet: the section's lines and the
+    end view's circles, projected from the spec's geometry."""
+    names = tuple(END_VIEW_CIRCLES_MM)
+    centres = model_points_in_view(
+        adapter,
+        end,
+        tuple(
+            tuple(value / 1000.0 for value in centre)
+            for centre, _radius in END_VIEW_CIRCLES_MM.values()
+        ),
+        label="feed nut end view outline",
+        names=names,
+    )
+    circles = {
+        name: (x, y, radius * _REWORK_PER_MODEL_MM)
+        for name, (x, y), (_centre, radius) in zip(
+            names, centres, END_VIEW_CIRCLES_MM.values(), strict=True
+        )
+    }
+    ends = model_points_in_view(
+        adapter,
+        section,
+        tuple(_nut_point(*point) for segment in SECTION_OUTLINE_MM.values() for point in segment),
+        label="section F-F outline",
+        names=tuple(
+            f"{name} {end}" for name in SECTION_OUTLINE_MM for end in ("start", "end")
+        ),
+    )
+    lines = {
+        name: (*ends[2 * index][:2], *ends[2 * index + 1][:2])
+        for index, name in enumerate(SECTION_OUTLINE_MM)
+    }
+    return lines, circles
+
+
+def _assert_rework_ink(
+    adapter: Any, annotations: list[Any], spigot: Any, end: Any, section: Any
+) -> None:
     """Every leadered callout block and the spigot note, as SolidWorks draws
-    them, stay inside the sheet's zone frame and clear of each other, and no
-    callout's leader runs through another callout's text. The note's native
-    extent spans its own leader down to the seat face, where the faced length's
-    witness starts, so leaders are checked against the callouts' text alone.
-    (No readback shows whether an ABOVE callout printed; its one-line guard
-    stands in.)"""
+    them, stay inside the sheet's zone frame and clear of each other; no
+    callout's leader runs through another callout's text; and no callout's
+    text is crossed by its own dimension, extension or leader lines or by
+    either view's part outline. The note's native extent spans its own leader
+    down to the seat face, where the faced length's witness starts, so leaders
+    are checked against the callouts' text alone. (No readback shows whether
+    an ABOVE callout printed; its one-line guard stands in.)"""
     rebuild_drawing(adapter, label="feed nut rework ink")
     region = sheet_region(adapter)
     named = _named(adapter, annotations)
@@ -1448,12 +1557,26 @@ def _assert_rework_ink(adapter: Any, annotations: list[Any], spigot: Any) -> Non
     for name in LEADERED:
         inks[name], boxes[name] = _callout_block(adapter, named[name], f"{name} callout")
     note = _box(_early_bound(spigot, "INote").GetExtent(), label="spigot note", kind="note")
+    outline_lines, outline_circles = _rework_outlines(adapter, end, section)
     for name, box in {**boxes, "spigot note": note}.items():
         require_inside(name, box, region)
         others = {other: value for other, value in boxes.items() if other != name}
         require_clear(name, box, others)
-        if name in inks:
-            require_leader_clear(inks[name], others)
+        if name not in inks:
+            continue
+        require_leader_clear(inks[name], others)
+        # Own lines against the shoulder's box, whose lower-left corner the
+        # leader ends on; outlines against the whole text block.
+        own = {
+            f"own line {index}": (segment.x0, segment.y0, segment.x1, segment.y1)
+            for index, segment in enumerate(inks[name].leader)
+        }
+        crossed = [
+            *text_crossings(inks[name].text, lines=own, circles={}),
+            *text_crossings(box, lines=outline_lines, circles=outline_circles),
+        ]
+        if crossed:
+            raise RuntimeError(f"{name} callout text {box!r} is crossed by {crossed}")
 
 
 def _add_spigot_note(adapter: Any, section: Any) -> tuple[Any, tuple[float, float]]:
@@ -1689,7 +1812,7 @@ def _append_feed_nut_rework_sheet(adapter: Any) -> tuple[Callable[[], None], ...
         _assert_callouts(adapter, annotations, REWORK_CALLOUTS)
         _assert_callouts(adapter, receipt, RECEIPT_CALLOUTS)
         _assert_spigot_note(adapter, spigot, spigot_tip)
-        _assert_rework_ink(adapter, [*annotations, *receipt], spigot)
+        _assert_rework_ink(adapter, [*annotations, *receipt], spigot, end, section)
         title_fit()
 
     settled()

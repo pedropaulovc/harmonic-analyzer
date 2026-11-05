@@ -513,12 +513,14 @@ DRAWING_PRECISION = {
 # One printed countersink stands for all four. The section shows the mouth
 # as a linear size, so the Ø is the native <MOD-DIAM> token in the prefix,
 # as build_sm_gooseneck / build_mg_magnifying_wheel print their diameters.
-# The hole circle's diameter prints its own Ø.
+# A diameter's own Ø is its default prefix, which a set prefix replaces (run
+# 20261105T023247678Z printed "4X 3.60/3.46"), so the hole's count carries
+# the token too.
 CSK_PREFIX = f"{SCREW_COUNT}X <MOD-DIAM>"
 CSK_CALLOUT = f"{CSK_ANGLE:.0f}° CSK"
 DIMENSION_PREFIXES = {
     ("Countersink1Profile", "CskDia"): CSK_PREFIX,
-    (RECEIPT_SKETCH, "ReceiptHoleDia"): f"{SCREW_COUNT}X ",
+    (RECEIPT_SKETCH, "ReceiptHoleDia"): CSK_PREFIX,
 }
 
 # --- Supplier reference sizes (the dimension image's, mm) ---------------------------
