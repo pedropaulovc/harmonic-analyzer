@@ -27,18 +27,20 @@ LEGS = (
 AXIS_Y = Y_DRIVE
 DRAWING_DIMENSIONS = {feature: {name} for feature, name, _south, _north in LEGS}
 # The package prints decimal inch (#290).  Both settings carry a ±0.10 fit-up
-# band, printed ±.003 at three inch places: floored onto the printed grid so
-# the sheet never admits a stack or gap the bank layout's budget refuses
-# (±.004 would, by 0.0016), the nominal (5.556, .037) at the band's places
-# (drawing-guidelines rule 3).  Four places (±.0039) read as a converted mm
-# band, not a deliberate inch one.
-PLACES = 3
+# band, floored to ±.003 (±.004 would admit 0.0016 past the bank layout's
+# budget).  The nominals stay the model's (the stack is the gears' sum, the
+# gap a metric gauge blade), so they print at four places with the band as
+# ±.0030 (5.5563, .0374): at three places their rounding would move the
+# printed limits off the native ones (Codjiflo, #2194; drawing-guidelines
+# rule 3).
+BAND_PLACES = 3
+PLACES = 4
 DRAWING_PRECISION = {feature: {name: PLACES} for feature, name, _south, _north in LEGS}
 
 
 def _inward(band_mm: float) -> float:
-    """``band_mm`` floored onto the ``PLACES``-place inch grid, in mm."""
-    return math.floor(band_mm / 25.4 * 10**PLACES + 1e-9) / 10**PLACES * 25.4
+    """``band_mm`` floored onto the ``BAND_PLACES``-place inch grid, in mm."""
+    return math.floor(band_mm / 25.4 * 10**BAND_PLACES + 1e-9) / 10**BAND_PLACES * 25.4
 
 
 DIMENSION_BANDS = {
@@ -54,6 +56,25 @@ DIMENSION_CALLOUTS = {
     STACK_DIMENSION: "CLOSED GEAR STACK",
     SPRING_DIMENSION: "GEAR 19 TO NORTH PEDESTAL / SET WITH BLADE",
 }
+
+# The printed limits (nominal at PLACES, ± band) are the native limits to
+# within the display rounding, and inside the bank layout's budget.
+for _feature, _name, _south, _north in LEGS:
+    _nominal = _north - _south
+    _budget = (
+        (bank.STACK_L20_ACCEPT_BAND[1], bank.STACK_L20_ACCEPT_BAND[0])
+        if _name == STACK_DIMENSION
+        else (-bank.BANK_SPRING_SET_BAND, bank.BANK_SPRING_SET_BAND)
+    )
+    _printed = round(_nominal / 25.4, PLACES) * 25.4
+    _upper, _lower = DIMENSION_BANDS[_name]
+    if abs(_printed - _nominal) > 0.5 * 25.4 / 10**PLACES + 1e-9:
+        raise AssertionError(f"{_name}: the printed nominal leaves the native one")
+    if not (
+        _nominal + _budget[0] - 1e-9 <= _printed + _lower
+        and _printed + _upper <= _nominal + _budget[1] + 1e-9
+    ):
+        raise AssertionError(f"{_name}: the printed limits leave the bank budget {_budget}")
 
 if abs(LEGS[0][3] - LEGS[0][2] - bank.STACK_L20) > bank.PITCH_LOCKSTEP_TOLERANCE:
     raise AssertionError("the bank setting leg is not the closed stack length")
