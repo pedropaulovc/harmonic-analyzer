@@ -7,4 +7,5 @@ mg-magnifying-vertical-rod:
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
   drawing_unit: in
-  process: "machined (brass)"
+  # Pedro's owner ruling, 2026-11-05 (coordinator session): thread stays die-cut.
+  process: "machined (brass); die-cut #4-40 thread"

@@ -12,7 +12,7 @@ Design (owner rulings 2026-10-27, #1951).  The whole gooseneck is 1/2 in x
 stock, bent R3.0 on the 1/2 in x 3 in CLR die.  The arm ends flush, with no
 step, in a solid Ø.500 end piece silver-brazed on a shank inside the tube
 and tapped 1/4-28 UNF-2B blind after the braze for MHA-SM-04; an arm-end
-counterbore clears that screw's die run-out.  A 5/8 in x 0.058 in 4130-N
+counterbore clears that screw's thread run-out.  A 5/8 in x 0.058 in 4130-N
 seamless sleeve (OnlineMetals 7324), select-fitted from stock and brazed both
 ends, covers the leg from its foot: the post the top frame's Ø17 hub bore
 takes.

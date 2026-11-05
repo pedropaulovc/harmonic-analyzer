@@ -597,7 +597,7 @@ if THUMBNUT_ENGAGEMENT_WORST < ENGAGEMENT_FLOOR_D * THREAD_MAJOR - 1e-9:
     )
 # At the rearward stop the nut's seat stands in front of the core's step, so
 # its thread runs only on full thread or over the relief, never onto the core
-# or a die run-out.
+# or incomplete thread at the tool's exit.
 NUT_CORE_STEP_AIR = LENGTH_FITTED_MIN + PILOT_LENGTH_FITTED_MIN - _CORE_FRONT_MAX
 if NUT_CORE_STEP_AIR <= 0.0:
     raise AssertionError(

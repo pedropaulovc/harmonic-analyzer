@@ -67,6 +67,11 @@ MOUTH_CHAMFER_BAND = (MOUTH_CHAMFER_MAX - MOUTH_CHAMFER, -MOUTH_CHAMFER)
 CHAMFER_LEG_MAX = MOUTH_CHAMFER_MAX * math.tan(
     math.radians(45.0 + angular_band_deg(unit=BRACKET_UNIT))
 )
+# The process YAML records single-pointing on the lathe (Pedro, 2026-11-05,
+# coordinator session). This existing printed MAX is an acceptance limit on
+# incomplete thread, not a die-lead requirement; retain it in the engagement
+# and root-clearance stacks. There is no seating shoulder to clear with a
+# relief groove: the fitted receiver stays wholly beyond the root runout.
 INCOMPLETE_THREAD_MAX = 1.5 * PITCH  # .075
 REQUIRED_FULL_ENGAGEMENT = 1.5 * THREAD_MAJOR
 TAP_SPEC = HoleSpec("tapped", THREAD, end="through_all", thread_class="2B")

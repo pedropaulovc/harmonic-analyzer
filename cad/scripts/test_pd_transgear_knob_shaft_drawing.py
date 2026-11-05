@@ -169,6 +169,17 @@ def test_real_d_core_thread_and_inch_g6_source() -> None:
     assert ring.LENGTH == 5.207
 
 
+def test_single_point_thread_retains_the_functional_relief() -> None:
+    # Pedro 2026-11-05: no die-lead requirement, but the thumbnut must cross
+    # the unchanged relief and the tool must exit below the thread root.
+    assert spec.PLAIN_CORE == pytest.approx(0.30 * spec.MM_PER_IN)
+    assert spec.CORE_FRONT_FROM_F == pytest.approx(0.21 * spec.MM_PER_IN)
+    assert spec.RELIEF_WIDTH_MIN == pytest.approx(0.07 * spec.MM_PER_IN)
+    assert spec.RELIEF_DIA == pytest.approx(0.10 * spec.MM_PER_IN)
+    assert spec.RELIEF_WIDTH_MIN > 0.0
+    assert spec.RELIEF_DIA_MAX < spec.THREAD_ROOT_2A_MIN
+
+
 def test_machine_and_float_stations_are_unchanged() -> None:
     for local, machine in (
         (spec.TIP_Z, -171.976), (spec.THREAD_END_Z, -155.72),

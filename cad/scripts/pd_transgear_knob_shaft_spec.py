@@ -223,7 +223,7 @@ THREAD_BASIC_MINOR = THREAD_MAJOR - 1.082532 * THREAD_PITCH
 THREAD_MAJOR_2A_IN = (0.1571, 0.1631)
 THREAD_MAJOR_2A = tuple(v * MM_PER_IN for v in THREAD_MAJOR_2A_IN)
 THREAD_PD_2A_MIN_IN = 0.1399
-# Conservative die root: a full basic half-depth below minimum 2A pitch.
+# Conservative thread-root estimate: a full basic half-depth below minimum 2A pitch.
 THREAD_ROOT_2A_MIN = (THREAD_PD_2A_MIN_IN - 0.649519 / THREADS_PER_IN) * MM_PER_IN
 # The #8-32 UNC-2A class (title block) governs the turned blank: the blank is
 # printed as a reference nominal inside the 2A major window, and the window
@@ -312,7 +312,7 @@ TOOTH_SPACE_CALLOUT_POINT_MM = (
     0.0,
 )
 # FRONT STATION from F, not the shortened active D length.  Its stacks (the
-# collar's D support, the thumbnut's core-step air, the die's relief) all hold
+# collar's D support, the thumbnut's core-step air, the thread relief) all hold
 # at the .XX grade, so it prints two places.
 CORE_FRONT_FROM_F = 5.334  # .21
 CORE_FRONT_FROM_F_PLACES = 2
@@ -388,23 +388,20 @@ if (
 if FRONT_RELIEF_WIDTH_MIN <= 2.0 * FRONT_CORNER_RADIUS_MAX:
     raise AssertionError("the front neck has no straight floor between its corner radii")
 
-# --- Thread relief: the die's run-out lies in it (R9-53) -----------------------
-# Full thread ends PLAIN_CORE in front of F, on the relief's front shoulder
-# (.XX).  The die runs rearward until its leading face meets the core's
-# step, so it cuts full thread to the step plus its chamfered lead; the
-# narrowest printed relief holds a lead of DIE_RUNOUT_PITCHES (a die run
-# with its chamfer leading [INFERENCE: 1.5 P is the shorter of the common
-# die leads]).  The relief's floor stands under the deepest die-cut root,
-# so the lead's incomplete threads lie in air, and the thumbnut at the
-# collar's rearward stop runs only on full thread or over the relief.
+# --- Thread relief: single-point tool exit and thumbnut clearance (R9-53) ----
+# Pedro's owner ruling 2026-11-05 (coordinator session): single-point the
+# #8-32 UNC-2A thread on the lathe, not with a die. Full thread ends at
+# PLAIN_CORE in front of F, on the relief's front shoulder (.XX). The existing
+# relief provides a tool-exit space below the conservative thread-root estimate;
+# the thumbnut at the collar's rearward stop runs on full thread or over that
+# relief. Single-pointing removes the die's assumed 1.5-pitch lead requirement,
+# not the functional relief, its floor diameter or either shoulder station.
 PLAIN_CORE = 7.62  # .30
 PLAIN_CORE_PLACES = 2
 THREAD_LENGTH_REF = TIP_STATION - PLAIN_CORE  # .64 REF
-DIE_RUNOUT_PITCHES = 1.5
-DIE_RUNOUT_MAX = DIE_RUNOUT_PITCHES * THREAD_PITCH
-# Ø.10 at the .XX row (.09-.11): the relief only clears the thumbnut and lays
-# the die's lead in air, so it takes the loosest row whose maximum stays
-# under the deepest die root (machinist review of cf6e32b19: .110 at .XXX
+# Ø.10 at the .XX row (.09-.11): the relief clears the thumbnut and lets the
+# tool exit below the thread root, so it takes the loosest row whose maximum
+# stays under the root estimate (machinist review of cf6e32b19: .110 at .XXX
 # named no function; .11 at .XX would reach .120, over the .1196 root).
 RELIEF_DIA = 2.54  # .10
 RELIEF_DIA_PLACES = 2
@@ -415,16 +412,12 @@ RELIEF_DIA_MIN = RELIEF_DIA - printed_band_mm(RELIEF_DIA_PLACES, unit=UNIT)
 RELIEF_WIDTH_MIN = (PLAIN_CORE - _PLAIN_CORE_TOL) - (
     CORE_FRONT_FROM_F + _CORE_FRONT_TOL
 )  # .29 - .22 = .07
-if RELIEF_WIDTH_MIN < DIE_RUNOUT_MAX - 1e-9:
-    raise AssertionError(
-        f"MHA-PD-08 thread relief / die run-out: the narrowest relief "
-        f"{RELIEF_WIDTH_MIN:.3f} is under the {DIE_RUNOUT_MAX:.3f} "
-        f"({DIE_RUNOUT_PITCHES}P) a die's lead runs out over"
-    )
+if RELIEF_WIDTH_MIN <= 0.0:
+    raise AssertionError("MHA-PD-08 thread relief must separate the core and full thread")
 if RELIEF_DIA_MAX > THREAD_ROOT_2A_MIN + 1e-9:
     raise AssertionError(
-        f"MHA-PD-08 thread relief / die root: the largest relief "
-        f"Ø{RELIEF_DIA_MAX:.3f} stands above the deepest die-cut root "
+        f"MHA-PD-08 thread relief / root estimate: the largest relief "
+        f"Ø{RELIEF_DIA_MAX:.3f} stands above the deepest thread-root estimate "
         f"Ø{THREAD_ROOT_2A_MIN:.3f}"
     )
 # Nut clamp crosses the relief; drive torque enters the D-core behind it.
