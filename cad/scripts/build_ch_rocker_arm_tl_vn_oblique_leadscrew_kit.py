@@ -100,7 +100,6 @@ from _visibility import assert_reference_geometry_hidden, blank_reference_geomet
 from ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec import (
     BLANK_VOLUME_MM3,
     CLOCKED_FLATS,
-    DIMENSION_CONTROLS,
     DIMENSION_TOLERANCE_TYPES,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -917,7 +916,7 @@ def _author_flange_limits(adapter) -> None:
 def _feed_nut_rework(adapter) -> None:
     """The FeedNut's native rework controls (Codjiflo P2), authored while it
     is the active member on its own features: the flange LIMIT, the
-    countersink's ± and its "4X" prefix, both at the band's one place, then
+    countersink's ± and its "4X Ø" prefix, both at the band's one place, then
     marked for the REWORK sheet."""
     _author_flange_limits(adapter)
     _, lower, upper, places = feed_nut.REWORK_CONTROLS["CskDia"]

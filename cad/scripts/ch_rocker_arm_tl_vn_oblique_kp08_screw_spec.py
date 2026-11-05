@@ -44,7 +44,8 @@ from __future__ import annotations
 import _config
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
-from _mcmaster_91255a150 import DIMS, LENGTH_TEXT, PACK_QUANTITY, PART_NO, TENSILE_PSI, THREAD
+from _mcmaster_91255a150 import DIMS, LENGTH_TEXT, PART_NO, THREAD
+from _mcmaster_91255a150 import TENSILE_PSI as TENSILE_PSI  # re-exported for the jig's preload check
 from _package_units import drawing_unit
 
 UNIT = drawing_unit(

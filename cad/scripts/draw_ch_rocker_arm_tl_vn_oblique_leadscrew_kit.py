@@ -49,6 +49,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 from _com import _early_bound, _read_member
+import _config
 from _drawing_centerline import add_view_centerline
 from _drawing_common import read_required_properties, rebuild_drawing
 from _drawing_detail_projection import settle_detail_projection
@@ -476,11 +477,48 @@ REWORK_SECTION_CENTER = (0.280, 0.160)
 # The cutting line runs this far past the flange rim each side (sheet).
 REWORK_SECTION_OVERRUN = 0.008
 # Text points, model mm (radius toward +X, station from the seat face): the
-# flange's thickness beyond its rim; the countersink's diameter beside the
-# body, past the head face, clear of the body (Ø10.2) and the rim.
-FLANGE_THICK_TEXT_MM = (feed_nut.FLANGE_DIA / 2.0 + 4.0, feed_nut.FLANGE_THICK / 2.0)
-CSK_DIA_TEXT_MM = (feed_nut.HOLE_PCD / 2.0 + 1.0, feed_nut.FLANGE_THICK + 5.0)
-REWORK_CALLOUTS = {"CskDia": feed_nut.CSK_CALLOUT}
+# flange's thickness beyond its rim, high enough for its two callout lines
+# above; the countersink's past the body's end and above it, so its callout
+# lines below clear the flange, the body and the flange's text.
+FLANGE_THICK_TEXT_MM = (feed_nut.FLANGE_DIA / 2.0 + 6.0, feed_nut.FLANGE_THICK / 2.0)
+CSK_DIA_TEXT_MM = (feed_nut.FLANGE_DIA / 2.0 + 1.0, feed_nut.LENGTH + 6.0)
+# Rule 4: each band tighter than the title block's names its mate. The faced
+# seat bears on TL-32's lug face and the flange is the four nut screws' grip;
+# the countersinks seat those screws' 82° heads, which stand proud of the
+# head face at every countersink in the band (the spec's HEAD_PROUD_MIN).
+# Rule 17: the countersink's callout states its walls as a plain fact
+# (RV-01, as dt-cone-gear-tl-index-plate prints WEB .03 MIN).
+FEED_BLOCK_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-feed-block")["number"]
+NUT_SCREW_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-riser-screw")["number"]
+if feed_nut.SCREW_SKU not in _config.parts("ch-rocker-arm-tl-vn-oblique-riser-screw")[
+    "supplier_skus"
+]:
+    raise AssertionError("the nut screws' number is not the screw the spec sizes")
+if feed_nut.HEAD_PROUD_MIN <= 0.0:
+    raise AssertionError("the callout says the heads stand proud")
+FLANGE_THICK_CALLOUT = (
+    f"SEAT FACE ON {FEED_BLOCK_NUMBER} LUG\n"
+    f"GRIP OF {feed_nut.SCREW_COUNT}X {NUT_SCREW_NUMBER}"
+)
+CSK_SCREW_CALLOUT = (
+    f"{feed_nut.CSK_CALLOUT} FOR {feed_nut.SCREW_THREAD} FLAT HEAD\n"
+    f"{feed_nut.SCREW_SKU} ({NUT_SCREW_NUMBER})\n"
+    "HEAD PROUD OF FACE\n"
+    f"{feed_nut.CSK_WALL_TEXT}"
+)
+# name -> (callout lane, text); swDimensionTextCalloutAbove 3, Below 4.
+REWORK_CALLOUTS = {
+    "FlangeThick": ("above", FLANGE_THICK_CALLOUT),
+    "CskDia": ("below", CSK_SCREW_CALLOUT),
+}
+_CALLOUT_TEXT_PARTS = {"above": 3, "below": 4}
+# The faced face: the spigot stood on the seat face, inside the Ø10.2; its
+# tip lands midway across that annulus, on the -X half below the axis. The
+# note sits left of the section, between it and the end view.
+SPIGOT_NOTE = "SPIGOT FACED FLUSH\nWITH FLANGE SEAT FACE"
+SPIGOT_TIP_MM = (-(feed_nut.BORE_DIA + feed_nut.BODY_DIA) / 4.0, 0.0)
+SPIGOT_NOTE_XY = (0.172, 0.130)
+SPIGOT_NOTE_CELL = (0.165, 0.108, 0.248, 0.136)
 REWORK_EXPECTED = {
     name: (nominal / 1000.0, lower / 1000.0, upper / 1000.0)
     for name, (nominal, lower, upper, _places) in feed_nut.REWORK_CONTROLS.items()
@@ -1254,6 +1292,64 @@ def _require_axis_horizontal(adapter: Any, view: Any, *, label: str) -> None:
         raise RuntimeError(f"{label} does not lie axis-horizontal: {step!r}")
 
 
+def _assert_rework_callouts(adapter: Any, annotations: list[Any]) -> None:
+    """Each banded control still prints its mate in its own callout lane."""
+    printed = {}
+    for raw in annotations:
+        annotation = _sw_type_info.early_bound_or_flag(
+            raw, "IAnnotation", "GetSpecificAnnotation"
+        )
+        name = dimension_name(adapter, annotation)
+        if name not in REWORK_CALLOUTS:
+            continue
+        lane, text = REWORK_CALLOUTS[name]
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        actual = str(display.GetText(_CALLOUT_TEXT_PARTS[lane]) or "")
+        printed[name] = actual.replace("\r\n", "\n").replace("\r", "\n")
+        if printed[name] != text:
+            raise RuntimeError(f"{name}: callout reads {printed[name]!r}, not {text!r}")
+    if set(printed) != set(REWORK_CALLOUTS):
+        raise RuntimeError(
+            f"rework callouts missing: {sorted(set(REWORK_CALLOUTS) - set(printed))}"
+        )
+
+
+def _add_spigot_note(adapter: Any, section: Any) -> Any:
+    """Name the faced face: a leader to the seat face where the spigot stood."""
+    (tip,) = model_points_in_view(
+        adapter,
+        section,
+        (_nut_point(*SPIGOT_TIP_MM),),
+        label="section F-F faced seat face",
+        names=("spigot footprint on the seat face",),
+    )
+    # The seat face must face the note: right of its cell, the leader short.
+    if not SPIGOT_NOTE_CELL[2] < tip[0] < SPIGOT_NOTE_CELL[2] + 0.015:
+        raise RuntimeError(f"section F-F's seat face is not beside its note: {tip!r}")
+    if not SPIGOT_NOTE_CELL[1] < tip[1] < REWORK_SECTION_CENTER[1]:
+        raise RuntimeError(f"the spigot note's tip left the faced half: {tip!r}")
+    note = add_leader_note(
+        adapter,
+        SPIGOT_NOTE,
+        text_xy=SPIGOT_NOTE_XY,
+        attach_xy=tip,
+        label="feed nut spigot facing",
+        view=section,
+    )
+    _assert_spigot_note(adapter, note)
+    return note
+
+
+def _assert_spigot_note(adapter: Any, note: Any) -> None:
+    native = _early_bound(note, "INote")
+    text = str(native.GetText() or "").replace("\r\n", "\n").replace("\r", "\n")
+    if text != SPIGOT_NOTE:
+        raise RuntimeError(f"spigot facing note reads {text!r}")
+    box = _box(native.GetExtent(), label="spigot facing note", kind="note")
+    if not _inside(box, SPIGOT_NOTE_CELL):
+        raise RuntimeError(f"spigot facing note leaves its cell: {box!r}")
+
+
 @_telemetry.traced("drawing.feed_nut_rework_sheet")
 def _append_feed_nut_rework_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
     """Author FEED NUT REWORK: the FeedNut's native flange and countersink
@@ -1327,7 +1423,15 @@ def _append_feed_nut_rework_sheet(adapter: Any) -> tuple[Callable[[], None], ...
         tolerance_types=feed_nut.DIMENSION_TOLERANCE_TYPES,
         precision=REWORK_PRECISION,
     )
-    set_dimension_callouts(adapter, annotations, REWORK_CALLOUTS)
+    for lane in ("below", "above"):
+        set_dimension_callouts(
+            adapter,
+            annotations,
+            {name: text for name, (where, text) in REWORK_CALLOUTS.items() if where == lane},
+            location=lane,
+        )
+    _assert_rework_callouts(adapter, annotations)
+    spigot = _add_spigot_note(adapter, section)
     note = _literal_note(adapter, REWORK_ITEM, *ITEM_LABEL_XY)
     notes = [(note, REWORK_ITEM, REWORK_ITEM, ITEM_LABEL_CELL)]
     title_notes, title_fit = _member_title_block(adapter, draw, properties)
@@ -1350,6 +1454,8 @@ def _append_feed_nut_rework_sheet(adapter: Any) -> tuple[Callable[[], None], ...
             tolerance_types=feed_nut.DIMENSION_TOLERANCE_TYPES,
             precision=REWORK_PRECISION,
         )
+        _assert_rework_callouts(adapter, annotations)
+        _assert_spigot_note(adapter, spigot)
         title_fit()
 
     settled()

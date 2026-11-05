@@ -842,7 +842,13 @@ def test_feed_nut_rework_is_native_banded_controls_on_sheet_3() -> None:
         "NutProfile": {"FlangeThick": 1},
         "Countersink1Profile": {"CskDia": 1},
     }
-    assert nut.CSK_PREFIX == f"{nut.SCREW_COUNT}X " == "4X "
+    # "4X Ø4.6 ±0.1": the count, then SolidWorks' own diameter token, once.
+    # CskDia is the mouth's diameter (REWORK_CONTROLS' 4.6), printed in the
+    # section as a linear size, which adds no Ø of its own (run 6 printed
+    # "4X 4.6"); the callout lines below carry none either.
+    assert nut.CSK_PREFIX == f"{nut.SCREW_COUNT}X <MOD-DIAM>" == "4X <MOD-DIAM>"
+    assert nut.REWORK_CONTROLS["CskDia"][0] == nut.CSK_DIA
+    assert "Ø" not in draw.CSK_SCREW_CALLOUT and "MOD-DIAM" not in draw.CSK_SCREW_CALLOUT
     assert nut.CSK_ANGLE == 82.0
     assert nut.CSK_CALLOUT == "82° CSK"
     assert nut.CSK_APEX_DEPTH * math.tan(math.radians(41.0)) == pytest.approx(
@@ -870,7 +876,50 @@ def test_feed_nut_rework_is_native_banded_controls_on_sheet_3() -> None:
         "CskDia": pytest.approx((0.0046, -0.0001, 0.0001)),
     }
     assert draw.REWORK_PRECISION == {"FlangeThick": 1, "CskDia": 1}
-    assert draw.REWORK_CALLOUTS == {"CskDia": nut.CSK_CALLOUT}
+    assert set(draw.REWORK_CALLOUTS) == set(nut.REWORK_CONTROLS)
+
+
+def test_rework_bands_name_their_mates_at_their_callouts() -> None:
+    """Rule 4 (run 20261104T230444981Z): the flange's 3.3/3.7 names the lug
+    the faced seat bears on and the screws it grips; the countersink's ±0.1
+    names the flat head that seats in it and how it seats."""
+    import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
+
+    lane, flange = draw.REWORK_CALLOUTS["FlangeThick"]
+    assert lane == "above"
+    lane, countersink = draw.REWORK_CALLOUTS["CskDia"]
+    assert lane == "below"
+    # The lug is the feed block's, and the screws are the registry row that
+    # buys the SKU whose head the spec sizes the countersink for.
+    assert draw.FEED_BLOCK_NUMBER == feed_block.NUMBER
+    assert f"SEAT FACE ON {feed_block.NUMBER} LUG" in flange.splitlines()[0]
+    screw_row = _config.parts("ch-rocker-arm-tl-vn-oblique-riser-screw")
+    assert screw_row["supplier_skus"] == [nut.SCREW_SKU]
+    assert draw.NUT_SCREW_NUMBER == screw_row["number"]
+    assert flange.splitlines()[1] == f"GRIP OF {nut.SCREW_COUNT}X {screw_row['number']}"
+    # The fastener table's nut row is that flat head, through the flange
+    # (the grip) into the feed block.
+    row = fasteners.NUT_TO_FEED_BLOCK
+    assert (row.thread, row.length, row.count) == (
+        nut.SCREW_THREAD, nut.SCREW_LENGTH_TEXT, nut.SCREW_COUNT,
+    )
+    assert row.head == fasteners.FLAT_HEAD
+    assert row.grip_mm == pytest.approx(nut.FLANGE_THICK + nut.HEAD_PROUD_NOMINAL)
+    rows = countersink.splitlines()
+    assert rows[0] == f"{nut.CSK_ANGLE:.0f}° CSK FOR {nut.SCREW_THREAD} FLAT HEAD"
+    assert nut.SCREW_DIMS.head_angle_deg == nut.CSK_ANGLE
+    assert rows[1] == f"{nut.SCREW_SKU} ({screw_row['number']})"
+    # Seating: the head stands proud at every countersink the band and the
+    # opening remedy allow, never flush or below the face.
+    assert 0.0 < nut.HEAD_PROUD_MIN < nut.HEAD_PROUD_MAX
+    assert rows[2] == "HEAD PROUD OF FACE"
+    # Nothing the spec does not establish: no seat depth, no flush; the only
+    # numbers past the screw's are the spec's walls (RV-01).
+    assert len(rows) == 4 and rows[3] == nut.CSK_WALL_TEXT
+    assert "FLUSH" not in countersink and not re.search(r"\d\.\d", "\n".join(rows[:3]))
+    # The faced face is named where it is: the seat face the lug bears on.
+    assert draw.SPIGOT_NOTE.replace("\n", " ") == "SPIGOT FACED FLUSH WITH FLANGE SEAT FACE"
+    assert nut.LENGTH == nut.FLANGE_THICK + nut.BODY_LENGTH  # no spigot left
 
 
 def test_rework_tolerances_live_only_in_the_feed_nut_member() -> None:
@@ -1235,13 +1284,77 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
         assert draw._inside_sheet(box), box
     assert not draw._overlaps(cut, section)
     assert cut[3] < draw.ITEM_LABEL_CELL[1]
-    # The texts stand clear of the section's ink: the flange's beyond the rim,
-    # the countersink's beside the body, past the head face, inside the rim.
-    flange_r, flange_y = draw.FLANGE_THICK_TEXT_MM
-    assert flange_r > nut.FLANGE_DIA / 2.0 + 2.0 and 0.0 < flange_y < nut.FLANGE_THICK
-    csk_r, csk_y = draw.CSK_DIA_TEXT_MM
-    assert nut.BODY_DIA / 2.0 + 2.0 < csk_r < nut.FLANGE_DIA / 2.0
-    assert nut.FLANGE_THICK + 3.0 < csk_y < nut.LENGTH
+    # Text fit, at 2.8 mm a character and 5.5 mm a line (the farm render's
+    # 4:1 sheet): each control's value and callout lanes, and the spigot
+    # note, stand clear of the section's ink, the end view and each other.
+    char, line = 0.0028, 0.0055
+
+    def sheet_point(radius_mm, station_mm):
+        return (
+            draw.REWORK_SECTION_CENTER[0] + (station_mm - nut.LENGTH / 2.0) * scale,
+            draw.REWORK_SECTION_CENTER[1] + radius_mm * scale,
+        )
+
+    def width(text):
+        return char * max(len(row) for row in text.splitlines())
+
+    flange_x, flange_y = sheet_point(*draw.FLANGE_THICK_TEXT_MM)
+    lane, callout = draw.REWORK_CALLOUTS["FlangeThick"]
+    assert lane == "above"
+    half = max(width(callout), char * 3) / 2.0
+    flange_text = (
+        flange_x - half,
+        flange_y - line,  # 3.7 over 3.3
+        flange_x + half,
+        flange_y + line + line * len(callout.splitlines()),
+    )
+    csk_x, csk_y = sheet_point(*draw.CSK_DIA_TEXT_MM)
+    lane, callout = draw.REWORK_CALLOUTS["CskDia"]
+    assert lane == "below"
+    half = width(callout) / 2.0
+    csk_text = (
+        csk_x - half,
+        csk_y - line / 2.0 - line * len(callout.splitlines()),
+        csk_x + half,
+        csk_y + line / 2.0,
+    )
+    seat_x = sheet_point(0.0, 0.0)[0]
+    flange_ink = (
+        seat_x,
+        draw.REWORK_SECTION_CENTER[1] - radius,
+        seat_x + nut.FLANGE_THICK * scale,
+        draw.REWORK_SECTION_CENTER[1] + radius,
+    )
+    body_ink = (
+        flange_ink[2],
+        draw.REWORK_SECTION_CENTER[1] - nut.BODY_DIA / 2.0 * scale,
+        seat_x + nut.LENGTH * scale,
+        draw.REWORK_SECTION_CENTER[1] + nut.BODY_DIA / 2.0 * scale,
+    )
+    note_x, note_y = draw.SPIGOT_NOTE_XY
+    note = (
+        note_x,
+        note_y - line * len(draw.SPIGOT_NOTE.splitlines()),
+        note_x + width(draw.SPIGOT_NOTE),
+        note_y,
+    )
+    assert draw._inside(note, draw.SPIGOT_NOTE_CELL)
+    texts = (flange_text, csk_text, draw.SPIGOT_NOTE_CELL)
+    for index, text in enumerate(texts):
+        assert draw._inside_sheet(text), text
+        assert not draw._overlaps(text, draw.ITEM_LABEL_CELL)
+        for ink in (flange_ink, body_ink, end, cut):
+            assert not draw._overlaps(text, ink), (text, ink)
+        for other in texts[index + 1 :]:
+            assert not draw._overlaps(text, other), (text, other)
+    # The spigot note's leader lands on the seat face, inside the annulus the
+    # faced spigot stood on, just right of its cell.
+    tip_r, tip_station = draw.SPIGOT_TIP_MM
+    assert tip_station == 0.0
+    assert nut.BORE_DIA / 2.0 < abs(tip_r) < nut.BODY_DIA / 2.0
+    tip = sheet_point(tip_r, tip_station)
+    assert draw.SPIGOT_NOTE_CELL[2] < tip[0] < draw.SPIGOT_NOTE_CELL[2] + 0.015
+    assert draw.SPIGOT_NOTE_CELL[1] < tip[1] < draw.REWORK_SECTION_CENTER[1]
     assert draw.REWORK_END_ANGLE == math.pi / 2.0
     # One letter per cut in the package: sheet 2's A to E, sheet 3's F.
     letters = [
@@ -2171,3 +2284,95 @@ def test_build_activates_the_nut_and_keeps_the_rolled_leadscrew_in_projection(
         else:
             assert end[0::2] == front[0::2] and end[1] > front[3]
             assert lateral[1::2] == front[1::2] and lateral[0] > front[2]
+
+
+def _floor2(value: float) -> str:
+    return f"{math.floor(value * 100.0 + 1e-9) / 100.0:.2f}"
+
+
+def test_countersink_walls_are_the_worst_case_the_package_allows() -> None:
+    # Every allowance a MIN must cover: the hole off station (receipt band),
+    # the countersink off the hole, the mouth opened to F2's Ø3/16 cutter
+    # (past the band's Ø4.7) and the body at its receipt maximum; the flange
+    # OD has no receipt minimum, so the listing's Ø22.
+    shift = nut.HOLE_STATION_BAND + nut.CSK_ECCENTRICITY_MAX
+    assert (nut.HOLE_STATION_BAND, nut.CSK_ECCENTRICITY_MAX) == (0.05, 0.02)
+    mouth = nut.CSK_DIA_OPEN_MAX
+    assert mouth == pytest.approx(3.0 / 16.0 * 25.4) and mouth > nut.CSK_DIA + nut.CSK_DIA_BAND
+    assert nut.BODY_DIA_MAX == 10.3
+    assert nut.CSK_WALL_TO_BODY == pytest.approx(
+        nut.HOLE_PCD / 2.0 - shift - mouth / 2.0 - nut.BODY_DIA_MAX / 2.0
+    ) == pytest.approx(0.39875)
+    assert nut.CSK_WALL_TO_OD == pytest.approx(
+        nut.FLANGE_DIA / 2.0 - nut.HOLE_PCD / 2.0 - shift - mouth / 2.0
+    ) == pytest.approx(0.54875)
+    # Thinner than at the band's Ø4.7 with everything nominal (0.55, 0.65).
+    band_mouth = nut.CSK_DIA + nut.CSK_DIA_BAND
+    assert nut.CSK_WALL_TO_BODY < nut.HOLE_PCD / 2.0 - band_mouth / 2.0 - nut.BODY_DIA / 2.0
+    assert nut.CSK_WALL_TO_OD < nut.FLANGE_DIA / 2.0 - nut.HOLE_PCD / 2.0 - band_mouth / 2.0
+    assert 0.0 < nut.CSK_WALL_TO_BODY < nut.CSK_WALL_TO_OD < nut.WALL_FLOOR == 1.5
+    # The supplied holes alone already miss the floor, nominal and at receipt.
+    assert nut.HOLE_WALL_TO_BODY == pytest.approx(1.15)
+    assert nut.HOLE_WALL_TO_OD == pytest.approx(1.25)
+    assert nut.HOLE_WALL_TO_BODY_MIN == pytest.approx(
+        nut.HOLE_PCD / 2.0 - nut.HOLE_STATION_BAND - nut.HOLE_DIA_MAX / 2.0 - nut.BODY_DIA_MAX / 2.0
+    ) == pytest.approx(1.00)
+    assert nut.HOLE_WALL_TO_OD_MIN == pytest.approx(
+        nut.FLANGE_DIA / 2.0 - nut.HOLE_PCD / 2.0 - nut.HOLE_STATION_BAND - nut.HOLE_DIA_MAX / 2.0
+    ) == pytest.approx(1.15)
+    assert max(nut.HOLE_WALL_TO_BODY, nut.HOLE_WALL_TO_OD) < nut.WALL_FLOOR
+    # Printed rounded down, so a MIN never overstates the wall.
+    assert nut.CSK_WALL_TEXT == "WALL 0.39 MIN TO BODY, 0.54 MIN TO OD"
+    for printed, wall in zip(
+        re.findall(r"\d+\.\d\d", nut.CSK_WALL_TEXT),
+        (nut.CSK_WALL_TO_BODY, nut.CSK_WALL_TO_OD),
+        strict=True,
+    ):
+        assert wall - 0.01 < float(printed) <= wall + 1e-9
+    # The countersink's callout carries it as its last line.
+    assert draw.CSK_SCREW_CALLOUT.splitlines()[-1] == nut.CSK_WALL_TEXT
+
+
+def test_countersink_wall_shortfall_is_a_declared_provisional_minor() -> None:
+    """A printed shortfall with no declaration gates the machinist review."""
+    import ch_rocker_arm_tl_oblique_jig_assembly_spec as jig
+    from machinist_exceptions import load_exceptions
+
+    (wall,) = load_exceptions(_config.CONFIG_DIR, draw.PART_STEM, "part")
+    assert (wall.id, wall.kind) == ("RV-01", "minor")
+    # "where" quotes the printed callout: the prefix's Ø token as printed,
+    # the band, the angle and the wall line, exactly.
+    printed = (
+        f"{nut.CSK_PREFIX.replace('<MOD-DIAM>', 'Ø')}{nut.CSK_DIA:.1f} "
+        f"±{nut.CSK_DIA_BAND:.1f} {nut.CSK_CALLOUT}"
+    )
+    label = draw.REWORK_SECTION_LABEL
+    assert wall.where == (
+        f"sheet {nut.REWORK_SHEET}, Section {label}-{label}, the {printed} callout: "
+        f"{nut.CSK_WALL_TEXT}"
+    )
+    worst = (
+        f"each hole ±{nut.HOLE_STATION_BAND:.2f} off its station on the "
+        f"Ø{nut.HOLE_PCD:.0f} PCD, the countersink {nut.CSK_ECCENTRICITY_MAX:.2f} off "
+        f"its hole, the mouth opened to the Ø{nut.CSK_DIA_OPEN_MAX:.2f} F2 cutter, the "
+        f"body at its Ø{nut.BODY_DIA_MAX:.1f} receipt maximum"
+    )
+    assert f"({worst})" in wall.finding
+    assert (
+        f"leave {_floor2(nut.CSK_WALL_TO_BODY)} mm to the body and "
+        f"{_floor2(nut.CSK_WALL_TO_OD)} mm to the Ø{nut.FLANGE_DIA:.0f} flange OD, "
+        f"below the {nut.WALL_FLOOR:.1f} mm metric wall floor"
+    ) in wall.finding
+    assert wall.reason.startswith("provisional: option A auto-selected")
+    assert "owner confirmation pending before merge" in wall.reason
+    assert (
+        f"Ø{nut.HOLE_DIA:.1f} holes on the Ø{nut.HOLE_PCD:.0f} PCD already leave "
+        f"{nut.HOLE_WALL_TO_BODY:.2f} mm to the body and {nut.HOLE_WALL_TO_OD:.2f} mm "
+        f"to the OD nominal, {_floor2(nut.HOLE_WALL_TO_BODY_MIN)} mm and "
+        f"{_floor2(nut.HOLE_WALL_TO_OD_MIN)} mm at the receipt limits"
+    ) in wall.reason
+    # The load facts are the jig spec's nut-stop numbers.
+    assert (
+        f"({nut.SCREW_SKU}) takes {jig.NUT_STOP_FORCE_N:.0f} N at the "
+        f"{jig.NUT_TORQUE_NM:.2f} N·m reversing torque, ×{jig.NUT_STOP_MARGIN:.1f} in shear"
+    ) in wall.reason

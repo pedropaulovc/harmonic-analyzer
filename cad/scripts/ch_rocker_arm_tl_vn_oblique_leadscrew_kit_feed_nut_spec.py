@@ -78,10 +78,12 @@ from fractions import Fraction
 import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec as leadscrew_stock
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 from _hole_spec import THREAD_MAJOR_MM
+import _mcmaster_91771a112 as _nut_screw
 from _mcmaster_91771a112 import DIMS as SCREW_DIMS
-from _mcmaster_91771a112 import LENGTH_TEXT as SCREW_LENGTH_TEXT
-from _mcmaster_91771a112 import PART_NO as SCREW_SKU
 from _mcmaster_91771a112 import THREAD as SCREW_THREAD
+
+SCREW_LENGTH_TEXT = _nut_screw.LENGTH_TEXT  # read by the fastener table
+SCREW_SKU = _nut_screw.PART_NO  # read by the kit drawing's callout
 
 INCH = 25.4
 PART_NAME = leadscrew_stock.PART_NAME  # the kit's one native model
@@ -233,6 +235,44 @@ if not HOLE_PCD / 2.0 - _CSK_SHIFT - CSK_DIA_OPEN_MAX / 2.0 > _BODY_R_MAX:
 if not BORE_DIA < BODY_DIA:
     raise AssertionError("the bore is wider than the body")
 
+# --- The countersinks' walls: a stated rule-17 shortfall ----------------------
+# Ruling relayed by Main 2026-11-04, option A (auto-selected after an owner
+# timeout; the kit's machinist_exceptions RV-01, provisional): the Ø4.6
+# countersinks stay. A printed MIN covers everything the package allows: each
+# hole ±HOLE_STATION_BAND off its station on the Ø16 PCD (receipt), its
+# countersink CSK_ECCENTRICITY_MAX off the hole, the mouth opened to F2's
+# Ø3/16 cutter (CSK_DIA_OPEN_MAX, past the band's Ø4.7) and the body at its
+# receipt Ø10.3 maximum. The flange OD has no receipt minimum, so the OD wall
+# is taken to the listing's Ø22. Both are under the metric packages' 1.5
+# floor (drawing-guidelines rule 17). The supplied Ø3.5 holes alone already
+# leave less than the floor, nominal and at the receipt limits, so no
+# countersink on this bought nut meets it. CskDia's callout prints both
+# countersink walls, rounded down.
+WALL_FLOOR = 1.5
+CSK_WALL_TO_BODY = HOLE_PCD / 2.0 - _CSK_SHIFT - CSK_DIA_OPEN_MAX / 2.0 - _BODY_R_MAX  # 0.399
+CSK_WALL_TO_OD = FLANGE_DIA / 2.0 - HOLE_PCD / 2.0 - _CSK_SHIFT - CSK_DIA_OPEN_MAX / 2.0  # 0.549
+HOLE_WALL_TO_BODY = HOLE_PCD / 2.0 - HOLE_DIA / 2.0 - BODY_DIA / 2.0  # 1.15, nominal
+HOLE_WALL_TO_OD = FLANGE_DIA / 2.0 - HOLE_PCD / 2.0 - HOLE_DIA / 2.0  # 1.25, nominal
+HOLE_WALL_TO_BODY_MIN = HOLE_PCD / 2.0 - HOLE_STATION_BAND - HOLE_R_MAX - _BODY_R_MAX  # 1.00
+HOLE_WALL_TO_OD_MIN = FLANGE_DIA / 2.0 - HOLE_PCD / 2.0 - HOLE_STATION_BAND - HOLE_R_MAX  # 1.15
+if not 0.0 < CSK_WALL_TO_BODY < CSK_WALL_TO_OD < WALL_FLOOR:
+    raise AssertionError("the countersink walls are not the stated shortfall")
+if not max(HOLE_WALL_TO_BODY, HOLE_WALL_TO_OD) < WALL_FLOOR:
+    raise AssertionError("a supplied hole meets the wall floor; revisit RV-01")
+if not (HOLE_WALL_TO_BODY_MIN < HOLE_WALL_TO_BODY and HOLE_WALL_TO_OD_MIN < HOLE_WALL_TO_OD):
+    raise AssertionError("the receipt limits do not thin the supplied holes' walls")
+
+
+def _wall_text(wall: float) -> str:
+    """A wall in mm at two places, rounded down: a MIN never overstates."""
+    return f"{math.floor(wall * 100.0 + 1e-9) / 100.0:.2f}"
+
+
+CSK_WALL_TEXT = (
+    f"WALL {_wall_text(CSK_WALL_TO_BODY)} MIN TO BODY, "
+    f"{_wall_text(CSK_WALL_TO_OD)} MIN TO OD"
+)
+
 # --- Model --------------------------------------------------------------------------
 _BORE_R = BORE_DIA / 2.0
 _BODY_R = BODY_DIA / 2.0
@@ -364,8 +404,10 @@ DRAWING_PRECISION = {
     feature: {name: REWORK_CONTROLS[name][3] for name in names}
     for feature, names in DRAWING_DIMENSIONS.items()
 }
-# One printed countersink stands for all four.
-CSK_PREFIX = f"{SCREW_COUNT}X "
+# One printed countersink stands for all four. The section shows the mouth
+# as a linear size, so the Ø is the native <MOD-DIAM> token in the prefix,
+# as build_sm_gooseneck / build_mg_magnifying_wheel print their diameters.
+CSK_PREFIX = f"{SCREW_COUNT}X <MOD-DIAM>"
 CSK_CALLOUT = f"{CSK_ANGLE:.0f}° CSK"
 
 # --- Supplier reference sizes (the dimension image's, mm) ---------------------------
