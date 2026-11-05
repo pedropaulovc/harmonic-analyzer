@@ -30,8 +30,8 @@ PD_2A_MIN = 0.1399 * INCH
 MINOR_2B_MIN = 0.130 * INCH
 # The shared tap/native-thread registry carries the basic major rounded to mm.
 BASIC_MAJOR = 4.166
-# The deepest root a die cuts: a basic half-depth under the smallest 2A pitch
-# diameter (the assumption dt_crank_handle_pivot_screw_spec makes for #4-40).
+# Conservative thread-root estimate: a basic half-depth under the smallest
+# 2A pitch diameter (the dt_crank_handle_pivot_screw_spec construction).
 ROOT_2A_MIN = PD_2A_MIN - 0.649519 * PITCH
 ENGAGEMENT_FLOOR = 1.5 * BASIC_MAJOR
 
@@ -139,7 +139,7 @@ def test_fitted_rear_face_reacts_on_actual_f_at_every_printed_corner(
 
 
 def test_thread_blank_lies_inside_the_2a_major() -> None:
-    """The die cuts #8-32 UNC-2A on a blank inside .1571..1631; the class
+    """Single-point #8-32 UNC-2A on a blank inside .1571..1631; the class
     governs the blank, which prints only as a three-place reference."""
     blank = shaft.THREAD_BLANK_LIMITS
     assert _stud_places("ThreadBlankDia") == 3
@@ -156,19 +156,18 @@ def test_thread_blank_lies_inside_the_2a_major() -> None:
     assert head_blank_min > MAJOR_2A[1]
 
 
-def test_relief_holds_the_die_lead_under_the_deepest_root() -> None:
-    """R9-53: full thread ends on the relief's front shoulder; the narrowest
-    relief takes a 1.5-pitch die lead, and its largest floor stands under the
-    deepest die-cut root and inside the nut's smallest minor."""
+def test_relief_keeps_the_single_point_exit_below_the_thread_root() -> None:
+    """R9-53: retain the relief's shoulder stations and floor below the
+    thread-root estimate and the nut's smallest minor, without a die-lead minimum."""
     core_max = _limits(shaft.CORE_FRONT_FROM_F, _stud_places("CoreFront"))[1]
     thread_end_min = _limits(shaft.PLAIN_CORE, _stud_places("PlainCore"))[0]
     assert thread_end_min - core_max == pytest.approx(1.778)
-    assert thread_end_min - core_max >= 1.5 * PITCH
+    assert thread_end_min - core_max > 0.0
     relief_max = _limits(shaft.RELIEF_DIA, _stud_places("ReliefDia"))[1]
     assert relief_max == pytest.approx(2.794)  # .10 +.01
     assert relief_max < ROOT_2A_MIN < MINOR_2B_MIN
     # Negative control: Ø.11 at the .XX row (the review's first suggestion)
-    # would stand above the conservative deepest #8-32 die-cut root.
+    # would stand above the conservative deepest #8-32 thread-root estimate.
     assert 2.794 + printed_band_mm(2, unit=shaft.UNIT) > ROOT_2A_MIN
 
 
@@ -185,8 +184,8 @@ def test_thumbnut_runs_clear_of_the_core_step_at_the_rearward_stop(
     assert nut_seat - core_max == pytest.approx(1.049)
     assert nut_seat - core_max > 0.0
     # Negative control: a full-thread end 6.5 in front of F, with a
-    # one-pitch lead behind it, would put the nut's first full thread on
-    # incomplete thread rather than on the relief.
+    # hypothetical one-pitch transition behind it, would put the nut's first
+    # full thread on incomplete thread rather than on the relief.
     bad_runout_end = 6.5 + printed_band_mm(3, unit=shaft.UNIT) + PITCH
     assert nut_seat + nut.REAR_THREAD_LOSS < bad_runout_end
     with pytest.raises(AssertionError, match="MHA-PD-13 thumbnut / MHA-PD-08 core step"):

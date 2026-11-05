@@ -609,7 +609,7 @@ async def build(adapter: Any) -> dict[str, str]:
     check("open quarter-inch lever source", await adapter.open_model(str(SOURCE)))
     read_required_properties(adapter.currentModel, ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity", "Iso View Note"), required=("Number", "Material Specification", "Finish", "Quantity", "Iso View Note"))
     drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout, unit=part_drawing_unit("mg-magnifying-lever"))
-    stamp_drawing_summary(adapter, drawing, {0: "Magnifying Lever Rod Manufacturing Drawing", 1: "Harmonic Analyzer hobby-machinist book drawing", 2: "Harmonic Analyzer Project", 3: "quarter-inch brass lever; flat UNC-2A end; external die runout", 4: "Generated from the project-owned ASME B drawing standard"})
+    stamp_drawing_summary(adapter, drawing, {0: "Magnifying Lever Rod Manufacturing Drawing", 1: "Harmonic Analyzer hobby-machinist book drawing", 2: "Harmonic Analyzer Project", 3: "quarter-inch brass lever; flat UNC-2A end; external thread runout", 4: "Generated from the project-owned ASME B drawing standard"})
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     for view in (front, iso):

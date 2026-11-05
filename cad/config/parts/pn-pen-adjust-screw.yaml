@@ -5,7 +5,8 @@ pn-pen-adjust-screw:
   finish: plain; no coating
   quantity: 1
   tolerance_class: machined_block
-  process: "turned (brass)"
+  # Pedro's owner ruling, 2026-11-05 (coordinator session): thread stays die-cut.
+  process: "turned (brass); die-cut #0-80 thread"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"

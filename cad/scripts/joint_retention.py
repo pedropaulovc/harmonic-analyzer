@@ -662,7 +662,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "pd_transgear_arm",  # MHA-PD-18: 2x #8-32 plate taps through (pd_transgear_arm_spec), receiver; the pin MHA-PD-23 is pressed in a reamed hole
         "pd_vn_transgear_arm_plate_screw",  # #8-32 slotted oval head (McMaster 91790A199, MHA-PD-VN-56), 1-in stock cut to fit; member: 2 into transgear_arm
         "pd_vn_transgear_disc_screw",  # #0-80 slotted fillister (McMaster 91794A055, MHA-PD-VN-55), cut to fit; member: 3 through the hub flange into rack_pinion
-        "pd_transgear_knob_shaft",  # MHA-PD-08: #8-32 UNC die-cut front thread (thumbnut), receiver; the rear journal is cross-pinned to the cup (MHA-PD-VN-62)
+        "pd_transgear_knob_shaft",  # MHA-PD-08: #8-32 UNC single-pointed front thread (thumbnut), receiver; the rear journal is cross-pinned to the cup (MHA-PD-VN-62)
         "pd_vn_transgear_pivot_screw",  # #8-32 shoulder screw (McMaster 90325A174, MHA-PD-VN-57), member into the support_bar's through pivot tap
         "pd_transgear_thumbnut",  # MHA-PD-13 knurled nut, #8-32 UNC-2B through; member on the knob shaft's front thread
         "mg_wheel_axle",  # 3/16 drill-rod pin, #4-40 UNC front end (mg_wheel_axle_spec.THREAD_CALLOUT), receiver of the wheel-axle nuts
@@ -1581,7 +1581,7 @@ JOINTS: tuple[Joint, ...] = (
             "made MHA-SM-04 slotted cheese head clamps the double-loop band, seated on "
             "the screw's plain Ø6.35 body, to the face of MHA-SM-01's solid Ø12.70 "
             "end piece; full thread engagement runs in the end piece's blind 1/4-28 "
-            "UNF-2B tap past its arm-end counterbore, which keeps the screw's die "
+            "UNF-2B tap past its arm-end counterbore, which keeps the screw's thread "
             "run-out out of the tap's full thread. The deepest screw tip stays inside "
             "the tap's full thread, and the bottoming tap's lead inside its drill."
         ),
@@ -2327,7 +2327,7 @@ JOINTS: tuple[Joint, ...] = (
         ),
         axial_capture=(
             "the nut's flange seat face bears on the collar pilot's faced front; #8-32 UNC-2B "
-            "through on the shaft's die-cut front thread. At collar-shoulder-seated the collar's "
+            "through on the shaft's single-pointed front thread. At collar-shoulder-seated the collar's "
             "fitted rear face bears on actual F and reacts the nut's axial clamp, independently "
             "of its D-flat torque key; the flange retains the wheel on the drive pins and is "
             "removed by hand for gear swaps"
