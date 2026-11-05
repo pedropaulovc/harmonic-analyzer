@@ -9,8 +9,9 @@ Design (owner rulings 2026-10-27, #1951, rederived from the ch19 reference
 close-up page001_img02).  MHA-SM-04 is a slotted cheese-head screw turned
 from hardened 4140: a Ø11.50 x 6.60 flat-topped head, its under-face edge
 relieved for the spring's transition wire, and under it the plain Ø6.35
-body the MHA-SM-VN-51 loop bears on, which is also the blank the die cuts
-the 1/4-28 UNF thread on, toward the tip.  The thread runs into the blind
+body the MHA-SM-VN-51 loop bears on, which is also the blank for the
+single-pointed 1/4-28 UNF thread (Pedro's owner ruling 2026-11-05, coordinator
+session). The thread runs into the blind
 1/4-28 UNF-2B tap in the solid end piece of MHA-SM-01's 1/2 in arm.  The
 2026-09-21 rulings stand unchanged: the head is tightened until the loop is
 clamped to the end face and cannot swivel, with no torque value and no
@@ -337,7 +338,7 @@ _TIGHTENING_SF_EXACT = {
     pair: tightening_safety_factor(*pair) for pair in FRICTION_PAIRS
 }
 # The criterion is NOMINAL von Mises stress against yield, on smooth sections
-# at the deepest estimated root and the smallest body.  The die-cut root and
+# at the deepest estimated root and the smallest body. The cut thread root and
 # the under-head corner raise local stress above it, and local first yield
 # there is accepted: the screw is a statically loaded clamp of ductile steel
 # (4140 at HRC 32, 7 % elongation, McMaster 6818T53), so a notch root yields

@@ -1,7 +1,7 @@
 """Pure geometry of the made MHA-SM-04 counter-spring clamp screw.
 
 Native frame: axis Z, under-head face Z=0, head +Z, shank -Z. The
-thread is represented by its basic major cylinder, not a die blank with a
+thread is represented by its basic major cylinder, not a thread blank with a
 made-up general diameter tolerance. The external UNF-2A callout defines it.
 No drawing, prose, builder or COM dependencies belong in this module.
 
@@ -10,10 +10,13 @@ Owner rulings 2026-10-27 (#1951): rederived from the ch19 reference close-up
 double loop clamped on the screw's plain body between the head and the
 MHA-SM-01 end piece's flush face.  The body is the 1/4-28 UNF thread's own
 blank, turned to the 2A major band and left plain under the head for the
-loop; the die runs up to it and leaves its run-out inside the end piece's
-counterbore.  The Ø11.50 head stands under an owner minor exception to the
-1.0 head retention check (sm_gooseneck_spring_joint).  The 2026-09-21 rulings
-stand: the head clamps the loop to the end face (no torque value, no
+loop; the thread transition lies inside the end piece's counterbore.
+Pedro's owner ruling 2026-11-05 (coordinator session) specifies single-pointing
+on the lathe, not die-cutting. The existing plain MIN and full-thread MAX
+stations remain functional limits: single-pointing does not require moving
+either, nor adding a relief groove. The Ø11.50 head stands under an owner
+minor exception to the 1.0 head retention check (sm_gooseneck_spring_joint).
+The 2026-09-21 rulings stand: the head clamps the loop to the end face (no torque value, no
 threadlocker).  ``sm_gooseneck_spring_screw_spec`` carries the strength case;
 ``sm_gooseneck_spring_joint`` the body, engagement and wall budgets.
 
@@ -84,40 +87,35 @@ THREAD_PD_2A_MIN_IN = 0.2225
 THREAD_MAJOR_2A_MAX = THREAD_MAJOR_2A_MAX_IN * MM_PER_IN
 THREAD_MAJOR_2A_MIN = THREAD_MAJOR_2A_MIN_IN * MM_PER_IN
 # DERIVED ESTIMATE, not a standard minimum minor-diameter limit: the repo's
-# deepest die-root construction takes a full basic half-depth (0.649519 P)
+# deepest thread-root construction takes a full basic half-depth (0.649519 P)
 # below the minimum 2A pitch diameter (pd_vn_transgear_pivot_screw_spec uses
 # the same construction for its #8-32): 5.062.
 THREAD_MINOR_2A_MIN_EST = (THREAD_PD_2A_MIN_IN - 0.649519 / THREADS_PER_IN) * MM_PER_IN
 
 # The plain body is the thread blank: modelled at the basic major with the
 # thread, a LIMIT band (envelope 6.32/6.20) inside the 2A major band, so the
-# die cuts a 2A crest and the loop bears on one turned diameter.  The title
-# block's .XX band would leave the blank outside the thread class.
+# finished thread has a 2A crest and the loop bears on one turned diameter.
+# The title block's .XX band would leave the blank outside the thread class.
 BODY_DIA = MAJOR_DIA
 BODY_DIA_LOWER, BODY_DIA_UPPER = -0.15, -0.03
 BODY_DIA_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
 BODY_DIA_MIN = round(BODY_DIA + BODY_DIA_LOWER, 6)
 BODY_DIA_MAX = round(BODY_DIA + BODY_DIA_UPPER, 6)
-# Under-head face to the die's first incomplete thread, a single MIN limit
+# Under-head face to the first incomplete thread, a single MIN limit
 # (the inch sheet's ".14 MIN"): the loop's plug-side pass
 # (sm_gooseneck_spring_joint.LOOP_PASS_X, 3.14 at the free gap) always bears
 # on the plain body.  Any longer plain body only shortens the run-out window
 # below, which the full-thread MAX bounds.
 PLAIN_LENGTH_MIN = 3.60
 PLAIN_LENGTH_MIN_TOL_TYPE = 5  # swTolType_e.swTolMIN
-# The die's chamfered start leaves 1.5 pitches of incomplete thread
-# (drawing-guidelines.md rule 18; the repo's tip allowance,
-# sm_gooseneck_spring_joint.SCREW_END_INCOMPLETE_MAX) behind the full thread.
-DIE_RUNOUT = 1.5 * PITCH
 # Under-head face to the first full thread, a single MAX limit (the inch
 # sheet's ".225 MAX"); 5.71 is the largest two-place mm limit whose run-out
 # the end piece's counterbore (sm_gooseneck_spring_joint.COUNTERBORE_DEPTH_MIN,
 # 2.73) clears
-# by its margin at the least gap on the screw's axis.  Between the two limits
-# a die has 2.3 pitches for its chamfer.
+# by its margin at the least gap on the screw's axis. These stations bound the
+# single-point tool's transition without specifying its run-out length.
 FULL_THREAD_STATION_MAX = 5.71
 FULL_THREAD_STATION_MAX_TOL_TYPE = 6  # swTolType_e.swTolMAX
-FULL_THREAD_DIE_ROOM_MIN = 2.0 * PITCH
 # The two limits bound each other, so each one's native band (upper, lower)
 # about its modelled limit runs to the other: the plain body at most reaches
 # the full thread (zero run-out), and the full thread starts no earlier than
@@ -146,13 +144,11 @@ def require_body_form(
     plain_length_min: float = PLAIN_LENGTH_MIN,
     full_thread_station_max: float = FULL_THREAD_STATION_MAX,
 ) -> None:
-    """Refuse a body outside the 2A major band, or no room for the die and thread."""
+    """Refuse a body outside the 2A major band, or reversed thread stations."""
     if not THREAD_MAJOR_2A_MIN <= body_dia_min <= body_dia_max <= THREAD_MAJOR_2A_MAX:
         raise AssertionError("screw body leaves the 1/4-28 UNF-2A major band")
-    if full_thread_station_max - plain_length_min < FULL_THREAD_DIE_ROOM_MIN:
-        raise AssertionError(
-            "screw full-thread limit leaves a die no room for its chamfer"
-        )
+    if full_thread_station_max <= plain_length_min:
+        raise AssertionError("screw full-thread limit must follow the plain-body limit")
     if full_thread_station_max + TIP_CHAMFER + 1.5 * PITCH >= LENGTH + LENGTH_LOWER:
         raise AssertionError(
             "screw leaves no full thread between the run-out and the tip"

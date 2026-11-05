@@ -7,7 +7,8 @@ sm-gooseneck-spring-screw:
   finish: "black oxide per MIL-DTL-13924 Class 1, oil sealed"
   quantity: 1
   tolerance_class: machined_block
-  process: "turned slotted cheese-head screw: plain Ø.250 body under the head, die-cut 1/4-28 UNF thread"
+  # Pedro's owner ruling, 2026-11-05 (coordinator session): single-point, not die-cut.
+  process: "turned slotted cheese-head screw: plain Ø.250 body under the head, single-pointed 1/4-28 UNF-2A thread on the lathe"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"

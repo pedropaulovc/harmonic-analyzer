@@ -4,7 +4,8 @@ A made slotted cheese-head screw turned from 1/2-in 4140 hardened to HRC 32,
 the grade its clamp strength needs (owner rulings 2026-10-27, #1951).  Under
 the flat-topped Ø11.50 x 6.60 head, a plain Ø6.35 body is the MHA-SM-VN-51
 counter spring's loop seat.  It is also the 1/4-28 UNF thread's own blank,
-turned to its LIMIT band, and the die cuts the thread on it toward the tip.
+turned to its LIMIT band; the thread is single-pointed on the lathe (Pedro's
+owner ruling 2026-11-05, coordinator session).
 The thread runs into the blind 1/4-28 tap in the solid end piece of the
 gooseneck MHA-SM-01, and the under-head face clamps the loop against the end
 piece's flush face.  Sizes and bands live in
