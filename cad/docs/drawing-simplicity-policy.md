@@ -28,14 +28,22 @@ cannot ask for what the authors were told to leave out.
 
 ## How the repository implements the guidelines
 
-Packages convert to decimal inches in batches under issue #290. The temporary
-`drawing_unit: in` declaration in a package's own part or assembly registry row
-selects the model's TOL_* stamps and document units, and the draw script passes
-it to `new_project_drawing(unit=...)`. Missing declarations mean `mm`; explicit
-`mm` is retained for metric-only supplier packages. `finalize_drawing` refuses
-a sheet whose linked model carries inch rows while the drawing is not in
-inches. Remove the rollout switch when the last batch lands and make inches
-the fabrication default, retaining the supplier-unit exception. On an inch
+Packages are drawn in decimal inches (issue #290). Every drawing package, part
+or assembly, declares `drawing_unit` explicitly in its own registry row
+(`cad/config/parts/<dashed-name>.yaml` or
+`cad/config/assemblies/<dashed-stem>.yaml`): `in`, or `mm` only for a
+metric-only supplier package named on the explicit-declaration contract
+test's allowlist. That test refuses an omitted declaration and an `mm`
+declaration outside the allowlist. A part with no drawing needs no
+declaration; such parts are named in
+[`test_part_coverage.PART_DRAWING_EXEMPTIONS`](../scripts/test_part_coverage.py)
+(today `pd_platen_paper`, the consumable recording paper). The declaration
+selects the model's TOL_* stamps and document units, and the draw script
+passes it to
+`new_project_drawing(unit=...)`. The `_package_units.drawing_unit` helper
+still resolves an absent row or key to `mm`; that fallback is not permission
+to omit the declaration. `finalize_drawing` refuses a sheet whose linked model
+carries inch rows while the drawing is not in inches. On an inch
 fabrication sheet, a metric-only vendor line's dimension (HGR15R, KP08, Tr8)
 keeps its exact millimetres: the builder gives the model dimension its own
 symmetric band (`set_dimension_symmetric_tolerance(display_unit="mm")`) and
@@ -44,7 +52,7 @@ symmetric band (`set_dimension_symmetric_tolerance(display_unit="mm")`) and
 so the draw script prints it in mm again and reads it back with
 `_drawing_metric_vendor.print_imported_metric_dimensions`.
 
-A converted package's builder selects the model's document units with
+An inch package's builder selects the model's document units with
 `_document_units.apply_package_model_units` right after `create_part` or
 `create_assembly`, before any global, sketch, feature or check
 (`_stock_fastener` does it for purchased stock). They are IPS decimal inches at
@@ -55,11 +63,12 @@ Printed places stay each dimension's `DRAWING_PRECISION`.
 The inch grades are `.X ±.1` for non-functional features only, `.XX ±.01` and
 `.XXX ±.005`; drilled holes use `+.004/0` with three-place inch diameters.
 Printed-grid nominals, explicit fits, roughness and worst-case wall checks
-convert together with each package. Unconverted packages keep their metric
-conventions. Supplier fractions remain exact REF values through
-`_supplier_dimensions` with `RoundToFraction=False`; no fractional tolerance
-grade applies. Changes to these shared review documents invalidate every cached
-machinist review once, even though only selected native packages change units.
+are inch on every fabrication package; metric-only supplier packages keep the
+millimetre title-block rows and metric grades. Supplier fractions remain exact
+REF values through `_supplier_dimensions` with `RoundToFraction=False`; no
+fractional tolerance grade applies. Editing `drawing-guidelines.md` re-keys
+every cached machinist review once; editing a reviewer prompt re-keys the
+reviews that read it. This policy file is not a review input.
 
 - **The model owns tolerance and precision (rules 3 and 4).** A band goes on
   the dimension as a native model tolerance
@@ -70,12 +79,36 @@ machinist review once, even though only selected native packages change units.
   render time (`SetPrecision3`, `set_dimension_precision`) or types a spec
   constant into note text (`f"{DEPTH:.1f} DEEP"`). A value the sheet prints
   but no feature dimension carries is modelled, if need be by a hidden
-  reference sketch whose one driving dimension is the value. The one
+  reference sketch whose one driving dimension is the value. The first
   exception is a pure reference dimension with no band and no model dimension
   to import; its places come from a `*_spec` constant
   (`DRAWING_REFERENCE_PRECISION`), never a literal. Migrated packages are
   gated by `test_drawing_specification_purity.py`; the rest of the fleet
   migrates incrementally.
+  The render-time prohibition has one further exception: Hole Wizard callout
+  precision (delegated rulings of 2026-11-02, generalized to every package by
+  Main; owner review on #2144). A part-authored Hole Wizard precision does not
+  reach its native callout: in native run 20261102T230110877Z the callout's
+  variable read -1, the document default. A drawing may therefore set the
+  decimal places of named length variables on a native hole callout through
+  `_drawing_hole_callout.set_hole_callout_precision`
+  (`ICalloutLengthVariable.Precision`, per variable, read back and refused on
+  mismatch) and, for a banded hole size, that variable's
+  `ICalloutLengthVariable.TolerancePrecision`, read back the same way
+  (`draw_dt_cone_swing_platform._print_pivot_band_exactly` derives both from
+  the part's band). The exception covers those callout variables' decimal
+  places only: not `SetPrecision3` or `set_dimension_precision` on any
+  dimension, and not a band, callout text or other package departure. The
+  model still owns every band, and every other dimension's places stay
+  part-authored and read back. The exception needs no new per-package
+  ruling. The package-local `machinist_exceptions` entries that declared it
+  before it was generalized stay as declared, because only the reviewed
+  package's own declarations reach its reviewer. Precedents (kind `accept`):
+  `dt-cone-pivot-post` RV-02; `dt-cone-swing-platform` RV-01 and RV-03;
+  `dt-cone-tip-block` RV-01; `dt-pinion-pivot-block` RV-01;
+  `dt-pinion-spring` RV-02; `dt-vn-cone-tip-collar` RV-01;
+  `pn-pen-adjust-screw` RV-01; `pn-pen-frame` RV-02; `pn-pen-hanger` RV-01;
+  `pn-pen-rod` RV-02; `pn-pen-v-block` RV-02; `sm-summing-lever` RV-04.
   The cylinder-bank assembly settings also author their native dimension
   callout text in the builder; the drawing reads it back instead of calling
   `SetText` on imported dimensions. That call can write through to the source
@@ -127,8 +160,10 @@ machinist review once, even though only selected native packages change units.
 - **Roughness grades (rule 6)** on inch sheets are 63 µin Ra for running
   journals and bores, cam-follower contact, slides, knife edges and their seats;
   32 µin Ra for ground knife edges and pivot-screw shoulders; and 125 µin Ra
-  for the one locating seat. Unconverted metric sheets retain `_surface_finish`
-  grades `MACHINED_UM` (1.6), `GROUND_UM` (0.8) and `SEAT_UM` (3.2).
+  for the one locating seat: the preferred microinch values of the
+  `_surface_finish` grades (`_PREFERRED_RA_UIN`). Sheets that declare
+  `drawing_unit: mm` print the micrometre grades `MACHINED_UM` (1.6),
+  `GROUND_UM` (0.8) and `SEAT_UM` (3.2).
 - **Notes (rule 7)** that live in `<part>_notes.py` stay there. A
   drawing-only note helper enters a part's rebuild closure only if its builder
   imports it. When a builder stamps notes into a saved model property, that
@@ -172,8 +207,9 @@ machinist review once, even though only selected native packages change units.
   base's pure fastener contract). Receiver capacity does not by itself prove
   a purchased screw's installed engagement; existing inspected minima and
   owner-declared shortfalls remain explicit. The 1.5D engagement minimum and
-  the rule-17 wall targets (.080 in target, .060 in floor after conversion;
-  2.0 mm target, 1.5 mm floor on unconverted packages) allow for a first-time hobby machinist:
+  the rule-17 wall targets (.080 in target, .060 in floor; 2.0 mm target,
+  1.5 mm floor on packages that declare `drawing_unit: mm`) allow for a
+  first-time hobby machinist:
   they are design margins for the shop class the guidelines describe, not
   capability limits.
 - **Retention (rule 23).** Mechanical locks are the default, in preference
