@@ -33,18 +33,24 @@ spec's): origin on the bottom face at the inner end (toward the rail),
 mid-width; +X outward (machine +lateral), +Y along the screw, +Z up. Envelope
 X 0 .. 2.71, Y -.25 .. .25, Z 0 .. 1.00.
 
-Holes, all six on the mid-width row (Y 0), tapped THRU from the top face:
+Holes, all six on the mid-width row (Y 0), each tap drill THRU the 1 in
+height, each thread from the face its screw enters to a .450 MIN full
+thread (``FULL_THREAD_DEPTH``; owner ruling 2026-11-05: the CAD matches the
+2026-11-02 hand traveler, issue #2154). A hand plug tap carries about 11/16
+to 3/4 in of thread on a shank wider than the tap drill, so it cannot thread
+the whole height; the far end of each hole stays tap drill:
 
-- Two #6-32 UNC tapped holes at X 13.925 and 55.925 mm: the KP08's two base
-  screws at its 42 mm bolt spacing, about the screw axis. The bought block's
-  holes are plain, so the screw is shop-chosen US-customary (fastener policy).
-- Four #8-32 UNC tapped holes at X .285, .942, 1.808 and 2.465: the base-bar
-  screws, #8-32 SHCS fitted up through the bar's counterbored clearance holes
-  (``leadscrew.BASE_BAR_HOLE_SPEC``) into these taps; two pairs symmetric
-  about the screw axis (ruling A′), the outer pair's half-span set by the
-  rule-17 window in the leadscrew spec. A counterbore from the top would
-  leave no wall to the #6-32 taps, so the screws come from underneath (JigAssembly
-  ruling).
+- Two #6-32 UNC tapped holes at X 13.925 and 55.925 mm, threaded from the
+  top (KP08) face: the KP08's two base screws at its 42 mm bolt spacing,
+  about the screw axis. The bought block's holes are plain, so the screw is
+  shop-chosen US-customary (fastener policy).
+- Four #8-32 UNC tapped holes at X .285, .942, 1.808 and 2.465, threaded from
+  the bottom (bar) face: the base-bar screws, #8-32 SHCS fitted up through
+  the bar's counterbored clearance holes (``leadscrew.BASE_BAR_HOLE_SPEC``)
+  into these taps; two pairs symmetric about the screw axis (ruling A′), the
+  outer pair's half-span set by the rule-17 window in the leadscrew spec. A
+  counterbore from the top would leave no wall to the #6-32 taps, so the
+  screws come from underneath (JigAssembly ruling).
 
 Bands. Both patterns are fixed-fastener fits, so every station and the row
 print at three places: the bar taps and the row at the title block's ±.005,
@@ -66,13 +72,15 @@ supplier band, each thread at its major diameter (``WALLS_MM``). No rule-20
 shortfall.
 
 Rule 18 belongs to the screws' lengths (leadscrew spec): the #8 engagement is
-``leadscrew.BAR_SCREW_ENGAGEMENT``; this part only proves its through thread
-offers 1.5 D for both screws.
+``leadscrew.BAR_SCREW_ENGAGEMENT``; this part proves its full thread offers
+1.5 D to both screws and that neither screw reaches past it
+(``SCREW_REACH_MAX``).
 """
 
 from __future__ import annotations
 
 import math
+from fractions import Fraction
 from typing import Any
 
 import _config
@@ -117,7 +125,7 @@ STOCK_PLACES = 2
 STOCK_FRACTION_DENOMINATORS = {"BracketWidth": 2, "BracketThick": 1}  # (1/2), (1)
 STOCK_DIMENSIONS = {"BracketWidth", "BracketThick"}
 
-# --- Holes: six taps THRU on the mid-width row ---------------------------------
+# --- Holes: six tap drills THRU on the mid-width row ----------------------------
 HOLE_PLACES = 3  # fixed-fastener patterns (module docstring)
 HOLE_ROW_Y = HALF_WIDTH  # .250 from the -Y side face to the row
 BAR_SCREW = leadscrew.BAR_SCREW  # "#8-32"
@@ -136,9 +144,22 @@ KP08_TAP_PLACES = 3
 KP08_TAP_BAND = printed_band_mm(KP08_TAP_PLACES, unit=METRIC_UNIT)  # 0.13
 KP08_TAP_SPEC = HoleSpec("tapped", KP08_THREAD, end="through_all")
 KP08_TAP_DRILL = blind_cut_dia_mm(KP08_TAP_SPEC)  # #36, .1065
-# Every tap callout's lengths print .XXX (.136, .107); a THRU tap's callout
-# carries no hw-tapdrldia (farm r1), so the sheet sets every length it has.
+# Every tap callout's lengths print .XXX (.136, .107, .450); the sheet sets
+# every length the native callout carries.
 TAP_CALLOUT_PLACES = 3
+
+# --- Threads: drill THRU, thread from the screw's face (owner ruling 2026-11-05)
+# The CAD follows the 2026-11-02 hand traveler (issue #2154): each tap drill
+# runs THRU and each thread runs FULL_THREAD_DEPTH from the face its screw
+# enters, a minimum (a deeper thread costs nothing in a through hole). Each
+# face is the wizard's placement face: (model outward normal, its Z).
+FULL_THREAD_DEPTH = round(0.450 * 25.4, 9)  # .450 MIN
+BAR_TAP_FACE = ((0.0, 0.0, -1.0), 0.0)  # the bottom, on TL-20's top
+KP08_TAP_FACE = ((0.0, 0.0, 1.0), BRACKET_THICK)  # the top, under the KP08 foot
+# Each callout's thread depth carries MIN; the plan looks at the top face, so
+# the bar taps' threads also say FAR SIDE (base bar's C'BORE FAR SIDE).
+BAR_THREAD_CALLOUT = "MIN FAR SIDE"
+KP08_THREAD_CALLOUT = "MIN"
 
 _LENGTH_LOW = _limits(BRACKET_LENGTH, LENGTH_PLACES)[0]
 _BAR_R = THREAD_MAJOR_MM[BAR_SCREW] / 2.0
@@ -206,10 +227,23 @@ if not (
 if abs(KP08_TAP_X[1] - KP08_TAP_X[0] - leadscrew.KP08_BOLT_SPACING) > 1e-9:
     raise AssertionError("the KP08 taps are off the block's bolt spacing")
 
-# --- Rule 18: the through thread offers 1.5 D to both screws --------------------
-for _thread in (BAR_SCREW, KP08_THREAD):
-    if BRACKET_THICK - THICK_STOCK_BAND < 1.5 * THREAD_MAJOR_MM[_thread]:
-        raise AssertionError(f"end bracket {_thread} thread under 1.5 D")
+# --- Rule 18: each screw lands on full thread ------------------------------------
+# The deepest each screw reaches past its face: the #8 at TL-20's printed
+# bands, the 5/8 KP08 screw (ASME B18.3: no plus length tolerance) past the
+# block's UNVERIFIED foot. Neither reaches past the full thread into the tap's
+# lead, and the full thread offers 1.5 D to both.
+SCREW_REACH_MAX = {
+    BAR_SCREW: leadscrew.BAR_SCREW_ENGAGEMENT_RANGE[1],  # 9.119
+    KP08_THREAD: float(Fraction(leadscrew.KP08_SCREW_LENGTH)) * 25.4
+    - leadscrew.KP08_FOOT_THICK,  # 10.875
+}
+for _thread, _reach in SCREW_REACH_MAX.items():
+    if FULL_THREAD_DEPTH < 1.5 * THREAD_MAJOR_MM[_thread]:
+        raise AssertionError(f"end bracket {_thread} full thread under 1.5 D")
+    if _reach > FULL_THREAD_DEPTH:
+        raise AssertionError(f"the {_thread} screw reaches past its full thread")
+if FULL_THREAD_DEPTH >= BRACKET_THICK - THICK_STOCK_BAND:
+    raise AssertionError("the end bracket's full thread runs the whole height")
 
 # --- Rule 17: walls at the printed worst case ----------------------------------------
 WALL_TARGET = WALL_TARGET_MM

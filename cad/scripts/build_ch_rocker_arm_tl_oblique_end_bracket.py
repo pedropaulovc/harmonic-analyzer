@@ -6,8 +6,10 @@ leadscrew feed's KP08 pillow blocks on base bar 1's top
 
 Layout (the spec's model frame, +Z up): ONE Front-plane rectangle from the
 inner end face (model x 0) about the mid-width line, extruded +Z by the stock
-thickness; the four #8-32 UNC base-bar taps and the two #6-32 UNC KP08 taps are
-two native Hole Wizard features tapped THRU from the top face on the row y 0.
+thickness; the four #8-32 UNC base-bar taps (from the bottom face) and the two
+#6-32 UNC KP08 taps (from the top face) are two native Hole Wizard features on
+the row y 0, each tap drill THRU and each thread ``FULL_THREAD_DEPTH`` from its
+own face (owner ruling 2026-11-05: the CAD matches the hand traveler).
 The row's printed station (.250 from the -Y side face) lives on a hidden
 reference sketch, ``HoleRowReference`` (build_ch_rocker_arm_tl_oblique_base_bar's
 ``RailRowReference``); the stock thickness the end view prints lives on another,
@@ -36,7 +38,7 @@ from _drawing_precision import apply_drawing_precision
 from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
-from _holes import wizard_holes
+from _holes import _commit_definition_edits, wizard_holes
 from _part_checks import report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
 from _metric_vendor_dimension import set_metric_vendor_units
@@ -56,6 +58,7 @@ from _sketch import (
 from _sketch_chains import define_rectilinear_chain
 from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     BAR_TAP_DRILL,
+    BAR_TAP_FACE,
     BAR_TAP_SPEC,
     BAR_TAP_X,
     BRACKET_LENGTH,
@@ -63,10 +66,12 @@ from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     BRACKET_WIDTH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    FULL_THREAD_DEPTH,
     HALF_WIDTH,
     HOLE_ROW_Y,
     ISOMETRIC_VIEW_NOTE,
     KP08_TAP_DRILL,
+    KP08_TAP_FACE,
     KP08_TAP_SPEC,
     KP08_TAP_X,
     METRIC_DIMENSIONS,
@@ -97,6 +102,44 @@ def _require_one_solid_body(adapter, *, label: str) -> None:
         raise RuntimeError(
             f"{label}: expected exactly one solid body, found {len(bodies)}"
         )
+
+
+# swEndConditions_e: the drill's THRU ALL, the thread's BLIND.
+_THRU_ALL = 1
+_BLIND = 0
+
+
+def _thread_from_face(adapter, feature_name: str, *, label: str) -> None:
+    """Stop a THRU tap's thread ``FULL_THREAD_DEPTH`` from its wizard face;
+    its tap drill stays THRU ALL.
+
+    ``wizard_holes`` commits a through tap with a THRU ALL thread; its own
+    edit flow then sets the thread's end and depth, and the committed
+    definition, read back, is the proof (a hand tap cannot thread the 1 in
+    height: owner ruling 2026-11-05).
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    feature = _early_bound(
+        _early_bound(model, "IPartDoc").FeatureByName(feature_name), "IFeature"
+    )
+    definition = _commit_definition_edits(
+        model,
+        feature,
+        _early_bound(feature.GetDefinition(), "IWizardHoleFeatureData2"),
+        [("ThreadEndCondition", _BLIND), ("ThreadDepth", FULL_THREAD_DEPTH / 1000.0)],
+        label,
+    )
+    readback = {
+        "EndCondition": int(definition.EndCondition),
+        "ThreadEndCondition": int(definition.ThreadEndCondition),
+        "ThreadDepth": float(definition.ThreadDepth) * 1000.0,
+    }
+    if (
+        readback["EndCondition"] != _THRU_ALL
+        or readback["ThreadEndCondition"] != _BLIND
+        or abs(readback["ThreadDepth"] - FULL_THREAD_DEPTH) > 0.005
+    ):
+        raise RuntimeError(f"{label}: thread did not stop short: {readback!r}")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -153,15 +196,18 @@ async def build(adapter) -> dict[str, str]:
     )
     volume = await volume_check(adapter, "bracket", V_BRACKET, _V_TOL)
 
-    # --- Base-bar taps: ONE #8-32 UNC wizard feature, THRU from the top -----
-    # The wizard sets the row on y 0 by an origin relation (a zero coordinate
-    # takes no dimension); each station is a dimension from the inner end.
+    # --- Base-bar taps: ONE #8-32 UNC wizard feature from the bottom face ----
+    # Their screws come up through TL-20, so each thread runs from the bar
+    # face; the tap drill runs THRU. The wizard sets the row on y 0 by an
+    # origin relation (a zero coordinate takes no dimension); each station is
+    # a dimension from the inner end.
+    bar_normal, bar_z = BAR_TAP_FACE
     bar_taps = wizard_holes(
         adapter,
         BAR_TAP_SPEC,
-        [[x, 0.0, BRACKET_THICK] for x in BAR_TAP_X],
-        (0.0, 0.0, 1.0),
-        "base-bar screw taps (#8-32 through)",
+        [[x, 0.0, bar_z] for x in BAR_TAP_X],
+        bar_normal,
+        "base-bar screw taps (#8-32 from the bar face)",
         name="BarTaps",
         expect_dia_mm=BAR_TAP_DRILL,
         placement_dims=[
@@ -170,18 +216,20 @@ async def build(adapter) -> dict[str, str]:
         ],
     )
     drive_jobs += bar_taps.placement_drive_jobs
+    _thread_from_face(adapter, "BarTaps", label="base-bar screw taps")
     volume = await volume_check(
         adapter, "bracket with base-bar taps", volume - V_BAR_TAPS, _V_TOL
     )
 
-    # --- KP08 taps: ONE #6-32 UNC wizard feature, THRU from the top ---------
+    # --- KP08 taps: ONE #6-32 UNC wizard feature from the top face ----------
     # The size token is checked by the cut diameter (a wrong token fails).
+    kp08_normal, kp08_z = KP08_TAP_FACE
     kp08_taps = wizard_holes(
         adapter,
         KP08_TAP_SPEC,
-        [[x, 0.0, BRACKET_THICK] for x in KP08_TAP_X],
-        (0.0, 0.0, 1.0),
-        "KP08 screw taps (#6-32 through)",
+        [[x, 0.0, kp08_z] for x in KP08_TAP_X],
+        kp08_normal,
+        "KP08 screw taps (#6-32 from the KP08 face)",
         name="KP08Taps",
         expect_dia_mm=KP08_TAP_DRILL,
         placement_dims=[
@@ -190,6 +238,7 @@ async def build(adapter) -> dict[str, str]:
         ],
     )
     drive_jobs += kp08_taps.placement_drive_jobs
+    _thread_from_face(adapter, "KP08Taps", label="KP08 screw taps")
     volume = await volume_check(
         adapter, "bracket with KP08 taps", volume - V_KP08_TAPS, _V_TOL
     )

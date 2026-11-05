@@ -4,10 +4,11 @@ PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  Shop fixture hardware (cad/docs/subsystem-identities.md), modelled
 so the jig assembly can mate it and run native interference: the
 ``#6-32 X 5/8 BHCS`` that holds a KP08 pillow block to its TL-28 end bracket,
-tapped THRU; the head seats on the KP08's foot (its thickness is UNVERIFIED
-in the fastener table).  It is the C4 fastener table's ``KP08_TO_BRACKET``
-row.  It is its own row on the jig's BOM; the shop inventory carries no screw
-stock (no ``INVENTORY_ID``), and the assembly steps cite it by item and
+into the bracket's .450 MIN full thread; the head seats on the KP08's foot
+(its thickness is UNVERIFIED in the fastener table).  It is the C4 fastener
+table's ``KP08_TO_BRACKET`` row.  It is its own row on the jig's BOM; the shop
+inventory carries no screw stock (no ``INVENTORY_ID``), and the assembly
+steps cite it by item and
 callout (``fasteners.callout``).
 
 Why a button head (owner ruling 2026-11-04, option b): the uxcell KP08's

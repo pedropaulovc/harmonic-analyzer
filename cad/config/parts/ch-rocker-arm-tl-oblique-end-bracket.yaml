@@ -11,7 +11,10 @@ ch-rocker-arm-tl-oblique-end-bracket:
   finish: as machined
   quantity: 2
   tolerance_class: machined_block
-  process: "saw and face to length; drill and tap the four #8-32 and the two #6-32 holes through; break edges"
+  # Owner ruling 2026-11-05: the CAD follows the 2026-11-02 hand traveler (issue
+  # #2154): a hand plug tap cannot thread the 1 in height, so each tap drill runs
+  # through and each thread runs from its screw's face to .450 MIN full thread.
+  process: "saw and face to length; drill the four #8-32 and two #6-32 tap holes through; plug-tap the #8-32 from the bar (bottom) face and the #6-32 from the KP08 (top) face about 5/8 in deep, leaving .450 min full thread; break edges"
   # KP08 axial width 13 is the uxcell listing's (55 x 13 x 28, read 2026-11-04); nominal overhang is 0.15 each side.
   # Reallocate bought 1165 leftover after TL-26; 1164 half-by-three-quarter is spare.
   machinist_exceptions:

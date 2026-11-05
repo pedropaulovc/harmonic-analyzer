@@ -1,6 +1,6 @@
 r"""Purchased MHA-CH-06-TL-VN-62 oblique-trammel end bracket screw: McMaster 91251A196.
 
-The ``#8-32 X 5/8 SHCS`` (``ch_rocker_arm_tl_vn_oblique_bracket_screw_spec``) that holds a TL-28 end bracket to the TL-20 base bar, up from the bar's underside into the bracket, tapped THRU.
+The ``#8-32 X 5/8 SHCS`` (``ch_rocker_arm_tl_vn_oblique_bracket_screw_spec``) that holds a TL-28 end bracket to the TL-20 base bar, up from the bar's underside into the bracket's .450 MIN full thread.
 The stock recipe ``diagnostics/diag_build_91251A196.py`` builds the catalogue screw on
 the 91251A family recipe (``diag_mcmaster_socket_head.build_socket_head``);
 the recipe's standalone run is catalog-only (no replica gate, user ruling

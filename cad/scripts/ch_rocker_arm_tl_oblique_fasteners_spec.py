@@ -44,6 +44,7 @@ from fractions import Fraction
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_oblique_feed_lever_spec as feed_lever
+import ch_rocker_arm_tl_oblique_end_bracket_spec as end_bracket
 import ch_rocker_arm_tl_oblique_feed_block_spec as feed_block
 import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_feed_nut_spec as feed_nut
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
@@ -158,7 +159,7 @@ BRACKET_TO_BAR = Fastener(
     leadscrew.BAR_SCREW_LENGTH,
     len(leadscrew.BASE_BAR_HOLES),
     leadscrew.BAR_SCREW_GRIP,  # head recessed in TL-20's 4.80 counterbore
-    leadscrew.BRACKET_THICK,  # tapped THRU
+    end_bracket.FULL_THREAD_DEPTH,  # drilled THRU, threaded from the bar face
 )
 BLOCK_TO_CARRIAGE = Fastener(
     "TL-32 feed block / TL-22 pivot block to HGH15CA carriage",
@@ -179,7 +180,7 @@ KP08_TO_BRACKET = Fastener(
     leadscrew.KP08_SCREW_LENGTH,
     2 * leadscrew.END_BRACKET_QUANTITY,
     leadscrew.KP08_FOOT_THICK,  # UNVERIFIED foot thickness
-    leadscrew.BRACKET_THICK,  # tapped THRU
+    end_bracket.FULL_THREAD_DEPTH,  # drilled THRU, threaded from the KP08 face
 )
 NUT_TO_FEED_BLOCK = Fastener(
     "TL-VN-84 FeedNut to TL-32 feed block",
