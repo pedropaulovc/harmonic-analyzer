@@ -269,8 +269,8 @@ def _wall_text(wall: float) -> str:
 
 
 CSK_WALL_TEXT = (
-    f"WALL {_wall_text(CSK_WALL_TO_BODY)} MIN TO BODY, "
-    f"{_wall_text(CSK_WALL_TO_OD)} MIN TO OD"
+    f"MIN WALL {_wall_text(CSK_WALL_TO_BODY)} TO BODY, "
+    f"{_wall_text(CSK_WALL_TO_OD)} TO OD"
 )
 
 # --- Model --------------------------------------------------------------------------

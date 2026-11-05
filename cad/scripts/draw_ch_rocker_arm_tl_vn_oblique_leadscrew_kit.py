@@ -50,6 +50,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 from _com import _early_bound, _read_member
 import _config
+from _drawing_annotation_extent import callout_ink, require_inside, sheet_region
 from _drawing_centerline import add_view_centerline
 from _drawing_common import read_required_properties, rebuild_drawing
 from _drawing_detail_projection import settle_detail_projection
@@ -477,11 +478,13 @@ REWORK_SECTION_CENTER = (0.280, 0.160)
 # The cutting line runs this far past the flange rim each side (sheet).
 REWORK_SECTION_OVERRUN = 0.008
 # Text points, model mm (radius toward +X, station from the seat face): the
-# flange's thickness beyond its rim, high enough for its two callout lines
-# above; the countersink's past the body's end and above it, so its callout
-# lines below clear the flange, the body and the flange's text.
+# flange's thickness beyond its rim, its one callout line above the limits;
+# the countersink's past the body's end and above it. That callout prints on
+# a leader whose shoulder starts at the text point and runs right under the
+# block (run 20261105T010614057Z: shoulder 0.331 to 0.425, past the border at
+# 0.419), so the point sits just clear of the body's end.
 FLANGE_THICK_TEXT_MM = (feed_nut.FLANGE_DIA / 2.0 + 6.0, feed_nut.FLANGE_THICK / 2.0)
-CSK_DIA_TEXT_MM = (feed_nut.FLANGE_DIA / 2.0 + 1.0, feed_nut.LENGTH + 6.0)
+CSK_DIA_TEXT_MM = (feed_nut.FLANGE_DIA / 2.0 + 1.0, feed_nut.LENGTH + 2.0)
 # Rule 4: each band tighter than the title block's names its mate. The faced
 # seat bears on TL-32's lug face and the flange is the four nut screws' grip;
 # the countersinks seat those screws' 82° heads, which stand proud of the
@@ -496,8 +499,10 @@ if feed_nut.SCREW_SKU not in _config.parts("ch-rocker-arm-tl-vn-oblique-riser-sc
     raise AssertionError("the nut screws' number is not the screw the spec sizes")
 if feed_nut.HEAD_PROUD_MIN <= 0.0:
     raise AssertionError("the callout says the heads stand proud")
+# One line: SolidWorks keeps a line-broken ABOVE callout but never prints it
+# (run 20261105T010614057Z printed this one's limits alone).
 FLANGE_THICK_CALLOUT = (
-    f"SEAT FACE ON {FEED_BLOCK_NUMBER} LUG\n"
+    f"SEAT FACE ON {FEED_BLOCK_NUMBER} LUG, "
     f"GRIP OF {feed_nut.SCREW_COUNT}X {NUT_SCREW_NUMBER}"
 )
 CSK_SCREW_CALLOUT = (
@@ -512,6 +517,8 @@ REWORK_CALLOUTS = {
     "CskDia": ("below", CSK_SCREW_CALLOUT),
 }
 _CALLOUT_TEXT_PARTS = {"above": 3, "below": 4}
+if any("\n" in text for lane, text in REWORK_CALLOUTS.values() if lane == "above"):
+    raise AssertionError("an above-callout with a line break does not print")
 # The faced face: the spigot stood on the seat face, inside the Ø10.2; its
 # tip lands midway across that annulus, on the -X half below the axis. The
 # note's text sits left of the section, between it and the end view, its
@@ -1316,6 +1323,29 @@ def _assert_rework_callouts(adapter: Any, annotations: list[Any]) -> None:
         )
 
 
+def _assert_rework_ink_inside(adapter: Any, annotations: list[Any], spigot: Any) -> None:
+    """The countersink's leadered callout block and the spigot note, as
+    SolidWorks draws them, stay inside the sheet's zone frame. (No readback
+    shows whether an ABOVE callout printed; its one-line guard stands in.)"""
+    rebuild_drawing(adapter, label="feed nut rework ink")
+    region = sheet_region(adapter)
+    leadered = [
+        annotation
+        for annotation in annotations
+        if dimension_name(
+            adapter,
+            _sw_type_info.early_bound_or_flag(annotation, "IAnnotation", "GetSpecificAnnotation"),
+        )
+        == "CskDia"
+    ]
+    if len(leadered) != 1:
+        raise RuntimeError(f"section F-F holds {len(leadered)} CskDia dimensions")
+    ink = callout_ink(adapter, leadered[0], label="CskDia callout")
+    require_inside("CskDia callout", ink.text, region)
+    note = _box(_early_bound(spigot, "INote").GetExtent(), label="spigot note", kind="note")
+    require_inside("spigot facing note", note, region)
+
+
 def _add_spigot_note(adapter: Any, section: Any) -> tuple[Any, tuple[float, float]]:
     """Name the faced face: a leader to the seat face where the spigot stood."""
     (tip,) = model_points_in_view(
@@ -1481,6 +1511,7 @@ def _append_feed_nut_rework_sheet(adapter: Any) -> tuple[Callable[[], None], ...
         )
         _assert_rework_callouts(adapter, annotations)
         _assert_spigot_note(adapter, spigot, spigot_tip)
+        _assert_rework_ink_inside(adapter, annotations, spigot)
         title_fit()
 
     settled()

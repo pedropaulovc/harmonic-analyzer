@@ -886,17 +886,19 @@ def test_rework_bands_name_their_mates_at_their_callouts() -> None:
     import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
 
     lane, flange = draw.REWORK_CALLOUTS["FlangeThick"]
-    assert lane == "above"
+    # ABOVE: one line, since a line-broken above-callout reads back but never
+    # prints (run 20261105T010614057Z printed the limits alone).
+    assert lane == "above" and "\n" not in flange
     lane, countersink = draw.REWORK_CALLOUTS["CskDia"]
     assert lane == "below"
     # The lug is the feed block's, and the screws are the registry row that
     # buys the SKU whose head the spec sizes the countersink for.
     assert draw.FEED_BLOCK_NUMBER == feed_block.NUMBER
-    assert f"SEAT FACE ON {feed_block.NUMBER} LUG" in flange.splitlines()[0]
+    assert flange.startswith(f"SEAT FACE ON {feed_block.NUMBER} LUG, ")
     screw_row = _config.parts("ch-rocker-arm-tl-vn-oblique-riser-screw")
     assert screw_row["supplier_skus"] == [nut.SCREW_SKU]
     assert draw.NUT_SCREW_NUMBER == screw_row["number"]
-    assert flange.splitlines()[1] == f"GRIP OF {nut.SCREW_COUNT}X {screw_row['number']}"
+    assert flange.endswith(f", GRIP OF {nut.SCREW_COUNT}X {screw_row['number']}")
     # The fastener table's nut row is that flat head, through the flange
     # (the grip) into the feed block.
     row = fasteners.NUT_TO_FEED_BLOCK
@@ -1284,14 +1286,12 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
         assert draw._inside_sheet(box), box
     assert not draw._overlaps(cut, section)
     assert cut[3] < draw.ITEM_LABEL_CELL[1]
-    # Text fit. Calibration, run 20261105T002852195Z's native extents: the
-    # 3 mm member caption "[2] FEED NUT  QTY 1 INSTALLED" read 57.2 mm wide
-    # and 3.81 mm tall, 1.97 mm a character and 1.27 x its height a line;
-    # the two-line spigot note read 8.9 mm from its anchor down, 4.45 mm a
-    # line, so a 3.5 mm default note height (4.45 / 1.27) and 2.30 mm a
-    # character. ASSUMPTION: the dimension texts print no larger (run 7
-    # logged no dimension extents). Each estimate below covers these with
-    # margin.
+    # Text fit, notes. Calibration, run 20261105T002852195Z's native extents:
+    # the 3 mm member caption "[2] FEED NUT  QTY 1 INSTALLED" read 57.2 mm
+    # wide and 3.81 mm tall, 1.97 mm a character and 1.27 x its height a
+    # line; the two-line spigot note read 8.9 mm from its anchor down, 4.45 mm
+    # a line, so a 3.5 mm default note height (4.45 / 1.27) and 2.30 mm a
+    # character. Each estimate covers these with margin.
     caption = "[2] FEED NUT  QTY 1 INSTALLED"
     caption_extent = (0.21971254849498326, 0.2583655719063545, 0.2769007759197324, 0.2621781204013378)
     measured_char = (caption_extent[2] - caption_extent[0]) / len(caption) * 3.5 / 3.0
@@ -1300,6 +1300,16 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
     assert measured_line == pytest.approx(0.00445, abs=0.00005)
     char, line = 0.0028, 0.0055
     assert char > 1.15 * measured_char and line > 1.15 * measured_line
+    # Dimension text, from run 20261105T010614057Z's sheet-3 render (150 dpi):
+    # the CskDia block, its value and four rows, read 0.3305..0.4227 by
+    # 0.1941..0.2213 m, its shoulder from the text point rightward and its
+    # rows centred on the point's height; its 30-character row
+    # "91771A112 (MHA-CH-06-TL-VN-67)" read 0.3393..0.4142.
+    run9_csk = (0.3305, 0.1941, 0.4227, 0.2213)
+    dim_char_measured = (0.4142 - 0.3393) / 30
+    dim_line_measured = (run9_csk[3] - run9_csk[1]) / 5
+    dim_char, dim_line = 0.0029, 0.0065
+    assert dim_char > 1.15 * dim_char_measured and dim_line > 1.15 * dim_line_measured
 
     def sheet_point(radius_mm, station_mm):
         return (
@@ -1307,29 +1317,53 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
             draw.REWORK_SECTION_CENTER[1] + radius_mm * scale,
         )
 
-    def width(text):
-        return char * max(len(row) for row in text.splitlines())
+    def width(text, per_char=char):
+        return per_char * max(len(row) for row in text.splitlines())
 
+    def leadered_block(point, text):
+        # The shoulder's stroke starts a hair left of the point (run 9: 0.5 mm).
+        rows = 1 + len(text.splitlines())
+        return (
+            point[0] - 0.001,
+            point[1] - rows * dim_line / 2.0,
+            point[0] + width(text, dim_char),
+            point[1] + rows * dim_line / 2.0,
+        )
+
+    # Run 9's text point and wall row: the model holds the measured block and
+    # crosses the border, as the render did.
+    run9_text = (
+        "\n".join(draw.CSK_SCREW_CALLOUT.splitlines()[:-1])
+        + "\nWALL 0.39 MIN TO BODY, 0.54 MIN TO OD"
+    )
+    run9_model = leadered_block(
+        sheet_point(nut.FLANGE_DIA / 2.0 + 1.0, nut.LENGTH + 6.0), run9_text
+    )
+    assert draw._inside(run9_csk, run9_model)
+    assert run9_csk[2] > draw.BORDER[2] and not draw._inside_sheet(run9_model)
     flange_x, flange_y = sheet_point(*draw.FLANGE_THICK_TEXT_MM)
     lane, callout = draw.REWORK_CALLOUTS["FlangeThick"]
-    assert lane == "above"
-    half = max(width(callout), char * 3) / 2.0
+    assert lane == "above" and "\n" not in callout
+    # 3.7 over 3.3 (run 9: 0.2569..0.2628 by 0.2220..0.2296 m), the one
+    # callout row above them.
+    flange_limits = (
+        flange_x - 1.5 * dim_char,
+        flange_y - dim_line,
+        flange_x + 1.5 * dim_char,
+        flange_y + dim_line,
+    )
+    assert draw._inside((0.2569, 0.2220, 0.2628, 0.2296), flange_limits)
+    half = width(callout, dim_char) / 2.0
     flange_text = (
         flange_x - half,
-        flange_y - line,  # 3.7 over 3.3
+        flange_y + dim_line,
         flange_x + half,
-        flange_y + line + line * len(callout.splitlines()),
+        flange_y + 2.0 * dim_line,
     )
-    csk_x, csk_y = sheet_point(*draw.CSK_DIA_TEXT_MM)
+    csk_point = sheet_point(*draw.CSK_DIA_TEXT_MM)
     lane, callout = draw.REWORK_CALLOUTS["CskDia"]
     assert lane == "below"
-    half = width(callout) / 2.0
-    csk_text = (
-        csk_x - half,
-        csk_y - line / 2.0 - line * len(callout.splitlines()),
-        csk_x + half,
-        csk_y + line / 2.0,
-    )
+    csk_text = leadered_block(csk_point, callout)
     seat_x = sheet_point(0.0, 0.0)[0]
     flange_ink = (
         seat_x,
@@ -1374,7 +1408,10 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
         max(note[3], tip[1]),
     )
     assert draw._inside(noted, bounds)
-    texts = (flange_text, csk_text, noted)
+    # The countersink's dimension line stands at its text point, its lower
+    # arrow hanging past the body's top: clear of the body's end.
+    assert csk_text[0] > body_ink[2] + 0.004
+    texts = (flange_limits, flange_text, csk_text, noted)
     for index, text in enumerate(texts):
         assert draw._inside_sheet(text), text
         assert not draw._overlaps(text, draw.ITEM_LABEL_CELL)
@@ -2349,7 +2386,7 @@ def test_countersink_walls_are_the_worst_case_the_package_allows() -> None:
     ) == pytest.approx(1.15)
     assert max(nut.HOLE_WALL_TO_BODY, nut.HOLE_WALL_TO_OD) < nut.WALL_FLOOR
     # Printed rounded down, so a MIN never overstates the wall.
-    assert nut.CSK_WALL_TEXT == "WALL 0.39 MIN TO BODY, 0.54 MIN TO OD"
+    assert nut.CSK_WALL_TEXT == "MIN WALL 0.39 TO BODY, 0.54 TO OD"
     for printed, wall in zip(
         re.findall(r"\d+\.\d\d", nut.CSK_WALL_TEXT),
         (nut.CSK_WALL_TO_BODY, nut.CSK_WALL_TO_OD),
