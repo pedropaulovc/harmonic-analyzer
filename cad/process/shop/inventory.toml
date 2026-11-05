@@ -6695,7 +6695,7 @@ cite = ["OnlineMetals part 7487 https://www.onlinemetals.com/en/buy/x/pid/7487 o
 [[stock]]
 form = "flat_bar"
 material = "1018 cold-finish carbon steel"
-note = "Ordered 2026-11-03: 5/16 x 1 in 1018 CF flat, 12 in (standard length). Allocation: pd-transgear-arm (MHA-PD-18)."
+note = "Ordered 2026-11-03: 5/16 x 1 in 1018 CF flat, 12 in (standard length). Allocation: pd-transgear-arm (MHA-PD-18), unqualified: the arm's package calls for precision-ground 5/16 x 1 flat (McMaster 9517K466) with faces as supplied at 5/16 +/-.001 in. This bar qualifies only if it measures within that thickness and flatness on receipt (owner ruling 2026-11-04)."
 section_mm = [25.4, 7.9375]
 length_mm = 304.8
 on_hand = false
@@ -7059,7 +7059,7 @@ cite = ["McMaster-Carr 8956K435 https://www.mcmaster.com/8956K435/ ordered 2026-
 [[stock]]
 form = "rectangular_blank"
 material = "260 brass sheet, H02 (half hard)"
-note = "Ordered 2026-11-03: 0.063 in 260 H02 brass sheet, 6 x 6 in. Allocation: pd-guide-lock (MHA-PD-12), fr-nameplate (MHA-FR-04)."
+note = "Ordered 2026-11-03: 0.063 in 260 H02 brass sheet, 6 x 6 in. Allocation: fr-nameplate (MHA-FR-04). Not for the pd-guide-lock (MHA-PD-12): its package specifies low-carbon steel sheet 1/16 in, black-oxide finished, still to be bought (owner ruling 2026-11-04)."
 section_mm = [152.4, 1.6002]
 length_mm = 152.4
 on_hand = false
