@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+import _config
 from _assembly_contract import assembly_contract
 from _package_units import drawing_unit
 from _part_properties import part_drawing_unit, part_properties
@@ -52,6 +53,9 @@ def test_the_metric_supplier_rail_and_unconverted_parts_stay_millimetres():
     assert part_properties("ch-rocker-arm-tl-vn-oblique-rail")["TOL_LIN_XX"] == "±0.51"
 
 
-def test_the_pilot_assembly_declares_inches_and_others_do_not():
-    assert assembly_contract("ms-measuring-stick").drawing_unit == "in"
-    assert assembly_contract("dt-drive-train").drawing_unit == "mm"
+def test_every_assembly_declares_inches():
+    """#290's last step converts the top sheets: no assembly is left in mm."""
+    stems = sorted(path.stem for path in (_config.CONFIG_DIR / "assemblies").glob("*.yaml"))
+    assert {"ms-measuring-stick", "dt-drive-train", "ha-harmonic-analyzer"} <= set(stems)
+    for stem in stems:
+        assert assembly_contract(stem).drawing_unit == "in", stem

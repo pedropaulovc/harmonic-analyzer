@@ -29,6 +29,7 @@ from _printed_tolerance import (
     printed_deviations,
 )
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
+from _title_block_units import render_number
 
 import _cone_axis_constants as cone_axis
 import dt_cone_post_envelope as post_envelope
@@ -212,10 +213,13 @@ POST_MOUNT_ENGAGEMENT_NOTE = (
     f"1/4-20 THREAD ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN."
 )
 
-# Owner-accepted 2026-11-01 (MHA-DT-VN-61's RV-01).  A MIN never
-# rounds up: the length floors to two places like the diameters.
+# Owner-accepted 2026-11-01 (MHA-DT-VN-61's RV-01).  A MIN never rounds up:
+# the length floors to three inch places on MHA-DT-00's decimal-inch sheet.
+_POST_MOUNT_ENGAGEMENT_FLOOR_IN = (
+    math.floor(POST_MOUNT_ENGAGEMENT_WORST / 25.4 * 1000.0 + 1e-9) / 1000.0
+)
 POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT = (
-    f"ENGAGEMENT {math.floor(POST_MOUNT_ENGAGEMENT_WORST * 100.0) / 100.0:.2f} MIN "
+    f"ENGAGEMENT {render_number(_POST_MOUNT_ENGAGEMENT_FLOOR_IN, 'in', 3)} MIN "
     f"({POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D)."
 )
 

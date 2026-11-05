@@ -1,5 +1,6 @@
 """Offline contract for the complete-machine fitter package (MHA-HA-00)."""
 
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -104,6 +105,78 @@ def test_settings_are_derived_from_the_pose_sources() -> None:
     }
 
 
+def test_settings_print_at_the_inch_xx_grade() -> None:
+    """#290: the sheet is decimal inch. Both settings are functional, so they
+    take the .XX row (+/-.01), tighter than the mm .X row (+/-0.8) they
+    replace, never the inch .X row (+/-.1) kept for non-functional sizes."""
+    from _printed_tolerance import printed_band_mm
+
+    assert spec.SETTING_PRECISION == 2
+    assert spec.DRAWING_PRECISION == {
+        spec.SETTING_FEATURE: {
+            line.dimension: spec.SETTING_PRECISION for line in spec.SETTING_LINES
+        }
+    }
+    printed = {
+        line.dimension: f"{line.length / 25.4:.{spec.SETTING_PRECISION}f}"
+        for line in spec.SETTING_LINES
+    }
+    assert printed == {spec.BAR_HEIGHT_DIMENSION: "20.86", spec.STUD_DROP_DIMENSION: "2.43"}
+    band = printed_band_mm(spec.SETTING_PRECISION, unit="in")
+    assert band == pytest.approx(0.254)
+    assert band < printed_band_mm(1, unit="mm")
+    # The as-modelled machine passes the printed setting: rounding to the
+    # printed value spends under half its band.
+    for line in spec.SETTING_LINES:
+        offset = abs(float(printed[line.dimension]) * 25.4 - line.length)
+        assert offset < band / 2.0
+
+
+def test_the_package_is_decimal_inch_end_to_end(monkeypatch) -> None:
+    """The contract's drawing_unit drives the model's units (right after
+    create_assembly), the TOL_* rows and both new_project_drawing calls."""
+    import asyncio
+
+    from _title_block_units import linear_band_display
+
+    assert assembly_contract(spec.ASM_NAME).drawing_unit == "in" == drawing.UNIT
+    assert linear_band_display(2, unit=drawing.UNIT) == "±.01"
+
+    class Reached(Exception):
+        pass
+
+    calls: list[object] = []
+
+    async def create_assembly():
+        calls.append("create_assembly")
+        return SimpleNamespace(is_success=True, data=None, error=None)
+
+    def model_units(adapter, unit, *, label):
+        calls.append((unit, label))
+        raise Reached
+
+    monkeypatch.setattr(builder, "apply_package_model_units", model_units)
+    adapter = SimpleNamespace(create_assembly=create_assembly)
+    with pytest.raises(Reached):
+        asyncio.run(builder.build(adapter))
+    assert calls == ["create_assembly", ("in", builder.ASM_NAME)]
+
+    units: list[str] = []
+
+    def new_drawing(_adapter, *, layout, scale, unit):
+        units.append(unit)
+        raise Reached
+
+    monkeypatch.setattr(drawing, "new_project_drawing", new_drawing)
+    with pytest.raises(Reached):
+        drawing._create_mixed_package_sheets(SimpleNamespace())
+    with pytest.raises(Reached):
+        drawing._append_template_sheet(
+            SimpleNamespace(), None, name=drawing.SHEET_NAMES[-1]
+        )
+    assert units == ["in", "in"]
+
+
 def test_bar_height_chain_lies_on_the_west_front_column_axis() -> None:
     """Machinist review r2/r3 (b4df34ad9): at the deck's west edge the shown
     chain floated beside the column. It lies on the column's axis, and the
@@ -133,9 +206,13 @@ def test_steps_cover_the_sequence_and_print_no_setting_values() -> None:
     printed = " ".join(
         (*notes.ASSEMBLY_STEPS, *notes.ASSEMBLY_CHECKS, drawing.ASSEMBLED_NOTE)
     )
-    # The settings live on the associative sheet-1 dimensions only.
+    # The settings live on the associative sheet-1 dimensions only, in
+    # neither unit.
     for value in (spec.BAR_HEIGHT_MM, spec.STUD_DROP_MM):
         assert f"{value:.1f}" not in printed
+        assert f"{value / 25.4:.{spec.SETTING_PRECISION}f}" not in printed
+    # ASME decimal inch: no printed value keeps a millimetre leading zero.
+    assert not re.search(r"(?<![\d.])0\.\d", printed)
     # Period hardware: no step leans on, or names, a chemical or nylon lock.
     for bad in ("TBD", "TODO", "THREADLOCK", "LOCTITE", "NYLON", "NYLOC"):
         assert bad not in printed
@@ -160,7 +237,7 @@ def test_shared_vendor_instructions_print_current_numbers_and_roles() -> None:
 
 
 def test_bar_height_names_the_raised_deck_it_runs_from() -> None:
-    """#2060: the 529.9's extension line ends at the west column, short of the
+    """#2060: the 20.86's extension line ends at the west column, short of the
     raised deck it is measured from (spec.DECK_TOP_Y is the base stack top),
     so the callout and step 8 name that surface."""
     import fr_harmonic_base_spec as base
@@ -262,7 +339,11 @@ def test_the_parked_nib_is_set_on_the_paper_before_the_line_check() -> None:
     by_number = {
         int(line.split(". ", 1)[0]): line for line in notes.ASSEMBLY_STEPS
     }
-    feeler = f"{PEN_PAPER_CLEARANCE_MM:.2f} FEELER"
+    # The modelled gap in the sheet's inch: the stock .010 leaf, within
+    # half a .001 count of the model's 0.25.
+    assert notes.NIB_CLEARANCE_TEXT == ".010"
+    assert abs(0.010 * 25.4 - PEN_PAPER_CLEARANCE_MM) <= 0.0005 * 25.4
+    feeler = f"A {notes.NIB_CLEARANCE_TEXT} FEELER"
     assert feeler in by_number[parked]
     assert "TOUCHES THE PAPER" in by_number[contact]
     assert "FEELER" not in by_number[contact].replace("NO FEELER", "")
@@ -277,7 +358,7 @@ def test_the_parked_nib_is_set_on_the_paper_before_the_line_check() -> None:
     assert "DRAW A STRAIGHT LINE" in notes.ASSEMBLY_CHECKS[2]
     assert notes.NIB_PARKED_NOTE in drawing.ASSEMBLED_NOTE.replace("\n   ", " ")
     assert (
-        f"PARKED {PEN_PAPER_CLEARANCE_MM:.2f} OFF THE PAPER (STEP {parked}); "
+        f"PARKED {notes.NIB_CLEARANCE_TEXT} OFF THE PAPER (STEP {parked}); "
         f"STEP {contact} SETS IT ON."
     ) in notes.NIB_PARKED_NOTE
     lines = drawing.ASSEMBLED_NOTE.count("\n") + 1

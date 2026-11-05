@@ -802,16 +802,17 @@ def test_part_sheet_carries_no_assembly_procedure() -> None:
     locks its set screw; the sheet keeps the stock line and the bore's fit."""
     import draw_dt_drive_train_assembly as assembly
     from cone_stack_end_play import COLLAR_FEELER
+    from dt_drive_train_assembly_sheet import FEELER_PLACES, inch_text
 
     printed = f"{spec.DRAWING_NOTES}\n{spec.INSTALLATION_NOTES}"
     for word in ("FEELER", "LEAF", "SNUG", "SWING", "SEAT", "T006"):
         assert word not in printed
     assert spec.INSTALLATION_NOTES.count("\n") == 1
     step = (
-        f"PUSH MHA-DT-VN-54 ONTO A\n   {COLLAR_FEELER:.2f} FEELER ON T006; "
+        f"PUSH MHA-DT-VN-54 ONTO A {inch_text(COLLAR_FEELER, FEELER_PLACES)} FEELER ON T006; "
         "LOCK ITS SET SCREW ON THE FLAT."
     )
-    assert step in assembly.CONE_CRANK_STEPS
+    assert step in " ".join(assembly.CONE_CRANK_STEPS.split())
 
 
 def test_stock_line_is_a_supply_size_the_turned_od_comes_from() -> None:

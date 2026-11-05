@@ -1285,11 +1285,16 @@ def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
     # longest pin in the narrowest foot shares PIN_BURIED_MARGIN, the
     # shortest in the widest PIN_DRIVE_SHARE_MAX); at the limit the far wall
     # still grips a pin diameter.
+    # The inch sheet prints the maximum rounded down, never past it (#290).
+    from dt_drive_train_assembly_sheet import inch_max_text
+
     step_line = FITUP.SHAFT_DRILL_STEP.split("\n")[-1]
     assert step_line == (
-        f"BOTH ENDS 0 TO {pin.PIN_SUB_FLUSH_MAX:.1f} BELOW THE "
+        f"BOTH ENDS 0 TO {inch_max_text(pin.PIN_SUB_FLUSH_MAX, 3)} BELOW THE "
         f"{_config.parts('dt-pinion-bracket')['number']} EDGES."
     )
+    printed = float(inch_max_text(pin.PIN_SUB_FLUSH_MAX, 3)) * 25.4
+    assert pin.PIN_SUB_FLUSH_MAX - 0.0254 < printed <= pin.PIN_SUB_FLUSH_MAX
     assert pin.PIN_SUB_FLUSH_MAX == pytest.approx(2.8)
     assert 0.0 <= pin.PIN_BURIED_MARGIN <= 2.0 * pin.PIN_SUB_FLUSH_MAX
     assert pin.PIN_DRIVE_SHARE_MAX <= 2.0 * pin.PIN_SUB_FLUSH_MAX
@@ -1762,8 +1767,8 @@ def test_every_fit_up_setting_is_a_gage_leaf_and_the_prints_name_it() -> None:
     # The collars' set is an assembly step: nothing is cut, so MHA-DT-23's own
     # print stays free of it (drawing-guidelines.md rule 7 (notes: few, flagged, never a method), as MHA-DT-18 keeps its feeler).
     assert "LEAF" not in dt_pinion_cam_spec.DRAWING_NOTES
-    assert "0.90 OFF BACK MHA-DT-18" in FITUP.COLLAR_SET_STEP
-    assert "0.25 OFF FRONT MHA-DT-18" in FITUP.COLLAR_SET_STEP
+    assert "(0.90 MM LEAF) OFF BACK MHA-DT-18" in FITUP.COLLAR_SET_STEP
+    assert "(0.25 MM LEAF) OFF FRONT MHA-DT-18" in FITUP.COLLAR_SET_STEP
     # The fit-up module no longer claims MHA-DT-00 prints the feeler band.
     assert "MHA-DT-00 prints" not in (FITUP.__doc__ or "")
 

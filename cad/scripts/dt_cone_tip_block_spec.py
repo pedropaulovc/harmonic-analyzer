@@ -407,16 +407,22 @@ if not (
 ):
     raise AssertionError("adjuster embed leaves its working window")
 # The worst-case full-thread engagement the window guarantees, floored to the
-# printed places so the sheet never states more than the stack delivers.
+# printed inch places so the sheet never states more than the stack delivers.
+ADJUSTER_ENGAGEMENT_PLACES = 3
 ADJUSTER_ENGAGEMENT_MIN_MM = (
-    math.floor(ADJUSTER_MIN_ENGAGEMENT_D * THREAD_MAJOR_MM[ADJUSTER_THREAD] * 100.0)
-    / 100.0
+    math.floor(
+        ADJUSTER_MIN_ENGAGEMENT_D * THREAD_MAJOR_MM[ADJUSTER_THREAD] / 25.4
+        * 10**ADJUSTER_ENGAGEMENT_PLACES + 1e-9
+    )
+    / 10**ADJUSTER_ENGAGEMENT_PLACES * 25.4
 )
-# The assembly sheet states the shortfall as a plain fact at the step that
-# sets the adjuster, worded like MHA-DT-VN-61's.
+# The assembly sheet (MHA-DT-00, decimal inch) states the shortfall as a plain
+# fact at the step that sets the adjuster, worded like MHA-DT-VN-61's.
 # Pending exception ruling: MHA-DT-VN-55 engagement (#975).
 ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT = (
-    f"ENGAGEMENT {ADJUSTER_ENGAGEMENT_MIN_MM:.2f} MIN ({ADJUSTER_MIN_ENGAGEMENT_D:.1f}D)."
+    "ENGAGEMENT "
+    f"{render_number(ADJUSTER_ENGAGEMENT_MIN_MM / 25.4, 'in', ADJUSTER_ENGAGEMENT_PLACES)} "
+    f"MIN ({ADJUSTER_MIN_ENGAGEMENT_D:.1f}D)."
 )
 
 # --- hold-down (user ruling 2026-09-29) --------------------------------------

@@ -30,13 +30,14 @@ HEAD_REAR_FACE_Z = DRUM_FRONT_END_Z - DRUM_STATION
 LEGS = ((FEATURE, DIMENSION, HEAD_REAR_FACE_Z, DRUM_FRONT_END_Z),)
 AXIS_Y = APINION_Y
 DRAWING_DIMENSIONS = {feature: {name} for feature, name, _south, _north in LEGS}
-DRAWING_PRECISION = {feature: {name: 2} for feature, name, _south, _north in LEGS}
+# The package prints decimal inch (#290): the setting and its ±.010 band at
+# three places, the band's own (drawing-guidelines rule 3).
+PLACES = 3
+DRAWING_PRECISION = {feature: {name: PLACES} for feature, name, _south, _north in LEGS}
 # The one band every drum-station stack reads (land cover, drum ends on the
-# journals, collar gap, rig advance/retreat): ±.010 in, printed in mm.
+# journals, collar gap, rig advance/retreat): ±.010 in, printed exactly.
 DIMENSION_BANDS = {DIMENSION: (DRUM_STATION_BAND, -DRUM_STATION_BAND)}
-# The package prints mm, where ±.010 in prints whole only at three places
-# (_drawing_tolerances refuses a rounding precision).
-TOLERANCE_PRECISION = 3
+TOLERANCE_PRECISION = PLACES
 ARBOR_NUMBER = _config.parts("dt-pinion-arbor")["number"]
 DRUM_NUMBER = _config.parts("dt-alignment-pinion")["number"]
 # What is set (the drum's front end), from where (the arbor head's rear face)

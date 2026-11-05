@@ -23,6 +23,7 @@ from ha_harmonic_analyzer_assembly_spec import (
     STUD_DROP_DIMENSION,
 )
 from _recording_geometry import PEN_PAPER_CLEARANCE_MM
+from _title_block_units import render_number
 
 DRAWING_NUMBER = steps.DRAWING_NUMBER
 
@@ -91,7 +92,13 @@ if not (
 ):
     raise AssertionError("the spare label's tip must land on the solid plate face")
 
-NIB_CLEARANCE_TEXT = f"{PEN_PAPER_CLEARANCE_MM:.2f}"
+# The parked nib's feeler, in the sheet's decimal inch (#290): the modelled
+# 0.25 gap prints as the stock .010 leaf (0.254), three places as a feeler
+# size reads; the next step closes the gap, so the 0.004 is immaterial.
+NIB_CLEARANCE_PLACES = 3
+NIB_CLEARANCE_TEXT = render_number(
+    round(PEN_PAPER_CLEARANCE_MM / 25.4, NIB_CLEARANCE_PLACES), "in", NIB_CLEARANCE_PLACES
+)
 # Each setting's printed callout names what it sets and the step that sets
 # it; the step text points back to the sheet-1 dimension, so the value lives
 # only on the associative model dimension.

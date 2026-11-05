@@ -10,6 +10,7 @@ import _config
 import dt_cone_gear_stack
 import cone_stack_end_play
 import draw_dt_drive_train_assembly as drawing
+import dt_drive_train_assembly_sheet as sheet
 import dt_drive_train_steps as steps
 import pinion_rig_tip_gap as tip_gap
 import pytest
@@ -19,7 +20,7 @@ SEQUENCE_BLOCKS = (
     drawing.BANK_STEPS,
     drawing.rig_steps(pivot_blocks=2, cams=2, slotted=4),
 )
-TIP_GAP_FEELER = f"{tip_gap.TIP_GAP_FEELER:.2f} FEELER"
+TIP_GAP_FEELER = f"{tip_gap.TIP_GAP_SETTING_TEXT} FEELER"
 STEP_HEAD = re.compile(r"^\s*(\d+)\. ", re.MULTILINE)
 
 
@@ -66,7 +67,11 @@ def test_the_cone_stack_step_prints_measured_limits() -> None:
     assert "MHA-DT-07" in stack and "MHA-DT-03" in stack
     assert "T120 FIRST THROUGH T006" in stack
     assert "EACH FLAT TO FLAT AND AGAINST THE LAST" in stack
-    assert f"{low:.3f}-{high:.3f}" in stack
+    # The decimal-inch window rounds inward, a thousandth inside each limit.
+    printed = re.search(r"T006 NORTH FACE: (\d*\.\d{3})-(\d*\.\d{3})\.", stack)
+    assert printed is not None
+    first, last = (float(value) * 25.4 for value in printed.groups())
+    assert low <= first < low + 0.0254 and high - 0.0254 < last <= high
     assert "RE-FACE A LONG STACK" in stack
     assert "REMAKE THE THINNEST GEAR OF A SHORT ONE" in stack
 
@@ -82,7 +87,7 @@ def test_the_tip_step_sets_the_collar_before_the_end_play() -> None:
     # end play is set (Codex P1 on #1136).
     order = (
         f"PUSH {_config.parts('dt-vn-cone-tip-collar')['number']} ONTO A "
-        f"{cone_stack_end_play.COLLAR_FEELER:.2f} FEELER ON T006",
+        f"{sheet.inch_text(cone_stack_end_play.COLLAR_FEELER, sheet.FEELER_PLACES)} FEELER ON T006",
         "LOCK ITS SET SCREW",
         "THREAD MHA-DT-VN-55 INTO MHA-DT-21",
         "TURN MHA-DT-05 ON ITS SCREWS UNTIL THE TIP CENTRES IN THE CUP",
@@ -103,12 +108,14 @@ def test_the_tip_step_sets_the_collar_before_the_end_play() -> None:
 
 def test_the_printed_shaft_end_play_is_the_band_the_stacks_book() -> None:
     """The collar-to-block air and the adjuster's embed window book
-    cone_stack_end_play.SHAFT_END_PLAY; the sheet prints exactly that band."""
-    match = re.search(r"END PLAY (\d+\.\d+)-(\d+\.\d+)", _step_body("tip-adjuster-set"))
+    cone_stack_end_play.SHAFT_END_PLAY; the sheet prints that band, rounded
+    inward to the thousandth."""
+    match = re.search(r"END PLAY (\.\d{3})-(\.\d{3})", _step_body("tip-adjuster-set"))
     assert match is not None
-    printed = tuple(float(value) for value in match.groups())
-    assert printed == cone_stack_end_play.SHAFT_END_PLAY
-    assert 0.0 < printed[0] < printed[1]
+    low, high = (float(value) * 25.4 for value in match.groups())
+    least, most = cone_stack_end_play.SHAFT_END_PLAY
+    assert least <= low < least + 0.0254 and most - 0.0254 < high <= most
+    assert 0.0 < low < high
 
 
 def test_post_screws_keep_spec_owned_stock_and_cut_to_fit_acceptance() -> None:
@@ -124,10 +131,10 @@ def test_post_screws_keep_spec_owned_stock_and_cut_to_fit_acceptance() -> None:
         in fitup
     )
     places = screw.DRAWING_PRECISION_BY_NAME[screw.CUT_LENGTH_DIMENSION]
-    assert f"({screw.CUT_LENGTH_MM:.{places}f}) REF CUT LENGTH" in fitup
+    assert f"({sheet.inch_text(screw.CUT_LENGTH_MM, places)}) REF CUT LENGTH" in fitup
     # The step prints the part sheet's exact maximum short, never a wider one.
-    printed_short = float(re.search(r"FLUSH TO (\d+\.\d+) SHORT", fitup).group(1))
-    assert printed_short == screw.POST_SCREW_CUT_TO_FIT_SHORT
+    printed_short = float(re.search(r"FLUSH TO (\d*\.\d+) SHORT", fitup).group(1))
+    assert printed_short * 25.4 == pytest.approx(screw.POST_SCREW_CUT_TO_FIT_SHORT, abs=1e-9)
     assert "CUT TO FIT" in fitup and "UNDERSIDE, NEVER PROUD" in fitup
     assert "DEBURR ENDS" in fitup
     assert screw.FIXED_CUT_LENGTH_EXISTS is False
@@ -154,15 +161,15 @@ def test_crank_fit_reads_t120_before_the_full_turn_and_retention_drilling() -> N
     fitup = _step_body("crank-mesh-checked")
     order = (
         "SLIDE MHA-DT-10 ON UNPINNED",
-        f"SET MHA-DT-10 {pinion.SEAT_FEELER_MM:.2f} OFF",
+        f"SET MHA-DT-10 {sheet.inch_text(pinion.SEAT_FEELER_MM, sheet.FEELER_PLACES)} OFF",
         "PUSH MHA-DT-10 AND T120 TOWARD EACH OTHER",
-        f"READING A {pinion.T120_FITUP_FEELER_MM:.2f} FEELER ALL ROUND",
+        f"READING A {sheet.T120_FITUP_FEELER_TEXT} FEELER ALL ROUND",
         "MHA-DT-10 BAND TO T120 TIPS: IF THE FEELER STOPS",
         "TURN THE MHA-DT-10 BAND DOWN",
-        f"Ø{pinion.TURNED_DIA_FITUP_MIN:.2f} MIN",
+        f"Ø{sheet.inch_min_text(pinion.TURNED_DIA_FITUP_MIN, 3)} MIN",
         "MHA-DT-10 SHOULDER TO T120 SOUTH FACE: IF THE FEELER STOPS",
         "FACE THE MHA-DT-10 SHOULDER BACK",
-        f"{pinion.SHOULDER_LENGTH_FITUP_MIN:.2f} MIN",
+        f"{sheet.inch_min_text(pinion.SHOULDER_LENGTH_FITUP_MIN, 3)} MIN",
         "RESET, RECHECK",
         "TURN MHA-DT-07 ONE FULL REVOLUTION; IT MUST NEVER BIND",
         "THEN MATCH-DRILL THROUGH THE MHA-DT-10",
@@ -202,14 +209,20 @@ def test_crank_end_fit_holds_the_collar_on_the_boss_and_leaves_the_end_proud() -
     assert least >= 0.0
     order = (
         "MHA-DT-11 COLLAR REAR FACE HARD ON THE MHA-DT-05 BOSS SOUTH FACE",
-        f"MHA-DT-10 ON THE {pinion.SEAT_FEELER_MM:.2f} FEELER OFF THE BOSS NORTH FACE",
+        f"MHA-DT-10 ON THE {sheet.inch_text(pinion.SEAT_FEELER_MM, sheet.FEELER_PLACES)} "
+        "FEELER OFF THE BOSS NORTH FACE",
         "MATCH-DRILL AND REAM FOR MHA-DT-29",
         "END PLAY = THE FEELER",
-        f"END STANDS {least:.2f}-{most:.2f} PROUD OF MHA-DT-10 NORTH FACE",
+        f"END STANDS {drawing.inch_envelope((least, most), 3)} PROUD OF MHA-DT-10 NORTH FACE",
         "DO NOT FACE",
     )
     positions = [fitup.index(phrase) for phrase in order]
     assert positions == sorted(positions)
+    # A stack result the fitter cannot adjust: every accepted part set,
+    # including both extremes, must fall inside the printed range.
+    printed = fitup.split("END STANDS ", 1)[1].split(" PROUD", 1)[0]
+    low, high = (float(limit) * 25.4 for limit in printed.split("-"))
+    assert low <= least and most <= high
     assert f"(STEP {steps.step_number('crank-mesh-checked')})" in fitup
     assert "SHIM" not in fitup and "MHA-CH-VN-57" not in fitup
 

@@ -36,6 +36,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     view_name,
 )
 
+from _assembly_contract import assembly_contract
 from _check import check
 from _com import _early_bound
 from _component_references import component_reference_names
@@ -113,9 +114,15 @@ from dt_cylinder_end_disc_spec import WASHER_THICK as BANK_WASHER_THICK
 import dt_cylinder_gear_spec as drum
 import dt_drum_station_setting_spec as drum_station_setting
 from dt_drive_train_assembly_sheet import (
+    FEELER_PLACES,
     HANDLE_FERRULE_CURE,
     LEVER_PIN_HOLE_FIT,
     T120_FITUP_ASSEMBLY_CHECK,
+    inch_ceil_mm,
+    inch_floor_mm,
+    inch_max_text,
+    inch_text,
+    inch_window,
 )
 from dt_drive_train_assembly_spec import (
     CLUSTERS,
@@ -167,6 +174,9 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 DRAWING_NUMBER = "MHA-DT-00"
+# The package's sheets, TOL_* rows and model-owned settings print decimal inch
+# (#290; the contract's drawing_unit).
+UNIT = assembly_contract("dt-drive-train").drawing_unit
 # swUserPreferenceToggle_e.swViewDisplayHideAllTypes = 198: read by reflection
 # from the installed SOLIDWORKS 3DEXPERIENCE R2026x
 # SolidWorks.Interop.swconst.dll (2026-09-23), matching the API help's "Hide or
@@ -706,17 +716,14 @@ def _split_sequence_notes(text: str, number: int, heading: str) -> tuple[str, st
     return first, f"{heading}\n{head}{rest}"
 
 
-# Acceptance limits on the assembly sheets round inward at these places.
-FIT_LIMIT_PLACES = 2
+# Acceptance limits on the assembly sheets round inward at these places: the
+# DRO-set coordinates' ±0.10 at four inch places, a DRO count.
+FIT_LIMIT_PLACES = 4
 
 
 def _inward_limits(low: float, high: float) -> str:
     """Print only sizes inside the owning spec's acceptance interval."""
-    scale = 10**FIT_LIMIT_PLACES
-    return (
-        f"{math.ceil(low * scale - 1e-9) / scale:.{FIT_LIMIT_PLACES}f}-"
-        f"{math.floor(high * scale + 1e-9) / scale:.{FIT_LIMIT_PLACES}f}"
-    )
+    return inch_window((low, high), FIT_LIMIT_PLACES)
 
 
 _BANK_X = cone_line.X_DRUM + base.BOTTOM_LENGTH / 2.0
@@ -857,8 +864,7 @@ CONE_CRANK_STEPS = _note_text(
         "1. SLIDE MHA-DT-07 ONTO THE MHA-DT-04 D-FLAT AGAINST ITS COLLAR.",
         "   SLIDE {cone_gears}X MHA-DT-03 ON, T120 FIRST THROUGH T006,",
         f"   EACH FLAT TO FLAT AND AGAINST THE LAST. MEASURE THE {CONE_GEAR_COUNT}-GEAR",
-        f"   STACK T120 SOUTH FACE TO T006 NORTH FACE: {STACK_L20_ACCEPT[0]:.3f}-"
-        f"{STACK_L20_ACCEPT[1]:.3f}.",
+        f"   STACK T120 SOUTH FACE TO T006 NORTH FACE: {inch_window(STACK_L20_ACCEPT, 3)}.",
         "   RE-FACE A LONG STACK; REMAKE THE THINNEST GEAR OF A SHORT ONE.",
         # U37c cut-to-fit acceptance survives the taller post and longer stock:
         # MHA-DT-VN-61's registry/spec own the selected screw and reference length.
@@ -869,11 +875,12 @@ CONE_CRANK_STEPS = _note_text(
         "2. ALIGN MHA-DT-05 COUNTERBORES TO MHA-DT-20 TAPS; USE 2X",
         f"   MHA-DT-VN-61: MSC {post_screw.SKU}, {post_screw.THREAD} X "
         f"{post_screw.STOCK_LENGTH_MM / 25.4:g} IN STOCK, CUT TO FIT;",
-        # The exact maximum short the part sheet allows (.005 in = 0.127):
-        # rounding a maximum outward would pass a cut the part rejects.
-        f"   FLUSH TO {post_screw.POST_SCREW_CUT_TO_FIT_SHORT:.3f} SHORT OF "
-        "MHA-DT-20 UNDERSIDE, NEVER PROUD.",
-        f"   ({post_screw.CUT_LENGTH_MM:.{post_screw.DRAWING_PRECISION_BY_NAME[post_screw.CUT_LENGTH_DIMENSION]}f}) "
+        # The exact maximum short the part sheet allows (.005 in = 0.127): a
+        # maximum never rounds outward, and the part's places print it whole.
+        "   FLUSH TO "
+        f"{inch_max_text(post_screw.POST_SCREW_CUT_TO_FIT_SHORT, post_screw.CUT_TO_FIT_SHORT_PLACES)}"
+        " SHORT OF MHA-DT-20 UNDERSIDE, NEVER PROUD.",
+        f"   ({inch_text(post_screw.CUT_LENGTH_MM, post_screw.DRAWING_PRECISION_BY_NAME[post_screw.CUT_LENGTH_DIMENSION])}) "
         "REF CUT LENGTH. DEBURR ENDS; " + POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT,
         # User ruling 2026-09-29 (eight-views-4 photo): MHA-DT-21 is a prism
         # standing directly on MHA-DT-20, held by one #4-40 socket head cap
@@ -900,14 +907,14 @@ CONE_CRANK_STEPS = _note_text(
         # screws tightened, so its screw clearance can only carry the shaft
         # north, away from G19 (dt_tip_collar_air).
         "3. PUSH THE STACK ONTO THE MHA-DT-04 COLLAR. PUSH MHA-DT-VN-54 ONTO A",
-        f"   {COLLAR_FEELER:.2f} FEELER ON T006; LOCK ITS SET SCREW ON THE FLAT.",
+        f"   {inch_text(COLLAR_FEELER, FEELER_PLACES)} FEELER ON T006; LOCK ITS SET SCREW ON THE FLAT.",
         "   THREAD MHA-DT-VN-55 INTO MHA-DT-21 TO THE TIP. HOLD MHA-DT-05 PUSHED",
         "   TOWARD MHA-DT-21 ALONG THE SHAFT THROUGHOUT: TURN MHA-DT-05 ON ITS",
         "   SCREWS UNTIL THE TIP CENTRES IN THE CUP; TIGHTEN BOTH MHA-DT-VN-61",
         "   AND RECHECK. THREAD MHA-DT-VN-55 ON UNTIL MHA-DT-04 JUST STOPS",
         "   SHUTTLING AND STILL TURNS FREELY; BACK OFF 1/8 TURN; TIGHTEN",
         "   MHA-DT-VN-56 ACROSS THE SLIT. END PLAY "
-        f"{SHAFT_END_PLAY[0]:.2f}-{SHAFT_END_PLAY[1]:.2f}, BY FEEL OR INDICATOR.",
+        f"{inch_window(SHAFT_END_PLAY, 3)}, BY FEEL OR INDICATOR.",
         "   MHA-DT-VN-55 " + ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT,
         # User ruling 2026-09-28: the crank journal runs directly in the post;
         # the centres are fixed, and the only mesh requirement is no binding.
@@ -926,7 +933,7 @@ CONE_CRANK_STEPS = _note_text(
         "4. PRESS 2X MHA-DT-VN-67 TO THE MHA-DT-11 COLLAR HOLE FLOORS. FIT MHA-DT-11 IN",
         "   THE MHA-DT-05 CRANK BORE; SLIDE MHA-DT-10 ON UNPINNED, TOOTH IN GAP",
         "   WITH MHA-DT-07. HOLD THE MHA-DT-11 COLLAR HARD ON THE BOSS SOUTH FACE;",
-        f"   SET MHA-DT-10 {PINION_SEAT_FEELER:.2f} OFF THE MHA-DT-05 BOSS NORTH FACE WITH A FEELER.",
+        f"   SET MHA-DT-10 {inch_text(PINION_SEAT_FEELER, FEELER_PLACES)} OFF THE MHA-DT-05 BOSS NORTH FACE WITH A FEELER.",
         T120_FITUP_ASSEMBLY_CHECK + " THEN",
         "   TURN MHA-DT-07 ONE FULL REVOLUTION; IT MUST NEVER BIND (ELSE CHECK",
         "   THE PARTS AND BORE SPACING). THEN MATCH-DRILL THROUGH THE MHA-DT-10",
@@ -966,9 +973,10 @@ CONE_CRANK_STEPS = _note_text(
         "   WIPE THE WAX OFF MHA-DT-32; SLIDE MHA-DT-08 ON",
         "   MHA-DT-32 AND THREAD MHA-DT-32 INTO MHA-DT-06, NO THREADLOCKER,",
         "   SHOULDER TIGHT; END PLAY",
-        "   0.25-1.0. FILE THE TIP FLUSH TO THE ARM INBOARD FACE, THEN STAKE THE",
+        f"   {inch_window(handle_screw.END_PLAY_RANGE, 3)}. FILE THE TIP FLUSH TO THE ARM INBOARD FACE, THEN STAKE THE",
         f"   TAP MOUTH ONTO IT AT {HANDLE_STAKE_POINTS} (SHEET {FULL_DETAIL_SHEET}).",
-        f"   CYLINDER BANK: SHEET {BANK_SHEET}.",
+        # NBSP keeps the continuation pointer on one printed line.
+        f"   CYLINDER\u00a0BANK:\u00a0SHEET {BANK_SHEET}.",
     )
 )
 
@@ -999,7 +1007,7 @@ BANK_STEPS = _note_text(
         # Each connecting rod comes pinned to its rocker arm (MHA-CH-00's
         # bench pinning step, cited by key): its ring is captured in the closed
         # cam slot as the next gear goes on, so the pair travels with its gear.
-        "   MANDREL ~190 LONG, ALL ALIKE, CAM SIDE FRONT; SET EACH CONNECTING",
+        "   MANDREL ~7.5 LONG, ALL ALIKE, CAM SIDE FRONT; SET EACH CONNECTING",
         f"   ROD + ARM PAIR ({RODS_PINNED_REF}) ON ITS CAM AS ITS GEAR GOES ON.",
         "   CLAMP LIGHTLY END TO END: ACCEPT THE GEAR 0 CAM FACE TO GEAR 19",
         f"   NORTH FACE LENGTH SHOWN ON SHEET {BANK_SETTINGS_SHEET}. LONG: SLIDE THE GEARS",
@@ -1011,10 +1019,13 @@ BANK_STEPS = _note_text(
         "9A. FRONT MHA-DT-02 ALONE ON THE MANDREL, ON THE BASE. EDGE-FIND BOTH",
         "   MHA-FR-01 HOLE-TABLE DATUM FACES (SEE ITS PRINT); ZERO DRO X AND Y.",
         "   MIC THE MHA-DT-26, W. SET THE FRONT MHA-DT-02 INNER FACE",
-        f"   TO Y {FRONT_STRAP_Y_LIMITS} PLUS (W - {BANK_WASHER_THICK:.3f}) AND THE MANDREL",
+        # NBSP keeps each (W - nominal) term on one printed line.
+        f"   TO Y {FRONT_STRAP_Y_LIMITS} PLUS (W\u00a0-\u00a0{inch_text(BANK_WASHER_THICK, 3)}) AND THE MANDREL",
         f"   CENTRE (EDGE-FIND BOTH SIDES, HALVE) TO X {BANK_X_LIMITS}.",
         "   SPOT MHA-FR-01 THROUGH THE FOOT HOLE (11/64 TRANSFER PUNCH);",
-        "   LIFT OFF. DRILL #29 X 19.5, TAP #8-32 X 16.0 (PLUG, THEN",
+        # The seat's drill, tap and depth are the MHA-FR-01 transfer callout's,
+        # so the step names the print, never a copy (as the rig's seats do).
+        "   LIFT OFF. DRILL AND TAP PER MHA-FR-01 (PLUG, THEN",
         "   BOTTOMING); CLEAR CHIPS. REFIT AT X AND Y; TIGHTEN",
         # Check 4 re-reads both coordinates against the step 9 setting bands
         # after the cone swing's radial shims move the pedestals.
@@ -1039,10 +1050,10 @@ BANK_STEPS = _note_text(
         "   MHA-DT-VN-62, REMOVE THE BLADE, RECHECK AND RECORD X. DRO STILL ZEROED,",
         "   DRILL AND TAP THE MHA-FR-01 PIVOT SEAT PER ITS PRINT NOTE.",
         "9D. MEASURE MHA-DT-02 OUTER FACE TO OUTER FACE. TURN MHA-DT-13: ITS",
-        f"   CYLINDER IS THAT SPAN, PLUS A {bank.ARBOR_DOME_HEIGHT:.1f} DOME EACH END (SEE ITS PRINT).",
+        f"   CYLINDER IS THAT SPAN, PLUS A {inch_text(bank.ARBOR_DOME_HEIGHT, 2)} DOME EACH END (SEE ITS PRINT).",
         "9E. PUSH MHA-DT-13 IN FROM THE BACK, END TO END WITH THE MANDREL, UNTIL",
-        f"   THE MANDREL IS OUT AND EACH DOME STANDS {bank.ARBOR_DOME_HEIGHT:.1f} PROUD (DEPTH GAUGE).",
-        "   SPOT MHA-DT-13 THROUGH EACH CROWN TAP WITH A #43 DRILL, 0.5 DEEP;",
+        f"   THE MANDREL IS OUT AND EACH DOME STANDS {inch_text(bank.ARBOR_DOME_HEIGHT, 2)} PROUD (DEPTH GAUGE).",
+        "   SPOT MHA-DT-13 THROUGH EACH CROWN TAP WITH A #43 DRILL, .02 DEEP;",
         "   BLOW OUT CHIPS. RUN THE FRONT MHA-SH-VN-54 IN TIGHT, THEN THE BACK ONE.",
         "9F. EACH GEAR TURNS FREE BY HAND, THE BANK HELD SOUTH BY MHA-DT-VN-68.",
         # #936 P1 b, option A (user ruling 2026-09-26): the north MHA-CH-08 ear
@@ -1065,7 +1076,7 @@ BANK_STEPS = _note_text(
         f"   {NORTH_BRACKET_SCREW} AND ONE MHA-CH-VN-56. STAND THE MHA-CH-08 ON THE MHA-FR-05",
         "   RAIL, FOOT TO THE BACK. MIC THE MHA-CH-VN-56, W. SET THE EAR",
         f"   INNER FACE TO Y {NORTH_EAR_Y_LIMITS} LESS "
-        f"(W - {rocker_washer.THICKNESS:.3f});",
+        f"(W\u00a0-\u00a0{inch_text(rocker_washer.THICKNESS, 3)});",
         "   CLAMP. DRILL AND TAP THE RAIL THROUGH ITS FOOT PER THE MHA-FR-05 SEAT",
         f"   CALLOUT (VIEW B); SCREW IT DOWN WITH THE {NORTH_BRACKET_SCREW} AND RECHECK Y.",
         "   KEEP THAT MHA-CH-VN-56 FOR THE NORTH END OF "
@@ -1099,7 +1110,7 @@ RIG_SEQUENCE_HEADING = "ASSEMBLY SEQUENCE CONT. - PINION RIG"
 # SET's pad leaf sets the other axis, along the bank.  The window a fitter
 # must hold it in is known issue #1037, which ships this as the interim.
 SPRING_EAST_WEST = (
-    f"MHA-DT-24 FOOT HOLE CENTRE {SPRING_SCREW_EAST_OF_PIVOT:.1f} EAST OF THE "
+    f"MHA-DT-24 FOOT HOLE CENTRE {inch_text(SPRING_SCREW_EAST_OF_PIVOT, 2)} EAST OF THE "
     "MHA-DT-19 AXIS, CREST BEARING ON THE PARKED BACK MHA-DT-14 FLANK"
 )
 
@@ -1229,8 +1240,8 @@ CHECKS = _note_text(
         "   TO THE MHA-SH-VN-52 STOP, CLEAR OF EVERY MHA-DT-12. ZERO AN INDICATOR ON",
         "   EACH MHA-DT-02 IN X AND ONE ON THE FRONT MHA-DT-02 IN Y. EASE THE",
         "   MHA-DT-02 SCREWS (MHA-DT-VN-62) TO SNUG-LOOSE. SWING IN ON RADIAL SHIMS,",
-        f"   TIP TO MHA-DT-12 ROOT: {set_stack.feeler_gap_mm(12):.2f} AT T012, "
-        f"{set_stack.feeler_gap_mm(120):.2f} AT T120; TIGHTEN MHA-DT-VN-62.",
+        f"   TIP TO MHA-DT-12 ROOT: {inch_text(set_stack.feeler_gap_mm(12), FEELER_PLACES)} AT T012, "
+        f"{inch_text(set_stack.feeler_gap_mm(120), FEELER_PLACES)} AT T120; TIGHTEN MHA-DT-VN-62.",
         "   EACH RECORDED X (9A, 9C) PLUS ITS X READING IS "
         f"{BANK_X_LIMITS};",
         "   FRONT INNER-FACE Y RECORDED IN 9A PLUS ITS Y READING IS WITHIN",
@@ -1240,13 +1251,13 @@ CHECKS = _note_text(
         f"   AND {steps.step_number('rig-located')}-"
         f"{steps.step_number('rig-seats-transferred')} STAND; CHECK 7 RE-PROVES THE RIG.",
         "   SWING OUT AND REMOVE THE SHIMS. SWING IN UNTIL A "
-        f"{set_stack.feeler_gap_mm(120):.2f} FEELER IS SNUG T120 TIP TO ROOT; HOLD",
+        f"{inch_text(set_stack.feeler_gap_mm(120), FEELER_PLACES)} FEELER IS SNUG T120 TIP TO ROOT; HOLD",
         "   IT THERE AND TIGHTEN MHA-DT-VN-51. DO NOT LOOSEN MHA-DT-02 AFTER",
         "   THIS SET; IF YOU DO, REPEAT CHECKS 4, 5, 6 AND 7.",
         # User ruling 2026-10-10: T012's arithmetic worst-corner overlap is a
         # REF fit-up note, never a gate (dt_mesh_checks; the RSS corner is gated).
         "   IF T012 BINDS AFTER THE SET (WORST-CORNER OVERLAP "
-        f"{-mesh_checks.cone_check(12).interference_margin_worst_mm:.2f} REF), STONE",
+        f"{inch_text(-mesh_checks.cone_check(12).interference_margin_worst_mm, 3)} REF), STONE",
         "   THE T012 TIP UNTIL IT TURNS FREE; THE T120 SET STANDS.",
         "   VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT "
         f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT}; SHOULDER FULLY SEATED.",
@@ -1260,10 +1271,10 @@ CHECKS = _note_text(
         # The saved pose is engaged with MHA-DT-VN-51 tight (SETUP_NOTES): P2
         # ends by re-setting the swing as check 4 does.
         "   RETURN MHA-DT-16 TO PARK. SWING THE CONE SET IN UNTIL THE "
-        f"{set_stack.feeler_gap_mm(120):.2f} FEELER",
+        f"{inch_text(set_stack.feeler_gap_mm(120), FEELER_PLACES)} FEELER",
         "   IS SNUG T120 TIP TO ROOT AND TIGHTEN MHA-DT-VN-51: THE CHECK 4 SETTING.",
         "6. PARKED, MHA-DT-24 HOLDS MHA-DT-01 CLEAR OF EVERY MHA-DT-12.",
-        f"7. PARKED, PINS ON THE CAMS: A {TIP_GAP.TIP_GAP_FEELER:.2f} FEELER IS SNUG TIP TO TIP",
+        f"7. PARKED, PINS ON THE CAMS: A {TIP_GAP.TIP_GAP_SETTING_TEXT} FEELER IS SNUG TIP TO TIP",
         f"   AT THE FRONT AND BACK STATIONS; {TIP_GAP.TIP_GAP_ACCEPT_TEXT}",
         f"   (SHEET {FIT_SHEET}, STEP {steps.step_number('rig-located')}). IF A STATION IS OUT,",
         "   EASE THE MHA-DT-VN-57 SCREWS, RE-SET THE RIG ON THE FEELER AT BOTH STATIONS",
@@ -1343,6 +1354,15 @@ FIT_PLACEHOLDER = _note_text(
     heading=False,
 )
 
+def inch_envelope(limits_mm: tuple[float, float], places: int) -> str:
+    """A predicted (min, max) stack result the fitter cannot adjust, rounded
+    outward so every accepted part set lands inside the printed range."""
+    return (
+        f"{inch_text(inch_floor_mm(limits_mm[0], places), places)}-"
+        f"{inch_text(inch_ceil_mm(limits_mm[1], places), places)}"
+    )
+
+
 # Owner ruling D1 (2026-10-15): the collar bears on the boss with no washer,
 # the 16T's feeler is the end play, and the shaft end stands proud of the
 # 16T by dt_crankshaft_spec.SHAFT_END_PROUD_RANGE at every accepted part set;
@@ -1352,12 +1372,14 @@ CRANK_END_FIT_NOTES = _note_text(
         f"MHA-DT-11 CRANK END FIT (STEP {steps.step_number('crank-mesh-checked')})",
         "A. MHA-DT-11 COLLAR REAR FACE HARD ON THE MHA-DT-05 BOSS SOUTH FACE;",
         "   NO WASHER.",
-        f"B. MHA-DT-10 ON THE {PINION_SEAT_FEELER:.2f} FEELER OFF THE BOSS NORTH FACE, "
+        f"B. MHA-DT-10 ON THE {inch_text(PINION_SEAT_FEELER, FEELER_PLACES)} FEELER OFF THE BOSS NORTH FACE, "
         "THEN",
         "   MATCH-DRILL AND REAM FOR MHA-DT-29 AS STEP "
         f"{steps.step_number('crank-mesh-checked')}. END PLAY = THE FEELER.",
-        f"C. MHA-DT-11 END STANDS {max(CRANK_END_PROUD_RANGE[0], 0.0):.2f}-"
-        f"{CRANK_END_PROUD_RANGE[1]:.2f} PROUD OF MHA-DT-10 NORTH FACE;",
+        "C. MHA-DT-11 END STANDS "
+        # A stack result, not a set window: rounded outward (Codjiflo, #2194).
+        f"{inch_envelope((max(CRANK_END_PROUD_RANGE[0], 0.0), CRANK_END_PROUD_RANGE[1]), 3)}"
+        " PROUD OF MHA-DT-10 NORTH FACE;",
         "   LEAVE IT PROUD, DO NOT FACE.",
     )
 )
@@ -2884,7 +2906,7 @@ def _hide_model_reference_types(adapter: Any) -> None:
 
 
 def _create_package_sheets(adapter: Any) -> None:
-    new_project_drawing(adapter, layout=SPEC.layout, scale=ASSEMBLED_SCALE)
+    new_project_drawing(adapter, layout=SPEC.layout, scale=ASSEMBLED_SCALE, unit=UNIT)
     _hide_model_reference_types(adapter)
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="drive-train assembly package")
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
