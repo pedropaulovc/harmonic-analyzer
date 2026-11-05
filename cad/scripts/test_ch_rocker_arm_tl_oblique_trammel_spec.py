@@ -286,12 +286,12 @@ def test_carriage_play_and_shoulder_clearance_share_half_the_top_edge_band() -> 
     )
     low, high = sorted(rocker.TOP_EDGE_BAND)
     half_band = (high - low) / 2.0
-    assert trammel.TOP_EDGE_HALF_BAND == pytest.approx(half_band) == 0.25
+    assert trammel.TOP_EDGE_HALF_BAND == pytest.approx(half_band) == pytest.approx(0.254)
     assert trammel.CARRIAGE_PLAY_RADIUS <= trammel.RADIUS_FROM_SHOULDER_CLEARANCE
     budget = trammel.CARRIAGE_PLAY_RADIUS + trammel.RADIUS_FROM_SHOULDER_CLEARANCE
     assert budget <= half_band
-    # 0.050 + 0.112 leaves 0.088 of the 0.25 half band.
-    assert half_band - budget == pytest.approx(0.088, abs=5e-4)
+    # 0.050 + 0.112 leaves 0.092 of the .010 in (0.254) half band.
+    assert half_band - budget == pytest.approx(0.092, abs=5e-4)
 
 
 def test_plain_pivot_stack_sets_the_carrier_height() -> None:

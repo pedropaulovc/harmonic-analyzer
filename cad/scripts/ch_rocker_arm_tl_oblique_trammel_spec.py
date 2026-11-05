@@ -75,7 +75,7 @@ Error sensitivity (printed next to the bands that carry it):
   radial error (owner, issue #2177). The fit-up acceptance is
   ``CARRIAGE_PLAY_TIR_MAX`` 0.05 mm TIR at the shoulder-screw head, so its
   radius contribution ``CARRIAGE_PLAY_RADIUS`` 0.050 is under the shoulder
-  term, and both together stay inside half the strap's 0.50 one-sided
+  term, and both together stay inside half the strap's .020 in (0.508) one-sided
   ``TOP_EDGE_BAND`` that the hub aims at the middle of. The rail/carriage
   pair's height and width tolerances do not apply: one carriage runs on each
   rail, the selected shims set the carrier height, and HUB and CL are reamed
