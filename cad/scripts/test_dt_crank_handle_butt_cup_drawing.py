@@ -70,15 +70,17 @@ def test_bottom_chamfer_clears_the_handle_counterbore_corner() -> None:
 def test_floor_and_pocket_wall_hold_their_floors_at_the_printed_limits() -> None:
     # Owner ruling B on #1375 grows only the body around the unchanged pocket.
     assert not hasattr(spec, "FLANGE_DIA") and not hasattr(spec, "FLANGE_THICKNESS")
-    # The floor is what the overall (.X) leaves after the banded pocket depth,
+    # The floor is what the overall (.XX) leaves after the banded pocket depth,
     # both from the face (re-review: one faced end).
     assert spec.FLOOR_THICKNESS_MIN >= spec.WALL_FLOOR_MM
     assert spec.POCKET_WALL_FLOOR_MM == spec.WALL_FLOOR_MM == WALL_FLOOR_MM
-    assert spec.POCKET_STRAIGHT_WALL_MIN >= spec.POCKET_WALL_FLOOR_MM
+    assert spec.POCKET_WALL_MIN >= spec.POCKET_WALL_FLOOR_MM
     assert screw.CUP_POCKET_WALL_MIN == spec.POCKET_STRAIGHT_WALL_MIN
     assert screw.POCKET_MAX <= spec.POCKET_DIA_MAX
     assert spec.BODY_DIA - spec.BODY_DIA_TOL >= (
-        spec.POCKET_DIA_MAX + 2.0 * spec.POCKET_WALL_FLOOR_MM - 1e-9
+        spec.POCKET_DIA_MAX
+        + 2.0 * (spec.POCKET_WALL_FLOOR_MM + 2.0 * spec.EDGE_BREAK_MAX_MM)
+        - 1e-9
     )
     assert screw.HEAD_BEARING_RADIAL_MIN > 0.0
     assert spec.FLOOR_HOLE_DIA > screw.SHOULDER_DIA_MAX
@@ -88,20 +90,27 @@ def test_face_walls_charge_every_exposed_break() -> None:
     # Codjiflo on #2102 (#2170): at the outer face the pocket mouth and the OD
     # edge each take the title block's break, so the governing wall is the
     # straight one less both, and the callout prints that, not the straight.
+    # Main delegated ruling 2026-11-04 (#2170, option B): the body grows to
+    # .422, so the face holds the .060 floor (RV-01) and the straight the target.
     brk = edge_break_chamfer_mm(unit=spec.UNIT)
     assert spec.EDGE_BREAK_MAX_MM == brk == pytest.approx(0.010 * 25.4)
+    assert spec.BODY_DIA == pytest.approx(0.422 * 25.4)
     assert spec.POCKET_WALL_MIN == pytest.approx(spec.POCKET_STRAIGHT_WALL_MIN - 2.0 * brk)
-    assert spec.POCKET_WALL_MIN < spec.POCKET_STRAIGHT_WALL_MIN
-    assert notes.POCKET_FIT_CALLOUT.splitlines()[-1] == (
-        f"WALL {notes.inch_text(spec.POCKET_WALL_MIN, 3)} MIN"
-    )
-    # The floor at the floor hole's lip, and the bottom face's ring round
-    # the hole, each lose the hole mouth's break.
+    assert spec.POCKET_WALL_MIN == pytest.approx(WALL_FLOOR_MM)
+    assert spec.POCKET_STRAIGHT_WALL_MIN == pytest.approx(WALL_TARGET_MM)
+    assert notes.POCKET_FIT_CALLOUT.splitlines()[-1] == "WALL .060 MIN"
+    exceptions = {
+        row["id"]: row for row in _config.parts("dt-crank-handle-butt-cup")["machinist_exceptions"]
+    }
+    assert set(exceptions) == {"RV-01"}
+    assert exceptions["RV-01"]["where"].endswith(notes.POCKET_FIT_CALLOUT.splitlines()[-1])
+    # #2196 (Main delegated ruling 2026-11-04): the .34 overall keeps the
+    # target at the floor hole's lip, both mouths broken; option B lifts the
+    # bottom face's ring round the hole over it too.
+    assert spec.OVERALL_LENGTH == pytest.approx(0.34 * 25.4)
     assert spec.FLOOR_AT_HOLE_MIN == pytest.approx(spec.FLOOR_THICKNESS_MIN - 2.0 * brk)
-    assert spec.FLOOR_AT_HOLE_MIN >= WALL_FLOOR_MM
-    assert spec.FLOOR_HOLE_WALL_MIN >= WALL_FLOOR_MM
-    assert screw.HEAD_BEARING_RADIAL_MIN > 0.0
-    assert spec.FLOOR_HOLE_DIA > screw.SHOULDER_DIA_MAX
+    assert spec.FLOOR_AT_HOLE_MIN >= WALL_TARGET_MM
+    assert spec.FLOOR_HOLE_WALL_MIN >= WALL_TARGET_MM
 
 
 def test_ruling_b_keeps_the_head_pocket_and_axial_geometry() -> None:

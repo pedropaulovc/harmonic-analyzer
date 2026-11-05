@@ -112,8 +112,8 @@ CAPTION_XY = (0.160, 0.114)
 ISO_NOTE_POS = (0.335, 0.170)
 
 _S = VIEW_SCALE[0] / 1000.0
-BODY_R = BODY_DIA * _S / 2.0  # 0.024
-HALF_LENGTH = OVERALL_LENGTH * _S / 2.0  # 0.02025
+BODY_R = BODY_DIA * _S / 2.0  # 0.0268
+HALF_LENGTH = OVERALL_LENGTH * _S / 2.0  # 0.0216
 # The section lays the part's +X to the right (the draw_crank_pinion
 # convention), so the face is the right edge and the floor the left.
 FACE_X = SECTION_CENTER[0] + HALF_LENGTH

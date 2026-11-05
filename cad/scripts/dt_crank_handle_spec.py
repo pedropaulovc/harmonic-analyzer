@@ -27,7 +27,8 @@ machinist review of 2026-10-18: the contour had lived in a note).
 
 Owner ruling B on #1375 enlarges the cup body to retain its pocket wall and
 derives the butt crest from that cup's largest counterbore, the .XX band,
-both eccentricities, and the rule-17 oak wall target plus a radial margin.
+both eccentricities, the counterbore mouth's break (#2170) and the rule-17
+oak wall target plus a radial margin.
 
 Issue #290: the sheet prints decimal inch (``drawing_unit: in``).  Every
 nominal is the exact millimetre decimal of its printed inch value, and every
@@ -153,15 +154,17 @@ COUNTERBORE_DIA_MAX = _to_grid(
 )
 # Owner ruling B on #1375: the flat oak end on the cup-face plane keeps the
 # rule-17 wall target plus a radial design margin.  Derive its crest from the
-# cup-driven counterbore limit, the .XX diameter band and the outside and
-# counterbore each off the bore by the eccentricity in opposite directions, up
-# to the next printed hundredth.
+# cup-driven counterbore limit, the .XX diameter band, the outside and
+# counterbore each off the bore by the eccentricity in opposite directions,
+# and the title-block break on the counterbore's mouth (Main delegated ruling
+# 2026-11-04, #2170: the crest is tangent to the end round, so only the mouth
+# is an edge), up to the next printed hundredth.
 BUTT_WALL_RULING_MARGIN_MM = 0.0508  # .002
 BUTT_WALL_DESIGN_MIN_MM = round(WALL_TARGET_MM + BUTT_WALL_RULING_MARGIN_MM, 6)
 CREST_DIA = _to_grid(
     COUNTERBORE_DIA_MAX
     + _GENERAL_2PL
-    + 2.0 * (2.0 * BORE_ECCENTRICITY + BUTT_WALL_DESIGN_MIN_MM),
+    + 2.0 * (2.0 * BORE_ECCENTRICITY + BUTT_WALL_DESIGN_MIN_MM + EDGE_BREAK_MAX_MM),
     2,
     math.ceil,
 )
@@ -233,11 +236,12 @@ WOOD_LENGTH = OAK_END_X - SHOULDER_X
 
 # The oak round the largest counterbore at the butt, its thinnest place: the
 # crest turned its .XX band small, off the bore by the eccentricity one way and
-# the counterbore the other.
+# the counterbore the other, less the break on the counterbore's mouth.
 BUTT_WALL_MIN = round(
     (CREST_DIA - _GENERAL_2PL) / 2.0
     - 2.0 * BORE_ECCENTRICITY
-    - COUNTERBORE_DIA_MAX / 2.0,
+    - COUNTERBORE_DIA_MAX / 2.0
+    - EDGE_BREAK_MAX_MM,
     6,
 )
 # The tenon is turned to suit the actual ferrule bore (Codex P1/P2 on #1139):
@@ -361,6 +365,13 @@ TENON_STRAIGHT_WALL_MIN = (TENON_DIA_MIN - PIVOT_BORE_FIT_MAX) / 2.0 - BORE_ECCE
 # bore's mouth are both exposed there and each takes the title block's break,
 # as TENON_GLUE_LENGTH_MIN charges the end break (codjiflo on #2102, #2171).
 TENON_WALL_MIN = round(TENON_STRAIGHT_WALL_MIN - 2.0 * EDGE_BREAK_MAX_MM, 6)
+# Main delegated ruling 2026-11-04 (#2171, option C; listed for owner review
+# on #2144): that end ring is oak bonded inside the brass ferrule, its edges
+# carry no load (the bore runs on the MHA-DT-32 shoulder along its length), and
+# a larger tenon would need a larger ferrule against the user's 2026-09-30 ring
+# size, so .040 is accepted as minor exception RV-02 (precedent #1900's
+# ferrule arm face, both edges broken).
+TENON_WALL_ACCEPTED_MM = 1.016  # .040
 # Oak at the waist over the largest bore, the waist turned its .XX band small.
 WAIST_WALL_MIN = (
     (2.0 * WAIST_R - _GENERAL_2PL) - PIVOT_BORE_FIT_MAX
@@ -383,6 +394,11 @@ for _ok, _what in (
     (
         TENON_STRAIGHT_WALL_MIN >= TENON_WALL_FLOOR_MM,
         "the smallest fitted tenon leaves under .060 over the bore",
+    ),
+    (
+        TENON_WALL_MIN >= TENON_WALL_ACCEPTED_MM,
+        "the smallest fitted tenon leaves under the accepted .040 at its broken "
+        "free end (#2171)",
     ),
     (
         FERRULE_STOCK_DIA_MIN / 2.0
@@ -519,15 +535,17 @@ CUP_NAME = "BUTT CUP"
 # The matched fits, each flagged on its feature (drawing-guidelines.md rules 4
 # and 7): the mate by name and number, and the acceptance.  Short lines keep
 # each block narrow beside its neighbours on the sheet.
-# The tenon's governing oak wall, at its broken free end (#2171), is under the
-# rule-17 target, so its callout states it as a plain fact (rule 20; #290
-# review of b28d38a16), rounded down to the printed thousandth.
+# The tenon's oak over the pivot bore is under the rule-17 target along its
+# length and under the floor at its broken free end (#2171), so its callout
+# states both as plain facts (rule 20; #290 review of b28d38a16), each rounded
+# down to the printed thousandth: minor exceptions RV-01 and RV-02.
 TENON_FIT_NOTE = (
     f"TURN TO SUIT {FERRULE_NAME}\n"
     f"{FERRULE_NUMBER} BORE, {inch_text(TENON_GLUE_LINE[0], 3)}-"
     f"{inch_text(TENON_GLUE_LINE[1], 3)}\n"
     "DIAMETRAL CLEARANCE;\n"
-    f"WALL {inch_text(math.floor(TENON_WALL_MIN / 0.0254) * 0.0254, 3)} MIN"
+    f"WALL {inch_text(math.floor(TENON_STRAIGHT_WALL_MIN / 0.0254) * 0.0254, 3)} MIN;\n"
+    f"WALL {inch_text(math.floor(TENON_WALL_MIN / 0.0254) * 0.0254, 3)} MIN AT TENON END"
 )
 COUNTERBORE_FIT_NOTE = (
     f"BORE TO SUIT {CUP_NAME}\n"

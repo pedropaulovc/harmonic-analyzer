@@ -13,7 +13,8 @@ cup, whose face stays flat (local review of fbf82ad96).  Formerly: turned across
 the cup together, so wood and steel read as one rounded butt.  The smaller
 MHA-DT-32 head sets the pocket's matched fit.  Owner ruling B on #1375
 enlarges the body to retain the rule-17 floor as the pocket wall at the
-smallest body and largest pocket.
+smallest body and largest pocket; Main's delegated ruling 2026-11-04 (#2170,
+option B) holds it at the outer face, after both of that face's edge breaks.
 
 The pocket is bored to suit the MHA-DT-32 head; the handle's end play is fitted
 on the screw shoulder at assembly, so no length here is a stack term.  The
@@ -37,7 +38,7 @@ and the walls are judged at the inch title block's bands.
 from __future__ import annotations
 
 import _config
-from _inch_wall_limits import WALL_FLOOR_MM
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import (
     drilled_oversize_mm,
@@ -53,8 +54,9 @@ BODY_DIA_TOL = printed_band_mm(3, unit=UNIT)
 # Every axial size reads from the outer face, the one faced end (MHA-DT-35
 # re-review): overall and pocket depth.  The floor is what remains, so the
 # overall carries enough that its .XX worst case, over the deepest banded
-# pocket, still leaves the rule-17 target.
-OVERALL_LENGTH = 8.128  # .32
+# pocket, still leaves the rule-17 target at the floor hole's lip, both of the
+# hole's mouths broken (Main delegated ruling 2026-11-04, #2196: .32 -> .34).
+OVERALL_LENGTH = 8.636  # .34
 # Deep enough that the longest banded MHA-DT-32 head, at the widest fitted end
 # play, still sits below the face (Codex P2 on #1139).  User ruling 2026-09-30.
 POCKET_DEPTH = 5.5118  # .217
@@ -66,9 +68,11 @@ POCKET_DIA = 6.2992  # .248
 POCKET_CLEARANCE = (0.2032, 0.4064)  # .008-.016
 POCKET_DIA_MAX = 6.5278  # .257
 # Owner ruling B on #1375: the cup grows around the unchanged head and pocket,
-# rather than retaining a sub-floor wall or tightening the body band.
+# rather than retaining a sub-floor wall or tightening the body band.  Main
+# delegated ruling 2026-11-04 (#2170, option B) grows it again so that the
+# floor holds at the outer face, where both of the wall's edges are broken.
 POCKET_WALL_FLOOR_MM = WALL_FLOOR_MM
-BODY_DIA = 9.7028  # .382: the largest pocket, two .060 walls and the band
+BODY_DIA = 10.7188  # .422: the largest pocket, two .060 face walls, their breaks and the band
 # The head bears on the floor: the floor-to-wall corner may round no more than
 # the tightest radial clearance, so a sharp-edged, centred head still seats on
 # the flat (rule 16: the largest radius acceptable; MHA-DT-35 r1 finding 5).
@@ -117,18 +121,16 @@ FLOOR_HOLE_WALL_MIN = round(
 STOCK_DIA = 0.5 * 25.4
 
 for _ok, _what in (
-    (FLOOR_THICKNESS_MIN >= WALL_FLOOR_MM, "cup floor is under .060 at its limits"),
+    # #2196: the floor holds the target even at the floor hole's broken lip.
+    (FLOOR_AT_HOLE_MIN >= WALL_TARGET_MM, "cup floor is under .080 at the floor hole's lip"),
+    # #2170 option B also lifts the bottom ring over the target.
     (
-        FLOOR_AT_HOLE_MIN >= WALL_FLOOR_MM,
-        "cup floor is under .060 at the floor hole's broken mouths",
+        FLOOR_HOLE_WALL_MIN >= WALL_TARGET_MM,
+        "the bottom face's ring round the floor hole is under .080",
     ),
     (
-        FLOOR_HOLE_WALL_MIN >= WALL_FLOOR_MM,
-        "the bottom face's ring round the floor hole is under .060",
-    ),
-    (
-        POCKET_STRAIGHT_WALL_MIN >= POCKET_WALL_FLOOR_MM,
-        "straight pocket wall is under .060 at its limits (owner ruling B on #1375)",
+        POCKET_WALL_MIN >= POCKET_WALL_FLOOR_MM,
+        "pocket wall is under .060 at the broken face (#2170, option B)",
     ),
     (FLOOR_HOLE_DIA < POCKET_DIA, "floor hole leaves no floor"),
     (BODY_DIA + BODY_DIA_TOL < STOCK_DIA - 0.2, "body is not turnable from 1/2-in rod"),

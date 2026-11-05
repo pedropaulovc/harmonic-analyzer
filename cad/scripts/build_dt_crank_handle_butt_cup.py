@@ -8,6 +8,9 @@ a plain cup with a flat face; the handle's end round is turned on the oak only.
 Dimensions live in ``dt_crank_handle_butt_cup_spec``.
 Owner ruling B on #1375 enlarges only the body and its stock; the unchanged
 head pocket now retains the wall floor without a shortfall note or property.
+Main's delegated rulings 2026-11-04 grow the body again so the floor holds at
+the broken face (#2170) and lengthen the cup so its floor holds the target at
+the floor hole's broken lip (#2196).
 
 Layout: one revolve about local +X.  The cup's outer face is the origin
 plane (x=0); the body and floor run toward -X, into the handle, so in
