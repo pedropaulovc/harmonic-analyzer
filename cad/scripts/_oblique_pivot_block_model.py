@@ -14,7 +14,7 @@ from _dimensions import name_dimensions
 from _document_units import apply_package_model_units
 from _drawing_marks import clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
+from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_angular_tolerance, set_dimension_symmetric_tolerance
 from _metric_vendor_dimension import set_metric_vendor_units
 from _feature_tree import name_last_feature
 from _fit_deviations import deviations
@@ -230,15 +230,26 @@ async def _circles(adapter, plane, z, profile, circles, *, side=False):
     dims.apply(adapter, profile)
 
 
-async def _construction(adapter, create, label: str) -> str:
-    """One construction entity, drawn without inference (no snap to the
-    model edges it lies on), so only the dimensions below define it.
-    ``create`` is the un-awaited adapter call; it runs inside the mode."""
+async def _drawn(adapter, create, label: str) -> str:
+    """One sketch entity, drawn without inference (no snap to the model
+    edges it lies on), so only the dimensions below define it. ``create``
+    is the un-awaited adapter call; it runs inside the mode.
+
+    A line ON a printed outline stays a plain sketch line, as the base bar's
+    and end bracket's reference lines do: shown in its view, a construction
+    line's dash font prints over the outline, which then reads broken by
+    dashes (TL-32 machinist review, farm run 20261105T054045952Z: the plan's
+    -X edge and lug -X face, VIEW D's lug end; TL-22's -X edge the same)."""
     set_sketch_direct_db(adapter, True)
     try:
-        entity = check(label, await create)
+        return check(label, await create)
     finally:
         set_sketch_direct_db(adapter, False)
+
+
+async def _construction(adapter, create, label: str) -> str:
+    """One construction entity, drawn as :func:`_drawn`."""
+    entity = await _drawn(adapter, create, label)
     _as_construction(adapter, entity)
     return entity
 
@@ -265,18 +276,18 @@ async def _construction_circle(adapter, dims, base, base_uv, uv, dia, names, lab
 
 async def _plan_datum_reference(adapter, part) -> None:
     """The hidden top-face sketch that carries the plan's X ordinates from
-    the -X edge (rule 10): a construction line ON that edge, construction
-    circles ON the shoulder seat and one carriage hole per column, and on
-    TL-32 a line ON the lug's -X face, which also carries the overall from the
-    top (+Y) edge. Shown in the plan view, every entity overlies a real edge."""
+    the -X edge (rule 10): a plain line ON that edge, construction circles ON
+    the shoulder seat and one carriage hole per column, and on TL-32 a plain
+    line ON the lug's -X face, which also carries the overall from the top
+    (+Y) edge. Shown in the plan view, every entity overlies a real edge."""
     feature = spec.PLAN_DATUM_REFERENCE
     z = part.BLOCK_HEIGHT
     check(f"create_sketch {feature}", await adapter.create_sketch("TopFace"))
     at = _xy_mapper(adapter, z, feature)
     dims = SketchDims()
     edge_start, edge_end = at(part.BLOCK_X0, -part.BLOCK_WIDTH / 2), at(part.BLOCK_X0, part.BLOCK_WIDTH / 2)
-    edge = await _construction(adapter, adapter.add_line(edge_start[0], edge_start[1], edge_end[0], edge_end[1]),
-                               f"{feature} -X edge")
+    edge = await _drawn(adapter, adapter.add_line(edge_start[0], edge_start[1], edge_end[0], edge_end[1]),
+                        f"{feature} -X edge")
     check(f"{feature} -X edge vertical", await adapter.add_sketch_constraint(edge, None, "vertical"))
     await anchor_point_to_origin(adapter, f"{edge}.start", *edge_start, f"{feature} -X edge foot")
     dims.record("PlanEdgeX")
@@ -293,8 +304,8 @@ async def _plan_datum_reference(adapter, part) -> None:
                                    f"{feature} carriage hole column {i}")
     if hasattr(part, "LUG_WIDTH"):
         lug_top, lug_end = at(part.LUG_X0, part.LUG_Y1), at(part.LUG_X0, part.LUG_Y0)
-        lug = await _construction(adapter, adapter.add_line(lug_top[0], lug_top[1], lug_end[0], lug_end[1]),
-                                  f"{feature} lug -X face")
+        lug = await _drawn(adapter, adapter.add_line(lug_top[0], lug_top[1], lug_end[0], lug_end[1]),
+                           f"{feature} lug -X face")
         check(f"{feature} lug face vertical", await adapter.add_sketch_constraint(lug, None, "vertical"))
         await _offset_point(adapter, dims, f"{edge}.start", f"{lug}.start",
                             abs(lug_top[0] - edge_start[0]), abs(lug_top[1] - edge_start[1]),
@@ -308,12 +319,48 @@ async def _plan_datum_reference(adapter, part) -> None:
     dims.apply(adapter, feature)
 
 
+async def _driving_angle(adapter, first: str, second: str, text_mm, degrees: float, label: str) -> None:
+    """A driving angular dimension between two sketch lines, its text at the
+    model point ``text_mm`` (inside the wedge it measures), read back exact.
+    The shared ``add_angular_reference_dimension`` makes a driven one and
+    passes sketch coordinates with z = 0, which is not on the nut face's plane
+    (build_ch_rocker_arm_tl_oblique_riser's note); the supplier reference
+    sketches' driving angle is the pattern (_supplier_screw_reference)."""
+    import math
+    from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    model.ClearSelection2(True)
+    try:
+        _select_sketch_entities(adapter, [first, second], 0)
+        display, status = _early_bound(model.Extension, "IModelDocExtension").AddSpecificDimension(
+            *(c / 1000.0 for c in text_mm), 3, 0  # swDimensionType_e.swAngularDimension
+        )
+    finally:
+        model.ClearSelection2(True)
+    if display is None or status != 0:  # swAddSpecificDimension_Success
+        raise RuntimeError(f"{label}: AddSpecificDimension(angular) failed ({status})")
+    display = _early_bound(display, "IDisplayDimension")
+    if int(display.Type2) != 3:  # swAngularDimension
+        raise RuntimeError(f"{label}: not a native angular dimension")
+    angle = _early_bound(display.GetDimension2(0), "IDimension")
+    angle.DrivenState = 2  # swDimensionDrivenState_e.swDimensionDriving
+    if int(angle.DrivenState) != 2 or not math.isclose(
+        float(angle.SystemValue), math.radians(degrees), rel_tol=0.0, abs_tol=math.radians(1e-5)
+    ):
+        raise RuntimeError(
+            f"{label}: angle {math.degrees(float(angle.SystemValue)):.6f} deg is not a "
+            f"driving {degrees:g} deg"
+        )
+
+
 async def _nut_pattern_reference(adapter, part) -> None:
-    """The hidden nut-face sketch that carries VIEW D's locations: a
-    construction line ON the lug end, the leadscrew axis (a circle ON the
-    screw clearance) from that end and the bottom face, and each tap (a
-    circle ON its drill) from the axis, one each side, so the pair prints as
-    the TL-27 nut's (2X .340, no chain)."""
+    """The hidden nut-face sketch that carries VIEW D's locations: a plain
+    line ON the lug end and the leadscrew axis (a construction circle ON the
+    screw clearance) from that end and the bottom face; and the taps'
+    clocking, the angle between two construction rays from the axis, along
+    +Z and to one tap's centre. The feed nut's taps are located by their
+    transfer callout, not here; the clocking bounds every one of them."""
+    import math
     feature = "NutPatternReference"
     check(f"create_sketch {feature}", await adapter.create_sketch("NutFace"))
     to_sketch = _sketch_mapper(adapter, u_axis=2, v_axis=1, label=feature)
@@ -323,8 +370,8 @@ async def _nut_pattern_reference(adapter, part) -> None:
 
     dims = SketchDims()
     end_start, end_end = at(part.LUG_Y0, 0.0), at(part.LUG_Y0, part.BLOCK_HEIGHT)
-    end = await _construction(adapter, adapter.add_line(end_start[0], end_start[1], end_end[0], end_end[1]),
-                              f"{feature} lug end")
+    end = await _drawn(adapter, adapter.add_line(end_start[0], end_start[1], end_end[0], end_end[1]),
+                       f"{feature} lug end")
     check(f"{feature} lug end horizontal", await adapter.add_sketch_constraint(end, None, "horizontal"))
     await anchor_point_to_origin(adapter, f"{end}.start", *end_start, f"{feature} lug end corner")
     dims.record("NutEndY")
@@ -334,9 +381,37 @@ async def _nut_pattern_reference(adapter, part) -> None:
     axis_uv = at(part.NUT_AXIS_Y, part.NUT_AXIS_Z)
     axis = await _construction_circle(adapter, dims, f"{end}.start", end_start, axis_uv, part.SCREW_CLEARANCE_DIA,
                                       ("NutCentreZ", "NutCentreY", "NutCentreDia"), f"{feature} nut axis")
-    for i, (y, z) in enumerate(part.NUT_HOLES_YZ, 1):
-        await _construction_circle(adapter, dims, f"{axis}.center", axis_uv, at(y, z), part.NUT_TAP_DRILL,
-                                   (f"NutTap{i}Z", f"NutTap{i}Y", f"NutTap{i}Dia"), f"{feature} tap {i}")
+    centre = f"{axis}.center"
+    reach = part.NUT_CLOCK_RAY
+    base_end = at(part.NUT_AXIS_Y, part.NUT_AXIS_Z + reach)
+    baseline = await _construction(adapter, adapter.add_line(axis_uv[0], axis_uv[1], base_end[0], base_end[1]),
+                                   f"{feature} clock baseline")
+    check(f"{feature} clock baseline on the axis",
+          await adapter.add_sketch_constraint(f"{baseline}.start", centre, "coincident"))
+    check(f"{feature} clock baseline along +Z", await adapter.add_sketch_constraint(baseline, None, "horizontal"))
+    await dimension_between(adapter, f"{baseline}.start", f"{baseline}.end", "horizontal_distance",
+                            reach, f"{feature} clock baseline length")
+    dims.record("NutClockBaselineLength")
+    tap_y, tap_z = part.NUT_HOLES_YZ[part.NUT_CLOCK_TAP]
+    tap_uv = at(tap_y, tap_z)
+    ray = await _construction(adapter, adapter.add_line(axis_uv[0], axis_uv[1], tap_uv[0], tap_uv[1]),
+                              f"{feature} clock ray")
+    check(f"{feature} clock ray on the axis",
+          await adapter.add_sketch_constraint(f"{ray}.start", centre, "coincident"))
+    await dimension_between(adapter, f"{ray}.start", f"{ray}.end", "distance",
+                            math.hypot(tap_y - part.NUT_AXIS_Y, tap_z - part.NUT_AXIS_Z),
+                            f"{feature} clock ray length")
+    dims.record("NutClockRayLength")
+    # The text on the wedge's bisector, inside the wedge, so it reads the
+    # angle itself, not its supplement.
+    bisector = math.atan2(tap_y - part.NUT_AXIS_Y, tap_z - part.NUT_AXIS_Z) / 2.0
+    await _driving_angle(
+        adapter, baseline, ray,
+        (part.NUT_FACE_X, part.NUT_AXIS_Y + 0.6 * reach * math.sin(bisector),
+         part.NUT_AXIS_Z + 0.6 * reach * math.cos(bisector)),
+        part.NUT_CLOCK_DEG, f"{feature} tap clocking",
+    )
+    dims.record(part.NUT_CLOCK_DIMENSION)
     await ensure_fully_defined(adapter, feature)
     check(f"exit_sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
@@ -406,17 +481,10 @@ async def build_block_model(adapter, part) -> None:
              "feed nut screw taps (#4-40 through)",name="NutTaps",expect_dia_mm=part.NUT_TAP_DRILL,
              placement_dims=[((f"NutPlacement{i}U",None),(f"NutPlacement{i}V",None))
                              for i in range(1,len(part.NUT_HOLES_YZ)+1)])
-        # The taps and the dowel hole are transferred through TL-27 at
-        # assembly: modelled where the nominal nut puts them.
-        await _circles(adapter,"NutFace",part.NUT_FACE_X,"NutDowelProfile",
-                       [(part.DOWEL_YZ[1],part.DOWEL_YZ[0],part.DOWEL_DRILL,
-                         ("NutDowelHoleZ","NutDowelHoleY","NutDowelDia"))],side=True)
-        check("NutDowel",await adapter.create_cut_extrude(ExtrusionParameters(depth=part.LUG_WIDTH*2,reverse_direction=True)))
-        name_last_feature(adapter,"NutDowel")
-        name_dimensions(adapter,"NutDowel",["NutDowelDepth"])
+        # The taps are transferred through the TL-VN-84 FeedNut at assembly:
+        # modelled where the nominal nut puts them.
         expected -= math.pi*(part.SCREW_CLEARANCE_DIA/2)**2*part.LUG_WIDTH
         expected -= len(part.NUT_HOLES_YZ)*math.pi*(part.NUT_TAP_DRILL/2)**2*part.LUG_WIDTH
-        expected -= math.pi*(part.DOWEL_DRILL/2)**2*part.LUG_WIDTH
         await _nut_pattern_reference(adapter, part)
     await name_bore_axis(adapter,"Right Plane",spec.BORE_X,"Top Plane",0.0,"pivot axis")
     name_last_feature(adapter,spec.PIVOT_AXIS_NAME)
@@ -431,9 +499,14 @@ async def build_block_model(adapter, part) -> None:
     for (feature_name,dimension_name),(places,band) in getattr(part,"METRIC_DIMENSIONS",{}).items():
         set_dimension_symmetric_tolerance(adapter,feature_name,dimension_name,band,display_unit="mm")
         set_metric_vendor_units(adapter,feature_name,dimension_name,places=places)
+    # TL-32's tap clocking band, every tap (TL-00 F1B sets all four holes in it).
+    if hasattr(part,"NUT_CLOCK_DIMENSION"):
+        set_dimension_symmetric_angular_tolerance(adapter,"NutPatternReference",part.NUT_CLOCK_DIMENSION,
+                                                  part.NUT_CLOCK_TOL_DEG)
     # Thread identity and fit/process qualifiers belong to the saved model.
     from _drawing_precision import _named_dimension
-    for channel,callouts in ((2,part.CALLOUTS_SUFFIX),(3,part.CALLOUTS_ABOVE),(4,part.CALLOUTS_BELOW)):
+    for channel,callouts in ((1,getattr(part,"CALLOUTS_PREFIX",{})),(2,part.CALLOUTS_SUFFIX),
+                             (3,part.CALLOUTS_ABOVE),(4,part.CALLOUTS_BELOW)):
         for name,text in callouts.items():
             owners = [feature for feature,names in part.DRAWING_DIMENSIONS.items() if name in names]
             if len(owners) != 1:

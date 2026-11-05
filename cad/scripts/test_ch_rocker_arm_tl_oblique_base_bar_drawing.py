@@ -45,8 +45,15 @@ def test_bar_is_milled_from_the_owned_bar_and_faced_to_thickness() -> None:
         assert value / 25.4 == pytest.approx(round(value / 25.4, 2), abs=1e-9)
     # Milled from 6 in, the widest part still fits the vise's stock jaws.
     assert spec.BAR_WIDTH + spec.BAR_WIDTH_BAND < 6.0 * 25.4
-    # Rail and bar flush within the length's band.
-    assert abs(spec.BAR_LENGTH - trammel.RAIL_LENGTH) < printed_band_mm(2, unit="in")
+    # Owner ruling 2026-11-04 (#2177 option B): the 450 kit rail goes on the
+    # 17.32 bar uncut, flush at the spindle end, and overhangs the far end.
+    assert spec.BAR_LENGTH == trammel.BASE_BAR_LENGTH
+    assert round(spec.BAR_LENGTH / 25.4, 2) == 17.32
+    assert trammel.RAIL_OVERHANG == pytest.approx(
+        trammel.RAIL_LENGTH - spec.BAR_LENGTH, abs=1e-9
+    )
+    assert trammel.RAIL_OVERHANG == pytest.approx(10.072, abs=1e-9)
+    assert spec.RAIL_HOLE_X[-1] < spec.BAR_LENGTH
     # The 2026-10-30 ruling: 5.50 wide (vise fit) with the column-side edge
     # still 3.5 in off the rail, so the rail sits off the centreline. Rail 1's
     # part frame has y = -lateral, so the column side is the faced -Y side.
@@ -56,8 +63,8 @@ def test_bar_is_milled_from_the_owned_bar_and_faced_to_thickness() -> None:
     assert not hasattr(spec, "HALF_WIDTH")
 
 
-def test_rail_holes_are_seven_on_the_rail_pitch() -> None:
-    assert spec.RAIL_HOLE_X == (40.0, 100.0, 160.0, 220.0, 280.0, 340.0, 400.0)
+def test_rail_holes_are_eight_on_the_rail_pitch() -> None:
+    assert spec.RAIL_HOLE_X == (15.0, 75.0, 135.0, 195.0, 255.0, 315.0, 375.0, 435.0)
     assert spec.TAP_SPEC.kind == "tapped" and spec.TAP_SPEC.size == trammel.RAIL_SCREW
     assert spec.TAP_SPEC.end == "through_all"
 
@@ -144,9 +151,95 @@ def test_walls_meet_rule_17() -> None:
     )
     assert spec.SIDE_WALL_WORST == spec.FAR_SIDE_WALL_WORST
     assert min(spec.SIDE_WALL_WORST, spec.NEAR_END_WALL_WORST) >= WALL_TARGET_MM
+    # The kit rail's end taps: 15 from the spindle end, 4.93 from the far end
+    # of the 17.32 bar (option B), so the far end governs. The bar is drilled
+    # to print: the end wall reads the station's band (and the length's at the
+    # far end), the slot walls the slots' stations and rises at .XX.
+    xx_station = printed_band_mm(2, unit="in")
+    tap_r = THREAD_MAJOR_MM[spec.RAIL_SCREW] / 2.0
+    far_nominal = spec.BAR_LENGTH - spec.RAIL_HOLE_X[-1] - tap_r
+    assert far_nominal / 25.4 == pytest.approx(0.112, abs=5e-4)
+    assert spec.RAIL_TAP_END_WALL_WORST == pytest.approx(
+        far_nominal - xx_station - spec.RAIL_HOLE_BAND
+    )
+    assert spec.RAIL_TAP_END_WALL_WORST < spec.RAIL_HOLE_X[0] - spec.RAIL_HOLE_BAND - tap_r
+    assert spec.RAIL_TAP_END_WALL_WORST >= WALL_TARGET_MM
+    assert spec.RAIL_TAP_SLOT_WALL_WORST >= WALL_TARGET_MM
     build = BUILD.read_text(encoding="utf-8")
     assert "high_corner" not in build
     assert "adapter, low_corner, FAR_SLOT_X, FAR_SLOT_Y, FAR_SLOT_RISE" in build
+
+
+def test_receipt_band_accepts_only_rails_that_fit_the_printed_bar() -> None:
+    """Codjiflo P2 (PR #2187) and farm review 20261104T203420333Z: the bar is
+    drilled at its printed stations, never at measured ones, so the rail
+    sheet accepts a received rail only if every station, measured from the
+    flush end, lies within RAIL_RECEIPT_BAND of nominal: the fit's own
+    allowance (the #8's float in the rail's Ø4.5 less the bar's station band),
+    floored to the stations' printed places."""
+    band = spec.RAIL_RECEIPT_BAND
+    assert spec.RAIL_PATTERN_ALLOWANCE == pytest.approx(
+        (spec.RAIL_HOLE_DIA - THREAD_MAJOR_MM[spec.RAIL_SCREW]) / 2.0 - spec.RAIL_HOLE_BAND
+    )
+    assert band == pytest.approx(
+        int(spec.RAIL_PATTERN_ALLOWANCE * 10**spec.RAIL_HOLE_PLACES)
+        / 10**spec.RAIL_HOLE_PLACES
+    )
+    assert band == pytest.approx(0.08)
+    assert band <= spec.RAIL_PATTERN_ALLOWANCE < band + 0.01
+
+    def accepted(stations: tuple[float, ...]) -> bool:
+        return all(
+            abs(x - nominal) <= band + 1e-9
+            for x, nominal in zip(stations, spec.RAIL_HOLE_X, strict=True)
+        )
+
+    def fits(stations: tuple[float, ...]) -> bool:
+        # Each received hole against the bar's tap at its worst printed spot:
+        # the screw's float in the rail's hole covers both errors.
+        return all(
+            abs(x - nominal) + spec.RAIL_HOLE_POSITION_RADIUS
+            <= spec.RAIL_SCREW_CLEARANCE + 1e-9
+            for x, nominal in zip(stations, spec.RAIL_HOLE_X, strict=True)
+        )
+
+    count = len(spec.RAIL_HOLE_X)
+    # Received near E and pitch on a grid round the nominal 15 / 60: every
+    # accepted pattern fits a bar drilled anywhere inside its printed band.
+    grid = [
+        tuple(e + k * p for k in range(count))
+        for e in (14.8 + 0.01 * i for i in range(41))
+        for p in (59.97 + 0.001 * j for j in range(61))
+    ]
+    inside = [stations for stations in grid if accepted(stations)]
+    assert inside
+    assert all(fits(stations) for stations in inside)
+    # A pattern inside the band is accepted; one just past it is not.
+    assert accepted(tuple(15.05 + 59.995 * k for k in range(count)))
+    assert not accepted(tuple(15.0 + 60.015 * k for k in range(count)))
+    # The review's example, E 17/13 at P 60: the last tap would sit 0.85 from
+    # the end, under the floor; the receipt check rejects it.
+    tap_r = THREAD_MAJOR_MM[spec.RAIL_SCREW] / 2.0
+    e17 = tuple(17.0 + 60.0 * k for k in range(count))
+    assert spec.BAR_LENGTH - e17[-1] - tap_r == pytest.approx(0.845, abs=1e-3)
+    assert spec.BAR_LENGTH - e17[-1] - tap_r < WALL_FLOOR_MM
+    assert not accepted(e17)
+    # The bar's printed walls need no band beyond the stations' own.
+    walls = spec.bracket_hole_walls(leadscrew.BASE_BAR_HOLES)
+    assert walls["rail tap"] >= WALL_FLOOR_MM
+    # The base-bar plan prints the same acceptance and stations, and drills
+    # to print.
+    plan = (
+        Path(__file__).resolve().parents[1]
+        / "process"
+        / "ch_rocker_arm_tl_oblique_base_bar"
+        / "plan.toml"
+    ).read_text(encoding="utf-8")
+    stations = ", ".join(f"{x:g}" for x in spec.RAIL_HOLE_X)
+    assert f"within +/-{band:.2f} of {stations}" in plan
+    assert f"outside +/-{band:.2f}, stop and report before drilling" in plan
+    assert "never at a measured one" in plan
+    assert "received rail's station" not in plan
 
 
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
@@ -187,10 +280,10 @@ def test_slot_run_is_centre_to_centre_with_centre_marks() -> None:
 
 
 def test_rail_holes_hold_a_baseline_band_that_names_its_mate() -> None:
-    stations = {f"RailHole{k}X" for k in range(1, 8)}
+    stations = {f"RailHole{k}X" for k in range(1, 9)}
     assert spec.DRAWING_DIMENSIONS["RailHoles"] == stations
     # c3-r7 (rule 4): only the stations, the rail's pitch, carry the band.
-    # Owner ruling 4 (2026-11-01): the HGR15R pattern is a metric vendor line,
+    # Owner ruling 4 (2026-11-01): the HGR15 pattern is a metric vendor line,
     # so each station prints exact millimetres at two places with its band.
     rail = {
         key: value
@@ -200,7 +293,7 @@ def test_rail_holes_hold_a_baseline_band_that_names_its_mate() -> None:
     assert set(rail) == {("RailHoles", name) for name in stations}
     assert set(rail.values()) == {(2, spec.RAIL_HOLE_BAND)}
     assert spec.RAIL_HOLE_BAND == 0.08
-    assert not stations & set(drawing.CALLOUTS_BELOW) - {"RailHole7X"}
+    assert not stations & set(drawing.CALLOUTS_BELOW) - {"RailHole8X"}
     assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 2 for name in stations)
     assert all(x == round(x, 2) for x in spec.RAIL_HOLE_X)
     # One DRO Y setting cuts the row: only the station band scatters one hole
@@ -212,9 +305,25 @@ def test_rail_holes_hold_a_baseline_band_that_names_its_mate() -> None:
     )
     assert spec.RAIL_PATTERN_ALLOWANCE > 0.0
     # The mate rides the outermost station, the one lane no extension line
-    # crosses; no other station carries a callout.
-    assert drawing.CALLOUTS_BELOW["RailHole7X"] == "MATCHES HGR15R RAIL HOLES"
-    assert not (stations - {"RailHole7X"}) & set(drawing.CALLOUTS_BELOW)
+    # crosses; no other station carries a callout. The bar is drilled to
+    # print, so the callout names the mate by its drawing number and the
+    # fit-up acceptance (farm review 20261104T203420333Z: a received-rail
+    # band contradicted the printed ±0.08, and the match had no acceptance).
+    rail_number = _config.parts("ch-rocker-arm-tl-vn-oblique-rail-kit")["number"]
+    assert drawing.CALLOUTS_BELOW["RailHole8X"] == spec.RAIL_MATE_CALLOUT
+    assert spec.RAIL_MATE_CALLOUT == (
+        f"MATCHES HGR15 RAIL {rail_number}; ALL 8 SCREWS START BY HAND"
+    )
+    assert "RECEIVED" not in spec.RAIL_MATE_CALLOUT
+    assert "\n" not in spec.RAIL_MATE_CALLOUT
+    assert not (stations - {"RailHole8X"}) & set(drawing.CALLOUTS_BELOW)
+    # One line at about 2.6 mm a glyph, centred under the 435.00's text, stays
+    # between the end face's and hole 8's extension lines, the only lines in
+    # that gap.
+    half = len(spec.RAIL_MATE_CALLOUT) * 0.0026 / 2.0
+    centre = drawing.FRONT_KEEP["RailHole8X"][0]
+    assert centre - half >= drawing._LEFT + 0.002
+    assert centre + half <= drawing._sheet_x(drawing.FRONT_CENTER, spec.RAIL_HOLE_X[-1]) - 0.002
 
 
 def test_rail_row_is_located_from_the_faced_low_side() -> None:
@@ -274,14 +383,14 @@ def test_rail_row_names_what_it_buys() -> None:
     callout keeps the reason, in the station stack's words."""
     assert drawing.CALLOUTS_BELOW["RailRowY"] == spec.RAIL_ROW_CALLOUT
     lines = spec.RAIL_ROW_CALLOUT.split("\n")
-    assert lines == ["HOLES IN LINE", "FOR HGR15R RAIL"]
-    assert "HGR15R" in spec.RAIL_MATE_CALLOUT
+    assert lines == ["HOLES IN LINE", "FOR HGR15 RAIL"]
+    assert "HGR15" in spec.RAIL_MATE_CALLOUT and "HGR15R" not in spec.RAIL_MATE_CALLOUT
     widest = max(len(line) for line in lines)
     # The lane is sized for the widest line as measured on the r4 sheet,
     # about 2.6 mm a glyph (r1-r3 assumed 2.2 and the block overran).
     assert 2 * drawing._RAIL_ROW_TEXT_HALF >= widest * 0.0026
     # The stations' band stays inside the screw clearance; the title block's
-    # .XX would not, so only the row (moving all seven together) takes it.
+    # .XX would not, so only the row (moving all eight together) takes it.
     assert (
         spec.RAIL_HOLE_BAND < spec.RAIL_SCREW_CLEARANCE < printed_band_mm(2, unit="in")
     )
@@ -292,9 +401,9 @@ def test_tap_callout_has_clear_air_under_the_border() -> None:
     span about 4.8 above and below the keep point."""
     x, y = drawing.TAP_CALLOUT_XY
     assert y + 0.0048 <= 0.267 - 0.004
-    # Clear of the station stack's outermost extension line (hole 7).
-    hole_7 = drawing._sheet_x(drawing.FRONT_CENTER, spec.RAIL_HOLE_X[-1])
-    assert x - 0.022 >= hole_7 + 0.010
+    # Clear of the station stack's outermost extension line (hole 8).
+    hole_8 = drawing._sheet_x(drawing.FRONT_CENTER, spec.RAIL_HOLE_X[-1])
+    assert x - 0.022 >= hole_8 + 0.010
 
 
 def test_short_span_texts_print_beside_their_spans() -> None:
@@ -360,26 +469,48 @@ def test_short_span_texts_print_beside_their_spans() -> None:
 
 
 def test_rail_hole_stack_has_clear_lanes_inside_the_sheet() -> None:
-    # c4-r8: with the plan centred at y 0.1725 the 400.00 block's top line
-    # printed about 0.4 under the 267 border; the drop keeps 3 or more.
+    # c4-r8: with the plan centred at y 0.1725 the seven-lane stack's top
+    # block (400.00) printed about 0.4 under the 267 border; the kit rail's
+    # eighth lane (#2177) stands one stack lane higher, and the drop keeps 3
+    # or more.
     r8_air, r8_centre_y = 0.0004, 0.1725
-    assert r8_air + (r8_centre_y - drawing.FRONT_CENTER[1]) >= 0.003
-    lines = [drawing._above_line(k) for k in range(7)]
+    extra_lanes = len(spec.RAIL_HOLE_X) - 7
+    assert extra_lanes == 1
+    assert (
+        r8_air
+        + (r8_centre_y - drawing.FRONT_CENTER[1])
+        - extra_lanes * drawing.STACK_LANE
+        >= 0.003
+    )
+    count = len(spec.RAIL_HOLE_X)
+    lines = [drawing._above_line(k) for k in range(count)]
     assert lines[0] - drawing._TOP >= 0.008
     assert all(b - a >= 0.006 - 1e-12 for a, b in zip(lines, lines[1:]))
-    keeps = [drawing.FRONT_KEEP[f"RailHole{k}X"] for k in range(1, 8)]
+    keeps = [drawing.FRONT_KEEP[f"RailHole{k}X"] for k in range(1, count + 1)]
     assert [y for _x, y in keeps] == sorted(y for _x, y in keeps)
     # The two-line top block (value + mate) stays under the 267 mm border.
     assert keeps[-1][1] + 0.0046 <= 0.265
-    # The 40.00 ±0.08 mm text is wider than the gap between holes 1 and 2
-    # (owner ruling 4's mm label), so it stands left of the end face's
-    # extension line, above the width's upper extension line along the top
-    # edge and inside the left border.
-    x, y = keeps[0]
-    half = drawing._RAIL_HOLE_1_TEXT_HALF
-    assert x + half <= drawing._LEFT - 0.002
-    assert x - half >= 0.010 + 0.005
-    assert y - 0.00175 >= drawing._TOP + 0.002
+    # A station text (15.00 ±0.08 mm, owner ruling 4's mm label) wider than
+    # its span with a gap each side stands left of the end face's extension
+    # line, above the width's upper extension line along the top edge and
+    # inside the left border: the 15 and the 75 (37.5 on the sheet). Every
+    # other one stands mid-span, clear of both its extension lines.
+    half = drawing._RAIL_HOLE_TEXT_HALF
+    left = [
+        name
+        for name, (x, _y) in zip(range(1, count + 1), keeps, strict=True)
+        if x < drawing._LEFT
+    ]
+    assert left == [1, 2]
+    for k, ((x, y), station) in enumerate(zip(keeps, spec.RAIL_HOLE_X), start=1):
+        if k in left:
+            assert x + half <= drawing._LEFT - 0.002
+            assert x - half >= 0.010 + 0.005
+            assert y - 0.00175 >= drawing._TOP + 0.002
+        else:
+            hole = drawing._sheet_x(drawing.FRONT_CENTER, station)
+            assert x - half >= drawing._LEFT + 0.002
+            assert x + half <= hole - 0.002
 
 
 def test_end_view_projects_on_the_plans_centreline() -> None:
@@ -393,19 +524,22 @@ def test_end_view_projects_on_the_plans_centreline() -> None:
 def test_isometric_and_its_note_take_the_free_bottom_left_corner() -> None:
     """C4: the bracket callout takes the bottom right; the 1:5 iso (about
     66 x 62 mm since the 2026-10-17 widening) moves under the plan's stack,
-    left of the title block."""
+    left of the title block, its note beside it along its foot (the kit
+    rail's eighth station lane dropped the plan, #2177)."""
     iso_x, iso_y = drawing.ISO_CENTER
     half_x, half_y = drawing.ISO_HALF
     lowest_text = drawing._below_line(5) + drawing.TEXT_DROP - 0.00175
-    # c4-r8 dropped the plan 3 for the border: the iso keeps 7 under the
-    # length's text, its note under it.
+    # c4-r8: the iso keeps 7 under the length's text.
     assert iso_y + half_y <= lowest_text - 0.007
     assert iso_x - half_x >= 0.0127 + 0.010
-    assert iso_x + half_x <= 0.216 - 0.010  # the title block's left edge
+    assert iso_y - half_y >= 0.0127 + 0.005
     note_x, note_y = drawing.ISO_NOTE_XY
-    assert note_y <= iso_y - half_y - 0.003
-    assert note_y - 0.0042 >= 0.0127 + 0.005
-    assert iso_x - half_x <= note_x <= iso_x
+    note_width = len(spec.ISOMETRIC_VIEW_NOTE) * 0.0026
+    assert note_x >= iso_x + half_x + 0.003
+    assert note_x + note_width <= 0.216 - 0.010  # the title block's left edge
+    # Its foot level with the iso's, under the length's text.
+    assert note_y - drawing.ISO_NOTE_HEIGHT == pytest.approx(iso_y - half_y)
+    assert note_y <= lowest_text - 0.007
 
 
 def test_bracket_holes_are_the_leadscrew_layouts() -> None:
@@ -592,11 +726,11 @@ def test_places_are_model_authored_and_the_sheet_is_pure() -> None:
 
 
 def test_metric_vendor_stations_are_model_authored_in_mm() -> None:
-    """Owner ruling 4 (2026-11-01, option B): the HGR15R rail's and KP08's
+    """Owner ruling 4 (2026-11-01, option B): the HGR15 rail's and KP08's
     stations print exact millimetres, labelled mm: the part authors them, the
     sheet proves they survived the import."""
     assert set(spec.METRIC_DIMENSIONS) == {
-        *(("RailHoles", f"RailHole{k}X") for k in range(1, 8)),
+        *(("RailHoles", f"RailHole{k}X") for k in range(1, len(spec.RAIL_HOLE_X) + 1)),
         ("BracketHoles", "BracketHole1X"),
         ("BracketHoles", "BracketHole5X"),
     }

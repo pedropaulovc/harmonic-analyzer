@@ -1,0 +1,434 @@
+r"""LeadScrew member of the ReliaBot T8 kit, Amazon B085DDHJTW (MHA-CH-06-TL-VN-84).
+
+PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
+closure: ``build_ch_rocker_arm_tl_vn_oblique_leadscrew_kit`` revolves
+``PROFILE`` and mills the flats in the kit's ``LeadScrew`` configuration.
+The name ``ch_rocker_arm_tl_vn_oblique_leadscrew_spec`` belongs to C4's
+feed-layout contract, which this module imports.
+
+The item is the shop-inventory ``fixtures.trammel-tr8-leadscrew``: a ReliaBot
+600 mm T8 lead screw (SUS304 stainless, single start, pitch and lead 2) that
+the shop cuts to the installed length. The ends are broken, and no journals
+are turned. The KP08 inner rings' two set screws each and one of the
+handwheel's set screws bear on milled flats, not on the thread's crests
+(``FLAT_STATIONS``). The listing's brass flange nut is the kit's other
+member, ``FeedNut`` (``ch_rocker_arm_tl_vn_oblique_leadscrew_kit_feed_nut_spec``).
+Owner ruling 2026-11-04 (#2187): screw and nut are one native model, one
+configuration each, under one Number; this replaces the retired TL-VN-54.
+
+Datasheet-built: no vendor CAD obtained (the listing offers no CAD
+download; its dimension image gives the screw's 600 length and the nut's
+envelope only, checked 2026-11-04).
+
+Sources:
+
+- FROM C4 (imported from ``ch_rocker_arm_tl_vn_oblique_leadscrew_spec``, never
+  retyped): the Ø8 major diameter, the lead 2, the 600 stock length and the
+  installed length ``SCREW_LENGTH`` 410.
+- SOURCED, https://www.amazon.com/dp/B085DDHJTW (read 2026-11-04): "ReliaBot
+  600mm T8 Tr8x2 Lead Screw and Brass Nut (Acme Thread, 2mm Pitch, 1 Start,
+  2mm Lead)"; "Lead screw diameter 8mm, length 600mm, SUS304 stainless
+  steel"; "Screw pitch: 2mm; Number of Thread/Start:1; Lead: 2mm"; packing
+  list 1 x T8x2 600mm lead screw, 1 x T8x2 brass nut. The listing states no
+  thread hand, straightness or length tolerance.
+- DECIDED (owner/C4 layout decision 2026-10-16): cut to 410, deburr and
+  lightly chamfer the cut end. The print uses the title block's .X band
+  (``LENGTH_TOLERANCE``): the self-checks below show the feed absorbs it,
+  and the handwheel flat runs out through the cut end, so no land on it
+  depends on the cut. The cut needs no band of its own.
+- FROM the bought-parts contract: the Tr8x2 thread minor diameter is 6.0, a
+  modelled simplification of the ISO 2904 root (below).
+- DECIDED: both ends are broken 0.25 x 45°, the title block's edge break
+  ("BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX") at its limit, so they print
+  nothing. The layout decision's "lightly chamfer the cut end" asks no more.
+- DECIDED (user ruling on the machinist review's rule 23, lock threaded
+  joints): a set-screw flat ``FLAT_DEPTH`` deep under each set screw,
+  stationed from C4's layout: each KP08's axial centre ``KP08_S`` and the
+  handwheel's set screw, ``HANDWHEEL_GRUB_FROM_HUB`` into its hub. Each KP08
+  flat is ``FLAT_LENGTH`` long. Each KP08 takes two flats
+  ``KP08_SET_SCREW_SPACING_DEG`` apart, one per inner-ring set screw.
+- DECIDED (owner ruling 2026-11-05, Codjiflo 4483623004 on #2187, rule 4):
+  the handwheel flat (``OPEN_FLAT``) starts at its station and runs out
+  through the cut end. A closed flat kept its end land only with the cut and
+  flat bands tightened to .XX, which rule 4 forbids. Open, every band is the
+  title block's .X. The handwheel comes with two set screws
+  (``ch_rocker_arm_tl_vn_oblique_handwheel_spec``); the one opposite the
+  handle bears on the handwheel flat, the other on the plain thread past the
+  feed nut's travel. The flats' clock round the axis is set at assembly: each
+  KP08 ring and the handwheel turn to them.
+- SOURCED, ISO 4029: an M5 cup point is 2.5 across at most
+  (``SET_SCREW_POINT_DIA``), the handwheel's set screw.
+- SOURCED, ISO 2904: the Tr8x2 external thread's root d3 = d - 2 h3, h3 =
+  P/2 + ac with ac = 0.25, is Ø5.5 (``SCREW_ROOT_DIA``). The flats' depth
+  check uses it; the contract's Ø6.0 minor stays the modelled nut bore.
+- UNVERIFIED (verify on receipt, each with its check):
+  - the thread hand (``HAND``; the listing does not state it). Check: the
+    screw and its nut are right-hand before the screw is cut or fitted (the
+    feed's handwheel sense and the assembly steps assume it).
+  - the KP08 set screws: two on each inner ring, 120° apart (the KP08
+    series' arrangement; the uxcell listing states neither count nor clock,
+    its photographs show one hole), their size, and where across the block's
+    width the ring carries them (the flats sit at the block's axial centre).
+    Check: count and clock both rings' set screws before the clock flats are
+    milled.
+  - the handwheel's set-screw station (its spec). Check: its axis stands
+    ``HANDWHEEL_GRUB_FROM_HUB`` from the hub end within
+    ``HANDWHEEL_GRUB_COVER``, so the handwheel flat at its printed band
+    still runs past the screw on the hub side; outside that, the hub gap is
+    reset at fitting so the screw lands on the flat, inside the engagement
+    margins.
+
+Thread: not modelled (bought-parts modelling rule). The body is a plain
+cylinder at the major diameter, so it overstates the real screw by the thread
+groove, about ``THREAD_GROOVE_MM3_PER_MM`` per mm of length. The assembly's
+thread-engagement contracts (nut, KP08, handwheel) carry that.
+
+Part frame. The axis is +Y and is published as ``ScrewAxis`` (Front ∩ Right).
+y = 0 is the near (spindle-side) end, and the far end at y = ``LENGTH`` goes
+into the handwheel. The part is symmetric end for end.
+"""
+
+from __future__ import annotations
+
+import math
+
+from _printed_tolerance import angular_band_deg, printed_band_mm
+import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as feed
+
+PART_NAME = "ch-rocker-arm-tl-vn-oblique-leadscrew-kit"
+NUMBER = "MHA-CH-06-TL-VN-84"
+CONFIGURATION = "LeadScrew"
+SUPPLIER = "Amazon (sold by ReliaBot)"
+SKU = "B085DDHJTW"
+INVENTORY_ID = feed.SCREW_ID  # fixtures.trammel-tr8-leadscrew
+QUANTITY = 1
+MATERIAL = "AISI 304"
+# The kit package's sheet for this member's cut and flats.
+MODIFIED_STOCK_SHEET = 2
+# The member's Manufacturing Notes: where its work is drawn, no method.
+DRAWING_NOTES = f"CUT AND MILL FLATS PER SHEET {MODIFIED_STOCK_SHEET}."
+
+# --- FROM C4 (imported) ---------------------------------------------------------
+MAJOR_DIA = feed.SCREW_MAJOR_DIA  # 8
+LEAD = feed.SCREW_LEAD  # 2
+STOCK_LENGTH = feed.SCREW_STOCK_LENGTH  # 600, as bought
+LENGTH = feed.SCREW_LENGTH  # 410, installed (shop-cut)
+# The member's native BOM description under the kit's one Number.
+BOM_DESCRIPTION = f"TR8X2 LEADSCREW, {LENGTH:.0f} MM LONG"
+
+# --- SOURCED: listing / layout decision / contract --------------------------------
+PITCH = 2.0  # single start: the pitch equals the lead
+STARTS = 1
+HAND = "right"  # UNVERIFIED: not stated on the listing; receipt check
+
+# The drawing prints none of the stock's sizes: its thread designation and
+# the SKU identify the stock (review: a gauge sketch, then a numeric note row).
+SUPPLIER_PRODUCT_URL = "https://www.amazon.com/dp/B085DDHJTW"
+
+# The cut length prints as a native one-place dimension (410.0) under the
+# title block's .X row: the handwheel flat runs out through the cut end
+# (``OPEN_FLAT``), so no flat's land depends on the cut.
+LENGTH_PLACES = 1
+LENGTH_TOLERANCE = printed_band_mm(LENGTH_PLACES)  # ±0.8, the title block's .X
+MINOR_DIA = 6.0  # Tr8x2 thread minor (contract; the nut bore's model value)
+
+# --- DECIDED: the title block's edge break --------------------------------------
+END_CHAMFER = 0.25  # 0.25 x 45°, both ends: "CHAMFER 0.25 MAX", printed by none
+
+_R = MAJOR_DIA / 2.0
+_R_END = _R - END_CHAMFER
+
+# (radius, y), revolved 360° about the axis; the chain closes along the axis.
+PROFILE: tuple[tuple[float, float], ...] = (
+    (0.0, 0.0),
+    (_R_END, 0.0),
+    (_R, END_CHAMFER),
+    (_R, LENGTH - END_CHAMFER),
+    (_R_END, LENGTH),
+    (0.0, LENGTH),
+)
+
+
+def revolved_volume(profile: tuple[tuple[float, float], ...]) -> float:
+    """Volume (mm^3) of a closed (radius, y) polygon revolved about r = 0 (Pappus)."""
+    area_moment = 0.0
+    for (r1, y1), (r2, y2) in zip(profile, profile[1:] + profile[:1], strict=True):
+        area_moment += (r1 + r2) * (r1 * y2 - r2 * y1)
+    return abs(2.0 * math.pi * area_moment / 6.0)
+
+
+# The cut blank, before its flats.
+BLANK_VOLUME_MM3 = revolved_volume(PROFILE)
+# The trapezoidal groove takes about half the crest-to-root annulus (the
+# Ooznest Tr8x2 STEP cross-reference: 10.9 mm^3 per mm).
+THREAD_GROOVE_MM3_PER_MM = math.pi * (_R**2 - (MINOR_DIA / 2.0) ** 2) / 2.0
+
+# --- DECIDED: the set-screw flats (user ruling, see the docstring) -----------------
+FLAT_DEPTH = 0.72  # under the crest: AF 7.28, inside the 7.26..7.289 the checks pass
+FLAT_LENGTH = feed.SCREW_FLAT_LENGTH  # 8, along the axis, centred on the set screw
+FLAT_AF = MAJOR_DIA - FLAT_DEPTH  # 7.28, across the flat to the far crest
+FLAT_AF_PLACES = 2
+FLAT_AF_TOLERANCE = printed_band_mm(FLAT_AF_PLACES)  # ±0.51, the title block's .XX
+# The flats' stations and length print at one place, the title block's .X
+# row. Each station locates its flat's near edge (rule 10: to a feature's
+# edge, not its unmarked middle), so a KP08 flat's length band stacks onto
+# its far edge's; the self-checks keep each inside its KP08 block.
+FLAT_PLACES = LENGTH_PLACES
+FLAT_TOLERANCE = printed_band_mm(FLAT_PLACES)  # ±0.8
+FLAT_LENGTH_PLACES = 1
+FLAT_LENGTH_TOLERANCE = printed_band_mm(FLAT_LENGTH_PLACES)  # ±0.8
+KP08_SET_SCREW_SPACING_DEG = 120.0  # UNVERIFIED: the KP08 series' clock; receipt check
+CLOCK_PLACES = 0
+CLOCK_TOLERANCE_DEG = angular_band_deg()  # ±1, the title block's angular row
+SET_SCREW_POINT_DIA = 2.5  # SOURCED, ISO 4029: the M5 cup point's dp max
+# SOURCED, ISO 2904: the Tr8x2 external root d3 = 8 - 2 x (2/2 + 0.25). The
+# contract's and the vendor STEP's Ø6.0 (MINOR_DIA) is a modelled
+# simplification of the root, kept for the nut bore and the groove estimate.
+SCREW_ROOT_DIA = 5.5
+HANDWHEEL_SET_SCREW_MAJOR = float(feed.HANDWHEEL_GRUB.removeprefix("M"))  # 5
+
+# Each set screw's station, part frame (from the near end), from C4's layout.
+FLAT_STATIONS = {
+    "NearKP08": feed.KP08_S[0] - feed.SCREW_NEAR_END_S,  # 8.5
+    "FarKP08": feed.KP08_S[1] - feed.SCREW_NEAR_END_S,  # 379.5
+    "Handwheel": (
+        feed.HUB_END_S + feed.HANDWHEEL_GRUB_FROM_HUB - feed.SCREW_NEAR_END_S
+    ),  # 404.0
+}
+# The flat that runs out through the cut end (owner ruling 2026-11-05).
+OPEN_FLAT = "Handwheel"
+# Each flat's near edge, from the near end: what the print dimensions. A
+# KP08 flat is centred on its set screw; the open flat starts where a
+# centred FLAT_LENGTH flat did.
+FLAT_STARTS = {
+    name: station - FLAT_LENGTH / 2.0 for name, station in FLAT_STATIONS.items()
+}  # 4.5, 375.5, 400.0
+# The open flat's profile runs this far past the cut end, as every flat's
+# runs past the screw's round, so the cut leaves no far wall.
+FLAT_RUNOUT = 1.0
+# Each flat's far edge in the model: FLAT_LENGTH on from its start, or, the
+# open flat, past the cut end. Only the KP08 flats' length prints.
+FLAT_ENDS = {
+    name: LENGTH + FLAT_RUNOUT if name == OPEN_FLAT else start + FLAT_LENGTH
+    for name, start in FLAT_STARTS.items()
+}
+CLOSED_FLATS = tuple(name for name in FLAT_STATIONS if name != OPEN_FLAT)
+# How far the handwheel's set-screw axis may stand off its 7 (UNVERIFIED)
+# station with the screw still wholly on the open flat at the printed bands:
+# the receipt check's window, ± this. Toward the hub the flat's start takes
+# its station band; toward the end the shortest cut, less its edge break,
+# bounds the flat.
+HANDWHEEL_GRUB_COVER = min(
+    FLAT_STATIONS[OPEN_FLAT]
+    - HANDWHEEL_SET_SCREW_MAJOR / 2.0
+    - (FLAT_STARTS[OPEN_FLAT] + FLAT_TOLERANCE),
+    (LENGTH - LENGTH_TOLERANCE - END_CHAMFER)
+    - (FLAT_STATIONS[OPEN_FLAT] + HANDWHEEL_SET_SCREW_MAJOR / 2.0),
+)  # 0.70
+# What each flat sits under, as station spans on the rail (C4's s): the KP08
+# blocks' widths, and the screw's length inside the handwheel's hub.
+FLAT_HOUSINGS = {
+    "NearKP08": (feed.KP08_FACE_S[0], feed.KP08_FACE_S[0] + feed.KP08_WIDTH),
+    "FarKP08": (feed.KP08_FACE_S[1] - feed.KP08_WIDTH, feed.KP08_FACE_S[1]),
+    "Handwheel": (feed.HUB_END_S, feed.SCREW_FAR_END_S),
+}
+# Every station's flat faces +X (clock 0). Each KP08 station takes a second
+# flat KP08_SET_SCREW_SPACING_DEG round from +X toward +Z, for its second
+# set screw: the "clock" flat.
+CLOCKED_FLATS = ("NearKP08", "FarKP08")
+FLAT_COUNT = len(FLAT_STATIONS) + len(CLOCKED_FLATS)  # 5
+# The flat whose across-flat prints, once for every clock-0 flat, and the
+# one whose length prints, once for every KP08 flat (``NX``). The open
+# flat's length is its run to the end (``OPEN_FLAT_CALLOUT``).
+PRINTED_FLAT = "Handwheel"
+PRINTED_LENGTH_FLAT = "FarKP08"
+FLAT_LENGTH_CALLOUT = f"{len(CLOSED_FLATS) + len(CLOCKED_FLATS)}X"  # 4X
+FLAT_AF_CALLOUT = f"{len(FLAT_STATIONS)}X"  # the clock flats print their own
+OPEN_FLAT_CALLOUT = "1X FLAT TO END"
+
+
+def flat_offset(depth: float) -> float:
+    """The flat's distance from the axis at ``depth`` under the crest."""
+    return _R - depth
+
+
+def flat_chord(depth: float) -> float:
+    """The flat's width across the screw at ``depth`` under the crest."""
+    return 2.0 * math.sqrt(_R**2 - flat_offset(depth) ** 2)
+
+
+def flat_half_angle_deg(depth: float) -> float:
+    """Half the arc of the screw's round a flat ``depth`` deep takes."""
+    return math.degrees(math.acos(flat_offset(depth) / _R))
+
+
+FLAT_CHORD = flat_chord(FLAT_DEPTH)  # 4.579
+# The circular segment each flat takes off the round, times its length.
+_FLAT_OFFSET = flat_offset(FLAT_DEPTH)  # 3.28
+
+
+def segment_area(radius: float) -> float:
+    """The circular segment a flat at ``_FLAT_OFFSET`` takes off a round of
+    ``radius``."""
+    half = math.sqrt(radius**2 - _FLAT_OFFSET**2)
+    return radius**2 * math.acos(_FLAT_OFFSET / radius) - _FLAT_OFFSET * half
+
+
+def _through_end_break(width, steps: int = 64) -> float:
+    """∫ ``width(r)`` along the far end's 45° break, where the round falls
+    from ``_R`` to ``_R_END`` (Simpson's rule; the flat stays inside it)."""
+    h = END_CHAMFER / steps
+    total = width(_R) + width(_R_END)
+    for k in range(1, steps):
+        total += (4.0 if k % 2 else 2.0) * width(_R - k * h)
+    return total * h / 3.0
+
+
+if not _R_END > _FLAT_OFFSET:
+    raise AssertionError("the open flat runs off the far end's break")
+FLAT_SEGMENT_AREA = segment_area(_R)
+FLAT_VOLUME_MM3 = FLAT_SEGMENT_AREA * FLAT_LENGTH
+# The open flat: full round from its start to the far end's break, then the
+# break, where the round and so the flat narrow.
+_OPEN_FULL = LENGTH - END_CHAMFER - FLAT_STARTS[OPEN_FLAT]
+OPEN_FLAT_VOLUME_MM3 = FLAT_SEGMENT_AREA * _OPEN_FULL + _through_end_break(segment_area)
+OPEN_FLAT_AREA_MM2 = FLAT_CHORD * _OPEN_FULL + _through_end_break(
+    lambda r: 2.0 * math.sqrt(r**2 - _FLAT_OFFSET**2)
+)
+# Each clock-0 flat's face area and volume, the open one's to the end.
+FLAT_AREAS_MM2 = {
+    name: OPEN_FLAT_AREA_MM2 if name == OPEN_FLAT else FLAT_CHORD * FLAT_LENGTH
+    for name in FLAT_STATIONS
+}
+FLAT_VOLUMES_MM3 = {
+    name: OPEN_FLAT_VOLUME_MM3 if name == OPEN_FLAT else FLAT_VOLUME_MM3
+    for name in FLAT_STATIONS
+}
+VOLUME_MM3 = (
+    BLANK_VOLUME_MM3
+    - sum(FLAT_VOLUMES_MM3.values())
+    - len(CLOCKED_FLATS) * FLAT_VOLUME_MM3
+)
+
+# The drawing's manufacturing controls, each a driving native dimension
+# printed under the title block's general band for its places (swTolGeneral,
+# 11, prints no band of its own): name -> (nominal, ± band, places), in mm,
+# or degrees for the clock angles. The cut length is the profile sketch's
+# axis edge; the flats' length, across-flat and stations are FlatProfile's
+# (on Front, so they print on the main view); each clock flat's across-flat
+# and angle from clock 0 are its station sketch's (they print on its section).
+DIMENSION_CONTROLS = {
+    "CutLength": (LENGTH, LENGTH_TOLERANCE, LENGTH_PLACES),
+    "FlatLength": (FLAT_LENGTH, FLAT_LENGTH_TOLERANCE, FLAT_LENGTH_PLACES),
+    "FlatAF": (FLAT_AF, FLAT_AF_TOLERANCE, FLAT_AF_PLACES),
+    **{
+        f"{name}FlatStation": (start, FLAT_TOLERANCE, FLAT_PLACES)
+        for name, start in FLAT_STARTS.items()
+    },
+    **{
+        f"{name}ClockAF": (FLAT_AF, FLAT_AF_TOLERANCE, FLAT_AF_PLACES)
+        for name in CLOCKED_FLATS
+    },
+    **{
+        f"{name}ClockAngle": (
+            KP08_SET_SCREW_SPACING_DEG,
+            CLOCK_TOLERANCE_DEG,
+            CLOCK_PLACES,
+        )
+        for name in CLOCKED_FLATS
+    },
+}
+ANGULAR_DIMENSIONS = frozenset(f"{name}ClockAngle" for name in CLOCKED_FLATS)
+DRAWING_DIMENSIONS = {
+    "ScrewProfile": {"CutLength"},
+    "FlatProfile": {
+        "FlatLength",
+        "FlatAF",
+        *(f"{name}FlatStation" for name in FLAT_STATIONS),
+    },
+    **{
+        f"{name}ClockProfile": {f"{name}ClockAF", f"{name}ClockAngle"}
+        for name in CLOCKED_FLATS
+    },
+}
+DIMENSION_PRECISION = {
+    name: places for name, (_, _, places) in DIMENSION_CONTROLS.items()
+}
+DRAWING_PRECISION = {
+    feature: {name: DIMENSION_PRECISION[name] for name in names}
+    for feature, names in DRAWING_DIMENSIONS.items()
+}
+DIMENSION_TOLERANCE_TYPES = dict.fromkeys(DIMENSION_CONTROLS, 11)
+
+
+def control_si(name: str) -> tuple[float, float]:
+    """``(nominal, band)`` of a control in SolidWorks' units: m, or radians."""
+    nominal, band, _places = DIMENSION_CONTROLS[name]
+    if name in ANGULAR_DIMENSIONS:
+        return math.radians(nominal), math.radians(band)
+    return nominal / 1000.0, band / 1000.0
+
+
+# --- Self-checks ----------------------------------------------------------------
+if not LENGTH + LENGTH_TOLERANCE <= STOCK_LENGTH:
+    raise AssertionError("the installed screw is longer than the stock")
+# A short cut: the fitter keeps the handwheel's minimum engagement at the far
+# end and gives up near stub, so the two margins together must cover the band.
+if (feed.NEAR_STUB - feed.NEAR_STUB_MIN) + (
+    feed.HANDWHEEL_ENGAGEMENT - feed.HANDWHEEL_ENGAGEMENT_MIN
+) < LENGTH_TOLERANCE:
+    raise AssertionError("a short cut loses the near stub or the handwheel grip")
+# A long cut at the nominal near stub: the far end stays inside the handwheel's
+# guaranteed (hub-deep) bore.
+if not feed.SCREW_FAR_END_S + LENGTH_TOLERANCE < feed.HUB_END_S + feed.HANDWHEEL_BORE_LENGTH:
+    raise AssertionError("a long cut reaches past the handwheel's guaranteed bore")
+if not 0.0 < END_CHAMFER < MAJOR_DIA / 2.0:
+    raise AssertionError("the end chamfer is not inside the screw")
+if abs(PITCH * STARTS - LEAD) > 1e-9:
+    raise AssertionError("the pitch and starts no longer make C4's lead")
+# The flats, at the band's limits. The deepest stays in the thread's crests,
+# clear of its root.
+if not flat_offset(FLAT_DEPTH + FLAT_AF_TOLERANCE) > SCREW_ROOT_DIA / 2.0:
+    raise AssertionError("a deep set-screw flat cuts into the thread's root")
+# The shallowest still seats the set screw's cup point across the flat.
+if not flat_chord(FLAT_DEPTH - FLAT_AF_TOLERANCE) >= SET_SCREW_POINT_DIA:
+    raise AssertionError("a shallow set-screw flat is narrower than the cup point")
+# The open flat at its station's band, and the shortest cut, still run past
+# the handwheel's set screw both sides.
+if not HANDWHEEL_GRUB_COVER >= 0.0:
+    raise AssertionError("a flat off station leaves the set screw on the thread")
+# A KP08's two flats, both at their deepest and the angle at its band, keep a
+# full round between them.
+if not 2.0 * flat_half_angle_deg(FLAT_DEPTH + FLAT_AF_TOLERANCE) < (
+    KP08_SET_SCREW_SPACING_DEG - CLOCK_TOLERANCE_DEG
+):
+    raise AssertionError("a KP08's two set-screw flats run into each other")
+if set(FLAT_HOUSINGS) != set(FLAT_STATIONS) or not set(CLOCKED_FLATS) < set(
+    FLAT_STATIONS
+):
+    raise AssertionError(
+        "every flat station needs its housing; the clock flats a station"
+    )
+for _name, _start in FLAT_STARTS.items():
+    _housing = tuple(s - feed.SCREW_NEAR_END_S for s in FLAT_HOUSINGS[_name])
+    # Clear of the near end's break, and under its KP08 block or inside the
+    # handwheel's hub, at its station's band: the near end is the stations'
+    # datum.
+    if not (END_CHAMFER < _start - FLAT_TOLERANCE and _housing[0] <= _start - FLAT_TOLERANCE):
+        raise AssertionError(f"the {_name} flat leaves its housing toward the near end")
+    if _name == OPEN_FLAT:
+        # It runs out through the cut end, which the long-cut check keeps
+        # inside the hub's guaranteed bore.
+        continue
+    # A closed flat's far edge takes its length's band too: clear of the
+    # shortest cut's break, and inside its housing.
+    _far_edge_max = _start + FLAT_LENGTH + FLAT_TOLERANCE + FLAT_LENGTH_TOLERANCE
+    if not (
+        _far_edge_max < LENGTH - LENGTH_TOLERANCE - END_CHAMFER
+        and _far_edge_max <= _housing[1]
+    ):
+        raise AssertionError(f"the {_name} flat leaves its housing toward the far end")
+if set(CLOSED_FLATS) | {OPEN_FLAT} != set(FLAT_STATIONS) or PRINTED_LENGTH_FLAT not in (
+    CLOSED_FLATS
+):
+    raise AssertionError("the printed flat length must be a closed flat's")

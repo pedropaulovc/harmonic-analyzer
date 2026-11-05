@@ -1,7 +1,8 @@
 r"""Build the oblique trammel's base bar (MHA-CH-06-TL-20; shop fixture).
 
 A 6061-T6511 flat bar milled to 5.50 wide from the owned 1/2 x 6 bar (owner
-ruling #2083), rail-length long, with the HIWIN rail's seven #8-32 tapped
+ruling #2083), 17.32 long (the 450 kit rail overhangs its far end, owner ruling
+2026-11-04, #2177 option B), with the HGR15 kit rail's eight #8-32 tapped
 holes on the rail axis (off the bar's centreline, the column-side edge 3.50
 from it) and two hold-down slots across it
 (``ch_rocker_arm_tl_oblique_base_bar_spec``). One part, one configuration,
@@ -492,7 +493,7 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    # The metric vendor lines' stations (the HGR15R rail's holes, the KP08
+    # The metric vendor lines' stations (the HGR15 rail's holes, the KP08
     # stations; owner ruling 4) print exact millimetres with their own bands,
     # authored on the model's own dimensions.
     for (feature_name, dimension_name), (places, band) in METRIC_DIMENSIONS.items():

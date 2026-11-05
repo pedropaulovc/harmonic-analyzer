@@ -3634,6 +3634,9 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         SCRIPTS_DIR / "test_export_models.py",
         SCRIPTS_DIR / "test_part_configuration_exports.py",
         SCRIPTS_DIR / "test_purchased_part_variants.py",
+        # Configured purchased drawings keep their source guards out of the
+        # spring drawing modules, so a spring change never re-keys a kit.
+        SCRIPTS_DIR / "test_reference_source_lifecycle.py",
         SCRIPTS_DIR / "test_shared_vendor_consumers.py",
         SCRIPTS_DIR / "test_shared_wire_assembly_consumers.py",
         SCRIPTS_DIR / "test_shared_vendor_selector_consumers.py",

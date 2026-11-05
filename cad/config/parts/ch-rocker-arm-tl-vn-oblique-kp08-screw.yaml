@@ -2,13 +2,13 @@ ch-rocker-arm-tl-vn-oblique-kp08-screw:
   title: Rocker Oblique Trammel Pillow Block Screw
   # Shop fixture: the parent MHA-CH-06 Number plus -TL-VN-nn (subsystem-identities.md).
   number: MHA-CH-06-TL-VN-65
-  stock_name: Black-Oxide Alloy Steel Socket Head Screw
+  stock_name: Black-Oxide Button Head Hex-Drive Screw
   supplier: McMaster-Carr
-  supplier_skus: ["91251A150"]
+  supplier_skus: ["91255A150"]
   material: Alloy Steel
-  material_specification: "Alloy steel, black oxide, 170,000 psi tensile; McMaster-Carr 91251A150"
+  material_specification: "Alloy steel, black oxide, ASTM F835, 140,000 psi tensile, Rockwell C39; McMaster-Carr 91255A150"
   finish: black oxide
-  # The fastener table's KP08_TO_BRACKET count (#6-32 X 5/8 SHCS).
+  # The fastener table's KP08_TO_BRACKET count (#6-32 X 5/8 BHCS).
   quantity: 4
   tolerance_class: machined_block
   fit_class: fastener_clearance

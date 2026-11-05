@@ -8,11 +8,11 @@ sibling part spec, never retyped.
 
 What it is: a Tr8x2 screw parallel to rail 1, on the rail's column side
 (+lateral), turning in two KP08 pillow blocks. Each block stands on an
-end bracket (TL-28, two off) bolted on base bar 1's top. The shop-made brass
-feed nut (TL-27), screwed to the integral lug of feed block TL-32, drives
-carriage 1. The handwheel
-(``fixtures.trammel-handwheel``) sits on the screw's outboard end, past the
-base bar's far end, so the wheel overhangs it.
+end bracket (TL-28, two off) bolted on base bar 1's top. The bought brass
+flange nut, supplied with the screw and its spigot faced off, is screwed to
+the integral lug of feed block TL-32 and drives carriage 1. The handwheel
+(``fixtures.trammel-handwheel``) sits on the screw's outboard end, its rim
+past the base bar's far end, so the wheel overhangs it.
 
 Frames. Layout stations are rail 1's: ``s`` along the rail from the spindle
 (``trammel.rail_point``) ⚙, ``lateral`` square to it (+ toward the column), and
@@ -50,11 +50,10 @@ numbers only, or trips a check.
 The nut remains attached to the feed block during either feed mode. Align
 the KP08 blocks at both travel ends so the screw runs centred in the feed
 lug's clearance before tightening their floating mounting screws; the lug's
-nut taps and dowel hole are then transferred from the seated nut (TL-00
-F1).
+nut taps are then transferred from the seated nut (TL-00 F2).
 
-Thrust is taken on the KP08 inner-ring set screws gripping the plain thread
-(no journals; the AMPEC block has no axial or end-play rating): a hand-fed
+Thrust is taken on the KP08 inner-ring set screws gripping the screw's flats
+(no journals; the uxcell block has no axial or end-play rating): a hand-fed
 finish pass only.
 
 LOAD_CASES (ruling A′): 1 kN hand-abuse thrust along the screw at its axis
@@ -62,7 +61,7 @@ LOAD_CASES (ruling A′): 1 kN hand-abuse thrust along the screw at its axis
 2.8 N·m (25 in·lbf; head bearing on TL-20's counterbore floor limits it):
 preload T/(0.2 d) 3.36 kN a screw; the row's centroid is on the screw axis
 (e = 0), so the bracket slips at 2.69 kN (μ 0.2, margin 2.69). It starts to
-open (F·h = n·P·w/6, w 12.7) at 704 N, below TL-00's 1161 N feed thrust at
+open (F·h = n·P·w/6, w 12.7) at 704 N, below TL-00's 1361 N feed thrust at
 a 70 N hand pull. Owner ruling 2026-10-27: the heel may lift elastically;
 slip governs, held at 1.5 x both the 1 kN abuse and the feed thrust.
 
@@ -98,8 +97,8 @@ KP08_ID = "fixtures.trammel-kp08-blocks"
 HANDWHEEL_ID = "fixtures.trammel-handwheel"
 
 # --- Bought items: every bought dimension, in one place -------------------------
-# Tr8x2 leadscrew, Zyltech, single start, lead 2; plain thread end to end,
-# 600 stock.
+# Tr8x2 leadscrew, ReliaBot (Amazon B085DDHJTW, read 2026-11-04): SUS304,
+# single start, lead 2; plain thread end to end, 600 stock.
 SCREW_MAJOR_DIA = 8.0
 SCREW_LEAD = 2.0
 SCREW_STOCK_LENGTH = 600.0
@@ -142,18 +141,22 @@ def _shortest_length(grip: float, thread: str) -> str:
     )
 
 
-# KP08 pillow block. Verified: axis height, bolt spacing, length, height, bore.
-KP08_AXIS_HEIGHT = 15.0
+# KP08 pillow block, uxcell 6-pack (Amazon B0D2L8M4QR, read 2026-11-04):
+# "Overall Size: 55 x 13 x 28mm (L*W*H)", "Holes Centre Distance: 42mm",
+# "Installation Hole Diameter: 5mm", "Bore Diameter: 8mm", "Width of
+# Bearing: 12mm". The listing gives no centre height: 15 is the KP08 series'
+# axis height, UNVERIFIED on this block (measure on receipt, step 7).
+KP08_AXIS_HEIGHT = 15.0  # UNVERIFIED on the uxcell block: KP08 series value
 KP08_BOLT_SPACING = 42.0
 KP08_LENGTH = 55.0  # across the screw axis
-KP08_HEIGHT = 29.0
+KP08_HEIGHT = 28.0
 KP08_BORE = 8.0
-KP08_WIDTH = 13.0  # UNVERIFIED: axial width, verify on receipt
-# US-customary UNC (fastener policy): the block's plain holes, sized for its
-# maker's M4, float a #6-32 (major 3.505).
+KP08_WIDTH = 13.0  # the listing's W: the housing's axial width
+# US-customary UNC (fastener policy): the block's plain Ø5 holes, sized for
+# its maker's M4, float a #6-32 (major 3.505).
 KP08_SCREW = "#6-32"
-KP08_HOLE_DIA = 4.5  # UNVERIFIED: the smaller of the 4.5 / 4.8 M4 holes
-KP08_FOOT_THICK = 5.0  # UNVERIFIED: base (foot) thickness
+KP08_HOLE_DIA = 5.0
+KP08_FOOT_THICK = 5.0  # UNVERIFIED: base (foot) thickness, not on the listing
 # Rule 18 through the foot at its unverified nominal (a thicker foot takes
 # engagement off one for one: ENGAGEMENT_TARGET_D's half diameter). The 5/8
 # tip stops inside TL-28's 25.4 THRU tap.
@@ -162,30 +165,36 @@ KP08_SCREW_FULL_THREAD_MIN = full_thread_min(
     KP08_SCREW_LENGTH, KP08_FOOT_THICK, KP08_SCREW
 )  # 8.67, 2.47 D
 KP08_MARGIN = 3.0  # clearance-check envelope margin, all round (Main)
-# Misumi HOK40-HC8 handwheel, along the screw axis from the hub end outward:
-# hub, rim, then the grip standing off the rim's outer face. Source: the
-# vendor STEP HOK40-HC8.step (sha256 a9c2c04c...a7af), measured by JigBought;
-# the hub, rim, bore, grip offset and set-screw station agree with the
-# catalogue, the grip does not (the catalogue's 18.8 projection and Ø13 are
-# the STEP's 21.0 and Ø14). Bore Ø8 H8 THRU, through hub and rim; 2 x M5
-# radial holes in the hub, one set screw supplied.
-HANDWHEEL_HUB_DIA = 22.0
-HANDWHEEL_HUB_LENGTH = 13.0
-HANDWHEEL_WHEEL_DIA = 40.0
-HANDWHEEL_WHEEL_LENGTH = 12.0
-HANDWHEEL_BORE_LENGTH = 25.0
-# Grip: a Ø10 x 5 collar, a taper Ø12 to Ø14, Ø14 to an R2 end; Ø14 is its max.
-HANDWHEEL_GRIP_DIA = 14.0
-HANDWHEEL_GRIP_LENGTH = 21.0  # past the rim's outer face
-HANDWHEEL_GRIP_OFFSET = 14.5  # grip axis from the screw axis
-HANDWHEEL_LENGTH = 46.0  # overall
-HANDWHEEL_GRUB = "M5"
-HANDWHEEL_GRUB_FROM_HUB = 6.5  # grub axis from the hub end
-# The grip sweeps radius 21.5 as the wheel turns, past the rim's 20: the
-# envelope is that swept Ø43 over the handwheel's whole length (conservative).
+# HARFINGTON handwheel (Amazon B0DJ3DZT86, read 2026-11-04), along the screw
+# axis from the hub end outward: hub, rim, then the revolving handle standing
+# off the rim's outer face. The listing's dimension image gives OD 50, bore
+# Ø8, hub ("step") Ø26 x 14 and 27 overall over hub and rim, so the rim is
+# 13. Two set screws are supplied; their size is not stated.
+HANDWHEEL_HUB_DIA = 26.0
+HANDWHEEL_HUB_LENGTH = 14.0
+HANDWHEEL_WHEEL_DIA = 50.0
+HANDWHEEL_WHEEL_LENGTH = 13.0
+# The Ø8 bore is certain only through the hub: the listing's photos of the
+# rim's outer face show no through hole. The screw's engagement stays inside
+# this guaranteed depth.
+HANDWHEEL_BORE_LENGTH = HANDWHEEL_HUB_LENGTH  # UNVERIFIED beyond the hub
+# Handle: the listing publishes no handle size or offset. A conservative
+# envelope that the photos' handle sits inside: Ø14 x 25 proud of the rim
+# face, its axis 17 off the screw axis, so it sweeps inside the rim's 25.
+HANDWHEEL_GRIP_DIA = 14.0  # UNVERIFIED envelope
+HANDWHEEL_GRIP_LENGTH = 25.0  # UNVERIFIED envelope, past the rim's outer face
+HANDWHEEL_GRIP_OFFSET = 17.0  # UNVERIFIED envelope: grip axis from the screw axis
+HANDWHEEL_LENGTH = (
+    HANDWHEEL_HUB_LENGTH + HANDWHEEL_WHEEL_LENGTH + HANDWHEEL_GRIP_LENGTH
+)  # 52 overall
+# The set-screw holes: the dimension image shows one at about mid-hub, with
+# a hex socket the size of an M5 set screw's 2.5 key. Both UNVERIFIED.
+HANDWHEEL_GRUB = "M5"  # UNVERIFIED
+HANDWHEEL_GRUB_FROM_HUB = 7.0  # UNVERIFIED: grub axis from the hub end
+# The rim (radius 25) governs the swept envelope; the handle sweeps inside it.
 HANDWHEEL_SWEEP_R = max(
     HANDWHEEL_WHEEL_DIA / 2.0, HANDWHEEL_GRIP_OFFSET + HANDWHEEL_GRIP_DIA / 2.0
-)  # 21.5
+)  # 25
 
 # --- Layout (rail-1 stations s, lateral; machine Z) -------------------------------
 # Issue #290: the fabricated layout (axis lateral, the bracket's inner end and
@@ -197,18 +206,25 @@ SCREW_LATERAL = 54.991  # 2.165; TL-32's nut lug reads it
 BRACKET_THICK = 1.0 * INCH  # OnlineMetals 1165 half-by-one bar, on edge
 KP08_BASE_Z = trammel.BASE_BAR_THICK + BRACKET_THICK  # 37.338
 SCREW_AXIS_Z = KP08_BASE_Z + KP08_AXIS_HEIGHT  # 52.338
-HUB_GAP = 6.0  # far KP08 outer face to the handwheel's hub end
+# Far KP08 outer face to the handwheel's hub end: the 410 screw's far end then
+# stands 13 into the wheel's bore, past the grub on its flat (which runs out
+# through the cut end, leadscrew_stock.OPEN_FLAT), and 1 short of the hub's
+# guaranteed bore depth.
+HUB_GAP = 11.0
 # The drilled parts fix the KP08 stations and the screw length; a vendor swap
 # must not move them. The self-checks below guard them against the bought
 # block: a swap that trips one is a redesign decision.
 FEED_GAP = 2.5  # feed lug/nut to KP08 envelope at a travel stop (TL-32 checks)
 NEAR_STUB = 2.0  # screw past the near KP08's outer face, as fitted (step 7)
 NEAR_STUB_MIN = 1.0  # at least
-# The screw's set-screw flat, centred on the handwheel's grub (TL-VN-54).
+# The screw's set-screw flats' length (TL-VN-84 LeadScrew): each KP08 flat's,
+# centred on its set screw; the handwheel's starts half of it short of the grub
+# and runs out through the cut end.
 SCREW_FLAT_LENGTH = 8.0
 HANDWHEEL_GRUB_MAJOR = float(HANDWHEEL_GRUB.removeprefix("M"))
-# The screw in the handwheel's bore, at least: past the grub's far flank and
-# the flat's far end. HANDWHEEL_BORE_LENGTH caps it (the screw end stays
+# The screw in the handwheel's bore, at least: past the grub's far flank, and
+# half a flat's length past the grub, so the open flat runs as far beyond it
+# as toward the hub. HANDWHEEL_BORE_LENGTH caps it (the screw end stays
 # inside the wheel's outer face).
 HANDWHEEL_ENGAGEMENT_MIN = max(
     HANDWHEEL_GRUB_FROM_HUB + HANDWHEEL_GRUB_MAJOR / 2.0,  # 9.0
@@ -299,7 +315,7 @@ KP08_FACE_S = (
 HUB_END_S = KP08_FACE_S[1] + HUB_GAP
 SCREW_NEAR_END_S = KP08_FACE_S[0] - NEAR_STUB
 SCREW_FAR_END_S = SCREW_NEAR_END_S + SCREW_LENGTH
-HANDWHEEL_ENGAGEMENT = SCREW_FAR_END_S - HUB_END_S  # 18
+HANDWHEEL_ENGAGEMENT = SCREW_FAR_END_S - HUB_END_S  # 13
 HANDWHEEL_STUB = SCREW_FAR_END_S - KP08_FACE_S[1]  # screw past the far KP08: 24
 HANDWHEEL_S = (HUB_END_S, HUB_END_S + HANDWHEEL_LENGTH)
 WHEEL_S = (
@@ -400,18 +416,20 @@ if not BRACKET_BOXES["end bracket near"][0] > _near_stud_s + 14.0:
     raise AssertionError("the near bracket reaches the near hold-down's nut")
 # Both brackets stand on the bar, inside its ends; the far bracket's screws too.
 if not (
-    BRACKET_BOXES["end bracket far"][1] < trammel.RAIL_FAR_S
+    BRACKET_BOXES["end bracket far"][1] < trammel.BASE_BAR_FAR_S
     and BRACKET_BOXES["end bracket near"][0] > trammel.RAIL_NEAR_S
 ):
     raise AssertionError("an end bracket overhangs its bar's end")
-# The wheel overhangs the bar end; its hub clears the far KP08 envelope.
+# The wheel's rim overhangs the bar end; its hub clears the far KP08 envelope.
 if not HUB_END_S > KP08_BOXES["KP08 far"][1]:
     raise AssertionError("the handwheel hub reaches the far KP08")
+if not WHEEL_S[0] > trammel.BASE_BAR_FAR_S:
+    raise AssertionError("the handwheel's rim stands over the bar instead of past its end")
 _wheel_parts = HANDWHEEL_HUB_LENGTH + HANDWHEEL_WHEEL_LENGTH
 if abs(_wheel_parts + HANDWHEEL_GRIP_LENGTH - HANDWHEEL_LENGTH) > 1e-6:
     raise AssertionError("the handwheel's hub, rim and grip miss its length")
-if abs(_wheel_parts - HANDWHEEL_BORE_LENGTH) > 1e-6:
-    raise AssertionError("the handwheel's bore is not through hub and rim")
+if not HANDWHEEL_HUB_LENGTH <= HANDWHEEL_BORE_LENGTH <= _wheel_parts:
+    raise AssertionError("the handwheel's bore is not through its hub, inside the wheel")
 if not HANDWHEEL_Z[0] > trammel.BASE_BAR_THICK:
     raise AssertionError("the handwheel's swept grip reaches the bar top")
 # The screw: cut from the stock, past both KP08s, past the hub's grub and the
@@ -424,7 +442,7 @@ if not NEAR_STUB >= NEAR_STUB_MIN:
 if not HANDWHEEL_ENGAGEMENT >= HANDWHEEL_ENGAGEMENT_MIN:
     raise AssertionError("the screw stops short of the handwheel's grub or its flat")
 if not HANDWHEEL_ENGAGEMENT < HANDWHEEL_BORE_LENGTH:
-    raise AssertionError("the screw stands proud of the wheel's outer face")
+    raise AssertionError("the screw reaches past the handwheel's guaranteed bore")
 # The bracket's screws land in the bar between the rail and the bar edge,
 # clear of the hold-down slots, rail holes and bar ends.
 for _x, _y in BASE_BAR_HOLES:
@@ -482,7 +500,7 @@ BRACKET_SLIP_THRUST = FRICTION_MIN * BAR_SCREW_PRELOAD / _worst_shear  # 2.69 kN
 # Opening onset: the thrust's moment about the bracket's heel, at the screw
 # axis above the bar top, against the row's preload over the bracket width.
 # Owner ruling 2026-10-27 (#1943 review): slip governs. A firm hand pull can
-# reach the onset (TL-00's 1161 N feed thrust), lifting the heel elastically;
+# reach the onset (TL-00's 1361 N feed thrust), lifting the heel elastically;
 # the joint must not slip, so the onset is reported, not required.
 _thrust_height = SCREW_AXIS_Z - trammel.BASE_BAR_THICK  # 40.4
 BRACKET_OPENING_THRUST = (

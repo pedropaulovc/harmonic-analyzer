@@ -1,4 +1,4 @@
-"""Create the four-view purchased-reference sheet for MISUMI HOK40-HC8, Ø40 knurled handwheel with revolving grip.
+"""Create the four-view purchased-reference sheet for the HARFINGTON 50 mm knurled handwheel with rotating handle (Amazon B0DJ3DZT86).
 
 Identification only: the part as installed, its stock and ordering SKU, and
 its fitting note; no fabrication dimensions.
@@ -22,8 +22,8 @@ MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_handwheel"]
 PART_STEM = SPEC.artifact_stem
-# The footer's ITEM row: the catalogue designation in plain text.
-ITEM = "40 MM KNURLED HANDWHEEL, REVOLVING GRIP, 8 MM BORE"
+# The footer's ITEM row: the listing's designation in plain text.
+ITEM = "50 MM KNURLED HANDWHEEL, ROTATING HANDLE, 8 MM BORE"
 
 
 async def build(adapter: Any) -> dict[str, str]:

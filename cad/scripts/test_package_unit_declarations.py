@@ -23,30 +23,27 @@ from test_part_coverage import PART_DRAWING_EXEMPTIONS
 # Metric-only supplier packages: package -> why its sheet stays millimetres.
 # Each reason cites one of its row's ``supplier_skus``.
 METRIC_PACKAGES: dict[str, str] = {
-    "parts/ch-rocker-arm-tl-vn-oblique-carriage": (
-        "HIWIN HGH15CA linear guideway block (HGH-15-CA-Z0-C), the metric-only "
-        "HGR15R rail's own carriage"
-    ),
     "parts/ch-rocker-arm-tl-vn-oblique-carriage-screw": (
         "DIN 912 / ISO 4762 M4 x 20 socket head screw (McMaster-Carr 91290A168) "
         "into the HGH15CA carriage's vendor-cut M4 holes, the fastener policy's "
         "vendor-cut metric exception"
     ),
     "parts/ch-rocker-arm-tl-vn-oblique-handwheel": (
-        "MISUMI D40 knurled handwheel with an 8 mm HC8 bore (HOK40-HC8) for the "
+        "HARFINGTON 50 mm handwheel with an 8 mm bore (Amazon B0DJ3DZT86) for the "
         "Tr8 leadscrew"
     ),
-    "parts/ch-rocker-arm-tl-vn-oblique-leadscrew": (
-        "ZYLtech T8x2 lead screw (HW-SC-T8x2-600) cut to 410 mm, the Tr8 "
-        "metric-only vendor line (owner ruling 4, 2026-11-01)"
+    "parts/ch-rocker-arm-tl-vn-oblique-leadscrew-kit": (
+        "ReliaBot T8 Tr8x2 lead screw cut to 410 mm and its brass flange nut "
+        "(Amazon B085DDHJTW), the Tr8 metric-only vendor line (owner ruling 4, "
+        "2026-11-01)"
     ),
     "parts/ch-rocker-arm-tl-vn-oblique-pillow-block": (
-        "KP08 pillow block with an 8 mm bore insert bearing, a metric-only vendor "
-        "line (owner ruling 4, 2026-11-01)"
+        "uxcell KP08 pillow block with an 8 mm bore insert bearing (Amazon "
+        "B0D2L8M4QR), a metric-only vendor line (owner ruling 4, 2026-11-01)"
     ),
-    "parts/ch-rocker-arm-tl-vn-oblique-rail": (
-        "HIWIN HGR15R linear guideway rail cut to 440 mm (Motion Constrained "
-        "172270559990), a metric-only vendor line (owner ruling 4, 2026-11-01)"
+    "parts/ch-rocker-arm-tl-vn-oblique-rail-kit": (
+        "NUIBBYED HGR15 rail and HGH15CA carriage kit, 450 mm (Amazon B0C4DJNL33), "
+        "a metric-only vendor line (owner ruling 4, 2026-11-01)"
     ),
 }
 

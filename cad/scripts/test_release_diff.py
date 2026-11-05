@@ -52,6 +52,20 @@ GROUPS = [
         "ch-rocker-arm-tl-vn-oblique-flange-nut": "FlangeNut",
     }),
 ]
+# The oblique jig's parent-scoped Amazon kits (#2187): one native part per kit,
+# its members as configurations, each prior stem paired with its member only.
+KITS = [
+    ("ch-rocker-arm-tl-vn-oblique-rail-kit", "MHA-CH-06-TL-VN-83", "Rail", {
+        "ch-rocker-arm-tl-vn-oblique-rail": "Rail",
+        "ch-rocker-arm-tl-vn-oblique-carriage": "Carriage",
+    }),
+    ("ch-rocker-arm-tl-vn-oblique-leadscrew-kit", "MHA-CH-06-TL-VN-84", "LeadScrew", {
+        "ch-rocker-arm-tl-vn-oblique-leadscrew": "LeadScrew",
+        "ch-rocker-arm-tl-vn-oblique-feed-nut": "FeedNut",
+    }),
+]
+FAMILIES = GROUPS + KITS
+NAMED_FAMILIES = [family for family in FAMILIES if family[2] != "Default"]
 
 
 def mesh_key(stem, configuration):
@@ -89,11 +103,11 @@ def render_diff(monkeypatch):
     return module
 
 
-@pytest.mark.parametrize("stem,number,neutral,prior_members", GROUPS)
-def test_fixed8_exact_members_and_all19_prior_current_aliases(stem, number, neutral, prior_members):
+@pytest.mark.parametrize("stem,number,neutral,prior_members", FAMILIES)
+def test_configured_family_members_and_prior_current_aliases(stem, number, neutral, prior_members):
     mapping = load_identity_map()
-    assert len(mapping.shared_groups) == 8
-    group = mapping.shared_groups[stem]
+    assert set(mapping.configured_families) == {family[0] for family in FAMILIES}
+    group = mapping.configured_families[stem]
     assert group["number"] == number
     assert group["neutral_export_configuration"] == neutral
     assert set(group["configurations"]) == set(prior_members.values())
@@ -113,6 +127,75 @@ def test_fixed8_exact_members_and_all19_prior_current_aliases(stem, number, neut
         assert paired_keys([prior], current, mapping) == {
             mesh_key(stem, configuration): (prior,)
         }
+
+
+def _kit_map(tmp_path, mutate):
+    payload = json.loads(IDENTITY_MAP.read_text(encoding="utf-8"))
+    mutate(payload)
+    current = tmp_path / "current.json"
+    current.write_text(json.dumps(payload), encoding="utf-8")
+    return current
+
+
+def test_every_kit_configuration_keeps_one_current_member(tmp_path):
+    def repeat_rail(payload):
+        rows = {row["old_stem"]: row for row in payload["parts_and_assemblies"]}
+        carriage = rows["ch-rocker-arm-tl-oblique-carriage"]["new_identities"][0]
+        carriage["configuration"] = "Rail"
+
+    with pytest.raises(ValueError, match="configured family member has no current identity"):
+        load_identity_map(_kit_map(tmp_path, repeat_rail), HISTORICAL_IDENTITY_MAP)
+
+
+def test_a_configured_kit_member_needs_its_declared_family(tmp_path):
+    def drop_kits(payload):
+        payload["configured_kits"] = []
+
+    with pytest.raises(ValueError, match="configured identity outside a configured family"):
+        load_identity_map(_kit_map(tmp_path, drop_kits), HISTORICAL_IDENTITY_MAP)
+
+
+@pytest.mark.parametrize("stem,number,neutral,prior_members", KITS)
+def test_kit_step_and_stl_pair_with_their_prior_parts_and_the_bare_kit_selects_both(
+    tmp_path, monkeypatch, capsys, stem, number, neutral, prior_members,
+):
+    from _part_configuration_exports import member_export_paths
+
+    paths = {configuration: member_export_paths(stem, configuration, neutral, Path("."))
+             for configuration in prior_members.values()}
+    # The default member's STEP is the bare kit basename, its STL is qualified.
+    assert (paths[neutral]["step"].stem, paths[neutral]["stl"].stem) == (stem, mesh_key(stem, neutral))
+    old = {f"{kind}/{prior}.{kind}": {"crc": 1, "uncomp": 10}
+           for prior in prior_members for kind in ("step", "stl")}
+    new = {member[kind].as_posix(): {"crc": 2, "uncomp": 10}
+           for member in paths.values() for kind in ("step", "stl")}
+    mapping = load_identity_map()
+    assert release_diff.release_inventory(new, mapping) == {
+        mesh_key(stem, configuration): {kind: new[member[kind].as_posix()] for kind in ("step", "stl")}
+        for configuration, member in paths.items()
+    }
+    monkeypatch.setattr(release_diff, "central_dir", lambda url: old if "before/" in url else new)
+    monkeypatch.setattr(release_diff, "CACHE", tmp_path)
+    monkeypatch.setattr(release_diff, "extract", lambda *args: None)
+    mesh_calls, step_calls = [], []
+    mesh_result = dict(hausdorff_mm=0, mean_dev_mm=0, vol_a_mm3=1, vol_b_mm3=1,
+                       tris_a=12, tris_b=12, bbox_a=[1, 1, 1], bbox_b=[1, 1, 1])
+    monkeypatch.setattr(release_diff, "mesh_deviation", lambda *args: mesh_calls.append(args) or mesh_result)
+    monkeypatch.setattr(release_diff, "boolean_cut", lambda *args: step_calls.append(args) or
+                        dict(removed=0, added=0, net=0, vol_a=1, vol_b=1))
+    monkeypatch.setattr(sys, "argv", ["release_diff.py", "before", "after", "--parts", stem])
+    release_diff.main()
+    assert sorted(mesh_calls) == sorted(
+        ("before", "after", prior, paths[configuration]["stl"].stem)
+        for prior, configuration in prior_members.items()
+    )
+    assert sorted(step_calls) == sorted(
+        ("before", "after", prior, paths[configuration]["step"].stem)
+        for prior, configuration in prior_members.items()
+    )
+    output = capsys.readouterr().out
+    assert "new parts: (none)" in output and "deleted parts: (none)" in output
+    assert "SKIPPED" not in output
 
 
 @pytest.mark.parametrize("extension", [".step", ".STL", ".pdf", ".SLDPRT", ".SLDDRW"])
@@ -288,7 +371,7 @@ def test_all_same_generation_historical_clones_are_retained(stem, number, neutra
         assert pairs[logical] == inventory[logical]
 
 
-@pytest.mark.parametrize("stem,number,neutral,prior_members", [g for g in GROUPS if g[2] != "Default"])
+@pytest.mark.parametrize("stem,number,neutral,prior_members", NAMED_FAMILIES)
 def test_bare_neutral_is_only_one_member_and_never_a_default_alias(stem, number, neutral, prior_members):
     mapping = load_identity_map()
     current = [mesh_key(stem, configuration) for configuration in prior_members.values()]
@@ -533,7 +616,7 @@ def test_pose_consumer_rejects_ambiguous_clone_sources_even_after_one_was_cached
         pose_to_meshprobe.release_member(f"{directory}/{GROUPS[1][0]}{extension}", "v50")
 
 
-@pytest.mark.parametrize("stem,number,neutral,prior_members", [g for g in GROUPS if g[2] != "Default"])
+@pytest.mark.parametrize("stem,number,neutral,prior_members", NAMED_FAMILIES)
 def test_pose_consumer_selects_exact_chain_wire_and_kit_member(
     tmp_path, monkeypatch, stem, number, neutral, prior_members,
 ):
@@ -563,7 +646,7 @@ def test_pose_consumer_rejects_archive_occurrence_selector_before_fetch(monkeypa
         pose_to_meshprobe.release_member("gltf/sh-vn-chain-link--InnerLink-1.glb", "v50")
 
 
-@pytest.mark.parametrize("stem,number,neutral,prior_members", [g for g in GROUPS if g[2] != "Default"])
+@pytest.mark.parametrize("stem,number,neutral,prior_members", NAMED_FAMILIES)
 def test_declared_neutral_and_explicit_first_member_candidates_both_survive(
     stem, number, neutral, prior_members,
 ):
@@ -678,10 +761,10 @@ def test_pose_source_resolver_rejects_ambiguous_extracted_cache_without_fetch(tm
 
 @pytest.mark.parametrize("stem,configuration,neutral", [
     (stem, configuration, neutral)
-    for stem, _, neutral, members in GROUPS if neutral != "Default"
+    for stem, _, neutral, members in NAMED_FAMILIES
     for configuration in members.values()
 ])
-def test_all7_members_use_the_same21_format_paths_as_producer_and_registry(
+def test_named_members_use_the_same_format_paths_as_producer_and_registry(
     tmp_path, stem, configuration, neutral,
 ):
     from _part_configuration_exports import configuration_export_paths, member_export_paths
@@ -694,7 +777,7 @@ def test_all7_members_use_the_same21_format_paths_as_producer_and_registry(
         "png": tmp_path / "png" / neutral_key / f"{neutral_key}_isometric.png",
     }
     mapping = load_identity_map()
-    group = mapping.shared_groups[stem]
+    group = mapping.configured_families[stem]
     assert group["neutral_export_configuration"] == neutral
     assert member_export_paths(stem, configuration, neutral, tmp_path) == expected
     assert configuration_export_paths(stem, tmp_path)[configuration] == expected
@@ -702,7 +785,7 @@ def test_all7_members_use_the_same21_format_paths_as_producer_and_registry(
 
 @pytest.mark.parametrize("stem,configuration,neutral", [
     (stem, configuration, neutral)
-    for stem, _, neutral, members in GROUPS if neutral != "Default"
+    for stem, _, neutral, members in NAMED_FAMILIES
     for configuration in members.values()
 ])
 def test_comparison_member_resolution_uses_declared_format_specific_paths(
@@ -911,7 +994,7 @@ def test_pose_explicit_source_does_not_hide_a_mixed_generation_bundle(tmp_path, 
         pose_to_meshprobe.release_member("gltf/dt-vn-fillister-screw.glb", "v50")
 
 
-@pytest.mark.parametrize("stem,number,neutral,prior_members", [g for g in GROUPS if g[2] != "Default"])
+@pytest.mark.parametrize("stem,number,neutral,prior_members", NAMED_FAMILIES)
 def test_identical_current_member_layouts_have_no_crc_changes_or_renames(
     tmp_path, monkeypatch, capsys, stem, number, neutral, prior_members,
 ):
@@ -952,8 +1035,8 @@ def test_identical_current_member_layouts_have_no_crc_changes_or_renames(
     assert f"{len(expected)} common parts; analyzing 0:" in output
 
 
-@pytest.mark.parametrize("stem,number,neutral,prior_members", [g for g in GROUPS if g[2] != "Default"])
-def test_bare_shared_parts_selector_compares_every_member_once(
+@pytest.mark.parametrize("stem,number,neutral,prior_members", NAMED_FAMILIES)
+def test_bare_family_parts_selector_compares_every_member_once(
     tmp_path, monkeypatch, capsys, stem, number, neutral, prior_members,
 ):
     import release_diff
@@ -1138,7 +1221,7 @@ def test_pose_explicit_actual_cached_source_does_not_require_alias_resolution_or
 def test_release_inventory_rejects_undeclared_duplicate_first_member_step_spelling():
     from release_diff import release_inventory
 
-    with pytest.raises(ValueError, match="conflicting shared step export"):
+    with pytest.raises(ValueError, match="conflicting configured step export"):
         release_inventory({
             "step/sh-vn-chain-link.STEP": {"crc": 1, "uncomp": 10},
             "step/sh-vn-chain-link--innerlink.STEP": {"crc": 2, "uncomp": 10},

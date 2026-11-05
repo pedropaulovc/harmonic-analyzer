@@ -474,6 +474,152 @@ def test_configuration_cells_refuse_invalid_panel_count_or_index(index, count) -
         configured.configuration_view_cells(index, count)
 
 
+@pytest.mark.parametrize("count", (2, 3))
+def test_isometric_only_cell_fills_its_member_panel(count) -> None:
+    for index in range(count):
+        (iso,) = configured.isometric_view_cells(index, count)
+        cells = [cell for _, _, cell in configured.configuration_view_cells(index, count)]
+        panel = (
+            min(cell[0] for cell in cells),
+            min(cell[1] for cell in cells),
+            max(cell[2] for cell in cells),
+            max(cell[3] for cell in cells),
+        )
+        assert iso[0] == "*Isometric"
+        assert iso[2] == panel
+        assert iso[1] == pytest.approx(((panel[0] + panel[2]) / 2, (panel[1] + panel[3]) / 2))
+
+
+def _isometric_only_sheet(monkeypatch, tmp_path):
+    variants = (("Rail", "[1] RAIL"), ("Carriage", "[2] CARRIAGE"))
+    state = _variant_sheet(
+        monkeypatch, tmp_path, variants, {"Rail": 2, "Carriage": 2}, 4
+    )
+    new_drawing = configured.new_project_drawing
+
+    def create(adapter, *, layout, unit):
+        draw, sheet = new_drawing(adapter, layout=layout, unit=unit)
+        sheet.GetName = lambda: "REFERENCE"
+        draw.ActivateSheet = lambda _name: True
+        return draw, sheet
+
+    monkeypatch.setattr(configured, "new_project_drawing", create)
+    monkeypatch.setattr(
+        configured, "create_blank_drawing_sheets", lambda *_args, **_kwargs: None
+    )
+    # The isometric fits at 1:2, the orthographic views at 1:1.
+    def fit(_draw, views, cells):
+        scales = {}
+        for view, (name, _, _) in zip(views, cells, strict=True):
+            scales[name] = (1, 2) if name == "*Isometric" else (1, 1)
+            view.ScaleRatio = tuple(float(value) for value in scales[name])
+        return scales
+
+    monkeypatch.setattr(configured, "_fit_views", fit)
+    texts = []
+    literal_note = configured._literal_note
+
+    def note(adapter, text, x, y):
+        texts.append(text)
+        return literal_note(adapter, text, x, y)
+
+    monkeypatch.setattr(configured, "_literal_note", note)
+    finalizations = []
+
+    async def finalize(_adapter, outputs, *, settled_checks, **kwargs):
+        finalizations.append(kwargs)
+        state.before_settle()
+        for settled in settled_checks:
+            settled()
+        state.finalized = True
+        return {"pdf": str(outputs.pdf)}
+
+    monkeypatch.setattr(configured, "finalize_drawing", finalize)
+    return state, variants, texts, finalizations
+
+
+def test_isometric_only_member_shows_its_isometric_and_cites_its_sheet(
+    monkeypatch, tmp_path
+):
+    state, variants, texts, finalizations = _isometric_only_sheet(monkeypatch, tmp_path)
+    asyncio.run(
+        configured.build_purchased_variant_drawing(
+            state.adapter,
+            state.spec,
+            variants=variants,
+            item="RAIL KIT",
+            purchase_unit="ONE KIT",
+            additional_sheet_scales={"RAIL RECEIPT": (1, 2)},
+            append_sheets=lambda _adapter: (),
+            isometric_only={"Rail": 2},
+        )
+    )
+    assert state.finalized
+    assert [(view.ReferencedConfiguration, view.GetOrientationName()) for view in state.views] == [
+        ("Rail", "*Isometric"),
+        ("Carriage", "*Front"),
+        ("Carriage", "*Top"),
+        ("Carriage", "*Right"),
+        ("Carriage", "*Isometric"),
+    ]
+    (iso,) = configured.isometric_view_cells(0, 2)
+    assert state.views[0]._center == iso[1]
+    assert "[1] RAIL  QTY 2 INSTALLED, SEE SHEET 2" in texts
+    assert "[2] CARRIAGE  QTY 2 INSTALLED" in texts
+    assert "ISOMETRIC  1:2" in texts
+    # The sheet's scale is the first orthographic member's, not the isometric's.
+    assert finalizations[0]["sheet_scales"]["REFERENCE"] == (1, 1)
+
+
+def test_isometric_only_member_refuses_a_restored_orthographic_view(
+    monkeypatch, tmp_path
+):
+    state, variants, _texts, _finalizations = _isometric_only_sheet(monkeypatch, tmp_path)
+    state.before_settle = lambda: state.views.append(
+        SimpleNamespace(
+            ReferencedConfiguration="Rail", GetOrientationName=lambda: "*Front"
+        )
+    )
+    with pytest.raises(RuntimeError, match="missing or extra member views"):
+        asyncio.run(
+            configured.build_purchased_variant_drawing(
+                state.adapter,
+                state.spec,
+                variants=variants,
+                item="RAIL KIT",
+                purchase_unit="ONE KIT",
+                additional_sheet_scales={"RAIL RECEIPT": (1, 2)},
+                append_sheets=lambda _adapter: (),
+                isometric_only={"Rail": 2},
+            )
+        )
+    assert not state.finalized
+
+
+@pytest.mark.parametrize(
+    "isometric_only, scales",
+    [
+        ({"Nope": 2}, {"RECEIPT": (1, 2)}),
+        ({"Rail": 1}, {"RECEIPT": (1, 2)}),
+        ({"Rail": 3}, {"RECEIPT": (1, 2)}),
+        ({"Rail": True}, {"RECEIPT": (1, 2)}),
+        ({"Rail": 2}, None),
+    ],
+)
+def test_isometric_only_must_cite_an_appended_sheet_before_native_calls(
+    isometric_only, scales
+):
+    with pytest.raises(ValueError):
+        asyncio.run(configured.build_purchased_variant_drawing(
+            object(), object(), variants=(("Rail", "RAIL"), ("Carriage", "CARRIAGE")),
+            item="KIT", purchase_unit="KIT",
+            additional_sheet_scales=scales,
+            append_sheets=None if scales is None else (lambda _adapter: ()),
+            isometric_only=isometric_only,
+        ))
+
+
+
 def _variant_sheet(monkeypatch, tmp_path, variants, quantities, total):
     """Only model paths, native view fields and note extents; never real COM."""
     source = tmp_path / "configured-stock.SLDPRT"
@@ -528,17 +674,32 @@ def _variant_sheet(monkeypatch, tmp_path, variants, quantities, total):
         views=[],
         finalized=False,
         before_settle=lambda: None,
+        active=[variants[0][0]],
+        transitions=[],
     )
     draw = _Drawing()
 
-    async def open_model(path):
+    def open_read_only(adapter, path, *, label):
         state.opens.append(path)
-        return True
+        return adapter.currentModel
 
-    state.adapter.open_model = open_model
+    monkeypatch.setattr(configured, "_open_supplier_source_read_only", open_read_only)
+    monkeypatch.setattr(
+        configured, "active_configuration_name", lambda _adapter, _model: state.active[0]
+    )
+
+    def show(_adapter, _model, name, *, label):
+        state.transitions.append(name)
+        state.active[0] = name
+
+    monkeypatch.setattr(configured, "_show_reference_configuration", show)
+    monkeypatch.setattr(
+        configured,
+        "_activate_reference_document",
+        lambda _adapter, _model, *, label: state.transitions.append("activate source"),
+    )
     monkeypatch.setattr(configured._config, "parts", lambda _stem: row)
     monkeypatch.setattr(configured, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(configured, "check", lambda _label, result: result)
     monkeypatch.setattr(configured, "double_array", tuple)
 
     def required_properties(_model, names, *, required):
@@ -758,6 +919,163 @@ def test_configured_sheet_accepts_complete_consistent_native_members(
         )
     )
     assert state.finalized
+
+
+_MEMBERS = (("InnerLink", "INNER"), ("OuterLink", "OUTER"))
+_MEMBER_QUANTITIES = {"InnerLink": 34, "OuterLink": 33}
+_FINALIZE_STAGES = (
+    "before_drawing_save",
+    "after_drawing_save",
+    "before_pdf_save",
+    "after_pdf_save",
+    "before_drawing_close",
+    "after_drawing_close",
+)
+
+
+def _guarded_finalize(monkeypatch, state, mutate=None):
+    """finalize_drawing's settled checks, then its save/close checkpoints."""
+    stages = []
+
+    async def finalize(_adapter, outputs, *, settled_checks, checkpoint, **_kwargs):
+        state.before_settle()
+        for settled in settled_checks:
+            settled()
+        for stage in _FINALIZE_STAGES:
+            if mutate is not None:
+                mutate(stage)
+            checkpoint(stage)
+            stages.append(stage)
+        state.finalized = True
+        return {"pdf": str(outputs.pdf)}
+
+    monkeypatch.setattr(configured, "finalize_drawing", finalize)
+    return stages
+
+
+@pytest.mark.parametrize(
+    "drift",
+    (None, "dirty", "settled-bytes", "writable", "configuration", "saved-bytes"),
+)
+def test_configured_sheet_keeps_its_source_read_only_clean_and_unchanged(
+    monkeypatch, tmp_path, drift
+):
+    state = _variant_sheet(monkeypatch, tmp_path, _MEMBERS, _MEMBER_QUANTITIES, 67)
+    model = state.adapter.currentModel
+    source = state.spec.source
+
+    def mutate(stage):
+        if drift == "saved-bytes" and stage == "after_drawing_save":
+            source.write_bytes(b"drawing saved the referenced part")
+
+    stages = _guarded_finalize(monkeypatch, state, mutate)
+    if drift == "dirty":
+        model.GetSaveFlag = lambda: True
+    elif drift == "settled-bytes":
+        state.before_settle = lambda: source.write_bytes(b"dimension text wrote through")
+    elif drift == "writable":
+        state.before_settle = lambda: setattr(model, "IsOpenedReadOnly", lambda: False)
+    elif drift == "configuration":
+        state.before_settle = lambda: state.active.__setitem__(0, "OuterLink")
+
+    def build():
+        return asyncio.run(
+            configured.build_purchased_variant_drawing(
+                state.adapter,
+                state.spec,
+                variants=_MEMBERS,
+                item="PURCHASED PRODUCT",
+                purchase_unit="ONE PRODUCT",
+            )
+        )
+
+    if drift is None:
+        build()
+        assert state.finalized
+        assert stages == list(_FINALIZE_STAGES)
+        assert state.opens == [source]
+        assert state.transitions == []
+        return
+    message = "clean before the drawing exists" if drift == "dirty" else "source state changed"
+    with pytest.raises(RuntimeError, match=message):
+        build()
+    assert not state.finalized
+    if drift == "dirty":
+        assert state.views == []
+    if drift == "saved-bytes":
+        assert stages == ["before_drawing_save"]
+
+
+@pytest.mark.parametrize("drift", (None, "reverted", "other"))
+def test_configured_sheet_holds_exactly_the_declared_source_member(
+    monkeypatch, tmp_path, drift
+):
+    state = _variant_sheet(monkeypatch, tmp_path, _MEMBERS, _MEMBER_QUANTITIES, 67)
+    stages = _guarded_finalize(monkeypatch, state)
+    seen = []
+    placed = []
+    place_view = configured.place_view
+
+    def place(*args, **kwargs):
+        placed.append(state.active[0])
+        return place_view(*args, **kwargs)
+
+    monkeypatch.setattr(configured, "place_view", place)
+
+    def annotate(_adapter, configuration, _cells, _views):
+        seen.append((configuration, state.active[0]))
+        return ()
+
+    if drift is not None:
+        state.before_settle = lambda: state.active.__setitem__(
+            0, "InnerLink" if drift == "reverted" else "Default"
+        )
+
+    def build():
+        return asyncio.run(
+            configured.build_purchased_variant_drawing(
+                state.adapter,
+                state.spec,
+                variants=_MEMBERS,
+                item="PURCHASED PRODUCT",
+                purchase_unit="ONE PRODUCT",
+                annotate_member=annotate,
+                source_configuration="OuterLink",
+            )
+        )
+
+    if drift is None:
+        build()
+        assert stages == list(_FINALIZE_STAGES)
+    else:
+        with pytest.raises(RuntimeError, match="expected='OuterLink'"):
+            build()
+        assert not state.finalized
+    # Active before the first view, for every view and annotation, then the
+    # saved member again.
+    assert placed == ["OuterLink"] * 8
+    assert seen == [("InnerLink", "OuterLink"), ("OuterLink", "OuterLink")]
+    assert state.transitions == ["OuterLink", "activate source", "InnerLink"]
+    assert state.active == ["InnerLink"]
+
+
+def test_configured_sheet_refuses_an_undepicted_source_member_before_opening(
+    monkeypatch, tmp_path
+):
+    state = _variant_sheet(monkeypatch, tmp_path, _MEMBERS, _MEMBER_QUANTITIES, 67)
+    with pytest.raises(ValueError, match="depicted member"):
+        asyncio.run(
+            configured.build_purchased_variant_drawing(
+                state.adapter,
+                state.spec,
+                variants=_MEMBERS,
+                item="PURCHASED PRODUCT",
+                purchase_unit="ONE PRODUCT",
+                source_configuration="Default",
+            )
+        )
+    assert state.opens == []
+
 
 
 @pytest.mark.parametrize("drift", [None, "reference-view", "reference-activation"])

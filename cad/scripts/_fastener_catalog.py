@@ -374,15 +374,6 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "98381A542",
         material="Alloy Steel",
     ),
-    # MHA-CH-06-TL-VN-81: the oblique trammel jig's feed nut dowel, keying the
-    # TL-27 nut to the TL-32 lug against rotation (shop fixture hardware
-    # modelled for native mates and interference).
-    "ch-rocker-arm-tl-vn-oblique-nut-dowel": _stock(
-        "ch-rocker-arm-tl-vn-oblique-nut-dowel",
-        "Alloy Steel Dowel Pin, 3/32 x 1/2 in",
-        "98381A438",
-        material="Alloy Steel",
-    ),
     # MHA-CH-06-TL-VN-61: the oblique trammel jig's #8-32 X 3/4 SHCS (the
     # fastener table's RAIL_TO_BAR row); shop fixture hardware, modelled so
     # the jig assembly can mate it and run native interference.
@@ -410,28 +401,19 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "91290A168",
         material="Alloy Steel",
     ),
-    # MHA-CH-06-TL-VN-65: the oblique trammel jig's #6-32 X 5/8 SHCS (the
+    # MHA-CH-06-TL-VN-65: the oblique trammel jig's #6-32 X 5/8 BHCS (the
     # fastener table's KP08_TO_BRACKET row); shop fixture hardware, modelled
     # so the jig assembly can mate it and run native interference.
     "ch-rocker-arm-tl-vn-oblique-kp08-screw": _stock(
         "ch-rocker-arm-tl-vn-oblique-kp08-screw",
-        "Black-Oxide Alloy Steel Socket Head Screw",
-        "91251A150",
+        "Black-Oxide Button Head Hex-Drive Screw",
+        "91255A150",
         material="Alloy Steel",
     ),
-    # MHA-CH-06-TL-VN-66: the oblique trammel jig's #4-40 X 3/4 FLANGED BHCS
-    # (the fastener table's NUT_TO_FEED_BLOCK row); shop fixture hardware,
-    # modelled so the jig assembly can mate it and run native interference.
-    "ch-rocker-arm-tl-vn-oblique-nut-screw": _stock(
-        "ch-rocker-arm-tl-vn-oblique-nut-screw",
-        "Black-Oxide Flanged Button Head Hex-Drive Screw",
-        "91355A581",
-        material="Alloy Steel",
-    ),
-    # MHA-CH-06-TL-VN-67: the oblique trammel jig's #4-40 X 5/8 flat head (the
-    # fastener table's RISER_TO_CARRIER row), installed as bought; shop
-    # fixture hardware, modelled so the jig assembly can mate it and run
-    # native interference.
+    # MHA-CH-06-TL-VN-67: the oblique trammel jig's #4-40 X 5/8 flat heads (the
+    # fastener table's RISER_TO_CARRIER and NUT_TO_FEED_BLOCK rows), installed
+    # as bought; shop fixture hardware, modelled so the jig assembly can mate
+    # it and run native interference.
     "ch-rocker-arm-tl-vn-oblique-riser-screw": _stock(
         "ch-rocker-arm-tl-vn-oblique-riser-screw",
         "Stainless Steel Phillips Flat Head Screw",

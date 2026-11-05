@@ -258,11 +258,28 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
             logical = "cad/config/parts/" + row["stem"] + ".yaml"
             self.assertEqual(identity.source_aliases({sealed})[logical], (sealed,))
 
+    def test_amazon_kit_members_alias_their_sealed_jig_specs(self):
+        identity = CurrentNativeIdentity()
+        for member, configuration, sealed in (
+            ("rail_kit_rail", "Rail", "rail"),
+            ("rail_kit_carriage", "Carriage", "carriage"),
+            ("leadscrew_kit_leadscrew", "LeadScrew", "leadscrew"),
+        ):
+            current = f"cad/scripts/ch_rocker_arm_tl_vn_oblique_{member}_spec.py"
+            old = f"cad/scripts/ch_rocker_arm_tl_oblique_{sealed}_spec.py"
+            self.assertTrue((ROOT / current).is_file(), current)
+            self.assertEqual(identity.source_aliases({old})[current], (old,))
+            self.assertEqual(identity.source_aliases(
+                {old}, parent="ch-rocker-arm-tl-oblique-jig", configuration=configuration,
+                role=configuration)[current], (old,))
+            self.assertEqual(identity.source_aliases(
+                {old}, configuration="NotAMember")[current], ())
+
     def test_retired_tooling_is_reserved_history_not_a_current_projection_or_registry(self):
         cad_map = json.loads((ROOT / "cad/config/current-identity-map.json").read_text(encoding="utf-8"))
         identity = CurrentNativeIdentity()
         retired = cad_map["retired_identities"]
-        self.assertEqual(len(retired), 33)
+        self.assertEqual(len(retired), 36)
         # #2119: the 3/16 pen-rod set screw gave way to the shared MHA-SH-VN-54;
         # #290: the arm's spot face took the MHA-PD-VN-67 pivot shim's room.
         machine = [row for row in retired if "-tl-" not in row["old_stem"]]
@@ -284,6 +301,12 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
             "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire": "MHA-CH-06-TL-VN-76",
             # #2112: the shop-made TL-27 nut retires the bought Tr8 flange nut.
             "ch-rocker-arm-tl-vn-oblique-leadscrew-nut": "MHA-CH-06-TL-VN-55",
+            # #2177 option B (2026-11-04): the ReliaBot screw's own flange nut
+            # (TL-VN-82) on four TL-VN-67 flat heads retires the shop-made nut,
+            # its dowel and its two screws.
+            "ch-rocker-arm-tl-oblique-feed-nut": "MHA-CH-06-TL-27",
+            "ch-rocker-arm-tl-vn-oblique-nut-dowel": "MHA-CH-06-TL-VN-81",
+            "ch-rocker-arm-tl-vn-oblique-nut-screw": "MHA-CH-06-TL-VN-66",
         }
         actual_oblique = {
             target["stem"]: target["number"]
@@ -326,6 +349,45 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
                          PREFIX + "mg-magnifier/sh-vn-music-wire--LeverWire--T006-1@upper")
         self.assertEqual(project_current_native_path(PREFIX + "pd-paper-drive/vn-latch-hook-rivet-1"),
                          PREFIX + "pd-paper-drive/pd-vn-latch-hook-rivet-1")
+
+    def test_jig_kit_members_project_to_configured_parent_scoped_kits(self):
+        # #2187 owner ruling: one parent-scoped native part per multi-member
+        # Amazon kit; the members' former Numbers stay prior and never return.
+        jig = "ch-rocker-arm-tl-oblique-jig"
+        cases = (
+            ("ch-rocker-arm-tl-oblique-rail", "MHA-CH-006-TL-30", "ch-rocker-arm-tl-vn-oblique-rail",
+             "MHA-CH-06-TL-VN-50", "ch-rocker-arm-tl-vn-oblique-rail-kit", "MHA-CH-06-TL-VN-83", "Rail"),
+            ("ch-rocker-arm-tl-oblique-carriage", "MHA-CH-006-TL-31", "ch-rocker-arm-tl-vn-oblique-carriage",
+             "MHA-CH-06-TL-VN-51", "ch-rocker-arm-tl-vn-oblique-rail-kit", "MHA-CH-06-TL-VN-83", "Carriage"),
+            ("ch-rocker-arm-tl-oblique-leadscrew", "MHA-CH-006-TL-34", "ch-rocker-arm-tl-vn-oblique-leadscrew",
+             "MHA-CH-06-TL-VN-54", "ch-rocker-arm-tl-vn-oblique-leadscrew-kit", "MHA-CH-06-TL-VN-84", "LeadScrew"),
+            ("ch-rocker-arm-tl-vn-oblique-feed-nut", None, "ch-rocker-arm-tl-vn-oblique-feed-nut",
+             "MHA-CH-06-TL-VN-82", "ch-rocker-arm-tl-vn-oblique-leadscrew-kit", "MHA-CH-06-TL-VN-84", "FeedNut"),
+        )
+        cad_map = json.loads((ROOT / "cad/config/current-identity-map.json").read_text(encoding="utf-8"))
+        mapped = sorted(
+            (row["old_stem"], row["old_number"], target["prior_stem"], target["prior_number"],
+             target["stem"], target["number"], target["configuration"])
+            for row in cad_map["parts_and_assemblies"] for target in row["new_identities"]
+            if target["stem"].endswith(("-rail-kit", "-leadscrew-kit")))
+        self.assertEqual(mapped, sorted(cases))
+        active = {target["number"] for row in cad_map["parts_and_assemblies"]
+                  for target in row["new_identities"]}
+        identity = CurrentNativeIdentity()
+        for source, source_number, prior, prior_number, kit, number, configuration in cases:
+            with self.subTest(member=configuration):
+                self.assertNotIn(prior_number, active)
+                expected = PREFIX + jig + "/" + kit + "--" + configuration + "-2"
+                for stem in (source, prior, kit + "--" + configuration):
+                    self.assertEqual(identity.project_path(PREFIX + jig + "/" + stem + "-2"), expected)
+                for value, stem in ((source_number, source), (prior_number, prior),
+                                    (number, kit + "--" + configuration + "-2")):
+                    if value is not None:
+                        self.assertEqual(identity.project_number(value, stem, jig), number)
+        for ambiguous in ("ch-rocker-arm-tl-vn-oblique-rail-kit-1",
+                          "ch-rocker-arm-tl-vn-oblique-rail-kit--FeedNut-1"):
+            with self.assertRaises(ValueError):
+                identity.project_path(PREFIX + jig + "/" + ambiguous)
 
     def test_all_five_default_shared_groups_keep_native_variants_idempotently(self):
         default_numbers = {"MHA-SH-VN-51", "MHA-SH-VN-52", "MHA-SH-VN-53",

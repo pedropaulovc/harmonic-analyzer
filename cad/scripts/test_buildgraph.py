@@ -143,18 +143,17 @@ _INSERTED_SOURCES = {
     "ch_rocker_arm_tl_oblique_feed_lever ch_rocker_arm_tl_oblique_feed_block "
     "ch_rocker_arm_tl_oblique_end_bracket "
     "ch_rocker_arm_tl_oblique_pivot_block ch_rocker_arm_tl_oblique_riser "
-    "ch_rocker_arm_tl_vn_oblique_rail ch_rocker_arm_tl_vn_oblique_carriage "
-    "ch_rocker_arm_tl_vn_oblique_cl_dowel ch_rocker_arm_tl_vn_oblique_leadscrew "
-    "ch_rocker_arm_tl_oblique_feed_nut ch_rocker_arm_tl_vn_oblique_pillow_block "
+    "ch_rocker_arm_tl_vn_oblique_rail_kit "
+    "ch_rocker_arm_tl_vn_oblique_cl_dowel ch_rocker_arm_tl_vn_oblique_leadscrew_kit "
+    "ch_rocker_arm_tl_vn_oblique_pillow_block "
     "ch_rocker_arm_tl_vn_oblique_handwheel sh_vn_clamping_kit_hardware "
     "ch_rocker_arm_tl_vn_oblique_rail_screw ch_rocker_arm_tl_vn_oblique_bracket_screw "
     "ch_rocker_arm_tl_vn_oblique_carriage_screw "
-    "ch_rocker_arm_tl_vn_oblique_kp08_screw ch_rocker_arm_tl_vn_oblique_nut_screw "
+    "ch_rocker_arm_tl_vn_oblique_kp08_screw "
     "ch_rocker_arm_tl_vn_oblique_riser_screw ch_rocker_arm_tl_vn_oblique_clamp_screw "
     "ch_rocker_arm_tl_vn_oblique_lever_screw ch_rocker_arm_tl_vn_oblique_lever_washer "
     "ch_rocker_arm_tl_vn_oblique_pivot_screw ch_rocker_arm_tl_vn_oblique_pivot_spacer "
-    "ch_rocker_arm_tl_vn_oblique_pivot_shim ch_rocker_arm_tl_vn_oblique_hub_pin "
-    "ch_rocker_arm_tl_vn_oblique_nut_dowel",
+    "ch_rocker_arm_tl_vn_oblique_pivot_shim ch_rocker_arm_tl_vn_oblique_hub_pin",
     "dt_cone_gear_tl_indexing": "dt_cone_gear_tl_index_plate",
     "ha_harmonic_analyzer": "fr_frame dt_drive_train ch_channel sm_summing mg_magnifier pn_pen "
     "pd_paper_drive ms_measuring_stick",
@@ -177,6 +176,10 @@ def test_all_assembly_references_match_inserted_source_manifests(assembly):
         ("sh_vn_thumb_screw", {"mg_magnifier", "ms_measuring_stick"}),
         ("sh_vn_music_wire", {"mg_magnifier", "pn_pen"}),
         ("sh_vn_clamping_kit_hardware", {"ch_rocker_arm_tl_oblique_jig"}),
+        # Parent-scoped kits (owner exception, #2187): one producer, two
+        # configured members each, one direct consumer.
+        ("ch_rocker_arm_tl_vn_oblique_rail_kit", {"ch_rocker_arm_tl_oblique_jig"}),
+        ("ch_rocker_arm_tl_vn_oblique_leadscrew_kit", {"ch_rocker_arm_tl_oblique_jig"}),
     ],
 )
 def test_shared_vendor_producers_have_exact_direct_consumers(producer, consumers):
@@ -510,8 +513,8 @@ def test_tuple_member_manifests_track_physical_sources_not_logical_row_keys(
         "'sh-vn-clamping-kit-hardware--TNut'),\n"
         "    ('sh-vn-clamping-kit-hardware', "
         "'sh-vn-clamping-kit-hardware--FlangeNut'),\n"
-        "    ('ch-rocker-arm-tl-vn-oblique-rail', "
-        "'ch-rocker-arm-tl-vn-oblique-rail'),\n"
+        "    ('ch-rocker-arm-tl-vn-oblique-cl-dowel', "
+        "'ch-rocker-arm-tl-vn-oblique-cl-dowel'),\n"
         ")\n"
         "async def _place_family(adapter, physical, logical):\n"
         f"    {placement}\n"
@@ -522,10 +525,10 @@ def test_tuple_member_manifests_track_physical_sources_not_logical_row_keys(
         tmp_path, monkeypatch, source,
         (
             "sh_vn_clamping_kit_hardware",
-            "ch_rocker_arm_tl_vn_oblique_rail",
+            "ch_rocker_arm_tl_vn_oblique_cl_dowel",
             "pd_vn_chain_connecting_link",
         ),
-    ) == {"sh_vn_clamping_kit_hardware", "ch_rocker_arm_tl_vn_oblique_rail"}
+    ) == {"sh_vn_clamping_kit_hardware", "ch_rocker_arm_tl_vn_oblique_cl_dowel"}
 
 
 def test_ambiguous_dynamic_source_family_keeps_every_possible_producer(

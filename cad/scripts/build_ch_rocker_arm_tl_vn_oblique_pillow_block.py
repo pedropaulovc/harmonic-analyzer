@@ -1,7 +1,7 @@
-r"""Purchased KP08 pillow block, AMPEC (MHA-CH-06-TL-VN-56).
+r"""Purchased KP08 pillow block, uxcell (Amazon B0D2L8M4QR) (MHA-CH-06-TL-VN-56).
 
 The datasheet-built envelope of ``ch_rocker_arm_tl_vn_oblique_pillow_block_spec``
-(no vendor CAD obtained): one solid of the full unverified axial width, the
+(no vendor CAD obtained): one solid of the listing's full axial width, the
 insert bearing included. Built on the Top Plane (the axial mid-plane), whose
 sketch (u, v) is model (X, -Z), each section extruded mid-plane by the width:
 
@@ -161,7 +161,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "ScrewAxis")
 
     await apply_material(adapter, MATERIAL)
-    # The zinc-alloy housing's bright cast finish.
+    # The housing's bright cast finish (listing photographs).
     await apply_color(adapter, POLISHED_STEEL)
     apply_custom_properties(adapter, STOCK_PROPERTIES)
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})

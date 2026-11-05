@@ -1,4 +1,4 @@
-"""AMPEC KP08 pillow block (MHA-CH-06-TL-VN-56) contracts, SolidWorks-free."""
+"""uxcell KP08 pillow block (MHA-CH-06-TL-VN-56) contracts, SolidWorks-free."""
 
 from __future__ import annotations
 
@@ -21,11 +21,12 @@ NAME = STEM.replace("-", "_")
 ROW = _config.parts(STEM)
 
 
-def test_registry_row_is_the_purchased_ampec_kp08() -> None:
+def test_registry_row_is_the_purchased_uxcell_kp08() -> None:
     assert ROW["number"] == "MHA-CH-06-TL-VN-56"
     assert ROW["process"] == "purchased"
-    assert ROW["supplier"] == spec.SUPPLIER
-    assert ROW["supplier_skus"] == [spec.SKU] == ["KP08"]
+    assert ROW["supplier"] == spec.SUPPLIER == "Amazon (sold by uxcell)"
+    assert ROW["supplier_skus"] == [spec.SKU] == ["B0D2L8M4QR"]
+    assert spec.SOURCE_URL == f"https://www.amazon.com/dp/{spec.SKU}"
     assert ROW["material"] == spec.MATERIAL
     assert ROW["tolerance_class"] == "visual_noncritical"
     assert len(ROW["material_specification"]) <= 36  # one MATERIAL-cell line
@@ -72,6 +73,18 @@ def test_bought_dimensions_are_imported_from_c4_not_retyped() -> None:
         "FOOT_THICK",
     ):
         assert re.search(rf"^{name} = leadscrew\.KP08_\w+", source, re.M), name
+
+
+def test_listing_sizes_and_the_tl28_screw_fit() -> None:
+    """The listing's 55 x 13 x 28, Ø5 holes at 42 and Ø8 bore; the TL-28
+    #6-32 screws float in the Ø5 holes on TL-28's unchanged 42 tap span."""
+    assert (spec.LENGTH, spec.WIDTH, spec.HEIGHT) == (55.0, 13.0, 28.0)
+    assert (spec.BOLT_SPACING, spec.HOLE_DIA, spec.BORE_DIA) == (42.0, 5.0, 8.0)
+    major = leadscrew.THREAD_MAJOR_MM[leadscrew.KP08_SCREW]
+    assert leadscrew.KP08_SCREW == "#6-32"
+    assert (spec.HOLE_DIA - major) / 2.0 > 0.7  # radial float
+    near, far = leadscrew.BRACKET_KP08_HOLES_X
+    assert math.isclose(far - near, spec.BOLT_SPACING, abs_tol=1e-9)
 
 
 def test_spec_is_pure_data() -> None:

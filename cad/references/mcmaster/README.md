@@ -55,9 +55,10 @@ recipes:
 | 23065A855-23065A4 | `ch-rocker-arm-tl-vn-oblique-hub-pin` (MHA-CH-06-TL-VN-80; abrasive-cut to .79, factory end up) | Class Z NO-GO Plug Gauge, .4000 in, 2 in supply |
 | 91255A106 | — (diagnostic recipe; a former `pd-vn-guide-lock-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A148 | — (diagnostic recipe; a former `dt-vn-cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
-| 91251A150 | `ch-rocker-arm-tl-vn-oblique-kp08-screw` (MHA-CH-06-TL-VN-65; shop fixture; catalogue-only, product page login-walled, no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
+| 91255A150 | `ch-rocker-arm-tl-vn-oblique-kp08-screw` (MHA-CH-06-TL-VN-65, 4 in the jig since 2026-11-04; shop fixture; catalogue-only, product page read live 2026-11-04) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
+| 91251A150 | — (retired TL-VN-65 source, 2026-11-04; now 91255A150, whose larger head covers the uxcell KP08's Ø5 hole; diagnostic recipe removed) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91290A168 | `ch-rocker-arm-tl-vn-oblique-carriage-screw` (MHA-CH-06-TL-VN-64; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
-| 91355A581 | `ch-rocker-arm-tl-vn-oblique-nut-screw` (MHA-CH-06-TL-VN-66; shop fixture; catalogue-only, product page read live 2026-11-02; the free vendor STEP (SHA-256 fb11dbce…aa7) measured for the 0.024-in flange and its Ø0.222 flat bearing face, not committed, not replica-gated) | Black-Oxide Flanged Button Head Hex-Drive Screw, Alloy Steel |
+| 91355A581 | — (retired TL-VN-66 source, 2026-11-04: TL-VN-66 retired; the TL-VN-84 kit's feed nut uses TL-VN-67's 91771A112; diagnostic recipe removed) | Black-Oxide Flanged Button Head Hex-Drive Screw, Alloy Steel |
 | 90325A174 | `pd-vn-transgear-pivot-screw` (catalogue-only; CAD download refused) | 18-8 Stainless Steel Precision Shoulder Screw, hex socket |
 | 91375A106 | `sh-vn-arbor-set-screw` (MHA-SH-VN-54; shared by ch, dt and pn) | Alloy Steel Cup-Tip Set Screw |
 | 91375A942 | `ch-vn-fulcrum-set-screw` (catalogue-only; no vendor model) | Alloy Steel Cup-Tip Set Screw |
@@ -65,8 +66,8 @@ recipes:
 | 91410A540 | `fr-vn-gooseneck-set-screw` (catalogue-only; no vendor model) | Steel Square-Head Cup-Point Set Screw |
 | 91595A452 | — (retired TL-VN-53 source, 2026-10-31; now 98381A542, issue #290; diagnostic recipe removed) | Dowel Pin |
 | 98381A542 | `ch-rocker-arm-tl-vn-oblique-cl-dowel` (MHA-CH-06-TL-VN-53; shop fixture; catalogue-only, product page login-walled, vendor STEP read for dimensions, not replica-gated) | Alloy Steel Dowel Pin |
-| 98381A438 | `ch-rocker-arm-tl-vn-oblique-nut-dowel` (MHA-CH-06-TL-VN-81; shop fixture; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
-| 91771A112 | `ch-rocker-arm-tl-vn-oblique-riser-screw` (MHA-CH-06-TL-VN-67; shop fixture; catalogue-only, same-family vendor geometry, not replica-gated) | Stainless Steel Phillips Flat Head Screw |
+| 98381A438 | — (retired TL-VN-81, 2026-11-04; owner option B: the bought ReliaBot feed nut, TL-VN-84 `FeedNut`, needs no dowel; diagnostic recipe removed) | Alloy Steel Dowel Pin |
+| 91771A112 | `ch-rocker-arm-tl-vn-oblique-riser-screw` (MHA-CH-06-TL-VN-67, 8 in the jig: 4 riser and, since 2026-11-04, 4 feed nut; shop fixture; catalogue-only, same-family vendor geometry, not replica-gated) | Stainless Steel Phillips Flat Head Screw |
 | 91790A199 | `pd-vn-transgear-arm-plate-screw` (catalogue-only; populated live SKU verified; 2-D PDF offered, CAD requires login) | 18-8 Stainless Steel Oval Head Slotted Screw |
 | 91792A108 | `pd-vn-guide-lock-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Pan Head Slotted Screw |
 | 91794A112 | `dt-vn-cone-tip-pinch-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
@@ -187,15 +188,17 @@ its dimension provider and diagnostic recipe have also been removed.
   catalog-only run. It is pressed, chamfered end first, into the carrier's
   .2490-.2495 reamed CL hole, its round tip .060-.068 above the actual riser.
   It supplies `fixtures.trammel-cl-dowel`.
-- [98381A438](https://www.mcmaster.com/98381A438/) (`ch-rocker-arm-tl-vn-oblique-nut-dowel`,
-  MHA-CH-06-TL-VN-81, one: the TL-27 feed nut's anti-rotation key into the
-  TL-32 lug since November 3, 2026) was read live on November 3, 2026: alloy
-  steel dowel pin, 3/32 in diameter, diameter tolerance 0.0001 to 0.0003 in,
-  1/2 in long, 1,400 lbf double shear, Rockwell C47 minimum, ASME B18.8.2, end
-  shape "Round x Chamfer", pack of 100, $14.06; length tolerance unstated. As
-  for 98381A433, `diag_build_98381A438.py` models the plain nominal cylinder;
-  catalogue-only, no vendor model, no replica gate. It supplies
-  `fixtures.trammel-nut-dowel`.
+- [98381A438](https://www.mcmaster.com/98381A438/) (retired
+  `ch-rocker-arm-tl-vn-oblique-nut-dowel`, MHA-CH-06-TL-VN-81, November 4,
+  2026: owner option B replaced the shop-made TL-27 feed nut it keyed into the
+  TL-32 lug with the ReliaBot screw's own flange nut (TL-VN-84 `FeedNut`), held by four
+  screws and no dowel; historical reading follows) was read live on November
+  3, 2026: alloy steel dowel pin, 3/32 in diameter, diameter tolerance 0.0001
+  to 0.0003 in, 1/2 in long, 1,400 lbf double shear, Rockwell C47 minimum,
+  ASME B18.8.2, end shape "Round x Chamfer", pack of 100, $14.06; length
+  tolerance unstated. `diag_build_98381A438.py` (removed November 4, 2026)
+  modelled the plain nominal cylinder; catalogue-only, no vendor model, no
+  replica gate. `fixtures.trammel-nut-dowel` now records it as not to be ordered.
 - [91595A452](https://www.mcmaster.com/91595A452/) (retired TL-VN-53 source,
   October 31, 2026; historical reading follows) was
   read live on October 17, 2026: 52100 alloy steel dowel pin, 6 mm diameter
@@ -224,7 +227,7 @@ its dimension provider and diagnostic recipe have also been removed.
   It also supplied `fixtures.trammel-cl-dowel`; length tolerance unstated.
   Both purchases remain unconfirmed in `cad/process/shop/inventory.toml`.
 - [91251A197](https://www.mcmaster.com/91251A197/)
-  (`ch-rocker-arm-tl-vn-oblique-rail-screw`, MHA-CH-06-TL-VN-61, 14 in the oblique
+  (`ch-rocker-arm-tl-vn-oblique-rail-screw`, MHA-CH-06-TL-VN-61, 16 in the oblique
   trammel jig: the fastener table's `RAIL_TO_BAR` row) was read live on October
   17, 2026: #8-32 UNC class 3A, 3/4 in under the head, fully threaded, head
   Ø0.27 x 0.164 in, 9/64 in hex, Rockwell C37, ASTM A574, $18.68 per pack of
@@ -325,7 +328,20 @@ lug became integral with TL-32. The following describes the former joint.
   Each is cut to its own counterbore floor at assembly (owner ruling November
   1, 2026; the jig's step 5), so the jig part passes `cut_length` and the
   recipe draws the installed screw at that length under the head.
-- [91251A150](https://www.mcmaster.com/91251A150/)
+- [91255A150](https://www.mcmaster.com/91255A150/)
+  (`ch-rocker-arm-tl-vn-oblique-kp08-screw`, MHA-CH-06-TL-VN-65, 4 in the oblique
+  trammel jig since November 4, 2026, owner option (b): the fastener table's
+  `KP08_TO_BRACKET` row) was read live on November 4, 2026: black-oxide alloy
+  steel button head hex drive screw, #6-32 UNC class 3A, 5/8 in under the
+  head, fully threaded, head Ø0.262 x 0.073 in, 5/64 in hex, 140,000 psi,
+  Rockwell C39, ASME B18.3 / ASTM F835, $18.56 per pack of 100. Callout
+  `#6-32 X 5/8 BHCS`, torqued to 1.0 N·m (9 in·lbf), below Holo-Krome's #6
+  button-head nominal of 15 in·lbf and held lower by the KP08 foot's bearing.
+  It replaced 91251A150 because the uxcell KP08's listed Ø5 hole left the
+  SHCS head's Ø.226 only 0.37 mm of cover against 0.75 mm float; the button
+  head's Ø6.655 covers it by 0.827 mm.
+- [91251A150](https://www.mcmaster.com/91251A150/) (retired TL-VN-65 source,
+  November 4, 2026; historical reading follows)
   (`ch-rocker-arm-tl-vn-oblique-kp08-screw`, MHA-CH-06-TL-VN-65, 4 in the oblique
   trammel jig: the fastener table's `KP08_TO_BRACKET` row) was read live on
   October 19, 2026 from the #6-32 x 5/8 in black-oxide socket head screw
@@ -340,7 +356,7 @@ lug became integral with TL-32. The following describes the former joint.
   hex, 7/64 in, ASME B18.3's minimum key engagement for #6, 0.064 in (the
   91251A108 convention), and ASME B18.3's -0.03 in length tolerance (up to 1
   in long).
-  `diag_build_91251A150.py` builds it from those catalogue values on the 91251A
+  `diag_build_91251A150.py` (removed November 4, 2026) built it from those catalogue values on the 91251A
   family recipe (`diag_mcmaster_socket_head.build_socket_head`: plain
   cylindrical head, 0.75P tip chamfer, 45 deg thread neck; bearing face at y =
   0, tip at y = -length), fully threaded. No vendor model was downloaded (the
@@ -348,8 +364,10 @@ lug became integral with TL-32. The following describes the former joint.
   is catalogue-only (it builds the recipe, checks the solid and saves it under
   `cad/out/reference`).
 - [91771A112](https://www.mcmaster.com/91771A112/)
-  (`ch-rocker-arm-tl-vn-oblique-riser-screw`, MHA-CH-06-TL-VN-67, 4 in the oblique
-  trammel jig: the fastener table's `RISER_TO_CARRIER` row) was read live on
+  (`ch-rocker-arm-tl-vn-oblique-riser-screw`, MHA-CH-06-TL-VN-67, 8 in the oblique
+  trammel jig: four in the fastener table's `RISER_TO_CARRIER` row and, since
+  November 4, 2026, four holding the TL-VN-84 kit's feed nut to TL-32's lug in Ø4.6
+  82 deg countersinks at 0.3 N·m, replacing retired TL-VN-66) was read live on
   October 19, 2026: 18-8 stainless steel, passivated, Phillips No. 1 drive,
   standard 82 deg flat head Ø0.212 x 0.067 in, #4-40 UNC class 2A, 5/8 in
   overall (McMaster measures a flat head from its top), fully threaded, flat
@@ -1630,7 +1648,15 @@ rows below preserve the dated source readings, not current jig registrations.
 So do the `nut-screw` and `leadscrew-nut` rows: on 2026-11-01 the shop-made
 TL-27 feed nut retired TL-VN-55 and TL-VN-66 became McMaster 91355A581
 (#4-40 x 3/4 flanged button head, two off; Codjiflo P1 on #2112: a #4 SHCS
-head could not seat flat at the nut's fit-up eccentricity).
+head could not seat flat at the nut's fit-up eccentricity). On 2026-11-04
+(issue #2177 and owner option B) the `leadscrew` row became the ReliaBot
+Amazon listing B085DDHJTW, whose included brass flange nut, spigot faced off,
+is TL-VN-82; TL-27 and TL-VN-81 retired. TL-VN-66 retired the same day: the
+nut's four screws are TL-VN-67's 91771A112, and TL-VN-65 became 91255A150
+(#6-32 x 5/8 button head). Also on 2026-11-04 (owner ruling, #2187 comment
+4473182209) the screw and nut became one leadscrew kit, TL-VN-84, with
+`LeadScrew` and `FeedNut` configurations (TL-VN-54 retired, TL-VN-82 never
+released). The ZYLtech and 91251A150 rows are historical.
 
 | target suffix at source date | exact SKU at source date | primary size coverage |
 |---|---|---|

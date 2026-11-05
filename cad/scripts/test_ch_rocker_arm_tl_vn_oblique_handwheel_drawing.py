@@ -1,4 +1,4 @@
-"""MISUMI HOK40-HC8 feed handwheel (MHA-CH-06-TL-VN-57) contracts, SolidWorks-free."""
+"""HARFINGTON 50 mm feed handwheel (MHA-CH-06-TL-VN-57) contracts, SolidWorks-free."""
 
 from __future__ import annotations
 
@@ -35,29 +35,17 @@ def _numeric_revolve(profile, n: int = 4000) -> float:
     return abs(volume)
 
 
-def _numeric_corner_round(
-    corner_r: float, rho: float, outward: bool, n: int = 4000
-) -> float:
-    """The ring a round sweeps, by integrating the spandrel over its width."""
-    volume = 0.0
-    for i in range(n):
-        s = (i + 0.5) / n * rho  # distance in from the corner along one leg
-        height = rho - math.sqrt(rho * rho - (rho - s) ** 2)
-        radius = corner_r - s if outward else corner_r + s
-        volume += 2.0 * math.pi * radius * height * rho / n
-    return volume
-
-
-def test_registry_row_is_the_purchased_misumi_handwheel() -> None:
+def test_registry_row_is_the_purchased_amazon_handwheel() -> None:
     assert ROW["number"] == "MHA-CH-06-TL-VN-57"
     assert ROW["process"] == "purchased"
-    assert ROW["supplier"] == spec.SUPPLIER == "MISUMI"
-    assert ROW["supplier_skus"] == [spec.SKU] == ["HOK40-HC8"]
+    assert ROW["supplier"] == spec.SUPPLIER == "Amazon (sold by HARFINGTON)"
+    assert ROW["supplier_skus"] == [spec.SKU] == ["B0DJ3DZT86"]
     assert ROW["material"] == spec.MATERIAL
     assert int(ROW["quantity"]) == spec.QUANTITY == 1
     # One line in the title block's MATERIAL cell; the provenance is the spec's.
     assert len(ROW["material_specification"]) <= 36
-    assert spec.SKU in (spec.__doc__ or "")
+    doc = spec.__doc__ or ""
+    assert f"https://www.amazon.com/dp/{spec.SKU}" in doc
     assert part.STOCK_PROPERTIES == {
         "Stock Name": ROW["stock_name"],
         "Supplier": spec.SUPPLIER,
@@ -67,39 +55,73 @@ def test_registry_row_is_the_purchased_misumi_handwheel() -> None:
 
 
 def test_c4_values_are_imported_not_retyped() -> None:
-    assert spec.HUB_DIA == feed.HANDWHEEL_HUB_DIA
-    assert spec.HUB_LENGTH == feed.HANDWHEEL_HUB_LENGTH
-    assert spec.WHEEL_DIA == feed.HANDWHEEL_WHEEL_DIA
-    assert spec.WHEEL_LENGTH == feed.HANDWHEEL_WHEEL_LENGTH
-    assert spec.BODY_LENGTH == feed.HANDWHEEL_BORE_LENGTH == spec.WHEEL_FACE_Y
+    assert spec.HUB_DIA == feed.HANDWHEEL_HUB_DIA == 26.0
+    assert spec.HUB_LENGTH == feed.HANDWHEEL_HUB_LENGTH == 14.0
+    assert spec.WHEEL_DIA == feed.HANDWHEEL_WHEEL_DIA == 50.0
+    assert spec.WHEEL_LENGTH == feed.HANDWHEEL_WHEEL_LENGTH == 13.0
+    assert spec.BORE_LENGTH == feed.HANDWHEEL_BORE_LENGTH
     assert spec.BORE_DIA == feed.SCREW_MAJOR_DIA
     assert spec.GRIP_OFFSET == feed.HANDWHEEL_GRIP_OFFSET
+    assert spec.GRIP_DIA == feed.HANDWHEEL_GRIP_DIA
+    assert spec.GRIP_LENGTH == feed.HANDWHEEL_GRIP_LENGTH
+    assert spec.LENGTH == feed.HANDWHEEL_LENGTH
     assert spec.SET_SCREW_THREAD == feed.HANDWHEEL_GRUB
     assert spec.SET_SCREW_STATION == feed.HANDWHEEL_GRUB_FROM_HUB
     source = Path(spec.__file__).read_text(encoding="utf-8")
-    for name in ("HUB_DIA", "HUB_LENGTH", "WHEEL_DIA", "WHEEL_LENGTH", "GRIP_OFFSET"):
+    for name in (
+        "HUB_DIA",
+        "HUB_LENGTH",
+        "WHEEL_DIA",
+        "WHEEL_LENGTH",
+        "BORE_LENGTH",
+        "GRIP_OFFSET",
+        "GRIP_DIA",
+        "GRIP_LENGTH",
+        "LENGTH",
+        "SET_SCREW_STATION",
+    ):
         assert re.search(rf"^{name} = feed\.", source, re.MULTILINE), name
 
 
-def test_vendor_grip_encloses_the_catalogue_grip() -> None:
-    # The vendor STEP's grip (Ø14 max, 21 proud) against C4's catalogue
-    # values (Ø13, 18.8, 43.8 overall): reported to C4, modelled as the STEP.
-    assert spec.CATALOGUE_GRIP_DIA == feed.HANDWHEEL_GRIP_DIA
-    assert spec.CATALOGUE_LENGTH == feed.HANDWHEEL_LENGTH
-    assert spec.GRIP_DIA >= spec.CATALOGUE_GRIP_DIA
-    assert spec.GRIP_LENGTH >= spec.CATALOGUE_GRIP_LENGTH
-    assert spec.LENGTH == spec.WHEEL_FACE_Y + spec.GRIP_LENGTH >= spec.CATALOGUE_LENGTH
-    assert spec.SWEEP_R >= feed.HANDWHEEL_SWEEP_R
+def test_listing_envelope_hub_rim_and_overall() -> None:
+    # The listing: OD 50, "Height: 27mm", "Step Overall Dimension: 26 x 14mm".
+    assert spec.WHEEL_FACE_Y == spec.HUB_LENGTH + spec.WHEEL_LENGTH == 27.0
+    radii = [r for r, _ in spec.WHEEL_PROFILE]
+    stations = [y for _, y in spec.WHEEL_PROFILE]
+    assert max(radii) == spec.WHEEL_DIA / 2.0
+    assert (min(stations), max(stations)) == (0.0, spec.WHEEL_FACE_Y)
+    # The hub's OD runs from the hub end to the rim, nowhere past it.
+    hub = [(r, y) for r, y in spec.WHEEL_PROFILE if r == spec.HUB_DIA / 2.0]
+    assert sorted(y for _, y in hub) == [0.0, spec.HUB_LENGTH]
+    # The handle envelope: 52 overall, sweeping inside the rim's radius 25.
+    assert spec.LENGTH == spec.WHEEL_FACE_Y + spec.GRIP_LENGTH == 52.0
+    assert spec.GRIP_OFFSET + spec.GRIP_DIA / 2.0 <= spec.WHEEL_DIA / 2.0
+    assert spec.SWEEP_R == feed.HANDWHEEL_SWEEP_R == spec.WHEEL_DIA / 2.0
 
 
-def test_set_screw_taps_are_plain_minor_bores() -> None:
+def test_bore_is_blind_to_the_guaranteed_hub_depth() -> None:
+    """The listing's photos show no hole in the rim's outer face: the bore
+    stops at the hub's 14, and the leadscrew's engagement stays short of it."""
+    assert spec.BORE_LENGTH == spec.HUB_LENGTH
+    r_bore = spec.BORE_DIA / 2.0
+    bore = [(r, y) for r, y in spec.WHEEL_PROFILE if r == r_bore]
+    assert sorted(y for _, y in bore) == [0.0, spec.BORE_LENGTH]
+    # The revolve's closing edge lies on the axis, behind the bore's bottom.
+    (r0, y0), (r1, y1) = spec.WHEEL_PROFILE[-1], spec.WHEEL_PROFILE[0]
+    assert (r0, r1) == (0.0, 0.0)
+    assert (y0, y1) == (spec.BORE_LENGTH, spec.WHEEL_FACE_Y)
+    assert feed.HANDWHEEL_ENGAGEMENT_MIN <= feed.HANDWHEEL_ENGAGEMENT < spec.BORE_LENGTH
+
+
+def test_set_screw_taps_are_plain_minor_bores_in_the_hub() -> None:
     import _hole_spec
 
     assert (
         f"{spec.SET_SCREW_THREAD}x{spec.SET_SCREW_PITCH:g}"
         not in _hole_spec.TAP_DRILL_MM
     )
-    assert spec.SET_SCREW_MINOR_DIA == pytest.approx(4.134, abs=5e-4)  # the vendor hole
+    assert spec.SET_SCREW_MINOR_DIA == pytest.approx(4.134, abs=5e-4)
+    # "Comes with two screws to secure the shaft": one tap each.
     assert spec.SET_SCREW_COUNT == len(spec.SET_SCREW_DIRECTIONS) == len(part.TAPS) == 2
     # Front sketches u = x, Right sketches u = -z; the profile runs along -u.
     planes = {
@@ -111,9 +133,13 @@ def test_set_screw_taps_are_plain_minor_bores() -> None:
     assert min(u for u, _ in spec.TAP_PROFILE) < -spec.HUB_DIA / 2.0
     # The closing edge lies on the tap's axis (the revolve centerline).
     assert spec.TAP_PROFILE[-1][1] == spec.TAP_PROFILE[0][1] == spec.SET_SCREW_STATION
+    # The whole tap lies inside the hub and over the bore.
+    half = spec.SET_SCREW_MINOR_DIA / 2.0
+    assert 0.0 < spec.SET_SCREW_STATION - half
+    assert spec.SET_SCREW_STATION + half < spec.BORE_LENGTH <= spec.HUB_LENGTH
 
 
-def test_volume_matches_numeric_integration() -> None:
+def test_volume_matches_closed_form_and_numeric_integration() -> None:
     d = spec.SET_SCREW_MINOR_DIA
     tap = (
         cross_hole_volume_mm3(d, spec.HUB_DIA) - cross_hole_volume_mm3(d, spec.BORE_DIA)
@@ -122,37 +148,17 @@ def test_volume_matches_numeric_integration() -> None:
     assert spec.WHEEL_VOLUME_MM3 == pytest.approx(
         _numeric_revolve(spec.WHEEL_PROFILE), rel=1e-6
     )
+    hub = math.pi * ((spec.HUB_DIA / 2.0) ** 2 - (spec.BORE_DIA / 2.0) ** 2)
+    rim = math.pi * (spec.WHEEL_DIA / 2.0) ** 2
+    assert spec.WHEEL_VOLUME_MM3 == pytest.approx(
+        hub * spec.HUB_LENGTH + rim * spec.WHEEL_LENGTH, rel=1e-12
+    )
     assert spec.GRIP_VOLUME_MM3 == pytest.approx(
-        _numeric_revolve(spec.GRIP_PROFILE), rel=1e-6
+        math.pi * (spec.GRIP_DIA / 2.0) ** 2 * spec.GRIP_LENGTH, rel=1e-12
     )
-    hub_r = spec.HUB_DIA / 2.0
-    assert spec.HUB_END_FILLET_MM3 == pytest.approx(
-        _numeric_corner_round(hub_r, spec.HUB_FILLET, True), rel=1e-4
+    assert spec.VOLUME_MM3 == pytest.approx(
+        spec.WHEEL_VOLUME_MM3 + spec.GRIP_VOLUME_MM3 - 2.0 * tap, rel=1e-5
     )
-    assert spec.HUB_CORNER_FILLET_MM3 == pytest.approx(
-        _numeric_corner_round(hub_r, spec.HUB_FILLET, False), rel=1e-4
-    )
-    assert spec.GRIP_END_ROUND_MM3 == pytest.approx(
-        _numeric_corner_round(spec.GRIP_DIA / 2.0, spec.GRIP_END_ROUND, True), rel=1e-4
-    )
-
-
-def test_volume_matches_the_vendor_step_less_the_explained_detail() -> None:
-    # Native minus the vendor's omitted detail (collar flats, grip-socket
-    # void) is the vendor wheel-plus-grip volume; the residual is the STEP's
-    # rounded socket/shank diameters.
-    explained = spec.GRIP_FLATS_MM3 + spec.GRIP_SOCKET_VOID_MM3
-    assert spec.GRIP_FLATS_MM3 == pytest.approx(32.70, abs=0.01)
-    assert spec.GRIP_SOCKET_VOID_MM3 == pytest.approx(7.73, abs=0.01)
-    assert spec.VOLUME_MM3 - explained == pytest.approx(spec.VENDOR_VOLUME_MM3, abs=0.5)
-    assert spec.VENDOR_STEP_SHA256 in (spec.__doc__ or "")
-
-
-def test_mass_agrees_with_the_catalogue_weight() -> None:
-    grip = spec.GRIP_VOLUME_MM3 - spec.GRIP_END_ROUND_MM3
-    wheel = spec.VOLUME_MM3 - grip
-    grams = (wheel * spec.WHEEL_DENSITY + grip * spec.GRIP_DENSITY) / 1000.0
-    assert grams == pytest.approx(spec.MASS_G, rel=0.05)
 
 
 def test_build_sketches_the_spec_profiles() -> None:
@@ -162,6 +168,8 @@ def test_build_sketches_the_spec_profiles() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'volume_check(adapter, "handwheel", VOLUME_MM3' in source
     assert "publish_screw_axis(adapter)" in source
+    # No edge break is published, so none is modelled.
+    assert "fillet" not in source and "chamfer" not in source.lower()
 
 
 def test_spec_is_pure_data() -> None:
@@ -195,12 +203,15 @@ def test_sheet_is_the_registered_purchased_part_reference(monkeypatch) -> None:
     assert asyncio.run(draw.build(adapter)) == {"pdf": "x"}
     # The 18-character number is fitted to its DWG. NO. cell, clear of REV.
     assert calls == [(adapter, sheet, draw.ITEM, False, draw.NumberFit.SHRINK_TO_CELL)]
-    assert "HANDWHEEL" in draw.ITEM
+    assert draw.MACHINIST_REVIEW is draw.MachinistReviewMode.ENFORCE
+    # The ITEM row names the listing's wheel size and bore, as the model has them.
+    assert f"{spec.WHEEL_DIA:.0f} MM" in draw.ITEM and "HANDWHEEL" in draw.ITEM
+    assert f"{spec.BORE_DIA:.0f} MM BORE" in draw.ITEM
 
 
 def test_note_is_one_short_line_naming_the_leadscrew_by_its_drawing_number() -> None:
     note = spec.DRAWING_NOTES
-    number = _config.parts("ch-rocker-arm-tl-vn-oblique-leadscrew")["number"]
+    number = _config.parts("ch-rocker-arm-tl-vn-oblique-leadscrew-kit")["number"]
     assert spec.LEADSCREW_NUMBER == number
     assert "\n" not in note and len(note) <= 80
     assert f"LEADSCREW {number}" in note

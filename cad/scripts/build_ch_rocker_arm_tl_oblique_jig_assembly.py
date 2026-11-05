@@ -47,7 +47,7 @@ from __future__ import annotations
 import json
 import math
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -101,7 +101,7 @@ ASM_NAME = "ch-rocker-arm-tl-oblique-jig"
 assert ASM_NAME == spec.ASM_NAME, (ASM_NAME, spec.ASM_NAME)
 # Literal (physical filename, logical family) rows: the build graph reads the
 # first field syntactically, never through a spec-derived or generated filename.
-# Repeated kit files are one producer and three separately configured BOM rows.
+# A repeated kit file is one producer with one configured BOM row per member.
 _PARTS = (
     ("ch-rocker-arm-tl-oblique-base-bar", "ch-rocker-arm-tl-oblique-base-bar"),
     ("ch-rocker-arm-tl-oblique-carrier", "ch-rocker-arm-tl-oblique-carrier"),
@@ -114,11 +114,11 @@ _PARTS = (
     ("ch-rocker-arm-tl-vn-oblique-hub-pin", "ch-rocker-arm-tl-vn-oblique-hub-pin"),
     ("ch-rocker-arm-tl-oblique-feed-lever", "ch-rocker-arm-tl-oblique-feed-lever"),
     ("ch-rocker-arm-tl-oblique-end-bracket", "ch-rocker-arm-tl-oblique-end-bracket"),
-    ("ch-rocker-arm-tl-vn-oblique-rail", "ch-rocker-arm-tl-vn-oblique-rail"),
-    ("ch-rocker-arm-tl-vn-oblique-carriage", "ch-rocker-arm-tl-vn-oblique-carriage"),
+    ("ch-rocker-arm-tl-vn-oblique-rail-kit", "ch-rocker-arm-tl-vn-oblique-rail-kit--Rail"),
+    ("ch-rocker-arm-tl-vn-oblique-rail-kit", "ch-rocker-arm-tl-vn-oblique-rail-kit--Carriage"),
     ("ch-rocker-arm-tl-vn-oblique-cl-dowel", "ch-rocker-arm-tl-vn-oblique-cl-dowel"),
-    ("ch-rocker-arm-tl-vn-oblique-leadscrew", "ch-rocker-arm-tl-vn-oblique-leadscrew"),
-    ("ch-rocker-arm-tl-oblique-feed-nut", "ch-rocker-arm-tl-oblique-feed-nut"),
+    ("ch-rocker-arm-tl-vn-oblique-leadscrew-kit", "ch-rocker-arm-tl-vn-oblique-leadscrew-kit--LeadScrew"),
+    ("ch-rocker-arm-tl-vn-oblique-leadscrew-kit", "ch-rocker-arm-tl-vn-oblique-leadscrew-kit--FeedNut"),
     ("ch-rocker-arm-tl-vn-oblique-pillow-block", "ch-rocker-arm-tl-vn-oblique-pillow-block"),
     ("ch-rocker-arm-tl-vn-oblique-handwheel", "ch-rocker-arm-tl-vn-oblique-handwheel"),
     ("sh-vn-clamping-kit-hardware", "sh-vn-clamping-kit-hardware--HoldDownStud"),
@@ -128,12 +128,10 @@ _PARTS = (
     ("ch-rocker-arm-tl-vn-oblique-bracket-screw", "ch-rocker-arm-tl-vn-oblique-bracket-screw"),
     ("ch-rocker-arm-tl-vn-oblique-carriage-screw", "ch-rocker-arm-tl-vn-oblique-carriage-screw"),
     ("ch-rocker-arm-tl-vn-oblique-kp08-screw", "ch-rocker-arm-tl-vn-oblique-kp08-screw"),
-    ("ch-rocker-arm-tl-vn-oblique-nut-screw", "ch-rocker-arm-tl-vn-oblique-nut-screw"),
     ("ch-rocker-arm-tl-vn-oblique-riser-screw", "ch-rocker-arm-tl-vn-oblique-riser-screw"),
     ("ch-rocker-arm-tl-vn-oblique-clamp-screw", "ch-rocker-arm-tl-vn-oblique-clamp-screw"),
     ("ch-rocker-arm-tl-vn-oblique-lever-screw", "ch-rocker-arm-tl-vn-oblique-lever-screw"),
     ("ch-rocker-arm-tl-vn-oblique-lever-washer", "ch-rocker-arm-tl-vn-oblique-lever-washer"),
-    ("ch-rocker-arm-tl-vn-oblique-nut-dowel", "ch-rocker-arm-tl-vn-oblique-nut-dowel"),
 )
 assert tuple(family for _physical, family in _PARTS) == spec.BOM_ORDER
 assert all(
@@ -230,14 +228,15 @@ def _verify_kit_references(adapter: Any, placed_names: dict[str, str]) -> None:
         )
 
 
-async def _mate_carriages(adapter: Any) -> None:
+async def _mate_carriages(adapter: Any, names: dict[str, str]) -> None:
     """Each carriage rides its rail (Front and Top planes coincident: the
     frames coincide by construction). Carriage 1's slide is the sweep's one
     DOF: recorded for verify's replays, never authored; carriage 2's is
-    driven through the carrier."""
+    driven through the carrier. ``names`` maps each selector to the native
+    name its placement returned (kit members are role references)."""
     for index, (origin, _carriage_rows) in enumerate(spec.CARRIAGE_PLACEMENTS):
-        carriage = spec.instance_name(spec.CARRIAGE, index)
-        rail = spec.instance_name(spec.RAIL, index)
+        carriage = names[spec.instance_name(spec.CARRIAGE, index)]
+        rail = names[spec.instance_name(spec.RAIL, index)]
         for plane in ("Front Plane", "Top Plane"):
             await coincident_mate(
                 adapter,
@@ -247,10 +246,10 @@ async def _mate_carriages(adapter: Any) -> None:
                 verify=(carriage, list(origin)),
             )
     index = spec.RAILS.index(spec.SLIDE_RAIL)
-    carriage = spec.instance_name(spec.CARRIAGE, index)
+    carriage = names[spec.instance_name(spec.CARRIAGE, index)]
     await distance_driver(
         adapter,
-        named_ref(f"Right Plane@{spec.instance_name(spec.RAIL, index)}", "PLANE"),
+        named_ref(f"Right Plane@{names[spec.instance_name(spec.RAIL, index)]}", "PLANE"),
         named_ref(f"Right Plane@{carriage}", "PLANE"),
         spec.slide_distance(spec.CARRIAGE_STATION),
         label=f"carriage {spec.SLIDE_RAIL} slide on rail {spec.SLIDE_RAIL}",
@@ -259,12 +258,14 @@ async def _mate_carriages(adapter: Any) -> None:
     )
 
 
-async def _lock_families(adapter: Any, families: list[str]) -> None:
+async def _lock_families(
+    adapter: Any, families: list[str], names: dict[str, str]
+) -> None:
     """Lock-mate every instance of ``families`` to what carries it."""
     for stem in families:
         for index in range(spec.QUANTITIES[stem]):
-            child = spec.instance_name(stem, index)
-            parent = spec.lock_parent(stem, index)
+            child = names[spec.instance_name(stem, index)]
+            parent = names[spec.lock_parent(stem, index)]
             await lock_mate(
                 adapter,
                 named_ref(f"Front Plane@{child}", "PLANE"),
@@ -339,6 +340,43 @@ def jig_exploded_view_name(configuration: str) -> str:
     raise ValueError(
         f"{spec.EXPLODED_VIEW_NAME}: no explode is authored in {configuration!r}"
     )
+
+
+def explode_step_components(
+    label: str,
+    selectors: Sequence[str],
+    groups: Mapping[str, Sequence[Any]],
+    by_name: Mapping[str, Any],
+    kit_names: Mapping[str, str],
+) -> list[Any]:
+    """The native components one ``spec.EXPLODE_STEPS`` entry moves.
+
+    A family selector moves its whole identity group. An instance selector
+    (``spec.instance_name``; the riser and nut screws share a family but
+    explode apart) moves the one occurrence it names: a kit occurrence by its
+    persisted role reference (``kit_names``), any other by the Name2
+    ``_place_family`` proved equal to its selector.
+    """
+    moved: dict[str, Any] = {}
+    for selector in selectors:
+        if selector in groups:
+            members = tuple(groups[selector])
+        else:
+            try:
+                (occurrence,) = spec.explode_occurrences(selector)
+            except ValueError as error:
+                raise RuntimeError(
+                    f"{label}: unknown explode selector {selector!r}"
+                ) from error
+            name = kit_names.get(occurrence, occurrence)
+            if name not in by_name:
+                raise RuntimeError(
+                    f"{label}: explode occurrence {selector!r} has no component {name!r}"
+                )
+            members = (by_name[name],)
+        for component in members:
+            moved.setdefault(str(component.Name2), component)
+    return list(moved.values())
 
 
 def _presentation_transform(component: Any) -> tuple[float, ...]:
@@ -442,7 +480,7 @@ def _create_jig_explode(adapter: Any, configuration_name: str) -> None:
         _early_bound(component, "IComponent2")
         for component in (assembly.GetComponents(True) or ())
     )
-    component_reference_names(model, spec.KIT_COMPONENT_REFERENCES)
+    kit_names = component_reference_names(model, spec.KIT_COMPONENT_REFERENCES)
     groups: dict[str, list[Any]] = {family: [] for family in spec.QUANTITIES}
     for component in components:
         identity = component_identity(component)
@@ -464,6 +502,7 @@ def _create_jig_explode(adapter: Any, configuration_name: str) -> None:
     }
     if len(baseline) != sum(spec.QUANTITIES.values()):
         raise RuntimeError(f"{view_name}: duplicate component identities")
+    by_name = {str(component.Name2): component for component in components}
     expected = {name: [0.0, 0.0, 0.0] for name in baseline}
     axes = _global_axes(adapter, assembly, view_name)
 
@@ -480,12 +519,7 @@ def _create_jig_explode(adapter: Any, configuration_name: str) -> None:
         for step_index, (label, selectors, key, distance_mm) in enumerate(
             spec.EXPLODE_STEPS, 1
         ):
-            moved = []
-            for selector in selectors:
-                if selector in groups:
-                    moved.extend(groups[selector])
-                else:
-                    raise RuntimeError(f"{label}: unknown explode selector {selector!r}")
+            moved = explode_step_components(label, selectors, groups, by_name, kit_names)
             distance = distance_mm / 1000.0
             with _telemetry.span(
                 "assembly.jig_explode.step", label=label, moved=len(moved)
@@ -803,20 +837,23 @@ async def build(adapter) -> dict[str, str]:
     # The carriages on their rails; what rides a carriage, a pivot block or
     # the nut bracket locked to it; the carrier on the pins; its riders
     # locked to it.
-    await _mate_carriages(adapter)
+    await _mate_carriages(adapter, placed_names)
     def _rides_carrier(parents: tuple[tuple[str, int], ...]) -> bool:
         return any(parent == spec.CARRIER for parent, _n in parents)
 
     carried = [stem for stem, parents in spec.LOCKED_TO.items() if not _rides_carrier(parents)]
     riders = [stem for stem, parents in spec.LOCKED_TO.items() if _rides_carrier(parents)]
-    await _lock_families(adapter, carried)
+    await _lock_families(adapter, carried, placed_names)
     await _mate_carrier(adapter)
-    await _lock_families(adapter, riders)
+    await _lock_families(adapter, riders, placed_names)
     # The mates solved in place: every moving instance is still at its pose.
     for moving in spec.MOVING:
         for index, (origin, rows) in enumerate(spec.PLACEMENTS[moving]):
             assert_component_placed(
-                adapter, spec.instance_name(moving, index), list(origin), _rows(rows)
+                adapter,
+                placed_names[spec.instance_name(moving, index)],
+                list(origin),
+                _rows(rows),
             )
     _telemetry.info(
         f"jig at the {spec.PASS} pass, theta {spec.THETA:g}: pins at station "
@@ -826,11 +863,19 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # One free DOF, the sweep: every moving family reads under-constrained
-    # (a rider a mate silently fixed fails) and nothing else does.
+    # (a rider a mate silently fixed fails) and nothing else does. A moving
+    # kit member shares its file with a fixed one (Carriage with Rail, FeedNut
+    # with LeadScrew), so each of its own occurrences must read free too.
     assert_free_dof_necessity(
         adapter,
         1,
-        required_stems=spec.MOVING,
+        required_stems=spec.MOVING_STEMS,
+        required_instances=tuple(
+            placed_names[spec.instance_name(family, index)]
+            for family in spec.MOVING
+            if family in spec.KIT_IDENTITIES
+            for index in range(spec.QUANTITIES[family])
+        ),
         allowed_stems=allowed_free_stems(ASM_NAME),
     )
     write_dof_manifest(ASM_NAME)

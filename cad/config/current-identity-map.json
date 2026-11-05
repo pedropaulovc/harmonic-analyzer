@@ -20,17 +20,6 @@
   },
   "parts_and_assemblies": [
     {
-      "old_stem": "ch-rocker-arm-tl-oblique-nut-screw",
-      "old_number": "MHA-CH-006-TL-46",
-      "new_identities": [
-        {
-          "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-nut-screw",
-          "number": "MHA-CH-06-TL-VN-66"
-        }
-      ]
-    },
-    {
       "old_stem": "ch-rocker-arm-tl-oblique-pillow-block",
       "old_number": "MHA-CH-006-TL-36",
       "new_identities": [
@@ -73,8 +62,12 @@
       "new_identities": [
         {
           "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-leadscrew",
-          "number": "MHA-CH-06-TL-VN-54"
+          "stem": "ch-rocker-arm-tl-vn-oblique-leadscrew-kit",
+          "number": "MHA-CH-06-TL-VN-84",
+          "prior_stem": "ch-rocker-arm-tl-vn-oblique-leadscrew",
+          "prior_number": "MHA-CH-06-TL-VN-54",
+          "configuration": "LeadScrew",
+          "role": "LeadScrew"
         }
       ]
     },
@@ -185,8 +178,12 @@
       "new_identities": [
         {
           "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-carriage",
-          "number": "MHA-CH-06-TL-VN-51"
+          "stem": "ch-rocker-arm-tl-vn-oblique-rail-kit",
+          "number": "MHA-CH-06-TL-VN-83",
+          "prior_stem": "ch-rocker-arm-tl-vn-oblique-carriage",
+          "prior_number": "MHA-CH-06-TL-VN-51",
+          "configuration": "Carriage",
+          "role": "Carriage"
         }
       ]
     },
@@ -1997,8 +1994,12 @@
       "new_identities": [
         {
           "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-rail",
-          "number": "MHA-CH-06-TL-VN-50"
+          "stem": "ch-rocker-arm-tl-vn-oblique-rail-kit",
+          "number": "MHA-CH-06-TL-VN-83",
+          "prior_stem": "ch-rocker-arm-tl-vn-oblique-rail",
+          "prior_number": "MHA-CH-06-TL-VN-50",
+          "configuration": "Rail",
+          "role": "Rail"
         }
       ]
     },
@@ -2249,17 +2250,6 @@
       "kind": "assembly"
     },
     {
-      "old_stem": "ch-rocker-arm-tl-oblique-feed-nut",
-      "old_number": null,
-      "introduced": "2026-11-01",
-      "new_identities": [
-        {
-          "stem": "ch-rocker-arm-tl-oblique-feed-nut",
-          "number": "MHA-CH-06-TL-27"
-        }
-      ]
-    },
-    {
       "old_stem": "ch-rocker-arm-tl-vn-oblique-pivot-screw",
       "old_number": null,
       "introduced": "2026-10-23",
@@ -2320,14 +2310,18 @@
       ]
     },
     {
-      "old_stem": "ch-rocker-arm-tl-vn-oblique-nut-dowel",
+      "old_stem": "ch-rocker-arm-tl-vn-oblique-feed-nut",
       "old_number": null,
-      "introduced": "2026-11-03",
+      "introduced": "2026-11-04",
       "new_identities": [
         {
           "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-nut-dowel",
-          "number": "MHA-CH-06-TL-VN-81"
+          "stem": "ch-rocker-arm-tl-vn-oblique-leadscrew-kit",
+          "number": "MHA-CH-06-TL-VN-84",
+          "prior_stem": "ch-rocker-arm-tl-vn-oblique-feed-nut",
+          "prior_number": "MHA-CH-06-TL-VN-82",
+          "configuration": "FeedNut",
+          "role": "FeedNut"
         }
       ]
     }
@@ -2689,6 +2683,43 @@
       "status": "retired"
     },
     {
+      "old_stem": "ch-rocker-arm-tl-oblique-feed-nut",
+      "old_number": null,
+      "introduced": "2026-11-01",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-feed-nut",
+          "number": "MHA-CH-06-TL-27"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-vn-oblique-nut-dowel",
+      "old_number": null,
+      "introduced": "2026-11-03",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm-tl-oblique-jig",
+          "stem": "ch-rocker-arm-tl-vn-oblique-nut-dowel",
+          "number": "MHA-CH-06-TL-VN-81"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-nut-screw",
+      "old_number": "MHA-CH-006-TL-46",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm-tl-oblique-jig",
+          "stem": "ch-rocker-arm-tl-vn-oblique-nut-screw",
+          "number": "MHA-CH-06-TL-VN-66"
+        }
+      ],
+      "status": "retired"
+    },
+    {
       "old_stem": "vn-pen-rod-set-screw",
       "old_number": "MHA-VN-061",
       "new_identities": [
@@ -2820,6 +2851,32 @@
       "neutral_export_configuration": "HoldDownStud"
     }
   ],
+  "configured_kits": [
+    {
+      "parent": "ch-rocker-arm-tl-oblique-jig",
+      "stem": "ch-rocker-arm-tl-vn-oblique-rail-kit",
+      "number": "MHA-CH-06-TL-VN-83",
+      "supplier": "Amazon (sold by XIQI)",
+      "supplier_sku": "B0C4DJNL33",
+      "configurations": [
+        "Rail",
+        "Carriage"
+      ],
+      "neutral_export_configuration": "Rail"
+    },
+    {
+      "parent": "ch-rocker-arm-tl-oblique-jig",
+      "stem": "ch-rocker-arm-tl-vn-oblique-leadscrew-kit",
+      "number": "MHA-CH-06-TL-VN-84",
+      "supplier": "Amazon (sold by ReliaBot)",
+      "supplier_sku": "B085DDHJTW",
+      "configurations": [
+        "LeadScrew",
+        "FeedNut"
+      ],
+      "neutral_export_configuration": "LeadScrew"
+    }
+  ],
   "current_source_files": [
     {
       "current_path": "cad/scripts/sh_vn_music_wire_lever_geom.py",
@@ -2862,6 +2919,24 @@
       "source_path": "cad/scripts/ch_rocker_arm_tl_oblique_flange_nut_spec.py",
       "configuration": "FlangeNut",
       "role": "FlangeNut"
+    },
+    {
+      "current_path": "cad/scripts/ch_rocker_arm_tl_vn_oblique_rail_kit_rail_spec.py",
+      "source_path": "cad/scripts/ch_rocker_arm_tl_oblique_rail_spec.py",
+      "configuration": "Rail",
+      "role": "Rail"
+    },
+    {
+      "current_path": "cad/scripts/ch_rocker_arm_tl_vn_oblique_rail_kit_carriage_spec.py",
+      "source_path": "cad/scripts/ch_rocker_arm_tl_oblique_carriage_spec.py",
+      "configuration": "Carriage",
+      "role": "Carriage"
+    },
+    {
+      "current_path": "cad/scripts/ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec.py",
+      "source_path": "cad/scripts/ch_rocker_arm_tl_oblique_leadscrew_spec.py",
+      "configuration": "LeadScrew",
+      "role": "LeadScrew"
     }
   ]
 }

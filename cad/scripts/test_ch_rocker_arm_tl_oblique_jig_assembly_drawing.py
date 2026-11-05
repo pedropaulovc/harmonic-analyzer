@@ -9,9 +9,11 @@ shared finalizer must leave every physical sheet linked to the live source.
 
 from __future__ import annotations
 
+import functools
 import math
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 import _com
@@ -34,10 +36,16 @@ ROW_PITCH_M = 0.00615
 ISO = math.sqrt(2.0 / 3.0)  # an isometric view's foreshortening
 
 
+def _ink_height(text: str) -> float:
+    """The taller of the layout's flat line pitch and the farm-measured ink
+    (a first line's box plus a pitch a further line)."""
+    return max(_lines(text) * LINE_M, drawing.note_ink_height(text))
+
+
 def _note_box(text: str, xy: tuple[float, float]) -> tuple[float, float, float, float]:
     lines = text.split("\n")
     width = max(len(line) for line in lines) * CHAR_M
-    return xy[0], xy[1] - len(lines) * LINE_M, xy[0] + width, xy[1]
+    return xy[0], xy[1] - _ink_height(text), xy[0] + width, xy[1]
 
 
 def _view_box(center, width_mm, height_mm, scale, margin=0.0):
@@ -252,9 +260,23 @@ def test_clusters_partition_the_bom() -> None:
     assert spec.LOCKED_TO[spec.CARRIAGE_SCREW] == (
         ((spec.FEED_BLOCK, 0),) * 4 + ((spec.PIVOT_BLOCK, 0),) * 4
     )
-    assert feed.context == (spec.instance_name(spec.CARRIAGE, 0), *feed_screws)
+    # The feed nut's four flat heads are riser-screw instances (option B,
+    # 2026-11-04): shown over the nut on the feed sheet, ballooned with the
+    # riser's four on the carrier sheet.
+    assert feed.context == (
+        spec.instance_name(spec.CARRIAGE, 0), *feed_screws, *spec.NUT_SCREW_INSTANCES,
+    )
     assert spec.CARRIAGE_SCREW not in feed.visible
-    assert set(feed_screws) <= feed.visible
+    assert set(feed_screws) | set(spec.NUT_SCREW_INSTANCES) <= feed.visible
+    assert spec.FEED_NUT in feed.stems and spec.RISER_SCREW not in feed.stems
+    carrier_sheet = next(c for c in drawing.CLUSTERS if c.sheet == "CARRIER EXPLODED")
+    assert carrier_sheet.partial == ((spec.RISER_SCREW, spec.RISER_SCREW_INSTANCES),)
+    assert not set(spec.RISER_SCREW_INSTANCES) & set(spec.NUT_SCREW_INSTANCES)
+    assert len(spec.RISER_SCREW_INSTANCES) + len(spec.NUT_SCREW_INSTANCES) == (
+        spec.QUANTITIES[spec.RISER_SCREW]
+    )
+    assert set(spec.RISER_SCREW_INSTANCES) <= carrier_sheet.visible
+    assert not set(spec.NUT_SCREW_INSTANCES) & carrier_sheet.visible
     rails = next(c for c in drawing.CLUSTERS if c.sheet == "RAIL BARS EXPLODED")
     assert spec.CARRIAGE_SCREW in rails.stems
     assert rails.partial == ((spec.CARRIAGE_SCREW, pivot_screws),)
@@ -322,7 +344,7 @@ def test_sheet_text_wraps_within_its_layout_width() -> None:
         assert line in drawing.ALIGNMENT_NOTE.split("\n")
     # The general torque note opens sheet 7's sequence, its items unbroken.
     assert drawing.ASSEMBLY_STEPS.split("\n")[1].startswith("TORQUE WHERE NO STEP")
-    assert "(ITEMS 21, 22, 24, 25, 27 AND 28)" in drawing.ASSEMBLY_STEPS.replace("\n", " ")
+    assert "(ITEMS 21, 22, 24, 26 AND 27)" in drawing.ASSEMBLY_STEPS.replace("\n", " ")
 
 
 def test_a_blank_line_parts_each_top_level_step() -> None:
@@ -644,11 +666,9 @@ def _assert_steps_sheet_fits(layout) -> None:
     for index, a in enumerate(boxes):
         for b in boxes[index + 1 :]:
             assert not _overlap(a, b)
-    # The left column ends over its floor at the farm's measured line pitch.
-    steps_lines = _lines(layout.steps)
-    assert drawing.STEPS_XY[1] - steps_lines * drawing.NOTE_LINE_M >= (
-        drawing.STEPS_FLOOR
-    )
+    # The left column's ink ends over its floor at the layout pitch and at
+    # the farm-measured ink height.
+    assert drawing.STEPS_XY[1] - _ink_height(layout.steps) >= drawing.STEPS_FLOOR
 
 
 def _lines(text: str) -> int:
@@ -780,7 +800,8 @@ def test_every_bom_row_carries_one_balloon() -> None:
     walked = {
         stem: anchor
         for stem, anchor in drawing.BALLOON_ANCHORS.items()
-        if stem not in {spec.BASE_BAR, spec.RAIL} and stem not in spec.KIT_IDENTITIES
+        if stem not in {spec.BASE_BAR, spec.RAIL_SCREW, *drawing.BALLOON_APPROACH_DEG}
+        and stem not in spec.KIT_IDENTITIES
     }
     assert all(
         anchor.instance is None and anchor.point_mm is None
@@ -803,16 +824,621 @@ def test_every_bom_row_carries_one_balloon() -> None:
     assert nut.instance == spec.instance_name(spec.T_NUT, len(spec.T_NUT_PLACEMENTS) - 1)
     assert nut.instance != spec.instance_name(spec.T_NUT, 0)
     assert nut.point_mm == (0.0, spec.t_nut.FOOT_HEIGHT, spec.t_nut.FOOT_WIDTH / 2.0)
-    # Review jig-asm r1: balloon 19 lands on bar 2's far stud, beside it,
-    # not across bar 2 on bar 1's near stud.
-    stud = drawing.BALLOON_ANCHORS[spec.HOLD_DOWN_STUD]
-    last = len(spec.HOLD_DOWN_STUD_PLACEMENTS) - 1
-    assert stud.instance == spec.instance_name(spec.HOLD_DOWN_STUD, last)
-    assert spec.STUD_XY[last] == spec.trammel.rail_point(2, *spec.trammel.HOLD_DOWN_STUDS[-1])
-    assert stud.point_mm is None
+    # TL-00 review (farm 20261104T210601055Z): balloon 22 lands on rail 1's
+    # outboard-end screw, the last hole's, on its head's top rim (the
+    # screw's part frame: head up +Y, bearing face at 0), not across the
+    # T-nut, bar and rail on the spindle-end screw.
+    screw = drawing.BALLOON_ANCHORS[spec.RAIL_SCREW]
+    last_hole = len(spec.guide_rail.HOLE_X) - 1
+    assert screw.instance == spec.instance_name(spec.RAIL_SCREW, last_hole)
+    origin, _rows = spec.RAIL_SCREW_PLACEMENTS[last_hole]
+    assert origin == pytest.approx(spec.compose(
+        spec.RAIL_PLACEMENTS[0],
+        (spec.guide_rail.HOLE_X[-1], 0.0, spec.trammel.RAIL_SCREW_SEAT_ABOVE_BASE),
+        spec.UPRIGHT_ROWS,
+    )[0])
+    dims = spec.rail_screw.DIMS
+    x, y, z = screw.point_mm
+    assert (x, y, z) == (dims.head_dia / 2.0, dims.head_h, 0.0)
     assert drawing.BALLOON_RING_REACH == (
         drawing.BALLOON_MARGIN + drawing.BALLOON_RADIUS
     )
+
+
+FEED_SHEET = "LEADSCREW FEED EXPLODED"
+
+
+def _dot(a, b) -> float:
+    return sum(x * y for x, y in zip(a, b))
+
+
+def test_feed_sheet_balloons_land_on_clear_edges_of_their_own_parts() -> None:
+    """TL-00 review (farm 20261105T054045952Z, sheet 5): the walks put
+    balloon 4 on the feed block's corner over the carriage and leadscrew, 15
+    in the near KP08's bore and 17 on the KP08 foot at its bracket. Each is
+    frozen on an edge of its own part away from every other one."""
+    away = spec.rail_direction(spec.leadscrew.RAIL)  # from the spindle
+    block = spec.feed_block
+    anchor = drawing.BALLOON_ANCHORS[spec.FEED_BLOCK]
+    assert anchor.instance is None and len(spec.PLACEMENTS[spec.FEED_BLOCK]) == 1
+    x, y, z = anchor.point_mm
+    # The spindle-end face's edge with the lug-side face, bare because the
+    # lug starts inboard of it, between the block's bottom and top.
+    assert (x, y) == (block.BLOCK_X0, -block.BLOCK_WIDTH / 2.0)
+    assert block.BLOCK_X0 < block.LUG_X0 and block.LUG_Y1 == y
+    assert 0.0 < z < block.BLOCK_HEIGHT
+    assert _dot(spec.PLACEMENTS[spec.FEED_BLOCK][0][1][0], away) > 0.0
+
+    screw = spec.leadscrew_stock
+    anchor = drawing.BALLOON_ANCHORS[spec.LEADSCREW]
+    assert anchor.instance == spec.instance_name(spec.LEADSCREW, 0)
+    x, y, z = anchor.point_mm
+    # The far end chamfer's outer circle, off the handwheel flat (part +X,
+    # ending short of the circle) and on the end that stands past the far
+    # KP08's outer face.
+    assert math.hypot(x, z) == pytest.approx(screw.MAJOR_DIA / 2.0)
+    assert y == screw.LENGTH - screw.END_CHAMFER
+    assert x <= 0.0
+    assert screw.FLAT_STATIONS["Handwheel"] + screw.FLAT_LENGTH / 2.0 < y
+    assert (
+        spec.leadscrew.SCREW_NEAR_END_S + screw.LENGTH
+        > max(spec.leadscrew.KP08_S) + spec.pillow_block.WIDTH / 2.0
+    )
+
+    kp08 = spec.pillow_block
+    anchor = drawing.BALLOON_ANCHORS[spec.PILLOW_BLOCK]
+    near = min(
+        range(len(spec.PILLOW_BLOCK_PLACEMENTS)),
+        key=lambda index: _dot(spec.PILLOW_BLOCK_PLACEMENTS[index][0], away),
+    )
+    assert anchor.instance == spec.instance_name(spec.PILLOW_BLOCK, near)
+    x, y, z = anchor.point_mm
+    # The boss rim on the spindle-side face (part +Y runs away from the
+    # spindle), on its upper half, well off the bore.
+    assert math.hypot(x, z - kp08.AXIS_HEIGHT) == pytest.approx(kp08.BOSS_RADIUS)
+    assert z > kp08.AXIS_HEIGHT and x > 0.0
+    assert y == -kp08.WIDTH / 2.0
+    assert _dot(spec.PILLOW_BLOCK_PLACEMENTS[near][1][1], away) > 0.0
+
+
+def test_re_routed_balloons_on_sheets_3_to_6_land_on_their_own_edges() -> None:
+    """The same run's replay of every walked leader on sheets 3-6: 25 ran
+    over the near KP08 to the screw end in its foot, 11 crossed a bracket
+    screw, 3 landed on the pivot block's corner over bar 2, 19 crossed bar 2,
+    7 crossed the feed block's top, 8 landed on the riser's corner on the
+    carrier and 10 crossed the riser. Each is frozen on an edge of its own
+    part."""
+    away = spec.rail_direction(spec.leadscrew.RAIL)  # from the spindle
+    near = drawing.BALLOON_ANCHORS[spec.PILLOW_BLOCK].instance
+    kp08_origin, kp08_rows = spec.PLACEMENTS[spec.PILLOW_BLOCK][
+        int(near.rsplit("-", 1)[1]) - 1
+    ]
+
+    def nearest(stem, point):
+        return min(
+            range(len(spec.PLACEMENTS[stem])),
+            key=lambda index: math.dist(spec.PLACEMENTS[stem][index][0][:2], point[:2]),
+        )
+
+    # 25: the near KP08's outboard screw (KP08 part +X), on its button head's
+    # flat-top rim.
+    dims = spec.kp08_screw.DIMS
+    anchor = drawing.BALLOON_ANCHORS[spec.PILLOW_BLOCK_SCREW]
+    assert anchor.instance == spec.instance_name(spec.PILLOW_BLOCK_SCREW, 1)
+    origin = spec.PLACEMENTS[spec.PILLOW_BLOCK_SCREW][1][0]
+    assert spec.instance_name(spec.PILLOW_BLOCK, nearest(spec.PILLOW_BLOCK, origin)) == near
+    assert _dot([o - k for o, k in zip(origin, kp08_origin)], kp08_rows[0]) > 0.0
+    x, y, z = anchor.point_mm
+    assert math.hypot(x, z) == pytest.approx(dims.flat_top_dia / 2.0)
+    assert y == dims.head_h
+    # 11: the bracket under the near KP08, on its outboard end's edge with
+    # its spindle-side face, mid-height.
+    lead = spec.leadscrew
+    anchor = drawing.BALLOON_ANCHORS[spec.END_BRACKET]
+    assert anchor.instance == spec.instance_name(
+        spec.END_BRACKET, nearest(spec.END_BRACKET, kp08_origin)
+    )
+    assert anchor.point_mm == (
+        lead.BRACKET_LENGTH, -lead.BRACKET_WIDTH / 2.0, lead.BRACKET_THICK / 2.0
+    )
+    rows = spec.PLACEMENTS[spec.END_BRACKET][0][1]
+    assert _dot(rows[1], away) > 0.0  # part -Y faces the spindle
+    # 3: the pivot block's outboard vertical edge, mid-height.
+    block = spec.pivot_block
+    assert drawing.BALLOON_ANCHORS[spec.PIVOT_BLOCK] == drawing.BalloonAnchor(
+        point_mm=(block.BLOCK_X1, block.BLOCK_WIDTH / 2.0, block.BLOCK_HEIGHT / 2.0)
+    )
+    # 19: bar 2's near stud (STUD_XY: bar 1 near and far, then bar 2), on
+    # its upper cut-end chamfer's boundary with the barrel.
+    stud = spec.hold_down_stud
+    anchor = drawing.BALLOON_ANCHORS[spec.HOLD_DOWN_STUD]
+    assert anchor.instance == spec.instance_name(spec.HOLD_DOWN_STUD, 2)
+    assert spec.STUD_XY[2] == spec.trammel.rail_point(2, *spec.trammel.HOLD_DOWN_STUDS[0])
+    x, y, z = anchor.point_mm
+    assert math.hypot(x, z) == pytest.approx(stud.RADIUS)
+    assert y == stud.LENGTH - stud.CUT_END_CHAMFER_MAX
+    # On the barrel's near side: farm 20261105T070642635Z froze it at 210
+    # degrees, where the stud's own barrel covers it in the isometric.
+    placement = spec.PLACEMENTS[spec.HOLD_DOWN_STUD][2]
+    rim = spec.frame_point(placement, (x, y, z))
+    axis = spec.frame_point(placement, (0.0, y, 0.0))
+    toward = spec.VIEW_AXES[spec.ISOMETRIC_VIEW][2]
+    assert _dot([r - a for r, a in zip(rim, axis)], toward) > 0.5 * stud.RADIUS
+    # 7: the top shim of the pivot block's stack, on its outer top rim.
+    shim = spec.pivot_shim
+    anchor = drawing.BALLOON_ANCHORS[spec.PIVOT_SHIM]
+    stack = [
+        index
+        for index, parent in enumerate(spec.LOCKED_TO[spec.PIVOT_SHIM])
+        if parent == (spec.PIVOT_BLOCK, 0)
+    ]
+    top = max(stack, key=lambda index: spec.PLACEMENTS[spec.PIVOT_SHIM][index][0][2])
+    assert anchor.instance == spec.instance_name(spec.PIVOT_SHIM, top)
+    x, y, z = anchor.point_mm
+    assert math.hypot(x, y) == pytest.approx(shim.OD / 2.0)
+    assert z == shim.THICKNESS
+    # 8: the riser's back top long edge, along it.
+    riser = spec.riser
+    x, y, z = drawing.BALLOON_ANCHORS[spec.RISER].point_mm
+    assert (y, z) == (riser.BLANK_WIDTH, riser.THICKNESS)
+    assert 0.0 < x < riser.BLANK_LENGTH
+    # 10: the lever's top front long edge, short of the grip end's corners.
+    lever = spec.feed_lever
+    x, y, z = drawing.BALLOON_ANCHORS[spec.FEED_LEVER].point_mm
+    assert (y, z) == (lever.LEVER_THICK, -lever.LEVER_WIDTH)
+    assert 0.0 < x < lever.LEVER_LENGTH - lever.CORNER_R
+
+
+def _box(x0, x1, y0, y1, z0, z1):
+    return [(x, y, z) for x in (x0, x1) for y in (y0, y1) for z in (z0, z1)]
+
+
+def _cylinder(axis, start, length, radius, centre=(0.0, 0.0, 0.0), sides=24):
+    """Part points round a cylinder along part axis ``axis`` (0, 1 or 2)."""
+    across = [k for k in range(3) if k != axis]
+    points = []
+    for t in (start, start + length):
+        for k in range(sides):
+            angle = 2.0 * math.pi * k / sides
+            point = list(centre)
+            point[axis] += t
+            point[across[0]] += radius * math.cos(angle)
+            point[across[1]] += radius * math.sin(angle)
+            points.append(tuple(point))
+    return points
+
+
+def _frustum(y0, r0, y1, r1, sides=24):
+    """Part points round a frustum along part +Y."""
+    return [
+        (r * math.cos(2.0 * math.pi * k / sides), y, r * math.sin(2.0 * math.pi * k / sides))
+        for y, r in ((y0, r0), (y1, r1))
+        for k in range(sides)
+    ]
+
+
+def _screw(dims):
+    """A screw's head and shank (part +Y up, bearing face at 0): a flat
+    head as its countersunk cone below 0."""
+    shank = _cylinder(1, -dims.length, dims.length, dims.major_dia / 2.0)
+    if hasattr(dims, "head_h"):
+        return [_cylinder(1, 0.0, dims.head_h, dims.head_dia / 2.0), shank]
+    sink = (dims.head_dia - dims.major_dia) / 2.0 / math.tan(math.radians(dims.head_angle_deg / 2.0))
+    return [_frustum(-sink, dims.major_dia / 2.0, 0.0, dims.head_dia / 2.0), shank]
+
+
+def _part_solids():
+    """Each family's part-frame solids: the spec's conservative boxes, finer
+    where a box would cover what the sheets show: the feed block and its lug,
+    the KP08's foot, pedestal and boss, the turned leadscrew, nut and
+    handwheel (at its wheel's diameter over its whole length), the carriage
+    body and every screw's head and shank."""
+    block, kp08, lead = spec.feed_block, spec.pillow_block, spec.leadscrew
+    screw, nut, carriage = spec.leadscrew_stock, spec.feed_nut, spec.carriage
+    solids = {
+        stem: [_box(*box[0], *box[1], *box[2])]
+        for stem, box in spec._component_local_boxes().items()
+    }
+    solids.update({
+        spec.FEED_BLOCK: [
+            _box(block.BLOCK_X0, block.BLOCK_X1, -block.BLOCK_WIDTH / 2.0,
+                 block.BLOCK_WIDTH / 2.0, 0.0, block.BLOCK_HEIGHT),
+            _box(block.LUG_X0, block.LUG_X1, block.LUG_Y0, block.LUG_Y1, 0.0,
+                 block.BLOCK_HEIGHT),
+        ],
+        spec.LEADSCREW: [_cylinder(1, 0.0, screw.LENGTH, screw.MAJOR_DIA / 2.0)],
+        spec.FEED_NUT: [
+            _cylinder(1, 0.0, nut.FLANGE_THICK, nut.FLANGE_DIA / 2.0),
+            _cylinder(1, 0.0, nut.BODY_LENGTH, nut.BODY_DIA / 2.0),
+        ],
+        spec.PILLOW_BLOCK: [
+            _box(-kp08.LENGTH / 2.0, kp08.LENGTH / 2.0, -kp08.WIDTH / 2.0,
+                 kp08.WIDTH / 2.0, 0.0, kp08.FOOT_THICK),
+            _box(-kp08.BOSS_RADIUS, kp08.BOSS_RADIUS, -kp08.WIDTH / 2.0,
+                 kp08.WIDTH / 2.0, 0.0, kp08.AXIS_HEIGHT),
+            _cylinder(1, -kp08.WIDTH / 2.0, kp08.WIDTH, kp08.BOSS_RADIUS,
+                      (0.0, 0.0, kp08.AXIS_HEIGHT)),
+        ],
+        spec.HANDWHEEL: [
+            _cylinder(1, 0.0, lead.HANDWHEEL_LENGTH, lead.HANDWHEEL_WHEEL_DIA / 2.0)
+        ],
+        spec.CARRIAGE: [
+            _box(-carriage.LENGTH / 2.0, carriage.LENGTH / 2.0, -carriage.WIDTH / 2.0,
+                 carriage.WIDTH / 2.0, carriage.UNDERSIDE_Z, carriage.MOUNTING_FACE_Z),
+        ],
+    })
+    for stem, fastener in (
+        (spec.RAIL_SCREW, spec.rail_screw), (spec.BRACKET_SCREW, spec.bracket_screw),
+        (spec.CARRIAGE_SCREW, spec.carriage_screw),
+        (spec.PILLOW_BLOCK_SCREW, spec.kp08_screw), (spec.RISER_SCREW, spec.riser_screw),
+        (spec.CLAMP_SCREW, spec.clamp_screw), (spec.LEVER_SCREW, spec.lever_screw),
+    ):
+        solids[stem] = _screw(fastener.DIMS)
+    return solids
+
+
+def _sheet_occurrences(cluster):
+    """A cluster sheet's occurrences, instance -> (family, index): its
+    families' shown instances, and its context."""
+    shown = dict(cluster.partial)
+    return {
+        name: (stem, index)
+        for stem in spec.BOM_ORDER
+        for index in range(len(spec.PLACEMENTS[stem]))
+        for name in (spec.instance_name(stem, index),)
+        if (stem in cluster.stems and name in shown.get(stem, (name,)))
+        or name in cluster.context
+    }
+
+
+def _exploded(name, stem, index, point):
+    """Part-frame ``point`` (mm) of occurrence ``name``, exploded, machine mm."""
+    machine = spec.frame_point(spec.PLACEMENTS[stem][index], point)
+    return [machine[k] + spec.explode_shift(name, axis) for k, axis in enumerate("xyz")]
+
+
+@functools.cache
+def _sheet_bodies(sheet):
+    """Every convex solid the sheet shows, exploded: (instance, face
+    normals, offsets, vertices), inside where ``normals @ p + offsets <= 0``."""
+    from scipy.spatial import ConvexHull
+
+    cluster = next(c for c in drawing.CLUSTERS if c.sheet == sheet)
+    solids = _part_solids()
+    bodies = []
+    for name, (stem, index) in _sheet_occurrences(cluster).items():
+        for solid in solids[stem]:
+            hull = ConvexHull([_exploded(name, stem, index, p) for p in solid])
+            bodies.append(
+                (name, hull.equations[:, :3], hull.equations[:, 3], hull.points[hull.vertices])
+            )
+    return tuple(bodies)
+
+
+def _iso_axes():
+    return tuple(np.array(axis, dtype=float) for axis in spec.VIEW_AXES[spec.ISOMETRIC_VIEW])
+
+
+def _frontmost(sheet, ratio, points):
+    """The instance drawn frontmost at each sheet point (mm about the model
+    origin at ``ratio``), or None: each point's view ray against every body,
+    the hit nearest the viewer winning, as ViewRayCaster ranks covered_by."""
+    right, up, toward = _iso_axes()
+    points = np.asarray(points, dtype=float).reshape(-1, 2)
+    base = np.outer(points[:, 0] / ratio, right) + np.outer(points[:, 1] / ratio, up)
+    front = np.full(len(points), -np.inf)
+    drawn = [None] * len(points)
+    for name, normals, offsets, _vertices in _sheet_bodies(sheet):
+        rate = normals @ toward
+        room = -(offsets[None, :] + base @ normals.T)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            bound = room / rate[None, :]
+        upper = np.where(rate[None, :] > 1e-12, bound, np.inf).min(axis=1)
+        lower = np.where(rate[None, :] < -1e-12, bound, -np.inf).max(axis=1)
+        level = np.abs(rate) <= 1e-12
+        hit = (lower <= upper) & (room[:, level] >= 0.0).all(axis=1)
+        for k in np.flatnonzero(hit & (upper > front)):
+            front[k], drawn[k] = upper[k], name
+    return drawn
+
+
+def _replay_ratio(cluster):
+    """The smaller of the placed scale and the offline ring fit's, so the
+    replayed clearances are the smaller."""
+    fitted = drawing.cluster_ring_scale(_cluster_outline(cluster), cluster.scale, label=cluster.sheet)
+    return min(cluster.scale[0] / cluster.scale[1], fitted[0] / fitted[1])
+
+
+def _approach_replay(stem):
+    """Replay the declared balloon on its sheet: (the instance drawn at its
+    landing, the other instances drawn frontmost along its approach ray until
+    the ray is past every body, those drawn within LANDING_CLEARANCE_M of the
+    landing)."""
+    cluster = next(c for c in drawing.CLUSTERS if stem in c.stems)
+    anchor = drawing.BALLOON_ANCHORS[stem]
+    own = anchor.instance or spec.instance_name(stem, 0)
+    ratio = _replay_ratio(cluster)
+    right, up, _toward = _iso_axes()
+    occurrence = _sheet_occurrences(cluster)[own]
+    moved = np.array(_exploded(own, *occurrence, anchor.point_mm))
+    landing = np.array([moved @ right, moved @ up]) * ratio
+    vertices = np.vstack([body[3] for body in _sheet_bodies(cluster.sheet)])
+    reach = np.hypot(vertices @ right * ratio - landing[0], vertices @ up * ratio - landing[1]).max()
+    angle = math.radians(drawing.BALLOON_APPROACH_DEG[stem])
+    steps = np.arange(0.05, reach, 0.1)
+    ray = landing + np.outer(steps, (math.cos(angle), math.sin(angle)))
+    turns = np.linspace(0.0, 2.0 * math.pi, 48, endpoint=False)
+    radii = np.arange(0.1, drawing.LANDING_CLEARANCE_M * 1000.0 + 1e-9, 0.1)
+    disk = landing + np.vstack(
+        [np.column_stack((r * np.cos(turns), r * np.sin(turns))) for r in radii]
+    )
+
+    def others(points):
+        return set(_frontmost(cluster.sheet, ratio, points)) - {own, None}
+
+    return _frontmost(cluster.sheet, ratio, [landing])[0], others(ray), others(disk)
+
+
+def test_declared_approaches_are_the_re_routed_balloons() -> None:
+    assert set(drawing.BALLOON_APPROACH_DEG) == {
+        spec.PIVOT_BLOCK, spec.HOLD_DOWN_STUD, spec.PIVOT_SHIM,
+        spec.FEED_BLOCK, spec.LEADSCREW, spec.PILLOW_BLOCK,
+        spec.PILLOW_BLOCK_SCREW, spec.END_BRACKET,
+        spec.RISER, spec.FEED_LEVER,
+    }
+    for stem in drawing.BALLOON_APPROACH_DEG:
+        assert sum(stem in cluster.stems for cluster in drawing.CLUSTERS) == 1
+        assert drawing.BALLOON_ANCHORS[stem].point_mm is not None
+
+
+@pytest.mark.parametrize("stem", sorted(drawing.BALLOON_APPROACH_DEG))
+def test_declared_approaches_clear_every_other_occurrence(stem) -> None:
+    """Ray-cast on the spec's exploded poses and part envelopes through the
+    isometric: the landing is its own part's ink (or its silhouette), the
+    declared leader crosses no other instance on its sheet, and none is drawn
+    within LANDING_CLEARANCE_M of the landing (the nearest at the farm's
+    scales: 4 riser screw 5.2 mm, 15 KP08 screw 4.2, 17 bracket 2.5, 11 KP08
+    2.7, 25 none within 6; 3 none, 19 bar 2 2.2; 7 the next shim 2.9; 8 riser
+    screw 5.3, 10 none)."""
+    anchor = drawing.BALLOON_ANCHORS[stem]
+    drawn, crossed, beside = _approach_replay(stem)
+    assert drawn in {anchor.instance or spec.instance_name(stem, 0), None}
+    assert not crossed
+    assert not beside
+
+
+@pytest.mark.parametrize(
+    ("stem", "degrees", "crossed"),
+    (
+        # Farm 20261105T054045952Z: balloon 4 hung under the block, its leader
+        # up through the carriage and across the leadscrew.
+        (spec.FEED_BLOCK, -115.0, {spec.instance_name(spec.CARRIAGE, 0), spec.instance_name(spec.LEADSCREW, 0)}),
+        # The ring's own slot for the far end, beside balloon 18's.
+        (spec.LEADSCREW, 165.0, {spec.instance_name(spec.HANDWHEEL, 0)}),
+    ),
+)
+def test_the_replay_refuses_a_route_across_another_part(
+    monkeypatch, stem, degrees, crossed,
+) -> None:
+    monkeypatch.setitem(drawing.BALLOON_APPROACH_DEG, stem, degrees)
+    assert _approach_replay(stem)[1] == crossed
+
+
+def test_the_replay_refuses_a_landing_beside_another_part(monkeypatch) -> None:
+    # Farm 20261105T054045952Z, sheet 3: balloon 3 on the pivot block's
+    # bottom corner, drawn against bar 2 behind it and the carriage under it.
+    block = spec.pivot_block
+    monkeypatch.setitem(
+        drawing.BALLOON_ANCHORS,
+        spec.PIVOT_BLOCK,
+        drawing.BalloonAnchor(point_mm=(block.BLOCK_X1, -block.BLOCK_WIDTH / 2.0, 0.0)),
+    )
+    assert _approach_replay(spec.PIVOT_BLOCK)[2] == {
+        spec.instance_name(spec.BASE_BAR, 1), spec.instance_name(spec.CARRIAGE, 1),
+    }
+
+
+def _ring_outline():
+    return (0.10, 0.10, 0.30, 0.20)
+
+
+def test_an_approach_meets_the_ring_on_its_ray() -> None:
+    outline, margin = _ring_outline(), drawing.BALLOON_MARGIN
+    attach = (0.25, 0.12)
+    for degrees in (0.0, 10.0, 225.0, 270.0):
+        x, y = drawing.approach_ring_centre(outline, attach, degrees)
+        rx, ry = 0.1 + margin, 0.05 + margin
+        assert ((x - 0.2) / rx) ** 2 + ((y - 0.15) / ry) ** 2 == pytest.approx(1.0)
+        assert math.degrees(math.atan2(y - attach[1], x - attach[0])) % 360.0 == pytest.approx(degrees)
+    with pytest.raises(ValueError, match="not inside"):
+        drawing.approach_ring_centre(outline, (0.40, 0.15), 0.0)
+
+
+def test_declared_balloons_take_their_approach_and_keep_it() -> None:
+    outline = _ring_outline()
+    names = ["a", "b", "c"]
+    attachments = [(0.25, 0.15), (0.15, 0.12), (0.20, 0.12)]
+    centres = [(0.33, 0.15), (0.07, 0.17), (0.20, 0.05)]
+    placed, slots = drawing.approached_ring_slots(
+        centres, attachments, {0: 45.0}, outline=outline, radius=0.005, names=names,
+    )
+    assert slots == [0, 1, 2]
+    assert placed[0] == drawing.approach_ring_centre(outline, attachments[0], 45.0)
+    assert placed[1:] == centres[1:]
+    # Up and right from a's landing runs onto c's circle...
+    centres[2] = drawing.approach_ring_centre(outline, attachments[0], 50.0)
+    with pytest.raises(RuntimeError, match="a's approach puts it"):
+        drawing.approached_ring_slots(
+            centres, attachments, {0: 45.0}, outline=outline, radius=0.005, names=names,
+        )
+    # ...and leftward from a's landing crosses b's leader.
+    centres[2] = (0.20, 0.05)
+    with pytest.raises(RuntimeError, match=r"approaches of \['a'\] cross"):
+        drawing.approached_ring_slots(
+            centres, attachments, {0: 180.0}, outline=outline, radius=0.005, names=names,
+        )
+
+
+def test_leader_probes_cover_the_route_and_ring_its_landing() -> None:
+    leader = [(0.0, 0.0), (0.01, 0.0), (0.01, 0.003)]
+    points = drawing.leader_probe_points(leader)
+    assert points[0] == leader[0] and points[-1] == pytest.approx(leader[-1])
+    assert max(math.dist(a, b) for a, b in zip(points, points[1:])) <= drawing.LEADER_PROBE_STEP_M + 1e-12
+    ring = drawing.landing_probe_points(leader[-1])
+    assert len(ring) == drawing.LANDING_PROBES
+    assert all(math.dist(p, leader[-1]) == pytest.approx(drawing.LANDING_CLEARANCE_M) for p in ring)
+    assert max(math.dist(a, b) for a, b in zip(ring, ring[1:])) < 0.95e-3
+
+
+def test_leader_clearance_names_crossings_and_junctions() -> None:
+    route, ring = [(0.0, 0.0), (0.001, 0.0)], [(0.002, 0.0), (0.003, 0.0)]
+    assert not drawing.leader_clearance_failures(
+        "4 balloon", "Block-1", route, [None, "block-1"], ring, ["BLOCK-1", None]
+    )
+    failures = drawing.leader_clearance_failures(
+        "4 balloon", "block-1", route, ["carriage-1", "block-1"], ring, [None, "screw-2"]
+    )
+    assert failures == [
+        "4 balloon crosses carriage-1 at (0.0, 0.0) mm",
+        "4 balloon lands within 1.0 mm of screw-2 at (3.0, 0.0) mm",
+    ]
+    with pytest.raises(ValueError):
+        drawing.leader_clearance_failures("4", "block-1", route, [None], ring, [None, None])
+
+
+def test_a_landing_beside_its_own_items_stacked_occurrences_clears() -> None:
+    # Farm 20261105T163942818Z, balloon 7: the top pivot shim of a stack of
+    # five lands within 1 mm of the shims under it. Those are the balloon's
+    # own item; another part there, or any crossing, still fails.
+    shims = drawing._same_item_occurrences(spec.PIVOT_SHIM)
+    assert len(shims) == spec.QUANTITIES[spec.PIVOT_SHIM]
+    own, below = shims[-1], shims[5]
+    route, ring = [(0.0, 0.0), (0.001, 0.0)], [(0.002, 0.0), (0.003, 0.0)]
+    assert not drawing.leader_clearance_failures(
+        "7 balloon", own, route, [own, None], ring, [below, shims[7]], same_item=shims
+    )
+    assert drawing.leader_clearance_failures(
+        "7 balloon", own, route, [below, None], ring, [None, None], same_item=shims
+    ) == [f"7 balloon crosses {below} at (0.0, 0.0) mm"]
+    block = spec.instance_name(spec.PIVOT_BLOCK, 0)
+    assert drawing.leader_clearance_failures(
+        "7 balloon", own, route, [None, None], ring, [below, block], same_item=shims
+    ) == [f"7 balloon lands within 1.0 mm of {block} at (3.0, 0.0) mm"]
+
+
+@pytest.mark.parametrize("scale_in_rows", (False, True))
+def test_sheet_points_invert_the_view_transform(scale_in_rows) -> None:
+    from _drawing_ray_pick import _to_model
+
+    right, up, toward = spec.VIEW_AXES[spec.ISOMETRIC_VIEW]
+    rows = [c for axis in range(3) for c in (right[axis], up[axis], toward[axis])]
+    scale = 1.0 / 3.0
+    if scale_in_rows:
+        rows, scale = [c * 1.0 / 3.0 for c in rows], 1.0
+    values = (*rows, 0.2, 0.15, 0.01, scale)
+    model = (0.1, -0.2, 0.05)
+    sheet = _to_model(values, model)
+    point = drawing.sheet_point_in_model(values, toward, sheet[:2], depth=2.0)
+    drawn = _to_model(values, point)
+    assert drawn[:2] == pytest.approx(sheet[:2])
+    assert drawn[2] == pytest.approx(0.01 - 2.0 / 3.0)
+    assert _dot([p - m for p, m in zip(point, model)], toward) < -1.5
+
+
+class _ClearanceCaster:
+    """Draws the probes' sheet points through ``outlines`` (instance -> (box,
+    depth toward the viewer)), the frontmost first, as ViewRayCaster lists
+    what covers a point behind every body."""
+
+    outlines: dict = {}
+
+    def __init__(self, adapter, view, leaves, pose, *, label):
+        self.normal = (0.0, 0.0, 1.0)
+
+    def probe(self, candidates, *, label):
+        picks = []
+        for _own, (x, y, _z) in candidates:
+            hits = sorted(
+                (-depth, name)
+                for name, ((x0, y0, x1, y1), depth) in self.outlines.items()
+                if x0 <= x <= x1 and y0 <= y <= y1
+            )
+            picks.append(SimpleNamespace(covered_by=tuple(name for _d, name in hits)))
+        return picks
+
+
+@pytest.mark.parametrize(
+    ("outlines", "message"),
+    (
+        # The block, the carriage behind it under the leader: drawn over.
+        ({"block-1": ((0.0, 0.0, 0.010, 0.010), 2.0), "carriage-1": ((0.002, 0.003, 0.009, 0.007), 1.0)}, None),
+        # The carriage in front across the route.
+        ({"block-1": ((0.0, 0.0, 0.010, 0.010), 1.0), "carriage-1": ((0.020, 0.003, 0.025, 0.007), 1.0)}, "crosses carriage-1"),
+        # A screw in front of the block 0.5 mm under the landing.
+        ({"block-1": ((0.0, 0.0, 0.010, 0.010), 1.0), "screw-2": ((0.003, 0.0035, 0.005, 0.0045), 3.0)}, "lands within 1.0 mm of screw-2"),
+    ),
+)
+def test_declared_leaders_are_probed_from_balloon_to_landing(
+    monkeypatch, outlines, message,
+) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "_view_component_leaves", lambda *a, **kw: ())
+    monkeypatch.setattr(drawing, "_view_explode_offsets", lambda *a, **kw: {})
+    monkeypatch.setattr(_ClearanceCaster, "outlines", outlines)
+    monkeypatch.setattr(drawing, "ViewRayCaster", _ClearanceCaster)
+    identity = (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+    monkeypatch.setattr(
+        drawing, "_com_invoke",
+        lambda target, _interface, member: identity if member == "ArrayData" else "transform",
+    )
+    # Leader from its balloon at (40, 5) mm over the block to (4, 5).
+    annotation = SimpleNamespace(GetLeaderPointsAtIndex=lambda _i: (0.040, 0.005, 0.0, 0.004, 0.005, 0.0))
+    note = SimpleNamespace(GetAnnotation=lambda: annotation)
+    landing = drawing.BalloonLanding(spec.FEED_BLOCK, "block-1", note, (0.004, 0.005), "4")
+    if message is None:
+        drawing._assert_declared_leaders_clear(object(), object(), [landing], label="feed")
+    else:
+        with pytest.raises(RuntimeError, match=message):
+            drawing._assert_declared_leaders_clear(object(), object(), [landing], label="feed")
+
+
+def test_feed_balloons_prove_their_declared_leaders_with_the_explode_active(
+    monkeypatch,
+) -> None:
+    from contextlib import contextmanager
+
+    cluster = next(c for c in drawing.CLUSTERS if c.sheet == FEED_SHEET)
+    events = []
+
+    @contextmanager
+    def active(view, *, label):
+        events.append("activate")
+        yield
+        events.append("restore")
+
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda *a: None)
+    monkeypatch.setattr(drawing, "_link_view_to_bom", lambda *a, **kw: None)
+    monkeypatch.setattr(drawing, "_source_configuration_active", active)
+    monkeypatch.setattr(drawing, "_ring_balloons", lambda *a, **kw: events.append("ring"))
+    monkeypatch.setattr(
+        drawing, "_relax_cluster_slide",
+        lambda a, v, landings, **kw: events.append("relax") or landings,
+    )
+    monkeypatch.setattr(
+        drawing, "add_component_bom_balloons",
+        lambda a, v, *, items, **kw: [SimpleNamespace(stem=stem) for stem, _item in items],
+    )
+    monkeypatch.setattr(
+        drawing, "_assert_declared_leaders_clear",
+        lambda a, v, declared, **kw: events.append(("clear", {d.stem for d in declared})),
+    )
+    drawing._balloon_cluster(object(), object(), cluster, tuple(spec.ITEM_NUMBERS.items()), "BOM")
+    assert events == [
+        "activate", "restore", "ring", "relax",
+        "activate",
+        ("clear", {stem for stem in drawing.BALLOON_APPROACH_DEG if stem in cluster.stems}),
+        "restore",
+    ]
 
 
 def test_crossed_leaders_swap_ring_slots() -> None:
@@ -853,8 +1479,17 @@ def test_bom_identity_is_the_registry() -> None:
         assert drawing.BOM_PART_NUMBERS[stem] == _config.parts(physical)["number"]
     assert set(drawing.BOM_PART_NUMBERS) == set(spec.BOM_ORDER)
     assert drawing.BOM_COMPONENT_IDENTITIES == spec.COMPONENT_IDENTITIES
-    assert {drawing.BOM_PART_NUMBERS[family] for family in spec.KIT_IDENTITIES} == {
-        "MHA-SH-VN-57"
+    # Every member of a kit prints its kit's one Number.
+    assert {
+        family: drawing.BOM_PART_NUMBERS[family] for family in spec.KIT_IDENTITIES
+    } == {
+        spec.RAIL: "MHA-CH-06-TL-VN-83",
+        spec.CARRIAGE: "MHA-CH-06-TL-VN-83",
+        spec.LEADSCREW: "MHA-CH-06-TL-VN-84",
+        spec.FEED_NUT: "MHA-CH-06-TL-VN-84",
+        spec.HOLD_DOWN_STUD: "MHA-SH-VN-57",
+        spec.T_NUT: "MHA-SH-VN-57",
+        spec.FLANGE_NUT: "MHA-SH-VN-57",
     }
     assert drawing.BOM_ITEM_NUMBERS == {
         stem: str(item) for item, stem in enumerate(spec.BOM_ORDER, 1)
@@ -1194,7 +1829,7 @@ def test_package_settled_checks_reread_native_bom_without_mutating_layout(
     )
     seat._place_assembled_sheet.return_value = lambda: None
     seat._place_kit_bom_note.return_value = lambda: None
-    seat._place_shim_stock_note.return_value = lambda: None
+    seat._place_bom_note.return_value = lambda: None
     seat._place_notes_reference_views.return_value = {
         name: drawing.NOTES_REFERENCE_SCALE for name in drawing.NOTES_REFERENCE_REGIONS
     }
@@ -1298,11 +1933,19 @@ def test_bom_prints_registry_numbers_one_line_a_row(
     assert set(table.association_configurations) == {
         drawing.SIMPLIFIED_VIEW_CONFIGURATION
     }
-    kit_rows = [
-        table.cells[int(spec.ITEM_NUMBERS[family])] for family in spec.KIT_IDENTITIES
-    ]
-    assert [row[1] for row in kit_rows] == ["MHA-SH-VN-57"] * 3
-    assert [row[3] for row in kit_rows] == ["4"] * 3
+    kit_rows = {
+        family: table.cells[int(spec.ITEM_NUMBERS[family])][1::2]
+        for family in spec.KIT_IDENTITIES
+    }
+    assert kit_rows == {
+        spec.RAIL: ["MHA-CH-06-TL-VN-83", "2"],
+        spec.CARRIAGE: ["MHA-CH-06-TL-VN-83", "2"],
+        spec.LEADSCREW: ["MHA-CH-06-TL-VN-84", "1"],
+        spec.FEED_NUT: ["MHA-CH-06-TL-VN-84", "1"],
+        spec.HOLD_DOWN_STUD: ["MHA-SH-VN-57", "4"],
+        spec.T_NUT: ["MHA-SH-VN-57", "4"],
+        spec.FLANGE_NUT: ["MHA-SH-VN-57", "4"],
+    }
     assert attrs["anchor_mm"] == pytest.approx(
         tuple(value * 1000.0 for value in drawing.BOM_ANCHOR)
     )
@@ -1415,32 +2058,52 @@ def test_bom_refuses_native_row_growth_past_the_bottom_border(
 def test_kit_bom_key_uses_registry_identity_and_native_item_mapping(
     native_bom_bindings,
 ):
-    # Reversed native rows prove the citations are not copied from spec item 18-20.
+    # Reversed native rows prove the citations are not copied from spec items.
     order = tuple(reversed(spec.BOM_ORDER))
     table = _Table(order)
     text = drawing._kit_bom_note_text(
         table, configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION
     )
-    registry = _config.parts(spec.CLAMPING_KIT)
-    assert registry["number"] in text
-    assert str(registry["supplier"]).upper() in text
-    assert all(sku in text for sku in registry["supplier_skus"])
-    for family, (_physical, member) in spec.KIT_IDENTITIES.items():
-        [citation] = [line for line in text.splitlines() if member in line]
-        assert f"ITEM {order.index(family) + 1}:" in citation
-        assert f"({registry['configuration_quantities'][member]})" in citation
-    assert "CONFIGURATIONS" in text and "INSTALLED QTY." in text
-    assert "MEMBERS, NOT KITS" in text
+    lines = text.splitlines()
+    assert lines[0] == "PURCHASED KITS, MEMBER CONFIGURATIONS (INSTALLED QTY.):"
+    assert lines[-1] == "BOM QTY. COUNTS MEMBERS, NOT KITS."
+    assert max(map(len, lines)) <= drawing.KIT_KEY_LINE_WIDTH
+    kits: dict[str, list[tuple[str, str]]] = {}
+    for family, (physical, member) in spec.KIT_IDENTITIES.items():
+        kits.setdefault(physical, []).append((family, member))
+    assert list(kits) == [spec.RAIL_KIT, spec.LEADSCREW_KIT, spec.CLAMPING_KIT]
+    # One block per kit: its Number, supplier and SKU, then its members.
+    starts = []
+    for physical in kits:
+        registry = _config.parts(physical)
+        [sku] = registry["supplier_skus"]
+        starts.append(lines.index(
+            f"{registry['number']}, {str(registry['supplier']).upper()} SKU {sku}:"
+        ))
+    assert starts[0] == 1 and starts == sorted(starts)
+    for (physical, members), start, end in zip(kits.items(), starts, [*starts[1:], len(lines) - 1]):
+        quantities = _config.parts(physical)["configuration_quantities"]
+        cited = "; ".join(lines[start + 1:end]).split("; ")
+        assert sorted(cited) == sorted(
+            f"ITEM {order.index(family) + 1}: {member} ({quantities[member]})"
+            for family, member in members
+        )
+    # The two Amazon kits and the clamping kit each print their own SKU.
+    assert "B0C4DJNL33" in text and "B085DDHJTW" in text and "52PCCK-9/16-14mm" in text
 
 
 class _KitBomNote:
-    """Native-style note geometry with a nonzero insertion-to-extent offset."""
+    """Native-style note geometry with a nonzero insertion-to-extent offset and
+    the farm-measured ink height of its line count; ``drift`` moves its ink
+    once it has been seated."""
 
-    def __init__(self, text, xy, *, width, move):
+    def __init__(self, text, xy, *, width, move, drift=(0.0, 0.0)):
         self.text = text
         self.position = (*xy, 0.0)
         self.width = width
         self.move = move
+        self.drift = (0.0, 0.0)
+        self.seat_drift = drift
         self.OwnerType = 1
         self.Visible = 1
         self.leaders = 0
@@ -1453,7 +2116,9 @@ class _KitBomNote:
 
     def GetExtent(self):
         x, y, _z = self.position
-        return x + 0.005, y - 0.036, 0.0, x + 0.005 + self.width, y + 0.002, 0.0
+        x, y = x + self.drift[0], y + self.drift[1]
+        bottom = y + 0.002 - drawing.note_ink_height(self.text)
+        return x + 0.005, bottom, 0.0, x + 0.005 + self.width, y + 0.002, 0.0
 
     def GetText(self):
         return self.text.replace("\n", "\r\n")
@@ -1466,6 +2131,7 @@ class _KitBomNote:
             return False
         if self.move != "ignored":
             self.position = position
+            self.drift = self.seat_drift
         return True
 
 
@@ -1483,6 +2149,7 @@ def kit_bom_note_state(monkeypatch, native_bom_bindings):
         notes=[],
         width=0.145,
         move="applied",
+        drift=(0.0, 0.0),
         active=None,
     )
     state.reference = SimpleNamespace(
@@ -1492,7 +2159,9 @@ def kit_bom_note_state(monkeypatch, native_bom_bindings):
 
     def add_native_note(_adapter, text, x, y):
         assert state.active == drawing.BOM_SHEET
-        note = _KitBomNote(text, (x, y), width=state.width, move=state.move)
+        note = _KitBomNote(
+            text, (x, y), width=state.width, move=state.move, drift=state.drift
+        )
         state.notes.append(note)
         return note
 
@@ -1509,6 +2178,8 @@ def test_kit_bom_key_measured_extent_clears_native_neighbors(kit_bom_note_state)
     state = kit_bom_note_state
     settled = drawing._place_kit_bom_note(_ADAPTER, state.table, state.reference)
     [note] = state.notes
+    # Three kits: a heading, three blocks of two lines and the closing line.
+    assert len(note.text.splitlines()) == 9
     extent = drawing._kit_bom_note_extent(note)
     bom = drawing._bom_bounds(state.table)
     field = drawing.kit_bom_note_region(bom, state.outline)
@@ -1520,7 +2191,8 @@ def test_kit_bom_key_measured_extent_clears_native_neighbors(kit_bom_note_state)
     settled()
     for family in spec.KIT_IDENTITIES:
         row = state.table.cells[int(spec.ITEM_NUMBERS[family])]
-        assert row[1] == drawing.BOM_PART_NUMBERS[family] and row[3] == "4"
+        assert row[1] == drawing.BOM_PART_NUMBERS[family]
+        assert row[3] == str(spec.QUANTITIES[family])
 
 
 @pytest.mark.parametrize("fault", ("oversized", "ignored", "refused"))
@@ -1534,15 +2206,19 @@ def test_kit_bom_key_refuses_a_native_note_that_does_not_fit(kit_bom_note_state,
         drawing._place_kit_bom_note(_ADAPTER, state.table, state.reference)
 
 
-def test_shim_stock_note_sits_under_the_bom_left_of_the_title(kit_bom_note_state):
+def test_bom_note_sits_under_the_bom_left_of_the_title(kit_bom_note_state):
     state = kit_bom_note_state
-    settled = drawing._place_shim_stock_note(_ADAPTER, state.table)
+    settled = drawing._place_bom_note(_ADAPTER, state.table)
     [note] = state.notes
-    assert note.text == spec.PIVOT_SHIM_STOCK_NOTE
+    assert note.text == spec.BOM_NOTE
     extent = drawing._kit_bom_note_extent(note)
     bom = drawing._bom_bounds(state.table)
-    assert extent[0] == pytest.approx(bom[0])  # flush with the table, by its ink
-    assert bom[1] - extent[3] == pytest.approx(drawing.REGION_GAP)
+    # Seated by its ink, the allowance inside the table's left edge and
+    # inside REGION_GAP under its last row.
+    assert extent[0] - bom[0] == pytest.approx(drawing.NOTE_SEAT_ALLOWANCE)
+    assert bom[1] - extent[3] == pytest.approx(
+        drawing.REGION_GAP + drawing.NOTE_SEAT_ALLOWANCE
+    )
     assert extent[2] < drawing.TITLE_BLOCK_KEEP_OUT[0] and _inside_sheet(extent)
     settled()
     state.notes[0].text = "ITEM 7: SOMETHING ELSE"
@@ -1550,24 +2226,77 @@ def test_shim_stock_note_sits_under_the_bom_left_of_the_title(kit_bom_note_state
         settled()
 
 
+def test_bom_note_seat_absorbs_the_farm_measured_ink_drift(kit_bom_note_state):
+    # Farm 20261104T203420333Z: seated flush, the note's ink then read
+    # 0.19 mm over its field's top and 0.05 mm right of where it was seated,
+    # and the settle check refused it.
+    state = kit_bom_note_state
+    farm = (0.01804789062499998 - 0.018, 0.079484140625 - 0.07929453150272764)
+    state.drift = farm
+    settled = drawing._place_bom_note(_ADAPTER, state.table)
+    settled()
+    # Drift past the allowance, either way, is still refused.
+    for drift in (
+        (0.0, drawing.NOTE_SEAT_ALLOWANCE + 1e-5),
+        (-(drawing.NOTE_SEAT_ALLOWANCE + 1e-5), 0.0),
+    ):
+        state.drift = drift
+        with pytest.raises(RuntimeError, match="leaves its clear field"):
+            drawing._place_bom_note(_ADAPTER, state.table)
+
+
+def test_bom_note_ink_model_reproduces_the_farm_and_fits_its_native_field(
+    kit_bom_note_state, monkeypatch,
+):
+    def block(lines: int) -> str:
+        return "\n".join("X" * lines for _ in range(lines))
+
+    # The two farm measurements the model is fitted to, at their 0.01 mm.
+    assert drawing.note_ink_height(block(8)) == pytest.approx(0.0365596, abs=1e-5)
+    assert drawing.note_ink_height(block(47)) == pytest.approx(0.21233, abs=1e-5)
+    # Farm 20261104T203420333Z's field under the native BOM, whose rows grew
+    # to 5.82 mm on average: the note, seated the allowance under its top,
+    # inks above its floor.
+    field = (0.018, 0.0187, 0.207, 0.07929453150272764)
+    native_bom = (field[0], field[3] + drawing.REGION_GAP, 0.208, drawing.BOM_ANCHOR[1])
+    assert drawing.bom_note_region(native_bom) == pytest.approx(field)
+    top = field[3] - drawing.NOTE_SEAT_ALLOWANCE
+    assert top - drawing.note_ink_height(spec.BOM_NOTE) >= field[1]
+    # A note too tall for its field is refused before it is placed.
+    state = kit_bom_note_state
+    region = drawing.bom_note_region(drawing._bom_bounds(state.table))
+    lines = 1
+    while drawing.note_ink_height(block(lines)) + drawing.NOTE_SEAT_ALLOWANCE <= (
+        region[3] - region[1]
+    ):
+        lines += 1
+    monkeypatch.setattr(drawing.spec, "BOM_NOTE", "\n".join(["ITEM 7"] * lines))
+    with pytest.raises(RuntimeError, match="inks about"):
+        drawing._place_bom_note(_ADAPTER, state.table)
+    assert state.notes == []
+    monkeypatch.setattr(drawing.spec, "BOM_NOTE", "\n".join(["ITEM 7"] * (lines - 1)))
+    drawing._place_bom_note(_ADAPTER, state.table)
+    assert len(state.notes) == 1
+
+
 @pytest.mark.parametrize("fault", ("oversized", "ignored", "refused"))
-def test_shim_stock_note_refuses_a_note_that_does_not_fit(kit_bom_note_state, fault):
+def test_bom_note_refuses_a_note_that_does_not_fit(kit_bom_note_state, fault):
     state = kit_bom_note_state
     if fault == "oversized":
         state.width = 0.250
     else:
         state.move = fault
     with pytest.raises(RuntimeError):
-        drawing._place_shim_stock_note(_ADAPTER, state.table)
+        drawing._place_bom_note(_ADAPTER, state.table)
 
 
-def test_shim_stock_note_buys_the_worst_case_at_both_supports() -> None:
+def test_bom_note_buys_the_worst_case_at_both_supports() -> None:
     # Owner ruling 2026-10-27: the nominal pack plus the worst-case pack a
     # support, at both supports, from the fitting stock alone.
     assert set(spec.PIVOT_SHIM_BUY) == set(spec.pivot_shim.FIT_SKUS.values())
     assert all(count % 2 == 0 for _thickness, count in spec.PIVOT_SHIM_BUY.values())
     assert spec.PIVOT_SHIM_BUY[spec.pivot_shim.SKU][1] >= spec.pivot_shim.QUANTITY
-    note = spec.PIVOT_SHIM_STOCK_NOTE
+    note = spec.BOM_NOTE
     assert note.startswith(f"ITEM {spec.ITEM_NUMBERS[spec.PIVOT_SHIM]}:")
     for sku, (_thickness, count) in spec.PIVOT_SHIM_BUY.items():
         assert f"{sku} " in note and f"X{count}" in note
@@ -1994,6 +2723,11 @@ def test_pivot_balloon_recipe_requests_each_new_family_once_and_refuses_missing(
     monkeypatch.setattr(drawing, "_source_configuration_active", lambda *a, **kw: nullcontext())
     monkeypatch.setattr(drawing, "_ring_balloons", lambda *a, **kw: None)
     monkeypatch.setattr(drawing, "_relax_cluster_slide", lambda a, v, landings, **kw: landings)
+    proved = []
+    monkeypatch.setattr(
+        drawing, "_assert_declared_leaders_clear",
+        lambda a, v, declared, **kw: proved.append({d.stem for d in declared}),
+    )
 
     def create(a, v, *, items, **kwargs):
         calls.append(tuple(items))
@@ -2006,6 +2740,7 @@ def test_pivot_balloon_recipe_requests_each_new_family_once_and_refuses_missing(
     else:
         landings = drawing._balloon_cluster(object(), object(), cluster, tuple(spec.ITEM_NUMBERS.items()), "BOM")
         assert {landing.stem for landing in landings} == set(cluster.stems)
+        assert proved == [{spec.PIVOT_SHIM}]
     assert calls == [tuple((stem, item) for stem, item in spec.ITEM_NUMBERS.items() if stem in cluster.stems)]
 
 

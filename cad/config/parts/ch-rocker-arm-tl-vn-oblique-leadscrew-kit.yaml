@@ -1,0 +1,42 @@
+ch-rocker-arm-tl-vn-oblique-leadscrew-kit:
+  title: Rocker Oblique Trammel Leadscrew Kit
+  # Shop fixture: the parent MHA-CH-06 Number plus -TL-VN-nn (subsystem-identities.md).
+  # Owner ruling 2026-11-04 (#2187): the ReliaBot screw and its brass nut are one
+  # native model with the LeadScrew and FeedNut members as configurations. It
+  # replaces TL-VN-54 (screw) and the unreleased TL-VN-82 (nut).
+  number: MHA-CH-06-TL-VN-84
+  stock_name: ReliaBot T8 Tr8x2 lead screw, 600 mm, with brass flange nut
+  supplier: Amazon (sold by ReliaBot)
+  supplier_skus: ["B085DDHJTW"]
+  # The default LeadScrew member's SOLIDWORKS library material. The FeedNut
+  # member carries Brass in its own configuration (its member spec).
+  material: AISI 304
+  # Kit-level wording, printed in every sheet's title block; the members'
+  # materials are SUS304 stainless steel and brass, alloy not stated.
+  material_specification: "SUS304 screw; brass nut"
+  finish: as supplied
+  # Installed members, not purchased kits: one screw and one nut per listing.
+  quantity: 2
+  default_configuration: LeadScrew
+  configuration_quantities:
+    LeadScrew: 1
+    FeedNut: 1
+  tolerance_class: visual_noncritical
+  process: purchased
+  drawing_unit: mm
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "sheet 3, Section F-F, the 4X Ø4.76/4.50 82° CSK callout: MIN WALL 0.40 TO BODY, 0.45 TO OD"
+      finding: "countersink rims at the worst case the package allows (each hole ±0.05 off its station on the Ø16 PCD, the countersink 0.02 off its hole, the mouth at its Ø4.76 band maximum, the body at its Ø10.3 receipt maximum, the flange at its Ø21.8 receipt minimum) leave 0.40 mm to the body and 0.45 mm to the flange OD, below the 1.5 mm metric wall floor"
+      reason: "owner ruling 2026-11-04 (Pedro, PR #2187 comment 6651067089, on the sketch in comment 6650871642, https://github.com/user-attachments/assets/2f652ca3-b30d-45ee-a564-23d49ce63751): \"Accept as owner exception\" for the 0.40 mm (to body) / 0.45 mm (to flange OD) walls around the four countersinks on the faced ReliaBot nut. The supplied Ø3.5 holes on the Ø16 PCD already leave 1.15 mm to the body and 1.25 mm to the OD nominal, 1.00 mm and 1.05 mm at the receipt limits, so no countersink on this bought nut meets the floor. The lip carries no load: each #4-40 flat head (91771A112) takes 37 N at the 1.19 N·m reversing torque, ×29.8 in shear."
+    - id: "RV-02"
+      kind: "minor"
+      where: "sheet 3, the end view, the Ø10.3/10.0 body callout: MIN WALL 0.75 TO THREAD"
+      finding: "the Tr8x2 internal thread's Ø8.5 major (8 + 2 × 0.25 crest clearance, ISO 2904) inside the body at its Ø10.0 receipt minimum, concentric, leaves 0.75 mm between thread major and body OD, below the 1.5 mm metric wall floor"
+      reason: "owner ruling 2026-11-04 (Pedro, PR #2187 comment 6651067089, on the sketch in comment 6650871642, https://github.com/user-attachments/assets/2f652ca3-b30d-45ee-a564-23d49ce63751): \"Accept as owner exception\" for the bought nut's 0.75 mm thread-to-body wall. The wall is a supplied, unmachined feature of the bought nut: no rework touches its body or thread, and its nominal Ø10.2 body leaves 0.85 mm. It carries the 1361 N largest nut thrust axially from the thread into the flange, reacted by the lug seat one way and the four screws' preload the other: 62 MPa on the bare annulus, teeth not credited, ×1.9 under the brass's 117 MPa yield."
+    - id: "RV-03"
+      kind: "minor"
+      where: "sheet 3, Section F-F, the faced length 13.8/13.2"
+      finding: "the shortest faced nut (13.2) less the supplied body end's incomplete threads (1.5 pitches, 3.0) holds 10.2 mm of full Tr8x2 thread, under rule 18's 1.5D (12.0) for the Ø8 screw"
+      reason: "owner ruling 2026-11-05 (Pedro, recorded in PR #2187 comment 6665347496, on Codjiflo 4483623010), consistent with ruling A1 (a517a1cd3f): approve RV-03 for the ReliaBot nut's rule-18 shortfall. A1 sized the retired shop-made TL-27 feed nut at five Tr8 turns (10 mm); the bought nut, faced to its 13.2 minimum, keeps 10.2 mm of full thread (5.1 turns), which the model checks (FULL_THREAD_MIN at least five turns)."

@@ -44,7 +44,7 @@ passes it to
 still resolves an absent row or key to `mm`; that fallback is not permission
 to omit the declaration. `finalize_drawing` refuses a sheet whose linked model
 carries inch rows while the drawing is not in inches. On an inch
-fabrication sheet, a metric-only vendor line's dimension (HGR15R, KP08, Tr8)
+fabrication sheet, a metric-only vendor line's dimension (HGR15, KP08, Tr8)
 keeps its exact millimetres: the builder gives the model dimension its own
 symmetric band (`set_dimension_symmetric_tolerance(display_unit="mm")`) and
 `_metric_vendor_dimension.set_metric_vendor_units` prints it in mm labelled

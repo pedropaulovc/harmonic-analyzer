@@ -52,18 +52,21 @@ def test_catalogue_row_is_the_registered_mcmaster_screw() -> None:
 
 def test_quantity_thread_and_length_are_the_fastener_tables() -> None:
     row = fasteners.RISER_TO_CARRIER
-    assert spec.ROW is row
-    assert int(_config.parts(STEM)["quantity"]) == spec.QUANTITY == row.count
-    assert (dims.THREAD, dims.LENGTH_TEXT, fasteners.FLAT_HEAD) == (
-        row.thread,
-        row.length,
-        row.head,
-    )
+    nut_row = fasteners.NUT_TO_FEED_BLOCK
+    assert spec.ROW is row and spec.NUT_ROW is nut_row
+    # One BOM row: 4 riser screws and the 4 that hold the TL-VN-84 FeedNut.
+    assert int(_config.parts(STEM)["quantity"]) == spec.QUANTITY == row.count + nut_row.count == 8
+    for joint in (row, nut_row):
+        assert (dims.THREAD, dims.LENGTH_TEXT, fasteners.FLAT_HEAD) == (
+            joint.thread,
+            joint.length,
+            joint.head,
+        )
+        # Installed as bought: the tip stops inside the receiving tap.
+        assert joint.protrusion_mm < 0.0
     assert dims.DIMS.length == pytest.approx(row.length_mm)
     assert row.length_mm == pytest.approx(0.625 * IN)
     assert spec.CALLOUT == fasteners.callout(row) == "#4-40 X 5/8 B18.6.3 FLAT HEAD"
-    # Installed as bought: the tip stops inside the carrier's tap.
-    assert row.protrusion_mm < 0.0
 
 
 def test_head_seats_nominally_below_the_riser_top() -> None:

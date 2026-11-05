@@ -242,9 +242,9 @@ _COMPONENT_BAND = {
     # the thumbscrew.
     "ms-measuring-stick": (5, 7),  # expected 6
     # The rocker's oblique-trammel jig (shop fixture, TL-00; never under the
-    # top): its 9 made parts (13 instances) and its 20 bought families, every
+    # top): its 7 made parts (9 instances) and its 22 bought families, every
     # screw, stud, nut and bearing inserted (jig spec QUANTITIES).
-    "ch-rocker-arm-tl-oblique-jig": (81, 83),  # expected 82
+    "ch-rocker-arm-tl-oblique-jig": (94, 96),  # expected 95
     "ha-harmonic-analyzer": (
         7,
         9,
@@ -894,9 +894,8 @@ def _shared_reference_counts(name: str) -> dict[str, dict[str, int]]:
 
         return {
             "": {
-                "HoldDownStud": jig.QUANTITIES[jig.HOLD_DOWN_STUD],
-                "TNut": jig.QUANTITIES[jig.T_NUT],
-                "FlangeNut": jig.QUANTITIES[jig.FLANGE_NUT],
+                member: jig.QUANTITIES[family]
+                for family, (_physical, member) in jig.KIT_IDENTITIES.items()
             }
         }
     roles = {
@@ -1389,8 +1388,14 @@ async def _walk_pass_sweep(adapter: Any, name: str) -> list[str]:
                 f"{walk['pass']} pass, theta {math.degrees(pose['theta_rad']):+.3f} deg "
                 f"(slide {pose['drive_mm']:.3f} mm)"
             )
+            carriages = bind_component_selectors(
+                adapter.currentModel, pose["carriages"]
+            )
             for carriage, origin in pose["carriages"].items():
-                at = [v * 1000.0 for v in component_transform(adapter, carriage)[9:12]]
+                at = [
+                    v * 1000.0
+                    for v in component_transform(adapter, carriages[carriage])[9:12]
+                ]
                 off = math.dist(at, origin)
                 if off > tolerance:
                     failures.append(

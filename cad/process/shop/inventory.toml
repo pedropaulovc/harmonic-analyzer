@@ -3670,54 +3670,37 @@ name = "3M 444 double-coated PET film tape, 2 in x 36 yd, 0.10 mm"
 products = ["Uline S-10085, USD 103 per roll, 2-roll minimum (https://www.uline.com/Product/Detail/S-10085/3M-Double-Sided-Tape/3M-444-Double-Sided-Film-Tape-2-x-36-yds, read 2026-10-16); candidate purchase for fixtures.thin-part-tape-subplate, not owned"]
 
 # Rocker route-v3 purchased jig hardware. Candidate purchases only: no possession,
-# receipt metrology, preload certificate or physical fit acceptance is asserted.
+# receipt metrology or physical fit acceptance is asserted.
+# Owner decisions 2026-11-04 (issue #2177 comment 6637023572): the rail, carriages,
+# leadscrew (with its nut), handwheel and KP08 blocks are bought on Amazon. Owner
+# ruling 2026-11-04 (#2187 comment 4473182209): each multi-form kit is one CAD
+# identity with member configurations, the rail kit MHA-CH-06-TL-VN-83 (Rail,
+# Carriage) and the leadscrew kit MHA-CH-06-TL-VN-84 (LeadScrew, FeedNut).
 [fixtures.trammel-hgr15-rails]
 kind = "linear_rail"
-make = "HIWIN"
-sku = "172270559990"
-source = "https://motionconstrained.com/store/hiwin-linear-guides/hiwin-hg-series-linear-guides/hg-rails-only/hiwin-hgr15r-linear-guideway-rail/"
+make = "NUIBBYED"
+sku = "B0C4DJNL33"
+source = "https://www.amazon.com/dp/B0C4DJNL33"
 present = false
 verify = true
-purchase = "Special order / vendor quote required: 2 x HGR15R rails cut to 440 mm. Current authored request is seven holes at 60 mm pitch, symmetric E = 40 mm; confirm the supplied pattern before drilling the shop-made base. E40 / seven holes is not a sourcing invariant."
-note = "Read live 2026-10-16: reseller lists HGR15RXXXC, 15 mm rail, 60 mm pitch, and says Order Rails in any Length. The selector does not offer 440 mm. Main-approved 440 replaces brief 420: carriage centre reaches 412.3 plus half-length 30.7 from spindle, requiring rail to reach 443 from near end 15. Custom length and supplied hole pattern require a vendor quote; the shop-made base can be tapped to match the rail. Keep this rail with its HIWIN carriage only because the matched McMaster pair's preload is unstated, not because of the hole pattern."
-cite = ["Motion Constrained part 172270559990, read 2026-10-16", "Rejected matched pair, preload unstated, live 2026-10-16: https://www.mcmaster.com/6709K26/", "Compared stock rail, live 2026-10-16: https://www.mcmaster.com/6709K33/", "Compared long-life rail; matching carriage unverified, live 2026-10-16: https://www.mcmaster.com/6688K18/"]
-# McMaster matched pair, live 2026-10-16: 6709K26 permits custom 440 mm,
-# 15 x 15 mm section / 60 mm pitch, paired with 6709K12 carriage.
-# The base is shop-made and can be tapped to its pattern; E40/seven holes
-# is not required for equivalence. The sole reason to keep the HIWIN pair
-# is unstated preload/clearance for the McMaster carriage.
-# 6709K33 is the stock rail family: no 440 mm option (460 mm is listed);
-# 6709K26 is the appropriate custom-length candidate, not rejected for end spacing.
-# Sources: https://www.mcmaster.com/6709K26/ and https://www.mcmaster.com/6709K33/
+purchase = "1 x NUIBBYED 450MM / HGR15 linear rail kit (Amazon ASIN B0C4DJNL33, a retailer SKU, not a maker part number): 2 x HGR15 450 mm rails + 4 x HGH15CA carriages, USD 48.99 per kit, sold by XIQI, ships from Amazon, read live 2026-11-04. The one kit is the MHA-CH-06-TL-VN-83 rail kit (Rail x2 and Carriage x2 configurations) and also supplies fixtures.trammel-hgh15ca-carriages; its cost is counted once, here. The rails are fitted uncut on the 17.32 in (439.928 mm) TL-20 bars, flush at the near end and overhanging the bar's far end by 10.07 mm (owner option B, 2026-11-04)."
+note = "Generic HIWIN-style HGR15 rail / HGH15CA carriage; NUIBBYED-branded, not genuine HIWIN. Supplied as a matched rail/carriage kit. Z0 preload and C accuracy not required; accept by fit-up play check (<= 0.05 mm TIR at the pivot). Listing read live 2026-11-04: bullets '2 PCS HGR15 450mm Linear Rail+4 PCS HGH15CA Slide Block', 'HGR15 Linear bearing rails made of quality bearing steel. Anti-rust surface treatment ensures durability, hardness, and stiffness.', 'Easy to assemble and interchangeable'. The listing states no hole pitch, end distance, rail or carriage dimensions. Its photos show 8 counterbored holes per 450 rail (consistent with HGR15's 60 mm pitch at a symmetric 15 mm end distance, the jig's RAIL_HOLE_COUNT 8 / RAIL_HOLE_END 15), each rail shipped with 2 carriages on it, and 4 plastic false rails (loading arbors), grease nipples, green hole caps and black socket screws in the kit. The CAD keeps HIWIN's published HGR15 profile and HGH15CA envelope as reference geometry only (style designation, not the maker). Why no preload grade is needed: lateral carriage play moves the cut radius about 1:1; the trammel check (alpha 16.4405 deg, D 450.1, R_c 795.24, sweep +/-11 deg) gave 0.01/0.02/0.05 mm play -> <= 0.010/0.020/0.050 mm radial error, inside RADIUS_FROM_SHOULDER_CLEARANCE 0.112 mm and the strap's TOP_EDGE_BAND 0.50 mm (CARRIAGE_PLAY_TIR_MAX in cad/scripts/ch_rocker_arm_tl_oblique_trammel_spec.py). Pair height/width tolerances do not apply: one carriage per rail, carrier height set by the selected shims, HUB/CL reamed in place. Receipt checks: measure each rail's length, hole count, pitch and both end distances (the base-bar taps follow the rail, not the photo), the rail's width and height against the HGR15 reference profile, and the counterbore against the rail screws; keep the false rails for moving carriages."
+cite = ["NUIBBYED rail kit https://www.amazon.com/dp/B0C4DJNL33 variant 450MM / HGR15, read live 2026-11-04: '450MM Linear Rail 2PCS HGR15 Linear Guide Rail HGH15 Linear Slide Rail with 4PCS HGH15CA Carriage Slider Block CNC Kit', brand/manufacturer NUIBBYED, sold by XIQI, ships from Amazon, USD 48.99", "Owner decisions https://github.com/pedropaulovc/harmonic-analyzer/issues/2177#issuecomment-6637023572"]
+# Superseded 2026-11-04 (#2177): the genuine-HIWIN special-order rail (Motion
+# Constrained) and carriages (DigiKey/Midwest), and the McMaster 6709K26/6709K12
+# matched pair, which had been rejected only for its unstated preload; the fit-up
+# play check now covers that for any supplier.
 
 [fixtures.trammel-hgh15ca-carriages]
 kind = "linear_carriage"
-make = "HIWIN"
-sku = "HGH-15-CA-Z0-C"
-source = "https://www.digikey.com/en/products/detail/midwest-machine-tool-supply/HGH-15-CA-Z0-C/16622864"
+make = "NUIBBYED"
+sku = "B0C4DJNL33"
+source = "https://www.amazon.com/dp/B0C4DJNL33"
 present = false
 verify = true
-purchase = "2 x HIWIN HGH-15-CA-Z0-C carriages for HGR15R, DigiKey/Midwest 4433-HGH-15-CA-Z0-C."
-note = "Read live 2026-10-16: DigiKey Marketplace lists HIWIN, HGH15CA series, 61.4 mm length, Z0 part number and 92 in stock. Rejected eBay 127866788929: photos show H15C/HG15 but not full Z0 part number. Rejected Motion Constrained HGH15CAZAC: published medium preload, not requested Z0."
-cite = ["DigiKey/Midwest 4433-HGH-15-CA-Z0-C, read 2026-10-16", "Rejected: https://www.ebay.com/itm/127866788929", "Rejected: https://motionconstrained.com/store/hiwin-linear-guides/hiwin-hg-series-linear-guides/hg-blocks-only/hiwin-hgh15cazac-square-block/", "Rejected live 2026-10-16: https://www.mcmaster.com/6709K12/", "Compared flanged alternative, live 2026-10-16: https://www.mcmaster.com/6709K11/"]
-# McMaster matched pair, live 2026-10-16: 6709K12 with corresponding 6709K26.
-# Drawing matches 26 x 26 M4 x 5 mm mounting, 34 mm width, 28 mm assembled height.
-# Length 56.6 mm (table: 57) versus HIWIN 61.4 is acceptable: on a 440 rail,
-# half-length 28.3 gives centre travel 28.3..411.7 mm, span 383.4 mm,
-# 4.8 mm more than HIWIN, before end-stop allowances. Shorter is not a blocker.
-# The sole blocker is no stated preload/clearance/no-play guarantee; perpendicular
-# play can move the jig pin and change the generated radius.
-# This is a matched McMaster pair comparison, not a proposal to mix brands.
-# 6709K11 flanged alternative changes width to 47, height to 24, top threads to M5.
-# Sources: https://www.mcmaster.com/6709K12/ and https://www.mcmaster.com/6709K11/
-# HIWIN manufacturer Z0/interface reference (not a substitute order code):
-# https://www.hiwin.de/en/Products/Linear-guideways/Blocks/Ball-guides/Series-HG-QH/HGH-QHH/HGH15CAZ0H/p/5-001622
-# Long-life alternative 6688K18 has a 13 mm-high rail (-2 mm); not rejected
-# solely for section height. Its matching 6688K784 carriage remains unverified.
-# 6688K784 direct page returned HTTP 200 homepage shell, not a verified SKU table;
-# no dimensions from that unverified SKU page are relied on for selection.
-# Verified rail source: https://www.mcmaster.com/6688K18/
-# Failed carriage fetch (unverified): https://www.mcmaster.com/6688K784/
+purchase = "Supplied by the fixtures.trammel-hgr15-rails kit (4 x HGH15CA, 2 arrive on each rail): the Carriage configuration of the MHA-CH-06-TL-VN-83 rail kit; no separate purchase or cost. The jig uses 2, one per rail; 2 are spares."
+note = "Generic HIWIN-style HGR15 rail / HGH15CA carriage; NUIBBYED-branded, not genuine HIWIN. Supplied as a matched rail/carriage kit. Z0 preload and C accuracy not required; accept by fit-up play check (<= 0.05 mm TIR at the pivot). The CAD envelope is HIWIN's HGH15CA reference (H 28, H1 4.3, W 34, L 61.4, 26 x 26 M4); the listing states none of it. Receipt checks: measure height over the rail, width, length and the 26 x 26 M4 pattern against that reference. Fit-up: play-check all four carriages and keep the two tightest, one per rail; move a carriage off or between rails only on the kit's plastic false rail (loading arbor), never bare, or its balls fall out."
+cite = ["NUIBBYED rail kit https://www.amazon.com/dp/B0C4DJNL33 read live 2026-11-04: 4 PCS HGH15CA Slide Block in the kit", "Owner decisions https://github.com/pedropaulovc/harmonic-analyzer/issues/2177#issuecomment-6637023572"]
 
 [fixtures.trammel-6200-2rs]
 kind = "ball_bearing"
@@ -3749,26 +3732,29 @@ sku = "98381A438"
 source = "https://www.mcmaster.com/98381A438/"
 present = false
 verify = true
-purchase = "1 pack of 100 McMaster-Carr 98381A438, alloy-steel 3/32 x 1/2 in dowel pins; one required to key the TL-27 feed nut to the TL-32 lug, $14.06 per pack, possession unconfirmed."
-note = "Read live 2026-11-03: distributor McMaster-Carr, manufacturer not stated; 3/32 in diameter, +0.0001/+0.0003 in (.0939-.0941), 1/2 in long, ASME B18.8.2, Rockwell C47 minimum, 1,400 lbf double shear, round x chamfer ends. Length tolerance not stated. Check the received diameter before use."
+purchase = "Not to be ordered: no longer required by the jig (owner option B, 2026-11-04). The bought ReliaBot flange nut (fixtures.trammel-tr8-leadscrew) replaces the TL-27 nut this dowel keyed to the TL-32 lug, so TL-VN-81 is retired; not owned."
+note = "Historical read live 2026-11-03: distributor McMaster-Carr, manufacturer not stated; 3/32 in diameter, +0.0001/+0.0003 in (.0939-.0941), 1/2 in long, ASME B18.8.2, Rockwell C47 minimum, 1,400 lbf double shear, round x chamfer ends, $14.06 per pack of 100."
 cite = ["McMaster-Carr 98381A438 https://www.mcmaster.com/98381A438/ read live 2026-11-03: Alloy Steel, 3/32 in Diameter, 0.0001 to 0.0003 in Diameter Tolerance, 1/2 in Long, 1,400 lbf, Rockwell C47, ASME B18.8.2, Round x Chamfer, pack 100, $14.06"]
 
 # Trammel hand-feed purchases: catalogue candidates, not possession or fit proof.
 # The Tr8x2 screw and direct-fit wheel avoid turned journals and hub boring.
+# Owner, 2026-11-04: screw + wheel + blocks total USD 43.17 (18.99 + 14.19 + 9.99),
+# free shipping over USD 35; all in stock, delivery Nov 8 when checked.
 [fixtures.trammel-tr8-leadscrew]
 kind = "lead_screw"
-make = "ZYLtech Engineering"
-sku = "HW-SC-T8x2-600"
-source = "https://www.zyltech.com/8mm-t8x2-trapezoidal-acme-lead-screw-w-brass-nut-pre-cut-lengths-150mm-2000mm/"
+make = "ReliaBot"
+sku = "B085DDHJTW"
+source = "https://www.amazon.com/dp/B085DDHJTW"
 present = false
 verify = true
-purchase = "1 x ZYLtech HW-SC-T8x2-600, select 600 mm pre-cut length; USD 14.95 and in stock in the live variant response 2026-10-17 UTC. The brass flange nut included with the screw is not used: the shop-made TL-27 feed nut replaces it (owner ruling 2026-11-01). Houston, Texas vendor with domestic shipping and will-call pickup."
-note = "Read live 2026-10-17 UTC: nominal diameter 8 mm, T8x2 single-start right-hand trapezoidal thread, pitch 2 mm and lead 2 mm/revolution, 304 stainless steel. Ordered stock length is 600 mm, not the installed length; vendor length tolerance and straightness are unpublished. Owner's C4 layout retains 410 mm +/-0.5 mm installed total length. Shop step: confirm the matching C4 support positions and wheel engagement, cut the stock screw to 410 mm +/-0.5 mm, deburr and lightly chamfer the cut end, and check that the TL-27 feed nut runs freely over it before assembly. Do not turn end journals; the KP08 and wheel set screws grip the threaded ends. Keep nut travel off set-screw-marked end threads; inspect for raised crest damage before passing the nut over a previously clamped end. Receipt checks of crest fit, runout, installed travel and bidirectional axial retention remain required."
-cite = ["ZYLtech pre-cut screw/regular nut kit https://www.zyltech.com/8mm-t8x2-trapezoidal-acme-lead-screw-w-brass-nut-pre-cut-lengths-150mm-2000mm/ read live 2026-10-17 UTC: T8x2 single start, pitch/lead 2 mm, right hand, 304 stainless; product 197 length variant HW-SC-T8x2-600 USD 14.95 in stock", "Owner/C4 layout decision 2026-10-16 (not vendor tolerance): cut to 410 mm +/-0.5 mm; SCREW_LENGTH = 410.0 in cad/scripts/ch_rocker_arm_tl_vn_oblique_leadscrew_spec.py, rocker/trammel-jig-4 branch stacked on PR #1583"]
+purchase = "1 x ReliaBot 600mm T8 Tr8x2 lead screw and brass nut (Amazon ASIN B085DDHJTW), USD 18.99, sold by ReliaBot, ships from Amazon, read live 2026-11-04: the MHA-CH-06-TL-VN-84 leadscrew kit (LeadScrew and FeedNut configurations). The included T8x2 brass flange nut is used as the feed nut with its 1.5 mm spigot faced off (owner option B, 2026-11-04), so the shop-made TL-27 nut, its brass stock and Tr8x2 tap and the TL-VN-81 dowel are no longer required."
+note = "Read live 2026-11-04: 'Lead screw diameter 8mm, length 600mm, SUS304 stainless steel'; 'Brass nut, with 4 holes for fixing to the machine'; 'Screw pitch: 2mm; Number of Thread/Start:1; Lead: 2mm'; material stainless_steel_304, brass; packing list 1 x T8x2 600mm lead screw, 1 x T8x2 brass nut. The listing's dimension image gives the nut: flange Ø22 x 3.5 thick, 4 x Ø3.5 holes on a Ø16 PCD, body Ø10.2 x 10, spigot Ø10.2 x 1.5 on the flange's other side, 15 overall; screw 600. Thread hand, straightness and length tolerance are not stated. Ordered stock length is 600 mm, not the installed length; the owner's C4 layout cuts it to 410 mm +/-0.5 mm. Shop steps: confirm the C4 support positions and wheel engagement, cut the screw to 410 mm +/-0.5 mm, deburr and lightly chamfer the cut end; face the nut's spigot off in one lathe facing pass so the flange seats flat on the TL-32 lug's -X face (13.5 overall as fitted); countersink the flange's four holes 82 deg to Ø4.6 for the TL-VN-67 #4-40 X 5/8 flat-head screws (McMaster 91771A112, torqued 0.3 N·m at TL-00); measure the faced nut (flange OD and thickness, hole size and PCD) before the lug's 4 x #4-40 taps are transferred through it at TL-00 assembly; check that the nut runs freely over the screw. Do not turn end journals; the KP08 and wheel set screws grip the threaded ends. Keep nut travel off set-screw-marked end threads; inspect for raised crest damage before passing the nut over a previously clamped end. Receipt checks: thread hand (the nut comes matched; only the wheel's feed direction depends on it), straightness and runout, crest fit in the KP08 and wheel bores, installed travel and bidirectional axial retention."
+cite = ["ReliaBot lead screw and nut https://www.amazon.com/dp/B085DDHJTW read live 2026-11-04: 'ReliaBot 600mm T8 Tr8x2 Lead Screw and Brass Nut (Acme Thread, 2mm Pitch, 1 Start, 2mm Lead)', sold by ReliaBot, ships from Amazon, USD 18.99; dimension image: nut flange Ø22 x 3.5, 4-Ø3.5 on Ø16 PCD, body Ø10.2 x 10, spigot Ø10.2 x 1.5, overall 15", "Owner decisions https://github.com/pedropaulovc/harmonic-analyzer/issues/2177#issuecomment-6637023572; feed nut option B, owner ruling 2026-11-04", "Owner/C4 layout decision 2026-10-16 (not vendor tolerance): cut to 410 mm +/-0.5 mm; SCREW_LENGTH = 410.0 in cad/scripts/ch_rocker_arm_tl_vn_oblique_leadscrew_spec.py"]
+# Superseded 2026-11-04 (#2177): ZYLtech HW-SC-T8x2-600 (read 2026-10-17).
 # McMaster alternatives considered, not chosen: M8 pitch 2 / lead 4 screws
 # 97783A170/97783A180 are only 200/300 mm; too short for the final 410 mm order.
 # McMaster 2391N25 is 500 mm but pitch 2.5 / lead 10, unnecessarily coarse
-# compared with the available no-journal-machining ZYLtech lead-2 matched pair.
+# compared with this no-journal-machining lead-2 screw and nut.
 # https://www.mcmaster.com/97783A170/ https://www.mcmaster.com/97783A180/
 # https://www.mcmaster.com/2391N25/
 # McMaster M8 pitch/lead 1.5 screws 7549K55/7549K56/7549K57 are only
@@ -3778,67 +3764,43 @@ cite = ["ZYLtech pre-cut screw/regular nut kit https://www.zyltech.com/8mm-t8x2-
 # https://www.mcmaster.com/7549K55/ https://www.mcmaster.com/7549K56/
 # https://www.mcmaster.com/7549K57/ https://www.mcmaster.com/7549K72/
 # https://www.mcmaster.com/7549K16/
-# Ooznest LS-TR8-2-2P-CTS was dimensionally acceptable but superseded by
-# this US vendor: owner logistics ruling 2026-10-16 reports UK DHL shipping
-# only, with the inexpensive mail service suspended.
-# https://ooznest.co.uk/product/tr8x2-2p-lead-screw-cut-to-size/
-# ZYLtech 500 mm HW-SC-T8x2-500 was out of stock. Custom 410 mm
-# HW-SC-T8x2-REG-CUTSMALL had conflicting stock flags and no published
-# cut tolerance; choose in-stock 600 mm and perform the specified shop cut.
-# Misumi straight D8 MTSR/MTSBR and matching brass nuts are pitch 1.5,
-# not Tr8x2; MTSRW/MTSBRW also add stepped ends. Roton starts at Tr10.
-# Helix 8 mm trapezoidal families offer 1.5/4/8 lead, not exact lead 2.
 
 [fixtures.trammel-kp08-blocks]
 kind = "pillow_block_bearing"
-make = "AMPEC"
-sku = "KP08"
-source = "https://bearingsdirect.com/8mm-bore-kp08-mini-zinc-pillow-set-screw-block-bearing-kp8uu/"
+make = "uxcell"
+sku = "B0D2L8M4QR"
+source = "https://www.amazon.com/dp/B0D2L8M4QR"
 present = false
 verify = true
-purchase = "2 x AMPEC KP08 from Bearings Direct, $9.18 each on the live listing; possession unconfirmed."
-note = "Read live 2026-10-16: 8 mm bore rotary insert ball bearing in mini zinc pillow housing; shaft axis height 15 mm, mounting bolt spacing 42 mm, overall length 55 mm and height 29 mm. Two inner-ring set screws 120 degrees apart provide shaft locking; not a press-fit-only bearing. Vendor does not publish bolt-hole diameter or axial housing/inner-ring width: verify these on receipt, do not copy another maker's KP08 drawing. Issue #1630 replaces the original M4 mounting proposal with #6-32 screws at 42 mm spacing; the bought block's hole diameter remains unverified. Catalogue gives 3500 rpm and 292/742 lbf static/dynamic load, but no axial-load or endplay rating. Fully threaded screw ends seat on thread crests, not smooth journals: check crest passage, runout, axial creep under feed reversal and set-screw locking before use. Assembled bidirectional axial location is not proven by this listing; no turned journals are specified by this sourcing entry."
-cite = ["Bearings Direct / AMPEC KP08 https://bearingsdirect.com/8mm-bore-kp08-mini-zinc-pillow-set-screw-block-bearing-kp8uu/ read live 2026-10-16: 8 mm bore, axis 15 mm, bolt spacing 42 mm, length 55 mm, height 29 mm, two set screws"]
+purchase = "1 x uxcell 6 Pcs KP08 pillow block bearing 8mm bore (Amazon ASIN B0D2L8M4QR), USD 9.99 per 6-pack, sold by uxcell, ships from Amazon, read live 2026-11-04. The jig uses 2; 4 are spares."
+note = "Read live 2026-11-04: Model KP08; 'Overall Size: 55 x 13 x 28mm (L*W*H)'; 'Holes Centre Distance: 42mm'; 'Width of Bearing: 12mm'; 'Installation Hole Diameter: 5mm'; 'Bore Diameter: 8mm'. The title says zinc alloy; the description says 'Bearing housings are made of cast iron while bearings are made of zinc alloy': the housing material is unverified. Not stated: centre (axis) height, foot thickness, set-screw count and size, axial-load or end-play rating. The C4 spec carries KP08_AXIS_HEIGHT 15 (the KP08 series value) and KP08_FOOT_THICK 5 as UNVERIFIED. Receipt checks: measure the axis height above the base and the foot thickness against those two values, the hole size and 42 mm spacing, the 13 mm width and the bore; count the inner-ring set screws. Issue #1630's #6-32 mounting screws (major 3.505 mm) pass the listed Ø5 holes. Fully threaded screw ends seat on thread crests, not smooth journals: check crest passage, runout, axial creep under feed reversal and set-screw locking before use. Assembled bidirectional axial location is not proven by this listing; no turned journals are specified by this sourcing entry."
+cite = ["uxcell KP08 6-pack https://www.amazon.com/dp/B0D2L8M4QR read live 2026-11-04: 'uxcell 6 Pcs KP08 Pillow Block Bearing 8mm Bore Zinc Alloy Inner Ball Mounted Bearing Block Insert Bearing Self-Alignment', sold by uxcell, ships from Amazon, USD 9.99; 55 x 13 x 28 mm, holes 42 mm apart, Ø5 holes, bore 8, bearing width 12", "Owner decisions https://github.com/pedropaulovc/harmonic-analyzer/issues/2177#issuecomment-6637023572"]
+# Superseded 2026-11-04 (#2177): AMPEC KP08 from Bearings Direct (read 2026-10-16).
 # Rejected McMaster 4491N33 and 8600N13: 8 mm rotary base-mount bearings,
 # but press-fit shaft mounting would require a turned journal on the rolled
 # screw, and does not supply the requested set-screw end locking.
-# Keep nut travel off set-screw-marked end threads; raised crest damage can
-# bind the brass nut. Inspect before running the nut across a previously
-# clamped end during assembly or servicing.
 # https://www.mcmaster.com/4491N33/ https://www.mcmaster.com/8600N13/
-# Ooznest's live KP08 product search returned no matching products; no stable
-# Ooznest KP08 SKU/drawing was verified. Other makers' KP08 hole/width values
-# are deliberately not transferred to AMPEC.
+# Other makers' KP08 values are not transferred to this block beyond the two
+# UNVERIFIED C4 values above.
 
 [fixtures.trammel-handwheel]
 kind = "handwheel"
-make = "MISUMI"
-sku = "HOK40-HC8"
-source = "https://us.misumi-ec.com/vona2/detail/110300515660/?HissuCode=HOK40-HC8"
+make = "HARFINGTON"
+sku = "B0DJ3DZT86"
+source = "https://www.amazon.com/dp/B0DJ3DZT86"
 present = false
 verify = true
-purchase = "1 x MISUMI HOK40-HC8 with factory HC8 alteration, USD 47.92 and estimated ship date 2026-10-26 on the live configured page; includes one M5 set screw, not two. MISUMI USA's shipping FAQ specifies domestic warehouses and default UPS Ground; confirm price and delivery at checkout."
-note = "Read live 2026-10-17 UTC: black-anodised 5056 aluminium knurled wheel OD 40 mm x 12 mm rim thickness; hub OD 22 mm projects 13 mm, body axial length 25 mm. Factory HC8 alteration specifies an 8 mm H8 through bore across the body, plus two radial M5 tapped set-screw holes 90 degrees apart, centres 6.5 mm from the hub end. One set screw is included; its length and retention torque are not stated. Revolving black Nylon 6 grip has diameter 13 mm, axis offset 14.5 mm and forward projection 18.8 mm, giving calculated total axial envelope 43.8 mm (25+18.8) and grip swept radius 21 mm (14.5+13/2); add hand clearance. No shop boring, tapping or turned screw journals are required. Receipt fit, screw engagement and installed retention remain to verify against C4; factory machining is included in the ordered SKU."
-# Layout condition: wheel radius 20 mm and grip swept radius 21 mm versus
-# KP08 axis height 15 mm require base-edge overhang or at least 6 mm lift
-# plus running/hand clearance. This purchase record proves no installed layout.
-cite = ["MISUMI HOK40-HC8 https://us.misumi-ec.com/vona2/detail/110300515660/?HissuCode=HOK40-HC8 live configured SKU/price/specification read 2026-10-17 UTC", "MISUMI catalogue page 3210 https://us.misumi-ec.com/pdf/fa/2019/2019_US_3210.pdf and drawing https://us.misumi-ec.com/linked/item/10300515660/img/drw_01.gif : D40, H25, A12, S13, D1 22, h6.5, P14.5, B13, G18.8", "MISUMI HC alteration table https://us.misumi-ec.com/linked/item/10300515660/img/alt_01.gif : through H8 bore, two tapped holes, one set screw included; HC8 uses M5", "MISUMI USA shipping https://us.misumi-ec.com/guide/faq/shipping.html : Illinois/Ohio/California warehouses, default UPS Ground"]
+purchase = "1 x HARFINGTON aluminium alloy handwheel, 50 mm OD, 8 mm bore, with rotating handle, wrench and 2 screws (Amazon ASIN B0DJ3DZT86), USD 14.19, sold by HARFINGTON, ships from Amazon, read live 2026-11-04."
+note = "Read live 2026-11-04: 'Outer Diameter: 50mm / 2\", Bore: 8mm / 0.31\", Height: 27mm / 1.1\", Step Overall Dimension: 26 x 14mm / 1\" x 0.6\"(D*H). Comes with two screws to secure the shaft'; anodized aluminum alloy, knurled rim, movable (rotating) handle; product dimensions 1.97\" L x 1.06\" W. The C4 spec reads the hub as Ø26 x 14 and the rim as 13 (27 - 14). Not published: handle diameter, length and offset; set-screw size and station; bore depth (photos of the rim's outer face show no through hole, so the bore is certain only through the 14 mm hub); edge chamfers; mass. The C4 spec's handle envelope (Ø14 x 25 proud of the rim, axis 17 off the screw axis), M5 set screw at 7 mm from the hub end and 14 mm blind bore are UNVERIFIED. Receipt checks: measure the bore depth (the screw must engage the C4 HANDWHEEL_ENGAGEMENT inside it), the bore over the Tr8 crests, the set-screw size and station and whether both screws sit in the hub, and the handle diameter, length and offset against the envelope and the rim's 25 mm swept radius. Retention is by the set screws on the thread crests; no shop boring, tapping or turned screw journals are required."
+cite = ["HARFINGTON handwheel https://www.amazon.com/dp/B0DJ3DZT86 read live 2026-11-04: 'HARFINGTON Aluminum Alloy Handwheel 50mm OD 8mm Bore Lathe Hand Wheel | with Rotate Handle ... with Wrench and 2pcs Screws', sold by HARFINGTON, ships from Amazon, USD 14.19; dimension image OD 50, bore 8, height 27, step 26 x 14", "Owner decisions https://github.com/pedropaulovc/harmonic-analyzer/issues/2177#issuecomment-6637023572"]
+# Superseded 2026-11-04 (#2177): MISUMI HOK40-HC8 (read 2026-10-17).
 # McMaster 6547N15 crank is acceptable in principle, with ready 8 mm bore,
-# but requires drilling/tapping its hub for set-screw retention; HOK40-HC8 does not.
+# but requires drilling/tapping its hub for set-screw retention; this wheel
+# comes with its screws.
 # McMaster 6024K81/6024K107 wheels have 6.35 mm pilot bores and require
-# bore enlargement plus retention machining. Avoid shop machining with HC8.
+# bore enlargement plus retention machining.
 # https://www.mcmaster.com/6547N15/ https://www.mcmaster.com/6024K81/
 # https://www.mcmaster.com/6024K107/
-# Ooznest HW-8 was dimensionally acceptable but superseded by this US
-# vendor after the owner reported UK-only DHL / suspended cheap mail service.
-# https://ooznest.co.uk/product/8mm-handwheel/
-# MISUMI HOK40-8 costs less but its blind-bore depth is unpublished; HC8
-# explicitly supplies the through bore and tapped holes at the factory.
-# StepperOnline HWA40-D8 offered China/Germany dispatch, no documented
-# retaining screw. ZYLtech's identified NEMA 17 wheel has a 5 mm bore.
-# Interface delta from HW-8: hub OD 25 -> 22; blind 8 x 18 bore ->
-# 8 H8 through x 25; M4 holes -> M5, only one screw supplied instead of two;
-# grip OD 9.6 -> 13, projection 19 -> 18.8, axial envelope 44 -> 43.8.
 
 # --- pivot-bracket additions ---
 # Illustrative angle plate. Local XY is the table plane; the front upright face
@@ -5624,14 +5586,14 @@ purchase = "PROPOSED, awaiting Pedro: Tap America T/A57097 10-24 HSS 2-flute spi
 source = "DrillsandCutters.com $6.24 (https://drillsandcutters.com/10-24-hss-2-flute-spiral-point-tap-tap-america/); Bolt Depot 8474 $0.10 each search listing (https://boltdepot.com/Product-Details?product=8474); Bolt Depot 5008 $7.89/100 search listing (https://boltdepot.com/Product-Details?product=5008)"
 note = "Taps the trammel block set-screw and clamp holes (#25 tap drill)."
 
-# The shop-made TL-27 feed nut's Tr8x2 RH thread (owner ruling 2026-11-01, item 4).
+# Formerly for the shop-made TL-27 feed nut's Tr8x2 RH thread (owner ruling 2026-11-01, item 4).
 [tools.tap-tr8x2-rh]
 name = "Tr8x2 right-hand HSS trapezoidal tap (purchase)"
 kind = "tap"
 present = false
 purchase = "1 x Fedeas TR8X2 trapezoidal tap, right hand, M2 HSS, uncoated, class 7H, 30 deg flank angle; USD 14.99, in stock, read live 2026-11-01."
 source = "Fedeas https://www.fedeas.com/product/fedeas-tr8x2-trapezoidal-tap-right-hand-hss-tr82-trapezoidal-thread-tap/ read live 2026-11-01; alternative eBay listing 175178158577 not re-verified (its page did not load)."
-note = "Taps the MHA-CH-06-TL-27 feed nut's Tr8x2-7H RH thread through the .40 brass after the letter C (.242) tap drill. Vendor: use a high-viscosity EP cutting oil."
+note = "No longer required by the jig (owner option B, 2026-11-04): the bought ReliaBot flange nut replaces the shop-made TL-27 feed nut this tap was to thread, so it is not to be ordered for the jig. Not owned."
 
 # --- pivot-bracket additions ---
 
@@ -6582,7 +6544,7 @@ cite = ["OnlineMetals part 20743 https://www.onlinemetals.com/en/buy/carbon-stee
 [[stock]]
 form = "flat_bar"
 material = "6061-T6511 aluminium"
-note = "Owned OnlineMetals 1173, 1/2 x 6 in, 54 in left of the original 72 in (owner-reported 2026-11-02): allocate the TL-21 carrier and one TL-20 base bar (owner ruling #2083, 2026-10-30: mill the owned bar to width, no bandsaw rip; about 39 of the 54 in). TL-21: a 21.3 in length for the 20.5 x 5.1 x .47 carrier; its process route is not yet written (#2083). TL-20: a 17.44 in blank, the long edges milled on edge in the vise to 5.50 wide, both faces faced to .47; the second base bar comes from the 18 in 1173 cut ordered 2026-11-03. Purchased nominal dimensions are not receipt measurements."
+note = "Owned OnlineMetals 1173, 1/2 x 6 in, 54 in left of the original 72 in (owner-reported 2026-11-02): allocate the TL-21 carrier and one TL-20 base bar (owner ruling #2083, 2026-10-30: mill the owned bar to width, no bandsaw rip; about 39 of the 54 in). TL-21: a 21.3 in length for the 20.5 x 5.1 x .47 carrier; its process route is not yet written (#2083). TL-20: a 17.44 in blank for the 17.32 in (439.928 mm) bar, the long edges milled on edge in the vise to 5.50 wide, both faces faced to .47; the second base bar comes from the 18 in 1173 cut ordered 2026-11-03. The bar length is unchanged by the Amazon rail kit (owner option B, 2026-11-04: the uncut 450 rail overhangs the bar's far end by 10.07 mm), so no further stock is bought. Purchased nominal dimensions are not receipt measurements."
 section_mm = [152.4, 12.7]
 length_mm = 1371.6
 on_hand = true
@@ -6600,7 +6562,7 @@ cite = ["OnlineMetals part 17666 https://www.onlinemetals.com/en/buy/aluminum/0-
 [[stock]]
 form = "flat_bar"
 material = "6061-T6511 aluminium"
-note = "Owned OnlineMetals 1165, 1/2 x 1 x 24 in: TL-26 feed lever uses 11.811 in; cut two TL-28 end brackets 68.9 mm (2.713 in) long from the remainder, with saw kerf allowance. TL-28 is on edge: 25.4 mm high and 12.7 mm along the screw. KP08's unverified 13 mm foot width overhangs the top by nominal 0.15 mm per side; verify on receipt."
+note = "Owned OnlineMetals 1165, 1/2 x 1 x 24 in: TL-26 feed lever uses 11.811 in; cut two TL-28 end brackets 68.9 mm (2.713 in) long from the remainder, with saw kerf allowance. TL-28 is on edge: 25.4 mm high and 12.7 mm along the screw. The uxcell KP08's listed 13 mm width (W of its 55 x 13 x 28) overhangs the top by nominal 0.15 mm per side; verify on receipt."
 section_mm = [25.4, 12.7]
 length_mm = 609.6
 on_hand = true
@@ -6618,7 +6580,7 @@ cite = ["Owner-reported purchased stock and reallocation, oblique jig simplifica
 [[stock]]
 form = "flat_bar"
 material = "Brass 360-H02 (C36000, ASTM B16), extruded"
-note = "MHA-CH-06-TL-27 feed nut: 3/4 x 1-1/4 in rectangle bar, 12 in, as bought on the 3/4 and 1-1/4 faces (stock .7500 +/-.0045, 1.250 +/-.005), sawn and faced to .40 long. Purchase, not owned."
+note = "Former MHA-CH-06-TL-27 feed nut stock (3/4 x 1-1/4 in rectangle bar, 12 in): not to be ordered; no longer required by the jig (owner option B, 2026-11-04: the ReliaBot screw's included brass flange nut replaces TL-27). Not owned."
 section_mm = [31.75, 19.05]
 length_mm = 304.8
 on_hand = false

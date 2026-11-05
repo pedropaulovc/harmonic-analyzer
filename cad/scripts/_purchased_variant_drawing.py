@@ -18,7 +18,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     view_name,
 )
 
-from _check import check
 from _com import _early_bound
 import _config
 import _telemetry
@@ -44,25 +43,60 @@ from _purchased_fastener_drawing import (
     _fit_views,
     _inside,
     _literal_note,
+    _open_supplier_source_read_only,
     _purchased_title_block,
+    _source_file_sha256,
     add_purchased_footer,
+)
+from _purchased_title_fit import fit_purchased_title_block
+from _rebuild import active_configuration_name
+from _reference_source_lifecycle import (
+    _activate_reference_document,
+    _preserve_reference_source_file,
+    _show_reference_configuration,
 )
 
 
-def configuration_view_cells(index: int, count: int) -> tuple:
-    """Four third-angle reference cells in one of two or three member panels."""
+# Third-angle slots (column, row) in a member panel's 2 x 2 grid: Top above
+# Front, Right beside it, the Isometric in the free corner.
+_SLOTS = {"*Front": (0, 0), "*Top": (0, 1), "*Right": (1, 0), "*Isometric": (1, 1)}
+_PANEL_ROWS = ((0.127, 0.179), (0.194, 0.244))
+
+
+def _panel(index: int, count: int) -> tuple[float, float]:
+    """One of two or three member panels' left and right edges."""
     if count not in (2, 3) or not 0 <= index < count:
         raise ValueError(f"invalid purchased-member panel {index} of {count}")
     width = (0.396 - 0.008 * (count - 1)) / count
     left = 0.018 + index * (width + 0.008)
-    middle = left + width / 2.0
-    right = left + width
-    return (
-        _cell("*Front", left, 0.127, middle - 0.004, 0.179),
-        _cell("*Top", left, 0.194, middle - 0.004, 0.244),
-        _cell("*Right", middle + 0.004, 0.127, right, 0.179),
-        _cell("*Isometric", middle + 0.004, 0.194, right, 0.244),
+    return left, left + width
+
+
+def configuration_view_cells(index: int, count: int) -> tuple:
+    """Four third-angle reference cells in one of two or three member panels.
+
+    Returned in Front, Top, Right, Isometric order.
+    """
+    left, right = _panel(index, count)
+    middle = (left + right) / 2.0
+    columns = ((left, middle - 0.004), (middle + 0.004, right))
+    return tuple(
+        _cell(
+            name,
+            columns[_SLOTS[name][0]][0],
+            _PANEL_ROWS[_SLOTS[name][1]][0],
+            columns[_SLOTS[name][0]][1],
+            _PANEL_ROWS[_SLOTS[name][1]][1],
+        )
+        for name in ("*Front", "*Top", "*Right", "*Isometric")
     )
+
+
+def isometric_view_cells(index: int, count: int) -> tuple:
+    """One Isometric cell over a whole member panel: a member whose own sheet
+    carries its orthographic views."""
+    left, right = _panel(index, count)
+    return (_cell("*Isometric", left, _PANEL_ROWS[0][0], right, _PANEL_ROWS[1][1]),)
 
 
 def configure_reference_views(
@@ -93,6 +127,11 @@ async def build_purchased_variant_drawing(
     ] | None = None,
     additional_sheet_scales: Mapping[str, tuple[float, float]] | None = None,
     append_sheets: Callable[[Any], tuple[Callable[[], None], ...]] | None = None,
+    additional_sheets_title: str = "Member Rework",
+    notes: str = "",
+    title_fit: bool = False,
+    isometric_only: Mapping[str, int] | None = None,
+    source_configuration: str | None = None,
     unit: str = "mm",
 ) -> dict[str, str]:
     """Draw purchased-member references, with separately scoped rework sheets.
@@ -110,6 +149,30 @@ async def build_purchased_variant_drawing(
     follow (and never replace) the complete purchased-reference sheet checks.
     ``general_text`` overrides only the footer's general line, retaining its
     native text/extent checks; None keeps the ``cut_to_suit``-selected default.
+    ``notes`` prints a member note in the footer's notes lines (rule 7's
+    budget); ``additional_sheets_title`` names what the appended sheets carry
+    in the PDF title and summary. ``title_fit`` fits the reference sheet's
+    Name, Material and DWG. NO. in their native cells
+    (``fit_purchased_title_block``) and re-proves them settled.
+    ``isometric_only`` names members whose own appended sheet carries their
+    orthographic views, each with that sheet's number: such a member shows
+    only its isometric, over its whole panel at the largest scale that fits,
+    its header pointing at the sheet ("SEE SHEET n"). Other members keep
+    their four views.
+    ``source_configuration`` activates that member in the open source part,
+    in memory, before the drawing exists. Supplier-reference attachment
+    proofs (``_supplier_screw_dimensions``) read the source part's ACTIVE
+    configuration, so a member that carries them must be the active one
+    while it is annotated and settled.
+
+    The source part is opened read-only and must be clean before the drawing
+    exists. Its bytes are hashed before the open and must match at every
+    finalization checkpoint, in the settled checks and on exit, failures
+    included (``_preserve_reference_source_file``). Imported dimensions whose
+    text the sheets set can write through to the part in memory; only the
+    file is guarded. The one allowed state change is the declared
+    ``source_configuration``: every check requires exactly that member
+    active, and exit restores the saved one.
     """
     if (additional_sheet_scales is None) != (append_sheets is None):
         raise ValueError("additional sheets require both scales and an author")
@@ -118,10 +181,24 @@ async def build_purchased_variant_drawing(
     configurations = tuple(configuration for configuration, _ in variants)
     if len(set(configurations)) != len(configurations):
         raise ValueError("purchased-member configurations must be unique")
+    isometric_only = dict(isometric_only or {})
+    if set(isometric_only) - set(configurations):
+        raise ValueError("isometric-only members must be depicted configurations")
+    last_sheet = 1 + len(additional_sheet_scales or {})
+    if any(
+        type(number) is not int or not 2 <= number <= last_sheet
+        for number in isometric_only.values()
+    ):
+        raise ValueError("an isometric-only member must cite an appended sheet")
     cells_by_configuration = {
-        configuration: configuration_view_cells(index, len(variants))
+        configuration: (
+            isometric_view_cells if configuration in isometric_only
+            else configuration_view_cells
+        )(index, len(variants))
         for index, (configuration, _) in enumerate(variants)
     }
+    if source_configuration is not None and source_configuration not in configurations:
+        raise ValueError("the active source configuration must be a depicted member")
     source = spec.source
     if spec.source_kind != "part" or not source.is_file():
         raise FileNotFoundError(
@@ -131,16 +208,137 @@ async def build_purchased_variant_drawing(
     quantities = row["configuration_quantities"]
     if set(quantities) != set(configurations):
         raise ValueError("purchased sheet must depict every registered configuration")
-    total = sum(int(quantities[name]) for name in configurations)
-    if total != int(row["quantity"]):
+    if sum(int(quantities[name]) for name in configurations) != int(row["quantity"]):
         raise ValueError(
             "configured installed quantities do not sum to the family quantity"
         )
+    label = spec.artifact_stem
+    source_sha256 = _source_file_sha256(source)
+    with _preserve_reference_source_file(source, source_sha256, label=label):
+        model = _open_supplier_source_read_only(
+            adapter, source, label=f"open {label} source"
+        )
+        if model.GetSaveFlag() is not False:
+            raise RuntimeError(f"{label}: source part must be clean before the drawing exists")
+        saved = active_configuration_name(adapter, model)
+        if not saved:
+            raise RuntimeError(f"{label}: source part has no readable active configuration")
+        active = source_configuration or saved
+
+        def assert_source(stage: str) -> None:
+            require_source_state(
+                adapter, model, source, active, source_sha256, stage=stage, label=label
+            )
+
+        primary: BaseException | None = None
+        try:
+            if active != saved:
+                # The just-opened part is the active document, as the transition requires.
+                _show_reference_configuration(adapter, model, active, label=label)
+            assert_source("before view creation")
+            return await _draw_purchased_variants(
+                adapter,
+                spec,
+                model,
+                assert_source,
+                variants=variants,
+                configurations=configurations,
+                row=row,
+                cells_by_configuration=cells_by_configuration,
+                isometric_only=isometric_only,
+                item=item,
+                purchase_unit=purchase_unit,
+                cut_to_suit=cut_to_suit,
+                general_text=general_text,
+                annotate_member=annotate_member,
+                additional_sheet_scales=additional_sheet_scales,
+                append_sheets=append_sheets,
+                additional_sheets_title=additional_sheets_title,
+                notes=notes,
+                title_fit=title_fit,
+                unit=unit,
+            )
+        except BaseException as error:
+            primary = error
+            raise
+        finally:
+            try:
+                if active != saved:
+                    _activate_reference_document(adapter, model, label=label)
+                    _show_reference_configuration(adapter, model, saved, label=label)
+                require_source_state(
+                    adapter,
+                    model,
+                    source,
+                    saved,
+                    source_sha256,
+                    stage="drawing lifecycle exit",
+                    label=label,
+                )
+            except BaseException as integrity_error:
+                if primary is None:
+                    raise
+                primary.add_note(f"{label}: source integrity check also failed: {integrity_error}")
+
+
+def require_source_state(
+    adapter: Any,
+    model: Any,
+    source: Path,
+    configuration: str,
+    expected_sha256: str,
+    *,
+    stage: str,
+    label: str,
+) -> None:
+    """The live source: same file, still read-only, the expected member, same bytes."""
+    active = active_configuration_name(adapter, model)
+    read_only = model.IsOpenedReadOnly()
+    path = str(model.GetPathName())
+    digest = _source_file_sha256(source)
+    if (
+        active != configuration
+        or read_only is not True
+        or Path(path).resolve() != Path(source).resolve()
+        or digest != expected_sha256
+    ):
+        raise RuntimeError(
+            f"{label} source {stage}: source state changed: "
+            f"configuration={active!r}; expected={configuration!r}; "
+            f"read_only={read_only!r}; path={path!r}; "
+            f"bytes_unchanged={digest == expected_sha256}"
+        )
+
+
+async def _draw_purchased_variants(
+    adapter: Any,
+    spec: DrawingSpec,
+    model: Any,
+    assert_source: Callable[[str], None],
+    *,
+    variants: tuple[tuple[str, str], ...],
+    configurations: tuple[str, ...],
+    row: Mapping[str, Any],
+    cells_by_configuration: Mapping[str, tuple],
+    isometric_only: Mapping[str, int],
+    item: str,
+    purchase_unit: str,
+    cut_to_suit: bool,
+    general_text: str | None,
+    annotate_member: Callable[
+        [Any, str, tuple, list[Any]], tuple[Callable[[], None], ...]
+    ] | None,
+    additional_sheet_scales: Mapping[str, tuple[float, float]] | None,
+    append_sheets: Callable[[Any], tuple[Callable[[], None], ...]] | None,
+    additional_sheets_title: str,
+    notes: str,
+    title_fit: bool,
+    unit: str,
+) -> dict[str, str]:
+    source = spec.source
+    quantities = row["configuration_quantities"]
+    total = sum(int(quantities[name]) for name in configurations)
     names = (*_PROPERTIES, "Material Specification", "Finish")
-    check(f"open {spec.artifact_stem} source", await adapter.open_model(str(source)))
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    if Path(model.GetPathName()).resolve() != source.resolve():
-        raise RuntimeError(f"opened configured purchased part is not {source}")
     properties = read_required_properties(model, names, required=names)
     expected = {
         "Number": str(row["number"]),
@@ -178,7 +376,8 @@ async def build_purchased_variant_drawing(
     )
     title = (
         f"{row['title']} — Configured Purchased Part Reference"
-        f"{' and Member Rework' if append_sheets is not None else ''} Drawing"
+        f"{f' and {additional_sheets_title}' if append_sheets is not None else ''}"
+        " Drawing"
     )
     stamp_drawing_summary(
         adapter,
@@ -186,7 +385,8 @@ async def build_purchased_variant_drawing(
         {
             0: title,
             1: (
-                "Harmonic Analyzer purchased-part identification and member rework"
+                "Harmonic Analyzer purchased-part identification and "
+                f"{additional_sheets_title.lower()}"
                 if append_sheets is not None
                 else "Harmonic Analyzer purchased-part identification; reference only"
             ),
@@ -225,16 +425,20 @@ async def build_purchased_variant_drawing(
     placed = []
     configured_views = []
     member_checks = []
-    sheet_scale = (1, 1)
-    for index, (configuration, label, cells, views) in enumerate(groups):
+    sheet_scale = None
+    for configuration, label, cells, views in groups:
         scales = _fit_views(draw, views, cells)
         center_marks = _center_marks_without_lines(views, cells)
-        if index == 0:
+        # The sheet's scale is the first orthographic member's.
+        if sheet_scale is None and "*Front" in scales:
             sheet_scale = scales["*Front"]
         if annotate_member is not None:
             member_checks.extend(annotate_member(adapter, configuration, cells, views))
-        left, right = cells[0][2][0], cells[2][2][2]
+        left = min(cell[0] for _, _, cell in cells)
+        right = max(cell[2] for _, _, cell in cells)
         caption = f"{label}  QTY {int(quantities[configuration])} INSTALLED"
+        if configuration in isometric_only:
+            caption += f", SEE SHEET {isometric_only[configuration]}"
         caption_cell = (left, 0.255, right, 0.264)
         note = _literal_note(adapter, caption, left, 0.262)
         # The insertion point is not an extent edge. Seat the measured text box
@@ -286,6 +490,8 @@ async def build_purchased_variant_drawing(
                 )
             )
             configured_views.append((view, configuration, scale, cell))
+    if sheet_scale is None:  # every member isometric-only: the first one's
+        sheet_scale = configured_views[0][2]
     purchase_note = f"QTY {total} INSTALLED MEMBERS; PURCHASE UNIT: {purchase_unit}."
     note = _literal_note(adapter, purchase_note, 0.018, 0.113)
     placed.append((note, purchase_note, purchase_note, (0.015, 0.107, 0.415, 0.114)))
@@ -295,6 +501,7 @@ async def build_purchased_variant_drawing(
             draw,
             properties,
             item=item,
+            notes=notes,
             cut_to_suit=cut_to_suit,
             general_text=general_text,
             label=spec.artifact_stem,
@@ -316,6 +523,11 @@ async def build_purchased_variant_drawing(
         False,
     )
     sheet.CustomPropertyView = first_view_name
+    title_check = None
+    if title_fit:
+        # The title links resolve, and their extents are measurable, after rebuild.
+        rebuild_drawing(adapter, label=f"{spec.artifact_stem} title-block fit")
+        title_check = fit_purchased_title_block(adapter, spec=spec)
 
     def assert_reference_sheet() -> None:
         if reference_sheet_name is not None and not _early_bound(
@@ -385,6 +597,8 @@ async def build_purchased_variant_drawing(
                     f"configured purchased note leaves its reserved space: {linked!r}; "
                     f"extent_m={box!r}, reserved_m={cell!r}, border_m={border!r}"
                 )
+        if title_check is not None:
+            title_check()
 
     additional_checks = ()
     if append_sheets is not None:
@@ -392,6 +606,12 @@ async def build_purchased_variant_drawing(
             reference_sheet_name: sheet_scale, **additional_sheet_scales,
         }
         additional_checks = append_sheets(adapter)
+
+    def checkpoint(stage: str) -> None:
+        # After an attempted close the drawing's handles are not dereferenced;
+        # the lifecycle exit check still observes the source.
+        if stage != "after_drawing_close":
+            assert_source(stage)
 
     return await finalize_drawing(
         adapter,
@@ -401,5 +621,11 @@ async def build_purchased_variant_drawing(
         scale=sheet_scale,
         expected_sheet_names=package_sheet_names,
         sheet_scales=package_sheet_scales,
-        settled_checks=(assert_reference_sheet, *member_checks, *additional_checks),
+        settled_checks=(
+            assert_reference_sheet,
+            *member_checks,
+            *additional_checks,
+            lambda: assert_source("settled before drawing save"),
+        ),
+        checkpoint=checkpoint,
     )

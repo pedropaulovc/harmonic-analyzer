@@ -25,10 +25,11 @@ the jig sheets (MHA-CH-06-TL-20 to TL-26 and the TL-00 jig assembly) from:
   an unrelated inventory edit does not rebuild the jig);
 * ``ALPHA_DEG``, kept at the brief's 16.4405 degrees;
 * the 350 x 1-1/2 in blank (strap stock 1018 cold-finish 1/8 x 1-1/2 in, OnlineMetals 4807);
-* the bought hardware the jig is built round (HIWIN HGR15 rail cut to 440,
-  HGH15CA Z0 carriage, shoulder screws and loose spacers) and the PM-30MV table (maker manual,
-  macclab.com PM-30MV-v3-2020-10: table 33 x 8-1/4 in, three 14 mm T-slots at
-  63.5 mm, spindle centreline 7-1/2 in from the pleated column cover).
+* the bought hardware the jig is built round (one generic HIWIN-style kit of
+  HGR15 rails, 450 as supplied, and HGH15CA carriages; shoulder screws and
+  loose spacers) and the PM-30MV table (maker manual, macclab.com
+  PM-30MV-v3-2020-10: table 33 x 8-1/4 in, three 14 mm T-slots at 63.5 mm,
+  spindle centreline 7-1/2 in from the pleated column cover).
 
 Plain shoulder-screw pivots positively capture both supports during both
 passes. Each 5/16-18 shoulder screw bottoms its shoulder on the block seat;
@@ -66,6 +67,19 @@ Error sensitivity (printed next to the bands that carry it):
   ``RADIUS_FROM_SHOULDER_CLEARANCE`` (0.112 mm).
   The block's locating counterbore has its own shoulder-clearance budget;
   there are no rolling bearings, press fits or mounted C3-play assumptions.
+* carriage play: lateral play of a carriage on its rail moves the pin
+  sideways to the rail, and the cut radius moves with it about 1:1
+  (``CARRIAGE_PLAY_RADIUS_PER_PLAY``). A numeric trammel check at
+  alpha 16.4405 deg, D 450.1, R_c 795.24 over the +/-11 deg sweep gave
+  0.01 / 0.02 / 0.05 mm of play as at most 0.010 / 0.020 / 0.050 mm of
+  radial error (owner, issue #2177). The fit-up acceptance is
+  ``CARRIAGE_PLAY_TIR_MAX`` 0.05 mm TIR at the shoulder-screw head, so its
+  radius contribution ``CARRIAGE_PLAY_RADIUS`` 0.050 is under the shoulder
+  term, and both together stay inside half the strap's .020 in (0.508) one-sided
+  ``TOP_EDGE_BAND`` that the hub aims at the middle of. The rail/carriage
+  pair's height and width tolerances do not apply: one carriage runs on each
+  rail, the selected shims set the carrier height, and HUB and CL are reamed
+  in place. So neither Z0 preload nor C accuracy is required of the pair.
 
 Sweep (Main, 2026-10-16). The brief swept the cutter over the whole 350
 blank, +/-13 degrees about C. Here each pass covers the part only. The
@@ -84,7 +98,9 @@ Pivot pin offset (owner-approved 2026-10-23). Keep ``PIN_OFFSET`` 32 toward
 the spindle along the rail, preserving both pass stations and the carrier
 hole layout. The plain .375 reamed shoulder seat replaces the former bearing
 cartridge. The carriage centre still runs 107.2 to 421.4 against the rail's
-45.7 to 424.3 (half the 61.4 carriage from each end of the 440 rail).
+45.7 to 434.3 (half the 61.4 carriage from each end of the 450 rail). The
+rail overhangs its 17.32 bar's far end by 10.07; the carriage's far end, at
+452.1 at most, stays over the bar (owner ruling 2026-11-04, #2177 option B).
 """
 
 from __future__ import annotations
@@ -346,16 +362,26 @@ SHOULDER_CARRIER_CLEARANCE = (0.0254, 0.0635)
 RADIUS_FROM_SHOULDER_CLEARANCE = (
     RADIUS_PER_SPACING * SHOULDER_CARRIER_CLEARANCE[1]
 )
+# Carriage play (docstring): the fit-up check's acceptance, TIR at the
+# shoulder-screw head rocking the carrier sideways to the rail, and the cut
+# radius it can move (1:1, owner's numeric trammel check, #2177).
+CARRIAGE_PLAY_TIR_MAX = 0.05
+CARRIAGE_PLAY_RADIUS_PER_PLAY = 1.0
+CARRIAGE_PLAY_RADIUS = CARRIAGE_PLAY_RADIUS_PER_PLAY * CARRIAGE_PLAY_TIR_MAX
+# The hub aims at the middle of the strap's one-sided top-edge band, so the
+# radial terms the jig adds must stay inside half of it.
+TOP_EDGE_HALF_BAND = (max(rocker.TOP_EDGE_BAND) - min(rocker.TOP_EDGE_BAND)) / 2.0
 
 # --- Bought hardware (catalogue values; not modelled in detail) --------------
-# HIWIN HGR15R rail, cut to 440 (inventory, Main 2026-10-16). The cut is a
-# special order: the symmetric 40 end distance below is the order
-# requirement the bars are drilled to, to be confirmed by the supplier.
-RAIL_LENGTH = 440.0
+# HGR15 rail, 450 as supplied (Amazon kit B0C4DJNL33, owner ruling #2177): a
+# generic HIWIN-style rail on the 60 pitch, 8 holes at a symmetric 15 end
+# distance. The listing states no pitch or end distance; its photos show 8
+# holes a rail. The bars are tapped to the received rails (TL-20).
+RAIL_LENGTH = 450.0
 RAIL_WIDTH = 15.0
 RAIL_HEIGHT = 15.0
 RAIL_HOLE_PITCH = 60.0
-RAIL_HOLE_COUNT = 7
+RAIL_HOLE_COUNT = 8
 RAIL_HOLE_END = (RAIL_LENGTH - (RAIL_HOLE_COUNT - 1) * RAIL_HOLE_PITCH) / 2.0
 # The rails' M4 holes (Ø4.5, Ø7.5 counterbore) take #8-32 UNC socket screws
 # (Ø4.17), keeping the repo's UNC thread policy. A 3/4 in screw seats on the
@@ -363,7 +389,8 @@ RAIL_HOLE_END = (RAIL_LENGTH - (RAIL_HOLE_COUNT - 1) * RAIL_HOLE_PITCH) / 2.0
 RAIL_SCREW = "#8-32"
 RAIL_SCREW_LENGTH = round(0.75 * INCH, 9)
 RAIL_SCREW_SEAT_ABOVE_BASE = 9.7
-# HIWIN HGH15CA carriage (Z0 preload).
+# HGH15CA carriage, HIWIN-style, from the same kit; accepted by the fit-up
+# play check (CARRIAGE_PLAY_TIR_MAX), not by preload or accuracy class.
 CARRIAGE_HEIGHT = 28.0  # rail seat to carriage top (H)
 CARRIAGE_UNDER = 4.3  # rail seat to the carriage's underside (H1)
 CARRIAGE_WIDTH = 34.0
@@ -372,8 +399,9 @@ CARRIAGE_BOLT_SPAN = (26.0, 26.0)  # (along, across), four M4 tapped
 CARRIAGE_BOLT = "M4"
 
 # --- Rails on the bars --------------------------------------------------------
-# Each rail's near end stops RAIL_NEAR_S from the spindle axis (brief); rail
-# and bar are the same length and flush.
+# Each rail's near end stops RAIL_NEAR_S from the spindle axis (brief), flush
+# with its bar's near end. The kit rail is used uncut: it runs RAIL_OVERHANG
+# past the bar's far end (owner ruling 2026-11-04, #2177 option B).
 RAIL_NEAR_S = 15.0
 RAIL_FAR_S = RAIL_NEAR_S + RAIL_LENGTH
 # A carriage stays fully on its rail: centre within half its length of an end.
@@ -450,9 +478,18 @@ BASE_BAR_WIDTH_IN = 5.5
 BASE_BAR_WIDTH = round(BASE_BAR_WIDTH_IN * INCH, 9)  # 139.7, milled
 BASE_BAR_COLUMN_EDGE = round(3.5 * INCH, 9)  # lateral +88.9
 BASE_BAR_OPERATOR_EDGE = BASE_BAR_COLUMN_EDGE - BASE_BAR_WIDTH  # lateral -50.8
-# The rail's 440 cut printed on the bar's .XX grid: the rail overhangs the
-# bar's far end by .07 mm, inside the length's band.
+# Owner ruling 2026-11-04 (#2177, option B): the bars keep their 17.32 length,
+# so bar 1's blank sawn 2026-10-29 stays usable and no stock is bought; the
+# 450 kit rail, used uncut, overhangs the bar's far end by 10.07.
 BASE_BAR_LENGTH = 439.928  # 17.32
+BASE_BAR_FAR_S = RAIL_NEAR_S + BASE_BAR_LENGTH
+RAIL_OVERHANG = RAIL_FAR_S - BASE_BAR_FAR_S  # 10.07
+# The rail's last hole stays on the bar, and the carriage stays over the bar
+# at the far end of its working travel.
+if not RAIL_NEAR_S + RAIL_HOLE_END + (RAIL_HOLE_COUNT - 1) * RAIL_HOLE_PITCH < BASE_BAR_FAR_S:
+    raise AssertionError("the rail's last hole lies past the bar's far end")
+if not CARRIAGE_TRAVEL[1] + CARRIAGE_LENGTH / 2.0 < BASE_BAR_FAR_S:
+    raise AssertionError("the carriage runs off the bar onto the rail's overhang")
 # Two 1/2-13 hold-down studs per bar in .53 slots across the bar, one each
 # side of the rail, outside the carriage's sweep. Their stations put both on
 # T-slots two pitches apart, the far one inside the table end by a T-nut.
@@ -527,6 +564,10 @@ if not (
     and CARRIAGE_TRAVEL[1] <= CARRIAGE_S_RANGE[1]
 ):
     raise AssertionError("a carriage runs off its rail inside the pass sweep")
+if CARRIAGE_PLAY_RADIUS > RADIUS_FROM_SHOULDER_CLEARANCE:
+    raise AssertionError("the carriage-play term outgrows the shoulder-clearance term")
+if RADIUS_FROM_SHOULDER_CLEARANCE + CARRIAGE_PLAY_RADIUS > TOP_EDGE_HALF_BAND:
+    raise AssertionError("the jig's radial error terms leave half the top-edge band")
 if abs((STUD_Y[0] - STUD_Y[1]) - 2.0 * TSLOT_PITCH) > 1e-9:
     raise AssertionError("the hold-down studs do not land two T-slot pitches apart")
 if min(RISER_SCREW_WALLS) < WALL_TARGET_MM:

@@ -5,7 +5,7 @@
  */
 import mapping from './content/current-native-identities.json' with { type: 'json' }
 
-export const CURRENT_NATIVE_IDENTITY_MAP_SHA256 = '21642569981c850df7b41b602305bb9bfe3d235102fe0690169ce8579e3734b2'
+export const CURRENT_NATIVE_IDENTITY_MAP_SHA256 = 'fdcb3772649eab7b088ed78ef2714f905ed012204d33ed386e59ba17757e1882'
 export const CURRENT_NATIVE_OCCURRENCE_NAMESPACE = 'archive-role-local'
 export const CURRENT_NATIVE_IDENTITY_PROJECTION = Object.freeze({
   kind: 'current-native-identity-projection',
@@ -60,6 +60,14 @@ function register(sourceStem, sourceNumber, identities) {
 }
 for (const row of [...mapping.machineVendors, ...mapping.nativeIdentities]) register(row.sourceStem, row.sourceNumber, row.identities)
 for (const row of [...mapping.toolingVendors, ...mapping.archiveOnlyVendors]) register(row.sourceStem, row.sourceNumber, [row])
+// Named-configuration members: shared SKU groups and parent-scoped kits such
+// as the jig's rail and leadscrew kits (#2187), which keep their parent prefix.
+const memberConfigurations = new Map(mapping.sharedVendors.map(row => [row.stem, row.configurations]))
+for (const records of targets.values()) for (const { identity } of records) {
+  if (identity.configuration && !shared.has(identity.stem)) {
+    memberConfigurations.set(identity.stem, [...new Set([...(memberConfigurations.get(identity.stem) ?? []), identity.configuration])])
+  }
+}
 const tokens = [...new Set([...sources.keys(), ...aliases.keys(), ...priorTargets.keys(),
   ...Array.from(targets.values()).flatMap(records => records.map(record => record.identity.stem))])].sort((a, b) => b.length - a.length)
 const INSTANCE = /^(?:__[A-Za-z][A-Za-z0-9]*)?(?:(?:--[A-Za-z][A-Za-z0-9_.]*)*-[1-9][0-9]*|-stretch[0-9]{2}-[1-9][0-9]*)(?:@[A-Za-z][A-Za-z0-9_-]*)?$/
@@ -82,17 +90,18 @@ function resolveIdentity(stem, parent, suffix = '') {
     const role = /^__([A-Za-z][A-Za-z0-9]*)/.exec(suffix)?.[1]
     const configuration = /^--([A-Za-z][A-Za-z0-9_.]*)/.exec(suffix)?.[1]
     if (role) records = records.filter(record => record.identity.role === role)
-    if (configuration && shared.has(stem) && !shared.get(stem).configurations.includes('Default')) records = records.filter(record => record.identity.configuration === configuration)
+    const configurations = memberConfigurations.get(stem)
+    if (configuration && configurations && !configurations.includes('Default')) records = records.filter(record => record.identity.configuration === configuration)
   }
   const identities = new Map(records.map(record => [contextKey(record.identity), record.identity]))
   if (identities.size !== 1) fail(`native identity ${stem} has no unique immediate parent/member ${parent ?? '<root>'}`)
   const identity = identities.values().next().value
   const role = /^__([A-Za-z][A-Za-z0-9]*)/.exec(suffix)?.[1]
   if (role && role !== identity.role) fail(`wrong role for ${stem}`)
-  const group = shared.get(identity.stem)
-  if (group) {
+  const configurations = memberConfigurations.get(identity.stem)
+  if (configurations) {
     const configuration = /^--([A-Za-z][A-Za-z0-9_.]*)/.exec(suffix)?.[1]
-    if (configuration && group.configurations.includes(configuration) && configuration !== identity.configuration) fail(`wrong configuration for ${stem}`)
+    if (configuration && configurations.includes(configuration) && configuration !== identity.configuration) fail(`wrong configuration for ${stem}`)
   }
   return { records, identity }
 }
@@ -221,7 +230,7 @@ export function projectCurrentNativeDocument(document, occurrenceNamespace = CUR
     const parent = token(parentName)?.stem ?? parentName
     const resolved = resolveIdentity(found.stem, parent || null, found.suffix)
     const result = { ...identity }
-    if (shared.has(resolved.identity.stem)) {
+    if (memberConfigurations.has(resolved.identity.stem)) {
       result.configuration = resolved.identity.configuration
       result.role = resolved.identity.role
       result.occurrenceNamespace = CURRENT_NATIVE_OCCURRENCE_NAMESPACE

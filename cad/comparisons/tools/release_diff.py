@@ -21,8 +21,9 @@ never the whole 460 MB asset.
 
 The current identity map composes active and retired release provenance with the
 sealed historical map. Retired rows reserve identities without reactivating CAD
-or API entries. Shared vendor aliases converge by exact member configuration,
-retaining every historical candidate rather than selecting one clone. Bare shared
+or API entries. Configured families (shared vendor groups and parent-scoped
+configured kits) converge by exact member configuration, retaining every
+historical candidate rather than selecting one clone. Bare configured-family
 neutral files represent only their declared active member. Configuration/stretch
 qualifiers remain distinct. ``--parts`` accepts historical or current geometry
 mesh keys, not archive-role-local selectors or native Component2.Name2 paths.
@@ -72,7 +73,7 @@ class AliasContext(NamedTuple):
 
 class IdentityMapping(NamedTuple):
     aliases: dict[str, tuple[MeshTarget, ...]]
-    shared_groups: dict[str, dict]
+    configured_families: dict[str, dict]
     alias_contexts: dict[str, AliasContext]
 
 
@@ -81,22 +82,25 @@ def load_identity_map(path=IDENTITY_MAP, historical_path=HISTORICAL_IDENTITY_MAP
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     if payload.get("schema_version") != 1:
         raise ValueError("release diff current identity map requires schema_version 1")
-    groups, numbers = {}, {}
-    for group in payload.get("shared_vendor_groups", []):
-        stem, number = group["stem"], group["number"]
+    # One native part, its members as named configurations: the shared vendor
+    # groups and the parent-scoped configured kits (the oblique jig's rail and
+    # leadscrew kits, #2187) carry the same member and default metadata.
+    families, numbers = {}, {}
+    for family in payload.get("shared_vendor_groups", []) + payload.get("configured_kits", []):
+        stem, number = family["stem"], family["number"]
         _check_stems(stem)
-        configurations = group["configurations"]
-        if (stem in groups or number in numbers or not configurations
+        configurations = family["configurations"]
+        if (stem in families or number in numbers or not configurations
                 or any(not isinstance(c, str) or not c for c in configurations)
                 or len({c.lower() for c in configurations}) != len(configurations)
                 or ("Default" in configurations and configurations != ["Default"])
-                or group["neutral_export_configuration"] not in configurations):
-            raise ValueError(f"conflicting shared vendor group: {group!r}")
-        groups[stem], numbers[number] = group, stem
+                or family["neutral_export_configuration"] not in configurations):
+            raise ValueError(f"conflicting configured family: {family!r}")
+        families[stem], numbers[number] = family, stem
 
     aliases, identities, old_stems = {}, {}, set()
     prior_identities, prior_numbers = {}, {}
-    row_numbers = set()
+    row_numbers, members = set(), {}
     contexts = {}
 
     def assign(alias, targets, generation, prior_stems):
@@ -128,32 +132,35 @@ def load_identity_map(path=IDENTITY_MAP, historical_path=HISTORICAL_IDENTITY_MAP
             if ((stem in identities and identities[stem] != number)
                     or (number is not None and number in numbers and numbers[number] != stem)):
                 raise ValueError(f"duplicate or conflicting current identity: {identity!r}")
-            if stem in identities and stem not in groups:
-                raise ValueError(f"duplicate current identity: {identity!r}")
-            identities[stem] = number
-            if number is not None:
-                numbers[number] = stem
-            configuration = None
-            if stem in groups:
-                group = groups[stem]
-                configuration = identity.get("configuration")
-                if (number != group["number"] or configuration not in group["configurations"]
+            configuration = identity.get("configuration")
+            if stem in families:
+                family = families[stem]
+                if (number != family["number"] or configuration not in family["configurations"]
                         or not identity.get("prior_number") or not identity.get("role")):
-                    raise ValueError(f"conflicting shared member identity: {identity!r}")
+                    raise ValueError(f"conflicting configured member identity: {identity!r}")
                 prior = identity.get("prior_stem")
                 _check_stems(prior)
                 prior_number, role = identity["prior_number"], identity["role"]
                 contract = (prior_number, stem, configuration, role)
                 if ((prior in prior_identities and prior_identities[prior] != contract)
                         or (prior_number in prior_numbers and prior_numbers[prior_number] != prior)):
-                    raise ValueError(f"conflicting prior shared identity: {identity!r}")
+                    raise ValueError(f"conflicting prior configured identity: {identity!r}")
                 prior_identities[prior], prior_numbers[prior_number] = contract, prior
+                members.setdefault(stem, set()).add(configuration)
                 assign(prior, (MeshTarget(stem, configuration),), "prior-current", (prior,))
+            elif configuration is not None:
+                raise ValueError(f"configured identity outside a configured family: {identity!r}")
+            elif stem in identities:
+                raise ValueError(f"duplicate current identity: {identity!r}")
+            identities[stem] = number
+            if number is not None:
+                numbers[number] = stem
             targets.append(MeshTarget(stem, configuration))
             lineages.append(identity.get("prior_stem", stem))
         assign(old, targets, "category", lineages)
-    if groups.keys() - identities.keys():
-        raise ValueError("shared vendor group has no current identity")
+    if any(set(family["configurations"]) != members.get(stem, set())
+           for stem, family in families.items()):
+        raise ValueError("a configured family member has no current identity")
 
     for row in payload.get("historical_current_aliases", []):
         old, prior, current = row["old_stem"], row["prior_current_stem"], row["current_stem"]
@@ -178,7 +185,7 @@ def load_identity_map(path=IDENTITY_MAP, historical_path=HISTORICAL_IDENTITY_MAP
         historical_targets.add(prior)
         lineages = contexts[prior].prior_stems if prior in contexts else (prior,)
         assign(old, aliases.get(prior, (MeshTarget(prior),)), "archive", lineages)
-    return IdentityMapping(aliases, groups, contexts)
+    return IdentityMapping(aliases, families, contexts)
 
 
 def split_mesh_key(key):
@@ -211,7 +218,7 @@ def _native_occurrence_stem(key, mapping):
     stem, separator, ordinal = key.rpartition("-")
     if not separator or not re.fullmatch(r"\d+", ordinal):
         return None
-    if stem in mapping.aliases or stem in mapping.shared_groups:
+    if stem in mapping.aliases or stem in mapping.configured_families:
         return stem
     return None
 
@@ -226,7 +233,7 @@ def canonical_keys(key, mapping, *, drawing=False):
     if _native_occurrence_stem(key, mapping) is not None:
         raise ValueError(f"native occurrence request is not a geometry mesh key: {key!r}")
     stem, suffix = split_mesh_key(key)
-    group = mapping.shared_groups.get(stem)
+    group = mapping.configured_families.get(stem)
     if group:
         if re.fullmatch(r"--.+-\d+", suffix):
             raise ValueError(f"archive-role-local occurrence request is not a geometry mesh key: {key!r}")
@@ -244,7 +251,7 @@ def canonical_keys(key, mapping, *, drawing=False):
 def _declared_shared_collision(logical, actuals, mapping):
     """Allow distinct same-generation sources, not overlapping stale aliases."""
     stem, _ = split_mesh_key(logical)
-    group = mapping.shared_groups.get(stem)
+    group = mapping.configured_families.get(stem)
     if group is None:
         return False
     keys = [geometry_key(actual) for actual in actuals]
@@ -429,15 +436,15 @@ def member(cd, sub, base, ext):
 def artifact_member(cd, sub, base, ext, mapping):
     """Resolve an exact physical member, then its declared per-format neutral path.
 
-    Only current shared member metadata authorizes STEP/STL basename differences.
-    Archived names use their actual files, never a guessed shared export path.
+    Only current configured-family member metadata authorizes STEP/STL basename
+    differences. Archived names use their actual files, never a guessed export path.
     """
     canonical_keys(base, mapping)
     entry = member(cd, sub, base, ext)
     if entry is not None:
         return entry, base
     stem, suffix = split_mesh_key(base.lower())
-    group = mapping.shared_groups.get(stem)
+    group = mapping.configured_families.get(stem)
     if group is None:
         return None
     configuration = (group["neutral_export_configuration"] if not suffix else next(
@@ -541,9 +548,9 @@ def mesh_deviation(tag_a: str, tag_b: str, base_a: str, base_b: str) -> dict[str
 def release_inventory(cd, mapping):
     """Index one comparison source per member, with CRCs kept per format.
 
-    Historical clones remain separate sources. Current shared first-member
-    STEP/STL spellings are merged by the declared physical export paths, so a
-    bare STEP is never compared with a qualified STL signature.
+    Historical clones remain separate sources. Current configured-family
+    first-member STEP/STL spellings are merged by the declared physical export
+    paths, so a bare STEP is never compared with a qualified STL signature.
     """
     physical = {}
     for name, entry in cd.items():
@@ -561,7 +568,7 @@ def release_inventory(cd, mapping):
     inventory = {}
     for actual, formats in physical.items():
         stem, suffix = split_mesh_key(actual)
-        group = mapping.shared_groups.get(stem)
+        group = mapping.configured_families.get(stem)
         configuration = None
         if group is not None:
             configuration = (group["neutral_export_configuration"] if not suffix else next(
@@ -575,7 +582,7 @@ def release_inventory(cd, mapping):
             for kind in formats:
                 if paths[kind].stem.lower() != actual:
                     raise ValueError(
-                        f"conflicting shared {kind} export for {source!r}: {actual!r}; "
+                        f"conflicting configured {kind} export for {source!r}: {actual!r}; "
                         f"declared physical member is {paths[kind].stem!r}"
                     )
         combined = inventory.setdefault(source, {})
