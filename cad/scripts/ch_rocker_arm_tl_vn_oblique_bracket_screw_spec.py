@@ -3,7 +3,7 @@ r"""MHA-CH-06-TL-VN-62 oblique-trammel end bracket screw: McMaster 91251A196.
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  Shop fixture hardware (cad/docs/subsystem-identities.md), modelled
 so the jig assembly can mate it and run native interference: the
-``#8-32 X 5/8 SHCS`` that holds a TL-28 end bracket to the TL-20 base bar, up from the bar's underside into the bracket, tapped THRU; the head seats on the floor of TL-20's counterbore.
+``#8-32 X 5/8 SHCS`` that holds a TL-28 end bracket to the TL-20 base bar, up from the bar's underside into the bracket's .450 MIN full thread; the head seats on the floor of TL-20's counterbore.
 It is the C4 fastener table's ``BRACKET_TO_BAR`` row.  It is its own row on the
 jig's BOM; the shop inventory carries no screw stock (no ``INVENTORY_ID``),
 and the assembly steps cite it by item and callout (``fasteners.callout``).

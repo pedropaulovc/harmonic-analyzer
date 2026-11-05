@@ -8,7 +8,9 @@ one native callout per tap over it, each leader on its own hole; the end
 view, projected right of the plan, carries the stock thickness; the shaded
 isometric rides top right at 1:1, clear of the title block. No datums
 (drawing-guidelines.md rule 5). The two KP08 tap stations print exact
-millimetres, labelled mm (owner ruling 4, 2026-11-01).
+millimetres, labelled mm (owner ruling 4, 2026-11-01). Each tap drill runs
+THRU and each thread prints its .450 MIN full-thread depth from its screw's
+face, the bar taps' FAR SIDE (owner ruling 2026-11-05: the hand traveler).
 
 Run with SolidWorks open::
 
@@ -64,6 +66,7 @@ from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     BAR_TAP_DRILL,
     BAR_TAP_SPEC,
     BAR_TAP_X,
+    BAR_THREAD_CALLOUT,
     BRACKET_LENGTH,
     BRACKET_THICK,
     BRACKET_WIDTH,
@@ -76,6 +79,7 @@ from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     KP08_TAP_DRILL,
     KP08_TAP_SPEC,
     KP08_TAP_X,
+    KP08_THREAD_CALLOUT,
     METRIC_DIMENSIONS,
     ROW_CALLOUT,
     STOCK_CALLOUTS,
@@ -227,9 +231,11 @@ END_KEEP: dict[str, tuple[float, float, float]] = {
 # the tap kind, its X, the text block's centre (model X, Y) and the side (-1
 # left, +1 right) whose upper rim the edge pick takes.
 TAP_DRILLS = {"bar": BAR_TAP_DRILL, "kp08": KP08_TAP_DRILL}
-# Each callout's two rows, about this wide (glyphs): "Ø.136 THRU ALL" /
-# "8-32 UNC THRU ALL" and "Ø.107 THRU ALL" / "6-32 UNC THRU ALL".
-CALLOUT_GLYPHS = {"bar": 17, "kp08": 17}
+# What follows each callout's thread depth: MIN, and the bar taps' FAR SIDE.
+THREAD_CALLOUTS = {"bar": BAR_THREAD_CALLOUT, "kp08": KP08_THREAD_CALLOUT}
+# Each callout's two rows, its wider about this many glyphs: "Ø.136 THRU ALL" /
+# "8-32 UNC ▽.450 MIN FAR SIDE" and "Ø.107 THRU ALL" / "6-32 UNC ▽.450 MIN".
+CALLOUT_GLYPHS = {"bar": 27, "kp08": 18}
 _TIER_PITCH = 2.0 * text_half_high(2) + STACK_PITCH + 0.1  # 7.46
 TAP_TIERS = tuple(
     _HW + 5.0 + text_half_high(2) + 0.2 + k * _TIER_PITCH for k in range(3)
@@ -360,8 +366,9 @@ for _index, _x in enumerate(part_spec.BAR_TAP_X, start=1):
         faces=(CylinderFace(part_spec.BAR_TAP_DRILL, contains_x_mm=_x),),
         requirements=("thread", "dia", "station", "height", "thru", "note"),
         fields={
-            "at": ([_x, 0.0, part_spec.BRACKET_THICK], ("BAR_TAP_X", "BRACKET_THICK")),
-            "axis": _INTO_BRACKET,
+            # Entered and threaded from the bar (bottom) face; the drill runs THRU.
+            "at": ([_x, 0.0, 0.0], ("BAR_TAP_X", "BAR_TAP_FACE")),
+            "axis": ([0.0, 0.0, 1.0], ("BAR_TAP_FACE",)),
             "thread": (
                 f"{part_spec.BAR_SCREW} UNC-{part_spec.BAR_TAP_SPEC.thread_class}",
                 ("BAR_TAP_SPEC", "BAR_SCREW"),
@@ -403,7 +410,8 @@ for _index, _x in enumerate(part_spec.KP08_TAP_X, start=1):
         faces=(CylinderFace(part_spec.KP08_TAP_DRILL, contains_x_mm=_x),),
         requirements=("thread", "dia", "station", "height", "thru", "note"),
         fields={
-            "at": ([_x, 0.0, part_spec.BRACKET_THICK], ("KP08_TAP_X", "BRACKET_THICK")),
+            # Entered and threaded from the KP08 (top) face; the drill runs THRU.
+            "at": ([_x, 0.0, part_spec.BRACKET_THICK], ("KP08_TAP_X", "KP08_TAP_FACE")),
             "axis": _INTO_BRACKET,
             "thread": (
                 f"{part_spec.KP08_THREAD} UNC-{part_spec.KP08_TAP_SPEC.thread_class}",
@@ -463,8 +471,8 @@ def _view_mapper(adapter: Any, view: Any):
 
 def _omit_tap_thread_class(display: Any, *, label: str) -> None:
     """The title block's THREADS row owns the UNC class (rule 2): the #8 rows
-    read ``8-32 UNC THRU ALL`` and the KP08 rows ``6-32 UNC THRU ALL``, not
-    ``... - 2B ...``."""
+    read ``8-32 UNC ▽.450 MIN FAR SIDE`` and the KP08 rows ``6-32 UNC ▽.450
+    MIN``, not ``... - 2B ...``."""
     omit_title_block_thread_class(display, label=label)
     native = _early_bound(display, "IDisplayDimension")
     resolved = [str(native.GetText(part) or "") for part in (1, 2, 3, 4)]
@@ -488,9 +496,26 @@ def single_hole_definitions(definitions: dict[int, str]) -> dict[int, str]:
     return {**definitions, part: _COUNT.sub("", definitions[part], count=1)}
 
 
+_THREAD_DEPTH = "<hw-threaddepth>"
+
+
+def thread_depth_definitions(
+    definitions: dict[int, str], callout: str
+) -> dict[int, str]:
+    """Follow the one native thread depth with ``callout`` (``MIN``, and the
+    bar taps' ``FAR SIDE``); the depth variable itself stays live."""
+    owners = [part for part, text in definitions.items() if _THREAD_DEPTH in text]
+    if len(owners) != 1 or definitions[owners[0]].count(_THREAD_DEPTH) != 1:
+        raise RuntimeError(f"hole callout lacks one thread depth: {definitions!r}")
+    (part,) = owners
+    text = definitions[part].replace(_THREAD_DEPTH, f"{_THREAD_DEPTH} {callout}", 1)
+    return {**definitions, part: text}
+
+
 @_telemetry.traced("drawing.end_bracket.single_hole_callout")
-def _call_out_one_hole(display: Any, *, label: str) -> None:
-    """Write the count-free definition; prove no row prints a count."""
+def _call_out_one_hole(display: Any, *, label: str, thread_callout: str) -> None:
+    """Write the count-free definition with the thread depth's ``thread_callout``;
+    prove no row prints a count and one row prints the callout."""
     native = _early_bound(display, "IDisplayDimension")
 
     def read(parts: tuple[int, ...]) -> dict[int, str]:
@@ -499,17 +524,21 @@ def _call_out_one_hole(display: Any, *, label: str) -> None:
         }
 
     definitions = read((5, 6, 7, 8))
-    updated = single_hole_definitions(definitions)
+    updated = thread_depth_definitions(
+        single_hole_definitions(definitions), thread_callout
+    )
     for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
         if updated[definition_part] != definitions[definition_part]:
             native.SetText(writable_part, updated[definition_part])
     persisted = read((5, 6, 7, 8))
     resolved = read((1, 2, 3, 4))
-    if persisted != updated or any(
-        _PRINTED_COUNT.search(text) for text in resolved.values()
+    if (
+        persisted != updated
+        or any(_PRINTED_COUNT.search(text) for text in resolved.values())
+        or sum(text.count(thread_callout) for text in resolved.values()) != 1
     ):
         raise RuntimeError(
-            f"{label}: callout still prints a count: "
+            f"{label}: callout prints a count or misses {thread_callout!r}: "
             f"definitions={persisted!r}, resolved={resolved!r}"
         )
     _telemetry.info(f"{label}: {resolved!r}")
@@ -637,7 +666,7 @@ async def build(adapter: Any) -> dict[str, str]:
             callout_xy=on_plan((text_x, text_y, _H)),
             label=label,
         )
-        _call_out_one_hole(callout, label=label)
+        _call_out_one_hole(callout, label=label, thread_callout=THREAD_CALLOUTS[kind])
         _omit_tap_thread_class(callout, label=label)
         set_callout_lengths_to_three_places(callout, label=label)
 

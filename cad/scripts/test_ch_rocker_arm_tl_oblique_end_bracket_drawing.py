@@ -12,6 +12,7 @@ import _config
 import _drawing_contract
 import build_ch_rocker_arm_tl_oblique_end_bracket as part
 import ch_rocker_arm_tl_oblique_end_bracket_spec as spec
+import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_end_bracket as drawing
@@ -111,6 +112,9 @@ def test_bar_taps_land_on_the_base_bars_bracket_holes() -> None:
     assert spec.BAR_TAP_SPEC.end == "through_all"
     # No counterbore in this part: the screws come up through the bar.
     assert not any(kind.startswith("counterbore") for kind in (spec.BAR_TAP_SPEC.kind,))
+    # Their threads start on the bar (bottom) face, where the screws enter.
+    assert spec.BAR_TAP_FACE == ((0.0, 0.0, -1.0), 0.0)
+    assert all(h["at"][2] == 0.0 and h["axis"] == [0.0, 0.0, 1.0] for h in holes)
 
 
 def test_both_patterns_fit_their_mates_at_three_places() -> None:
@@ -185,9 +189,29 @@ def test_walls_hold_rule_17_at_worst_case() -> None:
     assert bar_1["height"][0] - bar_r >= WALL_TARGET_MM
 
 
-def test_through_thread_offers_one_and_a_half_diameters() -> None:
-    for thread in (spec.BAR_SCREW, spec.KP08_THREAD):
-        assert spec.BRACKET_THICK >= 1.5 * THREAD_MAJOR_MM[thread]
+def test_threads_stop_at_a_full_thread_from_the_screws_faces() -> None:
+    # Owner ruling 2026-11-05: the CAD matches the 2026-11-02 hand traveler.
+    # Drill THRU; thread .450 MIN from each screw's face.
+    assert spec.FULL_THREAD_DEPTH == pytest.approx(0.450 * 25.4)
+    assert spec.FULL_THREAD_DEPTH < spec.BRACKET_THICK - spec.THICK_STOCK_BAND
+    assert spec.KP08_TAP_FACE == ((0.0, 0.0, 1.0), spec.BRACKET_THICK)
+    assert spec.BAR_THREAD_CALLOUT == "MIN FAR SIDE"
+    assert spec.KP08_THREAD_CALLOUT == "MIN"
+    for thread, reach in spec.SCREW_REACH_MAX.items():
+        assert spec.FULL_THREAD_DEPTH >= 1.5 * THREAD_MAJOR_MM[thread]
+        assert 1.5 * THREAD_MAJOR_MM[thread] <= reach <= spec.FULL_THREAD_DEPTH
+    assert spec.SCREW_REACH_MAX[spec.KP08_THREAD] == pytest.approx(10.875)
+    taps = {name: f for name, f in _features().items() if "_tap_" in name}
+    assert len(taps) == 6 and all(f["thru"] is True for f in taps.values())
+    # Both wizard features take the blind thread after their THRU tap drill.
+    builder = Path(part.__file__).read_text(encoding="utf-8")
+    for feature in ("BarTaps", "KP08Taps"):
+        assert builder.count(f'_thread_from_face(adapter, "{feature}"') == 1
+    # The fastener table's receiving thread is the full thread, not the height.
+    assert fasteners.BRACKET_TO_BAR.thread_depth_mm == spec.FULL_THREAD_DEPTH
+    assert fasteners.KP08_TO_BRACKET.thread_depth_mm == spec.FULL_THREAD_DEPTH
+    assert fasteners.BRACKET_TO_BAR.protrusion_mm < 0.0
+    assert fasteners.KP08_TO_BRACKET.protrusion_mm < 0.0
 
 
 def test_holes_carry_the_title_block_band_except_the_kp08_stations() -> None:
@@ -288,6 +312,30 @@ def test_single_hole_definitions_drop_exactly_the_count() -> None:
         drawing.single_hole_definitions({5: "", 6: "", 7: ""})
     assert drawing._PRINTED_COUNT.search("x\n2X Ø3.45 THRU ALL")
     assert not drawing._PRINTED_COUNT.search("Ø3.45 THRU ALL\n6-32 UNC THRU ALL")
+
+
+def test_thread_depth_definitions_follow_the_depth_with_its_callout() -> None:
+    definitions = {
+        5: "<hw-thread> UNC - <hw-threadclass> <HOLE-DEPTH><hw-threaddepth>",
+        6: "",
+        7: "<MOD-DIAM><hw-tapdrldia> THRU ALL",
+        8: "",
+    }
+    updated = drawing.thread_depth_definitions(definitions, "MIN FAR SIDE")
+    assert updated == {
+        **definitions,
+        5: "<hw-thread> UNC - <hw-threadclass> <HOLE-DEPTH><hw-threaddepth> MIN FAR SIDE",
+    }
+    with pytest.raises(RuntimeError):
+        drawing.thread_depth_definitions(
+            {**definitions, 5: "<hw-thread> THRU ALL"}, "MIN"
+        )
+    with pytest.raises(RuntimeError):
+        drawing.thread_depth_definitions({**definitions, 6: "<hw-threaddepth>"}, "MIN")
+    assert drawing.THREAD_CALLOUTS == {
+        "bar": spec.BAR_THREAD_CALLOUT,
+        "kp08": spec.KP08_THREAD_CALLOUT,
+    }
 
 
 # --- Sheet layout (model mm in the plan, sheet m around it) -----------------------

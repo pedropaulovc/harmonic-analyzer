@@ -1361,14 +1361,15 @@ FASTENER_TABLE = {
     "BRACKET_TO_BAR": (
         f"{leadscrew.BAR_SCREW} X {leadscrew.BAR_SCREW_LENGTH} SHCS", 8,
         leadscrew.BAR_SCREW_ENGAGEMENT,
-        leadscrew.BAR_SCREW_ENGAGEMENT - leadscrew.BRACKET_THICK,
+        leadscrew.BAR_SCREW_ENGAGEMENT - end_bracket.FULL_THREAD_DEPTH,
     ),
     "BLOCK_TO_CARRIAGE": (
         "M4 X 20 SHCS", 8,
         pivot_block.SCREW_REACH,
         pivot_block.SCREW_REACH - pivot_block.CARRIAGE_THREAD_DEPTH,
     ),
-    "KP08_TO_BRACKET": ("#6-32 X 5/8 BHCS", 4, 10.875, -14.525),
+    # Into TL-28's .450 MIN full thread (drilled THRU; owner ruling 2026-11-05).
+    "KP08_TO_BRACKET": ("#6-32 X 5/8 BHCS", 4, 10.875, 10.875 - 0.450 * 25.4),
     # The 5/8 screw past the TL-VN-84 FeedNut flange (its head seated in the
     # countersink) into the lug's THRU tap, the tip stopping inside it.
     "NUT_TO_FEED_BLOCK": (

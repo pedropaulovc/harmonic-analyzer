@@ -1,6 +1,6 @@
 r"""Purchased MHA-CH-06-TL-VN-65 oblique-trammel pillow block screw: McMaster 91255A150.
 
-The ``#6-32 X 5/8 BHCS`` (``ch_rocker_arm_tl_vn_oblique_kp08_screw_spec``) that holds a KP08 pillow block to its TL-28 end bracket, tapped THRU.
+The ``#6-32 X 5/8 BHCS`` (``ch_rocker_arm_tl_vn_oblique_kp08_screw_spec``) that holds a KP08 pillow block to its TL-28 end bracket, into the bracket's .450 MIN full thread.
 The stock recipe ``diagnostics/diag_build_91255A150.py`` builds the catalogue screw on
 the button-head recipe (``diag_mcmaster_button_head.build_button_head``);
 the recipe's standalone run is catalog-only (no vendor model, no replica
