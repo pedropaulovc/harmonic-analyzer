@@ -186,7 +186,10 @@ RIGHT_DIMENSION_CALLOUTS = {"FaceWidth": FACE_WIDTH_CALLOUT}
 # x < 0 centre drawn under the axis whichever way the view mirrors.
 # (19e33c6c2 let visible_circle_edge break the tie between the two x < 0
 # taps on float noise: it took the upper one and the leader crossed the bore.)
-TAP_TEXT_BLOCK = (0.084, 0.037)
+# Seven rows (the native thread line and TAP_CALLOUT_LINES, the finished wall
+# last, #2167): the block grows upward from the fixed shoulder, its top
+# ~4.6 mm under the tip circle at the shoulder's x.
+TAP_TEXT_BLOCK = (0.084, 0.043)
 _TAP_SHOULDER = (FRONT_CENTER[0] - 0.015, FRONT_CENTER[1] - 0.085)
 TAP_CALLOUT_XY = (
     _TAP_SHOULDER[0] - TAP_TEXT_BLOCK[0] / 2.0,

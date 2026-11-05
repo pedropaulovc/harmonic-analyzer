@@ -19,6 +19,7 @@ import _component_references
 import _drawing_balloons
 import _drawing_tables
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
+from _printed_tolerance import printed_band_mm
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES
 import build_pd_paper_drive_assembly as assembly
@@ -1514,6 +1515,22 @@ def test_the_rear_cup_is_pinned_and_the_nut_seats_on_the_faced_pilot() -> None:
         f"{disc.inch_text(cup.PIN_HOLE_FROM_FRONT, 3)} FROM THE CUP FRONT",
     ):
         assert text in knob, text
+    # #2169: the step prints the pin station at three places, so the sheet's
+    # title-block band (wider than the cup's .004 marking-out) holds it; the
+    # shortest 1.61 journal, less its .010 rear-end break, still leaves the
+    # end wall over its .080 target.  The match-drilled crosshole's mouths
+    # stay buried in the cup's bore, unbroken, and charge nothing.
+    station_band = printed_band_mm(
+        3, unit=assembly_contract("pd-paper-drive").drawing_unit
+    )
+    end_wall = (
+        knob_shaft.JOURNAL_REAR_EXTENSION_MIN
+        - (cup.PIN_HOLE_FROM_FRONT + station_band)
+        - cup_pin.HOLE_MAX / 2.0
+        - knob_shaft.EDGE_BREAK_MAX
+    )
+    assert end_wall == pytest.approx(0.0815 * 25.4, abs=1e-9)
+    assert end_wall >= cup.WALL_FLOOR
     seq = steps.SEQUENCE
     assert seq.index("pilot-faced-to-fit") < seq.index("knob-stack-fitted")
     assert seq.index("pilot-faced-to-fit") < seq.index("collar-shoulder-seated")

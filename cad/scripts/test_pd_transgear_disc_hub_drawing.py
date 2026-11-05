@@ -633,6 +633,47 @@ def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
     assert spec.FLAT_WALL_WORST == pytest.approx(flat_wall, abs=1e-9)
 
 
+def test_finished_walls_over_the_bore_pay_both_end_breaks() -> None:
+    """#2168 (Codjiflo on #2124): at the hub front face and at the spigot's
+    end the wall over the round bore also loses the OD's and the bore
+    mouth's .010 breaks: the body .098 -> .078, the spigot .0931 -> .0731,
+    both over the .060 floor (the bore and the spigot are the cluster's
+    fits); the wall over the flat still holds .080 (.0956).  The bore's
+    callout states the least (rule 20)."""
+    breaks = 2.0 * 0.010 * IN
+    finished = spec.BORE_WALLS_FINISHED
+    assert finished == pytest.approx(
+        {
+            "hub wall over the bore": spec.HUB_WALL_WORST - breaks,
+            "spigot wall over the bore": spec.SPIGOT_WALL_WORST - breaks,
+        }
+    )
+    assert finished["hub wall over the bore"] == pytest.approx(0.078 * IN, abs=1e-3)
+    assert finished["spigot wall over the bore"] == pytest.approx(0.0731 * IN, abs=1e-3)
+    for wall in finished.values():
+        assert 0.060 * IN - 1e-9 <= wall < WALL_FLOOR
+    assert spec.FLAT_WALL_FINISHED == pytest.approx(spec.FLAT_WALL_WORST - breaks)
+    assert spec.FLAT_WALL_FINISHED >= WALL_FLOOR
+    assert spec.BORE_WALL_TEXT == "WALL .073 MIN"
+    assert drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"].split("\n")[-1] == (
+        spec.BORE_WALL_TEXT
+    )
+
+
+def test_the_package_declares_the_bore_wall_the_callout_prints() -> None:
+    """#2168: Main's delegated minor (option A, the geometry kept) names the
+    generated wall line the bore callout prints last (rule 20)."""
+    exceptions = _config.parts("pd-transgear-disc-hub")["machinist_exceptions"]
+    (entry,) = [entry for entry in exceptions if entry["id"] == "RV-02"]
+    assert entry["kind"] == "minor"
+    assert spec.BORE_WALL_TEXT in entry["where"]
+    assert "delegated ruling 2026-11-04" in entry["reason"]
+    assert "#2144" in entry["reason"]
+    assert drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"].split("\n")[-1] == (
+        spec.BORE_WALL_TEXT
+    )
+
+
 def test_screw_heads_keep_a_millimetre_of_air_to_the_hub_body() -> None:
     head = spec.SCREW_HEAD_DIA + spec.SCREW_HEAD_DIA_ALLOWANCE
     bc_r_min = joint.BOLT_CIRCLE_DIA / 2.0 - joint.BOLT_CIRCLE_POSITION_TOL

@@ -2,7 +2,7 @@ r"""MHA-PD-17 transgear-disc-hub: the brass hub and flange in front of the reduc
 
 The retained Ø.52 turned hub has a .313 +.0010/+.0005 bore (an owned .3135
 reamer) on the pinion sleeve's (MHA-PD-10) .313 +.0005/.0000 boss and drives
-through its D-flat, with a Ø1.01 × .094 flange and a Ø.501 SHAFT_H rear
+through its D-flat, with a Ø1.05 × .094 flange and a Ø.501 SHAFT_H rear
 spigot.  The spigot passes the reducer disc's (MHA-PD-06)
 bore, which pilots on it, and its end seats on the sleeve's step face (the
 12T's tooth ends); the flange's rear face clamps the disc's front face, the
@@ -25,8 +25,12 @@ assembly (R9-8), at a printed .XX station from the hub front face, so the
 sheet carries a match-drill callout, not a free drilled hole.
 
 Sizes (drawing-guidelines.md rule 17 (walls and webs)): every wall holds the
-.080 target at the printed worst case; the flange is Ø1.01 so the screw
-hole keeps it to the rim with the flange and the circle both at .XX.
+.080 target at the printed worst case; the flange is Ø1.05 so the screw
+hole keeps it to the rim with the flange and the circle both at .XX, its
+edge breaks charged.  Finished, the body's and the spigot's walls over the
+round bore pay both .010 breaks at their exposed ends and land under the
+target, over the .060 floor; the bore's callout states the least
+(BORE_WALL_TEXT).
 
 Printed lengths, from the spigot's end and the flange's rear face: the
 overall, spigot end to hub front face, and the spigot (both terms of the
@@ -58,7 +62,7 @@ import pd_rack_pinion_spec as DISC
 import transgear_cluster_fit as FIT
 import pd_transgear_feed_pinion_spec as SLEEVE
 from _fit_deviations import deviations
-from _inch_wall_limits import WALL_TARGET_MM
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _printed_tolerance import (
     drilled_oversize_mm,
     edge_break_chamfer_mm,
@@ -463,6 +467,33 @@ for _label, _wall, _floor in (
 ):
     if _wall < _floor - 1e-9:
         raise AssertionError(f"MHA-PD-17 {_label}: {_wall:.3f} worst < floor {_floor}")
+
+# Finished, the walls over the bore also pay the title block's .010 break at
+# both edges of their exposed end (Codjiflo, #2124; the flange rim's
+# pattern): the body's at the hub front face (the OD's rim and the bore's
+# mouth, or the flat's edge), the spigot's at its end on the step.  The
+# bore (the MHA-PD-10 boss's) and the spigot (the MHA-PD-06 bore's) are the
+# cluster's fits, so the body and spigot walls over the round bore land
+# between the .060 floor and the .080 target; the bore's callout states the
+# least (rule 20; pd-transgear-disc-hub.yaml).  The wall over the flat
+# still holds the target.
+BORE_WALLS_FINISHED = {
+    "hub wall over the bore": HUB_WALL_WORST - 2.0 * EDGE_BREAK_MAX,
+    "spigot wall over the bore": SPIGOT_WALL_WORST - 2.0 * EDGE_BREAK_MAX,
+}
+FLAT_WALL_FINISHED = FLAT_WALL_WORST - 2.0 * EDGE_BREAK_MAX
+if FLAT_WALL_FINISHED < WALL_FLOOR - 1e-9:
+    raise AssertionError(
+        f"MHA-PD-17 hub wall over the flat: {FLAT_WALL_FINISHED:.3f} finished "
+        f"< {WALL_FLOOR}"
+    )
+for _label, _wall in BORE_WALLS_FINISHED.items():
+    if _wall < WALL_FLOOR_MM - 1e-9:
+        raise AssertionError(
+            f"MHA-PD-17 {_label}: {_wall:.3f} finished < floor {WALL_FLOOR_MM}"
+        )
+BORE_WALL_FINISHED_MIN = min(BORE_WALLS_FINISHED.values())
+BORE_WALL_TEXT = f"WALL {inch_text(DISC.inch_floor_mm(BORE_WALL_FINISHED_MIN, 3), 3)} MIN"
 
 # --- sheet --------------------------------------------------------------------
 # No loose notes: each requirement is flagged at its feature (rule 7).

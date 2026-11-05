@@ -63,7 +63,10 @@ length here stays physical millimetres.  How the sheet locates things:
 
 Walls (drawing-guidelines.md rule 17 (walls and webs)) are judged at the
 worst case of those bands, with the sheet rounding each printed value to its
-places, against the .080 in target.  The pin hole is drilled on the pin, so
+places, against the .080 in target, unbroken and again finished (both
+in-plane edge breaks charged): the screw holes' walls to the base's edges
+finish under the target, over the .060 floor, and the screw-hole callout
+states the least (SCREW_HOLE_WALL_TEXT).  The pin hole is drilled on the pin, so
 its walls take its model place; where the pin sits on the bar is the
 paper-drive assembly's to hold.
 """
@@ -78,6 +81,8 @@ from _package_units import drawing_unit
 from _printed_tolerance import (
     angular_band_deg,
     drilled_oversize_mm,
+    edge_break_chamfer_mm,
+    edge_break_radius_mm,
     printed_band_mm,
     printed_deviations,
 )
@@ -278,6 +283,34 @@ for _name, (_nominal, _worst) in WALLS.items():
             f"MHA-PD-14 {_name} wall {_worst:.3f} at the printed worst case is "
             f"under the {WALL_TARGET} target"
         )
+# Finished, each wall also pays the title block's in-plane edge break at
+# both its edges: the outside edge's and the hole mouth's, or both holes'
+# mouths (Codjiflo, #2124; the platen clip's .032 sheet, RV-02 on
+# MHA-PD-03).  The screw holes' walls to the base's edges land between the
+# .060 floor and the .080 target (the holes stand on the MHA-PD-07 bar's
+# taps), and the sheet states the least on the screw-hole callout (rule 20);
+# every other wall still holds the target.
+_EDGE_BREAK = max(edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT))
+WALLS_FINISHED: dict[str, float] = {
+    name: worst - 2.0 * _EDGE_BREAK for name, (_nominal, worst) in WALLS.items()
+}
+SCREW_EDGE_WALLS = (
+    "screw holes to the base's y edges",
+    "far screw hole to the base's -X end",
+)
+for _name, _finished in WALLS_FINISHED.items():
+    _floor = WALL_FLOOR if _name in SCREW_EDGE_WALLS else WALL_TARGET
+    if _finished < _floor - 1e-9:
+        raise AssertionError(
+            f"MHA-PD-14 {_name} wall {_finished:.3f} finished is under {_floor}"
+        )
+SCREW_EDGE_WALL_FINISHED_MIN = min(WALLS_FINISHED[name] for name in SCREW_EDGE_WALLS)
+_SCREW_EDGE_WALL_IN = (
+    math.floor(round(SCREW_EDGE_WALL_FINISHED_MIN / 25.4, 4) * 1000) / 1000
+)
+SCREW_HOLE_WALL_TEXT = f"WALL {_SCREW_EDGE_WALL_IN:.3f}".replace(" 0.", " .") + (
+    " MIN TO EDGES"
+)
 
 
 def head_clearance(

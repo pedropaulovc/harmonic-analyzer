@@ -14,3 +14,8 @@ pd-transgear-disc-hub:
       where: "the flange rear face and spigot end squareness frames to the bore (datum A)"
       finding: "squareness frames over-specified (rule 5)"
       reason: "owner-accepted disc-cluster control keeping the flange and spigot square to the bore"
+    - id: "RV-02"
+      kind: "minor"
+      where: "the bore callout's last line: WALL .073 MIN (the spigot end; the hub front face .078)"
+      finding: "body and spigot walls over the bore below the .080 target at the finished worst case (rules 17, 20)"
+      reason: "Main delegated ruling 2026-11-04 on #2168 (option A, the existing geometry kept), following the owner's approved band for thin walls between .060 and .080 (DT-35 .060, DT-08 .0602; #989), RV-04 on MHA-PD-18 (#1379) and RV-01 on MHA-PD-11 (#2124); owner review on #2144. The bore fits the MHA-PD-10 boss and the spigot the MHA-PD-06 bore, so the spigot wall cannot grow; a Ø.53 body restores .080 at the hub front only and takes .005 from the disc-screw head air and the knob-wheel gap. Each wall pays the .010 rim break and the .010 bore-mouth break: the body .098 to .078, the spigot .093 to .073"

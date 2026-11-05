@@ -68,6 +68,7 @@ from pd_transgear_disc_hub_geometry import BOLT_CIRCLE_DIA
 from pd_transgear_disc_hub_spec import (
     BORE_DATUM,
     BORE_DIA,
+    BORE_WALL_TEXT,
     BOSS_CLEARANCE_LIMITS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -139,7 +140,8 @@ _SPIGOT_R = SPIGOT_DIA / 2.0 * _S
 # the mating feature by name and number with the clearance the pair gives
 # (this spec computes both).  No process word: a reamer
 # would cut away the flat, and the dimensions define the D-profile (the
-# crank drive gear's D-bore wording).
+# crank drive gear's D-bore wording).  The bore's last line states the
+# finished wall over it, the body's and the spigot's (#2168, rule 20).
 BORE_CALLOUT = "\n".join(
     (
         "THRU",
@@ -147,6 +149,7 @@ BORE_CALLOUT = "\n".join(
         f"{inch_text(BOSS_CLEARANCE_LIMITS[1], 4)}",
         f"ON {SLEEVE_NAME}",
         f"{SLEEVE_NUMBER} BOSS)",
+        BORE_WALL_TEXT,
     )
 )
 FLAT_CALLOUT = "\n".join(
@@ -202,10 +205,12 @@ FLAT_CALLOUT = "\n".join(
 #   flange's extension lines; the spigot end's inside the spigot's, between
 #   its upper extension line and its diameter's text, left of that
 #   dimension's line.
-# Estimated (width, height) of the bore's six-row block, as run
-# 20261101T054343686Z printed it.
-BORE_TEXT_BLOCK = (0.046, 0.031)
-_BORE_SHOULDER_DROP = 0.110
+# Estimated (width, height) of the bore's block: six rows as run
+# 20261101T054343686Z printed it, plus the wall row (#2168).  The block's
+# top stays where six rows put it, under the oil hole's block: the shoulder
+# drops one row further down the bore's -60° ray.
+BORE_TEXT_BLOCK = (0.046, 0.037)
+_BORE_SHOULDER_DROP = 0.116
 _BORE_SHOULDER = (
     END_CENTER[0] + _BORE_SHOULDER_DROP / math.tan(math.radians(60.0)),
     AXIS_Y - _BORE_SHOULDER_DROP,

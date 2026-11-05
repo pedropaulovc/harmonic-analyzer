@@ -288,18 +288,21 @@ if not all(
         f"MHA-PD-18 pin bore press on MHA-PD-23 is {PIN_PRESS_INTERFERENCE}, "
         "not .0003..0010"
     )
-# Four short lines under the Ø: the operation, the mating pin, the press, and
-# the rear mouth's chamfer that clears the pin's seat root (its limits, as the
-# press's: a modelled feature with a minimum the title block's break lacks).
+# Three short lines under the Ø: the operation, the mating pin and the press.
 PIN_BORE_CALLOUT = "\n".join(
     (
         "REAM THRU",
         f"PRESS FIT PIN {PIN.PIN_NUMBER}",
         f"{_inch(PIN_PRESS_INTERFERENCE[0], 4)}/{_inch(PIN_PRESS_INTERFERENCE[1], 4)}"
         " INTERFERENCE",
-        f"REAR MOUTH {_inch(ARM.PIN_MOUTH_CHAMFER_LIMITS[0], 3)}/"
-        f"{_inch(ARM.PIN_MOUTH_CHAMFER_LIMITS[1], 3)} X 45\u00b0",
     )
+)
+# The rear mouth's chamfer prints its own native leg dimension and band in
+# section D-D (#2174: a modelled feature with a minimum the title block's
+# break lacks); the callout gives the angle, the end and the mate whose seat
+# fillet the minimum clears (rule 4).
+PIN_MOUTH_CALLOUT = "\n".join(
+    ("X 45\u00b0 REAR MOUTH", f"CLEARS {PIN.PIN_NUMBER}", "SEAT FILLET")
 )
 
 
@@ -367,6 +370,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Arm": {"Depth"},
     "PivotBoreProfile": {"PivotBoreDia"},
     "PinBoreProfile": {"PinBoreDia"},
+    "PinBoreRearMouthProfile": {"PinMouthChamfer"},
     "SpotFaceProfile": {"SpotFaceDia", "FloorDepth"},
     "StationReference": {"PinStation", "PlateTapStation1", "PlateTapStation2"},
     "PinHoleProfile": {"PinHoleDia", "PinHoleZ"},
@@ -382,6 +386,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Arm": {"Depth": THICKNESS_PLACES},
     "PivotBoreProfile": {"PivotBoreDia": PIVOT_BORE_PLACES},
     "PinBoreProfile": {"PinBoreDia": PIN_BORE_DIA_PLACES},
+    "PinBoreRearMouthProfile": {"PinMouthChamfer": ARM.PIN_MOUTH_CHAMFER_PLACES},
     "SpotFaceProfile": {
         "SpotFaceDia": SPOT_FACE_DIA_PLACES,
         "FloorDepth": SPOT_FACE_FLOOR_PLACES,

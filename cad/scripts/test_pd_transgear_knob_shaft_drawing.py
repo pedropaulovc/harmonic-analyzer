@@ -172,13 +172,13 @@ def test_real_d_core_thread_and_inch_g6_source() -> None:
 def test_machine_and_float_stations_are_unchanged() -> None:
     for local, machine in (
         (spec.TIP_Z, -171.976), (spec.THREAD_END_Z, -155.72),
-        (spec.PINION_REAR_Z, -142.2072), (spec.REAR_END_Z, -101.2624),
+        (spec.PINION_REAR_Z, -142.2072), (spec.REAR_END_Z, -101.0592),
     ):
         assert F_MACHINE_Z + local == pytest.approx(machine, abs=0.005)
     assert spec.CUP_FACE_STATION == pytest.approx(ring.LENGTH + plate.HUB_TO_BOSS + spec.END_FLOAT)
     assert spec.END_FLOAT > spec.END_FLOAT_SET_TOL
     assert spec.JOURNAL_LENGTH == pytest.approx(spec.CUP_FACE_STATION + spec.JOURNAL_REAR_EXTENSION)
-    assert spec.OVERALL_LENGTH == pytest.approx(70.7136, abs=0.005)
+    assert spec.OVERALL_LENGTH == pytest.approx(70.9168, abs=0.005)
 
 
 def test_d_flat_uses_signed_physical_round_tool_end_and_real_neck() -> None:
@@ -296,6 +296,8 @@ def test_every_native_dimension_is_placed_once_with_model_places() -> None:
     assert spec.DRAWING_PRECISION["StudProfile"]["PlainCore"] == 2
     assert spec.DRAWING_PRECISION["StudProfile"]["ThreadBlankDia"] == 3
     assert spec.DRAWING_PRECISION["StudProfile"]["OverallLength"] == 2
+    # #2169: the cup-pin end wall holds at the .XX row.
+    assert spec.DRAWING_PRECISION["JournalProfile"]["JournalLength"] == 2
     references = {"OverallLength": False, "ThreadBlankDia": True}
     assert drawing.REFERENCE_DIMENSIONS == references
 

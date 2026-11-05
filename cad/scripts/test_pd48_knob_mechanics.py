@@ -288,7 +288,7 @@ def test_retained_walls_and_axial_stations_need_no_new_waiver():
     assert ring.LENGTH == 5.207
     assert plate.HUB_LENGTH == pytest.approx(12.6746)
     assert shaft.CUP_FACE_Z == pytest.approx(40.3352)
-    assert shaft.REAR_END_Z == pytest.approx(46.8376)
+    assert shaft.REAR_END_Z == pytest.approx(47.0408)
     assert collar.COLLAR_DISC_AIR_MIN == 0.1016
     assert "ONE FULL TURN" in collar.COLLAR_DISC_AIR_PHRASE
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import ast
 import itertools
 import math
@@ -9,10 +10,12 @@ import re
 import runpy
 from fractions import Fraction
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 import _config
+import _drawing_dimensions
 import build_pd_transgear_arm as part
 import draw_pd_transgear_arm as drawing
 import pd_latch_hook_geometry as hook
@@ -44,7 +47,12 @@ def test_required_drawing_paths() -> None:
 
 def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    views = (drawing.FRONT_KEEP, drawing.SECTION_KEEP, drawing.END_KEEP)
+    views = (
+        drawing.FRONT_KEEP,
+        drawing.SECTION_KEEP,
+        drawing.END_KEEP,
+        drawing.PIN_SECTION_KEEP,
+    )
     assert set().union(*views) == marked
     assert sum(len(view) for view in views) == len(marked)
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
@@ -299,6 +307,7 @@ def test_the_explicit_bands_are_the_spot_face_and_the_reams() -> None:
         ("LocatorProfile", "f'LocatorDia{index}'"): "*deviations(LOCATOR_HOLE_DIA_BAND)",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_DIA_BAND)",
         ("PinBoreProfile", "PinBoreDia"): "*deviations(PIN_BORE_DIA_BAND)",
+        ("PinBoreRearMouthProfile", "PinMouthChamfer"): "PIN_MOUTH_CHAMFER_TOLERANCE",
     }
     assert geometry.LATCH_PIN_HEIGHT_BAND == geometry.printed_reach_mm(
         geometry.PIN_HOLE_Z, spec.DRAWING_PRECISION_BY_NAME["PinHoleZ"]
@@ -366,10 +375,135 @@ def test_the_pin_bore_presses_the_mha_179_pin_at_every_limit() -> None:
     tightest = cluster_pin.DIA_MAX - geometry.PIN_BORE_DIA_MIN
     assert (loosest, tightest) == pytest.approx((0.00762, 0.0254))
     assert spec.PIN_BORE_CALLOUT.splitlines()[2] == ".0003/.0010 INTERFERENCE"
-    # The rear mouth's chamfer limits print beside the press they protect.
-    assert spec.PIN_BORE_CALLOUT.splitlines()[3] == "REAR MOUTH .006/.010 X 45\u00b0"
+    # #2174: the rear mouth's band is its own native leg dimension's, in
+    # section D-D, not callout text.
+    assert len(spec.PIN_BORE_CALLOUT.splitlines()) == 3
+    assert "MOUTH" not in spec.PIN_BORE_CALLOUT
     assert spec.PIN_PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
     assert min(geometry.PIN_BORE_DIA_BAND) == 0.0 < max(geometry.PIN_BORE_DIA_BAND)
+
+
+def test_the_rear_mouth_prints_its_modelled_band_on_its_native_leg_in_d_d() -> None:
+    """#2174 (Codjiflo on #2124): the rear mouth's .006/.010 printed as text
+    in the pin bore's callout. Its leg is the revolved profile's native
+    dimension, toleranced on the part, and the pin's root-clearance check
+    reads the limits that band prints. Section D-D cuts on the profile's
+    plane; its text stands off the line, left of the cut face, its shoulder
+    at the mouth's height, clear of the border, the plan and the title
+    block."""
+    assert spec.DRAWING_DIMENSIONS["PinBoreRearMouthProfile"] == {"PinMouthChamfer"}
+    assert set(drawing.PIN_SECTION_KEEP) == {"PinMouthChamfer"}
+    tolerance = geometry.PIN_MOUTH_CHAMFER_TOLERANCE
+    assert geometry.PIN_MOUTH_CHAMFER_LIMITS == pytest.approx(
+        (geometry.PIN_MOUTH_CHAMFER - tolerance, geometry.PIN_MOUTH_CHAMFER + tolerance)
+    )
+    assert geometry.PIN_MOUTH_CHAMFER_LIMITS == pytest.approx((0.1524, 0.254))
+    assert spec.PIN_MOUTH_CALLOUT.splitlines()[0] == "X 45\u00b0 REAR MOUTH"
+    assert cluster_pin.PIN_NUMBER in spec.PIN_MOUTH_CALLOUT
+    lines = [".008 \u00b1.002", *spec.PIN_MOUTH_CALLOUT.splitlines()]
+    width = max(map(len, lines)) * _CAPS_CHAR_WIDTH
+    half_height = len(lines) * _LINE_PITCH / 2.0
+    x, y = drawing.PIN_MOUTH_TEXT_XY
+    box = (x - width / 2.0, y - half_height, x + width / 2.0, y + half_height)
+    line_x, mouth_y = drawing.PIN_SECTION_KEEP["PinMouthChamfer"]
+    assert line_x < drawing.PIN_SECTION_REAR_X - 0.004
+    assert box[2] < line_x - 0.002
+    assert box[0] > _BORDER + 0.003
+    assert box[1] <= mouth_y <= box[1] + _LINE_PITCH
+    assert box[1] > 0.065 + 0.005
+    assert box[3] < drawing._front_y(-geometry.PIVOT_END_R) - 0.010
+
+
+@pytest.mark.parametrize("dropped", (None, "arm sheet", "section D-D"))
+def test_each_import_phase_proves_the_precision_of_the_dimensions_it_imports(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, dropped: str | None
+) -> None:
+    """Run 20261105T023327427Z: sheet 1's guard demanded the whole package's
+    places, D-D's PinMouthChamfer among them, before sheet 2 existed, and
+    failed a sound import.  The real guard runs at each phase on what that
+    phase's views import; together the phases cover every marked dimension,
+    and a dimension a phase fails to import still fails the build."""
+    sheet_one_names = [*drawing.FRONT_KEEP, *drawing.SECTION_KEEP, *drawing.END_KEEP]
+    lost = {
+        None: None,
+        "arm sheet": sheet_one_names[0],
+        "section D-D": "PinMouthChamfer",
+    }[dropped]
+
+    def annotation(name: str) -> SimpleNamespace:
+        places = spec.DRAWING_PRECISION_BY_NAME[name]
+        display = SimpleNamespace(GetPrimaryPrecision2=lambda: places)
+        return SimpleNamespace(name=name, GetSpecificAnnotation=lambda: display)
+
+    def curate(_adapter, _view, *, keep, view_label, dimensions_by_feature):
+        assert dimensions_by_feature is spec.DRAWING_DIMENSIONS
+        return [annotation(name) for name in keep if name != lost]
+
+    guarded: list[tuple[set[str], dict[str, int]]] = []
+
+    def guard(adapter, annotations, precision):
+        annotations = list(annotations)
+        guarded.append(({a.name for a in annotations}, dict(precision)))
+        _drawing_dimensions.assert_imported_precision(adapter, annotations, precision)
+
+    async def open_model(_path):
+        return True
+
+    async def finalize(*_args, **_kwargs):
+        return {"drawing": "arm.SLDDRW"}
+
+    source = tmp_path / "pd-transgear-arm.SLDPRT"
+    source.write_bytes(b"")
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    monkeypatch.setattr(drawing.hidden_sketches, "curate_view_dimensions", curate)
+    monkeypatch.setattr(drawing, "assert_imported_precision", guard)
+    monkeypatch.setattr(_drawing_dimensions, "dimension_name", lambda _adapter, a: a.name)
+    monkeypatch.setattr(
+        _drawing_dimensions._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
+    )
+    sheets = SimpleNamespace(ActivateSheet=lambda _name: True)
+    returns = {
+        "new_project_drawing": (object(), object()),
+        "_early_bound": sheets,
+        "place_view": object(),
+        "create_section_view": object(),
+        "_rim_point": (0.0, 0.0),
+        "_wall_point": (0.0, 0.0),
+        "model_point_in_view": (0.0, 0.0),
+        "auto_center_marks": True,
+        "add_native_hole_callout": object(),
+        "_rear_rim": object(),
+        "_pin_zone_section": object(),
+    }
+    for name in (
+        "check", "read_required_properties", "create_blank_drawing_sheets",
+        "stamp_drawing_summary", "set_hidden_lines_removed", "set_dimension_callouts",
+        "set_reference_dimensions", "_set_stock_text", "_end_radius_to_arc",
+        "offset_dimension_text", "project_part_pmi", "_add_projected_zone_chains",
+        "_overall_reference", "_set_tap_callout_text", "set_hole_callout_precision",
+        "_match_pin_section_caption", "add_property_linked_note",
+        "require_saved_projected_gtols", *returns,
+    ):
+        monkeypatch.setattr(
+            drawing, name, lambda *_a, _r=returns.get(name), **_k: _r
+        )
+    monkeypatch.setattr(drawing, "finalize_drawing", finalize)
+    adapter = SimpleNamespace(
+        open_model=open_model, currentModel=object(), _attempt=lambda fn: fn()
+    )
+
+    if lost is not None:
+        with pytest.raises(RuntimeError, match=rf"never reached the sheet: \['{lost}'\]"):
+            asyncio.run(drawing.build(adapter))
+        return
+    assert asyncio.run(drawing.build(adapter)) == {"drawing": "arm.SLDDRW"}
+    assert [set(precision) for _names, precision in guarded] == [
+        set(sheet_one_names),
+        set(drawing.PIN_SECTION_KEEP),
+    ]
+    assert all(names == set(precision) for names, precision in guarded)
+    assert guarded[0][1].keys().isdisjoint(guarded[1][1])
+    assert guarded[0][1] | guarded[1][1] == spec.DRAWING_PRECISION_BY_NAME
 
 
 def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:

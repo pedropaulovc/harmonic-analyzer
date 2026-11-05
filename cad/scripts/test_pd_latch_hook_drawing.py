@@ -17,6 +17,7 @@ import draw_pd_latch_hook as drawing
 import pd_latch_hook_geometry as geom
 import pd_latch_hook_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
+from _drawing_leaders import distance_to_box
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES
 
@@ -104,6 +105,47 @@ def test_walls_hold_the_target_at_the_worst_case_the_sheet_prints() -> None:
     for name, (nominal, worst) in spec.WALLS.items():
         assert nominal >= worst >= spec.WALL_TARGET - 1e-9, name
     assert spec.WALL_TARGET > spec.WALL_FLOOR
+
+
+def test_finished_walls_pay_both_edge_breaks() -> None:
+    """#2166 (Codjiflo on #2124): every wall also loses the title block's
+    .010 in-plane break at both its edges.  The screw holes' walls to the
+    base's edges (the holes fixed on the MHA-PD-07 bar's taps) finish at
+    .063 (+Y edge), .071 (-Y edge) and .064 (-X end), over the .060 floor;
+    the web and the pin hole's walls still hold the .080 target."""
+    breaks = 2.0 * 0.010 * 25.4
+    finished = spec.WALLS_FINISHED
+    assert finished == pytest.approx(
+        {name: worst - breaks for name, (_, worst) in spec.WALLS.items()}
+    )
+    for name, wall in finished.items():
+        if name in spec.SCREW_EDGE_WALLS:
+            assert spec.WALL_FLOOR - 1e-9 <= wall < spec.WALL_TARGET, name
+        else:
+            assert wall >= spec.WALL_TARGET - 1e-9, name
+    assert finished["screw holes to the base's y edges"] == pytest.approx(
+        0.063 * 25.4, abs=1e-3
+    )
+    assert finished["far screw hole to the base's -X end"] == pytest.approx(
+        0.064 * 25.4, abs=1e-3
+    )
+    assert spec.SCREW_HOLE_WALL_TEXT == "WALL .063 MIN TO EDGES"
+    # The line is no wider than the callout's widest line already printed.
+    assert len(spec.SCREW_HOLE_WALL_TEXT) <= len(spec.SCREW_HOLE_MATE)
+
+
+def test_the_package_declares_the_screw_hole_wall_the_callout_prints() -> None:
+    """#2166: Main's delegated minor (option A, the geometry kept) names the
+    generated wall line the screw-hole callout prints last (rule 20)."""
+    exceptions = _config.parts("pd-latch-hook")["machinist_exceptions"]
+    (entry,) = [entry for entry in exceptions if entry["id"] == "RV-01"]
+    assert entry["kind"] == "minor"
+    assert spec.SCREW_HOLE_WALL_TEXT in entry["where"]
+    assert "delegated ruling 2026-11-04" in entry["reason"]
+    assert "#2144" in entry["reason"]
+    assert drawing.CALLOUTS_BELOW["ScrewDia"].split("\n")[-1] == (
+        spec.SCREW_HOLE_WALL_TEXT
+    )
 
 
 def test_the_screw_position_band_is_the_widest_xxx_the_screw_stack_closes() -> None:
@@ -723,13 +765,104 @@ def test_the_inside_bend_leader_clears_every_dimension_line() -> None:
 def test_the_screw_hole_callout_names_the_taps_its_bands_serve() -> None:
     """Review 4: the ±.002 positions read as unexplained.  The 2X Ø.128
     callout names the mate (MHA-PD-07's fixed taps); the holes are drilled
-    to the print, not match-drilled."""
+    to the print, not match-drilled.  Its last line states the holes'
+    finished wall to the base's edges (#2166, rule 20)."""
     assert spec.SCREW_HOLE_MATE == "LOCATE TO MHA-PD-07 TAPS"
     assert drawing.CALLOUTS_BELOW["ScrewDia"].split("\n") == [
         spec.SCREW_HOLE_CALLOUT,
         spec.SCREW_HOLE_MATE,
+        spec.SCREW_HOLE_WALL_TEXT,
     ]
     assert "MATCH" not in drawing.CALLOUTS_BELOW["ScrewDia"]
+
+
+def test_the_native_screw_callout_stack_clears_the_hole_row_extension() -> None:
+    # Farm 20261105T023327427Z: native multiline text centres the whole block,
+    # moving 2X up when the WALL line is added. Budget its observed 5.6 mm
+    # line pitch conservatively at 6 mm, rather than treating xy as the value.
+    rows = (
+        len(drawing.CALLOUTS_ABOVE["ScrewDia"].splitlines())
+        + 1
+        + len(drawing.CALLOUTS_BELOW["ScrewDia"].splitlines())
+    )
+    top = drawing.FRONT_KEEP["ScrewDia"][1] + (rows - 1) * 0.006 / 2.0 + 0.0035 / 2.0
+    extension_y = drawing._front(0.0, 0.0)[1]
+    assert extension_y - top >= 0.00178
+
+
+# The 2X Ø.128 callout as farm run 20261105T023327427Z's seat printed it at
+# _front(-25, -8) (reports/layout-audit/pd-latch-hook.json, ScrewDia): each
+# row's baseline over the dimension's position and its advance width (m),
+# every row centred on the position's x.  A row's PDF ink sits 0.40 / 0.32 mm
+# in from its ends and 0.97..4.47 mm over its baseline.  The leader leaves
+# the last row's underline 1/16 in past the widest row's end and runs at the
+# far hole's centre, its arrow on the rim.  A changed row moves every row:
+# re-read them off a seat's audit dump, never estimate them.
+_SCREW_VALUE_ROW = "<MOD-DIAM>.128"
+_SCREW_ROWS = {
+    spec.PAIR_CALLOUT: (0.0083611, 0.0054299),
+    _SCREW_VALUE_ROW: (0.0027514, 0.0143298),
+    spec.SCREW_HOLE_CALLOUT: (-0.0028048, 0.0338528),
+    spec.SCREW_HOLE_MATE: (-0.0083611, 0.0638215),
+    spec.SCREW_HOLE_WALL_TEXT: (-0.0139173, 0.0561701),
+}
+_ROW_INK_INSET = (0.0004, 0.00032)  # from the row's left / right end
+_ROW_INK_RISE = (0.00097, 0.00447)  # ink bottom / top over the baseline
+_SHOULDER_PAST_ROW = 0.0015875
+_FARM_SCREW_DIA = (-25.0, -8.0)
+# What that seat printed: the underline's leader end, the arrow's tip, and
+# the audit's ink box of the row the leader ran 3.49 mm through.
+_FARM_SHOULDER = (0.0901094, 0.2043703)
+_FARM_LEADER_TIP = (0.0761925, 0.2341366)
+_FARM_STRUCK_INK = (0.0251, 0.2109, 0.0882, 0.2144)
+# Visible air between the leader and any row of its own callout.
+_LEADER_ROW_CLEARANCE = 0.0005
+
+
+def _screw_callout(xy: tuple[float, float]):
+    """Each row's ink box and the leader (shoulder, arrow tip) of the screw
+    callout whose dimension sits at sheet point ``xy``."""
+    boxes = {}
+    for text, (rise, width) in _SCREW_ROWS.items():
+        left, base = xy[0] - width / 2.0, xy[1] + rise
+        boxes[text] = (
+            left + _ROW_INK_INSET[0],
+            base + _ROW_INK_RISE[0],
+            left + width - _ROW_INK_INSET[1],
+            base + _ROW_INK_RISE[1],
+        )
+    widest = max(width for _, width in _SCREW_ROWS.values())
+    last_rise = list(_SCREW_ROWS.values())[-1][0]
+    shoulder = (xy[0] + widest / 2.0 + _SHOULDER_PAST_ROW, xy[1] + last_rise)
+    centre = drawing._front(geom.SCREW_HOLE_X[0], geom.SCREW_HOLE_Y)
+    radius = geom.SCREW_HOLE_DIA / 2.0 * drawing._S
+    run = math.dist(shoulder, centre)
+    tip = tuple(c + radius * (s - c) / run for s, c in zip(shoulder, centre))
+    return boxes, (shoulder, tip)
+
+
+def test_the_screw_callout_model_reproduces_the_farm_strike() -> None:
+    """The model is the seat's: at the farm run's position it prints the
+    seat's shoulder, arrow tip and struck row, and finds the strike."""
+    rows = [
+        *drawing.CALLOUTS_ABOVE["ScrewDia"].split("\n"),
+        _SCREW_VALUE_ROW,
+        *drawing.CALLOUTS_BELOW["ScrewDia"].split("\n"),
+    ]
+    assert rows == list(_SCREW_ROWS)
+    boxes, (shoulder, tip) = _screw_callout(drawing._front(*_FARM_SCREW_DIA))
+    assert math.dist(shoulder, _FARM_SHOULDER) < 5e-5
+    assert math.dist(tip, _FARM_LEADER_TIP) < 5e-5
+    assert boxes[spec.SCREW_HOLE_MATE] == pytest.approx(_FARM_STRUCK_INK, abs=1e-4)
+    assert distance_to_box((shoulder, tip), boxes[spec.SCREW_HOLE_MATE]) == 0.0
+
+
+def test_the_screw_callout_leader_strikes_none_of_its_own_rows() -> None:
+    """Farm 20261105T023327427Z's three reviews: the hole callout's leader
+    ran through the S of TAPS.  It now rises past every row with air."""
+    boxes, leader = _screw_callout(drawing.FRONT_KEEP["ScrewDia"])
+    gaps = {text: distance_to_box(leader, box) for text, box in boxes.items()}
+    assert min(gaps.values()) >= _LEADER_ROW_CLEARANCE, gaps
 
 
 class _Display:

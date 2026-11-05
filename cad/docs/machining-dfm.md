@@ -1075,3 +1075,17 @@ The chain is 66 links of ANSI #25, 12:24 from the crank sprocket to the knob spr
 moved the knob 6.64 mm nearer the crank; the former 68 links no longer close). The
 sprockets are made from McMaster 6793K blanks. The transgear arm and its plate are located by two
 MHA-PD-VN-64 dowels (McMaster 98381A435, 3/32 × 5/16); the screws only clamp.
+
+The knob-shaft journal length is **1.62 in**, under the title block's
+two-place **±.01 in** row (#2169, Main delegated ruling 2026-11-04 under
+#989). It runs .264 in behind the cup face, which sits at 1.356 ±.005 in
+from the gear rear; the cup pin is at .120 in from the cup front, marked out
+within ±.004 in on the cup sheet and ±.005 in on the assembly step. The
+journal's rear-end rim takes the title block's .010 in edge break. The
+crosshole is match-drilled through cup and journal together, so its mouths
+stay buried in the cup bore and are left unbroken. The shortest journal,
+less that break, leaves **.0825 in** beyond the largest Ø.065 pin hole at
+the cup sheet's station band and **.0815 in** at the assembly step's; both
+clear the .080 in wall target. The longest journal stays **.031 in** inside
+the shortest cup (.056 in nominal). The cup and pin stations do not move;
+only the journal is longer.

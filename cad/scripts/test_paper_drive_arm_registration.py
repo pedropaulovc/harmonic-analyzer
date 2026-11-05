@@ -29,6 +29,7 @@ def _arm_part_seat(module, seat) -> None:
         (1.0, [0.0, 0.0, 0.0]),
     ]
     seat._open_end_face_sketch.return_value = (module.PIN_HOLE_Z, 0.0, True)
+    seat._pin_section_sketch.return_value = (lambda y_mm, z_mm: (z_mm, y_mm), True)
     seat.name_bore_axis.side_effect = [f"Axis{k}" for k in range(1, 9)]
 
 
