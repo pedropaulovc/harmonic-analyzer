@@ -111,6 +111,7 @@ from pd_latch_hook_spec import (
     ROUND_REFERENCE,
     SCREW_HOLE_CALLOUT,
     SCREW_HOLE_MATE,
+    SCREW_HOLE_WALL_TEXT,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -261,8 +262,10 @@ CALLOUTS_ABOVE = {
     "PinHoleDia": PIN_HOLE_CALLOUT,
     "DevRoundC": FLAT_ROUND_CALLOUT,
 }
+# The screw-hole callout's last line states the holes' finished wall to the
+# base's edges, under the .080 target (rule 20; pd-latch-hook.yaml).
 CALLOUTS_BELOW = {
-    "ScrewDia": f"{SCREW_HOLE_CALLOUT}\n{SCREW_HOLE_MATE}",
+    "ScrewDia": f"{SCREW_HOLE_CALLOUT}\n{SCREW_HOLE_MATE}\n{SCREW_HOLE_WALL_TEXT}",
     "FaceY": PIN_STATION_CALLOUT,
     "RoundR": ROUND_CALLOUT,
 }

@@ -12,6 +12,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+import _config
 import build_pd_rack_pinion as part
 import draw_pd_rack_pinion as drawing
 import pd_rack_pinion_spec as spec
@@ -129,6 +130,39 @@ def test_disc_tap_drill_cuts_a_2b_minor_at_about_80_percent_thread() -> None:
 def test_tap_to_bore_wall_meets_the_target_worst_case() -> None:
     assert spec.TAP_TO_BORE_WALL_WORST >= 2.0
     assert spec.TAP_TO_BORE_WALL_WORST < spec.TAP_TO_BORE_WALL
+
+
+def test_finished_tap_web_pays_both_mouths_and_prints_its_least() -> None:
+    """#2167 (Codjiflo on #2124): at the front face the web also loses the
+    bore's chamfer at its .015 leg and the tap's .004 break (.0666), at the
+    rear the bore's .010 title-block break and the .004 (.0716): over the
+    .060 floor, under the .080 target, and the tap callout's last line
+    states the least (rule 20)."""
+    inch = 25.4
+    finished = spec.TAP_TO_BORE_WALL_FINISHED
+    assert finished["front face"] == pytest.approx(
+        spec.TAP_TO_BORE_WALL_WORST - 0.015 * inch - 0.004 * inch
+    )
+    assert finished["rear face"] == pytest.approx(
+        spec.TAP_TO_BORE_WALL_WORST - 0.010 * inch - 0.004 * inch
+    )
+    assert spec.TAP_TO_BORE_WALL_FINISHED_MIN == finished["front face"]
+    assert 0.060 * inch <= spec.TAP_TO_BORE_WALL_FINISHED_MIN < 0.080 * inch
+    assert spec.TAP_TO_BORE_WALL_FINISHED_MIN == pytest.approx(0.0666 * inch, abs=1e-3)
+    assert spec.TAP_WALL_TEXT == "WALL .066 MIN TO BORE"
+    assert spec.TAP_CALLOUT_LINES[-1] == spec.TAP_WALL_TEXT
+
+
+def test_the_package_declares_the_tap_web_the_callout_prints() -> None:
+    """#2167: Main's delegated minor (option A, the geometry kept) names the
+    generated wall line the tap callout prints last (rule 20)."""
+    exceptions = _config.parts("pd-rack-pinion")["machinist_exceptions"]
+    (entry,) = [entry for entry in exceptions if entry["id"] == "RV-03"]
+    assert entry["kind"] == "minor"
+    assert spec.TAP_WALL_TEXT in entry["where"]
+    assert "delegated ruling 2026-11-04" in entry["reason"]
+    assert "#2144" in entry["reason"]
+    assert spec.TAP_CALLOUT_QUALIFIER.split("\n")[-1] == spec.TAP_WALL_TEXT
 
 
 def test_the_bore_pilots_on_the_hub_spigot_at_every_limit() -> None:

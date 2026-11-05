@@ -39,9 +39,13 @@ from _fit_ream_h7 import REAM_H7
 from _gear_fit_limits import gear_tip_band_mm
 from _gear_quality import toothspace_runout_tir_mm
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
-from _inch_wall_limits import WALL_TARGET_MM
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_tolerance import (
+    drilled_oversize_mm,
+    edge_break_chamfer_mm,
+    printed_band_mm,
+)
 from _mcmaster_91794a055 import FILLISTER_SIZE
 from paper_drive_stock_inspection import GaugeContact, toothspace_gauge_contact_mm
 from pd_transgear_disc_hub_geometry import (
@@ -365,6 +369,30 @@ if TAP_TO_BORE_WALL_WORST < WALL_FLOOR - 1e-9:
     raise AssertionError(
         f"MHA-PD-06 tap to bore wall {TAP_TO_BORE_WALL_WORST:.3f} worst < {WALL_FLOOR}"
     )
+# Finished, the web also pays both mouths where it meets a face (Codjiflo,
+# #2124): at the front face the bore's .010 ±.005 chamfer (its .015 leg) and
+# the tap's .004 break, at the rear face the bore's title-block .010 break
+# and the tap's .004.  The front face's web lands between the .060 floor
+# and the .080 target: the bore (the MHA-PD-17 spigot's) and the bolt circle
+# (the MHA-PD-17 flange holes') are the joint's, and the tap callout states
+# the least (rule 20; pd-rack-pinion.yaml).
+TAP_TO_BORE_WALL_FINISHED = {
+    "front face": TAP_TO_BORE_WALL_WORST
+    - BORE_FRONT_CHAMFER_LIMITS[1]
+    - MOUTH_BREAK_MAX,
+    "rear face": TAP_TO_BORE_WALL_WORST
+    - edge_break_chamfer_mm(unit=UNIT)
+    - MOUTH_BREAK_MAX,
+}
+TAP_TO_BORE_WALL_FINISHED_MIN = min(TAP_TO_BORE_WALL_FINISHED.values())
+if TAP_TO_BORE_WALL_FINISHED_MIN < WALL_FLOOR_MM - 1e-9:
+    raise AssertionError(
+        f"MHA-PD-06 tap to bore wall {TAP_TO_BORE_WALL_FINISHED_MIN:.3f} finished "
+        f"< {WALL_FLOOR_MM}"
+    )
+TAP_WALL_TEXT = (
+    f"WALL {inch_text(inch_floor_mm(TAP_TO_BORE_WALL_FINISHED_MIN, 3), 3)} MIN TO BORE"
+)
 
 # --- sheet -------------------------------------------------------------------------
 HUB_NUMBER = "MHA-PD-17"
@@ -374,13 +402,15 @@ SCREW_NUMBER = "MHA-PD-VN-55"
 # block's thread row carries the 2B class).  The .004 mouth breaks are
 # tighter than the title block's .010 because the MHA-PD-VN-55 engagement
 # (pd_vn_transgear_disc_screw_spec) spends them; the callout names that
-# screw, so no loose note repeats it.
+# screw, so no loose note repeats it.  The last line states the web's
+# finished wall to the bore (TAP_WALL_TEXT, rule 20).
 TAP_CALLOUT_LINES = (
     f"BREAK EDGE {inch_text(MOUTH_BREAK_MAX, 3)} MAX BOTH SIDES,",
     f"KEEPS {SCREW_NUMBER} ENGAGEMENT",
     f"SPOT THRU {HUB_NUMBER} FLANGE",
     "HOLES AT ASSY, THEN DRILL",
     "AND TAP; MATCH-MARK BOTH",
+    TAP_WALL_TEXT,
 )
 TAP_CALLOUT_QUALIFIER = "\n".join(TAP_CALLOUT_LINES)
 # The .XXX thickness is the screw engagement's: its least is the tapped

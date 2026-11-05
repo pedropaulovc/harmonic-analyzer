@@ -26,3 +26,8 @@ pd-rack-pinion:
       where: "the tooth-space radial runout callout to the actual running bore"
       finding: "runout callout over-specified (rule 5)"
       reason: "tooth-space radial runout to the actual running bore, measured with a calibrated pin in each space, is the owner gear-tooth critical class; the assembled running datum is the feed pinion bore (owner-accepted)"
+    - id: "RV-03"
+      kind: "minor"
+      where: "the #0-80 tap callout's last line: WALL .066 MIN TO BORE (the front-face web; the rear .071)"
+      finding: "tap-to-bore web below the .080 target at the finished worst case (rules 17, 20)"
+      reason: "Main delegated ruling 2026-11-04 on #2167 (option A, the existing geometry kept), following the owner's approved band for thin walls between .060 and .080 (DT-35 .060, DT-08 .0602; #989), RV-04 on MHA-PD-18 (#1379) and RV-01 on MHA-PD-11 (#2124); owner review on #2144. The Ø.501 bore pilots on the MHA-PD-17 spigot and the taps transfer from its Ø.75 flange bolt circle; a Ø.78 circle restores .080 but moves the hub's holes and grows its flange from Ø1.05 to Ø1.08. The .0856 unbroken web pays the bore's .015 front chamfer leg and the tap's .004 mouth break and lands at .0666"

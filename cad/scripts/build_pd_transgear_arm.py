@@ -14,9 +14,11 @@ face, +X to the square end, +Z to the rear face):
   extruded ``THICKNESS`` toward +Z as ``Arm``.
 * ``PivotBore``: the Ø4.9 running bore through at P.
 * ``PinBore``: the Ø3.874 reamed press bore through at S for the MHA-PD-23
-  pin, cut normal to the faces (the pin's head seats on the rear face), its
-  rear mouth chamfered 45 degrees as ``PinBoreRearMouth`` to clear the pin's
-  seat root.
+  pin, cut normal to the faces (the pin's head seats on the rear face).
+* ``PinBoreRearMouth``: the bore's 45-degree rear mouth, clearing the pin's
+  seat root: a revolved cut whose profile ``PinBoreRearMouthProfile`` lies on
+  ``PinBoreSectionPlane`` (x = PIN_STATION, section D-D's cutting plane), so
+  D-D imports its toleranced leg.
 * ``PlateTaps``: native Hole Wizard taps through from the rear face, with
   ``PlateTapRearEntryBreaks`` and ``PlateTapFrontExitBreaks`` at 0.10 MAX.
 * ``SpotFace``: the rear spot face, a revolved cut whose profile (Top plane,
@@ -28,9 +30,9 @@ face, +X to the square end, +Z to the rear face):
   taps are not importable.
 
 Datums (all blanked): ``Axis1`` pivot, ``Axis2`` pin, ``Axis3``/``Axis4``
-plate taps, ``Axis5`` latch pin; planes ``RearFace`` (z = THICKNESS),
-``PivotHeadSeat`` (the spot-face floor, the pivot head's seat) and ``EndFace``
-(x = TIP_STATION).
+plate taps, ``Axis5`` latch pin; planes ``PinBoreSectionPlane``,
+``RearFace`` (z = THICKNESS), ``PivotHeadSeat`` (the spot-face floor, the
+pivot head's seat) and ``EndFace`` (x = TIP_STATION).
 
 Run (SolidWorks already open)::
 
@@ -41,6 +43,7 @@ from __future__ import annotations
 
 import math
 import sys
+from collections.abc import Callable
 from typing import Any
 
 import _telemetry
@@ -94,6 +97,7 @@ from pd_transgear_arm_geometry import (
     PIN_BORE_DIA,
     PIN_BORE_DIA_BAND,
     PIN_MOUTH_CHAMFER,
+    PIN_MOUTH_CHAMFER_TOLERANCE,
     PIN_HOLE_DEPTH,
     PIN_HOLE_DIA,
     PIN_HOLE_DIA_BAND,
@@ -140,6 +144,9 @@ THROUGH_CUT_DEPTH = 4.0 * THICKNESS  # mid-plane total; > the arm's thickness
 # The spot-face profile runs this far past the rear face so the revolved cut
 # clears it (not printed).
 SPOT_FACE_OVERRUN = SPOT_FACE_DEPTH
+# The rear mouth's profile runs this far past the rear face, and its axis
+# this far again, so the revolved cut clears the face (not printed).
+PIN_MOUTH_OVERRUN = 1.0
 
 _R_BORE = PIVOT_BORE_DIA / 2.0
 _R_SPOT = SPOT_FACE_DIA / 2.0
@@ -265,6 +272,63 @@ def _open_end_face_sketch(adapter: Any) -> tuple[float, float, bool]:
     return u, v, w_out > 0.0
 
 
+def _pin_section_sketch(
+    adapter: Any,
+) -> tuple[Callable[[float, float], tuple[float, float]], bool]:
+    """Map points of the pin bore's axial plane (x = PIN_STATION), given as
+    (model y, model z), into the ACTIVE sketch on ``PinBoreSectionPlane``.
+
+    An offset plane's sketch axes are SolidWorks' choice (the arm plate's
+    countersink profiles), so the points go through ``ModelToSketchTransform``;
+    only that model Y and Z lie along the sketch axes, and that the sketch
+    origin is the pin axis on the front face, is required.  Returns the mapper
+    and whether the pin axis (model Z) runs along sketch u.
+    """
+    import pythoncom
+    from win32com.client import VARIANT
+
+    active = adapter.currentModel.GetActiveSketch2()
+    if active is None:
+        raise RuntimeError("pin bore rear mouth: no active sketch")
+    sketch = _early_bound(active, "ISketch")
+    math_util = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    xform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+
+    def raw(y_mm: float, z_mm: float) -> tuple[float, ...]:
+        point = math_util.CreatePoint(
+            VARIANT(
+                pythoncom.VT_ARRAY | pythoncom.VT_R8,
+                [PIN_STATION / 1000.0, y_mm / 1000.0, z_mm / 1000.0],
+            )
+        )
+        mapped = _early_bound(
+            _early_bound(point, "IMathPoint").MultiplyTransform(xform), "IMathPoint"
+        )
+        return tuple(c * 1000.0 for c in mapped.ArrayData)
+
+    origin = raw(0.0, 0.0)
+    if max(map(abs, origin)) > 1e-6:
+        raise RuntimeError(f"pin bore rear mouth: sketch origin maps to {origin!r}")
+    along_y = tuple(c - o for c, o in zip(raw(1.0, 0.0), origin, strict=True))
+    along_z = tuple(c - o for c, o in zip(raw(0.0, 1.0), origin, strict=True))
+
+    def axis_of(delta: tuple[float, ...]) -> int:
+        hits = [i for i in (0, 1) if abs(abs(delta[i]) - 1.0) < 1e-6]
+        if len(hits) != 1 or abs(delta[1 - hits[0]]) > 1e-6 or abs(delta[2]) > 1e-6:
+            raise RuntimeError(f"pin bore rear mouth: model axis maps to sketch {delta!r}")
+        return hits[0]
+
+    axial = axis_of(along_z)
+    if axis_of(along_y) == axial:
+        raise RuntimeError("pin bore rear mouth: model Y and Z map to one sketch axis")
+
+    def to_sketch(y_mm: float, z_mm: float) -> tuple[float, float]:
+        u, v, _w = raw(y_mm, z_mm)
+        return (0.0 if abs(u) < 1e-9 else u, 0.0 if abs(v) < 1e-9 else v)
+
+    return to_sketch, axial == 0
+
+
 async def build(adapter: Any) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreatePlaneParameters,
@@ -286,6 +350,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ("EndWidth", 2.0 * END_HALF_WIDTH),
         ("PivotBoreDia", PIVOT_BORE_DIA),
         ("PinBoreDia", PIN_BORE_DIA),
+        ("PinMouthChamfer", PIN_MOUTH_CHAMFER),
         ("SpotFaceDia", SPOT_FACE_DIA),
         ("SpotFaceFloor", SPOT_FACE_FLOOR_FROM_FRONT),
         ("PinStation", PIN_STATION),
@@ -431,11 +496,118 @@ async def build(adapter: Any) -> dict[str, str]:
     name_last_feature(adapter, "PinBore")
     expected -= V_PIN_BORE
     await volume_check(adapter, "arm with pin bore", expected, 0.01 * V_PIN_BORE)
+
+    # --- Pin bore rear mouth: a 45-degree revolved cut about the pin axis.
+    # Its profile lies on section D-D's cutting plane, so D-D imports the
+    # toleranced leg (#2174): a sketch on a dedicated plane in a cut-face-only
+    # section's cut, as sm_gooseneck's counterbore. A chamfer feature's leg
+    # reached no view of D-D, picked on +X or on +Y (runs 20261103T155747207Z
+    # and 20261103T174329095Z).  The profile spans the bore's empty middle
+    # from its floor on the axis, the leg's depth below the rear face, out
+    # past the face; only the mouth's ring is metal.
     check(
-        "pin bore rear mouth",
-        await adapter.add_chamfer(
-            PIN_MOUTH_CHAMFER, [[PIN_STATION + _R_PIN_BORE, 0.0, THICKNESS]]
+        "create_plane PinBoreSectionPlane",
+        await adapter.create_plane(
+            CreatePlaneParameters(mode="offset", base_plane="Right Plane", offset=PIN_STATION)
         ),
+    )
+    name_last_feature(adapter, "PinBoreSectionPlane")
+    drive_jobs.append(
+        (
+            name_dimensions(adapter, "PinBoreSectionPlane", ["PinBoreSectionPlaneOffset"])[0],
+            '"PinStation"',
+        )
+    )
+    mouth = SketchDims()
+    check(
+        "create_sketch pin bore rear mouth",
+        await adapter.create_sketch("PinBoreSectionPlane"),
+    )
+    to_sketch, axial_on_u = _pin_section_sketch(adapter)
+    # The pin axis (model Z) reads along "axial", the bore's radius (model Y)
+    # along "radial".
+    axial, radial = ("horizontal", "vertical") if axial_on_u else ("vertical", "horizontal")
+    beyond = THICKNESS + PIN_MOUTH_OVERRUN
+    floor_z = THICKNESS - PIN_MOUTH_CHAMFER
+    rim_r = _R_PIN_BORE + PIN_MOUTH_CHAMFER
+    profile = [
+        to_sketch(0.0, floor_z),
+        to_sketch(_R_PIN_BORE, floor_z),
+        to_sketch(rim_r, THICKNESS),
+        to_sketch(rim_r, beyond),
+        to_sketch(0.0, beyond),
+    ]
+    set_sketch_direct_db(adapter, True)
+    mouth_axis = check(
+        "pin bore rear mouth axis",
+        await adapter.add_centerline(
+            *profile[4], *to_sketch(0.0, beyond + PIN_MOUTH_OVERRUN)
+        ),
+    )
+    floor, mouth_leg, rim, top, axis_side = await add_line_chain(adapter, profile)
+    set_sketch_direct_db(adapter, False)
+    for line, relation in (
+        (floor, radial),
+        (rim, axial),
+        (top, radial),
+        (axis_side, axial),
+        (mouth_axis, axial),
+    ):
+        check(
+            f"pin bore rear mouth {relation} {line}",
+            await adapter.add_sketch_constraint(line, None, relation),
+        )
+    check(
+        "pin bore rear mouth axis on the profile",
+        await adapter.add_sketch_constraint(
+            f"{mouth_axis}.start", f"{axis_side}.start", "coincident"
+        ),
+    )
+    check(
+        "pin bore rear mouth on the pin axis",
+        await adapter.add_sketch_constraint(
+            f"{axis_side}.start", "origin", f"{axial}_points"
+        ),
+    )
+    check(
+        "pin bore rear mouth axis length",
+        await adapter.add_sketch_dimension(mouth_axis, None, "linear", PIN_MOUTH_OVERRUN),
+    )
+    mouth.record("PinMouthAxisLength")
+    await dimension_between(
+        adapter, "origin", f"{rim}.start", f"{axial}_distance", THICKNESS,
+        "pin bore rear mouth on the rear face",
+    )
+    mouth.record("PinMouthSeat", '"ArmThickness"')
+    await dimension_between(
+        adapter, f"{rim}.start", f"{rim}.end", f"{axial}_distance", PIN_MOUTH_OVERRUN,
+        "pin bore rear mouth overrun",
+    )
+    mouth.record("PinMouthOverrun")
+    check(
+        "pin bore rear mouth bore radius",
+        await adapter.add_sketch_dimension(floor, None, "linear", _R_PIN_BORE),
+    )
+    mouth.record("PinMouthBoreR", '"PinBoreDia" / 2')
+    # The printed leg, across the rear face (D-D shows it on the cut); the
+    # equal leg along the bore holds the 45 degrees.
+    await dimension_between(
+        adapter, f"{mouth_leg}.start", f"{mouth_leg}.end", f"{radial}_distance",
+        PIN_MOUTH_CHAMFER, "pin bore rear mouth leg on the rear face",
+    )
+    mouth.record("PinMouthChamfer", '"PinMouthChamfer"')
+    await dimension_between(
+        adapter, f"{mouth_leg}.start", f"{mouth_leg}.end", f"{axial}_distance",
+        PIN_MOUTH_CHAMFER, "pin bore rear mouth leg along the bore",
+    )
+    mouth.record("PinMouthChamferDepth", '"PinMouthChamfer"')
+    await ensure_fully_defined(adapter, "pin bore rear mouth profile")
+    check("exit_sketch pin bore rear mouth", await adapter.exit_sketch())
+    name_last_feature(adapter, "PinBoreRearMouthProfile")
+    drive_jobs += mouth.apply(adapter, "PinBoreRearMouthProfile")
+    check(
+        "revolve-cut pin bore rear mouth",
+        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
     )
     name_last_feature(adapter, "PinBoreRearMouth")
     expected -= V_PIN_MOUTH
@@ -697,6 +869,7 @@ async def build(adapter: Any) -> dict[str, str]:
     blank_reference_geometry(
         adapter,
         (
+            ("PinBoreSectionPlane", "PLANE"),
             ("RearFace", "PLANE"), ("PivotHeadSeat", "PLANE"),
             ("EndFace", "PLANE"), ("LocatorClock", "PLANE"),
         ),
@@ -782,6 +955,12 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "PinBoreProfile", "PinBoreDia", *deviations(PIN_BORE_DIA_BAND),
         display_unit=UNIT,
+    )
+    # The rear mouth's leg: its minimum clears the MHA-PD-23 seat fillet
+    # (pd_transgear_pin_spec), its maximum is the title block's break.
+    set_dimension_symmetric_tolerance(
+        adapter, "PinBoreRearMouthProfile", "PinMouthChamfer",
+        PIN_MOUTH_CHAMFER_TOLERANCE, display_unit=UNIT,
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _author_pivot_fit_annotation(adapter)

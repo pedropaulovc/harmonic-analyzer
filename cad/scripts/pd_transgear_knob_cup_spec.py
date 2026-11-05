@@ -32,6 +32,7 @@ from pd_vn_transgear_knob_cup_pin_spec import HOLE_MAX as PIN_HOLE_MAX
 from pd_vn_transgear_knob_cup_pin_spec import PIN_LEN, PIN_LEN_MAX
 from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
 from pd_transgear_knob_shaft_spec import (
+    EDGE_BREAK_MAX as SHAFT_EDGE_BREAK_MAX,
     JOURNAL_DIA,
     JOURNAL_DIA_BAND,
     JOURNAL_DIA_MIN,
@@ -93,13 +94,17 @@ FRONT_PIN_WALL = PIN_HOLE_FROM_FRONT - _PIN_HOLE_R_MAX
 FRONT_PIN_WALL_WORST = PIN_HOLE_FROM_FRONT - PIN_HOLE_STATION_TOL - _PIN_HOLE_R_MAX
 # Hole to the journal's rear end, the journal at its shortest behind the
 # cup's front face (MHA-PD-08's length, the ring and hub-to-boss bands and
-# the feeler setting).
+# the feeler setting), less the title-block break on the journal's rear-end
+# rim (MHA-PD-08's EDGE_BREAK_MAX, #2169).  The crosshole's mouths are
+# match-drilled through cup and journal together and stay buried in the
+# cup's bore, so they are left unbroken and charge nothing.
 END_PIN_WALL = JOURNAL_REAR_EXTENSION - PIN_HOLE_FROM_FRONT - _PIN_HOLE_R_MAX
 END_PIN_WALL_WORST = (
     JOURNAL_REAR_EXTENSION_MIN
     - PIN_HOLE_FROM_FRONT
     - PIN_HOLE_STATION_TOL
     - _PIN_HOLE_R_MAX
+    - SHAFT_EDGE_BREAK_MAX
 )
 # Cup ring around the bore at the hole.
 RADIAL_WALL = (OD - BORE_DIA) / 2.0
@@ -136,8 +141,8 @@ JOURNAL_END_INSET = LENGTH - JOURNAL_REAR_EXTENSION
 JOURNAL_END_INSET_WORST = LENGTH_MIN - JOURNAL_REAR_EXTENSION_MAX
 if JOURNAL_END_INSET_WORST <= 0.0:
     raise AssertionError("the knob shaft's rear end stands out of MHA-PD-16")
-if not math.isclose(JOURNAL_END_INSET, 1.6256, abs_tol=1e-9):
-    raise AssertionError("MHA-PD-16 no longer covers the journal's end by .064")
+if not math.isclose(JOURNAL_END_INSET, 1.4224, abs_tol=1e-9):
+    raise AssertionError("MHA-PD-16 no longer covers the journal's end by .056")
 
 # The front face is the running face on the plate's rear boss: MACHINED, on
 # the exact native face the part build resolves.

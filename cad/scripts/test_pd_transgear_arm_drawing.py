@@ -44,7 +44,12 @@ def test_required_drawing_paths() -> None:
 
 def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    views = (drawing.FRONT_KEEP, drawing.SECTION_KEEP, drawing.END_KEEP)
+    views = (
+        drawing.FRONT_KEEP,
+        drawing.SECTION_KEEP,
+        drawing.END_KEEP,
+        drawing.PIN_SECTION_KEEP,
+    )
     assert set().union(*views) == marked
     assert sum(len(view) for view in views) == len(marked)
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
@@ -299,6 +304,7 @@ def test_the_explicit_bands_are_the_spot_face_and_the_reams() -> None:
         ("LocatorProfile", "f'LocatorDia{index}'"): "*deviations(LOCATOR_HOLE_DIA_BAND)",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_DIA_BAND)",
         ("PinBoreProfile", "PinBoreDia"): "*deviations(PIN_BORE_DIA_BAND)",
+        ("PinBoreRearMouthProfile", "PinMouthChamfer"): "PIN_MOUTH_CHAMFER_TOLERANCE",
     }
     assert geometry.LATCH_PIN_HEIGHT_BAND == geometry.printed_reach_mm(
         geometry.PIN_HOLE_Z, spec.DRAWING_PRECISION_BY_NAME["PinHoleZ"]
@@ -366,10 +372,43 @@ def test_the_pin_bore_presses_the_mha_179_pin_at_every_limit() -> None:
     tightest = cluster_pin.DIA_MAX - geometry.PIN_BORE_DIA_MIN
     assert (loosest, tightest) == pytest.approx((0.00762, 0.0254))
     assert spec.PIN_BORE_CALLOUT.splitlines()[2] == ".0003/.0010 INTERFERENCE"
-    # The rear mouth's chamfer limits print beside the press they protect.
-    assert spec.PIN_BORE_CALLOUT.splitlines()[3] == "REAR MOUTH .006/.010 X 45\u00b0"
+    # #2174: the rear mouth's band is its own native leg dimension's, in
+    # section D-D, not callout text.
+    assert len(spec.PIN_BORE_CALLOUT.splitlines()) == 3
+    assert "MOUTH" not in spec.PIN_BORE_CALLOUT
     assert spec.PIN_PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
     assert min(geometry.PIN_BORE_DIA_BAND) == 0.0 < max(geometry.PIN_BORE_DIA_BAND)
+
+
+def test_the_rear_mouth_prints_its_modelled_band_on_its_native_leg_in_d_d() -> None:
+    """#2174 (Codjiflo on #2124): the rear mouth's .006/.010 printed as text
+    in the pin bore's callout. Its leg is the revolved profile's native
+    dimension, toleranced on the part, and the pin's root-clearance check
+    reads the limits that band prints. Section D-D cuts on the profile's
+    plane; its text stands off the line, left of the cut face, its shoulder
+    at the mouth's height, clear of the border, the plan and the title
+    block."""
+    assert spec.DRAWING_DIMENSIONS["PinBoreRearMouthProfile"] == {"PinMouthChamfer"}
+    assert set(drawing.PIN_SECTION_KEEP) == {"PinMouthChamfer"}
+    tolerance = geometry.PIN_MOUTH_CHAMFER_TOLERANCE
+    assert geometry.PIN_MOUTH_CHAMFER_LIMITS == pytest.approx(
+        (geometry.PIN_MOUTH_CHAMFER - tolerance, geometry.PIN_MOUTH_CHAMFER + tolerance)
+    )
+    assert geometry.PIN_MOUTH_CHAMFER_LIMITS == pytest.approx((0.1524, 0.254))
+    assert spec.PIN_MOUTH_CALLOUT.splitlines()[0] == "X 45\u00b0 REAR MOUTH"
+    assert cluster_pin.PIN_NUMBER in spec.PIN_MOUTH_CALLOUT
+    lines = [".008 \u00b1.002", *spec.PIN_MOUTH_CALLOUT.splitlines()]
+    width = max(map(len, lines)) * _CAPS_CHAR_WIDTH
+    half_height = len(lines) * _LINE_PITCH / 2.0
+    x, y = drawing.PIN_MOUTH_TEXT_XY
+    box = (x - width / 2.0, y - half_height, x + width / 2.0, y + half_height)
+    line_x, mouth_y = drawing.PIN_SECTION_KEEP["PinMouthChamfer"]
+    assert line_x < drawing.PIN_SECTION_REAR_X - 0.004
+    assert box[2] < line_x - 0.002
+    assert box[0] > _BORDER + 0.003
+    assert box[1] <= mouth_y <= box[1] + _LINE_PITCH
+    assert box[1] > 0.065 + 0.005
+    assert box[3] < drawing._front_y(-geometry.PIVOT_END_R) - 0.010
 
 
 def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:

@@ -106,6 +106,47 @@ def test_walls_hold_the_target_at_the_worst_case_the_sheet_prints() -> None:
     assert spec.WALL_TARGET > spec.WALL_FLOOR
 
 
+def test_finished_walls_pay_both_edge_breaks() -> None:
+    """#2166 (Codjiflo on #2124): every wall also loses the title block's
+    .010 in-plane break at both its edges.  The screw holes' walls to the
+    base's edges (the holes fixed on the MHA-PD-07 bar's taps) finish at
+    .063 (+Y edge), .071 (-Y edge) and .064 (-X end), over the .060 floor;
+    the web and the pin hole's walls still hold the .080 target."""
+    breaks = 2.0 * 0.010 * 25.4
+    finished = spec.WALLS_FINISHED
+    assert finished == pytest.approx(
+        {name: worst - breaks for name, (_, worst) in spec.WALLS.items()}
+    )
+    for name, wall in finished.items():
+        if name in spec.SCREW_EDGE_WALLS:
+            assert spec.WALL_FLOOR - 1e-9 <= wall < spec.WALL_TARGET, name
+        else:
+            assert wall >= spec.WALL_TARGET - 1e-9, name
+    assert finished["screw holes to the base's y edges"] == pytest.approx(
+        0.063 * 25.4, abs=1e-3
+    )
+    assert finished["far screw hole to the base's -X end"] == pytest.approx(
+        0.064 * 25.4, abs=1e-3
+    )
+    assert spec.SCREW_HOLE_WALL_TEXT == "WALL .063 MIN TO EDGES"
+    # The line is no wider than the callout's widest line already printed.
+    assert len(spec.SCREW_HOLE_WALL_TEXT) <= len(spec.SCREW_HOLE_MATE)
+
+
+def test_the_package_declares_the_screw_hole_wall_the_callout_prints() -> None:
+    """#2166: Main's delegated minor (option A, the geometry kept) names the
+    generated wall line the screw-hole callout prints last (rule 20)."""
+    exceptions = _config.parts("pd-latch-hook")["machinist_exceptions"]
+    (entry,) = [entry for entry in exceptions if entry["id"] == "RV-01"]
+    assert entry["kind"] == "minor"
+    assert spec.SCREW_HOLE_WALL_TEXT in entry["where"]
+    assert "delegated ruling 2026-11-04" in entry["reason"]
+    assert "#2144" in entry["reason"]
+    assert drawing.CALLOUTS_BELOW["ScrewDia"].split("\n")[-1] == (
+        spec.SCREW_HOLE_WALL_TEXT
+    )
+
+
 def test_the_screw_position_band_is_the_widest_xxx_the_screw_stack_closes() -> None:
     """The band is the fixed-fastener stack's: the bar taps' radial reach
     plus the hole's printed reach stays inside the drilled hole's float over
@@ -723,11 +764,13 @@ def test_the_inside_bend_leader_clears_every_dimension_line() -> None:
 def test_the_screw_hole_callout_names_the_taps_its_bands_serve() -> None:
     """Review 4: the ±.002 positions read as unexplained.  The 2X Ø.128
     callout names the mate (MHA-PD-07's fixed taps); the holes are drilled
-    to the print, not match-drilled."""
+    to the print, not match-drilled.  Its last line states the holes'
+    finished wall to the base's edges (#2166, rule 20)."""
     assert spec.SCREW_HOLE_MATE == "LOCATE TO MHA-PD-07 TAPS"
     assert drawing.CALLOUTS_BELOW["ScrewDia"].split("\n") == [
         spec.SCREW_HOLE_CALLOUT,
         spec.SCREW_HOLE_MATE,
+        spec.SCREW_HOLE_WALL_TEXT,
     ]
     assert "MATCH" not in drawing.CALLOUTS_BELOW["ScrewDia"]
 

@@ -451,11 +451,15 @@ CUP_FACE_STATION = RING_LENGTH + PLATE_HUB_TO_BOSS + END_FLOAT  # 1.356
 # boss's own bands, and the feeler setting.
 CUP_FACE_STATION_BAND = RING_LENGTH_TOL + PLATE_HUB_TO_BOSS_BAND + END_FLOAT_SET_TOL
 # The journal runs on behind the cup's front face to carry the cup's pin
-# (K-1); pinion rear face to the rear end face, at the title block's .XXX:
-# at .XX the knob cup's (MHA-PD-16) pin-hole end wall falls under its floor.
-JOURNAL_REAR_EXTENSION = 6.5024  # .256
-JOURNAL_LENGTH = CUP_FACE_STATION + JOURNAL_REAR_EXTENSION  # 1.612
-JOURNAL_LENGTH_PLACES = 3
+# (K-1); pinion rear face to the rear end face, at the .XX row (#2169, Main
+# delegated ruling 2026-11-04 under #989): the shortest 1.61 journal behind
+# the farthest cup station, less its rear-end EDGE_BREAK_MAX, still leaves
+# the knob cup's (MHA-PD-16) pin-hole end wall over its .080 target, and the
+# longest stays .031 inside the shortest cup (pd_transgear_knob_cup_spec).
+# The cup and pin stations stay where they are; only the journal grows.
+JOURNAL_REAR_EXTENSION = 6.7056  # .264
+JOURNAL_LENGTH = CUP_FACE_STATION + JOURNAL_REAR_EXTENSION  # 1.62
+JOURNAL_LENGTH_PLACES = 2
 _JOURNAL_LENGTH_BAND = printed_band_mm(JOURNAL_LENGTH_PLACES, unit=UNIT)
 # The journal behind the cup's front face at the printed worst case.
 JOURNAL_REAR_EXTENSION_MIN = JOURNAL_REAR_EXTENSION - (
