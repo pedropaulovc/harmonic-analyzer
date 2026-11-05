@@ -146,6 +146,9 @@ FLANGE_DIA_MAX = round(FLANGE_DIA + FLANGE_DIA_BAND, 6)  # 22.2
 FLANGE_THICK_MIN = 3.3
 FLANGE_THICK_MAX = 3.7
 BODY_DIA_MAX = 10.3
+# The body's least: the listing's Ø10.2 at the 0.2 its flange OD takes
+# (FLANGE_DIA_BAND); it bounds the thread's wall (THREAD_BODY_WALL_MIN).
+BODY_DIA_MIN = round(BODY_DIA - FLANGE_DIA_BAND, 6)  # 10.0
 HOLE_DIA_MIN = 3.46  # a #29 transfer drill (Ø3.454) still enters
 HOLE_DIA_MAX = 3.60
 HOLE_PCD_BAND = 0.1  # ± on the diameter, so ±0.05 on each hole's station
@@ -295,6 +298,23 @@ CSK_WALL_TEXT = (
     f"{_wall_text(CSK_WALL_TO_OD)} TO OD"
 )
 
+# --- The thread's body wall: a second stated rule-17 shortfall (RV-02) --------
+# Codjiflo 4476701302 on #2187: the model's Ø6 plain bore (BORE_DIA, the
+# thread's minor) hides the real internal thread. A Tr nut's major diameter
+# is D4 = d + 2 ac, the crest clearance ac = 0.25 for pitches 1.5 to 5 (ISO
+# 2904; the repo holds no Tr thread table), so Tr8x2's is Ø8.5. Round the
+# body at its receipt minimum, concentric (the listing gives no runout),
+# that leaves 0.75 between the thread's major and the body's OD, under the
+# 1.5 floor rule 17 sets for a thread-major-to-edge wall. It is the bought
+# nut's, unmachined: no rework touches the body or the thread. The body's
+# callout prints it, rounded down.
+TR_CREST_CLEARANCE = 0.25
+THREAD_MAJOR_DIA = leadscrew_stock.MAJOR_DIA + 2.0 * TR_CREST_CLEARANCE  # 8.5
+THREAD_BODY_WALL_MIN = (BODY_DIA_MIN - THREAD_MAJOR_DIA) / 2.0  # 0.75
+if not 0.0 < THREAD_BODY_WALL_MIN < WALL_FLOOR:
+    raise AssertionError("the thread's body wall is not the stated shortfall")
+THREAD_WALL_TEXT = f"MIN WALL {_wall_text(THREAD_BODY_WALL_MIN)} TO THREAD"
+
 # --- Model --------------------------------------------------------------------------
 _BORE_R = BORE_DIA / 2.0
 _BODY_R = BODY_DIA / 2.0
@@ -437,11 +457,13 @@ REWORK_CONTROLS = {
     ),
     "FacedLength": (LENGTH_MAX, _deviation(LENGTH - LENGTH_MAX), 0.0, 1),
 }
-# RECEIPT, on the end view: the flange OD (22.2/21.8), the body (10.3 MAX),
+# RECEIPT, on the end view: the flange OD (22.2/21.8), the body (10.3/10.0),
 # the holes (3.60/3.46) and their PCD (16.0 ±0.1), as F1A measures them.
 RECEIPT_CONTROLS = {
     "ReceiptFlangeDia": (FLANGE_DIA, -FLANGE_DIA_BAND, FLANGE_DIA_BAND, 1),
-    "ReceiptBodyDia": (BODY_DIA_MAX, _deviation(BODY_DIA - BODY_DIA_MAX), 0.0, 1),
+    "ReceiptBodyDia": (
+        BODY_DIA, _deviation(BODY_DIA_MIN - BODY_DIA), _deviation(BODY_DIA_MAX - BODY_DIA), 1,
+    ),
     "ReceiptHoleDia": (
         HOLE_DIA, _deviation(HOLE_DIA_MIN - HOLE_DIA), _deviation(HOLE_DIA_MAX - HOLE_DIA), 2,
     ),
@@ -453,7 +475,7 @@ DIMENSION_TOLERANCE_TYPES = {
     "CskDia": TOL_LIMIT,
     "FacedLength": TOL_MAX,
     "ReceiptFlangeDia": TOL_LIMIT,
-    "ReceiptBodyDia": TOL_MAX,
+    "ReceiptBodyDia": TOL_LIMIT,
     "ReceiptHoleDia": TOL_LIMIT,
     "ReceiptHolePcd": TOL_SYMMETRIC,
 }
@@ -470,14 +492,14 @@ for _name, (_nominal, _lower, _upper, _places) in NATIVE_CONTROLS.items():
 # own hidden construction entity (drawing-simplicity-policy, model
 # ownership); the entities' stations off the origin do not print.
 # ``ReceiptReference`` on Top (sketch (x, -z), the end view's): the flange OD,
-# the body at its maximum, the bolt circle and the +Z hole as construction
+# the body, the bolt circle and the +Z hole as construction
 # circles, each driven by its diameter. The hole's centre stands
 # ``ReceiptHoleStation`` off the origin, which does not print.
 RECEIPT_SKETCH = "ReceiptReference"
 # (diameter dimension, its value, centre in sketch (x, -z)), in creation order.
 RECEIPT_CIRCLES = (
     ("ReceiptFlangeDia", FLANGE_DIA, (0.0, 0.0)),
-    ("ReceiptBodyDia", BODY_DIA_MAX, (0.0, 0.0)),
+    ("ReceiptBodyDia", BODY_DIA, (0.0, 0.0)),
     ("ReceiptHolePcd", HOLE_PCD, (0.0, 0.0)),
     ("ReceiptHoleDia", HOLE_DIA, (0.0, -HOLE_PCD / 2.0)),  # the +Z hole
 )

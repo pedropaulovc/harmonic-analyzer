@@ -805,7 +805,7 @@ def test_feed_nut_receipt_limits_are_native_dimensions_on_sheet_3() -> None:
     }
     assert limits == {
         "ReceiptFlangeDia": (nut.FLANGE_DIA_MIN, nut.FLANGE_DIA_MAX, 1),
-        "ReceiptBodyDia": (nut.BODY_DIA, nut.BODY_DIA_MAX, 1),
+        "ReceiptBodyDia": (nut.BODY_DIA_MIN, nut.BODY_DIA_MAX, 1),
         "ReceiptHoleDia": (nut.HOLE_DIA_MIN, nut.HOLE_DIA_MAX, 2),
         "ReceiptHolePcd": (
             nut.HOLE_PCD - nut.HOLE_PCD_BAND, nut.HOLE_PCD + nut.HOLE_PCD_BAND, 1,
@@ -821,12 +821,15 @@ def test_feed_nut_receipt_limits_are_native_dimensions_on_sheet_3() -> None:
         for name in (*nut.RECEIPT_CONTROLS, "FacedLength")
     } == {
         "ReceiptFlangeDia": 3,
-        "ReceiptBodyDia": 6,
+        "ReceiptBodyDia": 3,
         "ReceiptHoleDia": 3,
         "ReceiptHolePcd": 4,
         "FacedLength": 6,
     }
-    assert nut.RECEIPT_CONTROLS["ReceiptBodyDia"][0] == nut.BODY_DIA_MAX
+    # 4476701302: the body's least bounds RV-02's thread wall; its nominal
+    # is the listing's.
+    assert nut.RECEIPT_CONTROLS["ReceiptBodyDia"][0] == nut.BODY_DIA
+    assert nut.BODY_DIA_MIN == round(nut.BODY_DIA - nut.FLANGE_DIA_BAND, 6) == 10.0
     # Each receipt control is the driving diameter of its own construction
     # circle on the hidden Top-plane carrier, at the control's nominal; the
     # faced length is a Front-plane line LENGTH_MAX long from the seat face.
@@ -874,7 +877,7 @@ def test_feed_nut_rework_is_native_banded_controls_on_sheet_3() -> None:
         "CskDia": 3,
         "FacedLength": 6,
         "ReceiptFlangeDia": 3,
-        "ReceiptBodyDia": 6,
+        "ReceiptBodyDia": 3,
         "ReceiptHoleDia": 3,
         "ReceiptHolePcd": 4,
     }
@@ -938,7 +941,7 @@ def test_feed_nut_rework_is_native_banded_controls_on_sheet_3() -> None:
     assert set(draw.REWORK_CALLOUTS) == set(nut.REWORK_CONTROLS)
     assert draw.RECEIPT_EXPECTED == {
         "ReceiptFlangeDia": pytest.approx((0.022, -0.0002, 0.0002)),
-        "ReceiptBodyDia": pytest.approx((0.0103, -0.0001, 0.0)),
+        "ReceiptBodyDia": pytest.approx((0.0102, -0.0002, 0.0001)),
         "ReceiptHoleDia": pytest.approx((0.0035, -0.00004, 0.0001)),
         "ReceiptHolePcd": pytest.approx((0.016, -0.0001, 0.0001)),
     }
@@ -999,11 +1002,16 @@ def test_rework_bands_name_their_mates_at_their_callouts() -> None:
     assert lane == "below" and draw.KP08_NUMBER == kp08
     assert faced.splitlines()[-1] == kp08
     # The receipt limits print once, natively; each callout below them names
-    # its mate by its registry number, with no number of its own.
+    # its mate by its registry number, with no number of its own but the
+    # body's RV-02 wall row, the spec's.
     mates = {}
     for name, (lane, text) in draw.RECEIPT_CALLOUTS.items():
-        assert lane == "below" and not re.search(r"\d\.\d", text)
-        mates[name] = text.splitlines()[-1]
+        rows = text.splitlines()
+        if name == "ReceiptBodyDia":
+            assert rows[-1] == nut.THREAD_WALL_TEXT
+            rows = rows[:-1]
+        assert lane == "below" and not re.search(r"\d\.\d", "\n".join(rows))
+        mates[name] = rows[-1]
     assert mates == {
         "ReceiptFlangeDia": "LUG FACE",
         "ReceiptBodyDia": screw_row["number"],
@@ -1667,7 +1675,7 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
     csk_r = nut.CSK_DIA_MAX / 2.0 * scale
     circles = {
         "ReceiptFlangeDia": ((cx, cy), nut.FLANGE_DIA / 2.0),
-        "ReceiptBodyDia": ((cx, cy), nut.BODY_DIA_MAX / 2.0),
+        "ReceiptBodyDia": ((cx, cy), nut.BODY_DIA / 2.0),
         "ReceiptHolePcd": ((cx, cy), nut.HOLE_PCD / 2.0),
         "ReceiptHoleDia": (hole_centre, nut.HOLE_DIA / 2.0),
     }
@@ -1688,11 +1696,16 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
         block = centred_block(point, text, value_rows=2 if stacked else 1)
         assert draw.text_crossings(block, lines={}, circles=outline) == [], name
         (ox, oy), r_mm = circles[name]
-        shoulder = (block[0], block[1])
+        # The shoulder's corner nearer the arrow: a block right of its
+        # circle's centre hangs from its lower left, one left from its lower
+        # right.
+        right = (block[0] + block[2]) / 2.0 > ox
+        shoulder = (block[0] if right else block[2], block[1])
         dx, dy = shoulder[0] - ox, shoulder[1] - oy
         length = math.hypot(dx, dy)
         arrow = (ox + r_mm * scale * dx / length, oy + r_mm * scale * dy / length)
-        assert shoulder[0] > arrow[0], name  # the text runs right, off its circle
+        # The text stands wholly off its circle, beyond the arrow.
+        assert (block[0] > arrow[0]) if right else (block[2] < arrow[0]), name
         receipt[name], leaders[name] = block, (arrow, shoulder)
 
     def along(segment, steps=400):
@@ -1708,16 +1721,19 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
     def off(segment, centre, radius):
         return min(math.hypot(x - centre[0], y - centre[1]) for x, y in along(segment)) > radius
 
-    # Three stack between the end view and the section, under the FlangeThick
-    # row and over the spigot note's run-7 extent; the flange OD's goes under
-    # the end view, right of the cutting line's lower letter.
+    # Two stack between the end view and the section, under the FlangeThick
+    # row and over the spigot note's run-7 extent; the bolt circle's goes under
+    # the end view right of the cutting line's lower letter, the flange OD's
+    # under it left of the cutting line.
     letters_f = [(0.1257, y - 0.002, 0.1317, y + 0.004) for y in (0.2117, 0.1077)]
-    for name in ("ReceiptBodyDia", "ReceiptHolePcd", "ReceiptHoleDia"):
+    for name in ("ReceiptBodyDia", "ReceiptHoleDia"):
         assert end[2] < receipt[name][0] and receipt[name][2] < section[0], name
         assert run7[3] + CLEAR_GAP_M <= receipt[name][1], name
         assert receipt[name][3] + CLEAR_GAP_M <= flange_text[1], name
-    assert receipt["ReceiptFlangeDia"][3] + CLEAR_GAP_M <= run7[1]
-    assert receipt["ReceiptFlangeDia"][3] < end[1]
+    for name in ("ReceiptHolePcd", "ReceiptFlangeDia"):
+        assert receipt[name][3] + CLEAR_GAP_M <= min(run7[1], cut[1]), name
+    assert receipt["ReceiptHolePcd"][0] > letters_f[1][2]
+    assert receipt["ReceiptFlangeDia"][2] < cx
     # Each block clears every other text by the readback's gap; each leader
     # runs through no text, its arrow off the countersinks it passes, and the
     # hole's under the end view's horizontal centreline.
@@ -1748,8 +1764,9 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
                     for x, y in along(segment, 100)
                     for u, v in along(leaders[name], 100)
                 ), (name, other)
+    bottom_hole = (cx, cy - nut.HOLE_PCD / 2.0 * scale)
     for name in ("ReceiptBodyDia", "ReceiptHolePcd"):
-        for hole in (hole_centre, top_hole):
+        for hole in (hole_centre, top_hole, bottom_hole):
             assert off(leaders[name], hole, csk_r + 0.002), name
     assert max(y for _x, y in along(leaders["ReceiptHoleDia"])) < cy
     for name, block in {"faced length": faced_text}.items():
@@ -2843,7 +2860,7 @@ def test_countersink_wall_shortfall_is_a_declared_provisional_minor() -> None:
     import ch_rocker_arm_tl_oblique_jig_assembly_spec as jig
     from machinist_exceptions import load_exceptions
 
-    (wall,) = load_exceptions(_config.CONFIG_DIR, draw.PART_STEM, "part")
+    wall, _thread = load_exceptions(_config.CONFIG_DIR, draw.PART_STEM, "part")
     assert (wall.id, wall.kind) == ("RV-01", "minor")
     # "where" quotes the printed callout: the prefix's Ø token as printed,
     # the band, the angle and the wall line, exactly.
@@ -2884,4 +2901,63 @@ def test_countersink_wall_shortfall_is_a_declared_provisional_minor() -> None:
     assert (
         f"({nut.SCREW_SKU}) takes {jig.NUT_STOP_FORCE_N:.0f} N at the "
         f"{jig.NUT_TORQUE_NM:.2f} N·m reversing torque, ×{jig.NUT_STOP_MARGIN:.1f} in shear"
+    ) in wall.reason
+
+
+def test_thread_body_wall_is_the_real_thread_at_the_least_body() -> None:
+    """4476701302: the Ø6 bore models the thread's minor; the real Tr8x2
+    internal thread's major is D4 = d + 2 ac (ISO 2904, ac 0.25 at P2), and
+    the body at its receipt minimum leaves the printed MIN under the floor."""
+    assert spec.MAJOR_DIA == 8.0 and nut.LEAD == 2.0
+    assert nut.THREAD_MAJOR_DIA == spec.MAJOR_DIA + 2.0 * 0.25 == 8.5
+    assert nut.BORE_DIA == spec.MAJOR_DIA - nut.LEAD  # D1 = d - P, the model's bore
+    assert nut.THREAD_BODY_WALL_MIN == pytest.approx(
+        (nut.BODY_DIA_MIN - nut.THREAD_MAJOR_DIA) / 2.0
+    ) == pytest.approx(0.75)
+    assert nut.THREAD_BODY_WALL_MIN < (nut.BODY_DIA - nut.THREAD_MAJOR_DIA) / 2.0 < nut.WALL_FLOOR
+    assert nut.THREAD_WALL_TEXT == f"MIN WALL {_floor2(nut.THREAD_BODY_WALL_MIN)} TO THREAD"
+    assert nut.THREAD_WALL_TEXT == "MIN WALL 0.75 TO THREAD"
+    # The body's callout carries it as its last line.
+    assert draw.RECEIPT_CALLOUTS["ReceiptBodyDia"][1].splitlines()[-1] == nut.THREAD_WALL_TEXT
+
+
+def test_thread_wall_shortfall_is_a_declared_provisional_minor() -> None:
+    """RV-02, on RV-01's pattern: where quotes the printed callout, finding
+    the worst case, reason the pending owner ruling and the load facts."""
+    import ch_rocker_arm_tl_oblique_jig_assembly_spec as jig
+    from machinist_exceptions import load_exceptions
+
+    csk, wall = load_exceptions(_config.CONFIG_DIR, draw.PART_STEM, "part")
+    assert (wall.id, wall.kind) == ("RV-02", "minor")
+    _nominal, lower, upper, places = nut.RECEIPT_CONTROLS["ReceiptBodyDia"]
+    assert nut.DIMENSION_TOLERANCE_TYPES["ReceiptBodyDia"] == nut.TOL_LIMIT
+    printed = f"Ø{nut.BODY_DIA_MAX:.{places}f}/{nut.BODY_DIA_MIN:.{places}f}"
+    assert printed == "Ø10.3/10.0"
+    assert wall.where == (
+        f"sheet {nut.REWORK_SHEET}, the end view, the {printed} body callout: "
+        f"{nut.THREAD_WALL_TEXT}"
+    )
+    assert (
+        f"Ø{nut.THREAD_MAJOR_DIA:.1f} major ({spec.MAJOR_DIA:.0f} + 2 × "
+        f"{nut.TR_CREST_CLEARANCE:.2f} crest clearance, ISO 2904) inside the body at "
+        f"its Ø{nut.BODY_DIA_MIN:.1f} receipt minimum, concentric, leaves "
+        f"{_floor2(nut.THREAD_BODY_WALL_MIN)} mm"
+    ) in wall.finding
+    assert f"below the {nut.WALL_FLOOR:.1f} mm metric wall floor" in wall.finding
+    # The same pending-ruling opening as RV-01, then the facts.
+    opening = csk.reason.split(" (option A")[0]
+    assert opening.startswith("owner ruling pending — see #2187 owner-decision comment https://")
+    assert wall.reason.startswith(opening + ". ")
+    assert "delegated" not in wall.reason
+    assert "a supplied, unmachined feature of the bought nut" in wall.reason
+    assert f"Ø{nut.BODY_DIA:.1f} body leaves {_floor2((nut.BODY_DIA - nut.THREAD_MAJOR_DIA) / 2.0)} mm" in wall.reason
+    # The load facts are the jig spec's nut-thrust numbers.
+    assert (
+        f"carries the {jig.NUT_THRUST_N:.0f} N largest nut thrust axially from the thread "
+        f"into the flange"
+    ) in wall.reason
+    assert (
+        f"{jig.NUT_BODY_WALL_MPA:.0f} MPa on the bare annulus, teeth not credited, "
+        f"×{jig.NUT_BODY_WALL_MARGIN:.1f} under the brass's "
+        f"{jig._BRASS_YIELD_MPA:.0f} MPa yield"
     ) in wall.reason

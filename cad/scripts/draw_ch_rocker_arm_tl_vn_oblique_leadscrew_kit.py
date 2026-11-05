@@ -510,18 +510,21 @@ FACED_LENGTH_TEXT_MM = (-(feed_nut.FLANGE_DIA / 2.0 + 5.4), feed_nut.LENGTH_MAX 
 # by 0.209 .. 0.225, and the hole's crossed the flange's Ø22 outline and the
 # +Z hole). Each one's arrow lands on its circle's near side
 # (set_near_side_diameter), its leader radial from the circle's centre to the
-# block's shoulder (its lower-left corner), so no two leaders from the shared
-# centre cross. Three stack in the gap between the end view's rim (x 0.154)
-# and the section (x 0.253), under the FlangeThick callout row (run 11: from
-# y 0.232) and over the spigot note's extent (to y 0.144): the body's, the
-# bolt circle's and the +Z hole's. The flange OD's leaves its rim at its
-# lower right, right of the cutting line's lower F, for a block under the
-# spigot note.
+# block's shoulder (the corner of its underline nearer the arrow), so no two
+# leaders from the shared centre cross. Two stack in the gap between the end
+# view's rim (x 0.154) and the section (x 0.253), under the FlangeThick
+# callout row (run 11: from y 0.232) and over the spigot note's extent (to y
+# 0.144): the body's five rows (its LIMIT and RV-02's wall), from 31°, and
+# the +Z hole's. A radial leader under 23° would cross the +Z countersink,
+# so the bolt circle's leaves its circle at its lower right instead, right
+# of the cutting line's lower F, for a block under the spigot note; the
+# flange OD's leaves its rim at its lower left, for a block left of the
+# cutting line.
 RECEIPT_TEXT_XY = {
-    "ReceiptBodyDia": (0.205, 0.2175),
-    "ReceiptHolePcd": (0.205, 0.1950),
+    "ReceiptBodyDia": (0.205, 0.214),
     "ReceiptHoleDia": (0.205, 0.1595),
-    "ReceiptFlangeDia": (0.185, 0.093),
+    "ReceiptHolePcd": (0.185, 0.093),
+    "ReceiptFlangeDia": (0.054, 0.093),
 }
 # The receipt callouts' hole is the +Z one: the end view must lay it right of
 # its centre, on the centre's height, for the layout above.
@@ -564,8 +567,12 @@ REWORK_CALLOUTS = {
 }
 RECEIPT_CALLOUTS = {
     "ReceiptFlangeDia": ("below", f"WITHIN {FEED_BLOCK_NUMBER}\nLUG FACE"),
+    # Rule 17: the thread's body wall as a plain fact (RV-02), as the
+    # countersink's callout states its walls (RV-01).
     "ReceiptBodyDia": (
-        "below", f"CLEARS HEADS OF {feed_nut.SCREW_COUNT}X\n{NUT_SCREW_NUMBER}",
+        "below",
+        f"CLEARS HEADS OF {feed_nut.SCREW_COUNT}X\n{NUT_SCREW_NUMBER}\n"
+        f"{feed_nut.THREAD_WALL_TEXT}",
     ),
     # The supplied holes are received, not cut (the band feeds RV-01's walls).
     "ReceiptHoleDia": (

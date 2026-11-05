@@ -1488,6 +1488,20 @@ if NUT_PULL_OFF_MARGIN < 1.0:
         f"{NUT_SCREW_PRELOAD_N:.0f} N preload lets the {NUT_THRUST_N:.0f} N "
         "thrust pull the nut off the lug"
     )
+# RV-02's thread wall: that thrust runs axially from the thread through the
+# nut's body into its flange (the lug seat reacts it one way, the screws'
+# preload the other). On the bare annulus between the thread's Ø8.5 major
+# and the body's Ø10.0 receipt minimum, its teeth not credited, it stays
+# under the brass's yield.
+NUT_BODY_WALL_MPA = NUT_THRUST_N / (
+    math.pi / 4.0 * (feed_nut.BODY_DIA_MIN**2 - feed_nut.THREAD_MAJOR_DIA**2)
+)  # 62
+NUT_BODY_WALL_MARGIN = _BRASS_YIELD_MPA / NUT_BODY_WALL_MPA  # 1.9
+if NUT_BODY_WALL_MARGIN < 1.5:
+    raise ValueError(
+        f"the nut's thread wall takes {NUT_BODY_WALL_MPA:.0f} MPa, over 1/1.5 of "
+        f"the brass's {_BRASS_YIELD_MPA:.0f} MPa yield"
+    )
 # The torque that thrust puts on the nut: T = F d2/2 tan(lead + friction),
 # the oiled thread above.
 NUT_TORQUE_NM = (
