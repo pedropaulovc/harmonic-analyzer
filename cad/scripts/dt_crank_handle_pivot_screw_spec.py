@@ -210,13 +210,15 @@ RELIEF_WIDTH = 2.286  # .09
 # leaves no sharp inside corner.  It keeps the lead inside the #4-40 thread
 # major, i.e. inside the arm's tapped hole, so the whole seat annulus that
 # bears on the arm face stays flat.  The 45 degrees is enforced in the model by
-# an equation, and printed as a callout on the lead's axial size, as limits
-# (MHA-DT-32 re-review: a loose lead could print as nothing).
+# an equation, and the lead's axial size prints with an "X 45 DEG" callout and
+# its own band (MHA-DT-32 re-review: a loose lead could print as nothing).
 RELIEF_LEAD = 0.3048  # .012
 # The model owns the band (drawing-simplicity-policy.md `How the repository
 # implements the guidelines`; Codex P2 on #1139): the ReliefLead dimension
-# carries +/-.004 and the callout prints the limits it gives, so a nominal edit
-# cannot leave the printed limits behind.
+# carries +/-.004 and the drawing imports it, so the sheet prints the model's
+# nominal and band and a model edit cannot leave the print behind (#2172: a
+# note typed the limits from these constants).  The limits below feed only the
+# worst-case checks.
 RELIEF_LEAD_TOL = 0.1016  # .004
 RELIEF_LEAD_LIMITS = (
     round(RELIEF_LEAD - RELIEF_LEAD_TOL, 6),
@@ -228,21 +230,14 @@ CHAMFER_CALLOUT = "X 45 DEG"
 # the arm's tapped thread, so the seat annulus stays flat.  The tip chamfer's
 # single limit is the thread start (#290 review of d72bdd039: functional
 # words, not the die).  The relief prints at the title block's band and says
-# what it clears.  The 45-degree lead takes its own leader note onto the lead
-# (#290 review of b28d38a16: on the relief's Ø callout its leader ended in
-# the groove), printing the limits its model band gives.
+# what it clears.  The 45-degree lead's own native dimension prints its band
+# in detail A (#2172), with words only as its callout (#290 review of
+# b28d38a16 took the lead off the relief's Ø callout).
 # Rows of 18 characters at most keep each block clear of the extension lines
 # beside it (farm r8 of f5256bf3d).
 TIP_CHAMFER_CALLOUT = f"{CHAMFER_CALLOUT};\nTHREAD START"
 RELIEF_CALLOUT = "UNDER THREAD ROOT"
-RELIEF_LEAD_NOTE = "\n".join(
-    (
-        f"{inch_text(RELIEF_LEAD_LIMITS[0], 3)}-{inch_text(RELIEF_LEAD_LIMITS[1], 3)} "
-        f"{CHAMFER_CALLOUT}",
-        "LEAD, INSIDE",
-        "MHA-DT-06 THREAD",
-    )
-)
+RELIEF_LEAD_CALLOUT = f"{CHAMFER_CALLOUT}\nLEAD, INSIDE\nMHA-DT-06 THREAD"
 SEAT_FLAT_INNER_DIA = RELIEF_DIA + 2.0 * RELIEF_LEAD
 # ... and at its printed worst: the largest relief under the longest lead.
 SEAT_FLAT_INNER_DIA_MAX = round(RELIEF_DIA_MAX + 2.0 * RELIEF_LEAD_LIMITS[1], 6)
@@ -292,9 +287,15 @@ HEAD_RECESS_WORST = round(
     6,
 )
 # The pocket is bored to suit the actual head, so its wall is judged at the
-# largest head plus the widest clearance, inside the smallest cup body.
+# largest head plus the widest clearance, inside the smallest cup body, at the
+# cup's outer face, where the pocket mouth and the body's face edge each take
+# the cup sheet's edge break (#2170).
 POCKET_MAX = HEAD_DIA + HEAD_DIA_TOL + CUP_POCKET_CLEARANCE[1]
-CUP_POCKET_WALL_MIN = round(((CUP_BODY_DIA - CUP_BODY_DIA_TOL) - POCKET_MAX) / 2.0, 6)
+CUP_POCKET_WALL_MIN = round(
+    ((CUP_BODY_DIA - CUP_BODY_DIA_TOL) - POCKET_MAX) / 2.0
+    - 2.0 * edge_break_chamfer_mm(unit=CUP_UNIT),
+    6,
+)
 # The slot's worst-case web: the shortest head under the deepest slot.
 SLOT_WEB_MIN = round(
     HEAD_LENGTH - HEAD_LENGTH_TOL - (SLOT_DEPTH + SLOT_DEPTH_TOL), 6
@@ -495,7 +496,8 @@ for _ok, _what in (
     (
         # Owner ruling B on #1375: the cup body grows; the head and fit stay unchanged.
         CUP_POCKET_WALL_MIN >= CUP_POCKET_WALL_FLOOR_MM,
-        "the MHA-DT-35 pocket bored to suit the largest head leaves under its .060 wall",
+        "the MHA-DT-35 pocket bored to suit the largest head leaves under its .060 "
+        "wall at the cup's broken face",
     ),
     (HEAD_BEARING_RADIAL_MIN >= 0.1, "under 0.1 mm of under-head bearing on the cup floor"),
     (
@@ -522,9 +524,9 @@ for _ok, _what in (
 # engagement check.  The under-head face is the fitted shoulder length from
 # the seat, a reference (the shoulder is turned to suit the bonded handle), and
 # the head face the reference overall, for stock cut-off.  The head length, the
-# slot depth, the relief width and the tip chamfer's leg are local sizes of
-# their features.  A head-face origin cannot work: the seat is fitted, so the
-# thread length would ride on the handle stack.
+# slot depth, the relief width, the relief lead's and the tip chamfer's legs are
+# local sizes of their features.  A head-face origin cannot work: the seat is
+# fitted, so the thread length would ride on the handle stack.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ScrewProfile": {
         "HeadDia",
@@ -534,6 +536,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "ThreadLength",
         "ReliefDia",
         "ReliefWidth",
+        "ReliefLead",
         "TipChamfer",
     },
     "SlotProfile": {"SlotWidth"},
@@ -542,10 +545,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 # Decimal places ARE the tolerance (drawing-guidelines.md rule 3 (decimal
 # places carry the tolerance)): the head diameter and length (the cup-floor
-# bearing and recess), the shoulder's running band, the relief diameter and
-# the tip chamfer's single limit at three; every other size at two, the relief
-# width for the 1.5D engagement rule and the thread length with its own
-# +.00/-.02 band; the fitted shoulder length and the overall are references.
+# bearing and recess), the shoulder's running band, the relief diameter, the
+# relief lead's band and the tip chamfer's single limit at three; every other
+# size at two, the relief width for the 1.5D engagement rule and the thread
+# length with its own +.00/-.02 band; the fitted shoulder length and the
+# overall are references.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ScrewProfile": {
         "HeadDia": 3,
@@ -555,6 +559,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "ThreadLength": 2,
         "ReliefDia": 3,
         "ReliefWidth": 2,
+        "ReliefLead": 3,
         "TipChamfer": 3,
     },
     "SlotProfile": {"SlotWidth": 2},

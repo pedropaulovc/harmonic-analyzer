@@ -110,7 +110,7 @@ def test_fitted_tenon_keeps_its_seat_and_wall() -> None:
     )
     assert spec.STOCK_DIA_MIN / 2.0 >= (spec.INSTALLED_OUTER_DIA + xx) / 2.0 + 2.0 * ecc
     assert handle.FERRULE_SEAT_RADIAL_MIN >= handle.FERRULE_SEAT_RADIAL_FLOOR
-    assert handle.TENON_WALL_MIN >= WALL_FLOOR_MM
+    assert handle.TENON_STRAIGHT_WALL_MIN >= WALL_FLOOR_MM
 
 
 def test_bore_reads_on_a_section_not_hidden_lines() -> None:

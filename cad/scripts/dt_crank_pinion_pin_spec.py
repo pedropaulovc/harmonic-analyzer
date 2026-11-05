@@ -54,13 +54,12 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 ):
     raise AssertionError("every marked pin dimension needs authored places")
 
-# Under the fraction: the stock's own diameter tolerance governs, quoted as
-# reference for each stock the MATERIAL cell allows (machinist review: the
-# two differ). Drill rod is ground to ±.0002 (ch_rod_pivot_pin_spec's figure);
-# 1018 cold-drawn rounds to 1 1/2 in are +.000/-.002 (ASTM A108).
-PIN_DIA_CALLOUT = (
-    "STOCK, AS SUPPLIED; SUPPLIER TOL. (REF):\nDRILL ROD ±.0002, 1018 CF +.000/-.002"
-)
+# Under the fraction: the as-bought REF prints untoleranced, the supplier's
+# catalogue tolerance governing unprinted (drawing-guidelines.md: fractions
+# are as-bought stock, REF, untoleranced). Quoting each stock's catalogue
+# figure repeated the MATERIAL cell's alternatives and over-specified a
+# reference size (#2175, machinist review of MHA-DT-29).
+PIN_DIA_CALLOUT = "STOCK, AS SUPPLIED"
 
 # No manufacturing note (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): the title-block MATERIAL "AISI 1018 CF or
 # drill rod, 1/8 in" is the one statement of the stock, and the faced ends are

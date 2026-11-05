@@ -114,11 +114,14 @@ from dt_crank_handle_pivot_screw_spec import (
 
 # The reamed bore prints as a reference over the running clearance its model
 # band gives on the MHA-DT-32 shoulder's band, at the places that hold it
-# exactly (#290 fit F12: .0050-.0075).
+# exactly (#290 fit F12: .0050-.0075).  Rule 4: the mate reads by name and
+# number (MHA-DT-08 machinist review of 1bdd4e8d7), on a row of its own so the
+# widest row, and so the block's clearance to the title block, stays put.
+SCREW_NAME = "PIVOT SCREW"
 PIVOT_BORE_CALLOUT = (
     f"REAM THRU; {inch_text(DIAMETRAL_CLEARANCE_MIN, 4)}-"
     f"{inch_text(DIAMETRAL_CLEARANCE_MAX, 4)}\n"
-    f"DIAMETRAL CLEARANCE ON\n{SCREW_NUMBER} SHOULDER"
+    f"DIAMETRAL CLEARANCE ON\n{SCREW_NAME}\n{SCREW_NUMBER} SHOULDER"
 )
 
 
@@ -153,13 +156,15 @@ FRONT_CENTER = (0.162, 0.130)
 RIGHT_CENTER = (0.362, FRONT_CENTER[1])
 # Detail B took the upper right, so the isometric, its note and the section's
 # caption share the lower left, under the fitted tenon's callout (bottom y
-# ~0.069, x 0.056..0.116) and left of the reamed bore's (x >= 0.152 down to y
-# ~0.055).  The 1:1 isometric reads about 53 x 39 mm: x ~0.087..0.140, y
-# ~0.020..0.059; the caption (top-centre anchored, ~44 x 16 mm) and the note
-# (top-left anchored, ~59 x 5 mm) stand left of it.
+# ~0.059, x 0.056..0.123) and left of the reamed bore's (x >= 0.145 down to y
+# ~0.056).  The 1:1 isometric reads x 0.089..0.138, y 0.020..0.055 (farm r1 of
+# 1bdd4e8d7), 3.6 mm under the tenon's block; the caption (top-centre
+# anchored, 45 x 15 mm: x 0.023..0.068, y 0.040..0.055, 3.8 mm under that
+# block) and the note (top-left anchored, ~59 x 5 mm, top y 0.034) stand left
+# of it.
 ISO_CENTER = (0.112, 0.040)
 ISO_NOTE_POS = (0.016, 0.034)
-CAPTION_XY = (0.045, 0.061)
+CAPTION_XY = (0.045, 0.055)
 
 END_R = HANDLE_MAX_DIA * _S / 2.0
 
@@ -196,6 +201,11 @@ _ROW = (0.195, 0.205, 0.242, 0.250, 0.258)
 _SHELF = 0.0015
 _BELOW = 0.098
 _CALLOUT_ROW = 0.080
+# The fitted tenon's six-row block (32.4 mm tall, centred on its keep) hangs
+# under the shoulder and waist shelves: top y 0.0912, 3.9 mm under their
+# shoulder lines (y 0.0951).  MHA-DT-08 machinist review of 1bdd4e8d7: on the
+# shared callout row its "(Ø.299)" stood 1.2 mm into those shoulders.
+_TENON_CALLOUT_ROW = 0.075
 FRONT_KEEP = {
     "TenonLength": (_front_x((TENON_X0 + SHOULDER_X) / 2.0), _ROW[0]),
     "WaistStation": (_front_x((TENON_X0 + WAIST_X) / 2.0), _ROW[1]),
@@ -205,10 +215,13 @@ FRONT_KEEP = {
     "CounterboreDepth": (_front_x(OAK_END_X - COUNTERBORE_DEPTH / 2.0), _ROW[1]),
     # The radii stand between the station extension lines, below the rows:
     # the convex ones outside their arcs (a short leader to the arc), the
-    # concave ones between centre and arc.
+    # concave ones between centre and arc.  The convex arc's "(R2.29)" (15 x
+    # 4.6 mm) stands at 105 degrees, x 0.137..0.152, 15 mm right of the
+    # inflection station's extension line and 14 mm left of the counterbore
+    # floor's block.
     "FlareR": _on_radius(FLARE_CENTER, 5.3, 245.0),
     "SConcaveR": _on_radius(S_CONCAVE_CENTER, 15.5, 285.0),
-    "SConvexR": _on_radius(S_CONVEX_CENTER, S_CONVEX_R + 5.0, 100.0),
+    "SConvexR": _on_radius(S_CONVEX_CENTER, S_CONVEX_R + 5.0, 105.0),
     # Ruling-B native audit: the R77.3 text is 14.2 mm wide.  Its former
     # radial keep straddled the oak-end extension at x 0.274; this left-side
     # keep leaves 5.4 mm of air and separates it from the end-round callout.
@@ -227,11 +240,13 @@ FRONT_KEEP = {
     # waist row), so its shelf hangs 7 mm lower, 8 mm right of the fitted
     # tenon's block.
     "InflectionDia": (_front_x(INFLECTION[0]) + _SHELF, _BELOW - 0.007),
-    "TenonDia": (_front_x(TENON_X0) + 4.0 * _SHELF, _CALLOUT_ROW),
+    "TenonDia": (_front_x(TENON_X0) + 4.0 * _SHELF, _TENON_CALLOUT_ROW),
     # The reamed bore's dimension line stands 22 mm right of the tangent
-    # point's, 5 mm clear of its text; the four-line block and its leader
-    # shoulder end about 6 mm left of the title block (machinist review of
-    # 4cde83cb6: at 0.152 the shoulder touched the title block's edge).
+    # point's, 5 mm clear of its text; the five-row block (24.3 mm tall, y
+    # 0.056..0.080: 8.7 mm under the tangent point's shelf, right of the
+    # isometric's x 0.138) and its leader shoulder end about 6 mm left of the
+    # title block (machinist review of 4cde83cb6: at 0.152 the shoulder
+    # touched the title block's edge).
     "PivotBoreDia": (0.146, 0.068),
     "CounterboreDia": (
         _front_x(OAK_END_X - COUNTERBORE_DEPTH) + 0.0055,
@@ -245,19 +260,22 @@ FRONT_KEEP = {
     # 4 mm clear of that text, with another 4 mm from its own text to the
     # end view's x 0.320 outline.
     "CrestDia": (_front_x(OAK_END_X) + 0.025, 0.165),
-    # The counterbore floor corner's three-row block (R0.3 MAX / mate / SEAT),
-    # 8 x 2.75 = 22.0 mm wide and 2 x 5.55 + 3.5 = 14.6 mm tall, centred on
-    # the keep (were the rows to hang from the keep instead, the box drops
-    # ~7 mm and stays clear):
-    #   Counterbore floor, above the section between the swell diameter's
-    #   dimension line (x 0.213) and the 8.1's floor extension line (x
-    #   0.2416): box x 0.2163..0.2383 (3.3 mm clear of each), y 0.1877..0.2023
-    #   -- 15.8 above the silhouette (y <= 0.1719 there), 19.9 under the
-    #   swell diameter's text (y 0.2222).  Its leader drops ~23 mm through the
-    #   oak to the corner (under the corner's 25.4 approach to the section's
-    #   top edge) and crosses the 8.1's floor extension line at y ~0.157,
-    #   31 mm from either text.
-    "CounterboreFloorRadius": (_front_x(COUNTERBORE_FLOOR_X) - 0.0143, 0.195),
+    # The counterbore floor corner's three-row block (R.012 max. / mate /
+    # SEAT), 25.4 x 14.5 mm centred on the keep, its leader leaving the
+    # shoulder line's end nearer the corner (farm r1 of 1bdd4e8d7).  The
+    # corner's arc spans its upper-left quarter, and the 8.64 depth's
+    # extension line rises from the corner itself, so a leader from above runs
+    # along that line (machinist review of 1bdd4e8d7: the block also touched
+    # the swell diameter's line at x 0.2128).  The block stands up-left
+    # instead, over the swell's left flank: x 0.166..0.191, y 0.180..0.195,
+    # 18 mm left of the peak station's extension line (x 0.2098) and 8.6 mm
+    # above the outline.  Its shoulder end (0.1914, 0.1800) sits 149 degrees
+    # from the arc's centre, inside the arc's span, so the leader lands on the
+    # arc; that 31-degree line runs through the oak under the swell's top,
+    # 3.2 mm below the peak (y 0.1690 at x 0.2098) where the swell diameter's
+    # arrow and the peak station's extension line start, and leaves the
+    # outline at x ~0.205, 25 mm left of the depth's extension line.
+    "CounterboreFloorRadius": (_front_x(COUNTERBORE_FLOOR_X) - 0.0605, 0.1877),
 }
 
 # DETAIL B (MHA-DT-08 machinist review of 3de09b959): at 4:1 the root relief

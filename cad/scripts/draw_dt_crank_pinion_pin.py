@@ -84,8 +84,8 @@ HALF_LEN = PIN_LEN * VIEW_SCALE[0] / 2000.0  # 0.054
 # Side view (a *Right view lays model +Z to the left; a plain pin has no end
 # to prefer): the diameter above the view, its dimension line left of centre
 # so the axis-centerline pick at the view's middle lands on bare face; the
-# length below. The diameter's two callout lines hang under its value, so the
-# value stands a line higher than the length's offset.
+# length below. The diameter's callout line hangs under its value, so the
+# value stands higher than the length's offset.
 RIGHT_KEEP = {
     "PinDia": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1] + HALF_DIA + 0.022),
     "PinLen": (RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_DIA - 0.016),
@@ -151,7 +151,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, right_annotations, DRAWING_PRECISION_BY_NAME)
-    # The rod's as-bought diameter: a fraction reference, supplier tolerance.
+    # The rod's as-bought diameter: an untoleranced fraction reference.
     (pin_dia,) = (
         annotation
         for annotation in right_annotations
