@@ -2739,8 +2739,9 @@ def test_countersink_wall_shortfall_is_a_declared_provisional_minor() -> None:
         f"{_floor2(nut.CSK_WALL_TO_OD)} mm to the flange OD, "
         f"below the {nut.WALL_FLOOR:.1f} mm metric wall floor"
     ) in wall.finding
-    assert wall.reason.startswith("provisional: option A auto-selected")
-    assert "owner confirmation pending before merge" in wall.reason
+    # No owner or delegated ruling exists yet: the reason must say so, not claim one.
+    assert wall.reason.startswith("owner ruling pending")
+    assert "delegated" not in wall.reason
     assert (
         f"Ø{nut.HOLE_DIA:.1f} holes on the Ø{nut.HOLE_PCD:.0f} PCD already leave "
         f"{nut.HOLE_WALL_TO_BODY:.2f} mm to the body and {nut.HOLE_WALL_TO_OD:.2f} mm "
