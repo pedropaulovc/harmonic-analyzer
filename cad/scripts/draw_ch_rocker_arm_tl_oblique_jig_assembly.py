@@ -657,8 +657,10 @@ BALLOON_ANCHORS[spec.PILLOW_BLOCK] = BalloonAnchor(
 #   right;
 # - 19 (hold-down stud, sheet 3) crossed bar 2's front edge to rail 2's far
 #   stud: it lands on bar 2's near stud (the bars' junction), on its upper
-#   cut-end chamfer boundary on the side away from the bar; out to the upper
-#   right, past the flange nut;
+#   cut-end chamfer boundary on the barrel's near side, left of its axis on
+#   the sheet (farm 20261105T070642635Z refused the first freeze, 210
+#   degrees: that is the far side, covered by the stud's own barrel); out
+#   to the upper right, past the flange nut;
 # - 7 (pivot shim, sheet 4) ran across the feed block's top to the shims
 #   stacked on its lug: it lands on the pivot block's stack instead, on the
 #   top shim's outer top rim, the far side from the block; out to the upper
@@ -696,7 +698,7 @@ BALLOON_ANCHORS[spec.PIVOT_BLOCK] = BalloonAnchor(
         spec.pivot_block.BLOCK_HEIGHT / 2.0,
     )
 )
-STUD_RIM_DEG = 210.0
+STUD_RIM_DEG = 60.0
 BALLOON_ANCHORS[spec.HOLD_DOWN_STUD] = BalloonAnchor(
     point_mm=(
         spec.hold_down_stud.RADIUS * math.cos(math.radians(STUD_RIM_DEG)),

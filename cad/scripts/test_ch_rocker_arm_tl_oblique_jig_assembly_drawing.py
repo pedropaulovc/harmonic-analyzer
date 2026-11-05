@@ -957,6 +957,13 @@ def test_re_routed_balloons_on_sheets_3_to_6_land_on_their_own_edges() -> None:
     x, y, z = anchor.point_mm
     assert math.hypot(x, z) == pytest.approx(stud.RADIUS)
     assert y == stud.LENGTH - stud.CUT_END_CHAMFER_MAX
+    # On the barrel's near side: farm 20261105T070642635Z froze it at 210
+    # degrees, where the stud's own barrel covers it in the isometric.
+    placement = spec.PLACEMENTS[spec.HOLD_DOWN_STUD][2]
+    rim = spec.frame_point(placement, (x, y, z))
+    axis = spec.frame_point(placement, (0.0, y, 0.0))
+    toward = spec.VIEW_AXES[spec.ISOMETRIC_VIEW][2]
+    assert _dot([r - a for r, a in zip(rim, axis)], toward) > 0.5 * stud.RADIUS
     # 7: the top shim of the pivot block's stack, on its outer top rim.
     shim = spec.pivot_shim
     anchor = drawing.BALLOON_ANCHORS[spec.PIVOT_SHIM]
