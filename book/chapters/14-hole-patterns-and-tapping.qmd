@@ -37,9 +37,10 @@ TODO
 
 ::: {.callout-tip}
 ## Now make
-`fr-rocker-arm-support` foot holes: 4× 1/2-13 UNC-2B through the 6.35 mm foot,
-tap drill Ø10.716 mm (Ø10.72 displayed; 27/64 in), from
-`cad/scripts/build_fr_rocker_arm_support.py` and `cad/scripts/_holes.py`.
+`fr-rocker-arm-support` foot holes: 4× 5/16 in drilled clearances through the
+.25 in (6.35 mm) foot; the sheet's hole table prints each as Ø .313 THRU ALL
+under a DRILL heading. From `cad/scripts/fr_rocker_arm_support_spec.py`
+(`HOLE_SPEC`) and `cad/scripts/draw_fr_rocker_arm_support.py`.
 :::
 
 ---
@@ -47,6 +48,7 @@ tap drill Ø10.716 mm (Ø10.72 displayed; 27/64 in), from
 **Sources for this chapter**
 
 - `cad/docs/machining-dfm.md` (`fr-rocker-arm-support`, `sm-summing-lever`)
-- `cad/scripts/build_fr_rocker_arm_support.py` (foot thickness, four-hole pattern and thread class)
-- `cad/scripts/_holes.py` (`TAP_DRILL_MM["1/2-13"]`)
+- `cad/scripts/build_fr_rocker_arm_support.py` (foot thickness and four-hole pattern)
+- `cad/scripts/fr_rocker_arm_support_spec.py` (`HOLE_SPEC`: the 5/16 drill)
+- `cad/scripts/draw_fr_rocker_arm_support.py` (the hole table's printed size)
 

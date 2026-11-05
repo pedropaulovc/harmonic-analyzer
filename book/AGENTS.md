@@ -28,11 +28,14 @@ to change geometry.
    frontmatter is one of `stub` → `drafted` (written from CAD, not yet cut) →
    `verified` (the part has been made following exactly this text). Never
    promote a chapter's status because it reads well.
-5. **Units: millimetres primary.** The model is metric; the original machine is
-   a mix (the fastener policy is US customary — see
+5. **Units: decimal inches primary.** Fabricated parts are drawn in decimal
+   inches (issue #290); only metric-only purchased lines keep millimetre
+   sheets. The build scripts still hold their constants in millimetres, so
+   quote the inch value the drawing prints. The original machine is a mix (the
+   fastener policy is US customary — see
    `memory/fastener-policy-us-customary.md`, and drill/tap sizes are imperial).
-   Give mm first with the inch equivalent in parentheses where a reader will
-   buy an imperial tool: `Ø9.525 mm (3/8")`.
+   Give inches first with the metric equivalent in parentheses where a reader
+   will buy a metric tool: `Ø.375 in (9.525 mm)`.
 6. **Safety language is not decorative.** Where an operation can grab, throw or
    cut, say so specifically ("the 0.4 mm slitting saw will grab if the feed
    stalls"), not generically.

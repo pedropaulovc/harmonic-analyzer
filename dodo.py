@@ -4183,12 +4183,18 @@ def _check_graph_spec(pytest_cmd: list[str]) -> dict[str, Any]:
                 for path in sorted(SCRIPTS_DIR.glob(pattern))
             ),
             config_py,
+            # test_package_unit_declarations reads every package's own raw
+            # drawing_unit row (#290 explicit declarations).
+            str((SCRIPTS_DIR / "test_package_unit_declarations.py").resolve()),
+            *parts_registry_files(),
+            *assembly_contract_files(),
         ],
         "cmd": [
             *pytest_cmd,
             str(SCRIPTS_DIR / "test_buildgraph.py"),
             str(SCRIPTS_DIR / "test_part_coverage.py"),
             str(SCRIPTS_DIR / "test_assembly_sheet_isolation.py"),
+            str(SCRIPTS_DIR / "test_package_unit_declarations.py"),
         ],
     }
 

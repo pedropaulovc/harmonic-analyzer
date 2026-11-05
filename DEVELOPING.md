@@ -10,6 +10,21 @@ goes to the farm)? Read
 — it is the decision tree, the seat/cache invariants and the evidence trail for
 an ad-hoc COM operation, and it links back here for cache detail.
 
+## Drawing units
+
+Every part and assembly drawing package must declare `drawing_unit` explicitly
+in its own config YAML. Use `drawing_unit: in`; only the six metric-only supplier
+packages named in `test_package_unit_declarations.py` may declare `drawing_unit: mm`.
+Nondrawing parts listed in `test_part_coverage.PART_DRAWING_EXEMPTIONS` do not
+need a drawing-unit declaration.
+The SolidWorks-free `check:graph` gate enforces the declarations. The legacy
+helper fallback remains `mm`, so a drawing package's omitted declaration is an
+error rather than a way to select drawing units. Existing inch declarations and
+metric title-block rows remain in place; their cleanup is tracked in #2199.
+
+See [the drawing policy](cad/docs/drawing-simplicity-policy.md) for model units,
+printed precision and metric supplier dimensions on inch sheets.
+
 ## Read-only cleanup inventory (Windows)
 
 Before a clean slate, inventory the machine without deleting files, pruning
