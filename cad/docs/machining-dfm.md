@@ -133,8 +133,8 @@ its first-root position; no second general note restates that location.
   socket and the far mouth's .010 edge break: **7.50 mm (1.55D)** of full
   thread (6.87 mm, 1.42D, if a 1.5P tip loss is assumed instead), above the
   1.5D = 7.24 mm floor. The 0.7P tip is a nominal allowance, as for the swing
-  stop, so MHA-FR-00 check 2 accepts each installed lower screw at `.285 MIN`
-  full-form far-wall engagement. The tap keeps its bottoming lead (`↧ 1.93 MIN` drill;
+  stop, so MHA-FR-00 check 2 accepts each installed lower screw at full-form
+  far-wall engagement of at least 1.5 screw diameters. The tap keeps its bottoming lead (`↧ 1.93 MIN` drill;
   the lug's past-tip guard leaves no room for a plug lead). The callout reads
   `FAR WALL ONLY`, and its associative full-thread and minimum-drill depth
   tokens are unchanged. MHA-FR-02 is not yet converted: its taps still thread

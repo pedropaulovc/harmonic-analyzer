@@ -57,11 +57,16 @@ def test_base_cross_screws_clear_the_near_wall_and_engage_the_far_wall() -> None
     # accepts each installed lower joint at 1.5D of full-form engagement.
     import draw_fr_frame_assembly as assembly_sheet
 
-    assert base_fasteners.CROSS_SCREW_MIN_USEFUL_ENGAGEMENT_TEXT == ".285 MIN"
-    assert (
-        f"MHA-FR-01 FAR WALL {base_fasteners.CROSS_SCREW_MIN_USEFUL_ENGAGEMENT_TEXT}"
-        in assembly_sheet.ASSEMBLY_CHECKS
+    assert base_fasteners.CROSS_SCREW_ENGAGEMENT_CHECK == (
+        "FULL-FORM THREAD ENGAGEMENT OF AT LEAST 1.5 SCREW DIAMETERS"
     )
+    checks = " ".join(
+        line.strip() for line in assembly_sheet.ASSEMBLY_CHECKS.splitlines()
+    )
+    assert (
+        f"VERIFY EACH LOWER SCREW HAS {base_fasteners.CROSS_SCREW_ENGAGEMENT_CHECK} "
+        "IN THE MHA-FR-01 FAR WALL"
+    ) in checks
 
 
 def _printed_mm(value_mm: float, places: int) -> float:

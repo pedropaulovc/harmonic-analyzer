@@ -694,6 +694,7 @@ def _cross_clearance_callout_definitions(definitions: dict[int, str]) -> dict[in
     return updated
 
 
+@_telemetry.traced("drawing.base_cross_clearance_callout_text")
 def _set_cross_clearance_callout_text(display: Any) -> None:
     """State 4X and DRILL TO SOCKET without severing the diameter variable."""
     definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
