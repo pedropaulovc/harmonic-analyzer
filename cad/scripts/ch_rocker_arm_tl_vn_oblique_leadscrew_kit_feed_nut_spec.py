@@ -23,7 +23,7 @@ accepted to is a native model tolerance in the FeedNut configuration, printed
 on the kit's REWORK sheet (``REWORK_SHEET_REFERENCE``). Section F-F carries
 ``REWORK_CONTROLS``: ``FlangeThick`` (LIMIT ``FLANGE_THICK_MIN`` /
 ``FLANGE_THICK_MAX``), ``CskDia`` (LIMIT ``CSK_DIA_MIN`` / ``CSK_DIA_MAX``)
-and ``FacedLength`` (``LENGTH_MAX`` MAX); the end view carries
+and ``FacedLength`` (LIMIT ``LENGTH_MIN`` / ``LENGTH_MAX``); the end view carries
 ``RECEIPT_CONTROLS``: the flange OD, body, hole and PCD limits. Values no
 feature dimension holds are the driving dimensions of hidden reference
 sketches (``REFERENCE_SKETCHES``). The 82° is held by the driving apex depth
@@ -127,9 +127,6 @@ BORE_DIA = leadscrew_stock.MINOR_DIA  # 6.0
 
 # --- FIT-UP: the spigot faced off ----------------------------------------------
 LENGTH = FLANGE_THICK + BODY_LENGTH  # 13.5, seat face to body end
-# Five Tr8 turns at least, as the retired TL-27 was sized (ruling A1).
-if LENGTH < 5.0 * LEAD:
-    raise AssertionError("the fitted nut is shorter than five Tr8 turns")
 
 # --- RECEIPT ACCEPTANCE: UNVERIFIED nominals, measured in F1A -----------------
 # Every limit below is a native dimension of the FeedNut configuration
@@ -153,6 +150,17 @@ HOLE_DIA_MIN = 3.46  # a #29 transfer drill (Ø3.454) still enters
 HOLE_DIA_MAX = 3.60
 HOLE_PCD_BAND = 0.1  # ± on the diameter, so ±0.05 on each hole's station
 LENGTH_MAX = 13.8  # faced, seat face to body end
+# The faced length's least (owner ruling 2026-11-05, Codjiflo 4483623010 on
+# #2187): facing takes the spigot, not the thread under it.
+LENGTH_MIN = 13.2
+# Rule 18 at the worst case: the shortest faced nut, less the supplied body
+# end's incomplete threads (rule 18's 1.5 pitches; the faced end is cut
+# through full thread). It holds five Tr8 turns, as the retired TL-27 was
+# sized (ruling A1, a517a1cd3f), short of rule 18's 1.5 D (12): RV-03, owner
+# ruling 2026-11-05.
+FULL_THREAD_MIN = LENGTH_MIN - 1.5 * LEAD  # 10.2
+if FULL_THREAD_MIN < 5.0 * LEAD:
+    raise AssertionError("the shortest faced nut holds under five full Tr8 turns")
 HOLE_R_MAX = HOLE_DIA_MAX / 2.0
 HOLE_STATION_BAND = HOLE_PCD_BAND / 2.0
 # The listing gives the holes no angular stations (HOLE_ANGLES_DEG is the
@@ -160,8 +168,8 @@ HOLE_STATION_BAND = HOLE_PCD_BAND / 2.0
 # are bounded at fit-up instead (Codjiflo 4477879822 on #2187): TL-00 F1B sets
 # all four holes within TL-32's tap clocking (its NutClock) before a tap is
 # transferred, and rejects a nut whose four cannot all be set there.
-if not SUPPLIED_LENGTH > LENGTH_MAX > LENGTH:
-    raise AssertionError("the faced-length limit does not reject an unfaced nut")
+if not SUPPLIED_LENGTH > LENGTH_MAX > LENGTH > LENGTH_MIN:
+    raise AssertionError("the faced-length limits do not hold the nut as fitted")
 
 # --- FIT-UP: the 82° countersinks for the four TL-VN-67 flat heads ------------
 SCREW_COUNT = len(HOLE_ANGLES_DEG)
@@ -447,14 +455,12 @@ VOLUME_MM3 = BODY_VOLUME_MM3 - SCREW_COUNT * (HOLE_VOLUME_MM3 + CSK_VOLUME_MM3)
 
 # --- Native controls in the FeedNut configuration only (Codjiflo P2) ------------
 # name -> (nominal, lower deviation, upper deviation, places), mm. A LIMIT
-# prints its two limits; a MAX prints its nominal, which IS the limit, then
-# MAX (``_single_limit_tolerance``), the deviation below it the model's record
-# of the modelled size; a symmetric band prints ±. Each prints at its band's
-# places. The 82° prints in CskDia's callout under the title block's angular
-# band; CskApexDepth drives it and does not print.
+# prints its two limits (the faced length's nominal is its maximum, the
+# reference line's length); a symmetric band prints ±. Each prints at its
+# band's places. The 82° prints in CskDia's callout under the title block's
+# angular band; CskApexDepth drives it and does not print.
 TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
 TOL_SYMMETRIC = 4  # swTolType_e.swTolSYMMETRIC
-TOL_MAX = 6  # swTolType_e.swTolMAX
 
 
 def _deviation(value: float) -> float:
@@ -462,7 +468,7 @@ def _deviation(value: float) -> float:
 
 
 # REWORK, in section F-F: the flange after facing (3.7/3.3), the countersink
-# mouth (4.76/4.50) and the faced length (13.8 MAX).
+# mouth (4.76/4.50) and the faced length (13.8/13.2).
 REWORK_CONTROLS = {
     "FlangeThick": (
         FLANGE_THICK,
@@ -476,7 +482,7 @@ REWORK_CONTROLS = {
         _deviation(CSK_DIA_MAX - CSK_DIA),
         CSK_DIA_PLACES,
     ),
-    "FacedLength": (LENGTH_MAX, _deviation(LENGTH - LENGTH_MAX), 0.0, 1),
+    "FacedLength": (LENGTH_MAX, _deviation(LENGTH_MIN - LENGTH_MAX), 0.0, 1),
 }
 # RECEIPT, on the end view: the flange OD (22.2/21.8), the body (10.3/10.0),
 # the holes (3.60/3.46) and their PCD (16.0 ±0.1), as F1A measures them.
@@ -500,7 +506,7 @@ NATIVE_CONTROLS = {**REWORK_CONTROLS, **RECEIPT_CONTROLS}
 DIMENSION_TOLERANCE_TYPES = {
     "FlangeThick": TOL_LIMIT,
     "CskDia": TOL_LIMIT,
-    "FacedLength": TOL_MAX,
+    "FacedLength": TOL_LIMIT,
     "ReceiptFlangeDia": TOL_LIMIT,
     "ReceiptBodyDia": TOL_LIMIT,
     "ReceiptHoleDia": TOL_LIMIT,
@@ -508,9 +514,6 @@ DIMENSION_TOLERANCE_TYPES = {
 }
 if set(DIMENSION_TOLERANCE_TYPES) != set(NATIVE_CONTROLS):
     raise AssertionError("a native control has no tolerance type")
-for _name, (_nominal, _lower, _upper, _places) in NATIVE_CONTROLS.items():
-    if DIMENSION_TOLERANCE_TYPES[_name] == TOL_MAX and _upper != 0.0:
-        raise AssertionError(f"{_name}: a MAX's nominal is not its limit")
 
 # --- The carriers no feature dimension holds: hidden reference sketches ---------
 # The profile's dimensions are widths from the bore and the holes stand at
@@ -543,7 +546,7 @@ if {name for name, _, _ in RECEIPT_CIRCLES} != set(RECEIPT_CONTROLS) or any(
 ):
     raise AssertionError("the receipt circles are not the receipt controls")
 # ``FacedLengthReference`` on Front (section F-F's): a line from the seat face
-# along the body's -X silhouette, LENGTH_MAX long.
+# along the body's -X silhouette, LENGTH_MAX long (its LIMIT's upper value).
 FACED_LENGTH_SKETCH = "FacedLengthReference"
 FACED_LENGTH_START = (-BODY_DIA / 2.0, 0.0)
 FACED_LENGTH_DIMENSIONS = ("FacedLength", "FacedLengthStart")

@@ -23,7 +23,7 @@ view names it over the full length.
 Sheet 3 (FEED NUT REWORK) is the FeedNut member's rework and receipt (Codjiflo
 P2 and 4475311251 on #2187): section F-F through two countersunk holes,
 carrying the native ``FlangeThick`` and ``CskDia`` LIMITs, the countersink's
-82° callout and the faced length's MAX; and the end view, carrying the native
+82° callout and the faced length's LIMIT; and the end view, carrying the native
 receipt limits: the flange OD, the body's MAX, the holes and their PCD. TL-00's
 F1A cites this sheet (``feed_nut.REWORK_SHEET_REFERENCE``) and types none of
 them.
@@ -113,6 +113,8 @@ from ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec import (
     KP08_SET_SCREW_SPACING_DEG,
     LENGTH,
     MAJOR_DIA,
+    OPEN_FLAT_CALLOUT,
+    PRINTED_LENGTH_FLAT,
     control_si,
 )
 
@@ -354,29 +356,28 @@ def _text_row_radius_mm() -> float:
 _NEAR_CENTRE_MM = (FLAT_STATIONS["NearKP08"] + FLAT_LENGTH / 2.0) / 2.0
 _NEAR_XY = (0.043, DETAIL_ROW_Y)
 # D: the far KP08's two flats (375.5 .. 383.5); its station is the main
-# view's.
+# view's. The printed flat length (every KP08 flat's) stands under the
+# fence, right of the flat: the flat length's text (widest row
+# "4X, KP08 FLATS", about 29 mm) is wider than the flat's 24 mm at 3:1, so
+# it stands right of the flat's far-end extension line, its dimension line
+# run out to it (review jbf-r17, rule 14: both extension lines crossed the
+# text), left of fence E.
 _FAR_CENTRE_MM = FLAT_STATIONS["FarKP08"]
 _FAR_XY = (0.091, DETAIL_ROW_Y)
-# E: the handwheel's flat and the far end (400.0 .. 410), the printed flat's
-# length under the fence, right of the flat, and its across-flat left of it,
-# square to the axis:
-# its extension line off the flat runs back along the flat and out of the
-# fence over 2 mm of thread (right of it, it would run along the 2 mm of
-# unflatted thread, the flat's end land, to the far end, reading as the flat
-# running out there). The fence's radius 7 holds the flat's start corners and
-# the far end's (each 6.40 off its centre) whole.
+# E: the handwheel's open flat and the far end (400.0 .. 410), its
+# across-flat left of it, square to the axis: its extension line off the
+# flat runs back along the flat and out of the fence over the thread. The
+# flat runs out through the cut end (owner ruling 2026-11-05), so the
+# detail shows no land past it. The fence's radius 7 holds the flat's start
+# corners and the far end's (each 6.40 off its centre) whole.
 # The across-flat's text (its widest row, "C, D, E", about 15 mm wide, centred
 # on its dimension line) stands between D's fence and E's.
-_WHEEL_CENTRE_MM = (FLAT_STATIONS["Handwheel"] - FLAT_LENGTH / 2.0 + LENGTH) / 2.0
+_WHEEL_CENTRE_MM = (FLAT_STARTS["Handwheel"] + LENGTH) / 2.0
 _WHEEL_RADIUS_MM = 7.0
 _WHEEL_XY = (0.1615, DETAIL_ROW_Y)
 # The across-flat runs from the far crest (clock 180, radius -4) to the flat
 # (FLAT_AF - 4 toward clock 0): its middle stands at half their sum.
 _AF_MID_RADIUS_MM = (FLAT_AF - MAJOR_DIA) / 2.0
-# The flat length's text (widest row "5X, ALL FLATS", about 29 mm) is wider
-# than the flat's 24 mm at 3:1, so it stands right of the flat's far-end
-# extension line, its dimension line run out to it (review jbf-r17, rule 14:
-# both extension lines crossed the text).
 FLAT_LENGTH_TEXT_HALF_WIDTH = 0.0155
 FLAT_LENGTH_TEXT_GAP = 0.003
 END_DETAILS = (
@@ -404,7 +405,18 @@ END_DETAILS = (
         # Over its fence, between section B-B's cutting line and the cut
         # length's far extension line.
         (sheet_x(FLAT_STATIONS["FarKP08"]) + 0.005, MAIN_CENTER[1] + 0.012),
-        {},
+        {
+            "FlatLength": (
+                detail_xy(
+                    _FAR_CENTRE_MM,
+                    _FAR_XY,
+                    FLAT_STARTS[PRINTED_LENGTH_FLAT] + FLAT_LENGTH,
+                )[0]
+                + FLAT_LENGTH_TEXT_GAP
+                + FLAT_LENGTH_TEXT_HALF_WIDTH,
+                detail_xy(_FAR_CENTRE_MM, _FAR_XY, 0.0, _text_row_radius_mm())[1],
+            ),
+        },
     ),
     EndDetail(
         "E",
@@ -414,16 +426,6 @@ END_DETAILS = (
         # Right of the far end, level with the axis.
         (sheet_x(LENGTH) + 0.008, MAIN_CENTER[1]),
         {
-            "FlatLength": (
-                detail_xy(
-                    _WHEEL_CENTRE_MM,
-                    _WHEEL_XY,
-                    FLAT_STATIONS["Handwheel"] + FLAT_LENGTH / 2.0,
-                )[0]
-                + FLAT_LENGTH_TEXT_GAP
-                + FLAT_LENGTH_TEXT_HALF_WIDTH,
-                detail_xy(_WHEEL_CENTRE_MM, _WHEEL_XY, 0.0, _text_row_radius_mm())[1],
-            ),
             "FlatAF": detail_xy(
                 _WHEEL_CENTRE_MM,
                 _WHEEL_XY,
@@ -433,17 +435,19 @@ END_DETAILS = (
         },
     ),
 )
-# Every flat is one size: the printed one says how many (pivot-shaft style)
-# and which (review bought-r16, rule 1: "3X" and "5X" on detail E's one flat
-# left the reader to work out which flats they cover). The length is every
-# flat's; the across-flat is each clock-0 flat's, one in each detail (the
-# clock flats print their own in sections A-A and B-B). The across-flat's
-# rows stay narrower than the 25 mm between fences D and E.
+# Every closed flat is one size: the printed one says how many
+# (pivot-shaft style) and which (review bought-r16, rule 1: "3X" and "5X" on
+# detail E's one flat left the reader to work out which flats they cover).
+# The length is every KP08 flat's; the handwheel's runs to the end, which its
+# station says. The across-flat is each clock-0 flat's, one in each detail
+# (the clock flats print their own in sections A-A and B-B). The
+# across-flat's rows stay narrower than the 25 mm between fences D and E.
 FLAT_CALLOUTS = {
-    "FlatLength": f"{FLAT_LENGTH_CALLOUT}, ALL FLATS",
+    "FlatLength": f"{FLAT_LENGTH_CALLOUT}, KP08 FLATS",
     "FlatAF": "\n".join(
         (FLAT_AF_CALLOUT, ", ".join(detail.label for detail in END_DETAILS))
     ),
+    "HandwheelFlatStation": OPEN_FLAT_CALLOUT,
 }
 # The cylinder face on the axis, 50 mm right of centre: 2 mm from either
 # silhouette and clear of the dimension above.

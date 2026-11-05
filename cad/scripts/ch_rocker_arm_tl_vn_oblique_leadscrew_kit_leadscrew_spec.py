@@ -32,21 +32,26 @@ Sources:
   list 1 x T8x2 600mm lead screw, 1 x T8x2 brass nut. The listing states no
   thread hand, straightness or length tolerance.
 - DECIDED (owner/C4 layout decision 2026-10-16): cut to 410, deburr and
-  lightly chamfer the cut end. The print uses the title block's .XX band
-  (``LENGTH_TOLERANCE``): the self-checks below show the feed absorbs it and
-  the handwheel flat keeps its end land at the shortest cut, so the cut
-  needs no band of its own.
+  lightly chamfer the cut end. The print uses the title block's .X band
+  (``LENGTH_TOLERANCE``): the self-checks below show the feed absorbs it,
+  and the handwheel flat runs out through the cut end, so no land on it
+  depends on the cut. The cut needs no band of its own.
 - FROM the bought-parts contract: the Tr8x2 thread minor diameter is 6.0, a
   modelled simplification of the ISO 2904 root (below).
 - DECIDED: both ends are broken 0.25 x 45°, the title block's edge break
   ("BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX") at its limit, so they print
   nothing. The layout decision's "lightly chamfer the cut end" asks no more.
 - DECIDED (user ruling on the machinist review's rule 23, lock threaded
-  joints): a set-screw flat ``FLAT_DEPTH`` deep and ``FLAT_LENGTH`` long under
-  each set screw, stationed from C4's layout: each KP08's axial centre
-  ``KP08_S`` and the handwheel's set screw, ``HANDWHEEL_GRUB_FROM_HUB`` into
-  its hub. Each KP08 takes two flats ``KP08_SET_SCREW_SPACING_DEG`` apart, one
-  per inner-ring set screw. The handwheel comes with two set screws
+  joints): a set-screw flat ``FLAT_DEPTH`` deep under each set screw,
+  stationed from C4's layout: each KP08's axial centre ``KP08_S`` and the
+  handwheel's set screw, ``HANDWHEEL_GRUB_FROM_HUB`` into its hub. Each KP08
+  flat is ``FLAT_LENGTH`` long. Each KP08 takes two flats
+  ``KP08_SET_SCREW_SPACING_DEG`` apart, one per inner-ring set screw.
+- DECIDED (owner ruling 2026-11-05, Codjiflo 4483623004 on #2187, rule 4):
+  the handwheel flat (``OPEN_FLAT``) starts at its station and runs out
+  through the cut end. A closed flat kept its end land only with the cut and
+  flat bands tightened to .XX, which rule 4 forbids. Open, every band is the
+  title block's .X. The handwheel comes with two set screws
   (``ch_rocker_arm_tl_vn_oblique_handwheel_spec``); the one opposite the
   handle bears on the handwheel flat, the other on the plain thread past the
   feed nut's travel. The flats' clock round the axis is set at assembly: each
@@ -68,9 +73,10 @@ Sources:
     milled.
   - the handwheel's set-screw station (its spec). Check: its axis stands
     ``HANDWHEEL_GRUB_FROM_HUB`` from the hub end within
-    ``HANDWHEEL_GRUB_COVER``, so the handwheel flat at its printed bands
-    still runs past the screw both sides; outside that, the hub gap is reset
-    at fitting so the screw lands on the flat, inside the engagement margins.
+    ``HANDWHEEL_GRUB_COVER``, so the handwheel flat at its printed band
+    still runs past the screw on the hub side; outside that, the hub gap is
+    reset at fitting so the screw lands on the flat, inside the engagement
+    margins.
 
 Thread: not modelled (bought-parts modelling rule). The body is a plain
 cylinder at the major diameter, so it overstates the real screw by the thread
@@ -119,11 +125,11 @@ HAND = "right"  # UNVERIFIED: not stated on the listing; receipt check
 # the SKU identify the stock (review: a gauge sketch, then a numeric note row).
 SUPPLIER_PRODUCT_URL = "https://www.amazon.com/dp/B085DDHJTW"
 
-# The cut length prints as a native two-place dimension (410.00), so the
-# title block's .XX row is its band: at .X (±0.8) the shortest cut would run
-# the handwheel flat out through the screw's end (``HANDWHEEL_FLAT_END_LAND``).
-LENGTH_PLACES = 2
-LENGTH_TOLERANCE = printed_band_mm(LENGTH_PLACES)  # ±0.51, the title block's .XX
+# The cut length prints as a native one-place dimension (410.0) under the
+# title block's .X row: the handwheel flat runs out through the cut end
+# (``OPEN_FLAT``), so no flat's land depends on the cut.
+LENGTH_PLACES = 1
+LENGTH_TOLERANCE = printed_band_mm(LENGTH_PLACES)  # ±0.8, the title block's .X
 MINOR_DIA = 6.0  # Tr8x2 thread minor (contract; the nut bore's model value)
 
 # --- DECIDED: the title block's edge break --------------------------------------
@@ -163,15 +169,14 @@ FLAT_LENGTH = feed.SCREW_FLAT_LENGTH  # 8, along the axis, centred on the set sc
 FLAT_AF = MAJOR_DIA - FLAT_DEPTH  # 7.28, across the flat to the far crest
 FLAT_AF_PLACES = 2
 FLAT_AF_TOLERANCE = printed_band_mm(FLAT_AF_PLACES)  # ±0.51, the title block's .XX
-# The flats' stations print at two places, the cut length's row. Their length
-# prints at two as well: each station locates its flat's near edge (rule 10:
-# to a feature's edge, not its unmarked middle), so the length's band stacks
-# onto the far edge's. Both bands, with the cut length's, set the handwheel
-# flat's end land; at one place on any of the three the land is lost.
+# The flats' stations and length print at one place, the title block's .X
+# row. Each station locates its flat's near edge (rule 10: to a feature's
+# edge, not its unmarked middle), so a KP08 flat's length band stacks onto
+# its far edge's; the self-checks keep each inside its KP08 block.
 FLAT_PLACES = LENGTH_PLACES
-FLAT_TOLERANCE = printed_band_mm(FLAT_PLACES)  # ±0.51
-FLAT_LENGTH_PLACES = 2
-FLAT_LENGTH_TOLERANCE = printed_band_mm(FLAT_LENGTH_PLACES)  # ±0.51
+FLAT_TOLERANCE = printed_band_mm(FLAT_PLACES)  # ±0.8
+FLAT_LENGTH_PLACES = 1
+FLAT_LENGTH_TOLERANCE = printed_band_mm(FLAT_LENGTH_PLACES)  # ±0.8
 KP08_SET_SCREW_SPACING_DEG = 120.0  # UNVERIFIED: the KP08 series' clock; receipt check
 CLOCK_PLACES = 0
 CLOCK_TOLERANCE_DEG = angular_band_deg()  # ±1, the title block's angular row
@@ -181,15 +186,6 @@ SET_SCREW_POINT_DIA = 2.5  # SOURCED, ISO 4029: the M5 cup point's dp max
 # simplification of the root, kept for the nut bore and the groove estimate.
 SCREW_ROOT_DIA = 5.5
 HANDWHEEL_SET_SCREW_MAJOR = float(feed.HANDWHEEL_GRUB.removeprefix("M"))  # 5
-# How far the handwheel's set-screw axis may stand off its 7 (UNVERIFIED)
-# station with the flat still past the screw both sides at the flat's
-# printed bands: the receipt check's window, ± this.
-HANDWHEEL_GRUB_COVER = (
-    FLAT_LENGTH / 2.0
-    - FLAT_TOLERANCE
-    - FLAT_LENGTH_TOLERANCE
-    - HANDWHEEL_SET_SCREW_MAJOR / 2.0
-)  # 0.48
 
 # Each set screw's station, part frame (from the near end), from C4's layout.
 FLAT_STATIONS = {
@@ -199,16 +195,36 @@ FLAT_STATIONS = {
         feed.HUB_END_S + feed.HANDWHEEL_GRUB_FROM_HUB - feed.SCREW_NEAR_END_S
     ),  # 404.0
 }
-# Each flat's near edge, from the near end: what the print dimensions.
+# The flat that runs out through the cut end (owner ruling 2026-11-05).
+OPEN_FLAT = "Handwheel"
+# Each flat's near edge, from the near end: what the print dimensions. A
+# KP08 flat is centred on its set screw; the open flat starts where a
+# centred FLAT_LENGTH flat did.
 FLAT_STARTS = {
     name: station - FLAT_LENGTH / 2.0 for name, station in FLAT_STATIONS.items()
 }  # 4.5, 375.5, 400.0
-# The handwheel flat's closed end: from its far edge, at its station's and
-# length's bands, to the shortest cut's far end less its edge break. Detail E
-# shows this land; it must stay positive at every printed limit.
-HANDWHEEL_FLAT_END_LAND = (LENGTH - LENGTH_TOLERANCE - END_CHAMFER) - (
-    FLAT_STARTS["Handwheel"] + FLAT_TOLERANCE + FLAT_LENGTH + FLAT_LENGTH_TOLERANCE
-)  # 0.22
+# The open flat's profile runs this far past the cut end, as every flat's
+# runs past the screw's round, so the cut leaves no far wall.
+FLAT_RUNOUT = 1.0
+# Each flat's far edge in the model: FLAT_LENGTH on from its start, or, the
+# open flat, past the cut end. Only the KP08 flats' length prints.
+FLAT_ENDS = {
+    name: LENGTH + FLAT_RUNOUT if name == OPEN_FLAT else start + FLAT_LENGTH
+    for name, start in FLAT_STARTS.items()
+}
+CLOSED_FLATS = tuple(name for name in FLAT_STATIONS if name != OPEN_FLAT)
+# How far the handwheel's set-screw axis may stand off its 7 (UNVERIFIED)
+# station with the screw still wholly on the open flat at the printed bands:
+# the receipt check's window, ± this. Toward the hub the flat's start takes
+# its station band; toward the end the shortest cut, less its edge break,
+# bounds the flat.
+HANDWHEEL_GRUB_COVER = min(
+    FLAT_STATIONS[OPEN_FLAT]
+    - HANDWHEEL_SET_SCREW_MAJOR / 2.0
+    - (FLAT_STARTS[OPEN_FLAT] + FLAT_TOLERANCE),
+    (LENGTH - LENGTH_TOLERANCE - END_CHAMFER)
+    - (FLAT_STATIONS[OPEN_FLAT] + HANDWHEEL_SET_SCREW_MAJOR / 2.0),
+)  # 0.70
 # What each flat sits under, as station spans on the rail (C4's s): the KP08
 # blocks' widths, and the screw's length inside the handwheel's hub.
 FLAT_HOUSINGS = {
@@ -221,10 +237,14 @@ FLAT_HOUSINGS = {
 # set screw: the "clock" flat.
 CLOCKED_FLATS = ("NearKP08", "FarKP08")
 FLAT_COUNT = len(FLAT_STATIONS) + len(CLOCKED_FLATS)  # 5
-# The flat whose length and across-flat print, once for every flat (``NX``).
+# The flat whose across-flat prints, once for every clock-0 flat, and the
+# one whose length prints, once for every KP08 flat (``NX``). The open
+# flat's length is its run to the end (``OPEN_FLAT_CALLOUT``).
 PRINTED_FLAT = "Handwheel"
-FLAT_LENGTH_CALLOUT = f"{FLAT_COUNT}X"
+PRINTED_LENGTH_FLAT = "FarKP08"
+FLAT_LENGTH_CALLOUT = f"{len(CLOSED_FLATS) + len(CLOCKED_FLATS)}X"  # 4X
 FLAT_AF_CALLOUT = f"{len(FLAT_STATIONS)}X"  # the clock flats print their own
+OPEN_FLAT_CALLOUT = "1X FLAT TO END"
 
 
 def flat_offset(depth: float) -> float:
@@ -245,11 +265,50 @@ def flat_half_angle_deg(depth: float) -> float:
 FLAT_CHORD = flat_chord(FLAT_DEPTH)  # 4.579
 # The circular segment each flat takes off the round, times its length.
 _FLAT_OFFSET = flat_offset(FLAT_DEPTH)  # 3.28
-FLAT_SEGMENT_AREA = (
-    _R**2 * math.acos(_FLAT_OFFSET / _R) - _FLAT_OFFSET * FLAT_CHORD / 2.0
-)
+
+
+def segment_area(radius: float) -> float:
+    """The circular segment a flat at ``_FLAT_OFFSET`` takes off a round of
+    ``radius``."""
+    half = math.sqrt(radius**2 - _FLAT_OFFSET**2)
+    return radius**2 * math.acos(_FLAT_OFFSET / radius) - _FLAT_OFFSET * half
+
+
+def _through_end_break(width, steps: int = 64) -> float:
+    """∫ ``width(r)`` along the far end's 45° break, where the round falls
+    from ``_R`` to ``_R_END`` (Simpson's rule; the flat stays inside it)."""
+    h = END_CHAMFER / steps
+    total = width(_R) + width(_R_END)
+    for k in range(1, steps):
+        total += (4.0 if k % 2 else 2.0) * width(_R - k * h)
+    return total * h / 3.0
+
+
+if not _R_END > _FLAT_OFFSET:
+    raise AssertionError("the open flat runs off the far end's break")
+FLAT_SEGMENT_AREA = segment_area(_R)
 FLAT_VOLUME_MM3 = FLAT_SEGMENT_AREA * FLAT_LENGTH
-VOLUME_MM3 = BLANK_VOLUME_MM3 - FLAT_COUNT * FLAT_VOLUME_MM3
+# The open flat: full round from its start to the far end's break, then the
+# break, where the round and so the flat narrow.
+_OPEN_FULL = LENGTH - END_CHAMFER - FLAT_STARTS[OPEN_FLAT]
+OPEN_FLAT_VOLUME_MM3 = FLAT_SEGMENT_AREA * _OPEN_FULL + _through_end_break(segment_area)
+OPEN_FLAT_AREA_MM2 = FLAT_CHORD * _OPEN_FULL + _through_end_break(
+    lambda r: 2.0 * math.sqrt(r**2 - _FLAT_OFFSET**2)
+)
+# Each clock-0 flat's face area and volume, the open one's to the end.
+FLAT_AREAS_MM2 = {
+    name: OPEN_FLAT_AREA_MM2 if name == OPEN_FLAT else FLAT_CHORD * FLAT_LENGTH
+    for name in FLAT_STATIONS
+}
+FLAT_VOLUMES_MM3 = {
+    name: OPEN_FLAT_VOLUME_MM3 if name == OPEN_FLAT else FLAT_VOLUME_MM3
+    for name in FLAT_STATIONS
+}
+VOLUME_MM3 = (
+    BLANK_VOLUME_MM3
+    - sum(FLAT_VOLUMES_MM3.values())
+    - len(CLOCKED_FLATS) * FLAT_VOLUME_MM3
+)
 
 # The drawing's manufacturing controls, each a driving native dimension
 # printed under the title block's general band for its places (swTolGeneral,
@@ -334,8 +393,8 @@ if not flat_offset(FLAT_DEPTH + FLAT_AF_TOLERANCE) > SCREW_ROOT_DIA / 2.0:
 # The shallowest still seats the set screw's cup point across the flat.
 if not flat_chord(FLAT_DEPTH - FLAT_AF_TOLERANCE) >= SET_SCREW_POINT_DIA:
     raise AssertionError("a shallow set-screw flat is narrower than the cup point")
-# A flat off station by its band, and short by its length's band, still runs
-# past the set screw both sides: the far side takes both bands.
+# The open flat at its station's band, and the shortest cut, still run past
+# the handwheel's set screw both sides.
 if not HANDWHEEL_GRUB_COVER >= 0.0:
     raise AssertionError("a flat off station leaves the set screw on the thread")
 # A KP08's two flats, both at their deepest and the angle at its band, keep a
@@ -351,21 +410,25 @@ if set(FLAT_HOUSINGS) != set(FLAT_STATIONS) or not set(CLOCKED_FLATS) < set(
         "every flat station needs its housing; the clock flats a station"
     )
 for _name, _start in FLAT_STARTS.items():
-    _end = _start + FLAT_LENGTH
-    # Clear of the end breaks at the printed bands: the near end is the
-    # stations' datum; the far end is the shortest cut's.
-    _far_edge_max = _end + FLAT_TOLERANCE + FLAT_LENGTH_TOLERANCE
-    if not (
-        END_CHAMFER < _start - FLAT_TOLERANCE
-        and _far_edge_max < LENGTH - LENGTH_TOLERANCE - END_CHAMFER
-    ):
-        raise AssertionError(f"the {_name} flat runs onto an end of the screw")
-    # Under its KP08 block, or inside the handwheel's hub, at its bands.
     _housing = tuple(s - feed.SCREW_NEAR_END_S for s in FLAT_HOUSINGS[_name])
+    # Clear of the near end's break, and under its KP08 block or inside the
+    # handwheel's hub, at its station's band: the near end is the stations'
+    # datum.
+    if not (END_CHAMFER < _start - FLAT_TOLERANCE and _housing[0] <= _start - FLAT_TOLERANCE):
+        raise AssertionError(f"the {_name} flat leaves its housing toward the near end")
+    if _name == OPEN_FLAT:
+        # It runs out through the cut end, which the long-cut check keeps
+        # inside the hub's guaranteed bore.
+        continue
+    # A closed flat's far edge takes its length's band too: clear of the
+    # shortest cut's break, and inside its housing.
+    _far_edge_max = _start + FLAT_LENGTH + FLAT_TOLERANCE + FLAT_LENGTH_TOLERANCE
     if not (
-        _housing[0] <= _start - FLAT_TOLERANCE
-        and _end + FLAT_TOLERANCE + FLAT_LENGTH_TOLERANCE <= _housing[1]
+        _far_edge_max < LENGTH - LENGTH_TOLERANCE - END_CHAMFER
+        and _far_edge_max <= _housing[1]
     ):
-        raise AssertionError(f"the {_name} flat leaves its housing")
-if not HANDWHEEL_FLAT_END_LAND > 0.0:
-    raise AssertionError("the handwheel flat runs out through the screw's far end")
+        raise AssertionError(f"the {_name} flat leaves its housing toward the far end")
+if set(CLOSED_FLATS) | {OPEN_FLAT} != set(FLAT_STATIONS) or PRINTED_LENGTH_FLAT not in (
+    CLOSED_FLATS
+):
+    raise AssertionError("the printed flat length must be a closed flat's")

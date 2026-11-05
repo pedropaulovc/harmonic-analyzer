@@ -212,13 +212,35 @@ def test_volume_is_the_blank_less_five_flat_segments() -> None:
         math.pi * r * r * spec.LENGTH - 2.0 * ring, rel=1e-12
     )
     # A circular segment by its subtended angle: R^2 (theta - sin theta) / 2.
-    theta = 2.0 * math.acos((r - spec.FLAT_DEPTH) / r)
-    segment = r * r * (theta - math.sin(theta)) / 2.0
-    assert spec.FLAT_SEGMENT_AREA == pytest.approx(segment, rel=1e-12)
-    assert spec.FLAT_VOLUME_MM3 == pytest.approx(segment * 8.0, rel=1e-12)
+    offset = r - spec.FLAT_DEPTH
+
+    def segment(radius: float) -> float:
+        theta = 2.0 * math.acos(offset / radius)
+        return radius * radius * (theta - math.sin(theta)) / 2.0
+
+    theta = 2.0 * math.acos(offset / r)
+    assert spec.FLAT_SEGMENT_AREA == pytest.approx(segment(r), rel=1e-12)
+    assert spec.FLAT_VOLUME_MM3 == pytest.approx(segment(r) * 8.0, rel=1e-12)
     assert spec.FLAT_CHORD == pytest.approx(2.0 * r * math.sin(theta / 2.0))
+    # The open flat: the full segment from 400 to the far break, then the
+    # break's shrinking round (a fine midpoint sum, independent of the spec's
+    # Simpson rule); its face likewise.
+    steps = 20000
+    h = c / steps
+    radii = [r - (k + 0.5) * h for k in range(steps)]
+    full = spec.LENGTH - c - 400.0
+    open_volume = segment(r) * full + h * sum(segment(radius) for radius in radii)
+    open_area = spec.FLAT_CHORD * full + h * sum(
+        2.0 * math.sqrt(radius**2 - offset**2) for radius in radii
+    )
+    assert spec.OPEN_FLAT_VOLUME_MM3 == pytest.approx(open_volume, rel=1e-6)
+    assert spec.OPEN_FLAT_AREA_MM2 == pytest.approx(open_area, rel=1e-6)
+    assert spec.FLAT_VOLUMES_MM3 == pytest.approx(
+        {"NearKP08": spec.FLAT_VOLUME_MM3, "FarKP08": spec.FLAT_VOLUME_MM3,
+         "Handwheel": open_volume}, rel=1e-6
+    )
     assert spec.VOLUME_MM3 == pytest.approx(
-        spec.BLANK_VOLUME_MM3 - 5 * spec.FLAT_VOLUME_MM3, rel=1e-12
+        spec.BLANK_VOLUME_MM3 - 4 * spec.FLAT_VOLUME_MM3 - open_volume, rel=1e-9
     )
     # The groove allowance the plain cylinder overstates (Ooznest STEP: 10.9/mm).
     assert spec.THREAD_GROOVE_MM3_PER_MM == pytest.approx(10.9, rel=0.02)
@@ -238,7 +260,7 @@ def test_build_sketches_the_spec_profile() -> None:
     assert 'name_last_feature(adapter, "FlatProfile")' in source
     assert 'name_last_feature(adapter, "Flats")' in source
     # Every cut is proved by its own faces as well as its volume step.
-    assert '_flat_faces_readback(adapter, "Flats"' in source
+    assert re.search(r'_flat_faces_readback\(\s*adapter,\s*"Flats",', source)
     assert 'f"{name}ClockFlat"' in source
 
 
@@ -267,53 +289,55 @@ def test_flat_stations_are_c4s_set_screw_positions() -> None:
     for name, start in spec.FLAT_STARTS.items():
         lo, hi = (s - near for s in spec.FLAT_HOUSINGS[name])
         assert lo <= start - spec.FLAT_TOLERANCE
+        if name == spec.OPEN_FLAT:
+            continue
         end_max = start + spec.FLAT_LENGTH + spec.FLAT_TOLERANCE
         assert end_max + spec.FLAT_LENGTH_TOLERANCE <= hi
     # The handwheel's set screw may stand off its station by the cover and
-    # still have flat both sides at the printed bands; the screw's far end
+    # still sit wholly on the open flat: the flat's start at its band on the
+    # hub side, the shortest cut's break on the other. The screw's far end
     # stays inside the handwheel's guaranteed bore at a long cut.
-    cover = (
-        spec.FLAT_LENGTH / 2.0
-        - spec.FLAT_TOLERANCE
-        - spec.FLAT_LENGTH_TOLERANCE
-        - spec.HANDWHEEL_SET_SCREW_MAJOR / 2.0
+    station = spec.FLAT_STATIONS["Handwheel"]
+    cover = min(
+        station - 2.5 - (400.0 + spec.FLAT_TOLERANCE),
+        spec.LENGTH - spec.LENGTH_TOLERANCE - spec.END_CHAMFER - (station + 2.5),
     )
-    assert spec.HANDWHEEL_GRUB_COVER == pytest.approx(cover) == pytest.approx(0.48)
+    assert spec.HANDWHEEL_GRUB_COVER == pytest.approx(cover) == pytest.approx(0.7)
     assert (
         feed.SCREW_FAR_END_S + spec.LENGTH_TOLERANCE
         < feed.HUB_END_S + feed.HANDWHEEL_BORE_LENGTH
     )
 
 
-def test_handwheel_flat_keeps_an_end_land_at_every_printed_limit() -> None:
-    """Review (PR #2187): the flat's far edge at its station's and length's
-    bands stops short of the shortest cut's far end less its edge break, so
-    detail E's flat stays closed. At .X on any one of the three controls the
-    land is lost."""
-    start = spec.FLAT_STARTS["Handwheel"]
-
-    def land(station_band: float, length_band: float, cut_band: float) -> float:
-        far_edge = start + station_band + spec.FLAT_LENGTH + length_band
-        return spec.LENGTH - cut_band - spec.END_CHAMFER - far_edge
-
+def test_handwheel_flat_runs_out_through_the_cut_end_at_title_block_bands() -> None:
+    """Owner ruling 2026-11-05 (Codjiflo 4483623004, rule 4): the handwheel
+    flat runs from its station out through the cut end, so no land on it
+    depends on the cut, and the cut, the stations and the flat length print at
+    the title block's .X. A closed 8 flat there kept a land only at .XX."""
+    assert spec.OPEN_FLAT == "Handwheel"
     bands = (spec.FLAT_TOLERANCE, spec.FLAT_LENGTH_TOLERANCE, spec.LENGTH_TOLERANCE)
-    assert bands == (printed_band_mm(2),) * 3
-    assert spec.HANDWHEEL_FLAT_END_LAND == pytest.approx(land(*bands))
-    assert spec.HANDWHEEL_FLAT_END_LAND == pytest.approx(0.22, abs=1e-9)
-    for loosened in range(3):
-        trial = list(bands)
-        trial[loosened] = printed_band_mm(1)
-        assert land(*trial) < 0.0, loosened
-    # Every flat stays off both end breaks at its bands, the far one at the
-    # shortest cut.
+    assert bands == (printed_band_mm(1),) * 3
+    assert (spec.LENGTH_PLACES, spec.FLAT_PLACES, spec.FLAT_LENGTH_PLACES) == (1, 1, 1)
+    # Its profile runs past even the longest cut, so the cut leaves no far wall.
+    assert spec.FLAT_ENDS["Handwheel"] == spec.LENGTH + spec.FLAT_RUNOUT
+    assert spec.FLAT_RUNOUT > spec.LENGTH_TOLERANCE
+    assert spec.CLOSED_FLATS == ("NearKP08", "FarKP08")
+    # Negative control: the closed 400..408 flat at these bands breaks through
+    # the shortest cut's far break.
+    closed_far_edge = 400.0 + spec.FLAT_LENGTH + spec.FLAT_TOLERANCE + spec.FLAT_LENGTH_TOLERANCE
+    assert closed_far_edge > spec.LENGTH - spec.LENGTH_TOLERANCE - spec.END_CHAMFER
+    # Every closed flat stays off both end breaks at its bands, the far one at
+    # the shortest cut; the open one off the near end.
     for name, flat_start in spec.FLAT_STARTS.items():
         assert flat_start - spec.FLAT_TOLERANCE > spec.END_CHAMFER, name
+        if name == spec.OPEN_FLAT:
+            continue
         far_edge = flat_start + spec.FLAT_LENGTH + spec.FLAT_TOLERANCE
         assert (
             far_edge + spec.FLAT_LENGTH_TOLERANCE
             < spec.LENGTH - spec.LENGTH_TOLERANCE - spec.END_CHAMFER
         ), name
-    # C4's hub gap that buys the land: 13 engaged, 1 short of the bore's 14.
+    # C4's hub gap: 13 engaged, 1 short of the bore's 14.
     assert feed.HUB_GAP == 11.0
     assert feed.HANDWHEEL_ENGAGEMENT == pytest.approx(13.0)
 
@@ -323,8 +347,8 @@ def test_flats_hold_the_set_screws_at_the_band_limits() -> None:
     assert (spec.FLAT_DEPTH, spec.FLAT_LENGTH) == (0.72, 8.0)
     assert spec.FLAT_AF == pytest.approx(7.28)
     assert spec.FLAT_AF_TOLERANCE == printed_band_mm(2) == pytest.approx(0.51)
-    assert spec.FLAT_TOLERANCE == printed_band_mm(2) == pytest.approx(0.51)
-    assert spec.FLAT_LENGTH_TOLERANCE == printed_band_mm(2) == pytest.approx(0.51)
+    assert spec.FLAT_TOLERANCE == printed_band_mm(1) == pytest.approx(0.8)
+    assert spec.FLAT_LENGTH_TOLERANCE == printed_band_mm(1) == pytest.approx(0.8)
     assert spec.CLOCK_TOLERANCE_DEG == 1.0
     # ISO 2904: the Tr8x2 external root d3 = d - 2 (P/2 + ac), ac = 0.25.
     assert spec.SCREW_ROOT_DIA == spec.MAJOR_DIA - 2.0 * (spec.PITCH / 2.0 + 0.25)
@@ -348,10 +372,9 @@ def test_flats_hold_the_set_screws_at_the_band_limits() -> None:
     assert r - deepest == pytest.approx(2.77)
     # Wider than an M5 cup point, and past the screw both sides off station.
     assert spec.flat_chord(shallowest) == pytest.approx(2.558, abs=1e-3)
-    # The far side takes the near edge's band and the length's.
-    far_side = spec.FLAT_LENGTH / 2.0 - spec.FLAT_TOLERANCE - spec.FLAT_LENGTH_TOLERANCE
-    assert far_side >= 2.5
-    # With both at one place the far side would be on the thread.
+    # The handwheel's M5 sits wholly on the open flat off station by the
+    # cover; a closed 8 flat at .X would leave its far side on the thread.
+    assert spec.HANDWHEEL_GRUB_COVER >= 0.0
     assert spec.FLAT_LENGTH / 2.0 - 2.0 * printed_band_mm(1) < 2.5
     # A KP08's two flats never meet.
     assert 2.0 * spec.flat_half_angle_deg(deepest) < 120.0 - 1.0
@@ -359,8 +382,9 @@ def test_flats_hold_the_set_screws_at_the_band_limits() -> None:
 
 def test_flats_sketch_records_every_dimension_it_emits(monkeypatch) -> None:
     """One Front sketch, a rectangle and across-flat line per station: the
-    printed FlatLength and FlatAF on the handwheel's, each station from the
-    origin, every emitted dimension named in creation order."""
+    printed FlatAF on the handwheel's, the printed FlatLength on the far
+    KP08's, each station from the origin, every emitted dimension named in
+    creation order."""
     emitted, chains, applied = [], [], {}
     ok = SimpleNamespace(is_success=True, data="D", error=None)
 
@@ -406,18 +430,24 @@ def test_flats_sketch_records_every_dimension_it_emits(monkeypatch) -> None:
     assert spec.DRAWING_DIMENSIONS["FlatProfile"] <= set(names)
     assert by_name["FlatLength"][2:] == ("vertical_distance", 8.0)
     assert by_name["FlatAF"][2:] == ("horizontal_distance", pytest.approx(7.28))
+    assert by_name["HandwheelFlatLength"][2:] == ("vertical_distance", 11.0)
     for name, start in spec.FLAT_STARTS.items():
         station = by_name[f"{name}FlatStation"]
         assert station[1:] == ("origin", "vertical_distance", start)
         # From the flat's near end: the rectangle's first vertex.
         assert station[0].endswith("_0.start")
-    # The printed pair is on the handwheel's rectangle: its station's chains.
-    handwheel = [points for points in chains if points[0][1] == 404.0 - 4.0]
-    assert handwheel and by_name["FlatLength"][0].startswith(
-        f"L{chains.index(handwheel[0]) + 1}_"
-    )
+
+    def chain_of(start: float) -> str:
+        (found,) = [points for points in chains if points[0][1] == start]
+        return f"L{chains.index(found) + 1}_"
+
+    # The across-flat prints on the handwheel's rectangle, the length on the
+    # far KP08's; the handwheel's runs 1 past the cut end, its length unprinted.
+    assert by_name["FlatLength"][0].startswith(chain_of(375.5))
+    assert by_name["HandwheelFlatLength"][0].startswith(chain_of(400.0))
     offset = spec.MAJOR_DIA / 2.0 - spec.FLAT_DEPTH  # 3.28
-    assert [(offset, 400.0), (offset, 408.0), (5.0, 408.0), (5.0, 400.0)] in chains
+    assert [(offset, 400.0), (offset, 411.0), (5.0, 411.0), (5.0, 400.0)] in chains
+    assert [(offset, 375.5), (offset, 383.5), (5.0, 383.5), (5.0, 375.5)] in chains
 
 
 def test_clock_flat_sketch_is_defined_by_its_angle(monkeypatch) -> None:
@@ -494,7 +524,8 @@ def test_clock_flat_sketch_is_defined_by_its_angle(monkeypatch) -> None:
 
 def test_flat_face_readback_refuses_a_wrong_cut(monkeypatch) -> None:
     """The flats are proved by their own planar faces: one flat per station
-    square to the clock's radial 3.28 from the axis, two end walls each."""
+    square to the clock's radial 3.28 from the axis, two end walls each, or
+    one for the open flat run out through the cut end."""
     monkeypatch.setattr(part, "_early_bound", lambda value, _kind: value)
 
     def face(normal, root, area_mm2=0.0):
@@ -516,22 +547,33 @@ def test_flat_face_readback_refuses_a_wrong_cut(monkeypatch) -> None:
     area = spec.FLAT_CHORD * spec.FLAT_LENGTH
     offset = spec.MAJOR_DIA / 2.0 - spec.FLAT_DEPTH
     c, s = math.cos(math.radians(120.0)), math.sin(math.radians(120.0))
+    closed = ((375.5, 383.5, area),)
     good = [
         face((c, 0.0, s), (offset * c, 379.5, offset * s), area),
         face((0.0, 1.0, 0.0), (0.0, 375.5, 0.0)),
         face((0.0, -1.0, 0.0), (0.0, 383.5, 0.0)),
     ]
-    part._flat_faces_readback(adapter(good), "FarKP08ClockFlat", 120.0, (379.5,))
+    part._flat_faces_readback(adapter(good), "FarKP08ClockFlat", 120.0, closed)
     deep = offset + 0.1
     shallow = [face((c, 0.0, s), (deep * c, 379.5, deep * s), area), *good[1:]]
     off_station = [good[0], good[1], face((0.0, -1.0, 0.0), (0.0, 384.5, 0.0))]
     for faces in (shallow, off_station, good[:2]):
         with pytest.raises(RuntimeError):
-            part._flat_faces_readback(
-                adapter(faces), "FarKP08ClockFlat", 120.0, (379.5,)
-            )
+            part._flat_faces_readback(adapter(faces), "FarKP08ClockFlat", 120.0, closed)
     with pytest.raises(RuntimeError):  # a clock-0 flat where the 120° one belongs
-        part._flat_faces_readback(adapter(good), "FarKP08ClockFlat", 0.0, (379.5,))
+        part._flat_faces_readback(adapter(good), "FarKP08ClockFlat", 0.0, closed)
+    # The open flat: its start wall only, its face run through the far break.
+    open_ = ((400.0, None, spec.OPEN_FLAT_AREA_MM2),)
+    run_out = [
+        face((1.0, 0.0, 0.0), (offset, 405.0, 0.0), spec.OPEN_FLAT_AREA_MM2),
+        face((0.0, 1.0, 0.0), (0.0, 400.0, 0.0)),
+    ]
+    part._flat_faces_readback(adapter(run_out), "Flats", 0.0, open_)
+    closed_at_end = [*run_out, face((0.0, -1.0, 0.0), (0.0, 408.0, 0.0))]
+    short = [face((1.0, 0.0, 0.0), (offset, 404.0, 0.0), area), run_out[1]]
+    for faces in (closed_at_end, short):
+        with pytest.raises(RuntimeError):
+            part._flat_faces_readback(adapter(faces), "Flats", 0.0, open_)
 
 
 def test_cut_length_is_the_axis_edge_driving_dimension() -> None:
@@ -571,7 +613,7 @@ def test_cut_length_is_the_axis_edge_driving_dimension() -> None:
 
 
 def test_controls_print_at_the_title_block_rows() -> None:
-    assert spec.LENGTH_TOLERANCE == printed_band_mm(2) == pytest.approx(0.51)
+    assert spec.LENGTH_TOLERANCE == printed_band_mm(1) == pytest.approx(0.8)
     stations = {f"{name}FlatStation" for name in spec.FLAT_STATIONS}
     assert spec.DRAWING_DIMENSIONS == {
         "ScrewProfile": {"CutLength"},
@@ -580,10 +622,10 @@ def test_controls_print_at_the_title_block_rows() -> None:
         "FarKP08ClockProfile": {"FarKP08ClockAF", "FarKP08ClockAngle"},
     }
     places = {
-        "CutLength": 2,
-        "FlatLength": 2,
+        "CutLength": 1,
+        "FlatLength": 1,
         "FlatAF": 2,
-        **dict.fromkeys(stations, 2),
+        **dict.fromkeys(stations, 1),
         "NearKP08ClockAF": 2,
         "FarKP08ClockAF": 2,
         "NearKP08ClockAngle": 0,
@@ -602,11 +644,13 @@ def test_controls_print_at_the_title_block_rows() -> None:
         else:
             assert band == printed_band_mm(digits)
             assert spec.control_si(name)[1] == band / 1000.0
-    # Every flat is one size; the printed one says how many.
-    assert (spec.FLAT_LENGTH_CALLOUT, spec.FLAT_AF_CALLOUT) == ("5X", "3X")
+    # Every KP08 flat is one size; the printed one says how many, and the
+    # handwheel's station that its flat runs to the end.
+    assert (spec.FLAT_LENGTH_CALLOUT, spec.FLAT_AF_CALLOUT) == ("4X", "3X")
     assert draw.FLAT_CALLOUTS == {
-        "FlatLength": "5X, ALL FLATS",
+        "FlatLength": "4X, KP08 FLATS",
         "FlatAF": "3X\nC, D, E",
+        "HandwheelFlatStation": "1X FLAT TO END",
     }
     # The feed absorbs the band at either limit.
     short_margin = (feed.NEAR_STUB - feed.NEAR_STUB_MIN) + (
@@ -789,7 +833,7 @@ def test_feed_nut_sourced_envelope_and_the_faced_length() -> None:
 def test_feed_nut_receipt_limits_are_native_dimensions_on_sheet_3() -> None:
     """4475311251: F1A's receipt limits are the FeedNut's own native
     dimensions, each at its band's places in its native type, imported onto
-    sheet 3's end view; the faced length's MAX joins the rework in F-F."""
+    sheet 3's end view; the faced length's LIMIT joins the rework in F-F."""
     # UNVERIFIED nominals: F1A measures the nut against these before the lug's
     # taps are transferred, in the nut's own millimetres.
     assert nut.FLANGE_THICK_MIN < nut.FLANGE_THICK < nut.FLANGE_THICK_MAX
@@ -797,7 +841,8 @@ def test_feed_nut_receipt_limits_are_native_dimensions_on_sheet_3() -> None:
     assert nut.BODY_DIA < nut.BODY_DIA_MAX
     assert nut.FLANGE_DIA_MIN < nut.FLANGE_DIA < nut.FLANGE_DIA_MAX
     assert (nut.FLANGE_DIA_MIN, nut.FLANGE_DIA_MAX) == (21.8, 22.2)
-    assert nut.LENGTH < nut.LENGTH_MAX < nut.SUPPLIED_LENGTH
+    assert nut.LENGTH_MIN < nut.LENGTH < nut.LENGTH_MAX < nut.SUPPLIED_LENGTH
+    assert (nut.LENGTH_MIN, nut.LENGTH_MAX) == (13.2, 13.8)
     assert nut.HOLE_STATION_BAND == nut.HOLE_PCD_BAND / 2.0
     # (nominal, lower, upper, places): each band's limits are the spec's.
     limits = {
@@ -814,9 +859,9 @@ def test_feed_nut_receipt_limits_are_native_dimensions_on_sheet_3() -> None:
     }
     nominal, lower, upper, places = nut.REWORK_CONTROLS["FacedLength"]
     assert (nominal, round(nominal + lower, 6), upper, places) == (
-        nut.LENGTH_MAX, nut.LENGTH, 0.0, 1,
+        nut.LENGTH_MAX, nut.LENGTH_MIN, 0.0, 1,
     )
-    # swTolLIMIT 3, swTolSYMMETRIC 4, swTolMAX 6: a MAX prints its nominal.
+    # swTolLIMIT 3, swTolSYMMETRIC 4: a LIMIT prints both limits.
     assert {
         name: nut.DIMENSION_TOLERANCE_TYPES[name]
         for name in (*nut.RECEIPT_CONTROLS, "FacedLength")
@@ -825,7 +870,7 @@ def test_feed_nut_receipt_limits_are_native_dimensions_on_sheet_3() -> None:
         "ReceiptBodyDia": 3,
         "ReceiptHoleDia": 3,
         "ReceiptHolePcd": 4,
-        "FacedLength": 6,
+        "FacedLength": 3,
     }
     # 4476701302: the body's least bounds RV-02's thread wall; its nominal
     # is the listing's.
@@ -872,11 +917,11 @@ def test_feed_nut_rework_is_native_banded_controls_on_sheet_3() -> None:
     assert (nut.CSK_DIA_MIN, nut.CSK_DIA_MAX) == (4.50, 4.76)
     assert nut.CSK_DIA_MIN < nut.CSK_DIA < nut.CSK_DIA_MAX <= nut.CSK_CUTTER_DIA_MAX
     assert nut.CSK_CUTTER_DIA_MAX - nut.CSK_DIA_MAX < 0.01
-    # swTolLIMIT 3, swTolSYMMETRIC 4, swTolMAX 6.
+    # swTolLIMIT 3, swTolSYMMETRIC 4.
     assert nut.DIMENSION_TOLERANCE_TYPES == {
         "FlangeThick": 3,
         "CskDia": 3,
-        "FacedLength": 6,
+        "FacedLength": 3,
         "ReceiptFlangeDia": 3,
         "ReceiptBodyDia": 3,
         "ReceiptHoleDia": 3,
@@ -936,7 +981,7 @@ def test_feed_nut_rework_is_native_banded_controls_on_sheet_3() -> None:
     assert draw.REWORK_EXPECTED == {
         "FlangeThick": pytest.approx((0.0035, -0.0002, 0.0002)),
         "CskDia": pytest.approx((0.0046, -0.0001, 0.00016)),
-        "FacedLength": pytest.approx((0.0138, -0.0003, 0.0)),
+        "FacedLength": pytest.approx((0.0138, -0.0006, 0.0)),
     }
     assert draw.REWORK_PRECISION == {"FlangeThick": 1, "CskDia": 2, "FacedLength": 1}
     assert set(draw.REWORK_CALLOUTS) == set(nut.REWORK_CONTROLS)
@@ -1052,9 +1097,10 @@ def test_rework_tolerances_live_only_in_the_feed_nut_member() -> None:
     def callers(name: str) -> set[str]:
         return {function for function in functions if name in calls(function)}
 
-    banded = {"set_dimension_symmetric_tolerance", "set_dimension_prefix", "set_single_limit"}
+    banded = {"set_dimension_symmetric_tolerance", "set_dimension_prefix", "_author_limits"}
     assert callers("set_dimension_symmetric_tolerance") == {"_feed_nut_rework"}
-    assert callers("set_single_limit") == {"_feed_nut_rework"}
+    # Every nut control is a LIMIT or a ±: no single-limit MAX is left.
+    assert callers("set_single_limit") == set()
     assert callers("set_dimension_prefix") == {"_feed_nut_rework"}
     assert callers("_author_limits") == {"_feed_nut_rework"}
     assert callers("_feed_nut_rework") == {"_author_feed_nut"}
@@ -1636,7 +1682,8 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
     # The countersink's dimension line stands at its text point, its lower
     # arrow hanging past the body's top: clear of the body's end.
     assert csk_text[0] > body_ink[2] + 0.004
-    # The faced length's MAX (13.8, one row) and its mate, offset right of the
+    # The faced length's LIMIT (13.8/13.2, stacked in one row as the body's
+    # 10.3/10.0 prints) and its mate, offset right of the
     # far witness and under its line, over the title block and right of the
     # section's caption. The caption hangs its native box's top centre at
     # REWORK_CAPTION_TOP: run 20261105T054045952Z printed its two rows
@@ -2087,17 +2134,18 @@ def test_details_show_every_flat_at_the_sections_scale() -> None:
 
 
 def test_details_carry_the_near_station_and_the_printed_flat() -> None:
-    """C prints the near station from the near end's centre; E the printed
-    flat's length and across-flat, the 5X and 3X callouts; every text off its
-    fence and over the captions' row."""
+    """C prints the near station from the near end's centre; D the KP08
+    flats' length (4X); E the open flat's across-flat (3X); every text off
+    its fence and over the captions' row."""
     by_label = {detail.label: detail for detail in draw.END_DETAILS}
     assert set(by_label["C"].keep) == {"NearKP08FlatStation"}
-    assert set(by_label["D"].keep) == set()
-    assert set(by_label["E"].keep) == {"FlatLength", "FlatAF"}
-    assert spec.PRINTED_FLAT == "Handwheel"
+    assert set(by_label["D"].keep) == {"FlatLength"}
+    assert set(by_label["E"].keep) == {"FlatAF"}
+    assert (spec.PRINTED_FLAT, spec.PRINTED_LENGTH_FLAT) == ("Handwheel", "FarKP08")
     assert draw.FLAT_CALLOUTS == {
-        "FlatLength": "5X, ALL FLATS",
+        "FlatLength": "4X, KP08 FLATS",
         "FlatAF": "3X\nC, D, E",
+        "HandwheelFlatStation": "1X FLAT TO END",
     }
     for detail in draw.END_DETAILS:
         fence = detail.radius_mm * draw._DETAIL_PER_MODEL_MM
@@ -2106,40 +2154,44 @@ def test_details_carry_the_near_station_and_the_printed_flat() -> None:
             assert y - draw.TEXT_HALF_HEIGHT - 0.006 > draw.DETAIL_CAPTION_TOP
             assert draw.BORDER[0] < x < draw.TITLE_BLOCK[0]
     # The flat's length and the near station hang under their spans.
-    near, wheel = by_label["C"], by_label["E"]
+    near, far, wheel = by_label["C"], by_label["D"], by_label["E"]
     x, _y = near.keep["NearKP08FlatStation"]
     assert draw.detail_xy(near.centre_mm, near.centre, 0.0)[0] < x
     assert (
         x
         < draw.detail_xy(near.centre_mm, near.centre, spec.FLAT_STATIONS["NearKP08"])[0]
     )
-    # The flat length's text stands right of the flat's far-end extension line
-    # (review jbf-r17, rule 14), its widest row clear of the line and of the
-    # title block.
+    # The flat length's text stands right of the far KP08 flat's far-end
+    # extension line (review jbf-r17, rule 14), its widest row clear of the
+    # line and of E's fence.
     flat_end = draw.detail_xy(
-        wheel.centre_mm,
-        wheel.centre,
-        spec.FLAT_STATIONS["Handwheel"] + spec.FLAT_LENGTH / 2.0,
+        far.centre_mm,
+        far.centre,
+        spec.FLAT_STATIONS["FarKP08"] + spec.FLAT_LENGTH / 2.0,
     )[0]
-    text_x = wheel.keep["FlatLength"][0]
+    text_x, text_y = far.keep["FlatLength"]
     assert text_x - draw.FLAT_LENGTH_TEXT_HALF_WIDTH > flat_end
-    assert text_x + draw.FLAT_LENGTH_TEXT_HALF_WIDTH < draw.TITLE_BLOCK[0]
+    assert text_x + draw.FLAT_LENGTH_TEXT_HALF_WIDTH < _fence_box(wheel)[0]
     assert draw.FLAT_LENGTH_TEXT_HALF_WIDTH * 2 > 0.0022 * len(
         draw.FLAT_CALLOUTS["FlatLength"]
     )
     # The across-flat's dimension line stands left of E's fence, short of the
     # flat's start (so its extension line leaves the fence over the flat, not
-    # along the thread to the far end), its text (widest row "C, D, E", about
-    # 15 mm) clear of both fences and between the far crest and the flat.
+    # along the thread), its text (widest row "C, D, E", about 15 mm) clear of
+    # both fences and between the far crest and the flat, and a row over the
+    # flat length's two rows.
     af_x, af_y = wheel.keep["FlatAF"]
-    flat_start = spec.FLAT_STATIONS["Handwheel"] - spec.FLAT_LENGTH / 2.0
+    flat_start = spec.FLAT_STARTS["Handwheel"]
     assert wheel.centre_mm - wheel.radius_mm < flat_start
     assert af_x + 0.0075 < _fence_box(wheel)[0]
-    assert af_x - 0.0075 > _fence_box(by_label["D"])[2] + 0.004
+    assert af_x - 0.0075 > _fence_box(far)[2] + 0.004
+    assert af_y - 3 * draw.TEXT_HALF_HEIGHT > text_y + 2 * draw.TEXT_HALF_HEIGHT
     radius = spec.MAJOR_DIA / 2.0
     crest = draw.detail_xy(wheel.centre_mm, wheel.centre, 0.0, -radius)[1]
     flat = draw.detail_xy(wheel.centre_mm, wheel.centre, 0.0, spec.FLAT_AF - radius)[1]
     assert flat < af_y < crest
+    # The open flat runs out through the end inside E's fence.
+    assert wheel.centre_mm + wheel.radius_mm > spec.LENGTH
 
 
 def test_details_letters_stand_off_the_screw() -> None:
@@ -2181,8 +2233,8 @@ def test_drawing_requires_every_control(monkeypatch, fault, target) -> None:
     monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
     assert draw.EXPECTED_CONTROLS["CutLength"] == (
         pytest.approx(0.410),
-        pytest.approx(-0.00051),
-        pytest.approx(0.00051),
+        pytest.approx(-0.0008),
+        pytest.approx(0.0008),
     )
     assert draw.EXPECTED_CONTROLS["FlatAF"] == (
         pytest.approx(0.00728),
@@ -2946,7 +2998,7 @@ def test_countersink_wall_shortfall_is_a_declared_owner_ruled_minor() -> None:
     import ch_rocker_arm_tl_oblique_jig_assembly_spec as jig
     from machinist_exceptions import load_exceptions
 
-    wall, _thread = load_exceptions(_config.CONFIG_DIR, draw.PART_STEM, "part")
+    wall, _thread, _faced = load_exceptions(_config.CONFIG_DIR, draw.PART_STEM, "part")
     assert (wall.id, wall.kind) == ("RV-01", "minor")
     # "where" quotes the printed callout: the prefix's Ø token as printed,
     # the band, the angle and the wall line, exactly.
@@ -3016,7 +3068,7 @@ def test_thread_wall_shortfall_is_a_declared_owner_ruled_minor() -> None:
     import ch_rocker_arm_tl_oblique_jig_assembly_spec as jig
     from machinist_exceptions import load_exceptions
 
-    csk, wall = load_exceptions(_config.CONFIG_DIR, draw.PART_STEM, "part")
+    csk, wall, _faced = load_exceptions(_config.CONFIG_DIR, draw.PART_STEM, "part")
     assert (wall.id, wall.kind) == ("RV-02", "minor")
     _nominal, lower, upper, places = nut.RECEIPT_CONTROLS["ReceiptBodyDia"]
     assert nut.DIMENSION_TOLERANCE_TYPES["ReceiptBodyDia"] == nut.TOL_LIMIT
@@ -3050,3 +3102,28 @@ def test_thread_wall_shortfall_is_a_declared_owner_ruled_minor() -> None:
         f"×{jig.NUT_BODY_WALL_MARGIN:.1f} under the brass's "
         f"{jig._BRASS_YIELD_MPA:.0f} MPa yield"
     ) in wall.reason
+
+
+def test_feed_nut_full_thread_shortfall_is_the_owner_ruled_rv03() -> None:
+    """Codjiflo 4483623010 (rule 18): the faced length is bounded both ways,
+    and the shortest faced nut, less the body end's incomplete threads, holds
+    five Tr8 turns: under 1.5 D, declared as RV-03 on the owner's ruling."""
+    from machinist_exceptions import load_exceptions
+
+    *_walls, faced = load_exceptions(_config.CONFIG_DIR, draw.PART_STEM, "part")
+    assert (faced.id, faced.kind) == ("RV-03", "minor")
+    assert nut.FULL_THREAD_MIN == pytest.approx(nut.LENGTH_MIN - 1.5 * nut.LEAD) == pytest.approx(10.2)
+    assert 5.0 * nut.LEAD <= nut.FULL_THREAD_MIN < 1.5 * spec.MAJOR_DIA
+    # Negative control: a nut faced 0.3 under the limit holds under five turns.
+    assert (nut.LENGTH_MIN - 0.3) - 1.5 * nut.LEAD < 5.0 * nut.LEAD
+    label = draw.REWORK_SECTION_LABEL
+    printed = f"{nut.LENGTH_MAX:.1f}/{nut.LENGTH_MIN:.1f}"
+    assert faced.where == (
+        f"sheet {nut.REWORK_SHEET}, Section {label}-{label}, the faced length {printed}"
+    )
+    assert f"holds {nut.FULL_THREAD_MIN:.1f} mm of full Tr8x2 thread" in faced.finding
+    assert f"1.5D ({1.5 * spec.MAJOR_DIA:.1f})" in faced.finding
+    assert faced.reason.startswith(
+        "owner ruling 2026-11-05 (Pedro, recorded in PR #2187 comment 6665347496"
+    )
+    assert "consistent with ruling A1 (a517a1cd3f)" in faced.reason

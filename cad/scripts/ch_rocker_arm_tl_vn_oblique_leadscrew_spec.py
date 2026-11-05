@@ -207,9 +207,9 @@ BRACKET_THICK = 1.0 * INCH  # OnlineMetals 1165 half-by-one bar, on edge
 KP08_BASE_Z = trammel.BASE_BAR_THICK + BRACKET_THICK  # 37.338
 SCREW_AXIS_Z = KP08_BASE_Z + KP08_AXIS_HEIGHT  # 52.338
 # Far KP08 outer face to the handwheel's hub end: the 410 screw's far end then
-# stands 13 into the wheel's bore, past the grub and its flat with an end land
-# on the flat at the printed bands (leadscrew_stock.HANDWHEEL_FLAT_END_LAND),
-# and 1 short of the hub's guaranteed bore depth.
+# stands 13 into the wheel's bore, past the grub on its flat (which runs out
+# through the cut end, leadscrew_stock.OPEN_FLAT), and 1 short of the hub's
+# guaranteed bore depth.
 HUB_GAP = 11.0
 # The drilled parts fix the KP08 stations and the screw length; a vendor swap
 # must not move them. The self-checks below guard them against the bought
@@ -217,11 +217,14 @@ HUB_GAP = 11.0
 FEED_GAP = 2.5  # feed lug/nut to KP08 envelope at a travel stop (TL-32 checks)
 NEAR_STUB = 2.0  # screw past the near KP08's outer face, as fitted (step 7)
 NEAR_STUB_MIN = 1.0  # at least
-# The screw's set-screw flat, centred on the handwheel's grub (TL-VN-84 LeadScrew).
+# The screw's set-screw flats' length (TL-VN-84 LeadScrew): each KP08 flat's,
+# centred on its set screw; the handwheel's starts half of it short of the grub
+# and runs out through the cut end.
 SCREW_FLAT_LENGTH = 8.0
 HANDWHEEL_GRUB_MAJOR = float(HANDWHEEL_GRUB.removeprefix("M"))
-# The screw in the handwheel's bore, at least: past the grub's far flank and
-# the flat's far end. HANDWHEEL_BORE_LENGTH caps it (the screw end stays
+# The screw in the handwheel's bore, at least: past the grub's far flank, and
+# half a flat's length past the grub, so the open flat runs as far beyond it
+# as toward the hub. HANDWHEEL_BORE_LENGTH caps it (the screw end stays
 # inside the wheel's outer face).
 HANDWHEEL_ENGAGEMENT_MIN = max(
     HANDWHEEL_GRUB_FROM_HUB + HANDWHEEL_GRUB_MAJOR / 2.0,  # 9.0

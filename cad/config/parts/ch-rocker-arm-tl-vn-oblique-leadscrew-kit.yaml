@@ -35,3 +35,8 @@ ch-rocker-arm-tl-vn-oblique-leadscrew-kit:
       where: "sheet 3, the end view, the Ø10.3/10.0 body callout: MIN WALL 0.75 TO THREAD"
       finding: "the Tr8x2 internal thread's Ø8.5 major (8 + 2 × 0.25 crest clearance, ISO 2904) inside the body at its Ø10.0 receipt minimum, concentric, leaves 0.75 mm between thread major and body OD, below the 1.5 mm metric wall floor"
       reason: "owner ruling 2026-11-04 (Pedro, PR #2187 comment 6651067089, on the sketch in comment 6650871642, https://github.com/user-attachments/assets/2f652ca3-b30d-45ee-a564-23d49ce63751): \"Accept as owner exception\" for the bought nut's 0.75 mm thread-to-body wall. The wall is a supplied, unmachined feature of the bought nut: no rework touches its body or thread, and its nominal Ø10.2 body leaves 0.85 mm. It carries the 1361 N largest nut thrust axially from the thread into the flange, reacted by the lug seat one way and the four screws' preload the other: 62 MPa on the bare annulus, teeth not credited, ×1.9 under the brass's 117 MPa yield."
+    - id: "RV-03"
+      kind: "minor"
+      where: "sheet 3, Section F-F, the faced length 13.8/13.2"
+      finding: "the shortest faced nut (13.2) less the supplied body end's incomplete threads (1.5 pitches, 3.0) holds 10.2 mm of full Tr8x2 thread, under rule 18's 1.5D (12.0) for the Ø8 screw"
+      reason: "owner ruling 2026-11-05 (Pedro, recorded in PR #2187 comment 6665347496, on Codjiflo 4483623010), consistent with ruling A1 (a517a1cd3f): approve RV-03 for the ReliaBot nut's rule-18 shortfall. A1 sized the retired shop-made TL-27 feed nut at five Tr8 turns (10 mm); the bought nut, faced to its 13.2 minimum, keeps 10.2 mm of full thread (5.1 turns), which the model checks (FULL_THREAD_MIN at least five turns)."

@@ -14,7 +14,8 @@ major diameter (the thread is not modelled), shop-cut to C4's
 ``SCREW_LENGTH``, each end broken 0.25 x 45° (``ScrewProfile`` ->
 ``Screw``), then milled with a set-screw flat under each set screw that locks
 it: one at clock 0 (+X) at each KP08 and the handwheel (``FlatProfile`` ->
-``Flats``), and each KP08's second at 120° from it (``<Station>ClockProfile``
+``Flats``; the handwheel's runs out through the cut end, ``OPEN_FLAT``), and
+each KP08's second at 120° from it (``<Station>ClockProfile``
 -> ``<Station>ClockFlat``, sketched on the offset plane
 ``<Station>ClockPlane``). Its controls are named driving dimensions (the
 member spec's ``DIMENSION_CONTROLS``) under the title block's general band:
@@ -34,7 +35,7 @@ revolved bodies, ``_features.py``). Its native controls (Codjiflo P2 and
 features, ``FlangeThick`` (seat face to head face at the rim) and ``CskDia``
 as LIMITs, the latter with a "4X Ø" prefix, the 82° held by the driving
 ``CskApexDepth``; on two hidden reference sketches, the values no feature
-dimension holds: ``FacedLengthReference`` (Front) the faced length's MAX, and
+dimension holds: ``FacedLengthReference`` (Front) the faced length's LIMIT, and
 ``ReceiptReference`` (Top) the flange OD, body, hole and PCD receipt limits.
 y = 0 is the faced seat face. The listing's nominal sizes are hidden supplier
 references.
@@ -89,7 +90,6 @@ from _purchased_part_variants import (
 )
 from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
-from _single_limit_tolerance import set_single_limit
 from _sketch import (
     SketchDims,
     add_line_chain,
@@ -110,15 +110,20 @@ from ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FLAT_AF,
+    FLAT_AREAS_MM2,
     FLAT_CHORD,
     FLAT_DEPTH,
+    FLAT_ENDS,
     FLAT_LENGTH,
     FLAT_STARTS,
     FLAT_STATIONS,
     FLAT_VOLUME_MM3,
+    FLAT_VOLUMES_MM3,
     KP08_SET_SCREW_SPACING_DEG,
     MAJOR_DIA,
+    OPEN_FLAT,
     PRINTED_FLAT,
+    PRINTED_LENGTH_FLAT,
     PROFILE,
     VOLUME_MM3,
     control_si,
@@ -280,10 +285,12 @@ async def _flats(adapter) -> None:
     line from the screw's far side (x = -R) square to the flat's midpoint has
     the across-flat as its length, and the flat's near end's height over the
     origin is its station: the review's rule 10 dimensions the flat's edge,
-    not its unmarked middle. ``PRINTED_FLAT``'s rectangle carries
-    the printed ``FlatLength`` and ``FlatAF``; every station's ``FlatStation``
-    prints. A mid-plane cut 1 mm past the screw each side of Front takes the
-    whole segment."""
+    not its unmarked middle. ``PRINTED_LENGTH_FLAT``'s rectangle carries the
+    printed ``FlatLength``, ``PRINTED_FLAT``'s the printed ``FlatAF``; every
+    station's ``FlatStation`` prints. The open flat's rectangle runs
+    ``FLAT_RUNOUT`` past the cut end (``FLAT_ENDS``), its length unprinted.
+    A mid-plane cut 1 mm past the screw each side of Front takes the whole
+    segment."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     radius = MAJOR_DIA / 2.0
@@ -292,8 +299,8 @@ async def _flats(adapter) -> None:
     dims = SketchDims()
     check("create_sketch flats", await adapter.create_sketch("Front"))
     drawn = []
-    for name, station in FLAT_STATIONS.items():
-        v0, v1 = station - FLAT_LENGTH / 2.0, station + FLAT_LENGTH / 2.0
+    for name in FLAT_STATIONS:
+        v0, v1 = FLAT_STARTS[name], FLAT_ENDS[name]
         flat, end, outer, start = await add_line_chain(
             adapter, [(offset, v0), (offset, v1), (reach, v1), (reach, v0)]
         )
@@ -308,7 +315,7 @@ async def _flats(adapter) -> None:
                 await adapter.add_sketch_constraint(edge, None, direction),
             )
         (across,) = await add_line_chain(
-            adapter, [(-radius, station), (offset, station)], close=False
+            adapter, [(-radius, (v0 + v1) / 2.0), (offset, (v0 + v1) / 2.0)], close=False
         )
         _as_construction(adapter, across)
         check(
@@ -327,10 +334,10 @@ async def _flats(adapter) -> None:
             f"{flat}.start",
             f"{flat}.end",
             "vertical_distance",
-            FLAT_LENGTH,
+            FLAT_ENDS[name] - FLAT_STARTS[name],
             f"{name} flat length",
         )
-        dims.record("FlatLength" if printed else f"{name}FlatLength")
+        dims.record("FlatLength" if name == PRINTED_LENGTH_FLAT else f"{name}FlatLength")
         await dimension_between(
             adapter,
             f"{end}.start",
@@ -594,13 +601,18 @@ _FLAT_PLANE_TOL_MM = 1e-4
 
 
 def _flat_faces_readback(
-    adapter, feature_name: str, clock_deg: float, stations: tuple[float, ...]
+    adapter,
+    feature_name: str,
+    clock_deg: float,
+    flats: tuple[tuple[float, float | None, float], ...],
 ) -> None:
     """Prove a flats cut by its own planar faces (the
-    build_dt_cylinder_gear._notch_kerf_readback idiom): per station, one flat
-    square to the clock's radial, FLAT_DEPTH under the crest, FLAT_CHORD by
-    FLAT_LENGTH, between two end walls square to the axis at the station
-    -+ FLAT_LENGTH / 2. Any other face, or a missing one, fails the build."""
+    build_dt_cylinder_gear._notch_kerf_readback idiom): per ``flats`` entry
+    ``(start, end, area)``, one flat square to the clock's radial, FLAT_DEPTH
+    under the crest, of face ``area`` (mm^2), with an end wall square to the
+    axis at ``start`` and, unless ``end`` is None (the open flat, run out
+    through the cut end), one at ``end``. Any other face, or a missing one,
+    fails the build."""
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     raw = _early_bound(model, "IPartDoc").FeatureByName(feature_name)
     if raw is None:
@@ -634,13 +646,11 @@ def _flat_faces_readback(
         else:
             raise RuntimeError(f"flats: unexpected {feature_name} plane {values}")
     expected_walls = sorted(
-        station + side * FLAT_LENGTH / 2.0
-        for station in stations
-        for side in (-1.0, 1.0)
+        wall for start, end, _area in flats for wall in (start, end) if wall is not None
     )
-    expected_area = len(stations) * FLAT_CHORD * FLAT_LENGTH
+    expected_area = sum(area for _start, _end, area in flats)
     if (
-        flat_count != len(stations)
+        flat_count != len(flats)
         or not math.isclose(flat_area, expected_area, rel_tol=1e-4)
         or len(walls) != len(expected_walls)
         or any(
@@ -650,7 +660,7 @@ def _flat_faces_readback(
     ):
         raise RuntimeError(
             f"flats: {feature_name} has {flat_count} flats of {flat_area:.4f} mm^2 "
-            f"(expected {len(stations)}, {expected_area:.4f}) and end walls at "
+            f"(expected {len(flats)}, {expected_area:.4f}) and end walls at "
             f"{sorted(walls)} (expected {expected_walls})"
         )
 
@@ -707,14 +717,27 @@ async def _author_lead_screw(adapter) -> None:
     volume = await volume_check(
         adapter, "leadscrew blank", BLANK_VOLUME_MM3, 0.002 * BLANK_VOLUME_MM3
     )
-    # Each flat takes FLAT_VOLUME_MM3 (17.9 mm^3): each cut must take its own
-    # count of them, and its faces must be the flats and walls it was drawn as.
+    # Each closed flat takes FLAT_VOLUME_MM3 (17.9 mm^3), the open one its
+    # run to the end (FLAT_VOLUMES_MM3): each cut must take its own, and its
+    # faces must be the flats and walls it was drawn as.
     await _flats(adapter)
-    _flat_faces_readback(adapter, "Flats", 0.0, tuple(FLAT_STATIONS.values()))
+    _flat_faces_readback(
+        adapter,
+        "Flats",
+        0.0,
+        tuple(
+            (
+                FLAT_STARTS[name],
+                None if name == OPEN_FLAT else FLAT_ENDS[name],
+                FLAT_AREAS_MM2[name],
+            )
+            for name in FLAT_STATIONS
+        ),
+    )
     volume = await volume_check(
         adapter,
         "leadscrew clock-0 flats",
-        volume - len(FLAT_STATIONS) * FLAT_VOLUME_MM3,
+        volume - sum(FLAT_VOLUMES_MM3.values()),
         0.25 * FLAT_VOLUME_MM3,
     )
     for name in CLOCKED_FLATS:
@@ -723,7 +746,13 @@ async def _author_lead_screw(adapter) -> None:
             adapter,
             f"{name}ClockFlat",
             KP08_SET_SCREW_SPACING_DEG,
-            (FLAT_STATIONS[name],),
+            (
+                (
+                    FLAT_STATIONS[name] - FLAT_LENGTH / 2.0,
+                    FLAT_STATIONS[name] + FLAT_LENGTH / 2.0,
+                    FLAT_CHORD * FLAT_LENGTH,
+                ),
+            ),
         )
         volume = await volume_check(
             adapter,
@@ -921,8 +950,9 @@ async def _receipt_reference(adapter) -> None:
 async def _faced_length_reference(adapter) -> None:
     """``FacedLength``'s hidden carrier on Front (section F-F's): a
     construction line from the seat face along the body's -X silhouette, as
-    long as the printed maximum, so its driving dimension prints "13.8 MAX"
-    once set_single_limit types it (build_pn_pen_rod's _tap_wall_reference)."""
+    long as the printed maximum, so its driving dimension prints "13.8/13.2"
+    once ``_author_limits`` types its LIMIT (build_pn_pen_rod's
+    _tap_wall_reference)."""
     start = feed_nut.FACED_LENGTH_START
     dims = SketchDims()
     check("create_sketch faced length reference", await adapter.create_sketch("Front"))
@@ -985,18 +1015,12 @@ def _author_limits(adapter, feature: str, name: str) -> None:
 def _feed_nut_rework(adapter) -> None:
     """The FeedNut's native controls (Codjiflo P2, 4475311251), authored while
     it is the active member on its own features and reference sketches: each
-    band in its native type at its places (a LIMIT's two limits, a MAX's
-    nominal as the limit, a ±), the prefixes, then marked for the REWORK
-    sheet."""
-    for name, (nominal, lower, upper, places) in feed_nut.NATIVE_CONTROLS.items():
+    band in its native type at its places (a LIMIT's two limits, a ±), the
+    prefixes, then marked for the REWORK sheet."""
+    for name, (_nominal, _lower, upper, places) in feed_nut.NATIVE_CONTROLS.items():
         feature = _control_feature(name)
-        kind = feed_nut.DIMENSION_TOLERANCE_TYPES[name]
-        if kind == feed_nut.TOL_LIMIT:
+        if feed_nut.DIMENSION_TOLERANCE_TYPES[name] == feed_nut.TOL_LIMIT:
             _author_limits(adapter, feature, name)
-        elif kind == feed_nut.TOL_MAX:
-            set_single_limit(
-                adapter, feature, name, limit=nominal, band=(upper, lower), tol_type=kind
-            )
         else:
             set_dimension_symmetric_tolerance(adapter, feature, name, upper, places=places)
     for (feature, name), prefix in feed_nut.DIMENSION_PREFIXES.items():

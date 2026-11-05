@@ -1948,7 +1948,7 @@ def test_f1_f2_prepare_seat_and_transfer_from_the_nut() -> None:
         f"RECEIPT LIMITS ON {feed_nut.REWORK_SHEET_REFERENCE}",
         "REJECT ONE OUTSIDE THEM",
         "FACE AND COUNTERSINK IT PER THAT SHEET",
-        "REJECT ONE OVER ITS FACED LENGTH",
+        "REJECT ONE OUTSIDE ITS FACED LENGTH",
     )
     positions = [f1a.index(phrase) for phrase in order]
     assert positions == sorted(positions)
@@ -1961,7 +1961,7 @@ def test_f1_f2_prepare_seat_and_transfer_from_the_nut() -> None:
         for deviation in (lower, upper)
     }
     assert limits == {
-        "3.3", "3.7", "4.50", "4.76", "13.5", "13.8", "21.8", "22.2",
+        "3.3", "3.7", "4.50", "4.76", "13.2", "13.8", "21.8", "22.2",
         "10.0", "10.3", "3.46", "3.60", "15.9", "16.1",
     }
     for typed in (
