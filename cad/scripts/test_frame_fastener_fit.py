@@ -53,6 +53,15 @@ def test_base_cross_screws_clear_the_near_wall_and_engage_the_far_wall() -> None
     assert engagement == base_fasteners.BASE_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT
     assert engagement >= 1.5 * cross_screw.SHANK_DIA
     assert math.isclose(engagement, 7.501, abs_tol=0.005)
+    # The 0.7P tip allowance is nominal (dt_swing_stop precedent): MHA-FR-00
+    # accepts each installed lower joint at 1.5D of full-form engagement.
+    import draw_fr_frame_assembly as assembly_sheet
+
+    assert base_fasteners.CROSS_SCREW_MIN_USEFUL_ENGAGEMENT_TEXT == ".285 MIN"
+    assert (
+        f"MHA-FR-01 FAR WALL {base_fasteners.CROSS_SCREW_MIN_USEFUL_ENGAGEMENT_TEXT}"
+        in assembly_sheet.ASSEMBLY_CHECKS
+    )
 
 
 def _printed_mm(value_mm: float, places: int) -> float:

@@ -117,17 +117,35 @@ if not (
 # The clearance's model depth runs from the seat to the socket axis: past the
 # near wall it cuts only socket air, and its drill point stops far short of
 # the far wall. The sheet prints DRILL TO SOCKET, not this depth.
-BASE_NEAR_WALL_CLEARANCE_DEPTH = BASE_SCREW_SEAT_Z - abs(COLUMN_SOCKET_XZ[0][1])  # 20.980
+BASE_NEAR_WALL_CLEARANCE_DEPTH = BASE_SCREW_SEAT_Z - abs(
+    COLUMN_SOCKET_XZ[0][1]
+)  # 20.980
 
 # Far-wall engagement (drawing-guidelines.md rule 18), in the convention of
 # require_through_seat_fit below: the stock screw's least length and tip loss
 # against the deepest guaranteed start of full female thread. ASME B18.6.3
-# machine screws, sizes 0-12 over 1 to 2 in long, are -.06 on length; the tip
-# loses the 0.7-pitch chamfer the swing-stop screw
-# (dt_swing_stop_screw_spec.TIP_CHAMFER) books for the same standard.
+# machine screws, sizes 0-12 over 1 to 2 in long, are -.06 on length. The
+# tip allowance is the nominal 0.7-pitch chamfer the swing-stop joint books
+# (dt_swing_stop_screw_spec.TIP_CHAMFER), not a qualified supplier bound:
+# as there, the installed joint is accepted by inspection (MHA-FR-00 check 2,
+# CROSS_SCREW_MIN_USEFUL_ENGAGEMENT_TEXT) -- full-form far-wall engagement at
+# least 1.5D with the head fully seated. At a 1.5-pitch tip the print-worst
+# stack would give 6.87 mm (1.42D), so a short-tipped screw is caught there.
 CROSS_SCREW_LENGTH_SHORT_ALLOWANCE_MM = 0.06 * IN
 CROSS_SCREW_TIP_LOSS_MM = 0.7 * CROSS_SCREW_PITCH
 FAR_WALL_ENGAGEMENT_FLOOR_MM = 1.5 * CROSS_SCREW_MAJOR
+# MHA-FR-00 prints decimal inch: the 1.5D rule rounded UP to .001 in.
+CROSS_SCREW_MIN_USEFUL_ENGAGEMENT_TEXT = (
+    f"{math.ceil(1.5 * CROSS_SCREW_MAJOR / IN * 1000.0 - 1e-9) / 1000.0:.3f}".removeprefix(
+        "0"
+    )
+    + " MIN"
+)
+if (
+    float(CROSS_SCREW_MIN_USEFUL_ENGAGEMENT_TEXT.split()[0]) * IN
+    < FAR_WALL_ENGAGEMENT_FLOOR_MM - 1e-9
+):
+    raise AssertionError("the printed cross-screw engagement minimum is under 1.5D")
 
 
 def far_wall_full_thread_min_mm(far_wall_start_max_mm: float) -> float:
