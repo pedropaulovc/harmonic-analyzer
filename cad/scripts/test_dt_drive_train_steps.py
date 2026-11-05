@@ -213,11 +213,16 @@ def test_crank_end_fit_holds_the_collar_on_the_boss_and_leaves_the_end_proud() -
         "FEELER OFF THE BOSS NORTH FACE",
         "MATCH-DRILL AND REAM FOR MHA-DT-29",
         "END PLAY = THE FEELER",
-        f"END STANDS {sheet.inch_window((least, most), 3)} PROUD OF MHA-DT-10 NORTH FACE",
+        f"END STANDS {drawing.inch_envelope((least, most), 3)} PROUD OF MHA-DT-10 NORTH FACE",
         "DO NOT FACE",
     )
     positions = [fitup.index(phrase) for phrase in order]
     assert positions == sorted(positions)
+    # A stack result the fitter cannot adjust: every accepted part set,
+    # including both extremes, must fall inside the printed range.
+    printed = fitup.split("END STANDS ", 1)[1].split(" PROUD", 1)[0]
+    low, high = (float(limit) * 25.4 for limit in printed.split("-"))
+    assert low <= least and most <= high
     assert f"(STEP {steps.step_number('crank-mesh-checked')})" in fitup
     assert "SHIM" not in fitup and "MHA-CH-VN-57" not in fitup
 

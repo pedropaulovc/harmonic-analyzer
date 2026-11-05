@@ -118,6 +118,8 @@ from dt_drive_train_assembly_sheet import (
     HANDLE_FERRULE_CURE,
     LEVER_PIN_HOLE_FIT,
     T120_FITUP_ASSEMBLY_CHECK,
+    inch_ceil_mm,
+    inch_floor_mm,
     inch_max_text,
     inch_text,
     inch_window,
@@ -1352,6 +1354,15 @@ FIT_PLACEHOLDER = _note_text(
     heading=False,
 )
 
+def inch_envelope(limits_mm: tuple[float, float], places: int) -> str:
+    """A predicted (min, max) stack result the fitter cannot adjust, rounded
+    outward so every accepted part set lands inside the printed range."""
+    return (
+        f"{inch_text(inch_floor_mm(limits_mm[0], places), places)}-"
+        f"{inch_text(inch_ceil_mm(limits_mm[1], places), places)}"
+    )
+
+
 # Owner ruling D1 (2026-10-15): the collar bears on the boss with no washer,
 # the 16T's feeler is the end play, and the shaft end stands proud of the
 # 16T by dt_crankshaft_spec.SHAFT_END_PROUD_RANGE at every accepted part set;
@@ -1366,7 +1377,8 @@ CRANK_END_FIT_NOTES = _note_text(
         "   MATCH-DRILL AND REAM FOR MHA-DT-29 AS STEP "
         f"{steps.step_number('crank-mesh-checked')}. END PLAY = THE FEELER.",
         "C. MHA-DT-11 END STANDS "
-        f"{inch_window((max(CRANK_END_PROUD_RANGE[0], 0.0), CRANK_END_PROUD_RANGE[1]), 3)}"
+        # A stack result, not a set window: rounded outward (Codjiflo, #2194).
+        f"{inch_envelope((max(CRANK_END_PROUD_RANGE[0], 0.0), CRANK_END_PROUD_RANGE[1]), 3)}"
         " PROUD OF MHA-DT-10 NORTH FACE;",
         "   LEAVE IT PROUD, DO NOT FACE.",
     )
