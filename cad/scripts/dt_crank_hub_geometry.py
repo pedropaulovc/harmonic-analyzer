@@ -198,10 +198,10 @@ CRANK_FACE_SHIFT = ARM_THICKNESS
 # the already released ground-shaft h band (0/-.0008 in).  The resulting
 # worst-case diametral clearance is exactly the catalogued .0010-.0023 in, and
 # the bore comes out .376 +.0005/.0000 in, the owned .3760 reamer's cut.  The
-# catalogue pair is restated, not read: _interference_contracts imports this
-# module into every assembly's recipe, and a fit-class read would make them
-# all depend on tolerances/shaft_in_bushing.yaml.  test_dt_crank_hub_drawing
-# pins it to the catalogue.
+# catalogue pair is restated, not read: _dt_drive_train_interference imports
+# this module, and a fit-class read would add tolerances/shaft_in_bushing.yaml
+# to the drive-train assembly's closure. test_dt_crank_hub_drawing pins it to
+# the catalogue.
 SHAFT_DIA_BAND = (0.0, -0.02032)
 SHAFT_CLEARANCE_MIN, SHAFT_CLEARANCE_MAX = 0.0254, 0.05842
 HUB_BORE_DIA = SHAFT_DIA + SHAFT_CLEARANCE_MIN
