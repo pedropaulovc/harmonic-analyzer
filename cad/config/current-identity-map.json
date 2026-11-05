@@ -2919,6 +2919,24 @@
       "source_path": "cad/scripts/ch_rocker_arm_tl_oblique_flange_nut_spec.py",
       "configuration": "FlangeNut",
       "role": "FlangeNut"
+    },
+    {
+      "current_path": "cad/scripts/ch_rocker_arm_tl_vn_oblique_rail_kit_rail_spec.py",
+      "source_path": "cad/scripts/ch_rocker_arm_tl_oblique_rail_spec.py",
+      "configuration": "Rail",
+      "role": "Rail"
+    },
+    {
+      "current_path": "cad/scripts/ch_rocker_arm_tl_vn_oblique_rail_kit_carriage_spec.py",
+      "source_path": "cad/scripts/ch_rocker_arm_tl_oblique_carriage_spec.py",
+      "configuration": "Carriage",
+      "role": "Carriage"
+    },
+    {
+      "current_path": "cad/scripts/ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec.py",
+      "source_path": "cad/scripts/ch_rocker_arm_tl_oblique_leadscrew_spec.py",
+      "configuration": "LeadScrew",
+      "role": "LeadScrew"
     }
   ]
 }

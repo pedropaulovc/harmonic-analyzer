@@ -1061,7 +1061,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "77162e43dd1083e6873d26344c39f5b0306dea39177bc44a8837e06f64e514cc",
+  "currentRegistryMapSha256": "2484403ef6e38c7d6f721340950642ebd830943d089f62c02d70ee3d19e697cb",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",
@@ -3012,6 +3012,24 @@
       "sourcePath": "cad/scripts/ch_rocker_arm_tl_oblique_flange_nut_spec.py",
       "configuration": "FlangeNut",
       "role": "FlangeNut"
+    },
+    {
+      "currentPath": "cad/scripts/ch_rocker_arm_tl_vn_oblique_rail_kit_rail_spec.py",
+      "sourcePath": "cad/scripts/ch_rocker_arm_tl_oblique_rail_spec.py",
+      "configuration": "Rail",
+      "role": "Rail"
+    },
+    {
+      "currentPath": "cad/scripts/ch_rocker_arm_tl_vn_oblique_rail_kit_carriage_spec.py",
+      "sourcePath": "cad/scripts/ch_rocker_arm_tl_oblique_carriage_spec.py",
+      "configuration": "Carriage",
+      "role": "Carriage"
+    },
+    {
+      "currentPath": "cad/scripts/ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec.py",
+      "sourcePath": "cad/scripts/ch_rocker_arm_tl_oblique_leadscrew_spec.py",
+      "configuration": "LeadScrew",
+      "role": "LeadScrew"
     }
   ]
 }

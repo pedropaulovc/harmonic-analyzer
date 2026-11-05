@@ -21,7 +21,7 @@ import math
 import re
 import sys
 import textwrap
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Collection, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from typing import Any, Callable
@@ -2112,27 +2112,45 @@ def leader_clearance_failures(
     route_drawn: Sequence[str | None],
     ring: Sequence[tuple[float, float]],
     ring_drawn: Sequence[str | None],
+    *,
+    same_item: Collection[str] = (),
 ) -> list[str]:
     """How a leader fails its clearance: ``route_drawn`` and ``ring_drawn``
     name the instance the view draws in front at each point of its
     ``route`` and of the ``ring`` round its landing (None: nothing). Any but
-    ``own`` is a crossing on the route and a junction on the ring."""
+    ``own`` is a crossing on the route. On the ring, ``same_item`` (the other
+    occurrences of the balloon's own BOM item) is no junction either: the
+    balloon names them too. The pivot shims stand five to a stack, 0.20
+    thick, so every rim of the top shim lies within the clearance of the one
+    under it or, through its bore, of those below (farm
+    20261105T163942818Z, balloon 7 beside pivot-shim-6 and -8)."""
+    shared = {name.casefold() for name in same_item}
     failures = []
-    for where, points, drawn in (
-        ("crosses", route, route_drawn),
-        (f"lands within {LANDING_CLEARANCE_M * 1000.0:.1f} mm of", ring, ring_drawn),
+    for where, points, drawn, allowed in (
+        ("crosses", route, route_drawn, {own.casefold()}),
+        (
+            f"lands within {LANDING_CLEARANCE_M * 1000.0:.1f} mm of",
+            ring,
+            ring_drawn,
+            {own.casefold(), *shared},
+        ),
     ):
         if len(points) != len(drawn):
             raise ValueError(f"{what}: one drawn instance per probe point")
         foreign: dict[str, tuple[float, float]] = {}
         for point, name in zip(points, drawn):
-            if name is not None and name.casefold() != own.casefold():
+            if name is not None and name.casefold() not in allowed:
                 foreign.setdefault(name, point)
         failures += [
             f"{what} {where} {name} at ({x * 1000.0:.1f}, {y * 1000.0:.1f}) mm"
             for name, (x, y) in sorted(foreign.items())
         ]
     return failures
+
+
+def _same_item_occurrences(stem: str) -> tuple[str, ...]:
+    """Every occurrence of BOM family ``stem`` by the name a ray pick reports."""
+    return tuple(spec.instance_name(stem, index) for index in range(spec.QUANTITIES[stem]))
 
 
 def sheet_point_in_model(
@@ -2230,6 +2248,7 @@ def _assert_declared_leaders_clear(
             drawn[start:middle],
             ring,
             drawn[middle:end],
+            same_item=_same_item_occurrences(landing.stem),
         )
         start = end
     if failures:

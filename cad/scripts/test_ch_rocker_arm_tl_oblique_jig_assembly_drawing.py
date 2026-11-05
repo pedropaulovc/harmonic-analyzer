@@ -1306,6 +1306,26 @@ def test_leader_clearance_names_crossings_and_junctions() -> None:
         drawing.leader_clearance_failures("4", "block-1", route, [None], ring, [None, None])
 
 
+def test_a_landing_beside_its_own_items_stacked_occurrences_clears() -> None:
+    # Farm 20261105T163942818Z, balloon 7: the top pivot shim of a stack of
+    # five lands within 1 mm of the shims under it. Those are the balloon's
+    # own item; another part there, or any crossing, still fails.
+    shims = drawing._same_item_occurrences(spec.PIVOT_SHIM)
+    assert len(shims) == spec.QUANTITIES[spec.PIVOT_SHIM]
+    own, below = shims[-1], shims[5]
+    route, ring = [(0.0, 0.0), (0.001, 0.0)], [(0.002, 0.0), (0.003, 0.0)]
+    assert not drawing.leader_clearance_failures(
+        "7 balloon", own, route, [own, None], ring, [below, shims[7]], same_item=shims
+    )
+    assert drawing.leader_clearance_failures(
+        "7 balloon", own, route, [below, None], ring, [None, None], same_item=shims
+    ) == [f"7 balloon crosses {below} at (0.0, 0.0) mm"]
+    block = spec.instance_name(spec.PIVOT_BLOCK, 0)
+    assert drawing.leader_clearance_failures(
+        "7 balloon", own, route, [None, None], ring, [below, block], same_item=shims
+    ) == [f"7 balloon lands within 1.0 mm of {block} at (3.0, 0.0) mm"]
+
+
 @pytest.mark.parametrize("scale_in_rows", (False, True))
 def test_sheet_points_invert_the_view_transform(scale_in_rows) -> None:
     from _drawing_ray_pick import _to_model

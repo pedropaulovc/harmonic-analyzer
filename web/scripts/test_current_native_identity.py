@@ -258,6 +258,23 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
             logical = "cad/config/parts/" + row["stem"] + ".yaml"
             self.assertEqual(identity.source_aliases({sealed})[logical], (sealed,))
 
+    def test_amazon_kit_members_alias_their_sealed_jig_specs(self):
+        identity = CurrentNativeIdentity()
+        for member, configuration, sealed in (
+            ("rail_kit_rail", "Rail", "rail"),
+            ("rail_kit_carriage", "Carriage", "carriage"),
+            ("leadscrew_kit_leadscrew", "LeadScrew", "leadscrew"),
+        ):
+            current = f"cad/scripts/ch_rocker_arm_tl_vn_oblique_{member}_spec.py"
+            old = f"cad/scripts/ch_rocker_arm_tl_oblique_{sealed}_spec.py"
+            self.assertTrue((ROOT / current).is_file(), current)
+            self.assertEqual(identity.source_aliases({old})[current], (old,))
+            self.assertEqual(identity.source_aliases(
+                {old}, parent="ch-rocker-arm-tl-oblique-jig", configuration=configuration,
+                role=configuration)[current], (old,))
+            self.assertEqual(identity.source_aliases(
+                {old}, configuration="NotAMember")[current], ())
+
     def test_retired_tooling_is_reserved_history_not_a_current_projection_or_registry(self):
         cad_map = json.loads((ROOT / "cad/config/current-identity-map.json").read_text(encoding="utf-8"))
         identity = CurrentNativeIdentity()
