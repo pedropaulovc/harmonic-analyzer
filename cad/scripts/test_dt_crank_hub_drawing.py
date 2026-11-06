@@ -275,24 +275,39 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     # nominal prints as a reference.
     assert dt_crank_hub_spec.REFERENCE_DIMENSIONS == {"SeatDia"}
     seam = dt_crank_hub_notes.SEAM_CALLOUT
-    # Size first, then the final process (REAM, not DRILL/REAM), then two
-    # lines naming the mate and the pin by name and number.  The depth prints
-    # natively on the side view, never typed into the note; no private
-    # phrase (ON SEAM) and no assembly instruction (PERMANENT PAIR;
-    # DISASSEMBLE AT MHA-DT-09).
+    # Size, the final process (REAM, not DRILL/REAM) and the depth first
+    # (rule 26), then two lines naming the mate and the pin by name and
+    # number; no private phrase (ON SEAM) and no assembly instruction
+    # (PERMANENT PAIR; DISASSEMBLE AT MHA-DT-09).
     assert seam.splitlines() == [
-        "(<MOD-DIAM>.156) REAM AT ASSEMBLY",
+        "(<MOD-DIAM>.156) REAM <HOLE-DEPTH> .17 AT ASSEMBLY",
         "WITH CRANK ARM MHA-DT-06 FOR",
         "DOWEL PIN MHA-DT-VN-59, LIGHT DRIVE FIT",
     ]
     for phrase in ("ON SEAM", "DRILL/REAM", "PERMANENT", "DISASSEMBLE", "O'CLOCK"):
         assert phrase not in seam
-    # The seat length is the arm's thickness as made, a plain reference
-    # (owner ruling 2026-11-01 on the r9 review); the overall and the relief
-    # print their value and band only (rule 7: no reason on an overall or a
-    # plain length).
-    assert drawing.REFERENCE_LENGTHS == ("SeatLength",)
-    assert set(drawing.DIMENSION_CALLOUTS) == {"BoreDia", "SeatDia"}
+    # The typed depth is the model's seam depth at the native dimension's
+    # places; that native depth then prints as a reference, so the callout
+    # is the one controlling value.
+    places = dt_crank_hub_spec.DRAWING_PRECISION_BY_NAME["SeamDepth"]
+    assert dt_crank_hub_notes.SEAM_DEPTH_TEXT == f"{geometry.SEAM_DEPTH / 25.4:.{places}f}"[1:]
+    # The seat length is the arm's thickness as made (owner ruling
+    # 2026-11-01 on the r9 review): a reference flagged to numbered note 2,
+    # the matched length with its mate by name and number.  The overall and
+    # the relief print their value and band only (rule 7: no reason on an
+    # overall or a plain length).
+    assert drawing.REFERENCE_LENGTHS == ("SeatLength", "SeamDepth")
+    assert drawing.DIMENSION_CALLOUTS == {
+        "BoreDia": dt_crank_hub_notes.BORE_CALLOUT,
+        "SeatDia": seat,
+        "SeatLength": "SEE NOTE 2",
+    }
+    assert dt_crank_hub_notes.SEAT_LENGTH_NOTE == (
+        "2. SEAT LENGTH (.31): MATCH TO MEASURED THICKNESS OF CRANK ARM MHA-DT-06."
+    )
+    assert f"{geometry.HUB_SEAT_LENGTH / 25.4:.2f}" == "0.31"
+    # Rule 7: the sheet's notes are at most four lines.
+    assert len(dt_crank_hub_notes.SHEET_NOTES.splitlines()) <= 4
     # The taper-pin cross-hole flags numbered note 1, which names the mate
     # by name and number, the pin it takes and the ream's acceptance: the
     # driven pin's keeper ring MHA-DT-27 clear of the hub, the condition the
@@ -449,13 +464,26 @@ def test_callouts_stand_clear_of_views_and_each_other() -> None:
     # above (none of it under the line's lower arrow: Opus review at
     # 7fe9d97bd).
     seat_len_x, _ = drawing.SIDE_KEEP["SeatLength"]
-    value_half = len("(.31)") * char_w / 2.0
-    assert seat_len_x + value_half < end_left
-    assert seat_len_x - value_half - drawing.SIDE_KEEP["SeatDia"][0] > 0.002
-    # Numbered note 1 stands bottom left: under the overall's row, left of
+    seat_len_half = max(len("(.31)"), len(dt_crank_hub_notes.SEAT_LENGTH_CALLOUT)) * char_w / 2.0
+    assert seat_len_x + seat_len_half < end_left
+    assert seat_len_x - seat_len_half > drawing.SIDE_KEEP["SeatDia"][0]
+    # The seam's radial station stands between the seat diameter's line and
+    # the end view, level with the seam and clear of the seat length's block.
+    station_x, station_y = drawing.SEAM_STATION_TEXT_XY
+    station_half = len(".38") * char_w / 2.0
+    assert drawing.SIDE_KEEP["SeatDia"][0] + 0.002 < station_x - station_half
+    assert station_x + station_half < end_left
+    assert drawing.SEAM_CENTER[1] < station_y < drawing.END_CENTER[1]
+    assert station_y - 0.003 > drawing.SIDE_KEEP["SeatLength"][1] + 0.006
+    # The bore pick sits on the bore circle, off the centre mark's arms.
+    bx, by = drawing.BORE_EDGE_PICK
+    r = geometry.HUB_BORE_DIA / 2.0 * drawing._S
+    assert (bx - drawing.END_CENTER[0]) ** 2 + (by - drawing.END_CENTER[1]) ** 2 == pytest.approx(r**2)
+    assert bx < drawing.END_CENTER[0] and by > drawing.END_CENTER[1]
+    # The numbered notes stand bottom left: under the overall's row, left of
     # the title block (x 0.216), inside the border.
     notes_x, notes_y = drawing.NOTES_XY
-    note_lines = dt_crank_hub_notes.CROSS_HOLE_NOTE.splitlines()
+    note_lines = dt_crank_hub_notes.SHEET_NOTES.splitlines()
     assert notes_x > 0.0127 and notes_x + max(map(len, note_lines)) * char_w < 0.216
     assert notes_y < min(row[1] for row in drawing.SIDE_KEEP.values()) - 0.015
     assert notes_y - len(note_lines) * 0.006 > 0.0127

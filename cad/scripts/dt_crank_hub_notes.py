@@ -16,6 +16,8 @@ from __future__ import annotations
 from dt_crank_hub_geometry import (
     AXIAL_PIN_DIA,
     MM_PER_IN,
+    HUB_SEAT_LENGTH,
+    SEAM_DEPTH,
     SEAT_PRESS_INTERFERENCE,
     SHAFT_CLEARANCE_MAX,
     SHAFT_CLEARANCE_MIN,
@@ -88,28 +90,38 @@ BORE_CALLOUT = (
 # The arm bore is made first and carries the band; this seat is turned to fit
 # it, so its nominal prints as a reference under the match-fit callout.
 SEAT_CALLOUT = seat_callout("MHA-DT-06")
-# The hub's own seam callout: the size and process line, then two lines of
-# words (rule 7).  The final process is REAM, at assembly with the arm, so
-# the hole is matched to its mate (rule 4); the pin is named by part name
-# and number.  The hole's centre is drawn on the Ø.76 edge and the view's
-# vertical centreline, so no words locate it (rule 26: a location is not a
-# sentence, and ON SEAM is a private phrase).  The depth prints natively on
-# the side view, never typed here (Codjiflo review of 831be7869).  The
-# permanent-pair and disassembly line is an assembly instruction on a part
-# sheet (rule 7), so it is gone.  The arm's sheet keeps ``seam_callout``.
+# The hub's own seam callout: the size, process and depth line, then two
+# lines of words (rule 7).  The final process is REAM, at assembly with the
+# arm, so the hole is matched to its mate (rule 4); the pin is named by part
+# name and number.  The depth sits in the callout (rule 26: size, process,
+# depth; a depth is never deferred to a view), read from SEAM_DEPTH, the
+# constant the model's seam cut is built to; the side view's native depth
+# then prints as a reference.  The hole's radial station is a native
+# dimension on the end view (rule 26: a location is a dimension, not a
+# sentence; ON SEAM is a private phrase).  The permanent-pair and
+# disassembly line is an assembly instruction on a part sheet (rule 7), so
+# it is gone.  The arm's sheet keeps ``seam_callout``.
+SEAM_DEPTH_TEXT = inch_text(SEAM_DEPTH, 2)
 SEAM_CALLOUT = "\n".join(
     (
-        f"(<MOD-DIAM>{inch_text(AXIAL_PIN_DIA, 3)}) REAM AT ASSEMBLY",
+        f"(<MOD-DIAM>{inch_text(AXIAL_PIN_DIA, 3)}) REAM <HOLE-DEPTH> {SEAM_DEPTH_TEXT} AT ASSEMBLY",
         "WITH CRANK ARM MHA-DT-06 FOR",
         "DOWEL PIN MHA-DT-VN-59, LIGHT DRIVE FIT",
     )
 )
 # The seat length is the arm's thickness as made, not a turned size (owner
 # ruling 2026-11-01; r9 review: a toleranced seat length read against the
-# flush condition), so it prints as a plain reference.  The faces-flush
-# acceptance is the MHA-DT-00 press step's; rule 7 names END FLUSH on a part
-# sheet an assembly instruction.
-#
+# flush condition): its nominal prints as a reference flagged to numbered
+# note 2, the matched length with its mate by name and number (rule 4).  A
+# plain reference left the shoulder with no controlling value (round-1
+# review, 2 of 3 runs); END FLUSH on a part sheet is an assembly instruction
+# (rule 7), so the faces-flush check stays on the MHA-DT-00 press step.
+SEAT_LENGTH_NOTE_NUMBER = 2
+SEAT_LENGTH_CALLOUT = f"SEE NOTE {SEAT_LENGTH_NOTE_NUMBER}"
+SEAT_LENGTH_NOTE = (
+    f"{SEAT_LENGTH_NOTE_NUMBER}. SEAT LENGTH ({inch_text(HUB_SEAT_LENGTH, 2)}): "
+    "MATCH TO MEASURED THICKNESS OF CRANK ARM MHA-DT-06."
+)
 # The cross-hole is drilled, then taper-reamed through hub and shaft together
 # at assembly.  Its callout carries SEE NOTE 1 and the numbered note states
 # the matched ream: the mate by name and number, the pin it takes, and the
@@ -133,6 +145,8 @@ CROSS_HOLE_NOTE = "\n".join(
         "   FROM THE DRIVEN PIN, STILL CLEARS THE HUB.",
     )
 )
+# The sheet's numbered notes, in one block (rule 7: at most four lines).
+SHEET_NOTES = f"{CROSS_HOLE_NOTE}\n{SEAT_LENGTH_NOTE}"
 
 # The overall and the relief print their value and band only: a reason on an
 # overall size, or on a plain .XX length, is narration (rule 7).  The stacks
