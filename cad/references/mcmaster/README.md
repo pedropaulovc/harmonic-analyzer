@@ -447,7 +447,8 @@ lug became integral with TL-32. The following describes the former joint.
   catalogue-only, not replica-gated. The hub screw keeps the bought 1/2 in
   length (its tip stops inside the TL-33 stud's full thread at every printed
   limit); the left clamp screw is cut at assembly to the actual strap/riser
-  grip plus 8.65-8.85 mm into the carrier's blind tap, its tip restored.
+  grip plus 8.40-8.62 mm into the carrier's blind tap, its cut tip chamfered
+  45 deg x .030-.035 so its full thread ends inside the tap's .310 MIN.
 - [91251A583](https://www.mcmaster.com/91251A583/)
   (`ch-rocker-arm-tl-vn-oblique-lever-screw`, MHA-CH-06-TL-VN-69, 2 in the oblique
   trammel jig: the fastener table's `LEVER_TO_CARRIER` row) was read live on

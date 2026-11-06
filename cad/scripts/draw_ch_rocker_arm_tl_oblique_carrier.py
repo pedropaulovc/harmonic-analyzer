@@ -102,8 +102,12 @@ SHEET_SCALE = (1.0, 2.0)
 VIEW_SCALE = (1, 2)
 ISO_SCALE = part_spec.ISOMETRIC_VIEW_SCALE
 TOP_CENTER = (0.222, 0.185)
-SHEET_NAMES = ("CARRIER", "LEFT CLAMP")
+SHEET_NAMES = ("CARRIER", "LEFT CLAMP", "ASSEMBLY HUB")
 LEFT_CLAMP_DIMENSIONS = frozenset(("LeftClampX", "LeftClampY"))
+HUB_KEEP = {
+    "HubHoleDia": (-80.0, 0.0, -140.0),
+    "HubChamferSize": (80.0, -part_spec.THICKNESS, -140.0),
+}
 # The iso (~58 x 34 mm at 1:8) right of section A-A and its note under it,
 # both above the title block (jig-r3: the note ran into it).
 ISO_CENTER = (0.386, 0.103)
@@ -459,6 +463,37 @@ for _key, (_x, _y) in part_spec.PIN_HOLES.items():
         },
     )
 
+requirement(
+    "assembly_hub_bore",
+    kind="hole",
+    faces=(CylinderFace(part_spec.HUB_HOLE_DIA, contains_x_mm=part_spec.HUB[0], contains_z_mm=-part_spec.HUB[1]),),
+    requirements=("dia", "thru", "note"),
+    fields={
+        "at": ([part_spec.HUB[0], 0.0, -part_spec.HUB[1]], ("HUB",)),
+        "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
+        "dia": (limits(part_spec.HUB_HOLE_DIA, 4, part_spec.HUB_HOLE_BAND), ("HUB_HOLE_DIA", "HUB_HOLE_BAND")),
+        "dia_nominal": (part_spec.HUB_HOLE_DIA, ("HUB_HOLE_DIA",)),
+        "thru": (True, ("HUB_HOLE_CALLOUT",)),
+        "note": (part_spec.HUB_HOLE_CALLOUT.replace("\n", " "), ("HUB_HOLE_CALLOUT",)),
+    },
+    precision={"dia": 4},
+)
+requirement(
+    "assembly_hub_underside_chamfer",
+    kind="chamfer",
+    faces=(ConeFace(45.0, contains_x_mm=part_spec.HUB[0]),),
+    requirements=("length", "note"),
+    fields={
+        "at": ([part_spec.HUB[0], -part_spec.THICKNESS, -part_spec.HUB[1]], ("HUB", "THICKNESS")),
+        "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
+        "length": (_limits(part_spec.HUB_CHAMFER, part_spec.HUB_CHAMFER_PLACES), ("HUB_CHAMFER", "HUB_CHAMFER_PLACES")),
+        "length_nominal": (part_spec.HUB_CHAMFER, ("HUB_CHAMFER",)),
+        "note": (part_spec.HUB_CHAMFER_CALLOUT.replace("\n", " "), ("HUB_CHAMFER_CALLOUT",)),
+    },
+    precision={"length": part_spec.HUB_CHAMFER_PLACES},
+)
+
+
 _SPOT_DIA_PLACES = part_spec.DRAWING_PRECISION_BY_NAME["SpotDia"]
 for _prefix, (_x, _y) in part_spec.SPOTS.items():
     _station_places = part_spec.DRAWING_PRECISION_BY_NAME[f"{_prefix}X"]
@@ -536,7 +571,7 @@ for _stem, _points, _thread, _drill, _spec_name, _places, _y_places in _TAPS:
             faces=(CylinderFace(_drill, contains_x_mm=_x, contains_z_mm=-_y),),
             requirements=(
                 "thread", "dia", "station", "height", "thru",
-                *(("depth", "thread_depth_min") if _stem == "left_clamp_tap" else ()),
+                *(("depth", "note") if _stem == "left_clamp_tap" else ()),
             ),
             fields={
                 "at": ([_x, 0.0, -_y], (_spec_name,)),
@@ -554,9 +589,15 @@ for _stem, _points, _thread, _drill, _spec_name, _places, _y_places in _TAPS:
                         _limits(part_spec.LEFT_CLAMP_DRILL_DEPTH, 2),
                         ("LEFT_CLAMP_DRILL_DEPTH",),
                     ),
-                    "thread_depth_min": (
-                        part_spec.LEFT_CLAMP_THREAD_DEPTH,
-                        ("LEFT_CLAMP_THREAD_DEPTH",),
+                    # prechips Feature has no independent thread-depth field:
+                    # depth governs the pilot; the cited note governs threading.
+                    "note": (
+                        f"THREAD DEPTH {part_spec.LEFT_CLAMP_THREAD_DEPTH:.3f} mm MIN "
+                        "FROM ENTRY FACE; "
+                        f"USABLE FULL THREAD {part_spec.LEFT_CLAMP_FULL_THREAD_MIN:.3f} mm MIN "
+                        "AFTER THE 0.254 mm ENTRY BREAK. FLAT-BOTTOM PILOT.",
+                        ("LEFT_CLAMP_THREAD_DEPTH", "LEFT_CLAMP_FULL_THREAD_MIN",
+                         "LEFT_CLAMP_SPEC"),
                     ),
                 } if _stem == "left_clamp_tap" else {}),
                 "station": (
@@ -576,7 +617,7 @@ for _stem, _points, _thread, _drill, _spec_name, _places, _y_places in _TAPS:
             },
             precision={
                 "dia": _CALLOUT_PLACES, "station": _places, "height": _y_places,
-                **({"depth": 2, "thread_depth_min": 3} if _stem == "left_clamp_tap" else {}),
+                **({"depth": 2} if _stem == "left_clamp_tap" else {}),
             },
         )
 
@@ -586,7 +627,11 @@ def _left_clamp_depth_callout(callout: Any) -> None:
     from win32com.client.dynamic import Dispatch as dynamic_dispatch
 
     required = {
-        "hw-threaddepth": (part_spec.LEFT_CLAMP_THREAD_DEPTH, 3, 5),
+        "hw-threaddepth": (
+            part_spec.LEFT_CLAMP_THREAD_DEPTH,
+            part_spec.LEFT_CLAMP_THREAD_PLACES,
+            part_spec.LEFT_CLAMP_THREAD_TOL_TYPE,
+        ),
         "hw-tapdrldepth": (part_spec.LEFT_CLAMP_DRILL_DEPTH, 2, 0),
     }
     for raw in callout.GetHoleCalloutVariables() or ():
@@ -599,11 +644,12 @@ def _left_clamp_depth_callout(callout: Any) -> None:
         if abs(float(length.Length) * 1000.0 - nominal) > 1e-5:
             raise RuntimeError(f"left clamp {name}: wrong native depth")
         length.Precision = places
-        variable.ToleranceType = tolerance_type
         if int(length.Precision) != places or int(variable.ToleranceType) != tolerance_type:
-            raise RuntimeError(f"left clamp {name}: depth presentation rejected")
+            raise RuntimeError(f"left clamp {name}: source depth precision/tolerance was not preserved")
     if required:
         raise RuntimeError(f"left clamp callout omits native depths: {sorted(required)}")
+    # The MIN belongs to the model. A drawing may set callout decimal places,
+    # never repair a missing source tolerance here.
 
 
 # Copied from _trammel_block_drawing (the old trammel kit is being retired;
@@ -1154,6 +1200,32 @@ def _pin_section(adapter: Any, source_model: Any, top: Any) -> tuple[list[Any], 
     return annotations, section
 
 
+def _hub_sheet(adapter: Any) -> list[Any]:
+    """Show the finished assembly-machined bore and underside chamfer."""
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not drawing.ActivateSheet(SHEET_NAMES[2]):
+        raise RuntimeError("cannot activate the assembly HUB sheet")
+    bottom = place_view(adapter, str(SOURCE), "*Bottom", *TOP_CENTER, scale=VIEW_SCALE)
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    for view in (bottom, iso):
+        set_hidden_lines_removed(adapter, view)
+    on_bottom = _view_mapper(adapter, bottom)
+    annotations = hidden_sketches.curate_view_dimensions(
+        adapter, bottom,
+        keep={name: on_bottom(point) for name, point in HUB_KEEP.items()},
+        view_label="finished assembly HUB underside",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    set_dimension_callouts(adapter, annotations, {
+        "HubHoleDia": part_spec.HUB_HOLE_CALLOUT,
+        "HubChamferSize": part_spec.HUB_CHAMFER_CALLOUT,
+    })
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    if not drawing.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("cannot restore the carrier sheet")
+    return annotations
+
+
 def _left_clamp_sheet(adapter: Any) -> list[Any]:
     """Give the added blind receiver its own uncrowded native callout sheet."""
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
@@ -1314,6 +1386,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (top, iso):
         _hide_thread_labels(adapter, view)
     annotations.extend(_left_clamp_sheet(adapter))
+    annotations.extend(_hub_sheet(adapter))
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
 
     def pin_controls_settled() -> None:

@@ -6,6 +6,7 @@ import inspect
 import math
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -65,6 +66,7 @@ def test_every_calculator_position_is_the_calculators() -> None:
         "pin_hole_b2": trammel.B2,
         "cl_spot": trammel.CL,
         "cr_tap_1": trammel.CR,
+        "assembly_hub_bore": trammel.HUB,
         **{
             f"riser_tap_{i}": point
             for i, point in enumerate(trammel.RISER_SCREWS, start=1)
@@ -74,7 +76,7 @@ def test_every_calculator_position_is_the_calculators() -> None:
         assert _at(features[name]) == tuple(point), name
     assert spec.PIN_HOLES == trammel.PIN_HOLES
     assert (spec.CL, spec.CR) == (trammel.CL, trammel.CR)
-    # Owner ruling 5: the HUB is drilled in situ at assembly, not on TL-21.
+    # The finished model includes HUB, still drilled in situ at assembly.
     assert "hub_spot" not in features and set(spec.SPOTS) == {"Cl"}
     assert spec.RISER_SCREWS == trammel.RISER_SCREWS
     assert spec.D1 == trammel.D1
@@ -166,8 +168,9 @@ def test_no_skid_sag_is_negligible() -> None:
 
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.TOP_KEEP) | set(drawing.SECTION_KEEP_MODEL_MM) == marked
+    assert set(drawing.TOP_KEEP) | set(drawing.SECTION_KEEP_MODEL_MM) | set(drawing.HUB_KEEP) == marked
     assert not set(drawing.TOP_KEEP) & set(drawing.SECTION_KEEP_MODEL_MM)
+    assert not set(drawing.HUB_KEEP) & (set(drawing.TOP_KEEP) | set(drawing.SECTION_KEEP_MODEL_MM))
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert set(spec.CALLOUT_SUFFIXES) <= marked
     assert set(spec.CALLOUT_PREFIXES) <= marked
@@ -800,12 +803,118 @@ def test_added_left_clamp_is_a_blind_full_thread_receiver_on_its_own_sheet() -> 
     feature = _features()["left_clamp_tap_1"]
     assert feature["thru"] is False
     assert feature["depth"] == pytest.approx([9.144, 9.652])
-    assert feature["thread_depth_min"] == spec.LEFT_CLAMP_THREAD_DEPTH
+    assert "thread_depth_min" not in feature
+    assert "note" in feature["requirements"]
+    assert feature["note"] == (
+        "THREAD DEPTH 7.874 mm MIN FROM ENTRY FACE; "
+        "USABLE FULL THREAD 7.620 mm MIN AFTER THE 0.254 mm ENTRY BREAK. "
+        "FLAT-BOTTOM PILOT."
+    )
+    assert f"{spec.LEFT_CLAMP_THREAD_DEPTH:.3f} mm MIN" in feature["note"]
+    assert f"{spec.LEFT_CLAMP_FULL_THREAD_MIN:.3f} mm MIN" in feature["note"]
+    declaration = requirements_for(drawing)["left_clamp_tap_1"]
+    assert declaration.fields["note"][1] == (
+        "LEFT_CLAMP_THREAD_DEPTH", "LEFT_CLAMP_FULL_THREAD_MIN", "LEFT_CLAMP_SPEC",
+    )
     assert feature["precision"]["depth"] == 2
-    assert feature["precision"]["thread_depth_min"] == 3
-    assert drawing.SHEET_NAMES == ("CARRIER", "LEFT CLAMP")
+    assert "thread_depth_min" not in feature["precision"]
+    assert drawing.SHEET_NAMES == ("CARRIER", "LEFT CLAMP", "ASSEMBLY HUB")
     assert drawing.LEFT_CLAMP_DIMENSIONS == {"LeftClampX", "LeftClampY"}
     source = inspect.getsource(drawing._left_clamp_sheet)
     assert "add_native_hole_callout" in source
     assert "_left_clamp_depth_callout(callout)" in source
     assert "expected_sheet_names=SHEET_NAMES" in inspect.getsource(drawing.build)
+
+
+@pytest.mark.parametrize("persisted_precision", [3, 2])
+def test_thread_min_is_authored_and_read_back_on_the_model(
+    monkeypatch, persisted_precision: int,
+) -> None:
+    values = []
+
+    def set_values(lower, upper):
+        values.append((lower, upper))
+        return True
+
+    tolerance = SimpleNamespace(
+        Type=0, SetValues=set_values, GetMinValue=lambda: 0.0, GetMaxValue=lambda: 0.0,
+    )
+    requested_precision = []
+    display = SimpleNamespace(
+        SetPrecision3=lambda *args: requested_precision.append(args),
+        GetPrimaryPrecision2=lambda: persisted_precision,
+    )
+    dimension = SimpleNamespace(Tolerance=tolerance)
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(part, "_left_clamp_thread_dimension", lambda _adapter: (display, dimension))
+    if persisted_precision == 3:
+        part._author_left_clamp_thread_min(None)
+    else:
+        with pytest.raises(RuntimeError, match="source-model thread-depth MIN did not persist"):
+            part._author_left_clamp_thread_min(None)
+    assert tolerance.Type == spec.LEFT_CLAMP_THREAD_TOL_TYPE == 5
+    assert values == [(0.0, 0.0)]
+    assert requested_precision == [(3, -1, -1, -1)]
+    source = inspect.getsource(part.build)
+    assert "_author_left_clamp_thread_min(adapter)" in source
+    assert "_require_left_clamp_thread_min(adapter)" in source
+
+
+@pytest.mark.parametrize("source_thread_tolerance", [5, 0])
+def test_drawing_preserves_source_min_and_never_repairs_it(
+    monkeypatch, source_thread_tolerance: int,
+) -> None:
+    import win32com.client.dynamic
+
+    class Variable:
+        def __init__(self, name, nominal, tolerance):
+            self.VariableName = name
+            self.Length = nominal / 1000.0
+            self.Precision = 0
+            self._tolerance = tolerance
+            self._oleobj_ = self
+
+        @property
+        def ToleranceType(self):
+            return self._tolerance
+
+        @ToleranceType.setter
+        def ToleranceType(self, _value):
+            raise AssertionError("drawing must not assign a source-model tolerance")
+
+    thread = Variable("hw-threaddepth", spec.LEFT_CLAMP_THREAD_DEPTH, source_thread_tolerance)
+    pilot = Variable("hw-tapdrldepth", spec.LEFT_CLAMP_DRILL_DEPTH, 0)
+    callout = SimpleNamespace(GetHoleCalloutVariables=lambda: (thread, pilot))
+    monkeypatch.setattr(win32com.client.dynamic, "Dispatch", lambda value: value)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    if source_thread_tolerance == 5:
+        drawing._left_clamp_depth_callout(callout)
+        assert thread.Precision == 3
+        assert pilot.Precision == 2
+    else:
+        with pytest.raises(RuntimeError, match="source depth precision/tolerance was not preserved"):
+            drawing._left_clamp_depth_callout(callout)
+    assert thread.ToleranceType == source_thread_tolerance
+
+
+def test_finished_hub_bore_and_controlled_chamfer_clear_the_stud_root() -> None:
+    assert spec.HUB == trammel.HUB
+    assert spec.HUB_HOLE_DIA == pytest.approx(10.16)
+    assert spec.HUB_CHAMFER == pytest.approx(0.02 * INCH)
+    assert spec.HUB_CHAMFER_BAND == printed_band_mm(2, unit=spec.UNIT)
+    assert spec.HUB_ROOT_CLEARANCE_MIN > 0.04
+    assert spec.HUB_FLANGE_SEAT_WIDTH_MIN >= WALL_TARGET_MM
+    assert spec.DRAWING_PRECISION["HubHoleProfile"]["HubHoleDia"] == 4
+    assert spec.DRAWING_PRECISION["HubChamfer"]["HubChamferSize"] == 2
+    assert "HubX" not in drawing.HUB_KEEP and "HubY" not in drawing.HUB_KEEP
+    assert "AT ASSEMBLY" in spec.HUB_HOLE_CALLOUT
+    assert "TL-00 STEP 10" in spec.HUB_HOLE_CALLOUT
+    assert "UNDERSIDE" in spec.HUB_CHAMFER_CALLOUT
+    source = inspect.getsource(part._finished_hub_bore)
+    assert "volume_check" in source
+    assert '"HubChamfer", "HubChamferSize"' in source
+    assert "-THICKNESS" in source  # underside edge, not the top entry edge
+    assert "an explicit size band" in source
+    features = _features()
+    assert "assembly_hub_bore" in features
+    assert "assembly_hub_underside_chamfer" in features

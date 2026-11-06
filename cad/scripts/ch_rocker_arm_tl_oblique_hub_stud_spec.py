@@ -99,10 +99,11 @@ if SUPPLY_LENGTH_MIN <= FIT_LENGTH:
     raise AssertionError("the hub stud supply leaves nothing to face to fit")
 
 # --- Shank root ---------------------------------------------------------------
-# The flange top seats on the carrier's underside, so the internal corner at
-# the shank root is printed as a single MAX limit (sharp is good, anything up
-# to the limit is good): .008 clears the carrier's broken bore mouth (the
-# pn_pen_rod shoulder precedent).
+# The flange seats on the carrier underside; the root itself must not bear.
+# TL-21's controlled .02 x 45° underside HUB chamfer, at its ordinary .XX
+# band, supplies .010 minimum specified leg for this .008 MAX radius. A general
+# maximum edge break is not sufficient. The carrier spec owns the pair's
+# worst-case root-clearance and remaining flange-seat checks.
 ROOT_FILLET_R = 0.2032  # .008
 ROOT_FILLET_BAND = (0.0, -ROOT_FILLET_R)
 ROOT_FILLET_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R.008 MAX"
@@ -190,7 +191,7 @@ STRAP_NUMBER = _config.parts("ch-rocker-strap")["number"]
 DIMENSION_CALLOUTS: dict[str, str] = {
     "ShankDia": f"SLIP FIT IN\n{CARRIER_NUMBER} HUB BORE",
     "NoseDia": f"LOCATES {STRAP_NUMBER}\nHUB HOLE",
-    "RootRadius": f"SEATS ON\n{CARRIER_NUMBER}",
+    "RootRadius": f"CLEARS HUB CHAMFER\n{CARRIER_NUMBER}",
     "FitLength": (
         f"FIT AT ASSEMBLY: NOSE {inch_text(TIP_SET, 3)}"
         f" +/-{inch_text(TIP_SET_BAND, 3)}\nABOVE {RISER_NUMBER}"
