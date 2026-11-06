@@ -24,6 +24,8 @@ def _component(role, ordinal, *, scope="", index=91, configuration=None, stem=No
         native_stem, member = "ch-rocker-arm-tl-vn-oblique-rail-kit", role
     elif role in {"LeadScrew", "FeedNut"}:
         native_stem, member = "ch-rocker-arm-tl-vn-oblique-leadscrew-kit", role
+    elif role in {"Bar1", "Bar2"}:
+        native_stem, member = "ch-rocker-arm-tl-oblique-base-bar", role
     elif role in {"FootScrew", "SwingStopScrew"}:
         native_stem, member = "sh-vn-fillister-screw-90280a108", "Default"
     else:
@@ -58,6 +60,7 @@ def _inventory(name):
         "ch-rocker-arm-tl-oblique-jig": {
             "HoldDownStud": 4, "TNut": 4, "FlangeNut": 4,
             "Rail": 2, "Carriage": 2, "LeadScrew": 1, "FeedNut": 1,
+            "Bar1": 1, "Bar2": 1,
         },
         "dt-drive-train": {"FootScrew": 1, "SwingStopScrew": 1},
         "mg-magnifier": {"LeverWire": 1},

@@ -42,8 +42,8 @@ recipes:
 | 91251A108 | `dt-vn-cone-tip-block-screw` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A157 | — (catalogue-only diagnostic recipe; former `sm-vn-knife-hanger-stud`) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A188 | — (retired TL-VN-63, 2026-10-23; former catalogue-only diagnostic recipe removed) | Black-Oxide Alloy Steel Socket Head Screw |
-| 91251A196 | `ch-rocker-arm-tl-vn-oblique-bracket-screw` (MHA-CH-06-TL-VN-62; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
-| 91251A197 | `ch-rocker-arm-tl-vn-oblique-rail-screw` (MHA-CH-06-TL-VN-61; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
+| 91251A196 | `ch-rocker-arm-tl-vn-oblique-bracket-screw` (MHA-CH-06-TL-VN-62, the 4 KP08 screws since 2026-11-06; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
+| 91251A197 | `ch-rocker-arm-tl-vn-oblique-rail-screw` (MHA-CH-06-TL-VN-61, the jig's 20 common screws since 2026-11-06; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
 | 91251A541 | `ch-rocker-arm-tl-vn-oblique-clamp-screw` (MHA-CH-06-TL-VN-68; shop fixture; catalogue-only, no vendor model; installed at bought 7/8 in length) | Socket Head Screw |
 | 91251A583 | `ch-rocker-arm-tl-vn-oblique-lever-screw` (MHA-CH-06-TL-VN-69; shop fixture; catalogue-only, product page login-walled, the 7/8 in sibling's vendor model read for dimensions, not replica-gated) | Socket Head Screw |
 | 91812A215 | — (retired TL-VN-70, 2026-10-23; jig-only diagnostic recipe removed) | Extreme-Vibration-Resistant Wedge Lock Washer |
@@ -55,7 +55,7 @@ recipes:
 | 23065A855-23065A4 | `ch-rocker-arm-tl-vn-oblique-hub-pin` (MHA-CH-06-TL-VN-80; abrasive-cut to .79, factory end up) | Class Z NO-GO Plug Gauge, .4000 in, 2 in supply |
 | 91255A106 | — (diagnostic recipe; a former `pd-vn-guide-lock-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A148 | — (diagnostic recipe; a former `dt-vn-cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
-| 91255A150 | `ch-rocker-arm-tl-vn-oblique-kp08-screw` (MHA-CH-06-TL-VN-65, 4 in the jig since 2026-11-04; shop fixture; catalogue-only, product page read live 2026-11-04) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
+| 91255A150 | — (retired TL-VN-65, 2026-11-06; the KP08 screws are now 91251A196, TL-VN-62; diagnostic recipe removed) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91251A150 | — (retired TL-VN-65 source, 2026-11-04; now 91255A150, whose larger head covers the uxcell KP08's Ø5 hole; diagnostic recipe removed) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91290A168 | `ch-rocker-arm-tl-vn-oblique-carriage-screw` (MHA-CH-06-TL-VN-64; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
 | 91355A581 | — (retired TL-VN-66 source, 2026-11-04: TL-VN-66 retired; the TL-VN-84 kit's feed nut uses TL-VN-67's 91771A112; diagnostic recipe removed) | Black-Oxide Flanged Button Head Hex-Drive Screw, Alloy Steel |
@@ -227,8 +227,9 @@ its dimension provider and diagnostic recipe have also been removed.
   It also supplied `fixtures.trammel-cl-dowel`; length tolerance unstated.
   Both purchases remain unconfirmed in `cad/process/shop/inventory.toml`.
 - [91251A197](https://www.mcmaster.com/91251A197/)
-  (`ch-rocker-arm-tl-vn-oblique-rail-screw`, MHA-CH-06-TL-VN-61, 16 in the oblique
-  trammel jig: the fastener table's `RAIL_TO_BAR` row) was read live on October
+  (`ch-rocker-arm-tl-vn-oblique-rail-screw`, MHA-CH-06-TL-VN-61, 20 in the oblique
+  trammel jig since November 6, 2026, the jig's common screw: the fastener
+  table's `RAIL_TO_BAR` and `BRACKET_TO_BAR` rows) was read live on October
   17, 2026: #8-32 UNC class 3A, 3/4 in under the head, fully threaded, head
   Ø0.27 x 0.164 in, 9/64 in hex, Rockwell C37, ASTM A574, $18.68 per pack of
   100.
@@ -248,8 +249,10 @@ its dimension provider and diagnostic recipe have also been removed.
   standalone run is catalogue-only (it builds the recipe, checks the solid and
   saves it under `cad/out/reference`).
 - [91251A196](https://www.mcmaster.com/91251A196/)
-  (`ch-rocker-arm-tl-vn-oblique-bracket-screw`, MHA-CH-06-TL-VN-62, 8 in the oblique
-  trammel jig: the fastener table's `BRACKET_TO_BAR` row) was read live on
+  (`ch-rocker-arm-tl-vn-oblique-bracket-screw`, MHA-CH-06-TL-VN-62, 4 in the oblique
+  trammel jig since November 6, 2026 (owner ruling, option B): the fastener
+  table's `KP08_TO_BRACKET` row, two down through each KP08's Ø5 holes at
+  1.0 N·m; until then the 8 bracket-to-bar screws) was read live on
   October 17, 2026: #8-32 UNC class 3A, 5/8 in under the head, fully threaded,
   head Ø0.27 x 0.164 in, 9/64 in hex, Rockwell C37, ASTM A574, $15.24 per pack
   of 100.
@@ -328,7 +331,9 @@ lug became integral with TL-32. The following describes the former joint.
   Each is cut to its own counterbore floor at assembly (owner ruling November
   1, 2026; the jig's step 5), so the jig part passes `cut_length` and the
   recipe draws the installed screw at that length under the head.
-- [91255A150](https://www.mcmaster.com/91255A150/)
+- [91255A150](https://www.mcmaster.com/91255A150/) (retired TL-VN-65 source,
+  November 6, 2026: the KP08 screws became 91251A196, TL-VN-62, and
+  `diag_build_91255A150.py` was removed; historical reading follows)
   (`ch-rocker-arm-tl-vn-oblique-kp08-screw`, MHA-CH-06-TL-VN-65, 4 in the oblique
   trammel jig since November 4, 2026, owner option (b): the fastener table's
   `KP08_TO_BRACKET` row) was read live on November 4, 2026: black-oxide alloy
@@ -1656,7 +1661,9 @@ nut's four screws are TL-VN-67's 91771A112, and TL-VN-65 became 91255A150
 (#6-32 x 5/8 button head). Also on 2026-11-04 (owner ruling, #2187 comment
 4473182209) the screw and nut became one leadscrew kit, TL-VN-84, with
 `LeadScrew` and `FeedNut` configurations (TL-VN-54 retired, TL-VN-82 never
-released). The ZYLtech and 91251A150 rows are historical.
+released). The ZYLtech and 91251A150 rows are historical. On 2026-11-06
+(owner ruling, option B) TL-VN-65 retired: the KP08 screws are TL-VN-62's
+91251A196 and the bar screws TL-VN-61's 91251A197.
 
 | target suffix at source date | exact SKU at source date | primary size coverage |
 |---|---|---|

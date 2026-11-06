@@ -70,64 +70,76 @@ def test_stock_is_the_half_by_one_flat_on_edge() -> None:
     assert spec.KP08_FOOT_OVERHANG == pytest.approx(0.15)
 
 
-def test_kp08_taps_land_on_the_blocks_bolt_spacing_about_the_screw() -> None:
-    holes = [_features()[f"kp08_tap_{i}"] for i in (1, 2)]
+def test_two_holes_land_on_the_blocks_bolt_spacing_about_the_screw() -> None:
+    # Owner ruling Main 2026-11-06 (option B): two THRU holes at the KP08's
+    # 42 mm pitch, X 13.925 and 55.925, each tapped #8-32 from both faces.
+    holes = [_features()[f"tap_{i}"] for i in (1, 2)]
     laterals = [_lateral(h["at"][0]) for h in holes]
     half = leadscrew.KP08_BOLT_SPACING / 2.0
     assert laterals == pytest.approx(
         [leadscrew.SCREW_LATERAL - half, leadscrew.SCREW_LATERAL + half]
     )
+    assert laterals == pytest.approx(list(leadscrew.BAR_SCREW_LATERALS))
     # Owner ruling 4 (2026-11-01): the KP08's metric stations print exact
     # millimetres at three places, labelled mm, with the millimetre title
     # block's three-place band.
-    assert spec.KP08_TAP_X == pytest.approx((13.925, 55.925))
-    assert all(x == round(x, 3) for x in spec.KP08_TAP_X)
+    assert spec.HOLE_X == pytest.approx((13.925, 55.925))
+    assert spec.HOLE_X == pytest.approx(leadscrew.BRACKET_HOLES_X)
+    assert all(x == round(x, 3) for x in spec.HOLE_X)
     assert spec.METRIC_DIMENSIONS == {
         ("KP08Taps", "KP08Tap1X"): (3, 0.13),
         ("KP08Taps", "KP08Tap2X"): (3, 0.13),
     }
-    assert spec.KP08_TAP_BAND == printed_band_mm(3, unit="mm")
+    assert spec.HOLE_BAND == printed_band_mm(3, unit="mm")
     assert "set_metric_vendor_units(" in Path(part.__file__).read_text(encoding="utf-8")
     sheet = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "print_imported_metric_dimensions(" in sheet
     for hole in holes:
         x = hole["at"][0]
         assert hole["station"] == pytest.approx([x - 0.13, x + 0.13])
-    assert all(h["at"][1] == 0.0 for h in holes)  # the row on the screw's KP08_S
+        assert hole["at"][1] == 0.0  # the row on the screw's KP08_S
+        assert hole["at"][2] == spec.BRACKET_THICK and hole["axis"] == [0.0, 0.0, -1.0]
+        assert hole["thru"] is True
+    assert spec.SCREW == leadscrew.BAR_SCREW == leadscrew.KP08_SCREW == "#8-32"
+    # The KP08-face thread: THRU ALL from the intact top face.
     assert spec.KP08_TAP_SPEC.kind == "tapped"  # UNC: the block's holes are plain
-    assert spec.KP08_TAP_SPEC.size == leadscrew.KP08_SCREW == "#6-32"
+    assert spec.KP08_TAP_SPEC.size == "#8-32"
     assert spec.KP08_TAP_SPEC.end == "through_all"
-    assert spec.KP08_TAP_DRILL == pytest.approx(2.705)
-
-
-def test_bar_taps_land_on_the_base_bars_bracket_holes() -> None:
-    holes = [_features()[f"bar_tap_{i}"] for i in (1, 2, 3, 4)]
-    laterals = [_lateral(h["at"][0]) for h in holes]
-    assert laterals == pytest.approx(list(leadscrew.BAR_SCREW_LATERALS))
-    # Ruling A′: two pairs symmetric about the screw axis; every station
-    # prints as modelled at .XXX.
-    assert all(_on_grid(x, spec.HOLE_PLACES) for x in spec.BAR_TAP_X)
+    assert spec.KP08_TAP_FACE == ((0.0, 0.0, 1.0), spec.BRACKET_THICK)
+    # The bar-face thread: a blind wizard from the bottom, its drill stopping
+    # where the KP08-face thread ends; one #29 tap drill for both.
     assert spec.BAR_TAP_SPEC.kind == "tapped"
-    assert spec.BAR_TAP_SPEC.size == leadscrew.BAR_SCREW == "#8-32"
-    assert spec.BAR_TAP_SPEC.end == "through_all"
-    # No counterbore in this part: the screws come up through the bar.
-    assert not any(kind.startswith("counterbore") for kind in (spec.BAR_TAP_SPEC.kind,))
-    # Their threads start on the bar (bottom) face, where the screws enter.
+    assert spec.BAR_TAP_SPEC.size == "#8-32"
+    assert spec.BAR_TAP_SPEC.end == "blind"
+    assert spec.BAR_TAP_SPEC.depth_mm == pytest.approx(
+        spec.BRACKET_THICK - spec.KP08_THREAD_DEPTH
+    )
+    assert spec.BAR_TAP_SPEC.overrides_mm == {"ThreadDepth": spec.BAR_THREAD_DEPTH}
     assert spec.BAR_TAP_FACE == ((0.0, 0.0, -1.0), 0.0)
-    assert all(h["at"][2] == 0.0 and h["axis"] == [0.0, 0.0, 1.0] for h in holes)
+    assert spec.TAP_DRILL == pytest.approx(3.454)
+    # No counterbore in this part: the bar screws come up through the bar.
+    assert not spec.BAR_TAP_SPEC.kind.startswith("counterbore")
 
 
 def test_both_patterns_fit_their_mates_at_three_places() -> None:
-    # Each station's band about the row's: the bar taps' .XXX, the KP08
-    # taps' exact millimetres at ±0.13.
-    band = printed_band_mm(spec.HOLE_PLACES, unit="in")
-    assert spec.POSITION_RADIUS >= math.hypot(band, band)
-    assert spec.POSITION_RADIUS <= math.hypot(band + 0.0127, band)
-    # The uxcell block's listed Ø5 holes about the #6-32's 3.505 major.
-    assert spec.KP08_SCREW_FLOAT == pytest.approx(0.7475)
+    # Each station's ±0.13 mm about the row's ±.005.
+    band_mm = printed_band_mm(spec.HOLE_PLACES, unit="mm")
+    row_band = printed_band_mm(spec.ROW_PLACES, unit="in")
+    assert spec.POSITION_RADIUS >= math.hypot(band_mm, row_band)
+    assert spec.POSITION_RADIUS == pytest.approx(0.182, abs=1e-3)
+    # The uxcell block's listed Ø5 holes (UNVERIFIED, #2184) about the #8's
+    # 4.166 major.
+    assert spec.KP08_SCREW_FLOAT == pytest.approx(0.417, abs=1e-3)
     assert spec.KP08_PATTERN_ALLOWANCE > 0.0
-    assert spec.BAR_HOLE_DIA == pytest.approx(4.978)
-    assert spec.BAR_PATTERN_ALLOWANCE > 0.0
+    # TL-20's #12 (.189) clearance: each two-screw joint slides and turns, so
+    # half the worst spacing difference must sit inside the least float.
+    assert spec.BAR_HOLE_DIA == pytest.approx(4.801)
+    assert spec.BAR_SCREW_FLOAT == pytest.approx(0.3175, abs=1e-4)
+    assert spec.BAR_PAIR_MISFIT == pytest.approx(0.261, abs=1e-3)
+    assert spec.BAR_PATTERN_ALLOWANCE == pytest.approx(
+        spec.BAR_SCREW_FLOAT - spec.BAR_PAIR_MISFIT
+    )
+    assert spec.BAR_PATTERN_ALLOWANCE > 0.05
     stations = {*drawing.STATION_ORDER, "HoleRowY"}
     assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 3 for name in stations)
     # At the title block's two places this part's and TL-20's position
@@ -137,81 +149,111 @@ def test_both_patterns_fit_their_mates_at_three_places() -> None:
 
 
 def test_every_tight_band_names_its_mate() -> None:
-    for name in ("KP08Tap1X", "KP08Tap2X"):
-        assert spec.CALLOUTS_BELOW[name] == spec.KP08_MATE_CALLOUT
-    for name in ("BarTap1X", "BarTap2X", "BarTap3X", "BarTap4X"):
-        assert spec.CALLOUTS_BELOW[name] == spec.BAR_MATE_CALLOUT
-    assert spec.CALLOUTS_BELOW["HoleRowY"] == spec.ROW_CALLOUT
-    assert "KP08" in spec.KP08_MATE_CALLOUT
-    assert "MHA-CH-06-TL-20" in spec.BAR_MATE_CALLOUT
-    assert "KP08" in spec.ROW_CALLOUT and "MHA-CH-06-TL-20" in spec.ROW_CALLOUT
+    for name in ("KP08Tap1X", "KP08Tap2X", "HoleRowY"):
+        assert spec.CALLOUTS_BELOW[name] == spec.MATE_CALLOUT == spec.ROW_CALLOUT
+    assert spec.MATE_CALLOUT == "KP08 + MHA-CH-06-TL-20"
     # Every three-place dimension on the sheet carries its mate.
     three_place = {
         name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places == 3
     }
     assert three_place <= set(spec.CALLOUTS_BELOW)
     for name, feature in _features().items():
-        if name.startswith(("bar_tap", "kp08_tap")):
-            assert feature["note"].startswith("MATCHES"), name
+        if name.startswith("tap_"):
+            assert feature["note"] == spec.MATE_CALLOUT, name
 
 
 def test_no_vendor_sku_on_the_sheet() -> None:
     texts = (
-        spec.KP08_MATE_CALLOUT,
-        spec.BAR_MATE_CALLOUT,
+        spec.MATE_CALLOUT,
         spec.ROW_CALLOUT,
+        spec.FAR_SIDE_THREAD_CALLOUT,
         spec.DRAWING_NOTES,
         spec.ISOMETRIC_VIEW_NOTE,
     )
     for text in texts:
         assert not re.search(r"\b\d{4,}[A-Z]\d+\b", text), text  # McMaster style
         assert "AMPEC" not in text.upper()
+        assert "RULING" not in text.upper() and "OWNER" not in text.upper()
 
 
 def test_walls_hold_rule_17_at_worst_case() -> None:
     walls = spec.WALLS_MM
     assert spec.WALL_TARGET == WALL_TARGET_MM
     assert min(walls.values()) >= spec.WALL_TARGET
-    # Ruling A′: every tap to its row neighbours and the end taps to the
-    # ends, in row order, plus the row to both sides.
-    taps = [name for name in walls if "tap" in name]
-    assert len(taps) == len(spec.BAR_TAP_X) + len(spec.KP08_TAP_X) + 1
+    # Each hole to its end, the two holes to each other, the row to both sides.
+    holes = [name for name in walls if name.startswith("hole")]
+    assert len(holes) == len(spec.HOLE_X) + 1
     assert {"row to -Y side", "row to +Y side"} <= set(walls)
     assert spec.RULE_20_SHORTFALLS == ()
     # Cross-check from the exported bands: each thread's major at its station
     # band's far end.
-    holes = _features()
-    bar_1, kp08_1 = holes["bar_tap_1"], holes["kp08_tap_1"]
-    bar_r = THREAD_MAJOR_MM[spec.BAR_SCREW] / 2.0
-    kp08_r = THREAD_MAJOR_MM[spec.KP08_THREAD] / 2.0
-    assert bar_1["station"][0] - bar_r >= WALL_TARGET_MM
-    assert kp08_1["station"][0] - bar_1["station"][1] - bar_r - kp08_r >= WALL_TARGET_MM
-    assert bar_1["height"][0] - bar_r >= WALL_TARGET_MM
+    features = _features()
+    tap_1, tap_2 = features["tap_1"], features["tap_2"]
+    r = THREAD_MAJOR_MM[spec.SCREW] / 2.0
+    assert tap_1["station"][0] - r >= WALL_TARGET_MM
+    assert tap_2["station"][0] - tap_1["station"][1] - 2.0 * r >= WALL_TARGET_MM
+    assert tap_1["height"][0] - r >= WALL_TARGET_MM
 
 
-def test_threads_stop_at_a_full_thread_from_the_screws_faces() -> None:
-    # Owner ruling 2026-11-05: the CAD matches the 2026-11-02 hand traveler.
-    # Drill THRU; thread .450 MIN from each screw's face.
-    assert spec.FULL_THREAD_DEPTH == pytest.approx(0.450 * 25.4)
-    assert spec.FULL_THREAD_DEPTH < spec.BRACKET_THICK - spec.THICK_STOCK_BAND
-    assert spec.KP08_TAP_FACE == ((0.0, 0.0, 1.0), spec.BRACKET_THICK)
-    assert spec.BAR_THREAD_CALLOUT == "MIN FAR SIDE"
-    assert spec.KP08_THREAD_CALLOUT == "MIN"
-    for thread, reach in spec.SCREW_REACH_MAX.items():
-        assert spec.FULL_THREAD_DEPTH >= 1.5 * THREAD_MAJOR_MM[thread]
-        assert 1.5 * THREAD_MAJOR_MM[thread] <= reach <= spec.FULL_THREAD_DEPTH
-    assert spec.SCREW_REACH_MAX[spec.KP08_THREAD] == pytest.approx(10.875)
-    taps = {name: f for name, f in _features().items() if "_tap_" in name}
-    assert len(taps) == 6 and all(f["thru"] is True for f in taps.values())
-    # Both wizard features take the blind thread after their THRU tap drill.
+def test_two_face_threads_hold_each_screw_and_keep_the_tips_apart() -> None:
+    # Owner ruling Main 2026-11-06 (option B): a #8-32 x 3/4 SHCS up from the
+    # bar, a #8-32 x 5/8 SHCS down from the KP08, each in at least 1.5 D of
+    # full thread at the worst case, the tips never meeting.
+    pitch = 25.4 / 32.0
+    assert spec.TAP_LEAD == pytest.approx(2.0 * pitch)
+    assert spec.THICK_MIN == pytest.approx(25.4 - 0.3048)
+    assert spec.BAR_REACH_MAX == pytest.approx(leadscrew.BAR_SCREW_ENGAGEMENT_RANGE[1])
+    assert spec.BAR_REACH_MAX == pytest.approx(12.294, abs=1e-3)
+    assert spec.KP08_REACH_MAX == pytest.approx(10.875, abs=1e-3)
+    assert spec.SCREW_REACH_MAX == {"bar": spec.BAR_REACH_MAX, "kp08": spec.KP08_REACH_MAX}
+    # Each printed depth's limits sit inside its window: the own screw's
+    # reach in full thread, the other screw's reach clear of thread and lead.
+    assert spec.BAR_THREAD_DEPTH == pytest.approx(0.491 * 25.4)
+    assert spec.KP08_THREAD_DEPTH == pytest.approx(0.436 * 25.4)
+    for (low, high), (lo, hi) in (
+        (spec.BAR_THREAD_LIMITS, spec.BAR_THREAD_WINDOW),
+        (spec.KP08_THREAD_LIMITS, spec.KP08_THREAD_WINDOW),
+    ):
+        assert lo <= low <= high <= hi
+        assert low >= 1.5 * THREAD_MAJOR_MM[spec.SCREW]
+    assert spec.BAR_THREAD_WINDOW[1] == pytest.approx(
+        spec.THICK_MIN - spec.KP08_REACH_MAX - spec.TAP_LEAD
+    )
+    assert spec.KP08_THREAD_WINDOW[1] == pytest.approx(
+        spec.THICK_MIN - spec.BAR_REACH_MAX - spec.TAP_LEAD
+    )
+    # The tips' worst-case gap; the common 3/4 from the top would collide.
+    assert spec.SCREW_TIP_GAP_MIN == pytest.approx(
+        spec.THICK_MIN - spec.BAR_REACH_MAX - spec.KP08_REACH_MAX
+    )
+    assert spec.SCREW_TIP_GAP_MIN > 1.9
+    assert spec.COMMON_SCREW_TIP_GAP < 0.0
+    # The KP08 foot (UNVERIFIED, #2184) must be at least this thick for the
+    # 5/8's reach to stay in the top thread: the jig's step 7 receipt check.
+    assert spec.KP08_FOOT_THICK_MIN == pytest.approx(
+        leadscrew.KP08_FOOT_THICK - (spec.KP08_THREAD_LIMITS[0] - spec.KP08_REACH_MAX)
+    )
+    assert 4.9 < spec.KP08_FOOT_THICK_MIN < leadscrew.KP08_FOOT_THICK
+    taps = {name: f for name, f in _features().items() if name.startswith("tap_")}
+    assert len(taps) == 2 and all(f["thru"] is True for f in taps.values())
+    for feature in taps.values():
+        assert feature["thread_depth_top"] == pytest.approx(list(spec.KP08_THREAD_LIMITS))
+        assert feature["thread_depth_far_side"] == pytest.approx(
+            list(spec.BAR_THREAD_LIMITS)
+        )
+    # The bar-face wizard first (blind, from the bottom), then the KP08-face
+    # wizard THRU ALL from the top, its thread depth set from that face.
     builder = Path(part.__file__).read_text(encoding="utf-8")
-    for feature in ("BarTaps", "KP08Taps"):
-        assert builder.count(f'_thread_from_face(adapter, "{feature}"') == 1
-    # The fastener table's receiving thread is the full thread, not the height.
-    assert fasteners.BRACKET_TO_BAR.thread_depth_mm == spec.FULL_THREAD_DEPTH
-    assert fasteners.KP08_TO_BRACKET.thread_depth_mm == spec.FULL_THREAD_DEPTH
+    assert len(
+        re.findall(r'_thread_from_face\(\s*adapter, "KP08Taps", KP08_THREAD_DEPTH', builder)
+    ) == 1
+    assert builder.index('"BarTaps"') < builder.index('"KP08Taps"')
+    # The fastener table's receiving threads.
+    assert fasteners.BRACKET_TO_BAR.thread_depth_mm == spec.BAR_THREAD_DEPTH
+    assert fasteners.KP08_TO_BRACKET.thread_depth_mm == spec.KP08_THREAD_DEPTH
     assert fasteners.BRACKET_TO_BAR.protrusion_mm < 0.0
     assert fasteners.KP08_TO_BRACKET.protrusion_mm < 0.0
+    assert spec.FAR_SIDE_THREAD_CALLOUT == "+ 8-32 UNC .491 DEEP FAR SIDE"
 
 
 def test_holes_carry_the_title_block_band_except_the_kp08_stations() -> None:
@@ -222,25 +264,18 @@ def test_holes_carry_the_title_block_band_except_the_kp08_stations() -> None:
         ("feature_name", "dimension_name"): "band"
     }
     holes = _features()
-    # The tap drills print .XXX with the title block's drilled-hole band.
-    for name, drill in (
-        ("bar_tap_1", spec.BAR_TAP_DRILL),
-        ("kp08_tap_1", spec.KP08_TAP_DRILL),
-    ):
+    band = printed_band_mm(spec.ROW_PLACES, unit="in")
+    for name in ("tap_1", "tap_2"):
+        # The tap drill prints .XXX with the title block's drilled-hole band.
         low, high = holes[name]["dia"]
-        assert low == pytest.approx(round(drill / 25.4, 3) * 25.4)
+        assert low == pytest.approx(round(spec.TAP_DRILL / 25.4, 3) * 25.4)
         assert high - low == pytest.approx(spec.DRILLED_BAND[0])
-    band = printed_band_mm(spec.HOLE_PLACES, unit="in")
-    for name, width in (
-        ("kp08_tap_2", 2.0 * spec.KP08_TAP_BAND),
-        ("bar_tap_1", 2.0 * band),
-    ):
         low, high = holes[name]["station"]
-        assert high - low == pytest.approx(width)
-    assert holes["bar_tap_1"]["height"] == pytest.approx(
-        [spec.HOLE_ROW_Y - band, spec.HOLE_ROW_Y + band]
-    )
-    assert holes["bar_tap_1"]["height_from"] == "bracket_low_side"
+        assert high - low == pytest.approx(2.0 * spec.HOLE_BAND)
+        assert holes[name]["height"] == pytest.approx(
+            [spec.HOLE_ROW_Y - band, spec.HOLE_ROW_Y + band]
+        )
+        assert holes[name]["height_from"] == "bracket_low_side"
 
 
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
@@ -266,7 +301,7 @@ def test_every_exported_band_endpoint_is_a_printed_value() -> None:
             if (name, requirement) in stock:
                 continue  # the supplier's band about the stock size
             places = feature["precision"][requirement]
-            metric = name.startswith("kp08_tap") and requirement == "station"
+            metric = name.startswith("tap_") and requirement == "station"
             for end in band:
                 if metric:  # exact millimetres (owner ruling 4)
                     assert end == pytest.approx(round(end, places), abs=1e-9), name
@@ -288,16 +323,16 @@ def test_row_is_located_from_the_faced_low_side() -> None:
     assert drawing._FROM_LOW_SIDE[0] == "bracket_low_side"
 
 
-def test_every_tap_has_its_own_callout() -> None:
-    called = sorted((kind, x) for kind, x, _xy, _side in drawing.TAP_CALLOUTS)
-    assert called == sorted(
-        [("bar", x) for x in spec.BAR_TAP_X] + [("kp08", x) for x in spec.KP08_TAP_X]
-    )
+def test_every_hole_has_its_own_callout() -> None:
+    called = sorted(x for x, _xy, _side in drawing.TAP_CALLOUTS)
+    assert called == sorted(spec.HOLE_X)
+    assert drawing.CALLOUT_ROWS == 3
+    assert drawing.CALLOUT_GLYPHS == len(spec.FAR_SIDE_THREAD_CALLOUT)
 
 
 def test_single_hole_definitions_drop_exactly_the_count() -> None:
     definitions = {
-        5: "<hw-thread> UNC - <hw-threadclass> THRU ALL",
+        5: "<hw-thread> UNC - <hw-threadclass> <HOLE-DEPTH><hw-threaddepth>",
         6: "",
         7: "<NUM_INST>X <MOD-DIAM><hw-tapdrldia> THRU ALL",
         8: "",
@@ -311,31 +346,33 @@ def test_single_hole_definitions_drop_exactly_the_count() -> None:
     with pytest.raises(RuntimeError):
         drawing.single_hole_definitions({5: "", 6: "", 7: ""})
     assert drawing._PRINTED_COUNT.search("x\n2X Ø3.45 THRU ALL")
-    assert not drawing._PRINTED_COUNT.search("Ø3.45 THRU ALL\n6-32 UNC THRU ALL")
+    assert not drawing._PRINTED_COUNT.search("Ø3.45 THRU ALL\n8-32 UNC THRU ALL")
 
 
-def test_thread_depth_definitions_follow_the_depth_with_its_callout() -> None:
+def test_thread_depth_definitions_put_the_far_side_thread_on_its_own_row() -> None:
     definitions = {
         5: "<hw-thread> UNC - <hw-threadclass> <HOLE-DEPTH><hw-threaddepth>",
         6: "",
         7: "<MOD-DIAM><hw-tapdrldia> THRU ALL",
         8: "",
     }
-    updated = drawing.thread_depth_definitions(definitions, "MIN FAR SIDE")
+    callout = spec.FAR_SIDE_THREAD_CALLOUT
+    updated = drawing.thread_depth_definitions(definitions, callout)
     assert updated == {
         **definitions,
-        5: "<hw-thread> UNC - <hw-threadclass> <HOLE-DEPTH><hw-threaddepth> MIN FAR SIDE",
+        5: "<hw-thread> UNC - <hw-threadclass> <HOLE-DEPTH><hw-threaddepth>\n"
+        "+ 8-32 UNC .491 DEEP FAR SIDE",
     }
     with pytest.raises(RuntimeError):
         drawing.thread_depth_definitions(
-            {**definitions, 5: "<hw-thread> THRU ALL"}, "MIN"
+            {**definitions, 5: "<hw-thread> THRU ALL"}, callout
         )
     with pytest.raises(RuntimeError):
-        drawing.thread_depth_definitions({**definitions, 6: "<hw-threaddepth>"}, "MIN")
-    assert drawing.THREAD_CALLOUTS == {
-        "bar": spec.BAR_THREAD_CALLOUT,
-        "kp08": spec.KP08_THREAD_CALLOUT,
-    }
+        drawing.thread_depth_definitions(
+            {**definitions, 6: "<hw-threaddepth>"}, callout
+        )
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "thread_callout=FAR_SIDE_THREAD_CALLOUT" in sheet
 
 
 # --- Sheet layout (model mm in the plan, sheet m around it) -----------------------
@@ -346,16 +383,8 @@ def _plan(name: str) -> tuple[float, float]:
     return x, y
 
 
-_STATION_MATES = {
-    **{f"BarTap{k}X": spec.BAR_MATE_CALLOUT for k in range(1, 5)},
-    "KP08Tap1X": spec.KP08_MATE_CALLOUT,
-    "KP08Tap2X": spec.KP08_MATE_CALLOUT,
-}
-_STATION_X = {
-    **{f"BarTap{k}X": x for k, x in enumerate(spec.BAR_TAP_X, start=1)},
-    "KP08Tap1X": spec.KP08_TAP_X[0],
-    "KP08Tap2X": spec.KP08_TAP_X[1],
-}
+_STATION_MATES = {"KP08Tap1X": spec.MATE_CALLOUT, "KP08Tap2X": spec.MATE_CALLOUT}
+_STATION_X = {"KP08Tap1X": spec.HOLE_X[0], "KP08Tap2X": spec.HOLE_X[1]}
 
 
 def _block(name: str) -> tuple[float, float, float, float]:
@@ -457,17 +486,15 @@ def test_row_block_sits_between_its_extension_lines_off_the_part() -> None:
     assert left >= LEFT_BORDER + 0.01
 
 
-def _callout_block(kind: str, xy: tuple[float, float]) -> tuple[float, ...]:
-    half = drawing.CALLOUT_GLYPHS[kind] * drawing.GLYPH / 2.0
-    half_high = drawing.text_half_high(2)
+def _callout_block(xy: tuple[float, float]) -> tuple[float, ...]:
+    half = drawing.CALLOUT_GLYPHS * drawing.GLYPH / 2.0
+    half_high = drawing.text_half_high(drawing.CALLOUT_ROWS)
     return xy[0] - half, xy[0] + half, xy[1] - half_high, xy[1] + half_high
 
 
-def _leader(
-    kind: str, x: float, xy: tuple[float, float]
-) -> tuple[tuple[float, float], ...]:
+def _leader(x: float, xy: tuple[float, float]) -> tuple[tuple[float, float], ...]:
     """Shelf end nearer the hole (the bottom row's baseline) to its centre."""
-    left, right, bottom, _top = _callout_block(kind, xy)
+    left, right, bottom, _top = _callout_block(xy)
     near = left if abs(left - x) < abs(right - x) else right
     return (near, bottom), (x, 0.0)
 
@@ -491,9 +518,9 @@ def _box_edges(box: tuple[float, ...]) -> list[tuple[tuple[float, float], ...]]:
 
 def test_each_leader_lands_on_its_own_hole_crossing_nothing() -> None:
     callouts = drawing.TAP_CALLOUTS
-    leaders = [_leader(kind, x, xy) for kind, x, xy, _side in callouts]
-    blocks = [_callout_block(kind, xy) for kind, _x, xy, _side in callouts]
-    holes = [(x, drawing.TAP_DRILLS[kind] / 2.0) for kind, x, _xy, _side in callouts]
+    leaders = [_leader(x, xy) for x, xy, _side in callouts]
+    blocks = [_callout_block(xy) for _x, xy, _side in callouts]
+    holes = [(x, spec.TAP_DRILL / 2.0) for x, _xy, _side in callouts]
     width_ext = (
         (spec.BRACKET_LENGTH + 0.5, spec.HALF_WIDTH),
         (
@@ -501,13 +528,11 @@ def test_each_leader_lands_on_its_own_hole_crossing_nothing() -> None:
             spec.HALF_WIDTH,
         ),
     )
-    for i, ((kind, x, xy, side), leader) in enumerate(
-        zip(callouts, leaders, strict=True)
-    ):
+    for i, ((x, xy, side), leader) in enumerate(zip(callouts, leaders, strict=True)):
         (sx, sy), _centre = leader
         # The edge pick is the rim on the leader's side, off the centre lines.
-        ex, ey, _ez = drawing.tap_edge_model(kind, x, side)
-        assert math.hypot(ex - x, ey) == pytest.approx(drawing.TAP_DRILLS[kind] / 2.0)
+        ex, ey, _ez = drawing.tap_edge_model(x, side)
+        assert math.hypot(ex - x, ey) == pytest.approx(spec.TAP_DRILL / 2.0)
         assert (sx - x) * side > 0 and ey > 0
         assert not _cross(*leader, *width_ext), i
         for j, other in enumerate(leaders):
@@ -537,7 +562,7 @@ def test_each_leader_lands_on_its_own_hole_crossing_nothing() -> None:
 
 def test_tap_callouts_stand_over_the_plan_inside_the_sheet() -> None:
     gap = drawing.TEXT_GAP - 1e-9
-    blocks = [_callout_block(kind, xy) for kind, _x, xy, _side in drawing.TAP_CALLOUTS]
+    blocks = [_callout_block(xy) for _x, xy, _side in drawing.TAP_CALLOUTS]
     end_top = drawing.END_CENTER[1] + spec.HALF_WIDTH * drawing._S / 1000.0
     end_left = drawing.END_CENTER[0] - spec.BRACKET_THICK / 2.0 * drawing._S / 1000.0
     for i, box in enumerate(blocks):
@@ -635,15 +660,7 @@ def test_prechips_solids_are_valid_fixture_solids() -> None:
     for solid in spec.PRECHIPS_SOLIDS:
         FixtureSolid.model_validate(solid)
     names = {solid["name"] for solid in spec.PRECHIPS_SOLIDS}
-    assert names == {
-        "end bracket",
-        "bar tap 1",
-        "bar tap 2",
-        "bar tap 3",
-        "bar tap 4",
-        "KP08 tap 1",
-        "KP08 tap 2",
-    }
+    assert names == {"end bracket", "tap 1", "tap 2"}
     box = spec.PRECHIPS_SOLIDS[0]
     assert box["size_mm"] == pytest.approx(
         [spec.BRACKET_LENGTH, spec.BRACKET_WIDTH, spec.BRACKET_THICK]

@@ -77,13 +77,13 @@ def test_bought_dimensions_are_imported_from_c4_not_retyped() -> None:
 
 def test_listing_sizes_and_the_tl28_screw_fit() -> None:
     """The listing's 55 x 13 x 28, Ø5 holes at 42 and Ø8 bore; the TL-28
-    #6-32 screws float in the Ø5 holes on TL-28's unchanged 42 tap span."""
+    #8-32 screws float in the Ø5 holes on TL-28's two holes' 42 span."""
     assert (spec.LENGTH, spec.WIDTH, spec.HEIGHT) == (55.0, 13.0, 28.0)
     assert (spec.BOLT_SPACING, spec.HOLE_DIA, spec.BORE_DIA) == (42.0, 5.0, 8.0)
     major = leadscrew.THREAD_MAJOR_MM[leadscrew.KP08_SCREW]
-    assert leadscrew.KP08_SCREW == "#6-32"
-    assert (spec.HOLE_DIA - major) / 2.0 > 0.7  # radial float
-    near, far = leadscrew.BRACKET_KP08_HOLES_X
+    assert leadscrew.KP08_SCREW == "#8-32"
+    assert math.isclose((spec.HOLE_DIA - major) / 2.0, 0.417, abs_tol=1e-3)  # radial float
+    near, far = leadscrew.BRACKET_HOLES_X
     assert math.isclose(far - near, spec.BOLT_SPACING, abs_tol=1e-9)
 
 
@@ -182,7 +182,7 @@ def test_note_is_one_short_line_naming_the_end_bracket() -> None:
     assert note == note.upper()
     assert "MHA-CH-06-TL-28" in note
     # The receipt check's pass condition: the bracket's screws pass the holes.
-    assert "#6-32 SCREWS MUST PASS BOTH HOLES" in note
+    assert "#8-32 SCREWS MUST PASS BOTH HOLES" in note
 
 
 def test_sheet_is_the_registered_purchased_part_reference(monkeypatch) -> None:
