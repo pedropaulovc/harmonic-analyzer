@@ -313,10 +313,10 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
         "HubLength": "SETS CLEARANCE TO\nSPROCKET MHA-PD-09",
     }
     assert geometry.HUB_LENGTH_BAND[0] < geometry.GENERAL_2PL_TOL_MM / 2.0
-    # Note 2's acceptance (.002 either way) is provisional, pending owner
-    # confirmation (round-2 review: MATCH alone states no acceptance).
+    # Note 2's acceptance is one-sided, +.000/-.002 to the arm's measured
+    # thickness: the hub end is never proud (owner ruling 2026-11-06).
     assert dt_crank_hub_notes.SEAT_LENGTH_NOTE == (
-        "2. SEAT LENGTH (.31): MEASURED THICKNESS OF CRANK ARM MHA-DT-06 <MOD-PM>.002."
+        "2. SEAT LENGTH (.31): MEASURED THICKNESS OF CRANK ARM MHA-DT-06 +.000/-.002."
     )
     assert f"{geometry.HUB_SEAT_LENGTH / 25.4:.2f}" == "0.31"
     # Rule 7: the sheet's notes are at most four lines.
