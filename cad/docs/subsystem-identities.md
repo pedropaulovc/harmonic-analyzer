@@ -122,6 +122,16 @@ remain unverified (#2184). Native block bore/dimension readbacks, one-free-DOF
 proof and driven whole-assembly interference at both passes remain mandatory;
 analytic separating axes and generated sweep targets are not native results.
 
+TL-00's last sheet, LINEAR MOTION FROM ABOVE (owner, PR4 #2227), is the
+arrangement's named plan of the same assembly with the TL-21 carrier and
+every occurrence locked to it (riser and its four screws, feed lever with its
+screws and wedge-lock washers, hub stud, sleeve, washer and screw, left and
+CR clamp screws, CL dowel) hidden in that one drawing view. The base bars,
+rails, carriages, both blocks, the shoulder screws with their spacers and
+shims, the leadscrew feed, the hold-downs and all of their fasteners stay
+drawn; ten BOM balloons name the slide and feed parts. No configuration,
+display state or model hide exists for it: the model, its BOM, interference,
+sweeps and every other sheet keep the full assembly.
 
 New purchases are TL-VN-77 shoulder screws (Huyett BLTS40-0375-1500188P,
 thread shop-cut), TL-VN-78 spacers (AluminumSpacers.com AS62-18-40) and TL-VN-79
