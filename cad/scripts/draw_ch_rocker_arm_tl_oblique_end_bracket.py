@@ -658,24 +658,21 @@ def _check_hole_table(
     texts: dict[str, dict[int, str]],
 ) -> None:
     """Read the finished table back: generated rows unchanged, each group's
-    size and mate once over its rows, both headers."""
+    size and mate in its first row, both headers. (MergeCells' True is the
+    merge proof: early-bound IsCellMerged raises Type mismatch on its out
+    parameters, r1 CAD retry.)"""
     if _table_rows(table) != rows:
         raise RuntimeError("end bracket hole-table rows changed under the custom columns")
     for column, title in ((_SIZE, SIZE_COLUMN), (_MATE, MATE_COLUMN)):
         if _cell(table, 0, column).upper() != title:
             raise RuntimeError(f"end bracket hole-table header {column}: {_cell(table, 0, column)!r}")
-    for kind, (first, last) in spans.items():
+    for kind, (first, _last) in spans.items():
         for column, text in texts[kind].items():
             printed = _cell(table, first, column)
             if _glyphless(printed) != _glyphless(text):
                 raise RuntimeError(
                     f"end bracket hole-table {kind} cell {column}: {printed!r} != {text!r}"
                 )
-            for row in range(first + 1, last + 1):
-                # pywin32 returns the out-params after the result: (merged, row, column).
-                merged = table.IsCellMerged(row, column)
-                if (merged[0] if isinstance(merged, tuple) else merged) is not True:
-                    raise RuntimeError(f"end bracket hole-table cell {row},{column} is not merged")
     _telemetry.info(
         "end bracket hole table: "
         + repr([[_cell(table, r, c) for c in range(6)] for r in range(int(table.RowCount))])
