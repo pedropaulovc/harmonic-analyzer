@@ -649,6 +649,7 @@ one adequate method over another is not a defect.
 | friction torque: a member turns or rocks on a stationary shaft or screw | press or bonded fit; cross-pin; set screw on a flat or spot with its own lock; jam nut; staked or peened tail; red threadlocker on a seated thread | a plain seated thread; `SNUG` |
 | drive torque: the joint transmits working torque, usually reversing | key or flat with axial capture; cross- or taper pin; press or bonded fit; pressed drive pins; set screw on a flat, staked, for light torque only | set screw on a plain round; solder; threadlocker |
 | adjuster: the thread's own turn sets a position, gap or preload | jam nut; pinch clamp across a slit; jam screw; locked nut; none only by owner ruling | threadlocker; stake |
+| adjustable clamp: a member clamped at a setting along a rod or slot that must stay adjustable | a clamp screw or thumb screw bearing on the round, or a pinch clamp across a slit, with a step that sets it and checks it holds; a light-load clamp only | a bond, stake or flat that fixes the setting |
 | pivot: a member swings or spins on a threaded shoulder | staked tap mouth on a flush tip (steel receiver); jam nut or cross-pin on the tail; red threadlocker on a seated shoulder | a shoulder alone |
 | sheet, tube or wire to metal; wood to metal | braze with its filler; soft solder on a shear lap; retaining compound for a tube in a sleeve; epoxy for wood | solder in a torque or peel path |
 
