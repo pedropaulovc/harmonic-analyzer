@@ -212,12 +212,18 @@ reviews that read it. This policy file is not a review input.
   first-time hobby machinist:
   they are design margins for the shop class the guidelines describe, not
   capability limits.
-- **Retention (rule 23).** Mechanical locks are the default, in preference
-  order: dowels, set screws, jam nuts, cross-pins, keys or flats with axial
-  capture, pinch clamps — then a brazed joint — then peening. Threadlocker is
-  an option, never the default; on its own it locks nothing (rule 23).
-  `cad/scripts/joint_retention.py` lists every threaded joint and audits the
-  rule (`check:joint_retention`).
+- **Retention (rule 23).** Owner priority (2026-11-06): physical retention,
+  then visual fidelity to the 1898 machine, then simplicity for a hobby
+  builder, then sturdiness under handling. Every fixed joint, threaded or
+  not, is held by a printed, bench-checkable means suited to its load; a CAD
+  mate holds nothing. No device order is imposed. A specified anaerobic bond
+  (grade, clearance, prep, cure, acceptance) equals a press fit, including
+  for axial-only pins and rods (supersedes the 2026-10-15 thread-or-press
+  ruling). Red threadlocker (262/263) is a lock on seated threads #10 and
+  larger, never on adjusters or joints that must open; 222/243 are optional
+  consumables. `cad/scripts/joint_retention.py` lists every threaded joint
+  and audits it (`check:joint_retention`); smooth fixed joints are not yet
+  in its inventory.
 - **Legacy assembly sheets.** Three-view sheets from
   `drawing_recipe_assembly.md` are orientation placeholders and are expected
   to fail review until they are built out to rule 22.

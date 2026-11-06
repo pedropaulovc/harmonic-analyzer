@@ -34,11 +34,15 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
    every balloon against its row, steps across sheet boundaries, and every
    repeated dimension, state or instruction (rule 25). SHIP requires all of it
    to agree.
-4. List every threaded joint the package shows or depends on, including
-   screws a part pivots, swings or turns on and joints the package lists as
-   external interfaces or leaves to final assembly. For each, decide whether
-   operating loads reach it and where its lock and locking step are shown
-   (rule 23).
+4. Census every fixed joint the package shows or depends on, threaded or
+   not (pressed, bonded, pinned, set-screwed, staked), including screws a
+   part pivots, swings or turns on and joints the package lists as external
+   interfaces or leaves to final assembly. From the exploded view, sections
+   and steps, classify each nested or seated pair as runs, adjusts or fixed;
+   for each fixed pair find its load class, its fit or feature on the part
+   sheet, the step that makes it and its bench acceptance, and check the
+   method against rule 23's table. A pair you cannot classify from the
+   package is a candidate. Never compute a capacity or invent a load.
 5. Walk rule 22 item by item and record each gap: assembled views where every
    part is identifiable; an exploded view that reads; a parts list with
    balloons for every visible part; steps that fit every part the package
