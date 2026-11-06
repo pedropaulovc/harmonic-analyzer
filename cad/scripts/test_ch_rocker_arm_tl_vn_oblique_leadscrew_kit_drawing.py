@@ -790,7 +790,10 @@ def test_one_axis_horizontal_view_at_the_largest_fitting_scale() -> None:
         draw.MAIN_KEEP[f"{name}FlatStation"][1] for name in ("FarKP08", "Handwheel")
     ]
     assert len(set(rows)) == 2 and max(rows) < main[1] - 0.015
-    assert draw.sheet_x(spec.FLAT_STATIONS["Handwheel"]) == pytest.approx(0.2945)
+    end_to_grub = spec.LENGTH - spec.FLAT_STATIONS["Handwheel"]
+    assert draw.sheet_x(spec.FLAT_STATIONS["Handwheel"]) == pytest.approx(
+        main[2] - end_to_grub * draw._SHEET_PER_MODEL_MM
+    )
     # The cut length's dimension line (its text about 2.7 mm over it) stands
     # over the sections' letters, 1.7 .. 7.9 mm past the cutting lines' reach.
     assert text_y - 0.0027 > draw.MAIN_CENTER[1] + draw.SECTION_REACH + 0.0079 + 0.004
@@ -818,8 +821,8 @@ def test_one_axis_horizontal_view_at_the_largest_fitting_scale() -> None:
         caption_bottom = y - drop - draw.SECTION_CAPTION_GAP - 0.013
         assert caption_bottom > text_y + draw.TEXT_HALF_HEIGHT, section.label
         # The cutting line crosses its station's flat, 2.5 clear of both of
-        # its ends: the far flat's start prints the 375.5 station's extension
-        # line (machinist review: 0.5 off it, the two lines merged).
+        # its ends and away from the far KP08 station's extension line
+        # (machinist review: at 0.5 separation the two lines merged).
         start = spec.FLAT_STARTS[section.flat]
         assert start + 2.5 <= section.cut_mm <= start + spec.FLAT_LENGTH - 2.5
         assert section.cut_mm != spec.FLAT_STATIONS[section.flat]
