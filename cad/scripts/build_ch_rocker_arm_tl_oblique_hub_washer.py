@@ -46,11 +46,10 @@ from ch_rocker_arm_tl_oblique_hub_washer_spec import (
     DRAWING_PRECISION,
     ID,
     OD,
-    STEM,
     THICK,
 )
 
-PART_NAME = STEM
+PART_NAME = "ch-rocker-arm-tl-oblique-hub-washer"
 MATERIAL = "Brass"  # C36000 free-machining brass rod
 
 V_RING = math.pi * ((OD / 2.0) ** 2 - (ID / 2.0) ** 2) * THICK

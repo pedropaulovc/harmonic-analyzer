@@ -32,7 +32,8 @@ def test_registry_row_is_the_turned_stud() -> None:
     assert row["drawing_unit"] == spec.UNIT == "in"
     assert "1018" in row["material_specification"]
     assert "supplier_skus" not in row
-    assert part.PART_NAME == STEM
+    # A literal, so verify's static PART_NAME scan registers the build.
+    assert part.PART_NAME == spec.STEM == STEM
     assert part.MATERIAL == "Plain Carbon Steel"
 
 
