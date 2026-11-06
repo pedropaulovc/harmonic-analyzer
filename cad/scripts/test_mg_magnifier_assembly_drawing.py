@@ -1542,6 +1542,33 @@ def test_tie1_angle_readback_requires_the_rest_angle_driven_at_whole_degrees(
             drawing._assert_tie1_angle(display, label="VIEW D")
 
 
+@pytest.mark.parametrize("kinds", [(1,), (12, 1, 1), (12,), ()])
+def test_view_edge_pick_keeps_the_first_selected_edge(monkeypatch, kinds):
+    objects = [object() for _ in kinds]
+    cleared = []
+    manager = SimpleNamespace(
+        GetSelectedObjectCount2=lambda _mark: len(kinds),
+        GetSelectedObjectType3=lambda index, _mark: kinds[index - 1],
+        GetSelectedObject6=lambda index, _mark: objects[index - 1],
+    )
+    model = SimpleNamespace(
+        Extension=SimpleNamespace(SelectByID2=lambda *_args: bool(kinds)),
+        SelectionManager=manager,
+        ClearSelection2=lambda value: cleared.append(value),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "_activate", lambda *_a, **_k: None)
+    monkeypatch.setattr(drawing, "null_callout", lambda: None)
+    adapter = SimpleNamespace(currentModel=model)
+    if drawing.SEL_EDGES in kinds:
+        edge = drawing._pick_view_edge(adapter, object(), (0.3, 0.16), label="bar edge")
+        assert edge is objects[kinds.index(drawing.SEL_EDGES)]
+        assert cleared == [True]
+    else:
+        with pytest.raises(RuntimeError, match="bar edge"):
+            drawing._pick_view_edge(adapter, object(), (0.3, 0.16), label="bar edge")
+
+
 def test_wheel_rest_view_dimensions_tie_1_from_the_bar_edge(monkeypatch):
     detail = drawing.WHEEL_REST
     view = object()
@@ -1589,6 +1616,12 @@ def test_wheel_rest_view_dimensions_tie_1_from_the_bar_edge(monkeypatch):
         return display
 
     monkeypatch.setattr(drawing, "add_edge_dimension", dimension_add)
+    edge = object()
+    picks = []
+    monkeypatch.setattr(
+        drawing, "_pick_view_edge",
+        lambda _a, actual, xy, **_k: picks.append((actual, xy)) or edge,
+    )
     monkeypatch.setattr(
         drawing, "add_leader_note",
         lambda _a, text, *, text_xy, attach_xy, view, label: leaders.append(
@@ -1616,13 +1649,14 @@ def test_wheel_rest_view_dimensions_tie_1_from_the_bar_edge(monkeypatch):
     # vertex and the line by its own segment, at whole degrees.
     (kwargs,) = dimensions
     assert kwargs["orientation"] == "angular"
-    assert kwargs["entity_types"] == ("EDGE", "SKETCHSEGMENT")
-    assert kwargs["entities"] == (None, segment)
+    assert kwargs["entity_types"] == ("SKETCHSEGMENT", "EDGE")
+    assert kwargs["entities"] == (segment, edge)
+    assert picks == [(view, kwargs["p1"])]
     edge_y = cy - 2.0 * drawing.BORE_ROW_HEIGHT / 1000.0
-    assert kwargs["p0"][1] == pytest.approx(edge_y)
+    assert kwargs["p1"][1] == pytest.approx(edge_y)
     vertex = project(detail.model_m(drawing.TIE1_VERTEX_MM))
-    assert (kwargs["p0"][0] - vertex[0]) * (tie[0] - cx) > 0.0
-    assert math.dist(kwargs["p0"], (cx, cy)) < detail.crop_radius
+    assert (kwargs["p1"][0] - vertex[0]) * (tie[0] - cx) > 0.0
+    assert math.dist(kwargs["p1"], (cx, cy)) < detail.crop_radius
     assert precision == [(0, -1, -1, -1)]
     # TIE 1's label stands outside the crop, its leader on the hole's rim.
     ((text, text_xy, tip),) = leaders

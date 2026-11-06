@@ -773,6 +773,7 @@ CONTINUOUS_LINE_STYLE = 0  # swLineStyles_e.swLineCONTINUOUS
 CENTER_LINE_STYLE = 4  # swLineStyles_e.swLineCENTER
 THIN_LINE_WEIGHT = 0  # swLineWeights_e.swLW_THIN
 TIE1_ANGLE_TOL_DEG = 0.05
+SEL_EDGES = 1  # swSelectType_e.swSelEDGES
 
 
 @dataclass(frozen=True)
@@ -1298,6 +1299,34 @@ def _assert_tie1_angle(display: Any, *, label: str) -> None:
         )
 
 
+def _pick_view_edge(
+    adapter: Any, view: Any, xy: tuple[float, float], *, label: str
+) -> Any:
+    """The model edge under sheet point ``xy`` in ``view``, as an entity.
+
+    Round 1 (run 20261106T210134118Z): a coordinate ``EDGE`` pick here left
+    two objects selected, so the angle's selection count read 3. Pick once,
+    log what came back, and keep the first edge; the angle readback proves
+    it is the bar's bottom edge."""
+    draw = adapter.currentModel
+    _activate(adapter, view, label=label)
+    if not draw.Extension.SelectByID2("", "EDGE", xy[0], xy[1], 0.0, False, 0, null_callout(), 0):
+        raise RuntimeError(f"{label}: no edge at sheet {xy!r}")
+    manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    count = int(manager.GetSelectedObjectCount2(-1))
+    kinds = [int(manager.GetSelectedObjectType3(index, -1)) for index in range(1, count + 1)]
+    _telemetry.info(f"{label}: pick at {xy!r} selected types {kinds}")
+    edges = [
+        manager.GetSelectedObject6(index, -1)
+        for index, kind in enumerate(kinds, start=1)
+        if kind == SEL_EDGES
+    ]
+    draw.ClearSelection2(True)
+    if not edges or edges[0] is None:
+        raise RuntimeError(f"{label}: pick at {xy!r} selected no edge (types {kinds})")
+    return edges[0]
+
+
 def _wheel_rest_view(
     adapter: Any, source_step: Callable[[str], None]
 ) -> Callable[[], None]:
@@ -1336,17 +1365,18 @@ def _wheel_rest_view(
     segment = _sketch_in_view(adapter, view, "line", (axle, end), label=axis_label)
     _ink_segment(adapter, segment, CENTER_LINE_STYLE, label=axis_label)
     angle_label = f"{detail.title} TIE 1 angle"
+    edge = _pick_view_edge(adapter, view, edge_pick, label=f"{angle_label} bar edge")
     display = _early_bound(
         add_edge_dimension(
             adapter,
             view,
-            p0=edge_pick,
-            p1=line_pick,
+            p0=line_pick,
+            p1=edge_pick,
             text_xy=text,
             label=angle_label,
             orientation="angular",
-            entity_types=("EDGE", "SKETCHSEGMENT"),
-            entities=(None, segment),
+            entity_types=("SKETCHSEGMENT", "EDGE"),
+            entities=(segment, edge),
         ),
         "IDisplayDimension",
     )
