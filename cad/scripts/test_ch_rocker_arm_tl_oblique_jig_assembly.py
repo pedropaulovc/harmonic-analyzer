@@ -2249,6 +2249,9 @@ def test_f1_f2_prepare_seat_and_transfer_from_the_nut() -> None:
     )
     assert steps["F3"].startswith("F3. AFTER STEP 8B, WITH THE HANDWHEEL AND ALL SET SCREWS TIGHT")
     assert "NO BINDING" in steps["F3"]
+    assert "FEED END TO END BY HANDWHEEL" in steps["F3"]
+    assert "NUT OR LUG CONTACT WITH A KP08" in steps["F3"]
+    assert "NO MOVING PART CONTACT" in steps["F3"]
     assert steps["7"].endswith(f"{spec._item(spec.PILLOW_BLOCK_SCREW)}, LOOSE.")
     for text in (*spec.ASSEMBLY_STEPS, *spec.FEED_FIT_STEPS):
         for stale in ("PRINT-DRILLED", "TRANSFER SPOTTING", "LOOSE HOLES", "DOWEL PIN", "FLANGED"):
