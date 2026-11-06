@@ -189,7 +189,10 @@ a chamfer gets the loosest title-block band that serves it.
   row or one flagged note linked to the features (rule 7), never repeated on
   each dimension. A mate the package identifies uniquely but by the wrong
   form is a clarity defect; a mate that cannot be identified at all is a
-  blocker.
+  blocker. A drawing number is complete as printed in its registered form:
+  subsystems number differently (`MHA-PD-07`, `MHA-PD-VN-57`,
+  `MHA-CH-06-TL-21`), so never demand a sub-group code a number does not
+  have.
 - **Matched or selectively fitted pairs.** For a one-off pair, the callout
   identifies the mate by name and full drawing number, and states
   the required clearance, interference or an unambiguous functional
@@ -311,7 +314,9 @@ are gear data, not narration.
   narration and is over-specification: design rationale (`HOLDS … SCREWS
   CLEAR OF ITS CUT EDGES`, `MAX KEEPS D AT ENTRY`, `MIRRORS CL STATION`), a
   second reason on one feature, the same reason repeated on several
-  dimensions, a reason on an overall or stock size, or an assembly
+  dimensions, a reason on an overall or stock size that has no band of its
+  own (an overall with an explicit tight band that sets a stack names that
+  stack once under rule 4, and that is not narration), or an assembly
   instruction on a part sheet (`END FLUSH WITH CRANK ARM FRONT`, `ALL 8
   SCREWS START BY HAND`, `DISASSEMBLE AT MHA-DT-09`). Match-drilling or
   reaming at assembly with its mate is a requirement, not narration.
@@ -362,6 +367,8 @@ Hidden lines appear only where they inform (ASME Y14.3).
   them, such as a cross-hole through a turned part. Every other orthographic
   view, and every assembly view, is hidden-lines-removed so its dimensions sit
   on clean geometry. This is a criterion, not a count.
+- Standard parts cut lengthwise in an assembly section (screws, pins,
+  shafts, keys) are conventionally left unhatched; a hatched one is polish.
 - A section never carries hidden lines. It shows either the material beyond
   the cut in solid lines or only the cut faces. Hatched slices among dashed
   ghosts of removed material mean the cut is in the wrong place.
