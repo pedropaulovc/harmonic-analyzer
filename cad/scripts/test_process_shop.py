@@ -110,6 +110,95 @@ def test_bound_shop_validates_and_preserves_tracked_inventory(tmp_path):
     )
 
 
+def test_zoro_order_is_owned_but_not_installed_or_measured():
+    inventory = _shop("inventory.toml")
+    ordered = {
+        row["sku"]: row
+        for category in ("tools", "holders")
+        for row in inventory[category].values()
+        if "WB7365521946" in row.get("purchase", "")
+    }
+    quantities = {
+        "1000100": 2,
+        "1010700": 2,
+        "1011008": 2,
+        "1011108": 2,
+        "1012200": 5,
+        "1023700": 3,
+        "1024300": 4,
+        "1024400": 1,
+        "1024901": 1,
+        "1025000": 1,
+        "1025200": 1,
+        "1025308": 1,
+        "015326AS": 2,
+        "008320AS": 2,
+        "1120408": 1,
+        "1120500": 1,
+        "1120700": 1,
+        "DWTH1316-080": 1,
+        "DWTH1316-440": 1,
+        "3000DS1": 1,
+    }
+    assert {sku: row["pieces"] for sku, row in ordered.items()} == quantities
+    assert sum(row["pieces"] for row in ordered.values() if row["kind"] == "tap") == 32
+    for row in ordered.values():
+        assert row["present"] is False
+        assert row["verify"] is True
+        assert row["make"]
+        assert row["source"].startswith("https://www.zoro.com/i/G")
+        assert row["source"].endswith("/")
+        assert "2026-11-06" in row["purchase"]
+        assert "ordered, not yet received" in row["purchase"]
+        for _, measured in _measurements(row):
+            assert measured["status"] == "assumed"
+
+
+def test_owned_kit_members_follow_the_photo_not_the_hypothetical_kit():
+    kit = _shop("inventory.toml")["tools"]["tap-die-set-40"]
+    sizes = {
+        "4-36",
+        "6-32",
+        "8-32",
+        "10-32",
+        "10-24",
+        "12-24",
+        "1-4-20",
+        "1-4-28",
+        "5-16-18",
+        "3-8-16",
+        "7-16-20",
+        "7-16-14",
+        "5-16-24",
+        "3-8-24",
+        "1-2-20",
+        "1-2-13",
+    }
+    assert set(kit["sizes"]) == sizes
+    assert set(kit["members"]) == {
+        f"{kind}-{size}" for kind in ("tap", "die") for size in sizes
+    } | {"tap-1-8-pipe"}
+    assert kit["present"] is True
+    assert kit["verify"] is True
+    assert "NOT trust its taps or dies for project work" in kit["note"]
+    assert not list(_measurements(kit))
+    assert all(set(row) == {"kind", "name"} for row in kit["members"].values())
+
+
+def test_owned_kit_holders_replace_the_catalogue_example():
+    inventory = _shop("inventory.toml")
+    holders = inventory["holders"]
+    assert "tap-wrench-t-1-16-1-4" not in holders
+    for name in ("tap-wrench-kit-40-t", "tap-wrench-kit-40-bar", "die-handle-kit-40"):
+        row = holders[name]
+        assert row["present"] is True
+        assert row["verify"] is True
+        assert "tools.tap-die-set-40" in row["note"]
+        assert "sku" not in row
+        assert not list(_measurements(row))
+    assert "#0-80 square remains unverified" in holders["tap-wrench-kit-40-t"]["note"]
+
+
 @pytest.mark.parametrize("name", list(MODELS))
 def test_every_measured_record_names_who_measured(name):
     records = list(_measurements(_shop(name)))

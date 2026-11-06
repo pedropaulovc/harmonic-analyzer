@@ -1,3 +1,10 @@
+# Actual ownership update (2026-11-06): tools.tap-die-set-40 and its named kit
+# holders below replace their hypothetical identities with Pedro's photo/owner
+# evidence. The Zoro WB7365521946 tool and holder records are paid purchases,
+# ordered but not yet received (present=false), not installed shop equipment.
+# Their fact-local sources supersede the historical trial-only notices below.
+# No new physical measurements are claimed.
+#
 # Identity/ownership extension (#1413, 2026-10-13): Pedro explicitly permits realistic
 # hypothetical possession and named identities for the 18 legacy unresolved roots plus
 # the two shop-made trammel records. present=true / verify=false below qualify this
@@ -1254,493 +1261,412 @@ flute_len_mm = { value = 101, measured = { status = "measured", by = "placeholde
 oal_mm = { value = 151, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
 
 [tools.tap-die-set-40]
-name = "Generic 40-piece SAE carbon-steel tap-and-die kit"
+name = "Owned 40-piece tap and die set (unidentified make)"
 kind = "tap_die_set"
-by = "photo"
-# Identity/ownership: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "hypothetical visual identity, package-label and shop-shelf inspection".
-# Basis: Pedro-authorized trial ownership/identity assumption (#1413); not a real receipt, owned-tool sighting or shop measurement.
+by = "Pedro; photo label, 2025-06-28; owner ruling, 2026-11-06"
+# Basis: lid label in 20250628_224315797_iOS.heic; dies stamped JAPAN.
+# The label says 40 pieces; the enumerated contents account for 38. Do not
+# invent two accessories to reconcile the advertised count. Material, thread
+# hand, tap lead, flute counts and physical dimensions have not been verified.
 present = true
-verify = false
-note = "Trial 16 matching UNC/UNF/NPT taps and dies plus eight non-cutting accessories; not a metric kit. Tap lead is recorded, not a twist-drill point angle. Hypothetical identity and ownership only; remeasure and establish actual ownership before shop use."
-# Basis: tools.tap-die-set-40.pieces: Retained 40-piece kit count; 16 taps + 16 dies + eight handling accessories.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual count and package-label inspection"; scalar/vector/text-only schema.
+verify = true
 pieces = 40
-# Basis: tools.tap-die-set-40.standards: Generic SAE kit content estimate; not a claim about the unidentified photographed kit.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "package-label and material-marking inspection"; scalar/vector/text-only schema.
-standards = "UNC / UNF / NPT"
-# Basis: tools.tap-die-set-40.material: Generic inexpensive hand tap-and-die kit material estimate.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "package-label and material-marking inspection"; scalar/vector/text-only schema.
-material = "carbon tool steel"
-# Basis: tools.tap-die-set-40.sizes: Generic 16 thread-size assignments; each has one tap and one die.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual count and package-label inspection"; scalar/vector/text-only schema.
-sizes = ["4-40", "6-32", "8-32", "10-24", "10-32", "12-24", "1-4-20", "1-4-28", "5-16-18", "5-16-24", "3-8-16", "3-8-24", "7-16-14", "7-16-20", "1-2-13", "1-8-27NPT"]
-# Basis: tools.tap-die-set-40.included: Eight counted handling accessories; screw pair is one counted accessory unit. All hypothetical.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual count and package-label inspection"; scalar/vector/text-only schema.
-included = ["tap wrench", "T-handle tap wrench", "round-die stock", "hex-die adapter", "pitch gauge", "flat screwdriver", "die retaining screw pair", "storage case"]
+note = "Owned kit. Pedro does NOT trust its taps or dies for project work; its wrenches ARE used. The 40-piece label is retained, not a verified physical count. No cutting geometry or die-holder fit is claimed."
+sizes = ["4-36", "6-32", "8-32", "10-32", "10-24", "12-24", "1-4-20", "1-4-28", "5-16-18", "3-8-16", "7-16-20", "7-16-14", "5-16-24", "3-8-24", "1-2-20", "1-2-13"]
+included = ["one tap and one die per listed size", "1/8 pipe tap (standard and pitch unverified)", "long-handle adjustable tap wrench: holders.tap-wrench-kit-40-bar", "T-handle tap wrench: holders.tap-wrench-kit-40-t", "die handle: holders.die-handle-kit-40", "screwdriver", "screw pitch gauge"]
 
-[tools.tap-die-set-40.members."tap-4-40"]
+[tools.tap-die-set-40.members."tap-4-36"]
 kind = "tap"
-name = "4-40 right-hand hand tap"
-# Basis: tools.tap-die-set-40.members."tap-4-40".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."tap-4-40".flutes: Generic four-flute straight hand-tap estimate.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual count and package-label inspection"; scalar/vector/text-only schema.
-flutes = 4
-# Basis: tools.tap-die-set-40.members."tap-4-40".shank_mm: Generic straight tap-shank estimate with -0.005 mm h8-style fit allowance; not thread major diameter.
-shank_mm = { value = 2.8398, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, straight shank across cylindrical bearing surface" } }
-# Basis: tools.tap-die-set-40.members."tap-4-40".flute_len_mm: Generic hand-tap threaded/cutting-length estimate, no supplier dimensional claim.
-flute_len_mm = { value = 16.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, tip to end of usable flutes" } }
-# Basis: tools.tap-die-set-40.members."tap-4-40".oal_mm: Generic hand-tap overall-length estimate.
-oal_mm = { value = 50.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
-# Basis: tools.tap-die-set-40.members."tap-4-40".lead_mm: Generic four-pitch plug-tap lead estimate; NPT pitch is 27 TPI, no drill point angle.
-lead_mm = { value = 2.54, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "optical comparator, axial tap chamfer length" } }
+name = "4-36 tap (kit label)"
 
-[tools.tap-die-set-40.members."die-4-40"]
+[tools.tap-die-set-40.members."die-4-36"]
 kind = "die"
-name = "4-40 round split die"
-# Basis: tools.tap-die-set-40.members."die-4-40".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."die-4-40".body_dia_mm: Generic one-inch round-die body estimate; not the threaded-hole nominal diameter.
-body_dia_mm = { value = 25.4, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, external die body" } }
-# Basis: tools.tap-die-set-40.members."die-4-40".thickness_mm: Generic round-die body thickness estimate.
-thickness_mm = { value = 9.5, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
+name = "4-36 die (kit label)"
 
 [tools.tap-die-set-40.members."tap-6-32"]
 kind = "tap"
-name = "6-32 right-hand hand tap"
-# Basis: tools.tap-die-set-40.members."tap-6-32".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."tap-6-32".flutes: Generic four-flute straight hand-tap estimate.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual count and package-label inspection"; scalar/vector/text-only schema.
-flutes = 4
-# Basis: tools.tap-die-set-40.members."tap-6-32".shank_mm: Generic straight tap-shank estimate with -0.005 mm h8-style fit allowance; not thread major diameter.
-shank_mm = { value = 3.5002, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, straight shank across cylindrical bearing surface" } }
-# Basis: tools.tap-die-set-40.members."tap-6-32".flute_len_mm: Generic hand-tap threaded/cutting-length estimate, no supplier dimensional claim.
-flute_len_mm = { value = 16.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, tip to end of usable flutes" } }
-# Basis: tools.tap-die-set-40.members."tap-6-32".oal_mm: Generic hand-tap overall-length estimate.
-oal_mm = { value = 50.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
-# Basis: tools.tap-die-set-40.members."tap-6-32".lead_mm: Generic four-pitch plug-tap lead estimate; NPT pitch is 27 TPI, no drill point angle.
-lead_mm = { value = 3.175, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "optical comparator, axial tap chamfer length" } }
+name = "6-32 tap (kit label)"
 
 [tools.tap-die-set-40.members."die-6-32"]
 kind = "die"
-name = "6-32 round split die"
-# Basis: tools.tap-die-set-40.members."die-6-32".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."die-6-32".body_dia_mm: Generic one-inch round-die body estimate; not the threaded-hole nominal diameter.
-body_dia_mm = { value = 25.4, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, external die body" } }
-# Basis: tools.tap-die-set-40.members."die-6-32".thickness_mm: Generic round-die body thickness estimate.
-thickness_mm = { value = 9.5, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
+name = "6-32 die (kit label)"
 
 [tools.tap-die-set-40.members."tap-8-32"]
 kind = "tap"
-name = "8-32 right-hand hand tap"
-# Basis: tools.tap-die-set-40.members."tap-8-32".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."tap-8-32".flutes: Generic four-flute straight hand-tap estimate.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual count and package-label inspection"; scalar/vector/text-only schema.
-flutes = 4
-# Basis: tools.tap-die-set-40.members."tap-8-32".shank_mm: Generic straight tap-shank estimate with -0.005 mm h8-style fit allowance; not thread major diameter.
-shank_mm = { value = 4.1606, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, straight shank across cylindrical bearing surface" } }
-# Basis: tools.tap-die-set-40.members."tap-8-32".flute_len_mm: Generic hand-tap threaded/cutting-length estimate, no supplier dimensional claim.
-flute_len_mm = { value = 16.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, tip to end of usable flutes" } }
-# Basis: tools.tap-die-set-40.members."tap-8-32".oal_mm: Generic hand-tap overall-length estimate.
-oal_mm = { value = 50.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
-# Basis: tools.tap-die-set-40.members."tap-8-32".lead_mm: Generic four-pitch plug-tap lead estimate; NPT pitch is 27 TPI, no drill point angle.
-lead_mm = { value = 3.175, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "optical comparator, axial tap chamfer length" } }
+name = "8-32 tap (kit label)"
 
 [tools.tap-die-set-40.members."die-8-32"]
 kind = "die"
-name = "8-32 round split die"
-# Basis: tools.tap-die-set-40.members."die-8-32".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."die-8-32".body_dia_mm: Generic one-inch round-die body estimate; not the threaded-hole nominal diameter.
-body_dia_mm = { value = 25.4, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, external die body" } }
-# Basis: tools.tap-die-set-40.members."die-8-32".thickness_mm: Generic round-die body thickness estimate.
-thickness_mm = { value = 9.5, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
-
-[tools.tap-die-set-40.members."tap-10-24"]
-kind = "tap"
-name = "10-24 right-hand hand tap"
-# Basis: tools.tap-die-set-40.members."tap-10-24".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."tap-10-24".flutes: Generic four-flute straight hand-tap estimate.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual count and package-label inspection"; scalar/vector/text-only schema.
-flutes = 4
-# Basis: tools.tap-die-set-40.members."tap-10-24".shank_mm: Generic straight tap-shank estimate with -0.005 mm h8-style fit allowance; not thread major diameter.
-shank_mm = { value = 4.821, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, straight shank across cylindrical bearing surface" } }
-# Basis: tools.tap-die-set-40.members."tap-10-24".flute_len_mm: Generic hand-tap threaded/cutting-length estimate, no supplier dimensional claim.
-flute_len_mm = { value = 16.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, tip to end of usable flutes" } }
-# Basis: tools.tap-die-set-40.members."tap-10-24".oal_mm: Generic hand-tap overall-length estimate.
-oal_mm = { value = 50.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
-# Basis: tools.tap-die-set-40.members."tap-10-24".lead_mm: Generic four-pitch plug-tap lead estimate; NPT pitch is 27 TPI, no drill point angle.
-lead_mm = { value = 4.2333, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "optical comparator, axial tap chamfer length" } }
-
-[tools.tap-die-set-40.members."die-10-24"]
-kind = "die"
-name = "10-24 round split die"
-# Basis: tools.tap-die-set-40.members."die-10-24".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."die-10-24".body_dia_mm: Generic one-inch round-die body estimate; not the threaded-hole nominal diameter.
-body_dia_mm = { value = 25.4, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, external die body" } }
-# Basis: tools.tap-die-set-40.members."die-10-24".thickness_mm: Generic round-die body thickness estimate.
-thickness_mm = { value = 9.5, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
+name = "8-32 die (kit label)"
 
 [tools.tap-die-set-40.members."tap-10-32"]
 kind = "tap"
-name = "10-32 right-hand hand tap"
-# Basis: tools.tap-die-set-40.members."tap-10-32".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."tap-10-32".flutes: Generic four-flute straight hand-tap estimate.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual count and package-label inspection"; scalar/vector/text-only schema.
-flutes = 4
-# Basis: tools.tap-die-set-40.members."tap-10-32".shank_mm: Generic straight tap-shank estimate with -0.005 mm h8-style fit allowance; not thread major diameter.
-shank_mm = { value = 4.821, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, straight shank across cylindrical bearing surface" } }
-# Basis: tools.tap-die-set-40.members."tap-10-32".flute_len_mm: Generic hand-tap threaded/cutting-length estimate, no supplier dimensional claim.
-flute_len_mm = { value = 16.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, tip to end of usable flutes" } }
-# Basis: tools.tap-die-set-40.members."tap-10-32".oal_mm: Generic hand-tap overall-length estimate.
-oal_mm = { value = 50.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
-# Basis: tools.tap-die-set-40.members."tap-10-32".lead_mm: Generic four-pitch plug-tap lead estimate; NPT pitch is 27 TPI, no drill point angle.
-lead_mm = { value = 3.175, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "optical comparator, axial tap chamfer length" } }
+name = "10-32 tap (kit label)"
 
 [tools.tap-die-set-40.members."die-10-32"]
 kind = "die"
-name = "10-32 round split die"
-# Basis: tools.tap-die-set-40.members."die-10-32".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."die-10-32".body_dia_mm: Generic one-inch round-die body estimate; not the threaded-hole nominal diameter.
-body_dia_mm = { value = 25.4, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, external die body" } }
-# Basis: tools.tap-die-set-40.members."die-10-32".thickness_mm: Generic round-die body thickness estimate.
-thickness_mm = { value = 9.5, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
+name = "10-32 die (kit label)"
+
+[tools.tap-die-set-40.members."tap-10-24"]
+kind = "tap"
+name = "10-24 tap (kit label)"
+
+[tools.tap-die-set-40.members."die-10-24"]
+kind = "die"
+name = "10-24 die (kit label)"
 
 [tools.tap-die-set-40.members."tap-12-24"]
 kind = "tap"
-name = "12-24 right-hand hand tap"
-# Basis: tools.tap-die-set-40.members."tap-12-24".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."tap-12-24".flutes: Generic four-flute straight hand-tap estimate.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual count and package-label inspection"; scalar/vector/text-only schema.
-flutes = 4
-# Basis: tools.tap-die-set-40.members."tap-12-24".shank_mm: Generic straight tap-shank estimate with -0.005 mm h8-style fit allowance; not thread major diameter.
-shank_mm = { value = 5.4814, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, straight shank across cylindrical bearing surface" } }
-# Basis: tools.tap-die-set-40.members."tap-12-24".flute_len_mm: Generic hand-tap threaded/cutting-length estimate, no supplier dimensional claim.
-flute_len_mm = { value = 16.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, tip to end of usable flutes" } }
-# Basis: tools.tap-die-set-40.members."tap-12-24".oal_mm: Generic hand-tap overall-length estimate.
-oal_mm = { value = 50.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
-# Basis: tools.tap-die-set-40.members."tap-12-24".lead_mm: Generic four-pitch plug-tap lead estimate; NPT pitch is 27 TPI, no drill point angle.
-lead_mm = { value = 4.2333, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "optical comparator, axial tap chamfer length" } }
+name = "12-24 tap (kit label)"
 
 [tools.tap-die-set-40.members."die-12-24"]
 kind = "die"
-name = "12-24 round split die"
-# Basis: tools.tap-die-set-40.members."die-12-24".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."die-12-24".body_dia_mm: Generic one-inch round-die body estimate; not the threaded-hole nominal diameter.
-body_dia_mm = { value = 25.4, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, external die body" } }
-# Basis: tools.tap-die-set-40.members."die-12-24".thickness_mm: Generic round-die body thickness estimate.
-thickness_mm = { value = 9.5, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
+name = "12-24 die (kit label)"
 
 [tools.tap-die-set-40.members."tap-1-4-20"]
 kind = "tap"
-name = "1-4-20 right-hand hand tap"
-# Basis: tools.tap-die-set-40.members."tap-1-4-20".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."tap-1-4-20".flutes: Generic four-flute straight hand-tap estimate.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual count and package-label inspection"; scalar/vector/text-only schema.
-flutes = 4
-# Basis: tools.tap-die-set-40.members."tap-1-4-20".shank_mm: Generic straight tap-shank estimate with -0.005 mm h8-style fit allowance; not thread major diameter.
-shank_mm = { value = 6.345, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, straight shank across cylindrical bearing surface" } }
-# Basis: tools.tap-die-set-40.members."tap-1-4-20".flute_len_mm: Generic hand-tap threaded/cutting-length estimate, no supplier dimensional claim.
-flute_len_mm = { value = 22.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, tip to end of usable flutes" } }
-# Basis: tools.tap-die-set-40.members."tap-1-4-20".oal_mm: Generic hand-tap overall-length estimate.
-oal_mm = { value = 63.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
-# Basis: tools.tap-die-set-40.members."tap-1-4-20".lead_mm: Generic four-pitch plug-tap lead estimate; NPT pitch is 27 TPI, no drill point angle.
-lead_mm = { value = 5.08, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "optical comparator, axial tap chamfer length" } }
+name = "1-4-20 tap (kit label)"
 
 [tools.tap-die-set-40.members."die-1-4-20"]
 kind = "die"
-name = "1-4-20 round split die"
-# Basis: tools.tap-die-set-40.members."die-1-4-20".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."die-1-4-20".body_dia_mm: Generic one-inch round-die body estimate; not the threaded-hole nominal diameter.
-body_dia_mm = { value = 25.4, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, external die body" } }
-# Basis: tools.tap-die-set-40.members."die-1-4-20".thickness_mm: Generic round-die body thickness estimate.
-thickness_mm = { value = 9.5, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
+name = "1-4-20 die (kit label)"
 
 [tools.tap-die-set-40.members."tap-1-4-28"]
 kind = "tap"
-name = "1-4-28 right-hand hand tap"
-# Basis: tools.tap-die-set-40.members."tap-1-4-28".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."tap-1-4-28".flutes: Generic four-flute straight hand-tap estimate.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual count and package-label inspection"; scalar/vector/text-only schema.
-flutes = 4
-# Basis: tools.tap-die-set-40.members."tap-1-4-28".shank_mm: Generic straight tap-shank estimate with -0.005 mm h8-style fit allowance; not thread major diameter.
-shank_mm = { value = 6.345, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, straight shank across cylindrical bearing surface" } }
-# Basis: tools.tap-die-set-40.members."tap-1-4-28".flute_len_mm: Generic hand-tap threaded/cutting-length estimate, no supplier dimensional claim.
-flute_len_mm = { value = 22.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, tip to end of usable flutes" } }
-# Basis: tools.tap-die-set-40.members."tap-1-4-28".oal_mm: Generic hand-tap overall-length estimate.
-oal_mm = { value = 63.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
-# Basis: tools.tap-die-set-40.members."tap-1-4-28".lead_mm: Generic four-pitch plug-tap lead estimate; NPT pitch is 27 TPI, no drill point angle.
-lead_mm = { value = 3.6286, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "optical comparator, axial tap chamfer length" } }
+name = "1-4-28 tap (kit label)"
 
 [tools.tap-die-set-40.members."die-1-4-28"]
 kind = "die"
-name = "1-4-28 round split die"
-# Basis: tools.tap-die-set-40.members."die-1-4-28".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."die-1-4-28".body_dia_mm: Generic one-inch round-die body estimate; not the threaded-hole nominal diameter.
-body_dia_mm = { value = 25.4, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, external die body" } }
-# Basis: tools.tap-die-set-40.members."die-1-4-28".thickness_mm: Generic round-die body thickness estimate.
-thickness_mm = { value = 9.5, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
+name = "1-4-28 die (kit label)"
 
 [tools.tap-die-set-40.members."tap-5-16-18"]
 kind = "tap"
-name = "5-16-18 right-hand hand tap"
-# Basis: tools.tap-die-set-40.members."tap-5-16-18".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."tap-5-16-18".flutes: Generic four-flute straight hand-tap estimate.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual count and package-label inspection"; scalar/vector/text-only schema.
-flutes = 4
-# Basis: tools.tap-die-set-40.members."tap-5-16-18".shank_mm: Generic straight tap-shank estimate with -0.005 mm h8-style fit allowance; not thread major diameter.
-shank_mm = { value = 7.9325, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, straight shank across cylindrical bearing surface" } }
-# Basis: tools.tap-die-set-40.members."tap-5-16-18".flute_len_mm: Generic hand-tap threaded/cutting-length estimate, no supplier dimensional claim.
-flute_len_mm = { value = 22.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, tip to end of usable flutes" } }
-# Basis: tools.tap-die-set-40.members."tap-5-16-18".oal_mm: Generic hand-tap overall-length estimate.
-oal_mm = { value = 63.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
-# Basis: tools.tap-die-set-40.members."tap-5-16-18".lead_mm: Generic four-pitch plug-tap lead estimate; NPT pitch is 27 TPI, no drill point angle.
-lead_mm = { value = 5.6444, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "optical comparator, axial tap chamfer length" } }
+name = "5-16-18 tap (kit label)"
 
 [tools.tap-die-set-40.members."die-5-16-18"]
 kind = "die"
-name = "5-16-18 round split die"
-# Basis: tools.tap-die-set-40.members."die-5-16-18".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."die-5-16-18".body_dia_mm: Generic one-inch round-die body estimate; not the threaded-hole nominal diameter.
-body_dia_mm = { value = 25.4, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, external die body" } }
-# Basis: tools.tap-die-set-40.members."die-5-16-18".thickness_mm: Generic round-die body thickness estimate.
-thickness_mm = { value = 9.5, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
-
-[tools.tap-die-set-40.members."tap-5-16-24"]
-kind = "tap"
-name = "5-16-24 right-hand hand tap"
-# Basis: tools.tap-die-set-40.members."tap-5-16-24".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."tap-5-16-24".flutes: Generic four-flute straight hand-tap estimate.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual count and package-label inspection"; scalar/vector/text-only schema.
-flutes = 4
-# Basis: tools.tap-die-set-40.members."tap-5-16-24".shank_mm: Generic straight tap-shank estimate with -0.005 mm h8-style fit allowance; not thread major diameter.
-shank_mm = { value = 7.9325, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, straight shank across cylindrical bearing surface" } }
-# Basis: tools.tap-die-set-40.members."tap-5-16-24".flute_len_mm: Generic hand-tap threaded/cutting-length estimate, no supplier dimensional claim.
-flute_len_mm = { value = 22.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, tip to end of usable flutes" } }
-# Basis: tools.tap-die-set-40.members."tap-5-16-24".oal_mm: Generic hand-tap overall-length estimate.
-oal_mm = { value = 63.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
-# Basis: tools.tap-die-set-40.members."tap-5-16-24".lead_mm: Generic four-pitch plug-tap lead estimate; NPT pitch is 27 TPI, no drill point angle.
-lead_mm = { value = 4.2333, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "optical comparator, axial tap chamfer length" } }
-
-[tools.tap-die-set-40.members."die-5-16-24"]
-kind = "die"
-name = "5-16-24 round split die"
-# Basis: tools.tap-die-set-40.members."die-5-16-24".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."die-5-16-24".body_dia_mm: Generic one-inch round-die body estimate; not the threaded-hole nominal diameter.
-body_dia_mm = { value = 25.4, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, external die body" } }
-# Basis: tools.tap-die-set-40.members."die-5-16-24".thickness_mm: Generic round-die body thickness estimate.
-thickness_mm = { value = 9.5, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
+name = "5-16-18 die (kit label)"
 
 [tools.tap-die-set-40.members."tap-3-8-16"]
 kind = "tap"
-name = "3-8-16 right-hand hand tap"
-# Basis: tools.tap-die-set-40.members."tap-3-8-16".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."tap-3-8-16".flutes: Generic four-flute straight hand-tap estimate.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual count and package-label inspection"; scalar/vector/text-only schema.
-flutes = 4
-# Basis: tools.tap-die-set-40.members."tap-3-8-16".shank_mm: Generic straight tap-shank estimate with -0.005 mm h8-style fit allowance; not thread major diameter.
-shank_mm = { value = 9.495, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, straight shank across cylindrical bearing surface" } }
-# Basis: tools.tap-die-set-40.members."tap-3-8-16".flute_len_mm: Generic hand-tap threaded/cutting-length estimate, no supplier dimensional claim.
-flute_len_mm = { value = 22.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, tip to end of usable flutes" } }
-# Basis: tools.tap-die-set-40.members."tap-3-8-16".oal_mm: Generic hand-tap overall-length estimate.
-oal_mm = { value = 63.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
-# Basis: tools.tap-die-set-40.members."tap-3-8-16".lead_mm: Generic four-pitch plug-tap lead estimate; NPT pitch is 27 TPI, no drill point angle.
-lead_mm = { value = 6.35, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "optical comparator, axial tap chamfer length" } }
+name = "3-8-16 tap (kit label)"
 
 [tools.tap-die-set-40.members."die-3-8-16"]
 kind = "die"
-name = "3-8-16 round split die"
-# Basis: tools.tap-die-set-40.members."die-3-8-16".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."die-3-8-16".body_dia_mm: Generic one-inch round-die body estimate; not the threaded-hole nominal diameter.
-body_dia_mm = { value = 25.4, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, external die body" } }
-# Basis: tools.tap-die-set-40.members."die-3-8-16".thickness_mm: Generic round-die body thickness estimate.
-thickness_mm = { value = 9.5, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
-
-[tools.tap-die-set-40.members."tap-3-8-24"]
-kind = "tap"
-name = "3-8-24 right-hand hand tap"
-# Basis: tools.tap-die-set-40.members."tap-3-8-24".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."tap-3-8-24".flutes: Generic four-flute straight hand-tap estimate.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual count and package-label inspection"; scalar/vector/text-only schema.
-flutes = 4
-# Basis: tools.tap-die-set-40.members."tap-3-8-24".shank_mm: Generic straight tap-shank estimate with -0.005 mm h8-style fit allowance; not thread major diameter.
-shank_mm = { value = 9.495, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, straight shank across cylindrical bearing surface" } }
-# Basis: tools.tap-die-set-40.members."tap-3-8-24".flute_len_mm: Generic hand-tap threaded/cutting-length estimate, no supplier dimensional claim.
-flute_len_mm = { value = 22.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, tip to end of usable flutes" } }
-# Basis: tools.tap-die-set-40.members."tap-3-8-24".oal_mm: Generic hand-tap overall-length estimate.
-oal_mm = { value = 63.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
-# Basis: tools.tap-die-set-40.members."tap-3-8-24".lead_mm: Generic four-pitch plug-tap lead estimate; NPT pitch is 27 TPI, no drill point angle.
-lead_mm = { value = 4.2333, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "optical comparator, axial tap chamfer length" } }
-
-[tools.tap-die-set-40.members."die-3-8-24"]
-kind = "die"
-name = "3-8-24 round split die"
-# Basis: tools.tap-die-set-40.members."die-3-8-24".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."die-3-8-24".body_dia_mm: Generic one-inch round-die body estimate; not the threaded-hole nominal diameter.
-body_dia_mm = { value = 25.4, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, external die body" } }
-# Basis: tools.tap-die-set-40.members."die-3-8-24".thickness_mm: Generic round-die body thickness estimate.
-thickness_mm = { value = 9.5, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
-
-[tools.tap-die-set-40.members."tap-7-16-14"]
-kind = "tap"
-name = "7-16-14 right-hand hand tap"
-# Basis: tools.tap-die-set-40.members."tap-7-16-14".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."tap-7-16-14".flutes: Generic four-flute straight hand-tap estimate.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual count and package-label inspection"; scalar/vector/text-only schema.
-flutes = 4
-# Basis: tools.tap-die-set-40.members."tap-7-16-14".shank_mm: Generic straight tap-shank estimate with -0.005 mm h8-style fit allowance; not thread major diameter.
-shank_mm = { value = 9.495, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, straight shank across cylindrical bearing surface" } }
-# Basis: tools.tap-die-set-40.members."tap-7-16-14".flute_len_mm: Generic hand-tap threaded/cutting-length estimate, no supplier dimensional claim.
-flute_len_mm = { value = 28.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, tip to end of usable flutes" } }
-# Basis: tools.tap-die-set-40.members."tap-7-16-14".oal_mm: Generic hand-tap overall-length estimate.
-oal_mm = { value = 75.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
-# Basis: tools.tap-die-set-40.members."tap-7-16-14".lead_mm: Generic four-pitch plug-tap lead estimate; NPT pitch is 27 TPI, no drill point angle.
-lead_mm = { value = 7.2571, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "optical comparator, axial tap chamfer length" } }
-
-[tools.tap-die-set-40.members."die-7-16-14"]
-kind = "die"
-name = "7-16-14 round split die"
-# Basis: tools.tap-die-set-40.members."die-7-16-14".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."die-7-16-14".body_dia_mm: Generic one-inch round-die body estimate; not the threaded-hole nominal diameter.
-body_dia_mm = { value = 25.4, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, external die body" } }
-# Basis: tools.tap-die-set-40.members."die-7-16-14".thickness_mm: Generic round-die body thickness estimate.
-thickness_mm = { value = 9.5, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
+name = "3-8-16 die (kit label)"
 
 [tools.tap-die-set-40.members."tap-7-16-20"]
 kind = "tap"
-name = "7-16-20 right-hand hand tap"
-# Basis: tools.tap-die-set-40.members."tap-7-16-20".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."tap-7-16-20".flutes: Generic four-flute straight hand-tap estimate.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual count and package-label inspection"; scalar/vector/text-only schema.
-flutes = 4
-# Basis: tools.tap-die-set-40.members."tap-7-16-20".shank_mm: Generic straight tap-shank estimate with -0.005 mm h8-style fit allowance; not thread major diameter.
-shank_mm = { value = 9.495, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, straight shank across cylindrical bearing surface" } }
-# Basis: tools.tap-die-set-40.members."tap-7-16-20".flute_len_mm: Generic hand-tap threaded/cutting-length estimate, no supplier dimensional claim.
-flute_len_mm = { value = 28.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, tip to end of usable flutes" } }
-# Basis: tools.tap-die-set-40.members."tap-7-16-20".oal_mm: Generic hand-tap overall-length estimate.
-oal_mm = { value = 75.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
-# Basis: tools.tap-die-set-40.members."tap-7-16-20".lead_mm: Generic four-pitch plug-tap lead estimate; NPT pitch is 27 TPI, no drill point angle.
-lead_mm = { value = 5.08, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "optical comparator, axial tap chamfer length" } }
+name = "7-16-20 tap (kit label)"
 
 [tools.tap-die-set-40.members."die-7-16-20"]
 kind = "die"
-name = "7-16-20 round split die"
-# Basis: tools.tap-die-set-40.members."die-7-16-20".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."die-7-16-20".body_dia_mm: Generic one-inch round-die body estimate; not the threaded-hole nominal diameter.
-body_dia_mm = { value = 25.4, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, external die body" } }
-# Basis: tools.tap-die-set-40.members."die-7-16-20".thickness_mm: Generic round-die body thickness estimate.
-thickness_mm = { value = 9.5, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
+name = "7-16-20 die (kit label)"
+
+[tools.tap-die-set-40.members."tap-7-16-14"]
+kind = "tap"
+name = "7-16-14 tap (kit label)"
+
+[tools.tap-die-set-40.members."die-7-16-14"]
+kind = "die"
+name = "7-16-14 die (kit label)"
+
+[tools.tap-die-set-40.members."tap-5-16-24"]
+kind = "tap"
+name = "5-16-24 tap (kit label)"
+
+[tools.tap-die-set-40.members."die-5-16-24"]
+kind = "die"
+name = "5-16-24 die (kit label)"
+
+[tools.tap-die-set-40.members."tap-3-8-24"]
+kind = "tap"
+name = "3-8-24 tap (kit label)"
+
+[tools.tap-die-set-40.members."die-3-8-24"]
+kind = "die"
+name = "3-8-24 die (kit label)"
+
+[tools.tap-die-set-40.members."tap-1-2-20"]
+kind = "tap"
+name = "1-2-20 tap (kit label)"
+
+[tools.tap-die-set-40.members."die-1-2-20"]
+kind = "die"
+name = "1-2-20 die (kit label)"
 
 [tools.tap-die-set-40.members."tap-1-2-13"]
 kind = "tap"
-name = "1-2-13 right-hand hand tap"
-# Basis: tools.tap-die-set-40.members."tap-1-2-13".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."tap-1-2-13".flutes: Generic four-flute straight hand-tap estimate.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual count and package-label inspection"; scalar/vector/text-only schema.
-flutes = 4
-# Basis: tools.tap-die-set-40.members."tap-1-2-13".shank_mm: Generic straight tap-shank estimate with -0.005 mm h8-style fit allowance; not thread major diameter.
-shank_mm = { value = 9.495, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, straight shank across cylindrical bearing surface" } }
-# Basis: tools.tap-die-set-40.members."tap-1-2-13".flute_len_mm: Generic hand-tap threaded/cutting-length estimate, no supplier dimensional claim.
-flute_len_mm = { value = 28.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, tip to end of usable flutes" } }
-# Basis: tools.tap-die-set-40.members."tap-1-2-13".oal_mm: Generic hand-tap overall-length estimate.
-oal_mm = { value = 75.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
-# Basis: tools.tap-die-set-40.members."tap-1-2-13".lead_mm: Generic four-pitch plug-tap lead estimate; NPT pitch is 27 TPI, no drill point angle.
-lead_mm = { value = 7.8154, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "optical comparator, axial tap chamfer length" } }
+name = "1-2-13 tap (kit label)"
 
 [tools.tap-die-set-40.members."die-1-2-13"]
 kind = "die"
-name = "1-2-13 round split die"
-# Basis: tools.tap-die-set-40.members."die-1-2-13".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."die-1-2-13".body_dia_mm: Generic one-inch round-die body estimate; not the threaded-hole nominal diameter.
-body_dia_mm = { value = 25.4, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, external die body" } }
-# Basis: tools.tap-die-set-40.members."die-1-2-13".thickness_mm: Generic round-die body thickness estimate.
-thickness_mm = { value = 9.5, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
+name = "1-2-13 die (kit label)"
 
-[tools.tap-die-set-40.members."tap-1-8-27NPT"]
+[tools.tap-die-set-40.members."tap-1-8-pipe"]
 kind = "tap"
-name = "1-8-27NPT right-hand hand tap"
-# Basis: tools.tap-die-set-40.members."tap-1-8-27NPT".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."tap-1-8-27NPT".flutes: Generic four-flute straight hand-tap estimate.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual count and package-label inspection"; scalar/vector/text-only schema.
-flutes = 4
-# Basis: tools.tap-die-set-40.members."tap-1-8-27NPT".shank_mm: Generic straight tap-shank estimate with -0.005 mm h8-style fit allowance; not thread major diameter.
-shank_mm = { value = 9.495, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, straight shank across cylindrical bearing surface" } }
-# Basis: tools.tap-die-set-40.members."tap-1-8-27NPT".flute_len_mm: Generic hand-tap threaded/cutting-length estimate, no supplier dimensional claim.
-flute_len_mm = { value = 28.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, tip to end of usable flutes" } }
-# Basis: tools.tap-die-set-40.members."tap-1-8-27NPT".oal_mm: Generic hand-tap overall-length estimate.
-oal_mm = { value = 75.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
-# Basis: tools.tap-die-set-40.members."tap-1-8-27NPT".lead_mm: Generic four-pitch plug-tap lead estimate; NPT pitch is 27 TPI, no drill point angle.
-lead_mm = { value = 3.763, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "optical comparator, axial tap chamfer length" } }
+name = "1/8 pipe tap (kit label; standard and pitch unverified)"
 
-[tools.tap-die-set-40.members."die-1-8-27NPT"]
+# Purchased by Pedro on 2026-11-06, Zoro order WB7365521946.
+# Free shipping; merchandise subtotal USD 417.33. Every line is owned by
+# purchase but ordered, not yet received: present=false and verify=true.
+# Basis: owner-provided paid order; catalogue identities, not shop metrology.
+# No coating is asserted. Receipt must verify identity, quantity and fit before
+# use. Unpublished dimensions stay unknown, not #1413 trial measurements.
+
+[tools.tap-osg-1000100]
+name = "#0-80 UNF plug hand tap"
+kind = "tap"
+make = "OSG"
+sku = "1000100"
+source = "https://www.zoro.com/i/G9665914/"
+purchase = "Zoro order WB7365521946; purchased 2026-11-06; quantity 2; USD 14.39 each; ordered, not yet received"
+present = false
+verify = true
+pieces = 2
+material = "HSS"
+note = "plug, 2 flute? (verify on receipt). Flute count unverified; order describes 2 flutes provisionally. Straight flute, square drive hand tap."
+
+[tools.tap-osg-1010700]
+name = "#1-72 UNF plug hand tap"
+kind = "tap"
+make = "OSG"
+sku = "1010700"
+source = "https://www.zoro.com/i/G9665652/"
+purchase = "Zoro order WB7365521946; purchased 2026-11-06; quantity 2; USD 13.19 each; ordered, not yet received"
+present = false
+verify = true
+pieces = 2
+material = "HSS"
+note = "plug. Straight flute, square drive hand tap."
+
+[tools.tap-osg-1011008]
+name = "#2-56 UNC plug hand tap"
+kind = "tap"
+make = "OSG"
+sku = "1011008"
+source = "https://www.zoro.com/i/G9665616/"
+purchase = "Zoro order WB7365521946; purchased 2026-11-06; quantity 2; USD 14.29 each; ordered, not yet received"
+present = false
+verify = true
+pieces = 2
+material = "HSS"
+note = "plug. Straight flute, square drive hand tap."
+
+[tools.tap-osg-1011108]
+name = "#2-56 UNC bottoming hand tap"
+kind = "tap"
+make = "OSG"
+sku = "1011108"
+source = "https://www.zoro.com/i/G9665591/"
+purchase = "Zoro order WB7365521946; purchased 2026-11-06; quantity 2; USD 13.49 each; ordered, not yet received"
+present = false
+verify = true
+pieces = 2
+material = "HSS"
+note = "bottoming. Straight flute, square drive hand tap."
+
+[tools.tap-osg-1012200]
+name = "#4-40 UNC plug hand tap"
+kind = "tap"
+make = "OSG"
+sku = "1012200"
+source = "https://www.zoro.com/i/G9173875/"
+purchase = "Zoro order WB7365521946; purchased 2026-11-06; quantity 5; USD 10.69 each; ordered, not yet received"
+present = false
+verify = true
+pieces = 5
+material = "HSS"
+note = "plug. Straight flute, square drive hand tap."
+
+[tools.tap-osg-1023700]
+name = "#6-32 UNC plug hand tap"
+kind = "tap"
+make = "OSG"
+sku = "1023700"
+source = "https://www.zoro.com/i/G7511786/"
+purchase = "Zoro order WB7365521946; purchased 2026-11-06; quantity 3; USD 8.99 each; ordered, not yet received"
+present = false
+verify = true
+pieces = 3
+material = "HSS"
+note = "plug, 3 flutes. Straight flute, square drive hand tap."
+
+[tools.tap-osg-1024300]
+name = "#8-32 UNC plug hand tap"
+kind = "tap"
+make = "OSG"
+sku = "1024300"
+source = "https://www.zoro.com/i/G7562843/"
+purchase = "Zoro order WB7365521946; purchased 2026-11-06; quantity 4; USD 6.99 each; ordered, not yet received"
+present = false
+verify = true
+pieces = 4
+material = "HSS"
+note = "plug. Straight flute, square drive hand tap."
+
+[tools.tap-osg-1024400]
+name = "#8-32 UNC bottoming hand tap"
+kind = "tap"
+make = "OSG"
+sku = "1024400"
+source = "https://www.zoro.com/i/G7530616/"
+purchase = "Zoro order WB7365521946; purchased 2026-11-06; quantity 1; USD 6.19 each; ordered, not yet received"
+present = false
+verify = true
+pieces = 1
+material = "HSS"
+note = "bottoming. Straight flute, square drive hand tap."
+
+[tools.tap-osg-1024901]
+name = "#10-24 UNC plug hand tap"
+kind = "tap"
+make = "OSG"
+sku = "1024901"
+source = "https://www.zoro.com/i/G7514683/"
+purchase = "Zoro order WB7365521946; purchased 2026-11-06; quantity 1; USD 7.69 each; ordered, not yet received"
+present = false
+verify = true
+pieces = 1
+material = "HSS"
+note = "plug. Coating unverified on receipt. Straight flute, square drive hand tap."
+
+[tools.tap-osg-1025000]
+name = "#10-24 UNC bottoming hand tap"
+kind = "tap"
+make = "OSG"
+sku = "1025000"
+source = "https://www.zoro.com/i/G7555536/"
+purchase = "Zoro order WB7365521946; purchased 2026-11-06; quantity 1; USD 8.69 each; ordered, not yet received"
+present = false
+verify = true
+pieces = 1
+material = "HSS"
+note = "bottoming. Straight flute, square drive hand tap."
+
+[tools.tap-osg-1025200]
+name = "#10-32 UNF plug hand tap"
+kind = "tap"
+make = "OSG"
+sku = "1025200"
+source = "https://www.zoro.com/i/G7618432/"
+purchase = "Zoro order WB7365521946; purchased 2026-11-06; quantity 1; USD 8.59 each; ordered, not yet received"
+present = false
+verify = true
+pieces = 1
+material = "HSS"
+note = "plug. Straight flute, square drive hand tap."
+
+[tools.tap-osg-1025308]
+name = "#10-32 UNF bottoming hand tap"
+kind = "tap"
+make = "OSG"
+sku = "1025308"
+source = "https://www.zoro.com/i/G2771119/"
+purchase = "Zoro order WB7365521946; purchased 2026-11-06; quantity 1; USD 10.59 each; ordered, not yet received"
+present = false
+verify = true
+pieces = 1
+material = "HSS"
+note = "bottoming. Coating unverified on receipt. Straight flute, square drive hand tap."
+
+[tools.tap-regal-cutting-tools-015326as]
+name = "#10-32 UNF bottoming PULLEY tap hand tap"
+kind = "tap"
+make = "Regal Cutting Tools"
+sku = "015326AS"
+source = "https://www.zoro.com/i/G8337420/"
+purchase = "Zoro order WB7365521946; purchased 2026-11-06; quantity 2; USD 41.79 each; ordered, not yet received"
+present = false
+verify = true
+pieces = 2
+material = "HSS"
+note = "bottoming PULLEY tap, 6 in OAL, 4 flutes, ~.19 shank. Approximate 0.19 in shank is not measured; reduced-shank access must be checked before use. Straight flute, square drive hand tap."
+# Basis: paid-order catalogue nominal 6 in OAL, offset zero; not measured.
+oal_in = { value = 6, measured = { status = "assumed", by = "Pedro order WB7365521946 (catalogue nominal, verify on receipt)", date = "2026-11-06", instrument = "order description; no physical measurement" } }
+flutes = 4
+
+[tools.tap-regal-008320as]
+name = "1/4-20 UNC plug hand tap"
+kind = "tap"
+make = "Regal"
+sku = "008320AS"
+source = "https://www.zoro.com/i/G7437939/"
+purchase = "Zoro order WB7365521946; purchased 2026-11-06; quantity 2; USD 7.45 each; ordered, not yet received"
+present = false
+verify = true
+pieces = 2
+material = "HSS"
+note = "plug. Straight flute, square drive hand tap."
+
+[tools.tap-osg-1120408]
+name = "1/4-28 UNF plug hand tap"
+kind = "tap"
+make = "OSG"
+sku = "1120408"
+source = "https://www.zoro.com/i/G1960990/"
+purchase = "Zoro order WB7365521946; purchased 2026-11-06; quantity 1; USD 11.79 each; ordered, not yet received"
+present = false
+verify = true
+pieces = 1
+material = "HSS"
+note = "plug. Coating unverified on receipt. Straight flute, square drive hand tap."
+
+[tools.tap-osg-1120500]
+name = "1/4-28 UNF bottoming hand tap"
+kind = "tap"
+make = "OSG"
+sku = "1120500"
+source = "https://www.zoro.com/i/G7559736/"
+purchase = "Zoro order WB7365521946; purchased 2026-11-06; quantity 1; USD 7.89 each; ordered, not yet received"
+present = false
+verify = true
+pieces = 1
+material = "HSS"
+note = "bottoming. Straight flute, square drive hand tap."
+
+[tools.tap-osg-1120700]
+name = "5/16-18 UNC plug hand tap"
+kind = "tap"
+make = "OSG"
+sku = "1120700"
+source = "https://www.zoro.com/i/G2669703/"
+purchase = "Zoro order WB7365521946; purchased 2026-11-06; quantity 1; USD 10.49 each; ordered, not yet received"
+present = false
+verify = true
+pieces = 1
+material = "HSS"
+note = "plug. Straight flute, square drive hand tap."
+
+[tools.die-drill-america-dwth1316-080]
+name = "#0-80 UNF round adjustable split die die"
 kind = "die"
-name = "1-8-27NPT round split die"
-# Basis: tools.tap-die-set-40.members."die-1-8-27NPT".hand: Right-hand cutting/working orientation assigned for this named trial tool; not a spindle observation.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "visual cutting-edge/helix orientation inspection"; scalar/vector/text-only schema.
-hand = "right"
-# Basis: tools.tap-die-set-40.members."die-1-8-27NPT".body_dia_mm: Generic one-inch round-die body estimate; not the threaded-hole nominal diameter.
-body_dia_mm = { value = 25.4, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, external die body" } }
-# Basis: tools.tap-die-set-40.members."die-1-8-27NPT".thickness_mm: Generic round-die body thickness estimate.
-thickness_mm = { value = 9.5, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
+make = "Drill America"
+sku = "DWTH1316-080"
+source = "https://www.zoro.com/i/G1809327/"
+purchase = "Zoro order WB7365521946; purchased 2026-11-06; quantity 1; USD 8.89 each; ordered, not yet received"
+present = false
+verify = true
+pieces = 1
+material = "HSS"
+note = "round adjustable split die, 13/16 in OD, HSS. Round adjustable split die; nominal 13/16 in OD."
+# Basis: paid-order catalogue nominal 13/16 in x 25.4 = 20.6375 mm; offset zero.
+body_dia_mm = { value = 20.6375, measured = { status = "assumed", by = "Pedro order WB7365521946 (catalogue nominal, verify on receipt)", date = "2026-11-06", instrument = "order description; no physical measurement" } }
+
+[tools.die-drill-america-dwth1316-440]
+name = "#4-40 UNC round adjustable split die die"
+kind = "die"
+make = "Drill America"
+sku = "DWTH1316-440"
+source = "https://www.zoro.com/i/G1817508/"
+purchase = "Zoro order WB7365521946; purchased 2026-11-06; quantity 1; USD 9.65 each; ordered, not yet received"
+present = false
+verify = true
+pieces = 1
+material = "HSS"
+note = "round adjustable split die, 13/16 in OD, HSS. Round adjustable split die; nominal 13/16 in OD."
+# Basis: paid-order catalogue nominal 13/16 in x 25.4 = 20.6375 mm; offset zero.
+body_dia_mm = { value = 20.6375, measured = { status = "assumed", by = "Pedro order WB7365521946 (catalogue nominal, verify on receipt)", date = "2026-11-06", instrument = "order description; no physical measurement" } }
 
 [tools.taps-metric-set]
 name = "Generic 14-piece M3-M12 coarse-thread HSS tap/drill box"
@@ -3841,7 +3767,7 @@ solids = [
   { name = "base", supply = "existing", shape = "box", at_mm = [-63.5, 0.0, -92.9], size_mm = [127.0, 101.6, 12.7], fastener = "two 1/2-13 T-bolts with flange nuts through the base slots into the table T-slots", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
   # DataBracket4/7: make note. Gray cast iron (ASTM Class 30 assumed) HSS drilling 80 fpm, Machinery's Handbook 27th ed. Table 20, p.1068 -> 2044 rpm for the #25 (0.1495 in), 1487 rpm for the #5 (0.2055 in) spotting through the ledge and 770 rpm for the letter X (0.397 in); 1800, 1400 and 750 rpm are under them; the 3/8 in spot drill at 700 rpm runs 69 fpm. Feeds: p.1060 drill feeds 0.002-0.006 in/rev (1/8-1/4 in: 0.003 = 0.08 mm/rev) and 0.004-0.010 in/rev (1/4-1/2 in: 0.005 = 0.13 mm/rev); spotting 0.0016 in/rev inside 0.001-0.003 (under 1/8 in). Dry drilling and tapping: p.1147 "Cutting Fluids Recommended for Machining Operations", cast iron: drilling dry, tapping dry.
   # Basis: fixtures.angle-plate.solids.upright: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:1225 (fixtures.angle-plate.solids.upright) finished seat face (datum A); authored physical-size model {"size_mm":[127.0,12.7,76.2]} mm, offsets zero. at_mm/axis are unchanged design coordinates, not surveyed measurements; void overrun lengths remain model extents, not physical depth.
-  { name = "upright", supply = "existing", shape = "box", at_mm = [-63.5, 0.0, -80.2], size_mm = [127.0, 12.7, 76.2], locates = "finished seat face (datum A)", note = "cast iron as bought: make the four holes only, after the ledge is made. 1. Stud holes: lay the plate on the upright's front face across two 1 in parallels, one under each outer end 45-63 mm from the centreline, so every hole is over the open gap; clamp it to the PM-30MV table with two strap clamps from the clamping kit on the upright's back face over the parallels. 2. Edge-find one outer end and the upright's top edge; the centreline is 63.5 mm from that end. 3. Two letter X stud holes on the DRO at ±20.0 from the centreline, 13.5 below the top edge (print band ±0.8; hold their 40.0 pitch within ±0.1, the bridge's, so both studs pass): spot each 1.0 mm deep (a Ø3.5 cone) with the 3/8 in 120° spot drill at 700 rpm and 0.04 mm/rev, then drill letter X (0.397 in) through at 750 rpm and 0.13 mm/rev, dry, by hand on the quill. 4. Ledge taps, spotted through the ledge's holes (the spots govern the taps; ±5.0 from the centreline and 29.2 below the top edge are reference only): tilt the head 90°, spindle along table X; stand the plate base down on the table, front face toward the spindle, strapped down on its base with the clamping kit; stand a 1-2-3 block on its 1 x 3 in face (2 in high) in front of the upright, rest the made ledge on it, back face flat on the upright and centred on the centreline, and clamp it to the upright with the fixtures.bracket-ledge-clamp over the upright's top edge, the jaw tips above the ledge holes. 5. With a #5 (0.2055 in) drill in the drill chuck, spindle off, move table Y and the head until the drill enters each ledge hole freely by hand, then spot the upright 1.0 mm deep through it at 1400 rpm and 0.04 mm/rev. Unclamp the ledge and lift it and the block away. 6. At each spot drill #25 (0.1495 in) through at 1800 rpm and 0.08 mm/rev, dry, by hand on the quill, and tap it #10-24 UNC-2B through before moving the table: the tools.taps-unc-hand/10-24-plug in the drill chuck, spindle off, turned two turns by hand under light quill pressure to start it square; then release the chuck and tap through with the holders.tap-wrench-t-1-16-1-4, dry, backing off every turn. 7. Return the head to 0° and tram it with the DTI. 8. Stone the front face flat over every exit burr: it seats datum A.", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
+  { name = "upright", supply = "existing", shape = "box", at_mm = [-63.5, 0.0, -80.2], size_mm = [127.0, 12.7, 76.2], locates = "finished seat face (datum A)", note = "cast iron as bought: make the four holes only, after the ledge is made. 1. Stud holes: lay the plate on the upright's front face across two 1 in parallels, one under each outer end 45-63 mm from the centreline, so every hole is over the open gap; clamp it to the PM-30MV table with two strap clamps from the clamping kit on the upright's back face over the parallels. 2. Edge-find one outer end and the upright's top edge; the centreline is 63.5 mm from that end. 3. Two letter X stud holes on the DRO at ±20.0 from the centreline, 13.5 below the top edge (print band ±0.8; hold their 40.0 pitch within ±0.1, the bridge's, so both studs pass): spot each 1.0 mm deep (a Ø3.5 cone) with the 3/8 in 120° spot drill at 700 rpm and 0.04 mm/rev, then drill letter X (0.397 in) through at 750 rpm and 0.13 mm/rev, dry, by hand on the quill. 4. Ledge taps, spotted through the ledge's holes (the spots govern the taps; ±5.0 from the centreline and 29.2 below the top edge are reference only): tilt the head 90°, spindle along table X; stand the plate base down on the table, front face toward the spindle, strapped down on its base with the clamping kit; stand a 1-2-3 block on its 1 x 3 in face (2 in high) in front of the upright, rest the made ledge on it, back face flat on the upright and centred on the centreline, and clamp it to the upright with the fixtures.bracket-ledge-clamp over the upright's top edge, the jaw tips above the ledge holes. 5. With a #5 (0.2055 in) drill in the drill chuck, spindle off, move table Y and the head until the drill enters each ledge hole freely by hand, then spot the upright 1.0 mm deep through it at 1400 rpm and 0.04 mm/rev. Unclamp the ledge and lift it and the block away. 6. At each spot drill #25 (0.1495 in) through at 1800 rpm and 0.08 mm/rev, dry, by hand on the quill, and tap it #10-24 UNC-2B through before moving the table: the tools.taps-unc-hand/10-24-plug in the drill chuck, spindle off, turned two turns by hand under light quill pressure to start it square; then release the chuck and tap through with the holders.tap-wrench-kit-40-t, dry, backing off every turn. 7. Return the head to 0° and tram it with the DTI. 8. Stone the front face flat over every exit burr: it seats datum A.", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
   # DataBracket4/7: make note. 1018 (125-175 HB) HSS drilling 90 fpm, Machinery's Handbook 27th ed. Table 17, p.1061 -> 1673 rpm for the #5 (0.2055 in); 1500 rpm is under it. End-mill speed and feed are the S1 T1 values (examples/cutting-data.toml). Feed: p.1060 drill feed 0.002-0.006 in/rev for 1/8-1/4 in drills. The ledge sets the foot's tilt about Y (its top is the S4 foot-end rest), so its fitted top is swept parallel to the table within 0.02 over its 22.6 (0.05°, about 0.03 mm at the 33 mm crown); its sizes ride the print's one-place band because S4 touches Z on the part.
   # Basis: fixtures.angle-plate.solids.bolted foot-end ledge: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:1227 (fixtures.angle-plate.solids.bolted foot-end ledge) two #10-24 x 5/8 in SHCS into the tapped upright; authored physical-size model {"size_mm":[22.6,6.0,17.9]} mm, offsets zero. at_mm/axis are unchanged design coordinates, not surveyed measurements; void overrun lengths remain model extents, not physical depth.
   { name = "bolted foot-end ledge", shape = "box", at_mm = [-11.3, -6.0, -42.1], size_mm = [22.6, 6.0, 17.9], locates = "foot free end", fastener = "two #10-24 x 5/8 in SHCS into the tapped upright", note = "1018 cold-rolled 3/4 x 1/4 in flat bar, no heat treatment. 1. Bandsaw 26 mm off the bar. 2. Mill all six faces square in the vise with the 3/8 in 4-flute end mill at 900 rpm and 90 mm/min, at most 1 mm per pass, to 22.6 wide x 17.9 high x 6.0 thick (print band ±0.8). 3. Clamp it flat, 6 mm up, the vise jaws on its top and bottom faces, its bottom face against the fixed jaw, on two 1/8 in thick parallels against the jaws. Edge-find one end and the fixed jaw (the bottom face): the hole centres are 6.3 and 16.3 mm from that end (10.0 apart) and 8.9 above the bottom face, on the DRO (print band ±0.8; 9.0 below the top face is reference only; the upright's taps are spotted through these holes, so nothing has to match them). Spot each 1.0 mm deep with the 3/8 in 120° spot drill at 700 rpm and 0.04 mm/rev, then drill #5 (0.2055 in) through at 1500 rpm and 0.08 mm/rev, with cutting oil. Break the edges. 4. Spot the angle plate's taps through these holes (angle-plate make note, steps 4-6). 5. Fit it: angle plate base down on the mill table; stand a 1-2-3 block on its 1 x 3 in face (2 in high) in front of the upright under the tapped holes; rest the ledge on it, back face flat on the upright, and tighten both #10-24 SHCS. Its top is then 68.7 mm above the table and 20.2 below the upright's top edge. 6. Check: sweep the ledge top along X with the DTI from the spindle; it must read 0.02 or less over its 22.6 mm. Lift the block out.", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
@@ -4087,13 +4013,45 @@ gauge_dia_mm = { value = 50.8, measured = { status = "measured", by = "placehold
 # Basis: holders.drill-chuck-r8.grip_mm: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:1389 (holders.drill-chuck-r8.grip_mm) authored drill_chuck geometry baseline 20 mm, offset +0 mm = 20 mm. No additional supported shank engagement is credited.
 grip_mm = { value = 20, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers and steel rule, installed nose-to-exit distance or engaged shank" } }
 
-[holders.tap-wrench-t-1-16-1-4]
-name = "T-handle tap wrench, 1/16-1/4 in taps"
+[holders.tap-wrench-kit-40-t]
+name = "Owned 40-piece kit T-handle tap wrench"
 kind = "tap_wrench"
-make = "Drill America"
-sku = "DWTD328"
-source = "https://drillsandcutters.com/1-16-1-4-t-handle-tap-wrench/"
-note = "illustrative example item: ratcheting T-handle tap wrench for the #8-32, #10-24 and 1/4-20 taps"
+by = "Pedro; photo label, 2025-06-28; owner ruling, 2026-11-06"
+present = true
+verify = true
+# Basis: kit label and owner use, not a catalogue capacity or measured jaw range.
+note = "From tools.tap-die-set-40; make unidentified. Pedro uses this wrench for #0-80 through #10 taps, but grip on the #0-80 square remains unverified. No ratchet, dimensional capacity or measured fit is asserted."
+
+[holders.tap-wrench-kit-40-bar]
+name = "Owned 40-piece kit long-handle adjustable tap wrench"
+kind = "tap_wrench"
+by = "Pedro; photo label, 2025-06-28; owner ruling, 2026-11-06"
+present = true
+verify = true
+# Basis: kit label and owner use; physical dimensions and jaw range unmeasured.
+note = "From tools.tap-die-set-40; make unidentified. Pedro uses the long adjustable bar wrench for 1/4 through 5/16 taps and the long taps. Check each tap square's grip before use."
+
+[holders.die-handle-kit-40]
+name = "Owned 40-piece kit die handle"
+kind = "die_stock"
+by = "Pedro; photo label, 2025-06-28; owner ruling, 2026-11-06"
+present = true
+verify = true
+# Basis: photo appearance only; roughly 1 in die OD is not a measured capacity.
+note = "From tools.tap-die-set-40; make unidentified. Appears sized for about 1 in OD dies, not measured. Compatibility with the ordered 13/16 in dies is not established; use the matching ordered Drillco stock after receipt and fit verification."
+
+[holders.die-stock-drillco-3000ds1]
+name = "Drillco die stock for 13/16 in round dies"
+kind = "die_stock"
+make = "Drillco"
+sku = "3000DS1"
+source = "https://www.zoro.com/i/G910373383/"
+purchase = "Zoro order WB7365521946; purchased 2026-11-06; quantity 1; USD 9.29 each; ordered, not yet received"
+present = false
+verify = true
+pieces = 1
+# Basis: paid-order catalogue die-size nominal, not a measured pocket diameter.
+note = "Catalogue fit: 13/16 in round dies. Ordered, not yet received; verify actual die fit and retention on receipt. No physical stock dimensions are asserted."
 
 # --- ShaftPrep additions ---
 # Example purchase: MT3-arbor 1/2 in keyed drill chuck (JT33) for the PM-1127VF-LB
