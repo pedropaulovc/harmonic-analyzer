@@ -309,8 +309,18 @@ _KP08_STATION_ROUNDING = max(
     abs((s - trammel.RAIL_NEAR_S) - round(s - trammel.RAIL_NEAR_S, base_bar.BRACKET_STATION_PLACES))
     for s in KP08_S
 )
+# Along the screw is TL-28 local Y: HoleRowY is .250 at ROW_PLACES=3
+# on the inch sheet, not the metric X stations of the opposed-hole pair.
+# Resolve its package unit here; importing end_bracket would close a cycle.
+BRACKET_AXIAL_ROW_BAND = printed_band_mm(
+    3,
+    unit=drawing_unit(
+        "parts/ch-rocker-arm-tl-oblique-end-bracket",
+        _config.parts("ch-rocker-arm-tl-oblique-end-bracket"),
+    ),
+)
 KP08_STATION_ENVELOPE = (
-    base_bar.BRACKET_STATION_BAND + _KP08_STATION_ROUNDING + _TL28_BAND
+    base_bar.BRACKET_STATION_BAND + _KP08_STATION_ROUNDING + BRACKET_AXIAL_ROW_BAND
     + BRACKET_STOP_FLOAT_MAX + KP08_SCREW_FLOAT_MAX
 )
 # Native metric sheet prints one place. The chosen cut is
