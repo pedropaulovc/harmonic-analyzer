@@ -7,11 +7,11 @@ CARRIAGE`` in four native views; each member's installed quantity, the kit
 as the purchase unit, and the carriage's note (the owner's kit description
 and the fit-up play acceptance in MHA-CH-06-TL-00).
 
-Sheet 2, RAIL RECEIPT, is the rail's receipt check. The listing states no
-hole pattern, so the received rail is measured before the base bar is
-tapped: every hole station is the Rail member's own native model dimension
-from the -X end face (rule 10, baseline), each carrying the base bar's
-receipt band as its native tolerance, the length a parenthesised reference.
+Sheet 2, RAIL RECEIPT, checks the installed rail after equal end trims to
+match the existing base bar, flush at both ends. Every hole station is the
+Rail member's native model dimension from the trimmed -X end face (rule 10,
+baseline), each carrying the unchanged receipt band. The matched-bar overall
+length is a three-place parenthesised reference, not the purchase length.
 Each value sits on its own dimension line, clear of every other line; a note
 under the stack flags them as the note's check, and the note says what to
 do when one is out of band. FRONT (the hole face) and TOP stand
@@ -120,7 +120,7 @@ SOURCE_PROPERTIES = ("Number", "Material Specification", "Finish", *NOTE_PROPERT
 # in; the title block fills x >= 215.9 mm below y = 65.1 mm; the receipt
 # note's three lines top out at footer_top (70 mm).
 #
-# The 450 rail is 225 mm long at 1:2, the largest project scale whose
+# The trimmed rail fits at 1:2, the largest project scale whose
 # length fits the drawable width with the profile beside it.
 SHEET_SCALE = (1, 2)
 # The 15 x 15 profile prints 30 mm square at 2:1 (7.5 mm at the sheet's 1:2,
@@ -143,8 +143,7 @@ _CELL_SLACK = 0.002  # reserved cell beyond the expected outline, each side
 # Model-box half-extents on the sheet. FRONT looks down on the hole face
 # (length x width), TOP at the flank (length x height), RIGHT along the rail
 # at the end profile (width x height). The isometric's box is the r9 sheet's
-# 1:4 pictorial of the 440 rail (about 81 x 48 mm) read off its PDF; the 450
-# rail adds about 2 mm along it, inside the slack.
+# 1:4 pictorial of the 440 rail (about 81 x 48 mm) read off its PDF.
 _FRONT_HALF = (
     rail.LENGTH / 2.0 * _sheet_mm(SHEET_SCALE),
     rail.WIDTH / 2.0 * _sheet_mm(SHEET_SCALE),
@@ -224,8 +223,8 @@ RECEIPT_DIMENSIONS = {
 }
 RECEIPT_DIMENSIONS["Length"] = (0.0, rail.LENGTH, LENGTH_ROW_RISE)
 STATION_NOMINALS = dict(zip(rail.STATION_DIMENSIONS, rail.HOLE_X, strict=True))
-# The first station spans 7.5 mm at 1:2, narrower than its "15.00 ±0.08"
-# text (about 24 mm): the text stands outside the span, left of the -X end
+# The first station is narrower than its three-place banded
+# text: it stands outside the span, left of the -X end
 # face and of FRONT's cell, its centre this far (sheet metres) from the
 # face's extension line, so its row can stand nearest the part.
 TEXT_OUTSIDE_START = {rail.STATION_DIMENSIONS[0]: 0.020}

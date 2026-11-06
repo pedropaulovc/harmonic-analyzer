@@ -3,8 +3,8 @@ r"""Configured NUIBBYED HGR15 rail kit, Amazon B0C4DJNL33 (MHA-CH-06-TL-VN-83).
 One purchased kit owns the jig's two native members, each modelled on its
 HIWIN reference STEP (the member specs record every source):
 
-* ``Rail`` (default): the end-face ``SECTION`` on the Right plane extruded 450
-  along +X, then the eight Ø4.5 holes through and their Ø7.5 counterbores
+* ``Rail`` (default): the end-face ``SECTION`` on the Right plane extruded to
+  the trimmed base-bar length, then eight Ø4.5 holes and Ø7.5 counterbores
   down from the top. Every hole is placed from the -X end face (rule 10:
   baseline, never chained); the extrusion's ``Length`` and the eight
   ``Station<n>`` dimensions are marked for the receipt sheet, each station
@@ -347,8 +347,7 @@ async def _author_rail(adapter: Any) -> None:
     await _rail_checks(adapter)
 
     # The receipt sheet's check of the kit rail (the spec's DRAWING_DIMENSIONS):
-    # the stations at the base bar's places with its receipt band, the length
-    # in whole millimetres, imported into the hole face.
+    # the stations and matched-bar length at three metric places.
     apply_drawing_precision(adapter, rail.DRAWING_PRECISION)
     for name in rail.STATION_DIMENSIONS:
         set_dimension_symmetric_tolerance(

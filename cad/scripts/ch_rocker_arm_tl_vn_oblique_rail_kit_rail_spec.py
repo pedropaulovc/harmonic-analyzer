@@ -1,4 +1,4 @@
-r"""Pure-data envelope of the kit's ``Rail`` member: the HIWIN-style HGR15 rail, 450 as supplied (MHA-CH-06-TL-VN-83).
+r"""Pure-data envelope of the kit's ``Rail`` member: HGR15 trimmed equally at both ends to its base bar (MHA-CH-06-TL-VN-83).
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure: ``build_ch_rocker_arm_tl_vn_oblique_rail_kit`` extrudes ``SECTION``
@@ -64,8 +64,8 @@ Source of each number:
   HG15: shoulder height beside the rail E1 3, shoulder fillet r1 0.5 max.
   The reference STEP agrees with every catalogue rail dimension.
 - FROM THE CALCULATOR (imported, ``ch_rocker_arm_tl_oblique_trammel_spec``):
-  ``RAIL_LENGTH`` 450, ``RAIL_WIDTH`` 15, ``RAIL_HEIGHT`` 15,
-  ``RAIL_HOLE_PITCH`` 60, ``RAIL_HOLE_COUNT`` 8, ``RAIL_HOLE_END`` 15, and
+  ``RAIL_LENGTH`` 439.928 (450 supplied), ``RAIL_WIDTH`` 15, ``RAIL_HEIGHT`` 15,
+  ``RAIL_HOLE_PITCH`` 60, ``RAIL_HOLE_COUNT`` 8, ``RAIL_HOLE_END`` 9.964, and
   ``RAIL_SCREW_SEAT_ABOVE_BASE`` 9.7 (the counterbore floor, so
   ``CBORE_DEPTH`` = 15 - 9.7 = the reference's 5.3). The registry quantity 2
   is C4's ``ch_rocker_arm_tl_oblique_fasteners_spec.RAILS`` (asserted by
@@ -84,13 +84,13 @@ Modelling departures from the reference solid, each closed-form in
   engraved on the reference's top face is omitted; with the dims' 3-decimal
   rounding these stay inside ``REFERENCE_VOLUME_ALLOWANCE_MM3`` (45 mm^3,
   ten segments under 0.01 mm^2 each; measured residual 5.4 mm^3).
-- The rail is 450 with 8 holes at E 15, the reference 440 with 8 at E 10:
-  ``REFERENCE_EQUIVALENT_VOLUME_MM3`` adds the extra 10 of the reference's
-  true section (the chord section less the groove fill) to its volume.
+- The installed rail is 439.928 with 8 holes at E 9.964, the reference 440
+  with 8 at E 10. ``REFERENCE_EQUIVALENT_VOLUME_MM3`` adjusts the length
+  using the reference's true section (the chord section less the groove fill).
 
 Part frame (CONTRACT.md, the jig assembly mates on the default planes):
 origin at one end face, on the bottom (seat) face, on the rail centreline;
-+X along the 450 length, +Z up (height 15), Y across. Front (XY) is the seat
++X along the trimmed length, +Z up (height 15), Y across. Front (XY) is the seat
 face, Top (XZ) the centre plane, Right (YZ) the end face. Holes at
 ``RAIL_HOLE_END + k * RAIL_HOLE_PITCH``. ``SECTION`` lists (y, z) vertices
 of the end-face section, counter-clockwise seen from +X. The reference STEP's
@@ -117,12 +117,12 @@ MATERIAL_SPECIFICATION = "Hardened bearing steel"
 ITEM_TAG = "[1]"
 
 # --- Calculator (imported) -------------------------------------------------------
-LENGTH = trammel.RAIL_LENGTH  # 450, as supplied
+LENGTH = trammel.RAIL_LENGTH  # 439.928 installed; 450 supplied
 WIDTH = trammel.RAIL_WIDTH  # WR 15
 HEIGHT = trammel.RAIL_HEIGHT  # HR 15
 HOLE_PITCH = trammel.RAIL_HOLE_PITCH  # P 60
 HOLE_COUNT = trammel.RAIL_HOLE_COUNT  # 8, the kit photos
-HOLE_END = trammel.RAIL_HOLE_END  # 15, unverified until receipt
+HOLE_END = trammel.RAIL_HOLE_END  # 9.964 after equal end trims; receipt checked
 HOLE_X: tuple[float, ...] = tuple(HOLE_END + k * HOLE_PITCH for k in range(HOLE_COUNT))
 CBORE_DEPTH = HEIGHT - trammel.RAIL_SCREW_SEAT_ABOVE_BASE  # h 5.3
 
@@ -290,8 +290,8 @@ VOLUME_TOL_MM3 = 5e-4 * VOLUME_MM3
 # prints with its own receipt band, the acceptance itself: a chained pitch
 # band would let the stations walk (farm run 20261104T210601055Z: the band
 # lived only in the note, the plain (15) and 7X (60) did not carry it). The
-# length is the Rail extrusion's depth, parenthesised as reference (the rail
-# is used as supplied, uncut).
+# length is the Rail extrusion's depth, parenthesised as a matched-bar
+# reference; trim both ends equally to the actual finished base bar.
 STATION_DIMENSIONS: tuple[str, ...] = tuple(
     f"Station{k}" for k in range(1, HOLE_COUNT + 1)
 )
@@ -299,11 +299,10 @@ DRAWING_DIMENSIONS = {
     "Rail": {"Length"},
     "BoltHoleProfile": set(STATION_DIMENSIONS),
 }
-# The length in whole millimetres, the listing's; the stations at the base
-# bar's own places for its rail holes, so the band prints whole.
+# Three places preserve the exact metric station after equal end trimming.
 RECEIPT_PLACES = base_bar.RAIL_HOLE_PLACES
 DRAWING_PRECISION = {
-    "Rail": {"Length": 0},
+    "Rail": {"Length": 3},
     "BoltHoleProfile": dict.fromkeys(STATION_DIMENSIONS, RECEIPT_PLACES),
 }
 # The listing gives no pattern, so the received rail is measured before the
@@ -321,12 +320,19 @@ RECEIPT_SHEET = 2
 RECEIPT_FLAG = "RECEIPT CHECK: ALL STATIONS ABOVE, SEE NOTE"
 DRAWING_NOTES = "\n".join(
     (
-        "RECEIPT CHECK BEFORE TAPPING MHA-CH-06-TL-20 BASE BAR: MEASURE THE",
-        "STATIONS FROM THE END FITTED FLUSH. ANY OUT OF BAND: STOP AND REPORT.",
-        "KIT RAIL, USED UNCUT. THE BAR IS DRILLED AS DRAWN.",
+        "CHECK STATIONS FROM TRIMMED END BEFORE TAPPING MHA-CH-06-TL-20.",
+        "ANY OUT OF BAND: STOP AND REPORT. THE BAR IS DRILLED AS DRAWN.",
+        "TRIM BOTH ENDS EQUALLY; MATCH BASE BAR FLUSH AT BOTH ENDS.",
     )
 )
 # The member's native BOM row under the kit's one Number.
-BOM_DESCRIPTION = f"{STYLE} RAIL, {LENGTH:.0f} MM, KIT, UNCUT"
+BOM_DESCRIPTION = f"{STYLE} RAIL, {LENGTH:.3f} MM, KIT, TRIMMED"
 if abs(LENGTH - (2.0 * HOLE_END + (HOLE_COUNT - 1) * HOLE_PITCH)) > 1e-9:
-    raise AssertionError("the rail's hole pattern is not symmetric on its length")
+    raise AssertionError("the trimmed rail's hole pattern is not symmetric")
+# The 7.5 counterbores must remain wholly enclosed even at the shortest bar
+# and furthest accepted station. No mounting hole is lost or opened by trim.
+CBORE_END_WALL_WORST = (
+    HOLE_END - trammel.RAIL_LENGTH_BAND - RECEIPT_BAND - CBORE_DIA / 2.0
+)
+if CBORE_END_WALL_WORST < base_bar.WALL_TARGET_MM:
+    raise AssertionError("trimming leaves insufficient rail counterbore end wall")

@@ -241,6 +241,16 @@ def test_every_pin_stays_on_its_rail_over_both_passes() -> None:
                 carriage = s - trammel.PIN_OFFSET
                 lo, hi = trammel.CARRIAGE_S_RANGE
                 assert lo <= carriage <= hi
+                assert carriage <= hi - trammel.RAIL_LENGTH_BAND
+
+
+def test_trimmed_rails_retain_full_travel_at_shortest_bar_length() -> None:
+    assert trammel.RAIL_LENGTH == trammel.BASE_BAR_LENGTH
+    assert trammel.RAIL_SUPPLY_LENGTH == 450.0
+    assert trammel.RAIL_TRIM_PER_END == pytest.approx(5.036)
+    assert trammel.CARRIAGE_S_RANGE == pytest.approx((45.7, 424.228))
+    assert trammel.CARRIAGE_END_MARGINS_WORST[0] > 60.0
+    assert trammel.CARRIAGE_END_MARGINS_WORST[1] == pytest.approx(2.60, abs=0.02)
 
 
 def test_the_sweep_carries_the_part_cutter_past_both_tip_lands() -> None:

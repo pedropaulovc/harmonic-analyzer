@@ -373,16 +373,19 @@ CARRIAGE_PLAY_RADIUS = CARRIAGE_PLAY_RADIUS_PER_PLAY * CARRIAGE_PLAY_TIR_MAX
 TOP_EDGE_HALF_BAND = (max(rocker.TOP_EDGE_BAND) - min(rocker.TOP_EDGE_BAND)) / 2.0
 
 # --- Bought hardware (catalogue values; not modelled in detail) --------------
-# HGR15 rail, 450 as supplied (Amazon kit B0C4DJNL33, owner ruling #2177): a
-# generic HIWIN-style rail on the 60 pitch, 8 holes at a symmetric 15 end
-# distance. The listing states no pitch or end distance; its photos show 8
-# holes a rail. The bars are tapped to the received rails (TL-20).
-RAIL_LENGTH = 450.0
+# HGR15 kit rails arrive 450 long. Trim equal amounts from both ends to the
+# existing 17.32 in base bar, preserving all eight holes and their end walls.
+RAIL_SUPPLY_LENGTH = 450.0
+BASE_BAR_LENGTH = 439.928  # 17.32; retain the existing bar blanks
+RAIL_LENGTH = BASE_BAR_LENGTH
 RAIL_WIDTH = 15.0
 RAIL_HEIGHT = 15.0
 RAIL_HOLE_PITCH = 60.0
 RAIL_HOLE_COUNT = 8
-RAIL_HOLE_END = (RAIL_LENGTH - (RAIL_HOLE_COUNT - 1) * RAIL_HOLE_PITCH) / 2.0
+RAIL_TRIM_LENGTH = RAIL_SUPPLY_LENGTH - RAIL_LENGTH
+RAIL_TRIM_PER_END = RAIL_TRIM_LENGTH / 2.0
+RAIL_HOLE_END = round((RAIL_LENGTH - (RAIL_HOLE_COUNT - 1) * RAIL_HOLE_PITCH) / 2.0, 9)
+RAIL_LENGTH_BAND = printed_band_mm(2, unit=BASE_BAR_UNIT)
 # The rails' M4 holes (Ø4.5, Ø7.5 counterbore) take #8-32 UNC socket screws
 # (Ø4.17), keeping the repo's UNC thread policy. A 3/4 in screw seats on the
 # counterbore floor 9.7 above the rail base, so 9.35 of it engages the bar.
@@ -399,9 +402,8 @@ CARRIAGE_BOLT_SPAN = (26.0, 26.0)  # (along, across), four M4 tapped
 CARRIAGE_BOLT = "M4"
 
 # --- Rails on the bars --------------------------------------------------------
-# Each rail's near end stops RAIL_NEAR_S from the spindle axis (brief), flush
-# with its bar's near end. The kit rail is used uncut: it runs RAIL_OVERHANG
-# past the bar's far end (owner ruling 2026-11-04, #2177 option B).
+# Each rail starts RAIL_NEAR_S from the spindle; after equal end trims it is
+# flush with its actual finished bar at both ends.
 RAIL_NEAR_S = 15.0
 RAIL_FAR_S = RAIL_NEAR_S + RAIL_LENGTH
 # A carriage stays fully on its rail: centre within half its length of an end.
@@ -478,18 +480,16 @@ BASE_BAR_WIDTH_IN = 5.5
 BASE_BAR_WIDTH = round(BASE_BAR_WIDTH_IN * INCH, 9)  # 139.7, milled
 BASE_BAR_COLUMN_EDGE = round(3.5 * INCH, 9)  # lateral +88.9
 BASE_BAR_OPERATOR_EDGE = BASE_BAR_COLUMN_EDGE - BASE_BAR_WIDTH  # lateral -50.8
-# Owner ruling 2026-11-04 (#2177, option B): the bars keep their 17.32 length,
-# so bar 1's blank sawn 2026-10-29 stays usable and no stock is bought; the
-# 450 kit rail, used uncut, overhangs the bar's far end by 10.07.
-BASE_BAR_LENGTH = 439.928  # 17.32
+# Rails and bars share the existing bar length; no bar stock is replaced.
 BASE_BAR_FAR_S = RAIL_NEAR_S + BASE_BAR_LENGTH
-RAIL_OVERHANG = RAIL_FAR_S - BASE_BAR_FAR_S  # 10.07
-# The rail's last hole stays on the bar, and the carriage stays over the bar
-# at the far end of its working travel.
-if not RAIL_NEAR_S + RAIL_HOLE_END + (RAIL_HOLE_COUNT - 1) * RAIL_HOLE_PITCH < BASE_BAR_FAR_S:
-    raise AssertionError("the rail's last hole lies past the bar's far end")
-if not CARRIAGE_TRAVEL[1] + CARRIAGE_LENGTH / 2.0 < BASE_BAR_FAR_S:
-    raise AssertionError("the carriage runs off the bar onto the rail's overhang")
+RAIL_OVERHANG = RAIL_FAR_S - BASE_BAR_FAR_S
+# Include the bar's printed .XX length band when checking full seal support.
+CARRIAGE_END_MARGINS_WORST = (
+    CARRIAGE_TRAVEL[0] - CARRIAGE_S_RANGE[0],
+    CARRIAGE_S_RANGE[1] - RAIL_LENGTH_BAND - CARRIAGE_TRAVEL[1],
+)
+if min(CARRIAGE_END_MARGINS_WORST) <= 0.0:
+    raise AssertionError("the carriage runs off the trimmed rail at full travel")
 # Two 1/2-13 hold-down studs per bar in .53 slots across the bar, one each
 # side of the rail, outside the carriage's sweep. Their stations put both on
 # T-slots two pitches apart, the far one inside the table end by a T-nut.

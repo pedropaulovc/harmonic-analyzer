@@ -36,9 +36,9 @@ z = "up"
 # One 443 mm blank per bar from the owned 1/2 x 6 bar (#2083): about 1.5 over the 439.928 length at
 # each end, the zero edge about 1.0 proud of the finished -Y side, about 0.35 on each big
 # face. These placements are the author's route choice, not measurements of a sawn blank.
-# Owner ruling 2026-11-04 (#2177 option B): the bar keeps its 439.928 length; the 450 kit rail
-# goes on uncut, flush at the zero end, and overhangs the far end by 10.07, so the bar takes the
-# rail's eight #8-32 taps at 15 .. 435 (the last 4.93 from the far end).
+# Retain the existing 439.928 mm bars. Trim each purchased 450 mm rail equally
+# at both ends (5.036 mm nominal per end), flush with its actual finished bar.
+# All eight taps shift to 9.964 .. 429.964 mm; never reuse the uncut pattern.
 [stock]
 form = "flat_bar"
 form_verify = false
@@ -863,7 +863,7 @@ coolant = "cutting oil, brushed on"
 deburr_mm = 0.25
 deburr_cite = "features.toml general_tolerances edge_break R0.25"
 stock_in = "A0"
-note = "Same clamping as A0: do not unclamp. Drill only over open air: every hole is clear of the parallels, but look before every hole anyway. Brush on oil, peck every 3 mm, stop exactly on each DRO number. The eight rail holes are the only tight feature (+/-0.08 along X). Before the first rail hole, read the kit rail's receipt check (MHA-CH-06-TL-VN-83 sheet 2): its eight holes measured from the end that sits flush at X 0 must each be within +/-0.08 of 15, 75, 135, 195, 255, 315, 375, 435; if any is outside +/-0.08, stop and report before drilling. Drill every rail hole at its printed station, never at a measured one."
+note = "Same clamping as A0: do not unclamp. Drill only over open air: every hole is clear of the parallels, but look before every hole anyway. Brush on oil, peck every 3 mm, stop exactly on each DRO number. The eight rail holes are the only tight feature (+/-0.08 along X). Before drilling, transfer every carriage onto a kit false rail; keep bearings and raceways clear of abrasive grit. Measure the finished bar, mark equal removals at BOTH rail ends (5.036 mm nominal each), abrasive-cut the hardened rail with allowance, finish to the bar length and deburr without touching the running surfaces. Clean out all grit before reloading carriages. Both rail ends must be flush with the bar. Read the rail receipt check (MHA-CH-06-TL-VN-83 sheet 2): from the trimmed end at X 0, each station must be within +/-0.08 of 9.964, 69.964, 129.964, 189.964, 249.964, 309.964, 369.964, 429.964; if any is outside +/-0.08, stop and report before drilling. Drill every rail hole at its printed station, never at a measured one."
 
 [setups.stock_state]
 top_feature = "underside_seat"
@@ -1600,7 +1600,7 @@ checks = { dia = "pin-gauges", thru = "pin-gauges", station = "calipers-18in", h
 inspection_methods.height = "On the top face (no counterbores): put the largest plain pin gauge that enters the hole, diameter D; calipers from the zero edge to the near side of the pin, plus D/2."
 inspection_methods.station = "On the top face: largest pin gauge that enters, diameter D; calipers from the zero end to the near side of the pin, plus D/2, for each hole."
 inspection_methods.thread = "An 8-32 screw turns in all the way with your fingers."
-inspection_methods.note = "The real test: lay the HGR15 kit rail on the un-marked face, its end flush with the zero end (it overhangs the far end by about 10); all eight #8-32 x 3/4 socket screws start by hand without pushing the rail sideways."
+inspection_methods.note = "The real test: lay the trimmed HGR15 kit rail on the un-marked face, flush at BOTH ends; all eight #8-32 x 3/4 socket screws start by hand without pushing the rail sideways. Both outer counterbores remain fully enclosed; run the carriage through both complete pass sweeps without an end seal leaving the rail."
 
 [[setups.ops]]
 op = 50

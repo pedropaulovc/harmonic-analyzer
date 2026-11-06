@@ -204,11 +204,10 @@ def _below_line(k: int) -> float:
 
 
 # The plan: the rail-hole stations stack above it from the end face, nearest
-# first (DRO absolutes), each in its own lane; the outermost (435.00 ±0.08 mm)
+# first (DRO absolutes), each in its own lane; the outermost station
 # carries the mate on a second line, the only lane no extension line crosses.
-# A station whose span is shorter than its text with a gap each side (the
-# 15.00 and 75.00: the millimetre label, owner ruling 4, makes them wider
-# than 37.5 on the sheet) prints left of the end face's extension line, where
+# A station whose span is shorter than its three-place metric text with a
+# gap each side prints left of the end face's extension line, where
 # no other line runs (r1 printed the 40.00 across that line), each on its own
 # lane; the rest print mid-span.
 #
@@ -254,7 +253,7 @@ _RAIL_ROW_TEXT_HALF = 0.0182
 # "5.50", four glyphs at 2.6 (the #290 "(5-1/2 in)" over "STOCK" was 0.0104).
 _BAR_WIDTH_TEXT_HALF = 0.0055
 # The metric vendor stations at about 2.6 a glyph (owner ruling 4).
-_RAIL_HOLE_TEXT_HALF = 0.0182  # "15.00 ±0.08 mm", 14 glyphs
+_RAIL_HOLE_TEXT_HALF = 0.0221  # Three-place station and band, 17 glyphs maximum
 _BRACKET_NEAR_X_TEXT_HALF = 0.0195  # "57.000 ±0.13 mm", 15 glyphs
 _BRACKET_ROW_TEXT_HALF = 0.0070  # "2.425": "61.400" was 13.9 wide on the c4-r9 sheet
 _BRACKET_OUTER_TEXT_BELOW = 0.004  # "6.400"'s centre under the bar's -Y edge

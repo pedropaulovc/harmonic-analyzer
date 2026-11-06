@@ -45,14 +45,11 @@ def test_bar_is_milled_from_the_owned_bar_and_faced_to_thickness() -> None:
         assert value / 25.4 == pytest.approx(round(value / 25.4, 2), abs=1e-9)
     # Milled from 6 in, the widest part still fits the vise's stock jaws.
     assert spec.BAR_WIDTH + spec.BAR_WIDTH_BAND < 6.0 * 25.4
-    # Owner ruling 2026-11-04 (#2177 option B): the 450 kit rail goes on the
-    # 17.32 bar uncut, flush at the spindle end, and overhangs the far end.
-    assert spec.BAR_LENGTH == trammel.BASE_BAR_LENGTH
+    # Purchased 450 rails are trimmed equally to the existing bars.
+    assert spec.BAR_LENGTH == trammel.BASE_BAR_LENGTH == trammel.RAIL_LENGTH
     assert round(spec.BAR_LENGTH / 25.4, 2) == 17.32
-    assert trammel.RAIL_OVERHANG == pytest.approx(
-        trammel.RAIL_LENGTH - spec.BAR_LENGTH, abs=1e-9
-    )
-    assert trammel.RAIL_OVERHANG == pytest.approx(10.072, abs=1e-9)
+    assert trammel.RAIL_OVERHANG == pytest.approx(0.0, abs=1e-9)
+    assert trammel.RAIL_TRIM_PER_END == pytest.approx(5.036)
     assert spec.RAIL_HOLE_X[-1] < spec.BAR_LENGTH
     # The 2026-10-30 ruling: 5.50 wide (vise fit) with the column-side edge
     # still 3.5 in off the rail, so the rail sits off the centreline. Rail 1's
@@ -64,7 +61,7 @@ def test_bar_is_milled_from_the_owned_bar_and_faced_to_thickness() -> None:
 
 
 def test_rail_holes_are_eight_on_the_rail_pitch() -> None:
-    assert spec.RAIL_HOLE_X == (15.0, 75.0, 135.0, 195.0, 255.0, 315.0, 375.0, 435.0)
+    assert spec.RAIL_HOLE_X == pytest.approx(tuple(9.964 + 60.0 * k for k in range(8)))
     assert spec.TAP_SPEC.kind == "tapped" and spec.TAP_SPEC.size == trammel.RAIL_SCREW
     assert spec.TAP_SPEC.end == "through_all"
 
@@ -158,7 +155,7 @@ def test_walls_meet_rule_17() -> None:
     xx_station = printed_band_mm(2, unit="in")
     tap_r = THREAD_MAJOR_MM[spec.RAIL_SCREW] / 2.0
     far_nominal = spec.BAR_LENGTH - spec.RAIL_HOLE_X[-1] - tap_r
-    assert far_nominal / 25.4 == pytest.approx(0.112, abs=5e-4)
+    assert far_nominal / 25.4 == pytest.approx(0.310, abs=5e-4)
     assert spec.RAIL_TAP_END_WALL_WORST == pytest.approx(
         far_nominal - xx_station - spec.RAIL_HOLE_BAND
     )
@@ -182,8 +179,7 @@ def test_receipt_band_accepts_only_rails_that_fit_the_printed_bar() -> None:
         (spec.RAIL_HOLE_DIA - THREAD_MAJOR_MM[spec.RAIL_SCREW]) / 2.0 - spec.RAIL_HOLE_BAND
     )
     assert band == pytest.approx(
-        int(spec.RAIL_PATTERN_ALLOWANCE * 10**spec.RAIL_HOLE_PLACES)
-        / 10**spec.RAIL_HOLE_PLACES
+        int(spec.RAIL_PATTERN_ALLOWANCE * 100) / 100
     )
     assert band == pytest.approx(0.08)
     assert band <= spec.RAIL_PATTERN_ALLOWANCE < band + 0.01
@@ -208,14 +204,14 @@ def test_receipt_band_accepts_only_rails_that_fit_the_printed_bar() -> None:
     # accepted pattern fits a bar drilled anywhere inside its printed band.
     grid = [
         tuple(e + k * p for k in range(count))
-        for e in (14.8 + 0.01 * i for i in range(41))
+        for e in (trammel.RAIL_HOLE_END - 0.2 + 0.01 * i for i in range(41))
         for p in (59.97 + 0.001 * j for j in range(61))
     ]
     inside = [stations for stations in grid if accepted(stations)]
     assert inside
     assert all(fits(stations) for stations in inside)
     # A pattern inside the band is accepted; one just past it is not.
-    assert accepted(tuple(15.05 + 59.995 * k for k in range(count)))
+    assert accepted(tuple(trammel.RAIL_HOLE_END + 0.05 + 59.995 * k for k in range(count)))
     assert not accepted(tuple(15.0 + 60.015 * k for k in range(count)))
     # The review's example, E 17/13 at P 60: the last tap would sit 0.85 from
     # the end, under the floor; the receipt check rejects it.
@@ -291,11 +287,11 @@ def test_rail_holes_hold_a_baseline_band_that_names_its_mate() -> None:
         if key[0] == "RailHoles"
     }
     assert set(rail) == {("RailHoles", name) for name in stations}
-    assert set(rail.values()) == {(2, spec.RAIL_HOLE_BAND)}
+    assert set(rail.values()) == {(3, spec.RAIL_HOLE_BAND)}
     assert spec.RAIL_HOLE_BAND == 0.08
     assert not stations & set(drawing.CALLOUTS_BELOW) - {"RailHole8X"}
-    assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 2 for name in stations)
-    assert all(x == round(x, 2) for x in spec.RAIL_HOLE_X)
+    assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 3 for name in stations)
+    assert all(x == round(x, 3) for x in spec.RAIL_HOLE_X)
     # One DRO Y setting cuts the row: only the station band scatters one hole
     # off another (exact stations add no rounding), inside the #8's float in
     # the rail's Ø4.5.

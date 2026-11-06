@@ -181,7 +181,7 @@ def test_member_properties_carry_each_members_material_quantity_and_note() -> No
         assert properties["Manufacturing Notes"] == spec.DRAWING_NOTES
         assert properties["Description"] == spec.BOM_DESCRIPTION
     assert part.MEMBER_DESCRIPTIONS == {
-        "Rail": "HGR15 RAIL, 450 MM, KIT, UNCUT",
+        "Rail": "HGR15 RAIL, 439.928 MM, KIT, TRIMMED",
         "Carriage": "HGH15CA CARRIAGE, KIT",
     }
     assert part.MEMBER_NOTE_PROPERTIES == draw.NOTE_PROPERTIES
@@ -243,12 +243,12 @@ def test_builder_adapter_calls_bind_to_the_vendored_sdk() -> None:
 
 
 def test_rail_calculator_values_are_imported_not_retyped() -> None:
-    assert rail.LENGTH == trammel.RAIL_LENGTH == 450.0
+    assert rail.LENGTH == trammel.RAIL_LENGTH == 439.928
     assert rail.WIDTH == trammel.RAIL_WIDTH == 15.0
     assert rail.HEIGHT == trammel.RAIL_HEIGHT == 15.0
     assert rail.HOLE_PITCH == trammel.RAIL_HOLE_PITCH == 60.0
     assert rail.HOLE_COUNT == trammel.RAIL_HOLE_COUNT == 8
-    assert rail.HOLE_END == trammel.RAIL_HOLE_END == 15.0
+    assert rail.HOLE_END == trammel.RAIL_HOLE_END == 9.964
     source = Path(rail.__file__).read_text(encoding="utf-8")
     for name, value in (
         ("LENGTH", "RAIL_LENGTH"),
@@ -273,7 +273,7 @@ def test_rail_agrees_with_the_catalogue_and_reference_rail() -> None:
     )
     assert rail.REFERENCE_HOLE_COUNT == rail.HOLE_COUNT
     assert math.isclose(rail.HOLE_X[0] + rail.HOLE_X[-1], rail.LENGTH)
-    assert rail.HOLE_X == (15.0, 75.0, 135.0, 195.0, 255.0, 315.0, 375.0, 435.0)
+    assert rail.HOLE_X == tuple(9.964 + 60.0 * k for k in range(8))
     # The rail's stations are the base bar's tapped stations.
     assert rail.HOLE_X == base_bar.RAIL_HOLE_X
 
@@ -301,7 +301,7 @@ def test_rail_volume_mass_and_centroid_match_the_reference() -> None:
     expected = _shoelace(rail.SECTION) * rail.LENGTH - rail.HOLE_COUNT * (hole + cbore)
     assert math.isclose(rail.VOLUME_MM3, expected, rel_tol=1e-12)
     extra = rail.LENGTH - rail.REFERENCE_LENGTH
-    assert extra == 10.0
+    assert math.isclose(extra, -0.072, abs_tol=1e-10)
     assert math.isclose(
         rail.REFERENCE_EQUIVALENT_VOLUME_MM3,
         rail.REFERENCE_VOLUME_MM3 + (rail.SECTION_AREA - rail.GROOVE_FILL_MM2) * extra,
@@ -312,7 +312,7 @@ def test_rail_volume_mass_and_centroid_match_the_reference() -> None:
         - rail.REFERENCE_EQUIVALENT_VOLUME_MM3
         - rail.GROOVE_FILL_MM2 * rail.LENGTH
     )
-    assert abs(residual) < rail.REFERENCE_VOLUME_ALLOWANCE_MM3 == 45.0
+    assert abs(residual) < rail.REFERENCE_VOLUME_ALLOWANCE_MM3
     assert 0.0 < rail.GROOVE_FILL_MM2 < 0.01 * rail.SECTION_AREA
     kg_per_m = rail.VOLUME_MM3 * STEEL_KG_PER_MM3 / (rail.LENGTH / 1000.0)
     assert math.isclose(kg_per_m, rail.MASS_KG_PER_M, rel_tol=0.03)
@@ -329,11 +329,11 @@ def test_rail_receipt_stations_carry_the_base_bars_band() -> None:
         "BoltHoleProfile": set(rail.STATION_DIMENSIONS),
     }
     assert rail.RECEIPT_BAND == base_bar.RAIL_RECEIPT_BAND == 0.08
-    assert rail.RECEIPT_PLACES == base_bar.RAIL_HOLE_PLACES == 2
-    assert rail.RECEIPT_TEXT == "±0.08"
+    assert rail.RECEIPT_PLACES == base_bar.RAIL_HOLE_PLACES == 3
+    assert rail.RECEIPT_TEXT == "±0.080"
     assert rail.DRAWING_PRECISION == {
-        "Rail": {"Length": 0},
-        "BoltHoleProfile": dict.fromkeys(rail.STATION_DIMENSIONS, 2),
+        "Rail": {"Length": 3},
+        "BoltHoleProfile": dict.fromkeys(rail.STATION_DIMENSIONS, 3),
     }
     # The band is authored natively on exactly the stations, in the Rail
     # member's own sketch, never on the length or a carriage feature.
@@ -450,9 +450,12 @@ def test_rail_receipt_note_points_at_the_stations() -> None:
     # bar's drawing number.
     assert not re.search(r"\d", note.replace(bar["number"], ""))
     assert rail.RECEIPT_TEXT not in note
-    assert "RECEIPT CHECK" in note and "RECEIPT CHECK" in rail.RECEIPT_FLAG
+    assert "CHECK STATIONS" in note and "RECEIPT CHECK" in rail.RECEIPT_FLAG
     assert "STOP AND REPORT" in note and "THE BAR IS DRILLED AS DRAWN" in note
-    assert "USED UNCUT" in note and "TAP THE BAR TO THE RAIL" not in note
+    assert "TRIM BOTH ENDS EQUALLY" in note
+    assert "MATCH BASE BAR FLUSH AT BOTH ENDS" in note
+    assert rail.CBORE_END_WALL_WORST >= base_bar.WALL_TARGET_MM
+    assert math.isclose(rail.CBORE_END_WALL_WORST, 5.88, abs_tol=1e-9)
 
 
 # --- Carriage member ----------------------------------------------------------------
@@ -721,7 +724,7 @@ def _stack_ink(*, pitch=None, lift=None):
         line_y = y - draw.TEXT_OVER_LINE
         y += (lift or {}).get(name, 0.0)
         if name == "Length":
-            text = f"({rail.LENGTH:.0f})"
+            text = f"({rail.LENGTH:.3f})"
         else:
             text = f"{end:.{rail.RECEIPT_PLACES}f} {rail.RECEIPT_TEXT}"
         box = estimate_text_box(

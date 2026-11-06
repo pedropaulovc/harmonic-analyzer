@@ -22,10 +22,9 @@ labelled ``mm``, each with its own band (``METRIC_DIMENSIONS``,
 
 Material and stock: 6061-T6511 aluminium flat bar milled from the owned 1/2 x
 6 bar (OnlineMetals 1173; owner ruling #2083), sawn and faced to ⚙
-``BASE_BAR_LENGTH`` 17.32 (the length set for the earlier 440 rail; owner
-ruling 2026-11-04, #2177 option B, keeps it for the 450 kit rail, which is
-used uncut, flush at the spindle end, and overhangs the far end by ⚙
-``trammel.RAIL_OVERHANG`` 10.07; the carriage stays over the bar) and
+``BASE_BAR_LENGTH`` 17.32. Trim the purchased 450 kit rails equally at both
+ends to match these existing bars, flush at both ends; retain all eight
+mounting holes at the shifted stations below. The bars are
 milled to width ⚙ ``BASE_BAR_WIDTH`` 5.50 on edge in the
 vise, no bandsaw rip: the width is a machined size at the title block's .XX
 band. Both large faces are faced from ⚙ ``BASE_BAR_STOCK_THICK`` to ⚙
@@ -48,13 +47,12 @@ face; +X along the bar away from the spindle, +Y across it, +Z up
 operator-side edge ⚙ ``BASE_BAR_OPERATOR_EDGE`` (lateral -2.00) the +Y side.
 
 Rail holes: 8 x #8-32 UNC tapped THRU on the rail axis (y 0) at x = ⚙
-``RAIL_HOLE_END`` + k * ⚙ ``RAIL_HOLE_PITCH`` (15 .. 435 mm, the rail's own
-pattern, printed ``15.00 ±0.08 mm`` .. ``435.00 ±0.08 mm``). The kit rail
-(owner ruling #2177) is used uncut; its listing states no hole pattern, and
-the symmetric E = 15 end distance is the HGR15's 60 pitch over the 450
-length with the 8 holes its photos show: an unverified vendor value. The
-last tap sits 4.93 from the bar's far end (wall .112 nominal to the thread
-major). The bar is drilled at these printed stations, never at measured
+``RAIL_HOLE_END`` + k * ⚙ ``RAIL_HOLE_PITCH`` (9.964 .. 429.964 mm).
+The purchased 450 rail's assumed E = 15 pattern is shifted by the equal
+5.036 mm end trims. Its listing states no pattern; the trimmed rail must
+pass the native station receipt check before the bar is drilled.
+The last tap sits 9.964 from the bar's far end.
+The bar is drilled at these printed stations, never at measured
 ones. The rail sheet's receipt check accepts a received rail only if its
 pattern fits a bar drilled to this print: every station, measured from the
 end fitted flush, within ``RAIL_RECEIPT_BAND`` of nominal, the fit's own
@@ -68,7 +66,7 @@ bar's tapped hole has only ``RAIL_SCREW_CLEARANCE`` .0066 a side in the
 rail's Ø4.5 mm hole (a fixed-fastener pattern), so every bar hole's position
 error plus the rail's own must stay inside that radius. Every hole is located
 by DRO absolutes from the two faced datums: its station from the spindle-end
-face at 2 mm places ± ``RAIL_HOLE_BAND`` 0.08 mm, the rail's pitch, and the row
+face at 3 mm places ± ``RAIL_HOLE_BAND`` 0.08 mm, the rail's pitch, and the row
 from the faced -Y edge (``RAIL_ROW_Y`` 3.50, the column-side edge's lateral)
 at the title block's .XX (``RAIL_ROW_PLACES``; c3-r7, rule 4: the row's
 height has no mate, the hold-down slots set the bar's place at fit-up and
@@ -182,9 +180,9 @@ RAIL_HOLE_X: tuple[float, ...] = tuple(
 if len(RAIL_HOLE_X) != 8:
     raise AssertionError("the kit rail's base bar carries eight rail holes")
 RAIL_ROW_Y = -LOW_SIDE_Y  # 3.50: the row (y 0) from the faced -Y edge
-# The HGR15 rail's metric pattern prints exact millimetres at two places,
-# each station with the rail pitch's own band (``15.00 ±0.08 mm``).
-RAIL_HOLE_PLACES = 2
+# Equal end trims produce exact three-place metric vendor stations; the
+# existing position and receipt bands remain unchanged.
+RAIL_HOLE_PLACES = 3
 RAIL_HOLE_BAND = 0.08  # the stations only: the rail's hole pitch
 # The row's height prints at the title block's band (c3-r7, rule 4): nothing
 # mates with it, and the one DRO Y setting keeps the holes in line.
@@ -204,9 +202,7 @@ if RAIL_PATTERN_ALLOWANCE <= 0.0:
 # allowance of nominal, floored to the stations' printed places; a bar drilled
 # to this print then takes it (farm review 20261104T203420333Z: tapping to the
 # received rail contradicted the printed ±0.08).
-RAIL_RECEIPT_BAND = math.floor(RAIL_PATTERN_ALLOWANCE * 10**RAIL_HOLE_PLACES) / (
-    10**RAIL_HOLE_PLACES
-)
+RAIL_RECEIPT_BAND = math.floor(RAIL_PATTERN_ALLOWANCE * 100) / 100
 if not 0.0 < RAIL_RECEIPT_BAND <= RAIL_PATTERN_ALLOWANCE:
     raise AssertionError("the rail's receipt band is not inside the fit's allowance")
 # The rail kit's Number: the rail is its Rail configuration.
