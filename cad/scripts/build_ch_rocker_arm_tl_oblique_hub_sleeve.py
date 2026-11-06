@@ -50,11 +50,10 @@ from ch_rocker_arm_tl_oblique_hub_sleeve_spec import (
     ID,
     LENGTH,
     OD,
-    STEM,
     UNIT,
 )
 
-PART_NAME = STEM
+PART_NAME = "ch-rocker-arm-tl-oblique-hub-sleeve"
 MATERIAL = "Plain Carbon Steel"  # 1018 bar; see _appearance.apply_material
 
 V_RING = math.pi * ((OD / 2.0) ** 2 - (ID / 2.0) ** 2) * LENGTH

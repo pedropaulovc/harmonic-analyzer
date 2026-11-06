@@ -74,7 +74,6 @@ from ch_rocker_arm_tl_oblique_hub_stud_spec import (
     ROOT_FILLET_TOL_TYPE,
     SHANK_DIA,
     SHANK_LENGTH,
-    STEM,
     SUPPLY_LENGTH_BAND,
     SUPPLY_LENGTH_MIN,
     SUPPLY_LENGTH_TOL_TYPE,
@@ -83,7 +82,7 @@ from ch_rocker_arm_tl_oblique_hub_stud_spec import (
     UNIT,
 )
 
-PART_NAME = STEM
+PART_NAME = "ch-rocker-arm-tl-oblique-hub-stud"
 MATERIAL = "Plain Carbon Steel"  # 1018 bar; see _appearance.apply_material
 # The assembly mates the stud axis to ``Axis1@<stud>``: the first (and only)
 # reference axis the part creates.
