@@ -2895,6 +2895,12 @@ def test_complete_source_instructions_fit_existing_pages_at_normal_note_size():
         "1", "2", "3", "4", "5", "6", "7", "8A", "8B", "9", "10", "11",
         "12", "13A", "13B", "13C", "13D",
     ]
+    # The integrated two-sheet budget was short by 1.075 mm: F3's fourth
+    # line. Preserve all checks while keeping that paragraph to three lines.
+    f3 = drawing._wrapped(
+        (spec.FEED_FIT_STEPS[-1],), width=drawing.STEPS_LINE_WIDTH, spaced=True,
+    )
+    assert len(f3.splitlines()) == 3
     layouts = (drawing.STEPS_LAYOUT, drawing.FIT_LAYOUT)
     printed = " ".join(" ".join(
         text
