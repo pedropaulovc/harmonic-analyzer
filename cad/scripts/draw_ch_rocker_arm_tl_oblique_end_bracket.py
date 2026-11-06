@@ -16,7 +16,10 @@ The KP08 stations print in inch in the table like every other row, PENDING
 OWNER CONFIRMATION: owner ruling 4 (2026-11-01) printed them in exact
 millimetres, which a native hole table cannot carry (its generated LOC cells
 are not editable). At the table's three places they stay inside the KP08's
-float (``TABLE_POSITION_RADIUS``) and every wall holds rule 17.
+float (``TABLE_POSITION_RADIUS``) and every wall holds rule 17. The part keeps
+its native ±0.13 mm band on those two model dimensions (the spec feeds the
+whole jig's keys), so their rows print it as ``±.005``, the title block's own
+.XXX band (``location_mm``).
 
 Each tap drill runs THRU and each thread prints its .450 MIN full-thread depth
 from its screw's face, the bar taps' FAR SIDE (owner ruling 2026-11-05: the
@@ -72,6 +75,7 @@ import ch_rocker_arm_tl_oblique_end_bracket_spec as part_spec
 from _feature_requirements import part_metadata, requirement
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
+from _printed_tolerance import printed_band_mm
 from _printed_limits import limits
 from _supplier_dimensions import supplier_reference_dimension
 from ch_rocker_arm_tl_oblique_end_bracket_spec import (
@@ -206,12 +210,12 @@ def size_text(kind: str) -> str:
 
 # The table stands under the plan's length, its top-left corner here (sheet
 # m), left of the title block (x 216) and the end view's thickness (x 267).
-HOLE_TABLE_ANCHOR = (0.025, 0.158)
+HOLE_TABLE_ANCHOR = (0.020, 0.158)
 # Column widths (sheet m), 3.5 mm text at ~2.5 mm a glyph (fr_harmonic_base's
-# "SEE NOTE 1" prints 24.7): TAG, X LOC, Y LOC, then the custom SIZE ("8-32
-# UNC <depth>.450 MIN FAR SIDE", 27 glyphs) and MATCHES HOLES OF
-# ("MHA-CH-06-TL-VN-56", 18) columns.
-HOLE_TABLE_WIDTHS = {0: 0.013, 1: 0.019, 2: 0.019, 4: 0.078, 5: 0.050}
+# "SEE NOTE 1" prints 24.7): TAG, X LOC (the KP08 rows' ".548 ±.005", 10
+# glyphs), Y LOC, then the custom SIZE ("8-32 UNC <depth>.450 MIN FAR SIDE",
+# 27 glyphs) and MATCHES HOLES OF ("MHA-CH-06-TL-VN-56", 18) columns.
+HOLE_TABLE_WIDTHS = {0: 0.013, 1: 0.027, 2: 0.019, 4: 0.078, 5: 0.050}
 _NATIVE_SIZE = 3  # the generated SIZE column, hidden: it restates the class
 _SIZE = 4
 _MATE = 5
@@ -565,6 +569,23 @@ def table_groups(
         raise RuntimeError(f"end bracket hole table lacks a tap group: {sorted(spans)}")
     return spans
 
+# The KP08 taps' model dimensions carry the part's native ±0.13 mm band
+# (owner ruling 4), which the table prints in inch as the title block's own
+# .XXX band (r1: "B1 .548 ±.005"). A printed band must be exactly that.
+_LOCATION = re.compile(r"^(-?\d*\.\d+|-?\d+)(?:\s*±\s*(\d*\.\d+))?$")
+_TITLE_BLOCK_BAND_IN = round(printed_band_mm(_PLACES, unit=_UNIT) / 25.4, _PLACES)
+
+
+def location_mm(cell: str, *, label: str) -> float:
+    """A LOC cell's value in mm; any printed band must be the .XXX band."""
+    match = _LOCATION.match(cell.strip())
+    if match is None:
+        raise RuntimeError(f"end bracket hole-table {label} is unparseable: {cell!r}")
+    if match[2] is not None and float(match[2]) != _TITLE_BLOCK_BAND_IN:
+        raise RuntimeError(f"end bracket hole-table {label} prints a foreign band: {cell!r}")
+    return float(match[1]) * 25.4
+
+
 
 def _table_rows(table: Any) -> list[tuple[int, str, str, float]]:
     """(row, tag, kind, model X) per generated row, each bound to one station."""
@@ -573,8 +594,11 @@ def _table_rows(table: Any) -> list[tuple[int, str, str, float]]:
         tag = _cell(table, row, 0)
         size = _cell(table, row, _NATIVE_SIZE)
         kinds = {kind for thread, kind in _THREAD_KIND.items() if thread in size}
-        x_mm = float(_cell(table, row, 1)) * 25.4
+        x_mm = location_mm(_cell(table, row, 1), label=f"row {row} X LOC")
+        y_mm = location_mm(_cell(table, row, 2), label=f"row {row} Y LOC")
         station = [x for kind, x in TABLE_HOLES if abs(x - x_mm) <= _TABLE_LOCATION_TOLERANCE_MM]
+        if abs(y_mm - HOLE_ROW_Y) > _TABLE_LOCATION_TOLERANCE_MM:
+            raise RuntimeError(f"end bracket hole-table row {row} Y LOC is {y_mm:g} mm")
         if len(kinds) != 1 or len(station) != 1:
             raise RuntimeError(f"end bracket hole-table row {row} unbound: {tag!r} {size!r} {x_mm:g}")
         rows.append((row, tag, kinds.pop(), station[0]))
@@ -585,18 +609,18 @@ def _table_rows(table: Any) -> list[tuple[int, str, str, float]]:
 def _finish_hole_table(adapter: Any, table: Any) -> dict[str, str]:
     """Sort the rows by tag, write each group's size and mate once in merged
     custom cells, hide the generated SIZE column; return tag -> kind."""
-    holes = _early_bound(table, "IHoleTableAnnotation")
-    if not holes.Sort(0, True):
-        raise RuntimeError("end bracket hole table refused to sort by tag")
+    # Tag order groups each size's rows (table_groups proves it either way).
+    sorted_ok = _early_bound(table, "IHoleTableAnnotation").Sort(0, True)
     rebuild_drawing(adapter, label="end bracket hole-table sort")
     rows = _table_rows(table)
+    _telemetry.info(f"end bracket hole table sorted={sorted_ok!r}: {rows!r}")
     spans = table_groups(rows)
     for index, title in ((_SIZE, SIZE_COLUMN), (_MATE, MATE_COLUMN)):
         if table.InsertColumn2(
             _INSERT_COLUMN_AFTER, index - 1, title, _INSERT_COLUMN_DEFAULT_WIDTH
         ) is not True:
             raise RuntimeError(f"end bracket hole table refused the {title} column")
-        if table.SetColumnTitle2(index, title, True) is not True:
+        if table.SetColumnTitle2(index, title, False) is not True:
             raise RuntimeError(f"end bracket hole-table {title} title did not set")
     texts = {
         kind: {_SIZE: size_text(kind), _MATE: MATE_CELLS[kind]} for kind in spans
@@ -605,7 +629,7 @@ def _finish_hole_table(adapter: Any, table: Any) -> dict[str, str]:
         for column, text in texts[kind].items():
             if table.IsCellTextEditable(first, column) is not True:
                 raise RuntimeError(f"end bracket hole-table cell {first},{column} is locked")
-            table.SetText2(first, column, True, text)
+            table.SetText2(first, column, False, text)
             if last > first and table.MergeCells(first, column, last, column) is not True:
                 raise RuntimeError(f"end bracket hole table refused to merge {kind} {column}")
     for column, width in HOLE_TABLE_WIDTHS.items():
@@ -768,8 +792,8 @@ async def build(adapter: Any) -> dict[str, str]:
         hole_points=tuple(on_plan((x, 0.0, _H)) for _kind, x in TABLE_HOLES),
         hole_entities=_hole_rims(plan),
         # X LOC = the station from the inner end; Y LOC = the row from the
-        # -Y side face, both at .XXX.
-        expected_locations_mm=tuple((x, HOLE_ROW_Y) for _kind, x in TABLE_HOLES),
+        # -Y side face, both at .XXX. _table_rows binds every printed row to
+        # its station (the shared check cannot read the KP08 rows' band).
         anchor_xy=HOLE_TABLE_ANCHOR,
         basic_locations=False,
         label="end bracket taps",

@@ -310,7 +310,7 @@ def test_hole_table_lists_every_tap_once_in_two_size_groups() -> None:
     # stations' and the row's own datums.
     assert drawing.TABLE_ORIGIN_MODEL == (0.0, -spec.HALF_WIDTH, spec.BRACKET_THICK)
     sheet = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "expected_locations_mm=tuple((x, HOLE_ROW_Y)" in sheet
+    assert "abs(y_mm - HOLE_ROW_Y) > _TABLE_LOCATION_TOLERANCE_MM" in sheet
     assert "basic_locations=False" in sheet  # no datums, no BASIC (rule 5)
     assert "location_places=_PLACES" in sheet
 
@@ -345,6 +345,17 @@ def test_table_groups_need_one_contiguous_tag_run_per_size() -> None:
         drawing.table_groups(mixed)
     with pytest.raises(RuntimeError, match="lacks a tap group"):
         drawing.table_groups(_rows("bar", "bar", "bar", "bar"))
+
+
+def test_loc_cells_parse_with_only_the_title_block_band() -> None:
+    # r1 readback: the KP08 rows carry the part's native band as ±.005.
+    assert drawing.location_mm(".285", label="x") == pytest.approx(7.239)
+    assert drawing.location_mm(".548 ±.005", label="x") == pytest.approx(13.9192)
+    assert drawing.location_mm("2.202±.005", label="x") == pytest.approx(55.9308)
+    with pytest.raises(RuntimeError, match="foreign band"):
+        drawing.location_mm(".548 ±.010", label="x")
+    with pytest.raises(RuntimeError, match="unparseable"):
+        drawing.location_mm("13.925 mm", label="x")
 
 
 def test_each_size_prints_once_without_the_title_block_class() -> None:
