@@ -30,7 +30,8 @@ def test_registry_row_is_the_turned_brass_washer() -> None:
     assert int(row["quantity"]) == spec.QUANTITY == 1
     assert row["drawing_unit"] == spec.UNIT == "in"
     assert "C36000" in row["material_specification"]
-    assert part.PART_NAME == STEM
+    # A literal, so verify's static PART_NAME scan registers the build.
+    assert part.PART_NAME == spec.STEM == STEM
     assert part.MATERIAL == "Brass"
 
 
