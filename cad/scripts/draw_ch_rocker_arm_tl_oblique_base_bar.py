@@ -229,8 +229,11 @@ def _below_line(k: int) -> float:
 # station, the far slot's, the far row's, the length. A span shorter than
 # its text prints the text beside it, clear of both extension lines (r2
 # struck "2X 13.50" and "20.9" with their own lines): the near station's
-# right of the slot's centre line; the near row's (57.000 ±0.13 mm, wider
-# than its span) right of its own extension line. The width's "2X 13.50 THRU"
+# left of the end face's extension line, where no other line runs (right of
+# the slot's centre line it stood about 1.2 short of the near bracket row's
+# extension line once the centred feed block moved that row to 47.484); the
+# near row's (its metric station and band, wider than its span) right of its
+# own extension line. The width's "2X 13.50 THRU"
 # (r5: the slots' depth) sits right of the near row's extension line, which
 # runs down through lane 0 too close to the slot for the text to fit
 # between them (Y14.5 lets an extension line cross a dimension line).
@@ -266,7 +269,7 @@ _RAIL_ROW_TEXT_HALF = 0.0182
 _BAR_WIDTH_TEXT_HALF = 0.0055
 # The metric vendor stations at about 2.6 a glyph (owner ruling 4).
 _RAIL_HOLE_TEXT_HALF = 0.0221  # Three-place station and band, 17 glyphs maximum
-_BRACKET_NEAR_X_TEXT_HALF = 0.0195  # "57.00 ±0.13 mm", 15 glyphs
+_BRACKET_NEAR_X_TEXT_HALF = 0.0195  # "47.48 ±0.13 mm", 14 glyphs; 15 allowed
 _BRACKET_ROW_TEXT_HALF = 0.0195  # "54.909 ±0.13 mm", 15 glyphs
 _BRACKET_OUTER_TEXT_BELOW = 0.004  # "12.909 ±0.13 mm"'s centre under the -Y edge
 # The outer row's text stands on a shoulder right of its own line, so the
@@ -333,7 +336,7 @@ FRONT_KEEP = {
         _below_line(0) + TEXT_DROP,
     ),
     "NearSlotX": (
-        _sheet_x(FRONT_CENTER, NEAR_SLOT_X) + _TEXT_GAP + _NEAR_SLOT_X_TEXT_HALF,
+        _LEFT - _TEXT_GAP - _NEAR_SLOT_X_TEXT_HALF,
         _below_line(1) + TEXT_DROP,
     ),
     "BracketHole1X": (
