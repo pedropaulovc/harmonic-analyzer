@@ -2647,7 +2647,7 @@ def test_hole_sheet_callout_check_runs_on_every_callout_before_finalize() -> Non
         ("TRANSFER_BLOCK_CALLOUT", f"TRANSFER FROM MHA-DT-18\nAFTER {step_ref('rig-set')};\n"),
         ("TRANSFER_PEDESTAL_CALLOUT", "TRANSFER FROM MHA-DT-02\nAT ASSEMBLY;\n"),
         ("TRANSFER_SPRING_CALLOUT", f"TRANSFER FROM MHA-DT-24\nAFTER {step_ref('rig-set')};\n"),
-        ("CROSS_TAP_PROCESS", "FAR WALL ONLY\n"),
+        ("CROSS_TAP_PROCESS", "DEPTHS FROM SPOTFACE FLOOR\nFAR WALL ONLY "),
     ],
 )
 def test_base_callout_prefix_is_the_shared_helpers(
@@ -2655,8 +2655,9 @@ def test_base_callout_prefix_is_the_shared_helpers(
 ) -> None:
     # Main's hb-notes-2 ruling (a): the block and pedestal callouts end their
     # process text with a newline so the 8-32 thread gets its own fourth line;
-    # the cross-tap thread gets its own row the same way, and so does the
-    # spring's since its step citation outgrew a joined row. add_native_hole_callout writes exactly
+    # so does the spring's since its step citation outgrew a joined row. The
+    # cross-tap's FAR WALL ONLY joins its thread row, as the top frame's does,
+    # under the depths' datum row. add_native_hole_callout writes exactly
     # compose_hole_callout_prefix's result into the prefix DEFINITION.
     import draw_fr_harmonic_base as sheet
 
@@ -2732,20 +2733,20 @@ def test_callout_rules_fail_the_hb_render_4_cross_tap_block() -> None:
 
 
 def test_cross_tap_callout_carries_hole_facts_only() -> None:
-    # hb-render-4 eye pass: count/drill/depth, the thru instruction and the
-    # thread each on a row; the depth datum is the model's (the tap starts on
-    # the spotface floor) and the X location is a dimension, not text.
+    # hb-render-4 eye pass: count/drill/depth, the depths' datum and the
+    # thread each on a row; the X location is a dimension, not text.
     import inspect
 
     import draw_fr_harmonic_base as sheet
 
-    assert sheet.CROSS_TAP_PROCESS == "FAR WALL ONLY\n"
+    assert sheet.CROSS_TAP_PROCESS == "DEPTHS FROM SPOTFACE FLOOR\nFAR WALL ONLY"
     assert "THRU" not in sheet.CROSS_TAP_PROCESS
     source = inspect.getsource(sheet)
-    for gone in ("DEPTHS FROM SPOTFACE FLOOR\n", "ON A1-A4 X CENTRES\n", "2 EACH FRONT/REAR FACE"):
+    for gone in ("ON A1-A4 X CENTRES\n", "2 EACH FRONT/REAR FACE"):
         assert gone not in source
-    # The Hole Wizard seats the taps on the spotface floor, so its depths
-    # already run from there.
+    # The Hole Wizard seats the taps on the spotface floor, the datum the
+    # callout names (two of three machinist reviews asked for it once the
+    # near wall became a clearance, run 20261106T172701582Z).
     assert part.BASE_SPOTFACE_PLANE_Z - part.BASE_SPOTFACE_DEPTH == part.BASE_SCREW_SEAT_Z
 
 
@@ -2764,7 +2765,7 @@ def test_cross_near_wall_clearance_callout_drills_to_the_socket() -> None:
     )
     # Seat .826 off the socket axis: the drill stops once it opens the socket.
     assert spec.depth_mm == pytest.approx(part.BASE_SCREW_SEAT_Z - 112.014)
-    assert sheet.CROSS_TAP_PROCESS == "FAR WALL ONLY\n"
+    assert sheet.CROSS_TAP_PROCESS.endswith("FAR WALL ONLY")
     native = {
         5: "",
         6: "",

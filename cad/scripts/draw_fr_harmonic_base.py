@@ -264,7 +264,9 @@ NOTE_ROW_M = 0.0046
 PEDESTAL_CALLOUT_XY = (0.200, 0.252)
 BLOCK_CALLOUT_XY = (0.272, 0.252)
 SPRING_CALLOUT_XY = (0.315, 0.1428)
-CROSS_TAP_CALLOUT_XY = (0.285, 0.117)
+# Centred left of the old 0.285 so the right shoulder end, where the leader
+# leaves, stays put while the wider DEPTHS / FAR WALL ONLY rows grow left.
+CROSS_TAP_CALLOUT_XY = (0.273, 0.117)
 # The near-wall clearance callout stands right of the cross-tap block, on its
 # row, short of section A-A: its leader drops onto the same +X entry the tap
 # leader reaches from the left.
@@ -1269,15 +1271,18 @@ TRANSFER_NAMEPLATE_LEADER_HOLE = max(
 PIVOT_SEAT_NOTE_XY = (0.020, 0.100)
 
 # The cross-tap callout carries hole facts only, in three rows: count, drill
-# and depth; this instruction; the thread and its depth, on its own row. The
-# old "DEPTHS FROM SPOTFACE FLOOR" row restated the model: the Hole Wizard
-# seats each tap ON the spotface floor (build_harmonic_base places it at
-# BASE_SCREW_SEAT_Z), and its depths run from that face. "ON A1-A4 X
+# and depth; the depths' datum; the thread and its depth after FAR WALL
+# ONLY. The Hole Wizard seats each tap ON the spotface floor
+# (build_harmonic_base places it at BASE_SCREW_SEAT_Z) and its depths run
+# from that face, but the print has to say so: with the near wall cleared
+# and the thread starting past the socket, two of three machinist reviews
+# asked which face 1.93 and 1.81 start from (run 20261106T172701582Z), as
+# the top frame's DEPTHS FROM COUNTERBORE FLOOR answers. "ON A1-A4 X
 # CENTRES" was a location, now the CrossTapX/CrossTapFarX dimensions, and
 # the spotface callout's 4X FRONT/REAR already counts the faces. The near
 # wall is the ⌀.206 clearance (owner ruling 2026-11-05), called out on its
 # own, so the thread is the far wall's only.
-CROSS_TAP_PROCESS = "FAR WALL ONLY\n"
+CROSS_TAP_PROCESS = "DEPTHS FROM SPOTFACE FLOOR\nFAR WALL ONLY"
 TRANSFER_HOLES = (
     *TRANSFER_BLOCK_HOLES,
     TRANSFER_SPRING_HOLE,

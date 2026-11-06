@@ -136,9 +136,10 @@ its first-root position; no second general note restates that location.
   stop, so MHA-FR-00 check 2 accepts each installed lower screw at full-form
   far-wall engagement of at least 1.5 screw diameters. The tap keeps its bottoming lead (`↧ 1.93 MIN` drill;
   the lug's past-tip guard leaves no room for a plug lead). The callout reads
-  `FAR WALL ONLY`, and its associative full-thread and minimum-drill depth
-  tokens are unchanged. MHA-FR-02 is not yet converted: its taps still thread
-  both walls in phase.
+  `DEPTHS FROM SPOTFACE FLOOR` / `FAR WALL ONLY 10-32 UNF`, naming the face
+  the depths start from as the top frame's does, and its associative
+  full-thread and minimum-drill depth tokens are unchanged. MHA-FR-02 is not
+  yet converted: its taps still thread both walls in phase.
   The native pedestal-to-pivot X/Y dimensions locate the pivot from the actual
   near pedestal axis with the existing ±0.05 mm functional band. Both carry
   one-line ABOVE `SEE NOTE 1` flags to numbered free note 1 in the B4 notes
