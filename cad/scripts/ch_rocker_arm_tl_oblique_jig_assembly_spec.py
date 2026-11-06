@@ -32,7 +32,10 @@ transferred through the seated nut at assembly (F2).
 
 Every fabricated and purchased family has its own BOM row. Each purchased
 kit's members (the TL-VN-83 rail kit, the TL-VN-84 leadscrew kit and the
-shared clamping kit) are logical rows backed by one configured native model.
+shared clamping kit) are logical rows backed by one configured native model,
+and so are the two TL-20 base bars (oblique simplification PR2: ``Bar1``
+drilled for the end brackets, ``Bar2`` plain; one Number). The rail screws
+and the TL-28 bar screws are one common screw and one row (TL-VN-61).
 PLACEMENTS, QUANTITIES and BOM_ORDER are the builder and drawing authority.
 
 Mates and the sweep: the structure is fixed; the carriages slide on their
@@ -84,6 +87,7 @@ import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_vn_oblique_cl_dowel_spec as cl_dowel
 import ch_rocker_arm_tl_vn_oblique_clamp_screw_spec as clamp_screw
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
+import ch_rocker_arm_tl_oblique_end_bracket_spec as end_bracket
 import ch_rocker_arm_tl_oblique_feed_lever_spec as feed_lever
 import sh_vn_clamping_kit_flange_nut_spec as flange_nut
 import ch_rocker_arm_tl_vn_oblique_handwheel_spec as handwheel
@@ -95,7 +99,6 @@ import ch_rocker_arm_tl_oblique_feed_block_spec as feed_block
 import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec as leadscrew_stock
 import ch_rocker_arm_tl_vn_oblique_lever_screw_spec as lever_screw
 import ch_rocker_arm_tl_vn_oblique_lever_washer_spec as lever_washer
-import ch_rocker_arm_tl_vn_oblique_kp08_screw_spec as kp08_screw
 import ch_rocker_arm_tl_vn_oblique_pillow_block_spec as pillow_block
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_vn_oblique_rail_screw_spec as rail_screw
@@ -145,6 +148,11 @@ def _torque(nm: float) -> str:
 
 
 BASE_BAR = "ch-rocker-arm-tl-oblique-base-bar"
+# The base bar's two members (one native model, one Number): Bar1 under rail
+# 1 carries the TL-28 bracket holes, Bar2 under rail 2 is plain.
+BASE_BAR_1 = f"{BASE_BAR}--{base_bar.BAR1}"
+BASE_BAR_2 = f"{BASE_BAR}--{base_bar.BAR2}"
+BASE_BARS = (BASE_BAR_1, BASE_BAR_2)
 PIVOT_BLOCK = "ch-rocker-arm-tl-oblique-pivot-block"
 FEED_BLOCK = "ch-rocker-arm-tl-oblique-feed-block"
 PIVOT_SCREW = "ch-rocker-arm-tl-vn-oblique-pivot-screw"
@@ -171,10 +179,12 @@ CLAMPING_KIT = "sh-vn-clamping-kit-hardware"
 HOLD_DOWN_STUD = "sh-vn-clamping-kit-hardware--HoldDownStud"
 T_NUT = "sh-vn-clamping-kit-hardware--TNut"
 FLANGE_NUT = "sh-vn-clamping-kit-hardware--FlangeNut"
+# The jig's common #8-32 x 3/4 SHCS: the rail screws, then the TL-28 bar
+# screws (fasteners.COMMON_SCREW_ROWS), one row.
 RAIL_SCREW = "ch-rocker-arm-tl-vn-oblique-rail-screw"
-BRACKET_SCREW = "ch-rocker-arm-tl-vn-oblique-bracket-screw"
 CARRIAGE_SCREW = "ch-rocker-arm-tl-vn-oblique-carriage-screw"
-PILLOW_BLOCK_SCREW = "ch-rocker-arm-tl-vn-oblique-kp08-screw"
+# TL-VN-62, #8-32 x 5/8 SHCS: each KP08 down into its TL-28.
+PILLOW_BLOCK_SCREW = "ch-rocker-arm-tl-vn-oblique-bracket-screw"
 RISER_SCREW = "ch-rocker-arm-tl-vn-oblique-riser-screw"
 CLAMP_SCREW = "ch-rocker-arm-tl-vn-oblique-clamp-screw"
 LEVER_SCREW = "ch-rocker-arm-tl-vn-oblique-lever-screw"
@@ -184,7 +194,8 @@ LEVER_LOCK_WASHER = "ch-rocker-arm-tl-vn-oblique-lever-washer"
 # moves and the drawing proves this inventory in its established item order.
 # The bought counts are each member's own, never the number of purchased kits.
 QUANTITIES = {
-    BASE_BAR: base_bar.QUANTITY,
+    BASE_BAR_1: base_bar.CONFIGURATION_QUANTITIES[base_bar.BAR1],
+    BASE_BAR_2: base_bar.CONFIGURATION_QUANTITIES[base_bar.BAR2],
     CARRIER: 1,
     PIVOT_BLOCK: 1,
     FEED_BLOCK: 1,
@@ -206,9 +217,8 @@ QUANTITIES = {
     T_NUT: t_nut.QUANTITY,
     FLANGE_NUT: flange_nut.QUANTITY,
     RAIL_SCREW: rail_screw.QUANTITY,
-    BRACKET_SCREW: bracket_screw.QUANTITY,
     CARRIAGE_SCREW: carriage_screw.QUANTITY,
-    PILLOW_BLOCK_SCREW: kp08_screw.QUANTITY,
+    PILLOW_BLOCK_SCREW: bracket_screw.QUANTITY,
     RISER_SCREW: riser_screw.QUANTITY,
     CLAMP_SCREW: clamp_screw.QUANTITY,
     LEVER_SCREW: lever_screw.QUANTITY,
@@ -218,7 +228,8 @@ QUANTITIES = {
 # the builder's insertion order (the builder asserts it) and the steps' item
 # numbers (``_item``, ITEM_NUMBERS) read it (c4-r10, rule 25).
 BOM_ORDER = (
-    BASE_BAR,
+    BASE_BAR_1,
+    BASE_BAR_2,
     CARRIER,
     PIVOT_BLOCK,
     FEED_BLOCK,
@@ -240,7 +251,6 @@ BOM_ORDER = (
     T_NUT,
     FLANGE_NUT,
     RAIL_SCREW,
-    BRACKET_SCREW,
     CARRIAGE_SCREW,
     PILLOW_BLOCK_SCREW,
     RISER_SCREW,
@@ -269,10 +279,22 @@ if (
     leadscrew_stock.CONFIGURATION, feed_nut.CONFIGURATION,
 ) != tuple(KIT_IDENTITIES[family][1] for family in (RAIL, CARRIAGE, LEADSCREW, FEED_NUT)):
     raise AssertionError("a kit family's configuration is not its member spec's")
+# The fabricated configured members (not purchased kits: no SKU key).
+FABRICATED_MEMBER_IDENTITIES = {
+    BASE_BAR_1: (BASE_BAR, base_bar.BAR1),
+    BASE_BAR_2: (BASE_BAR, base_bar.BAR2),
+}
+if tuple(member for _physical, member in FABRICATED_MEMBER_IDENTITIES.values()) != (
+    base_bar.CONFIGURATIONS
+):
+    raise AssertionError("the jig's base bar members are not the part's configurations")
+# Every configured member family, fabricated or purchased: each instance is a
+# persisted role reference (``instance_name``).
+MEMBER_IDENTITIES = {**FABRICATED_MEMBER_IDENTITIES, **KIT_IDENTITIES}
 COMPONENT_IDENTITIES: dict[str, tuple[str, str | None]] = {
     family: (family, None) for family in BOM_ORDER
 }
-COMPONENT_IDENTITIES.update(KIT_IDENTITIES)
+COMPONENT_IDENTITIES.update(MEMBER_IDENTITIES)
 
 
 def component_family(native_stem: str, configuration: str) -> str:
@@ -303,12 +325,15 @@ POSE = trammel.carrier_pose(PASS, THETA)
 PIN_STATION = trammel.SYMMETRIC_PIN_STATION[PASS]  # ⚙ 227.404 on both rails
 CARRIAGE_STATION = PIN_STATION - trammel.PIN_OFFSET  # ⚙ 259.404
 RAILS = (1, 2)  # rail 1 on the -X side, rail 2 on the +X side
-# One base bar part (TL-20, QTY 2). Rail 1 takes it as saved; rail 2 takes it
-# turned over (180° about its long axis), which swaps its slots' sides so
-# each slot still lands on its T-slot stud. Every bar feature goes through.
+# One base bar part (TL-20, QTY 2), two members: rail 1 takes Bar1 as saved;
+# rail 2 takes Bar2 turned over (180° about its long axis), which swaps its
+# slots' sides so each slot still lands on its T-slot stud. Every Bar2
+# feature goes through.
 TURNED_OVER = {1: False, 2: True}
-if base_bar.QUANTITY != len(RAILS):
+if base_bar.QUANTITY != len(RAILS) or len(BASE_BARS) != len(RAILS):
     raise AssertionError("one base bar under each rail")
+if leadscrew.RAIL != RAILS.index(1) + 1 or TURNED_OVER[leadscrew.RAIL]:
+    raise AssertionError("the bracket holes' Bar1 lies unturned under the leadscrew rail")
 
 
 def _unit(vector: tuple[float, float]) -> tuple[float, float]:
@@ -650,14 +675,15 @@ T_NUT_PLACEMENTS = HOLD_DOWN_STUD_PLACEMENTS  # +X along the table's T-slot
 FLANGE_NUT_PLACEMENTS: tuple[Placement, ...] = tuple(
     ((*xy, FLANGE_NUT_SEAT_Z), UPRIGHT_ROWS) for xy in STUD_XY
 )
-# Screws, head on its seat: rail 1's seven then rail 2's; bracket screws up
-# from bar 1's underside; four per block into its carriage; two per KP08.
+# Screws, head on its seat: rail 1's then rail 2's; the TL-28 bar screws (the
+# same common screw) up from Bar1's underside, two per bracket; four per
+# block into its carriage; two per KP08.
 RAIL_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
     compose(rail, (x, 0.0, trammel.RAIL_SCREW_SEAT_ABOVE_BASE), UPRIGHT_ROWS)
     for rail in RAIL_PLACEMENTS
     for x in guide_rail.HOLE_X
 )
-BRACKET_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
+BAR_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
     compose(
         BASE_BAR_PLACEMENTS[RAILS.index(leadscrew.RAIL)],
         (*hole, base_bar.BRACKET_CBORE_DEPTH),
@@ -819,7 +845,8 @@ PIVOT_FIT_PACK_MAX = math.ceil(max(pack for _, pack in _fits) / _THOU - 1e-9) * 
 # Every instance of every logical family, in insertion order. Ordinary families
 # keep native <stem>-N names; kit instances use persisted role-local references.
 PLACEMENTS: dict[str, tuple[Placement, ...]] = {
-    BASE_BAR: BASE_BAR_PLACEMENTS,
+    BASE_BAR_1: (BASE_BAR_PLACEMENTS[RAILS.index(1)],),
+    BASE_BAR_2: (BASE_BAR_PLACEMENTS[RAILS.index(2)],),
     CARRIER: ((CARRIER_ORIGIN, CARRIER_ROWS),),
     PIVOT_BLOCK: PIVOT_BLOCK_PLACEMENTS,
     FEED_BLOCK: FEED_BLOCK_PLACEMENTS,
@@ -840,8 +867,8 @@ PLACEMENTS: dict[str, tuple[Placement, ...]] = {
     HOLD_DOWN_STUD: HOLD_DOWN_STUD_PLACEMENTS,
     T_NUT: T_NUT_PLACEMENTS,
     FLANGE_NUT: FLANGE_NUT_PLACEMENTS,
-    RAIL_SCREW: RAIL_SCREW_PLACEMENTS,
-    BRACKET_SCREW: BRACKET_SCREW_PLACEMENTS,
+    # One BOM row, two joints: the rail screws, then the TL-28 bar screws.
+    RAIL_SCREW: RAIL_SCREW_PLACEMENTS + BAR_SCREW_PLACEMENTS,
     CARRIAGE_SCREW: CARRIAGE_SCREW_PLACEMENTS,
     PILLOW_BLOCK_SCREW: PILLOW_BLOCK_SCREW_PLACEMENTS,
     # One BOM row, two joints: the riser's 4, then the feed nut's 4.
@@ -853,17 +880,25 @@ PLACEMENTS: dict[str, tuple[Placement, ...]] = {
 
 
 def instance_name(stem: str, index: int) -> str:
-    """Selector for family instance ``index`` (0-based), not a guessed kit Name2."""
-    if stem in KIT_IDENTITIES:
-        return f"@{KIT_IDENTITIES[stem][1]}:{index + 1}"
+    """Selector for family instance ``index`` (0-based), not a guessed member Name2."""
+    if stem in MEMBER_IDENTITIES:
+        return f"@{MEMBER_IDENTITIES[stem][1]}:{index + 1}"
     return f"{stem}-{index + 1}"
 
 
-KIT_COMPONENT_REFERENCES = {
+MEMBER_COMPONENT_REFERENCES = {
     instance_name(family, index): identity
-    for family, identity in KIT_IDENTITIES.items()
+    for family, identity in MEMBER_IDENTITIES.items()
     for index in range(QUANTITIES[family])
 }
+# The rail screw family's occurrences by joint (PLACEMENTS' order).
+RAIL_SCREW_INSTANCES = tuple(
+    instance_name(RAIL_SCREW, index) for index in range(len(RAIL_SCREW_PLACEMENTS))
+)
+BAR_SCREW_INSTANCES = tuple(
+    instance_name(RAIL_SCREW, len(RAIL_SCREW_PLACEMENTS) + index)
+    for index in range(len(BAR_SCREW_PLACEMENTS))
+)
 # The riser screw family's occurrences by joint (PLACEMENTS' order).
 RISER_SCREW_INSTANCES = tuple(
     instance_name(RISER_SCREW, index) for index in range(len(RISER_SCREW_PLACEMENTS))
@@ -957,7 +992,9 @@ COVER_Y = trammel.THROAT_TO_COVER  # the column's pleated cover, 7.5 in from the
 # The TL-VN-83 kit rail and carriages carry the owner's description note
 # under the BOM (BOM_NOTE, #2177). Screws by their fastener-table callout.
 BOM_DESCRIPTIONS = {
-    BASE_BAR: "BASE BAR",
+    # The base bar members print their native configuration descriptions.
+    BASE_BAR_1: base_bar.CONFIGURATION_DESCRIPTIONS[base_bar.BAR1],
+    BASE_BAR_2: base_bar.CONFIGURATION_DESCRIPTIONS[base_bar.BAR2],
     PIVOT_BLOCK: "PIVOT BLOCK",
     FEED_BLOCK: "FEED BLOCK",
     PIVOT_SCREW: "5/16-18 SHOULDER SCREW, 3/8 X 1-1/2",
@@ -987,9 +1024,8 @@ BOM_DESCRIPTIONS = {
     T_NUT: t_nut.BOM_DESCRIPTION,
     FLANGE_NUT: flange_nut.BOM_DESCRIPTION,
     RAIL_SCREW: rail_screw.CALLOUT,
-    BRACKET_SCREW: bracket_screw.CALLOUT,
     CARRIAGE_SCREW: carriage_screw.CALLOUT,
-    PILLOW_BLOCK_SCREW: kp08_screw.CALLOUT,
+    PILLOW_BLOCK_SCREW: bracket_screw.CALLOUT,
     RISER_SCREW: f"{riser_screw.CALLOUT} SCREW",
     CLAMP_SCREW: clamp_screw.CALLOUT,
     LEVER_SCREW: lever_screw.CALLOUT,
@@ -1045,17 +1081,17 @@ EXPLODE_STEPS = (
     ("blocks lift off", (PIVOT_BLOCK, FEED_BLOCK, *_BLOCK_RIDERS), "z", 90.0),
     ("carriage screws lift out", (CARRIAGE_SCREW,), "z", 60.0),
     ("carriages lift off the rails", (CARRIAGE,), "z", 50.0),
-    ("rail screws lift out", (RAIL_SCREW,), "z", 35.0),
+    ("rail screws lift out", RAIL_SCREW_INSTANCES, "z", 35.0),
     ("handwheel slides off", (HANDWHEEL,), "x", -50.0),
     ("kp08 screws lift out", (PILLOW_BLOCK_SCREW,), "z", 40.0),
-    ("bracket screws drop out", (BRACKET_SCREW,), "z", -40.0),
+    ("bar screws drop out", BAR_SCREW_INSTANCES, "z", -40.0),
     ("flange nuts lift off", (FLANGE_NUT,), "z", 60.0),
     ("t-nuts drop out", (T_NUT,), "z", -30.0),
 )
 # Shown where they are fitted: the table-side structure and the feed's
 # stationary parts every exploded item is read against.
 EXPLODE_STATIC = (
-    BASE_BAR,
+    *BASE_BARS,
     END_BRACKET,
     RAIL,
     LEADSCREW,
@@ -1076,7 +1112,7 @@ def explode_shift(component_or_family: str, axis: str) -> float:
         family = component_or_family
         names = tuple(instance_name(family, index) for index in range(QUANTITIES[family]))
     else:
-        identity = KIT_COMPONENT_REFERENCES.get(component_or_family)
+        identity = MEMBER_COMPONENT_REFERENCES.get(component_or_family)
         if identity is not None:
             family = component_family(*identity)
         else:
@@ -1148,7 +1184,7 @@ _static = {
 }
 if _moved & _static or _moved | _static != INSTANCE_NAMES:
     raise AssertionError("every occurrence is exploded or deliberately static, not both")
-_RAIL_SCREW_TOP_EXPLODED = RAIL_TOP_Z + explode_lift(RAIL_SCREW)
+_RAIL_SCREW_TOP_EXPLODED = RAIL_TOP_Z + max(map(explode_lift, RAIL_SCREW_INSTANCES))
 if _RAIL_SCREW_TOP_EXPLODED > CARRIAGE_UNDERSIDE_Z + explode_lift(CARRIAGE):
     raise AssertionError("the exploded rail screws stand inside the carriages")
 # Each exploded sheet's cross-reference, after its cluster's title; the
@@ -1408,13 +1444,58 @@ FEED_THRUST_N = (
     * _SCREW_EFFICIENCY
     / (leadscrew_stock.LEAD / 1000.0)
 )  # 1361
-# Owner ruling 2026-10-27: TL-28 may lift its heel elastically under this
-# thrust (it opens at leadscrew.BRACKET_OPENING_THRUST, 704 N); slip governs.
-if leadscrew.BRACKET_SLIP_THRUST < leadscrew.SLIP_MARGIN_MIN * FEED_THRUST_N:
+# FEED_THRUST_N is the crank's abuse envelope, not the cutting load.
+#
+# The normal finish feed's thrust, from the cut itself: the 3/8 four-flute
+# HSS cutter (trammel.PART_CUTTER_DIA) on the rocker arm's low-carbon steel at
+# cutting-data.toml's profile chip load for that cutter (0.0254 mm/tooth).
+# Specific cutting force kc = kc1 h^-mc with kc1 1500 N/mm², mc 0.22
+# (SOURCED: Machining Doctor, Specific Cutting Force, material group 02,
+# low-carbon steel), h the chip load (its maximum, a full-slot entry). Each
+# tooth's tangential force kc ap h over the whole strap (ap = STRAP_THICK,
+# one pass). AUTHOR'S CHOICE: at most two teeth cut at once (a full slot,
+# 4 flutes) and each tooth's radial force is no larger than its tangential,
+# so the cutter's resultant is at most 2 sqrt(2) times one tooth's.
+_CUT_KC1_MPA = 1500.0
+_CUT_MC = 0.22
+_CUT_TEETH_ENGAGED = 2
+NORMAL_FEED_CHIP_LOAD_MM = 0.0254  # cutting-data.toml: low-carbon steel, HSS profile, 3-12.7
+_CUT_KC_MPA = _CUT_KC1_MPA * NORMAL_FEED_CHIP_LOAD_MM ** (-_CUT_MC)  # 3364
+_CUT_TOOTH_FORCE_N = _CUT_KC_MPA * trammel.STRAP_THICK * NORMAL_FEED_CHIP_LOAD_MM  # 213
+NORMAL_CUT_FORCE_N = _CUT_TEETH_ENGAGED * math.sqrt(2.0) * _CUT_TOOTH_FORCE_N  # 602
+
+
+def _feed_ratio(theta: float) -> float:
+    """Leadscrew thrust per newton along the cutter's path (virtual work):
+    the cutter centre moves R dθ while carriage 1's pin moves
+    ds_A = R cos((ALPHA + θ)/2) dθ (trammel.pin_station)."""
+    return 1.0 / math.cos((trammel.ALPHA + theta) / 2.0)
+
+
+NORMAL_FEED_RATIO = max(
+    _feed_ratio(sign * trammel.SWEEP[name])
+    for name in trammel.PASS_RADIUS
+    for sign in (-1.0, 1.0)
+)  # 1.03 at the sweep's end
+NORMAL_FEED_THRUST_N = NORMAL_CUT_FORCE_N * NORMAL_FEED_RATIO  # 619
+# Owner ruling Main 2026-11-06 (option B; replaces the 2026-10-27 slip-governs
+# criterion for TL-28 on TL-20 only): no slip under the normal feed; above
+# leadscrew.BRACKET_SLIP_THRUST (1344 N, handwheel abuse) TL-28 may slip onto
+# its bar screws' positive thread stop, which carries the abuse envelope.
+# The heel's elastic opening (leadscrew.BRACKET_OPENING_THRUST) is reported.
+if leadscrew.BRACKET_SLIP_THRUST < leadscrew.SLIP_MARGIN_MIN * NORMAL_FEED_THRUST_N:
     raise AssertionError(
         f"TL-28 slips at {leadscrew.BRACKET_SLIP_THRUST:.0f} N, under "
-        f"{leadscrew.SLIP_MARGIN_MIN} x the {FEED_THRUST_N:.0f} N feed thrust"
+        f"{leadscrew.SLIP_MARGIN_MIN} x the {NORMAL_FEED_THRUST_N:.0f} N normal feed"
     )
+BRACKET_ABUSE_THRUST_N = max(FEED_THRUST_N, leadscrew.HAND_ABUSE_THRUST)  # 1361
+BRACKET_ABUSE_STOP_MARGINS = leadscrew.bracket_stop_margins(BRACKET_ABUSE_THRUST_N)
+for _check, _margin in BRACKET_ABUSE_STOP_MARGINS.items():
+    if _margin < leadscrew.STOP_MARGIN_MIN:
+        raise AssertionError(
+            f"TL-28's positive stop fails its {_check} at the "
+            f"{BRACKET_ABUSE_THRUST_N:.0f} N crank envelope ({_margin:.2f})"
+        )
 _AL_SHEAR_ULTIMATE_MPA = 207.0
 _STRIP_SAFETY = 3.0
 _NUT_FACTOR = 0.20
@@ -1529,20 +1610,22 @@ _AL_YIELD_MPA = 276.0
 _NUT_TORQUE = _torque(NUT_SCREW_TORQUE_NM)
 
 # --- The KP08 screws: their tightening torque -----------------------------------
-# Each #6-32 X 5/8 BHCS (TL-VN-65) clamps a KP08's cast foot to TL-28. The
-# listing's title says zinc alloy and its description cast iron; the jig
+# Each #8-32 X 5/8 SHCS (TL-VN-62; owner ruling Main 2026-11-06, option B,
+# expressly approves this second length) clamps a KP08's cast foot to TL-28.
+# The listing's title says zinc alloy and its description cast iron; the jig
 # takes the weaker, zinc (Zamak 3, yield 208 MPa, SOURCED: AZoM
 # https://www.azom.com/article.aspx?ArticleID=9565, read 2026-11-04). The
-# torque stays under Holo-Krome's 15 in·lbf for a #6 button head (SOURCED:
-# https://www.holo-krome.com/uploads/7/2/7/5/72754089/hk_torquedatachart.pdf,
-# read 2026-11-04). The head bears on the foot round the Ø5 hole with the
-# block floated fully to one side (kp08_screw.HOLE_FLOAT); the tap is the
-# worst-case full thread in TL-28's 6061.
+# head bears on the foot round the Ø5 hole (UNVERIFIED, #2184) with the
+# block floated fully to one side (bracket_screw.HOLE_FLOAT); the tap is the
+# worst-case full thread in TL-28's 6061 top-face thread. The torque is kept
+# at 1.0 N·m for the zinc foot. This is a seating torque: the KP08-to-TL-28
+# joint's slip under thrust was never checked (an inherited open question,
+# not certified here).
 _ZAMAK_YIELD_MPA = 208.0
 KP08_SCREW_TORQUE_NM = 1.0
 KP08_SCREW_PRELOAD_N = KP08_SCREW_TORQUE_NM / (
     _NUT_FACTOR * fasteners.KP08_TO_BRACKET.major_mm / 1000.0
-)  # 1426
+)  # 1200
 KP08_SCREW_ENGAGEMENT_MIN = leadscrew.full_thread_min(
     fasteners.KP08_TO_BRACKET.length, leadscrew.KP08_FOOT_THICK, fasteners.KP08_TO_BRACKET.thread
 )  # 8.67
@@ -1554,7 +1637,7 @@ _KP08_STRIP_N = (
     * fasteners.KP08_TO_BRACKET.major_mm
     * KP08_SCREW_ENGAGEMENT_MIN
     * _AL_SHEAR_ULTIMATE_MPA
-)  # 14.8 kN
+)  # 17.6 kN
 
 
 def _circle_overlap_mm2(r1: float, r2: float, d: float) -> float:
@@ -1569,14 +1652,14 @@ def _circle_overlap_mm2(r1: float, r2: float, d: float) -> float:
     return a1 + a2 - kite
 
 
-KP08_FOOT_BEARING_MM2 = math.pi * kp08_screw.DIMS.bearing_edge_r**2 - _circle_overlap_mm2(
-    kp08_screw.DIMS.bearing_edge_r, leadscrew.KP08_HOLE_DIA / 2.0, kp08_screw.HOLE_FLOAT
-)  # 14.1
-KP08_FOOT_BEARING_MPA = KP08_SCREW_PRELOAD_N / KP08_FOOT_BEARING_MM2  # 101
-# The #6-32 tensile stress area, 0.00909 in² (ASME B1.1), against half the
-# 91255A150's 140,000 psi (SOURCED: McMaster-Carr page, read 2026-11-04).
-_KP08_SCREW_STRESS_AREA_MM2 = 0.00909 * trammel.INCH**2
-_KP08_SCREW_TENSILE_MPA = kp08_screw.TENSILE_PSI * 0.006894757
+KP08_FOOT_BEARING_MM2 = math.pi * bracket_screw.HEAD_BEARING_R**2 - _circle_overlap_mm2(
+    bracket_screw.HEAD_BEARING_R, leadscrew.KP08_HOLE_DIA / 2.0, bracket_screw.HOLE_FLOAT
+)
+KP08_FOOT_BEARING_MPA = KP08_SCREW_PRELOAD_N / KP08_FOOT_BEARING_MM2
+# The #8-32 tensile stress area, 0.0140 in² (ASME B1.1), against half the
+# 91251A196's tensile (bracket_screw.TENSILE_PSI).
+_KP08_SCREW_STRESS_AREA_MM2 = leadscrew.SHCS_8_STRESS_AREA_MM2
+_KP08_SCREW_TENSILE_MPA = bracket_screw.TENSILE_PSI * 0.006894757
 KP08_SCREW_MARGINS = {
     "foot bearing": _ZAMAK_YIELD_MPA / KP08_FOOT_BEARING_MPA,
     "TL-28 thread strip": _KP08_STRIP_N / _STRIP_SAFETY / KP08_SCREW_PRELOAD_N,
@@ -1589,8 +1672,6 @@ for _check, _margin in KP08_SCREW_MARGINS.items():
             f"the KP08 screws at {KP08_SCREW_TORQUE_NM} N·m fail their {_check} "
             f"budget ({_margin:.2f})"
         )
-if KP08_SCREW_TORQUE_NM >= 15.0 * _NM_PER_IN_LBF:
-    raise ValueError("the KP08 screw torque reaches the #6 button head's 15 in·lbf")
 _KP08_TORQUE = _torque(KP08_SCREW_TORQUE_NM)
 
 
@@ -1681,11 +1762,12 @@ GENERAL_TORQUE_NOTE = (
 ASSEMBLY_STEPS = (
     f"1. SCREW AN {guide_rail.STYLE} RAIL {_item(RAIL)} ON EACH BASE BAR WITH "
     f"{trammel.RAIL_HOLE_COUNT} {_RAIL_SCREW} {_item(RAIL_SCREW)}, NEAR ENDS FLUSH: "
-    "ONE BAR AS DRAWN FOR RAIL 1, THE OTHER TURNED OVER FOR RAIL 2, "
-    "ITS COUNTERBORES UP. SCREW AN END BRACKET "
-    f"{_item(END_BRACKET)} ON RAIL 1'S BAR AT EACH KP08 STATION, "
+    f"BASE BAR 1 {_item(BASE_BAR_1)} AS DRAWN FOR RAIL 1, BASE BAR 2 "
+    f"{_item(BASE_BAR_2)} TURNED OVER FOR RAIL 2, IN PLAN THE MIRROR IMAGE OF "
+    "BASE BAR 1. SCREW AN "
+    f"END BRACKET {_item(END_BRACKET)} ON BASE BAR 1 AT EACH KP08 STATION, "
     f"{len(leadscrew.BAR_SCREW_LATERALS)} {_BAR_SCREW} "
-    f"{_item(BRACKET_SCREW)} PER BRACKET FROM BELOW, "
+    f"{_item(RAIL_SCREW)} PER BRACKET FROM BELOW, NO WASHERS, "
     f"{_torque(leadscrew.BAR_SCREW_TORQUE_NM)}.",
     "2. SET BOTH BARS ON THE TABLE, NEAR ENDS TOWARD THE SPINDLE. USE TWO "
     f"UNCUT {fasteners.HOLD_DOWN_STUD_THREAD} STUDS {_item(HOLD_DOWN_STUD)} "
@@ -1724,8 +1806,9 @@ ASSEMBLY_STEPS = (
     "TIGHTEN THE HOLD-DOWN NUTS AND READ EACH STATION AGAIN. SET EACH SWEEP "
     "LIMIT (SHEET 1) THE SAME WAY, CENTRING IN X ONLY, AND WITNESS-MARK EACH "
     "BAR AT ITS CARRIAGE'S SPINDLE-END FACE, I OR O BY PASS.",
-    f"7. FIT EACH KP08 {_item(PILLOW_BLOCK)} WITH 2 {_KP08_SCREW} "
-    f"{_item(PILLOW_BLOCK_SCREW)}, LOOSE.",
+    f"7. CHECK EACH KP08 {_item(PILLOW_BLOCK)} FOOT IS AT LEAST "
+    f"{_bound(end_bracket.KP08_FOOT_THICK_MIN, 3, up=True)} THICK AT ITS 2 HOLES. "
+    f"FIT EACH KP08 WITH 2 {_KP08_SCREW} {_item(PILLOW_BLOCK_SCREW)}, LOOSE.",
     # TL-00 review (farm 20261104T210601055Z, blocker): one linear order,
     # every cross-reference one way: F1A, 8A, F1B, F2, 8B, F3.
     # The Tr8 screw's stub and the hub's gap close its metric cut along the
@@ -2051,8 +2134,10 @@ def _component_local_boxes() -> dict[str, Box3]:
     nut_r = feed_nut.FLANGE_DIA_MAX / 2.0
     # The fitted nut's flange round its axis (+Y), seat face to faced end.
     nut_box = ((-nut_r, nut_r), (0.0, feed_nut.LENGTH_MAX), (-nut_r, nut_r))
+    bar_box = ((0.0, base_bar.BAR_LENGTH), (base_bar.LOW_SIDE_Y, base_bar.HIGH_SIDE_Y), (0.0, base_bar.BAR_THICK))
     boxes = {
-        BASE_BAR: ((0.0, base_bar.BAR_LENGTH), (base_bar.LOW_SIDE_Y, base_bar.HIGH_SIDE_Y), (0.0, base_bar.BAR_THICK)),
+        BASE_BAR_1: bar_box,
+        BASE_BAR_2: bar_box,
         RAIL: ((0.0, guide_rail.LENGTH), (-guide_rail.WIDTH / 2.0, guide_rail.WIDTH / 2.0), (0.0, guide_rail.HEIGHT)),
         CARRIAGE: ((-carriage.LENGTH / 2.0 - carriage.NIPPLE_PROUD, carriage.LENGTH / 2.0 + carriage.PLUG_PROUD), (-carriage.WIDTH / 2.0, carriage.WIDTH / 2.0), (carriage.UNDERSIDE_Z, carriage.MOUNTING_FACE_Z)),
         PIVOT_BLOCK: ((pivot_block.BLOCK_X0, pivot_block.BLOCK_X1), (-pivot_block.BLOCK_WIDTH / 2.0, pivot_block.BLOCK_WIDTH / 2.0), (0.0, pivot_block.BLOCK_HEIGHT)),
@@ -2077,9 +2162,9 @@ def _component_local_boxes() -> dict[str, Box3]:
         RISER_SCREW: _axis_y_box(riser_screw.DIMS.head_dia / 2.0, -riser_screw.DIMS.length, 0.0),
     }
     for stem, screw in (
-        (RAIL_SCREW, rail_screw), (BRACKET_SCREW, bracket_screw),
+        (RAIL_SCREW, rail_screw),
         (CARRIAGE_SCREW, carriage_screw),
-        (PILLOW_BLOCK_SCREW, kp08_screw),
+        (PILLOW_BLOCK_SCREW, bracket_screw),
         (CLAMP_SCREW, clamp_screw), (LEVER_SCREW, lever_screw),
     ):
         radius = max(screw.DIMS.head_dia, screw.DIMS.major_dia) / 2.0
@@ -2091,7 +2176,8 @@ def _component_local_boxes() -> dict[str, Box3]:
 
 def _component_label(stem: str, index: int) -> str:
     names = {
-        BASE_BAR: "base bar", RAIL: "rail", CARRIAGE: "carriage",
+        BASE_BAR_1: "base bar 1", BASE_BAR_2: "base bar 2",
+        RAIL: "rail", CARRIAGE: "carriage",
         PIVOT_BLOCK: "pivot block 2", FEED_BLOCK: "feed block",
         PIVOT_SCREW: "pivot screw", PIVOT_SPACER: "pivot spacer",
         PIVOT_SHIM: "pivot shim",
@@ -2101,7 +2187,7 @@ def _component_label(stem: str, index: int) -> str:
         LEADSCREW: "screw", HANDWHEEL: "handwheel",
         END_BRACKET: "end bracket", PILLOW_BLOCK: "pillow block",
         HOLD_DOWN_STUD: "hold-down stud", T_NUT: "T-nut", FLANGE_NUT: "flange nut",
-        RAIL_SCREW: "rail screw", BRACKET_SCREW: "bracket screw",
+        RAIL_SCREW: "rail screw",
         CARRIAGE_SCREW: "carriage screw",
         PILLOW_BLOCK_SCREW: "pillow block screw",
         RISER_SCREW: "riser screw", CLAMP_SCREW: "clamp screw",
@@ -2538,7 +2624,7 @@ def _right_handed(rows: Rows) -> bool:
 # The bought hardware: one right-handed placement per BOM unit; each carriage
 # seats its pivot block; the KP08 bores sit on the leadscrew's axis; the
 # rail's holes over the bar's tapped holes, read from the bar's underside on
-# rail 1 (the bracket screws come up through bar 1); the underside pick
+# rail 1 (the TL-28 bar screws come up through Bar1); the underside pick
 # clear of the collar and every pin hole; the sweep's end poses at the end stops.
 if set(PLACEMENTS) != set(BOM_ORDER) or any(
     len(PLACEMENTS[stem]) != QUANTITIES[stem] for stem in BOM_ORDER
@@ -2565,7 +2651,7 @@ _tap_out = [_tap_x * _wheel_rows[0][i] + _tap_z * _wheel_rows[2][i] for i in ran
 if math.dist(_tap_out, _screw_rows[0]) > 1e-9:
     raise AssertionError("the handwheel's set screw is not clocked to the flats")
 if guide_rail.HOLE_X != base_bar.RAIL_HOLE_X or TURNED_OVER[leadscrew.RAIL]:
-    raise AssertionError("the rail holes or the bracket screws miss the bar")
+    raise AssertionError("the rail holes or the TL-28 bar screws miss the bar")
 if CARRIER_ORIGIN[2] != trammel.CARRIER_TOP_Z:
     raise AssertionError("the carrier's origin (its Top plane) is not its top face")
 for _pass, _stops in trammel.END_STOPS.items():

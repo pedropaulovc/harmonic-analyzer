@@ -111,8 +111,9 @@ not move the correctly placed note merely to satisfy an obsolete inset.
 
 A purchased-part sheet whose registry number overruns the DWG. NO. cell into
 REV opts in by passing `number_fit=NumberFit.SHRINK_TO_CELL` to
-`build_purchased_fastener_drawing`; the four oblique-trammel vendor screws,
-MHA-CH-06-TL-VN-65 to -68, do. Once the links resolve, the builder measures
+`build_purchased_fastener_drawing`; the oblique-trammel vendor sheets that
+overrun (for example the MHA-CH-06-TL-VN-67 riser screw) do. Once the links
+resolve, the builder measures
 the existing `$PRPSHEET:"Number"` note. Only if it ends less than 1.2 mm
 before the REV divider does one proportional write lower that note's local
 character height, aimed 0.3 mm inside that limit. The link, number, typeface

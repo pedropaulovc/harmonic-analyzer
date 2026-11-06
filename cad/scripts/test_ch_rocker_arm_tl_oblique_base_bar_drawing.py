@@ -15,7 +15,7 @@ import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_base_bar as drawing
 import export_features
 from _gtol_planar import PlanarFace
-from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM
+from _hole_spec import CLEARANCE_MM, NUMBER_DRILL_MM, THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _printed_tolerance import printed_band_mm
 from _surface_finish import SEAT_UM
@@ -98,14 +98,29 @@ def test_slots_follow_the_brief() -> None:
     )
 
 
-def test_one_part_two_off_the_second_turned_over() -> None:
-    """Main's ruling: one configuration, QTY 2. Turned over (180° about X) the
-    bar keeps lateral: its column-side edge, near slot and rail row land where
-    bar 1's do on its own rail, so the two bars need no second hand."""
+def test_one_number_two_members_the_second_plain_and_turned_over() -> None:
+    """Oblique simplification PR2: one native model, one Number, two named
+    members. Bar1 (rail 1) carries the TL-28 bracket holes; Bar2 (rail 2) is
+    the same bar without them, turned over (180° about X): it keeps lateral,
+    so its column-side edge, near slot and rail row land where Bar1's do on
+    its own rail, and the two bars need no second hand."""
     assert spec.QUANTITY == 2
     row = _config.parts("ch-rocker-arm-tl-oblique-base-bar")
     assert row["quantity"] == spec.QUANTITY
+    assert row["number"] == "MHA-CH-06-TL-20"
     assert row["description"] == "BASE BAR"
+    assert spec.CONFIGURATIONS == (spec.BAR1, spec.BAR2) == ("Bar1", "Bar2")
+    assert row["default_configuration"] == spec.BAR1
+    assert row["configuration_quantities"] == {"Bar1": 1, "Bar2": 1}
+    assert spec.CONFIGURATION_QUANTITIES == {"Bar1": 1, "Bar2": 1}
+    assert sum(spec.CONFIGURATION_QUANTITIES.values()) == spec.QUANTITY
+    assert spec.CONFIGURATION_DESCRIPTIONS == {
+        "Bar1": "BASE BAR 1, END BRACKET HOLES",
+        "Bar2": "BASE BAR 2, NO BRACKET HOLES",
+    }
+    # Bar1 alone owns the bracket holes and their row reference.
+    assert spec.BRACKET_FEATURES == ("BracketHoles", "BracketRowReference")
+    assert spec.CONFIGURATION_FEATURES == {"Bar1": spec.BRACKET_FEATURES, "Bar2": ()}
     assert spec.FAR_SLOT_Y == -spec.NEAR_SLOT_Y
     # The slots stay symmetric about the rail, both located from the -Y side
     # (c3-r6, rule 10): the rises differ by the slots' spacing.
@@ -116,7 +131,6 @@ def test_one_part_two_off_the_second_turned_over() -> None:
     for gone in (
         "CONFIGS",
         "DEFAULT_CONFIG",
-        "QUANTITIES",
         "SLOT_Y",
         "RISES",
         "CONFIGURATION_DIMENSIONS",
@@ -124,12 +138,73 @@ def test_one_part_two_off_the_second_turned_over() -> None:
         "configuration_number",
     ):
         assert not hasattr(spec, gone), gone
+    # The shared member helpers (_purchased_part_variants) author, select,
+    # read back and export each member; no hand-rolled configuration code.
     build = BUILD.read_text(encoding="utf-8")
-    assert "create_configuration" not in build
-    assert "assert_saved_configurations_regenerate" not in build
+    assert "create_member_configurations(adapter, PART_NAME, CONFIGURATIONS)" in build
+    assert "require_member_configurations(PART_NAME, CONFIGURATIONS)" in build
+    assert "select_member_features(adapter, configuration, CONFIGURATION_FEATURES)" in build
+    assert "assert_member_suppression(adapter, configuration, CONFIGURATION_FEATURES)" in build
+    assert "save_member_part(" in build and "readback=_readback" in build
+    assert "save_part_and_images" not in build
+    assert "create_configuration(" not in build
+    # Members are authored before the first feature, so every feature exists
+    # in both; selection then suppresses Bar1's bracket features in Bar2.
+    assert build.index("create_member_configurations(") < build.index('("BarLength", BAR_LENGTH)')
+    assert build.index("blank_sketch(adapter, \"BracketRowReference\")") < build.index(
+        "select_member_features("
+    )
+    # Each member has its own sheet (drawing-guidelines rule 7: a member is
+    # drawn in its own right, never left to a note on another's sheet), every
+    # view on it referencing that member; no hand-opposite shorthand.
     sheet = Path(drawing.__file__).read_text(encoding="utf-8")
-    for token in ("ReferencedConfiguration", "QTY", '"LH"', '"RH"', "OPPOSITE HAND"):
+    assert drawing.SHEET_NAMES == ("BAR 1", "BAR 2")
+    assert drawing.MEMBER_SHEETS == {"BAR 1": spec.BAR1, "BAR 2": spec.BAR2}
+    assert "configure_reference_views(adapter, configuration, [front, end, iso])" in sheet
+    assert "configure_reference_views(adapter, part_spec.BAR1" not in sheet
+    assert "create_blank_drawing_sheets(adapter, SHEET_NAMES" in sheet
+    assert "expected_sheet_names=SHEET_NAMES" in sheet
+    assert "expected_redundant_notes=len(SHEET_NAMES)" in sheet
+    assert spec.BRACKET_CALLOUT_PROCESS.startswith("BAR 1 ONLY; NONE ON BAR 2\n")
+    for token in ('"LH"', '"RH"', "OPPOSITE HAND"):
         assert token not in sheet, token
+
+
+def test_bar_2_sheet_dimensions_every_feature_it_keeps() -> None:
+    """Bar2's sheet marks every dimension but the bracket features' own, each
+    where bar 1's sheet puts it; only bar 1's carries the bracket callout."""
+    bracket = set().union(*(spec.DRAWING_DIMENSIONS[f] for f in spec.BRACKET_FEATURES))
+    assert bracket == {"BracketHole1X", "BracketHole3X", "BracketRow1Y", "BracketRow2Y"}
+    assert spec.MEMBER_DRAWING_DIMENSIONS[spec.BAR1] == set(spec.DRAWING_PRECISION_BY_NAME)
+    assert spec.MEMBER_DRAWING_DIMENSIONS[spec.BAR2] == (
+        set(spec.DRAWING_PRECISION_BY_NAME) - bracket
+    )
+    assert drawing.member_front_keep(spec.BAR1) == drawing.FRONT_KEEP
+    two = drawing.member_front_keep(spec.BAR2)
+    assert set(two) == set(drawing.FRONT_KEEP) - bracket
+    assert all(two[name] == drawing.FRONT_KEEP[name] for name in two)
+    assert set(drawing.END_KEEP) <= spec.MEMBER_DRAWING_DIMENSIONS[spec.BAR2]
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    member = sheet[sheet.index("def _draw_member_sheet") : sheet.index("async def build")]
+    assert member.index("if configuration == part_spec.BAR1:") < member.index(
+        "label=\"end bracket holes\""
+    )
+    assert member.count("add_native_hole_callout(") == 2
+    assert "if name in names" in member
+
+
+def test_each_member_exports_its_own_step_and_png() -> None:
+    from _part_configuration_exports import configuration_producer_paths, member_configurations
+
+    assert member_configurations(spec.PART_NAME) == spec.CONFIGURATIONS
+    paths = configuration_producer_paths(spec.PART_NAME)
+    assert tuple(paths) == spec.CONFIGURATIONS
+    for configuration, members in paths.items():
+        assert set(members) == {"step", "png"}, configuration
+        assert members["png"].suffix == ".png", configuration
+    # Bar1 is the bare output; Bar2's STEP and PNG are its own.
+    assert paths["Bar1"]["png"] != paths["Bar2"]["png"]
+    assert paths["Bar1"]["step"] != paths["Bar2"]["step"]
 
 
 def test_walls_meet_rule_17() -> None:
@@ -268,7 +343,7 @@ def test_rail_row_is_located_from_the_faced_low_side() -> None:
     assert 'names=["BarLength", "BarWidth", "BarLowSide"]' in build
     assert "drives=['\"BarLength\"', '\"BarWidth\"', '\"RailRowY\"']" in build
     assert build.index('blank_sketch(adapter, "RailRowReference")') < build.index(
-        "save_part_and_images(adapter, PART_NAME)"
+        "save_member_part("
     )
     sheet = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "from _drawing_hidden_sketches import curate_view_dimensions" in sheet
@@ -357,17 +432,17 @@ def test_short_span_texts_print_beside_their_spans() -> None:
         "NearSlotX",
         "BracketHole1X",
         "FarSlotX",
-        "BracketHole5X",
+        "BracketHole3X",
         "BarLength",
     )
     lanes = [keep[name][1] - drawing.TEXT_DROP for name in below]
     assert lanes == pytest.approx([drawing._below_line(k) for k in range(6)])
     # c3-r6: the far rise, from the -Y edge, is the tallest right-side
     # dimension, so it takes the outermost lane, past the outermost bracket
-    # row's, its text above that row's upper extension line (and its
-    # overshoot), below the run's text and clear of the end view. c4-r9: its
-    # line one stack lane out struck the 61.400's last "0"; it now clears
-    # that text (13.9 wide on the r9 sheet) by 1.5.
+    # row's (PR2: the inner row, 54.909), its text above that row's upper
+    # extension line (and its overshoot), below the run's text and clear of
+    # the end view. c4-r9: its line one stack lane out struck the row text's
+    # last "0"; it now clears that text by 1.5.
     rise_x, rise_y = keep["FarSlotRise"]
     outer_row = drawing._BRACKET_ROW_LANES[0]
     assert drawing._BRACKET_ROW_TEXT_HALF >= 0.0139 / 2
@@ -467,30 +542,39 @@ def test_isometric_and_its_note_take_the_free_bottom_left_corner() -> None:
 
 
 def test_bracket_holes_are_the_leadscrew_layouts() -> None:
-    """C4: eight #8 clearance holes at the leadscrew spec's positions, from
-    its own tuple; counterbored from the underside, the spec's hole kind."""
-    # A row of four (ruling A′) at each KP08 station (derived by the leadscrew
-    # layout) on four shared rows; the near station moves with the nut, so it
-    # is not pinned.
+    """PR2: four #8 clearance holes (Bar1 only) at the leadscrew spec's
+    positions, from its own tuple; counterbored from the underside."""
+    # A pair at each KP08 station (derived by the leadscrew layout), on TL-28's
+    # two holes at the KP08's 42 mm pitch; the near station moves with the
+    # nut, so it is not pinned.
     near_x = leadscrew.BASE_BAR_HOLES[0][0]
     far_x = leadscrew.BASE_BAR_HOLES[-1][0]
     rows = drawing.BRACKET_ROW_Y
+    assert len(leadscrew.BASE_BAR_HOLES) == 4 and len(rows) == 2
     assert leadscrew.BASE_BAR_HOLES == tuple(
         (x, y) for x in (near_x, far_x) for y in rows
     )
     assert rows == tuple(-lateral for lateral in leadscrew.BAR_SCREW_LATERALS)
-    # #290: every row from the -Y edge prints as modelled at .XXX; the two
-    # stations are the KP08's metric stations (owner ruling 4) and print
-    # exact millimetres with their own band.
+    assert rows[0] - rows[1] == pytest.approx(leadscrew.KP08_BOLT_SPACING)
+    # The rows derive from the KP08's metric span: exact millimetres at three
+    # places from the -Y edge (54.909, 12.909) with the stations' band; the
+    # two stations print exact millimetres with their own band (owner ruling 4).
+    assert [y - spec.LOW_SIDE_Y for y in rows] == pytest.approx([54.909, 12.909])
     for y in rows:
-        edge = (y - spec.LOW_SIDE_Y) / 25.4
-        assert edge == pytest.approx(round(edge, 3), abs=1e-9)
+        edge = y - spec.LOW_SIDE_Y
+        assert edge == pytest.approx(round(edge, spec.BRACKET_ROW_PLACES), abs=1e-9)
     for x in (near_x, far_x):
         assert x == round(x, spec.BRACKET_STATION_PLACES)
     assert spec.METRIC_DIMENSIONS[("BracketHoles", "BracketHole1X")] == (
         2,
         spec.BRACKET_STATION_BAND,
     )
+    for row in (1, 2):
+        assert spec.METRIC_DIMENSIONS[("BracketRowReference", f"BracketRow{row}Y")] == (
+            3,
+            spec.BRACKET_ROW_BAND,
+        )
+    assert spec.BRACKET_STATION_BAND == spec.BRACKET_ROW_BAND
     assert spec.BRACKET_STATION_BAND == printed_band_mm(3, unit="mm") == 0.13
     assert drawing.BRACKET_HOLES is leadscrew.BASE_BAR_HOLES
     hole = spec.BRACKET_HOLE_SPEC
@@ -501,7 +585,11 @@ def test_bracket_holes_are_the_leadscrew_layouts() -> None:
         wanted.end,
         wanted.fit,
     )
-    assert spec.BRACKET_HOLE_DIA == CLEARANCE_MM[("#8", "normal")]
+    # A #12 drill (.189): its worst-case float holds TL-28's reversal lost
+    # motion under the owner's ~.9 mm (leadscrew LOAD_CASES).
+    assert spec.BRACKET_HOLE_DRILL == "#12"
+    assert spec.BRACKET_HOLE_DIA == NUMBER_DRILL_MM["#12"] == pytest.approx(0.189 * 25.4, abs=1e-3)
+    assert CLEARANCE_MM[("#8", "close")] < spec.BRACKET_HOLE_DIA < CLEARANCE_MM[("#8", "normal")]
     assert hole.overrides_mm["HoleDiameter"] == spec.BRACKET_HOLE_DIA
     source = BUILD.read_text(encoding="utf-8")
     assert "leadscrew.BASE_BAR_HOLES" in source
@@ -519,11 +607,34 @@ def test_bracket_counterbores_sink_and_seat_the_heads() -> None:
     assert spec.BRACKET_HEAD_CLEARANCE_MIN >= 0.25
     assert spec.BRACKET_HEAD_BEARING_MIN >= 0.5
     assert spec.BRACKET_CBORE_FLOOR_MIN >= WALL_TARGET_MM
-    # Rule 18: a #8-32 x 5/8 reaches 1.5 D into TL-28 at the printed worst
-    # (the faced .47 bar at its .XX band), and never through the 1 in bracket.
-    low, high = spec.bracket_screw_under_head(0.625 * 25.4)
+    # Rule 18: the common #8-32 x 3/4 reaches 1.5 D into TL-28 at the printed
+    # worst (the faced .47 bar at its .XX band), and never through the 1 in
+    # bracket; its deepest reach is TL-28's bar-thread window floor.
+    assert leadscrew.BAR_SCREW_LENGTH_MM == pytest.approx(0.75 * 25.4)
+    low, high = spec.bracket_screw_under_head(leadscrew.BAR_SCREW_LENGTH_MM)
     assert low >= 1.5 * THREAD_MAJOR_MM[leadscrew.BAR_SCREW]
     assert high < leadscrew.BRACKET_THICK
+    assert (low, high) == pytest.approx(leadscrew.BAR_SCREW_ENGAGEMENT_RANGE)
+
+
+def test_bracket_hole_float_bounds_the_lost_motion_on_reversal() -> None:
+    """Owner ruling Main 2026-11-06 (option B): TL-28 may slip onto its bar
+    screws' positive stop above ~1344 N; up to ~.9 mm reversal lost motion.
+    The worst case is the largest drilled hole over the #8 UNC-3A minimum
+    major; the basic-major figure is disclosed beside it."""
+    hole_max = spec.BRACKET_HOLE_DIA + 0.004 * 25.4
+    assert spec.BRACKET_SCREW_FLOAT_MAX == pytest.approx((hole_max - 0.164 * 25.4) / 2.0)
+    assert leadscrew.SHCS_8_MAJOR_MIN == pytest.approx(0.1585 * 25.4)
+    assert leadscrew.BRACKET_STOP_FLOAT_MAX == pytest.approx(
+        (hole_max - leadscrew.SHCS_8_MAJOR_MIN) / 2.0
+    )
+    assert leadscrew.BRACKET_REVERSAL_LOST_MOTION_BASIC == pytest.approx(0.737, abs=1e-3)
+    assert leadscrew.BRACKET_REVERSAL_LOST_MOTION == pytest.approx(0.876, abs=1e-3)
+    assert leadscrew.BRACKET_REVERSAL_LOST_MOTION_ACCEPTED == 0.9
+    assert (
+        leadscrew.BRACKET_REVERSAL_LOST_MOTION
+        <= leadscrew.BRACKET_REVERSAL_LOST_MOTION_ACCEPTED
+    )
 
 
 def test_bracket_hole_walls_meet_rule_17() -> None:
@@ -539,31 +650,41 @@ def test_bracket_hole_walls_meet_rule_17() -> None:
 
 
 def test_bracket_pattern_holds_the_tl28_float_and_names_it() -> None:
-    """Rows at .XXX and stations at three millimetre places: inside the screw
-    float the TL-28 stack leaves; the tight band names its mate, and the plan,
-    looking at the top, says the counterbores are on the far side."""
-    assert printed_band_mm(spec.BRACKET_HOLE_PLACES, unit="in") <= 0.15
+    """Rows and stations at exact millimetres with ±0.13 mm: the pair's
+    spacing change at the printed limits stays inside the screw float the
+    TL-28 pair leaves; the tight band names its mate, and the plan, looking
+    at the top, says the counterbores are on the far side and bar 2 has none."""
+    assert spec.bracket_pair_spacing_error(leadscrew.BASE_BAR_HOLES) == pytest.approx(
+        0.261, abs=1e-3
+    )
     # The whole-millimetre KP08 stations print two places under their
-    # explicit ±0.13 mm band; the inch rows hold .XXX.
-    for name in ("BracketHole1X", "BracketHole5X"):
+    # explicit ±0.13 mm band; the rows three.
+    for name in ("BracketHole1X", "BracketHole3X"):
         assert spec.DRAWING_PRECISION_BY_NAME[name] == 2
-    for name in (f"BracketRow{row}Y" for row in range(1, 5)):
-        assert spec.DRAWING_PRECISION_BY_NAME[name] == 3
+    for name in ("BracketRow1Y", "BracketRow2Y"):
+        assert spec.DRAWING_PRECISION_BY_NAME[name] == spec.BRACKET_ROW_PLACES == 3
     lines = spec.BRACKET_CALLOUT_PROCESS.split("\n")
-    assert lines == ["MATCHES MHA-CH-06-TL-28", "DRILL, C'BORE FAR SIDE", ""]
+    assert lines == [
+        "BAR 1 ONLY; NONE ON BAR 2",
+        "MATCHES MHA-CH-06-TL-28",
+        "DRILL, C'BORE FAR SIDE",
+        "",
+    ]
     assert "MHA-CH-06-TL-28" == spec.BRACKET_MATE
     # Every Hole Wizard length prints .XXX (#290).
     assert set(spec.BRACKET_CALLOUT_PRECISION.values()) == {3}
-    # Rule 12: the size and a process word, no screw in the place of a size.
+    # Rule 12: the size and a process word, no screw in the place of a size;
+    # plain physical facts, no rule or ruling words.
     assert "SHCS" not in spec.BRACKET_CALLOUT_PROCESS
+    assert "RULING" not in spec.BRACKET_CALLOUT_PROCESS
 
 
 def test_bracket_dimensions_and_callout_lay_out_clear() -> None:
     keep = drawing.FRONT_KEEP
     sx = drawing._sheet_x
     centre = drawing.FRONT_CENTER
-    # The near row's station text (57.000 ±0.13 mm) is wider than its span, so
-    # it sits right of its own extension line, short of the far slot's.
+    # The near station's text (57.00 ±0.13 mm) is wider than its span, so it
+    # sits right of its own extension line, short of the far slot's.
     near_text = keep["BracketHole1X"][0]
     near_station = sx(centre, drawing.BRACKET_NEAR_X)
     assert near_text - drawing._BRACKET_NEAR_X_TEXT_HALF >= near_station + 0.002
@@ -571,36 +692,24 @@ def test_bracket_dimensions_and_callout_lay_out_clear() -> None:
         near_text + drawing._BRACKET_NEAR_X_TEXT_HALF
         <= sx(centre, spec.FAR_SLOT_X) - 0.002
     )
-    # Right lanes, nearest first: 6.400 (its text right of its line on a
-    # shoulder, under the bar), then 22.900, whose outside arrow under the
-    # bar's edge clears that text (c4-r2: it struck the "8"), then 44.900 and
-    # 61.400 (ruling A′'s four rows), each one lane further out.
-    lanes = [keep[f"BracketRow{row}Y"] for row in (4, 3, 2, 1)]
-    outer_x, outer_y = lanes[0]
-    assert drawing._RIGHT < outer_x < lanes[1][0] < lanes[2][0] < lanes[3][0]
-    assert outer_y + 0.00175 <= drawing._BOTTOM - 0.002  # under the bar's edge
-    outer_text_right = outer_x + drawing._SHOULDER_TEXT_SPAN[1]
-    assert lanes[1][0] >= outer_text_right + 0.003
-    # Spread: the first two lines at least 15 apart (c4-r2: 9, bunched).
-    assert lanes[1][0] - outer_x >= 0.015
+    # Right lanes: the outer row (12.909) nearest, its text on a shoulder
+    # right of its line under the bar's edge; the inner row (54.909) a text
+    # gap and a half-text further out, mid-span; the far rise outside it.
+    inner_x, inner_y = keep["BracketRow1Y"]
+    outer_x, outer_y = keep["BracketRow2Y"]
     half = drawing._BRACKET_ROW_TEXT_HALF
-    tops = [drawing._sheet_y(centre, y) for y in reversed(drawing.BRACKET_ROW_Y)]
-    for (short_x, _), (tall_x, tall_y), short_top in zip(
-        lanes[1:], lanes[2:], tops[1:], strict=False
-    ):
-        # A text sharing heights with the shorter row's line and that row's
-        # extension line (overshoot about 2) clears them by 2.5.
-        if tall_y - 0.00175 < short_top:
-            # (exactly 2.5 at r9's measured 61.400 width; float slack only)
-            assert tall_x - half >= short_x + 0.002 + 0.0025 - 1e-9
-    # c4-r8: the 44.900 and 61.400 texts, both mid-span, read as one cluster;
-    # the 61.400's stands at the top of its span, 8 or more clear of the other.
-    (_x2, y2), (_x1, y1) = lanes[2], lanes[3]
-    assert y1 - y2 >= 0.0035 + 0.008
-    assert y1 + 0.00175 <= tops[3] - 0.0045  # under its upper arrow (about 3.5)
-    assert lanes[-1][0] + half <= (
-        drawing.END_CENTER[0] - spec.BAR_THICK / 4000 - 0.005
-    )
+    outer_line = drawing._RIGHT + drawing._BRACKET_OUTER_LANE
+    inner_line = drawing._RIGHT + drawing._BRACKET_INNER_LANE
+    assert drawing._RIGHT < outer_line < inner_line < keep["FarSlotRise"][0]
+    assert inner_x == pytest.approx(inner_line)
+    assert outer_x - half == pytest.approx(outer_line + drawing._TEXT_GAP)
+    assert outer_y + 0.00175 <= drawing._BOTTOM - 0.002  # under the bar's edge
+    assert inner_x - half >= outer_line + drawing._TEXT_GAP - 1e-9
+    assert keep["FarSlotRise"][0] - inner_x >= half + 0.0015 - 1e-9
+    # The inner row's text stands above the outer row's extension line.
+    outer_top = drawing._sheet_y(centre, drawing.BRACKET_ROW_Y[1])
+    assert inner_y - 0.00175 >= outer_top + 0.002
+    assert inner_x + half <= drawing.END_CENTER[0] - spec.BAR_THICK / 4000 - 0.005
     # The leader leaves the far outer hole down and right; at the length's
     # extension line (x _RIGHT) it is under the bar, and it passes under the
     # outer row's text.
@@ -609,14 +718,14 @@ def test_bracket_dimensions_and_callout_lay_out_clear() -> None:
         drawing._sheet_y(centre, drawing.BRACKET_OUTER_Y),
     )
     cx, cy = drawing.BRACKET_CALLOUT_XY
-    half_w, half_h = 0.027, 0.010  # "MATCHES MHA-CH-06-TL-28", four rows
+    half_w, half_h = 0.027, 0.0125  # "MATCHES MHA-CH-06-TL-28", five rows
     land = (cx - half_w, cy)
     slope = (land[1] - hole[1]) / (land[0] - hole[0])
     at_right = hole[1] + slope * (drawing._RIGHT - hole[0])
     assert at_right < drawing._BOTTOM - 0.002
-    text_left = outer_x + drawing._SHOULDER_TEXT_SPAN[0]
-    under_text = hole[1] + slope * (text_left - hole[0])
-    assert under_text <= outer_y - 0.00175 - 0.002
+    # Through the outer text's height the leader runs left of the text.
+    for y in (outer_y + 0.00175, outer_y - 0.00175):
+        assert hole[0] + (y - hole[1]) / slope <= outer_x - half - 0.005
     # The block: under the end view, above the title block, inside the border.
     assert cy + half_h <= drawing.END_CENTER[1] - drawing._HALF_W_SHEET - 0.010
     assert cy - half_h >= 0.0657 + 0.010
@@ -655,7 +764,9 @@ def test_metric_vendor_stations_are_model_authored_in_mm() -> None:
     sheet proves they survived the import."""
     assert set(spec.METRIC_DIMENSIONS) == {
         ("BracketHoles", "BracketHole1X"),
-        ("BracketHoles", "BracketHole5X"),
+        ("BracketHoles", "BracketHole3X"),
+        ("BracketRowReference", "BracketRow1Y"),
+        ("BracketRowReference", "BracketRow2Y"),
     }
     for (_feature, name), (places, _band) in spec.METRIC_DIMENSIONS.items():
         assert spec.DRAWING_PRECISION_BY_NAME[name] == places
@@ -802,7 +913,7 @@ def test_both_faced_seats_carry_the_part_owned_seat_finish() -> None:
     assert by_key["underside_seat"].face == PlanarFace((0.0, 0.0, -1.0), 0.0)
     build = "".join(BUILD.read_text(encoding="utf-8").split())
     assert "author_part_pmi(adapter,surface_finishes=SURFACE_FINISHES)" in build
-    assert build.index("author_part_pmi(") < build.index("save_part_and_images(")
+    assert build.index("author_part_pmi(") < build.index("save_member_part(")
     sheet = Path(drawing.__file__).read_text(encoding="utf-8")
     assert sheet.count("add_surface_finish(") == 1  # one loop over both seats
     assert "surface_finish_by_key(SURFACE_FINISHES, key)" in sheet

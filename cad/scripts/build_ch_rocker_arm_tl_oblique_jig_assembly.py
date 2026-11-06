@@ -101,9 +101,11 @@ ASM_NAME = "ch-rocker-arm-tl-oblique-jig"
 assert ASM_NAME == spec.ASM_NAME, (ASM_NAME, spec.ASM_NAME)
 # Literal (physical filename, logical family) rows: the build graph reads the
 # first field syntactically, never through a spec-derived or generated filename.
-# A repeated kit file is one producer with one configured BOM row per member.
+# A repeated configured file (a purchased kit or the TL-20 base bar) is one
+# producer with one configured BOM row per member.
 _PARTS = (
-    ("ch-rocker-arm-tl-oblique-base-bar", "ch-rocker-arm-tl-oblique-base-bar"),
+    ("ch-rocker-arm-tl-oblique-base-bar", "ch-rocker-arm-tl-oblique-base-bar--Bar1"),
+    ("ch-rocker-arm-tl-oblique-base-bar", "ch-rocker-arm-tl-oblique-base-bar--Bar2"),
     ("ch-rocker-arm-tl-oblique-carrier", "ch-rocker-arm-tl-oblique-carrier"),
     ("ch-rocker-arm-tl-oblique-pivot-block", "ch-rocker-arm-tl-oblique-pivot-block"),
     ("ch-rocker-arm-tl-oblique-feed-block", "ch-rocker-arm-tl-oblique-feed-block"),
@@ -125,9 +127,8 @@ _PARTS = (
     ("sh-vn-clamping-kit-hardware", "sh-vn-clamping-kit-hardware--TNut"),
     ("sh-vn-clamping-kit-hardware", "sh-vn-clamping-kit-hardware--FlangeNut"),
     ("ch-rocker-arm-tl-vn-oblique-rail-screw", "ch-rocker-arm-tl-vn-oblique-rail-screw"),
-    ("ch-rocker-arm-tl-vn-oblique-bracket-screw", "ch-rocker-arm-tl-vn-oblique-bracket-screw"),
     ("ch-rocker-arm-tl-vn-oblique-carriage-screw", "ch-rocker-arm-tl-vn-oblique-carriage-screw"),
-    ("ch-rocker-arm-tl-vn-oblique-kp08-screw", "ch-rocker-arm-tl-vn-oblique-kp08-screw"),
+    ("ch-rocker-arm-tl-vn-oblique-bracket-screw", "ch-rocker-arm-tl-vn-oblique-bracket-screw"),
     ("ch-rocker-arm-tl-vn-oblique-riser-screw", "ch-rocker-arm-tl-vn-oblique-riser-screw"),
     ("ch-rocker-arm-tl-vn-oblique-clamp-screw", "ch-rocker-arm-tl-vn-oblique-clamp-screw"),
     ("ch-rocker-arm-tl-vn-oblique-lever-screw", "ch-rocker-arm-tl-vn-oblique-lever-screw"),
@@ -216,15 +217,16 @@ async def _place_family(adapter: Any, physical: str, family: str) -> dict[str, s
     return observed
 
 
-def _verify_kit_references(adapter: Any, placed_names: dict[str, str]) -> None:
-    """Read every kit role/file/member again after the final solve before save."""
+def _verify_member_references(adapter: Any, placed_names: dict[str, str]) -> None:
+    """Read every configured member's role/file/member again after the final
+    solve before save (purchased kits and the TL-20 base bars)."""
     actual = component_reference_names(
-        adapter.currentModel, spec.KIT_COMPONENT_REFERENCES
+        adapter.currentModel, spec.MEMBER_COMPONENT_REFERENCES
     )
     expected = {selector: placed_names[selector] for selector in actual}
     if actual != expected:
         raise RuntimeError(
-            f"jig final kit references {actual!r} != inserted {expected!r}"
+            f"jig final member references {actual!r} != inserted {expected!r}"
         )
 
 
@@ -347,14 +349,15 @@ def explode_step_components(
     selectors: Sequence[str],
     groups: Mapping[str, Sequence[Any]],
     by_name: Mapping[str, Any],
-    kit_names: Mapping[str, str],
+    member_names: Mapping[str, str],
 ) -> list[Any]:
     """The native components one ``spec.EXPLODE_STEPS`` entry moves.
 
     A family selector moves its whole identity group. An instance selector
     (``spec.instance_name``; the riser and nut screws share a family but
-    explode apart) moves the one occurrence it names: a kit occurrence by its
-    persisted role reference (``kit_names``), any other by the Name2
+    explode apart; so do the rail and TL-28 bar screws) moves the one
+    occurrence it names: a configured member's occurrence by its persisted
+    role reference (``member_names``), any other by the Name2
     ``_place_family`` proved equal to its selector.
     """
     moved: dict[str, Any] = {}
@@ -368,7 +371,7 @@ def explode_step_components(
                 raise RuntimeError(
                     f"{label}: unknown explode selector {selector!r}"
                 ) from error
-            name = kit_names.get(occurrence, occurrence)
+            name = member_names.get(occurrence, occurrence)
             if name not in by_name:
                 raise RuntimeError(
                     f"{label}: explode occurrence {selector!r} has no component {name!r}"
@@ -480,7 +483,7 @@ def _create_jig_explode(adapter: Any, configuration_name: str) -> None:
         _early_bound(component, "IComponent2")
         for component in (assembly.GetComponents(True) or ())
     )
-    kit_names = component_reference_names(model, spec.KIT_COMPONENT_REFERENCES)
+    member_names = component_reference_names(model, spec.MEMBER_COMPONENT_REFERENCES)
     groups: dict[str, list[Any]] = {family: [] for family in spec.QUANTITIES}
     for component in components:
         identity = component_identity(component)
@@ -519,7 +522,7 @@ def _create_jig_explode(adapter: Any, configuration_name: str) -> None:
         for step_index, (label, selectors, key, distance_mm) in enumerate(
             spec.EXPLODE_STEPS, 1
         ):
-            moved = explode_step_components(label, selectors, groups, by_name, kit_names)
+            moved = explode_step_components(label, selectors, groups, by_name, member_names)
             distance = distance_mm / 1000.0
             with _telemetry.span(
                 "assembly.jig_explode.step", label=label, moved=len(moved)
@@ -919,7 +922,7 @@ async def build(adapter) -> dict[str, str]:
     return await save_assembly_and_images(
         adapter,
         ASM_NAME,
-        solved_gates=lambda current: _verify_kit_references(current, placed_names),
+        solved_gates=lambda current: _verify_member_references(current, placed_names),
     )
 
 

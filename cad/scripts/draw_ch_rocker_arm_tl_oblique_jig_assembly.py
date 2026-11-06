@@ -156,7 +156,7 @@ CLUSTERS = (
         "RAIL BARS EXPLODED",
         "BASE BARS, RAILS, CARRIAGES AND PIVOT BLOCK",
         (
-            spec.BASE_BAR,
+            *spec.BASE_BARS,
             spec.PIVOT_BLOCK,
             spec.RAIL,
             spec.CARRIAGE,
@@ -167,7 +167,12 @@ CLUSTERS = (
             spec.CARRIAGE_SCREW,
         ),
         (1.0, 5.0),
-        partial=((spec.CARRIAGE_SCREW, _carriage_screws(spec.PIVOT_BLOCK)),),
+        partial=(
+            (spec.CARRIAGE_SCREW, _carriage_screws(spec.PIVOT_BLOCK)),
+            # The common screw's rail occurrences; its TL-28 bar screws
+            # show unballooned on the leadscrew sheet.
+            (spec.RAIL_SCREW, spec.RAIL_SCREW_INSTANCES),
+        ),
     ),
     Cluster(
         PIVOT_SHEET,
@@ -193,14 +198,15 @@ CLUSTERS = (
             spec.FEED_NUT,
             spec.PILLOW_BLOCK,
             spec.HANDWHEEL,
-            spec.BRACKET_SCREW,
             spec.PILLOW_BLOCK_SCREW,
         ),
         (1.0, 3.0),
         # The integral lug moves with the feed block on rail 1, fastened to
         # its carriage by its four carriage screws. The feed nut's four flat
-        # heads are riser screws, ballooned on the carrier's sheet.
+        # heads are riser screws, ballooned on the carrier's sheet. The TL-28
+        # bar screws are the common rail screw, ballooned on the rail sheet.
         context=(
+            *spec.BAR_SCREW_INSTANCES,
             spec.instance_name(spec.CARRIAGE, 0),
             *_carriage_screws(spec.FEED_BLOCK),
             *spec.NUT_SCREW_INSTANCES,
@@ -460,7 +466,10 @@ if sorted(_CLUSTERED) != sorted(BOM_COMPONENTS):
     raise AssertionError("the clusters must partition the BOM's families")
 # Literal stems, so the config-dependency analysis reads exactly these rows.
 PART_ROWS = {
-    "ch-rocker-arm-tl-oblique-base-bar": _config.parts(
+    "ch-rocker-arm-tl-oblique-base-bar--Bar1": _config.parts(
+        "ch-rocker-arm-tl-oblique-base-bar"
+    ),
+    "ch-rocker-arm-tl-oblique-base-bar--Bar2": _config.parts(
         "ch-rocker-arm-tl-oblique-base-bar"
     ),
     "ch-rocker-arm-tl-oblique-carrier": _config.parts(
@@ -524,14 +533,11 @@ PART_ROWS = {
     "ch-rocker-arm-tl-vn-oblique-rail-screw": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-rail-screw"
     ),
-    "ch-rocker-arm-tl-vn-oblique-bracket-screw": _config.parts(
-        "ch-rocker-arm-tl-vn-oblique-bracket-screw"
-    ),
     "ch-rocker-arm-tl-vn-oblique-carriage-screw": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-carriage-screw"
     ),
-    "ch-rocker-arm-tl-vn-oblique-kp08-screw": _config.parts(
-        "ch-rocker-arm-tl-vn-oblique-kp08-screw"
+    "ch-rocker-arm-tl-vn-oblique-bracket-screw": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-bracket-screw"
     ),
     "ch-rocker-arm-tl-vn-oblique-riser-screw": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-riser-screw"
@@ -558,7 +564,7 @@ BOM_ITEM_NUMBERS = dict(spec.ITEM_NUMBERS)
 
 # One real-edge balloon per logical BOM family.
 BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
-for _family in spec.KIT_IDENTITIES:
+for _family in spec.MEMBER_IDENTITIES:
     BALLOON_ANCHORS[_family] = BalloonAnchor(instance=spec.instance_name(_family, 0))
 # The base bar's walk landed on rail 2's carriage end seal (review r5): its
 # balloon lands on bar 1's long top edge on the operator's side (part +Y,
@@ -566,8 +572,15 @@ for _family in spec.KIT_IDENTITIES:
 # spindle end: what stands on the bar sits behind and above it on the sheet,
 # what hangs under it below. The bottom edge 300 out (bought-r15) selected no
 # edge on the sheet once C4 widened the bar to 1/2 x 6 (bought-r16).
-BALLOON_ANCHORS[spec.BASE_BAR] = BalloonAnchor(
-    point_mm=(200.0, base_bar.HIGH_SIDE_Y, base_bar.BAR_THICK)
+BALLOON_ANCHORS[spec.BASE_BAR_1] = BalloonAnchor(
+    point_mm=(200.0, base_bar.HIGH_SIDE_Y, base_bar.BAR_THICK),
+    instance=spec.instance_name(spec.BASE_BAR_1, 0),
+)
+# Bar 2 (Bar2) is turned over: the same operator-side top edge is its part
+# +Y edge at z 0, 200 from the spindle end.
+BALLOON_ANCHORS[spec.BASE_BAR_2] = BalloonAnchor(
+    point_mm=(200.0, base_bar.HIGH_SIDE_Y, 0.0),
+    instance=spec.instance_name(spec.BASE_BAR_2, 0),
 )
 # Keep the rail and T-nut arrows away from the two bars' overlapping inner
 # ends. Both remain native edge-attached balloons: the frozen picks must hit
@@ -644,13 +657,13 @@ BALLOON_ANCHORS[spec.PILLOW_BLOCK] = BalloonAnchor(
 # exploded poses and part envelopes, ray-cast frontmost) found seven more
 # crossing or landing against another part. Each is frozen the same way:
 # - 25 (KP08 screw) ran over the near KP08's boss to the screw end in its
-#   foot: it lands on that KP08's lifted outboard screw (kp08-screw-2, alone
-#   in white space), its head's flat-top rim on the sheet-right side; out to
-#   the upper right, between 17's and 4's;
-# - 11 (end bracket) crossed a bracket screw to the bracket's foot corner:
+#   foot: it lands on that KP08's lifted outboard screw (the family's second,
+#   alone in white space), its head's top rim on the sheet-right side; out
+#   to the upper right, between 17's and 4's (PR2: now the #8 SHCS);
+# - 11 (end bracket) crossed a bar screw to the bracket's foot corner:
 #   it lands on the near bracket's outboard (+X) end, on its edge with the
 #   spindle-side (-Y) face, mid-height, under the KP08's foot; out to the
-#   lower right, over the bracket screws;
+#   lower right, over the bar screws;
 # - 3 (pivot block, sheet 3) landed on the block's bottom corner over bar 2:
 #   it lands on the block's outboard (+X, +Y) vertical edge, mid-height, the
 #   corner nearest the ring, with white paper behind it; out to the lower
@@ -677,9 +690,9 @@ BALLOON_ANCHORS[spec.PILLOW_BLOCK] = BalloonAnchor(
 # out crosses it.
 BALLOON_ANCHORS[spec.PILLOW_BLOCK_SCREW] = BalloonAnchor(
     point_mm=(
-        spec.kp08_screw.DIMS.flat_top_dia / 2.0 * math.cos(math.radians(45.0)),
-        spec.kp08_screw.DIMS.head_h,
-        spec.kp08_screw.DIMS.flat_top_dia / 2.0 * math.sin(math.radians(45.0)),
+        spec.bracket_screw.DIMS.head_dia / 2.0 * math.cos(math.radians(45.0)),
+        spec.bracket_screw.DIMS.head_h,
+        spec.bracket_screw.DIMS.head_dia / 2.0 * math.sin(math.radians(45.0)),
     ),
     instance=spec.instance_name(spec.PILLOW_BLOCK_SCREW, 1),
 )
@@ -1084,7 +1097,7 @@ def _validate_source(source_model: Any) -> None:
             )
     if counts != BOM_QUANTITIES:
         raise RuntimeError(f"jig families {counts!r} != contract {BOM_QUANTITIES!r}")
-    component_reference_names(source_model, spec.KIT_COMPONENT_REFERENCES)
+    component_reference_names(source_model, spec.MEMBER_COMPONENT_REFERENCES)
 
 
 def _bom_cells(table: Any) -> tuple[tuple[str, ...], ...]:

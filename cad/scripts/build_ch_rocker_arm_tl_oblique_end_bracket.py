@@ -6,10 +6,12 @@ leadscrew feed's KP08 pillow blocks on base bar 1's top
 
 Layout (the spec's model frame, +Z up): ONE Front-plane rectangle from the
 inner end face (model x 0) about the mid-width line, extruded +Z by the stock
-thickness; the four #8-32 UNC base-bar taps (from the bottom face) and the two
-#6-32 UNC KP08 taps (from the top face) are two native Hole Wizard features on
-the row y 0, each tap drill THRU and each thread ``FULL_THREAD_DEPTH`` from its
-own face (owner ruling 2026-11-05: the CAD matches the hand traveler).
+thickness; the two holes on the row y 0 (the KP08's 42 mm span) are tapped
+#8-32 UNC from both faces (owner ruling 2026-11-06, Main, option B) by two
+native Hole Wizard features at the same stations: ``BarTaps``, BLIND from the
+bottom face (its thread ``BAR_THREAD_DEPTH``, its tap drill stopping where the
+top thread ends), then ``KP08Taps``, THRU ALL from the intact top face (its
+thread ``KP08_THREAD_DEPTH``), whose drill completes the through hole.
 The row's printed station (.250 from the -Y side face) lives on a hidden
 reference sketch, ``HoleRowReference`` (build_ch_rocker_arm_tl_oblique_base_bar's
 ``RailRowReference``); the stock thickness the end view prints lives on another,
@@ -38,7 +40,7 @@ from _drawing_precision import apply_drawing_precision
 from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
-from _holes import _commit_definition_edits, wizard_holes
+from _holes import _commit_definition_edits, blind_hole_volume_mm3, wizard_holes
 from _part_checks import report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
 from _metric_vendor_dimension import set_metric_vendor_units
@@ -58,24 +60,23 @@ from _sketch import (
 )
 from _sketch_chains import define_rectilinear_chain
 from ch_rocker_arm_tl_oblique_end_bracket_spec import (
-    BAR_TAP_DRILL,
+    BAR_TAP_DRILL_DEPTH,
     BAR_TAP_FACE,
     BAR_TAP_SPEC,
-    BAR_TAP_X,
     BRACKET_LENGTH,
     BRACKET_THICK,
     BRACKET_WIDTH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
-    FULL_THREAD_DEPTH,
     HALF_WIDTH,
     HOLE_ROW_Y,
+    HOLE_X,
     ISOMETRIC_VIEW_NOTE,
-    KP08_TAP_DRILL,
     KP08_TAP_FACE,
     KP08_TAP_SPEC,
-    KP08_TAP_X,
+    KP08_THREAD_DEPTH,
     METRIC_DIMENSIONS,
+    TAP_DRILL,
 )
 
 PART_NAME = "ch-rocker-arm-tl-oblique-end-bracket"
@@ -89,9 +90,12 @@ _SAVED_DRAWING_PROPERTIES = (
 )
 
 V_BRACKET = BRACKET_LENGTH * BRACKET_WIDTH * BRACKET_THICK
-V_BAR_TAPS = len(BAR_TAP_X) * math.pi * (BAR_TAP_DRILL / 2.0) ** 2 * BRACKET_THICK
-V_KP08_TAPS = len(KP08_TAP_X) * math.pi * (KP08_TAP_DRILL / 2.0) ** 2 * BRACKET_THICK
-# Tight enough that a missing tap (about 146 mm^3 the smaller) fails.
+# The bar-face wizard's blind drills (with their 118 deg points), then the
+# whole through holes once the top wizard's THRU ALL drill completes them
+# (the point cone lies inside the through cylinder).
+V_BAR_TAPS = len(HOLE_X) * blind_hole_volume_mm3(TAP_DRILL, BAR_TAP_DRILL_DEPTH)
+V_HOLES = len(HOLE_X) * math.pi * (TAP_DRILL / 2.0) ** 2 * BRACKET_THICK
+# Tight enough that a missing tap (about 237 mm^3 each) fails.
 _V_TOL = 20.0
 
 
@@ -111,9 +115,11 @@ _BLIND = 0
 
 
 @_telemetry.traced("feature.thread_from_face", label_param="label")
-def _thread_from_face(adapter, feature_name: str, *, label: str) -> None:
-    """Stop a THRU tap's thread ``FULL_THREAD_DEPTH`` from its wizard face;
-    its tap drill stays THRU ALL.
+def _thread_from_face(
+    adapter, feature_name: str, depth_mm: float, *, label: str
+) -> None:
+    """Stop a THRU tap's thread ``depth_mm`` from its wizard face; its tap
+    drill stays THRU ALL.
 
     ``wizard_holes`` commits a through tap with a THRU ALL thread; its own
     edit flow then sets the thread's end and depth, and the committed
@@ -121,14 +127,17 @@ def _thread_from_face(adapter, feature_name: str, *, label: str) -> None:
     height: owner ruling 2026-11-05).
     """
     model = _early_bound(adapter.currentModel, "IModelDoc2")
-    feature = _early_bound(
-        _early_bound(model, "IPartDoc").FeatureByName(feature_name), "IFeature"
-    )
+    # IPartDoc::FeatureByName is VT_DISPATCH: a missing feature is None,
+    # which _early_bound passes through, so refuse it by identity here.
+    raw = _early_bound(model, "IPartDoc").FeatureByName(feature_name)
+    if raw is None:
+        raise RuntimeError(f"{label}: no feature {feature_name!r}")
+    feature = _early_bound(raw, "IFeature")
     definition = _commit_definition_edits(
         model,
         feature,
         _early_bound(feature.GetDefinition(), "IWizardHoleFeatureData2"),
-        [("ThreadEndCondition", _BLIND), ("ThreadDepth", FULL_THREAD_DEPTH / 1000.0)],
+        [("ThreadEndCondition", _BLIND), ("ThreadDepth", depth_mm / 1000.0)],
         label,
     )
     readback = {
@@ -139,7 +148,7 @@ def _thread_from_face(adapter, feature_name: str, *, label: str) -> None:
     if (
         readback["EndCondition"] != _THRU_ALL
         or readback["ThreadEndCondition"] != _BLIND
-        or abs(readback["ThreadDepth"] - FULL_THREAD_DEPTH) > 0.005
+        or abs(readback["ThreadDepth"] - depth_mm) > 0.005
     ):
         raise RuntimeError(f"{label}: thread did not stop short: {readback!r}")
 
@@ -157,9 +166,8 @@ async def build(adapter) -> dict[str, str]:
         ("BracketLength", BRACKET_LENGTH),
         ("BracketWidth", BRACKET_WIDTH),
         ("BracketThick", BRACKET_THICK),
-        *((f"BarTapX{k}", x) for k, x in enumerate(BAR_TAP_X, start=1)),
-        ("KP08TapX1", KP08_TAP_X[0]),
-        ("KP08TapX2", KP08_TAP_X[1]),
+        ("HoleX1", HOLE_X[0]),
+        ("HoleX2", HOLE_X[1]),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -198,51 +206,57 @@ async def build(adapter) -> dict[str, str]:
     )
     volume = await volume_check(adapter, "bracket", V_BRACKET, _V_TOL)
 
-    # --- Base-bar taps: ONE #8-32 UNC wizard feature from the bottom face ----
+    # --- Bar-face threads: ONE #8-32 UNC BLIND wizard from the bottom face --
     # Their screws come up through TL-20, so each thread runs from the bar
-    # face; the tap drill runs THRU. The wizard sets the row on y 0 by an
-    # origin relation (a zero coordinate takes no dimension); each station is
-    # a dimension from the inner end.
+    # face, BAR_THREAD_DEPTH deep; the drill stops where the KP08-face thread
+    # will end, so the top face stays whole for the next wizard. The wizard
+    # sets the row on y 0 by an origin relation (a zero coordinate takes no
+    # dimension); each station is a dimension from the inner end.
     bar_normal, bar_z = BAR_TAP_FACE
     bar_taps = wizard_holes(
         adapter,
         BAR_TAP_SPEC,
-        [[x, 0.0, bar_z] for x in BAR_TAP_X],
+        [[x, 0.0, bar_z] for x in HOLE_X],
         bar_normal,
-        "base-bar screw taps (#8-32 from the bar face)",
+        "bar-face screw threads (#8-32 from the bar face)",
         name="BarTaps",
-        expect_dia_mm=BAR_TAP_DRILL,
+        expect_dia_mm=TAP_DRILL,
         placement_dims=[
-            ((f"BarTap{k}X", f'"BarTapX{k}"'), (None, None))
-            for k in range(1, len(BAR_TAP_X) + 1)
+            ((f"BarTap{k}X", f'"HoleX{k}"'), (None, None))
+            for k in range(1, len(HOLE_X) + 1)
         ],
     )
     drive_jobs += bar_taps.placement_drive_jobs
-    _thread_from_face(adapter, "BarTaps", label="base-bar screw taps")
     volume = await volume_check(
-        adapter, "bracket with base-bar taps", volume - V_BAR_TAPS, _V_TOL
+        adapter, "bracket with bar-face threads", volume - V_BAR_TAPS, _V_TOL
     )
 
-    # --- KP08 taps: ONE #6-32 UNC wizard feature from the top face ----------
-    # The size token is checked by the cut diameter (a wrong token fails).
+    # --- KP08-face threads: ONE #8-32 UNC wizard THRU ALL from the top face --
+    # Its drill completes each through hole; its thread stops
+    # KP08_THREAD_DEPTH from the top, short of the bar screw's reach.
     kp08_normal, kp08_z = KP08_TAP_FACE
     kp08_taps = wizard_holes(
         adapter,
         KP08_TAP_SPEC,
-        [[x, 0.0, kp08_z] for x in KP08_TAP_X],
+        [[x, 0.0, kp08_z] for x in HOLE_X],
         kp08_normal,
-        "KP08 screw taps (#6-32 from the KP08 face)",
+        "KP08-face screw threads (#8-32 from the KP08 face)",
         name="KP08Taps",
-        expect_dia_mm=KP08_TAP_DRILL,
+        expect_dia_mm=TAP_DRILL,
         placement_dims=[
-            ((f"KP08Tap{k}X", f'"KP08TapX{k}"'), (None, None))
-            for k in range(1, len(KP08_TAP_X) + 1)
+            ((f"KP08Tap{k}X", f'"HoleX{k}"'), (None, None))
+            for k in range(1, len(HOLE_X) + 1)
         ],
     )
     drive_jobs += kp08_taps.placement_drive_jobs
-    _thread_from_face(adapter, "KP08Taps", label="KP08 screw taps")
+    _thread_from_face(
+        adapter, "KP08Taps", KP08_THREAD_DEPTH, label="KP08-face screw threads"
+    )
     volume = await volume_check(
-        adapter, "bracket with KP08 taps", volume - V_KP08_TAPS, _V_TOL
+        adapter,
+        "bracket with through holes",
+        V_BRACKET - V_HOLES,
+        _V_TOL,
     )
 
     # --- The row's station: a reference sketch -------------------------------
@@ -317,9 +331,9 @@ async def build(adapter) -> dict[str, str]:
     _require_one_solid_body(adapter, label="driven end bracket")
 
     # Every model edit -- material, marked set, model-owned places -- precedes
-    # the save. The bar taps and row print at three places, so the title
-    # block's ±.005 governs them; the KP08 taps print exact millimetres with
-    # their own band (owner ruling 4; spec module docstring).
+    # the save. The row prints at three places, so the title block's ±.005
+    # governs it; the hole stations print exact millimetres with their own
+    # band (owner ruling 4; spec module docstring).
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)

@@ -807,13 +807,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="ch_rocker_arm_tl_vn_oblique_kp08_screw",
-        part="ch_rocker_arm_tl_vn_oblique_kp08_screw",
-        artifact_stem="ch-rocker-arm-tl-vn-oblique-kp08-screw",
-        script_name="draw_ch_rocker_arm_tl_vn_oblique_kp08_screw.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
         name="ch_rocker_arm_tl_vn_oblique_riser_screw",
         part="ch_rocker_arm_tl_vn_oblique_riser_screw",
         artifact_stem="ch-rocker-arm-tl-vn-oblique-riser-screw",

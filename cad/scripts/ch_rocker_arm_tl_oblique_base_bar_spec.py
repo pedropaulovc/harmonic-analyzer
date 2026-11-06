@@ -14,11 +14,11 @@ matter; the only tight bands are the rail holes' end distance and pitch
 Issue #290: the sheet prints decimal inch (``drawing_unit: in``). Lengths
 stay physical millimetres, each fabricated nominal the exact millimetres of
 its printed inch value. Exempt: the near slot's station (it closes the T-slot
-limits. The HGR15 rail's hole pattern and the bracket holes' stations (the
-leadscrew's KP08 stations along the Tr8 screw) belong to metric-only vendor
-lines (owner ruling 4, 2026-11-01, option B): they print exact millimetres,
-labelled ``mm``, each with its own band (``METRIC_DIMENSIONS``,
-``_metric_vendor_dimension``).
+limits. The HGR15 rail's hole pattern and the bracket holes' stations and
+rows (the leadscrew's KP08 stations along the Tr8 screw and its 42 mm foot
+pitch across it) belong to metric-only vendor lines (owner ruling 4,
+2026-11-01, option B): they print exact millimetres, labelled ``mm``, each
+with its own band (``METRIC_DIMENSIONS``, ``_metric_vendor_dimension``).
 
 Material and stock: 6061-T6511 aluminium flat bar milled from the owned 1/2 x
 6 bar (OnlineMetals 1173; owner ruling #2083), sawn and faced to ⚙
@@ -66,35 +66,43 @@ x = ⚙ ``HOLD_DOWN_FAR_S`` - ⚙ ``RAIL_NEAR_S`` (15.35), each ± ⚙
 12 the slots are dimensioned to their radius centres: width .53 and the .16
 between the two end-arc centres, each centre carrying a printed centre mark.
 
-One part, one configuration, two off (Main's ruling): every feature goes
-through, so the bar under rail 2 is the same part turned over (rotated 180°
-about its X axis). Turning it over mirrors plan X and keeps lateral, so on
-both bars the column-side edge stays on the column side, the near slot on
-the near stud and the rail row on the rail. The part as modelled is the
-rail-1 bar: near slot at y -1.48, far slot at +1.48. Both slots are located
-from the faced -Y side, the datum every hole uses, to their lower end
-centres (c3-r6 review, rule 10): the near slot's rise ``NEAR_SLOT_RISE``
-1.94, the far slot's ``FAR_SLOT_RISE`` 4.90.
+One part, one Number, two named configurations, one off each (the oblique
+simplification's PR2 ruling: bar 1 drilled, bar 2 plain, configurations of
+one model under the configuration-identity convention): ``Bar1`` (rail 1,
+the default) carries the end brackets' holes, ``Bar2`` (rail 2) suppresses
+them (``CONFIGURATION_FEATURES``). Every other feature goes through, so the
+bar under rail 2 is the same body turned over (rotated 180° about its X
+axis). Turning it over mirrors plan X and keeps lateral, so on both bars the
+column-side edge stays on the column side, the near slot on the near stud
+and the rail row on the rail. The part as modelled is the rail-1 bar: near
+slot at y -1.48, far slot at +1.48. Both slots are located from the faced -Y
+side, the datum every hole uses, to their lower end centres (c3-r6 review,
+rule 10): the near slot's rise ``NEAR_SLOT_RISE`` 1.94, the far slot's
+``FAR_SLOT_RISE`` 4.90.
 
 Walls (rule 17, .080 target, .060 floor, worst case at the printed bands):
 the near slot to the bar's spindle end; a slot end to its bar side (the far
 slot to the +Y side is the thinner: its rise, run and the stock width's
 supplier band all enter it).
 
-End bracket holes (PR C4): 8 x #8 SHCS clearance (``BRACKET_HOLE_DIA``
-.196, normal fit) THRU, counterbored Ø.313 x .189 from the UNDERSIDE, at
-the leadscrew layout's ``BASE_BAR_HOLES`` (four in a row at each KP08
-station; rows 2.425, 1.768, .902 and .245 from the -Y edge). Four #8-32 x
-5/8 SHCS per TL-28 bracket go up through the bar into the bracket's tapped
-holes before the bar goes on the table; the heads sit below the underside.
-Since the 2026-10-17 widening (ruling A′) each bracket stands wholly on the
-bar, its outer end flush with the -Y edge. Both bars carry the holes; on the
-turned-over bar 2 the counterbores face up, unused. The rows print at .XXX:
-their spacings must hold TL-28's tapped row inside the screws' float, so the
-callout names the mate. The two stations are the KP08's metric stations and
-print exact, ``57.000 ±0.13 mm`` and ``428.000 ±0.13 mm`` (the millimetre
-title block's three-place band, stated on each). Worst-case walls:
-``bracket_hole_walls``.
+End bracket holes (PR C4; PR2's two-hole TL-28), ``Bar1`` only: 4 x #8 SHCS
+clearance (``BRACKET_HOLE_DIA`` .189, a #12 drill) THRU, counterbored Ø.313 x
+.189 from the UNDERSIDE, at the leadscrew layout's ``BASE_BAR_HOLES`` (a pair
+at each KP08 station, on TL-28's two holes at the KP08's 42 mm foot pitch;
+rows 54.909 and 12.909 mm from the -Y edge). Two #8-32 x 3/4 SHCS (the
+jig's common screw, ``ch_rocker_arm_tl_oblique_fasteners_spec``) per TL-28
+bracket go up through the bar into the bracket's lower threads before the
+bar goes on the table; the heads sit below the underside. Since the
+2026-10-17 widening (ruling A′) each bracket stands wholly on the bar, its
+outer end flush with the -Y edge. The rows derive from the KP08's metric
+foot pitch, so they print exact millimetres to three places with the
+stations' band (``BRACKET_ROW_PLACES``, ``BRACKET_ROW_BAND`` ±0.13 mm): the
+rows must hold TL-28's two holes inside the screws' float, so the callout
+names the mate and bar 1. The two stations are the KP08's metric stations,
+``57.00 ±0.13 mm`` and ``428.00 ±0.13 mm``. Worst-case walls:
+``bracket_hole_walls``. The hole wall is also TL-28's positive stop under
+slip (``BRACKET_SCREW_FLOAT_MAX``; leadscrew LOAD_CASES, owner ruling Main
+2026-11-06 option B).
 """
 
 from __future__ import annotations
@@ -103,7 +111,7 @@ import math
 
 import _config
 from _gtol_planar import PlanarFace
-from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
+from _hole_spec import NUMBER_DRILL_MM, THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
@@ -193,6 +201,32 @@ HOLD_DOWN_STUD_DIA = 0.5 * INCH  # 1/2-13 T-slot stud
 NEAR_SLOT_Y = -SLOT_LATERAL
 FAR_SLOT_Y = SLOT_LATERAL
 QUANTITY = 2
+
+# One native model, one Number, two named configurations (the registry's
+# configuration_quantities, one off each): Bar1 under rail 1 carries the
+# TL-28 bracket holes; Bar2 under rail 2 is the same bar without them, every
+# other feature identical. BRACKET_FEATURES are suppressed in Bar2.
+PART_NAME = "ch-rocker-arm-tl-oblique-base-bar"
+BAR1 = "Bar1"
+BAR2 = "Bar2"
+CONFIGURATIONS = (BAR1, BAR2)
+CONFIGURATION_DESCRIPTIONS = {
+    BAR1: "BASE BAR 1, END BRACKET HOLES",
+    BAR2: "BASE BAR 2, NO BRACKET HOLES",
+}
+BRACKET_FEATURES = ("BracketHoles", "BracketRowReference")
+CONFIGURATION_FEATURES = {BAR1: BRACKET_FEATURES, BAR2: ()}
+_REGISTRY = _config.parts(PART_NAME)
+if (
+    _REGISTRY.get("default_configuration") != BAR1
+    or tuple(_REGISTRY.get("configuration_quantities", {})) != CONFIGURATIONS
+    or sum(_REGISTRY["configuration_quantities"].values()) != QUANTITY
+    or _REGISTRY["quantity"] != QUANTITY
+):
+    raise AssertionError("the base bar registry's configurations are not Bar1/Bar2")
+CONFIGURATION_QUANTITIES = {
+    name: int(_REGISTRY["configuration_quantities"][name]) for name in CONFIGURATIONS
+}  # one off each
 
 
 def slot_rise(y_centre: float) -> float:
@@ -285,14 +319,22 @@ def require_matched_rail_walls(
         if not math.isfinite(wall) or wall < WALL_TARGET_MM:
             raise ValueError(f"matched rail wall {label}: {wall!r}, require {WALL_TARGET_MM}")
 
-# --- End bracket holes (PR C4) -------------------------------------------
-# The two TL-28 brackets' #8-32 x 5/8 SHCS, fitted up through the bar before it
-# goes on the table. Positions: ``ch_rocker_arm_tl_vn_oblique_leadscrew_spec``'s
-# BASE_BAR_HOLES, which imports this module; only the build, drawing and test
-# read them, and pass them to ``bracket_hole_walls``.
+# --- End bracket holes (PR C4), Bar1 configuration only ------------------
+# The two TL-28 brackets' #8-32 x 3/4 SHCS (the jig's common screw), two a
+# bracket, fitted up through bar 1 before it goes on the table. Positions:
+# ``ch_rocker_arm_tl_vn_oblique_leadscrew_spec``'s BASE_BAR_HOLES, which
+# imports this module; only the build, drawing and test read them, and pass
+# them to ``bracket_hole_walls``. Bar 2 (the Bar2 configuration) has none.
 BRACKET_SCREW = "#8"
 BRACKET_HOLE_FIT = "normal"
-BRACKET_HOLE_DIA = CLEARANCE_MM[(BRACKET_SCREW, BRACKET_HOLE_FIT)]  # .196
+# The Hole Wizard's normal-fit #8 counterbore with its hole overridden to a
+# #12 drill (.189), between the close (.180) and normal (.196) fits: the
+# smallest standard drill whose float still takes the two patterns' spacing
+# (end bracket spec, ``BAR_PAIR_MISFIT``) and whose worst-case float keeps
+# TL-28's reversal lost motion under the owner's ~.9 mm (leadscrew
+# LOAD_CASES, owner ruling Main 2026-11-06 option B).
+BRACKET_HOLE_DRILL = "#12"
+BRACKET_HOLE_DIA = NUMBER_DRILL_MM[BRACKET_HOLE_DRILL]  # .189
 BRACKET_SCREW_HEAD_DIA = 0.270 * INCH  # #8 SHCS head, ASME B18.3 max
 BRACKET_SCREW_HEAD_HEIGHT = 0.164 * INCH
 BRACKET_CBORE_DIA = 7.9502  # .313, the 5/16 counterbore
@@ -307,15 +349,17 @@ BRACKET_HOLE_SPEC = HoleSpec(
         "CounterBoreDepth": BRACKET_CBORE_DEPTH,
     },
 )
-# Rows at .XXX: their spacings must hold TL-28's four tapped holes inside the
-# screws' float. Every Hole Wizard length prints .XXX. The stations are the
-# KP08's along the Tr8 screw (owner ruling 4): exact millimetres, each
-# stating the millimetre title block's three-place band. Whole millimetres,
-# they print two places like the rail row (machinist review: a third place
-# adds nothing under an explicit band).
-BRACKET_HOLE_PLACES = 3
+# The holes stand at the KP08's bolt pattern, through TL-28 (owner ruling 4:
+# a metric-only vendor line): both the stations along the Tr8 screw and the
+# rows across the bar (the KP08's 42 span about the screw axis) print exact
+# millimetres, each stating the millimetre title block's three-place band.
+# The whole-millimetre stations print two places like the rail row
+# (machinist review: a third place adds nothing under an explicit band); the
+# rows need three. Every Hole Wizard length prints .XXX.
+BRACKET_ROW_PLACES = 3
 BRACKET_STATION_PLACES = 2
 BRACKET_STATION_BAND = printed_band_mm(3, unit=METRIC_UNIT)  # 0.13
+BRACKET_ROW_BAND = BRACKET_STATION_BAND
 BRACKET_CBORE_PLACES = 3
 BRACKET_CALLOUT_PRECISION = {
     "hw-thruholedia": 3,
@@ -324,14 +368,19 @@ BRACKET_CALLOUT_PRECISION = {
 }
 BRACKET_MATE = "MHA-CH-06-TL-28"
 # The plan looks at the top face; the counterbores open on the underside.
-BRACKET_CALLOUT_PROCESS = f"MATCHES {BRACKET_MATE}\nDRILL, C'BORE FAR SIDE\n"
-_XXX = printed_band_mm(BRACKET_HOLE_PLACES, unit=UNIT)
+# The sheet draws Bar1; the callout says the holes are its alone and that
+# bar 2 (the Bar2 configuration, same Number) has none.
+BRACKET_CALLOUT_PROCESS = (
+    f"BAR 1 ONLY; NONE ON BAR 2\nMATCHES {BRACKET_MATE}\nDRILL, C'BORE FAR SIDE\n"
+)
 _CB = printed_band_mm(BRACKET_CBORE_PLACES, unit=UNIT)
 _THICK_BAND = printed_band_mm(THICK_PLACES, unit=UNIT)
-# Public for the leadscrew layout's rule-17 window (ruling A′): a hole's .XXX
-# band and the counterbore's largest printed radius.
-BRACKET_HOLE_BAND = _XXX
 BRACKET_CBORE_RADIUS_MAX = (BRACKET_CBORE_DIA + _CB) / 2.0
+# The #8's float (at its basic major) in the largest DRILLED HOLES clearance
+# hole, a side: the TL-28 positive stop's travel (leadscrew LOAD_CASES).
+BRACKET_SCREW_FLOAT_MAX = (
+    BRACKET_HOLE_DIA + drilled_oversize_mm(unit=UNIT) - THREAD_MAJOR_MM["#8-32"]
+) / 2.0
 BRACKET_HEAD_RECESS_MIN = BRACKET_CBORE_DEPTH - _CB - BRACKET_SCREW_HEAD_HEIGHT
 BRACKET_HEAD_CLEARANCE_MIN = BRACKET_CBORE_DIA - _CB - BRACKET_SCREW_HEAD_DIA
 BRACKET_HEAD_BEARING_MIN = (
@@ -369,7 +418,9 @@ def bracket_hole_walls(holes: tuple[tuple[float, float], ...]) -> dict[str, floa
         )
 
     def row(y: float) -> float:
-        return _deviation(y - LOW_SIDE_Y, BRACKET_HOLE_PLACES)
+        return _deviation(
+            y - LOW_SIDE_Y, BRACKET_ROW_PLACES, BRACKET_ROW_BAND, unit=METRIC_UNIT
+        )
 
     def position(x: float, y: float) -> float:
         return math.hypot(station(x), row(y))  # a hole's corner of its square
@@ -427,6 +478,29 @@ def bracket_hole_walls(holes: tuple[tuple[float, float], ...]) -> dict[str, floa
     }
 
 
+def bracket_pair_spacing_error(holes: tuple[tuple[float, float], ...]) -> float:
+    """The largest change, at the printed limits, in the centre distance of
+    one bracket's hole pair (two holes on one station, one on each row):
+    both rows across the pair, both stations across it (second order)."""
+    errors = []
+    for i, (x1, y1) in enumerate(holes):
+        for x2, y2 in holes[i + 1 :]:
+            if x1 != x2:
+                continue
+            span = abs(y1 - y2)
+            along = sum(
+                _deviation(y - LOW_SIDE_Y, BRACKET_ROW_PLACES, BRACKET_ROW_BAND, unit=METRIC_UNIT)
+                for y in (y1, y2)
+            )
+            across = 2.0 * _deviation(
+                x1, BRACKET_STATION_PLACES, BRACKET_STATION_BAND, unit=METRIC_UNIT
+            )
+            errors.append(max(along, math.hypot(span + along, across) - span))
+    if not errors:
+        raise ValueError("no bracket hole pair shares a station")
+    return max(errors)
+
+
 # --- Drawing contract ----------------------------------------------------------
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarProfile": {
@@ -442,11 +516,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Bar": {"BarThick"},
     "RailHoles": {f"RailHole{k}X" for k in range(1, len(RAIL_HOLE_X) + 1)},
     "RailRowReference": {"RailRowY"},
-    # The bracket rows' stations (one per KP08 station) from the spindle-end
-    # face, and the four rows from the faced -Y edge (the hidden reference
-    # sketch; ruling A′: four screws a bracket).
-    "BracketHoles": {"BracketHole1X", "BracketHole5X"},
-    "BracketRowReference": {f"BracketRow{k}Y" for k in range(1, 5)},
+    # The bracket holes' stations (one per KP08 station) from the spindle-end
+    # face, and the two rows from the faced -Y edge (the hidden reference
+    # sketch): the Bar1 configuration's only.
+    "BracketHoles": {"BracketHole1X", "BracketHole3X"},
+    "BracketRowReference": {"BracketRow1Y", "BracketRow2Y"},
 }
 # The width is milled to size (owner ruling #2083) and the thickness faced
 # (owner ruling 2026-10-30): both take the title block's .XX band; the rail
@@ -462,6 +536,10 @@ METRIC_DIMENSIONS: dict[tuple[str, str], tuple[int, float]] = {
         ("BracketHoles", name): (BRACKET_STATION_PLACES, BRACKET_STATION_BAND)
         for name in sorted(DRAWING_DIMENSIONS["BracketHoles"])
     },
+    **{
+        ("BracketRowReference", name): (BRACKET_ROW_PLACES, BRACKET_ROW_BAND)
+        for name in sorted(DRAWING_DIMENSIONS["BracketRowReference"])
+    },
 }
 _PLACES = {
     "SlotWidth": SLOT_PLACES,
@@ -469,7 +547,6 @@ _PLACES = {
     "BarThick": THICK_PLACES,
     "BarWidth": WIDTH_PLACES,
     "RailRowY": RAIL_ROW_PLACES,
-    **{name: BRACKET_HOLE_PLACES for name in DRAWING_DIMENSIONS["BracketRowReference"]},
     **{name: places for (_feature, name), (places, _band) in METRIC_DIMENSIONS.items()},
     **{name: places for (_feature, name), places in RAIL_REFERENCE_DIMENSIONS.items()},
 }
@@ -484,6 +561,23 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked base bar dimension needs authored places")
+# Each member's sheet marks only the dimensions of the features it keeps:
+# Bar2's sheet (rule 7: the plain member drawn in its own right, not left to
+# a note on bar 1's) carries every dimension but the bracket features'.
+MEMBER_DRAWING_DIMENSIONS: dict[str, frozenset[str]] = {
+    configuration: frozenset(
+        name
+        for feature, names in DRAWING_DIMENSIONS.items()
+        if feature not in BRACKET_FEATURES or feature in CONFIGURATION_FEATURES[configuration]
+        for name in names
+    )
+    for configuration in CONFIGURATIONS
+}
+if MEMBER_DRAWING_DIMENSIONS[BAR1] != set(DRAWING_PRECISION_BY_NAME) or (
+    MEMBER_DRAWING_DIMENSIONS[BAR1] - MEMBER_DRAWING_DIMENSIONS[BAR2]
+    != set().union(*(DRAWING_DIMENSIONS[feature] for feature in BRACKET_FEATURES))
+):
+    raise AssertionError("Bar1 marks every dimension; Bar2 all but the bracket features'")
 
 # Both large faces are static locating seats (rule 6, Ra 125 µin): bar 1's
 # underside on the mill table and its top under the rail and the TL-28
