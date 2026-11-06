@@ -40,6 +40,7 @@ SEQUENCE: tuple[str, ...] = (
     AXLE_CHECKED_KEY,
     "trial-parts-removed",
     "axle-pressed-further",
+    "axle-pressed-back",
     "column-clamps-fitted",
     COLUMN_CLAMP_STARTED_KEY,
     "axle-oiled",
