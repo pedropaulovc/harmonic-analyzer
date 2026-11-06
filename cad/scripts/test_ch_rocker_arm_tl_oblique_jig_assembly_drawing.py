@@ -402,7 +402,7 @@ def test_sheet_text_wraps_within_its_layout_width() -> None:
     for line in (*spec.ALIGNMENT_NOTE_LINES[1:], *spec.SWEEP_NOTE_LINES[1:]):
         assert line in drawing.ALIGNMENT_NOTE.split("\n")
     # The general torque note opens sheet 7's sequence, its items unbroken.
-    assert drawing.ASSEMBLY_STEPS.split("\n")[1].startswith("TORQUE WHERE NO STEP")
+    assert drawing.ASSEMBLY_STEPS.split("\n")[1].startswith("UNSPECIFIED TORQUES")
     assert " ".join(spec.GENERAL_TORQUE_NOTE.split()) in " ".join(drawing.ASSEMBLY_STEPS.split())
 
 
@@ -2397,6 +2397,8 @@ def test_bom_note_buys_the_worst_case_at_both_supports() -> None:
     assert "SELECTED PER P1" in note
     item = f"(ITEM {spec.ITEM_NUMBERS[spec.PIVOT_SHIM]})"
     assert item in spec.PIVOT_FIT_STEPS[0] and "BUY LIST UNDER THE BOM" in spec.PIVOT_FIT_STEPS[0]
+    # One purchase list, not a duplicate expanded inside the two-page fit-up.
+    assert all(sku not in spec.PIVOT_FIT_STEPS[0] for sku in spec.PIVOT_SHIM_BUY)
     description = spec.BOM_DESCRIPTIONS[spec.PIVOT_SHIM]
     assert "FITTING STOCK" in description
     assert len(description) <= drawing.BOM_DESCRIPTION_MAX_CHARS
@@ -2883,3 +2885,35 @@ def test_two_instruction_sheets_refuse_a_sequence_that_cannot_fit():
     steps = tuple(f"{index}. STEP." for index in range(1, 101))
     with pytest.raises(ValueError, match="exceed sheets"):
         drawing.assembly_and_fit_layouts(steps, (), ("P1. FIT.",))
+
+
+def test_complete_source_instructions_fit_existing_pages_at_normal_note_size():
+    assert drawing.NOTE_LINE_M == 0.004525
+    assert drawing.STEPS_LINE_WIDTH == 68
+    assert drawing.NOTES_REFERENCE_MIN_HEIGHT == 0.075
+    assert [step.split(". ", 1)[0] for step in spec.ASSEMBLY_STEPS] == [
+        "1", "2", "3", "4", "5", "6", "7", "8A", "8B", "9", "10", "11",
+        "12", "13A", "13B", "13C", "13D",
+    ]
+    layouts = (drawing.STEPS_LAYOUT, drawing.FIT_LAYOUT)
+    printed = " ".join(" ".join(
+        text
+        for layout in layouts
+        for text in (layout.steps, layout.continued, layout.checks)
+    ).split())
+    for step in (
+        spec.GENERAL_TORQUE_NOTE, *spec.ASSEMBLY_STEPS,
+        *spec.PIVOT_FIT_STEPS, *spec.FEED_FIT_STEPS, *spec.ASSEMBLY_CHECKS,
+    ):
+        assert printed.count(" ".join(step.split())) == 1
+    for layout in layouts:
+        _assert_steps_sheet_fits(layout)
+        text_bottom = layout.checks_xy[1] - drawing._note_height(layout.checks)
+        reference_floor = (
+            drawing.TITLE_BLOCK[3] + drawing.BOM_SHEET_CLEARANCE
+            + drawing.NOTE_LINE_M + drawing.VIEW_LABEL_GAP
+        )
+        assert (
+            text_bottom - drawing.REGION_GAP - reference_floor
+            >= drawing.NOTES_REFERENCE_MIN_HEIGHT
+        )
