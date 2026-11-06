@@ -931,13 +931,17 @@ class ViewArrow:
 
 
 VIEW_ARROWS = (
-    # VIEW C: at the lever axis, clear of the clamp's front flat.
+    # VIEW C: at the lever axis, clear of the clamp's front flat. The lever
+    # group lies in the drum's wire lane (build_mg_magnifier_assembly
+    # LEVER_ROD_Z); round 1 put this tip at z 0, behind the lever, so the
+    # arrow pointed away from it.
     ViewArrow(
         notes.LEVER_TIP_VIEW_LETTER,
         (
             stack.THREADED_TIP_X,
             stack.LEVER_AXIS_Y,
-            -(CLAMP_HEX_AF / 2.0 + VIEW_ARROW_CLEAR_MM),
+            sh_vn_music_wire_lever_geom.DRUM_END_Z
+            - (CLAMP_HEX_AF / 2.0 + VIEW_ARROW_CLEAR_MM),
         ),
     ),
     # VIEW D: at the axle, past DETAIL B's boundary in front of the nuts.
