@@ -58,6 +58,9 @@ function, and where the right value depends on a design decision, say what the
 owner must decide instead of inventing a number. Cluster by the same feature and
 the same violated requirement: identity, precision support and layout defects on
 one feature are separate clusters; paraphrases of one defect are one cluster.
+Each input id still goes in exactly one cluster: an input claim that bundles
+several defects joins the cluster of the defect it names first, and that
+cluster's reason notes the other defects it bundled.
 
 `blockers`, `over_specification`, and `clarity` are gating categories; `minor`
 is not. Confirm each supported issue without regard to how many runs raised it.
