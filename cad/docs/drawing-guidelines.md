@@ -367,11 +367,13 @@ Hidden lines appear only where they inform (ASME Y14.3).
   ghosts of removed material mean the cut is in the wrong place.
 - Never dimension to a hidden line. Cut a section or breakout instead.
 - **Every section, detail and auxiliary view says what it shows.** It is
-  labelled with a letter and its scale (`SECTION A-A`, `DETAIL B`, `VIEW C`),
-  and its cutting plane, detail boundary or viewing arrow sits on a parent
-  view with the same letter. A view named only in prose (`LEVER TIP DETAIL`,
-  `VIEW FROM THE BACK`), or an enlarged view with no boundary on a parent, is
-  unlabelled. A rotated view says so.
+  labelled with a letter (`SECTION A-A`, `DETAIL B`, `VIEW C`), plus its scale
+  when that differs from the sheet scale, and its cutting plane, detail
+  boundary or viewing arrow sits on a parent view with the same letter. A
+  view named only in prose (`LEVER TIP DETAIL`, `GRADUATED UNDERSIDE`), or an
+  enlarged view with no boundary on a parent, is unlabelled. A rotated view
+  says so. Projected principal views (front, top, side in third-angle
+  alignment) need no label.
 - **A section shows the whole cut or says which part of it is shown.** Where
   the cutting plane passes through several like features and the section is
   broken to one of them, the label names that feature (`SECTION A-A, HOLE
@@ -666,10 +668,11 @@ those under rules 2, 3 or 7 at their own severity.
 A first-time builder reads these prints with ASME Y14.5 and a shop handbook
 beside them. Every symbol, abbreviation and phrase is one they can look up.
 
-- **Views.** `FRONT VIEW`, `TOP VIEW`, `RIGHT SIDE VIEW`, `SECTION A-A`,
-  `DETAIL B`, `VIEW C`, each with its scale. Notes and steps give directions
-  by those view names, never a compass (`NORTH`, `EAST`) or a private
-  convention.
+- **Views.** Projected principal views need no names. Every other view
+  carries a standard label (`SECTION A-A`, `DETAIL B`, `VIEW C`), never a
+  prose name (`VIEW FROM THE BACK`). Notes and steps give directions by the
+  standard view names (front, top, right side), never a compass (`NORTH`,
+  `EAST`), a clock reading or a private convention.
 - **Holes.** Size first, then process, then depth, with the Y14.5 symbols:
   `Ø.257 THRU`, `Ø.3750 +.0015/+.0010 REAM THRU`, `⌴ Ø.31 ↧ .19`,
   `⌵ Ø.312 X 82°`, `1/4-20 UNC ↧ .45`. A counterbore or countersink is
