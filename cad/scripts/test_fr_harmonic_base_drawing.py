@@ -810,7 +810,7 @@ def test_callout_box_rule_fails_e0e287c83_sheet_on_its_real_display_data() -> No
 # Keep every display segment, including each tip stub and horizontal shoulder,
 # and every logged obstacle. This is the observed failure, not an after-fix dump.
 # The cross-tap callout it also captured has since left sheet 2 with the front
-# cross-tap view (now on sheet 3), so only the four plan callouts replay here;
+# cross-tap view (now on sheet 5), so only the four plan callouts replay here;
 # the obstacles stay as logged.
 NATIVE_R5_CALLOUTS = {
     "MHA-DT-18 block transfer": (
@@ -1571,11 +1571,11 @@ def _drive_hole_sheet_callout_check(
         sheet._check_hole_sheet_callouts(
             object(),
             ddoc,
-            sheet_name=sheet.SHEET_NAMES[2],
+            sheet_name=sheet.SHEET_NAMES[4],
             callouts={"pedestal": object()},
             views={"top": "top view"},
         )
-    assert activated == [sheet.SHEET_NAMES[1 if holes_sheet else 2]]
+    assert activated == [sheet.SHEET_NAMES[1 if holes_sheet else 4]]
 
 
 def test_hole_sheet_callout_check_skips_display_dimensions(monkeypatch) -> None:
@@ -1585,7 +1585,7 @@ def test_hole_sheet_callout_check_skips_display_dimensions(monkeypatch) -> None:
 
 
 def test_cross_tap_sheet_callout_check_needs_no_table_or_pivot_note(monkeypatch) -> None:
-    # Sheet 3 carries the front cross-tap view but neither the hole table nor
+    # Sheet 5 carries the front cross-tap view but neither the hole table nor
     # the numbered pivot note; its callouts are still measured against notes.
     _drive_hole_sheet_callout_check(
         monkeypatch, (0.200, 0.200, 0.220, 0.210), numbered_note_copies=0, holes_sheet=False
@@ -2597,7 +2597,7 @@ def test_hole_sheet_callout_check_runs_on_every_callout_before_finalize() -> Non
         if getattr(call.func, "id", None) == "_check_hole_sheet_callouts"
     }
     # Sheet 2 checks the plan's callouts against its table and datum origin;
-    # sheet 3 the front cross-tap view's, which carries neither.
+    # sheet 5 the front cross-tap view's, which carries neither.
     assert set(checks) == {"hole_sheet_callouts", "cross_tap_sheet_callouts"}
     expected = {
         "hole_sheet_callouts": (
@@ -2606,8 +2606,8 @@ def test_hole_sheet_callout_check_runs_on_every_callout_before_finalize() -> Non
             {"block_callout", "pedestal_callout", "spring_callout", "nameplate_callout"},
         ),
         "cross_tap_sheet_callouts": (
-            "SHEET_NAMES[2]",
-            {"bottom", "underside_section", "hole_side"},
+            "SHEET_NAMES[4]",
+            {"hole_side"},
             {"tap_callout", "clearance_callout"},
         ),
     }
@@ -2812,7 +2812,8 @@ def test_cross_tap_xs_are_baselines_from_the_flange_edge_on_the_front_view() -> 
     assert "CrossTapPitch" not in keep
     # Shortest innermost: the near tap's row sits between the view and the
     # far tap's.
-    view_bottom = sheet.HOLE_SIDE_CENTER[1] - fr_harmonic_base_spec.STACK_HEIGHT * sheet.VIEW_SCALE / 2000.0
+    scale = sheet.CROSS_TAP_SHEET_SCALE[0] / sheet.CROSS_TAP_SHEET_SCALE[1]
+    view_bottom = sheet.HOLE_SIDE_CENTER[1] - fr_harmonic_base_spec.STACK_HEIGHT * scale / 2000.0
     assert keep["CrossTapFarX"][1] < keep["CrossTapX"][1] < view_bottom
     # 1.244 and 16.756 (flow-through until the column snap: 1.2441 / 16.7559)
     # are also the table's A1/A2 and A3/A4 X LOCs from the same flange edge.
@@ -3804,9 +3805,9 @@ def test_numbered_note_and_wider_flags_predict_clearance_in_the_proven_lanes() -
     assert sheet.HOLE_TOP_KEEP["PivotSeatY"] == (0.2616, 0.1705)
     assert sheet.PIVOT_SEAT_Y_TEXT_XY == (0.2080, 0.1895)
     assert sheet.HOLE_TAG_STATION_POSITIONS[sheet.PIVOT_SCREW_XZ] == (0.2456, 0.1550)
-    # The front cross-tap view and its spotface callout now sit on sheet 3,
+    # The front cross-tap view and its spotface callout now sit on sheet 5,
     # so neither is this sheet-2 note's neighbour any longer.
-    assert sheet.HOLE_SIDE_KEEP["SpotFaceDia"] == (0.063, 0.115)
+    assert sheet.HOLE_SIDE_KEEP["SpotFaceDia"] == (0.062, 0.200)
 
     # Native-r4 embedded-font calibration supplies conservative NEW text-width
     # estimates. This is not a claim that numbered note 1 has printed natively.
@@ -5514,7 +5515,7 @@ def test_all_five_native_callouts_omit_only_after_quantity_and_precision_edits()
     assert [element.elts[1].id for element in omission.iter.elts] == [
         "block_callout", "pedestal_callout", "spring_callout", "nameplate_callout",
     ]
-    # The cross-tap callout moved to sheet 3 with its view: its omission is
+    # The cross-tap callout moved to sheet 5 with its view: its omission is
     # its own call, still after the quantity and precision edits.
     tap_omission = next(
         c for c in calls if getattr(c.func, "id", None) == "_omit_base_callout_thread_class"
