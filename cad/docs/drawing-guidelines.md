@@ -37,7 +37,7 @@ the only capability figure a review may use.
 |---|---|---|
 | location of a drilled hole from a datum edge or bore | ±.005 | edge finder, DRO, spot drill; height gauge and pin |
 | location of a reamed or bored hole or a milled step, up to 6 in from its datum | ±.002 | as above, then ream or bore; surface plate, pin, indicator |
-| the same, more than 6 in from its datum | ±.004 | DRO over long travel in a shop without temperature control |
+| the same, more than 6 in from its datum, measured along the toleranced direction | ±.004 | DRO over long travel in a shop without temperature control |
 | milled width, thickness or slot | ±.001 | micrometer, gauge blocks |
 | turned diameter | ±.0005 | micrometer, made to the measured mate |
 | turned length or shoulder | ±.001 | DRO, depth micrometer |
@@ -415,16 +415,17 @@ Hidden lines appear only where they inform (ASME Y14.3).
   pattern X/Y ordinates from that datum where the shop will set it up on a DRO.
 - Prefer regular hole spacings that the shop can step off.
 - **Use a hole table when the holes outgrow dimensions.** When one view
-  locates eight or more hole axes, when a location dimension line would cross
-  another dimension line, or when more than one hole in the view would carry
-  a mate or reason, locate the holes with a tagged hole table instead of
-  individual dimensions: an origin mark on a real datum (above), a tag at
-  each hole, X and Y from that origin, the size callout once per tag group
-  and one column naming the mate (rule 4). The view then carries the
+  locates eight or more hole axes, or when a location dimension line would
+  cross another dimension line, locate the holes with a tagged hole table
+  instead of individual dimensions: an origin mark on a real datum (above),
+  a tag at each hole, X and Y from that origin, the size callout once per tag
+  group and one column naming the mate (rule 4). The view then carries the
   overall, the datum features and the non-hole geometry. Ordinate
-  dimensioning with grouped hole callouts is an equal alternative for a
-  view with no more than two hole sizes. A single regular pattern (`20X Ø.089
-  ON .250 PITCH`) counts as one axis.
+  dimensioning with grouped hole callouts is an equal alternative for a view
+  with no more than two hole sizes. A single regular pattern (`20X Ø.089 ON
+  .250 PITCH`) counts as one axis. The CAD system's origin mark, drawn as
+  arrows offset along the datum bore's centrelines, marks that bore; it is
+  not a mid-air origin.
 - **Identical holes take one callout.** Give them one `nX` callout or one
   table tag group, never a repeated callout per hole.
 - The overall size is real and conspicuous. Nothing reads like an overall
@@ -695,13 +696,19 @@ beside them. Every symbol, abbreviation and phrase is one they can look up.
   `Ø.257 THRU`, `Ø.3750 +.0015/+.0010 REAM THRU`, `⌴ Ø.31 ↧ .19`,
   `⌵ Ø.312 X 82°`, `1/4-20 UNC ↧ .45`. A counterbore or countersink is
   written with its symbol, not in words; a depth is never deferred to a view.
+  A depth printed as REF in the callout is complete when a controlling
+  dimension on the views locates the floor (`↧ (.235)` with the floor at `.65`
+  from the socket axis).
 - **Words.** `MIN`, `MAX`, `REF`, `THRU` (the CAD form `THRU ALL` reads the
   same and is not a defect), `nX`, `°`, and the standard fit
   names (running, sliding, locational clearance, locational interference,
   press, drive). Private phrases a reader cannot look up are defects: `TO
   SUIT`, `ON SEAM`, `IN PHASE`, `MIRRORS`, `SAME X AS`, `AIR` for clearance,
   `BY EYE`, `TRUE D`. A location is a dimension or a table row, not a
-  sentence; holes in line share a drawn centreline.
+  sentence; holes in line share a drawn centreline. A plain functional
+  acceptance in ordinary words (`SLIDES IN, NO ROCK`, `TURNS FREE, NO
+  RATTLE`) is a stated acceptance, not a private phrase. An `nX` count on a
+  section that names its hole applies to that hole's table group.
 - **Project labels.** A label made up for this project (`R816`, `CL`, `CR`,
   `TIE 1`) is defined where it first appears or in one linked key on the
   same sheet, or replaced by a hole-table tag or a standard numbered flag
