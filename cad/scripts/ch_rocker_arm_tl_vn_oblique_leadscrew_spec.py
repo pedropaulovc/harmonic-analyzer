@@ -178,9 +178,10 @@ KP08_SCREW_LENGTH = _shortest_length(KP08_FOOT_THICK, KP08_SCREW)  # 5/8
 KP08_SCREW_FULL_THREAD_MIN = full_thread_min(
     KP08_SCREW_LENGTH, KP08_FOOT_THICK, KP08_SCREW
 )  # 8.67, 2.08 D
-# The deepest the KP08 screw reaches past TL-28's top face: B18.3 allows no
-# plus length tolerance, so its nominal length past the UNVERIFIED foot.
-KP08_SCREW_REACH_MAX = float(Fraction(KP08_SCREW_LENGTH)) * INCH - KP08_FOOT_THICK
+# The KP08 screw's reach past TL-28's top face on the nominal foot: its
+# length (B18.3: no plus length tolerance) less the UNVERIFIED 5.0. A thinner
+# foot reaches deeper; TL-28's spec takes its windows on the least foot.
+KP08_SCREW_REACH = float(Fraction(KP08_SCREW_LENGTH)) * INCH - KP08_FOOT_THICK
 KP08_MARGIN = 3.0  # clearance-check envelope margin, all round (Main)
 # HARFINGTON handwheel (Amazon B0DJ3DZT86, read 2026-11-04), along the screw
 # axis from the hub end outward: hub, rim, then the revolving handle standing

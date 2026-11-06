@@ -259,7 +259,9 @@ CONFIGURATION_DESCRIPTIONS = {
 }
 BRACKET_FEATURES = ("BracketHoles", "BracketRowReference")
 CONFIGURATION_FEATURES = {BAR1: BRACKET_FEATURES, BAR2: ()}
-_REGISTRY = _config.parts(PART_NAME)
+# Keep this shared-spec read literal: foreign drawing closures must track this
+# concrete row, not the dynamic parts/* token narrowed to their own part.
+_REGISTRY = _config.parts("ch-rocker-arm-tl-oblique-base-bar")
 if (
     _REGISTRY.get("default_configuration") != BAR1
     or tuple(_REGISTRY.get("configuration_quantities", {})) != CONFIGURATIONS
