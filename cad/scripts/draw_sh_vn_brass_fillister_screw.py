@@ -32,6 +32,27 @@ SHELVES = {
     "SupplierThreadDiameter": (True, "left"),
     "SupplierHeadDiameter": (True, "right"),
 }
+# swDisplayTangentEdges_e.swTangentEdgesHidden
+_TANGENT_EDGES_HIDDEN = 0
+
+
+def _hide_tangent_edges(adapter: Any, views: dict[str, Any]):
+    """The vendor body's split-face seams printed as grey dashes on TOP's head
+    edge and down and across its thread, used by no dimension (v47 machinist
+    FIX, rule 9). Hide tangent edges in the orthographic views; display only,
+    so scales, sources, orientations and positions are unchanged."""
+    orthographic = {name: views[name] for name in ("*Front", "*Top", "*Right")}
+    for view in orthographic.values():
+        view.SetDisplayTangentEdges2(_TANGENT_EDGES_HIDDEN)
+        view.UpdateViewDisplayGeometry()
+
+    def assert_hidden():
+        for name, view in orthographic.items():
+            if int(view.GetDisplayTangentEdges2()) != _TANGENT_EDGES_HIDDEN:
+                raise RuntimeError(f"fillister {name}: tangent edges are not hidden")
+
+    assert_hidden()
+    return assert_hidden
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -69,6 +90,7 @@ async def build(adapter: Any) -> dict[str, str]:
             sides=supplier.SUPPLIER_REFERENCE_SIDES,
         ),
         settled_checks=checks,
+        view_placement=_hide_tangent_edges,
         unit=part_drawing_unit("sh-vn-brass-fillister-screw"),
     )
 
