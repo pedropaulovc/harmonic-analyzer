@@ -189,43 +189,30 @@ for _wall, _mm in WALLS_MM.items():
     if _mm < WALL_TARGET_MM:
         raise AssertionError(f"riser {_wall} wall {_mm:.3f} under rule 17's .080")
 
-# CL and CR sit on the hub radius inside the self-cut band, the drill at its
-# band's top. Spotted through the carrier's holes, each carries the carrier
-# station's error about the cut's centre C (trammel.ARC_CENTRE): its X and Y
-# title-block bands, X also half the D1 band (C stands D1/2 from A1, as
-# carrier.RISER_WALLS_FROM_A1), each times its direction cosine to C.
+# Table locations and self-cut circles share the same actual pin errors.
+# Charge the correlated radial error, including baseline rounding, separately
+# for each cut; do not reuse the retired chained-location stack.
 _CLAMP_R_MAX = (CLAMP_DIA + DRILLED_BAND[0]) / 2.0
 _CLAMP_RADIUS = math.dist(trammel.CL, trammel.ARC_CENTRE)
 if abs(math.dist(trammel.CR, trammel.ARC_CENTRE) - _CLAMP_RADIUS) > 1e-9:
     raise AssertionError("CL and CR are not on one radius")
 
 
-def _radial_station_error(
-    point: tuple[float, float], x_name: str, y_name: str
-) -> float:
-    """The carrier station's worst radial error about C at ``point``."""
-    places = carrier.DRAWING_PRECISION_BY_NAME
-    x_band = (
-        printed_band_mm(places[x_name], unit=carrier.UNIT) + carrier.POSITION_BAND / 2.0
-    )
-    y_band = printed_band_mm(places[y_name], unit=carrier.UNIT)
-    dx, dy = (abs(p - c) for p, c in zip(point, trammel.ARC_CENTRE, strict=True))
-    return (dx * x_band + dy * y_band) / _CLAMP_RADIUS
-
-
 CLAMP_STATION_ERROR = max(
-    _radial_station_error(trammel.CL, "ClX", "ClY"),
-    _radial_station_error(trammel.CR, "CrX", "CrY"),
+    carrier.station_cut_error(point, pass_name)
+    for point in (trammel.CL, trammel.CR)
+    for pass_name in ("inner", "outer")
 )
 CLAMP_BAND_WALLS = (
-    _CLAMP_RADIUS - _CLAMP_R_MAX - CLAMP_STATION_ERROR - trammel.RISER_INNER_RADIUS,
-    trammel.RISER_OUTER_RADIUS - _CLAMP_RADIUS - _CLAMP_R_MAX - CLAMP_STATION_ERROR,
+    _CLAMP_RADIUS - _CLAMP_R_MAX - trammel.RISER_INNER_RADIUS
+    - max(carrier.station_cut_error(point, "inner") for point in (trammel.CL, trammel.CR)),
+    trammel.RISER_OUTER_RADIUS - _CLAMP_RADIUS - _CLAMP_R_MAX
+    - max(carrier.station_cut_error(point, "outer") for point in (trammel.CL, trammel.CR)),
 )
-# Rule 17 / 20 (owner ruling 6, 2026-11-01, the PN-01 precedent): the outer
-# wall's shortfall under the .080 target, over the .060 floor, is accepted and
-# stated as plain fact on the CL/CR callout, floored to three places (a MIN
-# never rounds up). The window refuses both a wall under the floor and a
-# stale statement once the wall reaches the target.
+# Rule 17 / 20: original RV-01 (2026-11-01) extended to .071 MIN by owner
+# Option B ruling 2026-11-06 (coordinator-applied). Keep the 9/16 self-cut
+# and all nominal hole locations. The numeric target/floor are unchanged.
+# The callout is floored to its printed grid, never rounded upward.
 if not WALL_FLOOR_MM < min(CLAMP_BAND_WALLS) < WALL_TARGET_MM:
     raise AssertionError(
         "the riser CL/CR band wall no longer matches its stated shortfall"

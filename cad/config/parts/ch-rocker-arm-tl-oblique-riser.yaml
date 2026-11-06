@@ -12,7 +12,7 @@ ch-rocker-arm-tl-oblique-riser:
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
-      where: "the 2X Ø.257 CL and CR clearance-hole callout: WALL .074 MIN TO CUT EDGE"
-      finding: "wall from the CL/CR holes to the jig's self-cut band edge .074 in at the printed worst case (drill at its band's top, the TL-21 CL/CR stations' title-block error about the cut's centre), under the .080 in target and over the .060 in floor (rule 17)"
-      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions (this package: .074 at the printed worst case, relayed by Main as the jig riser .075; also ruling 6); CL/CR stay on the strap's hub radius and the riser cutter and band stay as they are. ch_rocker_arm_tl_oblique_riser_spec.CLAMP_BAND_WALLS counts the carrier station error and refuses anything under the .060 floor; the sheet states the worst-case wall floored to three places, never as note text"
+      where: "the 2X Ø.257 CL and CR clearance-hole callout: WALL .071 MIN TO CUT EDGE"
+      finding: "wall from CL/CR to the self-cut outer band edge .071 in minimum at the printed worst case; CR governs at 1.810703955 mm (.071287557 in), under the .080 in target and over the .060 in floor (rule 17)"
+      reason: "Owner ruling 2026-11-01 accepted this package's .074 minimum. Extended to .071 MIN by owner Option B ruling 2026-11-06 (coordinator-applied): the carrier's .XXX ±.005 baseline coordinates and local A2/B2 Y .964 ±.002 control require the correlated pin/cut-circle and rounding stack. Retain the 9/16 self-cut route and all nominal hole positions; no geometry or threshold change. ch_rocker_arm_tl_oblique_riser_spec.CLAMP_BAND_WALLS refuses a wall below .060 and the native callout prints the calculated minimum floored to three places."
   drawing_unit: in

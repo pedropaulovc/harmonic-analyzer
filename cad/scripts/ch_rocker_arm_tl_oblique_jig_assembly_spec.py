@@ -1387,10 +1387,9 @@ PLAN_TAGS: tuple[PlanTag, ...] = (
 )
 
 # --- Fitter package text -------------------------------------------------------------
-# The rails are set by indicating a pin in each pivot block; the carrier holds
-# its own pin spacing to ±POSITION_BAND, the same band the readings use. The
-# readings and the band print at the carrier's 4 places (a .0001 DRO).
-ALIGNMENT_BAND = carrier.POSITION_BAND
+# Rail-angle setting is an assembly control, independent of the carrier's
+# .XXX hole-table locations. Preserve the existing .0008 indicating band.
+ALIGNMENT_BAND = 0.0008 * trammel.INCH
 ALIGNMENT_PLACES = 4
 ASSEMBLED_CAPTION = (
     "INNER PASS AT THE SYMMETRIC POSITION: A1/B1; OUTER PASS: A2/B2. "

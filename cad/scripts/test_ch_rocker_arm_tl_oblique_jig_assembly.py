@@ -983,6 +983,9 @@ def _thread(row: fasteners.Fastener, tap_drill: float) -> tuple[float, float, fl
 
 
 def test_interference_contracts_are_physical_seats_and_threads() -> None:
+    assert not hasattr(contracts, "JIG_HUB_STUD_SEAT")
+    assert carrier.HUB_HOLE_LIMITS[0] > max(carrier.HUB_STUD_LIMITS)
+    assert carrier.HUB_ROOT_CLEARANCE_MIN > 0.0
     assert contracts.JIG_CL_DOWEL_PRESS == (cl_dowel.DIA, carrier.THICKNESS)
     for envelope, expected in (
         (
@@ -1076,7 +1079,7 @@ def test_interference_contracts_are_physical_seats_and_threads() -> None:
         for index in range(count)
     }
     for pair in pairs:
-        if pair == hub or spec.CL_DOWEL + "-1" in pair:
+        if spec.CL_DOWEL + "-1" in pair:
             continue
         (insert,) = [name for name in pair if occurrences[name][0] in inserted]
         (receiver,) = pair - {insert}
@@ -2495,6 +2498,11 @@ def test_flanged_hub_stud_keeps_the_locator_nose_and_positive_seat() -> None:
     assert spec.HUB_STUD_ORIGIN[2] + hub_stud.FLANGE_THICK == pytest.approx(trammel.CARRIER_UNDERSIDE_Z)
     assert carrier.HUB_ROOT_CLEARANCE_MIN > 0
     assert carrier.HUB_FLANGE_SEAT_WIDTH_MIN >= 2.032
+    overlap = min(trammel.CARRIER_TOP_Z, spec.HUB_STUD_TOP_Z) - max(
+        trammel.CARRIER_UNDERSIDE_Z, spec.HUB_STUD_ORIGIN[2],
+    )
+    assert overlap == pytest.approx(carrier.THICKNESS)
+    assert frozenset((f"{spec.HUB_STUD}-1", f"{spec.CARRIER}-1")) not in contracts.ALLOWED_PAIRS
 
 
 def test_hold_down_inch_limits_lie_on_the_safe_side_of_the_kit_limits() -> None:

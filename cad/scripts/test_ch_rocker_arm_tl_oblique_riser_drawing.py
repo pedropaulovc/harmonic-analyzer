@@ -182,30 +182,27 @@ def test_clamp_holes_pass_their_mates_and_state_the_band_wall_shortfall() -> Non
     )
     assert lo > spec.CL_DOWEL_MAX
     assert lo > spec.CR_SCREW_MAJOR
-    # The carrier's 3-place CL station (±.005 each way, X also half the D1
-    # band from A1 to the cut's centre), resolved along the radius to CL.
-    centre = trammel.ARC_CENTRE
-    radius = math.dist(trammel.CL, centre)
-    cos_x = abs(trammel.CL[0] - centre[0]) / radius
-    cos_y = abs(trammel.CL[1] - centre[1]) / radius
-    station = 0.005 * INCH
-    error = cos_x * (station + carrier_spec.POSITION_BAND / 2.0) + cos_y * station
-    assert spec.CLAMP_STATION_ERROR == pytest.approx(error)
-    assert 0.14 < spec.CLAMP_STATION_ERROR < 0.16
+    radius = math.dist(trammel.CL, trammel.ARC_CENTRE)
+    errors = {
+        name: max(carrier_spec.station_cut_error(point, name) for point in (trammel.CL, trammel.CR))
+        for name in ("inner", "outer")
+    }
+    assert spec.CLAMP_STATION_ERROR == pytest.approx(max(errors.values()))
     hole_r = (spec.CLAMP_DIA + spec.DRILLED_BAND[0]) / 2.0
     inner, outer = spec.CLAMP_BAND_WALLS
-    assert inner == pytest.approx(radius - hole_r - error - trammel.RISER_INNER_RADIUS)
-    assert outer == pytest.approx(trammel.RISER_OUTER_RADIUS - radius - hole_r - error)
+    assert inner == pytest.approx(radius - hole_r - errors["inner"] - trammel.RISER_INNER_RADIUS)
+    assert outer == pytest.approx(trammel.RISER_OUTER_RADIUS - radius - hole_r - errors["outer"])
     assert inner >= WALL_TARGET_MM
     assert WALL_FLOOR_MM < outer < WALL_TARGET_MM
     # Stated floored to three places: a MIN never rounds up.
-    assert outer / INCH == pytest.approx(0.0747, abs=0.0001)
-    assert spec.CLAMP_WALL_MIN_TEXT == "WALL .074 MIN TO CUT EDGE"
+    assert outer == pytest.approx(1.810703955, abs=1e-8)
+    assert spec.CLAMP_WALL_MIN_TEXT == "WALL .071 MIN TO CUT EDGE"
     rows = spec.CALLOUTS_BELOW["ClampDia"].split("\n")
     assert rows[:3] == ["DRILL THRU", "CL AND CR HOLES", spec.CLAMP_WALL_MIN_TEXT]
     exceptions = _config.parts("ch-rocker-arm-tl-oblique-riser")["machinist_exceptions"]
     assert [(e["id"], e["kind"]) for e in exceptions] == [("RV-01", "minor")]
     assert spec.CLAMP_WALL_MIN_TEXT in exceptions[0]["where"]
+    assert "owner Option B ruling 2026-11-06 (coordinator-applied)" in exceptions[0]["reason"]
 
 
 def test_each_row_count_matches_the_holes_on_that_row() -> None:

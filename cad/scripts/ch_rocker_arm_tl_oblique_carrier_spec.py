@@ -15,11 +15,10 @@ vise, no bandsaw rip (owner ruling #2083: the 6 in width does not fit the
 5 3/4 in vise jaws flat), then faced to .47 (``CARRIER_THICK``) and milled to
 20.5 x 5.1. Finished thickness takes the .XX title-block band, not STOCK.
 
-Issue #290: the sheet prints decimal inch (``UNIT``). Lengths stay physical
-millimetres, each fabricated nominal the exact millimetre value of its printed
-inch on the printed grid. The kinematic stations (pin holes, CL, CR and the
-riser taps, all derived from R800/R816) are exempt from snapping: they print
-at 3 places, or 4 where the former band needs it.
+Issue #2151: one native hole table locates all holes from A1's actual axis,
+with +X along A1-B1. Coordinates print .XXX under the title-block ±.005.
+The sole local exception is A2/B2 Y .964 ±.002. Kinematic geometric nominals
+remain unchanged; their printed rounding is included in the budget below.
 
 Frame (the calculator's carrier frame, and the model frame): origin at the
 midpoint of A1-B1; +X runs A1 -> B1, +Y points toward the part, Z0 is the
@@ -30,24 +29,24 @@ directly.
 
 Values marked (calc) are read from ``trammel``, never retyped:
 
-* (calc) Pivot-pin holes A1/B1 at (-/+D1/2, 0), D1 = 17.7219 in; A2/B2 at
-  ``trammel.A2``/``B2``, chained FROM A1/B1 by dX = (D2 - D1)/2 = .2844 and
-  dY = .9638. Never from a plate edge.
+* (calc) Pivot-pin holes A1/B1 at (-/+D1/2, 0), D1 prints 17.722 in.
+  A2/B2 have independent X baselines from A1, not chained offsets.
+  Their Y .964 ±.002 is measured from the A1-B1 axis line.
 * (calc) CL (-6.334, 1.156): a Ø.12 x 90° centre-drill spot only, finished
   in place on the running jig to .2490-.2495 (the owned .2490 reamer) for the
   bought 1/4 x 1 dowel (.2501-.2503, McMaster 98381A542), a .0006-.0013
   diametral press (``CL_DOWEL_INTERFERENCE``). The jig assembly carries that
   size, not this sheet. The spot's callout names the MHA-CH-13 strap feature
   it becomes.
-* (calc) HUB (0, 1.792): not on this sheet (owner ruling 5, option A,
-  2026-11-01). Its Y station moves the strap's pivot radially 1:1, so it is
-  drilled in situ at assembly (MHA-CH-06-TL-00 step 10): at the symmetric
+* (calc) HUB (0, 1.792): the table's location is REF, not a second drilling
+  control (owner ruling 5, option A, 2026-11-01). Its Y station moves the pivot
+  radially 1:1, so it is drilled in situ at MHA-CH-06-TL-00 step 10: at the symmetric
   position, the table run from the apex (the spindle origin) +Y by
   ``trammel.HUB_OFFSET`` (``HUB_OFFSET_BAND``), then reamed to Ø.4000
   +.0005/0 (the purchased .4000 reamer) for the removable TL-33 hub clamp stud.
-  The pin spacing then moves the HUB with the cut, so only that setting and
-  the pin clearance's shift reach the strap's top edge (``HUB_RADIAL_STACK``,
-  inside half its band at the worst case: rule 19's fit-up).
+  The pin spacing moves HUB with the cut. The residual pin-shape error is
+  bounded against that same HUB by ``PIN_RELATIVE_ERROR``, in addition to
+  the setting and pin-clearance stack ``HUB_RADIAL_STACK``.
 * (calc) CR (+6.334, 1.156): 1/4-20 UNC tapped THRU for the clamp screw that
   clamps the MHA-CH-13 strap (``CR_TAP_CALLOUT``); its SHCS head (Ø.375) is
   under the Ø12 mm that clears both cutter paths.
@@ -59,27 +58,12 @@ Values marked (calc) are read from ``trammel``, never retyped:
 * Feed lever: 2 x 5/16-18 UNC tapped THRU at ``LEVER_HOLES`` (0, -.87) and
   (0, -1.50), .63 pitch (TrammelJig ruling) so the Ø.469 SHCS heads keep a gap.
 
-Tight bands (drawing-guidelines.md rule 4). The print names each band's
-function and mate (``SPACING_CALLOUT``, ``DX_CALLOUT``, ``DY_CALLOUT``: the
-pair sets R800 or R816 on the MHA-CH-13 strap); the sensitivities stay here:
-
-* Pin holes Ø.3750 +.0015/+.0010 (REAM_SLIDE, the owned .3760 reamer), REAM
-  THRU. Mate: MHA-CH-06-TL-VN-77 shoulder, Ø.375 -.001/0, so .0010-.0025
-  diametral clearance. That clearance is edge error 1:1.
-* D1 ±.0008: a spacing error x 1.77 (``trammel.RADIUS_PER_SPACING``) is the
-  cut radius error on R800.
-* dX ±.0008: moves the outer pass's pin spacing D2 one to one, so x 1.77 on
-  R816.
-* dY ±.0008: 1:1 on the 16.00 mm strap depth (R816 - R800).
-* Rail angle (not on this sheet): 0.1° of rail angle is about 4.7 mm of R
-  (``trammel.RADIUS_PER_TENTH_DEG``); the rails are set by indicating.
-
-Position chains (rule 10: one datum per view). X runs from A1's axis, the
-left lower ream that carries the ±.0008 pair: the left end 1.4 from it, B1 by
-the spacing, and every spot and tap by a baseline of its own
-(``STATION_REFERENCE``), the lever taps' axis by the 8.861. Y
-runs from the A1-B1 pin line, the reamed pair's own axes, placed 1.77 from
-the -Y edge. A2/B2 chain from A1/B1, never from an edge.
+The pin-hole fit remains Ø.3750 +.0015/+.0010, REAM THRU, on the
+MHA-CH-06-TL-VN-77 shoulder. The assembly's rail alignment retains its own
+±.0008 setting; it is not a carrier coordinate tolerance. In-situ HUB
+location follows the actual inner-pass apex. The correlated pin/radius
+calculation below therefore compares both cuts to that SAME HUB, rather
+than adding independent absolute radius errors.
 
 Pin-hole chamfer (``PIN_CHAMFER``): a .012 MIN x 45° underside edge break on
 all four holes. Each active pair slides on the purchased TL-VN-78 spacer's top
@@ -105,6 +89,7 @@ The feed-lever tap's existing under-1.5D RV-01 shortfall remains unchanged.
 from __future__ import annotations
 
 import math
+from itertools import product
 
 import _config
 import ch_rocker_arm_tl_vn_oblique_pivot_screw_spec as pivot_screw
@@ -183,8 +168,16 @@ _hole_low, _hole_high = deviations(PIN_HOLE_BAND)
 _mate_low, _mate_high = deviations(PIN_MATE_BAND)
 PIN_CLEARANCE_MIN = _hole_low - _mate_high
 PIN_CLEARANCE_MAX = _hole_high - _mate_low
-# Symmetric, on D1, dX and dY: the former +/-0.02 mm on the inch grid.
-POSITION_BAND = 0.02032  # .0008
+# Owner Option B, #2151: table locations, not chained ±.0008 dimensions.
+TABLE_LOCATION_PLACES = 3
+TABLE_LOCATION_BAND = printed_band_mm(TABLE_LOCATION_PLACES, unit=UNIT)
+OUTER_Y_NOMINAL = 0.964 * trammel.INCH
+OUTER_Y_BAND = 0.002 * trammel.INCH
+OUTER_Y_DEVIATIONS = (
+    OUTER_Y_NOMINAL - A2_DY - OUTER_Y_BAND,
+    OUTER_Y_NOMINAL - A2_DY + OUTER_Y_BAND,
+)
+OUTER_Y_NOTE = "A2, B2: Y .964 ±.002 FROM THE A1-B1 AXIS LINE"
 PIN_NUMBER = "MHA-CH-06-TL-VN-77"
 # Keep the current .4000 H7 bore. The new stud shank slips through it; its
 # unchanged .4000 locating nose serves the strap, not the carrier fit.
@@ -235,12 +228,8 @@ PIN_HOLE_CALLOUT = (
     f"{inch_text(PIN_CLEARANCE_MAX, 4)}\n"
     f"DIAMETRAL CLEARANCE ON\n{PIN_NUMBER}\nSHOULDER SCREW)"
 )
-# Rule 4: each pin band names what it sets and on which part (jig-r3 review);
-# the error sensitivities stay in the docstring.
+# Functions are carried once by the table's NOTE column.
 STRAP_NUMBER = "MHA-CH-13"
-SPACING_CALLOUT = f"SETS R{trammel.R_INNER:.0f} ON\n{STRAP_NUMBER}"
-DX_CALLOUT = f"SETS R{trammel.R_OUTER:.0f} ON\n{STRAP_NUMBER}"
-DY_CALLOUT = DX_CALLOUT
 STRAP_DEPTH = trammel.R_OUTER - trammel.R_INNER
 
 # Underside chamfer: clears the entry and leaves a spacer thrust seat.
@@ -290,8 +279,7 @@ SPOTS = {"Cl": CL}
 # reference plane's offset cannot be imported into a drawing (farm jig-r1),
 # so the spot plane and cone are driven from this sketch instead.
 SPOT_REFERENCE = "SpotReference"
-# The hidden sketch of points carrying every printed X station from A1
-# (``STATIONS``).
+# Hidden model baseline drivers; only EdgeX remains a printed dimension.
 STATION_REFERENCE = "StationReference"
 REFERENCE_SKETCHES = (SECTION_REFERENCE, SPOT_REFERENCE, STATION_REFERENCE)
 # The CL dowel is press-set from the actual riser once CL is finished in place:
@@ -362,14 +350,6 @@ if LEFT_CLAMP_FULL_THREAD_MIN < 1.5 * THREAD_MAJOR_MM[LEFT_CLAMP_THREAD]:
 # full thread even at the shallowest permitted pilot depth.
 if LEFT_CLAMP_DRILL_DEPTH - _XX - LEFT_CLAMP_THREAD_DEPTH < trammel.INCH / 24.0:
     raise AssertionError("left blind clamp tap has no room for its bottoming lead")
-# mr4: the tap axis's 8.861 is 3-place because it locates the lever taps;
-# mr8: named by the feature it locates on the sheet, its row no wider than
-# the 11-character one it replaced (draw: LeverX's lane).
-LEVER_STATION_CALLOUT = "LEVER TAPS"
-# Final review: the taps stand on the kinematic tap axis (8.861 from A1,
-# exempt from snapping) but the lever needs no .XXX band, so the station
-# prints its own two-place band (rule 3), set on the model dimension.
-LEVER_STATION_BAND = _XX
 
 RISER_SCREWS = trammel.RISER_SCREWS
 RISER_THREAD = "#4-40"
@@ -382,26 +362,15 @@ RISER_TAP_DRILL = TAP_DRILL_MM[RISER_THREAD]
 RISER_STATION_PLACES = trammel.RISER_TAP_STATION_PLACES
 RISER_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-riser")["number"]
 RISER_TAP_CALLOUT = f"HOLDS {RISER_NUMBER} SCREWS\nCLEAR OF ITS CUT EDGES"
-# Rule 4: each 3-place station names what it locates (carrier r11 review), on
-# one row by the riser's tool number (the A1 baselines leave no room for the
-# full number's 39 mm; RISER_TAP_CALLOUT spells it out).
-RISER_TOOL_ID = "-".join(RISER_NUMBER.split("-")[-2:])
-RISER_STATION_CALLOUT = f"LOCATES {RISER_TOOL_ID}"
-RISER_STATIONS = ("RiserX1", "RiserX1R", "RiserY1", "RiserX2", "RiserX2R", "RiserY2")
 
 LEVER_THREAD = "5/16-18"
 LEVER_SPEC = HoleSpec("tapped", LEVER_THREAD)
 LEVER_TAP_DRILL = TAP_DRILL_MM[LEVER_THREAD]
 
-# --- X stations: baselines from A1 (rule 10, one datum per view) ---------------
-# A Hole Wizard placement sketch cannot carry a datum point, so the taps'
-# and SpotReference's placements stay origin-based, driven from
-# STATION_REFERENCE: one point on A1's axis and one on each station's feature
-# (the left end's on the -X/-Y corner), each printed dimension the baseline
-# from A1. The lever taps' axis (X = 0) prints as LeverX, its point on the
-# upper lever tap: its extension line rises from the X lane through both
-# taps, so one 8.861 visibly locates the pair. LeverX is driven equal to A1X,
-# which stays the model's driving dimension, unprinted.
+# --- Hidden X drivers: unchanged nominal geometry, baselines from A1 ----------
+# Hole Wizard placement sketches cannot contain a datum point. Keep the
+# existing baseline driver sketch, but only EdgeX prints as a dimension.
+# The native table reads actual hole axes, not these construction points.
 STATIONS = {
     "EdgeX": (OUTLINE_X[0], OUTLINE_Y[0]),
     "ClX": CL,
@@ -413,15 +382,6 @@ STATIONS = {
     "CrX": CR,
     "LeftClampX": LEFT_CLAMP,
 }
-# Rule 17 (riser walls): C, the cut's centre (trammel.ARC_CENTRE), stands D1/2
-# from A1, so each riser station's error about C adds half the spacing band to
-# the station band trammel.RISER_SCREW_WALLS assumes, radially x |x|/R.
-_RISER_X_MAX = max(abs(x) for x, _y in RISER_SCREWS)
-RISER_WALLS_FROM_A1 = min(trammel.RISER_SCREW_WALLS) - (
-    POSITION_BAND / 2.0 * _RISER_X_MAX / trammel.RISER_SCREW_RADIUS
-)
-if trammel.ARC_CENTRE[0] != 0.0 or RISER_WALLS_FROM_A1 < WALL_TARGET_MM:
-    raise AssertionError("a riser countersink breaks rule 17's .080 wall from A1")
 
 # --- Rule 18: full thread at the worst case ------------------------------------
 # Every tap runs THRU the faced plate: its finished .XX low limit, less the
@@ -480,21 +440,10 @@ SAG_CUTTING_LOAD = CUTTING_LOAD_N * D1**3 / (48.0 * E_6061 * _I)
 # --- Drawing --------------------------------------------------------------------
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateProfile": {"PlateLength", "PlateWidth", "PlateNearY"},
-    "PinHoleProfile": {
-        "PinSpacing",
-        "PinHoleDia",
-        "A2DX",
-        "A2DY",
-        "B2DX",
-        "B2DY",
-    },
+    "PinHoleProfile": {"PinHoleDia"},
     SECTION_REFERENCE: {"PinChamferSize", "StockThick"},
-    SPOT_REFERENCE: {"SpotDia", "ClY"},
-    STATION_REFERENCE: set(STATIONS),
-    "CrTap": {"CrY"},
-    "LeftClampTap": {"LeftClampY"},
-    "RiserTaps": {"RiserY1", "RiserY2"},
-    "LeverTaps": {"LeverY1", "LeverY2"},
+    SPOT_REFERENCE: {"SpotDia"},
+    STATION_REFERENCE: {"EdgeX"},
     "HubHoleProfile": {"HubHoleDia"},
     "HubChamfer": {"HubChamferSize"},
 }
@@ -504,14 +453,14 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PlateWidth": 1,
         "PlateNearY": 2,
     },
-    # The reamed size and the ±.0008 chain need four places.
+    # Size remains four-place; unprinted kinematic drivers follow table places.
     "PinHoleProfile": {
-        "PinSpacing": 4,
+        "PinSpacing": TABLE_LOCATION_PLACES,
         "PinHoleDia": 4,
-        "A2DX": 4,
-        "A2DY": 4,
-        "B2DX": 4,
-        "B2DY": 4,
+        "A2DX": TABLE_LOCATION_PLACES,
+        "A2DY": TABLE_LOCATION_PLACES,
+        "B2DX": TABLE_LOCATION_PLACES,
+        "B2DY": TABLE_LOCATION_PLACES,
     },
     SECTION_REFERENCE: {
         "PinChamferSize": PIN_CHAMFER_PLACES,
@@ -531,7 +480,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CrTap": {"CrY": 3},
     "LeftClampTap": {"LeftClampY": 3},
     "RiserTaps": {"RiserY1": RISER_STATION_PLACES, "RiserY2": RISER_STATION_PLACES},
-    "LeverTaps": {"LeverY1": 2, "LeverY2": 2},
+    "LeverTaps": {"LeverY1": TABLE_LOCATION_PLACES, "LeverY2": TABLE_LOCATION_PLACES},
     "HubHoleProfile": {"HubHoleDia": 4},
     "HubChamfer": {"HubChamferSize": HUB_CHAMFER_PLACES},
 }
@@ -540,7 +489,7 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for dimensions in DRAWING_PRECISION.values()
     for name, places in dimensions.items()
 }
-if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
+if not set().union(*DRAWING_DIMENSIONS.values()) <= set(DRAWING_PRECISION_BY_NAME):
     raise AssertionError("every marked carrier dimension needs authored places")
 
 # The HUB, reamed for the stud carrying the strap's pivot on the cut
@@ -567,8 +516,198 @@ HUB_RADIAL_STACK = (
 if HUB_RADIAL_STACK >= _TOP_EDGE_HALF_BAND:
     raise AssertionError("the HUB fit-up stack exceeds half the strap's top-edge band")
 
-# Symmetric ±.0008 on these (build: set_dimension_symmetric_tolerance).
-POSITION_BANDED = ("PinSpacing", "A2DX", "A2DY", "B2DX", "B2DY")
+
+def _trig_range(a: float, b: float, c: float, angle: float) -> tuple[float, float]:
+    """Exact range of a*sin(t)+b*cos(t)+c on [-angle, angle]."""
+    candidates = [-angle, angle]
+    phase = math.atan2(a, b)
+    candidates.extend(
+        t for k in range(-2, 3)
+        if -angle <= (t := phase + k * math.pi) <= angle
+    )
+    values = [a * math.sin(t) + b * math.cos(t) + c for t in candidates]
+    return min(values), max(values)
+
+
+def pin_coordinate_intervals(
+    location_band: float = TABLE_LOCATION_BAND,
+    outer_y_band: float = OUTER_Y_BAND,
+    *, include_rounding: bool = True,
+) -> tuple[tuple[float, float], ...]:
+    """Errors of B1.X, A2.X, B2.X, A2.Y, B2.Y, in the A1 datum frame."""
+    a1 = PIN_HOLES["A1"]
+    values = (
+        D1, PIN_HOLES["A2"][0] - a1[0], PIN_HOLES["B2"][0] - a1[0],
+        A2_DY, A2_DY,
+    )
+    bands = (location_band,) * 3 + (outer_y_band,) * 2
+    return tuple(
+        (
+            (round(value / trammel.INCH, TABLE_LOCATION_PLACES) * trammel.INCH
+             - value if include_rounding else 0.0) - band,
+            (round(value / trammel.INCH, TABLE_LOCATION_PLACES) * trammel.INCH
+             - value if include_rounding else 0.0) + band,
+        )
+        for value, band in zip(values, bands, strict=True)
+    )
+
+
+def correlated_pin_budget(
+    location_band: float = TABLE_LOCATION_BAND,
+    outer_y_band: float = OUTER_Y_BAND,
+    *, include_rounding: bool = True,
+    angle: float = trammel.TIP_ANGLE,
+) -> dict[str, tuple[float, float]]:
+    """Enclose the entire tolerance box and continuous strap arc, in mm.
+
+    C=(a+b)/2 + cot(alpha)/2*(dy,-dx), R=|b-a|/(2*sin(alpha)).
+    The in-situ HUB follows the INNER apex: dH=(dD/2,k*dD),
+    k=(1-cos(alpha))/(2*sin(alpha)). Both cuts use that SAME HUB.
+    First-order edge error is u·(dH-dC)-dR, u=(sin(t),cos(t)).
+    This is affine in the five errors, so extrema lie on box corners.
+    Trig extrema are analytic, not sampled. The norm Hessian is bounded by
+    1/(R-|dv|); the remainder encloses every interior error as well.
+    The outer chord's norm remainder is charged independently. No RSS.
+    """
+    if location_band < 0.0 or outer_y_band < 0.0 or not 0.0 <= angle < math.pi / 2:
+        raise ValueError("invalid carrier tolerance box or arc")
+    intervals = pin_coordinate_intervals(
+        location_band, outer_y_band, include_rounding=include_rounding
+    )
+    q = trammel.RADIUS_PER_SPACING
+    h = 0.5 / math.tan(trammel.ALPHA)
+    k = q - h
+    corners = tuple(product(*intervals))
+    result = {}
+    for name, radius in (("inner", trammel.R_INNER), ("outer", trammel.R_OUTER)):
+        lo, hi, v_max, chord_max = math.inf, -math.inf, 0.0, 0.0
+        for d, ax, bx, ay, by in corners:
+            if name == "inner":
+                vx, vy, dr = 0.0, q * d, q * d
+            else:
+                vx = d / 2.0 - (ax + bx) / 2.0 - h * (by - ay)
+                vy = k * d - (ay + by) / 2.0 + h * (bx - ax)
+                dr = q * (bx - ax)
+                chord_max = max(chord_max, math.hypot(bx - ax, by - ay))
+            low, high = _trig_range(vx, vy, -dr, angle)
+            lo, hi = min(lo, low), max(hi, high)
+            v_max = max(v_max, math.hypot(vx, vy))
+        if v_max >= radius or chord_max >= trammel.D2:
+            raise AssertionError("carrier error box no longer supports the norm bound")
+        radial_remainder = v_max**2 / (2.0 * (radius - v_max))
+        chord_remainder = q * chord_max**2 / (2.0 * (trammel.D2 - chord_max))
+        result[name] = (lo - chord_remainder, hi + radial_remainder)
+    result["R800"] = tuple(q * value for value in intervals[0])
+    dx = (intervals[2][0] - intervals[1][1], intervals[2][1] - intervals[1][0])
+    dy = (intervals[4][0] - intervals[3][1], intervals[4][1] - intervals[3][0])
+    dy_min = 0.0 if dy[0] <= 0.0 <= dy[1] else min(abs(v) for v in dy)
+    result["R816"] = (
+        q * math.hypot(trammel.D2 + dx[0], dy_min) - trammel.R_C2,
+        q * math.hypot(trammel.D2 + dx[1], max(abs(v) for v in dy)) - trammel.R_C2,
+    )
+    return result
+
+
+PIN_ONLY_BUDGET = correlated_pin_budget(include_rounding=False)
+PIN_ROUNDED_BUDGET = correlated_pin_budget()
+PIN_RELATIVE_ERROR = {
+    name: max(abs(value) for value in PIN_ROUNDED_BUDGET[name])
+    for name in ("inner", "outer")
+}
+# Owner's .010 half-band less the conservatively rounded .005 HUB stack.
+PIN_RELATIVE_ALLOWANCE = _TOP_EDGE_HALF_BAND - 0.005 * trammel.INCH
+if HUB_RADIAL_STACK > 0.005 * trammel.INCH:
+    raise AssertionError("HUB setting and clearance exceed the reserved .005")
+if max(PIN_RELATIVE_ERROR.values()) >= PIN_RELATIVE_ALLOWANCE:
+    raise AssertionError("correlated pin errors exceed the remaining .005 HUB budget")
+# Owner's approximate bounds: .0088/.0177 absolute, .0001/.0038 relative.
+# The .0001 is rounded: the continuous top-edge enclosure is under .0002.
+for _name, _expected in (("R800", .0089), ("R816", .0178), ("inner", .0002), ("outer", .0039)):
+    if max(abs(v) for v in PIN_ONLY_BUDGET[_name]) >= _expected * trammel.INCH:
+        raise AssertionError(f"pin-only {_name} exceeds the owner's expected bound")
+
+
+def station_sweep_error(point: tuple[float, float], pass_name: str) -> float:
+    """Bound hole-to-cutter displacement on the whole finite sweep, not radial only.
+
+    A clamp outside the arc endpoint needs a Euclidean bound. For each box
+    corner, |w-dr*u|² is a single sine/cosine expression; bound its entire
+    sweep analytically, then include the outer chord's norm remainder.
+    """
+    ex, ey = table_coordinate_errors(point)
+    q, h = trammel.RADIUS_PER_SPACING, .5 / math.tan(trammel.ALPHA)
+    worst_squared, chord_max = 0.0, 0.0
+    for d, ax, bx, ay, by in product(*pin_coordinate_intervals()):
+        if pass_name == "inner":
+            cx, cy, dr = d / 2.0, -h * d, q * d
+        elif pass_name == "outer":
+            cx, cy = (ax + bx) / 2.0 + h * (by - ay), (ay + by) / 2.0 - h * (bx - ax)
+            dr = q * (bx - ax)
+            chord_max = max(chord_max, math.hypot(bx - ax, by - ay))
+        else:
+            raise ValueError(pass_name)
+        for px, py in product((-ex, ex), (-ey, ey)):
+            wx, wy = px - cx, py - cy
+            _low, high = _trig_range(
+                -2.0 * dr * wx, -2.0 * dr * wy,
+                wx * wx + wy * wy + dr * dr, trammel.SWEEP[pass_name],
+            )
+            worst_squared = max(worst_squared, high)
+    return math.sqrt(worst_squared) + q * chord_max**2 / (2.0 * (trammel.D2 - chord_max))
+
+
+def table_coordinate_errors(point: tuple[float, float]) -> tuple[float, float]:
+    """Ordinary table row's X/Y errors, including its printed rounding."""
+    return tuple(
+        TABLE_LOCATION_BAND + abs(
+            round(value / trammel.INCH, TABLE_LOCATION_PLACES) * trammel.INCH - value
+        )
+        for value in (point[0] - PIN_HOLES["A1"][0], point[1])
+    )
+
+
+def station_cut_error(point: tuple[float, float], pass_name: str) -> float:
+    """Table-located hole versus self-cut edge, including printed rounding."""
+    theta = math.atan2(point[0], point[1] + trammel.H1)
+    sx, cy = math.sin(theta), math.cos(theta)
+    station_errors = table_coordinate_errors(point)
+    q, h = trammel.RADIUS_PER_SPACING, 0.5 / math.tan(trammel.ALPHA)
+    worst, v_max, chord_max = 0.0, 0.0, 0.0
+    for d, ax, bx, ay, by in product(*pin_coordinate_intervals()):
+        if pass_name == "inner":
+            cx, cy_shift, dr = d / 2.0, -h * d, q * d
+        elif pass_name == "outer":
+            cx = (ax + bx) / 2.0 + h * (by - ay)
+            cy_shift = (ay + by) / 2.0 - h * (bx - ax)
+            dr = q * (bx - ax)
+            chord_max = max(chord_max, math.hypot(bx - ax, by - ay))
+        else:
+            raise ValueError(pass_name)
+        worst = max(worst, abs(-sx * cx - cy * cy_shift - dr))
+        v_max = max(v_max, math.hypot(
+            abs(cx) + station_errors[0], abs(cy_shift) + station_errors[1]
+        ))
+    radius = math.dist(point, trammel.ARC_CENTRE)
+    remainder = v_max**2 / (2.0 * (radius - v_max))
+    remainder += q * chord_max**2 / (2.0 * (trammel.D2 - chord_max))
+    return worst + abs(sx) * station_errors[0] + abs(cy) * station_errors[1] + remainder
+
+
+_RISER_MOUTH_MAX = (
+    trammel.RISER_CSK_DIA + printed_band_mm(trammel.RISER_CSK_PLACES, unit=trammel.RISER_UNIT)
+) / 2.0
+RISER_WALLS_FROM_A1 = min(
+    min(
+        math.dist(point, trammel.ARC_CENTRE) - trammel.RISER_INNER_RADIUS
+        - station_cut_error(point, "inner"),
+        trammel.RISER_OUTER_RADIUS - math.dist(point, trammel.ARC_CENTRE)
+        - station_cut_error(point, "outer"),
+    ) - _RISER_MOUTH_MAX
+    for point in RISER_SCREWS
+)
+if RISER_WALLS_FROM_A1 < WALL_TARGET_MM:
+    raise AssertionError("a riser countersink breaks rule 17's .080 wall from A1")
+
 
 # The spot has its own leader and callout, naming the strap feature it
 # becomes (machinist review mr3: the 3-place stations to it read as
@@ -580,25 +719,36 @@ SPOT_CALLOUT = "SPOT FOR"
 SPOT_CALLOUTS = {"SpotDia": f"{SPOT_CALLOUT}\n{STRAP_NUMBER} CL"}
 CALLOUTS_BELOW = {
     "PinHoleDia": PIN_HOLE_CALLOUT,
-    "PinSpacing": SPACING_CALLOUT,
-    "A2DX": DX_CALLOUT,
-    "B2DX": DX_CALLOUT,
-    "A2DY": DY_CALLOUT,
-    "B2DY": DY_CALLOUT,
     **SPOT_CALLOUTS,
     "PinChamferSize": PIN_CHAMFER_CALLOUT,
-    **{name: RISER_STATION_CALLOUT for name in RISER_STATIONS},
-    "LeverX": LEVER_STATION_CALLOUT,
 }
 _SPOT_SUFFIX = f" X {SPOT_ANGLE:.0f}\u00b0"
 CALLOUT_SUFFIXES = {"SpotDia": _SPOT_SUFFIX}
-# Each riser row's +X screw shares its -X twin's height (the tap sketch's
-# shared coordinate) and has its own X station from A1, so each printed
-# height covers both holes of its row (carrier-r1 review: the +X pair read as
-# unlocated in Y).
-CALLOUT_PREFIXES = {"RiserY1": "2X ", "RiserY2": "2X "}
+CALLOUT_PREFIXES: dict[str, str] = {}
 
-DRAWING_NOTES = ""
+# Includes the finished in-situ HUB: its native LOC cells are reference only.
+TABLE_HOLES = {
+    **{key: (*point, PIN_HOLE_DIA) for key, point in PIN_HOLES.items()},
+    "CL": (*CL, SPOT_DIA),
+    "CR": (*CR, CR_TAP_DRILL),
+    "LEFT": (*LEFT_CLAMP, LEFT_CLAMP_TAP_DRILL),
+    **{f"R{i}": (*point, RISER_TAP_DRILL) for i, point in enumerate(RISER_SCREWS, 1)},
+    **{f"L{i}": (*point, LEVER_TAP_DRILL) for i, point in enumerate(LEVER_HOLES, 1)},
+    "HUB": (*trammel.HUB, HUB_HOLE_DIA),
+}
+TABLE_ROW_NOTES = {
+    "A1": "ORIGIN; R800 / MHA-CH-13",
+    "B1": "X AXIS; R800 / MHA-CH-13",
+    "A2": "R816 / MHA-CH-13; NOTE 1",
+    "B2": "R816 / MHA-CH-13; NOTE 1",
+    "CL": "SPOT FOR MHA-CH-13 CL",
+    "CR": "CLAMPS MHA-CH-13",
+    "LEFT": "BLIND CLAMP; SEE CALLOUT",
+    **{f"R{i}": "LOCATES TL-24 RISER" for i in range(1, 5)},
+    **{f"L{i}": "FEED LEVER; SEE CALLOUT" for i in range(1, 3)},
+    "HUB": "LOCATIONS REF; TL-00 STEP 10",
+}
+DRAWING_NOTES = OUTER_Y_NOTE
 ISOMETRIC_VIEW_SCALE = (1, 8)
 ISOMETRIC_VIEW_NOTE = (
     f"ISOMETRIC VIEW SCALE {ISOMETRIC_VIEW_SCALE[0]}:{ISOMETRIC_VIEW_SCALE[1]}"

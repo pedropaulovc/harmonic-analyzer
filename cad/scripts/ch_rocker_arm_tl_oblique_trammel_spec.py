@@ -48,17 +48,20 @@ Frames.
   through the origin at -/+ ALPHA/2 to -X/+X and diverge toward the
   operator (-Y). ``s`` is a pin's distance from the origin along its line.
 
-Error sensitivity (printed next to the bands that carry it):
+Error sensitivity (carrier correlated acceptance lives in carrier_spec):
 
 * rail angle: 0.1 degree of pin-line angle changes R by
   ``RADIUS_PER_TENTH_DEG`` (about 4.7 mm) and moves the arc centre about as
   far. That is why HUB and CL are reamed in place on the running jig, where
   the real circle sits.
-* pin-pair Y: a Y error between the A1/B1 and A2/B2 pairs moves the second
-  circle's centre 1:1, so the 16.00 band moves 1:1. A2/B2 are therefore
-  dimensioned from A1/B1, never from a plate edge.
-* pin spacing: a D error changes R by ``RADIUS_PER_SPACING`` (1.77) per unit
-  of spacing error. The spacing is held by one DRO setting.
+* pin-pair Y: A2/B2 have a local .964 ±.002 control from the A1-B1 axis
+  line. All other carrier hole-table coordinates are .XXX under ±.005.
+* pin spacing: an absolute D error changes R by ``RADIUS_PER_SPACING``
+  (1.77). These absolute radius errors are not independent errors against
+  the in-situ HUB: its location follows the actual inner-pass apex.
+  ``carrier_spec.correlated_pin_budget`` bounds both complete strap edges
+  relative to that same HUB, including table rounding, rather than adding
+  two absolute radius errors. Rail alignment keeps its assembly-owned .0008.
 * shoulder/carrier clearance: the purchased Ø.375 shoulder (-.001/0) in the
   carrier's .3760-.3765 REAM_SLIDE hole gives .0010-.0025 (0.025-0.064 mm)
   diametral clearance. This can move the edge 1:1; it is not a

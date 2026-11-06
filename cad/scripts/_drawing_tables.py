@@ -167,6 +167,7 @@ def insert_hole_table(
     starting_hole_tag: str = "A",
     unit: str = "mm",
     location_places: int | None = None,
+    manual_tags: Sequence[str] | None = None,
 ) -> Any:
     """Insert the model-associated TAG/X LOC/Y LOC/SIZE hole table on ``view``.
 
@@ -184,6 +185,9 @@ def insert_hole_table(
     ``unit`` is the sheet's length unit, in which the LOC cells print.
     ``location_places`` overrides the table's own LOC precision (an inch
     sheet's .XXX); ``None`` keeps the document's.
+    ``manual_tags`` supplies unique native tags, one per selected hole, via
+    InsertHoleTable3's ManualTags SAFEARRAY; it never replaces table cells.
+    Callers must prove the generated row/tag/physical-hole correspondence.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(
@@ -198,6 +202,12 @@ def insert_hole_table(
             f"{label} supplied {len(hole_entities)} hole entities for "
             f"{len(hole_points)} hole points"
         )
+    if manual_tags is not None and (
+        len(manual_tags) != len(hole_points)
+        or len(set(manual_tags)) != len(manual_tags)
+        or any(not tag for tag in manual_tags)
+    ):
+        raise ValueError(f"{label} requires one unique manual tag per selected hole")
 
     def _select_entity(entity: Any, *, append: bool, mark: int) -> bool:
         selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
@@ -249,8 +259,8 @@ def insert_hole_table(
         starting_hole_tag,
         str(hole_table_template(adapter)),
         1,  # swHoleTableTagOrder_XY
-        1,  # swHoleTable_AlphaNumericTags
-        None,
+        3 if manual_tags is not None else 1,  # swHoleTable_ManualTags / AlphaNumericTags
+        bstr_array(manual_tags) if manual_tags is not None else None,
     )
     draw.ClearSelection2(True)
     if table is None:

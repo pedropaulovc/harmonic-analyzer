@@ -54,7 +54,7 @@ STUD_FLOAT = carrier.HUB_SLIP_CLEARANCE_MAX / 2.0
 SLEEVE_RADIUS_MAX = (sleeve.OD + printed_band_mm(sleeve.OD_PLACES, unit=carrier.UNIT)) / 2.0
 SLEEVE_GAPS_MIN = {
     name: cutter_gap(trammel.HUB, SLEEVE_RADIUS_MAX, name)
-    - SLEEVE_FLOAT - STUD_FLOAT - carrier.HUB_RADIAL_STACK
+    - SLEEVE_FLOAT - STUD_FLOAT - carrier.HUB_RADIAL_STACK - carrier.PIN_RELATIVE_ERROR[name]
     for name in trammel.SWEEP
 }
 # Owner clarification relayed by Main, 2026-11-06: use the plain Ø11 washer;
@@ -79,17 +79,24 @@ WASHER_BORE_MAX = (
 WASHER_FLOAT_MAX = (WASHER_BORE_MAX - SCREW_MAJOR_MIN) / 2.0
 WASHER_GAPS_MIN = {
     name: gap - printed_band_mm(washer.OD_PLACES, unit=washer.UNIT) / 2.0
-    - STUD_FLOAT - carrier.HUB_RADIAL_STACK - WASHER_FLOAT_MAX - SCREW_AXIS_FLOAT_MAX
+    - STUD_FLOAT - carrier.HUB_RADIAL_STACK - carrier.PIN_RELATIVE_ERROR[name]
+    - WASHER_FLOAT_MAX - SCREW_AXIS_FLOAT_MAX
     for name, gap in WASHER_GAPS.items()
 }
-LEFT_STATION_ERROR = math.hypot(
-    printed_band_mm(3, unit=carrier.UNIT) + carrier.POSITION_BAND / 2.0,
-    printed_band_mm(3, unit=carrier.UNIT),
-)
+LEFT_STATION_ERROR = {
+    name: carrier.station_cut_error(trammel.LEFT_CLAMP, name)
+    for name in trammel.SWEEP
+}
 LEFT_GRIP_MAX = trammel.RISER_THICK + trammel.RISER_THICK_BAND + trammel.STRAP_THICK + max(rocker.ARM_THICKNESS_BAND)
 LEFT_AXIS_FLOAT_MAX = THREAD_RADIAL_PLAY * (1.0 + 2.0 * LEFT_GRIP_MAX / left_screw.ENGAGEMENT_MIN)
+# LEFT lies beyond the finite cutter arc: radial wall error alone does not
+# bound its head clearance. Use the complete correlated displacement envelope.
+LEFT_SWEEP_ERROR = {
+    name: carrier.station_sweep_error(trammel.LEFT_CLAMP, name)
+    for name in trammel.SWEEP
+}
 LEFT_HEAD_GAPS_MIN = {
-    name: gap - LEFT_STATION_ERROR - LEFT_AXIS_FLOAT_MAX - trammel.RADIUS_FROM_SHOULDER_CLEARANCE
+    name: gap - LEFT_SWEEP_ERROR[name] - LEFT_AXIS_FLOAT_MAX - trammel.RADIUS_FROM_SHOULDER_CLEARANCE
     for name, gap in LEFT_HEAD_GAPS.items()
 }
 LEFT_CLAMP_TO_CL = math.dist(trammel.LEFT_CLAMP, trammel.CL)
@@ -100,12 +107,16 @@ LEFT_HOLE_TO_END_MIN = (
 )
 LEFT_HOLE_TO_CL_MIN = (
     LEFT_CLAMP_TO_CL - (riser.LEFT_CLAMP_DIA + riser.CLAMP_DIA) / 2.0
-    - riser.DRILLED_BAND[0] - 2.0 * printed_band_mm(3, unit=carrier.UNIT)
+    - riser.DRILLED_BAND[0]
+    - math.hypot(*(a + b for a, b in zip(
+        carrier.table_coordinate_errors(trammel.LEFT_CLAMP),
+        carrier.table_coordinate_errors(trammel.CL), strict=True,
+    )))
 )
 LEFT_BAND_WALL_MIN = min(
     trammel.HUB_RADIUS - trammel.RISER_INNER_RADIUS,
     trammel.RISER_OUTER_RADIUS - trammel.HUB_RADIUS,
-) - (riser.LEFT_CLAMP_DIA + riser.DRILLED_BAND[0]) / 2.0 - riser.CLAMP_STATION_ERROR
+) - (riser.LEFT_CLAMP_DIA + riser.DRILLED_BAND[0]) / 2.0 - max(LEFT_STATION_ERROR.values())
 
 # All carrier poses are rotations/translations in XY. These vertical gaps
 # therefore hold for every pose, not just sampled stop positions. Use current

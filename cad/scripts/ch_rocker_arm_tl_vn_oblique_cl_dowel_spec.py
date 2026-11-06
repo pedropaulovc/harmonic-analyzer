@@ -28,12 +28,12 @@ Sources:
   dimensions only and NOT replica-gated; the recipe's standalone run is
   catalog-only.
 
-Model diameter: nominal Ø.250, the vendor's.  The carrier models CL as its
-Ø.12 x 90 deg centre-drill spot only (finished in place, like HUB), so the
-assembly's press-fit allowance for this pair is the dowel's own volume in the
-plate: ``PRESS_ALLOWANCE_MM3`` below (1.10 x a Ø.250 x .47 carrier cylinder), which
-the modelled overlap (only pin metal inside the carrier, less its centre spot)
-stays under.
+Model diameter: nominal Ø.250, the vendor's. The carrier models CL as its
+Ø.12 x 90 deg centre-drill spot only, finished in place. Its
+``JIG_CL_DOWEL_PRESS`` allowance is ``PRESS_ALLOWANCE_MM3`` below
+(1.10 x a Ø.250 x .47 carrier cylinder); the modelled overlap, less the
+centre spot, stays under it. HUB differs: the carrier now models its finished
+bore and underside chamfer, so the slipping HUB stud has no overlap allowance.
 
 Part frame: pin axis local +Y through the origin, published as ``ScrewAxis``
 (Front ∩ Right); the chamfered end's face at y = 0 (the Top Plane), the round

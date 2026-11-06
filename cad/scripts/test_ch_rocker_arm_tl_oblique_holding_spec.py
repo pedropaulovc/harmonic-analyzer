@@ -153,5 +153,29 @@ def test_self_cut_uses_the_actual_removal_list_and_bigger_cutter() -> None:
 
 
 def test_left_head_has_worst_case_clearance_not_just_a_stop_pose() -> None:
-    assert min(holding.LEFT_HEAD_GAPS_MIN.values()) > 10.6
+    for name, nominal in holding.LEFT_HEAD_GAPS.items():
+        assert holding.LEFT_HEAD_GAPS_MIN[name] == pytest.approx(
+            nominal - carrier.station_sweep_error(trammel.LEFT_CLAMP, name)
+            - holding.LEFT_AXIS_FLOAT_MAX - trammel.RADIUS_FROM_SHOULDER_CLEARANCE
+        )
+    # The design acceptance remains the original 5 mm, not the former
+    # 10.6 mm numerical observation calculated with the retired pin bands.
+    assert min(holding.LEFT_HEAD_GAPS_MIN.values()) >= 5.0
     assert all(holding.LEFT_HEAD_GAPS_MIN[name] < gap for name, gap in holding.LEFT_HEAD_GAPS.items())
+
+
+def test_holding_gaps_include_the_new_correlated_table_errors() -> None:
+    for name in ("inner", "outer"):
+        assert carrier.PIN_RELATIVE_ERROR[name] > 0.0
+        assert holding.LEFT_STATION_ERROR[name] == pytest.approx(
+            carrier.station_cut_error(trammel.LEFT_CLAMP, name)
+        )
+        assert holding.WASHER_GAPS[name] - holding.WASHER_GAPS_MIN[name] >= (
+            carrier.HUB_RADIAL_STACK + carrier.PIN_RELATIVE_ERROR[name]
+            + holding.STUD_FLOAT + holding.WASHER_FLOAT_MAX + holding.SCREW_AXIS_FLOAT_MAX
+        )
+        assert holding.SLEEVE_GAPS_MIN[name] == pytest.approx(
+            holding.cutter_gap(trammel.HUB, holding.SLEEVE_RADIUS_MAX, name)
+            - holding.SLEEVE_FLOAT - holding.STUD_FLOAT - carrier.HUB_RADIAL_STACK
+            - carrier.PIN_RELATIVE_ERROR[name]
+        )
