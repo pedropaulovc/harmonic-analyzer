@@ -155,9 +155,10 @@ def _stem_dia_anchor(bottom_mm: float, top_mm: float) -> tuple[float, float]:
 # The arc stands far enough out that it passes under the end of the cone
 # diameter's right extension line rather than across that dimension line,
 # and the text sits on the wedge's bisector, under that extension line and
-# left of the cone's own.
+# left of the cone's own.  At 27 mm the text's corner stood 1.78 mm from
+# that line's end (run 20261106T002837971Z layout audit, 2 mm clearance).
 COUNTERSINK_APEX_XY = (SECTION_CENTER[0], _section_y(REAR_CSK_APEX_Y))
-COUNTERSINK_ANGLE_RADIUS = 0.027
+COUNTERSINK_ANGLE_RADIUS = 0.0285
 _ANGLE_TEXT_FROM_AXIS = math.radians(CSK_HALF_ANGLE_DEG / 2.0)
 COUNTERSINK_ANGLE_TEXT_XY = (
     COUNTERSINK_APEX_XY[0] + COUNTERSINK_ANGLE_RADIUS * math.sin(_ANGLE_TEXT_FROM_AXIS),

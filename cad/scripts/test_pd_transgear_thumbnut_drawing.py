@@ -539,8 +539,8 @@ def test_the_stem_diameters_print_across_their_own_cut() -> None:
     radius = drawing.COUNTERSINK_ANGLE_RADIUS
     assert math.dist(angle_text, apex) == pytest.approx(radius)
     assert from_axis(angle_text) == pytest.approx(spec.CSK_HALF_ANGLE_DEG / 2.0)
-    # Rendered "45°" measured on run 20261105T225441526Z: 6.8 x 3.2 mm.
-    half_w, half_h = 0.0034, 0.0016
+    # The layout audit's "45°" box on run 20261106T002837971Z: 6.8 x 3.5 mm.
+    half_w, half_h = 0.0034, 0.00175
     cone_right = drawing._section_x(spec.CSK_DIA / 2.0)
     cone_dim_line = seat_y - 0.0135
     cone_extension_end = cone_dim_line - 0.0011
@@ -551,6 +551,13 @@ def test_the_stem_diameters_print_across_their_own_cut() -> None:
     # The text sits under that extension line's end, right of the axis and
     # clear of the cone's own extension line (the flank produced, 45°).
     assert angle_text[1] + half_h < cone_extension_end - 0.001
+    # The audit's 2 mm text clearance from that extension line's end.
+    box_dx = max(0.0, (angle_text[0] - half_w) - cone_right)
+    box_dy = cone_extension_end - (angle_text[1] + half_h)
+    assert math.hypot(box_dx, box_dy) > 0.0025
+    # Negative control: the 27 mm arc of that run left 1.78 mm.
+    first_text_top = apex[1] - 0.027 * math.cos(math.radians(22.5)) + half_h
+    assert cone_extension_end - first_text_top < 0.002
     assert angle_text[0] - half_w > apex[0] + 0.001
     corner = (angle_text[0] + half_w, angle_text[1] + half_h)
     flank_gap = ((apex[1] - corner[1]) - (corner[0] - apex[0])) / math.sqrt(2.0)
