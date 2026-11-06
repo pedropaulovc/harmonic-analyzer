@@ -70,6 +70,7 @@ from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_prec
 from _drawing_layout_check import DrawableRegion
 from _drawing_layout_collect import _iter_tables, _iter_view_annotations
 from _drawing_leader_notes import add_leader_note
+from _drawing_leaders import set_near_side_diameter
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES
@@ -2929,6 +2930,15 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to activate the cross-tap sheet for the leader sides")
     for label, display in cross_tap_sheet_callouts.items():
         _attach_leader_nearest_hole(adapter, display, label)
+    # Both leaders reach the +X axis, the tap's to its far mouth: drawn
+    # diametric, their lines through the shared centre crossed (run
+    # 20261106T190540434Z). The clearance's single arrow stops at its near
+    # rim instead, outside the tap's far-mouth circle (as on MHA-FR-02).
+    set_near_side_diameter(
+        _early_bound(clearance_callout, "IDisplayDimension").GetAnnotation(),
+        "base cross near-wall clearance callout",
+    )
+    rebuild_drawing(adapter, label="base cross near-wall clearance near-side leader")
     _check_hole_sheet_callouts(
         adapter,
         ddoc,
