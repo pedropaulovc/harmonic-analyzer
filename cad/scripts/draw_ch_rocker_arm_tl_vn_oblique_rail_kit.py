@@ -223,11 +223,11 @@ RECEIPT_DIMENSIONS = {
 }
 RECEIPT_DIMENSIONS["Length"] = (0.0, rail.LENGTH, LENGTH_ROW_RISE)
 STATION_NOMINALS = dict(zip(rail.STATION_DIMENSIONS, rail.HOLE_X, strict=True))
-# The first station is narrower than its three-place banded
-# text: it stands outside the span, left of the -X end
-# face and of FRONT's cell, its centre this far (sheet metres) from the
-# face's extension line, so its row can stand nearest the part.
-TEXT_OUTSIDE_START = {rail.STATION_DIMENSIONS[0]: 0.020}
+# The first station is narrower than its three-place banded text. Keep the
+# text left of FRONT's padded outline cell, not just the physical end face:
+# at 20 mm offset its ink reached 0.61 mm into that cell (8a1a gate).
+# Moving the label 3 mm left retains normal text and over 11 mm to the border.
+TEXT_OUTSIDE_START = {rail.STATION_DIMENSIONS[0]: 0.023}
 # Smart arrows put the 75 span's arrows outside, over the 15 row (run
 # 20261104T222143958Z); every station keeps its arrows inside, under its text.
 ARROWS_INSIDE = rail.STATION_DIMENSIONS

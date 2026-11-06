@@ -822,11 +822,13 @@ def test_receipt_texts_fit_their_spans_rows_and_the_border() -> None:
     end_face_x, per_mm, inks, _ = _stack_ink()
     boxes = {name: text for name, (text, _) in inks.items()}
     first = boxes["Station1"]
-    # The 15 station spans 7.5 mm: its text stands left of the end face's
-    # extension line, clear of it and inside the border with air.
+    # The trimmed first station's text stands left of the view's padded
+    # outline cell, clear of it and inside the border with air.
     assert rail.HOLE_X[0] * per_mm < first[2] - first[0]
     assert first[2] + 0.002 <= end_face_x
     assert first[0] >= BORDER[0] + 0.005
+    front_cell = draw.view_cell(draw.FRONT_CENTER, draw._FRONT_HALF)
+    assert first[2] + draw.CLEAR_GAP_M <= front_cell[0]
     for name, x in zip(rail.STATION_DIMENSIONS[1:], rail.HOLE_X[1:], strict=True):
         box = boxes[name]
         # Between its own extension lines, clear of the end face's.
