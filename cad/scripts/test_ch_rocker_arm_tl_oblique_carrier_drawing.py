@@ -479,7 +479,7 @@ def test_every_x_station_is_a_baseline_from_a1() -> None:
     assert spec.STATIONS["ClX"] == spec.CL and spec.STATIONS["CrX"] == spec.CR
     assert spec.STATIONS["LeverX"] == spec.LEVER_HOLES[0]
     features = _features()
-    located = ("cl_spot", "cr_tap_1", "lever_tap_1", "lever_tap_2")
+    located = ("cl_spot", "cr_tap_1", "left_clamp_tap_1", "lever_tap_1", "lever_tap_2")
     for name in located + tuple(f"riser_tap_{i}" for i in range(1, 5)):
         feature = features[name]
         places = feature["precision"]["station"]
@@ -785,3 +785,27 @@ def test_lever_tap_station_prints_its_own_two_place_band():
     # A1's station is the same LeverX measurement: one band in features.toml.
     features = _features()
     assert features["pin_hole_a1"]["station"] == features["lever_tap_1"]["station"]
+
+
+def test_added_left_clamp_is_a_blind_full_thread_receiver_on_its_own_sheet() -> None:
+    from _hole_spec import HoleSpec
+
+    assert spec.LEFT_CLAMP == trammel.LEFT_CLAMP
+    assert spec.LEFT_CLAMP_THREAD == "#10-24"
+    assert spec.LEFT_CLAMP_SPEC.end == "blind"
+    assert spec.LEFT_CLAMP_SPEC.drill_angle_deg == 180.0
+    assert HoleSpec("tapped", "#10-24").drill_angle_deg == 118.0
+    assert spec.LEFT_CLAMP_FLOOR_MIN == pytest.approx(WALL_TARGET_MM)
+    assert spec.LEFT_CLAMP_FULL_THREAD_MIN >= 1.5 * THREAD_MAJOR_MM["#10-24"]
+    feature = _features()["left_clamp_tap_1"]
+    assert feature["thru"] is False
+    assert feature["depth"] == pytest.approx([9.144, 9.652])
+    assert feature["thread_depth_min"] == spec.LEFT_CLAMP_THREAD_DEPTH
+    assert feature["precision"]["depth"] == 2
+    assert feature["precision"]["thread_depth_min"] == 3
+    assert drawing.SHEET_NAMES == ("CARRIER", "LEFT CLAMP")
+    assert drawing.LEFT_CLAMP_DIMENSIONS == {"LeftClampX", "LeftClampY"}
+    source = inspect.getsource(drawing._left_clamp_sheet)
+    assert "add_native_hole_callout" in source
+    assert "_left_clamp_depth_callout(callout)" in source
+    assert "expected_sheet_names=SHEET_NAMES" in inspect.getsource(drawing.build)

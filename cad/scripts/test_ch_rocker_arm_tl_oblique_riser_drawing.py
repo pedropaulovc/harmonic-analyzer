@@ -1,4 +1,4 @@
-"""Offline contracts for the oblique-trammel jig's acetal riser (MHA-CH-06-TL-24)."""
+"""Offline contracts for the oblique-trammel jig's 6061 riser (MHA-CH-06-TL-24)."""
 
 from __future__ import annotations
 
@@ -12,7 +12,8 @@ import build_ch_rocker_arm_tl_oblique_riser as part
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier_spec
 import ch_rocker_arm_tl_oblique_riser_spec as spec
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
-import ch_rocker_arm_tl_vn_oblique_hub_pin_spec as hub_pin
+import ch_rocker_arm_tl_oblique_hub_stud_spec as hub_stud
+import ch_rocker_arm_tl_oblique_hub_sleeve_spec as hub_sleeve
 import draw_ch_rocker_arm_tl_oblique_riser as drawing
 import export_features
 from _drawing_contract import model_toleranced_dimensions
@@ -51,6 +52,7 @@ def test_hole_positions_map_back_to_the_calculator() -> None:
     assert _close(_carrier(spec.HUB_HOLE), trammel.HUB, tol)
     assert _close(_carrier(spec.CL_HOLE), trammel.CL, tol)
     assert _close(_carrier(spec.CR_HOLE), trammel.CR, tol)
+    assert _close(_carrier(spec.LEFT_CLAMP_HOLE), trammel.LEFT_CLAMP, tol)
     features = _features()
     for name, carrier in (
         *(
@@ -60,6 +62,7 @@ def test_hole_positions_map_back_to_the_calculator() -> None:
         ("hub_hole", trammel.HUB),
         ("cl_hole", trammel.CL),
         ("cr_hole", trammel.CR),
+        ("left_clamp_hole", trammel.LEFT_CLAMP),
     ):
         feature = features[name]
         exported = (feature["station_nominal"], feature["width_nominal"])
@@ -75,9 +78,10 @@ def test_the_model_globals_are_the_spec_stations() -> None:
     assert (g["HubX"], g["HubY"]) == spec.HUB_HOLE
     assert (g["ClX"], g["ClampY"]) == spec.CL_HOLE
     assert (g["CrX"], g["ClampY"]) == spec.CR_HOLE
+    assert (g["LeftClampX"], g["LeftClampY"]) == spec.LEFT_CLAMP_HOLE
     for xy, dia, _names, _drives in spec.CIRCLES:
-        assert xy in (spec.HUB_HOLE, spec.CL_HOLE, spec.CR_HOLE)
-        assert dia in (spec.HUB_DIA, spec.CLAMP_DIA)
+        assert xy in (spec.HUB_HOLE, spec.CL_HOLE, spec.CR_HOLE, spec.LEFT_CLAMP_HOLE)
+        assert dia in (spec.HUB_DIA, spec.CLAMP_DIA, spec.LEFT_CLAMP_DIA)
 
 
 def test_blank_and_holes_are_the_part_sheet() -> None:
@@ -92,12 +96,15 @@ def test_blank_and_holes_are_the_part_sheet() -> None:
         ("BlankThick", spec.THICKNESS),
         ("HubDia", spec.HUB_DIA),
         ("ClampDia", spec.CLAMP_DIA),
+        ("LeftClampDia", spec.LEFT_CLAMP_DIA),
     ):
         assert _on_inch_grid(value, spec.DRAWING_PRECISION_BY_NAME[name]), name
     assert spec.SCREW_SPEC.kind == "clearance" and spec.SCREW_SPEC.size == "#4"
     assert trammel.RISER_SCREW == "#4-40"
-    # The HUB clearance passes the bonded HUB gauge pin.
-    assert spec.HUB_DIA > hub_pin.DIA + max(hub_pin.DIA_BAND)
+    # The enlarged HUB hole passes the full-wall sleeve, not just the stud.
+    assert spec.HUB_DIA > hub_sleeve.OD + 0.005 * INCH
+    assert hub_sleeve.ID >= hub_stud.DIA + max(hub_stud.DIA_BAND)
+    assert part.MATERIAL == "6061 Alloy"
 
 
 def test_blank_sizes_are_finished_native_dimensions_not_stock() -> None:
@@ -154,7 +161,7 @@ def test_hole_locations_are_reference_values_from_the_carrier() -> None:
     assert all(spec.DRAWING_PRECISION_BY_NAME[n] == 2 for n in stations)
     carrier_number = _config.parts("ch-rocker-arm-tl-oblique-carrier")["number"]
     rows = [f"LOCATE FROM {carrier_number}", "AT ASSEMBLY"]
-    assert set(spec.HOLE_CALLOUTS) == {"ScrewDia", "HubDia", "ClampDia"}
+    assert set(spec.HOLE_CALLOUTS) == {"ScrewDia", "HubDia", "ClampDia", "LeftClampDia"}
     for name in spec.HOLE_CALLOUTS:
         assert spec.CALLOUTS_BELOW[name].split("\n")[-2:] == rows, name
     assert spec.DRAWING_NOTES == ""
@@ -214,7 +221,7 @@ def test_each_row_count_matches_the_holes_on_that_row() -> None:
         ],
         "ClampY": [spec.CL_HOLE, spec.CR_HOLE],
     }
-    all_holes = [*spec.SCREW_HOLES, spec.HUB_HOLE, spec.CL_HOLE, spec.CR_HOLE]
+    all_holes = [*spec.SCREW_HOLES, spec.HUB_HOLE, spec.CL_HOLE, spec.CR_HOLE, spec.LEFT_CLAMP_HOLE]
     for name, holes in rows.items():
         on_row = [xy for xy in all_holes if xy[1] == spec.GLOBALS[name]]
         assert on_row == holes and len(holes) == 2, name
@@ -346,3 +353,14 @@ def test_clamp_callout_stands_left_of_and_above_the_cutting_plane() -> None:
     assert x == -26.0
     assert y == drawing._CALLOUT_Y + 10.0
     assert x < drawing.CUT_X
+
+
+def test_left_clamp_clearance_has_complete_uncluttered_sheet_coverage() -> None:
+    assert drawing.SHEET_NAMES == ("RISER", "LEFT CLAMP CLEARANCE")
+    assert drawing.LEFT_CLAMP_DIMENSIONS == {"LeftClampX", "LeftClampY", "LeftClampDia"}
+    assert drawing.LEFT_CLAMP_DIMENSIONS <= set(drawing.PLAN_KEEP)
+    assert spec.CALLOUTS_BELOW["LeftClampDia"].startswith("DRILL THRU")
+    feature = _features()["left_clamp_hole"]
+    assert feature["thru"] is True
+    assert feature["dia"][0] > 4.826
+    assert len(spec.HOLES) == 8

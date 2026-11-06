@@ -109,6 +109,7 @@ BOM_SHEET = "BILL OF MATERIALS"
 STEPS_SHEET = "ASSEMBLY STEPS"
 FIT_SHEET = "PIVOT AND FEED FIT"
 OPERATION_SHEET = "OPERATION AND HOLD DOWNS"
+HOLDING_SHEET = "STRAP HOLDING AND PREPARATION"
 PIVOT_SHEET = "PLAIN PIVOTS EXPLODED"
 
 
@@ -218,7 +219,11 @@ CLUSTERS = (
         (
             spec.CARRIER,
             spec.RISER,
-            spec.HUB_PIN,
+            spec.HUB_STUD,
+            spec.HUB_SLEEVE,
+            spec.HUB_WASHER,
+            spec.HUB_SCREW,
+            spec.LEFT_CLAMP_SCREW,
             spec.FEED_LEVER,
             spec.CL_DOWEL,
             spec.RISER_SCREW,
@@ -237,6 +242,7 @@ SHEET_NAMES = (
     STEPS_SHEET,
     FIT_SHEET,
     OPERATION_SHEET,
+    HOLDING_SHEET,
 )
 # The captions cite sheets by these numbers, never typed ones.
 BOM_SHEET_NUMBER = SHEET_NAMES.index(BOM_SHEET) + 1
@@ -286,6 +292,7 @@ def package_sheet_scales(
         STEPS_SHEET: NOTES_REFERENCE_SCALE,
         FIT_SHEET: NOTES_REFERENCE_SCALE,
         OPERATION_SHEET: ISOMETRIC_SCALE,
+        HOLDING_SHEET: NOTES_REFERENCE_SCALE,
     }
     return {
         name: cluster_scales[name] if name in cluster_scales else fixed[name]
@@ -488,8 +495,20 @@ PART_ROWS = {
         "ch-rocker-arm-tl-vn-oblique-pivot-shim"
     ),
     "ch-rocker-arm-tl-oblique-riser": _config.parts("ch-rocker-arm-tl-oblique-riser"),
-    "ch-rocker-arm-tl-vn-oblique-hub-pin": _config.parts(
-        "ch-rocker-arm-tl-vn-oblique-hub-pin"
+    "ch-rocker-arm-tl-oblique-hub-stud": _config.parts(
+        "ch-rocker-arm-tl-oblique-hub-stud"
+    ),
+    "ch-rocker-arm-tl-oblique-hub-sleeve": _config.parts(
+        "ch-rocker-arm-tl-oblique-hub-sleeve"
+    ),
+    "ch-rocker-arm-tl-oblique-hub-washer": _config.parts(
+        "ch-rocker-arm-tl-oblique-hub-washer"
+    ),
+    "ch-rocker-arm-tl-vn-oblique-hub-screw": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-hub-screw"
+    ),
+    "ch-rocker-arm-tl-vn-oblique-left-clamp-screw": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-left-clamp-screw"
     ),
     "ch-rocker-arm-tl-oblique-feed-lever": _config.parts(
         "ch-rocker-arm-tl-oblique-feed-lever"
@@ -732,6 +751,21 @@ BALLOON_ANCHORS[spec.PIVOT_SHIM] = BalloonAnchor(
 BALLOON_ANCHORS[spec.RISER] = BalloonAnchor(
     point_mm=(60.0, spec.riser.BLANK_WIDTH, spec.riser.THICKNESS)
 )
+BALLOON_ANCHORS[spec.HUB_STUD] = BalloonAnchor(
+    point_mm=(spec.hub_stud.FLANGE_DIA / 2.0, 0.0, 0.0)
+)
+BALLOON_ANCHORS[spec.HUB_SLEEVE] = BalloonAnchor(
+    point_mm=(spec.hub_sleeve.OD / 2.0, 0.0, spec.hub_sleeve.LENGTH)
+)
+BALLOON_ANCHORS[spec.HUB_WASHER] = BalloonAnchor(
+    point_mm=(spec.hub_washer.OD / 2.0, 0.0, spec.hub_washer.THICK)
+)
+BALLOON_ANCHORS[spec.HUB_SCREW] = BalloonAnchor(
+    point_mm=(spec.hub_screw.DIMS.head_dia / 2.0, spec.hub_screw.DIMS.head_h, 0.0)
+)
+BALLOON_ANCHORS[spec.LEFT_CLAMP_SCREW] = BalloonAnchor(
+    point_mm=(spec.left_clamp_screw.DIMS.head_dia / 2.0, spec.left_clamp_screw.DIMS.head_h, 0.0)
+)
 BALLOON_ANCHORS[spec.FEED_LEVER] = BalloonAnchor(
     point_mm=(280.0, spec.feed_lever.LEVER_THICK, -spec.feed_lever.LEVER_WIDTH)
 )
@@ -919,9 +953,15 @@ ASSEMBLY_STEPS_CONTINUED = STEPS_LAYOUT.continued
 ASSEMBLY_CHECKS = STEPS_LAYOUT.checks
 CHECKS_XY = STEPS_LAYOUT.checks_xy
 OPERATION_LAYOUT = steps_sheet_layout(
-    (*spec.OPERATION_STEPS, "HOLD-DOWN FIT:", *spec.HOLD_DOWN_STEPS),
-    spec.CAPTURE_CHECKS,
+    (*spec.OPERATION_STEPS[:2], "HOLD-DOWN FIT:", *spec.HOLD_DOWN_STEPS),
+    (*spec.CAPTURE_CHECKS[:3], *spec.CAPTURE_CHECKS[4:]),
     heading="OPERATION AND INSTALLED ACCEPTANCE",
+)
+HOLDING_LAYOUT = steps_sheet_layout(
+    spec.OPERATION_STEPS[2:],
+    spec.CAPTURE_CHECKS[3:4],
+    heading="STRAP PREPARATION AND THREE-POINT HOLDING",
+    reference_height=NOTES_REFERENCE_MIN_HEIGHT,
 )
 # Only this sheet has a finished view. Its room follows the filled right
 # column, keeping the actual native outline clear of its checks and title.
@@ -948,6 +988,7 @@ NOTES_REFERENCE_REGIONS = {
     for sheet, layout in (
         (STEPS_SHEET, STEPS_LAYOUT),
         (FIT_SHEET, FIT_LAYOUT),
+        (HOLDING_SHEET, HOLDING_LAYOUT),
     )
 }
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
@@ -2921,6 +2962,7 @@ def _place_operation_notes(adapter: Any) -> None:
     for sheet, layout, label in (
         (FIT_SHEET, FIT_LAYOUT, "pivot fit and KP08 alignment"),
         (OPERATION_SHEET, OPERATION_LAYOUT, "operation and installed-machine acceptance"),
+        (HOLDING_SHEET, HOLDING_LAYOUT, "strap preparation and holding"),
     ):
         _add_note_block(adapter, sheet, layout.steps, STEPS_XY, label=label)
         if layout.continued:

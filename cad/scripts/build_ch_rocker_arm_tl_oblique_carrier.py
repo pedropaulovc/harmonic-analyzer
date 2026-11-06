@@ -95,6 +95,10 @@ from ch_rocker_arm_tl_oblique_carrier_spec import (
     LEVER_HOLES,
     LEVER_SPEC,
     LEVER_TAP_DRILL,
+    LEFT_CLAMP,
+    LEFT_CLAMP_SPEC,
+    LEFT_CLAMP_TAP_DRILL,
+    LEFT_CLAMP_DRILL_DEPTH,
     OUTLINE_X,
     OUTLINE_Y,
     PIN_HOLE_AXES,
@@ -774,6 +778,26 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += cr.placement_drive_jobs
     v_cr = math.pi * (cr.hole_dia_mm / 2.0) ** 2 * THICKNESS
     volume = await volume_check(adapter, "CR tap", volume - v_cr, 0.03 * v_cr)
+
+    left_clamp = wizard_holes(
+        adapter,
+        LEFT_CLAMP_SPEC,
+        [_top(LEFT_CLAMP)],
+        _UP,
+        "left clamp blind bottoming tap (#10-24)",
+        name="LeftClampTap",
+        expect_dia_mm=LEFT_CLAMP_TAP_DRILL,
+        placement_dims=[
+            (("LeftClampXOrigin", _origin_x("LeftClampX")), ("LeftClampY", None)),
+        ],
+    )
+    drive_jobs += left_clamp.placement_drive_jobs
+    # A flat bottom removes only this cylinder. A silently retained 118-degree
+    # point fails the volume check instead of consuming the specified floor.
+    v_left = math.pi * (LEFT_CLAMP_TAP_DRILL / 2.0) ** 2 * LEFT_CLAMP_DRILL_DEPTH
+    volume = await volume_check(
+        adapter, "left clamp flat-bottom pilot", volume - v_left, 0.01 * v_left
+    )
 
     riser = wizard_holes(
         adapter,

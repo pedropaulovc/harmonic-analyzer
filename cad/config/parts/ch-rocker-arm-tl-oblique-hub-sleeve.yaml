@@ -1,0 +1,11 @@
+ch-rocker-arm-tl-oblique-hub-sleeve:
+  title: Rocker Oblique Trammel Hub Sleeve
+  # Shop fixture: the parent MHA-CH-06 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-06-TL-34
+  material: 1018 cold-finished steel
+  material_specification: 1018 cold-finished steel
+  finish: as machined
+  quantity: 1
+  tolerance_class: machined_block
+  process: "turn from 5/8 in 1018 round: turn the .580 O.D., drill and ream the bore .4000 with the .4000 chucking reamer, part off long; after the riser is self-cut, face to the actual MHA-CH-06-TL-24 thickness, flush to .002 below its top; break edges"
+  drawing_unit: in

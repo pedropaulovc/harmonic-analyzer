@@ -411,7 +411,9 @@ def wizard_holes(
         # V2=bottom drill angle.
         d = spec.depth_mm / 1000.0
         dia = blind_cut_dia_mm(spec) / 1000.0
-        ang = 2.0594885  # 118-degree drill point
+        if not 0.0 < spec.drill_angle_deg <= 180.0:
+            raise ValueError(f"hole wizard {label}: invalid bottom drill angle")
+        ang = spec.drill_angle_deg * 3.141592653589793 / 180.0
         if hole_type == 4:
             blind_thread_depth_mm = spec.overrides_mm.get("ThreadDepth", spec.depth_mm)
             if not 0.0 < blind_thread_depth_mm <= spec.depth_mm:

@@ -152,7 +152,9 @@ _INSERTED_SOURCES = {
     "ch_rocker_arm_tl_vn_oblique_riser_screw ch_rocker_arm_tl_vn_oblique_clamp_screw "
     "ch_rocker_arm_tl_vn_oblique_lever_screw ch_rocker_arm_tl_vn_oblique_lever_washer "
     "ch_rocker_arm_tl_vn_oblique_pivot_screw ch_rocker_arm_tl_vn_oblique_pivot_spacer "
-    "ch_rocker_arm_tl_vn_oblique_pivot_shim ch_rocker_arm_tl_vn_oblique_hub_pin",
+    "ch_rocker_arm_tl_vn_oblique_pivot_shim ch_rocker_arm_tl_oblique_hub_stud "
+    "ch_rocker_arm_tl_oblique_hub_sleeve ch_rocker_arm_tl_oblique_hub_washer "
+    "ch_rocker_arm_tl_vn_oblique_hub_screw ch_rocker_arm_tl_vn_oblique_left_clamp_screw",
     "dt_cone_gear_tl_indexing": "dt_cone_gear_tl_index_plate",
     "ha_harmonic_analyzer": "fr_frame dt_drive_train ch_channel sm_summing mg_magnifier pn_pen "
     "pd_paper_drive ms_measuring_stick",
@@ -265,7 +267,6 @@ def test_plain_pivot_components_are_first_class_jig_only_targets() -> None:
         "ch_rocker_arm_tl_vn_oblique_pivot_screw": ("MHA-CH-06-TL-VN-77", 2),
         "ch_rocker_arm_tl_vn_oblique_pivot_spacer": ("MHA-CH-06-TL-VN-78", 2),
         "ch_rocker_arm_tl_vn_oblique_pivot_shim": ("MHA-CH-06-TL-VN-79", 10),
-        "ch_rocker_arm_tl_vn_oblique_hub_pin": ("MHA-CH-06-TL-VN-80", 1),
     }
     jig = "ch_rocker_arm_tl_oblique_jig"
     contract = assembly_contract(jig.replace("_", "-"))
@@ -312,6 +313,7 @@ def test_plain_pivot_components_are_first_class_jig_only_targets() -> None:
         ("ch_rocker_arm_tl_vn_oblique_nut_washer", "MHA-CH-06-TL-VN-72"),
         ("ch_rocker_arm_tl_oblique_pivot_pin", "MHA-CH-06-TL-23"),
         ("ch_rocker_arm_tl_oblique_hub_pin", "MHA-CH-06-TL-25"),
+        ("ch_rocker_arm_tl_vn_oblique_hub_pin", "MHA-CH-06-TL-VN-80"),
         ("ch_rocker_arm_tl_oblique_nut_bracket", "MHA-CH-06-TL-29"),
         ("ch_rocker_arm_tl_oblique_pivot_cap", "MHA-CH-06-TL-30"),
         ("ch_rocker_arm_tl_oblique_pivot_retainer", "MHA-CH-06-TL-31"),
