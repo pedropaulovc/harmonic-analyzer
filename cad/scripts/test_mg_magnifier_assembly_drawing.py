@@ -142,6 +142,19 @@ def test_the_press_gauge_is_a_reference_accepted_at_the_nuts() -> None:
     assert notes.STEP_TEXT["axle-accepted"] == (
         f"REPEAT THE STEP {steps.step_number(steps.AXLE_CHECKED_KEY)} CHECK."
     )
+    # The low side prints as a number in DETAIL A: full thread through the
+    # locknut leaves at least the dome's incomplete pitch past it, the
+    # condition the stack's low corner holds (LOCKNUT_THREAD_MARGIN >= 0).
+    assert float(notes.THREAD_PAST_LOCKNUT_MIN_TEXT) * 25.4 == pytest.approx(
+        mg_wheel_axle_spec.TIP_INCOMPLETE
+    )
+    assert notes.PRESS_DETAIL_ACCEPT_MIN in drawing.PRESSED.label_text
+    assert mg_wheel_group.LOCKNUT_THREAD_MARGIN >= 0.0
+    # Each side has its own remedy, back to the trial fit.
+    for key, side in (("axle-pressed-further", "OVER THE MAX"), ("axle-pressed-back", "UNDER THE MIN")):
+        remedy = notes.STEP_TEXT[key]
+        assert side in remedy
+        assert remedy.endswith(f"RETURN TO STEP {steps.step_number(steps.AXLE_TRIAL_KEY)}.")
     # The one-line callout centres over the value: at the 2.7 mm a capital
     # measured on the e04fd60ab sheet it stays inside the right border.
     x, _y = drawing.PRESSED_KEEP[stack.PRESS_GAUGE_DIMENSION]

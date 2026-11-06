@@ -13,6 +13,7 @@ from __future__ import annotations
 import math
 
 import mg_magnifier_assembly_steps as _steps
+import mg_wheel_axle_spec as _pin
 import sh_vn_clamp_screw_spec as _clamp_screw
 import mg_vn_magnifying_bracket_screw_spec as _bracket_screw
 from _inch_fraction import inch_fraction
@@ -66,6 +67,16 @@ if UNIT != "in":
     raise AssertionError("the endshake feeler check reads inch leaves")
 ENDSHAKE_GO_TEXT = render_number((ENDSHAKE - ENDSHAKE_TOL) / _INCH, UNIT, 3)
 ENDSHAKE_NO_GO_TEXT = render_number((ENDSHAKE + ENDSHAKE_TOL) / _INCH, UNIT, 3)
+
+# DETAIL A's lower acceptance limit as a number: the locknut is on full
+# thread while the thread end stands at least the dome's incomplete pitch past
+# it (mg_wheel_group.LOCKNUT_THREAD_MARGIN). Machinist review r3: the model
+# callout's words alone left step 5 nothing to read on the short side. The
+# high side, .114 MAX, prints on that callout.
+THREAD_PAST_LOCKNUT_MIN_TEXT = render_number(_pin.TIP_INCOMPLETE / _INCH, UNIT, 3)
+PRESS_DETAIL_ACCEPT_MIN = (
+    f"LOCKNUT ON FULL THREAD:\nTHREAD END {THREAD_PAST_LOCKNUT_MIN_TEXT} MIN PAST IT"
+)
 
 # The summing lever (cad/config/parts/sm-summing-lever.yaml), the mate the
 # bracket screws to at MHA-HA-00; rule 4 names it by its drawing number.
@@ -227,13 +238,17 @@ STEP_TEXT = {
         f"JAM BOTH {_NUT} NUTS ON {_AXLE} WITH {_WHEEL} JUST FREE."
     ),
     _steps.AXLE_CHECKED_KEY: (
-        f"CHECK THE ACCEPT CONDITION IN {PRESS_DETAIL_TITLE} WITH A CALIPER DEPTH "
+        f"CHECK BOTH ACCEPT LIMITS IN {PRESS_DETAIL_TITLE} WITH A CALIPER DEPTH "
         "ROD ON THE THREAD END PAST THE SECOND NUT."
     ),
     "trial-parts-removed": f"REMOVE THE TRIAL NUTS AND PARTS FROM {_AXLE}.",
     "axle-pressed-further": (
-        f"IF {_step(_steps.AXLE_CHECKED_KEY)} READ THE THREAD END PAST ITS LIMIT, "
-        f"PRESS {_AXLE} IN BY THAT EXCESS AND RETURN TO "
+        f"IF {_step(_steps.AXLE_CHECKED_KEY)} READ OVER THE MAX, PRESS {_AXLE} IN "
+        f"BY THE EXCESS AND RETURN TO {_step(_steps.AXLE_TRIAL_KEY)}."
+    ),
+    "axle-pressed-back": (
+        f"IF {_step(_steps.AXLE_CHECKED_KEY)} READ UNDER THE MIN, PRESS {_AXLE} "
+        f"BACK OUT FROM THE BACK FACE OF {_BAR} BY THE SHORTFALL AND RETURN TO "
         f"{_step(_steps.AXLE_TRIAL_KEY)}."
     ),
     "column-clamps-fitted": (
@@ -361,9 +376,9 @@ ASSEMBLY_CHECKS = (
     f"CHECK: WITH BOTH {_NUT} NUTS SET, {_WHEEL} TURNS FREE, NO RATTLE.",
     f"CHECK: {_CLAMP} AND {_FIXTURE} HOLD THEIR SETTINGS WHEN {_LEVER} IS "
     "ROCKED BY HAND.",
-    f"CHECK: {_WIRE} CLEARS THE RIM, SPOKES AND BOSS OF {_WHEEL} AND, "
-    f"ROCKED THROUGH THE TRAVEL OF {_LEVER}, STAYS WRAPPED ON {_DRUM} SHORT "
-    "OF TIE 1.",
+    f"CHECK: {_WIRE} CLEARS THE RIM, SPOKES AND BOSS OF {_WHEEL}.",
+    f"CHECK: WITH {_LEVER} ROCKED BY HAND TO EACH END OF ITS TRAVEL ON THE "
+    f"MACHINE, {_WIRE} STAYS WRAPPED ON {_DRUM} SHORT OF TIE 1.",
     f"LOOSE ITEMS: BOTH {_item(BRACKET_SCREW)} SCREWS GO WITH THE ASSEMBLY; "
     f"MHA-HA-00 DRIVES THEM THROUGH {_BRACKET} INTO {SUMMING_LEVER_NUMBER}.",
 )
