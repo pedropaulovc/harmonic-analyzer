@@ -164,9 +164,14 @@ THREAD_PROJECTION_TOL = _lever.THREAD_PROJECTION_TOL
 assert _lever.LEVER_UNIT == UNIT, "the lever charges this sheet's projection band in its unit"
 INSTALLED_FULL_ENGAGEMENT_MIN = _lever.INSTALLED_FULL_ENGAGEMENT_MIN
 
-# The thread-past-locknut limit as the press-gauge callout prints it.
+# The thread-past-locknut window as the press-gauge callout prints it. High:
+# the axle's limit. Low: the locknut on full thread, i.e. at least the dome's
+# incomplete pitch past it (mg_wheel_group.LOCKNUT_THREAD_MARGIN).
 THREAD_PAST_LOCKNUT_TEXT = render_number(
     _pin.THREAD_PAST_LOCKNUT_LIMIT / LENGTH_UNITS[UNIT], UNIT, 3
+)
+THREAD_PAST_LOCKNUT_MIN_TEXT = render_number(
+    _pin.TIP_INCOMPLETE / LENGTH_UNITS[UNIT], UNIT, 3
 )
 
 # Native IDisplayDimension.SetText compartments (swDimensionTextParts_e):
@@ -178,17 +183,16 @@ THREAD_PAST_LOCKNUT_TEXT = render_number(
 SETTING_CALLOUTS = {
     FEATURE: {
         # The reference gauge's acceptance, both sides of the stack window
-        # (PRESS_GAUGE_LOW_LIMIT, PRESS_GAUGE_HIGH_LIMIT), in the axle
-        # drawing's thread-length wording (mg_wheel_group).
+        # (PRESS_GAUGE_LOW_LIMIT, PRESS_GAUGE_HIGH_LIMIT), as a number pair a
+        # depth rod reads at the second nut (owner ruling 2026-11-06, Q1).
         PRESS_GAUGE_DIMENSION: (
             3,
-            "ACCEPT: LOCKNUT ON FULL THREAD, THREAD END "
-            f"{THREAD_PAST_LOCKNUT_TEXT} MAX PAST IT",
+            f"ACCEPT: THREAD END {THREAD_PAST_LOCKNUT_MIN_TEXT}-"
+            f"{THREAD_PAST_LOCKNUT_TEXT} PAST 2ND NUT",
         ),
-        ENDSHAKE_DIMENSION: (
-            4,
-            "WHEEL FREE, NO RATTLE;\nSET BY THE FIRST NUT,\nLOCKED BY THE SECOND",
-        ),
+        # One reason line; the steps carry how the nuts set and lock it
+        # (owner ruling 2026-11-06, Q2).
+        ENDSHAKE_DIMENSION: (4, "WHEEL FREE, NO RATTLE"),
     },
     LEVER_FEATURE: {
         CLAMP_STATION_DIMENSION: (3, "CLAMP STATION: SETS MAGNIFICATION"),

@@ -128,11 +128,19 @@ def test_the_press_gauge_is_a_reference_accepted_at_the_nuts() -> None:
     assert stack.PRESS_GAUGE_LOW_LIMIT <= low < high <= stack.PRESS_GAUGE_HIGH_LIMIT
     part, text = stack.SETTING_CALLOUTS[stack.FEATURE][stack.PRESS_GAUGE_DIMENSION]
     assert part == 3 and "\n" not in text
-    # The printed limit, in inches, is the axle's own limit and passes the
-    # worst stack.
-    printed = float(re.search(r"THREAD END (\.\d+) MAX", text).group(1)) * 25.4
+    # The printed window, in inches: the high side is the axle's own limit
+    # and passes the worst stack; the low side keeps the locknut on full
+    # thread, the dome's incomplete pitch past it, which the stack's low
+    # corner holds (owner ruling 2026-11-06).
+    low_text, high_text = re.search(
+        r"ACCEPT: THREAD END (\.\d+)-(\.\d+) PAST 2ND NUT", text
+    ).groups()
+    printed = float(high_text) * 25.4
     assert printed == pytest.approx(mg_wheel_axle_spec.THREAD_PAST_LOCKNUT_LIMIT)
     assert mg_wheel_group.THREAD_PAST_LOCKNUT_MAX <= printed
+    assert float(low_text) * 25.4 == pytest.approx(mg_wheel_axle_spec.TIP_INCOMPLETE)
+    assert mg_wheel_group.LOCKNUT_THREAD_MARGIN >= 0.0
+    assert "LOCKNUT ON FULL THREAD" not in drawing.PRESSED.label_text
     # The acceptance is checked on the trial stack, then again once both
     # nuts are set, at the DETAIL A gauge with a named instrument.
     checked = notes.STEP_TEXT[steps.AXLE_CHECKED_KEY]
@@ -142,14 +150,10 @@ def test_the_press_gauge_is_a_reference_accepted_at_the_nuts() -> None:
     assert notes.STEP_TEXT["axle-accepted"] == (
         f"REPEAT THE STEP {steps.step_number(steps.AXLE_CHECKED_KEY)} CHECK."
     )
-    # The low side prints as a number in DETAIL A: full thread through the
-    # locknut leaves at least the dome's incomplete pitch past it, the
-    # condition the stack's low corner holds (LOCKNUT_THREAD_MARGIN >= 0).
-    assert float(notes.THREAD_PAST_LOCKNUT_MIN_TEXT) * 25.4 == pytest.approx(
-        mg_wheel_axle_spec.TIP_INCOMPLETE
+    # The endshake callout keeps one reason line; the steps carry the method.
+    assert stack.SETTING_CALLOUTS[stack.FEATURE][stack.ENDSHAKE_DIMENSION] == (
+        4, "WHEEL FREE, NO RATTLE"
     )
-    assert notes.PRESS_DETAIL_ACCEPT_MIN in drawing.PRESSED.label_text
-    assert mg_wheel_group.LOCKNUT_THREAD_MARGIN >= 0.0
     # Each side has its own remedy, back to the trial fit.
     for key, side in (("axle-pressed-further", "OVER THE MAX"), ("axle-pressed-back", "UNDER THE MIN")):
         remedy = notes.STEP_TEXT[key]

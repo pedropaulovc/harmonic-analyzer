@@ -869,11 +869,9 @@ PRESSED = StackDetail(
     frozenset({"mg-wheel-bar", "mg-wheel-axle"}),
     BORE_ROW_HEIGHT,
     # The BOM items it shows (machinist review r1); the rest are left out.
-    # Then the acceptance's low side as a number (machinist review r3); the
-    # model callout over the gauge carries the high side.
+    # The acceptance, both limits, is the model callout over the gauge.
     f"ITEM {notes.ITEM_NUMBERS['mg-wheel-axle']} PRESSED INTO "
-    f"ITEM {notes.ITEM_NUMBERS['mg-wheel-bar']},\nOTHER PARTS NOT SHOWN\n"
-    f"{notes.PRESS_DETAIL_ACCEPT_MIN}",
+    f"ITEM {notes.ITEM_NUMBERS['mg-wheel-bar']},\nOTHER PARTS NOT SHOWN",
     letter_corner=(-1, 1),
 )
 _ENDSHAKE_CENTRE_D = (stack.HUB_FRONT_D + TIP_Y) / 2.0
