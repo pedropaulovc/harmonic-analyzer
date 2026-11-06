@@ -1,4 +1,5 @@
-"""Create the purchased reference drawing for the oblique-trammel end bracket screw."""
+"""Create the purchased reference drawing for the oblique-trammel KP08 screw
+(MHA-CH-06-TL-VN-62, #8-32 X 5/8 SHCS: each KP08 pillow block to its TL-28)."""
 
 from __future__ import annotations
 

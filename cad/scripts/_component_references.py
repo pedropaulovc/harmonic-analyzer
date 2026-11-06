@@ -31,6 +31,8 @@ REFERENCE_IDENTITIES: dict[str, tuple[str, str]] = {
     "Carriage": ("ch-rocker-arm-tl-vn-oblique-rail-kit", "Carriage"),
     "LeadScrew": ("ch-rocker-arm-tl-vn-oblique-leadscrew-kit", "LeadScrew"),
     "FeedNut": ("ch-rocker-arm-tl-vn-oblique-leadscrew-kit", "FeedNut"),
+    "Bar1": ("ch-rocker-arm-tl-oblique-base-bar", "Bar1"),
+    "Bar2": ("ch-rocker-arm-tl-oblique-base-bar", "Bar2"),
     "FootScrew": ("sh-vn-fillister-screw-90280a108", "Default"),
     "SwingStopScrew": ("sh-vn-fillister-screw-90280a108", "Default"),
 }

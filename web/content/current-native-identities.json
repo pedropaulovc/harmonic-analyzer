@@ -941,13 +941,6 @@
       "number": "MHA-CH-06-TL-VN-64"
     },
     {
-      "sourceStem": "ch-rocker-arm-tl-oblique-kp08-screw",
-      "sourceNumber": "MHA-CH-006-TL-45",
-      "parent": "ch-rocker-arm-tl-oblique-jig",
-      "stem": "ch-rocker-arm-tl-vn-oblique-kp08-screw",
-      "number": "MHA-CH-06-TL-VN-65"
-    },
-    {
       "sourceStem": "ch-rocker-arm-tl-oblique-riser-screw",
       "sourceNumber": "MHA-CH-006-TL-47",
       "parent": "ch-rocker-arm-tl-oblique-jig",
@@ -1061,7 +1054,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "2484403ef6e38c7d6f721340950642ebd830943d089f62c02d70ee3d19e697cb",
+  "currentRegistryMapSha256": "bf749cd855fb5640fb6d67de56320f050bd07f858fcece351ec4198d556e982f",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",

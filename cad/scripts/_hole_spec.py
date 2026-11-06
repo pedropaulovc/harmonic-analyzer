@@ -89,6 +89,7 @@ CLEARANCE_MM = {  # (size, fit) -> hole diameter (CLOSE/NORMAL/LOOSE_FIT)
 }
 NUMBER_DRILL_MM = {  # number drills cut diameter exactly
     "#9": 4.978,
+    "#12": 4.801,  # 0.1890in: #8 screw clearance held to about .9 reversal (oblique TL-20)
     "#19": 4.216,
     "#20": 4.089,
     "#21": 4.039,

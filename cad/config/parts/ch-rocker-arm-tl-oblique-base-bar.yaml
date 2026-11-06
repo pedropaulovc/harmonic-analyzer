@@ -15,12 +15,19 @@ ch-rocker-arm-tl-oblique-base-bar:
   material_specification: Aluminum flat bar milled from 1/2 x 6 in (e.g. 6061-T6511, owned OnlineMetals 1173); both large faces faced to .47, width milled to 5.50
   finish: as machined
   quantity: 2
+  # One native model, one Number, two named members (oblique simplification
+  # PR2): Bar1 under rail 1 carries the TL-28 end-bracket holes; Bar2 under
+  # rail 2 is the same bar without them, turned over.
+  default_configuration: Bar1
+  configuration_quantities:
+    Bar1: 1
+    Bar2: 1
   tolerance_class: machined_block
-  process: "saw and face to length; face both large faces to thickness; mill to width on edge in the vise (no bandsaw rip); drill and tap the eight #8-32 rail holes through; drill the eight #8 bracket holes through and counterbore them from the underside; mill the two hold-down slots through; break edges"
+  process: "saw and face to length; face both large faces to thickness; mill to width on edge in the vise (no bandsaw rip); drill and tap the eight #8-32 rail holes through; bar 1 only: drill the four #12 bracket holes through and counterbore them from the underside; mill the two hold-down slots through; break edges"
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
-      where: "front view: the HGR15 rail-hole row (15.00 ... 435.00 ±.08 mm) and the 8X TL-28 bracket-hole stations 57.00 ±.13 mm and 428.00 ±.13 mm"
+      where: "front views: the HGR15 rail-hole row (15.00 ... 435.00 ±.08 mm) on sheets BAR 1 and BAR 2, and on sheet BAR 1 the 4X TL-28 bracket-hole stations 57.00 ±.13 mm and 428.00 ±.13 mm and their rows 54.909 ±.13 mm and 12.909 ±.13 mm"
       finding: "metric vendor-mating hole stations print in millimetres on an inch sheet, beside inch dimensions from the same left end"
       reason: "owner ruling 2026-11-01 (ruling 4B), relayed by Main: the KP08 pillow block, HGR15 rail and Tr8 nut are metric-only vendor lines, so the stations that mate with their holes keep the vendor's exact millimetres, printed in mm with the unit label and an explicit mm band (drawing-simplicity-policy.md, supplier-unit exception), not rounded inch conversions"
   drawing_unit: in
