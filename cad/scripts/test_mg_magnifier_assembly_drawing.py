@@ -47,7 +47,7 @@ def test_magnifier_keeps_registry_outputs_and_precomputed_placement() -> None:
     assert drawing.SHEET_SCALE == (1.0, 4.0)
     assert drawing.FRONT_CENTER == (0.070, 0.150)
     assert drawing.RIGHT_CENTER == (0.168, 0.150)
-    assert drawing.ISO_CENTER == (0.225, 0.140)
+    assert drawing.ISO_CENTER == (0.233, 0.140)
 
 
 @pytest.mark.parametrize(
@@ -133,8 +133,15 @@ def test_the_press_gauge_is_a_reference_accepted_at_the_nuts() -> None:
     printed = float(re.search(r"THREAD END (\.\d+) MAX", text).group(1)) * 25.4
     assert printed == pytest.approx(mg_wheel_axle_spec.THREAD_PAST_LOCKNUT_LIMIT)
     assert mg_wheel_group.THREAD_PAST_LOCKNUT_MAX <= printed
-    # The acceptance is checked once both nuts are set.
-    assert "AXLE AS PRESSED ACCEPTANCE" in notes.STEP_TEXT[steps.LOCKNUT_JAMMED_KEY]
+    # The acceptance is checked on the trial stack, then again once both
+    # nuts are set, at the DETAIL A gauge with a named instrument.
+    checked = notes.STEP_TEXT[steps.AXLE_CHECKED_KEY]
+    assert "DETAIL A" in checked and "CALIPER DEPTH ROD" in checked
+    accepted = steps.SEQUENCE.index("axle-accepted")
+    assert accepted > steps.SEQUENCE.index(steps.LOCKNUT_JAMMED_KEY)
+    assert notes.STEP_TEXT["axle-accepted"] == (
+        f"REPEAT THE STEP {steps.step_number(steps.AXLE_CHECKED_KEY)} CHECK."
+    )
     # The one-line callout centres over the value: at the 2.7 mm a capital
     # measured on the e04fd60ab sheet it stays inside the right border.
     x, _y = drawing.PRESSED_KEEP[stack.PRESS_GAUGE_DIMENSION]
@@ -456,24 +463,29 @@ def test_the_stack_chain_is_authored_on_the_axle_and_driven_from_globals(
 
 def test_the_package_has_five_landscape_sheets_with_the_wire_steps_on_sheet_5() -> None:
     assert drawing.SHEET_NAMES[3] == "ASSEMBLY STEPS"
-    assert drawing.SHEET_NAMES[-1] == "WIRE STEPS + CHECKS"
+    assert drawing.SHEET_NAMES[-1] == "LEVER + WIRE STEPS"
     assert len(drawing.SHEET_NAMES) == 5
     assert set(drawing.SHEET_LAYOUTS.values()) == {DrawingLayout.LANDSCAPE}
     assert set(drawing.SHEET_SCALES) == set(drawing.SHEET_NAMES)
-    # MHA-HA-00 prints "LEVER WIRE: PER MHA-MG-00 SHEET 5." and names these keys;
-    # both wire steps, and only they, continue on sheet 5.
-    wire = notes.ASSEMBLY_STEPS[drawing.STEPS_SPLIT:]
-    assert [step.split(". ", 1)[0] for step in wire] == [
-        str(steps.step_number(steps.WIRE_HOOKED_KEY)),
-        str(steps.step_number(steps.WIRE_TIED_KEY)),
+    # MHA-HA-00 prints "LEVER WIRE: PER MHA-MG-00 SHEET 5." and MHA-SH-VN-56
+    # cites the wire steps there: the lever group and the wire, and only
+    # they, continue on sheet 5.
+    continued = notes.ASSEMBLY_STEPS[drawing.STEPS_SPLIT:]
+    first = steps.step_number(steps.LEVER_THREADED_KEY)
+    assert [step.split(". ", 1)[0] for step in continued] == [
+        str(number) for number in range(first, len(steps.SEQUENCE) + 1)
     ]
     assert all(
-        step.split(". ", 1)[1] in " ".join(drawing.ASSEMBLY_STEPS_CONTINUED.split())
-        for step in wire
+        " ".join(step.split()) in " ".join(drawing.ASSEMBLY_STEPS_CONTINUED.split())
+        for step in continued
     )
     assert steps.WIRE_HOOKED_KEY == "lever-wire-hooked"
     assert steps.WIRE_TIED_KEY == "lever-wire-tied"
-    assert steps.SEQUENCE[-2:] == (steps.WIRE_HOOKED_KEY, steps.WIRE_TIED_KEY)
+    assert steps.SEQUENCE.index(steps.WIRE_HOOKED_KEY) >= drawing.STEPS_SPLIT
+    assert steps.SEQUENCE[-1] == steps.WIRE_TIED_KEY
+    # VIEW D, which the wire steps cite, prints on this sheet at its scale.
+    assert notes.WHEEL_REST_VIEW_SHEET == len(drawing.SHEET_NAMES)
+    assert drawing.SHEET_SCALES[drawing.SHEET_NAMES[-1]] == drawing.WHEEL_REST_SCALE
 
 
 def test_the_drawing_key_reads_only_the_package_parts_config() -> None:
@@ -530,40 +542,52 @@ def test_the_wire_wrap_has_the_required_geometric_margin() -> None:
     assert mg_wheel_group.LEVER_WIRE_WRAP_LEFT_DEG >= mg_wheel_group.WRAP_MARGIN_DEG
 
 
-def test_the_wire_tie_step_brings_tie_1_to_its_modelled_rest_clock() -> None:
+def test_the_wire_tie_step_sets_tie_1_at_its_modelled_rest_angle() -> None:
     import mg_magnifying_wheel_geom as wheel
 
-    # The step's clock-face hour is where the wheel model puts TIE 1 at rest
-    # (seen from the front), so the wire is tied in the state its wrap is
-    # proved in.
-    step = notes.STEP_TEXT[steps.WIRE_TIED_KEY]
-    hours = [int(hour) for hour in re.findall(r"\b(\d{1,2}) O'CLOCK\b", step)]
-    assert len(hours) == 1
-    hour_clock_deg = 90.0 - 30.0 * hours[0]
-    assert (hour_clock_deg - wheel.TIE1_CLOCK_DEG + 180.0) % 360.0 - 180.0 == (
-        pytest.approx(0.0, abs=1.0)
+    # VIEW D dimensions TIE 1's axis line from the wheel bar's bottom edge;
+    # at the wheel model's rest pose that angle is TIE 1's, midway between
+    # two spokes, so the wire is tied in the state its wrap is proved in.
+    assert notes.TIE1_ANGLE_DEG == pytest.approx(
+        -math.degrees(math.atan2(wheel.TIE1_Y, wheel.TIE1_X))
     )
+    assert drawing.TIE1_DIRECTION == pytest.approx(
+        (wheel.TIE1_X / math.hypot(wheel.TIE1_X, wheel.TIE1_Y),
+         wheel.TIE1_Y / math.hypot(wheel.TIE1_X, wheel.TIE1_Y))
+    )
+    step = notes.STEP_TEXT["wheel-turned"]
+    assert "VIEW D" in step and "TIE 1" in step and "PROTRACTOR" in step
+    assert "O'CLOCK" not in " ".join(notes.ASSEMBLY_STEPS)
+    # The vertex lies on the bar's bottom edge, the picks beyond it.
+    vx, vy = drawing.TIE1_VERTEX_MM
+    assert vy == -drawing.BORE_ROW_HEIGHT
+    assert vy / vx == pytest.approx(wheel.TIE1_Y / wheel.TIE1_X)
 
 
-def test_the_assembled_views_name_their_direction_clear_of_their_neighbours() -> None:
-    # r8's printed outlines (sheet metres): Front, Right, Isometric.
-    front = (0.041, 0.091, 0.099, 0.204)
-    right = (0.153, 0.091, 0.183, 0.204)
-    iso_left = 0.194
-    boxes = []
-    for outline, name in (
-        (front, stack.DRAWING_BACK_VIEW), (right, stack.DRAWING_LEFT_VIEW)
+def test_the_lettered_views_are_marked_on_the_right_side_view() -> None:
+    # Every lettered view has its mark: DETAIL A and B their boundaries,
+    # VIEW C and VIEW D their viewing arrows; no view is named in prose.
+    assert (drawing.PRESSED.letter, drawing.ENDSHAKE.letter) == ("A", "B")
+    assert [arrow.letter for arrow in drawing.VIEW_ARROWS] == ["C", "D"]
+    assert drawing.LEVER_TIP.title == "VIEW C"
+    assert drawing.WHEEL_REST.title == "VIEW D"
+    assert drawing.VIEW_ARROWS[1].sheet_ref == "(SHEET 5)"
+    for text in (
+        drawing.LEVER_TIP.label_text,
+        drawing.WHEEL_REST.label_text,
+        drawing.PRESSED.label_text,
+        drawing.ENDSHAKE.label_text,
     ):
-        text = drawing.ASSEMBLED_VIEW_CAPTIONS[name]
-        left, top = drawing.caption_under(outline, text)
-        width = len(text) * drawing.CAPTION_CHAR_WIDTH
-        assert left + width / 2.0 == pytest.approx((outline[0] + outline[2]) / 2.0)
-        assert top < outline[1]
-        assert top - drawing.NOTE_LINE_PITCH > drawing.TITLE_BLOCK[3]
-        assert left > drawing.INNER_BORDER[0]
-        boxes.append((left, left + width))
-    assert boxes[0][1] < boxes[1][0]
-    assert boxes[1][1] < iso_left
+        assert "VIEW FROM" not in text
+    # Each detail's letter stands outside its boundary toward its corner.
+    for detail in (drawing.PRESSED, drawing.ENDSHAKE):
+        left, top = drawing.boundary_letter_xy((0.0, 0.0), 0.010, detail.letter_corner)
+        box = (left, top - drawing.LETTER_BOX[1], left + drawing.LETTER_BOX[0], top)
+        nearest = (
+            min(max(0.0, box[0]), box[2]) if box[0] > 0 or box[2] < 0 else 0.0,
+            min(max(0.0, box[1]), box[3]) if box[1] > 0 or box[3] < 0 else 0.0,
+        )
+        assert math.hypot(*nearest) > 0.010
 
 
 def test_every_step_is_numbered_in_sequence() -> None:
@@ -929,25 +953,12 @@ def lever_tip_native(monkeypatch, projection_native):
         GetExtent=lambda: native.caption_extent,
     )
     native.neighbour = SimpleNamespace(GetOutline=lambda: (0.035, 0.085, 0.105, 0.215))
-    native.back_extent = [0.0486244, 0.0767929, 0.0, 0.0972344, 0.0815586, 0.0]
-
-    def move_back(x, y, z):
-        dx, dy = x - native.back_extent[0], y - native.back_extent[4]
-        native.events.append(("caption-move", dx, dy, z))
-        for index in (0, 3):
-            native.back_extent[index] += dx
-        for index in (1, 4):
-            native.back_extent[index] += dy
-        return True
-
-    native.back_annotation = SimpleNamespace(
-        GetPosition=lambda: (native.back_extent[0], native.back_extent[4], 0.0),
-        SetPosition2=move_back,
-    )
-    native.back_caption = SimpleNamespace(
-        GetText=lambda: drawing.ASSEMBLED_VIEW_CAPTIONS[stack.DRAWING_BACK_VIEW],
-        GetExtent=lambda: native.back_extent,
-        GetAnnotation=lambda: native.back_annotation,
+    # A neighbouring view-owned note (the right side view's sheet reference
+    # under VIEW D's arrow), clear of VIEW C's whole native outline.
+    native.neighbour_extent = [0.0400, 0.0767929, 0.0, 0.0600, 0.0815586, 0.0]
+    native.neighbour_note = SimpleNamespace(
+        GetText=lambda: drawing.VIEW_ARROWS[1].sheet_ref,
+        GetExtent=lambda: native.neighbour_extent,
     )
     monkeypatch.setattr(drawing, "view_name", lambda _a, view: view.name)
     name = stack.THREAD_PROJECTION_DIMENSION
@@ -1031,7 +1042,7 @@ def lever_tip_native(monkeypatch, projection_native):
 def test_projection_detail_imports_once_before_crop_and_rechecks_settled_ink(lever_tip_native):
     native = lever_tip_native
     settled = drawing._thread_projection_detail(
-        native.adapter, (native.neighbour,), (native.back_caption,), native.source_step,
+        native.adapter, (native.neighbour,), (native.neighbour_note,), native.source_step,
     )
     assert len(native.imports) == 1
     view, args = native.imports[0]
@@ -1043,8 +1054,8 @@ def test_projection_detail_imports_once_before_crop_and_rechecks_settled_ink(lev
     assert native.annotation.endpoints is native.endpoints
     assert native.source.SystemValue == pytest.approx(0.00125)
     assert native.source.Tolerance.Type == 0
-    assert "VIEW FROM THE FRONT" in native.caption.GetText()
-    assert native.caption.GetText().count("\n") == 2
+    assert "VIEW FROM" not in native.caption.GetText()
+    assert native.caption.GetText().count("\n") == 1
     settled()
     native.rows[1]["position"] = (-0.100, -0.003, 0.0)
     moves = sum(event[0] == "move" for event in native.events)
@@ -1092,67 +1103,7 @@ def test_detail_direction_exposes_the_nose_instead_of_the_occluding_flange():
     assert detail.scale == (4, 1)
     from mg_lever_thread_joint import NOSE_R
     assert assembly.LEVER_ROD_Z - NOSE_R < flange_near_z
-    assert drawing.ASSEMBLED_VIEW_CAPTIONS[stack.DRAWING_BACK_VIEW] == "VIEW FROM THE BACK"
-
-
-def test_back_caption_moves_once_using_whole_native_outline_not_crop(lever_tip_native):
-    native = lever_tip_native
-    before = tuple(native.back_extent)
-    box = drawing._projection_note_box(native.back_caption)
-    assert drawing.boxes_clear(box, drawing._crop_box(native.view, drawing.LEVER_TIP))
-    assert not drawing.boxes_clear(box, tuple(native.outline))
-    settled = drawing._thread_projection_detail(
-        native.adapter, (native.neighbour,), (native.back_caption,), native.source_step,
-    )
-    assert drawing.boxes_clear(drawing._projection_note_box(native.back_caption), tuple(native.outline))
-    assert native.back_extent[1] == before[1] and native.back_extent[4] == before[4]
-    assert native.back_caption.GetText() == "VIEW FROM THE BACK"
-    assert native.back_extent[3] == pytest.approx(
-        native.outline[0] - drawing.CLEAR_GAP_M - drawing.PLACE_SETTLE_M
-    )
-    assert native.back_extent[0] >= native.margins[3]
-    assert sum(event[0] == "caption-move" for event in native.events) == 1
-    native.outline[0] -= 0.010
-    with pytest.raises(RuntimeError, match="actual native view outline"):
-        settled()
-    assert sum(event[0] == "caption-move" for event in native.events) == 1
-
-
-def test_moved_back_caption_must_still_clear_live_border_after_rebuild(lever_tip_native):
-    native = lever_tip_native
-    settled = drawing._thread_projection_detail(
-        native.adapter, (native.neighbour,), (native.back_caption,), native.source_step,
-    )
-    native.back_extent[0] -= 0.002
-    native.back_extent[3] -= 0.002
-    with pytest.raises(RuntimeError, match="assembled back caption.*zone frame"):
-        settled()
-    assert sum(event[0] == "caption-move" for event in native.events) == 1
-
-
-def test_back_caption_fit_never_moves_from_an_invalid_native_outline(lever_tip_native):
-    native = lever_tip_native
-    native.outline[0] = float("nan")
-    with pytest.raises(RuntimeError, match="non-finite native view outline"):
-        drawing._fit_projection_back_caption(
-            native.adapter, native.view, (native.neighbour,), (native.back_caption,),
-        )
-    assert not any(event[0] == "caption-move" for event in native.events)
-
-
-@pytest.mark.parametrize("failure", ["refused-move", "ignored-move", "border"])
-def test_back_caption_fit_requires_actual_native_readback(lever_tip_native, failure):
-    native = lever_tip_native
-    if failure == "refused-move":
-        native.back_annotation.SetPosition2 = lambda *_args: False
-    elif failure == "ignored-move":
-        native.back_annotation.SetPosition2 = lambda *_args: True
-    else:
-        native.margins[3] = 0.020
-    with pytest.raises(RuntimeError):
-        drawing._fit_projection_back_caption(
-            native.adapter, native.view, (native.neighbour,), (native.back_caption,),
-        )
+    assert drawing.VIEW_ARROWS[0].letter == detail.title.removeprefix("VIEW ")
 
 
 @pytest.mark.parametrize("fence", [
@@ -1293,7 +1244,7 @@ def test_projection_source_collects_all_identity_codes_before_reader_failure(
 def test_projection_layout_guards_all_native_ink_and_neighbours(lever_tip_native, failure):
     native = lever_tip_native
     settled = drawing._thread_projection_detail(
-        native.adapter, (native.neighbour,), (native.back_caption,), native.source_step,
+        native.adapter, (native.neighbour,), (native.neighbour_note,), native.source_step,
     )
     if failure == "arrow-border":
         native.arrow_x = 0.012
@@ -1302,7 +1253,7 @@ def test_projection_layout_guards_all_native_ink_and_neighbours(lever_tip_native
     elif failure == "nonfinite-witness":
         native.line_x = float("nan")
     elif failure == "direction-caption":
-        native.caption.GetText = lambda: drawing.LEVER_TIP.label_text.replace("FRONT", "BACK")
+        native.caption.GetText = lambda: drawing.LEVER_TIP.label_text.replace("VIEW C", "VIEW X")
     elif failure == "nonfinite-outline":
         native.outline[0] = float("nan")
     elif failure == "caption-border":
@@ -1310,7 +1261,7 @@ def test_projection_layout_guards_all_native_ink_and_neighbours(lever_tip_native
     elif failure == "caption-crop":
         native.caption_extent[4] = 0.036
     elif failure == "neighbour-caption":
-        native.back_caption.GetExtent = lambda: (0.080, 0.070, 0, 0.130, 0.080, 0)
+        native.neighbour_note.GetExtent = lambda: (0.080, 0.070, 0, 0.130, 0.080, 0)
     elif failure == "neighbour-view":
         native.neighbour.GetOutline = lambda: (0.090, 0.070, 0.150, 0.120)
     elif failure == "scale":
@@ -1324,13 +1275,14 @@ def test_projection_layout_guards_all_native_ink_and_neighbours(lever_tip_native
 
 
 def test_step_seven_uses_the_actual_detail_and_attached_qualifier():
+    # The step names the view whose attached callout sets the projection and
+    # the instrument that reads it; the value stays on the view.
     step = notes.STEP_TEXT[steps.LEVER_THREADED_KEY]
-    qualifier = " ".join(stack.SETTING_CALLOUTS[stack.THREAD_FEATURE][stack.THREAD_PROJECTION_DIMENSION][1].split())
-    assert qualifier in step
     assert drawing.LEVER_TIP.title in step
+    assert "CALIPER DEPTH ROD" in step
+    assert f"ITEM {notes.ITEM_NUMBERS['mg-magnifying-lever']} " in step
+    assert f"ITEM {notes.ITEM_NUMBERS['mg-magnifying-bracket']} " in step
     assert "THREAD PROJECTION" not in step
-    assert "NO LOCKNUT, SET SCREW OR ADHESIVE" in step
-    assert "THE PLAIN ROD HAS NO SHOULDER" in step
     assert "1.25" not in step
 
 
@@ -1493,7 +1445,197 @@ def test_deterministic_crop_restores_database_mode_on_native_refusal(monkeypatch
     assert calls == []
 
 
-def test_assembled_sheet_adds_one_projection_detail_with_existing_neighbours(monkeypatch):
+def _side_view_projection(point):
+    """MG LEFT at 1:4 about an arbitrary origin: sheet x runs with machine
+    -z, sheet y with machine y."""
+    x, y, z = point
+    return 0.168 - z / 4.0, 0.150 + (y - stack.AXLE_Y / 1000.0) / 4.0
+
+
+def test_right_side_view_marks_each_lettered_view(monkeypatch):
+    view = object()
+    circles, inked, notes_added, leaders = [], [], [], []
+    monkeypatch.setattr(
+        drawing, "model_point_in_view", lambda _a, _v, point, **_k: _side_view_projection(point)
+    )
+
+    def sketch(_adapter, actual, kind, points, *, label):
+        assert actual is view and kind == "circle"
+        circles.append(points)
+        return SimpleNamespace(label=label)
+
+    monkeypatch.setattr(drawing, "_sketch_in_view", sketch)
+    monkeypatch.setattr(
+        drawing, "_ink_segment",
+        lambda _a, segment, style, **_k: inked.append((segment.label, style)),
+    )
+    monkeypatch.setattr(drawing, "_activate", lambda *_a, **_k: None)
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(ClearSelection2=lambda _v: None))
+    monkeypatch.setattr(
+        drawing, "add_note", lambda _a, text, x, y: notes_added.append((text, x, y)) or object()
+    )
+    monkeypatch.setattr(
+        drawing, "add_leader_note",
+        lambda _a, text, *, text_xy, attach_xy, view, label: leaders.append(
+            (text, text_xy, attach_xy, view)
+        ),
+    )
+    steps_seen = []
+    drawing._mark_right_side_view(adapter, view, steps_seen.append)
+    # DETAIL A and B: a black boundary of the detail's model radius at 1:4,
+    # round the point the detail is centred on, lettered outside it.
+    for (centre, rim), detail, (letter, x, y) in zip(
+        circles, (drawing.PRESSED, drawing.ENDSHAKE), notes_added, strict=False
+    ):
+        assert centre == pytest.approx(_side_view_projection(detail.model_centre_m))
+        radius = rim[0] - centre[0]
+        assert radius == pytest.approx(detail.radius_mm / 4000.0)
+        assert letter == detail.letter
+        box = (x, y - drawing.LETTER_BOX[1], x + drawing.LETTER_BOX[0], y)
+        nearest = (
+            min(max(centre[0], box[0]), box[2]) - centre[0],
+            min(max(centre[1], box[1]), box[3]) - centre[1],
+        )
+        assert math.hypot(*nearest) >= radius + drawing.DETAIL_LETTER_GAP - 1e-12
+    assert [style for _label, style in inked] == [drawing.CONTINUOUS_LINE_STYLE] * 2
+    # VIEW C and D: horizontal arrows from the right, each tip clear of the
+    # ink it names; D's sheet reference sits under its letter, off the leader.
+    assert [leader[0] for leader in leaders] == ["C", "D"]
+    for (_text, text_xy, tip, actual), arrow in zip(leaders, drawing.VIEW_ARROWS, strict=True):
+        assert actual is view
+        assert tip == pytest.approx(_side_view_projection(arrow.tip_m))
+        assert text_xy == pytest.approx(
+            (tip[0] + drawing.VIEW_ARROW_RUN, tip[1] + drawing.LETTER_BOX[1] / 2.0)
+        )
+    d_tip = leaders[1][2]
+    pressed = _side_view_projection(drawing.PRESSED.model_centre_m)
+    endshake = _side_view_projection(drawing.ENDSHAKE.model_centre_m)
+    assert d_tip[0] > endshake[0] + drawing.ENDSHAKE.radius_mm / 4000.0
+    assert d_tip[0] > pressed[0] + drawing.PRESSED.radius_mm / 4000.0
+    ref, ref_x, ref_y = notes_added[2]
+    assert ref == "(SHEET 5)"
+    assert ref_y < d_tip[1] - drawing.LETTER_BOX[1] / 2.0
+    assert len(steps_seen) == 4
+
+
+@pytest.mark.parametrize(
+    "degrees, precision, driven",
+    [
+        (180.0 - notes.TIE1_ANGLE_DEG, 0, 1),
+        (notes.TIE1_ANGLE_DEG + 0.1, 0, 1),
+        (notes.TIE1_ANGLE_DEG, 2, 1),
+        (notes.TIE1_ANGLE_DEG, 0, 2),
+        (notes.TIE1_ANGLE_DEG, 0, 1),
+    ],
+)
+def test_tie1_angle_readback_requires_the_rest_angle_driven_at_whole_degrees(
+    monkeypatch, degrees, precision, driven
+):
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    dimension = SimpleNamespace(SystemValue=-math.radians(degrees), DrivenState=driven)
+    display = SimpleNamespace(
+        GetDimension2=lambda _index: dimension, GetPrimaryPrecision2=lambda: precision
+    )
+    if (degrees, precision, driven) == (notes.TIE1_ANGLE_DEG, 0, 1):
+        drawing._assert_tie1_angle(display, label="VIEW D")
+    else:
+        with pytest.raises(RuntimeError, match="VIEW D reads"):
+            drawing._assert_tie1_angle(display, label="VIEW D")
+
+
+def test_wheel_rest_view_dimensions_tie_1_from_the_bar_edge(monkeypatch):
+    detail = drawing.WHEEL_REST
+    view = object()
+    events, sketched, dimensions, leaders, labels = [], [], [], [], []
+    cx, cy = detail.centre
+
+    def project(point):
+        # *Front at 2:1: sheet x mirrors machine x about the axle.
+        x, y, _z = point
+        return cx - 2.0 * (x - stack.AXLE_X / 1000.0), cy + 2.0 * (y - stack.AXLE_Y / 1000.0)
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda *_a: events.append("sheet"))
+    monkeypatch.setattr(drawing, "_activate", lambda *_a, **_k: None)
+    monkeypatch.setattr(drawing, "_placed_detail", lambda _a, actual: actual is detail and view)
+    monkeypatch.setattr(drawing, "_crop", lambda _a, actual, d: events.append(("crop", actual, d)))
+    monkeypatch.setattr(drawing, "_crop_box", lambda actual, d: events.append(("fence", actual, d)))
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        drawing, "model_points_in_view",
+        lambda _a, actual, points, **_k: [project(point) for point in points],
+    )
+    segment = SimpleNamespace()
+
+    def sketch(_adapter, actual, kind, points, *, label):
+        sketched.append((kind, points))
+        return segment
+
+    monkeypatch.setattr(drawing, "_sketch_in_view", sketch)
+    monkeypatch.setattr(
+        drawing, "_ink_segment", lambda _a, actual, style, **_k: events.append(("ink", style))
+    )
+    dimension = SimpleNamespace(
+        SystemValue=math.radians(notes.TIE1_ANGLE_DEG), DrivenState=1
+    )
+    precision = []
+    display = SimpleNamespace(
+        GetDimension2=lambda _index: dimension,
+        SetPrecision3=lambda *args: precision.append(args) or 1,
+        GetPrimaryPrecision2=lambda: precision[-1][0] if precision else 2,
+    )
+
+    def dimension_add(_adapter, actual, **kwargs):
+        dimensions.append(kwargs)
+        return display
+
+    monkeypatch.setattr(drawing, "add_edge_dimension", dimension_add)
+    monkeypatch.setattr(
+        drawing, "add_leader_note",
+        lambda _a, text, *, text_xy, attach_xy, view, label: leaders.append(
+            (text, text_xy, attach_xy)
+        ),
+    )
+
+    def note(_adapter, text, x, y):
+        labels.append((text, x, y))
+        return SimpleNamespace(GetText=lambda: text)
+
+    monkeypatch.setattr(drawing, "add_note", note)
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(ClearSelection2=lambda _v: None))
+    settled = drawing._wheel_rest_view(adapter, lambda _step: None)
+    assert ("crop", view, detail) in events
+    # The axis line runs from the axle axis through TIE 1, a centreline.
+    (kind, (start, end)), = sketched
+    assert kind == "line" and start == pytest.approx((cx, cy))
+    tie = project(detail.model_m((drawing.TIE1_X, drawing.TIE1_Y)))
+    cross = (end[0] - start[0]) * (tie[1] - start[1]) - (end[1] - start[1]) * (tie[0] - start[0])
+    assert cross == pytest.approx(0.0, abs=1e-12)
+    assert math.dist(start, end) < detail.crop_radius
+    assert ("ink", drawing.CENTER_LINE_STYLE) in events
+    # One driven angle, the bar's bottom edge picked as an edge beyond the
+    # vertex and the line by its own segment, at whole degrees.
+    (kwargs,) = dimensions
+    assert kwargs["orientation"] == "angular"
+    assert kwargs["entity_types"] == ("EDGE", "SKETCHSEGMENT")
+    assert kwargs["entities"] == (None, segment)
+    edge_y = cy - 2.0 * drawing.BORE_ROW_HEIGHT / 1000.0
+    assert kwargs["p0"][1] == pytest.approx(edge_y)
+    vertex = project(detail.model_m(drawing.TIE1_VERTEX_MM))
+    assert (kwargs["p0"][0] - vertex[0]) * (tie[0] - cx) > 0.0
+    assert math.dist(kwargs["p0"], (cx, cy)) < detail.crop_radius
+    assert precision == [(0, -1, -1, -1)]
+    # TIE 1's label stands outside the crop, its leader on the hole's rim.
+    ((text, text_xy, tip),) = leaders
+    assert text == "TIE 1"
+    assert math.dist(text_xy, (cx, cy)) > detail.crop_radius
+    assert math.dist(tip, tie) == pytest.approx(drawing.TIE_HOLE_DIA / 2.0 * detail.mm)
+    assert labels == [(detail.label_text, *detail.label_xy)]
+    settled()
+    assert ("fence", view, detail) in events
+
+
+def test_assembled_sheet_marks_the_right_side_view_before_the_projection_detail(monkeypatch):
     views, captions, projection_calls = [], [], []
     source_steps = []
     source_step = source_steps.append
@@ -1525,9 +1667,14 @@ def test_assembled_sheet_adds_one_projection_detail_with_existing_neighbours(mon
         return stack_check
 
     def caption(*args, **kwargs):
-        note = object()
-        captions.append(note)
-        return note
+        captions.append(args)
+
+    marked = []
+
+    def mark(_adapter, view, callback):
+        assert callback is source_step
+        callback("marks callback")
+        marked.append(view)
 
     def detail(_adapter, neighbours, notes, callback):
         assert callback is source_step
@@ -1545,16 +1692,22 @@ def test_assembled_sheet_adds_one_projection_detail_with_existing_neighbours(mon
     monkeypatch.setattr(drawing, "_stack_dimensions", stacks)
     monkeypatch.setattr(drawing, "_add_note_block", caption)
     monkeypatch.setattr(drawing, "_thread_projection_detail", detail)
+    monkeypatch.setattr(drawing, "_mark_right_side_view", mark)
     assert drawing._place_assembled_sheet(adapter, source_step) == (base_check, stack_check, projection_check)
     assert [view.orientation for view in views[:3]] == [
         stack.DRAWING_BACK_VIEW, stack.DRAWING_LEFT_VIEW, stack.DRAWING_ISOMETRIC_VIEW,
     ]
     assert source_steps.index("lever callback") < source_steps.index("stack callback")
-    assert source_steps.index("stack callback") < source_steps.index("tip callback")
+    assert source_steps.index("stack callback") < source_steps.index("marks callback")
+    assert source_steps.index("marks callback") < source_steps.index("tip callback")
+    # The right side view carries the lettered views' marks; no principal
+    # view is captioned in prose.
+    assert marked == [views[1]]
+    assert captions == []
     assert len(projection_calls) == 1
     neighbours, notes = projection_calls[0]
     assert neighbours == tuple(views) and len(neighbours) == 5
-    assert notes[:2] == tuple(captions) and len(notes) == 4
+    assert len(notes) == 2
 
 
 @pytest.mark.parametrize(
@@ -1984,10 +2137,12 @@ def test_instruction_native_bounds_refuse_unreadable_or_degenerate_boxes(
 def test_the_steps_and_checks_fit_their_column() -> None:
     for block, width in (
         (drawing.ASSEMBLY_STEPS, drawing.STEPS_LINE_WIDTH),
-        (drawing.ASSEMBLY_STEPS_CONTINUED, drawing.STEPS_LINE_WIDTH),
-        (drawing.ASSEMBLY_CHECKS, drawing.CHECKS_LINE_WIDTH),
+        (drawing.ASSEMBLY_STEPS_CONTINUED, drawing.CONTINUED_LINE_WIDTH),
+        (drawing.ASSEMBLY_CHECKS, drawing.CONTINUED_LINE_WIDTH),
     ):
         assert max(len(line) for line in block.splitlines()) <= width
+    # Sheet 5's column at the native note pitch ends left of VIEW D's ink.
+    assert drawing.CONTINUED_RIGHT + drawing._PAD < drawing.REST_INK_LEFT
     # Each block's native box runs right of the title block's left edge, so
     # each must end above the title block. Final native whole-note/layout
     # checks establish clearance for this exact text.
@@ -2006,35 +2161,39 @@ def test_the_steps_and_checks_fit_their_column() -> None:
     assert drawing.STEPS_XY[1] < drawing.INNER_BORDER[3]
     assert drawing.STEPS_RIGHT + drawing._PAD <= drawing.FINISHED_FIELD[0]
     assert drawing.STEPS_RIGHT < drawing.TITLE_BLOCK[0]
+    titles = [title for title, _key in notes.STEP_GROUPS]
     assert (
         drawing.ASSEMBLY_STEPS + " " + drawing.ASSEMBLY_STEPS_CONTINUED
     ).split() == " ".join(
         (
             "ASSEMBLY SEQUENCE",
+            titles[0],
             *notes.ASSEMBLY_STEPS[: drawing.STEPS_SPLIT],
             drawing.CONTINUED_HEADING,
-            *notes.ASSEMBLY_STEPS[drawing.STEPS_SPLIT :],
+            titles[1],
+            *notes.ASSEMBLY_STEPS[drawing.STEPS_SPLIT : drawing._GROUP_STARTS[2]],
+            titles[2],
+            *notes.ASSEMBLY_STEPS[drawing._GROUP_STARTS[2] :],
         )
     ).split()
     assert drawing.ASSEMBLY_CHECKS.split() == " ".join(notes.ASSEMBLY_CHECKS).split()
-    printed = drawing.ASSEMBLY_STEPS + drawing.ASSEMBLY_STEPS_CONTINUED
-    for number in drawing.BOM_PART_NUMBERS.values():
-        if any(number in step for step in notes.ASSEMBLY_STEPS):
-            assert number in printed
 
 
-def test_one_blank_line_separates_consecutive_steps_only() -> None:
+def test_steps_stay_tight_and_a_blank_line_opens_each_later_group() -> None:
     numbered = 0
+    titles = [title for title, _key in notes.STEP_GROUPS]
     for block in (drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_STEPS_CONTINUED):
         rows = block.splitlines()
         starts = [i for i, row in enumerate(rows) if re.match(r"\d+\. ", row)]
         numbered += len(starts)
-        # The heading sits directly over the block's first step.
-        assert starts[0] == 1
+        # The heading, then the first group's title, sit directly over the
+        # block's first step.
+        assert rows[1].startswith(titles[0 if block is drawing.ASSEMBLY_STEPS else 1][:20])
+        assert starts[0] == 2
         blanks = [i for i, row in enumerate(rows) if not row.strip()]
-        # Exactly one blank row before every later step; continuation rows
-        # stay tight under their step.
-        assert blanks == [start - 1 for start in starts[1:]]
+        group_rows = [i for i, row in enumerate(rows) if any(row == t[: len(row)] and len(row) > 20 for t in titles)]
+        # One blank row before each later group's title; none between steps.
+        assert blanks == [row - 1 for row in group_rows[1:]]
     assert numbered == len(notes.ASSEMBLY_STEPS)
     # The unnumbered checks stay tight.
     assert "" not in drawing.ASSEMBLY_CHECKS.splitlines()
@@ -2055,9 +2214,10 @@ def test_whole_check_note_rewrap_clears_r22_aggregate_keepout(
     # A left shift for the existing layout pad would breach the left border.
     required_shift = native_extent[2] - drawing.TITLE_BLOCK[0] + drawing._PAD
     assert native_extent[0] - required_shift < drawing.INNER_BORDER[0]
-    # CenturyGothic 13.2286 pt, advances measured from R22 PDF char boxes.
-    # Predict the extent delta using the same native font, not source-copy
-    # wrapping code or a claim that the candidate has already rendered.
+    # CenturyGothic 13.2286 pt, advances measured from R22 PDF char boxes
+    # (its figures are tabular, so every digit takes "1"'s advance and ";"
+    # takes ":"'s). Predict the extent from the same native font, not
+    # source-copy wrapping code or a claim that the candidate has rendered.
     advances = {
         " ": 3.664551, "'": 2.619415, ",": 3.664536, ".": 3.664551,
         "1": 7.329041, ":": 3.664330, "A": 9.789703, "B": 7.593231,
@@ -2068,10 +2228,9 @@ def test_whole_check_note_rewrap_clears_r22_aggregate_keepout(
         "U": 8.665222, "V": 9.287003, "W": 12.700165, "X": 8.056381,
         "Y": 7.831787,
     }
-    old_rows = [
-        *drawing._wrapped(notes.ASSEMBLY_CHECKS[:-1], width=80).splitlines(),
-        *drawing._wrapped(notes.ASSEMBLY_CHECKS[-1:], width=72).splitlines(),
-    ]
+    advances.update({digit: advances["1"] for digit in "0123456789"})
+    advances[";"] = advances[":"]
+    advances["-"] = advances[","]
     adapter = object()
     calls = []
     monkeypatch.setattr(
@@ -2096,10 +2255,10 @@ def test_whole_check_note_rewrap_clears_r22_aggregate_keepout(
     printed_rows = note.GetText().splitlines()
     assert " ".join(printed_rows).split() == " ".join(notes.ASSEMBLY_CHECKS).split()
     assert printed_rows[0] == notes.ASSEMBLY_CHECKS[0]
-    # Keep all five CHECK rows. A changed wire step may move the check block
-    # only through the existing line-count formula.
-    assert len(printed_rows) == len(old_rows) == 5
-    assert [i for i, row in enumerate(printed_rows) if row.startswith("CHECK:")] == [0, 1, 3]
+    # Every CHECK row, and the loose-items row, starts its own line; the
+    # check block moves only through the existing line-count formula.
+    starts = [i for i, row in enumerate(printed_rows) if row.startswith(("CHECK:", "LOOSE ITEMS:"))]
+    assert len(starts) == len(notes.ASSEMBLY_CHECKS)
     assert drawing.CHECKS_XY == (
         drawing.STEPS_XY[0],
         drawing.STEPS_XY[1]
@@ -2107,19 +2266,20 @@ def test_whole_check_note_rewrap_clears_r22_aggregate_keepout(
         - 2 * drawing._PAD,
     )
     points_per_m = 72 / 0.0254
-    old_width = max(sum(advances[c] for c in row) for row in old_rows)
-    new_width = max(sum(advances[c] for c in row) for row in printed_rows)
-    vertical_shift = drawing.CHECKS_XY[1] - 0.0798  # R22 native insertion y
+    width = max(sum(advances[c] for c in row) for row in printed_rows) / points_per_m
+    # The native box starts where R22's did and is a millimetre wider than
+    # its widest row; it runs down one pitch per row.
     predicted_extent = (
-        native_extent[0], native_extent[1] + vertical_shift,
-        native_extent[2] + (new_width - old_width) / points_per_m,
-        native_extent[3] + vertical_shift,
+        native_extent[0],
+        drawing.CHECKS_XY[1] - len(printed_rows) * drawing.NOTE_LINE_PITCH,
+        native_extent[0] + width + 0.001,
+        drawing.CHECKS_XY[1],
     )
     drawing.require_inside(
         "assembly checks", predicted_extent, DrawableRegion(*drawing.INNER_BORDER)
     )
     assert boxes_clear(predicted_extent, drawing.TITLE_BLOCK, gap=drawing._PAD)
-    assert predicted_extent[2] + drawing._PAD < drawing.FINISHED_FIELD[0]
+    assert predicted_extent[2] + drawing._PAD < drawing.REST_INK_LEFT
 
 
 def test_the_exploded_ladders_keep_the_simplified_configuration() -> None:
@@ -2447,8 +2607,13 @@ def magnifier_bom(monkeypatch):
     expected_items = {}
     # Native row order need not match the package's balloon order. Keep the
     # configured wire expectation independent of the drawing's BOM_ROW_KEYS.
-    native_order = tuple(reversed(notes.BOM_ORDER))
-    for item, stem in enumerate(native_order, start=1):
+    # Rows run in item order, each with the item number the steps cite.
+    native_order = tuple(sorted(notes.BOM_ORDER, key=notes.ITEM_NUMBERS.__getitem__))
+    assert [notes.ITEM_NUMBERS[stem] for stem in native_order] == list(
+        range(1, len(native_order) + 1)
+    )
+    for stem in native_order:
+        item = notes.ITEM_NUMBERS[stem]
         is_wire = stem == "sh-vn-music-wire"
         row_key = "sh-vn-music-wire--LeverWire" if is_wire else stem
         expected_items[row_key] = str(item)
@@ -2547,6 +2712,17 @@ def test_bom_keeps_physical_quantity_and_refuses_rebuild_drift(
             drawing._validate_bom(adapter, table)
     assert rebuilds == ([] if fault == "number-property" else [True])
     assert table.cells[0].count(drawing.BOM_SKU_TITLE) == 1
+
+
+def test_bom_refuses_item_numbers_other_than_the_ones_the_steps_cite(magnifier_bom) -> None:
+    # Swap two physical rows: still contiguous, but item 1 is no longer the bar.
+    cells = magnifier_bom.table.cells
+    cells[1][1:], cells[2][1:] = cells[2][1:], cells[1][1:]
+    members = magnifier_bom.table.native_members
+    members[0], members[1] = members[1], members[0]
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
+    with pytest.raises(RuntimeError, match="moved from the ones its steps cite"):
+        drawing._validate_bom(adapter, magnifier_bom.table)
 
 
 @pytest.mark.parametrize(
@@ -3611,6 +3787,14 @@ def immutable_tip_build(
         return (drawing._thread_projection_detail(adapter, (), (), source_step),)
 
     monkeypatch.setattr(drawing, "_place_assembled_sheet", assembled)
+    state.wheel_rest = []
+
+    def wheel_rest(_adapter, source_step):
+        source_step("VIEW D placement, crop, angle and labels")
+        state.wheel_rest.append("placed")
+        return lambda: state.wheel_rest.append("settled")
+
+    monkeypatch.setattr(drawing, "_wheel_rest_view", wheel_rest)
     monkeypatch.setattr(
         drawing._telemetry, "event",
         lambda name, **fields: state.phases.append((name, fields)),
@@ -3684,6 +3868,7 @@ def test_build_keeps_source_immutable_through_tip_and_finalization(immutable_tip
     expected_sha = drawing._source_sha256(state.path)
     assert asyncio.run(drawing.build(state.native.adapter)) == {"drawing": "synthetic artifact"}
     assert state.saved and state.finalized
+    assert state.wheel_rest == ["placed", "settled"]
     assert state.native.display.parts == inherited
     assert drawing._source_sha256(state.path) == expected_sha
     assert not state.source.dirty
