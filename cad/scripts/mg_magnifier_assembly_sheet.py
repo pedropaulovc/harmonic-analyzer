@@ -13,7 +13,6 @@ from __future__ import annotations
 import math
 
 import mg_magnifier_assembly_steps as _steps
-import mg_wheel_axle_spec as _pin
 import sh_vn_clamp_screw_spec as _clamp_screw
 import mg_vn_magnifying_bracket_screw_spec as _bracket_screw
 from _inch_fraction import inch_fraction
@@ -67,16 +66,6 @@ if UNIT != "in":
     raise AssertionError("the endshake feeler check reads inch leaves")
 ENDSHAKE_GO_TEXT = render_number((ENDSHAKE - ENDSHAKE_TOL) / _INCH, UNIT, 3)
 ENDSHAKE_NO_GO_TEXT = render_number((ENDSHAKE + ENDSHAKE_TOL) / _INCH, UNIT, 3)
-
-# DETAIL A's lower acceptance limit as a number: the locknut is on full
-# thread while the thread end stands at least the dome's incomplete pitch past
-# it (mg_wheel_group.LOCKNUT_THREAD_MARGIN). Machinist review r3: the model
-# callout's words alone left step 5 nothing to read on the short side. The
-# high side, .114 MAX, prints on that callout.
-THREAD_PAST_LOCKNUT_MIN_TEXT = render_number(_pin.TIP_INCOMPLETE / _INCH, UNIT, 3)
-PRESS_DETAIL_ACCEPT_MIN = (
-    f"LOCKNUT ON FULL THREAD:\nTHREAD END {THREAD_PAST_LOCKNUT_MIN_TEXT} MIN PAST IT"
-)
 
 # The summing lever (cad/config/parts/sm-summing-lever.yaml), the mate the
 # bracket screws to at MHA-HA-00; rule 4 names it by its drawing number.
