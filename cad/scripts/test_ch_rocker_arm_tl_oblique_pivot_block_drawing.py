@@ -3,6 +3,8 @@ from __future__ import annotations
 import ast
 import math
 from pathlib import Path
+from types import SimpleNamespace
+import pytest
 import _config
 import ch_rocker_arm_tl_oblique_pivot_block_spec as spec
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
@@ -80,6 +82,12 @@ def test_outline_bands_keep_the_counterbore_walls_at_target():
     assert places['BlockLength']==places['BlockWidth']
     assert spec.CBORE_END_WALL_MIN>=WALL_TARGET_MM
     assert spec.CBORE_SIDE_WALL_MIN>=WALL_TARGET_MM
+    assert spec.BORE_X == spec.BORE_Y == trammel.PIN_OFFSET == 0.0
+    assert math.isclose(spec.BLOCK_LENGTH / INCH, 1.64)
+    assert math.isclose(spec.PLAN_BORE_X / INCH, .82)
+    assert spec.BLOCK_X0 == -spec.BLOCK_X1
+    assert min(spec.CBORE_NEAR_END_WALL_MIN, spec.BORE_CBORE_WEB_MIN,
+               spec.SHIM_CBORE_GAP_MIN, spec.BORE_END_WALL_MIN) >= WALL_TARGET_MM
 
 
 def test_native_builder_owns_real_solids_dimensions_and_final_volume():
@@ -92,6 +100,8 @@ def test_native_builder_owns_real_solids_dimensions_and_final_volume():
     assert 'TopBoreDepth' in literals
     assert 'SeatFillets' not in literals
     assert 'BottomBore' not in literals
+    assert "require_block_geometry(adapter, part)" in source
+    assert "geometry.parameters" in source and "dimension.SystemValue" in source
 
 
 def test_drawing_has_only_pivot_and_carriage_sections_under_enforcement():
@@ -120,3 +130,60 @@ def test_engagement_shortfall_is_the_declared_minor():
     assert (engagement['id'],engagement['kind'])==('RV-01','minor')
     assert spec.ENGAGEMENT_TEXT in engagement['where']
     assert 'Owner exception confirmed' in engagement['reason']
+
+
+@pytest.mark.parametrize("feed", (False, True))
+@pytest.mark.parametrize("fault", (None, "missing", "axis", "diameter", "dimension", "extra_body"))
+def test_native_block_readback_refuses_moved_or_missing_geometry(monkeypatch, feed, fault):
+    import _oblique_pivot_block_model as model
+    import _drawing_precision
+    import _gtol_face_read
+    from _gtol_face import SURFACE_CYLINDER
+    import ch_rocker_arm_tl_oblique_feed_block_spec as feed_spec
+
+    part = feed_spec if feed else spec
+    cylinders = []
+
+    def cylinder(axis, centre, diameter):
+        direction = [0.0, 0.0, 0.0]
+        direction[axis] = 1.0
+        cylinders.append(SimpleNamespace(
+            identity=SURFACE_CYLINDER,
+            parameters=tuple(v / 1000.0 for v in centre) + tuple(direction) + (diameter / 2000.0,),
+        ))
+
+    cylinder(2, (0.0, 0.0, 0.0), spec.BORE_DIA)
+    cylinder(2, (0.0, 0.0, 0.0), spec.PIVOT_TAP_DRILL)
+    for x, y in spec.BOLT_POINTS:
+        for diameter in (spec.HOLE_DIA, spec.CBORE_DIA):
+            cylinder(2, (x, y, 0.0), diameter)
+    if feed:
+        cylinder(0, (0.0, part.NUT_AXIS_Y, part.NUT_AXIS_Z), part.SCREW_CLEARANCE_DIA)
+        for y, z in part.NUT_HOLES_YZ:
+            cylinder(0, (0.0, y, z), part.NUT_TAP_DRILL)
+    if fault == "missing":
+        cylinders.pop(0)
+    if fault in ("axis", "diameter"):
+        values = list(cylinders[0].parameters)
+        values[0 if fault == "axis" else 6] += 0.001
+        cylinders[0].parameters = tuple(values)
+    body = SimpleNamespace(GetFaces=lambda: cylinders)
+    document = SimpleNamespace(GetBodies2=lambda kind, visible: [body] * (2 if fault == "extra_body" else 1))
+    adapter = SimpleNamespace(currentModel=document)
+    monkeypatch.setattr(model, "_early_bound", lambda obj, kind: obj)
+    monkeypatch.setattr(_gtol_face_read, "face_geometry", lambda face, **kwargs: face)
+
+    def dimensions(adapter, feature, names):
+        return {
+            name: (None, SimpleNamespace(
+                SystemValue=(part.DRAWING_VALUES[name] + (1.0 if fault == "dimension" else 0.0)) / 1000.0
+            ))
+            for name in names
+        }
+
+    monkeypatch.setattr(_drawing_precision, "_named_dimensions", dimensions)
+    if fault is None:
+        model.require_block_geometry(adapter, part)
+    else:
+        with pytest.raises(RuntimeError):
+            model.require_block_geometry(adapter, part)

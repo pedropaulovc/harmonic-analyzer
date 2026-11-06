@@ -2232,7 +2232,7 @@ def test_drawing_requires_every_control(monkeypatch, fault, target) -> None:
     """A reference-only, moved, banded or re-placed control is a regression."""
     monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
     assert draw.EXPECTED_CONTROLS["CutLength"] == (
-        pytest.approx(0.410),
+        pytest.approx(spec.LENGTH / 1000.0),
         pytest.approx(-0.0008),
         pytest.approx(0.0008),
     )
