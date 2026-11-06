@@ -374,9 +374,10 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "98381A542",
         material="Alloy Steel",
     ),
-    # MHA-CH-06-TL-VN-61: the oblique trammel jig's #8-32 X 3/4 SHCS (the
-    # fastener table's RAIL_TO_BAR row); shop fixture hardware, modelled so
-    # the jig assembly can mate it and run native interference.
+    # MHA-CH-06-TL-VN-61: the oblique trammel jig's common #8-32 X 3/4 SHCS
+    # (the fastener table's RAIL_TO_BAR and BRACKET_TO_BAR rows); shop fixture
+    # hardware, modelled so the jig assembly can mate it and run native
+    # interference.
     "ch-rocker-arm-tl-vn-oblique-rail-screw": _stock(
         "ch-rocker-arm-tl-vn-oblique-rail-screw",
         "Black-Oxide Alloy Steel Socket Head Screw",
@@ -384,7 +385,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         material="Alloy Steel",
     ),
     # MHA-CH-06-TL-VN-62: the oblique trammel jig's #8-32 X 5/8 SHCS (the
-    # fastener table's BRACKET_TO_BAR row); shop fixture hardware, modelled so
+    # fastener table's KP08_TO_BRACKET row); shop fixture hardware, modelled so
     # the jig assembly can mate it and run native interference.
     "ch-rocker-arm-tl-vn-oblique-bracket-screw": _stock(
         "ch-rocker-arm-tl-vn-oblique-bracket-screw",
@@ -399,15 +400,6 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "ch-rocker-arm-tl-vn-oblique-carriage-screw",
         "Black-Oxide Alloy Steel Socket Head Screw",
         "91290A168",
-        material="Alloy Steel",
-    ),
-    # MHA-CH-06-TL-VN-65: the oblique trammel jig's #6-32 X 5/8 BHCS (the
-    # fastener table's KP08_TO_BRACKET row); shop fixture hardware, modelled
-    # so the jig assembly can mate it and run native interference.
-    "ch-rocker-arm-tl-vn-oblique-kp08-screw": _stock(
-        "ch-rocker-arm-tl-vn-oblique-kp08-screw",
-        "Black-Oxide Button Head Hex-Drive Screw",
-        "91255A150",
         material="Alloy Steel",
     ),
     # MHA-CH-06-TL-VN-67: the oblique trammel jig's #4-40 X 5/8 flat heads (the

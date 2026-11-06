@@ -26,9 +26,11 @@ _JIG_VENDOR = "ch-rocker-arm-tl-vn-oblique"
 JIG_HUB_PIN_SEAT = (10.16, 11.938)
 JIG_CL_DOWEL_PRESS = (6.35, 11.938)  # (diameter, carrier thickness)
 JIG_RAIL_SCREW_THREAD = (4.1656, 3.454, 9.35)  # #8-32 into each base bar
-JIG_BRACKET_SCREW_THREAD = (4.1656, 3.454, 8.7376)  # #8-32 into a end bracket
+# The common #8-32 x 3/4 (rail screw family, occurrences 17-20) up through
+# Bar1 into an end bracket's bar-face thread: 19.05 less the 7.137 grip.
+JIG_BAR_SCREW_THREAD = (4.1656, 3.454, 11.913)
 JIG_CARRIAGE_SCREW_THREAD = (4.0, 3.242, 4.8006)  # M4 cut to fit .189 into each HGH15 carriage from the .570 floor
-JIG_PILLOW_BLOCK_SCREW_THREAD = (3.5052, 2.705, 10.875)  # #6-32 BHCS into an end bracket
+JIG_PILLOW_BLOCK_SCREW_THREAD = (4.1656, 3.454, 10.875)  # #8-32 x 5/8 SHCS past the 5.0 KP08 foot into an end bracket
 # The four #4-40 flat heads (riser screw family, occurrences 5-8) past the
 # TL-VN-84 kit FeedNut's 3.5 flange and their heads' 0.45 stand-proud into the lug.
 JIG_NUT_SCREW_THREAD = (2.8448, 2.261, 11.923595)
@@ -50,30 +52,30 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
     frozenset((f"{_JIG_VENDOR}-cl-dowel-1", f"{_JIG}-carrier-1")): (
         1.10 * math.pi * JIG_CL_DOWEL_PRESS[0] ** 2 * JIG_CL_DOWEL_PRESS[1] / 4.0
     ),
+    # Base bar members are role references (Bar1 under rail 1, Bar2 under 2).
     **numbered_pairs(
         f"{_JIG_VENDOR}-rail-screw",
         range(1, 9),
-        f"{_JIG}-base-bar",
+        "@Bar1:",
         smooth_annulus_limit_mm3(*JIG_RAIL_SCREW_THREAD),
     ),
     **numbered_pairs(
         f"{_JIG_VENDOR}-rail-screw",
         range(9, 17),
-        f"{_JIG}-base-bar",
+        "@Bar2:",
         smooth_annulus_limit_mm3(*JIG_RAIL_SCREW_THREAD),
-        second_number=2,
     ),
     **numbered_pairs(
-        f"{_JIG_VENDOR}-bracket-screw",
-        range(1, 5),
+        f"{_JIG_VENDOR}-rail-screw",
+        range(17, 19),
         f"{_JIG}-end-bracket",
-        smooth_annulus_limit_mm3(*JIG_BRACKET_SCREW_THREAD),
+        smooth_annulus_limit_mm3(*JIG_BAR_SCREW_THREAD),
     ),
     **numbered_pairs(
-        f"{_JIG_VENDOR}-bracket-screw",
-        range(5, 9),
+        f"{_JIG_VENDOR}-rail-screw",
+        range(19, 21),
         f"{_JIG}-end-bracket",
-        smooth_annulus_limit_mm3(*JIG_BRACKET_SCREW_THREAD),
+        smooth_annulus_limit_mm3(*JIG_BAR_SCREW_THREAD),
         second_number=2,
     ),
     **numbered_pairs(
@@ -90,13 +92,13 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
         second_number=2,
     ),
     **numbered_pairs(
-        f"{_JIG_VENDOR}-kp08-screw",
+        f"{_JIG_VENDOR}-bracket-screw",
         range(1, 3),
         f"{_JIG}-end-bracket",
         smooth_annulus_limit_mm3(*JIG_PILLOW_BLOCK_SCREW_THREAD),
     ),
     **numbered_pairs(
-        f"{_JIG_VENDOR}-kp08-screw",
+        f"{_JIG_VENDOR}-bracket-screw",
         range(3, 5),
         f"{_JIG}-end-bracket",
         smooth_annulus_limit_mm3(*JIG_PILLOW_BLOCK_SCREW_THREAD),
