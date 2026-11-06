@@ -19,7 +19,7 @@ quantity_cite = ["harmonic-analyzer/cad/config/parts/ch-rocker-arm-tl-oblique-ba
 
 [drawing]
 number = "MHA-CH-06-TL-20"
-revision = "v47"
+revision = "v48"
 cite = ["harmonic-analyzer/cad/config/parts/ch-rocker-arm-tl-oblique-base-bar.yaml:ch-rocker-arm-tl-oblique-base-bar.number", "harmonic-analyzer/cad/config/release.yaml:next_revision"]
 
 [dro]
