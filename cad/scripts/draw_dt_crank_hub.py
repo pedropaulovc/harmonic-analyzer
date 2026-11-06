@@ -203,11 +203,13 @@ SIDE_KEEP = {
     # at 0.113) (machinist review of the inch sheet: no chain through the
     # shoulder).
     "ServicePinStation": ((OUTBOARD_X + SERVICE_PIN_CENTER[0]) / 2.0, 0.104),
-    # The seam's depth from the faced outboard end, under the notch the seam
-    # cuts in the seat's bottom edge: between that edge and the seat length's
-    # dimension line, its right extension line shared with the seat length's.
-    # A reference: the seam callout carries the depth (rule 26).
-    "SeamDepth": ((OUTBOARD_X + SEAM_END_X) / 2.0, SEAT_BOTTOM - 0.007),
+    # The seam's depth from the faced outboard end, level with the notch the
+    # seam cuts in the seat's bottom edge.  A reference: the seam callout
+    # carries the depth (rule 26).  "(.17)" is wider than its 8.6-mm span and
+    # sat struck by both extension lines (round-2 review, 2 of 3 runs), so it
+    # prints right of the outboard end, the dimension line running out to it,
+    # short of the seat diameter's dimension line (OUTBOARD_X + 0.020).
+    "SeamDepth": (OUTBOARD_X + 0.010, SEAT_BOTTOM - 0.007),
     # The toleranced .990 filled the span between its extension lines and
     # sat on its own dimension line (machinist review of the inch sheet, r2):
     # it prints right of the outboard face instead, the dimension line
