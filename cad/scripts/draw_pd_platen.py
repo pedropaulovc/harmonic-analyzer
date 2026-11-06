@@ -7,7 +7,7 @@ prints decimal inch (the part's ``drawing_unit: in``) and runs at 1:2: the
 front view carries the outline, the bosses and every hole
 coordinate from the plate's bottom-left corner, an enlarged 1:1 right view the
 thickness on a native text shelf clear of its witnesses and the boss height,
-a 4:1 partial section A-A through one
+a 2:1 partial section A-A through one
 counterbore the user-accepted counterbore floor as a reference dimension with
 its worst case, and a 1:4 isometric the form.  The counterbores' far side is
 named in their callout.
@@ -32,6 +32,7 @@ from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name,
     place_view,
+    view_name,
     visible_component_entities,
 )
 
@@ -64,7 +65,7 @@ import _drawing_hidden_sketches
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leaders import dimension_segments
 from _drawing_notes import add_property_linked_note
-from _drawing_projection import model_point_in_view
+from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
@@ -132,11 +133,12 @@ ISO_NOTE_XY = (0.338, 0.168)
 RIGHT_NOTE_XY = (0.262, 0.100)
 # Section A-A: a partial cut down the top row's middle guide hole (x =
 # CBORE_SECTION_X, its cutting plane the part's CBORE_SECTION_PLANE) from
-# SECTION_SPAN below the hole's centre to as far above, at 2:1 (40 mm tall),
-# +Y up.  The span sets the cutting-plane line's length on the 1:2 front
-# view: at 4.5 (4.5 mm of line) its two arrows stood side by side and the
-# lower A's apex sat in the upper A's legs (machinist review round 2); at 10
-# the line runs 10 mm, each labelled end ~4 mm clear of the Ø.26 counterbore.
+# SECTION_SPAN below the hole's centre to as far above, at 2:1 (40 mm tall
+# uncropped), +Y up.  The span sets the cutting-plane line's length on the
+# 1:2 front view: at 4.5 (4.5 mm of line) its two arrows stood side by
+# side and the lower A's apex sat in the upper A's legs (machinist review
+# round 2); at 10 the line runs 10 mm, each labelled end ~4 mm clear of the
+# Ø.26 counterbore.
 # The cut stays symmetric about the hole: run from 14.7 below to 5.3 above
 # (to stop short of the clip-screw boss seen beyond), the section imported
 # no CboreFloorReference sketch (farm fail8, round 4).
@@ -146,11 +148,22 @@ RIGHT_NOTE_XY = (0.262, 0.100)
 # stands LEFT of the extension lines, its right end at SECTION_TEXT_RIGHT
 # (r5: centred on them, they ran down through all three of its rows); the
 # native caption's top centre stands above the cut.
+# Machinist review v47: the cut's ends printed as solid object lines and read
+# as the plate's own edges (it is 5.31 tall).  A Crop2 fence trims the cut to
+# SECTION_CROP_HALF either side of the hole with no outline
+# (draw_ch_rocker_arm_tl_oblique_carrier's _crop_section), short of the
+# clip-screw boss's fillet root seen beyond (the cut's upper end printed it),
+# and a thin long-break line with one Z stands on each trimmed end across the
+# thickness, past both faces by _SECTION_BREAK_OVERRUN (inside the fence's
+# margin).  The Z keeps 0.3 clear of the floor's extension line at the
+# counterbore floor (z = CBORE_DEPTH), where the lower break crosses it.
 SECTION_SCALE = (2, 1)
 _SECTION_S = SECTION_SCALE[0] / SECTION_SCALE[1] / 1000.0
 SECTION_SPAN = 10.0
+SECTION_CROP_HALF = 5.0
+_SECTION_FENCE_MARGIN = 1.0
 SECTION_CENTER = (0.390, 0.114)
-SECTION_CAPTION_XY = (0.385, 0.157)
+SECTION_CAPTION_XY = (0.385, 0.147)
 # The floor value's top row stands 14 mm of sheet under the cut's lower end.
 _SECTION_TEXT_DROP_M = 0.014
 # The value's widest row (".027 MIN WORST CASE", ~47 mm) ends 2.5
@@ -159,18 +172,43 @@ _SECTION_TEXT_HALF_WIDTH = 0.0245
 SECTION_TEXT_RIGHT = (
     SECTION_CENTER[0] + (CBORE_DEPTH - PLATE_THICKNESS / 2.0) * _SECTION_S - 0.0025
 )
-# Model mm, in the cutting plane: the cut's ends, its centre (the hole's axis
-# at mid-thickness) and the floor value's text, _SECTION_TEXT_DROP_M below
-# the cut and left of the floor (model +Z is sheet +X in the cut).
+# Model mm, in the cutting plane: the cut's ends, its crop fence's corners,
+# its break lines, its centre (the hole's axis at mid-thickness) and the
+# floor value's text, _SECTION_TEXT_DROP_M below the cropped end and left of
+# the floor (model +Z is sheet +X in the cut).
 SECTION_LINE_MODEL_MM = (
     (CBORE_SECTION_X, CBORE_SECTION_HOLE_Y - SECTION_SPAN, 0.0),
     (CBORE_SECTION_X, CBORE_SECTION_HOLE_Y + SECTION_SPAN, 0.0),
+)
+_SECTION_ENDS_Y = (
+    CBORE_SECTION_HOLE_Y - SECTION_CROP_HALF,
+    CBORE_SECTION_HOLE_Y + SECTION_CROP_HALF,
+)
+SECTION_CROP_MODEL_MM = (
+    (CBORE_SECTION_X, _SECTION_ENDS_Y[0], -_SECTION_FENCE_MARGIN),
+    (CBORE_SECTION_X, _SECTION_ENDS_Y[1], PLATE_THICKNESS + _SECTION_FENCE_MARGIN),
+)
+_SECTION_BREAK_OVERRUN = 0.6
+_SECTION_BREAK_MID = PLATE_THICKNESS / 2.0
+SECTION_BREAKS = tuple(
+    tuple(
+        (CBORE_SECTION_X, y + dy, z)
+        for dy, z in (
+            (0.0, -_SECTION_BREAK_OVERRUN),
+            (0.0, _SECTION_BREAK_MID - 0.7),
+            (0.6, _SECTION_BREAK_MID - 0.35),
+            (-0.6, _SECTION_BREAK_MID + 0.35),
+            (0.0, _SECTION_BREAK_MID + 0.7),
+            (0.0, PLATE_THICKNESS + _SECTION_BREAK_OVERRUN),
+        )
+    )
+    for y in _SECTION_ENDS_Y
 )
 _SECTION_ANCHOR_MM = (CBORE_SECTION_X, CBORE_SECTION_HOLE_Y, PLATE_THICKNESS / 2.0)
 SECTION_TEXT_MODEL_MM = {
     "CboreFloor": (
         CBORE_SECTION_X,
-        CBORE_SECTION_HOLE_Y - SECTION_SPAN - _SECTION_TEXT_DROP_M / _SECTION_S,
+        _SECTION_ENDS_Y[0] - _SECTION_TEXT_DROP_M / _SECTION_S,
         PLATE_THICKNESS / 2.0
         + (SECTION_TEXT_RIGHT - _SECTION_TEXT_HALF_WIDTH - SECTION_CENTER[0])
         / _SECTION_S,
@@ -471,13 +509,134 @@ def _centre_section(adapter: Any, section: Any) -> None:
     )
 
 
+def _view_sketch_points(
+    adapter: Any, native: Any, sheet_points: list[tuple[float, float]]
+) -> list[tuple[float, ...]]:
+    """Sheet points (metres) in the active view's own sketch frame, through
+    its ModelToSketchTransform (draw_ch_rocker_arm_tl_oblique_carrier)."""
+    sketch = _early_bound(native.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in sheet_points:
+        point = _early_bound(
+            math_utility.CreatePoint(double_array([float(x), float(y), 0.0])),
+            "IMathPoint",
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    return points
+
+
+def _crop_section(adapter: Any, section: Any) -> None:
+    """Crop section A-A to SECTION_CROP_MODEL_MM with no crop outline, so the
+    cut's trimmed ends print no object line (draw_ch_rocker_arm_tl_oblique_carrier
+    ``_crop_section``'s sequence: a rectangle sketched in the view's own sketch
+    round the projected fence corners, selected, then Crop2)."""
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    native = _early_bound(section, "IView")
+    rebuild_drawing(adapter, label="platen section A-A before crop")
+    sheet_corners = model_points_in_view(
+        adapter,
+        native,
+        [_metres(point) for point in SECTION_CROP_MODEL_MM],
+        label="section A-A crop corners",
+    )
+    if not ddoc.ActivateView(view_name(adapter, native)):
+        raise RuntimeError("failed to activate platen section A-A for its crop")
+    draw.ClearSelection2(True)
+    before = tuple(float(value) for value in native.GetOutline())
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    corners = _view_sketch_points(adapter, native, sheet_corners)
+    segments = tuple(
+        sketch_manager.CreateCornerRectangle(*corners[0], *corners[1]) or ()
+    )
+    if len(segments) != 4:
+        raise RuntimeError(f"section A-A crop fence has {len(segments)} segments")
+    for segment in segments:
+        if not _early_bound(segment, "ISketchSegment").Select4(True, None):
+            raise RuntimeError("failed to select the section A-A crop fence")
+    # Crop2(jagged, no outline, intensity) returns swCropViewErrors_e; 1 is
+    # NoError.
+    status = int(native.Crop2(False, True, 0))
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="platen section A-A crop")
+    native.UpdateViewDisplayGeometry()
+    outline = tuple(float(value) for value in native.GetOutline())
+    _telemetry.info(
+        f"section A-A Crop2 status {status}: outline {before!r} -> {outline!r}, "
+        f"fence corners {sheet_corners!r}"
+    )
+    # The outline carries a margin past the fence (carrier, fr_nameplate), so
+    # the proof is that it still holds the fence and lost height: the 20 mm
+    # of cut trimmed off its ends.
+    fence_x = sorted(float(x) for x, _ in sheet_corners)
+    fence_y = sorted(float(y) for _, y in sheet_corners)
+    contains = (
+        outline[0] <= fence_x[0]
+        and outline[2] >= fence_x[-1]
+        and outline[1] <= fence_y[0]
+        and outline[3] >= fence_y[-1]
+    )
+    if (
+        status != 1
+        or not bool(native.IsCropped())
+        or not contains
+        or outline[3] - outline[1] >= before[3] - before[1]
+    ):
+        raise RuntimeError(
+            f"section A-A did not crop to its fence: status {status}, "
+            f"outline {before!r} -> {outline!r}, fence corners {sheet_corners!r}"
+        )
+
+
+def _sketch_section_breaks(adapter: Any, section: Any) -> None:
+    """Draw SECTION_BREAKS into A-A's own sketch as thin lines
+    (draw_ch_rocker_arm_tl_oblique_carrier ``_sketch_section_breaks``).
+    AddToDB keeps sketch inference from snapping the short Z segments onto
+    the cut face's edges."""
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    native = _early_bound(section, "IView")
+    if not ddoc.ActivateView(view_name(adapter, native)):
+        raise RuntimeError("failed to activate platen section A-A for its breaks")
+    draw.ClearSelection2(True)
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(sketch_manager.AddToDB)
+    sketch_manager.AddToDB = True
+    try:
+        for end, polyline in enumerate(SECTION_BREAKS):
+            sheet_points = model_points_in_view(
+                adapter,
+                native,
+                [_metres(point) for point in polyline],
+                label=f"section A-A break line {end}",
+            )
+            points = _view_sketch_points(adapter, native, sheet_points)
+            for index in range(len(points) - 1):
+                if (
+                    sketch_manager.CreateLine(*points[index], *points[index + 1])
+                    is None
+                ):
+                    raise RuntimeError(
+                        f"section A-A break line {end} segment {index} failed"
+                    )
+    finally:
+        sketch_manager.AddToDB = previous_add_to_db
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="platen section A-A break lines")
+
+
 def _floor_section(adapter: Any, source_model: Any, front: Any) -> list[Any]:
     """Section A-A through one counterbore, carrying the floor reference.
 
     The floor's hidden owner sketch lies in the cutting plane; a derived view
     takes it from the part as it stands when cut and selects it through its
     base view, so the section is cut and curated while the part shows it
-    (draw_pn_pen_v_block's recipe).  A section shows no hidden lines.
+    (draw_pn_pen_v_block's recipe).  A section shows no hidden lines.  The
+    floor is imported before the crop (the carrier's order: cropped first, an
+    import there lost a dimension), and the trimmed ends get break lines.
     """
     line = [
         model_point_in_view(adapter, front, _metres(point), label="section A-A line")
@@ -517,6 +676,9 @@ def _floor_section(adapter: Any, source_model: Any, front: Any) -> list[Any]:
             view_label="section A-A",
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
+        _crop_section(adapter, section)
+        _centre_section(adapter, section)
+    _sketch_section_breaks(adapter, section)
     position_section_caption(
         adapter, section, SECTION_CAPTION_XY, label="platen section A-A"
     )
