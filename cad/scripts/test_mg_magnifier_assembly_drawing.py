@@ -572,6 +572,12 @@ def test_the_lettered_views_are_marked_on_the_right_side_view() -> None:
     assert drawing.LEVER_TIP.title == "VIEW C"
     assert drawing.WHEEL_REST.title == "VIEW D"
     assert drawing.VIEW_ARROWS[1].sheet_ref == "(SHEET 5)"
+    # Each arrow looks from the machine front (-z): its tip stands just in
+    # front of the ink it names, the lever's clamp and the axle's nuts.
+    lever_z = assembly.LEVER_ROD_Z
+    assert lever_z - drawing.CLAMP_HEX_AF < drawing.VIEW_ARROWS[0].tip_mm[2]
+    assert drawing.VIEW_ARROWS[0].tip_mm[2] < lever_z - drawing.CLAMP_HEX_AF / 2.0
+    assert drawing.VIEW_ARROWS[1].tip_mm[2] < stack.BAR_FRONT_Z - stack.HUB_FRONT_D
     for text in (
         drawing.LEVER_TIP.label_text,
         drawing.WHEEL_REST.label_text,
