@@ -64,12 +64,25 @@ def test_round_sleeve_supports_strap_after_self_cut_without_touching_cutter() ->
     assert sleeve.WALL_MIN >= 2.032
     assert riser.HUB_DIA > sleeve.OD + 0.127
     assert sleeve.SHANK_CLEARANCE_MIN > 0
-    assert min(holding.SLEEVE_GAPS_MIN.values()) > 0.15
+    # The required acceptance is non-contact, not the pre-table >.15 mm
+    # numerical snapshot. Keep the correlated pin contribution in the stack.
+    assert holding.SLEEVE_GAPS_MIN == pytest.approx({
+        "inner": 0.6566889747584723,
+        "outer": 0.05421491233350326,
+    })
+    assert min(holding.SLEEVE_GAPS_MIN.values()) > 0.0
     assert len(holding.SELF_CUT_REMOVED) == 6
     assert "ch-rocker-arm-tl-oblique-hub-sleeve" in holding.SELF_CUT_REMOVED
     assert "ch-rocker-arm-tl-oblique-hub-stud" in holding.SELF_CUT_REMOVED
     assert trammel.RISER_INNER_RADIUS - trammel.R_INNER == pytest.approx(2.38125)
     assert trammel.R_OUTER - trammel.RISER_OUTER_RADIUS == pytest.approx(2.38125)
+
+
+@pytest.mark.parametrize("gap", [0.0, -0.001])
+def test_clearance_guard_rejects_sleeve_contact_or_overlap(monkeypatch, gap) -> None:
+    monkeypatch.setattr(holding, "SLEEVE_GAPS_MIN", {"inner": 1.0, "outer": gap})
+    with pytest.raises(AssertionError, match="full round steel sleeve touches a cutter flank"):
+        holding.require_clearance()
 
 
 def test_left_clamp_keeps_cl_dowel_and_material_in_all_three_layers() -> None:
@@ -133,7 +146,10 @@ def test_flange_clears_obstacles_over_all_planar_poses() -> None:
             ))
     assert holding.CLAMP_TOP_Z["hub"] < holding.CLAMP_TOP_Z["CR"]
     assert holding.CLAMP_TOP_Z["left"] < holding.CLAMP_TOP_Z["CR"]
-    assert holding.CLAMP_TOP_Z["CR"] == pytest.approx(107.1464)
+    # Main clarification: 107.15 was an animation approximation, not a
+    # requirement. Main 1dfb96c1 already gives this nominal (not a max envelope):
+    # 81.213 underside + 11.938 carrier + 6.096 riser + 2.4892 strap + 6.35 head.
+    assert holding.CLAMP_TOP_Z["CR"] == pytest.approx(108.0862)
 
 
 def test_self_cut_uses_the_actual_removal_list_and_bigger_cutter() -> None:
