@@ -15,7 +15,10 @@ thread ``KP08_THREAD_DEPTH``), whose drill completes the through hole.
 The row's printed station (.250 from the -Y side face) lives on a hidden
 reference sketch, ``HoleRowReference`` (build_ch_rocker_arm_tl_oblique_base_bar's
 ``RailRowReference``); the stock thickness the end view prints lives on another,
-``BracketThickReference`` (a drawing view cannot attach the extrusion's depth).
+``BracketThickReference`` (a drawing view cannot attach the extrusion's depth);
+the bar-face thread's depth section A-A prints lives on a third,
+``BarThreadReference`` (two points on a hole's axis), which the build proves
+equals ``BarTaps``' own thread depth.
 
 Run (SolidWorks already open)::
 
@@ -30,7 +33,7 @@ import sys
 from _appearance import apply_material
 from _check import check
 from _com import _early_bound
-from _dimensions import drive_dimension, name_dimensions, set_global
+from _dimensions import drive_dimension, dump_dimensions, name_dimensions, set_global
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -53,6 +56,7 @@ from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
+    anchor_point_to_point,
     blank_sketch,
     dimension_between,
     ensure_fully_defined,
@@ -63,6 +67,9 @@ from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     BAR_TAP_DRILL_DEPTH,
     BAR_TAP_FACE,
     BAR_TAP_SPEC,
+    BAR_THREAD_DEPTH,
+    BAR_THREAD_DEPTH_DIMENSION,
+    BAR_THREAD_REFERENCE,
     BRACKET_LENGTH,
     BRACKET_THICK,
     BRACKET_WIDTH,
@@ -153,6 +160,50 @@ def _thread_from_face(
         raise RuntimeError(f"{label}: thread did not stop short: {readback!r}")
 
 
+def _add_point(adapter, point: tuple[float, float], label: str) -> str:
+    """One sketch point straight into the sketch DB (no inference snap),
+    registered for the adapter's dimension refs
+    (build_ch_rocker_arm_tl_oblique_carrier)."""
+    sketch_manager = _early_bound(adapter.currentSketchManager, "ISketchManager")
+    previous = bool(sketch_manager.AddToDB)
+    sketch_manager.AddToDB = True
+    try:
+        created = sketch_manager.CreatePoint(point[0] / 1000.0, point[1] / 1000.0, 0.0)
+    finally:
+        sketch_manager.AddToDB = previous
+    if created is None:
+        raise RuntimeError(f"cannot create the {label} point")
+    return adapter._register_sketch_entity("Point", created)
+
+
+def _require_bar_thread_reference(adapter) -> None:
+    """The depth section A-A prints is the bar-face wizard's own thread
+    depth: ``BarThreadReference``'s dimension and ``BarTaps``' committed
+    ``ThreadDepth`` both read ``BAR_THREAD_DEPTH``."""
+    sketch = [
+        row["value_mm"]
+        for row in dump_dimensions(adapter, BAR_THREAD_REFERENCE)
+        if row["full_name"].split("@")[:2]
+        == [BAR_THREAD_DEPTH_DIMENSION, BAR_THREAD_REFERENCE]
+    ]
+    raw = _early_bound(adapter.currentModel, "IPartDoc").FeatureByName("BarTaps")
+    if raw is None:
+        raise RuntimeError("bar thread reference: no feature 'BarTaps'")
+    definition = _early_bound(
+        _early_bound(raw, "IFeature").GetDefinition(), "IWizardHoleFeatureData2"
+    )
+    wizard = float(definition.ThreadDepth) * 1000.0
+    if (
+        len(sketch) != 1
+        or abs(sketch[0] - wizard) > 1e-4
+        or abs(wizard - BAR_THREAD_DEPTH) > 1e-4
+    ):
+        raise RuntimeError(
+            f"bar thread reference {sketch!r} mm disagrees with BarTaps' thread "
+            f"{wizard:.4f} mm or the spec's {BAR_THREAD_DEPTH:.4f} mm"
+        )
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -168,6 +219,7 @@ async def build(adapter) -> dict[str, str]:
         ("BracketThick", BRACKET_THICK),
         ("HoleX1", HOLE_X[0]),
         ("HoleX2", HOLE_X[1]),
+        ("BarThreadDepth", BAR_THREAD_DEPTH),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -319,6 +371,38 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch thickness reference", await adapter.exit_sketch())
     name_last_feature(adapter, "BracketThickReference")
     drive_jobs += thick.apply(adapter, "BracketThickReference")
+
+    # --- The bar-face thread's depth: a reference sketch ---------------------
+    # Section A-A cuts the hole row (y 0) and prints the bar-face thread's
+    # depth from the bottom face, which no wizard dimension carries into a
+    # view. Two points on the outer hole's axis, on the Top plane through the
+    # row, sketch (u, v) = model (X, -Z) (build_fr_nameplate's
+    # SectionReference): one on the bottom face at the hole's station, one
+    # BAR_THREAD_DEPTH above it. Points, not a line: a line on the axis would
+    # print across the cut hole. _require_bar_thread_reference proves the
+    # depth equals BarTaps' committed thread depth.
+    thread_ref = SketchDims()
+    check("create_sketch bar thread reference", await adapter.create_sketch("Top"))
+    hole_x = HOLE_X[-1]
+    face_point = _add_point(adapter, (hole_x, 0.0), "bar thread face")
+    await anchor_point_to_origin(
+        adapter, face_point, hole_x, 0.0, "bar thread face station"
+    )
+    thread_ref.record("BarThreadStation", f'"HoleX{len(HOLE_X)}"')
+    end_point = _add_point(adapter, (hole_x, -BAR_THREAD_DEPTH), "bar thread end")
+    await anchor_point_to_point(
+        adapter,
+        face_point,
+        end_point,
+        0.0,
+        -BAR_THREAD_DEPTH,
+        BAR_THREAD_DEPTH_DIMENSION,
+    )
+    thread_ref.record(BAR_THREAD_DEPTH_DIMENSION, '"BarThreadDepth"')
+    await ensure_fully_defined(adapter, "bar thread reference sketch")
+    check("exit_sketch bar thread reference", await adapter.exit_sketch())
+    name_last_feature(adapter, BAR_THREAD_REFERENCE)
+    drive_jobs += thread_ref.apply(adapter, BAR_THREAD_REFERENCE)
     _require_one_solid_body(adapter, label="end bracket")
 
     await force_rebuild(adapter)
@@ -329,6 +413,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven end bracket (equations neutral)", volume, _V_TOL
     )
     _require_one_solid_body(adapter, label="driven end bracket")
+    _require_bar_thread_reference(adapter)
 
     # Every model edit -- material, marked set, model-owned places -- precedes
     # the save. The row prints at three places, so the title block's ±.005
@@ -353,6 +438,7 @@ async def build(adapter) -> dict[str, str]:
     # that imports its dimension (_drawing_hidden_sketches).
     blank_sketch(adapter, "HoleRowReference")
     blank_sketch(adapter, "BracketThickReference")
+    blank_sketch(adapter, BAR_THREAD_REFERENCE)
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
