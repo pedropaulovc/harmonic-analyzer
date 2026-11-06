@@ -2,6 +2,9 @@
 
 #2151 owner Option B. The generated HUB coordinates remain untouched and are
 explicitly REF in the NOTE column; TL-00 step 10 alone owns their acceptance.
+
+Creation and settled readback have separate operation-level tracing spans;
+individual hole/row traversal stays inside those spans.
 """
 from __future__ import annotations
 
@@ -17,6 +20,7 @@ from _drawing_common import rebuild_drawing
 from _drawing_notes import add_note, add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_tables import insert_hole_table
+import _telemetry
 import ch_rocker_arm_tl_oblique_carrier_spec as spec
 
 TABLE_ANCHOR = (0.020, 0.175)
@@ -175,6 +179,7 @@ def _outer_row_source(model: Any) -> None:
             raise RuntimeError(f"carrier {name} does not own the flagged .964 ±.002 limits")
 
 
+@_telemetry.traced("drawing.carrier_hole_table.create")
 def create_carrier_hole_table(
     adapter: Any, view: Any, model: Any, source: Path,
 ) -> Callable[[], None]:
@@ -258,6 +263,7 @@ def create_carrier_hole_table(
         if len(native_tables) != 1 or int(adapter.swApp.IsSame(native_tables[0], table)) != 1:
             raise RuntimeError("carrier tagged view does not own exactly this one native table")
 
+    @_telemetry.traced("drawing.carrier_hole_table.settled")
     def settled() -> None:
         previous = str(_early_bound(drawing.GetCurrentSheet(), "ISheet").GetName())
         if not drawing.ActivateSheet(table_sheet):

@@ -1,6 +1,7 @@
 """#2151 carrier table and correlated pin-budget contracts (no COM seat)."""
 from __future__ import annotations
 
+import ast
 import inspect
 import itertools
 import math
@@ -192,3 +193,21 @@ def test_complete_view_tag_identity_refuses_every_inventory_failure(monkeypatch,
         annotations[0] = annotation("A1", edges["A1"], dangling=True)
     with pytest.raises(RuntimeError):
         table._tags(adapter, view, edges, place=False)
+
+
+def test_table_creation_and_settled_readback_have_operation_spans() -> None:
+    source = ast.parse(inspect.getsource(table))
+    traced = []
+    for function in ast.walk(source):
+        if not isinstance(function, ast.FunctionDef):
+            continue
+        for decorator in function.decorator_list:
+            if (
+                isinstance(decorator, ast.Call)
+                and ast.unparse(decorator.func) == "_telemetry.traced"
+            ):
+                traced.append((function.name, ast.literal_eval(decorator.args[0])))
+    assert sorted(traced) == [
+        ("create_carrier_hole_table", "drawing.carrier_hole_table.create"),
+        ("settled", "drawing.carrier_hole_table.settled"),
+    ]
