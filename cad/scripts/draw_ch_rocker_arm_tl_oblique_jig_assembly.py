@@ -268,7 +268,8 @@ def _instances(*stems: str) -> set[str]:
 # is modelled. Kept: the base bars, rails, carriages, both blocks, the pivot
 # shoulder screws with their spacers and shims, the leadscrew feed (nut, KP08
 # blocks, end brackets, handwheel) and the hold-downs, with every fastener of
-# theirs, including the common screw's 16 rail and 4 TL-28 bar occurrences.
+# theirs: 16 fixed common rail screws and all eight bracket-family screws
+# (four KP08 and four lower TL-28), while common occurrences 17/18/19 hide.
 if set(LINEAR_MOTION_HIDDEN) != {
     spec.instance_name(spec.CARRIER, 0),
     *spec.RISER_SCREW_INSTANCES,
@@ -843,10 +844,8 @@ BALLOON_ANCHORS[spec.PIVOT_SHIM] = BalloonAnchor(
 BALLOON_ANCHORS[spec.RISER] = BalloonAnchor(
     point_mm=(60.0, spec.riser.BLANK_WIDTH, spec.riser.THICKNESS)
 )
-# The top-hat washer's flange: its outer top rim (seat face at z 0).
-BALLOON_ANCHORS[spec.HUB_WASHER] = BalloonAnchor(
-    point_mm=(spec.hub_washer.OD / 2.0, 0.0, spec.hub_washer.THICK)
-)
+# The workholding washer walks its visible body. A frozen landing needs a
+# declared approach and a settled leader-clearance proof.
 BALLOON_ANCHORS[spec.FEED_LEVER] = BalloonAnchor(
     point_mm=(280.0, spec.feed_lever.LEVER_THICK, -spec.feed_lever.LEVER_WIDTH)
 )

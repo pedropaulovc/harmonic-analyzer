@@ -312,30 +312,38 @@ def test_clusters_partition_the_bom() -> None:
     assert spec.LOCKED_TO[spec.CARRIAGE_SCREW] == (
         ((spec.FEED_BLOCK, 0),) * 4 + ((spec.PIVOT_BLOCK, 0),) * 4
     )
-    # R4: the common #8 rail screw is one BOM row over three joints: the
-    # rails into their bars, the TL-28 brackets up into Bar1, then the
-    # strap's CL, CR and HUB clamps, context on the carrier sheet.
+    # R4 and A″: the common #8 screw holds the rails and CL/CR/HUB clamps;
+    # the upper KP08 and lower TL-28 screws share the separate 5/8 family.
     rail_family = tuple(
         spec.instance_name(spec.RAIL_SCREW, index)
         for index in range(spec.QUANTITIES[spec.RAIL_SCREW])
     )
     assert rail_family == (
         *spec.RAIL_SCREW_INSTANCES,
-        *spec.BAR_SCREW_INSTANCES,
         *spec.STRAP_CLAMP_SCREW_INSTANCES.values(),
     )
+    assert tuple(
+        spec.instance_name(spec.PILLOW_BLOCK_SCREW, index) for index in range(8)
+    ) == (*spec.KP08_SCREW_INSTANCES, *spec.BAR_SCREW_INSTANCES)
     carrier_cluster = next(c for c in drawing.CLUSTERS if c.sheet == "CARRIER EXPLODED")
     assert set(spec.STRAP_CLAMP_SCREW_INSTANCES.values()) <= set(carrier_cluster.context)
+    assert len(spec.RAIL_SCREW_INSTANCES) == len(spec.RAILS) * len(spec.guide_rail.HOLE_X)
+    assert len(spec.BAR_SCREW_INSTANCES) == len(spec.leadscrew.BASE_BAR_HOLES)
     # The feed nut's four flat heads are riser-screw instances (option B,
     # 2026-11-04): shown over the nut on the feed sheet, ballooned with the
-    # riser's four on the carrier sheet.
+    # riser's four on the carrier sheet. Both bracket screw joints are
+    # ballooned with their shared 5/8 family on the feed sheet.
     assert feed.context == (
-        spec.instance_name(spec.CARRIAGE, 0), *feed_screws, *spec.NUT_SCREW_INSTANCES,
+        spec.instance_name(spec.CARRIAGE, 0),
+        *feed_screws,
+        *spec.NUT_SCREW_INSTANCES,
     )
     # Both TL-28 joints are already visible through their shared 5/8 family;
     # the lower screws must not also be duplicated as context occurrences.
     assert spec.PILLOW_BLOCK_SCREW in feed.stems
     assert not set(spec.BAR_SCREW_INSTANCES) & set(feed.context)
+    assert spec.RAIL_SCREW not in feed.visible
+    assert not set(spec.RAIL_SCREW_INSTANCES) & feed.visible
     assert spec.CARRIAGE_SCREW not in feed.visible
     assert set(feed_screws) | set(spec.NUT_SCREW_INSTANCES) <= feed.visible
     assert spec.FEED_NUT in feed.stems and spec.RISER_SCREW not in feed.stems
@@ -2088,7 +2096,13 @@ def test_bom_refuses_items_numbered_off_the_steps(native_bom_bindings) -> None:
 
 def test_bom_refuses_a_wrong_quantity(native_bom_bindings) -> None:
     table = _Table(spec.BOM_ORDER)
-    table.cells[1][3] = "1"  # the base bar row grouped per configuration
+    # Each base-bar configuration is its own row, one off (Bar1, Bar2); the
+    # regression is both bars counted on Bar1's row.
+    row = int(spec.ITEM_NUMBERS[spec.BASE_BAR_1])
+    assert table.cells[row][3] == str(spec.QUANTITIES[spec.BASE_BAR_1]) == "1"
+    table.cells[row][3] = str(
+        spec.QUANTITIES[spec.BASE_BAR_1] + spec.QUANTITIES[spec.BASE_BAR_2]
+    )
     with pytest.raises(RuntimeError, match="quantity"):
         drawing._validate_bom(_ADAPTER, table)
 
@@ -2818,10 +2832,10 @@ def test_linear_motion_view_hides_only_the_carrier_and_its_load() -> None:
     assert hidden == {
         spec.instance_name(spec.CARRIER, 0),
         *spec.RISER_SCREW_INSTANCES,
+        *spec.STRAP_CLAMP_SCREW_INSTANCES.values(),
         *_family_instances(
-            spec.RISER, spec.HUB_STUD, spec.HUB_SLEEVE, spec.HUB_WASHER,
-            spec.HUB_SCREW, spec.LEFT_CLAMP_SCREW, spec.FEED_LEVER, spec.CL_DOWEL,
-            spec.CLAMP_SCREW, spec.LEVER_SCREW, spec.LEVER_LOCK_WASHER,
+            spec.RISER, spec.HUB_WASHER, spec.FEED_LEVER, spec.STOP_PIN,
+            spec.LEVER_SCREW, spec.LEVER_LOCK_WASHER,
         ),
     }
     assert all(
@@ -2836,12 +2850,25 @@ def test_linear_motion_view_hides_only_the_carrier_and_its_load() -> None:
     )
     # The riser-screw family splits: the feed nut's four stay on the lug.
     assert set(spec.NUT_SCREW_INSTANCES) <= shown
+    # Only common occurrences 17/18/19 ride the carrier; the 16 rail screws
+    # and all eight bracket-family screws remain visible.
+    common = _family_instances(spec.RAIL_SCREW)
+    assert common & hidden == {
+        spec.instance_name(spec.RAIL_SCREW, index) for index in range(16, 19)
+    }
+    assert common & shown == {
+        spec.instance_name(spec.RAIL_SCREW, index) for index in range(16)
+    }
+    bracket = _family_instances(spec.PILLOW_BLOCK_SCREW)
+    assert len(bracket) == 8
+    assert bracket <= shown
+    assert not bracket & hidden
     assert _family_instances(
         *spec.BASE_BARS, spec.RAIL, spec.CARRIAGE, spec.PIVOT_BLOCK,
         spec.FEED_BLOCK, spec.PIVOT_SCREW, spec.PIVOT_SPACER, spec.PIVOT_SHIM,
         spec.LEADSCREW, spec.FEED_NUT, spec.PILLOW_BLOCK, spec.END_BRACKET,
         spec.HANDWHEEL, spec.HOLD_DOWN_STUD, spec.T_NUT, spec.FLANGE_NUT,
-        spec.RAIL_SCREW, spec.CARRIAGE_SCREW, spec.PILLOW_BLOCK_SCREW,
+        spec.CARRIAGE_SCREW, spec.PILLOW_BLOCK_SCREW,
     ) <= shown
     # Drawing-only: no cluster, BOM or model inventory changes for it.
     assert sorted(stem for c in drawing.CLUSTERS for stem in c.stems) == sorted(spec.BOM_ORDER)
