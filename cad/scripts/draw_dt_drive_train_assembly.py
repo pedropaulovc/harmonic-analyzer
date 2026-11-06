@@ -287,9 +287,11 @@ BANK_SPRING_LABEL = (
 # Sheet 13's bank and drum views are removed views of parts alone, so each is
 # lettered with its scale and named by a viewing arrow on the sheet 1 FRONT
 # view (drawing-guidelines rule 9; rubric sample round 2).  Both look from
-# the FRONT view's LEFT (model +X, SolidWorks *Right); the arrows run at the
-# bank's upper half and at the arbor's axis, 8 mm apart at 1:3.  Detail A is
-# sheet 13's own letter; MHA-FR-05's print owns its VIEW B.
+# the FRONT view's LEFT (model +X, SolidWorks *Right): C runs high on the
+# bank, D just under the arbor axis, 42 mm apart in the model (14 mm at 1:3)
+# so the two letters clear the layout audit's 7.71 mm row pitch as separate
+# blocks (round 3 failed merged-blocks at 8 mm).  Detail A is sheet 13's own
+# letter; MHA-FR-05's print owns its VIEW B.
 BANK_VIEW_LETTER = "C"
 DRUM_VIEW_LETTER = "D"
 BANK_VIEW_CAPTION = f"VIEW {BANK_VIEW_LETTER} 1:1 - CYLINDER BANK ONLY (ARROW: SHEET 1)"
@@ -297,8 +299,8 @@ DRUM_VIEW_CAPTION = (
     f"VIEW {DRUM_VIEW_LETTER} 1:1 - ARBOR AND DRUM ONLY\nPARTIAL (ARROW: SHEET 1)"
 )
 SHEET1_VIEW_ARROWS = (
-    (BANK_VIEW_LETTER, bank_settings.AXIS_Y + 24.0),
-    (DRUM_VIEW_LETTER, drum_station_setting.AXIS_Y),
+    (BANK_VIEW_LETTER, bank_settings.AXIS_Y + 34.0),
+    (DRUM_VIEW_LETTER, drum_station_setting.AXIS_Y - 8.0),
 )
 VIEW_LETTER_HEIGHT = 0.005
 # The frame's inner left edge is at 12.4 mm; the FRONT view's outline starts
@@ -435,13 +437,17 @@ PROJECTED_GAP = 0.012
 PROJECTED_REGION = (0.018, 0.068, 0.300, 0.262)
 # The right half between the four-line heading (bottom ~0.245) and the title block
 # (top 0.0655): a 1:3 isometric outline is ~130 mm, 1.5x baseline-5's 1:4.
-ASSEMBLED_ISO_CENTER = (0.320, 0.155)
+# Lowered 16 mm (rubric sample round 3) to give the general notes the
+# LOCTITE 638 bond rules rule 23 asks for; its caption still clears the title
+# block by ~10 mm.
+ASSEMBLED_ISO_CENTER = (0.320, 0.139)
 VIEW_CAPTION_GAP = 0.004
 # The general notes sit between the heading and the isometric (see
 # general_notes_field). Main's last green build measured the isometric's outline
-# top at 0.2117; only the offline budget reads this, the placement reads the
-# placed view. The notes clear the view as a caption does.
-ASSEMBLED_ISO_TOP = 0.2117
+# top at 0.2117 with the centre at 0.155; only the offline budget reads this,
+# the placement reads the placed view. The notes clear the view as a caption
+# does.
+ASSEMBLED_ISO_TOP = 0.2117 - 0.016
 GENERAL_NOTES_ISO_GAP = VIEW_CAPTION_GAP
 
 # --- sheet 2: two BOM pieces + reference isometric below the first ------------
@@ -1642,6 +1648,14 @@ CONSUMABLES_NOTES = _note_text(
         "OIL ALL RUNNING JOURNALS AND PIVOTS WITH ISO VG 32",
         "MACHINE OIL. NO THREADLOCKER ON ANY THREAD. RUN EVERY SCREW IN SNUG",
         "UNLESS ITS STEP GIVES ANOTHER SETTING.",
+        # Rule 23 (rubric d9f8b0c): one package note may carry the bond's
+        # degrease, apply and cure rules; the bonds are part-spec steps.
+        f"LOCTITE 638 BONDS (STEPS {steps.step_number('drum-bonded')}-"
+        f"{steps.step_number('cam-pins-bonded')}): DEGREASE BOTH PARTS; COAT THE "
+        "INSERTED PART, NEVER A BLIND SEAT; KEEP IT OFF RUNNING LANDS; SET STEP "
+        f"{steps.step_number('drum-bonded')}'S DRUM STATION WITHIN 3 MIN; CURE 24 H "
+        "BEFORE LOADING OR OILING. ACCEPT: THE BONDED PART DOES NOT TURN OR SLIDE "
+        "BY HAND.",
     )
 )
 
