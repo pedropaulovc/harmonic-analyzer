@@ -231,7 +231,8 @@ HUB_CLAMP = Fastener(
     hub_washer.THICK + trammel.STRAP_THICK - hub_stud.TIP_SET,
     hub_stud.TAP_FULL_DEPTH,
 )
-LEFT_CLAMP_INSERTION = (8.65, 8.85)
+LEFT_CLAMP_INSERTION = (8.40, 8.62)
+LEFT_CLAMP_TIP_CHAMFER = (0.762, 0.889)  # AXIAL length, .030–.035 at the restored 45° tip
 LEFT_CLAMP_CUT_LENGTH = (
     trammel.RISER_THICK + trammel.STRAP_THICK + sum(LEFT_CLAMP_INSERTION) / 2.0
 )
@@ -245,7 +246,7 @@ LEFT_CLAMP = Fastener(
     carrier.LEFT_CLAMP_THREAD_DEPTH,
     tip_clearance_mm=carrier.LEFT_CLAMP_DRILL_DEPTH - carrier.LEFT_CLAMP_THREAD_DEPTH,
     cut_length_mm=LEFT_CLAMP_CUT_LENGTH,
-    note="cut to actual grip plus 8.65–8.85; restore tip to at most one incomplete pitch",
+    note="cut to actual grip plus 8.40–8.62; chamfer the cut tip 45° x .030–.035 AXIAL (0.76–0.89)",
 )
 LEVER_TO_CARRIER = Fastener(
     "TL-26 feed lever to TL-21 carrier",

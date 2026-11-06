@@ -41,7 +41,7 @@ def test_catalogue_row_is_the_registered_mcmaster_screw() -> None:
     assert metadata.threaded is True
 
 
-def test_production_build_is_the_cut_screw(monkeypatch) -> None:
+def test_production_build_is_the_cut_screw_with_its_native_chamfer(monkeypatch) -> None:
     seen: dict = {}
 
     async def stock_fastener(adapter, **kwargs):
@@ -52,9 +52,51 @@ def test_production_build_is_the_cut_screw(monkeypatch) -> None:
     asyncio.run(part.build(None))
     (component,) = seen["components"]
     assert component.sku == spec.SKU
-    assert component.author is recipe.build_92220A165
+    # The author re-cuts the tip after the recipe; wraps keeps the recipe's
+    # declaration, so the stock row still resolves to 92220A165's recipe.
+    assert component.author is not recipe.build_92220A165
+    assert component.author.__wrapped__ is recipe.build_92220A165
+    assert recipe_declaration(spec.SKU, component.author).module == recipe.__name__
     assert component.parameters == {"cut_length": spec.CUT_LENGTH}
     assert seen["screw_axis_planes"] == ("Front Plane", "Right Plane")
+
+
+def test_cut_end_chamfer_is_a_native_toleranced_control() -> None:
+    low, high = spec.TIP_CHAMFER
+    # Modelled at the band's maximum, banded down to its minimum.
+    assert spec.TIP_CHAMFER_LENGTH == high
+    assert spec.TIP_CHAMFER_BAND == (0.0, low - high)
+    assert (high, low) == pytest.approx((0.035 * IN, 0.030 * IN))
+    # It contains the recipe's 0.75P chamfer, so the native control is the tip.
+    assert dims.DIMS.tip_chamfer == pytest.approx(0.75 * dims.DIMS.pitch)
+    assert dims.DIMS.tip_chamfer <= spec.TIP_CHAMFER_LENGTH
+    assert spec.TIP_CHAMFER_ANGLE == 45.0
+    assert spec.DRAWING_DIMENSIONS == {
+        "TipChamferProfile": {"ChamferLength", "ChamferAngle"}
+    }
+    assert spec.DIMENSION_TOLERANCE_TYPES == {"ChamferLength": 2, "ChamferAngle": 11}
+    assert spec.DIMENSION_PRECISION == {"ChamferLength": 3, "ChamferAngle": 0}
+    callout = spec.DIMENSION_CALLOUTS["ChamferLength"]
+    assert spec.CARRIER_NUMBER in callout and "1.5D" in callout
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "*deviations(TIP_CHAMFER_BAND)" in source
+    assert "mark_dimensions_for_drawing(adapter, feature, names)" in source
+    assert "tolerance.Type = 11" in source
+    assert "angle.DrivenState = 2" in source
+
+
+def test_sheet_prints_and_rereads_the_cut_end_controls() -> None:
+    import draw_ch_rocker_arm_tl_vn_oblique_left_clamp_screw as drawing
+
+    assert set(drawing.EXPECTED_CONTROLS) == set(spec.DIMENSION_TOLERANCE_TYPES)
+    nominal, lower, upper = drawing.EXPECTED_CONTROLS["ChamferLength"]
+    assert nominal * 1000 == pytest.approx(spec.TIP_CHAMFER[1])
+    assert (nominal + lower) * 1000 == pytest.approx(spec.TIP_CHAMFER[0])
+    assert upper == 0.0
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "dimensions_by_feature=supplier.DRAWING_DIMENSIONS" in source
+    assert "_verify_cut_end_controls(adapter, controls)" in source
+    assert drawing.SUPPLIER_MARGINS["*Front"][1] >= drawing._CUT_END_TEXT_ROOM
 
 
 def test_recipe_refuses_a_cut_outside_the_bought_screw() -> None:
@@ -90,12 +132,43 @@ def test_recipe_is_the_catalogue_low_head_screw() -> None:
 
 def test_cut_screw_engages_the_blind_tap_and_clears_its_floor() -> None:
     low, high = spec.CUT_INSERTION
+    chamfer_low, chamfer_high = spec.TIP_CHAMFER
     assert 0.0 < low < high
+    assert 0.0 < chamfer_low < chamfer_high
     assert 0.0 < spec.CUT_LENGTH < dims.DIMS.length
     assert spec.CUT_LENGTH == spec.ROW.cut_length_mm
+    # Engagement at the LONGEST chamfer and shallowest reach (rule 18: only
+    # full-form thread counts).
+    assert spec.ENGAGEMENT_MIN == pytest.approx(
+        min(low - chamfer_high - carrier.TAP_MOUTH_BREAK, carrier.LEFT_CLAMP_FULL_THREAD_MIN)
+    )
     assert spec.ENGAGEMENT_MIN >= 1.5 * dims.DIMS.major_dia
-    assert high - dims.DIMS.pitch <= carrier.LEFT_CLAMP_THREAD_DEPTH
+    # Runout at the SHORTEST chamfer and deepest reach: the external full form
+    # never passes the receiver's guaranteed full thread (codjiflo PR #2228).
+    assert spec.FULL_THREAD_END_MAX == pytest.approx(high - chamfer_low)
+    assert spec.FULL_THREAD_END_MAX <= carrier.LEFT_CLAMP_THREAD_DEPTH
+    # Mutation witness: the old proof passed an 8.85 reach that, at the
+    # recipe's real 0.75P chamfer, ran 8.056 deep.
+    assert 8.85 - dims.DIMS.tip_chamfer > carrier.LEFT_CLAMP_THREAD_DEPTH
+    # Past both full forms the screw's crest falls faster than the tap lead's
+    # root, so the truncated crest never meets the incomplete internal thread.
+    assert spec.LEAD_ROOT_SLOPE_MAX == pytest.approx(
+        (dims.DIMS.major_dia - carrier.LEFT_CLAMP_TAP_DRILL) / 2.0 / dims.DIMS.pitch
+    )
+    assert spec.LEAD_ROOT_SLOPE_MAX < spec.CHAMFER_RADIAL_SLOPE_MIN
+    assert spec.MODEL_FULL_THREAD_END == pytest.approx(
+        spec.CUT_LENGTH - spec.ROW.grip_mm - spec.TIP_CHAMFER_LENGTH
+    )
+    assert (
+        spec.SCREW_FULL_THREAD_MIN + carrier.TAP_MOUTH_BREAK
+        <= spec.MODEL_FULL_THREAD_END
+        <= spec.FULL_THREAD_END_MAX
+    )
     assert high < spec.PILOT_DEPTH_MIN
+    assert dims.DIMS.neck_h < spec.ROW.grip_mm
+    # No "one pitch" ceiling stands in for the proof above.
+    spec_source = Path(spec.__file__).read_text(encoding="utf-8")
+    assert "under one incomplete pitch" not in spec_source
 
 
 def test_cut_length_is_a_reference_beside_the_stock_witness() -> None:

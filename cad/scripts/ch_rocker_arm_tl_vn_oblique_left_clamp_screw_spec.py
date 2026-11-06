@@ -12,12 +12,21 @@ steps cite it by item and callout (``fasteners.callout``).
 
 Cut to fit: the carrier's receiver is blind (owner requirement), so each
 screw is cut at assembly to the actual riser-plus-strap grip plus the
-``fasteners.LEFT_CLAMP_INSERTION`` reach below the carrier top, its tip
-restored to at most one incomplete pitch.  The part is modelled as
-installed, ``CUT_LENGTH`` under the head at the nominal grip
-(``build_92220A165(cut_length=...)``).  The sheet prints that length as a
-reference, cut to fit, and the as-supplied 3/4 in as a separate stock
-witness beside the solid (the TL-VN-64 idiom).
+``fasteners.LEFT_CLAMP_INSERTION`` reach below the carrier top, and its cut
+tip is chamfered 45 deg, ``fasteners.LEFT_CLAMP_TIP_CHAMFER`` long along the
+axis.  Both are controlled because the receiver's full thread is guaranteed
+only to its .310 MIN: the screw's full-form thread ends where the chamfer
+starts, so the deepest insertion with the SHORTEST chamfer bounds the runout
+and the shallowest insertion with the LONGEST chamfer bounds the engagement.
+
+The chamfer is a model-owned manufacturing control, not catalogue data: the
+builder cuts it natively (``TipChamferProfile``: a driving axial
+``ChamferLength`` at the band's .035 maximum with its -.005 band, and a
+driving 45 deg ``ChamferAngle`` on the title block's angular row), and the
+sheet imports both associatively.  The cut length stays a fit-up reference
+(rule 19): the solid is the screw as installed at the nominal grip and the
+insertion window's middle, ``CUT_LENGTH`` under the head; the as-supplied
+3/4 in is a separate stock witness beside the solid (the TL-VN-64 idiom).
 
 Sources:
 
@@ -44,10 +53,17 @@ head's seat, the strap's top face.
 
 from __future__ import annotations
 
+import math
+
+import _config
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
 from _mcmaster_92220a165 import DIMS, LENGTH_TEXT, PART_NO, THREAD
-from _printed_tolerance import printed_band_mm
+from _package_units import drawing_unit
+from _printed_tolerance import angular_band_deg, printed_band_mm
+
+STEM = "ch-rocker-arm-tl-vn-oblique-left-clamp-screw"
+UNIT = drawing_unit(f"parts/{STEM}", _config.parts(STEM))
 
 SKU = PART_NO
 ROW = fasteners.LEFT_CLAMP
@@ -68,23 +84,103 @@ CUT_INSERTION = fasteners.LEFT_CLAMP_INSERTION  # tip reach below TL-21's top
 if not 0.0 < CUT_LENGTH < DIMS.length:
     raise AssertionError(f"{SKU}: a {CUT_LENGTH} mm cut is not inside the bought screw")
 
-# --- Rule 18 and the blind receiver -------------------------------------------
-# The restored tip leaves at most one incomplete pitch; the tap's mouth takes
-# the title block's edge break.  Its full thread ends above the receiver's
-# guaranteed full thread, and the tip stops short of the flat pilot floor.
-TIP_INCOMPLETE_LENGTH = DIMS.pitch
-SCREW_FULL_THREAD_MIN = CUT_INSERTION[0] - TIP_INCOMPLETE_LENGTH - carrier.TAP_MOUTH_BREAK
+# --- The restored tip: model-owned controls ------------------------------------
+# The recipe (diag_mcmaster_socket_head) builds the screw at CUT_LENGTH with
+# its own 0.75P 45 deg tip chamfer; the builder's native TipChamfer cut then
+# re-cuts the tip to ChamferLength, which must contain the recipe's chamfer so
+# the native dimension, not the recipe, defines the finished tip.
+TIP_CHAMFER = fasteners.LEFT_CLAMP_TIP_CHAMFER  # (min, max) axial length
+TIP_CHAMFER_LENGTH = TIP_CHAMFER[1]  # the modelled nominal: the band's .035 max
+TIP_CHAMFER_BAND = (0.0, TIP_CHAMFER[0] - TIP_CHAMFER[1])  # upper, lower: .030-.035
+TIP_CHAMFER_ANGLE = 45.0  # driving, between the cut end face and the chamfer
+TIP_CHAMFER_ANGLE_TOLERANCE = angular_band_deg(unit=UNIT)  # title-block row
+TIP_CHAMFER_FEATURE = "TipChamferProfile"
+if not DIMS.tip_chamfer <= TIP_CHAMFER_LENGTH:
+    raise AssertionError(f"{SKU}: the native tip chamfer must contain the recipe's")
+# The chamfer's radial leg at the steepest permitted angle still leaves a flat
+# cut end, and at the shallowest it passes under the tap drill (so the crest
+# is gone well before the chamfer's end).
+_ANGLE_MIN = math.radians(TIP_CHAMFER_ANGLE - TIP_CHAMFER_ANGLE_TOLERANCE)
+_ANGLE_MAX = math.radians(TIP_CHAMFER_ANGLE + TIP_CHAMFER_ANGLE_TOLERANCE)
+if not TIP_CHAMFER[1] / math.tan(_ANGLE_MIN) < DIMS.major_dia / 2.0:
+    raise AssertionError(f"{SKU}: the tip chamfer consumes the whole cut end")
+if not DIMS.major_dia / 2.0 - TIP_CHAMFER[0] / math.tan(_ANGLE_MAX) < (
+    carrier.LEFT_CLAMP_TAP_DRILL / 2.0
+):
+    raise AssertionError(f"{SKU}: the tip chamfer does not pass under the tap drill")
+
+# --- Rule 18 and the blind receiver: full-form thread, from the geometry -------
+# External: the recipe sweeps one uniform groove from the tip up to the neck,
+# so above the chamfer every crest stands at the major (full form) and inside
+# it each crest is truncated to the 45 deg cone.  The full-form thread
+# therefore ends exactly ChamferLength above the cut end.  Under the head the
+# 45 deg neck cone (``DIMS.neck_h``) is the run-up; it lies inside the grip.
+# Internal: full form is guaranteed from TL-21's top to
+# LEFT_CLAMP_THREAD_DEPTH (.310 MIN), less the mouth's TAP_MOUTH_BREAK; past
+# it the bottoming tap's chamfered lead (STANDARD, ASME B94.9: a bottoming
+# chamfer spans 1 to 2 threads; the carrier reserves at least one pitch for
+# it) cuts an incomplete thread whose root falls from the major to the tap
+# drill no faster than over one pitch.
+# No interference past the internal full form: where the screw's full form
+# ends at or above the internal's, the screw crest falls from the major at the
+# chamfer's radial slope (at least 1/tan(45 deg + band)) while the internal
+# root falls at the lead's (at most (major - drill) / 2 per pitch), so the
+# crest stays inside the incomplete root all the way to the floor.  Nothing
+# here waives incomplete thread: engagement counts only the full form above.
+CHAMFER_RADIAL_SLOPE_MIN = 1.0 / math.tan(_ANGLE_MAX)
+LEAD_ROOT_SLOPE_MAX = (DIMS.major_dia - carrier.LEFT_CLAMP_TAP_DRILL) / 2.0 / DIMS.pitch
+if not LEAD_ROOT_SLOPE_MAX < CHAMFER_RADIAL_SLOPE_MIN:
+    raise AssertionError(f"{SKU}: the tip chamfer is shallower than the tap's lead")
+# Runout: the deepest insertion with the shortest chamfer.
+FULL_THREAD_END_MAX = CUT_INSERTION[1] - TIP_CHAMFER[0]
+if FULL_THREAD_END_MAX > carrier.LEFT_CLAMP_THREAD_DEPTH:
+    raise AssertionError(f"{SKU}: the screw's full thread runs past TL-21's full thread")
+# Engagement: the shallowest insertion with the longest chamfer, less the
+# mouth break; the neck cone lies inside the grip, clear of the receiver.
+SCREW_FULL_THREAD_MIN = CUT_INSERTION[0] - TIP_CHAMFER[1] - carrier.TAP_MOUTH_BREAK
 ENGAGEMENT_MIN = min(SCREW_FULL_THREAD_MIN, carrier.LEFT_CLAMP_FULL_THREAD_MIN)
 if ENGAGEMENT_MIN < ROW.min_engagement_d * DIMS.major_dia:
     raise AssertionError(
         f"{SKU}: {ENGAGEMENT_MIN:.3f} full thread in TL-21, under rule 18's 1.5D"
     )
-if CUT_INSERTION[1] - TIP_INCOMPLETE_LENGTH > carrier.LEFT_CLAMP_THREAD_DEPTH:
-    raise AssertionError(f"{SKU}: the screw's full thread runs past TL-21's full thread")
+if DIMS.neck_h >= ROW.grip_mm:
+    raise AssertionError(f"{SKU}: the thread run-up under the head reaches TL-21")
+# The model's own full thread (nominal grip, window middle, native chamfer).
+MODEL_FULL_THREAD_END = CUT_LENGTH - ROW.grip_mm - TIP_CHAMFER_LENGTH
+_MODEL_FULL_THREAD_MIN = SCREW_FULL_THREAD_MIN + carrier.TAP_MOUTH_BREAK
+if not _MODEL_FULL_THREAD_MIN <= MODEL_FULL_THREAD_END <= FULL_THREAD_END_MAX:
+    raise AssertionError(f"{SKU}: the installed model's thread end is outside the bounds")
 # The pilot's depth carries the .XX band; the tip stays above its shallowest.
 PILOT_DEPTH_MIN = carrier.LEFT_CLAMP_DRILL_DEPTH - printed_band_mm(2, unit=carrier.UNIT)
 if not CUT_INSERTION[1] < PILOT_DEPTH_MIN:
     raise AssertionError(f"{SKU}: the cut tip reaches TL-21's flat pilot floor")
+
+# --- The cut end's native manufacturing controls (sheet 1, *Front) -------------
+# Marked, toleranced and printed from the part: ChamferLength's bilateral
+# -.005/0 at .035 (swTolBILAT) and the driving 45 deg on the title block's
+# angular row (swTolGeneral keeps the band natively, prints none).
+DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    TIP_CHAMFER_FEATURE: {"ChamferLength", "ChamferAngle"},
+}
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    TIP_CHAMFER_FEATURE: {"ChamferLength": 3, "ChamferAngle": 0},
+}
+DIMENSION_PRECISION: dict[str, int] = DRAWING_PRECISION[TIP_CHAMFER_FEATURE]
+DIMENSION_TOLERANCE_TYPES: dict[str, int] = {
+    "ChamferLength": 2,  # swTolBILAT
+    "ChamferAngle": 11,  # swTolGeneral
+}
+CARRIER_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-carrier")["number"]
+# Rule 4 and rule 12: the band names its mate and both of its reasons, in
+# rows no wider than the stock length's qualifier.
+DIMENSION_CALLOUTS: dict[str, str] = {
+    "ChamferLength": (
+        "AXIAL CUT-END CHAMFER\n"
+        "MIN: FULL THREAD ENDS\n"
+        f"IN {CARRIER_NUMBER} TAP\n"
+        "MAX: 1.5D FULL THREAD"
+    ),
+}
 
 # Exact-current product table and engineering drawing read 2026-11-06.
 # Hidden nominal source references, not physical-edge/replica assertions.

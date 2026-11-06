@@ -31,8 +31,7 @@ Sources:
 Model diameter: nominal Ø.250, the vendor's.  The carrier models CL as its
 Ø.12 x 90 deg centre-drill spot only (finished in place, like HUB), so the
 assembly's press-fit allowance for this pair is the dowel's own volume in the
-plate, as the jig interference table's ``JIG_HUB_STUD_SEAT`` bounds the HUB stud:
-``PRESS_ALLOWANCE_MM3`` below (1.10 x a Ø.250 x .47 carrier cylinder), which
+plate: ``PRESS_ALLOWANCE_MM3`` below (1.10 x a Ø.250 x .47 carrier cylinder), which
 the modelled overlap (only pin metal inside the carrier, less its centre spot)
 stays under.
 
