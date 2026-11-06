@@ -1787,10 +1787,8 @@ def test_kp08_row_and_stud_cut_timing_read_plainly() -> None:
     and step 2 says when the stud stock is cut."""
     assert spec.BOM_DESCRIPTIONS[spec.PILLOW_BLOCK] == "KP08 PILLOW BLOCK, 8 MM BORE"
     step = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("2. "))
-    assert (
-        "THE STUDS STAY UNCUT UNTIL STEP 13B; THERE HD3 CUTS EACH TO ITS BOM "
-        "LENGTH, 2.25." in step
-    )
+    assert "KEEP STUDS UNCUT UNTIL 13B/HD3; CUT TO BOM LENGTH 2.25 THERE." in step
+    assert "FOLLOW HD1 FOR UNCUT-STOCK OBSTRUCTIONS" in step
     assert spec.BOM_DESCRIPTIONS[spec.HOLD_DOWN_STUD].endswith("CUT 2.25 IN")
 
 
@@ -2099,8 +2097,8 @@ def test_kit_rails_and_carriages_carry_the_owner_note_and_the_play_check() -> No
     # The printed check reads the trammel's budgeted play: lateral play moves
     # the cut radius 1:1 and stays inside the shoulder term's band.
     check = next(text for text in spec.ASSEMBLY_CHECKS if "TIR" in text)
-    assert check.endswith(f"ACCEPT {tir}.")
-    assert "SHOULDER-SCREW HEAD" in check and "SIDEWAYS TO THE RAIL" in check
+    assert check.endswith(f"HAND: {tir}.")
+    assert "SHOULDER-SCREW HEAD" in check and "SIDEWAYS TO RAIL" in check
     assert trammel.CARRIAGE_PLAY_RADIUS == pytest.approx(
         trammel.CARRIAGE_PLAY_RADIUS_PER_PLAY * trammel.CARRIAGE_PLAY_TIR_MAX
     )
