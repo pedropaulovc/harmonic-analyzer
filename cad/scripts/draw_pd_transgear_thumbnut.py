@@ -41,7 +41,6 @@ from _drawing_common import (
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
-    offset_dimension_text,
     set_dimension_callouts,
 )
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
@@ -58,7 +57,7 @@ from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
 from pd_transgear_thumbnut_spec import (
-    CSK_DIA,
+    CSK_HALF_ANGLE_DEG,
     CSK_QUALIFIER,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -134,7 +133,7 @@ def _section_y(model_y_mm: float) -> float:
 # across their own cut, each dimension line at its feature's height and its
 # text out to the right: an extension line run past the rim or seat would
 # cross another feature's hatching. The cone diameter sits below the seat,
-# left of the caption; the half-angle's short arc stays at the actual cone.
+# left of the caption; the half-angle prints on its own arc below the cone.
 _STEM_TEXT_X = _section_x(HEAD_DIA / 2.0) + 0.021
 # A horizontal diameter's line prints this far below its text anchor (run
 # 20261101T070124857Z: anchored at mid-height, the Ø.43 and Ø.49 lines
@@ -147,6 +146,24 @@ DIM_LINE_BELOW_TEXT = 0.0029
 def _stem_dia_anchor(bottom_mm: float, top_mm: float) -> tuple[float, float]:
     """Text anchor whose dimension line runs mid-way up a stem feature."""
     return (_STEM_TEXT_X, _section_y((bottom_mm + top_mm) / 2.0) + DIM_LINE_BELOW_TEXT)
+
+
+# The rear cone's half-angle prints on its own native arc, its text in the
+# wedge between the axis below the seat and the cone's extension: no offset,
+# so no leader.  Release v47's review (r2, r3) gated on the offset text's
+# leader, which ran up from the text past the arc's end into the hatching.
+# The arc stands far enough out that it passes under the end of the cone
+# diameter's right extension line rather than across that dimension line,
+# and the text sits on the wedge's bisector, under that extension line and
+# left of the cone's own.  At 27 mm the text's corner stood 1.78 mm from
+# that line's end (run 20261106T002837971Z layout audit, 2 mm clearance).
+COUNTERSINK_APEX_XY = (SECTION_CENTER[0], _section_y(REAR_CSK_APEX_Y))
+COUNTERSINK_ANGLE_RADIUS = 0.0285
+_ANGLE_TEXT_FROM_AXIS = math.radians(CSK_HALF_ANGLE_DEG / 2.0)
+COUNTERSINK_ANGLE_TEXT_XY = (
+    COUNTERSINK_APEX_XY[0] + COUNTERSINK_ANGLE_RADIUS * math.sin(_ANGLE_TEXT_FROM_AXIS),
+    COUNTERSINK_APEX_XY[1] - COUNTERSINK_ANGLE_RADIUS * math.cos(_ANGLE_TEXT_FROM_AXIS),
+)
 
 
 SECTION_KEEP = {
@@ -168,24 +185,9 @@ SECTION_KEEP = {
     ),
     "FlangeDia": _stem_dia_anchor(0.0, FLANGE_LENGTH),
     "WaistDia": _stem_dia_anchor(FLANGE_LENGTH, FLANGE_LENGTH + WAIST_LENGTH),
-    # A sheet-outboard angular anchor makes the native cone/axis arc huge
-    # (4e9a4df). First place its arc just beyond the actual rear cone, then
-    # offset only its text; the imported model association stays unchanged.
     "CountersinkDia": (_section_x(-HEAD_DIA / 2.0) - 0.025, _section_y(0.0) - 0.008),
-    "CountersinkHalfAngle": (_section_x(CSK_DIA / 2.0 + 0.6), _section_y(-0.6)),
+    "CountersinkHalfAngle": COUNTERSINK_ANGLE_TEXT_XY,
 }
-# The half-angle's text sits inside its own sector, between the axis below
-# the seat and the cone's extension, beyond the arc: text out at the old
-# right-of-the-head spot swung the arc on past the cone into the hatching
-# (machinist review round 3). 40° off the axis keeps its leader right of the
-# cone diameter's extension line.
-COUNTERSINK_APEX_XY = (SECTION_CENTER[0], _section_y(REAR_CSK_APEX_Y))
-_ANGLE_TEXT_RADIUS = 0.024
-_ANGLE_TEXT_FROM_AXIS = math.radians(40.0)
-COUNTERSINK_ANGLE_TEXT_XY = (
-    COUNTERSINK_APEX_XY[0] + _ANGLE_TEXT_RADIUS * math.sin(_ANGLE_TEXT_FROM_AXIS),
-    COUNTERSINK_APEX_XY[1] - _ANGLE_TEXT_RADIUS * math.cos(_ANGLE_TEXT_FROM_AXIS),
-)
 # The baseline lengths' spans hold their text and arrows: inside, so no arrow
 # hangs below the seat face into the cone diameter's "max." (run
 # 20261024T025840809Z).  The knurl diameter's too: arrows outside, its line
@@ -195,9 +197,12 @@ ARROWS_INSIDE = ("FlangeLength", "HeadRearY", "HeadDia")
 _DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
 # The native caption's top centre.  The cone diameter's dimension line runs
 # under its below-callout, 13.5 mm under the seat face (run
-# 20261024T025840809Z): the caption hangs 6.5 mm under that line, clear of
-# its extension lines.
-SECTION_CAPTION_XY = (SECTION_CENTER[0], _section_y(0.0) - 0.020)
+# 20261024T025840809Z); the half-angle's arc dips lower, to the axis, and the
+# caption hangs 4.5 mm under the arc's foot, clear of its arrow.
+SECTION_CAPTION_XY = (
+    SECTION_CENTER[0],
+    COUNTERSINK_APEX_XY[1] - COUNTERSINK_ANGLE_RADIUS - 0.0045,
+)
 # The face view prints only the native thread callout.
 FACE_KEEP: dict[str, tuple[float, float]] = {}
 # Above the knurl diameter, the outermost of the rim's stack: the below lane
@@ -406,32 +411,24 @@ def _set_dimension_suffixes(adapter: Any, annotations: list[Any]) -> None:
 
 
 def _place_countersink_angle(adapter: Any, annotations: list[Any]) -> None:
-    """Keep the native rear cone/axis arc local; its text sits in its sector."""
+    """Stand the native rear cone/axis angle's text on its own arc, in its wedge."""
     name = "CountersinkHalfAngle"
     matches = [item for item in annotations if dimension_name(adapter, item) == name]
     if len(matches) != 1:
         raise RuntimeError(f"thumbnut needs one native {name}, got {len(matches)}")
     annotation = _early_bound(matches[0], "IAnnotation")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    # An inherited offset would move only text, leaving the old long arc.
+    # An inherited offset would move only the text and hang it on a leader.
     display.OffsetText = False
     if bool(display.OffsetText):
         raise RuntimeError("thumbnut countersink angle offset could not be reset")
     if not annotation.SetPosition2(*SECTION_KEEP[name], 0.0):
-        raise RuntimeError("failed to position the thumbnut countersink angle arc")
-    arc_position = annotation.GetPosition()
-    if not arc_position or math.dist(
-        (float(arc_position[0]), float(arc_position[1])), SECTION_KEEP[name]
-    ) > 1e-5:
-        raise RuntimeError(f"thumbnut countersink angle arc did not persist: {arc_position!r}")
-    offset_dimension_text(adapter, [annotation], {name: COUNTERSINK_ANGLE_TEXT_XY})
-    if not bool(display.OffsetText):
-        raise RuntimeError("thumbnut countersink angle text did not stay offset")
+        raise RuntimeError("failed to position the thumbnut countersink angle")
     position = annotation.GetPosition()
     if not position or math.dist(
-        (float(position[0]), float(position[1])), COUNTERSINK_ANGLE_TEXT_XY
+        (float(position[0]), float(position[1])), SECTION_KEEP[name]
     ) > 1e-5:
-        raise RuntimeError(f"thumbnut countersink angle text did not persist: {position!r}")
+        raise RuntimeError(f"thumbnut countersink angle did not persist: {position!r}")
 
 
 @_telemetry.traced("drawing.thumbnut.arrows_inside")
