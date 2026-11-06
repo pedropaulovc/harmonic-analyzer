@@ -6,10 +6,11 @@ wording edit rebuilds the drawing alone. Printed dimensions interpolate a
 symbol of ``ms_measuring_stick_assembly_spec`` or a part/vendor spec; mate
 drawing numbers come from the part registry.
 
-The near-face setting is a native reference dimension of the saved clamped
-pose, not an acceptance band; the setting step prints its value and names the
-features it runs between, and the stick graduation it puts on the thumbscrew
-axis. Printed lengths are in the assembly contract's ``drawing_unit``.
+The stop is set by the stick's own scale: with STOP_MARK on the thumbscrew
+axis the block's 0-side end face lands between two tenth graduations the
+fitter can read from below (the 2.0 mark itself is under the block). The
+sheet-1 near-face dimension stays a reference of that pose. Printed lengths
+are in the assembly contract's ``drawing_unit``.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from fractions import Fraction
 
 import _config
 import ms_measuring_stick_assembly_spec as spec
+import ms_stick_spec as stick
 import ms_stop_spec as stop
 import _mcmaster_90114a124 as plate_screw
 import sh_vn_thumb_screw_spec as thumb
@@ -62,12 +64,13 @@ def _item(stem: str) -> str:
     return f"{_ref(stem)} {_ITEM_NOUNS[stem]}"
 
 
-def _setting() -> str:
-    """The near-face reference as the front view rounds and prints it,
-    ``(2.923)``; a reference carries no band, so rounding is the display's."""
-    inches = spec.SETTING_NEAR_FACE_MM / LENGTH_UNITS[UNIT]
-    value = render_number(round(inches, spec.SETTING_PRECISION), UNIT, spec.SETTING_PRECISION)
-    return f"({value})"
+# The block's 0-side end face, in stick divisions, when STOP_MARK lies on the
+# thumbscrew axis; the step names the tenth graduations either side of it.
+NEAR_FACE_MARK = stop.STOP_MARK - stop.THUMB_AXIS_X / stick.DIVISION_SPACING
+_TENTHS = int(NEAR_FACE_MARK * 10.0)
+NEAR_FACE_WINDOW = (_TENTHS / 10.0, (_TENTHS + 1) / 10.0)
+# Readable as "between" only if the face stands clear of both graduations.
+assert all(abs(NEAR_FACE_MARK - mark) >= 0.02 for mark in NEAR_FACE_WINDOW), NEAR_FACE_MARK
 
 
 def _inch_fraction(length_mm: float) -> str:
@@ -112,8 +115,11 @@ _THUMB, _SCREWS = _item(spec.THUMB_SCREW), _item(spec.PLATE_SCREW)
 ASSEMBLY_STEPS = (
     f"1. LAY OUT THE TWO HOLES OF {_PLATE} PER {PLATE_DRAWING_NUMBER}; "
     "DO NOT DRILL THEM YET.",
-    f"2. CLAMP {_PLATE} TO {_BLOCK} WITH THEIR "
-    f"{stop.MATCH_DRILL_DATUM_ALIGNMENT}.",
+    f"2. CLAMP {_PLATE} TO {_BLOCK}, LEFT ENDS AND TOP EDGES FLUSH AS IN THE "
+    f"SHEET 1 FRONT VIEW (TOP OF {_ref(spec.BLOCK)}: ITS {thumb.THREAD} "
+    f"TAPPED FACE). THESE ARE THE {stop.LOCATING_END_NOTE} AND "
+    f"{stop.LOCATING_EDGE_NOTE} ON {BLOCK_DRAWING_NUMBER} AND "
+    f"{PLATE_DRAWING_NUMBER}.",
     f"3. AT EACH LAID-OUT HOLE, DRILL Ø{_hole(stop.PLATE_TAP_DRILL_DIA)} "
     f"THROUGH {_PLATE} AND INTO {_BLOCK} TO THE {BLOCK_DRAWING_NUMBER} TAP "
     f"DRILL DEPTH, MEASURED FROM THE {_ref(spec.BLOCK)} FACE UNDER "
@@ -129,11 +135,10 @@ ASSEMBLY_STEPS = (
     f"WINDOW OF {_ref(spec.BLOCK)}, GRADUATED FACE DOWN.",
     f"9. FIT {_PLATE} OVER THE WINDOW, PAIR MARKS TOGETHER; DRIVE BOTH "
     f"{_SCREWS} UNTIL THEIR HEADS SEAT.",
-    f"10. SLIDE {_ref(spec.BLOCK)} ALONG {_ref(spec.STICK)} UNTIL THE LEFT END "
-    f"OF {_ref(spec.STICK)} IS {_setting()} FROM THE LEFT FACE OF "
-    f"{_ref(spec.BLOCK)}, THE REF DIMENSION IN THE SHEET 1 FRONT VIEW. STICK "
-    f"GRADUATION {stop.STOP_MARK:.1f} THEN LIES ON THE {_ref(spec.THUMB_SCREW)} "
-    "AXIS.",
+    f"10. SEEN FROM BELOW, SLIDE {_ref(spec.BLOCK)} ALONG {_ref(spec.STICK)} "
+    "UNTIL ITS END FACE NEARER THE 0 GRADUATION LIES BETWEEN THE "
+    f"{NEAR_FACE_WINDOW[0]:.1f} AND {NEAR_FACE_WINDOW[1]:.1f} GRADUATIONS, AS "
+    "IN THE SHEET 1 BOTTOM VIEW.",
     f"11. TURN THE {_THUMB} IN BY HAND UNTIL ITS TIP CLAMPS THE TOP FACE OF "
     f"{_ref(spec.STICK)}.",
 )

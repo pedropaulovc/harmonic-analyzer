@@ -408,10 +408,22 @@ def test_fitter_package_covers_rule_9() -> None:
     for step in sheet.ASSEMBLY_STEPS:
         assert len(drawing._wrapped((step,), width=drawing.STEPS_LINE_WIDTH).splitlines()) <= 6
         assert "ITEM " in step
+    # The setting is read off the stick's own scale, from below: with the
+    # STOP_MARK on the thumbscrew axis the block's 0-side face lands between
+    # the two named tenth graduations.
     setting = sheet.ASSEMBLY_STEPS[-2]
-    assert sheet._setting() in setting and "REF DIMENSION IN THE SHEET 1 FRONT VIEW" in setting
-    assert f"STICK GRADUATION {stop.STOP_MARK:.1f} THEN LIES ON THE ITEM 4 AXIS" in setting
-    assert "±" not in setting  # the reference carries no band
+    low, high = sheet.NEAR_FACE_WINDOW
+    assert low < sheet.NEAR_FACE_MARK < high
+    # The same face, read from the stick's end through the near-face setting.
+    assert sheet.NEAR_FACE_MARK == pytest.approx(
+        (spec.SETTING_NEAR_FACE_MM - stick.SCALE_START_X) / stick.DIVISION_SPACING
+    )
+    assert f"BETWEEN THE {low:.1f} AND {high:.1f} GRADUATIONS" in setting
+    assert "SHEET 1 BOTTOM VIEW" in setting and "±" not in setting
+    # Step 2 names the match-drill faces by view; the part sheets' labels follow.
+    align = sheet.ASSEMBLY_STEPS[1]
+    assert "LEFT ENDS AND TOP EDGES FLUSH AS IN THE SHEET 1 FRONT VIEW" in align
+    assert stop.LOCATING_END_NOTE in align and stop.LOCATING_EDGE_NOTE in align
     # Rules 9 and 26: the projected bottom view carries no prose caption, and
     # no private phrase or sheet-1 note restates the steps.
     for gone in ("UNDERSIDE_CAPTION", "CLAMPED_SETUP_NOTE"):
@@ -867,11 +879,10 @@ def test_fitter_text_tracks_mutated_setting_and_depth_specs(
         changed.STICK_MARK_X - stop.THUMB_AXIS_X
     )
     setting = changed.ASSEMBLY_STEPS[-2]
-    assert f"STICK GRADUATION {mark:.1f} THEN LIES" in setting
+    face = mark - stop.THUMB_AXIS_X / stick.DIVISION_SPACING
+    low = int(face * 10.0) / 10.0
+    assert f"BETWEEN THE {low:.1f} AND {low + 0.1:.1f} GRADUATIONS" in setting
     assert "±" not in setting
-    near_face = round(changed.SETTING_NEAR_FACE_MM / 25.4, 3)
-    assert f"({near_face:.3f})" in setting
-    assert stop.MATCH_DRILL_DATUM_ALIGNMENT in changed.ASSEMBLY_STEPS[1]
     pilot = changed.ASSEMBLY_STEPS[2]
     assert "DRILL Ø.070 THROUGH ITEM 2 PLATE AND INTO ITEM 1 BLOCK" in pilot
     assert "OPEN ITS TWO HOLES TO Ø.096 THRU" in changed.ASSEMBLY_STEPS[3]
