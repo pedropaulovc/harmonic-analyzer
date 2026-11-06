@@ -276,6 +276,51 @@ and the five separate native tap callouts still omit the duplicate class.
 The generated cells are not rewritten. This is not a general native-table
 exemption and accepts no other specification, geometry or numeric shortfall.
 
+### Oblique carrier: one native hole table (#2151)
+
+The owner's Option B ruling of **2026-11-06** applies only to
+**MHA-CH-06-TL-21**. Its native table includes all fourteen top-face holes,
+including LEFT and the assembly-finished HUB, with X/Y taken from A1's actual
+bore axis and +X along A1–B1. Coordinates print `.XXX` under the existing
+title-block `±.005`; HUB locations are explicitly REF because TL-00 step 10
+still sets that bore in situ. The generated TAG/X/Y/SIZE cells are not
+replaced by typed values. Physical source-body correspondence, source/view
+configuration and units, all table rows and attached tags, the A1 origin and
+three-place location precision are read back after the final rebuild.
+
+Carrier **RV-02** permits exactly one flagged local-control note:
+`A2, B2: Y .964 ±.002 FROM THE A1-B1 AXIS LINE`. The builder stores those
+limits on both source-model Y dimensions without moving their nominal
+geometry, and saves the property-linked note; the drawing only reads the
+limits. This is not a general exception to rules 3 or 7. Section A-A identifies
+the cropped feature as A1. The rail-indicating `ALIGNMENT_BAND` belongs to
+the assembly and remains `.0008`, independent of the carrier table.
+
+[`correlated_pin_budget`](../scripts/ch_rocker_arm_tl_oblique_carrier_spec.py)
+bounds the whole tolerance box and continuous strap arc analytically. For a
+pin pair `a,b`, the cutter circle has
+`C=(a+b)/2 + cot(alpha)/2*(dy,-dx)` and `R=|b-a|/(2 sin(alpha))`.
+The same actual inner-pass apex sets HUB for both cuts. Affine corner extrema,
+analytic sine/cosine extrema and a bounded norm remainder retain that
+correlation; absolute radius errors are not added as independent edge errors.
+Pin-only enclosures in inches are approximately `R800 ±.0088333`,
+`R816 -.0176666/+.0176674`, top relative to HUB
+`-.0001468/+.0001481`, and bottom `-.0037853/+.0037857`.
+Including `.XXX` nominal rounding gives relative bounds
+`-.0001507/+.0001442` and `-.0038702/+.0037023`: both below `.005`,
+the `.010` strap half-band less the reserved `.005` HUB setting/clearance
+stack. These are analytic design bounds, not native-build evidence.
+
+The same correlated errors feed the tooling-clearance and riser-wall checks.
+TL-24 **RV-01** was extended from `.074` to **`.071 MIN`** by
+**owner Option B ruling 2026-11-06 (coordinator-applied)**. CR governs at
+`1.810703955 mm` (`.071287557 in`); CL is `1.810817528 mm`.
+The 9/16 self-cut route, nominal holes and `.080` target/`.060` floor stay
+unchanged. The package YAML owns the ruling; the native sheet carries only
+the calculated, floored wall fact. Ref [#2151](https://github.com/pedropaulovc/harmonic-analyzer/issues/2151);
+its separate machinist-review rubric/eval work is not part of this change.
+
+
 ## The gate
 
 `uv run cad/scripts/machinist_review.py <name>... --before-pdf-dir <baseline>`
