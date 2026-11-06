@@ -92,7 +92,11 @@ import ch_rocker_arm_tl_oblique_feed_lever_spec as feed_lever
 import sh_vn_clamping_kit_flange_nut_spec as flange_nut
 import ch_rocker_arm_tl_vn_oblique_handwheel_spec as handwheel
 import sh_vn_clamping_kit_hold_down_stud_spec as hold_down_stud
-import ch_rocker_arm_tl_vn_oblique_hub_pin_spec as hub_pin
+import ch_rocker_arm_tl_oblique_hub_stud_spec as hub_stud
+import ch_rocker_arm_tl_oblique_hub_sleeve_spec as hub_sleeve
+import ch_rocker_arm_tl_oblique_hub_washer_spec as hub_washer
+import ch_rocker_arm_tl_vn_oblique_hub_screw_spec as hub_screw
+import ch_rocker_arm_tl_vn_oblique_left_clamp_screw_spec as left_clamp_screw
 import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_feed_nut_spec as feed_nut
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_feed_block_spec as feed_block
@@ -107,6 +111,10 @@ import ch_rocker_arm_tl_vn_oblique_riser_screw_spec as riser_screw
 import ch_rocker_arm_tl_oblique_riser_spec as riser
 import sh_vn_clamping_kit_t_nut_spec as t_nut
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
+import ch_rocker_arm_tl_oblique_holding_spec as holding
+
+holding.require_clearance()
+SELF_CUT_REMOVED = holding.SELF_CUT_REMOVED
 
 ASM_NAME = "ch-rocker-arm-tl-oblique-jig"
 DRAWING_NUMBER = "MHA-CH-06-TL-00"
@@ -160,7 +168,11 @@ PIVOT_SPACER = "ch-rocker-arm-tl-vn-oblique-pivot-spacer"
 PIVOT_SHIM = "ch-rocker-arm-tl-vn-oblique-pivot-shim"
 CARRIER = "ch-rocker-arm-tl-oblique-carrier"
 RISER = "ch-rocker-arm-tl-oblique-riser"
-HUB_PIN = "ch-rocker-arm-tl-vn-oblique-hub-pin"
+HUB_STUD = "ch-rocker-arm-tl-oblique-hub-stud"
+HUB_SLEEVE = "ch-rocker-arm-tl-oblique-hub-sleeve"
+HUB_WASHER = "ch-rocker-arm-tl-oblique-hub-washer"
+HUB_SCREW = "ch-rocker-arm-tl-vn-oblique-hub-screw"
+LEFT_CLAMP_SCREW = "ch-rocker-arm-tl-vn-oblique-left-clamp-screw"
 FEED_LEVER = "ch-rocker-arm-tl-oblique-feed-lever"
 END_BRACKET = leadscrew.END_BRACKET
 # Bought hardware (parent-scoped TL-VN and shared SH-VN-57; VN-72 retired),
@@ -203,7 +215,11 @@ QUANTITIES = {
     PIVOT_SPACER: pivot_spacer.QUANTITY,
     PIVOT_SHIM: pivot_shim.QUANTITY,
     RISER: 1,
-    HUB_PIN: 1,
+    HUB_STUD: 1,
+    HUB_SLEEVE: 1,
+    HUB_WASHER: 1,
+    HUB_SCREW: 1,
+    LEFT_CLAMP_SCREW: 1,
     FEED_LEVER: 1,
     END_BRACKET: leadscrew.END_BRACKET_QUANTITY,
     RAIL: fasteners.RAILS,
@@ -237,7 +253,11 @@ BOM_ORDER = (
     PIVOT_SPACER,
     PIVOT_SHIM,
     RISER,
-    HUB_PIN,
+    HUB_STUD,
+    HUB_SLEEVE,
+    HUB_WASHER,
+    HUB_SCREW,
+    LEFT_CLAMP_SCREW,
     FEED_LEVER,
     END_BRACKET,
     RAIL,
@@ -416,12 +436,13 @@ CARRIER_ROWS = _rz(POSE.rotation, ((1.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, -1.0,
 RISER_ORIGIN = _at(riser.BLANK_ORIGIN, trammel.CARRIER_TOP_Z)
 RISER_ROWS = PIN_ROWS
 
-# The cut gauge pin is bonded in the carrier's HUB hole, factory end up, its
-# top set hub_pin.TIP_SET above the riser; its bottom lands on the underside.
-HUB_SET_ABOVE_RISER = hub_pin.TIP_SET
-HUB_PIN_TOP_Z = trammel.CARRIER_TOP_Z + trammel.RISER_THICK + HUB_SET_ABOVE_RISER
-HUB_PIN_ORIGIN = _at(trammel.HUB, HUB_PIN_TOP_Z - hub_pin.CUT_LENGTH)
-HUB_PIN_ROWS = PIN_ROWS
+# The removable stud's flange bears on the carrier underside. Its unchanged
+# locating nose projects above the riser; the loose sleeve is fitted only
+# after the 9/16 self-cut, flush with the actual riser top.
+HUB_SET_ABOVE_RISER = hub_stud.TIP_SET
+HUB_STUD_TOP_Z = trammel.CARRIER_TOP_Z + trammel.RISER_THICK + HUB_SET_ABOVE_RISER
+HUB_STUD_ORIGIN = _at(trammel.HUB, trammel.CARRIER_UNDERSIDE_Z - hub_stud.FLANGE_THICK)
+HUB_STUD_ROWS = PIN_ROWS
 
 # Feed lever: Y-up model, +X toward the operator (carrier -Y), +Y up, width
 # along model -Z (carrier +X); origin at the inner end on the bottom face and
@@ -457,7 +478,7 @@ END_BRACKET_PLACEMENTS: tuple[tuple[Point3, Rows], ...] = tuple(
 # --- Heights ⚙ ---------------------------------------------------------------------
 RAIL_TOP_Z = trammel.RAIL_SEAT_Z + trammel.RAIL_HEIGHT  # 27.0
 CARRIAGE_UNDERSIDE_Z = trammel.RAIL_SEAT_Z + trammel.CARRIAGE_UNDER  # 16.3
-HUB_PIN_BOTTOM_Z = HUB_PIN_ORIGIN[2]
+HUB_STUD_BOTTOM_Z = HUB_STUD_ORIGIN[2]
 PIVOT_HEAD_UNDERSIDE_Z = PIVOT_SCREW_BOTTOM_Z + pivot_screw.SHOULDER_LENGTH
 PIVOT_HEAD_TOP_Z = PIVOT_HEAD_UNDERSIDE_Z + pivot_screw.HEAD_HEIGHT
 PART_TOP_Z = trammel.CARRIER_TOP_Z + trammel.RISER_THICK + trammel.STRAP_THICK
@@ -709,6 +730,10 @@ RISER_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
     for point in trammel.RISER_SCREWS
 )
 CLAMP_SCREW_PLACEMENTS = (_carried(trammel.CR, PART_TOP_Z),)
+HUB_SLEEVE_PLACEMENTS = ((_at(trammel.HUB, trammel.CARRIER_TOP_Z), PIN_ROWS),)
+HUB_WASHER_PLACEMENTS = ((_at(trammel.HUB, PART_TOP_Z), PIN_ROWS),)
+HUB_SCREW_PLACEMENTS = (_carried(trammel.HUB, PART_TOP_Z + hub_washer.THICK),)
+LEFT_CLAMP_SCREW_PLACEMENTS = (_carried(trammel.LEFT_CLAMP, PART_TOP_Z),)
 LEVER_LOCK_WASHER_PLACEMENTS: tuple[Placement, ...] = tuple(
     _carried(point, trammel.CARRIER_TOP_Z + feed_lever.LEVER_THICK)
     for point in carrier.LEVER_HOLES
@@ -854,7 +879,11 @@ PLACEMENTS: dict[str, tuple[Placement, ...]] = {
     PIVOT_SPACER: PIVOT_SPACER_PLACEMENTS,
     PIVOT_SHIM: PIVOT_SHIM_PLACEMENTS,
     RISER: ((RISER_ORIGIN, RISER_ROWS),),
-    HUB_PIN: ((HUB_PIN_ORIGIN, HUB_PIN_ROWS),),
+    HUB_STUD: ((HUB_STUD_ORIGIN, HUB_STUD_ROWS),),
+    HUB_SLEEVE: HUB_SLEEVE_PLACEMENTS,
+    HUB_WASHER: HUB_WASHER_PLACEMENTS,
+    HUB_SCREW: HUB_SCREW_PLACEMENTS,
+    LEFT_CLAMP_SCREW: LEFT_CLAMP_SCREW_PLACEMENTS,
     FEED_LEVER: ((FEED_LEVER_ORIGIN, FEED_LEVER_ROWS),),
     END_BRACKET: END_BRACKET_PLACEMENTS,
     RAIL: RAIL_PLACEMENTS,
@@ -934,7 +963,11 @@ LOCKED_TO: dict[str, tuple[tuple[str, int], ...]] = {
         *((CARRIER, 0) for _ in trammel.RISER_SCREWS),
         *((FEED_BLOCK, 0) for _ in feed_block.NUT_HOLES_YZ),
     ),
-    HUB_PIN: ((CARRIER, 0),),
+    HUB_STUD: ((CARRIER, 0),),
+    HUB_SLEEVE: ((CARRIER, 0),),
+    HUB_WASHER: ((CARRIER, 0),),
+    HUB_SCREW: ((CARRIER, 0),),
+    LEFT_CLAMP_SCREW: ((CARRIER, 0),),
     FEED_LEVER: ((CARRIER, 0),),
     LEVER_SCREW: tuple((CARRIER, 0) for _ in carrier.LEVER_HOLES),
     CL_DOWEL: ((CARRIER, 0),),
@@ -1001,13 +1034,12 @@ BOM_DESCRIPTIONS = {
     PIVOT_SPACER: "SPACER, 3/8 ID X 5/8 OD X 5/8",
     PIVOT_SHIM: "SHIM 3/8 X 5/8, FITTING STOCK",
     CARRIER: "CARRIER PLATE",
-    RISER: "ACETAL RISER",
-    # TL-00 review (farm 20261104T210601055Z): the bought pin's size, Ø.4000
-    # X its 2.00 supply length; step 11 cuts it.
-    HUB_PIN: (
-        f"HUB LOCATOR PIN Ø{_length(hub_pin.DIA, 4)} X "
-        f"{_length(hub_pin.SUPPLY_LENGTH, 2)}"
-    ),
+    RISER: "6061 RISER",
+    HUB_STUD: "FLANGED HUB CLAMP STUD",
+    HUB_SLEEVE: "STEEL HUB SUPPORT SLEEVE",
+    HUB_WASHER: "BRASS HUB CLAMP WASHER",
+    HUB_SCREW: hub_screw.CALLOUT,
+    LEFT_CLAMP_SCREW: left_clamp_screw.CALLOUT,
     FEED_LEVER: "FEED LEVER",
     END_BRACKET: "END BRACKET",
     # Kit members print their native per-configuration descriptions.
@@ -1037,9 +1069,8 @@ BOM_DESCRIPTIONS = {
 ITEM_NUMBERS = {stem: str(index) for index, stem in enumerate(BOM_ORDER, 1)}
 
 # --- Native explode (JIG_EXPLODED) -------------------------------------------------
-# Presentation separates each purchased pivot member above its block and the
-# carrier above its supports. The bonded hub locator is shown below the
-# carrier for identification, not as an instruction for destructive removal.
+# Presentation separates the pivot stacks and carrier. The removable hub
+# stud withdraws below the carrier; its sleeve, washer and screw lift above.
 # (label, selectors, axis, signed distance mm).
 EXPLODED_VIEW_NAME = "JIG_EXPLODED"
 SOURCE_CONFIGURATION = "Default"
@@ -1047,6 +1078,10 @@ _CARRIER_RIDERS = (
     RISER,
     *RISER_SCREW_INSTANCES,
     CLAMP_SCREW,
+    HUB_SLEEVE,
+    HUB_WASHER,
+    HUB_SCREW,
+    LEFT_CLAMP_SCREW,
     FEED_LEVER,
     LEVER_SCREW,
     LEVER_LOCK_WASHER,
@@ -1065,15 +1100,19 @@ EXPLODE_STEPS = (
         60.0,
     ),
     ("clamp screw lifts out", (CLAMP_SCREW,), "z", 40.0),
+    ("hub screw lifts out", (HUB_SCREW,), "z", 110.0),
+    ("hub washer lifts off", (HUB_WASHER,), "z", 85.0),
+    ("hub sleeve lifts out", (HUB_SLEEVE,), "z", 65.0),
+    ("left clamp screw lifts out", (LEFT_CLAMP_SCREW,), "z", 100.0),
     ("riser screws lift out", RISER_SCREW_INSTANCES, "z", 30.0),
     ("riser lifts off", (RISER, *RISER_SCREW_INSTANCES, CLAMP_SCREW), "z", 60.0),
     (
         "carrier lifts off the pins",
-        (CARRIER, HUB_PIN, CL_DOWEL, *_CARRIER_RIDERS),
+        (CARRIER, HUB_STUD, CL_DOWEL, *_CARRIER_RIDERS),
         "z",
         230.0,
     ),
-    ("bonded hub locator identification", (HUB_PIN,), "z", -150.0),
+    ("hub clamp stud withdraws below carrier", (HUB_STUD,), "z", -150.0),
     # The dowel goes in from above, down through the riser (step 11), so it
     # lifts out as the clamp screw does, clear above the lifted riser.
     ("cl dowel lifts out", (CL_DOWEL,), "z", 100.0),
@@ -1145,13 +1184,13 @@ def explode_lift(component_or_family: str) -> float:
 
 _CARRIER_UNDERSIDE_EXPLODED = trammel.CARRIER_UNDERSIDE_Z + explode_lift(CARRIER)
 if (
-    _CARRIER_UNDERSIDE_EXPLODED - (HUB_PIN_TOP_Z + explode_lift(HUB_PIN))
+    _CARRIER_UNDERSIDE_EXPLODED - (HUB_STUD_TOP_Z + explode_lift(HUB_STUD))
     <= trammel.HUB[1] - carrier.OUTLINE_Y[0]
 ):
-    raise AssertionError("the exploded carrier hides the HUB pin")
-# The riser must clear the HUB pin's locator before it moves sideways.
-if explode_lift(RISER) - explode_lift(CARRIER) <= HUB_PIN_TOP_Z - trammel.CARRIER_TOP_Z:
-    raise AssertionError("the exploded riser does not clear the HUB pin")
+    raise AssertionError("the exploded carrier hides the HUB stud")
+# The riser must clear the stud's locator before it moves sideways.
+if explode_lift(RISER) - explode_lift(CARRIER) <= HUB_STUD_TOP_Z - trammel.CARRIER_TOP_Z:
+    raise AssertionError("the exploded riser does not clear the HUB stud")
 # Every occurrence's selector, ``instance_name`` by family and index.
 INSTANCE_NAMES = frozenset(
     instance_name(family, index)
@@ -1723,16 +1762,15 @@ def _item(stem: str) -> str:
     return f"(ITEM {ITEM_NUMBERS[stem]})"
 
 
-# Review jig-asm r2/r3: steps 10 and 11 name item 9 as its BOM row does.
-_HUB_PIN = f"{BOM_DESCRIPTIONS[HUB_PIN]} {_item(HUB_PIN)}"
+_HUB_STUD = f"{BOM_DESCRIPTIONS[HUB_STUD]} {_item(HUB_STUD)}"
 # TL-21 supplies the CL spot; the HUB is drilled in situ from the apex
 # (owner ruling 5, option A, 2026-11-01: carrier HUB_RADIAL_STACK). Fit doc
 # F16 (HUB, the purchased .4000 reamer) and F19 (CL, the owned .2490 reamer)
 # size the finished holes.
 _HUB_HOLE = (
     f"HUB Ø{_length(carrier.HUB_HOLE_LIMITS[0], 4)}-"
-    f"{_length(carrier.HUB_HOLE_LIMITS[1], 4)} THRU, FOR THE {_HUB_PIN}, "
-    "BONDED AT STEP 11"
+    f"{_length(carrier.HUB_HOLE_LIMITS[1], 4)} THRU, FOR THE {_HUB_STUD}, "
+    "SLIP FIT; FLANGE BELOW THE CARRIER"
 )
 _CL_HOLE = (
     f"CL Ø{_length(carrier.CL_DOWEL_DIA + min(carrier.CL_HOLE_BAND), 4)}-"
@@ -1842,15 +1880,11 @@ ASSEMBLY_STEPS = (
     "MATCH-DRILL AND REAM THE HUB THERE, THEN THE CL HOLE OFF ITS SPOT, IN "
     f"ONE SETUP SQUARE TO THE CARRIER TOP: {_HUB_HOLE}; {_CL_HOLE}.",
     "11. CLAMP THE RISER ON THE CARRIER AND SPOT ITS "
-    f"{len(riser.SCREW_HOLES) + 3} HOLES FROM BELOW THROUGH THE FINISHED CARRIER "
-    "HOLES; FINISH TO MHA-CH-06-TL-24 AND FIT WITH "
+    f"{len(riser.SCREW_HOLES) + 3} THROUGH-HOLE CENTRES FROM BELOW. TRANSFER "
+    "THE EIGHTH, LEFT-CLAMP CENTRE WITH A POINTED TRANSFER SCREW IN ITS BLIND TAP. "
+    "FINISH TO MHA-CH-06-TL-24 AND FIT WITH "
     f"{len(riser.SCREW_HOLES)} {_RISER_SCREW}S {_item(RISER_SCREW)}. "
-    f"CUT THE {_HUB_PIN} TO "
-    f"{_length(hub_pin.CUT_LENGTH, hub_pin.CUT_PLACES)}; "
-    "DEBURR THE CUT END ONLY, CUT END DOWN, FACTORY END UP. CLEAN AND BOND "
-    f"WITH LOCTITE 638; SET ITS FACTORY TOP WITH A {_length(hub_pin.TIP_SET, 3)} "
-    f"GAUGE ABOVE THE RISER ({_length(hub_pin.TIP_SET, 3)} +/-"
-    f"{_length(hub_pin.TIP_SET_BAND, 3)}); LET THE BOND CURE BEFORE USE. "
+    "LEAVE THE HUB STUD, SLEEVE, WASHER AND BOTH NEW CLAMP SCREWS OUT UNTIL O3. "
     f"PRESS THE CL DOWEL {_item(CL_DOWEL)} CHAMFERED END FIRST DOWN UNTIL ITS "
     f"ROUND TIP IS {_length(cl_dowel.TIP_SET_MIN, 3)}-"
     f"{_length(cl_dowel.TIP_SET_MAX, 3)} ABOVE THE RISER. "
@@ -1885,6 +1919,8 @@ ASSEMBLY_CHECKS = (
     "CHECK: WITH AN INDICATOR AT THE SHOULDER-SCREW HEAD, ROCK THE CARRIER BY "
     "HAND SIDEWAYS TO THE RAIL; ACCEPT "
     f"{trammel.CARRIAGE_PLAY_TIR_MAX:.2f} MM TIR MAX.",
+    "CHECK: THE HUB FLANGE CLEARS BOTH PIVOT BLOCKS, SUPPORT STACKS, KP08 "
+    "BLOCKS AND HANDWHEEL THROUGH BOTH COMPLETE PASSES; NO BOND RETAINS IT.",
 )
 PIVOT_FIT_STEPS = (
     f"P1. AT EACH SUPPORT SET A LOOSE SPACER {_item(PIVOT_SPACER)} ON THE "
@@ -2066,12 +2102,39 @@ OPERATION_STEPS = (
     "O2. SERVICE: SUPPORT THE CARRIER BEFORE REMOVING ITS TWO SCREWS. "
     "KEEP THE SELECTED SHIMS WITH THEIR SUPPORTS. AFTER REASSEMBLY REPEAT "
     "THE PIVOT GAP, FEED ALIGNMENT, HD4 AND ACTUAL TOOLING-CLEARANCE CHECKS.",
+    "O3. SELF-CUT THE 6061 RISER WITH THE 9/16 CUTTER BEFORE LOADING WORK. "
+    "REMOVE HUB STUD, STEEL SLEEVE, BRASS WASHER, BOTH #10 SCREWS AND CR SCREW. "
+    "KEEP ALL FOUR RISER SCREWS FITTED. THE FINISHED BAND CLEARS THE 3/8 "
+    "STRAP CUTTER BY 2.38 MM PER SIDE; THE STRAP CUTTER DOES NOT CUT THE RISER.",
+    f"O4. AFTER SELF-CUTTING, INSERT THE {_HUB_STUD} FROM BELOW, FLANGE "
+    f"AGAINST THE CARRIER. FIT STEEL SLEEVE {_item(HUB_SLEEVE)} OVER IT, "
+    "MATCHED FLUSH 0/-.002 TO THE ACTUAL RISER TOP. FACE THE SUPPLIED "
+    "EXTRA-LENGTH NOSE AT ASSEMBLY TO "
+    f"{_length(hub_stud.TIP_SET, 3)} +/-{_length(hub_stud.TIP_SET_BAND, 3)} "
+    "PROUD OF THE ACTUAL RISER; CHECK THE STRAP SEATED WITHOUT ROCKING. NO ADHESIVE.",
+    "O5. BANDSAW THE 350 MM STRAP BLANK TO THE CHORD OUTLINE IN ITS PROCESS "
+    "PLAN BEFORE LOADING; KEEP THE END WASTE FOR CL, CR AND THE LEFT CLAMP. "
+    "TRANSFER THE LEFT HOLE WITH A POINTED #10-24 SCREW THROUGH THE RISER; "
+    f"REMOVE WORK, DRILL Ø{_length(riser.LEFT_CLAMP_DIA, 3)} THRU IN THE END WASTE "
+    "AND DEBURR. REMOVE THE TRANSFER SCREW BEFORE CLAMPING. "
+    "LOCATE ON HUB AND CL; FIT CR AS BEFORE. FIT THE HUB #10-24 LOW-HEAD "
+    f"SCREW {_item(HUB_SCREW)} THROUGH BRASS WASHER {_item(HUB_WASHER)}; "
+    f"FIT LEFT #10-24 LOW-HEAD SCREW {_item(LEFT_CLAMP_SCREW)} DIRECTLY ON WORK. "
+    "COMPLETE O6 BEFORE TIGHTENING; THEN TORQUE BOTH #10 SCREWS TO 1 N·m. "
+    "DO NOT REMOVE THE CL DOWEL.",
+    "O6. FIT THE LEFT SCREW TO THE ACTUAL STRAP/RISER GRIP: TIP REACH "
+    "8.65–8.85 MM BELOW THE CARRIER TOP, AT MOST ONE INCOMPLETE #10-24 "
+    "PITCH AT THE DRESSED TIP. GAUGE FULL THREAD ENGAGEMENT 7.239 MM MIN "
+    "AND BOTTOM CLEARANCE .29 MM MIN; NO BOTTOM CONTACT. RETAIN ALL THREE "
+    "CLAMPS THROUGH BOTH PASSES. EACH START IS AN EDGE CUT WITH AIR BESIDE "
+    "THE CUTTER, NEVER A FULL-WIDTH SLOT OR PLUNGE.",
 )
 CAPTURE_CHECKS = (
     "TOOLING CLEARANCE: BEFORE USE, WITH THE SPINDLE ISOLATED, CHECK THE "
     "ACTUAL SPINDLE, CUTTER, NON-CUTTING TOOL AND HOLDER AGAINST THE "
     "FIXTURE THROUGH BOTH PASSES AND THE ENTIRE USED Z RANGE, INCLUDING "
-    "BREAKTHROUGH AND RETRACTION. INCLUDE BOTH SHOULDER-SCREW HEADS. "
+    "BREAKTHROUGH AND RETRACTION. INCLUDE BOTH SHOULDER-SCREW HEADS, BOTH "
+    "#10 CLAMPS, THE HUB WASHER, FULL ROUND SLEEVE AND EXISTING CR HEAD. "
     "VERIFY VISIBLE OR MEASURED CLEARANCE AT EVERY CLOSEST APPROACH: "
     "NO SPINDLE/TOOL/HOLDER CONTACT WITH THE FIXTURE.",
     "KEEP THE REPEATED STEP 6 ACTUAL SPINDLE-AXIS REGISTER; REINDICATE AFTER "
@@ -2079,6 +2142,12 @@ CAPTURE_CHECKS = (
     f"REFERENCE TABLE HEIGHTS: WORK {_length(PART_TOP_Z, 3)}; SHOULDER-SCREW HEADS "
     f"{_length(PIVOT_HEAD_TOP_Z, 3)}, NOMINAL. "
     "SET CUTTING DEPTH FROM THE ACTUAL SEATED WORK, NOT THESE REFERENCES.",
+    f"CLAMP HEIGHTS FROM TABLE: HUB {_length(PART_TOP_Z + hub_washer.THICK + hub_screw.DIMS.head_h, 3)}, "
+    f"LEFT {_length(PART_TOP_Z + left_clamp_screw.DIMS.head_h, 3)}, "
+    f"CR {_length(PART_TOP_Z + clamp_screw.DIMS.head_h, 3)}; CR REMAINS TALLEST. "
+    "HUB WASHER CLEARANCE 1.5 MM MIN TO BOTH CUTTER FLANKS; LEFT HEAD 5 MM MIN "
+    "TO THE COMPLETE SWEEPS. CHECK SLEEVE CLEARANCE AFTER FITTING IT, NOT "
+    "WITH IT REMOVED AS FOR THE RISER SELF-CUT.",
     "ACCEPTANCE: THE CARRIAGE/RAIL AND TABLE ANCHORS PASS THE ASSEMBLY CHECKS "
     "AFTER FINAL TIGHTENING (EVERY STEP 6 READING WITHIN "
     f"±{_length(ALIGNMENT_BAND, ALIGNMENT_PLACES)}; "
@@ -2153,7 +2222,9 @@ def _component_local_boxes() -> dict[str, Box3]:
         PIVOT_SHIM: ((-pivot_shim.OD / 2.0, pivot_shim.OD / 2.0), (-pivot_shim.OD / 2.0, pivot_shim.OD / 2.0), (0.0, pivot_shim.THICKNESS)),
         CARRIER: (carrier.OUTLINE_X, (-carrier.THICKNESS, 0.0), (-carrier.OUTLINE_Y[1], -carrier.OUTLINE_Y[0])),
         RISER: ((0.0, riser.BLANK_LENGTH), (0.0, riser.BLANK_WIDTH), (0.0, riser.THICKNESS)),
-        HUB_PIN: ((-hub_pin.DIA / 2.0, hub_pin.DIA / 2.0), (-hub_pin.DIA / 2.0, hub_pin.DIA / 2.0), (0.0, hub_pin.CUT_LENGTH)),
+        HUB_STUD: ((-hub_stud.FLANGE_DIA / 2.0, hub_stud.FLANGE_DIA / 2.0), (-hub_stud.FLANGE_DIA / 2.0, hub_stud.FLANGE_DIA / 2.0), (0.0, hub_stud.LENGTH)),
+        HUB_SLEEVE: ((-hub_sleeve.OD / 2.0, hub_sleeve.OD / 2.0), (-hub_sleeve.OD / 2.0, hub_sleeve.OD / 2.0), (0.0, hub_sleeve.LENGTH)),
+        HUB_WASHER: ((-hub_washer.OD / 2.0, hub_washer.OD / 2.0), (-hub_washer.OD / 2.0, hub_washer.OD / 2.0), (0.0, hub_washer.THICK)),
         FEED_LEVER: ((0.0, feed_lever.LEVER_LENGTH), (0.0, feed_lever.LEVER_THICK), (-feed_lever.LEVER_WIDTH, 0.0)),
         CL_DOWEL: _axis_y_box(cl_dowel.DIA_MAX / 2.0, 0.0, cl_dowel.LENGTH),
         END_BRACKET: ((0.0, leadscrew.BRACKET_LENGTH), (-leadscrew.BRACKET_WIDTH / 2.0, leadscrew.BRACKET_WIDTH / 2.0), (0.0, leadscrew.BRACKET_THICK)),
@@ -2172,9 +2243,15 @@ def _component_local_boxes() -> dict[str, Box3]:
         (CARRIAGE_SCREW, carriage_screw),
         (PILLOW_BLOCK_SCREW, bracket_screw),
         (CLAMP_SCREW, clamp_screw), (LEVER_SCREW, lever_screw),
+        (HUB_SCREW, hub_screw), (LEFT_CLAMP_SCREW, left_clamp_screw),
     ):
         radius = max(screw.DIMS.head_dia, screw.DIMS.major_dia) / 2.0
         boxes[stem] = _axis_y_box(radius, -screw.DIMS.length, screw.DIMS.head_h)
+    boxes[LEFT_CLAMP_SCREW] = _axis_y_box(
+        left_clamp_screw.DIMS.head_dia / 2.0,
+        -left_clamp_screw.CUT_LENGTH,
+        left_clamp_screw.DIMS.head_h,
+    )
     if set(boxes) != set(BOM_ORDER):
         raise ValueError("fixture envelope must cover every native BOM family")
     return boxes
@@ -2188,7 +2265,9 @@ def _component_label(stem: str, index: int) -> str:
         PIVOT_SCREW: "pivot screw", PIVOT_SPACER: "pivot spacer",
         PIVOT_SHIM: "pivot shim",
         CARRIER: "carrier", RISER: "riser", FEED_LEVER: "feed lever",
-        HUB_PIN: "HUB locator", CL_DOWEL: "CL dowel",
+        HUB_STUD: "HUB clamp stud", CL_DOWEL: "CL dowel",
+        HUB_SLEEVE: "HUB support sleeve", HUB_WASHER: "HUB washer",
+        HUB_SCREW: "HUB clamp screw", LEFT_CLAMP_SCREW: "left clamp screw",
         FEED_NUT: "feed nut",
         LEADSCREW: "screw", HANDWHEEL: "handwheel",
         END_BRACKET: "end bracket", PILLOW_BLOCK: "pillow block",
@@ -2368,9 +2447,6 @@ def moving_outlines(
     return out
 
 
-def hub_locator(pass_name: str, theta: float) -> tuple[tuple[float, float], float]:
-    """Machine XY centre and radius of the straight bonded gauge pin."""
-    return trammel.carrier_pose(pass_name, theta).to_machine(trammel.HUB), hub_pin.DIA / 2.0
 
 
 def fixed_outlines() -> dict[str, list[tuple[float, float]]]:
@@ -2573,8 +2649,8 @@ for (_origin, _rows), _pin in zip(BLOCK_PLACEMENTS, PIVOT_SCREW_ORIGINS):
         raise AssertionError("pivot counterbore is not on its screw axis")
 if abs(trammel.PIVOT_BLOCK_TOP_Z + trammel.PIVOT_SHIM_PACK + pivot_spacer.LENGTH - trammel.CARRIER_UNDERSIDE_Z) > 1e-9:
     raise AssertionError("shim and spacer do not support the nominal carrier seat")
-if not HUB_PIN_TOP_Z < PART_TOP_Z:
-    raise AssertionError("the HUB pin stands above the strap")
+if not HUB_STUD_TOP_Z < PART_TOP_Z:
+    raise AssertionError("the HUB locating nose stands above the strap")
 
 
 def bar_point(rail: int, point: Point3) -> Point3:

@@ -2,14 +2,13 @@ ch-rocker-arm-tl-oblique-riser:
   title: Rocker Oblique Trammel Riser
   # Shop fixture: the parent MHA-CH-06 Number plus -TL-nn (subsystem-identities.md).
   number: MHA-CH-06-TL-24
-  # Acetal machines clean and spares the cutter where the jig cuts its own
-  # band in place (SolidWorks material POM Acetal Copolymer).
-  material: ACETAL (DELRIN)
-  material_specification: black acetal (Delrin), McMaster 8663K55, 1/4 x 1-3/4 bar
+  # The wider self-cut band keeps the strap cutter 2.38125 mm off the riser.
+  material: 6061 aluminium
+  material_specification: 6061 aluminium
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
-  process: "start from 1/4 in acetal stock; face to .24 drawing thickness and mill the blank to 1.60 x 13.40; spot the holes from the carrier at assembly, drill #4 clearance through and countersink 82 degrees for the four screws; drill the HUB, CL and CR clearance holes through; break edges"
+  process: "start from 1/4 x 1-3/4 in 6061 bar; face to .24 and mill to 1.62 x 13.80; locate seven holes through the carrier and transfer the eighth from the left blind tap at assembly; drill #4 clearance through and countersink 82 degrees for four screws; drill .600 HUB, CL, CR and added left-clamp clearances through; self-cut the band with the 9/16 cutter before fitting the steel hub sleeve and loading the strap; break edges"
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"

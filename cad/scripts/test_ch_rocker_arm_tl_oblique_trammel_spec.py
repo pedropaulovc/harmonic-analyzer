@@ -90,7 +90,7 @@ def test_both_cutters_are_on_hand_as_four_flute_end_mills() -> None:
     assert trammel.RISER_CUTTER_DIA == pytest.approx(0.5625 * 25.4)
 
 
-def test_jig_stock_covers_finished_geometry_carrier_on_hand_riser_ordered() -> None:
+def test_carrier_stock_and_new_riser_blank_requirements() -> None:
     inventory = tomllib.loads(
         (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_bytes().decode()
     )
@@ -99,8 +99,8 @@ def test_jig_stock_covers_finished_geometry_carrier_on_hand_riser_ordered() -> N
         if "OnlineMetals 1173" in row.get("note", "")
         and "TL-21 carrier" in row.get("note", "")
     ]
-    (riser,) = [
-        row for row in inventory["stock"] if "MHA-CH-06-TL-24" in row.get("note", "")
+    (former_riser,) = [
+        row for row in inventory["stock"] if "8663K55" in row.get("note", "")
     ]
     assert carrier["on_hand"] is True
     import ch_rocker_arm_tl_oblique_carrier_spec as carrier_spec
@@ -109,14 +109,14 @@ def test_jig_stock_covers_finished_geometry_carrier_on_hand_riser_ordered() -> N
     assert carrier["section_mm"][0] >= carrier_spec.PLATE_WIDTH
     assert carrier["section_mm"][1] > carrier_spec.THICKNESS
     assert carrier["length_mm"] >= carrier_spec.PLATE_LENGTH
-    # The owner-selected riser bar (McMaster 8663K55) was ordered 2026-11-03 and
-    # covers the faced and milled blank. It is not on hand until received (#2173).
-    assert "8663K55" in riser["note"]
-    assert "ordered 2026-11-03" in riser["note"]
-    assert riser["on_hand"] is False
-    assert riser["section_mm"][0] > riser_spec.BLANK_WIDTH
-    assert riser["section_mm"][1] > riser_spec.THICKNESS
-    assert riser["length_mm"] > riser_spec.BLANK_LENGTH
+    # Keep the real acetal order as provenance; do not invent a 6061 purchase.
+    assert former_riser["material"] == "Acetal (Delrin)"
+    assert "ordered 2026-11-03" in former_riser["note"]
+    assert "unallocated stock" in former_riser["note"]
+    assert 1.75 * 25.4 > riser_spec.BLANK_WIDTH
+    assert 0.25 * 25.4 > riser_spec.THICKNESS
+    assert riser_spec.BLANK_LENGTH == 13.80 * 25.4
+    assert riser_spec.BLANK_WIDTH == 1.62 * 25.4
 
 
 def test_strap_blank_is_the_bought_one_and_a_half_inch_strap_stock() -> None:
@@ -182,7 +182,7 @@ def test_both_cutter_circles_share_the_arc_centre() -> None:
 
 
 def test_in_situ_hub_and_end_holes_lie_on_the_hub_radius() -> None:
-    for point in (trammel.HUB, trammel.CL, trammel.CR):
+    for point in (trammel.HUB, trammel.CL, trammel.CR, trammel.LEFT_CLAMP):
         assert math.dist(point, trammel.ARC_CENTRE) == pytest.approx(trammel.HUB_RADIUS)
     assert trammel.HUB_RADIUS == pytest.approx(trammel.R_INNER + trammel.HUB_TO_TOP_EDGE)
     assert trammel.HUB_OFFSET == pytest.approx(trammel.HUB_RADIUS - trammel.R_C1)

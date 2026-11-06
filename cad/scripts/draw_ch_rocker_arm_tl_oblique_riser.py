@@ -1,4 +1,4 @@
-r"""Create the drawing for the oblique-trammel jig's acetal riser (MHA-CH-06-TL-24)."""
+r"""Create the drawing for the oblique-trammel jig's 6061 riser (MHA-CH-06-TL-24)."""
 
 from __future__ import annotations
 
@@ -24,6 +24,7 @@ from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
+from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _feature_requirements import part_metadata, requirement
 from _gtol_cone import ConeFace
@@ -68,7 +69,7 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# A 340 x 40 x 6 blank: the plan view at 1:2 carries the outline, every hole
+# A 350.52 x 41.148 x 6.096 blank: the plan view at 1:2 carries the outline,
 # station as a REFERENCE value (X stack below the view; row heights beside it)
 # and one callout per hole size above it (the screw hole's size from the
 # part's blanked ScrewHoleReference sketch, shown in the plan only, its
@@ -86,6 +87,8 @@ SECTION_CENTER = (0.355, 0.215)
 CAPTION_XY = (0.355, 0.140)
 ISO_CENTER = (0.110, 0.070)
 ISO_NOTE_XY = (0.060, 0.040)
+SHEET_NAMES = ("RISER", "LEFT CLAMP CLEARANCE")
+LEFT_CLAMP_DIMENSIONS = frozenset(("LeftClampX", "LeftClampY", "LeftClampDia"))
 # The cutting line runs across the width at screw hole 3, 7 mm (sheet) past
 # both edges so its letters clear the outline; at screw 3 the arrows' letters
 # fall between the Screw3X and Screw1X extension lines (jig-r6: at screw 1
@@ -126,6 +129,8 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "Screw4X": (SCREW_HOLES[3][0] / 2.0, _stack_row(5), _T),
     "CrX": (CR_HOLE[0] - 45.0, _stack_row(6), _T),
     "BlankLength": (BLANK_LENGTH / 2.0, _stack_row(7), _T),
+    "LeftClampX": (-24.0, _stack_row(8), _T),
+    "LeftClampY": (-90.0, part_spec.LEFT_CLAMP_HOLE[1] / 2.0, _T),
     # Row heights from the bottom edge, one line each ("2X (13.35)"), centred
     # in their spans. Each 2X pair's dimension stands right of the view, so
     # its extension line runs from the dimensioned left hole through its
@@ -153,6 +158,7 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "ClampDia": (-26.0, _CALLOUT_Y + 10.0, _T),
     "HubDia": (HUB_HOLE[0], _CALLOUT_Y, _T),
     "ScrewDia": (BLANK_LENGTH + 10.0, _CALLOUT_Y + 8.0, _T),
+    "LeftClampDia": (85.0, _CALLOUT_Y + 43.0, _T),
 }
 # The thickness's text stands outside its 12 mm (sheet) span (jig-r6: its
 # extension lines ran through "6.0 STOCK").
@@ -253,12 +259,17 @@ _HOLE_ROWS = (
             ("hub_hole", HUB_HOLE, part_spec.HUB_DIA, "HUB", "HUB_DIA"),
             ("cl_hole", CL_HOLE, part_spec.CLAMP_DIA, "CL", "CLAMP_DIA"),
             ("cr_hole", CR_HOLE, part_spec.CLAMP_DIA, "CR", "CLAMP_DIA"),
+            (
+                "left_clamp_hole", part_spec.LEFT_CLAMP_HOLE,
+                part_spec.LEFT_CLAMP_DIA, "LEFT_CLAMP", "LEFT_CLAMP_DIA",
+            ),
         )
     ),
 )
 for name, (x, y), cut_dia, dia, sources, dia_sources in _HOLE_ROWS:
     dia_places = DRAWING_PRECISION_BY_NAME[
-        {"hub_hole": "HubDia", "cl_hole": "ClampDia", "cr_hole": "ClampDia"}.get(
+        {"hub_hole": "HubDia", "cl_hole": "ClampDia", "cr_hole": "ClampDia",
+         "left_clamp_hole": "LeftClampDia"}.get(
             name, "ScrewDia"
         )
     ]
@@ -343,6 +354,27 @@ def _mark_reference(adapter: Any, annotation: Any, name: str) -> None:
         raise RuntimeError(f"{name} count prefix did not take: {got!r}")
 
 
+def _left_clamp_sheet(adapter: Any) -> list[Any]:
+    """Keep the extra hole's three native dimensions off the crowded main sheet."""
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not drawing.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("cannot activate the left-clamp clearance sheet")
+    plan = place_view(adapter, str(SOURCE), "*Front", *PLAN_CENTER, scale=VIEW_SCALE)
+    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    set_hidden_lines_removed(adapter, plan)
+    on_plan = _view_mapper(adapter, plan)
+    annotations = curate_view_dimensions(
+        adapter, plan,
+        keep={name: on_plan(PLAN_KEEP[name]) for name in LEFT_CLAMP_DIMENSIONS},
+        view_label="left clamp clearance",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    if not drawing.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("cannot restore the riser sheet")
+    return annotations
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -365,6 +397,9 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         unit=part_drawing_unit(PART_STEM),
     )
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="riser")
+    if not _early_bound(drawing_model, "IDrawingDoc").ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("cannot activate the riser sheet")
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -372,7 +407,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Oblique Trammel Riser Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker oblique trammel riser; acetal blank; MHA-CH-06-TL-24",
+            3: "rocker oblique trammel riser; 6061 blank; MHA-CH-06-TL-24",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -400,7 +435,7 @@ async def build(adapter: Any) -> dict[str, str]:
         *curate_view_dimensions(
             adapter,
             plan,
-            keep={name: on_plan(xyz) for name, xyz in PLAN_KEEP.items()},
+            keep={name: on_plan(xyz) for name, xyz in PLAN_KEEP.items() if name not in LEFT_CLAMP_DIMENSIONS},
             view_label="plan view",
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
@@ -412,6 +447,7 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
     ]
+    annotations.extend(_left_clamp_sheet(adapter))
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     # The stations are located from the carrier at assembly: REFERENCE values.
@@ -434,6 +470,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Rocker Oblique Trammel Riser Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        expected_sheet_names=SHEET_NAMES,
     )
 
 

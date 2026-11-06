@@ -6574,7 +6574,7 @@ cite = ["Owner-approved oblique jig plain-pivot and integral feed-block design, 
 [[stock]]
 form = "rectangular_blank"
 material = "Acetal (Delrin)"
-note = "MHA-CH-06-TL-24 riser: black acetal (Delrin) bar, 1/4 x 1-3/4 in, oversized tolerance, 2 ft (McMaster 8663K55, selected by the owner and ordered 2026-11-03). Face to .24 and mill to the finished 1.60 x 13.40 blank."
+note = "Black acetal (Delrin) bar, 1/4 x 1-3/4 in, oversized tolerance, 2 ft (McMaster 8663K55, selected by the owner and ordered 2026-11-03). Originally allocated to MHA-CH-06-TL-24; the 2026-11-06 R3 design uses a 6061 riser instead. Retain this order as unallocated stock, not as the current riser material."
 # Basis: catalogue nominals 1/4 x 1-3/4 in x 24 in = [44.45, 6.35] x 609.6 mm; oversized tolerance, so the faced and milled blank sizes are the ones that count. Not metrology.
 section_mm = [44.45, 6.35]
 length_mm = 609.6

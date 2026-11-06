@@ -135,6 +135,8 @@ class HoleSpec:
     thread_class: str = "2B"
     fit: str = "normal"
     overrides_mm: dict[str, float] = field(default_factory=dict)
+    # HoleWizard5's bottom-angle input; 180 produces a flat-bottom blind hole.
+    drill_angle_deg: float = 118.0
 
 
 def blind_cut_dia_mm(spec: HoleSpec) -> float:

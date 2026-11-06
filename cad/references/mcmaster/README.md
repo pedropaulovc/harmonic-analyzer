@@ -51,8 +51,10 @@ recipes:
 | 90323A492 | — (retired TL-VN-77 source, 2026-10-31; now Huyett BLTS40-0375-1500188P, issue #290) | 18-8 Precision Shoulder Screw, Ø10 × 35, metric thread |
 | 92871A359 | — (retired TL-VN-78 source, 2026-10-31; now AluminumSpacers.com AS62-18-40, issue #290) | 18-8 Round Spacer, 10 ID × 16 OD × 15 |
 | 98055A118 | — (retired TL-VN-79 source with 98055A117/98055A121, 2026-10-31; now Huyett SHIM-0375-004/-008/-020, issue #290) | DIN 988 Spring Steel Shim, 10 × 16 × 0.2 |
-| 2281A11-6410N695 | — (retired TL-VN-80 source, 2026-10-31; now 23065A855-23065A4, issue #290) | Class Z Minus Gauge Pin, Ø10.2000, 2 in supply |
-| 23065A855-23065A4 | `ch-rocker-arm-tl-vn-oblique-hub-pin` (MHA-CH-06-TL-VN-80; abrasive-cut to .79, factory end up) | Class Z NO-GO Plug Gauge, .4000 in, 2 in supply |
+| 2281A11-6410N695 | — (retired TL-VN-80 source, 2026-10-31; then 23065A855-23065A4, issue #290) | Class Z Minus Gauge Pin, Ø10.2000, 2 in supply |
+| 23065A855-23065A4 | — (retired TL-VN-80 source, 2026-11-06: TL-VN-80 retired; the turned TL-33 hub stud replaces the bonded gauge pin; no recipe) | Class Z NO-GO Plug Gauge, .4000 in, 2 in supply |
+| 92220A163 | `ch-rocker-arm-tl-vn-oblique-hub-screw` (MHA-CH-06-TL-VN-85; shop fixture; catalogue-only, product page read live 2026-11-06, no vendor model; installed at bought 1/2 in length) | Alloy Steel Low-Profile Socket Head Screw |
+| 92220A165 | `ch-rocker-arm-tl-vn-oblique-left-clamp-screw` (MHA-CH-06-TL-VN-86; shop fixture; catalogue-only, product page read live 2026-11-06, no vendor model; cut to fit) | Alloy Steel Low-Profile Socket Head Screw |
 | 91255A106 | — (diagnostic recipe; a former `pd-vn-guide-lock-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A148 | — (diagnostic recipe; a former `dt-vn-cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A150 | — (retired TL-VN-65, 2026-11-06; the KP08 screws are now 91251A196, TL-VN-62; diagnostic recipe removed) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
@@ -427,6 +429,25 @@ lug became integral with TL-32. The following describes the former joint.
   Do not shorten a tip merely for appearance or because it is proud:
   rework only if actual interference prevents assembly. No plate band,
   receipt limit or short-engagement exception is added.
+- [92220A163](https://www.mcmaster.com/92220A163/) and
+  [92220A165](https://www.mcmaster.com/92220A165/)
+  (`ch-rocker-arm-tl-vn-oblique-hub-screw`, MHA-CH-06-TL-VN-85, and
+  `ch-rocker-arm-tl-vn-oblique-left-clamp-screw`, MHA-CH-06-TL-VN-86, 1 each in
+  the oblique trammel jig: the fastener table's `HUB_CLAMP` and `LEFT_CLAMP`
+  rows) were read live on November 6, 2026: alloy steel low-profile socket
+  head screw, black oxide, #10-24 UNC class 3A right hand, 1/2 in and 3/4 in
+  under the head, fully threaded, flat tip, low head Ø5/16 x 3/32 in, 3/32 in
+  hex, Rockwell C39, 140,000 psi, ASME B18.3; $11.80 and $11.38 per pack of
+  50. The pages give no socket depth, so the model takes ASME B18.3's minimum
+  key engagement for the #10 low head, 0.072 in (Brighton-Best "Socket Low
+  Head Cap Screws" data sheet, read November 6, 2026; the 91251A108
+  convention). `diag_build_92220A163.py` and `diag_build_92220A165.py` build
+  them on the catalogue 91251A family recipe at the low head; no vendor model
+  was downloaded or measured, and the standalone diagnostics remain
+  catalogue-only, not replica-gated. The hub screw keeps the bought 1/2 in
+  length (its tip stops inside the TL-33 stud's full thread at every printed
+  limit); the left clamp screw is cut at assembly to the actual strap/riser
+  grip plus 8.65-8.85 mm into the carrier's blind tap, its tip restored.
 - [91251A583](https://www.mcmaster.com/91251A583/)
   (`ch-rocker-arm-tl-vn-oblique-lever-screw`, MHA-CH-06-TL-VN-69, 2 in the oblique
   trammel jig: the fastener table's `LEVER_TO_CARRIER` row) was read live on

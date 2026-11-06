@@ -990,11 +990,18 @@
       "number": "MHA-CH-06-TL-VN-79"
     },
     {
-      "sourceStem": "ch-rocker-arm-tl-vn-oblique-hub-pin",
+      "sourceStem": "ch-rocker-arm-tl-vn-oblique-hub-screw",
       "sourceNumber": null,
       "parent": "ch-rocker-arm-tl-oblique-jig",
-      "stem": "ch-rocker-arm-tl-vn-oblique-hub-pin",
-      "number": "MHA-CH-06-TL-VN-80"
+      "stem": "ch-rocker-arm-tl-vn-oblique-hub-screw",
+      "number": "MHA-CH-06-TL-VN-85"
+    },
+    {
+      "sourceStem": "ch-rocker-arm-tl-vn-oblique-left-clamp-screw",
+      "sourceNumber": null,
+      "parent": "ch-rocker-arm-tl-oblique-jig",
+      "stem": "ch-rocker-arm-tl-vn-oblique-left-clamp-screw",
+      "number": "MHA-CH-06-TL-VN-86"
     },
     {
       "sourceStem": "ch-rocker-arm-tl-vn-oblique-feed-nut",
@@ -1054,7 +1061,7 @@
       "status": "archive-only"
     }
   ],
-  "currentRegistryMapSha256": "bf749cd855fb5640fb6d67de56320f050bd07f858fcece351ec4198d556e982f",
+  "currentRegistryMapSha256": "87816498d8844ea6206e0f5e8a0500a395da84d770219d93d710e400d24d7f0b",
   "nativeIdentities": [
     {
       "sourceStem": "ch-rocker-arm-tl-oblique-feed-lever",
@@ -2233,6 +2240,36 @@
         {
           "stem": "ch-rocker-arm-tl-oblique-feed-block",
           "number": "MHA-CH-06-TL-32"
+        }
+      ]
+    },
+    {
+      "sourceStem": "ch-rocker-arm-tl-oblique-hub-stud",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-hub-stud",
+          "number": "MHA-CH-06-TL-33"
+        }
+      ]
+    },
+    {
+      "sourceStem": "ch-rocker-arm-tl-oblique-hub-sleeve",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-hub-sleeve",
+          "number": "MHA-CH-06-TL-34"
+        }
+      ]
+    },
+    {
+      "sourceStem": "ch-rocker-arm-tl-oblique-hub-washer",
+      "sourceNumber": null,
+      "identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-hub-washer",
+          "number": "MHA-CH-06-TL-35"
         }
       ]
     },

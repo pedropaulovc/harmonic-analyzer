@@ -62,6 +62,7 @@ from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
+from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
@@ -101,6 +102,8 @@ SHEET_SCALE = (1.0, 2.0)
 VIEW_SCALE = (1, 2)
 ISO_SCALE = part_spec.ISOMETRIC_VIEW_SCALE
 TOP_CENTER = (0.222, 0.185)
+SHEET_NAMES = ("CARRIER", "LEFT CLAMP")
+LEFT_CLAMP_DIMENSIONS = frozenset(("LeftClampX", "LeftClampY"))
 # The iso (~58 x 34 mm at 1:8) right of section A-A and its note under it,
 # both above the title block (jig-r3: the note ran into it).
 ISO_CENTER = (0.386, 0.103)
@@ -198,6 +201,8 @@ TOP_KEEP: dict[str, tuple[float, float, float]] = {
     # Y stations left; CR's X below, CR's Y and the levers right.
     "CrX": _xy(141.0, -140.4),  # lane y 102
     "CrY": _xy(_RIGHT[2], 13.0),
+    "LeftClampX": _xy(-190.0, -155.0),
+    "LeftClampY": _xy(-369.0, 14.0),
     "RiserX1": _xy(-80.0, 138.2),  # lane y 238.5
     "RiserX1R": _xy(-104.0, -104.8),  # lane y 117
     "RiserY1": _xy(_LEFT[3], 65.8),
@@ -315,6 +320,7 @@ part_metadata(
         "DRAWING_PRECISION_BY_NAME",
         ("_drawing_hole_callout", "add_native_hole_callout"),
         ("ch_rocker_arm_tl_oblique_callouts", "set_callout_lengths_to_three_places"),
+        ("draw_ch_rocker_arm_tl_oblique_carrier", "_left_clamp_depth_callout"),
     )
 )
 
@@ -493,6 +499,15 @@ _TAPS = (
         part_spec.DRAWING_PRECISION_BY_NAME["CrY"],
     ),
     (
+        "left_clamp_tap",
+        (part_spec.LEFT_CLAMP,),
+        part_spec.LEFT_CLAMP_THREAD,
+        part_spec.LEFT_CLAMP_TAP_DRILL,
+        "LEFT_CLAMP_SPEC",
+        3,
+        3,
+    ),
+    (
         "riser_tap",
         part_spec.RISER_SCREWS,
         part_spec.RISER_THREAD,
@@ -519,7 +534,10 @@ for _stem, _points, _thread, _drill, _spec_name, _places, _y_places in _TAPS:
             f"{_stem}_{_index}",
             kind="hole",
             faces=(CylinderFace(_drill, contains_x_mm=_x, contains_z_mm=-_y),),
-            requirements=("thread", "dia", "station", "height", "thru"),
+            requirements=(
+                "thread", "dia", "station", "height", "thru",
+                *(("depth", "thread_depth_min") if _stem == "left_clamp_tap" else ()),
+            ),
             fields={
                 "at": ([_x, 0.0, -_y], (_spec_name,)),
                 "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
@@ -530,7 +548,17 @@ for _stem, _points, _thread, _drill, _spec_name, _places, _y_places in _TAPS:
                     (_spec_name, "DRILLED_BAND"),
                 ),
                 "dia_nominal": (_drill_printed, (_spec_name,)),
-                "thru": (True, (_spec_name,)),
+                "thru": (_stem != "left_clamp_tap", (_spec_name,)),
+                **({
+                    "depth": (
+                        _limits(part_spec.LEFT_CLAMP_DRILL_DEPTH, 2),
+                        ("LEFT_CLAMP_DRILL_DEPTH",),
+                    ),
+                    "thread_depth_min": (
+                        part_spec.LEFT_CLAMP_THREAD_DEPTH,
+                        ("LEFT_CLAMP_THREAD_DEPTH",),
+                    ),
+                } if _stem == "left_clamp_tap" else {}),
                 "station": (
                     limits(
                         _from_a1(_x, _places),  # on its printed nominal, like _BAND
@@ -546,8 +574,36 @@ for _stem, _points, _thread, _drill, _spec_name, _places, _y_places in _TAPS:
                 "height": (_limits(_y, _y_places), (_spec_name,)),
                 "height_nominal": (_printed(_y, _y_places), (_spec_name,)),
             },
-            precision={"dia": _CALLOUT_PLACES, "station": _places, "height": _y_places},
+            precision={
+                "dia": _CALLOUT_PLACES, "station": _places, "height": _y_places,
+                **({"depth": 2, "thread_depth_min": 3} if _stem == "left_clamp_tap" else {}),
+            },
         )
+
+
+def _left_clamp_depth_callout(callout: Any) -> None:
+    """Print the model-owned required thread depth as MIN, pilot at .XX."""
+    from win32com.client.dynamic import Dispatch as dynamic_dispatch
+
+    required = {
+        "hw-threaddepth": (part_spec.LEFT_CLAMP_THREAD_DEPTH, 3, 5),
+        "hw-tapdrldepth": (part_spec.LEFT_CLAMP_DRILL_DEPTH, 2, 0),
+    }
+    for raw in callout.GetHoleCalloutVariables() or ():
+        variable = dynamic_dispatch(raw._oleobj_)
+        name = str(variable.VariableName)
+        if name not in required:
+            continue
+        nominal, places, tolerance_type = required.pop(name)
+        length = _early_bound(raw, "ICalloutLengthVariable")
+        if abs(float(length.Length) * 1000.0 - nominal) > 1e-5:
+            raise RuntimeError(f"left clamp {name}: wrong native depth")
+        length.Precision = places
+        variable.ToleranceType = tolerance_type
+        if int(length.Precision) != places or int(variable.ToleranceType) != tolerance_type:
+            raise RuntimeError(f"left clamp {name}: depth presentation rejected")
+    if required:
+        raise RuntimeError(f"left clamp callout omits native depths: {sorted(required)}")
 
 
 # Copied from _trammel_block_drawing (the old trammel kit is being retired;
@@ -1098,6 +1154,43 @@ def _pin_section(adapter: Any, source_model: Any, top: Any) -> tuple[list[Any], 
     return annotations, section
 
 
+def _left_clamp_sheet(adapter: Any) -> list[Any]:
+    """Give the added blind receiver its own uncrowded native callout sheet."""
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not drawing.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("cannot activate the left-clamp sheet")
+    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=VIEW_SCALE)
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    for view in (top, iso):
+        set_hidden_lines_removed(adapter, view)
+    on_top = _view_mapper(adapter, top)
+    annotations = hidden_sketches.curate_view_dimensions(
+        adapter, top,
+        keep={name: on_top(TOP_KEEP[name]) for name in LEFT_CLAMP_DIMENSIONS},
+        view_label="left clamp locations from A1",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    x, y = part_spec.LEFT_CLAMP
+    callout = add_native_hole_callout(
+        adapter, top, callout_xy=(0.145, 0.115), label="left clamp blind tap",
+        edge=_circle_edge(
+            adapter, top, part_spec.LEFT_CLAMP_TAP_DRILL, "left clamp blind tap",
+            center_x_mm=x, center_y_mm=y,
+        ),
+    )
+    _strip_thread_class(callout, label="left clamp callout", thread=part_spec.LEFT_CLAMP_THREAD)
+    set_callout_lengths_to_three_places(callout, label="left clamp callout")
+    _left_clamp_depth_callout(callout)
+    _append_callout_below(callout, part_spec.LEFT_CLAMP_TAP_CALLOUT, label="left clamp callout")
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    import_cosmetic_threads(adapter, iso)
+    for view in (top, iso):
+        _hide_thread_labels(adapter, view)
+    if not drawing.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("cannot restore the carrier sheet")
+    return annotations
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -1121,6 +1214,9 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         unit=part_drawing_unit(PART_STEM),
     )
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="carrier")
+    if not _early_bound(drawing_model, "IDrawingDoc").ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("cannot activate the carrier sheet")
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -1154,7 +1250,7 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = hidden_sketches.curate_view_dimensions(
         adapter,
         top,
-        keep={name: on_top(xyz) for name, xyz in TOP_KEEP.items()},
+        keep={name: on_top(xyz) for name, xyz in TOP_KEEP.items() if name not in LEFT_CLAMP_DIMENSIONS},
         view_label="top view",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
@@ -1163,7 +1259,6 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     _set_callout_texts(adapter, annotations, CALLOUT_PREFIXES, part=1)
     _set_callout_texts(adapter, annotations, CALLOUT_SUFFIXES, part=2)
-    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _arrows_inside(adapter, annotations, "EdgeX")
     ream = [
         item for item in annotations if dimension_name(adapter, item) == "PinHoleDia"
@@ -1218,6 +1313,8 @@ async def build(adapter: Any) -> dict[str, str]:
     import_cosmetic_threads(adapter, iso)
     for view in (top, iso):
         _hide_thread_labels(adapter, view)
+    annotations.extend(_left_clamp_sheet(adapter))
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
 
     def pin_controls_settled() -> None:
         _assert_ream_control(adapter, ream[0])
@@ -1229,6 +1326,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
         layout=SPEC.layout,
         settled_checks=(pin_controls_settled,),
+        expected_sheet_names=SHEET_NAMES,
     )
 
 

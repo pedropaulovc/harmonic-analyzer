@@ -168,7 +168,7 @@ APEX_Y = R_C1 - H1  # the spindle on the carrier's +Y centreline (inner pass)
 HUB = (0.0, HUB_RADIUS - H1)
 HUB_OFFSET = HUB_RADIUS - R_C1
 
-# --- Riser (6 mm acetal, cut on the jig by the 9/16 in cutter) ⚙ ------------
+# --- Riser (6061, self-cut by the 9/16 in cutter before loading the strap) ------
 RISER_INNER_RADIUS = R_C1 + RISER_CUTTER_DIA / 2.0
 RISER_OUTER_RADIUS = R_C2 - RISER_CUTTER_DIA / 2.0
 # Acceptance on the riser: HUB pin to the riser's inner edge at the apex.
@@ -205,7 +205,7 @@ def at_arc_station(
 # are UNC (memory/fastener-policy-us-customary.md), and they are ASME B18.6.3
 # #4-40 x 5/8 82-degree flat-head machine screws (head Ø0.225 in max), not
 # the plan's M4: an M4 countersunk head (Ø8.96 max) would leave under 1.5 of
-# acetal to a self-cut edge. A B18.3 socket flat head (Ø0.255 in) does not fit
+# aluminium to a self-cut edge. A B18.3 socket flat head (Ø0.255 in) does not fit
 # the riser's countersink either (TrammelJig, jig-r5).
 RISER_SCREW = "#4-40"
 RISER_SCREW_HEAD_DIA = round(0.225 * INCH, 9)
@@ -245,14 +245,13 @@ RISER_SCREW_WALLS = (
     - _RISER_CSK_MOUTH_MAX
     - _RISER_RADIAL_SHIFT,
 )
-# The milled riser blank, 13.40 x 1.60 in, lies square on the carrier with its
-# corner at RISER_BLANK_ORIGIN (carrier frame, y .63). The self-cut band runs
-# from y 21.40 (inner edge at the blank's ends) to 50.90 (outer edge at the
-# apex), nominally at least 5 inside both long edges. Rule 17 reads the
-# blank's edges, so its size prints .XX (.X is for unread features only).
-RISER_BLANK_LENGTH = 340.36  # 13.40
-RISER_BLANK_WIDTH = 40.64  # 1.60
-RISER_BLANK_ORIGIN = (-RISER_BLANK_LENGTH / 2.0, 16.002)  # y .63
+# The 6061 blank extends beyond the extra left clamp. The .59 Y station
+# preserves the existing >=5 mm raw-edge allowance after extending its ends.
+# The self-cut 9/16 band is 2.38125 mm clear of the 3/8 strap cutter on each
+# side: the strap cutter does not cut the riser.
+RISER_BLANK_LENGTH = 350.52  # 13.80
+RISER_BLANK_WIDTH = 41.148  # 1.62: enlarged HUB sleeve hole retains .080 edge wall
+RISER_BLANK_ORIGIN = (-RISER_BLANK_LENGTH / 2.0, 14.986)  # y .59
 RISER_BAND_Y = (
     math.sqrt(RISER_INNER_RADIUS**2 - (RISER_BLANK_LENGTH / 2.0) ** 2) - H1,
     RISER_OUTER_RADIUS - H1,
@@ -281,6 +280,10 @@ _BLANK_END_ANGLE = math.asin((BLANK_LENGTH / 2.0) / HUB_RADIUS)
 CL_ANGLE = (TIP_ANGLE + _BLANK_END_ANGLE) / 2.0
 CR = on_hub_radius(HUB_RADIUS * math.sin(CL_ANGLE))
 CL = (-CR[0], CR[1])
+# Additional hold-down outboard of CL; CL remains the locating dowel.
+# Its radius is the actual main-line hub radius (808.254), not a rounded
+# concept value. The 350 mm held blank leaves material under its entire head.
+LEFT_CLAMP = on_hub_radius(-169.5)
 # The same points from the hub (the strap's own frame for the T1 setup):
 CL_FROM_HUB = (CL[0] - HUB[0], CL[1] - HUB[1])
 CR_FROM_HUB = (CR[0] - HUB[0], CR[1] - HUB[1])
@@ -441,9 +444,9 @@ PIVOT_SHIM_PACK = 1.016  # 5 x .008
 PIVOT_SPACER_LENGTH = 15.875  # .625 loose purchased spacer (TL-VN-78)
 PIVOT_SUPPORT_HEIGHT = PIVOT_SHIM_PACK + PIVOT_SPACER_LENGTH
 # Finished dimensions, not purchased stock: face 1/2 in 6061-T6511 bar to
-# CARRIER_THICK and 1/4 in acetal to RISER_THICK (#1619). Both native drawing
-# dimensions take their printed title-block band, not a supplier-stock
-# tolerance. CL locator height is set from the actual riser at assembly.
+# CARRIER_THICK and 1/4 in 6061 to RISER_THICK. Both native drawing dimensions
+# take their printed title-block band, not a supplier-stock tolerance.
+# CL locator height is set from the actual riser at assembly.
 CARRIER_THICK = 11.938  # .47
 CARRIER_THICK_PLACES = 2
 CARRIER_THICK_BAND = printed_band_mm(CARRIER_THICK_PLACES, unit=CARRIER_UNIT)

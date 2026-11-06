@@ -1,29 +1,28 @@
-r"""Pure-data contract for the oblique-trammel jig's acetal riser (MHA-CH-06-TL-24).
+r"""Pure-data contract for the oblique-trammel jig's 6061 riser (MHA-CH-06-TL-24).
 
 Shop fixture, not a machine part (cad/docs/subsystem-identities.md). The riser
-is screwed flat on the carrier top (MHA-CH-06-TL-21) under the strap blank,
-so the cutter that profiles the strap runs out into acetal rather than the
-aluminium carrier.
+supports the strap and both added hold-downs on the carrier. Self-cut it with
+the 9/16 cutter before loading the strap: the 3/8 cutter then clears both
+band edges by 2.38125 mm. Neither strap pass cuts the riser.
 
-Material and stock: black acetal (Delrin), McMaster 8663K55, 1/4 x 1-3/4 in
-bar (owner selection 2026-11-03). Face to .24 (``RISER_THICK``) and mill the blank to 1.60 x 13.40
-(``RISER_BLANK_WIDTH`` x ``RISER_BLANK_LENGTH``) at the .XX title-block band:
-the rule-17 walls below read the blank's edges.
+Material and stock: 6061 aluminium, 1/4 x 1-3/4 in bar. Face to .24
+(``RISER_THICK``), mill to 1.62 x 13.80 (``RISER_BLANK_WIDTH`` x
+``RISER_BLANK_LENGTH``). The rule-17 walls below read the blank's edges.
 
 Issue #290: the sheet prints decimal inch (``UNIT``). Lengths stay physical
 millimetres, each fabricated nominal the exact millimetre value of its printed
 inch on the printed grid; the hole stations are the carrier's kinematic ones.
 
 Frame (the SolidWorks model): origin at the blank corner, which sits at
-``RISER_BLANK_ORIGIN`` ⚙ (y .63) in the carrier frame (origin at the
+``RISER_BLANK_ORIGIN`` ⚙ (y .59) in the carrier frame (origin at the
 midpoint of A1-B1, +X A1 to B1, +Y toward the part, Z0 the carrier top).
-+X runs along the 13.40 length, +Y across the 1.60 width, +Z up through the
++X runs along the 13.80 length, +Y across the 1.62 width, +Z up through the
 .24 thickness; Z0 is the bottom face (the carrier seat). The axes are parallel
 to the carrier's, so every hole position is its carrier-frame position minus
 ``RISER_BLANK_ORIGIN``.
 
 Hole locations come from the carrier at assembly: the riser is cut in place
-on the carrier, so its seven holes are spotted through the carrier's finished
+on the carrier, so its eight holes are spotted through the carrier's finished
 holes and taps (the TL-00 assembly sequence). The sheet prints every station
 as a REFERENCE value in parentheses at 2 places, with one note naming the
 mate; the model retains the unrounded carrier stations so the clearance holes
@@ -45,14 +44,16 @@ Holes, all THRU from the top face:
   countersink in its callout: the plan shows only the countersink's edges of
   each hole, so a native hole callout there is not the wizard's (farm runs
   jig-r3/r4).
-* HUB clearance Ø.47 at ``HUB`` ⚙: passes the purchased HUB gauge pin
-  Ø.4000 -.0001/0 (MHA-CH-06-TL-VN-80).
+* HUB clearance Ø.600 at ``HUB`` ⚙: receives the loose steel sleeve around
+  the flanged hub clamp stud; the sleeve supports the strap locally.
 * CL and CR clearance Ø.257 (letter F) at ``CL`` / ``CR`` ⚙: pass the CL
   1/4 dowel (.2503 max) and the CR 1/4-20 clamp screw (.250 major), and leave
   ``CLAMP_BAND_WALLS`` to the self-cut band at the top of the DRILLED HOLES
   band. The outer band wall falls under the .080 target, over the .060
   floor: a stated shortfall, ``CLAMP_WALL_MIN_TEXT`` on the CL/CR callout
   (owner ruling 6, 2026-11-01; RV-01).
+* Left clamp clearance Ø.206 at ``LEFT_CLAMP`` ⚙: passes the added #10-24
+  hold-down beside the retained CL locating dowel.
 
 The self-cut band (not modelled): the jig cuts the riser in place on its first
 passes with the 9/16 riser cutter, leaving an arc band between
@@ -95,8 +96,8 @@ INCLUDED_ANGLE_TOL_DEG = angular_band_deg(unit=UNIT)
 STATION_PLACES = 2
 
 # --- Blank (faced and milled from 1/4 in stock) -------------------------------
-BLANK_LENGTH = trammel.RISER_BLANK_LENGTH  # 13.40 ⚙
-BLANK_WIDTH = trammel.RISER_BLANK_WIDTH  # 1.60 ⚙
+BLANK_LENGTH = trammel.RISER_BLANK_LENGTH  # 13.80 ⚙
+BLANK_WIDTH = trammel.RISER_BLANK_WIDTH  # 1.62 ⚙
 BLANK_PLACES = 2
 THICKNESS = trammel.RISER_THICK  # .24 ⚙
 THICKNESS_PLACES = trammel.RISER_THICK_PLACES
@@ -117,6 +118,8 @@ SCREW_HOLES = tuple(to_riser(p) for p in trammel.RISER_SCREWS)  # ⚙
 HUB_HOLE = to_riser(trammel.HUB)  # ⚙
 CL_HOLE = to_riser(trammel.CL)  # ⚙
 CR_HOLE = to_riser(trammel.CR)  # ⚙
+LEFT_CLAMP_HOLE = to_riser(trammel.LEFT_CLAMP)
+LEFT_CLAMP_DIA = 5.2324  # .206, #10 close clearance
 
 # "#4-40" -> the wizard's "#4" clearance size.
 SCREW_SIZE = trammel.RISER_SCREW.split("-")[0]
@@ -134,7 +137,7 @@ CSK_ANGLE = 82.0  # the flat head's own included angle
 CSK_FLANK_ANGLE = 90.0 - CSK_ANGLE / 2.0  # face to flank, the sketch's
 CSK_DIA = trammel.RISER_CSK_DIA  # .25 ⚙
 CSK_PLACES = trammel.RISER_CSK_PLACES  # 2 ⚙
-HUB_DIA = 11.938  # .470
+HUB_DIA = 15.24  # .600: loose clearance for the full-wall steel sleeve
 # Drilled sizes print 3 places so the DRILLED HOLES band lands on their grid.
 HUB_PLACES = 3
 # CL 1/4 dowel and CR 1/4-20 screw, on the self-cut band: the letter F drill.
@@ -151,14 +154,15 @@ if (CSK_DIA - _XX) / 2.0 < SCREW_HEAD_DIA_MAX / 2.0:
 CSK_DEPTH_MAX = (CSK_DIA + _XX) / 2.0 / math.tan(math.radians(CSK_ANGLE / 2.0))
 if CSK_DEPTH_MAX >= THICKNESS - THICKNESS_BAND:
     raise AssertionError("riser countersink breaks through the blank")
-if HUB_DIA <= carrier.HUB_PIN_LIMITS[1]:
-    raise AssertionError("the riser's HUB hole does not pass the gauge pin")
+if HUB_DIA <= carrier.HUB_STUD_LIMITS[1]:
+    raise AssertionError("the riser's HUB hole does not pass the clamp stud")
 
 HOLES: dict[str, tuple[tuple[float, float], float]] = {
     **{f"screw {i}": (xy, SCREW_DIA) for i, xy in enumerate(SCREW_HOLES, start=1)},
     "HUB": (HUB_HOLE, HUB_DIA),
     "CL": (CL_HOLE, CLAMP_DIA),
     "CR": (CR_HOLE, CLAMP_DIA),
+    "left clamp": (LEFT_CLAMP_HOLE, LEFT_CLAMP_DIA),
 }
 
 # Rule 17 at worst case: every hole (or its countersink) to the blank edges,
@@ -265,6 +269,9 @@ GLOBALS: dict[str, float] = {
     "ClampY": CL_HOLE[1],
     "HubDia": HUB_DIA,
     "ClampDia": CLAMP_DIA,
+    "LeftClampX": LEFT_CLAMP_HOLE[0],
+    "LeftClampY": LEFT_CLAMP_HOLE[1],
+    "LeftClampDia": LEFT_CLAMP_DIA,
     "CskDia": CSK_DIA,
     # The reference circle prints the drill's size; the wizard cuts SCREW_DIA.
     "ScrewDia": SCREW_DIA_PRINTED,
@@ -280,6 +287,8 @@ CIRCLES: tuple[
      ('"ClX"', '"ClampY"', '"ClampDia"')),
     (CR_HOLE, CLAMP_DIA, ("CrX", "CrY", "ClampDia2"),
      ('"CrX"', '"ClampY"', '"ClampDia"')),
+    (LEFT_CLAMP_HOLE, LEFT_CLAMP_DIA, ("LeftClampX", "LeftClampY", "LeftClampDia"),
+     ('"LeftClampX"', '"LeftClampY"', '"LeftClampDia"')),
 )  # fmt: skip
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -293,10 +302,15 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "ScrewInnerY",
         "ScrewOuterY",
     },
-    "HoleProfile": {"HubX", "HubY", "ClX", "CrX", "ClampY", "HubDia", "ClampDia"},
+    "HoleProfile": {
+        "HubX", "HubY", "ClX", "CrX", "ClampY", "HubDia", "ClampDia",
+        "LeftClampX", "LeftClampY", "LeftClampDia",
+    },
     "ScrewHoleReference": {"ScrewDia"},
 }
-_STATIONS = DRAWING_DIMENSIONS["ScrewHoles"] | {"HubX", "HubY", "ClX", "CrX", "ClampY"}
+_STATIONS = DRAWING_DIMENSIONS["ScrewHoles"] | {
+    "HubX", "HubY", "ClX", "CrX", "ClampY", "LeftClampX", "LeftClampY",
+}
 _SIZE_PLACES = {
     "BlankLength": BLANK_PLACES,
     "BlankWidth": BLANK_PLACES,
@@ -304,6 +318,7 @@ _SIZE_PLACES = {
     "ScrewDia": SCREW_DIA_PLACES,
     "HubDia": HUB_PLACES,
     "ClampDia": CLAMP_PLACES,
+    "LeftClampDia": 3,
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     feature: {
@@ -349,10 +364,11 @@ if not set(ROW_COUNTS) <= REFERENCE_DIMENSIONS:
     raise AssertionError("a counted row height is not a reference station")
 # The hole callouts, one per hole size: the screw hole's carries its
 # countersink, and each its location from the carrier.
-HOLE_CALLOUTS = ("ScrewDia", "HubDia", "ClampDia")
+HOLE_CALLOUTS = ("ScrewDia", "HubDia", "ClampDia", "LeftClampDia")
 CALLOUTS_BELOW = {
     "ScrewDia": f"DRILL THRU\n{CSK_CALLOUT}\n{LOCATE_CALLOUT}",
     "HubDia": f"DRILL THRU\nHUB HOLE\n{LOCATE_CALLOUT}",
+    "LeftClampDia": f"DRILL THRU\nLEFT HOLD-DOWN\n{LOCATE_CALLOUT}",
     "ClampDia": (
         f"DRILL THRU\nCL AND CR HOLES\n{CLAMP_WALL_MIN_TEXT}\n{LOCATE_CALLOUT}"
     ),
