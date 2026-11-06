@@ -515,7 +515,7 @@ def test_the_stem_diameters_print_across_their_own_cut() -> None:
     # The text clears the overall length's dimension line beyond it.
     assert drawing.SECTION_KEEP["OverallLength"][0] - drawing._STEM_TEXT_X > 0.004
     # All nine turned/dished sizes remain above the seat. The cone diameter
-    # has a left caption lane; the native angle's arc stays at its real cone.
+    # has a left caption lane; the native angle prints on its own arc below.
     seat_y = drawing._section_y(0.0)
     turned = set().union(
         *(spec.DRAWING_DIMENSIONS[feature] for feature in ("HeadProfile", "StemProfile", "DishProfile"))
@@ -523,40 +523,45 @@ def test_the_stem_diameters_print_across_their_own_cut() -> None:
     assert len(turned) == 9
     assert all(drawing.SECTION_KEEP[name][1] >= seat_y for name in turned)
     dia = drawing.SECTION_KEEP["CountersinkDia"]
-    angle_arc = drawing.SECTION_KEEP["CountersinkHalfAngle"]
-    angle_text = drawing.COUNTERSINK_ANGLE_TEXT_XY
+    angle_text = drawing.SECTION_KEEP["CountersinkHalfAngle"]
     assert dia[0] < drawing.SECTION_CENTER[0] - drawing.HALF_HEAD - 0.020
     assert dia[1] < seat_y
     assert dia[1] > SHEET_INNER_LEFT + 0.020
-    # Compact arc anchor just outside the rear cone, not outside the head.
-    cone_right = drawing._section_x(spec.CSK_DIA / 2.0)
-    assert 0.0 < angle_arc[0] - cone_right < 0.003
-    assert 0.0 < seat_y - angle_arc[1] < 0.003
     apex = drawing.COUNTERSINK_APEX_XY
     assert apex == (drawing.SECTION_CENTER[0], drawing._section_y(spec.REAR_CSK_APEX_Y))
-    assert math.dist(angle_arc, apex) < 0.015
 
     def from_axis(point: tuple[float, float]) -> float:
         """Degrees off the axis below the apex, toward the right-hand cone."""
         return math.degrees(math.atan2(point[0] - apex[0], apex[1] - point[1]))
 
-    # Round 3: the text sits inside the angle's own sector (axis to cone
-    # extension), beyond the arc and below the seat, so the native arc is
-    # never extended past the cone into the hatching.
-    assert 0.0 < from_axis(angle_text) < spec.CSK_HALF_ANGLE_DEG
-    assert math.dist(angle_text, apex) > math.dist(angle_arc, apex) + 0.005
-    assert drawing.SECTION_CAPTION_XY[1] < angle_text[1] - 0.0035 < angle_text[1] < dia[1]
-    # Its leader leaves the arc right of the cone diameter's extension line.
-    arc_r = math.dist(angle_arc, apex)
-    leader_start_x = apex[0] + arc_r * math.sin(math.radians(from_axis(angle_text)))
-    assert leader_start_x > cone_right
-    # Negative control: round 2's text right of the head sat ~73° off the
-    # axis, so the arc swung on past the 45° cone into the material.
-    round_2_text = (drawing.SECTION_CENTER[0] + 0.049, seat_y - 0.008)
-    assert from_axis(round_2_text) > spec.CSK_HALF_ANGLE_DEG
-    # Negative control: 4e9a4df's sheet-outboard anchor grew a >50 mm arc.
-    old_arc = (head_right + 0.025, seat_y - 0.008)
-    assert math.dist(old_arc, apex) > 0.050
+    # The text is the arc's own point, on the bisector of the 45° wedge
+    # between the axis and the cone's extension: no leader to run anywhere.
+    radius = drawing.COUNTERSINK_ANGLE_RADIUS
+    assert math.dist(angle_text, apex) == pytest.approx(radius)
+    assert from_axis(angle_text) == pytest.approx(spec.CSK_HALF_ANGLE_DEG / 2.0)
+    # Rendered "45°" measured on run 20261105T225441526Z: 6.8 x 3.2 mm.
+    half_w, half_h = 0.0034, 0.0016
+    cone_right = drawing._section_x(spec.CSK_DIA / 2.0)
+    cone_dim_line = seat_y - 0.0135
+    cone_extension_end = cone_dim_line - 0.0011
+    # The arc passes under the cone diameter's right extension line, never
+    # across its dimension line between the axis and that extension line.
+    arc_at_extension = apex[1] - math.sqrt(radius**2 - (cone_right - apex[0]) ** 2)
+    assert arc_at_extension < cone_extension_end - 0.003
+    # The text sits under that extension line's end, right of the axis and
+    # clear of the cone's own extension line (the flank produced, 45°).
+    assert angle_text[1] + half_h < cone_extension_end - 0.001
+    assert angle_text[0] - half_w > apex[0] + 0.001
+    corner = (angle_text[0] + half_w, angle_text[1] + half_h)
+    flank_gap = ((apex[1] - corner[1]) - (corner[0] - apex[0])) / math.sqrt(2.0)
+    assert flank_gap > 0.003
+    # Negative control: the old arc seed hugged the cone (radius ~12 mm). Its
+    # arc stays above the cone diameter's dimension line, so text standing on
+    # it at the bisector would sit on that dimension's right extension line.
+    old_radius = math.dist((cone_right + 0.0018, seat_y - 0.0018), apex)
+    assert apex[1] - old_radius > cone_dim_line
+    old_text_x = apex[0] + old_radius * math.sin(math.radians(22.5))
+    assert old_text_x - half_w < cone_right < old_text_x + half_w
     # The rim's diameters print above the rim, the knurl outermost.
     rim_y = drawing._section_y(spec.OVERALL_LENGTH)
     assert drawing.SECTION_KEEP["HeadDia"][1] > drawing.SECTION_KEEP["DishDia"][1]
@@ -629,26 +634,33 @@ def test_the_waist_keeps_a_length_at_every_printed_corner(monkeypatch) -> None:
 def test_the_section_caption_hangs_below_the_cone_diameter() -> None:
     """Machinist review: the cone diameter's line and extension lines struck the
     default caption's letters.  Run 20261024T025840809Z measured that line
-    13.5 mm under the seat face; the caption's top stands 6.5 mm under it."""
+    13.5 mm under the seat face; the caption's top stands 6.5 mm under it,
+    and under the foot of the half-angle's arc on the axis."""
     seat_y = drawing._section_y(0.0)
     caption = drawing.SECTION_CAPTION_XY
     assert caption[0] == drawing.SECTION_CENTER[0]
     assert seat_y - caption[1] - 0.0135 >= 0.005
+    arc_foot = drawing.COUNTERSINK_APEX_XY[1] - drawing.COUNTERSINK_ANGLE_RADIUS
+    assert arc_foot - caption[1] >= 0.004
+    # The caption's two rows (15 mm) stay above the inner border, 12.7 mm up.
+    assert caption[1] - 0.015 > 0.0127 + 0.005
 
 
 @pytest.mark.parametrize(
-    "offset_persists,arc_moves,text_moves",
-    ((True, True, True), (False, True, True), (True, False, True), (True, True, False)),
+    "offset_resets,moves",
+    ((True, True), (False, True), (True, False)),
 )
-def test_native_cone_angle_offsets_only_text_and_refuses_noops(
-    monkeypatch, offset_persists, arc_moves, text_moves,
+def test_native_cone_angle_stands_its_text_on_its_arc_and_refuses_noops(
+    monkeypatch,
+    offset_resets,
+    moves,
 ) -> None:
     """Bounded annotation fake follows the SDK OffsetText movement semantics."""
     model_dimension = object()
 
     class Display:
         def __init__(self):
-            self.offset = True  # A previous offset must not preserve a long arc.
+            self.offset = True  # An inherited offset would hang the text on a leader.
 
         @property
         def OffsetText(self):
@@ -656,7 +668,7 @@ def test_native_cone_angle_offsets_only_text_and_refuses_noops(
 
         @OffsetText.setter
         def OffsetText(self, value):
-            self.offset = bool(value) and offset_persists
+            self.offset = bool(value) or not offset_resets
 
     class Annotation:
         def __init__(self):
@@ -671,8 +683,7 @@ def test_native_cone_angle_offsets_only_text_and_refuses_noops(
 
         def SetPosition2(self, x, y, z):
             assert z == 0.0
-            can_move = text_moves if self.display.OffsetText else arc_moves
-            if can_move:
+            if moves:
                 self.text = (x, y)
                 if not self.display.OffsetText:
                     self.arc = self.text
@@ -682,36 +693,20 @@ def test_native_cone_angle_offsets_only_text_and_refuses_noops(
             return (*self.text, 0.0)
 
     annotation = Annotation()
-    adapter = object()
-    calls = []
-
-    def offset(actual_adapter, annotations, positions):
-        assert actual_adapter is adapter and annotations == [annotation]
-        calls.append(positions)
-        annotation.display.OffsetText = True
-        assert annotation.SetPosition2(*positions[annotation.name], 0.0)
-
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, item: item.name)
-    monkeypatch.setattr(drawing, "offset_dimension_text", offset)
-    if not offset_persists:
-        with pytest.raises(RuntimeError, match="did not stay offset"):
-            drawing._place_countersink_angle(adapter, [annotation])
-    elif not arc_moves:
-        with pytest.raises(RuntimeError, match="angle arc did not persist"):
-            drawing._place_countersink_angle(adapter, [annotation])
-    elif not text_moves:
-        with pytest.raises(RuntimeError, match="angle text did not persist"):
-            drawing._place_countersink_angle(adapter, [annotation])
+    if not offset_resets:
+        with pytest.raises(RuntimeError, match="offset could not be reset"):
+            drawing._place_countersink_angle(object(), [annotation])
+    elif not moves:
+        with pytest.raises(RuntimeError, match="angle did not persist"):
+            drawing._place_countersink_angle(object(), [annotation])
     else:
-        drawing._place_countersink_angle(adapter, [annotation])
-        assert annotation.arc == drawing.SECTION_KEEP[annotation.name]
-        assert annotation.text == drawing.COUNTERSINK_ANGLE_TEXT_XY
-        assert annotation.display.OffsetText
+        drawing._place_countersink_angle(object(), [annotation])
+        assert annotation.text == drawing.SECTION_KEEP[annotation.name]
+        assert annotation.arc == annotation.text
+        assert not annotation.display.OffsetText
     assert annotation.dimension is model_dimension
-    assert calls == (
-        [{annotation.name: drawing.COUNTERSINK_ANGLE_TEXT_XY}] if arc_moves else []
-    )
 
 
 def test_native_cone_angle_requires_exactly_one_model_annotation(monkeypatch) -> None:
