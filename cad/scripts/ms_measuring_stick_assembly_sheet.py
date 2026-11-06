@@ -6,11 +6,11 @@ wording edit rebuilds the drawing alone. Printed dimensions interpolate a
 symbol of ``ms_measuring_stick_assembly_spec`` or a part/vendor spec; mate
 drawing numbers come from the part registry.
 
-The stop is set by the stick's own scale: with STOP_MARK on the thumbscrew
-axis the block's 0-side end face lands between two tenth graduations the
-fitter can read from below (the 2.0 mark itself is under the block). The
-sheet-1 near-face dimension stays a reference of that pose. Printed lengths
-are in the assembly contract's ``drawing_unit``.
+Owner ruling 2026-11-06 (option C): the stop has no as-shipped setting; it
+clamps anywhere along the stick. The saved pose (STOP_MARK on the thumbscrew
+axis) and its sheet-1 near-face reference only show an example position, and
+the sheet-1 note says so. Printed lengths are in the assembly contract's
+``drawing_unit``.
 """
 
 from __future__ import annotations
@@ -19,7 +19,6 @@ from fractions import Fraction
 
 import _config
 import ms_measuring_stick_assembly_spec as spec
-import ms_stick_spec as stick
 import ms_stop_spec as stop
 import _mcmaster_90114a124 as plate_screw
 import sh_vn_thumb_screw_spec as thumb
@@ -64,15 +63,6 @@ def _item(stem: str) -> str:
     return f"{_ref(stem)} {_ITEM_NOUNS[stem]}"
 
 
-# The block's 0-side end face, in stick divisions, when STOP_MARK lies on the
-# thumbscrew axis; the step names the tenth graduations either side of it.
-NEAR_FACE_MARK = stop.STOP_MARK - stop.THUMB_AXIS_X / stick.DIVISION_SPACING
-_TENTHS = int(NEAR_FACE_MARK * 10.0)
-NEAR_FACE_WINDOW = (_TENTHS / 10.0, (_TENTHS + 1) / 10.0)
-# Readable as "between" only if the face stands clear of both graduations.
-assert all(abs(NEAR_FACE_MARK - mark) >= 0.02 for mark in NEAR_FACE_WINDOW), NEAR_FACE_MARK
-
-
 def _inch_fraction(length_mm: float) -> str:
     """A vendor's nominal inch length (``1/4``, ``7/16``) from its modeled mm."""
     inches = Fraction(length_mm / 25.4).limit_denominator(64)
@@ -106,7 +96,7 @@ EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
 DRAWING_DIMENSIONS = {spec.SETTING_FEATURE: {spec.SETTING_DIMENSION}}
 # Components own material and finish; no assembly coating operation is required.
 # The fitter's order, one action a step; the explode
-# (ms_measuring_stick_explode_spec) runs steps 7-11 backwards. The block and
+# (ms_measuring_stick_explode_spec) runs steps 7-10 backwards. The block and
 # its cover are a match-drilled pair (steps 1-6): neither is interchangeable.
 # The block's own tapped-hole callout states the drill and full-thread depths;
 # steps 3 and 5 point to it instead of restating them.
@@ -135,11 +125,8 @@ ASSEMBLY_STEPS = (
     f"WINDOW OF {_ref(spec.BLOCK)}, GRADUATED FACE DOWN.",
     f"9. FIT {_PLATE} OVER THE WINDOW, PAIR MARKS TOGETHER; DRIVE BOTH "
     f"{_SCREWS} UNTIL THEIR HEADS SEAT.",
-    f"10. SEEN FROM BELOW, SLIDE {_ref(spec.BLOCK)} ALONG {_ref(spec.STICK)} "
-    "UNTIL ITS END FACE NEARER THE 0 GRADUATION LIES BETWEEN THE "
-    f"{NEAR_FACE_WINDOW[0]:.1f} AND {NEAR_FACE_WINDOW[1]:.1f} GRADUATIONS, AS "
-    "IN THE SHEET 1 BOTTOM VIEW.",
-    f"11. TURN THE {_THUMB} IN BY HAND UNTIL ITS TIP CLAMPS THE TOP FACE OF "
+    f"10. WITH {_ref(spec.BLOCK)} AT ANY POSITION ALONG {_ref(spec.STICK)}, "
+    f"TURN THE {_THUMB} IN BY HAND UNTIL ITS TIP CLAMPS THE TOP FACE OF "
     f"{_ref(spec.STICK)}.",
 )
 ASSEMBLY_CHECKS = (
@@ -147,8 +134,13 @@ ASSEMBLY_CHECKS = (
     "IN THE WINDOW.",
     f"CHECK: WITH {_ref(spec.THUMB_SCREW)} TIGHT, {_BLOCK} DOES NOT MOVE ALONG "
     f"{_ref(spec.STICK)}.",
-    f"CHECK: BOTH {_ref(spec.PLATE_SCREW)} HEADS SEAT ON {_PLATE}, AND "
-    f"{_ref(spec.PLATE)} LIES FLAT ON {_ref(spec.BLOCK)}.",
+    f"CHECK: BOTH {_ref(spec.PLATE_SCREW)} HEADS SEAT ON {_PLATE}.",
+    f"CHECK: {_ref(spec.PLATE)} LIES FLAT ON {_ref(spec.BLOCK)}.",
+)
+# Sheet 1: the pose drawn (and its near-face reference) is one example.
+EXAMPLE_POSE_NOTE = (
+    f"STOP SHOWN CLAMPED AT AN EXAMPLE POSITION. {_ref(spec.BLOCK)} CLAMPS "
+    f"AT ANY POSITION ALONG {_ref(spec.STICK)} (SHEET 3, STEP 10)."
 )
 
 # Both dimensions are reference: the assembly pose, not component sizes.

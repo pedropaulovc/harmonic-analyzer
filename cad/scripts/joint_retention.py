@@ -1861,7 +1861,7 @@ JOINTS: tuple[Joint, ...] = (
         receiver="ms_stop_block",
         thread="#4-40 UNC",
         quantity=1,
-        installed_at="MHA-MS-00 STEP 11",
+        installed_at="MHA-MS-00 STEP 10",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "hand-set operator clamp on a gauge: the stop is pinched at a chosen mark on the measuring "

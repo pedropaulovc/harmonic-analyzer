@@ -135,6 +135,10 @@ STOP_POSITION_TEXT_Y = 0.220
 STOP_POSITION_TEXT_FRACTION = 0.42
 OVERALL_LENGTH_TEXT_Y = 0.257
 NOTE_LINE_PITCH = 0.0046  # default-format note line pitch, as measured on MHA-MG-00
+# Owner ruling 2026-11-06 (option C): the drawn stop position is an example.
+# The note sits under the bottom view, where the deleted setup note stood.
+EXAMPLE_NOTE_XY = (0.030, 0.100)
+EXAMPLE_NOTE_WIDTH = 52  # characters; default-format note text
 
 # Sheet 2 alone is portrait: the native full-size exploded outline plus its
 # unchanged 24 mm balloon ring is 202.0739 mm high; landscape has 200.7 mm
@@ -285,6 +289,7 @@ if CHECKS_XY[1] - (ASSEMBLY_CHECKS.count("\n") + 1) * NOTE_LINE_PITCH < (
     SHEET_INNER_BORDER[1] + NOTE_LINE_PITCH
 ):
     raise AssertionError("the assembly checks run past the bottom border")
+EXAMPLE_NOTE = _wrapped((sheet.EXAMPLE_POSE_NOTE,), width=EXAMPLE_NOTE_WIDTH)
 
 
 def _activate_sheet(adapter: Any, name: str) -> Any:
@@ -901,7 +906,8 @@ def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
 
 def _place_clamped_sheet(adapter: Any) -> Callable[[], None]:
     """Upright working elevation, its projected bottom view (the graduated
-    underside) and clamp section, with the near-face setting reference."""
+    underside) and clamp section, the near-face reference of the drawn pose
+    and the note that the pose is an example."""
     _activate_sheet(adapter, SHEET_NAMES[0])
     # Native StandardWithoutConnector, as in draw_fr_rocker_arm_support:
     # retain the full cutting plane and both arrows, not a hidden section line.
@@ -942,7 +948,11 @@ def _place_clamped_sheet(adapter: Any) -> Callable[[], None]:
     set_hidden_lines_removed(adapter, section)
     apply_view_configuration(adapter, section, label="thumbscrew clamp section")
     _assert_view_on_sheet(section, label="thumbscrew clamp section")
-    return _add_assembly_dimensions(adapter, front)
+    settled = _add_assembly_dimensions(adapter, front)
+    _add_note_block(
+        adapter, SHEET_NAMES[0], EXAMPLE_NOTE, EXAMPLE_NOTE_XY, label="example-pose note"
+    )
+    return settled
 
 
 def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
