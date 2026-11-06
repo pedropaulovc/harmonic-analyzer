@@ -826,24 +826,7 @@ def test_posed_unknown_primitive_names_the_solid():
         _posed_box({"name": "mystery", "shape": "cone", "at_mm": [0, 0, 0]}, pose)
 
 
-@pytest.mark.parametrize(
-    "stem",
-    [
-        pytest.param(
-            stem,
-            marks=(
-                pytest.mark.xfail(
-                    strict=True,
-                    raises=AssertionError,
-                    reason="superseded plan collides with 52PCCK clamps; rewrite in #1577",
-                )
-                if stem == "ch_rocker_arm"
-                else ()
-            ),
-        )
-        for stem in plans.revision_stems()
-    ],
-)
+@pytest.mark.parametrize("stem", plans.revision_stems())
 def test_every_touch_spot_clears_the_hold_by_the_tool_radius_plus_1mm(stem):
     # A paper touch lowers the tool onto the work's top face at a spot the plan names in
     # prose (prechips 0.1.2 has no touch-position field). The tool's widest diameter must

@@ -17,8 +17,9 @@ y = -length.
 
 Cut to fit (optional ``cut_length``; MHA-CH-06-TL-VN-86, the blind TL-21
 receiver): a screw cut at assembly is drawn as installed, the same recipe at
-the cut length under the head, its 0.75P tip chamfer standing for the
-restored cut end.
+the cut length under the head.  Its 0.75P tip chamfer is only the recipe's;
+the production builder re-cuts the cut end natively to the left-clamp spec's
+toleranced ``ChamferLength`` (``fasteners.LEFT_CLAMP_TIP_CHAMFER``).
 
 Run standalone (SolidWorks open)::
 

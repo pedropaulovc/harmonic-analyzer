@@ -22,7 +22,10 @@ ch-rocker-arm-tl-oblique-carrier:
     bottoming-tap #10-24 to .310 MIN from the entry face, with at most .010
     entry break and a bottoming lead no longer than one pitch. Do not drill
     through the carrier. Break edges. The unchanged .4000 HUB bore is
-    match-drilled and reamed in situ on the assembled jig (TL-00 step 10).
+    match-drilled and reamed in situ on the assembled jig (TL-00 step 10);
+    chamfer that bore's underside .02 x 45 degrees, ordinary .XX tolerance,
+    to clear the TL-33 root fillet. The CAD shows the finished assembly-machined
+    bore and chamfer, not a predrilling operation or a separate hole location.
     The pivot bores turn on TL-VN-77 shoulder screws; the underside seats on
     TL-VN-78 spacers.
   machinist_exceptions:

@@ -983,12 +983,6 @@ def _thread(row: fasteners.Fastener, tap_drill: float) -> tuple[float, float, fl
 
 
 def test_interference_contracts_are_physical_seats_and_threads() -> None:
-    overlap = min(trammel.CARRIER_TOP_Z, spec.HUB_STUD_TOP_Z) - max(
-        trammel.CARRIER_UNDERSIDE_Z, spec.HUB_STUD_ORIGIN[2],
-    )
-    assert contracts.JIG_HUB_STUD_SEAT == pytest.approx((hub_stud.SHANK_DIA, overlap))
-    # The in-situ receiver envelope covers the shank, not the flange/nose.
-    assert overlap == pytest.approx(carrier.THICKNESS)
     assert contracts.JIG_CL_DOWEL_PRESS == (cl_dowel.DIA, carrier.THICKNESS)
     for envelope, expected in (
         (
@@ -1060,10 +1054,9 @@ def test_interference_contracts_are_physical_seats_and_threads() -> None:
         for index in range(count)
     }
     assert all(pair <= names for pair in pairs)
-    assert len(pairs) == 2 + sum(spec.QUANTITIES[s] for s in SCREW_ROWS) + 8 + 1 + 2
-    seat = math.pi * hub_stud.SHANK_DIA**2 * overlap / 4.0
+    assert len(pairs) == 1 + sum(spec.QUANTITIES[s] for s in SCREW_ROWS) + 8 + 1 + 2
     hub = frozenset((f"{spec.HUB_STUD}-1", f"{spec.CARRIER}-1"))
-    assert pairs[hub] == pytest.approx(1.10 * seat)
+    assert hub not in pairs  # finished native bore and chamfer must clear, not overlap
     dowel = math.pi * cl_dowel.DIA**2 * carrier.THICKNESS / 4.0
     assert pairs[frozenset((f"{spec.CL_DOWEL}-1", f"{spec.CARRIER}-1"))] == (
         pytest.approx(1.10 * dowel)
@@ -1750,7 +1743,8 @@ def test_r3_operation_order_retains_all_clamps_and_clears_self_cutting() -> None
     assert "DO NOT REMOVE THE CL DOWEL" in steps["O5"]
     for family in (spec.HUB_SCREW, spec.HUB_WASHER, spec.LEFT_CLAMP_SCREW):
         assert spec._item(family) in steps["O5"]
-    assert "8.65–8.85 MM" in steps["O6"]
+    assert "8.40–8.62 MM" in steps["O6"]
+    assert "45° X .030–.035" in steps["O6"]
     assert "GAUGE FULL THREAD ENGAGEMENT 7.239 MM MIN" in steps["O6"]
     assert "BOTTOM CLEARANCE .29 MM MIN; NO BOTTOM CONTACT" in steps["O6"]
     assert "RETAIN ALL THREE CLAMPS THROUGH BOTH PASSES" in steps["O6"]
@@ -2520,10 +2514,8 @@ def test_flanged_hub_stud_keeps_the_locator_nose_and_positive_seat() -> None:
     assert spec.HUB_STUD_TOP_Z - (trammel.CARRIER_TOP_Z + trammel.RISER_THICK) == pytest.approx(hub_stud.TIP_SET)
     assert spec.HUB_STUD_TOP_Z - spec.HUB_STUD_ORIGIN[2] == pytest.approx(hub_stud.LENGTH)
     assert spec.HUB_STUD_ORIGIN[2] + hub_stud.FLANGE_THICK == pytest.approx(trammel.CARRIER_UNDERSIDE_Z)
-    overlap = min(trammel.CARRIER_TOP_Z, spec.HUB_STUD_TOP_Z) - max(
-        trammel.CARRIER_UNDERSIDE_Z, spec.HUB_STUD_ORIGIN[2],
-    )
-    assert overlap == pytest.approx(contracts.JIG_HUB_STUD_SEAT[1])
+    assert carrier.HUB_ROOT_CLEARANCE_MIN > 0
+    assert carrier.HUB_FLANGE_SEAT_WIDTH_MIN >= 2.032
 
 
 def test_hold_down_inch_limits_lie_on_the_safe_side_of_the_kit_limits() -> None:

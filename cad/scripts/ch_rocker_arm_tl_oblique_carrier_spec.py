@@ -120,6 +120,7 @@ from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import (
+    angular_band_deg,
     drilled_oversize_mm,
     edge_break_chamfer_mm,
     printed_band_mm,
@@ -200,6 +201,32 @@ HUB_SLIP_CLEARANCE_MIN = HUB_HOLE_LIMITS[0] - HUB_STUD_LIMITS[1]
 HUB_SLIP_CLEARANCE_MAX = HUB_HOLE_LIMITS[1] - HUB_STUD_LIMITS[0]
 if HUB_SLIP_CLEARANCE_MIN <= 0.0:
     raise AssertionError("hub clamp stud does not slip through the unchanged carrier bore")
+# Finished assembly-machined state: the bore's location is still set by TL-00
+# step 10, not independently located from the plate edges on this drawing.
+HUB = trammel.HUB
+HUB_CHAMFER = 0.508  # .02, ordinary .XX ±.01: no tightened band
+HUB_CHAMFER_PLACES = 2
+HUB_CHAMFER_BAND = printed_band_mm(HUB_CHAMFER_PLACES, unit=UNIT)
+HUB_CHAMFER_MIN = HUB_CHAMFER - HUB_CHAMFER_BAND
+HUB_CHAMFER_MAX = HUB_CHAMFER + HUB_CHAMFER_BAND
+HUB_CHAMFER_ANGLE_BAND = angular_band_deg(unit=UNIT)
+# Bound both legs irrespective of which chamfer leg SOLIDWORKS dimensions.
+_HUB_CHAMFER_LEG_RATIO = math.tan(math.radians(45.0 - HUB_CHAMFER_ANGLE_BAND))
+HUB_ROOT_CLEARANCE_MIN = (
+    HUB_CHAMFER_MIN * _HUB_CHAMFER_LEG_RATIO - hub_stud.ROOT_FILLET_R
+)
+HUB_FLANGE_SEAT_WIDTH_MIN = (
+    (hub_stud.FLANGE_DIA - printed_band_mm(3, unit=UNIT)) / 2.0
+    - HUB_HOLE_LIMITS[1] / 2.0 - HUB_CHAMFER_MAX / _HUB_CHAMFER_LEG_RATIO
+)
+if HUB_ROOT_CLEARANCE_MIN <= 0.0:
+    raise AssertionError("the HUB underside mouth cannot clear the stud root fillet")
+if HUB_FLANGE_SEAT_WIDTH_MIN < WALL_TARGET_MM:
+    raise AssertionError("the HUB chamfer consumes the stud flange's bearing seat")
+HUB_HOLE_CALLOUT = (
+    "REAM THRU AT ASSEMBLY\nLOCATION: TL-00 STEP 10\nSLIP ON MHA-CH-06-TL-33"
+)
+HUB_CHAMFER_CALLOUT = "X 45° UNDERSIDE\nAT ASSEMBLY; CLEARS TL-33 ROOT"
 # The mate's number and name print on rows of their own: on one row they
 # made the block 91 mm wide, past the inner border and across the plate
 # end's extension line.
@@ -310,7 +337,13 @@ LEFT_CLAMP_THREAD = "#10-24"
 LEFT_CLAMP_TAP_DRILL = TAP_DRILL_MM[LEFT_CLAMP_THREAD]
 LEFT_CLAMP_DRILL_DEPTH = 9.398  # .37, .XX band
 LEFT_CLAMP_THREAD_DEPTH = 7.874  # .310 MIN from entry face
+LEFT_CLAMP_THREAD_TOL_TYPE = 5  # swTolMIN, authored on the Wizard's source dimension
+LEFT_CLAMP_THREAD_PLACES = 3
 LEFT_CLAMP_FULL_THREAD_MIN = LEFT_CLAMP_THREAD_DEPTH - 0.254  # .010 entry break
+# Feature export keeps the pilot's .XX depth band in `depth` and cites these
+# independent thread minima in the required `note`: prechips has no separate
+# full-thread-depth field. The .310 MIN is not a bilateral depth tolerance;
+# the .010 entry break leaves .300 MIN of usable full thread.
 LEFT_CLAMP_FLOOR_MIN = (
     THICKNESS - THICKNESS_BAND - LEFT_CLAMP_DRILL_DEPTH - _XX
 )
@@ -462,6 +495,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "LeftClampTap": {"LeftClampY"},
     "RiserTaps": {"RiserY1", "RiserY2"},
     "LeverTaps": {"LeverY1", "LeverY2"},
+    "HubHoleProfile": {"HubHoleDia"},
+    "HubChamfer": {"HubChamferSize"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateProfile": {
@@ -497,6 +532,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LeftClampTap": {"LeftClampY": 3},
     "RiserTaps": {"RiserY1": RISER_STATION_PLACES, "RiserY2": RISER_STATION_PLACES},
     "LeverTaps": {"LeverY1": 2, "LeverY2": 2},
+    "HubHoleProfile": {"HubHoleDia": 4},
+    "HubChamfer": {"HubChamferSize": HUB_CHAMFER_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

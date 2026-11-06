@@ -23,8 +23,10 @@ Z, model Z = -carrier Y, so a Top-plane sketch reads carrier (X, Y)):
   placements below stay origin-based, driven from it;
 * the CL centre-drill spot is a 90 degree cone, revolved on a plane through
   its axis parallel to the Front plane (the plane's offset is the spot's Y
-  station) as the pivot plate's seat cone; the HUB is not on this part (it is
-  drilled in situ at assembly, owner ruling 5);
+  station) as the pivot plate's seat cone;
+* the unchanged HUB bore and controlled underside chamfer show the finished
+  assembly-machined state; TL-00 step 10 still owns its drilling/reaming
+  location and sequence, so no independent HUB station is printed here;
 * the CR, riser and feed-lever taps are UNC Hole Wizard features from the
   top face, through;
 * each pin hole carries a hidden reference axis (``PIN_HOLE_AXES``), two
@@ -99,6 +101,13 @@ from ch_rocker_arm_tl_oblique_carrier_spec import (
     LEFT_CLAMP_SPEC,
     LEFT_CLAMP_TAP_DRILL,
     LEFT_CLAMP_DRILL_DEPTH,
+    LEFT_CLAMP_THREAD_DEPTH,
+    LEFT_CLAMP_THREAD_TOL_TYPE,
+    LEFT_CLAMP_THREAD_PLACES,
+    HUB,
+    HUB_HOLE_DIA,
+    HUB_HOLE_BAND,
+    HUB_CHAMFER,
     OUTLINE_X,
     OUTLINE_Y,
     PIN_HOLE_AXES,
@@ -676,6 +685,93 @@ def _pin_chamfer_min_limit(adapter) -> None:
     _telemetry.success(f"{label}: single limit {PIN_CHAMFER:g} MIN")
 
 
+def _left_clamp_thread_dimension(adapter):
+    """Resolve the one Wizard-owned full-thread depth, including its subfeatures."""
+    from _com import _com_invoke
+    from _dimensions import _feature_display_dimensions
+    from _drawing_marks import _feature_tree
+
+    feature = _early_bound(_feature_by_name(adapter, "LeftClampTap"), "IFeature")
+    definition = _early_bound(feature.GetDefinition(), "IWizardHoleFeatureData2")
+    if abs(float(definition.ThreadDepth) * 1000.0 - LEFT_CLAMP_THREAD_DEPTH) > 1e-5:
+        raise RuntimeError("LeftClampTap: native full-thread depth changed")
+    matches = []
+    for current in _feature_tree(feature):
+        owner = str(_com_invoke(current, "IFeature", "Name"))
+        for display in _feature_display_dimensions(current):
+            dimension = _com_invoke(display, "IDisplayDimension", "GetDimension2", 0)
+            name = str(_com_invoke(dimension, "IDimension", "FullName"))
+            parts = name.split("@")
+            if int(_com_invoke(dimension, "IDimension", "GetType")) != 0:
+                continue
+            if len(parts) < 2 or parts[1] != owner:
+                continue
+            value = float(_com_invoke(dimension, "IDimension", "SystemValue")) * 1000.0
+            if abs(value - LEFT_CLAMP_THREAD_DEPTH) < 1e-5:
+                matches.append((display, dimension))
+    if len(matches) != 1:
+        raise RuntimeError(f"LeftClampTap: expected one owned full-thread dimension, got {len(matches)}")
+    return tuple(_early_bound(value, interface) for value, interface in zip(
+        matches[0], ("IDisplayDimension", "IDimension"), strict=True
+    ))
+
+
+def _require_left_clamp_thread_min(adapter) -> None:
+    display, dimension = _left_clamp_thread_dimension(adapter)
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    if (int(tolerance.Type) != LEFT_CLAMP_THREAD_TOL_TYPE
+            or abs(float(tolerance.GetMinValue())) > 1e-12
+            or abs(float(tolerance.GetMaxValue())) > 1e-12
+            or int(display.GetPrimaryPrecision2()) != LEFT_CLAMP_THREAD_PLACES):
+        raise RuntimeError("LeftClampTap: source-model thread-depth MIN did not persist")
+
+
+def _author_left_clamp_thread_min(adapter) -> None:
+    display, dimension = _left_clamp_thread_dimension(adapter)
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = LEFT_CLAMP_THREAD_TOL_TYPE
+    if not tolerance.SetValues(0.0, 0.0):
+        raise RuntimeError("LeftClampTap: source thread-depth MIN rejected")
+    display.SetPrecision3(LEFT_CLAMP_THREAD_PLACES, -1, -1, -1)
+    _require_left_clamp_thread_min(adapter)
+
+
+async def _finished_hub_bore(adapter, drive_jobs, volume: float) -> float:
+    """Model the assembly-reamed bore and its controlled underside relief."""
+    from solidworks_mcp.adapters.base import ExtrusionParameters
+
+    dims = SketchDims()
+    check("create HUB bore sketch", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter, *HUB, HUB_HOLE_DIA / 2.0, "assembly HUB bore",
+        dims=dims, names=("HubX", "HubY", "HubHoleDia"),
+    )
+    await ensure_fully_defined(adapter, "assembly HUB bore")
+    check("exit HUB bore sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, "HubHoleProfile")
+    drive_jobs += dims.apply(adapter, "HubHoleProfile")
+    check("cut finished HUB bore", await adapter.create_cut_extrude(
+        ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+    ))
+    name_last_feature(adapter, "HubHole")
+    bore_volume = math.pi * (HUB_HOLE_DIA / 2.0) ** 2 * THICKNESS
+    volume = await volume_check(adapter, "finished HUB bore", volume - bore_volume, 0.001 * bore_volume)
+    check("chamfer HUB underside", await adapter.add_chamfer(
+        HUB_CHAMFER, [[HUB[0] - HUB_HOLE_DIA / 2.0, -THICKNESS, -HUB[1]]]
+    ))
+    name_last_feature(adapter, "HubChamfer")
+    name_dimensions(adapter, "HubChamfer", ["HubChamferSize"])
+    _, size = _named_dimension(adapter, "HubChamfer", "HubChamferSize")
+    if abs(float(size.SystemValue) * 1000.0 - HUB_CHAMFER) > 1e-6:
+        raise RuntimeError("HUB underside chamfer leg did not read back")
+    if int(_early_bound(size.Tolerance, "IDimensionTolerance").Type) != 0:
+        raise RuntimeError("HUB underside chamfer acquired an explicit size band")
+    chamfer_volume = math.pi * HUB_CHAMFER**2 * (HUB_HOLE_DIA / 2.0 + HUB_CHAMFER / 3.0)
+    return await volume_check(
+        adapter, "HUB underside chamfer", volume - chamfer_volume, 0.01 * chamfer_volume
+    )
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -750,6 +846,7 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(
         adapter, "pin chamfers", volume - V_PIN_CHAMFER, 0.05 * V_PIN_CHAMFER + 0.05
     )
+    volume = await _finished_hub_bore(adapter, drive_jobs, volume)
 
     # --- X stations from A1, then the CL centre-drill spot -------------------
     # The printed baselines first: the hidden sketch of points that drives
@@ -792,6 +889,7 @@ async def build(adapter) -> dict[str, str]:
         ],
     )
     drive_jobs += left_clamp.placement_drive_jobs
+    _author_left_clamp_thread_min(adapter)
     # A flat bottom removes only this cylinder. A silently retained 118-degree
     # point fails the volume check instead of consuming the specified floor.
     v_left = math.pi * (LEFT_CLAMP_TAP_DRILL / 2.0) ** 2 * LEFT_CLAMP_DRILL_DEPTH
@@ -890,6 +988,11 @@ async def build(adapter) -> dict[str, str]:
         display_unit=UNIT,
     )
     _pin_chamfer_min_limit(adapter)
+    set_dimension_bilateral_tolerance(
+        adapter, "HubHoleProfile", "HubHoleDia", *deviations(HUB_HOLE_BAND),
+        display_unit=UNIT,
+    )
+    _require_left_clamp_thread_min(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
