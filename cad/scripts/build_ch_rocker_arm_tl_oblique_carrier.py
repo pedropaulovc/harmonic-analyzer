@@ -18,9 +18,9 @@ Z, model Z = -carrier Y, so a Top-plane sketch reads carrier (X, Y)):
   plane, coincident with the Front plane: the A1-B1 pin line), which drives
   the feature's distance and carries the finished thickness section A-A prints,
   driven from Plate's depth;
-* ``StationReference``, a hidden Top-plane sketch of points, carries every
-  printed X station as a baseline from A1's axis (rule 10); the tap
-  placements below stay origin-based, driven from it;
+* ``StationReference`` retains the unchanged hidden model baseline drivers;
+  only EdgeX prints as a dimension. The drawing's native hole table reads
+  the actual hole axes from A1; the tap placements stay origin-based;
 * the CL and CR end-clamp taps (``ClTap``, ``CrTap``), the HUB clamp tap
   (``HubTap``), the riser and the feed-lever taps are UNC Hole Wizard
   features from the top face, through; the three clamp taps are the
@@ -55,7 +55,6 @@ from _drawing_marks import (
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_tolerances import (
     set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
 )
 from _feature_tree import _feature_by_name, name_last_feature
 from _fit_deviations import deviations
@@ -99,13 +98,12 @@ from ch_rocker_arm_tl_oblique_carrier_spec import (
     PIN_HOLES,
     PLATE_LENGTH,
     PLATE_WIDTH,
-    POSITION_BAND,
-    POSITION_BANDED,
+    OUTER_Y_DEVIATIONS,
+    OUTER_Y_NOTE,
     RISER_SCREWS,
     RISER_SPEC,
     REFERENCE_SKETCHES,
     RISER_TAP_DRILL,
-    LEVER_STATION_BAND,
     STATION_REFERENCE,
     STATIONS,
     THICKNESS,
@@ -127,6 +125,7 @@ _SAVED_DRAWING_PROPERTIES = (
     "Finish",
     "Quantity",
     "Isometric View Note",
+    "Outer Pin Row Note",
 )
 
 THROUGH_CUT_DEPTH = 2.0 * (THICKNESS + 1.0)
@@ -220,8 +219,7 @@ def _add_point(adapter, point: tuple[float, float], label: str) -> str:
 
 
 def _origin_x(station: str) -> str:
-    """A feature's origin-based |X| placement as its printed station from A1
-    (``STATIONS``) less A1's own |X| (A1X; A1 is at -A1X)."""
+    """An origin-based |X| placement from its hidden A1 baseline driver."""
     a1x = _pin_dim("A1X")
     printed = f'"{station}@{STATION_REFERENCE}"'
     if STATIONS[station][0] < 0.0:
@@ -230,19 +228,13 @@ def _origin_x(station: str) -> str:
 
 
 async def _station_reference(adapter) -> list[tuple[str, str]]:
-    """The hidden Top-plane sketch of points carrying every printed X station
-    from A1 (rule 10: one datum per view; drawing-simplicity-policy: a Hole
-    Wizard placement sketch cannot carry a datum point). Points, not
-    construction lines: the drawing shows the sketch in the view it
-    dimensions (build_dt_pinion_lever's points-only idiom).
+    """Retain the original A1-based geometry drivers without printing chains.
 
-    The A1 point stands on the pin line, its X driven from A1X. Each station
-    point stands on its feature's centre (the left end's on the -X/-Y corner),
-    so its extension line leaves the feature: X from the A1 point (printed,
-    the owner the feature placements are driven from), Y from it too (not
-    printed; driven where a printed Y has a name, else the spec's). LeverX is
-    the lever taps' printed station, driven equal to A1X: the taps stand on
-    the origin's X, so it cannot disagree with them."""
+    A Hole Wizard placement sketch cannot carry a datum point. This point-only
+    owner supplies its baseline drivers and the one surviving EdgeX dimension.
+    The hole table reads physical edges; none of these hidden points is its
+    datum or a replacement for a hole.
+    """
     stations = SketchDims()
     check("create_sketch station reference", await adapter.create_sketch("Top"))
     a1 = PIN_HOLES["A1"]
@@ -509,6 +501,26 @@ def _pin_chamfer_min_limit(adapter) -> None:
     _telemetry.success(f"{label}: single limit {PIN_CHAMFER:g} MIN")
 
 
+def _author_outer_pin_rows(adapter) -> None:
+    """Author the flagged limits on the unchanged, unprinted geometric drivers."""
+    for dimension_name in ("A2DY", "B2DY"):
+        # Preserve the irrational nominal: shift native limits to printed .964,
+        # without rounding a displayed deviation or moving the model geometry.
+        _, dimension = _named_dimension(adapter, "PinHoleProfile", dimension_name)
+        dimension = _early_bound(_bind(dimension, "IDimension"), "IDimension")
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        tolerance.Type = 2  # swTolBILAT
+        lower, upper = (value / 1000.0 for value in OUTER_Y_DEVIATIONS)
+        if not tolerance.SetValues(lower, upper):
+            raise RuntimeError(f"{dimension_name}: local row limits rejected")
+        if (
+            int(tolerance.Type) != 2
+            or abs(float(tolerance.GetMinValue()) - lower) > 1e-12
+            or abs(float(tolerance.GetMaxValue()) - upper) > 1e-12
+        ):
+            raise RuntimeError(f"{dimension_name}: local row limits changed")
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -694,8 +706,8 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    # Rule 4: the reamed pin holes and the pin-position chain; the bands are
-    # millimetres, UNIT prints them in inches.
+    # Rule 4: the reamed pin holes; the band is millimetres, UNIT prints it
+    # in inches. The native table owns every location at the title block.
     set_dimension_bilateral_tolerance(
         adapter,
         "PinHoleProfile",
@@ -703,22 +715,9 @@ async def build(adapter) -> dict[str, str]:
         *deviations(PIN_HOLE_BAND),
         display_unit=UNIT,
     )
-    for dimension_name in POSITION_BANDED:
-        set_dimension_symmetric_tolerance(
-            adapter,
-            "PinHoleProfile",
-            dimension_name,
-            POSITION_BAND,
-            display_unit=UNIT,
-        )
-    # The lever taps' station: its own .XX band on the 3-place axis.
-    set_dimension_symmetric_tolerance(
-        adapter,
-        STATION_REFERENCE,
-        "LeverX",
-        LEVER_STATION_BAND,
-        display_unit=UNIT,
-    )
+    # Owner's flagged .964 ±.002 control: unchanged geometric nominal,
+    # actual native limits shifted to the printed nominal, never a draw edit.
+    _author_outer_pin_rows(adapter)
     _pin_chamfer_min_limit(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
@@ -730,6 +729,7 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+            "Outer Pin Row Note": OUTER_Y_NOTE,
         },
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
