@@ -8,3 +8,13 @@ dt-crank-hub:
   fit_class: shaft_in_bushing
   process: "turned stepped through hub; matched light press in crank arm"
   drawing_unit: in
+  machinist_exceptions:
+    # PROVISIONAL, pending owner confirmation (rubric sample PR on
+    # machinist/rubric-novice-v2): restates owner rulings 2026-11-01 (hub and
+    # arm a permanent pair, taken apart at MHA-DT-09) as the rule-16 exception
+    # the rubric now needs, since rule 7 removed the sheet's PERMANENT PAIR line.
+    - id: "RV-01"
+      kind: "accept"
+      where: "end view, the (Ø.156) REAM ↧ .17 AT ASSEMBLY blind seam half-hole and its dowel pin MHA-DT-VN-59, light drive fit"
+      finding: "a driven dowel in a blind hole with no knockout hole or extraction thread (rule 16)"
+      reason: "Owner rulings 2026-11-01: hub MHA-DT-31 and crank arm MHA-DT-06 are a permanent pair, pinned once and never separated; the drive train comes apart at taper pin MHA-DT-09. A knockout from the arm's rear face is covered by the hub's Ø.88 shoulder. Provisional pending owner confirmation."
