@@ -301,15 +301,18 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     assert dt_crank_hub_notes.SEAM_DEPTH_TEXT == f"{geometry.SEAM_DEPTH / 25.4:.{places}f}"[1:]
     # The seat length is the arm's thickness as made (owner ruling
     # 2026-11-01 on the r9 review): a reference flagged to numbered note 2,
-    # the matched length with its mate by name and number.  The overall and
-    # the relief print their value and band only (rule 7: no reason on an
-    # overall or a plain length).
+    # the matched length with its mate by name and number.  The relief
+    # prints its value only (rule 7: no reason on a plain length); the
+    # overall's functional +.004 names the stack it sets and its mate by
+    # number (rule 4), in two lines, no AIR (rule 26).
     assert drawing.REFERENCE_LENGTHS == ("SeatLength", "SeamDepth")
     assert drawing.DIMENSION_CALLOUTS == {
         "BoreDia": dt_crank_hub_notes.BORE_CALLOUT,
         "SeatDia": seat,
         "SeatLength": "SEE NOTE 2",
+        "HubLength": "SETS CLEARANCE TO\nSPROCKET MHA-PD-09",
     }
+    assert geometry.HUB_LENGTH_BAND[0] < geometry.GENERAL_2PL_TOL_MM / 2.0
     # Note 2's acceptance (.002 either way) is provisional, pending owner
     # confirmation (round-2 review: MATCH alone states no acceptance).
     assert dt_crank_hub_notes.SEAT_LENGTH_NOTE == (

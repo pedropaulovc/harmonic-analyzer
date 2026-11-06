@@ -47,6 +47,7 @@ import _telemetry
 from dt_crank_hub_notes import (
     BORE_CALLOUT,
     CROSS_HOLE_CALLOUT,
+    HUB_LENGTH_CALLOUT,
     SEAM_CALLOUT,
     SEAT_CALLOUT,
     SEAT_LENGTH_CALLOUT,
@@ -210,10 +211,11 @@ SIDE_KEEP = {
     # prints right of the outboard end, the dimension line running out to it,
     # short of the seat diameter's dimension line (OUTBOARD_X + 0.020).
     "SeamDepth": (OUTBOARD_X + 0.010, SEAT_BOTTOM - 0.007),
-    # The toleranced .990 filled the span between its extension lines and
-    # sat on its own dimension line (machinist review of the inch sheet, r2):
-    # it prints right of the outboard face instead, the dimension line
-    # running out to it, clear of the seam callout.
+    # The toleranced .990 and its two-line stack callout filled the span
+    # between its extension lines and sat on its own dimension line
+    # (machinist review of the inch sheet, r2): they print right of the
+    # outboard face instead, the dimension line running out to them, clear
+    # of the seam callout.
     "HubLength": (OUTBOARD_X + 0.032, _ROW_Y[1]),
     # Its text prints outside the span, left of the rear face, the dimension
     # line running out to it.
@@ -231,6 +233,7 @@ DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "SeatDia": SEAT_CALLOUT,
     "SeatLength": SEAT_LENGTH_CALLOUT,
+    "HubLength": HUB_LENGTH_CALLOUT,
 }
 
 
