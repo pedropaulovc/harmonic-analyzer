@@ -347,13 +347,16 @@ def test_table_groups_need_one_contiguous_tag_run_per_size() -> None:
         drawing.table_groups(_rows("bar", "bar", "bar", "bar"))
 
 
-def test_loc_cells_parse_with_only_the_title_block_band() -> None:
-    # r1 readback: the KP08 rows carry the part's native band as ±.005.
+def test_loc_cells_parse_with_any_generated_band_and_bare_where_visible() -> None:
+    # The hidden generated X LOC carries the KP08 rows' native band, read back
+    # as ".548 ±.005" (review round 1) and ".548±.01" (fix round 2 CAD).
     assert drawing.location_mm(".285", label="x") == pytest.approx(7.239)
     assert drawing.location_mm(".548 ±.005", label="x") == pytest.approx(13.9192)
-    assert drawing.location_mm("2.202±.005", label="x") == pytest.approx(55.9308)
-    with pytest.raises(RuntimeError, match="foreign band"):
-        drawing.location_mm(".548 ±.010", label="x")
+    assert drawing.location_mm(".548±.01", label="x") == pytest.approx(13.9192)
+    assert drawing.location_text("2.202±.005", label="x") == "2.202"
+    assert drawing.location_mm(".250", label="y", bare=True) == pytest.approx(6.35)
+    with pytest.raises(RuntimeError, match="prints a band"):
+        drawing.location_mm(".250 ±.005", label="y", bare=True)
     with pytest.raises(RuntimeError, match="unparseable"):
         drawing.location_mm("13.925 mm", label="x")
 
@@ -369,6 +372,8 @@ def test_x_locs_print_bare_at_the_model_station() -> None:
             cells[row] += " ±.005"
     texts = drawing.x_loc_texts(rows, cells)
     assert sorted(texts.values()) == sorted([".285", ".942", "1.808", "2.465", ".548", "2.202"])
+    cells = {row: cell.replace(" ±.005", "±.01") for row, cell in cells.items()}
+    assert drawing.x_loc_texts(rows, cells) == texts
     assert not any("±" in text for text in texts.values())
     with pytest.raises(RuntimeError, match="is not"):
         drawing.x_loc_texts(rows[:1], {1: ".290"})

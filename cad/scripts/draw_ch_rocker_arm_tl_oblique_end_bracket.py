@@ -75,7 +75,6 @@ import ch_rocker_arm_tl_oblique_end_bracket_spec as part_spec
 from _feature_requirements import part_metadata, requirement
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
-from _printed_tolerance import printed_band_mm
 from _printed_limits import limits
 from _supplier_dimensions import supplier_reference_dimension
 from ch_rocker_arm_tl_oblique_end_bracket_spec import (
@@ -582,28 +581,32 @@ def table_groups(
     return spans
 
 # The KP08 taps' model dimensions carry the part's native ±0.13 mm band
-# (owner ruling 4), which the generated X LOC prints in inch as the title
-# block's own .XXX band ("B1 .548 ±.005"). A generated band must be exactly
-# that; the sheet then prints the value bare (review round 1: the band
-# restated the title block), so the title block governs every row.
+# (owner ruling 4), which the generated X LOC prints in inch beside the value
+# (".548 ±.005" on one seat, ".548±.01" on another: fix round 2 CAD). That
+# column stands hidden and the sheet prints the value bare (review round 1:
+# the band restated the title block), so the title block governs every row;
+# the module guard above proves the fit at that band. The visible generated
+# column (Y LOC) must print bare.
 _LOCATION = re.compile(r"^(-?\d*\.\d+|-?\d+)(?:\s*±\s*(\d*\.\d+))?$")
-_TITLE_BLOCK_BAND_IN = round(printed_band_mm(_PLACES, unit=_UNIT) / 25.4, _PLACES)
 
 
-def location_mm(cell: str, *, label: str) -> float:
-    """A LOC cell's value in mm; any printed band must be the .XXX band."""
+def _location(cell: str, *, label: str, bare: bool) -> re.Match[str]:
     match = _LOCATION.match(cell.strip())
     if match is None:
         raise RuntimeError(f"end bracket hole-table {label} is unparseable: {cell!r}")
-    if match[2] is not None and float(match[2]) != _TITLE_BLOCK_BAND_IN:
-        raise RuntimeError(f"end bracket hole-table {label} prints a foreign band: {cell!r}")
-    return float(match[1]) * 25.4
+    if bare and match[2] is not None:
+        raise RuntimeError(f"end bracket hole-table {label} prints a band: {cell!r}")
+    return match
+
+
+def location_mm(cell: str, *, label: str, bare: bool = False) -> float:
+    """A LOC cell's value in mm; ``bare`` cells must print no band."""
+    return float(_location(cell, label=label, bare=bare)[1]) * 25.4
 
 
 def location_text(cell: str, *, label: str) -> str:
-    """A LOC cell's printed value without its band (``location_mm`` checks it)."""
-    location_mm(cell, label=label)
-    return _LOCATION.match(cell.strip())[1]
+    """A LOC cell's printed value without its band."""
+    return _location(cell, label=label, bare=False)[1]
 
 
 def _table_rows(
@@ -616,7 +619,7 @@ def _table_rows(
         size = _cell(table, row, columns["size"])
         kinds = {kind for thread, kind in _THREAD_KIND.items() if thread in size}
         x_mm = location_mm(_cell(table, row, columns["x"]), label=f"row {row} X LOC")
-        y_mm = location_mm(_cell(table, row, columns["y"]), label=f"row {row} Y LOC")
+        y_mm = location_mm(_cell(table, row, columns["y"]), label=f"row {row} Y LOC", bare=True)
         station = [x for kind, x in TABLE_HOLES if abs(x - x_mm) <= _TABLE_LOCATION_TOLERANCE_MM]
         if abs(y_mm - HOLE_ROW_Y) > _TABLE_LOCATION_TOLERANCE_MM:
             raise RuntimeError(f"end bracket hole-table row {row} Y LOC is {y_mm:g} mm")
