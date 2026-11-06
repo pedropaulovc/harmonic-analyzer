@@ -97,13 +97,13 @@ rail: 75.2 to 389.4 over both passes. The riser's 9/16 in cutter rides the
 same circle as the part cutter with a larger radius. The same stops
 therefore cut the riser clear of every position the part cutter reaches.
 
-Pivot pin offset (owner-approved 2026-10-23). Keep ``PIN_OFFSET`` 32 toward
-the spindle along the rail, preserving both pass stations and the carrier
-hole layout. The plain .375 reamed shoulder seat replaces the former bearing
-cartridge. The carriage centre still runs 107.2 to 421.4 against the rail's
-45.7 to 424.228 support range on the nominal trimmed rail. The near cut
-sets the fixed first-hole station; the far cut matches the actual 17.32 bar.
-Equal 5.036 end removals are nominal only. Both ends are fitted flush.
+Centred pivots (owner-authorized 2026-11-06). ``PIN_OFFSET`` is zero:
+both blocks and their shoulder bores centre on the HGH15CA patterns. The
+carrier holes and cutter circles are unchanged; carriage travel and stops
+follow the pin stations, 75.2 to 389.4. The feed nut faces away from the
+spindle and the near KP08 moves inward to clear that travel. The rails retain
+their 439.928 nominal fitted length, flush with the existing bars; the near
+cut sets the fixed first-hole station and the far cut matches the actual bar.
 """
 
 from __future__ import annotations
@@ -418,9 +418,9 @@ CARRIAGE_S_RANGE = (
     RAIL_NEAR_S + CARRIAGE_LENGTH / 2.0,
     RAIL_FAR_S - CARRIAGE_LENGTH / 2.0,
 )
-# The unchanged pivot station preserves the carrier's four holes and both
-# sweeps; the simplified block locates a shoulder screw at that same station.
-PIN_OFFSET = -32.0  # pin s minus carriage-centre s
+# Centre the shoulder bore and block on the carriage pattern. The carrier's
+# four holes and cutter circles stay fixed; feed layout follows this travel.
+PIN_OFFSET = 0.0  # pin s minus carriage-centre s
 CARRIAGE_TRAVEL = (PIN_S_MIN - PIN_OFFSET, PIN_S_MAX - PIN_OFFSET)
 END_STOPS = {
     name: (lo - PIN_OFFSET, hi - PIN_OFFSET) for name, (lo, hi) in PIN_TRAVEL.items()

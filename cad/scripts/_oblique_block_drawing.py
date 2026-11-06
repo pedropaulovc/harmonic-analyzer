@@ -42,36 +42,13 @@ SHEET_SCALE = (1.0,1.0)
 # SolidWorks' own descriptive note for TL-32's Hole Wizard nut taps; the native
 # tap callout already states the thread.
 TAPPED_HOLE_NOTE = '#4-40 Tapped Hole'
-# Sheet metres. The plan sits at x .170 so the 112 mm REAM text, the tap
-# callout and the 4X callouts fit left of it inside the border, with short
-# leaders. Plan geometry on the sheet: block x 139..201, y 185..225; frame
-# centre 181,205; bore 149,205; holes x 168/194, y 192/218.
-# Both sections are removed sections whose cutting lines run 4 mm past both
-# block edges, so each prints the whole profile at its cut (review of farm
-# run 20261027T171931429Z: a cut stopping inside the block printed a slice
-# that read as a complete small part). Both look away from the plan (third
-# angle, review of farm run 20261024T133158704Z), so their letters stand on
-# the plan side: A along y 205 from x 205 to 135, its letters up between the
-# seat axis's extension line (y 205) and row 4Y's (y 218); B along x 194
-# from y 229 down, letters left at x ~176..182 (TL-22 to y 181; TL-32 stops
-# inside the block at y 210, since its lug fills x 171.75..190.25 below).
-# The REAM and 4X DRILL callouts stand under the A letter at x 135, their
-# leaders rising to the seat and hole 1 from the lower left; the 4X
-# COUNTERBORE stands lower right, its leader on hole 3 (review: two leaders
-# converged on hole 1).
-# X ordinates stand above the plan in 9 mm lanes from the -X edge (x 139):
-# the 10.00 to the seat, its text right of its 10 mm span, then the two hole
-# columns and the 62.00 overall, 8 mm under the border. The 62.00's text and
-# the counterbore end wall it sets stand off right of the +X edge, leadered,
-# one row under the value, the block centred on its point: inline, the
-# callout row pushed the line onto the 55.000's text, and centred at y .2615
-# the value crossed the border (farm run 20261028T152045278Z). Rows are
-# dimensioned once each from the seat axis: 3Y/4Y on the +X side at x .222,
-# clear of A's right letter, arrows inside so neither's outside tail strikes
-# the other's text (review r1-r3); BlockSideY at x .231 and BlockWidth past
-# its shouldered text, its three rows centred on the point over the bottom
-# edge's extension line, 4 mm right of BlockSideY's arrow tail (at x .255
-# 1.6 mm, same run) and left of TL-32's 88.00 (x .285).
+# Sheet metres. Keep the existing external annotation lanes while the block
+# shrinks symmetrically about its now-centred pivot. Both removed sections
+# run 4 mm past the actual block edges and look away from the plan.
+# B-B cuts the -X M4 column, avoiding the integral +X lug. X ordinates
+# remain baseline dimensions from the finished -X edge; Y starts at the
+# pivot axis. The counterbore callout points to a different hole from the
+# clearance callout. Final native layout and machinist-review gates own fit.
 PLAN_XY = (.170,.205)
 PLAN_KEEP = {
     'BlockLength':(.170,.259),'PlanHole2X':(.1665,.250),'PlanHole1X':(.1535,.241),
@@ -90,18 +67,9 @@ PLAN_KEEP = {
 }
 BLOCK_LENGTH_TEXT_XY = (.240,.2585)
 ROW_DIMENSIONS = ('CarriageDrills3Y','CarriageDrills4Y')
-# Section A-A looks up the sheet (third-angle: placed below the plan, its
-# arrows point away from it, review of farm run 20261024T133158704Z), so the
-# top face prints on top: Z 0..24.3 at y 67.9..92.2, the seat floor at y
-# 84.55. The tap's Ø prints on the plan (PLAN_KEEP). The
-# 7.650 seat depth keeps its line at x .120, arrows inside so the line is
-# drawn for the text leader to land on, and stands its text, with the stack
-# it sets, off to the upper left in the empty band under the plan's
-# callouts. The ~72 mm two-row text is centred on the point and must end
-# left of x .120, or the leader to its right end crosses its last letters
-# (farm run 20261024T133158704Z).
-# A-A is centred on its cut span (X -46..+24), the block's own centre, so its
-# -X face lands at x 139 under the plan's.
+# A-A remains below the plan, top face up. Its depth text stays outboard
+# left of the dimension line; the baseline and actual section span come
+# from the model, not the retired asymmetric block's sheet coordinates.
 SIDE_XY = (.170,.080)
 SIDE_KEEP = {'TopBoreDepth':(.120,.088)}
 # TL-22 prints the block height (the Block extrusion's depth) on a standard
@@ -139,27 +107,19 @@ _PREF_OPTION_NONE = 0
 # The 1:1 pictorial's top vertex touched the border at y .235 (review of farm
 # run 20261027T181901497Z); 7 mm lower it stays clear of B-B's 24.30 (y 175).
 ISO_XY, ISO_SCALE = (.355,.228), SHEET_SCALE
-# TL-32: the plan drops 24 mm so its block lands where TL-22's does; the lug
-# (x 171.75..190.25, y 137..185) takes the space below. Under it: LugWidth,
-# arrows and text inside its 18.5 mm span, then the lug face from the -X
-# edge. B's line runs on past the lug's end to y 105, under both: its lower
-# arrow and letter point left, into the lug's lane, so a line stopping at
-# the block's -Y edge put them on the lug, and one stopping inside the block
-# printed a strip read as a whole part (review of farm run
-# 20261027T181901497Z). The 88.00 overall stands outermost on the +X side,
-# past the 4X COUNTERBORE callout. A-A moves down 20 mm. Its taller
-# pictorial prints at 1:2 to stay under the border.
+# TL-32's plan drops to allow its column-side lug below the block. LugWidth
+# and PlanLugX occupy separate baseline lanes; B-B stops beyond the block
+# because its -X column no longer crosses the lug. The taller pictorial
+# retains its own 1:2 scale.
 FEED_PLAN_XY = (.170,.181)
 FEED_PLAN_KEEP = PLAN_KEEP | {
     'LugWidth':(.181,.1305),'PlanLugX':(.1554,.1225),'PlanOverallY':(.285,.181),
 }
-FEED_FLOOR_CUT_END_Y = -100
 FEED_SIDE_XY = (.170,.060)
 FEED_SIDE_KEEP = {'TopBoreDepth':(.120,.068)}
 FEED_SEAT_DEPTH_TEXT_XY = (.078,.084)
 FEED_ISO_XY, FEED_ISO_SCALE = (.360,.225), (1,2)
-# VIEW D looks at the lug's -X (nut) face: its letter's leader is the viewing
-# arrow, level with the lug's mid-length, 15 mm left of that face.
+# VIEW D looks at the lug's +X nut face; its arrow approaches from the right.
 VIEW_LETTER = 'D'
 VIEW_LETTER_HEIGHT = .005
 VIEW_ARROW_RUN = .015
@@ -167,34 +127,20 @@ VIEW_ARROW_RUN = .015
 # centred under the letter, clear of the 4X DRILL leader above (review of
 # farm run 20261101T175835750Z).
 VIEW_SHEET_REF = '(SHEET 2)'
-VIEW_SHEET_REF_OFFSET = (-.010, -.008)
-# Nut interface, VIEW D, *Left at 2:1 on a 2:1 sheet, at .190,.175: Z runs
-# right from the bottom face at x 165.7, Y=0 prints at y 223, the lug end
-# (Y -68) at y 87; the clearance's axis at 190.5,113, the four taps
-# transferred from the TL-VN-84 FeedNut on its diagonals at x 179.2 / 201.8, y 101.7 /
-# 124.3. The clearance stands from the lug end / carriage-face corner. Left
-# of the view: the clearance's .515 (x 104) and, under the lug end, the
-# 12.400 mm height, its three rows outboard left of the bottom face's
-# extension line. The Ø.351 clearance callout comes in from the left, its
-# four rows over the .515's axis extension line (y 113) and its leader under
-# the upper-left tap; the taps' transfer callout from the upper right onto
-# the upper-right tap's rim, wholly right of the view's edge (x 214; from
-# the lower right its rows ran into the title block, final
-# 20261103T152424387Z). The taps' clocking, 4X 45° ±5° from the axis's +Z
-# centreline to the lower-right (-Y, +Z) tap, reads on the wedge's bisector
-# 45 mm out (at 2:1), wholly right of the lug's top face (x 214.5) and above
-# the title block: its arc runs 222-236 x, 81-113 y, outside the lug's
-# corner (214.5, 87) by 10 mm.
+VIEW_SHEET_REF_OFFSET = (.010, -.008)
+# VIEW D is the standard Right view at 2:1. Relative to the former Left
+# view its Z direction reverses: mirror the annotation lanes about NUT_XY,
+# not the model or its native dimensions. The lug end remains below the block.
 NUT_XY, NUT_SCALE = (.190,.175), (2,1)
 NUT_KEEP = {
-    'NutCentreY':(.104,.100),'NutCentreZ':(.134,.0772),
-    'NutClearanceDia':(.135,.133),'NutClock':(.2321,.0958),
+    'NutCentreY':(.276,.100),'NutCentreZ':(.246,.0772),
+    'NutClearanceDia':(.245,.133),'NutClock':(.1479,.0958),
 }
 NUT_CAPTION = 'VIEW D'
 NUT_CAPTION_XY = (.178,.058)  # the note's left edge; centred under the view
 # TL-32's cut-face sections hang their captions 6 mm under the face.
 SECTION_CAPTION_GAP = .006
-NUT_CALLOUT_XY = (.268,.165)
+NUT_CALLOUT_XY = (.112,.165)
 NUT_ISO_XY = (.380,.215)
 _ARROWS_INSIDE = 0  # swDimArrowsInside
 _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
@@ -367,10 +313,10 @@ def _fit_section_letters(adapter, fitted, matched, *, below_y: float) -> None:
 
 
 def _view_arrow(adapter, plan, contract) -> None:
-    """The lettered viewing arrow onto the lug's -X face (draw_dt_cone_tip_block)."""
-    tip = _project(adapter, plan, (contract.LUG_X0, (contract.LUG_Y0 + contract.LUG_Y1) / 2,
+    """The lettered viewing arrow onto the lug's +X nut face."""
+    tip = _project(adapter, plan, (contract.NUT_FACE_X, (contract.LUG_Y0 + contract.LUG_Y1) / 2,
                                    contract.BLOCK_HEIGHT), 'view D arrow tip')
-    text_xy = (tip[0] - VIEW_ARROW_RUN, tip[1] + VIEW_LETTER_HEIGHT / 2)
+    text_xy = (tip[0] + VIEW_ARROW_RUN, tip[1] + VIEW_LETTER_HEIGHT / 2)
     note = add_leader_note(adapter, VIEW_LETTER, text_xy=text_xy, attach_xy=tip, view=plan,
                            label=f'view {VIEW_LETTER} viewing arrow')
     _size_note(adapter, note, VIEW_LETTER_HEIGHT, label=f'view {VIEW_LETTER} arrow letter')
@@ -423,7 +369,7 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     annotations = plan_annotations + side_annotations
     x = part.CBORE_SECTION_X
     start = _project(adapter,plan,(x,part.BLOCK_WIDTH/2+4,contract.BLOCK_HEIGHT),'floor cut start')
-    end_y = FEED_FLOOR_CUT_END_Y if is_feed else -part.BLOCK_WIDTH/2-4
+    end_y = -part.BLOCK_WIDTH/2-4
     end = _project(adapter,plan,(x,end_y,contract.BLOCK_HEIGHT),'floor cut end')
     floor = create_section_view(adapter,plan,line_start=start,line_end=end,view_xy=FLOOR_XY,
                                 section_label='B',scale=(1,1),partial=True,
@@ -450,7 +396,7 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     if is_feed:
         _view_arrow(adapter, plan, contract)
         drawing.ActivateSheet(sheets[1])
-        nut = place_view(adapter,str(source),'*Left',*NUT_XY,scale=NUT_SCALE)
+        nut = place_view(adapter,str(source),'*Right',*NUT_XY,scale=NUT_SCALE)
         nut_iso = place_view(adapter,str(source),'*Isometric',*NUT_ISO_XY,scale=FEED_ISO_SCALE)
         set_hidden_lines_removed(adapter,nut)
         set_hidden_lines_removed(adapter,nut_iso)
@@ -462,8 +408,8 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
         if caption is None:
             raise RuntimeError('failed to insert the VIEW D caption')
         _size_note(adapter, caption, VIEW_LETTER_HEIGHT, label='VIEW D caption')
-        # The callout reaches the upper-right tap (+Y, +Z) from the upper
-        # right. The title block's THREADS row owns the class; the process
+        # The +Y/+Z tap is upper-left in this Right view. Its callout
+        # approaches from the left; the title block owns the thread class.
         # row says where the taps come from (TL-00 says how).
         y,z = contract.NUT_HOLES_YZ[3]
         rim = contract.NUT_TAP_DRILL/2/math.sqrt(2)

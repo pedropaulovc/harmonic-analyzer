@@ -28,6 +28,8 @@ import math
 
 import _config
 import ch_rocker_arm_tl_vn_oblique_pivot_screw_spec as pivot_screw
+import ch_rocker_arm_tl_oblique_trammel_spec as trammel
+import ch_rocker_arm_tl_vn_oblique_pivot_shim_spec as shim
 from _fit_deviations import deviations
 from _fit_ream_slide import REAM_SLIDE
 from _hole_spec import TAP_DRILL_MM
@@ -43,10 +45,12 @@ UNIT = drawing_unit(
 )
 NUMBER = "MHA-CH-06-TL-22"
 QUANTITY = 1
-BORE_X, BORE_Y = -32.0, 0.0  # trammel PIN_OFFSET: kinematic, not snapped
-PLAN_BORE_X = 9.906  # .39, the seat from the -X edge
-BLOCK_X0 = BORE_X - PLAN_BORE_X
-BLOCK_LENGTH = 61.976  # 2.44
+BORE_X, BORE_Y = trammel.PIN_OFFSET, 0.0
+# .82 from either end: both the overall and the bore ordinate are on the
+# two-place inch grid. The feed lug/support float, not the bore wall, sets L.
+PLAN_BORE_X = 20.828  # .82
+BLOCK_X0 = -PLAN_BORE_X
+BLOCK_LENGTH = 2 * PLAN_BORE_X  # 1.64
 BLOCK_X1 = BLOCK_X0 + BLOCK_LENGTH
 BLOCK_WIDTH = 40.132  # 1.58
 BLOCK_HEIGHT = 24.384  # .96
@@ -84,7 +88,7 @@ CBORE_DEPTH = BLOCK_HEIGHT - CBORE_FLOOR
 CBORE_FLOOR_REFERENCE = "CboreFloorReference"
 CARRIAGE_THREAD_DEPTH = 5.0  # the HGH15CA's M4 x 5 (vendor)
 CBORE_SECTION_PLANE = "CboreSectionPlane"
-CBORE_SECTION_X = BOLT_X  # B-B cuts the +X hole column
+CBORE_SECTION_X = -BOLT_X  # B-B cuts the column clear of the +X feed lug
 # Hidden reference sketch on the top face: a plain line on the -X edge and
 # construction circles on the bore and one hole per column, so the plan's X
 # ordinates start on that edge (rule 10) while staying model dimensions.
@@ -140,7 +144,11 @@ DRAWING_PRECISION_BY_NAME = {name: places for names in DRAWING_PRECISION.values(
 
 
 def _band(name: str) -> float:
-    return printed_band_mm(DRAWING_PRECISION_BY_NAME[name], unit=UNIT)
+    """Printed tolerance plus rounding of an exact vendor-pattern ordinate."""
+    places = DRAWING_PRECISION_BY_NAME[name]
+    nominal = DRAWING_VALUES[name]
+    printed = round(nominal / 25.4, places) * 25.4
+    return printed_band_mm(places, unit=UNIT) + abs(printed - nominal)
 
 
 # The outline sets the counterbore walls (rule 17, worst case at the printed
@@ -153,6 +161,20 @@ _ROW_BAND = max(_band(name) for name in ("CarriageDrills3Y", "CarriageDrills4Y")
 CBORE_END_WALL_MIN = BLOCK_X1 - BOLT_X - _CBORE_R_MAX - _band("BlockLength") - _band("PlanHole2X")
 CBORE_SIDE_WALL_MIN = (BLOCK_WIDTH / 2 - BOLT_Y - _CBORE_R_MAX - _ROW_BAND
                        - _band("BlockWidth") - _band("BlockSideY"))
+CBORE_NEAR_END_WALL_MIN = -BLOCK_X0 - BOLT_X - _CBORE_R_MAX - _band("PlanHole1X")
+_BORE_COLUMN_BAND = _band("PlanBoreX") + max(_band("PlanHole1X"), _band("PlanHole2X"))
+_BORE_ROW_BAND = _band("BlockSideY") + _ROW_BAND
+_BORE_BOLT_DISTANCE_MIN = math.hypot(BOLT_X - _BORE_COLUMN_BAND, BOLT_Y - _BORE_ROW_BAND)
+BORE_CBORE_WEB_MIN = _BORE_BOLT_DISTANCE_MIN - BORE_LIMITS[1] / 2 - _CBORE_R_MAX
+# The largest loose shim must sit on solid material, not bridge an M4 recess.
+_SHIM_RADIAL_FLOAT = (
+    shim.ID + max(shim.ID_BAND) - (pivot_screw.SHOULDER_DIA + _shoulder_lower)
+) / 2
+SHIM_CBORE_GAP_MIN = (
+    _BORE_BOLT_DISTANCE_MIN - (shim.OD + max(shim.OD_BAND)) / 2 - _CBORE_R_MAX
+    - _SHIM_RADIAL_FLOAT - PIVOT_LOCATING_CLEARANCE_MAX / 2
+)
+BORE_END_WALL_MIN = PLAN_BORE_X - BORE_LIMITS[1] / 2 - 2 * _band("PlanBoreX")
 # The M4 x 20 carriage screws' reach into the HGH15CA's M4 x 5 holes. No
 # bought length band reaches 1.5D short of the thread end, so each screw is
 # cut to fit (rule 19): the fitter measures its counterbore floor's height to
@@ -220,6 +242,8 @@ WALLS_MM = {
 assert min(WALLS_MM.values()) >= WALL_TARGET_MM
 assert CBORE_END_WALL_MIN >= WALL_TARGET_MM
 assert CBORE_SIDE_WALL_MIN >= WALL_TARGET_MM
+assert min(CBORE_NEAR_END_WALL_MIN, BORE_CBORE_WEB_MIN, SHIM_CBORE_GAP_MIN, BORE_END_WALL_MIN) >= WALL_TARGET_MM
+assert BORE_X == BORE_Y == 0.0 and BLOCK_X1 == -BLOCK_X0
 # 0.045: the worst-case reach margin, the long cut on a misread floor still
 # stopping short of the carriage's M4 x 5 thread end.
 assert ENGAGEMENT_MIN < REACH_MIN <= REACH_MAX <= CARRIAGE_THREAD_DEPTH - 0.045

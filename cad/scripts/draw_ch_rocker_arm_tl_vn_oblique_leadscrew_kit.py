@@ -179,8 +179,8 @@ ITEM_LABEL_XY = (0.025, 0.262)
 ITEM_LABEL_CELL = (0.015, 0.250, 0.200, 0.264)
 
 # --- Sheet 2: the LeadScrew --------------------------------------------------------
-# The 410 screw overruns the 406.4 mm border at 1:1; 1:2, the next project
-# scale down, lays it 205 mm long and Ø8 4 mm across.
+# The installed screw exceeds the 406.4 mm border at 1:1; 1:2 leaves room
+# for its native cut-length dimension. All view extents below read LENGTH.
 SHEET_SCALE = (1.0, 2.0)
 ISO_SCALE = SHEET_SCALE  # One-scale sheet: no per-view scale label.
 _SHEET_PER_MODEL_MM = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000
@@ -191,14 +191,11 @@ SCREW_SHEET_DIA = MAJOR_DIA * _SHEET_PER_MODEL_MM
 # into it; turned -90 deg, model +Y (near end y = 0 to the far end) runs to
 # sheet right and the axis lies horizontal.
 MAIN_VIEW_ANGLE = -math.pi / 2.0
-# The main view centred left of the isometric's column: x 0.195 spans the
-# screw over 0.0925 .. 0.2975, 80 mm in from the left border; y 0.160 sits
-# mid-height, 95 mm above the title block's top.
+# Keep the main view left of the isometric column. The length read from
+# the model determines both ends; y .160 clears the title block.
 MAIN_CENTER = (0.195, 0.160)
-# The isometric stands the axis up: 410 cos 35.26 deg plus the Ø8 end
-# ellipses is about 340 mm, 170 at 1:2, and about 5 wide. Centred 29 mm in
-# from the right border, its outline spans y 0.081 .. 0.251, between the
-# title block's top (0.0651) and the top border (0.2667).
+# The isometric stands the axis up. Its physical height follows LENGTH
+# and the end diameter; the final native layout audit checks containment.
 ISO_CENTER = (0.390, 0.166)
 # Model station s (mm from the near end) on the main view's sheet x.
 NEAR_END_X = MAIN_CENTER[0] - SCREW_SHEET_LENGTH / 2.0
@@ -364,7 +361,7 @@ _NEAR_XY = (0.043, DETAIL_ROW_Y)
 # text), left of fence E.
 _FAR_CENTRE_MM = FLAT_STATIONS["FarKP08"]
 _FAR_XY = (0.091, DETAIL_ROW_Y)
-# E: the handwheel's open flat and the far end (400.0 .. 410), its
+# E: the handwheel's open flat and the cut end, its
 # across-flat left of it, square to the axis: its extension line off the
 # flat runs back along the flat and out of the fence over the thread. The
 # flat runs out through the cut end (owner ruling 2026-11-05), so the
