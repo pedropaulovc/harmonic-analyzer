@@ -20,6 +20,48 @@ jig the package does not tell the builder to make.
 The machine is a hobby-scale scientific instrument, not aerospace hardware.
 Parts that work with loose tolerances are the mark of a good design.
 
+The builder learned to read prints from a textbook and a shop handbook and
+reads each callout once, at the machine. They know standard ASME symbols and
+shop words; they do not know this project's private vocabulary, its CAD model
+or why the designer chose a number. A phrase they would have to ask about is
+a question under rule 1.
+
+### What the shop holds
+
+Every explicit band on a fabricated feature is judged against this table. It
+is the declared capability of the shop above for one part cut by a first-time
+machinist and checked with the listed tools. It is not a target, and it is
+the only capability figure a review may use.
+
+| feature, inch sheet | narrowest band held and checked | with |
+|---|---|---|
+| location of a drilled hole from a datum edge or bore | ±.005 | edge finder, DRO, spot drill; height gauge and pin |
+| location of a reamed or bored hole or a milled step, up to 6 in from its datum | ±.002 | as above, then ream or bore; surface plate, pin, indicator |
+| the same, more than 6 in from its datum | ±.004 | DRO over long travel in a shop without temperature control |
+| milled width, thickness or slot | ±.001 | micrometer, gauge blocks |
+| turned diameter | ±.0005 | micrometer, made to the measured mate |
+| turned length or shoulder | ±.001 | DRO, depth micrometer |
+| reamed hole size | the reamer's size, banded no tighter than `+.0005 / 0` | pin gauges |
+| angle | ±0.25° | sine bar and gauge blocks |
+| flatness, parallelism, perpendicularity, runout | .001 per inch of feature, never under .001 total | surface plate, indicator, V-blocks |
+| position of a reamed pattern | Ø.004 | surface plate, pins, height gauge |
+| assembly gap, alignment or end play | ±.0005 | dial or test indicator, feeler gauges |
+
+Unconverted millimetre sheets use the same rows at ±0.12, ±0.05, ±0.10,
+±0.025, ±0.012, ±0.025 mm and Ø0.1 mm position.
+
+A band narrower than its row cannot be reached by cutting to a number. It is
+reached only by a **fit route** the sheet names at the feature:
+
+- a matched fit to a named mate with its stated clearance, interference or
+  acceptance (rule 4);
+- match-drilling, reaming in place or transferring through the mate;
+- a set-at-assembly feature (slot, shim, adjusting screw, feeler-set gap)
+  whose setting and acceptance the assembly step gives (rule 19); or
+- purchased precision stock (`STOCK OK`, drill rod, ground shaft, dowel).
+
+Rule 4 applies the table.
+
 Prints use decimal inches on ASME sheets in third-angle projection. During the
 package-by-package conversion, unconverted packages remain in millimetres;
 read each sheet's UNIT cell and its own title-block bands. Metric-only purchased
@@ -43,7 +85,9 @@ A good package passes two tests:
   tells the shop nothing. A busy print is not a well-engineered print.
 
 A redundant correct dimension never hurt anyone; a missing one does. Where the
-two tests seem to pull apart, answer the question.
+two tests seem to pull apart, answer the question. Repeated prose is not a
+redundant dimension: the same reason printed on several dimensions, or a
+paragraph on a leader, is a busy print (rule 7).
 
 ## Specification
 
@@ -89,8 +133,12 @@ HOLES row.
   wall or fit check needs `.XX` or tighter.
 - Inch drill diameters, including native Hole Wizard callouts, use three
   decimal places. Their tolerance still comes from DRILLED HOLES, not the
-  three-place linear grade. Tap and tap-drill depths and routine locations
-  normally use two places.
+  three-place linear grade. Keep the exact decimal of a named number, letter
+  or fractional drill (`#30 DRILL Ø.1285`): that digit is the drill's size,
+  not precision. Counterbore and countersink diameters and depths in a Hole
+  Wizard callout print in its standard three-place form; they are clearance
+  pockets toleranced by the `.XX` grade, not over-specification. Tap and
+  tap-drill depths and routine locations normally use two places.
 - On unconverted millimetre sheets, the existing one-, two- and three-place
   grades remain in force; drill diameters normally use two places.
 - Fabricated nominals sit on their printed grid: `.01 in` for `.XX`,
@@ -117,19 +165,33 @@ a chamfer gets the loosest title-block band that serves it.
   narrower than the title-block band for its decimal places, a three-place
   size given a function, or any REAM callout (REAM marks a fit bore even when
   its band matches DRILLED HOLES). The reason for it is the mating part, so
-  the callout, or a flagged note attached to it (rule 7), names the mate
-  ("SLIDING FIT ON SHAFT, ITEM 4", or the mate's name and drawing or part
-  number) and the fit it needs: running, sliding, press or locating. A gear
-  centre distance names the mesh; a width that sets a stack names the stack.
-  Where the mate alone does not show why the band is tight, add a few words
-  of reason (`SETS MESH BACKLASH`, `KNIFE-EDGE SEAT`); see rule 7.
-  The shop can then make the hole to the shaft instead of chasing a number.
-  A tight band whose mate appears nowhere in the package is a blocker: either
-  name the mate or loosen the band. A mate named somewhere in the package (a
-  general note, a gear data block, another sheet) but not at the callout it
-  serves is a clarity defect, not a blocker.
+  the callout, or a flagged note attached to it (rule 7), names the mate and
+  the fit it needs: running, sliding, press or locating. A gear centre
+  distance names the mesh; a width that sets a stack names the stack. Where
+  the mate alone does not show why the band is tight, add a few words of
+  reason (`SETS MESH BACKLASH`, `KNIFE-EDGE SEAT`); see rule 7. The shop can
+  then make the hole to the shaft instead of chasing a number. A tight band
+  whose mate appears nowhere in the package is a blocker: either name the
+  mate or loosen the band. A mate named somewhere in the package (a general
+  note, a gear data block, another sheet) but not at the callout it serves is
+  a clarity defect, not a blocker.
+- **Every mate is named by its full drawing number.** Any callout, note,
+  table row or step that refers to another part (MATCHES, FOR, ON, IN, FITS,
+  LOCATES, SETS, CLEARS, SEATS ON, HOLDS) names it by its full assigned
+  drawing number (`MHA-CH-06-TL-VN-83`), with its name where that helps.
+  Every part in this project, purchased parts and kits included, has a
+  drawing number; a kit member also names the member (`HGR15 RAIL OF
+  MHA-CH-06-TL-VN-83`). A catalogue or vendor code (`HGR15R`, `KP08`,
+  `HGH15CA`), a file slug (`MG-WHEEL-AXLE`), a shortened number (`TL-24`,
+  `TL-VN-77`) or a bare item number on a sheet with no parts list is not a
+  drawing number; a catalogue code may follow the drawing number. A mate
+  serving several features is named once, on the pattern callout, hole-table
+  row or one flagged note linked to the features (rule 7), never repeated on
+  each dimension. A mate the package identifies uniquely but by the wrong
+  form is a clarity defect; a mate that cannot be identified at all is a
+  blocker.
 - **Matched or selectively fitted pairs.** For a one-off pair, the callout
-  identifies the mate by name and assigned drawing or part number, and states
+  identifies the mate by name and full drawing number, and states
   the required clearance, interference or an unambiguous functional
   acceptance. Give diametral or radial clearance where applicable. "MATCH FIT"
   alone is incomplete. When the nominal is reference-only, the finished mate
@@ -143,16 +205,31 @@ a chamfer gets the loosest title-block band that serves it.
 - **Read a band as its total width.** `+.001 / 0 in` is `.001 in` wide,
   the same as `±.0005 in`. Keep the nominal and asymmetric limits when checking a
   fit; equal widths are not equal fits.
-- **Necessity before capability.** Being printed does not make precision
-  necessary. Unneeded precision is over-specification even when it is hard to
-  achieve. Precision is a capability problem only when the function genuinely
-  needs it AND a specific conflict with the allowed machining or verification
-  route can be shown. DRO or micrometer resolution is not accuracy. Without
-  stated equipment accuracy, condition or temperature control, describe burden
-  and uncertainty; do not invent capability figures, stock or catalogue
-  limits, or declare a size impossible. Do not assume grinding, lapping,
-  temperature-controlled metrology or an ideal reamed hole. Precision may
-  legitimately come from catalogue stock, such as a precision-ground shaft.
+- **Necessity, then the shop table.** Being printed does not make precision
+  necessary. Unneeded precision is over-specification even when it is easy.
+  Needed precision is then checked against "What the shop holds":
+  - A band narrower than its row, with no fit route named at the feature, is
+    unbuildable as a cut-to-number dimension. Quote the band, the row and the
+    missing route. Do not decide whether the function could live with less;
+    the designer either names the route or changes the design.
+  - A band inside its row but narrower than `.002` total on a location,
+    length or setting needs the same named fit route or a stated check at the
+    feature (what it is checked against and with which listed tool). Missing
+    that support is a clarity defect, not a claim that the band is impossible.
+  - Use no figure the table does not give. DRO or micrometer resolution is not
+    accuracy, and "the DRO reads to .0002" never excuses a band. Do not
+    assume grinding, lapping, temperature-controlled metrology or an ideal
+    reamed hole.
+- **A clearance hole is never located tighter than its clearance.** With hole
+  Ø H and fastener Ø F, its position tolerance is at least Ø(H−F) when both
+  parts have clearance holes and Ø(H−F)/2 when the mate is tapped or pinned
+  (± a quarter of that per axis). Where the fastener is not printed, a THRU
+  hole with no REAM, dowel or register word carries no position tighter than
+  Ø.010 and no location band tighter than ±.005. Tighter is over-specification.
+- **Bands are written in inch steps.** An explicit inch band uses a plain
+  inch step (`±.0005`, `±.001`, `±.002`, `±.005`, `+.001 / 0`), not a
+  converted millimetre value (`±.0008`, `±.0009`, `Ø.0039`). A converted band
+  is a clarity defect: it reads as a deliberate precision no one chose.
 - **Never loosen a functional fit just to ease manufacture,** and never
   tighten a band to rescue a thin wall, a short thread or a stack (rules
   17–19). A proposed replacement band faces the same scrutiny: wider is not
@@ -217,16 +294,33 @@ gear data block. A gear data block may carry REF values (module, transverse
 DP, contact ratio), addendum modification and a backlash acceptance; those
 are gear data, not narration.
 
-- A note never restates the title block, never carries a dimension or a
-  tolerance that belongs on a feature, and never explains what a datum letter
-  is. Other part numbers appear only to identify a mate, and identifying a
-  mate is always allowed.
-- **Say why when it is not obvious.** A short functional reason is welcome
+- A note never restates the title block and never explains what a datum
+  letter is. Ordinary sizes and locations sit on the views or in a hole
+  table. A numbered note linked to its feature by a flag or `SEE NOTE n` may
+  carry a fit-up or supply requirement with its limits (`SUPPLY .292 MIN;
+  FITTED .153–.271 AT ASSEMBLY`); it then counts as being at the callout, and
+  the feature carries no second controlling value. Other part numbers appear
+  only to identify a mate.
+- **Say why in a few words, once.** A short functional reason is welcome
   where a tight band, a roughness symbol or a hardness would otherwise look
-  arbitrary: `BEARING SURFACE`, `KNIFE-EDGE SEAT`, `SETS MESH BACKLASH`.
-  Put it on the callout it explains; naming the mate (rule 4) is the commonest
-  form. A reason says what the feature does, never how to make it, and it is
-  never a defect in itself. What a note must not do is prescribe the process.
+  arbitrary: `BEARING SURFACE`, `KNIFE-EDGE SEAT`, `SETS MESH BACKLASH`,
+  `SLIDING FIT ON MHA-CH-05`. A reason is one line of at most six words,
+  beyond the mate's drawing number, on the callout it explains, once per
+  feature or pattern. A matched-fit statement (rule 4) and a stated shortfall
+  (rule 20) have their own forms and are not counted. Anything beyond that is
+  narration and is over-specification: design rationale (`HOLDS … SCREWS
+  CLEAR OF ITS CUT EDGES`, `MAX KEEPS D AT ENTRY`, `MIRRORS CL STATION`), a
+  second reason on one feature, the same reason repeated on several
+  dimensions, a reason on an overall or stock size, or an assembly
+  instruction on a part sheet (`END FLUSH WITH CRANK ARM FRONT`, `ALL 8
+  SCREWS START BY HAND`, `DISASSEMBLE AT MHA-DT-09`). Match-drilling or
+  reaming at assembly with its mate is a requirement, not narration.
+- **A location dimension carries its value and band and nothing else.** The
+  mate or reason a location serves sits once on the hole's size callout,
+  its hole-table row or a linked flag note.
+- **A callout is short.** Size and process lines (Hole Wizard form, thread,
+  depth, stacked limits, `nX`) plus at most two lines of words. Anything
+  longer moves to a numbered flag note linked to the feature.
 - The title block's Finish field (`AS DRAWN`, `DRAWN WIRE`, `BORE AS REAMED`)
   is a finish statement under rule 2, not a note line and not a method.
 - **Flag it where it applies.** A requirement that matters (a matched fit, a
@@ -272,6 +366,20 @@ Hidden lines appear only where they inform (ASME Y14.3).
   the cut in solid lines or only the cut faces. Hatched slices among dashed
   ghosts of removed material mean the cut is in the wrong place.
 - Never dimension to a hidden line. Cut a section or breakout instead.
+- **Every section, detail and auxiliary view says what it shows.** It is
+  labelled with a letter and its scale (`SECTION A-A`, `DETAIL B`, `VIEW C`),
+  and its cutting plane, detail boundary or viewing arrow sits on a parent
+  view with the same letter. A view named only in prose (`LEVER TIP DETAIL`,
+  `VIEW FROM THE BACK`), or an enlarged view with no boundary on a parent, is
+  unlabelled. A rotated view says so.
+- **A section shows the whole cut or says which part of it is shown.** Where
+  the cutting plane passes through several like features and the section is
+  broken to one of them, the label names that feature (`SECTION A-A, HOLE
+  A2`) or the plane is moved to cut a single feature. A section is never
+  explained by a prose note; what it shows is read from its plane and label.
+  If the builder cannot tell which feature's size, depth or orientation the
+  section defines anywhere in the package, that is missing information.
+- A callout never defers a size to another view (`FLOOR: SECTION B-B`).
 
 ### Rule 10 — Dimension from a real feature
 
@@ -286,6 +394,19 @@ Hidden lines appear only where they inform (ASME Y14.3).
   to feature, so tolerances do not accumulate. Give a bolt circle or radial
   pattern X/Y ordinates from that datum where the shop will set it up on a DRO.
 - Prefer regular hole spacings that the shop can step off.
+- **Use a hole table when the holes outgrow dimensions.** When one view
+  locates eight or more hole axes, when a location dimension line would cross
+  another dimension line, or when more than one hole in the view would carry
+  a mate or reason, locate the holes with a tagged hole table instead of
+  individual dimensions: an origin mark on a real datum (above), a tag at
+  each hole, X and Y from that origin, the size callout once per tag group
+  and one column naming the mate (rule 4). The view then carries the
+  overall, the datum features and the non-hole geometry. Ordinate
+  dimensioning with grouped hole callouts is an equal alternative for a
+  view with no more than two hole sizes. A single regular pattern (`20X Ø.089
+  ON .250 PITCH`) counts as one axis.
+- **Identical holes take one callout.** Give them one `nX` callout or one
+  table tag group, never a repeated callout per hole.
 - The overall size is real and conspicuous. Nothing reads like an overall
   that is not one.
 - Reference dimensions in parentheses are welcome.
@@ -426,7 +547,11 @@ a manufacturing fact, for example `ENGAGEMENT n.nn MIN (n.nnD)` or
 `WALL n.nn MIN`. The sheet never argues for it: no rule numbers and no words
 such as EXCEPTION, ACCEPTED, RULING, POLICY or BOOK FIDELITY. Stating a
 shortfall makes it visible; it does not approve it. Approval belongs to the
-project owner and lives outside the drawing.
+project owner and lives outside the drawing, as an owner exception supplied
+to the review. A stated value below a hard floor (the `.060 in` wall, 1.5D
+engagement, an adjustment range short of its worst-case stack) still gates
+unless an owner exception covers that feature and value. A wall between the
+floor and the target is advisory.
 
 ### Rule 21 — Fix the model, not the drawing
 
@@ -457,7 +582,16 @@ sub-assembly, never on part fabrication.
   every balloon has a row.
 - Ordered assembly steps, each a short instruction the fitter can act on:
   press this bushing to this depth, set this mesh with this backlash, torque
-  this screw, align this axis to that face within so much. A fit made at
+  this screw, align this axis to that face within so much. A step does one
+  thing and is at most six printed lines. A check and its remedy (`IF THE
+  FEELER STOPS, …`) are separate steps; a sequence that needs more is more
+  steps, not a longer one. A setting table gives the reference, target,
+  range and check in columns; a check with three or more measured variables
+  uses a labelled sketch and a table, not equations in prose. Steps name
+  parts by item number (with the BOM supplying the full drawing number) and
+  directions by view names (rule 26), never a compass or a code the sheet
+  does not define in a labelled table (`HD1`, `F1A`, `P1–P3`). A setting
+  finer than `.XXX` names the indicator or gauge that reads it. A fit made at
   assembly (match-drill, ream in place, shim, adjust) names the mating parts
   as rule 4 requires; an item reference is enough when the BOM supplies the
   item's name and number unambiguously.
@@ -527,6 +661,43 @@ listed alternatives, the same size spelled with different places (`Øn.n` and
 label differing from the title-block scale on a DO NOT SCALE sheet. Judge
 those under rules 2, 3 or 7 at their own severity.
 
+### Rule 26 — Standard forms only
+
+A first-time builder reads these prints with ASME Y14.5 and a shop handbook
+beside them. Every symbol, abbreviation and phrase is one they can look up.
+
+- **Views.** `FRONT VIEW`, `TOP VIEW`, `RIGHT SIDE VIEW`, `SECTION A-A`,
+  `DETAIL B`, `VIEW C`, each with its scale. Notes and steps give directions
+  by those view names, never a compass (`NORTH`, `EAST`) or a private
+  convention.
+- **Holes.** Size first, then process, then depth, with the Y14.5 symbols:
+  `Ø.257 THRU`, `Ø.3750 +.0015/+.0010 REAM THRU`, `⌴ Ø.31 ↧ .19`,
+  `⌵ Ø.312 X 82°`, `1/4-20 UNC ↧ .45`. A counterbore or countersink is
+  written with its symbol, not in words; a depth is never deferred to a view.
+- **Words.** `MIN`, `MAX`, `REF`, `THRU`, `nX`, `°`, and the standard fit
+  names (running, sliding, locational clearance, locational interference,
+  press, drive). Private phrases a reader cannot look up are defects: `TO
+  SUIT`, `ON SEAM`, `IN PHASE`, `MIRRORS`, `SAME X AS`, `AIR` for clearance,
+  `BY EYE`, `TRUE D`. A location is a dimension or a table row, not a
+  sentence; holes in line share a drawn centreline.
+- **Project labels.** A label made up for this project (`R816`, `CL`, `CR`,
+  `TIE 1`) is defined where it first appears or in one linked key on the
+  same sheet, or replaced by a hole-table tag or a standard numbered flag
+  note. A symbol followed by a number (`R816`) is either a dimension with its
+  unit or a defined label; the reader never has to choose.
+- **Geometric symbols** (rule 5): position, perpendicularity, parallelism,
+  flatness, runout, concentricity and profile with an equal bilateral zone,
+  each with plain datums. No Ⓤ, Ⓟ, Ⓜ, Ⓛ, free-state or translation modifiers
+  and no composite frames; where a profile would be unequally disposed,
+  dimension the offset surface instead.
+- **Units.** An inch sheet prints inch values. A metric pitch inherited from a
+  purchased part is converted on the fabricated part's sheet, or carried in a
+  hole-table column headed `mm` beside the inch columns; a view never mixes
+  `mm` values with inch values.
+- **Spelling slips** that a reader cannot misread (`45 DEG` for `45°`, `min.`
+  for `MIN`, a thread class repeated on a callout) are polish, never a reason
+  on their own to hold a sheet.
+
 ## Sources and departures
 
 The rules distil three shop-floor sources. Their text lives in the
@@ -545,9 +716,10 @@ Deliberate departures:
   instead and show them only where they inform (rule 9): on castings,
   hidden lines in every view buried the dimensions.
 - **Units.** Harvey (#28) asks for inch equivalents after metric dimensions.
-  The shop's DROs read millimetres, and dual dimensions would double the text
-  on crowded sheets, so prints stay in millimetres (with US fastener and drill
-  sizes).
+  Prints are decimal-inch with US fastener and drill sizes; unconverted
+  packages stay millimetre until converted, and purchased metric product
+  lines keep labelled millimetre reference sheets. Dual dimensions would
+  double the text on crowded sheets, so a view carries one unit (rule 26).
 - **Not applicable.** Welded low-quantity assemblies (#5), Delrin (#21), lead
   times (#23), returning borrowed tools (#27), revision highlighting (#3; each
   package is regenerated whole and the title block carries its revision), and

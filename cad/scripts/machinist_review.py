@@ -5,10 +5,11 @@ overlays of frozen BEFORE/AFTER PDFs. It may skip only rendering noise or assemb
 changes confined to one part's geometry with clearly no mating impact. Doubt
 requires review. Otherwise the package receives three blind reviews (``--runs``).
 That same isolated judge session then vets every finding, clustering
-duplicates and rejecting misreads or non-gating claims. A confirmed blocker,
-over-specification or clarity cluster gates the aggregate verdict only when at
-least ``GATING_MIN_RUNS`` valid runs raised it (fewer when fewer runs are
-valid); single-run confirmations stay in the report as non-gating evidence.
+duplicates and rejecting misreads or non-gating claims. A confirmed cluster
+gates the aggregate verdict when at least ``GATING_MIN_RUNS[category]`` valid
+runs raised it (fewer when fewer runs are valid): one run for a blocker, two
+for over-specification or clarity. Lone non-blocker confirmations stay in the
+report as non-gating evidence.
 Raw per-run verdicts are retained as evidence.
 Every reviewer uses an isolated transport in a neutral attempt directory. The judge
 resumes its own precheck session for adjudication, never another package's context.
@@ -155,11 +156,12 @@ _CODEX_AUTH_LOCK = threading.Lock()
 REVIEWERS = tuple(review_config.DEFAULT_MODELS)
 FINDING_KEYS = ("blockers", "over_specification", "clarity", "minor")
 GATING_KEYS = ("blockers", "over_specification", "clarity")
-# Owner ruling 2026-10-18: a confirmed finding gates only when two blind runs
-# raised it independently. Across many rounds on one sheet the single-run
-# confirmations kept moving while the sheet converged, so one reviewer's lone
-# claim is evidence to read, not a merge block.
-GATING_MIN_RUNS = 2
+# Owner rulings: 2026-10-18 required two independent runs before a confirmed
+# finding gates, because lone confirmations kept moving across rounds while the
+# sheet converged. 2026-11-06 keeps that for over-specification and clarity but
+# lets one run's judge-confirmed blocker gate: v47 shipped two confirmed
+# blockers (rule 23 retention, a step contradiction) that one run had raised.
+GATING_MIN_RUNS = {"blockers": 1, "over_specification": 2, "clarity": 2}
 # Tool descriptors and isolation settings are static across packages, so neither
 # source paths nor sheet counts disturb the model's cached tool/prompt prefix.
 SHEETS_SERVER = SCRIPTS_DIR / "machinist_review_sheets_mcp.py"
@@ -2511,10 +2513,14 @@ def aggregate_package(
                 judge_span.set_attribute("rejected_count", len(rejected))
                 judge_span.set_attribute("failed", error is not None)
         valid_runs = sum(not summary["error"] for summary in summaries)
-        gating_min_runs = max(1, min(GATING_MIN_RUNS, valid_runs))
+        gating_min_runs = {
+            category: max(1, min(runs_needed, valid_runs))
+            for category, runs_needed in GATING_MIN_RUNS.items()
+        }
         for item in confirmed:
             item["gating"] = (
-                item["category"] in GATING_KEYS and item["run_count"] >= gating_min_runs
+                item["category"] in GATING_KEYS
+                and item["run_count"] >= gating_min_runs[item["category"]]
             )
         gating_count = sum(item["gating"] for item in confirmed)
         verdict = "ERROR" if error else "FIX" if gating_count else "SHIP"
@@ -2560,8 +2566,12 @@ def aggregate_package(
 def render_aggregate(aggregate: dict[str, Any]) -> str:
     lines = [
         f"# {aggregate['name']} — {aggregate['verdict']}", "",
-        f"- confirmed gating findings: {aggregate['gating_count']} "
-        f"(a finding gates when {aggregate['gating_min_runs']}+ runs raised it)",
+        f"- confirmed gating findings: {aggregate['gating_count']} (a finding gates when "
+        + ", ".join(
+            f"{category} {runs}+ run{'s' if runs > 1 else ''}"
+            for category, runs in aggregate["gating_min_runs"].items()
+        )
+        + " raised it)",
         f"- source sha256: {', '.join(aggregate['source_sha256'])}",
         f"- reviewer: {aggregate['reviewer']}/{aggregate['model']} ({aggregate['effort']})",
         f"- judge: {aggregate['judge']['reviewer']}/{aggregate['judge']['model']} "
