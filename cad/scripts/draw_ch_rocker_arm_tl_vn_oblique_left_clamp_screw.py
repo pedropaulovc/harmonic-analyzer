@@ -1,28 +1,36 @@
-"""Create the purchased reference drawing for the oblique-trammel left clamp screw.
+"""Create the modified purchased drawing for the oblique-trammel left clamp screw.
 
 The screw is cut to fit at assembly (TL-21's receiver is blind): the solid is
 the installed screw, its length a CUT TO FIT reference, and the as-supplied
 3/4 in a separate stock witness that lands on the uncut tip drawn in phantom
-(the TL-VN-64 carriage-screw sheet's idiom).
+(the TL-VN-64 carriage-screw sheet's idiom).  The catalogue sizes print as
+supplier references; the cut end's chamfer prints from the part's own
+driving, toleranced ``TipChamferProfile`` controls (the transgear pivot
+screw's modified-stock idiom), re-read on the settled sheet.
 """
 
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from functools import partial
 from typing import Any
 
 import _telemetry
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from _com import _early_bound
 from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M
 from _drawing_common import rebuild_drawing
+from _drawing_dimensions import offset_dimension_text, set_dimension_callouts
+from _drawing_hidden_sketches import curate_view_dimensions
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _purchased_title_fit import fit_purchased_title_block
+from _stock_trim_drawing import verify_machining_controls
 from _supplier_screw_dimensions import _supplier_top_record, annotate_supplier_screw
 from _drawing_projection import model_points_in_view
 from _supplier_screw_layout import supplier_screw_margins, supplier_top_text_geometry
@@ -60,6 +68,9 @@ LIFTED = "SupplierHeadHeight"
 # one projection line: left, the stock-length lane and its qualifier; right,
 # the cut length's lane and its text.
 _SIDE_ROOM = (0.082, 0.036)
+# Front also reserves room under the uncut tip for the cut-end chamfer's
+# five-row text (value, band and its four-row callout).
+_CUT_END_TEXT_ROOM = 0.042
 
 
 def _margins() -> dict[str, tuple[float, float, float, float]]:
@@ -70,7 +81,12 @@ def _margins() -> dict[str, tuple[float, float, float, float]]:
     )
     left, right = _SIDE_ROOM
     return {
-        name: (left, bottom, right, top)
+        name: (
+            left,
+            max(bottom, _CUT_END_TEXT_ROOM) if name == "*Front" else bottom,
+            right,
+            top,
+        )
         for name, (_left, bottom, _right, top) in margins.items()
     }
 
@@ -177,6 +193,95 @@ def _assert_uncut_tip(adapter: Any, lines: Any, *, stage: str) -> None:
     )
 
 
+# The cut end's controls (sheet metres from their projected model points).
+# The chamfer is cut on the screw's left (-X) silhouette, so its axial length's
+# dimension line stands just left of the major, inside the stock-length lane,
+# and its text leaves on a leader to the lower left, under the uncut tip's end
+# and clear of the thread Ø's bottom lane; the 45 deg text sits on the angle's
+# bisector, outside the cut wedge.
+_CHAMFER_LINE_GAP = 0.005
+_CHAMFER_TEXT_OFFSET = (-0.034, -0.016)
+_ANGLE_TEXT_RADIUS = 0.008
+EXPECTED_CONTROLS = {
+    "ChamferLength": (
+        supplier.TIP_CHAMFER_LENGTH / 1000,
+        supplier.TIP_CHAMFER_BAND[1] / 1000,
+        supplier.TIP_CHAMFER_BAND[0] / 1000,
+    ),
+    "ChamferAngle": (
+        math.radians(supplier.TIP_CHAMFER_ANGLE),
+        -math.radians(supplier.TIP_CHAMFER_ANGLE_TOLERANCE),
+        math.radians(supplier.TIP_CHAMFER_ANGLE_TOLERANCE),
+    ),
+}
+
+
+def _verify_cut_end_controls(adapter: Any, annotations: list[Any]) -> None:
+    verify_machining_controls(
+        annotations,
+        expected=EXPECTED_CONTROLS,
+        tolerance_types=supplier.DIMENSION_TOLERANCE_TYPES,
+        precision=supplier.DIMENSION_PRECISION,
+    )
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        display = _early_bound(
+            _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
+            "IDisplayDimension",
+        )
+        if str(display.GetText(4) or "").replace("\r", "") != (
+            supplier.DIMENSION_CALLOUTS.get(name, "")
+        ):
+            raise RuntimeError(f"{name}: cut-end control callout did not persist")
+
+
+def _cut_end_controls(adapter: Any, front: Any) -> list[Any]:
+    """Import, place, call out and re-read the cut end's native controls."""
+    r = supplier.DIMS.major_dia / 2000.0
+    tip = -supplier.CUT_LENGTH / 1000.0
+    chamfer = supplier.TIP_CHAMFER_LENGTH / 1000.0
+    corner, vertex, stock_end = model_points_in_view(
+        adapter,
+        front,
+        [
+            (-r, tip + chamfer, 0.0),
+            (-(r - chamfer), tip, 0.0),
+            (-r, -supplier.DIMS.length / 1000.0, 0.0),
+        ],
+        label="left clamp screw cut-end chamfer",
+    )
+    bisector = math.radians(180.0 - supplier.TIP_CHAMFER_ANGLE / 2.0)
+    annotations = curate_view_dimensions(
+        adapter,
+        front,
+        keep={
+            "ChamferLength": (corner[0] - _CHAMFER_LINE_GAP, (corner[1] + vertex[1]) / 2.0),
+            "ChamferAngle": (
+                vertex[0] + _ANGLE_TEXT_RADIUS * math.cos(bisector),
+                vertex[1] + _ANGLE_TEXT_RADIUS * math.sin(bisector),
+            ),
+        },
+        view_label="left clamp screw cut-end chamfer",
+        dimensions_by_feature=supplier.DRAWING_DIMENSIONS,
+    )
+    names = sorted(dimension_name(adapter, annotation) for annotation in annotations)
+    if names != sorted(EXPECTED_CONTROLS):
+        raise RuntimeError(f"cut-end controls on *Front are {names}")
+    set_dimension_callouts(adapter, annotations, supplier.DIMENSION_CALLOUTS)
+    offset_dimension_text(
+        adapter,
+        annotations,
+        {
+            "ChamferLength": (
+                corner[0] + _CHAMFER_TEXT_OFFSET[0],
+                stock_end[1] + _CHAMFER_TEXT_OFFSET[1],
+            )
+        },
+    )
+    _verify_cut_end_controls(adapter, annotations)
+    return annotations
+
+
 async def build(adapter: Any) -> dict[str, str]:
     checks = []
 
@@ -198,11 +303,13 @@ async def build(adapter: Any) -> dict[str, str]:
         _lift_head_height(adapter, displays)
         _assert_layout(adapter, displays, stations)
         tip = _phantom_uncut_tip(adapter, views["*Front"])
+        controls = _cut_end_controls(adapter, views["*Front"])
         settled_references = checks[0]
 
         def assert_layout() -> None:
             _assert_layout(adapter, settled_references(), stations)
             _assert_uncut_tip(adapter, tip, stage="settled")
+            _verify_cut_end_controls(adapter, controls)
 
         checks.append(assert_layout)
 

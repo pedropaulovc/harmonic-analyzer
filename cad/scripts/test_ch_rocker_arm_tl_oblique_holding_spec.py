@@ -74,7 +74,9 @@ def test_blind_receiver_retains_floor_and_full_thread_without_tip_bottoming() ->
     assert carrier.LEFT_CLAMP_FLOOR_MIN == pytest.approx(2.032)
     assert carrier.LEFT_CLAMP_FULL_THREAD_MIN >= 1.5 * THREAD_MAJOR_MM["#10-24"]
     insertion_lo, insertion_hi = fasteners.LEFT_CLAMP_INSERTION
-    assert insertion_lo - 25.4 / 24 - 0.254 >= 1.5 * THREAD_MAJOR_MM["#10-24"]
+    chamfer_lo, chamfer_hi = fasteners.LEFT_CLAMP_TIP_CHAMFER
+    assert insertion_lo - chamfer_hi - 0.254 >= 1.5 * THREAD_MAJOR_MM["#10-24"]
+    assert insertion_hi - chamfer_lo <= carrier.LEFT_CLAMP_THREAD_DEPTH
     assert carrier.LEFT_CLAMP_DRILL_DEPTH - 0.254 - insertion_hi >= 0.29
     assert fasteners.LEFT_CLAMP.cut_length_mm is not None
     assert fasteners.CR_CLAMP in fasteners.FASTENERS

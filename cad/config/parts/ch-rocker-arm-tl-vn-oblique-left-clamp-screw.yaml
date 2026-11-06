@@ -13,6 +13,6 @@ ch-rocker-arm-tl-vn-oblique-left-clamp-screw:
   tolerance_class: machined_block
   fit_class: fastener_clearance
   # Modified purchased part: cut to the actual strap/riser grip plus the
-  # 8.65-8.85 reach below the carrier top, tip restored.
+  # 8.40-8.62 reach below the carrier top, cut tip chamfered 45 deg x .030-.035.
   process: "purchased; cut to fit at assembly"
   drawing_unit: in
