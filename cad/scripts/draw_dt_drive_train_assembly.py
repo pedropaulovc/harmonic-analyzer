@@ -253,25 +253,30 @@ BANK_SPRING_CROP_RADIUS_MM = 8.0
 # The bank's settings are labelled on its views, each label naming its
 # setting-table row on sheet 14 (rubric sample review of v47: the steps'
 # equations needed a labelled sketch).  (text, top-left sheet point, model
-# point in mm the leader tip lands on); the bank labels hang over the bank,
-# where its imported stack dimension stood, the spring gap's beside Detail A.
+# point in mm the leader tip lands on); the spring gap's sits beside Detail A.
+# The layout audit boxes a leader note from its text to its tip, so the three
+# bank labels stand side by side over the bank, each wholly on its own side
+# of the next one's tip (round 1, stacked at one x, overlapped 99 x 47 mm):
+# the mandrel label over the back pedestal, right of the Detail A circle's
+# letter (x ~103 mm) and under the heading; the disc's left of the front
+# pedestal (tip x ~263 mm); the front pedestal's right of it, clear of the
+# drum station dimension text (x ~328 mm up).
 BANK_SETTINGS_POINTER = f"TARGETS AND STACK LENGTH: SETTING TABLE, SHEET {SETTING_SHEET}."
-_BANK_LABEL_X = 0.165
 BANK_SETTING_LABELS = (
     (
-        "MHA-DT-26: MIC ITS THICKNESS, W (ROW 2)",
-        (_BANK_LABEL_X, 0.257),
+        "MANDREL AXIS AT EACH\nMHA-DT-02: DRO X (ROW 3)",
+        (0.112, 0.247),
+        (cone_line.X_DRUM, bank_settings.AXIS_Y, bank.BACK_STRAP_INNER_Z + 1.0),
+    ),
+    (
+        "MHA-DT-26: MIC ITS\nTHICKNESS, W (ROW 2)",
+        (0.200, 0.257),
         (cone_line.X_DRUM, bank_settings.AXIS_Y + 6.0, sum(bank.SOUTH_DISC_Z) / 2.0),
     ),
     (
-        "FRONT MHA-DT-02 INNER FACE: DRO Y (ROW 2)",
-        (_BANK_LABEL_X, 0.250),
+        "FRONT MHA-DT-02\nINNER FACE:\nDRO Y (ROW 2)",
+        (0.274, 0.257),
         (cone_line.X_DRUM, bank_settings.AXIS_Y + 8.0, bank.FRONT_STRAP_INNER_Z - 0.5),
-    ),
-    (
-        "MANDREL AXIS AT EACH MHA-DT-02: DRO X (ROW 3)",
-        (_BANK_LABEL_X, 0.243),
-        (cone_line.X_DRUM, bank_settings.AXIS_Y, bank.ARBOR_SOUTH_Z + 0.5),
     ),
 )
 BANK_SPRING_LABEL = (
@@ -528,8 +533,10 @@ CHECKS_RIGHT_FIELD = (
 )
 # Sheet 14: the setting, pedestal recheck and feeler stack tables stack down
 # the left from NOTE_FIELD_LEFT's top (SETTING_TABLE_LEFT); the cone station
-# table prints right of them, over the reference view.
-STATION_TABLE_FIELD = (0.245, 0.195, NOTE_FIELD_RIGHT[2], 0.140)
+# table prints right of the narrow feeler stack table, under the pedestal
+# recheck table (round 1 measured those at x 147.6 mm and y 178.1 mm) and
+# clear left of the reference view (x 361 mm up).
+STATION_TABLE_FIELD = (0.158, 0.172, 0.350, 0.117)
 SETTING_TABLE_LEFT = NOTE_FIELD_LEFT[0]
 # A general table's cell text runs ~2.8 mm a character at the 3.5 mm note
 # font (47 note lines measured 212.33 mm; 70 characters ~194 mm); each column
