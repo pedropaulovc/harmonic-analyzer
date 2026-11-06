@@ -33,7 +33,9 @@ def test_catalogue_row_is_the_registered_mcmaster_screw() -> None:
     assert stock.stock_name == row["stock_name"]
     assert stock.material == row["material"]
     assert row["number"] == "MHA-CH-06-TL-VN-86"
-    assert "cut to fit" in row["process"]
+    assert row["process"] == "purchased"
+    assert "cut to fit" in row["installation_notes"]
+    assert "MHA-CH-06-TL-00 step O6" in row["installation_notes"]
     assert spec.SKU in row["material_specification"]
     metadata = recipe_declaration(spec.SKU, recipe.build_92220A165)
     assert metadata.module == recipe.__name__
