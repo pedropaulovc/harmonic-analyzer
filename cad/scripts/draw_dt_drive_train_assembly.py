@@ -1,4 +1,4 @@
-r"""Create the native fifteen-sheet drive-train assembly drawing package (MHA-DT-00).
+r"""Create the native thirteen-sheet drive-train assembly drawing package (MHA-DT-00).
 
 The released ``dt-drive-train.SLDASM`` stays authoritative and byte-for-byte
 unchanged. This recipe consumes the builder-owned ``DRIVE_TRAIN_EXPLODED``
@@ -193,13 +193,11 @@ SHEET_NAMES = (
     "CRANK EXPLODED",
     "ALIGNMENT PINION RIG EXPLODED",
     "ASSEMBLY SEQUENCE",
-    "ASSEMBLY SEQUENCE CONT. - CRANK",
     "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK",
     "ASSEMBLY SEQUENCE CONT. + FIT",
     "ASSEMBLY SEQUENCE CONT. + CRANK END FIT",
     "FULL-DETAIL SIDE VIEW",
     "CHECKS + SETUP",
-    "CHECKS (CONT.)",
     "CYLINDER BANK + DRUM STATION SETTINGS",
 )
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
@@ -221,24 +219,25 @@ CLUSTER_TITLES: dict[Cluster, str] = {
 # #743 grew steps 8-9 past the sequence sheet's right field, so the bank
 # sequence has its own sheet (Main, B1 re-ruling 2026-09-26). A blank line
 # between numbered steps (user, 2026-10-23: "add line breaks bw steps; add
-# extra sheets as needed") pushed steps 6-7 and check 7 onto continuation
-# sheets. The numbered steps read in sheet order: 1-5 on sheet 7 (4-5 in its
-# right field), 6-7 on 8, 8-10 on 9, 11-18 on 10 and 19-23 on 11; the checks
-# follow the full-detail view (gate review of 042726e87: the steps jumped
-# 6 -> 11 -> 7 -> 8 -> 11), check 7 on the sheet after them.
+# extra sheets as needed") once pushed steps 6-7 and check 7 onto
+# continuation sheets of their own; the v47 machinist review read those as
+# near-empty sheets beside free fields, so sheet 7's right field now runs the
+# full height (its reference view moves under the left column) and carries
+# steps 4-7, and check 7 heads sheet 12's right field. The numbered steps
+# read in sheet order: 1-7 on sheet 7, 8-10 on 8, 11-18 on 9 and 19-23 on
+# 10; the checks follow the full-detail view (gate review of 042726e87: the
+# steps jumped 6 -> 11 -> 7 -> 8 -> 11).
 SEQUENCE_SHEET = 7
-CRANK_SHEET = 8
-BANK_SHEET = 9
-FIT_SHEET = 10
-CONTINUATION_SHEET = 11
+BANK_SHEET = 8
+FIT_SHEET = 9
+CONTINUATION_SHEET = 10
 # Every view at 1:2 or smaller prints the teeth/thread-free "Default
 # Simplified" configuration (the policy in _drawing_view_configuration); the
 # user asked for the ENTIRE drive train at 1:2 or larger with every modeled
-# tooth and thread, so sheet 12 carries it.
-FULL_DETAIL_SHEET = 12
-CHECKS_SHEET = 13
-CHECKS_CONTINUATION_SHEET = 14
-BANK_SETTINGS_SHEET = 15
+# tooth and thread, so sheet 11 carries it.
+FULL_DETAIL_SHEET = 11
+CHECKS_SHEET = 12
+BANK_SETTINGS_SHEET = 13
 BANK_SETTING_SCALE = (1.0, 1.0)
 BANK_SPRING_DETAIL_SCALE = (4.0, 1.0)
 # 12 mm left of its first seat (0.205): run 20261103T063712849Z's native
@@ -280,7 +279,7 @@ DRUM_STATION_CROP_RADIUS_MM = (
 DRUM_STATION_TEXT_Y = (
     DRUM_STATION_SETTING_CENTER[1] + DRUM_STATION_CROP_RADIUS_MM / 1000.0 + 0.008 + 3 * 0.0056
 )
-# Sheet 15 reads back every setting spec's model-owned dimension the same way.
+# Sheet 13 reads back every setting spec's model-owned dimension the same way.
 SETTING_SPECS = (bank_settings, drum_station_setting)
 SETTING_DIMENSIONS = {
     feature: names for spec in SETTING_SPECS for feature, names in spec.DRAWING_DIMENSIONS.items()
@@ -464,16 +463,38 @@ NOTE_LINE_PITCH = 0.004525
 # view that every sheet needs for its title-block property links
 # (finalize_drawing refuses a sheet without a view: r8, leaf
 # 20260923T214354Z-1-4126331f). A blank line between numbered steps takes one
-# pitch. Sheet 7 carries steps 1-3 on the left and 4-5 on the right, sheet 8
-# the crank's 6-7. Step 10 uses sheet 9's right field. Sheet 10 carries the
-# first rig steps and station table; sheet 11 the last rig steps and the crank
-# end fit. Sheet 14 carries check 7.
+# pitch. Sheet 7 carries steps 1-3 on the left and 4-7 down its full right
+# field. Step 10 uses sheet 8's right field. Sheet 9 carries the first rig
+# steps and station table; sheet 10 the last rig steps and the crank end fit.
+# Sheet 12 carries checks 1-6 on the left and check 7 at the top of its right
+# field, over the saved pose and interfaces.
 # package_note_fields lists every field and its blocks.
 ISO_RIGHT_FIELD = (NOTE_FIELD_RIGHT[0], NOTE_FIELD_RIGHT[1], NOTE_FIELD_RIGHT[2], 0.140)
+# Sheet 7's reference view sits under the left column's steps 1-3 (they end
+# near y=104 mm), so the right field runs to NOTE_FIELD_RIGHT's foot; its
+# caption prints ~9 mm under the outline, clear of the zone border.
+SEQUENCE_ISO_CENTER = (0.115, 0.056)
+SEQUENCE_ISO_GAP = 0.006
+# Sheet 12's reference view drops 7 mm so check 7 fits over the saved pose
+# and interfaces; its caption still prints ~3 mm over the title block.
+CHECKS_ISO_CENTER = (REFERENCE_ISO_CENTER[0], 0.103)
+CHECKS_ISO_GAP = 0.003
 REFERENCE_ISO_CAPTION_XY = (0.330, 0.082)
 # A 1:8 reference view's outline is ~49 mm tall (its ink ~31 mm square inside
 # it, st19 dt-02); this half-extent budgets it both ways.
 REFERENCE_ISO_HALF_OUTLINE = 0.0247
+SEQUENCE_LEFT_FIELD = (
+    NOTE_FIELD_LEFT[0],
+    NOTE_FIELD_LEFT[1],
+    NOTE_FIELD_LEFT[2],
+    SEQUENCE_ISO_CENTER[1] + REFERENCE_ISO_HALF_OUTLINE + SEQUENCE_ISO_GAP,
+)
+CHECKS_RIGHT_FIELD = (
+    ISO_RIGHT_FIELD[0],
+    ISO_RIGHT_FIELD[1],
+    ISO_RIGHT_FIELD[2],
+    CHECKS_ISO_CENTER[1] + REFERENCE_ISO_HALF_OUTLINE + CHECKS_ISO_GAP,
+)
 # With 27 data rows the first piece ends near y=80 mm (the historical header
 # measured 10.2 mm). The 1:8 reference view is wholly below that piece; its
 # complete metadata, including scale, sits beside it. The native table budget
@@ -493,7 +514,7 @@ BOM_REFERENCE_VIEW_FIELD = (
 )
 BOM_REFERENCE_NOTE_FIELD = (0.100, 0.072, BOM_REFERENCE_FIELD[2], 0.040)
 
-# --- sheet 12: the whole drive train, full detail ----------------------------
+# --- sheet 11: the whole drive train, full detail ----------------------------
 # The view (outline only) must fit between the one-line heading and the title
 # block row: NOTE_FIELD's top under the heading, and the title block's top
 # (0.0655) plus the BOM's paper clearance plus the caption under the view
@@ -740,6 +761,12 @@ NORTH_EAR_Y_LIMITS = _inward_limits(
     _NORTH_EAR_Y - rockers.NORTH_EAR_LOCATE_BAND,
     _NORTH_EAR_Y + rockers.NORTH_EAR_LOCATE_BAND,
 )
+# Step 9C's spring gap is set with one leaf of the rig's STARRETT 66MA gage,
+# named by its stamped size as the rig steps name theirs (v47 machinist
+# review: the blade was never identified).
+if round(bank.BANK_SPRING_SET, 2) not in FITUP.FEELER_GAGE_LEAVES_MM:
+    raise AssertionError(f"spring set {bank.BANK_SPRING_SET} mm is not one gage leaf")
+BANK_SPRING_LEAF = f"{bank.BANK_SPRING_SET:.2f} MM 66MA LEAF"
 
 # Step 4's pin fit is the MHA-DT-10 and MHA-DT-11 prints' own wording.
 _PINION_PIN_FIT = ", ".join(pinion.PIN_FIT_LINES)
@@ -817,7 +844,7 @@ CAM_STAKE_NOTE = "\n".join(
         f"(STEP {steps.step_number('cam-collars-set')})",
     )
 )
-# Sheet 12's Right view puts the front cam's tap at (229.2, 129.2) mm, above
+# Sheet 11's Right view puts the front cam's tap at (229.2, 129.2) mm, above
 # the base plate (bottom near y 119 mm), with its hold-down screws hanging to
 # y 106 mm at x 142-145 mm and x 237-248 mm and the caption at y 90.6-95.4 mm
 # (run 20261018T154747118Z, whose 22.5 mm drop overlapped the caption by
@@ -1038,7 +1065,7 @@ BANK_STEPS = _note_text(
         "   SEAT MHA-DT-26 DIRECTLY ON THE FRONT MHA-DT-02 AND CLOSE THE",
         "   BANK SOUTH ON THE DISC. PROP THE MANDREL BACK END AT BORE HEIGHT",
         "   (V-BLOCK ON PARALLELS); REMOVE THE PROP ONLY TO SLIDE THE BACK MHA-DT-02 ON.",
-        "9C. SLIDE THE BACK MHA-DT-02 ON UNTIL THE SPRING-SET BLADE",
+        f"9C. SLIDE THE BACK MHA-DT-02 ON UNTIL THE {BANK_SPRING_LEAF}",
         f"   (SHEET {BANK_SETTINGS_SHEET}, DETAIL A), BESIDE MHA-DT-VN-68 BETWEEN THE",
         "   BACK MHA-DT-02 INNER FACE AND GEAR 19'S NORTH FACE, IS LIGHTLY PINCHED.",
         f"   SET X {BANK_X_LIMITS} AND SPOT AS 9A. SLIDE THE BACK MHA-DT-02 OFF;",
@@ -1046,8 +1073,8 @@ BANK_STEPS = _note_text(
         "   MHA-DT-26 AND MHA-DT-VN-68; LAY IT IN V-BLOCKS ON PARALLELS OFF",
         "   THE BASE, PAIRS HANGING FREE. DRILL AND TAP AS 9A. PASS THE MANDREL",
         "   BACK THROUGH THE FRONT MHA-DT-02; SEAT THE DISC AND BANK SOUTH,",
-        "   PROP AS 9B. REFIT THE BACK MHA-DT-02; RE-SET THE BLADE AND X, TIGHTEN",
-        "   MHA-DT-VN-62, REMOVE THE BLADE, RECHECK AND RECORD X. DRO STILL ZEROED,",
+        "   PROP AS 9B. REFIT THE BACK MHA-DT-02; RE-SET THE LEAF AND X, TIGHTEN",
+        "   MHA-DT-VN-62, REMOVE THE LEAF, RECHECK AND RECORD X. DRO STILL ZEROED,",
         "   DRILL AND TAP THE MHA-FR-01 PIVOT SEAT PER ITS PRINT NOTE.",
         "9D. MEASURE MHA-DT-02 OUTER FACE TO OUTER FACE. TURN MHA-DT-13: ITS",
         f"   CYLINDER IS THAT SPAN, PLUS A {inch_text(bank.ARBOR_DOME_HEIGHT, 2)} DOME EACH END (SEE ITS PRINT).",
@@ -1385,26 +1412,20 @@ CRANK_END_FIT_NOTES = _note_text(
 )
 
 # The blank lines between steps leave sheet 7's left field room for steps 1-3
-# only: steps 4-5 go to its right field and the crank's 6-7 to sheet 8.  Steps
-# 4 and 5 stay on SEQUENCE_SHEET, where MHA-PD-00 cites them.
-CRANK_SEQUENCE_HEADING = "ASSEMBLY SEQUENCE CONT. - CRANK"
-CONE_CRANK_PRIMARY, _CONE_CRANK_REST = _split_sequence_notes(
+# only: steps 4-7 run down its full-height right field.  Steps 4 and 5 stay
+# on SEQUENCE_SHEET, where MHA-PD-00 cites them.
+CONE_CRANK_PRIMARY, CONE_CRANK_CONTINUED = _split_sequence_notes(
     CONE_CRANK_STEPS,
     steps.step_number("crank-mesh-checked"),
-    CRANK_SEQUENCE_HEADING,
-)
-CONE_CRANK_CONTINUED, CRANK_SHEET_STEPS = _split_sequence_notes(
-    _CONE_CRANK_REST,
-    steps.step_number("crank-hub-fitted"),
-    CRANK_SEQUENCE_HEADING,
+    "ASSEMBLY SEQUENCE CONT. - CRANK",
 )
 BANK_PRIMARY, BANK_CONTINUED = _split_sequence_notes(
     BANK_STEPS,
     steps.step_number(NORTH_BRACKET_SET_KEY),
     "ASSEMBLY SEQUENCE CONT. - NORTH BRACKET",
 )
-# With the blank lines, checks 1-7 overran sheet 13's left field by 5.2 mm and
-# check 7 does not fit its right field under the saved pose and interfaces.
+# With the blank lines, checks 1-7 overran sheet 12's left field by 5.2 mm, so
+# check 7 heads its right field, over the saved pose and interfaces.
 CHECKS_CONTINUED_FROM = 7
 CHECKS_PRIMARY, CHECKS_CONTINUED = _split_sequence_notes(
     CHECKS,
@@ -1867,7 +1888,7 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
         NoteField(
             SEQUENCE_SHEET,
             f"sheet {SEQUENCE_SHEET} left note field",
-            NOTE_FIELD_LEFT,
+            SEQUENCE_LEFT_FIELD,
             (
                 ("direction key", DIRECTION_NOTES),
                 (
@@ -1881,21 +1902,8 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
         NoteField(
             SEQUENCE_SHEET,
             f"sheet {SEQUENCE_SHEET} right note field",
-            ISO_RIGHT_FIELD,
-            (
-                (
-                    "crank sequence continuation",
-                    CONE_CRANK_CONTINUED
-                    + f"\nCONT. STEP {steps.step_number('crank-hub-fitted')}: "
-                    f"SHEET {CRANK_SHEET}.",
-                ),
-            ),
-        ),
-        NoteField(
-            CRANK_SHEET,
-            f"sheet {CRANK_SHEET} left note field",
-            NOTE_FIELD_LEFT,
-            (("crank sequence", CRANK_SHEET_STEPS),),
+            NOTE_FIELD_RIGHT,
+            (("crank sequence continuation", CONE_CRANK_CONTINUED),),
         ),
         NoteField(
             BANK_SHEET,
@@ -1959,16 +1967,16 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
                 (
                     "functional checks",
                     CHECKS_PRIMARY
-                    + f"\nCONT. CHECK {CHECKS_CONTINUED_FROM}: "
-                    f"SHEET {CHECKS_CONTINUATION_SHEET}.",
+                    + f"\nCONT. CHECK {CHECKS_CONTINUED_FROM}: RIGHT FIELD.",
                 ),
             ),
         ),
         NoteField(
             CHECKS_SHEET,
             f"sheet {CHECKS_SHEET} right note field",
-            ISO_RIGHT_FIELD,
+            CHECKS_RIGHT_FIELD,
             (
+                ("functional checks continuation", CHECKS_CONTINUED),
                 ("saved pose", SETUP_NOTES),
                 (
                     "external interfaces",
@@ -1980,12 +1988,6 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
                     ),
                 ),
             ),
-        ),
-        NoteField(
-            CHECKS_CONTINUATION_SHEET,
-            f"sheet {CHECKS_CONTINUATION_SHEET} left note field",
-            NOTE_FIELD_LEFT,
-            (("functional checks continuation", CHECKS_CONTINUED),),
         ),
     )
 
@@ -3206,16 +3208,12 @@ def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     _activate_sheet(adapter, SHEET_NAMES[SEQUENCE_SHEET - 1])
     _heading(adapter, SEQUENCE_SHEET)
     _reference_iso(
-        adapter, caption="FINISHED ASSEMBLY 1:8", label="sequence reference isometric"
+        adapter,
+        caption="FINISHED ASSEMBLY 1:8",
+        label="sequence reference isometric",
+        center=SEQUENCE_ISO_CENTER,
     )
     return _stack_sheet_note_fields(adapter, facts, SEQUENCE_SHEET)
-
-
-def _place_crank_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
-    _activate_sheet(adapter, SHEET_NAMES[CRANK_SHEET - 1])
-    _heading(adapter, CRANK_SHEET)
-    _reference_iso(adapter, caption="FINISHED ASSEMBLY 1:8", label="crank reference isometric")
-    return _stack_sheet_note_fields(adapter, facts, CRANK_SHEET)
 
 
 def _place_bank_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
@@ -3236,20 +3234,12 @@ def _place_checks_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     _activate_sheet(adapter, SHEET_NAMES[CHECKS_SHEET - 1])
     _heading(adapter, CHECKS_SHEET)
     _reference_iso(
-        adapter, caption="CHECK REFERENCE 1:8", label="checks reference isometric"
-    )
-    return _stack_sheet_note_fields(adapter, facts, CHECKS_SHEET)
-
-
-def _place_checks_continuation_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
-    _activate_sheet(adapter, SHEET_NAMES[CHECKS_CONTINUATION_SHEET - 1])
-    _heading(adapter, CHECKS_CONTINUATION_SHEET)
-    _reference_iso(
         adapter,
         caption="CHECK REFERENCE 1:8",
-        label="checks continuation reference isometric",
+        label="checks reference isometric",
+        center=CHECKS_ISO_CENTER,
     )
-    return _stack_sheet_note_fields(adapter, facts, CHECKS_CONTINUATION_SHEET)
+    return _stack_sheet_note_fields(adapter, facts, CHECKS_SHEET)
 
 
 def _place_continuation_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
@@ -3799,8 +3789,6 @@ def _place_package(
     step("BOM view")
     findings += _place_sequence_sheet(adapter, facts)
     step("sequence sheet")
-    findings += _place_crank_sheet(adapter, facts)
-    step("crank sheet")
     findings += _place_bank_sheet(adapter, facts)
     step("bank sheet")
     settings_settled = _place_bank_setting_sheet(adapter, facts, step)
@@ -3809,8 +3797,6 @@ def _place_package(
     step("fit sheet")
     findings += _place_checks_sheet(adapter, facts)
     step("checks sheet")
-    findings += _place_checks_continuation_sheet(adapter, facts)
-    step("checks continuation sheet")
     full_detail = _place_full_detail_sheet(adapter)
     step("full-detail sheet")
     findings += _place_continuation_sheet(adapter, facts)
