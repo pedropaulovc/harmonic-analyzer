@@ -319,10 +319,13 @@ _RIM_FILLET_SHOULDER = _polar(_RIM_FILLET[0], 190.0, 11.2)
 AXLE_NUMBER = str(_config.parts("mg-wheel-axle")["number"])
 DRUM_NUMBER = str(_config.parts("mg-wheel-drum")["number"])
 WIRE_NUMBER = str(_config.parts("sh-vn-music-wire")["number"])
-# Each tie hole names the wire member it ties as a member of the music-wire
-# kit (rule 4), two lines of words under its size and process (rule 7).
+# TIE 1 names the wire member it ties as a member of the music-wire kit
+# (rule 4).  TIE 2 says where it runs: radial, from the groove's bottom (the
+# groove sits on A-A's drawn centreline) through to the rim bore, clocked by
+# its 43° from the horizontal.  Each takes two lines of words under its size
+# and process (rule 7).
 TIE1_CALLOUT = f"DRILL THRU\nTIES LEVER WIRE\nOF {WIRE_NUMBER}"
-TIE2_CALLOUT = f"DRILL THRU\nTIES PEN WIRE\nOF {WIRE_NUMBER}"
+TIE2_CALLOUT = "DRILL THRU\nRADIAL FROM\nGROOVE BOTTOM"
 # Each side of a centred tie block past the DRILL THRU line's half-width
 # (capitals about 2.6 mm a character), mm.
 _TIE_BLOCK_WIDEN = (
@@ -542,7 +545,7 @@ _HUB_ROWS = tuple(
 )
 # The spigot length's +.004/.000 band keeps the drum under the spigot face
 # (mg_magnifying_wheel_geom.DRUM_RECESS): its callout names the drum.
-SPIGOT_LENGTH_CALLOUT = f"MG-WHEEL-DRUM {DRUM_NUMBER} NOT PROUD"
+SPIGOT_LENGTH_CALLOUT = f"DRUM {DRUM_NUMBER} NOT PROUD"
 # The overall sets the axle's locknut stack (mg_wheel_group): the callout
 # names the stack and the axle by number on one short line, so its dimension
 # line stops short of TIE 1's block.
