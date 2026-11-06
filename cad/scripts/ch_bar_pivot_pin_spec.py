@@ -19,10 +19,12 @@ and a pressed pin drives out with a punch. The MHA-CH-10 rod-fork pin
 review F1).
 
 Frame (part): pin axis = part X (Top ∩ Front, named Axis1), axial mid-plane =
-Right Plane (x = 0), as build_ch_bar_pivot_pin revolves it; the
-model is the INSTALLED pin -- a Ø PIN_DIA cylinder BAR_WIDTH long, flush with
-both bar faces. The shop cuts the blank PIN_BLANK_LENGTH long; the drawing
-prints that from the part's blanked BlankReference sketch.
+Right Plane (x = 0), as build_ch_bar_pivot_pin revolves it. The part's
+default configuration is the pin the shop makes, a Ø PIN_DIA blank
+PIN_BLANK_LENGTH long, and is what the drawing prints; the INSTALLED_CONFIG
+configuration is the pin dressed flush with both bar faces, PIN_INSTALLED_LENGTH
+(BAR_WIDTH) long, and is what the channel assembly places (the
+``build_dt_pinion_lever_pin`` pattern).
 """
 
 from __future__ import annotations
@@ -69,6 +71,10 @@ PIN_BLANK_LENGTH_BAND = (
 # below leaves 0.1065 against the 0.10 running floor (#1038, owner ruling
 # 2026-10-15 option 2).
 PIN_END_PROUD_MAX = 0.0
+
+# The configuration the channel assembly places: the pin dressed flush with
+# both bar faces, PinLen = PIN_INSTALLED_LENGTH.
+INSTALLED_CONFIG = "INSTALLED"
 
 # --- The bar's reamed press hole (the bar spec owns it; restated here so the
 # budget reads one place). ---
