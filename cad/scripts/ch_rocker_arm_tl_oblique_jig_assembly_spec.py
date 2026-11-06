@@ -94,6 +94,7 @@ from _printed_tolerance import printed_band_mm
 from _title_block_units import LENGTH_UNITS
 
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
+import ch_rocker_arm_tl_oblique_end_bracket_spec as end_bracket
 import ch_rocker_arm_tl_vn_oblique_pivot_screw_spec as pivot_screw
 import ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec as pivot_spacer
 import ch_rocker_arm_tl_vn_oblique_pivot_shim_spec as pivot_shim
@@ -343,7 +344,7 @@ PASS = "inner"
 THETA = 0.0
 POSE = trammel.carrier_pose(PASS, THETA)
 PIN_STATION = trammel.SYMMETRIC_PIN_STATION[PASS]  # ⚙ 227.404 on both rails
-CARRIAGE_STATION = PIN_STATION - trammel.PIN_OFFSET  # ⚙ 259.404
+CARRIAGE_STATION = PIN_STATION - trammel.PIN_OFFSET  # centred on the pivot
 RAILS = (1, 2)  # rail 1 on the -X side, rail 2 on the +X side
 # One base bar part (TL-20, QTY 2), two members: rail 1 takes Bar1 as saved;
 # rail 2 takes Bar2 turned over (180° about its long axis), which swaps its
@@ -616,13 +617,11 @@ HANDWHEEL_PLACEMENTS = (
         FEED_ROWS,
     ),
 )
-# The TL-VN-84 kit's FeedNut seats on the integral lug's -X face, its body toward the
-# spindle, its bore on the leadscrew axis: its axis (+Y) along the block's
-# -X, its seat face (y = 0) on the lug face. It is turned 45° about that
-# axis (+X onto the block's +Y+Z diagonal), so its four holes, at 0/90/180/
-# 270° in its own frame, sit on the lug's diagonals over TL-32's taps.
+# The FeedNut seats on the lug's +X face, its body away from the spindle.
+# Local +Y follows block +X; local +X remains on the block +Y/+Z diagonal,
+# placing the same four holes over the lug's transferred taps.
 _DIAGONAL = math.sqrt(0.5)
-FEED_NUT_ROWS: Rows = axis_rows((0.0, _DIAGONAL, _DIAGONAL), (-1.0, 0.0, 0.0))
+FEED_NUT_ROWS: Rows = axis_rows((0.0, _DIAGONAL, _DIAGONAL), (1.0, 0.0, 0.0))
 FEED_NUT_PLACEMENTS = (
     compose(
         FEED_BLOCK_PLACEMENTS[0],
@@ -644,12 +643,12 @@ if any(
     raise AssertionError("the placed feed nut's holes are not over TL-32's taps")
 # The four nut screws, flat heads seated nominally in the flange's
 # countersinks: each head top feed_nut.SCREW_GRIP off the lug face, each
-# screw's +Y (head) along the block's -X.
-NUT_ROWS: Rows = ((0.0, 1.0, 0.0), (-1.0, 0.0, 0.0), (0.0, 0.0, 1.0))
+# screw's +Y (head) along the block's +X.
+NUT_ROWS: Rows = ((0.0, -1.0, 0.0), (1.0, 0.0, 0.0), (0.0, 0.0, 1.0))
 NUT_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
     compose(
         FEED_BLOCK_PLACEMENTS[0],
-        (feed_block.NUT_FACE_X - feed_nut.SCREW_GRIP, y, z),
+        (feed_block.NUT_FACE_X + feed_nut.SCREW_GRIP, y, z),
         NUT_ROWS,
     )
     for y, z in feed_block.NUT_HOLES_YZ
@@ -2019,8 +2018,8 @@ FEED_FIT_STEPS = (
     f"RECEIPT LIMITS ON {feed_nut.REWORK_SHEET_REFERENCE}; REJECT ONE OUTSIDE "
     "THEM. FACE AND COUNTERSINK IT PER THAT SHEET; REJECT ONE OUTSIDE ITS "
     "FACED LENGTH.",
-    "F1B. AFTER STEP 8A, NUT SEAT FACE "
-    "TOWARD THE LUG, MOVE THE FEED CARRIAGE TO EACH TRAVEL END IN TURN AND "
+    "F1B. AFTER STEP 8A, SEAT THE NUT ON THE LUG'S FACE AWAY FROM THE SPINDLE, "
+    "BODY AWAY FROM THE LUG. MOVE THE FEED CARRIAGE TO EACH TRAVEL END AND "
     "ALIGN EACH KP08 SO THE SCREW RUNS CENTRED IN THE LUG'S "
     f"Ø{_length(feed_block.SCREW_CLEARANCE_DIA, feed_block.NUT_PATTERN_PLACES)} "
     f"CLEARANCE WITHOUT FORCING IT; TIGHTEN THE KP08 SCREWS TO {_KP08_TORQUE}, "
@@ -2240,7 +2239,7 @@ def _component_local_boxes() -> dict[str, Box3]:
         BASE_BAR_1: bar_box,
         BASE_BAR_2: bar_box,
         RAIL: ((0.0, guide_rail.LENGTH), (-guide_rail.WIDTH / 2.0, guide_rail.WIDTH / 2.0), (0.0, guide_rail.HEIGHT)),
-        CARRIAGE: ((-carriage.LENGTH / 2.0 - carriage.NIPPLE_PROUD, carriage.LENGTH / 2.0 + carriage.PLUG_PROUD), (-carriage.WIDTH / 2.0, carriage.WIDTH / 2.0), (carriage.UNDERSIDE_Z, carriage.MOUNTING_FACE_Z)),
+        CARRIAGE: ((-carriage.LENGTH / 2.0 - carriage.PLUG_PROUD, carriage.LENGTH / 2.0 + carriage.NIPPLE_PROUD), (-carriage.WIDTH / 2.0, carriage.WIDTH / 2.0), (carriage.UNDERSIDE_Z, carriage.MOUNTING_FACE_Z)),
         PIVOT_BLOCK: ((pivot_block.BLOCK_X0, pivot_block.BLOCK_X1), (-pivot_block.BLOCK_WIDTH / 2.0, pivot_block.BLOCK_WIDTH / 2.0), (0.0, pivot_block.BLOCK_HEIGHT)),
         FEED_BLOCK: ((pivot_block.BLOCK_X0, pivot_block.BLOCK_X1), (feed_block.LUG_Y0, pivot_block.BLOCK_WIDTH / 2.0), (0.0, pivot_block.BLOCK_HEIGHT)),
         PIVOT_SCREW: ((-pivot_screw.HEAD_DIA / 2.0, pivot_screw.HEAD_DIA / 2.0), (-pivot_screw.HEAD_DIA / 2.0, pivot_screw.HEAD_DIA / 2.0), (-pivot_screw.THREAD_LENGTH, pivot_screw.SHOULDER_LENGTH + pivot_screw.HEAD_HEIGHT)),
@@ -2420,6 +2419,34 @@ MODEL_EXTENT = _model_extent()
 
 # --- Clearance check over the full sweep of both passes -------------------------
 SWEEP_SAMPLES = 2001  # per pass, endpoints included: a 0.011 degree step
+
+# Continuous (not sampled) separating axes for the centred rail branches.
+# Include the nipple beyond either seal in each oriented carriage rectangle.
+# s_A+s_B = 4 R sin(alpha/2) cos(theta/2), least at a pass endpoint.
+_CARRIAGE_HALF_ENVELOPE = carriage.LENGTH / 2 + max(carriage.NIPPLE_PROUD, carriage.PLUG_PROUD)
+CARRIAGE_PAIR_GAPS = {
+    name: (4 * radius * math.sin(trammel.HALF_ALPHA) * math.cos(trammel.SWEEP[name] / 2)
+           - 2 * trammel.PIN_OFFSET - 2 * _CARRIAGE_HALF_ENVELOPE)
+    * math.cos(trammel.HALF_ALPHA) - carriage.WIDTH * math.sin(trammel.HALF_ALPHA)
+    for name, radius in trammel.PASS_RADIUS.items()
+}
+_BLOCK_SIDE_BAND = 2 * printed_band_mm(2, unit=pivot_block.UNIT)
+CENTRED_BLOCK_CLEARANCES = {
+    "KP08 lateral": leadscrew.SCREW_LATERAL - leadscrew.KP08_LENGTH / 2
+    - leadscrew.KP08_MARGIN - pivot_block.BLOCK_WIDTH / 2
+    - _BLOCK_SIDE_BAND - leadscrew.KP08_STATION_ENVELOPE,
+    "leadscrew lateral": leadscrew.SCREW_LATERAL - leadscrew.SCREW_MAJOR_DIA / 2
+    - pivot_block.BLOCK_WIDTH / 2 - _BLOCK_SIDE_BAND - leadscrew.KP08_STATION_ENVELOPE,
+    "far stud lateral": trammel.HOLD_DOWN_LATERAL - trammel.HOLD_DOWN_ADJUST
+    - flange_nut.FLANGE_DIA / 2 - pivot_block.BLOCK_WIDTH / 2 - _BLOCK_SIDE_BAND,
+    "lug to near stud": trammel.CARRIAGE_TRAVEL[0] + feed_block.LUG_X0
+    - trammel.HOLD_DOWN_NEAR_S - flange_nut.FLANGE_DIA / 2
+    - feed_block.LUG_POSITION_BAND - printed_band_mm(2, unit=base_bar.UNIT),
+    "lug above bracket": trammel.CARRIAGE_HEIGHT - leadscrew.BRACKET_THICK
+    - end_bracket.THICK_STOCK_BAND,
+}
+if min((*CARRIAGE_PAIR_GAPS.values(), *CENTRED_BLOCK_CLEARANCES.values())) <= 0.0:
+    raise AssertionError("centred rail branches lose a continuous separating axis")
 
 
 def sweep_thetas(pass_name: str, samples: int = SWEEP_SAMPLES) -> Iterator[float]:
@@ -2639,11 +2666,12 @@ def sweep_poses(pass_name: str) -> list[dict]:
                 "theta_rad": theta,
                 "drive_mm": slide_distance(stations[SLIDE_RAIL]),
                 "check": index not in seen,
-                "carriages": {
-                    instance_name(CARRIAGE, RAILS.index(rail)): list(
-                        carriage_origin(rail, station)
+                "origins": {
+                    instance_name(family, occurrence): list(
+                        _swept_placement(family, occurrence, pass_name, theta)[0]
                     )
-                    for rail, station in stations.items()
+                    for family in BOM_ORDER if family in MOVING
+                    for occurrence in range(QUANTITIES[family])
                 },
             }
         )

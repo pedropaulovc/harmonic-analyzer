@@ -110,6 +110,19 @@ the seated nut at TL-00 assembly (Main ruling 2026-11-03). Both blocks use new 6
 owned OnlineMetals 1165 1/2 × 1 in bar on edge, raising the screw axis to
 Z52.4. The owned 1164 1/2 × 3/4 in stock is spare.
 
+The 2026-11-06 centred-block relayout puts each pivot bore and the
+1.64 × 1.58 in block on its HGH15CA carriage centre. The carrier's pin holes
+and cutter circles stay unchanged; carriage travel is 75.215–389.366 mm on
+the retained 439.928 mm rails. The feed nut now seats on the lug's +X face,
+body away from the spindle. Near KP08 station is 62.484 mm (2.46 in);
+the far station remains 443 mm. The native LeadScrew cut is 419.5 mm.
+Clearance stacks include both #8 mounting joints' full hole float and their
+station bands, not a no-slip assumption. KP08 axis height/foot thickness
+remain unverified (#2184). Native block bore/dimension readbacks, one-free-DOF
+proof and driven whole-assembly interference at both passes remain mandatory;
+analytic separating axes and generated sweep targets are not native results.
+
+
 New purchases are TL-VN-77 shoulder screws (Huyett BLTS40-0375-1500188P,
 thread shop-cut), TL-VN-78 spacers (AluminumSpacers.com AS62-18-40) and TL-VN-79
 shims (Huyett SHIM-0375-008 nominal; SHIM-0375-004/-020 fitting stock);

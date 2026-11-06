@@ -40,14 +40,14 @@ underside counterbore is .200 ±.005. TL-28's full-thread and opposed-cut
 limits protect both complete physical screw reaches (owner A″).
 
 Travel. The KP08 blocks sit at least FEED_GAP outside the feed lug's reach
-over the carriage travel ``trammel.CARRIAGE_TRAVEL`` ⚙ (107.2 .. 421.4, both
+over the carriage travel ``trammel.CARRIAGE_TRAVEL`` ⚙ (75.2 .. 389.4, both
 passes); the screw runs NEAR_STUB past the near KP08 and on into the
 handwheel's bore past its grub and its set-screw flat
 (HANDWHEEL_ENGAGEMENT_MIN), short of the wheel's outer face; the hub stands
-HUB_GAP past the far block: SCREW_LENGTH 410. The stations
-and the screw length are fixed (the drilled parts carry them); self-checks
-guard them against the bought block, so a vendor swap changes the bought
-numbers only, or trips a check.
+HUB_GAP past the far block. The near station follows the centred feed block;
+the screw cut preserves handwheel engagement. Both mounting joints' hole
+floats and printed stations enter the clearance envelope; none of these
+geometric checks certifies the unverified KP08 height or thrust rating.
 
 The nut remains attached to the feed block during either feed mode. Align
 the KP08 blocks at both travel ends so the screw runs centred in the feed
@@ -94,6 +94,7 @@ import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec
 from _inch_wall_limits import WALL_TARGET_MM
+from _printed_tolerance import printed_band_mm
 
 INCH = trammel.INCH
 
@@ -224,10 +225,8 @@ SCREW_LATERAL = 54.991  # 2.165; TL-32's nut lug reads it
 BRACKET_THICK = 1.0 * INCH  # OnlineMetals 1165 half-by-one bar, on edge
 KP08_BASE_Z = trammel.BASE_BAR_THICK + BRACKET_THICK  # 37.338
 SCREW_AXIS_Z = KP08_BASE_Z + KP08_AXIS_HEIGHT  # 52.338
-# Far KP08 outer face to the handwheel's hub end: the 410 screw's far end then
-# stands 13 into the wheel's bore, past the grub on its flat (which runs out
-# through the cut end, leadscrew_stock.OPEN_FLAT), and 1 short of the hub's
-# guaranteed bore depth.
+# Far KP08 outer face to the handwheel's hub end. Retain the 13 mm nominal
+# engagement when moving the near support; the screw cut follows both ends.
 HUB_GAP = 11.0
 # The drilled parts fix the KP08 stations and the screw length; a vendor swap
 # must not move them. The self-checks below guard them against the bought
@@ -295,8 +294,31 @@ BAR_SCREW_FULL_THREAD_MIN = full_thread_min(
     BAR_SCREW_LENGTH, BAR_SCREW_GRIP_MAX, BAR_SCREW
 )  # 6.433375, 1.544D
 
-KP08_S = (72.0, 443.0)  # near, far: KP08 axial centre stations
-SCREW_LENGTH = 410.0
+KP08_S = (62.484, 443.0)  # near 2.46 in, far unchanged: axial centre stations
+# PR4 follows PR2's #8-32 class-3A upper and lower mounting screws. Charge
+# both joints' full radial float, not friction, at ASME B1.1 minimum major.
+# This is a clearance envelope, not a change to PR2's positive-stop ruling.
+SHCS_8_MAJOR_MIN = base_bar.BRACKET_SCREW_MAJOR_MIN
+BRACKET_STOP_FLOAT_MAX = base_bar.BRACKET_SCREW_FLOAT_WORST
+# The upper KP08 joint was never slip-checked; its Ø5 hole remains
+# UNVERIFIED (#2184). Charge its full float for clearance without certifying it.
+KP08_SCREW_FLOAT_MAX = (KP08_HOLE_DIA - SHCS_8_MAJOR_MIN) / 2.0
+# The near bar station prints 47.48 mm from its end, not 47.484; charge
+# that rounding in addition to its explicit metric location band.
+_KP08_STATION_ROUNDING = max(
+    abs((s - trammel.RAIL_NEAR_S) - round(s - trammel.RAIL_NEAR_S, base_bar.BRACKET_STATION_PLACES))
+    for s in KP08_S
+)
+KP08_STATION_ENVELOPE = (
+    base_bar.BRACKET_STATION_BAND + _KP08_STATION_ROUNDING + _TL28_BAND
+    + BRACKET_STOP_FLOAT_MAX + KP08_SCREW_FLOAT_MAX
+)
+# Native metric sheet prints one place. The chosen cut is
+# round((443 + 6.5 + 11 + 13) - (62.484 - 6.5 - 2), 1) = 419.5:
+# retain the far end, with 12.984 nominal wheel engagement after rounding.
+# Freeze this manufactured size: a vendor swap must trip the fit guards,
+# not silently resize the already-cut screw.
+SCREW_LENGTH = 419.5
 KP08_FACE_S = (
     KP08_S[0] - KP08_WIDTH / 2.0,  # the near block's outer face
     KP08_S[1] + KP08_WIDTH / 2.0,  # the far block's outer face
@@ -403,6 +425,14 @@ for _stud_s, _stud_lat in trammel.HOLD_DOWN_STUDS:
 _near_stud_s = trammel.HOLD_DOWN_STUDS[0][0]
 if not BRACKET_BOXES["end bracket near"][0] > _near_stud_s + 14.0:
     raise AssertionError("the near bracket reaches the near hold-down's nut")
+# Include the printed stud station and the complete support float even
+# though the installed short studs also clear the moving blocks in Z.
+KP08_STUD_CLEARANCE_WORST = (
+    KP08_BOXES["KP08 near"][0] - (_near_stud_s + 14.0)
+    - KP08_STATION_ENVELOPE - printed_band_mm(2, unit=base_bar.UNIT)
+)
+if KP08_STUD_CLEARANCE_WORST <= 0.0:
+    raise AssertionError("the displaced near KP08 reaches the hold-down envelope")
 # Both brackets stand on the bar, inside its ends; the far bracket's screws too.
 if not (
     BRACKET_BOXES["end bracket far"][1] < trammel.BASE_BAR_FAR_S
@@ -515,13 +545,7 @@ BRACKET_OPENING_THRUST = (
 # is .1585 in (ASME B1.1, external class 3A). Disclosed beside it: the
 # basic-major (.164) figures, 0.368 a side and 0.737 reversal. The upper
 # joint (KP08 on TL-28, ``KP08_SCREW_FLOAT_MAX``) is not part of this bound.
-SHCS_8_MAJOR_MIN = base_bar.BRACKET_SCREW_MAJOR_MIN  # 4.026
 BRACKET_STOP_FLOAT_BASIC = base_bar.BRACKET_SCREW_FLOAT_MAX  # 0.368 a side
-# Directly from the largest drilled hole (base bar spec, which also proves
-# the counterbore keeps the head clear over this whole travel): offsetting
-# the basic figure by SHCS_8_MAJOR (.164 exactly) against the table's 4.166
-# basic major dropped 0.0002 of float.
-BRACKET_STOP_FLOAT_MAX = base_bar.BRACKET_SCREW_FLOAT_WORST  # 0.438
 BRACKET_REVERSAL_LOST_MOTION_BASIC = 2.0 * BRACKET_STOP_FLOAT_BASIC  # 0.737
 BRACKET_REVERSAL_LOST_MOTION = 2.0 * BRACKET_STOP_FLOAT_MAX  # 0.876
 BRACKET_REVERSAL_LOST_MOTION_ACCEPTED = 1.06  # the R4 ruling's "up to 1.06 mm"
@@ -530,11 +554,6 @@ if BRACKET_REVERSAL_LOST_MOTION > BRACKET_REVERSAL_LOST_MOTION_ACCEPTED:
         f"TL-28 can shift {BRACKET_REVERSAL_LOST_MOTION:.3f} on TL-20 at a reversal, "
         f"over the ruling's {BRACKET_REVERSAL_LOST_MOTION_ACCEPTED}"
     )
-# The KP08 on TL-28, for position envelopes (PR4's centred blocks): the #8
-# in the KP08's Ø5 hole (UNVERIFIED, #2184) at its minimum major. That joint
-# was never slip-checked (an inherited open question, not certified here),
-# so a conservative envelope charges this float as well.
-KP08_SCREW_FLOAT_MAX = (KP08_HOLE_DIA - SHCS_8_MAJOR_MIN) / 2.0  # 0.487
 # The positive stop: each bar screw's thread bears on the wall of TL-20's
 # clearance hole over the bar left under the counterbore (its least printed
 # length) and on TL-28's thread over its worst-case full thread, and the

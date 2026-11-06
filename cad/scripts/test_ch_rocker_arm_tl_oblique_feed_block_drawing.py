@@ -49,7 +49,7 @@ def test_identity_stock_and_common_pivot_interface():
 
 
 def test_nut_face_carries_the_screw_clearance_and_four_through_taps_only():
-    assert spec.NUT_FACE_X==spec.LUG_X0
+    assert spec.NUT_FACE_X==spec.LUG_X1
     assert math.isclose(spec.NUT_AXIS_Y,-lead.SCREW_LATERAL)
     assert math.isclose(trammel.CARRIAGE_TOP_Z+spec.NUT_AXIS_Z,lead.SCREW_AXIS_Z)
     assert math.isclose(spec.SCREW_CLEARANCE_DIA,.351*INCH)
@@ -95,7 +95,7 @@ def test_four_taps_sit_on_the_nut_pcd_on_the_lug_diagonals_and_are_transferred()
     assert set(drawing.NUT_KEEP)=={'NutCentreY','NutCentreZ','NutClearanceDia','NutClock'}
     source=(FOLDER/'_oblique_block_drawing.py').read_text(encoding='utf-8')
     assert source.count('process=contract.TRANSFER_PROCESS')==1
-    # The callout lands on the tap at the view's upper right (+Y, +Z).
+    # The callout lands on the Right view's upper-left tap (+Y, +Z).
     tree=ast.parse(source)
     [index]=[n.slice.value for n in ast.walk(tree) if isinstance(n,ast.Subscript)
              and ast.unparse(n.value)=='contract.NUT_HOLES_YZ']
@@ -184,7 +184,7 @@ def test_every_tap_is_bound_by_the_native_clocking_band_the_walls_charge():
     assert spec.CALLOUTS_PREFIX=={'NutClock':f'{feed_nut.SCREW_COUNT}X '}
     assert spec.LUG_WALLS_MM==spec.lug_walls_mm(spec.NUT_CLOCK_TOL_DEG)
     y,z=spec.NUT_HOLES_YZ[spec.NUT_CLOCK_TAP]
-    assert (y<spec.NUT_AXIS_Y,z>spec.NUT_AXIS_Z)==(True,True)  # VIEW D's lower right
+    assert (y<spec.NUT_AXIS_Y,z>spec.NUT_AXIS_Z)==(True,True)  # VIEW D's lower left
     assert math.isclose(math.degrees(math.atan2(spec.NUT_AXIS_Y-y,z-spec.NUT_AXIS_Z)),spec.NUT_CLOCK_DEG)
     assert math.isclose(spec.NUT_CLOCK_RAY,feed_nut.HOLE_PCD/2)
     # Negative control: a tap free to sit 10° off its diagonal, as an
@@ -250,15 +250,19 @@ def test_reference_lines_on_the_printed_outline_are_plain_sketch_lines():
 
 
 def test_nut_and_lug_clear_both_end_blocks_at_both_travel_limits():
-    assert math.isclose(spec.NUT_REACH_X[0],spec.NUT_FACE_X-feed_nut.REACH)
+    assert math.isclose(spec.NUT_REACH_X[1],spec.NUT_FACE_X+feed_nut.REACH)
     assert feed_nut.REACH==feed_nut.LENGTH_MAX
     for station in trammel.CARRIAGE_TRAVEL:
         lo,hi=(station+v for v in spec.NUT_REACH_X)
         for box in lead.KP08_BOXES.values():
             assert max(box[0]-hi,lo-box[1])>=lead.FEED_GAP
-    # The -X gap to the near KP08 at the longest faced nut (13.8).
+    # Near clearance is the lug, not a nut projecting toward the spindle.
     near=min(gap for (name,_station),gap in spec.FEED_GAPS.items() if name=='KP08 near')
-    assert round(near,1)==2.8
+    assert round(near,1)==4.5
+    assert min(spec.FEED_GAPS_WORST.values()) >= lead.FEED_GAP
+    assert pivot.CBORE_SECTION_X < spec.LUG_X0
+    source=(FOLDER/'_oblique_block_drawing.py').read_text(encoding='utf-8')
+    assert "'*Right',*NUT_XY" in source
 
 
 def test_feed_entrypoints_use_the_native_shared_geometry_and_not_a_separate_bracket():
