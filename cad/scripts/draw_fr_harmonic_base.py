@@ -466,9 +466,11 @@ HOLE_SIDE_KEEP = {
     "CrossScrewAxisHeight": (0.064, 0.1215),
     # Two baselines beneath the front view, above its label, both from the
     # flange's west face (the table's X0), shortest innermost: at 1:2 the near
-    # tap's 15.8 mm witness span holds its text, and the far tap's text sits
+    # tap's 15.8 mm witness span (x 85.7-101.5 mm) holds its 10.9 mm text
+    # centred, 2.4 mm clear of each extension line (at x 0.088 the flange's
+    # line struck it, run 20261106T191202377Z), and the far tap's text sits
     # mid-span on the outer row.
-    "CrossTapX": (0.088, 0.117),
+    "CrossTapX": (0.0936, 0.117),
     "CrossTapFarX": (0.186, 0.106),
 }
 # The front cross-tap view's label, centred under the view and about 6 mm
