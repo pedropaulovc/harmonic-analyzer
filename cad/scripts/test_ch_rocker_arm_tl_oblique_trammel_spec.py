@@ -244,8 +244,11 @@ def test_trimmed_rails_retain_full_travel_at_shortest_bar_length() -> None:
     assert trammel.RAIL_SUPPLY_LENGTH == 450.0
     assert trammel.RAIL_TRIM_PER_END == pytest.approx(5.036)
     assert trammel.CARRIAGE_S_RANGE == pytest.approx((45.7, 424.228))
-    assert trammel.CARRIAGE_END_MARGINS_WORST[0] > 60.0
-    assert trammel.CARRIAGE_END_MARGINS_WORST[1] == pytest.approx(2.60, abs=0.02)
+    # Centring the pivot moves the carriage interval 32 mm toward the near end.
+    assert trammel.PIN_OFFSET == 0.0
+    assert trammel.CARRIAGE_END_MARGINS_WORST == pytest.approx(
+        (29.515018839, 34.607559206), abs=0.001
+    )
 
 
 def test_the_sweep_carries_the_part_cutter_past_both_tip_lands() -> None:
