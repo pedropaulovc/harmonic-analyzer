@@ -18,7 +18,10 @@ from __future__ import annotations
 
 DRAWING_NUMBER = "MHA-MG-00"
 
+DRUM_PRESSED_KEY = "drum-pressed"
+DRUM_HELD_KEY = "drum-held"
 AXLE_PRESSED_KEY = "axle-pressed"
+AXLE_HELD_KEY = "axle-held"
 AXLE_TRIAL_KEY = "axle-trial-fitted"
 AXLE_CHECKED_KEY = "axle-checked"
 COLUMN_CLAMP_STARTED_KEY = "column-clamp-started"
@@ -27,14 +30,22 @@ ENDSHAKE_CHECKED_KEY = "endshake-checked"
 LOCKNUT_JAMMED_KEY = "locknut-jammed"
 LEVER_THREADED_KEY = "lever-threaded"
 CLAMP_SET_KEY = "clamp-set"
+CLAMP_HELD_KEY = "clamp-held"
 FIXTURE_SET_KEY = "fixture-set"
+FIXTURE_HELD_KEY = "fixture-held"
 WIRE_HOOKED_KEY = "lever-wire-hooked"
 WIRE_TIED_KEY = "lever-wire-tied"
 
 SEQUENCE: tuple[str, ...] = (
-    # Wheel group.
-    "drum-pressed",
+    # Wheel group. Each press is accepted at the bench before anything else
+    # goes on it (rule 23): it does not turn or slide by hand, and a slip fit
+    # has its own step.
+    DRUM_PRESSED_KEY,
+    DRUM_HELD_KEY,
+    "drum-slip-fit",
     AXLE_PRESSED_KEY,
+    AXLE_HELD_KEY,
+    "axle-slip-fit",
     AXLE_TRIAL_KEY,
     "trial-nuts-jammed",
     AXLE_CHECKED_KEY,
@@ -58,11 +69,16 @@ SEQUENCE: tuple[str, ...] = (
     "clamp-thumb-screw-started",
     CLAMP_SET_KEY,
     "clamp-thumb-screw-tightened",
+    # Each hand-set clamp is checked to hold its setting (rule 23).
+    CLAMP_HELD_KEY,
+    "clamp-reset",
     "fixture-thumb-screw-started",
     "rod-through-fixture",
     "rod-seated",
     FIXTURE_SET_KEY,
     "fixture-thumb-screw-tightened",
+    FIXTURE_HELD_KEY,
+    "fixture-reset",
     # Lever wire, on the machine.
     WIRE_HOOKED_KEY,
     "lever-wire-hook-twisted",

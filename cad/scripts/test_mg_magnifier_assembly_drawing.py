@@ -154,15 +154,57 @@ def test_the_press_gauge_is_a_reference_accepted_at_the_nuts() -> None:
     assert stack.SETTING_CALLOUTS[stack.FEATURE][stack.ENDSHAKE_DIMENSION] == (
         4, "WHEEL FREE, NO RATTLE"
     )
-    # Each side has its own remedy, back to the trial fit.
+    # Each side has its own remedy, back through the press-hold check.
     for key, side in (("axle-pressed-further", "OVER THE MAX"), ("axle-pressed-back", "UNDER THE MIN")):
         remedy = notes.STEP_TEXT[key]
         assert side in remedy
-        assert remedy.endswith(f"RETURN TO STEP {steps.step_number(steps.AXLE_TRIAL_KEY)}.")
+        assert remedy.endswith(f"RETURN TO STEP {steps.step_number(steps.AXLE_HELD_KEY)}.")
     # The one-line callout centres over the value: at the 2.7 mm a capital
     # measured on the e04fd60ab sheet it stays inside the right border.
     x, _y = drawing.PRESSED_KEEP[stack.PRESS_GAUGE_DIMENSION]
     assert x + len(text) * 0.0027 / 2.0 < SHEET_RIGHT - 0.005
+
+
+def test_each_press_is_accepted_at_the_bench_with_a_slip_fit_remedy() -> None:
+    """Rule 23: a press prints a bench acceptance and what a slip fit gets."""
+    for pressed, held, slip in (
+        (steps.DRUM_PRESSED_KEY, steps.DRUM_HELD_KEY, "drum-slip-fit"),
+        (steps.AXLE_PRESSED_KEY, steps.AXLE_HELD_KEY, "axle-slip-fit"),
+    ):
+        number = steps.step_number(pressed)
+        assert steps.SEQUENCE[number : number + 2] == (held, slip)
+        assert notes.STEP_TEXT[held].endswith("DOES NOT TURN OR SLIDE BY HAND.")
+        assert "BY HAND" in notes.STEP_TEXT[slip]
+        assert notes.STEP_TEXT[slip].endswith(f"RETURN TO STEP {number}.")
+
+
+def test_each_hand_set_clamp_is_checked_to_hold_its_setting() -> None:
+    """Rule 23 adjustable clamp: a thumb screw on the round, set and checked."""
+    for set_key, held, reset in (
+        (steps.CLAMP_SET_KEY, steps.CLAMP_HELD_KEY, "clamp-reset"),
+        (steps.FIXTURE_SET_KEY, steps.FIXTURE_HELD_KEY, "fixture-reset"),
+    ):
+        held_at = steps.SEQUENCE.index(held)
+        assert steps.SEQUENCE[held_at - 1].endswith("thumb-screw-tightened")
+        assert steps.SEQUENCE[held_at + 1] == reset
+        assert notes.STEP_TEXT[held].startswith("CHECK ")
+        assert notes.STEP_TEXT[held].endswith(" BY HAND.")
+        assert " DOES NOT SLIP ON " in notes.STEP_TEXT[held]
+        assert notes.STEP_TEXT[reset].endswith(f"RETURN TO STEP {steps.step_number(set_key)}.")
+
+
+def test_the_joints_left_loose_cite_the_mha_ha_00_step_that_seats_them() -> None:
+    """Rule 23 across the package boundary: drawing and step, by number."""
+    import ha_harmonic_analyzer_assembly_steps as ha_steps
+
+    assert notes.STEP_TEXT[steps.COLUMN_CLAMP_STARTED_KEY].endswith(
+        f"{ha_steps.step_ref('magnifier-bar-clamped')} TIGHTENS THEM."
+    )
+    assert any(
+        ha_steps.step_ref("magnifier-bracket-screwed") in line
+        for line in notes.ASSEMBLY_CHECKS
+        if line.startswith("LOOSE ITEMS:")
+    )
 
 
 def _circle_box(detail) -> tuple[float, float, float, float]:
