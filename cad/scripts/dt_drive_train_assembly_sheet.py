@@ -76,17 +76,17 @@ HANDLE_FERRULE_CURE = (
 T120_FITUP_FEELER_TEXT = inch_text(pinion.T120_FITUP_FEELER_MM, FEELER_PLACES)
 if float(T120_FITUP_FEELER_TEXT) * MM_PER_IN < pinion.T120_FITUP_FEELER_MM - 1e-9:
     raise AssertionError("the printed T120 fit-up feeler is thinner than its check")
-T120_FITUP_ASSEMBLY_CHECK = "\n".join(
-    (
-        f"   PUSH {pinion.T120_FITUP_PUSHED[0]} AND {pinion.T120_FITUP_PUSHED[1]} TOWARD EACH OTHER;",
-        "   TURN MHA-DT-07 SLOWLY BY HAND, READING A",
-        f"   {T120_FITUP_FEELER_TEXT} FEELER ALL ROUND. MHA-DT-10 BAND TO T120 TIPS:",
-        "   IF THE FEELER STOPS, TURN THE MHA-DT-10 BAND DOWN,",
-        f"   Ø{inch_min_text(pinion.TURNED_DIA_FITUP_MIN, 3)} MIN.",
-        "   MHA-DT-10 SHOULDER TO T120 SOUTH FACE: IF THE FEELER STOPS,",
-        "   FACE THE MHA-DT-10 SHOULDER BACK,",
-        f"   {inch_min_text(pinion.SHOULDER_LENGTH_FITUP_MIN, 3)} MIN. RESET, RECHECK.",
-    )
+# A check and its remedy are separate steps (drawing-guidelines rule 22).
+T120_FITUP_CHECK = (
+    f"PUSH {pinion.T120_FITUP_PUSHED[0]} AND {pinion.T120_FITUP_PUSHED[1]} TOWARD EACH "
+    "OTHER. TURN MHA-DT-07 SLOWLY BY HAND: A "
+    f"{T120_FITUP_FEELER_TEXT} FEELER PASSES ALL ROUND BETWEEN THE MHA-DT-10 BAND AND "
+    "THE T120 TIPS, AND BETWEEN THE MHA-DT-10 SHOULDER AND THE T120 FRONT FACE."
+)
+T120_FITUP_REMEDY = (
+    "IF THE FEELER STOPS AT THE BAND, TURN THE MHA-DT-10 BAND DOWN, "
+    f"Ø{inch_min_text(pinion.TURNED_DIA_FITUP_MIN, 3)} MIN; AT THE SHOULDER, FACE THE "
+    f"MHA-DT-10 SHOULDER BACK, {inch_min_text(pinion.SHOULDER_LENGTH_FITUP_MIN, 3)} MIN."
 )
 
 # The lever and lift-rod prints defer this hole to assembly. The pin contract

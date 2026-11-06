@@ -98,20 +98,21 @@ if FEELER_SET_ERROR != FRONT_BLOCK_FEELER_BAND or DRUM_END_SHIM_SET_ERROR != (
     raise AssertionError("a fit-up setting carries its own band")
 
 
-# The bank is seated on its south hard datum before the rig follows actual g19.
-RIG_SET_BANK_PRECONDITION = "BANK HELD SOUTH ON MHA-DT-26"
+# The bank is seated on its front hard datum before the rig follows actual g19.
+RIG_SET_BANK_PRECONDITION = "BANK HELD TO THE FRONT ON MHA-DT-26"
 
 
-# MHA-DT-00 prints decimal inch (#290).  Each setting prints its inch value
-# to the gage's thousandth, then the leaves that make it up by their stamped
-# metric size, so a fitter holding the metric set picks the right ones.
-def _leaf_setting(setting: float, leaves: tuple[float, ...]) -> str:
-    stamps = " + ".join(f"{leaf:.2f}" for leaf in leaves)
-    noun = "LEAF" if len(leaves) == 1 else "LEAVES"
-    return f"{inch_text(setting, FEELER_PLACES)} ({stamps} MM {noun})"
+# MHA-DT-00 prints decimal inch (#290) and an inch sheet prints inch values
+# only (drawing-guidelines rule 26): each setting prints its inch value to the
+# gage's thousandth, and MHA-DT-00's feeler-stack table (draw_dt_drive_train_
+# assembly.FEELER_STACK_ROWS) lists the stamped metric leaves that make it up.
+def _leaf_setting(setting: float) -> str:
+    return inch_text(setting, FEELER_PLACES)
 
 
-# The step each print carries, uppercase to match the sheets.  The base
+# The step each print carries, uppercase to match the sheets.  Each line is
+# one sub-step that does one thing (drawing-guidelines rule 22); MHA-DT-00
+# letters the lines after the first.  The base
 # carries the set-up its transfer seats are spotted in: RIG_SET_STEP is a
 # note named by its first words, and both transfer callouts name it
 # (TRANSFER_AFTER_RIG_SET).  On the callouts it
@@ -121,12 +122,12 @@ def _leaf_setting(setting: float, leaves: tuple[float, ...]) -> str:
 RIG_SET_NAME = "RIG SET"
 RIG_SET_STEP = "\n".join(
     (
-        f"{RIG_SET_NAME}, BEFORE SPOTTING THE TRANSFER SEATS:",
-        f"FRONT MHA-DT-18 {_leaf_setting(FRONT_BLOCK_FEELER, (FRONT_BLOCK_FEELER,))} "
-        "OFF FRONT MHA-DT-14;",
-        f"MHA-DT-01 BACK END {_leaf_setting(RIG_SET_LEAF_D, RIG_SET_LEAVES)} OFF",
-        f"ACTUAL NORTH MHA-DT-12 BACK FACE, {RIG_SET_BANK_PRECONDITION};",
-        f"MHA-DT-24 PAD {_leaf_setting(SPRING_PAD_LEAF, (SPRING_PAD_LEAF,))} OFF MHA-DT-18.",
+        f"{RIG_SET_NAME}, BEFORE SPOTTING THE TRANSFER SEATS: SET THE FRONT MHA-DT-18 "
+        f"{_leaf_setting(FRONT_BLOCK_FEELER)} OFF THE FRONT MHA-DT-14 ON A FEELER.",
+        f"WITH THE {RIG_SET_BANK_PRECONDITION}, SET THE MHA-DT-01 BACK END "
+        f"{_leaf_setting(RIG_SET_LEAF_D)} OFF THE BACK FACE OF GEAR 19 (THE BACK "
+        "MHA-DT-12) AS FITTED, ON A FEELER STACK.",
+        f"SET THE MHA-DT-24 PAD {_leaf_setting(SPRING_PAD_LEAF)} OFF MHA-DT-18 ON A FEELER.",
     )
 )
 TRANSFER_AFTER_RIG_SET = f"AFTER {RIG_SET_NAME};"
@@ -136,13 +137,14 @@ TRANSFER_AFTER_RIG_SET = f"AFTER {RIG_SET_NAME};"
 # 45 deg or more off the follower contact (test_dt_drive_train_support_layout),
 # so the stakes stay off the follower's track. "CAMS", the BOM's name (machinist
 # review of 82158b1bb).
-COLLAR_SET_STEP = (
-    f"SET THE MHA-DT-23 CAMS ON {FEELER_GAGE_NAME} LEAVES:\n"
-    f"  FRONT CAM FRONT FACE {_leaf_setting(FRONT_COLLAR_LEAF, (FRONT_COLLAR_LEAF,))} "
-    "OFF FRONT MHA-DT-18;\n"
-    f"  BACK CAM BACK FACE {_leaf_setting(BACK_COLLAR_LEAF_F, (BACK_COLLAR_LEAF_F,))} "
-    "OFF BACK MHA-DT-18.\n"
-    "  TIGHTEN THEIR SET SCREWS AND STAKE EACH TAP MOUTH AT 2 POINTS."
+COLLAR_SET_STEP = "\n".join(
+    (
+        f"SET THE FRONT MHA-DT-23 CAM'S FRONT FACE {_leaf_setting(FRONT_COLLAR_LEAF)} "
+        "OFF THE FRONT MHA-DT-18 ON A FEELER.",
+        f"SET THE BACK MHA-DT-23 CAM'S BACK FACE {_leaf_setting(BACK_COLLAR_LEAF_F)} "
+        "OFF THE BACK MHA-DT-18 ON A FEELER.",
+        "TIGHTEN THEIR SET SCREWS AND STAKE EACH TAP MOUTH AT 2 POINTS.",
+    )
 )
 
 # MHA-DT-19's drilling pose.  Main's re-ruling (2026-09-26, after the
@@ -168,15 +170,14 @@ SHAFT_DRILL_NAME = "SHAFT DRILL SET"
 STRAP_PIN_NUMBER = "MHA-DT-VN-63"
 SHAFT_DRILL_STEP = "\n".join(
     (
-        f"{SHAFT_DRILL_NAME}: MATCH-DRILL MHA-DT-19 THRU MHA-DT-14 CROSS HOLES, 2 PL,",
-        "MHA-DT-19 REAR END FLUSH WITH MHA-DT-18 REAR FACE "
-        f"+/-{inch_max_text(FLUSH_SET_ERROR, 3)}",
-        "(SETS MHA-DT-19 BEARING IN BOTH MHA-DT-18 AND ITS FRONT END CLEARANCE",
-        "TO MHA-DT-16),",
-        "STRAPS ON BACK STOP, MHA-DT-01 ON BACK STRAP,",
-        f"{_leaf_setting(DRUM_END_SHIM, (DRUM_END_SHIM,))} FEELER AT MHA-DT-01 FRONT END; "
-        f"DRIVE {STRAP_PIN_NUMBER} PINS,",
-        f"BOTH ENDS 0 TO {inch_max_text(PIN_SUB_FLUSH_MAX, 3)} BELOW THE MHA-DT-14 EDGES.",
+        f"{SHAFT_DRILL_NAME}: STRAPS ON THE BACK STOP, MHA-DT-01 ON THE BACK STRAP, A "
+        f"{_leaf_setting(DRUM_END_SHIM)} FEELER AT THE MHA-DT-01 FRONT END.",
+        "SET THE MHA-DT-19 REAR END FLUSH WITH THE MHA-DT-18 REAR FACE "
+        f"±{inch_max_text(FLUSH_SET_ERROR, 3)} (SETS MHA-DT-19 BEARING IN BOTH MHA-DT-18 "
+        "AND ITS FRONT END CLEARANCE TO MHA-DT-16).",
+        "MATCH-DRILL MHA-DT-19 THRU THE MHA-DT-14 CROSS HOLES, 2 PL.",
+        f"DRIVE {STRAP_PIN_NUMBER} PINS, BOTH ENDS 0 TO "
+        f"{inch_max_text(PIN_SUB_FLUSH_MAX, 3)} BELOW THE MHA-DT-14 EDGES.",
     )
 )
 

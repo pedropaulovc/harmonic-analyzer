@@ -42,6 +42,9 @@ EXTERNAL_NUMBERS = frozenset(
         drawing.NORTH_BRACKET_SCREW,
         # Step 5's paper-drive T12, named on sheet 12's interface line.
         drawing.CRANK_CHAIN_WHEEL,
+        # Step 8A's MHA-CH-00 connecting rod and rocker arm pairs.
+        drawing.CONNECTING_ROD,
+        drawing.ROCKER_ARM,
     }
 )
 # Named installation assemblies are external interfaces, not drive-train BOM rows.
@@ -187,7 +190,7 @@ def test_package_text_cites_only_bom_or_external_part_numbers() -> None:
         drawing.CHECKS,
         drawing.SETUP_NOTES,
         drawing.INTERFACE_NOTES,
-        drawing.FIT_PLACEHOLDER,
+        drawing.DIRECTION_NOTES,
         drawing.CRANK_END_FIT_NOTES,
         *drawing.BOM_DESCRIPTIONS.values(),
     )
@@ -255,19 +258,22 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
         drawing.CHECKS_SHEET,
         drawing.BANK_SETTINGS_SHEET,
     ) == (7, 8, 9, 10, 11, 12, 13), "the numbered steps read in sheet order"
-    assert len(names) == drawing.BANK_SETTINGS_SHEET
+    assert len(names) == drawing.SETTING_SHEET == drawing.BANK_SETTINGS_SHEET + 1
     assert names[drawing.FULL_DETAIL_SHEET - 1] == "FULL-DETAIL SIDE VIEW"
     assert f"FULL DETAIL: SHEET {drawing.FULL_DETAIL_SHEET}." in drawing.ASSEMBLED_HEADING
     assert names[drawing.SEQUENCE_SHEET - 1] == "ASSEMBLY SEQUENCE"
-    assert names[drawing.BANK_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK"
+    assert names[drawing.BANK_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CRANK + CYLINDER BANK"
     assert names[drawing.CHECKS_SHEET - 1] == "CHECKS + SETUP"
-    assert names[drawing.FIT_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. + FIT"
+    assert names[drawing.FIT_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK + PINION RIG"
     assert names[drawing.BANK_SETTINGS_SHEET - 1] == "CYLINDER BANK + DRUM STATION SETTINGS"
+    assert names[drawing.SETTING_SHEET - 1] == "SETTING TABLES + CONE STATIONS"
     assert sorted(drawing.CLUSTER_SHEETS.values()) == [3, 4, 5, 6]
     assert set(drawing.SHEET_SCALES) == set(names)
     assert "BALLOONS ON SHEETS 3-6" in drawing.BOM_REFERENCE_NOTES
-    assert f"STATIONS: SHEET {drawing.FIT_SHEET}" in drawing.BOM_REFERENCE_NOTES
-    assert f"CYLINDER BANK: SHEET {drawing.BANK_SHEET}." in drawing.CONE_CRANK_STEPS
+    assert f"STATIONS: SHEET {drawing.SETTING_SHEET}" in drawing.BOM_REFERENCE_NOTES
+    fields = {field.label: field for field in drawing.package_note_fields(_drawing_facts())}
+    sequence_right = fields[f"sheet {drawing.SEQUENCE_SHEET} right note field"].blocks[-1][1]
+    assert sequence_right.endswith(f"CONT. STEP 6: SHEET {drawing.BANK_SHEET}.")
     assert all(text.count(",") <= 1 for text in drawing.BOM_DESCRIPTIONS.values())
 
 
@@ -599,7 +605,7 @@ def test_cone_swing_check_requires_installed_stop_inspection_and_seating() -> No
     assert 1.5 * stop_screw.SHANK_DIA - 1e-9 <= minimum
     assert minimum <= stop_screw.MIN_USEFUL_ENGAGEMENT_MM + 1e-9
     assert "HEAD FULLY SEATED" in check
-    assert "MHA-DT-20 REMAINS SEATED THROUGH P1" in check
+    assert "MHA-DT-20 STAYS SEATED THROUGH CHECK 4" in check
 
 
 def test_cone_swing_check_requires_pivot_thread_engagement() -> None:
@@ -618,6 +624,12 @@ def test_cone_swing_check_requires_pivot_thread_engagement() -> None:
 
 def _flat(text: str) -> str:
     return " ".join(text.split())
+
+
+def _unlettered(text: str) -> str:
+    """Printed text with its lettered sub-step heads (16A., 21B. ...) removed,
+    so a fit-up step's one-thing lines read back word for word."""
+    return _flat(re.sub(r"(?m)\b\d+[A-HJ-NP-Z]\. ", "", text))
 
 
 def _rig_step_body(key: str) -> str:
@@ -642,8 +654,8 @@ def test_rig_is_located_by_its_parked_tip_gap() -> None:
     check = _flat(drawing.CHECKS)
     assert feeler in check
     assert (
-        f"{tip_gap.TIP_GAP_ACCEPT_TEXT} (SHEET {drawing.FIT_SHEET}, "
-        f"STEP {steps.step_number('rig-located')})"
+        f"{tip_gap.TIP_GAP_ACCEPT_TEXT} (SHEET {drawing.CONTINUATION_SHEET}, "
+        f"STEP {steps.step_number('rig-located')}C)"
     ) in check
     # The inch acceptance rounds inward, inside the spec's window.
     printed = re.search(r"ACCEPT (\.\d{3})-(\.\d{3})", tip_gap.TIP_GAP_ACCEPT_TEXT)
@@ -651,7 +663,8 @@ def test_rig_is_located_by_its_parked_tip_gap() -> None:
     low, high = (float(value) * 25.4 for value in printed.groups())
     assert tip_gap.TIP_GAP_ACCEPT[0] - 1e-9 <= low < high <= tip_gap.TIP_GAP_ACCEPT[1] + 1e-9
     assert f"SEE SHEET {drawing.CHECKS_SHEET}" in drawing.ASSEMBLED_HEADING
-    assert f"PINION RIG: CONT. ON SHEET {drawing.FIT_SHEET}." in drawing.BANK_STEPS
+    fields = {field.label: field for field in drawing.package_note_fields(_drawing_facts())}
+    assert "pinion rig sequence" in dict(fields[f"sheet {drawing.FIT_SHEET} left note field"].blocks)
     # The seats are spotted after RIG SET, and drilled per the base's own
     # transfer callouts, not a second copy of their sizes.
     seats = _rig_step_body("rig-seats-transferred")
@@ -678,10 +691,10 @@ def test_the_rig_steps_print_the_fitup_sequence_once_in_order() -> None:
         "cam-collars-set",
         "lever-pin-set",
     )
-    flat = _flat(RIG_STEPS)
+    flat = _unlettered(RIG_STEPS)
     for key, step in zip(keys, fitup.ASSEMBLY_SEQUENCE, strict=True):
         assert flat.count(_flat(step)) == 1, key
-        assert _flat(step) in _rig_step_body(key), key
+        assert _flat(step) in _unlettered(_rig_step_body(key)), key
     numbers = [steps.step_number(key) for key in keys]
     assert numbers == sorted(numbers)
     printed = [int(n) for n in re.findall(r"^(\d+)\. ", RIG_STEPS, re.MULTILINE)]
@@ -730,16 +743,16 @@ def test_the_tip_gap_feeler_is_the_rest_gap_in_gage_leaves() -> None:
             tip_gap.TIP_GAP_FEELER + tip_gap.TIP_GAP_ACCEPT_BAND,
         )
     )
-    # The inch sheet prints the setting to the thousandth, then the leaves
-    # by their stamped metric size.
-    printed = re.search(
-        r"^(\.\d{3}) FEELER \(([\d.+ ]+) MM STARRETT 66MA LEAVES\)$", tip_gap.TIP_GAP_FEELER_TEXT
-    )
+    # The inch sheet prints the setting to the thousandth; the feeler stack
+    # table (sheet 14) lists the leaves by their stamped metric size.
+    printed = re.search(r"^(\.\d{3}) FEELER$", tip_gap.TIP_GAP_FEELER_TEXT)
     assert printed is not None
     assert float(printed.group(1)) * 25.4 == pytest.approx(tip_gap.TIP_GAP_FEELER, abs=0.0127)
-    leaves = [float(leaf) for leaf in printed.group(2).split(" + ")]
+    (row,) = (row for row in drawing.FEELER_STACK_ROWS if row[0] == printed.group(1))
+    leaves = [float(leaf) for leaf in row[1].split(" + ")]
     assert math.isclose(sum(leaves), tip_gap.TIP_GAP_FEELER, abs_tol=1e-9)
     assert set(leaves) <= set(fitup.FEELER_GAGE_LEAVES_MM)
+    assert "CHECK 7" in row[2]
 
 
 @pytest.mark.parametrize("setting", (0.05, 0.95, 1.0, 1.05, 2.0, 2.5, 2.95))
@@ -763,7 +776,7 @@ def test_the_spring_is_stationed_east_west_where_its_preload_is_gated() -> None:
 
     located = _rig_step_body("rig-located")
     assert drawing.SPRING_EAST_WEST in located
-    printed = re.search(r"FOOT HOLE CENTRE (\d*\.\d+) EAST OF THE MHA-DT-19 AXIS", located)
+    printed = re.search(r"FOOT HOLE CENTRE (\d*\.\d+) RIGHT OF THE MHA-DT-19 AXIS", located)
     assert printed is not None
     # The inch sheet's .XX: within half a hundredth of the gated station.
     assert float(printed.group(1)) * 25.4 == pytest.approx(SCREW_EAST_OF_PIVOT, abs=0.127)
@@ -804,7 +817,7 @@ def test_torque_shaft_pins_go_in_before_the_cams() -> None:
     assert "DRIVE MHA-DT-VN-63 PINS" in _rig_step_body("straps-pinned-to-torque-shaft")
     cams = _rig_step_body("cams-and-lever-fitted")
     assert "FIT 2X MHA-DT-23" in cams and "LOOSE" in cams and "MHA-DT-30" not in cams
-    assert _flat(fitup.COLLAR_SET_STEP) in _rig_step_body("cam-collars-set")
+    assert _flat(fitup.COLLAR_SET_STEP) in _unlettered(_rig_step_body("cam-collars-set"))
     order = [
         steps.step_number(key)
         for key in (
