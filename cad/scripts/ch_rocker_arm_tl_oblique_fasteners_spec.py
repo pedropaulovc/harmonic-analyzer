@@ -345,7 +345,7 @@ if abs(RAIL_TO_BAR.engagement_mm - base_bar.RAIL_SCREW_ENGAGEMENT) > 1e-9:
     raise AssertionError("rail screw engagement disagrees with the base bar spec")
 if abs(BRACKET_TO_BAR.engagement_mm - leadscrew.BAR_SCREW_ENGAGEMENT) > 1e-9:
     raise AssertionError("bar screw engagement disagrees with the leadscrew spec")
-if abs(KP08_TO_BRACKET.engagement_mm - leadscrew.KP08_SCREW_REACH_MAX) > 1e-9:
+if abs(KP08_TO_BRACKET.engagement_mm - leadscrew.KP08_SCREW_REACH) > 1e-9:
     raise AssertionError("KP08 screw engagement disagrees with the leadscrew spec")
 for _row in COMMON_SCREW_ROWS:
     if (_row.thread, _row.length, _row.head) != COMMON_SCREW:

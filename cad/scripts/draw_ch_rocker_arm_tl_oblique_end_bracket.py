@@ -5,13 +5,17 @@ One part, two off (the title block's quantity). A 2.71 x 1/2 x 1 in flat at
 two hole stations from the inner end and the length, all stacked below it,
 the row's station from the -Y side face (left), the stock width (right) and
 one native callout per hole over it, each leader on its own hole; the end
-view, projected right of the plan, carries the stock thickness; the shaded
-isometric rides top right at 1:1, clear of the title block. No datums
-(drawing-guidelines.md rule 5). The two hole stations (the KP08's 42 mm span)
-print exact millimetres, labelled mm (owner ruling 4, 2026-11-01). Each hole
-is drilled THRU and tapped #8-32 from both faces (owner ruling 2026-11-06,
-Main, option B): the callout prints the drill, the top thread's depth and,
-on its last row, the far side's (bar face) thread depth.
+view, projected right of the plan, carries the stock thickness and section
+A-A's cutting line; section A-A, cut along the hole row and placed under the
+plan, carries the bottom thread's depth; the shaded isometric rides top
+right at 1:1, clear of the title block. No datums (drawing-guidelines.md
+rule 5). The two hole stations (the KP08's 42 mm span) print exact
+millimetres, labelled mm (owner ruling 4, 2026-11-01). Each hole is drilled
+THRU and tapped #8-32 from both faces (owner ruling 2026-11-06, Main,
+option B): the callout prints the drill and the top thread's native depth,
+its last row pointing at section A-A, where the part's own
+``BarThreadReference`` dimension prints the bottom thread's depth (PR2229
+review r1: no typed depth).
 
 Run with SolidWorks open::
 
@@ -21,6 +25,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import re
 import sys
 from typing import Any
@@ -40,10 +45,14 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
-from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
+from _drawing_projection import model_point_in_view, model_points_in_view
+from _drawing_sections import create_section_view
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -53,6 +62,7 @@ from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
+from _section_axis import position_section_caption
 import _telemetry
 import ch_rocker_arm_tl_oblique_end_bracket_spec as part_spec
 from _feature_requirements import part_metadata, requirement
@@ -64,13 +74,15 @@ from _supplier_dimensions import supplier_reference_dimension
 from ch_rocker_arm_tl_oblique_callouts import set_callout_lengths_to_three_places
 from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     BAR_TAP_SPEC,
+    BAR_THREAD_DEPTH,
+    BAR_THREAD_DEPTH_DIMENSION,
+    BAR_THREAD_REFERENCE,
     BRACKET_LENGTH,
     BRACKET_THICK,
     BRACKET_WIDTH,
     CALLOUTS_BELOW,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    FAR_SIDE_THREAD_CALLOUT,
     HALF_WIDTH,
     HOLE_ROW_Y,
     HOLE_X,
@@ -206,6 +218,34 @@ END_KEEP: dict[str, tuple[float, float, float]] = {
     "BracketThick": (_L, -_HW - SIDE_LANE, _H / 2.0),
 }
 
+# Section A-A: the plane of the hole row (model y 0), its cutting line drawn
+# across the end view (where it is the view's mid-height line; on the plan it
+# would run along the row's and the width's own lines) from SECTION_OVERRUN
+# below the bottom face to as far above the top. Removed under the plan at
+# the sheet scale, +Z up, its centre (mid-length, mid-height) on
+# SECTION_CENTER: its top 10 under the plan's lowest text (sheet y 0.142),
+# its foot 15 over the title block's top; the caption under it, left of the
+# title block. It prints one dimension, the bottom thread's depth on the
+# outer hole's axis (BAR_THREAD_REFERENCE), its text a TEXT_GAP off the
+# outer end, centred on the depth, the depth line through it.
+SECTION_LABEL = "A"
+SECTION_OVERRUN = 2.0
+SECTION_LINE_MODEL_MM = (
+    (_L, 0.0, -SECTION_OVERRUN),
+    (_L, 0.0, _H + SECTION_OVERRUN),
+)
+SECTION_ANCHOR_MODEL_MM = (_L / 2.0, 0.0, _H / 2.0)
+SECTION_CENTER = (PLAN_CENTER[0], 0.106)
+SECTION_CAPTION_XY = (PLAN_CENTER[0], 0.074)
+_DEPTH_CALLOUT = CALLOUTS_BELOW[BAR_THREAD_DEPTH_DIMENSION]
+SECTION_KEEP: dict[str, tuple[float, float, float]] = {
+    BAR_THREAD_DEPTH_DIMENSION: (
+        _L + TEXT_GAP + text_half(_DEPTH_CALLOUT),
+        0.0,
+        BAR_THREAD_DEPTH / 2.0,
+    ),
+}
+
 # One native callout per hole over the plan, its count dropped (c4-r3: a 2X
 # callout's leader lands on one hole only, leaving the other's thread to a
 # guess). Each leader runs from its shelf's near end to its hole's centre;
@@ -216,9 +256,11 @@ END_KEEP: dict[str, tuple[float, float, float]] = {
 # apart (c4-r8). Each tuple: the hole's X, the text block's centre (model X,
 # Y) and the side (-1 left) whose upper rim the edge pick takes.
 # Each callout's three rows, the widest about this many glyphs: "Ø.136 THRU
-# ALL" / "8-32 UNC ▽.436" / "+ 8-32 UNC .491 DEEP FAR SIDE".
+# ALL" / "8-32 UNC ▽.436" / BOTTOM_THREAD_CALLOUT, the last pointing to the
+# section that dimensions the bottom thread.
+BOTTOM_THREAD_CALLOUT = "+ BOTTOM THREAD: SECTION A-A"
 CALLOUT_ROWS = 3
-CALLOUT_GLYPHS = len(FAR_SIDE_THREAD_CALLOUT)
+CALLOUT_GLYPHS = len(BOTTOM_THREAD_CALLOUT)
 _TIER_PITCH = 2.0 * text_half_high(CALLOUT_ROWS) + STACK_PITCH + 0.1
 TAP_TIERS = tuple(
     _HW + 5.0 + text_half_high(CALLOUT_ROWS) + 0.2 + k * _TIER_PITCH
@@ -340,7 +382,6 @@ def _row_fields() -> dict[str, tuple[Any, tuple[Any, ...]]]:
 
 _HOLE_PLACES = part_spec.HOLE_PLACES
 _HOLE_BAND = (part_spec.HOLE_BAND, -part_spec.HOLE_BAND)
-_THREAD_PLACES = part_spec.TAP_CALLOUT_PLACES
 for _index, _x in enumerate(part_spec.HOLE_X, start=1):
     _drill = _printed(part_spec.TAP_DRILL, TAP_CALLOUT_PLACES)
     requirement(
@@ -363,15 +404,6 @@ for _index, _x in enumerate(part_spec.HOLE_X, start=1):
             ),
             "nominal_dia": (_drill, ("TAP_DRILL",)),
             "thru": (True, ("KP08_TAP_SPEC",)),
-            # Each face's thread depth, inside its window (spec).
-            "thread_depth_top": (
-                _limits(part_spec.KP08_THREAD_DEPTH, _THREAD_PLACES),
-                ("KP08_THREAD_DEPTH", "KP08_THREAD_WINDOW", "TAP_CALLOUT_PLACES"),
-            ),
-            "thread_depth_far_side": (
-                _limits(part_spec.BAR_THREAD_DEPTH, _THREAD_PLACES),
-                ("BAR_THREAD_DEPTH", "BAR_THREAD_WINDOW", "TAP_CALLOUT_PLACES"),
-            ),
             # A DRO absolute from the inner end: the KP08's 42 bolt spacing,
             # exact millimetres with its own band (owner ruling 4).
             "station": (
@@ -386,13 +418,27 @@ for _index, _x in enumerate(part_spec.HOLE_X, start=1):
             ),
             "station_nominal": (_x, ("HOLE_X",)),
             **_row_fields(),
+            # prechips Feature has no per-face thread-depth field (the
+            # carrier's left clamp tap precedent): the cited note carries
+            # both faces' full-thread windows, the top's printed by the
+            # plan's native callout, the bottom's by section A-A's
+            # BarThreadReference dimension.
             "note": (
-                MATE_CALLOUT,
+                f"{MATE_CALLOUT}; FULL THREAD "
+                f"{part_spec.KP08_THREAD_LIMITS[0]:.3f} TO "
+                f"{part_spec.KP08_THREAD_LIMITS[1]:.3f} mm FROM THE TOP FACE AND "
+                f"{part_spec.BAR_THREAD_LIMITS[0]:.3f} TO "
+                f"{part_spec.BAR_THREAD_LIMITS[1]:.3f} mm FROM THE BOTTOM FACE",
                 (
                     "MATE_CALLOUT",
                     "KP08_PATTERN_ALLOWANCE",
                     "BAR_PATTERN_ALLOWANCE",
                     "POSITION_RADIUS",
+                    "KP08_THREAD_LIMITS",
+                    "KP08_THREAD_WINDOW",
+                    "BAR_THREAD_LIMITS",
+                    "BAR_THREAD_WINDOW",
+                    "BAR_THREAD_REFERENCE",
                 ),
             ),
         },
@@ -400,8 +446,6 @@ for _index, _x in enumerate(part_spec.HOLE_X, start=1):
             "dia": TAP_CALLOUT_PLACES,
             "station": _HOLE_PLACES,
             "height": _PLACES,
-            "thread_depth_top": _THREAD_PLACES,
-            "thread_depth_far_side": _THREAD_PLACES,
         },
     )
 
@@ -422,6 +466,150 @@ def _view_mapper(adapter: Any, view: Any):
         return float(data[0]), float(data[1])
 
     return to_sheet
+
+
+def _metres(point_mm: tuple[float, float, float]) -> tuple[float, float, float]:
+    return tuple(value / 1000.0 for value in point_mm)
+
+
+def _section_axes(
+    adapter: Any, native: Any
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    """Sheet directions of model +X and +Z (1 mm each) in section A-A, read
+    behind the projection barrier (draw_ch_rocker_arm_tl_oblique_carrier
+    ``_section_axes``)."""
+    native.UpdateViewDisplayGeometry()
+    x, y, z = SECTION_ANCHOR_MODEL_MM
+    origin, plus_x, plus_z = model_points_in_view(
+        adapter,
+        native,
+        (_metres((x, y, z)), _metres((x + 1.0, y, z)), _metres((x, y, z + 1.0))),
+        label="end bracket section A-A axes",
+        names=("origin", "plus x", "plus z"),
+    )
+    return (
+        (plus_x[0] - origin[0], plus_x[1] - origin[1]),
+        (plus_z[0] - origin[0], plus_z[1] - origin[1]),
+    )
+
+
+def _orient_section(adapter: Any, section: Any) -> None:
+    """Turn section A-A until model +Z runs up the sheet, keeping the cut
+    direction SolidWorks gives it (draw_ch_rocker_arm_tl_oblique_carrier
+    ``_orient_section``: a reversed section imported nothing, jig-r4). +X
+    then reads right or left; SECTION_KEEP is projected either way, and the
+    log says which."""
+    native = _early_bound(section, "IView")
+    _right, up = _section_axes(adapter, native)
+    native.Angle = float(native.Angle) + math.pi / 2.0 - math.atan2(up[1], up[0])
+    rebuild_drawing(adapter, label="end bracket section turned")
+    right, up = _section_axes(adapter, native)
+    tolerance = 1e-7
+    if (
+        up[1] <= 0.0
+        or abs(up[0]) > tolerance
+        or abs(right[1]) > tolerance
+        or abs(right[0]) <= tolerance
+    ):
+        raise RuntimeError(f"end bracket section A-A is not +Z up: {right=}, {up=}")
+    _telemetry.info(
+        f"end bracket section A-A angle={float(native.Angle):.6f} rad, "
+        f"+X reads {'right' if right[0] > 0.0 else 'left'} (cut not reversed)"
+    )
+
+
+def _centre_section(adapter: Any, section: Any) -> None:
+    """Land the cut's centre (mid-length, mid-height) on SECTION_CENTER: a
+    section's Position is its cut-plane origin, not its outline's centre
+    (draw_ch_rocker_arm_tl_oblique_carrier ``_centre_section``)."""
+    native = _early_bound(section, "IView")
+    anchor = _metres(SECTION_ANCHOR_MODEL_MM)
+    for attempt in range(4):
+        native.UpdateViewDisplayGeometry()
+        projected = model_point_in_view(
+            adapter, native, anchor, label=f"end bracket section A-A centre, pass {attempt}"
+        )
+        if math.dist(projected, SECTION_CENTER) <= 1e-4:
+            break
+        position = tuple(float(value) for value in native.Position)
+        moved = [
+            position[axis] + SECTION_CENTER[axis] - projected[axis] for axis in (0, 1)
+        ]
+        if not native.SetViewPosition(double_array(moved), False):
+            raise RuntimeError("failed to re-centre end bracket section A-A")
+        rebuild_drawing(adapter, label="end bracket section re-centred")
+    settle_detail_projection(
+        adapter,
+        native,
+        anchor,
+        ink_xy=SECTION_CENTER,
+        tolerance_xy=(0.0005, 0.0005),
+        label="end bracket section A-A",
+    )
+
+
+def _section(adapter: Any, end: Any) -> Any:
+    """Section A-A along the hole row, cut from the end view, +Z up, centred."""
+    line = model_points_in_view(
+        adapter,
+        end,
+        [_metres(point) for point in SECTION_LINE_MODEL_MM],
+        label="end bracket section A-A line",
+        names=("below", "above"),
+    )
+    section = create_section_view(
+        adapter,
+        end,
+        line_start=line[0],
+        line_end=line[1],
+        view_xy=SECTION_CENTER,
+        section_label=SECTION_LABEL,
+        scale=VIEW_SCALE,
+        label="bottom thread depth section",
+    )
+    _orient_section(adapter, section)
+    # A section shows no hidden lines (rule 9), set before centring so the
+    # display change cannot shift the ink.
+    set_hidden_lines_removed(adapter, section)
+    _centre_section(adapter, section)
+    return section
+
+
+def _require_bar_thread_depth(section: Any) -> None:
+    """Section A-A's one dimension is the part's own bottom-thread depth:
+    ``BarThreadDepth@BarThreadReference``, reading the thread depth the
+    ``BarTaps`` wizard of the view's own part carries, which is the spec's
+    (the sheet types no depth)."""
+    view = _early_bound(section, "IView")
+    found: list[tuple[str, float]] = []
+    for raw in view.GetDisplayDimensions() or ():
+        display = _early_bound(raw, "IDisplayDimension")
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        found.append((str(dimension.FullName), float(dimension.SystemValue) * 1000.0))
+    owned = [
+        value
+        for full_name, value in found
+        if full_name.split("@")[:2] == [BAR_THREAD_DEPTH_DIMENSION, BAR_THREAD_REFERENCE]
+    ]
+    model = _early_bound(view.ReferencedDocument, "IModelDoc2")
+    raw_taps = _early_bound(model, "IPartDoc").FeatureByName("BarTaps")
+    if raw_taps is None:
+        raise RuntimeError("section A-A's part has no BarTaps feature")
+    wizard = _early_bound(
+        _early_bound(raw_taps, "IFeature").GetDefinition(), "IWizardHoleFeatureData2"
+    )
+    thread_mm = float(wizard.ThreadDepth) * 1000.0
+    if (
+        len(found) != 1
+        or len(owned) != 1
+        or abs(owned[0] - thread_mm) > 1e-4
+        or abs(thread_mm - BAR_THREAD_DEPTH) > 1e-4
+    ):
+        raise RuntimeError(
+            f"section A-A must print only {BAR_THREAD_DEPTH_DIMENSION}@"
+            f"{BAR_THREAD_REFERENCE} at BarTaps' thread {thread_mm:.4f} mm: {found!r}"
+        )
+    _telemetry.info(f"section A-A bottom thread depth: {found[0]!r}")
 
 
 def _omit_tap_thread_class(display: Any, *, label: str) -> None:
@@ -457,7 +645,8 @@ def thread_depth_definitions(
     definitions: dict[int, str], callout: str
 ) -> dict[int, str]:
     """Follow the one native thread depth with ``callout`` on a row of its
-    own (the far side's thread); the depth variable itself stays live."""
+    own (the bottom thread's pointer to section A-A); the depth variable
+    itself stays live."""
     owners = [part for part, text in definitions.items() if _THREAD_DEPTH in text]
     if len(owners) != 1 or definitions[owners[0]].count(_THREAD_DEPTH) != 1:
         raise RuntimeError(f"hole callout lacks one thread depth: {definitions!r}")
@@ -539,6 +728,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open end bracket source", await adapter.open_model(str(SOURCE)))
+    source_model = adapter.currentModel
     required = (
         "Number",
         "Material Specification",
@@ -595,6 +785,34 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
     ]
+    # BarThreadReference lies in A-A's cutting plane, saved hidden: a derived
+    # view takes it from the part as it stands when it is cut and selects it
+    # through its base view, so the section is cut and curated while the part
+    # shows it (draw_fr_nameplate's SectionReference).
+    with part_sketches_shown(
+        adapter,
+        source_model,
+        (BAR_THREAD_REFERENCE,),
+        label="section A-A bottom thread reference",
+        base_view=end,
+    ):
+        section = _section(adapter, end)
+        annotations += curate_view_dimensions(
+            adapter,
+            section,
+            keep={
+                name: model_point_in_view(
+                    adapter, section, _metres(xyz), label=f"section A-A {name} text"
+                )
+                for name, xyz in SECTION_KEEP.items()
+            },
+            view_label="end bracket section A-A",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        )
+    position_section_caption(
+        adapter, section, SECTION_CAPTION_XY, label="end bracket section A-A"
+    )
+    _require_bar_thread_depth(section)
     # Places are authored on the part; the sheet only proves the import kept
     # them, then writes the mate callouts and the stock references.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
@@ -621,7 +839,7 @@ async def build(adapter: Any) -> dict[str, str]:
             label=label,
         )
         _call_out_one_hole(
-            callout, label=label, thread_callout=FAR_SIDE_THREAD_CALLOUT
+            callout, label=label, thread_callout=BOTTOM_THREAD_CALLOUT
         )
         _omit_tap_thread_class(callout, label=label)
         set_callout_lengths_to_three_places(callout, label=label)

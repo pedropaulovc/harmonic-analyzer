@@ -39,9 +39,10 @@ Source of each number:
   series' base-to-centre height (check: the bore axis stands 15 over the
   foot's bottom face, measured with an Ø8 pin in the bore; the leadscrew
   axis height is set by it), and ``FOOT_THICK`` 5 (check: the foot under the
-  bolt holes is 4.93 to 5 thick: no thicker, so the #8-32 x 5/8 screw's
-  engagement in TL-28 holds at least its rule-18 minimum; no thinner, so its
-  tip stays clear of the bar screw's from below, ``end_bracket.KP08_FOOT_THICK_MIN``).
+  bolt holes is .196 (4.98) to 5 thick: no thicker, so the #8-32 x 5/8
+  screw's engagement in TL-28 holds at least its rule-18 minimum; no
+  thinner, so its tip stays in TL-28's top thread and clear of the bottom
+  thread and its tap's lead, ``end_bracket.KP08_FOOT_THICK_MIN``).
 - DERIVED (shape ESTIMATED from the photographs): the boss is round and
   concentric with the bore, its crown the overall height, so
   ``BOSS_RADIUS`` = ``HEIGHT`` - ``AXIS_HEIGHT``; its sides drop straight to
