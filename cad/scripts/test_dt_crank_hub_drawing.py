@@ -310,8 +310,10 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
         "SeatDia": seat,
         "SeatLength": "SEE NOTE 2",
     }
+    # Note 2's acceptance (.002 either way) is provisional, pending owner
+    # confirmation (round-2 review: MATCH alone states no acceptance).
     assert dt_crank_hub_notes.SEAT_LENGTH_NOTE == (
-        "2. SEAT LENGTH (.31): MATCH TO MEASURED THICKNESS OF CRANK ARM MHA-DT-06."
+        "2. SEAT LENGTH (.31): MEASURED THICKNESS OF CRANK ARM MHA-DT-06 <MOD-PM>.002."
     )
     assert f"{geometry.HUB_SEAT_LENGTH / 25.4:.2f}" == "0.31"
     # Rule 7: the sheet's notes are at most four lines.
