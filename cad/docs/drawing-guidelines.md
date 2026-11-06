@@ -135,7 +135,9 @@ HOLES row.
   decimal places. Their tolerance still comes from DRILLED HOLES, not the
   three-place linear grade. Keep the exact decimal of a named number, letter
   or fractional drill (`#30 DRILL Ø.1285`): that digit is the drill's size,
-  not precision. Counterbore and countersink diameters and depths in a Hole
+  not precision. A plain decimal with no drill named (`Ø.106`) is simply a
+  size under DRILLED HOLES; it is not a rounded drill. Counterbore and
+  countersink diameters and depths in a Hole
   Wizard callout print in its standard three-place form; they are clearance
   pockets toleranced by the `.XX` grade, not over-specification. Tap and
   tap-drill depths and routine locations normally use two places.
@@ -708,7 +710,10 @@ beside them. Every symbol, abbreviation and phrase is one they can look up.
 - **Units.** An inch sheet prints inch values. A metric pitch inherited from a
   purchased part is converted on the fabricated part's sheet, or carried in a
   hole-table column headed `mm` beside the inch columns; a view never mixes
-  `mm` values with inch values.
+  `mm` values with inch values. One linked flag note may state a purchased
+  part's catalogue spacing in millimetres as REF (`B1 TO B2: 42.00 mm REF,
+  KP08 CATALOGUE SPACING`) beside the inch dimensions that control it; that
+  is a labelled reference, not mixed units.
 - **Spelling slips** that a reader cannot misread (`45 DEG` for `45°`, `min.`
   for `MIN`, a thread class repeated on a callout) are polish, never a reason
   on their own to hold a sheet.
