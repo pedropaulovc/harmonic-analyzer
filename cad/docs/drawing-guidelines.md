@@ -174,7 +174,11 @@ a chamfer gets the loosest title-block band that serves it.
   whose mate appears nowhere in the package is a blocker: either name the
   mate or loosen the band. A mate named somewhere in the package (a general
   note, a gear data block, another sheet) but not at the callout it serves is
-  a clarity defect, not a blocker.
+  a clarity defect, not a blocker. One feature with several tight dimensions
+  (a groove's diameter and radius, a bore's size and depth) names its mate
+  once, on one numbered flag note linked to every one of those dimensions;
+  that note counts as at each callout, and repeating the mate on each
+  dimension is narration (rule 7).
 - **Every mate is named by its full drawing number.** Any callout, note,
   table row or step that refers to another part (MATCHES, FOR, ON, IN, FITS,
   LOCATES, SETS, CLEARS, SEATS ON, HOLDS) names it by its full assigned
@@ -684,7 +688,8 @@ beside them. Every symbol, abbreviation and phrase is one they can look up.
   `Ø.257 THRU`, `Ø.3750 +.0015/+.0010 REAM THRU`, `⌴ Ø.31 ↧ .19`,
   `⌵ Ø.312 X 82°`, `1/4-20 UNC ↧ .45`. A counterbore or countersink is
   written with its symbol, not in words; a depth is never deferred to a view.
-- **Words.** `MIN`, `MAX`, `REF`, `THRU`, `nX`, `°`, and the standard fit
+- **Words.** `MIN`, `MAX`, `REF`, `THRU` (the CAD form `THRU ALL` reads the
+  same and is not a defect), `nX`, `°`, and the standard fit
   names (running, sliding, locational clearance, locational interference,
   press, drive). Private phrases a reader cannot look up are defects: `TO
   SUIT`, `ON SEAM`, `IN PHASE`, `MIRRORS`, `SAME X AS`, `AIR` for clearance,
