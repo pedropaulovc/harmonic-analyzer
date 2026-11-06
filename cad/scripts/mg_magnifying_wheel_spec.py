@@ -23,6 +23,7 @@ from _gtol_cylinder import CylinderFace
 from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import angular_band_deg, drilled_oversize_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _title_block_units import MM_PER_INCH, render_number
 from _mg_wheel_rim_geometry import (
     GROOVE_BOTTOM_BAND,
     GROOVE_BOTTOM_DIA,
@@ -39,6 +40,7 @@ from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
     CAST_ROUND_R,
     CAST_TOL,
     DRILL_WANDER_DEG,
+    DRUM_PRESS,
     HUB_BACK_Z,
     HUB_DIA,
     HUB_FILLET_R,
@@ -65,7 +67,7 @@ from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
     fillet,
     printed_limits,
 )
-from mg_wheel_group import WHEEL_BORE_MAX
+from mg_wheel_group import HUB_RUNNING, WHEEL_BORE_MAX
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  The face view carries the bore, spoke, fillet and tie
@@ -89,7 +91,8 @@ from mg_wheel_group import WHEEL_BORE_MAX
 # (SPOKE_STUB_R), and the angle between them is a DRIVEN reference (the
 # Tie2Angle precedent) printed "6X 60°".  The seed spoke lies on local +X,
 # so two spokes lie on the face view's horizontal centerline, which the
-# angle's callout states.
+# drawing draws through them and the bore (drawing-guidelines.md rule 26: a
+# location is a dimension or a drawn line, not a sentence).
 SECTION_PLANE = "SectionAPlane"
 DIAMETER_REFERENCE = "DiameterReference"
 SPOKE_REFERENCE = "SpokeReference"
@@ -99,7 +102,6 @@ SPOKE_PITCH_DEG = 360.0 / SPOKE_COUNT
 SPOKE_PITCH_SPOKES = (1, 2)
 SPOKE_STUB_R = (RIM_INNER_DIA / 2.0 - 4.0, RIM_OUTER_DIA / 2.0 + 3.0)
 SPOKE_PITCH_PREFIX = f"{SPOKE_COUNT}X "
-SPOKE_PITCH_CALLOUT = "TWO ON THE HORIZONTAL CENTERLINE"
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     DIAMETER_REFERENCE: {"RimOuterDiaDim", "RimInnerDiaDim"},
     SPOKE_REFERENCE: {"SpokePitch"},
@@ -178,18 +180,38 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
 }
 ROUND_TEXT_SUFFIX = " MAX"
 
-# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the notes say only what no callout can.  The spigot's press fit and
-# the bore's running fit print on their own diameter callouts, and the
-# spokes' count, pitch and clocking on their own angle (SPOKE_REFERENCE).
-# TIE 1's two coordinates ride the title
-# block: the boss is sized so its wall holds at .XX (TIE1_HUB_WALL), and its
-# note says why the hole stands off the drum (mg_magnifying_wheel_geom
-# TIE1_DRUM_OPENING) without a number.
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the notes say only what no callout can.  The bore's running fit and
+# the spigot's press fit are matched-fit statements (rule 4: mate and
+# acceptance), each a numbered note its own callout links by "SEE NOTE n",
+# so neither callout runs past two lines of words.  The spokes' count, pitch
+# and clocking print on their own angle (SPOKE_REFERENCE) and centreline.
+# TIE 1's two coordinates ride the title block: the boss is sized so its
+# wall holds at .XX (TIE1_HUB_WALL).  Each tie's key names the wire member
+# it holds by the wire's drawing number (rule 4: a kit member names the
+# member).  The mates' numbers are literals so the axle, drum and wire stay
+# out of the part's recipe; test_mg_magnifying_wheel_drawing pins them to
+# the config rows.
 MIN_WALL = WALL_TARGET_MM  # drawing-guidelines.md rule 17 (walls and webs) target
+AXLE_NUMBER = "MHA-MG-07"
+DRUM_NUMBER = "MHA-MG-10"
+WIRE_NUMBER = "MHA-SH-VN-56"
+BORE_FIT_NOTE = 1
+SPIGOT_FIT_NOTE = 2
+
+
+def _fit_limits(limits_mm: tuple[float, float]) -> str:
+    """A stated diametral fit (mm) as the inch sheet prints it, to .0001."""
+    return "-".join(render_number(value / MM_PER_INCH, "in", 4) for value in limits_mm)
+
+
 DRAWING_NOTES = "\n".join(
     (
-        "TIE 1: LEVER-WIRE TIE HOLE THRU BOSS, CLEAR OF MG-WHEEL-DRUM.",
-        "TIE 2: PEN-WIRE TIE HOLE, GROOVE BOTTOM TO RIM BORE.",
+        f"{BORE_FIT_NOTE}. {_fit_limits(HUB_RUNNING)} DIAMETRAL CLEARANCE ON AXLE "
+        f"{AXLE_NUMBER}.",
+        f"{SPIGOT_FIT_NOTE}. {_fit_limits(DRUM_PRESS)} DIAMETRAL INTERFERENCE IN DRUM "
+        f"{DRUM_NUMBER}.",
+        f"TIE 1: TIE HOLE FOR LEVER WIRE OF {WIRE_NUMBER}, THRU BOSS.",
+        f"TIE 2: TIE HOLE FOR PEN WIRE OF {WIRE_NUMBER}, GROOVE TO RIM BORE.",
     )
 )
 # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the bore is a running journal on the axle.  The spigot is
