@@ -442,7 +442,7 @@ def test_hole_sketch_places_every_station_from_the_end_face(monkeypatch) -> None
 def test_rail_receipt_note_points_at_the_stations() -> None:
     bar = _config.parts("ch-rocker-arm-tl-oblique-base-bar")
     lines = note_lines(rail.DRAWING_NOTES, label=NAME)
-    assert len(lines) == 4
+    assert len(lines) == 3
     assert all(len(line) <= 70 for line in lines), lines
     note = " ".join(lines)
     assert bar["number"] in note
@@ -452,10 +452,7 @@ def test_rail_receipt_note_points_at_the_stations() -> None:
     assert rail.RECEIPT_TEXT not in note
     assert "CHECK STATIONS" in note and "RECEIPT CHECK" in rail.RECEIPT_FLAG
     assert "STOP AND REPORT" in note and "THE BAR IS DRILLED AS DRAWN" in note
-    assert "SET NEAR TRIM BY FIRST HOLE STATION" in note
-    assert "FAR TRIM TO ACTUAL BAR" in note
-    assert "FIT FLUSH BOTH ENDS" in note
-    assert "EQUAL REMOVAL IS NOMINAL ONLY" in note
+    assert "RAIL MATCHES ACTUAL BASE BAR, FLUSH BOTH ENDS" in note
     assert rail.CBORE_END_WALL_WORST >= base_bar.WALL_TARGET_MM
     assert math.isclose(rail.CBORE_END_WALL_WORST, 5.88, abs_tol=1e-9)
     assert rail.CBORE_END_WALLS_WORST == pytest.approx((6.134, 5.88))

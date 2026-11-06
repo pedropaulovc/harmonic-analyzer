@@ -118,7 +118,7 @@ SOURCE_PROPERTIES = ("Number", "Material Specification", "Finish", *NOTE_PROPERT
 # --- Sheet 2: the rail receipt check --------------------------------------------
 # ASME B landscape 431.8 x 279.4, all in sheet metres. The border is 12.7 mm
 # in; the title block fills x >= 215.9 mm below y = 65.1 mm; the receipt
-# note's four lines use the existing dynamic footer_top reserve.
+# note's three lines use the existing dynamic footer_top reserve.
 #
 # The trimmed rail fits at 1:2, the largest project scale whose
 # length fits the drawable width with the profile beside it.
