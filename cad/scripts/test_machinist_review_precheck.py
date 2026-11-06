@@ -63,6 +63,7 @@ class _Reviewer:
         self.rows: dict[str, list[dict[str, Any]]] = {}
         self.findings = False
         self.confirmed_runs: int | None = None
+        self.category = "blockers"
         self.failure: str | None = None
         self.on_precheck: Any = None
 
@@ -118,7 +119,7 @@ class _Reviewer:
             assert findings is not None
             ids = [finding["id"] for finding in findings]
             accepted = ids if self.confirmed_runs is None else ids[:self.confirmed_runs]
-            clusters = [_judge_cluster(accepted)] if accepted else []
+            clusters = [_judge_cluster(accepted, category=self.category)] if accepted else []
             if accepted != ids:
                 clusters.append(_judge_cluster(ids[len(accepted):], decision="misread"))
             value = {"clusters": clusters}
@@ -311,17 +312,21 @@ def test_precheck_skip_inspects_after_and_rgb_overlay_without_review_runs(
 
 
 @pytest.mark.parametrize("reviewer", mr.REVIEWERS)
-@pytest.mark.parametrize("confirmed_runs,expected", [(1, "SHIP"), (2, "FIX")])
+@pytest.mark.parametrize("confirmed_runs,category,expected", [
+    (1, "clarity", "SHIP"), (2, "clarity", "FIX"), (1, "blockers", "FIX"),
+])
 def test_doubt_reviews_then_resumes_precheck_session_preserving_ensemble_threshold(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reviewer: str, confirmed_runs: int, expected: str,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reviewer: str, confirmed_runs: int,
+    category: str, expected: str,
 ) -> None:
     harness = _Reviewer()
     harness.findings = True
     harness.confirmed_runs = confirmed_runs
+    harness.category = category
     monkeypatch.setattr(mr, "_run_reviewer", harness)
     aggregate = _aggregate(_package(tmp_path), tmp_path, reviewer)
     assert aggregate["verdict"] == expected and aggregate["error"] is None
-    assert aggregate["gating_min_runs"] == 2
+    assert aggregate["gating_min_runs"] == {"blockers": 1, "over_specification": 2, "clarity": 2}
     assert aggregate["gating_count"] == int(expected == "FIX")
     assert [call["phase"] for call in harness.calls] == ["precheck", "review", "review", "review", "judge"]
     first, *runs, judge = harness.calls
