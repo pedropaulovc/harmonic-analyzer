@@ -897,21 +897,11 @@ BALLOON_ANCHORS[spec.PIVOT_SHIM] = BalloonAnchor(
 BALLOON_ANCHORS[spec.RISER] = BalloonAnchor(
     point_mm=(60.0, spec.riser.BLANK_WIDTH, spec.riser.THICKNESS)
 )
-BALLOON_ANCHORS[spec.HUB_STUD] = BalloonAnchor(
-    point_mm=(spec.hub_stud.FLANGE_DIA / 2.0, 0.0, 0.0)
-)
-BALLOON_ANCHORS[spec.HUB_SLEEVE] = BalloonAnchor(
-    point_mm=(spec.hub_sleeve.OD / 2.0, 0.0, spec.hub_sleeve.LENGTH)
-)
-BALLOON_ANCHORS[spec.HUB_WASHER] = BalloonAnchor(
-    point_mm=(spec.hub_washer.OD / 2.0, 0.0, spec.hub_washer.THICK)
-)
-BALLOON_ANCHORS[spec.HUB_SCREW] = BalloonAnchor(
-    point_mm=(spec.hub_screw.DIMS.head_dia / 2.0, spec.hub_screw.DIMS.head_h, 0.0)
-)
-BALLOON_ANCHORS[spec.LEFT_CLAMP_SCREW] = BalloonAnchor(
-    point_mm=(spec.left_clamp_screw.DIMS.head_dia / 2.0, spec.left_clamp_screw.DIMS.head_h, 0.0)
-)
+# The R3 hub stack (stud, sleeve, washer, hub screw) and the left clamp screw
+# walk their own bodies, as the bonded hub pin they replaced did: a frozen
+# point is only taken with a declared approach (BALLOON_APPROACH_DEG) whose
+# settled leader _assert_declared_leaders_clear proves, and none is declared
+# for them, so a frozen rim here would land unproven.
 BALLOON_ANCHORS[spec.FEED_LEVER] = BalloonAnchor(
     point_mm=(280.0, spec.feed_lever.LEVER_THICK, -spec.feed_lever.LEVER_WIDTH)
 )
