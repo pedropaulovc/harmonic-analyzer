@@ -190,10 +190,10 @@ HANDWHEEL_SET_SCREW_MAJOR = float(feed.HANDWHEEL_GRUB.removeprefix("M"))  # 5
 # Each set screw's station, part frame (from the near end), from C4's layout.
 FLAT_STATIONS = {
     "NearKP08": feed.KP08_S[0] - feed.SCREW_NEAR_END_S,  # 8.5
-    "FarKP08": feed.KP08_S[1] - feed.SCREW_NEAR_END_S,  # 379.5
+    "FarKP08": feed.KP08_S[1] - feed.SCREW_NEAR_END_S,
     "Handwheel": (
         feed.HUB_END_S + feed.HANDWHEEL_GRUB_FROM_HUB - feed.SCREW_NEAR_END_S
-    ),  # 404.0
+    ),
 }
 # The flat that runs out through the cut end (owner ruling 2026-11-05).
 OPEN_FLAT = "Handwheel"
@@ -202,7 +202,7 @@ OPEN_FLAT = "Handwheel"
 # centred FLAT_LENGTH flat did.
 FLAT_STARTS = {
     name: station - FLAT_LENGTH / 2.0 for name, station in FLAT_STATIONS.items()
-}  # 4.5, 375.5, 400.0
+}
 # The open flat's profile runs this far past the cut end, as every flat's
 # runs past the screw's round, so the cut leaves no far wall.
 FLAT_RUNOUT = 1.0
@@ -372,6 +372,10 @@ def control_si(name: str) -> tuple[float, float]:
 # --- Self-checks ----------------------------------------------------------------
 if not LENGTH + LENGTH_TOLERANCE <= STOCK_LENGTH:
     raise AssertionError("the installed screw is longer than the stock")
+# The open rectangle must remove material through even the longest allowed
+# cut. Its end follows LENGTH, never the former installation's end station.
+if FLAT_ENDS[OPEN_FLAT] <= LENGTH + LENGTH_TOLERANCE:
+    raise AssertionError("the handwheel flat stops before the longest cut end")
 # A short cut: the fitter keeps the handwheel's minimum engagement at the far
 # end and gives up near stub, so the two margins together must cover the band.
 if (feed.NEAR_STUB - feed.NEAR_STUB_MIN) + (
