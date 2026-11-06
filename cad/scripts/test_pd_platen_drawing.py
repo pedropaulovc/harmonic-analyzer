@@ -53,9 +53,9 @@ def _view_boxes() -> dict[str, tuple[float, float, float, float]]:
         ),
         "section A-A": (
             draw.SECTION_CENTER[0] - spec.PLATE_THICKNESS * draw._SECTION_S / 2.0,
-            draw.SECTION_CENTER[1] - draw.SECTION_SPAN * draw._SECTION_S,
+            draw.SECTION_CENTER[1] - draw.SECTION_CROP_HALF * draw._SECTION_S,
             draw.SECTION_CENTER[0] + spec.PLATE_THICKNESS * draw._SECTION_S / 2.0,
-            draw.SECTION_CENTER[1] + draw.SECTION_SPAN * draw._SECTION_S,
+            draw.SECTION_CENTER[1] + draw.SECTION_CROP_HALF * draw._SECTION_S,
         ),
     }
 
@@ -123,10 +123,34 @@ def test_counterbore_floor_holds_the_user_accepted_worst_case():
         (spec.CBORE_SECTION_X, spec.CBORE_SECTION_HOLE_Y - draw.SECTION_SPAN),
         (spec.CBORE_SECTION_X, spec.CBORE_SECTION_HOLE_Y + draw.SECTION_SPAN),
     }
-    # The value hangs below the cut, wholly left of both extension lines (r5:
-    # centred on them, they struck its text).
+    # Its crop keeps the whole counterbore inside the cut and stops short of
+    # the clip-screw boss's fillet root seen beyond (v47: the cut's upper end
+    # printed it); a break line stands on each cropped end, across both faces.
+    assert spec.CBORE_DIA / 2.0 < draw.SECTION_CROP_HALF < draw.SECTION_SPAN
+    boss_root = (
+        min(y for _, y in spec.SOCKET_XY)
+        - spec.SOCKET_BOSS_DIA / 2.0
+        - spec.SOCKET_BOSS_FILLET_R
+    )
+    assert spec.CBORE_SECTION_HOLE_Y + draw.SECTION_CROP_HALF < boss_root - 1.0
+    ends = (
+        spec.CBORE_SECTION_HOLE_Y - draw.SECTION_CROP_HALF,
+        spec.CBORE_SECTION_HOLE_Y + draw.SECTION_CROP_HALF,
+    )
+    assert sorted({point[1] for point in draw.SECTION_CROP_MODEL_MM}) == list(ends)
+    for end_y, polyline in zip(ends, draw.SECTION_BREAKS):
+        zs = [point[2] for point in polyline]
+        assert min(zs) < 0.0 and max(zs) > spec.PLATE_THICKNESS
+        assert min(zs) > min(p[2] for p in draw.SECTION_CROP_MODEL_MM)
+        assert max(zs) < max(p[2] for p in draw.SECTION_CROP_MODEL_MM)
+        assert {polyline[0][1], polyline[-1][1]} == {end_y}
+        # The Z stays clear of the floor's extension line at z = CBORE_DEPTH.
+        zig = [z for (_, y, z) in polyline if y != end_y]
+        assert max(zig) < spec.CBORE_DEPTH - 0.2
+    # The value hangs below the cropped cut, wholly left of both extension
+    # lines (r5: centred on them, they struck its text).
     _, text_y, text_z = draw.SECTION_TEXT_MODEL_MM[draw.REFERENCE_DIMENSION]
-    assert text_y < spec.CBORE_SECTION_HOLE_Y - draw.SECTION_SPAN
+    assert text_y < ends[0]
     text_right = (
         draw.SECTION_CENTER[0]
         + (text_z - spec.PLATE_THICKNESS / 2.0) * draw._SECTION_S
