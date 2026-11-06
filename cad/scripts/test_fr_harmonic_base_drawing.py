@@ -596,8 +596,9 @@ def test_tapped_hole_note_count_is_derived_from_the_deck_seat_features() -> None
     # warm-c486: the sheet removed 16 descriptive "Tapped Hole" notes against a
     # literal 14, because U34c split the two pedestal seats out of
     # FootScrewHoles into their own PedestalSeats feature. SolidWorks drops one
-    # such note per deck seat FEATURE into each plan view, so the count is
-    # derived from the same per-feature table that feeds the hole table.
+    # such note per deck seat FEATURE into the first view placed on each sheet
+    # (sheet 5's lone front view too), so the count is derived from the same
+    # per-feature table that feeds the hole table.
     import ast
     from pathlib import Path
 
@@ -614,18 +615,16 @@ def test_tapped_hole_note_count_is_derived_from_the_deck_seat_features() -> None
 
     source = Path(sheet.__file__).read_text(encoding="utf-8")
     calls = [node for node in ast.walk(ast.parse(source)) if isinstance(node, ast.Call)]
-    plan_views = [
-        call
-        for call in calls
-        if getattr(call.func, "id", None) == "place_view"
-        and any(
-            isinstance(arg, ast.Constant) and arg.value in ("*Top", "*Bottom")
-            for arg in call.args
-        )
-    ]
-    assert len(plan_views) == len(sheet.PLAN_VIEWS)
-    assert sheet.TAPPED_HOLE_NOTES == len(build_features) * len(sheet.PLAN_VIEWS)
-    assert sheet.TAPPED_HOLE_NOTES == 32
+    build_source = source[source.index("async def build(") :]
+    first_views = []
+    for index, name in enumerate(sheet.SHEET_NAMES):
+        activated = build_source.index(f"ActivateSheet(SHEET_NAMES[{index}])")
+        placed = build_source.index("place_view(", activated)
+        orientation = build_source[placed:].split('"', 2)[1]
+        first_views.append((name, orientation))
+    assert tuple(first_views) == sheet.FIRST_SHEET_VIEWS
+    assert sheet.TAPPED_HOLE_NOTES == len(build_features) * len(sheet.FIRST_SHEET_VIEWS)
+    assert sheet.TAPPED_HOLE_NOTES == 40
 
     finalize = [call for call in calls if getattr(call.func, "id", None) == "finalize_drawing"]
     assert len(finalize) == 1

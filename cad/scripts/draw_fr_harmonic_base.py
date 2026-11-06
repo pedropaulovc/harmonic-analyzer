@@ -1337,21 +1337,25 @@ ALL_HOLES = (
     *((x, z, COLUMN_SOCKET_DIAMETER) for x, z in COLUMN_SOCKET_XZ),
 )
 # SolidWorks adds descriptive "<size> Tapped Hole" notes per deck-seat
-# FEATURE in each plan view, including the two bottom views. These notes are
-# not manufacturing callouts; the native table and transfer callouts own the
-# through-tap definitions. Keep the strict per-view inventory so a native
-# regeneration change is reported rather than hidden during final cleanup.
+# FEATURE in the first view placed on each sheet: the four plan views, and
+# sheet 5's front cross-tap view, which has its sheet to itself (run
+# 20261106T185913892Z); sheets 1 and 2 placed their front views after a plan,
+# and those carried none. These notes are not manufacturing callouts; the
+# native table and transfer callouts own the through-tap definitions. Keep
+# the strict per-view inventory so a native regeneration change is reported
+# rather than hidden during final cleanup.
 TAPPED_HOLE_NOTE = "Tapped Hole"
 # finalize_drawing deletes every note containing one of these (case-blind, the
 # adapter's remove_notes_matching), so none of them reaches the final sheet.
 FINAL_SHEET_REMOVED_NOTES = (TAPPED_HOLE_NOTE,)
-PLAN_VIEWS = (
+FIRST_SHEET_VIEWS = (
     (SHEET_NAMES[0], "*Top"),
     (SHEET_NAMES[1], "*Top"),
     (SHEET_NAMES[2], "*Bottom"),
     (SHEET_NAMES[3], "*Bottom"),
+    (SHEET_NAMES[4], "*Front"),
 )
-TAPPED_HOLE_NOTES = len(DECK_TAPPED_SEAT_FEATURES) * len(PLAN_VIEWS)
+TAPPED_HOLE_NOTES = len(DECK_TAPPED_SEAT_FEATURES) * len(FIRST_SHEET_VIEWS)
 TABLE_HOLES = tuple(hole for hole in ALL_HOLES if hole not in TRANSFER_HOLES)
 if len(TABLE_HOLES) != len(ALL_HOLES) - len(TRANSFER_HOLES):
     raise AssertionError("a transferred seat is not a unique base hole")
