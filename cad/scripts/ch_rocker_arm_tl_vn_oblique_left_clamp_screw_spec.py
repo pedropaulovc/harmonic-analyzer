@@ -63,7 +63,7 @@ from _package_units import drawing_unit
 from _printed_tolerance import angular_band_deg, printed_band_mm
 
 STEM = "ch-rocker-arm-tl-vn-oblique-left-clamp-screw"
-UNIT = drawing_unit(f"parts/{STEM}", _config.parts(STEM))
+UNIT = drawing_unit(f"parts/{STEM}", _config.parts("ch-rocker-arm-tl-vn-oblique-left-clamp-screw"))
 
 SKU = PART_NO
 ROW = fasteners.LEFT_CLAMP

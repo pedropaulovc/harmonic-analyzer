@@ -30,8 +30,8 @@ from _printed_tolerance import printed_band_mm
 from ch_rocker_arm_spec import inch_text
 
 STEM = "ch-rocker-arm-tl-oblique-hub-sleeve"
-UNIT = drawing_unit(f"parts/{STEM}", _config.parts(STEM))
-NUMBER = _config.parts(STEM)["number"]
+UNIT = drawing_unit(f"parts/{STEM}", _config.parts("ch-rocker-arm-tl-oblique-hub-sleeve"))
+NUMBER = _config.parts("ch-rocker-arm-tl-oblique-hub-sleeve")["number"]
 QUANTITY = 1
 
 OD = 14.732  # .580
