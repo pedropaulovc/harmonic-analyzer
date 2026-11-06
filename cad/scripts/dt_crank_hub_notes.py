@@ -112,15 +112,19 @@ SEAM_CALLOUT = "\n".join(
 # The seat length is the arm's thickness as made, not a turned size (owner
 # ruling 2026-11-01; r9 review: a toleranced seat length read against the
 # flush condition): its nominal prints as a reference flagged to numbered
-# note 2, the matched length with its mate by name and number (rule 4).  A
-# plain reference left the shoulder with no controlling value (round-1
-# review, 2 of 3 runs); END FLUSH on a part sheet is an assembly instruction
+# note 2, the matched length with its mate by name and number and its
+# acceptance (rule 4).  A plain reference left the shoulder with no
+# controlling value (round-1 review, 2 of 3 runs), and MATCH alone gave no
+# acceptance (round-2 review, 2 of 3 runs).  SEAT_LENGTH_MATCH_TOL (.002
+# either way: faces flush to the touch) is PROVISIONAL, pending owner
+# confirmation.  END FLUSH on a part sheet is an assembly instruction
 # (rule 7), so the faces-flush check stays on the MHA-DT-00 press step.
+SEAT_LENGTH_MATCH_TOL = ".002"
 SEAT_LENGTH_NOTE_NUMBER = 2
 SEAT_LENGTH_CALLOUT = f"SEE NOTE {SEAT_LENGTH_NOTE_NUMBER}"
 SEAT_LENGTH_NOTE = (
     f"{SEAT_LENGTH_NOTE_NUMBER}. SEAT LENGTH ({inch_text(HUB_SEAT_LENGTH, 2)}): "
-    "MATCH TO MEASURED THICKNESS OF CRANK ARM MHA-DT-06."
+    f"MEASURED THICKNESS OF CRANK ARM MHA-DT-06 <MOD-PM>{SEAT_LENGTH_MATCH_TOL}."
 )
 # The cross-hole is drilled, then taper-reamed through hub and shaft together
 # at assembly.  Its callout carries SEE NOTE 1 and the numbered note states
