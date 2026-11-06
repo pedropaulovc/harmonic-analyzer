@@ -809,6 +809,9 @@ def test_callout_box_rule_fails_e0e287c83_sheet_on_its_real_display_data() -> No
 # Native R5 at af0b5d14744d, artifact 150 (2026-10-20T22:30:25Z), sheet metres.
 # Keep every display segment, including each tip stub and horizontal shoulder,
 # and every logged obstacle. This is the observed failure, not an after-fix dump.
+# The cross-tap callout it also captured has since left sheet 2 with the front
+# cross-tap view (now on sheet 3), so only the four plan callouts replay here;
+# the obstacles stay as logged.
 NATIVE_R5_CALLOUTS = {
     "MHA-DT-18 block transfer": (
         [0.272, 0.252],
@@ -872,32 +875,12 @@ NATIVE_R5_CALLOUTS = {
             ("AT ASSEMBLY; 4-40 UNC - 2B THRU ALL", [0.32024062824249255, 0.2466388888959773, -0.00635], 0.0035),
         ],
     ),
-    "MHA-FR-VN-53 cross-tap": (
-        [0.285, 0.117],
-        [
-            (0.32936898242057217, 0.09866560316368712, 0.33178124668598175, 0.10861215219646692),
-            (0.3291310175794279, 0.0976843968363129, 0.32936898242057217, 0.09866560316368712),
-            (0.33178124668598175, 0.10861215219646692, 0.23980625331401823, 0.10861215219646692),
-        ],
-        [
-            ("4X ", [0.26240421816706655, 0.11983159763785078, 0.0], 0.0035),
-            ("<MOD-DIAM>", [0.2691271350160241, 0.11977812546119093, 0.0], 0.0035),
-            (" 4.04 ", [0.27440557241439817, 0.11983159763785078, 0.0], 0.0035),
-            ("<HOLE-DEPTH>", [0.28604307197034357, 0.11977812546119093, 0.0], 0.0035),
-            (" 49 MIN", [0.2910436967760324, 0.11983159763785078, 0.0], 0.0035),
-            ("COMMON THREAD LEAD IN BOTH WALLS", [0.23980625331401823, 0.11422187529550865, 0.0], 0.0035),
-            (" 10-32 UNF - 2B ", [0.25906183928251264, 0.10866562530444934, 0.0], 0.0035),
-            ("<HOLE-DEPTH>", [0.2930069787800312, 0.10861215312778949, 0.0], 0.0035),
-            (" 46.00", [0.29800760358572004, 0.10866562530444934, 0.0], 0.0035),
-        ],
-    ),
 }
 NATIVE_R5_CALLOUT_BOXES = {
     "MHA-DT-18 block transfer": (0.24083541718125345, 0.24086076360940933, 0.3047520828187466, 0.2610829862249084),
     "MHA-DT-02 pedestal transfer": (0.16883541718125344, 0.24086076360940933, 0.23275208281874657, 0.2610829862249084),
     "MHA-DT-24 spring transfer": (0.2822479171812534, 0.13166076360940931, 0.3461645828187465, 0.1518829862249084),
     "MHA-FR-04 nameplate transfer": (0.3186531282424926, 0.246638888604939, 0.4037593717575072, 0.26130486122937874),
-    "MHA-FR-VN-53 cross-tap": (0.23980625331401823, 0.10861215219646692, 0.33178124668598175, 0.12333159763785079),
 }
 NATIVE_R5_OBSTACLES = {
     "frame left": (0.0, 0.0, 0.0127, 0.2794),
@@ -998,7 +981,7 @@ NATIVE_R6_PITCH_UPPER_M = 0.005405
 
 
 def _native_r5_r6_callout_layout():
-    """Reconstruct all five unchanged callouts from their actual display data."""
+    """Reconstruct the four unchanged plan callouts from their actual display data."""
     import draw_fr_harmonic_base as sheet
 
     anchors = {
@@ -1006,7 +989,6 @@ def _native_r5_r6_callout_layout():
         "MHA-DT-02 pedestal transfer": sheet.PEDESTAL_CALLOUT_XY,
         "MHA-DT-24 spring transfer": sheet.SPRING_CALLOUT_XY,
         "MHA-FR-04 nameplate transfer": sheet.NAMEPLATE_CALLOUT_XY,
-        "MHA-FR-VN-53 cross-tap": sheet.CROSS_TAP_CALLOUT_XY,
     }
     assert set(anchors) == set(NATIVE_R5_CALLOUTS) == set(NATIVE_R5_CALLOUT_BOXES)
     callouts, leaders, own_rows = {}, {}, {}
@@ -1235,7 +1217,7 @@ def test_native_r6_stop_lock_ink_blocks_require_stop_station_shift() -> None:
         region=DrawableRegion(0.0127, 0.0127, 0.4191, 0.2667),
         annotations=(*callout_annotations, *tags),
     )
-    assert len(observed.annotations) == 7  # all five callouts plus both tag notes
+    assert len(observed.annotations) == 6  # the four plan callouts plus both tag notes
     before = find_merged_blocks(observed)
     assert [(finding.kind, finding.a, finding.b) for finding in before] == [
         ("merged-blocks", stop_tag, lock_tag),
@@ -1531,6 +1513,7 @@ def _drive_hole_sheet_callout_check(
     pivot_tag="Q7",
     numbered_note_tag=None,
     leaders=(),
+    holes_sheet=True,
 ) -> None:
     """Exercise ordinary note obstacles without COM; boxes are unit controls."""
     from types import SimpleNamespace
@@ -1569,21 +1552,48 @@ def _drive_hole_sheet_callout_check(
         ),
     }.items():
         monkeypatch.setattr(sheet, name, value)
-    ddoc = SimpleNamespace(ActivateSheet=lambda name: True, GetFirstView=lambda: "sheet")
-    sheet._check_hole_sheet_callouts(
-        object(),
-        ddoc,
-        callouts={"pedestal": object()},
-        views={"top": "top view"},
-        datum_origin=SimpleNamespace(GetAxisPoints2=lambda: ()),
-        hole_table=_NativeHoleTable(pivot_tag=pivot_tag),
+    activated = []
+    ddoc = SimpleNamespace(
+        ActivateSheet=lambda name: activated.append(name) or True,
+        GetFirstView=lambda: "sheet",
     )
+    if holes_sheet:
+        sheet._check_hole_sheet_callouts(
+            object(),
+            ddoc,
+            sheet_name=sheet.SHEET_NAMES[1],
+            callouts={"pedestal": object()},
+            views={"top": "top view"},
+            datum_origin=SimpleNamespace(GetAxisPoints2=lambda: ()),
+            hole_table=_NativeHoleTable(pivot_tag=pivot_tag),
+        )
+    else:
+        sheet._check_hole_sheet_callouts(
+            object(),
+            ddoc,
+            sheet_name=sheet.SHEET_NAMES[2],
+            callouts={"pedestal": object()},
+            views={"top": "top view"},
+        )
+    assert activated == [sheet.SHEET_NAMES[1 if holes_sheet else 2]]
 
 
 def test_hole_sheet_callout_check_skips_display_dimensions(monkeypatch) -> None:
     # layoutcal2 (harmonic_base-task.log:280): with #902 the dimension row
     # raised AttributeError on None.kind before any clash was measured.
     _drive_hole_sheet_callout_check(monkeypatch, (0.200, 0.200, 0.220, 0.210))
+
+
+def test_cross_tap_sheet_callout_check_needs_no_table_or_pivot_note(monkeypatch) -> None:
+    # Sheet 3 carries the front cross-tap view but neither the hole table nor
+    # the numbered pivot note; its callouts are still measured against notes.
+    _drive_hole_sheet_callout_check(
+        monkeypatch, (0.200, 0.200, 0.220, 0.210), numbered_note_copies=0, holes_sheet=False
+    )
+    with pytest.raises(RuntimeError, match="callout pedestal vs note D1"):
+        _drive_hole_sheet_callout_check(
+            monkeypatch, (0.110, 0.102, 0.120, 0.108), numbered_note_copies=0, holes_sheet=False
+        )
 
 
 def test_hole_sheet_callout_check_still_measures_notes_beside_dimensions(
@@ -2581,26 +2591,53 @@ def test_hole_sheet_callout_check_runs_on_every_callout_before_finalize() -> Non
         node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
     )
     calls = [node for node in ast.walk(build) if isinstance(node, ast.Call)]
-    check = [call for call in calls if getattr(call.func, "id", None) == "_check_hole_sheet_callouts"]
-    assert len(check) == 1
-    keywords = {kw.arg: kw.value for kw in check[0].keywords}
-    assert ast.unparse(keywords["callouts"]) == "hole_sheet_callouts"
-    assert ast.unparse(keywords["datum_origin"]) == "hole_feature.DatumOrigin"
-    table = next(
-        node
-        for node in ast.walk(build)
-        if isinstance(node, ast.Assign)
-        and [ast.unparse(target) for target in node.targets] == ["hole_sheet_callouts"]
-    )
-    callout_names = {ast.unparse(value) for value in table.value.values}
-    # Every callout's leader is moved to its nearer shoulder end before the check.
-    side_loop = next(
-        node
-        for node in ast.walk(build)
-        if isinstance(node, ast.For) and ast.unparse(node.iter) == "hole_sheet_callouts.items()"
-    )
-    assert "_attach_leader_nearest_hole(adapter, display, label)" in ast.unparse(side_loop)
-    assert side_loop.lineno < check[0].lineno
+    checks = {
+        ast.unparse({kw.arg: kw.value for kw in call.keywords}["callouts"]): call
+        for call in calls
+        if getattr(call.func, "id", None) == "_check_hole_sheet_callouts"
+    }
+    # Sheet 2 checks the plan's callouts against its table and datum origin;
+    # sheet 3 the front cross-tap view's, which carries neither.
+    assert set(checks) == {"hole_sheet_callouts", "cross_tap_sheet_callouts"}
+    expected = {
+        "hole_sheet_callouts": (
+            "SHEET_NAMES[1]",
+            {"hole_top", "section"},
+            {"block_callout", "pedestal_callout", "spring_callout", "nameplate_callout"},
+        ),
+        "cross_tap_sheet_callouts": (
+            "SHEET_NAMES[2]",
+            {"bottom", "underside_section", "hole_side"},
+            {"tap_callout", "clearance_callout"},
+        ),
+    }
+    checked = set()
+    for name, (sheet_name, views, callouts) in expected.items():
+        keywords = {kw.arg: kw.value for kw in checks[name].keywords}
+        assert ast.unparse(keywords["sheet_name"]) == sheet_name
+        assert {ast.unparse(value) for value in keywords["views"].values} == views
+        table = next(
+            node
+            for node in ast.walk(build)
+            if isinstance(node, ast.Assign)
+            and [ast.unparse(target) for target in node.targets] == [name]
+        )
+        assert {ast.unparse(value) for value in table.value.values} == callouts
+        checked |= callouts
+        # Every callout's leader is moved to its nearer shoulder end before the check.
+        side_loop = next(
+            node
+            for node in ast.walk(build)
+            if isinstance(node, ast.For) and ast.unparse(node.iter) == f"{name}.items()"
+        )
+        assert "_attach_leader_nearest_hole(adapter, display, label)" in ast.unparse(side_loop)
+        assert side_loop.lineno < checks[name].lineno
+    holes = {kw.arg: kw.value for kw in checks["hole_sheet_callouts"].keywords}
+    assert ast.unparse(holes["datum_origin"]) == "hole_feature.DatumOrigin"
+    assert ast.unparse(holes["hole_table"]) == "hole_table"
+    assert {kw.arg for kw in checks["cross_tap_sheet_callouts"].keywords} == {
+        "sheet_name", "callouts", "views"
+    }
     placed = {
         target.id
         for node in ast.walk(build)
@@ -2617,28 +2654,9 @@ def test_hole_sheet_callout_check_runs_on_every_callout_before_finalize() -> Non
         and getattr(node.value.func, "id", None) == "add_native_hole_callout"
     ]
     assert not unassigned  # every callout is kept, so every one is checked
-    assert (
-        callout_names
-        == placed
-        == {
-            "block_callout",
-            "pedestal_callout",
-            "spring_callout",
-            "nameplate_callout",
-            "tap_callout",
-            "clearance_callout",
-        }
-    )
-    assert {ast.unparse(value) for value in keywords["views"].values} == {
-        "hole_top",
-        "hole_side",
-        "section",
-    }
-    assert {ast.unparse(value) for value in keywords["views"].values} == {
-        "hole_top", "hole_side", "section"
-    }
+    assert checked == placed
     finalize = next(call for call in calls if getattr(call.func, "id", None) == "finalize_drawing")
-    assert check[0].lineno < finalize.lineno
+    assert all(check.lineno < finalize.lineno for check in checks.values())
 
 
 @pytest.mark.parametrize(
@@ -2995,7 +3013,7 @@ def test_section_a_is_cut_off_sheet_scale_and_both_captions_are_checked() -> Non
     off_scale = "_set_active_sheet_scale(adapter, SECTION_CAPTION_SHEET_SCALE)"
     pinned = "_set_active_sheet_scale(adapter, SHEET_SCALE)"
     a_cut = source.index('section_label="A",')
-    assert source.rindex(off_scale, 0, a_cut) > source.rindex("hole_side = ", 0, a_cut)
+    assert source.rindex(off_scale, 0, a_cut) > source.rindex("hole_top = ", 0, a_cut)
     after_a = source[a_cut:]
     a_check = '_require_section_caption_scale(adapter, section, label="section A-A")'
     assert after_a.index(pinned) < after_a.index(a_check)
@@ -3786,7 +3804,9 @@ def test_numbered_note_and_wider_flags_predict_clearance_in_the_proven_lanes() -
     assert sheet.HOLE_TOP_KEEP["PivotSeatY"] == (0.2616, 0.1705)
     assert sheet.PIVOT_SEAT_Y_TEXT_XY == (0.2080, 0.1895)
     assert sheet.HOLE_TAG_STATION_POSITIONS[sheet.PIVOT_SCREW_XZ] == (0.2456, 0.1550)
-    assert sheet.HOLE_SIDE_KEEP["SpotFaceDia"] == (0.193, 0.135)
+    # The front cross-tap view and its spotface callout now sit on sheet 3,
+    # so neither is this sheet-2 note's neighbour any longer.
+    assert sheet.HOLE_SIDE_KEEP["SpotFaceDia"] == (0.063, 0.115)
 
     # Native-r4 embedded-font calibration supplies conservative NEW text-width
     # estimates. This is not a claim that numbered note 1 has printed natively.
@@ -3797,8 +3817,6 @@ def test_numbered_note_and_wider_flags_predict_clearance_in_the_proven_lanes() -
     neighbors = {
         "table": (0.018, 0.1630628306, 0.1627633865, 0.260),
         "plan": (0.22285, 0.1591, 0.33715, 0.2309),
-        "front": (0.22285, 0.08865, 0.33715, 0.10135),
-        "spotface": (0.168835, 0.123861, 0.218752, 0.144083),
         "title block": _TITLE_BLOCK_M,
     }
     for label, box in neighbors.items():
@@ -3898,7 +3916,9 @@ def test_numbered_pivot_note_is_created_once_as_an_ordinary_free_note() -> None:
     assert "pivot_seat_rim" not in inspect.getsource(sheet.build)
     assert not hasattr(sheet, "_route_pivot_seat_note")
     check = next(node for node in calls if getattr(node.func, "id", None) == "_check_hole_sheet_callouts")
-    assert {keyword.arg for keyword in check.keywords} == {"callouts", "views", "datum_origin", "hole_table"}
+    assert {keyword.arg for keyword in check.keywords} == {
+        "sheet_name", "callouts", "views", "datum_origin", "hole_table"
+    }
     flags = [node for node in calls if getattr(node.func, "id", None) == "_flag_pivot_seat_dimensions"]
     assert len(flags) == 1
     assert [ast.unparse(arg) for arg in flags[0].args] == ["adapter", "hole_top_dimensions"]
@@ -5492,12 +5512,18 @@ def test_all_five_native_callouts_omit_only_after_quantity_and_precision_edits()
         )
     )
     assert [element.elts[1].id for element in omission.iter.elts] == [
-        "block_callout", "pedestal_callout", "spring_callout", "nameplate_callout", "tap_callout",
+        "block_callout", "pedestal_callout", "spring_callout", "nameplate_callout",
     ]
+    # The cross-tap callout moved to sheet 3 with its view: its omission is
+    # its own call, still after the quantity and precision edits.
+    tap_omission = next(
+        c for c in calls if getattr(c.func, "id", None) == "_omit_base_callout_thread_class"
+        and c.args and isinstance(c.args[0], ast.Name) and c.args[0].id == "tap_callout"
+    )
     aggregate = next(c for c in calls if getattr(c.func, "id", None) == "_set_cross_tap_callout_text")
     precision = next(
         c for c in calls if getattr(c.func, "id", None) == "set_hole_callout_precision"
         and c.args and isinstance(c.args[0], ast.Name) and c.args[0].id == "tap_callout"
     )
     readback = next(c for c in calls if getattr(c.func, "id", None) == "_check_cross_tap_callout")
-    assert aggregate.lineno < precision.lineno < omission.lineno < readback.lineno
+    assert aggregate.lineno < precision.lineno < tap_omission.lineno < readback.lineno
