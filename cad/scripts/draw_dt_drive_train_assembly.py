@@ -1,4 +1,4 @@
-r"""Create the native thirteen-sheet drive-train assembly drawing package (MHA-DT-00).
+r"""Create the native fourteen-sheet drive-train assembly drawing package (MHA-DT-00).
 
 The released ``dt-drive-train.SLDASM`` stays authoritative and byte-for-byte
 unchanged. This recipe consumes the builder-owned ``DRIVE_TRAIN_EXPLODED``
@@ -117,7 +117,8 @@ from dt_drive_train_assembly_sheet import (
     FEELER_PLACES,
     HANDLE_FERRULE_CURE,
     LEVER_PIN_HOLE_FIT,
-    T120_FITUP_ASSEMBLY_CHECK,
+    T120_FITUP_CHECK,
+    T120_FITUP_REMEDY,
     inch_ceil_mm,
     inch_floor_mm,
     inch_max_text,
@@ -193,12 +194,13 @@ SHEET_NAMES = (
     "CRANK EXPLODED",
     "ALIGNMENT PINION RIG EXPLODED",
     "ASSEMBLY SEQUENCE",
-    "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK",
-    "ASSEMBLY SEQUENCE CONT. + FIT",
+    "ASSEMBLY SEQUENCE CONT. - CRANK + CYLINDER BANK",
+    "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK + PINION RIG",
     "ASSEMBLY SEQUENCE CONT. + CRANK END FIT",
     "FULL-DETAIL SIDE VIEW",
     "CHECKS + SETUP",
     "CYLINDER BANK + DRUM STATION SETTINGS",
+    "SETTING TABLES + CONE STATIONS",
 )
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
@@ -219,14 +221,12 @@ CLUSTER_TITLES: dict[Cluster, str] = {
 # #743 grew steps 8-9 past the sequence sheet's right field, so the bank
 # sequence has its own sheet (Main, B1 re-ruling 2026-09-26). A blank line
 # between numbered steps (user, 2026-10-23: "add line breaks bw steps; add
-# extra sheets as needed") once pushed steps 6-7 and check 7 onto
-# continuation sheets of their own; the v47 machinist review read those as
-# near-empty sheets beside free fields, so sheet 7's right field now runs the
-# full height (its reference view moves under the left column) and carries
-# steps 4-7, and check 7 heads sheet 12's right field. The numbered steps
-# read in sheet order: 1-7 on sheet 7, 8-10 on 8, 11-18 on 9 and 19-23 on
-# 10; the checks follow the full-detail view (gate review of 042726e87: the
-# steps jumped 6 -> 11 -> 7 -> 8 -> 11).
+# extra sheets as needed").  The rubric sample review of v47 split every step
+# into one-thing sub-steps (rule 22), so a field may end inside a step, at a
+# lettered sub-step, and its pointer names that sub-step.  The numbered steps
+# read in sheet order: 1-5 on sheet 7 (MHA-PD-00 cites 4 and 5 there), 6-9D
+# on 8, 9E-16 on 9 and 17-23 on 10; the checks follow the full-detail view
+# (gate review of 042726e87: the steps jumped 6 -> 11 -> 7 -> 8 -> 11).
 SEQUENCE_SHEET = 7
 BANK_SHEET = 8
 FIT_SHEET = 9
@@ -237,7 +237,11 @@ CONTINUATION_SHEET = 10
 # tooth and thread, so sheet 11 carries it.
 FULL_DETAIL_SHEET = 11
 CHECKS_SHEET = 12
+# MHA-DT-VN-68's print cites sheet 13 and its Detail A (step 9C).
 BANK_SETTINGS_SHEET = 13
+# The DRO targets, feeler stacks, pedestal recheck record and the cone
+# station table: the sheet the steps and checks read their numbers from.
+SETTING_SHEET = 14
 BANK_SETTING_SCALE = (1.0, 1.0)
 BANK_SPRING_DETAIL_SCALE = (4.0, 1.0)
 # 12 mm left of its first seat (0.205): run 20261103T063712849Z's native
@@ -246,8 +250,35 @@ BANK_SPRING_DETAIL_SCALE = (4.0, 1.0)
 BANK_SETTING_CENTER = (0.193, 0.195)
 BANK_SPRING_DETAIL_CENTER = (0.105, 0.075)
 BANK_SPRING_CROP_RADIUS_MM = 8.0
-BANK_SETTING_KEEP = {bank_settings.STACK_DIMENSION: (0.193, 0.250)}
-BANK_SPRING_KEEP = {bank_settings.SPRING_DIMENSION: (0.165, 0.125)}
+# The bank's settings are labelled on its views, each label naming its
+# setting-table row on sheet 14 (rubric sample review of v47: the steps'
+# equations needed a labelled sketch).  (text, top-left sheet point, model
+# point in mm the leader tip lands on); the bank labels hang over the bank,
+# where its imported stack dimension stood, the spring gap's beside Detail A.
+BANK_SETTINGS_POINTER = f"TARGETS AND STACK LENGTH: SETTING TABLE, SHEET {SETTING_SHEET}."
+_BANK_LABEL_X = 0.165
+BANK_SETTING_LABELS = (
+    (
+        "MHA-DT-26: MIC ITS THICKNESS, W (ROW 2)",
+        (_BANK_LABEL_X, 0.257),
+        (cone_line.X_DRUM, bank_settings.AXIS_Y + 6.0, sum(bank.SOUTH_DISC_Z) / 2.0),
+    ),
+    (
+        "FRONT MHA-DT-02 INNER FACE: DRO Y (ROW 2)",
+        (_BANK_LABEL_X, 0.250),
+        (cone_line.X_DRUM, bank_settings.AXIS_Y + 8.0, bank.FRONT_STRAP_INNER_Z - 0.5),
+    ),
+    (
+        "MANDREL AXIS AT EACH MHA-DT-02: DRO X (ROW 3)",
+        (_BANK_LABEL_X, 0.243),
+        (cone_line.X_DRUM, bank_settings.AXIS_Y, bank.ARBOR_SOUTH_Z + 0.5),
+    ),
+)
+BANK_SPRING_LABEL = (
+    "GAP BESIDE MHA-DT-VN-68: FEELER (ROW 4, STEP 9C)",
+    (0.145, 0.115),
+    (cone_line.X_DRUM, bank_settings.AXIS_Y + 5.0, sum(bank.BANK_SPRING_Z) / 2.0),
+)
 # MHA-DT-22 prints the drum station as a reference; its setting and band live
 # on this sheet (dt_drum_station_setting_spec).  A 1:1 *Right view of the
 # arbor and drum alone, circle-cropped from the head's front crown to a short
@@ -280,7 +311,7 @@ DRUM_STATION_TEXT_Y = (
     DRUM_STATION_SETTING_CENTER[1] + DRUM_STATION_CROP_RADIUS_MM / 1000.0 + 0.008 + 3 * 0.0056
 )
 # Sheet 13 reads back every setting spec's model-owned dimension the same way.
-SETTING_SPECS = (bank_settings, drum_station_setting)
+SETTING_SPECS = (drum_station_setting,)
 SETTING_DIMENSIONS = {
     feature: names for spec in SETTING_SPECS for feature, names in spec.DRAWING_DIMENSIONS.items()
 }
@@ -414,7 +445,7 @@ BOM_REFERENCE_NOTES = (
     "REFERENCE 1:8\n"
     f"BALLOONS ON SHEETS {min(CLUSTER_SHEETS.values())}-{max(CLUSTER_SHEETS.values())}\n"
     "MHA-DT-03 CONE GEAR\n"
-    f"STATIONS: SHEET {FIT_SHEET}"
+    f"STATIONS: SHEET {SETTING_SHEET}"
 )
 
 # --- sheets 3-6: exploded cluster views --------------------------------------
@@ -495,6 +526,17 @@ CHECKS_RIGHT_FIELD = (
     ISO_RIGHT_FIELD[2],
     CHECKS_ISO_CENTER[1] + REFERENCE_ISO_HALF_OUTLINE + CHECKS_ISO_GAP,
 )
+# Sheet 14: the setting, pedestal recheck and feeler stack tables stack down
+# the left from NOTE_FIELD_LEFT's top (SETTING_TABLE_LEFT); the cone station
+# table prints right of them, over the reference view.
+STATION_TABLE_FIELD = (0.245, 0.195, NOTE_FIELD_RIGHT[2], 0.140)
+SETTING_TABLE_LEFT = NOTE_FIELD_LEFT[0]
+# A general table's cell text runs ~2.8 mm a character at the 3.5 mm note
+# font (47 note lines measured 212.33 mm; 70 characters ~194 mm); each column
+# is cut to its longest cell plus 2 mm a side.
+TABLE_CHAR_WIDTH = 0.0028
+TABLE_CELL_PAD = 0.004
+TABLE_TITLE_GAP = 0.0015
 # With 27 data rows the first piece ends near y=80 mm (the historical header
 # measured 10.2 mm). The 1:8 reference view is wholly below that piece; its
 # complete metadata, including scale, sits beside it. The native table budget
@@ -594,7 +636,7 @@ BOM_PART_NUMBERS = {
 BOM_DESCRIPTIONS = {
     "dt-cylinder-gear-shaft": "CYLINDER GEAR ARBOR",
     "dt-arbor-pedestal": "ARBOR PEDESTAL",
-    "dt-cylinder-end-disc": "CYLINDER BANK SOUTH END DISC",
+    "dt-cylinder-end-disc": "CYLINDER BANK FRONT END DISC",
     "dt-vn-cylinder-bank-spring": "WAVE DISC SPRING, MCMASTER 9714K392",
     "dt-cylinder-gear": f"CYLINDER GEAR WITH CAM, {drum.TEETH}T",
     "dt-vn-pedestal-hold-down-screw": "#8-32 FILLISTER SCREW, MCMASTER 90280A197",
@@ -727,19 +769,22 @@ def _note_text(rows: Sequence[str], *, heading: bool = True) -> str:
     return "\n".join(lines)
 
 
-def _split_sequence_notes(text: str, number: int, heading: str) -> tuple[str, str]:
-    """Move a whole numbered step (or check) and its successors to a
-    continuation field, dropping the blank line that separated them."""
+def _split_sequence_notes(text: str, number: int | str, heading: str) -> tuple[str, str]:
+    """Move a numbered step (or check) -- or, for a lettered head such as
+    ``"8K"``, a sub-step -- and everything after it to a continuation field,
+    dropping the blank line that separated two numbered steps."""
     head = f"{number}. "
-    first, separator, rest = text.partition("\n\n" + head)
-    if not separator:
+    separator = "\n\n" if str(number).isdigit() else "\n"
+    first, found, rest = text.partition(separator + head)
+    if not found:
         raise ValueError(f"note block has no head {head!r}")
     return first, f"{heading}\n{head}{rest}"
 
 
-# Acceptance limits on the assembly sheets round inward at these places: the
-# DRO-set coordinates' ±0.10 at four inch places, a DRO count.
-FIT_LIMIT_PLACES = 4
+# DRO-set coordinates print as three-place inch windows rounded inward off the
+# owning spec's ±0.10 mm, so the sheet admits no position the spec refuses and
+# prints no converted millimetre band (drawing-guidelines rule 4).
+FIT_LIMIT_PLACES = 3
 
 
 def _inward_limits(low: float, high: float) -> str:
@@ -747,26 +792,162 @@ def _inward_limits(low: float, high: float) -> str:
     return inch_window((low, high), FIT_LIMIT_PLACES)
 
 
+def _plus_w_window(low: float, high: float, nominal_w: float, sign: int) -> str:
+    """A DRO window that moves with a micrometered thickness W: the limits
+    less (``sign`` +1) or plus (``sign`` -1) the nominal W, rounded inward,
+    then printed as ``W + a TO W + b`` or ``a - W TO b - W``."""
+    a, b = (
+        inch_text(inch_ceil_mm(low - sign * nominal_w, FIT_LIMIT_PLACES), FIT_LIMIT_PLACES),
+        inch_text(inch_floor_mm(high - sign * nominal_w, FIT_LIMIT_PLACES), FIT_LIMIT_PLACES),
+    )
+    return f"W + {a} TO W + {b}" if sign > 0 else f"{a} - W TO {b} - W"
+
+
 _BANK_X = cone_line.X_DRUM + base.BOTTOM_LENGTH / 2.0
 BANK_X_LIMITS = _inward_limits(
     _BANK_X - bank.FRONT_STRAP_LOCATE_BAND, _BANK_X + bank.FRONT_STRAP_LOCATE_BAND
 )
+# A thick front disc moves its strap to the front, hence PLUS its measured
+# excess in the base's rear-face Y coordinate (cylinder_bank_layout).
 _FRONT_STRAP_Y = base.BOTTOM_REAR_Z - bank.FRONT_STRAP_INNER_Z
-FRONT_STRAP_Y_LIMITS = _inward_limits(
+FRONT_STRAP_Y_WINDOW = _plus_w_window(
     _FRONT_STRAP_Y - bank.FRONT_STRAP_LOCATE_BAND,
     _FRONT_STRAP_Y + bank.FRONT_STRAP_LOCATE_BAND,
+    BANK_WASHER_THICK,
+    +1,
 )
+# Hub 19 bears on the miced washer against the ear, so the ear moves back
+# (LESS Y) by the washer's excess over nominal.
 _NORTH_EAR_Y = base.BOTTOM_REAR_Z - rockers.NORTH_EAR_INNER_Z
-NORTH_EAR_Y_LIMITS = _inward_limits(
+NORTH_EAR_Y_WINDOW = _plus_w_window(
     _NORTH_EAR_Y - rockers.NORTH_EAR_LOCATE_BAND,
     _NORTH_EAR_Y + rockers.NORTH_EAR_LOCATE_BAND,
+    rocker_washer.THICKNESS,
+    -1,
 )
-# Step 9C's spring gap is set with one leaf of the rig's STARRETT 66MA gage,
-# named by its stamped size as the rig steps name theirs (v47 machinist
-# review: the blade was never identified).
+# The closed gear stack's acceptance, gear 0 cam face to gear 19 back face.
+_STACK_LENGTH = bank.G19_BACK_FACE_Z - bank.G0_CAM_FACE_Z
+STACK_WINDOW = inch_window(
+    (
+        _STACK_LENGTH + bank.STACK_L20_ACCEPT_BAND[1],
+        _STACK_LENGTH + bank.STACK_L20_ACCEPT_BAND[0],
+    ),
+    FIT_LIMIT_PLACES,
+)
+# Step 9C's spring gap is set with one leaf of the rig's STARRETT 66MA gage
+# (v47 machinist review: the blade was never identified); the steps print its
+# inch size and the feeler-stack table its stamped size.
 if round(bank.BANK_SPRING_SET, 2) not in FITUP.FEELER_GAGE_LEAVES_MM:
     raise AssertionError(f"spring set {bank.BANK_SPRING_SET} mm is not one gage leaf")
-BANK_SPRING_LEAF = f"{bank.BANK_SPRING_SET:.2f} MM 66MA LEAF"
+BANK_SPRING_FEELER = inch_text(bank.BANK_SPRING_SET, FEELER_PLACES)
+
+# --- sheet 14: the setting tables ----------------------------------------------
+# Every DRO target the bank steps set, with what to measure first and how to
+# check it, prints once here as a table row the steps cite (rubric sample
+# review of v47: equations in prose and converted millimetre bands).  The DRO
+# is zeroed on the MHA-FR-01 hole-table datum faces at step 8G.
+def _step_ref(key: str, letter: str = "") -> str:
+    return f"{steps.step_number(key)}{letter}"
+
+
+SETTING_TABLE_TITLE = (
+    "SETTING TABLE - DRO ZEROED ON THE MHA-FR-01 HOLE-TABLE DATUM FACES AT STEP "
+    f"{_step_ref('cylinder-stack-accepted', 'G')}; W IS THE PART AS MICED"
+)
+SETTING_TABLE_HEADER = ("ROW", "STEP", "SETTING", "MEASURE FIRST", "SET TO / ACCEPT", "CHECK WITH")
+SETTING_TABLE_ROWS = (
+    (
+        "1",
+        _step_ref("cylinder-stack-accepted", "B"),
+        "GEAR 0 CAM FACE TO GEAR 19 BACK FACE",
+        "-",
+        STACK_WINDOW,
+        "5-6 IN MICROMETER",
+    ),
+    (
+        "2",
+        _step_ref("cylinder-stack-accepted", "J"),
+        "FRONT MHA-DT-02 INNER FACE, DRO Y",
+        "W = MHA-DT-26 THICKNESS",
+        FRONT_STRAP_Y_WINDOW,
+        "DRO, EDGE FINDER",
+    ),
+    (
+        "3",
+        f"{_step_ref('cylinder-stack-accepted', 'J')}, {_step_ref('cylinder-bank-located', 'C')}",
+        "MANDREL CENTRE AT EACH MHA-DT-02, DRO X",
+        "-",
+        BANK_X_LIMITS,
+        "EDGE FINDER, HALVED",
+    ),
+    (
+        "4",
+        _step_ref("cylinder-bank-located", "C"),
+        "BACK MHA-DT-02 INNER FACE TO GEAR 19",
+        "-",
+        f"{BANK_SPRING_FEELER} FEELER",
+        "LIGHTLY PINCHED",
+    ),
+    (
+        "5",
+        _step_ref(NORTH_BRACKET_SET_KEY, "C"),
+        "BACK MHA-CH-08 EAR INNER FACE, DRO Y",
+        "W = MHA-CH-VN-56 THICKNESS",
+        NORTH_EAR_Y_WINDOW,
+        "DRO, EDGE FINDER",
+    ),
+)
+
+# The rig's settings and the bank's spring gap are stacks of the STARRETT
+# 66MA metric gage's leaves (pinion_rig_fitup): the steps print each setting's
+# inch size, this table the stamped leaves that make it up.
+FEELER_STACK_TITLE = f"FEELER STACKS - {FITUP.FEELER_GAGE_NAME} LEAVES"
+FEELER_STACK_HEADER = ("SETTING", "LEAVES (MM, AS STAMPED)", "STEPS")
+
+
+def _feeler_stack_rows() -> tuple[tuple[str, str, str], ...]:
+    settings = (
+        (FITUP.DRUM_END_SHIM, (FITUP.DRUM_END_SHIM,), _step_ref("straps-pinned-to-torque-shaft")),
+        (FITUP.FRONT_BLOCK_FEELER, (FITUP.FRONT_BLOCK_FEELER,), _step_ref("rig-set")),
+        (FITUP.RIG_SET_LEAF_D, FITUP.RIG_SET_LEAVES, _step_ref("rig-set", "A")),
+        (FITUP.SPRING_PAD_LEAF, (FITUP.SPRING_PAD_LEAF,), _step_ref("rig-set", "B")),
+        (FITUP.FRONT_COLLAR_LEAF, (FITUP.FRONT_COLLAR_LEAF,), _step_ref("cam-collars-set", "A")),
+        (FITUP.BACK_COLLAR_LEAF_F, (FITUP.BACK_COLLAR_LEAF_F,), _step_ref("cam-collars-set", "B")),
+        (bank.BANK_SPRING_SET, (bank.BANK_SPRING_SET,), _step_ref("cylinder-bank-located", "C")),
+        (
+            TIP_GAP.TIP_GAP_FEELER,
+            TIP_GAP.TIP_GAP_LEAVES,
+            f"{_step_ref('rig-located', 'C')}, CHECK 7",
+        ),
+    )
+    rows: dict[tuple[str, str], list[str]] = {}
+    for setting, leaves, step in settings:
+        if abs(sum(leaves) - setting) > 1e-9:
+            raise AssertionError(f"the {inch_text(setting, FEELER_PLACES)} leaves miss it")
+        key = (
+            inch_text(setting, FEELER_PLACES),
+            " + ".join(f"{leaf:.2f}" for leaf in sorted(leaves, reverse=True)),
+        )
+        rows.setdefault(key, []).append(step)
+    return tuple(
+        (inch, leaves, ", ".join(cited))
+        for (inch, leaves), cited in sorted(rows.items(), key=lambda item: float(item[0][0]))
+    )
+
+
+FEELER_STACK_ROWS = _feeler_stack_rows()
+
+# Check 4 re-reads the pedestals after the cone swing's shims: each recorded
+# DRO value plus its indicator reading must stay in its setting-table range.
+PEDESTAL_RECHECK_TITLE = "PEDESTAL RECHECK (CHECK 4) - FILL IN"
+PEDESTAL_RECHECK_HEADER = (
+    "PEDESTAL, AXIS", "RECORDED AT", "RECORDED VALUE", "INDICATOR READING", "SUM", "ACCEPT"
+)
+PEDESTAL_RECHECK_ROWS = (
+    ("FRONT MHA-DT-02, X", _step_ref("cylinder-stack-accepted", "L"), "", "", "", BANK_X_LIMITS),
+    ("BACK MHA-DT-02, X", _step_ref("cylinder-bank-located", "F"), "", "", "", BANK_X_LIMITS),
+    ("FRONT MHA-DT-02, Y", _step_ref("cylinder-stack-accepted", "L"), "", "", "", FRONT_STRAP_Y_WINDOW),
+)
 
 # Step 4's pin fit is the MHA-DT-10 and MHA-DT-11 prints' own wording.
 _PINION_PIN_FIT = ", ".join(pinion.PIN_FIT_LINES)
@@ -868,8 +1049,12 @@ def cam_stake_note_xy(tip: tuple[float, float]) -> tuple[float, float]:
     )
 
 
-# Step 10 screws the north MHA-CH-08 down with the channel's own hold-down.
+# Step 10 screws the back MHA-CH-08 down with the channel's own hold-down.
 NORTH_BRACKET_SCREW = str(_config.parts("ch-vn-bracket-hold-down-screw")["number"])
+# Step 8A hangs each MHA-CH-00 connecting rod and rocker arm pair on its cam by
+# their own numbers (rubric sample review of v47: "ROD + ARM PAIR" named no part).
+CONNECTING_ROD = str(_config.parts("ch-connecting-rod")["number"])
+ROCKER_ARM = str(_config.parts("ch-rocker-arm")["number"])
 # Step 5's T12 is the paper drive's removable chain sprocket in its T12
 # configuration (pd_transgear_removable_spec: T12 on the crank); the machinist
 # review of 8e6a0dbd8 asked for its own number.
@@ -883,233 +1068,225 @@ ASSEMBLED_HEADING = (
 )
 
 
+# Every step does one thing in six printed lines or fewer, and a check and its
+# remedy are separate steps (drawing-guidelines rule 22; rubric sample review
+# of v47).  A step's number is the registry's (dt_drive_train_steps, which
+# other packages cite); the actions under it are lettered sub-steps 1A, 1B...
+# (I and O skipped).  Directions are the sheet 1 FRONT view's: FRONT is the
+# crank end (model -Z), BACK the cone tip end, RIGHT model -X.
 CONE_CRANK_STEPS = _note_text(
     (
         "ASSEMBLY SEQUENCE - CONE SET AND CRANK",
         # Slide the one flat of every gear onto the shaft and close the
         # accepted stack against its collar before setting tip end play.
         "1. SLIDE MHA-DT-07 ONTO THE MHA-DT-04 D-FLAT AGAINST ITS COLLAR.",
-        "   SLIDE {cone_gears}X MHA-DT-03 ON, T120 FIRST THROUGH T006,",
-        f"   EACH FLAT TO FLAT AND AGAINST THE LAST. MEASURE THE {CONE_GEAR_COUNT}-GEAR",
-        f"   STACK T120 SOUTH FACE TO T006 NORTH FACE: {inch_window(STACK_L20_ACCEPT, 3)}.",
-        "   RE-FACE A LONG STACK; REMAKE THE THINNEST GEAR OF A SHORT ONE.",
+        "1A. SLIDE {cone_gears}X MHA-DT-03 ON, T120 FIRST THROUGH T006, EACH FLAT TO",
+        "   FLAT AND AGAINST THE LAST.",
+        f"1B. MEASURE THE {CONE_GEAR_COUNT}-GEAR STACK, T120 FRONT FACE TO T006 BACK FACE:",
+        f"   ACCEPT {inch_window(STACK_L20_ACCEPT, 3)}.",
+        "1C. IF THE STACK IS LONG, RE-FACE ITS THICKEST GEAR; IF SHORT, REMAKE ITS",
+        "   THINNEST GEAR. REPEAT 1B.",
         # U37c cut-to-fit acceptance survives the taller post and longer stock:
         # MHA-DT-VN-61's registry/spec own the selected screw and reference length.
         # Each screw is cut against its own matched post/platform hole, never
         # proud of the plate underside. The short-engagement fact includes
         # the stock band, cut allowance and both tap-mouth edge breaks.
         # The sheet states the actual minimum, never the governance label.
-        "2. ALIGN MHA-DT-05 COUNTERBORES TO MHA-DT-20 TAPS; USE 2X",
+        "2. ALIGN THE MHA-DT-05 COUNTERBORES TO THE MHA-DT-20 TAPS. USE 2X",
         f"   MHA-DT-VN-61: MSC {post_screw.SKU}, {post_screw.THREAD} X "
-        f"{post_screw.STOCK_LENGTH_MM / 25.4:g} IN STOCK, CUT TO FIT;",
+        f"{post_screw.STOCK_LENGTH_MM / 25.4:g} IN STOCK.",
         # The exact maximum short the part sheet allows (.005 in = 0.127): a
         # maximum never rounds outward, and the part's places print it whole.
-        "   FLUSH TO "
+        "2A. CUT EACH MHA-DT-VN-61 TO FIT: FLUSH TO "
         f"{inch_max_text(post_screw.POST_SCREW_CUT_TO_FIT_SHORT, post_screw.CUT_TO_FIT_SHORT_PLACES)}"
-        " SHORT OF MHA-DT-20 UNDERSIDE, NEVER PROUD.",
+        " SHORT OF THE MHA-DT-20 UNDERSIDE, NEVER PROUD;",
         f"   ({inch_text(post_screw.CUT_LENGTH_MM, post_screw.DRAWING_PRECISION_BY_NAME[post_screw.CUT_LENGTH_DIMENSION])}) "
-        "REF CUT LENGTH. DEBURR ENDS; " + POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT,
-        # User ruling 2026-09-29 (eight-views-4 photo): MHA-DT-21 is a prism
-        # standing directly on MHA-DT-20, held by one #4-40 socket head cap
-        # screw up from under the plate through its counterbored hole.  The
-        # MHA-DT-VN-54 collar goes on loose here; step 3 sets it.  Whether the post
-        # pattern itself can be assembled is issue #1134 (pre-existing).
+        "REF CUT LENGTH. DEBURR THE ENDS. " + POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT,
+        "2B. RUN BOTH MHA-DT-VN-61 IN. LEAVE MHA-DT-VN-61 LOOSE ENOUGH TO TURN MHA-DT-05.",
         # #1074: the collar's bearing on the boss end reacts the tip
         # adjuster's preload (#914), and the model mates it (#1058).
-        "   JOURNAL MHA-DT-04 IN THE MHA-DT-05 CONE BOSS UNTIL THE MHA-DT-04",
-        "   COLLAR BEARS ON THE BOSS NORTH END. SLIP MHA-DT-VN-54 ON THE TIP STUB.",
-        "   STAND MHA-DT-21 ON MHA-DT-20 AT ITS HOLE; MHA-DT-VN-60 UP FROM",
-        "   UNDER THE PLATE THROUGH THE COUNTERBORE INTO THE MHA-DT-21 FOOT,",
-        "   SNUG. LEAVE MHA-DT-VN-61 LOOSE ENOUGH TO TURN MHA-DT-05.",
-        # User ruling 2026-09-29: the stack's north float is held on the
+        "2C. JOURNAL MHA-DT-04 IN THE MHA-DT-05 CONE BOSS UNTIL THE MHA-DT-04",
+        "   COLLAR BEARS ON THE BOSS BACK END.",
+        "2D. SLIP MHA-DT-VN-54 ON THE MHA-DT-04 TIP STUB.",
+        # User ruling 2026-09-29 (eight-views-4 photo): MHA-DT-21 is a prism
+        # standing directly on MHA-DT-20, held by one #4-40 socket head cap
+        # screw up from under the plate through its counterbored hole.
+        "2E. STAND MHA-DT-21 ON MHA-DT-20 AT ITS HOLE. RUN MHA-DT-VN-60 UP FROM",
+        "   UNDER THE PLATE THROUGH THE COUNTERBORE INTO THE MHA-DT-21 FOOT, SNUG.",
+        # User ruling 2026-09-29: the stack's back float is held on the
         # shaft by MHA-DT-VN-54, set off T006 by one feeler and locked on the
         # D-flat; the cup screw alone then sets MHA-DT-04's end play
-        # (cone_stack_end_play).  U32 (user, 2026-09-23): option 1A turn-set,
-        # worded without the pitch (#10-32: 1/8 turn is ~0.10).  The tip's
-        # lateral error is taken up by turning MHA-DT-05 on its screws'
-        # clearance (TIP_LATERAL_CAPACITY_MM in build_drive_train_assembly),
-        # so the fitter centres the tip in the cup before locking the post
-        # (Codex P1 on #1136, 9e9982c5d).  User decision 2026-10-12: the post
-        # is held pushed toward the tip block while it is turned and its
-        # screws tightened, so its screw clearance can only carry the shaft
-        # north, away from G19 (dt_tip_collar_air).
-        "3. PUSH THE STACK ONTO THE MHA-DT-04 COLLAR. PUSH MHA-DT-VN-54 ONTO A",
-        f"   {inch_text(COLLAR_FEELER, FEELER_PLACES)} FEELER ON T006; LOCK ITS SET SCREW ON THE FLAT.",
-        "   THREAD MHA-DT-VN-55 INTO MHA-DT-21 TO THE TIP. HOLD MHA-DT-05 PUSHED",
-        "   TOWARD MHA-DT-21 ALONG THE SHAFT THROUGHOUT: TURN MHA-DT-05 ON ITS",
-        "   SCREWS UNTIL THE TIP CENTRES IN THE CUP; TIGHTEN BOTH MHA-DT-VN-61",
-        "   AND RECHECK. THREAD MHA-DT-VN-55 ON UNTIL MHA-DT-04 JUST STOPS",
-        "   SHUTTLING AND STILL TURNS FREELY; BACK OFF 1/8 TURN; TIGHTEN",
-        "   MHA-DT-VN-56 ACROSS THE SLIT. END PLAY "
-        f"{inch_window(SHAFT_END_PLAY, 3)}, BY FEEL OR INDICATOR.",
+        # (cone_stack_end_play).  U32 (user, 2026-09-23): option 1A turn-set.
+        # The tip's lateral error is taken up by turning MHA-DT-05 on its
+        # screws' clearance (Codex P1 on #1136, 9e9982c5d).  User decision
+        # 2026-10-12: the post is held pushed toward the tip block while it is
+        # turned and its screws tightened (dt_tip_collar_air).
+        "3. PUSH THE GEAR STACK TO THE FRONT, ONTO THE MHA-DT-04 COLLAR.",
+        f"3A. PUSH MHA-DT-VN-54 ONTO A {inch_text(COLLAR_FEELER, FEELER_PLACES)} FEELER ON T006. "
+        "LOCK ITS SET SCREW ON THE FLAT;",
+        "   REMOVE THE FEELER.",
+        "3B. THREAD MHA-DT-VN-55 INTO MHA-DT-21 UNTIL IT TOUCHES THE MHA-DT-04 TIP.",
         "   MHA-DT-VN-55 " + ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT,
+        "3C. HOLD MHA-DT-05 PUSHED TOWARD MHA-DT-21 ALONG THE SHAFT THROUGH 3D.",
+        "   TURN MHA-DT-05 ON ITS SCREWS UNTIL THE TIP CENTRES IN THE CUP.",
+        "3D. TIGHTEN BOTH MHA-DT-VN-61 AND RECHECK THAT THE TIP IS CENTRED.",
+        "3E. THREAD MHA-DT-VN-55 IN UNTIL MHA-DT-04 JUST STOPS SHUTTLING AND STILL",
+        "   TURNS FREELY; BACK OFF 1/8 TURN. TIGHTEN MHA-DT-VN-56 ACROSS THE SLIT.",
+        "3F. CHECK THE MHA-DT-04 END PLAY WITH A DIAL INDICATOR ON THE SHAFT END,",
+        f"   PUSHING THE SHAFT BACK AND FORTH ALONG ITS AXIS: {inch_window(SHAFT_END_PLAY, 3)}.",
+        "3G. IF THE END PLAY IS OUT, LOOSEN MHA-DT-VN-56 AND REPEAT 3E AND 3F.",
         # User ruling 2026-09-28: the crank journal runs directly in the post;
         # the centres are fixed, and the only mesh requirement is no binding.
-        # CONTRACT-crank: MHA-DT-VN-67 press to the blind-hole floor (their proud
-        # length is the result).  Owner ruling D1 (2026-10-15): no crank-seat
-        # washer -- the collar is held hard on the boss's south face, the 16T
-        # set on its feeler off the north face, and only then is its pin
-        # match-drilled, so the end play is the feeler and the shaft end is
-        # left proud (CRANK_END_FIT_NOTES, on the continuation sheet).
+        # CONTRACT-crank: MHA-DT-VN-67 press to the blind-hole floor.  Owner
+        # ruling D1 (2026-10-15): no crank-seat washer -- the collar is held
+        # hard on the boss's front face, the 16T set on its feeler off the
+        # back face, and only then is its pin match-drilled (CRANK_END_FIT_NOTES).
         # User ruling 2026-09-30 (#1154): the 16T's shoulder and turned band
-        # are feeler-checked against T120 before the pin is drilled.  The
-        # pair may rub on T120 until that check closes, so the seat and the
-        # check come first, turning by hand, and the free-running revolution
-        # after them (Codex P2 on #1154, review 3).  The check's last line is
-        # short; the step carries on after it.
-        "4. PRESS 2X MHA-DT-VN-67 TO THE MHA-DT-11 COLLAR HOLE FLOORS. FIT MHA-DT-11 IN",
-        "   THE MHA-DT-05 CRANK BORE; SLIDE MHA-DT-10 ON UNPINNED, TOOTH IN GAP",
-        "   WITH MHA-DT-07. HOLD THE MHA-DT-11 COLLAR HARD ON THE BOSS SOUTH FACE;",
-        f"   SET MHA-DT-10 {inch_text(PINION_SEAT_FEELER, FEELER_PLACES)} OFF THE MHA-DT-05 BOSS NORTH FACE WITH A FEELER.",
-        T120_FITUP_ASSEMBLY_CHECK + " THEN",
-        "   TURN MHA-DT-07 ONE FULL REVOLUTION; IT MUST NEVER BIND (ELSE CHECK",
-        "   THE PARTS AND BORE SPACING). THEN MATCH-DRILL THROUGH THE MHA-DT-10",
-        "   BOSS AT ITS MID-LENGTH INTO MHA-DT-11; "
-        + _PINION_PIN_FIT
-        + "; RE-CHECK NO BINDING.",
+        # are feeler-checked against T120 before the pin is drilled, turning
+        # by hand, and the free-running revolution after them (Codex P2 on
+        # #1154, review 3).
+        "4. PRESS 2X MHA-DT-VN-67 TO THE FLOORS OF THE MHA-DT-11 COLLAR HOLES.",
+        "4A. FIT MHA-DT-11 IN THE MHA-DT-05 CRANK BORE. SLIDE MHA-DT-10 ON,",
+        "   UNPINNED, A TOOTH IN A GAP OF MHA-DT-07.",
+        "4B. HOLD THE MHA-DT-11 COLLAR HARD ON THE MHA-DT-05 BOSS FRONT FACE. SET",
+        f"   MHA-DT-10 {inch_text(PINION_SEAT_FEELER, FEELER_PLACES)} OFF THE BOSS BACK FACE WITH A FEELER.",
+        "4C. " + T120_FITUP_CHECK,
+        "4D. " + T120_FITUP_REMEDY + " REPEAT 4B AND 4C.",
+        "4E. TURN MHA-DT-07 ONE FULL REVOLUTION BY HAND: IT MUST NEVER BIND.",
+        "4F. IF IT BINDS, CHECK THE PARTS AND THE MHA-DT-05 BORE SPACING.",
+        "4G. MATCH-DRILL THROUGH THE MHA-DT-10 BOSS AT ITS MID-LENGTH INTO",
+        "   MHA-DT-11; " + _PINION_PIN_FIT + ".",
+        "4H. TURN MHA-DT-07 ONE FULL REVOLUTION AGAIN: NO BINDING.",
         f"5. SLIDE {CRANK_CHAIN_WHEEL} T12 ONTO MHA-DT-11 BEFORE THE ARM, ITS HOLES OVER",
         "   THE 2X MHA-DT-VN-67.",
         # U33 (user, 2026-09-23): crank hub MHA-DT-31 pressed into the arm and
-        # seam-pinned by MHA-DT-VN-59 (a 5/32 dowel cut to .15, driven flush in
-        # a blind seam); the MHA-DT-09 cross-hole runs behind the arm through
-        # the hub barrel. The handle rides the MHA-DT-32 shoulder screw. The
-        # seam's size and depth print once, on MHA-DT-06 and MHA-DT-31 (codex
-        # review: a copied Ø4 X 4.0 went stale when the pin went to 5/32).
+        # seam-pinned by MHA-DT-VN-59; the MHA-DT-09 cross-hole runs behind
+        # the arm through the hub barrel. The seam's size and depth print
+        # once, on MHA-DT-06 and MHA-DT-31.  Pipeline review of 49287772c: the
+        # ream's acceptance (the ring clear of the hub) is an assembly setting.
+        # Codex #1140: the keeper chain's bead count is the spec's solve.
         "6. PRESS MHA-DT-31 INTO MHA-DT-06 TO THE SHOULDER, FACES FLUSH.",
-        "   MATCH-DRILL/REAM THE SEAM PER MHA-DT-31; DRIVE MHA-DT-VN-59 FLUSH. SLIDE",
-        f"   ONTO MHA-DT-11, SET HUB FRONT FACE FLUSH WITH THE {HUB_FRONT_FACE_DATUM},",
-        "   PUNCH MARKS ALIGNED; ONLY THEN TAPER-REAM 1:48 THROUGH HUB AND",
-        "   SHAFT; LIGHT-DRIVE MHA-DT-09, REMOVABLE BY TAP ON SMALL END. HANG",
-        # Codex #1140: the keeper chain's length and topology belong on the
-        # sheet; the bead count is the spec's solve, never a typed number.
-        # Pipeline review of 49287772c: the ream's acceptance (the ring clear
-        # of the hub) is an assembly setting, stated here, not on MHA-DT-31.
-        "   MHA-DT-27 FROM THE PIN HEAD, CLEAR OF THE HUB; CLAMP MHA-DT-28 UNDER MHA-SH-VN-51. CUT MHA-DT-VN-65",
-        f"   TO {KEEPER_CHAIN_BEADS} BEADS; THREAD IT THROUGH THE MHA-DT-28 LOOP AND MHA-DT-27; SNAP",
-        "   ONE END BEAD INTO EACH DOME OF MHA-DT-VN-66.",
-        # Local review of 747487c71: the cup cures centred on the screw, or
-        # its offset can bind the head and shoulder.  Owner ruling 2026-10-24
-        # (#1900): the ferrule cures centred on the pivot bore, the offset
-        # its skimmed wall is budgeted on.  Rule 23: the handle spins on the
-        # MHA-DT-32 shoulder, so the screw is staked in the arm's through tap
-        # (the MHA-PD-VN-57 pivot's staked-mouth lock, user ruling
-        # 2026-10-15); no threadlocker.
+        "6A. MATCH-DRILL AND REAM THE SEAM PER MHA-DT-31; DRIVE MHA-DT-VN-59 FLUSH.",
+        "6B. SLIDE THE ARM ONTO MHA-DT-11: HUB FRONT FACE FLUSH WITH THE",
+        f"   {HUB_FRONT_FACE_DATUM}, PUNCH MARKS ALIGNED.",
+        "6C. ONLY THEN TAPER-REAM 1:48 THROUGH THE HUB AND SHAFT. LIGHT-DRIVE",
+        "   MHA-DT-09, REMOVABLE BY A TAP ON ITS SMALL END.",
+        "6D. HANG MHA-DT-27 FROM THE MHA-DT-09 HEAD, CLEAR OF THE HUB. CLAMP",
+        "   MHA-DT-28 UNDER MHA-SH-VN-51.",
+        f"6E. CUT MHA-DT-VN-65 TO {KEEPER_CHAIN_BEADS} BEADS. THREAD IT THROUGH THE MHA-DT-28 LOOP AND",
+        "   MHA-DT-27; SNAP ONE END BEAD INTO EACH DOME OF MHA-DT-VN-66.",
+        # Local review of 747487c71 and owner ruling 2026-10-24 (#1900): the
+        # ferrule cures centred on the pivot bore.  Rule 23: the handle spins
+        # on the MHA-DT-32 shoulder, so the screw is staked in the arm's
+        # through tap (user ruling 2026-10-15); no threadlocker.
         "7. EPOXY MHA-DT-34 ON THE MHA-DT-08 TENON AND MHA-DT-35 IN ITS BUTT",
-        f"   WITH {HANDLE_EPOXY}; CURE THEM ON MHA-DT-32, WAXED WITH {HANDLE_RELEASE},",
-        f"   THROUGH BOTH; HOLD {HANDLE_FERRULE_CURE} UNTIL CURED.",
-        "   WIPE THE WAX OFF MHA-DT-32; SLIDE MHA-DT-08 ON",
-        "   MHA-DT-32 AND THREAD MHA-DT-32 INTO MHA-DT-06, NO THREADLOCKER,",
-        "   SHOULDER TIGHT; END PLAY",
-        f"   {inch_window(handle_screw.END_PLAY_RANGE, 3)}. FILE THE TIP FLUSH TO THE ARM INBOARD FACE, THEN STAKE THE",
-        f"   TAP MOUTH ONTO IT AT {HANDLE_STAKE_POINTS} (SHEET {FULL_DETAIL_SHEET}).",
-        # NBSP keeps the continuation pointer on one printed line.
-        f"   CYLINDER\u00a0BANK:\u00a0SHEET {BANK_SHEET}.",
+        f"   WITH {HANDLE_EPOXY}.",
+        f"7A. CURE THEM ON MHA-DT-32, WAXED WITH {HANDLE_RELEASE}, THROUGH BOTH;",
+        f"   HOLD {HANDLE_FERRULE_CURE} UNTIL CURED.",
+        "7B. WIPE THE WAX OFF MHA-DT-32. SLIDE MHA-DT-08 ON MHA-DT-32 AND THREAD",
+        "   MHA-DT-32 INTO MHA-DT-06, NO THREADLOCKER, SHOULDER TIGHT.",
+        "7C. CHECK THE MHA-DT-08 END PLAY ON MHA-DT-32 WITH FEELERS: "
+        f"{inch_window(handle_screw.END_PLAY_RANGE, 3)}.",
+        "7D. FILE THE MHA-DT-32 TIP FLUSH TO THE ARM INBOARD FACE. STAKE THE TAP",
+        f"   MOUTH ONTO IT AT {HANDLE_STAKE_POINTS} (SHEET {FULL_DETAIL_SHEET}).",
     )
 )
 
+# U34c (user/Main 2026-09-23): pedestals inboard, arbor cut to the measured
+# strap span, base holes transferred at assembly; x is set on the mill DRO
+# against the hole-table datum, since a square cannot resolve the band.  The
+# band protects channel accuracy (error_budget axis_dx), not the cone mesh.
+# User ruling 2026-10-20: one reduced-OD brass disc on the FRONT strap; back
+# spring directly on gear 19.  A thick front disc moves its strap to the
+# front, hence W in the front strap's Y; the back pedestal is then set from
+# the actual accepted stack on the spring-gap feeler.  The front pedestal's
+# location and seat run as 8F-8L, so step 9C stays the spring-gap set that
+# MHA-DT-VN-68's print cites ("SHEET 13, DETAIL A (9C)").  Every DRO target is
+# a SETTING_TABLE row on sheet 14.
 BANK_STEPS = _note_text(
     (
         "ASSEMBLY SEQUENCE - CYLINDER BANK",
-        # U34c (user/Main 2026-09-23, rev 3 H1, foot 28): pedestals inboard,
-        # arbor cut to the measured strap span, base holes transferred at
-        # assembly. 168.2 is the arbor-axis x from the base hole-table datum
-        # (plinth east face, x = -228.6), not the 161.9 REF arbor length.
-        # Wording from dtscout (dt-bank-pedestal-layout-20260923.md sections 3
-        # and 11): x is set on the mill DRO against the plinth east face, since
-        # a square cannot resolve the band and a caliper cannot reach 168.21.
-        # dtscout's 168.21 +/-0.10 prints as the limits 168.11-168.31: the
-        # drawing-spec purity gate keeps bilateral bands in model/spec.
-        # The band protects channel accuracy (error_budget axis_dx: drum axis
-        # x against the rocker pivot tilts all 20 rods), not the cone mesh
-        # (depthed at assembly) or the pinion rig (feeler-set).
-        # The MHA-DT-13 print owns the stock (3/8 1018 CF X 190, long enough for
-        # the edge finder) and its cut-to-fit rule (Main, r9).
-        # User ruling 2026-10-20: one reduced-OD brass disc on the SOUTH strap;
-        # north spring directly on gear 19. Preserve the nominal gear grid.
-        # A thick south disc moves its strap south, hence PLUS its measured
-        # excess in the base's rear-face Y coordinate. The north pedestal is
-        # then set from the actual accepted stack, not a frozen nominal end.
-        "8. MIC EACH OF {cylinder_gears}X MHA-DT-12, CAM FACE TO BACK FACE;",
-        "   RECORD. SLIDE THEM ONTO A 3/8 GROUND SETTING",
+        "8. MIC EACH MHA-DT-12, CAM FACE TO BACK FACE, AND RECORD IT.",
         # Each connecting rod comes pinned to its rocker arm (MHA-CH-00's
         # bench pinning step, cited by key): its ring is captured in the closed
         # cam slot as the next gear goes on, so the pair travels with its gear.
-        "   MANDREL ~7.5 LONG, ALL ALIKE, CAM SIDE FRONT; SET EACH CONNECTING",
-        f"   ROD + ARM PAIR ({RODS_PINNED_REF}) ON ITS CAM AS ITS GEAR GOES ON.",
-        "   CLAMP LIGHTLY END TO END: ACCEPT THE GEAR 0 CAM FACE TO GEAR 19",
-        f"   NORTH FACE LENGTH SHOWN ON SHEET {BANK_SETTINGS_SHEET}. LONG: SLIDE THE GEARS",
-        "   OFF IN ORDER WITH THEIR PAIRS TO THE THICKEST CAM; RE-FACE ITS",
-        "   CAM FACE, RESTACK, REMEASURE. SHORT: REMAKE THE THINNEST GEAR, REMEASURE.",
-        "   SLIDE THE STACK OFF, GEAR 0 FIRST, EACH GEAR WITH ITS PAIR.",
-        "9. BASE MHA-FR-01 OUT OF THE FRAME, ON THE MILL TABLE, PAD TRAMMED,",
+        "8A. SLIDE THEM ONTO A 3/8 GROUND SETTING MANDREL ~7.5 LONG, ALL ALIKE, CAM",
+        f"   SIDE FRONT. AS EACH GEAR GOES ON, SET ITS {CONNECTING_ROD} CONNECTING ROD",
+        f"   AND {ROCKER_ARM} ROCKER ARM PAIR ({RODS_PINNED_REF}) ON ITS CAM.",
+        "8B. CLAMP THE STACK LIGHTLY END TO END. MEASURE GEAR 0 CAM FACE TO GEAR 19",
+        f"   BACK FACE WITH A 5-6 IN MICROMETER: ACCEPT {STACK_WINDOW}.",
+        "8C. IF LONG, SLIDE THE GEARS OFF IN ORDER, WITH THEIR PAIRS, TO THE",
+        "   THICKEST CAM; RE-FACE ITS CAM FACE; RESTACK AND REPEAT 8B.",
+        "8D. IF SHORT, REMAKE THE THINNEST GEAR AND REPEAT 8B.",
+        "8E. SLIDE THE STACK OFF, GEAR 0 FIRST, EACH GEAR WITH ITS PAIR.",
+        "8F. PUT BASE MHA-FR-01, OUT OF THE FRAME, ON THE MILL TABLE, PAD TRAMMED,",
         "   OVERHANG SUPPORTED; CONE SET (MHA-DT-20) NOT FITTED.",
-        "9A. FRONT MHA-DT-02 ALONE ON THE MANDREL, ON THE BASE. EDGE-FIND BOTH",
-        "   MHA-FR-01 HOLE-TABLE DATUM FACES (SEE ITS PRINT); ZERO DRO X AND Y.",
-        "   MIC THE MHA-DT-26, W. SET THE FRONT MHA-DT-02 INNER FACE",
-        # NBSP keeps each (W - nominal) term on one printed line.
-        f"   TO Y {FRONT_STRAP_Y_LIMITS} PLUS (W\u00a0-\u00a0{inch_text(BANK_WASHER_THICK, 3)}) AND THE MANDREL",
-        f"   CENTRE (EDGE-FIND BOTH SIDES, HALVE) TO X {BANK_X_LIMITS}.",
-        "   SPOT MHA-FR-01 THROUGH THE FOOT HOLE (11/64 TRANSFER PUNCH);",
+        "8G. STAND THE FRONT MHA-DT-02 ALONE ON THE MANDREL, ON THE BASE.",
+        "   EDGE-FIND BOTH MHA-FR-01 HOLE-TABLE DATUM FACES (SEE ITS PRINT);",
+        "   ZERO DRO X AND Y.",
+        "8H. MIC MHA-DT-26 AND RECORD ITS THICKNESS AS W (SETTING TABLE ROW 2,",
+        f"   SHEET {SETTING_SHEET}).",
+        "8J. SET THE FRONT MHA-DT-02 INNER FACE TO ITS Y AND THE MANDREL CENTRE",
+        "   (EDGE-FIND BOTH SIDES, HALVE) TO ITS X: SETTING TABLE ROWS 2 AND 3.",
         # The seat's drill, tap and depth are the MHA-FR-01 transfer callout's,
         # so the step names the print, never a copy (as the rig's seats do).
-        "   LIFT OFF. DRILL AND TAP PER MHA-FR-01 (PLUG, THEN",
-        "   BOTTOMING); CLEAR CHIPS. REFIT AT X AND Y; TIGHTEN",
-        # Check 4 re-reads both coordinates against the step 9 setting bands
-        # after the cone swing's radial shims move the pedestals.
-        "   MHA-DT-VN-62, RECHECK AND RECORD X AND Y.",
+        "8K. SPOT MHA-FR-01 THROUGH THE FOOT HOLE (11/64 TRANSFER PUNCH); LIFT",
+        "   OFF. DRILL AND TAP PER MHA-FR-01 (PLUG, THEN BOTTOMING); CLEAR CHIPS.",
+        # Check 4 re-reads both coordinates after the cone swing's radial
+        # shims move the pedestals.
+        "8L. REFIT AT X AND Y; TIGHTEN MHA-DT-VN-62. RECHECK X AND Y AND RECORD",
+        f"   THEM IN THE PEDESTAL RECHECK TABLE (SHEET {SETTING_SHEET}).",
+        "9. FROM THE BACK, LOAD THE MICED MHA-DT-26, THEN GEARS 0 TO 19, CAM SIDE",
+        "   FRONT, THEIR PAIRS HANGING FREE, THEN MHA-DT-VN-68.",
+        "9A. CHECK THAT EACH PART SLIDES FREE ON THE MANDREL; IF ONE DRAGS, STONE",
+        "   ITS BORE BURR.",
         # Support the loaded mandrel until the second pedestal is fitted.
+        "9B. SEAT MHA-DT-26 DIRECTLY ON THE FRONT MHA-DT-02 AND CLOSE THE BANK TO",
+        "   THE FRONT ON THE DISC. PROP THE MANDREL BACK END AT BORE HEIGHT",
+        "   (V-BLOCK ON PARALLELS); REMOVE THE PROP ONLY TO SLIDE THE BACK",
+        "   MHA-DT-02 ON.",
+        f"9C. SLIDE THE BACK MHA-DT-02 ON UNTIL A {BANK_SPRING_FEELER} FEELER BESIDE MHA-DT-VN-68,",
+        f"   BETWEEN ITS INNER FACE AND GEAR 19'S BACK FACE (SHEET {BANK_SETTINGS_SHEET},",
+        "   DETAIL A), IS LIGHTLY PINCHED. SET ITS X (SETTING TABLE ROW 3) AND",
+        "   SPOT ITS FOOT HOLE AS 8K.",
         # Lift it off before drilling: the mandrel covers that foot's hole.
-        "9B. FROM THE BACK, LOAD THE MICED MHA-DT-26, THEN GEARS 0 TO 19,",
-        "   CAM SIDE FRONT, THEIR PAIRS HANGING FREE, THEN MHA-DT-VN-68;",
-        "   IT SLIDES FREE ON THE MANDREL (ELSE STONE ITS BORE BURR).",
-        "   SEAT MHA-DT-26 DIRECTLY ON THE FRONT MHA-DT-02 AND CLOSE THE",
-        "   BANK SOUTH ON THE DISC. PROP THE MANDREL BACK END AT BORE HEIGHT",
-        "   (V-BLOCK ON PARALLELS); REMOVE THE PROP ONLY TO SLIDE THE BACK MHA-DT-02 ON.",
-        f"9C. SLIDE THE BACK MHA-DT-02 ON UNTIL THE {BANK_SPRING_LEAF}",
-        f"   (SHEET {BANK_SETTINGS_SHEET}, DETAIL A), BESIDE MHA-DT-VN-68 BETWEEN THE",
-        "   BACK MHA-DT-02 INNER FACE AND GEAR 19'S NORTH FACE, IS LIGHTLY PINCHED.",
-        f"   SET X {BANK_X_LIMITS} AND SPOT AS 9A. SLIDE THE BACK MHA-DT-02 OFF;",
-        "   DRAW THE LOADED MANDREL OUT OF THE FRONT MHA-DT-02, HOLDING",
-        "   MHA-DT-26 AND MHA-DT-VN-68; LAY IT IN V-BLOCKS ON PARALLELS OFF",
-        "   THE BASE, PAIRS HANGING FREE. DRILL AND TAP AS 9A. PASS THE MANDREL",
-        "   BACK THROUGH THE FRONT MHA-DT-02; SEAT THE DISC AND BANK SOUTH,",
-        "   PROP AS 9B. REFIT THE BACK MHA-DT-02; RE-SET THE LEAF AND X, TIGHTEN",
-        "   MHA-DT-VN-62, REMOVE THE LEAF, RECHECK AND RECORD X. DRO STILL ZEROED,",
-        "   DRILL AND TAP THE MHA-FR-01 PIVOT SEAT PER ITS PRINT NOTE.",
-        "9D. MEASURE MHA-DT-02 OUTER FACE TO OUTER FACE. TURN MHA-DT-13: ITS",
+        "9D. SLIDE THE BACK MHA-DT-02 OFF. DRAW THE LOADED MANDREL OUT OF THE",
+        "   FRONT MHA-DT-02, HOLDING MHA-DT-26 AND MHA-DT-VN-68; LAY IT IN",
+        "   V-BLOCKS ON PARALLELS OFF THE BASE, PAIRS HANGING FREE.",
+        "9E. DRILL AND TAP THE BACK SEAT AS 8K.",
+        "9F. PASS THE MANDREL BACK THROUGH THE FRONT MHA-DT-02; SEAT THE DISC AND",
+        "   BANK TO THE FRONT; PROP AS 9B. REFIT THE BACK MHA-DT-02; RE-SET THE",
+        "   FEELER AND X; TIGHTEN MHA-DT-VN-62; REMOVE THE FEELER. RECHECK X AND",
+        "   RECORD IT IN THE PEDESTAL RECHECK TABLE.",
+        "9G. DRO STILL ZEROED, DRILL AND TAP THE MHA-FR-01 PIVOT SEAT PER ITS",
+        "   PRINT NOTE.",
+        "9H. MEASURE MHA-DT-02 OUTER FACE TO OUTER FACE. TURN MHA-DT-13: ITS",
         f"   CYLINDER IS THAT SPAN, PLUS A {inch_text(bank.ARBOR_DOME_HEIGHT, 2)} DOME EACH END (SEE ITS PRINT).",
-        "9E. PUSH MHA-DT-13 IN FROM THE BACK, END TO END WITH THE MANDREL, UNTIL",
+        "9J. PUSH MHA-DT-13 IN FROM THE BACK, END TO END WITH THE MANDREL, UNTIL",
         f"   THE MANDREL IS OUT AND EACH DOME STANDS {inch_text(bank.ARBOR_DOME_HEIGHT, 2)} PROUD (DEPTH GAUGE).",
-        "   SPOT MHA-DT-13 THROUGH EACH CROWN TAP WITH A #43 DRILL, .02 DEEP;",
+        "9K. SPOT MHA-DT-13 THROUGH EACH CROWN TAP WITH A #43 DRILL, .02 DEEP;",
         "   BLOW OUT CHIPS. RUN THE FRONT MHA-SH-VN-54 IN TIGHT, THEN THE BACK ONE.",
-        "9F. EACH GEAR TURNS FREE BY HAND, THE BANK HELD SOUTH BY MHA-DT-VN-68.",
-        # #936 P1 b, option A (user ruling 2026-09-26): the north MHA-CH-08 ear
-        # is the rocker bank's axial datum (rocker_bank_layout), set here on
-        # the 9A DRO zero so the cams and the rocker stations share one datum.
-        # Y is the hole-table rear-face distance of the ear inner face,
-        # BOTTOM_REAR_Z - NORTH_EAR_INNER_Z, held to the
-        # NORTH_EAR_LOCATE_BAND edge-find. Hub 19 bears on the north MHA-CH-VN-56
-        # washer against that face (user, 2026-10-10), so the target moves
-        # north (LESS Y) by the miced washer's excess, W - 0.787, and hub 19
-        # stays at nominal. The plain shaft threads through the set ear, so
-        # the bracket stays screwed down. Channel assembly MHA-CH-00 cites
-        # this step by key (channel_steps.NORTH_BRACKET_SET_REF).
-        # The bracket, washer and screw are MHA-CH-00 BOM items set here on
-        # the 9A DRO zero (INTERFACE_NOTES lists them); the screw is the one
-        # the channel's south bracket uses.
+        "9L. CHECK THAT EACH GEAR TURNS FREE BY HAND, THE BANK HELD ON MHA-DT-26",
+        "   BY MHA-DT-VN-68.",
+        # #936 P1 b, option A (user ruling 2026-09-26): the back MHA-CH-08 ear
+        # is the rocker bank's axial datum (rocker_bank_layout), set on the 8G
+        # DRO zero so the cams and the rocker stations share one datum.  Hub
+        # 19 bears on the back MHA-CH-VN-56 washer against that face (user,
+        # 2026-10-10), so the target moves back (LESS Y) by the miced washer's
+        # excess.  Channel assembly MHA-CH-00 cites this step by key
+        # (channel_steps.NORTH_BRACKET_SET_REF).
         f"{steps.step_number(NORTH_BRACKET_SET_KEY)}. MHA-FR-05 SCREWED DOWN ON THE BASE"
         " (FRAME ASSEMBLY MHA-FR-00 STEP 8),",
-        "   DRO STILL ZEROED AS 9A. FROM MHA-CH-00 TAKE THE NORTH MHA-CH-08, ONE",
-        f"   {NORTH_BRACKET_SCREW} AND ONE MHA-CH-VN-56. STAND THE MHA-CH-08 ON THE MHA-FR-05",
-        "   RAIL, FOOT TO THE BACK. MIC THE MHA-CH-VN-56, W. SET THE EAR",
-        f"   INNER FACE TO Y {NORTH_EAR_Y_LIMITS} LESS "
-        f"(W\u00a0-\u00a0{inch_text(rocker_washer.THICKNESS, 3)});",
-        "   CLAMP. DRILL AND TAP THE RAIL THROUGH ITS FOOT PER THE MHA-FR-05 SEAT",
-        f"   CALLOUT (VIEW B); SCREW IT DOWN WITH THE {NORTH_BRACKET_SCREW} AND RECHECK Y.",
-        "   KEEP THAT MHA-CH-VN-56 FOR THE NORTH END OF "
+        "   DRO STILL ZEROED AS 8G: FROM MHA-CH-00 TAKE THE BACK MHA-CH-08, ONE",
+        f"   {NORTH_BRACKET_SCREW} AND ONE MHA-CH-VN-56.",
+        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}A. STAND THE MHA-CH-08 ON THE MHA-FR-05 RAIL, FOOT TO THE BACK.",
+        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}B. MIC THE MHA-CH-VN-56 AND RECORD ITS THICKNESS AS W (SETTING TABLE",
+        "   ROW 5).",
+        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}C. SET THE EAR INNER FACE TO ITS Y (SETTING TABLE ROW 5); CLAMP.",
+        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}D. DRILL AND TAP THE RAIL THROUGH THE MHA-CH-08 FOOT PER THE MHA-FR-05",
+        f"   SEAT CALLOUT (VIEW B). SCREW IT DOWN WITH THE {NORTH_BRACKET_SCREW}; RECHECK Y.",
+        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}E. KEEP THAT MHA-CH-VN-56 FOR THE BACK END OF "
         f"{channel_step_ref('north-ear-datum')}.",
-        # NBSP keeps the continuation pointer on one printed line.
-        f"   PINION\u00a0RIG:\u00a0CONT.\u00a0ON\u00a0SHEET {FIT_SHEET}.",
     )
 )
 
@@ -1131,49 +1308,66 @@ RIG_SEQUENCE_HEADING = "ASSEMBLY SEQUENCE CONT. - PINION RIG"
     _LEVER_PIN_STEP,
 ) = FITUP.ASSEMBLY_SEQUENCE
 
-# MHA-DT-24's east-west station, in the strap's swing plane (Main's TbPB
+# MHA-DT-24's left-right station, in the strap's swing plane (Main's TbPB
 # ruling Q2(2) A): the foot hole where the preload gates put it
-# (pinion_spring_section), the crest then bearing on the parked flank.  RIG
-# SET's pad leaf sets the other axis, along the bank.  The window a fitter
-# must hold it in is known issue #1037, which ships this as the interim.
+# (pinion_spring_section; model -X, the sheet 1 FRONT view's RIGHT), the crest
+# then bearing on the parked flank.  RIG SET's pad leaf sets the other axis,
+# along the bank.  The window a fitter must hold it in is known issue #1037,
+# which ships this as the interim.
 SPRING_EAST_WEST = (
-    f"MHA-DT-24 FOOT HOLE CENTRE {inch_text(SPRING_SCREW_EAST_OF_PIVOT, 2)} EAST OF THE "
+    f"MHA-DT-24 FOOT HOLE CENTRE {inch_text(SPRING_SCREW_EAST_OF_PIVOT, 2)} RIGHT OF THE "
     "MHA-DT-19 AXIS, CREST BEARING ON THE PARKED BACK MHA-DT-14 FLANK"
 )
 
+# Sub-step letters: I and O are skipped, as on drawing zones.
+_SUB_STEP_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"
+
+
+def _flat(text: str) -> str:
+    """One paragraph of a part spec's soft-wrapped step text."""
+    return " ".join(text.split())
+
 
 def _numbered_step(key: str, text: str) -> str:
-    """Print a complete step with its registry head and retained sublist depth."""
-    head = f"{steps.step_number(key)}. "
-    hang = " " * len(head)
+    """Print a step with its registry head: each further line of ``text`` is
+    one sub-step, lettered 1A, 1B... (drawing-guidelines rule 22)."""
+    number = steps.step_number(key)
     first, *rest = text.splitlines()
-    return _note_text((head + first, *(hang + source for source in rest)), heading=False)
+    return _note_text(
+        (
+            f"{number}. {first}",
+            *(f"{number}{_SUB_STEP_LETTERS[index]}. {line}" for index, line in enumerate(rest)),
+        ),
+        heading=False,
+    )
 
 
 def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
     """The pinion rig's steps, counted from the built assembly."""
     numbered = (
         # MHA-DT-33 and the front strap go on first: neither passes the Ø15
-        # head or a bonded drum (Codex #860, PRRT_kwDOPHDy386mTbe7).
-        ("arbor-collar-pinned", _ARBOR_COLLAR_STEP),
+        # head or a bonded drum (Codex #860, PRRT_kwDOPHDy386mTbe7).  The part
+        # specs' steps are soft-wrapped paragraphs, printed as one step each.
+        ("arbor-collar-pinned", _flat(_ARBOR_COLLAR_STEP)),
         # The drum is bonded to the setting MHA-DT-22 prints only as a REF.
         (
             "drum-bonded",
-            f"{_DRUM_BOND_STEP}\nDRUM STATION SETTING: SHEET {BANK_SETTINGS_SHEET}.",
+            f"{_flat(_DRUM_BOND_STEP)} DRUM STATION SETTING: SHEET {BANK_SETTINGS_SHEET}.",
         ),
-        ("handle-bonded", _HANDLE_BOND_STEP),
-        ("cam-pins-bonded", _CAM_PIN_BOND_STEP),
+        ("handle-bonded", _flat(_HANDLE_BOND_STEP)),
+        ("cam-pins-bonded", _flat(_CAM_PIN_BOND_STEP)),
         (
             "cluster-hung",
-            "JOURNAL THE MHA-DT-22 BACK END IN THE BACK MHA-DT-14 TOP BORE; HANG "
-            f"BOTH MHA-DT-14 ON MHA-DT-19 THROUGH {pivot_blocks}X MHA-DT-18.",
+            "JOURNAL THE MHA-DT-22 BACK END IN THE BACK MHA-DT-14 TOP BORE.\n"
+            f"HANG BOTH MHA-DT-14 ON MHA-DT-19 THROUGH {pivot_blocks}X MHA-DT-18.",
         ),
         # E-a (user): the straps are pinned to the torque shaft before the
-        # cams go on, which leave the pin's west edge 0.38 of air.
+        # cams go on, which leave the pin's left edge 0.38 of air.
         (
             "straps-pinned-to-torque-shaft",
             f"{_SHAFT_DRILL_STEP}\n"
-            "THE CLUSTER SWINGS FREELY; MHA-DT-19 TURNS WITH IT IN BOTH MHA-DT-18.",
+            "CHECK THAT THE CLUSTER SWINGS FREELY AND MHA-DT-19 TURNS WITH IT IN BOTH "
+            "MHA-DT-18.",
         ),
         # Main's TbPB ruling (1), 2026-09-27: the set screws stay loose here;
         # the cam set tightens and stakes them once the cams are set (#1176).
@@ -1181,9 +1375,10 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             "cams-and-lever-fitted",
             f"FIT {cams}X MHA-DT-23 AND MHA-DT-16 ON MHA-DT-17 IN THE MHA-DT-18 LIFT "
             "BORES, EACH CAM ECCENTRIC DOWN, ITS #2-56 SET SCREW (SUPPLIED WITH "
-            "MHA-DT-23) LOOSE. SEAT MHA-DT-16 ON MHA-DT-17 TO THE BORE FLOOR.",
+            "MHA-DT-23) LOOSE.\n"
+            "SEAT MHA-DT-16 ON MHA-DT-17 TO THE BORE FLOOR.",
         ),
-        # U28 corollary (Main 2026-09-23): the rig's east-west locate is its
+        # U28 corollary (Main 2026-09-23): the rig's left-right locate is its
         # parked tip gap, on the level line of centres, where block travel
         # equals gap change; the feeler is the bench rest gap, the pins on
         # the cams (pinion_rig_tip_gap).  RIG SET, next, sets it along the
@@ -1191,13 +1386,14 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         (
             "rig-located",
             "LOCATE THE RIG ON BASE MHA-FR-01 (FRAME ASSEMBLY MHA-FR-00); ITS SEATS "
-            "ARE TRANSFERRED, NOT PRE-DRILLED. SET BOTH MHA-DT-18 LOOSE ON THE "
-            f"BASE WITH MHA-DT-24 FITTED: {SPRING_EAST_WEST}. PARK MHA-DT-16: THE "
-            "MHA-DT-25 PINS REST ON THE CAMS UNDER THE SPRING. FACE A MHA-DT-01 "
-            "TOOTH TIP TO A MHA-DT-12 TOOTH TIP ON THE LEVEL LINE OF CENTRES. "
-            f"SLIDE THE RIG IN UNTIL A {TIP_GAP.TIP_GAP_FEELER_TEXT} IS SNUG; "
-            f"{TIP_GAP.TIP_GAP_ACCEPT_TEXT}. SET IT AT THE FRONT AND BACK "
-            "STATIONS TO SQUARE BOTH MHA-DT-18 TO THE DRUM.",
+            "ARE TRANSFERRED, NOT PRE-DRILLED. SET BOTH MHA-DT-18 LOOSE ON THE BASE.\n"
+            f"FIT MHA-DT-24: {SPRING_EAST_WEST}.\n"
+            "PARK MHA-DT-16: THE MHA-DT-25 PINS REST ON THE CAMS UNDER THE SPRING.\n"
+            "FACE A MHA-DT-01 TOOTH TIP TO A MHA-DT-12 TOOTH TIP ON THE LEVEL LINE OF "
+            f"CENTRES. SLIDE THE RIG IN UNTIL A {TIP_GAP.TIP_GAP_FEELER_TEXT} IS SNUG "
+            f"BETWEEN THE TIPS: {TIP_GAP.TIP_GAP_ACCEPT_TEXT}.\n"
+            f"SET THE TIP GAP AS {steps.step_number('rig-located')}C AT THE FRONT AND "
+            "BACK STATIONS, SQUARING BOTH MHA-DT-18 TO THE DRUM.",
         ),
         ("rig-set", f"{_RIG_SET_STEP}\nCLAMP BOTH MHA-DT-18."),
         # The seats' drill, tap and depth are the MHA-FR-01 transfer callouts'
@@ -1205,27 +1401,30 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         (
             "rig-seats-transferred",
             f"SPOT MHA-FR-01 THROUGH THE {slotted} MHA-DT-18 HOLES AND THE MHA-DT-24 "
-            "FOOT HOLE; DRILL AND TAP EACH PER ITS MHA-FR-01 TRANSFER CALLOUT. "
+            "FOOT HOLE.\n"
+            "DRILL AND TAP EACH PER ITS MHA-FR-01 TRANSFER CALLOUT.\n"
             f"FIT {slotted}X MHA-DT-VN-57 AND 1X MHA-SH-VN-52 AT THE SPRING FOOT.",
         ),
         # The cams' phase is set with the lever parked; the cam set then sets
         # each cam along the rod, tightens its set screw and stakes the tap.
         (
             "cam-collars-set",
-            f"MHA-DT-16 AT PARK, EACH CAM ECCENTRIC DOWN;\n{_COLLAR_SET_STEP}",
+            f"PUT MHA-DT-16 AT PARK, EACH CAM ECCENTRIC DOWN.\n{_COLLAR_SET_STEP}",
         ),
-        ("lever-pin-set", f"{_LEVER_PIN_STEP}\n{LEVER_PIN_HOLE_FIT}"),
-        # The cone set goes on last, into the pivot seat drilled at 9C; the
+        ("lever-pin-set", f"{_flat(_LEVER_PIN_STEP)} {_flat(LEVER_PIN_HOLE_FIT)}"),
+        # The cone set goes on last, into the pivot seat drilled at 9G; the
         # stop and lock seats are MHA-FR-01 print holes.  Check 4 then sets
         # the swing and clamps it with MHA-DT-VN-51.
         (
             "other-base-mounting",
             "CONE SET ON THE BASE: OIL THE MHA-DT-VN-52 SHOULDER. STAND MHA-DT-20 ON "
-            "MHA-FR-01 OVER THE STEP 9C PIVOT SEAT; RUN MHA-DT-VN-52 DOWN THROUGH ITS "
-            "PIVOT BORE, SHOULDER SEATED HARD ON THE BASE; MHA-DT-20 SWINGS FREELY "
-            "UNDER THE HEAD. RUN 1X MHA-SH-VN-52 AS SWING STOP INTO ITS TAPPED MHA-FR-01 SEAT (HOLE TABLE), "
-            "HEAD SEATED. SWING THE CONE SET IN; RUN MHA-DT-VN-51 THROUGH THE MHA-DT-20 "
-            "NOTCH INTO ITS TAPPED MHA-FR-01 SEAT (HOLE TABLE), FINGER-LOOSE. CHECK 4 "
+            "MHA-FR-01 OVER THE STEP 9G PIVOT SEAT.\n"
+            "RUN MHA-DT-VN-52 DOWN THROUGH ITS PIVOT BORE, SHOULDER SEATED HARD ON THE "
+            "BASE; MHA-DT-20 SWINGS FREELY UNDER THE HEAD.\n"
+            "RUN 1X MHA-SH-VN-52, THE SWING STOP, INTO ITS TAPPED MHA-FR-01 SEAT (HOLE "
+            "TABLE), HEAD SEATED.\n"
+            "SWING THE CONE SET IN. RUN MHA-DT-VN-51 THROUGH THE MHA-DT-20 NOTCH INTO "
+            "ITS TAPPED MHA-FR-01 SEAT (HOLE TABLE), FINGER-LOOSE. CHECK 4 "
             f"(SHEET {CHECKS_SHEET}) SETS THE SWING.",
         ),
     )
@@ -1233,10 +1432,24 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
     return "\n".join(
         (
             RIG_SEQUENCE_HEADING,
+            FEELER_TABLE_NOTE,
+            "",
             "\n\n".join(_numbered_step(key, text) for key, text in numbered),
         )
     )
 
+
+# Each feeler the rig steps and checks print is a stack of gage leaves the
+# sheet 14 table lists (rubric sample review of v47: no mm in the steps).
+FEELER_TABLE_NOTE = _note_text(
+    (
+        f"FEELERS: EACH SETTING IS A STACK OF {FITUP.FEELER_GAGE_NAME} LEAVES; THE "
+        f"FEELER STACK TABLE (SHEET {SETTING_SHEET}) LISTS THEM.",
+    ),
+    heading=False,
+)
+
+_T120_SET_FEELER = inch_text(set_stack.feeler_gap_mm(120), FEELER_PLACES)
 
 CHECKS = _note_text(
     (
@@ -1247,11 +1460,11 @@ CHECKS = _note_text(
         # User ruling 2026-09-28: the fixed-centre crank mesh must never bind;
         # no backlash acceptance interval or fit-up target remains.
         "2. MHA-DT-10/MHA-DT-07 TURNS WITHOUT BINDING THROUGH ONE FULL MHA-DT-07",
-        "   TURN, MHA-DT-07 CLEAR OF THE UNRELIEVED MHA-DT-20 TOP THROUGHOUT;",
-        "   EACH CONE GEAR MESHES ITS MHA-DT-12 PER THE MHA-DT-03 PRINT.",
+        "   TURN, MHA-DT-07 CLEAR OF THE UNRELIEVED MHA-DT-20 TOP THROUGHOUT.",
+        "2A. EACH CONE GEAR MESHES ITS MHA-DT-12 PER THE MHA-DT-03 PRINT.",
         "3. EACH MHA-DT-12 TURNS FREELY ON MHA-DT-13 WITHOUT AXIAL BINDING.",
-        # Prove the reversed preload seats on the south disc.
-        "   PUSH GEAR 0 TOWARD THE BACK BY HAND AND RELEASE; THE BANK SPRINGS",
+        # Prove the reversed preload seats on the front disc.
+        "3A. PUSH GEAR 0 TOWARD THE BACK BY HAND AND RELEASE: THE BANK SPRINGS",
         "   BACK ONTO THE FRONT MHA-DT-26.",
         # MHA-SH-VN-52 is the DISENGAGED stop (build_cone_swing_platform
         # swing_hardware_geometry): engaged, the plate edge stands >= 2.0 off
@@ -1259,55 +1472,56 @@ CHECKS = _note_text(
         # cone_set_stack (user ruling 2026-10-10). The shims line MHA-DT-13
         # up with the cone line before the pedestals tighten (Main ruling:
         # pedestal term booked at zero), then T120 is set on its feeler.  The
-        # shims may move each pedestal only inside its step 9 bands, so step
-        # 10 (set from the DRO zero) and the rig (re-proved by check 7) stand
-        # (#1691 review r4).  Stoning is T012's only remedy: backing the swing
-        # off would undo the T120 set (#1691 review r2).
-        "4. CONE SWING SET (P1): LOOSEN MHA-DT-VN-51; SWING THE CONE SET ON MHA-DT-VN-52",
-        "   TO THE MHA-SH-VN-52 STOP, CLEAR OF EVERY MHA-DT-12. ZERO AN INDICATOR ON",
-        "   EACH MHA-DT-02 IN X AND ONE ON THE FRONT MHA-DT-02 IN Y. EASE THE",
-        "   MHA-DT-02 SCREWS (MHA-DT-VN-62) TO SNUG-LOOSE. SWING IN ON RADIAL SHIMS,",
-        f"   TIP TO MHA-DT-12 ROOT: {inch_text(set_stack.feeler_gap_mm(12), FEELER_PLACES)} AT T012, "
-        f"{inch_text(set_stack.feeler_gap_mm(120), FEELER_PLACES)} AT T120; TIGHTEN MHA-DT-VN-62.",
-        "   EACH RECORDED X (9A, 9C) PLUS ITS X READING IS "
-        f"{BANK_X_LIMITS};",
-        "   FRONT INNER-FACE Y RECORDED IN 9A PLUS ITS Y READING IS WITHIN",
-        "   THE 9A Y LIMITS, USING THE SAME W. IF OUT, EASE THAT PEDESTAL,",
-        "   RESET WITHIN THOSE LIMITS ON ITS INDICATORS AND TIGHTEN. STEPS "
-        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}",
-        f"   AND {steps.step_number('rig-located')}-"
-        f"{steps.step_number('rig-seats-transferred')} STAND; CHECK 7 RE-PROVES THE RIG.",
-        "   SWING OUT AND REMOVE THE SHIMS. SWING IN UNTIL A "
-        f"{inch_text(set_stack.feeler_gap_mm(120), FEELER_PLACES)} FEELER IS SNUG T120 TIP TO ROOT; HOLD",
-        "   IT THERE AND TIGHTEN MHA-DT-VN-51. DO NOT LOOSEN MHA-DT-02 AFTER",
-        "   THIS SET; IF YOU DO, REPEAT CHECKS 4, 5, 6 AND 7.",
+        # shims may move each pedestal only inside its setting-table range, so
+        # step 10 (set from the DRO zero) and the rig (re-proved by check 7)
+        # stand (#1691 review r4).  Stoning is T012's only remedy: backing the
+        # swing off would undo the T120 set (#1691 review r2).
+        "4. CONE SWING SET: LOOSEN MHA-DT-VN-51. SWING THE CONE SET ON MHA-DT-VN-52",
+        "   TO THE MHA-SH-VN-52 STOP, CLEAR OF EVERY MHA-DT-12.",
+        "4A. ZERO A DIAL INDICATOR ON EACH MHA-DT-02 IN X AND ONE ON THE FRONT",
+        "   MHA-DT-02 IN Y.",
+        "4B. EASE THE MHA-DT-02 SCREWS (MHA-DT-VN-62) TO SNUG-LOOSE.",
+        "4C. SWING IN ON RADIAL SHIMS, TIP TO MHA-DT-12 ROOT: "
+        f"{inch_text(set_stack.feeler_gap_mm(12), FEELER_PLACES)} AT T012, "
+        f"{_T120_SET_FEELER} AT T120. TIGHTEN MHA-DT-VN-62.",
+        "4D. FILL IN THE PEDESTAL RECHECK TABLE (SHEET "
+        f"{SETTING_SHEET}): EACH RECORDED VALUE PLUS ITS INDICATOR READING MUST BE IN "
+        "ITS ACCEPT RANGE.",
+        "4E. IF A PEDESTAL IS OUT, EASE IT, RESET IT INTO ITS ACCEPT RANGE ON ITS "
+        f"INDICATORS AND TIGHTEN. STEPS {steps.step_number(NORTH_BRACKET_SET_KEY)} AND "
+        f"{steps.step_number('rig-located')}-{steps.step_number('rig-seats-transferred')} "
+        "STAND; CHECK 7 RE-PROVES THE RIG.",
+        "4F. SWING OUT AND REMOVE THE SHIMS. SWING IN UNTIL A "
+        f"{_T120_SET_FEELER} FEELER IS SNUG T120 TIP TO ROOT; HOLD IT THERE AND "
+        "TIGHTEN MHA-DT-VN-51.",
+        "4G. DO NOT LOOSEN MHA-DT-02 AFTER THIS SET; IF YOU DO, REPEAT CHECKS 4, 5,",
+        "   6 AND 7.",
         # User ruling 2026-10-10: T012's arithmetic worst-corner overlap is a
         # REF fit-up note, never a gate (dt_mesh_checks; the RSS corner is gated).
-        "   IF T012 BINDS AFTER THE SET (WORST-CORNER OVERLAP "
-        f"{inch_text(-mesh_checks.cone_check(12).interference_margin_worst_mm, 3)} REF), STONE",
-        "   THE T012 TIP UNTIL IT TURNS FREE; THE T120 SET STANDS.",
-        "   VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT "
+        "4H. IF T012 BINDS AFTER THE SET (WORST-CORNER OVERLAP "
+        f"{inch_text(-mesh_checks.cone_check(12).interference_margin_worst_mm, 3)} REF), STONE "
+        "THE T012 TIP UNTIL IT TURNS FREE; THE T120 SET STANDS.",
+        "4J. VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT "
         f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT}; SHOULDER FULLY SEATED.",
-        "   VERIFY THE MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT "
-        f"{stop_screw.MIN_USEFUL_ENGAGEMENT_TEXT};",
-        "   HEAD FULLY SEATED; MHA-DT-20 REMAINS SEATED THROUGH P1.",
-        "5. ZEROING (P2), CONE SET SWUNG CLEAR: TURN EACH MHA-DT-12 BY HAND",
-        "   UNTIL ITS NOTCH LINES UP. TURN MHA-DT-16 TO ENGAGE MHA-DT-01; TURN",
-        "   MHA-DT-01 BY MHA-DT-15 UNTIL ALL NOTCHES POINT UP (COSINES) OR 90 DEG",
-        "   (SINES), FINISHING IN THE CYLINDERS' RUNNING DIRECTION TO TAKE UP PLAY.",
-        # The saved pose is engaged with MHA-DT-VN-51 tight (SETUP_NOTES): P2
-        # ends by re-setting the swing as check 4 does.
-        "   RETURN MHA-DT-16 TO PARK. SWING THE CONE SET IN UNTIL THE "
-        f"{inch_text(set_stack.feeler_gap_mm(120), FEELER_PLACES)} FEELER",
-        "   IS SNUG T120 TIP TO ROOT AND TIGHTEN MHA-DT-VN-51: THE CHECK 4 SETTING.",
+        "4K. VERIFY THE MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT "
+        f"{stop_screw.MIN_USEFUL_ENGAGEMENT_TEXT}; HEAD FULLY SEATED. MHA-DT-20 STAYS "
+        "SEATED THROUGH CHECK 4.",
+        "5. ZEROING, CONE SET SWUNG CLEAR: TURN EACH MHA-DT-12 BY HAND UNTIL ITS",
+        "   NOTCH LINES UP.",
+        "5A. TURN MHA-DT-16 TO ENGAGE MHA-DT-01. TURN MHA-DT-01 BY MHA-DT-15 UNTIL",
+        "   ALL NOTCHES POINT UP (COSINES) OR AT 90° (SINES), FINISHING IN THE",
+        "   CYLINDERS' RUNNING DIRECTION TO TAKE UP PLAY.",
+        # The saved pose is engaged with MHA-DT-VN-51 tight (SETUP_NOTES):
+        # zeroing ends by re-setting the swing as check 4 does.
+        "5B. RETURN MHA-DT-16 TO PARK. RE-SET THE CONE SET SWING AS 4F.",
         "6. PARKED, MHA-DT-24 HOLDS MHA-DT-01 CLEAR OF EVERY MHA-DT-12.",
         f"7. PARKED, PINS ON THE CAMS: A {TIP_GAP.TIP_GAP_SETTING_TEXT} FEELER IS SNUG TIP TO TIP",
         f"   AT THE FRONT AND BACK STATIONS; {TIP_GAP.TIP_GAP_ACCEPT_TEXT}",
-        f"   (SHEET {FIT_SHEET}, STEP {steps.step_number('rig-located')}). IF A STATION IS OUT,",
-        "   EASE THE MHA-DT-VN-57 SCREWS, RE-SET THE RIG ON THE FEELER AT BOTH STATIONS",
-        f"   AS STEP {steps.step_number('rig-located')}, WITH THE STEP "
-        f"{steps.step_number('rig-set')} LEAVES REFITTED SNUG;",
-        "   TIGHTEN, RECHECK THOSE LEAVES AND REPEAT CHECKS 6 AND 7.",
+        f"   (SHEET {CONTINUATION_SHEET}, STEP {steps.step_number('rig-located')}C).",
+        "7A. IF A STATION IS OUT, EASE THE MHA-DT-VN-57 SCREWS AND RE-SET THE RIG "
+        f"AS STEP {steps.step_number('rig-located')}D, WITH THE STEP "
+        f"{steps.step_number('rig-set')} LEAVES REFITTED SNUG. TIGHTEN, RECHECK "
+        "THOSE LEAVES AND REPEAT CHECKS 6 AND 7.",
     )
 )
 
@@ -1330,11 +1544,11 @@ INTERFACE_NOTES = _note_text(
         "MHA-SH-VN-52 ({stop} SWING STOP + {foot} SPRING FOOT), {slotted}X MHA-DT-VN-57 AND",
         "{hold_down}X MHA-DT-VN-62.",
         f"PAPER DRIVE MHA-PD-00: {CRANK_CHAIN_WHEEL} T12 CHAIN WHEEL ON MHA-DT-11.",
-        "FRAME ASSEMBLY MHA-FR-00: ITS MHA-FR-05 RAIL TAKES THE NORTH MHA-CH-08 "
+        "FRAME ASSEMBLY MHA-FR-00: ITS MHA-FR-05 RAIL TAKES THE BACK MHA-CH-08 "
         f"AT STEP {steps.step_number(NORTH_BRACKET_SET_KEY)}.",
         "CHANNEL ASSEMBLY MHA-CH-00:",
         "   CONNECTING RODS RUN ON THE MHA-DT-12 CAMS.",
-        f"   ITS NORTH MHA-CH-08, ONE MHA-CH-VN-56 AND ONE {NORTH_BRACKET_SCREW} ARE SET "
+        f"   ITS BACK MHA-CH-08, ONE MHA-CH-VN-56 AND ONE {NORTH_BRACKET_SCREW} ARE SET "
         f"AT STEP {steps.step_number(NORTH_BRACKET_SET_KEY)}.",
     )
 )
@@ -1352,34 +1566,20 @@ CONSUMABLES_NOTES = _note_text(
     )
 )
 
-# The steps' compass and FRONT/BACK words, keyed once over step 1 (machinist
-# review of 53a7c4266: EAST in the rig steps could not be worked out). Model
-# -Z is south, the machine front; -X is east (the builder's block screws, "east
-# screw first (-x)"). Sheet 1's general notes field has no line to spare.
-# One reflowed paragraph (heading=False): as a heading, the 72-character first
-# line wrapped "TIP" onto its own line (machinist review of 82158b1bb).
+# The steps' FRONT/BACK/LEFT/RIGHT words, keyed once to the sheet 1 FRONT view
+# (rubric sample review of v47: compass words needed a private key).  The
+# FRONT view is the model's *Back view, looking from the crank end (model -Z)
+# toward the cone tip, so its RIGHT is model -X.  Sheet 1's general notes
+# field has no line to spare.
 DIRECTION_NOTES = _note_text(
     (
-        "DIRECTIONS: FRONT IS SOUTH, THE CRANK END; BACK IS NORTH, THE CONE",
-        "TIP END. SHEET 1: THE TOP VIEW HAS SOUTH UP AND EAST LEFT; THE",
-        "FRONT VIEW LOOKS SOUTH, EAST AT ITS LEFT; THE RIGHT VIEW LOOKS",
-        "EAST, SOUTH AT ITS RIGHT.",
+        "DIRECTIONS: FRONT, BACK, LEFT AND RIGHT ARE AS SEEN IN THE SHEET 1",
+        "FRONT VIEW, WHICH LOOKS AT THE CRANK END (FRONT) TOWARD THE CONE TIP",
+        "(BACK).",
     ),
     heading=False,
 )
 
-FIT_PLACEHOLDER = _note_text(
-    (
-        # U31 (pivot): the bored spacing fixes the mesh; check 2 proves it.
-        # The rest of the old placeholder is owned elsewhere now: each cone
-        # gear's mesh by the MHA-DT-03 print (check 2), the pinion engagement
-        # by the rig-located step and check 7, the taper pin by step 6.
-        f"{pinion.TEETH}T:{gear64.TEETH}T CENTRE DISTANCE FIXED BY MHA-DT-05 "
-        "BORE SPACING; VERIFY NO",
-        "BINDING THROUGH ONE FULL MHA-DT-07 TURN (CHECK 2).",
-    ),
-    heading=False,
-)
 
 def inch_envelope(limits_mm: tuple[float, float], places: int) -> str:
     """A predicted (min, max) stack result the fitter cannot adjust, rounded
@@ -1397,32 +1597,50 @@ def inch_envelope(limits_mm: tuple[float, float], places: int) -> str:
 CRANK_END_FIT_NOTES = _note_text(
     (
         f"MHA-DT-11 CRANK END FIT (STEP {steps.step_number('crank-mesh-checked')})",
-        "A. MHA-DT-11 COLLAR REAR FACE HARD ON THE MHA-DT-05 BOSS SOUTH FACE;",
+        "A. MHA-DT-11 COLLAR REAR FACE HARD ON THE MHA-DT-05 BOSS FRONT FACE;",
         "   NO WASHER.",
-        f"B. MHA-DT-10 ON THE {inch_text(PINION_SEAT_FEELER, FEELER_PLACES)} FEELER OFF THE BOSS NORTH FACE, "
+        f"B. MHA-DT-10 ON THE {inch_text(PINION_SEAT_FEELER, FEELER_PLACES)} FEELER OFF THE BOSS BACK FACE, "
         "THEN",
         "   MATCH-DRILL AND REAM FOR MHA-DT-29 AS STEP "
-        f"{steps.step_number('crank-mesh-checked')}. END PLAY = THE FEELER.",
+        f"{steps.step_number('crank-mesh-checked')}G. END PLAY = THE FEELER.",
         "C. MHA-DT-11 END STANDS "
         # A stack result, not a set window: rounded outward (Codjiflo, #2194).
         f"{inch_envelope((max(CRANK_END_PROUD_RANGE[0], 0.0), CRANK_END_PROUD_RANGE[1]), 3)}"
-        " PROUD OF MHA-DT-10 NORTH FACE;",
+        " PROUD OF MHA-DT-10 BACK FACE;",
         "   LEAVE IT PROUD, DO NOT FACE.",
     )
 )
 
-# The blank lines between steps leave sheet 7's left field room for steps 1-3
-# only: steps 4-7 run down its full-height right field.  Steps 4 and 5 stay
-# on SEQUENCE_SHEET, where MHA-PD-00 cites them.
-CONE_CRANK_PRIMARY, CONE_CRANK_CONTINUED = _split_sequence_notes(
+def _split_sequence_chain(
+    text: str, *splits: tuple[int | str, str]
+) -> tuple[str, ...]:
+    """Cut a note block at each (head, continuation heading) in order."""
+    pieces = []
+    for head, heading in splits:
+        piece, text = _split_sequence_notes(text, head, heading)
+        pieces.append(piece)
+    return (*pieces, text)
+
+
+# The fields, in reading order (package_note_fields): sheet 7's left field
+# carries the direction key and steps 1-2, its full-height right field steps
+# 3-5 (MHA-PD-00 cites 4 and 5 on SEQUENCE_SHEET); sheet 8's left field steps
+# 6-8J and its right field 8K-9D; sheet 9's left field 9E-12, its right field
+# 13-16; sheet 10's left field 17-22 and its right field 23 over the crank end
+# fit.  test_every_note_field_holds_its_stacked_blocks proves each fits.
+_CRANK_CONTINUED_HEADING = "ASSEMBLY SEQUENCE CONT. - CRANK"
+CONE_CRANK_PRIMARY, CONE_CRANK_CONTINUED, CRANK_CONTINUED = _split_sequence_chain(
     CONE_CRANK_STEPS,
-    steps.step_number("crank-mesh-checked"),
-    "ASSEMBLY SEQUENCE CONT. - CRANK",
+    (steps.step_number("tip-adjuster-set"), "ASSEMBLY SEQUENCE CONT. - CONE SET AND CRANK"),
+    (steps.step_number("crank-hub-fitted"), _CRANK_CONTINUED_HEADING),
 )
-BANK_PRIMARY, BANK_CONTINUED = _split_sequence_notes(
+_BANK_CONTINUED_HEADING = "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK"
+BANK_CONTINUED_FROM = f"{steps.step_number('cylinder-stack-accepted')}K"
+BANK_LAST_FROM = f"{steps.step_number('cylinder-bank-located')}E"
+BANK_PRIMARY, BANK_CONTINUED, BANK_LAST = _split_sequence_chain(
     BANK_STEPS,
-    steps.step_number(NORTH_BRACKET_SET_KEY),
-    "ASSEMBLY SEQUENCE CONT. - NORTH BRACKET",
+    (BANK_CONTINUED_FROM, _BANK_CONTINUED_HEADING),
+    (BANK_LAST_FROM, _BANK_CONTINUED_HEADING),
 )
 # With the blank lines, checks 1-7 overran sheet 12's left field by 5.2 mm, so
 # check 7 heads its right field, over the saved pose and interfaces.
@@ -1866,15 +2084,25 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
     """
     heading_lines = len(heading_text(1, ASSEMBLED_HEADING).splitlines())
     cone_gears = facts.count("dt-cone-gear")
-    rig_primary, rig_continued = _split_sequence_notes(
+    rig_first, rig_second, rig_third, rig_last = _split_sequence_chain(
         rig_steps(
             pivot_blocks=facts.count("dt-pinion-pivot-block"),
             cams=facts.count("dt-pinion-cam"),
             slotted=facts.count("dt-vn-slotted-screw"),
         ),
-        steps.step_number("rig-set"),
-        RIG_SEQUENCE_HEADING,
+        (steps.step_number("handle-bonded"), RIG_SEQUENCE_HEADING),
+        (steps.step_number("cams-and-lever-fitted"), RIG_SEQUENCE_HEADING),
+        (steps.step_number("other-base-mounting"), "ASSEMBLY SEQUENCE CONT. - CONE SET ON THE BASE"),
     )
+
+    def cont(head: int | str, where: str) -> str:
+        return f"\nCONT. STEP {head}: {where}."
+
+    right = "RIGHT FIELD"
+
+    def sheet(number: int) -> str:
+        return f"SHEET {number}"
+
     return (
         NoteField(
             1,
@@ -1892,10 +2120,9 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
             (
                 ("direction key", DIRECTION_NOTES),
                 (
-                    "cone and crank sequence",
+                    "cone set sequence",
                     CONE_CRANK_PRIMARY.format(cone_gears=cone_gears)
-                    + f"\nCONT. STEP {steps.step_number('crank-mesh-checked')}: "
-                    "RIGHT FIELD.",
+                    + cont(steps.step_number("tip-adjuster-set"), right),
                 ),
             ),
         ),
@@ -1903,37 +2130,43 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
             SEQUENCE_SHEET,
             f"sheet {SEQUENCE_SHEET} right note field",
             NOTE_FIELD_RIGHT,
-            (("crank sequence continuation", CONE_CRANK_CONTINUED),),
+            (
+                (
+                    "cone set and crank sequence continuation",
+                    CONE_CRANK_CONTINUED
+                    + cont(steps.step_number("crank-hub-fitted"), sheet(BANK_SHEET)),
+                ),
+            ),
         ),
         NoteField(
             BANK_SHEET,
             f"sheet {BANK_SHEET} left note field",
             NOTE_FIELD_LEFT,
             (
-                (
-                    "cylinder bank sequence",
-                    BANK_PRIMARY.format(cylinder_gears=facts.count("dt-cylinder-gear"))
-                    + f"\nCONT. STEP {steps.step_number(NORTH_BRACKET_SET_KEY)}: "
-                    "RIGHT FIELD.",
-                ),
+                ("crank sequence continuation", CRANK_CONTINUED),
+                ("cylinder bank sequence", BANK_PRIMARY + cont(BANK_CONTINUED_FROM, right)),
             ),
         ),
         NoteField(
             BANK_SHEET,
             f"sheet {BANK_SHEET} right note field",
             ISO_RIGHT_FIELD,
-            (("north bracket sequence", BANK_CONTINUED),),
+            (
+                (
+                    "cylinder bank sequence continuation",
+                    BANK_CONTINUED + cont(BANK_LAST_FROM, sheet(FIT_SHEET)),
+                ),
+            ),
         ),
         NoteField(
             FIT_SHEET,
             f"sheet {FIT_SHEET} left note field",
             NOTE_FIELD_LEFT,
             (
+                ("back bracket sequence", BANK_LAST),
                 (
                     "pinion rig sequence",
-                    rig_primary
-                    + f"\nCONT. STEP {steps.step_number('rig-set')}: "
-                    f"SHEET {CONTINUATION_SHEET}.",
+                    rig_first + cont(steps.step_number("handle-bonded"), right),
                 ),
             ),
         ),
@@ -1942,22 +2175,32 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
             f"sheet {FIT_SHEET} right note field",
             ISO_RIGHT_FIELD,
             (
-                ("cone station table", station_table_text(facts.cone_rows())),
-                ("fit placeholder", FIT_PLACEHOLDER),
-                ("crank fit pointer", f"MHA-DT-11 CRANK END FIT: SHEET {CONTINUATION_SHEET}."),
+                (
+                    "pinion rig sequence continuation",
+                    rig_second
+                    + cont(steps.step_number("cams-and-lever-fitted"), sheet(CONTINUATION_SHEET)),
+                ),
             ),
         ),
         NoteField(
             CONTINUATION_SHEET,
             f"sheet {CONTINUATION_SHEET} left note field",
             NOTE_FIELD_LEFT,
-            (("pinion rig sequence continuation", rig_continued),),
+            (
+                (
+                    "pinion rig sequence, second continuation",
+                    rig_third + cont(steps.step_number("other-base-mounting"), right),
+                ),
+            ),
         ),
         NoteField(
             CONTINUATION_SHEET,
             f"sheet {CONTINUATION_SHEET} right note field",
             ISO_RIGHT_FIELD,
-            (("crank end fit", CRANK_END_FIT_NOTES),),
+            (
+                ("cone set mounting", rig_last),
+                ("crank end fit", CRANK_END_FIT_NOTES),
+            ),
         ),
         NoteField(
             CHECKS_SHEET,
@@ -1988,6 +2231,12 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
                     ),
                 ),
             ),
+        ),
+        NoteField(
+            SETTING_SHEET,
+            f"sheet {SETTING_SHEET} station table field",
+            STATION_TABLE_FIELD,
+            (("cone station table", station_table_text(facts.cone_rows())),),
         ),
     )
 
@@ -2102,6 +2351,118 @@ def _stack_sheet_note_fields(adapter: Any, facts: SourceFacts, sheet: int) -> li
                 adapter, field.blocks, field.bounds, label=field.label
             )
     return findings
+
+
+def table_column_widths(
+    header: Sequence[str], rows: Sequence[Sequence[str]]
+) -> tuple[float, ...]:
+    """Each general-table column cut to its longest cell (metres)."""
+    return tuple(
+        max(len(text) for text in column) * TABLE_CHAR_WIDTH + TABLE_CELL_PAD
+        for column in zip(header, *rows, strict=True)
+    )
+
+
+def table_box_violations(
+    box: tuple[float, float, float, float], *, label: str
+) -> list[str]:
+    """A sheet 14 table stays above the note floor and off the station table."""
+    x0, y0, x1, y1 = box
+    station = STATION_TABLE_FIELD
+    findings = []
+    if y0 < NOTE_FIELD_LEFT[3]:
+        findings.append(f"{label} runs {(NOTE_FIELD_LEFT[3] - y0) * 1000.0:.1f} mm below its floor")
+    if x1 > station[0] and y0 < station[1] and y1 > station[3]:
+        findings.append(f"{label} overlaps the cone station table field")
+    return findings
+
+
+def _place_general_table(
+    adapter: Any,
+    *,
+    title: str,
+    header: Sequence[str],
+    rows: Sequence[Sequence[str]],
+    top_left: tuple[float, float],
+    label: str,
+) -> tuple[float, float, float, float]:
+    """A titled native general table, every cell read back; returns its box."""
+    x, top = top_left
+    title_note = _add_note_block(adapter, title, (x, top), label=f"{label} title")
+    title_extent = _anchor_note(
+        adapter, title_note, (x + NOTE_FIELD_INSET, top - NOTE_FIELD_INSET), label=f"{label} title"
+    )
+    table_top = title_extent[1] - TABLE_TITLE_GAP
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    # swBOMConfigurationAnchor_TopLeft = 1; no template: a plain general table.
+    raw = ddoc.InsertTableAnnotation2(False, x, table_top, 1, "", len(rows) + 1, len(header))
+    if raw is None:
+        raise RuntimeError(f"{label}: InsertTableAnnotation2 returned no table")
+    table = _early_bound(raw, "ITableAnnotation")
+    if (int(table.RowCount), int(table.ColumnCount)) != (len(rows) + 1, len(header)):
+        raise RuntimeError(
+            f"{label}: table is {table.RowCount}x{table.ColumnCount}, "
+            f"expected {len(rows) + 1}x{len(header)}"
+        )
+    for column, width in enumerate(table_column_widths(header, rows)):
+        # swTableRowColChange_TableSizeCanChange = 0
+        if abs(float(table.SetColumnWidth(column, width, 0)) - width) > 1e-6:
+            raise RuntimeError(f"{label}: column {column} width did not persist")
+    for row, cells in enumerate((header, *rows)):
+        for column, text in enumerate(cells):
+            table.SetText2(row, column, True, text)
+            applied = str(table.DisplayedText2(row, column, True) or "")
+            if applied != text:
+                raise RuntimeError(
+                    f"{label}: cell ({row}, {column}) did not persist: {applied!r} != {text!r}"
+                )
+    annotation = _early_bound(table.GetAnnotation(), "IAnnotation")
+    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+    heights = tuple(float(table.GetRowHeight(row)) for row in range(int(table.RowCount)))
+    widths = tuple(float(table.GetColumnWidth(column)) for column in range(int(table.ColumnCount)))
+    if len(position) != 3 or not all(map(math.isfinite, (*position, *heights, *widths))):
+        raise RuntimeError(f"{label}: table geometry is unreadable")
+    box = (position[0], position[1] - sum(heights), position[0] + sum(widths), position[1])
+    _telemetry.event(
+        "drawing.general_table",
+        table=label,
+        box_mm=tuple(value * 1000.0 for value in box),
+        row_heights_mm=tuple(value * 1000.0 for value in heights),
+        column_widths_mm=tuple(value * 1000.0 for value in widths),
+    )
+    return box
+
+
+def _place_setting_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
+    """The setting, pedestal recheck and feeler stack tables, then the cone
+    station table beside them."""
+    _activate_sheet(adapter, SHEET_NAMES[SETTING_SHEET - 1])
+    _heading(adapter, SETTING_SHEET)
+    _reference_iso(adapter, caption="FINISHED ASSEMBLY 1:8", label="setting reference isometric")
+    findings = []
+    top = NOTE_FIELD_LEFT[1]
+    for title, header, rows, label in (
+        (SETTING_TABLE_TITLE, SETTING_TABLE_HEADER, SETTING_TABLE_ROWS, "setting table"),
+        (
+            PEDESTAL_RECHECK_TITLE,
+            PEDESTAL_RECHECK_HEADER,
+            PEDESTAL_RECHECK_ROWS,
+            "pedestal recheck table",
+        ),
+        (FEELER_STACK_TITLE, FEELER_STACK_HEADER, FEELER_STACK_ROWS, "feeler stack table"),
+    ):
+        box = _place_general_table(
+            adapter,
+            title=title,
+            header=header,
+            rows=rows,
+            top_left=(SETTING_TABLE_LEFT, top),
+            label=label,
+        )
+        findings += table_box_violations(box, label=f"sheet {SETTING_SHEET} {label}")
+        top = box[1] - NOTE_BLOCK_GAP
+    return findings + _stack_sheet_note_fields(adapter, facts, SETTING_SHEET)
+
 
 
 def _view_outline(view: Any) -> tuple[float, float, float, float]:
@@ -2949,9 +3310,20 @@ def _reference_iso(
 
 def _place_assembled_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     _activate_sheet(adapter, SHEET_NAMES[0])
-    front = place_view(adapter, str(SOURCE), "*Front", 0.080, 0.110, scale=ASSEMBLED_SCALE)
-    top = place_view(adapter, str(SOURCE), "*Top", 0.080, 0.200, scale=ASSEMBLED_SCALE)
-    right = place_view(adapter, str(SOURCE), "*Right", 0.200, 0.110, scale=ASSEMBLED_SCALE)
+    # The FRONT view looks at the crank end (model -Z, the machine's front)
+    # toward the cone tip, so the steps' FRONT, BACK, LEFT and RIGHT read off
+    # it (DIRECTION_NOTES; rubric sample review of v47).  That is the model's
+    # *Back view; the TOP over it is *Top turned half a turn, and the RIGHT
+    # beside it *Left.
+    front = place_view(adapter, str(SOURCE), "*Back", 0.080, 0.110, scale=ASSEMBLED_SCALE)
+    top = _early_bound(
+        place_view(adapter, str(SOURCE), "*Top", 0.080, 0.200, scale=ASSEMBLED_SCALE), "IView"
+    )
+    top.Angle = math.pi
+    rebuild_drawing(adapter, label="assembled top view turned")
+    if abs(abs(float(top.Angle)) - math.pi) > 1e-6:
+        raise RuntimeError(f"assembled top view angle reads {top.Angle!r}, expected pi")
+    right = place_view(adapter, str(SOURCE), "*Left", 0.200, 0.110, scale=ASSEMBLED_SCALE)
     iso = place_view(
         adapter, str(SOURCE), "*Isometric", *ASSEMBLED_ISO_CENTER, scale=ASSEMBLED_ISO_SCALE
     )
@@ -3361,7 +3733,7 @@ def _place_bank_setting_sheet(
     """
     _activate_sheet(adapter, SHEET_NAMES[BANK_SETTINGS_SHEET - 1])
     step("bank settings: activate sheet")
-    _heading(adapter, BANK_SETTINGS_SHEET)
+    _heading(adapter, BANK_SETTINGS_SHEET, BANK_SETTINGS_POINTER)
     step("bank settings: heading")
     bank_names = frozenset(facts.clusters["cylinder-bank"])
     overall = _setting_view(
@@ -3406,21 +3778,23 @@ def _place_bank_setting_sheet(
         label="drum station leg",
     )
     drum_keep = {drum_station_setting.DIMENSION: (leg_middle[0], DRUM_STATION_TEXT_Y)}
+    # The bank's closed stack and spring gap print as setting-table rows
+    # (sheet 14) and labels here, not as the model's imported setting
+    # dimensions: those carry a model-authored converted band and compass
+    # wording the drawing cannot re-word without dirtying the source.
     annotations = []
-    for view, feature, keep, label in (
-        (overall, bank_settings.STACK_FEATURE, BANK_SETTING_KEEP, "closed bank length"),
-        (detail, bank_settings.SPRING_FEATURE, BANK_SPRING_KEEP, "north spring gap"),
-        (drum_view, drum_station_setting.FEATURE, drum_keep, "drum station"),
+    _show_base_view_sketches(adapter, drum_view, (drum_station_setting.FEATURE,), label="drum station")
+    step(f"drum station: show base-view sketch {drum_station_setting.FEATURE}")
+    with _bank_dimension_source_trace(
+        adapter, step, label=f"drum station / {drum_station_setting.FEATURE}"
     ):
-        _show_base_view_sketches(adapter, view, (feature,), label=label)
-        step(f"{label}: show base-view sketch {feature}")
-        with _bank_dimension_source_trace(adapter, step, label=f"{label} / {feature}"):
-            imported = curate_view_dimensions(
-                adapter, view, keep=keep, view_label=label,
+        annotations.extend(
+            curate_view_dimensions(
+                adapter, drum_view, keep=drum_keep, view_label="drum station",
                 dimensions_by_feature=SETTING_DIMENSIONS,
             )
-            step(f"{label}: curate_view_dimensions")
-        annotations.extend(imported)
+        )
+        step("drum station: curate_view_dimensions")
     radius = BANK_SPRING_CROP_RADIUS_MM / 1000.0
     parent_centre = model_point_in_view(
         adapter, overall,
@@ -3465,9 +3839,9 @@ def _place_bank_setting_sheet(
     placement_gap = 2.0 * VIEW_CAPTION_GAP
     captions = []
     for view, text, right_aligned, label in (
-        (overall, "CYLINDER BANK RIGHT 1:1", True, "bank setting caption"),
-        (detail, "DETAIL A 4:1 - NORTH SPRING SET", False, "spring detail caption"),
-        (drum_view, "DRUM STATION RIGHT 1:1", False, "drum station caption"),
+        (overall, "CYLINDER BANK LEFT 1:1", True, "bank setting caption"),
+        (detail, "DETAIL A 4:1", False, "spring detail caption"),
+        (drum_view, "DRUM STATION, PARTIAL LEFT VIEW 1:1", False, "drum station caption"),
     ):
         view.UpdateViewDisplayGeometry()
         step(f"{label}: UpdateViewDisplayGeometry")
@@ -3505,6 +3879,18 @@ def _place_bank_setting_sheet(
     )
     _anchor_note(adapter, letter, letter_corner, label="spring detail letter")
     step("spring detail letter: anchor note")
+    # The labelled sketch the setting table's rows name: each leader tip on
+    # the model point it labels, the note owned by its view.
+    for view, (text, text_xy, model_point), label in (
+        *((overall, spec, f"bank setting label {index}") for index, spec in enumerate(BANK_SETTING_LABELS, 1)),
+        (detail, BANK_SPRING_LABEL, "spring gap label"),
+    ):
+        tip = model_point_in_view(
+            adapter, view, tuple(value / 1000.0 for value in model_point), label=label
+        )
+        add_leader_note(adapter, text, text_xy=text_xy, attach_xy=tip, label=label, view=view)
+        step(f"{label}: leader note")
+    _activate_sheet(adapter, SHEET_NAMES[BANK_SETTINGS_SHEET - 1])
     placements = []
     for note, label, owner_type in (
         *((note, label, 1) for note, _view, label in captions),
@@ -3569,7 +3955,6 @@ def _place_bank_setting_sheet(
                     or abs(float(tolerance.GetMinValue()) - lower / 1000.0) > 1e-9):
                 raise RuntimeError(f"{name} lost its model-authored setting band")
         for view, kept, label in (
-            (detail, bank_settings.SPRING_DIMENSION, "north spring setting"),
             (drum_view, drum_station_setting.DIMENSION, "drum station setting"),
         ):
             names = {
@@ -3621,7 +4006,9 @@ def _place_full_detail_sheet(adapter: Any) -> tuple[float, float]:
     _caption_under(
         adapter,
         view,
-        f"RIGHT {_scale_text(scale)} - {FULL_DETAIL_CAPTION}",
+        # The model's *Right looks from model +X: the machine's LEFT side
+        # (DIRECTION_NOTES).
+        f"LEFT {_scale_text(scale)} - {FULL_DETAIL_CAPTION}",
         label=f"{label} caption",
     )
     _note_handle_stake(adapter, view, label=f"{label} stake note")
@@ -3797,6 +4184,8 @@ def _place_package(
     step("fit sheet")
     findings += _place_checks_sheet(adapter, facts)
     step("checks sheet")
+    findings += _place_setting_sheet(adapter, facts)
+    step("setting sheet")
     full_detail = _place_full_detail_sheet(adapter)
     step("full-detail sheet")
     findings += _place_continuation_sheet(adapter, facts)

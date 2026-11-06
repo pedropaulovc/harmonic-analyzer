@@ -181,16 +181,18 @@ def test_the_settings_sheet_reads_back_the_drum_setting_like_the_bank() -> None:
         setting.DIMENSION_CALLOUTS[setting.DIMENSION]
     )
     assert drawing.SETTING_BANDS[setting.DIMENSION] == setting.DIMENSION_BANDS[setting.DIMENSION]
+    # The bank's closed stack and spring gap are setting-table rows and
+    # labels (rubric sample fix), not imported model dimensions.
     for name in (bank_settings.STACK_DIMENSION, bank_settings.SPRING_DIMENSION):
-        assert drawing.SETTING_PRECISION[name] == bank_settings.TOLERANCE_PRECISION
-        assert drawing.SETTING_BANDS[name] == bank_settings.DIMENSION_BANDS[name]
+        assert name not in drawing.SETTING_PRECISION
+        assert name not in drawing.SETTING_BANDS
     source = inspect.getsource(drawing._place_bank_setting_sheet)
     for fragment in (
-        "(drum_view, drum_station_setting.FEATURE, drum_keep, \"drum station\")",
+        "adapter, drum_view, keep=drum_keep",
         "dimensions_by_feature=SETTING_DIMENSIONS",
         "drum_view.Crop2(False, False, 1)",
         "drum_view.IsCropped()",
-        '(drum_view, "DRUM STATION RIGHT 1:1", False, "drum station caption")',
+        '(drum_view, "DRUM STATION, PARTIAL LEFT VIEW 1:1", False, "drum station caption")',
         "assert_imported_precision(adapter, annotations, SETTING_PRECISION)",
         "SETTING_CALLOUTS[name]",
         "SETTING_BANDS[name]",

@@ -116,10 +116,11 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
     }
     # What each pointer's target must name, keyed by (citing sheet, pointer).
     expected = {
-        (channel_number, north_ref): f"THE NORTH {bracket}",
+        # MHA-DT-00 names directions by its sheet 1 FRONT view: north is BACK.
+        (channel_number, north_ref): f"THE BACK {bracket}",
         # The rod rings go onto their cams in the cylinder stack, so the
         # bench-pinned rod + arm pairs must exist by then.
-        (channel_number, stack_ref): "ON ITS CAM AS ITS GEAR GOES ON",
+        (channel_number, stack_ref): "AS EACH GEAR GOES ON",
         # ... and that drive-train step names the pinning step it relies on.
         (fitup_number, steps.RODS_PINNED_REF): "ROD FORK TO ITS",
         (fitup_number, f"{frame_number} STEP 8"): f"{support} ON DECK",
@@ -138,18 +139,30 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
                     foreign.add((sheet, pointer.group(0)))
                     continue
                 found.add((sheet, pointer.group(0)))
-                target = sheets[pointer.group(1)][pointer.group(2)]
+                # A numbered step owns its lettered sub-steps (8 = 8, 8A, 8B...).
+                label = pointer.group(2)
+                owned = rf"{label}[A-Z]?" if label.isdigit() else re.escape(label)
+                target = " ".join(
+                    text
+                    for head, text in sheets[pointer.group(1)].items()
+                    if re.fullmatch(owned, head)
+                )
                 assert expected[(sheet, pointer.group(0))] in target, pointer.group(0)
     assert found == set(expected)
     assert foreign == {(channel_number, steps.HA_ANCHORS_SET_REF)}
     north_label = str(dt_drive_train_steps.step_number(steps.NORTH_BRACKET_SET_KEY))
-    north = sheets[fitup_number][north_label]
-    assert "EAR INNER FACE TO Y" in north and "DRO STILL ZEROED AS 9A" in north
+    labels = list(sheets[fitup_number])
+    north = " ".join(
+        text
+        for head, text in sheets[fitup_number].items()
+        if re.fullmatch(rf"{north_label}[A-Z]?", head)
+    )
+    assert "SET THE EAR INNER FACE TO ITS Y" in north and "DRO STILL ZEROED AS 8G" in north
     # The plain shaft threads through the set ear: the bracket stays down,
     # and the channel sheet threads the shaft and the washer measured there
     # from the north.
     assert "LIFT IT OFF" not in north
-    assert "MIC THE MHA-CH-VN-56, W" in north
+    assert "MIC THE MHA-CH-VN-56 AND RECORD ITS THICKNESS AS W" in north
     north_ear = _step_body("north-ear-datum")
     washer = _config.parts("ch-vn-rocker-thrust-washer")["number"]
     assert "FLATS UP" in north_ear and "SOUTH THROUGH THE EAR" in north_ear
@@ -157,12 +170,11 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
     # measurement; the washer is the one measured at the drive-train step.
     assert f"THE {washer} WASHER MEASURED AT THAT STEP, THEN HUBS" in north_ear
     assert "MICED" not in north_ear
-    # Positive control: the step before it is the bank's end play, not the ear.
-    assert f"NORTH {bracket}" not in sheets[fitup_number]["9F"]
-    # It follows 9F, the bank's last sub-step, on the bank sheet: the rig's
-    # first step comes after it.
-    labels = list(sheets[fitup_number])
-    assert labels.index(north_label) == labels.index("9F") + 1
+    # It follows the bank's last sub-step on the bank sheet; positive control:
+    # that sub-step is the bank's, not the ear's.
+    bank_last = labels[labels.index(north_label) - 1]
+    assert re.fullmatch(r"9[A-Z]", bank_last), bank_last
+    assert f"BACK {bracket}" not in sheets[fitup_number][bank_last]
     # The rig's first step is whichever key the registry puts right after the
     # north bracket, so reordering the rig's own steps cannot break this.
     sequence = dt_drive_train_steps.SEQUENCE
@@ -172,7 +184,8 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
     )
     rig_first_key = sequence[sequence.index(steps.NORTH_BRACKET_SET_KEY) + 1]
     rig_first = str(dt_drive_train_steps.step_number(rig_first_key))
-    assert labels.index(rig_first) == labels.index(north_label) + 1
+    numbered = [label for label in labels if label.isdigit()]
+    assert numbered.index(rig_first) == numbered.index(north_label) + 1
 
 
 def test_the_printed_step_heads_are_the_registry_in_order() -> None:

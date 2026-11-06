@@ -809,8 +809,8 @@ def test_part_sheet_carries_no_assembly_procedure() -> None:
         assert word not in printed
     assert spec.INSTALLATION_NOTES.count("\n") == 1
     step = (
-        f"PUSH MHA-DT-VN-54 ONTO A {inch_text(COLLAR_FEELER, FEELER_PLACES)} FEELER ON T006; "
-        "LOCK ITS SET SCREW ON THE FLAT."
+        f"PUSH MHA-DT-VN-54 ONTO A {inch_text(COLLAR_FEELER, FEELER_PLACES)} FEELER ON T006. "
+        "LOCK ITS SET SCREW ON THE FLAT;"
     )
     assert step in " ".join(assembly.CONE_CRANK_STEPS.split())
 
