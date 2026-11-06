@@ -494,10 +494,14 @@ CROSS_TAP_CALLOUT = (
 )
 # The Hole Wizard's own tap feature names (build_fr_top_frame step 13).
 CROSS_TAP_FEATURES = ("SideTapsFront", "SideTapsRear")
-# The near-wall clearance callout stands right of the tap callout, below
-# section arrow A's lower head and the .90 axis dimension: its leader
-# reaches the same +X entry the tap leader reaches from the left.
-CROSS_CLEARANCE_CALLOUT_XY = (0.315, 0.205)
+# The near-wall clearance callout stands above the view, left of section
+# arrow A's upper head and clear of the ⌀.35 counterbore leader below it, so
+# its leader drops onto the clearance's upper-left rim. Right of the tap
+# (run 20261106T172701582Z) its leader ran through section label A, and
+# both native leaders, drawn rim to rim through the shared centre, crossed
+# there: the clearance's leader stops at its near rim instead
+# (set_near_side_diameter), outside the tap's far-mouth circle.
+CROSS_CLEARANCE_CALLOUT_XY = (0.192, 0.256)
 # The clearance is drilled full diameter until it opens into the socket: its
 # native blind depth ("<HOLE-DEPTH> <hw-depth>") becomes that instruction on
 # its own row, and the count row is headed by the total, as the tap's is.
@@ -4113,6 +4117,11 @@ async def build(adapter: Any) -> dict[str, str]:
         label="cross near-wall clearance diameter",
     )
     _set_cross_clearance_callout_text(clearance_callout)
+    set_near_side_diameter(
+        _early_bound(clearance_callout, "IDisplayDimension").GetAnnotation(),
+        "cross near-wall clearance callout",
+    )
+    rebuild_drawing(adapter, label="cross near-wall clearance near-side leader")
     _checked_dimension(
         adapter, detail_front,
         p0=(COLUMN_X, HALF_H+BOSS_ABOVE, REAR_COLUMN_Z),
