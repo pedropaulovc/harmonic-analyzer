@@ -935,7 +935,6 @@ async def build(adapter) -> dict[str, str]:
     )
     v_lever = len(LEVER_HOLES) * math.pi * (lever.hole_dia_mm / 2.0) ** 2 * THICKNESS
     volume = await volume_check(adapter, "lever taps", volume - v_lever, 0.03 * v_lever)
-    volume = await _finished_hub_bore(adapter, drive_jobs, volume)
     _require_one_solid_body(adapter, label="carrier")
     # Model X = carrier X and model Z = -carrier Y: each axis is a Right-plane
     # offset by its X and a Front-plane offset by its -Y, each offset driven by
