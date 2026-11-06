@@ -158,9 +158,12 @@ EXPLODED_GROUP_SHIFT_Y = (
 EXPLODED_ISO_CENTER = (_EXPLODED_TEMPLATE.width_m / 2.0, 0.235 + EXPLODED_GROUP_SHIFT_Y)
 BALLOON_MARGIN = 0.012
 SECOND_SCREW_BALLOON_MARGIN = 0.024
+# PART NUMBER holds the longest number (MHA-SH-VN-55, 12 glyphs at ~2.9 mm
+# measured on the 1c08225 sheet 2) on one line: at 32 mm it broke after the
+# last hyphen (machinist review stability r3, clarity).
 BOM_COLUMN_WIDTHS = {
     "item": 0.012,
-    "part": 0.032,
+    "part": 0.042,
     "description": 0.066,
     "sku": 0.032,
     "quantity": 0.012,

@@ -457,7 +457,8 @@ def test_bom_prints_registry_identity_and_vendor_sku_only() -> None:
         "sku",
         "quantity",
     }
-    assert drawing.BOM_COLUMN_WIDTHS["part"] > 0.026
+    # The longest drawing number (12 glyphs, ~2.9 mm each) prints on one line.
+    assert drawing.BOM_COLUMN_WIDTHS["part"] >= 12 * 0.0029 + 0.003
     assert drawing.BOM_COLUMN_WIDTHS["sku"] > 0.024
     assert drawing.BOM_COLUMN_WIDTHS["description"] < 0.080
     template = drawing.DRAWING_TEMPLATES[drawing.SHEET_LAYOUTS[drawing.SHEET_NAMES[1]]]
@@ -481,8 +482,8 @@ def test_portrait_group_translation_balances_visible_ink() -> None:
     assert lower_air == pytest.approx(upper_air)
     assert lower_air > 0.05
     assert drawing.EXPLODED_ISO_CENTER == pytest.approx((0.1397, 0.235 + shift))
-    assert drawing.BOM_ANCHOR == pytest.approx((0.0627, 0.405 + shift))
-    assert drawing.EXPLODED_CAPTION_XY == pytest.approx((0.0627, 0.415 + shift))
+    assert drawing.BOM_ANCHOR == pytest.approx((0.0577, 0.405 + shift))
+    assert drawing.EXPLODED_CAPTION_XY == pytest.approx((0.0577, 0.415 + shift))
 
 
 def test_bom_removes_material_without_changing_native_items(monkeypatch) -> None:
