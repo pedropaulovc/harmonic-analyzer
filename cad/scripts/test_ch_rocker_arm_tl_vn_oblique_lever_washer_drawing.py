@@ -64,7 +64,11 @@ def test_catalogue_dimensions_and_pair_stack() -> None:
 def test_one_pair_under_each_lever_screw_head() -> None:
     washer = fasteners.LEVER_LOCK_WASHER
     screw = fasteners.LEVER_TO_CARRIER
-    assert fasteners.WASHERS == (washer,)
+    # The lever joint takes exactly this one pair row; other joints may carry
+    # their own washers (the hub clamp's brass washer), so the table is not
+    # pinned to this row alone.
+    assert fasteners.WASHERS.count(washer) == 1
+    assert [row for row in fasteners.WASHERS if row.joint == screw.joint] == [washer]
     assert spec.ROW is washer
     assert washer.joint == screw.joint
     assert int(_config.parts(STEM)["quantity"]) == spec.QUANTITY == screw.count == 2
