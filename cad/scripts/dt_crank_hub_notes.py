@@ -152,9 +152,14 @@ CROSS_HOLE_NOTE = "\n".join(
 # The sheet's numbered notes, in one block (rule 7: at most four lines).
 SHEET_NOTES = f"{CROSS_HOLE_NOTE}\n{SEAT_LENGTH_NOTE}"
 
-# The overall and the relief print their value and band only: a reason on an
-# overall size, or on a plain .XX length, is narration (rule 7).  The stacks
-# they hold (A and B below) are checked on the drive-train assembly.
+# The relief prints its value only: a reason on a plain .XX length is
+# narration (rule 7).  The overall's +.004 is functional (stack B below and
+# the drive-pin tips; owner ruling 2026-10-31), so the band names the stack
+# it sets and its mate (rule 4: a width that sets a stack names the stack).
+# Value and band alone read as an unneeded explicit band (round-3 review, 2
+# of 3 runs); v47's "REAR FACE CLEARS SPROCKET MHA-PD-09" read as a reason
+# on an overall size (rule 7, 3 of 3 runs).  No AIR (rule 26).
+HUB_LENGTH_CALLOUT = "SETS CLEARANCE TO\nSPROCKET MHA-PD-09"
 
 # Axial stack at the printed worst case (Main, 2026-09-30), machine z, -Z =
 # FRONT, with a bought ANSI #25 chain on the crank T12.  Not printed: the
