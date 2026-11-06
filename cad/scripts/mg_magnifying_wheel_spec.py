@@ -173,30 +173,38 @@ _CAST_NAMES = set().union(*CAST_DIMENSIONS.values())
 # the sheet only passes them through).  The rim-bore round is a single
 # limit, R.03 MAX: TIE2_FACE_WALL takes the R at that limit, and a sharp
 # edge falls under the title block's edge break.  The rim's axial width
-# takes .XX: at .X its +/-.1 eats TIE 2's ligament to the rim faces.
+# takes .XX: at .X its +/-.1 eats TIE 2's ligament to the rim faces.  The
+# spokes' back face is located from the rim's back face at .XX with the
+# casting band (CAST_TOL), as the spokes' own thickness is: the spokes stand
+# centred in the rim, (RIM_AXIAL - SPOKE_AXIAL) / 2 in from each face.
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "rim bore round": 2,
     "rim axial width": 2,
+    "spoke face": 2,
 }
+SPOKE_FACE_OFFSET = (RIM_AXIAL - SPOKE_AXIAL) / 2.0
 ROUND_TEXT_SUFFIX = " MAX"
 
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the notes say only what no callout can.  The bore's running fit and
 # the spigot's press fit are matched-fit statements (rule 4: mate and
 # acceptance), each a numbered note its own callout links by "SEE NOTE n",
-# so neither callout runs past two lines of words.  The spokes' count, pitch
-# and clocking print on their own angle (SPOKE_REFERENCE) and centreline.
-# TIE 1's two coordinates ride the title block: the boss is sized so its
-# wall holds at .XX (TIE1_HUB_WALL).  Each tie's key names the wire member
-# it holds by the wire's drawing number (rule 4: a kit member names the
-# member).  The mates' numbers are literals so the axle, drum and wire stay
-# out of the part's recipe; test_mg_magnifying_wheel_drawing pins them to
-# the config rows.
+# so neither callout runs past two lines of words.  The groove's two tight
+# bands (its bottom Ø and its R) serve one mate, named once in a numbered
+# note both callouts link (rule 4: a mate serving several features).  The
+# spokes' count, pitch and clocking print on their own angle
+# (SPOKE_REFERENCE) and centreline.  The tie holes name the wire member each
+# holds at their own callouts.  TIE 1's two coordinates ride the title
+# block: the boss is sized so its wall holds at .XX (TIE1_HUB_WALL).  The
+# mates' numbers are literals so the axle, drum and wire stay out of the
+# part's recipe; test_mg_magnifying_wheel_drawing pins them to the config
+# rows.
 MIN_WALL = WALL_TARGET_MM  # drawing-guidelines.md rule 17 (walls and webs) target
 AXLE_NUMBER = "MHA-MG-07"
 DRUM_NUMBER = "MHA-MG-10"
 WIRE_NUMBER = "MHA-SH-VN-56"
 BORE_FIT_NOTE = 1
 SPIGOT_FIT_NOTE = 2
+GROOVE_SEAT_NOTE = 3
 
 
 def _fit_limits(limits_mm: tuple[float, float]) -> str:
@@ -210,8 +218,7 @@ DRAWING_NOTES = "\n".join(
         f"{AXLE_NUMBER}.",
         f"{SPIGOT_FIT_NOTE}. {_fit_limits(DRUM_PRESS)} DIAMETRAL INTERFERENCE IN DRUM "
         f"{DRUM_NUMBER}.",
-        f"TIE 1: TIE HOLE FOR LEVER WIRE OF {WIRE_NUMBER}, THRU BOSS.",
-        f"TIE 2: TIE HOLE FOR PEN WIRE OF {WIRE_NUMBER}, GROOVE TO RIM BORE.",
+        f"{GROOVE_SEAT_NOTE}. GROOVE SEATS PEN WIRE OF {WIRE_NUMBER}.",
     )
 )
 # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the bore is a running journal on the axle.  The spigot is
