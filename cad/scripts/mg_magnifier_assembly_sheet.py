@@ -58,13 +58,18 @@ _SPOKE_PITCH_DEG = 360.0 / _SPOKE_COUNT
 if abs(TIE1_ANGLE_DEG % _SPOKE_PITCH_DEG - _SPOKE_PITCH_DEG / 2.0) > 1.0:
     raise AssertionError(f"TIE 1 at {TIE1_ANGLE_DEG:.2f} deg is not midway between spokes")
 
-# The endshake's feeler-gauge check: the band's low limit enters, a leaf one
-# thousandth over its high limit does not.
+# The endshake's feeler-gauge check: the band's low limit enters, its high
+# limit does not (machinist review r1: a no-go one thousandth over the band
+# passed gaps the band rejects).
 _INCH = LENGTH_UNITS[UNIT]
 if UNIT != "in":
     raise AssertionError("the endshake feeler check reads inch leaves")
 ENDSHAKE_GO_TEXT = render_number((ENDSHAKE - ENDSHAKE_TOL) / _INCH, UNIT, 3)
-ENDSHAKE_NO_GO_TEXT = render_number((ENDSHAKE + ENDSHAKE_TOL) / _INCH + 0.001, UNIT, 3)
+ENDSHAKE_NO_GO_TEXT = render_number((ENDSHAKE + ENDSHAKE_TOL) / _INCH, UNIT, 3)
+
+# The summing lever (cad/config/parts/sm-summing-lever.yaml), the mate the
+# bracket screws to at MHA-HA-00; rule 4 names it by its drawing number.
+SUMMING_LEVER_NUMBER = "MHA-SM-03"
 
 # --- Fitter package -----------------------------------------------------------
 DRAWING_NUMBER = _steps.DRAWING_NUMBER
@@ -217,20 +222,20 @@ STEP_TEXT = {
         f"PRESS {_AXLE} INTO {_BAR}, THREADED END OUT, UNTIL ITS STEP REACHES "
         f"THE REF DEPTH IN {PRESS_DETAIL_TITLE}."
     ),
-    _steps.AXLE_TRIAL_KEY: (
-        f"TRIAL-FIT {_STACK}, IN THAT ORDER, ON {_AXLE}, THEN BOTH {_NUT} NUTS "
-        f"JAMMED WITH {_WHEEL} JUST FREE."
+    _steps.AXLE_TRIAL_KEY: f"TRIAL-FIT {_STACK} ON {_AXLE}, IN THAT ORDER.",
+    "trial-nuts-jammed": (
+        f"JAM BOTH {_NUT} NUTS ON {_AXLE} WITH {_WHEEL} JUST FREE."
     ),
     _steps.AXLE_CHECKED_KEY: (
         f"CHECK THE ACCEPT CONDITION IN {PRESS_DETAIL_TITLE} WITH A CALIPER DEPTH "
         "ROD ON THE THREAD END PAST THE SECOND NUT."
     ),
+    "trial-parts-removed": f"REMOVE THE TRIAL NUTS AND PARTS FROM {_AXLE}.",
     "axle-pressed-further": (
-        f"IF THE THREAD END STANDS FURTHER PAST, REMOVE THE TRIAL PARTS, PRESS {_AXLE} A "
-        f"LITTLE FURTHER IN AND REPEAT {_step(_steps.AXLE_TRIAL_KEY)} AND "
-        f"{_step(_steps.AXLE_CHECKED_KEY)}."
+        f"IF {_step(_steps.AXLE_CHECKED_KEY)} READ THE THREAD END PAST ITS LIMIT, "
+        f"PRESS {_AXLE} IN BY THAT EXCESS AND RETURN TO "
+        f"{_step(_steps.AXLE_TRIAL_KEY)}."
     ),
-    "trial-parts-removed": f"REMOVE THE TRIAL PARTS FROM {_AXLE}.",
     "column-clamps-fitted": (
         f"FIT {_item(CLAMP_FRONT)} AND {_item(CLAMP_BACK)} TO {_BAR} AS THE "
         "SHEET 2 EXPLODED VIEW SHOWS."
@@ -251,8 +256,12 @@ STEP_TEXT = {
         f"{_WASHER} AND THE SPIGOT FACE, {_WHEEL} PUSHED TOWARD {_BAR}: "
         f"{ENDSHAKE_GO_TEXT} ENTERS, {ENDSHAKE_NO_GO_TEXT} DOES NOT."
     ),
-    "endshake-reset": (
-        f"IF EITHER LEAF FAILS, TURN THE NUT AND REPEAT "
+    "endshake-loosened": (
+        f"IF {ENDSHAKE_GO_TEXT} DOES NOT ENTER, BACK THE NUT OFF SLIGHTLY AND "
+        f"REPEAT {_step(_steps.ENDSHAKE_CHECKED_KEY)}."
+    ),
+    "endshake-tightened": (
+        f"IF {ENDSHAKE_NO_GO_TEXT} ENTERS, TIGHTEN THE NUT SLIGHTLY AND REPEAT "
         f"{_step(_steps.ENDSHAKE_CHECKED_KEY)}."
     ),
     _steps.LOCKNUT_JAMMED_KEY: (
@@ -340,7 +349,7 @@ STEP_GROUPS = (
     ("LEVER GROUP (EXPLODED ON SHEET 3):", _steps.LEVER_THREADED_KEY),
     (
         "LEVER WIRE, ON THE MACHINE, AFTER MHA-HA-00 HAS CLAMPED "
-        f"{_BAR} TO THE FRONT COLUMN AND SCREWED {_BRACKET} TO THE SUMMING LEVER:",
+        f"{_BAR} IN PLACE AND SCREWED {_BRACKET} TO {SUMMING_LEVER_NUMBER}:",
         _steps.WIRE_HOOKED_KEY,
     ),
 )
@@ -356,5 +365,5 @@ ASSEMBLY_CHECKS = (
     f"ROCKED THROUGH THE TRAVEL OF {_LEVER}, STAYS WRAPPED ON {_DRUM} SHORT "
     "OF TIE 1.",
     f"LOOSE ITEMS: BOTH {_item(BRACKET_SCREW)} SCREWS GO WITH THE ASSEMBLY; "
-    f"MHA-HA-00 DRIVES THEM THROUGH {_BRACKET} INTO THE SUMMING LEVER.",
+    f"MHA-HA-00 DRIVES THEM THROUGH {_BRACKET} INTO {SUMMING_LEVER_NUMBER}.",
 )
