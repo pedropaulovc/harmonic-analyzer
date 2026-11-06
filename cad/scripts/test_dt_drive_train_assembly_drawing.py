@@ -273,7 +273,9 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
     assert f"STATIONS: SHEET {drawing.SETTING_SHEET}" in drawing.BOM_REFERENCE_NOTES
     fields = {field.label: field for field in drawing.package_note_fields(_drawing_facts())}
     sequence_right = fields[f"sheet {drawing.SEQUENCE_SHEET} right note field"].blocks[-1][1]
-    assert sequence_right.endswith(f"CONT. STEP 6: SHEET {drawing.BANK_SHEET}.")
+    assert sequence_right.endswith(
+        f"CONT. STEP {drawing.CRANK_CONTINUED_FROM}: SHEET {drawing.BANK_SHEET}."
+    )
     assert all(text.count(",") <= 1 for text in drawing.BOM_DESCRIPTIONS.values())
 
 

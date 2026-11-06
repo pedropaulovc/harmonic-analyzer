@@ -192,7 +192,7 @@ def test_the_settings_sheet_reads_back_the_drum_setting_like_the_bank() -> None:
         "dimensions_by_feature=SETTING_DIMENSIONS",
         "drum_view.Crop2(False, False, 1)",
         "drum_view.IsCropped()",
-        '(drum_view, "DRUM STATION, PARTIAL LEFT VIEW 1:1", False, "drum station caption")',
+        '(drum_view, DRUM_VIEW_CAPTION, False, "drum station caption")',
         "assert_imported_precision(adapter, annotations, SETTING_PRECISION)",
         "SETTING_CALLOUTS[name]",
         "SETTING_BANDS[name]",
