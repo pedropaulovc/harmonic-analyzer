@@ -154,21 +154,6 @@ DIMENSION_TOLERANCE_TYPES = {
     "ThreadLengthMin": 5,
 }
 PRINTED_THREAD = f"{THREAD} UNC"  # Class 2A comes from the title block.
-DIMENSION_CALLOUTS = {
-    "CutLength": (
-        "SHOULDER END TO FACED TIP\n"
-        f"TIP {TIP_RECESS[0] / 25.4:.3f}-{TIP_RECESS[1] / 25.4:.3f}".replace("0.", ".")
-        + " BELOW SUPPORT BAR\n"
-        f"{_config.parts('pd-support-bar')['number']} FRONT FACE AS FITTED"
-    ),
-    # The native ChamferAngle prints its own 45 degrees.
-    "ChamferWidth": "CUT-END CHAMFER\nPAST THE THREAD ROOT",
-    "ThreadLengthMin": (
-        f"{PRINTED_THREAD} CONTINUOUS TAIL FROM TIP\n"
-        "INCOMPLETE CUT-END THREAD 1 PITCH MAX\n"
-        "ALL REMAINING TAIL FULL FORM"
-    ),
-}
 
 # Supplier engineering drawing inspected 2026-10-19. Its .313/.156/.188
 # spellings do not replace the exact 5/16, 5/32 and 3/16 inch native geometry.
