@@ -408,18 +408,22 @@ def test_fitter_package_covers_rule_9() -> None:
     for step in sheet.ASSEMBLY_STEPS:
         assert len(drawing._wrapped((step,), width=drawing.STEPS_LINE_WIDTH).splitlines()) <= 6
         assert "ITEM " in step
-    # The setting is read off the stick's own scale, from below: with the
-    # STOP_MARK on the thumbscrew axis the block's 0-side face lands between
-    # the two named tenth graduations.
-    setting = sheet.ASSEMBLY_STEPS[-2]
-    low, high = sheet.NEAR_FACE_WINDOW
-    assert low < sheet.NEAR_FACE_MARK < high
-    # The same face, read from the stick's end through the near-face setting.
-    assert sheet.NEAR_FACE_MARK == pytest.approx(
-        (spec.SETTING_NEAR_FACE_MM - stick.SCALE_START_X) / stick.DIVISION_SPACING
+    # Owner ruling 2026-11-06 (option C): no as-shipped setting. The clamp
+    # step sets no position, and sheet 1 labels its drawn pose an example.
+    clamp = sheet.ASSEMBLY_STEPS[-1]
+    assert clamp.startswith("10. WITH ITEM 1 AT ANY POSITION ALONG ITEM 3")
+    assert "THUMBSCREW" in clamp
+    for gone in ("NEAR_FACE_MARK", "NEAR_FACE_WINDOW"):
+        assert not hasattr(sheet, gone)
+    for text in (*sheet.ASSEMBLY_STEPS, *sheet.ASSEMBLY_CHECKS):
+        assert "GRADUATION" not in text and "±" not in text
+    assert "EXAMPLE POSITION" in sheet.EXAMPLE_POSE_NOTE
+    assert "SHEET 3, STEP 10" in sheet.EXAMPLE_POSE_NOTE
+    assert all(
+        len(line) <= drawing.EXAMPLE_NOTE_WIDTH for line in drawing.EXAMPLE_NOTE.splitlines()
     )
-    assert f"BETWEEN THE {low:.1f} AND {high:.1f} GRADUATIONS" in setting
-    assert "SHEET 1 BOTTOM VIEW" in setting and "±" not in setting
+    # Each check is one acceptance (rule 22: a step does one thing).
+    assert all(" AND " not in check for check in sheet.ASSEMBLY_CHECKS[2:])
     # Step 2 names the match-drill faces by view; the part sheets' labels follow.
     align = sheet.ASSEMBLY_STEPS[1]
     assert "LEFT ENDS AND TOP EDGES FLUSH AS IN THE SHEET 1 FRONT VIEW" in align
@@ -879,11 +883,9 @@ def test_fitter_text_tracks_mutated_setting_and_depth_specs(
     assert changed.SETTING_NEAR_FACE_MM == pytest.approx(
         changed.STICK_MARK_X - stop.THUMB_AXIS_X
     )
-    setting = changed.ASSEMBLY_STEPS[-2]
-    face = mark - stop.THUMB_AXIS_X / stick.DIVISION_SPACING
-    low = int(face * 10.0) / 10.0
-    assert f"BETWEEN THE {low:.1f} AND {low + 0.1:.1f} GRADUATIONS" in setting
-    assert "±" not in setting
+    # Option C: whatever mark the saved pose uses, no step or note prints it.
+    for text in (*changed.ASSEMBLY_STEPS, changed.EXAMPLE_POSE_NOTE):
+        assert f"{mark:.1f}" not in text and "±" not in text
     pilot = changed.ASSEMBLY_STEPS[2]
     assert "DRILL Ø.070 THROUGH ITEM 2 PLATE AND INTO ITEM 1 BLOCK" in pilot
     assert "OPEN ITS TWO HOLES TO Ø.096 THRU" in changed.ASSEMBLY_STEPS[3]
@@ -918,6 +920,20 @@ def _assert_fitter_text_spacing(fitter) -> None:
     )
     # The left text column stays left of the title block.
     assert drawing.STEPS_XY[0] + drawing.STEPS_LINE_WIDTH * 0.00276 < drawing.TITLE_BLOCK[0]
+    # Sheet 1's example-pose note sits under the bottom view, above the
+    # border and left of the title block.
+    example = drawing._wrapped(
+        (fitter.EXAMPLE_POSE_NOTE,), width=drawing.EXAMPLE_NOTE_WIDTH
+    )
+    assert drawing.EXAMPLE_NOTE_XY[1] < drawing.UNDERSIDE_CENTER[1] - 0.020
+    assert (
+        drawing.EXAMPLE_NOTE_XY[1] - len(example.splitlines()) * line_pitch
+        > drawing.SHEET_INNER_BORDER[1] + line_pitch
+    )
+    assert (
+        drawing.EXAMPLE_NOTE_XY[0] + drawing.EXAMPLE_NOTE_WIDTH * 0.00276
+        < drawing.TITLE_BLOCK[0]
+    )
     # Initial native outline top: 206.0755 mm. The old 4 mm cut overhang
     # left the upper arrow below the setting dimension line.
     # At text Y220 the native setting line is Y211.6656; its witness ends
