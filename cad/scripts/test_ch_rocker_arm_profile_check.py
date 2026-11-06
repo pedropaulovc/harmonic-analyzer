@@ -1,4 +1,4 @@
-"""Offline contracts for the rocker arm's surface-profile check (plan S7 op 97)."""
+"""Archived template calculator contracts and its held-route replacement."""
 
 from __future__ import annotations
 
@@ -56,20 +56,28 @@ def _violations(windows: dict) -> list[str]:
     return found
 
 
-def test_plan_op_97_reads_every_profile_with_the_computed_procedure() -> None:
-    plan = tomllib.loads(plans.plan_path(STEM).read_text(encoding="utf-8"))
-    (op,) = [
-        op
-        for setup in plan["setups"]
-        if setup["id"] == "S7"
-        for op in setup["ops"]
-        if op["op"] == 97
-    ]
-    assert op["checks"] == {"surface_profile": "dti"}
-    assert sorted(op["feature"]) == sorted(_printed_zones())
-    covered = {feature for s in check.SEGMENTS.values() for feature in s["features"]}
-    assert covered == set(_printed_zones())
-    assert op["inspection_methods"]["surface_profile"] == check.method_steps()
+def test_held_route_replaces_template_metrology_with_current_drawing_acceptance() -> None:
+    text = plans.plan_path(STEM).read_text(encoding="utf-8")
+    plan = tomllib.loads(text)
+    assert text.startswith("# HELD REFERENCE ROUTE")
+    assert plan["construction"] == "built_up"
+    setups = {setup["id"]: setup for setup in plan["setups"]}
+    strap_acceptance = next(op for op in setups["S4"]["ops"] if op["op"] == 20)
+    assert set(strap_acceptance["feature"]) == {
+        "strap_faces", "top_edge", "profile_outer",
+        "tip_land_pos_x", "tip_land_neg_x",
+    }
+    assert "MHA-CH-13" in strap_acceptance["note"]
+    final_acceptance = next(op for op in setups["S5"]["ops"] if op["op"] == 20)
+    assert set(final_acceptance["feature"]) == {
+        "pivot_bore", "rod_hole", "hub_faces", "hub_od",
+    }
+    assert "MHA-CH-06" in final_acceptance["note"]
+    assert "full profile" in final_acceptance["note"]
+    assert all(
+        "surface_profile" not in op.get("inspection_methods", {})
+        for setup in setups.values() for op in setup["ops"]
+    )
 
 
 def test_op_97_uses_only_the_inventory_dti_and_height_gauge() -> None:

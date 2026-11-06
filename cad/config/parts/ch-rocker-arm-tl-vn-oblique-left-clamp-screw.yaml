@@ -1,0 +1,18 @@
+ch-rocker-arm-tl-vn-oblique-left-clamp-screw:
+  title: Rocker Oblique Trammel Left Clamp Screw
+  # Shop fixture: the parent MHA-CH-06 Number plus -TL-VN-nn (subsystem-identities.md).
+  number: MHA-CH-06-TL-VN-86
+  stock_name: Black-Oxide Alloy Steel Low-Profile Socket Head Screw
+  supplier: McMaster-Carr
+  supplier_skus: ["92220A165"]
+  material: Alloy Steel
+  material_specification: "Alloy steel, black oxide, ASME B18.3 low head, Rockwell C39; McMaster-Carr 92220A165"
+  finish: black oxide
+  # The fastener table's LEFT_CLAMP count (#10-24 X 3/4 LOW-HEAD SHCS).
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  # Modified purchased part: cut to the actual strap/riser grip plus the
+  # 8.65-8.85 reach below the carrier top, tip restored.
+  process: "purchased; cut to fit at assembly"
+  drawing_unit: in

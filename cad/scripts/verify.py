@@ -245,8 +245,9 @@ _COMPONENT_BAND = {
     # top): its made parts (TL-20's Bar1/Bar2 members among them) and its
     # bought families, every screw, stud, nut and bearing inserted (jig spec
     # QUANTITIES). Oblique simplification PR2: -8 #8 bracket screws, +4 common
-    # bar screws (2 a bracket); the KP08 screws stay 4.
-    "ch-rocker-arm-tl-oblique-jig": (90, 92),  # expected 91
+    # bar screws (2 a bracket); the KP08 screws stay 4. R3 replaces the
+    # hub pin with the stud, sleeve, washer and two low-head screws (+4).
+    "ch-rocker-arm-tl-oblique-jig": (94, 96),  # expected 95
     "ha-harmonic-analyzer": (
         7,
         9,

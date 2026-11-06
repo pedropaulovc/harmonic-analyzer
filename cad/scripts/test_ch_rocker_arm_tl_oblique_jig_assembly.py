@@ -3,7 +3,7 @@
 The poses close on the calculator's rail and carrier geometry and the leadscrew
 feed's layout, the builder places all made and bought families,
 one free DOF slides the carriages and their shoulder-screw pivot stacks,
-the interference contracts cover only physical bond seats and threads, the jig stays
+the interference contracts cover only in-situ receiver seats and threads, the jig stays
 a shop fixture outside the machine tree, and both passes retain both carrier
 ends while their full sweeps clear the table and column cover by pinned margins.
 """
@@ -34,7 +34,7 @@ import ch_rocker_arm_tl_oblique_feed_lever_spec as feed_lever
 import sh_vn_clamping_kit_flange_nut_spec as flange_nut
 import ch_rocker_arm_tl_vn_oblique_handwheel_spec as handwheel
 import sh_vn_clamping_kit_hold_down_stud_spec as hold_down_stud
-import ch_rocker_arm_tl_vn_oblique_hub_pin_spec as hub_pin
+import ch_rocker_arm_tl_oblique_hub_stud_spec as hub_stud
 import ch_rocker_arm_tl_oblique_jig_assembly_spec as spec
 import ch_rocker_arm_tl_oblique_end_bracket_spec as end_bracket
 import ch_rocker_arm_tl_vn_oblique_leadscrew_kit_feed_nut_spec as feed_nut
@@ -71,6 +71,8 @@ SCREW_ROWS = {
     spec.PILLOW_BLOCK_SCREW: (fasteners.KP08_TO_BRACKET,),
     spec.RISER_SCREW: (fasteners.RISER_TO_CARRIER, fasteners.NUT_TO_FEED_BLOCK),
     spec.CLAMP_SCREW: (fasteners.CR_CLAMP,),
+    spec.HUB_SCREW: (fasteners.HUB_CLAMP,),
+    spec.LEFT_CLAMP_SCREW: (fasteners.LEFT_CLAMP,),
     spec.LEVER_SCREW: (fasteners.LEVER_TO_CARRIER,),
 }
 
@@ -196,7 +198,7 @@ def test_pivot_blocks_and_screws_sit_on_the_pin_stations() -> None:
     assert trammel.CARRIER_TOP_Z == pytest.approx(trammel.CARRIER_UNDERSIDE_Z + trammel.CARRIER_THICK)
 
 
-def test_carrier_riser_hub_pin_and_lever_close_on_the_carrier_frame() -> None:
+def test_carrier_riser_hub_stud_and_lever_close_on_the_carrier_frame() -> None:
     def on_carrier(point):
         return _image(
             spec.CARRIER_ROWS, spec.CARRIER_ORIGIN, (point[0], 0.0, -point[1])
@@ -209,11 +211,12 @@ def test_carrier_riser_hub_pin_and_lever_close_on_the_carrier_frame() -> None:
         assert machine[:2] == pytest.approx(pin_origin[:2])
         assert machine[2] == trammel.CARRIER_TOP_Z
     hub = spec.POSE.to_machine(trammel.HUB)
-    assert spec.HUB_PIN_ORIGIN[:2] == pytest.approx(hub)
-    assert spec.HUB_PIN_TOP_Z - (trammel.CARRIER_TOP_Z + riser.THICKNESS) == pytest.approx(
-        hub_pin.TIP_SET
+    assert spec.HUB_STUD_ORIGIN[:2] == pytest.approx(hub)
+    assert spec.HUB_STUD_TOP_Z - (trammel.CARRIER_TOP_Z + riser.THICKNESS) == pytest.approx(
+        hub_stud.TIP_SET
     )
-    assert spec.HUB_PIN_BOTTOM_Z == pytest.approx(trammel.CARRIER_UNDERSIDE_Z)
+    assert spec.HUB_STUD_BOTTOM_Z == pytest.approx(trammel.CARRIER_UNDERSIDE_Z - hub_stud.FLANGE_THICK)
+    assert spec.HUB_STUD_BOTTOM_Z + hub_stud.FLANGE_THICK == pytest.approx(trammel.CARRIER_UNDERSIDE_Z)
     riser_hub = _image(spec.RISER_ROWS, spec.RISER_ORIGIN, (*riser.HUB_HOLE, 0.0))
     assert riser_hub[:2] == pytest.approx(hub, rel=0.0, abs=1e-9)
     for model_x, hole in zip(feed_lever.HOLE_X, carrier.LEVER_HOLES):
@@ -542,10 +545,13 @@ def test_named_views_are_the_machine_frame() -> None:
 
 
 def test_finished_locator_hole_fits() -> None:
-    # F16: the bonded HUB pin never presses, and its gap stays within the
-    # .0006 Loctite 638 fills.
-    assert 0.0 <= carrier.HUB_BOND_CLEARANCE_MIN <= carrier.HUB_BOND_CLEARANCE_MAX
-    assert carrier.HUB_BOND_CLEARANCE_MAX <= 0.0006 * 25.4 + 1e-9
+    # The manufactured stud's slip shank passes through the carrier; its
+    # locating nose retains the former pin's strap fit, without adhesive.
+    low, high = carrier.HUB_HOLE_LIMITS
+    clearance = (low - hub_stud.SHANK_DIA - max(hub_stud.SHANK_DIA_BAND),
+                 high - hub_stud.SHANK_DIA - min(hub_stud.SHANK_DIA_BAND))
+    assert clearance == pytest.approx(hub_stud.SHANK_CLEARANCE)
+    assert 0.0 < clearance[0] <= clearance[1]
     # F19: the CL dowel always presses into the carrier.
     low, high = carrier.CL_DOWEL_INTERFERENCE
     assert 0.0 < low <= high
@@ -610,7 +616,11 @@ def test_builder_places_exactly_the_inventory() -> None:
         spec.FEED_BLOCK: 1,
         **PIVOT_FAMILIES,
         spec.RISER: 1,
-        spec.HUB_PIN: 1,
+        spec.HUB_STUD: 1,
+        spec.HUB_SLEEVE: 1,
+        spec.HUB_WASHER: 1,
+        spec.HUB_SCREW: 1,
+        spec.LEFT_CLAMP_SCREW: 1,
         spec.FEED_LEVER: 1,
         spec.END_BRACKET: 2,
         spec.RAIL: 2,
@@ -631,7 +641,7 @@ def test_builder_places_exactly_the_inventory() -> None:
         spec.LEVER_SCREW: 2,
         spec.LEVER_LOCK_WASHER: 2,
     }
-    assert sum(spec.QUANTITIES.values()) == 91
+    assert sum(spec.QUANTITIES.values()) == 95
     assert spec.QUANTITIES[spec.END_BRACKET] == (leadscrew.END_BRACKET_QUANTITY)
     assert sum(spec.QUANTITIES[family] for family in spec.BASE_BARS) == base_bar.QUANTITY
     assert spec.QUANTITIES[spec.RAIL_SCREW] == fasteners.COMMON_SCREW_COUNT
@@ -657,14 +667,14 @@ def test_builder_places_exactly_the_inventory() -> None:
         spec.FLANGE_NUT: ("sh-vn-clamping-kit-hardware", "FlangeNut"),
     }
     assert set(bg.references_of(JIG)) == PART_STEMS
-    # 29 logical rows from 24 native parts: the base bar's two members, two
-    # kits of two members, one of three.
-    assert len(manifest) == len(spec.BOM_ORDER) == 29
-    assert len(PART_STEMS) == 24
+    # 33 logical rows from 28 native parts: the base bar's two members,
+    # two kits of two members, one of three.
+    assert len(manifest) == len(spec.BOM_ORDER) == 33
+    assert len(PART_STEMS) == 28
     # Option B (2026-11-04): the bought nut takes the retired TL-27's row,
     # now as the TL-VN-84 FeedNut member.
     assert spec.KIT_IDENTITIES[spec.FEED_NUT] == (feed_nut.PART_NAME, feed_nut.CONFIGURATION)
-    assert spec.ITEM_NUMBERS[spec.FEED_NUT] == "17"
+    assert spec.ITEM_NUMBERS[spec.FEED_NUT] == "21"
 
 
 @pytest.mark.parametrize("source_kind", ("all", "batch-only", "single-only"))
@@ -687,7 +697,7 @@ def test_actual_builder_sources_resolve_every_physical_producer(source_kind) -> 
                 node.func.id = "_excluded_source_sink"
         source = ast.unparse(tree)
     assert bg._AssemblySources(source).collect() == expected
-    assert len(expected) == 24
+    assert len(expected) == 28
 
 
 def test_member_selectors_are_role_local_not_native_instance_indices() -> None:
@@ -905,7 +915,11 @@ def test_one_free_dof_slides_the_carriages_and_what_rides_them() -> None:
         spec.PIVOT_BLOCK,
         *PIVOT_FAMILIES,
         spec.RISER,
-        spec.HUB_PIN,
+        spec.HUB_STUD,
+        spec.HUB_SLEEVE,
+        spec.HUB_WASHER,
+        spec.HUB_SCREW,
+        spec.LEFT_CLAMP_SCREW,
         spec.FEED_LEVER,
         spec.FEED_BLOCK,
         spec.CARRIAGE,
@@ -930,7 +944,11 @@ def test_one_free_dof_slides_the_carriages_and_what_rides_them() -> None:
     }
     assert riders == {
         spec.RISER,
-        spec.HUB_PIN,
+        spec.HUB_STUD,
+        spec.HUB_SLEEVE,
+        spec.HUB_WASHER,
+        spec.HUB_SCREW,
+        spec.LEFT_CLAMP_SCREW,
         spec.FEED_LEVER,
         spec.CL_DOWEL,
         spec.CLAMP_SCREW,
@@ -965,11 +983,11 @@ def _thread(row: fasteners.Fastener, tap_drill: float) -> tuple[float, float, fl
 
 
 def test_interference_contracts_are_physical_seats_and_threads() -> None:
-    overlap = min(trammel.CARRIER_TOP_Z, spec.HUB_PIN_TOP_Z) - max(
-        trammel.CARRIER_UNDERSIDE_Z, spec.HUB_PIN_ORIGIN[2],
+    overlap = min(trammel.CARRIER_TOP_Z, spec.HUB_STUD_TOP_Z) - max(
+        trammel.CARRIER_UNDERSIDE_Z, spec.HUB_STUD_ORIGIN[2],
     )
-    assert contracts.JIG_HUB_PIN_SEAT == pytest.approx((hub_pin.DIA, overlap))
-    # The bond runs the whole carrier: cut = carrier + riser + tip set.
+    assert contracts.JIG_HUB_STUD_SEAT == pytest.approx((hub_stud.SHANK_DIA, overlap))
+    # The in-situ receiver envelope covers the shank, not the flange/nose.
     assert overlap == pytest.approx(carrier.THICKNESS)
     assert contracts.JIG_CL_DOWEL_PRESS == (cl_dowel.DIA, carrier.THICKNESS)
     for envelope, expected in (
@@ -1000,6 +1018,15 @@ def test_interference_contracts_are_physical_seats_and_threads() -> None:
         (
             contracts.JIG_CLAMP_SCREW_THREAD,
             _thread(fasteners.CR_CLAMP, carrier.CR_TAP_DRILL),
+        ),
+        (
+            contracts.JIG_HUB_SCREW_THREAD,
+            _thread(fasteners.HUB_CLAMP, hub_stud.TAP_DRILL_DIA),
+        ),
+        (
+            contracts.JIG_LEFT_CLAMP_THREAD,
+            (fasteners.LEFT_CLAMP.major_mm, carrier.LEFT_CLAMP_TAP_DRILL,
+             sum(fasteners.LEFT_CLAMP_INSERTION) / 2.0),
         ),
         (
             contracts.JIG_LEVER_SCREW_THREAD,
@@ -1034,8 +1061,8 @@ def test_interference_contracts_are_physical_seats_and_threads() -> None:
     }
     assert all(pair <= names for pair in pairs)
     assert len(pairs) == 2 + sum(spec.QUANTITIES[s] for s in SCREW_ROWS) + 8 + 1 + 2
-    seat = math.pi * hub_pin.DIA**2 * overlap / 4.0
-    hub = frozenset((f"{spec.HUB_PIN}-1", f"{spec.CARRIER}-1"))
+    seat = math.pi * hub_stud.SHANK_DIA**2 * overlap / 4.0
+    hub = frozenset((f"{spec.HUB_STUD}-1", f"{spec.CARRIER}-1"))
     assert pairs[hub] == pytest.approx(1.10 * seat)
     dowel = math.pi * cl_dowel.DIA**2 * carrier.THICKNESS / 4.0
     assert pairs[frozenset((f"{spec.CL_DOWEL}-1", f"{spec.CARRIER}-1"))] == (
@@ -1418,6 +1445,15 @@ FASTENER_TABLE = {
         "1/4-20 X 7/8 SHCS", 1, carrier.THICKNESS,
         0.875 * 25.4 - fasteners.CR_CLAMP.grip_mm - carrier.THICKNESS,
     ),
+    "HUB_CLAMP": (
+        "#10-24 X 1/2 LOW-HEAD SHCS", 1,
+        0.5 * 25.4 - fasteners.HUB_CLAMP.grip_mm,
+        0.5 * 25.4 - fasteners.HUB_CLAMP.grip_mm - hub_stud.TAP_FULL_DEPTH,
+    ),
+    "LEFT_CLAMP": (
+        "#10-24 X 3/4 LOW-HEAD SHCS", 1, carrier.LEFT_CLAMP_THREAD_DEPTH,
+        sum(fasteners.LEFT_CLAMP_INSERTION) / 2.0 - carrier.LEFT_CLAMP_THREAD_DEPTH,
+    ),
     "LEVER_TO_CARRIER": ("5/16-18 X 1 SHCS", 2, 10.414, 10.414 - carrier.THICKNESS),
 }
 
@@ -1431,10 +1467,11 @@ def test_fastener_table_engagement_and_protrusion() -> None:
         assert row.count == count, name
         assert row.engagement_mm == pytest.approx(engagement, abs=1e-3), name
         assert row.protrusion_mm == pytest.approx(protrusion, abs=1e-3), name
-    # Only the CR clamp, installed full length as bought, stands past its
-    # THRU tap: into the free space between the carrier and the rail top.
+    # CR stands beyond its THRU receiver. LEFT passes the full-thread depth
+    # into its deeper blind pilot, but must still stop before the pilot floor.
     proud = [row for row in fasteners.FASTENERS if row.protrusion_mm > 0.0]
-    assert proud == [fasteners.CR_CLAMP]
+    assert proud == [fasteners.CR_CLAMP, fasteners.LEFT_CLAMP]
+    assert max(fasteners.LEFT_CLAMP_INSERTION) < carrier.LEFT_CLAMP_DRILL_DEPTH
     assert fasteners.CR_CLAMP.tip_clearance_mm == trammel.CARRIER_TO_RAIL_GAP
     assert 0.0 < fasteners.CR_CLAMP.protrusion_mm < fasteners.CR_CLAMP.tip_clearance_mm
     # Counts follow the parts: 8 rail holes on each of 2 rails, a 4-hole
@@ -1463,7 +1500,7 @@ def test_fastener_table_engagement_and_protrusion() -> None:
     assert fasteners.BLOCK_TO_CARRIAGE.engagement_mm == pytest.approx(pivot_block.SCREW_REACH)
     assert 1.2 * 4.0 <= fasteners.BLOCK_TO_CARRIAGE.engagement_mm < pivot_block.CARRIAGE_THREAD_DEPTH
     assert [row for row in fasteners.FASTENERS if row.cut_length_mm is not None] == [
-        fasteners.BLOCK_TO_CARRIAGE
+        fasteners.BLOCK_TO_CARRIAGE, fasteners.LEFT_CLAMP,
     ]
     # A 1-1/8 in lever screw would stand out of the carrier's underside.
     assert (
@@ -1475,7 +1512,9 @@ def test_fastener_table_engagement_and_protrusion() -> None:
     assert low < leadscrew.BAR_SCREW_ENGAGEMENT < high
     assert 1.5 * fasteners.BRACKET_TO_BAR.major_mm < low < high < leadscrew.BRACKET_THICK
     assert leadscrew.KP08_FOOT_THICK == 5.0  # UNVERIFIED: verify on receipt
-    assert fasteners.WASHERS == (fasteners.LEVER_LOCK_WASHER,)
+    assert fasteners.WASHERS == (fasteners.LEVER_LOCK_WASHER, fasteners.HUB_WASHER)
+    assert fasteners.HUB_WASHER.count == fasteners.HUB_CLAMP.count == 1
+    assert fasteners.HUB_WASHER.thickness_mm == spec.hub_washer.THICK
     # The nut screws' flat heads seat in the TL-VN-84 FeedNut's countersinks
     # (owner ruling 2026-11-04, option B; no washers): the grip is the flange
     # plus the head's nominal stand-proud above it.
@@ -1513,12 +1552,14 @@ def test_one_common_screw_with_every_exception_reasoned() -> None:
         "1/2-13 hold-down studs",
         "kit set screws, handwheel and KP08",
         "#8-32 x 5/8 SHCS, KP08 to TL-28",
+        "#10-24 low-head SHCS, HUB and left clamp",
     }
     assert all(reason.strip() for reason in fasteners.COMMON_SCREW_EXCEPTIONS.values())
     # The screw families on the BOM: the common one and the excepted ones.
     assert set(SCREW_ROWS) == {
         spec.RAIL_SCREW, spec.CARRIAGE_SCREW, spec.PILLOW_BLOCK_SCREW,
         spec.RISER_SCREW, spec.CLAMP_SCREW, spec.LEVER_SCREW,
+        spec.HUB_SCREW, spec.LEFT_CLAMP_SCREW,
     }
     # The retired 91255A150 #6-32 button head and its identity are gone.
     assert spec.PILLOW_BLOCK_SCREW == "ch-rocker-arm-tl-vn-oblique-bracket-screw"
@@ -1679,24 +1720,59 @@ def test_step_10_states_the_in_situ_hub_fit_up() -> None:
     step = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("10. "))
     assert "THE DRO READS X 0, Y .5125 ±.0005" in step
     assert "MATCH-DRILL AND REAM THE HUB THERE" in step
-    hub_pin_cited = f"{spec.BOM_DESCRIPTIONS[spec.HUB_PIN]} (ITEM {spec.ITEM_NUMBERS[spec.HUB_PIN]})"
-    assert f"HUB Ø.4000-.4005 THRU, FOR THE {hub_pin_cited}, BONDED AT STEP 11" in step
+    hub_stud_cited = f"{spec.BOM_DESCRIPTIONS[spec.HUB_STUD]} (ITEM {spec.ITEM_NUMBERS[spec.HUB_STUD]})"
+    assert f"HUB Ø.4000-.4005 THRU, FOR THE {hub_stud_cited}, SLIP FIT; FLANGE BELOW THE CARRIER" in step
     assert "THEIR SPOTS" not in step and "THE CL HOLE OFF ITS SPOT" in step
     assert spec.carrier.HUB_RADIAL_STACK < 0.25
 
 
-def test_steps_10_and_11_name_item_9_as_its_bom_row() -> None:
-    """Review jig-asm r2/r3: one name for item 9 across BOM and steps; the
-    TL-00 review (farm 20261104T210601055Z) adds the pin's size to its row."""
-    assert spec.BOM_DESCRIPTIONS[spec.HUB_PIN] == "HUB LOCATOR PIN Ø.4000 X 2.00" == (
-        f"HUB LOCATOR PIN Ø{spec._length(hub_pin.DIA, 4)} X "
-        f"{spec._length(hub_pin.SUPPLY_LENGTH, 2)}"
+def test_stud_bom_and_steps_name_the_manufactured_flanged_part() -> None:
+    assert spec.BOM_DESCRIPTIONS[spec.HUB_STUD] == "FLANGED HUB CLAMP STUD"
+    cited = f"{spec.BOM_DESCRIPTIONS[spec.HUB_STUD]} (ITEM {spec.ITEM_NUMBERS[spec.HUB_STUD]})"
+    step_10 = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("10. "))
+    fit = next(text for text in spec.OPERATION_STEPS if text.startswith("O4. "))
+    assert cited in step_10 and cited in fit
+    assert "FROM BELOW" in fit and "FLANGE" in fit and "NO ADHESIVE" in fit
+    assert "GAUGE PIN" not in step_10 and "BONDED" not in step_10
+
+
+def test_r3_operation_order_retains_all_clamps_and_clears_self_cutting() -> None:
+    steps = {text.split(". ", 1)[0]: text for text in spec.OPERATION_STEPS}
+    assert list(steps) == ["O1", "O2", "O3", "O4", "O5", "O6"]
+    assert "SELF-CUT THE 6061 RISER WITH THE 9/16 CUTTER BEFORE LOADING WORK" in steps["O3"]
+    assert "REMOVE HUB STUD, STEEL SLEEVE, BRASS WASHER, BOTH #10 SCREWS AND CR SCREW" in steps["O3"]
+    assert "KEEP ALL FOUR RISER SCREWS FITTED" in steps["O3"]
+    assert "AFTER SELF-CUTTING" in steps["O4"]
+    assert "MATCHED FLUSH 0/-.002 TO THE ACTUAL RISER TOP" in steps["O4"]
+    assert "BANDSAW THE 350 MM STRAP BLANK" in steps["O5"]
+    assert "LOCATE ON HUB AND CL; FIT CR AS BEFORE" in steps["O5"]
+    assert "TORQUE BOTH #10 SCREWS TO 1 N·m" in steps["O5"]
+    assert "DO NOT REMOVE THE CL DOWEL" in steps["O5"]
+    for family in (spec.HUB_SCREW, spec.HUB_WASHER, spec.LEFT_CLAMP_SCREW):
+        assert spec._item(family) in steps["O5"]
+    assert "8.65–8.85 MM" in steps["O6"]
+    assert "GAUGE FULL THREAD ENGAGEMENT 7.239 MM MIN" in steps["O6"]
+    assert "BOTTOM CLEARANCE .29 MM MIN; NO BOTTOM CONTACT" in steps["O6"]
+    assert "RETAIN ALL THREE CLAMPS THROUGH BOTH PASSES" in steps["O6"]
+    assert "NEVER A FULL-WIDTH SLOT OR PLUNGE" in steps["O6"]
+
+
+def test_new_hub_and_left_hardware_placements_close_on_actual_seats() -> None:
+    hub = spec.POSE.to_machine(trammel.HUB)
+    for family in (spec.HUB_SLEEVE, spec.HUB_WASHER, spec.HUB_SCREW):
+        (origin, _rows), = spec.PLACEMENTS[family]
+        assert origin[:2] == pytest.approx(hub)
+    assert spec.HUB_SLEEVE_PLACEMENTS[0][0][2] == pytest.approx(trammel.CARRIER_TOP_Z)
+    assert spec.HUB_WASHER_PLACEMENTS[0][0][2] == pytest.approx(spec.PART_TOP_Z)
+    assert spec.HUB_SCREW_PLACEMENTS[0][0][2] == pytest.approx(spec.PART_TOP_Z + spec.hub_washer.THICK)
+    assert spec.LEFT_CLAMP_SCREW_PLACEMENTS[0][0][:2] == pytest.approx(spec.POSE.to_machine(trammel.LEFT_CLAMP))
+    assert spec.LEFT_CLAMP_SCREW_PLACEMENTS[0][0][2] == pytest.approx(spec.PART_TOP_Z)
+    offset = spec.BOM_ORDER.index(spec.HUB_STUD)
+    assert spec.BOM_ORDER[offset:offset + 5] == (
+        spec.HUB_STUD, spec.HUB_SLEEVE, spec.HUB_WASHER, spec.HUB_SCREW, spec.LEFT_CLAMP_SCREW,
     )
-    cited = f"{spec.BOM_DESCRIPTIONS[spec.HUB_PIN]} (ITEM {spec.ITEM_NUMBERS[spec.HUB_PIN]})"
-    for number in ("10. ", "11. "):
-        step = next(text for text in spec.ASSEMBLY_STEPS if text.startswith(number))
-        assert cited in step
-        assert "GAUGE PIN" not in step and "BONDED LOCATOR" not in step
+    for family in spec.BOM_ORDER[offset:offset + 5]:
+        assert spec.LOCKED_TO[family] == ((spec.CARRIER, 0),)
 
 
 def test_steps_13b_and_13c_split_o1_around_the_stud_rework() -> None:
@@ -2436,24 +2512,18 @@ def test_invalid_bought_handwheel_geometry_still_refuses_the_fit(bought, message
         _leadscrew_with(**bought)
 
 
-def test_bonded_gauge_locator_uses_the_finished_hub_bore_and_actual_cut_overlap() -> None:
-    # The .4000 NO-GO gauge in the carrier's .4000-.4005 reamed HUB hole.
-    assert hub_pin.DIA + max(hub_pin.DIA_BAND) == pytest.approx(
-        carrier.HUB_HOLE_LIMITS[0]
+def test_flanged_hub_stud_keeps_the_locator_nose_and_positive_seat() -> None:
+    assert hub_stud.DIA + max(hub_stud.DIA_BAND) == pytest.approx(carrier.HUB_HOLE_LIMITS[0])
+    assert hub_stud.FLANGE_DIA == 18.0 and hub_stud.FLANGE_THICK == 3.0
+    assert hub_stud.TAP_THREAD == fasteners.HUB_CLAMP.thread == "#10-24"
+    assert hub_stud.SHANK_CLEARANCE[0] > 0.0
+    assert spec.HUB_STUD_TOP_Z - (trammel.CARRIER_TOP_Z + trammel.RISER_THICK) == pytest.approx(hub_stud.TIP_SET)
+    assert spec.HUB_STUD_TOP_Z - spec.HUB_STUD_ORIGIN[2] == pytest.approx(hub_stud.LENGTH)
+    assert spec.HUB_STUD_ORIGIN[2] + hub_stud.FLANGE_THICK == pytest.approx(trammel.CARRIER_UNDERSIDE_Z)
+    overlap = min(trammel.CARRIER_TOP_Z, spec.HUB_STUD_TOP_Z) - max(
+        trammel.CARRIER_UNDERSIDE_Z, spec.HUB_STUD_ORIGIN[2],
     )
-    assert hub_pin.BOND == "Loctite 638"
-    low, high = carrier.HUB_HOLE_LIMITS
-    clearance = (low - (hub_pin.DIA + max(hub_pin.DIA_BAND)),
-                 high - (hub_pin.DIA + min(hub_pin.DIA_BAND)))
-    assert clearance == pytest.approx(
-        (carrier.HUB_BOND_CLEARANCE_MIN, carrier.HUB_BOND_CLEARANCE_MAX)
-    )
-    assert spec.HUB_PIN_TOP_Z - (trammel.CARRIER_TOP_Z + trammel.RISER_THICK) == pytest.approx(hub_pin.TIP_SET)
-    assert spec.HUB_PIN_TOP_Z - spec.HUB_PIN_ORIGIN[2] == pytest.approx(hub_pin.CUT_LENGTH)
-    overlap = min(trammel.CARRIER_TOP_Z, spec.HUB_PIN_TOP_Z) - max(
-        trammel.CARRIER_UNDERSIDE_Z, spec.HUB_PIN_ORIGIN[2],
-    )
-    assert overlap == pytest.approx(contracts.JIG_HUB_PIN_SEAT[1])
+    assert overlap == pytest.approx(contracts.JIG_HUB_STUD_SEAT[1])
 
 
 def test_hold_down_inch_limits_lie_on_the_safe_side_of_the_kit_limits() -> None:

@@ -467,11 +467,24 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "SHIM-0375-008",
         supplier="Huyett",
     ),
-    # Hardened tool-steel gauge pin: the library's Alloy Steel stand-in.
-    "ch-rocker-arm-tl-vn-oblique-hub-pin": _stock(
-        "ch-rocker-arm-tl-vn-oblique-hub-pin",
-        "Class Z Plug Gauge, NO-GO, size .4000 in, 2 in supply, cut to .79 in",
-        "23065A855-23065A4",
+    # MHA-CH-06-TL-VN-85: the oblique trammel jig's #10-24 X 1/2 low-head SHCS
+    # (the fastener table's HUB_CLAMP row), used full length; shop fixture
+    # hardware, modelled so the jig assembly can mate it and run native
+    # interference.
+    "ch-rocker-arm-tl-vn-oblique-hub-screw": _stock(
+        "ch-rocker-arm-tl-vn-oblique-hub-screw",
+        "Black-Oxide Alloy Steel Low-Profile Socket Head Screw",
+        "92220A163",
+        material="Alloy Steel",
+    ),
+    # MHA-CH-06-TL-VN-86: the oblique trammel jig's #10-24 X 3/4 low-head SHCS
+    # (the fastener table's LEFT_CLAMP row), cut to fit at assembly; shop
+    # fixture hardware, modelled so the jig assembly can mate it and run
+    # native interference.
+    "ch-rocker-arm-tl-vn-oblique-left-clamp-screw": _stock(
+        "ch-rocker-arm-tl-vn-oblique-left-clamp-screw",
+        "Black-Oxide Alloy Steel Low-Profile Socket Head Screw",
+        "92220A165",
         material="Alloy Steel",
     ),
 }
