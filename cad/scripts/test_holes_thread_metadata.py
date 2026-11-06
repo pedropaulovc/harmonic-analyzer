@@ -321,3 +321,38 @@ def test_no_metric_tap_kind_or_row_remains() -> None:
     assert TAPPED_KINDS == ("tapped", "tapped_bottoming")
     assert not any(kind.endswith("metric") for kind in _holes._KINDS)
     assert not any(size.startswith("M") for size in TAP_DRILL_MM)
+
+
+@pytest.mark.parametrize(
+    "kind,size,value_slot",
+    (("drilled_number", "#43", 2), ("tapped", "#10-24", 6)),
+)
+@pytest.mark.parametrize(
+    "angle_deg,expected_native_angle",
+    ((None, 2.0594885), (118.0, 2.0594885), (180.0, 3.141592653589793)),
+)
+def test_blind_wizard_preserves_default_angle_and_explicit_flat_pilot(
+    fake_seat, monkeypatch, kind, size, value_slot, angle_deg, expected_native_angle,
+) -> None:
+    adapter, _feature = fake_seat
+    calls = []
+
+    def capture_native_inputs(*args):
+        calls.append(args)
+        return None  # Stop at the native boundary; no subsequent model editing.
+
+    monkeypatch.setattr(
+        adapter.currentModel.FeatureManager, "HoleWizard5", capture_native_inputs,
+        raising=False,
+    )
+    monkeypatch.setattr(_holes, "find_planar_face", lambda *args: _CrownFace())
+    options = {} if angle_deg is None else {"drill_angle_deg": angle_deg}
+    spec = HoleSpec(kind, size, end="blind", depth_mm=4.0, **options)
+    with pytest.raises(RuntimeError, match=r"HoleWizard5 \(blind\) failed"):
+        _holes.wizard_holes(
+            adapter, spec, [[0.0, 0.0, 0.0]], (0.0, 1.0, 0.0), "blind angle contract",
+        )
+    assert len(calls) == 1
+    # Eight fixed arguments precede V1. Exact equality protects the prior
+    # native float, not merely a geometrically close conversion of 118°.
+    assert calls[0][7 + value_slot] == expected_native_angle
