@@ -44,8 +44,15 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
    balloons for every visible part; steps that fit every part the package
    shows and install no part it does not contain; every check with an
    acceptance criterion the step can meet; setup states; every consumable
-   named (lubricant, locker, solder).
-6. Sheet views arrive at about 118 dpi. Before reporting a crossing, overprint,
+   named (lubricant, locker, solder). Count each step's printed lines and
+   actions; check that every code and direction it uses is defined on the
+   sheet and every setting finer than .XXX names its instrument.
+6. Read the package as the first-time builder of the guidelines would: every
+   part named by item number with its full drawing number in the BOM (rule
+   4); every section, detail and enlarged view lettered with its boundary on
+   a parent (rule 9); every word, symbol, direction and label one the builder
+   can look up, and one unit per view (rule 26).
+7. Sheet views arrive at about 118 dpi. Before reporting a crossing, overprint,
    leader landing, symbol, hidden-vs-solid line, small text or contradiction,
    call `crop` on that region and base the finding on what the crop shows.
 Record each candidate with its where, the defect, its evidence (text layer
@@ -54,7 +61,7 @@ line or crop), and the fix.
 <!-- MACHINIST_SEVERITY_CONTRACT -->
 
 DO NOT ASK FOR
-Component fabrication detail, material certs, a full inspection plan, a torque
+Component fabrication detail, material certs, a production inspection plan, a torque
 value for every screw where a general note covers them, or a production
 routing. Do not reopen fabrication tolerances on unseen part drawings, and do
 not invent a requirement from a mechanism you cannot see. The title block's
