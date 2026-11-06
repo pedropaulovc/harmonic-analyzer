@@ -142,6 +142,35 @@ def _pivot_cluster_extent():
     )
 
 
+def _hub_hardware_points():
+    """Actual new R3 hardware envelopes, including their distinct explode lifts."""
+    stud, sleeve, washer = spec.hub_stud, spec.hub_sleeve, spec.hub_washer
+    boxes = {
+        spec.HUB_STUD: (
+            (-stud.FLANGE_DIA / 2.0, stud.FLANGE_DIA / 2.0),
+            (-stud.FLANGE_DIA / 2.0, stud.FLANGE_DIA / 2.0),
+            (0.0, stud.LENGTH),
+        ),
+        spec.HUB_SLEEVE: (
+            (-sleeve.OD / 2.0, sleeve.OD / 2.0),
+            (-sleeve.OD / 2.0, sleeve.OD / 2.0),
+            (0.0, sleeve.LENGTH),
+        ),
+        spec.HUB_WASHER: (
+            (-washer.OD / 2.0, washer.OD / 2.0),
+            (-washer.OD / 2.0, washer.OD / 2.0),
+            (0.0, washer.THICK),
+        ),
+    }
+    for family, screw in ((spec.HUB_SCREW, spec.hub_screw), (spec.LEFT_CLAMP_SCREW, spec.left_clamp_screw)):
+        radius = max(screw.DIMS.head_dia, screw.DIMS.major_dia) / 2.0
+        boxes[family] = ((-radius, radius), (-screw.DIMS.length, screw.DIMS.head_h), (-radius, radius))
+    return {
+        family: _exploded_part_points(family, bounds)
+        for family, bounds in boxes.items()
+    }
+
+
 def _cluster_extent(sheet: str):
     """A cluster's exploded plan points and Z range (mm): its families' plan
     outlines where the spec draws them, each slid as its explode slides it,
@@ -201,10 +230,31 @@ def _cluster_extent(sheet: str):
             for p in outline
         ]
         z = (
-            spec.HUB_PIN_BOTTOM_Z + lift(spec.HUB_PIN),
+            spec.HUB_STUD_BOTTOM_Z + lift(spec.HUB_STUD),
             spec.MODEL_EXTENT[2][1] + lift(spec.LEVER_SCREW),
         )
+        hardware = [point for corners in _hub_hardware_points().values() for point in corners]
+        points.extend((x, y) for x, y, _z in hardware)
+        z = (min(z[0], *(point[2] for point in hardware)),
+             max(z[1], *(point[2] for point in hardware)))
     return points, z
+
+
+def test_carrier_exploded_extent_includes_all_new_hardware() -> None:
+    cluster = next(cluster for cluster in drawing.CLUSTERS if cluster.sheet == "CARRIER EXPLODED")
+    hardware = _hub_hardware_points()
+    assert set(hardware) == {
+        spec.HUB_STUD, spec.HUB_SLEEVE, spec.HUB_WASHER, spec.HUB_SCREW, spec.LEFT_CLAMP_SCREW,
+    }
+    assert set(hardware) <= set(cluster.stems)
+    points, (low, high) = _cluster_extent(cluster.sheet)
+    for family, corners in hardware.items():
+        assert spec.QUANTITIES[family] == 1
+        assert spec.explode_lift(family) != 0.0
+        assert family in drawing.BALLOON_ANCHORS
+        for x, y, z in corners:
+            assert (x, y) in points
+            assert low <= z <= high
 
 
 def _cluster_outline(cluster, center=(0.2, 0.15), *, scale=None):
@@ -219,8 +269,8 @@ def _cluster_outline(cluster, center=(0.2, 0.15), *, scale=None):
 
 def test_sheets_are_landscape_with_their_scales() -> None:
     assert len(drawing.SHEET_NAMES) == len(set(drawing.SHEET_NAMES))
-    assert drawing.SHEET_NAMES[7:] == (drawing.FIT_SHEET, drawing.OPERATION_SHEET)
-    assert len(drawing.SHEET_NAMES) == 9
+    assert drawing.SHEET_NAMES[7:] == (drawing.FIT_SHEET, drawing.OPERATION_SHEET, drawing.HOLDING_SHEET)
+    assert len(drawing.SHEET_NAMES) == 10
     assert set(drawing.SHEET_LAYOUTS.values()) == {drawing.DrawingLayout.LANDSCAPE}
     assert set(drawing.SHEET_SCALES) == set(drawing.SHEET_NAMES)
     assert drawing.SHEET_SCALES[drawing.ASSEMBLED_SHEET] == drawing.ASSEMBLED_SCALE
@@ -228,6 +278,7 @@ def test_sheets_are_landscape_with_their_scales() -> None:
     assert drawing.SHEET_SCALES[drawing.OPERATION_SHEET] == drawing.ISOMETRIC_SCALE
     assert drawing.SHEET_SCALES[drawing.STEPS_SHEET] == drawing.NOTES_REFERENCE_SCALE
     assert drawing.SHEET_SCALES[drawing.FIT_SHEET] == drawing.NOTES_REFERENCE_SCALE
+    assert drawing.SHEET_SCALES[drawing.HOLDING_SHEET] == drawing.NOTES_REFERENCE_SCALE
     assert all(
         drawing.SHEET_SCALES[cluster.sheet] in drawing.CLUSTER_SCALE_LADDER
         for cluster in drawing.CLUSTERS
@@ -330,6 +381,7 @@ def test_sheet_text_wraps_within_its_layout_width() -> None:
         assert drawing._STEP_LABEL.fullmatch(label)
     fit = drawing.FIT_LAYOUT
     operation = drawing.OPERATION_LAYOUT
+    holding = drawing.HOLDING_LAYOUT
     for text, width in (
         (drawing.ASSEMBLED_CAPTION, drawing.CAPTION_WIDTH),
         (drawing.ALIGNMENT_NOTE, drawing.ALIGNMENT_WIDTH),
@@ -341,6 +393,9 @@ def test_sheet_text_wraps_within_its_layout_width() -> None:
         (operation.steps, drawing.STEPS_LINE_WIDTH),
         (operation.continued, drawing.STEPS_LINE_WIDTH),
         (operation.checks, drawing.STEPS_LINE_WIDTH),
+        (holding.steps, drawing.STEPS_LINE_WIDTH),
+        (holding.continued, drawing.STEPS_LINE_WIDTH),
+        (holding.checks, drawing.STEPS_LINE_WIDTH),
     ):
         assert max(len(line) for line in text.split("\n")) <= width
     # Each alignment station and sweep-limit row prints whole on one line.
@@ -348,7 +403,7 @@ def test_sheet_text_wraps_within_its_layout_width() -> None:
         assert line in drawing.ALIGNMENT_NOTE.split("\n")
     # The general torque note opens sheet 7's sequence, its items unbroken.
     assert drawing.ASSEMBLY_STEPS.split("\n")[1].startswith("TORQUE WHERE NO STEP")
-    assert "(ITEMS 21, 22, 24, 26 AND 27)" in drawing.ASSEMBLY_STEPS.replace("\n", " ")
+    assert " ".join(spec.GENERAL_TORQUE_NOTE.split()) in " ".join(drawing.ASSEMBLY_STEPS.split())
 
 
 def test_a_blank_line_parts_each_top_level_step() -> None:
@@ -682,6 +737,7 @@ def _lines(text: str) -> int:
 def test_steps_sheet_regions_fit_apart() -> None:
     _assert_steps_sheet_fits(drawing.STEPS_LAYOUT)
     _assert_steps_sheet_fits(drawing.FIT_LAYOUT)
+    _assert_steps_sheet_fits(drawing.HOLDING_LAYOUT)
 
 
 @pytest.mark.parametrize(
@@ -689,6 +745,7 @@ def test_steps_sheet_regions_fit_apart() -> None:
     (
         (drawing.STEPS_SHEET, drawing.STEPS_LAYOUT),
         (drawing.FIT_SHEET, drawing.FIT_LAYOUT),
+        (drawing.HOLDING_SHEET, drawing.HOLDING_LAYOUT),
     ),
 )
 def test_instruction_reference_and_caption_fit_without_moving_notes(sheet, layout) -> None:
@@ -1526,6 +1583,7 @@ def test_steps_cite_every_screw_by_item_number() -> None:
         text
         for layout in (
             drawing.STEPS_LAYOUT, drawing.FIT_LAYOUT, drawing.OPERATION_LAYOUT,
+            drawing.HOLDING_LAYOUT,
         )
         for text in (layout.steps, layout.continued)
     )
@@ -1534,6 +1592,29 @@ def test_steps_cite_every_screw_by_item_number() -> None:
     # A citation never breaks across a line.
     for line in steps.split("\n"):
         assert not line.rstrip().endswith(("ITEM", "(ITEM"))
+
+
+def test_instruction_split_drops_or_duplicates_no_source_step() -> None:
+    layouts = (
+        drawing.STEPS_LAYOUT, drawing.FIT_LAYOUT,
+        drawing.OPERATION_LAYOUT, drawing.HOLDING_LAYOUT,
+    )
+    def content(layout):
+        return " ".join(" ".join((layout.steps, layout.continued, layout.checks)).split())
+
+    all_text = " ".join(content(layout) for layout in layouts)
+    source_steps = (
+        spec.GENERAL_TORQUE_NOTE, *spec.ASSEMBLY_STEPS, *spec.ASSEMBLY_CHECKS,
+        *spec.PIVOT_FIT_STEPS, *spec.FEED_FIT_STEPS,
+        *spec.OPERATION_STEPS, *spec.HOLD_DOWN_STEPS, *spec.CAPTURE_CHECKS,
+    )
+    for step in source_steps:
+        assert all_text.count(" ".join(step.split())) == 1, step
+    operation, holding = content(drawing.OPERATION_LAYOUT), content(drawing.HOLDING_LAYOUT)
+    for step in (*spec.OPERATION_STEPS[:2], *spec.HOLD_DOWN_STEPS, *spec.CAPTURE_CHECKS[:3], *spec.CAPTURE_CHECKS[4:]):
+        assert " ".join(step.split()) in operation
+    for step in (*spec.OPERATION_STEPS[2:], *spec.CAPTURE_CHECKS[3:4]):
+        assert " ".join(step.split()) in holding
 
 
 @pytest.fixture

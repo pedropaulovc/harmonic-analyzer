@@ -24,11 +24,13 @@ RECIPES = (
     "build_ch_rocker_arm_tl_vn_oblique_pivot_screw.py",
     "build_ch_rocker_arm_tl_vn_oblique_pivot_spacer.py",
     "build_ch_rocker_arm_tl_vn_oblique_pivot_shim.py",
-    "build_ch_rocker_arm_tl_vn_oblique_hub_pin.py",
+    "build_ch_rocker_arm_tl_oblique_hub_stud.py",
+    "build_ch_rocker_arm_tl_oblique_hub_sleeve.py",
+    "build_ch_rocker_arm_tl_oblique_hub_washer.py",
     "build_ch_rocker_arm_tl_oblique_jig_assembly.py",
     "build_sh_vn_clamping_kit_hardware.py",
 )
-HARDWARE_RECIPES = RECIPES[3:7]
+HARDWARE_RECIPES = RECIPES[3:9]
 
 
 def _local_nodes(scope: ast.AST):
@@ -253,7 +255,7 @@ def test_all_affected_native_recipe_calls_exist_and_bind_to_initialized_sdk(reci
 
 
 def test_census_covers_every_new_physical_interface() -> None:
-    assert len(RECIPES) == len(set(RECIPES)) == 9
+    assert len(RECIPES) == len(set(RECIPES)) == 11
     for recipe in RECIPES[1:3]:
         calls = {call.func.attr for path in _census_units(recipe) for call in sdk._adapter_calls(sdk._tree(path))}
         assert {"create_sketch", "create_cut_extrude"} <= calls

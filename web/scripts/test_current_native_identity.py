@@ -279,7 +279,7 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
         cad_map = json.loads((ROOT / "cad/config/current-identity-map.json").read_text(encoding="utf-8"))
         identity = CurrentNativeIdentity()
         retired = cad_map["retired_identities"]
-        self.assertEqual(len(retired), 37)
+        self.assertEqual(len(retired), 38)
         # #2119: the 3/16 pen-rod set screw gave way to the shared MHA-SH-VN-54;
         # #290: the arm's spot face took the MHA-PD-VN-67 pivot shim's room.
         machine = [row for row in retired if "-tl-" not in row["old_stem"]]
@@ -310,6 +310,9 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
             # Oblique simplification PR2 (owner ruling Main 2026-11-06, option
             # B): the KP08 screws are TL-VN-62's #8-32 X 5/8 SHCS.
             "ch-rocker-arm-tl-vn-oblique-kp08-screw": "MHA-CH-06-TL-VN-65",
+            # 2026-11-06 R3 hold-down: the turned TL-33 hub stud retires the
+            # bonded gauge pin.
+            "ch-rocker-arm-tl-vn-oblique-hub-pin": "MHA-CH-06-TL-VN-80",
         }
         actual_oblique = {
             target["stem"]: target["number"]

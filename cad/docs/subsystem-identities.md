@@ -111,18 +111,22 @@ owned OnlineMetals 1165 1/2 × 1 in bar on edge, raising the screw axis to
 Z52.4. The owned 1164 1/2 × 3/4 in stock is spare.
 
 New purchases are TL-VN-77 shoulder screws (Huyett BLTS40-0375-1500188P,
-thread shop-cut), TL-VN-78 spacers (AluminumSpacers.com AS62-18-40), TL-VN-79
-shims (Huyett SHIM-0375-008 nominal; SHIM-0375-004/-020 fitting stock),
-and TL-VN-80 HUB gauge pin (McMaster 23065A855-23065A4 .4000 Class Z NO-GO
-plug gauge, abrasive-cut to .79, factory end up, bonded with Loctite 638);
-the TL-VN-53 CL dowel is McMaster 98381A542 (1/4 x 1). These parts belong
-only to the jig, never a machine assembly. New identity-map rows use their
-canonical stem as source key, `old_number: null`, and the introduction date.
+thread shop-cut), TL-VN-78 spacers (AluminumSpacers.com AS62-18-40) and TL-VN-79
+shims (Huyett SHIM-0375-008 nominal; SHIM-0375-004/-020 fitting stock);
+the TL-VN-53 CL dowel is McMaster 98381A542 (1/4 x 1). The HUB is held by
+the turned TL-33 hub stud (flange under the carrier, the gauge pin's .4000
+locating nose faced to .080 proud at assembly), the TL-34 steel sleeve
+and TL-35 brass washer, clamped by the TL-VN-85 #10-24 X 1/2 low-head
+screw (McMaster 92220A163); the outboard left clamp is the TL-VN-86 #10-24
+X 3/4 low-head screw (McMaster 92220A165), cut to fit into the carrier's
+blind tap. These parts belong only to the jig, never a machine assembly.
+New identity-map rows use their canonical stem as source key,
+`old_number: null`, and the introduction date.
 
 Retirement records below reserve TL-23, TL-25, TL-27, TL-29, TL-30, TL-31,
 TL-VN-50, TL-VN-51, TL-VN-52, TL-VN-54, TL-VN-55, TL-VN-63, TL-VN-65, TL-VN-66, TL-VN-70,
-TL-VN-73 through TL-VN-76, TL-VN-81 and TL-VN-82 (assigned to the feed nut on
-2026-11-04 but never released) permanently.
+TL-VN-73 through TL-VN-76, TL-VN-80, TL-VN-81 and TL-VN-82 (assigned to the
+feed nut on 2026-11-04 but never released) permanently.
 TL-VN-72 also stays retired. Owned 6200 bearings remain shop stock without
 a jig identity. For a pass change, isolate the machine, support the carrier,
 unscrew both shoulder screws, lift the carrier, move the carriages and refit
@@ -434,6 +438,9 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | retired tooling part | — | — | `ch-rocker-arm-tl-oblique-pivot-cap` | MHA-CH-06-TL-30 | — | MHA-CH-06-TL-30 (retired 2026-10-23; never reissued) |
 | retired tooling part | — | — | `ch-rocker-arm-tl-oblique-pivot-retainer` | MHA-CH-06-TL-31 | — | MHA-CH-06-TL-31 (retired 2026-10-23; never reissued) |
 | new tooling part (2026-10-23) | — | — | — | — | `ch-rocker-arm-tl-oblique-feed-block` | MHA-CH-06-TL-32 |
+| new tooling part (2026-11-06) | — | — | — | — | `ch-rocker-arm-tl-oblique-hub-stud` | MHA-CH-06-TL-33 |
+| new tooling part (2026-11-06) | — | — | — | — | `ch-rocker-arm-tl-oblique-hub-sleeve` | MHA-CH-06-TL-34 |
+| new tooling part (2026-11-06) | — | — | — | — | `ch-rocker-arm-tl-oblique-hub-washer` | MHA-CH-06-TL-35 |
 | retired tooling part | — | — | `ch-rocker-arm-tl-oblique-feed-nut` | MHA-CH-06-TL-27 | — | MHA-CH-06-TL-27 (retired 2026-11-04; never reissued) |
 | retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-rail` | MHA-CH-006-TL-30 | — | MHA-CH-06-TL-VN-50 (retired 2026-11-04 into TL-VN-83 `Rail`; never reissued) |
 | retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-carriage` | MHA-CH-006-TL-31 | — | MHA-CH-06-TL-VN-51 (retired 2026-11-04 into TL-VN-83 `Carriage`; never reissued) |
@@ -464,11 +471,13 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | new tooling vendor part (2026-10-23) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-pivot-screw` | MHA-CH-06-TL-VN-77 |
 | new tooling vendor part (2026-10-23) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-pivot-spacer` | MHA-CH-06-TL-VN-78 |
 | new tooling vendor part (2026-10-23) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-pivot-shim` | MHA-CH-06-TL-VN-79 |
-| new tooling vendor part (2026-10-23) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-hub-pin` | MHA-CH-06-TL-VN-80 |
+| retired tooling vendor part | — | — | `ch-rocker-arm-tl-vn-oblique-hub-pin` | MHA-CH-06-TL-VN-80 | — | MHA-CH-06-TL-VN-80 (retired 2026-11-06; never reissued) |
 | retired tooling vendor part | — | — | `ch-rocker-arm-tl-vn-oblique-nut-dowel` | MHA-CH-06-TL-VN-81 | — | MHA-CH-06-TL-VN-81 (retired 2026-11-04; never reissued) |
 | reserved tooling vendor Number | — | — | — | — | — | MHA-CH-06-TL-VN-82 (assigned to `ch-rocker-arm-tl-vn-oblique-feed-nut` 2026-11-04, never released; now TL-VN-84 `FeedNut`; never reissued) |
 | new tooling vendor part (2026-11-04) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-rail-kit` | MHA-CH-06-TL-VN-83 |
 | new tooling vendor part (2026-11-04) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-leadscrew-kit` | MHA-CH-06-TL-VN-84 |
+| new tooling vendor part (2026-11-06) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-hub-screw` | MHA-CH-06-TL-VN-85 |
+| new tooling vendor part (2026-11-06) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-left-clamp-screw` | MHA-CH-06-TL-VN-86 |
 | retired tooling part | — | — | `ch-pivot-bracket-tl-ledge` | MHA-CH-008-TL-01 | — | MHA-CH-08-TL-01 (retired 2026-10-21; never reissued) |
 | retired tooling part | — | — | `ch-pivot-bracket-tl-angle-plate` | MHA-CH-008-TL-02 | — | MHA-CH-08-TL-02 (retired 2026-10-21; never reissued) |
 | retired tooling part | — | — | `dt-cone-pivot-post-tl-bond-cradle` | MHA-DT-005-TL-01 | — | MHA-DT-05-TL-01 (retired 2026-10-21; never reissued) |
@@ -695,3 +704,9 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | changed | `ch-rocker-arm-tl-vn-oblique-rail-screw` | MHA-CH-06-TL-VN-61 | Owner A″: McMaster 91251A197 #8-32 X 3/4 SHCS ×16 for the rails at PR2; upper R3 adds CL/CR/HUB clamps for ×19. The four lower TL-28 screws move to TL-VN-62. |
 | changed | `ch-rocker-arm-tl-vn-oblique-bracket-screw` | MHA-CH-06-TL-VN-62 | Owner A″: McMaster 91251A196 #8-32 X 5/8 SHCS ×8: four down through KP08 feet at 1.0 N·m, four up through TL-20's .200 counterbores at 2.8 N·m, no washers. Same Number/SKU, one BOM row; both thread-entry limits protect the complete screw reaches. |
 | retired | `ch-rocker-arm-tl-vn-oblique-kp08-screw` | MHA-CH-06-TL-VN-65 | 2026-11-06 owner ruling (Main, option B): the KP08 screws are the #8-32 X 5/8 SHCS TL-VN-62; McMaster 91255A150 #6-32 button heads leave the jig; no registry, builder or drawing; Number never reissued |
+| retired | `ch-rocker-arm-tl-vn-oblique-hub-pin` | MHA-CH-06-TL-VN-80 | 2026-11-06 R3 hold-down: the bonded gauge pin cannot take a clamp screw, so the turned TL-33 hub stud replaces it with the same .4000 nose and .080 proud; no registry, builder or drawing; Number never reissued |
+| added | `ch-rocker-arm-tl-oblique-hub-stud` | MHA-CH-06-TL-33 | 2026-11-06 turned 1018 stud: the owner's literal Ø18 x 3 mm flange (prints .709 x .118) under TL-21, .3990-.3995 shank slipping through TL-21's .4000 HUB bore, the TL-VN-80 pin's .4000 -.0001/0 nose faced to .080 +/-.008 above the actual riser at assembly, #10-24 blind nose tap |
+| added | `ch-rocker-arm-tl-oblique-hub-sleeve` | MHA-CH-06-TL-34 | 2026-11-06 loose turned 1018 sleeve, .580 O.D., .4000 reamed bore on the TL-33 shank, faced to the actual TL-24 thickness flush to .002 below its top, fitted after the riser's self-cut |
+| added | `ch-rocker-arm-tl-oblique-hub-washer` | MHA-CH-06-TL-35 | 2026-11-06 turned C360 brass washer x1, the owner's Ø11 O.D., #9 drilled bore, .06 thick, under the TL-VN-85 low head on the strap |
+| added | `ch-rocker-arm-tl-vn-oblique-hub-screw` | MHA-CH-06-TL-VN-85 | 2026-11-06 McMaster 92220A163 black-oxide alloy-steel low-profile SHCS x1, #10-24 x 1/2, head Ø5/16 x 3/32, into the TL-33 nose tap through the TL-35 washer; used full length |
+| added | `ch-rocker-arm-tl-vn-oblique-left-clamp-screw` | MHA-CH-06-TL-VN-86 | 2026-11-06 McMaster 92220A165 black-oxide alloy-steel low-profile SHCS x1, #10-24 x 3/4, head directly on the strap, cut to the actual strap/riser grip plus 8.65-8.85 into TL-21's flat-bottom blind tap |

@@ -5,9 +5,9 @@ carrier is the moving plate of the rocker arm's oblique-trammel mill jig
 (``ch_rocker_arm_tl_oblique_trammel_spec``, imported as ``trammel``). It rides
 on two purchased shoulder screws (MHA-CH-06-TL-VN-77), supported by loose
 spacers; for the inner pass they sit in A1/B1, for the outer pass in A2/B2.
-The rocker blank, on its riser (MHA-CH-06-TL-24), is located on the HUB pin
-(MHA-CH-06-TL-VN-80) and the CL dowel and clamped by the CR screw; the feed
-lever (MHA-CH-06-TL-26) bolts to the -Y edge.
+The rocker blank on its 6061 riser (MHA-CH-06-TL-24) locates on the TL-33
+hub stud's nose and the retained CL dowel. HUB and left #10-24 hold-downs
+supplement the CR clamp. The TL-26 feed lever bolts to the -Y edge.
 
 Material and stock: 1/2 x 6 in 6061-T6511 aluminium bar, the owned OnlineMetals
 1173 (shop inventory); sawn to length and milled to width on edge in the
@@ -44,7 +44,7 @@ Values marked (calc) are read from ``trammel``, never retyped:
   drilled in situ at assembly (MHA-CH-06-TL-00 step 10): at the symmetric
   position, the table run from the apex (the spindle origin) +Y by
   ``trammel.HUB_OFFSET`` (``HUB_OFFSET_BAND``), then reamed to Ø.4000
-  +.0005/0 (the purchased .4000 reamer) for the bonded TL-VN-80 gauge pin.
+  +.0005/0 (the purchased .4000 reamer) for the removable TL-33 hub clamp stud.
   The pin spacing then moves the HUB with the cut, so only that setting and
   the pin clearance's shift reach the strap's top edge (``HUB_RADIAL_STACK``,
   inside half its band at the worst case: rule 19's fit-up).
@@ -94,12 +94,12 @@ tolerance, so nothing need bear under the plate.
 
 Rule 17 (walls) at worst case, against the inch .080 target: the lever tap's
 thread major to the -Y edge at the stations' and the edge's .XX bands
-(``WALLS_MM``). Rule 18 (engagement): every tap runs THRU the .47 plate, so
-its full thread at the worst case is the plate at its .XX low limit less the
-tap mouth's title-block edge break and one pitch of incomplete lead
-(``ENGAGEMENT_MM``, build_pd_platen_clip's count). These are the carrier's
-available full threads, not the screws' actual engagement. The 5/16-18
-feed-lever tap offers under 1.5D; its RV-01 callout states that shortfall.
+(``WALLS_MM``). The existing CR, riser and lever taps run THRU the .47 plate:
+their available full thread is the low-limit plate less its entry break
+and one incomplete pitch (``ENGAGEMENT_MM``), not actual screw engagement.
+The added left #10-24 receiver is BLIND, with a flat-bottom pilot and
+separately required full thread; its own floor and engagement guards apply.
+The feed-lever tap's existing under-1.5D RV-01 shortfall remains unchanged.
 """
 
 from __future__ import annotations
@@ -109,7 +109,7 @@ import math
 import _config
 import ch_rocker_arm_tl_vn_oblique_pivot_screw_spec as pivot_screw
 import ch_rocker_arm_tl_vn_oblique_pivot_spacer_spec as pivot_spacer
-import ch_rocker_arm_tl_vn_oblique_hub_pin_spec as hub_pin
+import ch_rocker_arm_tl_oblique_hub_stud_spec as hub_stud
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import ch_rocker_arm_spec as rocker
 import _mcmaster_98381a542 as cl_dowel_stock
@@ -185,20 +185,21 @@ PIN_CLEARANCE_MAX = _hole_high - _mate_low
 # Symmetric, on D1, dX and dY: the former +/-0.02 mm on the inch grid.
 POSITION_BAND = 0.02032  # .0008
 PIN_NUMBER = "MHA-CH-06-TL-VN-77"
-# Fit doc F16: the bonded .4000 gauge pin in REAM_H7 (the purchased .4000
-# reamer): a 0 to .0006 diametral bond gap.
+# Keep the current .4000 H7 bore. The new stud shank slips through it; its
+# unchanged .4000 locating nose serves the strap, not the carrier fit.
 HUB_HOLE_DIA = 10.16  # .4000
 HUB_HOLE_BAND = REAM_H7  # +.0005/0
 _hub_hole_low, _hub_hole_high = deviations(HUB_HOLE_BAND)
-_hub_pin_low, _hub_pin_high = deviations(hub_pin.DIA_BAND)
+_hub_shank_low, _hub_shank_high = deviations(hub_stud.SHANK_DIA_BAND)
 HUB_HOLE_LIMITS = (HUB_HOLE_DIA + _hub_hole_low, HUB_HOLE_DIA + _hub_hole_high)
-HUB_PIN_LIMITS = (hub_pin.DIA + _hub_pin_low, hub_pin.DIA + _hub_pin_high)
-HUB_BOND_CLEARANCE_MIN = HUB_HOLE_LIMITS[0] - HUB_PIN_LIMITS[1]
-HUB_BOND_CLEARANCE_MAX = HUB_HOLE_LIMITS[1] - HUB_PIN_LIMITS[0]
-if HUB_BOND_CLEARANCE_MIN < 0.0:
-    raise AssertionError("bonded gauge pin interferes with the carrier HUB bore")
-if HUB_BOND_CLEARANCE_MAX > 0.0006 * trammel.INCH + 1e-9:
-    raise AssertionError("the HUB bond gap exceeds .0006")
+HUB_STUD_LIMITS = (
+    hub_stud.SHANK_DIA + _hub_shank_low,
+    hub_stud.SHANK_DIA + _hub_shank_high,
+)
+HUB_SLIP_CLEARANCE_MIN = HUB_HOLE_LIMITS[0] - HUB_STUD_LIMITS[1]
+HUB_SLIP_CLEARANCE_MAX = HUB_HOLE_LIMITS[1] - HUB_STUD_LIMITS[0]
+if HUB_SLIP_CLEARANCE_MIN <= 0.0:
+    raise AssertionError("hub clamp stud does not slip through the unchanged carrier bore")
 # The mate's number and name print on rows of their own: on one row they
 # made the block 91 mm wide, past the inner border and across the plate
 # end's extension line.
@@ -301,6 +302,33 @@ if CR_HEAD_DIA_MAX > CR_HEAD_CLEAR_DIA:
 # would cross the RiserX2R and CrX extension lines, 20.6 sheet mm apart.
 CR_STATION_FUNCTION = "MIRRORS CL STATION"
 CR_TAP_CALLOUT = f"CLAMPS {STRAP_NUMBER}\n{CR_STATION_FUNCTION}"
+
+# Added clamp beside CL. The blind receiver preserves an unbroken underside:
+# a flat-bottom pilot is end-milled, not made with a 118-degree drill point.
+LEFT_CLAMP = trammel.LEFT_CLAMP
+LEFT_CLAMP_THREAD = "#10-24"
+LEFT_CLAMP_TAP_DRILL = TAP_DRILL_MM[LEFT_CLAMP_THREAD]
+LEFT_CLAMP_DRILL_DEPTH = 9.398  # .37, .XX band
+LEFT_CLAMP_THREAD_DEPTH = 7.874  # .310 MIN from entry face
+LEFT_CLAMP_FULL_THREAD_MIN = LEFT_CLAMP_THREAD_DEPTH - 0.254  # .010 entry break
+LEFT_CLAMP_FLOOR_MIN = (
+    THICKNESS - THICKNESS_BAND - LEFT_CLAMP_DRILL_DEPTH - _XX
+)
+LEFT_CLAMP_SPEC = HoleSpec(
+    "tapped_bottoming", LEFT_CLAMP_THREAD, end="blind",
+    depth_mm=LEFT_CLAMP_DRILL_DEPTH,
+    overrides_mm={"ThreadDepth": LEFT_CLAMP_THREAD_DEPTH},
+    drill_angle_deg=180.0,
+)
+LEFT_CLAMP_TAP_CALLOUT = "FLAT BOTTOM\nTHREAD DEPTH MIN\nCLAMPS STRAP BESIDE CL"
+if LEFT_CLAMP_FLOOR_MIN < WALL_TARGET_MM - 1e-9:
+    raise AssertionError("left blind clamp pilot violates the .080 floor")
+if LEFT_CLAMP_FULL_THREAD_MIN < 1.5 * THREAD_MAJOR_MM[LEFT_CLAMP_THREAD]:
+    raise AssertionError("left blind clamp tap has under 1.5D full thread")
+# A bottoming tap with at most one incomplete pitch fits beyond the required
+# full thread even at the shallowest permitted pilot depth.
+if LEFT_CLAMP_DRILL_DEPTH - _XX - LEFT_CLAMP_THREAD_DEPTH < trammel.INCH / 24.0:
+    raise AssertionError("left blind clamp tap has no room for its bottoming lead")
 # mr4: the tap axis's 8.861 is 3-place because it locates the lever taps;
 # mr8: named by the feature it locates on the sheet, its row no wider than
 # the 11-character one it replaced (draw: LeverX's lane).
@@ -350,6 +378,7 @@ STATIONS = {
     "RiserX2": RISER_SCREWS[2],
     "RiserX2R": RISER_SCREWS[3],
     "CrX": CR,
+    "LeftClampX": LEFT_CLAMP,
 }
 # Rule 17 (riser walls): C, the cut's centre (trammel.ARC_CENTRE), stands D1/2
 # from A1, so each riser station's error about C adds half the spacing band to
@@ -430,6 +459,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     SPOT_REFERENCE: {"SpotDia", "ClY"},
     STATION_REFERENCE: set(STATIONS),
     "CrTap": {"CrY"},
+    "LeftClampTap": {"LeftClampY"},
     "RiserTaps": {"RiserY1", "RiserY2"},
     "LeverTaps": {"LeverY1", "LeverY2"},
 }
@@ -460,9 +490,11 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "ClX": 3,
         "LeverX": 3,
         "CrX": 3,
+        "LeftClampX": 3,
         **{name: RISER_STATION_PLACES for name in STATIONS if name.startswith("Riser")},
     },
     "CrTap": {"CrY": 3},
+    "LeftClampTap": {"LeftClampY": 3},
     "RiserTaps": {"RiserY1": RISER_STATION_PLACES, "RiserY2": RISER_STATION_PLACES},
     "LeverTaps": {"LeverY1": 2, "LeverY2": 2},
 }
@@ -474,7 +506,7 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked carrier dimension needs authored places")
 
-# The HUB, reamed for the bonded pin that carries the strap's pivot on the cut
+# The HUB, reamed for the stud carrying the strap's pivot on the cut
 # arcs' centreline (X = 0), moves the pivot radially 1:1 against the R800 top
 # edge. Rule 19 (owner ruling 5, option A, 2026-11-01): it is drilled in situ
 # on the running jig at the symmetric position, the table run from the apex

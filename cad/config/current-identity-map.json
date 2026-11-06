@@ -2275,18 +2275,6 @@
       ]
     },
     {
-      "old_stem": "ch-rocker-arm-tl-vn-oblique-hub-pin",
-      "old_number": null,
-      "introduced": "2026-10-23",
-      "new_identities": [
-        {
-          "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-hub-pin",
-          "number": "MHA-CH-06-TL-VN-80"
-        }
-      ]
-    },
-    {
       "old_stem": "pd-vn-transgear-cluster-shim",
       "old_number": null,
       "introduced": "2026-11-01",
@@ -2311,6 +2299,63 @@
           "prior_number": "MHA-CH-06-TL-VN-82",
           "configuration": "FeedNut",
           "role": "FeedNut"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-hub-stud",
+      "old_number": null,
+      "introduced": "2026-11-06",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-hub-stud",
+          "number": "MHA-CH-06-TL-33"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-hub-sleeve",
+      "old_number": null,
+      "introduced": "2026-11-06",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-hub-sleeve",
+          "number": "MHA-CH-06-TL-34"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-hub-washer",
+      "old_number": null,
+      "introduced": "2026-11-06",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-hub-washer",
+          "number": "MHA-CH-06-TL-35"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-vn-oblique-hub-screw",
+      "old_number": null,
+      "introduced": "2026-11-06",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm-tl-oblique-jig",
+          "stem": "ch-rocker-arm-tl-vn-oblique-hub-screw",
+          "number": "MHA-CH-06-TL-VN-85"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-vn-oblique-left-clamp-screw",
+      "old_number": null,
+      "introduced": "2026-11-06",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm-tl-oblique-jig",
+          "stem": "ch-rocker-arm-tl-vn-oblique-left-clamp-screw",
+          "number": "MHA-CH-06-TL-VN-86"
         }
       ]
     }
@@ -2716,6 +2761,19 @@
           "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-kp08-screw",
           "number": "MHA-CH-06-TL-VN-65"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-vn-oblique-hub-pin",
+      "old_number": null,
+      "introduced": "2026-10-23",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm-tl-oblique-jig",
+          "stem": "ch-rocker-arm-tl-vn-oblique-hub-pin",
+          "number": "MHA-CH-06-TL-VN-80"
         }
       ],
       "status": "retired"

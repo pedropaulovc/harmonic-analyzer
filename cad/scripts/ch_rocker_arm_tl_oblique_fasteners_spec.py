@@ -61,12 +61,15 @@ import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_riser_spec as riser
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import ch_rocker_arm_tl_vn_oblique_pivot_screw_spec as pivot_screw
+import ch_rocker_arm_tl_oblique_hub_stud_spec as hub_stud
+import ch_rocker_arm_tl_oblique_hub_washer_spec as hub_washer
 from _hole_spec import THREAD_MAJOR_MM
 from _mcmaster_91771a112 import DIMS as _RISER_SCREW
 
 INCH = trammel.INCH
 RAILS = 2  # one rail, one base bar, one carriage, one pivot block per side
 SHCS = "SHCS"
+LOW_HEAD = "LOW-HEAD SHCS"
 # The riser's countersinks take only the B18.6.3 machine-screw head; a B18.3
 # socket flat head stands proud of them (trammel spec; Codex #1583).
 FLAT_HEAD = "B18.6.3 FLAT HEAD"
@@ -219,6 +222,31 @@ CR_CLAMP = Fastener(
     # the full bought screw: its tip stands into the free space above the rail
     tip_clearance_mm=trammel.CARRIER_TO_RAIL_GAP,
 )
+HUB_CLAMP = Fastener(
+    "hub clamp: strap to TL-33 stud nose",
+    "#10-24",
+    LOW_HEAD,
+    "1/2",
+    1,
+    hub_washer.THICK + trammel.STRAP_THICK - hub_stud.TIP_SET,
+    hub_stud.TAP_FULL_DEPTH,
+)
+LEFT_CLAMP_INSERTION = (8.65, 8.85)
+LEFT_CLAMP_CUT_LENGTH = (
+    trammel.RISER_THICK + trammel.STRAP_THICK + sum(LEFT_CLAMP_INSERTION) / 2.0
+)
+LEFT_CLAMP = Fastener(
+    "left clamp: strap and riser to TL-21 blind receiver",
+    carrier.LEFT_CLAMP_THREAD,
+    LOW_HEAD,
+    "3/4",
+    1,
+    trammel.RISER_THICK + trammel.STRAP_THICK,
+    carrier.LEFT_CLAMP_THREAD_DEPTH,
+    tip_clearance_mm=carrier.LEFT_CLAMP_DRILL_DEPTH - carrier.LEFT_CLAMP_THREAD_DEPTH,
+    cut_length_mm=LEFT_CLAMP_CUT_LENGTH,
+    note="cut to actual grip plus 8.65–8.85; restore tip to at most one incomplete pitch",
+)
 LEVER_TO_CARRIER = Fastener(
     "TL-26 feed lever to TL-21 carrier",
     carrier.LEVER_THREAD,
@@ -239,6 +267,8 @@ FASTENERS: tuple[Fastener, ...] = (
     NUT_TO_FEED_BLOCK,
     RISER_TO_CARRIER,
     CR_CLAMP,
+    HUB_CLAMP,
+    LEFT_CLAMP,
     LEVER_TO_CARRIER,
 )
 LEVER_LOCK_WASHER = Washer(
@@ -248,7 +278,8 @@ LEVER_LOCK_WASHER = Washer(
     LEVER_TO_CARRIER.count,
     LEVER_LOCK_STACK,
 )
-WASHERS: tuple[Washer, ...] = (LEVER_LOCK_WASHER,)
+HUB_WASHER = Washer(HUB_CLAMP.joint, "#10", "BRASS WASHER", 1, hub_washer.THICK)
+WASHERS: tuple[Washer, ...] = (LEVER_LOCK_WASHER, HUB_WASHER)
 
 # --- The common screw and its exceptions ---------------------------------------
 # One SKU wherever its head and engagement fit (module docstring): these
@@ -295,6 +326,12 @@ COMMON_SCREW_EXCEPTIONS: dict[str, str] = {
     "#8-32 x 5/8 SHCS, TL-28 to bar": (
         "owner A″ 2026-11-07: .200 counterbore and 5/8 screw retain 1.5D "
         "full thread without entering the opposed-phase cut"
+    ),
+    "#10-24 low-head SHCS, HUB and left clamp": (
+        "the HUB and LEFT receivers are #10-24; low heads keep both clamps below "
+        "the CR head. HUB uses 92220A163 at its purchased 1/2 length; LEFT uses "
+        "92220A165 cut to the actual grip and blind-tap insertion. The common "
+        "#8-32 screw mates neither receiver nor the required head/grip geometry"
     ),
 }
 

@@ -6,8 +6,8 @@ saved under rail 1 on -X, turned over under rail 2 on +X) held to the table
 by hold-down studs in T-nuts under flange nuts, an HGR15 rail screwed on each
 bar with an HGH15 carriage on it, a plain pivot block on rail 2 and an
 integral nut-lug feed block on rail 1. Purchased shoulder screws, selected
-shims and loose spacers support and capture the carrier. Its gauge-pin HUB
-locator is bonded; the CL dowel, riser, clamp and lever retain their roles.
+shims and loose spacers support and capture the carrier. A removable flanged
+hub stud and left #10 clamp supplement CR; the CL locating dowel remains.
 The raised leadscrew runs in two KP08 blocks on on-edge end brackets and
 through the feed block's nut. Every bought item and screw is inserted.
 
@@ -113,7 +113,11 @@ _PARTS = (
     ("ch-rocker-arm-tl-vn-oblique-pivot-spacer", "ch-rocker-arm-tl-vn-oblique-pivot-spacer"),
     ("ch-rocker-arm-tl-vn-oblique-pivot-shim", "ch-rocker-arm-tl-vn-oblique-pivot-shim"),
     ("ch-rocker-arm-tl-oblique-riser", "ch-rocker-arm-tl-oblique-riser"),
-    ("ch-rocker-arm-tl-vn-oblique-hub-pin", "ch-rocker-arm-tl-vn-oblique-hub-pin"),
+    ("ch-rocker-arm-tl-oblique-hub-stud", "ch-rocker-arm-tl-oblique-hub-stud"),
+    ("ch-rocker-arm-tl-oblique-hub-sleeve", "ch-rocker-arm-tl-oblique-hub-sleeve"),
+    ("ch-rocker-arm-tl-oblique-hub-washer", "ch-rocker-arm-tl-oblique-hub-washer"),
+    ("ch-rocker-arm-tl-vn-oblique-hub-screw", "ch-rocker-arm-tl-vn-oblique-hub-screw"),
+    ("ch-rocker-arm-tl-vn-oblique-left-clamp-screw", "ch-rocker-arm-tl-vn-oblique-left-clamp-screw"),
     ("ch-rocker-arm-tl-oblique-feed-lever", "ch-rocker-arm-tl-oblique-feed-lever"),
     ("ch-rocker-arm-tl-oblique-end-bracket", "ch-rocker-arm-tl-oblique-end-bracket"),
     ("ch-rocker-arm-tl-vn-oblique-rail-kit", "ch-rocker-arm-tl-vn-oblique-rail-kit--Rail"),
@@ -862,7 +866,7 @@ async def build(adapter) -> dict[str, str]:
         f"jig at the {spec.PASS} pass, theta {spec.THETA:g}: pins at station "
         f"{spec.PIN_STATION:.3f}, carriages at {spec.CARRIAGE_STATION:.3f}; "
         f"carrier underside Z {spec.trammel.CARRIER_UNDERSIDE_Z:.1f}, "
-        f"HUB pin Z {spec.HUB_PIN_BOTTOM_Z:.1f}..{spec.HUB_PIN_TOP_Z:.1f}"
+        f"HUB pin Z {spec.HUB_STUD_BOTTOM_Z:.1f}..{spec.HUB_STUD_TOP_Z:.1f}"
     )
 
     # One free DOF, the sweep: every moving family reads under-constrained
