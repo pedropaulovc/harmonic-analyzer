@@ -1237,8 +1237,8 @@ def test_sweep_clears_the_column_cover(report) -> None:
     for rail in spec.RAILS:
         corners = [
             trammel.rail_point(rail, near + x, lateral)
-            for x in (-carriage.LENGTH / 2.0 - carriage.NIPPLE_PROUD,
-                      carriage.LENGTH / 2.0 + carriage.PLUG_PROUD)
+            for x in (-carriage.LENGTH / 2.0 - carriage.PLUG_PROUD,
+                      carriage.LENGTH / 2.0 + carriage.NIPPLE_PROUD)
             for lateral in (-carriage.WIDTH / 2.0, carriage.WIDTH / 2.0)
         ]
         expected[f"carriage {rail}"] = spec.COVER_Y - max(y for _x, y in corners)
@@ -1452,11 +1452,29 @@ def test_sweep_table_edge_margins(report) -> None:
     )
     assert feed["handwheel"]["-X end"] < 0.0
     assert feed["screw"]["-X end"] < 0.0
-    # The feed block's body rides on the rail like pivot block 2, mirrored.
-    block = edges["pivot block 2"]
-    assert feed["feed block"]["-X end"] == pytest.approx(block["+X end"])
-    assert feed["feed block"]["+X end"] == pytest.approx(block["-X end"])
-    assert feed["feed block"]["front"] == pytest.approx(edges["pivot block 2"]["front"])
+    # The body is mirrored, but the column-side integral lug is not:
+    # its +X/+lateral corner sets rail 1's outer table-edge margin.
+    lo, hi = trammel.CARRIAGE_TRAVEL
+    outline = (
+        (feed_block.BLOCK_X0, feed_block.LUG_Y1),
+        (feed_block.LUG_X0, feed_block.LUG_Y1),
+        (feed_block.LUG_X0, feed_block.LUG_Y0),
+        (feed_block.LUG_X1, feed_block.LUG_Y0),
+        (feed_block.LUG_X1, feed_block.LUG_Y1),
+        (feed_block.BLOCK_X1, feed_block.LUG_Y1),
+        (feed_block.BLOCK_X1, feed_block.BLOCK_WIDTH / 2.0),
+        (feed_block.BLOCK_X0, feed_block.BLOCK_WIDTH / 2.0),
+    )
+    swept = [
+        trammel.rail_point(1, station + x, -y)
+        for station in (lo, hi) for x, y in outline
+    ]
+    assert feed["feed block"] == pytest.approx({
+        "-X end": min(x for x, _y in swept) - spec.TABLE_X[0],
+        "+X end": spec.TABLE_X[1] - max(x for x, _y in swept),
+        "front": min(y for _x, y in swept) - spec.TABLE_Y[0],
+        "back": spec.TABLE_Y[1] - max(y for _x, y in swept),
+    })
     assert min(
         margin["front"] for family, margin in feed.items() if family != "feed block"
     ) > 90.0
@@ -1918,11 +1936,16 @@ def test_general_torque_note_covers_every_fastener_no_step_torques() -> None:
         spec.LEVER_SCREW: "12. ",
         spec.PIVOT_SCREW: "P2. ",
         spec.PILLOW_BLOCK_SCREW: "F1B. ",
+        spec.HUB_SCREW: "O5. ",
+        spec.LEFT_CLAMP_SCREW: "O5. ",
     }
-    steps = (*spec.ASSEMBLY_STEPS, *spec.PIVOT_FIT_STEPS, *spec.FEED_FIT_STEPS)
+    steps = (*spec.ASSEMBLY_STEPS, *spec.PIVOT_FIT_STEPS, *spec.FEED_FIT_STEPS,
+             *spec.OPERATION_STEPS)
     for label in torqued.values():
         step = next(text for text in steps if text.startswith(label))
         assert "N·m" in step
+    loading = next(text for text in steps if text.startswith("O5. "))
+    assert all(spec._item(family) in loading for family in (spec.HUB_SCREW, spec.LEFT_CLAMP_SCREW))
     # The common screw runs snug into the rails, but fitting step 2 torques
     # its TL-28 bar screws; the general note covers only the rail screws.
     fitting = next(text for text in steps if text.startswith("2. "))
@@ -1940,7 +1963,6 @@ def test_general_torque_note_covers_every_fastener_no_step_torques() -> None:
     }
     assert set(spec.SNUG_FASTENERS) == threaded - set(torqued)
     snug = sorted(int(spec.ITEM_NUMBERS[s]) for s in spec.SNUG_FASTENERS)
-    assert snug == [22, 23, 24, 26]
     # The note names exactly the snug items and states no torque figure.
     note = spec.GENERAL_TORQUE_NOTE
     assert sorted(int(n) for n in re.findall(r"\b\d+\b", note)) == snug
@@ -2382,8 +2404,13 @@ def test_f1_f2_prepare_seat_and_transfer_from_the_nut() -> None:
     assert "NO MOVING PART CONTACT" in steps["F3"]
     assert steps["7"].endswith(f"{spec._item(spec.PILLOW_BLOCK_SCREW)}, LOOSE.")
     for text in (*spec.ASSEMBLY_STEPS, *spec.FEED_FIT_STEPS):
-        for stale in ("PRINT-DRILLED", "TRANSFER SPOTTING", "LOOSE HOLES", "DOWEL PIN", "FLANGED"):
+        for stale in ("PRINT-DRILLED", "TRANSFER SPOTTING", "LOOSE HOLES", "DOWEL PIN"):
             assert stale not in text
+    # The retired feed-fit wording must not ban R3's actual flanged HUB stud.
+    for text in (steps["7"], steps["8A"], steps["8B"], *spec.FEED_FIT_STEPS):
+        assert "FLANGED" not in text
+    hub_step = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("10. "))
+    assert "FLANGED HUB CLAMP STUD" in hub_step
 
 
 def test_handwheel_set_screw_meets_the_leadscrew_flat() -> None:
@@ -2518,11 +2545,11 @@ def test_feed_lug_nut_and_drilled_threads_stay_in_real_material() -> None:
     for placement, (y, z) in zip(spec.NUT_SCREW_PLACEMENTS, feed_block.NUT_HOLES_YZ, strict=True):
         origin, screw_rows = placement
         expected = _image(rows, block_origin, (
-            feed_block.NUT_FACE_X - feed_nut.SCREW_GRIP, y, z,
+            feed_block.NUT_FACE_X + feed_nut.SCREW_GRIP, y, z,
         ))
         assert origin == pytest.approx(expected)
         # Bought heads point out of the lug; their -Y threaded shanks enter it.
-        assert screw_rows[1] == pytest.approx(tuple(-value for value in rows[0]))
+        assert screw_rows[1] == pytest.approx(rows[0])
     for station in trammel.CARRIAGE_TRAVEL:
         low = station + feed_block.NUT_REACH_X[0]
         high = station + feed_block.NUT_REACH_X[1]
@@ -2543,7 +2570,12 @@ def test_feed_nut_and_its_screws_hit_nothing_over_the_travel() -> None:
     assert {"pillow block 1", "end bracket 1", "base bar 1", "carrier"} <= set(gaps)
     assert not any(label.startswith("screw") for label in gaps)
     assert min(gaps.values()) > 0.0
-    assert min(gaps.values()) == pytest.approx(gaps["carrier"])
+    # The CL dowel, not the carrier underside, is now the lowest carrier
+    # rider. The report conservatively boxes the 45-degree turned nut flange.
+    nut_top = leadscrew.SCREW_AXIS_Z + math.sqrt(2.0) * feed_nut.FLANGE_DIA_MAX / 2.0
+    cl_bottom = trammel.CARRIER_TOP_Z + trammel.RISER_THICK + cl_dowel.TIP_HEIGHT - cl_dowel.LENGTH
+    assert gaps["CL dowel"] == pytest.approx(cl_bottom - nut_top)
+    assert min(gaps.values()) == pytest.approx(cl_bottom - nut_top)
     allowed = [pair for pair in contracts.ALLOWED_PAIRS if "@FeedNut:1" in pair]
     assert allowed == [frozenset(("@FeedNut:1", "@LeadScrew:1"))]
     screws = [

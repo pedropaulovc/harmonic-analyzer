@@ -324,12 +324,21 @@ def test_clusters_partition_the_bom() -> None:
     )
     carrier_cluster = next(c for c in drawing.CLUSTERS if c.sheet == "CARRIER EXPLODED")
     assert set(spec.STRAP_CLAMP_SCREW_INSTANCES.values()) <= set(carrier_cluster.context)
+    assert len(spec.RAIL_SCREW_INSTANCES) == len(spec.RAILS) * len(spec.guide_rail.HOLE_X)
+    assert len(spec.BAR_SCREW_INSTANCES) == len(spec.leadscrew.BASE_BAR_HOLES)
     # The feed nut's four flat heads are riser-screw instances (option B,
     # 2026-11-04): shown over the nut on the feed sheet, ballooned with the
-    # riser's four on the carrier sheet.
+    # riser's four on the carrier sheet. The bracket screws show under their
+    # brackets there too, ballooned with the rail occurrences on the rail sheet.
     assert feed.context == (
-        spec.instance_name(spec.CARRIAGE, 0), *feed_screws, *spec.NUT_SCREW_INSTANCES,
+        *spec.BAR_SCREW_INSTANCES,
+        spec.instance_name(spec.CARRIAGE, 0),
+        *feed_screws,
+        *spec.NUT_SCREW_INSTANCES,
     )
+    assert spec.RAIL_SCREW not in feed.visible
+    assert set(spec.BAR_SCREW_INSTANCES) <= feed.visible
+    assert not set(spec.RAIL_SCREW_INSTANCES) & feed.visible
     assert spec.CARRIAGE_SCREW not in feed.visible
     assert set(feed_screws) | set(spec.NUT_SCREW_INSTANCES) <= feed.visible
     assert spec.FEED_NUT in feed.stems and spec.RISER_SCREW not in feed.stems
@@ -343,10 +352,15 @@ def test_clusters_partition_the_bom() -> None:
     assert not set(spec.NUT_SCREW_INSTANCES) & carrier_sheet.visible
     rails = next(c for c in drawing.CLUSTERS if c.sheet == "RAIL BARS EXPLODED")
     assert spec.CARRIAGE_SCREW in rails.stems
-    assert rails.partial == ((spec.CARRIAGE_SCREW, pivot_screws),)
-    assert rails.visible == frozenset(
-        {*rails.stems, *pivot_screws} - {spec.CARRIAGE_SCREW}
+    assert rails.partial == (
+        (spec.CARRIAGE_SCREW, pivot_screws),
+        (spec.RAIL_SCREW, spec.RAIL_SCREW_INSTANCES),
     )
+    assert rails.visible == frozenset(
+        {*rails.stems, *pivot_screws, *spec.RAIL_SCREW_INSTANCES}
+        - {spec.CARRIAGE_SCREW, spec.RAIL_SCREW}
+    )
+    assert not set(spec.BAR_SCREW_INSTANCES) & rails.visible
     assert rails.title == "BASE BARS, RAILS, CARRIAGES AND PIVOT BLOCK"
     pivot = next(c for c in drawing.CLUSTERS if c.sheet == drawing.PIVOT_SHEET)
     assert set(pivot.stems) == {spec.PIVOT_SCREW, spec.PIVOT_SPACER, spec.PIVOT_SHIM}
@@ -2073,7 +2087,13 @@ def test_bom_refuses_items_numbered_off_the_steps(native_bom_bindings) -> None:
 
 def test_bom_refuses_a_wrong_quantity(native_bom_bindings) -> None:
     table = _Table(spec.BOM_ORDER)
-    table.cells[1][3] = "1"  # the base bar row grouped per configuration
+    # Each base-bar configuration is its own row, one off (Bar1, Bar2); the
+    # regression is both bars counted on Bar1's row.
+    row = int(spec.ITEM_NUMBERS[spec.BASE_BAR_1])
+    assert table.cells[row][3] == str(spec.QUANTITIES[spec.BASE_BAR_1]) == "1"
+    table.cells[row][3] = str(
+        spec.QUANTITIES[spec.BASE_BAR_1] + spec.QUANTITIES[spec.BASE_BAR_2]
+    )
     with pytest.raises(RuntimeError, match="quantity"):
         drawing._validate_bom(_ADAPTER, table)
 
