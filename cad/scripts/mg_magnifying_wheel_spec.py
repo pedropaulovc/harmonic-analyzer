@@ -192,8 +192,8 @@ ROUND_TEXT_SUFFIX = " MAX"
 # bands (its bottom Ø and its R) serve one mate, named once in a numbered
 # note both callouts link (rule 4: a mate serving several features).  The
 # spokes' count, pitch and clocking print on their own angle
-# (SPOKE_REFERENCE) and centreline.  The tie holes name the wire member each
-# holds at their own callouts.  TIE 1's two coordinates ride the title
+# (SPOKE_REFERENCE) and centreline.  TIE 1 names the wire member it ties,
+# and TIE 2 where it runs, at their own callouts.  TIE 1's two coordinates ride the title
 # block: the boss is sized so its wall holds at .XX (TIE1_HUB_WALL).  The
 # mates' numbers are literals so the axle, drum and wire stay out of the
 # part's recipe; test_mg_magnifying_wheel_drawing pins them to the config

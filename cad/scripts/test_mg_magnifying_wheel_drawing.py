@@ -313,8 +313,9 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
     assert drawing.DIMENSION_CALLOUTS["Tie1HoleDia"] == (
         "DRILL THRU\nTIES LEVER WIRE\nOF MHA-SH-VN-56"
     )
+    # TIE 2 states where it runs: radial, from the groove's bottom.
     assert drawing.DIMENSION_CALLOUTS["Tie2HoleDia"] == (
-        "DRILL THRU\nTIES PEN WIRE\nOF MHA-SH-VN-56"
+        "DRILL THRU\nRADIAL FROM\nGROOVE BOTTOM"
     )
     assert not {"Tie1HoleDia", "Tie2HoleDia"} & set(drawing.CALLOUTS_ABOVE)
     assert "TIE 1" not in notes and "TIE 2" not in notes
@@ -348,7 +349,7 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
     assert drawing.CALLOUTS_ABOVE["HubLength"] == "MHA-MG-07 LOCKNUT STACK"
     # An above-callout prints one line only.
     assert not any("\n" in text for text in drawing.CALLOUTS_ABOVE.values())
-    assert drawing.CALLOUTS_ABOVE["SpigotLength"] == "MG-WHEEL-DRUM MHA-MG-10 NOT PROUD"
+    assert drawing.CALLOUTS_ABOVE["SpigotLength"] == "DRUM MHA-MG-10 NOT PROUD"
     # The rim OD reads between its extension lines at the hub's height, with
     # A-A, clear of the front view's rim.
     od_x, od_y = drawing.SECTION_DIAMETER_KEEP["RimOuterDiaDim"]
