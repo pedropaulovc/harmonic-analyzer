@@ -159,14 +159,15 @@ def test_every_tight_band_names_its_mate() -> None:
     assert three_place <= set(spec.CALLOUTS_BELOW)
     for name, feature in _features().items():
         if name.startswith("tap_"):
-            assert feature["note"] == spec.MATE_CALLOUT, name
+            assert feature["note"].startswith(f"{spec.MATE_CALLOUT}; "), name
 
 
 def test_no_vendor_sku_on_the_sheet() -> None:
     texts = (
         spec.MATE_CALLOUT,
         spec.ROW_CALLOUT,
-        spec.FAR_SIDE_THREAD_CALLOUT,
+        spec.CALLOUTS_BELOW[spec.BAR_THREAD_DEPTH_DIMENSION],
+        drawing.BOTTOM_THREAD_CALLOUT,
         spec.DRAWING_NOTES,
         spec.ISOMETRIC_VIEW_NOTE,
     )
@@ -204,7 +205,14 @@ def test_two_face_threads_hold_each_screw_and_keep_the_tips_apart() -> None:
     assert spec.THICK_MIN == pytest.approx(25.4 - 0.3048)
     assert spec.BAR_REACH_MAX == pytest.approx(leadscrew.BAR_SCREW_ENGAGEMENT_RANGE[1])
     assert spec.BAR_REACH_MAX == pytest.approx(12.294, abs=1e-3)
-    assert spec.KP08_REACH_MAX == pytest.approx(10.875, abs=1e-3)
+    # PR2229 review r1 (P2): the KP08 screw reaches deepest on the least foot
+    # the receipt check accepts, so every window is taken there, not on the
+    # UNVERIFIED nominal 5.0 (#2184).
+    assert spec.KP08_SCREW_LENGTH_MM == pytest.approx(15.875)
+    assert spec.KP08_REACH_MAX == pytest.approx(
+        spec.KP08_SCREW_LENGTH_MM - spec.KP08_FOOT_THICK_MIN
+    )
+    assert spec.KP08_REACH_MAX > leadscrew.KP08_SCREW_REACH
     assert spec.SCREW_REACH_MAX == {"bar": spec.BAR_REACH_MAX, "kp08": spec.KP08_REACH_MAX}
     # Each printed depth's limits sit inside its window: the own screw's
     # reach in full thread, the other screw's reach clear of thread and lead.
@@ -228,18 +236,24 @@ def test_two_face_threads_hold_each_screw_and_keep_the_tips_apart() -> None:
     )
     assert spec.SCREW_TIP_GAP_MIN > 1.9
     assert spec.COMMON_SCREW_TIP_GAP < 0.0
-    # The KP08 foot (UNVERIFIED, #2184) must be at least this thick for the
-    # 5/8's reach to stay in the top thread: the jig's step 7 receipt check.
-    assert spec.KP08_FOOT_THICK_MIN == pytest.approx(
-        leadscrew.KP08_FOOT_THICK - (spec.KP08_THREAD_LIMITS[0] - spec.KP08_REACH_MAX)
-    )
-    assert 4.9 < spec.KP08_FOOT_THICK_MIN < leadscrew.KP08_FOOT_THICK
     taps = {name: f for name, f in _features().items() if name.startswith("tap_")}
     assert len(taps) == 2 and all(f["thru"] is True for f in taps.values())
+    # prechips' Feature schema has no per-face thread-depth field: both
+    # bounded windows ride the tap's cited note (the carrier precedent).
+    from prechips.model import Feature
+
     for feature in taps.values():
-        assert feature["thread_depth_top"] == pytest.approx(list(spec.KP08_THREAD_LIMITS))
-        assert feature["thread_depth_far_side"] == pytest.approx(
-            list(spec.BAR_THREAD_LIMITS)
+        assert not {"thread_depth_top", "thread_depth_bottom"} & set(feature)
+        assert not {"thread_depth_top", "thread_depth_bottom"} & set(
+            feature["precision"]
+        )
+        assert "note" in feature["requirements"]
+        for low, high in (spec.KP08_THREAD_LIMITS, spec.BAR_THREAD_LIMITS):
+            assert f"{low:.3f} TO {high:.3f} mm" in feature["note"]
+        # extra="forbid": every exported key is a Feature field (faces are
+        # bound to STEP names only at write_manifest, so not validated here).
+        assert set(feature) <= set(Feature.model_fields), set(feature) - set(
+            Feature.model_fields
         )
     # The bar-face wizard first (blind, from the bottom), then the KP08-face
     # wizard THRU ALL from the top, its thread depth set from that face.
@@ -253,7 +267,66 @@ def test_two_face_threads_hold_each_screw_and_keep_the_tips_apart() -> None:
     assert fasteners.KP08_TO_BRACKET.thread_depth_mm == spec.KP08_THREAD_DEPTH
     assert fasteners.BRACKET_TO_BAR.protrusion_mm < 0.0
     assert fasteners.KP08_TO_BRACKET.protrusion_mm < 0.0
-    assert spec.FAR_SIDE_THREAD_CALLOUT == "+ 8-32 UNC .491 DEEP FAR SIDE"
+    assert fasteners.KP08_TO_BRACKET.engagement_mm == pytest.approx(
+        leadscrew.KP08_SCREW_REACH
+    )
+
+
+def test_least_kp08_foot_is_set_by_both_threads_and_rounded_up() -> None:
+    # PR2229 review r1 (P2): at the least foot the KP08 screw's tip must stop
+    # in the top thread's full thread AND short of the bottom thread's
+    # deepest partial thread (its deepest full depth plus the tap's lead) on
+    # the thinnest stock. The printed .001 floor is rounded UP from the
+    # tighter of the two.
+    reach_allowed = min(
+        spec.KP08_THREAD_LIMITS[0],
+        spec.THICK_MIN - spec.BAR_THREAD_LIMITS[1] - spec.TAP_LEAD,
+    )
+    exact = spec.KP08_SCREW_LENGTH_MM - reach_allowed
+    printed = math.ceil(exact / 25.4 * 1000.0 - 1e-9) / 1000.0
+    assert spec.KP08_FOOT_THICK_MIN == pytest.approx(printed * 25.4)
+    assert spec.KP08_FOOT_THICK_MIN >= exact
+    assert spec.KP08_FOOT_THICK_MIN - exact < 0.0254
+    # On the 1 in stock's thinnest, the bottom tap's lead is the tighter
+    # bound (the top thread's least depth alone allowed .194).
+    assert spec.THICK_MIN - spec.BAR_THREAD_LIMITS[1] - spec.TAP_LEAD < (
+        spec.KP08_THREAD_LIMITS[0]
+    )
+    assert round(spec.KP08_FOOT_THICK_MIN / 25.4, 3) == 0.196
+    assert spec.KP08_FOOT_THICK_MIN < leadscrew.KP08_FOOT_THICK
+    # At the least foot the tip clears both bounds.
+    assert spec.KP08_REACH_MAX <= spec.KP08_THREAD_LIMITS[0]
+    assert spec.KP08_REACH_MAX + spec.BAR_THREAD_LIMITS[1] + spec.TAP_LEAD <= (
+        spec.THICK_MIN
+    )
+
+
+def test_each_face_is_plug_started_bottoming_finished_with_a_bounded_tap_point() -> None:
+    # PR2229 review r1 (P2): the geometry budgets two pitches of tap lead,
+    # a bottoming tap's; a plug tap's 3-5 chamfered threads would cut past
+    # it. Each face finishes with the bottoming tap, and neither tap's point
+    # goes past its face's mark: the thread's deepest full depth plus the
+    # bottoming tap's lead, rounded down to .001.
+    for (_low, high), tip, other_reach in (
+        (spec.BAR_THREAD_LIMITS, spec.BAR_TAP_TIP_MAX, spec.KP08_REACH_MAX),
+        (spec.KP08_THREAD_LIMITS, spec.KP08_TAP_TIP_MAX, spec.BAR_REACH_MAX),
+    ):
+        assert _on_grid(tip, 3)
+        assert high + spec.TAP_LEAD - 0.0254 < tip <= high + spec.TAP_LEAD
+        assert tip <= spec.THICK_MIN - other_reach
+    assert round(spec.BAR_TAP_TIP_MAX / 25.4, 3) == 0.558
+    assert round(spec.KP08_TAP_TIP_MAX / 25.4, 3) == 0.503
+    # The process names both taps, the bottoming tap finishing, and each
+    # face's printed window and tap-point mark (spec values, not prose).
+    process = _config.parts(ARTIFACT)["process"]
+    assert "plug" in process and "bottoming" in process
+    assert "min full thread" not in process
+    for depth, tip in (
+        (spec.BAR_THREAD_DEPTH, spec.BAR_TAP_TIP_MAX),
+        (spec.KP08_THREAD_DEPTH, spec.KP08_TAP_TIP_MAX),
+    ):
+        assert f"{depth / 25.4:.3f}".lstrip("0") + " ±.005" in process
+        assert f"{tip / 25.4:.3f}".lstrip("0") in process
 
 
 def test_holes_carry_the_title_block_band_except_the_kp08_stations() -> None:
@@ -280,8 +353,9 @@ def test_holes_carry_the_title_block_band_except_the_kp08_stations() -> None:
 
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.PLAN_KEEP) | set(drawing.END_KEEP) == marked
-    assert not set(drawing.PLAN_KEEP) & set(drawing.END_KEEP)
+    keeps = (drawing.PLAN_KEEP, drawing.END_KEEP, drawing.SECTION_KEEP)
+    assert set().union(*keeps) == marked
+    assert sum(len(keep) for keep in keeps) == len(marked)
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert set(spec.CALLOUTS_BELOW) <= marked
 
@@ -327,7 +401,7 @@ def test_every_hole_has_its_own_callout() -> None:
     called = sorted(x for x, _xy, _side in drawing.TAP_CALLOUTS)
     assert called == sorted(spec.HOLE_X)
     assert drawing.CALLOUT_ROWS == 3
-    assert drawing.CALLOUT_GLYPHS == len(spec.FAR_SIDE_THREAD_CALLOUT)
+    assert drawing.CALLOUT_GLYPHS == len(drawing.BOTTOM_THREAD_CALLOUT)
 
 
 def test_single_hole_definitions_drop_exactly_the_count() -> None:
@@ -349,19 +423,18 @@ def test_single_hole_definitions_drop_exactly_the_count() -> None:
     assert not drawing._PRINTED_COUNT.search("Ø3.45 THRU ALL\n8-32 UNC THRU ALL")
 
 
-def test_thread_depth_definitions_put_the_far_side_thread_on_its_own_row() -> None:
+def test_thread_depth_definitions_put_the_section_pointer_on_its_own_row() -> None:
     definitions = {
         5: "<hw-thread> UNC - <hw-threadclass> <HOLE-DEPTH><hw-threaddepth>",
         6: "",
         7: "<MOD-DIAM><hw-tapdrldia> THRU ALL",
         8: "",
     }
-    callout = spec.FAR_SIDE_THREAD_CALLOUT
+    callout = drawing.BOTTOM_THREAD_CALLOUT
     updated = drawing.thread_depth_definitions(definitions, callout)
     assert updated == {
         **definitions,
-        5: "<hw-thread> UNC - <hw-threadclass> <HOLE-DEPTH><hw-threaddepth>\n"
-        "+ 8-32 UNC .491 DEEP FAR SIDE",
+        5: f"{definitions[5]}\n{callout}",
     }
     with pytest.raises(RuntimeError):
         drawing.thread_depth_definitions(
@@ -372,7 +445,43 @@ def test_thread_depth_definitions_put_the_far_side_thread_on_its_own_row() -> No
             {**definitions, 6: "<hw-threaddepth>"}, callout
         )
     sheet = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "thread_callout=FAR_SIDE_THREAD_CALLOUT" in sheet
+    assert "thread_callout=BOTTOM_THREAD_CALLOUT" in sheet
+
+
+def test_bottom_thread_depth_prints_from_its_own_native_dimension() -> None:
+    # PR2229 review r1 (P2): the bottom thread's depth prints through a
+    # source-owned native dimension, never a typed spec string. The pointer
+    # row on the plan callout carries no number; section A-A's one dimension
+    # is BarThreadDepth@BarThreadReference, proved equal to BarTaps' thread.
+    assert not hasattr(spec, "FAR_SIDE_THREAD_CALLOUT")
+    assert not re.search(r"\d", drawing.BOTTOM_THREAD_CALLOUT)
+    label = drawing.SECTION_LABEL
+    assert f"SECTION {label}-{label}" in drawing.BOTTOM_THREAD_CALLOUT
+    assert spec.DRAWING_DIMENSIONS[spec.BAR_THREAD_REFERENCE] == {
+        spec.BAR_THREAD_DEPTH_DIMENSION
+    }
+    assert spec.DRAWING_PRECISION_BY_NAME[spec.BAR_THREAD_DEPTH_DIMENSION] == 3
+    assert set(drawing.SECTION_KEEP) == {spec.BAR_THREAD_DEPTH_DIMENSION}
+    assert not re.search(r"\d", spec.CALLOUTS_BELOW[spec.BAR_THREAD_DEPTH_DIMENSION])
+    builder = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'create_sketch("Top")' in builder
+    assert "thread_ref.record(BAR_THREAD_DEPTH_DIMENSION, '\"BarThreadDepth\"')" in builder
+    assert '("BarThreadDepth", BAR_THREAD_DEPTH)' in builder
+    assert builder.index("_require_bar_thread_reference(adapter)") < builder.index(
+        "save_part_and_images(adapter, PART_NAME)"
+    )
+    assert builder.index("blank_sketch(adapter, BAR_THREAD_REFERENCE)") < builder.index(
+        "save_part_and_images(adapter, PART_NAME)"
+    )
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "BAR_THREAD_DEPTH / 25.4" not in sheet
+    assert "FAR SIDE" not in sheet
+    assert sheet.index("_section(adapter, end)") < sheet.index(
+        "_require_bar_thread_depth(section)"
+    )
+    assert sheet.index("_require_bar_thread_depth(section)") < sheet.index(
+        "assert_imported_precision(adapter, annotations"
+    )
 
 
 # --- Sheet layout (model mm in the plan, sheet m around it) -----------------------
@@ -618,6 +727,37 @@ def test_views_clear_each_other_the_border_and_the_title_block() -> None:
     sheet = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'place_view(adapter, str(SOURCE), "*Right", *END_CENTER' in sheet
     assert "for view in (plan, end, iso):" in sheet
+
+
+def test_section_stands_under_the_plan_above_the_title_block() -> None:
+    s = drawing._S / 1000.0
+    centre_x, centre_y = drawing.SECTION_CENTER
+    top = centre_y + spec.BRACKET_THICK / 2.0 * s
+    foot = centre_y - spec.BRACKET_THICK / 2.0 * s
+    _, plan_lowest = drawing.plan_sheet(
+        0.0,
+        drawing.LENGTH_LANE + drawing.TEXT_DROP - drawing.text_half_high(1),
+    )
+    assert top + 0.008 <= plan_lowest
+    assert foot >= TITLE_BLOCK_TOP + 0.010
+    # The depth's text a TEXT_GAP off the outer end, wholly off the part and
+    # inside the border whichever way +X reads in the cut.
+    x, y, z = drawing.SECTION_KEEP[spec.BAR_THREAD_DEPTH_DIMENSION]
+    half = drawing.text_half(spec.CALLOUTS_BELOW[spec.BAR_THREAD_DEPTH_DIMENSION])
+    assert x - half >= spec.BRACKET_LENGTH + drawing.TEXT_GAP - 1e-9
+    assert y == 0.0 and z == pytest.approx(spec.BAR_THREAD_DEPTH / 2.0)
+    reach = (x + half - spec.BRACKET_LENGTH / 2.0) * s
+    assert centre_x + reach <= RIGHT_BORDER - 0.01
+    assert centre_x - reach >= LEFT_BORDER + 0.01
+    rows = 1 + spec.CALLOUTS_BELOW[spec.BAR_THREAD_DEPTH_DIMENSION].count("\n") + 1
+    assert (z - drawing.text_half_high(rows)) * s + foot >= TITLE_BLOCK_TOP + 0.010
+    # The caption under the section, left of the title block.
+    caption_x, caption_y = drawing.SECTION_CAPTION_XY
+    assert caption_y < foot and caption_x < TITLE_BLOCK_LEFT - 0.02
+    # The cutting line crosses the end view top to bottom, past both faces.
+    (_x0, y0, z0), (_x1, y1, z1) = drawing.SECTION_LINE_MODEL_MM
+    assert y0 == y1 == 0.0
+    assert z0 < 0.0 and z1 > spec.BRACKET_THICK
 
 
 def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:

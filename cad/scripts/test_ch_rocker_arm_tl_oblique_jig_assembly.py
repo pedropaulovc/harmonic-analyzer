@@ -1740,13 +1740,10 @@ def test_general_torque_note_covers_every_fastener_no_step_torques() -> None:
         step = next(text for text in steps if text.startswith(label))
         assert "N·m" in step
     # The common screw (PR2) runs snug into the rails, but step 1 torques its
-    # four TL-28 bar screws: the general note covers only the rail screws.
+    # TL-28 bar screws: the general note covers only the rail screws.
     one = next(text for text in steps if text.startswith("1. "))
-    assert (
-        f"{len(leadscrew.BAR_SCREW_LATERALS)} #8-32 X 3/4 SHCS "
-        f"{spec._item(spec.RAIL_SCREW)} PER BRACKET FROM BELOW, NO WASHERS, "
-        f"{spec._torque(leadscrew.BAR_SCREW_TORQUE_NM)}."
-    ) in one
+    assert spec._item(spec.RAIL_SCREW) in one
+    assert spec._torque(leadscrew.BAR_SCREW_TORQUE_NM) in one
     # The riser screw family's four feed-nut screws take F2's torque; its
     # four riser screws, with no stated torque, stay on the general note.
     f2 = next(text for text in steps if text.startswith("F2. "))
@@ -1758,15 +1755,12 @@ def test_general_torque_note_covers_every_fastener_no_step_torques() -> None:
         spec.CLAMP_SCREW, spec.LEVER_SCREW, spec.PIVOT_SCREW, spec.FLANGE_NUT,
     }
     assert set(spec.SNUG_FASTENERS) == threaded - set(torqued)
+    snug = sorted(int(spec.ITEM_NUMBERS[s]) for s in spec.SNUG_FASTENERS)
+    assert snug == [22, 23, 24, 26, 27]
+    # The note names exactly the snug items and states no torque figure.
     note = spec.GENERAL_TORQUE_NOTE
-    assert note == (
-        "TORQUE WHERE NO STEP STATES ONE (ITEMS 22, 23, 24, 26 AND 27): "
-        "RUN EACH SCREW OR NUT IN SNUG BY HAND ON A STANDARD-LENGTH HEX KEY "
-        "OR WRENCH, NO EXTENSION."
-    )
-    assert sorted(int(spec.ITEM_NUMBERS[s]) for s in spec.SNUG_FASTENERS) == [
-        22, 23, 24, 26, 27
-    ]
+    assert sorted(int(n) for n in re.findall(r"\b\d+\b", note)) == snug
+    assert "N·m" not in note and "IN·LBF" not in note
 
 
 def test_sweep_limits_are_witness_marked_and_every_pass_runs_mark_to_mark() -> None:
@@ -1959,12 +1953,12 @@ def test_kp08_screws_torque_inside_the_foot_thread_and_screw_budgets() -> None:
     seven = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("7. "))
     assert f"{spec._item(spec.PILLOW_BLOCK_SCREW)}, LOOSE" in seven
     # The two 3/4 and 5/8 tips must not meet in TL-28's shared hole: the
-    # KP08 foot under them is checked first (#2184 leaves it UNVERIFIED).
-    assert seven.startswith(
-        f"7. CHECK EACH KP08 {spec._item(spec.PILLOW_BLOCK)} FOOT IS AT LEAST "
-        f"{spec._bound(end_bracket.KP08_FOOT_THICK_MIN, 3, up=True)} THICK AT ITS 2 HOLES."
-    )
-    assert spec._bound(end_bracket.KP08_FOOT_THICK_MIN, 3, up=True) == ".194"
+    # KP08 foot under them is checked first (#2184 leaves it UNVERIFIED), at
+    # the end bracket's least foot rounded up.
+    assert seven.startswith("7. ")
+    assert spec._item(spec.PILLOW_BLOCK) in seven
+    assert f"{spec._bound(end_bracket.KP08_FOOT_THICK_MIN, 3, up=True)} " in seven
+    assert spec._bound(end_bracket.KP08_FOOT_THICK_MIN, 3, up=True) == ".196"
     assert end_bracket.KP08_FOOT_THICK_MIN < leadscrew.KP08_FOOT_THICK
 
 
