@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import math
 
+import ha_harmonic_analyzer_assembly_steps as _ha_steps
 import mg_magnifier_assembly_steps as _steps
 import sh_vn_clamp_screw_spec as _clamp_screw
 import mg_vn_magnifying_bracket_screw_spec as _bracket_screw
@@ -215,12 +216,26 @@ _STACK = (
 # Ends and sides name physical features or a lettered view, never a compass,
 # a clock or the machine's front and back (the principal views print unnamed).
 STEP_TEXT = {
-    "drum-pressed": f"PRESS {_DRUM} ONTO THE SPIGOT OF {_WHEEL}, HARD AGAINST THE BOSS.",
+    _steps.DRUM_PRESSED_KEY: (
+        f"PRESS {_DRUM} ONTO THE SPIGOT OF {_WHEEL}, HARD AGAINST THE BOSS."
+    ),
+    _steps.DRUM_HELD_KEY: f"CHECK {_DRUM} DOES NOT TURN OR SLIDE BY HAND.",
+    # A press that goes on by hand is a slip fit (rule 23): the remedy is to
+    # remake the part its sheet rejects, never a fix at the bench.
+    "drum-slip-fit": (
+        f"IF IT DOES, OR {_DRUM} SLID ON BY HAND, PULL IT OFF, REMAKE THE PART "
+        f"OFF ITS PRESS SIZE AND RETURN TO {_step(_steps.DRUM_PRESSED_KEY)}."
+    ),
     # Machinist review (run 20261024T053015093Z): the REF depth is the first
     # stop; the ACCEPT limit governs any further press.
     _steps.AXLE_PRESSED_KEY: (
         f"PRESS {_AXLE} INTO {_BAR}, THREADED END OUT, UNTIL ITS STEP REACHES "
         f"THE REF DEPTH IN {PRESS_DETAIL_TITLE}."
+    ),
+    _steps.AXLE_HELD_KEY: f"CHECK {_AXLE} DOES NOT TURN OR SLIDE BY HAND.",
+    "axle-slip-fit": (
+        f"IF IT DOES, OR {_AXLE} SLID IN BY HAND, PRESS IT OUT, REMAKE THE PART "
+        f"OFF ITS PRESS SIZE AND RETURN TO {_step(_steps.AXLE_PRESSED_KEY)}."
     ),
     _steps.AXLE_TRIAL_KEY: f"TRIAL-FIT {_STACK} ON {_AXLE}, IN THAT ORDER.",
     "trial-nuts-jammed": (
@@ -231,23 +246,27 @@ STEP_TEXT = {
         "ROD ON THE THREAD END PAST THE SECOND NUT."
     ),
     "trial-parts-removed": f"REMOVE THE TRIAL NUTS AND PARTS FROM {_AXLE}.",
+    # A re-press goes back through the hold check before the trial fit.
     "axle-pressed-further": (
         f"IF {_step(_steps.AXLE_CHECKED_KEY)} READ OVER THE MAX, PRESS {_AXLE} IN "
-        f"BY THE EXCESS AND RETURN TO {_step(_steps.AXLE_TRIAL_KEY)}."
+        f"BY THE EXCESS AND RETURN TO {_step(_steps.AXLE_HELD_KEY)}."
     ),
     "axle-pressed-back": (
         f"IF {_step(_steps.AXLE_CHECKED_KEY)} READ UNDER THE MIN, PRESS {_AXLE} "
         f"BACK OUT FROM THE BACK FACE OF {_BAR} BY THE SHORTFALL AND RETURN TO "
-        f"{_step(_steps.AXLE_TRIAL_KEY)}."
+        f"{_step(_steps.AXLE_HELD_KEY)}."
     ),
     "column-clamps-fitted": (
         f"FIT {_item(CLAMP_FRONT)} AND {_item(CLAMP_BACK)} TO {_BAR} AS THE "
         "SHEET 2 EXPLODED VIEW SHOWS."
     ),
+    # Rule 23 at the package boundary: the screws are seated and accepted at
+    # the MHA-HA-00 step that clamps the bar, cited by number.
     _steps.COLUMN_CLAMP_STARTED_KEY: (
         f"START BOTH {_item(CLAMP_SCREW)} SCREWS THROUGH ITEMS "
         f"{ITEM_NUMBERS[WHEEL_BAR]} AND {ITEM_NUMBERS[CLAMP_FRONT]} INTO "
-        f"{_item(CLAMP_BACK)}, LOOSE FOR MHA-HA-00."
+        f"{_item(CLAMP_BACK)}, LOOSE; "
+        f"{_ha_steps.step_ref('magnifier-bar-clamped')} TIGHTENS THEM."
     ),
     "axle-oiled": f"WIPE LIGHT MACHINE OIL ON {_AXLE}.",
     "wheel-stacked": f"SLIDE {_STACK} ONTO {_AXLE}, IN THAT ORDER.",
@@ -291,6 +310,10 @@ STEP_TEXT = {
         "THE CLAMP STATION (SHEET 1)."
     ),
     "clamp-thumb-screw-tightened": f"TIGHTEN THAT {_THUMB} BY HAND.",
+    # Rule 23 (adjustable clamp): a thumb screw on the round holds a light-load
+    # setting that must stay adjustable when a step sets it and checks it holds.
+    _steps.CLAMP_HELD_KEY: f"CHECK {_CLAMP} DOES NOT SLIP ON {_LEVER} BY HAND.",
+    "clamp-reset": f"IF IT SLIPS, RETURN TO {_step(_steps.CLAMP_SET_KEY)}.",
     "fixture-thumb-screw-started": (
         f"START THE OTHER {_THUMB} INTO THE TAP IN THE SPIGOT FACE OF {_FIXTURE}, "
         "CLEAR OF ITS BORE."
@@ -308,6 +331,8 @@ STEP_TEXT = {
         f"{_BRACKET}."
     ),
     "fixture-thumb-screw-tightened": f"TIGHTEN THE {_THUMB} IN {_FIXTURE} BY HAND.",
+    _steps.FIXTURE_HELD_KEY: f"CHECK {_FIXTURE} DOES NOT SLIP ON {_ROD} BY HAND.",
+    "fixture-reset": f"IF IT SLIPS, RETURN TO {_step(_steps.FIXTURE_SET_KEY)}.",
     # The upper end takes the TIE 1 method. The wire is tied in the rest pose
     # its run is derived at (sh_vn_music_wire_lever_geom), which MHA-HA-00 sets
     # as every channel amplitude at zero with the plate top level; the hook,
@@ -349,7 +374,7 @@ ASSEMBLY_STEPS = tuple(
 # the wire group's title states when its steps run, so no step carries a
 # precondition clause.
 STEP_GROUPS = (
-    ("WHEEL GROUP (EXPLODED ON SHEET 2):", "drum-pressed"),
+    ("WHEEL GROUP (EXPLODED ON SHEET 2):", _steps.DRUM_PRESSED_KEY),
     ("LEVER GROUP (EXPLODED ON SHEET 3):", _steps.LEVER_THREADED_KEY),
     (
         "LEVER WIRE, ON THE MACHINE, AFTER MHA-HA-00 HAS CLAMPED "
@@ -369,5 +394,6 @@ ASSEMBLY_CHECKS = (
     f"CHECK: WITH {_LEVER} ROCKED BY HAND TO EACH END OF ITS TRAVEL ON THE "
     f"MACHINE, {_WIRE} STAYS WRAPPED ON {_DRUM} SHORT OF TIE 1.",
     f"LOOSE ITEMS: BOTH {_item(BRACKET_SCREW)} SCREWS GO WITH THE ASSEMBLY; "
-    f"MHA-HA-00 DRIVES THEM THROUGH {_BRACKET} INTO {SUMMING_LEVER_NUMBER}.",
+    f"{_ha_steps.step_ref('magnifier-bracket-screwed')} DRIVES THEM THROUGH "
+    f"{_BRACKET} INTO {SUMMING_LEVER_NUMBER} UNTIL THE HEADS SEAT.",
 )
