@@ -43,7 +43,7 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
    are standard symbols, not defects.
 6. Read the sheet as the first-time builder of the guidelines would, once,
    at the machine. For every callout and dimension check: does every part it
-   refers to carry its full drawing number (rule 4); is each explicit band
+   refers to carry its drawing number or allowed short form (rule 4); is each explicit band
    inside its "What the shop holds" row, or is a fit route named (rule 4);
    does any location dimension carry words, any callout carry more than two
    lines of words, or any reason exceed six words or repeat (rule 7); does a

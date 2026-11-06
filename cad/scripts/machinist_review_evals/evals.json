@@ -4847,7 +4847,7 @@
       "kind": "part",
       "release": "v47",
       "prompt": "Blind machinist review of the ch-rocker-arm-tl-oblique-carrier part package (1 sheet).",
-      "expected_output": "FIX (#2151). The unsupported ±.0008 hole-location bands are unbuildable blockers under the shop table; the missing hole table, unidentified broken section and shortened mate numbers are clarity defects; the design narration is over_specification.",
+      "expected_output": "FIX (#2151). The unsupported ±.0008 hole-location bands are unbuildable blockers under the shop table; the missing hole table and unidentified broken section are clarity defects; same-parent short forms such as TL-24 are allowed; the design narration is over_specification.",
       "expectations": [
         {
           "text": "Verdict is FIX",
@@ -4890,14 +4890,14 @@
           "evidence": "Sheet 1: the A-A cutting plane runs through the lower left and lower right holes of the 'Ø.3750 +.0015/+.0010 / 4X REAM THRU' group. The short, broken section below shows one bore and is labelled only 'SECTION A-A / SCALE 3 : 1', with '.47' thickness and '.012 min. / X 45°, 4X UNDERSIDE / SEATS ON TL-VN-78 SPACER'; no hole tag or left/right identity is supplied."
         },
         {
-          "text": "A clarity finding flags the shortened mate numbers TL-24 and TL-VN-78 and requires their full assigned MHA drawing numbers, not a blocker claiming the mates are wholly unidentified",
+          "text": "No clarity or blocker finding objects to the short forms 'TL-24' and 'TL-VN-78': on this MHA-CH-06-TL-21 sheet they complete to MHA-CH-06-TL-24 and MHA-CH-06-TL-VN-78, mates in the same parent assembly (owner ruling 2026-11-06)",
           "check": {
-            "category": "clarity"
+            "absent_from": "clarity"
           },
           "rule": 4,
-          "polarity": "negative",
+          "polarity": "positive",
           "confidence": "high",
-          "evidence": "Sheet 1 repeatedly prints 'LOCATES TL-24'; the underside chamfer prints 'SEATS ON TL-VN-78 SPACER'. The same sheet also prints the full 'MHA-CH-06-TL-24' in 'HOLDS MHA-CH-06-TL-24 SCREWS CLEAR OF ITS CUT EDGES'."
+          "evidence": "Sheet 1 repeatedly prints 'LOCATES TL-24'; the underside chamfer prints 'SEATS ON TL-VN-78 SPACER'. The sheet's own number is MHA-CH-06-TL-21, so both complete from its MHA-CH-06- prefix."
         },
         {
           "text": "An over_specification finding flags 'HOLDS MHA-CH-06-TL-24 SCREWS CLEAR OF ITS CUT EDGES' and 'MIRRORS CL STATION' as design narration, and the repeated 'LOCATES TL-24' reasons on individual location dimensions as repeated narration rather than needed dimensions",

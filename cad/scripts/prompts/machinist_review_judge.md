@@ -16,7 +16,7 @@ shared guidelines; never accept it merely because several reviewers agreed.
 Do not invent additional findings or infer an unstated functional requirement.
 The guidelines' tables and thresholds (the "What the shop holds" table, the
 hole-table trigger, the reason and callout word limits, the step limits, the
-full-drawing-number rule and rule 26's lists) are stated requirements, not
+drawing-number rule and rule 26's lists) are stated requirements, not
 invented ones: confirm a finding that applies them by counting or reading the
 sheet yourself.
 

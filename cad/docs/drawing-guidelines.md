@@ -181,16 +181,21 @@ a chamfer gets the loosest title-block band that serves it.
   once, on one numbered flag note linked to every one of those dimensions;
   that note counts as at each callout, and repeating the mate on each
   dimension is narration (rule 7).
-- **Every mate is named by its full drawing number.** Any callout, note,
-  table row or step that refers to another part (MATCHES, FOR, ON, IN, FITS,
-  LOCATES, SETS, CLEARS, SEATS ON, HOLDS) names it by its full assigned
-  drawing number (`MHA-CH-06-TL-VN-83`), with its name where that helps.
-  Every part in this project, purchased parts and kits included, has a
-  drawing number; a kit member also names the member (`HGR15 RAIL OF
-  MHA-CH-06-TL-VN-83`). A catalogue or vendor code (`HGR15R`, `KP08`,
-  `HGH15CA`), a file slug (`MG-WHEEL-AXLE`), a shortened number (`TL-24`,
-  `TL-VN-77`) or a bare item number on a sheet with no parts list is not a
-  drawing number; a catalogue code may follow the drawing number. A mate
+- **Every mate is named by its drawing number.** Any callout, note, table
+  row or step that refers to another part (MATCHES, FOR, ON, IN, FITS,
+  LOCATES, SETS, CLEARS, SEATS ON, HOLDS) names it by its assigned drawing
+  number (`MHA-CH-06-TL-VN-83`), with its name where that helps. Every part
+  in this project, purchased parts and kits included, has a drawing number;
+  a kit member also names the member (`HGR15 RAIL OF MHA-CH-06-TL-VN-83`).
+  A mate in the same parent assembly as the sheet's own part may be named by
+  its short form: the full number less the leading part it shares with the
+  sheet's own number (on MHA-CH-06-TL-21, `TL-24` is MHA-CH-06-TL-24 and
+  `TL-VN-77` is MHA-CH-06-TL-VN-77). A mate outside that parent assembly
+  takes its full number (`MHA-CH-13`). A catalogue or vendor code (`HGR15R`,
+  `KP08`, `HGH15CA`), a file slug (`MG-WHEEL-AXLE`), a short form that does
+  not complete to a number from the sheet's own prefix, or a bare item number
+  on a sheet with no parts list is not a drawing number; a catalogue code may
+  follow the drawing number. A mate
   serving several features is named once, on the pattern callout, hole-table
   row or one flagged note linked to the features (rule 7), never repeated on
   each dimension. A mate the package identifies uniquely but by the wrong
