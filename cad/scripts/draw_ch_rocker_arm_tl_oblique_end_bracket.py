@@ -212,13 +212,25 @@ def size_text(kind: str) -> str:
 # m), left of the title block (x 216) and the end view's thickness (x 267).
 HOLE_TABLE_ANCHOR = (0.020, 0.158)
 # Column widths (sheet m), 3.5 mm text at ~2.5 mm a glyph (fr_harmonic_base's
-# "SEE NOTE 1" prints 24.7): TAG, X LOC (the KP08 rows' ".548 ±.005", 10
-# glyphs), Y LOC, then the custom SIZE ("8-32 UNC <depth>.450 MIN FAR SIDE",
-# 27 glyphs) and MATCHES HOLES OF ("MHA-CH-06-TL-VN-56", 18) columns.
-HOLE_TABLE_WIDTHS = {0: 0.013, 1: 0.027, 2: 0.019, 4: 0.078, 5: 0.050}
-_NATIVE_SIZE = 3  # the generated SIZE column, hidden: it restates the class
-_SIZE = 4
-_MATE = 5
+# "SEE NOTE 1" prints 24.7), by the finished table's columns (hidden ones
+# included): TAG, the custom X LOC, Y LOC, then the custom SIZE ("8-32 UNC
+# <depth>.450 MIN FAR SIDE", 27 glyphs) and MATCHES HOLES OF
+# ("MHA-CH-06-TL-VN-56", 18) columns.
+# The generated table: TAG, X LOC, Y LOC, SIZE. The finished one inserts a
+# custom X LOC after the generated one and the custom SIZE and MATCHES HOLES
+# OF after the generated SIZE, then hides the generated X LOC (r1: the KP08
+# rows print the part's native band, ".548 ±.005", restating the title
+# block) and the generated SIZE (it restates the thread class).
+NATIVE_COLUMNS = {"x": 1, "y": 2, "size": 3}
+FINISHED_COLUMNS = {"x": 1, "y": 3, "size": 4}
+_X_LOC = 2
+_SIZE = 5
+_MATE = 6
+_HIDDEN = (FINISHED_COLUMNS["x"], FINISHED_COLUMNS["size"])
+X_LOC_COLUMN = "X LOC"
+HOLE_TABLE_WIDTHS = {
+    0: 0.013, _X_LOC: 0.019, FINISHED_COLUMNS["y"]: 0.019, _SIZE: 0.078, _MATE: 0.050
+}
 _INSERT_COLUMN_AFTER = 3  # swTableItemInsertPosition_After
 _INSERT_COLUMN_DEFAULT_WIDTH = 0  # swInsertColumn_DefaultWidth
 _TABLE_SIZE_CAN_CHANGE = 0  # swTableRowColChange_TableSizeCanChange
@@ -570,8 +582,10 @@ def table_groups(
     return spans
 
 # The KP08 taps' model dimensions carry the part's native ±0.13 mm band
-# (owner ruling 4), which the table prints in inch as the title block's own
-# .XXX band (r1: "B1 .548 ±.005"). A printed band must be exactly that.
+# (owner ruling 4), which the generated X LOC prints in inch as the title
+# block's own .XXX band ("B1 .548 ±.005"). A generated band must be exactly
+# that; the sheet then prints the value bare (review round 1: the band
+# restated the title block), so the title block governs every row.
 _LOCATION = re.compile(r"^(-?\d*\.\d+|-?\d+)(?:\s*±\s*(\d*\.\d+))?$")
 _TITLE_BLOCK_BAND_IN = round(printed_band_mm(_PLACES, unit=_UNIT) / 25.4, _PLACES)
 
@@ -586,16 +600,23 @@ def location_mm(cell: str, *, label: str) -> float:
     return float(match[1]) * 25.4
 
 
+def location_text(cell: str, *, label: str) -> str:
+    """A LOC cell's printed value without its band (``location_mm`` checks it)."""
+    location_mm(cell, label=label)
+    return _LOCATION.match(cell.strip())[1]
 
-def _table_rows(table: Any) -> list[tuple[int, str, str, float]]:
+
+def _table_rows(
+    table: Any, columns: dict[str, int] = NATIVE_COLUMNS
+) -> list[tuple[int, str, str, float]]:
     """(row, tag, kind, model X) per generated row, each bound to one station."""
     rows: list[tuple[int, str, str, float]] = []
     for row in range(1, int(table.RowCount)):
         tag = _cell(table, row, 0)
-        size = _cell(table, row, _NATIVE_SIZE)
+        size = _cell(table, row, columns["size"])
         kinds = {kind for thread, kind in _THREAD_KIND.items() if thread in size}
-        x_mm = location_mm(_cell(table, row, 1), label=f"row {row} X LOC")
-        y_mm = location_mm(_cell(table, row, 2), label=f"row {row} Y LOC")
+        x_mm = location_mm(_cell(table, row, columns["x"]), label=f"row {row} X LOC")
+        y_mm = location_mm(_cell(table, row, columns["y"]), label=f"row {row} Y LOC")
         station = [x for kind, x in TABLE_HOLES if abs(x - x_mm) <= _TABLE_LOCATION_TOLERANCE_MM]
         if abs(y_mm - HOLE_ROW_Y) > _TABLE_LOCATION_TOLERANCE_MM:
             raise RuntimeError(f"end bracket hole-table row {row} Y LOC is {y_mm:g} mm")
@@ -605,42 +626,73 @@ def _table_rows(table: Any) -> list[tuple[int, str, str, float]]:
     return rows
 
 
+def x_loc_texts(
+    rows: list[tuple[int, str, str, float]], cells: dict[int, str]
+) -> dict[int, str]:
+    """Each row's custom X LOC: the generated cell's value without its band,
+    which must be the model station printed at .XXX."""
+    texts: dict[int, str] = {}
+    for row, _tag, _kind, x in rows:
+        text = location_text(cells[row], label=f"row {row} X LOC")
+        if text != _inch(x, _PLACES):
+            raise RuntimeError(f"end bracket hole-table row {row} X LOC {text!r} is not {x:g} mm")
+        texts[row] = text
+    return texts
+
+
+def _insert_column(table: Any, after: int, title: str) -> None:
+    if table.InsertColumn2(
+        _INSERT_COLUMN_AFTER, after, title, _INSERT_COLUMN_DEFAULT_WIDTH
+    ) is not True:
+        raise RuntimeError(f"end bracket hole table refused the {title} column")
+    if table.SetColumnTitle2(after + 1, title, False) is not True:
+        raise RuntimeError(f"end bracket hole-table {title} title did not set")
+
+
+def _write_cell(table: Any, row: int, column: int, text: str) -> None:
+    if table.IsCellTextEditable(row, column) is not True:
+        raise RuntimeError(f"end bracket hole-table cell {row},{column} is locked")
+    table.SetText2(row, column, False, text)
+
+
 @_telemetry.traced("drawing.end_bracket.hole_table")
 def _finish_hole_table(adapter: Any, table: Any) -> dict[str, str]:
-    """Sort the rows by tag, write each group's size and mate once in merged
-    custom cells, hide the generated SIZE column; return tag -> kind."""
+    """Sort the rows by tag, print each X LOC without a band, write each
+    group's size and mate once in merged custom cells and hide the generated
+    X LOC and SIZE columns; return tag -> kind."""
     # Tag order groups each size's rows (table_groups proves it either way).
     sorted_ok = _early_bound(table, "IHoleTableAnnotation").Sort(0, True)
     rebuild_drawing(adapter, label="end bracket hole-table sort")
     rows = _table_rows(table)
     _telemetry.info(f"end bracket hole table sorted={sorted_ok!r}: {rows!r}")
     spans = table_groups(rows)
-    for index, title in ((_SIZE, SIZE_COLUMN), (_MATE, MATE_COLUMN)):
-        if table.InsertColumn2(
-            _INSERT_COLUMN_AFTER, index - 1, title, _INSERT_COLUMN_DEFAULT_WIDTH
-        ) is not True:
-            raise RuntimeError(f"end bracket hole table refused the {title} column")
-        if table.SetColumnTitle2(index, title, False) is not True:
-            raise RuntimeError(f"end bracket hole-table {title} title did not set")
+    x_texts = x_loc_texts(
+        rows, {row: _cell(table, row, NATIVE_COLUMNS["x"]) for row, *_rest in rows}
+    )
+    _insert_column(table, NATIVE_COLUMNS["x"], X_LOC_COLUMN)
+    _insert_column(table, FINISHED_COLUMNS["size"], SIZE_COLUMN)
+    _insert_column(table, _SIZE, MATE_COLUMN)
+    for row, text in x_texts.items():
+        _write_cell(table, row, _X_LOC, text)
     texts = {
         kind: {_SIZE: size_text(kind), _MATE: MATE_CELLS[kind]} for kind in spans
     }
     for kind, (first, last) in spans.items():
         for column, text in texts[kind].items():
-            if table.IsCellTextEditable(first, column) is not True:
-                raise RuntimeError(f"end bracket hole-table cell {first},{column} is locked")
-            table.SetText2(first, column, False, text)
+            _write_cell(table, first, column, text)
             if last > first and table.MergeCells(first, column, last, column) is not True:
                 raise RuntimeError(f"end bracket hole table refused to merge {kind} {column}")
     for column, width in HOLE_TABLE_WIDTHS.items():
         actual = float(table.SetColumnWidth(column, width, _TABLE_SIZE_CAN_CHANGE))
         if abs(actual - width) > 1e-6:
             raise RuntimeError(f"end bracket hole-table column {column} width: {actual!r}")
-    table.SetColumnHidden(_NATIVE_SIZE, True)  # VT_VOID, not success.
+    for column in _HIDDEN:
+        table.SetColumnHidden(column, True)  # VT_VOID, not success.
     rebuild_drawing(adapter, label="end bracket hole-table columns")
-    if table.ColumnHidden(_NATIVE_SIZE) is not True:
-        raise RuntimeError("end bracket hole table kept its generated SIZE column")
-    _check_hole_table(table, rows, spans, texts)
+    for column in _HIDDEN:
+        if table.ColumnHidden(column) is not True:
+            raise RuntimeError(f"end bracket hole table kept its generated column {column}")
+    _check_hole_table(table, rows, spans, texts, x_texts)
     return {tag: kind for _row, tag, kind, _x in rows}
 
 
@@ -656,16 +708,20 @@ def _check_hole_table(
     rows: list[tuple[int, str, str, float]],
     spans: dict[str, tuple[int, int]],
     texts: dict[str, dict[int, str]],
+    x_texts: dict[int, str],
 ) -> None:
-    """Read the finished table back: generated rows unchanged, each group's
-    size and mate in its first row, both headers. (MergeCells' True is the
-    merge proof: early-bound IsCellMerged raises Type mismatch on its out
-    parameters, r1 CAD retry.)"""
-    if _table_rows(table) != rows:
+    """Read the finished table back: generated rows unchanged, each row's
+    custom X LOC, each group's size and mate in its first row, the headers.
+    (MergeCells' True is the merge proof: early-bound IsCellMerged raises
+    Type mismatch on its out parameters, r1 CAD retry.)"""
+    if _table_rows(table, FINISHED_COLUMNS) != rows:
         raise RuntimeError("end bracket hole-table rows changed under the custom columns")
-    for column, title in ((_SIZE, SIZE_COLUMN), (_MATE, MATE_COLUMN)):
+    for column, title in ((_X_LOC, X_LOC_COLUMN), (_SIZE, SIZE_COLUMN), (_MATE, MATE_COLUMN)):
         if _cell(table, 0, column).upper() != title:
             raise RuntimeError(f"end bracket hole-table header {column}: {_cell(table, 0, column)!r}")
+    for row, text in x_texts.items():
+        if _cell(table, row, _X_LOC) != text:
+            raise RuntimeError(f"end bracket hole-table row {row} X LOC: {_cell(table, row, _X_LOC)!r}")
     for kind, (first, _last) in spans.items():
         for column, text in texts[kind].items():
             printed = _cell(table, first, column)
@@ -675,7 +731,7 @@ def _check_hole_table(
                 )
     _telemetry.info(
         "end bracket hole table: "
-        + repr([[_cell(table, r, c) for c in range(6)] for r in range(int(table.RowCount))])
+        + repr([[_cell(table, r, c) for c in range(_MATE + 1)] for r in range(int(table.RowCount))])
     )
 
 
@@ -798,7 +854,7 @@ async def build(adapter: Any) -> dict[str, str]:
         location_places=_PLACES,
     )
     tags = _finish_hole_table(adapter, table)
-    stations = {tag: x for _row, tag, _kind, x in _table_rows(table)}
+    stations = {tag: x for _row, tag, _kind, x in _table_rows(table, FINISHED_COLUMNS)}
     _place_hole_tags(plan, tags, stations, on_plan)
 
     # The property-linked blocks land in the active view: the plan.

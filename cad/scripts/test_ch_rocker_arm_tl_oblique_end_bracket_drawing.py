@@ -358,6 +358,22 @@ def test_loc_cells_parse_with_only_the_title_block_band() -> None:
         drawing.location_mm("13.925 mm", label="x")
 
 
+def test_x_locs_print_bare_at_the_model_station() -> None:
+    # Review round 1: the KP08 rows' ".548 ±.005" restated the title block.
+    rows = [(i + 1, tag, kind, x) for i, (tag, (kind, x)) in enumerate(
+        zip(("A1", "A2", "A3", "A4", "B1", "B2"), sorted(drawing.TABLE_HOLES))
+    )]
+    cells = {row: f"{x / 25.4:.3f}".lstrip("0") for row, _t, kind, x in rows}
+    for row, _t, kind, _x in rows:
+        if kind == "kp08":
+            cells[row] += " ±.005"
+    texts = drawing.x_loc_texts(rows, cells)
+    assert sorted(texts.values()) == sorted([".285", ".942", "1.808", "2.465", ".548", "2.202"])
+    assert not any("±" in text for text in texts.values())
+    with pytest.raises(RuntimeError, match="is not"):
+        drawing.x_loc_texts(rows[:1], {1: ".290"})
+
+
 def test_each_size_prints_once_without_the_title_block_class() -> None:
     assert drawing.size_text("bar") == (
         "<MOD-DIAM>.136 THRU ALL\n8-32 UNC <HOLE-DEPTH>.450 MIN FAR SIDE"
@@ -407,7 +423,13 @@ def test_tags_stand_above_the_plan_each_right_of_its_own_hole() -> None:
 def test_hole_table_stands_under_the_plan_clear_of_views_and_title_block() -> None:
     x0, y0 = drawing.HOLE_TABLE_ANCHOR
     widths = drawing.HOLE_TABLE_WIDTHS
-    assert set(widths) == {0, 1, 2, drawing._SIZE, drawing._MATE}
+    # Every visible column; the generated X LOC and SIZE stand hidden.
+    assert set(widths) == {0, drawing._X_LOC, drawing.FINISHED_COLUMNS["y"], drawing._SIZE, drawing._MATE}
+    assert not set(widths) & set(drawing._HIDDEN)
+    assert drawing.FINISHED_COLUMNS["y"] == drawing.NATIVE_COLUMNS["y"] + 1
+    assert drawing.FINISHED_COLUMNS["size"] == drawing.NATIVE_COLUMNS["size"] + 1
+    assert drawing._X_LOC == drawing.FINISHED_COLUMNS["x"] + 1
+    assert (drawing._SIZE, drawing._MATE) == (drawing.FINISHED_COLUMNS["size"] + 1, drawing._SIZE + 1)
     right = x0 + sum(widths.values())
     assert x0 >= 0.020  # clears the sheet audit's 12.7 mm zone margin (pd_platen_guide)
     assert right <= TITLE_BLOCK_LEFT - 0.005
