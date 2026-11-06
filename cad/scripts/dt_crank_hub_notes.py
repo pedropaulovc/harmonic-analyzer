@@ -30,21 +30,22 @@ def inch_text(value_mm: float, places: int) -> str:
 def seat_callout(mate: str, name: str = "CRANK ARM") -> str:
     """Hub-seat fit on MHA-DT-31, turned second to press into ``mate``'s bore.
 
-    Four lines (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)). The seat end flush with ``mate``'s front
-    face is the acceptance, naming both faces (machinist review: FACES FLUSH
-    named neither); how the hub gets there (an arbor press) is a method, so
-    the sheet does not say it.  ``name`` is the mate's part name, printed with
-    its number (rule 4; r7 review of farm run 20261101T022045634Z).  The bore
-    is the arm's, said so on the first line: on a turned OD, "BORE FOR LIGHT
-    PRESS" read as this part's bore (review of farm run 20261101T081735465Z).
+    Two lines of words under the reference size (drawing-guidelines.md rule 7
+    (notes: few, flagged, never a method): at most two).  The arm bore is
+    made first, so the reference nominal, the named mate and the stated
+    interference define the matched fit (rule 4).  ``name`` is the mate's
+    part name, printed with its number (r7 review of farm run
+    20261101T022045634Z).  The fit is the seat's IN the arm: "BORE FOR LIGHT
+    PRESS" on a turned OD read as this part's bore (review of farm run
+    20261101T081735465Z).  The seat end flush with the arm's front is the
+    MHA-DT-00 press step's acceptance, not this sheet's: rule 7 names "END
+    FLUSH WITH CRANK ARM FRONT" as an assembly instruction.
     """
     low, high = SEAT_PRESS_INTERFERENCE
     return "\n".join(
         (
-            f"TURN TO SUIT BORE OF {name}",
-            f"{mate} FOR LIGHT PRESS:",
-            f"{inch_text(low, 4)}-{inch_text(high, 4)} DIAMETRAL INTERFERENCE;",
-            f"END FLUSH WITH {name} FRONT",
+            f"LIGHT PRESS IN {name} {mate}:",
+            f"{inch_text(low, 4)}-{inch_text(high, 4)} DIAMETRAL INTERFERENCE",
         )
     )
 
@@ -87,40 +88,55 @@ BORE_CALLOUT = (
 # The arm bore is made first and carries the band; this seat is turned to fit
 # it, so its nominal prints as a reference under the match-fit callout.
 SEAT_CALLOUT = seat_callout("MHA-DT-06")
-SEAM_CALLOUT = seam_callout("CRANK ARM MHA-DT-06")
-# The seat length is the arm's thickness as made, not a turned size: the
-# seat end finishes flush with the arm, so the arm shoulder is wherever the
-# arm puts it (owner ruling 2026-11-01; r9 review: a toleranced seat length
-# read against the flush condition).  Its nominal prints as a reference over
-# this.
-SEAT_LENGTH_CALLOUT = "TO SUIT\nCRANK ARM,\nEND FLUSH"
-# The cross-hole is drilled, then taper-reamed through hub and shaft together
-# at assembly, so the callout names the mate it is matched with and the pin it
-# takes.  Where the hub sits on the shaft before the ream (its front face --
-# the crank-arm end -- flush with the crankshaft's dome root, the crank face
-# CRANK_FACE_Z) and when the ream is deep enough (the driven pin's keeper ring
-# MHA-DT-27 clears the hub; dt_crank_pin_ring_spec.PIN_PROUD books that
-# clearance) are assembly settings, not how this hole is drilled or checked:
-# the MHA-DT-00 hub step states both, reading FRONT_FACE_DATUM (pipeline
-# review of 49287772c, 2 of 3 runs).  No number: no hub dimension carries the
-# pin's position, and a spec constant typed into the text is not model-owned
-# (drawing-simplicity-policy, Codjiflo P2 on #2095).  A native MIN to an
-# outline of the pin read as hidden hub geometry in dashed, phantom and thin
-# solid alike (Opus reviews at 7fe9d97bd, c7115c2c3 and 7e2f876c7).
-FRONT_FACE_DATUM = "MHA-DT-11 DOME ROOT"
-CROSS_HOLE_CALLOUT = "\n".join(
+# The hub's own seam callout: the size and process line, then two lines of
+# words (rule 7).  The final process is REAM, at assembly with the arm, so
+# the hole is matched to its mate (rule 4); the pin is named by part name
+# and number.  The hole's centre is drawn on the Ø.76 edge and the view's
+# vertical centreline, so no words locate it (rule 26: a location is not a
+# sentence, and ON SEAM is a private phrase).  The depth prints natively on
+# the side view, never typed here (Codjiflo review of 831be7869).  The
+# permanent-pair and disassembly line is an assembly instruction on a part
+# sheet (rule 7), so it is gone.  The arm's sheet keeps ``seam_callout``.
+SEAM_CALLOUT = "\n".join(
     (
-        "AT ASSEMBLY, MATCH TAPER-REAM 1:48",
-        "WITH MHA-DT-11 FOR MHA-DT-09",
+        f"(<MOD-DIAM>{inch_text(AXIAL_PIN_DIA, 3)}) REAM AT ASSEMBLY",
+        "WITH CRANK ARM MHA-DT-06 FOR",
+        "DOWEL PIN MHA-DT-VN-59, LIGHT DRIVE FIT",
+    )
+)
+# The seat length is the arm's thickness as made, not a turned size (owner
+# ruling 2026-11-01; r9 review: a toleranced seat length read against the
+# flush condition), so it prints as a plain reference.  The faces-flush
+# acceptance is the MHA-DT-00 press step's; rule 7 names END FLUSH on a part
+# sheet an assembly instruction.
+#
+# The cross-hole is drilled, then taper-reamed through hub and shaft together
+# at assembly.  Its callout carries SEE NOTE 1 and the numbered note states
+# the matched ream: the mate by name and number, the pin it takes, and the
+# acceptance -- the driven pin's keeper ring MHA-DT-27 still clear of the hub
+# (rule 4: a matched fit states its acceptance; dt_crank_pin_ring_spec.
+# PIN_PROUD books that clearance, and the MHA-DT-00 hub step reads the same
+# condition).  No number: no hub dimension carries the pin's position, and a
+# spec constant typed into the text is not model-owned (drawing-simplicity-
+# policy, Codjiflo P2 on #2095).  Where the hub sits on the shaft before the
+# ream (its front face flush with the crankshaft's dome root, the crank face
+# CRANK_FACE_Z) is an assembly setting the MHA-DT-00 hub step states, reading
+# FRONT_FACE_DATUM (pipeline review of 49287772c).  The note is too long for
+# a two-line callout, so it is numbered and flagged (rule 7).
+FRONT_FACE_DATUM = "MHA-DT-11 DOME ROOT"
+CROSS_HOLE_NOTE_NUMBER = 1
+CROSS_HOLE_CALLOUT = f"SEE NOTE {CROSS_HOLE_NOTE_NUMBER}"
+CROSS_HOLE_NOTE = "\n".join(
+    (
+        f"{CROSS_HOLE_NOTE_NUMBER}. AT ASSEMBLY, TAPER-REAM 1:48 WITH CRANKSHAFT MHA-DT-11 FOR",
+        "   TAPER PIN MHA-DT-09. STOP WHILE KEEPER RING MHA-DT-27, HUNG",
+        "   FROM THE DRIVEN PIN, STILL CLEARS THE HUB.",
     )
 )
 
-# The two axial bands state the mate they serve, under their dimensions
-# (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the overall places the rear face against the removable sprocket
-# (stack B below), the relief places the barrel's rear shoulder ahead of the
-# #25 chain wrapping it (stack A).
-HUB_LENGTH_CALLOUT = "REAR FACE CLEARS\nSPROCKET MHA-PD-09"
-RELIEF_LENGTH_CALLOUT = "CLEARS #25 CHAIN ON\nSPROCKET MHA-PD-09"
+# The overall and the relief print their value and band only: a reason on an
+# overall size, or on a plain .XX length, is narration (rule 7).  The stacks
+# they hold (A and B below) are checked on the drive-train assembly.
 
 # Axial stack at the printed worst case (Main, 2026-09-30), machine z, -Z =
 # FRONT, with a bought ANSI #25 chain on the crank T12.  Not printed: the
