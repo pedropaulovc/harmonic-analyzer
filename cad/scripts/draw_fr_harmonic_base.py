@@ -122,7 +122,7 @@ from fr_frame_attachment_spec import (
     CASTING_TAP_DRILL_DEPTH,
     SCREW_SPOTFACE_DIAMETER,
 )
-from fr_harmonic_base_fasteners import NEAR_WALL_CLEARANCE_DIAMETER
+from fr_frame_cross_screw import NEAR_WALL_CLEARANCE_DIAMETER
 from fr_harmonic_base_spec import (
     BOTTOM_FRONT_Z,
     BOTTOM_LENGTH,

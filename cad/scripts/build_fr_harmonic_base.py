@@ -196,14 +196,13 @@ from fr_harmonic_base_fasteners import (
     PEDESTAL_INSERTION_MIN_MM,
     PEDESTAL_INSERTION_MAX_MM,
     BASE_NEAR_WALL_CLEARANCE_DEPTH,
-    NEAR_WALL_CLEARANCE_DIAMETER,
-    near_wall_hole_volume_mm3,
     retained_material_segments_mm,
     through_seat_material,
     through_seat_pocket_clearances_mm,
     require_stop_seat_fit,
     require_through_seat_fit,
 )
+from fr_frame_cross_screw import NEAR_WALL_CLEARANCE_DIAMETER, near_wall_hole_volume_mm3
 from fr_frame_attachment_spec import (
     BASE_SCREW_SEAT_Z,
     BASE_SCREW_Y,

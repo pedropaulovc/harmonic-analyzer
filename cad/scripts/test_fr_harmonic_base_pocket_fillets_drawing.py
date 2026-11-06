@@ -37,6 +37,7 @@ from _printed_tolerance import drilled_oversize_mm
 import build_fr_harmonic_base as base
 import fr_harmonic_base_spec as spec
 import fr_harmonic_base_fasteners as fasteners
+from fr_frame_cross_screw import NEAR_WALL_CLEARANCE_DIAMETER
 
 # Standard casting-fillet radii, largest first, capped at the R.23 the
 # socket-boss junctions already carry: .23, .19, .16, .12, .10, .08.
@@ -539,7 +540,7 @@ def pocket_holes() -> tuple[VerticalHole | CrossTap, ...]:
                 _BAND,
             )
         )
-    clearance_radius = fasteners.NEAR_WALL_CLEARANCE_DIAMETER / 2.0 + _DRILL_OVERSIZE_R
+    clearance_radius = NEAR_WALL_CLEARANCE_DIAMETER / 2.0 + _DRILL_OVERSIZE_R
     for x, z in base.COLUMN_SOCKET_XZ:
         sign = math.copysign(1.0, z)
         span = sorted(

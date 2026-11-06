@@ -17,9 +17,11 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   four upper/lower bosses use the smaller user-ruled diameter so the
   outward keeper feet sit flat. The O25.5016 column bores and O27.5082 cap
   recesses follow the column and attachment specs. Four stock 1-3/4 in
-  cross screws seat flush in front/rear O8.89 (.35) counterbores and clear
-  both tube walls into the far casting wall/web through #10-32 taps on
-  TOP_SCREW_Y, .72 below the rail top (.90 below the boss top).
+  cross screws seat flush in front/rear O8.89 (.35) counterbores, pass a
+  #10 close clearance through the near casting wall (owner ruling
+  2026-11-05) and both tube walls, and thread into the far casting wall/web
+  through #10-32 taps on TOP_SCREW_Y, .72 below the rail top (.90 below the
+  boss top).
 * The whole TOP plane between the four corner bosses -- rail flange tops,
   crossbar and gussets -- is faced at the Ra 125 µin locating-seat finish (user
   rulings 2026-10-11 and 2026-10-14, one linked manufacturing note), the
@@ -252,6 +254,15 @@ from fr_frame_attachment_spec import (
     TOP_SCREW_COUNTERBORE_DIAMETER,
     TOP_SCREW_SEAT_Z,
 )
+from fr_frame_cross_screw import (
+    FAR_WALL_ENGAGEMENT_FLOOR_MM,
+    NEAR_WALL_CLEARANCE_DIAMETER,
+    NEAR_WALL_CLEARANCE_FIT,
+    NEAR_WALL_CLEARANCE_SIZE,
+    far_wall_full_thread_min_mm,
+    far_wall_start_max_mm,
+    near_wall_hole_volume_mm3,
+)
 from _fit_deviations import deviations
 from fr_vn_tube_frame_cap_spec import MAX_OUTER_DIAMETER as CAP_MAX_OUTER_DIAMETER
 import sm_knife_mount_spec as KNIFE_MOUNT
@@ -393,7 +404,9 @@ SET_TAP_SPEC = HoleSpec("tapped", SET_SCREW_THREAD, end="through_next")
 # --- Cross screws (frame -> tube-frame columns -> far casting wall) ----------
 # Flush counterbores: the Ø9 cut starts 0.4 outside the boss crown and stops
 # at the screw seat, deep enough that the stock fillister head sits below
-# the mouth's lowest barrel point (guards below).
+# the mouth's lowest barrel point (guards below). From each floor the near
+# casting wall is a #10 close clearance into the socket and only the far
+# wall is tapped (owner ruling 2026-11-05, fr_frame_cross_screw).
 COUNTERBORE_DIA = TOP_SCREW_COUNTERBORE_DIAMETER
 COUNTERBORE_PLANE = abs(FRONT_COLUMN_Z) + BOSS_DIA / 2.0 + 0.4
 COUNTERBORE_FLOOR = TOP_SCREW_SEAT_Z
@@ -413,6 +426,17 @@ SIDE_SCREW_FACES = (
 )
 if CAP_RECESS_FLOOR_Y - (SCREW_AXIS_Y + SIDE_TAP_DRILL_DIA / 2.0) <= 0.0:
     raise AssertionError("cap recess breaks into the cross-screw drill")
+# The clearance's model depth runs from the floor to the socket axis: past
+# the near wall it cuts only socket air, and its drill point stops far short
+# of the far wall. The sheet prints DRILL TO SOCKET, not this depth.
+SIDE_CLEARANCE_DEPTH = COUNTERBORE_FLOOR - abs(FRONT_COLUMN_Z)  # 16.510
+SIDE_CLEARANCE_SPEC = HoleSpec(
+    "clearance",
+    NEAR_WALL_CLEARANCE_SIZE,
+    end="blind",
+    depth_mm=SIDE_CLEARANCE_DEPTH,
+    fit=NEAR_WALL_CLEARANCE_FIT,
+)
 
 # --- Fulcrum keepers (west rail top face; shaft-end brackets, ch17 p.40) ----
 # The keeper's pure spec owns both screw station and receiver geometry:
@@ -1154,8 +1178,8 @@ if (
     raise AssertionError(
         "top cross-screw head stands proud of its counterbore at the printed bands"
     )
-# The near casting wall between the counterbore floor and the socket bore
-# carries the screw's near thread: the most-inboard printed floor against
+# The near casting wall between the counterbore floor and the socket bore,
+# which the #10 clearance crosses: the most-inboard printed floor against
 # the largest printed bore.
 COUNTERBORE_PRINTED_NEAR_WALL = (
     COUNTERBORE_MIN_FLOOR_OFFSET
@@ -1182,6 +1206,39 @@ COUNTERBORE_PRINTED_CAP_LIGAMENT = math.hypot(
 if min(COUNTERBORE_PRINTED_NEAR_WALL, COUNTERBORE_PRINTED_CAP_LIGAMENT) < WALL_TARGET_MM:
     raise AssertionError(
         "top cross-screw counterbore leaves under .080 to the bore or cap recess"
+    )
+# The near-wall clearance, print-worst (drawing-guidelines.md rule 17
+# (walls and webs)): its largest drilled size keeps a land inside the
+# smallest printed counterbore floor, and where it crosses under the cap
+# recess (between the bore and the recess wall) the recess's deepest printed
+# floor stays .080 above its highest crown, the axis at the high end of its
+# station: land 1.65, ligament 3.33.
+SIDE_CLEARANCE_MAX_RADIUS = (
+    NEAR_WALL_CLEARANCE_DIAMETER + PRINTED_DRILLED_HOLE_PLUS_MM
+) / 2.0
+SIDE_CLEARANCE_FLOOR_LAND = COUNTERBORE_MIN_RADIUS - SIDE_CLEARANCE_MAX_RADIUS
+SIDE_CLEARANCE_CAP_LIGAMENT = (CAP_RECESS_FLOOR_Y - CAP_RECESS_DEPTH_BAND[0]) - (
+    SCREW_AXIS_Y + PRINTED_LINEAR_BAND_MM[_AXIS_PLACES] + SIDE_CLEARANCE_MAX_RADIUS
+)
+if SIDE_CLEARANCE_FLOOR_LAND <= 0.0:
+    raise AssertionError("top near-wall clearance outgrows its counterbore floor")
+if SIDE_CLEARANCE_CAP_LIGAMENT < WALL_TARGET_MM:
+    raise AssertionError("top near-wall clearance leaves under .080 to the cap recess")
+# Far-wall engagement (rule 18, print worst): every floor is located from
+# its own socket axis ("4X COUNTERBORE FLOOR FROM SOCKET AXIS", .XX), so the
+# seat-to-axis stack is that one band at its most outboard; the shared joint
+# adds the match-bored socket ceiling and the far mouth's edge break, and
+# books the shortest stock screw and its 0.7-pitch tip.
+TOP_CROSS_SCREW_FAR_WALL_START_MAX = far_wall_start_max_mm(
+    COUNTERBORE_MAX_FLOOR_OFFSET, unit=UNIT
+)  # 30.018
+TOP_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT = far_wall_full_thread_min_mm(
+    TOP_CROSS_SCREW_FAR_WALL_START_MAX
+)  # 12.35 (2.56D); 11.72 (2.43D) at a 1.5-pitch tip
+if TOP_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT < FAR_WALL_ENGAGEMENT_FLOOR_MM:
+    raise AssertionError(
+        "top far casting wall engages MHA-FR-VN-53 "
+        f"{TOP_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT:.3f} mm < 1.5D at the printed bands"
     )
 SIDE_TAP_THREAD_MAJOR_DIA = THREAD_MAJOR_MM[SIDE_TAP_SPEC.size]
 SIDE_TAP_THREAD_END_Z = COUNTERBORE_FLOOR - CASTING_FULL_THREAD_DEPTH
@@ -2402,8 +2459,9 @@ def _qualify_machined_faces(adapter) -> None:
     area proves it named the RIGHT one, so a station typo ships a build failure
     instead of a roughness symbol on the wrong surface (build_fr_harmonic_base's
     _paint_machined_faces_black precedent). Each socket wall's expectation is
-    the full analytic cylinder; the 5% band absorbs the cross-screw tap
-    windows that break into the bores (~1% each) and the C1 bore-top breaks.
+    the full analytic cylinder; the 5% band absorbs the cross-screw clearance
+    and tap windows that break into the bores (~1.4% together) and the C1
+    bore-top breaks.
     """
     faces = resolve_faces(
         adapter.currentModel,
@@ -3280,7 +3338,12 @@ async def build(adapter) -> dict[str, str]:
     #     starts on its counterbore floor, crosses the near casting wall and column
     #     bore, then continues into the far boss/centred side-rail web.
     #     Opposed holes remain one two-position Hole Wizard feature per side.
+    #     The #10 close clearance is then cut from the same floor, so only
+    #     the far wall keeps thread (owner ruling 2026-11-05).
     v_side_tap = _side_tap_removal()
+    v_side_clear = near_wall_hole_volume_mm3(
+        NEAR_WALL_CLEARANCE_DIAMETER, SIDE_CLEARANCE_DEPTH
+    ) - near_wall_hole_volume_mm3(SIDE_TAP_DRILL_DIA, SIDE_CLEARANCE_DEPTH)
     for side, sign, _reverse in SIDE_SCREW_FACES:
         feat = f"SideTaps{side.capitalize()}"
         z_face = sign * COUNTERBORE_FLOOR
@@ -3300,6 +3363,22 @@ async def build(adapter) -> dict[str, str]:
             f"side taps {feat}",
             volume - len(tap_points) * v_side_tap,
             0.1 * v_side_tap + 15.0,
+        )
+        clearance = f"SideClearance{side.capitalize()}"
+        wizard_holes(
+            adapter,
+            SIDE_CLEARANCE_SPEC,
+            tap_points,
+            normal,
+            f"frame cross-screw near-wall clearance {clearance}",
+            name=clearance,
+            expect_dia_mm=NEAR_WALL_CLEARANCE_DIAMETER,
+        )
+        volume = await volume_check(
+            adapter,
+            f"side near-wall clearance {clearance}",
+            volume - len(tap_points) * v_side_clear,
+            0.05 * v_side_clear + 2.0,
         )
 
     v_set_tap = _set_tap_removal()
