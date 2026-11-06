@@ -2014,9 +2014,11 @@ FEED_FIT_STEPS = (
     f"{_NUT_TORQUE}. IF THE SCREW BINDS, LOOSEN, RE-CENTRE AND RETIGHTEN; IF IT "
     "STILL BINDS, OPEN THE COUNTERSINKS PER "
     f"{feed_nut.REWORK_SHEET_REFERENCE}. GO TO STEP 8B.",
-    "F3. AFTER STEP 8B, WITH THE HANDWHEEL AND ALL SET SCREWS TIGHT, TURN THE "
-    "HANDWHEEL TO BOTH FEED-CARRIAGE TRAVEL ENDS: NO BINDING, NUT OR LUG "
-    "CONTACT WITH A KP08, AND NO MOVING PART CONTACT. REPEAT F1B-F2 IF IT BINDS.",
+    # End to end is the full feed-carriage travel. This three-line instruction
+    # preserves the installed checks without overrunning sheet 8's source view.
+    "F3. AFTER STEP 8B, WITH THE HANDWHEEL AND ALL SET SCREWS TIGHT, "
+    "FEED END TO END BY HANDWHEEL: NO BINDING, NUT OR LUG CONTACT WITH A "
+    "KP08, AND NO MOVING PART CONTACT. REPEAT F1B-F2 IF IT BINDS.",
 )
 
 # The studs' measurements, fit limits and installed acceptance, migrated from
