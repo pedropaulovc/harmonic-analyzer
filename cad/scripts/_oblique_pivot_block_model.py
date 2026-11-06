@@ -7,6 +7,7 @@ from __future__ import annotations
 import math
 from typing import Any
 from collections.abc import Callable
+import _telemetry
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
@@ -411,12 +412,12 @@ async def _nut_pattern_reference(adapter, part) -> None:
     dims.apply(adapter, feature)
 
 
+@_telemetry.traced("part.readback.oblique_block_geometry")
 def require_block_geometry(adapter, part) -> None:
     """Read physical bore axes and model dimensions; never certify a nominal box."""
     from _drawing_precision import _named_dimensions
     from _gtol_face import SURFACE_CYLINDER
     from _gtol_face_read import face_geometry
-    import _telemetry
 
     bodies = tuple(_early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, False) or ())
     if len(bodies) != 1:
