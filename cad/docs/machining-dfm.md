@@ -124,21 +124,22 @@ its first-root position; no second general note restates that location.
   `(47.8 − 0.8) − (38.1 + 0.8) − (9.0 + 0.8)/2 = 3.2 mm`.
   This changes the dimensioning scheme, not the casting or its interfaces.
   Owner ruling **2026-11-05** removed the long-reach reduced-shank #10-32 tap
-  from the four MHA-FR-01 cross-screw paths: the near casting wall is a
-  **#10 close clearance, Ø.206** (`DRILL TO SOCKET`), wide enough for a
-  standard-shank 10-32 tap to pass and to guide the tube's Ø.197 match drill,
-  and only the far wall is threaded. Depths still run from the spotface floor.
+  from all eight frame cross-screw paths (MHA-FR-01 here, MHA-FR-02 below):
+  the near casting wall is a **#10 close clearance, Ø.206** (`DRILL TO
+  SOCKET`), wide enough for a standard-shank 10-32 tap to pass and to guide
+  the tube's Ø.197 match drill, and only the far wall is threaded. The shared
+  contract is `fr_frame_cross_screw`. Depths still run from the spotface floor.
   Engagement counts the far wall alone, at the shortest stock screw (B18.6.3
   −.06 length), 0.7P tip loss, the most outboard printed seat, a Ø26.0 matched
   socket and the far mouth's .010 edge break: **7.50 mm (1.55D)** of full
   thread (6.87 mm, 1.42D, if a 1.5P tip loss is assumed instead), above the
   1.5D = 7.24 mm floor. The 0.7P tip is a nominal allowance, as for the swing
-  stop, so MHA-FR-00 check 2 accepts each installed lower screw at full-form
+  stop, so MHA-FR-00 check 2 accepts each installed screw at full-form
   far-wall engagement of at least 1.5 screw diameters. The tap keeps its bottoming lead (`↧ 1.93 MIN` drill;
   the lug's past-tip guard leaves no room for a plug lead). The callout reads
-  `FAR WALL ONLY`, and its associative full-thread and minimum-drill depth
-  tokens are unchanged. MHA-FR-02 is not yet converted: its taps still thread
-  both walls in phase.
+  `DEPTHS FROM SPOTFACE FLOOR` / `FAR WALL ONLY 10-32 UNF`, naming the face
+  the depths start from as the top frame's does, and its associative
+  full-thread and minimum-drill depth tokens are unchanged.
   The native pedestal-to-pivot X/Y dimensions locate the pivot from the actual
   near pedestal axis with the existing ±0.05 mm functional band. Both carry
   one-line ABOVE `SEE NOTE 1` flags to numbered free note 1 in the B4 notes
@@ -630,10 +631,18 @@ The builder authors no band on it and section F-F imports it bare under the
 title block's .XX **±0.51 mm** band (owner ruling 2026-10-18); there is no
 hanger spotface, separate floor driver or cleanup-stock offset.
 
-On the MHA-FR-02 CROSS-TAPS sheet, the native 10-32 hole-callout leader
-states that the near and far casting walls are threaded **in phase for
-MHA-FR-VN-53**. The requirement travels with the feature, not a detached A-A
-note; the Hole Wizard still owns the thread and tap-drill depths.
+On the MHA-FR-02 CROSS-TAPS sheet the near casting wall is the same **#10
+close clearance, Ø.206** (owner ruling 2026-11-05, `fr_frame_cross_screw`),
+called out natively as `2X ⌀.206 / DRILL TO SOCKET` under `SAME AT OPPOSITE
+END, 4X TOTAL`, and the native 10-32 hole-callout leader states **`FAR WALL
+ONLY`**. Because the clearance consumes the tap's entry rim, the tap callout
+attaches to the far mouth, where the tap drill breaks into the socket, seen
+through the clearance. The requirement travels with the feature, not a
+detached A-A note; the Hole Wizard still owns the thread and tap-drill
+depths, from the counterbore floor. Each floor is located from its own
+socket axis, so the print-worst far-wall engagement is **12.35 mm (2.56D)**
+at the 0.7P tip (**11.72 mm, 2.43D**, at 1.5P), against the 1.5D = 7.24 mm
+floor; `build_fr_top_frame.TOP_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT` proves it.
 
 The A-A cap-recess-depth callout retains its full **MHA-FR-VN-54** skirt
 mate, three qualifier rows and **16.30 +0.3/0.0 mm** band. Its native sheet

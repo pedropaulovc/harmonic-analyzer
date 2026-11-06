@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import inspect
 import math
 import re
 from pathlib import Path
@@ -4468,12 +4469,70 @@ def test_pocket_length_dimension_stands_outside_the_plan() -> None:
 
 def test_far_wall_print_worst_engagement_meets_thread_rule() -> None:
     import build_fr_frame_assembly as assembly
-    from _mcmaster_90280a837 import SHANK_DIA
+    from fr_frame_cross_screw import FAR_WALL_ENGAGEMENT_FLOOR_MM
 
-    engagement = drawing.CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT
-    # Rule 18 (thread engagement): the printed bands only shorten the far-wall engagement, and
-    # the shortest still holds 1.5D.
-    assert 1.5 * SHANK_DIA <= engagement < assembly.TOP_FAR_CASTING_ENGAGEMENT
+    engagement = part.TOP_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT
+    # Rule 18 (thread engagement): the printed bands, the shortest stock
+    # screw and its tip only shorten the far-wall engagement, and the
+    # shortest still holds 1.5D.
+    assert (
+        FAR_WALL_ENGAGEMENT_FLOOR_MM <= engagement < assembly.TOP_FAR_CASTING_ENGAGEMENT
+    )
+    assert not hasattr(drawing, "CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT")
+
+
+def test_near_wall_clearance_opens_the_near_wall_from_the_counterbore_floor() -> None:
+    # Owner ruling 2026-11-05: the near casting wall is #10 close clearance
+    # drilled into the socket, so the 10-32 is threaded in the far wall only.
+    spec = part.SIDE_CLEARANCE_SPEC
+    assert (spec.kind, spec.size, spec.fit, spec.end) == (
+        "clearance",
+        "#10",
+        "close",
+        "blind",
+    )
+    # The floor stands .65 off the socket axis: the drill stops in the socket.
+    assert spec.depth_mm == pytest.approx(TOP_SCREW_SEAT_Z - abs(part.FRONT_COLUMN_Z))
+    assert spec.depth_mm == pytest.approx(16.51)
+    # Print-worst it stays inside the floor and under the cap recess.
+    assert part.SIDE_CLEARANCE_FLOOR_LAND > 0.0
+    assert part.SIDE_CLEARANCE_CAP_LIGAMENT >= 2.032
+    source = inspect.getsource(part.build)
+    tap = source.index("SIDE_TAP_SPEC,")
+    clearance = source.index("SIDE_CLEARANCE_SPEC,")
+    # One floor datum: the clearance is cut after the tap, at the same points.
+    assert tap < clearance
+    assert source.count("tap_points,") == 2
+
+
+def test_cross_tap_callout_states_far_wall_only() -> None:
+    assert drawing.CROSS_TAP_CALLOUT == (
+        "SAME AT OPPOSITE END, 4X TOTAL FOR MHA-FR-VN-53\n"
+        "DEPTHS FROM COUNTERBORE FLOOR\n"
+        "FAR WALL ONLY"
+    )
+    assert "PHASE" not in drawing.CROSS_TAP_CALLOUT
+    assert drawing.CROSS_TAP_FEATURES == ("SideTapsFront", "SideTapsRear")
+
+
+def test_cross_clearance_callout_drills_to_the_socket() -> None:
+    native = {
+        5: "",
+        6: "",
+        7: "<NUM_INST>X <MOD-DIAM><hw-diam> <HOLE-DEPTH> <hw-depth>",
+        8: "",
+    }
+    updated = drawing._cross_clearance_callout_definitions(native)
+    assert updated[7] == (
+        "SAME AT OPPOSITE END, 4X TOTAL\n"
+        "<NUM_INST>X <MOD-DIAM><hw-diam> \nDRILL TO SOCKET"
+    )
+    assert all(updated[part_no] == "" for part_no in (5, 6, 8))
+    with pytest.raises(RuntimeError, match="no single count and blind depth"):
+        drawing._cross_clearance_callout_definitions(
+            {**native, 7: "<MOD-DIAM><hw-diam> THRU"}
+        )
+    assert drawing.CROSS_CLEARANCE_PRECISION == {"hw-diam": 3}
 
 
 def _segments_apart(a, b) -> bool:

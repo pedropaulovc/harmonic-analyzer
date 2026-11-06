@@ -103,7 +103,7 @@ from fr_frame_attachment_spec import (
     TOP_SCREW_Y,
     TUBE_CROSS_HOLE_DIAMETER,
 )
-from fr_harmonic_base_fasteners import CROSS_SCREW_ENGAGEMENT_CHECK
+from fr_frame_cross_screw import CROSS_SCREW_ENGAGEMENT_CHECK
 from fr_harmonic_base_spec import BOTTOM_WIDTH, DECK_HALF_X, STACK_HEIGHT
 import fr_frame_explode_spec as explode
 from fr_frame_setting_bands import TOP_AXIS_HEIGHT_BAND_MM
@@ -437,10 +437,10 @@ EXPLODED_VIEW_NAMES = {
 }
 
 # These instructions carry only requirements that exist at assembly: matched
-# fits, the one-setup coaxial MHA-FR-02 casting threads, transfer-drilled tube
-# holes (MHA-FR-01's guided by its near-wall clearances), fitted stock caps,
-# and checks against the actual purchased components. Part drawings still
-# define the other manufacturing features.
+# fits, transfer-drilled tube holes (guided by both castings' near-wall
+# clearances; only their far walls are threaded), fitted stock caps, and
+# checks against the actual purchased components. Part drawings still define
+# the other manufacturing features.
 ASSEMBLY_STEPS = "\n".join(
     (
         "MATCH-FIT AND ASSEMBLY SEQUENCE",
@@ -469,9 +469,9 @@ ASSEMBLY_STEPS = "\n".join(
         "   SKIRT CLEAR OF THE RECESS FLOOR. DO NOT TRIM THE STOCK CAPS. FINISH",
         "   THE TOP CHAMFER; RESEAT COLUMNS AND RESET THE TOP-AXIS HEIGHT.",
         "",
-        "5. THROUGH THE EXISTING MHA-FR-02 CASTING BORES, PILOT-TRANSFER EACH",
-        "   TOP AXIS THROUGH BOTH TUBE WALLS AS STEP 2; PROTECT BOTH THREAD",
-        "   SEGMENTS. REMOVE MHA-FR-02/COLUMNS; ENLARGE BOTH WALLS TO",
+        "5. THROUGH THE MHA-FR-02 NEAR-WALL CLEARANCES, PILOT-TRANSFER EACH",
+        "   TOP AXIS THROUGH BOTH TUBE WALLS AS STEP 2; PROTECT THE FAR-WALL",
+        "   THREAD. REMOVE MHA-FR-02/COLUMNS; ENLARGE BOTH WALLS TO",
         f"   DIA {CROSS_HOLE_TEXT}, DEBURR, AND VERIFY FREE PASSAGE "
         "OF THE ACTUAL MHA-FR-VN-53",
         "   SHANK.",
@@ -503,10 +503,9 @@ ASSEMBLY_CHECKS = "\n".join(
         "   EACH FRONT/REAR TOP AXIS MEETS THE HEIGHT FROM THE BASE UNDERSIDE.",
         "",
         "2. ALL EIGHT MHA-FR-VN-53 HEADS SEAT WITHOUT TIPS BOTTOMING. EACH SHANK",
-        "   CLEARS BOTH TUBE WALLS. VERIFY EACH LOWER SCREW HAS",
+        "   CLEARS BOTH TUBE WALLS. VERIFY EACH SCREW HAS",
         f"   {CROSS_SCREW_ENGAGEMENT_CHECK}",
-        "   IN THE MHA-FR-01 FAR WALL; EACH UPPER SCREW ENGAGES BOTH MHA-FR-02",
-        "   THREAD SEGMENTS.",
+        "   IN THE FAR WALL OF ITS MHA-FR-01 OR MHA-FR-02 CASTING.",
         "",
         "3. ALL FOUR MHA-FR-VN-54 CAPS REACH THEIR INSIDE SEATS; SKIRTS CLEAR THE",
         "   MHA-FR-02 RECESSES AND TUBE ENDS ARE NOT DISTORTED.",

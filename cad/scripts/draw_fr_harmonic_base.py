@@ -70,6 +70,7 @@ from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_prec
 from _drawing_layout_check import DrawableRegion
 from _drawing_layout_collect import _iter_tables, _iter_view_annotations
 from _drawing_leader_notes import add_leader_note
+from _drawing_leaders import set_near_side_diameter
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES
@@ -121,7 +122,7 @@ from fr_frame_attachment_spec import (
     CASTING_TAP_DRILL_DEPTH,
     SCREW_SPOTFACE_DIAMETER,
 )
-from fr_harmonic_base_fasteners import NEAR_WALL_CLEARANCE_DIAMETER
+from fr_frame_cross_screw import NEAR_WALL_CLEARANCE_DIAMETER
 from fr_harmonic_base_spec import (
     BOTTOM_FRONT_Z,
     BOTTOM_LENGTH,
@@ -164,7 +165,10 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 4.0)
 VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
-SHEET_NAMES = ("GEOMETRY", "HOLES-SOCKETS", "UNDERSIDE", "UNDERSIDE-LUGS")
+# Sheet 5 carries the front cross-tap elevation alone (see HOLE_SIDE_CENTER).
+SHEET_NAMES = ("GEOMETRY", "HOLES-SOCKETS", "UNDERSIDE", "UNDERSIDE-LUGS", "CROSS-TAPS")
+CROSS_TAP_SHEET_SCALE = (1.0, 2.0)
+CROSS_TAP_VIEW_LABEL = "FRONT CROSS-TAP VIEW SCALE 1:2"
 
 # Section A-A is projected from a vertical cutting line, which lays machine +Y
 # across the sheet: it reads as the upright section turned 90 degrees
@@ -216,7 +220,15 @@ SERIAL_LEADER_START_OFFSET_M = (0.0440, -0.0118)
 DECK_FINISH_XY = (0.040, 0.1855)
 DECK_FINISH_FACE_INSET_M = 0.004
 HOLE_TOP_CENTER = (0.280, 0.195)
-HOLE_SIDE_CENTER = (0.280, 0.095)
+# The front cross-tap view has sheet 5 to itself, at CROSS_TAP_SHEET_SCALE.
+# On sheet 2 the band between the plan and this view was too shallow for its
+# callouts: the 1.030 D1 dimension pressed on the tap callout and both
+# cross-screw leaders landed on one tap (machinist review, run
+# 20261106T181023655Z, rule 15). Under sheet 3's bottom view it read as a
+# first-angle projection of that third-angle view (run 20261106T183437225Z).
+# At 1:2 the view spans x 0.075-0.325 and y 0.126-0.174 about this centre,
+# its +X cross-screw axis at (0.299, 0.157).
+HOLE_SIDE_CENTER = (0.200, 0.150)
 SECTION_CENTER = (0.375, 0.135)
 HOLE_TABLE_ANCHOR = (0.018, 0.260)
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the A1-A4 matched fit sits on the sockets, not in a general note
@@ -264,11 +276,18 @@ NOTE_ROW_M = 0.0046
 PEDESTAL_CALLOUT_XY = (0.200, 0.252)
 BLOCK_CALLOUT_XY = (0.272, 0.252)
 SPRING_CALLOUT_XY = (0.315, 0.1428)
-CROSS_TAP_CALLOUT_XY = (0.285, 0.117)
-# The near-wall clearance callout stands right of the cross-tap block, on its
-# row, short of section A-A: its leader drops onto the same +X entry the tap
-# leader reaches from the left.
-CROSS_CLEARANCE_CALLOUT_XY = (0.342, 0.117)
+# Sheet 5's cross-tap and clearance callouts stand over the front view
+# (HOLE_SIDE_CENTER), checked there by _check_hole_sheet_callouts. A callout
+# block centres on its anchor and its shoulder runs about 8.4 mm below it,
+# here about 6 mm over the view's top edge. The tap block's right shoulder
+# end stops 24 mm short of the +X axis, so its leader drops onto the tap's far
+# mouth from the upper left.
+CROSS_TAP_CALLOUT_XY = (0.237, 0.188)
+# The near-wall clearance block stands right of the +X boss on the same row:
+# its leader reaches the same entry from the upper right, so the two
+# arrowheads land on opposite sides of the tap instead of one on top of the
+# other (machinist review r3, run 20261106T172701582Z).
+CROSS_CLEARANCE_CALLOUT_XY = (0.345, 0.188)
 # The nameplate callout (#628): three rows, its top row level with the block
 # callout's, right of it in the band above the plan and high over section
 # arrow A's head and letter. Its near, left shoulder end stands over the
@@ -436,18 +455,27 @@ SECTION_KEEP = {
     # where it was.
     "SpotFaceDepth": (0.3845, 0.1186),
 }
+# Sheet 5 stations at 1:2 around HOLE_SIDE_CENTER (view x 0.075-0.325, y
+# 0.126-0.174; cross-screw axes at x 0.101 and 0.299, y 0.157).
 HOLE_SIDE_KEEP = {
-    "SpotFaceDia": (0.193, 0.135),
-    # 4 mm above the old station: three caption lines hang below this value and
-    # the lowest reached the title-block band at y 66 mm (audit keep-out).
-    "CrossScrewAxisHeight": (0.196, 0.0785),
+    # Upper left of the -X boss, its leader dropping onto that spotface.
+    "SpotFaceDia": (0.062, 0.200),
+    # The dimension line 10.6 mm left of the flange; its value and three
+    # caption lines centre about 22 mm further left (sheet-2 display data),
+    # 7 mm inside the frame.
+    "CrossScrewAxisHeight": (0.064, 0.1215),
     # Two baselines beneath the front view, above its label, both from the
-    # flange's west face (the table's X0), shortest innermost: the near tap
-    # reads left of the flange, since its 7.9 mm witness span is narrower than
-    # its text, and the far tap's text sits mid-span on the outer row.
-    "CrossTapX": (0.211, 0.0845),
-    "CrossTapFarX": (0.276, 0.0790),
+    # flange's west face (the table's X0), shortest innermost: at 1:2 the near
+    # tap's 15.8 mm witness span (x 85.7-101.5 mm) holds its 10.9 mm text
+    # centred, 2.4 mm clear of each extension line (at x 0.088 the flange's
+    # line struck it, run 20261106T191202377Z), and the far tap's text sits
+    # mid-span on the outer row.
+    "CrossTapX": (0.0936, 0.117),
+    "CrossTapFarX": (0.186, 0.106),
 }
+# The front cross-tap view's label, centred under the view and about 6 mm
+# under the 16.756 text (the label anchors at its left end).
+HOLE_SIDE_LABEL_XY = (0.162, 0.093)
 GEOMETRY_CALLOUTS = {
     "PadCornerRadius": "PAD",
     "FlangeCornerRadius": "FLANGE",
@@ -1269,15 +1297,18 @@ TRANSFER_NAMEPLATE_LEADER_HOLE = max(
 PIVOT_SEAT_NOTE_XY = (0.020, 0.100)
 
 # The cross-tap callout carries hole facts only, in three rows: count, drill
-# and depth; this instruction; the thread and its depth, on its own row. The
-# old "DEPTHS FROM SPOTFACE FLOOR" row restated the model: the Hole Wizard
-# seats each tap ON the spotface floor (build_harmonic_base places it at
-# BASE_SCREW_SEAT_Z), and its depths run from that face. "ON A1-A4 X
+# and depth; the depths' datum; the thread and its depth after FAR WALL
+# ONLY. The Hole Wizard seats each tap ON the spotface floor
+# (build_harmonic_base places it at BASE_SCREW_SEAT_Z) and its depths run
+# from that face, but the print has to say so: with the near wall cleared
+# and the thread starting past the socket, two of three machinist reviews
+# asked which face 1.93 and 1.81 start from (run 20261106T172701582Z), as
+# the top frame's DEPTHS FROM COUNTERBORE FLOOR answers. "ON A1-A4 X
 # CENTRES" was a location, now the CrossTapX/CrossTapFarX dimensions, and
 # the spotface callout's 4X FRONT/REAR already counts the faces. The near
 # wall is the ⌀.206 clearance (owner ruling 2026-11-05), called out on its
 # own, so the thread is the far wall's only.
-CROSS_TAP_PROCESS = "FAR WALL ONLY\n"
+CROSS_TAP_PROCESS = "DEPTHS FROM SPOTFACE FLOOR\nFAR WALL ONLY"
 TRANSFER_HOLES = (
     *TRANSFER_BLOCK_HOLES,
     TRANSFER_SPRING_HOLE,
@@ -1309,21 +1340,25 @@ ALL_HOLES = (
     *((x, z, COLUMN_SOCKET_DIAMETER) for x, z in COLUMN_SOCKET_XZ),
 )
 # SolidWorks adds descriptive "<size> Tapped Hole" notes per deck-seat
-# FEATURE in each plan view, including the two bottom views. These notes are
-# not manufacturing callouts; the native table and transfer callouts own the
-# through-tap definitions. Keep the strict per-view inventory so a native
-# regeneration change is reported rather than hidden during final cleanup.
+# FEATURE in the first view placed on each sheet: the four plan views, and
+# sheet 5's front cross-tap view, which has its sheet to itself (run
+# 20261106T185913892Z); sheets 1 and 2 placed their front views after a plan,
+# and those carried none. These notes are not manufacturing callouts; the
+# native table and transfer callouts own the through-tap definitions. Keep
+# the strict per-view inventory so a native regeneration change is reported
+# rather than hidden during final cleanup.
 TAPPED_HOLE_NOTE = "Tapped Hole"
 # finalize_drawing deletes every note containing one of these (case-blind, the
 # adapter's remove_notes_matching), so none of them reaches the final sheet.
 FINAL_SHEET_REMOVED_NOTES = (TAPPED_HOLE_NOTE,)
-PLAN_VIEWS = (
+FIRST_SHEET_VIEWS = (
     (SHEET_NAMES[0], "*Top"),
     (SHEET_NAMES[1], "*Top"),
     (SHEET_NAMES[2], "*Bottom"),
     (SHEET_NAMES[3], "*Bottom"),
+    (SHEET_NAMES[4], "*Front"),
 )
-TAPPED_HOLE_NOTES = len(DECK_TAPPED_SEAT_FEATURES) * len(PLAN_VIEWS)
+TAPPED_HOLE_NOTES = len(DECK_TAPPED_SEAT_FEATURES) * len(FIRST_SHEET_VIEWS)
 TABLE_HOLES = tuple(hole for hole in ALL_HOLES if hole not in TRANSFER_HOLES)
 if len(TABLE_HOLES) != len(ALL_HOLES) - len(TRANSFER_HOLES):
     raise AssertionError("a transferred seat is not a unique base hole")
@@ -2077,19 +2112,25 @@ def _check_hole_sheet_callouts(
     adapter: Any,
     ddoc: Any,
     *,
+    sheet_name: str,
     callouts: dict[str, Any],
     views: dict[str, Any],
-    datum_origin: Any,
-    hole_table: Any,
+    datum_origin: Any | None = None,
+    hole_table: Any | None = None,
 ) -> None:
-    """Fail loud on any sheet-2 callout that crowds another callout, a note, a
-    view label, the hole table, the table's datum origin, any view's casting
-    outline, the sheet frame or the title block; that sits closer than a row
-    pitch over another callout; that runs over four rows; or whose leader
-    runs through any of those texts or through its own text rows."""
-    pivot_tag = _hole_table_station_rows(hole_table)[PIVOT_SCREW_XZ].tag
-    if not ddoc.ActivateSheet(SHEET_NAMES[1]):
-        raise RuntimeError("failed to activate the holes sheet for the callout check")
+    """Fail loud on any of ``sheet_name``'s hole callouts that crowds another
+    callout, a note, a view label, the hole table, the table's datum origin,
+    any view's casting outline, the sheet frame or the title block; that sits
+    closer than a row pitch over another callout; that runs over four rows; or
+    whose leader runs through any of those texts or through its own text rows.
+    The holes sheet passes its table and datum origin; the cross-tap sheet,
+    which carries neither, passes none."""
+    pivot_tag = (
+        None if hole_table is None
+        else _hole_table_station_rows(hole_table)[PIVOT_SCREW_XZ].tag
+    )
+    if not ddoc.ActivateSheet(sheet_name):
+        raise RuntimeError(f"failed to activate {sheet_name} for the callout check")
     boxes = {}
     leaders = {}
     own_rows = {}
@@ -2103,10 +2144,12 @@ def _check_hole_sheet_callouts(
         (f"view {label}", _view_geometry_box(adapter, view, label))
         for label, view in views.items()
     )
-    axis_points = [
-        float(v) for v in (_early_bound(datum_origin, "IDatumOrigin").GetAxisPoints2() or ())
-    ]
-    obstacles.update(datum_origin_boxes(axis_points))
+    if datum_origin is not None:
+        axis_points = [
+            float(v)
+            for v in (_early_bound(datum_origin, "IDatumOrigin").GetAxisPoints2() or ())
+        ]
+        obstacles.update(datum_origin_boxes(axis_points))
     obstacles.update(_section_line_obstacles(views))
     sheet_view = ddoc.GetFirstView()  # the sheet itself: its free notes and tables
     pivot_seat_notes = 0
@@ -2122,11 +2165,13 @@ def _check_hole_sheet_callouts(
             text = _note_text(adapter, annotation)
             if not note_reaches_final_sheet(text):
                 continue
-            if text.replace("\r\n", "\n").strip() == pivot_seat_step(pivot_tag):
+            if pivot_tag is not None and (
+                text.replace("\r\n", "\n").strip() == pivot_seat_step(pivot_tag)
+            ):
                 pivot_seat_notes += 1
             is_label = any(word in element.label.upper() for word in _LAYOUT_LABEL_WORDS)
             obstacles[f"{'label' if is_label else 'note'} {element.label}"] = element.box
-    if pivot_seat_notes != 1:
+    if pivot_tag is not None and pivot_seat_notes != 1:
         raise RuntimeError(
             f"callout check requires exactly one numbered pivot seat note, found {pivot_seat_notes}"
         )
@@ -2135,12 +2180,12 @@ def _check_hole_sheet_callouts(
         for view in (sheet_view, *views.values())
         for element in _iter_tables(adapter, view)
     ]
-    if not tables:
+    if hole_table is not None and not tables:
         raise RuntimeError("callout check found no hole table on the holes sheet")
     for element in tables:
         obstacles[f"table {element.label}"] = element.box
     _telemetry.info(
-        f"hole-sheet callout boxes: {boxes!r}; leaders: {leaders!r}; obstacles: {obstacles!r}"
+        f"{sheet_name} callout boxes: {boxes!r}; leaders: {leaders!r}; obstacles: {obstacles!r}"
     )
     texts = {f"callout {label}": box for label, box in boxes.items()}
     texts.update(
@@ -2154,7 +2199,7 @@ def _check_hole_sheet_callouts(
         + find_leader_crossings(leaders, texts, own_rows)
     )
     if findings:
-        raise RuntimeError("hole-sheet callout clashes: " + "; ".join(findings))
+        raise RuntimeError(f"{sheet_name} callout clashes: " + "; ".join(findings))
 
 
 def _visible_hole_table_entities(
@@ -2451,9 +2496,6 @@ async def build(adapter: Any) -> dict[str, str]:
     hole_top = place_view(
         adapter, str(SOURCE), "*Top", *HOLE_TOP_CENTER, scale=SHEET_SCALE
     )
-    hole_side = place_view(
-        adapter, str(SOURCE), "*Front", *HOLE_SIDE_CENTER, scale=SHEET_SCALE
-    )
     section_line_x = _plan_xy(COLUMN_X, 0.0, center=HOLE_TOP_CENTER)[0]
     _set_active_sheet_scale(adapter, SECTION_CAPTION_SHEET_SCALE)
     section = create_section_view(
@@ -2468,13 +2510,13 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _set_active_sheet_scale(adapter, SHEET_SCALE)
     _require_section_caption_scale(adapter, section, label="section A-A")
-    # drawing-guidelines.md rule 12 (hole and slot callouts say what to do) again: the hole table plus the cross-tap and spotface callouts
+    # drawing-guidelines.md rule 12 (hole and slot callouts say what to do) again: the hole table plus the spotface depth
     # define every hole on this sheet, and section A-A shows the socket, its
     # depth and the cross tap through it in SOLID lines, so no view here needs
-    # dashed edges -- plan, front cross-tap elevation and section are all
-    # hidden-lines-removed. Every pick below therefore runs against the same
-    # visible-entity set the sheet exports.
-    for view in (hole_top, hole_side, section):
+    # dashed edges -- plan and section are both hidden-lines-removed, as is
+    # sheet 3's front cross-tap elevation. Every pick below therefore runs
+    # against the same visible-entity set the sheet exports.
+    for view in (hole_top, section):
         set_hidden_lines_removed(adapter, view)
 
     # The part saves PivotSeatReference blanked; show its point-only owner in
@@ -2495,20 +2537,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="section A-A",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # CrossTapX/CrossTapFarX are owned by a reference sketch the part saves
-    # blanked, so this view takes the hidden-owner curate.
-    hole_side_dimensions = curate_hidden_owner_dimensions(
-        adapter,
-        hole_side,
-        keep=HOLE_SIDE_KEEP,
-        view_label="holes front",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
     set_dimension_callouts(adapter, section_dimensions, SECTION_CALLOUTS)
-    set_dimension_callouts(adapter, hole_side_dimensions, HOLE_SIDE_CALLOUTS)
-    set_dimension_callouts(
-        adapter, hole_side_dimensions, CROSS_TAP_AXIS_CALLOUTS, location="above"
-    )
     # No root-radius callout: a 0.5 mm internal root at the pad-to-flange
     # junction is not measurable with hobby-shop kit, so the model keeps its
     # fillet and the deck cutter's own corner radius defines it (2026-09
@@ -2634,49 +2663,13 @@ async def build(adapter: Any) -> dict[str, str]:
         label="nameplate transfer seats",
         process=TRANSFER_NAMEPLATE_CALLOUT,
     )
-    tap_callout = add_native_hole_callout(
-        adapter,
-        hole_side,
-        edge=_cross_tap_edge(hole_side),
-        callout_xy=CROSS_TAP_CALLOUT_XY,
-        label="base column-retention taps",
-        process=CROSS_TAP_PROCESS,
-    )
-    _set_cross_tap_callout_text(tap_callout)
-    # The drill size prints .XXX and both depths .XX, the MIN drill depth
-    # included (per-variable, see set_hole_callout_precision).
-    set_hole_callout_precision(
-        tap_callout, CROSS_TAP_CALLOUT_PRECISION, label="base cross-tap drill depth"
-    )
-    clearance_callout = add_native_hole_callout(
-        adapter,
-        hole_side,
-        edge=_cross_clearance_edge(hole_side),
-        callout_xy=CROSS_CLEARANCE_CALLOUT_XY,
-        label="base cross near-wall clearances",
-    )
-    set_hole_callout_precision(
-        clearance_callout,
-        CROSS_CLEARANCE_PRECISION,
-        label="base cross near-wall clearance diameter",
-    )
-    _set_cross_clearance_callout_text(clearance_callout)
     for label, display in (
         ("pinion-block transfer seats", block_callout),
         ("arbor-pedestal transfer seats", pedestal_callout),
         ("pinion-spring transfer seat", spring_callout),
         ("nameplate transfer seats", nameplate_callout),
-        ("base column-retention taps", tap_callout),
     ):
         _omit_base_callout_thread_class(display, label=label)
-    _check_cross_tap_callout(tap_callout)
-    # The point-only HeightReference dimensions this actual cross-screw centre
-    # from the same faced underside as GreenTopHeight. The spec-owned caption
-    # names that seating face; no flange-to-deck chain controls either height.
-    # Keep the axis-height text below its extension-line band.
-    _require_single_center_marks(
-        adapter, hole_side, HOLE_SIDE_CENTER_MARKS, label="base cross-screw entries"
-    )
     # The four sockets locate the frame columns, so their bores carry the seat
     # grade (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)) -- the deck symbol stops at the deck plane and the hole
     # table's bore diameters are reference-only match-fit sizes. Section A-A is
@@ -2730,8 +2723,6 @@ async def build(adapter: Any) -> dict[str, str]:
     if abs(float(socket_annotation.BentLeaderLength) - SOCKET_FINISH_SHOULDER) > 1e-7:
         raise RuntimeError("socket bore finish leader shoulder did not persist")
     add_note(adapter, "TOP VIEW SCALE 1:4", *HOLES_TOP_LABEL_XY)
-    # Under the two cross-tap baselines' outer row, above the title block.
-    add_note(adapter, "FRONT CROSS-TAP VIEW SCALE 1:4", 0.245, 0.073)
     # Two nested outlines (flange, pad side) sit 1.6 mm apart at the table
     # origin, so the corner is named instead of left to
     # be inferred from A1-A4 symmetry. The note reads from the open field left
@@ -2832,6 +2823,68 @@ async def build(adapter: Any) -> dict[str, str]:
             view=lugs,
         )
 
+    # Sheet 5, the front cross-tap elevation on its own at 1:2, with its
+    # spotface, tap and clearance callouts and its axis-height and X
+    # baselines: sheet 2 had no room for them (rule 15, add a sheet), and on
+    # sheet 3 under the bottom view it read as a mis-projected view.
+    if not ddoc.ActivateSheet(SHEET_NAMES[4]):
+        raise RuntimeError("failed to activate harmonic-base cross-tap sheet")
+    hole_side = place_view(
+        adapter, str(SOURCE), "*Front", *HOLE_SIDE_CENTER, scale=CROSS_TAP_SHEET_SCALE
+    )
+    set_hidden_lines_removed(adapter, hole_side)
+    # CrossTapX/CrossTapFarX are owned by a reference sketch the part saves
+    # blanked, so this view takes the hidden-owner curate.
+    hole_side_dimensions = curate_hidden_owner_dimensions(
+        adapter,
+        hole_side,
+        keep=HOLE_SIDE_KEEP,
+        view_label="holes front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    set_dimension_callouts(adapter, hole_side_dimensions, HOLE_SIDE_CALLOUTS)
+    set_dimension_callouts(
+        adapter, hole_side_dimensions, CROSS_TAP_AXIS_CALLOUTS, location="above"
+    )
+    tap_callout = add_native_hole_callout(
+        adapter,
+        hole_side,
+        edge=_cross_tap_edge(hole_side),
+        callout_xy=CROSS_TAP_CALLOUT_XY,
+        label="base column-retention taps",
+        process=CROSS_TAP_PROCESS,
+    )
+    _set_cross_tap_callout_text(tap_callout)
+    # The drill size prints .XXX and both depths .XX, the MIN drill depth
+    # included (per-variable, see set_hole_callout_precision).
+    set_hole_callout_precision(
+        tap_callout, CROSS_TAP_CALLOUT_PRECISION, label="base cross-tap drill depth"
+    )
+    clearance_callout = add_native_hole_callout(
+        adapter,
+        hole_side,
+        edge=_cross_clearance_edge(hole_side),
+        callout_xy=CROSS_CLEARANCE_CALLOUT_XY,
+        label="base cross near-wall clearances",
+    )
+    set_hole_callout_precision(
+        clearance_callout,
+        CROSS_CLEARANCE_PRECISION,
+        label="base cross near-wall clearance diameter",
+    )
+    _set_cross_clearance_callout_text(clearance_callout)
+    _omit_base_callout_thread_class(tap_callout, label="base column-retention taps")
+    _check_cross_tap_callout(tap_callout)
+    # The point-only HeightReference dimensions this actual cross-screw centre
+    # from the same faced underside as GreenTopHeight. The spec-owned caption
+    # names that seating face; no flange-to-deck chain controls either height.
+    # Keep the axis-height text below its extension-line band.
+    _require_single_center_marks(
+        adapter, hole_side, HOLE_SIDE_CENTER_MARKS, label="base cross-screw entries"
+    )
+    # Under the two cross-tap baselines' outer row, clear of the 16.756 text.
+    add_note(adapter, CROSS_TAP_VIEW_LABEL, *HOLE_SIDE_LABEL_XY)
+
     # drawing-simplicity-policy.md `How the repository implements the guidelines`'s proof obligation, now that no sheet code writes places:
     # every imported dimension must still print what its PART authored. A
     # silent fallback to the drawing document's two places would ask the shop
@@ -2857,6 +2910,8 @@ async def build(adapter: Any) -> dict[str, str]:
         "MHA-DT-02 pedestal transfer": pedestal_callout,
         "MHA-DT-24 spring transfer": spring_callout,
         "MHA-FR-04 nameplate transfer": nameplate_callout,
+    }
+    cross_tap_sheet_callouts = {
         "MHA-FR-VN-53 cross-tap": tap_callout,
         "MHA-FR-VN-53 near-wall clearance": clearance_callout,
     }
@@ -2867,10 +2922,31 @@ async def build(adapter: Any) -> dict[str, str]:
     _check_hole_sheet_callouts(
         adapter,
         ddoc,
+        sheet_name=SHEET_NAMES[1],
         callouts=hole_sheet_callouts,
-        views={"holes top": hole_top, "holes front": hole_side, "section A-A": section},
+        views={"holes top": hole_top, "section A-A": section},
         datum_origin=hole_feature.DatumOrigin,
         hole_table=hole_table,
+    )
+    if not ddoc.ActivateSheet(SHEET_NAMES[4]):
+        raise RuntimeError("failed to activate the cross-tap sheet for the leader sides")
+    for label, display in cross_tap_sheet_callouts.items():
+        _attach_leader_nearest_hole(adapter, display, label)
+    # Both leaders reach the +X axis, the tap's to its far mouth: drawn
+    # diametric, their lines through the shared centre crossed (run
+    # 20261106T190540434Z). The clearance's single arrow stops at its near
+    # rim instead, outside the tap's far-mouth circle (as on MHA-FR-02).
+    set_near_side_diameter(
+        _early_bound(clearance_callout, "IDisplayDimension").GetAnnotation(),
+        "base cross near-wall clearance callout",
+    )
+    rebuild_drawing(adapter, label="base cross near-wall clearance near-side leader")
+    _check_hole_sheet_callouts(
+        adapter,
+        ddoc,
+        sheet_name=SHEET_NAMES[4],
+        callouts=cross_tap_sheet_callouts,
+        views={"holes front": hole_side},
     )
     _log_tapped_hole_notes(adapter, ddoc)
     return await finalize_drawing(
@@ -2881,6 +2957,7 @@ async def build(adapter: Any) -> dict[str, str]:
         sheet_scales={
             **dict.fromkeys(SHEET_NAMES[:3], SHEET_SCALE),
             SHEET_NAMES[3]: LUGS_SCALE,
+            SHEET_NAMES[4]: CROSS_TAP_SHEET_SCALE,
         },
         redundant_note_substrings=FINAL_SHEET_REMOVED_NOTES,
         expected_redundant_notes=TAPPED_HOLE_NOTES,

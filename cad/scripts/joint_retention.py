@@ -819,9 +819,9 @@ JOINTS: tuple[Joint, ...] = (
         installed_at="MHA-FR-00 STEP 6",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason="retains the top_frame casting on a tube_frame column; casting and columns are stationary relative to each other and no rotating/rocking member turns about the horizontal screw axis (clearance through both tube walls)",
-        axial_capture="narrow fillister head seated flush in the Ø9 boss counterbore; thread engages near and far wall of the top_frame interrupted #10-32 bottoming tap (SideTaps)",
+        axial_capture="narrow fillister head seated flush in the Ø9 boss counterbore; the shank clears the near casting wall (#10 close, SideClearance) and engages only the far casting wall's blind 46 mm #10-32 bottoming tap (SideTaps)",
         lock=Lock.NONE,
-        evidence="build_fr_frame_assembly.py:build (upper cross screws, TOP_SCREW_Y/TOP_SCREW_SEAT_Z); build_fr_top_frame.py:SIDE_TAP_SPEC, step 13 SideTaps; draw_fr_frame_assembly.py ASSEMBLY_STEPS 5, 6, ASSEMBLY_CHECKS 2",
+        evidence="build_fr_frame_assembly.py:build (upper cross screws, TOP_SCREW_Y/TOP_SCREW_SEAT_Z); build_fr_top_frame.py:SIDE_TAP_SPEC, SIDE_CLEARANCE_SPEC, TOP_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT, step 13 SideTaps/SideClearance; draw_fr_frame_assembly.py ASSEMBLY_STEPS 5, 6, ASSEMBLY_CHECKS 2",
     ),
     Joint(
         id="fr-frame/support-hold-down-in-base",

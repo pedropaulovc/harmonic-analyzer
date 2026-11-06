@@ -26,8 +26,10 @@ from fr_vn_frame_cross_screw_spec import SHANK_LEN as _FRAME_CROSS_LENGTH
 from fr_vn_frame_cross_screw_spec import THREAD as _FRAME_CROSS_THREAD
 
 # Minimum socket chord across the screw's complete major-diameter envelope.
-# Only the two tapped casting lands may overlap the stock helical thread.
-# Neither the clearance-drilled tubes nor the cap skirts receive an exemption.
+# Only tapped casting lands may overlap the stock helical thread. Since the
+# owner ruling of 2026-11-05 each near wall is a #10 clearance and only the
+# far land is tapped, so this whole-casting bound is conservative. Neither
+# the clearance-drilled tubes nor the cap skirts receive an exemption.
 _FRAME_CROSS_CASTING_LENGTH = _FRAME_CROSS_LENGTH - math.sqrt(
     COLUMN_SOCKET_DIAMETER**2 - _FRAME_CROSS_DIA**2
 )

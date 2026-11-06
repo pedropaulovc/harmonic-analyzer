@@ -85,10 +85,7 @@ from _drawing_sheets import (
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_resolve import resolve_faces
 from _layout_audit import display_box, estimated_text_runs
-from _mcmaster_90280a837 import (
-    SHANK_DIA as CROSS_SCREW_SHANK_DIA,
-    SHANK_LEN as CROSS_SCREW_SHANK_LEN,
-)
+from fr_frame_cross_screw import NEAR_WALL_CLEARANCE_DIAMETER
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
@@ -110,7 +107,6 @@ from build_fr_top_frame import (
     CAP_RECESS_DIAMETER,
     COLUMN_X,
     COUNTERBORE_DIA,
-    COUNTERBORE_MAX_FLOOR_OFFSET,
     FLANGE,
     FLANGE_BOT_Y,
     FRONT_COLUMN_Z,
@@ -141,7 +137,9 @@ from build_fr_top_frame import (
     SET_BOSS_FACE_X,
     SET_SPOT_FACE_X,
     SET_TAP_SPEC,
+    SIDE_SCREW_XS,
     SIDE_TAP_DRILL_DIA,
+    SIDE_TAP_SPEC,
     TAP_DRILL_MM,
     TOP_SCREW_SEAT_Z,
     WEB_IN_X,
@@ -152,7 +150,6 @@ from build_fr_top_frame import (
 )
 from fr_top_frame_spec import (
     DRAWING_DIMENSIONS,
-    DRAWING_PRECISION,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     EDGE_CHAMFER,
@@ -181,7 +178,6 @@ from fr_top_frame_spec import (
     STUD_Z_REAR,
     SURFACE_FINISHES,
     UNIT,
-    printed_limit,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -485,28 +481,144 @@ A_A_WITNESS_STANDOFF = 0.0012
 BORE_CHAMFER_TEXT_OFFSET_XY = (0.315, 0.174)
 
 
-# A-A's joint note. The near wall between the flush counterbore floor and
-# the socket bore only starts the thread; the far casting wall carries the
-# MHA-FR-VN-53 joint. drawing-guidelines.md rule 17 (walls and webs), print-worst: the stock shank, less the most
-# outboard printed floor (.644 + band) and the largest printed socket radius.
-_SOCKET_DIA_PLACES = DRAWING_PRECISION["BoreProfile"]["B0Dia"]
-CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT = (
-    CROSS_SCREW_SHANK_LEN
-    - COUNTERBORE_MAX_FLOOR_OFFSET
-    - printed_limit(BORE_DIA, _SOCKET_DIA_PLACES, 1.0) / 2.0
-)
-if CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT < 1.5 * CROSS_SCREW_SHANK_DIA:
-    raise AssertionError(
-        "far casting wall engages MHA-FR-VN-53 under 1.5D at the printed bands"
-    )
-# The phase requirement and its mate belong on the native cross-tap leader
-# (drawing-guidelines.md rule 7), not in a detached section note. The
-# engagement follows from the printed floor and socket and is proved above.
+# The far-wall-only requirement and its mate belong on the native cross-tap
+# leader (drawing-guidelines.md rule 7), not in a detached section note. The
+# near casting wall is the #10 close clearance (owner ruling 2026-11-05),
+# called out on its own, so the thread is the far wall's only; its
+# print-worst engagement is build_fr_top_frame's
+# TOP_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT.
 CROSS_TAP_CALLOUT = (
     "SAME AT OPPOSITE END, 4X TOTAL FOR MHA-FR-VN-53\n"
     "DEPTHS FROM COUNTERBORE FLOOR\n"
-    "THREAD NEAR AND FAR WALL IN PHASE"
+    "FAR WALL ONLY"
 )
+# The Hole Wizard's own tap feature names (build_fr_top_frame step 13).
+CROSS_TAP_FEATURES = ("SideTapsFront", "SideTapsRear")
+# The near-wall clearance callout stands above the view, left of section
+# arrow A's upper head and clear of the ⌀.35 counterbore leader below it, so
+# its leader drops onto the clearance's upper-left rim. Right of the tap
+# (run 20261106T172701582Z) its leader ran through section label A, and
+# both native leaders, drawn rim to rim through the shared centre, crossed
+# there: the clearance's leader stops at its near rim instead
+# (set_near_side_diameter), outside the tap's far-mouth circle.
+CROSS_CLEARANCE_CALLOUT_XY = (0.192, 0.256)
+# The clearance is drilled full diameter until it opens into the socket: its
+# native blind depth ("<HOLE-DEPTH> <hw-depth>") becomes that instruction on
+# its own row, and the count row is headed by the total, as the tap's is.
+# The native 2X count and the diameter stay Hole Wizard variables.
+CROSS_CLEARANCE_TOTAL_TEXT = "SAME AT OPPOSITE END, 4X TOTAL"
+CROSS_CLEARANCE_EXTENT_TEXT = "DRILL TO SOCKET"
+CROSS_CLEARANCE_PRECISION = {"hw-diam": 3}
+_BLIND_DEPTH_TOKENS = re.compile(r"<HOLE-DEPTH>\s*<hw-depth>")
+
+
+def _cross_clearance_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """Head the count with the total and swap the blind depth for DRILL TO SOCKET."""
+    if set(definitions) != {5, 6, 7, 8}:
+        raise RuntimeError(f"unexpected cross clearance callout parts: {definitions!r}")
+    depths = sorted(
+        len(_BLIND_DEPTH_TOKENS.findall(text)) for text in definitions.values()
+    )
+    counts = {part: text.count("<NUM_INST>") for part, text in definitions.items()}
+    if depths != [0, 0, 0, 1] or sorted(counts.values()) != [0, 0, 0, 1]:
+        raise RuntimeError(
+            "cross clearance callout has no single count and blind depth: "
+            f"{definitions!r}"
+        )
+    updated = {
+        part: (f"{CROSS_CLEARANCE_TOTAL_TEXT}\n" if counts[part] else "")
+        + _BLIND_DEPTH_TOKENS.sub(f"\n{CROSS_CLEARANCE_EXTENT_TEXT}", text)
+        for part, text in definitions.items()
+    }
+    rewritten = "\n".join(updated.values())
+    if "<hw-depth>" in rewritten or "<HOLE-DEPTH>" in rewritten:
+        raise RuntimeError(f"cross clearance rewrite left a depth: {updated!r}")
+    return updated
+
+
+@_telemetry.traced("drawing.top_cross_clearance_callout_text")
+def _set_cross_clearance_callout_text(display: Any) -> None:
+    """State the total and DRILL TO SOCKET without severing the diameter variable."""
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    updated = _cross_clearance_callout_definitions(definitions)
+    for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
+        if updated[definition_part] != definitions[definition_part]:
+            display.SetText(writable_part, updated[definition_part])
+    persisted = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    resolved = "\n".join(str(display.GetText(part) or "") for part in (1, 2, 3, 4))
+    diameter = f"{NEAR_WALL_CLEARANCE_DIAMETER / 25.4:.3f}".lstrip("0")
+    if (
+        persisted != updated
+        or resolved.count(CROSS_CLEARANCE_EXTENT_TEXT) != 1
+        or resolved.count(CROSS_CLEARANCE_TOTAL_TEXT) != 1
+        or f"{len(SIDE_SCREW_XS)}X " not in resolved
+        or "<HOLE-DEPTH>" in resolved
+        or diameter not in resolved
+    ):
+        raise RuntimeError(
+            "cross clearance total or DRILL TO SOCKET did not persist: "
+            f"definitions={persisted!r}, resolved={resolved!r}"
+        )
+
+
+@_telemetry.traced("drawing.top_cross_tap_edge")
+def _cross_tap_far_mouth_edge(view: Any) -> Any:
+    """Pick the +X far-wall tap's mouth where its drill breaks into the socket.
+
+    The near-wall clearance consumes the tap's entry rim on the counterbore
+    floor, and looking down the axis its drill-bottom circle hides behind
+    the far mouth (draw_fr_harmonic_base found the same on MHA-FR-01: the
+    view neither lists nor maps that circle). The mouth itself, the tap
+    cylinder's intersection with the socket bore, is the visible edge, seen
+    through the clearance across the bore. It is found on the tap feature's
+    far-wall cylinder, the face that ends at the drill-bottom circle.
+    """
+    center = (
+        COLUMN_X / 1000.0,
+        SCREW_AXIS_Y / 1000.0,
+        (TOP_SCREW_SEAT_Z - SIDE_TAP_SPEC.depth_mm) / 1000.0,
+    )
+    radius = SIDE_TAP_DRILL_DIA / 2000.0
+    part = _early_bound(_early_bound(view, "IView").ReferencedDocument, "IPartDoc")
+    far_walls = []
+    for name in CROSS_TAP_FEATURES:
+        feature = part.FeatureByName(name)
+        if feature is None:
+            raise RuntimeError(f"top cross-tap feature {name!r} is missing")
+        for raw_face in _early_bound(feature, "IFeature").GetFaces() or ():
+            face = _early_bound(raw_face, "IFace2")
+            if not _early_bound(face.GetSurface(), "ISurface").IsCylinder():
+                continue
+            edges = [_early_bound(raw, "IEdge") for raw in face.GetEdges() or ()]
+            for edge in edges:
+                curve = _early_bound(edge.GetCurve(), "ICurve")
+                if not curve.IsCircle():
+                    continue
+                values = tuple(float(value) for value in curve.CircleParams)
+                if (
+                    abs(values[6] - radius) <= 1e-7
+                    and all(abs(values[i] - center[i]) <= 1e-7 for i in range(3))
+                    and abs(abs(values[5]) - 1.0) <= 1e-7
+                ):
+                    far_walls.append(edges)
+                    break
+    # The kernel may split the cylinder (and its bottom circle) at a seam.
+    if not far_walls:
+        raise RuntimeError("found no top cross-tap far-wall cylinder")
+    mouths = []
+    for edge in (edge for edges in far_walls for edge in edges):
+        curve = _early_bound(edge.GetCurve(), "ICurve")
+        if curve.IsCircle() or curve.IsLine():
+            continue
+        shown = _early_bound(view, "IView").GetCorrespondingEntity(edge)
+        if shown is not None:
+            start = tuple(round(float(v), 7) for v in tuple(edge.GetCurveParams2())[:3])
+            mouths.append((start, shown))
+    if not mouths:
+        raise RuntimeError("top cross-tap far mouth has no visible view edge")
+    _telemetry.info(f"top cross-tap far mouth: {len(mouths)} visible edge(s)")
+    return min(mouths, key=lambda item: item[0])[1]
+
 
 # Sheet 5: hub location, true-axis side view, removed set-screw boss section.
 HUB_TOP_CENTER = (0.145, 0.200)
@@ -3900,9 +4012,12 @@ async def build(adapter: Any) -> dict[str, str]:
         label="front view outer boss rim on the upper boss plane",
         center_tol_mm=1e-4, radius_tol_mm=1e-4,
     ).edge
-    front_tap_edge = detail_front_edges.circle_at(
-        (COLUMN_X, SCREW_AXIS_Y, TOP_SCREW_SEAT_Z), SIDE_TAP_DRILL_DIA/2, axis=(0.0, 0.0, 1.0),
-        label="front view column cross-tap circle",
+    # The tap's entry rim on the counterbore floor is now the #10 near-wall
+    # clearance's: it carries the clearance callout and the axis height.
+    front_clearance_edge = detail_front_edges.circle_at(
+        (COLUMN_X, SCREW_AXIS_Y, TOP_SCREW_SEAT_Z), NEAR_WALL_CLEARANCE_DIAMETER/2,
+        axis=(0.0, 0.0, 1.0),
+        label="front view column cross near-wall clearance circle",
     ).edge
     section_floor_edges = [
         (item.edge, item.midpoint_mm)
@@ -3971,7 +4086,7 @@ async def build(adapter: Any) -> dict[str, str]:
     cross_tap_callout = add_native_hole_callout(
         adapter,
         detail_front,
-        edge=front_tap_edge,
+        edge=_cross_tap_far_mouth_edge(detail_front),
         # Left-below the tap, so the leader leaves the block's right end and
         # climbs to the tap clear of every line of the process text; centred
         # under the tap it attached at the far corner and crossed the text,
@@ -3990,16 +4105,33 @@ async def build(adapter: Any) -> dict[str, str]:
         {"hw-tapdrldia": 3, "hw-tapdrldepth": 2, "hw-threaddepth": 2},
         label="cross tap drill and depths",
     )
+    clearance_callout = add_native_hole_callout(
+        adapter,
+        detail_front,
+        edge=front_clearance_edge,
+        callout_xy=CROSS_CLEARANCE_CALLOUT_XY,
+        label="front/rear cross near-wall clearances",
+    )
+    set_hole_callout_precision(
+        clearance_callout, CROSS_CLEARANCE_PRECISION,
+        label="cross near-wall clearance diameter",
+    )
+    _set_cross_clearance_callout_text(clearance_callout)
+    set_near_side_diameter(
+        _early_bound(clearance_callout, "IDisplayDimension").GetAnnotation(),
+        "cross near-wall clearance callout",
+    )
+    rebuild_drawing(adapter, label="cross near-wall clearance near-side leader")
     _checked_dimension(
         adapter, detail_front,
         p0=(COLUMN_X, HALF_H+BOSS_ABOVE, REAR_COLUMN_Z),
-        p1=(COLUMN_X+SIDE_TAP_DRILL_DIA/2, SCREW_AXIS_Y, TOP_SCREW_SEAT_Z),
+        p1=(COLUMN_X+NEAR_WALL_CLEARANCE_DIAMETER/2, SCREW_AXIS_Y, TOP_SCREW_SEAT_Z),
         text_xy=(0.2605, 0.229), label="cross screw axis from boss top",
         expected_mm=HALF_H+BOSS_ABOVE-SCREW_AXIS_Y, orientation="vertical", center=True,
         # Two taps per column end, opposed across the boss, at both ends of
         # the casting: the count a machinist sets up from is the total.
         suffix="TAP AXIS BELOW BOSS TOP",
-        entities=(upper_boss_edge, front_tap_edge), offset_text=(0.300, 0.229),
+        entities=(upper_boss_edge, front_clearance_edge), offset_text=(0.300, 0.229),
     )
     # A section never carries hidden lines: the cut 10-32 taps' cosmetic
     # threads printed dashed through the hatch (machinist review r1); the
