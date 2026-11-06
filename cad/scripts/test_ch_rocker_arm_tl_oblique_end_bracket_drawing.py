@@ -151,7 +151,7 @@ def test_every_tap_group_names_its_mate_by_drawing_number() -> None:
     assert drawing.MATE_NUMBERS == {"bar": "MHA-CH-06-TL-20", "kp08": "MHA-CH-06-TL-VN-56"}
     for kind, number in drawing.MATE_NUMBERS.items():
         assert drawing.MATE_CELLS[kind].split("\n")[0] == number
-    assert drawing.MATE_CELLS["kp08"].split("\n")[1:] == ["(KP08)"]
+    assert drawing.MATE_CELLS["kp08"].split("\n")[1:] == [f"(KP08) {drawing.KP08_NOTE_LINK}"]
     assert drawing.MATE_COLUMN.startswith("MATCHES")
     for name, feature in _features().items():
         if name.startswith(("bar_tap", "kp08_tap")):
@@ -170,6 +170,7 @@ def test_no_vendor_sku_on_the_sheet() -> None:
         drawing.size_text("bar"),
         drawing.size_text("kp08"),
         spec.DRAWING_NOTES,
+        drawing.KP08_SPACING_NOTE,
         spec.ISOMETRIC_VIEW_NOTE,
     )
     for text in texts:
@@ -504,12 +505,36 @@ def test_places_are_model_authored_and_the_sheet_is_pure() -> None:
     )
 
 
-def test_sheet_carries_no_notes() -> None:
+def test_sheet_carries_only_the_kp08_spacing_note() -> None:
     assert spec.DRAWING_NOTES == ""
     assert spec.SURFACE_FINISHES == ()
     assert not re.search(r"\d", spec.DRAWING_NOTES)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "Manufacturing Notes" not in source
+
+
+def test_kp08_spacing_note_is_the_catalogue_spacing_as_a_mm_ref() -> None:
+    # Owner ruling 2026-11-06: an inch table plus one note, linked from the
+    # KP08 group, giving the catalogue spacing as a millimetre REF.
+    assert drawing.KP08_SPACING_MM == pytest.approx(leadscrew.KP08_BOLT_SPACING)
+    assert drawing.KP08_SPACING_NOTE == (
+        "1. B1 TO B2: 42.00 mm REF, KP08 CATALOGUE SPACING"
+    )
+    number = drawing.KP08_NOTE_LINK.rsplit(" ", 1)[1]
+    assert drawing.KP08_SPACING_NOTE.startswith(f"{number}. B1 TO B2")
+    assert drawing.KP08_NOTE_LINK in drawing.MATE_CELLS["kp08"]
+    assert drawing.KP08_NOTE_LINK not in drawing.MATE_CELLS["bar"]
+    # The B tags' printed span is the catalogue spacing at .XXX.
+    b1, b2 = (round(x / 25.4, spec.HOLE_PLACES) for x in spec.KP08_TAP_X)
+    assert (b2 - b1) * 25.4 == pytest.approx(42.0, abs=0.13)
+    # Right of the table, above the title block, left of and under the iso.
+    x, y = drawing.KP08_SPACING_NOTE_XY
+    table_right = drawing.HOLE_TABLE_ANCHOR[0] + sum(drawing.HOLE_TABLE_WIDTHS.values())
+    assert x >= table_right + 0.01
+    assert x + len(drawing.KP08_SPACING_NOTE) * 0.0025 <= drawing.ISO_CENTER[0] - drawing.ISO_HALF[0]
+    assert x + len(drawing.KP08_SPACING_NOTE) * 0.0025 <= RIGHT_BORDER - 0.01
+    assert y - 0.0042 >= TITLE_BLOCK_TOP + 0.01
+    assert y <= drawing.ISO_NOTE_XY[1] - 0.02
 
 
 def test_prechips_solids_are_valid_fixture_solids() -> None:

@@ -12,14 +12,16 @@ MHA-CH-06-TL-VN-56). The end view, projected right of the plan, carries the
 stock thickness; the shaded isometric rides top right at 1:1, clear of the
 title block. No datums (rule 5).
 
-The KP08 stations print in inch in the table like every other row, PENDING
-OWNER CONFIRMATION: owner ruling 4 (2026-11-01) printed them in exact
-millimetres, which a native hole table cannot carry (its generated LOC cells
-are not editable). At the table's three places they stay inside the KP08's
-float (``TABLE_POSITION_RADIUS``) and every wall holds rule 17. The part keeps
-its native ±0.13 mm band on those two model dimensions (the spec feeds the
-whole jig's keys), so their rows print it as ``±.005``, the title block's own
-.XXX band (``location_mm``).
+The KP08 stations print in inch in the table like every other row (owner
+ruling 2026-11-06, superseding ruling 4B / exception RV-01, which printed
+them in exact millimetres a native hole table cannot carry). One numbered
+note, linked from the B group's MATCHES cell by ``SEE NOTE 1``, gives the
+KP08's catalogue bolt spacing as a millimetre REF; no dimension mixes units.
+At the table's three places the stations stay inside the KP08's float
+(``TABLE_POSITION_RADIUS``) and every wall holds rule 17. The part keeps its
+native ±0.13 mm band on those two model dimensions (the spec feeds the whole
+jig's keys); the generated X LOC that prints it stands hidden and the sheet
+prints each station bare under the title block's .XXX band (``x_loc_texts``).
 
 Each tap drill runs THRU and each thread prints its .450 MIN full-thread depth
 from its screw's face, the bar taps' FAR SIDE (owner ruling 2026-11-05: the
@@ -40,6 +42,7 @@ from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -175,11 +178,23 @@ THREAD_CALLOUTS = {"bar": BAR_THREAD_CALLOUT, "kp08": KP08_THREAD_CALLOUT}
 # station is a DRO absolute from (rule 10).
 TABLE_ORIGIN_MODEL = (0.0, -_HW, _H)
 # Each tag group's mate by its full drawing number from the registry
-# (rule 4; #2046), the KP08's catalogue code after it.
+# (rule 4; #2046), the KP08's catalogue code after it with the link to the
+# spacing note (owner ruling 2026-11-06).
 BASE_BAR_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-base-bar")["number"]
 PILLOW_BLOCK_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-pillow-block")["number"]
 MATE_NUMBERS = {"bar": BASE_BAR_NUMBER, "kp08": PILLOW_BLOCK_NUMBER}
-MATE_CELLS = {"bar": BASE_BAR_NUMBER, "kp08": f"{PILLOW_BLOCK_NUMBER}\n(KP08)"}
+KP08_NOTE_LINK = "SEE NOTE 1"
+MATE_CELLS = {
+    "bar": BASE_BAR_NUMBER,
+    "kp08": f"{PILLOW_BLOCK_NUMBER}\n(KP08) {KP08_NOTE_LINK}",
+}
+# The KP08's catalogue bolt spacing (the spec proves the taps' span is it),
+# a millimetre REF in one numbered note: the uxcell block is a metric part.
+KP08_SPACING_MM = KP08_TAP_X[1] - KP08_TAP_X[0]
+KP08_SPACING_NOTE = f"1. B1 TO B2: {KP08_SPACING_MM:.2f} mm REF, KP08 CATALOGUE SPACING"
+# Upper left of the note (sheet m): right of the table (x 199), above the
+# title block (y 70), left of and under the iso and its note (x 348, y 155).
+KP08_SPACING_NOTE_XY = (0.225, 0.095)
 MATE_COLUMN = "MATCHES HOLES OF"
 SIZE_COLUMN = "SIZE"
 
@@ -863,6 +878,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # The property-linked blocks land in the active view: the plan.
     _activate_view(adapter, plan, label="plan")
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    _add_spacing_note(adapter)
     # SolidWorks pins its own "... Tapped Hole" note to the plan per tap
     # feature; the table owns the taps, so they go (draw_fr_rocker_arm_support).
     removed = remove_notes_matching(adapter, "Tapped Hole")
@@ -877,6 +893,19 @@ async def build(adapter: Any) -> dict[str, str]:
         redundant_note_substrings=("Tapped Hole",),
         expected_redundant_notes=0,
     )
+
+
+def _add_spacing_note(adapter: Any) -> None:
+    """Note 1, the KP08's catalogue spacing REF, read back where it stands."""
+    note = add_note(adapter, KP08_SPACING_NOTE, *KP08_SPACING_NOTE_XY)
+    if note is None:
+        raise RuntimeError("end bracket KP08 spacing note did not insert")
+    note = _early_bound(note, "INote")
+    text = str(note.GetText() or "")
+    position = tuple(float(v) for v in _early_bound(note.GetAnnotation(), "IAnnotation").GetPosition())
+    if text != KP08_SPACING_NOTE or math.dist(position[:2], KP08_SPACING_NOTE_XY) > 1e-6:
+        raise RuntimeError(f"end bracket KP08 spacing note reads {text!r} at {position!r}")
+    _telemetry.info(f"end bracket KP08 spacing note at {position!r}: {text!r}")
 
 
 def _parse_args() -> argparse.Namespace:
