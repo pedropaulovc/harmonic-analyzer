@@ -22,9 +22,9 @@ labelled ``mm``, each with its own band (``METRIC_DIMENSIONS``,
 
 Material and stock: 6061-T6511 aluminium flat bar milled from the owned 1/2 x
 6 bar (OnlineMetals 1173; owner ruling #2083), sawn and faced to ⚙
-``BASE_BAR_LENGTH`` 17.32. Trim the purchased 450 kit rails equally at both
-ends to match these existing bars, flush at both ends; retain all eight
-mounting holes at the shifted stations below. The bars are
+``BASE_BAR_LENGTH`` 17.32. Set each purchased rail's near trim from its first
+hole station, then trim the far end to match the actual bar, flush both ends.
+Equal end removals are nominal only. The bars are
 milled to width ⚙ ``BASE_BAR_WIDTH`` 5.50 on edge in the
 vise, no bandsaw rip: the width is a machined size at the title block's .XX
 band. Both large faces are faced from ⚙ ``BASE_BAR_STOCK_THICK`` to ⚙
@@ -48,10 +48,10 @@ operator-side edge ⚙ ``BASE_BAR_OPERATOR_EDGE`` (lateral -2.00) the +Y side.
 
 Rail holes: 8 x #8-32 UNC tapped THRU on the rail axis (y 0) at x = ⚙
 ``RAIL_HOLE_END`` + k * ⚙ ``RAIL_HOLE_PITCH`` (9.964 .. 429.964 mm).
-The purchased 450 rail's assumed E = 15 pattern is shifted by the equal
-5.036 mm end trims. Its listing states no pattern; the trimmed rail must
-pass the native station receipt check before the bar is drilled.
-The last tap sits 9.964 from the bar's far end.
+The purchased 450 rail's assumed E = 15 pattern is shifted by the nominal
+5.036 mm near trim. The actual near cut sets the first hole's printed
+station; the far cut absorbs the actual bar length. Receipt-check all
+stations before drilling the bar. Nominal last-hole end distance is 9.964.
 The bar is drilled at these printed stations, never at measured
 ones. The rail sheet's receipt check accepts a received rail only if its
 pattern fits a bar drilled to this print: every station, measured from the
@@ -180,8 +180,8 @@ RAIL_HOLE_X: tuple[float, ...] = tuple(
 if len(RAIL_HOLE_X) != 8:
     raise AssertionError("the kit rail's base bar carries eight rail holes")
 RAIL_ROW_Y = -LOW_SIDE_Y  # 3.50: the row (y 0) from the faced -Y edge
-# Equal end trims produce exact three-place metric vendor stations; the
-# existing position and receipt bands remain unchanged.
+# Nominal end trims produce exact three-place metric vendor stations; the
+# actual near trim preserves these stations and the far trim follows the bar.
 RAIL_HOLE_PLACES = 3
 RAIL_HOLE_BAND = 0.08  # the stations only: the rail's hole pitch
 # The row's height prints at the title block's band (c3-r7, rule 4): nothing

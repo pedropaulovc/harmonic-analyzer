@@ -36,9 +36,9 @@ z = "up"
 # One 443 mm blank per bar from the owned 1/2 x 6 bar (#2083): about 1.5 over the 439.928 length at
 # each end, the zero edge about 1.0 proud of the finished -Y side, about 0.35 on each big
 # face. These placements are the author's route choice, not measurements of a sawn blank.
-# Retain the existing 439.928 mm bars. Trim each purchased 450 mm rail equally
-# at both ends (5.036 mm nominal per end), flush with its actual finished bar.
-# All eight taps shift to 9.964 .. 429.964 mm; never reuse the uncut pattern.
+# Retain existing bars. Set the near rail cut by first hole 9.964 +/-0.080 mm;
+# trim the far end to the ACTUAL finished bar, flush at both ends. Removals
+# are 5.036 mm per end nominal only; all eight stations stay 9.964..429.964.
 [stock]
 form = "flat_bar"
 form_verify = false
@@ -863,7 +863,7 @@ coolant = "cutting oil, brushed on"
 deburr_mm = 0.25
 deburr_cite = "features.toml general_tolerances edge_break R0.25"
 stock_in = "A0"
-note = "Same clamping as A0: do not unclamp. Drill only over open air: every hole is clear of the parallels, but look before every hole anyway. Brush on oil, peck every 3 mm, stop exactly on each DRO number. The eight rail holes are the only tight feature (+/-0.08 along X). Before drilling, transfer every carriage onto a kit false rail; keep bearings and raceways clear of abrasive grit. Measure the finished bar, mark equal removals at BOTH rail ends (5.036 mm nominal each), abrasive-cut the hardened rail with allowance, finish to the bar length and deburr without touching the running surfaces. Clean out all grit before reloading carriages. Both rail ends must be flush with the bar. Read the rail receipt check (MHA-CH-06-TL-VN-83 sheet 2): from the trimmed end at X 0, each station must be within +/-0.08 of 9.964, 69.964, 129.964, 189.964, 249.964, 309.964, 369.964, 429.964; if any is outside +/-0.08, stop and report before drilling. Drill every rail hole at its printed station, never at a measured one."
+note = "Same clamping as A0: do not unclamp. Drill only over open air: every hole is clear of the parallels, but look before every hole anyway. Brush on oil, peck every 3 mm, stop exactly on each DRO number. The eight rail holes are the only tight feature (+/-0.08 along X). Before drilling, transfer every carriage onto a kit false rail; protect bearings and raceways from grit. Set the NEAR cut from the first existing hole centre: finished end to centre 9.964 +/-0.080 mm. Abrasive-cut with finishing allowance, finish and deburr without touching running surfaces. Then trim the FAR end to the ACTUAL finished bar length so both ends fit flush. Equal 5.036 mm removals are NOMINAL ONLY; actual removals may differ to absorb the bar length band. Clean all grit before reloading carriages. Read the rail receipt check (MHA-CH-06-TL-VN-83 sheet 2): from the trimmed near end at X 0, every station must be within +/-0.08 of 9.964, 69.964, 129.964, 189.964, 249.964, 309.964, 369.964, 429.964; if any is outside +/-0.08, stop and report before drilling. Drill every rail hole at its printed station, never at a measured one."
 
 [setups.stock_state]
 top_feature = "underside_seat"

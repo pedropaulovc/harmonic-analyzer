@@ -7,9 +7,9 @@ CARRIAGE`` in four native views; each member's installed quantity, the kit
 as the purchase unit, and the carriage's note (the owner's kit description
 and the fit-up play acceptance in MHA-CH-06-TL-00).
 
-Sheet 2, RAIL RECEIPT, checks the installed rail after equal end trims to
-match the existing base bar, flush at both ends. Every hole station is the
-Rail member's native model dimension from the trimmed -X end face (rule 10,
+Sheet 2, RAIL RECEIPT, checks the datum-trimmed installed rail. Set the near
+cut from the first hole station, then fit the far end to the actual bar.
+Each station is the Rail member's native dimension from the trimmed -X end (rule 10,
 baseline), each carrying the unchanged receipt band. The matched-bar overall
 length is a three-place parenthesised reference, not the purchase length.
 Each value sits on its own dimension line, clear of every other line; a note
@@ -118,7 +118,7 @@ SOURCE_PROPERTIES = ("Number", "Material Specification", "Finish", *NOTE_PROPERT
 # --- Sheet 2: the rail receipt check --------------------------------------------
 # ASME B landscape 431.8 x 279.4, all in sheet metres. The border is 12.7 mm
 # in; the title block fills x >= 215.9 mm below y = 65.1 mm; the receipt
-# note's three lines top out at footer_top (70 mm).
+# note's four lines use the existing dynamic footer_top reserve.
 #
 # The trimmed rail fits at 1:2, the largest project scale whose
 # length fits the drawable width with the profile beside it.

@@ -98,9 +98,9 @@ Pivot pin offset (owner-approved 2026-10-23). Keep ``PIN_OFFSET`` 32 toward
 the spindle along the rail, preserving both pass stations and the carrier
 hole layout. The plain .375 reamed shoulder seat replaces the former bearing
 cartridge. The carriage centre still runs 107.2 to 421.4 against the rail's
-45.7 to 434.3 (half the 61.4 carriage from each end of the 450 rail). The
-rail overhangs its 17.32 bar's far end by 10.07; the carriage's far end, at
-452.1 at most, stays over the bar (owner ruling 2026-11-04, #2177 option B).
+45.7 to 424.228 support range on the nominal trimmed rail. The near cut
+sets the fixed first-hole station; the far cut matches the actual 17.32 bar.
+Equal 5.036 end removals are nominal only. Both ends are fitted flush.
 """
 
 from __future__ import annotations
@@ -373,8 +373,8 @@ CARRIAGE_PLAY_RADIUS = CARRIAGE_PLAY_RADIUS_PER_PLAY * CARRIAGE_PLAY_TIR_MAX
 TOP_EDGE_HALF_BAND = (max(rocker.TOP_EDGE_BAND) - min(rocker.TOP_EDGE_BAND)) / 2.0
 
 # --- Bought hardware (catalogue values; not modelled in detail) --------------
-# HGR15 kit rails arrive 450 long. Trim equal amounts from both ends to the
-# existing 17.32 in base bar, preserving all eight holes and their end walls.
+# HGR15 kit rails arrive 450 long. Set the near trim from the first hole's
+# fixed station, then trim the far end to the actual existing 17.32 in bar.
 RAIL_SUPPLY_LENGTH = 450.0
 BASE_BAR_LENGTH = 439.928  # 17.32; retain the existing bar blanks
 RAIL_LENGTH = BASE_BAR_LENGTH
@@ -384,6 +384,7 @@ RAIL_HOLE_PITCH = 60.0
 RAIL_HOLE_COUNT = 8
 RAIL_TRIM_LENGTH = RAIL_SUPPLY_LENGTH - RAIL_LENGTH
 RAIL_TRIM_PER_END = RAIL_TRIM_LENGTH / 2.0
+# Nominal per end only; actual removals need not be equal.
 RAIL_HOLE_END = round((RAIL_LENGTH - (RAIL_HOLE_COUNT - 1) * RAIL_HOLE_PITCH) / 2.0, 9)
 RAIL_LENGTH_BAND = printed_band_mm(2, unit=BASE_BAR_UNIT)
 # The rails' M4 holes (Ø4.5, Ø7.5 counterbore) take #8-32 UNC socket screws
@@ -402,8 +403,8 @@ CARRIAGE_BOLT_SPAN = (26.0, 26.0)  # (along, across), four M4 tapped
 CARRIAGE_BOLT = "M4"
 
 # --- Rails on the bars --------------------------------------------------------
-# Each rail starts RAIL_NEAR_S from the spindle; after equal end trims it is
-# flush with its actual finished bar at both ends.
+# Each rail starts RAIL_NEAR_S from the spindle; after datum-led trimming it
+# is flush with its actual finished bar at both ends.
 RAIL_NEAR_S = 15.0
 RAIL_FAR_S = RAIL_NEAR_S + RAIL_LENGTH
 # A carriage stays fully on its rail: centre within half its length of an end.

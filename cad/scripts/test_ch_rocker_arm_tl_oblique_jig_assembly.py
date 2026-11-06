@@ -148,7 +148,7 @@ def test_base_bars_carry_their_rails_onto_the_studs() -> None:
         near = _image(rows, origin, (0.0, 0.0, 0.0))
         far = _image(rows, origin, (trammel.BASE_BAR_LENGTH, 0.0, 0.0))
         assert near[:2] == pytest.approx(trammel.rail_point(rail, trammel.RAIL_NEAR_S))
-        # Equally end-trimmed kit rail is flush at both bar ends.
+        # Datum-trimmed kit rail is flush at both bar ends.
         assert far[:2] == pytest.approx(trammel.rail_point(rail, trammel.BASE_BAR_FAR_S))
         assert trammel.RAIL_FAR_S == pytest.approx(trammel.BASE_BAR_FAR_S)
         assert trammel.RAIL_OVERHANG == pytest.approx(0.0)
@@ -1186,7 +1186,7 @@ def test_sweep_extents_and_rail_margins(report) -> None:
     # The 2026-10-17 widening (column-side edge at lateral +88.9), narrowed to
     # 5.50 wide on 2026-10-30: the far column-side corners set X, the near
     # column-side corners the top of Y, the operator-side corners the bottom.
-    # The equally end-trimmed rail shares both ends with its bar.
+    # The datum-trimmed rail shares both ends with its bar.
     assert report.fixed_x == pytest.approx((-462.96, 462.96), abs=0.01)
     assert report.fixed_y == pytest.approx((-115.33, 85.84), abs=0.01)
     assert report.bar_overhang == pytest.approx({1: 43.86, 2: 43.86}, abs=0.01)

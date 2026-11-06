@@ -45,7 +45,7 @@ def test_bar_is_milled_from_the_owned_bar_and_faced_to_thickness() -> None:
         assert value / 25.4 == pytest.approx(round(value / 25.4, 2), abs=1e-9)
     # Milled from 6 in, the widest part still fits the vise's stock jaws.
     assert spec.BAR_WIDTH + spec.BAR_WIDTH_BAND < 6.0 * 25.4
-    # Purchased 450 rails are trimmed equally to the existing bars.
+    # Purchased 450 rails are datum-trimmed to the actual existing bars.
     assert spec.BAR_LENGTH == trammel.BASE_BAR_LENGTH == trammel.RAIL_LENGTH
     assert round(spec.BAR_LENGTH / 25.4, 2) == 17.32
     assert trammel.RAIL_OVERHANG == pytest.approx(0.0, abs=1e-9)

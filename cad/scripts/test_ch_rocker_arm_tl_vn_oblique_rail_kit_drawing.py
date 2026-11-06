@@ -442,7 +442,7 @@ def test_hole_sketch_places_every_station_from_the_end_face(monkeypatch) -> None
 def test_rail_receipt_note_points_at_the_stations() -> None:
     bar = _config.parts("ch-rocker-arm-tl-oblique-base-bar")
     lines = note_lines(rail.DRAWING_NOTES, label=NAME)
-    assert len(lines) == 3
+    assert len(lines) == 4
     assert all(len(line) <= 70 for line in lines), lines
     note = " ".join(lines)
     assert bar["number"] in note
@@ -452,10 +452,42 @@ def test_rail_receipt_note_points_at_the_stations() -> None:
     assert rail.RECEIPT_TEXT not in note
     assert "CHECK STATIONS" in note and "RECEIPT CHECK" in rail.RECEIPT_FLAG
     assert "STOP AND REPORT" in note and "THE BAR IS DRILLED AS DRAWN" in note
-    assert "TRIM BOTH ENDS EQUALLY" in note
-    assert "MATCH BASE BAR FLUSH AT BOTH ENDS" in note
+    assert "SET NEAR TRIM BY FIRST HOLE STATION" in note
+    assert "FAR TRIM TO ACTUAL BAR" in note
+    assert "FIT FLUSH BOTH ENDS" in note
+    assert "EQUAL REMOVAL IS NOMINAL ONLY" in note
     assert rail.CBORE_END_WALL_WORST >= base_bar.WALL_TARGET_MM
     assert math.isclose(rail.CBORE_END_WALL_WORST, 5.88, abs_tol=1e-9)
+    assert rail.CBORE_END_WALLS_WORST == pytest.approx((6.134, 5.88))
+
+
+@pytest.mark.parametrize("bar_deviation", (-trammel.RAIL_LENGTH_BAND, trammel.RAIL_LENGTH_BAND))
+@pytest.mark.parametrize("station_deviation", (-rail.RECEIPT_BAND, rail.RECEIPT_BAND))
+def test_datum_led_trim_absorbs_bar_length_without_moving_stations(
+    bar_deviation: float, station_deviation: float
+) -> None:
+    actual_bar = rail.LENGTH + bar_deviation
+    first_station = rail.HOLE_END + station_deviation
+    supplied_first = (
+        trammel.RAIL_SUPPLY_LENGTH - (rail.HOLE_COUNT - 1) * rail.HOLE_PITCH
+    ) / 2.0
+    near_trim = supplied_first - first_station
+    far_trim = trammel.RAIL_SUPPLY_LENGTH - near_trim - actual_bar
+    assert near_trim > 0.0 and far_trim > 0.0
+    assert near_trim + actual_bar + far_trim == pytest.approx(trammel.RAIL_SUPPLY_LENGTH)
+    stations = tuple(
+        supplied_first + k * rail.HOLE_PITCH - near_trim
+        for k in range(rail.HOLE_COUNT)
+    )
+    assert all(
+        abs(actual - nominal) <= rail.RECEIPT_BAND + 1e-9
+        for actual, nominal in zip(stations, rail.HOLE_X, strict=True)
+    )
+    walls = (
+        stations[0] - rail.CBORE_DIA / 2.0,
+        actual_bar - stations[-1] - rail.CBORE_DIA / 2.0,
+    )
+    assert min(walls) >= rail.CBORE_END_WALL_WORST - 1e-9
 
 
 # --- Carriage member ----------------------------------------------------------------
@@ -896,12 +928,13 @@ def _receipt_annotations():
                 x,
                 {},
                 _Tolerance(4, -band, band),
+                places=rail.RECEIPT_PLACES,
             ),
         )
         for name, x in zip(rail.STATION_DIMENSIONS, rail.HOLE_X, strict=True)
     ]
     annotations.append(
-        _Annotation("Length", _Display(rail.LENGTH, {1: "(", 2: ")"}, _Tolerance(0, 0, 0), 0))
+        _Annotation("Length", _Display(rail.LENGTH, {1: "(", 2: ")"}, _Tolerance(0, 0, 0), rail.DRAWING_PRECISION["Rail"]["Length"]))
     )
     return annotations
 
