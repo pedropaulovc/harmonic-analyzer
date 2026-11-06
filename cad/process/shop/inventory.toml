@@ -573,10 +573,12 @@ by = "photo"
 [tools.drill-index-115.nominal_dia_mm]
 "#47" = 1.994
 "#15" = 4.572
+"#12" = 4.801
 
 [tools.drill-index-115.nominal_dia_cite]
 "#47" = "harmonic-analyzer/cad/scripts/_hole_spec.py:82"
 "#15" = "rev-3 pivot-bracket/plan.yaml S2:70; harmonic-analyzer/cad/scripts/_hole_spec.py:57 (#8 close clearance); #15 nominal 0.180 in × 25.4"
+"#12" = "harmonic-analyzer/cad/scripts/_hole_spec.py NUMBER_DRILL_MM (#12, the TL-20 #8 bracket clearance); #12 nominal 0.189 in × 25.4"
 
 # Jobber-length members the pilots select (example geometry; straight shank = drill size).
 [tools.drill-index-115.members."#47"]
@@ -612,6 +614,23 @@ oal_mm = { value = 82.52, measured = { status = "measured", by = "placeholder (r
 
 [tools.drill-index-115.members."#15".projection_mm]
 # Basis: tools.drill-index-115.members."#15".projection_mm."drill-chuck-r8": no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:352 (tools.drill-index-115.members."#15".projection_mm."drill-chuck-r8") authored drill_index geometry baseline 62 mm, offset +0 mm = 62 mm. No extra reachable/cutting length is credited over the source setup.
+"drill-chuck-r8" = { value = 62, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers or steel rule, installed holder exit face to cutting tip" } }
+
+[tools.drill-index-115.members."#12"]
+# Basis: tools.drill-index-115.members."#12".dia_mm: nominal declared 4.801 mm, offset -0.003 mm = 4.798 mm; typical HSS cutting-margin undersize under the authorized cutting-diameter manufacturing-tolerance exception. Same jobber-length basis as the index's #15 (oblique simplification PR2, TL-20 #8 bracket clearance); not a bore-fit or clearance pass claim.
+dia_mm = { value = 4.798, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "outside micrometer or digital calipers, physical cutting or body diameter" } }
+# Basis: tools.drill-index-115.members."#12".shank_mm: nominal 4.801 = 4.801 mm, offset -0.003 mm (-0.003 mm) = 4.798 mm; ISO 286 h8-style straight shank fit (trial tolerance-class assumption, not a maker tolerance assertion; upper deviation zero and selected negative/zero offset lies within that class). Same jobber-length basis as the index's #15 (oblique simplification PR2, TL-20 #8 bracket clearance).
+shank_mm = { value = 4.798, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers and steel rule, physical overall dimension" } }
+flutes = 2
+# Basis: tools.drill-index-115.members."#12".point_angle: no nominal; estimate from the #15 member's authored drill_index geometry baseline 118 deg, offset +0 deg = 118 deg. No shop metrology or acceptance result is asserted.
+point_angle = { value = 118, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "optical comparator, included drill or centre point angle" } }
+# Basis: tools.drill-index-115.members."#12".flute_len_mm: no nominal; estimate from the #15 member's authored drill_index geometry baseline 54 mm, offset -0.12 mm = 53.88 mm. No extra reachable/cutting length is credited over the source setup.
+flute_len_mm = { value = 53.88, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, cutting length from point to flute or countersink boundary" } }
+# Basis: tools.drill-index-115.members."#12".oal_mm: no nominal; estimate from the #15 member's authored drill_index geometry baseline 82.6 mm, offset -0.08 mm = 82.52 mm. A shorter unpublished example OAL credits no extra reachable length; the installed holder projection is not increased. No actual metrology is asserted.
+oal_mm = { value = 82.52, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "calipers" } }
+
+[tools.drill-index-115.members."#12".projection_mm]
+# Basis: tools.drill-index-115.members."#12".projection_mm."drill-chuck-r8": no nominal; estimate from the #15 member's authored drill_index geometry baseline 62 mm, offset +0 mm = 62 mm. No extra reachable/cutting length is credited over the source setup.
 "drill-chuck-r8" = { value = 62, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers or steel rule, installed holder exit face to cutting tip" } }
 
 [tools.drill-index-115.members."1-4in"]
