@@ -168,7 +168,7 @@ a chamfer gets the loosest title-block band that serves it.
   size given a function, or any REAM callout (REAM marks a fit bore even when
   its band matches DRILLED HOLES). The reason for it is the mating part, so
   the callout, or a flagged note attached to it (rule 7), names the mate and
-  the fit it needs: running, sliding, press or locating. A gear centre
+  the fit it needs: running, sliding, press, bonded or locating. A gear centre
   distance names the mesh; a width that sets a stack names the stack. Where
   the mate alone does not show why the band is tight, add a few words of
   reason (`SETS MESH BACKLASH`, `KNIFE-EDGE SEAT`); see rule 7. The shop can
@@ -523,7 +523,8 @@ depicted geometry, not only its annotation.
 - Give a thread that runs to a shoulder a relief of at least one pitch.
 - A press-fitted dowel or bearing needs a way out: never press a dowel into a
   blind hole without a knockout hole or extraction thread, and give a pressed
-  bearing a shoulder gap or knockout access.
+  bearing a shoulder gap or knockout access. A permanent pair the package
+  names as one unit (rule 23) is exempt.
 - Prefer coarse threads in soft receivers such as aluminium, and avoid #6-32
   and smaller taps in tough material.
 
@@ -547,7 +548,7 @@ receiver at the worst case. Count only full threads: a tap or die leaves about
 one to one and a half incomplete threads, and projection through a clearance
 hole is not engagement. A blind tap leaves room beyond the full thread for the
 tap's lead, and the thread major envelope never breaks through a nearby wall.
-Engagement is not retention: rule 23 still applies to every exposed joint.
+Engagement is not retention: rule 23 still applies to every fixed joint.
 
 ### Rule 19 — Absorb stacks at fit-up, not with tighter bands
 
@@ -627,27 +628,67 @@ sub-assembly, never on part fabrication.
 
 A three-view orientation sheet without these is a placeholder, not a package.
 
-### Rule 23 — Lock threaded joints exposed to operating loads
+### Rule 23 — Retain every fixed joint, and print how
 
-For every threaded joint the package shows or depends on, identify what is
-fixed and what turns, rocks, swings or reverses, and whether drag, torque
-reversal, vibration or loss of preload can turn the threaded member or unload
-its seat. A screw that a part pivots, swings or turns on is always exposed.
-Such a joint shows its mechanical anti-loosening means in a view or detail and
-the step that engages it: a jam nut, a nut locked by a pin or tab, a
-cross-pin, a key or flat with axial capture, a pinch clamp across a slit
-thread, or a staked or peened end.
+A fixed joint is two parts that operation needs to stay put against each
+other: a hub, gear, cam, collar, pin, rod, stud, bushing or block on its mate,
+threaded or not. A CAD mate, lock mate or passing kinematic check holds
+nothing. For every fixed joint the package shows or depends on, say what
+turns, rocks, reverses, pulls or is grabbed there, and print the physical
+means that holds it. Choose it in this order: it holds the joint in use and
+in ordinary handling; among those that do, it keeps the original machine's
+visible form (a hidden bond beats an added visible screw); among those, it is
+the simplest for a first-time builder at a bench; last, it best survives
+handling. No particular device is required, and a reviewer's preference for
+one adequate method over another is not a defect.
 
+| load at the joint | counts | never counts on its own |
+|---|---|---|
+| static clamp: nothing moves, no torque about the fastener | seated screws; a one-screw part that could turn about its screw is located by a dowel, tongue, step or second screw | a lock in place of a locating feature |
+| axial: a pin, rod, stud or bushing must not pull out or walk | press fit; bonded slip fit; thread to a shoulder; cross-pin; set screw into a spot; peened or staked end | set screw on a plain round; solder |
+| friction torque: a member turns or rocks on a stationary shaft or screw | press or bonded fit; cross-pin; set screw on a flat or spot with its own lock; jam nut; staked or peened tail; red threadlocker on a seated thread | a plain seated thread; `SNUG` |
+| drive torque: the joint transmits working torque, usually reversing | key or flat with axial capture; cross- or taper pin; press or bonded fit; pressed drive pins; set screw on a flat, staked, for light torque only | set screw on a plain round; solder; threadlocker |
+| adjuster: the thread's own turn sets a position, gap or preload | jam nut; pinch clamp across a slit; jam screw; locked nut; none only by owner ruling | threadlocker; stake |
+| pivot: a member swings or spins on a threaded shoulder | staked tap mouth on a flush tip (steel receiver); jam nut or cross-pin on the tail; red threadlocker on a seated shoulder | a shoulder alone |
+| sheet, tube or wire to metal; wood to metal | braze with its filler; soft solder on a shear lap; retaining compound for a tube in a sleeve; epoxy for wood | solder in a torque or peel path |
+
+- **A specified anaerobic bond is a fit, equal to a press fit.** A bonded
+  joint prints its grade by number (`LOCTITE 638`, `609`; `641` where the
+  part must come out), never a colour; the diametral clearance on the part
+  sheet inside that grade's gap; degrease; apply to the pin, not a blind
+  seat; keep compound off running lands; set inside the fixture time when
+  it is set to a dimension; and the cure before first load or oiling. One
+  general note per package may carry the degrease, apply and cure rules.
+  Retaining compound and threadlocker are not interchangeable.
+- **Red threadlocker (`262`, `263`) is a lock** on a seated thread of #10 or
+  larger, printed with grade, degrease, cure and an acceptance; never on an
+  adjuster or a joint that must open (below). Low- and medium-strength grades
+  (`222`, `243`, `290`) are optional consumables and never the lock.
+- **Print it where it is made.** The part sheet gives the fit or feature and
+  its mate (rule 4): press with its interference, bonded with its clearance,
+  a flat, spot, cross hole or taper at its station. The assembly step gives
+  the method and grade, the press direction and its stop or flush limit, the
+  stake points or nut order, and an acceptance the builder can do at the
+  bench (`DOES NOT TURN OR SLIDE BY HAND`, `FLUSH`, `SWINGS FREE UNDER ITS
+  OWN WEIGHT`). A press whose part slides in by hand is a slip fit; the step
+  says what to do then. Every lock part is in the BOM and a view; every
+  stake or peen is in a view or detail.
+- **Keep what must open openable.** Pen and marker changes, adjusters, gear
+  and feed setup, wear parts and the book's teaching splits stay releasable
+  with hand tools. A bond or stake there is a defect. A permanent pair
+  (a drum on its wheel) is fine when the unit comes off as a whole; releasing
+  a bond takes about 250 °C, never next to wood, epoxy or paint.
+- **A stake needs a steel receiver.** A gray-iron, hardened or thin-walled
+  receiver takes another method.
 - The duty does not lapse at the package boundary. A joint listed as an
   external interface, installed "at final assembly" or left to another
-  package still needs its lock and locking step here, or a reference to the
-  drawing and step that give them. A swinging or turning part in this package
-  that rides on an unlocked screw is a defect of this package.
-- A plain seated thread, shoulder, shim, unspecified tightening, lubricant or
-  thread locker alone does not lock such a joint.
-- A cap or nut that retains a rotating cluster axially does not lock a
+  package still needs its retention and step here, or a reference to the
+  drawing and step that give them. A part in this package that rides on an
+  unretained joint is a defect of this package.
+- A cap or nut that retains a rotating cluster axially does not retain a
   different interface, such as the stud's own thread in its frame.
-- A static clamp that no operating torque reaches needs no lock.
+- The reviewer checks what is printed against this table and never computes a
+  capacity or invents a load.
 
 ### Rule 24 — Assembly sheets carry assembly information only
 
@@ -702,8 +743,9 @@ beside them. Every symbol, abbreviation and phrase is one they can look up.
 - **Words.** `MIN`, `MAX`, `REF`, `THRU` (the CAD form `THRU ALL` reads the
   same and is not a defect), `nX`, `°`, and the standard fit
   names (running, sliding, locational clearance, locational interference,
-  press, drive). Private phrases a reader cannot look up are defects: `TO
-  SUIT`, `ON SEAM`, `IN PHASE`, `MIRRORS`, `SAME X AS`, `AIR` for clearance,
+  press, drive, bonded with its LOCTITE grade). Private phrases a reader
+  cannot look up are defects: `TO SUIT`, `ON SEAM`, `IN PHASE`, `MIRRORS`,
+  `SAME X AS`, `AIR` for clearance,
   `BY EYE`, `TRUE D`. A location is a dimension or a table row, not a
   sentence; holes in line share a drawn centreline. A plain functional
   acceptance in ordinary words (`SLIDES IN, NO ROCK`, `TURNS FREE, NO
