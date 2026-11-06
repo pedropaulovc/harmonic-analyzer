@@ -1839,8 +1839,9 @@ def test_assembly_poses_print_once_on_their_rig_steps() -> None:
             FITUP.SHAFT_DRILL_STEP,
             (
                 "REAR END FLUSH WITH THE MHA-DT-18 REAR FACE",
-                "STRAPS ON THE BACK STOP, MHA-DT-01 ON THE BACK STRAP",
-                "FEELER AT THE MHA-DT-01 FRONT END",
+                "THE BACK MHA-DT-14 HARD ON THE BACK MHA-DT-18 INNER FACE",
+                "PUSH MHA-DT-01 BACK, HARD ON THE BACK MHA-DT-14",
+                "OFF THE MHA-DT-01 FRONT END ON A",
             ),
         ),
         "dt_pinion_lever_pin_spec.ASSEMBLY_STEP": (
@@ -1890,7 +1891,7 @@ def test_assembly_poses_print_once_on_their_rig_steps() -> None:
     ):
         callout = importlib.import_module(drawing).DIMENSION_CALLOUTS["PinHoleDia"]
         assert callout.startswith("MATCH-DRILL THRU AT ASSEMBLY"), drawing
-    assert FITUP.SHAFT_DRILL_STEP.startswith(f"{FITUP.SHAFT_DRILL_NAME}: STRAPS ON")
+    assert FITUP.SHAFT_DRILL_STEP.startswith(f"{FITUP.SHAFT_DRILL_NAME}: PUSH THE BACK")
     assert "\nMATCH-DRILL MHA-DT-19 THRU" in FITUP.SHAFT_DRILL_STEP
     # The steps' pin numbers are the registry's.
     assert FITUP.STRAP_PIN_NUMBER == _config.parts("dt-vn-pinion-strap-pin")["number"]

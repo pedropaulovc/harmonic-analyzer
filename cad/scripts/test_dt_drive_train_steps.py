@@ -197,7 +197,8 @@ def test_full_turn_checks_use_the_spec_ratio_and_clear_the_unrelieved_platform()
     assert "WITHOUT BINDING THROUGH ONE FULL MHA-DT-07 TURN" in checks
     assert "MHA-DT-07 CLEAR OF THE UNRELIEVED MHA-DT-20 TOP THROUGHOUT" in checks
     assert "RELIEF THROUGHOUT" not in checks
-    assert "FINISHING IN THE CYLINDERS' RUNNING DIRECTION TO TAKE UP PLAY" in checks
+    assert "FINISHING IN THE RUNNING DIRECTION TO TAKE UP PLAY" in checks
+    assert "TURN THE CRANK FORWARD (CLOCKWISE, SHEET 1 FRONT VIEW)" in checks
     # The crank mesh's free turn is check 2; the step-4 turn is the same test.
     assert "TURN MHA-DT-07 ONE FULL REVOLUTION BY HAND: IT MUST NEVER BIND" in _step_body(
         "crank-mesh-checked"

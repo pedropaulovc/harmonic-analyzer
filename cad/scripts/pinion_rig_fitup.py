@@ -168,13 +168,20 @@ COLLAR_SET_STEP = "\n".join(
 # front block (proud) -- so the step names those clearances, not a size.
 SHAFT_DRILL_NAME = "SHAFT DRILL SET"
 STRAP_PIN_NUMBER = "MHA-DT-VN-63"
+# The back stop is the back MHA-DT-18's inner face (pinion_rig_layout
+# BACK_STOP_Z); the drum's shimmed end play is the feeler between its front
+# end and the front strap (STRAP_Z_INNER).  Each line does one thing
+# (drawing-guidelines rule 22; rubric sample round 2 named "BACK STOP").
 SHAFT_DRILL_STEP = "\n".join(
     (
-        f"{SHAFT_DRILL_NAME}: STRAPS ON THE BACK STOP, MHA-DT-01 ON THE BACK STRAP, A "
-        f"{_leaf_setting(DRUM_END_SHIM)} FEELER AT THE MHA-DT-01 FRONT END.",
+        f"{SHAFT_DRILL_NAME}: PUSH THE BACK MHA-DT-14 HARD ON THE BACK MHA-DT-18 INNER "
+        "FACE.",
+        "PUSH MHA-DT-01 BACK, HARD ON THE BACK MHA-DT-14.",
+        "SET THE FRONT MHA-DT-14 OFF THE MHA-DT-01 FRONT END ON A "
+        f"{_leaf_setting(DRUM_END_SHIM)} FEELER.",
         "SET THE MHA-DT-19 REAR END FLUSH WITH THE MHA-DT-18 REAR FACE "
-        f"±{inch_max_text(FLUSH_SET_ERROR, 3)} (SETS MHA-DT-19 BEARING IN BOTH MHA-DT-18 "
-        "AND ITS FRONT END CLEARANCE TO MHA-DT-16).",
+        f"±{inch_max_text(FLUSH_SET_ERROR, 3)}, SO IT BEARS IN BOTH MHA-DT-18 AND CLEARS "
+        "MHA-DT-16.",
         "MATCH-DRILL MHA-DT-19 THRU THE MHA-DT-14 CROSS HOLES, 2 PL.",
         f"DRIVE {STRAP_PIN_NUMBER} PINS, BOTH ENDS 0 TO "
         f"{inch_max_text(PIN_SUB_FLUSH_MAX, 3)} BELOW THE MHA-DT-14 EDGES.",
