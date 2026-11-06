@@ -245,14 +245,22 @@ def test_drawing_registry_and_marks_are_complete() -> None:
     assert set(drawing.DIMENSION_CALLOUTS) <= marked
 
 
-def test_seam_depth_prints_natively_under_the_seam_notch() -> None:
-    # Codjiflo review of 831be7869: the seam depth was typed into the note.
+def test_seam_depth_prints_natively_as_a_reference_clear_of_its_span() -> None:
+    # The native depth stays (the seam callout's typed depth reads the same
+    # model constant) and prints as a reference beside the seam notch.
     assert dt_crank_hub_spec.DRAWING_DIMENSIONS["SeamDepthReference"] == {"SeamDepth"}
     assert dt_crank_hub_spec.DRAWING_PRECISION_BY_NAME["SeamDepth"] == 2
+    assert "SeamDepth" in drawing.REFERENCE_LENGTHS
     x, y = drawing.SIDE_KEEP["SeamDepth"]
-    assert drawing.SEAM_END_X < x < drawing.OUTBOARD_X
+    # "(.17)" is wider than its span, so it stands right of the outboard end,
+    # clear of that end's extension line and short of the seat diameter's
+    # dimension line (round-2 review: struck by both extension lines).
+    half = len("(.17)") * 0.0025 / 2.0
+    assert drawing.OUTBOARD_X - drawing.SEAM_END_X < 2 * half
+    assert drawing.OUTBOARD_X + 0.002 < x - half
+    assert x + half < drawing.SIDE_KEEP["SeatDia"][0]
     # Below the seat's bottom edge, above the seat length's dimension line
-    # (about y 0.115) and the station row.
+    # and the station row.
     assert drawing.SIDE_KEEP["ServicePinStation"][1] + 0.015 < y < drawing.SEAT_BOTTOM - 0.005
 
 
