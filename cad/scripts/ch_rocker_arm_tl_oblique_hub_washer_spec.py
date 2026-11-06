@@ -26,8 +26,8 @@ from _package_units import drawing_unit
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 STEM = "ch-rocker-arm-tl-oblique-hub-washer"
-UNIT = drawing_unit(f"parts/{STEM}", _config.parts(STEM))
-NUMBER = _config.parts(STEM)["number"]
+UNIT = drawing_unit(f"parts/{STEM}", _config.parts("ch-rocker-arm-tl-oblique-hub-washer"))
+NUMBER = _config.parts("ch-rocker-arm-tl-oblique-hub-washer")["number"]
 QUANTITY = 1
 
 OD = 11.0  # the owner's literal; prints .433
