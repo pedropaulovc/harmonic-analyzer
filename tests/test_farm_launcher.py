@@ -1668,6 +1668,203 @@ def _tracking(fixture: dict[str, object], *args: str) -> list[str]:
     ]
 
 
+def _owned_process_row(
+    pid: int, parent: int, argv: list[str], created: int,
+) -> dict[str, object]:
+    """Original spawn evidence, not a guess from a later owner of this PID."""
+    return {
+        "ProcessId": pid,
+        "ParentProcessId": parent,
+        "CommandLine": subprocess.list2cmdline(argv),
+        "Created": created,
+    }
+
+
+def _owned_inventory_script(
+    *, jobs: tuple[str, ...] = (), processes: list[dict[str, object]] | None = None,
+) -> str:
+    """Replace only inventory: native identity, job membership and stops stay real."""
+    evidence = json.dumps({"jobs": jobs, "processes": processes or []})
+    return f"""
+$global:OwnedInventory = ConvertFrom-Json -AsHashtable {_ps_quote(evidence)}
+function global:Get-CimInstance {{
+    [CmdletBinding()]
+    param([string]$ClassName, [string]$Filter, [string[]]$Property)
+    if ($PSBoundParameters.Count -ne 3 -or $ClassName -cne 'Win32_Process' -or
+        ($Property -join ',') -cne 'ProcessId,ParentProcessId,CreationDate,CommandLine' -or
+        -not $PSBoundParameters.ContainsKey('ErrorAction') -or
+        $PSBoundParameters['ErrorAction'].ToString() -cne 'Stop') {{
+        throw 'unexpected controlled Win32_Process query'
+    }}
+    # Rebuild on EVERY query, including Stop-RunProcesses' fixed-point rescans.
+    # Only named job members may have modeled parent/command metadata: native
+    # membership, not the parent chain or a marker, attributes those processes.
+    $candidates = @{{}}
+    foreach ($row in $global:OwnedInventory.processes) {{
+        $candidates[[int]$row.ProcessId] = $row
+    }}
+    foreach ($job in $global:OwnedInventory.jobs) {{
+        foreach ($member in [FarmRunJob]::Members($job)) {{
+            if (-not $candidates.ContainsKey([int]$member)) {{
+                $candidates[[int]$member] = @{{
+                    ProcessId = $member; ParentProcessId = 0; CommandLine = ''; Created = $null
+                }}
+            }}
+        }}
+    }}
+    foreach ($row in $candidates.Values) {{
+        try {{ $holder = [System.Diagnostics.Process]::GetProcessById([int]$row.ProcessId) }}
+        catch [System.ArgumentException] {{ continue }} # This PID no longer exists.
+        try {{
+            try {{
+                $null = $holder.get_SafeHandle() # Pin identity while reading native times.
+                if ($holder.get_HasExited()) {{ continue }}
+                $created = $holder.get_StartTime().ToUniversalTime()
+            }}
+            catch {{
+                if ($holder.get_HasExited()) {{ continue }}
+                throw # Access/query errors must not masquerade as an empty inventory.
+            }}
+            if ($null -ne $row.Created -and $created.ToFileTimeUtc() -ne [long]$row.Created) {{
+                continue # An explicitly owned PID has since been reused.
+            }}
+            [pscustomobject]@{{
+                ProcessId = [int]$row.ProcessId; ParentProcessId = [int]$row.ParentProcessId
+                CreationDate = [datetime]::new(
+                    $created.Ticks - ($created.Ticks % 10), [DateTimeKind]::Utc)
+                CommandLine = [string]$row.CommandLine
+            }}
+        }}
+        finally {{ $holder.Dispose() }}
+    }}
+}}
+"""
+
+
+def _tracking_with_owned_inventory(
+    fixture: dict[str, object], *args: str,
+    jobs: tuple[str, ...] = (), processes: list[dict[str, object]] | None = None,
+) -> list[str]:
+    """Run production tracking with fixture-owned rows, never a real-CIM fallback."""
+    arguments = " ".join(
+        arg if arg.startswith("-") else _ps_quote(arg)
+        for arg in [*args, "-LogDirectory", str(fixture["log_directory"])]
+    )
+    script = _owned_inventory_script(jobs=jobs, processes=processes) + f"""
+& {_ps_quote(str(LAUNCHER))} {arguments}
+exit $LASTEXITCODE
+"""
+    return [str(fixture["pwsh"]), "-NoProfile", "-NonInteractive", "-Command", script]
+
+
+@pytest.mark.parametrize(
+    "shape",
+    ["class", "filter", "empty-filter", "properties", "error-action", "missing-error-action", "verbose"],
+)
+def test_owned_process_inventory_rejects_unexpected_queries(
+    tmp_path: Path, shape: str,
+) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    script = "$ErrorActionPreference = 'Stop'\n" + _owned_inventory_script() + f"""
+$query = @{{
+    ClassName = 'Win32_Process'; ErrorAction = 'Stop'
+    Property = @('ProcessId', 'ParentProcessId', 'CreationDate', 'CommandLine')
+}}
+switch ({_ps_quote(shape)}) {{
+    'class' {{ $query.ClassName = 'Win32_OperatingSystem' }}
+    'filter' {{ $query.Filter = 'ProcessId=1' }}
+    'empty-filter' {{ $query.Filter = '' }}
+    'properties' {{ $query.Property = @('ProcessId', 'ParentProcessId') }}
+    'error-action' {{ $query.ErrorAction = 'Continue' }}
+    'missing-error-action' {{ $query.Remove('ErrorAction') }}
+    'verbose' {{ $query.Verbose = $true }}
+}}
+Get-CimInstance @query
+"""
+    result = _run_launcher(
+        fixture,
+        [str(fixture["pwsh"]), "-NoProfile", "-NonInteractive", "-Command", script],
+        fixture["environment"],
+    )
+    assert result.returncode != 0, (result.stdout, result.stderr)
+    assert "unexpected controlled Win32_Process query" in result.stderr
+
+
+def test_owned_process_inventory_refreshes_job_members_and_liveness(tmp_path: Path) -> None:
+    """A second scan finds a new real member; an exited member is not a stale row."""
+    fixture = _launcher_fixture(tmp_path)
+    job = f"farm-launcher-inventory-{os.getpid()}-{time.time_ns()}"
+    script = "$ErrorActionPreference = 'Stop'\n" + _owned_inventory_script(jobs=(job,)) + f"""
+$tokens = $null; $errors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseFile(
+    {_ps_quote(str(LAUNCHER))}, [ref]$tokens, [ref]$errors)
+if ($errors.Count) {{ throw ($errors | Out-String) }}
+# Reuse the production native job API rather than a second job implementation.
+$node = $ast.Find({{
+    param($n)
+    $n -is [System.Management.Automation.Language.CommandAst] -and
+    $n.GetCommandName() -eq 'Add-Type'
+}}, $true)
+if ($null -eq $node) {{ throw 'missing production job type' }}
+. ([scriptblock]::Create($node.Extent.Text))
+$null = [FarmRunJob]::Join({_ps_quote(job)})
+$query = @{{
+    ClassName = 'Win32_Process'; ErrorAction = 'Stop'
+    Property = @('ProcessId', 'ParentProcessId', 'CreationDate', 'CommandLine')
+}}
+$before = @(Get-CimInstance @query)
+$start = [System.Diagnostics.ProcessStartInfo]::new({_ps_quote(sys.executable)})
+$start.UseShellExecute = $false
+$start.RedirectStandardInput = $true
+$start.ArgumentList.Add('-c')
+$start.ArgumentList.Add("__import__('sys').stdin.buffer.read(1)")
+$child = [System.Diagnostics.Process]::Start($start)
+try {{
+    $native = $child.get_StartTime().ToUniversalTime().ToFileTimeUtc()
+    $during = @(Get-CimInstance @query)
+    $childRow = @($during | Where-Object {{ $_.ProcessId -eq $child.Id }})
+    if ($childRow.Count -ne 1) {{ throw 'new job member missing from inventory' }}
+    $child.StandardInput.Close() # EOF releases this fixture, not a timer or a kill.
+    if (-not $child.WaitForExit({HANG_GUARD_S * 1000})) {{ throw 'fixture did not exit on release' }}
+    $after = @(Get-CimInstance @query)
+    @{{
+        owner = $PID; child = $child.Id
+        before = @($before.ProcessId); during = @($during.ProcessId); after = @($after.ProcessId)
+        fields = @($childRow[0].PSObject.Properties.Name)
+        inventory_created = $childRow[0].CreationDate.ToFileTimeUtc()
+        native_created = $native - ($native % 10)
+    }} | ConvertTo-Json -Depth 4 -Compress
+}}
+finally {{
+    try {{
+        $child.StandardInput.Close()
+        if (-not $child.WaitForExit({HANG_GUARD_S * 1000})) {{ throw 'fixture did not exit on release' }}
+    }}
+    finally {{ $child.Dispose() }}
+}}
+"""
+    # The normal guard rejects every inline shell Process.Start, whatever its
+    # target. Keep this stdin-only Python fixture transparent as a script file.
+    script_path = tmp_path / "owned-inventory-job.ps1"
+    script_path.write_text(script, encoding="utf-8")
+    result = _run_launcher(
+        fixture,
+        [str(fixture["pwsh"]), "-NoProfile", "-NonInteractive", "-File", str(script_path)],
+        fixture["environment"],
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    report = json.loads(result.stdout)
+    assert report["owner"] in report["before"]
+    assert report["child"] not in report["before"]
+    assert report["child"] in report["during"]
+    assert report["child"] not in report["after"]
+    assert set(report["before"]) == set(report["after"])
+    assert set(report["fields"]) == {
+        "ProcessId", "ParentProcessId", "CreationDate", "CommandLine",
+    }
+    assert report["inventory_created"] == report["native_created"]
+
+
 def _process_alive(pid: int) -> bool:
     import ctypes
     from ctypes import wintypes
@@ -1804,7 +2001,10 @@ def test_cancel_invalid_native_identity_stops_local_job_without_remote_calls(
         # Start normally and prove its registered P6 identity is readable first.
         # Corrupt only native identity fields, never local PID/start/job evidence.
         status = _run_launcher(
-            fixture, _tracking(fixture, "-Status", "-RunId", running["run_id"]),
+            fixture,
+            _tracking_with_owned_inventory(
+                fixture, "-Status", "-RunId", running["run_id"], jobs=(running["job"],),
+            ),
             fixture["environment"],
         )
         assert status.returncode == 0, (status.stdout, status.stderr)
@@ -1883,9 +2083,9 @@ def test_cancel_invalid_native_identity_stops_local_job_without_remote_calls(
 
         cancel = _run_launcher(
             fixture,
-            _tracking(
+            _tracking_with_owned_inventory(
                 fixture, "-Cancel", "-RunId", running["run_id"],
-                "-Why", "invalid native identity",
+                "-Why", "invalid native identity", jobs=(running["job"],),
             ),
             fixture["environment"],
         )
@@ -2214,7 +2414,13 @@ def test_a_pid_reused_after_the_record_is_not_the_launcher(tmp_path: Path) -> No
         stderr=subprocess.DEVNULL,
     )
     try:
-        _write_run_record(
+        inventory = [
+            _owned_process_row(
+                reused.pid, os.getpid(), [sys.executable, "-c", SLEEPER],
+                _process_created(int(reused._handle)),
+            ),
+        ]
+        run_path = _write_run_record(
             fixture,
             pid=reused.pid,
             tag="reused",
@@ -2225,13 +2431,16 @@ def test_a_pid_reused_after_the_record_is_not_the_launcher(tmp_path: Path) -> No
         )
         status = _run_launcher(
             fixture,
-            _tracking(fixture, "-Status", "-Tag", "reused"),
+            _tracking_with_owned_inventory(
+                fixture, "-Status", "-Tag", "reused", processes=inventory,
+            ),
             fixture["environment"],
         )
-        _run_launcher(
+        cancel = _run_launcher(
             fixture,
-            _tracking(
+            _tracking_with_owned_inventory(
                 fixture, "-Cancel", "-Tag", "reused", "-Why", "reused pid",
+                processes=inventory,
             ),
             fixture["environment"],
         )
@@ -2244,6 +2453,10 @@ def test_a_pid_reused_after_the_record_is_not_the_launcher(tmp_path: Path) -> No
     report = json.loads(status.stdout)
     assert report["state"] == "launcher-died"
     assert report["launcher"]["alive"] is False
+    assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+    done = _record(Path(_record(run_path)["done"]))
+    assert done["state"] == "cancelled"
+    assert done["cancel"]["stopped_pids"] == []
     assert survived
 
 
@@ -2545,6 +2758,12 @@ def test_a_pre_registration_dead_run_breaks_neither_status_nor_cancel(
     fixture = _launcher_fixture(tmp_path)
     exited = subprocess.Popen([sys.executable, "-c", "pass"])
     exited.wait(timeout=HANG_GUARD_S)
+    inventory = [
+        _owned_process_row(
+            exited.pid, os.getpid(), [sys.executable, "-c", "pass"],
+            _process_created(int(exited._handle)),
+        ),
+    ]
     old = _write_run_record(
         fixture,
         pid=exited.pid,
@@ -2567,15 +2786,24 @@ def test_a_pre_registration_dead_run_breaks_neither_status_nor_cancel(
         fixture, _command(fixture, "part:pen_rod", tag="broken"), failing
     )
     assert launched.returncode == 2
+    broken = next(
+        run for path in Path(fixture["log_directory"]).glob("*.run.json")
+        if (run := _record(path))["tag"] == "broken"
+    )
 
     status = _run_launcher(
         fixture,
-        _tracking(fixture, "-Status", "-Tag", "pre-registration"),
+        _tracking_with_owned_inventory(
+            fixture, "-Status", "-Tag", "pre-registration", processes=inventory,
+        ),
         fixture["environment"],
     )
     cancel = _run_launcher(
         fixture,
-        _tracking(fixture, "-Cancel", "-Tag", "broken", "-Why", "local fault"),
+        _tracking_with_owned_inventory(
+            fixture, "-Cancel", "-Tag", "broken", "-Why", "local fault",
+            jobs=(broken["job"],), processes=inventory,
+        ),
         fixture["environment"],
     )
 
@@ -2596,13 +2824,14 @@ def test_a_pre_registration_dead_run_breaks_neither_status_nor_cancel(
 
     cancel_old = _run_launcher(
         fixture,
-        _tracking(
+        _tracking_with_owned_inventory(
             fixture,
             "-Cancel",
             "-Tag",
             "pre-registration",
             "-Why",
             "pre-registration run",
+            processes=inventory,
         ),
         fixture["environment"],
     )
@@ -2714,7 +2943,9 @@ def _close_held_process(handle: int) -> None:
 
 
 @contextmanager
-def _orphan_process(extra: list[str]) -> Iterator[tuple[int, int]]:
+def _orphan_process(
+    extra: list[str], *, inventory: list[dict[str, object]] | None = None,
+) -> Iterator[tuple[int, int]]:
     """Keep a real orphan alive until the test releases its socket, not a timer."""
     held = None
     gate = None
@@ -2728,13 +2959,14 @@ def _orphan_process(extra: list[str]) -> Iterator[tuple[int, int]]:
                     sys.executable,
                     "-c",
                     "import ctypes, json, os, subprocess, sys; "
-                    f"child=subprocess.Popen([sys.executable, '-c', {ORPHAN_WAITER!r}, "
-                    f"'{listener.getsockname()[1]}', *{extra!r}], "
+                    f"child_argv=[sys.executable, '-c', {ORPHAN_WAITER!r}, "
+                    f"'{listener.getsockname()[1]}', *{extra!r}]; "
+                    "child=subprocess.Popen(child_argv, "
                     "stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, "
                     "stderr=subprocess.DEVNULL); "
                     + PROCESS_CREATED
                     + "print(json.dumps({'parent_pid':os.getpid(), 'child_pid':child.pid, "
-                    "'child_created':t[0].value}))",
+                    "'child_created':t[0].value, 'child_argv':child_argv}))",
                 ],
                 check=True,
                 capture_output=True,
@@ -2750,6 +2982,10 @@ def _orphan_process(extra: list[str]) -> Iterator[tuple[int, int]]:
             held = _open_held_process(child, int(evidence["child_created"]))
             assert not _process_alive(parent_pid), evidence
             assert not _held_process_exited(held, 0), evidence
+            if inventory is not None:
+                inventory.append(_owned_process_row(
+                    child, parent_pid, evidence["child_argv"], int(evidence["child_created"]),
+                ))
             yield parent_pid, child
         finally:
             if gate is not None:
@@ -2802,7 +3038,8 @@ def test_an_orphan_must_name_the_run_on_its_command_line(
     log_directory.mkdir()
     extra = [] if names is None else [str(log_directory / names)]
     started = time.time()
-    with _orphan_process(extra) as (parent, child):
+    inventory = []
+    with _orphan_process(extra, inventory=inventory) as (parent, child):
         _write_run_record(
             fixture,
             pid=parent,
@@ -2814,7 +3051,9 @@ def test_an_orphan_must_name_the_run_on_its_command_line(
         )
         status = _run_launcher(
             fixture,
-            _tracking(fixture, "-Status", "-Tag", "reused"),
+            _tracking_with_owned_inventory(
+                fixture, "-Status", "-Tag", "reused", processes=inventory,
+            ),
             fixture["environment"],
         )
 
@@ -2822,6 +3061,57 @@ def test_an_orphan_must_name_the_run_on_its_command_line(
     report = json.loads(status.stdout)
     assert report["state"] == "launcher-died"
     assert (child in report["launcher"]["orphaned_processes"]) is orphaned
+
+
+def test_real_provider_inventory_attributes_a_fixture_owned_orphan(tmp_path: Path) -> None:
+    """Real CIM rows feed production attribution; a broken provider is a failure."""
+    fixture = _launcher_fixture(tmp_path)
+    captured = tmp_path / "real provider row.json"
+    started = time.time()
+    inventory = []
+    with _orphan_process([], inventory=inventory) as (parent, child):
+        _write_run_record(
+            fixture, pid=parent, tag="real-provider", workflow=None,
+            argv=["uv", "-c", ORPHAN_WAITER], hexdigit="8", started=started,
+        )
+        # Forward the production query unchanged, recording the very row that
+        # Get-RunProcessTree consumes. No catch, empty substitute, or CIM retry
+        # outside the existing production wrapper can hide a provider failure.
+        script = f"""
+$ErrorActionPreference = 'Stop'
+function global:Get-CimInstance {{
+    [CmdletBinding()]
+    param([string]$ClassName, [string]$Filter, [string[]]$Property)
+    $rows = @(CimCmdlets\\Get-CimInstance @PSBoundParameters)
+    $childRows = @($rows | Where-Object {{ [int]$_.ProcessId -eq {child} }})
+    if ($childRows.Count -ne 1) {{ throw 'real provider did not return the live fixture orphan' }}
+    $row = $childRows[0]
+    @{{
+        ProcessId = $row.ProcessId; ParentProcessId = $row.ParentProcessId
+        Created = $row.CreationDate.ToUniversalTime().ToFileTimeUtc()
+        CommandLine = $row.CommandLine
+    }} | ConvertTo-Json -Compress | Set-Content -LiteralPath {_ps_quote(str(captured))}
+    $rows
+}}
+& {_ps_quote(str(LAUNCHER))} -Status -Tag real-provider -LogDirectory {_ps_quote(str(fixture["log_directory"]))}
+exit $LASTEXITCODE
+"""
+        status = _run_launcher(
+            fixture,
+            [str(fixture["pwsh"]), "-NoProfile", "-NonInteractive", "-Command", script],
+            fixture["environment"],
+        )
+        assert status.returncode == 0, (status.stdout, status.stderr)
+        row = _record(captured)
+        expected = inventory[0]
+        assert row["ProcessId"] == child == expected["ProcessId"]
+        assert row["ParentProcessId"] == parent == expected["ParentProcessId"]
+        assert row["Created"] == expected["Created"] - expected["Created"] % 10
+        assert row["CommandLine"] == expected["CommandLine"]
+        assert ORPHAN_WAITER in row["CommandLine"]
+        report = json.loads(status.stdout)
+        assert report["state"] == "launcher-died"
+        assert child in report["launcher"]["orphaned_processes"]
 
 
 def test_cancel_finds_a_build_whose_launcher_and_uv_both_died(
@@ -3222,19 +3512,31 @@ def test_cancel_finds_a_leaf_whose_request_never_reached_the_log(
         tmp_path, fixture, DISPATCH_LINES, "unlogged", {"UV_STUB_UNLOGGED": LEAF_NUT}
     )
     try:
+        build = _stub_pid(fixture)
+        local_pids = _job_process_ids(running["job"])
+        assert {process.pid, build} <= local_pids
+        assert all(_process_alive(pid) for pid in local_pids)
         assert LEAF_NUT not in Path(running["log"]).read_text(encoding="utf-8")
         status = _run_launcher(
             fixture,
-            _tracking(fixture, "-Status", "-RunId", running["run_id"]),
+            _tracking_with_owned_inventory(
+                fixture, "-Status", "-RunId", running["run_id"], jobs=(running["job"],),
+            ),
             fixture["environment"],
         )
         cancel = _run_launcher(
             fixture,
-            _tracking(
-                fixture, "-Cancel", "-RunId", running["run_id"], "-Why", "lost line"
+            _tracking_with_owned_inventory(
+                fixture, "-Cancel", "-RunId", running["run_id"], "-Why", "lost line",
+                jobs=(running["job"],),
             ),
             fixture["environment"],
         )
+        # Cancellation, not finally's release, must stop the real producer job.
+        assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+        assert process.poll() not in (None, 0), (cancel.stdout, cancel.stderr)
+        assert not any(_process_alive(pid) for pid in local_pids), local_pids
+        assert _job_process_ids(running["job"]) == set()
         process.communicate(timeout=HANG_GUARD_S)
     finally:
         release.touch()
@@ -3243,6 +3545,7 @@ def test_cancel_finds_a_leaf_whose_request_never_reached_the_log(
     assert LEAF_NUT in json.loads(status.stdout)["in_flight_workflows"]
     assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
     done = _record(Path(running["done"]))
+    assert {process.pid, build} <= set(done["cancel"]["stopped_pids"])
     assert {w["workflow_id"]: w["outcome"] for w in done["cancel"]["workflows"]} == {
         LEAF_CONE: "settled-untracked",
         LEAF_PEN: "cancelled",
