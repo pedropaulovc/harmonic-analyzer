@@ -2582,6 +2582,15 @@ def test_centred_branches_have_continuous_separating_axes() -> None:
     assert leadscrew.KP08_STATION_ENVELOPE > (
         leadscrew.BRACKET_STOP_FLOAT_MAX + leadscrew.KP08_SCREW_FLOAT_MAX
     )
+    # The axial station uses the bracket's inch Y-row tolerance, not its
+    # metric X-station band. Keep this leaf-side derivation synchronized
+    # without importing end_bracket back into leadscrew_spec.
+    assert leadscrew.BRACKET_AXIAL_ROW_BAND == pytest.approx(end_bracket._ROW_DEVIATION)
+    assert leadscrew.KP08_STATION_ENVELOPE == pytest.approx(
+        base_bar.BRACKET_STATION_BAND + leadscrew._KP08_STATION_ROUNDING
+        + end_bracket._ROW_DEVIATION
+        + leadscrew.BRACKET_STOP_FLOAT_MAX + leadscrew.KP08_SCREW_FLOAT_MAX
+    )
 
 
 @pytest.mark.parametrize("pass_name", ("inner", "outer"))
