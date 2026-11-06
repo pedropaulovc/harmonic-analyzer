@@ -17,7 +17,7 @@ import export_features
 from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, NUMBER_DRILL_MM, THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
 from _surface_finish import SEAT_UM
 
 BUILD = Path(drawing.__file__).with_name("build_ch_rocker_arm_tl_oblique_base_bar.py")
@@ -419,8 +419,37 @@ def test_short_span_texts_print_beside_their_spans() -> None:
     assert keep["SlotWidth"][0] + drawing._SLOT_WIDTH_TEXT_HALF <= sx(
         centre, spec.FAR_SLOT_X
     )
-    near_x = sx(centre, spec.NEAR_SLOT_X)
-    assert keep["NearSlotX"][0] - drawing._NEAR_SLOT_X_TEXT_HALF >= near_x + 0.002
+    # The near slot's station prints left of the end face's extension line:
+    # right of the slot's centre line it stood 1.2 short of the near bracket
+    # row's extension line, which runs down through its lane once the
+    # centred feed block brought that row to 47.484.
+    assert keep["NearSlotX"][0] + drawing._NEAR_SLOT_X_TEXT_HALF <= drawing._LEFT - 0.002
+    assert keep["NearSlotX"][0] - drawing._NEAR_SLOT_X_TEXT_HALF >= 0.0127 + 0.005
+    # Every measured-width text below the plan clears, by 2 or more, every
+    # extension line that runs down through or to its lane, wherever the
+    # leadscrew layout puts the bracket stations (model x, deepest lane).
+    extension_lines = [
+        (spec.NEAR_SLOT_X - spec.SLOT_WIDTH / 2.0, 0),
+        (spec.NEAR_SLOT_X + spec.SLOT_WIDTH / 2.0, 0),
+        (0.0, 5),
+        (spec.NEAR_SLOT_X, 1),
+        (drawing.BRACKET_NEAR_X, 2),
+        (spec.FAR_SLOT_X, 3),
+        (drawing.BRACKET_FAR_X, 4),
+        (spec.BAR_LENGTH, 5),
+    ]
+    for lane, (name, half) in enumerate(
+        (
+            ("SlotWidth", drawing._SLOT_WIDTH_TEXT_HALF),
+            ("NearSlotX", drawing._NEAR_SLOT_X_TEXT_HALF),
+            ("BracketHole1X", drawing._BRACKET_NEAR_X_TEXT_HALF),
+        )
+    ):
+        left, right = keep[name][0] - half, keep[name][0] + half
+        for x, deepest in extension_lines:
+            if deepest >= lane:
+                line = sx(centre, x)
+                assert line <= left - 0.002 or line >= right + 0.002, (name, x)
     # The run's text sits under its lower line, shouldered right of it.
     run_low = drawing._sheet_y(centre, spec.FAR_SLOT_Y - spec.SLOT_RUN / 2.0)
     assert keep["SlotRun"][1] + 0.00175 <= run_low - 0.002
@@ -446,9 +475,10 @@ def test_short_span_texts_print_beside_their_spans() -> None:
     rise_x, rise_y = keep["FarSlotRise"]
     outer_row = drawing._BRACKET_ROW_LANES[0]
     assert drawing._BRACKET_ROW_TEXT_HALF >= 0.0139 / 2
-    assert (
-        rise_x - 0.0015 >= drawing._RIGHT + outer_row + drawing._BRACKET_ROW_TEXT_HALF
-    )
+    # The 1.5 clearance holds by construction (_FAR_RISE_LANE); compare it
+    # as a clearance so float rounding of the sum cannot fail it.
+    clearance = rise_x - (drawing._RIGHT + outer_row + drawing._BRACKET_ROW_TEXT_HALF)
+    assert clearance >= 0.0015 - 1e-12
     assert rise_x - drawing._RIGHT - outer_row >= drawing.STACK_LANE
     assert all(rise_x > drawing._RIGHT + lane for lane in drawing._BRACKET_ROW_LANES)
     run_text_right = (
@@ -563,8 +593,16 @@ def test_bracket_holes_are_the_leadscrew_layouts() -> None:
     for y in rows:
         edge = y - spec.LOW_SIDE_Y
         assert edge == pytest.approx(round(edge, spec.BRACKET_ROW_PLACES), abs=1e-9)
+    # Each station prints at its places from the unrounded model centre; the
+    # printed limits charge the rounding on top of the band (the near
+    # station, 47.484 since the centred feed block, prints 47.48).
+    places = spec.BRACKET_STATION_PLACES
+    band = spec.BRACKET_STATION_BAND
     for x in (near_x, far_x):
-        assert x == round(x, spec.BRACKET_STATION_PLACES)
+        rounding = abs(x - round(x, places))
+        assert rounding <= 0.5 * 10.0**-places + 1e-12
+        low, high = printed_deviations(x, places, (-band, band), unit="mm")
+        assert max(-low, high) == pytest.approx(band + rounding, abs=1e-12)
     assert spec.METRIC_DIMENSIONS[("BracketHoles", "BracketHole1X")] == (
         2,
         spec.BRACKET_STATION_BAND,
@@ -622,14 +660,21 @@ def test_bracket_hole_float_bounds_the_lost_motion_on_reversal() -> None:
     screws' positive stop above ~1344 N; up to ~.9 mm reversal lost motion.
     The worst case is the largest drilled hole over the #8 UNC-3A minimum
     major; the basic-major figure is disclosed beside it."""
-    hole_max = spec.BRACKET_HOLE_DIA + 0.004 * 25.4
-    assert spec.BRACKET_SCREW_FLOAT_MAX == pytest.approx((hole_max - 0.164 * 25.4) / 2.0)
+    hole_max = spec.BRACKET_HOLE_DIA + drilled_oversize_mm(unit=spec.UNIT)
+    assert spec.BRACKET_SCREW_FLOAT_MAX == pytest.approx(
+        (hole_max - THREAD_MAJOR_MM[leadscrew.BAR_SCREW]) / 2.0
+    )
+    # ASME B1.1 class 3A #8-32 minimum major.
     assert leadscrew.SHCS_8_MAJOR_MIN == pytest.approx(0.1585 * 25.4)
     assert leadscrew.BRACKET_STOP_FLOAT_MAX == pytest.approx(
         (hole_max - leadscrew.SHCS_8_MAJOR_MIN) / 2.0
     )
-    assert leadscrew.BRACKET_REVERSAL_LOST_MOTION_BASIC == pytest.approx(0.737, abs=1e-3)
-    assert leadscrew.BRACKET_REVERSAL_LOST_MOTION == pytest.approx(0.876, abs=1e-3)
+    assert leadscrew.BRACKET_REVERSAL_LOST_MOTION_BASIC == pytest.approx(
+        2.0 * spec.BRACKET_SCREW_FLOAT_MAX
+    )
+    assert leadscrew.BRACKET_REVERSAL_LOST_MOTION == pytest.approx(
+        2.0 * leadscrew.BRACKET_STOP_FLOAT_MAX
+    )
     assert leadscrew.BRACKET_REVERSAL_LOST_MOTION_ACCEPTED == 0.9
     assert (
         leadscrew.BRACKET_REVERSAL_LOST_MOTION
@@ -638,14 +683,49 @@ def test_bracket_hole_float_bounds_the_lost_motion_on_reversal() -> None:
 
 
 def test_bracket_hole_walls_meet_rule_17() -> None:
-    walls = spec.bracket_hole_walls(leadscrew.BASE_BAR_HOLES)
-    # Ruling A′: the -Y edge wall is the rule-17 target that bounds the outer
-    # screws; every wall clears the target at its printed worst.
-    assert walls["-Y edge"] >= WALL_TARGET_MM
-    assert walls["spindle end"] > 50.0
-    assert walls["rail tap"] > 20.0
-    assert walls["hold-down slot"] > 20.0
-    assert min(walls.values()) >= WALL_TARGET_MM
+    holes = leadscrew.BASE_BAR_HOLES
+    walls = spec.bracket_hole_walls(holes)
+    # Each counterbore at its printed largest.
+    radius = spec.BRACKET_CBORE_RADIUS_MAX
+    assert radius == pytest.approx(
+        (
+            spec.BRACKET_CBORE_DIA
+            + printed_band_mm(spec.BRACKET_CBORE_PLACES, unit=spec.UNIT)
+        )
+        / 2.0
+    )
+
+    def off(value: float, places: int, band: float) -> float:
+        """The farthest a centre may sit from its unrounded model value: the
+        band about the printed (rounded) value, plus the rounding."""
+        return band + abs(value - round(value, places))
+
+    station_places, station_band = spec.BRACKET_STATION_PLACES, spec.BRACKET_STATION_BAND
+    row_places, row_band = spec.BRACKET_ROW_PLACES, spec.BRACKET_ROW_BAND
+    # The end and edge walls from the unrounded model centres at their
+    # printed limits, the rounding charged.
+    assert walls["spindle end"] == pytest.approx(
+        min(x - off(x, station_places, station_band) for x, _ in holes) - radius
+    )
+    assert walls["-Y edge"] == pytest.approx(
+        min(
+            (y - spec.LOW_SIDE_Y) - off(y - spec.LOW_SIDE_Y, row_places, row_band)
+            for _, y in holes
+        )
+        - radius
+    )
+    # Rule 17: every wall clears the .080 target at its printed worst.
+    assert set(walls) == {
+        "-Y edge",
+        "+Y edge",
+        "spindle end",
+        "far end",
+        "neighbour counterbore",
+        "rail tap",
+        "hold-down slot",
+    }
+    for name, wall in walls.items():
+        assert wall >= WALL_TARGET_MM, name
     assert spec.BRACKET_WALL_MIN == WALL_FLOOR_MM
 
 
@@ -683,7 +763,7 @@ def test_bracket_dimensions_and_callout_lay_out_clear() -> None:
     keep = drawing.FRONT_KEEP
     sx = drawing._sheet_x
     centre = drawing.FRONT_CENTER
-    # The near station's text (57.00 ±0.13 mm) is wider than its span, so it
+    # The near station's text (its metric station and band) is wider than its span, so it
     # sits right of its own extension line, short of the far slot's.
     near_text = keep["BracketHole1X"][0]
     near_station = sx(centre, drawing.BRACKET_NEAR_X)
