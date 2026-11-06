@@ -2,7 +2,7 @@
 
 The bought brass flange nut supplied with the lead screw (the FeedNut of
 leadscrew kit MHA-CH-06-TL-VN-84, ``ch_rocker_arm_tl_vn_oblique_leadscrew_kit_feed_nut_spec``; owner
-ruling 2026-11-04, #2177 option B) seats flat on the lug's -X face, its
+ruling 2026-11-04, #2177 option B) seats flat on the lug's +X face, its
 spigot faced off, so the lug needs no recess. Four #4-40 X 5/8 flat heads
 (MHA-CH-06-TL-VN-67) pass through the nut's countersunk flange holes into
 the lug's four #4-40 taps, tapped THRU, on the nut's 16 mm PCD at 45° to the
@@ -43,7 +43,7 @@ NUMBER = "MHA-CH-06-TL-32"
 QUANTITY = 1
 BLOCK_X0, BLOCK_X1 = pivot.BLOCK_X0, pivot.BLOCK_X1
 BLOCK_LENGTH, BLOCK_WIDTH, BLOCK_HEIGHT = pivot.BLOCK_LENGTH, pivot.BLOCK_WIDTH, pivot.BLOCK_HEIGHT
-PLAN_LUG_X = 32.766  # 1.29, the lug's -X face from the block's -X edge
+PLAN_LUG_X = 22.098  # .87, the lug's -X face from the block's -X edge
 LUG_WIDTH = 18.542  # .73
 PLAN_OVERALL_Y = 88.138  # 3.47, +Y edge to the lug end
 LUG_X0 = BLOCK_X0 + PLAN_LUG_X
@@ -51,7 +51,7 @@ LUG_X1 = LUG_X0 + LUG_WIDTH
 LUG_Y1 = -BLOCK_WIDTH / 2
 LUG_Y0 = BLOCK_WIDTH / 2 - PLAN_OVERALL_Y
 LUG_LENGTH = LUG_Y1 - LUG_Y0
-NUT_FACE_X = LUG_X0
+NUT_FACE_X = LUG_X1
 NUT_AXIS_Y = -lead.SCREW_LATERAL
 NUT_AXIS_Z = 12.4  # the leadscrew axis over the carriage top (checked below)
 # .351: the smallest three-place drill that clears the Tr8 major at the
@@ -69,7 +69,7 @@ SCREW_CLEARANCE_DIA = 0.351 * 25.4  # 8.915
 NUT_CLOCK_DEG = 45.0
 NUT_CLOCK_TOL_DEG = 5.0
 NUT_CLOCK_DIMENSION = "NutClock"
-NUT_CLOCK_TAP = 1  # NUT_HOLES_YZ's (-Y, +Z) tap, VIEW D's lower right
+NUT_CLOCK_TAP = 1  # NUT_HOLES_YZ's (-Y, +Z) tap, VIEW D's lower left
 NUT_CLOCK_VIEW = "VIEW D"
 _TAP_DIAGONAL = feed_nut.HOLE_PCD / 2 * math.cos(math.radians(NUT_CLOCK_DEG))
 # The taps at the nominal nut, ordered (-Y, -Z), (-Y, +Z), (+Y, -Z), (+Y, +Z).
@@ -80,8 +80,8 @@ NUT_HOLES_YZ = tuple(
 )
 NUT_TAP_SPEC = HoleSpec("tapped", feed_nut.SCREW_THREAD, end="through_all")
 NUT_TAP_DRILL = TAP_DRILL_MM[feed_nut.SCREW_THREAD]
-# The nut and its screw heads, and the lug, along X from the lug's -X face.
-NUT_REACH_X = (NUT_FACE_X - feed_nut.REACH, LUG_X1)
+# The nut points away from the spindle; its screws enter from the +X face.
+NUT_REACH_X = (LUG_X0, NUT_FACE_X + feed_nut.REACH)
 NUT_MACHINE_Z = trammel.CARRIAGE_TOP_Z + NUT_AXIS_Z
 PLAN_DATUM_REFERENCE = pivot.PLAN_DATUM_REFERENCE
 CBORE_FLOOR_REFERENCE = pivot.CBORE_FLOOR_REFERENCE
@@ -302,3 +302,20 @@ FEED_GAPS = {
     for station in trammel.CARRIAGE_TRAVEL
 }
 assert min(FEED_GAPS.values()) >= lead.FEED_GAP, FEED_GAPS
+# The block bore and lug ordinate each carry .XX; the far end also carries
+# LugWidth. The support envelope includes both mounting-hole floats and
+# their printed stations, including the permitted lower-joint slip.
+LUG_POSITION_BAND = printed_band_mm(2, unit=UNIT) + printed_band_mm(
+    pivot.DRAWING_PRECISION_BY_NAME["PlanBoreX"], unit=pivot.UNIT
+)
+FEED_GAPS_WORST = {
+    "near": trammel.CARRIAGE_TRAVEL[0] + NUT_REACH_X[0]
+    - lead.KP08_BOXES["KP08 near"][1] - LUG_POSITION_BAND - lead.KP08_STATION_ENVELOPE,
+    "far": lead.KP08_BOXES["KP08 far"][0]
+    - (trammel.CARRIAGE_TRAVEL[1] + NUT_REACH_X[1])
+    - LUG_POSITION_BAND - printed_band_mm(2, unit=UNIT) - lead.KP08_STATION_ENVELOPE,
+}
+if min(FEED_GAPS_WORST.values()) < lead.FEED_GAP:
+    raise AssertionError(f"centred feed reaches a displaced KP08: {FEED_GAPS_WORST}")
+if BLOCK_LENGTH - PLAN_LUG_X - LUG_WIDTH < 3 * printed_band_mm(2, unit=UNIT) - 1e-9:
+    raise AssertionError("lug can extend beyond the dimensioned block end")

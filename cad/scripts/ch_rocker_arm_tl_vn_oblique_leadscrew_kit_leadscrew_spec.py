@@ -24,15 +24,15 @@ Sources:
 
 - FROM C4 (imported from ``ch_rocker_arm_tl_vn_oblique_leadscrew_spec``, never
   retyped): the Ø8 major diameter, the lead 2, the 600 stock length and the
-  installed length ``SCREW_LENGTH`` 410.
+  installed length ``SCREW_LENGTH``.
 - SOURCED, https://www.amazon.com/dp/B085DDHJTW (read 2026-11-04): "ReliaBot
   600mm T8 Tr8x2 Lead Screw and Brass Nut (Acme Thread, 2mm Pitch, 1 Start,
   2mm Lead)"; "Lead screw diameter 8mm, length 600mm, SUS304 stainless
   steel"; "Screw pitch: 2mm; Number of Thread/Start:1; Lead: 2mm"; packing
   list 1 x T8x2 600mm lead screw, 1 x T8x2 brass nut. The listing states no
   thread hand, straightness or length tolerance.
-- DECIDED (owner/C4 layout decision 2026-10-16): cut to 410, deburr and
-  lightly chamfer the cut end. The print uses the title block's .X band
+- DECIDED (centred-block relayout authorized 2026-11-06): cut to the layout's
+  derived length, deburr and chamfer. The print uses the title block's .X band
   (``LENGTH_TOLERANCE``): the self-checks below show the feed absorbs it,
   and the handwheel flat runs out through the cut end, so no land on it
   depends on the cut. The cut needs no band of its own.
@@ -112,9 +112,9 @@ DRAWING_NOTES = f"CUT AND MILL FLATS PER SHEET {MODIFIED_STOCK_SHEET}."
 MAJOR_DIA = feed.SCREW_MAJOR_DIA  # 8
 LEAD = feed.SCREW_LEAD  # 2
 STOCK_LENGTH = feed.SCREW_STOCK_LENGTH  # 600, as bought
-LENGTH = feed.SCREW_LENGTH  # 410, installed (shop-cut)
-# The member's native BOM description under the kit's one Number.
-BOM_DESCRIPTION = f"TR8X2 LEADSCREW, {LENGTH:.0f} MM LONG"
+LENGTH = feed.SCREW_LENGTH  # installed, shop-cut from the layout
+# Preserve the cut sheet's one-place nominal in the native BOM.
+BOM_DESCRIPTION = f"TR8X2 LEADSCREW, {LENGTH:.1f} MM LONG"
 
 # --- SOURCED: listing / layout decision / contract --------------------------------
 PITCH = 2.0  # single start: the pitch equals the lead
@@ -125,7 +125,7 @@ HAND = "right"  # UNVERIFIED: not stated on the listing; receipt check
 # the SKU identify the stock (review: a gauge sketch, then a numeric note row).
 SUPPLIER_PRODUCT_URL = "https://www.amazon.com/dp/B085DDHJTW"
 
-# The cut length prints as a native one-place dimension (410.0) under the
+# The cut length prints as a native one-place dimension under the
 # title block's .X row: the handwheel flat runs out through the cut end
 # (``OPEN_FLAT``), so no flat's land depends on the cut.
 LENGTH_PLACES = 1

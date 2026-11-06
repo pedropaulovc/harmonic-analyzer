@@ -4,6 +4,7 @@ Taps are represented by their drill cylinders (as native Wizard taps are),
 not by helical cut threads. The model owns every size and printed tolerance.
 """
 from __future__ import annotations
+import math
 from typing import Any
 from collections.abc import Callable
 from _appearance import apply_material
@@ -111,18 +112,10 @@ def _as_construction(adapter: Any, entity_id: str) -> None:
 async def _cbore_floor_reference(adapter, part) -> list[tuple[str, str]]:
     """The hidden sketch carrying the printed counterbore floor height.
 
-    Section B-B cuts along Y through the (+13, +13) counterbore (along X its
-    arrows and letters would sit on the bore: review r5; through the -13
-    column its left-pointing letters met the seat's 10.00 extension line), so
-    its cutting plane is the Right plane (model YZ) carried to X = +BoltX; a
-    derived view imports a reference sketch that lies in its cut
-    (build_pd_platen ``CboreFloorReference``). One construction line on the
-    M4 clearance hole's +Y wall, a visible section edge, from the carriage
-    seat (Z = 0) up to the counterbore floor: its foot's Y from the origin
-    (unprinted; the Z = 0 end sits on the sketch axis), and its rise, the
-    printed floor. The off-sketch check in ``_sketch_mapper`` proves the
-    plane stands at X = +13 and that the sketch opened on it, not on a
-    fallback plane.
+    B-B cuts the -X carriage-hole column, clear of the centred feed block's
+    +X lug. Its native reference sketch lies on the same Right-plane offset,
+    so the section imports the actual counterbore floor from the carriage
+    seat. The mapper checks the signed plane location before authoring.
     """
     from solidworks_mcp.adapters.base import CreatePlaneParameters
 
@@ -418,8 +411,62 @@ async def _nut_pattern_reference(adapter, part) -> None:
     dims.apply(adapter, feature)
 
 
+def require_block_geometry(adapter, part) -> None:
+    """Read physical bore axes and model dimensions; never certify a nominal box."""
+    from _drawing_precision import _named_dimensions
+    from _gtol_face import SURFACE_CYLINDER
+    from _gtol_face_read import face_geometry
+    import _telemetry
+
+    bodies = tuple(_early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, False) or ())
+    if len(bodies) != 1:
+        raise RuntimeError(f"{part.PART_NAME}: expected one native solid for readback")
+    cylinders = []
+    for face in _early_bound(bodies[0], "IBody2").GetFaces() or ():
+        geometry = face_geometry(face, identities=frozenset({SURFACE_CYLINDER}))
+        if geometry is not None and geometry.identity == SURFACE_CYLINDER:
+            cylinders.append(geometry.parameters)
+    expected = [
+        ("pivot seat", 2, (spec.BORE_X, spec.BORE_Y, 0.0), spec.BORE_DIA),
+        ("pivot tap", 2, (spec.BORE_X, spec.BORE_Y, 0.0), spec.PIVOT_TAP_DRILL),
+        *[
+            (f"M4 {index} {label}", 2, (x, y, 0.0), diameter)
+            for index, (x, y) in enumerate(spec.BOLT_POINTS, 1)
+            for label, diameter in (("clearance", spec.HOLE_DIA), ("counterbore", spec.CBORE_DIA))
+        ],
+    ]
+    if hasattr(part, "NUT_FACE_X"):
+        expected += [
+            ("leadscrew clearance", 0, (0.0, part.NUT_AXIS_Y, part.NUT_AXIS_Z), part.SCREW_CLEARANCE_DIA),
+            *[(f"nut tap {index}", 0, (0.0, y, z), part.NUT_TAP_DRILL)
+              for index, (y, z) in enumerate(part.NUT_HOLES_YZ, 1)],
+        ]
+    measured = {}
+    for label, axis, centre, diameter in expected:
+        matches = [
+            parameters for parameters in cylinders
+            if len(parameters) == 7
+            and abs(abs(parameters[axis + 3]) - 1.0) < 1e-9
+            and all(abs(parameters[i] * 1000.0 - centre[i]) < 1e-6
+                    for i in range(3) if i != axis)
+            and abs(parameters[6] * 2000.0 - diameter) < 1e-6
+        ]
+        if not matches:
+            raise RuntimeError(f"{part.PART_NAME}: no native {label} at {centre}, diameter {diameter}")
+        measured[label] = [list(parameters) for parameters in matches]
+    dimensions = {}
+    for feature, names in part.DRAWING_DIMENSIONS.items():
+        wanted = set(names) & part.DRAWING_VALUES.keys()
+        for name, (_display, dimension) in _named_dimensions(adapter, feature, wanted).items():
+            value = float(dimension.SystemValue) * 1000.0
+            if not math.isclose(value, part.DRAWING_VALUES[name], rel_tol=0.0, abs_tol=1e-6):
+                raise RuntimeError(f"{name}@{feature}: native {value}, expected {part.DRAWING_VALUES[name]}")
+            dimensions[f"{name}@{feature}"] = value
+    _telemetry.info("centred block native dimensional readback", part=part.PART_NAME,
+                    cylinders=measured, dimensions_mm=dimensions)
+
+
 async def build_block_model(adapter, part) -> None:
-    import math
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
     check("create part", await adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(part.PART_NAME), label=part.PART_NAME)
@@ -443,13 +490,13 @@ async def build_block_model(adapter, part) -> None:
     name_last_feature(adapter,"TopFace")
     blank_reference_geometry(adapter,(("TopFace","PLANE"),))
     await _circles(adapter,"TopFace",part.BLOCK_HEIGHT,"TopBoreProfile",
-                   [(spec.BORE_X,0,spec.BORE_DIA,("BoreX",None,"BoreDia"))])
+                   [(spec.BORE_X,0,spec.BORE_DIA,(None,None,"BoreDia"))])
     check("shoulder seat",await adapter.create_cut_extrude(ExtrusionParameters(depth=spec.BORE_DEPTH)))
     name_last_feature(adapter,"TopBore")
     name_dimensions(adapter,"TopBore",["TopBoreDepth"])
     expected -= math.pi * (spec.BORE_DIA/2)**2 * spec.BORE_DEPTH
     await _circles(adapter,"TopFace",part.BLOCK_HEIGHT,"PivotTapProfile",
-                   [(spec.BORE_X,0,spec.PIVOT_TAP_DRILL,("TapX",None,"TapDrillDia"))])
+                   [(spec.BORE_X,0,spec.PIVOT_TAP_DRILL,(None,None,"TapDrillDia"))])
     check("pivot tap drill thru",await adapter.create_cut_extrude(ExtrusionParameters(depth=part.BLOCK_HEIGHT*2)))
     name_last_feature(adapter,"PivotTap")
     expected -= math.pi*(spec.PIVOT_TAP_DRILL/2)**2 * (part.BLOCK_HEIGHT-spec.BORE_DEPTH)
@@ -473,11 +520,11 @@ async def build_block_model(adapter, part) -> None:
         await _circles(adapter,"NutFace",part.NUT_FACE_X,"NutClearanceProfile",
                        [(part.NUT_AXIS_Z,part.NUT_AXIS_Y,part.SCREW_CLEARANCE_DIA,
                          ("NutClearanceZ","NutClearanceY","NutClearanceDia"))],side=True)
-        check("NutClearance",await adapter.create_cut_extrude(ExtrusionParameters(depth=part.LUG_WIDTH*2,reverse_direction=True)))
+        check("NutClearance",await adapter.create_cut_extrude(ExtrusionParameters(depth=part.LUG_WIDTH*2)))
         name_last_feature(adapter,"NutClearance")
         name_dimensions(adapter,"NutClearance",["NutClearanceDepth"])
         wizard_holes(adapter,part.NUT_TAP_SPEC,
-             [[part.NUT_FACE_X,y,z] for y,z in part.NUT_HOLES_YZ],(-1.0,0.0,0.0),
+             [[part.NUT_FACE_X,y,z] for y,z in part.NUT_HOLES_YZ],(1.0,0.0,0.0),
              "feed nut screw taps (#4-40 through)",name="NutTaps",expect_dia_mm=part.NUT_TAP_DRILL,
              placement_dims=[((f"NutPlacement{i}U",None),(f"NutPlacement{i}V",None))
                              for i in range(1,len(part.NUT_HOLES_YZ)+1)])
@@ -490,6 +537,7 @@ async def build_block_model(adapter, part) -> None:
     name_last_feature(adapter,spec.PIVOT_AXIS_NAME)
     await force_rebuild(adapter)
     _require_one_solid_body(adapter,label=part.PART_NAME)
+    require_block_geometry(adapter, part)
     await volume_check(adapter,"finished block",expected,expected*0.002)
     set_dimension_bilateral_tolerance(adapter,"TopBoreProfile","BoreDia",*deviations(spec.BORE_BAND),
                                       places=spec.BORE_PLACES,display_unit=spec.UNIT)
