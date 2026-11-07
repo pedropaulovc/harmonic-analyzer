@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 import pytest
 
@@ -152,3 +153,64 @@ def test_prechips_solids_are_valid_fixture_solids() -> None:
         FixtureSolid.model_validate(solid)
     names = {solid["name"] for solid in spec.PRECHIPS_SOLIDS}
     assert names == {"feed lever", "bolt hole 1", "bolt hole 2"}
+
+
+class _Callout:
+    """A native hole callout's four definitions (5..8), each written through
+    its writable twin (1..4) and read back with CR LF, as SolidWorks does."""
+
+    def __init__(self, definitions: dict[int, str], *, accepts: bool = True) -> None:
+        self.definitions = dict(definitions)
+        self.accepts = accepts
+
+    def IsHoleCallout(self) -> bool:
+        return True
+
+    def SetText(self, part: int, text: str) -> None:
+        assert 1 <= part <= 4
+        if self.accepts:
+            self.definitions[part + 4] = text
+
+    def GetText(self, part: int) -> str:
+        return self.definitions.get(part, "").replace("\n", "\r\n")
+
+
+@pytest.mark.parametrize("token", ("<hw-diam>", "<hw-thruholedia>"))
+def test_drill_follows_the_size_in_the_native_callout(token: str) -> None:
+    # Rule 26: size, then process: 2X Ø.344 DRILL THRU ALL.
+    native = {5: "", 6: "", 7: f"<NUM_INST>X <MOD-DIAM>{token} THRU ALL", 8: ""}
+    callout = _Callout(native)
+    drawing._write_drill_after_size(callout)
+    assert callout.definitions == {
+        **native,
+        7: f"<NUM_INST>X <MOD-DIAM>{token} DRILL THRU ALL",
+    }
+    # A refused write is caught on read-back.
+    with pytest.raises(RuntimeError, match="did not persist"):
+        drawing._write_drill_after_size(_Callout(native, accepts=False))
+
+
+@pytest.mark.parametrize(
+    "definitions",
+    (
+        {5: "", 6: "", 7: "<NUM_INST>X <MOD-DIAM><hw-cbdia> THRU ALL", 8: ""},
+        {5: "<hw-diam>", 6: "", 7: "<NUM_INST>X <MOD-DIAM><hw-thruholedia>", 8: ""},
+        {5: "<hw-diam>", 6: "", 7: "<NUM_INST>X <MOD-DIAM><hw-diam> THRU ALL", 8: ""},
+        {5: "", 6: "", 7: "<NUM_INST>X <MOD-DIAM><hw-diam> DRILL THRU ALL", 8: ""},
+        {5: "", 6: "", 7: "<NUM_INST>X <MOD-DIAM><hw-diam> THRU ALL"},
+    ),
+)
+def test_drill_rewrite_refuses_an_unexpected_callout(definitions: dict[int, str]) -> None:
+    # No size variable, both shapes, a repeated size, DRILL already there, or
+    # a missing part: refused, never guessed.
+    with pytest.raises(RuntimeError):
+        drawing.drill_callout_definitions(definitions)
+
+
+def test_the_callout_takes_no_process_prefix() -> None:
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = sheet[sheet.index("async def build") :]
+    assert "process=" not in body
+    assert body.index("_write_drill_after_size(hole_callout)") < body.index(
+        "set_hole_callout_precision("
+    )
