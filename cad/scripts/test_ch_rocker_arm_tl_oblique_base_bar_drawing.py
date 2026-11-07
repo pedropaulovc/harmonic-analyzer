@@ -10,6 +10,7 @@ import pytest
 import _config
 import _drawing_contract
 import ch_rocker_arm_tl_oblique_base_bar_spec as spec
+import ch_rocker_arm_tl_oblique_end_bracket_spec as end_bracket
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_base_bar as drawing
@@ -680,6 +681,50 @@ def test_bracket_hole_float_bounds_the_lost_motion_on_reversal() -> None:
         leadscrew.BRACKET_REVERSAL_LOST_MOTION
         <= leadscrew.BRACKET_REVERSAL_LOST_MOTION_ACCEPTED
     )
+    # One source: the base bar owns the screw's least major and its travel.
+    assert leadscrew.SHCS_8_MAJOR_MIN == spec.BRACKET_SCREW_MAJOR_MIN
+    assert leadscrew.BRACKET_STOP_FLOAT_MAX == spec.BRACKET_SCREW_FLOAT_WORST
+
+
+def test_counterbore_three_places_hold_the_head_float_and_the_screw_reach() -> None:
+    """Machinist review 84d5991d45: ⌴ Ø.313 ↧ .189 at .XXX with no stated
+    function. Both sizes hold a load-path control, so they keep ±.005 and
+    the callout names each; the review's .31/.19 at ±.01 breaks both."""
+    head = spec.BRACKET_SCREW_HEAD_DIA  # .270, ASME B18.3 max
+    hole_max = spec.BRACKET_HOLE_DIA + drilled_oversize_mm(unit=spec.UNIT)
+    travel = (hole_max - 0.1585 * 25.4) / 2.0  # the 3A screw's whole float
+    assert spec.BRACKET_SCREW_FLOAT_WORST == pytest.approx(travel)
+    assert travel == pytest.approx(0.438, abs=1e-3)
+    three = printed_band_mm(3, unit=spec.UNIT)  # .005
+    two = printed_band_mm(2, unit=spec.UNIT)  # .01
+    # Diameter: at .313 ±.005 the head keeps 0.483 a side to the wall, more
+    # than the screw's travel, so the thread is TL-28's stop. At .31 ±.01 the
+    # .300 bore leaves 0.381: the head bears first.
+    clearance = (spec.BRACKET_CBORE_DIA - three - head) / 2.0
+    assert spec.BRACKET_HEAD_FLOAT_CLEARANCE_MIN == pytest.approx(clearance)
+    assert clearance >= travel
+    assert (0.31 * 25.4 - two - head) / 2.0 < travel
+    # Depth: .189 ±.005 lets the 3/4 screw reach at most 12.294 past the
+    # bar's top, inside TL-28's bottom thread and short of the top thread's
+    # tap lead; .19 ±.01 lets it reach 12.446, past both.
+    screw = leadscrew.BAR_SCREW_LENGTH_MM
+    reach_max = spec.bracket_screw_under_head(screw)[1]
+    assert reach_max == pytest.approx(end_bracket.BAR_REACH_MAX)
+    two_place = screw - (
+        spec.BAR_THICK - printed_band_mm(spec.THICK_PLACES, unit=spec.UNIT)
+        - (0.19 * 25.4 + two)
+    )
+    assert two_place == pytest.approx(12.446, abs=1e-3)
+    assert reach_max <= end_bracket.BAR_THREAD_LIMITS[0]
+    assert two_place > end_bracket.BAR_THREAD_LIMITS[0]
+    assert (
+        end_bracket.THICK_MIN - two_place - end_bracket.TAP_LEAD
+        < end_bracket.KP08_THREAD_LIMITS[1]
+    )
+    # The callout names both functions, right above the counterbore's row.
+    lines = spec.BRACKET_CALLOUT_PROCESS.split("\n")
+    assert lines[-3:] == ["HEAD CLEAR AT FULL FLOAT", "DEPTH SETS SCREW REACH", ""]
+    assert set(spec.BRACKET_CALLOUT_PRECISION.values()) == {3}
 
 
 def test_bracket_hole_walls_meet_rule_17() -> None:
@@ -748,6 +793,8 @@ def test_bracket_pattern_holds_the_tl28_float_and_names_it() -> None:
         "BAR 1 ONLY; NONE ON BAR 2",
         "MATCHES MHA-CH-06-TL-28",
         "DRILL, C'BORE FAR SIDE",
+        "HEAD CLEAR AT FULL FLOAT",
+        "DEPTH SETS SCREW REACH",
         "",
     ]
     assert "MHA-CH-06-TL-28" == spec.BRACKET_MATE
@@ -805,7 +852,13 @@ def test_bracket_dimensions_and_callout_lay_out_clear() -> None:
         drawing._sheet_y(centre, drawing.BRACKET_OUTER_Y),
     )
     cx, cy = drawing.BRACKET_CALLOUT_XY
-    half_w, half_h = 0.027, 0.0125  # "MATCHES MHA-CH-06-TL-28", five rows
+    # Five rows measured 0.025 tall under the 23-glyph "MATCHES
+    # MHA-CH-06-TL-28"; the counterbore's two function rows make seven, the
+    # widest "HEAD CLEAR AT FULL FLOAT" (24 glyphs).
+    rows = 2 + len(spec.BRACKET_CALLOUT_PROCESS.rstrip("\n").split("\n"))
+    assert rows == 7
+    widest = max(len(line) for line in spec.BRACKET_CALLOUT_PROCESS.split("\n"))
+    half_w, half_h = 0.027 * max(widest, 23) / 23, 0.0125 * rows / 5
     land = (cx - half_w, cy)
     slope = (land[1] - hole[1]) / (land[0] - hole[0])
     at_right = hole[1] + slope * (drawing._RIGHT - hole[0])

@@ -364,6 +364,49 @@ def test_three_place_depths_are_set_by_the_opposed_screws() -> None:
     ]
 
 
+def test_threads_are_stated_by_the_callouts_alone() -> None:
+    # Farm 84d5991d45: with both faces' threads imported into A-A, SolidWorks
+    # pinned one "Tapped Hole" note where 0c3 had two; the hard-coded 2
+    # refused a correct sheet. The count is SolidWorks' grouping, bounded by
+    # the two tap features; the contract is the settled sheet: both callouts
+    # state their thread and the A-A pointer, and no note repeats a thread.
+    assert drawing.TAP_FEATURES == ("BarTaps", "KP08Taps")
+    assert drawing.REDUNDANT_THREAD_NOTES == range(1, 3)
+    assert 1 in drawing.REDUNDANT_THREAD_NOTES and 2 in drawing.REDUNDANT_THREAD_NOTES
+    assert 0 not in drawing.REDUNDANT_THREAD_NOTES
+    assert 3 not in drawing.REDUNDANT_THREAD_NOTES
+    # The 84d readback, after the class row and the lengths are set.
+    settled = [
+        f"8-32 UNC <HOLE-DEPTH> .436\n{drawing.BOTTOM_THREAD_CALLOUT}",
+        "",
+        "<MOD-DIAM> .136 THRU ALL",
+        "",
+    ]
+    assert drawing.callout_states_its_thread(settled)
+    # Negative controls: a callout that lost its thread, its drill, or its
+    # pointer (or carries it twice) is refused.
+    assert not drawing.callout_states_its_thread(["", "", "<MOD-DIAM> .136 THRU ALL", ""])
+    assert not drawing.callout_states_its_thread([settled[0], "", "", ""])
+    assert not drawing.callout_states_its_thread(
+        ["8-32 UNC <HOLE-DEPTH> .436", "", settled[2], ""]
+    )
+    assert not drawing.callout_states_its_thread(
+        [settled[0], drawing.BOTTOM_THREAD_CALLOUT, settled[2], ""]
+    )
+    # Every note the sheet keeps passes; any thread statement in a note is
+    # caught, whatever SolidWorks calls it.
+    kept = [spec.ISOMETRIC_VIEW_NOTE, "SECTION A-A", ""]
+    assert drawing.stray_thread_notes(kept) == []
+    for stray in ("#8-32 Tapped Hole", "8-32 Tapped Hole1", "#8-32 UNC - 2B"):
+        assert drawing.stray_thread_notes([*kept, stray]) == [stray]
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = sheet[sheet.index("async def build") :]
+    assert "expected_redundant_notes=REDUNDANT_THREAD_NOTES" in body
+    assert "expected_redundant_notes=2" not in sheet
+    assert "_require_threads_stated_by_callouts_only(adapter, callouts)" in body
+    assert "callouts.append((label, callout))" in body
+
+
 def test_section_draws_both_threads_solid_with_the_witness_on_the_thread() -> None:
     # Machinist review 0c3ed35988: A-A drew only the top thread, dashed, and
     # the .491's witness started in the plain bore. Both faces' threads on
