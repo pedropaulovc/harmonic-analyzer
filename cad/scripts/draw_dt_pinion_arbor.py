@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import math
 import sys
-import textwrap
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
@@ -53,7 +52,8 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from diagnostics.drawing_layout_audit import collect_document
-from dt_pinion_arbor_pin_spec import PIN_HOLE_CALLOUT as _PIN_HOLE_CALLOUT
+from dt_pinion_arbor_pin_spec import PIN_NUMBER as _PIN_NUMBER
+from dt_vn_pinion_strap_pin_spec import DRILL_THRU_CALLOUT as _PIN_DRILL_THRU_CALLOUT
 from dt_pinion_arbor_spec import (
     BACK_JOURNAL_Z,
     BOND_ZONE_DIA_Z,
@@ -373,12 +373,11 @@ DIAMETER_BLOCK_SIZE = (0.027, 0.014)
 # it, crossing the 38.0 line 6 mm inside that witness and passing 5 mm
 # right of the 19.0's head-end witness; the underline still starts right of
 # detail A's view box (x 0.1928).
-# Reflow across the old line break: FOR stays on the drill row, leaving the
-# full vendor number and SPRING PIN together below it.  Two rows preserve
-# the measured underline height between the crown-sag and cross-hole text.
-PIN_HOLE_CALLOUT = textwrap.fill(
-    _PIN_HOLE_CALLOUT, width=24, break_long_words=False, break_on_hyphens=False
-)
+# Two rows preserve the measured underline height between the crown-sag and
+# cross-hole text.  The fit names the spring pin it presses (fan-out, as the
+# MHA-DT-33 collar sheet prints it) by its number; at 22 characters the
+# longer row keeps the underline right of detail A's view box.
+PIN_HOLE_CALLOUT = f"{_PIN_DRILL_THRU_CALLOUT}\nPRESS FIT {_PIN_NUMBER}"
 PIN_HOLE_CALLOUT_ADVANCE = 0.00267
 PIN_HOLE_CALLOUT_CENTRE_DX = 0.00075
 PIN_HOLE_LEADER_ARROW_DX = -0.0004
