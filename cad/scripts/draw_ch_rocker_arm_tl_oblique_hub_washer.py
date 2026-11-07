@@ -2,9 +2,9 @@ r"""Create the manufacturing drawing for the oblique-trammel hub washer (MHA-CH-
 
 The face view carries the #9 drilled bore with its DRILL THRU callout; the
 O.D. moves onto the side view with the thickness (drawing-guidelines.md
-rule 11).  Places are authored on the part
-(``ch_rocker_arm_tl_oblique_hub_washer_spec``); every size takes the title
-block's rows.
+rule 11) and states the cutter clearance its .XXX row protects (rule 4).
+Places are authored on the part (``ch_rocker_arm_tl_oblique_hub_washer_spec``);
+every size takes the title block's rows.
 
 Run with SolidWorks open::
 
@@ -32,6 +32,7 @@ from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
     move_model_dimension,
+    offset_dimension_text,
     set_dimension_callouts,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -77,16 +78,20 @@ _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0
 # Both diameters import on the face view, where every diameter line runs
 # through the centre: two would cross there.  The bore keeps the face view,
 # its callout up and right of it; the O.D. is a donor there and moves onto
-# the side view, right of the washer.  The thickness hangs under the side
-# view.
+# the side view, right of the washer, its three-row function callout clear of
+# the washer's edge.  The thickness hangs under the side view; its .06 is
+# wider than the 6 mm span at 4:1 (review r1-r3: both extension lines touched
+# it), so its text leaves on a leader right of the right extension line.
 FRONT_KEEP = {
     "WasherOd": (0.050, 0.100),
     "WasherBore": (0.130, 0.215),
 }
+_THICKNESS_Y = RIGHT_CENTER[1] - OD / 2.0 * _S - 0.016
 RIGHT_KEEP = {
-    "WasherThickness": (RIGHT_CENTER[0], RIGHT_CENTER[1] - OD / 2.0 * _S - 0.016),
+    "WasherThickness": (RIGHT_CENTER[0], _THICKNESS_Y),
 }
-OD_ON_SIDE = (RIGHT_CENTER[0] + THICK / 2.0 * _S + 0.030, RIGHT_CENTER[1])
+OD_ON_SIDE = (RIGHT_CENTER[0] + THICK / 2.0 * _S + 0.040, RIGHT_CENTER[1])
+THICKNESS_TEXT_XY = (RIGHT_CENTER[0] + THICK / 2.0 * _S + 0.012, _THICKNESS_Y)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -153,6 +158,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # are authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    offset_dimension_text(
+        adapter, right_annotations, {"WasherThickness": THICKNESS_TEXT_XY}
+    )
 
     return await finalize_drawing(
         adapter,

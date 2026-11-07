@@ -13,9 +13,15 @@ the riser's HUB clearance and supports the strap under the washer.
 
 The shank is a free slip in the carrier bore (.3990-.3995 in the
 .4000-.4005 reamed hole, .0005-.0015 diametral); the nose keeps the gauge
-pin's .4000 -.0001/0 because it locates the strap (owner, 2026-11-06).
+pin's .4000 -.0001/0 because it locates the strap (owner, 2026-11-06): its
+band is what keeps the strap's hub-hole float inside the carrier's existing
+.005 edge-to-HUB allocation (``EDGE_TO_HUB_ALLOCATION``), and the sheet says
+so at the band, quoting the strap hole's limits as REF only.
 The flange is the owner's literal 18 x 3 mm (parent ruling 2026-11-06: the
-model keeps the exact millimetres; the inch sheet prints them .709 x .118).
+model keeps the exact millimetres).  The inch sheet prints it .71 x .12 at
+the title block's .XX row, so the part is accepted on the PRINTED limits,
+.71 +/-.01 and .12 +/-.01 (``FLANGE_DIA_LIMITS``, ``FLANGE_THICK_LIMITS``),
+not on 18 x 3 +/-.254: every stack that reads the flange takes those.
 
 Proud height is a fit-up adjustment (drawing-guidelines rule 19): the
 carrier (.47) and riser (.24) each carry the .XX band, so no part band can
@@ -37,12 +43,14 @@ import math
 
 import _config
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
+import ch_rocker_strap_spec as strap
 from _fit_ream_h7 import REAM_H7
 from _hole_spec import DRILL_POINT_H, THREAD_MAJOR_MM, TAP_DRILL_MM, HoleSpec
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
 from ch_rocker_arm_spec import inch_text
+from ch_rocker_hub_fit import STRAP_HOLE_BAND
 
 STEM = "ch-rocker-arm-tl-oblique-hub-stud"
 UNIT = drawing_unit(f"parts/{STEM}", _config.parts("ch-rocker-arm-tl-oblique-hub-stud"))
@@ -51,9 +59,30 @@ QUANTITY = 1
 INCH = trammel.INCH
 
 # --- Flange: the owner's literal 18 x 3 mm ----------------------------------
-FLANGE_DIA = 18.0  # prints .709
-FLANGE_THICK = 3.0  # prints .118
-FLANGE_PLACES = 3
+# A plain flange: it bears on the carrier underside and takes the hub
+# screw's pull.  It prints at the title block's .XX row; the literal model
+# size rounds to the printed nominal, and the accepted part is that printed
+# nominal +/- the row's band.  Stacks (TL-21's seat width beside the HUB
+# chamfer, the jig's flange-to-obstacle gaps) read these limits.
+FLANGE_DIA = 18.0  # prints .71
+FLANGE_THICK = 3.0  # prints .12
+FLANGE_PLACES = 2
+_FLANGE_ROW = printed_band_mm(FLANGE_PLACES, unit=UNIT)  # +/-.01
+FLANGE_DIA_PRINTED = round(FLANGE_DIA / INCH, FLANGE_PLACES) * INCH  # .71, 18.034
+FLANGE_THICK_PRINTED = round(FLANGE_THICK / INCH, FLANGE_PLACES) * INCH  # .12, 3.048
+FLANGE_DIA_LIMITS = (
+    FLANGE_DIA_PRINTED - _FLANGE_ROW,
+    FLANGE_DIA_PRINTED + _FLANGE_ROW,
+)  # 17.780..18.288
+FLANGE_THICK_LIMITS = (
+    FLANGE_THICK_PRINTED - _FLANGE_ROW,
+    FLANGE_THICK_PRINTED + _FLANGE_ROW,
+)  # 2.794..3.302
+if not (
+    FLANGE_DIA_LIMITS[0] <= FLANGE_DIA <= FLANGE_DIA_LIMITS[1]
+    and FLANGE_THICK_LIMITS[0] <= FLANGE_THICK <= FLANGE_THICK_LIMITS[1]
+):
+    raise AssertionError("the literal flange model is outside its printed limits")
 
 # --- Shank: free slip in the carrier's HUB bore -----------------------------
 # The bore is the carrier's .4000 REAM_H7 (+.0005/0); the shank .3995/.3990.
@@ -73,6 +102,25 @@ SHANK_LENGTH_PLACES = 2
 DIA = 10.16  # .4000
 DIA_BAND = (0.0, -0.00254)  # upper, lower: .3999-.4000
 DIA_PLACES = 4
+# The MHA-CH-13 strap's hub hole: the finished hub O.D.'s nominal, reamed
+# +.0005/0 (ch_rocker_hub_fit; the strap's sheet controls it, so this sheet
+# quotes it REF).  The nose's (least, most) diametral clearance in it; never
+# negative, so the strap always goes on.
+STRAP_HOLE_LIMITS = (
+    strap.HOLE_DIA + STRAP_HOLE_BAND[1],
+    strap.HOLE_DIA + STRAP_HOLE_BAND[0],
+)
+NOSE_CLEARANCE = (
+    STRAP_HOLE_LIMITS[0] - (DIA + DIA_BAND[0]),
+    STRAP_HOLE_LIMITS[1] - (DIA + DIA_BAND[1]),
+)
+if NOSE_CLEARANCE[0] < 0.0:
+    raise AssertionError("the hub stud nose interferes with the strap's hub hole")
+# Why the band is .0001: the strap's top edge is cut relative to the HUB, and
+# the carrier's existing edge-to-HUB allocation (.005, of which its
+# HUB_RADIAL_STACK leaves only ~.000044 in) is what the nose's locating float
+# must not reopen.  Not reallocated here; named on the sheet (rule 4).
+EDGE_TO_HUB_ALLOCATION = 0.005 * INCH
 TIP_SET = 2.032  # .080 above the actual riser, set at assembly
 TIP_SET_BAND = 0.2032  # +/-.008
 NOSE_LENGTH = TIP_SET
@@ -186,15 +234,24 @@ DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
 CARRIER_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-carrier")["number"]
 RISER_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-riser")["number"]
 STRAP_NUMBER = _config.parts("ch-rocker-strap")["number"]
-# Every tight band names its mate (rule 4); the root names the seat it must
-# not hold off; the fit and supply lengths say how the proud is set (rule 19).
+# Every tight band names its mate by name and number (rule 4) and why it is
+# tight: the nose's holds the edge-to-HUB allocation, the strap hole's limits
+# quoted REF (the strap's sheet controls them); the root names the seat it
+# must not hold off; the fit and supply lengths say how the proud is set and
+# which riser face it is read from (rule 19).
 DIMENSION_CALLOUTS: dict[str, str] = {
-    "ShankDia": f"SLIP FIT IN\n{CARRIER_NUMBER} HUB BORE",
-    "NoseDia": f"LOCATES {STRAP_NUMBER}\nHUB HOLE",
-    "RootRadius": f"CLEARS HUB CHAMFER\n{CARRIER_NUMBER}",
+    "ShankDia": f"SLIP FIT IN CARRIER\n{CARRIER_NUMBER} HUB BORE",
+    "NoseDia": (
+        f"LOCATES STRAP {STRAP_NUMBER} HUB\n"
+        f"HOLE ({inch_text(STRAP_HOLE_LIMITS[0], 4)}-"
+        f"{inch_text(STRAP_HOLE_LIMITS[1], 4)} REF): BAND\n"
+        f"HOLDS THE {inch_text(EDGE_TO_HUB_ALLOCATION, 3)}\n"
+        "EDGE-TO-HUB ALLOCATION"
+    ),
+    "RootRadius": f"CLEARS CARRIER HUB\nCHAMFER {CARRIER_NUMBER}",
     "FitLength": (
         f"FIT AT ASSEMBLY: NOSE {inch_text(TIP_SET, 3)}"
-        f" +/-{inch_text(TIP_SET_BAND, 3)}\nABOVE {RISER_NUMBER}"
+        f" +/-{inch_text(TIP_SET_BAND, 3)}\nABOVE TOP OF RISER {RISER_NUMBER}"
     ),
     "SupplyLength": "SUPPLY",
 }

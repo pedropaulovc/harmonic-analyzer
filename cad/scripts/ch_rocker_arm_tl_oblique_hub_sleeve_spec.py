@@ -34,6 +34,11 @@ UNIT = drawing_unit(f"parts/{STEM}", _config.parts("ch-rocker-arm-tl-oblique-hub
 NUMBER = _config.parts("ch-rocker-arm-tl-oblique-hub-sleeve")["number"]
 QUANTITY = 1
 
+# The O.D. keeps the .XXX row: the jig's holding proof charges its printed
+# maximum against the 3/8 strap cutter's flank (with the carrier's HUB stack,
+# the stud's slip and this sleeve's float), and the final correlated stack
+# leaves .054 mm there; the .XX row's extra .127 mm on the diameter
+# (.0635 radial) would close it.  The sheet states that function.
 OD = 14.732  # .580
 OD_PLACES = 3
 ID = 10.16  # .4000, the reamer's size
@@ -77,11 +82,17 @@ DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
 }
 
 RISER_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-riser")["number"]
-# Rule 12: the bore says ream and names its mate (rule 4); the length is the
-# matched fit with its acceptance.
+# The jig assembly's drawing number (ch_rocker_arm_tl_oblique_jig_assembly_spec
+# .DRAWING_NUMBER, not imported: that module imports this one).
+JIG_NUMBER = "MHA-CH-06-TL-00"
+# Rule 12: the bore says ream and names its mate (rule 4); the O.D. says what
+# its .XXX row protects; the length is the matched fit, naming the riser and
+# the feature it matches, with its acceptance.
 DIMENSION_CALLOUTS: dict[str, str] = {
-    "SleeveBore": f"REAM\nSLIP ON {stud.NUMBER} SHANK",
+    "SleeveBore": f"REAM\nSLIP ON HUB STUD\n{stud.NUMBER} SHANK",
+    "SleeveOd": f"MAX CLEARS 3/8 STRAP\nCUTTER SWEEP ON JIG\n{JIG_NUMBER}",
     "SleeveLength": (
-        f"MATCH {RISER_NUMBER}\nFLUSH TO {inch_text(FLUSH_BELOW_MAX, 3)} BELOW"
+        f"MATCH RISER {RISER_NUMBER}\nTHICKNESS AT HUB: FLUSH\n"
+        f"TO {inch_text(FLUSH_BELOW_MAX, 3)} BELOW ITS TOP"
     ),
 }

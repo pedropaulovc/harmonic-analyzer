@@ -65,7 +65,26 @@ def test_wall_and_length_match_the_riser() -> None:
     assert spec.WALL_MIN >= WALL_TARGET_MM
     assert spec.LENGTH == trammel.RISER_THICK
     assert spec.FLUSH_BELOW_MAX == pytest.approx(0.002 * INCH)
-    assert spec.RISER_NUMBER in spec.DIMENSION_CALLOUTS["SleeveLength"]
+    # Rule 4: the matched mate by name, number and the feature it matches.
+    length = spec.DIMENSION_CALLOUTS["SleeveLength"]
+    assert f"MATCH RISER {spec.RISER_NUMBER}" in length
+    assert "THICKNESS AT HUB" in length and "BELOW ITS TOP" in length
+    assert "HUB STUD " + stud.NUMBER in spec.DIMENSION_CALLOUTS["SleeveBore"]
+
+
+def test_od_keeps_its_xxx_row_for_the_cutter_and_says_so() -> None:
+    # The holding proof charges the printed .XXX maximum; the .XX row's extra
+    # .0635 mm radial would exceed the final .054 mm cutter-flank margin.
+    assert spec.OD_PLACES == 3
+    assert "STRAP" in spec.DIMENSION_CALLOUTS["SleeveOd"]
+    assert "CUTTER" in spec.DIMENSION_CALLOUTS["SleeveOd"]
+    assert spec.JIG_NUMBER in spec.DIMENSION_CALLOUTS["SleeveOd"]
+    # The length's text leaves its .24 span on a leader, right of the sleeve
+    # and under the O.D.'s lower extension line.
+    right_edge = drawing.RIGHT_CENTER[0] + spec.LENGTH / 2.0 * drawing._S
+    x, y = drawing.LENGTH_TEXT_XY
+    assert x - right_edge > 0.030
+    assert y < drawing.RIGHT_CENTER[1] - spec.OD / 2.0 * drawing._S
     assert spec.OD < stud.FLANGE_DIA
 
 
