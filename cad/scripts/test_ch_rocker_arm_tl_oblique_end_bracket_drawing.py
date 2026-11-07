@@ -60,7 +60,6 @@ def test_stock_is_the_half_by_one_flat_on_edge() -> None:
     # reference over STOCK (the supplier's catalogue tolerance governs).
     assert spec.STOCK_DIMENSIONS == {"BracketWidth", "BracketThick"}
     assert spec.STOCK_CALLOUTS == {"BracketWidth": "STOCK", "BracketThick": "STOCK"}
-    assert not spec.STOCK_DIMENSIONS & set(spec.CALLOUTS_BELOW)
     sizes = {"BracketWidth": spec.BRACKET_WIDTH, "BracketThick": spec.BRACKET_THICK}
     for name, denominator in spec.STOCK_FRACTION_DENOMINATORS.items():
         assert sizes[name] / 25.4 * denominator == pytest.approx(
@@ -77,22 +76,20 @@ def test_kp08_taps_land_on_the_blocks_bolt_spacing_about_the_screw() -> None:
     assert laterals == pytest.approx(
         [leadscrew.SCREW_LATERAL - half, leadscrew.SCREW_LATERAL + half]
     )
-    # Owner ruling 4 (2026-11-01): the KP08's metric stations print exact
-    # millimetres at three places, labelled mm, with the millimetre title
-    # block's three-place band.
+    # The model keeps the vendor's exact millimetres (owner ruling 4, the
+    # part's native metric band). The sheet's hole table prints them at the
+    # inch .XXX like every row, pending owner confirmation (the native table
+    # cannot print a millimetre cell).
     assert spec.KP08_TAP_X == pytest.approx((13.925, 55.925))
     assert all(x == round(x, 3) for x in spec.KP08_TAP_X)
-    assert spec.METRIC_DIMENSIONS == {
-        ("KP08Taps", "KP08Tap1X"): (3, 0.13),
-        ("KP08Taps", "KP08Tap2X"): (3, 0.13),
-    }
-    assert spec.KP08_TAP_BAND == printed_band_mm(3, unit="mm")
     assert "set_metric_vendor_units(" in Path(part.__file__).read_text(encoding="utf-8")
     sheet = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "print_imported_metric_dimensions(" in sheet
+    assert "print_imported_metric_dimensions(" not in sheet
+    band = printed_band_mm(spec.HOLE_PLACES, unit="in")
     for hole in holes:
         x = hole["at"][0]
-        assert hole["station"] == pytest.approx([x - 0.13, x + 0.13])
+        printed = round(x / 25.4, spec.HOLE_PLACES) * 25.4
+        assert hole["station"] == pytest.approx([printed - band, printed + band])
     assert all(h["at"][1] == 0.0 for h in holes)  # the row on the screw's KP08_S
     assert spec.KP08_TAP_SPEC.kind == "tapped"  # UNC: the block's holes are plain
     assert spec.KP08_TAP_SPEC.size == leadscrew.KP08_SCREW == "#6-32"
@@ -128,44 +125,58 @@ def test_both_patterns_fit_their_mates_at_three_places() -> None:
     assert spec.KP08_PATTERN_ALLOWANCE > 0.0
     assert spec.BAR_HOLE_DIA == pytest.approx(4.978)
     assert spec.BAR_PATTERN_ALLOWANCE > 0.0
-    stations = {*drawing.STATION_ORDER, "HoleRowY"}
+    stations = {*spec.DRAWING_DIMENSIONS["BarTaps"], *spec.DRAWING_DIMENSIONS["KP08Taps"]}
     assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 3 for name in stations)
+    assert spec.HOLE_PLACES == 3
+    # The table's inch KP08 stations reach a little past the spec's exact
+    # ±0.13 mm; both patterns still float clear at the table's limits.
+    assert drawing.TABLE_POSITION_RADIUS >= spec.POSITION_RADIUS
+    assert drawing.TABLE_POSITION_RADIUS <= math.hypot(band + 0.0127, band)
+    assert spec.KP08_SCREW_FLOAT - drawing.TABLE_POSITION_RADIUS > 0.5
+    assert spec.BAR_SCREW_FLOAT - drawing.TABLE_POSITION_RADIUS > 0.2
+    assert 0.0 < drawing._KP08_EXTRA < 0.01
     # At the title block's two places this part's and TL-20's position
     # radii together would overrun the #8's float.
     two = printed_band_mm(2, unit="in")
     assert 2.0 * math.hypot(two, two) > spec.BAR_SCREW_FLOAT
 
 
-def test_every_tight_band_names_its_mate() -> None:
-    for name in ("KP08Tap1X", "KP08Tap2X"):
-        assert spec.CALLOUTS_BELOW[name] == spec.KP08_MATE_CALLOUT
-    for name in ("BarTap1X", "BarTap2X", "BarTap3X", "BarTap4X"):
-        assert spec.CALLOUTS_BELOW[name] == spec.BAR_MATE_CALLOUT
-    assert spec.CALLOUTS_BELOW["HoleRowY"] == spec.ROW_CALLOUT
-    assert "KP08" in spec.KP08_MATE_CALLOUT
-    assert "MHA-CH-06-TL-20" in spec.BAR_MATE_CALLOUT
-    assert "KP08" in spec.ROW_CALLOUT and "MHA-CH-06-TL-20" in spec.ROW_CALLOUT
-    # Every three-place dimension on the sheet carries its mate.
-    three_place = {
-        name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places == 3
+def test_every_tap_group_names_its_mate_by_drawing_number() -> None:
+    # Rule 4 (#2046): each group's mate once, in the table's MATCHES column,
+    # by its full registry drawing number; the KP08's code may follow.
+    assert drawing.MATE_NUMBERS == {
+        "bar": _config.parts("ch-rocker-arm-tl-oblique-base-bar")["number"],
+        "kp08": _config.parts("ch-rocker-arm-tl-vn-oblique-pillow-block")["number"],
     }
-    assert three_place <= set(spec.CALLOUTS_BELOW)
+    assert drawing.MATE_NUMBERS == {"bar": "MHA-CH-06-TL-20", "kp08": "MHA-CH-06-TL-VN-56"}
+    for kind, number in drawing.MATE_NUMBERS.items():
+        assert drawing.MATE_CELLS[kind].split("\n")[0] == number
+    assert drawing.MATE_CELLS["kp08"].split("\n")[1:] == [f"(KP08) {drawing.KP08_NOTE_LINK}"]
+    assert drawing.MATE_COLUMN.startswith("MATCHES")
     for name, feature in _features().items():
         if name.startswith(("bar_tap", "kp08_tap")):
-            assert feature["note"].startswith("MATCHES"), name
+            kind = "bar" if name.startswith("bar") else "kp08"
+            assert feature["note"] == f"MATCHES HOLES OF {drawing.MATE_NUMBERS[kind]}"
+    # No location carries words (rule 7): the plan keeps no station at all.
+    assert set(drawing.PLAN_KEEP) == {"BracketLength", "BracketWidth"}
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "set_dimension_callouts(" not in sheet
 
 
 def test_no_vendor_sku_on_the_sheet() -> None:
     texts = (
-        spec.KP08_MATE_CALLOUT,
-        spec.BAR_MATE_CALLOUT,
-        spec.ROW_CALLOUT,
+        *drawing.MATE_CELLS.values(),
+        drawing.MATE_COLUMN,
+        drawing.size_text("bar"),
+        drawing.size_text("kp08"),
         spec.DRAWING_NOTES,
+        drawing.KP08_SPACING_NOTE,
         spec.ISOMETRIC_VIEW_NOTE,
     )
     for text in texts:
         assert not re.search(r"\b\d{4,}[A-Z]\d+\b", text), text  # McMaster style
         assert "AMPEC" not in text.upper()
+        assert "UXCELL" not in text.upper()
 
 
 def test_walls_hold_rule_17_at_worst_case() -> None:
@@ -214,25 +225,30 @@ def test_threads_stop_at_a_full_thread_from_the_screws_faces() -> None:
     assert fasteners.KP08_TO_BRACKET.protrusion_mm < 0.0
 
 
-def test_holes_carry_the_title_block_band_except_the_kp08_stations() -> None:
-    # Only the KP08 stations carry a model band: millimetres on the inch
-    # sheet, which the inch title block's rows do not cover (owner ruling 4).
-    # (The loop over METRIC_DIMENSIONS reports its source names.)
+def test_holes_carry_the_title_block_band() -> None:
+    # The part still bands its KP08 dimensions natively (owner ruling 4); the
+    # sheet no longer prints them. (The loop over METRIC_DIMENSIONS reports
+    # its source names.)
     assert model_toleranced_dimensions(part) == {
         ("feature_name", "dimension_name"): "band"
     }
     holes = _features()
-    # The tap drills print .XXX with the title block's drilled-hole band.
-    for name, drill in (
-        ("bar_tap_1", spec.BAR_TAP_DRILL),
-        ("kp08_tap_1", spec.KP08_TAP_DRILL),
+    # The tap drills print with the title block's drilled-hole band: the bar
+    # drill at .XXX, the named #36 at its exact .1065 (owner ruling 2026-11-07).
+    for name, kind, drill in (
+        ("bar_tap_1", "bar", spec.BAR_TAP_DRILL),
+        ("kp08_tap_1", "kp08", spec.KP08_TAP_DRILL),
     ):
         low, high = holes[name]["dia"]
-        assert low == pytest.approx(round(drill / 25.4, 3) * 25.4)
+        places = drawing.drill_places(kind)
+        assert low == pytest.approx(round(drill / 25.4, places) * 25.4)
+    assert holes["kp08_tap_1"]["dia"][0] == pytest.approx(0.1065 * 25.4)
+    for name in ("bar_tap_1", "kp08_tap_1"):
+        low, high = holes[name]["dia"]
         assert high - low == pytest.approx(spec.DRILLED_BAND[0])
     band = printed_band_mm(spec.HOLE_PLACES, unit="in")
     for name, width in (
-        ("kp08_tap_2", 2.0 * spec.KP08_TAP_BAND),
+        ("kp08_tap_2", 2.0 * band),
         ("bar_tap_1", 2.0 * band),
     ):
         low, high = holes[name]["station"]
@@ -245,10 +261,16 @@ def test_holes_carry_the_title_block_band_except_the_kp08_stations() -> None:
 
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.PLAN_KEEP) | set(drawing.END_KEEP) == marked
+    kept = set(drawing.PLAN_KEEP) | set(drawing.END_KEEP)
     assert not set(drawing.PLAN_KEEP) & set(drawing.END_KEEP)
+    # The hole table prints the stations and the row instead.
+    tabled = {
+        *spec.DRAWING_DIMENSIONS["BarTaps"],
+        *spec.DRAWING_DIMENSIONS["KP08Taps"],
+        *spec.DRAWING_DIMENSIONS["HoleRowReference"],
+    }
+    assert kept | tabled == marked and not kept & tabled
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
-    assert set(spec.CALLOUTS_BELOW) <= marked
 
 
 def test_every_exported_band_endpoint_is_a_printed_value() -> None:
@@ -266,12 +288,8 @@ def test_every_exported_band_endpoint_is_a_printed_value() -> None:
             if (name, requirement) in stock:
                 continue  # the supplier's band about the stock size
             places = feature["precision"][requirement]
-            metric = name.startswith("kp08_tap") and requirement == "station"
             for end in band:
-                if metric:  # exact millimetres (owner ruling 4)
-                    assert end == pytest.approx(round(end, places), abs=1e-9), name
-                else:
-                    assert _on_grid(end, places), (name, requirement)
+                assert _on_grid(end, places), (name, requirement)
     assert checked
 
 
@@ -288,284 +306,171 @@ def test_row_is_located_from_the_faced_low_side() -> None:
     assert drawing._FROM_LOW_SIDE[0] == "bracket_low_side"
 
 
-def test_every_tap_has_its_own_callout() -> None:
-    called = sorted((kind, x) for kind, x, _xy, _side in drawing.TAP_CALLOUTS)
-    assert called == sorted(
+def test_hole_table_lists_every_tap_once_in_two_size_groups() -> None:
+    assert sorted(drawing.TABLE_HOLES) == sorted(
         [("bar", x) for x in spec.BAR_TAP_X] + [("kp08", x) for x in spec.KP08_TAP_X]
     )
+    xs = [x for _kind, x in drawing.TABLE_HOLES]
+    assert xs == sorted(xs)
+    # The origin is the faced inner end and the -Y side face (rule 10): the
+    # stations' and the row's own datums.
+    assert drawing.TABLE_ORIGIN_MODEL == (0.0, -spec.HALF_WIDTH, spec.BRACKET_THICK)
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "abs(y_mm - HOLE_ROW_Y) > _TABLE_LOCATION_TOLERANCE_MM" in sheet
+    assert "basic_locations=False" in sheet  # no datums, no BASIC (rule 5)
+    assert "location_places=_PLACES" in sheet
 
 
-def test_single_hole_definitions_drop_exactly_the_count() -> None:
-    definitions = {
-        5: "<hw-thread> UNC - <hw-threadclass> THRU ALL",
-        6: "",
-        7: "<NUM_INST>X <MOD-DIAM><hw-tapdrldia> THRU ALL",
-        8: "",
+def _rows(*kinds: str) -> list[tuple[int, str, str, float]]:
+    stations = {
+        kind: iter([x for k, x in drawing.TABLE_HOLES if k == kind]) for kind in ("bar", "kp08")
     }
-    updated = drawing.single_hole_definitions(definitions)
-    assert updated == {**definitions, 7: "<MOD-DIAM><hw-tapdrldia> THRU ALL"}
-    with pytest.raises(RuntimeError):
-        drawing.single_hole_definitions(updated)  # no count left to drop
-    with pytest.raises(RuntimeError):
-        drawing.single_hole_definitions({**definitions, 5: "<NUM_INST>X THRU"})
-    with pytest.raises(RuntimeError):
-        drawing.single_hole_definitions({5: "", 6: "", 7: ""})
-    assert drawing._PRINTED_COUNT.search("x\n2X Ø3.45 THRU ALL")
-    assert not drawing._PRINTED_COUNT.search("Ø3.45 THRU ALL\n6-32 UNC THRU ALL")
+    counters = {"bar": 0, "kp08": 0}
+    letters = {"bar": "A", "kp08": "B"}
+    rows = []
+    for row, kind in enumerate(kinds, start=1):
+        counters[kind] += 1
+        rows.append((row, f"{letters[kind]}{counters[kind]}", kind, next(stations[kind])))
+    return rows
 
 
-def test_thread_depth_definitions_follow_the_depth_with_its_callout() -> None:
-    definitions = {
-        5: "<hw-thread> UNC - <hw-threadclass> <HOLE-DEPTH><hw-threaddepth>",
-        6: "",
-        7: "<MOD-DIAM><hw-tapdrldia> THRU ALL",
-        8: "",
+def test_table_groups_need_one_contiguous_tag_run_per_size() -> None:
+    assert drawing.table_groups(_rows("bar", "bar", "bar", "bar", "kp08", "kp08")) == {
+        "bar": (1, 4),
+        "kp08": (5, 6),
     }
-    updated = drawing.thread_depth_definitions(definitions, "MIN FAR SIDE")
-    assert updated == {
-        **definitions,
-        5: "<hw-thread> UNC - <hw-threadclass> <HOLE-DEPTH><hw-threaddepth> MIN FAR SIDE",
+    assert drawing.table_groups(_rows("kp08", "kp08", "bar", "bar", "bar", "bar")) == {
+        "kp08": (1, 2),
+        "bar": (3, 6),
     }
-    with pytest.raises(RuntimeError):
-        drawing.thread_depth_definitions(
-            {**definitions, 5: "<hw-thread> THRU ALL"}, "MIN"
-        )
-    with pytest.raises(RuntimeError):
-        drawing.thread_depth_definitions({**definitions, 6: "<hw-threaddepth>"}, "MIN")
+    with pytest.raises(RuntimeError, match="not one tag run"):
+        drawing.table_groups(_rows("bar", "kp08", "bar", "bar", "kp08", "bar"))
+    mixed = _rows("bar", "bar", "bar", "bar", "kp08", "kp08")
+    mixed[1] = (2, "C1", "bar", mixed[1][3])
+    with pytest.raises(RuntimeError, match="not one tag run"):
+        drawing.table_groups(mixed)
+    with pytest.raises(RuntimeError, match="lacks a tap group"):
+        drawing.table_groups(_rows("bar", "bar", "bar", "bar"))
+
+
+def test_loc_cells_parse_with_any_generated_band_and_bare_where_visible() -> None:
+    # The hidden generated X LOC carries the KP08 rows' native band, read back
+    # as ".548 ±.005" (review round 1) and ".548±.01" (fix round 2 CAD).
+    assert drawing.location_mm(".285", label="x") == pytest.approx(7.239)
+    assert drawing.location_mm(".548 ±.005", label="x") == pytest.approx(13.9192)
+    assert drawing.location_mm(".548±.01", label="x") == pytest.approx(13.9192)
+    assert drawing.location_text("2.202±.005", label="x") == "2.202"
+    assert drawing.location_mm(".250", label="y", bare=True) == pytest.approx(6.35)
+    with pytest.raises(RuntimeError, match="prints a band"):
+        drawing.location_mm(".250 ±.005", label="y", bare=True)
+    with pytest.raises(RuntimeError, match="unparseable"):
+        drawing.location_mm("13.925 mm", label="x")
+
+
+def test_x_locs_print_bare_at_the_model_station() -> None:
+    # Review round 1: the KP08 rows' ".548 ±.005" restated the title block.
+    rows = [(i + 1, tag, kind, x) for i, (tag, (kind, x)) in enumerate(
+        zip(("A1", "A2", "A3", "A4", "B1", "B2"), sorted(drawing.TABLE_HOLES))
+    )]
+    cells = {row: f"{x / 25.4:.3f}".lstrip("0") for row, _t, kind, x in rows}
+    for row, _t, kind, _x in rows:
+        if kind == "kp08":
+            cells[row] += " ±.005"
+    texts = drawing.x_loc_texts(rows, cells)
+    assert sorted(texts.values()) == sorted([".285", ".942", "1.808", "2.465", ".548", "2.202"])
+    cells = {row: cell.replace(" ±.005", "±.01") for row, cell in cells.items()}
+    assert drawing.x_loc_texts(rows, cells) == texts
+    assert not any("±" in text for text in texts.values())
+    with pytest.raises(RuntimeError, match="is not"):
+        drawing.x_loc_texts(rows[:1], {1: ".290"})
+
+
+def test_each_size_prints_once_without_the_title_block_class() -> None:
+    assert drawing.size_text("bar") == (
+        "<MOD-DIAM>.136 THRU ALL\n8-32 UNC <HOLE-DEPTH>.450 MIN FAR SIDE"
+    )
+    # Owner ruling 2026-11-07: the KP08 tap drill by name, exact decimal.
+    assert drawing.size_text("kp08") == (
+        "#36 DRILL <MOD-DIAM>.1065 THRU ALL\n6-32 UNC <HOLE-DEPTH>.450 MIN"
+    )
+    assert drawing.drill_places("kp08") == 4
+    assert drawing.drill_places("bar") == spec.TAP_CALLOUT_PLACES
+    for kind in ("bar", "kp08"):
+        text = drawing.size_text(kind)
+        assert "2B" not in text and "#" not in text.split("\n")[1]  # rule 2: the THREADS row
+        assert len(text.split("\n")) == 2
+        # The SIZE drill is the requirement's printed drill.
+        feature = _features()[f"{kind}_tap_1"]
+        places = drawing.drill_places(kind)
+        assert f"{feature['nominal_dia'] / 25.4:.{places}f}".lstrip("0") in text
+        line = drawing._glyphless(text.split("\n")[0]) + " "  # the diameter symbol
+        assert len(line) * 0.0025 <= drawing.HOLE_TABLE_WIDTHS[drawing._SIZE]
     assert drawing.THREAD_CALLOUTS == {
         "bar": spec.BAR_THREAD_CALLOUT,
         "kp08": spec.KP08_THREAD_CALLOUT,
     }
+    assert drawing._glyphless("Ø.136 THRU ALL\n8-32  UNC ↧.450") == drawing._glyphless(
+        "<MOD-DIAM>.136 THRU ALL 8-32 UNC <HOLE-DEPTH>.450"
+    )
 
 
 # --- Sheet layout (model mm in the plan, sheet m around it) -----------------------
+GLYPH = 2.75 / 2.0  # one 3.5 mm capital's advance, model mm at 2:1 (c4-r2 readback)
+TEXT_HALF_HIGH = 3.5 / 2.0 / 2.0
 
 
-def _plan(name: str) -> tuple[float, float]:
-    x, y, _z = drawing.PLAN_KEEP[name]
-    return x, y
-
-
-_STATION_MATES = {
-    **{f"BarTap{k}X": spec.BAR_MATE_CALLOUT for k in range(1, 5)},
-    "KP08Tap1X": spec.KP08_MATE_CALLOUT,
-    "KP08Tap2X": spec.KP08_MATE_CALLOUT,
-}
-_STATION_X = {
-    **{f"BarTap{k}X": x for k, x in enumerate(spec.BAR_TAP_X, start=1)},
-    "KP08Tap1X": spec.KP08_TAP_X[0],
-    "KP08Tap2X": spec.KP08_TAP_X[1],
-}
-
-
-def _block(name: str) -> tuple[float, float, float, float]:
-    """A text block's (left, right, bottom, top), model mm: a station's value
-    over its mate (the mate the wider line), the length one line."""
-    x, y = _plan(name)
-    if name == "BracketLength":
-        half, half_high = drawing.text_half("2.71"), drawing.text_half_high(1)
-    else:
-        half, half_high = (
-            drawing.text_half(_STATION_MATES[name]),
-            drawing.text_half_high(2),
-        )
-    return x - half, x + half, y - half_high, y + half_high
-
-
-def _lane(name: str) -> float:
-    if name == "BracketLength":
-        return drawing.LENGTH_LANE
-    return drawing.STATION_LANES[drawing.STATION_ORDER.index(name)]
-
-
-def test_station_stacks_run_shortest_nearest_in_clear_lanes() -> None:
-    order = list(drawing.STATION_ORDER)
-    assert order == sorted(_STATION_X, key=_STATION_X.get)
-    assert set(order) == set(_STATION_MATES)
-    lanes = [_lane(n) for n in (*order, "BracketLength")]
-    assert lanes == sorted(lanes, reverse=True)
-    for name in order:
-        assert _plan(name)[1] == pytest.approx(_lane(name) + drawing.TWO_LINE_DROP)
-    assert _plan("BracketLength")[1] == pytest.approx(
-        drawing.LENGTH_LANE + drawing.TEXT_DROP
-    )
-    # The first block clears the row's dimension line tail under the plan.
-    assert _block(order[0])[3] <= -spec.HALF_WIDTH - drawing.ROW_TAIL - (
-        drawing.TEXT_GAP - 1e-9
-    )
-
-
-def _extension_lines() -> list[tuple[float, float, float]]:
-    """Every vertical extension line under the plan: (x, y_low, y_high), run
-    from its feature (a tap from its centre) to its dimension line plus the
-    overshoot."""
-    over = drawing.EXT_OVERSHOOT
-    bottom = -spec.HALF_WIDTH
-    lines = [
-        (0.0, drawing.LENGTH_LANE - over, bottom),
-        (spec.BRACKET_LENGTH, drawing.LENGTH_LANE - over, bottom),
+def test_tags_stand_above_the_plan_each_right_of_its_own_hole() -> None:
+    xs = [x for _kind, x in drawing.TABLE_HOLES]
+    tag_half = 2 * GLYPH / 2.0
+    boxes = [
+        (x + drawing.HOLE_TAG_DX - tag_half, x + drawing.HOLE_TAG_DX + tag_half) for x in xs
     ]
-    lines += [(_STATION_X[n], _lane(n) - over, 0.0) for n in drawing.STATION_ORDER]
-    return lines
+    for (left, right), x in zip(boxes, xs):
+        assert left > x  # right of its hole: the leader runs down-left to it
+    for (_l1, r1), (l2, _r2) in zip(boxes, boxes[1:]):
+        assert r1 + 1.0 <= l2  # no two tags touch
+    for (_left, right), next_x in zip(boxes, xs[1:]):
+        assert right < next_x  # no tag reaches over the next hole's leader
+    # Above the +Y side, clear of the centre marks (2.5 sheet mm past each rim).
+    radius = max(drawing.TAP_DRILLS.values()) / 2.0
+    assert drawing.HOLE_TAG_Y - TEXT_HALF_HIGH >= spec.HALF_WIDTH + 1.0
+    assert drawing.HOLE_TAG_Y - TEXT_HALF_HIGH >= radius + 2.5 / drawing._S
+    _, top = drawing.plan_sheet(0.0, drawing.HOLE_TAG_Y + TEXT_HALF_HIGH)
+    assert top <= TOP_BORDER - 0.01
 
 
-def _dimension_lines() -> dict[str, tuple[float, float, float]]:
-    """Each dimension line (x0, x1, y), run out under its text left of X 0."""
-    lines = {
-        name: (min(0.0, _block(name)[0]), _STATION_X[name], _lane(name))
-        for name in drawing.STATION_ORDER
-    }
-    lines["BracketLength"] = (0.0, spec.BRACKET_LENGTH, drawing.LENGTH_LANE)
-    return lines
-
-
-def test_station_blocks_cross_no_extension_or_dimension_line() -> None:
-    gap = drawing.TEXT_GAP - 1e-9
-    names = [*drawing.STATION_ORDER, "BracketLength"]
-    for name in names:
-        left, right, bottom, top = _block(name)
-        for x, y0, y1 in _extension_lines():
-            if y0 < top + gap and bottom - gap < y1:
-                assert x <= left - gap or x >= right + gap, (name, x)
-        for other, (x0, x1, y) in _dimension_lines().items():
-            if other != name and x0 < right and left < x1:
-                assert y <= bottom - gap or y >= top + gap, (name, other)
-        assert top <= -spec.HALF_WIDTH - 1.0, name
-    # Every station text stands left of the inner end, inside the border.
-    for name in drawing.STATION_ORDER:
-        assert _block(name)[1] == pytest.approx(-drawing.TEXT_GAP)
-        left, _ = drawing.plan_sheet(_block(name)[0], 0.0)
-        assert left >= LEFT_BORDER + 0.01
-    # The blocks clear one another.
-    for i, first in enumerate(names):
-        for second in names[i + 1 :]:
-            l1, r1, b1, t1 = _block(first)
-            l2, r2, b2, t2 = _block(second)
-            assert r1 <= l2 or r2 <= l1 or t1 <= b2 or t2 <= b1, (first, second)
-
-
-def test_row_block_sits_between_its_extension_lines_off_the_part() -> None:
-    x, y = _plan("HoleRowY")
-    rows = drawing._ROW_ROWS
-    assert rows == 2
-    half_high = drawing.text_half_high(rows)
-    assert y - half_high >= -spec.HOLE_ROW_Y + 0.25
-    assert y + half_high <= -0.25
-    half = drawing.text_half(drawing._ROW_TEXT)
-    assert x + half <= -drawing.SIDE_LANE
-    left, _ = drawing.plan_sheet(x - half, y)
-    assert left >= LEFT_BORDER + 0.01
-
-
-def _callout_block(kind: str, xy: tuple[float, float]) -> tuple[float, ...]:
-    half = drawing.CALLOUT_GLYPHS[kind] * drawing.GLYPH / 2.0
-    half_high = drawing.text_half_high(2)
-    return xy[0] - half, xy[0] + half, xy[1] - half_high, xy[1] + half_high
-
-
-def _leader(
-    kind: str, x: float, xy: tuple[float, float]
-) -> tuple[tuple[float, float], ...]:
-    """Shelf end nearer the hole (the bottom row's baseline) to its centre."""
-    left, right, bottom, _top = _callout_block(kind, xy)
-    near = left if abs(left - x) < abs(right - x) else right
-    return (near, bottom), (x, 0.0)
-
-
-def _cross(p, q, r, s) -> bool:
-    """Whether segments pq and rs properly intersect."""
-
-    def orient(a, b, c) -> float:
-        return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
-
-    return (orient(p, q, r) * orient(p, q, s) < 0) and (
-        orient(r, s, p) * orient(r, s, q) < 0
-    )
-
-
-def _box_edges(box: tuple[float, ...]) -> list[tuple[tuple[float, float], ...]]:
-    left, right, bottom, top = box
-    corners = [(left, bottom), (right, bottom), (right, top), (left, top)]
-    return [(corners[i], corners[(i + 1) % 4]) for i in range(4)]
-
-
-def test_each_leader_lands_on_its_own_hole_crossing_nothing() -> None:
-    callouts = drawing.TAP_CALLOUTS
-    leaders = [_leader(kind, x, xy) for kind, x, xy, _side in callouts]
-    blocks = [_callout_block(kind, xy) for kind, _x, xy, _side in callouts]
-    holes = [(x, drawing.TAP_DRILLS[kind] / 2.0) for kind, x, _xy, _side in callouts]
-    width_ext = (
-        (spec.BRACKET_LENGTH + 0.5, spec.HALF_WIDTH),
-        (
-            spec.BRACKET_LENGTH + drawing.SIDE_LANE + drawing.EXT_OVERSHOOT,
-            spec.HALF_WIDTH,
-        ),
-    )
-    for i, ((kind, x, xy, side), leader) in enumerate(
-        zip(callouts, leaders, strict=True)
-    ):
-        (sx, sy), _centre = leader
-        # The edge pick is the rim on the leader's side, off the centre lines.
-        ex, ey, _ez = drawing.tap_edge_model(kind, x, side)
-        assert math.hypot(ex - x, ey) == pytest.approx(drawing.TAP_DRILLS[kind] / 2.0)
-        assert (sx - x) * side > 0 and ey > 0
-        assert not _cross(*leader, *width_ext), i
-        for j, other in enumerate(leaders):
-            if j != i:
-                assert not _cross(*leader, *other), (i, j)
-        for j, box in enumerate(blocks):
-            if j != i:
-                assert not any(_cross(*leader, *edge) for edge in _box_edges(box)), (
-                    i,
-                    j,
-                )
-        # No other hole under the leader.
-        for j, (hx, radius) in enumerate(holes):
-            if j != i:
-                (ax, ay), (bx, by) = leader
-                t = max(
-                    0.0,
-                    min(
-                        1.0,
-                        ((hx - ax) * (bx - ax) + (0 - ay) * (by - ay))
-                        / ((bx - ax) ** 2 + (by - ay) ** 2),
-                    ),
-                )
-                gap = math.hypot(ax + t * (bx - ax) - hx, ay + t * (by - ay))
-                assert gap >= radius + 1.0, (i, j)
-
-
-def test_tap_callouts_stand_over_the_plan_inside_the_sheet() -> None:
-    gap = drawing.TEXT_GAP - 1e-9
-    blocks = [_callout_block(kind, xy) for kind, _x, xy, _side in drawing.TAP_CALLOUTS]
-    end_top = drawing.END_CENTER[1] + spec.HALF_WIDTH * drawing._S / 1000.0
-    end_left = drawing.END_CENTER[0] - spec.BRACKET_THICK / 2.0 * drawing._S / 1000.0
-    for i, box in enumerate(blocks):
-        left, right, bottom, top = box
-        assert bottom >= spec.HALF_WIDTH + 1.0, i
-        (sheet_left, sheet_bottom), (sheet_right, sheet_top) = (
-            drawing.plan_sheet(left, bottom),
-            drawing.plan_sheet(right, top),
-        )
-        assert sheet_left >= LEFT_BORDER + 0.01, i
-        assert sheet_top <= TOP_BORDER - 0.01, i
-        if sheet_right > end_left - 0.01:  # over the end view
-            assert sheet_bottom >= end_top + 0.01, i
-        assert sheet_right <= drawing.ISO_CENTER[0] - drawing.ISO_HALF[0] - 0.01, i
-        for other in blocks[i + 1 :]:
-            l2, r2, b2, t2 = other
-            if right + gap <= l2 or r2 + gap <= left:
-                continue
-            # Stacked blocks stand the layout audit's row pitch apart (c4-r8:
-            # 2.82 sheet mm, and it merged each side's three into one).
-            pitch = drawing.STACK_PITCH
-            assert top + pitch <= b2 or t2 + pitch <= bottom, i
+def test_hole_table_stands_under_the_plan_clear_of_views_and_title_block() -> None:
+    x0, y0 = drawing.HOLE_TABLE_ANCHOR
+    widths = drawing.HOLE_TABLE_WIDTHS
+    # Every visible column; the generated X LOC and SIZE stand hidden.
+    assert set(widths) == {0, drawing._X_LOC, drawing.FINISHED_COLUMNS["y"], drawing._SIZE, drawing._MATE}
+    assert not set(widths) & set(drawing._HIDDEN)
+    assert drawing.FINISHED_COLUMNS["y"] == drawing.NATIVE_COLUMNS["y"] + 1
+    assert drawing.FINISHED_COLUMNS["size"] == drawing.NATIVE_COLUMNS["size"] + 1
+    assert drawing._X_LOC == drawing.FINISHED_COLUMNS["x"] + 1
+    assert (drawing._SIZE, drawing._MATE) == (drawing.FINISHED_COLUMNS["size"] + 1, drawing._SIZE + 1)
+    right = x0 + sum(widths.values())
+    assert x0 >= 0.020  # clears the sheet audit's 12.7 mm zone margin (pd_platen_guide)
+    assert right <= TITLE_BLOCK_LEFT - 0.005
+    # Under the length's text (one 3.5 mm row about its keep point).
+    _, length_text = drawing.plan_sheet(0.0, drawing.PLAN_KEEP["BracketLength"][1])
+    assert y0 <= length_text - 0.00175 - 0.005
+    # Header plus six rows at ~6 sheet mm: well above the title block.
+    assert y0 - 7 * 0.0065 >= TITLE_BLOCK_TOP + 0.01
+    # Every custom cell's widest line fits its column (~2.5 sheet mm a glyph).
+    glyph = 0.0025
+    for kind in ("bar", "kp08"):
+        size = drawing._glyphless(drawing.size_text(kind).split("\n")[1]) + "  "  # the depth symbol
+        assert len(size) * glyph <= widths[drawing._SIZE]
+        for line in drawing.MATE_CELLS[kind].split("\n"):
+            assert len(line) * glyph <= widths[drawing._MATE]
+    assert len(drawing.MATE_COLUMN) * glyph <= widths[drawing._MATE]
 
 
 def test_views_clear_each_other_the_border_and_the_title_block() -> None:
     s = drawing._S / 1000.0
     width_text_right, _ = drawing.plan_sheet(
-        _plan("BracketWidth")[0] + drawing.text_half("(1/2 in)\nSTOCK"), 0.0
+        drawing.PLAN_KEEP["BracketWidth"][0] + len("STOCK") * GLYPH / 2.0, 0.0
     )
     end_left = drawing.END_CENTER[0] - spec.BRACKET_THICK / 2.0 * s
     end_right = drawing.END_CENTER[0] + spec.BRACKET_THICK / 2.0 * s
@@ -580,14 +485,6 @@ def test_views_clear_each_other_the_border_and_the_title_block() -> None:
     assert note_y <= iso_y - half_y - 0.003
     assert note_y - 0.0042 >= TITLE_BLOCK_TOP + 0.01
     assert iso_x - half_x <= note_x <= iso_x
-    # The lowest plan line (the length's, under six station lanes since
-    # ruling A′; 25 above under four) stays well above the title block: 21.7
-    # once c4-r8's tiers set the plan's height (the top tier 10 under the
-    # border).
-    _, length_line = drawing.plan_sheet(
-        0.0, drawing.LENGTH_LANE - drawing.EXT_OVERSHOOT
-    )
-    assert length_line >= TITLE_BLOCK_TOP + 0.020
     plan_right, _ = drawing.plan_sheet(spec.BRACKET_LENGTH, 0.0)
     assert plan_right > TITLE_BLOCK_LEFT  # so the plan must stay above it
     sheet = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -621,12 +518,36 @@ def test_places_are_model_authored_and_the_sheet_is_pure() -> None:
     )
 
 
-def test_sheet_carries_no_notes() -> None:
+def test_sheet_carries_only_the_kp08_spacing_note() -> None:
     assert spec.DRAWING_NOTES == ""
     assert spec.SURFACE_FINISHES == ()
     assert not re.search(r"\d", spec.DRAWING_NOTES)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "Manufacturing Notes" not in source
+
+
+def test_kp08_spacing_note_is_the_catalogue_spacing_as_a_mm_ref() -> None:
+    # Owner ruling 2026-11-06: an inch table plus one note, linked from the
+    # KP08 group, giving the catalogue spacing as a millimetre REF.
+    assert drawing.KP08_SPACING_MM == pytest.approx(leadscrew.KP08_BOLT_SPACING)
+    assert drawing.KP08_SPACING_NOTE == (
+        "1. B1 TO B2: 42.00 mm REF, KP08 CATALOGUE SPACING"
+    )
+    number = drawing.KP08_NOTE_LINK.rsplit(" ", 1)[1]
+    assert drawing.KP08_SPACING_NOTE.startswith(f"{number}. B1 TO B2")
+    assert drawing.KP08_NOTE_LINK in drawing.MATE_CELLS["kp08"]
+    assert drawing.KP08_NOTE_LINK not in drawing.MATE_CELLS["bar"]
+    # The B tags' printed span is the catalogue spacing at .XXX.
+    b1, b2 = (round(x / 25.4, spec.HOLE_PLACES) for x in spec.KP08_TAP_X)
+    assert (b2 - b1) * 25.4 == pytest.approx(42.0, abs=0.13)
+    # Right of the table, above the title block, left of and under the iso.
+    x, y = drawing.KP08_SPACING_NOTE_XY
+    table_right = drawing.HOLE_TABLE_ANCHOR[0] + sum(drawing.HOLE_TABLE_WIDTHS.values())
+    assert x >= table_right + 0.01
+    assert x + len(drawing.KP08_SPACING_NOTE) * 0.0025 <= drawing.ISO_CENTER[0] - drawing.ISO_HALF[0]
+    assert x + len(drawing.KP08_SPACING_NOTE) * 0.0025 <= RIGHT_BORDER - 0.01
+    assert y - 0.0042 >= TITLE_BLOCK_TOP + 0.01
+    assert y <= drawing.ISO_NOTE_XY[1] - 0.02
 
 
 def test_prechips_solids_are_valid_fixture_solids() -> None:

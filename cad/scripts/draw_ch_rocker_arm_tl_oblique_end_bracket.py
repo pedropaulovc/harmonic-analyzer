@@ -1,16 +1,31 @@
 r"""Create the drawing for the oblique-trammel jig's end bracket (MHA-CH-06-TL-28).
 
 One part, two off (the title block's quantity). A 2.71 x 1/2 x 1 in flat at
-2:1: the plan (the *Front view, looking down on the top face) carries the
-six tap stations from the inner end and the length, all stacked below it,
-the row's station from the -Y side face (left), the stock width (right) and
-one native callout per tap over it, each leader on its own hole; the end
-view, projected right of the plan, carries the stock thickness; the shaded
-isometric rides top right at 1:1, clear of the title block. No datums
-(drawing-guidelines.md rule 5). The two KP08 tap stations print exact
-millimetres, labelled mm (owner ruling 4, 2026-11-01). Each tap drill runs
-THRU and each thread prints its .450 MIN full-thread depth from its screw's
-face, the bar taps' FAR SIDE (owner ruling 2026-11-05: the hand traveler).
+2:1. The plan (the *Front view, looking down on the top face) carries a tag at
+each of the six taps, the hole table's origin at its inner-end / -Y-side
+corner, the length under it and the stock width right of it. Under the plan a
+native hole table locates every tap from that corner, gives each tag group's
+size once and names the part whose holes the group matches by its drawing
+number (drawing-guidelines.md rules 4, 7 and 10: every hole carries a mate, so
+a tagged table, not a dimension per station; #2046: the KP08 block is
+MHA-CH-06-TL-VN-56). The end view, projected right of the plan, carries the
+stock thickness; the shaded isometric rides top right at 1:1, clear of the
+title block. No datums (rule 5).
+
+The KP08 stations print in inch in the table like every other row (owner
+ruling 2026-11-06, superseding ruling 4B / exception RV-01, which printed
+them in exact millimetres a native hole table cannot carry). One numbered
+note, linked from the B group's MATCHES cell by ``SEE NOTE 1``, gives the
+KP08's catalogue bolt spacing as a millimetre REF; no dimension mixes units.
+At the table's three places the stations stay inside the KP08's float
+(``TABLE_POSITION_RADIUS``) and every wall holds rule 17. The part keeps its
+native ±0.13 mm band on those two model dimensions (the spec feeds the whole
+jig's keys); the generated X LOC that prints it stands hidden and the sheet
+prints each station bare under the title block's .XXX band (``x_loc_texts``).
+
+Each tap drill runs THRU and each thread prints its .450 MIN full-thread depth
+from its screw's face, the bar taps' FAR SIDE (owner ruling 2026-11-05: the
+hand traveler).
 
 Run with SolidWorks open::
 
@@ -20,18 +35,23 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import re
 import sys
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
+    remove_notes_matching,
     view_name,
 )
+from solidworks_mcp.adapters.sw_type_info import constant
 
+import _config
 from _check import check
 from _com import _early_bound
 from _drawing_common import (
@@ -39,15 +59,16 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import assert_imported_precision
+from _drawing_edges import visible_view_entities
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_tables import insert_hole_table
 from _drawing_view_display import set_hidden_lines_removed
-from _hole_callout_thread_class import omit_title_block_thread_class
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
@@ -58,30 +79,24 @@ from _feature_requirements import part_metadata, requirement
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _printed_limits import limits
-from _drawing_metric_vendor import print_imported_metric_dimensions
 from _supplier_dimensions import supplier_reference_dimension
-from ch_rocker_arm_tl_oblique_callouts import set_callout_lengths_to_three_places
 from ch_rocker_arm_tl_oblique_end_bracket_spec import (
-    BAR_MATE_CALLOUT,
+    BAR_SCREW,
     BAR_TAP_DRILL,
-    BAR_TAP_SPEC,
     BAR_TAP_X,
     BAR_THREAD_CALLOUT,
     BRACKET_LENGTH,
     BRACKET_THICK,
     BRACKET_WIDTH,
-    CALLOUTS_BELOW,
-    DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    DRAWING_DIMENSIONS,
+    FULL_THREAD_DEPTH,
     HALF_WIDTH,
     HOLE_ROW_Y,
-    KP08_MATE_CALLOUT,
     KP08_TAP_DRILL,
-    KP08_TAP_SPEC,
     KP08_TAP_X,
+    KP08_THREAD,
     KP08_THREAD_CALLOUT,
-    METRIC_DIMENSIONS,
-    ROW_CALLOUT,
     STOCK_CALLOUTS,
     STOCK_FRACTION_DENOMINATORS,
     TAP_CALLOUT_PLACES,
@@ -99,14 +114,11 @@ OUTPUTS = DrawingOutputs(
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
 # The 68.9 bracket at 2:1 (ruling A′: flush with the 1/2 x 6 bar's column
-# edge, four bar taps): the plan outline spans sheet x 96.1..233.9; the end
-# view projects right of it on its centreline (third angle). The 1/2 x 1 bar
-# on edge makes the end view 50.8 wide (outline x 267.6..318.4), so the 1:1
-# iso stands 20 further right, its note under it, all above the title block
-# (x 216 on, up to y 70) and under the 267 border. The tap callouts stand in
-# three tiers a layout-audit row pitch apart (c4-r8: at 6 the audit merged
-# each side's three blocks), high enough that the right-hand ones clear the
-# end view; the plan drops 4 to keep the top tier under the border.
+# edge, four bar taps): the plan outline spans sheet x 96.1..233.9, y
+# 179.8..205.2; the end view projects right of it on its centreline (third
+# angle). The 1/2 x 1 bar on edge makes the end view 50.8 wide (outline x
+# 267.6..318.4), so the 1:1 iso stands 20 further right, its note under it,
+# all above the title block (x 216 on, up to y 70) and under the 267 border.
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 ISO_SCALE = (1, 1)
@@ -118,59 +130,17 @@ ISO_NOTE_XY = (0.350, 0.155)
 ISO_HALF = (0.030, 0.025)  # the iso's half extents (sheet m)
 
 # Every text position is a MODEL point (mm) off the part, mapped onto its
-# view at run time (draw_ch_rocker_arm_tl_oblique_feed_lever). In the plan
-# model +X runs right and +Y up; text sizes are sheet mm halved at 2:1.
-# A keep point is its text block's centre; SolidWorks hangs the dimension
-# line about TEXT_DROP below a one-line block and TWO_LINE_DROP below a
-# two-line one (base bar readback), so every station's text sits on the
-# part side of its line under the plan.
+# view at run time. In the plan model +X runs right and +Y up; sheet lengths
+# are halved at 2:1. A keep point is its text block's centre; SolidWorks hangs
+# the dimension line about TEXT_DROP below a one-line block (base bar
+# readback).
 _H = BRACKET_THICK
 _L = BRACKET_LENGTH
 _HW = HALF_WIDTH
-STACK_FIRST = 8.0 / _S
-STACK_LANE = 6.0 / _S  # ASME Y14.5's 6 sheet mm between one-line lanes
+STACK_FIRST = 8.0 / _S  # the length's line off the plan's -Y side
 TEXT_DROP = 2.7 / _S
-TWO_LINE_DROP = 5.6 / _S
-TEXT_GAP = 2.5 / _S  # a text's clearance from the line it sits beside
-EXT_OVERSHOOT = 1.5 / _S  # an extension line's run past its dimension line
 SIDE_LANE = 8.0 / _S  # first side-dimension line off the part
-# One 3.5 mm capital's advance: the c4-r2 readback measured 2.43 .. 2.74
-# sheet mm ("MATCHES KP08 BLOCK HOLES" the widest); take the widest.
-GLYPH = 2.75 / _S
-ROW_PITCH = 5.56 / _S  # text rows (_oblique_block_drawing)
-# The layout audit reads two blocks stacked closer than its 5.66 mm row pitch
-# as one ([merged-blocks], c4-r8).
-STACK_PITCH = 5.66 / _S
-
-
-def text_half(text: str) -> float:
-    """Half the widest line of ``text`` (model mm)."""
-    return max(len(line) for line in text.split("\n")) * GLYPH / 2.0
-
-
-def text_half_high(rows: int) -> float:
-    """Half a ``rows``-line block's height (model mm), 3.5 mm glyphs."""
-    return ((rows - 1) * ROW_PITCH + 3.5 / _S) / 2.0
-
-
-# A two-line block's far edge from its own line, plus the gap to the next.
-MATE_LANE = TWO_LINE_DROP + text_half_high(2) + TEXT_GAP
-# c4-r3: the row's station dimension line ran 6.35 sheet mm past the -Y side.
-ROW_TAIL = 6.35 / _S
-# The dimension lines below the plan, nearest first, shortest span nearest:
-# the first block clears the row station's line tail, each next one the line
-# above it; the length's one-line block clears the last station's line.
-STATION_ORDER = (
-    "BarTap1X",
-    "KP08Tap1X",
-    "BarTap2X",
-    "BarTap3X",
-    "KP08Tap2X",
-    "BarTap4X",
-)
-_FIRST_LANE = -_HW - ROW_TAIL - TEXT_GAP - (TWO_LINE_DROP + text_half_high(2))
-STATION_LANES = tuple(_FIRST_LANE - i * MATE_LANE for i in range(len(STATION_ORDER)))
-LENGTH_LANE = STATION_LANES[-1] - (TEXT_GAP + TEXT_DROP + text_half_high(1))
+LENGTH_LANE = -_HW - STACK_FIRST
 
 
 def plan_sheet(x: float, y: float) -> tuple[float, float]:
@@ -181,37 +151,10 @@ def plan_sheet(x: float, y: float) -> tuple[float, float]:
     )
 
 
-_ROW_TEXT = "\n".join((f"{HOLE_ROW_Y / 25.4:.3f}".lstrip("0"), ROW_CALLOUT))
-_ROW_ROWS = _ROW_TEXT.count("\n") + 1
-
-
-def _outboard_left(mate: str) -> float:
-    """Centre X of a station block standing left of the inner end's line."""
-    return -(TEXT_GAP + text_half(mate))
-
-
-_STATIONS = {
-    name: KP08_MATE_CALLOUT if name.startswith("KP08") else BAR_MATE_CALLOUT
-    for name in STATION_ORDER
-}
-# The plan. Every station is a DRO absolute from the inner end carrying its
-# mate on a second line. The blocks are wider than their spans, so each
-# stands left of the inner end's extension line, where none of the other
-# stations' extension lines (all at X >= 7.5) pass (c4-r3: the 14 and 56
-# stacks over the plan crowded the tap callouts off the 14 and 24 holes).
-# Left of the plan: the row's station from the -Y side face, its three-line
-# block between its own extension lines. Right of it: the stock width.
+# The plan keeps only the overall length (under it) and the stock width
+# (right of it); the hole table locates every tap.
 PLAN_KEEP: dict[str, tuple[float, float, float]] = {
-    **{
-        name: (
-            _outboard_left(_STATIONS[name]),
-            STATION_LANES[lane] + TWO_LINE_DROP,
-            _H,
-        )
-        for lane, name in enumerate(STATION_ORDER)
-    },
     "BracketLength": (_L / 2.0, LENGTH_LANE + TEXT_DROP, _H),
-    "HoleRowY": (-(SIDE_LANE + TEXT_GAP + text_half(_ROW_TEXT)), -HOLE_ROW_Y / 2.0, _H),
     "BracketWidth": (_L + SIDE_LANE + 1.0, 0.0, _H),
 }
 # The end view (*Right): the thickness beside its span, off the -Y side.
@@ -219,61 +162,125 @@ END_KEEP: dict[str, tuple[float, float, float]] = {
     "BracketThick": (_L, -_HW - SIDE_LANE, _H / 2.0),
 }
 
-# One native callout per tap over the plan, its count dropped (c4-r3: a 2X
-# callout's leader lands on one hole only, leaving the other's thread to a
-# guess; with the bar and KP08 taps interleaved a 4X would leave it worse).
-# Each leader runs from its shelf's near end to its hole's centre: the 7.5,
-# 14 and 24 callouts stand up-left of their holes, the 46, 56 and 62.5 ones
-# up-right, each side rising a tier toward the bracket's middle so no leader
-# crosses another, a callout or a line (every station hangs under the plan;
-# ruling A′ added the 46 and 62.5 bar taps). The tiers clear the +Y side by
-# 1 and stand a block plus the audit's row pitch apart (c4-r8). Each tuple:
-# the tap kind, its X, the text block's centre (model X, Y) and the side (-1
-# left, +1 right) whose upper rim the edge pick takes.
+# --- Hole table ---------------------------------------------------------------
+# The taps, in model X order: (kind, X). Two tag groups, one per size: the
+# four base-bar #8-32 taps and the two KP08 #6-32 taps.
+TABLE_HOLES: tuple[tuple[str, float], ...] = tuple(
+    sorted([("bar", x) for x in BAR_TAP_X] + [("kp08", x) for x in KP08_TAP_X],
+           key=lambda hole: hole[1])
+)
 TAP_DRILLS = {"bar": BAR_TAP_DRILL, "kp08": KP08_TAP_DRILL}
-# What follows each callout's thread depth: MIN, and the bar taps' FAR SIDE.
+TAP_THREADS = {"bar": BAR_SCREW, "kp08": KP08_THREAD}
+# What follows each thread depth: MIN, and the bar taps' FAR SIDE (they are
+# threaded from the bottom; the plan looks at the top).
 THREAD_CALLOUTS = {"bar": BAR_THREAD_CALLOUT, "kp08": KP08_THREAD_CALLOUT}
-# Each callout's two rows, its wider about this many glyphs: "Ø.136 THRU ALL" /
-# "8-32 UNC ▽.450 MIN FAR SIDE" and "Ø.107 THRU ALL" / "6-32 UNC ▽.450 MIN".
-CALLOUT_GLYPHS = {"bar": 27, "kp08": 18}
-_TIER_PITCH = 2.0 * text_half_high(2) + STACK_PITCH + 0.1  # 7.46
-TAP_TIERS = tuple(
-    _HW + 5.0 + text_half_high(2) + 0.2 + k * _TIER_PITCH for k in range(3)
-)
+# The origin: the faced inner end (X 0) and the -Y side face, the corner every
+# station is a DRO absolute from (rule 10).
+TABLE_ORIGIN_MODEL = (0.0, -_HW, _H)
+# Each tag group's mate by its full drawing number from the registry
+# (rule 4; #2046), the KP08's catalogue code after it with the link to the
+# spacing note (owner ruling 2026-11-06).
+BASE_BAR_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-base-bar")["number"]
+PILLOW_BLOCK_NUMBER = _config.parts("ch-rocker-arm-tl-vn-oblique-pillow-block")["number"]
+MATE_NUMBERS = {"bar": BASE_BAR_NUMBER, "kp08": PILLOW_BLOCK_NUMBER}
+KP08_NOTE_LINK = "SEE NOTE 1"
+MATE_CELLS = {
+    "bar": BASE_BAR_NUMBER,
+    "kp08": f"{PILLOW_BLOCK_NUMBER}\n(KP08) {KP08_NOTE_LINK}",
+}
+# The KP08's catalogue bolt spacing (the spec proves the taps' span is it),
+# a millimetre REF in one numbered note: the uxcell block is a metric part.
+KP08_SPACING_MM = KP08_TAP_X[1] - KP08_TAP_X[0]
+KP08_SPACING_NOTE = f"1. B1 TO B2: {KP08_SPACING_MM:.2f} mm REF, KP08 CATALOGUE SPACING"
+# Upper left of the note (sheet m): right of the table (x 199), above the
+# title block (y 70), left of and under the iso and its note (x 348, y 155).
+KP08_SPACING_NOTE_XY = (0.225, 0.095)
+MATE_COLUMN = "MATCHES HOLES OF"
+SIZE_COLUMN = "SIZE"
 
 
-def _tap_callout(
-    kind: str, x: float, tier: int, side: int, run: float
-) -> tuple[str, float, tuple[float, float], int]:
-    """A callout ``run`` past its hole on ``side``, its shelf's near end there."""
-    half = CALLOUT_GLYPHS[kind] * GLYPH / 2.0
-    return kind, x, (x + side * (run + half), TAP_TIERS[tier]), side
+def _inch(mm: float, places: int) -> str:
+    """``mm`` in inch at ``places``, leading zero dropped (ASME Y14.5)."""
+    return f"{mm / 25.4:.{places}f}".lstrip("0")
 
 
-TAP_CALLOUTS: tuple[tuple[str, float, tuple[float, float], int], ...] = (
-    _tap_callout("bar", BAR_TAP_X[0], 0, -1, 2.5),
-    _tap_callout("kp08", KP08_TAP_X[0], 1, -1, 3.0),
-    _tap_callout("bar", BAR_TAP_X[1], 2, -1, 4.0),
-    _tap_callout("bar", BAR_TAP_X[2], 2, 1, 4.0),
-    _tap_callout("kp08", KP08_TAP_X[1], 1, 1, 2.0),
-    _tap_callout("bar", BAR_TAP_X[3], 0, 1, 1.0),
-)
+def _printed(model: float, places: int) -> float:
+    """The millimetres of ``model`` printed at ``places`` inch decimals."""
+    return round(round(model / 25.4, places) * 25.4, 9)
 
 
-def tap_edge_model(kind: str, x: float, side: int) -> tuple[float, float, float]:
-    """A point on the tap's upper rim, on the side its leader comes from."""
-    radius = TAP_DRILLS[kind] / 2.0
-    return (x + side * 0.6 * radius, 0.8 * radius, _H)
+# Owner ruling 2026-11-07: the KP08 tap drill prints as its named drill with
+# the drill's exact decimal (rule 3), "#36 DRILL Ø.1065". The spec's Hole
+# Wizard tap drill already cuts it (2.705 mm, .1065 at four places).
+NAMED_TAP_DRILLS = {"kp08": ("#36", 0.1065)}
+for _kind, (_name, _decimal) in NAMED_TAP_DRILLS.items():
+    if abs(TAP_DRILLS[_kind] - _decimal * 25.4) > 0.0005:
+        raise AssertionError(f"end bracket {_kind} tap drill is not the {_name} drill")
 
 
-part_metadata(
-    precision_sources=(
-        "DRAWING_PRECISION_BY_NAME",
-        ("_drawing_hole_callout", "add_native_hole_callout"),
+def drill_places(kind: str) -> int:
+    """A named drill prints its exact decimal (four places); others .XXX."""
+    return 4 if kind in NAMED_TAP_DRILLS else TAP_CALLOUT_PLACES
+
+
+def size_text(kind: str) -> str:
+    """One tag group's size, printed once in its merged SIZE cell: the tap
+    drill THRU (a named drill by its name and exact decimal), then the thread
+    and its full-thread depth from its face. The title block's THREADS row
+    owns the UNC class (rule 2)."""
+    places = drill_places(kind)
+    drill = _inch(_printed(TAP_DRILLS[kind], places), places)
+    named = f"{NAMED_TAP_DRILLS[kind][0]} DRILL " if kind in NAMED_TAP_DRILLS else ""
+    depth = _inch(FULL_THREAD_DEPTH, TAP_CALLOUT_PLACES)
+    thread = TAP_THREADS[kind].lstrip("#")
+    return (
+        f"{named}<MOD-DIAM>{drill} THRU ALL\n"
+        f"{thread} UNC <HOLE-DEPTH>{depth} {THREAD_CALLOUTS[kind]}"
     )
-)
 
-_INTO_BRACKET = ([0.0, 0.0, -1.0], ("__frame__",))
+
+# The table stands under the plan's length, its top-left corner here (sheet
+# m), left of the title block (x 216) and the end view's thickness (x 267).
+HOLE_TABLE_ANCHOR = (0.020, 0.158)
+# Column widths (sheet m), 3.5 mm text at ~2.5 mm a glyph (fr_harmonic_base's
+# "SEE NOTE 1" prints 24.7), by the finished table's columns (hidden ones
+# included): TAG, the custom X LOC, Y LOC, then the custom SIZE ("8-32 UNC
+# <depth>.450 MIN FAR SIDE", 27 glyphs) and MATCHES HOLES OF
+# ("MHA-CH-06-TL-VN-56", 18) columns.
+# The generated table: TAG, X LOC, Y LOC, SIZE. The finished one inserts a
+# custom X LOC after the generated one and the custom SIZE and MATCHES HOLES
+# OF after the generated SIZE, then hides the generated X LOC (r1: the KP08
+# rows print the part's native band, ".548 ±.005", restating the title
+# block) and the generated SIZE (it restates the thread class).
+NATIVE_COLUMNS = {"x": 1, "y": 2, "size": 3}
+FINISHED_COLUMNS = {"x": 1, "y": 3, "size": 4}
+_X_LOC = 2
+_SIZE = 5
+_MATE = 6
+_HIDDEN = (FINISHED_COLUMNS["x"], FINISHED_COLUMNS["size"])
+X_LOC_COLUMN = "X LOC"
+HOLE_TABLE_WIDTHS = {
+    0: 0.013, _X_LOC: 0.019, FINISHED_COLUMNS["y"]: 0.019, _SIZE: 0.078, _MATE: 0.050
+}
+_INSERT_COLUMN_AFTER = 3  # swTableItemInsertPosition_After
+_INSERT_COLUMN_DEFAULT_WIDTH = 0  # swInsertColumn_DefaultWidth
+_TABLE_SIZE_CAN_CHANGE = 0  # swTableRowColChange_TableSizeCanChange
+_TABLE_LOCATION_TOLERANCE_MM = 0.02
+# Inch sheets drop the leading zero (ASME Y14.5; draw_fr_rocker_arm_support).
+HOLE_TABLE_LEADING_ZERO = "swLeadingZero_DoNotShow"
+
+# Each tag stands above the plan's +Y side, right of its hole, on a leader to
+# the hole's rim. The closest holes stand 6.69 apart (13.4 sheet mm), a
+# two-glyph tag ~6 sheet mm wide.
+HOLE_TAG_DX = 2.0
+HOLE_TAG_Y = _HW + 3.5
+
+# --- The table's printed limits ------------------------------------------------
+# Every station prints .XXX with the title block's band, the KP08 stations
+# included (owner ruling 2026-11-06). The spec proves both patterns'
+# float and the walls at its exact-millimetre KP08 band; here the KP08
+# stations' rounded inch limits reach a little further, so the float and the
+# walls are re-proved with that extra excursion.
 _PLACES = part_spec.HOLE_PLACES
 _UNIT = part_spec.UNIT
 
@@ -284,14 +291,38 @@ def _limits(model: float, places: int) -> list[float]:
     return limits(model, places, unit=_UNIT)
 
 
+def _excursion(model: float) -> float:
+    low, high = _limits(model, _PLACES)
+    return max(model - low, high - model)
+
+
+TABLE_POSITION_RADIUS = max(
+    math.hypot(_excursion(x), _excursion(HOLE_ROW_Y)) for _kind, x in TABLE_HOLES
+)
+if not (
+    part_spec.KP08_SCREW_FLOAT > TABLE_POSITION_RADIUS
+    and part_spec.BAR_SCREW_FLOAT > TABLE_POSITION_RADIUS
+):
+    raise AssertionError("an end bracket table station overruns its screw's float")
+_KP08_EXTRA = max(_excursion(x) for x in KP08_TAP_X) - part_spec.KP08_TAP_BAND
+if min(part_spec.WALLS_MM.values()) - max(_KP08_EXTRA, 0.0) < part_spec.WALL_TARGET:
+    raise AssertionError("an end bracket wall falls under rule 17 at the table's limits")
+
+part_metadata(
+    precision_sources=(
+        "DRAWING_PRECISION_BY_NAME",
+        "HOLE_PLACES",
+        "TAP_CALLOUT_PLACES",
+        ("_drawing_tables", "insert_hole_table"),
+    )
+)
+
+_INTO_BRACKET = ([0.0, 0.0, -1.0], ("__frame__",))
+
+
 def _stock_limits(model: float, band: float) -> list[float]:
     """An as-bought size's supplier band about its nominal."""
     return [round(model - band, 12), round(model + band, 12)]
-
-
-def _printed(model: float, places: int) -> float:
-    """The millimetres of ``model`` printed at ``places`` inch decimals."""
-    return round(round(model / 25.4, places) * 25.4, 9)
 
 
 _FROM_LOW_SIDE = (
@@ -331,7 +362,7 @@ requirement(
     },
 )
 
-# The -Y side face: the datum the row's station measures from.
+# The -Y side face: the table origin's Y datum, the row's station.
 requirement(
     "bracket_low_side",
     kind="face",
@@ -358,6 +389,11 @@ def _row_fields() -> dict[str, tuple[Any, tuple[Any, ...]]]:
     }
 
 
+_MATE_SOURCES = (
+    ("draw_ch_rocker_arm_tl_oblique_end_bracket", "MATE_COLUMN"),
+    ("draw_ch_rocker_arm_tl_oblique_end_bracket", "MATE_NUMBERS"),
+)
+
 for _index, _x in enumerate(part_spec.BAR_TAP_X, start=1):
     _drill = _printed(part_spec.BAR_TAP_DRILL, TAP_CALLOUT_PLACES)
     requirement(
@@ -374,14 +410,14 @@ for _index, _x in enumerate(part_spec.BAR_TAP_X, start=1):
                 ("BAR_TAP_SPEC", "BAR_SCREW"),
             ),
             "tap_drill_mm": (part_spec.BAR_TAP_DRILL, ("BAR_TAP_SPEC",)),
-            # The native callout prints the tap drill to three places (.136).
+            # The table's SIZE prints the tap drill to three places (.136).
             "dia": (
                 limits(_drill, TAP_CALLOUT_PLACES, part_spec.DRILLED_BAND),
                 ("BAR_TAP_DRILL", "DRILLED_BAND"),
             ),
             "nominal_dia": (_drill, ("BAR_TAP_DRILL",)),
             "thru": (True, ("BAR_TAP_SPEC",)),
-            # A DRO absolute from the inner end: base bar 1's bracket holes.
+            # A table X LOC from the inner end: base bar 1's bracket holes.
             "station": (
                 _limits(_x, _PLACES),
                 (
@@ -393,17 +429,15 @@ for _index, _x in enumerate(part_spec.BAR_TAP_X, start=1):
             "station_nominal": (_x, ("BAR_TAP_X",)),
             **_row_fields(),
             "note": (
-                BAR_MATE_CALLOUT,
-                ("BAR_MATE_CALLOUT", "BAR_PATTERN_ALLOWANCE", "POSITION_RADIUS"),
+                f"{MATE_COLUMN} {MATE_NUMBERS['bar']}",
+                (*_MATE_SOURCES, "BAR_PATTERN_ALLOWANCE", "POSITION_RADIUS"),
             ),
         },
         precision={"dia": TAP_CALLOUT_PLACES, "station": _PLACES, "height": _PLACES},
     )
 
-_KP08_PLACES = part_spec.KP08_TAP_PLACES
-_KP08_BAND = (part_spec.KP08_TAP_BAND, -part_spec.KP08_TAP_BAND)
 for _index, _x in enumerate(part_spec.KP08_TAP_X, start=1):
-    _drill = _printed(part_spec.KP08_TAP_DRILL, TAP_CALLOUT_PLACES)
+    _drill = _printed(part_spec.KP08_TAP_DRILL, drill_places("kp08"))
     requirement(
         f"kp08_tap_{_index}",
         kind="hole",
@@ -419,19 +453,18 @@ for _index, _x in enumerate(part_spec.KP08_TAP_X, start=1):
             ),
             "tap_drill_mm": (part_spec.KP08_TAP_DRILL, ("KP08_TAP_SPEC",)),
             "dia": (
-                limits(_drill, TAP_CALLOUT_PLACES, part_spec.DRILLED_BAND),
+                limits(_drill, drill_places("kp08"), part_spec.DRILLED_BAND),
                 ("KP08_TAP_DRILL", "DRILLED_BAND"),
             ),
             "nominal_dia": (_drill, ("KP08_TAP_DRILL",)),
             "thru": (True, ("KP08_TAP_SPEC",)),
-            # A DRO absolute from the inner end: the KP08's 42 bolt spacing,
-            # exact millimetres with its own band (owner ruling 4).
+            # A table X LOC from the inner end: the KP08's 42 bolt spacing at
+            # the table's .XXX (owner ruling 2026-11-06).
             "station": (
-                limits(_x, _KP08_PLACES, _KP08_BAND),
+                _limits(_x, _PLACES),
                 (
                     "KP08_TAP_X",
-                    "KP08_TAP_PLACES",
-                    "KP08_TAP_BAND",
+                    "HOLE_PLACES",
                     ("ch_rocker_arm_tl_vn_oblique_leadscrew_spec", "BRACKET_KP08_HOLES_X"),
                     ("ch_rocker_arm_tl_vn_oblique_leadscrew_spec", "KP08_BOLT_SPACING"),
                 ),
@@ -439,15 +472,11 @@ for _index, _x in enumerate(part_spec.KP08_TAP_X, start=1):
             "station_nominal": (_x, ("KP08_TAP_X",)),
             **_row_fields(),
             "note": (
-                KP08_MATE_CALLOUT,
-                ("KP08_MATE_CALLOUT", "KP08_PATTERN_ALLOWANCE", "POSITION_RADIUS"),
+                f"{MATE_COLUMN} {MATE_NUMBERS['kp08']}",
+                (*_MATE_SOURCES, "KP08_PATTERN_ALLOWANCE", "POSITION_RADIUS"),
             ),
         },
-        precision={
-            "dia": TAP_CALLOUT_PLACES,
-            "station": _KP08_PLACES,
-            "height": _PLACES,
-        },
+        precision={"dia": drill_places("kp08"), "station": _PLACES, "height": _PLACES},
     )
 
 
@@ -467,81 +496,6 @@ def _view_mapper(adapter: Any, view: Any):
         return float(data[0]), float(data[1])
 
     return to_sheet
-
-
-def _omit_tap_thread_class(display: Any, *, label: str) -> None:
-    """The title block's THREADS row owns the UNC class (rule 2): the #8 rows
-    read ``8-32 UNC ▽.450 MIN FAR SIDE`` and the KP08 rows ``6-32 UNC ▽.450
-    MIN``, not ``... - 2B ...``."""
-    omit_title_block_thread_class(display, label=label)
-    native = _early_bound(display, "IDisplayDimension")
-    resolved = [str(native.GetText(part) or "") for part in (1, 2, 3, 4)]
-    classes = {BAR_TAP_SPEC.thread_class, KP08_TAP_SPEC.thread_class}
-    if any(cls in text for text in resolved for cls in classes):
-        raise RuntimeError(f"{label}: callout still prints its class: {resolved!r}")
-
-
-_COUNT = re.compile(r"<NUM_INST>X\s*")
-_PRINTED_COUNT = re.compile(r"^\s*\d+X\s", re.MULTILINE)
-
-
-def single_hole_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    """Drop the instance count: this callout's leader names one hole."""
-    if set(definitions) != {5, 6, 7, 8}:
-        raise RuntimeError(f"unexpected hole-callout parts: {definitions!r}")
-    counts = [part for part, text in definitions.items() for _ in _COUNT.finditer(text)]
-    if len(counts) != 1:
-        raise RuntimeError(f"hole callout lacks one instance count: {definitions!r}")
-    (part,) = counts
-    return {**definitions, part: _COUNT.sub("", definitions[part], count=1)}
-
-
-_THREAD_DEPTH = "<hw-threaddepth>"
-
-
-def thread_depth_definitions(
-    definitions: dict[int, str], callout: str
-) -> dict[int, str]:
-    """Follow the one native thread depth with ``callout`` (``MIN``, and the
-    bar taps' ``FAR SIDE``); the depth variable itself stays live."""
-    owners = [part for part, text in definitions.items() if _THREAD_DEPTH in text]
-    if len(owners) != 1 or definitions[owners[0]].count(_THREAD_DEPTH) != 1:
-        raise RuntimeError(f"hole callout lacks one thread depth: {definitions!r}")
-    (part,) = owners
-    text = definitions[part].replace(_THREAD_DEPTH, f"{_THREAD_DEPTH} {callout}", 1)
-    return {**definitions, part: text}
-
-
-@_telemetry.traced("drawing.end_bracket.single_hole_callout")
-def _call_out_one_hole(display: Any, *, label: str, thread_callout: str) -> None:
-    """Write the count-free definition with the thread depth's ``thread_callout``;
-    prove no row prints a count and one row prints the callout."""
-    native = _early_bound(display, "IDisplayDimension")
-
-    def read(parts: tuple[int, ...]) -> dict[int, str]:
-        return {
-            part: str(native.GetText(part) or "").replace("\r", "") for part in parts
-        }
-
-    definitions = read((5, 6, 7, 8))
-    updated = thread_depth_definitions(
-        single_hole_definitions(definitions), thread_callout
-    )
-    for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
-        if updated[definition_part] != definitions[definition_part]:
-            native.SetText(writable_part, updated[definition_part])
-    persisted = read((5, 6, 7, 8))
-    resolved = read((1, 2, 3, 4))
-    if (
-        persisted != updated
-        or any(_PRINTED_COUNT.search(text) for text in resolved.values())
-        or sum(text.count(thread_callout) for text in resolved.values()) != 1
-    ):
-        raise RuntimeError(
-            f"{label}: callout prints a count or misses {thread_callout!r}: "
-            f"definitions={persisted!r}, resolved={resolved!r}"
-        )
-    _telemetry.info(f"{label}: {resolved!r}")
 
 
 def _activate_view(adapter: Any, view: Any, *, label: str) -> None:
@@ -578,6 +532,272 @@ def _stock_references(adapter: Any, annotations: list[Any]) -> None:
             fraction_denominator=STOCK_FRACTION_DENOMINATORS[name],
             callout=STOCK_CALLOUTS[name],
         )
+
+
+def _drop_hole_table_leading_zeros(adapter: Any) -> None:
+    """Set the drawing's hole-table leading-zero option before the table exists."""
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    preference = constant("swDetailingLeadingZero")
+    option = constant("swDetailingHoleTable")
+    value = constant(HOLE_TABLE_LEADING_ZERO)
+    if not extension.SetUserPreferenceInteger(preference, option, value):
+        raise RuntimeError("failed to drop the hole table's leading zeros")
+    if int(extension.GetUserPreferenceInteger(preference, option)) != value:
+        raise RuntimeError("hole-table leading-zero option did not persist")
+
+
+def _hole_rims(view: Any) -> tuple[Any, ...]:
+    """The visible top-face rim of each tap, in ``TABLE_HOLES`` order."""
+    circles: list[tuple[float, float, float, float, Any]] = []
+    for raw_edge in visible_view_entities(view, 1, label="end bracket plan rims"):
+        edge = _early_bound(raw_edge, "IEdge")
+        raw_curve = edge.GetCurve()
+        if raw_curve is None:
+            continue
+        curve = _early_bound(raw_curve, "ICurve")
+        if not curve.IsCircle():
+            continue
+        params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
+        circles.append((params[0], params[1], params[2], params[6], edge))
+    rims: list[Any] = []
+    for kind, x in TABLE_HOLES:
+        radius = TAP_DRILLS[kind] / 2.0
+        matches = [
+            edge
+            for cx, cy, cz, r, edge in circles
+            if abs(cx - x) <= 0.02
+            and abs(cy) <= 0.02
+            and abs(cz - _H) <= 0.02
+            and abs(r - radius) <= 0.02
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"end bracket {kind} tap at {x:g} mm has {len(matches)} visible "
+                f"top rims of r {radius:g}; circles={[c[:4] for c in circles]!r}"
+            )
+        rims.append(matches[0])
+    return tuple(rims)
+
+
+_THREAD_KIND = {TAP_THREADS[kind].lstrip("#"): kind for kind in TAP_THREADS}
+
+
+def _cell(table: Any, row: int, column: int) -> str:
+    """A cell's displayed text, hidden columns counted in the index."""
+    return str(table.DisplayedText2(row, column, True) or "").replace("\r", "").strip()
+
+
+def table_groups(
+    rows: list[tuple[int, str, str, float]],
+) -> dict[str, tuple[int, int]]:
+    """Each tap kind's (first, last) table row: one tag letter, contiguous rows,
+    the kind's every station once."""
+    groups: dict[str, list[tuple[int, str, float]]] = {}
+    for row, tag, kind, x in rows:
+        groups.setdefault(kind, []).append((row, tag, x))
+    spans: dict[str, tuple[int, int]] = {}
+    for kind, members in groups.items():
+        indices = [row for row, _tag, _x in members]
+        letters = {re.sub(r"\d+$", "", tag) for _row, tag, _x in members}
+        stations = sorted(x for _row, _tag, x in members)
+        expected = sorted(x for k, x in TABLE_HOLES if k == kind)
+        if (
+            len(letters) != 1
+            or indices != list(range(indices[0], indices[0] + len(indices)))
+            or stations != expected
+        ):
+            raise RuntimeError(f"end bracket hole-table group {kind} is not one tag run: {members!r}")
+        spans[kind] = (indices[0], indices[-1])
+    if set(spans) != set(TAP_DRILLS):
+        raise RuntimeError(f"end bracket hole table lacks a tap group: {sorted(spans)}")
+    return spans
+
+# The KP08 taps' model dimensions carry the part's native ±0.13 mm band
+# (owner ruling 4), which the generated X LOC prints in inch beside the value
+# (".548 ±.005" on one seat, ".548±.01" on another: fix round 2 CAD). That
+# column stands hidden and the sheet prints the value bare (review round 1:
+# the band restated the title block), so the title block governs every row;
+# the module guard above proves the fit at that band. The visible generated
+# column (Y LOC) must print bare.
+_LOCATION = re.compile(r"^(-?\d*\.\d+|-?\d+)(?:\s*±\s*(\d*\.\d+))?$")
+
+
+def _location(cell: str, *, label: str, bare: bool) -> re.Match[str]:
+    match = _LOCATION.match(cell.strip())
+    if match is None:
+        raise RuntimeError(f"end bracket hole-table {label} is unparseable: {cell!r}")
+    if bare and match[2] is not None:
+        raise RuntimeError(f"end bracket hole-table {label} prints a band: {cell!r}")
+    return match
+
+
+def location_mm(cell: str, *, label: str, bare: bool = False) -> float:
+    """A LOC cell's value in mm; ``bare`` cells must print no band."""
+    return float(_location(cell, label=label, bare=bare)[1]) * 25.4
+
+
+def location_text(cell: str, *, label: str) -> str:
+    """A LOC cell's printed value without its band."""
+    return _location(cell, label=label, bare=False)[1]
+
+
+def _table_rows(
+    table: Any, columns: dict[str, int] = NATIVE_COLUMNS
+) -> list[tuple[int, str, str, float]]:
+    """(row, tag, kind, model X) per generated row, each bound to one station."""
+    rows: list[tuple[int, str, str, float]] = []
+    for row in range(1, int(table.RowCount)):
+        tag = _cell(table, row, 0)
+        size = _cell(table, row, columns["size"])
+        kinds = {kind for thread, kind in _THREAD_KIND.items() if thread in size}
+        x_mm = location_mm(_cell(table, row, columns["x"]), label=f"row {row} X LOC")
+        y_mm = location_mm(_cell(table, row, columns["y"]), label=f"row {row} Y LOC", bare=True)
+        station = [x for kind, x in TABLE_HOLES if abs(x - x_mm) <= _TABLE_LOCATION_TOLERANCE_MM]
+        if abs(y_mm - HOLE_ROW_Y) > _TABLE_LOCATION_TOLERANCE_MM:
+            raise RuntimeError(f"end bracket hole-table row {row} Y LOC is {y_mm:g} mm")
+        if len(kinds) != 1 or len(station) != 1:
+            raise RuntimeError(f"end bracket hole-table row {row} unbound: {tag!r} {size!r} {x_mm:g}")
+        rows.append((row, tag, kinds.pop(), station[0]))
+    return rows
+
+
+def x_loc_texts(
+    rows: list[tuple[int, str, str, float]], cells: dict[int, str]
+) -> dict[int, str]:
+    """Each row's custom X LOC: the generated cell's value without its band,
+    which must be the model station printed at .XXX."""
+    texts: dict[int, str] = {}
+    for row, _tag, _kind, x in rows:
+        text = location_text(cells[row], label=f"row {row} X LOC")
+        if text != _inch(x, _PLACES):
+            raise RuntimeError(f"end bracket hole-table row {row} X LOC {text!r} is not {x:g} mm")
+        texts[row] = text
+    return texts
+
+
+def _insert_column(table: Any, after: int, title: str) -> None:
+    if table.InsertColumn2(
+        _INSERT_COLUMN_AFTER, after, title, _INSERT_COLUMN_DEFAULT_WIDTH
+    ) is not True:
+        raise RuntimeError(f"end bracket hole table refused the {title} column")
+    if table.SetColumnTitle2(after + 1, title, False) is not True:
+        raise RuntimeError(f"end bracket hole-table {title} title did not set")
+
+
+def _write_cell(table: Any, row: int, column: int, text: str) -> None:
+    if table.IsCellTextEditable(row, column) is not True:
+        raise RuntimeError(f"end bracket hole-table cell {row},{column} is locked")
+    table.SetText2(row, column, False, text)
+
+
+@_telemetry.traced("drawing.end_bracket.hole_table")
+def _finish_hole_table(adapter: Any, table: Any) -> dict[str, str]:
+    """Sort the rows by tag, print each X LOC without a band, write each
+    group's size and mate once in merged custom cells and hide the generated
+    X LOC and SIZE columns; return tag -> kind."""
+    # Tag order groups each size's rows (table_groups proves it either way).
+    sorted_ok = _early_bound(table, "IHoleTableAnnotation").Sort(0, True)
+    rebuild_drawing(adapter, label="end bracket hole-table sort")
+    rows = _table_rows(table)
+    _telemetry.info(f"end bracket hole table sorted={sorted_ok!r}: {rows!r}")
+    spans = table_groups(rows)
+    x_texts = x_loc_texts(
+        rows, {row: _cell(table, row, NATIVE_COLUMNS["x"]) for row, *_rest in rows}
+    )
+    _insert_column(table, NATIVE_COLUMNS["x"], X_LOC_COLUMN)
+    _insert_column(table, FINISHED_COLUMNS["size"], SIZE_COLUMN)
+    _insert_column(table, _SIZE, MATE_COLUMN)
+    for row, text in x_texts.items():
+        _write_cell(table, row, _X_LOC, text)
+    texts = {
+        kind: {_SIZE: size_text(kind), _MATE: MATE_CELLS[kind]} for kind in spans
+    }
+    for kind, (first, last) in spans.items():
+        for column, text in texts[kind].items():
+            _write_cell(table, first, column, text)
+            if last > first and table.MergeCells(first, column, last, column) is not True:
+                raise RuntimeError(f"end bracket hole table refused to merge {kind} {column}")
+    for column, width in HOLE_TABLE_WIDTHS.items():
+        actual = float(table.SetColumnWidth(column, width, _TABLE_SIZE_CAN_CHANGE))
+        if abs(actual - width) > 1e-6:
+            raise RuntimeError(f"end bracket hole-table column {column} width: {actual!r}")
+    for column in _HIDDEN:
+        table.SetColumnHidden(column, True)  # VT_VOID, not success.
+    rebuild_drawing(adapter, label="end bracket hole-table columns")
+    for column in _HIDDEN:
+        if table.ColumnHidden(column) is not True:
+            raise RuntimeError(f"end bracket hole table kept its generated column {column}")
+    _check_hole_table(table, rows, spans, texts, x_texts)
+    return {tag: kind for _row, tag, kind, _x in rows}
+
+
+def _glyphless(text: str) -> str:
+    """Compare cell text with its symbols however SolidWorks reads them back."""
+    for symbol in ("<MOD-DIAM>", "<HOLE-DEPTH>", "\u00d8", "\u2300", "\u21a7"):
+        text = text.replace(symbol, "")
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _check_hole_table(
+    table: Any,
+    rows: list[tuple[int, str, str, float]],
+    spans: dict[str, tuple[int, int]],
+    texts: dict[str, dict[int, str]],
+    x_texts: dict[int, str],
+) -> None:
+    """Read the finished table back: generated rows unchanged, each row's
+    custom X LOC, each group's size and mate in its first row, the headers.
+    (MergeCells' True is the merge proof: early-bound IsCellMerged raises
+    Type mismatch on its out parameters, r1 CAD retry.)"""
+    if _table_rows(table, FINISHED_COLUMNS) != rows:
+        raise RuntimeError("end bracket hole-table rows changed under the custom columns")
+    for column, title in ((_X_LOC, X_LOC_COLUMN), (_SIZE, SIZE_COLUMN), (_MATE, MATE_COLUMN)):
+        if _cell(table, 0, column).upper() != title:
+            raise RuntimeError(f"end bracket hole-table header {column}: {_cell(table, 0, column)!r}")
+    for row, text in x_texts.items():
+        if _cell(table, row, _X_LOC) != text:
+            raise RuntimeError(f"end bracket hole-table row {row} X LOC: {_cell(table, row, _X_LOC)!r}")
+    for kind, (first, _last) in spans.items():
+        for column, text in texts[kind].items():
+            printed = _cell(table, first, column)
+            if _glyphless(printed) != _glyphless(text):
+                raise RuntimeError(
+                    f"end bracket hole-table {kind} cell {column}: {printed!r} != {text!r}"
+                )
+    _telemetry.info(
+        "end bracket hole table: "
+        + repr([[_cell(table, r, c) for c in range(_MATE + 1)] for r in range(int(table.RowCount))])
+    )
+
+
+def _place_hole_tags(view: Any, tags: dict[str, str], rows: dict[str, float], on_plan) -> None:
+    """Move each native tag above the plan, right of its hole, on a leader to
+    its rim."""
+    moved: set[str] = set()
+    for raw in _early_bound(view, "IView").GetAnnotations() or ():
+        annotation = _early_bound(raw, "IAnnotation")
+        if int(annotation.GetType()) != 6:  # swNote
+            continue
+        note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
+        tag = str(note.GetText()).strip()
+        if tag not in tags:
+            continue
+        if tag in moved:
+            raise RuntimeError(f"duplicate end bracket hole tag {tag}")
+        x = rows[tag]
+        if annotation.SetLeader3(1, 0, True, False, False, False) != 0:
+            raise RuntimeError(f"failed to give end bracket hole tag {tag} a leader")
+        if not annotation.SetPosition2(*on_plan((x + HOLE_TAG_DX, HOLE_TAG_Y, _H)), 0.0):
+            raise RuntimeError(f"failed to place end bracket hole tag {tag}")
+        points = tuple(float(v) for v in annotation.GetLeaderPointsAtIndex(0) or ())
+        centre = on_plan((x, 0.0, _H))
+        reach = TAP_DRILLS[tags[tag]] * _S / 2000.0 + 0.0005
+        if len(points) < 6 or math.dist(points[-3:-1], centre) > reach:
+            raise RuntimeError(f"end bracket hole tag {tag} leader misses its hole: {points!r}")
+        moved.add(tag)
+    if moved != set(tags):
+        raise RuntimeError(f"end bracket hole tags missing on the plan: {sorted(set(tags) - moved)}")
+    _telemetry.info(f"end bracket hole tags placed: {sorted(moved)}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -624,7 +844,6 @@ async def build(adapter: Any) -> dict[str, str]:
 
     on_plan = _view_mapper(adapter, plan)
     on_end = _view_mapper(adapter, end)
-    # The plan shows the hidden HoleRowReference sketch, whose .250 it prints.
     annotations = [
         *curate_view_dimensions(
             adapter,
@@ -642,37 +861,45 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     ]
     # Places are authored on the part; the sheet only proves the import kept
-    # them, then writes the mate callouts and the stock references.
-    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    print_imported_metric_dimensions(
+    # them, then writes the stock references.
+    assert_imported_precision(
         adapter,
         annotations,
-        {
-            name: places
-            for (_feature, name), (places, _band) in METRIC_DIMENSIONS.items()
-        },
+        {name: DRAWING_PRECISION_BY_NAME[name] for name in (*PLAN_KEEP, *END_KEEP)},
     )
-    set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     _stock_references(adapter, annotations)
 
     if not auto_center_marks(adapter, plan, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the plan")
-    for kind, x, (text_x, text_y), side in TAP_CALLOUTS:
-        label = f"{'base-bar' if kind == 'bar' else 'KP08'} screw tap at {x / 25.4:.3f}"
-        callout = add_native_hole_callout(
-            adapter,
-            plan,
-            edge_xy=on_plan(tap_edge_model(kind, x, side)),
-            callout_xy=on_plan((text_x, text_y, _H)),
-            label=label,
-        )
-        _call_out_one_hole(callout, label=label, thread_callout=THREAD_CALLOUTS[kind])
-        _omit_tap_thread_class(callout, label=label)
-        set_callout_lengths_to_three_places(callout, label=label)
+
+    _drop_hole_table_leading_zeros(adapter)
+    table = insert_hole_table(
+        adapter,
+        plan,
+        datum_xy=on_plan(TABLE_ORIGIN_MODEL),
+        hole_points=tuple(on_plan((x, 0.0, _H)) for _kind, x in TABLE_HOLES),
+        hole_entities=_hole_rims(plan),
+        # X LOC = the station from the inner end; Y LOC = the row from the
+        # -Y side face, both at .XXX. _table_rows binds every printed row to
+        # its station (the shared check cannot read the KP08 rows' band).
+        anchor_xy=HOLE_TABLE_ANCHOR,
+        basic_locations=False,
+        label="end bracket taps",
+        unit=_UNIT,
+        location_places=_PLACES,
+    )
+    tags = _finish_hole_table(adapter, table)
+    stations = {tag: x for _row, tag, _kind, x in _table_rows(table, FINISHED_COLUMNS)}
+    _place_hole_tags(plan, tags, stations, on_plan)
 
     # The property-linked blocks land in the active view: the plan.
     _activate_view(adapter, plan, label="plan")
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    _add_spacing_note(adapter)
+    # SolidWorks pins its own "... Tapped Hole" note to the plan per tap
+    # feature; the table owns the taps, so they go (draw_fr_rocker_arm_support).
+    removed = remove_notes_matching(adapter, "Tapped Hole")
+    _telemetry.info(f"removed {removed} automatic tapped-hole label(s)")
 
     return await finalize_drawing(
         adapter,
@@ -680,13 +907,22 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Rocker Oblique Trammel End Bracket Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        # SolidWorks pins its own "... Tapped Hole" note to the plan for each
-        # tap feature in it (draw_fr_harmonic_base counts features x views),
-        # not per callout; each callout already states it. Two tap features
-        # (six callouts), two notes.
         redundant_note_substrings=("Tapped Hole",),
-        expected_redundant_notes=2,
+        expected_redundant_notes=0,
     )
+
+
+def _add_spacing_note(adapter: Any) -> None:
+    """Note 1, the KP08's catalogue spacing REF, read back where it stands."""
+    note = add_note(adapter, KP08_SPACING_NOTE, *KP08_SPACING_NOTE_XY)
+    if note is None:
+        raise RuntimeError("end bracket KP08 spacing note did not insert")
+    note = _early_bound(note, "INote")
+    text = str(note.GetText() or "")
+    position = tuple(float(v) for v in _early_bound(note.GetAnnotation(), "IAnnotation").GetPosition())
+    if text != KP08_SPACING_NOTE or math.dist(position[:2], KP08_SPACING_NOTE_XY) > 1e-6:
+        raise RuntimeError(f"end bracket KP08 spacing note reads {text!r} at {position!r}")
+    _telemetry.info(f"end bracket KP08 spacing note at {position!r}: {text!r}")
 
 
 def _parse_args() -> argparse.Namespace:
