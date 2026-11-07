@@ -3153,19 +3153,15 @@ def test_stamped_id_is_located_from_x0_y0_with_a_character_height() -> None:
         x0 + max(map(len, rows)) * sheet.NOTE_CHAR_M,
         top,
     )
-    # The note stands on the open deck: inside its outline, clear of every
-    # plan hole by a millimetre, its short leader reaching the serial.
-    deck_left, deck_bottom = sheet._plan_xy(-part.DECK_HALF_X, part.DECK_HALF_Z)
-    deck_right, _top = sheet._plan_xy(part.DECK_HALF_X, -part.DECK_HALF_Z)
-    assert deck_left < box[0] and box[2] < deck_right and deck_bottom < box[1]
-    for x, z, diameter in sheet.ALL_HOLES:
-        cx, cy = sheet._plan_xy(x, z)
-        radius = diameter * sheet.VIEW_SCALE / 2000.0
-        gap_x = max(box[0] - cx, 0.0, cx - box[2])
-        gap_y = max(box[1] - cy, 0.0, cy - box[3])
-        assert math.hypot(gap_x, gap_y) - radius >= 0.001, (x, z)
+    # The note stands off the part (rule 14, run 20261107T121814924Z): below
+    # the plan's rear edge, above the X reference row, left of the X
+    # dimension's extension line at the serial, its leader reaching it.
     serial = sheet._plan_xy(*part.SERIAL_XZ)
-    assert math.dist((box[2], box[1]), serial) < 0.012
+    rear_edge_y = sheet._plan_xy(0.0, fr_harmonic_base_spec.BOTTOM_REAR_Z)[1]
+    assert box[3] < rear_edge_y - 0.003
+    assert box[1] > sheet.SERIAL_X_TEXT_XY[1] + 0.003
+    assert box[2] < serial[0] - 0.004
+    assert math.dist((box[2], box[3]), serial) < 0.015
     # X runs on a third baseline row below DeckX, Y right of the plan, its
     # text below the flange's rear edge and left of the moved chamfer text.
     corner = sheet._plan_xy(-part.BOTTOM_LENGTH / 2.0, fr_harmonic_base_spec.BOTTOM_REAR_Z)
@@ -5488,3 +5484,13 @@ def test_all_five_native_callouts_omit_only_after_quantity_and_precision_edits()
     )
     readback = next(c for c in calls if getattr(c.func, "id", None) == "_check_cross_tap_callout")
     assert aggregate.lineno < precision.lineno < tap_omission.lineno < readback.lineno
+
+
+def test_spotface_depth_count_and_symbol_ride_above_the_banded_value() -> None:
+    # Run 20261107T121814924Z (3/3): on one row '4X <spot> <depth> .169
+    # +.020/.000' ran through sheet 2's right border from the 382-418 mm column.
+    import draw_fr_harmonic_base as sheet
+
+    assert sheet.SECTION_AFFIXES == {"SpotFaceDepth": ("<HOLE-DEPTH> ", "")}
+    assert sheet.SECTION_ABOVE_CALLOUTS == {"SpotFaceDepth": "4X <HOLE-SPOT>"}
+    assert sheet.SECTION_KEEP["SpotFaceDepth"][0] <= 0.3845

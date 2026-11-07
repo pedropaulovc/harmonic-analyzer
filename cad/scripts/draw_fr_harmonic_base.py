@@ -195,14 +195,16 @@ SIDE_CENTER = (0.145, 0.100)
 # so it is centred in that region instead of floating above a dead strip.
 ISO_SCALE = (1, 6)
 ISO_CENTER = (0.3425, 0.175)
-# The stamped ID's leader note sits on the open deck just inboard of the
-# serial, so its short leader crosses no outline or dimension; the two
-# reference dimensions below the plan and right of it locate the serial from
-# X0 Y0 (novice-rubric screen 20261107T081227004Z: "APPROX AS SHOWN" on a DO
-# NOT SCALE sheet located it by words only and gave no character height).
-# The note's two 9-glyph rows (22 mm x 9 mm) stand right of the deck's
-# front-left hole cluster and below its rear holes.
-SERIAL_NOTE_XY = (0.156, 0.1655)
+# The stamped ID's leader note sits off the part, below the plan's rear edge
+# and left of the X reference dimension's extension line, its leader rising
+# across the flange to the serial (run 20261107T121814924Z, 2/3: text inside
+# the deck outline with open sheet outside it, rule 14). The two reference
+# dimensions below the plan and right of it locate the serial from X0 Y0
+# (novice-rubric screen 20261107T081227004Z: "APPROX AS SHOWN" on a DO NOT
+# SCALE sheet located it by words only and gave no character height). The
+# note's two 9-glyph rows (22 mm x 9 mm) stand in the empty band above the
+# X dimension's (15.34) row.
+SERIAL_NOTE_XY = (0.157, 0.1455)
 SERIAL_NOTE = (
     f'STAMP "{SERIAL_TEXT}"\n'
     f"{SERIAL_HEIGHT_MM / 25.4:.2f} HIGH".replace("0.", ".", 1)
@@ -499,9 +501,13 @@ SECTION_CALLOUTS = {
 # count, symbol, size and the depth as REF beside the seat it makes, and
 # section A-A's banded depth is the control that REF points at (the rule's
 # own `<HOLE-DEPTH> (.235)` form). The depth control keeps its count and
-# symbols only, so the cross screw is named once, on sheet 5.
+# symbols only, so the cross screw is named once, on sheet 5. Its count and
+# spotface symbol ride the lane above the value: on one row the block ran
+# 49 mm from x 385 mm, its stacked +.020/.000 through the right border (run
+# 20261107T121814924Z, 3/3); the value row alone is 29 mm.
 SPOTFACE_DEPTH_REF = f"({BASE_SPOTFACE_DEPTH / 25.4:.3f})".replace("(0.", "(.")
-SECTION_AFFIXES = {"SpotFaceDepth": ("4X <HOLE-SPOT> <HOLE-DEPTH> ", "")}
+SECTION_AFFIXES = {"SpotFaceDepth": ("<HOLE-DEPTH> ", "")}
+SECTION_ABOVE_CALLOUTS = {"SpotFaceDepth": "4X <HOLE-SPOT>"}
 HOLE_SIDE_AFFIXES = {
     "SpotFaceDia": ("4X <HOLE-SPOT> <MOD-DIAM>", f" <HOLE-DEPTH> {SPOTFACE_DEPTH_REF}"),
 }
@@ -2613,6 +2619,9 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     set_dimension_callouts(adapter, section_dimensions, SECTION_CALLOUTS)
+    set_dimension_callouts(
+        adapter, section_dimensions, SECTION_ABOVE_CALLOUTS, location="above"
+    )
     _set_dimension_affixes(adapter, section_dimensions, SECTION_AFFIXES)
     # No root-radius callout: a 0.5 mm internal root at the pad-to-flange
     # junction is not measurable with hobby-shop kit, so the model keeps its
