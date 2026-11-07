@@ -284,7 +284,7 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
     assert "SPOKES" not in notes and "CAST" not in notes
     # The spokes' count, pitch and clocking print on their own angle between
     # two spoke centrelines, and the two spokes on the horizontal (the
-    # model's seed spoke on local +X) lie on a drawn centreline through the
+    # model's seed spoke on local +X) lie on A-A's cutting line through the
     # bore: no sentence states the clocking (rule 26).
     assert spec.SPOKE_PITCH_PREFIX == "6X " and spec.SPOKE_PITCH_DEG == 60.0
     assert spec.DRAWING_PRECISION[spec.SPOKE_REFERENCE] == {
@@ -293,45 +293,46 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
     }
     assert "SpokePitch" in drawing.FRONT_KEEP
     assert "SpokePitch" not in drawing.CALLOUTS_ABOVE
-    # TIE 2's clock reads from the 180 deg spoke on that drawn centreline,
+    # TIE 2's clock reads from the 180 deg spoke on that cutting line,
     # vertex on the bore axis (rule 10): not from a construction leg.
     assert spec.TIE2_CLOCK_SPOKE * spec.SPOKE_PITCH_DEG == 180.0
     assert spec.TIE2_FROM_SPOKE_DEG == pytest.approx(43.0)
     assert "Tie2Clock" in drawing.FRONT_KEEP
     assert "Tie2Angle" not in set().union(*spec.DRAWING_DIMENSIONS.values())
     assert not hasattr(spec, "SPOKE_PITCH_CALLOUT")
-    (start, end) = drawing.SPOKE_CENTRELINE
-    assert start[1] == end[1] == 0.0 and -start[0] == end[0] > rim.RIM_OUTER_DIA / 2.0
+    assert not hasattr(drawing, "SPOKE_CENTRELINE")
     assert spec.SPOKE_REFERENCE in spec.REFERENCE_SKETCHES
     # The .61 locates the groove, web and rim's shared mid-plane, drawn on
     # A-A; the location carries its value and band alone (rule 7).
     assert "HubFrontZ" not in drawing.CALLOUTS_ABOVE
     assert "HubFrontZ" not in drawing.DIMENSION_CALLOUTS
     for a, b in drawing.WEB_CENTRELINES.values():
-        assert a[0] == b[0] == a[2] == b[2] == 0.0
-        assert abs(a[1]) == geom.HUB_DIA / 2.0
-        assert abs(b[1]) > rim.RIM_OUTER_DIA / 2.0
-    # Each tie hole names the wire member it ties by the wire's number at its
-    # own callout (rule 4), size before process (rule 26), at most two lines
-    # of words (rule 7): no project label, so no key.
-    assert drawing.DIMENSION_CALLOUTS["Tie1HoleDia"] == (
-        "DRILL THRU\nTIES LEVER WIRE\nOF MHA-SH-VN-56"
-    )
+        assert a[1] == b[1] == a[2] == b[2] == 0.0
+        assert abs(a[0]) == geom.HUB_DIA / 2.0
+        assert abs(b[0]) > rim.RIM_OUTER_DIA / 2.0
+    # Each tie hole is named plainly at its own callout (rule 26: WIRE TIE
+    # HOLE, no coined label), size before process, at most two lines of
+    # words (rule 7): no project label, so no key.
+    assert drawing.DIMENSION_CALLOUTS["Tie1HoleDia"] == "DRILL THRU\nWIRE TIE HOLE"
     # TIE 2 states where it runs: radial, from the groove's bottom.
     assert drawing.DIMENSION_CALLOUTS["Tie2HoleDia"] == (
-        "DRILL THRU\nRADIAL FROM\nGROOVE BOTTOM"
+        "DRILL THRU\nRADIAL WIRE TIE HOLE\nFROM GROOVE BOTTOM"
     )
     assert not {"Tie1HoleDia", "Tie2HoleDia"} & set(drawing.CALLOUTS_ABOVE)
     assert "TIE 1" not in notes and "TIE 2" not in notes
+    for callout in drawing.DIMENSION_CALLOUTS.values():
+        assert "TIE 1" not in callout and "TIE 2" not in callout
     # Each matched fit is a numbered note its callout links, so neither
-    # callout runs past two lines of words (rule 7); the note names the mate
-    # by number and states the diametral fit (rule 4).  The groove's two
-    # tight bands serve one mate, named once in a note both link (rule 4).
+    # callout runs past two lines of words (rule 7); the note names the
+    # standard fit and the mate by number, the resulting clearance or
+    # interference as REF (rule 4).  The groove's two tight bands serve one
+    # mate, named once in a note both link (rule 4).
     assert lines == [
-        "1. .0008-.0017 DIAMETRAL CLEARANCE ON AXLE MHA-MG-07.",
-        "2. .0002-.0013 DIAMETRAL INTERFERENCE IN DRUM MHA-MG-10.",
+        "1. RUNNING FIT ON AXLE MHA-MG-07 (CLEARANCE .0008-.0017).",
+        "2. PRESS FIT IN DRUM MHA-MG-10 (INTERFERENCE .0002-.0013).",
         "3. GROOVE SEATS PEN WIRE OF MHA-SH-VN-56.",
     ]
+    assert "DIAMETRAL" not in notes
     assert drawing.DIMENSION_CALLOUTS["BoreDiaDim"] == "REAM THRU\nSEE NOTE 1"
     assert drawing.DIMENSION_CALLOUTS["SpigotDia"] == "SEE NOTE 2"
     assert drawing.DIMENSION_CALLOUTS["GrooveBottomDia"] == "SEE NOTE 3"
@@ -346,7 +347,7 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
     )
     # The bore's REAM THRU callout carries the process; the notes do not.
     assert "REAMED" not in notes
-    assert "PRESS FIT" not in notes and "RUNS ON" not in notes
+    assert "RUNS ON" not in notes
     # No design rationale on the round or the overall OD (rule 7).
     assert drawing.ROUND_CALLOUT == "2X RIM BORE EDGES"
     assert "RimOuterDiaDim" not in drawing.DIMENSION_CALLOUTS
@@ -380,7 +381,7 @@ def test_no_gdt_frames_and_two_sheet_dimensions() -> None:
         for control in mg_magnifying_wheel_spec.SURFACE_FINISHES
     }
     assert finishes == {"mg_wheel_bore": MACHINED_UM}
-    # Only the rim's axial width and the spokes' front face are added on the
+    # Only the rim's axial width and the spokes' back face are added on the
     # sheet; the face rides the spokes' casting band and is centred in the
     # rim.
     assert calls.count("add_edge_dimension") == 2

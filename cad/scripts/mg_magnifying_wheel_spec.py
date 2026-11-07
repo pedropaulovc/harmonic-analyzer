@@ -79,8 +79,11 @@ from mg_wheel_group import HUB_RUNNING, WHEEL_BORE_MAX
 #
 # The rim's Ø are Front-plane circles, which no side view can import, so
 # they are restated as diametric dimensions on a hidden reference sketch in
-# A-A's cutting plane (SECTION_PLANE, coincident with the Right plane), each
-# driven from the same global as its circle.  Each one's witness is a short
+# A-A's cutting plane (SECTION_PLANE, coincident with the Top plane: the
+# plane through the seed spoke on +X and the 180 deg spoke, so A-A cuts both
+# spokes, drawing-guidelines.md rule 9), each driven from the same global as
+# its circle.  The hub profile and the groove are revolved from that plane
+# too, so A-A imports their sizes.  Each reference's witness is a short
 # construction line REFERENCE_WITNESS_LEN long on its surface, starting at
 # the rim's back face (the OD) or at the back rim-bore round's tangent (the
 # rim bore), so its extension lines leave the part there.
@@ -90,13 +93,13 @@ from mg_wheel_group import HUB_RUNNING, WHEEL_BORE_MAX
 # (SPOKE_REFERENCE): each centreline is a construction stub through the rim
 # (SPOKE_STUB_R), and the angle between them is a DRIVEN reference printed
 # "6X 60°".  The seed spoke lies on local +X, so two spokes lie on the face
-# view's horizontal centerline, which the drawing draws through them and the
-# bore (drawing-guidelines.md rule 26: a location is a dimension or a drawn
-# line, not a sentence).  TIE 2's radial is clocked on the same sketch: a
-# stub on its axis and one on the TIE2_CLOCK_SPOKE spoke (the 180 deg one,
-# on that drawn centreline), the DRIVEN angle between them TIE2_FROM_SPOKE_DEG
-# with its vertex on the bore axis (drawing-guidelines.md rule 10: dimension
-# from a real feature).
+# view's horizontal centreline, on which A-A's cutting plane runs through
+# them and the bore (drawing-guidelines.md rule 26: a location is a
+# dimension or a drawn line, not a sentence).  TIE 2's radial is clocked on
+# the same sketch: a stub on its axis and one on the TIE2_CLOCK_SPOKE spoke
+# (the 180 deg one, on that line), the DRIVEN angle between them
+# TIE2_FROM_SPOKE_DEG with its vertex on the bore axis (drawing-guidelines.md
+# rule 10: dimension from a real feature).
 SECTION_PLANE = "SectionAPlane"
 DIAMETER_REFERENCE = "DiameterReference"
 SPOKE_REFERENCE = "SpokeReference"
@@ -129,12 +132,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # (build_mg_wheel_axle: the drawing's inserted radius lands on the first
 # pick's edge), so the builder picks the edge the face view prints first:
 # (spoke index from the seed on +X, side of that spoke in its own frame).
-# The R3.0's leader rises from the seed spoke's -Y hub fillet through the
-# spoke and the 0-60 window; the R4.0's leaves the 180 deg spoke's -Y (sheet
-# +Y) rim fillet out through the rim to the left.  Neither crosses the
-# spoke widths' dimension lines on the seed spoke.
-HUB_FILLET_PRINTED = (0, -1)
-RIM_FILLET_PRINTED = (3, -1)
+# Both print on the 60 deg spoke, above A-A's cutting plane on the
+# horizontal centreline, so neither leader crosses it: the R3.0 on the hub
+# fillet facing the 0-60 window, its leader out through that window from
+# the fillet's centre; the R4.0 on the rim fillet facing the 60-120 window,
+# its leader out through the rim.
+HUB_FILLET_PRINTED = (1, -1)
+RIM_FILLET_PRINTED = (1, 1)
 # Decimal places per marked dimension (drawing-guidelines.md rule 3 (decimal places carry the tolerance)), in inches:
 # every size a wall, the groove seat or the lever-wire run reads prints at
 # .XX or finer (the inch .X row, +/-.1, would swallow the walls), the banded
@@ -196,18 +200,19 @@ SPOKE_FACE_OFFSET = (RIM_AXIAL - SPOKE_AXIAL) / 2.0
 ROUND_TEXT_SUFFIX = " MAX"
 
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the notes say only what no callout can.  The bore's running fit and
-# the spigot's press fit are matched-fit statements (rule 4: mate and
-# acceptance), each a numbered note its own callout links by "SEE NOTE n",
-# so neither callout runs past two lines of words.  The groove's two tight
-# bands (its bottom Ø and its R) serve one mate, named once in a numbered
-# note both callouts link (rule 4: a mate serving several features).  The
-# spokes' count, pitch and clocking print on their own angle
-# (SPOKE_REFERENCE) and centreline.  TIE 1 names the wire member it ties,
-# and TIE 2 where it runs, at their own callouts.  TIE 1's two coordinates ride the title
-# block: the boss is sized so its wall holds at .XX (TIE1_HUB_WALL).  The
-# mates' numbers are literals so the axle, drum and wire stay out of the
-# part's recipe; test_mg_magnifying_wheel_drawing pins them to the config
-# rows.
+# the spigot's press fit are matched-fit statements (rule 4: the standard
+# fit name, the mate, and the resulting clearance or interference as REF),
+# each a numbered note its own callout links by "SEE NOTE n", so neither
+# callout runs past two lines of words.  The groove's two tight bands (its
+# bottom Ø and its R) serve one mate, named once in a numbered note both
+# callouts link (rule 4: a mate serving several features).  The spokes'
+# count, pitch and clocking print on their own angle (SPOKE_REFERENCE) and
+# A-A's cutting plane.  The tie holes are named plainly at their own
+# callouts (rule 26: WIRE TIE HOLE).  TIE 1's two coordinates ride the
+# title block: the boss is sized so its wall holds at .XX (TIE1_HUB_WALL).
+# The mates' numbers are literals so the axle, drum and wire stay out of
+# the part's recipe; test_mg_magnifying_wheel_drawing pins them to the
+# config rows.
 MIN_WALL = WALL_TARGET_MM  # drawing-guidelines.md rule 17 (walls and webs) target
 AXLE_NUMBER = "MHA-MG-07"
 DRUM_NUMBER = "MHA-MG-10"
@@ -218,16 +223,16 @@ GROOVE_SEAT_NOTE = 3
 
 
 def _fit_limits(limits_mm: tuple[float, float]) -> str:
-    """A stated diametral fit (mm) as the inch sheet prints it, to .0001."""
+    """A diametral fit range (mm) as the inch sheet prints it, to .0001."""
     return "-".join(render_number(value / MM_PER_INCH, "in", 4) for value in limits_mm)
 
 
 DRAWING_NOTES = "\n".join(
     (
-        f"{BORE_FIT_NOTE}. {_fit_limits(HUB_RUNNING)} DIAMETRAL CLEARANCE ON AXLE "
-        f"{AXLE_NUMBER}.",
-        f"{SPIGOT_FIT_NOTE}. {_fit_limits(DRUM_PRESS)} DIAMETRAL INTERFERENCE IN DRUM "
-        f"{DRUM_NUMBER}.",
+        f"{BORE_FIT_NOTE}. RUNNING FIT ON AXLE {AXLE_NUMBER} "
+        f"(CLEARANCE {_fit_limits(HUB_RUNNING)}).",
+        f"{SPIGOT_FIT_NOTE}. PRESS FIT IN DRUM {DRUM_NUMBER} "
+        f"(INTERFERENCE {_fit_limits(DRUM_PRESS)}).",
         f"{GROOVE_SEAT_NOTE}. GROOVE SEATS PEN WIRE OF {WIRE_NUMBER}.",
     )
 )
@@ -239,7 +244,6 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
         "mg_wheel_bore", MACHINED_UM, CylinderFace(BORE_DIA), display_unit=UNIT
     ),
 )
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
 
 # --- walls and the groove seat at the worst PRINTED band (drawing-guidelines.md rule 17 (walls and webs)) -----------------
 _PLACES = {
