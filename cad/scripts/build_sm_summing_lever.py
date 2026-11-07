@@ -133,6 +133,7 @@ from sm_summing_lever_notes import (
     CYLINDER_REFERENCE_Z,
     DIMENSION_PREFIXES,
     DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
     FRONT_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
     RECEIVER_COORDINATE_PLACES,
@@ -2464,6 +2465,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         PART_NAME,
         {
+            "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
             "Back View Note": BACK_VIEW_NOTE,
             "Front View Note": FRONT_VIEW_NOTE,
@@ -2491,6 +2493,7 @@ async def build(adapter) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
             "Isometric View Note",
             "Back View Note",
             "Front View Note",

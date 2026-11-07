@@ -333,22 +333,18 @@ def test_limit_band_sets_places_from_the_spec_model_not_the_readback(
 
 
 def test_head_and_relief_bands_name_the_wire_they_clear() -> None:
-    # drawing-guidelines.md rule 4: each LIMIT band names what it serves.
-    # The head's 0.95 (.037 in) retention under the 1.0 check (owner minor
-    # RV-01) prints on the head Ø as a plain fact, floored (rule 20).
-    assert spec.HEAD_RETENTION_CALLOUT == "LOOP OVERLAP\n.037 MIN"
+    # drawing-guidelines.md rule 4: each LIMIT band links the loop's note,
+    # which names MHA-SM-VN-51 once.  The head's .037 retention under the
+    # .039 check (owner minor RV-01) prints there as a plain fact, floored
+    # (rule 20).
     assert math.floor(joint.HEAD_RETENTION_MIN / 25.4 * 1000.0) == 37
-    assert spec.DIMENSION_CALLOUTS["HeadProfile"] == {
-        "HeadDia": (
-            f"{spec.COUNTER_SPRING_NUMBER}\nWIRE CLEARS;\nLOOP OVERLAP\n.037 MIN"
-        ),
-        "HeadReliefChamfer": f"X 45 DEG;\n{spec.COUNTER_SPRING_NUMBER}\nWIRE CLEARS",
-    }
+    assert spec.HEAD_RETENTION_CALLOUT in spec.DRAWING_NOTES
+    for name in ("HeadDia", "HeadReliefChamfer"):
+        assert spec.LOOP_NOTE_LINK in spec.DIMENSION_CALLOUTS["HeadProfile"][name]
     assert spec.DRAWING_PRECISION_BY_NAME["HeadDia"] == 3
     assert spec.DRAWING_PRECISION_BY_NAME["HeadReliefChamfer"] == 3
     # The head Ø's block stands between the head-end view's slot width and
     # the head's top face, centred on its own dimension line.
-    assert drawing.HEAD_DIA_TEXT_HEIGHT == drawing.block_height(2, 4)
     x, y = drawing.SIDE_KEEP["HeadDia"]
     assert y == drawing.SIDE_CENTER[1]
     right = x + drawing.HEAD_DIA_TEXT_WIDTH / 2.0
@@ -370,13 +366,8 @@ def test_body_limit_band_is_the_thread_blank_inside_the_2a_major() -> None:
     assert geom.BODY_DIA_MAX < geom.THREAD_MAJOR_2A_MAX
     with pytest.raises(AssertionError, match="2A major band"):
         geom.require_body_form(body_dia_max=geom.THREAD_MAJOR_2A_MAX + 0.01)
-    # The band names what it serves (drawing-guidelines.md rule 4).
-    assert spec.DIMENSION_CALLOUTS_BY_NAME["BodyDia"].splitlines() == [
-        "THREAD BLANK;",
-        spec.COUNTER_SPRING_NUMBER,
-        "LOOP SEAT",
-    ]
-    assert spec.CHAMFER_CALLOUT == "X 45 DEG"
+    # The band links the loop's note (drawing-guidelines.md rule 4).
+    assert spec.LOOP_NOTE_LINK in spec.DIMENSION_CALLOUTS_BY_NAME["BodyDia"]
 
 
 def test_plain_length_and_full_thread_limits_print_on_the_part() -> None:
@@ -390,17 +381,15 @@ def test_plain_length_and_full_thread_limits_print_on_the_part() -> None:
     geom.require_body_form(full_thread_station_max=geom.PLAIN_LENGTH_MIN + geom.PITCH)
     with pytest.raises(AssertionError, match="must follow the plain-body limit"):
         geom.require_body_form(full_thread_station_max=geom.PLAIN_LENGTH_MIN)
-    # The plain length names its mate below the value; the full-thread limit
-    # stands ABOVE its value, which alone takes the dimension line.
-    assert spec.DIMENSION_CALLOUTS["StationReference"] == {
-        "PlainLength": f"PLAIN;\n{spec.COUNTER_SPRING_NUMBER}\nLOOP SEAT"
-    }
+    # The plain length is a location: value and limit only (rule 7); the
+    # full-thread limit stands ABOVE its value, which alone takes the
+    # dimension line.
+    assert "StationReference" not in spec.DIMENSION_CALLOUTS
     assert spec.DIMENSION_CALLOUTS_ABOVE["StationReference"] == {
         "FullThread": "TO FULL THREAD"
     }
-    assert "MHA-SM-01" in spec.DRAWING_NOTES
-    assert "FULL THREAD" not in spec.DRAWING_NOTES
-    assert "PLAIN" not in spec.DRAWING_NOTES
+    # The thread names its mate at its own callout.
+    assert spec.PLUG_NUMBER in spec.THREAD_MATE_CALLOUT
     # The station sketch's witnesses lie on the outline: the under-head face
     # (from the corner round's tangent point up, under the head's rim) and
     # the body's silhouette from each printed station toward the tip.
@@ -581,15 +570,18 @@ def test_thread_callout_names_the_size_but_not_the_title_block_class() -> None:
 
 
 def test_notes_are_short_and_carry_no_dimension_or_method() -> None:
-    # The plain length and the full-thread limit print on their features, so
-    # one note is left, carrying no figure.
-    assert spec.DRAWING_NOTES == "1. THREAD MATES THE TAPPED END PIECE OF MHA-SM-01."
-    for line in spec.DRAWING_NOTES.splitlines():
-        # Only the mating part's number is quoted.
-        text = line.split(". ", 1)[-1].replace("MHA-SM-01", "")
-        assert not any(ch.isdigit() for ch in text), line
-        for word in ("TORQUE", "LOCTITE", "N-M", "IN-LB"):
-            assert word not in line
+    # One note: the loop's, with the head's stated overlap the only figure.
+    lines = spec.DRAWING_NOTES.splitlines()
+    assert len(lines) == 1
+    # Ends left of the title block (x 0.216) at the sheet's ~2.42 mm a
+    # character, as the gooseneck's notes.
+    assert drawing.NOTES_XY[0] + 0.00242 * len(lines[0]) < 0.214
+    text = lines[0].split(". ", 1)[-1]
+    for figure in (spec.COUNTER_SPRING_NUMBER, spec.HEAD_RETENTION_CALLOUT):
+        text = text.replace(figure, "")
+    assert not any(ch.isdigit() for ch in text), lines[0]
+    for word in ("TORQUE", "LOCTITE", "N-M", "IN-LB"):
+        assert word not in lines[0]
     assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW\nSCALE 2:1"
 
 
@@ -712,8 +704,11 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     # centred on its anchor, 5.56 mm per callout line (and value over its
     # callout), 4.53 mm between stacked limits, 4.50 mm of first-line ink.
     assert drawing.block_height(2, 3) == pytest.approx(0.2388337 - 0.2131399, abs=2e-4)
-    assert drawing.BODY_DIA_TEXT_HEIGHT == drawing.block_height(2, 3)
-    assert drawing.PLAIN_LENGTH_TEXT_HEIGHT == drawing.block_height(1, 3)
+    for name, height, values in (
+        ("BodyDia", drawing.BODY_DIA_TEXT_HEIGHT, 2),
+        ("PlainLength", drawing.PLAIN_LENGTH_TEXT_HEIGHT, 1),
+    ):
+        assert height == drawing.block_height(values, drawing._callout_lines(name))
     # The body Ø stands on the plain body, past the corner round, its line
     # inside the plain length; its text hangs right of its own dimension line
     # (its leader meets the text's left end, so the leader runs beside the
@@ -814,23 +809,20 @@ def test_underhead_corner_radius_reads_in_free_space() -> None:
     # plain length's dimension line.
     assert bend_x - drawing.FULL_THREAD_X >= 0.002
     assert bend_y <= drawing.PLAIN_LENGTH_LINE_Y - 0.010
-    # "R0.5 max." over "MHA-SM-VN-51" over "LOOP CLEARS" (rule 4), below the
-    # value since an above-callout line break would not print; the block
-    # centres on the anchor, its shoulder under the last row.
-    assert spec.DIMENSION_CALLOUTS["ShankProfile"]["UnderHeadCornerR"] == (
-        f"{spec.COUNTER_SPRING_NUMBER}\nLOOP CLEARS"
-    )
+    # The value over its callout rows, below the value since an
+    # above-callout line break would not print; the block centres on the
+    # anchor, its shoulder under the last row.
+    rows = drawing._callout_lines("UnderHeadCornerR")
     assert "ShankProfile" not in spec.DIMENSION_CALLOUTS_ABOVE
-    assert spec.COUNTER_SPRING_NUMBER == "MHA-SM-VN-51"
     text_x, text_y = drawing.SIDE_KEEP["UnderHeadCornerR"]
     assert (text_x, text_y) == drawing.UNDERHEAD_CORNER_TEXT_XY
-    assert text_y - bend_y == pytest.approx(0.0028 + 2.0 * 0.00556 / 2.0)
+    assert text_y - bend_y == pytest.approx(0.0028 + rows * 0.00556 / 2.0)
     left = text_x - drawing.UNDERHEAD_CORNER_TEXT_WIDTH / 2.0
     right = text_x + drawing.UNDERHEAD_CORNER_TEXT_WIDTH / 2.0
     assert bend_x == pytest.approx(left - drawing.RADIAL_BEND_GAP)
     ink_bottom = bend_y + 0.0009
     ink_top = bend_y + drawing.UNDERHEAD_CORNER_TEXT_HEIGHT
-    assert drawing.UNDERHEAD_CORNER_TEXT_HEIGHT == pytest.approx(2 * 0.00556 + 0.0045)
+    assert drawing.UNDERHEAD_CORNER_TEXT_HEIGHT == pytest.approx(rows * 0.00556 + 0.0045)
     # Clear of the 5.71 station's extension line, under the plain length's
     # dimension line, over the body, and short of the thread note and its
     # leader (whose lowest end is the pick).
@@ -850,7 +842,9 @@ def test_relief_chamfer_reads_over_the_head_clear_of_its_neighbours() -> None:
         geom.HEAD_RELIEF_CHAMFER * scale
     )
     assert drawing.TOP_X < drawing.SLOT_FLOOR_X < drawing.HEAD_RELIEF_X
-    assert drawing.HEAD_RELIEF_TEXT_HEIGHT == drawing.block_height(2, 3)
+    assert drawing.HEAD_RELIEF_TEXT_HEIGHT == drawing.block_height(
+        2, drawing._callout_lines("HeadReliefChamfer")
+    )
     x, y = drawing.SIDE_KEEP["HeadReliefChamfer"]
     assert (x, y) == drawing.HEAD_RELIEF_TEXT_XY
     left = x - drawing.HEAD_RELIEF_TEXT_WIDTH / 2.0
@@ -926,10 +920,8 @@ def test_readback_contract_mirrors_every_printed_and_callout_control() -> None:
         "HeadReliefChamfer",
         "TipChamfer",
         "UnderHeadCornerR",
-        "PlainLength",
     }
     assert spec.DIMENSION_CALLOUTS_ABOVE_BY_NAME == {"FullThread": "TO FULL THREAD"}
-    assert callouts["UnderHeadCornerR"] == "MHA-SM-VN-51\nLOOP CLEARS"
     assert callouts["TipChamfer"] == spec.CHAMFER_CALLOUT
     for by_feature in (spec.DIMENSION_CALLOUTS, spec.DIMENSION_CALLOUTS_ABOVE):
         for feature, names in by_feature.items():
