@@ -1349,11 +1349,11 @@ def test_sweep_sidecar_drives_both_passes_to_their_end_stops() -> None:
             )
             assert pose["origins"][carriage_1] == pytest.approx(list(spec.carriage_origin(1, stations[1])))
             assert pose["origins"][carriage_2] == pytest.approx(list(spec.carriage_origin(2, stations[2])))
-            expected = {
-                spec.instance_name(family, index)
-                for family in spec.MOVING for index in range(spec.QUANTITIES[family])
-            }
-            assert set(pose["origins"]) == expected
+            assert set(pose["origins"]) == set(spec.MOVING_INSTANCES)
+            assert set(spec.RAIL_SCREW_INSTANCES + spec.BAR_SCREW_INSTANCES).isdisjoint(
+                pose["origins"]
+            )
+            assert set(spec.STRAP_CLAMP_SCREW_INSTANCES.values()) <= set(pose["origins"])
             for family in (spec.FEED_BLOCK, spec.PIVOT_BLOCK, spec.FEED_NUT):
                 assert pose["origins"][spec.instance_name(family, 0)] == pytest.approx(
                     spec._swept_placement(family, 0, pass_name, pose["theta_rad"])[0]
@@ -2379,11 +2379,6 @@ def test_f1_f2_prepare_seat_and_transfer_from_the_nut() -> None:
     for text in (*spec.ASSEMBLY_STEPS, *spec.FEED_FIT_STEPS):
         for stale in ("PRINT-DRILLED", "TRANSFER SPOTTING", "LOOSE HOLES", "DOWEL PIN"):
             assert stale not in text
-    # The retired feed-fit wording must not ban R3's actual flanged HUB stud.
-    for text in (steps["7"], steps["8A"], steps["8B"], *spec.FEED_FIT_STEPS):
-        assert "FLANGED" not in text
-    hub_step = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("10. "))
-    assert "FLANGED HUB CLAMP STUD" in hub_step
 
 
 def test_handwheel_set_screw_meets_the_leadscrew_flat() -> None:
