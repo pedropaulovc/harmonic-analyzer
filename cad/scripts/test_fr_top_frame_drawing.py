@@ -4914,7 +4914,8 @@ def test_boss_and_socket_diameters_take_one_near_side_arrow() -> None:
     styled = source.index('set_near_side_diameter(annotation, f"holes/sockets top {name}")')
     assert source.index("for name in DETAIL_TOP_KEEP:", styled - 400) < styled
     assert drawing.DETAIL_TOP_KEEP["C0Dia"] == (0.035, 0.236)
-    assert drawing.DETAIL_TOP_KEEP["B0Dia"][1] - drawing.DETAIL_TOP_KEEP["C0Dia"][1] >= 0.019
+    # The socket's three rows stand under the boss's leader, left of the rail.
+    assert drawing.DETAIL_TOP_KEEP["C0Dia"][1] - drawing.DETAIL_TOP_KEEP["B0Dia"][1] >= 0.035
 
 
 def test_cap_recess_bands_preserve_the_counterbore_ligament() -> None:
@@ -5326,18 +5327,51 @@ def test_hole_tags_stand_in_the_windows_beside_their_holes() -> None:
 
 
 def test_socket_callout_leaves_its_leader_a_clear_corridor_to_a2() -> None:
-    """Farm runs 20261106T212431241Z (row past the frame) and
-    20261106T214613300Z (leader down the 7.165's extension line): the
+    """Farm run 20261106T212431241Z (row past the frame); the machinist
+    reviews of farm run 20261107T170344738Z's PDF (above A2 the leader
+    crossed the 7.840's dimension line at its left arrowhead).  The
     block's widest row, 2.58 mm a glyph, stays inside the frame and ends
-    left of the 7.165's extension line."""
-    x, _y = drawing.DETAIL_TOP_KEEP["B0Dia"]
+    left of the rail's outer face; its radial leader to A2's near rim
+    crosses that face 2 mm or more below the face's junction with the
+    boss, where the 7.840's extension line starts, and stays under the
+    boss's own leader."""
+    x, y = drawing.DETAIL_TOP_KEEP["B0Dia"]
     rows = drawing.DETAIL_CALLOUTS["B0Dia"].splitlines()
     assert len(rows) <= 2
     half = max(map(len, rows)) * 0.00258 / 2.0
     ink = drawing.INK_CLEARANCE
     assert x - half >= drawing.SHEET_FRAME[0] + ink
-    extension_x = _plan(-part.COLUMN_X, 0.0)[0]
-    assert x + half <= extension_x - 0.005
+    face_x = _plan(-part.OUTER_X, 0.0)[0]
+    assert x + half <= face_x - 0.005
+    cx, cy = _plan(-part.COLUMN_X, part.FRONT_COLUMN_Z)
+    start = (x + half, y)
+    run = math.dist(start, (cx, cy))
+    bore_r = part.BORE_DIA / 2.0 * _S
+    rim = (cx - (cx - start[0]) * bore_r / run, cy - (cy - start[1]) * bore_r / run)
+    t = (face_x - start[0]) / (rim[0] - start[0])
+    crossing_y = start[1] + t * (rim[1] - start[1])
+    boss_r = part.BOSS_DIA / 2.0 * _S
+    junction_y = cy - math.sqrt(boss_r**2 - (cx - face_x) ** 2)
+    assert junction_y - crossing_y >= 0.002
+    # Under the Ø1.77 boss leader's text point by more than the three rows.
+    assert drawing.DETAIL_TOP_KEEP["C0Dia"][1] - y >= 0.035
+
+
+def test_side_rail_web_text_stands_over_its_own_section() -> None:
+    """Local machinist review of farm run 20261107T170344738Z's PDF (r1):
+    parked right of E-E the 2X SIDE RAIL WEB rows ran out over M-M.  They
+    now stand centred over E-E's rail, the 37.5 mm row ending left of M-M's
+    T and its caption's left edge, and starting clear of the plan's 1.35
+    SIDE FLANGE text (its shoulder ends at x 266.6 mm)."""
+    x, y = drawing.SIDE_WEB_TEXT_XY
+    assert x == pytest.approx(drawing.SIDE_SECTION_PROFILE_X, abs=0.0002)
+    half = 0.0375 / 2.0
+    ink = drawing.INK_CLEARANCE
+    m_left = drawing._side_section_xy(part.BAR_X0, 0.0)[0]
+    assert x + half <= m_left - 0.02
+    assert x - half >= 0.2666 + 0.005
+    # The dimension line (5.56 mm under the text point) clears E-E's flange top.
+    assert y - 0.00556 - drawing._side_section_xy(0.0, part.HALF_H)[1] >= ink
 
 
 def test_cross_tap_callout_counts_all_four_taps_then_names_its_mate() -> None:

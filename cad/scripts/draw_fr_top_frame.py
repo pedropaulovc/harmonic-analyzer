@@ -1067,10 +1067,14 @@ SIDE_SECTION_SCALE = (1, 4)
 # under its T.  Both drop 3.5 mm from the old E-E caption's 91.5 so M-M's
 # top stays 2.3 mm under the crossbar web callout's ink (y 88.4).
 SIDE_SECTION_CAPTION_XY = (0.290, 0.088)
-# The web text sits 8 mm left so its 37.5 mm qualifier row ends at 345.8 mm,
-# 4.1 short of the crossbar flange's 8.0 dimension line at 349.9 (farm
-# 30394c1da: the row ran 3.8 mm past that line, text-on-line).
-SIDE_WEB_TEXT_XY = (0.327, 0.120)
+# E-E's web value and its 2X SIDE RAIL WEB row stand centred over E-E's
+# own rail, its dimension line printed 5.56 mm under the text point and
+# 3.8 mm over the flange: parked right of the rail (0.327) the rows ran out
+# over M-M and read as M-M's (local machinist review of farm run
+# 20261107T170344738Z's PDF, r1, 2 of 3 runs).  The 37.5 mm qualifier row
+# then spans x 278..315, 11 mm right of the plan's 1.35 SIDE FLANGE text
+# and 3.4 mm over M-M's pocket-depth rows.
+SIDE_WEB_TEXT_XY = (0.2967, 0.120)
 # Each section's web axis centreline runs this far (paper mm, times the
 # section's scale denominator in model mm) past the T's top and underside.
 SECTION_AXIS_OVERRUN_MM = 2.0
@@ -1272,16 +1276,16 @@ DETAIL_TOP_KEEP = {
     # about 2.5 mm over the 28.0 FRONT HANGER Z's upper arrow (machinist
     # review r3), the value still 4 mm under the socket block's shoulder.
     "C0Dia": (0.035, 0.236),
-    # One row taller than r1's two (the mating tube and the fit it holds,
-    # machinist review r1), so its top stands 3 mm higher.  Its widest row
-    # (25 glyphs at the 2.58 mm farm run 20261106T212431241Z measured) is
-    # 64.5 mm, so centred at x 55.7 it ends at 88.0: the radial leader from
-    # there to the A2 rim runs between the origin mark's Y arrow (x 81) and
-    # the 7.165's extension line (x 94.7).  At 75 mm wide it ended at 93.6
-    # and dropped along that extension line through the 7.165's arrowhead
-    # (farm run 20261106T214613300Z); centred at 50 its 38-glyph row ran
-    # past the frame.
-    "B0Dia": (0.0557, 0.255),
+    # Three rows (the value, the mating tube and the fit it holds, machinist
+    # review r1), the widest 25 glyphs (2.58 mm each, farm run
+    # 20261106T212431241Z: 64.5 mm).  It stands left of the rail, under the
+    # boss's leader, so its radial leader climbs to A2's lower-left rim and
+    # crosses the rail's outer face below that face's junction with the
+    # boss, where the 7.840's extension line starts: above A2 (0.255) the
+    # leader crossed the 7.840's dimension line at its left arrowhead
+    # (machinist reviews of farm run 20261107T170344738Z's PDF, 1 run in
+    # each of three).
+    "B0Dia": (0.047, 0.193),
 }
 # Sheet 3's tagged hole table (drawing-guidelines.md rule 10: more than one
 # hole group carries a mate): the four socket bores and the two hanger
