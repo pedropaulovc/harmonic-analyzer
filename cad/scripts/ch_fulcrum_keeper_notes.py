@@ -1,8 +1,10 @@
 """MHA-CH-07 fulcrum keeper: the print's words.
 
-The drawing prose lives here, apart from ch_fulcrum_keeper_spec, so a wording
-change re-keys only the keeper's own part and drawing, not every assembly,
-frame and shaft that imports the spec's geometry.
+The callout rows and the notes live here, apart from ch_fulcrum_keeper_spec
+(the ch_rocker_arm_notes split), so a wording change re-keys only the
+keeper's own part and drawing, not the frame, shaft and assemblies that
+import the spec's geometry. The spec keeps the two band-bearing captions
+its own walls are computed with (BORE_CENTRE_CALLOUT, SUPPLY_HEIGHT_CALLOUT).
 
 Each callout keeps its size first and at most two rows of words
 (drawing-guidelines rule 7); each mate is named on the feature it serves
@@ -33,9 +35,12 @@ SET_SCREW_QUALIFIER = "FOR MHA-CH-VN-55 SET\nSCREW, AT ASSEMBLY"
 # places). Rows of at most 21 characters keep the block clear of the tap
 # callout's leader on its left and the crown radius on its right.
 FOOT_HOLE_MATE = "FOR MHA-CH-VN-52;\nCENTERS MHA-FR-02 TAP"
+# True free-text facts only; the material and finish are the title block's.
 # The second keeper is this part turned over, not an opposite hand. Note 2
-# states the tip wall shortfall rule 20 asks the sheet to print (owner
-# exception RV-04).
+# states the tip wall shortfall rule 20 asks the sheet to print (Codjiflo
+# #2108; owner exception RV-04). The foot hole stays located off the foot tip
+# (owner ruling 2026-10-28, RV-03), and no note says why (MR-fleet r7: one
+# drew three findings of its own).
 DRAWING_NOTES = "\n".join(
     (
         "1. 2 REQUIRED, ONE PER MHA-CH-04 FULCRUM-SHAFT END (SECOND",
