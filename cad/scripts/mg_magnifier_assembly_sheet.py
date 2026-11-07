@@ -211,8 +211,8 @@ _STACK = (
 )
 
 # Rule 23: a specified anaerobic bond equals a press fit. The one bond in this
-# package is the slip-fit drum's fallback (provisional ruling 2026-11-06,
-# pending owner confirmation); its degrease, apply, keep-off and cure rules
+# package is the slip-fit drum's fallback (owner ruling 2026-11-07); its
+# degrease, apply, keep-off and cure rules
 # print once, as a general note with the checks on sheet 5, in two lines
 # (the sheet 5 column has under three to spare).
 BOND_GRADE = "LOCTITE 638"
@@ -233,9 +233,9 @@ STEP_TEXT = {
         f"PRESS {_DRUM} ONTO THE SPIGOT OF {_WHEEL}, HARD AGAINST THE BOSS."
     ),
     _steps.DRUM_HELD_KEY: f"CHECK {_DRUM} DOES NOT TURN OR SLIDE BY HAND.",
-    # A press that goes on by hand is a slip fit (rule 23). Provisional ruling
-    # 2026-11-06, pending owner confirmation: a bond equals a press, so a slip
-    # drum is bonded rather than the wheel remade (BOND_NOTE).
+    # A press that goes on by hand is a slip fit (rule 23). Owner ruling
+    # 2026-11-07: a bond equals a press, so a slip drum is bonded rather than
+    # the wheel remade (BOND_NOTE); a slip axle is remade.
     "drum-slip-fit": (
         f"IF IT DOES, OR {_DRUM} SLID ON BY HAND: PULL IT OFF AND BOND IT TO "
         f"{_WHEEL} WITH {BOND_GRADE}, {BOND_NOTE_REF}."
