@@ -20,7 +20,9 @@ face, +X to the square end, +Z to the rear face):
   ``PinBoreSectionPlane`` (x = PIN_STATION, section D-D's cutting plane), so
   D-D imports its toleranced leg.
 * ``PlateTaps``: native Hole Wizard taps through from the rear face, with
-  ``PlateTapRearEntryBreaks`` and ``PlateTapFrontExitBreaks`` at 0.10 MAX.
+  ``PlateTapRearEntryBreaks`` and ``PlateTapFrontExitBreaks`` at the title
+  block's edge break; spotted through MHA-PD-19's screw holes at assembly,
+  so they carry no frame and their stations print as references.
 * ``SpotFace``: the rear spot face, a revolved cut whose profile (Top plane,
   the arm's centreline section) dimensions its floor from the FRONT face.
 * ``PinHole``: the blind, flat-floored latch-pin hole (reamed for the dowel's
@@ -85,7 +87,6 @@ from _hole_spec import blind_cut_dia_mm
 from _holes import find_planar_face, wizard_holes
 from _part_pmi import author_part_pmi
 from _part_properties import part_drawing_unit
-from _native_projected_zone import require_saved_projected_gtols
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
 from pd_transgear_arm_geometry import (
@@ -116,6 +117,7 @@ from pd_transgear_arm_geometry import (
     SPOT_FACE_FLOOR_FROM_FRONT,
     THICKNESS,
     TIP_STATION,
+    UNIT,
 )
 from pd_transgear_arm_spec import (
     BASIC_REDUCER_DIMENSIONS,
@@ -127,7 +129,6 @@ from pd_transgear_arm_spec import (
     PIVOT_BORE_CALLOUT,
     SPOT_FACE_DIA_BAND,
     SPOT_FACE_FLOOR_TOLERANCE,
-    UNIT,
 )
 
 PART_NAME = "pd-transgear-arm"
@@ -980,9 +981,6 @@ async def build(adapter: Any) -> dict[str, str]:
     blank_sketch(adapter, "StationReference")
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
-    require_saved_projected_gtols(
-        adapter, artefacts["part"], GEOMETRIC_CONTROLS, label="saved transgear arm projected axes",
-    )
     return artefacts
 
 

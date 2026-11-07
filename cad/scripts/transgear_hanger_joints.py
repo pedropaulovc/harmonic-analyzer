@@ -201,7 +201,24 @@ _HEAD_THREAD_AXIAL_MAX = (
     PLATE_SCREW.HEAD_TOP_TO_THREAD_GAGE_MAX_MM + PLATE_SCREW.UNTHREADED_UNDER_HEAD_MAX_MM
 )
 _HEAD_RADIUS_MAX = PLATE_SCREW.HEAD_RADIUS_FROM_THREAD_AXIS_MAX_MM
-_TAP_AXIS_TILT_MAX = math.atan(ARM.REDUCER_POSITION_DIAMETER / ARM.CLAMP_TAP_PROJECTED_HEIGHT_MM)
+# The arm's plate taps are spotted and drilled through MHA-PD-19's screw
+# holes at assembly, the plate doweled on: the plate hole is the master. A
+# spotting drill of the hole's nominal size centres within half the hole's
+# drilled growth; the tap drill then runs off at most DRILL_RUN_OFF_DEG
+# through the arm, the tap following it.
+_TAP_STOCK_MIN = ARM.THICKNESS - ARM.THICKNESS_BAND
+_TAP_TRANSFER_CENTRING_RADIUS_MM = PLATE.DRILL_GROWTH / 2.0
+_TAP_AXIS_TILT_MAX = math.radians(ARM.DRILL_RUN_OFF_DEG)
+# The tap's location on the arm, through the plate hole's own zone and the
+# dowels' relative travel, must sit inside the radius the arm's walls pay.
+PLATE_TAP_LOCATION_RADIUS_MAX_MM = (
+    PLATE.REDUCER_POSITION_RADIUS
+    + REGISTRATION.LOCATOR_GEAR_PLANE_TRAVEL_MAX_MM / 2.0
+    + _TAP_TRANSFER_CENTRING_RADIUS_MM
+    + (ARM.THICKNESS + ARM.THICKNESS_BAND) * math.tan(_TAP_AXIS_TILT_MAX)
+)
+if PLATE_TAP_LOCATION_RADIUS_MAX_MM > ARM.PLATE_TAP_LOCATION_RADIUS_MM:
+    raise AssertionError("the transferred arm taps can leave the location the arm's walls pay")
 
 
 def _plate_screw_thread_contact_min_mm() -> float:
@@ -239,16 +256,16 @@ PLATE_SCREW_THREAD_TILT_MAX_RAD = math.asin(
     2.0 * PLATE_SCREW_THREAD_RADIAL_PLAY_MAX_MM / PLATE_SCREW_ENGAGEMENT_WORST
 )
 PLATE_SCREW_AXIS_TILT_MAX_RAD = PLATE_SCREW_THREAD_TILT_MAX_RAD + _TAP_AXIS_TILT_MAX
-# Only a seated BEARING contact must be below the arm tap's projected-axis
-# cap; neither XML serialization nor P14.7 asserts that every crown point is
-# there. The plate hole's zone runs from face A into the arm, so inside the
-# plate its axis is extrapolated
-# (pd_transgear_arm_plate_geometry.SCREW_AXIS_RADIUS_IN_PLATE_MM).
+# Only a seated bearing contact is charged. Inside the plate the screw's
+# thread axis is the arm tap's, extrapolated up from the rear face at its
+# run-off; it is measured from the plate hole that guided its spot, so the
+# plate hole's own zone does not enter (PD-19's holes are the master).
 PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM = (
     ARM.THICKNESS + ARM.THICKNESS_BAND + _PLATE_MAX + PLATE_SCREW_SEAT_HEIGHT_DEBIT_MM
 )
-if PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM > ARM.CLAMP_TAP_PROJECTED_HEIGHT_MM:
-    raise AssertionError("seated clamp contact exceeds an actually drawn projected-axis height")
+_TAP_AXIS_RADIUS_IN_PLATE_MM = _TAP_TRANSFER_CENTRING_RADIUS_MM + (
+    PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM - _TAP_STOCK_MIN
+) * math.tan(_TAP_AXIS_TILT_MAX)
 # Lo is OVERALL. Correlating it with TOTAL head height removes the unknown
 # crown/bevel split without turning .100 REF or .312 nominal into maxima.
 # The two extreme points' radial separation includes the complete head cap
@@ -285,7 +302,7 @@ PLATE_SCREW_REFERENCE_ENTRY_MARGIN_MM = (
     PLATE.SCREW_HOLE_DIA / 2.0
     - (PLATE_SCREW.THREAD_MAJOR / 2.0 + PLATE_SCREW.UNDER_HEAD_FILLET_RADIUS_MAX_MM)
     / math.cos(_TAP_AXIS_TILT_MAX + REGISTRATION.ARM_PLATE_TILT_MAX_RAD)
-    - ARM.REDUCER_POSITION_RADIUS - PLATE.SCREW_AXIS_RADIUS_IN_PLATE_MM
+    - _TAP_AXIS_RADIUS_IN_PLATE_MM
 )
 PLATE_SCREW_ENGAGEMENT_NOMINAL = min(
     PLATE_SCREW.LENGTH - PLATE.THICKNESS_OVER_ARM, ARM.THICKNESS
