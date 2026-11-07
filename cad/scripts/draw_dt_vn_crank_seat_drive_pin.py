@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from _machinist_review_mode import MachinistReviewMode
+
+MACHINIST_REVIEW = MachinistReviewMode.LEARN
+
 import argparse
 import sys
 from typing import Any

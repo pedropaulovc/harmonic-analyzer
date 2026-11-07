@@ -6,6 +6,10 @@ The radial through tap is a native Hole Wizard callout.
 
 from __future__ import annotations
 
+from _machinist_review_mode import MachinistReviewMode
+
+MACHINIST_REVIEW = MachinistReviewMode.LEARN
+
 import argparse
 import math
 import sys
