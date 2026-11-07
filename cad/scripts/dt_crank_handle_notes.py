@@ -73,13 +73,17 @@ TENON_NOTE = (
 COUNTERBORE_NOTE = (
     f"{COUNTERBORE_NOTE_NUMBER}. DEPTH SETS {CUP_NUMBER} FACE FLUSH WITH OAK END."
 )
-SHEET_NOTES = f"{TENON_NOTE}\n{COUNTERBORE_NOTE}"
-# The inside corners' single limits name the part seating on each by number.
-# The root relief's band keeps the root round behind the ferrule's seat face
-# and enough shoulder face for it (owner ruling 2026-10-24, #1900): the
-# shoulder seats the ferrule (rule 26: standard words, round 1 f08277cd).
-# Rows of 14 characters at most stand left of detail B, clear of the 2.20
-# row's extension line.
-TENON_ROOT_CALLOUT = f"{FERRULE_NUMBER}\nSEAT"
+# The tenon root's relief band and its R.012 MAX corner serve one function:
+# the relief keeps the root round behind the ferrule's seat face and leaves
+# it enough shoulder face (owner ruling 2026-10-24, #1900).  The mate and
+# that reason print once, in note 3, which both callouts flag (rules 4 and
+# 7; round 2 d6ae2a44: naming them on each callout repeated them).
+FERRULE_SEAT_NOTE_NUMBER = 3
+FERRULE_SEAT_NOTE = (
+    f"{FERRULE_SEAT_NOTE_NUMBER}. {FERRULE_NUMBER} {FERRULE_NAME} SEATS ON TENON SHOULDER."
+)
+SHEET_NOTES = f"{TENON_NOTE}\n{COUNTERBORE_NOTE}\n{FERRULE_SEAT_NOTE}"
+TENON_ROOT_CALLOUT = f"SEE NOTE {FERRULE_SEAT_NOTE_NUMBER}"
+TENON_ROOT_RELIEF_CALLOUT = f"X 45°\nSEE NOTE {FERRULE_SEAT_NOTE_NUMBER}"
+# The counterbore floor's single limit names the cup seating on it.
 COUNTERBORE_FLOOR_CALLOUT = f"{CUP_NUMBER}\nSEAT"
-TENON_ROOT_RELIEF_CALLOUT = f"X 45°\nSHOULDER SEATS\n{FERRULE_NUMBER}"

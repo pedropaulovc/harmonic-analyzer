@@ -355,12 +355,19 @@ def test_inside_corners_print_a_max_radius_their_mates_clear() -> None:
         drawing.DIMENSION_CALLOUTS["CounterboreFloorRadius"]
         == drawing.COUNTERBORE_FLOOR_CALLOUT
     )
-    # Rule 4: each corner's mate by drawing number at its callout.
-    assert spec.FERRULE_NUMBER in drawing.TENON_ROOT_CALLOUT
+    # Rule 4: each corner's mate by drawing number, once: the tenon root and
+    # its relief share note 3 (round 2 d6ae2a44), which names the ferrule;
+    # the counterbore floor names the cup at its callout.
+    assert drawing.TENON_ROOT_CALLOUT == "SEE NOTE 3"
+    assert drawing.TENON_ROOT_RELIEF_CALLOUT == "X 45°\nSEE NOTE 3"
+    assert drawing.SHEET_NOTES.splitlines()[2] == (
+        f"3. {spec.FERRULE_NUMBER} FERRULE SEATS ON TENON SHOULDER."
+    )
+    assert drawing.SHEET_NOTES.count(spec.FERRULE_NUMBER) == 1
     assert spec.CUP_NUMBER in drawing.COUNTERBORE_FLOOR_CALLOUT
-    # The blocks stand in narrow gaps: no row longer than "R.012 MAX".
+    # The blocks stand in narrow gaps: no row longer than "SEE NOTE 3".
     for callout in (drawing.TENON_ROOT_CALLOUT, drawing.COUNTERBORE_FLOOR_CALLOUT):
-        assert max(len(row) for row in callout.split("\n")) <= len("R.012 MAX")
+        assert max(len(row) for row in callout.split("\n")) <= len("SEE NOTE 3")
     assert set(drawing.INSIDE_CORNER_ARC_EXTENSION) == corners
     build_source = Path(handle.__file__).read_text(encoding="utf-8")
     assert '("InsideCornerR", INSIDE_CORNER_R_MAX)' in build_source
@@ -465,11 +472,10 @@ def test_tenon_root_relief_clears_the_ferrule_seat_and_keeps_the_tenon() -> None
     assert (
         drawing.DIMENSION_CALLOUTS["TenonRootRelief"] == drawing.TENON_ROOT_RELIEF_CALLOUT
     )
-    # The band names the seat it serves and the cone's angle (rule 4), with
-    # at most two rows of words (rule 7).
+    # The band flags the note naming the seat it serves (rule 4), with the
+    # cone's angle.
     rows = drawing.TENON_ROOT_RELIEF_CALLOUT.splitlines()
-    assert rows == ["X 45°", "SHOULDER SEATS", spec.FERRULE_NUMBER]
-    assert max(map(len, rows)) <= len("SHOULDER SEATS")
+    assert rows == ["X 45°", "SEE NOTE 3"]
     # The profile: the tenon OD runs on behind the seat face into the root
     # round, which the relief line leaves at 45 degrees for the shoulder face.
     relief = spec.TENON_ROOT_RELIEF

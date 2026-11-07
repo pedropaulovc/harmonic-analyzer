@@ -144,16 +144,16 @@ RIGHT_CENTER = (0.362, FRONT_CENTER[1])
 # Detail B took the upper right, so the lower left holds, top down: the
 # fitted tenon's four-row callout (keep y 0.078, ~22 mm tall: y
 # ~0.067..0.089, x ~0.048..0.131), the numbered notes (top-left anchored at
-# y 0.062, two rows of 2.5 mm characters, ~117 x 11 mm), the section's
-# caption (top-centre anchored, one row now that the scale equals the
-# sheet's, top y 0.043) and the isometric's note (top y 0.026).  The 1:1
+# y 0.062, three rows ~4.4 mm apart on round 2 d6ae2a44, ~117 mm wide), the
+# section's caption (top-centre anchored, one row now that the scale equals
+# the sheet's, top y 0.041) and the isometric's note (top y 0.026).  The 1:1
 # isometric (~49 x 35 mm, -0.020/+0.0152 about its centre in y) moves right,
 # x ~0.148..0.197, y ~0.016..0.051: 7 mm under the reamed bore's block (y
 # >= 0.058), 19 mm left of the title block (x 0.216), clear of the notes'
-# right end (x ~0.133).
+# right end (x ~0.134).
 ISO_CENTER = (0.172, 0.036)
 ISO_NOTE_POS = (0.016, 0.026)
-CAPTION_XY = (0.045, 0.043)
+CAPTION_XY = (0.045, 0.041)
 NOTES_XY = (0.016, 0.062)
 
 END_R = HANDLE_MAX_DIA * _S / 2.0

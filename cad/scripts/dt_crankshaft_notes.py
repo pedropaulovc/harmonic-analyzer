@@ -63,7 +63,10 @@ CROSS_HOLE_NOTE = "\n".join(
 # once, on one numbered note linked to each; rule 26: never AIR for clearance.
 SPIGOT_NOTE_NUMBER = 2
 SPIGOT_CALLOUT = see_note(SPIGOT_NOTE_NUMBER)
-SPIGOT_NOTE = f"{SPIGOT_NOTE_NUMBER}. SPIGOT CLEARS THE #25 CHAIN ON SPROCKET MHA-PD-09."
+# The chain by its drawing number, its catalogue size after it (rule 4).
+SPIGOT_NOTE = (
+    f"{SPIGOT_NOTE_NUMBER}. SPIGOT CLEARS CHAIN MHA-SH-VN-50 (#25) ON SPROCKET MHA-PD-09."
+)
 
 
 def _clearance(
@@ -175,19 +178,21 @@ FIDUCIAL_NOTE = "PUNCH MARK,\nLOCATION NOT CRITICAL"
 # route (rule 4: transferring through the mate; rule 26: a location is never
 # a sentence such as AT BOSS MID-LENGTH).  The size line carries the pin's
 # REF diameter (the hole is reamed to fit the pin), so no dimension stands on
-# the hole's hidden edges (rule 9).  Two lines of words (rule 7); the fit by
-# its standard name, matching the MHA-DT-10 sheet (DRIVE FIT ON PIN
-# MHA-DT-29).  The pin's flush ends and hand-removal check are the MHA-DT-00
-# step 4 acceptance, not this sheet's (rule 7).  The pinion row is last and
-# the longest: SolidWorks starts the note's leader at the end of its last
+# the hole's hidden edges (rule 9).  Two lines of words (rule 7): the route,
+# then the fit by its standard name with its bench acceptance (rule 4: a
+# matched fit states its acceptance; round-2 review).  Both match the
+# MHA-DT-10 sheet's own wording for this pin (DRIVE FIT ON PIN MHA-DT-29; NOT
+# REMOVABLE BY HAND), so the two sheets agree.  The pin's flush ends are the
+# MHA-DT-00 step 4 setting, not this sheet's (rule 7).  The fit row is last
+# and the longest: SolidWorks starts the note's leader at the end of its last
 # row, so it leaves the text's right end and drops right of the Ø.3125's
 # block (farm round 1: from a short last row it ran through that block).
 PINION_PIN_CALLOUT = "\n".join(
     (
         f"(<MOD-DIAM>{inch_text(pinion.PIN_DIA, pinion.PIN_HOLE_DIA_PLACES)})"
         " MATCH DRILL, REAM AT ASSEMBLY",
-        f"DRIVE FIT ON PIN {pinion.PIN_NUMBER},",
-        f"THRU THE RADIAL HOLE OF PINION {pinion.PINION_NUMBER}",
+        f"THRU THE RADIAL HOLE OF PINION {pinion.PINION_NUMBER},",
+        f"DRIVE FIT ON PIN {pinion.PIN_NUMBER}, NOT REMOVABLE BY HAND",
     )
 )
 

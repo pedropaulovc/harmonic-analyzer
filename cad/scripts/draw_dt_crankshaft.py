@@ -236,9 +236,10 @@ SIDE_KEEP = {
     "PinHoleStation": ((PIN_X + FAR_END_X) / 2.0, _ROW_Y[7]),
     # The shaft length's native unilateral block sits right of the reference
     # overall on the next row down, not over it; its stack suffix widens it
-    # left to x ~0.213, so the overall's text stands left of that (layout
-    # audit of 902433a8d: 1.3 mm text clearance).
-    "Depth": ((DOME_ROOT_X + FAR_END_X) / 2.0 + 0.035, _ROW_Y[8]),
+    # left, so the overall's text stands left of that (layout audit of
+    # 902433a8d: 1.3 mm text clearance; round 2: the longer CLEARANCE suffix
+    # left 1.34 mm to the (5.37), so the block stands 3 mm further right).
+    "Depth": ((DOME_ROOT_X + FAR_END_X) / 2.0 + 0.038, _ROW_Y[8]),
     "OverallLength": ((DOME_TIP_X + FAR_END_X) / 2.0 - 0.030, _ROW_Y[9]),
     # Above the dome, between the +Z drive-pin location's text and the
     # Ø9.525 dimension: the radial leader runs down, right of the one and
@@ -418,9 +419,12 @@ PINION_PIN_X = _sheet_x(PINION_PIN_STATION_Y)
 # so it lands there.
 PINION_PIN_LEADER_LANDING = (PINION_PIN_X + 0.0020, SIDE_CENTER[1] + 0.00055)
 # High in its field (top row ~4.5 mm under the border), so the right neck's
-# Ø9.5 and the Ø9.000's block stand under it, and its leader to the hole
-# passes right of the Ø9.000's block.
-PINION_PIN_NOTE_XY = (0.273, 0.264)
+# Ø.375 and the Ø.3125's block stand under it.  Its last (longest, ~125 mm)
+# row ends near x 0.370, where the leader starts (round 2: the leader leaves
+# the end of the last row), so the leader drops right of the Ø.3125's block
+# (ends x 0.3526) and left of the isometric (starts x 0.3779).  The text's
+# left end stays right of the #9 cross-hole callout's text (ends x 0.2282).
+PINION_PIN_NOTE_XY = (0.2455, 0.264)
 PINION_PIN_NOTE_FIELD = (
     HOLE_CALLOUT_XY[0] + 0.032,
     SIDE_CENTER[1],
@@ -437,9 +441,10 @@ PINION_PIN_HOLE_WINDOW = (
 )
 NOTE_FIELD_MARGIN = 0.001
 NOTES_XY = (0.016, 0.062)
-# The numbered notes, one 4.5-mm note line under the general note's one line
-# (the drive-train package's measured note pitch), left of the title block.
-SHEET_NOTES_XY = (NOTES_XY[0], NOTES_XY[1] - 0.006)
+# The numbered notes, under the general note's one line with 3.6 mm of air
+# (round 2 text-separation: 2.4 mm read as one block), left of the title
+# block.
+SHEET_NOTES_XY = (NOTES_XY[0], NOTES_XY[1] - 0.0075)
 # The plain Ø9.000 end is the right-hand edge of FRONT (the horizontal
 # ``side`` view), not the top end of the pictorial. Pick its lower half so
 # the centre permission's leader stays away from MATCH DRILL above the axis.

@@ -350,7 +350,8 @@ def _notch_cap_native_prediction(text_xy):
     The next native drawing/eye proof must confirm the reflected envelope.
     """
     per_mm = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1] / 1000.0
-    pivot = (0.256811, 0.126724)  # r15 notch-view pivot witnesses
+    # r15 notch-view pivot witnesses, translated onto the sheet-2 plan.
+    pivot = (0.256811 - drawing.NOTCH_SHIFT, 0.126724)
     centre = (
         pivot[0] + geometry.SLOT_E_X * per_mm,
         pivot[1] - geometry.SLOT_E_Z * per_mm,
@@ -371,7 +372,7 @@ def test_notch_diameter_shelf_ray_lands_inside_the_physical_concave_arc() -> Non
     fillet arc.  No saved/fixed tip is used for the new landing.
     """
     text = drawing.NOTCH_KEEP["CapEDia"]
-    assert text == pytest.approx((0.2355, 0.200))
+    assert text == pytest.approx((0.2355 - drawing.NOTCH_SHIFT, 0.200))
     pivot, centre, radius, knee, unit, tip = _notch_cap_native_prediction(text)
     scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1] / 1000.0
     mouth = (geometry.SLOT_TX, -geometry.SLOT_TZ)
@@ -433,7 +434,8 @@ def test_notch_diameter_saved_text_envelope_clears_the_actual_left_outline() -> 
     pivot, _centre, _radius, _knee, _unit, _tip = _notch_cap_native_prediction(text)
     left, right = text[0] - 0.008458, text[0] + 0.008458
     bottom, top = text[1] - 0.0028049, text[1] + 0.0007486
-    assert left - drawing.FEATURE_KEEP["PostMountWestZ"][0] >= 0.002
+    # Right of the 7.986 dimension line (x 0.130) it now shares the plan with.
+    assert left - drawing.FEATURE_KEEP["PostMountEastZ"][0] >= 0.002
     # NE -> SE is the left edge in this native plan; y grows toward SE.
     scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1] / 1000.0
     corners = {corner[0]: corner[1:] for corner in geometry.PLATE_CORNERS}
@@ -447,7 +449,9 @@ def test_notch_diameter_saved_text_envelope_clears_the_actual_left_outline() -> 
 
     assert min(left_outline(bottom), left_outline(top)) - right >= 0.002
     # Positive control: the originally proposed high station touches the edge.
-    assert left_outline(0.224 + 0.0007486) - (0.237 + 0.008458) < 0.002
+    assert left_outline(0.224 + 0.0007486) - (
+        0.237 - drawing.NOTCH_SHIFT + 0.008458
+    ) < 0.002
 
 
 def test_disengaged_collar_margin_survives_general_bands() -> None:
@@ -515,19 +519,29 @@ def test_plate_thickness_text_sits_beside_section_a_a() -> None:
 
 
 
-def test_plan_copies_carry_standard_labels_centred_under_their_views() -> None:
-    """Rule 9: the profile is the principal plan (no label); the hole and
-    lock-notch copies carry VIEW D / VIEW E, and none prints the sheet's 1:2."""
-    for text, (x, _y), center in (
-        (drawing.FEATURE_VIEW_LABEL, drawing.FEATURE_LABEL_UPPER_LEFT, drawing.FEATURE_CENTER),
-        (drawing.NOTCH_VIEW_LABEL, drawing.NOTCH_LABEL_UPPER_LEFT, drawing.NOTCH_CENTER),
-    ):
-        assert text in ("VIEW D", "VIEW E")
-        assert x + drawing.VIEW_LABEL_HALF_WIDTH == pytest.approx(center[0])
-    assert drawing.NOTCH_LABEL_UPPER_LEFT[1] <= 0.1276 - 0.0015
+def test_hole_pattern_and_notch_share_one_plan_on_sheet_two() -> None:
+    """Rule 9: no prose-named or VIEW-labelled copies of the plan.  Sheet 2's
+    one unlabelled plan carries the hole and notch stations; their texts
+    stand clear of each other (offline envelope arithmetic; the native sheet
+    must still prove it)."""
+    assert drawing.SHEET_NAMES == ("PLATFORM", "HOLES")
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    for prose in ("Profile View Note", "Feature View Note", "Notch View Note"):
+    for prose in ("Profile View Note", "Feature View Note", "Notch View Note", "VIEW D", "VIEW E"):
         assert prose not in source
+    assert not set(drawing.FEATURE_KEEP) & set(drawing.NOTCH_KEEP)
+    # 8.41 stands outboard of the 7.756 text (centred 0.225, ~28 mm wide).
+    assert drawing.NOTCH_KEEP["CapECz"][0] - 0.0055 > drawing.FEATURE_KEEP["PostMountWestZ"][0] + 0.014 + 0.002
+    # .28 stands right of detail B's parent letter (x 0.1861..0.1897).
+    assert drawing.NOTCH_KEEP["NorthEdgeZ"][0] - 0.005 > 0.1897 + 0.002
+    # The taps' callout block (round 2: 88 mm wide, centred; rows 0.2433..
+    # 0.2651 for y 0.2545) stands up-left of the plan: inside the left
+    # border, left of the 1.30 text, and over the 7.986 line's top (0.2285).
+    x, y = drawing.POST_MOUNT_CALLOUT_XY
+    left, right = x - 0.044, x + 0.044 + 0.0016
+    assert left > 0.0127 + 0.005
+    assert right < drawing.NOTCH_KEEP["CapECx"][0] - 0.0055 - 0.005
+    assert y - 0.0112 > 0.2285 + 0.010
+    assert y + 0.0106 < 0.2667  # inner border, as round 2 printed it
 
 
 def test_section_a_a_group_stays_inside_the_border() -> None:
@@ -667,7 +681,7 @@ def _holddown_x_text_box() -> tuple[float, float, float, float]:
 
 
 # The hold-down callout's widest row: DRILL Ø3.05 THRU ALL at 50.0 mm (r8),
-# or the mate row SPOT FROM MHA-DT-21 (19 characters, ~46..52 mm).  The
+# or the mate row LOCATES MHA-DT-21 (17 characters, ~41..47 mm).  The
 # underline's left end, where the leader leaves, stands 1.6 mm before it.
 _CALLOUT_HALF_WIDTHS = (0.0250, 0.0262)
 _CALLOUT_SHOULDER = 0.0016
@@ -1159,7 +1173,7 @@ def test_holddown_x_is_a_banded_dimension_hanging_right_of_detail_b() -> None:
         "HoldDownX": 2,
         "HoldDownZ": 3,
     }
-    assert spec.HOLDDOWN_STATION_TOL_MM == 0.1016
+    assert spec.HOLDDOWN_STATION_TOL_MM == 0.127  # the +/-.005 drilled-hole row
     text = _holddown_x_text_box()
     cx, cy = drawing.DETAIL_CENTER
     for corner_x in (text[0], text[2]):
@@ -1287,8 +1301,8 @@ def test_crank_axis_follows_the_actual_train() -> None:
     assert crank_axis.CRANK_PLANE_ANGLE == cone_line.INCLINE_DEG
     assert spec.POST_CONE_BORE_HEIGHT > gear64.OUTSIDE_DIA / 2.0
     assert spec.crank_gear_platform_clearance() >= 0.5
-    assert len(drawing.SHEET_NAMES) == 1
-    assert drawing.SHEET_SCALES == {drawing.SHEET_NAMES[0]: drawing.SHEET_SCALE}
+    assert len(drawing.SHEET_NAMES) == 2
+    assert drawing.SHEET_SCALES == {name: drawing.SHEET_SCALE for name in drawing.SHEET_NAMES}
 
 
 def test_nominal_crank_axis_follows_the_post_station_and_the_swing() -> None:
@@ -1603,7 +1617,7 @@ def test_holddown_callout_drills_in_its_thru_row_and_names_face_and_mate() -> No
     updated = drawing.holddown_callout_definitions(dict(_CBORE_PARTS))
     assert updated[5] == _CBORE_PARTS[5]
     assert updated[7] == "<MOD-DIAM><hw-diam> DRILL THRU ALL"
-    assert updated[8] == "FROM UNDERSIDE\nSPOT FROM MHA-DT-21"
+    assert updated[8] == "FROM UNDERSIDE\nLOCATES MHA-DT-21"
     counted = drawing.holddown_callout_definitions(
         {**_CBORE_PARTS, 7: "<NUM_INST>X <MOD-DIAM><hw-diam> THRU ALL"}
     )
@@ -2098,7 +2112,16 @@ def test_pivot_section_uses_profile_station_and_native_connected_style():
     )
     assert style.lineno < aa.lineno < cc.lineno
     assert ast.unparse(cc.value.args[1]) == "profile"
-    assert ast.unparse(assignments["detail"].value.args[1]) == "feature"
+    holes = next(
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_place_holes_sheet"
+    )
+    detail = next(
+        node for node in holes.body
+        if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name)
+        and node.targets[0].id == "detail"
+    )
+    assert ast.unparse(detail.value.args[1]) == "plan"
     assert "PostMount" not in " ".join(drawing.PROFILE_KEEP)
     assert {"PostMountWestZ", "PostMountEastZ"} <= drawing.FEATURE_KEEP.keys()
 

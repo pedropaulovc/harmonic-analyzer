@@ -10,13 +10,12 @@ The platform is an asymmetric steel wedge with a 1/4-in reamed H7 pivot
 bore on the stock screw shoulder, paired 1/4-20 post-mount taps, an open
 west-edge lock notch, four rounded plan corners and the counterbored #4
 clearance hole for the tip block's single hold-down screw, rising from the
-underside (user ruling 2026-09-29).  The three plan views run 1:2 and pivot
-section A-A 2:1.  Detail B enlarges a 12 mm radius around the pivot-to-hole
-region at 2:1 for the hole's station; section C-C (3:2, cropped to the
-strip), cut on the plate-profile plan through the hole's axis, shows the
-underside counterbore in solid lines and carries its native Hole Wizard
-callout. The isometric
-runs 1:3.
+underside (user ruling 2026-09-29).  Sheet 1 carries the 1:2 plate-profile
+plan, pivot section A-A at 2:1, section C-C (3:2, cropped to the strip, cut on
+the profile plan through the hold-down hole's axis, with the hole's native
+Hole Wizard callout) and the 1:3 isometric.  Sheet 2 carries one 1:2 plan
+with the hole pattern and lock notch, and detail B, which enlarges a 12 mm
+radius around the pivot-to-hole region at 2:1 for the hole's station.
 
 Run with SolidWorks open::
 
@@ -135,14 +134,18 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 2.0)  # title block states the principal (plan) scale; iso and section carry their own
-SHEET_NAMES = ("PLATFORM",)
-SHEET_SCALES = {SHEET_NAMES[0]: SHEET_SCALE}
+# Sheet 1 defines the plate: the principal profile plan, the sections cut
+# from it (A-A, C-C) and the isometric.  Sheet 2 holds the hole pattern and
+# the lock notch on ONE unlabelled principal plan, with detail B cut from it
+# (rule 9: no prose-named copies of the plan on one sheet; rule 15: a sheet
+# before cramming both dimension sets onto the A-A plan, whose cutting plane
+# would lie on their pivot-station witnesses, #1029).
+SHEET_NAMES = ("PLATFORM", "HOLES")
+SHEET_SCALES = {name: SHEET_SCALE for name in SHEET_NAMES}
 
 
-# Sheet layout (meters).  Three 1:2 plan views separate the profile, hole
-# pattern and lock-notch definitions instead of routing unrelated leaders
-# through one narrow 224-mm wedge.  The section and pictorial occupy the
-# right-hand field.
+# Sheet layout (meters).  Each sheet carries one 1:2 plan; the section and
+# pictorial occupy sheet 1's right-hand field.
 #
 # The plans and every annotation laid out on them stand PLAN_DROP lower than
 # at r1 (run 20261018T193840449Z): the post-mount taps' callout above the
@@ -157,8 +160,10 @@ def _planned(x: float, y: float) -> tuple[float, float]:
 
 
 PROFILE_CENTER = _planned(0.075, 0.190)
+# Sheet 2's plan stands where the hole-location plan stood on the one-sheet
+# package, so its proven annotation stations (FEATURE_KEEP, the callouts,
+# detail B and its parent letter) carry over unchanged.
 FEATURE_CENTER = _planned(0.180, 0.190)
-NOTCH_CENTER = _planned(0.260, 0.190)
 ISO_CENTER = (0.355, 0.205)
 # The section group sits up and right in the open field below the isometric,
 # clear of the lock-notch caption; every section annotation shares this shift.
@@ -276,24 +281,25 @@ FEATURE_KEEP = {
     "PostMountEastX": _planned(0.205, 0.185),
     "PostMountEastZ": _planned(0.130, 0.175),
 }
+# The lock-notch dimensions join the hole-location plan on sheet 2.  Each
+# keeps its station relative to the pivot from the former notch plan
+# (centred NOTCH_SHIFT to the right), except where a hole-location
+# dimension already stands.
+NOTCH_SHIFT = 0.080
 NOTCH_KEEP = {
-    # Pivot-to-north-edge lives here, sharing the 205.81 pivot witness: in the
-    # profile the R8 corner ray has no path that clears this dimension.
-    "NorthEdgeZ": _planned(0.270, 0.150),
+    # Pivot-to-north-edge shares the 7.756 pivot witness.  Its text stands
+    # right of detail B's parent letter (x 0.1861..0.1897).
+    "NorthEdgeZ": _planned(0.205, 0.150),
     # Text between its witnesses: outside, it read as spanning from the corner.
-    "CapECx": _planned(0.2652, 0.258),
-    # 9 mm left of r1's line (0.305): PLAN_DROP brings its pivot witness down
-    # beside section A-A's PlateThk text (x >= 0.3035), and the pivot relief
-    # note stands right of the line (RELIEF_NOTE_XY).
-    "CapECz": _planned(0.296, 0.180),
+    "CapECx": _planned(0.2652 - NOTCH_SHIFT, 0.258),
+    # Outboard of the 7.756 line (x 0.225, text to ~0.239): the longer
+    # station stands outside the shorter one.
+    "CapECz": _planned(0.252, 0.180),
     # r15 native envelope: the shelf is 2.8049 mm below the position;
     # on the left it ends 10.0455 mm to the right.  Aim down-left at the
-    # physical concave cap, below the 33.00 line (y 246.2219 mm).
-    # The measured 16.916 mm text block needs this lower station: at y224
-    # the plan's left outline is x245.4, not x248.  Here both it and the
-    # neighbouring x225 station line clear the text by at least 2 mm.
-    # Saved-envelope prediction only; require a new native sheet eye proof.
-    "CapEDia": _planned(0.2355, 0.209),
+    # physical concave cap, below the 1.30 line.  Saved-envelope prediction
+    # only, translated with the plan; require a new native sheet eye proof.
+    "CapEDia": _planned(0.2355 - NOTCH_SHIFT, 0.209),
 }
 SECTION_KEEP = {
     # Outside its witnesses, the text hangs LEFT of the dimension line (away
@@ -534,14 +540,16 @@ POST_MOUNT_CALLOUT_BELOW = (
     POST_MOUNT_LOCATING_CALLOUT,
     f"SEE NOTE {ENGAGEMENT_NOTE_NUMBER}",
 )
-# The post-mount taps' callout over the hole-location plan.  The block is
-# centred on the requested point: r3's four rows ran from the inner border
-# (top 0.2665, ~0.3 mm air) to their underline at 0.2453, 6.6 mm over the
-# plate's top edge (0.2387).  The underline runs 92 mm under the long
-# break row: r5, 3 mm lower, ran it (0.1530..0.2454 at y 0.2424) across
-# the notch view (x 0.2394 up, top 0.2444).  2 mm lower than r3 and 9 mm
-# left, the underline stops 3 mm short of that view.
-POST_MOUNT_CALLOUT_XY = (0.191, 0.2545)
+# The post-mount taps' callout, up and LEFT of the sheet-2 plan, in the
+# field the profile plan leaves empty on that sheet: the 1.30 notch station
+# now owns the band over the plate's top edge.  Round 2 (run
+# 20261107T121234299Z) printed the four-row block 88 mm wide, x
+# 0.1468..0.2349 and y 0.2433..0.2651 for a request of (0.191, 0.2545).  At
+# x 0.105 it spans ~0.061..0.149, 25 mm left of the 1.30 text and over the
+# 7.986 line's top end (0.2285) by 15 mm.  Its leader leaves the underline's
+# right end and drops to the EAST (sheet-left) tap (_visible_plan_controls),
+# the near one, meeting that tap's 7.986 extension line only at the tap.
+POST_MOUNT_CALLOUT_XY = (0.105, 0.2545)
 # The reamed pivot bore's callout, below the A-A cutting line between its
 # arrows: right of the plate the 189.26 dimension line crosses any callout
 # wider than ~40 mm.  Its fit row hangs under it, over the plan caption row
@@ -549,19 +557,6 @@ POST_MOUNT_CALLOUT_XY = (0.191, 0.2545)
 # r11 left 2.16 mm to the A identifier; 2 mm lower gives more than one
 # text-height of separation without crowding the plan caption.
 PIVOT_BORE_CALLOUT_XY = (0.215, 0.097)
-# The plate-profile plan is the principal view and carries no label; the two
-# copies that hold the hole and lock-notch dimensions carry standard view
-# labels, centred under each copy on the plans' caption row (rule 9: no
-# prose view names, and the copies share the sheet's 1:2 so print no scale).
-FEATURE_VIEW_LABEL = "VIEW D"
-NOTCH_VIEW_LABEL = "VIEW E"
-VIEW_LABEL_HALF_WIDTH = 0.008
-VIEW_LABEL_CHAR_HEIGHT = 0.0035
-FEATURE_LABEL_UPPER_LEFT = (FEATURE_CENTER[0] - VIEW_LABEL_HALF_WIDTH, 0.085)
-NOTCH_LABEL_UPPER_LEFT = (
-    NOTCH_CENTER[0] - VIEW_LABEL_HALF_WIDTH,
-    _planned(0.0, 0.1255)[1],
-)
 # Section A-A's cutting plane on the profile, sheet metres either side of
 # the pivot (east, west): 38/36 model mm, ~5 mm of sheet outside C-C's
 # ends at the hold-down station, so the A and C letters stand apart.
@@ -1456,16 +1451,14 @@ def _add_face_labels(adapter: Any, sections: dict[str, Any]) -> None:
 
 
 def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any]:
-    """Return the pivot and post-mount rims from the plan view.
-
-    The north-end and long-straight-side edges were dropped with the GD&T that
-    referenced them (see ``build``) -- nothing else on this sheet attaches to
-    them.
+    """Return the pivot rim and the EAST (sheet-left, model -x) post-mount
+    rim from the plan view: the taps' callout stands up and left of the
+    plan (POST_MOUNT_CALLOUT_XY), so its leader drops to the nearer tap.
     """
     expected_radius_m = PIVOT_HOLE_DIA / 2000.0
     expected_mount_radius_m = blind_cut_dia_mm(POST_MOUNT_SPEC) / 2000.0
     pivot_edges: list[Any] = []
-    mount_edges: list[Any] = []
+    mount_edges: list[tuple[float, Any]] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
         edges = (
@@ -1483,10 +1476,10 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any]:
             if abs(values[6] - expected_radius_m) <= 1e-6:
                 pivot_edges.append(edge)
             if abs(values[6] - expected_mount_radius_m) <= 1e-6:
-                mount_edges.append(edge)
+                mount_edges.append((values[0], edge))
     if not pivot_edges or len(mount_edges) < 2:
         raise RuntimeError("cone-platform plan view is missing pivot/mount controls")
-    return pivot_edges[0], mount_edges[0]
+    return pivot_edges[0], min(mount_edges, key=lambda item: item[0])[1]
 
 
 # swSFSymType_e.swSFBasic: the any-process symbol (open vee, no bar).
@@ -2067,6 +2060,101 @@ def _add_sized_note(
     return note
 
 
+def _place_holes_sheet(adapter: Any) -> list[Any]:
+    """Sheet 2 (active): the hole pattern and lock notch on one unlabelled
+    principal plan, detail B cut from it, the plan's hole callouts and note 2.
+    Returns the plan's and detail's curated dimensions."""
+    plan = place_view(adapter, str(SOURCE), "*Top", *FEATURE_CENTER, scale=(1, 2))
+    set_hidden_lines_removed(adapter, plan)
+    detail = _create_detail_view(
+        adapter,
+        plan,
+        model_center_mm=(0.0, PLATE_THICKNESS, DETAIL_MODEL_Z),
+        radius_mm=DETAIL_RADIUS_MM,
+        view_xy=DETAIL_CENTER,
+        detail_label="B",
+        scale=DETAIL_SCALE,
+        label="hold-down station detail",
+    )
+    _place_detail_parent_letter(adapter, plan)
+    # Hidden lines removed: HoldDownZ and HoldDownX run between the pivot bore
+    # and the hold-down hole's visible top-face rims, never to the underside
+    # counterbore.
+    set_hidden_lines_removed(adapter, detail)
+    plan_annotations = curate_view_dimensions(
+        adapter,
+        plan,
+        keep={**FEATURE_KEEP, **NOTCH_KEEP},
+        view_label="hole-pattern plan",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    # Name the relief so the reader ties the width to note 1's depth; its
+    # open end and round end show in the plan (rule 17 W18).
+    set_dimension_callouts(
+        adapter,
+        plan_annotations,
+        {"PivotBearingReliefDia": RELIEF_WIDTH_CALLOUT},
+    )
+    detail_annotations = curate_view_dimensions(
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="hold-down station detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    # No explicit AutoInsertCenterMarks2: the template centre-marks every
+    # hole as the plan is placed, and r1's explicit call printed each of the
+    # four marks twice (layout audit duplicate-annotation; fleet issue #913).
+    pivot_edge, mount_edge = _visible_plan_controls(adapter, plan)
+    pivot_callout = add_native_hole_callout(
+        adapter,
+        plan,
+        callout_xy=PIVOT_BORE_CALLOUT_XY,
+        label="pivot reamed bore",
+        edge=pivot_edge,
+    )
+    _rewrite_hole_callout(
+        pivot_callout,
+        pivot_callout_definitions,
+        label="pivot reamed bore",
+    )
+    _print_pivot_band_exactly(pivot_callout)
+    post_mount_callout = add_native_hole_callout(
+        adapter,
+        plan,
+        callout_xy=POST_MOUNT_CALLOUT_XY,
+        label="v2 post-mount tapped holes",
+        edge=mount_edge,
+    )
+    _rewrite_hole_callout(
+        post_mount_callout,
+        lambda definitions: callout_below_definitions(
+            definitions, POST_MOUNT_CALLOUT_BELOW
+        ),
+        label="v2 post-mount tapped holes",
+    )
+    _omit_post_mount_thread_class(post_mount_callout)
+    set_hole_callout_precision(
+        post_mount_callout, POST_MOUNT_CALLOUT_PRECISION, label="v2 post-mount tapped holes"
+    )
+    rebuild_drawing(adapter, label="plan hole callout rows")
+    _add_sized_note(
+        adapter, ENGAGEMENT_NOTE, *ENGAGEMENT_NOTE_XY,
+        char_height=NOTE_CHAR_HEIGHT, label="post-mount engagement note",
+    )
+    # Annotation insertion can invalidate the exported display geometry.
+    for view in (plan, detail):
+        set_hidden_lines_removed(adapter, view)
+    # Last, after every annotation and display-mode regen could re-lay it.
+    _position_view_label(
+        adapter,
+        detail,
+        DETAIL_LABEL_LOWER_LEFT,
+        label="detail B label",
+    )
+    return [*plan_annotations, *detail_annotations]
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -2119,16 +2207,12 @@ async def build(adapter: Any) -> dict[str, str]:
     profile = place_view(
         adapter, str(SOURCE), "*Top", *PROFILE_CENTER, scale=(1, 2)
     )
-    feature = place_view(
-        adapter, str(SOURCE), "*Top", *FEATURE_CENTER, scale=(1, 2)
-    )
-    notch = place_view(adapter, str(SOURCE), "*Top", *NOTCH_CENTER, scale=(1, 2))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 3))
-    for view in (profile, feature, notch, iso):
+    for view in (profile, iso):
         set_hidden_lines_removed(adapter, view)
 
-    # Keep the transverse pivot plane, but put its native end-only indicator
-    # on the profile: the feature plan's PostMount Z witnesses are collinear.
+    # The transverse pivot plane lives on the profile plan, which carries no
+    # pivot-station witnesses for the whole cutting-plane line to lie on.
     profile_section_pivot = model_point_in_view(
         adapter, profile, (0.0, 0.0, 0.0), label="pivot section station"
     )
@@ -2162,21 +2246,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="section A-A pivot hole",
     )
 
-    detail = _create_detail_view(
-        adapter,
-        feature,
-        model_center_mm=(0.0, PLATE_THICKNESS, DETAIL_MODEL_Z),
-        radius_mm=DETAIL_RADIUS_MM,
-        view_xy=DETAIL_CENTER,
-        detail_label="B",
-        scale=DETAIL_SCALE,
-        label="hold-down station detail",
-    )
-    _place_detail_parent_letter(adapter, feature)
-    # Hidden lines removed: HoldDownZ and HoldDownX run between the pivot bore
-    # and the hold-down hole's visible top-face rims, never to the underside
-    # counterbore.
-    set_hidden_lines_removed(adapter, detail)
     profile_pivot = model_point_in_view(
         adapter, profile, (0.0, PLATE_THICKNESS / 1000.0, 0.0), label="profile pivot"
     )
@@ -2227,27 +2296,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _add_profile_virtual_sharps(adapter, profile)
     _hide_profile_cosmetic_threads(adapter, profile)
-    feature_annotations = curate_view_dimensions(
-        adapter,
-        feature,
-        keep=FEATURE_KEEP,
-        view_label="feature plan",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    # Name the relief so the reader ties the width to note 1's depth; its
-    # open end and round end show in the plan (rule 17 W18).
-    set_dimension_callouts(
-        adapter,
-        feature_annotations,
-        {"PivotBearingReliefDia": RELIEF_WIDTH_CALLOUT},
-    )
-    notch_annotations = curate_view_dimensions(
-        adapter,
-        notch,
-        keep=NOTCH_KEEP,
-        view_label="notch plan",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
     section_annotations = curate_view_dimensions(
         adapter,
         section,
@@ -2292,13 +2340,6 @@ async def build(adapter: Any) -> dict[str, str]:
                 print(f"PlateThk witness {witness_index}: old_gap_m={old_gap} gap_m={actual_gap}")
             rebuild_drawing(adapter, label="plate thickness cut-edge witness gaps")
     _crop_pivot_section(adapter, section)
-    detail_annotations = curate_view_dimensions(
-        adapter,
-        detail,
-        keep=DETAIL_KEEP,
-        view_label="hold-down station detail",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
     # U41: the thickness is the stock's, a reference with no band.
     thickness_annotations = [
         item for item in section_annotations
@@ -2321,49 +2362,7 @@ async def build(adapter: Any) -> dict[str, str]:
     relief_reference = set_reference_dimension(
         adapter, relief_annotations[0], label="matched pivot relief reference depth"
     )
-    annotations = [
-        *profile_annotations,
-        *feature_annotations,
-        *notch_annotations,
-        *section_annotations,
-        *detail_annotations,
-    ]
-    # No explicit AutoInsertCenterMarks2: the template centre-marks every
-    # hole as the plan is placed, and r1's explicit call printed each of the
-    # four marks twice (layout audit duplicate-annotation; fleet issue #913).
-    pivot_edge, mount_edge = _visible_plan_controls(adapter, feature)
-    pivot_callout = add_native_hole_callout(
-        adapter,
-        feature,
-        callout_xy=PIVOT_BORE_CALLOUT_XY,
-        label="pivot reamed bore",
-        edge=pivot_edge,
-    )
-    _rewrite_hole_callout(
-        pivot_callout,
-        pivot_callout_definitions,
-        label="pivot reamed bore",
-    )
-    _print_pivot_band_exactly(pivot_callout)
-    post_mount_callout = add_native_hole_callout(
-        adapter,
-        feature,
-        callout_xy=POST_MOUNT_CALLOUT_XY,
-        label="v2 post-mount tapped holes",
-        edge=mount_edge,
-    )
-    _rewrite_hole_callout(
-        post_mount_callout,
-        lambda definitions: callout_below_definitions(
-            definitions, POST_MOUNT_CALLOUT_BELOW
-        ),
-        label="v2 post-mount tapped holes",
-    )
-    _omit_post_mount_thread_class(post_mount_callout)
-    set_hole_callout_precision(
-        post_mount_callout, POST_MOUNT_CALLOUT_PRECISION, label="v2 post-mount tapped holes"
-    )
-    rebuild_drawing(adapter, label="plan hole callout rows")
+    annotations = [*profile_annotations, *section_annotations]
     # The section shows the top seat at its head and the base slide at its
     # foot.  Arrows land mid-face so neither symbol reads as controlling a
     # corner, hole wall or outer edge: both on the left-hand piece, the
@@ -2396,22 +2395,10 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         _set_any_process_finish(adapter, symbol, label=label)
 
-    _add_sized_note(
-        adapter, FEATURE_VIEW_LABEL, *FEATURE_LABEL_UPPER_LEFT,
-        char_height=VIEW_LABEL_CHAR_HEIGHT, label="hole-location view label",
-    )
-    _add_sized_note(
-        adapter, NOTCH_VIEW_LABEL, *NOTCH_LABEL_UPPER_LEFT,
-        char_height=VIEW_LABEL_CHAR_HEIGHT, label="lock-notch view label",
-    )
     add_property_linked_note(adapter, "Isometric View Note", *ISO_CAPTION_UPPER_LEFT)
     _add_sized_note(
         adapter, RELIEF_NOTE, *RELIEF_NOTE_XY_UPPER_LEFT,
         char_height=NOTE_CHAR_HEIGHT, label="top relief note",
-    )
-    _add_sized_note(
-        adapter, ENGAGEMENT_NOTE, *ENGAGEMENT_NOTE_XY,
-        char_height=NOTE_CHAR_HEIGHT, label="post-mount engagement note",
     )
     add_leader_note(
         adapter,
@@ -2428,21 +2415,19 @@ async def build(adapter: Any) -> dict[str, str]:
     _add_face_labels(adapter, {"A-A": section, "C-C": holddown_section})
 
     # Annotation insertion can invalidate the exported display geometry.
-    for view in (profile, feature, notch, section, detail, holddown_section, iso):
+    for view in (profile, section, holddown_section, iso):
         set_hidden_lines_removed(adapter, view)
     # Last, after every annotation and display-mode regen could re-lay it.
-    _position_view_label(
-        adapter,
-        detail,
-        DETAIL_LABEL_LOWER_LEFT,
-        label="detail B label",
-    )
     _position_view_label(
         adapter,
         holddown_section,
         HOLDDOWN_SECTION_LABEL_LOWER_LEFT,
         label="section C-C label",
     )
+
+    if not ddoc.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("failed to activate the hole-pattern sheet")
+    annotations += _place_holes_sheet(adapter)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if (str(relief_reference.GetText(1)), str(relief_reference.GetText(2))) != ("(", ")"):
         raise RuntimeError("pivot relief reference state did not persist")
