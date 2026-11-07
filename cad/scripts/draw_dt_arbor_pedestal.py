@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+from collections.abc import Callable
 from math import sqrt
 from typing import Any, Literal
 
@@ -210,6 +211,11 @@ CROWN_CALLOUT = "SIDES TANGENT FROM FOOT CORNERS"
 SET_SCREW_PROCESS = "TAP"
 # Hole Wizard drill sizes print .XXX on the inch sheet, by native variable.
 HOLD_DOWN_PRECISION = {"hw-diam": HOLE_CALLOUT_PRECISION}
+# The hold-down hole reads size, then process, then extent (rule 26 (standard
+# forms only)): DRILL follows the native diameter variable instead of a prefix
+# ahead of it (fan-out screen 20261107T081227004Z: "DRILL Ø .180 THRU ALL").
+HOLD_DOWN_PROCESS = "DRILL"
+_HOLD_DOWN_DIAMETER = "<hw-diam>"
 SET_SCREW_PRECISION = {"hw-tapdrldia": HOLE_CALLOUT_PRECISION}
 SET_SCREW_EXTENT = "TO BORE"
 _THREAD_CLASS = re.compile(r"\s*(?:-\s*)?<hw-threadclass>\s*", re.IGNORECASE)
@@ -457,24 +463,58 @@ def set_screw_callout_definitions(definitions: dict[int, str]) -> dict[int, str]
     return updated
 
 
-@_telemetry.traced("drawing.arbor.tap_callout_text")
-def _set_tap_callout_text(display: Any) -> None:
-    """Write the rewritten definitions and prove they persisted."""
+def hold_down_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """Put DRILL after the hold-down hole's one native diameter variable."""
+    if set(definitions) != {5, 6, 7, 8}:
+        raise RuntimeError(f"unexpected hold-down callout parts: {definitions!r}")
+    joined = "\n".join(definitions.values())
+    if joined.count(_HOLD_DOWN_DIAMETER) != 1 or HOLD_DOWN_PROCESS in joined:
+        raise RuntimeError(f"hold-down callout lacks one bare diameter: {definitions!r}")
+    return {
+        part: text.replace(
+            _HOLD_DOWN_DIAMETER, f"{_HOLD_DOWN_DIAMETER} {HOLD_DOWN_PROCESS}"
+        )
+        for part, text in definitions.items()
+    }
+
+
+def _rewrite_callout_definitions(
+    display: Any, rewrite: Callable[[dict[int, str]], dict[int, str]]
+) -> dict[int, str]:
+    """Write a native hole callout's rewritten definitions, prove they
+    persisted and return the resolved text parts."""
     native = _early_bound(display, "IDisplayDimension")
     definitions = {part: str(native.GetText(part) or "") for part in (5, 6, 7, 8)}
-    updated = set_screw_callout_definitions(definitions)
+    updated = rewrite(definitions)
     for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
         if updated[definition_part] != definitions[definition_part]:
             native.SetText(writable_part, updated[definition_part])
     persisted = {part: str(native.GetText(part) or "") for part in (5, 6, 7, 8)}
-    resolved = {part: str(native.GetText(part) or "") for part in (1, 2, 3, 4)}
+    if persisted != updated:
+        raise RuntimeError(f"callout definitions did not persist: {persisted!r}")
+    return {part: str(native.GetText(part) or "") for part in (1, 2, 3, 4)}
+
+
+@_telemetry.traced("drawing.arbor.tap_callout_text")
+def _set_tap_callout_text(display: Any) -> None:
+    """Write the rewritten tap definitions and prove they resolved."""
+    resolved = _rewrite_callout_definitions(display, set_screw_callout_definitions)
     joined = "\n".join(resolved.values())
-    if persisted != updated or joined.count(SET_SCREW_EXTENT) != 2 or "2B" in joined:
-        raise RuntimeError(
-            "apex tap callout text did not persist: "
-            f"definitions={persisted!r}, resolved={resolved!r}"
-        )
+    if joined.count(SET_SCREW_EXTENT) != 2 or "2B" in joined:
+        raise RuntimeError(f"apex tap callout text did not resolve: {resolved!r}")
     _telemetry.info(f"apex tap callout: {resolved!r}")
+
+
+@_telemetry.traced("drawing.arbor.hold_down_callout_text")
+def _set_hold_down_callout_text(display: Any) -> None:
+    """Write the size-first hold-down definitions and prove they resolved."""
+    resolved = _rewrite_callout_definitions(display, hold_down_callout_definitions)
+    joined = "\n".join(resolved.values())
+    if joined.count(f" {HOLD_DOWN_PROCESS}") != 1 or joined.lstrip().startswith(
+        HOLD_DOWN_PROCESS
+    ):
+        raise RuntimeError(f"hold-down callout text did not resolve: {resolved!r}")
+    _telemetry.info(f"hold-down callout: {resolved!r}")
 
 
 @_telemetry.traced("drawing.diameter_second_arrow", label_param="label")
@@ -686,8 +726,8 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=HOLD_DOWN_EDGE_XY,
         callout_xy=HOLD_DOWN_CALLOUT_XY,
         label="flange hold-down hole",
-        process="DRILL",
     )
+    _set_hold_down_callout_text(hold_down_callout)
     set_hole_callout_precision(
         hold_down_callout, HOLD_DOWN_PRECISION, label="flange hold-down hole"
     )

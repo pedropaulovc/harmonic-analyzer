@@ -537,6 +537,21 @@ def test_tap_callout_rewrite_refuses_an_unexpected_native_format() -> None:
         drawing.set_screw_callout_definitions(no_class)
 
 
+def test_hold_down_callout_reads_size_then_drill_then_extent() -> None:
+    """Fan-out screen 20261107T081227004Z: "DRILL Ø .180 THRU ALL" put the
+    process ahead of the size (rule 26: size, process, depth)."""
+    import pytest
+
+    native = {5: "<MOD-DIAM><hw-diam> <hw-thru>", 6: "", 7: "", 8: ""}
+    updated = drawing.hold_down_callout_definitions(dict(native))
+    assert updated == {5: "<MOD-DIAM><hw-diam> DRILL <hw-thru>", 6: "", 7: "", 8: ""}
+    with pytest.raises(RuntimeError, match="one bare diameter"):
+        drawing.hold_down_callout_definitions(updated)
+    source = _drawing_source()
+    assert 'process="DRILL"' not in source
+    assert "_set_hold_down_callout_text(hold_down_callout)" in source
+
+
 def test_part_stamps_make_flexible_material_and_protective_finish() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_properties" in source
