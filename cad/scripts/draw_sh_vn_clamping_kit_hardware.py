@@ -39,7 +39,6 @@ from _drawing_common import (
 )
 from _drawing_dimensions import (
     assert_imported_precision,
-    set_dimension_callouts,
     set_reference_dimension,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
@@ -138,7 +137,7 @@ part_metadata(
 requirement(
     "finished_upper_end", kind="face",
     faces=(PlanarFace((0.0, 1.0, 0.0), stud.LENGTH),),
-    requirements=("length", "note"),
+    requirements=("length",),
     fields={
         "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
         "length": (
@@ -146,7 +145,6 @@ requirement(
             ("LENGTH", "LENGTH_BAND"),
         ),
         "length_nominal": (stud.LENGTH, ("LENGTH",)),
-        "note": (stud.DIMENSION_CALLOUTS["FinishedLength"], ("DIMENSION_CALLOUTS",)),
     },
     precision={"length": stud.LENGTH_PLACES},
 )
@@ -468,23 +466,6 @@ def read_saved_cut_end_angle(model: Any) -> float:
     return float(angle)
 
 
-def set_machining_callouts(adapter: Any, annotations: list[Any]) -> None:
-    """Read back the printed length callout without replacing its native size."""
-    callouts = {"FinishedLength": stud.DIMENSION_CALLOUTS["FinishedLength"]}
-    set_dimension_callouts(adapter, annotations, callouts)
-    remaining = dict(callouts)
-    for annotation in annotations:
-        name = dimension_name(adapter, annotation)
-        expected = remaining.pop(name, None)
-        if expected is None:
-            continue
-        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        if display.GetText(4) != expected:  # swDimensionTextCalloutBelow
-            raise RuntimeError(f"{name}: native machining callout did not persist")
-    if remaining:
-        raise RuntimeError(f"missing native machining callouts: {sorted(remaining)}")
-
-
 def assert_machining_controls(adapter: Any, annotations: list[Any]) -> None:
     """Read the printed source-owned length driver, precision and tolerance."""
     remaining = {
@@ -625,7 +606,6 @@ def append_stud_rework_sheets(adapter: Any) -> tuple[Callable[[], None], ...]:
     )
     annotations = [*front_annotations, *end_annotations]
     assert_machining_controls(adapter, annotations)
-    set_machining_callouts(adapter, annotations)
     if add_note(adapter, ITEM_LABEL, *ITEM_LABEL_XY) is None:
         raise RuntimeError("failed to label the stud REWORK sheet's item")
     settled_notes = add_rework_notes(adapter, front)
