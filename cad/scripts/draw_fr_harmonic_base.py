@@ -57,7 +57,6 @@ from _drawing_common import (
 from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
 from _drawing_dimensions import (
     assert_imported_precision,
-    offset_dimension_text,
     set_dimension_callouts,
     set_reference_dimension,
 )
@@ -336,8 +335,8 @@ SOCKET_FINISH_SHOULDER = 0.004
 # Every manufacturing value on the sheets is imported here: the part marks
 # and precises them (harmonic_base_spec.DRAWING_DIMENSIONS / DRAWING_PRECISION)
 # and these tables only say WHICH view shows each one and WHERE its text sits
-# -- the placement-only division drawing-guidelines.md rule 3 (decimal places carry the tolerance) draws. The six keeps partition
-# DRAWING_PRECISION_BY_NAME exactly, which assert_imported_precision proves at
+# -- the placement-only division drawing-guidelines.md rule 3 (decimal places carry the tolerance) draws. The keeps partition
+# SHOWN_PRECISION_BY_NAME exactly, which assert_imported_precision proves at
 # the end of the build.
 GEOMETRY_TOP_KEEP = {
     # Three lengths stacked above the plan, shortest nearest the outline, and
@@ -389,23 +388,24 @@ SIDE_KEEP = {
     # serial's Y reference text (SERIAL_Y_TEXT_XY).
     "DeckEdgeChamfer": (0.218, 0.134),
 }
-HOLE_TOP_KEEP = {
-    # D1 is held from the nearer transferred pedestal seat. The point-only
-    # reference sketch supplies real centre-to-centre extension origins;
-    # place X below the plan, left of both witnesses and the datum X letter.
-    "PivotSeatX": (0.2427, 0.1320),
-    # Preserve the R7 point-to-point line and its short native witnesses;
-    # offset the complete two-row block into the exterior west notes lane.
-    "PivotSeatY": (0.2616, 0.1705),
+# D1 shows no view offsets. Delegated ruling 2026-11-07 (Main), no precedent;
+# owner review #2144 (pending owner confirmation): D1 is transferred from the
+# MHA-DT-20 pivot bore, so its spec-owned .002 offsets from the MHA-DT-02 seat
+# (PivotSeatReference, booked in cone_set_stack) are an MHA-DT-00 assembly
+# check, not a print location. Run 20261107T191011860Z (2/3): the two banded
+# dimensions ran from an untagged transferred hole beside a hole table that
+# already locates D1, and read as cut-to values against the transfer.
+SHOWN_PRECISION_BY_NAME = {
+    name: places
+    for name, places in DRAWING_PRECISION_BY_NAME.items()
+    if name not in PIVOT_SEAT_DIMENSIONS
 }
-PIVOT_SEAT_Y_TEXT_XY = (0.2080, 0.1895)
-# Lower the free origin note 8.5 mm for the exterior block/leader, retaining
-# a full native row-pitch gap to both this note and the socket-fit note.
-# The theoretical origin, native axes and table stay fixed.
-HOLE_ORIGIN_NOTE_XY = (0.165, 0.1775)
-# ABOVE accepts one printable row; both native offsets cite numbered note 1.
+# D1's hole-table row cites numbered note 1, its transfer route.
 PIVOT_SEAT_FLAG = "SEE NOTE 1"
-PIVOT_SEAT_CALLOUTS = dict.fromkeys(PIVOT_SEAT_DIMENSIONS, PIVOT_SEAT_FLAG)
+# The free origin note sits 8.5 mm below the plan's west edge, a full native
+# row pitch clear of the socket-fit note. The theoretical origin, native axes
+# and table stay fixed.
+HOLE_ORIGIN_NOTE_XY = (0.165, 0.1775)
 # #1744: the D1 row carries the same flag where its reference X/Y print. The
 # hole table's generated cells are not editable (ITableAnnotation
 # IsCellTextEditable: only the header row and custom columns are), so the
@@ -959,77 +959,6 @@ def _serial_edge(view: Any) -> Any:
     if not candidates:
         raise RuntimeError("base stamped identifier lacks a visible source edge")
     return min(candidates, key=lambda item: item[0])[1]
-
-
-def _place_pivot_seat_y(adapter: Any, annotations: list[Any]) -> None:
-    """Keep the native Y line between its holes and offset only its text."""
-    name = "PivotSeatY"
-    matches = []
-    for raw in annotations:
-        annotation = _early_bound(raw, "IAnnotation")
-        if dimension_name(adapter, annotation) == name:
-            matches.append(annotation)
-    if len(matches) != 1:
-        raise RuntimeError(f"harmonic base needs one native {name}, got {len(matches)}")
-    annotation = matches[0]
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    # An inherited offset would move only text, leaving the old long witnesses.
-    display.OffsetText = False
-    if bool(display.OffsetText):
-        raise RuntimeError("harmonic base PivotSeatY offset could not be reset")
-    if not annotation.SetPosition2(*HOLE_TOP_KEEP[name], 0.0):
-        raise RuntimeError("failed to position the harmonic base PivotSeatY line")
-    line_position = annotation.GetPosition()
-    if (
-        not line_position
-        or not math.dist(
-            (float(line_position[0]), float(line_position[1])), HOLE_TOP_KEEP[name]
-        )
-        <= 1e-5
-    ):
-        raise RuntimeError(
-            f"harmonic base PivotSeatY line did not persist: {line_position!r}"
-        )
-    offset_dimension_text(adapter, [annotation], {name: PIVOT_SEAT_Y_TEXT_XY})
-    if not bool(display.OffsetText):
-        raise RuntimeError("harmonic base PivotSeatY text did not stay offset")
-    position = annotation.GetPosition()
-    if (
-        not position
-        or not math.dist(
-            (float(position[0]), float(position[1])), PIVOT_SEAT_Y_TEXT_XY
-        )
-        <= 1e-5
-    ):
-        raise RuntimeError(f"harmonic base PivotSeatY text did not persist: {position!r}")
-
-
-def _flag_pivot_seat_dimensions(adapter: Any, annotations: list[Any]) -> None:
-    """Apply one-line ABOVE flags to both native pivot offsets and read them back."""
-    if set(PIVOT_SEAT_CALLOUTS) != set(PIVOT_SEAT_DIMENSIONS) or any(
-        not text or "\n" in text or "\r" in text
-        for text in PIVOT_SEAT_CALLOUTS.values()
-    ):
-        raise RuntimeError("pivot offsets require both one-line ABOVE flags")
-    matches = {}
-    for raw in annotations:
-        annotation = _early_bound(raw, "IAnnotation")
-        name = dimension_name(adapter, annotation)
-        if name not in PIVOT_SEAT_CALLOUTS:
-            continue
-        if name in matches:
-            raise RuntimeError(f"duplicate native pivot offset: {name}")
-        matches[name] = annotation
-    if set(matches) != set(PIVOT_SEAT_CALLOUTS):
-        raise RuntimeError(f"missing native pivot offsets: {set(PIVOT_SEAT_CALLOUTS) - set(matches)}")
-    set_dimension_callouts(
-        adapter, annotations, PIVOT_SEAT_CALLOUTS, location="above"
-    )
-    for name, annotation in matches.items():
-        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        actual = display.GetText(3)  # swDimensionTextCalloutAbove
-        if actual != PIVOT_SEAT_CALLOUTS[name]:
-            raise RuntimeError(f"native {name} ABOVE flag did not persist: {actual!r}")
 
 
 def _table_cells(table: Any, columns: int) -> tuple[tuple[str, ...], ...]:
@@ -2601,17 +2530,6 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (hole_top, section):
         set_hidden_lines_removed(adapter, view)
 
-    # The part saves PivotSeatReference blanked; show its point-only owner in
-    # this view to import its dimensions without hiding them again afterward.
-    hole_top_dimensions = curate_hidden_owner_dimensions(
-        adapter,
-        hole_top,
-        keep=HOLE_TOP_KEEP,
-        view_label="holes top",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    _place_pivot_seat_y(adapter, hole_top_dimensions)
-    _flag_pivot_seat_dimensions(adapter, hole_top_dimensions)
     section_dimensions = curate_view_dimensions(
         adapter,
         section,
@@ -2960,20 +2878,19 @@ async def build(adapter: Any) -> dict[str, str]:
     # every imported dimension must still print what its PART authored. A
     # silent fallback to the drawing document's two places would ask the shop
     # for a band nobody specified, and nothing else on the sheet would look
-    # wrong. The seven keeps partition this map, so a missing name fails too.
+    # wrong. The keeps partition this map, so a missing name fails too.
     assert_imported_precision(
         adapter,
         [
             *top_dimensions,
             *side_dimensions,
-            *hole_top_dimensions,
             *section_dimensions,
             *hole_side_dimensions,
             *bottom_dimensions,
             *underside_section_dimensions,
             *lugs_dimensions,
         ],
-        DRAWING_PRECISION_BY_NAME,
+        SHOWN_PRECISION_BY_NAME,
     )
 
     hole_sheet_callouts = {
