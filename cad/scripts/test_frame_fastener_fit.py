@@ -89,7 +89,8 @@ def test_base_cross_screws_engage_the_far_wall() -> None:
     assert engagement == base_fasteners.BASE_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT
     assert engagement >= joint.FAR_WALL_ENGAGEMENT_FLOOR_MM
     assert math.isclose(engagement, 7.501, abs_tol=0.005)
-    # 1.42D at a 1.5-pitch tip: MHA-FR-00 check 2 catches a short tip.
+    # 1.42D at a 1.5-pitch tip: MHA-FR-00's full-thread length check catches
+    # a short tip before the screw goes in.
     assert math.isclose(
         joint.far_wall_full_thread_min_mm(
             front, tip_loss_mm=1.5 * joint.CROSS_SCREW_PITCH
@@ -130,29 +131,37 @@ def test_top_cross_screws_engage_the_far_wall() -> None:
     assert math.isclose(minimum_thread_reserve, 0.050 * 25.4, abs_tol=1e-9)
 
 
-def test_assembly_check_accepts_every_installed_screw_on_far_wall_engagement() -> None:
-    # The 0.7P tip allowance is nominal (dt_swing_stop precedent): MHA-FR-00
-    # accepts each installed joint, upper and lower, at 1.5D of full-form
-    # far-wall engagement, a ratio of the screw with no dimension in the note.
+def test_assembly_accepts_every_cross_screw_on_a_bench_measurable_thread_length() -> None:
+    # The installed far-wall thread is out of sight, so MHA-FR-00 accepts each
+    # screw before it goes in: its full thread must reach from under the head
+    # past the print-worst far-wall start of either casting by the 1.5D floor.
+    # The base governs, and the printed limit rounds up, so any screw that
+    # passes engages at least 1.5D whatever its tip chamfer.
     import draw_fr_frame_assembly as assembly_sheet
 
-    assert joint.CROSS_SCREW_ENGAGEMENT_CHECK == (
-        "FULL-FORM THREAD ENGAGEMENT OF AT LEAST 1.5 SCREW DIAMETERS"
-    )
-    checks = " ".join(
-        line.strip() for line in assembly_sheet.ASSEMBLY_CHECKS.splitlines()
-    )
+    starts = [
+        base_fasteners.base_cross_screw_far_wall_start_max_mm(front=front)
+        for front in (True, False)
+    ]
+    governing = max(*starts, top_frame.TOP_CROSS_SCREW_FAR_WALL_START_MAX)
+    assert governing == max(starts)
+    assert assembly_sheet.CROSS_SCREW_FAR_WALL_START_MAX_MM == governing
+    limit_mm = assembly_sheet.CROSS_SCREW_FULL_THREAD_MIN_IN * 25.4
+    assert 0.0 <= limit_mm - (governing + joint.FAR_WALL_ENGAGEMENT_FLOOR_MM) < 0.001 * 25.4
+    # A stock screw at its shortest still passes at the nominal tip.
+    assert limit_mm <= cross_screw.SHANK_LEN - joint.CROSS_SCREW_LENGTH_SHORT_ALLOWANCE_MM
+    measured = assembly_sheet.STEP_TEXT["cross-screws-measured"]
+    assert f"{assembly_sheet.CROSS_SCREW_FULL_THREAD_MIN_TEXT} MIN" in measured
+    assert "CALIPER" in measured
+    steps = assembly_sheet.steps
+    # Measured before the screws go in; a separate step replaces a short one.
     assert (
-        f"VERIFY EACH SCREW HAS {joint.CROSS_SCREW_ENGAGEMENT_CHECK} "
-        "IN THE FAR WALL OF ITS MHA-FR-01 OR MHA-FR-02 CASTING."
-    ) in checks
-    assert "THREAD SEGMENTS" not in checks
-    steps = " ".join(
-        line.strip() for line in assembly_sheet.ASSEMBLY_STEPS.splitlines()
+        steps.step_number("cross-screws-measured")
+        < steps.step_number("cross-screws-replaced")
+        < steps.step_number(steps.CROSS_SCREWS_DRIVEN_KEY)
+        < steps.step_number("cross-screw-heads-checked")
     )
-    assert "5. THROUGH THE MHA-FR-02 NEAR-WALL CLEARANCES, PILOT-TRANSFER" in steps
-    assert steps.count("PROTECT THE FAR-WALL THREAD") == 2
-    assert "BOTH THREAD SEGMENTS" not in steps
+    assert "SCREW DIAMETERS" not in assembly_sheet.ASSEMBLY_STEPS
 
 
 def test_stock_caps_seat_on_tube_ends_and_preserve_finished_height() -> None:

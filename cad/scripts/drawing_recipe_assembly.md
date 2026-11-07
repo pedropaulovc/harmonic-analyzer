@@ -62,9 +62,10 @@ the per-assembly files pin each registry row, output mapping, scale, and centers
 
 ## Frame package
 
-`draw_fr_frame_assembly.py` uses four ASME B sheets: landscape working views,
-portrait exploded view with native BOM and balloons, landscape assembly
-instructions, and landscape assembly-only checks. The registry includes both
+`draw_fr_frame_assembly.py` uses five ASME B sheets: landscape working views,
+portrait exploded view with native BOM and balloons, and three landscape step
+sheets, each a column of keyed single-action steps (`fr_frame_assembly_steps`)
+beside the finished-assembly isometric. The registry includes both
 orientation templates as dependencies.
 Finalization checks each native sheet and each exported PDF page against its
 declared layout.

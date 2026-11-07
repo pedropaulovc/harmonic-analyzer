@@ -147,6 +147,7 @@ from dt_pinion_arbor_geometry import (
     HEAD_REAR_Z as ARBOR_HEAD_REAR_Z,
 )
 from dt_pinion_spring_section import SCREW_EAST_OF_PIVOT as SPRING_SCREW_EAST_OF_PIVOT
+import fr_frame_assembly_steps
 import fr_harmonic_base_spec as base
 import pinion_rig_fitup as FITUP
 from pinion_rig_park_geometry import APINION_X
@@ -1098,7 +1099,8 @@ BANK_STEPS = _note_text(
         # the 9A DRO zero (INTERFACE_NOTES lists them); the screw is the one
         # the channel's south bracket uses.
         f"{steps.step_number(NORTH_BRACKET_SET_KEY)}. MHA-FR-05 SCREWED DOWN ON THE BASE"
-        " (FRAME ASSEMBLY MHA-FR-00 STEP 8),",
+        " (FRAME ASSEMBLY "
+        f"{fr_frame_assembly_steps.step_ref(fr_frame_assembly_steps.SUPPORT_SCREWED_KEY)}),",
         "   DRO STILL ZEROED AS 9A. FROM MHA-CH-00 TAKE THE NORTH MHA-CH-08, ONE",
         f"   {NORTH_BRACKET_SCREW} AND ONE MHA-CH-VN-56. STAND THE MHA-CH-08 ON THE MHA-FR-05",
         "   RAIL, FOOT TO THE BACK. MIC THE MHA-CH-VN-56, W. SET THE EAR",
