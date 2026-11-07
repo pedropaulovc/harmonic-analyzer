@@ -224,7 +224,7 @@ def test_pin_hole_callout_links_the_pins_drive_fit_note() -> None:
     callout = drawing.DIMENSION_CALLOUTS["PinHoleDia"]
     assert callout == notes.PIN_HOLE_CALLOUT
     assert callout.split("\n") == [
-        f"MATCH DRILL AND REAM AT ASSY WITH {spec.CRANKSHAFT_NUMBER}",
+        f"MATCH DRILL AND REAM THRU WITH {spec.CRANKSHAFT_NUMBER}",
         f"SEE NOTE {notes.PIN_FIT_NOTE_NUMBER}",
     ]
     assert _note(notes.PIN_FIT_NOTE_NUMBER) == (
@@ -236,6 +236,15 @@ def test_pin_hole_callout_links_the_pins_drive_fit_note() -> None:
     assert drawing.REFERENCE_DIMENSIONS == ("PinHoleDia",)
     assert "add_leader_note(\n        adapter,\n        PIN_HOLE" not in _source().replace(
         "\r\n", "\n"
+    )
+
+
+def test_curve_resolution_is_pinned_before_the_first_view() -> None:
+    # Fan-out r3 (rule 8): the isometric's tooth ends printed as polygons.
+    source = _source()
+    assert source.count('set_precise_curve_quality(adapter, label="crank-pinion")') == 1
+    assert source.index("set_precise_curve_quality(adapter") < source.index(
+        'place_view(adapter, str(SOURCE), "*Front"'
     )
 
 
@@ -612,10 +621,14 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     block_top = radius_y + drawing.RADIUS_SHOULDER_DROP
     assert text_right + 0.003 < pin_line_x(block_top)
     assert block_top + 0.002 < drawing._TOP_ROW_Y - drawing.PIN_HOLE_UNDERLINE_DROP
-    # The pin hole's callout keeps the 88d48ad2a7b4 audit's widest row (43
-    # characters), so its underline still ends PIN_HOLE_LINE_RUN_IN left of
-    # the keep; one row fewer lifts that underline by half a row.
-    assert max(len(row) for row in drawing.DIMENSION_CALLOUTS["PinHoleDia"].splitlines()) == 43
+    # The pin hole's underline ends PIN_HOLE_LINE_RUN_IN left of the keep,
+    # the 88d48ad2a7b4 audit's 55.4 mm for its 43-character row scaled to
+    # this callout's widest row; one row fewer lifts that underline by half a
+    # row.
+    widest = max(len(row) for row in drawing.DIMENSION_CALLOUTS["PinHoleDia"].splitlines())
+    assert widest == drawing.PIN_HOLE_WIDEST_ROW == 40
+    assert drawing.PIN_HOLE_LINE_RUN_IN == pytest.approx(0.0554 * 40 / 43)
+    assert text_x - drawing.PIN_HOLE_LINE_RUN_IN == pytest.approx(0.322 - 0.0554)
     assert drawing.PIN_HOLE_UNDERLINE_DROP == pytest.approx(3 * 0.0027781)
     positions = (
         *drawing.FRONT_KEEP.values(),

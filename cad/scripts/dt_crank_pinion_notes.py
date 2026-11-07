@@ -28,9 +28,13 @@ PIN_FIT_NOTE_NUMBER = 4
 # words). The pin's fit and acceptance are note 4; the flush ends are
 # MHA-DT-00 step 4's (an assembly instruction on a part sheet, rule 7). The
 # spec's PIN_FIT_LINES still feed that step and the crankshaft's property.
+# The cross hole runs through both walls of the boss and the shaft, so the
+# process row says THRU (rules 9 and 26; fan-out r3: no depth read); matched
+# with the crankshaft, it is drilled at assembly, which note 4 and MHA-DT-00's
+# pin step carry.
 PIN_HOLE_CALLOUT = "\n".join(
     (
-        f"MATCH DRILL AND REAM AT ASSY WITH {spec.CRANKSHAFT_NUMBER}",
+        f"MATCH DRILL AND REAM THRU WITH {spec.CRANKSHAFT_NUMBER}",
         f"SEE NOTE {PIN_FIT_NOTE_NUMBER}",
     )
 )

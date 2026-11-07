@@ -48,6 +48,7 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_curve_quality import set_precise_curve_quality
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
@@ -268,11 +269,16 @@ SHOULDER_RADIUS_RUN_IN = SHOULDER_RADIUS_TEXT_HALF_WIDTH + 0.0035
 SHOULDER_RADIUS_OVERRUN = 0.00174
 RADIUS_SHOULDER_DROP = SHOULDER_RADIUS_ROWS * 0.0027781
 # The pin hole's reference diameter runs from the hole's centre to the left
-# end of its callout's underline, 55.4 mm left of the keep (88d48ad2a7b4
-# audit: keep x 0.275, line to x 0.2196 at y 0.2322), under the block's last
-# row: half its 5.56 mm rows under the keep (the four-row block of that audit
-# read 11.1 mm). The callout's widest row is as wide as that audit's.
-PIN_HOLE_LINE_RUN_IN = 0.0554
+# end of its callout's underline, 55.4 mm left of the keep for a 43-character
+# widest row (88d48ad2a7b4 audit: keep x 0.275, line to x 0.2196 at y
+# 0.2322), under the block's last row: half its 5.56 mm rows under the keep
+# (the four-row block of that audit read 11.1 mm).  The centred row's
+# half-width scales with its characters.
+PIN_HOLE_WIDEST_ROW = max(len(row) for row in PIN_HOLE_CALLOUT.splitlines())
+PIN_HOLE_LINE_RUN_IN = 0.0554 * PIN_HOLE_WIDEST_ROW / 43
+# The underline's left end stays where the 43-character callout put it
+# (keep x 0.322), so the reference line keeps its slope off the boss top.
+PIN_HOLE_ATTACH_X = 0.322 - 0.0554
 PIN_HOLE_ROWS = 1 + len(PIN_HOLE_CALLOUT.splitlines())
 PIN_HOLE_UNDERLINE_DROP = PIN_HOLE_ROWS * 0.0027781
 RIGHT_KEEP = {
@@ -282,7 +288,7 @@ RIGHT_KEEP = {
     "OutsideDia": (_side_x(0.0) - 0.003, _SIDE_TOP + 0.027),
     "TurnedDia": (_side_x(SHOULDER_LENGTH + 1.5), _TOP_ROW_Y),
     "BossDia": (BOSS_DIA_TEXT_X, RIGHT_CENTER[1]),
-    "PinHoleDia": (0.322, _TOP_ROW_Y),
+    "PinHoleDia": (PIN_HOLE_ATTACH_X + PIN_HOLE_LINE_RUN_IN, _TOP_ROW_Y),
     "ShoulderLength": (_LENGTH_TEXT_X, _SIDE_BOTTOM - 0.019),
     # The banded text is wider than the hole-to-end span: it stands outside,
     # right of the end face's extension line, so neither line strikes it.
@@ -497,6 +503,10 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
+    # The involute tooth ends printed as polygons with stepped flank edges in
+    # the 3:1 isometric (fan-out r3, rule 8: draft quality); the finest curve
+    # resolution, set before any view computes, draws them as curves.
+    set_precise_curve_quality(adapter, label="crank-pinion")
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
     right = create_section_view(
