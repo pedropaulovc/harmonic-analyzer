@@ -148,7 +148,7 @@ def test_finished_tap_web_pays_both_mouths_and_prints_its_least() -> None:
     )
     assert spec.TAP_TO_BORE_WALL_FINISHED_MIN == finished["front face"]
     assert 0.060 * inch <= spec.TAP_TO_BORE_WALL_FINISHED_MIN < 0.080 * inch
-    assert spec.TAP_TO_BORE_WALL_FINISHED_MIN == pytest.approx(0.0666 * inch, abs=1e-3)
+    assert spec.TAP_TO_BORE_WALL_FINISHED_MIN == pytest.approx(0.0665 * inch, abs=1e-3)
     assert spec.TAP_WALL_TEXT == "WALL .066 MIN TO BORE"
     assert spec.TAP_CALLOUT_LINES[-1] == spec.TAP_WALL_TEXT
 

@@ -244,7 +244,8 @@ def test_tap_walls_to_the_edges_pay_both_breaks_and_print_at_the_floor() -> None
     # Rule 20: the sheet states the shortfall at the tap pattern's note, and
     # the package declares it (delegated ruling RV-01).
     assert guide.TAP_EDGE_WALL_TEXT == "WALL .060 MIN, TAPS TO EDGES"
-    assert drawing.TAP_WALL_NOTE.endswith(guide.TAP_EDGE_WALL_TEXT)
+    assert drawing.FCF_MATE_NOTE.split("\n")[1:] == [guide.TAP_EDGE_WALL_TEXT]
+    assert "BY HAND" not in drawing.FCF_MATE_NOTE
     exceptions = _config.parts("pd-platen-guide")["machinist_exceptions"]
     assert any(
         entry["kind"] == "minor" and ".060" in entry["where"] for entry in exceptions
@@ -269,6 +270,72 @@ def test_only_the_platen_taps_are_spotted_and_the_lock_taps_are_accepted() -> No
     assert entry["kind"] == "accept"
     assert all(tag in entry["where"] for tag in lock_tags)
     assert entry["reason"].startswith("Delegated ruling 2026-11-07 (Main), no precedent")
+
+
+class _FakeHoleTable:
+    """Native hole table stand-in: TAG / X LOC / Y LOC / SIZE, rows unordered."""
+
+    def __init__(self) -> None:
+        stations = list(reversed(drawing.HOLE_STATIONS_MM))
+        self.cells = [["TAG", "X LOC", "Y LOC", "SIZE"]] + [
+            [f"A{i}", f"{station / 25.4:.3f}", "0.140", "4-40"]
+            for i, station in enumerate(stations, start=1)
+        ]
+        self.widths = [0.02, 0.03, 0.03, 0.06]
+
+    @property
+    def RowCount(self) -> int:
+        return len(self.cells)
+
+    @property
+    def ColumnCount(self) -> int:
+        return len(self.cells[0])
+
+    def DisplayedText2(self, row: int, column: int, _hidden: bool) -> str:
+        return self.cells[row][column]
+
+    def InsertColumn2(self, where: int, index: int, title: str, _width: int) -> bool:
+        assert (where, index) == (3, 3)
+        for row in self.cells:
+            row.append("")
+        self.widths.append(0.01)
+        return True
+
+    def SetColumnTitle2(self, column: int, title: str, _flag: bool) -> bool:
+        self.cells[0][column] = title
+        return True
+
+    def IsCellTextEditable(self, row: int, column: int) -> bool:
+        return row > 0 and column == 4
+
+    def SetText2(self, row: int, column: int, _flag: bool, text: str) -> None:
+        self.cells[row][column] = text
+
+    def SetColumnWidth(self, column: int, width: float, _change: int) -> float:
+        self.widths[column] = width
+        return width
+
+
+def test_the_hole_table_names_each_taps_mate() -> None:
+    """Round 2 (rules 4 and 10): a MATE column names MHA-PD-02 for the platen
+    taps and MHA-PD-12 for the lock taps, each row bound by its station, not
+    by its tag's order; the generated cells stay as they were."""
+    platen = _config.parts("pd-platen")["number"]
+    lock = _config.parts("pd-guide-lock")["number"]
+    assert {drawing.HOLE_TABLE_MATES[s] for s in drawing.FRONT_X} == {platen}
+    assert {drawing.HOLE_TABLE_MATES[s] for s in drawing.REAR_X} == {lock}
+    table = _FakeHoleTable()
+    generated = drawing._add_mate_column(table)
+    drawing._check_mate_column(table, generated)
+    assert table.cells[0][4] == drawing.HOLE_TABLE_MATE_COLUMN
+    for row in table.cells[1:]:
+        x_mm = float(row[1]) * 25.4
+        station = min(drawing.HOLE_STATIONS_MM, key=lambda s: abs(s - x_mm))
+        assert row[4] == (platen if station in drawing.FRONT_X else lock)
+    assert table.widths[4] == drawing.HOLE_TABLE_MATE_COLUMN_WIDTH
+    table.cells[3][4] = platen if table.cells[3][4] == lock else lock
+    with pytest.raises(RuntimeError, match="MATE cells differ"):
+        drawing._check_mate_column(table, generated)
 
 
 def test_drawing_contract_imports_without_pywin32() -> None:

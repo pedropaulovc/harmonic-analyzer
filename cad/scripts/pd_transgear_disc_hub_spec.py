@@ -508,14 +508,18 @@ COLLAR_NUMBER = _config.parts("pd-transgear-drive-collar")["number"]
 # The D-bore is one feature with two bands finer than their rows (the round's
 # .0005, the flat's .0010): one matched fit to the measured sleeve boss and
 # flat, named once and linked from both.  No process word: a reamer or a
-# boring bar would cut the flat away, so the D is the shop's to make.
+# boring bar would cut the flat away, so the D is the shop's to make.  The
+# flat is blind: the D-bore runs from the hub front face back to the
+# flange's rear face (the model's Front plane), where the round spigot bore
+# takes over, so the note states where and how it stops (rule 9).
 BORE_FIT_NOTE = 1
 BORE_FIT_TEXT = (
     f"SLIDING FIT ON {SLEEVE_NAME} {SLEEVE_NUMBER} BOSS AND FLAT: FIT TO THE "
     f"MEASURED BOSS, CLEARANCE {inch_text(BOSS_CLEARANCE_LIMITS[0], 4)}-"
     f"{inch_text(BOSS_CLEARANCE_LIMITS[1], 4)} ON THE ROUND AND "
     f"{inch_text(FLAT_CLEARANCE[0], 4)}-{inch_text(FLAT_CLEARANCE[1], 4)} "
-    "ON THE FLAT."
+    "ON THE FLAT. THE FLAT RUNS FROM THE HUB FRONT FACE AND STOPS SQUARE AT "
+    "THE FLANGE REAR FACE; THE SPIGOT BORE STAYS ROUND."
 )
 # The overall and the spigot's length both print the disc cluster's band and
 # serve one stack (rule 4): one note, named once, linked from both.
@@ -526,12 +530,16 @@ SPIGOT_LENGTH_CALLOUT = f"SEE NOTE {STACK_NOTE}"
 # The flange's .XXX thickness sets the disc screws' reach (the cut window
 # in pd_vn_transgear_disc_screw_spec reads it).
 FLANGE_THICK_CALLOUT = f"SETS {SCREW_NAME}\n{SCREW_NUMBER} REACH"
-# The spigot only clears the disc's bore (the disc is centred at assembly);
-# its turned-row band keeps it clear at the bore's least size.  The callout
-# names the bore it clears and the sharp root the disc's face seats past.
+# The spigot slides into the disc's bore at assembly (the disc is then
+# centred and its taps transferred); its turned-row band keeps it clear at
+# the bore's least size.  The callout names the fit by its standard name
+# with the clearance as REF (rule 4), and the sharp root the disc's face
+# seats past.
 SPIGOT_CALLOUT_BELOW = "\n".join(
     (
-        f"CLEARS {DISC_NUMBER} BORE",
+        f"SLIDING FIT IN {DISC_NUMBER}",
+        f"(CLEARANCE {inch_text(DISC.SPIGOT_DIAMETRAL_CLEARANCE[0], 4)}-"
+        f"{inch_text(DISC.SPIGOT_DIAMETRAL_CLEARANCE[1], 4)})",
         f"SPIGOT ROOT R{inch_text(CORNER_RADIUS_MAX, 3)} MAX",
     )
 )

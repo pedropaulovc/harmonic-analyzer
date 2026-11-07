@@ -250,7 +250,9 @@ FLANGE_THICK_TEXT_BLOCK = (0.047, 0.017)
 _OIL_HOLE_SHOULDER = (_OIL_HOLE_X - 0.002, AXIS_Y - _FLANGE_R - 0.033)
 SIDE_KEEP = {
     "HubDia": (HUB_FRONT_X - 0.014, AXIS_Y),
-    "SpigotDia": (SPIGOT_END_X + 0.040, AXIS_Y - 0.003),
+    # Its five-line block (size, fit, REF clearance, root) keeps its top under
+    # the spigot end's ⊥ frame and its left edge clear of the spigot.
+    "SpigotDia": (SPIGOT_END_X + 0.040, AXIS_Y - 0.0053),
     # Clear the spigot's whole fit-callout box, not just its dimension line.
     "FlangeDia": (SPIGOT_END_X + 0.083, AXIS_Y),
     "FlangeThick": (

@@ -227,6 +227,23 @@ def test_reference_rows_follow_the_bar_globals_onto_the_holes(
             assert _evaluate(drive, globals_mm) == pytest.approx(expected[name]), name
 
 
+def test_hanger_row_line_clears_the_hook_taps_shoulder() -> None:
+    """Round 2 of the fan-out (layout audit, shoulder-crosses-line): the hook
+    taps' callout's bottom shoulder ran 230.1 -> 312.4 mm at 234.3, and the
+    .571 line, 22 mm off the right end (305.0), rose to 234.8 mm through it.
+    The line stands past the shoulder's measured right end with air, and its
+    one-row text (at 2.76 mm a character) still ends short of section A-A."""
+    bracket_x = drawing.FRONT_KEEP["BracketCskDia"][0]
+    assert bracket_x + drawing.BRACKET_SHOULDER_RIGHT == pytest.approx(0.3124, abs=2e-4)
+    line_x = drawing.FRONT_KEEP["HangerRowHeight"][0]
+    assert line_x - (bracket_x + drawing.BRACKET_SHOULDER_RIGHT) >= 0.003
+    section_left = drawing.SECTION_CENTER[0] - BAR_DEPTH * (
+        drawing.SECTION_SCALE[0] / drawing.SECTION_SCALE[1]
+    ) / 2000.0
+    text = f"{part.HANGER_ROW_HEIGHT / 25.4:.3f} \u00b1.002".lstrip("0")
+    assert line_x + 0.002 + len(text) * 0.00276 < section_left - 0.010
+
+
 def test_rows_stack_shortest_nearest_the_bar() -> None:
     def heights(keep: dict, names: tuple[str, ...]) -> list[float]:
         return [keep[name][1] for name in names]
