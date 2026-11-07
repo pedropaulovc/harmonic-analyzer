@@ -438,8 +438,10 @@ def test_tooth_system_and_pair_acceptance_match_current_geometry() -> None:
     assert spec.CUTTER_TEETH_RANGE[0] <= spec.TEETH <= spec.CUTTER_TEETH_RANGE[1]
     data = dict(line.partition(":")[::2] for line in notes.GEAR_DATA.splitlines()[1:])
     assert "NORMAL = TRANSVERSE" in notes.GEAR_DATA
-    assert f"#{spec.CUTTER_NUMBER}" in data["FORM CUTTER"]
-    assert f"{profile.template.reference_teeth}T REFERENCE" in data["FORM CUTTER"]
+    assert data["FORM CUTTER"].strip() == (
+        f"#{spec.CUTTER_NUMBER}, {spec.CUTTER_TEETH_RANGE[0]}-{spec.CUTTER_TEETH_RANGE[1]}T"
+    )
+    assert "REFERENCE" not in notes.GEAR_DATA
     assert data["TOOTH FORM"].strip() == "SPUR INVOLUTE, FULL DEPTH, AS CUT BY THE FORM CUTTER"
     # Screen of the novice rubric (#2223): the span's exact stock limits are
     # .0007 wide, under the .002 milled-thickness row, so they print as the

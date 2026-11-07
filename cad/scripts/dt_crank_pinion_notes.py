@@ -96,10 +96,13 @@ GEAR_DATA = mate_notes.gear_data_note(
             "DIAMETRAL PITCH, NORMAL = TRANSVERSE (CUTTER)",
             f"{spec.DIAMETRAL_PITCH:.2f}",
         ),
+        # The cutter by number and range, as the handbook lists it.  The
+        # template's 14-tooth design count printed as "14T REFERENCE", a
+        # private phrase (farm r6 196fd7720d, 3 of 3 runs; the 64T's row
+        # dropped the same count).
         (
             "FORM CUTTER",
-            f"#{spec.CUTTER_NUMBER}, {spec.CUTTER_TEETH_RANGE[0]}-{spec.CUTTER_TEETH_RANGE[1]}T; "
-            f"{spec.CUTTER_TEMPLATE.reference_teeth}T REFERENCE",
+            f"#{spec.CUTTER_NUMBER}, {spec.CUTTER_TEETH_RANGE[0]}-{spec.CUTTER_TEETH_RANGE[1]}T",
         ),
         ("PRESSURE ANGLE, NORMAL = TRANSVERSE", f"{spec.PRESSURE_ANGLE_DEG:.1f} DEG"),
         ("PITCH DIAMETER (REF)", inch_text(spec.PITCH_DIA, 3)),
