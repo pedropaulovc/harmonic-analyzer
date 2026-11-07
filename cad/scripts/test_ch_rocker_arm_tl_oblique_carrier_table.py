@@ -6,6 +6,7 @@ import inspect
 import itertools
 import math
 import re
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -682,3 +683,205 @@ def test_outer_row_authoring_binds_raw_named_dimensions(monkeypatch, failure):
         assert (state["lower"], state["upper"]) == pytest.approx(
             tuple(value / 1000.0 for value in spec.OUTER_Y_DEVIATIONS)
         )
+
+
+# Each hidden model driver the R4 sheet no longer imports -> the native table
+# (row, axis) cells that print the location it drives (axis 0 = X LOC from A1,
+# 1 = Y LOC from the A1-B1 line). Build: _PIN_AXIS_DRIVES, _origin_x
+# baselines from A1, SharedCoordinate(0/2) for the R2/R4 Y, LeverX on both
+# lever taps. A2DY/B2DY additionally own the flagged OUTER_Y_NOTE limits.
+TABLE_SUPERSEDED_DRIVERS = {
+    "PinSpacing": (("B1", 0),),
+    "A2DX": (("A2", 0),), "A2DY": (("A2", 1),),
+    "B2DX": (("B2", 0),), "B2DY": (("B2", 1),),
+    "ClX": (("CL", 0),), "ClY": (("CL", 1),),
+    "CrX": (("CR", 0),), "CrY": (("CR", 1),),
+    "LeverX": (("L1", 0), ("L2", 0)), "LeverY1": (("L1", 1),), "LeverY2": (("L2", 1),),
+    "RiserX1": (("R1", 0),), "RiserX1R": (("R2", 0),),
+    "RiserX2": (("R3", 0),), "RiserX2R": (("R4", 0),),
+    "RiserY1": (("R1", 1), ("R2", 1)), "RiserY2": (("R3", 1), ("R4", 1)),
+}
+
+
+def _imported(monkeypatch, places_by_name):
+    """Contract-faithful fakes for the production assert_imported_precision:
+    IAnnotation -> IDisplayDimension.GetPrimaryPrecision2, named by the
+    patched dimension_name (native naming is not exercised here)."""
+    import _drawing_dimensions
+    from solidworks_mcp.adapters import sw_type_info
+
+    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", lambda native, *_names: native)
+    monkeypatch.setattr(_drawing_dimensions, "dimension_name", lambda _adapter, item: item.name)
+    annotations = [
+        SimpleNamespace(
+            name=name,
+            GetSpecificAnnotation=lambda places=places: SimpleNamespace(GetPrimaryPrecision2=lambda: places),
+        )
+        for name, places in places_by_name.items()
+    ]
+    return _drawing_dimensions, SimpleNamespace(_attempt=lambda fn: fn()), annotations
+
+
+def test_imported_precision_contract_is_exactly_what_the_sheet_imports():
+    imported = set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert set(drawing.IMPORTED_PRECISION) == imported
+    assert imported == set(drawing.TOP_KEEP) | set(drawing.SECTION_KEEP_MODEL_MM)
+    assert all(drawing.IMPORTED_PRECISION[name] == spec.DRAWING_PRECISION_BY_NAME[name] for name in imported)
+    source = inspect.getsource(drawing.build)
+    assert "assert_imported_precision(adapter, annotations, IMPORTED_PRECISION)" in source
+    assert "DRAWING_PRECISION_BY_NAME)" not in source
+
+
+@pytest.mark.parametrize("defect", [None, "legacy_contract", "missing", "wrong_places"])
+def test_production_precision_guard_takes_the_imported_set_and_refuses_defects(monkeypatch, defect):
+    module, adapter, annotations = _imported(monkeypatch, dict(drawing.IMPORTED_PRECISION))
+    precision = dict(drawing.IMPORTED_PRECISION)
+    if defect is None:
+        module.assert_imported_precision(adapter, annotations, precision)
+        return
+    if defect == "legacy_contract":  # farm 1608aaf0: the whole part map
+        precision = dict(spec.DRAWING_PRECISION_BY_NAME)
+        match = re.escape(repr(sorted(TABLE_SUPERSEDED_DRIVERS)))
+    elif defect == "missing":
+        annotations = [item for item in annotations if item.name != "EdgeX"]
+        match = re.escape("['EdgeX']")
+    else:
+        _module, _adapter, annotations = _imported(
+            monkeypatch, {**drawing.IMPORTED_PRECISION, "PinHoleDia": drawing.IMPORTED_PRECISION["PinHoleDia"] - 1},
+        )
+        match = "'PinHoleDia' prints 3 decimal places, but its part authored 4"
+    with pytest.raises(RuntimeError, match=match):
+        module.assert_imported_precision(adapter, annotations, precision)
+
+
+def test_every_superseded_driver_prints_in_the_native_table_at_its_places():
+    superseded = set(spec.DRAWING_PRECISION_BY_NAME) - set(drawing.IMPORTED_PRECISION)
+    assert superseded == set(TABLE_SUPERSEDED_DRIVERS)
+    assert all(spec.DRAWING_PRECISION_BY_NAME[name] == spec.TABLE_LOCATION_PLACES for name in superseded)
+    assert spec.RISER_STATION_PLACES == spec.TABLE_LOCATION_PLACES
+    covered = {cell for cells in TABLE_SUPERSEDED_DRIVERS.values() for cell in cells}
+    # Complete: every located table cell but A1 (the origin), B1's Y (the
+    # A1-B1 line itself) and the REF HUB row (TL-00 locates it).
+    expected = {(tag, axis) for tag in spec.TABLE_HOLES for axis in (0, 1)} - {
+        ("A1", 0), ("A1", 1), ("B1", 1), ("HUB", 0), ("HUB", 1),
+    }
+    assert covered == expected
+    assert spec.PIN_HOLES["A1"][1] == spec.PIN_HOLES["B1"][1]
+    assert not {"HubX", "HubY"} & set(spec.DRAWING_PRECISION_BY_NAME)
+    # A driver shared by two rows drives one coordinate they share.
+    for cells in TABLE_SUPERSEDED_DRIVERS.values():
+        assert len({spec.TABLE_HOLES[tag][axis] for tag, axis in cells}) == 1, cells
+    # The production row guard reads every covered cell at exactly .XXX ...
+    native = NativeCells()
+    rows = table._rows(native)
+    for tag, axis in covered:
+        assert re.fullmatch(r"-?\d*\.\d{3}", rows[tag][1][1 + axis]), (tag, axis)
+    # ... and refuses any of them printed at other places.
+    for tag, axis in sorted(covered):
+        bad = NativeCells()
+        row = next(i for i, cells in enumerate(bad.cells) if cells[0] == tag)
+        bad.cells[row][1 + axis] = bad.cells[row][1 + axis][:-1]
+        with pytest.raises(RuntimeError, match="lost .XXX precision"):
+            table._rows(bad)
+    # A2DY/B2DY's .964 ±.002 is the model-linked flagged note
+    # (test_outer_note_reads_actual_model_limits_and_never_writes_them).
+    assert spec.inch_text(spec.OUTER_Y_NOMINAL, spec.TABLE_LOCATION_PLACES) in spec.OUTER_Y_NOTE
+    assert spec.inch_text(spec.OUTER_Y_BAND, spec.TABLE_LOCATION_PLACES) in spec.OUTER_Y_NOTE
+    assert spec.TABLE_ROW_NOTES["A2"].endswith("NOTE 1") and spec.TABLE_ROW_NOTES["B2"].endswith("NOTE 1")
+
+
+def _settled_harness(monkeypatch, *, fail_check=False):
+    """Run the production create_carrier_hole_table and its settled callback
+    over a three-sheet fake drawing. Native table content is NOT exercised
+    here (patched readers); only which sheet is active when the settled
+    readback runs, since _owned_table walks IDrawingDoc.GetFirstView, the
+    ACTIVE sheet's root view."""
+    sheets, seen = drawing.SHEET_NAMES, []
+    state = {"active": drawing.SHEET_NAMES[1], "refuse": set()}
+
+    def activate(name):
+        if name not in sheets or name in state["refuse"]:
+            return False
+        state["active"] = name
+        return True
+
+    current = lambda: SimpleNamespace(GetName=lambda: state["active"])  # noqa: E731
+    edges = {tag: SimpleNamespace(Select4=lambda *_: True) for tag in spec.TABLE_HOLES}
+    annotation = SimpleNamespace(GetAttachedEntities3=lambda: (edges["A1"],), IsDangling=lambda: False)
+    origin = SimpleNamespace(Reattach=lambda: True, GetAnnotation=lambda: annotation)
+    feature = SimpleNamespace(
+        DatumOrigin=origin, CombineSameSize=False, CombineTags=False,
+        GetHoleLocationUseDocPrecision=lambda: False,
+        GetHoleLocationPrecision=lambda: spec.TABLE_LOCATION_PLACES,
+    )
+    notes = {}
+    native = SimpleNamespace(
+        HoleTable=feature, RowCount=len(spec.TABLE_HOLES) + 1, ColumnCount=5,
+        InsertColumn2=lambda *_: True, SetColumnTitle2=lambda *_: True,
+        IsCellTextEditable=lambda *_: True,
+        SetText2=lambda row, _col, _hidden, text: notes.__setitem__(row, text),
+        Text2=lambda row, *_: notes[row], DisplayedText2=lambda row, *_: notes[row],
+        SetColumnWidth=lambda _col, width, _style: width,
+        GetRowHeight=lambda _row: .005, GetColumnWidth=lambda col: table.TABLE_WIDTHS[col],
+    )
+    rows = {tag: (row, (tag,)) for row, tag in enumerate(spec.TABLE_HOLES, 1)}
+    sheet_doc = SimpleNamespace(
+        GetCurrentSheet=current, ActivateSheet=activate, ClearSelection2=lambda *_: None,
+        SelectionManager=SimpleNamespace(CreateSelectData=lambda: SimpleNamespace()),
+    )
+    adapter = SimpleNamespace(currentModel=sheet_doc, swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)))
+
+    def check(*_args, **_kwargs):
+        seen.append(state["active"])
+        if fail_check and len(seen) > 1:
+            raise RuntimeError("settled readback refused")
+
+    for name, value in {
+        "_early_bound": lambda value, _interface: value,
+        "_source_edges": lambda *_: edges, "_outer_row_source": lambda _model: None,
+        "insert_hole_table": lambda *_a, **_k: native, "_point": lambda *_: None,
+        "rebuild_drawing": lambda *_a, **_k: None, "_assign_tags": lambda *_: None,
+        "_rows": lambda _table: rows, "_tags": lambda *_a, **_k: None,
+        "_frozen_rows": lambda *_a, **_k: rows, "add_note": lambda *_: None,
+        "add_property_linked_note": lambda *_: SimpleNamespace(GetText=lambda: spec.OUTER_Y_NOTE),
+        "_owned_table": check,
+    }.items():
+        monkeypatch.setattr(table, name, value)
+    return state, seen, lambda: table.create_carrier_hole_table(adapter, None, None, Path("carrier.SLDPRT"))
+
+
+@pytest.mark.parametrize("before", ["CARRIER", "HUB CLAMP"])
+def test_settled_readback_runs_on_the_table_sheet_from_any_later_sheet(monkeypatch, before):
+    # Build: create on HOLE TABLE (_hole_table_sheet), then CARRIER, the HUB
+    # sheet and back; finalize_drawing reactivates sheet 0, rebuilds and runs
+    # settled_checks once BEFORE its one save -- the path has no reopen.
+    state, seen, create = _settled_harness(monkeypatch)
+    settled = create()
+    assert seen == ["HOLE TABLE"] and state["active"] == "HOLE TABLE"
+    state["active"] = before
+    settled()
+    assert seen == ["HOLE TABLE", "HOLE TABLE"] and state["active"] == before
+    finalize = inspect.getsource(drawing.finalize_drawing)
+    assert (finalize.index("rebuild_drawing(adapter, label=\"finalize_drawing\")")
+            < finalize.index("settled()") < finalize.index("save_drawing("))
+    build = inspect.getsource(drawing.build)
+    assert (build.index("_hole_table_sheet(adapter, source_model)") < build.index("_hub_sheet(adapter)")
+            < build.index("settled_checks=(pin_controls_settled, table_settled)"))
+
+
+@pytest.mark.parametrize("fault", ["refused_table_sheet", "check_fails", "refused_restore"])
+def test_settled_readback_never_reads_or_leaves_the_wrong_sheet(monkeypatch, fault):
+    state, seen, create = _settled_harness(monkeypatch, fail_check=fault == "check_fails")
+    settled = create()
+    state["active"] = "HUB CLAMP"
+    state["refuse"] = {"refused_table_sheet": {"HOLE TABLE"}, "refused_restore": {"HUB CLAMP"}}.get(fault, set())
+    match = {"refused_table_sheet": "cannot be activated", "check_fails": "settled readback refused",
+             "refused_restore": "could not restore"}[fault]
+    with pytest.raises(RuntimeError, match=match):
+        settled()
+    if fault == "refused_table_sheet":
+        assert seen == ["HOLE TABLE"] and state["active"] == "HUB CLAMP"  # never read elsewhere
+    elif fault == "check_fails":
+        assert seen[-1] == "HOLE TABLE" and state["active"] == "HUB CLAMP"  # restored in finally
+    else:
+        assert seen[-1] == "HOLE TABLE"

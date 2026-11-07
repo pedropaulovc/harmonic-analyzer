@@ -213,6 +213,18 @@ SECTION_CHAMFER_TEXT_MODEL_MM = (_A1[0] + 10.5, -part_spec.THICKNESS - 3.5, 0.0)
 STOCK_WITNESS_MAX_M = (
     (_STOCK_TEXT_DX - _SECTION_HALF) * SECTION_SCALE[0] / SECTION_SCALE[1] - 1.5
 ) / 1000.0
+# The imported-precision contract is the DRAWING_DIMENSIONS this sheet imports
+# (TOP_KEEP and SECTION_KEEP_MODEL_MM). The hidden PinHoleProfile, tap and
+# StationReference drivers keep their part-authored .XXX on the model (the
+# part build applies all of DRAWING_PRECISION), but #2151 Option B prints
+# their locations as the native hole table's .XXX rows from A1
+# (IHoleTable.GetHoleLocationPrecision, read back by the table's settled
+# check) and A2/B2 Y as OUTER_Y_NOTE; no dimension of theirs reaches a sheet.
+IMPORTED_PRECISION: dict[str, int] = {
+    name: DRAWING_PRECISION_BY_NAME[name]
+    for names in DRAWING_DIMENSIONS.values()
+    for name in sorted(names)
+}
 # Top centre of the caption: left of the thickness text, level with the slab.
 SECTION_CAPTION_XY = (0.043, 0.052)
 
@@ -1187,7 +1199,7 @@ async def build(adapter: Any) -> dict[str, str]:
         _hide_thread_labels(adapter, view)
     table_settled = _hole_table_sheet(adapter, source_model)
     _hub_sheet(adapter)
-    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    assert_imported_precision(adapter, annotations, IMPORTED_PRECISION)
 
     def pin_controls_settled() -> None:
         _assert_ream_control(adapter, ream[0])
