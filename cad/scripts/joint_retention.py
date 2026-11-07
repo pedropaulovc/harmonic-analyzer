@@ -1336,8 +1336,8 @@ JOINTS: tuple[Joint, ...] = (
         lock_binds=("sh_vn_arbor_set_screw", "ch_pivot_bracket"),
         lock_step=ch_channel_assembly_steps.PIVOT_SET_SCREWS_STAKED_KEY,
         evidence=(
-            "draw_ch_channel_assembly.py _fitup_text 'set-screws-driven' ('RUN ONE ITEM 4 DOWN THE TAP AT THE TOP "
-            "OF EACH ITEM 3 EAR ONTO ITS FLAT, LEFT EAR FIRST, AND SNUG IT.') and 'pivot-set-screws-staked' "
+            "draw_ch_channel_assembly.py _fitup_text 'set-screws-driven' ('SNUG ONE ITEM 4 DOWN THE TAP AT THE TOP "
+            "OF EACH ITEM 3 EAR ONTO ITS FLAT, LEFT EAR FIRST.') and 'pivot-set-screws-staked' "
             "('STAKE THE MOUTH OF EACH ITEM 4 TAP AT 2 POINTS.'); build_ch_channel_assembly.py apex set screw "
             "placement (SET_SCREW_TIP_Y); ch_pivot_bracket_spec.SET_SCREW_HOLE_SPEC (#4-40 tapped, through_next) "
             "and SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT; ch_pivot_shaft_spec flats (FLAT_DEPTH, FLAT_LENGTH)"
@@ -1401,7 +1401,7 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "build_ch_channel_assembly.py BRACKET_SCREW_XZ loop + header; rocker_bracket_seat_layout.SEAT_SPEC; "
             "draw_ch_channel_assembly.py _fitup_text 'south-bracket-screwed' ('SCREW THE RIGHT ITEM 3 DOWN WITH ONE "
-            "ITEM 7'), after 'south-foot-transferred' taps the MHA-FR-05 rail through the foot hole"
+            "ITEM 7'), after 'south-foot-tapped' taps the MHA-FR-05 rail through the transferred foot hole"
         ),
     ),
     Joint(
@@ -1433,7 +1433,7 @@ JOINTS: tuple[Joint, ...] = (
             "ch_fulcrum_keeper_spec.py docstring/SCREW_X/SCREW_HOLE_SPEC/KEEPER_TAP_SPEC (#2-56 blind, 11.5 drill, "
             "ThreadDepth 7.6; FOOT_SCREW_ENGAGEMENT_D) + DRAWING_NOTES 2; build_fr_top_frame.py step 'KeeperTaps' "
             "consumes KEEPER_TAP_SPEC; config parts/ch-vn-frame-side-screw.yaml (91794A080); draw_ch_channel_assembly.py "
-            "step fulcrum-keepers-screwed ('SCREW EACH ITEM 8 DOWN WITH ONE ITEM 9'), after keeper-feet-transferred taps the rail"
+            "step fulcrum-keepers-screwed ('SCREW EACH ITEM 8 DOWN WITH ONE ITEM 9'), after keeper-feet-tapped taps the rail"
         ),
     ),
     Joint(

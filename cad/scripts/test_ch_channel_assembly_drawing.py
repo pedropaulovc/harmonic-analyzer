@@ -314,6 +314,10 @@ def test_each_step_column_fits_its_field() -> None:
     lever = headings.index("LEVER BANK FIT-UP")
     assert all(h == "ROCKER BANK FIT-UP (CONT.)" for h in headings[1:lever])
     assert all(h == "LEVER BANK FIT-UP (CONT.)" for h in headings[lever + 1 :])
+    # Round 1 review: no near-empty step column beside an empty half sheet.
+    for column, block in drawing.FITUP_NOTES:
+        if column is not drawing.LEVER_COLUMNS[-1]:
+            assert len(block.splitlines()) > column.capacity // 2, column
     # Each 1:1 bank's right-hand end (the keeper and ear outer faces) clears
     # the right column.
     for view, south_z in (
@@ -322,17 +326,18 @@ def test_each_step_column_fits_its_field() -> None:
     ):
         assert view.sheet_xy(south_z, 0.0)[0] < drawing.STEPS_RIGHT_X - 0.010
     # View G's outline (model x 7.4-217.1, y 955.6-1078.6 on the 06616793e
-    # farm leaf) sits under its step column, above the title block and
-    # inside the border.
+    # farm leaf) sits right of the full-height left column, inside the border,
+    # with its label above the short right column.
     hookup = drawing.HOOKUP
     cx, cy, _ = hookup.centre_xyz
     x0, x1 = (hookup.centre[0] + (x - cx) * hookup.mm for x in (7.4, 217.1))
     y0, y1 = (hookup.centre[1] + (y - cy) * hookup.mm for y in (955.6, 1078.6))
-    assert drawing.BORDER < x0 and x1 < drawing.STEPS_RIGHT_X
-    assert y1 == pytest.approx(drawing.HOOKUP_TOP_Y)
-    assert y1 < drawing.LEVER_COLUMNS[1].bottom
+    left_column_right = drawing.STEPS_LEFT_X + drawing.STEPS_LINE_WIDTH * NOTE_CHAR_WIDTH
+    assert left_column_right + 0.010 < x0 and x1 < right
+    assert y1 < template.height_m - drawing.BORDER
+    assert y0 == pytest.approx(drawing.HOOKUP_BOTTOM_Y)
     label_lines = len(hookup.label_text.splitlines())
-    assert y0 - 0.004 - label_lines * NOTE_LINE_PITCH > drawing.BORDER
+    assert y0 - 0.004 - label_lines * NOTE_LINE_PITCH > drawing.LEVER_COLUMNS[-1].xy[1]
 
 
 def test_a_column_never_splits_a_step_and_overflow_is_refused() -> None:
@@ -388,18 +393,25 @@ def test_the_package_sheets_and_settings_contract() -> None:
     assert set(asm.DIMENSION_TOLERANCES) == set(kept) - drawing.notes.REFERENCE_DIMENSIONS
     lower, upper = asm.DIMENSION_TOLERANCES[asm.SPRING_SET_DIMENSION]
     assert (lower, upper) == (-bank.ROCKER_SPRING_SET_BAND, bank.ROCKER_SPRING_SET_BAND)
-    # Every kept dimension text lands on its own sheet, inside the border.
-    for x, y in kept.values():
-        assert drawing.BORDER < x < drawing.STEPS_RIGHT_X
+    # Every kept dimension text lands on its own sheet, inside the border:
+    # the bank views' left of the right column, detail A's right of sheet 4's
+    # left column.
+    left_column_right = drawing.STEPS_LEFT_X + drawing.STEPS_LINE_WIDTH * NOTE_CHAR_WIDTH
+    right = drawing._TEMPLATE.width_m - drawing.BORDER
+    for name, (x, y) in kept.items():
+        if name in drawing.SPRING_KEEP:
+            assert left_column_right < x < right
+        else:
+            assert drawing.BORDER < x < drawing.STEPS_RIGHT_X
         assert drawing.BORDER < y < drawing._TEMPLATE.height_m - drawing.BORDER
     # The right-end detail's spring-set text sits above its crop circle,
-    # clear of the arc (r7 layout audit: inside it, the arc crossed the text),
-    # and under the sheet's left step column.
+    # clear of the arc (r7 layout audit: inside it, the arc crossed the text).
     detail = drawing.SOUTH_END
     x, y = drawing.SPRING_KEEP[asm.SPRING_SET_DIMENSION]
     radius = detail.crop_radius_mm * detail.mm
     assert y > detail.centre[1] + radius
-    assert y + 2 * NOTE_LINE_PITCH < drawing.ROCKER_COLUMNS[2].bottom
+    assert detail.centre[0] - radius > left_column_right + 0.010
+    assert detail.crop_label_xy[1] - 3 * NOTE_LINE_PITCH > drawing._TEMPLATE.title_block_top_m
     # ...and wholly right of the ear-side extension line (b9ae review:
     # centred on the gap, the text sat on its own dimension and extension
     # lines).
@@ -420,7 +432,7 @@ def test_the_package_sheets_and_settings_contract() -> None:
         near_x = min(max(detail.centre[0], tx), tx + width)
         near_y = min(max(detail.centre[1], bottom), ty)
         assert math.dist((near_x, near_y), detail.centre) > radius
-        assert drawing.BORDER < tx and tx + width < drawing.STEPS_RIGHT_X
+        assert left_column_right < tx and tx + width < right
         assert ty < y - NOTE_LINE_PITCH
     # The parent view D carries the detail's boundary, about the same model
     # point the detail is centred on, lettered outside it.

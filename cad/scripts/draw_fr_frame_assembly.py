@@ -120,6 +120,7 @@ from fr_nameplate_spec import (
 )
 from fr_rocker_arm_support_section_spec import FOOT_THICKNESS as SUPPORT_FOOT_THICKNESS
 from fr_rocker_arm_support_spec import SUPPORT_WORLD_X, SUPPORT_WORLD_Z
+from fr_tube_frame_spec import SUPPLY_LENGTH_MIN_IN as COLUMN_SUPPLY_LENGTH_MIN_IN
 from fr_vn_lag_screw_spec import BEARING_OFFSET as LAG_BEARING_OFFSET, HEAD_H as LAG_HEAD_H
 from sh_vn_brass_fillister_screw_spec import HEAD_H as NAMEPLATE_SCREW_HEAD_H
 from fr_vn_frame_cross_screw_spec import (
@@ -522,9 +523,12 @@ _LIFT_OFF = f"TAKE {_TOP} AND THE COLUMNS OFF {_BASE}."
 # own steps (rule 22). Sides and ends name physical features or a lettered
 # view, never a compass or the machine's front and back (rule 26).
 STEP_TEXT = {
+    # The rough cut is the column's own supply length (fr_tube_frame_spec,
+    # printed on its sheet as SUPPLY n.nn MIN): round 1 review, "LONG" gave
+    # no length to cut to.
     steps.COLUMNS_ROUGH_CUT_KEY: (
-        f"CUT FOUR {_COLUMN} COLUMNS LONG; {_step(steps.COLUMNS_CUT_KEY)} CUTS THEM "
-        "TO LENGTH."
+        f"CUT FOUR {_COLUMN} COLUMNS TO {COLUMN_SUPPLY_LENGTH_MIN_IN:.2f} MIN; "
+        f"{_step(steps.COLUMNS_CUT_KEY)} CUTS THEM TO LENGTH."
     ),
     "base-sockets-fitted": (
         f"WITH {_BASE} TOP FACE UP, FIT EACH OF ITS SOCKETS TO ITS OWN {_COLUMN}: "
@@ -658,7 +662,7 @@ STEP_TEXT = {
     # Rule 23 at the package boundary: the set screw's only job is to grip the
     # summing post, which MHA-HA-00 slides to level and tightens it on.
     steps.GOOSENECK_STARTED_KEY: (
-        f"START {_SET} IN THE TAP INTO {_POST_BORE}, CUP POINT CLEAR OF THE BORE; "
+        f"START {_SET} IN THE TAPPED HOLE INTO {_POST_BORE}, CUP POINT CLEAR OF THE BORE; "
         f"{HA_SET_SCREW_TIGHTENED_REF} TIGHTENS IT ON THE POST."
     ),
     "post-bore-checked": f"CHECK {_POST_BORE} IS CLEAR OF THE CUP POINT OF {_SET}.",
