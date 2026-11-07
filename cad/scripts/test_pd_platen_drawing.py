@@ -482,3 +482,27 @@ def test_callout_picks_lie_on_their_hole_rims():
     # Both callouts stand above the plate.
     assert draw.GUIDE_CALLOUT_XY[1] > draw.TOP_EDGE_Y
     assert draw.SOCKET_CALLOUT_XY[1] > draw.TOP_EDGE_Y
+
+
+def test_guide_leader_clears_the_socket_tags_and_the_callouts_clear_each_other():
+    # The leader leaves the guide text's left end, at its bottom row (round 3
+    # read it 11.2 mm under the callout point), for the pick: it must pass
+    # right of the upper left socket's tag box (round 3: it ran through A2).
+    # A two-character tag prints ~5.8 x 3.5 mm.
+    tag_w, tag_h, air = 0.006, 0.0035, 0.0015
+    top = (
+        draw.GUIDE_CALLOUT_XY[0] - draw.GUIDE_CALLOUT_HALF_WIDTH,
+        draw.GUIDE_CALLOUT_XY[1] - 0.0112,
+    )
+    pick = draw.GUIDE_EDGE_XY
+    for station in spec.SOCKET_XY:
+        (cx, cy), (sx, sy) = draw.hole_tag_corner(station)
+        if sx < 0:
+            continue
+        for y in (cy, cy + sy * tag_h):
+            t = (y - pick[1]) / (top[1] - pick[1])
+            if 0.0 <= t <= 1.0:
+                assert pick[0] + t * (top[0] - pick[0]) > cx + tag_w + air, station
+    guide_right = draw.GUIDE_CALLOUT_XY[0] + draw.GUIDE_CALLOUT_HALF_WIDTH
+    socket_left = draw.SOCKET_CALLOUT_XY[0] - draw.SOCKET_CALLOUT_HALF_WIDTH
+    assert socket_left - guide_right >= 0.004

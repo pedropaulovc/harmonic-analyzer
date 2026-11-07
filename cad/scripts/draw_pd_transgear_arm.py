@@ -280,10 +280,11 @@ END_KEEP = {
     "Depth": (END_CENTER[0], _end_y(PIVOT_END_R) + 0.017),
     # Between the end view and the stock text, right of the front face.
     "PinHoleZ": (_end_x(0.0) + 0.017, _end_y(PIVOT_END_R) + 0.006),
-    # Below the end view, above section B-B, right edge inside the border:
-    # 12 mm left of round 2's spot, so the size line's depth (round 2: a
-    # depth is never deferred to a view) still ends inside the border.
-    "PinHoleDia": (0.372, 0.1593),
+    # Below the end view, above section B-B: the text's left end just right
+    # of the hole's axis (END_CENTER x), so the leader rises from it straight
+    # up to the hole and crosses no text (round 3: from x 0.372 it ran up-left
+    # through the "B" of BLIND), its right end ~3 mm inside the border.
+    "PinHoleDia": (0.387, 0.1593),
 }
 # The stock text is far wider than the 15.9 between its extension lines,
 # which ran up into the "7" and the "O" of GROUND, with the dimension line

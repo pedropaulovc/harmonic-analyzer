@@ -335,7 +335,14 @@ GUIDE_EDGE_XY = (
     _front_x(_GUIDE_PICK_HOLE[0]) + GUIDE_HOLE_DIA / 2.0 * _S * _DIAG,
     _front_y(_GUIDE_PICK_HOLE[1]) + GUIDE_HOLE_DIA / 2.0 * _S * _DIAG,
 )
-GUIDE_CALLOUT_XY = (0.128, 0.248)
+# The guide text's centre stands one half-width right of the pick, so its
+# leader rises from the text's left end almost straight down to the rim
+# (round 3: centred at x 0.128, its left end at x 0.078 sent the leader up-left
+# through the upper left socket's A2 tag).  Half-widths from the v48 render's
+# ink: the guide's C'BORE row runs ~96 mm, the socket's TAP row ~69 mm; the
+# socket text moves right with it, ~6 mm clear of the guide's right end.
+GUIDE_CALLOUT_HALF_WIDTH = 0.050
+GUIDE_CALLOUT_XY = (0.137, 0.248)
 # Four rows at most (r4 tall-block): the drill, the far-side counterbore and
 # the screw whose heads it sinks share one (r5 asked for the process word).
 GUIDE_CALLOUT_PROCESS = (
@@ -347,7 +354,8 @@ SOCKET_EDGE_XY = (
     _front_x(_SOCKET_RIGHT_X) + SOCKET_DRILL_R_SHEET * _DIAG,
     _front_y(_SOCKET_HIGH_Y) + SOCKET_DRILL_R_SHEET * _DIAG,
 )
-SOCKET_CALLOUT_XY = (0.215, 0.252)
+SOCKET_CALLOUT_HALF_WIDTH = 0.035
+SOCKET_CALLOUT_XY = (0.226, 0.252)
 SOCKET_CALLOUT_PROCESS = f"PATTERN MATCHES {CLIP_NUMBER}\nTAP"  # pd-platen RV-01
 # The template centre-marks every hole as the view is placed (an explicit
 # AutoInsertCenterMarks2 printed all 28 marks twice in r1); the front view

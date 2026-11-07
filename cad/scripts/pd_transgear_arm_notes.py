@@ -75,10 +75,11 @@ PIN_BORE_CALLOUT = "\n".join((
 LOCATOR_CALLOUT_TEXT = f"2X REAM THRU, SEE NOTE {LOCATOR_NOTE}"
 # Size, process and depth at the callout (round 2: a depth is never deferred
 # to a view; section A-A keeps it as a reference); note 3 names the latch
-# pin, so the callout stays inside the right border.
+# pin.  Round 3's "BLIND FLAT-BOTTOM REAM" row was so wide its leader cut the
+# "B" of BLIND; the shorter row lets the text stand right of the hole, so the
+# leader leaves its left end straight up.
 PIN_HOLE_CALLOUT = "\n".join((
-    "BLIND FLAT-BOTTOM REAM "
-    f"<HOLE-DEPTH> {inch_text(PIN_HOLE_DEPTH, PIN_HOLE_DEPTH_PLACES)}",
+    f"REAM <HOLE-DEPTH> {inch_text(PIN_HOLE_DEPTH, PIN_HOLE_DEPTH_PLACES)} FLAT BOTTOM",
     f"SEE NOTE {LATCH_PIN_NOTE}",
 ))
 SPRING_CALLOUT = f"SEE NOTE {SPRING_NOTE}"

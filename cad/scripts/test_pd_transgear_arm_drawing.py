@@ -1022,6 +1022,21 @@ def test_the_dowel_group_prints_one_frame_with_its_count() -> None:
     assert left + len(count) * _CHAR_WIDTH < sheet_right
 
 
+def test_latch_pin_callout_stands_right_of_its_hole() -> None:
+    """Round 3 (clarity): the latch-pin leader rose up-left from the text's
+    left end through the "B" of BLIND. The text now starts at the hole's
+    axis, so the leader rises straight up from its left end, and its right
+    end stays inside the border."""
+    lines = [
+        line.replace("<HOLE-DEPTH>", "\N{DOWNWARDS ARROW}")
+        for line in arm_notes.PIN_HOLE_CALLOUT.splitlines()
+    ]
+    left, _bottom, right, _top = _centred_box(lines, drawing.END_KEEP["PinHoleDia"])
+    assert left >= drawing.END_CENTER[0] - 0.001
+    sheet_right = DRAWING_TEMPLATES[drawing.SPEC.layout].width_m - _BORDER
+    assert right <= sheet_right - 0.001
+
+
 class _FakeGtol:
     def __init__(self, *, accept: bool, keep: bool):
         self.accept, self.keep, self.text = accept, keep, {}
