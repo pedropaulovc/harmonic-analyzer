@@ -700,11 +700,8 @@ explicit way to stop a run, `-Cancel` (see
   the cache (`az login`; `off` is refused).
   Preflight checks every would-be leaf in the entire requested closure with
   that checkout's authoritative `agent.protocol.leaf_admitted`; refused tasks
-  and prefixes exit 2 before joining the FIFO. Preflight normalizes PoolHome's
-  full `agent_identity` with the pool's own `agent_identity_tag` and compares
-  every current worker's reported `agent_version` tag in the existing fleet
-  query. Mixed, missing or mismatching tags also exit 2; check out the deployed
-  pool release at PoolHome, or finish the rollout before submitting.
+  and prefixes exit 2 before joining the FIFO. Mixed agent versions are expected
+  during rolling upgrades and are not checked; the protocol version is.
   This is deliberately conservative for doit `-s`/`--single` and cache hits:
   the entire requested closure is prechecked, even when some leaves would not
   execute.
