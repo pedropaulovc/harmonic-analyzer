@@ -49,7 +49,7 @@ def test_flange_wall_shortfall_is_the_declared_owner_minor() -> None:
     assert spec.FLANGE_WALL_MIN < WALL_FLOOR_MM
     assert spec.FLANGE_WALL_MIN_TEXT == ".040"
     assert spec.FLANGE_WALL_CALLOUT == "WALL .040 MIN AT RIMS"
-    assert spec.DIMENSION_CALLOUTS["WasherThickness"].splitlines()[-1] == (
+    assert drawing.DIMENSION_CALLOUTS["WasherThickness"].splitlines()[-1] == (
         spec.FLANGE_WALL_CALLOUT
     )
     (wall,) = load_exceptions(_config.CONFIG_DIR, "ch_rocker_arm_tl_oblique_hub_washer", "part")
@@ -110,7 +110,7 @@ def test_spigot_locates_loose_in_mains_strap_hole() -> None:
     assert spec.SPIGOT_FLOAT_MIN > 0.0
     assert spec.SPIGOT_FLOAT_MAX == pytest.approx((10.1727 - 9.8806) / 2.0)
     assert spec.SPIGOT_FLOAT_MAX == pytest.approx(0.14605)
-    callout = spec.DIMENSION_CALLOUTS["SpigotDia"]
+    callout = drawing.DIMENSION_CALLOUTS["SpigotDia"]
     assert spec.STRAP_NUMBER == strap.NUMBER == "MHA-CH-13"
     assert f"STRAP {strap.NUMBER}" in callout
     assert "(.4000-.4005 REF)" in callout
@@ -139,27 +139,23 @@ def test_local_edge_limits_keep_a_cylindrical_locating_land() -> None:
         spec.SPIGOT_LENGTH_LIMITS[0] - spec.SPIGOT_ROOT_RADIUS_MAX
     )
     assert spec.SPIGOT_LAND_MIN > 0.0
-    # The owner's .005 flange break, with its function: the seat ring left on
-    # the strap outside its hub hole, which the title block's .010 would lose.
-    thickness = spec.DIMENSION_CALLOUTS["WasherThickness"]
-    assert thickness.splitlines()[:2] == [
-        "BREAK EDGES .005 MAX:",
-        "KEEPS SEAT RING ON STRAP;",
-    ]
+    # The owner's .005 flange break: the seat ring left on the strap outside
+    # its hub hole, which the title block's .010 would lose.
+    thickness = drawing.DIMENSION_CALLOUTS["WasherThickness"]
+    assert thickness.splitlines() == ["BREAK EDGES .005 MAX", spec.FLANGE_WALL_CALLOUT]
     assert spec.SEAT_RING_MIN == pytest.approx(
         (10.8712 - 10.1727) / 2.0 - spec.SPIGOT_FLOAT_MAX - 0.127
     )
     assert spec.SEAT_RING_MIN > 0.0
     assert spec.SEAT_RING_MIN - edge_break_chamfer_mm(unit=spec.UNIT) + 0.127 < 0.0
-    length = spec.DIMENSION_CALLOUTS["SpigotLength"]
-    assert "END EDGE SHARP, NO BURR" in length
-    assert "ROOT R.003 MAX: SEATS" in length
-    assert "FLAT" in length
-    assert "LOCATING LAND" in length
+    assert drawing.DIMENSION_CALLOUTS["SpigotLength"].splitlines() == [
+        "END EDGE SHARP, NO BURR",
+        "ROOT R.003 MAX",
+    ]
 
 
 def test_bore_clears_the_8_32_shcs_and_its_fillet() -> None:
-    assert spec.DIMENSION_CALLOUTS["WasherBore"] == "13/64 DRILL THRU"
+    assert drawing.DIMENSION_CALLOUTS["WasherBore"] == "13/64 DRILL THRU"
     assert spec.BORE_LIMITS[0] > SCREW_FILLET_DIA_MAX > HUB_SCREW.major_dia
     assert spec.OD_LIMITS[0] > HUB_SCREW.head_dia
     assert spec.WALL_MIN >= WALL_TARGET_MM
@@ -168,15 +164,18 @@ def test_bore_clears_the_8_32_shcs_and_its_fillet() -> None:
     )
 
 
-def test_od_keeps_its_xxx_row_for_the_cutter_floor_and_says_so() -> None:
+def test_od_keeps_its_xxx_row_and_names_the_cutter_it_clears() -> None:
+    # Rule 3: a .XXX clearance names what it clears.  The 1.5 mm floor is the
+    # holding proof's and the jig's tooling-clearance check's, not the sheet's.
     assert spec.OD_PLACES == 3
     assert spec.CUTTER_CLEARANCE_MIN == 1.5
-    od = spec.DIMENSION_CALLOUTS["WasherOd"]
-    # The sheet is inch: the 1.5 mm floor prints floored, .059.  The callout
-    # never opens on "MAX", which reads as a one-sided limit on the size.
-    assert od.startswith("UPPER LIMIT KEEPS\n.059 MIN TO 3/8 STRAP\n")
-    assert "CUTTER SWEEP" in od and spec.JIG_NUMBER in od
-    assert "BREAK" not in od
+    assert drawing.DIMENSION_CALLOUTS["WasherOd"] == f"CLEARS 3/8 CUTTER\nON {spec.JIG_NUMBER}"
+
+
+def test_every_callout_keeps_to_two_lines_of_words() -> None:
+    # Rule 7: anything longer moves to a numbered flag note.
+    for name, text in drawing.DIMENSION_CALLOUTS.items():
+        assert len(text.splitlines()) <= 2, name
 
 
 def test_every_marked_dimension_has_one_view_and_model_places() -> None:
@@ -192,7 +191,7 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
         "SpigotLength": 3,
         "WasherBore": 3,
     }
-    assert set(spec.DIMENSION_CALLOUTS) <= marked
+    assert set(drawing.DIMENSION_CALLOUTS) <= marked
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     assert part.DRAWING_PRECISION is spec.DRAWING_PRECISION
 
