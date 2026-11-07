@@ -488,6 +488,27 @@ def test_head_end_view_is_the_third_angle_right_view() -> None:
     assert drawing.HEAD_FACE_X < head_dia_text_x < drawing.END_CENTER[0] - head_radius - 0.010
 
 
+def test_fitted_shoulder_length_is_one_flagged_numbered_note() -> None:
+    """Fan-out screen 20261107T081227004Z: the fit-up hung on the (2.08) as
+    "FACED TO SUIT ..." (rule 26 private phrase; rule 7 linked flag note)."""
+    assert spec.SHOULDER_LENGTH_CALLOUT == "SEE NOTE 1"
+    lines = spec.SHOULDER_LENGTH_NOTE.splitlines()
+    assert lines[0].startswith("1. SHOULDER LENGTH")
+    assert len(lines) <= 4
+    flat = " ".join(line.strip() for line in lines)
+    assert "MHA-DT-34 OUTER FACE TO MHA-DT-35 FLOOR ON BONDED HANDLE MHA-DT-08" in flat
+    assert flat.endswith("PLUS .010-.040 END PLAY.")
+    assert "TO SUIT" not in flat and "FACED" not in flat
+    # The note's widest line, at ~2.7 mm a character, ends inside the right
+    # border; its upper-left stands right of the head length's callout.
+    x, _ = drawing.NOTES_XY
+    assert x + max(map(len, lines)) * 0.0027 < 0.4191
+    # Standard fit name and forms on the other callouts (rules 3, 4, 7).
+    assert spec.SHOULDER_FIT_CALLOUT == "RUNNING FIT IN MHA-DT-08\nREAMED BORE"
+    assert spec.HEAD_LENGTH_CALLOUT == "CLEARS MHA-DT-35 FACE"
+    assert spec.HEAD_DIA_CALLOUT == "BEARS ON\nMHA-DT-35 FLOOR"
+
+
 def test_sheet_placements_stay_inside_the_border() -> None:
     inner = (0.0127, 0.0127, 0.4191, 0.2667)  # ASME B landscape inner border
     title_block = (0.218, 0.065)  # x >= and y <=
@@ -506,6 +527,7 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         drawing.DETAIL_CENTER,
         drawing.DETAIL_LABEL_XY,
         drawing.DETAIL_LETTER_XY,
+        drawing.NOTES_XY,
     ]
     for x, y in points:
         assert inner[0] < x < inner[2] and inner[1] < y < inner[3]
