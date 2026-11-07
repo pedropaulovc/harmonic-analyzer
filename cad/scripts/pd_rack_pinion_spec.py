@@ -342,14 +342,13 @@ if (
 # the bore's rear edge takes the title block's break.  The front edge is
 # chamfered past the spigot-to-flange corner's R.004 so the front face seats
 # on the flange (pd_transgear_disc_hub_spec checks the pair): a modelled .XXX
-# chamfer on the title block's row, its leg dimensioned in the drawing's
-# detail of the bore section.
+# chamfer on the title block's row (the drawing's detail of the bore section
+# shows it, a leadered note sizes it; its feature dimension is not marked).
 BORE_FRONT_CHAMFER = 0.254  # .010, 45 deg
 BORE_FRONT_CHAMFER_LIMITS = (
     BORE_FRONT_CHAMFER - _BAND[3],
     BORE_FRONT_CHAMFER + _BAND[3],
 )  # .005-.015
-BORE_FRONT_CHAMFER_PLACES = 3
 
 # --- screw (MHA-PD-VN-55) -------------------------------------------------------------
 SCREW_MAJOR_DIA, SCREW_LENGTH, _HEAD_H, _HEAD_DIA, SCREW_PITCH = FILLISTER_SIZE
@@ -429,23 +428,21 @@ TAP_WALL_TEXT = (
 # keeps the mate number other parts' checks name.
 HUB_NUMBER = "MHA-PD-17"
 
-# Marked native model dimensions: the disc thickness, finite blank, bore,
-# controlling actual-flank span and the bore's front chamfer leg.  No root
-# diameter prints: the gear data gives the whole depth (REF), and a third
-# diameter line through the bore crowded the bore's leader (machinist review).
+# Marked native model dimensions: the disc thickness, finite blank, bore
+# and controlling actual-flank span.  No root diameter prints: the gear data
+# gives the whole depth (REF), and a third diameter line through the bore
+# crowded the bore's leader (machinist review).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
     "GearBlankProfile": {"OutsideDia"},
     "BoreProfile": {"BoreDia"},
     "SpanProfile": {"ToothSpan"},
-    "BoreFrontChamfer": {"BoreFrontChamferSize"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "GearBlank": {"FaceWidth": FACE_WIDTH_PLACES},
     "GearBlankProfile": {"OutsideDia": OUTSIDE_DIA_PLACES},
     "BoreProfile": {"BoreDia": BORE_PLACES},
     "SpanProfile": {"ToothSpan": SPAN_PLACES},
-    "BoreFrontChamfer": {"BoreFrontChamferSize": BORE_FRONT_CHAMFER_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

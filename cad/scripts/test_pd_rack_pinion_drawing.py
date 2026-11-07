@@ -42,18 +42,19 @@ def test_required_drawing_paths() -> None:
 def test_every_marked_dimension_is_kept_once_with_part_authored_places() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    kept = [*drawing.FRONT_KEEP, *drawing.SECTION_KEEP, *drawing.DETAIL_KEEP_NAMES]
+    kept = [*drawing.FRONT_KEEP, *drawing.SECTION_KEEP]
     assert sorted(kept) == sorted(marked) == [
-        "BoreDia", "BoreFrontChamferSize", "FaceWidth", "OutsideDia", "ToothSpan"
+        "BoreDia", "FaceWidth", "OutsideDia", "ToothSpan"
     ]
-    # Bore and blank print four places, the face and the chamfer's leg three
-    # (inch sheet).
+    # The modelled bore chamfer is never imported (farm r3: a chamfer's size
+    # is undetectable in a detail): its leadered note sizes it.
+    assert "BoreFrontChamfer" not in spec.DRAWING_DIMENSIONS
+    # Bore and blank print four places, the face three (inch sheet).
     assert spec.DRAWING_PRECISION_BY_NAME == {
         "FaceWidth": 3,
         "OutsideDia": 4,
         "BoreDia": 4,
         "ToothSpan": 4,
-        "BoreFrontChamferSize": 3,
     }
     assert "draw_pd_rack_pinion.py" in PRECISION_MIGRATED_DRAWINGS
     assert model_toleranced_dimensions(part) == {
@@ -223,40 +224,53 @@ def test_the_bore_front_chamfer_clears_the_spigot_corner() -> None:
     assert spec.BORE_FRONT_CHAMFER_LIMITS[0] >= hub.CORNER_RADIUS_MAX
 
 
-def test_the_bore_chamfer_is_modelled_and_dimensioned_in_detail_b() -> None:
+def test_the_bore_chamfer_is_modelled_and_sized_by_a_leadered_note_in_detail_b() -> None:
     """Round-2 review: the far-side chamfer shows and is sized on a view.
-    The part models it (its leg a marked .XXX dimension, so the title
-    block's row gives .005-.015), section A-A cuts it on the bore axis where
-    the edge view stood, and 10:1 detail B carries its leg with the 45° and
-    the root it clears; note 1 keeps only the fit."""
-    assert spec.DRAWING_DIMENSIONS["BoreFrontChamfer"] == {"BoreFrontChamferSize"}
-    assert spec.DRAWING_PRECISION_BY_NAME["BoreFrontChamferSize"] == 3
+    The part models it (its feature dimension named for the volume check,
+    never imported), section A-A cuts it on the bore axis where the edge
+    view stood, and 10:1 detail B shows it with a leadered note whose tip is
+    the chamfer's mid-point; note 1 keeps only the fit."""
     assert part.V_BORE_FRONT_CHAMFER == pytest.approx(
         math.pi
         * spec.BORE_FRONT_CHAMFER**2
         * (spec.BORE_DIA / 2.0 + spec.BORE_FRONT_CHAMFER / 3.0)
     )
-    assert drawing.DETAIL_KEEP_NAMES == ("BoreFrontChamferSize",)
-    assert drawing.DETAIL_DIMENSION_CALLOUTS == {
-        "BoreFrontChamferSize": f"CLEARS {spec.HUB_NUMBER}\nSPIGOT ROOT"
-    }
-    assert drawing.DETAIL_DIMENSION_SUFFIXES == {"BoreFrontChamferSize": " X 45\u00b0"}
+    assert callouts.CHAMFER_NOTE == f".010 X 45\u00b0\nCLEARS {spec.HUB_NUMBER}\nSPIGOT ROOT"
+    assert spec.BORE_FRONT_CHAMFER_LIMITS[0] >= 0.005 * 25.4 - 1e-9
+    # The leader's tip: the chamfer face's mid-point in the cut plane.
+    r = spec.BORE_DIA / 2.0
+    c = spec.BORE_FRONT_CHAMFER
+    assert drawing._CHAMFER_MID_M == pytest.approx((0.0, (r + c / 2) / 1000.0, c / 2000.0))
     # The cut runs on the bore axis past the tooth tips each end.
     (low, high) = drawing.SECTION_LINE_MODEL_M
     assert low[0] == high[0] == 0.0 == low[2] == high[2]
     assert -low[1] == high[1] > spec.OUTSIDE_DIA / 2000.0
-    # The detail's fence holds both chamfer ends; the circle stands in the
-    # clear left lane: under GEAR DATA, left of the bore's text and over the
-    # tap's callout block.
+    # The fence holds the chamfer (both ends) and its mid-point; the circle
+    # stands in the clear left lane: under GEAR DATA and over the tap block.
+    focus = drawing.DETAIL_FOCUS_MM
+    for point in (*drawing._CHAMFER_ENDS_MM, (0.0, r + c / 2, c / 2)):
+        assert math.dist(focus, point) < drawing.DETAIL_RADIUS_MM - 0.3
     radius = drawing.DETAIL_CROP_RADIUS
     cx, cy = drawing.DETAIL_CENTER
     assert cx - radius > 0.0127
     assert cy + radius < drawing.GEAR_DATA_XY[1] - 9 * 0.0035
-    bore_shoulder = drawing.FRONT_KEEP["BoreDia"][0] - drawing.BORE_TEXT_BLOCK[0] / 2.0
-    corner_x = cx + (0.0 - drawing.DETAIL_FOCUS_MM[2]) * -drawing._DS
-    text_right = corner_x + drawing.CHAMFER_TEXT_OFFSET + 0.021
-    assert text_right < bore_shoulder
     assert drawing.DETAIL_LABEL_XY[1] - 0.010 > drawing.TAP_CALLOUT_XY[1]
+    # The note, set off its nominal tip (section +Y up, -Z right, so the
+    # detail lays z = 0 right of the focus), clears the circle on the right,
+    # stands above the label and ends left of the bore's text.
+    tip = (
+        cx + (focus[2] - c / 2) * drawing._DS,
+        cy + (r + c / 2 - focus[1]) * drawing._DS,
+    )
+    note = dict(advance_ratio=109.7 / (42 * 3.5), line_spacing=16.8 * 25.4 / 72.0 / 3.5)
+    anchor = (tip[0] + drawing.CHAMFER_NOTE_OFFSET[0], tip[1] + drawing.CHAMFER_NOTE_OFFSET[1])
+    box = estimate_text_box(callouts.CHAMFER_NOTE, anchor=anchor, height=0.0035, **note)
+    assert box is not None
+    assert box.xmin > cx + radius
+    assert box.ymin > drawing.DETAIL_LABEL_XY[1] + 0.002
+    bore_shoulder = drawing.FRONT_KEEP["BoreDia"][0] - drawing.BORE_TEXT_BLOCK[0] / 2.0
+    assert box.xmax < bore_shoulder - 0.010
+    assert box.ymax < drawing.GEAR_DATA_XY[1] - 9 * 0.0035
     # The section's caption hangs under the thickness's text, clear of the
     # title block's top edge.
     assert 0.066 < drawing.SECTION_CAPTION_XY[1] - 0.006
@@ -353,7 +367,7 @@ def test_sheet_gear_data_names_the_mesh_once_with_its_backlash_acceptance() -> N
             *drawing.DIMENSION_CALLOUTS.values(),
             *drawing.DIMENSION_CALLOUTS_ABOVE.values(),
             *drawing.SECTION_DIMENSION_CALLOUTS.values(),
-            *drawing.DETAIL_DIMENSION_CALLOUTS.values(),
+            callouts.CHAMFER_NOTE,
         )
     )
     assert sheet_text.count(callouts.KNOB_NUMBER) == 1

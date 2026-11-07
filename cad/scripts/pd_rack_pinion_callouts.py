@@ -21,6 +21,7 @@ import math
 import paper_drive_mesh_check as mesh_check
 import pd_transgear_knob_shaft_spec as knob
 from pd_rack_pinion_spec import (
+    BORE_FRONT_CHAMFER,
     CENTRE_DISTANCE_WINDOW,
     CUTTER_NUMBER,
     CUTTER_TOOTH_RANGE,
@@ -49,10 +50,17 @@ TAP_NOTE = 2
 BORE_CALLOUT = f"REAM THRU\nSEE NOTE {BORE_NOTE}"
 # The bore's front-edge chamfer is a feature, not the title block's edge
 # break: its least must pass the spigot root's R.004 (the disc can ride on
-# the spigot's side while it is centred).  Its native leg prints at .XXX in
-# the detail of section A-A, the 45° after it, and the root it clears under.
-CHAMFER_SUFFIX = " X 45\u00b0"
-CHAMFER_CALLOUT = f"CLEARS {HUB_NUMBER}\nSPIGOT ROOT"
+# the spigot's side while it is centred).  Detail B of section A-A shows it;
+# this leadered note sizes it at .XXX (the title block's row gives
+# .005-.015) and names the root it clears, on three rows so it stays narrow
+# beside the detail.
+CHAMFER_NOTE = "\n".join(
+    (
+        f"{inch_text(BORE_FRONT_CHAMFER, 3)} X 45\u00b0",
+        f"CLEARS {HUB_NUMBER}",
+        "SPIGOT ROOT",
+    )
+)
 # The #0-80 taps: under the native drill and thread lines, the mouth breaks
 # (tighter than the title block's .010 because the screw's engagement spends
 # them, so the screw is named) and the link to the transfer note.

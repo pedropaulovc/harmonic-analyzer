@@ -46,6 +46,7 @@ from _drawing_dimensions import assert_imported_precision, set_dimension_callout
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_sections import create_section_view
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _drawing_leader_notes import add_leader_note
 from _drawing_leaders import set_near_side_diameter
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
@@ -60,8 +61,7 @@ import _telemetry
 from paper_drive_stock_drawing import add_toothspace_callout, require_source_control
 from pd_rack_pinion_callouts import (
     BORE_CALLOUT,
-    CHAMFER_CALLOUT,
-    CHAMFER_SUFFIX,
+    CHAMFER_NOTE,
     DRAWING_NOTES,
     FACE_WIDTH_CALLOUT,
     GEAR_DATA_NOTE,
@@ -148,11 +148,12 @@ SECTION_LINE_MODEL_M = tuple(
 SECTION_CAPTION_XY = (SECTION_CENTER[0], 0.100)
 
 # DETAIL B: at 1:1 the .010 chamfer is a quarter-millimetre of A-A, so a
-# native 10:1 detail of the bore's upper front corner carries its leg
-# (draw_dt_crank_handle's detail of a section).  The fence, in the cut plane
-# x = 0 (model mm as (x, y, z)), takes in the chamfer's two ends (the leg's
-# references: a detail imports only a dimension whose references it shows),
-# the bore wall behind it and the front face above it.
+# native 10:1 detail of the bore's upper front corner shows it
+# (draw_dt_crank_handle's detail of a section) and a leadered note sizes it.
+# The fence, in the cut plane x = 0 (model mm as (x, y, z)), takes in the
+# chamfer's two ends, the bore wall behind it and the front face above it.
+# No model dimension is imported: farm r3 found a chamfer feature's size
+# undetectable in the detail (its owner is no sketch).
 DETAIL_LETTER = "B"
 DETAIL_SCALE = (10, 1)
 _DS = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
@@ -178,12 +179,17 @@ DETAIL_LABEL_XY = (DETAIL_CENTER[0], DETAIL_CENTER[1] - DETAIL_CROP_RADIUS - 0.0
 # y ~0.182); its letter stands up-left of it in the gap between the face
 # view's rim (x <= 0.261) and A-A.
 DETAIL_LETTER_XY = (0.304, 0.194)
-# The leg's text stands right of the detail, beyond the front face, its
-# value line CHAMFER_TEXT_DROP under the bore wall (the leg's dimension line
-# runs in the bore's air, off the hatch) and its block's left end past the
-# circle; the corner itself is projected once the detail stands.
-CHAMFER_TEXT_OFFSET = 0.034
-CHAMFER_TEXT_DROP = 0.006
+# The note's top-left stands up-right of the chamfer's mid-point as the
+# detail projects it (x ~0.056, y ~0.177): three rows ending ~42 mm right,
+# x ~0.070..0.112, y ~0.190..0.177, right of the circle (x <= 0.064), above
+# its label and left of the bore's text (x >= 0.139); the straight leader
+# runs down-left into the circle onto the chamfer.
+CHAMFER_NOTE_OFFSET = (0.014, 0.013)
+_CHAMFER_MID_M = (
+    0.0,
+    (_BORE_R + BORE_FRONT_CHAMFER / 2.0) / 1000.0,
+    BORE_FRONT_CHAMFER / 2000.0,
+)
 
 # The bore's and the blank's diameters print near-side: one arrow on the rim
 # nearest the text, no line through the centre (machinist review: their
@@ -231,22 +237,19 @@ FRONT_KEEP = {
 SECTION_KEEP = {
     "FaceWidth": (FRONT_FACE_X + 0.028, SECTION_CENTER[1] - HALF_OD - 0.012),
 }
-DETAIL_KEEP_NAMES = ("BoreFrontChamferSize",)
+# The chamfer has no dimension: its size is CHAMFER_NOTE on detail B.
 # The bore's process and its note link stand under its size, on the bore
 # dimension's own leader: a separate fit-note leader converged on the small
 # bore with the size, datum, diameter and finish leaders (machinist review,
 # stack6: clarity).  The tip and the span link the GEAR DATA block, which
 # names their one mate (rule 4); the span's above its value, clear of the rim
-# below.  The thickness names the screw engagement its .XXX band holds; the
-# chamfer's leg reads "X 45°" and names the root it clears.
+# below.  The thickness names the screw engagement its .XXX band holds.
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "OutsideDia": MESH_CALLOUT,
 }
 DIMENSION_CALLOUTS_ABOVE = {"ToothSpan": SPAN_CALLOUT}
 SECTION_DIMENSION_CALLOUTS = {"FaceWidth": FACE_WIDTH_CALLOUT}
-DETAIL_DIMENSION_CALLOUTS = {"BoreFrontChamferSize": CHAMFER_CALLOUT}
-DETAIL_DIMENSION_SUFFIXES = {"BoreFrontChamferSize": CHAMFER_SUFFIX}
 # Lower-left of the face view, off the rim: the leader rises almost straight
 # to the lower-left tap from the block's lower-right corner, left of the
 # tap's centre, so it crosses neither the OD's line (lower right) nor datum
@@ -557,51 +560,23 @@ def _chamfer_detail(adapter: Any, section: Any) -> Any:
     return detail
 
 
-def _chamfer_keep(adapter: Any, detail: Any) -> dict[str, tuple[float, float]]:
-    """Where the chamfer leg's text stands in detail B: CHAMFER_TEXT_OFFSET
-    beyond the front face and CHAMFER_TEXT_DROP into the bore's air from the
-    bore's front corner, each direction read off the detail itself."""
-    radius_m = _BORE_R / 1000.0
-    corner, beyond, inside = model_points_in_view(
+def _chamfer_note(adapter: Any, detail: Any) -> Any:
+    """CHAMFER_NOTE on detail B, owned by the detail, its straight leader's
+    tip on the chamfer's mid-point as the detail's own transform projects it
+    (add_leader_note reads the tip back); the tip must fall inside the
+    detail's outline, or the arrow would point at nothing."""
+    tip = model_point_in_view(adapter, detail, _CHAMFER_MID_M, label="detail B chamfer")
+    outline = tuple(float(value) for value in _early_bound(detail, "IView").GetOutline())
+    if not (outline[0] < tip[0] < outline[2] and outline[1] < tip[1] < outline[3]):
+        raise RuntimeError(f"detail B's chamfer {tip} projects outside its outline {outline}")
+    return add_leader_note(
         adapter,
-        detail,
-        [(0.0, radius_m, 0.0), (0.0, radius_m, -0.001), (0.0, radius_m - 0.001, 0.0)],
-        label="detail B bore front corner",
+        CHAMFER_NOTE,
+        text_xy=(tip[0] + CHAMFER_NOTE_OFFSET[0], tip[1] + CHAMFER_NOTE_OFFSET[1]),
+        attach_xy=tip,
+        label="bore front chamfer",
+        view=detail,
     )
-    return {
-        "BoreFrontChamferSize": (
-            corner[0] + math.copysign(CHAMFER_TEXT_OFFSET, beyond[0] - corner[0]),
-            corner[1] + math.copysign(CHAMFER_TEXT_DROP, inside[1] - corner[1]),
-        )
-    }
-
-
-_CHAMFER_DIMENSION = 10  # swDimensionType_e.swChamferDimension
-
-
-def _set_dimension_suffixes(
-    adapter: Any, annotations: list[Any], suffixes: dict[str, str]
-) -> None:
-    """Append each named dimension's suffix after its value, read back.  A
-    leg the seat imports as a native chamfer dimension already prints its
-    angle, so it takes none."""
-    remaining = dict(suffixes)
-    for annotation in annotations:
-        annotation = _early_bound(annotation, "IAnnotation")
-        name = dimension_name(adapter, annotation)
-        suffix = remaining.pop(name, None)
-        if suffix is None:
-            continue
-        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        if int(display.Type2) == _CHAMFER_DIMENSION:
-            _telemetry.info(f"{name}: native chamfer dimension, angle printed natively")
-            continue
-        display.SetText(2, suffix)  # swDimensionTextSuffix
-        if str(display.GetText(2) or "") != suffix:
-            raise RuntimeError(f"{name} suffix did not persist")
-    if remaining:
-        raise RuntimeError(f"dimension suffixes not applied: {sorted(remaining)}")
-
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -659,18 +634,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
     section = _bore_section(adapter, front)
-    detail = _chamfer_detail(adapter, section)
-    set_hidden_lines_removed(adapter, detail)
 
-    # Detail B is dimensioned FIRST: a native detail imported nothing after
-    # its parent's import and deletions (draw_dt_crank_handle).
-    detail_annotations = curate_view_dimensions(
-        adapter,
-        detail,
-        keep=_chamfer_keep(adapter, detail),
-        view_label="bore chamfer detail",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
     front_annotations = curate_view_dimensions(
         adapter,
         front,
@@ -688,17 +652,18 @@ async def build(adapter: Any) -> dict[str, str]:
     # Decimal places (and so the general-tolerance row each dimension claims)
     # are authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(
-        adapter,
-        [*front_annotations, *section_annotations, *detail_annotations],
-        DRAWING_PRECISION_BY_NAME,
+        adapter, [*front_annotations, *section_annotations], DRAWING_PRECISION_BY_NAME
     )
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
     set_dimension_callouts(
         adapter, front_annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
     )
     set_dimension_callouts(adapter, section_annotations, SECTION_DIMENSION_CALLOUTS)
-    set_dimension_callouts(adapter, detail_annotations, DETAIL_DIMENSION_CALLOUTS)
-    _set_dimension_suffixes(adapter, detail_annotations, DETAIL_DIMENSION_SUFFIXES)
+    # Detail B after every import: it imports nothing, and its note is the
+    # chamfer's only size.
+    detail = _chamfer_detail(adapter, section)
+    set_hidden_lines_removed(adapter, detail)
+    _chamfer_note(adapter, detail)
     _set_near_side_diameters(adapter, front_annotations)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to disc bore")
