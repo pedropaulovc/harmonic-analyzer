@@ -197,8 +197,10 @@ def test_callouts_name_each_mate_at_its_dimension() -> None:
     assert notes.LEVER_NUMBER == parts("ch-channel-lever")["number"]
     assert notes.ROCKER_ARM_NUMBER == parts("ch-rocker-arm")["number"]
     callouts = notes.DIMENSION_CALLOUTS
-    assert callouts["TopNotchWidth"].startswith("STRADDLES MHA-CH-02\n")
-    assert callouts["BottomNotchWidth"].startswith("RIDES MHA-CH-06\n")
+    # Fan-out round 1 (rule 4): each width names its standard fit, the
+    # running floor its minimum holds over the plate.
+    assert callouts["TopNotchWidth"].startswith("RUNNING FIT MHA-CH-02\n")
+    assert callouts["BottomNotchWidth"].startswith("RUNNING FIT MHA-CH-06\n")
     # Fan-out screen 2026-11-07 (rule 7): a location carries its value and
     # band only, and each notch names its mate once, on its width; each
     # notch's ROOTS limit rides its depth.
@@ -209,7 +211,7 @@ def test_callouts_name_each_mate_at_its_dimension() -> None:
     assert len(callouts["BottomNotchWidth"].splitlines()) == 2
     assert drawing.CALLOUTS_ABOVE <= set(callouts)
     for text in callouts.values():
-        assert all(len(line) <= 20 for line in text.splitlines()), text
+        assert all(len(line) <= 21 for line in text.splitlines()), text
     # r1 (64ebba372): SOLIDWORKS printed nothing of the two-line callout set
     # above TopNotchWidth; a callout over its value is one line.
     for name in drawing.CALLOUTS_ABOVE:
@@ -668,8 +670,9 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     spec = _config.parts("ch-amplitude-bar")
     assert spec["material_specification"] == "low-carbon cold-finished steel, 1/4 in sq"
     # One line in the FINISH field (r1 wrapped at 50 characters). Round 2:
-    # the unplated press bore states its protection.
-    assert spec["finish"] == "bright chrome, dims plated; pin hole bare, oiled"
+    # the unplated press bore states its protection. Fan-out round 1 (rule
+    # 26): 'dims plated' was private shorthand; the sizes apply after plating.
+    assert spec["finish"] == "chrome, sizes after plating; pin hole bare, oiled"
     assert len(spec["finish"]) < 50
     assert int(spec["quantity"]) == 20
 

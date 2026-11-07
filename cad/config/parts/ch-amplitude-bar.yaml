@@ -4,7 +4,7 @@ ch-amplitude-bar:
   # fit, plating or load needs one grade (machinist review, rule 2).
   material: "LOW-CARBON STEEL CF, 1/4 in sq"
   material_specification: low-carbon cold-finished steel, 1/4 in sq
-  finish: "bright chrome, dims plated; pin hole bare, oiled"
+  finish: "chrome, sizes after plating; pin hole bare, oiled"
   quantity: 20
   tolerance_class: machined_block
   fit_class: sliding_amplitude_bar_on_rocker
@@ -28,7 +28,7 @@ ch-amplitude-bar:
       reason: "the tight location holds the reamed press-fit pin hole's wall to the nearer depth face at .079 on the narrowest stock (RV-06); a looser band lets the wall fall further under the .080 target, to .074 at .XX (owner-accepted: keep the band)"
     - id: "RV-04"
       kind: "minor"
-      where: "the CHEEK WALL n MIN line under each notch-width callout (STRADDLES the lever, RIDES the rocker)"
+      where: "the CHEEK WALL n MIN line under each notch-width callout (RUNNING FIT on the lever, RUNNING FIT on the rocker)"
       finding: "notch cheek walls below the .080 in target and the .060 floor (rules 17, 20)"
       reason: "the book's 1/4 square bar straddles the lever and rides the .098 rocker arm, so its cheeks cannot reach the target; approved floors 1.17 mm (.046) MIN at the top notch and 1.21 mm (.047) MIN at the foot, stated as plain facts at each width: .052 and .049 on the inch print (owner-ruled shortfall, 2026-10-15)"
     - id: "RV-05"
