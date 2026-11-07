@@ -668,12 +668,14 @@ DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
 # Every tight band or limit names its mate on the dimension it governs.  The
 # chamfer reads ".012 MIN" over its angle; why it has a floor rides above it,
 # clear of the extension lines below (draw_pn_pen_v_block's SECTION_KEEP).
-# The reamed diameter's mate runs three short rows: its callout stands in the
-# bottom view's corner, between the neck's depth dimensions and the title
-# block (draw_pn_pen_v_block's BOTTOM_KEEP).
+# The reamed diameter's mate: the standard fit name and the mate's number in
+# two short rows of words under REAM THRU (rule 7: at most two lines of words;
+# the fit's clearance is the rod's note 1, where the pin is turned to this
+# bore).  Its callout stands in the bottom view's corner, between the neck's
+# depth dimensions and the title block (draw_pn_pen_v_block's BOTTOM_KEEP).
 PEN_ROD_NUMBER = _config.parts("pn-pen-rod")["number"]
 DIMENSION_CALLOUTS: dict[str, str] = {
-    "PivotDia": f"REAM THRU\nSLIP FIT ON\nPEN ROD PIVOT\n{PEN_ROD_NUMBER}",
+    "PivotDia": f"REAM THRU\nSLIDING FIT ON\n{PEN_ROD_NUMBER} PIVOT",
     "PivotChamferSize": "X 45°",
     "TapWallMin": "TAP WALL",
 }
