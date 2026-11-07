@@ -77,7 +77,7 @@ def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
     cheeks (ch_bar_pivot_pin_spec holds the fit), so the hole is reamed to a
     band of its own, native on TopPinDia. Machinist round 1 (#1293): the hole
     was only words in a note; it now prints in the top end's right side view,
-    its THRU / REAM / PRESS FIT callout at the diameter."""
+    its REAM THRU callout at the diameter, flagged to note 1."""
     from _drawing_contract import model_toleranced_dimensions
 
     notes = ch_amplitude_bar_notes
@@ -99,7 +99,7 @@ def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
     # in note 1, which names the pin by name and number with its acceptance
     # (rules 4 and 7; pending owner confirmation, fan-out Q1).
     assert notes.DIMENSION_CALLOUTS["TopPinDia"] == (
-        "REAM THRU\nPRESS FIT MHA-CH-11\nSEE NOTE 1"
+        "REAM THRU\nSEE NOTE 1"
     )
     assert notes.DRAWING_NOTES.splitlines() == [
         "1. MATCHED PRESS FIT ON BAR PIVOT PIN MHA-CH-11:",

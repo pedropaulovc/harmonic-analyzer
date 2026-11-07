@@ -160,7 +160,7 @@ def test_pin_hole_is_the_reamed_press_hole_for_the_rod_pivot_pin() -> None:
     assert "drives=(None,'\"CenterDistance\"','\"PinHoleDia\"')" in build
     assert 'name_last_feature(adapter,"PinHoleProfile")' in build
     assert 'name_last_feature(adapter,"PinHole")' in build
-    assert drawing.PIN_NUMBER == _config.parts("ch-rod-pivot-pin")["number"]
+    assert ch_connecting_rod_notes.PIN_NUMBER == _config.parts("ch-rod-pivot-pin")["number"]
     assert ch_connecting_rod_notes.ARM_NUMBER == _config.parts("ch-rocker-arm")["number"]
     assert drawing.CAM_NUMBER == _config.parts("dt-cylinder-gear")["number"]
 
@@ -237,7 +237,7 @@ def test_every_tight_band_names_its_mate() -> None:
     # narrower than the reamer row links its matched press fit (note 1;
     # pending owner confirmation, fan-out Q1).
     assert drawing.FRONT_CALLOUTS["PinHoleDia"] == (
-        f"REAM THRU\nPRESS FIT ON {drawing.PIN_NUMBER}\nSEE NOTE 1"
+        "REAM THRU\nSEE NOTE 1"
     )
     # Fan-out rounds 1-2 (rule 4): two tight bands serving one mate link one
     # note naming it, so the mate prints once and each band reaches it: the
@@ -652,7 +652,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert spec["material"] == rod.MATERIAL == "Plain Carbon Steel"
     assert spec["material_specification"] == "AISI 1018 low-carbon steel plate"
     assert spec["finish"] == (
-        "BLACK ENAMEL; MASK BORE, RING AND SHANK FACES, PIN HOLE AND FORK SLOT; "
-        "OIL BARE MACHINED SURFACES"
+        "BLACK ENAMEL; MASK BORE, RING AND SHANK FACES, PIN HOLE, FORK SLOT; "
+        "OIL BARE SURFACES"
     )
     assert int(spec["quantity"]) == 20

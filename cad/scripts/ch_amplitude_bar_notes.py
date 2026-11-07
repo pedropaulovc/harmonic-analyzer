@@ -183,7 +183,7 @@ DRAWING_NOTES = (
 # (each notch's centring ledge) carries its value and band only; each notch
 # names its mate once, on its width, by the standard fit its running floor
 # gives (rules 4 and 7; fan-out round 1: STRADDLES and RIDES are not fit
-# names), in the pin hole's 'PRESS FIT MHA-CH-11' form.
+# names), the fit word then the mate's number.
 DIMENSION_CALLOUTS: dict[str, str] = {
     "TopNotchWidth": (
         f"RUNNING FIT {LEVER_NUMBER}\n"
@@ -197,7 +197,7 @@ DIMENSION_CALLOUTS: dict[str, str] = {
     # One line over its value (a two-line callout above printed nothing, r1).
     "BottomNotchHeight": ROOT_CALLOUT,
     "TopPinDia": (
-        f"REAM THRU\nPRESS FIT {TOP_PIN_NUMBER}\nSEE NOTE {PIN_FIT_NOTE_NUMBER}"
+        f"REAM THRU\nSEE NOTE {PIN_FIT_NOTE_NUMBER}"
     ),
     "TopPinX": f"HOLE WALL {inch_text(PIN_HOLE_WALL_MIN, WALL_PLACES)} MIN",
     "BarSection": "1/4 SQ STOCK",

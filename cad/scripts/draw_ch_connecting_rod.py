@@ -134,7 +134,6 @@ NOTES_XY = (0.110, 0.262)
 
 # The mates the tight bands name (drawing-guidelines.md rule 7).
 CAM_NUMBER = str(_config.parts("dt-cylinder-gear")["number"])
-PIN_NUMBER = str(_config.parts("ch-rod-pivot-pin")["number"])
 
 
 def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
@@ -172,8 +171,9 @@ NEAR_SIDE_DIAMETERS = ("RingOuterDia", "StrapBoreDia")
 # Descriptive text beneath each native value/band: the strap bore and its
 # cam, named by the standard fit with its clearance as REF (rule 4); the
 # fork's crown, a full round on the pin tangent to its sides; the reamed
-# press hole, size then process (rules 12 and 26), its pin and the linked
-# matched-fit note (rule 7: a callout carries at most two lines of words).
+# press hole, size then process (rules 12 and 26) and the flag of the note
+# that names its pin and the matched fit once (rule 4, fan-out round 4: named
+# at the callout too, the mate printed twice).
 _CLEARANCE_LEAST, _CLEARANCE_MOST = STRAP_DIAMETRAL_CLEARANCE
 
 
@@ -188,7 +188,7 @@ FRONT_CALLOUTS = {
         f"(CLEARANCE {_inch(_CLEARANCE_LEAST, 3)}-{_inch(_CLEARANCE_MOST, 3)})"
     ),
     "ForkWidthDim": "FULL R",
-    "PinHoleDia": f"REAM THRU\nPRESS FIT ON {PIN_NUMBER}\nSEE NOTE {PIN_FIT_NOTE_NUMBER}",
+    "PinHoleDia": f"REAM THRU\nSEE NOTE {PIN_FIT_NOTE_NUMBER}",
 }
 
 # The side view at 1:1: the plate's thickness at the ring (#982 review r1),
