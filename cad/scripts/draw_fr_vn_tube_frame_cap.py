@@ -17,8 +17,9 @@ MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["fr_vn_tube_frame_cap"]
-# The footer's ITEM row: the catalogue designation in plain text.
-ITEM = "PUSH-ON ROUND CAP FOR 1 IN OD TUBE (ID 1 X 23/32 DEEP)"
+# The footer's ITEM row: the catalogue designation in plain text, with the
+# tube it caps named by drawing number (rule 4: FOR names its mate).
+ITEM = "PUSH-ON ROUND CAP FOR MHA-FR-03 1 IN OD TUBE (ID 1 X 23/32 DEEP)"
 
 
 async def build(adapter: Any) -> dict[str, str]:
