@@ -7,9 +7,9 @@ the drawing's native save then saves the dirtied part outside its own recipe
 (``cad/docs/pipeline/evidence/vm2-datum-placement/source-hash-cause.md``,
 fleet issue #1942).
 
-The axle's number and the axle back end's range are literals so the wheel
-group and the axle stay out of this part's recipe; ``test_mg_wheel_bar_drawing``
-pins them to the axle's config row and ``mg_wheel_axle_spec``.
+The axle's number is a literal so the wheel group and the axle stay out of
+this part's recipe; ``test_mg_wheel_bar_drawing`` pins it to the axle's
+config row.
 """
 
 from __future__ import annotations
@@ -30,9 +30,6 @@ def _wall_row(bore: str) -> str:
 # interference prints once, as REF on the axle's own sheet, keeping this
 # callout to two lines of words (rule 7).
 AXLE_BORE_CALLOUT = "REAM THRU\nPRESS FIT ON MHA-MG-07 AXLE\n" + _wall_row("axle bore")
-# The depth's band sets the stack that places the pressed axle's end under
-# the back face (rule 4: a width that sets a stack names it).
-BAR_DEPTH_CALLOUT = "SETS MHA-MG-07 AXLE END\n.008-.040 BELOW BACK FACE"
 # Under the drawing's own native hole callouts (drawing annotations, not
 # imported model dimensions, so the sheet writes them): the hanger hole's
 # least wall; the taps the clamp pair's banded stations and row locate them
@@ -44,7 +41,6 @@ CLAMP_HOLE_CALLOUT = "LOCATE TO MHA-SH-02 TAPS\n" + _wall_row("clamp holes")
 CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
     CALLOUT_BELOW: {
         ("AxleBoreProfile", "AxleBoreDia"): AXLE_BORE_CALLOUT,
-        ("Bar", "BarDepth"): BAR_DEPTH_CALLOUT,
     },
 }
 

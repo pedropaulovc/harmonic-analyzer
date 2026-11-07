@@ -19,6 +19,7 @@ from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _printed_tolerance import (
     edge_break_chamfer_mm,
     edge_break_radius_mm,
+    printed_band_mm,
     printed_deviations,
 )
 from mg_wheel_bar_geom import (  # noqa: F401 (re-export)
@@ -66,13 +67,15 @@ BORE_ROW_PLACES = 2
 # its MHA-SH-02 back-arc tap (+/-0.1 station and height, sh_column_clamp_fit)
 # and passes this bar's #8 clearance hole, whose least size clears the screw
 # major by 0.812. A +/-band on a hole's row height and station is a diametral
-# zone of 2*sqrt(2)*band; with the taps' 0.283 it must stay inside the 0.812:
-# +/-.007 at .XXX (0.503 + 0.283 = 0.786). The clamp row and both clamp
-# stations carry it. A literal, so the clamp's geometry stays out of this
-# part's recipe (test_mg_wheel_bar_drawing derives it from the clamp's own
-# modules). Drill wander is not charged, as on the support bar (#1988).
-CLAMP_POSITION_BAND = 0.1778  # .007
+# zone of 2*sqrt(2)*band; with the taps' 0.283 it must stay inside the 0.812.
+# The clamp row and both clamp stations print .XXX with no band of their own:
+# the title block's +/-.005 (0.359 + 0.283 = 0.642), tightened from a
+# converted-mm +/-.007 (delegated ruling 2026-11-07, Main, no precedent;
+# owner review #2144). test_mg_wheel_bar_drawing derives the stack from the
+# clamp's own modules, so the clamp's geometry stays out of this part's
+# recipe. Drill wander is not charged, as on the support bar (#1988).
 CLAMP_POSITION_PLACES = 3
+CLAMP_POSITION_BAND = printed_band_mm(CLAMP_POSITION_PLACES, unit=UNIT)
 
 # drawing-guidelines.md rule 17 (walls and webs), at the FULL worst case:
 # - the locating bands: each row at its band from the top face, the stations
