@@ -222,7 +222,7 @@ KNIFE_FREE_ROCK_DEG = free_rock_deg(0.0)
 # The bore crown (its upper inner wall) below the top seat: 14.605.
 BORE_CROWN_DEPTH = BLK_TOP - (BORE_CY + R_BORE)
 # MHA-SM-VN-52, a #10-24 plain hex bolt cut from stock at MHA-SM-00 to its
-# hole's measured stack plus the .351 +/-.006 (8.9154 +/-0.1524) fit-up reach
+# hole's measured stack plus the .351 (8.9154, title block +/-.005) fit-up reach
 # (``sm_summing_assembly_spec.HANGER_FIT_REACH``), drops through a washer on
 # the crossbar's faced top and its #10 clearance hole and threads into a
 # bottoming tap on the bore's vertical centreline at mid-depth.  The full
