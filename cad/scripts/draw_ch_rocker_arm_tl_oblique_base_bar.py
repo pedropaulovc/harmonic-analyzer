@@ -3,8 +3,8 @@ r"""Create the drawing for the oblique trammel's base bar (MHA-CH-06-TL-20).
 One part, two named configurations, one off each: ``Bar1`` under rail 1
 carries the end brackets' holes; ``Bar2``, turned over under rail 2, is the
 same bar without them. Each member has its own sheet (``SHEET_NAMES``), its
-views referencing that configuration, so each title block reads that
-member's Description and quantity 1 under the one Number. Bar 1's plan
+views referencing that configuration, and prints its member's Description
+and quantity 1 (``member_note``) under the one Number. Bar 1's plan
 (the *Front view, looking down on the top face) carries the bar's length and
 milled width (owner ruling #2083), the rail holes' baseline stations and the
 row's lateral station from the -Y edge under one native tap callout, the end
@@ -46,6 +46,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
@@ -114,8 +115,7 @@ OUTPUTS = DrawingOutputs(
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 # One sheet per member, each drawing its own configuration in full: sheet 1
 # Bar1 with the end brackets' holes, sheet 2 Bar2 without them. Both share
-# the one Number; each title block reads its member's Description and
-# Quantity through the sheet's own views.
+# the one Number; each sheet's note names its member and quantity.
 SHEET_NAMES = ("BAR 1", "BAR 2")
 MEMBER_SHEETS = dict(zip(SHEET_NAMES, part_spec.CONFIGURATIONS, strict=True))
 
@@ -161,6 +161,24 @@ ISO_NOTE_XY = (
     ISO_CENTER[0] + ISO_HALF[0] + 0.005,
     ISO_CENTER[1] - ISO_HALF[1] + ISO_NOTE_HEIGHT,
 )
+# Each sheet names its member and its quantity above the iso note, in the
+# same free corner (machinist review 0c3ed35988: the title block prints the
+# one Number for both sheets). One part number, named configurations (the
+# coordinator's ruling); the member's Description and Quantity are the
+# configuration properties the builder writes.
+MEMBER_NOTE_LINES = 2
+MEMBER_NOTE_XY = (
+    ISO_NOTE_XY[0],
+    ISO_NOTE_XY[1] + 0.003 + MEMBER_NOTE_LINES * ISO_NOTE_HEIGHT + 0.0015,
+)
+
+
+def member_note(configuration: str) -> str:
+    """The member's sheet label: its Description over its quantity."""
+    return (
+        f"{part_spec.CONFIGURATION_DESCRIPTIONS[configuration]}\n"
+        f"QTY {part_spec.CONFIGURATION_QUANTITIES[configuration]}"
+    )
 
 
 def _sheet_x(center: tuple[float, float], model_x_mm: float) -> float:
@@ -272,9 +290,11 @@ _RAIL_HOLE_TEXT_HALF = 0.0221  # Three-place station and band, 17 glyphs maximum
 _BRACKET_NEAR_X_TEXT_HALF = 0.0195  # "47.48 ±0.13 mm", 14 glyphs; 15 allowed
 _BRACKET_ROW_TEXT_HALF = 0.0195  # "54.909 ±0.13 mm", 15 glyphs
 _BRACKET_OUTER_TEXT_BELOW = 0.004  # "12.909 ±0.13 mm"'s centre under the -Y edge
-# The outer row's text stands on a shoulder right of its own line, so the
-# bracket callout's leader from the far outer hole passes left of it.
-_BRACKET_OUTER_TEXT_RIGHT = _TEXT_GAP + _BRACKET_ROW_TEXT_HALF
+# The outer row's keep x is its LINE's x: with its text below its span,
+# SolidWorks draws the line at the keep point and stands the text on a
+# shoulder right of it (0c3 farm sheet). A keep a text gap and a half-text
+# right of the lane put that line on the inner row's x, and its outside
+# arrowhead struck the 54.909's "±" (machinist review, 0c3ed35988).
 _SLOT_RUN_TEXT_LOW = 0.0055  # text centre below the run's lower line
 # The row's block: three lines, 14.6 tall (measured on the 2026-10-30 farm
 # sheet). The near rise (49.4) carries its text inside its own span, so the
@@ -355,7 +375,7 @@ FRONT_KEEP = {
         )
     },
     f"BracketRow{len(BRACKET_ROW_Y)}Y": (
-        _RIGHT + _BRACKET_OUTER_LANE + _BRACKET_OUTER_TEXT_RIGHT,
+        _RIGHT + _BRACKET_OUTER_LANE,
         _BOTTOM - _BRACKET_OUTER_TEXT_BELOW,
     ),
     "SlotRun": (
@@ -843,6 +863,37 @@ def _add_view_note(
         raise RuntimeError(f"{label} note did not land in its view: {texts!r}")
 
 
+_CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
+
+
+def _dangling_center_marks(view: Any) -> list[Any]:
+    marks = _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION)
+    annotations = (_early_bound(mark, "IAnnotation") for mark in marks or ())
+    return [annotation for annotation in annotations if annotation.IsDangling()]
+
+
+def _delete_dangling_center_marks(adapter: Any, view: Any, *, label: str) -> None:
+    """Delete the centre marks left on no hole, and read none back.
+
+    The 0c3ed35988 farm sheet's Bar2 plan printed four dangling marks where
+    Bar1's bracket holes are (machinist review: orphan centre marks): marks
+    made on the member the view showed before it referenced Bar2, which
+    suppresses those holes. Bar 1's plan has none, so this is a no-op there.
+    """
+    dangling = _dangling_center_marks(view)
+    if dangling:
+        draw = adapter.currentModel
+        draw.ClearSelection2(True)
+        for index, mark in enumerate(dangling):
+            if not mark.Select2(index > 0, 0):
+                raise RuntimeError(f"cannot select a dangling {label} centre mark")
+        draw.EditDelete()  # VT_VOID: the re-read below is the proof
+        draw.ClearSelection2(True)
+        rebuild_drawing(adapter, label=f"delete dangling {label} centre marks")
+    if _dangling_center_marks(view):
+        raise RuntimeError(f"the {label} keeps a dangling centre mark")
+
+
 def member_front_keep(configuration: str) -> dict[str, tuple[float, float]]:
     """The plan's kept dimensions for one member: Bar2's plan has no bracket
     holes or rows, and every other dimension sits where bar 1's does."""
@@ -863,8 +914,8 @@ def _draw_member_sheet(adapter: Any, configuration: str) -> None:
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     for view in (front, end, iso):
         set_hidden_lines_removed(adapter, view)
-    # Every view on this sheet draws its own member, so the sheet's title
-    # block reads that member's Description and Quantity (one Number).
+    # Every view on this sheet draws its own member (one Number); the
+    # member's own note names it and its quantity (member_note).
     configure_reference_views(adapter, configuration, [front, end, iso])
     names = part_spec.MEMBER_DRAWING_DIMENSIONS[configuration]
 
@@ -913,6 +964,7 @@ def _draw_member_sheet(adapter: Any, configuration: str) -> None:
     # centre-to-centre (rule 12) and not as the slot's overall length.
     if not auto_center_marks(adapter, front, holes=False, slots=True, size=0.0025):
         raise RuntimeError("failed to add the slot center marks to the plan")
+    _delete_dangling_center_marks(adapter, front, label="plan")
     tap_callout = add_native_hole_callout(
         adapter,
         front,
@@ -974,6 +1026,9 @@ def _draw_member_sheet(adapter: Any, configuration: str) -> None:
         )
     _add_view_note(
         adapter, end, SEAT_FINISH_REASON, SEAT_REASON_XY, label="seat finish reason"
+    )
+    _add_view_note(
+        adapter, front, member_note(configuration), MEMBER_NOTE_XY, label="member"
     )
 
     # The property-linked blocks land in the active view: the plan.

@@ -844,9 +844,10 @@ def test_bracket_dimensions_and_callout_lay_out_clear() -> None:
         near_text + drawing._BRACKET_NEAR_X_TEXT_HALF
         <= sx(centre, spec.FAR_SLOT_X) - 0.002
     )
-    # Right lanes: the outer row (12.909) nearest, its text on a shoulder
-    # right of its line under the bar's edge; the inner row (54.909) a text
-    # gap and a half-text further out, mid-span; the far rise outside it.
+    # Right lanes: the outer row (12.909) nearest, its keep on its own line
+    # (SolidWorks shoulders the text right of the line under the bar's edge);
+    # the inner row (54.909) a text gap and a half-text further out,
+    # mid-span; the far rise outside it.
     inner_x, inner_y = keep["BracketRow1Y"]
     outer_x, outer_y = keep["BracketRow2Y"]
     half = drawing._BRACKET_ROW_TEXT_HALF
@@ -854,10 +855,16 @@ def test_bracket_dimensions_and_callout_lay_out_clear() -> None:
     inner_line = drawing._RIGHT + drawing._BRACKET_INNER_LANE
     assert drawing._RIGHT < outer_line < inner_line < keep["FarSlotRise"][0]
     assert inner_x == pytest.approx(inner_line)
-    assert outer_x - half == pytest.approx(outer_line + drawing._TEXT_GAP)
+    assert outer_x == pytest.approx(outer_line)
     assert outer_y + 0.00175 <= drawing._BOTTOM - 0.002  # under the bar's edge
-    assert inner_x - half >= outer_line + drawing._TEXT_GAP - 1e-9
+    # Machinist review 0c3ed35988: a keep a half-text right of the lane put
+    # the outer line on the inner row's x, its arrowhead in the 54.909's "±".
+    # The outer line and its arrowheads stay a text gap left of that text.
+    assert inner_x - half >= outer_x + drawing._TEXT_GAP - 1e-9
     assert keep["FarSlotRise"][0] - inner_x >= half + 0.0015 - 1e-9
+    # The shouldered outer text ends short of the end view.
+    end_left = drawing.END_CENTER[0] - spec.BAR_THICK / 4000
+    assert outer_x + drawing._TEXT_GAP + 2 * half <= end_left - 0.005
     # The inner row's text stands above the outer row's extension line.
     outer_top = drawing._sheet_y(centre, drawing.BRACKET_ROW_Y[1])
     assert inner_y - 0.00175 >= outer_top + 0.002
@@ -875,14 +882,109 @@ def test_bracket_dimensions_and_callout_lay_out_clear() -> None:
     slope = (land[1] - hole[1]) / (land[0] - hole[0])
     at_right = hole[1] + slope * (drawing._RIGHT - hole[0])
     assert at_right < drawing._BOTTOM - 0.002
-    # Through the outer text's height the leader runs left of the text.
+    # Through the outer text's height the leader runs 5 left of the outer
+    # line, so left of the text shouldered right of it.
     for y in (outer_y + 0.00175, outer_y - 0.00175):
-        assert hole[0] + (y - hole[1]) / slope <= outer_x - half - 0.005
+        assert hole[0] + (y - hole[1]) / slope <= outer_x - 0.005
     # The block: under the end view, above the title block, inside the border.
     assert cy + half_h <= drawing.END_CENTER[1] - drawing._HALF_W_SHEET - 0.010
     assert cy - half_h >= 0.0657 + 0.010
     assert land[0] >= drawing._RIGHT + 0.005
     assert cx + half_w <= 0.4194 - 0.005
+
+
+def test_each_sheet_names_its_member_and_quantity() -> None:
+    """Machinist review 0c3ed35988: both sheets printed the one Number and no
+    member. One part number with named configurations stays (coordinator
+    ruling, not the review's separate numbers): each sheet's note prints its
+    member's Description and quantity, plain physical words."""
+    assert drawing.member_note(spec.BAR1) == "BASE BAR 1, END BRACKET HOLES\nQTY 1"
+    assert drawing.member_note(spec.BAR2) == "BASE BAR 2, NO BRACKET HOLES\nQTY 1"
+    assert sum(spec.CONFIGURATION_QUANTITIES.values()) == spec.QUANTITY
+    notes = [drawing.member_note(name) for name in spec.CONFIGURATIONS]
+    assert all("RUL" not in note and "REVIEW" not in note for note in notes)
+    lines = [line for note in notes for line in note.split("\n")]
+    assert all(len(note.split("\n")) == drawing.MEMBER_NOTE_LINES for note in notes)
+    # Right of the iso, 3 above its note, 10 left of the title block (x 216)
+    # at 2.6 a glyph, and under the plan's lowest stack line.
+    x, top = drawing.MEMBER_NOTE_XY
+    foot = top - drawing.MEMBER_NOTE_LINES * drawing.ISO_NOTE_HEIGHT - 0.0015
+    assert foot >= drawing.ISO_NOTE_XY[1] + 0.003 - 1e-12
+    assert x >= drawing.ISO_CENTER[0] + drawing.ISO_HALF[0] + 0.005 - 1e-12
+    assert x + 0.0026 * max(map(len, lines)) <= 0.216 - 0.010
+    assert top <= drawing._below_line(5) - 0.010
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "member_note(configuration), MEMBER_NOTE_XY" in sheet
+
+
+class _CentreMark:
+    def __init__(self, dangling: bool) -> None:
+        self.dangling = dangling
+        self.selected: tuple[bool, int] | None = None
+
+    def IsDangling(self) -> bool:
+        return self.dangling
+
+    def Select2(self, append: bool, mark: int) -> bool:
+        self.selected = (append, mark)
+        return True
+
+
+class _MarkedView:
+    def __init__(self, marks: list[_CentreMark]) -> None:
+        self.marks = marks
+
+    def GetAnnotationsByType(self, kind: int) -> tuple[_CentreMark, ...]:
+        assert kind == 13  # swCenterMarkSym
+        return tuple(self.marks)
+
+
+class _MarkDrawing:
+    def __init__(self, view: _MarkedView, *, deletes: bool = True) -> None:
+        self.view = view
+        self.deletes = deletes
+
+    def ClearSelection2(self, _all: bool) -> None:
+        pass
+
+    def EditDelete(self) -> None:
+        if self.deletes:
+            self.view.marks = [m for m in self.view.marks if m.selected is None]
+
+
+def test_plan_deletes_only_its_dangling_centre_marks(monkeypatch) -> None:
+    """Machinist review 0c3ed35988: the Bar2 plan printed four orphan centre
+    marks at Bar1's bracket holes (dangling: Bar2 suppresses those holes).
+    The plan deletes exactly its dangling marks after inserting its own, and
+    a mark that survives the delete fails the sheet."""
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    rebuilt: list[str] = []
+    monkeypatch.setattr(
+        drawing, "rebuild_drawing", lambda _adapter, *, label: rebuilt.append(label)
+    )
+    kept = [_CentreMark(False), _CentreMark(False)]
+    orphans = [_CentreMark(True) for _ in range(4)]
+    view = _MarkedView([kept[0], *orphans, kept[1]])
+    adapter = type("Adapter", (), {"currentModel": _MarkDrawing(view)})()
+    drawing._delete_dangling_center_marks(adapter, view, label="plan")
+    assert view.marks == kept
+    assert [m.selected for m in orphans] == [(False, 0)] + [(True, 0)] * 3
+    assert all(m.selected is None for m in kept)
+    assert rebuilt == ["delete dangling plan centre marks"]
+    # Bar 1's plan: nothing dangles, nothing is deleted or rebuilt.
+    drawing._delete_dangling_center_marks(adapter, view, label="plan")
+    assert view.marks == kept and len(rebuilt) == 1
+    # A dangling mark the delete leaves behind raises.
+    stuck = _MarkedView([_CentreMark(True)])
+    adapter = type("Adapter", (), {"currentModel": _MarkDrawing(stuck, deletes=False)})()
+    with pytest.raises(RuntimeError, match="keeps a dangling centre mark"):
+        drawing._delete_dangling_center_marks(adapter, stuck, label="plan")
+    # The plan runs it after both of its own centre-mark insertions.
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = sheet[sheet.index("def _draw_member_sheet") :]
+    assert body.index("slots=True") < body.index(
+        '_delete_dangling_center_marks(adapter, front, label="plan")'
+    )
 
 
 def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
@@ -1005,6 +1107,9 @@ def test_both_faced_seats_carry_the_part_owned_seat_finish() -> None:
     build = "".join(BUILD.read_text(encoding="utf-8").split())
     assert "author_part_pmi(adapter,surface_finishes=SURFACE_FINISHES)" in build
     assert build.index("author_part_pmi(") < build.index("save_member_part(")
+    # The member PNGs hide the PMI (it floated past the image border); the
+    # saved part keeps it for the drawing.
+    assert "hide_model_annotations=True" in build
     sheet = Path(drawing.__file__).read_text(encoding="utf-8")
     assert sheet.count("add_surface_finish(") == 1  # one loop over both seats
     assert "surface_finish_by_key(SURFACE_FINISHES, key)" in sheet

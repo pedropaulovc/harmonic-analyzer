@@ -23,6 +23,7 @@ import yaml
 import _buildgraph as bg
 import _config
 import _ch_rocker_arm_tl_oblique_jig_interference as contracts
+from _hole_spec import THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_vn_oblique_rail_kit_carriage_spec as carriage
@@ -1952,14 +1953,34 @@ def test_kp08_screws_torque_inside_the_foot_thread_and_screw_budgets() -> None:
     assert f"TIGHTEN THE KP08 SCREWS TO {spec._torque(spec.KP08_SCREW_TORQUE_NM)}" in f1
     seven = next(text for text in spec.ASSEMBLY_STEPS if text.startswith("7. "))
     assert f"{spec._item(spec.PILLOW_BLOCK_SCREW)}, LOOSE" in seven
-    # The two 3/4 and 5/8 tips must not meet in TL-28's shared hole: the
-    # KP08 foot under them is checked first (#2184 leaves it UNVERIFIED), at
-    # the end bracket's least foot rounded up.
+    # The two 3/4 and 5/8 tips must not meet in TL-28's shared hole, and the
+    # 5/8 must keep 1.5 D of full thread: the KP08 foot under them is checked
+    # first (#2184 leaves it UNVERIFIED) between the end bracket's least foot
+    # rounded up and its thickest foot rounded down.
     assert seven.startswith("7. ")
     assert spec._item(spec.PILLOW_BLOCK) in seven
-    assert f"{spec._bound(end_bracket.KP08_FOOT_THICK_MIN, 3, up=True)} " in seven
-    assert spec._bound(end_bracket.KP08_FOOT_THICK_MIN, 3, up=True) == ".196"
-    assert end_bracket.KP08_FOOT_THICK_MIN < leadscrew.KP08_FOOT_THICK
+    least = spec._bound(end_bracket.KP08_FOOT_THICK_MIN, 3, up=True)
+    most = spec._bound(end_bracket.KP08_FOOT_THICK_MAX, 3, up=False)
+    assert (least, most) == (".196", ".292")
+    assert f"FOOT IS {least} TO {most} THICK AT ITS 2 HOLES" in seven
+    assert (
+        end_bracket.KP08_FOOT_THICK_MIN
+        < leadscrew.KP08_FOOT_THICK
+        < end_bracket.KP08_FOOT_THICK_MAX
+    )
+    major = THREAD_MAJOR_MM[leadscrew.KP08_SCREW]
+    full = leadscrew.full_thread_min(
+        leadscrew.KP08_SCREW_LENGTH, end_bracket.KP08_FOOT_THICK_MAX, leadscrew.KP08_SCREW
+    )
+    assert full >= 1.5 * major
+    # One .001 thicker leaves the 5/8 under 1.5 D: the bound is the criterion's.
+    thicker = end_bracket.KP08_FOOT_THICK_MAX + 0.0254
+    assert (
+        leadscrew.full_thread_min(
+            leadscrew.KP08_SCREW_LENGTH, thicker, leadscrew.KP08_SCREW
+        )
+        < 1.5 * major
+    )
 
 
 def test_kit_rails_and_carriages_carry_the_owner_note_and_the_play_check() -> None:

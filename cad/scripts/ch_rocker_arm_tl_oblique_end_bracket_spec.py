@@ -50,7 +50,8 @@ Each face is started with the plug tap and finished with the bottoming tap,
 neither tap's point past its face's ``*_TAP_TIP_MAX``. The KP08 screw reaches
 deepest on the thinnest KP08 foot; the receipt check's least foot
 (``KP08_FOOT_THICK_MIN``) is set by both threads, and every window is taken
-on it. The two screw tips stay ``SCREW_TIP_GAP_MIN`` apart at the worst case;
+on it; its thickest (``KP08_FOOT_THICK_MAX``) keeps the 5/8's full thread at
+1.5 D. The two screw tips stay ``SCREW_TIP_GAP_MIN`` apart at the worst case;
 the common 3/4 from the top as well would collide (``COMMON_SCREW_TIP_GAP``).
 This replaces the six-hole layout (four #8 bar taps and two #6-32 KP08 taps)
 and the #6-32 button heads.
@@ -208,6 +209,25 @@ KP08_FOOT_THICK_MIN = _inch_ceil(
 if not 0.0 < KP08_FOOT_THICK_MIN < leadscrew.KP08_FOOT_THICK:
     raise AssertionError("the KP08 screw's 5/8 needs a foot thicker than nominal")
 KP08_REACH_MAX = KP08_SCREW_LENGTH_MM - KP08_FOOT_THICK_MIN  # 10.897
+# The thickest foot the same receipt check accepts: a thicker foot takes the
+# 5/8 screw's engagement off one for one, and its worst-case full thread in
+# the KP08 thread (leadscrew.full_thread_min: B18.3 short length, tip's
+# incomplete pitches, mouth break) must stay rule 18's 1.5 D (owner's full-
+# thread criterion), rounded down to the .001 it prints. The foot itself
+# stays UNVERIFIED (#2184): this bounds the check, it is no measurement.
+KP08_FOOT_THICK_MAX = _inch_floor(
+    leadscrew.full_thread_min(leadscrew.KP08_SCREW_LENGTH, 0.0, SCREW)
+    - 1.5 * THREAD_MAJOR_MM[SCREW],
+    TAP_CALLOUT_PLACES,
+)  # .292
+if not (
+    KP08_FOOT_THICK_MIN < leadscrew.KP08_FOOT_THICK < KP08_FOOT_THICK_MAX
+    and leadscrew.full_thread_min(
+        leadscrew.KP08_SCREW_LENGTH, KP08_FOOT_THICK_MAX, SCREW
+    )
+    >= 1.5 * THREAD_MAJOR_MM[SCREW]
+):
+    raise AssertionError("the KP08 foot's receipt band leaves the 5/8 under 1.5 D")
 SCREW_REACH_MAX = {"bar": BAR_REACH_MAX, "kp08": KP08_REACH_MAX}
 # Each window: its own screw's reach in full thread (low); the thread and
 # its tap's lead short of the other screw's reach (high), on the thinnest
@@ -235,6 +255,22 @@ for _label, _depth in (("bar", BAR_THREAD_LIMITS[0]), ("KP08", KP08_THREAD_LIMIT
 SCREW_TIP_GAP_MIN = THICK_MIN - BAR_REACH_MAX - KP08_REACH_MAX  # 1.90
 if SCREW_TIP_GAP_MIN <= 0.0:
     raise AssertionError("the end bracket's two screw tips collide")
+# Why both depths print three places: each window is the screw-tip gap less
+# one tap lead wide, 0.317 (.0125). The title block's .XX band spans .020,
+# so no two-place depth fits either window; .XXX's .010 does, .0025 to
+# spare (machinist review 0c3ed35988 asked what the three places are for).
+DEPTH_WINDOW_WIDTH = SCREW_TIP_GAP_MIN - TAP_LEAD  # 0.317
+for _window in (BAR_THREAD_WINDOW, KP08_THREAD_WINDOW):
+    if abs(_window[1] - _window[0] - DEPTH_WINDOW_WIDTH) > 1e-9:
+        raise AssertionError("the end bracket's depth windows differ from the gap")
+_TWO_PLACE_SPAN = sum(
+    abs(d) for d in printed_deviations(BAR_THREAD_DEPTH, 2, unit=UNIT)
+)  # .020
+_THREE_PLACE_SPAN = sum(
+    abs(d) for d in printed_deviations(BAR_THREAD_DEPTH, TAP_CALLOUT_PLACES, unit=UNIT)
+)  # .010
+if not _THREE_PLACE_SPAN <= DEPTH_WINDOW_WIDTH < _TWO_PLACE_SPAN:
+    raise AssertionError("the end bracket's depth windows need fewer places")
 # Why the KP08 screw is the 5/8 and not the jig's common 3/4: from the top
 # the 3/4 would reach 14.07 past the face on the least foot and meet the bar
 # screw's tip.
@@ -270,12 +306,18 @@ if not BAR_THREAD_DEPTH < BAR_TAP_DRILL_DEPTH < BRACKET_THICK:
 BAR_TAP_FACE = ((0.0, 0.0, -1.0), 0.0)  # the bottom, on TL-20's top
 KP08_TAP_FACE = ((0.0, 0.0, 1.0), BRACKET_THICK)  # the top, under the KP08 foot
 # The plan looks at the top face: its native callout prints the drill THRU
-# and the KP08-face thread. Section A-A, cut along the hole row, prints the
-# bar-face thread's depth from the bottom face: a hidden reference sketch's
-# dimension (BAR_THREAD_REFERENCE) on a hole axis, which the build proves
-# equals the bar-face wizard's thread depth.
+# and the KP08-face thread. Section A-A, cut along the hole row, draws both
+# faces' cosmetic threads and prints the bar-face thread's depth from the
+# bottom face: a hidden reference sketch's dimension (BAR_THREAD_REFERENCE),
+# which the build proves equals the bar-face wizard's thread depth. Its two
+# points stand on the outer hole's thread major diameter on the outer-end
+# side (BAR_THREAD_WITNESS_X), where the section draws that thread's side
+# line: the witness leaves the drawn thread end (machinist review
+# 0c3ed35988: on the axis it started in the plain bore).
 BAR_THREAD_REFERENCE = "BarThreadReference"
 BAR_THREAD_DEPTH_DIMENSION = "BarThreadDepth"
+THREAD_MAJOR = THREAD_MAJOR_MM[SCREW]  # the cosmetic thread's major diameter
+BAR_THREAD_WITNESS_X = HOLE_X[-1] + THREAD_MAJOR / 2.0
 
 _LENGTH_LOW = _limits(BRACKET_LENGTH, LENGTH_PLACES)[0]
 _R = THREAD_MAJOR_MM[SCREW] / 2.0
@@ -433,8 +475,17 @@ CALLOUTS_BELOW = {
     "KP08Tap1X": MATE_CALLOUT,
     "KP08Tap2X": MATE_CALLOUT,
     "HoleRowY": ROW_CALLOUT,
-    # Section A-A's thread depth: which thread, from which face.
-    BAR_THREAD_DEPTH_DIMENSION: "FULL THREAD FROM BOTTOM\nBOTH HOLES",
+    # Section A-A's thread depth: which thread, from which face, and what
+    # both depths (this one and the plan's top depth) do. Machinist review
+    # 0c3ed35988 read the .436/.491 three places as unexplained: each window
+    # (BAR_/KP08_THREAD_WINDOW) is its own screw's deepest reach in full
+    # thread (low) to the other face's tap lead short of the other screw
+    # (high), SCREW_TIP_GAP_MIN - TAP_LEAD = .0125 wide, under a .XX band's
+    # .020 (DEPTH_WINDOW_WIDTH; the test proves no .XX depth fits).
+    BAR_THREAD_DEPTH_DIMENSION: (
+        "FULL THREAD FROM BOTTOM\nBOTH HOLES\nEACH SCREW TIP IN FULL\n"
+        "THREAD, SHORT OF THE\nOTHER FACE'S TAP LEAD"
+    ),
 }
 # drawing-guidelines.md (units): an as-bought fraction is an untoleranced REF;
 # the supplier's catalogue tolerance governs.
