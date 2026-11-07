@@ -209,15 +209,32 @@ def _printed(model: float, places: int) -> float:
     return round(round(model / 25.4, places) * 25.4, 9)
 
 
+# Owner ruling 2026-11-07: the KP08 tap drill prints as its named drill with
+# the drill's exact decimal (rule 3), "#36 DRILL Ø.1065". The spec's Hole
+# Wizard tap drill already cuts it (2.705 mm, .1065 at four places).
+NAMED_TAP_DRILLS = {"kp08": ("#36", 0.1065)}
+for _kind, (_name, _decimal) in NAMED_TAP_DRILLS.items():
+    if abs(TAP_DRILLS[_kind] - _decimal * 25.4) > 0.0005:
+        raise AssertionError(f"end bracket {_kind} tap drill is not the {_name} drill")
+
+
+def drill_places(kind: str) -> int:
+    """A named drill prints its exact decimal (four places); others .XXX."""
+    return 4 if kind in NAMED_TAP_DRILLS else TAP_CALLOUT_PLACES
+
+
 def size_text(kind: str) -> str:
     """One tag group's size, printed once in its merged SIZE cell: the tap
-    drill THRU, then the thread and its full-thread depth from its face. The
-    title block's THREADS row owns the UNC class (rule 2)."""
-    drill = _inch(_printed(TAP_DRILLS[kind], TAP_CALLOUT_PLACES), TAP_CALLOUT_PLACES)
+    drill THRU (a named drill by its name and exact decimal), then the thread
+    and its full-thread depth from its face. The title block's THREADS row
+    owns the UNC class (rule 2)."""
+    places = drill_places(kind)
+    drill = _inch(_printed(TAP_DRILLS[kind], places), places)
+    named = f"{NAMED_TAP_DRILLS[kind][0]} DRILL " if kind in NAMED_TAP_DRILLS else ""
     depth = _inch(FULL_THREAD_DEPTH, TAP_CALLOUT_PLACES)
     thread = TAP_THREADS[kind].lstrip("#")
     return (
-        f"<MOD-DIAM>{drill} THRU ALL\n"
+        f"{named}<MOD-DIAM>{drill} THRU ALL\n"
         f"{thread} UNC <HOLE-DEPTH>{depth} {THREAD_CALLOUTS[kind]}"
     )
 
@@ -260,7 +277,7 @@ HOLE_TAG_Y = _HW + 3.5
 
 # --- The table's printed limits ------------------------------------------------
 # Every station prints .XXX with the title block's band, the KP08 stations
-# included (provisional, module docstring). The spec proves both patterns'
+# included (owner ruling 2026-11-06). The spec proves both patterns'
 # float and the walls at its exact-millimetre KP08 band; here the KP08
 # stations' rounded inch limits reach a little further, so the float and the
 # walls are re-proved with that extra excursion.
@@ -420,7 +437,7 @@ for _index, _x in enumerate(part_spec.BAR_TAP_X, start=1):
     )
 
 for _index, _x in enumerate(part_spec.KP08_TAP_X, start=1):
-    _drill = _printed(part_spec.KP08_TAP_DRILL, TAP_CALLOUT_PLACES)
+    _drill = _printed(part_spec.KP08_TAP_DRILL, drill_places("kp08"))
     requirement(
         f"kp08_tap_{_index}",
         kind="hole",
@@ -436,13 +453,13 @@ for _index, _x in enumerate(part_spec.KP08_TAP_X, start=1):
             ),
             "tap_drill_mm": (part_spec.KP08_TAP_DRILL, ("KP08_TAP_SPEC",)),
             "dia": (
-                limits(_drill, TAP_CALLOUT_PLACES, part_spec.DRILLED_BAND),
+                limits(_drill, drill_places("kp08"), part_spec.DRILLED_BAND),
                 ("KP08_TAP_DRILL", "DRILLED_BAND"),
             ),
             "nominal_dia": (_drill, ("KP08_TAP_DRILL",)),
             "thru": (True, ("KP08_TAP_SPEC",)),
             # A table X LOC from the inner end: the KP08's 42 bolt spacing at
-            # the table's .XXX (provisional, module docstring).
+            # the table's .XXX (owner ruling 2026-11-06).
             "station": (
                 _limits(_x, _PLACES),
                 (
@@ -459,7 +476,7 @@ for _index, _x in enumerate(part_spec.KP08_TAP_X, start=1):
                 (*_MATE_SOURCES, "KP08_PATTERN_ALLOWANCE", "POSITION_RADIUS"),
             ),
         },
-        precision={"dia": TAP_CALLOUT_PLACES, "station": _PLACES, "height": _PLACES},
+        precision={"dia": drill_places("kp08"), "station": _PLACES, "height": _PLACES},
     )
 
 

@@ -233,13 +233,18 @@ def test_holes_carry_the_title_block_band() -> None:
         ("feature_name", "dimension_name"): "band"
     }
     holes = _features()
-    # The tap drills print .XXX with the title block's drilled-hole band.
-    for name, drill in (
-        ("bar_tap_1", spec.BAR_TAP_DRILL),
-        ("kp08_tap_1", spec.KP08_TAP_DRILL),
+    # The tap drills print with the title block's drilled-hole band: the bar
+    # drill at .XXX, the named #36 at its exact .1065 (owner ruling 2026-11-07).
+    for name, kind, drill in (
+        ("bar_tap_1", "bar", spec.BAR_TAP_DRILL),
+        ("kp08_tap_1", "kp08", spec.KP08_TAP_DRILL),
     ):
         low, high = holes[name]["dia"]
-        assert low == pytest.approx(round(drill / 25.4, 3) * 25.4)
+        places = drawing.drill_places(kind)
+        assert low == pytest.approx(round(drill / 25.4, places) * 25.4)
+    assert holes["kp08_tap_1"]["dia"][0] == pytest.approx(0.1065 * 25.4)
+    for name in ("bar_tap_1", "kp08_tap_1"):
+        low, high = holes[name]["dia"]
         assert high - low == pytest.approx(spec.DRILLED_BAND[0])
     band = printed_band_mm(spec.HOLE_PLACES, unit="in")
     for name, width in (
@@ -384,14 +389,22 @@ def test_each_size_prints_once_without_the_title_block_class() -> None:
     assert drawing.size_text("bar") == (
         "<MOD-DIAM>.136 THRU ALL\n8-32 UNC <HOLE-DEPTH>.450 MIN FAR SIDE"
     )
-    assert drawing.size_text("kp08") == "<MOD-DIAM>.106 THRU ALL\n6-32 UNC <HOLE-DEPTH>.450 MIN"
+    # Owner ruling 2026-11-07: the KP08 tap drill by name, exact decimal.
+    assert drawing.size_text("kp08") == (
+        "#36 DRILL <MOD-DIAM>.1065 THRU ALL\n6-32 UNC <HOLE-DEPTH>.450 MIN"
+    )
+    assert drawing.drill_places("kp08") == 4
+    assert drawing.drill_places("bar") == spec.TAP_CALLOUT_PLACES
     for kind in ("bar", "kp08"):
         text = drawing.size_text(kind)
-        assert "2B" not in text and "#" not in text  # rule 2: the THREADS row
+        assert "2B" not in text and "#" not in text.split("\n")[1]  # rule 2: the THREADS row
         assert len(text.split("\n")) == 2
         # The SIZE drill is the requirement's printed drill.
         feature = _features()[f"{kind}_tap_1"]
-        assert f"{feature['nominal_dia'] / 25.4:.3f}".lstrip("0") in text
+        places = drawing.drill_places(kind)
+        assert f"{feature['nominal_dia'] / 25.4:.{places}f}".lstrip("0") in text
+        line = drawing._glyphless(text.split("\n")[0]) + " "  # the diameter symbol
+        assert len(line) * 0.0025 <= drawing.HOLE_TABLE_WIDTHS[drawing._SIZE]
     assert drawing.THREAD_CALLOUTS == {
         "bar": spec.BAR_THREAD_CALLOUT,
         "kp08": spec.KP08_THREAD_CALLOUT,
