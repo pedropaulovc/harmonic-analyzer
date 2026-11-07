@@ -178,14 +178,17 @@ HOLE_EXTENT_TEXT = "DRILL THRU"
 # The hole coordinates' ±.001 bands exist for the mate (rule 4): the
 # pattern must land on the platen guide's #4-40 taps with the lock-screw
 # shanks clear in their holes (pd_vn_guide_lock_screw_spec.LOCK_SET_OFFSET).
-# The pattern callout names that mate once (rule 4: a mate serving several
-# features is named on the pattern callout, never on each location); its
-# second row states the holes' finished wall to the edges, under the .080
-# target (rule 20; pd-guide-lock.yaml RV-01).  Two rows of words (rule 7),
-# each at most 23 characters so the block keeps between the plate and the
-# right view.
+# Finer than the drilled-location row, so the pattern callout names the route
+# that holds them: the holes are transferred from the guide's taps at
+# assembly (MHA-PD-00 step; delegated ruling 2026-11-07 (Main), no precedent;
+# owner review #2144; pending owner confirmation).  It names that mate once
+# (rule 4: a mate serving several features is named on the pattern callout,
+# never on each location); its second row states the holes' finished wall to
+# the edges, under the .080 target (rule 20; pd-guide-lock.yaml RV-01).  Two
+# rows of words (rule 7), each at most 23 characters so the block keeps
+# between the plate and the right view.
 GUIDE_NUMBER = _config.parts("pd-platen-guide")["number"]
-HOLE_CALLOUT_BELOW = "\n".join((f"MATCHES {GUIDE_NUMBER} TAPS", HOLE_WALL_TEXT))
+HOLE_CALLOUT_BELOW = "\n".join((f"TRANSFER FROM {GUIDE_NUMBER}", HOLE_WALL_TEXT))
 
 
 def _set_dimension_prefixes(
