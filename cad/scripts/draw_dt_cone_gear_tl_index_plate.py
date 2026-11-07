@@ -45,11 +45,15 @@ from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
+from _machinist_review_mode import MachinistReviewMode
 from _native_axis_datum import add_native_axis_datum
 from _paths import CAD_ROOT
 from _session import run_build
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import place_view, view_name
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["dt_cone_gear_tl_index_plate"]
 PART_STEM = SPEC.artifact_stem

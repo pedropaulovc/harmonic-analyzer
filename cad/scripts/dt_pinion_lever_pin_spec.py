@@ -69,8 +69,7 @@ ASSEMBLY_STEP = "\n".join(
 PIN_DIA_CALLOUT = "\n".join(
     (
         "1/16 DRILL ROD, STOCK OK",
-        f"SLIP FIT IN {LEVER_NUMBER}",
-        f"AND {LIFT_ROD_NUMBER} PIN HOLE",
+        f"SLIDING FIT IN {LEVER_NUMBER} AND {LIFT_ROD_NUMBER}",
     )
 )
 PIN_LEN_CALLOUT = "CUT LENGTH"

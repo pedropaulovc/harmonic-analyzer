@@ -8,9 +8,9 @@ A-A is the ring's length view (drawing-guidelines.md rule 9 (show internal
 shape in solid lines)) and takes every dimension, so the bore reads on cut
 edges rather than hidden lines (the MHA-DT-34 machinist review).  Every size
 but the bore is routine (.X): the oak tenon is turned to suit this bore.
-There is no general note (MHA-DT-34 machinist ENFORCE, r1-r3): the bore's
-matched fit and the OD's skim with MHA-DT-08, with the wall it leaves, are
-callouts on their own dimensions (rule 7: flag it where it applies).
+Note 1, flagged from the OD, carries the OD's skim with MHA-DT-08 and the
+walls it leaves; the bore's matched fit is its own callout (rule 7: a callout
+is short, a longer requirement is a numbered flag note).
 
 Run with SolidWorks open::
 
@@ -24,6 +24,7 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -58,6 +59,7 @@ import _telemetry
 from dt_crank_handle_ferrule_notes import (
     BORE_FIT_CALLOUT,
     OUTER_DIA_CALLOUT,
+    SHEET_NOTES,
 )
 from dt_crank_handle_ferrule_spec import (
     BORE_DIA,
@@ -98,6 +100,8 @@ CAPTION_XY = (0.195, 0.113)
 # Moved 10 right of iteration 1 so the bore's block, set right of the
 # chamfer's dimension line, keeps clear of it.
 ISO_NOTE_POS = (0.345, 0.160)
+# Note 1 stands under the views, left of the title block.
+NOTES_XY = (0.030, 0.085)
 
 OUTER_R = OUTER_DIA * VIEW_SCALE[0] / 2000.0  # 0.030
 HALF_LENGTH = LENGTH * VIEW_SCALE[0] / 2000.0  # 0.014
@@ -219,6 +223,8 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, section, length_mm=LENGTH, label="ferrule axis"
     )
 
+    if add_note(adapter, SHEET_NOTES, *NOTES_XY) is None:
+        raise RuntimeError("failed to add the ferrule's numbered sheet note")
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_POS)
     rebuild_drawing(adapter, label="crank-handle-ferrule layout audit")
     check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
