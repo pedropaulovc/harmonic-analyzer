@@ -2361,14 +2361,20 @@ def test_hanger_x_locates_datum_d_not_a_hole() -> None:
     assert 'label="crossbar median D from left rail face"' in block
     assert "expected_mm=OUTER_X + crossbar_median_x" in block
     assert "p0=left_rail_face" in block
-    assert "left_rail_face = (-OUTER_X, HALF_H, FRONT_COLUMN_Z + BOSS_DIA / 2.0 + 10.0)" in block
-    # Between the upper-left boss and the set-screw boss on the rail's face.
-    assert part.FRONT_COLUMN_Z + part.BOSS_DIA / 2.0 + 10.0 < part.GOOSENECK_Z - spec.HUB_SET_BOSS_W
-    # Typed coordinate pick (the documented CENTERLINE select type) at the
-    # mid-bar point, clear of both holes; no entity re-key of the helper.
+    assert (
+        "face_z = (FRONT_COLUMN_Z + BOSS_DIA / 2.0 + GOOSENECK_Z - HUB_RIB_W / 2.0) / 2.0"
+        in block
+    )
+    # The face run between the upper-left boss and the set-screw boss's rib.
+    face_z = (part.FRONT_COLUMN_Z + part.BOSS_DIA / 2.0 + part.GOOSENECK_Z - part.HUB_RIB_W / 2.0) / 2.0
+    assert part.FRONT_COLUMN_Z + part.BOSS_DIA / 2.0 < face_z < part.GOOSENECK_Z - part.HUB_RIB_W / 2.0
+    # The face edge comes from the scan (a point pick took the edge break's
+    # inner line, 1.524 short); the median keeps its typed CENTERLINE pick
+    # at the mid-bar point, clear of both holes.
     assert 'entity_types=("EDGE", "CENTERLINE")' in block
     assert "p1=(crossbar_median_x, HALF_H, 0.0)" in block
-    assert "entities=" not in block[block.index("_checked_dimension("):]
+    assert "detail_top_edges, axis=2, across=0, at=-OUTER_X, through=face_z" in block
+    assert block.count("None,") == 1
     assert (
         part.STUD_Z_FRONT + spec.HANGER_WASHER.OD_MAX
         < 0.0
@@ -2379,6 +2385,29 @@ def test_hanger_x_locates_datum_d_not_a_hole() -> None:
     # rule 7: a location carries its value and band only.
     assert "suffix=" not in block[block.index("_checked_dimension("):]
     assert (part.BAR_X0 + part.BAR_X1) / 2.0 == pytest.approx(part.HANGER_X)
+
+
+def test_face_line_takes_the_run_through_the_station_not_the_edge_break() -> None:
+    """The scan pick holds the face line itself: the edge break's inner line
+    1.524 mm in never qualifies, and ``through`` picks the run that spans the
+    station even when the other run on the face is longer."""
+    from types import SimpleNamespace
+
+    x = -part.OUTER_X
+    front = SimpleNamespace(line=((x, 10.0, -89.0), (x, 10.0, -12.0)), edge="front run")
+    rear = SimpleNamespace(line=((x, 10.0, 18.0), (x, 10.0, 110.0)), edge="rear run")
+    inner = SimpleNamespace(
+        line=((x + part.EDGE_CHAMFER, 11.0, -110.0), (x + part.EDGE_CHAMFER, 11.0, 110.0)),
+        edge="edge break",
+    )
+    edges = SimpleNamespace(lines=[inner, front, rear])
+    assert drawing._face_line(edges, axis=2, across=0, at=x, face="left") == "rear run"
+    assert (
+        drawing._face_line(edges, axis=2, across=0, at=x, face="left", through=-50.0)
+        == "front run"
+    )
+    with pytest.raises(RuntimeError, match="no straight edge"):
+        drawing._face_line(edges, axis=2, across=0, at=x, face="left", through=0.0)
 
 
 def test_crossbar_median_is_the_native_centreline_of_both_sides(monkeypatch) -> None:

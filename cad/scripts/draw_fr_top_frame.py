@@ -121,6 +121,7 @@ from build_fr_top_frame import (
     HUB_GUSSET_HALF_IN,
     HUB_GUSSET_HALF_OUT,
     HUB_GUSSET_T,
+    HUB_RIB_W,
     INNER_X,
     INNER_Z,
     KEEPER_TAP_SPEC,
@@ -3647,6 +3648,32 @@ def _socket_bore_circle(edges: ViewEdges, x: float, z: float, *, label: str) -> 
     return socket.edge
 
 
+def _face_line(
+    edges: ViewEdges, *, axis: int, across: int, at: float, face: str,
+    through: float | None = None,
+) -> Any:
+    """A plan's visible straight edge running along model ``axis`` with its
+    ``across`` coordinate at ``at`` mm: the one whose run spans ``through``
+    when given, else the longest.  Picked from the scanned edges, not by a
+    sheet point, so the edge break's inner line 0.76 mm away (farm run
+    20261107T122639370Z: a point pick measured 1.524 short) cannot win."""
+    runs = [
+        item for item in edges.lines
+        if all(
+            abs(item.line[0][k] - item.line[1][k]) < 1e-6 for k in (0, 1, 2) if k != axis
+        )
+        and abs(item.line[0][across] - at) < 1e-3
+        and (
+            through is None
+            or min(item.line[0][axis], item.line[1][axis]) < through
+            < max(item.line[0][axis], item.line[1][axis])
+        )
+    ]
+    if not runs:
+        raise RuntimeError(f"holes/sockets plan shows no straight edge of the {face}")
+    return max(runs, key=lambda item: abs(item.line[0][axis] - item.line[1][axis])).edge
+
+
 def _hole_table_axes(edges: ViewEdges) -> tuple[Any, Any]:
     """The plan's two datum edges: the longest visible straight edge of the
     rear rail's outer face (X-running, at z OUTER_Z) and of the left rail's
@@ -3655,21 +3682,9 @@ def _hole_table_axes(edges: ViewEdges) -> tuple[Any, Any]:
     They give the native table its axis directions; its origin is then
     reattached to the theoretical point on that sharp.
     """
-    def longest(axis: int, across: int, at: float, face: str) -> Any:
-        runs = [
-            item for item in edges.lines
-            if all(
-                abs(item.line[0][k] - item.line[1][k]) < 1e-6 for k in (0, 1, 2) if k != axis
-            )
-            and abs(item.line[0][across] - at) < 1e-3
-        ]
-        if not runs:
-            raise RuntimeError(f"holes/sockets plan shows no straight edge of the {face}")
-        return max(runs, key=lambda item: abs(item.line[0][axis] - item.line[1][axis])).edge
-
     return (
-        longest(0, 2, TABLE_ORIGIN_XZ[1], "rear rail's outer face"),
-        longest(2, 0, TABLE_ORIGIN_XZ[0], "left rail's outer face"),
+        _face_line(edges, axis=0, across=2, at=TABLE_ORIGIN_XZ[1], face="rear rail's outer face"),
+        _face_line(edges, axis=2, across=0, at=TABLE_ORIGIN_XZ[0], face="left rail's outer face"),
     )
 
 
@@ -4462,13 +4477,24 @@ async def build(adapter: Any) -> dict[str, str]:
             label="crossbar sides for median D",
         )),
     )
-    left_rail_face = (-OUTER_X, HALF_H, FRONT_COLUMN_Z + BOSS_DIA / 2.0 + 10.0)
+    # The face's run between the upper-left boss and the set-screw boss's
+    # rib, picked from the scan at its middle, so the extension line leaves
+    # that run's upper end and never lies along the rail's outline.
+    face_z = (FRONT_COLUMN_Z + BOSS_DIA / 2.0 + GOOSENECK_Z - HUB_RIB_W / 2.0) / 2.0
+    left_rail_face = (-OUTER_X, HALF_H, face_z)
     _checked_dimension(
         adapter, detail_top,
         p0=left_rail_face, p1=(crossbar_median_x, HALF_H, 0.0),
         text_xy=(0.162, 0.240), label="crossbar median D from left rail face",
         expected_mm=OUTER_X + crossbar_median_x, orientation="horizontal",
         entity_types=("EDGE", "CENTERLINE"),
+        entities=(
+            _face_line(
+                detail_top_edges, axis=2, across=0, at=-OUTER_X, through=face_z,
+                face="left rail's outer face above the set-screw boss",
+            ),
+            None,
+        ),
     )
     # #946: RD4 reads off the rear keeper tap, from the rail's outer side.
     rear_keeper = (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_REAR)
