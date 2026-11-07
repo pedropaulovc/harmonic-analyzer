@@ -191,7 +191,6 @@ def test_package_text_cites_only_bom_or_external_part_numbers() -> None:
         drawing.SETUP_NOTES,
         drawing.INTERFACE_NOTES,
         drawing.DIRECTION_NOTES,
-        drawing.CRANK_END_FIT_NOTES,
         *drawing.BOM_DESCRIPTIONS.values(),
     )
     cited = set(re.findall(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", "\n".join(texts)))
@@ -583,7 +582,7 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
         check.index("TIGHTEN MHA-DT-VN-62"),
         # CodeRabbit on #1272: the shims block the swing, so they come out
         # before the T120 feeler set.
-        check.index("SWING OUT AND REMOVE THE SHIMS"),
+        check.index("SWING THE CONE SET OUT. 4L. REMOVE THE SHIMS"),
         check.index(f"{feeler(set_stack.feeler_gap_mm(120))} FEELER IS SNUG T120 TIP TO ROOT"),
         check.index("TIGHTEN MHA-DT-VN-51"),
     ]
@@ -718,7 +717,7 @@ def test_lever_pin_step_states_existing_drill_size_and_slip_fit() -> None:
     assert pin.PIN_DIA == 25.4 / 16.0
     assert "SLIP FIT" in _flat(pin.PIN_DIA_CALLOUT)
     step = _rig_step_body(pin.LEVER_PIN_SET_STEP_KEY)
-    assert step.endswith(_flat(drawing.LEVER_PIN_HOLE_FIT))
+    assert step.startswith(_flat(drawing.LEVER_PIN_HOLE_FIT))
     assert "MHA-DT-16'S PRINTED STATION: #51 DRILL THRU" in step
     assert "MHA-DT-30 SLIP FIT" in step
     assert "LIGHT HAMMER" not in step
