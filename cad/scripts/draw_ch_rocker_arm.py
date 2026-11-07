@@ -122,7 +122,6 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _seat_forensics
 import _telemetry
-from ch_channel_assembly_steps import step_ref as channel_step_ref
 from ch_rocker_arm_notes import (
     DEFAULT_DRAWING_PRECISION,
     DRAWING_DIMENSIONS,
@@ -182,8 +181,6 @@ _RADIUS_P = rocker_notes.DRAWING_PRECISION["StrapProfile"]["TopRadius"]
 # .0005 of the model.
 SHEET_DECIMALS = 3
 ROD_CALLOUT_PRECISION = {"hw-diam": _DRILL_P}
-# Names the lower arc each taper-foot BASIC lands on.
-TAPER_LABEL = f"R{inch_text(R_BOTTOM, _RADIUS_P)}/TAPER"
 
 _P = rocker_notes.DEFAULT_DRAWING_PRECISION
 _AXIS = ((0.0, 0.0, 1.0), ("__frame__",))
@@ -324,7 +321,6 @@ ARC_RADIUS_NAMES = ("TopRadius", "BottomRadius")
 # lines (2.2 mm each side) and 2 mm above the E circle.
 PROFILE_BETWEEN = ("J", "K")
 BETWEEN_POINT_OFFSET = {"J": (-0.007, 0.002), "K": (-0.0039, 0.008)}
-LAND_LABEL = "LAND"
 # Sheet-layout clearance, NOT a manufacturing tolerance. SIDE_SMART may put
 # the native junction on either frame edge; prove its rebuilt route, not a
 # junction inferred from the requested top-left or a fixed frame width.
@@ -1934,10 +1930,13 @@ def _pivot_finish_placement(
 # the lower arc well left of A's centreline (Opus #1020 review). R800 has one
 # below-text row and sits 40 mm left of R816's two-row block; its extra 4 mm
 # height keeps the shoulder above the left taper's native BASIC box.
+# The lower arc's BASIC from A sits right of A under the strap, clear of
+# D's tag (left) and the lower profile frame's J↔K row (right).
 FRONT_KEEP = {
     "TopRadius": (0.120, 0.160),
     "BottomRadius": (0.160, 0.156),
     "TopAbovePivot": (0.165, 0.191),
+    "BottomBelowPivot": (0.196, 0.151),
 }
 
 _TOP_P = rocker_notes.DRAWING_PRECISION["TopEdgeReference"]["TopAbovePivot"]
@@ -1970,7 +1969,7 @@ PROFILE_OUTER = requirement(
         # Material added on the lower outline moves it away from the arc centre.
         # The tip lands declare this same zone themselves (see the tip-land loop).
         **_profile_zone("BottomRadius", {"bottom_radius": "increases"}, (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
-        "arc_centre": ([0.0, rocker_interface.CENTER_Y, 0.0], (("_rocker_interface", "CENTER_Y"),)), "top_edge_feature": ("top_edge", (("ch_rocker_arm_notes", "BOTTOM_RADIUS_CALLOUT"),)),
+        "arc_centre": ([0.0, rocker_interface.CENTER_Y, 0.0], (("_rocker_interface", "CENTER_Y"),)), "top_edge_feature": ("top_edge", (("draw_ch_rocker_arm", "_dress_arc_radii"),)),
         "bottom_arc_len": (rocker.BOT_ARC_LEN, ("BOT_ARC_LEN",)),
         "mirror_symmetric": (True, (("draw_ch_rocker_arm", "_add_rocker_outline_dimensions"), ("draw_ch_rocker_arm", "_dress_detail_dimensions"))), "depth_ref": (rocker_interface.ARM_DEPTH, (("_rocker_interface", "ARM_DEPTH"),)),
         "bottom_end": (list(_BOTTOM), ("BOT_END_X", ("_rocker_interface", "R_BOTTOM"), ("_rocker_interface", "CENTER_Y"))),
@@ -2019,16 +2018,13 @@ END_KEEP = {
 # down-right to the +Z hub-root corner it measures (r3 run: requested right of
 # the view, the leader crossed the strap to that corner).
 STRAP_THICKNESS_TEXT_XY = (0.044, 0.2246)
-# The hub width's below rows end on the fit-up step that takes up the 20-hub
-# stack's excess (r5 Opus C2, drawing-guidelines.md rule 19 (absorb stacks at
-# fit-up)): MHA-CH-00 step "rocker-stack-accepted" re-faces a long stack.
-ROCKER_STACK_STEP_KEY = "rocker-stack-accepted"
-HUB_LENGTH_TEXT = (
-    f"{rocker_notes.HUB_LENGTH_CALLOUT} PER\n{channel_step_ref(ROCKER_STACK_STEP_KEY)}"
-)
-# Half a row up for that fourth row keeps the line (~0.142) where it was; the
-# widest row ("MHA-CH-00 STEP 1") clears the hub end.
-HUB_LENGTH_TEXT_XY = (0.040, 0.1578)
+# The hub width names the 20-hub stack it sets (rule 4); the stack's fit-up
+# lives in MHA-CH-00's own step (rule 19), so the part sheet adds no
+# assembly reference (rule 7).
+HUB_LENGTH_TEXT = rocker_notes.HUB_LENGTH_CALLOUT
+# Two rows under the value: one row lower than the four-row block's seat keeps
+# its line (~0.142) where it was, under the strap's bottom edge.
+HUB_LENGTH_TEXT_XY = (0.040, 0.1519)
 # The value plus two rows (#2136 r3: with three rows its top met the strap's
 # position frame), centred under that frame and left of the hub end.
 HUB_ROOT_TEXT_XY = (0.041, 0.199)
@@ -2132,7 +2128,7 @@ part_metadata(
         ),
     }
 )
-BASIC_PROFILE_DIMENSIONS = {"TopRadius", "BottomRadius", "TopAbovePivot"}
+BASIC_PROFILE_DIMENSIONS = {"TopRadius", "BottomRadius", "TopAbovePivot", "BottomBelowPivot"}
 
 
 def _basic_profile_dimensions(adapter: Any, annotations: list[Any]) -> None:
@@ -2150,9 +2146,10 @@ def _basic_profile_dimensions(adapter: Any, annotations: list[Any]) -> None:
 
 
 def _dress_arc_radii(adapter: Any, annotations: list[Any]) -> None:
-    """Exterior leaders on both BASIC radii; each states the shared centre in
-    below text: R800 locates it above A (the former general note 1), R816 its
-    concentricity with R800 (Opus #1020 r2 B1)."""
+    """Exterior leaders on both BASIC radii. No words ride them (rule 26: a
+    location is a dimension or a drawn line): the shared centre lies on A's
+    extended vertical centreline (_extend_pivot_centreline), the arm's
+    symmetry axis, each arc set on it by its own BASIC from A."""
     remaining = set(ARC_RADIUS_NAMES)
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
@@ -2174,14 +2171,6 @@ def _dress_arc_radii(adapter: Any, annotations: list[Any]) -> None:
             or bool(display.SolidLeader)
         ):
             raise RuntimeError(f"{name} retained its centre-directed radius leader")
-        if name == "TopRadius":
-            display.SetText(4, rocker_notes.TOP_RADIUS_CALLOUT)
-            if str(display.GetText(4) or "") != rocker_notes.TOP_RADIUS_CALLOUT:
-                raise RuntimeError("R800 centre-above-A callout did not persist")
-        if name == "BottomRadius":
-            display.SetText(4, rocker_notes.BOTTOM_RADIUS_CALLOUT)
-            if str(display.GetText(4) or "") != rocker_notes.BOTTOM_RADIUS_CALLOUT:
-                raise RuntimeError("R816 concentric callout did not persist")
         remaining.remove(name)
     if remaining:
         raise RuntimeError(f"arc radius dimensions missing: {sorted(remaining)}")
@@ -2253,22 +2242,20 @@ def _dress_detail_dimensions(
         ):
             raise RuntimeError(f"pivot bore lost its part-owned ream tolerance: {band}")
         tolerance_type = int(model_dimension.GetToleranceType())
-        # The ream band reads as clearance on its named mate (Opus #1020).
+        # The ream band names its mate and standard fit (rule 4).
         display.SetText(4, rocker_notes.PIVOT_FIT_CALLOUT)
         if str(display.GetText(4) or "") != rocker_notes.PIVOT_FIT_CALLOUT:
             raise RuntimeError("pivot bore fit callout did not persist")
         prefix = str(display.GetText(5) or "")  # native prefix definition
         suffix = str(display.GetText(6) or "")  # native suffix definition
         callouts = (str(display.GetText(7) or ""), str(display.GetText(8) or ""))
-        # A custom prefix replaces the automatic diameter glyph, so retain its
-        # native symbol token when the original prefix compartment is empty.
-        ream_prefix = "REAM " + (prefix if prefix else "<MOD-DIAM>")
-        through_suffix = suffix.rstrip() + " THRU"
-        display.SetText(1, ream_prefix)
-        display.SetText(2, through_suffix)
+        # Size first, then process, then depth (rule 26): the native prefix
+        # keeps its automatic diameter glyph and REAM THRU follows the limits.
+        ream_suffix = suffix.rstrip() + " REAM THRU"
+        display.SetText(2, ream_suffix)
         if (
-            str(display.GetText(5) or "") != ream_prefix
-            or str(display.GetText(6) or "") != through_suffix
+            str(display.GetText(5) or "") != prefix
+            or str(display.GetText(6) or "") != ream_suffix
             or (str(display.GetText(7) or ""), str(display.GetText(8) or "")) != callouts
             or not display.ShowDimensionValue
             or int(model_dimension.GetToleranceType()) != tolerance_type
@@ -2341,11 +2328,10 @@ def _add_rocker_outline_dimensions(
         entities=(pivot, taper), entity_types=("EDGE", "VERTEX"),
     )
     # The taper's foot is a J↔K profile station: BASIC, the zone is its band.
+    # A location carries its value only (rule 7): its extension line lands on
+    # the taper/lower-arc vertex it locates.
     set_basic_dimension(adapter, taper_dimension, label="taper intersection X")
     taper_dimension = _early_bound(taper_dimension, "IDisplayDimension")
-    taper_dimension.SetText(4, TAPER_LABEL)
-    if str(taper_dimension.GetText(4) or "") != TAPER_LABEL:
-        raise RuntimeError("taper endpoint identity label did not persist")
     taper_dimension.MaxWitnessLineLength = TAPER_WITNESS_LENGTH
     if (not _native_finite_scalar(taper_dimension.MaxWitnessLineLength)
             or abs(taper_dimension.MaxWitnessLineLength - TAPER_WITNESS_LENGTH) > 1e-9):
@@ -2373,9 +2359,6 @@ def _add_rocker_outline_dimensions(
     )
     set_basic_dimension(adapter, left_taper_dimension, label="left taper intersection X")
     left_taper_dimension = _early_bound(left_taper_dimension, "IDisplayDimension")
-    left_taper_dimension.SetText(4, TAPER_LABEL)
-    if str(left_taper_dimension.GetText(4) or "") != TAPER_LABEL:
-        raise RuntimeError("left taper endpoint identity label did not persist")
     left_taper_dimension.MaxWitnessLineLength = TAPER_WITNESS_LENGTH
     if (not _native_finite_scalar(left_taper_dimension.MaxWitnessLineLength)
             or abs(left_taper_dimension.MaxWitnessLineLength - TAPER_WITNESS_LENGTH) > 1e-9):
@@ -2396,9 +2379,6 @@ def _add_rocker_outline_dimensions(
         entities=land_entities, entity_types=("EDGE", "VERTEX"),
     )
     set_basic_dimension(adapter, land_dimension, label="tip land X location")
-    land_dimension.SetText(4, LAND_LABEL)
-    if str(land_dimension.GetText(4) or "") != LAND_LABEL:
-        raise RuntimeError("tip land X location: native label did not persist")
     land_dimension.MaxWitnessLineLength = TAPER_WITNESS_LENGTH
     if (not _native_finite_scalar(land_dimension.MaxWitnessLineLength)
             or abs(land_dimension.MaxWitnessLineLength - TAPER_WITNESS_LENGTH) > 1e-9):
@@ -2419,9 +2399,6 @@ def _add_rocker_outline_dimensions(
         entities=left_land_entities, entity_types=("EDGE", "VERTEX"),
     )
     set_basic_dimension(adapter, left_land_dimension, label="left tip land X location")
-    left_land_dimension.SetText(4, LAND_LABEL)
-    if str(left_land_dimension.GetText(4) or "") != LAND_LABEL:
-        raise RuntimeError("left tip land X location: native label did not persist")
     left_land_dimension.MaxWitnessLineLength = TAPER_WITNESS_LENGTH
     if (not _native_finite_scalar(left_land_dimension.MaxWitnessLineLength)
             or abs(left_land_dimension.MaxWitnessLineLength - TAPER_WITNESS_LENGTH) > 1e-9):
@@ -2457,10 +2434,61 @@ def _add_pin_coordinates(adapter: Any, front: Any) -> None:
             entities=(pivot_bore_edge, rod_hole_edge),
         )
         set_basic_dimension(adapter, dimension, label=label)
-        display = _early_bound(dimension, "IDisplayDimension")
-        display.SetText(4, "PIN AXIS")
-        if str(display.GetText(4) or "") != "PIN AXIS":
-            raise RuntimeError(f"{label}: native PIN AXIS label did not persist")
+
+
+# The pivot bore's centre mark runs on as the arm's vertical symmetry line,
+# through both arcs and past each edge (rule 26: the arcs' shared centre lies
+# on a drawn line, not "CENTRE ABOVE A" prose). Extended lengths run from the
+# bore rim in model metres (draw_dt_cone_gear_tl_index_plate); handles per
+# swCenterMarkHandle_e Up 0, Left 1, Down 2, Right 3.
+PIVOT_CENTRELINE_OVERRUN_MM = 4.0
+PIVOT_CENTRE_MARK_ARMS_MM = {
+    0: rocker.TOP_EDGE_ABOVE_PIVOT - PIVOT_HOLE_DIA / 2.0 + PIVOT_CENTRELINE_OVERRUN_MM,
+    1: PIVOT_CENTRELINE_OVERRUN_MM,
+    2: PIVOT_MID_Y - PIVOT_HOLE_DIA / 2.0 + PIVOT_CENTRELINE_OVERRUN_MM,
+    3: PIVOT_CENTRELINE_OVERRUN_MM,
+}
+# Sheet distance within which a centre mark's anchor is the pivot's.
+_MARK_MATCH_M = 0.0005
+
+
+@_telemetry.traced("drawing.rocker_pivot_centreline")
+def _extend_pivot_centreline(adapter: Any, front: Any) -> None:
+    """Extend the front view's pivot-bore centre mark per PIVOT_CENTRE_MARK_ARMS_MM.
+
+    Runs after the centre-mark census: the arms cross the view outline by
+    design (draw_ch_rocker_strap._extend_hole_centreline)."""
+    ((ax, ay),) = _project(
+        adapter, front, [(0.0, PIVOT_MID_Y / 1000.0, 0.0)], label="physical A centre mark"
+    )
+    matches = []
+    raw = _early_bound(front, "IView").GetFirstCenterMark2()
+    while raw is not None:
+        mark = _early_bound(raw, "ICenterMark")
+        position = _early_bound(mark.GetAnnotation(), "IAnnotation").GetPosition()
+        if position is not None and math.hypot(
+            float(position[0]) - ax, float(position[1]) - ay
+        ) <= _MARK_MATCH_M:
+            matches.append(mark)
+        raw = mark.GetNext()
+    if len(matches) != 1:
+        raise RuntimeError(f"front view: expected one pivot-bore centre mark at A, found {len(matches)}")
+    (mark,) = matches
+    mark.UseDocDisplaySettings = False
+    mark.ShowLines = True
+    for handle, arm_mm in PIVOT_CENTRE_MARK_ARMS_MM.items():
+        if not mark.SetExtendedLength(0, handle, arm_mm / 1000.0):
+            raise RuntimeError(f"pivot centre mark arm {handle} did not extend")
+    if bool(mark.UseDocDisplaySettings) or not bool(mark.ShowLines):
+        raise RuntimeError("pivot centre mark lost its extended lines")
+    _telemetry.success(
+        "pivot centre mark arms: "
+        + ", ".join(
+            f"{float(mark.GetExtendedLength(0, handle)):.4f}"
+            for handle in PIVOT_CENTRE_MARK_ARMS_MM
+        )
+    )
+
 
 
 def _require_land_location(
@@ -2487,7 +2515,7 @@ def _require_land_location(
     if (model.GetArcEndCondition(1) != 1
             or model.GetToleranceType() != 1
             or display.ShowDimensionValue is not True
-            or str(display.GetText(4) or "") != LAND_LABEL
+            or str(display.GetText(4) or "")
             or any(str(display.GetText(part) or "") for part in (1, 2))
             or not _native_finite_scalar(display.MaxWitnessLineLength)
             or abs(display.MaxWitnessLineLength - TAPER_WITNESS_LENGTH) > 1e-9):
@@ -4061,6 +4089,7 @@ async def build(adapter: Any) -> dict[str, str]:
         imported_annotations,
         {
             "TopAbovePivot": TOP_EDGE.precision["height_above_pivot"],
+            "BottomBelowPivot": rocker_notes.DRAWING_PRECISION["BottomEdgeReference"]["BottomBelowPivot"],
             "HubLength": HUB_FACES.precision["length"],
             "StrapThickness": STRAP_DATUM_B.precision["thickness"],
             "HubRootRadius": rocker_notes.DRAWING_PRECISION["HubRoot"]["HubRootRadius"],
@@ -4115,6 +4144,7 @@ async def build(adapter: Any) -> dict[str, str]:
         _require_center_mark_census(
             adapter, view, label=label, required=required, detail=detail,
         )
+    _extend_pivot_centreline(adapter, front)
 
     # E's native wizard-hole callout keeps the source through condition; its
     # first row names the pin that runs in it (Opus #1020 r3 C5).

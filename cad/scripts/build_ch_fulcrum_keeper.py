@@ -69,6 +69,7 @@ from ch_vn_frame_side_screw_spec import HEAD_DIA as FRAME_SIDE_HEAD_DIA
 from ch_vn_frame_side_screw_spec import HEAD_H as FRAME_SIDE_HEAD_H
 from ch_vn_frame_side_screw_spec import SHANK_DIA as FRAME_SIDE_SHANK_DIA
 from ch_vn_frame_side_screw_spec import THREAD as FRAME_SIDE_THREAD
+from ch_fulcrum_keeper_notes import DRAWING_NOTES
 from ch_fulcrum_keeper_spec import (
     BORE_DIA,
     BORE_DIA_BAND,
@@ -79,7 +80,6 @@ from ch_fulcrum_keeper_spec import (
     CROWN_R,
     CROWN_TOP_Y,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     FOOT_H,
     FOOT_L,

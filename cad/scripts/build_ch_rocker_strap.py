@@ -14,9 +14,10 @@ side, the hub hole PIVOT_MID_Y up), extruded mid-plane in Z. ONE sketch,
 ``StrapProfile``, holds the outline and the hole, so every printed location
 runs from the hole's centre: a construction line on the mirror axis, from the
 bottom edge through the hole's centre to the top edge, carries both edges'
-heights from the hole and puts the arcs' centre on that axis (the bottom radius is
-then derived, never printed); the tip lands' outer corners and the taper feet
-are dimensioned across from the hole's centre.
+heights from the hole and puts both arcs' centres on that axis; each arc then
+prints its own radius (the bottom one an equation of the top radius and the
+two heights, so the arcs stay concentric); the tip lands' outer corners and
+the taper feet are dimensioned across from the hole's centre.
 
 Run (SolidWorks already open)::
 
@@ -62,7 +63,6 @@ from _sketch_circle import define_circle
 from ch_rocker_hub_fit import STRAP_HOLE_BAND
 from ch_rocker_strap_notes import (
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     DRAWING_PRECISION_BY_NAME,
     ISOMETRIC_VIEW_NOTE,
@@ -80,6 +80,7 @@ from ch_rocker_strap_spec import (
     CURVE_RADIUS,
     HOLE_DIA,
     PIVOT_MID_Y,
+    R_BOTTOM,
     R_TOP,
     ROD_TIP_X,
     ROD_TIP_Y,
@@ -99,7 +100,6 @@ _SAVED_DRAWING_PROPERTIES = (
     "Material Specification",
     "Finish",
     "Quantity",
-    "Manufacturing Notes",
     "Isometric View Note",
 )
 
@@ -199,16 +199,11 @@ async def build(adapter) -> dict[str, str]:
         "mirror axis head on the top edge",
         await adapter.add_sketch_constraint(f"{axis}.end", top_arc, "coincident"),
     )
-    check(
-        "arc centre on the mirror axis",
-        await adapter.add_sketch_constraint(f"{top_arc}.center", axis, "coincident"),
-    )
-    check(
-        "concentric arcs",
-        await adapter.add_sketch_constraint(
-            f"{top_arc}.center", f"{bottom_arc}.center", "coincident"
-        ),
-    )
+    for arc, label in ((top_arc, "top"), (bottom_arc, "bottom")):
+        check(
+            f"{label} arc centre on the mirror axis",
+            await adapter.add_sketch_constraint(f"{arc}.center", axis, "coincident"),
+        )
     await dimension_between(
         adapter,
         hole_centre,
@@ -232,6 +227,14 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_dimension(top_arc, None, "radial", R_TOP),
     )
     strap.record("TopRadius", '"RTop"')
+    # The bottom arc's own radius, so the sheet prints it instead of a
+    # "concentric" sentence (rule 26): the top radius and both heights put
+    # its centre on the top arc's.
+    check(
+        "bottom radius",
+        await adapter.add_sketch_dimension(bottom_arc, None, "radial", R_BOTTOM),
+    )
+    strap.record("BottomRadius", '"RTop" + "TopAbovePivot" + "BottomBelowPivot"')
     # Offsets across from the hole's centre: horizontal_distance shows the
     # magnitude, so each drives POSITIVE against its shared global.
     for ref, name, value, expr in (
@@ -331,12 +334,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-        },
+        adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)

@@ -20,10 +20,8 @@ from ch_rocker_arm_spec import (
     LINEAR_2PL,
     PIVOT_HOLE_BAND,
     PIVOT_HOLE_DIA,
-    R_TOP,
     inch_text,
 )
-from ch_rod_pivot_pin_spec import BUDGET as ROD_JOINT_BUDGET
 
 # Coaxiality is owned by the spec, including its eccentricity in the hub's OD
 # floor. The note controls the result without prescribing the machining setup.
@@ -48,6 +46,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # PRRT_kwDOPHDy386mV3AO). Only this one of the sketch's two dimensions
     # prints; the other places the line's foot on the pivot centre.
     "TopEdgeReference": {"TopAbovePivot"},
+    # The lower arc's midpoint below the pivot axis: with TopAbovePivot and
+    # the two radii it places both arc centres on the mirror axis (rule 26),
+    # no "concentric" prose.
+    "BottomEdgeReference": {"BottomBelowPivot"},
     # The strap thickness, +/-.001 natively at three places (Main ruling
     # 2026-10, option b; ch_rocker_arm_spec.ARM_THICKNESS_BAND): the Strap
     # extrude's depth, printed in the end view where the section reads. Its
@@ -74,6 +76,7 @@ DRAWING_PRECISION = {
     "Hub": {"HubLength": 4},
     "HubProfile": {"HubDia": DEFAULT_DRAWING_PRECISION},
     "TopEdgeReference": {"TopAbovePivot": 3},
+    "BottomEdgeReference": {"BottomBelowPivot": 3},
     "Strap": {"StrapThickness": 3},
     "HubRoot": {"HubRootRadius": 3},
 }
@@ -124,15 +127,14 @@ BUILT_UP_PERMISSION_NOTE = (
     "2. MAY BE HUB MHA-CH-12 JOINED TO STRAP MHA-CH-13 PER THEIR DWGS."
 )
 
-# Two lines (drawing-guidelines rule 7; Opus #1020 r3 C3). The common arc
-# centre's location is no longer a general note: it rides R800's own
-# below-text callout (TOP_RADIUS_CALLOUT), at the feature it governs (rule 7).
+# Two lines (drawing-guidelines rule 7; Opus #1020 r3 C3): the stated wall
+# shortfall (rule 20) and the built-up permission. The hub OD's reason
+# (the MHA-CH-01 foot cheeks) is printed once, on the hub-root radius.
 DRAWING_NOTES = "\n".join(
     (
-        # The OD ceiling is the amplitude bar's foot cheeks at d = 0
-        # (ch_rocker_arm_spec); the hub OD's position frame to A in detail D
-        # (HUB_COAXIALITY_DIA) holds the named-exception wall.
-        f"1. {HUB_WALL_NOTE}; OD CLEARS MHA-CH-01 FOOT CHEEKS.",
+        # The hub OD's position frame to A in detail D (HUB_COAXIALITY_DIA)
+        # holds the named-exception wall.
+        f"1. {HUB_WALL_NOTE}.",
         BUILT_UP_PERMISSION_NOTE,
     )
 )
@@ -154,40 +156,28 @@ def _limits(low: float, high: float, places: int) -> str:
     )
 
 
-# Named mates for the two tight bands (drawing-guidelines rule 4): the reamed
-# bore runs on the MHA-CH-05 pivot shaft; the strap runs in the MHA-CH-03
-# rod's fork slot (ch_rod_pivot_pin_spec.joint_budget side clearance).
+# Named mates for the two tight bands (drawing-guidelines rule 4), each with
+# its standard fit name: the reamed bore runs on the MHA-CH-05 pivot shaft
+# (its clearance range as REF); the strap slides in the MHA-CH-03 rod's fork
+# slot. View F's left margin holds rows of ~17 characters.
 PIVOT_SHAFT_CLEARANCE = (
     PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[1] - (SHAFT_DIA + SHAFT_DIA_BAND[0]),
     PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0] - (SHAFT_DIA + SHAFT_DIA_BAND[1]),
 )
 # At the bore's own four places.
 PIVOT_FIT_CALLOUT = (
-    f"({_limits(*PIVOT_SHAFT_CLEARANCE, DRAWING_PRECISION['PivotHoleProfile']['PivotDia'])} DIAMETRAL\n"
-    "CLEARANCE ON PIVOT\n"
-    "SHAFT MHA-CH-05)"
+    "RUNNING FIT ON MHA-CH-05\n"
+    f"(CLEARANCE {_limits(*PIVOT_SHAFT_CLEARANCE, DRAWING_PRECISION['PivotHoleProfile']['PivotDia'])} REF)"
 )
-# At the strap thickness's three places.
-STRAP_FIT_CALLOUT = (
-    f"({_limits(ROD_JOINT_BUDGET['side_clearance_min'], ROD_JOINT_BUDGET['side_clearance_max'], DRAWING_PRECISION['Strap']['StrapThickness'])} TOTAL\n"
-    "SIDE CLEARANCE IN\n"
-    "MHA-CH-03 FORK)"
-)
+# Under the strap thickness in view F.
+STRAP_FIT_CALLOUT = "SLIDING FIT IN\nMHA-CH-03 FORK"
 # Integral hub length, not spacers, sets channel pitch: the hubs stack face to
 # face on the pivot shaft (rocker_bank_layout). Below-text rows (above-text
 # line breaks print as one run).
-HUB_LENGTH_CALLOUT = "SETS ARM PITCH:\n20X STACK ON\nMHA-CH-05"
+HUB_LENGTH_CALLOUT = "20X STACK PITCH\nON MHA-CH-05"
 # The amplitude bar's foot rides the top edge (ch_rocker_arm_spec
 # TOP_EDGE_BAND): the one profile frame names it below the frame.
 TOP_EDGE_MATE_CALLOUT = "MHA-CH-01 FOOT TRACK"
 # The rod-pin hole's mate (rule 4; Opus #1020 r3 C5): the MHA-CH-10 pin runs
 # in it (ch_rod_pivot_pin_spec), a prefix row over the native #47 DRILL.
 ROD_PIN_MATE_CALLOUT = "FOR PIN MHA-CH-10"
-# The lower arc shares the top edge's centre (Opus #1020 r2 B1): below-text
-# rows under R816 (above-text line breaks print as one run).
-BOTTOM_RADIUS_CALLOUT = f"CONCENTRIC\nWITH R{inch_text(R_TOP, DRAWING_PRECISION['StrapProfile']['TopRadius'])}"
-# That shared centre sits on A's axis (x = 0 in the clocked A|B|C frame; the
-# 1:2 view cannot reach it): one below-text row under R800, the former note 1.
-# Detail E's native BASIC angle defines the radial lands, so no note narrates
-# their direction either.
-TOP_RADIUS_CALLOUT = "CENTRE ABOVE A"
