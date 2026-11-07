@@ -177,17 +177,20 @@ DRAWING_NOTES = (
     f"\n    REAM {PIN_FIT_INTERFERENCE[0]}-{PIN_FIT_INTERFERENCE[1]}"
     " UNDER THE MEASURED PIN."
 )
-# Each line stays within ~20 characters (~48 mm at the sheet's dimension
-# font): the callouts sit between a notch's crop circle and its neighbours.
-# A location dimension (each notch's centring ledge) carries its value and
-# band only; each notch names its mate once, on its width (rule 7).
+# Each line stays within ~21 characters (~55 mm at the sheet's dimension
+# font): the callouts sit between a notch's crop circle and its neighbours,
+# DETAIL A's west of it beside the full-length view. A location dimension
+# (each notch's centring ledge) carries its value and band only; each notch
+# names its mate once, on its width, by the standard fit its running floor
+# gives (rules 4 and 7; fan-out round 1: STRADDLES and RIDES are not fit
+# names), in the pin hole's 'PRESS FIT MHA-CH-11' form.
 DIMENSION_CALLOUTS: dict[str, str] = {
     "TopNotchWidth": (
-        f"STRADDLES {LEVER_NUMBER}\n"
+        f"RUNNING FIT {LEVER_NUMBER}\n"
         f"CHEEK WALL {inch_text(TOP_CHEEK_WALL_MIN, WALL_PLACES)} MIN"
     ),
     "BottomNotchWidth": (
-        f"RIDES {ROCKER_ARM_NUMBER}\n"
+        f"RUNNING FIT {ROCKER_ARM_NUMBER}\n"
         f"CHEEK WALL {inch_text(BOTTOM_CHEEK_WALL_MIN, WALL_PLACES)} MIN"
     ),
     "TopNotchHeight": ROOT_CALLOUT,
