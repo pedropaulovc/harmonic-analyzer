@@ -184,11 +184,10 @@ DIMENSION_TOLERANCE_TYPES = {
     "ChamferAngle": 11,
 }
 _NUT_NUMBER = _config.parts("ch-anchor-jam-nut")["number"]
-DRAWING_NOTES = (
-    "FINISHED OVERALL TO EYE CROWN IS THE ACCEPTANCE SIZE.\n"
-    f"DISCARD THE SUPPLIED HEX NUT; {_NUT_NUMBER} LOCKS THIS ANCHOR.\n"
-    "UNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE."
-)
+# Rule 7: the 1.20 overall takes the title block's band, so it carries no
+# reason; the nut's omission is the stock name's, its jam nut the MHA-HA-00
+# step's (ANCHOR_INSTALL_STEP).
+DRAWING_NOTES = "UNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 3:1"
 
 # McMaster 9489T111 engineering drawing (2026-04-08):
