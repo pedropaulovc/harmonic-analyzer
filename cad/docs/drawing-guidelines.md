@@ -130,7 +130,10 @@ HOLES row.
 - On inch sheets, three places mean `.XXX ±.005`, two mean `.XX ±.01`,
   and one means `.X ±.1`. Use `.X` only for non-functional features such as
   profiles, chamfers and unmated overall lengths. A feature used by a stack,
-  wall or fit check needs `.XX` or tighter.
+  wall or fit check needs `.XX` or tighter. A clearance whose `.XX` band
+  would leave too little room to the part it clears takes `.XXX` and names
+  that part (`Ø1.083 CAP RECESS, CLEARS MHA-FR-VN-54 SKIRT`); that third
+  place is not over-specification.
 - Inch drill diameters, including native Hole Wizard callouts, use three
   decimal places. Their tolerance still comes from DRILLED HOLES, not the
   three-place linear grade. Keep the exact decimal of a named number, letter
