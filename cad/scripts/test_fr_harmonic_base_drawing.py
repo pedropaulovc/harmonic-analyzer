@@ -3813,26 +3813,29 @@ def test_numbered_note_and_wider_flags_predict_clearance_in_the_proven_lanes() -
 
 
 @pytest.mark.parametrize("tag", ("D1", "Q7", "B12"))
-def test_pivot_seat_setup_identifies_its_mate_without_numeric_offsets(tag) -> None:
-    """Native tag presentation changes without moving ownership of offsets/bands."""
+def test_pivot_seat_note_names_its_transfer_route_without_numeric_offsets(tag) -> None:
+    """Native tag presentation changes without moving ownership of offsets/bands.
+
+    Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144:
+    D1 is spotted through the MHA-DT-20 pivot bore at assembly (novice-rubric
+    screen 20261107T081227004Z: the .002 band named no fit route)."""
     import re
 
     import cone_set_stack
     import draw_fr_harmonic_base as sheet
     import fr_harmonic_base_spec as base_spec
 
-    assert sheet.pivot_seat_step is base_spec.pivot_seat_step
     assert base_spec.PIVOT_SEAT_POSITION_BAND_MM == cone_set_stack.PIVOT_SEAT_POSITION_MM
     text = sheet.pivot_seat_step(tag)
     assert text.split("\n") == [
-        f"1. {tag} IS LOCATED TO THE MHA-DT-02 SEAT;",
-        "DRILL AND TAP AT ASSEMBLY.",
+        f"1. {tag}: TRANSFER FROM MHA-DT-20 PIVOT BORE AT ASSEMBLY;",
+        "CHECK THE BANDED OFFSETS FROM THE MHA-DT-02 SEAT.",
         f"{tag} TABLE X/Y ARE REFERENCE.",
     ]
     # Only the note number and part/table identities may contain digits;
     # the native dimensions remain the sole owners of offsets and bands.
     identification = text.removeprefix("1. ")
-    for identity in (tag, "MHA-DT-02"):
+    for identity in (tag, "MHA-DT-20", "MHA-DT-02"):
         assert identity in identification
         identification = identification.replace(identity, "")
     assert not re.search(r"\d|<MOD-PM>|±", identification)
