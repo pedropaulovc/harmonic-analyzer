@@ -2823,21 +2823,32 @@ def test_linear_motion_view_hides_only_the_carrier_and_its_load() -> None:
     assert hidden == {
         spec.instance_name(spec.CARRIER, 0),
         *spec.RISER_SCREW_INSTANCES,
+        *spec.STRAP_CLAMP_SCREW_INSTANCES.values(),
         *_family_instances(
-            spec.RISER, spec.HUB_STUD, spec.HUB_SLEEVE, spec.HUB_WASHER,
-            spec.HUB_SCREW, spec.LEFT_CLAMP_SCREW, spec.FEED_LEVER, spec.CL_DOWEL,
-            spec.CLAMP_SCREW, spec.LEVER_SCREW, spec.LEVER_LOCK_WASHER,
+            spec.RISER, spec.HUB_WASHER, spec.FEED_LEVER, spec.STOP_PIN,
+            spec.LEVER_SCREW, spec.LEVER_LOCK_WASHER,
         ),
     }
+    assert hidden == {spec.instance_name(spec.CARRIER, 0), *spec.CARRIER_RIDERS}
     assert all(
-        name == spec.instance_name(spec.CARRIER, 0)
-        or any(
-            spec.lock_parent(stem, index) == spec.instance_name(spec.CARRIER, 0)
-            for stem in spec.LOCKED_TO
-            for index in range(len(spec.LOCKED_TO[stem]))
-            if spec.instance_name(stem, index) == name
-        )
-        for name in hidden
+        spec.lock_parent(stem, index) == spec.instance_name(spec.CARRIER, 0)
+        for stem, parents in spec.LOCKED_TO.items()
+        for index in range(len(parents))
+        if spec.instance_name(stem, index) in hidden
+    )
+    # The common screw is hidden by occurrence, never by stem: its three strap
+    # clamps (CL, CR, HUB: 0-based 20, 21, 22, native -21..-23) leave with the
+    # carrier, its rail and TL-28 bar screws stay on the bars.
+    assert spec.STRAP_CLAMP_SCREW_INSTANCES == {
+        role: spec.instance_name(spec.RAIL_SCREW, index)
+        for role, index in (("CL", 20), ("CR", 21), ("HUB", 22))
+    }
+    clamps = set(spec.STRAP_CLAMP_SCREW_INSTANCES.values())
+    assert len(clamps) == 3
+    assert _family_instances(spec.RAIL_SCREW) & hidden == clamps
+    assert set(spec.RAIL_SCREW_INSTANCES) | set(spec.BAR_SCREW_INSTANCES) <= shown
+    assert _family_instances(spec.RAIL_SCREW) - clamps == (
+        set(spec.RAIL_SCREW_INSTANCES) | set(spec.BAR_SCREW_INSTANCES)
     )
     # The riser-screw family splits: the feed nut's four stay on the lug.
     assert set(spec.NUT_SCREW_INSTANCES) <= shown
@@ -2846,7 +2857,7 @@ def test_linear_motion_view_hides_only_the_carrier_and_its_load() -> None:
         spec.FEED_BLOCK, spec.PIVOT_SCREW, spec.PIVOT_SPACER, spec.PIVOT_SHIM,
         spec.LEADSCREW, spec.FEED_NUT, spec.PILLOW_BLOCK, spec.END_BRACKET,
         spec.HANDWHEEL, spec.HOLD_DOWN_STUD, spec.T_NUT, spec.FLANGE_NUT,
-        spec.RAIL_SCREW, spec.CARRIAGE_SCREW, spec.PILLOW_BLOCK_SCREW,
+        spec.CARRIAGE_SCREW, spec.PILLOW_BLOCK_SCREW,
     ) <= shown
     # Drawing-only: no cluster, BOM or model inventory changes for it.
     assert sorted(stem for c in drawing.CLUSTERS for stem in c.stems) == sorted(spec.BOM_ORDER)
@@ -2915,28 +2926,64 @@ def _linear_leaves() -> list[SimpleNamespace]:
         ("missing handwheel", "occurs 0 times"),
         ("duplicate rail screw", "occurs 2 times"),
         ("unknown component", "not one occurrence"),
+        ("hub clamp drawn", "drawn but must be hidden"),
+        ("stop pin drawn", "drawn but must be hidden"),
+        ("bar screw hidden", "hidden but must be drawn"),
+        ("common stem hidden", "hidden but must be drawn"),
     ),
 )
 def test_linear_motion_readback_refuses_any_departure(fault, message) -> None:
     leaves = _linear_leaves()
     carrier = spec.instance_name(spec.CARRIER, 0)
     handwheel = spec.instance_name(spec.HANDWHEEL, 0)
+
+    def drawn(names: set[str], visible: bool) -> list[SimpleNamespace]:
+        return [
+            _linear_leaf(leaf.path, visible=visible) if leaf.path in names else leaf
+            for leaf in leaves
+        ]
+
     if fault == "carrier drawn":
-        leaves = [_linear_leaf(carrier, visible=True) if leaf.path == carrier else leaf for leaf in leaves]
+        leaves = drawn({carrier}, True)
     elif fault == "nut screw hidden":
-        nut_screw = spec.NUT_SCREW_INSTANCES[0]
-        leaves = [_linear_leaf(nut_screw, visible=False) if leaf.path == nut_screw else leaf for leaf in leaves]
+        leaves = drawn({spec.NUT_SCREW_INSTANCES[0]}, False)
     elif fault == "missing handwheel":
         leaves = [leaf for leaf in leaves if leaf.path != handwheel]
     elif fault == "duplicate rail screw":
         leaves.append(_linear_leaf(spec.RAIL_SCREW_INSTANCES[0], visible=True))
     elif fault == "unknown component":
         leaves.append(_linear_leaf("ch-rocker-arm-tl-oblique-strap-1", visible=False))
+    elif fault == "hub clamp drawn":
+        leaves = drawn({spec.STRAP_CLAMP_SCREW_INSTANCES["HUB"]}, True)
+    elif fault == "stop pin drawn":
+        leaves = drawn({spec.instance_name(spec.STOP_PIN, 0)}, True)
+    elif fault == "bar screw hidden":
+        leaves = drawn({spec.BAR_SCREW_INSTANCES[-1]}, False)
+    elif fault == "common stem hidden":
+        # Hiding the whole common stem would take its 20 rail and bar
+        # screws with the three strap clamps.
+        leaves = drawn(_family_instances(spec.RAIL_SCREW), False)
     failures = drawing.linear_motion_visibility_failures(leaves)
     if fault is None:
         assert failures == []
         return
     assert any(message in failure for failure in failures), failures
+
+
+def test_linear_motion_isolation_matches_common_screws_by_occurrence() -> None:
+    # isolate_drawing_view_components draws a leaf exactly when its file and
+    # instance identities match a shown occurrence; the common screw's strap
+    # clamps (native -21..-23) must match none, never by the bare stem or a
+    # shorter instance such as -2.
+    shown = frozenset(drawing.LINEAR_MOTION_SHOWN)
+    assert spec.RAIL_SCREW not in shown
+    for name in spec.STRAP_CLAMP_SCREW_INSTANCES.values():
+        identities = _linear_leaf(name, visible=False).identities
+        assert spec.RAIL_SCREW in identities
+        assert _drawing_balloons._stems_matching(identities, shown) == set()
+    for name in (*spec.RAIL_SCREW_INSTANCES, *spec.BAR_SCREW_INSTANCES):
+        identities = _linear_leaf(name, visible=True).identities
+        assert _drawing_balloons._stems_matching(identities, shown) == {name}
 
 
 def test_linear_motion_recipe_hides_reads_back_then_fits_collapsed(monkeypatch) -> None:
