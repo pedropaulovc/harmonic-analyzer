@@ -5223,6 +5223,32 @@ def test_hole_table_locations_drop_the_leading_zero() -> None:
     assert "leading_zero_locations(rows[1:])" in source
 
 
+def test_socket_finish_leader_passes_over_the_table_origin_mark() -> None:
+    """Farm run 20261107T084432155Z (leader-crosses-leader): the socket Ra
+    leader, level with the A1 axis, ran through the origin mark's Y arrow at
+    the lower-left corner.  From its tail (the symbol point plus
+    FINISH_LEADER_TAIL) to the upper-left bore rim it now passes over the
+    arrow and its letter."""
+    from _layout_geometry import Segment
+
+    s = drawing.DETAIL_VIEW_SCALE / 1000.0
+    cx, cy = drawing.DETAIL_TOP_CENTER
+    angle = math.radians(drawing.SOCKET_FINISH_LANDING_DEG)
+    r = part.BORE_DIA / 2.0 * s
+    rim = (cx - part.COLUMN_X * s + r * math.cos(angle), cy - part.REAR_COLUMN_Z * s + r * math.sin(angle))
+    sx, sy = drawing.SOCKET_FINISH_SYMBOL_XY
+    leader = Segment(sx + drawing.FINISH_LEADER_TAIL, sy, *rim)
+    _origin, arrows = _table_origin_mark()
+    for name, box in arrows.items():
+        assert _box_segment_gap(box, ((leader.x0, leader.y0), (leader.x1, leader.y1))) >= drawing.INK_CLEARANCE, name
+    y_arrow = arrows["Y arrow"]
+    # Over the Y arrow's letter (a 3.5 mm capital past its tip).
+    t = (y_arrow[0] + y_arrow[2]) / 2.0
+    at = leader.y0 + (leader.y1 - leader.y0) * (t - leader.x0) / (leader.x1 - leader.x0)
+    assert at - (y_arrow[3] + 0.0035) >= 0.001
+
+
+
 def test_hole_tags_stand_in_the_windows_beside_their_holes() -> None:
     """Farm run 20261106T204855971Z: the native tags, parked up-right of
     their holes, sat under the hanger and keeper callouts' leaders.  Each
@@ -6150,18 +6176,60 @@ def _sharp_landing_sheet(key, landing):
     return cx + (x - part.GOOSENECK_X) * scale, cy + (z - part.GOOSENECK_Z) * scale
 
 
+def _sharp_box(centre):
+    from _layout_geometry import Box
+
+    dx0, dy0, dx1, dy1 = drawing.SHARP_EDGE_TEXT_INK
+    return Box(centre[0] + dx0, centre[1] + dy0, centre[0] + dx1, centre[1] + dy1)
+
+
 def _sharp_ink(centre, landing):
     """A SHARP's text-box sides and its leader (Segments, sheet m): the
-    leader from the box side nearer the landing, at mid-height (SOLIDWORKS's
-    smart leader side), to the landing."""
-    from _layout_geometry import Box, Segment
+    leader from the box side nearer the landing, at the text's mid-height
+    (SOLIDWORKS's smart leader side), to the landing."""
+    from _layout_geometry import Segment
 
     cx, cy = centre
-    hw, hh = drawing.SHARP_EDGE_TEXT_HALF
-    sides = _box_sides(Box(cx - hw, cy - hh, cx + hw, cy + hh))
-    assert abs(landing[0] - cx) > hw or abs(landing[1] - cy) > hh, "landing under its own text"
-    start = (cx - hw if landing[0] < cx else cx + hw, cy)
+    box = _sharp_box(centre)
+    sides = _box_sides(box)
+    assert not (box.xmin <= landing[0] <= box.xmax and box.ymin <= landing[1] <= box.ymax), (
+        "landing under its own text"
+    )
+    start = (box.xmin if landing[0] < cx else box.xmax, cy)
     return sides, Segment(*start, *landing)
+
+
+def _sharp_pair_reads_apart(a, b) -> bool:
+    """Two SHARP boxes read as separate notes: one column only a row pitch
+    or more apart (the audit's merged-blocks, 5.66 mm at 3.5 mm text), and
+    otherwise a text height apart (its text-separation)."""
+    if min(a.xmax, b.xmax) > max(a.xmin, b.xmin):
+        return max(a.ymin - b.ymax, b.ymin - a.ymax) >= 0.006
+    return _box_box_gap((a.xmin, a.ymin, a.xmax, a.ymax), (b.xmin, b.ymin, b.xmax, b.ymax)) >= 0.0036
+
+
+def _locator_windows():
+    """The locator's two open windows (sheet m) as boxes, with the four
+    gussets' hypotenuses that cut their crossbar corners: a SHARP on the
+    locator stands in a window, 2 mm inside its edges and off its gussets,
+    never over the rails' or the crossbar's lines."""
+    from _layout_geometry import Box, Segment
+
+    def sheet(x, z):
+        return _sharp_landing_sheet(drawing.SHARP_EDGE_LOCATOR, (x, -part.HALF_H, z))
+
+    windows = []
+    for x0, x1 in ((-part.INNER_X, part.BAR_X0), (part.BAR_X1, part.INNER_X)):
+        (ax, ay), (bx, by) = sheet(x0, -part.INNER_Z), sheet(x1, part.INNER_Z)
+        windows.append(Box(min(ax, bx), min(ay, by), max(ax, bx), max(ay, by)))
+    gussets = []
+    for bar_x, side in ((part.BAR_X0, -1.0), (part.BAR_X1, 1.0)):
+        for face_z, toward in ((-part.INNER_Z, 1.0), (part.INNER_Z, -1.0)):
+            gussets.append(Segment(
+                *sheet(bar_x + side * part.GUSSET, face_z),
+                *sheet(bar_x, face_z + toward * part.GUSSET),
+            ))
+    return windows, gussets
 
 
 def _crosses(a, b) -> bool:
@@ -6260,11 +6328,14 @@ def _sharp_gap(sides, segment) -> float:
 
 def test_sharp_edge_notes_and_leaders_stand_clear_of_the_sheet_ink() -> None:
     """The SHARP notes stand in the views' open windows: no note or leader
-    touches another; every text box stands 2 mm off the modelled ink and the
-    sheet frame, every leader 1 mm off lines, text and circles.  The three
-    -X locator leaders each cross the 5.42 POCKET's extension line once (the
+    touches another; every text box stands the layout audit's text
+    clearance (half its 3.5 mm height) off the modelled lines and window
+    edges, 2 mm off other text and the sheet frame, every leader 1 mm off
+    lines, text and circles.  The -X bar side's and the rear -X gusset's
+    locator leaders each cross the 5.42 POCKET's extension line once (the
     lines fence the -X junctions; RsTopFrame 2026-11-06), 3 mm or more from
-    its ends, and nothing else."""
+    its ends, and nothing else; the -X gusset's SHARP stands under that
+    line, beside its gusset."""
     from _layout_geometry import segment_box_distance, segment_circle_distance
 
     layout = _sharp_layout()
@@ -6274,7 +6345,7 @@ def test_sharp_edge_notes_and_leaders_stand_clear_of_the_sheet_ink() -> None:
         for b in names[i + 1 :]:
             _key, b_sides, b_leader, _centre = layout[b]
             assert _segment_gap(a_leader, b_leader) >= 0.0015, (a, b)
-            assert min(_sharp_gap(a_sides, side) for side in b_sides) >= 0.003, (a, b)
+            assert _sharp_pair_reads_apart(_sharp_box(layout[a][3]), _sharp_box(layout[b][3])), (a, b)
             assert _sharp_gap(a_sides, b_leader) >= 0.0015, (a, b)
             assert _sharp_gap(b_sides, a_leader) >= 0.0015, (a, b)
     fx0, fy0, fx1, fy1 = drawing.SHEET_FRAME
@@ -6286,13 +6357,23 @@ def test_sharp_edge_notes_and_leaders_stand_clear_of_the_sheet_ink() -> None:
     detail_lines, detail_boxes, detail_circle = _detail_sharp_obstacles()
     extension = {name for name in locator_lines if name.startswith("138.0 extension")}
     crossed = {}
-    for name, (key, sides, leader, _centre) in layout.items():
+    windows, gussets = _locator_windows()
+    clear = 0.5 * 0.0035
+    for name, (key, sides, leader, centre) in layout.items():
         if key == drawing.SHARP_EDGE_LOCATOR:
             lines, boxes, circles = locator_lines, locator_boxes, locator_circles.values()
+            text = _sharp_box(centre)
+            assert any(
+                window.xmin + clear <= text.xmin and text.xmax <= window.xmax - clear
+                and window.ymin + clear <= text.ymin and text.ymax <= window.ymax - clear
+                for window in windows
+            ), name
+            for gusset in gussets:
+                assert _sharp_gap(sides, gusset) >= clear, name
         else:
             lines, boxes, circles = detail_lines, detail_boxes, ()
         for line_name, line in lines.items():
-            assert _sharp_gap(sides, line) >= 0.002, (name, line_name)
+            assert _sharp_gap(sides, line) >= clear, (name, line_name)
             if line_name in extension and _crosses(leader, line):
                 crossed.setdefault(name, []).append(line_name)
                 x = _crossing_x(leader, line)
@@ -6311,7 +6392,6 @@ def test_sharp_edge_notes_and_leaders_stand_clear_of_the_sheet_ink() -> None:
             assert min(segment_circle_distance(side, circle) for side in sides) >= 0.002, name
     assert crossed == {
         "front -X bar side": ["138.0 extension -1"],
-        "front -X gusset": ["138.0 extension -1"],
         "rear -X gusset": ["138.0 extension +1"],
     }
     # On J, the rib's inner bottom SHARP stands in the window between the
