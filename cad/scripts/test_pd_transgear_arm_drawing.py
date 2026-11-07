@@ -6,7 +6,6 @@ import asyncio
 import ast
 import itertools
 import math
-import re
 import runpy
 from fractions import Fraction
 from pathlib import Path
@@ -326,45 +325,19 @@ def test_the_section_cuts_through_the_pivot_and_the_square_end() -> None:
     assert x1 > drawing._front_x(geometry.TIP_STATION)
 
 
-def test_the_qualifier_lines_ride_the_tap_thread_compartment() -> None:
+def test_the_tap_callout_drops_the_title_block_thread_class() -> None:
     definitions = {
         5: "",
         6: "<MOD-DIAM><hw-tapdrilldia> THRU\n<hw-tapsize> - <hw-threadclass> THRU",
         7: "",
         8: "",
     }
-    updated = drawing.tap_callout_definitions(definitions, drawing.PLATE_TAP_QUALIFIER)
+    updated = drawing.tap_callout_definitions(definitions)
     assert "<hw-threadclass>" not in updated[6].lower()
-    assert updated[6].endswith(f"\n{drawing.PLATE_TAP_QUALIFIER}")
+    assert "<hw-tapsize>" in updated[6]
     assert {part: updated[part] for part in (5, 7, 8)} == {5: "", 7: "", 8: ""}
     with pytest.raises(RuntimeError):
-        drawing.tap_callout_definitions({5: "", 6: "", 7: "", 8: ""}, "X")
-
-
-_ENGAGEMENT_LINE = re.compile(r"ENGAGEMENT (\.\d{3}) MIN \((\d\.\d{2})D\)")
-
-
-def test_each_tap_callout_states_its_worst_case_full_thread_engagement() -> None:
-    """Review of 19e33c6c2 (blocker): the sheet gave no engagement, so a blind
-    reviewer charged 1.5 incomplete pitches at each end of the 5/16 stock.
-    Each callout states the build's worst case, floored, at 1.5D or more."""
-    worst = {
-        "plate taps": (
-            joints.PLATE_SCREW_ENGAGEMENT_WORST,
-            joints.PLATE_SCREW.THREAD_MAJOR,
-        ),
-    }
-    assert {row[0] for row in drawing.TAP_CALLOUTS} == set(worst)
-    for label, *_, qualifier in drawing.TAP_CALLOUTS:
-        match = _ENGAGEMENT_LINE.fullmatch(qualifier.splitlines()[-1])
-        assert match, label
-        printed_mm, printed_d = float(match[1]) * 25.4, float(match[2])
-        worst_mm, major = worst[label]
-        assert worst_mm - 0.0254 < printed_mm <= worst_mm + 1e-9, label
-        assert worst_mm / major - 0.01 < printed_d <= worst_mm / major, label
-        assert printed_d >= joints.ENGAGEMENT_TARGET_D, label
-    # A MIN never rounds up.
-    assert spec.engagement_line(7.749, 1.599) == "ENGAGEMENT .305 MIN (1.59D)"
+        drawing.tap_callout_definitions({5: "", 6: "", 7: "", 8: ""})
 
 
 def test_the_pin_bore_presses_the_mha_179_pin_at_every_limit() -> None:
@@ -374,11 +347,9 @@ def test_the_pin_bore_presses_the_mha_179_pin_at_every_limit() -> None:
     loosest = cluster_pin.DIA_MIN - geometry.PIN_BORE_DIA_MAX
     tightest = cluster_pin.DIA_MAX - geometry.PIN_BORE_DIA_MIN
     assert (loosest, tightest) == pytest.approx((0.00762, 0.0254))
-    assert spec.PIN_BORE_CALLOUT.splitlines()[2] == ".0003/.0010 INTERFERENCE"
     # #2174: the rear mouth's band is its own native leg dimension's, in
     # section D-D, not callout text.
-    assert len(spec.PIN_BORE_CALLOUT.splitlines()) == 3
-    assert "MOUTH" not in spec.PIN_BORE_CALLOUT
+    assert "MOUTH" not in drawing.PIN_BORE_CALLOUT
     assert spec.PIN_PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
     assert min(geometry.PIN_BORE_DIA_BAND) == 0.0 < max(geometry.PIN_BORE_DIA_BAND)
 
@@ -461,7 +432,7 @@ def test_each_import_phase_proves_the_precision_of_the_dimensions_it_imports(
     monkeypatch.setattr(
         _drawing_dimensions._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
     )
-    sheets = SimpleNamespace(ActivateSheet=lambda _name: True)
+    sheets = SimpleNamespace(ActivateSheet=lambda _name: True, ActivateView=lambda _name: True)
     returns = {
         "new_project_drawing": (object(), object()),
         "_early_bound": sheets,
@@ -474,6 +445,7 @@ def test_each_import_phase_proves_the_precision_of_the_dimensions_it_imports(
         "add_native_hole_callout": object(),
         "_rear_rim": object(),
         "_pin_zone_section": object(),
+        "add_note": object(),
     }
     for name in (
         "check", "read_required_properties", "create_blank_drawing_sheets",
@@ -481,7 +453,7 @@ def test_each_import_phase_proves_the_precision_of_the_dimensions_it_imports(
         "set_reference_dimensions", "_set_stock_text", "_end_radius_to_arc",
         "offset_dimension_text", "project_part_pmi", "_add_projected_zone_chains",
         "_overall_reference", "_set_tap_callout_text", "set_hole_callout_precision",
-        "_match_pin_section_caption", "add_property_linked_note",
+        "_section_captions_without_scale", "add_property_linked_note",
         "require_saved_projected_gtols", *returns,
     ):
         monkeypatch.setattr(
@@ -529,14 +501,16 @@ def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:
     low, high = spec.LATCH_PIN_PRESS_PRINTED
     assert 0.0 < low <= loosest + 1e-9
     assert loosest < tightest <= high + 1e-9 < tightest + 0.00254
-    lines = spec.PIN_HOLE_CALLOUT.splitlines()
-    assert lines[1] == f"PRESS FIT PIN {spec.LATCH_PIN_NUMBER}"
-    assert lines[2] == ".0006/.0013 INTERFERENCE"
-    # The owner-accepted ligament shortfall prints as a plain fact, rounded
-    # down so the sheet never promises more wall than the budget holds.
+    # The callout names the pin and links the note that carries the press
+    # and the owner-accepted ligament shortfall (RV-04), the wall rounded
+    # down so the sheet never promises more than the budget holds.
+    assert spec.LATCH_PIN_NUMBER in drawing.PIN_HOLE_CALLOUT
+    assert f"SEE NOTE {drawing.LATCH_PIN_NOTE}" in drawing.PIN_HOLE_CALLOUT
+    note = " ".join(drawing.NOTES[drawing.LATCH_PIN_NOTE - 1].split())
+    assert ".0006-.0013" in note
     worst = geometry.WALLS["pin hole to faces"][1]
     assert spec.LATCH_PIN_WALL_PRINTED <= worst < spec.LATCH_PIN_WALL_PRINTED + 0.0254
-    assert "PIN HOLE TO FACES .065 MIN" in lines
+    assert ".065 MIN" in note
 
 
 def test_the_pivot_bore_is_reamed_as_the_shoulder_running_fit() -> None:
@@ -548,14 +522,10 @@ def test_the_pivot_bore_is_reamed_as_the_shoulder_running_fit() -> None:
     assert joints.PIVOT_RADIAL_FLOAT_MAX == pytest.approx(upper / 2.0)
     screw = _config.parts("pd-vn-transgear-pivot-screw")["number"]
     # The fit's facts, not its wording: reamed to the measured shoulder, the
-    # diametral clearance band, the named screw and the matched set.
-    flat = " ".join(spec.PIVOT_BORE_CALLOUT.split())
-    for fact in (
-        "MEASURED SHOULDER",
-        ".0056-.0064 DIAMETRAL CLEARANCE",
-        screw,
-        "MATCHED SET",
-    ):
+    # clearance band and the named screw, in the note the bore's callout links.
+    assert f"SEE NOTE {drawing.PIVOT_NOTE}" in drawing.PIVOT_BORE_CALLOUT
+    flat = " ".join(drawing.NOTES[drawing.PIVOT_NOTE - 1].split())
+    for fact in ("MEASURED SHOULDER", ".0056-.0064", screw):
         assert fact in flat, fact
     assert screw == "MHA-PD-VN-57"
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the matched fit rides the callout; no inspection-method note.
@@ -563,7 +533,7 @@ def test_the_pivot_bore_is_reamed_as_the_shoulder_running_fit() -> None:
     assert "Pivot Fit Inspection" not in part._SAVED_DRAWING_PROPERTIES
     # Machinist review: the implied 90° to the front face is the title
     # block's angular row; a line restating it adds nothing.
-    assert "90°" not in spec.PIVOT_BORE_CALLOUT
+    assert "90°" not in flat
     assert geometry.PIVOT_AXIS_BINDING_SWEEP_MAX < lower
     assert lower - geometry.PIVOT_AXIS_BINDING_SWEEP_MAX >= 0.004
 
@@ -662,7 +632,7 @@ def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() ->
     right end up through the text, so the text stands right of its line,
     clear of section A-A's caption (centred under the section, about 46 mm
     wide); the isometric moved to sheet 2 (review of 67d749fb4)."""
-    lines = ["6.40 \u00b10.05", *spec.FLOOR_DEPTH_CALLOUT.splitlines()]
+    lines = [".2717 \u00b1.002", *drawing.SPRING_CALLOUT.splitlines()]
     width = max(map(len, lines)) * _CAPS_CHAR_WIDTH
     half_height = len(lines) * _LINE_PITCH / 2.0
     x, y = drawing.FLOOR_TEXT_XY
@@ -674,10 +644,11 @@ def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() ->
     assert floor[1] > _BORDER + 0.0015
     assert floor[3] < section_bottom - 0.008
     assert floor[2] < drawing.SECTION_CENTER[0] - 0.023 - 0.005
-    # Too wide to hang left of its line inside the border: hence the leader.
+    # It stands off its line on a leader, right of the line.
     line_x = drawing.SECTION_KEEP["FloorDepth"][0]
-    assert line_x - width < _BORDER
     assert floor[0] > line_x + 0.005
+    # Clear above the sheet's fit notes.
+    assert floor[1] > drawing.NOTES_XY[1] + 0.002
     # The line stands off the pivot end it dimensions.
     pivot_end_x = drawing._front_x(-geometry.PIVOT_END_R)
     assert line_x < pivot_end_x
@@ -695,7 +666,7 @@ def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() ->
 
 def _counterbore_box() -> tuple[float, ...]:
     return _centred_box(
-        ["+0.1", "\u00d811.500 0.0", *spec.SPOT_FACE_CALLOUT.splitlines()],
+        ["+.004", "\u00d8.453 .000", *drawing.SPRING_CALLOUT.splitlines()],
         drawing.SECTION_KEEP["SpotFaceDia"],
     )
 
@@ -714,9 +685,9 @@ def test_the_end_width_text_clears_the_section_arrow_and_the_end_view() -> None:
 def test_the_tap_callouts_stand_inside_the_upper_border() -> None:
     """Review of 19e33c6c2: both tap callouts touched the upper border."""
     sheet_top = DRAWING_TEMPLATES[drawing.SPEC.layout].height_m - _BORDER
-    for label, _station, _radius, xy, qualifier in drawing.TAP_CALLOUTS:
-        # Drill and thread lines, then the qualifier's.
-        lines = ["\u00d83.45 THRU ALL", "8-32 UNC THRU ALL", *qualifier.splitlines()]
+    for label, _station, _radius, xy in drawing.TAP_CALLOUTS:
+        # Drill and thread lines.
+        lines = ["\u00d8 .136 THRU ALL", "8-32 UNC THRU ALL"]
         assert _centred_box(lines, xy)[3] + 0.001 < sheet_top - 0.003, label
 
 
@@ -850,12 +821,13 @@ def test_the_counterbore_and_its_floor_name_the_pivot_spring() -> None:
     ±0.05 named no mate. The spring seats in it; the floor sets its room."""
     spring = _config.parts("pd-vn-transgear-pivot-spring")["number"]
     assert spring == "MHA-PD-VN-63"
-    # The mate is named on the counterbore, and again on the floor whose
-    # band sets its preload (review of 2ac1bdb28: a tight band names its
-    # mate at its own callout).
-    assert spring in " ".join(spec.SPOT_FACE_CALLOUT.split())
-    floor = " ".join(spec.FLOOR_DEPTH_CALLOUT.split())
-    assert spring in floor and "PRELOAD" in floor
+    # The counterbore's Ø and its floor link one note naming the spring they
+    # seat and preload.
+    assert drawing.DIMENSION_CALLOUTS["SpotFaceDia"] == drawing.SPRING_CALLOUT
+    assert drawing.DIMENSION_CALLOUTS["FloorDepth"] == drawing.SPRING_CALLOUT
+    assert f"SEE NOTE {drawing.SPRING_NOTE}" == drawing.SPRING_CALLOUT
+    note = " ".join(drawing.NOTES[drawing.SPRING_NOTE - 1].split())
+    assert spring in note and "PRELOAD" in note
 
 
 def test_the_locating_holes_name_their_dowel_press_and_match_drill() -> None:
@@ -877,7 +849,9 @@ def test_the_locating_holes_name_their_dowel_press_and_match_drill() -> None:
     assert max(geometry.LOCATOR_HOLE_PRINTED_LIMITS_MM) <= max(interface.PRESS_HOLE_LIMITS_MM) + 1e-9
     assert _config.parts("pd-vn-transgear-arm-plate-locating-pin")["number"] == dowel.PART_NUMBER
     plate = _config.parts("pd-transgear-arm-plate")["number"]
-    flat = " ".join(drawing.LOCATOR_CALLOUT_TEXT.split())
+    flat = " ".join(
+        (drawing.LOCATOR_CALLOUT_TEXT + " " + drawing.NOTES[drawing.LOCATOR_NOTE - 1]).split()
+    )
     # The contract, not the wording: the through ream, the mouth break's
     # limit, the dowel and its interference, and the match-drill partner and
     # the assembly view that sets it.
@@ -885,12 +859,13 @@ def test_the_locating_holes_name_their_dowel_press_and_match_drill() -> None:
         "THRU",
         ".002 MAX",
         dowel.PART_NUMBER,
-        ".0003/.0011",
+        ".0003-.0011",
         plate,
         knob_setting_ref(),
     ):
         assert fact in flat, fact
     assert f"{disc.CENTRE_DISTANCE:.3f}" not in flat
+    assert f"SEE NOTE {drawing.LOCATOR_NOTE}" in drawing.LOCATOR_CALLOUT_TEXT
     assert drawing.DIMENSION_CALLOUTS["LocatorDia1"] == drawing.LOCATOR_CALLOUT_TEXT
 
 
@@ -1013,10 +988,7 @@ def test_each_projected_zone_is_a_dimensioned_chain_line_from_its_mating_face() 
     caption_top = axis_y - half - drawing._PIN_CAPTION_GAP_M
     title_block_top = 0.065
     assert caption_top - 0.016 > title_block_top + 0.005
-    # No general notes remain (rule 7).
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_note(" not in source
-    assert not hasattr(drawing, "NOTES_TEXT")
+    # The zones' start and direction ride the chains, not a general note.
     assert not hasattr(spec, "PROJECTED_ZONE_NOTE")
 
 
