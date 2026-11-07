@@ -2654,7 +2654,11 @@ def carriage_origin(rail: int, station: float) -> Point3:
 
 
 def sweep_poses(pass_name: str) -> list[dict]:
-    """``pass_name``'s poses in visit order; ``check`` marks each first visit."""
+    """Pass poses in visit order; ``check`` marks each first visit.
+
+    Origins contain moving occurrences, not whole supplier families: the
+    three strap clamps move, while their rail/bar screw siblings stay fixed.
+    """
     sweep = trammel.SWEEP[pass_name]
     seen: set[int] = set()
     poses = []
@@ -2672,6 +2676,7 @@ def sweep_poses(pass_name: str) -> list[dict]:
                     )
                     for family in BOM_ORDER if family in MOVING
                     for occurrence in range(QUANTITIES[family])
+                    if is_moving(family, occurrence)
                 },
             }
         )
