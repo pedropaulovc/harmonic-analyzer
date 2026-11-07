@@ -1154,7 +1154,16 @@ def test_kit_bom_descriptions_use_native_member_authority() -> None:
     }
     assert set(members) == set(spec.KIT_IDENTITIES)
     for family, member in members.items():
+        if family == spec.RAIL:
+            continue
         assert spec.BOM_DESCRIPTIONS[family] == member.BOM_DESCRIPTION
+    # The one exception (TL-00 review 62753c5e, Main 2026-11-07): the jig
+    # prints the rail's native fitted length as a whole-mm reference, each
+    # rail trimmed to its bar in step 1. The member keeps its own row.
+    assert guide_rail.BOM_DESCRIPTION == f"{guide_rail.STYLE} RAIL, {guide_rail.LENGTH:.3f} MM, KIT, TRIMMED"
+    assert spec.BOM_DESCRIPTIONS[spec.RAIL] == (
+        f"{guide_rail.STYLE} RAIL, {round(guide_rail.LENGTH)} MM REF, TRIM TO BAR"
+    )
     # The Amazon kits' members also carry their configuration names.
     for family in (spec.RAIL, spec.CARRIAGE, spec.LEADSCREW, spec.FEED_NUT):
         assert spec.KIT_IDENTITIES[family][1] == members[family].CONFIGURATION
