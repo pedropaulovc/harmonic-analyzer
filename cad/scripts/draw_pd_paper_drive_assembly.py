@@ -1596,28 +1596,11 @@ def engaged_feed_text(domain: RackOperatingDomain) -> str:
 # stay the ones the arm, plate, collar, cup and purchased-part sheets cite.
 # No I or O, which read as 1 and 0.
 SUB_STEP_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"
-# Shake and backlash windows the shop sets with a dial reading in half
-# thousandths: printed on that grid, rounded inward.
-HALF_THOU_IN = 0.0005
 
 
 def sub_step(key: str, index: int) -> str:
     """The printed head of ``key``'s ``index``-th sub-step (0-based): ``9C``."""
     return f"{steps.step_number(key)}{SUB_STEP_LETTERS[index]}"
-
-
-def _half_thou_text(inches: float) -> str:
-    text = f"{inches:.4f}".lstrip("0")
-    return text[:-1] if text.endswith("0") else text
-
-
-def half_thou_window(limits_mm: tuple[float, float]) -> str:
-    """A (min, max) window on the .0005 inch grid, rounded inward."""
-    low = math.ceil(limits_mm[0] / disc.MM_PER_IN / HALF_THOU_IN - 1e-9) * HALF_THOU_IN
-    high = math.floor(limits_mm[1] / disc.MM_PER_IN / HALF_THOU_IN + 1e-9) * HALF_THOU_IN
-    if high <= low:
-        raise AssertionError(f"no .0005 step inside {limits_mm!r} mm")
-    return f"{_half_thou_text(low)} TO {_half_thou_text(high)}"
 
 
 # The #4-40 taps spotted through a mating part at assembly: the tap drill
@@ -1678,7 +1661,7 @@ def _step_text(
     pin_window = steps.inch_window(joints.LATCH_PIN_PROUD_RANGE, 3, " TO ")
     drive_window = steps.inch_window(drive_pin.PROUD_RANGE, 3, " TO ")
     knob_window = steps.inch_window(KNOB_END_FLOAT_RANGE, 3, " TO ")
-    shake = half_thou_window(rack_setup.RACK_DATUM_BACKLASH_RANGE)
+    shake = steps.RACK_DATUM_BACKLASH_TEXT
     lock_gap = steps.inch_window(platen_guide.LOCK_GAP_FIT, 3, " TO ")
     teeth = f"{KNOB_TEETH}T"
     knob = sprocket.KNOB_CONFIG

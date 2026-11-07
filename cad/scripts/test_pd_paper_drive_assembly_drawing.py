@@ -2201,8 +2201,8 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
     assert meshed == fitted + 1 and drilled == meshed + 1
     domain = _unit_operating_domain()
     mesh = _step_body("hanger-meshed")
-    # The datum shake prints on the .0005 dial grid, inside the setup band.
-    shake = drawing.half_thou_window(rack_setup.RACK_DATUM_BACKLASH_RANGE)
+    # The datum shake is the one constant MHA-PD-10's GEAR DATA also prints.
+    shake = steps.RACK_DATUM_BACKLASH_TEXT
     low, high = (float(value) * 25.4 for value in shake.split(" TO "))
     band = rack_setup.RACK_DATUM_BACKLASH_RANGE
     assert band[0] <= low < high <= band[1]
