@@ -6,7 +6,10 @@ stock_form_quality:
   # sized to that TIR. Pinion index stays 0.010 (about 0.1 deg at these
   # radii, held by a dividing head). The measurement uncertainties are
   # internal method constants and are never printed.
-  toothspace_runout_tir_mm: 0.050
+  # Tooth-space runout is the inch step .002 (0.0508 mm), so the printed
+  # TIR is a shop value, not a converted .0019 (delegated ruling 2026-11-07
+  # (Main) F3, no precedent; owner review #2144; pending owner confirmation).
+  toothspace_runout_tir_mm: 0.0508
   reducer_position_diameter_mm: 0.050
   # The matched knob bore K's setting circle about the arm's pin bore S
   # (MHA-PD-00 VIEW K): its radius is the reducer centre's standard +0.05/-0 set band
