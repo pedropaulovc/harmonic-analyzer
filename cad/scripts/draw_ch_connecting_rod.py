@@ -264,26 +264,31 @@ DETAIL_KEEP = {
     # Over the tines, nearest first: the near tine (text wholly left of the
     # datum face's witness), the slot (text right of the far face), the
     # reference thickness centred over the fork.
-    "TineNear": (_FACE_X - 0.030, _TINE_TOP_Y + 0.012),
+    "TineNear": (_FACE_X - 0.038, _TINE_TOP_Y + 0.012),
     "SlotWidth": (_FAR_X + 0.030, _TINE_TOP_Y + 0.016),
     "ForkThick": (DETAIL_CENTER[0], _TINE_TOP_Y + 0.028),
     # Down the right-hand side from the crown top: the slot depth inside, the
     # boss length outside.
     "SlotDepth": (_FAR_X + 0.016, (_TINE_TOP_Y + _ROOT_Y) / 2.0 + 0.004),
     "ForkBossLength": (_FAR_X + 0.034, (_TINE_TOP_Y + _ROOT_Y) / 2.0),
-    # Under the fork, from the datum face: the plate's near face, a location
-    # with its value and band only (rule 7), text left of the datum face.
+    # Under the fork, from the datum face: the plate's near face, its one
+    # reason and mate under its band, text left of the datum face.
     "RingFaceNear": (_FACE_X - 0.036, _REF_END_Y - 0.010),
 }
 # The near tine's band locates the slot from the datum face (the channel's
 # axial budget) and, with the far tine's, holds the gap to the next channel's
 # rod (#982 review r2: a clearance alone would not need it); one short reason
-# says so (rule 7). Its printed lower limit is the tines' known shortfall
-# against the .080 wall target, named TINE WALL (rule 20; MHA-CH-03 RV-02).
-# The slot names its fit on the arm by the standard name (rule 4).
+# says so (rule 7) and names the arm the slot serves (rule 4: a tight band
+# names its mate at its own callout, fan-out round 1). Its printed lower
+# limit is the tines' known shortfall against the .080 wall target, named
+# TINE WALL (rule 20; MHA-CH-03 RV-02). The slot names its fit on the arm by
+# the standard name (rule 4). The plate's near face locates the ring in the
+# cam's slot: its tight band names that mate (fan-out round 1: a bare
+# .077 +/-.002 named none); the slot's fit itself is the .086 thickness's.
 DETAIL_CALLOUTS = {
-    "TineNear": "2X TINE WALL\nLOCATES SLOT",
+    "TineNear": f"2X TINE WALL\nLOCATES SLOT FOR {ARM_NUMBER}",
     "SlotWidth": f"RUNNING FIT ON\nARM {ARM_NUMBER}",
+    "RingFaceNear": f"LOCATES RING IN\n{CAM_NUMBER} CAM SLOT",
 }
 
 BORE_FINISH_EDGE = _sheet_xy(RING_BORE_DIA / 2.0, 0.0)
