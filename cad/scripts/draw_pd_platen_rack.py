@@ -1,11 +1,12 @@
 r"""Manufacturing print for the composite platen rack, MHA-PD-05.
 
-The long front/top/end group is aligned at 1:1. A separately labelled 4:1
-end view defines the stepped brass section and soft-solder seam in solid
-lines. The standard shaded-with-edges isometric supplements those views.
-All sizes, decimal places and note contents come from the saved part and
-its pure-data spec; this recipe owns only placement. The sheet prints decimal
-inch (the part's ``drawing_unit: in``).
+The long front/top group is aligned at 1:1. A 4:1 VIEW A, lettered with its
+viewing arrow on the front view's right end, defines the stepped brass
+section and soft-solder seam in solid lines. The standard shaded-with-edges
+isometric supplements those views. All sizes and decimal places come from
+the saved part and its pure-data spec; the solder and flush-end requirements
+stand at leaders on the features they control (rule 7). The sheet prints
+decimal inch (the part's ``drawing_unit: in``).
 """
 
 from __future__ import annotations
@@ -31,18 +32,24 @@ from _drawing_common import (
 )
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edge_dimensions import assert_dimension_measures
+from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from pd_platen_rack_spec import (
+    BACKER_HEIGHT,
+    BAR_HEIGHT,
+    BAR_LENGTH,
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_NOMINALS_MM,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_DIMENSIONS,
+    RACK_Z0,
 )
-from solidworks_mcp.adapters.solidworks.drawing import place_view
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -65,7 +72,8 @@ ISO_CENTER = (0.155, 0.115)
 ISO_SCALE = (1, 2)
 FRONT_KEEP = {
     "Length": (FRONT_CENTER[0], 0.205),
-    "OverallHeight": (0.340, FRONT_CENTER[1]),
+    # Left of the left end: the right end carries VIEW A's arrow.
+    "OverallHeight": (0.038, FRONT_CENTER[1]),
 }
 END_KEEP = {
     "BackerDepth": (END_CENTER[0], 0.082),
@@ -78,11 +86,29 @@ GEAR_DATA_XY = (0.020, 0.254)
 # Under the isometric's label (y ~0.077, run 9 touched its first line), left
 # of the title block (x 0.216) and above the border.
 NOTES_XY = (0.020, 0.064)
+# Rule 7: the one part fact the views cannot carry; the mesh is set by the
+# MHA-PD-00 assembly steps, not on this part sheet.
+NOTES_TEXT = "END TOOTH PHASE NOT CONTROLLED."
+# Rule 9: the enlarged end view is VIEW A, its viewing arrow on the front
+# view's right end face, approaching from the right (third-angle right view).
+VIEW_LETTER = "A"
+VIEW_LETTER_HEIGHT = 0.005
+VIEW_ARROW_RUN = 0.012
+END_CAPTION = f"VIEW {VIEW_LETTER}\nSCALE {END_SCALE[0]}:{END_SCALE[1]}"
 # Centred under the 4:1 end view (axis x ~0.355), between the BackerDepth
-# dimension line (y ~0.0795) and the title block top (y 0.066); left-anchored,
-# its ~62 mm "ENLARGED RIGHT END VIEW" line starts 31 mm left of the axis.
-END_NOTE_XY = (0.324, 0.074)
+# dimension line (y ~0.0795) and the title block top (y 0.066); left-anchored.
+END_NOTE_XY = (0.343, 0.077)
 ISO_NOTE_XY = (0.104, 0.077)
+# Rule 7 (flag it where it applies): the soft-solder joint is called out at
+# its seam's corner beside the rack on VIEW A, the flush ends at the front
+# view's right end.  Each text stands up-left of its tip, clear of the views:
+# the solder note right of the isometric and under VIEW A's top dimension,
+# the flush note under the front view, left of its right end.
+NOTE_HEIGHT = 0.0025
+SOLDER_NOTE = "SOFT-SOLDER RACK TO BACKER\n(TIN-LEAD OR LEAD-FREE)"
+SOLDER_NOTE_XY = (0.250, 0.150)
+FLUSH_NOTE = "RACK AND BACKER ENDS FLUSH,\nBOTH ENDS"
+FLUSH_NOTE_XY = (0.240, 0.174)
 
 
 def _assert_native_dimensions(adapter: Any, annotations: list[Any]) -> None:
@@ -128,6 +154,48 @@ def _assert_native_dimensions(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(f"rack sheet is missing sizes {sorted(missing)}")
 
 
+def _add_sheet_notes(adapter: Any, front: Any, end: Any) -> None:
+    """VIEW A's arrow and caption, the leadered requirements and the note."""
+    mm = 1.0 / 1000.0
+    tip = model_point_in_view(
+        adapter, front, (BAR_LENGTH * mm, BAR_HEIGHT / 2.0 * mm, 0.0),
+        label="VIEW A arrow tip",
+    )
+    add_leader_note(
+        adapter, VIEW_LETTER,
+        text_xy=(tip[0] + VIEW_ARROW_RUN, tip[1] + VIEW_LETTER_HEIGHT / 2.0),
+        attach_xy=tip, view=front, height=VIEW_LETTER_HEIGHT,
+        label=f"view {VIEW_LETTER} viewing arrow",
+    )
+    seam = model_point_in_view(
+        adapter, end, (BAR_LENGTH * mm, BACKER_HEIGHT * mm, RACK_Z0 * mm),
+        label="rack/backer seam corner",
+    )
+    add_leader_note(
+        adapter, SOLDER_NOTE, text_xy=SOLDER_NOTE_XY, attach_xy=seam, view=end,
+        height=NOTE_HEIGHT, label="soft-solder joint note",
+    )
+    end_face = model_point_in_view(
+        adapter, front, (BAR_LENGTH * mm, BACKER_HEIGHT / 2.0 * mm, 0.0),
+        label="right end face",
+    )
+    add_leader_note(
+        adapter, FLUSH_NOTE, text_xy=FLUSH_NOTE_XY, attach_xy=end_face, view=front,
+        height=NOTE_HEIGHT, label="flush ends note",
+    )
+    # The free notes belong to the sheet, not the last view a leader used.
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    drawing.ActivateView("")
+    if drawing.ActiveDrawingView is not None:
+        raise RuntimeError("rack sheet notes: cannot leave view context for the sheet")
+    for text, xy, label in (
+        (END_CAPTION, END_NOTE_XY, "VIEW A caption"),
+        (NOTES_TEXT, NOTES_XY, "sheet note"),
+    ):
+        if add_note(adapter, text, *xy, height=NOTE_HEIGHT) is None:
+            raise RuntimeError(f"failed to insert the {label}")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -142,9 +210,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Gear Data",
-            "Manufacturing Notes",
             "Isometric View Note",
-            "Enlarged End View Note",
         ),
         required=(
             "Number",
@@ -152,9 +218,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Gear Data",
-            "Manufacturing Notes",
             "Isometric View Note",
-            "Enlarged End View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -204,11 +268,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # it remains hidden in the source part and in the isometric/assembly views.
     for property_name, position in (
         ("Gear Data", GEAR_DATA_XY),
-        ("Manufacturing Notes", NOTES_XY),
-        ("Enlarged End View Note", END_NOTE_XY),
         ("Isometric View Note", ISO_NOTE_XY),
     ):
-        add_property_linked_note(adapter, property_name, *position, char_height=0.0025)
+        add_property_linked_note(adapter, property_name, *position, char_height=NOTE_HEIGHT)
+    _add_sheet_notes(adapter, front, end)
     for view in (front, top, end):
         set_hidden_lines_removed(adapter, view)
     return await finalize_drawing(
