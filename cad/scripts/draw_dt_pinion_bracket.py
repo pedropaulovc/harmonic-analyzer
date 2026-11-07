@@ -81,7 +81,7 @@ from dt_pinion_bracket_spec import (
     DRAWING_REFERENCE_PRECISION,
     OVERALL_LENGTH,
     PIN_DROP,
-    PIN_SEAT_DEPTH_CALLOUT,
+    PIN_SEAT_CALLOUT,
     R_END,
     SURFACE_FINISHES,
 )
@@ -245,9 +245,8 @@ LEFT_KEEP = {
     # extension lines.  pc-rc eye pass (nit D): centred, the cross hole's
     # 4.50 threw its right arrow outside the span, where the THRU callout's
     # leader cut through it -- so it sits left of face A too, arrows inside,
-    # nothing right of the hole's witness.  The seat's carries two reason
-    # rows (r1), so it stands further left and higher, its right end short
-    # of face A.
+    # nothing right of the hole's witness.  The seat's stands further left
+    # and higher, its right end short of face A.
     "CrossHoleCz": (0.058, 0.099),
     "PinSeatCz": (0.043, 0.2055),
 }
@@ -257,11 +256,9 @@ SECTION_CENTER = (0.350, 0.115)
 # audit, text-on-line); 0.250 puts it past the arrow and the extension line's
 # end.
 SECTION_LINE_X = (0.180, 0.250)
-# Right of the seat's witness lines (x <= 0.3394), callout below the value:
-# the above-lane callout never rendered and left a bare 66 mm dimension line.
-# Its widest row (24 characters, ~65 mm) starts right of the entry-face
-# witness: centred at 0.361 the floor-corner row sat on that witness (r4).
-SECTION_KEEP = {"PinSeatDepth": (0.374, 0.160)}
+# The seat depth's bare value stands between the seat's witness lines, above
+# the section (the callout rows it once carried moved to the seat callout).
+SECTION_KEEP = {"PinSeatDepth": (0.333, 0.158)}
 # The flank's top and bottom edges are the strap's two extreme lines.  The
 # overall sits on the view's clear left: on its right the follower-seat
 # leader crossed its dimension line (r1 machinist review, rule 14).
@@ -270,27 +267,20 @@ OVERALL_XY = (0.040, 0.150)
 ARBOR_FINISH_EDGE = (_front_x(-ARBOR_BORE / 2.0), _front_y(C2C))
 ARBOR_FINISH_XY = (0.155, 0.205)
 # A callout says only what a dimension cannot: how the feature is made, where
-# it stops, what it mates with and the fit it needs (rule 4), and -- for the
-# dimensions held finer than the general grade -- why they are held there.
-# Naming both follower-seat annotations ties the native diameter and native
-# depth together without copying either model value into note text; the
-# depth then reads explicitly from the depicted entry face.  The pivot bore
-# is a slide fit so the strap goes onto the shaft for fit-up, then pinned
-# (option E-a); the arbor runs in its bore; the follower stud slips into its
-# seat and is bonded (LOCTITE 638, dt_pinion_cam_pin_spec's bond gap).
+# it stops, what it mates with and the fit it needs (rule 4).  A location
+# dimension carries its value and band and nothing else (rule 7): the seat's
+# mate rides its size callout.  The seat's depth rides its callout as REF
+# (rule 26: never deferred to a view) while Section B-B's .16 controls the
+# floor; the floor-corner allowance lets the builder pick a flat-bottom reamer
+# or end mill (rule 16).  The pivot bore is a sliding fit so the strap goes
+# onto the shaft for fit-up, then pinned (option E-a); the arbor runs in its
+# bore; the follower stud slips into its seat and is bonded (LOCTITE 638,
+# dt_pinion_cam_pin_spec's bond gap).
 DIMENSION_CALLOUTS = {
-    "PivotBoreDia": "REAM THRU\nSLIDE FIT ON SHAFT\nMHA-DT-19, PINNED",
+    "PivotBoreDia": "REAM THRU\nSLIDING FIT ON\nSHAFT MHA-DT-19",
     "ArborBoreDia": "REAM THRU\nRUNNING FIT ON\nARBOR MHA-DT-22",
-    "PinSeatDia": "FOLLOWER SEAT FOR MHA-DT-25\nBONDED SLIP FIT\nBLIND FLAT-BOTTOM REAM",
+    "PinSeatDia": PIN_SEAT_CALLOUT,
     "CrossHoleDia": CROSS_HOLE_CALLOUT,
-    # The two held locations name what they serve (rules 3 and 4): the
-    # follower's height sets the drum's swing for a given cam lift
-    # (DRAWING_PRECISION), and the seat's station keeps it mid-bar
-    # (PIN_SEAT_WEB_WORST, user ruling (a)).  SOLIDWORKS starts the follower
-    # height's text at its bent dimension line, so that leg touched the leading
-    # S of SETS (r3 review, rule 14); the leading spaces stand the rows off it.
-    "PinSeatCy": "   SETS FOLLOWER HEIGHT\n   ON MHA-DT-23 CAM",
-    "PinSeatCz": "CENTRES MHA-DT-25\nFOLLOWER IN BAR",
 }
 
 
@@ -335,7 +325,8 @@ def _seat_depth_dimension(adapter: Any, section: Any) -> Any:
     The section plane runs through the seat axis, so the blind cut's own depth
     dimension lies in the view plane and imports as a native model dimension
     with the part-authored places (drawing-simplicity-policy.md `How the repository implements the guidelines`) -- the sheet never writes a
-    precision for a controlling dimension.
+    precision for a controlling dimension.  It carries its value alone
+    (rule 7); the seat callout states the depth as REF and the corner limit.
     """
     (annotation,) = curate_view_dimensions(
         adapter,
@@ -343,11 +334,6 @@ def _seat_depth_dimension(adapter: Any, section: Any) -> Any:
         keep=SECTION_KEEP,
         view_label="follower seat section",
         dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    set_dimension_callouts(
-        adapter,
-        [annotation],
-        {"PinSeatDepth": PIN_SEAT_DEPTH_CALLOUT},
     )
     return annotation
 

@@ -248,9 +248,7 @@ def test_hand_slide_fit_rides_the_bore_callout_not_a_note() -> None:
     assert callout == spec.ARBOR_BORE_CALLOUT
     arbor = _config.parts("dt-pinion-arbor")
     assert arbor["number"] in callout
-    assert arbor["title"].upper() in callout
     assert arbor["number"] == "MHA-DT-22"
-    assert "PINION ARBOR" in callout
     for line in spec.DRAWING_NOTES.splitlines():
         assert "SLIDE" not in line and "BY HAND" not in line, line
 

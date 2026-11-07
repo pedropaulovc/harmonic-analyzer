@@ -256,7 +256,7 @@ GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{TEETH}"),
         ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
-        ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
+        ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f}\u00b0"),
         ("PITCH DIAMETER (REF)", _inch(PITCH_DIA, 4)),
         # The finite form's off-centre root arc spans only microns; one REF
         # value, not a range that reads like a working band (review r1 minor).
@@ -267,17 +267,14 @@ GEAR_DATA = gear_data_note(
         ("CUTTER PLUNGE (REF)", _inch(WHOLE_DEPTH, 4)),
         (
             "FORM CUTTER",
-            f"#{CUTTER_NUMBER}, {CUTTER_TEETH_RANGE[0]}-{CUTTER_TEETH_RANGE[1]}T; "
-            f"{CUTTER_REFERENCE_TEETH}T REFERENCE",
+            f"#{CUTTER_NUMBER} ({CUTTER_TEETH_RANGE[0]}-{CUTTER_TEETH_RANGE[1]}T RANGE, "
+            f"{CUTTER_REFERENCE_TEETH}T PROFILE)",
         ),
         ("TOOTH FORM", TOOTH_FORM),
         # The tip sits under the standard (N+2)/DP blank on purpose (the
         # cutter's support radius sets it); machinist reviews r5 and r6 asked
-        # the block to say so.
-        (
-            "TIP",
-            f"TOPPED, UNDER THE STANDARD {TEETH + 2}/DP BLANK; SIZE ON SIDE VIEW",
-        ),
+        # the block to say so.  Its size is the side view's banded OD.
+        ("TIP", f"TOPPED, UNDER THE STANDARD {TEETH + 2}/DP BLANK"),
         ("PITCH TOOTH THICKNESS (REF)", _inch(PITCH_TOOTH_THICKNESS_MM, 4)),
         (
             f"BASE-TANGENT SPAN, OVER {BASE_TANGENT_SPAN_TEETH} TEETH",
@@ -287,7 +284,8 @@ GEAR_DATA = gear_data_note(
         ),
         (
             "MATES WITH",
-            f"{MESH_MATE} (ALL {int(_CYLINDER_GEAR['quantity'])}), {drum.TEETH}T; "
+            f"EACH OF {int(_CYLINDER_GEAR['quantity'])} CYLINDER GEARS "
+            f"{_CYLINDER_GEAR['number']}, {drum.TEETH}T; "
             "SPAN SETS MESH BACKLASH",
         ),
     ]
@@ -296,16 +294,12 @@ GEAR_DATA = gear_data_note(
 OUTSIDE_DIA_CALLOUT = f"MESHES WITH\n{MESH_MATE}"
 
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): notes never carry a dimension.  MHA-DT-22 owns its bond-zone band
-# natively (BondZoneDia).  The hand slide is this part's matched-fit
-# acceptance, so it rides the reamed bore's callout, not a general note
-# (Codex P2 on #832).  It names the mating part as well as its number
-# (codex machinist review of f0faedc51), both from the part registry.
+# natively (BondZoneDia).  The reamed bore names its fit and its mate by
+# number and name (rule 4), from the part registry; the hand slide is this
+# part's matched-fit acceptance, in plain words (rule 26), so it rides the
+# bore's callout, not a general note (Codex P2 on #832).
 _ARBOR = _config.parts("dt-pinion-arbor")
-# The arbor's title is bracketed so it reads as the mate's name, not this
-# part's (machinist review r1 minor).
-ARBOR_BORE_CALLOUT = (
-    f"REAM THRU\nSLIDES BY HAND ON {_ARBOR['number']}\n({_ARBOR['title'].upper()})"
-)
+ARBOR_BORE_CALLOUT = f"REAM THRU\nSLIDING FIT ON ARBOR {_ARBOR['number']}\nSLIDES ON BY HAND"
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the bond to MHA-DT-22 is an assembly step (dt_pinion_arbor_spec
 # ASSEMBLY_STEP owns the drum joint), not a part note.  The one note is a
 # do-not-cut requirement, so it is leadered to the teeth on the side view and
@@ -316,4 +310,3 @@ DRAWING_NOTES = (
     "REMOVE BURRS ONLY; DO NOT CHAMFER OR BLEND."
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
-END_VIEW_NOTE = "END VIEW SCALE 2:1"

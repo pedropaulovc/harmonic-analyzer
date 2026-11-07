@@ -84,7 +84,10 @@ def test_handle_end_is_a_semicircle_about_the_pivot() -> None:
     assert spec.ARM_END_X == pytest.approx(87.63)
     assert spec.DRAWING_DIMENSIONS["ArmOutline"] == {"BossRadius", "EndRadius"}
     assert not hasattr(spec, "SQUARE_END_OVERHANG")
-    assert spec.DRAWING_REFERENCE_PRECISION == {"overall length reference": 2}
+    assert spec.DRAWING_REFERENCE_PRECISION == {
+        "overall length reference": 2,
+        "seam station reference": 2,
+    }
 
 
 def test_punch_and_seam_operations_are_callouts_not_fake_dimensions() -> None:
