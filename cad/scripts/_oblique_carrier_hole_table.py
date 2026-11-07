@@ -5,8 +5,9 @@ step 10 drills and taps that ordinary #8-32 receiver at assembly, so its
 position prints only as a parenthesized reference on the HUB CLAMP sheet.
 Every physical top-face hole, the HUB included, is still identified against
 the source body; the table and its tags carry the other twelve. The SIZE
-column is hidden: each hole's size and process is its sheet-1 callout, and
-the pin holes' 4X REAM THRU is their only size authority.
+column is hidden: each hole's size and process is its callout (the HUB's on
+sheet 3, every other on sheet 1), and the pin holes' 4X REAM THRU is their
+only size authority.
 
 Creation and settled readback have separate operation-level tracing spans;
 individual hole/row traversal stays inside those spans.
@@ -40,7 +41,9 @@ IN_SITU_HOLES = ("HUB",)
 TABLED_HOLES = {
     tag: hole for tag, hole in spec.TABLE_HOLES.items() if tag not in IN_SITU_HOLES
 }
-HOLE_SIZES_NOTE = "HOLE SIZES PER CALLOUTS, SHEET 1"
+# Machinist review 43452045: the untagged HUB's size is on sheet 3, so the
+# note names both callout sheets.
+HOLE_SIZES_NOTE = "HOLE SIZES PER CALLOUTS, SHEETS 1 AND 3"
 # Sheet metres relative to the actual projected hole centre. Keep the close
 # A1/A2 and B1/B2 pairs on opposite sides of their respective rows; A2's tag
 # sits up-right, off the datum's Y axis label (82129 review read it "AY2").

@@ -753,10 +753,106 @@ def test_hole_table_sheet_owns_every_location() -> None:
     )
     assert "settled_checks=(pin_controls_settled, table_settled, hub_settled)" in build
     assert '"Outer Pin Row Note"' in build
-    assert "A1 ONLY — OTHER PIN HOLES NOT SHOWN" in inspect.getsource(drawing._pin_section)
+    assert "add_note(adapter, SECTION_NOTE, *SECTION_NOTE_XY)" in inspect.getsource(drawing._pin_section)
     assert not {"ClY", "CrY", "LeverY1", "LeverY2", "RiserY1", "RiserY2"} & set(drawing.TOP_KEEP)
     for retired in ("_LEFT", "_RIGHT", "_LEVER_STATION", "_BAND", "_CHAIN_PLACES"):
         assert not hasattr(drawing, retired), retired
+
+
+def test_near_y_extension_lines_stop_outside_the_part() -> None:
+    """Machinist review 43452045 (r1/r3 clarity): the 1.77's upper extension
+    line ran from the sketch origin through A1 to mid-air. Main's ruling:
+    capped, it runs from its 1 mm overshoot past the dimension line to a
+    normal 1.5 mm gap short of the plate's -X end, outside the part; A-A's
+    thick end stubs stay as they are."""
+    lane_x, _lane_y = _top_text("PlateNearY")
+    cap = drawing.NEAR_Y_WITNESS_MAX_M * 1000.0
+    start = lane_x - 1.0  # 43452045: both 1.77 extension lines end at x 46.0
+    edge_x, _edge_y = _on_sheet(spec.OUTLINE_X[0], spec.OUTLINE_Y[0])
+    assert drawing.NEAR_Y_WITNESS_GAP_MM == 1.5
+    assert start + cap == pytest.approx(edge_x - 1.5)
+    # 43452045's printed lines: the plate's -X end at 91.825, overshoot 46.0.
+    assert edge_x == pytest.approx(91.825, abs=1e-3) and start == pytest.approx(46.0)
+    assert drawing._SECTION_LINE_X == (386.0, -342.0)
+    build = inspect.getsource(drawing.build)
+    assert build.index('_arrows_inside(adapter, annotations, "EdgeX")') < build.index(
+        "near_y_cap_settled = _cap_near_y_witness(adapter, annotations)"
+    )
+    # The cap's final readback runs in the sheet-1 settled check, on the
+    # CARRIER sheet, restoring whichever sheet was active.
+    settled = build[build.index("def pin_controls_settled"):build.index("return await finalize_drawing")]
+    assert settled.index("ActivateSheet(SHEET_NAMES[0])") < settled.index("near_y_cap_settled()")
+    assert settled.index("near_y_cap_settled()") < settled.index("finally:")
+    assert "ActivateSheet(previous)" in settled.split("finally:")[1]
+    assert "_assert_ream_control(adapter, ream[0])" in settled
+
+
+@pytest.mark.parametrize("persists", [True, False])
+def test_near_y_witness_cap_is_written_and_read_back(monkeypatch, persists) -> None:
+    """Fake-driven (not native): only PlateNearY is capped, after a rebuild;
+    the returned final readback refuses a cap a later rebuild lost."""
+
+    class Display:
+        def __init__(self) -> None:
+            self.cap = 0.0
+
+        @property
+        def MaxWitnessLineLength(self) -> float:
+            return self.cap
+
+        @MaxWitnessLineLength.setter
+        def MaxWitnessLineLength(self, value: float) -> None:
+            self.cap = value if persists else 0.2
+
+    near, other = Display(), Display()
+    annotations = [
+        SimpleNamespace(name="EdgeX", GetSpecificAnnotation=lambda: other),
+        SimpleNamespace(name="PlateNearY", GetSpecificAnnotation=lambda: near),
+    ]
+    rebuilt = []
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, item: item.name)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **kw: rebuilt.append(kw["label"]))
+    if not persists:
+        with pytest.raises(RuntimeError, match="did not persist"):
+            drawing._cap_near_y_witness(SimpleNamespace(), annotations)
+        return
+    check = drawing._cap_near_y_witness(SimpleNamespace(), annotations)
+    assert near.cap == drawing.NEAR_Y_WITNESS_MAX_M and other.cap == 0.0
+    assert rebuilt == ["carrier 1.77 witness cap"]
+    check()
+    near.cap = 0.0  # a later rebuild dropped it
+    with pytest.raises(RuntimeError, match="did not persist"):
+        check()
+
+
+def test_section_note_stands_under_the_caption_clear_of_every_line() -> None:
+    """Machinist review 43452045 (r2/r3 clarity): the 20.5's left extension
+    line struck the A1-only note, which stood apart from A-A. It stands
+    directly under the caption, clear of the plate's lanes, the thickness
+    lane, the slab and the border."""
+    rows = drawing.SECTION_NOTE.splitlines()
+    assert " ".join(rows) == "A1 ONLY — OTHER PIN HOLES NOT SHOWN"
+    x, top = (value * 1000.0 for value in drawing.SECTION_NOTE_XY)
+    caption_x, caption_y = (value * 1000.0 for value in drawing.SECTION_CAPTION_XY)
+    # The caption (top-centre anchor, ~46 x 15 mm): left-aligned under it.
+    assert caption_x - 23.0 <= x < caption_x - 20.0
+    # Under the caption's glyphs (to y 37.3, R4NativeEye 43452045).
+    assert caption_y - 20.0 < top < 37.3 - 2.0
+    right = x + 2.71 * max(len(row) for row in rows)  # 43452045: 35 chars, 94.7 mm
+    assert right < 214.0 * INCH / 72.0  # the clear slot's right end (PDF pt)
+    bottom = top - 5.0 * len(rows)
+    assert bottom > _BORDER[1] + 3.0
+    a1x = spec.PIN_HOLES["A1"][0]
+    for sign in (1.0, -1.0):
+        stock_x, _ = _section_sheet(drawing.SECTION_KEEP_MODEL_MM["StockThick"], sign)
+        slab_x = min(
+            _section_sheet((a1x - drawing._SECTION_HALF, 0.0), sign)[0],
+            _section_sheet((a1x + drawing._SECTION_HALF, 0.0), sign)[0],
+        )
+        assert right + 3.0 < min(stock_x - 1.0, slab_x), sign
+    # The plate's left extension lines stand at its -X end (sheet x ~92).
+    assert right + 3.0 < _on_sheet(spec.OUTLINE_X[0], 0.0)[0]
 
 
 def test_hub_clamp_tap_has_its_own_sheet_callout_and_reference_position() -> None:

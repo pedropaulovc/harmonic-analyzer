@@ -125,15 +125,31 @@ _A1 = part_spec.PIN_HOLES["A1"]
 # controls remain; the table owns all locations. The left end's 34.9 from A1
 # stands between the end and A1, under the REAM leader's reach, its arrows
 # held inside so its line stops at the end (_arrows_inside).
+_NEAR_Y_LANE_X = -350.0  # PlateNearY's dimension line, model X
 TOP_KEEP: dict[str, tuple[float, float, float]] = {
     "PlateLength": _xy(56.0, -194.4),
     "PlateWidth": _xy(279.0, -8.0),
-    "PlateNearY": _xy(-350.0, -24.0),
+    "PlateNearY": _xy(_NEAR_Y_LANE_X, -24.0),
     "EdgeX": _xy(-242.5, -120.4),
     # B9e4's complete native/PDF glyph block reaches y 164.57: the whole block
     # stands 16 sheet mm lower, its mate wrapped to two rows (x ~21..84).
     "PinHoleDia": _xy(-339.0, -106.3),
 }
+# Machinist review 43452045 (r1/r3 clarity): the 1.77's upper extension line
+# runs from the sketch origin (X 0, sheet x 221) on the pin line, so it ran
+# through A1 and across the plate to end mid-air (A-A's end stubs are the
+# thick ones). Main's ruling: it stops outside the part, a normal 1.5 sheet mm
+# gap short of the plate's -X end. Capped (STOCK_WITNESS_MAX_M's
+# MaxWitnessLineLength, the whole line from its overshoot), it runs from its
+# 1 mm overshoot past the dimension line (43452045's two lines, both to
+# x 46.0) to that gap; the lower one (from 1 mm off the same end) loses 0.5.
+NEAR_Y_WITNESS_GAP_MM = 1.5
+_WITNESS_OVERSHOOT_MM = 1.0
+NEAR_Y_WITNESS_MAX_M = (
+    (part_spec.OUTLINE_X[0] - _NEAR_Y_LANE_X) * VIEW_SCALE[0] / VIEW_SCALE[1]
+    - NEAR_Y_WITNESS_GAP_MM
+    + _WITNESS_OVERSHOOT_MM
+) / 1000.0
 
 # Section A-A along the pin line (model Z = 0), at 3:1, +Y up, its cut
 # direction SolidWorks' own, cropped to A1's slab. It is a FULL section: the
@@ -234,6 +250,14 @@ IMPORTED_PRECISION: dict[str, int] = {
 }
 # Top centre of the caption: left of the thickness text, level with the slab.
 SECTION_CAPTION_XY = (0.043, 0.052)
+# Machinist review 43452045 (r2/r3 clarity): at (20, 83) the A1-only note
+# stood apart from A-A and the 20.5's left extension line (x 91.8) struck its
+# "NOT". Its top-left now stands directly under the caption (whose glyphs end
+# at y 37.3), its two rows (the old row's 94.7 mm over 35 characters: ~51.5
+# mm) inside the clear slot x 14..75, y 14..35 (R4NativeEye, 43452045 PDF):
+# clear of the thickness lane (x >= 78), the slab and the bottom border.
+SECTION_NOTE = "A1 ONLY — OTHER PIN\nHOLES NOT SHOWN"
+SECTION_NOTE_XY = (0.020, 0.0335)
 
 # Sheet metres: each callout block's centre; its leader lands on the near end
 # of the first line. CR up-right into the margin right of the plate, its
@@ -747,6 +771,32 @@ def _arrows_inside(adapter: Any, annotations: list[Any], name: str) -> None:
         raise RuntimeError(f"{name}: arrows did not move inside")
 
 
+@_telemetry.traced("drawing.carrier_near_y_witness_cap")
+def _cap_near_y_witness(adapter: Any, annotations: list[Any]) -> Callable[[], None]:
+    """Cap the 1.77's extension lines (NEAR_Y_WITNESS_MAX_M) so both stop
+    outside the part, a gap short of its -X end, instead of the upper one
+    running through A1 to the sketch origin; read back after the rebuild
+    (_reposition_section_dimensions' stock cap). Returns that readback for
+    the final settled check: persistence across later rebuilds is not
+    documented."""
+    (annotation,) = [
+        item for item in annotations if dimension_name(adapter, item) == "PlateNearY"
+    ]
+    display = _early_bound(
+        _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
+        "IDisplayDimension",
+    )
+    display.MaxWitnessLineLength = NEAR_Y_WITNESS_MAX_M
+    rebuild_drawing(adapter, label="carrier 1.77 witness cap")
+
+    def check() -> None:
+        if abs(float(display.MaxWitnessLineLength) - NEAR_Y_WITNESS_MAX_M) > 1e-9:
+            raise RuntimeError("carrier 1.77: extension-line cap did not persist")
+
+    check()
+    return check
+
+
 def _metres(point_mm: tuple[float, float, float]) -> tuple[float, float, float]:
     return tuple(value / 1000.0 for value in point_mm)
 
@@ -1045,7 +1095,7 @@ def _pin_section(adapter: Any, source_model: Any, top: Any) -> tuple[list[Any], 
     position_section_caption(
         adapter, section, SECTION_CAPTION_XY, label="carrier section A-A"
     )
-    add_note(adapter, "A1 ONLY — OTHER PIN HOLES NOT SHOWN", 0.020, 0.083)
+    add_note(adapter, SECTION_NOTE, *SECTION_NOTE_XY)
     return annotations, section
 
 
@@ -1244,6 +1294,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     _set_callout_texts(adapter, annotations, CALLOUT_PREFIXES, part=1)
     _arrows_inside(adapter, annotations, "EdgeX")
+    near_y_cap_settled = _cap_near_y_witness(adapter, annotations)
     ream = [
         item for item in annotations if dimension_name(adapter, item) == "PinHoleDia"
     ]
@@ -1304,8 +1355,20 @@ async def build(adapter: Any) -> dict[str, str]:
     hub_settled = _hub_sheet(adapter)
     assert_imported_precision(adapter, annotations, IMPORTED_PRECISION)
 
+    @_telemetry.traced("drawing.carrier_pin_controls.settled")
     def pin_controls_settled() -> None:
-        _assert_ream_control(adapter, ream[0])
+        # The 1.77 cap is read back on its own sheet after every later
+        # rebuild (_hub_sheet's settled pattern), restoring the active sheet.
+        sheets = _early_bound(drawing_model, "IDrawingDoc")
+        previous = str(_early_bound(sheets.GetCurrentSheet(), "ISheet").GetName())
+        if not sheets.ActivateSheet(SHEET_NAMES[0]):
+            raise RuntimeError("carrier sheet cannot be activated for final readback")
+        try:
+            _assert_ream_control(adapter, ream[0])
+            near_y_cap_settled()
+        finally:
+            if not sheets.ActivateSheet(previous):
+                raise RuntimeError("carrier readback could not restore the active sheet")
 
     return await finalize_drawing(
         adapter,

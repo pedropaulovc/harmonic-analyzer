@@ -41,7 +41,8 @@ def test_table_inventory_is_complete_and_replaces_location_dimensions():
     assert set(drawing.TOP_KEEP) == {
         "PlateLength", "PlateWidth", "PlateNearY", "EdgeX", "PinHoleDia",
     }
-    assert "A1 ONLY" in inspect.getsource(drawing._pin_section)
+    assert drawing.SECTION_NOTE.startswith("A1 ONLY")
+    assert "SECTION_NOTE" in inspect.getsource(drawing._pin_section)
     assert "LOCATIONS REF" in spec.TABLE_ROW_NOTES["HUB"]
     assert "station" not in drawing._CHAIN["A1"]
     assert assembly.ALIGNMENT_BAND == pytest.approx(.0008 * I)
@@ -1079,6 +1080,8 @@ def test_table_selects_only_the_twelve_tabled_holes_and_hides_size(monkeypatch):
     assert state["edges"]["HUB"] not in entities
     assert {id(edge) for edge in entities} == {id(state["edges"][tag]) for tag in TABLED}
     assert state["hidden"] == [(table.SIZE_COLUMN, True)]
+    # 43452045 review: the untagged HUB's size is its sheet-3 callout.
+    assert table.HOLE_SIZES_NOTE == "HOLE SIZES PER CALLOUTS, SHEETS 1 AND 3"
     assert table.HOLE_SIZES_NOTE in state["notes"]
     assert not any("HUB" in text for text in state["notes"])
     source = inspect.getsource(table.create_carrier_hole_table)
