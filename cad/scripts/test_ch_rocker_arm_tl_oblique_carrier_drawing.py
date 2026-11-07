@@ -110,10 +110,12 @@ def test_pin_table_uses_title_band_and_one_model_owned_local_control() -> None:
     )
     assert "station" not in features["pin_hole_a1"]
     assert spec.DRAWING_DIMENSIONS["PinHoleProfile"] == {"PinHoleDia"}
-    source = inspect.getsource(part.build)
+    source = inspect.getsource(part._author_outer_pin_rows)
     assert 'for dimension_name in ("A2DY", "B2DY")' in source
     assert "OUTER_Y_DEVIATIONS" in source and "tolerance.SetValues(lower, upper)" in source
-    assert "Outer Pin Row Note" in source
+    build_source = inspect.getsource(part.build)
+    assert "_author_outer_pin_rows(adapter)" in build_source
+    assert "Outer Pin Row Note" in build_source
     toleranced = model_toleranced_dimensions(part)
     assert toleranced[("PinHoleProfile", "PinHoleDia")] == "*deviations(PIN_HOLE_BAND)"
 

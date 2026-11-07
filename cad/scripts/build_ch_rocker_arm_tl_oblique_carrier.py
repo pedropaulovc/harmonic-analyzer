@@ -776,6 +776,26 @@ async def _finished_hub_bore(adapter, drive_jobs, volume: float) -> float:
     )
 
 
+def _author_outer_pin_rows(adapter) -> None:
+    """Author the flagged limits on the unchanged, unprinted geometric drivers."""
+    for dimension_name in ("A2DY", "B2DY"):
+        # Preserve the irrational nominal: shift native limits to printed .964,
+        # without rounding a displayed deviation or moving the model geometry.
+        _, dimension = _named_dimension(adapter, "PinHoleProfile", dimension_name)
+        dimension = _early_bound(_bind(dimension, "IDimension"), "IDimension")
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        tolerance.Type = 2  # swTolBILAT
+        lower, upper = (value / 1000.0 for value in OUTER_Y_DEVIATIONS)
+        if not tolerance.SetValues(lower, upper):
+            raise RuntimeError(f"{dimension_name}: local row limits rejected")
+        if (
+            int(tolerance.Type) != 2
+            or abs(float(tolerance.GetMinValue()) - lower) > 1e-12
+            or abs(float(tolerance.GetMaxValue()) - upper) > 1e-12
+        ):
+            raise RuntimeError(f"{dimension_name}: local row limits changed")
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -977,22 +997,7 @@ async def build(adapter) -> dict[str, str]:
     )
     # Owner's flagged .964 ±.002 control: unchanged geometric nominal,
     # actual native limits shifted to the printed nominal, never a draw edit.
-    for dimension_name in ("A2DY", "B2DY"):
-        # These dimensions are unprinted geometric drivers. Their irrational
-        # nominal must not be snapped to the note's .964 printed nominal.
-        # Store the exact limits natively; no displayed deviation is rounded.
-        _, dimension = _named_dimension(adapter, "PinHoleProfile", dimension_name)
-        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-        tolerance.Type = 2  # swTolBILAT
-        lower, upper = (value / 1000.0 for value in OUTER_Y_DEVIATIONS)
-        if not tolerance.SetValues(lower, upper):
-            raise RuntimeError(f"{dimension_name}: local row limits rejected")
-        if (
-            int(tolerance.Type) != 2
-            or abs(float(tolerance.GetMinValue()) - lower) > 1e-12
-            or abs(float(tolerance.GetMaxValue()) - upper) > 1e-12
-        ):
-            raise RuntimeError(f"{dimension_name}: local row limits changed")
+    _author_outer_pin_rows(adapter)
     set_dimension_bilateral_tolerance(
         adapter, "HubHoleProfile", "HubHoleDia", *deviations(HUB_HOLE_BAND),
         display_unit=UNIT,
