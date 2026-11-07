@@ -1,12 +1,18 @@
 """Create the purchased reference drawing for the knob-cup pin.
 
 MHA-PD-VN-62 is pressed through the MHA-PD-16 cup and the MHA-PD-08 journal in a
-hole match-drilled through both at assembly.
+hole match-drilled through both at assembly. MHA-PD-00's knob-stack step
+specifies that hole, so this sheet prints no supplier application hole
+(``SHEET_REFERENCE``): the loose circle and its 'MATING HOLE' callout named no
+part and read as a second pin feature (machinist review, fan-out 2026-11-07).
+The part keeps its catalogue hole sketch, which this sheet neither shows nor
+dimensions.
 """
 
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
 import sys
 from typing import Any
 from collections.abc import Callable
@@ -26,13 +32,17 @@ MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 SPEC = DRAWINGS_BY_NAME["pd_vn_transgear_knob_cup_pin"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "Ø1/16 x 5/8 SLOTTED SPRING PIN; SLOT NOT SHOWN"
+# The drawing's view of the supplier reference: no application hole.
+SHEET_REFERENCE = replace(
+    SUPPLIER_REFERENCE, application_hole_limits=None, application_hole_precision=None
+)
 
 
 async def build(adapter: Any) -> dict[str, str]:
     proofs: list[Callable[[], None]] = []
 
     def supplier_dimensions(adapter: Any, views_by_orientation: dict[str, Any]) -> None:
-        proofs.append(add_supplier_spring_pin_dimensions(adapter, views_by_orientation, SUPPLIER_REFERENCE))
+        proofs.append(add_supplier_spring_pin_dimensions(adapter, views_by_orientation, SHEET_REFERENCE))
 
     def assert_supplier_dimensions() -> None:
         if len(proofs) != 1:
