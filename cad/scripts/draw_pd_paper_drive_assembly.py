@@ -115,6 +115,7 @@ from _session import run_build
 import _telemetry
 from _column_clamp_interface import BAR_DEPTH
 from _hole_spec import NUMBER_DRILL_MM, TAP_DRILL_MM, blind_cut_dia_mm
+from _printed_tolerance import printed_deviations
 import paper_drive_mesh_check as mesh_check
 import pd_latch_hook_geometry as hook_geometry
 import paper_drive_rack_setup as rack_setup
@@ -1643,6 +1644,30 @@ ARM_PLATE_SCREW_HOLE_TEXT = (
 ARM_PLATE_SPOT_DRILL_TEXT = (
     f"#1 (\u00d8{steps.inch_text(plate_geometry.SCREW_HOLE_DIA, 3)})"
 )
+# MHA-PD-12's holes are struck through the MHA-PD-11 taps with the lock placed
+# by hand; each mark is checked from the lock's edges to the hole locations'
+# printed .XXX band less the transfer's own .001 (the screw point and the
+# drill on its mark), so the drilled holes stay inside the band the lock's
+# walls are judged at (FoPdFab1's per-joint ruling; pending owner
+# confirmation, owner review #2144).
+GUIDE_LOCK_TRANSFER_MM = 0.0254
+GUIDE_LOCK_MARK_BAND_MM = max(
+    abs(deviation)
+    for xy in guide_lock.HOLE_XY
+    for value in xy
+    for deviation in printed_deviations(
+        value, guide_lock.HOLE_LOCATION_PLACES, unit=guide_lock.UNIT
+    )
+) - GUIDE_LOCK_TRANSFER_MM
+
+
+def _mark_window(location_mm: float) -> str:
+    """A struck guide-lock mark's accepted window about its drawn place."""
+    return steps.inch_window(
+        (location_mm - GUIDE_LOCK_MARK_BAND_MM, location_mm + GUIDE_LOCK_MARK_BAND_MM),
+        3,
+        " TO ",
+    )
 
 
 def _step_text(
@@ -1721,10 +1746,14 @@ def _step_text(
         ),
         "platen-hung": (
             "SCREW A #4-40 TRANSFER SCREW INTO EACH GUIDE TAP A2, A4, A6 AND A8.",
-            f"HOLD A {n['pd-guide-lock']} LOCK ON EACH TAP PAIR, ITS GUIDE-SIDE EDGE "
-            f"{steps.inch_text(guide_lock.HOLE_Y, 3)} FROM THE TAP CENTRES, ITS "
-            f"LEFT EDGE {steps.inch_text(guide_lock.HOLE_XY[0][0], 3)} FROM THE "
-            "PAIR'S LEFT TAP; STRIKE IT TO MARK BOTH HOLES.",
+            f"LAY A {n['pd-guide-lock']} LOCK OVER EACH TAP PAIR, ITS GUIDE-SIDE EDGE "
+            "TOWARD THE GUIDE, CENTRED ON THE PAIR BY EYE; STRIKE IT TO MARK BOTH "
+            "HOLES.",
+            f"CHECK WITH A SCALE: EACH MARK {_mark_window(guide_lock.HOLE_Y)} FROM THE "
+            f"LOCK'S GUIDE-SIDE EDGE, AND {_mark_window(guide_lock.HOLE_XY[0][0])} "
+            f"(LEFT MARK) / {_mark_window(guide_lock.HOLE_XY[1][0])} (RIGHT MARK) "
+            "FROM ITS LEFT EDGE.",
+            "IF A MARK IS OUTSIDE, STONE THE MARKS OFF, SHIFT THE LOCK AND RE-STRIKE.",
             f"DRILL EACH LOCK \u00d8{steps.inch_text(blind_cut_dia_mm(guide_lock.HOLE_SPEC), 3)} "
             "THRU "
             "AT ITS MARKS; DEBURR; MATCH-MARK IT TO ITS TAP PAIR.",
