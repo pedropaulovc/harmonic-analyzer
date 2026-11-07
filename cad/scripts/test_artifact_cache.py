@@ -375,6 +375,19 @@ def test_restore_path_accepts_windows_spelling_not_filesystem_aliases(
 
     assert restored.resolve() == (configured_root / "pdf" / "leaf.pdf").resolve()
     assert restored.relative_to(configured_root) == Path("pdf/leaf.pdf")
+    # WindowsPath equality ignores case; the restored spelling below the root
+    # must still be the caller's, because it is the path tag in every
+    # downstream cache key (lowercasing re-keyed every dependent drawing).
+    assert str(restored).endswith(str(Path(spelling).relative_to(Path(spelling).parents[1])))
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows case-insensitive paths")
+def test_restore_path_preserves_caller_case_below_root(archive_tree):
+    candidate = archive_tree / "sldprt" / "dt-vn-crank-hub-pin.SLDPRT"
+
+    restored = cache._restore_path(candidate)
+
+    assert str(restored) == str(candidate)
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows extended-length paths")

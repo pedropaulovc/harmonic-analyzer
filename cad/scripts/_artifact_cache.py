@@ -445,8 +445,11 @@ def _restore_path(path: Path) -> Path:
     ):
         raise RuntimeError(f"unsafe cache output path: {path}")
     # Keep REPO_ROOT's namespace for _unpack's later relative_to(REPO_ROOT),
-    # including when the configured checkout itself has an extended prefix.
-    return _CACHE_OUTPUT_ROOT / target.relative_to(root)
+    # including when the configured checkout itself has an extended prefix,
+    # and keep the caller's spelling below the root: the path tag feeds
+    # downstream cache keys, so lowercasing it (normcase) re-keys every
+    # dependent of a restored output.
+    return _CACHE_OUTPUT_ROOT.joinpath(*Path(os.path.abspath(path)).parts[-len(target.relative_to(root).parts):])
 
 
 def _unpack(blob: BinaryIO, outputs: list[Path]) -> None:
