@@ -1,7 +1,9 @@
 """Nominal supplier diagram/installed-state layout, independent of the four-view builder.
 
 View configurations are assigned before measuring/fitting. Supplier references
-never dimension the installed span. The optional maximum view is a construction-only nominal gauge, not a callback inserted behind a four-view contract.
+never dimension the installed span. An extension spring draws only its
+installed state (Front and Isometric); its supplier free/maximum lengths and
+sections print as footer reference data, never as gauge views with no spring.
 Nominal dimension diagrams are sketch-only configurations, never surrogate parts.
 Their actual native curves are captured once before fitting, with the source
 configuration restored before projection or annotation callbacks. Existing
@@ -23,14 +25,12 @@ from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
-    dimension_name,
     iter_views,
     place_view,
     view_name,
 )
 
 from _com import _bind, _early_bound
-from _construction_line_font import _construction_curves_as_outline
 import _config
 import _telemetry
 from _drawing_common import (
@@ -41,9 +41,7 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_hidden_sketches import _show_hidden_owners, curate_view_dimensions
 from _drawing_layout_audit import annotation_display
-from _drawing_leaders import set_near_side_diameter
 from _drawing_projection import model_point_in_view
 from _drawing_types import DRAWING_TEMPLATES, DrawingSpec
 from _drawing_sheet_region import sheet_drawable_region
@@ -71,22 +69,8 @@ from _purchased_fastener_drawing import (
 )
 from _purchased_part_variants import _suppressed
 from _rebuild import active_configuration_name
-from _supplier_dimensions import (
-    assert_supplier_reference_dimension,
-    supplier_reference_dimension,
-)
-from _supplier_extension_spring import (
-    COIL_OD,
-    DIMENSIONS_BY_FEATURE,
-    FREE_LENGTH,
-    MAX_LENGTH,
-    SOURCE_FEATURES,
-    WIRE_DIA,
-)
-from _supplier_spring_reference import (
-    SUPPLIER_FREE_CONFIGURATION,
-    SUPPLIER_MAX_CONFIGURATION,
-)
+from _supplier_extension_spring import COIL_OD, FREE_LENGTH, MAX_LENGTH, WIRE_DIA
+from _supplier_spring_reference import SUPPLIER_FREE_CONFIGURATION
 from _reference_source_lifecycle import (
     _activate_reference_document,
     _preserve_reference_source_file,
@@ -194,194 +178,58 @@ def assert_supplier_configuration_value(
         raise RuntimeError(f"{label}: exact configured supplier dimension changed")
 
 
-def prepare_extension_spring_diagrams(
-    adapter: Any,
-    views: Mapping[str, Any],
-    *,
-    reference_bounds: Callable[[str], tuple[float, float, float, float]],
-) -> tuple[Callable[[], None], ...]:
-    """Show only assigned construction gauges before native geometry fitting.
-
-    The gauges are construction geometry. In the default construction font the
-    coil OD printed as dash-gap arcs, and the wire section sat in one of the
-    gaps, so the two sections read as one broken shape. This SLDDRW draws
-    construction curves solid, as the disc-spring diagrams do.
-    """
-    if set(views) != {*SOURCE_FEATURES, "installed_iso"}:
-        raise RuntimeError(
-            "extension spring diagram needs free, section, maximum and installed views"
-        )
-    line_font = _construction_curves_as_outline(adapter)
-    for key, names in SOURCE_FEATURES.items():
-        if set(_show_hidden_owners(adapter, views[key], names, view_label=key)) != set(
-            names
-        ):
-            raise RuntimeError(f"{key}: nominal supplier gauges must be saved hidden")
-    return (line_font,)
-
-
-def extension_spring_dimensions(
-    adapter: Any,
-    views: Mapping[str, Any],
+def extension_spring_data(
     *,
     free_length_mm: float,
-    reference_bounds: Callable[[str], tuple[float, float, float, float]],
     max_length_mm: float,
     coil_od_mm: float,
     wire_dia_mm: float,
     precision: Mapping[str, int],
-) -> tuple[Callable[[], None], ...]:
-    """Import source sizes and reacquire every native dimension after final rebuild.
+    ends: str,
+) -> tuple[str, ...]:
+    """An extension spring's catalogue sizes as footer reference data lines.
 
-    Supplier sizes print as untoleranced REF: the catalogue governs.
+    The free and maximum lengths are the supplier's inside-hook/inside-loop
+    measurements of states the sheet does not draw. Printed as gauge views
+    they were bare dimension lines over no spring, under prose titles (novice
+    rubric screen, rule 9); as REF data beside the ITEM row they need no view.
+    Inch values in parentheses, at the catalogue's own places (``precision``
+    is keyed by the source dimension names).
     """
-    rows_by_view = {
-        "free_front": (
-            (
-                FREE_LENGTH,
-                free_length_mm,
-                "length",
-                "STOCK FREE / INSIDE HOOKS OR LOOPS",
-            ),
-        ),
-        "free_right": (
-            (COIL_OD, coil_od_mm, "diameter", "NOMINAL STOCK COIL OD"),
-            (WIRE_DIA, wire_dia_mm, "diameter", "NOMINAL STOCK WIRE SECTION"),
-        ),
-        "max_front": (
-            (
-                MAX_LENGTH,
-                max_length_mm,
-                "length",
-                "STOCK MAXIMUM / INSIDE HOOKS OR LOOPS",
-            ),
-        ),
-    }
-    expected = {key: {} for key in views}
-    configurations = {
-        key: str(view.ReferencedConfiguration) for key, view in views.items()
-    }
-    required = {
-        "free_front": SUPPLIER_FREE_CONFIGURATION,
-        "free_right": SUPPLIER_FREE_CONFIGURATION,
-        "max_front": SUPPLIER_MAX_CONFIGURATION,
-    }
-    for key, configuration in required.items():
-        if configurations.get(key) != configuration:
-            raise RuntimeError(f"{key}: nominal supplier gauge has wrong configuration")
-    settings = {}
-    for key, rows in rows_by_view.items():
-        view = views[key]
-        xmin, ymin, xmax, ymax = reference_bounds(key)
-        # Each section text block sits wholly beside its own circle, so its
-        # leader leaves the near end of the shoulder and runs away from the
-        # text. The wire circle lies on the coil's left (sketch -X in *Right),
-        # so its text goes below-left and the coil OD text above-right: the two
-        # arrows land on opposite sides. Offsets are half the printed callout
-        # row ("NOMINAL STOCK COIL OD" ~61 mm, "... WIRE SECTION" ~72 mm)
-        # plus a 6 mm leader.
-        positions = (
-            {
-                COIL_OD: (xmax + 0.037, ymax + 0.005),
-                WIRE_DIA: (xmin - 0.042, ymin - 0.009),
-            }
-            if key == "free_right"
-            else {rows[0][0]: ((xmin + xmax) / 2, ymax + 0.010)}
-        )
-        annotations = curate_view_dimensions(
-            adapter,
-            view,
-            keep=positions,
-            view_label=key,
-            dimensions_by_feature=DIMENSIONS_BY_FEATURE,
-        )
-        by_name = {
-            dimension_name(adapter, annotation): annotation
-            for annotation in annotations
-        }
-        if len(annotations) != len(positions) or set(by_name) != set(positions):
-            raise RuntimeError(
-                f"{key}: supplier reference inventory differs from source"
-            )
-        for name, value, presentation, callout in rows:
-            owner = next(
-                feature
-                for feature, names in DIMENSIONS_BY_FEATURE.items()
-                if name in names
-            )
-            expected[key][name] = owner
-            arguments = dict(
-                label=name,
-                units="in",
-                precision=precision[name],
-                expected_mm=value,
-                presentation=presentation,
-                callout=callout,
-                configuration=configurations[key],
-            )
-            supplier_reference_dimension(
-                adapter,
-                _early_bound(
-                    by_name[name].GetSpecificAnnotation(), "IDisplayDimension"
-                ),
-                **arguments,
-            )
-            if key == "free_right":
-                # One arrow on the near rim of each section: a coil OD line
-                # through the centre would end on the far rim beside the
-                # wire section's arrow, and a wire line would cross the
-                # small wire circle it sizes.
-                set_near_side_diameter(by_name[name], name)
-            settings[name] = (arguments, configurations[key])
 
-    def settled() -> None:
-        displays = reacquire_supplier_dimensions(
-            adapter,
-            views,
-            expected=expected,
-            configurations=configurations,
-        )
-        for name, (arguments, configuration) in settings.items():
-            display = displays[name]
-            # The shared assertion proves native dimension type before SI interpretation.
-            assert_supplier_reference_dimension(adapter, display, **arguments)
-            assert_supplier_configuration_value(
-                display,
-                configuration,
-                arguments["expected_mm"],
-                label=name,
-            )
-            native = _early_bound(display.GetDimension2(0), "IDimension")
-            if int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0:
-                raise RuntimeError(f"{name}: supplier REF gained a tolerance")
+    def inch(value_mm: float, name: str) -> str:
+        text = f"{value_mm / 25.4:.{precision[name]}f}"
+        return text[1:] if text.startswith("0.") else text
 
-    return (settled,)
-
-
-def supplier_state_cells(caption_y: float, *, maximum: bool) -> tuple:
-    """Reserve an annotation band around every fitted native view.
-
-    The maximum (extension spring) layout stacks the free gauge over the
-    sections on the left and gives the installed pictorial the full right
-    column, so a long coil prints at a scale where its turns and end loops
-    read instead of merging into a solid bar. The left column is wide enough
-    for the section texts on both sides of the coil. The sections cell reaches
-    down to 6 mm over the maximum cell, so that after the caller's 18 mm text
-    lanes above and below, the coil OD prints at 4:1 (9432K31, Ø.25) or 2:1
-    (1330K524, Ø.500) and the wire section is a circle, not a dot.
-    """
-    if not maximum:
-        return (
-            _cell("free_front", 0.028, caption_y + 0.020, 0.235, 0.166),
-            _cell("free_top", 0.028, 0.207, 0.235, 0.247),
-            _cell("free_right", 0.267, caption_y + 0.026, 0.406, 0.165),
-            _cell("installed_iso", 0.325, 0.190, 0.406, 0.252),
-        )
     return (
-        _cell("free_front", 0.028, 0.212, 0.256, 0.252),
-        _cell("free_right", 0.028, 0.128, 0.256, 0.192),
-        _cell("installed_iso", 0.264, 0.142, 0.406, 0.252),
-        _cell("max_front", 0.028, caption_y + 0.020, 0.403, 0.122),
+        f"FREE LENGTH INSIDE {ends} ({inch(free_length_mm, FREE_LENGTH)})",
+        f"MAXIMUM EXTENDED LENGTH INSIDE {ends} ({inch(max_length_mm, MAX_LENGTH)})",
+        f"COIL OD (Ø{inch(coil_od_mm, COIL_OD)}), WIRE (Ø{inch(wire_dia_mm, WIRE_DIA)})",
+    )
+
+
+def supplier_state_cells(caption_y: float) -> tuple:
+    """Reserve an annotation band around every fitted native view."""
+    return (
+        _cell("free_front", 0.028, caption_y + 0.020, 0.235, 0.166),
+        _cell("free_top", 0.028, 0.207, 0.235, 0.247),
+        _cell("free_right", 0.267, caption_y + 0.026, 0.406, 0.165),
+        _cell("installed_iso", 0.325, 0.190, 0.406, 0.252),
+    )
+
+
+def extension_spring_cells(caption_y: float) -> tuple:
+    """The installed extension spring: Front on the left, Isometric on the right.
+
+    The coil runs along the source +X with its end-loop axes on +Z, so the
+    Front draws the whole spring with both ends; it sets the sheet scale. The
+    right column, clear of the footer and over the title block's caption
+    floor, holds the pictorial at the sheet scale or nearer: at 1:8 the
+    counter spring's turns merged into a solid bar.
+    """
+    return (
+        _cell("installed_front", 0.020, caption_y + 0.020, 0.232, 0.252),
+        _cell("installed_iso", 0.240, 0.085, 0.406, 0.252),
     )
 
 
@@ -900,10 +748,11 @@ async def build_supplier_spring_drawing(
     spec: DrawingSpec,
     *,
     item: str,
-    supplier_dimensions: Callable[..., Sequence[Callable[[], None]] | None],
-    supplier_margins: Mapping[str, tuple[float, float, float, float]],
-    supplier_reference_features: Mapping[str, Sequence[str]],
-    maximum: bool = False,
+    supplier_dimensions: Callable[..., Sequence[Callable[[], None]] | None] | None = None,
+    supplier_margins: Mapping[str, tuple[float, float, float, float]] | None = None,
+    supplier_reference_features: Mapping[str, Sequence[str]] | None = None,
+    installed_front: bool = False,
+    supplier_data: Sequence[str] = (),
     stock_configuration: str = SUPPLIER_FREE_CONFIGURATION,
     prepare_views: Callable[..., Sequence[Callable[[], None]] | None] | None = None,
     include_right: bool = True,
@@ -918,6 +767,25 @@ async def build_supplier_spring_drawing(
     settled_checks: Sequence[Callable[[], None]] = (),
     unit: str = "mm",
 ) -> dict[str, str]:
+    """Draw a purchased spring's supplier diagrams beside its installed state.
+
+    ``installed_front`` (extension springs) draws the installed configuration
+    only, as a Front over an Isometric, and takes no supplier diagram views,
+    margins or dimension hooks: the catalogue sizes print as ``supplier_data``
+    footer lines (:func:`extension_spring_data`).
+    """
+    supplier_margins = supplier_margins or {}
+    supplier_reference_features = supplier_reference_features or {}
+    if installed_front and (
+        supplier_margins
+        or supplier_reference_features
+        or supplier_dimensions is not None
+        or prepare_views is not None
+        or installed_variants
+    ):
+        raise ValueError(
+            "an installed-front spring sheet takes no supplier diagram views or hooks"
+        )
     source = spec.source
     if spec.source_kind != "part" or not source.is_file():
         raise FileNotFoundError(f"source purchased part is missing: {source}")
@@ -930,8 +798,6 @@ async def build_supplier_spring_drawing(
     installed = installed_configuration or active_configuration_name(adapter, model)
     available = set(model.GetConfigurationNames() or ())
     required = {stock_configuration}
-    if maximum:
-        required.add(SUPPLIER_MAX_CONFIGURATION)
     if (
         not installed
         or installed not in available
@@ -976,14 +842,19 @@ async def build_supplier_spring_drawing(
         notes = str(registry.get("installation_notes", ""))
         document_title = str(registry["title"])
     check_item(item, label=spec.artifact_stem)
-    caption_y = view_band_bottom(notes, label=spec.artifact_stem)
-    cells = tuple(
-        cell
-        for cell in supplier_state_cells(caption_y, maximum=maximum)
-        if (include_right or cell[0] != "free_right")
-        and (include_top or cell[0] != "free_top")
+    caption_y = view_band_bottom(
+        notes, label=spec.artifact_stem, supplier_data=supplier_data
     )
-    if not include_right and not maximum:
+    if installed_front:
+        cells = extension_spring_cells(caption_y)
+    else:
+        cells = tuple(
+            cell
+            for cell in supplier_state_cells(caption_y)
+            if (include_right or cell[0] != "free_right")
+            and (include_top or cell[0] != "free_top")
+        )
+    if not include_right and not installed_front:
         cells = tuple(
             _cell("installed_iso", 0.267, caption_y + 0.026, 0.406, 0.252)
             if cell[0] == "installed_iso"
@@ -992,8 +863,7 @@ async def build_supplier_spring_drawing(
         )
     if installed_variants:
         if (
-            maximum
-            or include_right
+            include_right
             or len(installed_variants) != 2
             or len({name for name, _label in installed_variants}) != 2
             or any(
@@ -1027,7 +897,11 @@ async def build_supplier_spring_drawing(
         raise ValueError(
             "supplier reference owners must exactly name every source-diagram view"
         )
-    fit_cells = supplier_fit_cells(cells, supplier_margins, label=spec.artifact_stem)
+    fit_cells = (
+        supplier_fit_cells(cells, supplier_margins, label=spec.artifact_stem)
+        if supplier_margins
+        else cells
+    )
     draw, sheet = new_project_drawing(adapter, layout=spec.layout, unit=unit)
     title_notes = _purchased_title_block(
         adapter,
@@ -1045,8 +919,8 @@ async def build_supplier_spring_drawing(
             1: "Purchased identification only; supplier sizes are reference dimensions",
             2: "Harmonic Analyzer Project",
             3: f"{spec.artifact_stem}; {properties['Supplier']}; {properties['Supplier SKUs']}",
-            4: f"{stock_caption}; installed pictorial; separate maximum state"
-            if maximum
+            4: "installed front and pictorial; supplier data list"
+            if installed_front
             else f"{stock_caption}; separate installed pictorial",
         },
     )
@@ -1055,11 +929,11 @@ async def build_supplier_spring_drawing(
         "free_top": "*Top",
         "free_right": "*Right",
         "installed_iso": "*Isometric",
-        "max_front": "*Front",
+        "installed_front": "*Front",
     }
     configurations = {key: stock_configuration for key in orientations}
     configurations["installed_iso"] = installed
-    configurations["max_front"] = SUPPLIER_MAX_CONFIGURATION
+    configurations["installed_front"] = installed
     if installed_variants:
         orientations["installed_second_iso"] = "*Isometric"
         configurations["installed_second_iso"] = installed_variants[1][0]
@@ -1115,18 +989,32 @@ async def build_supplier_spring_drawing(
         else ()
     )
     _rebuild(draw, phase="supplier states before fitting")
-    captures.update(
-        _capture_reference_views(
-            adapter,
-            draw,
-            views,
-            source=source,
-            model=model,
-            features=reference_features,
-            configurations=configurations,
-            label=spec.artifact_stem,
+    if reference_features:
+        captures.update(
+            _capture_reference_views(
+                adapter,
+                draw,
+                views,
+                source=source,
+                model=model,
+                features=reference_features,
+                configurations=configurations,
+                label=spec.artifact_stem,
+            )
         )
-    )
+        source_state = next(iter(captures.values())).source
+    else:
+        # No supplier diagram to capture: seal the same clean read-only source
+        # state the capture would have, for the presentation-phase guard.
+        source_state = _ReferenceSourceState(
+            source.resolve(),
+            model,
+            active_configuration_name(adapter, model),
+            _reference_configuration_names(model, label=spec.artifact_stem),
+            _reference_body_counts(model),
+            bool(model.IsOpenedReadOnly()),
+        )
+        _assert_reference_source_restored(adapter, source_state, label=spec.artifact_stem)
     # Supplier circles can legitimately acquire native centre crosses. Remove
     # their template extension lines before fitting, not the useful crosses.
     _center_marks_without_lines(list(views.values()), cells)
@@ -1139,7 +1027,7 @@ async def build_supplier_spring_drawing(
         ("free_right",),
         # Two installed variants are read against each other: one joint scale.
         ("installed_iso", "installed_second_iso"),
-        ("max_front",),
+        ("installed_front",),
     ):
         members = [(views[key], cell) for cell in fit_cells if (key := cell[0]) in keys]
         if members:
@@ -1177,7 +1065,7 @@ async def build_supplier_spring_drawing(
     _center_marks_without_lines(list(views.values()), cells)
     for key in reference_features:
         _assert_reference_view_ink(views[key], label=f"{spec.artifact_stem} {key}")
-    scale = scales["free_front"]
+    scale = scales["installed_front" if installed_front else "free_front"]
     values = tuple(adapter._get_attr_or_call(sheet, "GetProperties2"))
     if len(values) != 8:
         raise RuntimeError("supplier sheet has incomplete native properties")
@@ -1213,11 +1101,7 @@ async def build_supplier_spring_drawing(
     # Model-owned SetText changes may dirty this read-only source without
     # changing geometry. Admit that state only at the known annotation stage,
     # never during preparation/capture/fitting, and never as a new clean seal.
-    _assert_reference_source_restored(
-        adapter,
-        next(iter(captures.values())).source,
-        label=spec.artifact_stem,
-    )
+    _assert_reference_source_restored(adapter, source_state, label=spec.artifact_stem)
     _telemetry.info(
         f"{spec.artifact_stem}: entering read-only supplier annotation presentation phase; "
         f"source={str(source.resolve())!r}; source bytes must remain unchanged"
@@ -1225,6 +1109,8 @@ async def build_supplier_spring_drawing(
     allow_presentation_dirty = True
     dimension_checks = (
         supplier_dimensions(adapter, views, reference_bounds=reference_bounds) or ()
+        if supplier_dimensions is not None
+        else ()
     )
     ddoc = _early_bound(draw, "IDrawingDoc")
     ddoc.ActivateView("")
@@ -1235,7 +1121,8 @@ async def build_supplier_spring_drawing(
         "free_top": f"{stock_caption} — TOP",
         "free_right": right_caption,
         "installed_iso": installed_caption,
-        "max_front": "SUPPLIER NOMINAL MAXIMUM EXTENSION — NOT INSTALLED",
+        # A principal Front at the sheet scale takes no label.
+        "installed_front": "",
         "installed_second_iso": installed_variants[1][1] if installed_variants else "",
     }
     if installed_variants:
@@ -1246,7 +1133,9 @@ async def build_supplier_spring_drawing(
         text = captions[key]
         # ASME Y14.3: only a view scale that differs from the sheet's prints.
         if ratio != scale:
-            text += f"  {ratio[0]}:{ratio[1]}"
+            text = f"{text}  {ratio[0]}:{ratio[1]}".strip()
+        if not text:
+            continue
         y = cell[1] - (0.016 if key == "free_right" else 0.012)
         # A small pictorial or thin diagram centred in a tall cell left its
         # caption far below it: hang each caption just under everything its
@@ -1278,6 +1167,7 @@ async def build_supplier_spring_drawing(
             notes=notes,
             cut_to_suit=cut_to_suit,
             label=spec.artifact_stem,
+            supplier_data=supplier_data,
         )
     )
     _rebuild(draw, phase="supplier/installed annotations")
