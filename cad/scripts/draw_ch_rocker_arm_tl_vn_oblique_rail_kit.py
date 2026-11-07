@@ -230,10 +230,12 @@ STATION_NOMINALS = dict(zip(rail.STATION_DIMENSIONS, rail.HOLE_X, strict=True))
 # is 16.25 + 7.59 + 2 = 25.84 mm; a 27 mm offset clears that whole cell.
 # The 2 mm FRONT/TOP shift also leaves the native text >6 mm inside the border.
 TEXT_OUTSIDE_START = dict.fromkeys(rail.STATION_DIMENSIONS[:2], 0.027)
-# Smart arrows put the 75 span's arrows outside, over the 15 row (run
-# 20261104T222143958Z); every station keeps its arrows inside, under its text.
-ARROWS_INSIDE = rail.STATION_DIMENSIONS
+# Only Station1's 4.982 mm sheet span cannot fit the two native arrowheads.
+# Put its arrows outside; retain inside arrows on all longer stations.
 _DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
+_DIM_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
+STATION_ARROW_SIDES = dict.fromkeys(rail.STATION_DIMENSIONS, _DIM_ARROWS_INSIDE)
+STATION_ARROW_SIDES[rail.STATION_DIMENSIONS[0]] = _DIM_ARROWS_OUTSIDE
 _CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 _TOL_SYMMETRIC = 4  # swTolType_e.swTolSYMMETRIC
 FRONT_DIMENSION_PRECISION = {
@@ -251,9 +253,9 @@ _LAST_ROW_LINE_DROP = (
 )
 RECEIPT_FLAG_XY = (FRONT_CENTER[0], FRONT_CENTER[1] - _LAST_ROW_LINE_DROP - 0.004)
 RECEIPT_FLAG_CELL = (
-    RECEIPT_FLAG_XY[0] - 0.052,
+    RECEIPT_FLAG_XY[0] - 0.075,
     RECEIPT_FLAG_XY[1] - 0.0065,
-    RECEIPT_FLAG_XY[0] + 0.052,
+    RECEIPT_FLAG_XY[0] + 0.075,
     RECEIPT_FLAG_XY[1] + 0.001,
 )
 
@@ -402,8 +404,8 @@ def assert_receipt_controls(adapter: Any, annotations: list[Any]) -> None:
                 f" (band {band!r}), tol places {int(display.GetPrimaryTolPrecision2())}, "
                 f"brackets {brackets!r}, callout {callout!r}"
             )
-        if name in ARROWS_INSIDE and int(display.ArrowSide) != _DIM_ARROWS_INSIDE:
-            raise RuntimeError(f"rail {name} did not keep its arrows inside")
+        if int(display.ArrowSide) != STATION_ARROW_SIDES[name]:
+            raise RuntimeError(f"rail {name} did not keep its authored arrow side")
 
 
 @_telemetry.traced("drawing.rail_receipt_dimensions")
@@ -423,7 +425,7 @@ def _receipt_dimensions(adapter: Any, front: Any) -> list[Any]:
             set_reference_dimension(adapter, annotation, label=name)
             continue
         display = _display(annotation)
-        display.ArrowSide = _DIM_ARROWS_INSIDE
+        display.ArrowSide = STATION_ARROW_SIDES[name]
     assert_receipt_controls(adapter, annotations)
     return annotations
 

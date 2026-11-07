@@ -317,7 +317,7 @@ RECEIPT_TEXT = f"±{RECEIPT_BAND:.{RECEIPT_PLACES}f}"
 # The kit drawing's sheet that prints the receipt check; citations name it.
 RECEIPT_SHEET = 2
 # The flag, a note of its own under the station stack, names the note's check.
-RECEIPT_FLAG = "RECEIPT CHECK: ALL STATIONS ABOVE, SEE NOTE"
+RECEIPT_FLAG = "RECEIPT CHECK: STATIONS MATCH BASE BAR MHA-CH-06-TL-20 TAPPED HOLES"
 DRAWING_NOTES = "\n".join(
     (
         "CHECK STATIONS FROM TRIMMED END BEFORE TAPPING MHA-CH-06-TL-20.",

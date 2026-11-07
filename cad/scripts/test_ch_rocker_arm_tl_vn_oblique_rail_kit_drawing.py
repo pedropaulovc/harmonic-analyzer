@@ -451,6 +451,7 @@ def test_rail_receipt_note_points_at_the_stations() -> None:
     assert not re.search(r"\d", note.replace(bar["number"], ""))
     assert rail.RECEIPT_TEXT not in note
     assert "CHECK STATIONS" in note and "RECEIPT CHECK" in rail.RECEIPT_FLAG
+    assert f"BASE BAR {bar['number']} TAPPED HOLES" in rail.RECEIPT_FLAG
     assert "STOP AND REPORT" in note and "THE BAR IS DRILLED AS DRAWN" in note
     assert "RAIL MATCHES ACTUAL BASE BAR, FLUSH BOTH ENDS" in note
     assert rail.CBORE_END_WALL_WORST >= base_bar.WALL_TARGET_MM
@@ -707,8 +708,11 @@ def test_receipt_dimensions_are_the_marked_model_dimensions() -> None:
     marked = set().union(*rail.DRAWING_DIMENSIONS.values())
     assert set(draw.RECEIPT_DIMENSIONS) == marked
     assert set(draw.FRONT_DIMENSION_PRECISION) == marked
-    # Every station keeps its arrows inside, under its own text.
-    assert draw.ARROWS_INSIDE == rail.STATION_DIMENSIONS
+    # The short first span uses outside arrows; all other stations stay inside.
+    assert draw.STATION_ARROW_SIDES == {
+        name: (1 if index == 0 else 0)
+        for index, name in enumerate(rail.STATION_DIMENSIONS)
+    }
     assert draw.RECEIPT_DIMENSIONS["Length"][:2] == (0.0, rail.LENGTH)
     offsets = []
     for name, x in zip(rail.STATION_DIMENSIONS, rail.HOLE_X, strict=True):
@@ -982,6 +986,8 @@ def _receipt_annotations():
         )
         for name, x in zip(rail.STATION_DIMENSIONS, rail.HOLE_X, strict=True)
     ]
+    for annotation in annotations:
+        annotation.display.ArrowSide = draw.STATION_ARROW_SIDES[annotation.name]
     annotations.append(
         _Annotation("Length", _Display(rail.LENGTH, {1: "(", 2: ")"}, _Tolerance(0, 0, 0), rail.DRAWING_PRECISION["Rail"]["Length"]))
     )
@@ -1000,6 +1006,7 @@ def _receipt_annotations():
         "length-bare",
         "missing",
         "arrows",
+        "short-arrows",
         "nominal",
     ],
 )
@@ -1025,6 +1032,8 @@ def test_receipt_controls_readback_refuses_every_drift(monkeypatch, fault) -> No
         annotations = annotations[1:]
     elif fault == "arrows":
         by_name["Station5"].ArrowSide = 1
+    elif fault == "short-arrows":
+        by_name["Station1"].ArrowSide = 0
     elif fault == "nominal":
         by_name["Station6"].dimension.SystemValue += 0.0001
     if fault is None:
