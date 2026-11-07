@@ -190,7 +190,7 @@ def _cluster_extent(sheet: str):
             if parent == (spec.FEED_BLOCK, 0)
         )
         z = (
-            -feed.BAR_SCREW_LENGTH_MM + lift(spec.BRACKET_SCREW),
+            -feed.BAR_SCREW_LENGTH_MM + lift(spec.BAR_SCREW_INSTANCES[0]),
             max(spec.trammel.PIVOT_BLOCK_TOP_Z + lift(spec.FEED_BLOCK), *screw_tops),
         )
     else:
@@ -800,20 +800,27 @@ def test_every_bom_row_carries_one_balloon() -> None:
     walked = {
         stem: anchor
         for stem, anchor in drawing.BALLOON_ANCHORS.items()
-        if stem not in {spec.BASE_BAR, spec.RAIL_SCREW, *drawing.BALLOON_APPROACH_DEG}
-        and stem not in spec.KIT_IDENTITIES
+        if stem not in {spec.RAIL_SCREW, *drawing.BALLOON_APPROACH_DEG}
+        and stem not in spec.MEMBER_IDENTITIES
     }
     assert all(
         anchor.instance is None and anchor.point_mm is None
         for anchor in walked.values()
     )
-    # Review r5: balloon 1 lands on the bar's operator-side long edge, part
+    # Review r5: balloon 1 lands on bar 1's operator-side long top edge, part
     # frame, mid-span between the spindle end and the far hold-down slot.
-    bar = drawing.BALLOON_ANCHORS[spec.BASE_BAR]
-    assert bar.instance is None
+    # PR2: balloon 2 lands on the same machine edge of the turned-over Bar2,
+    # its part +Y edge at z 0.
+    bar = drawing.BALLOON_ANCHORS[spec.BASE_BAR_1]
+    assert bar.instance == spec.instance_name(spec.BASE_BAR_1, 0) == "@Bar1:1"
     assert bar.point_mm == (200.0, base_bar.HIGH_SIDE_Y, base_bar.BAR_THICK)
     assert base_bar.NEAR_SLOT_X < bar.point_mm[0] < base_bar.FAR_SLOT_X
     assert 0.0 < bar.point_mm[0] < base_bar.BAR_LENGTH
+    two = drawing.BALLOON_ANCHORS[spec.BASE_BAR_2]
+    assert two.instance == spec.instance_name(spec.BASE_BAR_2, 0) == "@Bar2:1"
+    assert two.point_mm == (200.0, base_bar.HIGH_SIDE_Y, 0.0)
+    p1, p2 = spec.bar_point(1, bar.point_mm), spec.bar_point(2, two.point_mm)
+    assert p2 == pytest.approx((-p1[0], p1[1], p1[2]), abs=1e-9)
     rail = drawing.BALLOON_ANCHORS[spec.RAIL]
     assert rail.instance == spec.instance_name(spec.RAIL, 0)
     x, y, z = rail.point_mm
@@ -920,16 +927,16 @@ def test_re_routed_balloons_on_sheets_3_to_6_land_on_their_own_edges() -> None:
             key=lambda index: math.dist(spec.PLACEMENTS[stem][index][0][:2], point[:2]),
         )
 
-    # 25: the near KP08's outboard screw (KP08 part +X), on its button head's
-    # flat-top rim.
-    dims = spec.kp08_screw.DIMS
+    # 25: the near KP08's outboard screw (KP08 part +X), on its socket head's
+    # top rim.
+    dims = spec.bracket_screw.DIMS
     anchor = drawing.BALLOON_ANCHORS[spec.PILLOW_BLOCK_SCREW]
     assert anchor.instance == spec.instance_name(spec.PILLOW_BLOCK_SCREW, 1)
     origin = spec.PLACEMENTS[spec.PILLOW_BLOCK_SCREW][1][0]
     assert spec.instance_name(spec.PILLOW_BLOCK, nearest(spec.PILLOW_BLOCK, origin)) == near
     assert _dot([o - k for o, k in zip(origin, kp08_origin)], kp08_rows[0]) > 0.0
     x, y, z = anchor.point_mm
-    assert math.hypot(x, z) == pytest.approx(dims.flat_top_dia / 2.0)
+    assert math.hypot(x, z) == pytest.approx(dims.head_dia / 2.0)
     assert y == dims.head_h
     # 11: the bracket under the near KP08, on its outboard end's edge with
     # its spindle-side face, mid-height.
@@ -1068,9 +1075,8 @@ def _part_solids():
         ],
     })
     for stem, fastener in (
-        (spec.RAIL_SCREW, spec.rail_screw), (spec.BRACKET_SCREW, spec.bracket_screw),
-        (spec.CARRIAGE_SCREW, spec.carriage_screw),
-        (spec.PILLOW_BLOCK_SCREW, spec.kp08_screw), (spec.RISER_SCREW, spec.riser_screw),
+        (spec.RAIL_SCREW, spec.rail_screw), (spec.CARRIAGE_SCREW, spec.carriage_screw),
+        (spec.PILLOW_BLOCK_SCREW, spec.bracket_screw), (spec.RISER_SCREW, spec.riser_screw),
         (spec.CLAMP_SCREW, spec.clamp_screw), (spec.LEVER_SCREW, spec.lever_screw),
     ):
         solids[stem] = _screw(fastener.DIMS)
@@ -1234,7 +1240,7 @@ def test_the_replay_refuses_a_landing_beside_another_part(monkeypatch) -> None:
         drawing.BalloonAnchor(point_mm=(block.BLOCK_X1, -block.BLOCK_WIDTH / 2.0, 0.0)),
     )
     assert _approach_replay(spec.PIVOT_BLOCK)[2] == {
-        spec.instance_name(spec.BASE_BAR, 1), spec.instance_name(spec.CARRIAGE, 1),
+        spec.instance_name(spec.BASE_BAR_2, 0), spec.instance_name(spec.CARRIAGE, 1),
     }
 
 
@@ -1479,6 +1485,9 @@ def test_bom_identity_is_the_registry() -> None:
         assert drawing.BOM_PART_NUMBERS[stem] == _config.parts(physical)["number"]
     assert set(drawing.BOM_PART_NUMBERS) == set(spec.BOM_ORDER)
     assert drawing.BOM_COMPONENT_IDENTITIES == spec.COMPONENT_IDENTITIES
+    # TL-20's two members (PR2) print its one Number, no second part number.
+    assert drawing.BOM_PART_NUMBERS[spec.BASE_BAR_1] == "MHA-CH-06-TL-20"
+    assert drawing.BOM_PART_NUMBERS[spec.BASE_BAR_2] == "MHA-CH-06-TL-20"
     # Every member of a kit prints its kit's one Number.
     assert {
         family: drawing.BOM_PART_NUMBERS[family] for family in spec.KIT_IDENTITIES
@@ -1568,7 +1577,7 @@ def _native_component(family, index=0, *, simplified=True):
 def test_component_census_distinguishes_shared_file_members(
     native_bom_bindings, simplified
 ):
-    for family in spec.KIT_IDENTITIES:
+    for family in spec.MEMBER_IDENTITIES:
         component = _native_component(family, simplified=simplified)
         assert drawing._component_stem(component) == family
 

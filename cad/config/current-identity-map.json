@@ -46,17 +46,6 @@
       ]
     },
     {
-      "old_stem": "ch-rocker-arm-tl-oblique-kp08-screw",
-      "old_number": "MHA-CH-006-TL-45",
-      "new_identities": [
-        {
-          "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-kp08-screw",
-          "number": "MHA-CH-06-TL-VN-65"
-        }
-      ]
-    },
-    {
       "old_stem": "ch-rocker-arm-tl-oblique-leadscrew",
       "old_number": "MHA-CH-006-TL-34",
       "new_identities": [
@@ -2715,6 +2704,18 @@
           "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-nut-screw",
           "number": "MHA-CH-06-TL-VN-66"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-kp08-screw",
+      "old_number": "MHA-CH-006-TL-45",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm-tl-oblique-jig",
+          "stem": "ch-rocker-arm-tl-vn-oblique-kp08-screw",
+          "number": "MHA-CH-06-TL-VN-65"
         }
       ],
       "status": "retired"

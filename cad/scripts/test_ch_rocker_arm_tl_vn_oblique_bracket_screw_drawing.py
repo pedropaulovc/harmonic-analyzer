@@ -1,4 +1,4 @@
-"""Offline contracts for the MHA-CH-06-TL-VN-62 end bracket screw (McMaster 91251A196)."""
+"""Offline contracts for the MHA-CH-06-TL-VN-62 KP08 screw (McMaster 91251A196)."""
 
 from __future__ import annotations
 
@@ -44,9 +44,11 @@ def test_catalogue_row_is_the_registered_mcmaster_screw() -> None:
 
 
 def test_quantity_thread_and_length_are_the_fastener_tables() -> None:
-    row = fasteners.BRACKET_TO_BAR
+    # PR2 (owner ruling Main 2026-11-06, option B): the KP08 screws, two a
+    # KP08, the expressly approved second length.
+    row = fasteners.KP08_TO_BRACKET
     assert spec.ROW is row
-    assert int(_config.parts(STEM)["quantity"]) == spec.QUANTITY == row.count
+    assert int(_config.parts(STEM)["quantity"]) == spec.QUANTITY == row.count == 4
     assert (dims.THREAD, dims.LENGTH_TEXT, fasteners.SHCS) == (
         row.thread,
         row.length,
@@ -55,6 +57,26 @@ def test_quantity_thread_and_length_are_the_fastener_tables() -> None:
     assert dims.DIMS.length == pytest.approx(row.length_mm)
     assert dims.DIMS.major_dia == pytest.approx(row.major_mm, abs=1e-3)
     assert spec.CALLOUT == fasteners.callout(row) == "#8-32 X 5/8 SHCS"
+
+
+def test_head_covers_the_kp08_hole_at_full_float() -> None:
+    """The #8 at its UNC-3A minimum major floats 0.487 in the KP08's Ø5
+    (UNVERIFIED, #2184); the head's least flat bearing (ASME B18.3-2012
+    Table 1 #8: A min .257 less the K .008 edge break on each side, note
+    (12): .241) still covers the hole by 0.561, 0.074 more than the float,
+    so it bears on the foot."""
+    assert spec.HEAD_DIA_MIN == pytest.approx(0.257 * IN)
+    assert spec.HEAD_EDGE_BREAK_MAX == pytest.approx(0.008 * IN)
+    assert spec.HEAD_BEARING_DIA_MIN == pytest.approx(
+        spec.HEAD_DIA_MIN - 2.0 * spec.HEAD_EDGE_BREAK_MAX
+    )
+    assert spec.HEAD_BEARING_DIA_MIN == pytest.approx(0.241 * IN)
+    assert spec.HEAD_BEARING_R == pytest.approx(spec.HEAD_BEARING_DIA_MIN / 2.0)
+    assert spec.HOLE_FLOAT == pytest.approx((5.0 - 0.1585 * IN) / 2.0)
+    assert spec.HEAD_OVER_HOLE == pytest.approx(0.561, abs=1e-3)
+    assert spec.HEAD_OVER_HOLE - spec.HOLE_FLOAT == pytest.approx(0.0736, abs=1e-3)
+    assert spec.HEAD_OVER_HOLE > spec.HOLE_FLOAT
+    assert spec.TENSILE_PSI == 170_000
 
 
 def test_standalone_recipe_run_is_catalog_only() -> None:

@@ -149,7 +149,6 @@ _INSERTED_SOURCES = {
     "ch_rocker_arm_tl_vn_oblique_handwheel sh_vn_clamping_kit_hardware "
     "ch_rocker_arm_tl_vn_oblique_rail_screw ch_rocker_arm_tl_vn_oblique_bracket_screw "
     "ch_rocker_arm_tl_vn_oblique_carriage_screw "
-    "ch_rocker_arm_tl_vn_oblique_kp08_screw "
     "ch_rocker_arm_tl_vn_oblique_riser_screw ch_rocker_arm_tl_vn_oblique_clamp_screw "
     "ch_rocker_arm_tl_vn_oblique_lever_screw ch_rocker_arm_tl_vn_oblique_lever_washer "
     "ch_rocker_arm_tl_vn_oblique_pivot_screw ch_rocker_arm_tl_vn_oblique_pivot_spacer "

@@ -5,9 +5,11 @@ ruling #2083), 17.32 long (the 450 kit rail overhangs its far end, owner ruling
 2026-11-04, #2177 option B), with the HGR15 kit rail's eight #8-32 tapped
 holes on the rail axis (off the bar's centreline, the column-side edge 3.50
 from it) and two hold-down slots across it
-(``ch_rocker_arm_tl_oblique_base_bar_spec``). One part, one configuration,
-two off: the second bar is the same part turned over. Issue #290: an IPS
-document; the globals keep their millimetre values with the mm suffix.
+(``ch_rocker_arm_tl_oblique_base_bar_spec``). One part, one Number, two
+named configurations, one off each (``CONFIGURATIONS``): ``Bar1`` under rail
+1 carries the end brackets' holes; ``Bar2`` under rail 2, the same body
+turned over, suppresses them (``CONFIGURATION_FEATURES``). Issue #290: an
+IPS document; the globals keep their millimetre values with the mm suffix.
 
 Layout: ONE Front-plane profile -- the bar rectangle from its spindle-end
 face (model x 0), its -Y side ``RAIL_ROW_Y`` below the rail axis, with the
@@ -16,9 +18,12 @@ two slot stadiums inside it, both located from the faced -Y side's corner
 the faced thickness; the rail holes are one Hole Wizard feature tapped THRU
 from the top face. The row's printed lateral station (3.50 from the -Y
 edge) lives on a hidden reference sketch, ``RailRowReference``. The leadscrew
-brackets' eight #8 holes are one counterbored Hole Wizard feature from the
-underside, one printed station per KP08 station; their four rows print from
-the -Y edge on a second hidden reference sketch, ``BracketRowReference``.
+brackets' four #8 holes (Bar1) are one counterbored Hole Wizard feature from
+the underside, one printed station per KP08 station; their two rows print
+from the -Y edge on a second hidden reference sketch, ``BracketRowReference``.
+The member configurations, their BOM identities and the save are
+``_purchased_part_variants``'s (``create_member_configurations``,
+``select_member_features``, ``apply_member_properties``, ``save_member_part``).
 
 Run (SolidWorks already open)::
 
@@ -46,10 +51,18 @@ from _holes import SharedCoordinate, wizard_holes
 from _part_checks import report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
 from _part_pmi import author_part_pmi
-from _part_save import save_part_and_images
 from _metric_vendor_dimension import set_metric_vendor_units
 from _rebuild import force_rebuild
 from _saved_part_guard import require_saved_drawing_properties
+from _purchased_part_variants import (
+    apply_member_properties,
+    assert_member_properties,
+    assert_member_suppression,
+    create_member_configurations,
+    require_member_configurations,
+    save_member_part,
+    select_member_features,
+)
 from _session import run_build
 from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _sketch import (
@@ -71,6 +84,9 @@ from ch_rocker_arm_tl_oblique_base_bar_spec import (
     BRACKET_HOLE_DIA,
     BRACKET_HOLE_SPEC,
     BRACKET_WALL_MIN,
+    CONFIGURATION_DESCRIPTIONS,
+    CONFIGURATION_FEATURES,
+    CONFIGURATIONS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FAR_SLOT_RISE,
@@ -110,9 +126,9 @@ SLOT_AREA = SLOT_RUN * SLOT_WIDTH + math.pi * (SLOT_WIDTH / 2.0) ** 2
 V_BAR = (BAR_LENGTH * BAR_WIDTH - 2.0 * SLOT_AREA) * BAR_THICK
 V_TAPPED = V_BAR - len(RAIL_HOLE_X) * math.pi * (TAP_DRILL / 2.0) ** 2 * BAR_THICK
 
-# The leadscrew layout's eight bracket holes, station by station (near, far),
-# each a row of four (ruling A′), innermost row first: each station shares one
-# printed station, each row one printed height.
+# The leadscrew layout's four bracket holes (Bar1 only), station by station
+# (near, far), each a pair across the KP08's 42 mm foot pitch, inner row
+# first: each station shares one printed station, each row one printed height.
 BRACKET_HOLES = leadscrew.BASE_BAR_HOLES
 BRACKET_NEAR_X = BRACKET_HOLES[0][0]
 BRACKET_FAR_X = BRACKET_HOLES[-1][0]
@@ -121,7 +137,7 @@ if BRACKET_HOLES != tuple(
     (x, y) for x in (BRACKET_NEAR_X, BRACKET_FAR_X) for y in BRACKET_ROW_Y
 ):
     raise AssertionError("bracket placement assumes two stations on shared rows")
-# Each row from the faced -Y edge: 2.425, 1.768, .902, .245.
+# Each row from the faced -Y edge: 54.909 and 12.909 mm.
 BRACKET_ROWS = tuple(y - LOW_SIDE_Y for y in BRACKET_ROW_Y)
 _walls = bracket_hole_walls(BRACKET_HOLES)
 if min(_walls.values()) < BRACKET_WALL_MIN:
@@ -131,6 +147,10 @@ V_BRACKETED = V_TAPPED - len(BRACKET_HOLES) * math.pi * (
     + ((BRACKET_CBORE_DIA / 2.0) ** 2 - (BRACKET_HOLE_DIA / 2.0) ** 2)
     * BRACKET_CBORE_DEPTH
 )
+# Each member's own volume: Bar1 with the bracket holes, Bar2 without.
+V_BY_CONFIGURATION = dict(zip(CONFIGURATIONS, (V_BRACKETED, V_TAPPED), strict=True))
+if set(CONFIGURATION_FEATURES) != set(CONFIGURATIONS):
+    raise AssertionError("every base bar member owns its feature list")
 # The wizard dimensions each hole from the origin (on the rail axis): the
 # first of each station carries the station, the near station's holes the
 # rows (the rail row's 3.50 less the row's height); the rest share them.
@@ -278,12 +298,31 @@ async def _slot(
         dims.record("FarSlotRise", '"FarSlotRise"')
 
 
+async def _readback(adapter, configuration: str) -> None:
+    """Assert the selected member without authoring, repairing or saving it:
+    its own bracket features (present in Bar1 only), BOM identity and volume."""
+    assert_member_suppression(adapter, configuration, CONFIGURATION_FEATURES)
+    assert_member_properties(
+        adapter, PART_NAME, configuration, CONFIGURATION_DESCRIPTIONS[configuration], {}
+    )
+    await volume_check(
+        adapter,
+        f"base bar member {configuration}",
+        V_BY_CONFIGURATION[configuration],
+        _V_TOL,
+    )
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
+    require_member_configurations(PART_NAME, CONFIGURATIONS)
     check("create_part", await adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
+    # Bar1 (the default) is active while every feature is authored; new
+    # features stay unsuppressed in Bar2 until the member selection below.
+    await create_member_configurations(adapter, PART_NAME, CONFIGURATIONS)
 
     # The mm suffix is load-bearing: the equation manager reads bare numbers
     # in document units.
@@ -489,10 +528,9 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven bar (equations neutral)", V_BRACKETED, _V_TOL)
 
-    # Every model edit -- material, marked set, model-owned places -- precedes
-    # the save.
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    # Every model edit -- marked set, model-owned places, member selection,
+    # material -- precedes the save. The dimension edits run in Bar1, where
+    # the bracket features they touch are unsuppressed.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     # The metric vendor lines' stations (the HGR15 rail's holes, the KP08
     # stations; owner ruling 4) print exact millimetres with their own bands,
@@ -520,7 +558,30 @@ async def build(adapter) -> dict[str, str]:
     # imports their dimensions (_drawing_hidden_sketches).
     blank_sketch(adapter, "RailRowReference")
     blank_sketch(adapter, "BracketRowReference")
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    # Each member: its own bracket features (Bar1's, suppressed in Bar2), the
+    # library material and its BOM identity (one Number, member description).
+    for configuration in CONFIGURATIONS:
+        await select_member_features(adapter, configuration, CONFIGURATION_FEATURES)
+        await apply_material(adapter, MATERIAL)
+        apply_member_properties(
+            adapter,
+            PART_NAME,
+            configuration,
+            CONFIGURATION_DESCRIPTIONS[configuration],
+            {},
+        )
+        await report_mass_properties(adapter)
+    # The faced seats' Ra PMI floats past the isometric's right border in 3D:
+    # the member PNGs render with model annotations hidden; the saved part,
+    # and so the drawing, keeps them.
+    artefacts = await save_member_part(
+        adapter,
+        PART_NAME,
+        CONFIGURATIONS,
+        material=MATERIAL,
+        readback=_readback,
+        hide_model_annotations=True,
+    )
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
 

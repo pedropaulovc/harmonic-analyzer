@@ -1,20 +1,24 @@
 r"""Create the drawing for the oblique trammel's base bar (MHA-CH-06-TL-20).
 
-One part, one configuration, two off (the title block's quantity); the
-second bar is the same part turned over. Its plan (the *Front view, looking
-down on the top face) carries the bar's length and milled width (owner
-ruling #2083), the rail holes' baseline stations and the
+One part, two named configurations, one off each: ``Bar1`` under rail 1
+carries the end brackets' holes; ``Bar2``, turned over under rail 2, is the
+same bar without them. Each member has its own sheet (``SHEET_NAMES``), its
+views referencing that configuration, and prints its member's Description
+and quantity 1 (``member_note``) under the one Number. Bar 1's plan
+(the *Front view, looking down on the top face) carries the bar's length and
+milled width (owner ruling #2083), the rail holes' baseline stations and the
 row's lateral station from the -Y edge under one native tap callout, the end
-brackets' eight counterbored holes (stations from the end face, four rows
-from the -Y edge, one native callout naming the far-side counterbores and the
-TL-28 mate), and both slots' stations, rises, width and centre-to-centre run
-(slot centre marks); the end view, projected right of the plan on its
+brackets' four counterbored holes (stations from the end face, two rows from
+the -Y edge, one native callout naming bar 1, the far-side counterbores and
+the TL-28 mate), and both slots' stations, rises, width and centre-to-centre
+run (slot centre marks); the end view, projected right of the plan on its
 centreline, carries the faced thickness and both faced seats' Ra 125 µin
 under their one reason; the shaded isometric rides bottom left under the
-plan's stack, left of the title block. The sheet prints decimal inch
-(#290); the model keeps its millimetre nominals. The rail holes' and the
-brackets' stations belong to metric vendor lines (HGR15, KP08) and print
-exact millimetres, labelled mm (owner ruling 4, 2026-11-01).
+plan's stack, left of the title block. Bar 2's sheet is the same layout
+less the brackets' holes, their stations, rows and callout. The sheet prints decimal inch
+(#290); the model keeps its millimetre nominals. The rail holes' stations
+and the brackets' stations and rows belong to metric vendor lines (HGR15,
+KP08) and print exact millimetres, labelled mm (owner ruling 4, 2026-11-01).
 
 Run with SolidWorks open::
 
@@ -42,6 +46,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
@@ -51,6 +56,7 @@ from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_callout_thread_class import omit_title_block_thread_class
@@ -64,6 +70,7 @@ from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _surface_finish import SEAT_UM, surface_finish_by_key
 from _printed_limits import limits
+from _purchased_variant_drawing import configure_reference_views
 from _part_properties import part_drawing_unit
 from _printed_tolerance import drilled_oversize_mm
 from _drawing_metric_vendor import print_imported_metric_dimensions
@@ -106,6 +113,11 @@ OUTPUTS = DrawingOutputs(
     slddrw=SPEC.outputs["slddrw"], pdf=SPEC.outputs["pdf"], png=SPEC.outputs["png"]
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
+# One sheet per member, each drawing its own configuration in full: sheet 1
+# Bar1 with the end brackets' holes, sheet 2 Bar2 without them. Both share
+# the one Number; each sheet's note names its member and quantity.
+SHEET_NAMES = ("BAR 1", "BAR 2")
+MEMBER_SHEETS = dict(zip(SHEET_NAMES, part_spec.CONFIGURATIONS, strict=True))
 
 # A 17.32 x 5.50 x .47 bar: 1:2 puts the 220-wide plan on the B sheet, its end
 # view projected right of it on the same centreline (third angle). The
@@ -119,10 +131,11 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 # of the title block (x from about 216). The 2026-10-17 widening (1/2 x 4 to
 # 1/2 x 6, ruling A′) grew the plan and the end view 25.4 taller and the iso
 # about 8: the plan drops 11.0, as far as the rail-hole stack allows, so the
-# iso (about 66 x 62) still fits under the stack; its four bracket rows (two
-# before A′) take three lanes right of the plan, so the end view moves 21.5
-# right to clear the outermost row's text, and 5 more for the far slot's
-# rise outside them (c3-r6). c4-r8 read the 400.00 block's top line touching
+# iso (about 66 x 62) still fits under the stack; its bracket rows (four
+# under A′, two again under PR2's two-hole TL-28, now in metric) take lanes
+# right of the plan, so the end view moved 21.5 right to clear the row texts,
+# and 5 more for the far slot's rise outside them (c3-r6). c4-r8 read the
+# 400.00 block's top line touching
 # the border: the plan and end view drop 3, the iso staying put, its top 7
 # under the length's text. The 2026-10-30 narrowing to 5.50 shortens the
 # plan and end view 12.7 at the +Y side. #290 moved the plan and end view 3
@@ -148,6 +161,24 @@ ISO_NOTE_XY = (
     ISO_CENTER[0] + ISO_HALF[0] + 0.005,
     ISO_CENTER[1] - ISO_HALF[1] + ISO_NOTE_HEIGHT,
 )
+# Each sheet names its member and its quantity above the iso note, in the
+# same free corner (machinist review 0c3ed35988: the title block prints the
+# one Number for both sheets). One part number, named configurations (the
+# coordinator's ruling); the member's Description and Quantity are the
+# configuration properties the builder writes.
+MEMBER_NOTE_LINES = 2
+MEMBER_NOTE_XY = (
+    ISO_NOTE_XY[0],
+    ISO_NOTE_XY[1] + 0.003 + MEMBER_NOTE_LINES * ISO_NOTE_HEIGHT + 0.0015,
+)
+
+
+def member_note(configuration: str) -> str:
+    """The member's sheet label: its Description over its quantity."""
+    return (
+        f"{part_spec.CONFIGURATION_DESCRIPTIONS[configuration]}\n"
+        f"QTY {part_spec.CONFIGURATION_QUANTITIES[configuration]}"
+    )
 
 
 def _sheet_x(center: tuple[float, float], model_x_mm: float) -> float:
@@ -173,12 +204,12 @@ _LEFT = FRONT_CENTER[0] - _HALF_L_SHEET
 _RIGHT = FRONT_CENTER[0] + _HALF_L_SHEET
 TAP_R_SHEET = TAP_DRILL * _S / 2000.0
 BRACKET_R_SHEET = BRACKET_HOLE_DIA * _S / 2000.0
-# The leadscrew layout's bracket holes: a row of four at each KP08 station
-# (near, far), innermost first.
+# The leadscrew layout's bracket holes (Bar1 only): a pair at each KP08
+# station (near, far), inner row first.
 BRACKET_HOLES = leadscrew.BASE_BAR_HOLES
 BRACKET_NEAR_X = BRACKET_HOLES[0][0]
 BRACKET_FAR_X = BRACKET_HOLES[-1][0]
-# The four rows (ruling A′), innermost first, as the builder's.
+# The two rows, the inner first, as the builder's.
 BRACKET_ROW_Y = tuple(-lateral for lateral in leadscrew.BAR_SCREW_LATERALS)
 BRACKET_OUTER_Y = BRACKET_ROW_Y[-1]
 LANE = 0.008  # one side-dimension lane
@@ -216,8 +247,11 @@ def _below_line(k: int) -> float:
 # station, the far slot's, the far row's, the length. A span shorter than
 # its text prints the text beside it, clear of both extension lines (r2
 # struck "2X 13.50" and "20.9" with their own lines): the near station's
-# right of the slot's centre line; the near row's (57.000 ±0.13 mm, wider
-# than its span) right of its own extension line. The width's "2X 13.50 THRU"
+# left of the end face's extension line, where no other line runs (right of
+# the slot's centre line it stood about 1.2 short of the near bracket row's
+# extension line once the centred feed block moved that row to 47.484); the
+# near row's (its metric station and band, wider than its span) right of its
+# own extension line. The width's "2X 13.50 THRU"
 # (r5: the slots' depth) sits right of the near row's extension line, which
 # runs down through lane 0 too close to the slot for the text to fit
 # between them (Y14.5 lets an extension line cross a dimension line).
@@ -227,11 +261,10 @@ def _below_line(k: int) -> float:
 # callout lines under it; r3), the width, whose text rides above the
 # row's line so the row's upper extension line ends short of it. The row's
 # three-line block sits above the near rise's upper extension line.
-# Right of it: the bracket rows from the -Y edge (the outer row's 6.400
+# Right of it: the bracket rows from the -Y edge (the outer row's 12.909
 # below the bar, its span too short, its text right of its line on a
-# shoulder; each taller row mid-span, one lane further out, its line far
-# enough out that its outside arrow under the bar's edge clears the 6.400's
-# text: c4-r2 struck the "8" and bunched the two lines), the far slot's run
+# shoulder; the inner row mid-span, one lane further out, its text clear of
+# the outer row's line), the far slot's run
 # (2X; the far slot so the dimension lands off the part), its text below the
 # 3 mm span (r2 struck "2X 6.00" with its arrows), then the far slot's rise
 # from the -Y edge, the datum of every other location in the view (c3-r6,
@@ -254,12 +287,14 @@ _RAIL_ROW_TEXT_HALF = 0.0182
 _BAR_WIDTH_TEXT_HALF = 0.0055
 # The metric vendor stations at about 2.6 a glyph (owner ruling 4).
 _RAIL_HOLE_TEXT_HALF = 0.0221  # Three-place station and band, 17 glyphs maximum
-_BRACKET_NEAR_X_TEXT_HALF = 0.0195  # "57.000 ±0.13 mm", 15 glyphs
-_BRACKET_ROW_TEXT_HALF = 0.0070  # "2.425": "61.400" was 13.9 wide on the c4-r9 sheet
-_BRACKET_OUTER_TEXT_BELOW = 0.004  # "6.400"'s centre under the bar's -Y edge
-# SolidWorks sets an outside text right of its own line on a shoulder: the
-# 6.800 spanned from about 1.5 to 14.2 right of its line (c4-r2 sheet).
-_SHOULDER_TEXT_SPAN = (0.0015, 0.0142)
+_BRACKET_NEAR_X_TEXT_HALF = 0.0195  # "47.48 ±0.13 mm", 14 glyphs; 15 allowed
+_BRACKET_ROW_TEXT_HALF = 0.0195  # "54.909 ±0.13 mm", 15 glyphs
+_BRACKET_OUTER_TEXT_BELOW = 0.004  # "12.909 ±0.13 mm"'s centre under the -Y edge
+# The outer row's keep x is its LINE's x: with its text below its span,
+# SolidWorks draws the line at the keep point and stands the text on a
+# shoulder right of it (0c3 farm sheet). A keep a text gap and a half-text
+# right of the lane put that line on the inner row's x, and its outside
+# arrowhead struck the 54.909's "±" (machinist review, 0c3ed35988).
 _SLOT_RUN_TEXT_LOW = 0.0055  # text centre below the run's lower line
 # The row's block: three lines, 14.6 tall (measured on the 2026-10-30 farm
 # sheet). The near rise (49.4) carries its text inside its own span, so the
@@ -281,32 +316,18 @@ _RAIL_ROW_LANE = LANE + 0.0025 + _RAIL_ROW_TEXT_HALF
 _BAR_WIDTH_LANE = _RAIL_ROW_LANE + _RAIL_ROW_TEXT_HALF + 0.002
 _SLOT_RUN_LANE = 0.011  # its text's left end clears the bar's end face
 _BRACKET_OUTER_LANE = LANE
-# The next row's (22.900) line clears the 6.400's shouldered text by 3.8.
-_BRACKET_INNER_LANE = LANE + _SHOULDER_TEXT_SPAN[1] + 0.0038  # 0.026
-# Each taller row one step further out (ruling A′'s four rows): its mid-span
-# text clears the shorter row's line and that row's extension-line overshoot
-# by 2.5 past a 2 overshoot (the texts and extension lines share heights).
-_BRACKET_ROW_STEP = 0.0115
-_BRACKET_ROW_LANES = (
-    *(
-        _BRACKET_INNER_LANE + step * _BRACKET_ROW_STEP
-        for step in range(len(BRACKET_ROW_Y) - 2, -1, -1)
-    ),
-    _BRACKET_OUTER_LANE,
-)  # rows 1-4: 0.049, 0.0375, 0.026, 0.008
-# The far rise (c3-r6) past the outermost row: its text sits above that
-# row's upper extension line, so its line need only clear the row's text, by
-# 1.5 (c4-r9: one stack lane out, the line struck the 61.400's last "0",
-# which reached 0.9 past it). Its text then stands 3.3 left of the end view.
-_FAR_RISE_LANE = _BRACKET_ROW_LANES[0] + _BRACKET_ROW_TEXT_HALF + 0.0015  # 0.0575
-# Rows 2 and 3 print mid-span; c4-r8 read the 44.900 and 61.400 texts, both
-# mid-span, as one cluster, so the outermost row's text stands at the top of
-# its span instead, 5 under its upper arrow tip.
-_ROW_TEXT_UNDER_TIP = 0.005
-_BRACKET_ROW_TEXT_Y = (
-    _sheet_y(FRONT_CENTER, BRACKET_ROW_Y[0]) - _ROW_TEXT_UNDER_TIP - 0.00175,
-    *(_sheet_y(FRONT_CENTER, (LOW_SIDE_Y + y) / 2.0) for y in BRACKET_ROW_Y[1:-1]),
-)
+# The inner row's mid-span text clears the outer row's line by a text gap;
+# it stands above the outer row's span, so the shouldered text below the
+# bar does not reach it.
+_BRACKET_INNER_LANE = _BRACKET_OUTER_LANE + _TEXT_GAP + _BRACKET_ROW_TEXT_HALF  # 0.030
+_BRACKET_ROW_LANES = (_BRACKET_INNER_LANE, _BRACKET_OUTER_LANE)
+# The far rise (c3-r6) past the inner row: its text sits above that row's
+# upper extension line, so its line need only clear the row's text, by 1.5
+# (c4-r9: one stack lane out, the line struck the 61.400's last "0", which
+# reached 0.9 past it). Its text then stands left of the end view.
+_FAR_RISE_LANE = _BRACKET_ROW_LANES[0] + _BRACKET_ROW_TEXT_HALF + 0.0015  # 0.051
+# The inner row's text mid-span between the -Y edge and its row.
+_BRACKET_ROW_TEXT_Y = (_sheet_y(FRONT_CENTER, (LOW_SIDE_Y + BRACKET_ROW_Y[0]) / 2.0),)
 _LAST_HOLE = len(RAIL_HOLE_X)
 # Each station's text centre (model x): left of the end face, or mid-span.
 _HOLE_TEXT_LEFT = -(_TEXT_GAP + _RAIL_HOLE_TEXT_HALF) * 1000.0 / _S
@@ -335,7 +356,7 @@ FRONT_KEEP = {
         _below_line(0) + TEXT_DROP,
     ),
     "NearSlotX": (
-        _sheet_x(FRONT_CENTER, NEAR_SLOT_X) + _TEXT_GAP + _NEAR_SLOT_X_TEXT_HALF,
+        _LEFT - _TEXT_GAP - _NEAR_SLOT_X_TEXT_HALF,
         _below_line(1) + TEXT_DROP,
     ),
     "BracketHole1X": (
@@ -343,7 +364,7 @@ FRONT_KEEP = {
         _below_line(2) + TEXT_DROP,
     ),
     "FarSlotX": (_sheet_x(FRONT_CENTER, FAR_SLOT_X / 2.0), _below_line(3) + TEXT_DROP),
-    "BracketHole5X": (
+    "BracketHole3X": (
         _sheet_x(FRONT_CENTER, BRACKET_FAR_X / 2.0),
         _below_line(4) + TEXT_DROP,
     ),
@@ -408,12 +429,14 @@ CALLOUTS_BELOW = {
 # about 6 (r3 printed its first line touching it), and stand 10 right of the
 # outermost station's extension line (hole 8, 4.93 mm in from the far end).
 TAP_CALLOUT_XY = (0.327, 0.256)
-# The bracket callout's four lines (two process, two native), centred about
+# The bracket callout's five lines (three process, two native), centred about
 # here: right of the length's extension line, under the end view, above the
 # title block (the widening dropped the end view's foot 13, so the block
-# drops 20 and moves 10 right to keep its leader under the 6.400's text; it
-# drops 6 more with the views for the kit rail's eighth station lane).
-BRACKET_CALLOUT_XY = (0.345, 0.099)
+# drops 20 and moves 10 right; it drops 6 more with the views for the kit
+# rail's eighth station lane). PR2's two rows: 2 lower and left again, so
+# the leader from the far outer hole leaves the bar's end 2 under its edge
+# and passes left of the outer row's shouldered text.
+BRACKET_CALLOUT_XY = (0.343, 0.097)
 
 part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME",))
 
@@ -656,7 +679,8 @@ for _index, _x in enumerate(part_spec.RAIL_HOLE_X, start=1):
         },
     )
 
-_BRACKET_PLACES = part_spec.BRACKET_HOLE_PLACES
+_ROW_PLACES = part_spec.BRACKET_ROW_PLACES
+_ROW_BAND = (part_spec.BRACKET_ROW_BAND, -part_spec.BRACKET_ROW_BAND)
 _STATION_PLACES = part_spec.BRACKET_STATION_PLACES
 _STATION_BAND = (part_spec.BRACKET_STATION_BAND, -part_spec.BRACKET_STATION_BAND)
 _CBORE_PLACES = part_spec.BRACKET_CBORE_PLACES
@@ -664,9 +688,9 @@ _BRACKET_DIA_PRINTED = _printed(BRACKET_HOLE_DIA, _CALLOUT_PLACES)
 _FROM_UNDERSIDE = ([0.0, 0.0, 1.0], ("__frame__",))
 _BRACKET_SOURCE = (("ch_rocker_arm_tl_vn_oblique_leadscrew_spec", "BASE_BAR_HOLES"),)
 for _index, (_x, _y) in enumerate(BRACKET_HOLES, start=1):
-    # Stations from the spindle-end face (the KP08's, exact millimetres with
-    # their own band), rows from the faced -Y side at .XXX: each row holds
-    # TL-28's four taps inside the screws' float.
+    # Stations from the spindle-end face and rows from the faced -Y side, both
+    # the KP08's (exact millimetres with their own band): each pair holds
+    # TL-28's two holes inside the screws' float. Bar1 only.
     requirement(
         f"bracket_hole_{_index}",
         kind="hole",
@@ -681,8 +705,8 @@ for _index, (_x, _y) in enumerate(BRACKET_HOLES, start=1):
             ),
             "station_nominal": (_x, _BRACKET_SOURCE),
             "height": (
-                _limits(_y - part_spec.LOW_SIDE_Y, _BRACKET_PLACES),
-                (*_BRACKET_SOURCE, "LOW_SIDE_Y", "BRACKET_HOLE_PLACES"),
+                limits(_y - part_spec.LOW_SIDE_Y, _ROW_PLACES, _ROW_BAND),
+                (*_BRACKET_SOURCE, "LOW_SIDE_Y", "BRACKET_ROW_PLACES", "BRACKET_ROW_BAND"),
             ),
             "height_nominal": (
                 _y - part_spec.LOW_SIDE_Y,
@@ -704,7 +728,7 @@ for _index, (_x, _y) in enumerate(BRACKET_HOLES, start=1):
         },
         precision={
             "station": _STATION_PLACES,
-            "height": _BRACKET_PLACES,
+            "height": _ROW_PLACES,
             "dia": _CALLOUT_PLACES,
         },
     )
@@ -827,6 +851,185 @@ def _add_view_note(
         raise RuntimeError(f"{label} note did not land in its view: {texts!r}")
 
 
+_CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
+
+
+def _dangling_center_marks(view: Any) -> list[Any]:
+    marks = _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION)
+    annotations = (_early_bound(mark, "IAnnotation") for mark in marks or ())
+    return [annotation for annotation in annotations if annotation.IsDangling()]
+
+
+def _delete_dangling_center_marks(adapter: Any, view: Any, *, label: str) -> None:
+    """Delete the centre marks left on no hole, and read none back.
+
+    The 0c3ed35988 farm sheet's Bar2 plan printed four dangling marks where
+    Bar1's bracket holes are (machinist review: orphan centre marks): marks
+    made on the member the view showed before it referenced Bar2, which
+    suppresses those holes. Bar 1's plan has none, so this is a no-op there.
+    """
+    dangling = _dangling_center_marks(view)
+    if dangling:
+        draw = adapter.currentModel
+        draw.ClearSelection2(True)
+        for index, mark in enumerate(dangling):
+            if not mark.Select2(index > 0, 0):
+                raise RuntimeError(f"cannot select a dangling {label} centre mark")
+        draw.EditDelete()  # VT_VOID: the re-read below is the proof
+        draw.ClearSelection2(True)
+        rebuild_drawing(adapter, label=f"delete dangling {label} centre marks")
+    if _dangling_center_marks(view):
+        raise RuntimeError(f"the {label} keeps a dangling centre mark")
+
+
+def member_front_keep(configuration: str) -> dict[str, tuple[float, float]]:
+    """The plan's kept dimensions for one member: Bar2's plan has no bracket
+    holes or rows, and every other dimension sits where bar 1's does."""
+    names = part_spec.MEMBER_DRAWING_DIMENSIONS[configuration]
+    return {name: xy for name, xy in FRONT_KEEP.items() if name in names}
+
+
+def _draw_member_sheet(adapter: Any, configuration: str) -> None:
+    """One member's full sheet on the active sheet: plan, end view and
+    isometric of ``configuration``, with every dimension, callout, finish and
+    note its features need."""
+    # Explicit per-view scale: a view placed without one can silently
+    # auto-scale, which shifts every coordinate-based pick on it. The end view
+    # shares the plan's centre height: projected right of it (r2 hung it low).
+    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
+    end = place_view(adapter, str(SOURCE), "*Right", *END_CENTER, scale=VIEW_SCALE)
+    # finalize_drawing shades the pictorial isometric with edges.
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    for view in (front, end, iso):
+        set_hidden_lines_removed(adapter, view)
+    # Every view on this sheet draws its own member (one Number); the
+    # member's own note names it and its quantity (member_note).
+    configure_reference_views(adapter, configuration, [front, end, iso])
+    names = part_spec.MEMBER_DRAWING_DIMENSIONS[configuration]
+
+    # The plan shows the hidden RailRowReference sketch (its 88.90) and, on
+    # bar 1's sheet only, BracketRowReference (its two bracket rows).
+    annotations = [
+        *curate_view_dimensions(
+            adapter,
+            front,
+            keep=member_front_keep(configuration),
+            view_label="plan",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        ),
+        *curate_view_dimensions(
+            adapter,
+            end,
+            keep=END_KEEP,
+            view_label="end view",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        ),
+    ]
+    # Places (and so each dimension's tolerance) are authored on the part; the
+    # sheet only proves the import kept them, then marks the slot counts and
+    # writes the mate callouts.
+    assert_imported_precision(
+        adapter,
+        annotations,
+        {name: places for name, places in DRAWING_PRECISION_BY_NAME.items() if name in names},
+    )
+    print_imported_metric_dimensions(
+        adapter,
+        annotations,
+        {
+            name: places
+            for (_feature, name), (places, _band) in METRIC_DIMENSIONS.items()
+            if name in names
+        } | {
+            name: places
+            for (_feature, name), places in part_spec.RAIL_REFERENCE_DIMENSIONS.items()
+            if name in names
+        },
+        references=DRAWING_DIMENSIONS["RailHoles"],
+    )
+    _set_dimension_text(adapter, annotations, DIMENSION_TEXT)
+    set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
+
+    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center marks to the plan")
+    # One mark on each slot's round ends (draw_ch_rocker_arm_tl_outline_template):
+    # the rises and the 2X 6.00 run land on them, so the run reads as
+    # centre-to-centre (rule 12) and not as the slot's overall length.
+    if not auto_center_marks(adapter, front, holes=False, slots=True, size=0.0025):
+        raise RuntimeError("failed to add the slot center marks to the plan")
+    _delete_dangling_center_marks(adapter, front, label="plan")
+    tap_callout = add_native_hole_callout(
+        adapter,
+        front,
+        edge_xy=(
+            _sheet_x(FRONT_CENTER, RAIL_HOLE_X[-1]) + 0.6 * TAP_R_SHEET,
+            _sheet_y(FRONT_CENTER, 0.0) + 0.8 * TAP_R_SHEET,
+        ),
+        callout_xy=TAP_CALLOUT_XY,
+        label="rail screw taps",
+    )
+    _omit_tap_thread_class(tap_callout)
+    # A THRU tap's callout carries no hw-tapdrldia (farm r1): every length
+    # it does carry prints .XXX.
+    set_callout_lengths_to_three_places(tap_callout, label="rail screw taps")
+    if configuration == part_spec.BAR1:
+        # The far outer hole's edge, down and right of its centre: the leader
+        # leaves away from the far row's station line.
+        bracket_callout = add_native_hole_callout(
+            adapter,
+            front,
+            edge_xy=(
+                _sheet_x(FRONT_CENTER, BRACKET_FAR_X) + 0.6 * BRACKET_R_SHEET,
+                _sheet_y(FRONT_CENTER, BRACKET_OUTER_Y) - 0.8 * BRACKET_R_SHEET,
+            ),
+            callout_xy=BRACKET_CALLOUT_XY,
+            label="end bracket holes",
+            process=BRACKET_CALLOUT_PROCESS,
+        )
+        set_hole_callout_precision(
+            bracket_callout, BRACKET_CALLOUT_PRECISION, label="end bracket holes"
+        )
+    # The faced seats' Ra 125 µin, each on its own face's edge in the end view,
+    # under their one reason (rule 7: say why, beside the symbols).
+    seat_edges = _seat_edges(end)
+    for key, symbol_xy, label in (
+        ("top_seat", TOP_SEAT_FINISH_XY, "top seat finish"),
+        ("underside_seat", UNDERSIDE_SEAT_FINISH_XY, "underside seat finish"),
+    ):
+        control = surface_finish_by_key(SURFACE_FINISHES, key)
+        z_mm = control.face.normal[2] * control.face.offset_mm
+        add_surface_finish(
+            adapter,
+            end,
+            symbol_xy=symbol_xy,
+            control=control,
+            label=label,
+            char_height=FINISH_CHAR_HEIGHT,
+            entity=seat_edges[key],
+            leader_attach_xy=model_point_in_view(
+                adapter,
+                end,
+                (
+                    BAR_LENGTH / 1000.0,
+                    (HIGH_SIDE_Y - SEAT_LAND_BELOW_TOP) / 1000.0,
+                    z_mm / 1000.0,
+                ),
+                label=f"{label} landing",
+            ),
+        )
+    _add_view_note(
+        adapter, end, SEAT_FINISH_REASON, SEAT_REASON_XY, label="seat finish reason"
+    )
+    _add_view_note(
+        adapter, front, member_note(configuration), MEMBER_NOTE_XY, label="member"
+    )
+
+    # The property-linked blocks land in the active view: the plan.
+    _activate_view(adapter, front, label="plan")
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -861,125 +1064,12 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    # Explicit per-view scale: a view placed without one can silently
-    # auto-scale, which shifts every coordinate-based pick on it. The end view
-    # shares the plan's centre height: projected right of it (r2 hung it low).
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
-    end = place_view(adapter, str(SOURCE), "*Right", *END_CENTER, scale=VIEW_SCALE)
-    # finalize_drawing shades the pictorial isometric with edges.
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    for view in (front, end, iso):
-        set_hidden_lines_removed(adapter, view)
-
-    # The plan shows the hidden RailRowReference and BracketRowReference
-    # sketches, whose 88.90 and four bracket rows it prints.
-    annotations = [
-        *curate_view_dimensions(
-            adapter,
-            front,
-            keep=FRONT_KEEP,
-            view_label="plan",
-            dimensions_by_feature=DRAWING_DIMENSIONS,
-        ),
-        *curate_view_dimensions(
-            adapter,
-            end,
-            keep=END_KEEP,
-            view_label="end view",
-            dimensions_by_feature=DRAWING_DIMENSIONS,
-        ),
-    ]
-    # Places (and so each dimension's tolerance) are authored on the part; the
-    # sheet only proves the import kept them, then marks the slot counts and
-    # writes the mate callouts.
-    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    print_imported_metric_dimensions(
-        adapter,
-        annotations,
-        {
-            name: places
-            for (_feature, name), (places, _band) in METRIC_DIMENSIONS.items()
-        } | {
-            name: places
-            for (_feature, name), places in part_spec.RAIL_REFERENCE_DIMENSIONS.items()
-        },
-        references=DRAWING_DIMENSIONS["RailHoles"],
-    )
-    _set_dimension_text(adapter, annotations, DIMENSION_TEXT)
-    set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
-
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center marks to the plan")
-    # One mark on each slot's round ends (draw_ch_rocker_arm_tl_outline_template):
-    # the rises and the 2X 6.00 run land on them, so the run reads as
-    # centre-to-centre (rule 12) and not as the slot's overall length.
-    if not auto_center_marks(adapter, front, holes=False, slots=True, size=0.0025):
-        raise RuntimeError("failed to add the slot center marks to the plan")
-    tap_callout = add_native_hole_callout(
-        adapter,
-        front,
-        edge_xy=(
-            _sheet_x(FRONT_CENTER, RAIL_HOLE_X[-1]) + 0.6 * TAP_R_SHEET,
-            _sheet_y(FRONT_CENTER, 0.0) + 0.8 * TAP_R_SHEET,
-        ),
-        callout_xy=TAP_CALLOUT_XY,
-        label="rail screw taps",
-    )
-    _omit_tap_thread_class(tap_callout)
-    # A THRU tap's callout carries no hw-tapdrldia (farm r1): every length
-    # it does carry prints .XXX.
-    set_callout_lengths_to_three_places(tap_callout, label="rail screw taps")
-    # The far outer hole's edge, down and right of its centre: the leader
-    # leaves away from the far row's station line.
-    bracket_callout = add_native_hole_callout(
-        adapter,
-        front,
-        edge_xy=(
-            _sheet_x(FRONT_CENTER, BRACKET_FAR_X) + 0.6 * BRACKET_R_SHEET,
-            _sheet_y(FRONT_CENTER, BRACKET_OUTER_Y) - 0.8 * BRACKET_R_SHEET,
-        ),
-        callout_xy=BRACKET_CALLOUT_XY,
-        label="end bracket holes",
-        process=BRACKET_CALLOUT_PROCESS,
-    )
-    set_hole_callout_precision(
-        bracket_callout, BRACKET_CALLOUT_PRECISION, label="end bracket holes"
-    )
-    # The faced seats' Ra 125 µin, each on its own face's edge in the end view,
-    # under their one reason (rule 7: say why, beside the symbols).
-    seat_edges = _seat_edges(end)
-    for key, symbol_xy, label in (
-        ("top_seat", TOP_SEAT_FINISH_XY, "top seat finish"),
-        ("underside_seat", UNDERSIDE_SEAT_FINISH_XY, "underside seat finish"),
-    ):
-        control = surface_finish_by_key(SURFACE_FINISHES, key)
-        z_mm = control.face.normal[2] * control.face.offset_mm
-        add_surface_finish(
-            adapter,
-            end,
-            symbol_xy=symbol_xy,
-            control=control,
-            label=label,
-            char_height=FINISH_CHAR_HEIGHT,
-            entity=seat_edges[key],
-            leader_attach_xy=model_point_in_view(
-                adapter,
-                end,
-                (
-                    BAR_LENGTH / 1000.0,
-                    (HIGH_SIDE_Y - SEAT_LAND_BELOW_TOP) / 1000.0,
-                    z_mm / 1000.0,
-                ),
-                label=f"{label} landing",
-            ),
-        )
-    _add_view_note(
-        adapter, end, SEAT_FINISH_REASON, SEAT_REASON_XY, label="seat finish reason"
-    )
-
-    # The property-linked blocks land in the active view: the plan.
-    _activate_view(adapter, front, label="plan")
-    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    ddoc = _early_bound(drawing_model, "IDrawingDoc")
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="base bar members")
+    for sheet_name, configuration in MEMBER_SHEETS.items():
+        if not ddoc.ActivateSheet(sheet_name):
+            raise RuntimeError(f"cannot activate the base bar sheet {sheet_name!r}")
+        _draw_member_sheet(adapter, configuration)
 
     return await finalize_drawing(
         adapter,
@@ -987,10 +1077,12 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Rocker Oblique Trammel Base Bar Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        # SolidWorks pins its own "#8-32 Tapped Hole" note to the plan once
-        # the tap carries a hole callout; the callout already states it.
+        expected_sheet_names=SHEET_NAMES,
+        # SolidWorks pins its own "#8-32 Tapped Hole" note to a plan once the
+        # tap carries a hole callout; the callout already states it. Each
+        # member's plan carries the rail taps' callout, so one per sheet.
         redundant_note_substrings=("Tapped Hole",),
-        expected_redundant_notes=1,
+        expected_redundant_notes=len(SHEET_NAMES),
     )
 
 

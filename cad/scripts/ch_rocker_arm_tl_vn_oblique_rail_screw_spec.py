@@ -4,7 +4,10 @@ PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  Shop fixture hardware (cad/docs/subsystem-identities.md), modelled
 so the jig assembly can mate it and run native interference: the
 ``#8-32 X 3/4 SHCS`` that holds an HGR15 kit rail to its TL-20 base bar, tapped THRU; the head seats on the rail's counterbore floor.
-It is the C4 fastener table's ``RAIL_TO_BAR`` row.  It is its own row on the
+It is also the screw that holds each TL-28 end bracket to TL-20 Bar1 from
+below, its head in the bar's counterbore: the jig's common screw
+(``fasteners.COMMON_SCREW``, oblique simplification PR2), the C4 fastener
+table's ``RAIL_TO_BAR`` and ``BRACKET_TO_BAR`` rows.  It is one row on the
 jig's BOM; the shop inventory carries no screw stock (no ``INVENTORY_ID``),
 and the assembly steps cite it by item and callout (``fasteners.callout``).
 
@@ -42,12 +45,14 @@ UNIT = drawing_unit(
 )
 SKU = PART_NO
 ROW = fasteners.RAIL_TO_BAR
-QUANTITY = ROW.count
+ROWS = fasteners.COMMON_SCREW_ROWS  # the rail screws, then the TL-28 bar screws
+QUANTITY = fasteners.COMMON_SCREW_COUNT  # 16 + 4
 PACK_QUANTITY = 100  # McMaster sells 91251A197 in packs of 100
 CALLOUT = fasteners.callout(ROW)  # "#8-32 X 3/4 SHCS"
 
-if (THREAD, LENGTH_TEXT, fasteners.SHCS) != (ROW.thread, ROW.length, ROW.head):
-    raise AssertionError(f"{SKU} is not the screw of {ROW.joint}")
+for _row in ROWS:
+    if (THREAD, LENGTH_TEXT, fasteners.SHCS) != (_row.thread, _row.length, _row.head):
+        raise AssertionError(f"{SKU} is not the screw of {_row.joint}")
 if abs(DIMS.length - ROW.length_mm) > 1e-9:
     raise AssertionError(f"{SKU}: {DIMS.length} long, the row prints {ROW.length_mm}")
 if abs(DIMS.major_dia - ROW.major_mm) > 1e-3:
