@@ -25,12 +25,12 @@ def test_printed_mating_numbers_resolve_to_the_registered_parts() -> None:
             drawing.DIMENSION_CALLOUTS["ClampSlotCboreWidth"],
             "sh-vn-clamp-screw",
         ),
-        (
-            drawing.DIMENSION_CALLOUTS["ClampSlotCboreDepth"],
-            "sh-vn-clamp-screw",
-        ),
+        (drawing.DIMENSION_CALLOUTS["ClampSlotWidth"], "sh-vn-clamp-screw"),
         (drawing.CLAMP_CBORE_CALLOUT, "sh-vn-clamp-screw"),
-        (drawing.DIMENSION_CALLOUTS["Depth"], "sh-vn-fillister-screw-90280a108"),
+        (drawing.DIMENSION_CALLOUTS["PivotCskDia"], "pd-vn-transgear-pivot-screw"),
+        (drawing.DIMENSION_CALLOUTS["BracketCskDia"], "pd-latch-hook"),
+        (drawing.TOP_FINISH_REASON, "pd-platen-guide"),
+        (drawing.FRONT_FINISH_REASON, "pd-platen"),
     )
     for text, mate in references:
         printed = set(re.findall(r"\bMHA-[A-Z0-9]+(?:-[A-Z0-9]+)+\b", text))
@@ -1297,3 +1297,87 @@ def test_slot_profiles_run_along_the_bar_in_any_sketch_frame(
         ]
         assert ends[index][1] == pytest.approx(spec.CLAMP_TAP_Y)
         assert abs(ends[index][0] - slot_x) == pytest.approx(run / 2.0)
+
+
+def test_locations_and_overall_sizes_carry_no_words() -> None:
+    """Rule 7 (screen 20261107T081227004Z): a location dimension carries its
+    value and band alone, and an overall or stock size with no band of its
+    own no reason; the mates stand on the holes' size callouts."""
+    words = set(drawing.DIMENSION_CALLOUTS) | set(drawing.DIMENSION_CALLOUTS_ABOVE)
+    locations = {
+        "HangerRowHeight",
+        "ClampRowHeight",
+        *sheet_spec.HANGER_STATION_NAMES,
+        *sheet_spec.CLAMP_STATION_NAMES,
+    }
+    assert not words & (locations | {"Height", "Depth", "Length"})
+    # The counterbore's reason prints once, on the round holes' callout.
+    assert "ClampSlotCboreDepth" not in words
+    # At most two lines of words under each callout.
+    assert all(
+        len(text.splitlines()) <= 2 for text in drawing.DIMENSION_CALLOUTS.values()
+    )
+    assert len(sheet_spec.CLAMP_CBORE_CALLOUT.splitlines()) <= 2
+
+
+_CBORE_NATIVE = {
+    5: "<HOLE-SPOT><MOD-DIAM><hw-cbdia> <HOLE-DEPTH><hw-cbdepth>",
+    6: "",
+    7: "<NUM_INST>X <MOD-DIAM><hw-thruholedia> <hw-thru>",
+    8: "",
+}
+
+
+@pytest.mark.parametrize("extent", ["<hw-thru>", "THRU ALL"])
+def test_clamp_callout_reads_size_then_drill_then_thru(extent) -> None:
+    native = {**_CBORE_NATIVE, 7: _CBORE_NATIVE[7].replace("<hw-thru>", extent)}
+    updated = drawing.clamp_callout_definitions(native)
+    row = updated[7]
+    size = row.index("<hw-thruholedia>")
+    process = row.index(f" {sheet_spec.CLAMP_HOLE_PROCESS} ")
+    assert size < process < row.index(extent)
+    assert row.replace(f" {sheet_spec.CLAMP_HOLE_PROCESS}", "", 1) == native[7]
+    # The counterbore row keeps its symbol and variables; the mates go below.
+    assert updated[5] == native[5]
+    assert updated[8] == sheet_spec.CLAMP_CBORE_CALLOUT
+
+
+@pytest.mark.parametrize(
+    "native",
+    [
+        {**_CBORE_NATIVE, 8: "ALREADY BELOW"},
+        {**_CBORE_NATIVE, 7: "<NUM_INST>X <MOD-DIAM><hw-thruholedia>"},
+        {**_CBORE_NATIVE, 5: _CBORE_NATIVE[5] + " THRU"},
+        {k: v for k, v in _CBORE_NATIVE.items() if k != 6},
+    ],
+)
+def test_clamp_callout_refuses_an_unexpected_native_layout(native) -> None:
+    with pytest.raises(RuntimeError, match="clamp callout"):
+        drawing.clamp_callout_definitions(native)
+
+
+def test_countersinks_print_their_angle_after_the_max_limit() -> None:
+    assert drawing.COUNTERSINK_SUFFIX.startswith(part.MAX_SUFFIX)
+    assert drawing.COUNTERSINK_SUFFIX.endswith(f"{spec.TAP_CSK_ANGLE_DEG:.0f}\u00b0")
+    for name in drawing.COUNTERSINK_NAMES:
+        prefix = sheet_spec.DIMENSION_PREFIXES[("CountersinkReference", name)]
+        assert prefix.index("<HOLE-SINK>") < prefix.index("<MOD-DIAM>")
+
+
+def test_front_face_view_is_lettered_without_the_sheet_scale() -> None:
+    """Rules 9 and 26: the front face's removed rear view carries the letter
+    of its viewing arrow and, at the sheet's scale, no scale."""
+    assert drawing.FACE_SCALE == drawing.SHEET_SCALE
+    assert drawing.BACK_VIEW_CAPTION == f"VIEW {drawing.FRONT_FACE_VIEW_LETTER}"
+    taken = {"A", "B", drawing.DETAIL_LETTER}
+    assert drawing.FRONT_FACE_VIEW_LETTER not in taken | {"I", "O", "Q"}
+
+
+@pytest.mark.parametrize("side", [-1.0, 1.0])
+def test_view_arrow_points_level_at_the_front_face_from_outside(side) -> None:
+    front, back = (0.390 + side * 0.0095, 0.213), (0.390 - side * 0.0095, 0.213)
+    (letter_x, letter_top), (tip_x, tip_y) = drawing._view_arrow_points(front, back)
+    assert tip_y == front[1]
+    assert letter_top - drawing.VIEW_LETTER_HEIGHT / 2.0 == pytest.approx(tip_y)
+    assert side * (tip_x - front[0]) == pytest.approx(drawing.VIEW_ARROW_TIP_GAP)
+    assert side * (letter_x - tip_x) == pytest.approx(drawing.VIEW_ARROW_LENGTH)

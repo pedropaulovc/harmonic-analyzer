@@ -7,7 +7,7 @@ pd-latch-hook:
   finish: hardened, tempered blue after drilling, 44-50 HRC
   quantity: 1
   tolerance_class: machined_block
-  process: ".032 in annealed 1095 sheet: cut the blank to the flat pattern, bend the ear 90 degrees, drill the screw holes from the formed ear, roll the arm and form the tab annealed; fit to the support bar, clamp the hanger at full feed mesh and match-drill the pin hole from the latch pin; remove, harden and temper blue, reinstall"
+  process: ".032 in annealed 1095 sheet: cut the blank to the flat pattern, bend the ear 90 degrees, drill the screw holes from the formed ear, roll the arm and form the tab annealed; fit to the support bar, clamp the hanger at full feed mesh, transfer the latch pin's centre to the strip and drill the pin hole on the mark; remove, harden and temper blue, reinstall"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"

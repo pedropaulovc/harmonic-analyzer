@@ -394,6 +394,20 @@ async def build(adapter: Any) -> dict[str, str]:
         unit="in",
         location_places=3,
     )
+    # The nine taps are one size: the table prints that size once, the SIZE
+    # cells of tag group A merged natively (rule 10: the size callout once per
+    # tag group), each hole keeping its own tag and X/Y LOC row.  The shared
+    # helper inserts the table uncombined; draw_fr_harmonic_base combines it
+    # the same way.
+    hole_feature = _early_bound(
+        _early_bound(hole_table, "IHoleTableAnnotation").HoleTable, "IHoleTable"
+    )
+    hole_feature.CombineSameSize = True
+    if not hole_feature.CombineSameSize or hole_feature.CombineTags:
+        raise RuntimeError("platen-guide hole table did not keep one tag per hole")
+    drawing_model.EditRebuild3()
+    if int(hole_table.RowCount) != len(HOLE_STATIONS_MM) + 1:
+        raise RuntimeError("combining the platen-guide tap sizes changed the table rows")
     _place_hole_tags(front, hole_table)
 
     # Datums A (platen-mating face), B (bottom edge) and C (left end) frame the

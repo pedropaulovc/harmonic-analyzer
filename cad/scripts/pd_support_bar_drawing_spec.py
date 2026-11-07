@@ -20,7 +20,8 @@ height along Y with y = 0 at mid-height, and its depth along Z with the FRONT
   (that end's, -X) are round counterbored holes; the west pair (+X) are
   counterbored slots along the bar that take up the column pitch (owner
   ruling 2026-10-15, option A).
-* The platen hangs on the top face and slides across the front face: both
+* The platen guide (MHA-PD-11) hangs on the top face and slides along it,
+  and the platen's (MHA-PD-02) back slides across the front face: both faces
   carry the slide roughness (``SURFACE_FINISHES``, drawing-guidelines rule 6).
 
 The rows' nominals are the build's (``build_pd_support_bar``), which owns the
@@ -38,7 +39,6 @@ from pd_support_bar_spec import (
     BRACKET_TAP_SPEC,
     HOLE_POSITION_PLACES,
     PIVOT_TAP_THREAD,
-    TAP_CSK_ANGLE_DEG,
     UNIT,
 )
 
@@ -123,83 +123,66 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Bar": {"Depth": BAR_BAND_PLACES},
 }
 
-# Below each value: what the band or limit is for, naming the mating part.
-_CSK = f"{TAP_CSK_ANGLE_DEG:.0f}\u00b0 CSK"
-_HOOK_TAPS = "MHA-PD-14 HOOK TAPS"
+# Rule 7: a location dimension and an overall or stock size carry their value
+# and band alone; the mate a hole's location serves stands once, on that
+# hole's size callout, and a callout carries at most two lines of words.
 DIMENSION_CALLOUTS = {
-    "Height": "MHA-PD-11\nHANGS ON IT",
-    "Depth": "MHA-PD-VN-57 TIP RECESS AND\nMHA-SH-VN-52 SCREW TIPS",
-    # The two rows print on one line at 1:2 though they are separate rows
-    # (the hanger row from the machine layout, the clamp row on the SH column
-    # clamps' line, both from the top face the platen hangs on).
-    "HangerRowHeight": f"MHA-PD-VN-57 PIVOT AND\n{_HOOK_TAPS},\nNOT ON THE CLAMP ROW",
-    # The clamp row's band is the MHA-SH-02 taps' (CLAMP_POSITION_BAND), so
-    # its mate stands at the dimension, not only under the hole callout.
-    "ClampRowHeight": "MHA-SH-02\nTAPS",
-    "PivotTapStation": "MHA-PD-VN-57 PIVOT",
-    "BracketTapStation1": _HOOK_TAPS,
-    "BracketTapStation2": _HOOK_TAPS,
     # One stacked callout per hole or pattern, on its countersink's MAX Ø
     # (machinist review round 5: a separate tap callout per hole put two
     # leaders on one small hole, arrowheads stacked): the tap line above, the
-    # "90° CSK" prefix (DIMENSION_PREFIXES) before the Ø, the faces and the
-    # function below. The thread class is the title block's (rule 2). The
-    # pivot is one hole countersunk on both faces: no "2X", which on the hook
-    # taps' callout counts holes (r6 machinist review, rule 12).
-    "PivotCskDia": "BOTH FACES,\nMHA-PD-VN-57 BEARS OUTSIDE",
-    "BracketCskDia": "BOTH FACES",
-    # The west slots (rule 4: each band names its mate): the slots' run and
-    # stations take up the pitch of the MHA-SH-02 clamp taps the screws land
-    # in (build_pd_support_bar.clamp_slot_closure_margin), and the whole
-    # travel is spent on that pitch, so their limits and stations keep the
-    # full take-up (the r6 machinist read "take up" as licence to loosen
-    # them, the 2026-10-23 review as travel needing only to be "enough").
+    # countersink symbol (DIMENSION_PREFIXES) before the Ø and the included
+    # angle after its MAX (draw_pd_support_bar.COUNTERSINK_SUFFIX), the faces
+    # and the mate the hole's banded row height and station serve below. The
+    # thread class is the title block's (rule 2). The pivot is one hole
+    # countersunk on both faces: no "2X", which on the hook taps' callout
+    # counts holes (r6 machinist review, rule 12).
+    "PivotCskDia": "BOTH FACES\nLOCATES MHA-PD-VN-57",
+    "BracketCskDia": "BOTH FACES\nLOCATE MHA-PD-14",
     # The slot width's upper limit is the head's: wider, the MHA-SH-VN-53
     # head bears on less floor than over a round hole (CLAMP_HEAD_BEARING_MIN)
-    # and nears the counterbore's wall (clamp_slot_head_clearance); the
-    # 2026-10-23 review read the take-up reason alone as no reason for the
-    # width's band. The counterbore's minimum clears the slid MHA-SH-VN-53
-    # head; the reason names no limit word, which under the two-sided band
-    # read as ".335 MIN" (machinist review round 2). Short lines: detail C is
-    # 2:1 in a corner, and two lines of at most 15 characters keep the block
-    # between section B-B and the 440.50 line (farm run after round 2: an
-    # 18-character "MHA-SH-VN-53 HEADS" row crowded section B-B).
+    # and nears the counterbore's wall (clamp_slot_head_clearance). The
+    # counterbore's minimum clears the slid MHA-SH-VN-53 head; the reason
+    # names no limit word, which under the two-sided band read as ".335 MIN"
+    # (machinist review round 2). Short lines: detail C is 2:1 in a corner.
     # The slot width's broken leader runs down its text's left end to the
     # underline, so the widest row's first glyph rode that line (machinist
     # review round 4). A no-break space each side of the widest row widens
     # the block by a space past every glyph; the centred rows stand clear.
-    "ClampSlotWidth": (
-        "THRU, MAX SEATS\n\u00a0MHA-SH-VN-53 HEADS;\u00a0\nTRAVEL AND STATIONS\n"
-        "KEEP THE FULL TAKE-UP\nOF MHA-SH-02 PITCH"
-    ),
+    "ClampSlotWidth": "THRU, MAX SEATS\n\u00a0MHA-SH-VN-53 HEADS\u00a0",
     "ClampSlotCboreWidth": "CLEARS SLIDING\nMHA-SH-VN-53",
-    "ClampSlotCboreDepth": "MHA-SH-VN-53\nHEADS BELOW\nSLIDE FACE",
 }
 # Above the countersinks' Ø: the tap each callout carries (DIMENSION_CALLOUTS).
 DIMENSION_CALLOUTS_ABOVE = {
     "PivotCskDia": f"TAP {PIVOT_TAP_THREAD} UNC THRU",
     "BracketCskDia": f"2X TAP {BRACKET_TAP_SPEC.size} UNC THRU",
 }
-# The slot widths' count: both west slots share one detail. The countersinks'
-# Ø reads as the countersink's in its stacked tap callout; a diameter's prefix
-# replaces its native Ø token, so the prefix restates it (round 6 printed
-# "90° CSK .169" with no Ø).
+# The slot widths' count: both west slots share one detail. The countersinks
+# read in rule 26's form, the countersink symbol before the Ø; a diameter's
+# prefix replaces its native Ø token, so the prefix restates it (round 6
+# printed "90° CSK .169" with no Ø).
+_COUNTERSINK_PREFIX = "<HOLE-SINK><MOD-DIAM>"
 DIMENSION_PREFIXES = {
     ("ClampSlotProfile", "ClampSlotWidth"): "2X ",
     ("ClampSlotCboreProfile", "ClampSlotCboreWidth"): "2X ",
-    ("CountersinkReference", "PivotCskDia"): f"{_CSK} <MOD-DIAM>",
-    ("CountersinkReference", "BracketCskDia"): f"{_CSK} <MOD-DIAM>",
+    ("CountersinkReference", "PivotCskDia"): _COUNTERSINK_PREFIX,
+    ("CountersinkReference", "BracketCskDia"): _COUNTERSINK_PREFIX,
 }
-# Under the round counterbores' native callout: the taps the holes' banded
-# row height and stations locate to (rule 4: the tight band names its mate, as
-# the latch hook's SCREW_HOLE_MATE does), then the screws whose heads they
-# sink, and why the depth has a floor (the heads' worst case stays sub-flush).
+# Under the round counterbores' native callout: the taps the clamp row's
+# banded height and stations locate to (rule 4: the tight band names its
+# mate, as the latch hook's SCREW_HOLE_MATE does), then the screws whose heads
+# they sink, and why the depth has a floor (the heads' worst case stays
+# sub-flush). The reason stands here once; the slot counterbores' depth in
+# section B-B carries none (rule 7).
 CLAMP_TAP_MATE = "LOCATE TO MHA-SH-02 TAPS"
 CLAMP_CBORE_CALLOUT = f"{CLAMP_TAP_MATE}\nMHA-SH-VN-53 HEADS BELOW SLIDE FACE"
+# The round holes' drill, written after their size in the native THRU row
+# (rule 26: size, then process, then depth; the counterbore is its symbol).
+CLAMP_HOLE_PROCESS = "DRILL"
 
-# The platen hangs by its top rail's underside on the top face and slides
-# across the front face (build_pd_support_bar; pd_platen_guide_spec's own
-# "bar_slide" face is the mate of the top one): the slide grade, rule 6.
+# The platen guide MHA-PD-11 hangs by its top rail's underside on the top
+# face and slides along it (pd_platen_guide_spec's own "bar_slide" face is
+# its mate); the platen MHA-PD-02's back slides across the front face: the
+# slide grade, rule 6.
 # PlanarFace offsets run along the outward normal (point . normal).
 SURFACE_FINISHES = (
     SurfaceFinishControl(
@@ -216,13 +199,17 @@ SURFACE_FINISHES = (
     ),
 )
 
-FACE_VIEW_CAPTION = "VIEW ON BACK FACE"
-BACK_VIEW_CAPTION = "VIEW ON FRONT FACE"
-# The face views mirror each other, so the end every station runs from is
+# The back face's view is the unlabelled principal view; the front face's is
+# a removed rear view, lettered, its viewing arrow on section A-A pointing at
+# the front face (rules 9 and 26). Both are at the sheet's scale, so neither
+# prints one.
+FRONT_FACE_VIEW_LETTER = "D"
+BACK_VIEW_CAPTION = f"VIEW {FRONT_FACE_VIEW_LETTER}"
+# The two face views mirror each other, so the end every station runs from is
 # named at that end in both views (rule 10: one end, plainly the same one).
 STATION_END_LABEL = "END A"
 # Each slide grade's reason, beside its symbol (rule 7: flagged where it
-# applies), so the sheet carries no general note.
-TOP_FINISH_REASON = "PLATEN HANGS HERE"
-FRONT_FINISH_REASON = "PLATEN SLIDES HERE"
+# applies), naming the part that slides there by its drawing number (rule 4).
+TOP_FINISH_REASON = "MHA-PD-11 SLIDES HERE"
+FRONT_FINISH_REASON = "MHA-PD-02 SLIDES HERE"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"

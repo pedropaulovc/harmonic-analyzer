@@ -100,6 +100,31 @@ def test_the_far_face_prints_as_a_reference_and_the_strip_widths_control() -> No
     )
 
 
+def test_location_dimensions_end_on_a_drawn_axis_not_on_words() -> None:
+    """Screen 20261107T081227004Z: (2.77) and 3.53 carried words saying
+    where they end (rule 7).  The far face's references end on the pin's
+    axis, drawn as a centreline through the far face point across the strip,
+    and the flat pattern's round stations on a centre mark at the round's
+    centre."""
+    worded = {*drawing.CALLOUTS_ABOVE, *drawing.CALLOUTS_BELOW}
+    assert not worded & (spec.REFERENCE_DIMENSIONS | {"DevRoundC", "FlatTabC"})
+    near, far = (end[:2] for end in drawing.PIN_AXIS_ENDS)
+    face = part.FAR_FACE_POINT
+    for end, run in (
+        (near, -(geom.SHEET_T + drawing.PIN_AXIS_OVERSHOOT_MM)),
+        (far, drawing.PIN_AXIS_OVERSHOOT_MM),
+    ):
+        assert end[0] == pytest.approx(face[0] + run * geom.ARM_U[0])
+        assert end[1] == pytest.approx(face[1] + run * geom.ARM_U[1])
+    assert {end[2] for end in drawing.PIN_AXIS_ENDS} == {geom.PIN_HOLE_ZL}
+    assert drawing.FLAT_ROUND_CENTRE == pytest.approx(part._FLAT_ROUND_C)
+    u, v = drawing.FLAT_ROUND_CENTRE
+    for arm in drawing.FLAT_ROUND_MARK_ENDS:
+        mid = tuple((a + b) / 2.0 for a, b in zip(*arm))
+        assert mid == pytest.approx((0.0, v, -u))
+        assert math.dist(*arm) == pytest.approx(2.0 * drawing.CENTRE_MARK_ARM_MM)
+
+
 def test_walls_hold_the_target_at_the_worst_case_the_sheet_prints() -> None:
     assert spec.WALLS
     for name, (nominal, worst) in spec.WALLS.items():
@@ -797,7 +822,9 @@ def test_the_native_screw_callout_stack_clears_the_hole_row_extension() -> None:
 # in from its ends and 0.97..4.47 mm over its baseline.  The leader leaves
 # the last row's underline 1/16 in past the widest row's end and runs at the
 # far hole's centre, its arrow on the rim.  A changed row moves every row:
-# re-read them off a seat's audit dump, never estimate them.
+# re-read them off a seat's audit dump, never estimate them.  The drill row
+# then read "#30 DRILL THRU"; its width stays that seat's, an upper bound on
+# the shorter row the sheet prints now (screen 20261107T081227004Z, rule 3).
 _SCREW_VALUE_ROW = "<MOD-DIAM>.128"
 _SCREW_ROWS = {
     spec.PAIR_CALLOUT: (0.0083611, 0.0054299),
