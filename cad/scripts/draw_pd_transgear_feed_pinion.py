@@ -309,10 +309,14 @@ LEFT_KEEP: dict[str, tuple[float, float]] = {
 # The caption stands centred over the cropped view (its upper left given):
 # under it the cutter rows' dimension lines fill the lane, and left of it
 # VIEW D's arrow points at the rear face.  It stands right of the boss's
-# lower dimension arrow.
+# lower dimension arrow, between the view's own box (the crop fence and its
+# margin) and the boss's callout above: at +7.5 mm the native box, top
+# 142.3 mm, took the caption's lower 4.8 mm (layout audit, round 1 run
+# 20261107T103915122Z); at +14.3 its native box clears that top by ~0.9 mm
+# and its text stays a clearance height under the boss's.
 _LEFT_CROP_CENTRE_X = _LEFT_REAR_X + OUTSIDE_CROP_Z * VIEW_SCALE[0] / 2000.0
 LEFT_CAPTION_XY = (
-    _LEFT_CROP_CENTRE_X - _LEFT_CAPTION_WIDTH / 2.0, LEFT_CENTER[1] + HALF_OD + 0.0075
+    _LEFT_CROP_CENTRE_X - _LEFT_CAPTION_WIDTH / 2.0, LEFT_CENTER[1] + HALF_OD + 0.0143
 )
 
 # Viewing arrows (rule 9): a letter note whose straight leader is the arrow
