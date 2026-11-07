@@ -111,7 +111,9 @@ LEFT_BAND_WALL_MIN = min(
 # therefore hold for every pose, not just sampled stop positions. Use current
 # source hardware, including the KP08 clearance envelope and full handwheel
 # sweep, rather than the older concept's 69.4/73.9 height estimates.
-FLANGE_BOTTOM_Z = trammel.CARRIER_UNDERSIDE_Z - stud.FLANGE_THICK
+# Accepted flange limits are centred on the printed .71/.12, not on the
+# literal 18 x 3 model. Use the thickest/largest accepted part for clearance.
+FLANGE_BOTTOM_Z = trammel.CARRIER_UNDERSIDE_Z - stud.FLANGE_THICK_LIMITS[1]
 FLANGE_VERTICAL_GAPS = {
     "pivot blocks": FLANGE_BOTTOM_Z - trammel.PIVOT_BLOCK_TOP_Z,
     "KP08 envelope": FLANGE_BOTTOM_Z - feed.KP08_Z[1],
@@ -120,7 +122,7 @@ FLANGE_VERTICAL_GAPS = {
 # The supports reach the carrier underside, so they need a plan proof instead.
 # Both circles are carried by the same rigid pin-pair geometry in either pass.
 FLANGE_SUPPORT_GAPS = {
-    f"{name} {index}": math.dist(trammel.HUB, pin) - stud.FLANGE_DIA / 2.0 - spacer.OD / 2.0
+    f"{name} {index}": math.dist(trammel.HUB, pin) - stud.FLANGE_DIA_LIMITS[1] / 2.0 - spacer.OD / 2.0
     for name in trammel.PASS_RADIUS
     for index, pin in enumerate(trammel.pin_pair(name), 1)
 }
@@ -143,7 +145,7 @@ _PLAN_SEPARATIONS = (
     max(0.0, min(p[1] for p in _HANDWHEEL_POINTS) - max(_HUB_PATH_Y),
         min(_HUB_PATH_Y) - max(p[1] for p in _HANDWHEEL_POINTS)),
 )
-FLANGE_HANDWHEEL_PLAN_GAP = math.hypot(*_PLAN_SEPARATIONS) - stud.FLANGE_DIA / 2.0
+FLANGE_HANDWHEEL_PLAN_GAP = math.hypot(*_PLAN_SEPARATIONS) - stud.FLANGE_DIA_LIMITS[1] / 2.0
 PART_TOP_Z = trammel.CARRIER_TOP_Z + trammel.RISER_THICK + trammel.STRAP_THICK
 CLAMP_TOP_Z = {
     "hub": PART_TOP_Z + washer.THICK + hub_screw.DIMS.head_h,

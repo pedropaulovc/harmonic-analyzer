@@ -54,7 +54,22 @@ def test_owner_od_drilled_bore_and_title_block_bands() -> None:
     assert spec.WALL_MIN >= WALL_TARGET_MM
     assert spec.OD > HUB_SCREW.head_dia
     assert model_toleranced_dimensions(part) == {}
-    assert spec.DIMENSION_CALLOUTS == {"WasherBore": "#9 DRILL THRU"}
+    assert spec.DIMENSION_CALLOUTS["WasherBore"] == "#9 DRILL THRU"
+    assert set(spec.DIMENSION_CALLOUTS) == {"WasherBore", "WasherOd"}
+
+
+def test_od_keeps_its_xxx_row_for_the_cutter_floor_and_says_so() -> None:
+    # The holding proof charges half the printed .XXX band against the
+    # owner's 1.5 mm floor; the .XX row's extra .0635 mm radial takes the
+    # final 1.548 mm stack under it.
+    assert spec.OD_PLACES == 3
+    assert spec.CUTTER_CLEARANCE_MIN == 1.5
+    od = spec.DIMENSION_CALLOUTS["WasherOd"]
+    assert "1.5 MM MIN" in od and "STRAP CUTTER" in od and spec.JIG_NUMBER in od
+    # The .06 text leaves its 6 mm span on a leader, right of the washer.
+    right_edge = drawing.RIGHT_CENTER[0] + spec.THICK / 2.0 * drawing._S
+    assert drawing.THICKNESS_TEXT_XY[0] - right_edge >= 0.010
+    assert drawing.OD_ON_SIDE[0] - right_edge >= 0.035
 
 
 def test_every_marked_dimension_has_one_view_and_model_places() -> None:

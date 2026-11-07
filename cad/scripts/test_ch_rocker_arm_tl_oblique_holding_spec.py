@@ -26,6 +26,24 @@ def test_hub_keeps_current_carrier_bore_and_locating_nose() -> None:
     assert carrier.HUB_SLIP_CLEARANCE_MAX == pytest.approx(0.0015 * 25.4)
 
 
+def test_carrier_flange_seat_charges_the_studs_printed_limits() -> None:
+    assert stud.FLANGE_PLACES == 2
+    assert stud.FLANGE_DIA_PRINTED == pytest.approx(18.034)
+    assert stud.FLANGE_THICK_PRINTED == pytest.approx(3.048)
+    assert stud.FLANGE_DIA_LIMITS == pytest.approx((17.780, 18.288))
+    assert stud.FLANGE_THICK_LIMITS == pytest.approx((2.794, 3.302))
+    assert stud.FLANGE_DIA_LIMITS[0] <= stud.FLANGE_DIA <= stud.FLANGE_DIA_LIMITS[1]
+    assert stud.FLANGE_THICK_LIMITS[0] <= stud.FLANGE_THICK <= stud.FLANGE_THICK_LIMITS[1]
+    chamfer_ratio = math.tan(math.radians(45.0 - carrier.HUB_CHAMFER_ANGLE_BAND))
+    seat = (
+        stud.FLANGE_DIA_LIMITS[0] / 2.0
+        - carrier.HUB_HOLE_LIMITS[1] / 2.0
+        - carrier.HUB_CHAMFER_MAX / chamfer_ratio
+    )
+    assert carrier.HUB_FLANGE_SEAT_WIDTH_MIN == pytest.approx(seat)
+    assert seat >= 2.032
+
+
 def test_washer_complete_sweeps_include_float_and_thread_limits() -> None:
     assert holding.WASHER_GAPS == pytest.approx({"inner": 2.754, "outer": 2.246})
     assert holding.SCREW_MAJOR_MIN == pytest.approx(0.1828 * 25.4)
@@ -85,12 +103,26 @@ def test_blind_receiver_retains_floor_and_full_thread_without_tip_bottoming() ->
 
 
 def test_flange_clears_obstacles_over_all_planar_poses() -> None:
-    assert holding.FLANGE_BOTTOM_Z == pytest.approx(78.213)
+    assert holding.FLANGE_BOTTOM_Z == pytest.approx(77.911)
+    assert holding.FLANGE_BOTTOM_Z == pytest.approx(
+        trammel.CARRIER_UNDERSIDE_Z - stud.FLANGE_THICK_LIMITS[1]
+    )
     assert holding.FLANGE_VERTICAL_GAPS == pytest.approx({
-        "pivot blocks": 13.891, "KP08 envelope": 9.875, "handwheel sweep": 0.875,
+        "pivot blocks": 13.589, "KP08 envelope": 9.573, "handwheel sweep": 0.573,
     })
     assert holding.FLANGE_HANDWHEEL_PLAN_GAP > 275
     assert min(holding.FLANGE_SUPPORT_GAPS.values()) > 210
+    assert holding.FLANGE_HANDWHEEL_PLAN_GAP == pytest.approx(
+        math.hypot(*holding._PLAN_SEPARATIONS) - stud.FLANGE_DIA_LIMITS[1] / 2.0
+    )
+    assert holding.FLANGE_SUPPORT_GAPS == pytest.approx({
+        f"{name} {index}": (
+            math.dist(trammel.HUB, pin)
+            - stud.FLANGE_DIA_LIMITS[1] / 2.0 - holding.spacer.OD / 2.0
+        )
+        for name in trammel.PASS_RADIUS
+        for index, pin in enumerate(trammel.pin_pair(name), 1)
+    })
     for name, rc in trammel.PASS_RADIUS.items():
         for i in range(101):
             theta = trammel.SWEEP[name] * (2 * i / 100 - 1)

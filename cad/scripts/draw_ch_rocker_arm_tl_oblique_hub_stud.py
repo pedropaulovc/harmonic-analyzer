@@ -7,14 +7,16 @@ and the fit-up reference; sheet/template and export behavior lives in
 part (``ch_rocker_arm_tl_oblique_hub_stud_spec``).
 
 The sheet prints decimal inch (the part's ``drawing_unit: in``).  The side
-view ("*Right", 3:1) lays the stud axis horizontal as it sits in the lathe
-(drawing-guidelines.md rule 11), nose left, flange right, and carries every
-diameter between its flanks (flange, banded shank, banded nose), the
-flange thickness and the shank length from the flange seat, the root's
-R MAX, and the fit-up pair from the hidden ``FitReference`` sketch: the
-(.79) set-at-assembly reference and the .82 MIN supply (rule 19).  The end
-view ("*Front", 3:1) looks at the nose face and carries the native Hole
-Wizard callout of the #10-24 blind tap; the 2:1 isometric sits right.
+view ("*Left", 3:1) lays the stud axis horizontal, flange left and nose
+right (drawing-guidelines.md rule 11), and carries every diameter between
+its flanks (flange, banded shank, banded nose), the flange thickness and the
+shank length from the flange seat, the root's R MAX, and the fit-up pair
+from the hidden ``FitReference`` sketch: the (.79) set-at-assembly reference
+and the .82 MIN supply (rule 19).  The end view ("*Front", 3:1) is the
+side view's true third-angle right-side projection: it stands right of the
+side view and looks at the nose face, so the #10-24 blind tap it carries
+(the native Hole Wizard callout) is drawn solid in the end it is cut in.  The
+2:1 isometric sits right.
 
 Run with SolidWorks open::
 
@@ -46,6 +48,7 @@ from _drawing_common import (
 from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import (
     assert_imported_precision,
+    offset_dimension_text,
     set_dimension_callouts,
     set_reference_dimension,
 )
@@ -96,7 +99,7 @@ TAP_PRECISION = {
     "hw-threaddepth": TAP_DEPTH_PLACES,
 }
 
-# A Ø.709 x .91 stud: both orthographic views at 3:1 (54 mm across the
+# A Ø.71 x .91 stud: both orthographic views at 3:1 (54 mm across the
 # flange, 69 mm along the axis), the isometric at 2:1.
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
@@ -105,17 +108,18 @@ _K = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0
 
 # Sheet layout (meters; title block x >= 0.2155, y <= 0.0655): the side view
 # on the left two-thirds with its length rows under it and the diameters
-# above, the end view right of it on the same row, the isometric above-right.
+# above, the end view right of it on the same row (third angle: the nose
+# end's view on the nose's side), the isometric above-right.
 SIDE_CENTER = (0.125, 0.160)
 END_CENTER = (0.285, 0.160)
 ISO_CENTER = (0.375, 0.200)
 
 
 def _sx(model_z_mm: float) -> float:
-    """Sheet x of a station along the stud axis in the "*Right" side view
-    (looking from +X, model +Z points left; the view centres on the stud's
+    """Sheet x of a station along the stud axis in the "*Left" side view
+    (looking from -X, model +Z points right; the view centres on the stud's
     bounding box, z 0..LENGTH)."""
-    return SIDE_CENTER[0] - (model_z_mm - LENGTH / 2.0) * _K
+    return SIDE_CENTER[0] + (model_z_mm - LENGTH / 2.0) * _K
 
 
 def _sy(model_y_mm: float) -> float:
@@ -127,17 +131,24 @@ _BELOW = _sy(-FLANGE_DIA / 2.0)
 _ABOVE = _sy(FLANGE_DIA / 2.0)
 # Side view: the length rows hang under the flange's bottom edge, each from
 # the flange seat (rule 11: lengths from the faced end), the shortest
-# nearest; the diameters stand above (shank, nose) or right of the flange.
+# nearest; the diameters stand above (shank, nose) or left of the flange.
+# The nose callout stands right of the nose, clear of the shank callout's
+# shelf (r2 review: the two had interleaved above the shank).
 SIDE_KEEP = {
     "FlangeThick": (_sx(FLANGE_THICK / 2.0), _BELOW - 0.010),
     "ShankLength": (_sx(FLANGE_THICK + SHANK_LENGTH / 2.0), _BELOW - 0.020),
     "FitLength": (_sx((FLANGE_THICK + LENGTH) / 2.0), _BELOW - 0.032),
     "SupplyLength": (_sx((FLANGE_THICK + LENGTH) / 2.0), _BELOW - 0.046),
-    "FlangeDia": (_sx(0.0) + 0.018, _sy(0.0)),
+    "FlangeDia": (_sx(0.0) - 0.018, _sy(0.0)),
     "ShankDia": (_sx(FLANGE_THICK + SHANK_LENGTH / 2.0), _ABOVE + 0.018),
-    "NoseDia": (_sx(LENGTH) - 0.022, _ABOVE + 0.008),
-    "RootRadius": (_sx(FLANGE_THICK) - 0.004, _ABOVE + 0.036),
+    "NoseDia": (_sx(LENGTH) + 0.036, _ABOVE + 0.008),
+    "RootRadius": (_sx(FLANGE_THICK) + 0.004, _ABOVE + 0.036),
 }
+# The fit-up reference's two-row callout is wider than the .79 span between
+# its extension lines (review r1-r3: both lines struck it), so its text leaves
+# on a leader to the right of the nose's extension line, above the SUPPLY row
+# and below the end view.
+FIT_LENGTH_TEXT_XY = (_sx(LENGTH) + 0.048, _BELOW - 0.032)
 TAP_CALLOUT_XY = (END_CENTER[0] + 0.020, END_CENTER[1] + 0.045)
 _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 
@@ -194,7 +205,10 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=VIEW_SCALE)
+    # "*Left" puts the nose (+Z) right, so "*Front" (the nose face) is its
+    # right-side view in third angle; under "*Right" it stood on the flange's
+    # side and read as a flange-end view (review r1-r3 blocker).
+    side = place_view(adapter, str(SOURCE), "*Left", *SIDE_CENTER, scale=VIEW_SCALE)
     end = place_view(adapter, str(SOURCE), "*Front", *END_CENTER, scale=VIEW_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     for view in (side, end, iso):
@@ -212,6 +226,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    offset_dimension_text(adapter, annotations, {"FitLength": FIT_LENGTH_TEXT_XY})
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
