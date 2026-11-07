@@ -87,10 +87,12 @@ def test_registry_row_is_tooling_in_inch() -> None:
     assert entry.source_kind == "part"
 
 
-def test_only_the_bore_carries_a_model_band() -> None:
+def test_only_the_bore_and_the_reamed_index_holes_carry_a_model_band() -> None:
     bands = model_toleranced_dimensions(part)
-    assert set(bands) == {("PlateProfile", "BoreDia")}
+    assert set(bands) == {("PlateProfile", "BoreDia"), ("Ring57Profile", "PRINTED_HOLE")}
     assert spec.BORE_DEVIATIONS == (0.0, 0.003 * INCH)
+    assert spec.INDEX_HOLE_DEVIATIONS == (0.0, 0.0005 * INCH)
+    assert spec.DRAWING_PRECISION_BY_NAME[spec.PRINTED_HOLE] == 4
 
 
 def test_the_sheet_states_the_web_shortfall_it_carries() -> None:

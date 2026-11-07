@@ -50,7 +50,7 @@ from _native_axis_datum import add_native_axis_datum
 from _paths import CAD_ROOT
 from _session import run_build
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
-from solidworks_mcp.adapters.solidworks.drawing import place_view, view_name
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view, view_name
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -73,6 +73,9 @@ FACE_CENTER = (0.130, 0.150)
 EDGE_CENTER = (0.300, FACE_CENTER[1])
 ISO_CENTER = (0.380, 0.195)
 ISO_NOTE_XY = (0.345, 0.150)
+# The head's one full naming (RV-03): right of the edge view, above the title
+# block (top y ~0.065), its two rows short of the right border.
+HEAD_NOTE_XY = (0.315, 0.090)
 
 # Dimension text positions (sheet metres, the text's centre). The plate's
 # rim stands 75 mm (sheet) from the centre: the outer index circles' sizes
@@ -81,7 +84,7 @@ ISO_NOTE_XY = (0.345, 0.150)
 _FX, _FY = FACE_CENTER
 FACE_KEEP = {
     "PlateDia": (_FX - 0.080, _FY + 0.093),
-    part.PRINTED_HOLE: (_FX + 0.115, _FY + 0.098),
+    part.PRINTED_HOLE: (_FX + 0.110, _FY + 0.098),
     "Ring57Pcd": (_FX + 0.115, _FY + 0.050),
     "Ring51Pcd": (_FX + 0.115, _FY + 0.008),
     "Ring24Pcd": (_FX + 0.110, _FY - 0.040),
@@ -251,6 +254,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (face, edge, iso):
         set_hidden_lines_removed(adapter, view)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    add_note(adapter, part.HEAD_NOTE, *HEAD_NOTE_XY)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
