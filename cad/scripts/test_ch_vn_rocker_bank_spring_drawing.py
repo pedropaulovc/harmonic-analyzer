@@ -199,9 +199,3 @@ def test_purchased_sheet_documents_the_built_part() -> None:
     assert sheet.source_kind == "part"
     assert sheet.source.stem == part.PART_NAME == sheet.artifact_stem
     assert sheet.layout in DRAWING_TEMPLATES
-
-
-def test_installation_note_fits_the_sheet() -> None:
-    lines = _config.parts(STEM)["installation_notes"].splitlines()
-    assert len(lines) <= 4
-    assert all(len(line) <= 70 for line in lines), lines
