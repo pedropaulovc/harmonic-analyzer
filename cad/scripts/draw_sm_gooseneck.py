@@ -17,8 +17,9 @@ sheet carries, at 1:3:
   tube; the reference overall height and reach to real faces, from the
   part's hidden ``OverallReference``;
 * the END VIEW (``*Left``, third-angle left of the elevation): the end face,
-  carrying the native blind-tap callout with its depth datum and the thread
-  axis's location limit;
+  carrying the native blind-tap callout with its depth datum, datum A on the
+  end piece's Ø.50 rim, and the tap's (datum B) and the counterbore's
+  position frames;
 
 and at 3:1 SECTION A-A, a full section on the arm axis (cut faces only)
 cropped to the end piece, the tube's cut walls hatched across the end
@@ -59,6 +60,8 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimensions import assert_imported_precision
+from _drawing_edges import scan_view_edges
+from _drawing_gdt import add_datum_feature, add_feature_control_frame, add_frame_datum_feature
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
@@ -94,11 +97,13 @@ from sm_gooseneck_spec import (
     DIMENSION_CALLOUTS_BY_NAME,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    GEOMETRIC_TOLERANCES_IN,
     TAP_CALLOUT_BELOW,
     TAP_CALLOUT_PRECISION,
     TUBE_OD_REF_Y,
 )
 from sm_gooseneck_spring_joint import (
+    COUNTERBORE_DIA,
     TAP_DRILL_DEPTH_FROM_FLOOR,
     TAP_DRILL_DIA,
     TAP_SPEC,
@@ -200,8 +205,34 @@ FRONT_KEEP = {
 # The end view (*Left) looks at the end face along +X: sheet x is model +Z.
 # The tap's native callout stands up and left of it, clear of the section's
 # upper dimensions and of the elevation's arm-straight text, its top inside
-# the border (at 0.266 it crossed it, farm run 20261027T224212504Z).
-TAP_CALLOUT_XY = (0.158, 0.252)
+# the border (at 0.266 it crossed it, farm run 20261027T224212504Z), its
+# three rows' bottom ~3 mm over the tap frame's top.
+TAP_CALLOUT_XY = (0.158, 0.254)
+# The end view's frames (delegated ruling sm Q6): datum A is the end face's
+# Ø.50 rim (the end piece's OD, flush with the tube's), tagged right of it
+# from a pick on its upper-right rim, its box clear of the elevation's arm
+# end (x 0.2365) and the end view's leg (x 0.205 +/- 0.0021, below the arm
+# axis).  Left of the arm's end circle, between the section's top
+# dimensions (text to x ~0.153) and the end view: the tap's ⌖ Ø.012 | A
+# frame (~31 mm, one 7 mm row) under the tap callout, datum B's tag hung
+# under its middle, and the counterbore's ⌖ Ø.008 | B frame under that.
+# Each frame's leader leaves a 6.35 mm shoulder off its right end: the tap
+# frame's lands on the tap's upper-left rim, the counterbore frame's on the
+# counterbore's rim just under the arm axis, so the two never cross.
+END_GTOL_ROW = 0.007
+END_FRAME_WIDTH = 0.031
+END_DATUM_TAG_STEM = 0.003
+END_DATUM_TAG_BOX = 0.007
+TAP_FRAME_XY = (0.158, 0.2415)
+DATUM_B_XY = (
+    TAP_FRAME_XY[0] + END_FRAME_WIDTH / 2.0,
+    TAP_FRAME_XY[1] - END_GTOL_ROW - END_DATUM_TAG_STEM - END_DATUM_TAG_BOX,
+)
+COUNTERBORE_FRAME_XY = (0.158, 0.2195)
+TAP_FRAME_RIM_DEG = 135.0
+COUNTERBORE_FRAME_RIM_DEG = 200.0
+DATUM_A_RIM_DEG = 45.0
+DATUM_A_OFFSET = (0.008, -0.009)
 
 # Section A-A: a full section on the horizontal plane through the arm axis,
 # cut faces only, cropped to the end piece and the tube over its shank.  A
@@ -256,12 +287,12 @@ def _section_x(model_x: float) -> float:
 # Ø's upper extension line.  Its leader's shoulder underlines the whole
 # block, so the block ends short of the end face's extension lines (x 0.075;
 # a 21-character row reached 0.0754 and crossed them, farm run
-# 20261028T083207316Z).  With the counterbore's axis limit (r8: the Ø's rows
-# carry its mate and max) the block runs to value and three rows, ~20.3 mm
-# of ink (r8: value and two rows 14.7 mm, centred on the keep, shoulder 0.9
-# mm under): centred at keep y 230.65 its shoulder (~219.6) stands 2.8 mm
-# over the Ø's upper dimension line (its end at 216.8) and its top (~240.8)
-# 2.9 mm under the depth's shoulder (243.7).
+# 20261028T083207316Z).  Its axis limit is a position frame on the end view
+# (delegated ruling sm Q6), so the block is the value and one row (~9.2 mm
+# of ink; r8: value and two rows 14.7 mm, centred on the keep, shoulder 0.9
+# mm under): centred at keep y 230.65 its shoulder (~225.2) stands well over
+# the Ø's upper dimension line (its end at 216.8) and its top (~235.2) under
+# the depth's shoulder (243.7).
 SECTION_KEEP = {
     "PlugHeadLength": (
         _section_x(ARM_END_X + PLUG_HEAD_LENGTH / 2.0),
@@ -745,6 +776,80 @@ def _set_tap_callout_below(display: Any, text: str) -> None:
         )
 
 
+def _rim_point(
+    centre: tuple[float, float], radius_mm: float, degrees: float
+) -> tuple[float, float]:
+    """The sheet point ``degrees`` round an end-view rim from the view's +x."""
+    angle = math.radians(degrees)
+    radius = radius_mm * _S
+    return (centre[0] + radius * math.cos(angle), centre[1] + radius * math.sin(angle))
+
+
+def _add_axis_frames(adapter: Any, end: Any, tap_edge: Any) -> None:
+    """The tap's and the counterbore's axis limits as position frames.
+
+    Delegated ruling sm Q6 (2026-11-07 (Main), no precedent; owner review
+    #2144; pending owner confirmation): datum A is the end face's Ø.50 rim
+    (the end piece's OD), the tap is ⌖ Ø.012 to A and is datum B, and the
+    counterbore is ⌖ Ø.008 to B -- the radial offsets
+    sm_gooseneck_spring_joint charges (THREAD_AXIS_OFFSET_MAX,
+    COUNTERBORE_AXIS_OFFSET_MAX), as zones.  The rims are concentric on the
+    end face; the scan pins each by its own radius, the datum's hit-test must
+    resolve to the OD rim, and each frame selects its circle directly."""
+    centre = model_point_in_view(
+        adapter, end, (ARM_END_X / 1000.0, ARM_Y / 1000.0, 0.0), label="end face centre"
+    )
+    edges = scan_view_edges(end, label="gooseneck end view")
+    axis = (1.0, 0.0, 0.0)
+    end_face_centre = (ARM_END_X, ARM_Y, 0.0)
+    od_rim = edges.circle_at(
+        end_face_centre, _TUBE_R, axis=axis, label="end piece OD rim"
+    )
+    counterbore_rim = edges.circle_at(
+        end_face_centre, COUNTERBORE_DIA / 2.0, axis=axis, label="counterbore rim"
+    )
+    datum_pick = _rim_point(centre, _TUBE_R, DATUM_A_RIM_DEG)
+    add_datum_feature(
+        adapter,
+        end,
+        edge_xy=datum_pick,
+        expected_entity=od_rim.edge,
+        symbol_xy=(datum_pick[0] + DATUM_A_OFFSET[0], datum_pick[1] + DATUM_A_OFFSET[1]),
+        datum="A",
+        label="end piece OD datum A",
+    )
+    tap_frame = add_feature_control_frame(
+        adapter,
+        end,
+        edge_entity=tap_edge,
+        leader_attach_xy=_rim_point(centre, TAP_DRILL_DIA / 2.0, TAP_FRAME_RIM_DEG),
+        frame_xy=TAP_FRAME_XY,
+        characteristic="position",
+        tolerance=GEOMETRIC_TOLERANCES_IN["tap position"],
+        datums=("A",),
+        diameter=True,
+        label="tap position",
+    )
+    add_frame_datum_feature(
+        adapter, end, tap_frame, datum="B", symbol_xy=DATUM_B_XY, label="tap datum B"
+    )
+    add_feature_control_frame(
+        adapter,
+        end,
+        edge_entity=counterbore_rim.edge,
+        leader_attach_xy=_rim_point(
+            centre, COUNTERBORE_DIA / 2.0, COUNTERBORE_FRAME_RIM_DEG
+        ),
+        frame_xy=COUNTERBORE_FRAME_XY,
+        characteristic="position",
+        tolerance=GEOMETRIC_TOLERANCES_IN["counterbore position"],
+        datums=("B",),
+        diameter=True,
+        label="counterbore position",
+    )
+    rebuild_drawing(adapter, label="gooseneck axis frames")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -820,11 +925,12 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # The end piece's blind tap, natively called out on the end face: the
     # title block's THREADS row owns the 2B class (drawing-guidelines.md
-    # rule 2), its depths print at two places, its location limits below.
+    # rule 2), its depths print at two places, its axis limits on frames.
+    tap_edge = visible_circle_edge(adapter, end, TAP_DRILL_DIA)
     tap_callout = add_native_hole_callout(
         adapter,
         end,
-        edge=visible_circle_edge(adapter, end, TAP_DRILL_DIA),
+        edge=tap_edge,
         callout_xy=TAP_CALLOUT_XY,
         label=f"gooseneck end piece {TAP_SPEC.size} blind tap",
     )
@@ -834,6 +940,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _set_tap_callout_below(tap_callout, TAP_CALLOUT_BELOW)
     rebuild_drawing(adapter, label="gooseneck tap callout")
+    _add_axis_frames(adapter, end, tap_edge)
 
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)

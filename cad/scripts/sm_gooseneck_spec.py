@@ -25,7 +25,8 @@ stock, process and intent only.  The counterbore's wall shortfall (owner
 minor sm-gooseneck RV-01) is stated as ``C'BORE WALL .nnn MIN`` under the
 head Ø, the wall's outer bound (drawing-guidelines.md rule 20), the shank's
 braze fit on the shank Ø (rule 4, the matched fit names its mate and
-clearance) and the tap's location limits under its callout.
+clearance) and the tap's and the counterbore's axis limits as position
+frames on the end view (GEOMETRIC_TOLERANCES_IN).
 
 Decimal-inch sheet (#290): every size prints at the places its band needs
 (DRAWING_PRECISION, below); the end piece's calibrated spring-support sizes
@@ -112,21 +113,16 @@ COUNTERBORE_WALL_CALLOUT = (
 )
 COUNTERBORE_NOTE_LINK = f"SEE NOTE {COUNTERBORE_NOTE}"
 COUNTERBORE_DIA_CALLOUT = COUNTERBORE_NOTE_LINK
-# A radial offset between two named axes (machinist review r7: "WITHIN"
-# said neither radial nor diametral).
-COUNTERBORE_AXIS_CALLOUT = (
-    f"C'BORE AXIS TO TAP AXIS\n{_inch(COUNTERBORE_AXIS_OFFSET_MAX, 3)} MAX RADIAL"
-)
-# The floor corner's native "R.004 MAX" links the run-out note and carries
-# the counterbore's axis limit.
-COUNTERBORE_FLOOR_CALLOUT = f"{COUNTERBORE_NOTE_LINK};\n{COUNTERBORE_AXIS_CALLOUT}"
-# No row longer than r8's 23-character axis row (55.5 mm): each block stands
+# The floor corner's native "R.004 MAX" links the run-out note; the
+# counterbore's axis limit is its position frame (GEOMETRIC_TOLERANCES_IN).
+COUNTERBORE_FLOOR_CALLOUT = COUNTERBORE_NOTE_LINK
+# No row longer than r8's 23-character row (55.5 mm): each block stands
 # between the sheet's left border and the end face (farm run
 # 20261028T062539287Z: "CLEARS MHA-SM-04 RUN-OUT" crossed the border).
 COUNTERBORE_ROW_MAX_CHARS = 23
 _COUNTERBORE_ROWS = f"{COUNTERBORE_DIA_CALLOUT}\n{COUNTERBORE_FLOOR_CALLOUT}"
 if max(map(len, _COUNTERBORE_ROWS.splitlines())) > COUNTERBORE_ROW_MAX_CHARS:
-    raise AssertionError("a counterbore callout row is wider than its axis row")
+    raise AssertionError("a counterbore callout row is wider than r8's 23 characters")
 # The head Ø ends flush with the tube's OD; the counterbore's wall to it is
 # the stated shortfall (owner minor RV-01), at the counterbore's largest.
 PLUG_DIA_CALLOUT = f"FLUSH WITH TUBE OD\n{COUNTERBORE_WALL_CALLOUT}"
@@ -197,20 +193,26 @@ DIMENSION_CALLOUTS_ABOVE_BY_NAME: dict[str, str] = {
 # (sm_gooseneck_spring_joint.TAP_DEPTH_BAND), measured from the counterbore
 # floor (the Hole Wizard start face; codjiflo P2 on #1997), which the first
 # row states in plain words (novice-rubric screen: "DEEPEST DRILL AT C'BORE
-# MAX" left the depth origin unclear, rule 26), and the thread axis's
-# location limit prints under it.  The counterbore depth's MAX still sets
-# the drill's deepest point (sm_gooseneck_spring_joint.TAP_DRILL_DEPTH_MAX).
-# The drill's wander is a budget term, not a print row
-# (sm_gooseneck_spring_joint.DRILL_WANDER_MAX).  Four rows in all (the layout
-# audit's tall-block limit: a fifth row gated, farm run 20261028T005208028Z).
+# MAX" left the depth origin unclear, rule 26).  The counterbore depth's MAX
+# still sets the drill's deepest point
+# (sm_gooseneck_spring_joint.TAP_DRILL_DEPTH_MAX).  The drill's wander is a
+# budget term, not a print row (sm_gooseneck_spring_joint.DRILL_WANDER_MAX).
+# Three rows in all (the layout audit's tall-block limit is four).
 # Inch sheet: the depths at .XX (their band), the drill Ø at .XXX (#3, .213).
 TAP_CALLOUT_PRECISION = {"hw-tapdrldia": 3, "hw-threaddepth": 2, "hw-tapdrldepth": 2}
-# The thread axis's limit is a radial offset from the tube's OD axis, worded
-# as the counterbore's (r7 review: "+/-" named no zone and no surface).
-TAP_CALLOUT_BELOW = (
-    f"FOR {SCREW_NUMBER}; DEPTHS FROM C'BORE FLOOR\n"
-    f"THREAD AXIS TO TUBE OD AXIS {_inch(THREAD_AXIS_OFFSET_MAX, 3)} MAX RADIAL"
-)
+TAP_CALLOUT_BELOW = f"FOR {SCREW_NUMBER}; DEPTHS FROM C'BORE FLOOR"
+# The two axis limits the run-out clearance and the counterbore wall charge
+# (sm_gooseneck_spring_joint), as standard position frames on the end view
+# instead of prose (delegated ruling sm Q6, 2026-11-07 (Main), no precedent;
+# owner review #2144; pending owner confirmation; RV-03): the tap ⌖ to A, the
+# end piece's Ø.50 OD (flush with the tube's), and the counterbore ⌖ to B,
+# the tap.  Each zone is twice its radial offset.
+GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
+    "tap position": _inch(2.0 * THREAD_AXIS_OFFSET_MAX, 3),
+    "counterbore position": _inch(2.0 * COUNTERBORE_AXIS_OFFSET_MAX, 3),
+}
+if GEOMETRIC_TOLERANCES_IN != {"tap position": ".012", "counterbore position": ".008"}:
+    raise AssertionError("gooseneck axis zones moved off their ruled values")
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  StationReference is a hidden construction sketch on the

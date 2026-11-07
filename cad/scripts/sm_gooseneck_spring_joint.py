@@ -51,7 +51,8 @@ PLUG_DIA_DEVIATIONS = printed_deviations(gooseneck.PLUG_DIA, 2, unit=UNIT)
 PLUG_HEAD_LENGTH_DEVIATIONS = printed_deviations(
     gooseneck.PLUG_HEAD_LENGTH, 2, unit=UNIT
 )
-# The thread axis's location limit, ".006 MAX RADIAL" under the tap callout.
+# The thread axis's location limit: the tap's ⌖ Ø.012 to A (the end piece's
+# OD) on the MHA-SM-01 end view, a .006 radial offset.
 THREAD_AXIS_OFFSET_MAX = 0.006 * MM_PER_IN
 # The tap drill's wander off its axis at the point: a shop-capability term
 # the wall budgets charge and the print does not carry (as the fleet's other
@@ -245,7 +246,7 @@ SCREW_FACE_OFFSET_MAX = SCREW_RADIAL_PLAY_MAX + (
 # the body's upper limit) must clear the bore's SMALLEST size with the screw
 # and the bore each off the thread axis by their full bands: the
 # counterbore's printed axis band to the tap (COUNTERBORE_AXIS_OFFSET_MAX,
-# MHA-SM-01 note) and the tilted screw's SCREW_FACE_OFFSET_MAX, its largest
+# MHA-SM-01's ⌖ Ø.008 to B) and the tilted screw's SCREW_FACE_OFFSET_MAX, its largest
 # anywhere in the bore.
 COUNTERBORE_DIA = 7.00
 COUNTERBORE_DIA_BAND = 0.004 * MM_PER_IN

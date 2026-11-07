@@ -162,7 +162,15 @@ def test_counterbore_callouts_floor_the_wall_from_the_joint() -> None:
     )
     assert all(spec.COUNTERBORE_NOTE_LINK in text for text in linked)
     assert spec.SCREW_NUMBER not in " ".join(linked)
-    assert "WITHIN" not in spec.COUNTERBORE_AXIS_CALLOUT
+    # The axis limits are position frames, not prose (delegated ruling sm Q6):
+    # each zone twice the radial offset the run-out stack charges.
+    assert "AXIS" not in " ".join(linked)
+    assert spec.GEOMETRIC_TOLERANCES_IN == {
+        "tap position": f"{2 * joint.THREAD_AXIS_OFFSET_MAX / 25.4:.3f}".lstrip("0"),
+        "counterbore position": (
+            f"{2 * joint.COUNTERBORE_AXIS_OFFSET_MAX / 25.4:.3f}".lstrip("0")
+        ),
+    }
     assert "CounterboreDepth" not in callouts
     assert "\n" not in spec.COUNTERBORE_DEPTH_CALLOUT
     marked = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
@@ -201,7 +209,7 @@ def test_counterbore_blocks_stand_between_their_neighbours() -> None:
     # characters), which stood inside the left border and the end face.
     for callout in (spec.COUNTERBORE_DIA_CALLOUT, spec.COUNTERBORE_FLOOR_CALLOUT):
         assert max(map(len, callout.splitlines())) <= spec.COUNTERBORE_ROW_MAX_CHARS
-    assert spec.COUNTERBORE_ROW_MAX_CHARS == len("C'BORE AXIS TO TAP AXIS")
+    assert spec.COUNTERBORE_ROW_MAX_CHARS == 23
 
 
 def test_notes_state_stock_process_and_intent_without_sizes() -> None:
@@ -233,8 +241,7 @@ def test_notes_state_stock_process_and_intent_without_sizes() -> None:
     assert set(re.findall(r"SEE NOTE (\d)", printed)) <= numbers
     # A callout carries at most two lines of words (rule 7).
     for name, text in spec.DIMENSION_CALLOUTS_BY_NAME.items():
-        if name != "CounterboreFloorCornerR":  # its axis rows: owner question
-            assert len(text.splitlines()) <= 2, name
+        assert len(text.splitlines()) <= 2, name
     # Both fit windows print as the acceptance of a matched fit (fan-out
     # policy 1): the shank turned to suit the tube, the sleeve selected.
     assert notes.count(f"CLEARANCE {window};") == 2
@@ -370,7 +377,8 @@ def test_tap_callout_states_geometry_and_its_mate_within_four_rows() -> None:
     # The native callout's two rows plus these stay within the layout
     # audit's four-row limit; each row is finished geometry, not method.
     rows = spec.TAP_CALLOUT_BELOW.splitlines()
-    assert len(rows) == 2
+    assert len(rows) == 1
+    assert "AXIS" not in spec.TAP_CALLOUT_BELOW  # its limit is the ⌖ frame
     assert joint.TAP_DRILL_DEPTH_MAX > joint.COUNTERBORE_DEPTH_MAX
     # At most three characters past r7's 39-character row (103.9 mm, x 106.1-
     # 210.0 mm; ~105.3 mm in Century Gothic's metrics): ~1 mm more each side
@@ -381,6 +389,38 @@ def test_tap_callout_states_geometry_and_its_mate_within_four_rows() -> None:
     printed = " ".join((spec.DRAWING_NOTES, spec.TAP_CALLOUT_BELOW)).upper()
     assert "PURCHASED" not in printed and "INTEGRAL" not in printed
     assert "THREADLOCKER" not in printed  # spring-eye clamping belongs to the assembly
+
+
+def test_end_view_frames_stand_between_the_callout_and_the_views() -> None:
+    # The callout's three rows (r1, farm run 20261107T102825912Z: four rows
+    # inked ~23 mm, centred on the keep, ~5.75 mm a row) end over
+    # the tap frame; datum B's tag hangs between the two frames; each frame's
+    # right end plus its 6.35 mm shoulder stays left of the end view's
+    # Ø.50 rim, and the frames start right of the section's top dimension
+    # text (r8: to x ~153 mm).
+    centre = (drawing.END_CENTER[0], drawing.ARM_AXIS_Y)
+    od_r = geom.TUBE_DIA / 2.0 * drawing._S
+    callout_bottom = drawing.TAP_CALLOUT_XY[1] - 3 * 0.00575 / 2.0
+    row = drawing.END_GTOL_ROW
+    tap_top = drawing.TAP_FRAME_XY[1]
+    assert tap_top + 0.0025 <= callout_bottom
+    tag_bottom = drawing.DATUM_B_XY[1]
+    assert tag_bottom - 0.0015 >= drawing.COUNTERBORE_FRAME_XY[1]
+    assert tag_bottom + drawing.END_DATUM_TAG_BOX < tap_top - row
+    for frame in (drawing.TAP_FRAME_XY, drawing.COUNTERBORE_FRAME_XY):
+        assert frame[0] >= 0.155
+        assert frame[0] + drawing.END_FRAME_WIDTH + 0.00635 < centre[0] - od_r - 0.003
+    # The two leaders land on opposite sides of the arm axis, so they never
+    # cross; the counterbore's under it, the tap's over it.
+    assert math.sin(math.radians(drawing.TAP_FRAME_RIM_DEG)) > 0.0
+    assert math.sin(math.radians(drawing.COUNTERBORE_FRAME_RIM_DEG)) < 0.0
+    # Datum A's box (~7 mm) right of its upper-right rim pick and left of
+    # the elevation's end face, above the end view's leg.
+    angle = math.radians(drawing.DATUM_A_RIM_DEG)
+    pick = (centre[0] + od_r * math.cos(angle), centre[1] + od_r * math.sin(angle))
+    symbol_x = pick[0] + drawing.DATUM_A_OFFSET[0]
+    assert symbol_x - 0.0035 > centre[0] + od_r + 0.002
+    assert symbol_x + 0.0035 + 0.003 < drawing.END_FACE_X
 
 
 def test_sheet_places_every_marked_dimension_at_its_places() -> None:
