@@ -10,13 +10,12 @@ its line above every line it spans.  Each gear land's D-flat is shown in its
 own enlarged cut-only section, A-A to D-D, carrying its across-flat; B-B to
 D-D are cut on DETAIL E, the stepped tip at 4:1, where their arrows and
 letters have room.  A standard isometric supplies pictorial clarity.  Every
-tight band names its mate at its own callout (a seat's gears below or after
-its diameter, a flat's after its across-flat), the steps and the collar web
-say what their three places locate, and the note gives the gears' drawing
-numbers and the tailstock support the tip land needs (U40).  Source geometry
-and native model fits stay authoritative.  A separate setup sheet supplements
-these controls with parenthesized, unbanded native measurements from the
-collar's north / 64T-seat face; it creates no acceptance limits.  These pure
+tight band names its mate at its own callout or in the numbered land note
+linked from each land's diameter and across-flat, and the notes give the
+collar's tight limits and the tailstock support the tip land needs (U40).
+Source geometry and native model fits stay authoritative.  A separate setup
+sheet supplements these controls with parenthesized, unbanded native
+measurements from the collar's MHA-DT-07 seat face; it creates no acceptance limits.  These pure
 references and the front-to-tip overall take their display precision from the spec.
 
 Run with SolidWorks open::
@@ -37,7 +36,6 @@ from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
     delete_view,
     dimension_name,
     iter_views,
@@ -108,9 +106,7 @@ from dt_cone_gear_shaft_spec import (
     FILLET_CALLOUT,
     FLAT_LANDS,
     FLAT_MATE_SUFFIXES,
-    FLATS_IN_LINE_CALLOUT,
     JOURNAL_DIA,
-    LENGTH_FUNCTION_SUFFIXES,
     SEAT_MATE_CALLOUTS,
     SEAT_MATE_SUFFIXES,
     SECTION_DIAS,
@@ -144,14 +140,8 @@ SETUP_SCALE = (3, 2)
 SETUP_CENTER = (0.210, 0.183)
 SETUP_REFERENCE_LANDS = (1, 2, 3, 4)
 SETUP_REFERENCE_TIERS = (0.157, 0.139, 0.121, 0.103)
-SETUP_NOTE_XY = (0.065, 0.245)
-SETUP_NOTE = (
-    "SUPPLEMENTARY SETUP REFERENCES ONLY\n"
-    "PARENTHESIZED VALUES ARE NOT ACCEPTANCE LIMITS\n"
-    "ALL DIMENSIONAL REQUIREMENTS: SHEET 1"
-)
 SETUP_SEAT_NOTE_XY = (0.310, 0.215)
-SETUP_SEAT_NOTE = "COLLAR NORTH FACE\n64T SEAT"
+SETUP_SEAT_NOTE = "COLLAR FACE\nSEAT FOR MHA-DT-07"
 
 
 # Landscape sheet, 0.4318 x 0.2794 m, title block bottom right (x > ~0.216,
@@ -186,8 +176,7 @@ DONOR_CENTER = (0.360, 0.090)
 # A station's text is centred in its span when it fits there with
 # STATION_TEXT_CLEARANCE to spare; the web's 3.18 span is narrower than its
 # text, so the text stands LEFT of the collar's north witness line (the 916a
-# render had the web text touch that line), far enough left for its function
-# suffix (LENGTH_FUNCTION_SUFFIXES) to end clear of it.  The one radius rides
+# render had the web text touch that line).  The one radius rides
 # above the 3/8-to-1/4 in step it attaches to (the fillet's first edge),
 # right of the Ø.2500 line.  With its stacked +.000/-.002 band its text is
 # 23.4 mm wide and its shoulder 25.4 mm, so it stands 0.4 mm nearer that line
@@ -255,12 +244,12 @@ NEAR_SIDE_DIAMETERS = ("CollarDia",)
 REFERENCE_DIAMETERS = ("CollarDia",)
 # Sheet width of one diameter text with its stacked band, for the layout test.
 DIAMETER_TEXT_WIDTH = 0.032
-# One-line suffixes after a dimension's value: the tip-end seats' gears and
-# what the three-place steps and web locate (machinist review r1).
-DIMENSION_SUFFIXES = {**SEAT_MATE_SUFFIXES, **LENGTH_FUNCTION_SUFFIXES}
-# The collar prints its reference diameter over the stock statement, its
-# break and root limit, each with its reason, lines as wide as "5/8 BAR AS
-# SUPPLIED" or wider.  At LENGTH_CHAR_WIDTH a line
+# One-line suffixes after a dimension's value: the tip-end seats' flag to
+# the land note.  Lengths carry their value and band only (rule 7).
+DIMENSION_SUFFIXES = dict(SEAT_MATE_SUFFIXES)
+# The collar prints its reference diameter over the stock statement and its
+# mates' line, lines as wide as "5/8 BAR AS SUPPLIED" or wider.  At
+# LENGTH_CHAR_WIDTH a line
 # that long is wider than the whole journal land, so hanging right from its
 # rim arrow the block ran under the pivot-journal finish and that finish's
 # leader crossed it (final877 eye pass).  The build lifts the block above the
@@ -368,8 +357,8 @@ PARTIAL_CUT_PARENTS = frozenset({CutParent.TIP_DETAIL})
 # centred over its text and SECTION_CALLOUT_REACH either side of it, so D
 # stands between C-C's outline and the right border and A's stays left of
 # B's cell; C stands left of A's column, its cell clear of D's callout and
-# of the side view's big end.  Every across-flat names its gears after its
-# value (FLAT_MATE_SUFFIXES), the whole line centred on the text position
+# of the side view's big end.  Every across-flat flags the land note after
+# its value (FLAT_MATE_SUFFIXES), the whole line centred on the text position
 # (r2, 20261018T062935602Z: B's "5.842 -0.01 T024" read 376.0..410.5 mm
 # about its 393 mm centre), so A's 56 mm line pushes A-A 3 mm right of r2's
 # and B-B 1 mm right: r3 (20261018T065854075Z) measured A's box ending at
@@ -417,8 +406,9 @@ D_SECTION_KEEP = {
     f"Sec{section.land}AF": (section.centre[0], section.centre[1] + 0.017)
     for section in D_SECTIONS
 }
+# The terminal flat's torque corners ride above its across-flat; the flats'
+# shared clock is in the land note (spec LAND_NOTE) with their fit.
 SECTION_ABOVE_CALLOUTS = {
-    f"Sec{min(FLAT_LANDS)}AF": FLATS_IN_LINE_CALLOUT,
     f"Sec{max(FLAT_LANDS)}AF": TORQUE_CORNER_CALLOUT,
 }
 # An above callout is centred on its dimension's text, set as one run: a
@@ -683,8 +673,6 @@ def _add_setup_sheet(adapter: Any) -> list[SetupReference]:
         entity=seat, attached_to=seat, label="setup reference origin",
     )
     drawing.EditSheet()
-    if add_note(adapter, SETUP_NOTE, *SETUP_NOTE_XY) is None:
-        raise RuntimeError("failed to add setup reference-only note")
     _assert_setup_references(adapter, references)
     return references
 
@@ -1256,8 +1244,7 @@ def _add_d_sections(
         )
         if name in SECTION_ABOVE_CALLOUTS:
             # The terminal flat's torque corners stay sharp in the model, so
-            # their break limit rides above that flat's own across-flat; the
-            # flats' shared clock rides above the first flat's.
+            # their break limit rides above that flat's own across-flat.
             set_dimension_callouts(
                 adapter,
                 [across_flat],
