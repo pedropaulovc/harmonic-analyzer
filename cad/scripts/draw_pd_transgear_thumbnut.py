@@ -3,9 +3,9 @@ r"""Create the manufacturing drawing for the transgear thumbnut (MHA-PD-13).
 The face view is the ``*Top`` orientation, looking at the dished front face:
 it carries the native #8-32 UNC-2B through-thread callout, and stands
 directly above section A-A on one vertical centreline, top view over front
-(third angle; machinist review round 2). Both actual entry cones print a
-model-owned MAX diameter and their half-angle in section, measured from the
-section's full axis centreline.
+(third angle; machinist review round 2). Both entry cones print as one
+countersink callout in symbol form (``⌵ Ø.18 MAX X 90°  BOTH ENDS``,
+rule 26): the model-owned MAX diameter and the included angle.
 Section A-A uses the Front plane through the axis and two knurl crests, so the
 knurl diameter, the head, waist and flange, the overall length and the
 flange length from the seat face (the waist is their remainder) and the
@@ -57,8 +57,8 @@ from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
 from pd_transgear_thumbnut_spec import (
-    CSK_HALF_ANGLE_DEG,
-    CSK_QUALIFIER,
+    CSK_DIA_SUFFIX,
+    CSK_INCLUDED_ANGLE_DEG,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FLANGE_LENGTH,
@@ -67,7 +67,6 @@ from pd_transgear_thumbnut_spec import (
     KNURL_CALLOUT,
     KNURL_DIA_SUFFIX,
     OVERALL_LENGTH,
-    REAR_CSK_APEX_Y,
     TAP_DRILL_DIA,
     TAP_SPEC,
     WAIST_LENGTH,
@@ -148,22 +147,10 @@ def _stem_dia_anchor(bottom_mm: float, top_mm: float) -> tuple[float, float]:
     return (_STEM_TEXT_X, _section_y((bottom_mm + top_mm) / 2.0) + DIM_LINE_BELOW_TEXT)
 
 
-# The rear cone's half-angle prints on its own native arc, its text in the
-# wedge between the axis below the seat and the cone's extension: no offset,
-# so no leader.  Release v47's review (r2, r3) gated on the offset text's
-# leader, which ran up from the text past the arc's end into the hatching.
-# The arc stands far enough out that it passes under the end of the cone
-# diameter's right extension line rather than across that dimension line,
-# and the text sits on the wedge's bisector, under that extension line and
-# left of the cone's own.  At 27 mm the text's corner stood 1.78 mm from
-# that line's end (run 20261106T002837971Z layout audit, 2 mm clearance).
-COUNTERSINK_APEX_XY = (SECTION_CENTER[0], _section_y(REAR_CSK_APEX_Y))
-COUNTERSINK_ANGLE_RADIUS = 0.0285
-_ANGLE_TEXT_FROM_AXIS = math.radians(CSK_HALF_ANGLE_DEG / 2.0)
-COUNTERSINK_ANGLE_TEXT_XY = (
-    COUNTERSINK_APEX_XY[0] + COUNTERSINK_ANGLE_RADIUS * math.sin(_ANGLE_TEXT_FROM_AXIS),
-    COUNTERSINK_APEX_XY[1] - COUNTERSINK_ANGLE_RADIUS * math.cos(_ANGLE_TEXT_FROM_AXIS),
-)
+# Section A-A's caption hangs under the cone diameter's dimension line and
+# its BOTH ENDS row, 13.5 mm and one text line under the seat face (run
+# 20261024T025840809Z).
+CAPTION_BELOW_SEAT = 0.026
 
 
 SECTION_KEEP = {
@@ -186,7 +173,6 @@ SECTION_KEEP = {
     "FlangeDia": _stem_dia_anchor(0.0, FLANGE_LENGTH),
     "WaistDia": _stem_dia_anchor(FLANGE_LENGTH, FLANGE_LENGTH + WAIST_LENGTH),
     "CountersinkDia": (_section_x(-HEAD_DIA / 2.0) - 0.025, _section_y(0.0) - 0.008),
-    "CountersinkHalfAngle": COUNTERSINK_ANGLE_TEXT_XY,
 }
 # The baseline lengths' spans hold their text and arrows: inside, so no arrow
 # hangs below the seat face into the cone diameter's "max." (run
@@ -195,21 +181,23 @@ SECTION_KEEP = {
 # (machinist review round 3); the Ø.81 span holds its arrows.
 ARROWS_INSIDE = ("FlangeLength", "HeadRearY", "HeadDia")
 _DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
-# The native caption's top centre.  The cone diameter's dimension line runs
-# under its below-callout, 13.5 mm under the seat face (run
-# 20261024T025840809Z); the half-angle's arc dips lower, to the axis, and the
-# caption hangs 4.5 mm under the arc's foot, clear of its arrow.
-SECTION_CAPTION_XY = (
-    SECTION_CENTER[0],
-    COUNTERSINK_APEX_XY[1] - COUNTERSINK_ANGLE_RADIUS - 0.0045,
-)
+# The native caption's top centre, under the countersink callout.
+SECTION_CAPTION_XY = (SECTION_CENTER[0], _section_y(0.0) - CAPTION_BELOW_SEAT)
 # The face view prints only the native thread callout.
 FACE_KEEP: dict[str, tuple[float, float]] = {}
 # Above the knurl diameter, the outermost of the rim's stack: the below lane
 # would run into the dish chord.  "OVER KNURL" is the value's suffix.
 DIMENSION_CALLOUTS_ABOVE = {"HeadDia": KNURL_CALLOUT}
-DIMENSION_CALLOUTS_BELOW = {"CountersinkDia": CSK_QUALIFIER}
-DIMENSION_SUFFIXES = {"HeadDia": KNURL_DIA_SUFFIX}
+# The countersink in symbol form (rule 26): size, then the included angle;
+# the cone half-angle the part marks is not printed separately.  A custom
+# prefix replaces the native Ø glyph, so it carries SolidWorks' own token.
+DIMENSION_CALLOUTS_BELOW = {"CountersinkDia": "BOTH ENDS"}
+DIMENSION_PREFIXES = {"CountersinkDia": "<HOLE-SINK><MOD-DIAM>"}
+DIMENSION_SUFFIXES = {
+    "HeadDia": KNURL_DIA_SUFFIX,
+    "CountersinkDia": f"{CSK_DIA_SUFFIX} X {CSK_INCLUDED_ANGLE_DEG:.0f}°",
+}
+_DIMENSION_TEXT_PREFIX = 1  # swDimensionTextParts_e.swDimensionTextPrefix
 _DIMENSION_TEXT_SUFFIX = 2  # swDimensionTextParts_e.swDimensionTextSuffix
 
 
@@ -394,41 +382,46 @@ def _omit_thread_class(display: Any) -> None:
         raise RuntimeError(f"thumbnut tap callout still prints its class: {resolved!r}")
 
 
-def _set_dimension_suffixes(adapter: Any, annotations: list[Any]) -> None:
-    """Write each DIMENSION_SUFFIXES text after its value, read back."""
-    remaining = dict(DIMENSION_SUFFIXES)
+def _set_dimension_affixes(adapter: Any, annotations: list[Any]) -> None:
+    """Write each DIMENSION_PREFIXES / DIMENSION_SUFFIXES text, read back."""
+    remaining = {
+        (name, part): text
+        for part, texts in (
+            (_DIMENSION_TEXT_PREFIX, DIMENSION_PREFIXES),
+            (_DIMENSION_TEXT_SUFFIX, DIMENSION_SUFFIXES),
+        )
+        for name, text in texts.items()
+    }
     for raw in annotations:
         annotation = _early_bound(raw, "IAnnotation")
-        text = remaining.pop(dimension_name(adapter, annotation), None)
-        if text is None:
-            continue
-        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        display.SetText(_DIMENSION_TEXT_SUFFIX, text)
-        if str(display.GetText(_DIMENSION_TEXT_SUFFIX) or "") != text:
-            raise RuntimeError(f"thumbnut suffix {text!r} did not persist")
+        name = dimension_name(adapter, annotation)
+        for key in [key for key in remaining if key[0] == name]:
+            text = remaining.pop(key)
+            display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+            display.SetText(key[1], text)
+            if str(display.GetText(key[1]) or "") != text:
+                raise RuntimeError(f"thumbnut {name} text {text!r} did not persist")
     if remaining:
-        raise RuntimeError(f"no thumbnut dimension for suffixes: {sorted(remaining)}")
+        raise RuntimeError(f"no thumbnut dimension for affixes: {sorted(remaining)}")
 
 
-def _place_countersink_angle(adapter: Any, annotations: list[Any]) -> None:
-    """Stand the native rear cone/axis angle's text on its own arc, in its wedge."""
-    name = "CountersinkHalfAngle"
-    matches = [item for item in annotations if dimension_name(adapter, item) == name]
-    if len(matches) != 1:
-        raise RuntimeError(f"thumbnut needs one native {name}, got {len(matches)}")
-    annotation = _early_bound(matches[0], "IAnnotation")
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    # An inherited offset would move only the text and hang it on a leader.
-    display.OffsetText = False
-    if bool(display.OffsetText):
-        raise RuntimeError("thumbnut countersink angle offset could not be reset")
-    if not annotation.SetPosition2(*SECTION_KEEP[name], 0.0):
-        raise RuntimeError("failed to position the thumbnut countersink angle")
-    position = annotation.GetPosition()
-    if not position or math.dist(
-        (float(position[0]), float(position[1])), SECTION_KEEP[name]
-    ) > 1e-5:
-        raise RuntimeError(f"thumbnut countersink angle did not persist: {position!r}")
+def _pin_sheet_scale(adapter: Any) -> None:
+    """Hold the sheet at its printed 3:1 before section A-A is cut.
+
+    Placing a model view drifts the sheet scale, and a native section caption
+    carries a scale field when its view's scale differs from the sheet's at
+    creation (draw_fr_top_frame._pin_sheet_scale): the screen review read
+    SECTION A-A's "SCALE 3 : 1" as restating the title block (rule 9).
+    """
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
+    if sheet is None:
+        raise RuntimeError("no active thumbnut sheet to pin before section A-A")
+    if not sheet.SetScale(SHEET_SCALE[0], SHEET_SCALE[1], False, False):
+        raise RuntimeError("failed to pin the thumbnut sheet at 3:1")
+    properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
+    if len(properties) < 4 or (float(properties[2]), float(properties[3])) != SHEET_SCALE:
+        raise RuntimeError(f"thumbnut sheet scale did not persist: {properties!r}")
 
 
 @_telemetry.traced("drawing.thumbnut.arrows_inside")
@@ -464,11 +457,11 @@ def _sheet_sketch_point(sheet_xy: tuple[float, float]) -> tuple[float, float]:
 def _add_section_axis(adapter: Any, section: Any) -> None:
     """Draw the nut's axis through section A-A, past the seat and the rim.
 
-    The 45° half-angle measured from a short stub of the countersink sketch's
-    axis left the reader to infer the cone's reference (machinist review
-    round 2).  The ends are the model axis projected through the section's
-    own transform (draw_dt_cone_pivot_post's section axis), so the line is
-    the axis itself whichever way the section was turned rim up.
+    A short stub of the countersink sketch's axis left the reader to infer
+    the cone's reference (machinist review round 2).  The ends are the model
+    axis projected through the section's own transform
+    (draw_dt_cone_pivot_post's section axis), so the line is the axis itself
+    whichever way the section was turned rim up.
     """
     overshoot = AXIS_OVERSHOOT_MM / 1000.0
     ends = [
@@ -540,6 +533,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     face = place_view(adapter, str(SOURCE), "*Top", *FACE_CENTER, scale=VIEW_SCALE)
+    _pin_sheet_scale(adapter)
     section = create_section_view(
         adapter,
         face,
@@ -583,8 +577,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, section_annotations, DIMENSION_CALLOUTS_BELOW, location="below"
     )
-    _set_dimension_suffixes(adapter, section_annotations)
-    _place_countersink_angle(adapter, section_annotations)
+    _set_dimension_affixes(adapter, section_annotations)
     _set_arrows_inside(adapter, section_annotations)
     position_section_caption(
         adapter, section, SECTION_CAPTION_XY, label="thumbnut section A-A"

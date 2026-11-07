@@ -40,7 +40,10 @@ def test_required_drawing_paths() -> None:
 
 def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.FACE_KEEP) | set(drawing.SECTION_KEEP) == marked
+    # The cone half-angle folds into the countersink callout's "X 90°".
+    assert set(drawing.FACE_KEEP) | set(drawing.SECTION_KEEP) == marked - {
+        "CountersinkHalfAngle"
+    }
     assert not set(drawing.FACE_KEEP) & set(drawing.SECTION_KEEP)
     assert set(drawing.DRAWING_PRECISION_BY_NAME) == marked
     assert {
@@ -72,9 +75,15 @@ def test_actual_entry_cones_carry_model_owned_controls() -> None:
     assert spec.DRAWING_DIMENSIONS["CountersinkProfile"] == {
         "CountersinkDia", "CountersinkHalfAngle",
     }
-    # One way of saying "both cones", and no number in the qualifier.
-    assert spec.CSK_QUALIFIER == "CSK, BOTH ENDS"
-    assert not any(character.isdigit() for character in spec.CSK_QUALIFIER)
+
+
+def test_countersink_prints_in_symbol_form_with_its_included_angle() -> None:
+    # Rule 26: size, then angle, with the countersink symbol; no separate
+    # half-angle dimension and no words for the countersink.
+    assert drawing.DIMENSION_PREFIXES == {"CountersinkDia": "<HOLE-SINK><MOD-DIAM>"}
+    assert drawing.DIMENSION_SUFFIXES["CountersinkDia"] == " MAX X 90°"
+    assert drawing.DIMENSION_CALLOUTS_BELOW == {"CountersinkDia": "BOTH ENDS"}
+    assert "CountersinkHalfAngle" not in drawing.SECTION_KEEP
 
 
 def _thumbnut_spec_with(monkeypatch, module, name: str, value):
@@ -515,7 +524,7 @@ def test_the_stem_diameters_print_across_their_own_cut() -> None:
     # The text clears the overall length's dimension line beyond it.
     assert drawing.SECTION_KEEP["OverallLength"][0] - drawing._STEM_TEXT_X > 0.004
     # All nine turned/dished sizes remain above the seat. The cone diameter
-    # has a left caption lane; the native angle prints on its own arc below.
+    # has a left caption lane under the seat.
     seat_y = drawing._section_y(0.0)
     turned = set().union(
         *(spec.DRAWING_DIMENSIONS[feature] for feature in ("HeadProfile", "StemProfile", "DishProfile"))
@@ -523,52 +532,9 @@ def test_the_stem_diameters_print_across_their_own_cut() -> None:
     assert len(turned) == 9
     assert all(drawing.SECTION_KEEP[name][1] >= seat_y for name in turned)
     dia = drawing.SECTION_KEEP["CountersinkDia"]
-    angle_text = drawing.SECTION_KEEP["CountersinkHalfAngle"]
     assert dia[0] < drawing.SECTION_CENTER[0] - drawing.HALF_HEAD - 0.020
     assert dia[1] < seat_y
     assert dia[1] > SHEET_INNER_LEFT + 0.020
-    apex = drawing.COUNTERSINK_APEX_XY
-    assert apex == (drawing.SECTION_CENTER[0], drawing._section_y(spec.REAR_CSK_APEX_Y))
-
-    def from_axis(point: tuple[float, float]) -> float:
-        """Degrees off the axis below the apex, toward the right-hand cone."""
-        return math.degrees(math.atan2(point[0] - apex[0], apex[1] - point[1]))
-
-    # The text is the arc's own point, on the bisector of the 45° wedge
-    # between the axis and the cone's extension: no leader to run anywhere.
-    radius = drawing.COUNTERSINK_ANGLE_RADIUS
-    assert math.dist(angle_text, apex) == pytest.approx(radius)
-    assert from_axis(angle_text) == pytest.approx(spec.CSK_HALF_ANGLE_DEG / 2.0)
-    # The layout audit's "45°" box on run 20261106T002837971Z: 6.8 x 3.5 mm.
-    half_w, half_h = 0.0034, 0.00175
-    cone_right = drawing._section_x(spec.CSK_DIA / 2.0)
-    cone_dim_line = seat_y - 0.0135
-    cone_extension_end = cone_dim_line - 0.0011
-    # The arc passes under the cone diameter's right extension line, never
-    # across its dimension line between the axis and that extension line.
-    arc_at_extension = apex[1] - math.sqrt(radius**2 - (cone_right - apex[0]) ** 2)
-    assert arc_at_extension < cone_extension_end - 0.003
-    # The text sits under that extension line's end, right of the axis and
-    # clear of the cone's own extension line (the flank produced, 45°).
-    assert angle_text[1] + half_h < cone_extension_end - 0.001
-    # The audit's 2 mm text clearance from that extension line's end.
-    box_dx = max(0.0, (angle_text[0] - half_w) - cone_right)
-    box_dy = cone_extension_end - (angle_text[1] + half_h)
-    assert math.hypot(box_dx, box_dy) > 0.0025
-    # Negative control: the 27 mm arc of that run left 1.78 mm.
-    first_text_top = apex[1] - 0.027 * math.cos(math.radians(22.5)) + half_h
-    assert cone_extension_end - first_text_top < 0.002
-    assert angle_text[0] - half_w > apex[0] + 0.001
-    corner = (angle_text[0] + half_w, angle_text[1] + half_h)
-    flank_gap = ((apex[1] - corner[1]) - (corner[0] - apex[0])) / math.sqrt(2.0)
-    assert flank_gap > 0.003
-    # Negative control: the old arc seed hugged the cone (radius ~12 mm). Its
-    # arc stays above the cone diameter's dimension line, so text standing on
-    # it at the bisector would sit on that dimension's right extension line.
-    old_radius = math.dist((cone_right + 0.0018, seat_y - 0.0018), apex)
-    assert apex[1] - old_radius > cone_dim_line
-    old_text_x = apex[0] + old_radius * math.sin(math.radians(22.5))
-    assert old_text_x - half_w < cone_right < old_text_x + half_w
     # The rim's diameters print above the rim, the knurl outermost.
     rim_y = drawing._section_y(spec.OVERALL_LENGTH)
     assert drawing.SECTION_KEEP["HeadDia"][1] > drawing.SECTION_KEEP["DishDia"][1]
@@ -641,87 +607,56 @@ def test_the_waist_keeps_a_length_at_every_printed_corner(monkeypatch) -> None:
 def test_the_section_caption_hangs_below_the_cone_diameter() -> None:
     """Machinist review: the cone diameter's line and extension lines struck the
     default caption's letters.  Run 20261024T025840809Z measured that line
-    13.5 mm under the seat face; the caption's top stands 6.5 mm under it,
-    and under the foot of the half-angle's arc on the axis."""
+    13.5 mm under the seat face; the caption's top stands 6.5 mm under it."""
     seat_y = drawing._section_y(0.0)
     caption = drawing.SECTION_CAPTION_XY
     assert caption[0] == drawing.SECTION_CENTER[0]
     assert seat_y - caption[1] - 0.0135 >= 0.005
-    arc_foot = drawing.COUNTERSINK_APEX_XY[1] - drawing.COUNTERSINK_ANGLE_RADIUS
-    assert arc_foot - caption[1] >= 0.004
-    # The caption's two rows (15 mm) stay above the inner border, 12.7 mm up.
-    assert caption[1] - 0.015 > 0.0127 + 0.005
+    # The caption (one row now that it states no scale) stays above the
+    # inner border, 12.7 mm up.
+    assert caption[1] - 0.008 > 0.0127 + 0.005
 
 
-@pytest.mark.parametrize(
-    "offset_resets,moves",
-    ((True, True), (False, True), (True, False)),
-)
-def test_native_cone_angle_stands_its_text_on_its_arc_and_refuses_noops(
-    monkeypatch,
-    offset_resets,
-    moves,
-) -> None:
-    """Bounded annotation fake follows the SDK OffsetText movement semantics."""
-    model_dimension = object()
-
+def test_dimension_affixes_are_written_and_read_back(monkeypatch) -> None:
     class Display:
         def __init__(self):
-            self.offset = True  # An inherited offset would hang the text on a leader.
+            self.text = {1: "", 2: ""}
 
-        @property
-        def OffsetText(self):
-            return self.offset
+        def SetText(self, part, text):
+            self.text[part] = text
 
-        @OffsetText.setter
-        def OffsetText(self, value):
-            self.offset = bool(value) or not offset_resets
+        def GetText(self, part):
+            return self.text[part]
 
-    class Annotation:
-        def __init__(self):
-            self.name = "CountersinkHalfAngle"
-            self.dimension = model_dimension
-            self.display = Display()
-            self.arc = (0.271, 0.133)
-            self.text = self.arc
-
-        def GetSpecificAnnotation(self):
-            return self.display
-
-        def SetPosition2(self, x, y, z):
-            assert z == 0.0
-            if moves:
-                self.text = (x, y)
-                if not self.display.OffsetText:
-                    self.arc = self.text
-            return True  # A successful status alone does not prove a move.
-
-        def GetPosition(self):
-            return (*self.text, 0.0)
-
-    annotation = Annotation()
+    annotations = {
+        name: SimpleNamespace(name=name, display=Display())
+        for name in ("HeadDia", "CountersinkDia")
+    }
+    for annotation in annotations.values():
+        annotation.GetSpecificAnnotation = lambda a=annotation: a.display
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, item: item.name)
-    if not offset_resets:
-        with pytest.raises(RuntimeError, match="offset could not be reset"):
-            drawing._place_countersink_angle(object(), [annotation])
-    elif not moves:
-        with pytest.raises(RuntimeError, match="angle did not persist"):
-            drawing._place_countersink_angle(object(), [annotation])
-    else:
-        drawing._place_countersink_angle(object(), [annotation])
-        assert annotation.text == drawing.SECTION_KEEP[annotation.name]
-        assert annotation.arc == annotation.text
-        assert not annotation.display.OffsetText
-    assert annotation.dimension is model_dimension
+    drawing._set_dimension_affixes(object(), list(annotations.values()))
+    cone = annotations["CountersinkDia"].display.text
+    assert cone == {1: "<HOLE-SINK><MOD-DIAM>", 2: " MAX X 90°"}
+    with pytest.raises(RuntimeError, match="no thumbnut dimension"):
+        drawing._set_dimension_affixes(object(), [annotations["HeadDia"]])
 
 
-def test_native_cone_angle_requires_exactly_one_model_annotation(monkeypatch) -> None:
-    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, item: item.name)
-    angle = SimpleNamespace(name="CountersinkHalfAngle")
-    for imported in ([], [angle, angle]):
-        with pytest.raises(RuntimeError, match="needs one native"):
-            drawing._place_countersink_angle(object(), imported)
+def test_the_sheet_is_pinned_at_its_printed_scale_before_the_section(monkeypatch) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    sheet = MagicMock()
+    sheet.SetScale.return_value = True
+    sheet.GetProperties2.return_value = [0, 0, 3.0, 1.0]
+    adapter = MagicMock()
+    adapter._get_attr_or_call.side_effect = lambda obj, name: (
+        sheet if name == "GetCurrentSheet" else getattr(obj, name)()
+    )
+    drawing._pin_sheet_scale(adapter)
+    sheet.SetScale.assert_called_once_with(3.0, 1.0, False, False)
+    sheet.GetProperties2.return_value = [0, 0, 2.0, 1.0]
+    with pytest.raises(RuntimeError, match="did not persist"):
+        drawing._pin_sheet_scale(adapter)
 
 
 def test_the_section_stands_rim_up_or_is_refused() -> None:
@@ -917,7 +852,7 @@ def test_native_countersink_control_refuses_unwritten_or_obsolete_geometry(
         _apply_countersink_max(monkeypatch, tolerance, display, diameter=diameter)
 
 
-def test_build_places_the_cone_angle_on_the_section_after_its_callouts(
+def test_build_pins_the_sheet_before_the_section_and_writes_affixes_after_callouts(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
     source = tmp_path / "source.SLDPRT"
@@ -931,9 +866,10 @@ def test_build_places_the_cone_angle_on_the_section_after_its_callouts(
     )
     asyncio.run(drawing.build(offline_adapter()))
 
-    (placed,) = seat._place_countersink_angle.call_args_list
-    assert placed.args[1] == ["axial section dimension"]
+    (written,) = seat._set_dimension_affixes.call_args_list
+    assert written.args[1] == ["axial section dimension"]
     names = [name for name, _args, _kwargs in seat.mock_calls]
-    angle = names.index("_place_countersink_angle")
+    assert names.index("_pin_sheet_scale") < names.index("create_section_view")
+    affixes = names.index("_set_dimension_affixes")
     callouts = [k for k, name in enumerate(names) if name == "set_dimension_callouts"]
-    assert len(callouts) == 2 and max(callouts) < angle < names.index("finalize_drawing")
+    assert len(callouts) == 2 and max(callouts) < affixes < names.index("finalize_drawing")

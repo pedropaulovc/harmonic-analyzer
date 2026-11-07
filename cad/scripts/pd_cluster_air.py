@@ -48,6 +48,15 @@ from _printed_tolerance import edge_break_chamfer_mm, printed_band_mm
 
 COLLAR_AIR_MIN = COLLAR.COLLAR_DISC_AIR_MIN  # 0.10
 PLATEN_AIR_MIN = 0.03  # R9-68
+# MHA-PD-00 accepts the collar air itself at this floor
+# (COLLAR.COLLAR_DISC_AIR_PHRASE: disc and collar pushed together, the disc
+# turned a full turn, .004 MIN at the overlap); if it is short, the MHA-PD-10
+# step face is re-faced square on a mandrel.  That acceptance guarantees the
+# air the step face's .001 squareness closes, so the collar gate drops that
+# one term; every other source still clears the same floor by stack, and the
+# platen stack still charges it (delegated ruling 2026-11-07 (Main), no
+# precedent; owner review #2144; pending owner confirmation).
+ASSEMBLY_ACCEPTED_COLLAR_SOURCES = frozenset({"sleeve step face perpendicularity"})
 
 # --- classification ------------------------------------------------------------
 # In-service clearances and motions: running fits, floats and the arm
@@ -226,7 +235,8 @@ _SEAT_SPAN = REGISTRATION.ARM_SEAT_SPAN_MIN_MM
 
 
 def collar_terms() -> dict[str, float]:
-    """The collar air's closing sources at Q, one entry per physical source."""
+    """The collar air's closing sources at Q the stack must clear, one entry
+    per physical source; those MHA-PD-00 accepts by feeler are left out."""
     terms = {label: band for label, _, band in (term for term, _ in FIT.M_FWD_CHAIN)}
     terms.update(
         {
@@ -253,7 +263,11 @@ def collar_terms() -> dict[str, float]:
             * KNOB_TILT_LEVER,
         }
     )
-    return terms
+    return {
+        label: value
+        for label, value in terms.items()
+        if label not in ASSEMBLY_ACCEPTED_COLLAR_SOURCES
+    }
 
 
 COLLAR_AIR = AirStack(

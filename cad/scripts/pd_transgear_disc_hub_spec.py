@@ -161,7 +161,10 @@ BORE_BAND = (0.0254, 0.0127)  # (upper, lower) deviations: +.0010/+.0005
 BORE_DEVIATIONS = deviations(BORE_BAND)
 FLAT_TO_AXIS = SLEEVE.FLAT_TO_AXIS
 FLAT_TO_AXIS_PLACES = 4
-FLAT_TO_AXIS_BAND = (0.03556, 0.02032)  # (upper, lower) deviations: +.0014/+.0008
+# PROVISIONAL, pending owner confirmation: +.0015/+.0005, the plain inch
+# steps that loosen the former converted +.0014/+.0008 (coordinator fan-out
+# policy 2, 2026-11-07; the clearance and the flat wall still hold).
+FLAT_TO_AXIS_BAND = (0.0381, 0.0127)  # (upper, lower) deviations: +.0015/+.0005
 FLAT_TO_AXIS_DEVIATIONS = deviations(FLAT_TO_AXIS_BAND)
 if not 0.0 < FLAT_TO_AXIS < BORE_DIA / 2.0:
     raise AssertionError("MHA-PD-17 bore flat must cut the round bore")
@@ -343,7 +346,7 @@ DISC_STEP_GAP_NOMINAL = SPIGOT_LENGTH - DISC.FACE_WIDTH  # .026
 DISC_STEP_GAP_WORST = (
     SPIGOT_LENGTH_MIN
     - DISC.FACE_WIDTH_MAX
-    - float(DISC.GEOMETRIC_TOLERANCES_MM["disc rear face parallelism to front"])
+    - DISC.REAR_FACE_PARALLELISM_BOUND_MM
     - DISC_TILT_MAX * DISC.BORE_DIA_MAX / 2.0
 )
 if DISC_STEP_GAP_WORST <= 0.0:

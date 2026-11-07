@@ -1,24 +1,25 @@
 r"""Create the curated manufacturing drawing for the feed-pinion sleeve (MHA-PD-10).
 
-An end view, a longitudinal section B-B, a rear-face view, an outside view
-in the section's direction and an isometric at 3:1 (the section takes B: A
-names the bore datum). The end view looks at the rear face (*Back), the
-third-angle left view of the section, whose rear face stands left (the
-2026-10-27 ENFORCE review: a nose view there broke the projection). It
-carries the genuine native two-tooth span, finish and datum
-A; the captioned rear-face view below carries the toothspace inspection
-callout on a full-depth flank and the root's MIN across two gap floors; the
-outside view carries the cutter's full-depth station and run-out limit from
-the floor of the gap facing it; the section
+An end view, a longitudinal section B-B, VIEW D on the rear face, VIEW C
+outside in the section's direction and an isometric at 3:1 (the section
+takes B: A names the bore datum). The end view looks at the rear face
+(*Back), the third-angle left view of the section, whose rear face stands
+left (the 2026-10-27 ENFORCE review: a nose view there broke the
+projection). It carries the genuine native two-tooth span, finish, datum A
+and VIEW C's viewing arrow; VIEW D, named by an arrow on VIEW C, carries the
+toothspace inspection callout on a full-depth flank and the root's MIN
+across two gap floors; VIEW C carries the cutter's full-depth station and
+run-out limit from the floor of the gap facing it; the section
 carries diameters beside their axial extent, the D-flat from the axis, the
 lengths baselined from the rear face (drawing-guidelines.md rule 11 (turned
 parts read like the lathe)) and the step face (the disc hub's seat) square to
 the bore, all imported natively from the part with the places, bands and
 callout text the part authored (``pd_transgear_feed_pinion_spec``,
 ``pd_transgear_feed_pinion_callouts``).  The oil hole is drilled through the
-seated hub at assembly, so the section carries only its one-line drill note;
-its station belongs to the hub's sheet.  Decimal-inch sheet (#290); the
-model keeps its millimetre nominals.
+seated hub at assembly, so the section carries only its drill note; its
+station belongs to the hub's sheet.  Decimal-inch sheet (#290); the model
+keeps its millimetre nominals.  Views C and D print at the sheet's 3:1, so
+no caption restates a scale (rule 9).
 """
 
 from __future__ import annotations
@@ -90,7 +91,6 @@ from pd_transgear_feed_pinion_spec import (
     TEETH,
     STOCK_PROFILE,
     TOOTHSPACE_GAUGE_DIA_MM,
-    TOOTH_SPACE_CALLOUT,
     TOOTH_SPACE_INSPECTION_END_MM,
     TOOTH_SPACE_INSPECTION_PHASE_RAD,
     TOOTH_SPACE_CALLOUT_PROPERTY,
@@ -127,17 +127,19 @@ ISO_CENTER = (0.367, 0.214)
 # end view looked at the step face, where the cutter's run-out leaves only
 # partial-depth gaps (run 11's pick there found a flank 0.23 mm off the
 # contact).  The end view now sees the rear face, but its lanes hold the
-# span, finish, datum and fit note, so the callout and the root's MIN land
-# on a second rear-face view in the free lane below the section, left of the
-# title block (left edge 216 mm, top 66 mm) and under the section caption
-# (bottom ~78 mm); a caption names it, hung centred below the view's
-# measured outline (run 12: at a fixed point it overlapped the outline by
-# 2.4 mm; the outline runs 6 mm past the tip circle).
+# span, finish, datum and VIEW C's arrow, so the callout and the root's MIN
+# land on a second rear-face view in the free lane below the section, left
+# of the title block (left edge 216 mm, top 66 mm) and under the section
+# caption (bottom ~78 mm).  It is not projected, so it is VIEW D, named by a
+# viewing arrow on VIEW C (rule 9; the 2026-11-07 screen read the prose
+# "VIEW FROM GEAR END" as unlabelled); its caption hangs centred below the
+# view's measured outline (run 12: at a fixed point it overlapped the
+# outline by 2.4 mm; the outline runs 6 mm past the tip circle).
 # 2 mm lower than run 12 left room for the tooth length's stack row above.
 REAR_CENTER = (0.165, 0.044)
-# The end view sees the rear face too; the caption names the end by its
-# feature (2026-10-27 ENFORCE review, r1, r3: "REAR FACE" named no end).
-REAR_CAPTION = "VIEW FROM GEAR END"
+OUTSIDE_VIEW_LETTER = "C"
+REAR_VIEW_LETTER = "D"
+REAR_CAPTION = f"VIEW {REAR_VIEW_LETTER}"
 REAR_CAPTION_XY = (REAR_CENTER[0] - 0.020, REAR_CENTER[1] - 0.0215)
 REAR_CAPTION_GAP_M = 0.002
 # INote.GetExtent reads ~0.3 mm apart between sessions; settle within twice.
@@ -220,7 +222,10 @@ RIGHT_KEEP: dict[str, tuple[float, float]] = {
     # 4 mm farther out than run 20261027T064211655Z, whose "RACK" touched
     # the bore dimension's lower extension line (r1, r3).
     "OutsideDia": (_REAR_X - 0.044, RIGHT_CENTER[1]),
-    "BossDia": (_NOSE_X + 0.064, RIGHT_CENTER[1]),
+    # Its fit's two rows (the standard fit name and mate, the route and the
+    # clearance REF) are the sheet's widest: centred this far out, the text
+    # starts right of the flat's dimension line and ends inside the border.
+    "BossDia": (_NOSE_X + 0.066, RIGHT_CENTER[1]),
     # Its dimension line stands just right of the nose; the text prints right
     # of the line, below the flat (run 20261027T032128736Z: 30 mm out, the
     # outside view's outline struck its last row).
@@ -234,27 +239,23 @@ RIGHT_KEEP: dict[str, tuple[float, float]] = {
     "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.0452),
 }
 
-# The outside view: the *Left view looks along +X, the section's direction of
-# sight, so it lays the rear face left like the section and imports the
-# section plane's (Right plane's) dimensions.  It stands lower right, above
-# the title block and below the boss's callout; its two cutter rows hang
-# below it with their texts left of its rear face, and its caption stands
-# left of it above them.  Its tangent edges are hidden.  It is not projected
-# from any view, so its caption names its direction (codjiflo P2 on
-# 65a022125): it shows the side section B-B shows, uncut.  It is cropped
-# (below), so its caption names it PARTIAL and a break line closes the boss
-# stub at the crop (2026-10-28 ENFORCE review, r1, r2: with neither, the
-# 13.80 MAX's extension line landed past the drawn end and the view read as
-# the whole part).
+# VIEW C: the *Left view looks along +X, the section's direction of sight,
+# so it lays the rear face left like the section and imports the section
+# plane's (Right plane's) dimensions.  It stands lower right, above the
+# title block and below the boss's callout; its two cutter rows hang below
+# it with their texts left of its rear face.  Its tangent edges are hidden.
+# It is not projected from any view, so it takes a letter and a viewing
+# arrow on the end view (rule 9; the 2026-11-07 screen read the prose
+# "OUTSIDE VIEW SAME SIDE AS B-B" as unlabelled and private).  It is cropped
+# (below) and a break line closes the boss stub at the crop (2026-10-28
+# ENFORCE review, r1, r2: without one, the 13.80 MAX's extension line
+# landed past the drawn end and the view read as the whole part).
 # It stands 4 mm higher than the uncropped view did, so the full depth's
-# extra row (the rack it covers) stays above the title block.
+# extra row stays above the title block.
 LEFT_CENTER = (0.373, 0.116)
-LEFT_CAPTION = "PARTIAL\nOUTSIDE VIEW\nSAME SIDE AS B-B"
-# Its longest row.  Only 48 mm stand between the 27.35 overall's extension
-# line (sheet x 271.0) and the view's box (x 322.2): one row "PARTIAL
-# OUTSIDE VIEW" printed 49.4 mm wide (farm runs 20261028T064402620Z and
-# 070655020Z struck or overlapped one of them), so PARTIAL takes its own row.
-_LEFT_CAPTION_WIDTH = 0.047
+LEFT_CAPTION = f"VIEW {OUTSIDE_VIEW_LETTER}"
+# The caption's estimated width (the drawing test's 3.5 mm text box).
+_LEFT_CAPTION_WIDTH = 0.016
 TANGENT_EDGES_HIDDEN = 0  # swDisplayTangentEdges_e.swTangentEdgesHidden
 _LEFT_REAR_X = LEFT_CENTER[0] - OVERALL_LENGTH / 2.0 * VIEW_SCALE[0] / 1000.0
 _LEFT_BOTTOM = LEFT_CENTER[1] - HALF_OD
@@ -299,14 +300,51 @@ def _outside_sheet_xy(radial_y: float, axial_z: float) -> tuple[float, float]:
     return (_LEFT_REAR_X + axial_z * s, LEFT_CENTER[1] + radial_y * s)
 
 
-_FULL_DEPTH_TEXT_WIDTH = 0.0601
+_FULL_DEPTH_TEXT_WIDTH = 0.0496
 _CUTTER_TEXT_WIDTH = 0.0418
 LEFT_KEEP: dict[str, tuple[float, float]] = {
     "FullDepth": (_left_of(_LEFT_REAR_X, _FULL_DEPTH_TEXT_WIDTH), _LEFT_BOTTOM - 0.0100),
     "CutterRunout": (_left_of(_LEFT_REAR_X, _CUTTER_TEXT_WIDTH), _LEFT_BOTTOM - 0.0250),
 }
+# The caption stands centred over the cropped view (its upper left given):
+# under it the cutter rows' dimension lines fill the lane, and left of it
+# VIEW D's arrow points at the rear face.  It stands right of the boss's
+# lower dimension arrow.
+_LEFT_CROP_CENTRE_X = _LEFT_REAR_X + OUTSIDE_CROP_Z * VIEW_SCALE[0] / 2000.0
 LEFT_CAPTION_XY = (
-    _LEFT_REAR_X - _LEFT_OF_REAR_AIR - _LEFT_CAPTION_WIDTH, LEFT_CENTER[1] + 0.001
+    _LEFT_CROP_CENTRE_X - _LEFT_CAPTION_WIDTH / 2.0, LEFT_CENTER[1] + HALF_OD + 0.0075
+)
+
+# Viewing arrows (rule 9): a letter note whose straight leader is the arrow
+# (draw_fr_top_frame._add_view_arrow), the letter at the cutting-plane
+# letters' height, the tip a small gap off the face it looks at, level
+# with the letter's mid-height.
+VIEW_LETTER_HEIGHT = 0.005
+# The letter's estimated width (the drawing test's text box at that height).
+VIEW_LETTER_WIDTH = 0.0037
+VIEW_ARROW_TIP_GAP = 0.0035
+VIEW_ARROW_LEADER = 0.009
+VIEW_ARROW_SQUARE_TOL = 0.0003
+# C's arrow points left at the end view's tooth tip level with the bore:
+# model +X in the mirrored *Back view, the sight of B-B's arrows, so VIEW C
+# (*Left) sees that side uncut.  The letter stands right of the tip, short
+# of the tip diameter's text left of the section's rear face.
+_VIEW_C_TIP = (FRONT_CENTER[0] + HALF_OD + VIEW_ARROW_TIP_GAP, FRONT_CENTER[1])
+VIEW_C_ARROW = (
+    (_VIEW_C_TIP[0] + VIEW_ARROW_LEADER, _VIEW_C_TIP[1] + VIEW_LETTER_HEIGHT / 2.0),
+    _VIEW_C_TIP,
+)
+# D's arrow points right (model +Z) at VIEW C's rear face, 6 mm under the
+# axis: VIEW D (*Back) looks at the rear face from behind.  The letter
+# stands left of the face, under the flat's callout and over the cutter
+# rows.
+_VIEW_D_TIP = (_LEFT_REAR_X - VIEW_ARROW_TIP_GAP, LEFT_CENTER[1] - 0.006)
+VIEW_D_ARROW = (
+    (
+        _VIEW_D_TIP[0] - VIEW_ARROW_LEADER - VIEW_LETTER_WIDTH,
+        _VIEW_D_TIP[1] + VIEW_LETTER_HEIGHT / 2.0,
+    ),
+    _VIEW_D_TIP,
 )
 
 # The rear-face view's root diameter reads along a gap bisector (the *Back
@@ -331,13 +369,13 @@ REAR_KEEP: dict[str, tuple[float, float]] = {
 # (r1, r2).  Run 20261027T072743812Z, the short row last: it left that row's
 # right end, crossed the step's frame leader and the note's left end met the
 # end view (layout audit).  It is match drilled with the hub seated, so the
-# hub's sheet sets its position (CENTRED ON HUB BODY,
-# pd_transgear_disc_hub_spec.OIL_HOLE_CALLOUT_BELOW); the note says so
-# (2026-10-27 ENFORCE review, r1-r3: the match drill named no locating part).
+# note names the hub once; the hub's sheet sets its position (2026-11-07
+# screen: a second statement of the hub was narration).  Size first, then
+# the process (rule 26).
 OIL_HOLE_NOTE = "\n".join(
     (
-        f"\u00d8{inch_text(OIL_HOLE_DIA, 3)} OIL HOLE THRU HUB AND BOSS",
-        f"DRILL AT ASSY WITH {HUB_NUMBER}; POSITION SET BY {HUB_NUMBER}",
+        f"\u00d8{inch_text(OIL_HOLE_DIA, 3)} THRU",
+        f"MATCH-DRILL AT ASSY WITH {HUB_NUMBER}",
     )
 )
 OIL_HOLE_EDGE = (
@@ -345,7 +383,7 @@ OIL_HOLE_EDGE = (
     RIGHT_CENTER[1] + (BORE_DIA + BOSS_DIA) / 4.0 * VIEW_SCALE[0] / 1000.0,
 )
 # Its last row: run 20261027T064211655Z drew 61 characters 151 mm wide.
-_OIL_HOLE_NOTE_WIDTH = 0.151 * 55 / 61
+_OIL_HOLE_NOTE_WIDTH = 0.151 * len(OIL_HOLE_NOTE.splitlines()[-1]) / 61
 OIL_HOLE_CALLOUT = (OIL_HOLE_EDGE[0] - 0.008 - _OIL_HOLE_NOTE_WIDTH, _SIDE_TOP + 0.079)
 NOTE_HEIGHT = 0.0025
 
@@ -449,24 +487,49 @@ def _create_section_axis_centerline(
     return centerline
 
 
+def _pin_sheet_scale(adapter: Any) -> None:
+    """Hold the sheet at its printed 3:1, read back.
+
+    Placing a model view drifts the sheet scale, and a native section caption
+    carries a scale field when its view's scale differs from the sheet's at
+    creation (draw_fr_top_frame._pin_sheet_scale): the 2026-11-07 screen read
+    SECTION B-B's "SCALE 3 : 1" as restating the title block (rule 9).  The
+    rear view's caption is placed against the pinned scale too, so
+    finalization re-applying it cannot move the view after that readback.
+    """
+    sheet = _early_bound(
+        _early_bound(adapter.currentModel, "IDrawingDoc").GetCurrentSheet(), "ISheet"
+    )
+    if not sheet.SetScale(*SHEET_SCALE, False, False):
+        raise RuntimeError("cannot pin the pinion-sleeve sheet at 3:1")
+    properties = list(sheet.GetProperties2() or ())
+    if len(properties) < 4 or (float(properties[2]), float(properties[3])) != SHEET_SCALE:
+        raise RuntimeError(f"pinion-sleeve sheet scale did not persist: {properties!r}")
+
+
 def _position_section_caption(
     adapter: Any, view: Any, target: tuple[float, float]
 ) -> None:
-    """Move the native linked section caption clear of the length dimensions."""
+    """Move the native linked section caption clear of the length dimensions.
+
+    It is found by its label field (``_section_axis.position_section_caption``)
+    and must carry no scale field: B-B prints at the sheet's scale."""
     bound_view = _early_bound(view, "IView")
     candidates = []
     for raw_note in bound_view.GetNotes() or ():
         note = _early_bound(raw_note, "INote")
         linked_text = str(note.PropertyLinkedText or "")
-        if all(
-            token in linked_text for token in ("<VLNAME>", "<VLLABEL>", "<VLSCALEV>")
-        ):
+        if "<VLLABEL>" in linked_text:
             candidates.append((note, linked_text))
     if len(candidates) != 1:
         raise RuntimeError(
             f"expected one native linked section caption, found {len(candidates)}"
         )
     note, linked_text = candidates[0]
+    if "<VLSCALEV>" in linked_text:
+        raise RuntimeError(
+            f"section B-B caption {linked_text!r} restates the sheet's scale"
+        )
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     if not annotation.SetPosition2(*target, 0.0):
         raise RuntimeError("failed to position the pinion-sleeve section caption")
@@ -476,6 +539,54 @@ def _position_section_caption(
         raise RuntimeError("pinion-sleeve section caption position did not persist")
     if str(note.PropertyLinkedText or "") != linked_text:
         raise RuntimeError("pinion-sleeve section caption lost its native fields")
+
+
+def _add_view_arrow(
+    adapter: Any,
+    parent: Any,
+    letter: str,
+    arrow: tuple[tuple[float, float], tuple[float, float]],
+) -> None:
+    """A horizontal letter arrow on ``parent`` naming a removed view, square
+    onto the face it looks at (draw_fr_top_frame._add_view_arrow): the
+    letter slides in y by any miss."""
+    text_xy, tip_xy = arrow
+    label = f"view {letter} viewing arrow"
+    note = add_leader_note(
+        adapter, letter, text_xy=text_xy, attach_xy=tip_xy, view=parent, label=label,
+    )
+    # add_note leaves text at the document height; size the letter here and
+    # prove the leader tip did not move with it.
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError(f"{label} note has no text format")
+    text_format.CharHeight = VIEW_LETTER_HEIGHT
+    if not annotation.SetTextFormat(0, False, text_format):
+        raise RuntimeError(f"failed to size the {label} letter")
+    rebuild_drawing(adapter, label=f"{label} letter")
+    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+    if len(points) < 6 or math.dist((points[-3], points[-2]), tip_xy) > 0.001:
+        raise RuntimeError(f"{label} tip moved when its letter was sized")
+    # The leader leaves the letter's nearer side at the text's mid-height.
+    miss = tip_xy[1] - points[1]
+    if abs(miss) > VIEW_ARROW_SQUARE_TOL:
+        x, y, z = (float(value) for value in annotation.GetPosition())
+        if not annotation.SetPosition2(x, y + miss, z):
+            raise RuntimeError(f"failed to square the {label}")
+        rebuild_drawing(adapter, label=f"square {label}")
+        points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+        if (
+            len(points) < 6
+            or math.dist((points[-3], points[-2]), tip_xy) > 0.001
+            or abs(tip_xy[1] - points[1]) > VIEW_ARROW_SQUARE_TOL
+        ):
+            raise RuntimeError(f"{label} did not square: leader {points}")
+    _assert_note_inside_border(note, label)
+    _telemetry.info(
+        f"{label}: leader {points[0]:.5f},{points[1]:.5f} -> "
+        f"{points[-3]:.5f},{points[-2]:.5f} (square when the y agree)"
+    )
 
 
 def _assert_note_inside_border(note: Any, label: str) -> None:
@@ -523,14 +634,9 @@ def _place_rear_caption(adapter: Any, view: Any) -> None:
     """Hang the rear view's caption, centred, below the view's measured outline.
 
     Both boxes are measured (``IView.GetOutline``, ``INote.GetExtent``), as
-    main's draw_dt_cone_gear_shaft places its view captions. The sheet scale
-    is pinned first so finalization re-applying it cannot move the view
-    after this readback."""
-    sheet = _early_bound(
-        _early_bound(adapter.currentModel, "IDrawingDoc").GetCurrentSheet(), "ISheet"
-    )
-    if not sheet.SetScale(*SHEET_SCALE, False, False):
-        raise RuntimeError("cannot pin the sheet scale before the rear view caption")
+    main's draw_dt_cone_gear_shaft places its view captions, against the
+    pinned sheet scale."""
+    _pin_sheet_scale(adapter)
     outline = tuple(float(value) for value in _early_bound(view, "IView").GetOutline())
     target = ((outline[0] + outline[2]) / 2.0, outline[1] - REAR_CAPTION_GAP_M)
     note = _insert_view_caption(adapter, view, REAR_CAPTION, REAR_CAPTION_XY, "rear view")
@@ -800,7 +906,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     require_source_control(
-        source_properties[TOOTH_SPACE_CALLOUT_PROPERTY], TOOTH_SPACE_CALLOUT,
+        source_properties[TOOTH_SPACE_CALLOUT_PROPERTY], callouts.TOOTH_SPACE_CALLOUT,
         label="feed pinion toothspace/index control",
     )
     drawing_model, _sheet = new_project_drawing(
@@ -829,6 +935,7 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(
         adapter, str(SOURCE), END_VIEW_ORIENTATION, *FRONT_CENTER, scale=VIEW_SCALE
     )
+    _pin_sheet_scale(adapter)
     right = create_section_view(
         adapter,
         front,
@@ -875,6 +982,8 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, outside, label="outside view axis", nose_mm=OUTSIDE_CROP_Z - 1.0
     )
     _sketch_outside_break(adapter, outside)
+    _add_view_arrow(adapter, front, OUTSIDE_VIEW_LETTER, VIEW_C_ARROW)
+    _add_view_arrow(adapter, outside, REAR_VIEW_LETTER, VIEW_D_ARROW)
 
     oil_note = add_leader_note(
         adapter,

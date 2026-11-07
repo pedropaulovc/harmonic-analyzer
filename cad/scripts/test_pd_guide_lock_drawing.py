@@ -116,8 +116,7 @@ def test_hole_coordinates_print_from_the_corner_without_a_frame() -> None:
 
 
 def test_the_drill_callout_stands_between_the_plate_and_the_right_view() -> None:
-    text = f"2X {drawing.HOLE_CALLOUT_PROCESS} Ø.125 THRU ALL"
-    assert text.split()[1] == "DRILL"
+    text = f"2X Ø.125 {drawing.HOLE_EXTENT_TEXT}"
     half = len(text) * _CHAR_WIDTH / 2.0
     left, right = (
         drawing.HOLE_CALLOUT_XY[0] - half,
@@ -130,48 +129,35 @@ def test_the_drill_callout_stands_between_the_plate_and_the_right_view() -> None
     assert drawing.RIGHT_EDGE_X < left and right < right_view_left
 
 
-def test_the_drill_callout_names_the_mate_its_location_bands_serve() -> None:
-    """Machinist review ENFORCE r1-r3 (blocker): the banded hole coordinates
-    named no mate.  The callout names the platen guide's taps the pattern
-    lands on and the screws its holes clear, and its last row states the
+def test_the_drill_callout_prints_size_then_process_then_its_two_rows() -> None:
+    """Rule 26: size, then process, then depth.  Rule 7: two rows of words,
+    the route that holds the ±.001 pattern (transferred from the mate's taps
+    at assembly; the mate named once, on the pattern callout) and the
     finished wall to the edges (Codjiflo, #2124: both .010 breaks charged,
     RV-01)."""
     import _config
 
     rows = drawing.HOLE_CALLOUT_BELOW.split("\n")
     assert rows == [
-        f"MATCHES {_config.parts('pd-platen-guide')['number']} TAPS,",
-        "CLEARANCE FIT ON",
-        f"{_config.parts('pd-vn-guide-lock-screw')['number']} SCREWS",
+        f"TRANSFER FROM {_config.parts('pd-platen-guide')['number']}",
         "WALL .069 MIN TO EDGES",
     ]
     # Each row is no wider than the native row the plate and right view
     # already bound (test above).
-    assert max(len(row) for row in rows) <= len("2X DRILL Ø.125 THRU ALL")
+    assert max(len(row) for row in rows) <= len("2X Ø .125 DRILL THRU ALL")
+    native = {5: "2X <MOD-DIAM><hw-diam> <hw-thru>", 6: "", 7: "", 8: ""}
+    updated = drawing.hole_callout_definitions(native)
+    assert updated[5] == "2X <MOD-DIAM><hw-diam> DRILL THRU"
+    assert updated[8] == drawing.HOLE_CALLOUT_BELOW
+    with pytest.raises(RuntimeError):
+        drawing.hole_callout_definitions({**native, 5: "2X <MOD-DIAM><hw-diam>"})
 
 
-def test_the_hole_coordinates_name_the_taps_they_match() -> None:
-    """Machinist review ENFORCE at 2056e3344 (blocker): the 4.000 and 2X
-    3.700 ±0.035 edge locations gave no function; at eecbf880d the 18.000
-    still lacked it. The coordinates baseline the pattern from the corner,
-    and the set window spends each band (±0.065 is refused), so each names
-    the guide whose taps it matches."""
-    import _config
-
-    guide = _config.parts("pd-platen-guide")["number"]
-    assert drawing.DIMENSION_CALLOUTS_BELOW == {
-        "Hole1X": f"MATCHES\n{guide}",
-        "Hole2X": f"MATCHES\n{guide}",
-        "Hole1Y": f"MATCHES\n{guide}",
-    }
-    # Each block stays inside its value's width, the 4.000's left of the
-    # plate's left-edge extension line.
-    width = max(len(row) for row in f"MATCHES\n{guide}".split("\n")) * _CHAR_WIDTH
-    x_x, _ = drawing.FRONT_KEEP["Hole1X"]
-    assert width <= len("2X .155 ±.001") * _CHAR_WIDTH
-    assert width <= len(".157 ±.001") * _CHAR_WIDTH
-    assert width <= len(".709 ±.001") * _CHAR_WIDTH
-    assert x_x + width / 2.0 < drawing.LEFT_EDGE_X - 0.002
+def test_the_hole_coordinates_carry_value_and_band_only() -> None:
+    """Rule 7: a location dimension carries its value and band and nothing
+    else; the pattern callout names the mate once."""
+    assert not hasattr(drawing, "DIMENSION_CALLOUTS_BELOW")
+    assert set(drawing.DIMENSION_CALLOUTS) == {"Depth"}
 
 
 # A three-row block (value plus the two-row mate callout) centres on its text
