@@ -248,11 +248,17 @@ HOLDDOWN_LOCAL_Z = -dt_cone_tip_block_spec.TIP_BLOCK_PIVOT_OFFSET
 HOLDDOWN_LOCAL_X = -1.016  # -.04
 # The explicit band on both printed stations from the pivot bore (HoldDownX,
 # HoldDownZ): the block's lateral and axial stacks need it rather than the
-# general grade.
+# general grade.  It stays tighter than the shop's +/-.005 drilled-hole row,
+# so the hole is spotted from MHA-DT-21 at assembly (its callout names the
+# route).  Delegated ruling 2026-11-07 (Main), no precedent; owner review
+# #2144.
 HOLDDOWN_STATION_TOL_MM = 0.1016  # +/-.004
 # The same stacks run through the post-mount taps, whose placement dimensions
-# (PostMountWestX/WestZ/EastX/EastZ) carry this band instead of the grade.
-POST_MOUNT_STATION_TOL_MM = 0.1016  # +/-.004
+# (PostMountWestX/WestZ/EastX/EastZ) carry this band instead of the grade:
+# the shop's +/-.005 drilled-hole row.  Delegated ruling 2026-11-07 (Main),
+# no precedent; owner review #2144 (was +/-.004; adjuster embed, tip lateral
+# take-up and the hold-down webs still close at +/-.005).
+POST_MOUNT_STATION_TOL_MM = 0.127  # +/-.005
 # McMaster 91251A108 product page (read 2026-09-29): #4-40 x 3/8 black-oxide
 # alloy steel socket head screw, head 0.183 dia x 0.112 high.  Held here as
 # numbers so this pure-data module never imports a SolidWorks builder;

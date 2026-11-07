@@ -192,11 +192,12 @@ def test_cone_boss_length_at_one_place_opens_the_embed_band() -> None:
 
 
 def test_post_mount_stations_need_their_explicit_band() -> None:
-    """The platform's post-mount taps (explicit band) move the collar face; at
-    the inch .X the adjuster's embed leaves its window."""
+    """The platform's post-mount taps (the shop's +/-.005 drilled-hole row,
+    delegated ruling 2026-11-07) move the collar face; at the inch .X the
+    adjuster's embed leaves its window."""
     import build_dt_drive_train_assembly as bdt
 
-    assert bdt.PLAT_POST_MOUNT_STATION_TOL_MM == pytest.approx(0.1016)
+    assert bdt.PLAT_POST_MOUNT_STATION_TOL_MM == pytest.approx(0.127)
     grown = _loosened(bdt.PLAT_POST_MOUNT_STATION_TOL_MM)
     with pytest.raises(AssertionError, match="adjuster embed"):
         bdt.tip_embed_worst_mm(bdt.TIP_EMBED_BAND_MM + grown)
