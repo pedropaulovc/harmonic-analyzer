@@ -23,6 +23,7 @@ from ha_harmonic_analyzer_assembly_spec import (
     MEASURING_STICK,
     STUD_DROP_DIMENSION,
 )
+from _printed_tolerance import angular_band_deg
 from _recording_geometry import PEN_PAPER_CLEARANCE_MM
 from _title_block_units import render_number
 
@@ -127,7 +128,7 @@ CHANNEL_ANCHORS = 20
 SUB_STEP_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"
 # The title block's angular row is the level acceptance, read with the digital
 # angle gauge the shop owns (as MHA-SM-00 sets its plate).
-LEVEL_TOLERANCE_DEG = float(_config.title_block("angular")["value_deg"])
+LEVEL_TOLERANCE_DEG = angular_band_deg()
 LEVEL_ACCEPTANCE = f"LEVEL WITHIN \u00b1{LEVEL_TOLERANCE_DEG:g}\u00b0"
 _AMPLITUDE_BAR = str(_config.parts("ch-amplitude-bar")["number"])
 _ANCHOR = str(_config.parts("ch-vn-spring-hook")["number"])
