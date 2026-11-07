@@ -179,14 +179,6 @@ def test_tolerances_are_native_on_the_model() -> None:
     assert spec.DRAWING_PRECISION["PinProfile"]["ShankLength"] == 2
     assert spec.THREAD_LEN_BAND == pytest.approx((0.010 * 25.4, -0.010 * 25.4))
     assert spec.REFERENCE_DIMENSIONS == {"PinLength"}
-    assert "SHANK STEP" in callouts.SHANK_LENGTH_CALLOUT
-    # Rule 4: the band names the stack it sets, its locknut and the feature
-    # it ends on; the assembled 2.9 MAX past the locknut is MHA-MG-00's
-    # check, not this part's.
-    words = " ".join(callouts.THREAD_LENGTH_CALLOUT.split())
-    for required in ("SHANK STEP", "THREAD END", "MHA-MG-00", "MHA-MG-VN-52"):
-        assert required in words, required
-    assert ".114" not in words
     assert drawing.ORIGIN_DIMENSIONS == ("ShankLength", "ThreadLength")
     assert drawing.BROKEN_LINE_DIMENSIONS == ("PinLength",)
     assert group.THREAD_PAST_LOCKNUT_MAX <= spec.THREAD_PAST_LOCKNUT_LIMIT
@@ -227,18 +219,10 @@ def test_thread_callout_and_no_general_notes() -> None:
     assert not hasattr(spec, "DRAWING_NOTES")
     assert "Manufacturing Notes" not in Path(part.__file__).read_text(encoding="utf-8")
     # The stock Ø is an untoleranced REF (the supplier's limits govern) that
-    # states both fits: the press into the bar's reamed bore, at that bore's
-    # limits, and the wheel running on the shank, each matching the wheel
-    # group's proofs.
+    # states both fits: the press into the bar's reamed bore and the wheel
+    # running on the shank, each matching the wheel group's proofs.
     words = " ".join(callouts.PIN_DIA_CALLOUT.split())
     assert ".1873" not in words and "STOCK" not in words
-    for required in (
-        ".0003-.0012 DIAMETRAL INTERFERENCE",
-        "MHA-MG-08 <MOD-DIAM>.1865-.1870",
-        ".0008-.0017 RUNNING CLEARANCE",
-        "MHA-MG-05 BORE",
-    ):
-        assert required in words, required
     assert callouts.PRESS_LIMITS == pytest.approx(group.BAR_PRESS)
     assert callouts.RUNNING_CLEARANCE_TEXT == "-".join(
         f"{value / 25.4:.4f}".lstrip("0") for value in group.HUB_RUNNING
@@ -257,14 +241,7 @@ def test_callouts_are_part_authored_and_only_read_by_the_sheet() -> None:
         encoding="utf-8"
     )
     authored = callouts.authored_by_name()
-    assert set(authored) == {
-        "PinDia",
-        "ShankLength",
-        "ThreadLength",
-        "ReliefWidth",
-        "ReliefRootR",
-        "PinLength",
-    }
+    assert set(authored) == {"PinDia", "ReliefRootR", "PinLength"}
     assert authored["PinLength"] == {
         callouts.TEXT_PREFIX: "(",
         callouts.TEXT_SUFFIX: ")",

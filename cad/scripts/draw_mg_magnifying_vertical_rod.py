@@ -228,7 +228,8 @@ UPPER_ROOT_KEEP = {
 # thread; the note stands up and left of the crop.
 THREAD_PICK = _detail_xy((TIP_CHAMFER + RELIEF_START_X) / 2.0, THREAD_MAJOR / 2.0)
 THREAD_NOTE_XY = (0.030, DETAIL_CENTER[1] + 0.036)
-THREAD_NOTE_TEXT = f"{THREAD_CALLOUT}\nTIP 45° CHAMFER TO MINOR Ø"
+# The mate is named once, here (rule 4); the lengths carry their values only.
+THREAD_NOTE_TEXT = f"{THREAD_CALLOUT}\nMATES MHA-MG-02 CLAMP\nTIP 45° CHAMFER TO MINOR Ø"
 # Under detail A's lower-left, left of the thread length's tip extension
 # line (sheet x 0.090), so the label reads with its view.
 DETAIL_LABEL_XY = (0.050, _DETAIL_BOTTOM + 0.008)
@@ -240,14 +241,9 @@ DRAWING_PRECISION_BY_NAME = {
     for names in DRAWING_PRECISION.values()
     for name, places in names.items()
 }
-# Each length names the face it reads from (drawing-guidelines.md rule 4);
-# the thread length names its mate at the callout: it keeps the tip off the
-# bottom of MHA-MG-02's tap so the shoulder, not the tip, seats.
-DIMENSION_CALLOUTS = {
-    "BodyLength": "FROM SHOULDER",
-    "ThreadLength": "FROM SHOULDER\nSEATS ON MHA-MG-02;\nTIP CLEARS ITS TAP",
-    "DomeR": "TANGENT HEMISPHERE",
-}
+# Each length carries its value only (rule 7): its origin circle on the
+# shoulder's extension line shows the face it reads from.
+DIMENSION_CALLOUTS = {"DomeR": "TANGENT HEMISPHERE"}
 # The roots' count stands above their one radius.
 DIMENSION_CALLOUTS_ABOVE = {"ReliefRootR": RELIEF_ROOTS_CALLOUT}
 # ASME Y14.5 dimension origin (swArrowStyle_e): both lengths read from the

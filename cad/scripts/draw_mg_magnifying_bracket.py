@@ -212,7 +212,11 @@ def _curate_tap_callout(adapter: Any, view: Any, callout: Any) -> int:
 
 
 def _set_hole_process(display: Any, *, mate: str, tapped: bool) -> None:
-    """Keep every native hole variable, adding process words to its own row."""
+    """Keep every native hole variable; DRILL follows the drill's size.
+
+    Rule 26: size first, then process, then depth. The drill row reads
+    ``Ø.201 DRILL THRU ALL``; a through tap's thread row stays the bare
+    native thread and extent (``1/4-20 UNC THRU ALL``)."""
     display = _early_bound(display, "IDisplayDimension")
     definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
     tokens = re.findall(r"<hw-[^>]+>", "\n".join(definitions.values()))
@@ -227,12 +231,12 @@ def _set_hole_process(display: Any, *, mate: str, tapped: bool) -> None:
         rows = []
         for row in text.splitlines():
             if "<hw-threaddesc>" in row:
-                if not re.search(r"\bTAP\b", row):
-                    row = "TAP " + row
                 tap_rows += 1
             elif any(token in row for token in drill_tokens):
+                if "<hw-thru>" not in row:
+                    raise RuntimeError("hole process requires the drill row's native through extent")
                 if not re.search(r"\bDRILL\b", row):
-                    row = "DRILL " + row
+                    row = row.replace("<hw-thru>", "DRILL <hw-thru>", 1)
                 drill_rows += 1
             rows.append(row)
         revised[part] = "\n".join(rows)
