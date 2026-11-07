@@ -132,12 +132,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # (build_mg_wheel_axle: the drawing's inserted radius lands on the first
 # pick's edge), so the builder picks the edge the face view prints first:
 # (spoke index from the seed on +X, side of that spoke in its own frame).
-# Both print on the 60 deg spoke, above A-A's cutting plane on the
-# horizontal centreline, so neither leader crosses it: the R3.0 on the hub
-# fillet facing the 0-60 window, its leader out through that window from
-# the fillet's centre; the R4.0 on the rim fillet facing the 60-120 window,
-# its leader out through the rim.
-HUB_FILLET_PRINTED = (1, -1)
+# Both print above A-A's cutting plane on the horizontal centreline, so
+# neither leader crosses it: the R3.0 on the 120 deg spoke's hub fillet
+# facing the 120-180 window, its leader out to the right over the hub's top
+# and through the 0-60 window; the R4.0 on the 60 deg spoke's rim fillet
+# facing the 60-120 window, its leader out through the rim.
+HUB_FILLET_PRINTED = (2, 1)
 RIM_FILLET_PRINTED = (1, 1)
 # Decimal places per marked dimension (drawing-guidelines.md rule 3 (decimal places carry the tolerance)), in inches:
 # every size a wall, the groove seat or the lever-wire run reads prints at

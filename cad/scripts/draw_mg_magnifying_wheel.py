@@ -328,18 +328,22 @@ def _out_to(
     return _polar(centre, bearing_deg, reach)
 
 
-# Both fillet R's print on the 60 deg spoke, above A-A's cutting line, each
-# leader out through the rim to a shoulder outside the OD.  The hub fillet
-# R's arc faces the hub-spoke corner of the 0-60 window, so its arrow lands
-# from the window's side (inside, opposite: FILLET_ARROWS) and its leader
-# runs out through the arc's centre at 20 deg, between the rim fillets,
-# above the spoke widths' lines and under the A-A arrow's letter, to a
-# shoulder right of the wheel, its text right of the shoulder.  The rim
-# fillet R's leader leaves the spoke's 60-120 rim fillet through the rim on
-# a ray parallel to the spoke pitch's 60 deg extension line, 6.7 mm left of
-# it, to a shoulder above the wheel, its text left of the shoulder under the
-# pitch's arc.
-_HUB_FILLET_LEADER = 20.0
+# Both fillet R's print above A-A's cutting line, each arrow outside its
+# arc on the ray from the arc's centre through its shoulder, the leader
+# reaching it from the material side.  The hub fillet R's arc (the 120 deg
+# spoke's, facing the 120-180 window) opens toward the hub, so its leader
+# runs right at 10 deg over the 120 deg spoke's root, the hub's top and the
+# 60 deg spoke's root, through the 0-60 window above the spoke widths'
+# lines and the rim, to a shoulder right of the wheel above the A-A arrow's
+# letter, its text right of the shoulder.  (An arrow from inside on the
+# opposite side, which would let the leader come from the window, stays on
+# the circle's undrawn near side: runs 20261107T101438062Z and
+# 20261107T103514893Z, tip at 20 deg with the solid leader on or off.)  The
+# rim fillet R's leader leaves the 60 deg spoke's 60-120 rim fillet through
+# the rim on a ray parallel to the spoke pitch's 60 deg extension line,
+# 6.7 mm left of it, to a shoulder above the wheel, its text left of the
+# shoulder under the pitch's arc.
+_HUB_FILLET_LEADER = 10.0
 _HUB_FILLET_SHOULDER = _out_to(
     _HUB_FILLET[0], _HUB_FILLET_LEADER, RIM_OUTER_DIA / 2.0 + 6.0
 )
@@ -765,30 +769,16 @@ BORE_FINISH_SYMBOL = _face(
 )
 _BORE_FINISH_POINT = (*_polar((0.0, 0.0), _BORE_FINISH_BEARING, BORE_DIA / 2.0), 0.0)
 FINISH_CHAR_HEIGHT = 0.0025
-# The two fillet R's print one arrow on their arc (draw_dt_arbor_pedestal's
-# crown): no arc extension.  The rim fillet's lands from outside, its leader
-# through the rim and stopping there.  The hub fillet's lands from inside on
-# the opposite side (draw_pn_pen_adjust_screw's shoulder radius), its leader
-# from the window through the arc's centre.  With SolidLeader cleared,
-# SOLIDWORKS stopped that arrow on the undrawn near side of the circle (run
-# 20261107T101438062Z: tip at 20 deg, in the window's air), so its styles
-# are tried in order, leader as the document draws it and then solid, each
-# kept only if its rebuilt tip lands on the arc.  Each rebuilt arrow tip must
-# lie on its fillet's arc within FILLET_TIP_TOL (m) of its radius and
-# FILLET_SPAN_TOL (deg) of its span.
+# The two fillet R's print one arrow outside their arc, the leader stopping
+# there (draw_dt_arbor_pedestal's crown): no arc extension, no line on to
+# the centre.  Each rebuilt arrow tip must lie on its fillet's arc within
+# FILLET_TIP_TOL (m) of its radius and FILLET_SPAN_TOL (deg) of its span.
 _ARROWS_OUTSIDE = 1  # swDimArrowsOutside
 FILLET_TIP_TOL = 0.0002
 FILLET_SPAN_TOL = 1.0
 PRINTED_FILLETS = {
     "HubFilletR": (_HUB_FILLET, HUB_FILLET_R),
     "RimFilletR": (_RIM_FILLET, RIM_FILLET_R),
-}
-# Candidate (ArrowSide, ArcExtensionLineOrOppositeSide, SolidLeader) styles
-# per printed R, in order; None leaves SolidLeader as the document has it.
-FILLET_ARROWS: dict[str, tuple[tuple[int, bool, bool | None], ...]] = {
-    # swDimArrowsInside on the opposite side.
-    "HubFilletR": ((0, True, None), (0, True, True)),
-    "RimFilletR": ((_ARROWS_OUTSIDE, False, False),),
 }
 
 
@@ -1062,55 +1052,29 @@ def _fillet_tip(
     return tip, bearing, on_arc
 
 
-def _dress_fillet_radii(adapter: Any, front: Any, annotations: list[Any]) -> None:
-    """Print each PRINTED_FILLETS R with one arrow on its arc, in the first
-    FILLET_ARROWS style whose rebuilt tip lands there, read back."""
-    named = {
-        dimension_name(adapter, annotation): _early_bound(annotation, "IAnnotation")
-        for annotation in annotations
-    }
-    missing = set(PRINTED_FILLETS) - set(named)
-    if missing:
-        raise RuntimeError(f"no fillet radius to dress: {sorted(missing)}")
-    centres = model_points_in_view(
-        adapter,
-        front,
-        tuple(
-            (centre[0] / 1000.0, centre[1] / 1000.0, 0.0)
-            for (centre, _ends), _r in PRINTED_FILLETS.values()
-        ),
-        label="dressed fillet centres",
-        names=tuple(PRINTED_FILLETS),
-    )
-    for (name, ((_c, ends), radius)), centre in zip(
-        PRINTED_FILLETS.items(), centres, strict=True
-    ):
-        display = _early_bound(named[name].GetSpecificAnnotation(), "IDisplayDimension")
-        tried = []
-        for arrow_side, opposite, solid in FILLET_ARROWS[name]:
-            display.ArrowSide = arrow_side
-            display.ArcExtensionLineOrOppositeSide = opposite
-            if solid is not None:
-                display.SolidLeader = solid
-            if (
-                bool(display.Diametric)
-                or bool(display.ArcExtensionLineOrOppositeSide) != opposite
-                or int(display.ArrowSide) != arrow_side
-                or (solid is not None and bool(display.SolidLeader) != solid)
-            ):
-                raise RuntimeError(f"{name} did not keep its radial leader style")
-            rebuild_drawing(adapter, label=f"{name} leader style")
-            tip, bearing, on_arc = _fillet_tip(display, name, centre, ends, radius)
-            style = (arrow_side, opposite, bool(display.SolidLeader))
-            tried.append(f"{style}: tip at {bearing:.1f} deg")
-            if on_arc:
-                _telemetry.info(f"{name}: style {style}, arrow tip {tip} on its arc")
-                break
-        else:
-            raise RuntimeError(
-                f"{name}: no leader style lands its arrow on the fillet's arc "
-                f"{ends[0]:.1f}..{ends[1]:.1f} deg: {tried}"
-            )
+def _dress_fillet_radii(adapter: Any, annotations: list[Any]) -> None:
+    """Print each PRINTED_FILLETS R with one arrow outside its arc and the
+    leader stopping on it (_ARROWS_OUTSIDE), read back."""
+    remaining = set(PRINTED_FILLETS)
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name not in remaining:
+            continue
+        remaining.discard(name)
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.ArcExtensionLineOrOppositeSide = False
+        display.ArrowSide = _ARROWS_OUTSIDE
+        display.SolidLeader = False
+        if (
+            bool(display.Diametric)
+            or bool(display.ArcExtensionLineOrOppositeSide)
+            or int(display.ArrowSide) != _ARROWS_OUTSIDE
+            or bool(display.SolidLeader)
+        ):
+            raise RuntimeError(f"{name} did not keep its radial leader style")
+    if remaining:
+        raise RuntimeError(f"no fillet radius to dress: {sorted(remaining)}")
 
 
 # Section A-A shows only hatch on its cut faces (drawing-guidelines.md rule
@@ -1739,7 +1703,7 @@ async def build(adapter: Any) -> dict[str, str]:
         {"SpokeRootWidth": SPOKE_ROOT_TEXT_XY, "SpigotDia": SPIGOT_TEXT_XY},
     )
     _set_arrows_inside(adapter, annotations)
-    _dress_fillet_radii(adapter, front, annotations)
+    _dress_fillet_radii(adapter, annotations)
     _set_section_witnesses(adapter, annotations)
     axis, tie1, bore_landing = model_points_in_view(
         adapter,
