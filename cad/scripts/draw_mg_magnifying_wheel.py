@@ -114,6 +114,7 @@ from mg_magnifying_wheel_spec import (
     TIE1_CLOCK_DEG,
     TIE1_R,
     TIE2_CLOCK_DEG,
+    TIE2_FROM_SPOKE_DEG,
     TIE_HOLE_DIA,
     clock_to_local_deg,
     fillet,
@@ -249,24 +250,24 @@ _RIM_FILLET = _printed_fillet(
     RIM_INNER_DIA / 2.0, RIM_FILLET_R, False, RIM_FILLET_PRINTED
 )
 _TIE1 = _polar((0.0, 0.0), clock_to_local_deg(TIE1_CLOCK_DEG), TIE1_R)
-# TIE 2's angle is driven between its radial axis (outward at 223 deg) and the
-# horizontal inner end, where the axis enters the rim bore: the sketch's own
-# sector runs from that point's outward horizontal (180 deg) to the axis, so
-# a text in it draws one arc and no extension arcs.  Its text stands 35 mm
-# out on the sector's bisector, past the OD, so its arc meets the axis 79 mm
-# out: beyond the end of TIE 2's Ø extension lines.
+# TIE 2's clock is the spoke reference's driven angle from the 180 deg
+# spoke's centreline (the drawn horizontal centreline) to the hole's radial
+# axis (outward at 223 deg), its vertex on the bore axis (drawing-guidelines.md
+# rule 10: dimension from a real feature).  Its text stands
+# _TIE2_CLOCK_TEXT_R out on the sector's bisector, past the OD: its arc
+# crosses TIE 1's lower Y extension line well inside that line's end
+# (78 mm out), and its text stands clear of the rim and of the Y's text.
 _TIE2_OUTWARD = clock_to_local_deg(TIE2_CLOCK_DEG) % 360.0
-_TIE2_INNER = _polar((0.0, 0.0), _TIE2_OUTWARD, RIM_INNER_DIA / 2.0)
-_TIE2_ANGLE_SECTOR = (180.0, _TIE2_OUTWARD)
+_TIE2_CLOCK_SECTOR = (_TIE2_OUTWARD - TIE2_FROM_SPOKE_DEG, _TIE2_OUTWARD)
+_TIE2_CLOCK_TEXT_R = 64.0
 # TIE 2 runs inside the rim, so the hidden-lines-removed face view draws
 # none of it.  A broken-out window on its axis cuts the rim at the wheel's
 # mid-plane, the plane of TIE 2's axis and of the sketch its Ø and angle
 # dimension, so both stand on the hole's cut walls (drawing-guidelines.md
 # rule 9 (never dimension to a hidden line)).  The window is (s, t) mm about
 # the hole: s out along its axis, t across it along _TIE2_ACROSS (sheet
-# down-right).  It runs from the rim bore's air past the OD; on the -t side
-# it stays inside the angle's horizontal leg, which leaves the axis's inner
-# end, so the leg crosses no hatch.
+# down-right).  It runs from the rim bore's air past the OD and stays narrow
+# across the axis, so the clock's legs cross no hatch.
 _TIE2_ALONG = (
     math.cos(math.radians(_TIE2_OUTWARD)),
     math.sin(math.radians(_TIE2_OUTWARD)),
@@ -396,14 +397,16 @@ FRONT_KEEP = {
         20.0 + _CALLOUT_SHOULDER_LEFT + _TIE_BLOCK_WIDEN,
         -RIM_OUTER_DIA / 2.0 - 3.2 - _CALLOUT_ABOVE - _TEXT_LINE * 1500.0,
     ),
-    "Tie2Angle": _face(*_polar(_TIE2_INNER, sum(_TIE2_ANGLE_SECTOR) / 2.0, 35.0)),
+    "Tie2Clock": _face(
+        *_polar((0.0, 0.0), sum(_TIE2_CLOCK_SECTOR) / 2.0, _TIE2_CLOCK_TEXT_R)
+    ),
     # TIE 2's Ø is a linear width across the radial hole: its extension lines
     # run out along the hole's axis to the dimension line's foot, ~1 mm past
     # the text's projection onto the axis, so a block on that foot would sit
     # on both lines: the block stands 25 mm off the axis on the side away
-    # from the angle, its projection 75 mm out (the extension lines stop ~76,
-    # short of the angle's arc at 79); it stays outside the OD, left of the
-    # A-A line's lower "A" and of TIE 1's X.
+    # from the clock, its projection 75 mm out (the extension lines stop ~76,
+    # past the clock's arc, which ends on the hole's axis between them); it
+    # stays outside the OD, left of the A-A line's lower "A" and of TIE 1's X.
     "Tie2HoleDia": _face(
         *_polar(_polar((0.0, 0.0), _TIE2_OUTWARD, 75.0), _TIE2_OUTWARD + 90.0, 25.0)
     ),

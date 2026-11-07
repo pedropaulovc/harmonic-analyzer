@@ -37,6 +37,7 @@ from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import (
     SketchDims,
+    _record_origin_anchor,
     add_line_chain,
     anchor_point_to_origin,
     blank_reference_sketches,
@@ -127,6 +128,8 @@ from mg_magnifying_wheel_spec import (
     SPOKE_REFERENCE,
     SPOKE_STUB_R,
     SURFACE_FINISHES,
+    TIE2_CLOCK_SPOKE,
+    TIE2_FROM_SPOKE_DEG,
 )
 from mg_wheel_bar_geom import WHEEL_BAR_Y as _YOKE_WHEEL_Y
 
@@ -239,27 +242,14 @@ V_TIE2 = _tie2_volume()
 
 # --- TIE 2 profile: a half rectangle beside its radial axis, revolve-cut -------
 # The axis runs radially at TIE2_CLOCK_DEG from inside the rim bore out past the
-# groove floor. Its inner end runs HORIZONTAL (in the air inside the rim bore)
-# so the hole's angle reads off it on the face view.
+# groove floor. Its inner end runs HORIZONTAL, in the air inside the rim bore.
 _TIE2_LOCAL = math.radians(clock_to_local_deg(TIE2_CLOCK_DEG))
 _TIE2_U = (math.cos(_TIE2_LOCAL), math.sin(_TIE2_LOCAL))
 _TIE2_W = (-_TIE2_U[1], _TIE2_U[0])
 _TIE2_IN_R = _RIM_IN_R - 1.5  # the full bore starts inside the rim bore
 _TIE2_OUT_R = _GROOVE_CENTRE_R + 0.1  # ends in the groove's air
-_TIE2_ANGLE = math.degrees(math.atan2(abs(_TIE2_U[1]), abs(_TIE2_U[0])))
 if abs(_TIE2_U[1]) < 1e-6 or abs(_TIE2_U[0]) < 1e-6:
     raise AssertionError("TIE 2 must run oblique to the sketch axes")
-# The driven angle's text sits inside the ACUTE sector at P_in, between the
-# axis (outward, along U) and the horizontal ray on the same x side as U --
-# SolidWorks picks which of the four angles to report from the text point.
-_TIE2_ANGLE_TEXT_R = 2.5
-_TIE2_BISECTOR = (_TIE2_U[0] + math.copysign(1.0, _TIE2_U[0]), _TIE2_U[1])
-_TIE2_ANGLE_TEXT = (
-    _TIE2_IN_R * _TIE2_U[0]
-    + _TIE2_ANGLE_TEXT_R * _TIE2_BISECTOR[0] / math.hypot(*_TIE2_BISECTOR),
-    _TIE2_IN_R * _TIE2_U[1]
-    + _TIE2_ANGLE_TEXT_R * _TIE2_BISECTOR[1] / math.hypot(*_TIE2_BISECTOR),
-)
 
 
 def _tie2_profile() -> list[tuple[float, float]]:
@@ -490,26 +480,43 @@ async def _diameter_reference(adapter) -> list[tuple[str, str]]:
 
 
 async def _spoke_reference(adapter) -> list[tuple[str, str]]:
-    """The spoke pattern's pitch (mg_magnifying_wheel_spec.SPOKE_REFERENCE).
+    """The spoke pattern's pitch and TIE 2's clock
+    (mg_magnifying_wheel_spec.SPOKE_REFERENCE).
 
-    A hidden Front-plane sketch: the centrelines of SPOKE_PITCH_SPOKES as
-    construction stubs through the rim, each end anchored on its spoke's
-    radial, and the DRIVEN angle between them (the Tie2Angle precedent), so
-    it restates the pattern without driving it.  It adds no volume.
+    A hidden Front-plane sketch of construction stubs through the rim, each
+    end anchored on its radial, in pairs: the centrelines of
+    SPOKE_PITCH_SPOKES, and the TIE2_CLOCK_SPOKE spoke's with TIE 2's axis.
+    Each pair's DRIVEN angle (vertex on the bore axis) restates the pattern
+    and the hole's clock without driving either.  It adds no volume.
     """
     feature = SPOKE_REFERENCE
     check(f"create_sketch {feature}", await adapter.create_sketch("Front"))
-    bearings = [k * SPOKE_PITCH_DEG for k in SPOKE_PITCH_SPOKES]
+    clock_spoke = TIE2_CLOCK_SPOKE * SPOKE_PITCH_DEG
+    pairs = (
+        (
+            "SpokePitch",
+            "spoke pitch",
+            [k * SPOKE_PITCH_DEG for k in SPOKE_PITCH_SPOKES],
+            SPOKE_PITCH_DEG,
+        ),
+        (
+            "Tie2Clock",
+            "tie 2 clock",
+            [clock_spoke, clock_spoke + TIE2_FROM_SPOKE_DEG],
+            TIE2_FROM_SPOKE_DEG,
+        ),
+    )
     stubs = []
     set_sketch_direct_db(adapter, True)
-    for bearing in bearings:
-        a = math.radians(bearing)
-        ends = [(r * math.cos(a), r * math.sin(a)) for r in SPOKE_STUB_R]
-        line = check(
-            f"{feature} {bearing:g} deg centreline",
-            await adapter.add_centerline(*ends[0], *ends[1]),
-        )
-        stubs.append((line, ends))
+    for _name, label, bearings, _degrees in pairs:
+        for bearing in bearings:
+            a = math.radians(bearing)
+            ends = [(r * math.cos(a), r * math.sin(a)) for r in SPOKE_STUB_R]
+            line = check(
+                f"{feature} {label} {bearing:g} deg centreline",
+                await adapter.add_centerline(*ends[0], *ends[1]),
+            )
+            stubs.append((line, ends))
     set_sketch_direct_db(adapter, False)
     dims = SketchDims()
     for line, ends in stubs:
@@ -517,18 +524,18 @@ async def _spoke_reference(adapter) -> list[tuple[str, str]]:
             await anchor_point_to_origin(
                 adapter, end_ref, *point, f"{feature} {end_ref}"
             )
-            dims.record(None)
-            dims.record(None)
-    between = math.radians(sum(bearings) / 2.0)
-    await add_angular_reference_dimension(
-        adapter,
-        stubs[0][0],
-        stubs[1][0],
-        (SPOKE_STUB_R[0] * math.cos(between), SPOKE_STUB_R[0] * math.sin(between)),
-        "spoke pitch",
-        expected_degrees=SPOKE_PITCH_DEG,
-    )
-    dims.record("SpokePitch")
+            _record_origin_anchor(dims, *point, None, None, None, None)
+    for index, (name, label, bearings, degrees) in enumerate(pairs):
+        between = math.radians(sum(bearings) / 2.0)
+        await add_angular_reference_dimension(
+            adapter,
+            stubs[2 * index][0],
+            stubs[2 * index + 1][0],
+            (SPOKE_STUB_R[0] * math.cos(between), SPOKE_STUB_R[0] * math.sin(between)),
+            label,
+            expected_degrees=degrees,
+        )
+        dims.record(name)
     await ensure_fully_defined(adapter, feature)
     check(f"exit_sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
@@ -989,9 +996,9 @@ async def build(adapter) -> dict[str, str]:
     # The farm's first native run (1b6b007ff) left this sketch under-defined
     # with the axis pinned instead by an origin-on-line coincidence, an
     # outer-reach distance and an adapter "angular" dimension; none of those has
-    # a native precedent in the repo. The angle is therefore a DRIVEN
-    # reference here (the NotchPhase / BoreFlatClock precedent); the anchors
-    # are computed on the radial, so the axis still passes the origin.
+    # a native precedent in the repo. The anchors are computed on the radial,
+    # so the axis passes the origin; its clock prints from the spoke
+    # reference (_spoke_reference's Tie2Clock), vertex on the bore axis.
     # DOF: axis 4 + profile 4 lines 8 = 12 = 4 anchor dims + 2x2 end
     # coincidences + square + parallel + inner end horizontal + diameter.
     tie2_sd = SketchDims()
@@ -1036,15 +1043,6 @@ async def build(adapter) -> dict[str, str]:
     )
     await add_diametric_linear_dimension(adapter, tie2_axis, wall, text, "Tie2HoleDia")
     tie2_sd.record("Tie2HoleDia", '"TieHoleDia"')
-    await add_angular_reference_dimension(
-        adapter,
-        inner_end,
-        on_axis,
-        _TIE2_ANGLE_TEXT,
-        "tie 2 angle",
-        expected_degrees=_TIE2_ANGLE,
-    )
-    tie2_sd.record("Tie2Angle")
     await ensure_fully_defined(adapter, "tie 2 sketch")
     check("exit_sketch tie 2", await adapter.exit_sketch())
     name_last_feature(adapter, "Tie2Profile")

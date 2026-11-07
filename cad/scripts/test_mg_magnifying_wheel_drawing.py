@@ -209,18 +209,13 @@ def test_tie2_profile_runs_radially_and_ends_in_air() -> None:
     cross = p_in[0] * p_out[1] - p_in[1] * p_out[0]
     assert cross == pytest.approx(0.0, abs=1e-9)  # the axis passes the origin
     assert q_in[1] == pytest.approx(p_in[1])  # the inner end runs horizontal
-    assert part._TIE2_ANGLE == pytest.approx(43.0)
     assert (p_out[0] ** 2 + p_out[1] ** 2) ** 0.5 > rim.GROOVE_BOTTOM_DIA / 2.0
     assert (q_out[0] ** 2 + q_out[1] ** 2) ** 0.5 < rim.RIM_OUTER_DIA / 2.0
-    # The driven Tie2Angle reads the ACUTE angle: its text point lies between
-    # the axis ray and the horizontal ray (same x side) from P_in.
-    tx, ty = part._TIE2_ANGLE_TEXT
-    bearing = math.degrees(math.atan2(ty - p_in[1], tx - p_in[0]))
+    # The spoke reference's Tie2Clock stub lies on this axis.
     axis = math.degrees(math.atan2(p_out[1] - p_in[1], p_out[0] - p_in[0]))
-    horizontal = 0.0 if p_out[0] > p_in[0] else 180.0
-    low, high = sorted((axis % 360.0, horizontal % 360.0))
-    assert high - low == pytest.approx(part._TIE2_ANGLE)
-    assert low < bearing % 360.0 < high
+    spec = mg_magnifying_wheel_spec
+    clock = spec.TIE2_CLOCK_SPOKE * spec.SPOKE_PITCH_DEG + spec.TIE2_FROM_SPOKE_DEG
+    assert axis % 360.0 == pytest.approx(clock % 360.0)
 
 
 def _inside(polygon: list[tuple[float, float]], point: tuple[float, float]) -> bool:
@@ -292,9 +287,18 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
     # model's seed spoke on local +X) lie on a drawn centreline through the
     # bore: no sentence states the clocking (rule 26).
     assert spec.SPOKE_PITCH_PREFIX == "6X " and spec.SPOKE_PITCH_DEG == 60.0
-    assert spec.DRAWING_PRECISION[spec.SPOKE_REFERENCE] == {"SpokePitch": 0}
+    assert spec.DRAWING_PRECISION[spec.SPOKE_REFERENCE] == {
+        "SpokePitch": 0,
+        "Tie2Clock": 0,
+    }
     assert "SpokePitch" in drawing.FRONT_KEEP
     assert "SpokePitch" not in drawing.CALLOUTS_ABOVE
+    # TIE 2's clock reads from the 180 deg spoke on that drawn centreline,
+    # vertex on the bore axis (rule 10): not from a construction leg.
+    assert spec.TIE2_CLOCK_SPOKE * spec.SPOKE_PITCH_DEG == 180.0
+    assert spec.TIE2_FROM_SPOKE_DEG == pytest.approx(43.0)
+    assert "Tie2Clock" in drawing.FRONT_KEEP
+    assert "Tie2Angle" not in set().union(*spec.DRAWING_DIMENSIONS.values())
     assert not hasattr(spec, "SPOKE_PITCH_CALLOUT")
     (start, end) = drawing.SPOKE_CENTRELINE
     assert start[1] == end[1] == 0.0 and -start[0] == end[0] > rim.RIM_OUTER_DIA / 2.0
