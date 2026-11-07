@@ -51,7 +51,11 @@ from _drawing_common import (
 )
 from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimension_import import import_cosmetic_threads
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    offset_dimension_text,
+    set_dimension_callouts,
+)
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_sections import create_section_view
@@ -96,6 +100,7 @@ from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     STOCK_FRACTION_DENOMINATORS,
     TAP_CALLOUT_PLACES,
     TAP_DRILL,
+    THREAD_MAJOR,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -228,8 +233,10 @@ END_KEEP: dict[str, tuple[float, float, float]] = {
 # SECTION_CENTER: its top 10 under the plan's lowest text (sheet y 0.142),
 # its foot 15 over the title block's top; the caption under it, left of the
 # title block. It prints one dimension, the bottom thread's depth on the
-# outer hole's axis (BAR_THREAD_REFERENCE), its text a TEXT_GAP off the
-# outer end, centred on the depth, the depth line through it.
+# outer hole's axis (BAR_THREAD_REFERENCE): its line DEPTH_LANE off the outer
+# end, its text on a native OffsetText leader a TEXT_GAP right of that line,
+# centred on the section's height. Farm 26bb (machinist review, 3 of 3): with
+# the text centred on its own line, the line struck ".491" and the last row.
 SECTION_LABEL = "A"
 SECTION_OVERRUN = 2.0
 SECTION_LINE_MODEL_MM = (
@@ -240,13 +247,17 @@ SECTION_ANCHOR_MODEL_MM = (_L / 2.0, 0.0, _H / 2.0)
 SECTION_CENTER = (PLAN_CENTER[0], 0.106)
 SECTION_CAPTION_XY = (PLAN_CENTER[0], 0.074)
 _DEPTH_CALLOUT = CALLOUTS_BELOW[BAR_THREAD_DEPTH_DIMENSION]
+DEPTH_LANE = SIDE_LANE / 2.0
 SECTION_KEEP: dict[str, tuple[float, float, float]] = {
-    BAR_THREAD_DEPTH_DIMENSION: (
-        _L + TEXT_GAP + text_half(_DEPTH_CALLOUT),
-        0.0,
-        BAR_THREAD_DEPTH / 2.0,
-    ),
+    BAR_THREAD_DEPTH_DIMENSION: (_L + DEPTH_LANE, 0.0, BAR_THREAD_DEPTH / 2.0),
 }
+# The depth's text block centre (model mm): wholly right of its line.
+SECTION_TEXT = (
+    _L + DEPTH_LANE + TEXT_GAP + text_half(_DEPTH_CALLOUT),
+    0.0,
+    _H / 2.0,
+)
+_TEXT_SETTLE_M = 0.0005
 
 # One native callout per hole over the plan, its count dropped (c4-r3: a 2X
 # callout's leader lands on one hole only, leaving the other's thread to a
@@ -619,10 +630,107 @@ def _require_bar_thread_depth(section: Any) -> None:
 # section's thread annotation dashed, as a hidden thread, so every thread in
 # the cut moves onto a visible thin continuous layer of its own
 # (draw_pn_pen_v_block._section_thread_on_visible_layer). The cut runs on
-# both holes' axes, so each hole shows its top and its bottom thread.
+# both holes' axes, so each hole shows its top and its bottom thread. Farm
+# 84d5991d45 and 26bb still drew no bottom thread: every view imported
+# BarTaps' own thread annotations hidden (Visible 3, no display) while
+# KP08Taps' drew, so the part carries a native cosmetic thread on each
+# finished bore's bottom edge (build_..._end_bracket, BarFaceThread) and the
+# settled section must draw each one, both sides, from the bottom face to
+# BAR_THREAD_DEPTH, where the depth's witness lands.
 SECTION_THREAD_LAYER = "TAP-THREAD-SECTION"
-SECTION_THREAD_INSTANCES = len(HOLE_X) * len(("BarTaps", "KP08Taps"))
+SECTION_THREAD_INSTANCES = len(HOLE_X) * len(("BarFaceThread", "KP08Taps"))
 _COSMETIC_THREAD_ANNOTATION = 1  # swAnnotationType_e.swCosmeticThread
+_THREAD_LINE_TOL_M = 0.00025
+
+
+def _thread_annotation_lines(
+    section: Any,
+) -> tuple[list[tuple[float, float, float, float]], list[tuple[str, int, int]]]:
+    """Every visible cosmetic thread's drawn lines in section A-A (sheet m),
+    and each thread annotation's (name, Visible, line count) for the log."""
+    lines: list[tuple[float, float, float, float]] = []
+    states: list[tuple[str, int, int]] = []
+    for raw_annotation in _early_bound(section, "IView").GetAnnotations() or ():
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        if int(annotation.GetType()) != _COSMETIC_THREAD_ANNOTATION:
+            continue
+        visible = int(annotation.Visible)
+        drawn: list[tuple[float, float, float, float]] = []
+        raw_data = annotation.GetDisplayData()
+        if raw_data is not None:
+            data = _early_bound(raw_data, "IDisplayData")
+            for index in range(int(data.GetLineCount())):
+                # GetLineAtIndex2 -> [color, lineType, _, _, start[3], end[3]].
+                raw = [float(value) for value in data.GetLineAtIndex2(index)]
+                drawn.append((raw[4], raw[5], raw[7], raw[8]))
+        states.append((str(annotation.GetName() or ""), visible, len(drawn)))
+        if visible == 1:
+            lines.extend(drawn)
+    return lines, states
+
+
+def _covers(
+    lines: list[tuple[float, float, float, float]],
+    start: tuple[float, float],
+    end: tuple[float, float],
+) -> bool:
+    """True when drawn segments along ``start``..``end`` cover it and one of
+    them ends at ``end`` (the thread's drawn end, where the depth lands)."""
+    length = math.dist(start, end)
+    if length <= 0.0:
+        return False
+    ux, uy = (end[0] - start[0]) / length, (end[1] - start[1]) / length
+
+    def along(point: tuple[float, float]) -> tuple[float, float]:
+        dx, dy = point[0] - start[0], point[1] - start[1]
+        return dx * ux + dy * uy, abs(dx * uy - dy * ux)
+
+    spans: list[tuple[float, float]] = []
+    ends_at_end = False
+    for x0, y0, x1, y1 in lines:
+        (s0, off0), (s1, off1) = along((x0, y0)), along((x1, y1))
+        if max(off0, off1) > _THREAD_LINE_TOL_M:
+            continue
+        spans.append((min(s0, s1), max(s0, s1)))
+        if min(abs(s0 - length), abs(s1 - length)) <= _THREAD_LINE_TOL_M:
+            ends_at_end = True
+    reach = _THREAD_LINE_TOL_M
+    for low, high in sorted(spans):
+        if low > reach:
+            break
+        reach = max(reach, high)
+    return ends_at_end and reach >= length - _THREAD_LINE_TOL_M
+
+
+@_telemetry.traced("drawing.end_bracket.require_bottom_threads_drawn")
+def _require_bottom_threads_drawn(adapter: Any, section: Any) -> None:
+    """Each hole's bottom thread drawn on both sides of its bore in the cut,
+    from the bottom face to BAR_THREAD_DEPTH on the thread's major diameter."""
+    lines, states = _thread_annotation_lines(section)
+    missing = []
+    for x in HOLE_X:
+        for side in (-1.0, 1.0):
+            radius_x = x + side * THREAD_MAJOR / 2.0
+            start = model_point_in_view(
+                adapter,
+                section,
+                _metres((radius_x, 0.0, 0.0)),
+                label=f"section A-A bottom thread foot at {radius_x:.3f} mm",
+            )
+            end = model_point_in_view(
+                adapter,
+                section,
+                _metres((radius_x, 0.0, BAR_THREAD_DEPTH)),
+                label=f"section A-A bottom thread end at {radius_x:.3f} mm",
+            )
+            if not _covers(lines, start, end):
+                missing.append(round(radius_x, 3))
+    _telemetry.info(f"section A-A cosmetic thread annotations: {states!r}")
+    if missing:
+        raise RuntimeError(
+            f"section A-A draws no bottom thread at model x {missing} (bottom face "
+            f"to {BAR_THREAD_DEPTH:.3f} mm); thread annotations {states!r}"
+        )
 
 
 def _section_threads_on_visible_layer(adapter: Any, section: Any) -> None:
@@ -677,6 +785,33 @@ def _section_threads_on_visible_layer(adapter: Any, section: Any) -> None:
         f"section A-A cosmetic threads: seeds/instances={(seeds, instances)!r}, "
         f"{moved} on {SECTION_THREAD_LAYER}"
     )
+    _require_bottom_threads_drawn(adapter, section)
+
+
+@_telemetry.traced("drawing.end_bracket.offset_depth_text")
+def _offset_depth_text(
+    adapter: Any, annotations: list[Any], text_xy: tuple[float, float]
+) -> None:
+    """Park the bottom-thread depth's text on its OffsetText leader, right of
+    its line (SECTION_TEXT), and read it back
+    (draw_pn_pen_v_block._offset_tap_wall_text)."""
+    offset_dimension_text(adapter, annotations, {BAR_THREAD_DEPTH_DIMENSION: text_xy})
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        if dimension_name(adapter, annotation) != BAR_THREAD_DEPTH_DIMENSION:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        position = annotation.GetPosition()
+        if (
+            not bool(display.OffsetText)
+            or position is None
+            or math.dist(position[:2], text_xy) > _TEXT_SETTLE_M
+        ):
+            raise RuntimeError(
+                f"section A-A depth text at {position!r}, not offset to {text_xy!r}"
+            )
+        return
+    raise RuntimeError(f"section A-A lost {BAR_THREAD_DEPTH_DIMENSION}")
 
 
 def _omit_tap_thread_class(display: Any, *, label: str) -> None:
@@ -765,11 +900,14 @@ def _activate_view(adapter: Any, view: Any, *, label: str) -> None:
 # and the cut's cosmetic-thread import regroups them: farm 0c3 swept two from
 # the plan, 84d (both faces' threads imported into A-A) one. The count is
 # SolidWorks' bookkeeping, not the sheet's contract; finalize bounds it by
-# the two tap features (BarTaps, KP08Taps). The contract is what the settled
-# sheet says: each hole's callout states its thread and points at A-A, and
-# no note anywhere repeats a thread.
+# the features that carry such a note: the two tap features (BarTaps,
+# KP08Taps) and the part's bottom cosmetic threads (BarFaceThread1/2, whose
+# callout text is the same "#8-32 Tapped Hole"). The contract is what the
+# settled sheet says: each hole's callout states its thread and points at
+# A-A, and no note anywhere repeats a thread.
 TAP_FEATURES = ("BarTaps", "KP08Taps")
-REDUNDANT_THREAD_NOTES = range(1, len(TAP_FEATURES) + 1)
+BAR_FACE_THREADS = tuple(f"BarFaceThread{k}" for k in range(1, len(HOLE_X) + 1))
+REDUNDANT_THREAD_NOTES = range(1, len(TAP_FEATURES) + len(BAR_FACE_THREADS) + 1)
 _THREAD_TEXT = part_spec.SCREW.lstrip("#")  # "8-32"
 
 
@@ -954,6 +1092,14 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
+    # The depth's text, rows and all, off its line onto its leader.
+    _offset_depth_text(
+        adapter,
+        annotations,
+        model_point_in_view(
+            adapter, section, _metres(SECTION_TEXT), label="section A-A depth text"
+        ),
+    )
     _stock_references(adapter, annotations)
 
     if not auto_center_marks(adapter, plan, holes=True, size=0.0025):
@@ -986,7 +1132,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
         layout=SPEC.layout,
         # SolidWorks' own "... Tapped Hole" notes repeat what each callout
-        # states: swept, at most one per tap feature (REDUNDANT_THREAD_NOTES),
+        # states: swept, at most one per thread feature (REDUNDANT_THREAD_NOTES),
         # and the settled sheet proves none survives and both callouts do.
         redundant_note_substrings=("Tapped Hole",),
         expected_redundant_notes=REDUNDANT_THREAD_NOTES,

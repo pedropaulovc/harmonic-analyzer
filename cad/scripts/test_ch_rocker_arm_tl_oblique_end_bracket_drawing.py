@@ -348,19 +348,28 @@ def test_three_place_depths_are_set_by_the_opposed_screws() -> None:
     assert three <= width < two
     # The counterfactual roundings: .49 ±.01 and .44 ±.01 each leave their
     # window (the bar's both ways, the KP08's past the bar screw's reach).
+    # Farm 26bb's reviewer (2 of 3) bounded them by the untapped stock left
+    # between the two threads; the screws' tips and the tap leads bound them.
     bar_low, bar_high = spec._limits(spec.BAR_THREAD_DEPTH, 2)
     kp08_low, kp08_high = spec._limits(spec.KP08_THREAD_DEPTH, 2)
     assert bar_low < spec.BAR_THREAD_WINDOW[0]
     assert bar_high > spec.BAR_THREAD_WINDOW[1]
     assert kp08_high > spec.KP08_THREAD_WINDOW[1]
+    # At .48 the 3/4 bar screw's tip passes the bottom full thread.
+    assert bar_low < spec.BAR_REACH_MAX
+    # At .50 the bottom tap's lead passes the 5/8 KP08 screw's tip.
+    assert bar_high + spec.TAP_LEAD > spec.THICK_MIN - spec.KP08_REACH_MAX
+    # At .45 the top tap's lead passes the bar screw's tip.
+    assert kp08_high + spec.TAP_LEAD > spec.THICK_MIN - spec.BAR_REACH_MAX
     # The sheet names that function beside the depth, in plain words.
     text = spec.CALLOUTS_BELOW[spec.BAR_THREAD_DEPTH_DIMENSION]
     assert text.split("\n") == [
         "FULL THREAD FROM BOTTOM",
         "BOTH HOLES",
-        "EACH SCREW TIP IN FULL",
-        "THREAD, SHORT OF THE",
-        "OTHER FACE'S TAP LEAD",
+        "BOTH DEPTHS: EACH SCREW",
+        "TIP IN FULL THREAD AND",
+        "EACH TAP LEAD SHORT OF",
+        "THE OPPOSED SCREW TIP",
     ]
 
 
@@ -368,13 +377,20 @@ def test_threads_are_stated_by_the_callouts_alone() -> None:
     # Farm 84d5991d45: with both faces' threads imported into A-A, SolidWorks
     # pinned one "Tapped Hole" note where 0c3 had two; the hard-coded 2
     # refused a correct sheet. The count is SolidWorks' grouping, bounded by
-    # the two tap features; the contract is the settled sheet: both callouts
-    # state their thread and the A-A pointer, and no note repeats a thread.
+    # the features carrying such a note: the two tap features and the two
+    # bottom cosmetic threads (whose callout text is the same "Tapped Hole");
+    # the contract is the settled sheet: both callouts state their thread and
+    # the A-A pointer, and no note repeats a thread.
     assert drawing.TAP_FEATURES == ("BarTaps", "KP08Taps")
-    assert drawing.REDUNDANT_THREAD_NOTES == range(1, 3)
-    assert 1 in drawing.REDUNDANT_THREAD_NOTES and 2 in drawing.REDUNDANT_THREAD_NOTES
+    assert drawing.BAR_FACE_THREADS == ("BarFaceThread1", "BarFaceThread2")
+    assert part.BAR_FACE_THREAD_NOTE == f"{spec.SCREW} Tapped Hole"
+    assert all(name.startswith(part.BAR_FACE_THREAD) for name in drawing.BAR_FACE_THREADS)
+    assert drawing.REDUNDANT_THREAD_NOTES == range(1, 5)
     assert 0 not in drawing.REDUNDANT_THREAD_NOTES
-    assert 3 not in drawing.REDUNDANT_THREAD_NOTES
+    assert 5 not in drawing.REDUNDANT_THREAD_NOTES
+    assert drawing.stray_thread_notes([part.BAR_FACE_THREAD_NOTE]) == [
+        part.BAR_FACE_THREAD_NOTE
+    ]
     # The 84d readback, after the class row and the lengths are set.
     settled = [
         f"8-32 UNC <HOLE-DEPTH> .436\n{drawing.BOTTOM_THREAD_CALLOUT}",
@@ -617,6 +633,76 @@ def test_bottom_thread_depth_prints_from_its_own_native_dimension() -> None:
     assert sheet.index("_require_bar_thread_depth(section)") < sheet.index(
         "assert_imported_precision(adapter, annotations"
     )
+
+
+def test_bottom_thread_is_a_native_cosmetic_thread_the_section_must_draw() -> None:
+    # Farm 84d5991d45 and 26bb (machinist review, 3 of 3): section A-A drew
+    # no bottom thread; BarTaps' wizard threads came in hidden in every view.
+    # The part carries one native cosmetic thread per finished bore, from its
+    # bottom edge, after the last cut, read back against BarTaps' thread.
+    builder = Path(part.__file__).read_text(encoding="utf-8")
+    assert part.BAR_FACE_THREAD == "BarFaceThread"
+    create = builder.index("bar_face_threads = await _bar_face_cosmetic_threads(adapter)")
+    assert builder.index('label="KP08-face screw threads"') < create
+    assert create < builder.index("_require_bar_face_threads(adapter, bar_face_threads)")
+    assert builder.index(
+        "_require_bar_face_threads(adapter, bar_face_threads)"
+    ) < builder.index("save_part_and_images(adapter, PART_NAME)")
+    body = builder[builder.index("async def _bar_face_cosmetic_threads") :]
+    body = body[: body.index("\ndef _require_bar_face_threads")]
+    assert "edge_point=[x + TAP_DRILL / 2.0, 0.0, face_z]" in body
+    assert "size=SCREW" in body and 'end_type="blind"' in body
+    assert "depth=BAR_THREAD_DEPTH" in body
+    assert spec.BAR_TAP_FACE == ((0.0, 0.0, -1.0), 0.0)
+    # SelectByID2 picks at the screen projection: the picks run in the Back
+    # view (swBackView 2, viewer on -Z, square to the bottom face), the
+    # standard isometric restored even on failure; the readback proves each
+    # thread holds its own bore's bottom edge.
+    assert part._SW_BACK_VIEW == 2
+    assert 'model.ShowNamedView2("", _SW_BACK_VIEW)' in body
+    assert body.index('model.ShowNamedView2("", _SW_BACK_VIEW)') < body.index(
+        "await adapter.add_thread("
+    )
+    assert "finally:\n        set_isometric_view(adapter)" in body
+    proof = builder[builder.index("def _require_bar_face_threads") :]
+    proof = proof[: proof.index("\ndef _add_point")]
+    assert "_thread_edge_circle(model, definition" in proof
+    assert "(x, 0.0, face_z, TAP_DRILL / 2.0)" in proof
+    edge = builder[builder.index("def _thread_edge_circle") :]
+    edge = edge[: edge.index("\n@_telemetry.traced")]
+    assert "definition.AccessSelections(model, None)" in edge
+    assert "definition.ReleaseSelectionAccess()" in edge
+    assert "curve.CircleParams" in edge
+    # The settled section proves each bottom thread drawn, both sides of
+    # each bore, bottom face to the depth's witness.
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    layer = sheet[sheet.index("def _section_threads_on_visible_layer") :]
+    layer = layer[: layer.index("\ndef ")]
+    assert "_require_bottom_threads_drawn(adapter, section)" in layer
+    assert spec.BAR_THREAD_WITNESS_X == pytest.approx(
+        spec.HOLE_X[-1] + spec.THREAD_MAJOR / 2.0
+    )
+
+
+def test_thread_coverage_needs_the_whole_run_ending_at_the_depth() -> None:
+    start, end = (0.10, 0.0806), (0.10, 0.1055)
+    whole = [(0.10, 0.0806, 0.10, 0.1055)]
+    assert drawing._covers(whole, start, end)
+    # Split runs still cover it; the top thread's run beyond does not matter.
+    split = [
+        (0.10, 0.0806, 0.10, 0.0900),
+        (0.10, 0.0900, 0.10, 0.1055),
+        (0.10, 0.1092, 0.10, 0.1314),
+    ]
+    assert drawing._covers(split, start, end)
+    # A gap, a short run, a run on another diameter, or none: not drawn.
+    assert not drawing._covers([(0.10, 0.0806, 0.10, 0.0900)], start, end)
+    assert not drawing._covers(
+        [(0.10, 0.0806, 0.10, 0.0900), (0.10, 0.0950, 0.10, 0.1055)], start, end
+    )
+    assert not drawing._covers([(0.1010, 0.0806, 0.1010, 0.1055)], start, end)
+    assert not drawing._covers([(0.10, 0.1092, 0.10, 0.1314)], start, end)
+    assert not drawing._covers([], start, end)
 
 
 # --- Sheet layout (model mm in the plan, sheet m around it) -----------------------
@@ -875,17 +961,29 @@ def test_section_stands_under_the_plan_above_the_title_block() -> None:
     )
     assert top + 0.008 <= plan_lowest
     assert foot >= TITLE_BLOCK_TOP + 0.010
-    # The depth's text a TEXT_GAP off the outer end, wholly off the part and
-    # inside the border whichever way +X reads in the cut.
+    # The depth's line DEPTH_LANE off the outer end; its text (farm 26bb: the
+    # line struck ".491" and the last row when the text centred on it) on an
+    # OffsetText leader a TEXT_GAP right of the line, wholly beside the
+    # section's height and inside the border whichever way +X reads.
     x, y, z = drawing.SECTION_KEEP[spec.BAR_THREAD_DEPTH_DIMENSION]
-    half = drawing.text_half(spec.CALLOUTS_BELOW[spec.BAR_THREAD_DEPTH_DIMENSION])
-    assert x - half >= spec.BRACKET_LENGTH + drawing.TEXT_GAP - 1e-9
+    assert x == pytest.approx(spec.BRACKET_LENGTH + drawing.DEPTH_LANE)
+    assert drawing.DEPTH_LANE > 0.0
     assert y == 0.0 and z == pytest.approx(spec.BAR_THREAD_DEPTH / 2.0)
-    reach = (x + half - spec.BRACKET_LENGTH / 2.0) * s
+    text_x, text_y, text_z = drawing.SECTION_TEXT
+    half = drawing.text_half(spec.CALLOUTS_BELOW[spec.BAR_THREAD_DEPTH_DIMENSION])
+    assert text_x - half >= x + drawing.TEXT_GAP - 1e-9
+    assert text_y == 0.0
+    reach = (text_x + half - spec.BRACKET_LENGTH / 2.0) * s
     assert centre_x + reach <= RIGHT_BORDER - 0.01
     assert centre_x - reach >= LEFT_BORDER + 0.01
     rows = 1 + spec.CALLOUTS_BELOW[spec.BAR_THREAD_DEPTH_DIMENSION].count("\n") + 1
-    assert (z - drawing.text_half_high(rows)) * s + foot >= TITLE_BLOCK_TOP + 0.010
+    assert text_z - drawing.text_half_high(rows) >= 0.0
+    assert text_z + drawing.text_half_high(rows) <= spec.BRACKET_THICK
+    assert (text_z - drawing.text_half_high(rows)) * s + foot >= TITLE_BLOCK_TOP + 0.010
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert sheet.index(
+        "set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)"
+    ) < sheet.index("    _offset_depth_text(\n")
     # The caption under the section, left of the title block.
     caption_x, caption_y = drawing.SECTION_CAPTION_XY
     assert caption_y < foot and caption_x < TITLE_BLOCK_LEFT - 0.02
