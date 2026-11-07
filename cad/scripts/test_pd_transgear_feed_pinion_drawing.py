@@ -62,7 +62,8 @@ def test_every_marked_dimension_is_placed_and_has_places() -> None:
 def test_part_authors_every_callout_on_a_marked_dimension() -> None:
     """#1942: the sheet only reads text lanes back; the part writes them on
     the dimensions it marks, and every band tighter than its row names its
-    mate or stack at its own callout (2026-10-24 ENFORCE review)."""
+    mate and fit at its own callout (rule 4), the teeth's once in the gear
+    data block both tooth dimensions link (2026-11-07 screen)."""
     assert part.callouts is callouts
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "set_dimension_callouts" not in source and ".SetText(" not in source
@@ -72,21 +73,60 @@ def test_part_authors_every_callout_on_a_marked_dimension() -> None:
         name: text
         for (_feature, name), text in callouts.CALLOUTS[callouts.CALLOUT_BELOW].items()
     }
-    assert below["BoreDia"] == spec.BORE_CALLOUT
-    assert spec.BORE_CALLOUT.startswith(spec.BORE_PROCESS_CALLOUT)
-    assert spec.BORE_CALLOUT.endswith(spec.BORE_FIT_CALLOUT)
+    assert below["BoreDia"] == callouts.BORE_CALLOUT
+    assert callouts.BORE_CALLOUT.startswith(callouts.BORE_PROCESS_CALLOUT)
+    assert callouts.BORE_CALLOUT.endswith(callouts.BORE_FIT_CALLOUT)
     for name in ("BossDia", "FlatToAxis", "FaceWidth", "FlatEnd", "OverallLength"):
         assert spec.HUB_NUMBER in below[name], name
     for name in ("OutsideDia", "ToothSpan"):
-        assert spec.RACK_NUMBER in below[name], name
+        assert below[name] == "SEE GEAR DATA", name
     assert spec.PIN_NUMBER not in below["OverallLength"]
     assert "MHA-PD-25" in below["OverallLength"]
     for name in ("FaceWidth", "OverallLength"):
         assert STACK_NAME in below[name], name
         assert "FACED" not in below[name], name
+    # Rule 7: size and process rows, then at most two rows of words.
+    for name, text in below.items():
+        words = [row for row in text.split("\n") if row != callouts.BORE_PROCESS_CALLOUT]
+        assert len(words) <= 2, name
     assert callouts.CALLOUTS[callouts.TEXT_PREFIX] == {
         ("RootProfile", "RootDia"): "ROOT ENVELOPE <MOD-DIAM>"
     }
+
+
+def test_fits_take_standard_names_and_the_rack_is_named_once() -> None:
+    """2026-11-07 screen (rule 4): each fit takes a standard fit name, its
+    mate and its clearance as REF, or a bench acceptance where a plane-to-
+    plane clearance would read ambiguously; no private DIA CLR / CLR; the
+    rack mate prints once, in the gear data block."""
+    import pd_transgear_disc_hub_spec as hub
+
+    def window(limits: tuple[float, float]) -> str:
+        return f"{_inch(limits[0], 4)}-{_inch(limits[1], 4)} REF"
+
+    standard = ("RUNNING FIT", "SLIDING FIT", "LOCATIONAL CLEARANCE FIT")
+    for text, mate, clearance in (
+        (callouts.BORE_FIT_CALLOUT, spec.PIN_NUMBER, spec.BORE_DIAMETRAL_CLEARANCE),
+        (callouts.BOSS_CALLOUT, spec.HUB_NUMBER, hub.BOSS_CLEARANCE_LIMITS),
+        (callouts.FLAT_CALLOUT, spec.HUB_NUMBER, None),
+    ):
+        assert any(name in text for name in standard), text
+        assert mate in text, text
+        if clearance is not None:
+            assert window(clearance) in text, text
+    # The flats' plane-to-plane clearance is accepted on the bench.
+    assert "NO ROCK" in callouts.FLAT_CALLOUT
+    texts = [
+        *callouts.CALLOUTS[callouts.CALLOUT_BELOW].values(),
+        callouts.GEAR_DATA,
+        callouts.TOOTH_SPACE_CALLOUT,
+        drawing.OIL_HOLE_NOTE,
+        spec.DRAWING_NOTES,
+    ]
+    sheet = "\n".join(texts)
+    assert "DIA CLR" not in sheet and not re.search(r"\bCLR\b", sheet)
+    assert sheet.count(spec.RACK_NUMBER) == 1
+    assert f"MATES WITH:  PLATEN RACK {spec.RACK_NUMBER}" in callouts.GEAR_DATA
 
 
 def test_sheet_authors_no_manufacturing_value() -> None:
@@ -271,12 +311,8 @@ def test_cutter_stations_are_native_banded_model_dimensions() -> None:
     assert lines == [spec.FLAT_WALL_NOTE]
     assert max(len(line) for line in lines) <= 70
     # Short names, printed under the value, so the narrow text stands left
-    # of the outside view's rear face.  The full depth names its function:
-    # its teeth cover the rack's reach.
-    assert callouts.FULL_DEPTH_CALLOUT.split("\n") == [
-        f"{spec.TEETH}T FULL DEPTH",
-        f"COVERS {callouts.RACK_NUMBER} RACK",
-    ]
+    # of VIEW C's rear face; the rack is the gear data's mate, named there.
+    assert spec.RACK_NUMBER not in callouts.FULL_DEPTH_CALLOUT
     assert "\n" not in callouts.CUTTER_RUNOUT_CALLOUT
     # Their witnesses run along the floor of the gap facing the outside
     # view: model 195°, a gap centre (gap centres at 15° + k·30°).
@@ -399,16 +435,17 @@ def test_sheet_text_names_the_right_parts() -> None:
         assert _config.parts(stem)["number"] == number, stem
     note = drawing.OIL_HOLE_NOTE
     hole, drill = note.split("\n")
-    printed = re.match(r"\u00d8(\d*\.\d+) OIL HOLE", hole)
+    printed = re.match(r"\u00d8(\d*\.\d+) THRU$", hole)
     assert printed is not None
     assert float(printed.group(1)) * 25.4 == pytest.approx(hub.OIL_HOLE_DIA)
     # The leader leaves the last row's end, so that row is the longer.
     assert len(hole) < len(drill) <= 70
-    assert f"WITH {spec.HUB_NUMBER}" in drill
-    # The hub's sheet locates the match-drilled hole at its printed station.
-    assert drill.endswith(f"POSITION SET BY {spec.HUB_NUMBER}")
+    # The match drill names the hub once; the hub's sheet locates the hole
+    # at its printed station (2026-11-07 screen: a second mention was
+    # narration).
+    assert note.count(spec.HUB_NUMBER) == 1 and f"WITH {spec.HUB_NUMBER}" in drill
     assert "OilHoleStation" in hub.DRAWING_PRECISION_BY_NAME
-    assert f"MATE PIN {spec.PIN_NUMBER}" in spec.BORE_FIT_CALLOUT
+    assert f"FIT ON {spec.PIN_NUMBER}" in callouts.BORE_FIT_CALLOUT
     assert _config.parts("pd-transgear-front-bushing")["number"] == "MHA-PD-25"
 
 
@@ -610,10 +647,17 @@ def test_section_values_and_bands_print_clear_of_each_other() -> None:
         drawing.OIL_HOLE_NOTE, drawing.OIL_HOLE_CALLOUT, height=drawing.NOTE_HEIGHT
     )
     boxes["toothspace callout"] = _note_box(
-        spec.TOOTH_SPACE_CALLOUT, drawing.TOOTH_SPACE_CALLOUT_XY,
+        callouts.TOOTH_SPACE_CALLOUT, drawing.TOOTH_SPACE_CALLOUT_XY,
         height=drawing.TOOTH_SPACE_CALLOUT_CHAR_HEIGHT,
     )
     boxes["outside caption"] = _note_box(drawing.LEFT_CAPTION, drawing.LEFT_CAPTION_XY)
+    for letter, (text_xy, _tip) in (
+        (drawing.OUTSIDE_VIEW_LETTER, drawing.VIEW_C_ARROW),
+        (drawing.REAR_VIEW_LETTER, drawing.VIEW_D_ARROW),
+    ):
+        boxes[f"view {letter} letter"] = _note_box(
+            letter, text_xy, height=drawing.VIEW_LETTER_HEIGHT
+        )
     boxes["tooth edge note"] = _note_box(
         drawing.TOOTH_EDGE_LEADER_NOTE, drawing.TOOTH_EDGE_NOTE_XY, height=0.0025
     )
@@ -621,7 +665,7 @@ def test_section_values_and_bands_print_clear_of_each_other() -> None:
         spec.DRAWING_NOTES, drawing.NOTES_XY, height=0.0025
     )
     data_box = estimate_text_box(
-        spec.GEAR_DATA,
+        callouts.GEAR_DATA,
         anchor=drawing.GEAR_DATA_XY,
         height=drawing.GEAR_DATA_CHAR_HEIGHT,
         advance_ratio=_ADVANCE,
@@ -664,9 +708,10 @@ def test_section_values_and_bands_print_clear_of_each_other() -> None:
     assert flat_x + 2.0 * ARROW_TEXT_CLEARANCE_M < boxes["BossDia"].xmin
 
 
-# The native section caption, "SECTION B-B" over its scale, stands 16.5 mm
-# tall and is placed by its top centre; the B sheet's title block stands up
-# to 64.9 mm (test_crank_drive_gear_drawing, test_rocker_arm_support_drawing).
+# The native section caption, placed by its top centre, stood 16.5 mm tall
+# with its scale row; without it (rule 9) the bound stays conservative.  The
+# B sheet's title block stands up to 64.9 mm (test_crank_drive_gear_drawing,
+# test_rocker_arm_support_drawing).
 _CAPTION_HEIGHT = 0.0165
 _TITLE_BLOCK_TOP = 0.0649
 
@@ -829,7 +874,6 @@ def test_finite_gear_data_and_model_consume_one_tooth_system() -> None:
         assert profile.blank_radius_mm <= profile.support_radius_max_mm
         assert profile.tip_land_mm >= 0.25 * spec.MODULE_MM
         assert 2.0 * profile.root_radius_min_mm >= spec.ROOT_DIA_MIN
-    lower, upper = sorted(spec.SPAN_LIMITS)
     for label, value in (
         ("NUMBER OF TEETH", f"{spec.TEETH}"),
         ("DIAMETRAL PITCH", f"{spec.DIAMETRAL_PITCH:.2f}"),
@@ -841,20 +885,25 @@ def test_finite_gear_data_and_model_consume_one_tooth_system() -> None:
             f"#{spec.CUTTER_NUMBER}, "
             f"{spec.CUTTER_TOOTH_RANGE[0]}-{spec.CUTTER_TOOTH_RANGE[1]}T",
         ),
-        (
-            f"SPAN OVER {spec.SPAN_TEETH} TEETH",
-            f"{_inch(lower, spec.SPAN_PLACES)}-{_inch(upper, spec.SPAN_PLACES)}",
-        ),
         ("MATES WITH", f"PLATEN RACK {spec.RACK_NUMBER}"),
     ):
-        assert f"{label}:  {value}" in spec.GEAR_DATA
-    assert len(spec.GEAR_DATA.splitlines()) == 9
-    assert "PROFILE SHIFT" not in spec.GEAR_DATA
+        assert f"{label}:  {value}" in callouts.GEAR_DATA
+    # The span prints once, on the end view with its limits.
+    assert "SPAN" not in callouts.GEAR_DATA
+    # The span band's fit route (rule 4): the rack mesh's datum backlash band
+    # as the dial reads it at assembly, rounded inward on the .0001 in grid.
+    low, high = spec.RACK_BACKLASH_RANGE
+    accept = callouts.BACKLASH_ACCEPT_MM
+    assert low <= accept[0] < accept[1] <= high
+    assert accept[0] - low < 0.0001 * 25.4 and high - accept[1] < 0.0001 * 25.4
+    (row,) = [line for line in callouts.GEAR_DATA.splitlines() if "BACKLASH" in line]
+    assert row.endswith(f"{_inch(accept[0], 4)}-{_inch(accept[1], 4)}")
+    assert len(callouts.GEAR_DATA.splitlines()) == 9
+    assert "PROFILE SHIFT" not in callouts.GEAR_DATA
     # A form-cut tooth is a translated involute: its pitch thickness does
     # not follow the generated-involute span relation, so only the span
     # (the inspected quantity) is printed.
-    assert "CIRCULAR THICKNESS" not in spec.GEAR_DATA
-    assert part.GEAR_DATA == spec.GEAR_DATA
+    assert "CIRCULAR THICKNESS" not in callouts.GEAR_DATA
 
 
 def test_tangent_span_is_real_supported_flank_inspection() -> None:
@@ -916,25 +965,28 @@ def test_certified_single_pin_contacts_real_finite_flanks() -> None:
     for invalid_diameter in (0.0, -spec.TOOTHSPACE_GAUGE_DIA_MM, math.inf, math.nan):
         with pytest.raises(ValueError):
             toothspace_gauge_contact_mm(spec.STOCK_PROFILE, invalid_diameter)
-    assert "CERTIFIED" not in spec.GEAR_DATA and "STATION" not in spec.GEAR_DATA
+    assert "CERTIFIED" not in callouts.GEAR_DATA and "STATION" not in callouts.GEAR_DATA
 
 
 def test_toothspace_control_is_source_owned_and_feature_local() -> None:
     grade = toothspace_runout_tir_mm()
     assert spec.TOOTH_SPACE_RUNOUT_TIR_MM == grade
     assert math.isfinite(grade) and grade > 0.0
-    assert part.TOOTH_SPACE_CALLOUT is spec.TOOTH_SPACE_CALLOUT
     assert part.TOOTH_SPACE_CALLOUT_PROPERTY == spec.TOOTH_SPACE_CALLOUT_PROPERTY
     assert drawing.TOOTH_SPACE_CALLOUT_PROPERTY == spec.TOOTH_SPACE_CALLOUT_PROPERTY
-    assert spec.TOOTH_SPACE_CALLOUT.splitlines() == [
-        f"TOOTH SPACE RUNOUT {spec.TOOTH_SPACE_RUNOUT_TIR_TEXT} TIR TO {spec.BORE_DATUM}",
+    assert callouts.TOOTH_SPACE_CALLOUT.splitlines() == [
+        f"TOOTH SPACE RUNOUT {callouts.TOOTH_SPACE_RUNOUT_TIR_TEXT} TIR TO {spec.BORE_DATUM}",
         f"\u00d8{_inch(spec.TOOTHSPACE_GAUGE_DIA_MM, 4)} PIN, ALL {spec.TEETH} SPACES",
     ]
-    # The printed TIR never exceeds the grade it controls.
-    assert float(spec.TOOTH_SPACE_RUNOUT_TIR_TEXT) * 25.4 <= grade
+    # The printed TIR is the grade on the plain .001 in grid, rounded up
+    # (2026-11-07 screen: .0019 read as converted millimetres): PROVISIONAL
+    # pending owner confirmation of the shared grade at .002.
+    printed = float(callouts.TOOTH_SPACE_RUNOUT_TIR_TEXT)
+    assert printed == pytest.approx(round(printed, 3))
+    assert 0.0 <= printed * 25.4 - grade < 0.001 * 25.4
     # Indexing is held by the dividing head; no index inspection is printed.
-    assert max(map(len, spec.TOOTH_SPACE_CALLOUT.splitlines())) <= 70
-    assert "CANDIDATE" not in spec.TOOTH_SPACE_CALLOUT
+    assert max(map(len, callouts.TOOTH_SPACE_CALLOUT.splitlines())) <= 70
+    assert "CANDIDATE" not in callouts.TOOTH_SPACE_CALLOUT
     assert "TIR" not in spec.DRAWING_NOTES
     assert len(spec.DRAWING_NOTES.splitlines()) <= 4
     assert drawing.add_toothspace_callout is stock_drawing.add_toothspace_callout
@@ -979,7 +1031,7 @@ def test_toothspace_callout_lands_on_the_rear_face_full_depth_flank() -> None:
     gap_centre = math.pi - angle
     contact_angle = math.atan2(landing[1] - cy, landing[0] - cx)
     assert contact_angle < gap_centre  # the gap opens counter-clockwise of the contact
-    note = _note_box(spec.TOOTH_SPACE_CALLOUT, drawing.TOOTH_SPACE_CALLOUT_XY,
+    note = _note_box(callouts.TOOTH_SPACE_CALLOUT, drawing.TOOTH_SPACE_CALLOUT_XY,
                      height=drawing.TOOTH_SPACE_CALLOUT_CHAR_HEIGHT)
     toward_note = math.atan2(note.ymin - landing[1], note.xmax - landing[0])
     assert contact_angle < toward_note < contact_angle + math.pi / 2.0
@@ -1023,6 +1075,43 @@ def test_end_view_is_the_sections_third_angle_left_view(
     assert section.kwargs["view_xy"] == drawing.RIGHT_CENTER
     assert drawing.FRONT_CENTER[1] == drawing.RIGHT_CENTER[1]
     assert drawing.FRONT_CENTER[0] < drawing._side_x(0.0) < drawing._side_x(spec.OVERALL_LENGTH)
+    # 2026-11-07 screen (rule 9): B-B's caption restated the sheet's 3:1.
+    # The sheet is pinned at its scale before the section is cut, so the
+    # native caption carries no scale field.
+    order = [name for name, _args, _kwargs in seat.mock_calls]
+    assert order.index("_pin_sheet_scale") < order.index("create_section_view")
+    # Views C and D are named by viewing arrows on a parent view.
+    arrows = {
+        call.args[2]: (call.args[1], call.args[3])
+        for call in seat._add_view_arrow.call_args_list
+    }
+    assert set(arrows) == {drawing.OUTSIDE_VIEW_LETTER, drawing.REAR_VIEW_LETTER}
+    parent, arrow = arrows[drawing.OUTSIDE_VIEW_LETTER]
+    assert (parent.orientation, arrow) == ("*Back", drawing.VIEW_C_ARROW)
+    parent, arrow = arrows[drawing.REAR_VIEW_LETTER]
+    assert (parent.orientation, arrow) == ("*Left", drawing.VIEW_D_ARROW)
+
+
+def test_viewing_arrows_point_along_their_views_sight() -> None:
+    """Rule 9: VIEW C (*Left, looking along model +X) is named by an arrow on
+    the end view pointing left, B-B's sight in the mirrored *Back view; VIEW
+    D (*Back, looking at the rear face along +Z) by an arrow on VIEW C
+    pointing right at its rear face.  Each letter stands level with its tip,
+    clear of the face it looks at."""
+    assert drawing.LEFT_CAPTION == f"VIEW {drawing.OUTSIDE_VIEW_LETTER}"
+    assert drawing.REAR_CAPTION == f"VIEW {drawing.REAR_VIEW_LETTER}"
+    for (text_xy, tip), face_x, sign in (
+        (drawing.VIEW_C_ARROW, drawing.FRONT_CENTER[0] + drawing.HALF_OD, 1.0),
+        (drawing.VIEW_D_ARROW, drawing._LEFT_REAR_X, -1.0),
+    ):
+        letter = _note_box("C", text_xy, height=drawing.VIEW_LETTER_HEIGHT)
+        assert sign * (tip[0] - face_x) > 0.0
+        assert letter.ymin < tip[1] < letter.ymax
+        near = letter.xmin if sign > 0 else letter.xmax
+        assert sign * (near - tip[0]) >= 0.005
+    # D's tip lands on the rear face's extent, clear of the axis.
+    tip_y = drawing.VIEW_D_ARROW[1][1]
+    assert drawing.LEFT_CENTER[1] - drawing.HALF_OD < tip_y < drawing.LEFT_CENTER[1]
 
 
 def test_outside_view_crops_past_the_run_out_limit() -> None:
@@ -1041,13 +1130,13 @@ def test_outside_view_crops_past_the_run_out_limit() -> None:
     assert head > drawing.LEFT_CENTER[1] + drawing.HALF_OD
 
 
-def test_the_cropped_outside_view_reads_as_partial_with_a_break_on_the_boss() -> None:
+def test_the_cropped_view_c_has_a_break_on_the_boss() -> None:
     """2026-10-28 ENFORCE review (r1, r2): the cropped view had no break line
-    and no PARTIAL label, and the 13.80 MAX's extension line landed past the
-    drawn end.  The caption names the view PARTIAL; a long-break line on the
-    crop crosses the Ø8.2 boss past both outlines, so the MAX lands on the
-    boss stub between the step and the break, clear of the break's Z."""
-    assert drawing.LEFT_CAPTION.splitlines()[0] == "PARTIAL"
+    and the 13.80 MAX's extension line landed past the drawn end.  A
+    long-break line on the crop crosses the Ø8.2 boss past both outlines, so
+    the MAX lands on the boss stub between the step and the break, clear of
+    the break's Z.  The caption is the view's letter alone (rule 9)."""
+    assert drawing.LEFT_CAPTION == f"VIEW {drawing.OUTSIDE_VIEW_LETTER}"
     caption = _note_box(drawing.LEFT_CAPTION, (0.0, 0.0))
     assert caption.xmax - caption.xmin <= drawing._LEFT_CAPTION_WIDTH
     s = drawing.VIEW_SCALE[0] / 1000.0

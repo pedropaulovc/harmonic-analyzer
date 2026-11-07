@@ -110,7 +110,6 @@ from pd_transgear_feed_pinion_spec import (
     FULL_DEPTH_PLACES,
     FULL_DEPTH_TOL_TYPE,
     GAP_FLOOR_WITNESS_Y,
-    GEAR_DATA,
     OUTSIDE_DIA,
     OUTSIDE_DIA_DEVIATIONS,
     OUTSIDE_DIA_PLACES,
@@ -129,7 +128,6 @@ from pd_transgear_feed_pinion_spec import (
     ROOT_DIA_TOL_TYPE,
     SURFACE_FINISHES,
     TEETH,
-    TOOTH_SPACE_CALLOUT,
     TOOTH_SPACE_CALLOUT_PROPERTY,
     TOOTH_SPACE_INSPECTION_PHASE_RAD,
     UNIT,
@@ -859,9 +857,9 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         PART_NAME,
         {
-            "Gear Data": GEAR_DATA,
+            "Gear Data": callouts.GEAR_DATA,
             "Manufacturing Notes": DRAWING_NOTES,
-            TOOTH_SPACE_CALLOUT_PROPERTY: TOOTH_SPACE_CALLOUT,
+            TOOTH_SPACE_CALLOUT_PROPERTY: callouts.TOOTH_SPACE_CALLOUT,
         },
     )
     return await save_simplified_part(
