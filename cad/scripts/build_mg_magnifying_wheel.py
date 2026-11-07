@@ -903,17 +903,15 @@ async def build(adapter) -> dict[str, str]:
     left_foot = groove_point(-GROOVE_R, _GROOVE_CENTRE_R)
     right_foot = groove_point(GROOVE_R, _GROOVE_CENTRE_R)
     first, last = ("end", "start") if mirrored else ("start", "end")
+    left_ends = (bottom, left_foot) if mirrored else (left_foot, bottom)
+    right_ends = (right_foot, bottom) if mirrored else (bottom, right_foot)
     left_arc = check(
         "groove left arc",
-        await adapter.add_arc(
-            *centre, *((bottom, left_foot) if mirrored else (left_foot, bottom))
-        ),
+        await adapter.add_arc(*centre, *left_ends[0], *left_ends[1]),
     )
     right_arc = check(
         "groove right arc",
-        await adapter.add_arc(
-            *centre, *((right_foot, bottom) if mirrored else (bottom, right_foot))
-        ),
+        await adapter.add_arc(*centre, *right_ends[0], *right_ends[1]),
     )
     groove_bottom = f"{right_arc}.{first}"
     set_sketch_direct_db(adapter, False)
