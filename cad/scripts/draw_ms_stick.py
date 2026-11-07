@@ -154,11 +154,14 @@ DETAIL_KEEP = {
 }
 # Sheet 2's station table, right of detail A and under the parent's label:
 # the title's upper-left, then one note per column (upper-left corners),
-# all columns starting on the same line so their rows align.
+# all columns starting on the same line so their rows align. Round 3 printed
+# NUMERAL against +0 at 22 mm: the heading prints about 3.1 mm a character,
+# so the first value column starts a clear 3 mm past it.
 STATION_TITLE_XY = (0.245, 0.232)
 STATION_COLUMNS_TOP = 0.212
 STATION_NUMERAL_COLUMN_X = 0.245
-STATION_FIRST_VALUE_X = 0.267
+STATION_HEADING_CHAR_WIDTH = 0.0031
+STATION_FIRST_VALUE_X = 0.271
 STATION_COLUMN_PITCH = 0.0145
 # Local fences keep extension lines beside their tick. D sits between the
 # first two minor ticks, 0.7 inside the ruled edge, model radius 1.8: both

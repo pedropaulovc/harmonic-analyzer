@@ -699,8 +699,13 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     assert [text for _sheet, text, _xy in table_notes[1:]] == list(columns)
     xs = [xy[0] for _sheet, _text, xy in table_notes[1:]]
     assert {xy[1] for _sheet, _text, xy in table_notes[1:]} == {drawing.STATION_COLUMNS_TOP}
-    assert xs == sorted(xs) and xs[-1] + drawing.STATION_COLUMN_PITCH < 0.422
+    # The B-size inner border runs at x 0.419 m.
+    assert xs == sorted(xs) and xs[-1] + drawing.STATION_COLUMN_PITCH < 0.419
     assert drawing.STATION_TITLE_XY[0] > drawing.DETAIL_CENTER[0] + drawing.DETAIL_RADIUS_MM * 6.0 / 1000.0
+    # The NUMERAL heading ends a clear 3 mm before the first value column.
+    heading_end = (drawing.STATION_NUMERAL_COLUMN_X
+                   + len(callouts.STATION_ROW_HEADING) * drawing.STATION_HEADING_CHAR_WIDTH)
+    assert drawing.STATION_FIRST_VALUE_X - heading_end >= 0.003
     # Rule 9: each reduced parent is labelled under its centre on its sheet.
     dx, dy = drawing.PARENT_LABEL_OFFSET
     parent_labels = [
