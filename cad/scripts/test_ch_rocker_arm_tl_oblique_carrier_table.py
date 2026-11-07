@@ -290,6 +290,75 @@ def test_native_table_renames_default_tags_and_reattaches_the_real_edge():
     assert "GetCorrespondingEntity2" in inspect.getsource(table._source_edges)
     assert "GetAttachedEntities3" in inspect.getsource(table._tags)
     assert "table_settled" in inspect.getsource(drawing.build)
+    assert "_owned_table(adapter, view, feature, table)" in source
+    assert "view.GetTableAnnotations" not in source
+
+
+def _ownership_fakes(fault):
+    """A sheet (root) view, the tagged Top view and one other model view."""
+    expected = SimpleNamespace(GetName=lambda: "Hole Table1")
+    other = SimpleNamespace(GetName=lambda: "Hole Table2")
+    undetermined = SimpleNamespace(GetName=lambda: "Hole Table1")
+
+    def hole_table(annotation, kind=1):
+        return SimpleNamespace(Type=kind, GetAnnotation=lambda: annotation)
+
+    native = SimpleNamespace(Name="Hole Table1", GetTypeName2=lambda: "HoleTableFeat")
+    feature = SimpleNamespace(
+        GetFeature=lambda: native,
+        GetTableAnnotations=lambda: [hole_table(undetermined if fault == "undetermined" else expected)],
+    )
+    subs = [SimpleNamespace(Name="DetailItem1", GetTypeName2=lambda: "DetailItem"), native]
+    if fault == "second_feature":
+        subs.append(SimpleNamespace(Name="Hole Table2", GetTypeName2=lambda: "HoleTableFeat"))
+    for item, following in zip(subs, [*subs[1:], None]):
+        item.GetNextSubFeature = lambda following=following: following
+    view_feature = SimpleNamespace(GetFirstSubFeature=lambda: subs[0])
+    root_tables = [hole_table(expected), hole_table(other, kind=2)]  # BOM-type table ignored
+    top_tables = []
+    if fault == "view_listed":
+        root_tables, top_tables = [hole_table(other, kind=2)], [hole_table(expected)]
+    elif fault == "other_hole_table":
+        top_tables = [hole_table(other)]
+    elif fault == "not_listed":
+        root_tables = []
+    top = SimpleNamespace(GetName2=lambda: "Drawing View1", GetTableAnnotations=lambda: top_tables)
+    side = SimpleNamespace(GetName2=lambda: "Drawing View2", GetTableAnnotations=lambda: [],
+                           GetNextView=lambda: None)
+    top.GetNextView = lambda: side
+    sheet = SimpleNamespace(GetName2=lambda: "Sheet2", GetTableAnnotations=lambda: root_tables,
+                            GetNextView=lambda: top)
+    names = {"Drawing View1": None if fault == "no_view_feature" else view_feature}
+
+    def is_same(left, right):
+        return -1 if undetermined in (left, right) else int(left is right)
+
+    adapter = SimpleNamespace(
+        swApp=SimpleNamespace(IsSame=is_same),
+        currentModel=SimpleNamespace(FeatureByName=names.get, GetFirstView=lambda: sheet),
+    )
+    return adapter, top, feature, SimpleNamespace(GetAnnotation=lambda: expected)
+
+
+@pytest.mark.parametrize("fault", [
+    None, "view_listed", "other_hole_table", "not_listed", "second_feature",
+    "no_view_feature", "undetermined",
+])
+def test_table_ownership_is_the_view_feature_and_the_sheets_only_hole_table(monkeypatch, fault):
+    monkeypatch.setattr(table, "_early_bound", lambda value, _interface: value)
+    adapter, view, feature, inserted = _ownership_fakes(fault)
+    if fault in (None, "view_listed"):  # root- or view-listed enumeration both accepted
+        table._owned_table(adapter, view, feature, inserted)
+        return
+    with pytest.raises(RuntimeError, match="exactly this one native table") as failure:
+        table._owned_table(adapter, view, feature, inserted)
+    message = str(failure.value)
+    assert "view='Drawing View1'" in message and "expected='Hole Table1'" in message
+    assert "sheet_views=[('Drawing View1', 1), ('Drawing View2', 0)]" in message
+    if fault == "other_hole_table":
+        assert "('Drawing View1', 'Hole Table2', 0)" in message
+    elif fault == "undetermined":
+        assert "feature_annotations=[('Hole Table1', -1)]" in message
 
 
 @pytest.mark.parametrize("fault", [None, "size", "note", "moved_note", "columns"])

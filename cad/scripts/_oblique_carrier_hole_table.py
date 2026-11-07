@@ -307,6 +307,61 @@ def _outer_row_source(model: Any) -> None:
             raise RuntimeError(f"carrier {name} does not own the flagged .964 ±.002 limits")
 
 
+@_telemetry.traced("drawing.carrier_hole_table.ownership")
+def _owned_table(adapter: Any, view: Any, feature: Any, table: Any) -> None:
+    """The tagged view's one HoleTableFeat is this table, the sheet's only one.
+
+    Ownership follows the API example "Get and Set Table Anchor of Hole
+    Table": ``FeatureByName(view.Name).GetFirstSubFeature`` walks the model
+    view's sub-features to ``GetTypeName2 = "HoleTableFeat"``, whose
+    ``IHoleTable.GetTableAnnotations`` are its annotations. Table enumeration
+    instead scans the current sheet from ``IDrawingDoc.GetFirstView`` (the
+    sheet/root view) through every ``GetNextView``, so a table listed by the
+    root rather than the source view (farm bf1c82f4) is found, and any other
+    hole table on the sheet is refused. Identity is ``ISldWorks.IsSame``,
+    whose documented states are 1 same, 0 not same, -1 undetermined
+    (example "Compare Selected Objects..."); only 1 matches, never proxy
+    ``==``. Failures print the actual names and IsSame states.
+    """
+    app = adapter.swApp
+    expected = _early_bound(table.GetAnnotation(), "IAnnotation")
+    view_name = str(view.GetName2())
+    view_feature = _early_bound(adapter.currentModel, "IModelDoc2").FeatureByName(view_name)
+    hole_features = []
+    sub = None if view_feature is None else _early_bound(view_feature, "IFeature").GetFirstSubFeature()
+    while sub is not None:
+        sub = _early_bound(sub, "IFeature")
+        if str(sub.GetTypeName2()) == "HoleTableFeat":
+            hole_features.append(sub)
+        sub = sub.GetNextSubFeature()
+    feature_same = [(str(item.Name), int(app.IsSame(item, feature.GetFeature()))) for item in hole_features]
+    own = [_early_bound(_early_bound(raw, "ITableAnnotation").GetAnnotation(), "IAnnotation")
+           for raw in feature.GetTableAnnotations() or ()]
+    own_same = [(str(item.GetName()), int(app.IsSame(item, expected))) for item in own]
+    sheet_views, listed = [], []
+    # GetFirstView is the sheet (root) view; GetNextView walks its model views.
+    current, index = _early_bound(adapter.currentModel, "IDrawingDoc").GetFirstView(), 0
+    while current is not None:
+        current = _early_bound(current, "IView")
+        name = str(current.GetName2())
+        if index:
+            sheet_views.append((name, int(app.IsSame(current, view))))
+        for raw in current.GetTableAnnotations() or ():
+            native = _early_bound(raw, "ITableAnnotation")
+            if int(native.Type) == 1:  # swTableAnnotation_HoleChart
+                annotation = _early_bound(native.GetAnnotation(), "IAnnotation")
+                listed.append((name, str(annotation.GetName()), int(app.IsSame(annotation, expected))))
+        current, index = current.GetNextView(), index + 1
+    if ([same for _name, same in feature_same] != [1] or [same for _name, same in own_same] != [1]
+            or [same for _name, same in sheet_views].count(1) != 1
+            or not listed or any(same != 1 for _view, _name, same in listed)):
+        raise RuntimeError(
+            f"carrier tagged view does not own exactly this one native table: view={view_name!r} "
+            f"expected={str(expected.GetName())!r} HoleTableFeat={feature_same} "
+            f"feature_annotations={own_same} sheet_views={sheet_views} sheet_hole_tables={listed}"
+        )
+
+
 @_telemetry.traced("drawing.carrier_hole_table.create")
 def create_carrier_hole_table(
     adapter: Any, view: Any, model: Any, source: Path,
@@ -401,9 +456,7 @@ def create_carrier_hole_table(
         width = sum(float(table.GetColumnWidth(col)) for col in range(int(table.ColumnCount)))
         if TABLE_ANCHOR[1] - height < .015 or TABLE_ANCHOR[0] + width > .216:
             raise RuntimeError("carrier table crosses the border or title-block lane")
-        native_tables = tuple(view.GetTableAnnotations() or ())
-        if len(native_tables) != 1 or int(adapter.swApp.IsSame(native_tables[0], table)) != 1:
-            raise RuntimeError("carrier tagged view does not own exactly this one native table")
+        _owned_table(adapter, view, feature, table)
 
     @_telemetry.traced("drawing.carrier_hole_table.settled")
     def settled() -> None:
