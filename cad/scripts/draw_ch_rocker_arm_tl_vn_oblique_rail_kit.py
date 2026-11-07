@@ -167,7 +167,10 @@ _ISO_HALF = (0.045, 0.028)
 # isometric fills the upper right, clear of TOP's end and over RIGHT's
 # outline.
 FRONT_CENTER = (0.172, 0.160)
-TOP_CENTER = (FRONT_CENTER[0], 0.203)
+# The two-line Length fit callout reaches Y=184.50 mm (a966 recipe evidence).
+# TOP's caption reserve extends 20.04 mm below its view centre; Y=211 mm
+# leaves 6.46 mm above that callout, without moving the eight station lanes.
+TOP_CENTER = (FRONT_CENTER[0], 0.211)
 RIGHT_CENTER = (0.340, FRONT_CENTER[1])
 ISO_CENTER = (0.345, 0.230)
 VIEWS = (

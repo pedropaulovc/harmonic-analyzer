@@ -892,6 +892,9 @@ def test_receipt_sheet_views_captions_and_notes_fit() -> None:
             assert not _overlaps(box, text), (label, text_name)
         for other, cell in cells.items():
             assert not _overlaps(box, cell), (label, other)
+    # The full two-line fit callout, not just the nominal length value,
+    # must clear TOP's caption. The a966 layout overlapped by 1.54 mm.
+    assert caption_boxes["TOP"][1] >= texts["Length"][3] + draw.CLEAR_GAP_M
     # The flag stands between the stack and FRONT's caption, in the run of
     # the end face and last station's extension lines.
     end_face_x = draw.FRONT_CENTER[0] - draw._FRONT_HALF[0]
