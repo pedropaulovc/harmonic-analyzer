@@ -39,11 +39,12 @@ Holes, all THRU from the top face:
   does not fit), at ``RISER_SCREWS`` ⚙. They take the screws into the
   carrier's #4-40 tapped holes at the same stations. The wizard has no
   countersunk-clearance kind in ``_holes``, so the countersink is a revolved
-  cut, as the rocker trammel pivot plate's. The sheet prints the hole size
-  from a blanked reference sketch on the top face (``ScrewDia``), with the
-  countersink in its callout: the plan shows only the countersink's edges of
-  each hole, so a native hole callout there is not the wizard's (farm runs
-  jig-r3/r4).
+  cut, as the rocker trammel pivot plate's. The sheet's source-owned design
+  nominal is Ø.128 +.004/0, with #30 DRILL THRU identifying the actual cutter.
+  The native ``ScrewDia`` reference sketch carries that design nominal, not
+  a measurement of the #30's Ø.1285 cut. Rounding up to .129 would put the
+  real cut below the printed lower limit. The plan shows only countersink
+  edges, so its callout uses this blanked reference sketch (farm jig-r3/r4).
 * HUB clearance Ø.600 at ``HUB`` ⚙: receives the loose steel sleeve around
   the flanged hub clamp stud; the sleeve supports the strap locally.
 * CL and CR clearance Ø.257 (letter F) at ``CL`` / ``CR`` ⚙: pass the CL
@@ -125,12 +126,21 @@ LEFT_CLAMP_DIA = 5.2324  # .206, #10 close clearance
 SCREW_SIZE = trammel.RISER_SCREW.split("-")[0]
 SCREW_SPEC = HoleSpec(kind="clearance", size=SCREW_SIZE, fit="normal")
 SCREW_DIA = CLEARANCE_MM[(SCREW_SIZE, "normal")]  # .1285, the wizard table's #30
-# The DRILLED HOLES row bands the drill, so the size prints the #30 drill at 4
-# places: Ø.1285 +.004/0 holds the wizard's cut.
-SCREW_DIA_PLACES = 4
-SCREW_DIA_PRINTED = round(SCREW_DIA / trammel.INCH, SCREW_DIA_PLACES) * trammel.INCH
+SCREW_DRILL = "#30"
+SCREW_DRILL_DIA = 0.1285 * trammel.INCH
+if SCREW_DIA != round(SCREW_DRILL_DIA, 3):  # the clearance table is rounded to .001 mm
+    raise AssertionError("the riser clearance no longer matches its named drill")
+# Rule 3: a three-place DESIGN nominal on the existing native reference
+# circle, not a rounded measurement of the Wizard cut. Floor for +.004/0:
+# .128-.132 contains the actual #30; nearest .129-.133 would exclude it.
+SCREW_DIA_PLACES = 3
+SCREW_DIA_PRINTED = (
+    math.floor(SCREW_DIA / trammel.INCH * 1000.0 + 1e-9) / 1000.0 * trammel.INCH
+)
 if not SCREW_DIA_PRINTED - 1e-6 <= SCREW_DIA <= SCREW_DIA_PRINTED + DRILLED_BAND[0]:
     raise AssertionError("the wizard's #4 clearance falls outside its printed band")
+if not SCREW_DIA_PRINTED <= SCREW_DRILL_DIA <= SCREW_DIA_PRINTED + DRILLED_BAND[0]:
+    raise AssertionError("the actual #30 drill falls outside the design limits")
 SCREW_BODY_DIA = 0.112 * trammel.INCH  # #4 major diameter
 SCREW_HEAD_DIA_MAX = trammel.RISER_SCREW_HEAD_DIA  # .225
 CSK_ANGLE = 82.0  # the flat head's own included angle
@@ -144,8 +154,8 @@ HUB_PLACES = 3
 CLAMP_DIA = 6.5278  # .257
 CLAMP_PLACES = 3
 
-if SCREW_DIA <= SCREW_BODY_DIA:
-    raise AssertionError("riser screw hole does not clear the #4 body")
+if SCREW_DIA_PRINTED <= SCREW_BODY_DIA:
+    raise AssertionError("the smallest accepted riser screw hole does not clear the #4 body")
 # The smallest printed countersink still sinks the largest head (no head
 # proud of the riser top under the strap blank); the largest stays short of
 # the bottom face.
@@ -273,7 +283,7 @@ GLOBALS: dict[str, float] = {
     "LeftClampY": LEFT_CLAMP_HOLE[1],
     "LeftClampDia": LEFT_CLAMP_DIA,
     "CskDia": CSK_DIA,
-    # The reference circle prints the drill's size; the wizard cuts SCREW_DIA.
+    # Native design nominal; the Wizard still cuts the actual #30 SCREW_DIA.
     "ScrewDia": SCREW_DIA_PRINTED,
 }
 
@@ -366,7 +376,7 @@ if not set(ROW_COUNTS) <= REFERENCE_DIMENSIONS:
 # countersink, and each its location from the carrier.
 HOLE_CALLOUTS = ("ScrewDia", "HubDia", "ClampDia", "LeftClampDia")
 CALLOUTS_BELOW = {
-    "ScrewDia": f"DRILL THRU\n{CSK_CALLOUT}\n{LOCATE_CALLOUT}",
+    "ScrewDia": f"{SCREW_DRILL} DRILL THRU\n{CSK_CALLOUT}\n{LOCATE_CALLOUT}",
     "HubDia": f"DRILL THRU\nHUB HOLE\n{LOCATE_CALLOUT}",
     "LeftClampDia": f"DRILL THRU\nLEFT HOLD-DOWN\n{LOCATE_CALLOUT}",
     "ClampDia": (
