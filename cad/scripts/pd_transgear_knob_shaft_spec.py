@@ -277,8 +277,9 @@ if not math.isclose(
     raise AssertionError("knob shaft core runout is not the turned-shaft grade")
 # Pattern runout is a toothspace inspection, not mounting plate position.
 TOOTH_SPACE_RUNOUT_TIR_MM = toothspace_runout_tir_mm()
-# The printed limit never exceeds the booked one: floored to four inch places.
-TOOTH_SPACE_RUNOUT_TIR_TEXT = inch_text(inch_floor_mm(TOOTH_SPACE_RUNOUT_TIR_MM, 4), 4)
+# The printed limit never exceeds the booked one: floored to the plain .001
+# inch step (the shared grade is .002, delegated ruling 2026-11-07 (Main) F3).
+TOOTH_SPACE_RUNOUT_TIR_TEXT = inch_text(inch_floor_mm(TOOTH_SPACE_RUNOUT_TIR_MM, 3), 3)
 TOOTH_SPACE_GAUGE_PIN_DIA_MM = 1.016  # .040; use the actual certified diameter
 
 
@@ -713,15 +714,8 @@ GEAR_DATA = gear_data_note(
     ]
 )
 
-# The title block's .010 edge break is a fifth of this fine tooth's whole
-# depth, so the sheet carries the one part-specific exception it needs. A
-# shop note states the requirement, not the cutter or method (Main ruling
-# 2026-10-10); the cutter lives in the gear data block.  Each note's leader
-# lands on the feature it names (machinist review r8): this one on a tooth.
-TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
+# The drive collar MHA-PD-22: its D-bore slides on the D-core.
 DRIVE_COLLAR_NUMBER = _config.parts("pd-transgear-drive-collar")["number"]
-# Its leader lands on the 15T front face (F).
-BEARING_FACE_NOTE = f"DRIVE COLLAR\n{DRIVE_COLLAR_NUMBER} BEARS ON\n{TEETH}T FRONT FACE"
 
 
 # One running surface: the journal in the arm plate's bore.  The D-core is a
