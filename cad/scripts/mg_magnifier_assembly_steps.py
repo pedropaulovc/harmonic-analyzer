@@ -66,6 +66,7 @@ SEQUENCE: tuple[str, ...] = (
     "endshake-rechecked",
     "locknut-reset",
     "axle-accepted",
+    "axle-reset",
     # Lever group.
     LEVER_THREADED_KEY,
     "clamp-thumb-screw-started",

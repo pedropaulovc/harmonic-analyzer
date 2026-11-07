@@ -150,6 +150,13 @@ def test_the_press_gauge_is_a_reference_accepted_at_the_nuts() -> None:
     assert notes.STEP_TEXT["axle-accepted"] == (
         f"REPEAT THE STEP {steps.step_number(steps.AXLE_CHECKED_KEY)} CHECK."
     )
+    # The final reading has its own remedy: the stack comes off, back to the
+    # trial fit.
+    assert steps.SEQUENCE[accepted + 1] == "axle-reset"
+    assert notes.STEP_TEXT["axle-reset"] == (
+        "IF IT FAILS, REMOVE ITEMS 18, 17, 15, 14 AND 13 AND RETURN TO STEP "
+        f"{steps.step_number(steps.AXLE_TRIAL_KEY)}."
+    )
     # The endshake callout keeps one reason line; the steps carry the method.
     assert stack.SETTING_CALLOUTS[stack.FEATURE][stack.ENDSHAKE_DIMENSION] == (
         4, "WHEEL FREE, NO RATTLE"
