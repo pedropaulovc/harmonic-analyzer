@@ -131,10 +131,13 @@ VOLUME_MM3 = WIDTH * (BASE_AREA + BOSS_UPPER_AREA - BORE_AREA) - 2.0 * HOLE_VOLU
 
 # The bolt holes are the interface: on receipt, the end bracket's screws must
 # pass both holes into its taps (the pass condition; machinist review), the
-# bracket named by drawing number.
+# screws and the bracket named by drawing number, in plain shop words (no
+# CAD term such as "envelope model": rule 26). The screws' number is the
+# registry's (pinned by the drawing test; a spec stays pure data).
+BRACKET_SCREW_NUMBER = "MHA-CH-06-TL-VN-62"
 DRAWING_NOTES = (
-    f"ENVELOPE MODEL: {leadscrew.KP08_SCREW} SCREWS MUST PASS BOTH HOLES INTO"
-    " MHA-CH-06-TL-28 TAPS."
+    f"2X HOLES PASS {BRACKET_SCREW_NUMBER} SCREWS INTO"
+    f" {leadscrew.END_BRACKET_NUMBER} TAPS."
 )
 
 # Reference sizes on the plan view (the Front Plane, sketch (u, v) = model

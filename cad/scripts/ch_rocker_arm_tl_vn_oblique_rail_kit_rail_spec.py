@@ -298,8 +298,14 @@ DRAWING_PRECISION = {
 # accepted by free screw insertion with both ends flush, not a station band.
 # The kit drawing's sheet that prints the receipt check; citations name it.
 RECEIPT_SHEET = 2
-# The flag, a note of its own under the station stack, names the note's check.
-RECEIPT_FLAG = "MATCH-TRANSFER TO BASE BAR MHA-CH-06-TL-20; STATIONS REF"
+# The flag, a note of its own under the station dimension, gives the hole
+# pattern as one REF pattern callout (rule 10: a regular pattern counts as
+# one axis): the first station is dimensioned from the end, the rest step
+# off at the pitch; the pattern's mate follows it.
+RECEIPT_FLAG = (
+    f"{HOLE_COUNT}X HOLES ON ({HOLE_PITCH:.{base_bar.RAIL_HOLE_PLACES}f}) PITCH\n"
+    "MATCH-TRANSFER TO BASE BAR MHA-CH-06-TL-20"
+)
 END_FIT_CALLOUT = (
     "RAIL ENDS FLUSH WITH BASE BAR ENDS\n"
     "PASSES: MHA-CH-06-TL-00 SHEET 1 LIMITS; SEALS ON RAIL, NO BIND."
@@ -307,12 +313,10 @@ END_FIT_CALLOUT = (
 # Main's explicit 2026-11-07 sheet ruling prints the metric wall as 2.0 MIN.
 # The existing conservative 2.032 mm source-envelope guard remains unchanged.
 WALL_ACCEPTANCE_MM = 2.0
-DRAWING_NOTES = "\n".join(
-    (
-        f"[A] WALL FROM EACH END COUNTERBORE TO RAIL END: {WALL_ACCEPTANCE_MM:.1f} MIN.",
-        "KEEP EACH RAIL WITH ITS MATCHED BASE BAR.",
-        "ALL SCREWS MUST ENTER FREELY BY HAND.",
-    )
+# The pairing of each rail with its bar and the free screw entry are the
+# jig's steps (MHA-CH-06-TL-00 steps 1E, 1F), not this part sheet's (rule 7).
+DRAWING_NOTES = (
+    f"[A] WALL FROM EACH END COUNTERBORE TO RAIL END: {WALL_ACCEPTANCE_MM:.1f} MIN."
 )
 # The member's native BOM row under the kit's one Number.
 BOM_DESCRIPTION = f"{STYLE} RAIL, {LENGTH:.3f} MM, KIT, TRIMMED"

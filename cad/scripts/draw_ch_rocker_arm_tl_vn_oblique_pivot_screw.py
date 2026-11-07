@@ -49,7 +49,7 @@ GENERAL_TEXT = "PURCHASED PART AS SUPPLIED; SHORTEN THREADED END AND CHAMFER AT 
 VIEW_LAYOUT = "standard"
 # The Right view carries every dimension: the head Ø left of the head, the
 # shoulder Ø right of the thread end, the shoulder length above, the cut
-# (.570 CUT) on its own line under the thread, the end chamfer (.03 X 45°) on
+# (.570) on its own line under the thread, the end chamfer (.03 X 45°) on
 # the thread's upper silhouette, the cut note right of the thread end under
 # the shoulder Ø with a short leader to the tip's end face, the thread
 # leader above-right.
@@ -94,7 +94,7 @@ _REFERENCES = {
 # Shop sizes: owner feature, model value (m), places, suffix, callout below.
 _SHOP = {
     part.CUT_DIMENSION: (part.CUT_FEATURE, part.CUT_THREAD_LENGTH / 1000.0,
-                         part.CUT_THREAD_PLACES, "", part.CUT_CALLOUT),
+                         part.CUT_THREAD_PLACES, "", ""),
     part.CHAMFER_LEG_DIMENSION: (part.CHAMFER_REFERENCE_FEATURE, part.CUT_CHAMFER / 1000.0,
                                  part.CHAMFER_PLACES, part.CHAMFER_SUFFIX, ""),
 }

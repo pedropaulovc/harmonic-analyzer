@@ -349,23 +349,15 @@ CAP_INTERNAL_MM3 = (A_CAP_OUTLINE - REFERENCE_CHANNEL_MM2) * 2.0 * CAP_LENGTH - 
 )
 
 # The owner's description note for the kit carriages (#2177), the rail named
-# by its item on the kit drawing's reference sheet and the play acceptance
-# read from the trammel calculator. Rule 7: a matched-fit statement with its
-# mate and acceptance, three lines beside the footer's general line. The style
-# designation (HGH15CA) prints in the ITEM row. The check names its home, the
-# TL-00 jig where the carriage is fitted, how the carrier is rocked and where
-# the indicator reads (machinist review 20261104T194839817Z: the sheet draws
-# no pivot).
+# by its item on the kit drawing's reference sheet. Rule 7: two lines beside
+# the footer's general line. The style designation (HGH15CA) prints in the
+# ITEM row. The sideways-play acceptance is an assembly check, so it is
+# MHA-CH-06-TL-00's (steps 1 and 14C), not this part sheet's.
 ITEM_TAG = "[2]"
-JIG_NUMBER = "MHA-CH-06-TL-00"
-PLAY_ACCEPTANCE = (
-    f"ROCK SIDEWAYS, {trammel.CARRIAGE_PLAY_TIR_MAX:.2f} MM TIR MAX AT SHOULDER SCREW"
-)
 DRAWING_NOTES = "\n".join(
     (
         f"{ITEM_TAG} GENERIC HIWIN-STYLE, NUIBBYED-BRANDED, NOT GENUINE HIWIN;",
         f"MATCHED KIT WITH RAIL {rail.ITEM_TAG}. Z0 PRELOAD, C ACCURACY NOT REQUIRED.",
-        f"IN {JIG_NUMBER}: {PLAY_ACCEPTANCE}.",
     )
 )
 # The member's native BOM row under the kit's one Number.

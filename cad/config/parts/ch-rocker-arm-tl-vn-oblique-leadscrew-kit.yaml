@@ -27,7 +27,7 @@ ch-rocker-arm-tl-vn-oblique-leadscrew-kit:
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
-      where: "sheet 3, Section F-F, the 4X Ø4.76/4.50 82° CSK callout: MIN WALL 0.40 TO BODY, 0.45 TO OD"
+      where: "sheet 3, Section F-F, the 4X ⌵ Ø4.76/4.50 X 82° callout: MIN WALL 0.40 TO BODY, 0.45 TO OD"
       finding: "countersink rims at the worst case the package allows (each hole ±0.05 off its station on the Ø16 PCD, the countersink 0.02 off its hole, the mouth at its Ø4.76 band maximum, the body at its Ø10.3 receipt maximum, the flange at its Ø21.8 receipt minimum) leave 0.40 mm to the body and 0.45 mm to the flange OD, below the 1.5 mm metric wall floor"
       reason: "owner ruling 2026-11-04 (Pedro, PR #2187 comment 6651067089, on the sketch in comment 6650871642, https://github.com/user-attachments/assets/2f652ca3-b30d-45ee-a564-23d49ce63751): \"Accept as owner exception\" for the 0.40 mm (to body) / 0.45 mm (to flange OD) walls around the four countersinks on the faced ReliaBot nut. The supplied Ø3.5 holes on the Ø16 PCD already leave 1.15 mm to the body and 1.25 mm to the OD nominal, 1.00 mm and 1.05 mm at the receipt limits, so no countersink on this bought nut meets the floor. The lip carries no load: each #4-40 flat head (91771A112) takes 37 N at the 1.19 N·m reversing torque, ×29.8 in shear."
     - id: "RV-02"

@@ -181,8 +181,11 @@ def test_note_is_one_short_line_naming_the_end_bracket() -> None:
     assert "\n" not in note and len(note) <= 80
     assert note == note.upper()
     assert "MHA-CH-06-TL-28" in note
-    # The receipt check's pass condition: the bracket's screws pass the holes.
-    assert "#8-32 SCREWS MUST PASS BOTH HOLES" in note
+    # The receipt check's pass condition: the bracket's screws, named by
+    # their registered number, pass the holes.
+    screw = _config.parts("ch-rocker-arm-tl-vn-oblique-bracket-screw")["number"]
+    assert spec.BRACKET_SCREW_NUMBER == screw
+    assert f"2X HOLES PASS {screw} SCREWS" in note
 
 
 def test_sheet_is_the_registered_purchased_part_reference(monkeypatch) -> None:
