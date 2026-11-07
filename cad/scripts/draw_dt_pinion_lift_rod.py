@@ -119,15 +119,15 @@ DETAIL_KEEP = {
     # axis 0.335, front end 0.355): between them the text was struck by both.
     "PinHoleZ": (DETAIL_CENTER[0] + 0.047, DETAIL_CENTER[1] - 0.045),
 }
+# The pin station is a location: it carries its value and band only, its
+# extension lines already running to the flat end (rule 7; fan-out screen
+# 20261107T081227004Z: "FROM FLAT END" under the .16).
 DIMENSION_CALLOUTS = {
     # Below the value: SolidWorks stores a multi-line ABOVE callout but prints
     # none of it (r2 layout audit text-unmatched; draw_dt_cone_gear_shaft).
     "RodDia": ROD_DIA_CALLOUT,
     # The match-drill and its mate only: MHA-DT-00 names the hole in its step.
     "PinHoleDia": PIN_HOLE_CALLOUT,
-    # The rod has one flat end and one crowned end; "front" named nothing on
-    # the sheet (machinist review r2).
-    "PinHoleZ": "FROM FLAT END",
 }
 
 
