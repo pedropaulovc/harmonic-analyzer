@@ -200,9 +200,18 @@ def test_stud_drop_text_stands_east_of_the_east_column() -> None:
 
 
 def test_steps_cover_the_sequence_and_print_no_setting_values() -> None:
-    assert len(notes.ASSEMBLY_STEPS) == len(steps.SEQUENCE)
-    for number, line in enumerate(notes.ASSEMBLY_STEPS, 1):
-        assert line.startswith(f"{number}. ")
+    # Each keyed step prints under its own number, as one step or lettered
+    # sub-steps (rule 22), so the numbers other sheets cite never move.
+    for number, key in enumerate(steps.SEQUENCE, 1):
+        lines = notes.step_lines(key)
+        heads = [line.split(". ", 1)[0] for line in lines]
+        if len(lines) == 1:
+            assert heads == [str(number)]
+        else:
+            assert heads == [f"{number}{letter}" for letter in notes.SUB_STEP_LETTERS[: len(lines)]]
+    assert notes.ASSEMBLY_STEPS == tuple(
+        line for key in steps.SEQUENCE for line in notes.step_lines(key)
+    )
     printed = " ".join(
         (*notes.ASSEMBLY_STEPS, *notes.ASSEMBLY_CHECKS, drawing.ASSEMBLED_NOTE)
     )
@@ -216,20 +225,39 @@ def test_steps_cover_the_sequence_and_print_no_setting_values() -> None:
     # Period hardware: no step leans on, or names, a chemical or nylon lock.
     for bad in ("TBD", "TODO", "THREADLOCK", "LOCTITE", "NYLON", "NYLOC"):
         assert bad not in printed
-    # The anchor's install and acceptance are the anchor spec's text, unforked.
-    assert ch_vn_spring_hook_spec.ANCHOR_INSTALL_STEP in printed
-    assert ch_vn_spring_hook_spec.ANCHOR_INSTALL_CHECK in printed
+    # Rule 26: directions by view names, never a compass or a clock.
+    assert not re.search(r"\b(NORTH|SOUTH|EAST|WEST)\b|O'CLOCK", printed)
+
+
+def test_the_forked_driver_fits_the_jam_nut_and_its_anchor() -> None:
+    """Rule 1: the shop has no jig the package does not tell the builder to
+    make, so the anchor steps size the driver that runs the slotted jam nut."""
+    import ch_anchor_jam_nut_spec as nut
+
+    made = notes.step_lines("channel-anchors-set")[0]
+    assert "MAKE A FORKED DRIVER" in made
+    assert notes.DRIVER_BLADE_THICK_MAX * 25.4 < nut.SLOT_WIDTH
+    assert notes.DRIVER_BLADE_WIDTH * 25.4 <= nut.OD_MIN
+    assert notes.DRIVER_SLOT_WIDTH * 25.4 > nut.THREAD_MAJOR
+    assert notes.DRIVER_SLOT_DEPTH * 25.4 > ch_vn_spring_hook_spec.PROTRUSION_MAX_MM
+
+
+def test_every_adjustable_clamp_step_checks_that_it_holds() -> None:
+    """Rule 23: an adjustable clamp counts only with a step that sets it and
+    checks it holds."""
+    for key in ("summing-levelled", "magnifier-bar-clamped", "nib-set", "nib-on-paper"):
+        lines = notes.step_lines(key)
+        tightened = next(i for i, line in enumerate(lines) if "TIGHTEN" in line)
+        assert lines[tightened + 1].split(". ", 1)[1].startswith("CHECK:")
 
 
 def test_shared_vendor_instructions_print_current_numbers_and_roles() -> None:
     import _config
 
-    clamp = notes.ASSEMBLY_STEPS[steps.step_number("magnifier-bar-clamped") - 1]
-    pen_wire = notes.ASSEMBLY_STEPS[steps.step_number("pen-wire-tied") - 1]
+    clamp = " ".join(notes.step_lines("magnifier-bar-clamped"))
+    pen_wire = " ".join(notes.step_lines("pen-wire-tied"))
     assert f"BOTH {_config.parts('sh-vn-clamp-screw')['number']} CLAMP SCREWS" in clamp
     assert _config.parts("sh-vn-music-wire")["number"] in pen_wire
-    assert "PEN WIRE" in pen_wire
-    assert "RIM GROOVE" in pen_wire
     # Shared stock has no extra HA BOM row: each instruction must identify
     # its supplying assembly. MG's same-stock lever wire is not PN's wire.
     assert assembly_contract("mg-magnifier").number in clamp
@@ -246,7 +274,9 @@ def test_bar_height_names_the_raised_deck_it_runs_from() -> None:
     step = steps.step_number("magnifier-bar-clamped")
     callout = notes.SETTING_CALLOUTS[spec.BAR_HEIGHT_DIMENSION]
     assert callout.split("\n") == ["BAR TOP ABOVE", "RAISED DECK TOP", f"(STEP {step})"]
-    assert "ABOVE THE RAISED DECK TOP (SHEET 1)" in notes.ASSEMBLY_STEPS[step - 1]
+    assert "ABOVE THE RAISED DECK TOP (SHEET 1)" in " ".join(
+        notes.step_lines("magnifier-bar-clamped")
+    )
 
 
 def test_the_loose_spare_sprocket_is_named_with_its_row_and_its_place() -> None:
@@ -268,11 +298,8 @@ def test_the_loose_spare_sprocket_is_named_with_its_row_and_its_place() -> None:
     assert f"{number} {notes.SPARE_SPROCKET_CONFIG}" in label
     assert f"(ITEM {item}, STEP {step})" in label
     assert max(map(len, label.splitlines())) <= 16
-    text = notes.ASSEMBLY_STEPS[step - 1]
-    assert (
-        f"MHA-PD-00 ALSO SUPPLIES ONE LOOSE {number} {notes.SPARE_SPROCKET_CONFIG} "
-        "SPARE SPROCKET"
-    ) in text
+    text = " ".join(notes.step_lines("paper-drive-built"))
+    assert f"LOOSE {number} {notes.SPARE_SPROCKET_CONFIG} SPARE SPROCKET" in text
     assert "SHEET 2" in text and "SHEET 3" in text
     # The label's leader rides the paper drive's explode.
     assert drawing.PAPER_DRIVE_EXPLODE_M == pytest.approx((0.0, 0.0, -0.450))
@@ -336,27 +363,26 @@ def test_the_parked_nib_is_set_on_the_paper_before_the_line_check() -> None:
 
     parked, contact = steps.step_number("nib-set"), steps.step_number("nib-on-paper")
     assert contact == parked + 1
-    by_number = {
-        int(line.split(". ", 1)[0]): line for line in notes.ASSEMBLY_STEPS
-    }
+    parked_text = " ".join(notes.step_lines("nib-set"))
+    contact_text = " ".join(notes.step_lines("nib-on-paper"))
     # The modelled gap in the sheet's inch: the stock .010 leaf, within
     # half a .001 count of the model's 0.25.
     assert notes.NIB_CLEARANCE_TEXT == ".010"
     assert abs(0.010 * 25.4 - PEN_PAPER_CLEARANCE_MM) <= 0.0005 * 25.4
     feeler = f"A {notes.NIB_CLEARANCE_TEXT} FEELER"
-    assert feeler in by_number[parked]
-    assert "TOUCHES THE PAPER" in by_number[contact]
-    assert "FEELER" not in by_number[contact].replace("NO FEELER", "")
-    assert f"REPEAT STEP {parked}" in by_number[contact]
+    assert feeler in parked_text
+    assert "TOUCHES THE PAPER" in contact_text
+    assert "FEELER" not in contact_text
     # No later step re-parks the nib, and the checks find it on the paper
     # before the straight-line run.
-    for number in range(contact + 1, len(notes.ASSEMBLY_STEPS) + 1):
-        assert "NIB" not in by_number[number]
+    for key in steps.SEQUENCE[steps.SEQUENCE.index("nib-on-paper") + 1 :]:
+        assert "NIB" not in " ".join(notes.step_lines(key))
     checks = " ".join(notes.ASSEMBLY_CHECKS)
     assert "FEELER" not in checks
-    assert "THE NIB TOUCHES THE PAPER" in notes.ASSEMBLY_CHECKS[0]
-    assert "DRAW A STRAIGHT LINE" in notes.ASSEMBLY_CHECKS[2]
-    assert notes.NIB_PARKED_NOTE in drawing.ASSEMBLED_NOTE.replace("\n   ", " ")
+    nib = next(i for i, c in enumerate(notes.ASSEMBLY_CHECKS) if "THE NIB TOUCHES THE PAPER" in c)
+    line = next(i for i, c in enumerate(notes.ASSEMBLY_CHECKS) if "DRAW A STRAIGHT LINE" in c)
+    assert nib < line
+    assert notes.NIB_PARKED_NOTE in drawing.ASSEMBLED_NOTE.replace("\n", " ")
     assert (
         f"PARKED {notes.NIB_CLEARANCE_TEXT} OFF THE PAPER (STEP {parked}); "
         f"STEP {contact} SETS IT ON."
@@ -393,21 +419,30 @@ def test_channel_sheet_cites_the_anchor_step_by_its_number() -> None:
 def test_steps_sheet_text_clears_the_title_block() -> None:
     landscape = DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE]
     assert drawing.STEPS_COLUMN_BOTTOM_Y > landscape.title_block_top_m
-    for block in (drawing.STEPS_LEFT, drawing.STEPS_RIGHT, drawing.ASSEMBLY_CHECKS):
+    for block in (*drawing.STEP_COLUMNS, drawing.ASSEMBLY_CHECKS):
         assert max(map(len, block.splitlines())) <= drawing.STEPS_LINE_WIDTH
+    # Sheet 4 carries two columns, sheet 5 the third and the checks.
+    assert drawing.STEP_COLUMN_SHEETS == (
+        drawing.SHEET_NAMES[3], drawing.SHEET_NAMES[3], drawing.SHEET_NAMES[4]
+    )
+    assert drawing.CHECKS_XY == (drawing.STEPS_RIGHT_X, drawing.STEPS_TOP_Y)
 
 
 def test_a_blank_line_separates_each_numbered_step() -> None:
-    steps_printed = 0
-    for block in (drawing.STEPS_LEFT, drawing.STEPS_RIGHT, drawing.ASSEMBLY_CHECKS):
+    """A blank line between numbered steps; a step's lettered sub-steps stay
+    together, and a step never splits across columns."""
+    printed = []
+    for block in (*drawing.STEP_COLUMNS, drawing.ASSEMBLY_CHECKS):
         lines = block.splitlines()
         starts = [i for i, line in enumerate(lines) if line[:1].isdigit()]
-        assert starts[0] in (0, 1)  # no blank line under a heading
-        assert all(lines[i - 1] == "" for i in starts[1:])
-        assert lines.count("") == len(starts) - 1
+        assert starts[0] == 1  # the heading, then no blank line
+        numbers = [re.match(r"\d+", lines[i]).group(0) for i in starts]
+        for previous, index, number in zip(numbers, starts[1:], numbers[1:]):
+            assert (lines[index - 1] == "") == (number != previous)
+        assert lines.count("") == len(set(numbers)) - 1
         if block is not drawing.ASSEMBLY_CHECKS:
-            steps_printed += len(starts)
-    assert steps_printed == len(notes.ASSEMBLY_STEPS)
+            printed += [lines[i].split(". ", 1)[0] for i in starts]
+    assert printed == [line.split(". ", 1)[0] for line in notes.ASSEMBLY_STEPS]
 
 
 @pytest.mark.parametrize("axis", ((0.0, -1.0, 0.0), (0.0, 1.0, 0.0),

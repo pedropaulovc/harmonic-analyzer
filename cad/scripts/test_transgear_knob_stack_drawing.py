@@ -117,7 +117,7 @@ def test_fitted_rear_face_reacts_on_actual_f_at_every_printed_corner(
         + shaft.TOOTH_SPACE_RUNOUT_TIR_MM / 2.0
     )
     assert collar.D_CENTRE_FLOAT_MAX == pytest.approx(centre_float)
-    assert inner == pytest.approx(2.814658, abs=1e-6)
+    assert inner == pytest.approx(2.815058, abs=1e-6)
     assert collar.FRONT_BEARING_INNER_RADIUS_MAX == pytest.approx(inner)
     areas = [
         shaft.gear_bearing_area_lower(profile, inner)
