@@ -240,9 +240,18 @@ def test_every_tight_band_names_its_mate_and_fit_route():
     to the measured D-bores with an acceptance.  Lengths carry no words."""
     spec = dt_cone_gear_shaft_spec
     assert drawing.DIMENSION_CALLOUTS["Sec0Dia"].split("\n") == [
-        "RUNNING FIT, MATCHED TO MHA-DT-05",
-        "BORE (CLEARANCE .0010-.0023)",
+        "RUNNING FIT, MATCHED",
+        "TO MHA-DT-05 BORE",
+        "(CLEARANCE .0010-.0023)",
     ]
+    # The journal's text hangs right of its line only off the faced end
+    # (round 3: dragged onto the journal its box hung left onto section A's
+    # letter); its widest row, in the proof's 2.17 mm a character, ends at
+    # least 3 mm short of section A-A's box (0.3141).
+    x, _y = drawing.SIDE_DIAMETERS["Sec0Dia"]
+    assert x > drawing.BIG_END_X
+    widest = max(map(len, drawing.DIMENSION_CALLOUTS["Sec0Dia"].split("\n")))
+    assert x + widest * 0.00217 <= 0.3141 - 0.003
     assert drawing.DIMENSION_CALLOUTS["Sec1Dia"] == "SEE NOTE 1"
     assert drawing.DIMENSION_SUFFIXES == {
         f"Sec{land}Dia": " SEE NOTE 1" for land in (2, 3, 4)
@@ -261,10 +270,12 @@ def test_every_tight_band_names_its_mate_and_fit_route():
     # The three-place lengths name the stack they set once (rule 4), with the
     # values their dimensions print.
     assert notes[2] == "2. 4.701, 4.972, 5.243 AND .125 SET THE MHA-DT-07 AND MHA-DT-03 STACK."
-    # Every suffix is one line; every below callout fits two.
+    # Every suffix is one line; every below callout carries at most two lines
+    # of words (rule 7), a parenthesized REF clearance row beside them.
     assert not any("\n" in text for text in drawing.DIMENSION_SUFFIXES.values())
     assert not any("\n" in text for text in spec.FLAT_MATE_SUFFIXES.values())
-    assert all(text.count("\n") <= 1 for text in spec.SEAT_MATE_CALLOUTS.values())
+    for text in spec.SEAT_MATE_CALLOUTS.values():
+        assert len([row for row in text.split("\n") if not row.startswith("(")]) <= 2
 
 
 def test_display_precision_is_owned_by_the_part() -> None:

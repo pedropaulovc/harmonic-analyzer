@@ -202,16 +202,20 @@ def _gear(teeth: int) -> str:
 # 4).  The journal's .0008 band is under the turned-diameter row, so it is a
 # matched running fit to the MHA-DT-05 bore, the form the reviewer accepted
 # on MHA-DT-19's pivot shaft, its clearance the printed limits'
-# (JOURNAL_DIAMETRAL_CLEARANCE_MM).  Every gear land and its flat slide in
-# the bores of the gears it carries; those mates (MHA-DT-03, MHA-DT-07 on
-# land 1, MHA-DT-VN-54 on the terminal land) and the flats' matched fit are
-# flag note LAND_NOTE, linked from each land's diameter and across-flat: the
-# stepped tip's texts climb over each other and have no room for the names.
+# (JOURNAL_DIAMETRAL_CLEARANCE_MM) as a REF row of its own: two lines of
+# words (rule 7) narrow enough to stand between the faced end and section
+# A-A (round 3's 33-character line crowded section A's letter).  Every gear
+# land and its flat slide in the bores of the gears it carries; those mates
+# (MHA-DT-03, MHA-DT-07 on land 1, MHA-DT-VN-54 on the terminal land) and
+# the flats' matched fit are flag note LAND_NOTE, linked from each land's
+# diameter and across-flat: the stepped tip's texts climb over each other
+# and have no room for the names.
 LAND_NOTE = 1
 LAND_FLAG = f"SEE NOTE {LAND_NOTE}"
 JOURNAL_FIT_CALLOUT = (
-    "RUNNING FIT, MATCHED TO MHA-DT-05\n"
-    f"BORE (CLEARANCE {inch_text(JOURNAL_DIAMETRAL_CLEARANCE_MM[0], 4)}"
+    "RUNNING FIT, MATCHED\n"
+    "TO MHA-DT-05 BORE\n"
+    f"(CLEARANCE {inch_text(JOURNAL_DIAMETRAL_CLEARANCE_MM[0], 4)}"
     f"-{inch_text(JOURNAL_DIAMETRAL_CLEARANCE_MM[1], 4)})"
 )
 SEAT_MATE_CALLOUTS = {

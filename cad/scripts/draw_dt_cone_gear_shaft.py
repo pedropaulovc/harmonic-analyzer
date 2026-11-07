@@ -227,13 +227,18 @@ STATION_TEXT_CLEARANCE = 0.002
 # r1's (the tip detail with them); Ø9.525 stands right of all three suffixes,
 # its two mate lines centred on it clear above A-A's letter.
 SIDE_DIAMETERS = {
-    # The journal's matched-fit callout, "RUNNING FIT, MATCHED TO MHA-DT-05"
-    # at 33 characters, read 2.69 mm a character on round 2's render
-    # (20261107T104940656Z: 24 characters over 0.2575..0.3221), so ~89 mm.
-    # Its line stands on the journal 9.4 mm in from the collar face, so the
-    # block ends ~4 mm short of section A-A's across-flat ink (x 0.312); the
-    # pivot finish moves up and left, above the block (PIVOT_FINISH_XY).
-    "Sec0Dia": (0.2190, 0.1715),
+    # The journal's text stands just off the faced end, where rounds 1 and 2
+    # proved it hangs RIGHT of its line (r2 render 20261107T104940656Z: ink
+    # from 0.2575).  Dragged onto the journal instead (round 3, 0.2190) the
+    # proof's box hung LEFT, 0.1325..0.2041, onto section A's lower letter.
+    # Its widest line, "(CLEARANCE .0010-.0023)", boxes 23 x 2.17 mm in the
+    # proof's estimator (round 3: 33 characters 0.0716 wide), so the block
+    # ends ~0.307, 6.7 mm short of section A-A's box (x 0.3141).  The round 3
+    # box stood 10.1 mm below and 9.1 mm above the text position over four
+    # rows; at 0.1785 a fifth row of 5.3 mm, grown either way, stays 7 mm
+    # above the journal's upper extension line (0.1561) and 7 mm below the
+    # collar callout (bottom ~0.200 on round 2).
+    "Sec0Dia": (0.2575, 0.1785),
     "Sec1Dia": (0.1600, 0.1800),
     "Sec2Dia": (BIG_END_X - (2.0 * SECTION_ENDS[2] + SECTION_ENDS[1]) / 3000.0, 0.1785),
     "Sec3Dia": (BIG_END_X - (2.0 * SECTION_ENDS[3] + SECTION_ENDS[2]) / 3000.0, 0.1905),
@@ -242,9 +247,7 @@ SIDE_DIAMETERS = {
     # and two arrows inside it, so the collar alone takes the near-side
     # diametric style: one arrow on the top rim from outside, leader up to
     # the text, nothing drawn inside the ring.
-    # It starts above the journal's line at Sec0Dia's x; the build lifts it
-    # further, over the pivot finish.
-    "CollarDia": (0.2088, 0.1830),
+    "CollarDia": (0.2088, 0.1760),
 }
 NEAR_SIDE_DIAMETERS = ("CollarDia",)
 # The collar is the 5/8 bar's OD as supplied (user ruling 2026-09-26), so
@@ -282,14 +285,11 @@ DIMENSION_CALLOUTS = {
     **SEAT_MATE_CALLOUTS,
 }
 # The pivot-journal finish symbol, above whose ink the collar's text must
-# stand.  It sits above the journal's callout block (top ~0.182 on round 2)
-# and its leader drops to the journal near the collar
-# (PIVOT_FINISH_ATTACH_INSET from the faced end), left of the journal's
-# dimension line at Sec0Dia's x.  Round 2 measured the symbol's ink from
-# its xy at -0.0047..+0.0137 m across, 0..+0.0073 m up, and its leader
-# leaving 6.4 mm left of the xy.
-PIVOT_FINISH_XY = (0.2214, 0.1850)
-PIVOT_FINISH_ATTACH_INSET = 0.0375
+# stand; its leader lands on the journal's top flank
+# PIVOT_FINISH_ATTACH_INSET in from the faced end (round 2's placement, left
+# of the journal's text).
+PIVOT_FINISH_XY = (0.2400, 0.1800)
+PIVOT_FINISH_ATTACH_INSET = 0.020
 
 
 class CutParent(Enum):
