@@ -1,8 +1,12 @@
 """Native carrier hole table: source/view/edge/tag/row identity, never typed XY.
 
-#2151 owner Option B. The generated HUB coordinates remain untouched and are
-explicitly REF in the NOTE column: TL-00 step 10 taps that ordinary #8-32
-receiver in situ at the HUB DRO setting and alone owns its location.
+The in-situ HUB tap is NOT in the table (farm 82129 machinist review): TL-00
+step 10 drills and taps that ordinary #8-32 receiver at assembly, so its
+position prints only as a parenthesized reference on the HUB CLAMP sheet.
+Every physical top-face hole, the HUB included, is still identified against
+the source body; the table and its tags carry the other twelve. The SIZE
+column is hidden: each hole's size and process is its sheet-1 callout, and
+the pin holes' 4X REAM THRU is their only size authority.
 
 Creation and settled readback have separate operation-level tracing spans;
 individual hole/row traversal stays inside those spans.
@@ -28,15 +32,25 @@ import ch_rocker_arm_tl_oblique_carrier_spec as spec
 
 TABLE_ANCHOR = (0.020, 0.175)
 TABLE_WIDTHS = (0.012, 0.019, 0.019, 0.078, 0.065)
+# The physical columns, in the IncludeHidden=True index domain every read
+# and write below uses: SIZE stays generated (and compared) while hidden.
+COLUMNS = ("TAG", "X LOC", "Y LOC", "SIZE", "NOTE")
+SIZE_COLUMN = COLUMNS.index("SIZE")
+IN_SITU_HOLES = ("HUB",)
+TABLED_HOLES = {
+    tag: hole for tag, hole in spec.TABLE_HOLES.items() if tag not in IN_SITU_HOLES
+}
+HOLE_SIZES_NOTE = "HOLE SIZES PER CALLOUTS, SHEET 1"
 # Sheet metres relative to the actual projected hole centre. Keep the close
-# A1/A2 and B1/B2 pairs on opposite sides of their respective rows.
+# A1/A2 and B1/B2 pairs on opposite sides of their respective rows; A2's tag
+# sits up-right, off the datum's Y axis label (82129 review read it "AY2").
 TAG_OFFSETS = {
     "A1": (-.012, -.008), "B1": (.008, -.008),
-    "A2": (-.012, .009), "B2": (.008, .009),
+    "A2": (.007, .009), "B2": (.008, .009),
     "CL": (.006, -.010), "CR": (.009, .010),
     "R1": (-.008, .010), "R2": (.003, .010),
     "R3": (-.010, .009), "R4": (.005, .009),
-    "L1": (.008, .003), "L2": (.008, -.005), "HUB": (.009, .009),
+    "L1": (.008, .003), "L2": (.008, -.005),
 }
 # _hole_spec pins each cut diameter to 3-decimal mm. The Hole Wizard cuts
 # the exact inch drill: farm build 26bb read CL's #29 (.1360 in) as radius
@@ -118,25 +132,35 @@ def _source_edges(adapter: Any, view: Any, model: Any, source: Path) -> dict[str
     return found
 
 
+def _cell(table: Any, row: int, column: int) -> str:
+    """One generated cell in the physical (IncludeHidden=True) domain."""
+    return str(table.DisplayedText2(row, column, True) or "").strip()
+
+
+def _inventory(table: Any) -> tuple[int, int]:
+    """Physical rows/columns, hidden SIZE included (Total*Count)."""
+    return int(table.TotalRowCount), int(table.TotalColumnCount)
+
+
 def _rows(table: Any) -> dict[str, tuple[int, tuple[str, ...]]]:
     """Exact generated tag/coordinate bijection, not a nearest-coordinate guess."""
-    if int(table.RowCount) != len(spec.TABLE_HOLES) + 1 or int(table.ColumnCount) not in (4, 5):
+    rows_total, columns = _inventory(table)
+    if rows_total != len(TABLED_HOLES) + 1 or columns not in (4, 5):
         raise RuntimeError("carrier table has the wrong row/column inventory")
     rows = {}
     expected = _location_expected()
-    for row in range(1, int(table.RowCount)):
-        cells = tuple(str(table.DisplayedText2(row, col, False) or "").strip()
-                      for col in range(int(table.ColumnCount)))
+    for row in range(1, rows_total):
+        cells = tuple(_cell(table, row, col) for col in range(columns))
         tag = cells[0]
-        if tag not in spec.TABLE_HOLES or tag in rows:
+        if tag not in TABLED_HOLES or tag in rows:
             raise RuntimeError(f"carrier table has an extra/duplicate native tag: {tag!r}")
         values = tuple(map(_location_value, cells[1:3]))
         if values != expected[tag]:
             raise RuntimeError(f"carrier table {tag} is not measured from A1: {cells!r}")
         _location_display(tag, cells[1:3])
-        _size_semantics(tag, cells[3])
+        _size_semantics(tag, cells[SIZE_COLUMN])
         rows[tag] = (row, cells)
-    if set(rows) != set(spec.TABLE_HOLES):
+    if set(rows) != set(TABLED_HOLES):
         raise RuntimeError("carrier table omitted a tagged hole")
     return rows
 
@@ -160,12 +184,12 @@ def _location_value(text: str) -> Decimal:
 
 
 def _location_expected() -> dict[str, tuple[Decimal, Decimal]]:
-    """Each tag's source X/Y from A1, at the table's .XXX places, by value."""
+    """Each tabled tag's source X/Y from A1, at the table's .XXX places, by value."""
     a1x, a1y = spec.PIN_HOLES["A1"]
     return {
         tag: tuple(Decimal(repr(round(value / spec.trammel.INCH, spec.TABLE_LOCATION_PLACES)))
                    for value in (x - a1x, y - a1y))
-        for tag, (x, y, _diameter) in spec.TABLE_HOLES.items()
+        for tag, (x, y, _diameter) in TABLED_HOLES.items()
     }
 
 
@@ -241,8 +265,8 @@ def _frozen_rows(
     expected and actual cells.
     """
     rows = _rows(table)
-    columns = int(table.ColumnCount)
-    if columns != 5:
+    columns = _inventory(table)[1]
+    if columns != len(COLUMNS):
         raise RuntimeError(f"carrier table has {columns} columns {stage}; expected TAG/X/Y/SIZE/NOTE")
     for tag, (row, cells) in rows.items():
         expected = (*generated[tag], "" if notes is None else notes[tag])
@@ -259,17 +283,18 @@ def _frozen_rows(
 def _row_holes(table: Any) -> dict[int, str]:
     """Each generated row's physical hole, from its own native A1-baseline cells.
 
-    The .XXX source location pairs of the thirteen holes are distinct, so a
-    row's printed values identify exactly one hole or the table is refused.
+    The .XXX source location pairs of the twelve tabled holes are distinct,
+    so a row's printed values identify exactly one hole or the table is refused.
     """
-    if int(table.RowCount) != len(spec.TABLE_HOLES) + 1:
+    rows_total = _inventory(table)[0]
+    if rows_total != len(TABLED_HOLES) + 1:
         raise RuntimeError("carrier table has the wrong row inventory")
     expected = _location_expected()
     if len(set(expected.values())) != len(expected):
         raise AssertionError("two carrier holes print the same table location")
     holes: dict[int, str] = {}
-    for row in range(1, int(table.RowCount)):
-        texts = tuple(str(table.DisplayedText2(row, col, False) or "").strip() for col in (1, 2))
+    for row in range(1, rows_total):
+        texts = tuple(_cell(table, row, col) for col in (1, 2))
         values = tuple(map(_location_value, texts))
         matches = [tag for tag, location in expected.items() if location == values]
         if len(matches) != 1 or matches[0] in holes.values():
@@ -295,7 +320,7 @@ def _hole_tag_reader(feature: Any, current: dict[int, str]) -> int:
 
 
 def _assign_tags(feature: Any, table: Any) -> None:
-    """Rename SolidWorks' default A1..A13 tags to the owner tags, collision-free.
+    """Rename SolidWorks' default A1..A12 tags to the owner tags, collision-free.
 
     InsertHoleTable3's manual tags are prefixes that SolidWorks numbers per
     prefix (farm 4d: "A1" printed as "A11"). The documented IHoleTable.HoleTag
@@ -304,7 +329,7 @@ def _assign_tags(feature: Any, table: Any) -> None:
     to an unused temporary, then to its owner tag, each write read back.
     """
     holes = _row_holes(table)
-    current = {row: str(table.DisplayedText2(row, 0, False) or "").strip() for row in holes}
+    current = {row: _cell(table, row, 0) for row in holes}
     if len(set(current.values())) != len(current) or not all(current.values()):
         raise RuntimeError(f"carrier table generated duplicate or empty tags: {current!r}")
     offset = _hole_tag_reader(feature, current)
@@ -464,6 +489,23 @@ def _hole_table_format(adapter: Any) -> None:
             )
 
 
+def _size_column_hidden(table: Any, stage: str) -> None:
+    """Exactly the generated SIZE column is hidden; every row and every other
+    physical column shows. ``ColumnHidden``/``RowHidden`` must be BOOL."""
+    rows_total, columns = _inventory(table)
+    header = tuple(_cell(table, 0, column).upper() for column in range(columns))
+    hidden = tuple(table.ColumnHidden(column) for column in range(columns))
+    rows_hidden = tuple(table.RowHidden(row) for row in range(rows_total))
+    if (header != COLUMNS
+            or any(type(state) is not bool for state in (*hidden, *rows_hidden))
+            or hidden != tuple(column == SIZE_COLUMN for column in range(columns))
+            or any(rows_hidden)):
+        raise RuntimeError(
+            f"carrier table visibility {stage} is not SIZE-only hidden: header={header!r} "
+            f"columns_hidden={hidden!r} rows_hidden={rows_hidden!r}"
+        )
+
+
 @_telemetry.traced("drawing.carrier_hole_table.create")
 def create_carrier_hole_table(
     adapter: Any, view: Any, model: Any, source: Path,
@@ -478,12 +520,14 @@ def create_carrier_hole_table(
     # Insert against a real corner, then use the documented IDatumOrigin
     # reattachment to the actual A1 circular edge. No constructed datum point.
     # Default alphanumeric tags, renamed below from each row's own A1 cells.
-    order = sorted(spec.TABLE_HOLES, key=lambda tag: spec.TABLE_HOLES[tag][:2])
+    # The in-situ HUB is never selected, so the native table holds only the
+    # twelve tabled holes; _source_edges above still maps all thirteen.
+    order = sorted(TABLED_HOLES, key=lambda tag: TABLED_HOLES[tag][:2])
     table = insert_hole_table(
         adapter, view,
         datum_xy=_point(adapter, view, spec.OUTLINE_X[0], spec.OUTLINE_Y[0]),
         hole_points=[_point(adapter, view, x + diameter / 2.0, y)
-                     for x, y, diameter in (spec.TABLE_HOLES[tag] for tag in order)],
+                     for x, y, diameter in (TABLED_HOLES[tag] for tag in order)],
         hole_entities=[edges[tag] for tag in order],
         anchor_xy=TABLE_ANCHOR, basic_locations=False, label="carrier A1 baseline",
         unit=spec.UNIT, location_places=spec.TABLE_LOCATION_PLACES,
@@ -504,8 +548,8 @@ def create_carrier_hole_table(
     rows = _rows(table)
     generated = {tag: cells[:4] for tag, (_row, cells) in rows.items()}
     # The native SIZE readback, raw and semantic, for the record: a zero
-    # band stack is accepted as the plain size, not refused (owner ruling on
-    # the printed SIZE column pending; a7547069 printed one on the pin rows).
+    # band stack is accepted as the plain size (a7547069 printed one on the
+    # pin rows). The column is hidden below; its data is still compared.
     stacked = {tag: cells[3] for tag, cells in generated.items() if "<STACK" in cells[3].upper()}
     _telemetry.info(
         f"carrier hole-table SIZE readback: {len(stacked)} row(s) with a tolerance stack "
@@ -523,9 +567,8 @@ def create_carrier_hole_table(
         if not table.IsCellTextEditable(row, 4):
             raise RuntimeError(f"carrier {tag} NOTE cell (row {row}) is not editable")
         note = spec.TABLE_ROW_NOTES[tag]
-        table.SetText2(row, 4, False, note)  # void put: read back below
-        written = (str(table.Text2(row, 4, False) or ""),
-                   str(table.DisplayedText2(row, 4, False) or "").strip())
+        table.SetText2(row, 4, True, note)  # void put: read back below
+        written = (str(table.Text2(row, 4, True) or ""), _cell(table, row, 4))
         if written != (note, note):
             raise RuntimeError(
                 f"carrier {tag} NOTE (row {row}) did not take: expected={note!r} "
@@ -537,14 +580,20 @@ def create_carrier_hole_table(
             raise RuntimeError(
                 f"carrier table column {column} rejected its width: expected={width} actual={actual}"
             )
-    _tags(adapter, view, edges, place=True)
+    # Each hole's size and process is its sheet-1 callout (the 4X REAM THRU
+    # is the pin holes' only size authority): hide the generated SIZE column.
+    # SetColumnHidden is VT_VOID; the BOOL readback proves it after rebuild.
+    table.SetColumnHidden(SIZE_COLUMN, True)
+    tabled_edges = {tag: edges[tag] for tag in TABLED_HOLES}
+    _tags(adapter, view, tabled_edges, place=True)
     # NOTE 1 is flagged in the A2/B2 rows; the exact owner text is linked to
     # the saved model property and checked against both native local controls.
     add_note(adapter, "1", .225, .163)
     flagged = add_property_linked_note(adapter, "Outer Pin Row Note", .235, .163)
     add_note(adapter, "HOLE LOCATIONS FROM A1; +X ALONG A1-B1", .225, .143)
-    add_note(adapter, "HUB LOCATION REF — TAP IN SITU AT TL-00 STEP 10", .225, .128)
+    add_note(adapter, HOLE_SIZES_NOTE, .225, .128)
     rebuild_drawing(adapter, label="carrier table and tags")
+    _size_column_hidden(table, "after its rebuild")
 
     def check_active_table() -> None:
         current = _source_edges(adapter, view, model, source)
@@ -560,11 +609,15 @@ def create_carrier_hole_table(
                 or annotation.IsDangling()):
             raise RuntimeError("carrier table datum no longer owns A1's actual axis")
         _frozen_rows(table, generated, notes=spec.TABLE_ROW_NOTES, stage="at settled readback")
-        _tags(adapter, view, current, place=False)
+        _size_column_hidden(table, "at settled readback")
+        # The HUB stays a physical source hole (its HUB CLAMP sheet callout),
+        # never a table row or tag: _tags refuses an orphan HUB tag.
+        _tags(adapter, view, {tag: current[tag] for tag in TABLED_HOLES}, place=False)
         if str(_early_bound(flagged, "INote").GetText()).strip() != spec.OUTER_Y_NOTE:
             raise RuntimeError("carrier flagged note differs from its model-owned limits")
-        height = sum(float(table.GetRowHeight(row)) for row in range(int(table.RowCount)))
-        width = sum(float(table.GetColumnWidth(col)) for col in range(int(table.ColumnCount)))
+        rows_total, columns = _inventory(table)
+        height = sum(float(table.GetRowHeight(row)) for row in range(rows_total))
+        width = sum(float(table.GetColumnWidth(col)) for col in range(columns) if col != SIZE_COLUMN)
         if TABLE_ANCHOR[1] - height < .015 or TABLE_ANCHOR[0] + width > .216:
             raise RuntimeError("carrier table crosses the border or title-block lane")
         _owned_table(adapter, view, feature, table)

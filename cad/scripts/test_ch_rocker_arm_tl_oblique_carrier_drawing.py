@@ -263,7 +263,8 @@ def test_clamp_taps_are_ordinary_through_taps_located_by_the_table() -> None:
         assert features[name]["parent"] == "pin_hole_a1", name
     hub = features["hub_tap_1"]
     assert "station" not in hub["requirements"] and "height" not in hub["requirements"]
-    assert hub["note"] == " ".join(spec.HUB_TAP_CALLOUT.splitlines())
+    assert hub["note"] == " ".join(drawing.HUB_TAP_NOTE.splitlines())
+    assert hub["note"] == "DRILL AND TAP AT ASSEMBLY TL-00 STEP 10"
     for retired in ("cl_spot", "left_clamp_tap_1", "assembly_hub_bore",
                     "assembly_hub_underside_chamfer"):
         assert retired not in features, retired
@@ -750,7 +751,7 @@ def test_hole_table_sheet_owns_every_location() -> None:
     assert build.index("_hole_table_sheet(adapter, source_model)") < build.index(
         "_hub_sheet(adapter)"
     )
-    assert "settled_checks=(pin_controls_settled, table_settled)" in build
+    assert "settled_checks=(pin_controls_settled, table_settled, hub_settled)" in build
     assert '"Outer Pin Row Note"' in build
     assert "A1 ONLY — OTHER PIN HOLES NOT SHOWN" in inspect.getsource(drawing._pin_section)
     assert not {"ClY", "CrY", "LeverY1", "LeverY2", "RiserY1", "RiserY2"} & set(drawing.TOP_KEEP)
@@ -758,20 +759,32 @@ def test_hole_table_sheet_owns_every_location() -> None:
         assert not hasattr(drawing, retired), retired
 
 
-def test_hub_clamp_tap_has_its_own_sheet_and_in_situ_callout() -> None:
-    """The HUB tap is made in situ at the assembly's HUB setting: its table
-    row is REF and its sheet prints its native callout, no station."""
+def test_hub_clamp_tap_has_its_own_sheet_callout_and_reference_position() -> None:
+    """Farm 82129 review: the HUB tap is drilled and tapped at assembly, so it
+    is not in the table; its sheet prints its native callout saying so and
+    its position from A1 as two parenthesized REFERENCE drawing dimensions."""
     assert drawing.SHEET_NAMES[2] == "HUB CLAMP"
     assert "expected_sheet_names=SHEET_NAMES" in inspect.getsource(drawing.build)
-    assert "_hub_sheet(adapter)" in inspect.getsource(drawing.build)
+    assert "hub_settled = _hub_sheet(adapter)" in inspect.getsource(drawing.build)
     source = inspect.getsource(drawing._hub_sheet)
     assert "SHEET_NAMES[2]" in source
     assert "add_native_hole_callout" in source
     assert "curate_view_dimensions" not in source
-    assert "part_spec.HUB_TAP_CALLOUT" in source
+    assert "_append_callout_below(callout, HUB_TAP_NOTE" in source
+    assert "_hub_reference_position(adapter, top)" in source
     assert "_strip_thread_class(" in source
     assert "set_callout_lengths_to_three_places(" in source
-    assert "TL-00 STEP 10" in spec.HUB_TAP_CALLOUT
+    assert drawing.HUB_TAP_NOTE.splitlines() == ["DRILL AND TAP AT ASSEMBLY", "TL-00 STEP 10"]
+    reference = inspect.getsource(drawing._hub_reference_position)
+    for call in ("add_edge_dimension(", "set_arc_endpoints_to_center(", "set_reference_dimension(",
+                 "assert_dimension_measures(",
+                 'orientation=orientation, entities=(a1, hub)'):
+        assert call in reference, call
+    # Drawing-native only: no model dimension or part write, and no
+    # drawing-owned places (_drawing_contract: a *_spec value only).
+    assert "SetPrecision3" not in reference
+    for forbidden in ("SystemValue =", "SetSystemValue", "Parameter(", "SetValue"):
+        assert forbidden not in reference, forbidden
     assert spec.HUB[0] == spec.LEVER_HOLES[0][0] == 0.0
     assert not hasattr(drawing, "HUB_KEEP")
     for retired in ("_left_clamp_sheet", "_left_clamp_depth_callout", "_trace_left_clamp_callout"):
@@ -779,6 +792,80 @@ def test_hub_clamp_tap_has_its_own_sheet_and_in_situ_callout() -> None:
     assert "_require_left_clamp_thread_min" not in Path(drawing.__file__).read_text(
         encoding="utf-8"
     )
+
+
+@pytest.mark.parametrize("fault", [None, "prefix", "suffix", "arc_end", "wrong_value"])
+def test_hub_reference_position_is_parenthesized_between_actual_edges(monkeypatch, fault):
+    """Fake-driven (not native): the two dimensions run between the A1 and
+    HUB edges, on both axes, measure HUB - A1, and their settled readback
+    refuses a lost parenthesis, centred end or value."""
+    a1, hub, created, displays, measured = object(), object(), [], [], []
+    settled = {"wrong": False}
+
+    class Display:
+        def __init__(self):
+            self.text, self.places = {}, 2  # the document's own places
+            self.model = SimpleNamespace(GetArcEndCondition=lambda _i: 1)
+
+        def GetAnnotation(self):
+            return self
+
+        def GetDimension2(self, _index):
+            return self.model
+
+        def SetText(self, part, text):
+            self.text[part] = text
+
+        def GetText(self, part):
+            return self.text.get(part, "")
+
+        def SetPrecision3(self, *_args):
+            raise AssertionError("the sheet must not own the reference places")
+
+        def GetPrimaryPrecision2(self):
+            return self.places
+
+    def add(_adapter, _view, **kwargs):
+        created.append(kwargs)
+        displays.append(Display())
+        return displays[-1]
+
+    def measures(_adapter, display, *, expected_mm, label, entities):
+        measured.append((label, expected_mm, entities))
+        if settled["wrong"]:
+            raise RuntimeError(f"{label} measures the wrong value")
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "_view_mapper", lambda *_: lambda xyz: (xyz[0] / 2000.0, -xyz[2] / 2000.0))
+    monkeypatch.setattr(drawing, "_circle_edge", lambda _a, _v, dia, *_a2, **_k: a1 if dia == spec.PIN_HOLE_DIA else hub)
+    monkeypatch.setattr(drawing, "add_edge_dimension", add)
+    monkeypatch.setattr(drawing, "set_arc_endpoints_to_center", lambda *_a, **_k: None)
+    monkeypatch.setattr(drawing, "set_reference_dimension",
+                        lambda _adapter, display, **_k: (display.SetText(1, "("), display.SetText(2, ")")))
+    monkeypatch.setattr(drawing, "assert_dimension_measures", measures)
+    check = drawing._hub_reference_position(SimpleNamespace(), object())
+    assert [item["orientation"] for item in created] == ["horizontal", "vertical"]
+    assert all(item["entities"] == (a1, hub) for item in created)
+    assert all(display.text == {1: "(", 2: ")"} for display in displays)
+    a1x, a1y = spec.PIN_HOLES["A1"]
+    assert [expected for _label, expected, _entities in measured] == pytest.approx(
+        [abs(spec.HUB[0] - a1x), abs(spec.HUB[1] - a1y)]
+    )
+    assert all(entities == (a1, hub) for _label, _expected, entities in measured)
+    if fault == "prefix":
+        displays[0].text[1] = ""
+    elif fault == "suffix":
+        displays[1].text[2] = ""
+    elif fault == "arc_end":
+        displays[0].model = SimpleNamespace(GetArcEndCondition=lambda _i: 0)
+    elif fault == "wrong_value":
+        settled["wrong"] = True
+    if fault is None:
+        check()
+        return
+    with pytest.raises(RuntimeError):
+        check()
+
 
 
 @pytest.fixture

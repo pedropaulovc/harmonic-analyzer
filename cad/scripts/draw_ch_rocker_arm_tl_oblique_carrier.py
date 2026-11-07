@@ -3,16 +3,18 @@ r"""Create the drawing for the oblique-trammel jig's carrier plate (MHA-CH-06-TL
 The carrier uses one native hole table (#2151, owner Option B), with tags on
 actual hole edges and X/Y from the actual A1 bore axis, +X along A1-B1, at
 .XXX under the title block. Only A2/B2 Y carries the flagged .964 ±.002
-note. The HUB row is REF: that ordinary #8-32 tap is made in situ at the
-assembly's HUB setting (MHA-CH-06-TL-00 step 10). No chained hole-location
-dimensions remain.
+note. The table's SIZE column is hidden: every size is its sheet-1 callout.
+The HUB is not in the table: that ordinary #8-32 tap is drilled and tapped
+at assembly (MHA-CH-06-TL-00 step 10). No chained hole-location dimensions
+remain.
 
 The CARRIER sheet keeps the outline, the reamed size, the native tap
 callouts and section A-A (3:1, cropped to and identified as A1, carrying the
 finished thickness and underside chamfer); the shaded isometric stands above
-the title block. The HOLE TABLE sheet holds the complete table and its
-tagged plan. The HUB CLAMP sheet carries the HUB tap's native callout alone,
-naming where it is made; it prints no station.
+the title block. The HOLE TABLE sheet holds the twelve-row table and its
+tagged plan. The HUB CLAMP sheet carries the HUB tap's native callout, which
+says it is drilled and tapped at assembly, and its position from A1 as two
+parenthesized REFERENCE dimensions.
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ import argparse
 import math
 import re
 import sys
-from typing import Any
+from typing import Any, Callable
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -48,8 +50,11 @@ from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import (
     assert_imported_precision,
     offset_dimension_text,
+    set_arc_endpoints_to_center,
     set_dimension_callouts,
+    set_reference_dimension,
 )
+from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_hole_callout import add_native_hole_callout
 from ch_rocker_arm_tl_oblique_callouts import (
     CALLOUT_PLACES,
@@ -99,9 +104,9 @@ SHEET_SCALE = (1.0, 2.0)
 VIEW_SCALE = (1, 2)
 ISO_SCALE = part_spec.ISOMETRIC_VIEW_SCALE
 TOP_CENTER = (0.222, 0.185)
-# The HUB clamp tap is made in situ at the assembly's HUB setting, so its
-# table row is REF and its own sheet carries its callout, which says where
-# it is made. The table and its tags take a sheet of their own.
+# The HUB clamp tap is drilled and tapped at assembly, so it is not in the
+# table; its own sheet carries its callout, which says so, and its reference
+# position. The table and its tags take a sheet of their own.
 SHEET_NAMES = ("CARRIER", "HOLE TABLE", "HUB CLAMP")
 # The iso (~58 x 34 mm at 1:8) right of section A-A and its note under it,
 # both above the title block (jig-r3: the note ran into it).
@@ -220,6 +225,8 @@ STOCK_WITNESS_MAX_M = (
 # their locations as the native hole table's .XXX rows from A1
 # (IHoleTable.GetHoleLocationPrecision, read back by the table's settled
 # check) and A2/B2 Y as OUTER_Y_NOTE; no dimension of theirs reaches a sheet.
+# The HUB's only printed position is HUB CLAMP's two drawing-native
+# parenthesized references, not an imported driver.
 IMPORTED_PRECISION: dict[str, int] = {
     name: DRAWING_PRECISION_BY_NAME[name]
     for names in DRAWING_DIMENSIONS.values()
@@ -247,6 +254,17 @@ LEVER_CALLOUT_XY = (0.1815, 0.143)
 # The HUB CLAMP sheet: the HUB tap's callout up-right of it, above the plate
 # (sheet x ~237..291, y ~225..247), its leader from the tap (sheet ~222, 198).
 HUB_CALLOUT_XY = (0.264, 0.236)
+# The HUB tap is drilled and tapped at assembly (TL-00 step 10; farm 82129
+# machinist review): its callout says so, and its position from A1 prints
+# only as two parenthesized REFERENCE dimensions between the actual A1 and
+# HUB edges. Their texts are MODEL points (1:2: sheet x = 222 + X/2,
+# y = 175 + Y/2): X's line at sheet y ~182, between A1's rim (~177) and
+# A2's (~185); Y's at sheet x ~234, its HUB witness short of R2 (~241, 197).
+HUB_TAP_NOTE = "DRILL AND TAP AT ASSEMBLY\nTL-00 STEP 10"
+# No SetPrecision3: a sheet may only pass a *_spec DRAWING_REFERENCE_PRECISION
+# (_drawing_contract), and the part spec is not edited for this drawing-only
+# change, so the references print at the document's own linear places.
+HUB_REFERENCE_TEXT_MODEL_MM = {"X": _xy(-112.5, 14.0), "Y": _xy(24.0, 22.0)}
 
 part_metadata(
     precision_sources=(
@@ -456,8 +474,8 @@ for _stem, _points, _thread, _drill, _spec_name, _places, _y_places in _TAPS:
             precision={"dia": _CALLOUT_PLACES, "station": _places, "height": _y_places},
         )
 
-# The HUB clamp tap is made in situ at the assembly's HUB setting: no printed
-# station, its callout names where it is located.
+# The HUB clamp tap is drilled and tapped at assembly: no controlled station
+# (its sheet's two dimensions are parenthesized REFERENCE), its callout says so.
 requirement(
     "hub_tap_1",
     kind="hole",
@@ -473,7 +491,10 @@ requirement(
         **_tap_fields(
             *part_spec.HUB, part_spec.HUB_THREAD, part_spec.CLAMP_TAP_DRILL, "HUB_SPEC"
         ),
-        "note": (" ".join(part_spec.HUB_TAP_CALLOUT.splitlines()), ("HUB_TAP_CALLOUT",)),
+        "note": (
+            " ".join(HUB_TAP_NOTE.splitlines()),
+            (("draw_ch_rocker_arm_tl_oblique_carrier", "HUB_TAP_NOTE"),),
+        ),
     },
     precision={"dia": _CALLOUT_PLACES},
 )
@@ -1028,9 +1049,63 @@ def _pin_section(adapter: Any, source_model: Any, top: Any) -> tuple[list[Any], 
     return annotations, section
 
 
-def _hub_sheet(adapter: Any) -> None:
-    """The HUB clamp tap's own sheet: its native callout, which names where
-    it is made (in situ at the assembly's HUB setting), and no station."""
+@_telemetry.traced("drawing.carrier_hub_reference_position")
+def _hub_reference_position(adapter: Any, top: Any) -> Callable[[], None]:
+    """The HUB's position from A1 as two drawing-native dimensions between the
+    actual A1 and HUB edges, centred on both axes, parenthesized as ASME
+    REFERENCE (set_reference_dimension) at the document's places. Returns
+    their readback: the same two edges, values and parentheses after the
+    final rebuild."""
+    to_sheet = _view_mapper(adapter, top)
+
+    def edges() -> tuple[Any, Any]:
+        return (
+            _circle_edge(adapter, top, part_spec.PIN_HOLE_DIA, "A1 pin hole",
+                         center_x_mm=_A1[0], center_y_mm=_A1[1]),
+            _circle_edge(adapter, top, part_spec.CLAMP_TAP_DRILL, "HUB clamp tap",
+                         center_x_mm=part_spec.HUB[0], center_y_mm=part_spec.HUB[1]),
+        )
+
+    a1, hub = edges()
+    centres = (to_sheet(_xy(*_A1)), to_sheet(_xy(*part_spec.HUB)))
+    references = []
+    for axis, orientation, expected in (
+        ("X", "horizontal", abs(part_spec.HUB[0] - _A1[0])),
+        ("Y", "vertical", abs(part_spec.HUB[1] - _A1[1])),
+    ):
+        label = f"HUB reference {axis} from A1"
+        dimension = add_edge_dimension(
+            adapter, top, p0=centres[0], p1=centres[1],
+            text_xy=to_sheet(HUB_REFERENCE_TEXT_MODEL_MM[axis]), label=label,
+            orientation=orientation, entities=(a1, hub),
+        )
+        set_arc_endpoints_to_center(adapter, dimension, label=label)
+        display = _early_bound(dimension, "IDisplayDimension")
+        set_reference_dimension(adapter, display.GetAnnotation(), label=label)
+        _telemetry.info(f"{label}: {display.GetPrimaryPrecision2()} document places")
+        references.append((display, expected, label))
+
+    def check() -> None:
+        current = edges()
+        for display, expected, label in references:
+            model = _early_bound(display.GetDimension2(0), "IDimension")
+            if any(int(model.GetArcEndCondition(index)) != 1 for index in (1, 2)):
+                raise RuntimeError(f"{label}: both endpoints must stay on the hole axes")
+            assert_dimension_measures(
+                adapter, display, expected_mm=expected, label=label, entities=current,
+            )
+            marks = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+            if marks != ("(", ")"):
+                raise RuntimeError(f"{label} is not a REFERENCE: prefix/suffix={marks!r}")
+
+    check()
+    return check
+
+
+def _hub_sheet(adapter: Any) -> Callable[[], None]:
+    """The HUB clamp tap's own sheet: its native callout, which says it is
+    drilled and tapped at assembly, and its reference position from A1.
+    Returns the references' settled readback, run on this sheet."""
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     if not drawing.ActivateSheet(SHEET_NAMES[2]):
         raise RuntimeError("cannot activate the HUB clamp sheet")
@@ -1049,13 +1124,27 @@ def _hub_sheet(adapter: Any) -> None:
     )
     _strip_thread_class(callout, label=f"{label} callout", thread=part_spec.HUB_THREAD)
     set_callout_lengths_to_three_places(callout, label=f"{label} callout")
-    _append_callout_below(callout, part_spec.HUB_TAP_CALLOUT, label=f"{label} callout")
+    _append_callout_below(callout, HUB_TAP_NOTE, label=f"{label} callout")
+    check_references = _hub_reference_position(adapter, top)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     import_cosmetic_threads(adapter, iso)
     for view in (top, iso):
         _hide_thread_labels(adapter, view)
     if not drawing.ActivateSheet(SHEET_NAMES[0]):
         raise RuntimeError("cannot restore the carrier sheet")
+
+    @_telemetry.traced("drawing.carrier_hub_reference_position.settled")
+    def settled() -> None:
+        previous = str(_early_bound(drawing.GetCurrentSheet(), "ISheet").GetName())
+        if not drawing.ActivateSheet(SHEET_NAMES[2]):
+            raise RuntimeError("HUB clamp sheet cannot be activated for final readback")
+        try:
+            check_references()
+        finally:
+            if not drawing.ActivateSheet(previous):
+                raise RuntimeError("HUB reference readback could not restore the active sheet")
+
+    return settled
 
 
 def _hole_table_sheet(adapter: Any, source_model: Any) -> Any:
@@ -1198,7 +1287,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (top, iso):
         _hide_thread_labels(adapter, view)
     table_settled = _hole_table_sheet(adapter, source_model)
-    _hub_sheet(adapter)
+    hub_settled = _hub_sheet(adapter)
     assert_imported_precision(adapter, annotations, IMPORTED_PRECISION)
 
     def pin_controls_settled() -> None:
@@ -1210,7 +1299,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Rocker Oblique Trammel Carrier Plate Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        settled_checks=(pin_controls_settled, table_settled),
+        settled_checks=(pin_controls_settled, table_settled, hub_settled),
         expected_sheet_names=SHEET_NAMES,
     )
 

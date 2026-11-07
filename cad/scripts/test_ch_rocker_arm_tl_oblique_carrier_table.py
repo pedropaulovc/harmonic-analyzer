@@ -22,13 +22,22 @@ from _drawing_tables import insert_hole_table
 I = trammel.INCH
 
 
+TABLED = table.TABLED_HOLES
+
+
 def test_table_inventory_is_complete_and_replaces_location_dimensions():
     assert len(spec.TABLE_HOLES) == 13
     assert set(spec.TABLE_HOLES) == {
         "A1", "B1", "A2", "B2", "CL", "CR", "HUB",
         "R1", "R2", "R3", "R4", "L1", "L2",
     }
-    assert set(table.TAG_OFFSETS) == set(spec.TABLE_HOLES)
+    # Farm 82129 review: the in-situ HUB is drilled and tapped at assembly,
+    # so it is a physical source hole but never a table row or tag.
+    assert table.IN_SITU_HOLES == ("HUB",)
+    assert TABLED == {tag: hole for tag, hole in spec.TABLE_HOLES.items() if tag != "HUB"}
+    assert len(TABLED) == 12
+    assert set(table.TAG_OFFSETS) == set(TABLED)
+    assert table.COLUMNS[table.SIZE_COLUMN] == "SIZE"
     assert set(drawing.TOP_KEEP) == {
         "PlateLength", "PlateWidth", "PlateNearY", "EdgeX", "PinHoleDia",
     }
@@ -129,17 +138,37 @@ def test_local_row_band_is_functional_not_an_unconditional_pass_constant():
 
 
 class NativeCells:
+    """A generated hole table: physical rows/columns (``Total*Count``), the
+    native ``ColumnHidden``/``SetColumnHidden`` visibility, and
+    ``DisplayedText2``'s IncludeHidden index domain: with False, hidden
+    columns are skipped, so a reader in the wrong domain gets the wrong cell."""
+
     def __init__(self):
         a1x, a1y = spec.PIN_HOLES["A1"]
-        self.cells = [["TAG", "X LOC", "Y LOC", "SIZE", "NOTE"]] + [
+        self.cells = [list(table.COLUMNS)] + [
             [tag, f"{(x-a1x)/I:.3f}", f"{(y-a1y)/I:.3f}", "native size", spec.TABLE_ROW_NOTES[tag]]
-            for tag, (x, y, _dia) in spec.TABLE_HOLES.items()
+            for tag, (x, y, _dia) in TABLED.items()
         ]
-        self.RowCount = len(self.cells)
-        self.ColumnCount = 5
+        self.TotalRowCount = len(self.cells)
+        self.TotalColumnCount = len(table.COLUMNS)
+        self.hidden = {}
 
-    def DisplayedText2(self, row, col, _hidden):
-        return self.cells[row][col]
+    def _physical(self, col, include_hidden):
+        if include_hidden:
+            return col
+        return [c for c in range(self.TotalColumnCount) if not self.hidden.get(c, False)][col]
+
+    def DisplayedText2(self, row, col, include_hidden):
+        return self.cells[row][self._physical(col, include_hidden)]
+
+    def ColumnHidden(self, col):
+        return self.hidden.get(col, False)
+
+    def SetColumnHidden(self, col, hidden):
+        self.hidden[col] = hidden
+
+    def RowHidden(self, _row):
+        return False
 
 
 # The Hole Wizard cuts the exact inch drill, not _hole_spec's 3-decimal mm
@@ -241,10 +270,10 @@ def _round_away_a_place(cells):
 
 def test_native_rows_require_exact_tag_axis_and_values():
     cells = NativeCells()
-    assert set(table._rows(cells)) == set(spec.TABLE_HOLES)
+    assert set(table._rows(cells)) == set(TABLED)
     trailing = NativeCells()
     trailing.cells[2][1] += "0"  # same value: display only, accepted
-    assert set(table._rows(trailing)) == set(spec.TABLE_HOLES)
+    assert set(table._rows(trailing)) == set(TABLED)
     for mutation in ("wrong_axis", "wrong_tag", "duplicate_tag", "rounded", "empty_size", "missing"):
         bad = NativeCells()
         if mutation == "wrong_axis":
@@ -258,7 +287,7 @@ def test_native_rows_require_exact_tag_axis_and_values():
         elif mutation == "empty_size":
             bad.cells[2][3] = ""
         else:
-            bad.RowCount -= 1
+            bad.TotalRowCount -= 1
         with pytest.raises(RuntimeError):
             table._rows(bad)
 
@@ -293,12 +322,14 @@ def test_native_table_renames_default_tags_and_reattaches_the_real_edge():
     assert (source.index("origin.Reattach()") < source.index("_assign_tags(feature, table)")
             < source.index('label="carrier owner tags"') < source.index("rows = _rows(table)"))
     # NOTE text goes into each tag's row as re-read AFTER the column rebuild,
-    # every void SetText2 put is read back, and settle compares whole rows.
+    # every void SetText2 put is read back, and settle compares whole rows,
+    # all in the physical (IncludeHidden=True) column domain.
     assert (source.index('label="carrier NOTE column"')
             < source.index('_frozen_rows(table, generated, notes=None')
-            < source.index("table.SetText2(row, 4, False, note)")
-            < source.index("table.Text2(row, 4, False)")
+            < source.index("table.SetText2(row, 4, True, note)")
+            < source.index("table.Text2(row, 4, True)")
             < source.index('_frozen_rows(table, generated, notes=spec.TABLE_ROW_NOTES'))
+    assert "DisplayedText2(row, column, True)" in inspect.getsource(table._cell)
     assert "GetCorrespondingEntity2" in inspect.getsource(table._source_edges)
     assert "GetAttachedEntities3" in inspect.getsource(table._tags)
     assert "table_settled" in inspect.getsource(drawing.build)
@@ -411,10 +442,14 @@ def test_hole_table_native_calls_are_declared_on_their_bound_interfaces():
         # _hole_table_format dispatches these by name on IModelDocExtension.
         ("IModelDocExtension", "SetUserPreferenceInteger"), ("IModelDocExtension", "GetUserPreferenceInteger"),
         ("IModelDocExtension", "SetUserPreferenceToggle"), ("IModelDocExtension", "GetUserPreferenceToggle"),
+        # The hidden SIZE column: indexed BOOL get/put and row visibility.
+        ("ITableAnnotation", "ColumnHidden"), ("ITableAnnotation", "SetColumnHidden"),
+        ("ITableAnnotation", "RowHidden"),
     ):
         assert member in _native_declaration(interface)[0], f"{interface}.{member}"
     for interface, member in (
         ("ITableAnnotation", "Type"), ("IFeature", "Name"), ("IHoleTable", "EnableUpdate"),
+        ("ITableAnnotation", "TotalRowCount"), ("ITableAnnotation", "TotalColumnCount"),
     ):
         assert member in _native_declaration(interface)[1]["_prop_map_get_"], f"{interface}.{member}"
 
@@ -471,10 +506,10 @@ def test_frozen_rows_name_the_row_and_both_values(fault):
     elif fault == "moved_note":
         native.cells[1][4], native.cells[2][4] = native.cells[2][4], native.cells[1][4]
     elif fault == "columns":
-        native.ColumnCount = 4
+        native.TotalColumnCount = 4
     if fault is None:
         rows = table._frozen_rows(native, generated, notes=spec.TABLE_ROW_NOTES, stage="now")
-        assert set(rows) == set(spec.TABLE_HOLES)
+        assert set(rows) == set(TABLED)
         return
     with pytest.raises(RuntimeError) as failure:
         table._frozen_rows(native, generated, notes=spec.TABLE_ROW_NOTES, stage="now")
@@ -530,7 +565,7 @@ def test_frozen_location_cells_ignore_zero_style_only(side, style):
     else:
         generated = restyled
     assert set(table._frozen_rows(native, generated, notes=spec.TABLE_ROW_NOTES, stage="now")) \
-        == set(spec.TABLE_HOLES)
+        == set(TABLED)
 
 
 @pytest.mark.parametrize("drift", ["last_place", "sign", "rounded"])
@@ -575,8 +610,8 @@ def test_frozen_location_cells_accept_value_equal_leading_and_trailing_zeros(sid
         else:
             expected = restyled
         assert set(table._frozen_rows(table_cells, expected, notes=spec.TABLE_ROW_NOTES, stage="now")) \
-            == set(spec.TABLE_HOLES)
-        assert set(table._row_holes(table_cells).values()) == set(spec.TABLE_HOLES)
+            == set(TABLED)
+        assert set(table._row_holes(table_cells).values()) == set(TABLED)
 
 
 # A1's generated SIZE as two farm runs actually serialized it.
@@ -641,7 +676,7 @@ def test_observed_size_serializations_pass_and_real_changes_still_fail(generated
     generated["A1"] = ("A1", before, before, generated_size)
     native.cells[1][1:4] = [after, after, actual_size]
     assert set(table._frozen_rows(native, generated, notes=spec.TABLE_ROW_NOTES, stage="now")) \
-        == set(spec.TABLE_HOLES)
+        == set(TABLED)
     # Real changes on the same row still fail: size, depth, coordinate, note,
     # another hole's identity, and a missing row.
     for mutate, match in (
@@ -657,7 +692,7 @@ def test_observed_size_serializations_pass_and_real_changes_still_fail(generated
         with pytest.raises(RuntimeError, match=match):
             table._frozen_rows(bad, generated, notes=spec.TABLE_ROW_NOTES, stage="now")
     missing = NativeCells()
-    missing.RowCount -= 1
+    missing.TotalRowCount -= 1
     with pytest.raises(RuntimeError, match="row/column inventory"):
         table._frozen_rows(missing, generated, notes=spec.TABLE_ROW_NOTES, stage="now")
 
@@ -669,7 +704,7 @@ def test_freshly_inserted_note_cells_must_be_empty_before_writing():
         table._frozen_rows(native, generated, notes=None, stage="after the NOTE column")
     for row in native.cells[1:]:
         row[4] = ""
-    assert set(table._frozen_rows(native, generated, notes=None, stage="x")) == set(spec.TABLE_HOLES)
+    assert set(table._frozen_rows(native, generated, notes=None, stage="x")) == set(TABLED)
 
 
 class DefaultTagTable(NativeCells):
@@ -679,7 +714,7 @@ class DefaultTagTable(NativeCells):
         super().__init__()
         body = self.cells[1:]
         body.reverse()
-        xy_order = sorted(spec.TABLE_HOLES, key=lambda tag: spec.TABLE_HOLES[tag][:2])
+        xy_order = sorted(TABLED, key=lambda tag: TABLED[tag][:2])
         for row in body:
             row[0] = f"A{xy_order.index(row[0]) + 1}"
         self.cells[1:] = body
@@ -688,7 +723,7 @@ class DefaultTagTable(NativeCells):
     # IHoleTable.HoleTag/SetHoleTag over the same rows (``base`` 0 or 1).
     def HoleTag(self, index):
         row = index + 1 - self.base
-        if not 1 <= row < self.RowCount:
+        if not 1 <= row < self.TotalRowCount:
             raise IndexError(index)
         return self.cells[row][0]
 
@@ -707,9 +742,9 @@ def test_default_tags_are_renamed_two_phase_by_each_rows_a1_cells(base):
     assert {cells[0] for cells in native.cells[1:]} >= {"A1", "A2"}  # live collisions
     table._assign_tags(native, native)
     assert native.EnableUpdate is True
-    assert set(table._rows(native)) == set(spec.TABLE_HOLES)
-    assert len(native.writes) == 2 * len(spec.TABLE_HOLES)
-    assert all(name.startswith("TMP") for name in native.writes[:len(spec.TABLE_HOLES)])
+    assert set(table._rows(native)) == set(TABLED)
+    assert len(native.writes) == 2 * len(TABLED)
+    assert all(name.startswith("TMP") for name in native.writes[:len(TABLED)])
     # A single-phase rename would be refused by the live default tags.
     # Compare per row against the captured pre-state: a refused A1/A2 swap
     # leaves the same SET of names, just on the wrong holes.
@@ -741,11 +776,11 @@ def test_tag_assignment_refuses_unproven_rows_and_writes(monkeypatch, fault):
     assert native.EnableUpdate is True
 
 
-@pytest.mark.parametrize("fault", ["wrong_edge", "missing", "duplicate", "orphan", "dangling"])
+@pytest.mark.parametrize("fault", ["wrong_edge", "missing", "duplicate", "orphan", "hub_tag", "dangling"])
 def test_complete_view_tag_identity_refuses_every_inventory_failure(monkeypatch, fault):
     monkeypatch.setattr(table, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(table, "_point", lambda *_args: (.1, .2))
-    edges = {tag: object() for tag in spec.TABLE_HOLES}
+    edges = {tag: object() for tag in TABLED}
 
     def annotation(tag, edge, dangling=False):
         return SimpleNamespace(
@@ -767,6 +802,8 @@ def test_complete_view_tag_identity_refuses_every_inventory_failure(monkeypatch,
         annotations.append(annotations[0])
     elif fault == "orphan":
         annotations.append(annotation("Z99", object()))
+    elif fault == "hub_tag":  # the in-situ HUB is never tagged on the table sheet
+        annotations.append(annotation("HUB", object()))
     else:
         annotations[0] = annotation("A1", edges["A1"], dangling=True)
     with pytest.raises(RuntimeError):
@@ -933,10 +970,10 @@ def test_every_superseded_driver_prints_in_the_native_table_at_its_places():
     assert all(spec.DRAWING_PRECISION_BY_NAME[name] == spec.TABLE_LOCATION_PLACES for name in superseded)
     assert spec.RISER_STATION_PLACES == spec.TABLE_LOCATION_PLACES
     covered = {cell for cells in TABLE_SUPERSEDED_DRIVERS.values() for cell in cells}
-    # Complete: every located table cell but A1 (the origin), B1's Y (the
-    # A1-B1 line itself) and the REF HUB row (TL-00 locates it).
-    expected = {(tag, axis) for tag in spec.TABLE_HOLES for axis in (0, 1)} - {
-        ("A1", 0), ("A1", 1), ("B1", 1), ("HUB", 0), ("HUB", 1),
+    # Complete: every tabled location cell but A1 (the origin) and B1's Y (the
+    # A1-B1 line itself). The HUB is not tabled (drilled at assembly).
+    expected = {(tag, axis) for tag in TABLED for axis in (0, 1)} - {
+        ("A1", 0), ("A1", 1), ("B1", 1),
     }
     assert covered == expected
     assert spec.PIN_HOLES["A1"][1] == spec.PIN_HOLES["B1"][1]
@@ -985,6 +1022,7 @@ def _settled_harness(monkeypatch, *, fail_check=False):
 
     current = lambda: SimpleNamespace(GetName=lambda: state["active"])  # noqa: E731
     edges = {tag: SimpleNamespace(Select4=lambda *_: True) for tag in spec.TABLE_HOLES}
+    inserted, hidden, notes_added = {}, [], []
     annotation = SimpleNamespace(GetAttachedEntities3=lambda: (edges["A1"],), IsDangling=lambda: False)
     origin = SimpleNamespace(Reattach=lambda: True, GetAnnotation=lambda: annotation)
     feature = SimpleNamespace(
@@ -994,15 +1032,16 @@ def _settled_harness(monkeypatch, *, fail_check=False):
     )
     notes = {}
     native = SimpleNamespace(
-        HoleTable=feature, RowCount=len(spec.TABLE_HOLES) + 1, ColumnCount=5,
+        HoleTable=feature, TotalRowCount=len(TABLED) + 1, TotalColumnCount=5,
         InsertColumn2=lambda *_: True, SetColumnTitle2=lambda *_: True,
         IsCellTextEditable=lambda *_: True,
         SetText2=lambda row, _col, _hidden, text: notes.__setitem__(row, text),
         Text2=lambda row, *_: notes[row], DisplayedText2=lambda row, *_: notes[row],
         SetColumnWidth=lambda _col, width, _style: width,
+        SetColumnHidden=lambda col, state: hidden.append((col, state)),
         GetRowHeight=lambda _row: .005, GetColumnWidth=lambda col: table.TABLE_WIDTHS[col],
     )
-    rows = {tag: (row, (tag, ".000", ".000", "<MOD-DIAM>.38")) for row, tag in enumerate(spec.TABLE_HOLES, 1)}
+    rows = {tag: (row, (tag, ".000", ".000", "<MOD-DIAM>.38")) for row, tag in enumerate(TABLED, 1)}
     sheet_doc = SimpleNamespace(
         GetCurrentSheet=current, ActivateSheet=activate, ClearSelection2=lambda *_: None,
         SelectionManager=SimpleNamespace(CreateSelectData=lambda: SimpleNamespace()),
@@ -1017,15 +1056,59 @@ def _settled_harness(monkeypatch, *, fail_check=False):
     for name, value in {
         "_early_bound": lambda value, _interface: value,
         "_source_edges": lambda *_: edges, "_outer_row_source": lambda _model: None,
-        "insert_hole_table": lambda *_a, **_k: native, "_point": lambda *_: None,
+        "insert_hole_table": lambda *_a, **kw: inserted.update(kw) or native, "_point": lambda *_: None,
         "rebuild_drawing": lambda *_a, **_k: None, "_assign_tags": lambda *_: None,
         "_rows": lambda _table: rows, "_tags": lambda *_a, **_k: None,
-        "_frozen_rows": lambda *_a, **_k: rows, "add_note": lambda *_: None,
+        "_frozen_rows": lambda *_a, **_k: rows, "add_note": lambda _adapter, text, *_: notes_added.append(text),
         "add_property_linked_note": lambda *_: SimpleNamespace(GetText=lambda: spec.OUTER_Y_NOTE),
         "_owned_table": check, "_hole_table_format": lambda _adapter: None,
+        "_size_column_hidden": lambda *_: None,
     }.items():
         monkeypatch.setattr(table, name, value)
+    state.update(edges=edges, inserted=inserted, hidden=hidden, notes=notes_added)
     return state, seen, lambda: table.create_carrier_hole_table(adapter, None, None, Path("carrier.SLDPRT"))
+
+
+def test_table_selects_only_the_twelve_tabled_holes_and_hides_size(monkeypatch):
+    state, _seen, create = _settled_harness(monkeypatch)
+    create()
+    entities = state["inserted"]["hole_entities"]
+    assert len(entities) == len(state["inserted"]["hole_points"]) == 12
+    assert state["edges"]["HUB"] not in entities
+    assert {id(edge) for edge in entities} == {id(state["edges"][tag]) for tag in TABLED}
+    assert state["hidden"] == [(table.SIZE_COLUMN, True)]
+    assert table.HOLE_SIZES_NOTE in state["notes"]
+    assert not any("HUB" in text for text in state["notes"])
+    source = inspect.getsource(table.create_carrier_hole_table)
+    assert source.index("SetColumnHidden(SIZE_COLUMN, True)") < source.index(
+        '_size_column_hidden(table, "after its rebuild")'
+    )
+    assert '_size_column_hidden(table, "at settled readback")' in source
+
+
+@pytest.mark.parametrize("fault", [None, "not_hidden", "wrong_column", "not_bool", "row_hidden", "header"])
+def test_size_column_hidden_reads_back_only_size_hidden(fault):
+    native = NativeCells()
+    native.SetColumnHidden(table.SIZE_COLUMN, True)
+    # Physical reads (IncludeHidden=True) still see SIZE and NOTE in place;
+    # the visible domain would read NOTE where SIZE was.
+    assert native.DisplayedText2(1, 3, False) == native.cells[1][4]
+    assert set(table._rows(native)) == set(TABLED)
+    if fault == "not_hidden":
+        native.SetColumnHidden(table.SIZE_COLUMN, False)
+    elif fault == "wrong_column":
+        native.SetColumnHidden(4, True)
+    elif fault == "not_bool":
+        native.hidden[table.SIZE_COLUMN] = 1
+    elif fault == "row_hidden":
+        native.RowHidden = lambda row: row == 2
+    elif fault == "header":
+        native.cells[0][3] = "DRILL"
+    if fault is None:
+        table._size_column_hidden(native, "now")
+        return
+    with pytest.raises(RuntimeError, match="is not SIZE-only hidden"):
+        table._size_column_hidden(native, "now")
 
 
 @pytest.mark.parametrize("before", ["CARRIER", "HUB CLAMP"])
@@ -1044,7 +1127,7 @@ def test_settled_readback_runs_on_the_table_sheet_from_any_later_sheet(monkeypat
             < finalize.index("settled()") < finalize.index("save_drawing("))
     build = inspect.getsource(drawing.build)
     assert (build.index("_hole_table_sheet(adapter, source_model)") < build.index("_hub_sheet(adapter)")
-            < build.index("settled_checks=(pin_controls_settled, table_settled)"))
+            < build.index("settled_checks=(pin_controls_settled, table_settled, hub_settled)"))
 
 
 @pytest.mark.parametrize("fault", ["refused_table_sheet", "check_fails", "refused_restore"])
