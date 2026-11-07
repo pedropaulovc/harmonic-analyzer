@@ -34,8 +34,17 @@ def test_catalogue_row_is_the_registered_mcmaster_screw() -> None:
     assert stock.material == row["material"]
     assert row["number"] == "MHA-CH-06-TL-VN-86"
     assert row["process"] == "purchased"
-    assert "cut to fit" in row["installation_notes"]
-    assert "MHA-CH-06-TL-00 step O6" in row["installation_notes"]
+    notes = row["installation_notes"]
+    assert "CUT TO THE ACTUAL STRAP/RISER GRIP AT ASSEMBLY" in notes
+    assert "MHA-CH-06-TL-00 STEP O6" in notes
+    assert "CUT-END\nCHAMFER CONTROLS ON THIS SHEET" in notes
+    # The reflowed footer fits the purchased sheet's reserved note space
+    # (native failure: one 151-character line ran to x = .2969 m).
+    from _purchased_fastener_drawing import MAX_ITEM_CHARS, note_lines
+
+    lines = note_lines(notes, label=STEM)
+    assert 1 < len(lines) <= 3
+    assert max(len(line) for line in lines) <= MAX_ITEM_CHARS
     assert spec.SKU in row["material_specification"]
     metadata = recipe_declaration(spec.SKU, recipe.build_92220A165)
     assert metadata.module == recipe.__name__

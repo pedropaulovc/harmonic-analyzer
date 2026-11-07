@@ -30,8 +30,14 @@ UNIT = drawing_unit(f"parts/{STEM}", _config.parts("ch-rocker-arm-tl-oblique-hub
 NUMBER = _config.parts("ch-rocker-arm-tl-oblique-hub-washer")["number"]
 QUANTITY = 1
 
+# The O.D. keeps the .XXX row: the jig's holding proof charges half its
+# printed band against the owner's 1.5 mm worst-case clearance to both 3/8
+# strap-cutter flanks, and the final correlated stack leaves 1.548 mm; the
+# .XX row's extra .0635 mm radial would take it to 1.485, under the floor.
+# The sheet states that function at the size.
 OD = 11.0  # the owner's literal; prints .433
 OD_PLACES = 3
+CUTTER_CLEARANCE_MIN = 1.5  # mm, the owner's worst-case floor (holding spec)
 BORE_DRILL = "#9"
 ID = NUMBER_DRILL_MM[BORE_DRILL]  # .196
 ID_PLACES = 3
@@ -65,8 +71,15 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places for names in DRAWING_PRECISION.values() for name, places in names.items()
 }
+# The jig assembly's drawing number (ch_rocker_arm_tl_oblique_jig_assembly_spec
+# .DRAWING_NUMBER, not imported: that module imports this one).
+JIG_NUMBER = "MHA-CH-06-TL-00"
 # Rule 12: the bore says what to do; the title block's DRILLED HOLES row is
-# its band.
+# its band.  The O.D. says what its .XXX row protects (rule 4).
 DIMENSION_CALLOUTS: dict[str, str] = {
     "WasherBore": f"{BORE_DRILL} DRILL THRU",
+    "WasherOd": (
+        f"MAX KEEPS {CUTTER_CLEARANCE_MIN:.1f} MM MIN TO\n"
+        f"3/8 STRAP CUTTER SWEEP\nON JIG {JIG_NUMBER}"
+    ),
 }

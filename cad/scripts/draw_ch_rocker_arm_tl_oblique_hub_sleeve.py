@@ -1,9 +1,10 @@
 r"""Create the manufacturing drawing for the oblique-trammel hub sleeve (MHA-CH-06-TL-34).
 
 The face view carries the .4000 reamed bore with its REAM callout and mate;
-the O.D. moves onto the side view with the matched length and its
-acceptance (drawing-guidelines.md rules 4, 11 and 12).  Places and the
-bore's band are authored on the part
+the O.D. moves onto the side view with the cutter-clearance function its
+.XXX row protects, and the matched length with the riser feature it matches
+and its acceptance (drawing-guidelines.md rules 4, 11 and 12).  Places and
+the bore's band are authored on the part
 (``ch_rocker_arm_tl_oblique_hub_sleeve_spec``).
 
 Run with SolidWorks open::
@@ -32,6 +33,7 @@ from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
     move_model_dimension,
+    offset_dimension_text,
     set_dimension_callouts,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -77,16 +79,21 @@ _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0
 # Both diameters import on the face view, where every diameter line runs
 # through the centre: two would cross there.  The bore keeps the face view,
 # its three-row callout up and right of it; the O.D. is a donor there and
-# moves onto the side view, right of the sleeve.  The length and its
-# two-row matched-fit callout hang under the side view.
+# moves onto the side view, right of the sleeve, its three-row function
+# callout clear of the sleeve's edge.  The length hangs under the side view;
+# its three-row matched-fit callout is wider than the .24 span, so its text
+# leaves on a leader right of the right extension line (review r1-r3: both
+# extension lines struck it), under the O.D.'s lower extension line.
 FRONT_KEEP = {
     "SleeveOd": (0.050, 0.100),
     "SleeveBore": (0.135, 0.220),
 }
+_LENGTH_Y = RIGHT_CENTER[1] - OD / 2.0 * _S - 0.018
 RIGHT_KEEP = {
-    "SleeveLength": (RIGHT_CENTER[0], RIGHT_CENTER[1] - OD / 2.0 * _S - 0.018),
+    "SleeveLength": (RIGHT_CENTER[0], _LENGTH_Y),
 }
-OD_ON_SIDE = (RIGHT_CENTER[0] + LENGTH / 2.0 * _S + 0.030, RIGHT_CENTER[1])
+OD_ON_SIDE = (RIGHT_CENTER[0] + LENGTH / 2.0 * _S + 0.036, RIGHT_CENTER[1])
+LENGTH_TEXT_XY = (RIGHT_CENTER[0] + LENGTH / 2.0 * _S + 0.036, _LENGTH_Y - 0.008)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -153,6 +160,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # are authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    offset_dimension_text(adapter, right_annotations, {"SleeveLength": LENGTH_TEXT_XY})
 
     return await finalize_drawing(
         adapter,
