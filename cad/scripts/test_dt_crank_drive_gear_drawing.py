@@ -270,7 +270,7 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         "PRESSURE ANGLE, TRANSVERSE (REF)",
         "PITCH DIAMETER (REF)",
         "ROOT DIAMETER (REF)",
-        "FORM CUTTER / REFERENCE TEETH / VIRTUAL TEETH (REF)",
+        "FORM CUTTER:  #2, 55-134T, FOR 69.185 VIRTUAL TEETH (REF)",
         "HELIX AT PITCH DIA",
         "LEAD (in/rev, REF)",
         f"BASE TANGENT SPAN OVER {spec.BASE_TANGENT_SPAN_TEETH} TEETH, NORMAL, ACCEPT ON THIS PART",
