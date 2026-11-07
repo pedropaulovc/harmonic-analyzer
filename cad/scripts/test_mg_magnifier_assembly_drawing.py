@@ -167,22 +167,26 @@ def test_the_press_gauge_is_a_reference_accepted_at_the_nuts() -> None:
 
 def test_each_press_is_accepted_at_the_bench_with_a_slip_fit_remedy() -> None:
     """Rule 23: a press prints a bench acceptance and what a slip fit gets."""
-    for pressed, held, slip in (
-        (steps.DRUM_PRESSED_KEY, steps.DRUM_HELD_KEY, "drum-slip-fit"),
-        (steps.AXLE_PRESSED_KEY, steps.AXLE_HELD_KEY, "axle-slip-fit"),
+    for pressed, held, taken_out, remedy in (
+        (steps.DRUM_PRESSED_KEY, steps.DRUM_HELD_KEY, "drum-pulled-off", "drum-bonded"),
+        (steps.AXLE_PRESSED_KEY, steps.AXLE_HELD_KEY, "axle-pressed-out", "axle-remade"),
     ):
         number = steps.step_number(pressed)
-        assert steps.SEQUENCE[number : number + 2] == (held, slip)
+        assert steps.SEQUENCE[number : number + 3] == (held, taken_out, remedy)
         assert notes.STEP_TEXT[held].endswith("DOES NOT TURN OR SLIDE BY HAND.")
-        assert "BY HAND" in notes.STEP_TEXT[slip]
+        # One action per step (rule 22): the slip test takes the part out,
+        # the next step is the remedy.
+        assert "BY HAND" in notes.STEP_TEXT[taken_out]
+        assert notes.STEP_TEXT[taken_out].count(",") == 2
     # The axle, the cheap part, is remade; the drum is bonded rather than the
-    # wheel remade, by the one general bond note that prints with the checks.
+    # wheel remade, by the one general bond note that prints with the checks
+    # (owner ruling 2026-11-07).
     axle = notes.ITEM_NUMBERS["mg-wheel-axle"]
-    assert notes.STEP_TEXT["axle-slip-fit"].endswith(
-        f"REMAKE ITEM {axle} TO ITS PRESS SIZE AND RETURN TO STEP "
+    assert notes.STEP_TEXT["axle-remade"] == (
+        f"REMAKE THAT ITEM {axle} TO ITS PRESS SIZE AND RETURN TO STEP "
         f"{steps.step_number(steps.AXLE_PRESSED_KEY)}."
     )
-    assert notes.STEP_TEXT["drum-slip-fit"].endswith(
+    assert notes.STEP_TEXT["drum-bonded"].endswith(
         f"WITH {notes.BOND_GRADE}, {notes.BOND_NOTE_REF}."
     )
     assert notes.BOND_NOTE in notes.ASSEMBLY_CHECKS
