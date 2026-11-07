@@ -118,12 +118,12 @@ NUMERAL_FINAL_MIN_STROKE_MM3 = 0.0058
 # amplitude-bar stations through the linear READOUT table, at their own
 # +/-.002. The overall length (.XX), tick lengths and numeral layout take the
 # title block. Graduation width and both engraving depths name no mate, so
-# they are single ".nnn MIN" limits that hold the enamel fill (coordinator
-# ruling 2026-10-23). Their ceilings are stated facts, not bands (coordinator
-# ruling 2026-10-23, on codjiflo's #1905 review): the graduation width stays
-# .024 MAX on the .0559 minor pitch, so neighbouring grooves never merge and
-# the last one stays on the shortest bar; both depths leave the stated .080
-# of stock under them.
+# they are single ".nnn MIN" limits (coordinator ruling 2026-10-23); the
+# title block's finish calls for the enamel fill they hold. Their ceilings
+# are stated facts, not bands (coordinator ruling 2026-10-23, on codjiflo's
+# #1905 review): the graduation width stays .024 MAX, so neighbouring grooves
+# on the .0559 minor pitch never merge and the last one stays on the shortest
+# bar; both depths leave the stated .080 of stock under them.
 BODY_LENGTH_TOLERANCE_MM = printed_band_mm(2, unit=UNIT)
 BODY_FIT_TOLERANCE_MM = printed_band_mm(3, unit=UNIT)
 GRADUATION_POSITION_TOLERANCE_MM = 0.0508  # +/-.002
@@ -131,9 +131,7 @@ GRADUATION_FLOOR_MIN_MM = WALL_TARGET_MM
 GRADUATION_FLOOR_CALLOUT = f"STOCK UNDER GROOVE {inch_text(GRADUATION_FLOOR_MIN_MM, 3)} MIN"
 NUMERAL_FLOOR_CALLOUT = f"STOCK UNDER {inch_text(GRADUATION_FLOOR_MIN_MM, 3)} MIN"
 GRADUATION_WIDTH_MAX_MM = 0.6096  # .024
-GRADUATION_WIDTH_CALLOUT = (
-    f"{inch_text(GRADUATION_WIDTH_MAX_MM, 3)} MAX ON {inch_text(MINOR_SPACING, 4)} PITCH"
-)
+GRADUATION_WIDTH_CALLOUT = f"{inch_text(GRADUATION_WIDTH_MAX_MM, 3)} MAX"
 # swTolType_e.swTolMIN prints the nominal plus MIN: the model value is the
 # printed minimum. (lower, upper) deviations are the stored readback pair.
 MIN_LIMIT_TOL_TYPE = 5
@@ -156,6 +154,9 @@ REFERENCE_DIMENSIONS = {
     "NumeralHeightReference": ("NumeralHeight", (SCALE_START_X + TICK_WIDTH / 2.0 + NUMERAL_GAP_MM, BODY_WIDTH - TICK_LENGTH - NUMERAL_GAP_MM), (SCALE_START_X + TICK_WIDTH / 2.0 + NUMERAL_GAP_MM + NUMERAL_HEIGHT_MM, BODY_WIDTH - TICK_LENGTH - NUMERAL_GAP_MM)),
     "NumeralXGapReference": ("NumeralXGap", (SCALE_START_X + TICK_WIDTH / 2.0, BODY_WIDTH - TICK_LENGTH - NUMERAL_GAP_MM), (SCALE_START_X + TICK_WIDTH / 2.0 + NUMERAL_GAP_MM, BODY_WIDTH - TICK_LENGTH - NUMERAL_GAP_MM)),
     "NumeralYGapReference": ("NumeralYGap", (SCALE_START_X + TICK_WIDTH / 2.0 + NUMERAL_GAP_MM, BODY_WIDTH - TICK_LENGTH - NUMERAL_GAP_MM), (SCALE_START_X + TICK_WIDTH / 2.0 + NUMERAL_GAP_MM, BODY_WIDTH - TICK_LENGTH)),
+    # The 10 sits on the -X side of the last full tick (the bar ends just past
+    # it): its gap runs from the glyph's +X ink edge to that tick's -X edge.
+    "Numeral10GapReference": ("Numeral10XGap", (SCALE_START_X + SCALE_SPAN - TICK_WIDTH / 2.0 - NUMERAL_GAP_MM, BODY_WIDTH - TICK_LENGTH - NUMERAL_GAP_MM), (SCALE_START_X + SCALE_SPAN - TICK_WIDTH / 2.0, BODY_WIDTH - TICK_LENGTH - NUMERAL_GAP_MM)),
 }
 DRAWING_DIMENSIONS = {
     "BodyProfile": {"BodyLength", "BodyWidth"},
@@ -172,7 +173,7 @@ DRAWING_DIMENSIONS = {
 # Nothing on this part is .X.
 _TWO_PLACE = frozenset({
     "BodyLength", "FullTickLength", "MinorTickLength", "HalfTickLength",
-    "NumeralHeight", "NumeralXGap", "NumeralYGap",
+    "NumeralHeight", "NumeralXGap", "NumeralYGap", "Numeral10XGap",
 })
 DRAWING_PRECISION = {
     feature: {
@@ -191,20 +192,6 @@ DRAWING_TOLERANCES = {
     "FullTickPitch": GRADUATION_POSITION_TOLERANCE_MM,
     "MinorTickPitch": GRADUATION_POSITION_TOLERANCE_MM,
 }
-# The model's stroke shapes are representative; the shop's own single-stroke
-# sans font engraves the same V at the shown height and gaps.
-DRAWING_NOTES = "NUMERALS: ANY SINGLE-STROKE SANS FONT"
-NUMERAL_PLACEMENT_NOTE = (
-    "NUMERALS 0-9 RIGHT OF FULL TICKS;\n"
-    "10 LEFT OF FINAL FULL TICK.\n"
-    "BOTH USE SHOWN GAPS"
-)
-FRONT_VIEW_NOTE = "RULED FACE SCALE 1:1"
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
-# Sheet 4's G-G parent stays unturned so SolidWorks prints each G clear of
-# its arrow; the label says it reads opposite to the other ruled faces
-# (machinist review, run 20261031T082305583Z-d97607f2).
-SECTION_PARENT_VIEW_NOTE = "RULED FACE TURNED 180 DEG FROM SHEET 1"
 
 DRAWING_VALUES_BY_NAME = {
     "BodyLength": BODY_LENGTH,
