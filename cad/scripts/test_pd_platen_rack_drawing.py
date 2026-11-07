@@ -246,19 +246,18 @@ def test_purchase_and_joint_properties_do_not_prescribe_tooth_manufacture() -> N
     assert f"{feed.DIAMETRAL_PITCH:g} DP" in spec.GEAR_DATA
     assert f"{feed.PRESSURE_ANGLE_DEG:g}\N{DEGREE SIGN} PA" in spec.GEAR_DATA
     assert spec.PURCHASED_RACK_MATERIAL.upper() not in spec.GEAR_DATA.upper()
-    assert "SOFT-SOLDERED" in spec.DRAWING_NOTES
-    assert "PHASE NOT CONTROLLED" in spec.DRAWING_NOTES
-    assert "SET MESH AT ASSEMBLY" in spec.DRAWING_NOTES
-    assert sum(len(block.splitlines()) for block in (spec.GEAR_DATA, spec.DRAWING_NOTES)) <= 4
+    # The sheet's own notes: the leadered joint and flush-end requirements and
+    # one general line; no assembly instruction on the part sheet (rule 7).
+    sheet_notes = (drawing.NOTES_TEXT, drawing.SOLDER_NOTE, drawing.FLUSH_NOTE)
+    assert "MESH" not in "\n".join(sheet_notes)
     text = "\n".join(
-        (spec.PURCHASED_RACK_NOTE, spec.GEAR_DATA, spec.DRAWING_NOTES)
+        (spec.PURCHASED_RACK_NOTE, spec.GEAR_DATA, *sheet_notes)
     ).upper()
     for claim in (
         "FORM CUTTER", "RACK FORM", "135T", "STOCKED", "DROP-IN", "BRAZE",
         "WAIVER", "ACCEPTED", "EXCEPTION",
     ):
         assert claim not in text
-    assert not any(char.isdigit() for char in spec.DRAWING_NOTES)
     row = _config.parts(builder.PART_NAME)
     assert row["finish"] == "rack as purchased; backer and solder fillet cleaned"
     installation = row["installation_notes"]

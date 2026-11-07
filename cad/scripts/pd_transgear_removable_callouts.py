@@ -11,6 +11,7 @@ assemblies import.
 
 from __future__ import annotations
 
+import _config
 from pd_transgear_removable_spec import BORE_DRILL, PIN_HOLE_DRILL
 
 TEXT_PREFIX = 1  # swDimensionTextPrefix
@@ -21,28 +22,28 @@ CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 # The pins the drive-pin holes slip over are pressed into these two parts.
 CRANKSHAFT_NUMBER = "MHA-DT-11"
 KNOB_COLLAR_NUMBER = "MHA-PD-22"
+# The #25 chain the plate band serves, by its drawing number (rule 4).
+CHAIN_NUMBER = _config.parts("sh-vn-chain-link")["number"]
 
-# Each pin centre's band serves those drive pins, so each location names
-# them, in rows narrow enough to stop short of the T12 / T18 view labels.
-PIN_LOCATION_CALLOUT = (
-    f"SLIP FIT OVER\nPINS IN\n{CRANKSHAFT_NUMBER} AND\n{KNOB_COLLAR_NUMBER}"
+# Rule 7: the drive-pin pattern names its mates once, on its 2X callout, in a
+# standard fit name; each location carries only its value and band.
+PIN_HOLE_CALLOUT = (
+    f"{PIN_HOLE_DRILL[0]} DRILL THRU\nSLIDING FIT ON PINS OF\n"
+    f"{CRANKSHAFT_NUMBER} AND {KNOB_COLLAR_NUMBER}"
 )
 # The plate band serves the chain's axial float on the supplied plate; the
 # rows stand off the thickness dimension's lower arrow by leading spaces.
-PLATE_CALLOUT = "   SUPPLIED PLATE; SETS\n   ANSI #25 CHAIN FLOAT"
+PLATE_CALLOUT = f"   SUPPLIED PLATE; SETS\n   FLOAT OF CHAIN {CHAIN_NUMBER}"
 
 # lane -> (feature, dimension) -> text.  The two pin holes share one size:
 # the +Y hole's diameter prints for both, as "2X".  Both holes and the bore
 # are drilled through with the named drill: the title block's DRILLED HOLES
-# row governs their sizes.  A linear dimension's above lane does not print,
-# so the pin locations carry their mates below.
+# row governs their sizes.
 CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
     CALLOUT_ABOVE: {("BorePinsProfile", "PinPosDia"): "2X"},
     CALLOUT_BELOW: {
         ("BorePinsProfile", "BoreDiaDim"): f"{BORE_DRILL[0]} DRILL THRU",
-        ("BorePinsProfile", "PinPosDia"): f"{PIN_HOLE_DRILL[0]} DRILL THRU",
-        ("BorePinsProfile", "PinPosY"): PIN_LOCATION_CALLOUT,
-        ("BorePinsProfile", "PinNegY"): PIN_LOCATION_CALLOUT,
+        ("BorePinsProfile", "PinPosDia"): PIN_HOLE_CALLOUT,
         ("BlankProfile", "BlankWidth"): PLATE_CALLOUT,
     },
 }
