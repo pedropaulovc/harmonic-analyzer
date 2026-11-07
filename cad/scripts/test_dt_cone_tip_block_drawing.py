@@ -91,7 +91,8 @@ def test_pinch_joint_uses_entry_clearance_and_opposite_jaw_thread() -> None:
 
 
 def test_pinch_thread_callout_keeps_native_variables_but_limits_both_extents() -> None:
-    """The print must describe the remaining threaded jaw, not the pre-clearance cut."""
+    """The far jaw is tapped to the slot in the joint drill both callouts
+    name (round-8 farm review: one feature on one axis, a fit-up route)."""
     original = {
         5: "<hw-threaddesc> <hw-threadclass> <hw-thru>",
         6: "",
@@ -101,14 +102,27 @@ def test_pinch_thread_callout_keeps_native_variables_but_limits_both_extents() -
     rewritten = drawing._pinch_thread_callout_definitions(original)
     text = "\n".join(rewritten.values())
     assert "THRU ALL" not in text
-    assert text.count("TO SLOT") == 2
     assert all(token in text for token in drawing._PINCH_THREAD_NATIVE_TOKENS)
-    # Drill line, then thread line; no prose locates the far jaw.
-    assert "\n" not in rewritten[5]
-    assert "COAXIAL" not in text
-    # Rule 12 (machinist review of 04848e25c): the tap drill says DRILL.
-    assert rewritten[7] == "<MOD-DIAM> <hw-thrutapdrldia> DRILL TO SLOT"
-    assert "LEFT-JAW" not in text
+    # Two lines, each its own part; the drill line is the joint drill.
+    assert rewritten[5] == f"<hw-threaddesc> <hw-threadclass> {drawing.PINCH_TAP_EXTENT_TEXT}"
+    assert rewritten[7] == (
+        f"<MOD-DIAM> <hw-thrutapdrldia> {drawing.PINCH_JOINT_DRILL_TEXT}"
+    )
+    with pytest.raises(RuntimeError):
+        drawing._pinch_thread_callout_definitions({**original, 7: ""})
+
+
+def test_pinch_clearance_and_tap_share_one_joint_drill() -> None:
+    """Round-8 farm review (rules 4/19): the clearance's .19/1.85 and the
+    tap's carry loose bands, so both callouts name one tap-drill hole drilled
+    through both jaws, the clearance opened from it in the near jaw."""
+    spec = dt_cone_tip_block_spec
+    tap_drill = drawing.length_text(spec.PINCH_BORE_DIA, drawing.HOLE_CALLOUT_PLACES)
+    assert drawing._pinch_joint_drill_line() == (
+        f"<MOD-DIAM>{tap_drill} {drawing.PINCH_JOINT_DRILL_TEXT}"
+    )
+    # The far jaw's native tap-drill Ø prints at the same places.
+    assert drawing.THRU_TAP_DRILL_PRECISION == {"hw-thrutapdrldia": drawing.HOLE_CALLOUT_PLACES}
 
 
 def test_pinch_spacing_closes_every_print_tolerance_stack() -> None:
@@ -169,19 +183,19 @@ def test_block_stands_on_the_platform_and_keeps_every_axis_relation() -> None:
 
 
 def test_pinch_thread_readback_checks_the_thread_part_not_string_order() -> None:
-    """c6981bac (run 244bc8bb) resolved exactly this and was wrongly refused."""
+    """c6981bac (run 244bc8bb) resolved the thread part before the drill's."""
     resolved = {
-        1: "4-40 UNC - 2B TO SLOT",
+        1: f"4-40 UNC - 2B {drawing.PINCH_TAP_EXTENT_TEXT}",
         2: "",
-        3: "<MOD-DIAM> 2.26 DRILL TO SLOT",
+        3: f"<MOD-DIAM> .089 {drawing.PINCH_JOINT_DRILL_TEXT}",
         4: "",
     }
     assert drawing._pinch_thread_callout_resolved(resolved)
     assert not drawing._pinch_thread_callout_resolved(
-        {**resolved, 3: "<MOD-DIAM> 2.26 THRU ALL"}
+        {**resolved, 3: "<MOD-DIAM> .089 THRU ALL"}
     )
     assert not drawing._pinch_thread_callout_resolved(
-        {**resolved, 3: "<MOD-DIAM> 2.26 TO SLOT"}
+        {**resolved, 1: "4-40 UNC - 2B THRU ALL"}
     )
 
 
@@ -672,7 +686,7 @@ def test_pinch_clearance_print_breaks_into_the_slit_at_the_worst_case() -> None:
         floor = round(depth, 1) - _GENERAL[1]
         assert floor >= near_wall + 0.25, (floor, near_wall)
         return
-    assert drawing.PINCH_CLEARANCE_EXTENT_TEXT == "DRILL TO SLOT"
+    assert drawing.PINCH_CLEARANCE_EXTENT_TEXT.endswith("TO SLOT")
     clearance_max = spec.PINCH_CLEARANCE_DIA + _DRILLED_PLUS
     point = (clearance_max / 2.0) / math.tan(math.radians(118.0 / 2.0))
     slit_min = _printed("SlitW", spec.SLIT_W)[0]
@@ -682,20 +696,38 @@ def test_pinch_clearance_print_breaks_into_the_slit_at_the_worst_case() -> None:
 
 
 def test_pinch_clearance_callout_rewrites_the_blind_depth_to_drill_to_slot() -> None:
-    """The native blind depth pair becomes the instruction; the diameter
-    stays its Hole Wizard variable, and any other shape fails loud."""
+    """The native blind depth pair becomes the instruction under the joint
+    drill's line; the diameter stays its Hole Wizard variable, and any other
+    shape fails loud."""
     native = {5: "<MOD-DIAM><hw-diam> <HOLE-DEPTH> <hw-depth>", 6: "", 7: "", 8: ""}
     rewritten = drawing._pinch_clearance_callout_definitions(native)
-    assert rewritten == {5: "<MOD-DIAM><hw-diam> DRILL TO SLOT", 6: "", 7: "", 8: ""}
+    assert rewritten == {
+        5: (
+            f"{drawing._pinch_joint_drill_line()}\n"
+            f"<MOD-DIAM><hw-diam> {drawing.PINCH_CLEARANCE_EXTENT_TEXT}"
+        ),
+        6: "",
+        7: "",
+        8: "",
+    }
     with pytest.raises(RuntimeError):
         drawing._pinch_clearance_callout_definitions({**native, 5: "<MOD-DIAM><hw-diam>"})
     with pytest.raises(RuntimeError):
         drawing._pinch_clearance_callout_definitions({**native, 7: native[5]})
+    joint = f"<MOD-DIAM>.089 {drawing.PINCH_JOINT_DRILL_TEXT}"
+    clearance = f"<MOD-DIAM> .129 {drawing.PINCH_CLEARANCE_EXTENT_TEXT}"
     assert drawing._pinch_clearance_callout_resolved(
-        {1: "<MOD-DIAM> .129 DRILL TO SLOT", 2: "", 3: "", 4: ""}
+        {1: f"{joint}\n{clearance}", 2: "", 3: "", 4: ""}
+    )
+    # Clearance first, or no joint drill, fails.
+    assert not drawing._pinch_clearance_callout_resolved(
+        {1: f"{clearance}\n{joint}", 2: "", 3: "", 4: ""}
     )
     assert not drawing._pinch_clearance_callout_resolved(
-        {1: "<MOD-DIAM> .129 <HOLE-DEPTH> .272", 2: "", 3: "", 4: ""}
+        {1: clearance, 2: "", 3: "", 4: ""}
+    )
+    assert not drawing._pinch_clearance_callout_resolved(
+        {1: f"{joint}\n<MOD-DIAM> .129 <HOLE-DEPTH> .272", 2: "", 3: "", 4: ""}
     )
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     body = source[source.index("async def build(") :]

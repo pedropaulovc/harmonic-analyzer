@@ -450,30 +450,55 @@ VIEW_B_ARROW = (
 # it.  The shoulder's right end now stands far enough right that the leader
 # meets the rim PINCH_CLEARANCE_LEADER_ANGLE off vertical (17.4 mm past the
 # centre); it still enters through the view's top, under a millimetre
-# longer over the part than the hole's approach from the south face.  The
-# literals are PINCH_CLEARANCE_CALLOUT_EXTENT's drop (0.0030) and right
-# reach (0.0264), defined with the other callout extents below.
-PINCH_CLEARANCE_CALLOUT_Y = 0.2013
+# longer over the part than the hole's approach from the south face.
+#
+# Round 8 (fit-up route): the callout gains the joint drill's line over its
+# own and "THIS JAW " in its own.  On the round-8 render (run
+# 20261107T184300356Z) the callout glyphs printed 2.35 mm wide and its rows
+# 5.7 mm apart; SolidWorks centres a callout's lines on the commanded point.
+# The point rises half a row and slides left half the growth so the
+# shoulder's right end, where the leader leaves, keeps its place.
+CALLOUT_TEXT_GLYPH = 0.00235
+CALLOUT_TEXT_ROW = 0.0057
+_PINCH_CLEARANCE_GROWTH = 0.0196 + len("THIS JAW ") * CALLOUT_TEXT_GLYPH
+PINCH_CLEARANCE_CALLOUT_EXTENT = (
+    0.0150 + _PINCH_CLEARANCE_GROWTH / 2.0,
+    0.0030 + CALLOUT_TEXT_ROW / 2.0,
+    0.0166 + _PINCH_CLEARANCE_GROWTH / 2.0,
+    0.0023 + CALLOUT_TEXT_ROW / 2.0,
+)
+_PINCH_CLEARANCE_SHOULDER_Y = 0.2013 - 0.0030
+PINCH_CLEARANCE_CALLOUT_Y = _PINCH_CLEARANCE_SHOULDER_Y + PINCH_CLEARANCE_CALLOUT_EXTENT[1]
 PINCH_CLEARANCE_LEADER_ANGLE = math.radians(35.0)
 _PINCH_CLEARANCE_SHOULDER_DX = (
-    PINCH_CLEARANCE_CALLOUT_Y - 0.0030 - _elevation_y(PINCH_HEIGHT, RIGHT_CENTER)
+    _PINCH_CLEARANCE_SHOULDER_Y - _elevation_y(PINCH_HEIGHT, RIGHT_CENTER)
 ) * math.tan(PINCH_CLEARANCE_LEADER_ANGLE)
 PINCH_CLEARANCE_CALLOUT_XY = (
-    RIGHT_CENTER[0] + _PINCH_CLEARANCE_SHOULDER_DX - 0.0264,
+    RIGHT_CENTER[0] + _PINCH_CLEARANCE_SHOULDER_DX - PINCH_CLEARANCE_CALLOUT_EXTENT[2],
     PINCH_CLEARANCE_CALLOUT_Y,
 )
 # The pinch thread callout stands above VIEW B, its shoulder's left end left
 # of the hole so the leader drops steeply through the 2:1 view's top.  Its
-# shoulder (0.0085 under its point, PINCH_THREAD_CALLOUT_EXTENT below) stands
-# a text clearance over VIEW B's own depth value (round-1 farm review,
-# dt-fab-4), whose line and arrows run right of the hole's centre.
+# shoulder (0.0085 under its point) stands a text clearance over VIEW B's own
+# depth value (round-1 farm review, dt-fab-4), whose line and arrows run
+# right of the hole's centre.  Round 8: its longest line grows from "4-40 UNC
+# - 2B TO SLOT" to "Ø .089 DRILL THRU BOTH JAWS", six glyphs; the point slides
+# right half that so the shoulder's left end, where the leader leaves, keeps
+# its place.
+_PINCH_THREAD_GROWTH = 6 * CALLOUT_TEXT_GLYPH
+PINCH_THREAD_CALLOUT_EXTENT = (
+    0.0322 + _PINCH_THREAD_GROWTH / 2.0,
+    0.0085,
+    0.0310 + _PINCH_THREAD_GROWTH / 2.0,
+    0.0078,
+)
 PINCH_THREAD_CALLOUT_XY = (
-    LEFT_CENTER[0] + 0.015,
+    LEFT_CENTER[0] + 0.015 + _PINCH_THREAD_GROWTH / 2.0,
     VIEW_B_DIMENSIONS["ViewBPinchDepth"][1]
     + VALUE_TEXT_HALF_HEIGHT
     + TEXT_CLEARANCE
     + ROUND_OUT
-    + 0.0085,
+    + PINCH_THREAD_CALLOUT_EXTENT[1],
 )
 # The hold-down tap's callout stands above the bottom view, right of the
 # FootTapX value and under the front view's foot finish, so its leader drops
@@ -600,20 +625,10 @@ _VALUE_EXTENTS = {
     },
 }
 # Hole callouts: every line plus the shoulder the leader leaves from
-# (ADJUSTER_CALLOUT_EXTENT is with the adjuster callout's placement).
-# r3: "Ø 3.26 ↓ 6.9" measured 28.5 mm of text (I31); "Ø 2.26 TO SLOT" on
-# the same sheet 33.7 mm.  "Ø 3.26 DRILL TO SLOT" adds "DRILL " (six glyphs at
-# the 2.4 mm that line averages) to the latter: 19.6 mm over the old text,
-# split both sides of the commanded point as SolidWorks centres it.  An
-# estimate until a render measures it.
-_PINCH_CLEARANCE_TEXT_GROWTH = 0.0196
-PINCH_CLEARANCE_CALLOUT_EXTENT = (
-    0.0150 + _PINCH_CLEARANCE_TEXT_GROWTH / 2.0,
-    0.0030,
-    0.0166 + _PINCH_CLEARANCE_TEXT_GROWTH / 2.0,
-    0.0023,
-)
-PINCH_THREAD_CALLOUT_EXTENT = (0.0322, 0.0085, 0.0310, 0.0078)
+# (ADJUSTER_CALLOUT_EXTENT is with the adjuster callout's placement, the
+# pinch callouts' with theirs).  r3: "Ø 3.26 ↓ 6.9" measured 28.5 mm of text
+# (I31); "Ø 2.26 TO SLOT" on the same sheet 33.7 mm; "DRILL " added 19.6 mm,
+# the 0.0196 in the pinch clearance callout's growth.
 # The hold-down tap's lines (the tap drill and its depth, the thread and its
 # full-thread depth, then the mate its stations locate on) plus the
 # shoulder, measured on the c4c0e848a render: SolidWorks centres the block
@@ -1353,9 +1368,16 @@ def _add_view_b_pinch_dimensions(adapter: Any, view: Any, thread_edge: Any) -> N
     rebuild_drawing(adapter, label="VIEW B pinch stations")
 
 
-# Hole-callout order: drill line, then thread line.  Screen review dt-fab-4:
-# VIEW B's own driven stations locate the far-jaw thread
-# (_add_view_b_pinch_dimensions), not words.
+# Round-8 farm review (dt-fab-4, rules 4/19): the clearance and the tap are
+# one feature on one axis.  Their .19/1.85 stations stay loose; the fit-up
+# route at both callouts holds the axes together: one Ø tap-drill hole drilled
+# through both jaws in one pass, the near jaw opened to clearance up to the
+# slot, the far jaw tapped up to the slot.  Both callouts name the joint
+# drill by the same words, and each keeps to two lines (rule 7).
+PINCH_JOINT_DRILL_TEXT = "DRILL THRU BOTH JAWS"
+PINCH_TAP_EXTENT_TEXT = "TAP TO SLOT"
+# Hole-callout order: drill line, then thread line.  VIEW B's own driven
+# stations locate the far-jaw thread (_add_view_b_pinch_dimensions).
 _PINCH_THREAD_NATIVE_TOKENS = frozenset(
     {"<hw-thrutapdrldia>", "<hw-threaddesc>", "<hw-threadclass>"}
 )
@@ -1376,11 +1398,14 @@ def _pinch_thread_callout_definitions(
             "unexpected native pinch-thread callout definition: "
             f"missing={sorted(missing)!r}, definitions={definitions!r}"
         )
-    # The tap drill's line says DRILL as the clearance hole's does (rule 12,
-    # machinist review of 04848e25c); the thread's TO SLOT stands bare.
+    # The tap drill's line is the joint drill both callouts name; the
+    # thread's line says TAP (rule 12).
     updated = {
         part: text.replace(
-            "<hw-thru>", "TO SLOT" if "<hw-threadclass>" in text else "DRILL TO SLOT"
+            "<hw-thru>",
+            PINCH_TAP_EXTENT_TEXT
+            if "<hw-threadclass>" in text
+            else PINCH_JOINT_DRILL_TEXT,
         )
         for part, text in definitions.items()
     }
@@ -1390,7 +1415,9 @@ def _pinch_thread_callout_definitions(
     rewritten = "\n".join(updated.values())
     if (
         "THRU ALL" in rewritten
-        or rewritten.count("TO SLOT") != 2
+        or "<hw-thru>" in rewritten
+        or rewritten.count(PINCH_TAP_EXTENT_TEXT) != 1
+        or rewritten.count(PINCH_JOINT_DRILL_TEXT) != 1
         or any(token not in rewritten for token in _PINCH_THREAD_NATIVE_TOKENS)
     ):
         raise RuntimeError(f"pinch-thread callout rewrite lost semantics: {updated!r}")
@@ -1399,13 +1426,23 @@ def _pinch_thread_callout_definitions(
 
 # r3 blocker: the near jaw is drilled full diameter until it opens into the
 # slit, so the native blind depth ("<HOLE-DEPTH> <hw-depth>") becomes the
-# instruction; the diameter stays the Hole Wizard variable.
-PINCH_CLEARANCE_EXTENT_TEXT = "DRILL TO SLOT"
+# instruction; the diameter stays the Hole Wizard variable.  Round 8: the
+# joint drill's line stands over it, its Ø the tap drill's (the clearance
+# hole's Hole Wizard has no tap-drill variable, so it prints from the spec).
+PINCH_CLEARANCE_EXTENT_TEXT = "DRILL THIS JAW TO SLOT"
 _BLIND_DEPTH_TOKENS = re.compile(r"<HOLE-DEPTH>\s*<hw-depth>")
 
 
+def _pinch_joint_drill_line() -> str:
+    return (
+        f"<MOD-DIAM>{length_text(PINCH_BORE_DIA, HOLE_CALLOUT_PLACES)} "
+        f"{PINCH_JOINT_DRILL_TEXT}"
+    )
+
+
 def _pinch_clearance_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    """Swap the one native blind-depth pair for DRILL TO SLOT, loudly."""
+    """Put the joint drill over the clearance line and swap the one native
+    blind-depth pair for DRILL THIS JAW TO SLOT, loudly."""
     if set(definitions) != {5, 6, 7, 8}:
         raise RuntimeError(f"unexpected pinch clearance callout parts: {definitions!r}")
     hits = {
@@ -1416,7 +1453,12 @@ def _pinch_clearance_callout_definitions(definitions: dict[int, str]) -> dict[in
             f"pinch clearance callout has no single blind depth to replace: {definitions!r}"
         )
     updated = {
-        part: _BLIND_DEPTH_TOKENS.sub(PINCH_CLEARANCE_EXTENT_TEXT, text)
+        part: (
+            f"{_pinch_joint_drill_line()}\n"
+            f"{_BLIND_DEPTH_TOKENS.sub(PINCH_CLEARANCE_EXTENT_TEXT, text)}"
+            if hits[part]
+            else text
+        )
         for part, text in definitions.items()
     }
     rewritten = "\n".join(updated.values())
@@ -1426,16 +1468,22 @@ def _pinch_clearance_callout_definitions(definitions: dict[int, str]) -> dict[in
 
 
 def _pinch_clearance_callout_resolved(resolved_parts: dict[int, str]) -> bool:
-    joined = "\n".join(resolved_parts.values())
-    return (
-        joined.count(PINCH_CLEARANCE_EXTENT_TEXT) == 1
-        and "<HOLE-DEPTH>" not in joined
-        and length_text(PINCH_CLEARANCE_DIA, HOLE_CALLOUT_PLACES) in joined
+    """The joint drill's line, then the clearance line, in one part."""
+    joint = f"{length_text(PINCH_BORE_DIA, HOLE_CALLOUT_PLACES)} {PINCH_JOINT_DRILL_TEXT}"
+    clearance = (
+        f"{length_text(PINCH_CLEARANCE_DIA, HOLE_CALLOUT_PLACES)} "
+        f"{PINCH_CLEARANCE_EXTENT_TEXT}"
     )
+    parts = [text for text in resolved_parts.values() if text.strip()]
+    if len(parts) != 1 or "<HOLE-DEPTH>" in parts[0]:
+        return False
+    lines = [line.rstrip() for line in parts[0].strip().split("\n")]
+    return len(lines) == 2 and lines[0].endswith(joint) and lines[1].endswith(clearance)
 
 
 def _set_pinch_clearance_callout_text(display: Any) -> None:
-    """State DRILL TO SLOT without severing the diameter's Hole Wizard variable."""
+    """State the joint drill and the clearance extent without severing the
+    diameter's Hole Wizard variable."""
     definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
     updated = _pinch_clearance_callout_definitions(definitions)
     for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
@@ -1445,13 +1493,13 @@ def _set_pinch_clearance_callout_text(display: Any) -> None:
     resolved_parts = {part: str(display.GetText(part) or "") for part in (1, 2, 3, 4)}
     if persisted != updated or not _pinch_clearance_callout_resolved(resolved_parts):
         raise RuntimeError(
-            "pinch clearance DRILL TO SLOT did not persist: "
+            "pinch clearance fit-up lines did not persist: "
             f"definitions={persisted!r}, resolved={resolved_parts!r}"
         )
 
 
 def _pinch_thread_callout_resolved(resolved_parts: dict[int, str]) -> bool:
-    """Whether the resolved callout keeps both extents on their own lines.
+    """Whether the resolved callout keeps the joint drill and the tap extent.
 
     GetText(1..4) resolves definition parts 5..8 in part order, which is not
     the sheet's line order: af561fa7 printed part 7 (the tap drill) above
@@ -1462,11 +1510,12 @@ def _pinch_thread_callout_resolved(resolved_parts: dict[int, str]) -> bool:
     drill = [text for text in resolved_parts.values() if text.strip() and "UNC" not in text]
     return (
         "THRU ALL" not in joined
-        and joined.count("TO SLOT") == 2
         and len(thread) == 1
-        and thread[0].rstrip().endswith("TO SLOT")
+        and thread[0].rstrip().endswith(PINCH_TAP_EXTENT_TEXT)
         and len(drill) == 1
-        and drill[0].rstrip().endswith("DRILL TO SLOT")
+        and drill[0].rstrip().endswith(
+            f"{length_text(PINCH_BORE_DIA, HOLE_CALLOUT_PLACES)} {PINCH_JOINT_DRILL_TEXT}"
+        )
     )
 
 
