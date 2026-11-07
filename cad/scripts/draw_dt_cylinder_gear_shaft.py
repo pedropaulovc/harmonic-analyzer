@@ -43,13 +43,13 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from cylinder_bank_layout import ARBOR_DOME_HEIGHT, ARBOR_LENGTH
+from dt_cylinder_gear_shaft_notes import SHAFT_DIA_CALLOUT
 from dt_cylinder_gear_shaft_spec import (
     DOME_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     LENGTH_CALLOUT,
     SHAFT_DIA,
-    SHAFT_DIA_CALLOUT,
     SHAFT_RADIUS,
     SURFACE_FINISHES,
 )

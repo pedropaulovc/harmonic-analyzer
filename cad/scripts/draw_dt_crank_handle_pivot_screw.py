@@ -65,13 +65,18 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+from dt_crank_handle_pivot_screw_notes import (
+    HEAD_DIA_CALLOUT,
+    HEAD_LENGTH_CALLOUT,
+    SHOULDER_FIT_CALLOUT,
+    SHOULDER_LENGTH_CALLOUT,
+    SHOULDER_LENGTH_NOTE,
+)
 from dt_crank_handle_pivot_screw_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     HEAD_DIA,
-    HEAD_DIA_CALLOUT,
     HEAD_LENGTH,
-    HEAD_LENGTH_CALLOUT,
     OVERALL_LENGTH,
     REFERENCE_DIMENSIONS,
     RELIEF_CALLOUT,
@@ -82,9 +87,6 @@ from dt_crank_handle_pivot_screw_spec import (
     SEAT_EDGE_NOTE,
     SEAT_STATION,
     SHOULDER_DIA,
-    SHOULDER_FIT_CALLOUT,
-    SHOULDER_LENGTH_CALLOUT,
-    SHOULDER_LENGTH_NOTE,
     SURFACE_FINISHES,
     THREAD_CALLOUT,
     THREAD_MODEL_DIA,

@@ -13,11 +13,11 @@ No datums, no feature control frames, no roughness symbol: a custom pinion
 pinned to its crankshaft is not on the GD&T allowlist, and its pinned bore
 neither runs, slides nor locates (drawing-guidelines.md rule 5 (avoid
 excessive GD&T) and rule 6 (roughness symbols only where a surface runs,
-slides or locates)). The bore's native limits and feature callout jointly
-identify its mating crankshaft and required diametral clearance. The decimal
-places are the PART's (``crank_pinion_spec.DRAWING_PRECISION``, applied
-natively by ``build_crank_pinion``); this script only reads them back off the
-sheet.
+slides or locates)). The bore's native limits and REAM callout link the
+numbered note naming its mating crankshaft, standard fit and clearance. The
+decimal places are the PART's (``crank_pinion_spec.DRAWING_PRECISION``,
+applied natively by ``build_crank_pinion``); this script only reads them back
+off the sheet.
 
 Drawn 3:1: the longitudinal section and its diameter/length dimensions
 clear the end view and isometric at this common sheet scale. The sheet
@@ -55,12 +55,6 @@ from _drawing_dimensions import (
     set_reference_dimensions,
 )
 from _drawing_layout_collect import check_drawing_layout
-from _drawing_leader_notes import add_leader_note
-from _drawing_leaders import (
-    assert_leaders_clear,
-    leader_segments,
-    section_line_segments,
-)
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
@@ -70,23 +64,24 @@ from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+from dt_crank_pinion_notes import (
+    BORE_FIT_NOTE_NUMBER,
+    MESH_NOTE_NUMBER,
+    PIN_HOLE_CALLOUT,
+    TURNED_DIA_NOTE_NUMBER,
+)
 from dt_crank_pinion_spec import (
-    BORE_DIA,
-    BORE_FIT_CALLOUT,
     BORE_PROCESS_CALLOUT,
     BOSS_DIA,
-    CONE_GEAR_NUMBER,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
     MESH_GEAR_NUMBER,
     OUTSIDE_DIA,
     OVERALL_LENGTH,
-    PIN_HOLE_PROCESS,
     SHOULDER_LENGTH,
     SHOULDER_RADIUS,
     SHOULDER_RADIUS_TOL_TYPE,
-    TURNED_DIA_FITUP_CALLOUT,
 )
 
 
@@ -171,19 +166,26 @@ def _position_section_caption(
     view: Any,
     target: tuple[float, float],
 ) -> None:
-    """Move the native linked section caption clear of the length dimensions."""
+    """Drop the A-A caption's scale and move it clear of the length dimensions.
+
+    The section is drawn at the sheet's 3:1, so the caption keeps only its
+    native name and letter fields (drawing-guidelines.md rule 9: a scale
+    equal to the sheet's restates the title block), as
+    draw_dt_cone_pivot_post captions its A-A.
+    """
     bound_view = _early_bound(view, "IView")
     candidates = []
     for raw_note in bound_view.GetNotes() or ():
         note = _early_bound(raw_note, "INote")
         linked_text = str(note.PropertyLinkedText or "")
-        if all(token in linked_text for token in ("<VLNAME>", "<VLLABEL>", "<VLSCALEV>")):
-            candidates.append((note, linked_text))
+        if all(token in linked_text for token in ("<VLNAME>", "<VLLABEL>")):
+            candidates.append(note)
     if len(candidates) != 1:
         raise RuntimeError(
             f"expected one native linked section caption, found {len(candidates)}"
         )
-    note, linked_text = candidates[0]
+    note = candidates[0]
+    note.PropertyLinkedText = SECTION_CAPTION_TEXT
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     if not annotation.SetPosition2(*target, 0.0):
         raise RuntimeError("failed to position crank-pinion section caption")
@@ -191,8 +193,8 @@ def _position_section_caption(
     position = tuple(float(value) for value in annotation.GetPosition())
     if math.dist(position[:2], target) > 1e-6:
         raise RuntimeError("crank-pinion section caption position did not persist")
-    if str(note.PropertyLinkedText or "") != linked_text:
-        raise RuntimeError("crank-pinion section caption lost its native fields")
+    if str(note.PropertyLinkedText or "") != SECTION_CAPTION_TEXT:
+        raise RuntimeError("crank-pinion section caption did not keep name-and-letter fields only")
 
 
 
@@ -205,12 +207,13 @@ FRONT_KEEP: dict[str, tuple[float, float]] = {}
 # toothed face's side, stepped so no dimension line runs through another's
 # text: the bore lowest and the tip diameter next, both outside the faced
 # end with their text to the left, and the turned band's highest, its line
-# rising inside the band past both. Each diameter's reason rides its own
-# callout (machinist review r1 of #1652). The lengths stand on the LOWER
-# outline's witnesses, baseline-stacked below the view from the toothed
-# south face, shortest innermost (drawing-guidelines.md rule 11 (turned parts
-# read like the lathe): one origin per view, baseline not chained); the
-# banded two carry their stack callouts, so their text stands outside their
+# rising inside the band past both. Each diameter links the numbered note
+# that names its mate (machinist review r1 of #1652; drawing-guidelines.md
+# rule 4: a mate serving several features is named once). The lengths stand
+# on the LOWER outline's witnesses, baseline-stacked below the view from the
+# toothed south face, shortest innermost (drawing-guidelines.md rule 11
+# (turned parts read like the lathe): one origin per view, baseline not
+# chained); the banded two link note 1, so their text stands outside their
 # spans, where the callout lines clear every extension line: the shoulder's
 # left of the faced end, below the end view's lower A, the face width's right
 # of the boss end, so neither block's lines run through the other's limits
@@ -266,10 +269,16 @@ SHOULDER_RADIUS_OVERRUN = 0.00174
 RADIUS_SHOULDER_DROP = SHOULDER_RADIUS_ROWS * 0.0027781
 # The pin hole's reference diameter runs from the hole's centre to the left
 # end of its callout's underline, 55.4 mm left of the keep (88d48ad2a7b4
-# audit: keep x 0.275, line to x 0.2196 at y 0.2322).
+# audit: keep x 0.275, line to x 0.2196 at y 0.2322), under the block's last
+# row: half its 5.56 mm rows under the keep (the four-row block of that audit
+# read 11.1 mm). The callout's widest row is as wide as that audit's.
 PIN_HOLE_LINE_RUN_IN = 0.0554
+PIN_HOLE_ROWS = 1 + len(PIN_HOLE_CALLOUT.splitlines())
+PIN_HOLE_UNDERLINE_DROP = PIN_HOLE_ROWS * 0.0027781
 RIGHT_KEEP = {
-    "BoreDia": (_side_x(0.0) - 0.0095, _SIDE_TOP + 0.012),
+    # Two mm lower than the one-row callout's keep: the REAM row's link
+    # grows the block by a row, which stays clear of the tip diameter's.
+    "BoreDia": (_side_x(0.0) - 0.0095, _SIDE_TOP + 0.010),
     "OutsideDia": (_side_x(0.0) - 0.003, _SIDE_TOP + 0.027),
     "TurnedDia": (_side_x(SHOULDER_LENGTH + 1.5), _TOP_ROW_Y),
     "BossDia": (BOSS_DIA_TEXT_X, RIGHT_CENTER[1]),
@@ -287,8 +296,11 @@ RIGHT_KEEP = {
 }
 # The caption's top centre: under the section, its top 3 mm below the overall
 # length's extension-line ends (74.9 mm on run 7), its right edge (centre +
-# 22.6 mm) 3.4 mm left of the title block (x 216 mm).
+# 22.6 mm) 3.4 mm left of the title block (x 216 mm). It reads SECTION A-A
+# alone (_position_section_caption).
 SECTION_CAPTION_XY = (0.190, 0.072)
+# The native caption's fields: name and letter only, no scale compartment.
+SECTION_CAPTION_TEXT = "<VLNAME> <VLLABEL>"
 DIMENSION_TEXT_LINE_GAP = 0.0005
 # The boss diameter's text is centred on its dimension line; it read 13.1 mm
 # wide on the f0c105531 render. Its right edge plus a clearance bounds where
@@ -296,24 +308,21 @@ DIMENSION_TEXT_LINE_GAP = 0.0005
 BOSS_DIA_TEXT_HALF_WIDTH = 0.0075
 ISO_TEXT_CLEARANCE = 0.003
 
-# The stack each banded length sets: its short limit keeps full tips in the
-# 64T mesh, its long one the T120 clearance (build_dt_drive_train_assembly
-# proves both at these bands).
-_LENGTH_STACK_CALLOUT = "\n".join(
-    (f"{MESH_GEAR_NUMBER} MESH,", f"{CONE_GEAR_NUMBER} T120 CLR")
-)
+# Each band's mate and reason prints once, in a numbered note the dimension
+# links (dt_crank_pinion_notes.DRAWING_NOTES; drawing-guidelines.md rules 4 and
+# 7): the tip diameter and the two banded lengths serve the 64T mesh and the
+# 120T cone gear's clearance (note 1), the turned band its supply and
+# fitted-at-assembly sizes (note 2), the reamed bore its fit on the
+# crankshaft (note 3) and the pin hole its pin's fit (note 4).
 DIMENSION_CALLOUTS = {
-    # The native value/limits define the bore; this short feature callout adds
-    # the process and extent without tangling its native diameter leaders.
-    "BoreDia": BORE_PROCESS_CALLOUT,
-    # The tip diameter's band is the 64T mesh's tip-to-root air.
-    "OutsideDia": f"{MESH_GEAR_NUMBER} MESH",
-    "TurnedDia": TURNED_DIA_FITUP_CALLOUT,
-    "ShoulderLength": _LENGTH_STACK_CALLOUT,
-    "FaceWidth": _LENGTH_STACK_CALLOUT,
+    "BoreDia": f"{BORE_PROCESS_CALLOUT}\nSEE NOTE {BORE_FIT_NOTE_NUMBER}",
+    "OutsideDia": f"SEE NOTE {MESH_NOTE_NUMBER}",
+    "TurnedDia": f"SEE NOTE {TURNED_DIA_NOTE_NUMBER}",
+    "ShoulderLength": f"SEE NOTE {MESH_NOTE_NUMBER}",
+    "FaceWidth": f"SEE NOTE {MESH_NOTE_NUMBER}",
     # Reamed to the pin, so the size is a reference; the words carry the
-    # operation, the mate, the pin, the fit's acceptance and flush.
-    "PinHoleDia": PIN_HOLE_PROCESS,
+    # operation and its mate, and link the pin's fit.
+    "PinHoleDia": PIN_HOLE_CALLOUT,
     # The shoulder's R MAX is tighter than the title block's inside corners
     # for the 64T's tip clearance over the corner.
     "ShoulderRadius": SHOULDER_RADIUS_CALLOUT,
@@ -438,38 +447,10 @@ def _isometric_clears_boss_dia(iso: Any) -> None:
         )
 
 SHEET_INNER_BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
-_BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / 2000.0
-_BORE_GAP_ANGLE_RAD = math.radians(168.75)
-BORE_FIT_NOTE = (0.016, 0.174)
-BORE_FIT_ATTACH = (
-    FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(_BORE_GAP_ANGLE_RAD),
-    FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(_BORE_GAP_ANGLE_RAD),
-)
-# Where each stroke must END, from the bore centre (sheet metres): the bore
-# leader on the rim; the cutting line at its ends past the tooth tips. A
-# reading outside the band means the strokes are not sheet metres.
-BORE_LANDING = (0.5 * _BORE_SHEET_RADIUS, 1.5 * _BORE_SHEET_RADIUS)
-SECTION_LINE_LANDING = (0.0, HALF_OD + 0.010)
-# Below the length stack, clear of its stack callouts and the title block.
-MANUFACTURING_NOTES_XY = (0.016, 0.076)
-
-
-def _bore_leader_clears_section_line(adapter: Any, front: Any, bore_fit: Any) -> None:
-    """Fail when the bore leader crosses or runs along the A-A cutting line."""
-    rebuild_drawing(adapter, label="bore leader vs section line")
-    assert_leaders_clear(
-        {
-            "BoreFit": leader_segments(_early_bound(bore_fit, "INote").GetAnnotation()),
-            "SectionLine": section_line_segments(adapter, front),
-        },
-        centre=FRONT_CENTER,
-        keep_out={},
-        lands_within={
-            "BoreFit": BORE_LANDING,
-            "SectionLine": SECTION_LINE_LANDING,
-        },
-        label="crank pinion end view",
-    )
+# The numbered notes' top-left corner: under the section caption (one row,
+# top 0.072) and the length stack, left of the title block (x 0.216), so the
+# block's 2.5 mm rows run the full width to the title block.
+MANUFACTURING_NOTES_XY = (0.016, 0.060)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -572,19 +553,6 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         label="crank pinion axis",
     )
-    # Put the fit note immediately left of the end view and send its short
-    # leader radially through the upper-left tooth gap to the visible bore.
-    # The native section-view diameter remains beside its axial extent (drawing-guidelines.md rule 11 (turned parts read like the lathe)).
-    bore_fit = add_leader_note(
-        adapter,
-        BORE_FIT_CALLOUT,
-        text_xy=BORE_FIT_NOTE,
-        attach_xy=BORE_FIT_ATTACH,
-        label="crank pinion bore fit",
-        view=front,
-        height=0.0022,
-    )
-    _bore_leader_clears_section_line(adapter, front, bore_fit)
 
     add_property_linked_note(adapter, "Gear Data", 0.016, 0.258, char_height=0.0025)
     add_property_linked_note(

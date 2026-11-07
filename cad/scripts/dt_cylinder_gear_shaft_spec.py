@@ -42,16 +42,8 @@ DOME_CALLOUT = "BOTH ENDS"
 # drawing-guidelines.md rule 4 (tighten only for function, and name the mate):
 # the O.D. band exists for the 20 MHA-DT-12 gears that run on it (their
 # bores are matched to this finished bar) and the two MHA-DT-02 strap bores
-# it fills, so the callout names both at the dimension.  Its band is narrower
-# than the shop's turned-diameter row, so the callout also names the fit
-# route, purchased ground stock, at the feature (fan-out screen
-# 20261107T081227004Z: the route sat in an unlinked general note).
-SHAFT_DIA_CALLOUT = "RUNNING FIT IN MHA-DT-12 AND MHA-DT-02 BORES\n3/8 GROUND STOCK OK"
-# The cup-point set screws that make the spots, by drawing number, and the
-# taps they are drilled through (fan-out screen: "SET-SCREW SPOTS" named no
-# mate).
-SET_SCREW_NUMBER = "MHA-SH-VN-54"
-PEDESTAL_NUMBER = "MHA-DT-02"
+# it fills, so the callout names both at the dimension.
+SHAFT_DIA_CALLOUT = "RUNNING FIT IN MHA-DT-12 AND MHA-DT-02 BORES"
 ARBOR_BEARING_PROBE_Y_MM = 10.0
 
 # The arbor is one plain cylinder extruded +Y from the origin (y 0..ARBOR_LENGTH,
@@ -118,22 +110,22 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
 # Three part-specific facts a machinist cannot read off the views (policy
-# drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).  The
-# ground-stock route rides the O.D. callout (SHAFT_DIA_CALLOUT); a 6.5:.375
-# slender bar is turned between centres -- saying the centre holes may stay
-# saves a phone call (each dome is turned on its centre, which may stay).
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method)). The O.D. IS a catalog stock size, so the .0008 in running band is a
+# stock buy rather than a grind between centres, and a 6.5:.375 slender bar is
+# turned between centres -- saying the centre holes may stay saves a phone
+# call (each dome is turned on its centre, which may stay).
 # The length is cut at assembly, so the shop supplies the bar long (7-1/2 in
 # stock covers the nominal span plus both domes and facing stock) and the
 # domes are turned on the cut ends (r1 machinist review: nothing tied the end
 # form to the cut-to-fit). The set screws' cup points bear in spots drilled
 # through the pedestal taps at assembly (#743), so the bar itself is never
-# flatted: a match-drill at assembly with its mates, a requirement (rule 7).
+# flatted.
 DRAWING_NOTES = "\n".join(
     (
+        "3/8 GROUND STOCK OK.",
         "CENTRES OK.",
         "SUPPLY 7-1/2 LONG, UNCUT; CUT AND DOME BOTH ENDS AT ASSEMBLY.",
-        f"NO FLATS; SPOTS FOR {SET_SCREW_NUMBER} SET SCREWS DRILLED AT ASSEMBLY",
-        f"THROUGH {PEDESTAL_NUMBER} TAPS.",
+        "NO FLATS; SET-SCREW SPOTS ARE DRILLED AT ASSEMBLY.",
     )
 )
 # The title block declares 1:1, so the off-scale pictorial must say so
