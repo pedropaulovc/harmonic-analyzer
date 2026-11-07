@@ -121,9 +121,10 @@ VIEW_A_ARROW = (
 # Numbered notes (rule 7): each callout links its note by SEE NOTE n, so the
 # callouts stay within two lines of words. Note 1 is the OD's matched fit
 # (rule 4: both mates by name and number, and the acceptance); note 2 the
-# cut length's fit-up at assembly (rule 19), at the plain lower end so the
-# trim never takes the top end's chamfer (local repeat review of run
-# 20261107T102146937Z: which end is cut, and is the lower end chamfered?).
+# cut length's fit-up at assembly (rule 19), naming the end MHA-FR-00 step 4
+# trims -- the top -- and the chamfer finished on it afterwards (local repeat
+# review of run 20261107T102146937Z: which end is cut, and may the trim take
+# the one chamfer?).
 _BASE_ROW = _config.parts("fr-harmonic-base")
 _TOP_ROW = _config.parts("fr-top-frame")
 OD_FIT_NOTE_NUMBER = 1
@@ -136,8 +137,9 @@ NOTES = "\n".join(
         f"{str(_BASE_ROW['title']).upper()} AND",
         f"    {_TOP_ROW['number']} TOP FRAME SOCKETS ARE FITTED TO THIS TUBE;",
         "    IT SLIDES IN BY HAND, NO PERCEPTIBLE ROCK.",
-        f"{LENGTH_FIT_NOTE_NUMBER}. CUT LOWER END TO FIT AT ASSEMBLY TO THE {_BASE_ROW['number']} /",
-        f"    {_TOP_ROW['number']} / {_config.parts('fr-vn-tube-frame-cap')['number']} STACK.",
+        f"{LENGTH_FIT_NOTE_NUMBER}. CUT TOP END TO FIT AT ASSEMBLY TO THE {_BASE_ROW['number']} /",
+        f"    {_TOP_ROW['number']} / {_config.parts('fr-vn-tube-frame-cap')['number']} STACK,"
+        " THEN CHAMFER IT AS CALLED OUT.",
     )
 )
 # Upper-left of the note block: under the length view and the cross-hole
