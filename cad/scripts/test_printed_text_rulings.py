@@ -142,7 +142,7 @@ def test_the_internal_reference_pattern_catches_what_it_forbids() -> None:
 
 def test_the_scan_reaches_known_printed_text() -> None:
     constants = printed_constants()
-    assert "sm_knife_mount_spec.PIN_HOLE_CALLOUT" in constants
+    assert "draw_sm_knife_mount.PIN_HOLE_CALLOUT" in constants
     assert "draw_dt_drive_train_assembly.CHECKS" in constants
     assert "sm-knife-mount.material_specification" in printed_registry_fields()
 

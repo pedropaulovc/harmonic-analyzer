@@ -110,14 +110,16 @@ BLOCK_HEIGHT_PRINTED = BLK_TOP - BLK_BOT  # 29.718, 1.17 exactly
 # Manufacturing GD&T limits consumed by the part's drawing projection.  Owner
 # ruling 2026-10-24 (T+H3): the datum reference frame is A (the top seat), B
 # (the MHA-SM-VN-53 round slip hole, +X) and C (the dowel slot open to the -X
-# face, its width positioned to A|B, the crossbar's former slot frame).
+# face, its width positioned to A|B, the crossbar's former slot frame).  The
+# slot's position and both perpendicularities stand at their shop rows
+# (delegated rulings sm Q1, Q2, 2026-11-07 (Main), no precedent; owner
+# review #2144; pending owner confirmation).
 GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
     "knife-bore position": ".008",
     "knife-bore orientation": ".002",
-    "knife-hanger tap position": ".005",
-    "dowel slot position": ".002",
-    "dowel hole perpendicularity": ".0006",
-    "dowel slot perpendicularity": ".0006",
+    "dowel slot position": ".004",
+    "dowel hole perpendicularity": ".001",
+    "dowel slot perpendicularity": ".001",
 }
 GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
     key: float(value) * DOWEL.MM_PER_IN
@@ -138,33 +140,24 @@ GEOMETRIC_TOLERANCES_MM: dict[str, float] = {
 # the dowel pattern, and ⊥|C would take the yaw from the slot's short walls.
 KNIFE_BORE_POSITION_TOL = GEOMETRIC_TOLERANCES_MM["knife-bore position"]
 KNIFE_BORE_ORIENTATION_TOL = GEOMETRIC_TOLERANCES_MM["knife-bore orientation"]
-# The #10-24 tap's position to A|B|C: the bolt axis the crossbar's #10
-# clearance hole must float round (``build_sm_summing_assembly``'s knife-hanger
-# stack).  Its zone radius is one term of HANGER_SCREW_MISMATCH inside
-# the hole's 0.6095 radial float with the drill drift's 0.192 over the
-# printed grip's thickest 36.627.  Ø.005 keeps 0.020 of that float spare
-# (the stack closes at Ø0.155 mm, so Ø.006 = 0.1524 would fit with 0.0018;
-# B's simulator may stand t/2 off
-# the pin root under its ⊥ to A).  A screw through a clearance hole needs no
-# tighter zone than that float admits (drawing-guidelines.md rule 5); plain
-# face dimensions instead, even at .XXX (+/-.005 each way, not .0025), spend
-# the float: the frame is functional.
-# The zone is unprojected (owner ruling 2026-10-27, #2018: accepted as is).
-# It bounds the tap's axis only over its 9.398 shallowest thread, so the axis
-# may lean atan(0.127 / 9.398) = 0.77 deg and run 0.0635 + 37.01 * 0.127 /
-# 9.398 = 0.564 off nominal at the crossbar's faced top.  Charged in the zone
-# radius's place, that is about 0.4 past the float.  The dowels
-# locate the mount, not the bolt, so the knife's place and its rock are
-# unaffected.  The #10-24 bolt (minor Ø3.68 over the 37.01 grip) flexes that
-# much at under 49 N (cantilever estimate, E 200 GPa), and MHA-SM-00 has it
-# turned in by hand to its washer before it is tightened.
-STUD_TAP_POSITION_TOL = GEOMETRIC_TOLERANCES_MM["knife-hanger tap position"]
-# Owner ruling 2026-10-27 (#2016, option A): datum B's round slip hole and
-# datum C's slot stand square to the datum-A top seat, so the MHA-SM-VN-53
-# dowels, pressed square into the crossbar, enter them without binding.  The
-# hole takes ⊥Ø.0006|A (a cylindrical zone round its axis); the slot, a
-# width feature, takes ⊥.0006|A (a planar zone, no Ø) on its centre plane:
-# two controls, each its own key, both the ruling's 0.015 mm on the inch grid.
+# The #10-24 tap is spotted through MHA-FR-02's #10 clearance hole with the
+# annealed block hung on its dowels, then drilled and tapped before
+# hardening (delegated ruling sm Q3, 2026-11-07 (Main), no precedent; owner
+# review #2144; pending owner confirmation): no position frame prints, and
+# MHA-SM-00 carries the spotting step.  The stacks keep charging the former
+# Ø.005 zone as the transfer's residual: the tap follows the crossbar's
+# hole, so the knife-hanger float (``build_sm_summing_assembly``'s
+# HANGER_SCREW_MISMATCH, 0.020 spare at Ø.005) only gains, and the webs to
+# B, the slot and the faces below keep millimetres of margin.
+STUD_TAP_POSITION_TOL = 0.005 * DOWEL.MM_PER_IN
+# Datum B's round slip hole and datum C's slot stand square to the datum-A
+# top seat, so the MHA-SM-VN-53 dowels, pressed square into the crossbar,
+# enter them without binding (owner ruling 2026-10-27, #2016, option A).
+# The hole takes ⊥Ø.001|A (a cylindrical zone round its axis); the slot, a
+# width feature, takes ⊥.001|A (a planar zone, no Ø) on its centre plane:
+# two controls, each its own key, at the shop's perpendicularity row
+# (delegated ruling sm Q1).  ``build_sm_summing_assembly``'s slip-tilt proof
+# charges them: 0.337 deg (0.364 with #2244's crossbar) against 0.403.
 DOWEL_HOLE_PERPENDICULARITY_TOL = GEOMETRIC_TOLERANCES_MM["dowel hole perpendicularity"]
 DOWEL_SLOT_PERPENDICULARITY_TOL = GEOMETRIC_TOLERANCES_MM["dowel slot perpendicularity"]
 
@@ -402,15 +395,18 @@ if STUD_TAP_THREAD_DEPTH_MIN < STUD_TAP_ENGAGEMENT_MIN_D * STUD_THREAD_MAJOR:
 # The full thread holds the bolt, so the tap's callout says why its explicit
 # +/-.005 is there and names the mate (drawing-guidelines.md rule 4 (tighten
 # only for function, and name the mate)) on one reason row under the native
-# thread row: the bolt's tip clearance.  The callout names no tap tool (rule
-# 7: the thread row's depth is its full thread, ASME Y14.6, and the shop
-# picks the tap that reaches it).  The drill row names the #25 drill in the
-# native size token's place.  Three rows -- drill, thread, reason -- keep the
-# callout inside the layout audit's four-row limit (tall-block, farm build
-# 20261013T225639.450330Z: five rows failed it).
+# thread row: the bolt's tip clearance.  Under it the route row: the tap is
+# spotted through the crossbar's #10 hole (STUD_TAP_POSITION_TOL above).  The
+# callout names no tap tool (rule 7: the thread row's depth is its full
+# thread, ASME Y14.6, and the shop picks the tap that reaches it).  The drill
+# row names the #25 drill in the native size token's place.  Four rows --
+# drill, thread, reason, route -- stay inside the layout audit's four-row
+# limit (tall-block, farm build 20261013T225639.450330Z: five rows failed it).
 BOLT_NUMBER = "MHA-SM-VN-52"
+FRAME_NUMBER = str(_config.parts("fr-top-frame")["number"])
 TAP_DRILL_CALLOUT = f"{STUD_TAP_DRILL} DRILL"
 TAP_CALLOUT_REASON = f"SETS {BOLT_NUMBER} TIP CLEARANCE"
+TAP_CALLOUT_ROUTE = f"SPOT THRU {FRAME_NUMBER} #10 HOLE"
 
 # MHA-SM-VN-53 dowels (owner ruling 2026-10-24, T+H3; machinist ENFORCE
 # review of this sheet, rules 16 and 4): the pins press into the MHA-FR-02
@@ -433,7 +429,7 @@ SLOT_WIDTH = DOWEL.SLIP_HOLE_DIA
 SLOT_WIDTH_BAND = DOWEL.SLIP_HOLE_DIA_BAND
 SLOT_WIDTH_PLACES = DOWEL.SLIP_HOLE_DIA_PLACES
 DOWEL_NUMBER = "MHA-SM-VN-53"
-# The slot's width: ⌖.002 to A|B, at an implied basic zero across the line
+# The slot's width: ⌖.004 to A|B, at an implied basic zero across the line
 # from B (the crossbar's former slot frame, moved with the slot).
 SLOT_POSITION_TOL = GEOMETRIC_TOLERANCES_MM["dowel slot position"]
 # The slot's inner end: its half-round end's centre stands SLOT_END_FROM_B
@@ -524,14 +520,14 @@ PIN_HOLE_SIDE_WEB = PIN_HOLE_SIDE_DISTANCE - PIN_HOLE_SIDE_TOL - _PIN_R_MAX
 PIN_HOLE_Z_WEB = _ROW_Z_MIN - _PIN_R_MAX
 # The slot's two cheeks (no thin finger at the mouth): its centre plane off
 # B's line by half its zone, the line skewed by the angular tolerance out to
-# the -X face at its farthest, 6.477 - 0.025 - 0.364 - 1.634 = 4.45.
+# the -X face at its farthest, 6.477 - 0.051 - 0.364 - 1.634 = 4.43.
 SLOT_CHEEK_WEB = (
     _ROW_Z_MIN
     - SLOT_POSITION_TOL / 2.0
     - _FACE_FROM_B_MAX * _TAN_ANGULAR
     - _SLOT_HALF_W_MAX
 )
-# The tap axis stands BASIC PIN_HOLE_X from B, within its zone radius.
+# The tap axis stands PIN_HOLE_X from B, within the transfer's residual.
 _TAP_FROM_B_MIN = PIN_HOLE_X - STUD_TAP_POSITION_TOL / 2.0
 # B to the tap's thread major: 7.557 - 1.634 - 2.413 = 3.51.
 PIN_HOLE_TAP_WEB = _TAP_FROM_B_MIN - _PIN_R_MAX - STUD_THREAD_MAJOR / 2.0
@@ -651,20 +647,13 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "block-depth overall": BLOCK_SIZE_PLACES,
     "dowel hole from side face": PIN_HOLE_SIDE_PLACES,
 }
-# Rule 4: each slip band names its mate and the clearance it sets, in inches
-# printed outward to four places.
+# Rule 4: the slip hole and the slot are cut to suit the dowel; the clearance
+# they set, in inches printed outward to four places, is their acceptance
+# (draw_sm_knife_mount).
 PIN_SLIP_PRINTED = (
     math.floor(DOWEL.SLIP_CLEARANCE_MIN / DOWEL.MM_PER_IN * 1e4 + 1e-6) / 1e4,
     math.ceil(DOWEL.SLIP_CLEARANCE_MAX / DOWEL.MM_PER_IN * 1e4 - 1e-6) / 1e4,
 )  # (.0020, .0036)
-_SLIP_MATE = (
-    f"{PIN_SLIP_PRINTED[0]:.4f}-{PIN_SLIP_PRINTED[1]:.4f} DIAMETRAL CLEARANCE".replace(
-        "0.", "."
-    ),
-    f"ON {DOWEL_NUMBER} DOWEL",
-)
-PIN_HOLE_CALLOUT = "\n".join(("BLIND FLAT-BOTTOM REAM", *_SLIP_MATE))
-SLOT_WIDTH_CALLOUT = "\n".join(("OPEN-END SLOT", f"SLIP FIT ON {DOWEL_NUMBER}"))
 # One depth for the hole and the slot (one cut to one floor), the
 # fr_top_frame HANGER_PIN_DEPTH_CALLOUT precedent.  Nothing seats on the
 # floor (the longest proud pin stands SLIP_DEPTH_CLEARANCE_MIN off the
