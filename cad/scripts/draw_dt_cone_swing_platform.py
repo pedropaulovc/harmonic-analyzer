@@ -432,9 +432,9 @@ _TIP_DOWEL_X_TEXT_X = (
 # banded diameter in detail B, for MHA-DT-00 step post-and-tip-block ("DRILL
 # AND REAM UP THRU MHA-DT-20 INTO MHA-DT-21 PER THEIR CALLOUTS"): the
 # process, then the flag to the numbered note that states the fit, the part
-# that goes in the hole and when it is match-reamed (machinist review of
-# round 6, #7; two rows under the size, rule 7).
-TIP_BLOCK_NUMBER = _config.parts("dt-cone-tip-block")["number"]
+# that goes in the hole and where it is match-reamed (machinist review of
+# round 6, #7; two rows under the size, rule 7; round 8, #2: the order of
+# operations is MHA-DT-00 step 2's, not this sheet's).
 TIP_DOWEL_PIN_NUMBER = _config.parts("dt-vn-locating-pin")["number"]
 TIP_DOWEL_NOTE_NUMBER = 1
 TIP_DOWEL_CALLOUT = "\n".join(
@@ -457,8 +457,7 @@ TIP_DOWEL_NOTE_WIDTH = 55
 _NBSP = "\u00a0"
 TIP_DOWEL_NOTE = textwrap.fill(
     f"SLIP FIT FOR {TIP_DOWEL_PIN_NUMBER}. MATCH-REAM THRU AT "
-    f"{step_ref('post-and-tip-block').replace(' ', _NBSP)}, AFTER THE "
-    f"{TIP_BLOCK_NUMBER} REAM.",
+    f"{step_ref('post-and-tip-block').replace(' ', _NBSP)}.",
     width=TIP_DOWEL_NOTE_WIDTH,
     initial_indent=f"{TIP_DOWEL_NOTE_NUMBER}. ",
     subsequent_indent="   ",

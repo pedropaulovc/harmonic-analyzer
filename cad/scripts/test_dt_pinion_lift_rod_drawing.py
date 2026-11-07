@@ -150,13 +150,27 @@ def test_each_flat_covers_its_cams_feeler_set_range() -> None:
         assert need <= length < need + 0.01 * _IN
     assert spec.FRONT_FLAT_LEN == pytest.approx(0.22 * _IN)
     assert spec.BACK_FLAT_LEN == pytest.approx(0.17 * _IN)
-    # The printed rim-side edges, on the .XXX grid round the tap stations.
-    assert spec.FRONT_FLAT_EDGE_FROM_RIM == pytest.approx(6.546 * _IN)
-    assert spec.BACK_FLAT_EDGE_FROM_RIM == pytest.approx(0.583 * _IN)
-    assert spec.FRONT_FLAT_FROM_RIM == pytest.approx(6.656 * _IN)
-    assert spec.BACK_FLAT_FROM_RIM == pytest.approx(0.668 * _IN)
+    # R8 review #2: the printed rim-side edges sit on the .XX grid.  Each is
+    # the grid point nearest centring its flat on the tap station that still
+    # holds the screw point on the flat at both bands' worst case.  Rounding
+    # to nearest gave the back flat .58, which lets the point run off.
+    assert spec.FRONT_FLAT_EDGE_FROM_RIM == pytest.approx(6.55 * _IN)
+    assert spec.BACK_FLAT_EDGE_FROM_RIM == pytest.approx(0.59 * _IN)
+    assert spec.FRONT_FLAT_FROM_RIM == pytest.approx(6.66 * _IN)
+    assert spec.BACK_FLAT_FROM_RIM == pytest.approx(0.675 * _IN)
+    band = 0.01 * _IN
+    point_r = spec.SET_SCREW_POINT_DIA / 2.0
     for key in ("front", "back"):
-        assert abs(spec.FLAT_FROM_RIM[key] - spec.SCREW_FROM_RIM[key]) <= 0.0005 * _IN
+        edge, length = spec.FLAT_EDGE_FROM_RIM[key], spec.FLAT_LEN[key]
+        assert edge / (0.01 * _IN) == pytest.approx(round(edge / (0.01 * _IN)), abs=1e-9)
+        screw, half = spec.SCREW_FROM_RIM[key], spec.SCREW_HALF_RANGE[key]
+        assert edge + band <= screw - half - point_r
+        assert edge - band + length - band >= screw + half + point_r
+        assert abs(spec.FLAT_FROM_RIM[key] - screw) <= 0.01 * _IN
+    nearest = round((spec.SCREW_FROM_RIM["back"] - spec.BACK_FLAT_LEN / 2.0) / band) * band
+    assert nearest + spec.BACK_FLAT_LEN - 2.0 * band < (
+        spec.SCREW_FROM_RIM["back"] + spec.SCREW_HALF_RANGE["back"] + point_r
+    )
 
 
 def test_the_screw_point_lands_on_its_flat_at_the_worst_case() -> None:
@@ -166,14 +180,14 @@ def test_the_screw_point_lands_on_its_flat_at_the_worst_case() -> None:
     assert spec.SET_SCREW_POINT_DIA == pytest.approx(
         spec.CAM_SET_SCREW_MAJOR_MAX - 2.0 * spec.CAM_SET_SCREW_PITCH
     )
-    assert spec.SCREW_POINT_ON_FLAT_MARGIN_MM == pytest.approx(0.0038 * _IN, abs=0.0002 * _IN)
+    assert spec.SCREW_POINT_ON_FLAT_MARGIN_MM == pytest.approx(0.0028 * _IN, abs=0.0002 * _IN)
     assert spec.FLAT_CHORD_MIN > spec.SET_SCREW_POINT_DIA
     # For the record (owner sketch: the front flat can show past its hub):
-    # with the flats' own bands it shows .019 and reaches .005 under the
+    # with the flats' own .XX bands it shows .028 and reaches .014 under the
     # front block's bore mouth; the back flat stays inside on both counts.
-    assert spec.FLAT_HUB_COVER_MM["front"] == pytest.approx(-0.0190 * _IN, abs=0.0002 * _IN)
+    assert spec.FLAT_HUB_COVER_MM["front"] == pytest.approx(-0.0280 * _IN, abs=0.0002 * _IN)
     assert spec.FLAT_HUB_COVER_MM["back"] > 0.0
-    assert spec.FLAT_TO_BLOCK_MM["front"] == pytest.approx(-0.0053 * _IN, abs=0.0002 * _IN)
+    assert spec.FLAT_TO_BLOCK_MM["front"] == pytest.approx(-0.0143 * _IN, abs=0.0002 * _IN)
     assert spec.FLAT_TO_BLOCK_MM["back"] > 0.0
 
 
@@ -187,22 +201,28 @@ def test_the_flats_take_the_fulcrum_shafts_depth_and_name_their_mate() -> None:
     )
     assert spec.CAM_NUMBER == _config.parts("dt-pinion-cam")["number"]
     assert f"2X {spec.CAM_NUMBER}" in spec.ACROSS_FLAT_CALLOUT
-    # Round-6 review #2 (rule 7): one line of words under the value; VIEW B
-    # shows the flats in line on one side.
-    assert spec.ACROSS_FLAT_CALLOUT == f"SET SCREW FLATS FOR 2X {spec.CAM_NUMBER}"
+    # Round-6 review #2 (rule 7): at most two lines of words under the value;
+    # VIEW B shows the flats in line on one side.  R8 review #0: two short
+    # lines, so the text hanging left of its dimension line stays inside the
+    # border.
+    assert spec.ACROSS_FLAT_CALLOUT == f"SET SCREW FLATS\nFOR 2X {spec.CAM_NUMBER}"
     assert drawing.DIMENSION_CALLOUTS["AcrossFlat"] == spec.ACROSS_FLAT_CALLOUT
     # Round-6 review #3: location dimensions carry only value and band; their
     # extension lines land on the crown rim and the flat end.
     for name in ("FrontFlatFromRim", "BackFlatFromRim", "PinHoleZ"):
         assert name not in drawing.DIMENSION_CALLOUTS
     assert not hasattr(spec, "FLAT_STATION_CALLOUT")
+    # R8 review #2: two-place stations.  The across-flat keeps three: at .24
+    # +-.01 the largest size reaches the full rod and leaves no flat to seat
+    # the point (R8 review #3 declined).
     assert spec.DRAWING_PRECISION["FlatProfile"] == {
         "FrontFlatLen": 2,
         "BackFlatLen": 2,
-        "FrontFlatFromRim": 3,
-        "BackFlatFromRim": 3,
+        "FrontFlatFromRim": 2,
+        "BackFlatFromRim": 2,
         "AcrossFlat": 3,
     }
+    assert 0.24 * _IN + 0.01 * _IN >= spec.ROD_DIA - 1e-9
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'set_dimension_prefix(adapter, "FlatProfile", "AcrossFlat", "2X ")' in source
     assert "create_sketch(FLAT_PLANE)" in source
@@ -316,7 +336,7 @@ CAP_SAG_M = spec.CAP_SAG / 1000.0
 
 def test_across_flat_text_leaves_its_lines() -> None:
     # Round-6 review #4: the across-flat text sits below its lower witness, on
-    # its own dimension line, left of the crown; the .583 text ends short of
+    # its own dimension line, left of the crown; the back station's text ends short of
     # the rim witness.  R7 review #1: the words are the dimension's own
     # below-text callout, so there is no separate leadered note to stray.
     text_x, text_y = drawing.FLATS_KEEP["AcrossFlat"]
@@ -326,10 +346,14 @@ def test_across_flat_text_leaves_its_lines() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "offset_dimension_text" not in source
     assert "ACROSS_FLAT_TEXT_XY" not in source
-    # One callout line (~2.5 mm a glyph) under the value: inside the border and
-    # above the 1:2 isometric's top (y ~0.109).
-    half_width = len(spec.ACROSS_FLAT_CALLOUT) * 0.0025 / 2.0
-    assert text_x - half_width > 0.0127
-    assert text_y - 0.010 > 0.109
+    # R8 render: SolidWorks hangs the text LEFT of its dimension line, its
+    # widest line ending at the line (the 32-glyph line measured 80.4 mm,
+    # ~2.52 mm a glyph, and ran through the inner border at 0.0127).  The
+    # widest line now keeps 10 mm of air to the border, and the three text
+    # rows stay above the 1:2 isometric's top (y ~0.109).
+    widest = max(len(line) for line in spec.ACROSS_FLAT_CALLOUT.splitlines())
+    assert len(spec.ACROSS_FLAT_CALLOUT.splitlines()) <= 2
+    assert text_x - widest * 0.00252 > 0.0127 + 0.010
+    assert text_y - 0.015 > 0.109
     station_x, _ = drawing.FLATS_KEEP["BackFlatFromRim"]
     assert station_x + 2 * 0.0025 + 0.005 < drawing._RIM_X

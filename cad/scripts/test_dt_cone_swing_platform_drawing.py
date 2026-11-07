@@ -1352,7 +1352,7 @@ def test_tip_dowel_ream_callout_flags_its_fit_note() -> None:
     step = dt_drive_train_steps.step_ref("post-and-tip-block")
     for phrase in (
         "SLIP FIT FOR MHA-DT-VN-69",
-        f"MATCH-REAM THRU AT {step}, AFTER THE MHA-DT-21 REAM",
+        f"MATCH-REAM THRU AT {step}.",
     ):
         assert phrase in flat, phrase
     assert drawing_spec.DRAWING_DIMENSIONS["TipDowelProfile"] == {

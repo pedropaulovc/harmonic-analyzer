@@ -53,7 +53,9 @@ FLAT_DEPTH = 0.3048  # .012
 FLAT_HEIGHT = ROD_DIA / 2.0 - FLAT_DEPTH  # the flat above the rod axis
 ACROSS_FLAT = ROD_DIA - FLAT_DEPTH  # 6.0452 (.238): the printed size
 FLAT_LENGTH_PLACES = 2
-FLAT_STATION_PLACES = 3
+# R8 review #2: the stations print to two places.  The edges are picked so
+# the .XX bands still hold the screw point on its flat (below).
+FLAT_STATION_PLACES = 2
 ACROSS_FLAT_PLACES = 3
 _IN = 25.4
 
@@ -110,9 +112,12 @@ SCREW_STATION_TERMS: dict[str, dict[str, float]] = {
     },
 }
 SCREW_HALF_RANGE = {key: sum(terms.values()) for key, terms in SCREW_STATION_TERMS.items()}
-# Each flat covers its whole range plus the screw's major, up to the .XX grid;
-# its rim-side edge, the printed station, sits on the .XXX grid round the
-# nominal tap station.  Centres follow from the two.
+# Each flat covers its whole range plus the screw's major, up to the .XX grid.
+# Its rim-side edge, the printed station, is the .XX grid point closest to
+# centring the flat on the nominal tap station, among those that keep the
+# screw's point on the flat at both bands' worst case (R8 review #2).  Round
+# to nearest gave the back flat .58, and its far end then let the point run
+# off by .0014.  Centres follow from the edge and the length.
 _LENGTH_GRID = _IN / 10**FLAT_LENGTH_PLACES
 _STATION_GRID = _IN / 10**FLAT_STATION_PLACES
 FLAT_LEN = {
@@ -123,24 +128,37 @@ FLAT_LEN = {
     )
     for key, half in SCREW_HALF_RANGE.items()
 }
-FLAT_EDGE_FROM_RIM = {
-    key: round(round((SCREW_FROM_RIM[key] - FLAT_LEN[key] / 2.0) / _STATION_GRID) * _STATION_GRID, 9)
-    for key in FLAT_LEN
-}
-FLAT_FROM_RIM = {key: FLAT_EDGE_FROM_RIM[key] + FLAT_LEN[key] / 2.0 for key in FLAT_LEN}
-FRONT_FLAT_LEN = FLAT_LEN["front"]  # 5.588 (.22)
-BACK_FLAT_LEN = FLAT_LEN["back"]  # 4.318 (.17)
-FRONT_FLAT_EDGE_FROM_RIM = FLAT_EDGE_FROM_RIM["front"]  # 166.268 (6.546), printed
-BACK_FLAT_EDGE_FROM_RIM = FLAT_EDGE_FROM_RIM["back"]  # 14.808 (.583), printed
-FRONT_FLAT_FROM_RIM = FLAT_FROM_RIM["front"]  # 169.062 (6.656), centre
-BACK_FLAT_FROM_RIM = FLAT_FROM_RIM["back"]  # 16.967 (.668), centre
-
 # Worst case of the printed bands (inch title block) and the rig's set
 # errors together: the screw's point lies wholly on its flat.
 _LENGTH_BAND = printed_band_mm(FLAT_LENGTH_PLACES, unit=UNIT)
 _STATION_BAND = printed_band_mm(FLAT_STATION_PLACES, unit=UNIT)
 _ACROSS_FLAT_BAND = printed_band_mm(ACROSS_FLAT_PLACES, unit=UNIT)
 _POINT_R = SET_SCREW_POINT_DIA / 2.0
+
+
+def _flat_edge_from_rim(key: str) -> float:
+    """The printed rim-side edge of ``key``'s flat (see FLAT_LEN above)."""
+    screw, half, length = SCREW_FROM_RIM[key], SCREW_HALF_RANGE[key], FLAT_LEN[key]
+    lowest = screw + half + _POINT_R + _STATION_BAND + _LENGTH_BAND - length
+    highest = screw - half - _POINT_R - _STATION_BAND
+    first = math.ceil(lowest / _STATION_GRID - 1e-9)
+    last = math.floor(highest / _STATION_GRID + 1e-9)
+    if last < first:
+        raise AssertionError(f"no .XX station holds the {key} screw point on its flat")
+    centred = screw - length / 2.0
+    best = min(range(first, last + 1), key=lambda n: abs(n * _STATION_GRID - centred))
+    return round(best * _STATION_GRID, 9)
+
+
+FLAT_EDGE_FROM_RIM = {key: _flat_edge_from_rim(key) for key in FLAT_LEN}
+FLAT_FROM_RIM = {key: FLAT_EDGE_FROM_RIM[key] + FLAT_LEN[key] / 2.0 for key in FLAT_LEN}
+FRONT_FLAT_LEN = FLAT_LEN["front"]  # 5.588 (.22)
+BACK_FLAT_LEN = FLAT_LEN["back"]  # 4.318 (.17)
+FRONT_FLAT_EDGE_FROM_RIM = FLAT_EDGE_FROM_RIM["front"]  # 166.370 (6.55), printed
+BACK_FLAT_EDGE_FROM_RIM = FLAT_EDGE_FROM_RIM["back"]  # 14.986 (.59), printed
+FRONT_FLAT_FROM_RIM = FLAT_FROM_RIM["front"]  # 169.164 (6.660), centre
+BACK_FLAT_FROM_RIM = FLAT_FROM_RIM["back"]  # 17.145 (.675), centre
+
 SCREW_POINT_ON_FLAT_MARGIN_MM = min(
     min(
         SCREW_FROM_RIM[key] - SCREW_HALF_RANGE[key] - _POINT_R
@@ -278,10 +296,10 @@ DRAWING_REFERENCE_DIMENSIONS = frozenset({"RodOverall"})
 # three on the drilled pin hole, which takes the title block's DRILLED HOLES
 # row (.064, +.004/0); two on the length the rig's stacks read, the crown, the
 # reference overall and the pin station, which the lever's mid-engagement
-# sets at assembly.  The flats: two on their lengths, three on their stations
-# and the across-flat size, the grades SCREW_POINT_ON_FLAT_MARGIN_MM and
-# FLAT_CHORD_MIN are proved at (.XX stations let the back cam's point run off
-# its flat).
+# sets at assembly.  The flats: two on their lengths and stations (R8 review
+# #2), three on the across-flat size.  SCREW_POINT_ON_FLAT_MARGIN_MM and
+# FLAT_CHORD_MIN are proved at those grades.  At two places (.24 +-.01) the
+# across-flat could reach the full rod and leave no flat at all.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "RodProfile": {"RodDia": 4, "RodBody": 2, "CapR": 2, "RodOverall": 2},
     "PinHoleProfile": {"PinHoleDia": 3, "PinHoleZ": 2},
@@ -326,9 +344,11 @@ PIN_HOLE_CALLOUT = "\n".join(
         f"IN {LEVER_NUMBER} HUB",
     )
 )
-# drawing-guidelines.md rule 4: the three-place flat sizes name the mate, and
-# one AcrossFlat governs both flats in one plane.  One line under the value
+# drawing-guidelines.md rule 4: the across-flat size names the mate, and one
+# AcrossFlat governs both flats in one plane.  Two lines of words at most
 # (rule 7, round-6 review #2): VIEW B shows the flats in line on one side, and
 # the stations' extension lines land on the crown rim, so no words say either.
-ACROSS_FLAT_CALLOUT = f"SET SCREW FLATS FOR 2X {CAM_NUMBER}"
+# Two short lines rather than one long one (R8 review #0): the text hangs left
+# of its dimension line, and at ~80 mm the one line ran through the border.
+ACROSS_FLAT_CALLOUT = f"SET SCREW FLATS\nFOR 2X {CAM_NUMBER}"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

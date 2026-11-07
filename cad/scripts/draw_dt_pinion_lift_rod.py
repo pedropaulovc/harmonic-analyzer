@@ -225,12 +225,14 @@ FLATS_KEEP = {
     "FrontFlatFromRim": ((_RIM_X + _FRONT_FLAT_X) / 2.0, _FLATS_TOP + 0.023),
     # Round-6 review #4: the 6 mm span is shorter than its text, so a text
     # centred on the span was struck by its own dimension line and both
-    # witnesses.  The text (value, its one callout line under it) stands
+    # witnesses.  The text (the value, then its two callout lines) stands
     # below the lower witness (y ~0.137) on its own dimension line, which
     # runs down to it ~11 mm left of the crown apex.  R7 review #1: the
-    # offset-text leader instead crossed the callout and ended in open space.
-    # The callout line (~80 mm) spans x ~0.04..0.12, above the 1:2 isometric's
-    # top (y ~0.109).
+    # offset-text leader crossed the callout and ended in open space.  R8
+    # render: SolidWorks hangs the text LEFT of this x on a shelf, so its
+    # widest line (~41 mm, "FOR 2X MHA-DT-23") spans x ~0.038..0.080.  That
+    # leaves ~25 mm to the inner border (0.0127); the one ~80 mm line ran
+    # through the border (R8 review #0).
     "AcrossFlat": (_RIM_X - 0.012, FLATS_CENTER[1] - 0.013),
 }
 
