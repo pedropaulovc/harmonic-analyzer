@@ -2,12 +2,12 @@ sm-knife-mount:
   number: MHA-SM-02
   material: AISI O1 tool steel
   material_specification: AISI O1 tool steel
-  finish: "58-60 HRC, unpainted; after hardening: dowels slide home, .4720 pin enters bore"
+  finish: "58-60 HRC, unpainted; after hardening MHA-SM-VN-53 dowels slide home, MHA-SM-03 trunnion enters bore"
   quantity: 2
   tolerance_class: machined_block
   # Pedro's owner ruling, 2026-11-05 (coordinator session): tap annealed, inspect hardened.
   # Delegated ruling sm Q5, 2026-11-07 (Main), no precedent; owner review #2144 (pending owner confirmation): fit sizes cut annealed too, accepted functionally after hardening.
-  process: "machined in the annealed condition, fit sizes included; one blind #10-24 thread per mount (two mounts total), spotted through MHA-FR-02's #10 hole and cut with a bottoming tap before hardening; after heat treatment the MHA-SM-VN-53 dowels slide home, a .4720 pin enters the knife bore and the thread is gauge-checked"
+  process: "machined in the annealed condition, fit sizes included; one blind #10-24 thread per mount (two mounts total), spotted through MHA-FR-02's #10 hole and cut with a bottoming tap before hardening; after heat treatment the MHA-SM-VN-53 dowels slide home, the MHA-SM-03 trunnion enters the knife bore and the thread is gauge-checked"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"
