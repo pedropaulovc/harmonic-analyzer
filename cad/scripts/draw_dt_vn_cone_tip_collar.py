@@ -119,35 +119,19 @@ NOSE_DIA_ON_SIDE = (0.160, SIDE_CENTER[1])
 # body top at x ~221, left of CollarDia's top extension line (x >= 228), and
 # passes NoseLength's text at x ~230. At (165, 198) it crossed NoseLength's
 # extension line; at (282, 205), CollarDia's dimension line (main's review).
-# The .XXX nose length, width and tap station hold the tap's walls to the
-# shoulder and the end face (spec.WORST_WALLS_MM; at .XX they fall below the
-# wall target). Rules 3, 4 and 7: they name that function once, as one
-# numbered note each of them flags; a location carries no other words. The
-# flags: CollarWidth's below its value, into the open field under the view;
-# NoseLength's ABOVE its value, out of its extension lines' reach (at x 182
-# its old 53.5 mm function line stood 5.7 mm from the tap callout).
+# The .XXX nose length, width and tap station hold the 2-56 tap's walls to
+# the shoulder and the end face (spec.WORST_WALLS_MM; at .XX they fall below
+# the wall target). They print bare: any stated reason is design rationale
+# (rule 7; screen and round 1), so the sheet relies on exception RV-02 in
+# cad/config/parts/dt-vn-cone-tip-collar.yaml (PROVISIONAL, pending owner
+# confirmation).
 SIDE_KEEP = {"CollarWidth": (0.205, 0.110), "CollarDia": (0.250, SIDE_CENTER[1]),
              "NoseLength": (0.189, 0.218), "ShoulderRadius": (0.262, 0.232)}
-WALL_FLAG = "SEE NOTE 1"
-WALL_FLAGGED = ("NoseLength", "CollarWidth", "TapStation")
-# The least of the two tap walls the flagged sizes hold, floored to .001 in
-# (test_wall_note_states_the_least_booked_tap_wall pins it to the spec).
-WALL_NOTE = "1. 2-56 TAP: WALL .081 MIN TO SHOULDER AND TO END FACE."
-# One note block: note 1, then the stock line (spec.DRAWING_NOTES).
-NOTES_TEXT = f"{WALL_NOTE}\n2. {spec.DRAWING_NOTES}"
 # TapStation reads right of the tap centre's extension line, under the hole
-# callout's leader and above the end view's top (y 205 mm at x 80 mm), so its
-# flag clears both extension lines and the left border.  The two-line
-# thread-major gauge reads right of the view, above the hole callout: left of
-# the view (main's place) its leader crossed TapStation's extension line off
-# the nose face (run 20261101T183557651Z).  It bounds the envelope the wall
-# budget books (spec.THREAD_ENVELOPE_DIA), named in standard words (rule 26:
-# TAP ROOT was a private phrase).
-TAP_KEEP = {
-    "TapStation": (TAP_CENTER[0] + 0.040, TAP_CENTER[1] - 0.024),
-    "TapRootLimit": (TAP_CENTER[0] + 0.033, TAP_CENTER[1] + 0.012),
-}
-TAP_ROOT_CALLOUT = "THREAD MAJOR DIA"
+# callout's leader and above the end view's top (y 205 mm at x 80 mm). The
+# thread's envelope is the 2-56 UNC-2B callout's and the title block's thread
+# row (round 1: a separate Ø.09 MAX gauge on the tap was over-specification).
+TAP_KEEP = {"TapStation": (TAP_CENTER[0] + 0.040, TAP_CENTER[1] - 0.024)}
 # Right of the view: the hole callout's text starting past the view's right
 # edge. The view note goes over the view, 3.7 mm inside the top border.
 TAP_CALLOUT_XY = (TAP_CENTER[0] + 0.0553, TAP_CENTER[1] - 0.0062)
@@ -191,7 +175,7 @@ BORE_CALLOUT = "\n".join((
 # The circle's letter on the end view: up-right of the bore, off the centre
 # mark's lines and inside the nose circle.
 BORE_LETTER_OFFSET = (0.0045, 0.0045)
-# The two-line note block, under the detail's label.
+# The one stock note (spec.DRAWING_NOTES), under the detail's label.
 NOTES_XY = (0.016, 0.030)
 # swAnnotationType_e
 _NOTE = 6
@@ -364,14 +348,6 @@ def _nose_dia_onto_side(adapter, end_marks, end, side):
     return [a for a in end_marks if a is not donors[0]], moved
 
 
-def _side_callouts():
-    """The turning view's note-1 flags: (below their values, above them).
-    NoseLength's reads above: below it, 3.500's two extension lines ran up
-    through its words (r4 review)."""
-    below = _wall_flags(SIDE_KEEP)
-    return below, {"NoseLength": below.pop("NoseLength")}
-
-
 def _precision(keep):
     """The part-authored places of only the names this view keeps
     (main's per-view form, draw_ch_connecting_rod)."""
@@ -379,13 +355,7 @@ def _precision(keep):
 
 
 # Native tolerance types the part authors: MAX 6.
-TAP_DIMENSION_TYPES = {"TapRootLimit": 6}
 SIDE_DIMENSION_TYPES = {"ShoulderRadius": 6}
-
-
-def _wall_flags(keep):
-    """Note 1's flags on the .XXX sizes, for only the names this view keeps."""
-    return {name: WALL_FLAG for name in WALL_FLAGGED if name in keep}
 
 
 def _assert_functional_dimension_types(adapter, annotations, expected):
@@ -709,20 +679,11 @@ async def build(adapter: Any) -> dict[str, str]:
     marks = [*end_marks, *side_marks, nose_dia]
     assert_imported_precision(adapter, marks, _precision(END_KEEP | SIDE_KEEP))
     _assert_functional_dimension_types(adapter, side_marks, SIDE_DIMENSION_TYPES)
-    side_callouts, above = _side_callouts()
-    set_dimension_callouts(adapter, side_marks, side_callouts)
-    set_dimension_callouts(adapter, side_marks, above, location="above")
-    # TapRootGauge is a blanked sketch: the hidden-owner importer shows it in
-    # this view for the import (draw_ch_rocker_arm_tl_pivot_screw).
-    tap_marks = hidden_sketches.curate_view_dimensions(
+    tap_marks = curate_view_dimensions(
         adapter, tap, keep=TAP_KEEP, view_label="collar radial process controls",
         dimensions_by_feature=spec.DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, tap_marks, _precision(TAP_KEEP))
-    _assert_functional_dimension_types(adapter, tap_marks, TAP_DIMENSION_TYPES)
-    set_dimension_callouts(
-        adapter, tap_marks, {**_wall_flags(TAP_KEEP), "TapRootLimit": TAP_ROOT_CALLOUT}
-    )
     # Source geometry is asymmetric and the views are rotated: use the native
     # model-to-sheet transform rather than assuming the view's box centre is
     # the bore origin or that world +Y still projects vertically.
@@ -738,7 +699,7 @@ async def build(adapter: Any) -> dict[str, str]:
     view_a_arrow = _view_a_arrow(adapter, side)
     _sheet_context(adapter)
     placed = frozenset({
-        _literal_note(adapter, NOTES_TEXT, *NOTES_XY),
+        _literal_note(adapter, spec.DRAWING_NOTES, *NOTES_XY),
         _placed_note(adapter, "Isometric View Note", 0.310, 0.160),
         _literal_note(adapter, VIEW_A_CAPTION, *TAP_NOTE_XY),
         view_a_arrow,

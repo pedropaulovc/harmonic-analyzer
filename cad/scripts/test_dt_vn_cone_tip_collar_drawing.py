@@ -291,7 +291,7 @@ def test_part_max_types_are_authored_and_read_back(monkeypatch, refuse):
         }
 
 
-@pytest.mark.parametrize("expected", [drawing.TAP_DIMENSION_TYPES, drawing.SIDE_DIMENSION_TYPES])
+@pytest.mark.parametrize("expected", [drawing.SIDE_DIMENSION_TYPES])
 def test_drawing_refuses_a_lost_max_type(monkeypatch, expected):
     types = dict(expected)
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
@@ -772,29 +772,6 @@ def test_each_view_asserts_only_the_precision_it_keeps() -> None:
         assert set(drawing._precision(keep)) == set(keep)
 
 
-def test_tap_root_limit_bounds_the_envelope_the_walls_book() -> None:
-    """Codjiflo review of #2101: 2B alone has no root MAX, so the wall budget's
-    tap envelope holds only while the sheet prints it.  The part carries the
-    blanked gauge, the tap view imports its MAX at the booked diameter, and the
-    north-face wall spends that diameter."""
-    assert set(drawing.TAP_KEEP) == {"TapStation", "TapRootLimit"}
-    assert spec.DRAWING_DIMENSIONS["TapRootGauge"] == {"TapRootLimit"}
-    assert spec.DRAWING_PRECISION_BY_NAME["TapRootLimit"] == 2
-    assert {"TapRootGauge", "TapRootPlane"} <= set(part.COLLAR_FEATURES)
-    assert drawing.TAP_DIMENSION_TYPES == {"TapRootLimit": 6}
-    envelope_in = spec.THREAD_ENVELOPE_DIA / 25.4
-    assert round(envelope_in, 2) == pytest.approx(envelope_in)
-    assert spec.WORST_WALLS_MM["tap to north face"] == pytest.approx(
-        spec.WIDTH
-        - spec.WIDTH_BAND_MM
-        - spec.TAP_STATION
-        - spec.TAP_STATION_BAND_MM
-        - spec.THREAD_ENVELOPE_DIA / 2.0
-        - spec.EDGE_BREAK
-        - spec._TAP_AXIAL_DRIFT_MAX
-    )
-
-
 def test_part_sheet_carries_no_assembly_procedure() -> None:
     """Main's machinist review: four of the note lines were assembly or
     operating procedure. MHA-DT-00 step 3 sets the collar off its feeler and
@@ -803,7 +780,7 @@ def test_part_sheet_carries_no_assembly_procedure() -> None:
     from cone_stack_end_play import COLLAR_FEELER
     from dt_drive_train_assembly_sheet import FEELER_PLACES, inch_text
 
-    printed = f"{drawing.NOTES_TEXT}\n{drawing.BORE_CALLOUT}"
+    printed = f"{spec.DRAWING_NOTES}\n{drawing.BORE_CALLOUT}"
     for word in ("FEELER", "LEAF", "SNUG", "SWING", "SEAT", "T006"):
         assert word not in printed
     step = (
@@ -865,14 +842,6 @@ def test_nose_dia_moves_from_the_end_view_onto_the_turning_view(monkeypatch) -> 
         drawing._nose_dia_onto_side(object(), marks[:1], "end", "side")
 
 
-def test_nose_length_flag_reads_above_its_value() -> None:
-    """r4 review: 3.500's extension lines struck the words under it."""
-    below, above = drawing._side_callouts()
-    assert above == {"NoseLength": drawing.WALL_FLAG}
-    assert "NoseLength" not in below
-    assert below.keys() == drawing._wall_flags(drawing.SIDE_KEEP).keys() - {"NoseLength"}
-
-
 def test_nose_dia_on_the_turning_view_clears_its_neighbours() -> None:
     # Left of the nose's south face, right of FlatDistance's text.
     assert drawing.END_KEEP["FlatDistance"][0] < drawing.NOSE_DIA_ON_SIDE[0]
@@ -884,22 +853,27 @@ def test_nose_dia_on_the_turning_view_clears_its_neighbours() -> None:
     assert not 0.165 + 0.0183 < 0.182 - 0.00178
 
 
-def test_three_place_lengths_flag_their_function_once() -> None:
+def test_three_place_lengths_print_bare_under_the_declared_exception() -> None:
     """Main's machinist review: 11.500, 3.500 and 7.500 had no stated function;
-    the fan-out screen: one reason on three dimensions is narration. They
-    hold the tap's walls, stated once in note 1 that each flags; at .XX those
-    walls fall below the target."""
+    the screen and round 1: any stated tap-wall reason is narration. They hold
+    the tap's walls (at .XX those fall below the target), print bare, and rely
+    on exception RV-02."""
+    from machinist_exceptions import load_exceptions
+
     three_place = {
         name
         for name, places in spec.DRAWING_PRECISION_BY_NAME.items()
         if places == 3 and name != "BoreDia"
     }
-    assert three_place == set(drawing.WALL_FLAGGED)
-    side = drawing._wall_flags(drawing.SIDE_KEEP)
-    tap = drawing._wall_flags(drawing.TAP_KEEP)
-    assert side.keys() | tap.keys() == three_place
-    assert set(side.values()) == set(tap.values()) == {drawing.WALL_FLAG}
-    assert drawing.WALL_FLAG == f"SEE NOTE {drawing.WALL_NOTE.split('.')[0]}"
+    assert three_place == {"NoseLength", "CollarWidth", "TapStation"}
+    assert three_place <= drawing.SIDE_KEEP.keys() | drawing.TAP_KEEP.keys()
+    entry = {
+        e.id: e
+        for e in load_exceptions(_config.CONFIG_DIR, "dt_vn_cone_tip_collar", "part")
+    }["RV-02"]
+    assert entry.kind == "accept"
+    assert all(value in entry.where for value in (".138", ".453", ".295"))
+    assert min(spec.WORST_WALLS_MM.values()) >= spec.WALL_TARGET_MM
     # At .XX on the inch sheet (each mm nominal with its own rounding) the
     # two tap walls fall below the wall target.
     south = spec.WORST_WALLS_MM["tap to south shoulder"] - (
@@ -911,16 +885,6 @@ def test_three_place_lengths_flag_their_function_once() -> None:
         + _worst_printed_band(spec.TAP_STATION, 2) - spec.TAP_STATION_BAND_MM
     )
     assert south < spec.WALL_TARGET_MM and north < spec.WALL_TARGET_MM
-
-
-def test_wall_note_states_the_least_booked_tap_wall() -> None:
-    least = min(
-        spec.WORST_WALLS_MM["tap to south shoulder"], spec.WORST_WALLS_MM["tap to north face"]
-    )
-    printed = math.floor(least / 25.4 * 1000.0 + 1e-9) / 1000.0
-    assert f"WALL {printed:.3f} MIN".replace("0.", ".", 1) in drawing.WALL_NOTE
-    # Rule 17's .080 in target.
-    assert printed >= 0.080
 
 
 def test_bore_callout_states_the_journal_fit() -> None:
