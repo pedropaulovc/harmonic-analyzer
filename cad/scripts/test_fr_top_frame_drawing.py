@@ -6191,3 +6191,16 @@ def test_title_block_break_on_the_unbroken_edges_keeps_the_seats_and_reams() -> 
         part._REAM_BAR_FACE_REACH - part.HANGER_PIN_HOLE_DIA_MAX / 2.0 - worst
     )
     assert part.PIN_HOLE_MOUTH_BAR_WALL >= part.WALL_TARGET_MM
+
+
+def test_set_screw_boss_face_is_never_proud_of_the_left_boss_tangent() -> None:
+    """Owner ruling 2026-11-07 (Main): a jaw on the two left bosses locates
+    on their tangent; the set-screw boss's cast face (.87 reference at .XX
+    from the gooseneck axis, on the bosses' axis line) at most shares that
+    plane at the print's limits, the smallest Ø1.77 against the farthest
+    .87."""
+    assert part.GOOSENECK_X == pytest.approx(-part.COLUMN_X)
+    boss_r_min = (part.BOSS_DIA - spec.PRINTED_LINEAR_BAND_MM[2]) / 2.0
+    face_max = part.HUB_SET_BOSS_FROM_AXIS + spec.PRINTED_LINEAR_BAND_MM[2]
+    assert part.SET_BOSS_FACE_TANGENT_MARGIN == pytest.approx(boss_r_min - face_max, abs=1e-3)
+    assert part.SET_BOSS_FACE_TANGENT_MARGIN >= -1e-9

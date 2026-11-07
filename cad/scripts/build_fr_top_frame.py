@@ -1181,6 +1181,22 @@ COUNTERBORE_MAX_RADIUS = (
 COUNTERBORE_MIN_RADIUS = (
     _printed_limit(COUNTERBORE_DIA, _COUNTERBORE_DIA_PLACES, -1.0) / 2.0
 )
+# Sheet 3's hole table starts at the corner of the Ø1.77 bosses' tangents
+# (owner ruling 2026-11-07): a jaw or parallel set against the two left
+# bosses must locate on their tangent, so the set-screw boss's cast face on
+# the same rail (on the bosses' axis line, printed .87 from the gooseneck
+# bore axis as a reference at .XX) is never proud of it at the print's
+# limits -- at worst it shares the tangent's plane.
+SET_BOSS_FACE_TANGENT_MARGIN = COUNTERBORE_MIN_BOSS_RADIUS - _printed_limit(
+    HUB_SET_BOSS_FROM_AXIS,
+    DRAWING_REFERENCE_PRECISION["set-screw boss face from bore axis"],
+    1.0,
+)  # 0.000
+if abs(GOOSENECK_X + COLUMN_X) > 1e-9 or SET_BOSS_FACE_TANGENT_MARGIN < -1e-9:
+    raise AssertionError(
+        "set-screw boss face stands proud of the left bosses' tangent by "
+        f"{-SET_BOSS_FACE_TANGENT_MARGIN:.3f} at the print's limits"
+    )
 COUNTERBORE_MAX_FLOOR_OFFSET = _printed_limit(
     COUNTERBORE_FLOOR - abs(FRONT_COLUMN_Z), _COUNTERBORE_FLOOR_PLACES, 1.0
 )
