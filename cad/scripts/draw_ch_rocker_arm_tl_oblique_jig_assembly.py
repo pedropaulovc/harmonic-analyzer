@@ -391,8 +391,6 @@ SHEET_NAMES = (
 # The captions cite sheets by these numbers, never typed ones.
 BOM_SHEET_NUMBER = SHEET_NAMES.index(BOM_SHEET) + 1
 STEPS_SHEET_NUMBER = SHEET_NAMES.index(STEPS_SHEET) + 1
-if SHEET_NAMES.index(OPERATION_SHEET) + 1 != spec.OPERATION_SHEET_NUMBER:
-    raise AssertionError("the operation sheet reference moved")
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the jig's primary sheet must remain landscape")
 # The jig is about 970 x 435 in plan: 1:4 for the arrangement, 1:15 for the
@@ -470,38 +468,36 @@ TITLE_BLOCK = (
 )
 
 # Sheet 1: the plan over the operator's elevation, third-angle and on one
-# vertical, right of the pose caption; the alignment targets under the
+# vertical (projected principal views, so unlabelled: rule 9; TL-00 rubric
+# review ce83), right of the pose caption; the setting table under the
 # elevation, left of the title block. At 1:4 the plan is about 241 x 106 and
-# the elevation 241 x 31 (the handwheel and the screw heads included). Each
-# view's title stands centred under it. Review jig-asm r1 (2026-11-02): the
-# plan's title sat as close to the elevation as to the plan, so the
-# elevation and the targets under it drop 12 mm into the open room above
-# the border.
+# the elevation 241 x 31 (the handwheel and the screw heads included).
 PLAN_CENTER = (0.274, 0.205)
 ELEVATION_CENTER = (0.274, 0.113)
 CAPTION_XY = (0.018, 0.255)
 CAPTION_WIDTH = 45  # characters; default-format note text, clear left of the plan
-ALIGNMENT_XY = (0.018, 0.093)
-ALIGNMENT_WIDTH = 68  # characters; stops left of the title block
+# The setting table's title, then the native general table under it
+# (draw_dt_drive_train_assembly's setting tables: rule 22's reference,
+# target, range and check in columns).
+SETTING_TABLE_XY = (0.018, 0.093)
+SETTING_TITLE_WIDTH = 68  # characters; stops left of the title block
+TABLE_CHAR_WIDTH = 0.0028
+TABLE_CELL_PAD = 0.004
+TABLE_TITLE_GAP = 0.0015
 # Default-format note text: about 2.9 mm a character on the farm's templates.
 NOTE_CHAR_M = 0.0029
 VIEW_LABEL_GAP = 0.003
 
 
-def _label_under(center: tuple[float, float], height_mm: float, text: str):
-    """Top-left of ``text`` centred under a 1:4 view ``height_mm`` tall."""
-    half = height_mm / 1000.0 * ASSEMBLED_SCALE[0] / ASSEMBLED_SCALE[1] / 2.0
-    return (
-        center[0] - len(text) * NOTE_CHAR_M / 2.0,
-        center[1] - half - VIEW_LABEL_GAP,
+def table_column_widths(
+    header: Sequence[str], rows: Sequence[Sequence[str]]
+) -> tuple[float, ...]:
+    """Each general-table column cut to its longest cell (metres)."""
+    return tuple(
+        max(len(text) for text in column) * TABLE_CHAR_WIDTH + TABLE_CELL_PAD
+        for column in zip(header, *rows, strict=True)
     )
 
-
-(_EX0, _EX1), (_EY0, _EY1), (_EZ0, _EZ1) = spec.MODEL_EXTENT
-PLAN_LABEL_XY = _label_under(PLAN_CENTER, _EY1 - _EY0, spec.PLAN_VIEW_LABEL)
-ELEVATION_LABEL_XY = _label_under(
-    ELEVATION_CENTER, _EZ1 - _EZ0, spec.ELEVATION_VIEW_LABEL
-)
 
 # Sheet 2: the full-height BOM left, its collapsed reference right. The table
 # can extend below the title block's top because it stays left of that block.
@@ -570,10 +566,9 @@ TITLE_BLOCK_KEEP_OUT = (
 )
 
 
-# Sheets 7 and 8 share the complete assembly sequence and fit-up instructions.
-# Whole steps flow onto sheet 8 when the assembly sheet fills; assembly checks
-# follow the fit-up text there. Both retain room for their live source view.
-# Sheet 9 separates operation and acceptance from the finished isometric.
+# Sheets 7-10 carry the one numbered sequence (rule 22), whole steps flowing
+# down each sheet's left column, then its right column over its live source
+# view; sheet 9's is the finished full-detail isometric.
 # 4.525 mm line pitch and about 2.9 mm a character.
 NOTE_LINE_M = 0.004525
 STEPS_LINE_WIDTH = 68  # characters; 197 mm, either column
@@ -1016,9 +1011,10 @@ def _wrapped(
 
 
 ASSEMBLED_CAPTION = _wrapped((spec.ASSEMBLED_CAPTION,), width=CAPTION_WIDTH)
-ALIGNMENT_NOTE = _wrapped(
-    (*spec.ALIGNMENT_NOTE_LINES, *spec.SWEEP_NOTE_LINES), width=ALIGNMENT_WIDTH
-)
+SETTING_TABLE_TITLE = _wrapped((spec.SETTING_TABLE_TITLE,), width=SETTING_TITLE_WIDTH)
+SETTING_TABLE_WIDTHS = table_column_widths(spec.SETTING_TABLE_HEADER, spec.SETTING_TABLE_ROWS)
+if SETTING_TABLE_XY[0] + sum(SETTING_TABLE_WIDTHS) > TITLE_BLOCK[0] - BOM_SHEET_CLEARANCE:
+    raise AssertionError("the setting table runs into the title block")
 
 
 def _note_height(text: str) -> float:
@@ -1031,122 +1027,118 @@ def note_ink_height(text: str) -> float:
     return NOTE_INK_FIRST_LINE_M + (lines - 1) * NOTE_INK_PITCH_M if lines else 0.0
 
 
+SETTING_TABLE_TOP = SETTING_TABLE_XY[1] - note_ink_height(SETTING_TABLE_TITLE) - TABLE_TITLE_GAP
+# Its rows at the BOM's row height, which this package's BOM holds natively.
+if (
+    SETTING_TABLE_TOP - (len(spec.SETTING_TABLE_ROWS) + 1) * BOM_ROW_HEIGHT
+    < SHEET_INNER_BORDER[1] + BOM_SHEET_CLEARANCE
+):
+    raise AssertionError("the setting table runs below the border")
+
+
 @dataclass(frozen=True)
-class StepsLayout:
-    """Two-column instructions, with checks below the continuation."""
+class StepsSheet:
+    """One instruction sheet: its left column, its right column over its
+    source view, and that view's room."""
 
-    steps: str  # the heading and the steps the left column holds
-    continued: str  # the rest, atop the right column; "" when none
-    checks: str
-    checks_xy: tuple[float, float]
+    sheet: str
+    left: str  # the heading and the lines the left column holds
+    right: str  # the rest, atop the right column; "" when none
 
-
-def steps_sheet_layout(
-    steps: Sequence[str], checks: Sequence[str], *, heading: str = STEPS_HEADING,
-    reference_height: float = 0.0,
-) -> StepsLayout:
-    """Lay out whole steps in two columns, reserving the right-column source view.
-
-    Reference height is paper room, not a relaxation of the native outline gate.
-    """
-    for count in range(len(steps), 0, -1):
-        # Keep an instruction-group heading with its first complete step.
-        if count < len(steps) and steps[count - 1].endswith(":"):
-            continue
-        left = _wrapped(
-            tuple(steps[:count]), width=STEPS_LINE_WIDTH, heading=heading, spaced=True
+    @property
+    def view_region(self) -> tuple[float, float, float, float]:
+        """The source view's room under the right column, over its caption."""
+        top = STEPS_CONTINUED_XY[1]
+        if self.right:
+            top -= _note_height(self.right) + REGION_GAP
+        return (
+            STEPS_CONTINUED_XY[0],
+            TITLE_BLOCK[3] + BOM_SHEET_CLEARANCE + NOTE_LINE_M + VIEW_LABEL_GAP,
+            SHEET_INNER_BORDER[2],
+            top,
         )
-        if _note_height(left) <= STEPS_XY[1] - STEPS_FLOOR:
-            break
-    else:
-        raise ValueError("the first assembly step overruns the steps' left column")
-    continued = _wrapped(tuple(steps[count:]), width=STEPS_LINE_WIDTH, spaced=True)
-    checks_text = _wrapped(tuple(checks), width=STEPS_LINE_WIDTH, spaced=True)
-    x, top = STEPS_CONTINUED_XY
-    if continued:
-        top -= _note_height(continued) + REGION_GAP
-    floor = TITLE_BLOCK[3] + BOM_SHEET_CLEARANCE
-    if reference_height:
-        floor += NOTE_LINE_M + VIEW_LABEL_GAP + reference_height + REGION_GAP
-    if top - _note_height(checks_text) < floor:
-        raise ValueError("instruction checks overrun the right column")
-    return StepsLayout(left, continued, checks_text, (x, top))
 
 
-def assembly_and_fit_layouts(
-    assembly: Sequence[str], checks: Sequence[str], fit: Sequence[str],
-) -> tuple[StepsLayout, StepsLayout]:
-    """Allocate complete source steps across sheets 7–8 without dropping text."""
-    for count in range(len(assembly), 0, -1):
-        remainder = tuple(assembly[count:])
-        try:
-            sequence = steps_sheet_layout(
-                assembly[:count], (),
-                heading=(
-                    "ASSEMBLY SEQUENCE (CONTINUED ON SHEET 8)"
-                    if remainder else STEPS_HEADING
-                ),
-                reference_height=NOTES_REFERENCE_MIN_HEIGHT,
-            )
-            fitting = steps_sheet_layout(
-                (*remainder, "PLAIN PIVOT FIT-UP:", *fit),
-                checks,
-                heading="ASSEMBLY CONTINUED AND FIT-UP" if remainder else "FIT-UP",
-                reference_height=NOTES_REFERENCE_MIN_HEIGHT,
-            )
-        except ValueError:
+INSTRUCTION_SHEETS = (STEPS_SHEET, FIT_SHEET, OPERATION_SHEET, HOLDING_SHEET)
+STEPS_HEADING = (
+    f"ASSEMBLY SEQUENCE (SHEETS {SHEET_NAMES.index(INSTRUCTION_SHEETS[0]) + 1}-"
+    f"{SHEET_NAMES.index(INSTRUCTION_SHEETS[-1]) + 1})"
+)
+STEPS_CONTINUED_HEADING = "ASSEMBLY SEQUENCE, CONTINUED"
+_RIGHT_FLOOR = (
+    TITLE_BLOCK[3] + BOM_SHEET_CLEARANCE + NOTE_LINE_M + VIEW_LABEL_GAP
+    + NOTES_REFERENCE_MIN_HEIGHT + REGION_GAP
+)
+
+
+def _first_index(lines: Sequence[str], head: str) -> int:
+    return next(i for i, line in enumerate(lines) if line.startswith(f"{head}. "))
+
+
+_OPERATION_START = _first_index(spec.OPERATION_STEPS, "15")
+_CUTTING_START = _first_index(spec.OPERATION_STEPS, "17")
+# The one sequence, in print order: the general torque note, the assembly,
+# then the pass change and service and the tooling and cutting groups, each
+# under its heading; the reference heights stand under the cutting heading.
+INSTRUCTION_LINES = (
+    spec.GENERAL_TORQUE_NOTE,
+    *spec.ASSEMBLY_STEPS,
+    "PASS CHANGE AND SERVICE:",
+    *spec.OPERATION_STEPS[_OPERATION_START:_CUTTING_START],
+    "TOOLING CLEARANCE AND CUTTING:",
+    spec.REFERENCE_HEIGHTS,
+    *spec.OPERATION_STEPS[_CUTTING_START:],
+)
+
+
+def _column_fit(
+    lines: Sequence[str], room: float, *, heading: str | None
+) -> tuple[str, int]:
+    """The most whole leading ``lines`` that fit ``room``, never ending on a
+    group heading; their wrapped text and count."""
+    for count in range(len(lines), -1, -1):
+        if count and lines[count - 1].endswith(":"):
             continue
-        return sequence, fitting
-    raise ValueError("assembly and fit-up instructions exceed sheets 7–8")
+        text = _wrapped(tuple(lines[:count]), width=STEPS_LINE_WIDTH, heading=heading, spaced=True)
+        if _note_height(text) <= room:
+            return text, count
+    raise ValueError("an instruction heading overruns its column")
 
 
-STEPS_LAYOUT, FIT_LAYOUT = assembly_and_fit_layouts(
-    (spec.GENERAL_TORQUE_NOTE, *spec.ASSEMBLY_STEPS),
-    spec.ASSEMBLY_CHECKS,
-    (*spec.PIVOT_FIT_STEPS, "FEED NUT AND KP08 FIT-UP:", *spec.FEED_FIT_STEPS),
-)
-ASSEMBLY_STEPS = STEPS_LAYOUT.steps
-ASSEMBLY_STEPS_CONTINUED = STEPS_LAYOUT.continued
-ASSEMBLY_CHECKS = STEPS_LAYOUT.checks
-CHECKS_XY = STEPS_LAYOUT.checks_xy
-OPERATION_LAYOUT = steps_sheet_layout(
-    (*spec.OPERATION_STEPS[:2], "HOLD-DOWN FIT:", *spec.HOLD_DOWN_STEPS),
-    (*spec.CAPTURE_CHECKS[:3], *spec.CAPTURE_CHECKS[4:]),
-    heading="OPERATION AND INSTALLED ACCEPTANCE",
-)
-HOLDING_LAYOUT = steps_sheet_layout(
-    spec.OPERATION_STEPS[2:],
-    spec.CAPTURE_CHECKS[3:4],
-    heading="STRAP PREPARATION AND THREE-POINT HOLDING",
-    reference_height=NOTES_REFERENCE_MIN_HEIGHT,
-)
-# Only this sheet has a finished view. Its room follows the filled right
-# column, keeping the actual native outline clear of its checks and title.
-FINISHED_REGION = (
-    STEPS_CONTINUED_XY[0],
-    TITLE_BLOCK[3] + BOM_SHEET_CLEARANCE + NOTE_LINE_M + VIEW_LABEL_GAP,
-    SHEET_INNER_BORDER[2],
-    OPERATION_LAYOUT.checks_xy[1] - _note_height(OPERATION_LAYOUT.checks) - REGION_GAP,
-)
+def steps_sheets(lines: Sequence[str]) -> tuple[StepsSheet, ...]:
+    """Flow whole ``lines`` down each instruction sheet's left column, then
+    its right column over the source view, in sheet order."""
+    sheets = []
+    rest = tuple(lines)
+    for index, sheet in enumerate(INSTRUCTION_SHEETS):
+        heading = STEPS_HEADING if index == 0 else STEPS_CONTINUED_HEADING
+        left, count = _column_fit(rest, STEPS_XY[1] - STEPS_FLOOR, heading=heading)
+        rest = rest[count:]
+        right, count = _column_fit(rest, STEPS_CONTINUED_XY[1] - _RIGHT_FLOOR, heading=None)
+        rest = rest[count:]
+        sheets.append(StepsSheet(sheet, left, right))
+    if rest:
+        raise ValueError(f"the instructions overrun sheets 7-10 by {len(rest)} lines")
+    return tuple(sheets)
 
-# draw_dt_drive_train_assembly._reference_iso keeps an actual collapsed model
-# view on every instruction sheet for finalize_drawing's per-sheet
-# CustomPropertyView association. Follow that visible-reference convention:
-# no hidden/off-sheet geometry, copied property text or second instruction
-# authority. The original notes and their placements above stay unchanged.
-# Reserve one caption line below each reference, clear of the title block.
+
+STEPS_SHEETS = steps_sheets(INSTRUCTION_LINES)
+STEPS_BY_SHEET = {layout.sheet: layout for layout in STEPS_SHEETS}
+# The stud acceptance (spec.HOLD_DOWN_REFERENCE, cited by the kit drawing) is
+# printed on the sheet the spec names.
+_STUD_CHECK_HEAD = f"{spec.HOLD_DOWN_STEPS_REFERENCE.split('-')[0]}. "
+if not any(
+    _STUD_CHECK_HEAD in (layout.left + "\n" + layout.right)
+    and SHEET_NAMES.index(layout.sheet) + 1 == spec.HOLD_DOWN_SHEET_NUMBER
+    for layout in STEPS_SHEETS
+):
+    raise AssertionError("the stud acceptance moved off the sheet its reference names")
+# Only the operation sheet has the finished view; the others a reference.
+FINISHED_REGION = STEPS_BY_SHEET[OPERATION_SHEET].view_region
 NOTES_REFERENCE_REGIONS = {
-    sheet: (
-        STEPS_CONTINUED_XY[0],
-        TITLE_BLOCK[3] + BOM_SHEET_CLEARANCE + NOTE_LINE_M + VIEW_LABEL_GAP,
-        SHEET_INNER_BORDER[2],
-        layout.checks_xy[1] - _note_height(layout.checks) - REGION_GAP,
-    )
-    for sheet, layout in (
-        (STEPS_SHEET, STEPS_LAYOUT),
-        (FIT_SHEET, FIT_LAYOUT),
-        (HOLDING_SHEET, HOLDING_LAYOUT),
-    )
+    layout.sheet: layout.view_region
+    for layout in STEPS_SHEETS
+    if layout.sheet != OPERATION_SHEET
 }
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 # The scales each sheet is created at; build() reports the fitted ones.
@@ -1154,18 +1146,17 @@ SHEET_SCALES = package_sheet_scales({c.sheet: c.scale for c in CLUSTERS})
 SHEET_SCALE = SHEET_SCALES[ASSEMBLED_SHEET]
 
 
-
-
-
 def _scale_text(scale: tuple[float, float]) -> str:
     return f"{scale[0]:g}:{scale[1]:g}"
 
 
-def exploded_caption(cluster: Cluster, scale: tuple[float, float]) -> str:
+# Every view's scale is its sheet's scale (finalize_drawing sets each sheet to
+# its fitted view), so no caption prints one (rule 9; TL-00 rubric review
+# ce83/c752).
+def exploded_caption(cluster: Cluster) -> str:
     """A cluster sheet's caption: its title, then the spec's cross-reference
-    filled in with the fitted scale and this package's sheet numbers."""
+    filled in with this package's sheet numbers."""
     reference = spec.EXPLODED_CAPTION.format(
-        scale=_scale_text(scale),
         bom_sheet=BOM_SHEET_NUMBER,
         steps_sheet=STEPS_SHEET_NUMBER,
     )
@@ -1173,14 +1164,19 @@ def exploded_caption(cluster: Cluster, scale: tuple[float, float]) -> str:
     return _wrapped(lines, width=EXPLODED_CAPTION_WIDTH)
 
 
-def linear_motion_caption(scale: tuple[float, float]) -> str:
-    """The linear-motion sheet's title at its fitted scale, what the view
-    leaves out (the carrier by BOM item, rule 25) and the exploded sheets'
-    cross-reference."""
+# The linear-motion view is a top view with the carrier's parts removed: a
+# standard view name and what it leaves out (rules 9 and 26; TL-00 rubric
+# review ce83/c752: a prose-named view).
+LINEAR_MOTION_LABEL = "TOP VIEW"
+
+
+def linear_motion_caption() -> str:
+    """The linear-motion sheet's view label, what the view leaves out (the
+    carrier by BOM item, rule 25) and the cross-reference."""
     line = (
-        f"{LINEAR_MOTION_SHEET} {_scale_text(scale)} - CARRIER "
+        f"{LINEAR_MOTION_LABEL} - CARRIER "
         f"(ITEM {BOM_ITEM_NUMBERS[spec.CARRIER]}) AND EVERY PART MOUNTED ON IT "
-        f"NOT SHOWN; BOM ON SHEET {BOM_SHEET_NUMBER}, ASSEMBLY SEQUENCE ON SHEET "
+        f"REMOVED; BOM ON SHEET {BOM_SHEET_NUMBER}, ASSEMBLY SEQUENCE ON SHEET "
         f"{STEPS_SHEET_NUMBER}"
     )
     return _wrapped((line,), width=EXPLODED_CAPTION_WIDTH)
@@ -1210,6 +1206,77 @@ def _add_note_block(
     if printed != text:
         raise RuntimeError(f"jig {label} printed as {printed!r}")
     return note
+
+
+def _place_general_table(
+    adapter: Any,
+    *,
+    header: Sequence[str],
+    rows: Sequence[Sequence[str]],
+    widths: Sequence[float],
+    top_left: tuple[float, float],
+    label: str,
+) -> tuple[float, float, float, float]:
+    """A native general table (draw_dt_drive_train_assembly's setting
+    tables), every cell read back; returns its sheet box."""
+    x, top = top_left
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    # swBOMConfigurationAnchor_TopLeft = 1; no template: a plain general table.
+    raw = ddoc.InsertTableAnnotation2(False, x, top, 1, "", len(rows) + 1, len(header))
+    if raw is None:
+        raise RuntimeError(f"{label}: InsertTableAnnotation2 returned no table")
+    table = _early_bound(raw, "ITableAnnotation")
+    if (int(table.RowCount), int(table.ColumnCount)) != (len(rows) + 1, len(header)):
+        raise RuntimeError(
+            f"{label}: table is {table.RowCount}x{table.ColumnCount}, "
+            f"expected {len(rows) + 1}x{len(header)}"
+        )
+    for column, width in enumerate(widths):
+        # swTableRowColChange_TableSizeCanChange = 0
+        if abs(float(table.SetColumnWidth(column, width, 0)) - width) > 1e-6:
+            raise RuntimeError(f"{label}: column {column} width did not persist")
+    for row, cells in enumerate((header, *rows)):
+        for column, text in enumerate(cells):
+            table.SetText2(row, column, True, text)
+            applied = str(table.DisplayedText2(row, column, True) or "")
+            if applied != text:
+                raise RuntimeError(
+                    f"{label}: cell ({row}, {column}) did not persist: {applied!r} != {text!r}"
+                )
+    for row in range(len(rows) + 1):
+        # The BOM's row height (SETTING_TABLE_TOP's budget); the box readback
+        # below measures what the table actually holds.
+        table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)
+    annotation = _early_bound(table.GetAnnotation(), "IAnnotation")
+    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+    heights = tuple(float(table.GetRowHeight(row)) for row in range(int(table.RowCount)))
+    read = tuple(float(table.GetColumnWidth(column)) for column in range(int(table.ColumnCount)))
+    if len(position) != 3 or not all(map(math.isfinite, (*position, *heights, *read))):
+        raise RuntimeError(f"{label}: table geometry is unreadable")
+    box = (position[0], position[1] - sum(heights), position[0] + sum(read), position[1])
+    _telemetry.event(
+        "drawing.general_table",
+        table=label,
+        box_mm=tuple(value * 1000.0 for value in box),
+        row_heights_mm=tuple(value * 1000.0 for value in heights),
+        column_widths_mm=tuple(value * 1000.0 for value in read),
+    )
+    return box
+
+
+def setting_table_box_violations(box: tuple[float, float, float, float]) -> list[str]:
+    """The sheet 1 setting table stays inside the border, left of the title
+    block."""
+    x0, y0, x1, y1 = box
+    findings = []
+    if y0 < SHEET_INNER_BORDER[1] + BOM_SHEET_CLEARANCE:
+        findings.append(f"runs {(SHEET_INNER_BORDER[1] + BOM_SHEET_CLEARANCE - y0) * 1000.0:.1f} mm below the border")
+    if x1 > TITLE_BLOCK[0] - BOM_SHEET_CLEARANCE and y0 < TITLE_BLOCK[3] + BOM_SHEET_CLEARANCE:
+        findings.append("runs into the title block")
+    if x0 < SHEET_INNER_BORDER[0]:
+        findings.append("runs past the left border")
+    return findings
+
 
 
 def _view_outline(view: Any, *, label: str) -> tuple[float, float, float, float]:
@@ -1806,8 +1873,8 @@ def _add_plan_tags(adapter: Any, plan: Any) -> None:
 
 
 def _place_assembled_sheet(adapter: Any) -> None:
-    """Plan over the operator's elevation at the modelled pose, each titled,
-    the plan's tags, the pose caption and the rail-alignment targets."""
+    """Plan over the operator's elevation at the modelled pose, the plan's
+    tags, the pose caption and the setting table."""
     _activate_sheet(adapter, SHEET_NAMES[0])
     plan = _place_named_view(
         adapter, spec.PLAN_VIEW, PLAN_CENTER, ASSEMBLED_SCALE, label="jig plan"
@@ -1824,21 +1891,23 @@ def _place_assembled_sheet(adapter: Any) -> None:
         apply_view_configuration(adapter, view, label=label)
         _assert_view_on_sheet(view, label=label)
     _add_plan_tags(adapter, plan)
-    for text, xy, label in (
-        (spec.PLAN_VIEW_LABEL, PLAN_LABEL_XY, "plan title"),
-        (spec.ELEVATION_VIEW_LABEL, ELEVATION_LABEL_XY, "elevation title"),
-    ):
-        _add_note_block(adapter, SHEET_NAMES[0], text, xy, label=label)
     _add_note_block(
         adapter, SHEET_NAMES[0], ASSEMBLED_CAPTION, CAPTION_XY, label="pose caption"
     )
     _add_note_block(
-        adapter,
-        SHEET_NAMES[0],
-        ALIGNMENT_NOTE,
-        ALIGNMENT_XY,
-        label="rail-alignment targets",
+        adapter, SHEET_NAMES[0], SETTING_TABLE_TITLE, SETTING_TABLE_XY,
+        label="setting table title",
     )
+    box = _place_general_table(
+        adapter,
+        header=spec.SETTING_TABLE_HEADER,
+        rows=spec.SETTING_TABLE_ROWS,
+        widths=SETTING_TABLE_WIDTHS,
+        top_left=(SETTING_TABLE_XY[0], SETTING_TABLE_TOP),
+        label="jig setting table",
+    )
+    if findings := setting_table_box_violations(box):
+        raise RuntimeError(f"jig setting table: {'; '.join(findings)}")
 
 
 @contextmanager
@@ -2609,7 +2678,7 @@ def _place_notes_reference_views(adapter: Any) -> dict[str, tuple[float, float]]
         )
         scale = tuple(float(value) for value in _early_bound(view, "IView").ScaleRatio)
         scales[sheet_name] = scale
-        caption = f"REFERENCE {_scale_text(scale)}"
+        caption = "REFERENCE"
         x0, y0, x1, _y1 = _view_outline(view, label=label)
         _add_note_block(
             adapter,
@@ -2639,8 +2708,7 @@ def _place_finished_view(adapter: Any) -> None:
     _center_view_outline(adapter, finished, center, label=label)
     _assert_view_on_sheet(finished, bounds=FINISHED_REGION, label=label)
     assert_full_detail_view(adapter, label="jig assembly")
-    scale = tuple(float(value) for value in _early_bound(finished, "IView").ScaleRatio)
-    caption = f"FINISHED ASSEMBLY {_scale_text(scale)}"
+    caption = "FINISHED ASSEMBLY"
     x0, y0, x1, _y1 = _view_outline(finished, label=label)
     _add_note_block(
         adapter,
@@ -3112,37 +3180,15 @@ def _balloon_linear_motion(
 
 
 def _place_steps_notes(adapter: Any) -> None:
-    _add_note_block(
-        adapter, STEPS_SHEET, ASSEMBLY_STEPS, STEPS_XY, label="assembly sequence"
-    )
-    if ASSEMBLY_STEPS_CONTINUED:
-        _add_note_block(
-            adapter,
-            STEPS_SHEET,
-            ASSEMBLY_STEPS_CONTINUED,
-            STEPS_CONTINUED_XY,
-            label="assembly sequence, continued",
-        )
-    if ASSEMBLY_CHECKS:
-        _add_note_block(
-            adapter, STEPS_SHEET, ASSEMBLY_CHECKS, CHECKS_XY, label="assembly checks"
-        )
-
-
-def _place_operation_notes(adapter: Any) -> None:
-    for sheet, layout, label in (
-        (FIT_SHEET, FIT_LAYOUT, "pivot fit and KP08 alignment"),
-        (OPERATION_SHEET, OPERATION_LAYOUT, "operation and installed-machine acceptance"),
-        (HOLDING_SHEET, HOLDING_LAYOUT, "strap preparation and holding"),
-    ):
-        _add_note_block(adapter, sheet, layout.steps, STEPS_XY, label=label)
-        if layout.continued:
+    """Each instruction sheet's left column, then its right column."""
+    for layout in STEPS_SHEETS:
+        label = f"{layout.sheet.lower()} steps"
+        _add_note_block(adapter, layout.sheet, layout.left, STEPS_XY, label=label)
+        if layout.right:
             _add_note_block(
-                adapter, sheet, layout.continued, STEPS_CONTINUED_XY,
+                adapter, layout.sheet, layout.right, STEPS_CONTINUED_XY,
                 label=f"{label}, continued",
             )
-        if layout.checks:
-            _add_note_block(adapter, sheet, layout.checks, layout.checks_xy, label=f"{label} checks")
 
 
 def _activate_package(adapter: Any, target: Any) -> None:
@@ -3285,12 +3331,12 @@ def _place_package(
     bom_note_settled = _place_bom_note(adapter, table)
     bom_name = _bom_feature_name(table)
     landings: list[BalloonLanding] = []
-    for cluster, view, scale in placed:
+    for cluster, view, _scale in placed:
         landings += _balloon_cluster(adapter, view, cluster, items, bom_name)
         _add_note_block(
             adapter,
             cluster.sheet,
-            exploded_caption(cluster, scale),
+            exploded_caption(cluster),
             EXPLODED_CAPTION_XY,
             label=f"{cluster.sheet.lower()} caption",
         )
@@ -3307,12 +3353,11 @@ def _place_package(
     _add_note_block(
         adapter,
         LINEAR_MOTION_SHEET,
-        linear_motion_caption(linear_scale),
+        linear_motion_caption(),
         EXPLODED_CAPTION_XY,
         label=f"{LINEAR_MOTION_SHEET.lower()} caption",
     )
     _place_steps_notes(adapter)
-    _place_operation_notes(adapter)
     scales = package_sheet_scales(
         {cluster.sheet: scale for cluster, _view, scale in placed}
     )

@@ -105,7 +105,6 @@ import ch_rocker_arm_tl_vn_oblique_rail_kit_carriage_spec as carriage
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import sm_vn_knife_mount_dowel_spec as stop_pin
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
-import ch_rocker_arm_tl_oblique_end_bracket_spec as end_bracket
 import ch_rocker_arm_tl_oblique_feed_lever_spec as feed_lever
 import sh_vn_clamping_kit_flange_nut_spec as flange_nut
 import ch_rocker_arm_tl_vn_oblique_handwheel_spec as handwheel
@@ -160,11 +159,12 @@ _NM_PER_IN_LBF = 4.4482216152605 * 0.0254
 
 
 def _torque(nm: float) -> str:
-    """A tightening torque as the sheet prints it, ``2.8 N·m (25 IN·LBF)``:
-    the N·m source value first, its in·lbf conversion in parentheses rounded
-    to the nearest two significant figures (owner ruling 3, 2026-11-01)."""
+    """A tightening torque as the sheet prints it, ``25 IN·LBF``: the N·m
+    source value converted and rounded to two significant figures (owner
+    ruling 3, 2026-11-01). The inch sheet prints the inch value only (rule 26;
+    TL-00 rubric review ce83/c752: N·m first on an inch sheet)."""
     in_lbf = float(f"{nm / _NM_PER_IN_LBF:.2g}")
-    return f"{nm:.1f} N·m ({in_lbf:g} IN·LBF)"
+    return f"{in_lbf:g} IN·LBF"
 
 
 
@@ -1091,8 +1091,8 @@ BOM_DESCRIPTIONS = {
     PIVOT_SPACER: "SPACER, 3/8 ID X 5/8 OD X 5/8",
     PIVOT_SHIM: "SHIM 3/8 X 5/8, FITTING STOCK",
     CARRIER: "CARRIER PLATE",
-    RISER: "6061 RISER",
-    HUB_WASHER: "BRASS TOP-HAT HUB CLAMP WASHER",
+    RISER: "RISER",
+    HUB_WASHER: "TOP-HAT HUB CLAMP WASHER",
     FEED_LEVER: "FEED LEVER",
     END_BRACKET: "END BRACKET",
     # Kit members print their native per-configuration descriptions.
@@ -1326,9 +1326,9 @@ _RAIL_SCREW_TOP_EXPLODED = RAIL_TOP_Z + max(map(explode_lift, RAIL_SCREW_INSTANC
 if _RAIL_SCREW_TOP_EXPLODED > CARRIAGE_UNDERSIDE_Z + explode_lift(CARRIAGE):
     raise AssertionError("the exploded rail screws stand inside the carriages")
 # Each exploded sheet's cross-reference, after its cluster's title; the
-# drawing fills in the fitted scale and its own sheet numbers.
+# drawing fills in its own sheet numbers.
 EXPLODED_CAPTION = (
-    "EXPLODED {scale} - BOM ON SHEET {bom_sheet}, "
+    "EXPLODED - BOM ON SHEET {bom_sheet}, "
     "ASSEMBLY SEQUENCE ON SHEET {steps_sheet}"
 )
 
@@ -1373,8 +1373,6 @@ for _name, (_right, _up, _sight) in VIEW_AXES.items():
         > 1e-12
     ):
         raise AssertionError(f"{_name}: not a right-handed orthonormal frame")
-PLAN_VIEW_LABEL = "PLAN, FROM ABOVE"
-ELEVATION_VIEW_LABEL = "ELEVATION FROM THE OPERATOR SIDE (-Y)"
 
 # --- Sheet 1 plan tags ---------------------------------------------------------------
 # Each tag's text, the machine point its leader touches and the machine XY of
@@ -1455,35 +1453,26 @@ PLAN_TAGS: tuple[PlanTag, ...] = (
 
 # --- Fitter package text -------------------------------------------------------------
 # Rail-angle setting is an assembly control, independent of the carrier's
-# .XXX hole-table locations. Preserve the existing .0008 indicating band.
-ALIGNMENT_BAND = 0.0008 * trammel.INCH
+# .XXX hole-table locations. Q1 (Delegated ruling 2026-11-07 (Main), no
+# precedent; owner review #2144; pending owner confirmation): the converted
+# .0008 becomes the plain inch step ±.001, read with a .0001 spindle test
+# indicator (TL-00 rubric review ce83/c752). Only the print reads this band.
+ALIGNMENT_BAND = 0.001 * trammel.INCH
 ALIGNMENT_PLACES = 4
+ALIGNMENT_INDICATOR = ".0001 SPINDLE TEST INDICATOR"
 ASSEMBLED_CAPTION = (
-    "INNER PASS AT THE SYMMETRIC POSITION: A1/B1; OUTER PASS: A2/B2. "
-    "BOTH SHOULDER SCREWS MUST BE SEATED AND TORQUED BEFORE CUTTING. "
-    "CHECK ACTUAL SPINDLE/TOOL/HOLDER CLEARANCE BEFORE USE (OPERATION SHEET). "
-    "MACHINE ORIGIN: SPINDLE AT TABLE TOP; +Y TOWARD COLUMN. "
-    "NO STRAP SHOWN; ITS CLAMPS AND STOP PINS AS FITTED."
+    "SHOWN: INNER PASS, SHOULDER SCREWS IN A1/B1, AT THE SYMMETRIC POSITION "
+    "(SETTING TABLE). OUTER PASS: A2/B2. MACHINE ORIGIN, DRO X 0, Y 0: "
+    "SPINDLE AXIS AT TABLE TOP; +Y TOWARD THE COLUMN. NO STRAP SHOWN."
 )
-
-
-def _station_row(station: float) -> str:
-    """One table row: each rail's pin at ``station``, machine X/Y."""
-    (x1, y1), (x2, y2) = (trammel.rail_point(rail, station) for rail in (1, 2))
-    x1, y1, x2, y2 = (_length(v, ALIGNMENT_PLACES) for v in (x1, y1, x2, y2))
-    return (
-        f"S {_length(station, 2):>5}: RAIL 1 X {x1:>8} Y {y1:>7}; "
-        f"RAIL 2 X {x2:>8} Y {y2:>7}"
-    )
 
 
 # Review bought-tl000-r1: the checks' "sweep of each pass" gets its range,
 # each pin's station over ±trammel.SWEEP, rounded outward. Review jig-asm r2
-# (2026-11-02): no stop ends a pass, so step 6 and its HD3 repeat set a pin
-# at each limit as at a station and witness-mark its bar at the carriage;
-# every complete pass runs mark to mark. Rounded outward to .01, a limit
-# stays well inside the leadscrew.FEED_GAP the feed lug keeps to its KP08 at
-# the exact travel end.
+# (2026-11-02): no stop ends a pass, so step 6 sets a pin at each limit as at
+# a station and witness-marks its bar at the carriage; every complete pass
+# runs mark to mark. Rounded outward to .01, a limit stays well inside the
+# leadscrew.FEED_GAP the feed lug keeps to its KP08 at the exact travel end.
 SWEEP_LIMIT_PLACES = 2
 SWEEP_LIMITS = {
     name: (
@@ -1492,33 +1481,56 @@ SWEEP_LIMITS = {
     )
     for name, (lo, hi) in trammel.PIN_TRAVEL.items()
 }
+# The symmetric position (step 10): the inner pass's pins at their
+# zero-sweep station, where the carrier's HUB is set (owner ruling 3,
+# 2026-11-07). Its row's range is the HUB setting's own band, so the step
+# 10 indicator check of the A1/B1 heads reads the HUB setting's reference at
+# that band (Q2, Delegated ruling 2026-11-07 (Main), no precedent; owner
+# review #2144; pending owner confirmation).
+SYMMETRIC_STATION = trammel.SYMMETRIC_PIN_STATION["inner"]
+_SYMMETRIC_A1 = trammel.carrier_pose("inner", 0.0).to_machine(trammel.A1)
+if math.dist(_SYMMETRIC_A1, trammel.rail_point(1, SYMMETRIC_STATION)) > 1e-9:
+    raise AssertionError("A1 at the symmetric position is not rail 1's pin")
 
 
-def _sweep_lines() -> tuple[str, ...]:
-    spans = ", ".join(
-        f"{name.upper()} {_length(lo, SWEEP_LIMIT_PLACES)} TO "
-        f"{_length(hi, SWEEP_LIMIT_PLACES)}"
-        for name, (lo, hi) in SWEEP_LIMITS.items()
-    )
+def _station_cells(station: float) -> tuple[str, str, str, str, str]:
+    """S and each rail's pin X/Y at ``station``, machine X/Y."""
+    (x1, y1), (x2, y2) = (trammel.rail_point(rail, station) for rail in (1, 2))
     return (
-        f"SWEEP LIMITS, EACH PIN AT S: {spans}; NO STOP ENDS A PASS. STEP 6 "
-        "AND HD3 SET EACH PIN AT EACH LIMIT BELOW AS AT A STATION AND "
-        "WITNESS-MARK ITS BAR AT THE CARRIAGE'S SPINDLE-END FACE, I OR O BY "
-        "PASS. A COMPLETE PASS RUNS EACH CARRIAGE MARK TO MARK:",
-        *(
-            _station_row(s)
-            for s in sorted(s for limits in SWEEP_LIMITS.values() for s in limits)
-        ),
+        _length(station, SWEEP_LIMIT_PLACES),
+        *(_length(v, ALIGNMENT_PLACES) for v in (x1, y1, x2, y2)),
     )
 
 
-ALIGNMENT_NOTE_LINES = (
-    "RAIL ALIGNMENT TARGETS: PIVOT PIN AXIS, MACHINE X/Y FROM THE SPINDLE, "
-    "AT STATION S FROM THE SPINDLE ALONG THE RAIL "
-    f"(±{_length(ALIGNMENT_BAND, ALIGNMENT_PLACES)})",
-    *(_station_row(station) for station in trammel.ALIGNMENT_TARGETS),
+def _limit_cells(station: float) -> tuple[str, str, str, str, str]:
+    """A sweep-limit row: set in X only, its Y the bar's result (REF)."""
+    s, x1, y1, x2, y2 = _station_cells(station)
+    return s, x1, f"({y1})", x2, f"({y2})"
+
+
+_BAND_TEXT = f"±{_length(ALIGNMENT_BAND, ALIGNMENT_PLACES - 1)}"
+_HUB_BAND_TEXT = f"±{_length(carrier.HUB_OFFSET_BAND, carrier.HUB_OFFSET_PLACES)}"
+SETTING_TABLE_TITLE = (
+    "SETTING TABLE: PIVOT PIN AXIS AT STATION S ALONG EACH RAIL, DRO X/Y FROM "
+    f"THE SPINDLE ORIGIN, READ ON THE SHOULDER-SCREW HEAD WITH A {ALIGNMENT_INDICATOR}. "
+    "LIMIT ROWS ARE THE WITNESS MARKS ENDING EACH PASS, SET IN X ONLY. ( ) = REF."
 )
-SWEEP_NOTE_LINES = _sweep_lines()
+SETTING_TABLE_HEADER = ("ROW", "S", "RAIL 1 X", "RAIL 1 Y", "RAIL 2 X", "RAIL 2 Y", "RANGE")
+SETTING_ROW_STATION = "STATION"
+SETTING_ROW_SYMMETRIC = "SYMMETRIC"
+SETTING_TABLE_ROWS: tuple[tuple[str, ...], ...] = (
+    *(
+        (SETTING_ROW_STATION, *_station_cells(station), _BAND_TEXT)
+        for station in trammel.ALIGNMENT_TARGETS
+    ),
+    (SETTING_ROW_SYMMETRIC, *_station_cells(SYMMETRIC_STATION), _HUB_BAND_TEXT),
+    *(
+        (f"{name.upper()} LIMIT", *_limit_cells(s), f"X {_BAND_TEXT}")
+        for s, name in sorted(
+            (s, name) for name, limits in SWEEP_LIMITS.items() for s in limits
+        )
+    ),
+)
 
 # Every screw by its fastener-table callout (fasteners.FASTENERS) and every
 # bought item by its BOM item number.
@@ -1864,14 +1876,12 @@ _STOP_X = {abs(x) for x, _y in STOP_PIN_DRO_POINTS}
 _STOP_Y = {y for _x, y in STOP_PIN_DRO_POINTS}
 if len(_STOP_X) != 1 or len(_STOP_Y) != 1:
     raise AssertionError("the stop pins no longer stand symmetric on one Y")
+_STOP_X_TEXT = _length(_STOP_X.pop(), _STOP_AXIS_PLACES)
 _STOP_DRO = (
-    f"X ±{_length(_STOP_X.pop(), _STOP_AXIS_PLACES)}, "
+    f"X -{_STOP_X_TEXT} AND X {_STOP_X_TEXT}, "
     f"Y {_length(_STOP_Y.pop(), _STOP_AXIS_PLACES)} "
-    f"±{_length(_STOP_AXIS_BAND, _STOP_AXIS_PLACES)}"
+    f"(±{_length(_STOP_AXIS_BAND, _STOP_AXIS_PLACES)})"
 )
-# The shared stud REWORK sheet points to this installed-stack acceptance.
-OPERATION_SHEET_NUMBER = 9
-HOLD_DOWN_REFERENCE = f"{DRAWING_NUMBER}, STEPS HD1-HD4 (SHEET {OPERATION_SHEET_NUMBER})"
 # Review jig-asm r1 (minor): the screws and nuts whose steps state no
 # torque. Their fastener specs carry no torque figure, so rule 24's one
 # general note gives the conventional snug instruction, no invented value.
@@ -1887,8 +1897,6 @@ GENERAL_TORQUE_NOTE = (
     f"{', '.join(map(str, _SNUG_ITEMS[:-1]))} AND {_SNUG_ITEMS[-1]}): "
     "SNUG BY HAND WITH A STANDARD-LENGTH HEX KEY OR WRENCH; NO EXTENSION."
 )
-# Keep sheets 7–8 at the normal note size and paragraph spacing. The BOM owns
-# the shim SKU/thickness buy list; P1 cites it rather than printing it twice.
 # Step 1 cites its documents by Number (TL-00 review 62753c5e): the base
 # bar's process plan and the rail kit's receipt sheet, whose note [A] states
 # the counterbore-to-end wall each trimmed rail keeps.
@@ -1898,329 +1906,322 @@ BASE_BAR_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-base-bar")["number"]
 if base_bar.PART_NAME != "ch-rocker-arm-tl-oblique-base-bar":
     raise AssertionError("step 1's base-bar Number reads another part's row")
 RAIL_RECEIPT_REFERENCE = f"{base_bar.RAIL_NUMBER} SHEET {guide_rail.RECEIPT_SHEET}"
-ASSEMBLY_STEPS = (
-    # Select carriages and finish all rail/bar preparation before fastening
-    # the rails/brackets or putting the bars on the machine table.
-    f"1. PREPARE RAILS PER THE {BASE_BAR_NUMBER} PROCESS PLAN AND "
-    f"{RAIL_RECEIPT_REFERENCE}. "
-    f"EACH RAIL ARRIVES WITH 2 GREASED {carriage.STYLE} CARRIAGES "
-    f"{_item(CARRIAGE)}: ROCK ALL 4 SIDEWAYS UNDER AN INDICATOR; KEEP THE 2 "
-    "TIGHTEST, ONE PER RAIL. A CARRIAGE LEAVES A RAIL ONLY ONTO A KIT FALSE RAIL. "
-    f"IF NONE MEETS {trammel.CARRIAGE_PLAY_TIR_MAX:.2f} MM, FIT A PRELOADED (Z0/ZA) "
-    f"{carriage.STYLE} CARRIAGE. "
-    "TRIM EACH RAIL TO ITS ACTUAL BAR, FLUSH BOTH ENDS; CHECK EACH END "
-    f"COUNTERBORE WALL {guide_rail.WALL_ACCEPTANCE_MM:.1f} MM MIN "
-    f"({RAIL_RECEIPT_REFERENCE} NOTE [A]). "
-    "TRANSFER ITS HOLES TO THAT BAR PER THAT PLAN; "
-    "KEEP EACH PAIR IDENTIFIED. ALL EIGHT SCREWS MUST ENTER FREELY BY HAND "
-    "WITHOUT MOVING THE RAIL. CLEAN ALL CUTTING GRIT BEFORE RELOADING.",
-    f"2. FIT EACH {guide_rail.STYLE} RAIL {_item(RAIL)} WITH "
-    f"{trammel.RAIL_HOLE_COUNT} {_RAIL_SCREW} {_item(RAIL_SCREW)}, NEAR ENDS FLUSH. "
-    f"BASE BAR 1 {_item(BASE_BAR_1)}: AS DRAWN, RAIL 1. BASE BAR 2 "
-    f"{_item(BASE_BAR_2)}: TURNED OVER, RAIL 2; PLAN MIRROR OF BAR 1. "
-    f"AT EACH KP08 STATION ON BAR 1, FIT AN END BRACKET {_item(END_BRACKET)} "
-    f"WITH {len(leadscrew.BAR_SCREW_LATERALS)} {_BAR_SCREW} {_item(PILLOW_BLOCK_SCREW)} "
-    f"FROM BELOW, NO WASHERS, {_torque(leadscrew.BAR_SCREW_TORQUE_NM)}.",
-    "3. SET BARS ON THE TABLE, NEAR ENDS TOWARD THE SPINDLE. PER BAR, FIT "
-    f"2 UNCUT {fasteners.HOLD_DOWN_STUD_THREAD} STUDS {_item(HOLD_DOWN_STUD)} "
-    f"IN OUTER T-SLOT T-NUTS {_item(T_NUT)}, FLANGE NUTS {_item(FLANGE_NUT)} FINGER-TIGHT. "
-    "KEEP STUDS UNCUT UNTIL 13B/HD3; CUT TO BOM LENGTH "
-    f"{_length(hold_down_stud.LENGTH, hold_down_stud.LENGTH_PLACES)} THERE. "
-    "FOLLOW HD1 FOR UNCUT-STOCK OBSTRUCTIONS.",
-    f"4. FIT THE FEED BLOCK {_item(FEED_BLOCK)} ON RAIL 1'S CARRIAGE, "
-    f"THE PLAIN PIVOT BLOCK {_item(PIVOT_BLOCK)} ON RAIL 2'S, "
-    "PIVOT COUNTERBORES TOWARD THE SPINDLE AND FEED LUG TOWARD THE COLUMN.",
-    # Owner ruling 2026-11-01 (option A): each carriage screw is cut to its own
-    # counterbore (rule 19); the jig's RV-05 accepts the reach it leaves.
-    "5. MEASURE EACH BLOCK'S 4 COUNTERBORE FLOOR HEIGHTS ABOVE ITS BOTTOM TO "
-    f".001. CUT EACH {_CARRIAGE_SCREW} {_item(CARRIAGE_SCREW)} TO ITS OWN FLOOR "
-    f"HEIGHT + {_length(pivot_block.SCREW_REACH, 3)} "
-    f"(+/-{_length(pivot_block.SCREW_CUT_BAND, 3)}) UNDER THE HEAD; DEBURR THE "
-    "CUT END. FASTEN EACH BLOCK WITH ITS 4: EACH TIP ENGAGES "
-    f"{_length(pivot_block.REACH_MIN, 3)}-{_length(pivot_block.REACH_MAX, 3)} "
-    "OF THE CARRIAGE'S M4 X 5 AND NEVER BOTTOMS. "
-    f"TEMPORARILY SEAT THE SHOULDER SCREWS {_item(PIVOT_SCREW)} FOR INDICATING.",
-    "6. ZERO DRO X/Y AT THE SPINDLE ORIGIN (SHEET 1). AT EACH ALIGNMENT-TABLE "
-    "X/Y, CENTRE THE SHOULDER UNDER A SPINDLE INDICATOR: SLIDE THE CARRIAGE "
-    "IN X, TAP THE BAR IN Y. TIGHTEN HOLD-DOWN NUTS; RECHECK EVERY STATION. "
-    "SET EACH SWEEP LIMIT (SHEET 1) THE SAME WAY, CENTRING IN X ONLY. "
-    "WITNESS-MARK EACH BAR AT ITS CARRIAGE'S SPINDLE-END FACE, I OR O BY PASS.",
-    # Receipt foot bounds protect the whole upper reach from the opposed
-    # hand-tap cut and retain 1.5D full engagement at the thickest foot.
-    # The foot remains UNVERIFIED (#2184).
-    f"7. CHECK EACH KP08 {_item(PILLOW_BLOCK)} FOOT IS "
-    f"{_bound(end_bracket.KP08_FOOT_THICK_MIN, 3, up=True)} TO "
-    f"{_bound(end_bracket.KP08_FOOT_THICK_MAX, 3, up=False)} THICK AT ITS 2 HOLES. "
-    f"FIT EACH KP08 WITH 2 {_KP08_SCREW} {_item(PILLOW_BLOCK_SCREW)}, LOOSE.",
-    # TL-00 review (farm 20261104T210601055Z, blocker): one linear order,
-    # every cross-reference one way: F1A, 8A, F1B, F2, 8B, F3.
-    # The Tr8 screw's stub and the hub's gap close its metric cut along the
-    # KP08 stations: they print exact millimetres (owner ruling 4, 2026-11-01).
-    f"8A. COMPLETE F1A (SHEET 8). THREAD THE LEADSCREW {_item(LEADSCREW)}, "
-    "OILED WITH ISO VG 32, THROUGH THE KP08S, THE LUG CLEARANCE AND THE "
-    f"FEED NUT {_item(FEED_NUT)}, {leadscrew.NEAR_STUB:.1f} MM PAST THE NEAR "
-    "BLOCK. COMPLETE F1B-F2.",
-    f"8B. PUSH THE HANDWHEEL {_item(HANDWHEEL)} ON, HUB "
-    f"{leadscrew.HUB_GAP:.1f} MM OFF THE FAR BLOCK; "
-    "TIGHTEN ITS AND THE KP08 SET SCREWS ON THE FLATS WITH LOCTITE 222 "
-    "THREADLOCKER. COMPLETE F3.",
-    "9. REMOVE THE TEMPORARY SHOULDER SCREWS. FIT THE SPACERS AND CARRIER "
-    "ON A1/B1; SELECT SHIMS PER P1 AND COMPLETE P1-P3 (SHEET 8). RECORD HD1 "
-    "H THROUGH THE COMPLETE INNER-PASS HAND SWEEP, MARK TO MARK (STEP 6), "
-    "USING THE HANDWHEEL.",
-    # The carrier stays on its A1/B1 seats from step 9 to 13A: its HUB tap is
-    # made in place on the running jig and nothing removes it before 13A. The
-    # HUB is set from the spindle origin (the apex) by the printed offset, so
-    # the pin spacing moves it with the cut.
-    f"10. KEEP CARRIER {_item(CARRIER)} ON A1/B1 THROUGH STEP 11. "
-    "FEED TO SYMMETRIC POSITION; MOVE TABLE UNTIL THE DRO READS "
-    f"{_HUB_DRO}. RECORD IT: EVERY STRAP'S HUB HOLE IS DRILLED AND REAMED "
-    "THERE (O5). SPINDLE-GUIDED, SPOT, TAP-DRILL AND TAP THE CARRIER'S HUB "
-    f"{carrier.HUB_THREAD} THRU THERE, NO COUNTERBORE. CL AND CR ARE THE "
-    "CARRIER DRAWING'S ORDINARY TAPS; DO NOT REDRILL.",
-    f"11. AT THE STEP 10 SYMMETRIC POSITION, STAND THE {QUANTITIES[STOP_PIN]} "
-    f"STOP PINS {_item(STOP_PIN)} CHAMFERED END DOWN IN THE RISER'S STOP HOLES "
-    f"(DRILLED FIRST, {carrier.RISER_NUMBER}); SET THE RISER ON THE CARRIER SO "
-    f"THE PIN AXES READ DRO {_STOP_DRO} AND CLAMP IT. ONLY THEN SPOT "
-    f"{len(riser.SCREW_HOLES) + len(STRAP_CLAMP_ROLES)} THROUGH-HOLE CENTRES "
-    f"FROM BELOW. FINISH TO {carrier.RISER_NUMBER}; FIT WITH "
-    f"{len(riser.SCREW_HOLES)} {_RISER_SCREW}S {_item(RISER_SCREW)}. "
-    "KEEP BOTH STOP PINS LOOSE IN THEIR HOLES. OMIT THE TOP-HAT WASHER AND "
-    "THE CL, CR AND HUB SCREWS UNTIL O4.",
-    f"12. FIT FEED LEVER WITH 2 {_LEVER_SCREW} {_item(LEVER_SCREW)} "
-    f"AND WEDGE-LOCK PAIRS {_item(LEVER_LOCK_WASHER)}, {_LEVER_TORQUE}; "
-    f"GRIP TOWARD OPERATOR. THE CL, CR AND HUB {_STRAP_CLAMPS} ARE FITTED "
-    "AT EACH WORK LOADING (O4-O6). "
-    "HANDWHEEL FEED; NEVER FORCE LEVER AGAINST ENGAGED NUT.",
-    f"13A. FIT A2/B2 PER O1; COMPLETE HD1 (SHEET {OPERATION_SHEET_NUMBER}).",
-    # Review jig-asm r1/r2 (2026-11-02): the carrier stays off from 13B
-    # through HD3, so 13B states only O1's removal half and 13C its refit.
-    "13B. ISOLATE THE SPINDLE, SUPPORT THE CARRIER, REMOVE BOTH SHOULDER "
-    "SCREWS AND LIFT IT OFF; KEEP IT OFF AND REWORK STUDS PER HD2-HD3.",
-    "13C. MOVE CARRIAGES TO ALIGN A2/B2 OVER BLOCK COUNTERBORES; "
-    "LOWER THE CARRIER ONTO THEM, REFIT BOTH SCREWS PER P2 AND CHECK P1-P3; "
-    "DO HD4 AND THE CHECKS.",
-    "13D. RETURN TO A1/B1 PER O1; REPEAT HD4 AND THE CHECKS.",
-)
-ASSEMBLY_CHECKS = (
-    "CHECK: ALIGNMENT READINGS WITHIN "
-    f"±{_length(ALIGNMENT_BAND, ALIGNMENT_PLACES)} OF TARGET.",
-    "CHECK: HANDWHEEL FEEDS BOTH FULL PASSES WITHOUT BINDING; CARRIAGES "
-    "STAY ON RAILS; MOVING PARTS CLEAR STUDS, NUTS AND COLUMN COVER.",
-    "CHECK: SHOULDER ENDS SEATED, SCREWS TORQUED; BOTH HEADS HAVE P1 "
-    "RUNNING GAP WITHOUT CLAMPING CARRIER.",
-    # Owner P1-A, 2026-11-07: .02 TIR, same #2177 shoulder-head sideways check.
-    "CHECK: INDICATE SHOULDER-SCREW HEAD; ROCK CARRIER SIDEWAYS TO RAIL BY "
-    f"HAND: {trammel.CARRIAGE_PLAY_TIR_MAX:.2f} MM TIR MAX.",
-)
-PIVOT_FIT_STEPS = (
-    f"P1. SET A LOOSE SPACER {_item(PIVOT_SPACER)} ON EACH BLOCK, NO SHIMS. "
-    "LOWER CARRIER ON CHOSEN HOLE PAIR; SEAT BOTH SHOULDER SCREWS. MEASURE "
-    "EACH HEAD-TO-CARRIER GAP; LIFT CARRIER. UNDER EACH SPACER FIT SHIMS "
-    f"{_item(PIVOT_SHIM)} FROM THE BUY LIST UNDER THE BOM TO GIVE "
-    f"{_length(PIVOT_RUNNING_GAP[0], 3)}-{_length(PIVOT_RUNNING_GAP[1], 3)} GAP THROUGH FREE SWING. "
-    f"NOMINAL {pivot_shim.PER_SUPPORT} X {_length(pivot_shim.THICKNESS, 3)}; "
-    f"MAX PACK {_length(PIVOT_FIT_PACK_MAX, 3)} ({PIVOT_FIT_SHIMS_MAX} SHIMS). "
-    "REMEASURE. SAME SHIMS FOR BOTH HOLE PAIRS; NONE BETWEEN SPACER AND CARRIER.",
-    f"P2. CLEAN {pivot_screw.THREAD} THREADS; APPLY LOCTITE 222. LIGHTLY GREASE "
-    "SHOULDERS AND SPACER FACES WITH NLGI 2 LITHIUM GREASE; KEEP THREADS "
-    "GREASE-FREE. SEAT SHOULDERS IN COUNTERBORES; TORQUE "
-    f"{_torque(PIVOT_SCREW_TORQUE_NM)}. HEADS MUST NOT CLAMP CARRIER.",
-    "P3. HANDWHEEL-SWEEP FITTED PAIR'S FULL PASS: CHECK BOTH SUPPORT GAPS, "
-    "FREE ROTATION AND POSITIVE LIFT CAPTURE UNDER BOTH HEADS. REFIT A FAILED "
-    "STACK; NEVER LOOSEN A SEATED SCREW FOR CLEARANCE.",
-)
-# Sheet 2, under the BOM: what item 7's QTY counts and the fitting stock to
-# buy, and the owner's description note for the kit rails and carriages
-# (#2177, 2026-11-04), in three lines; the rail and carriage registry
-# records and inventory entries carry it word for word. Then one line names
-# the two base-bar rows' shared Number as two configurations, each on its own
-# TL-20 sheet in configuration order (TL-00 review 62753c5e). No line is
-# longer than the shim buy list's 75 characters, the widest the field under
-# the BOM already prints.
-_BASE_BAR_SHEETS = tuple(
-    base_bar.CONFIGURATIONS.index(configuration) + 1 for configuration in (base_bar.BAR1, base_bar.BAR2)
-)
-BOM_NOTE = "\n".join((
-    f"ITEM {ITEM_NUMBERS[PIVOT_SHIM]}: SHIM FITTING STOCK, SELECTED PER P1.",
-    f"BOM QTY. {pivot_shim.QUANTITY} IS THE NOMINAL PACK, {pivot_shim.PER_SUPPORT} X "
-    f"{_length(pivot_shim.THICKNESS, 3)} A SUPPORT.",
-    "BUY, COVERING THE WORST CASE AT BOTH SUPPORTS:",
-    ", ".join(
-        f"{sku} ({_length(thickness, 3)}) X{count}"
-        for sku, (thickness, count) in PIVOT_SHIM_BUY.items()
-    ) + ".",
-    f"ITEMS {ITEM_NUMBERS[RAIL]}-{ITEM_NUMBERS[CARRIAGE]}: HIWIN-STYLE "
-    f"{guide_rail.STYLE} RAIL / {carriage.STYLE} CARRIAGE, A MATCHED KIT,",
-    "NUIBBYED-BRANDED, NOT GENUINE HIWIN. Z0 PRELOAD AND C ACCURACY NOT",
-    "REQUIRED; ACCEPT BY FIT-UP PLAY CHECK "
-    f"({trammel.CARRIAGE_PLAY_TIR_MAX:.2f} MM TIR MAX AT THE PIVOT).",
-    f"ITEMS {ITEM_NUMBERS[BASE_BAR_1]}-{ITEM_NUMBERS[BASE_BAR_2]}: ONE NUMBER, TWO CONFIGURATIONS "
-    f"({BASE_BAR_NUMBER} SHEETS {_BASE_BAR_SHEETS[0]}, {_BASE_BAR_SHEETS[1]}).",
-))
-if int(ITEM_NUMBERS[CARRIAGE]) != int(ITEM_NUMBERS[RAIL]) + 1:
-    raise AssertionError("the BOM note's kit items are no longer consecutive")
-if int(ITEM_NUMBERS[BASE_BAR_2]) != int(ITEM_NUMBERS[BASE_BAR_1]) + 1:
-    raise AssertionError("the BOM note's base-bar items are no longer consecutive")
-# F2's transfer drills, by the names the fitter asks for; TL-32's spec owns
-# their sizes (TRANSFER_SPOT_DIA, NUT_TAP_DRILL).
+
+# The nut-tap transfer drills, by the names the fitter asks for; TL-32's
+# spec owns their sizes (TRANSFER_SPOT_DIA, NUT_TAP_DRILL).
 _SPOT_DRILL = "#29"
 _TAP_DRILL = "#43"
 if abs(NUMBER_DRILL_MM[_SPOT_DRILL] - feed_block.TRANSFER_SPOT_DIA) > 1e-3:
-    raise AssertionError("F2's spot drill is not TL-32's transfer spot")
+    raise AssertionError("the nut-tap spot drill is not TL-32's transfer spot")
 if NUMBER_DRILL_MM[_TAP_DRILL] != feed_block.NUT_TAP_DRILL:
-    raise AssertionError("F2's tap drill is not TL-32's nut tap drill")
-# F1A-F3 (owner ruling 2026-11-04, option B; Main's tightening procedure),
-# in one linear order with step 8: F1A measures and prepares the nut before
-# step 8A threads it, F1B aligns the KP08s and seats and clocks the nut, F2
-# transfers its taps and screws it down with the leadscrew in it, so it takes
-# its centre from the screw, not from the countersinks; step 8B fits the
-# handwheel and F3 checks the travel (TL-00 review, farm
-# 20261104T210601055Z). The receipt limits, the facing, the countersinks and
-# the faced length are native dimensions on the leadscrew kit drawing's FeedNut
-# REWORK sheet (feed_nut.REWORK_SHEET_REFERENCE; Codjiflo P2, 4475311251 on
-# #2187): F1A and F2 cite that sheet and type none of its limits. F2 opens a
-# binding nut's countersinks within the sheet's CskDia band (4475311242), so
-# the opened nut is a conforming one and F3 needs no concession for it.
-# F2 calipers the nut screws' heads before they go in (owner ruling
-# 2026-11-04, #2177 option 3): a head over feed_nut.SCREW_HEAD_DIA_MAX is
-# rejected and replaced, and the nut body is never cut (TL-32 spec,
-# HEAD_TO_BODY_*).
-# F1B sets all four of the nut's holes within TL-32's native tap clocking
-# (NutClock, printed 4X on its VIEW D) and cites it by view, typing no angle
-# (Codjiflo 4477879822 and 4477879826 on #2187): the supplier gives the holes
-# no angular stations, so one clocked hole bounds no other, and TL-32's lug
-# walls charge each tap anywhere in that band.
+    raise AssertionError("the nut-tap drill is not TL-32's nut tap drill")
+# The feed nut (owner ruling 2026-11-04, option B; Main's tightening
+# procedure): measured and prepared before the leadscrew threads it, the
+# pillow blocks aligned, the nut clocked and seated, its taps transferred and
+# the nut screwed down with the leadscrew in it, so it takes its centre from
+# the screw, not from the countersinks. The receipt limits, the facing, the
+# countersinks and the faced length are native dimensions on the leadscrew
+# kit drawing's FeedNut REWORK sheet (feed_nut.REWORK_SHEET_REFERENCE;
+# Codjiflo P2, 4475311251 on #2187): the steps cite that sheet and type none
+# of its limits. A binding nut's countersinks open within the sheet's CskDia
+# band (4475311242). The nut screws' heads are calipered before they go in
+# (owner ruling 2026-11-04, #2177 option 3): a head over
+# feed_nut.SCREW_HEAD_DIA_MAX is replaced and the nut body is never cut
+# (TL-32 spec, HEAD_TO_BODY_*). The four holes are set within TL-32's
+# native tap clocking (NutClock, printed 4X on its VIEW D), cited by view
+# (Codjiflo 4477879822 and 4477879826 on #2187).
 _HEAD_LIMIT = _bound(feed_nut.SCREW_HEAD_DIA_MAX, 3, up=False)
-_HEAD_SHARP_MAX = _length(feed_block.HEAD_DIA_SHARP_MAX, 3)
-FEED_FIT_STEPS = (
-    f"F1A. BEFORE STEP 8A, MEASURE THE FEED NUT {_item(FEED_NUT)} TO THE "
-    f"RECEIPT LIMITS ON {feed_nut.REWORK_SHEET_REFERENCE}; REJECT ONE OUTSIDE "
-    "THEM. FACE AND COUNTERSINK IT PER THAT SHEET; REJECT ONE OUTSIDE ITS "
-    "FACED LENGTH.",
-    "F1B. AFTER STEP 8A, SEAT THE NUT ON THE LUG'S FACE AWAY FROM THE SPINDLE, "
-    "BODY AWAY FROM THE LUG. MOVE THE FEED CARRIAGE TO EACH TRAVEL END AND "
-    "ALIGN EACH KP08 SO THE SCREW RUNS CENTRED IN THE LUG'S "
-    f"Ø{_length(feed_block.SCREW_CLEARANCE_DIA, feed_block.NUT_PATTERN_PLACES)} "
-    f"CLEARANCE WITHOUT FORCING IT; TIGHTEN THE KP08 SCREWS TO {_KP08_TORQUE}, "
-    f"THE SCREW STILL {leadscrew.NEAR_STUB:.1f} MM PAST THE NEAR BLOCK. "
-    f"TURN THE NUT UNTIL ALL {feed_nut.SCREW_COUNT} HOLES CENTRE WITHIN THE TAP "
-    f"CLOCKING ON {feed_block.NUT_CLOCK_REFERENCE}, EACH CHECKED WITH A MITRE "
-    "SQUARE ON THE LUG'S TOP EDGE THROUGH THE SCREW AXIS; REJECT A NUT WHOSE "
-    f"{feed_nut.SCREW_COUNT} HOLES CANNOT ALL BE SET WITHIN IT. HOLD IT "
-    "THERE AND TURN THE SCREW, NEVER SLIDE IT, UNTIL THE NUT SEATS FLAT ON THE "
-    "LUG FACE; CLAMP IT.",
-    f"F2. SPOT THE {feed_nut.SCREW_COUNT} TAPS THROUGH THE NUT'S HOLES WITH A "
-    f"{_SPOT_DRILL} DRILL, THEN DRILL {_TAP_DRILL} AND TAP "
-    f"{feed_nut.SCREW_THREAD} THRU. CALIPER {feed_nut.SCREW_COUNT} FLAT HEADS "
-    f"{_item(RISER_SCREW)}: HEAD Ø{_HEAD_LIMIT} MAX, AS B18.6.3'S MAX "
-    f"{_HEAD_SHARP_MAX} REACHES THE NUT BODY; REJECT ONE OVER AND FIT A "
-    "REPLACEMENT THAT PASSES; NEVER MACHINE THE NUT BODY. WITH THE "
-    "SCREW A FEW TURNS IN THE NUT, TIGHTEN THEM CROSSWISE IN 2 STAGES TO "
-    f"{_NUT_TORQUE}. IF THE SCREW BINDS, LOOSEN, RE-CENTRE AND RETIGHTEN; IF IT "
-    "STILL BINDS, OPEN THE COUNTERSINKS PER "
-    f"{feed_nut.REWORK_SHEET_REFERENCE}. GO TO STEP 8B.",
-    # End to end is the full feed-carriage travel. This three-line instruction
-    # preserves the installed checks without overrunning sheet 8's source view.
-    "F3. AFTER STEP 8B, WITH THE HANDWHEEL AND ALL SET SCREWS TIGHT, "
-    "FEED END TO END BY HANDWHEEL: NO BINDING, NUT OR LUG CONTACT WITH A "
-    "KP08, AND NO MOVING PART CONTACT. REPEAT F1B-F2 IF IT BINDS.",
-)
 
-# The studs' measurements, fit limits and installed acceptance, migrated from
-# the stud drawing (hold_down_stud.measured_fit_bounds evaluates the same G, Q,
-# nut-span, lower-interval and insertion predicates). H is only measurable
-# with the blocks on their carriages over both passes.
-# The kit's REWORK sheet prints the stud in mm; this inch sheet prints its
-# limits and the clearance rounded outward, the conservative side of HD2.
+# The hold-down studs (Q3, Delegated ruling 2026-11-07 (Main), no precedent;
+# owner review #2144; pending owner confirmation): the studs are cut to the
+# kit's finished length before fitting and accepted directly on the jig: the
+# stud-top gauge under every moving block over both passes, and one complete
+# pitch beyond each seated nut. A stud whose gauge stops is replaced by one
+# cut shorter by the missing clearance plus .010; one that then shows less
+# than the pitch stops the build. The former pre-cut prediction (HD1/HD2: B,
+# D, H, N, W, U and its G/Q inequalities) is no longer printed; its spec
+# stack (hold_down_stud.measured_fit_bounds) is unchanged.
 _STUD_CLEARANCE = _bound(hold_down_stud.CLEARANCE_MIN, 3, up=True)
+_STUD_REMEDY_EXTRA = _length(0.010 * trammel.INCH, 3)
 _STUD_PITCH = (
     f"{hold_down_stud.COMPLETE_PROJECTION_PITCHES:g} COMPLETE {hold_down_stud.THREAD} PITCH"
 )
-# The finished-length limits the kit drawing's stud rework sheet prints (the
-# title block's ± at its places); the kit's registry number, pinned by test.
+# The kit's registry number, pinned by test; its second sheet cuts the stud.
 CLAMPING_KIT_NUMBER = "MHA-SH-VN-57"
-# HD2-HD3 cut the studs to the kit drawing's REWORK sheet, its second.
 STUD_REWORK_SHEET = f"{CLAMPING_KIT_NUMBER} SHEET 2"
-_STUD_LIMITS = (
-    f"{_bound(hold_down_stud.LENGTH - hold_down_stud.LENGTH_BAND, 3, up=False)}/"
-    f"{_bound(hold_down_stud.LENGTH + hold_down_stud.LENGTH_BAND, 3, up=True)}"
-)
-HOLD_DOWN_STEPS = (
-    "HD1. FOR UNCUT-STOCK OBSTRUCTIONS, ISOLATE THE SPINDLE, SUPPORT THE "
-    "CARRIER AND SECURE THE OTHER HOLD-DOWNS. MARK/REMOVE ONLY THE "
-    "OBSTRUCTING STUD; RESTORE ITS ORIGINAL INSERTION BEFORE REMOVING "
-    "ANOTHER. NEVER FORCE MOTION PAST UNCUT STOCK. BEFORE CUTTING THE "
-    f"{hold_down_stud.QUANTITY} STUDS {_item(HOLD_DOWN_STUD)}, MEASURE AT EACH "
-    "STUD ON THE ACTUAL PARTS, MIN "
-    "AND MAX IN INCHES WITH GAUGE UNCERTAINTY INCLUDED: B, BAR THICKNESS; D, "
-    "STUD LOWER END TO BAR UNDERSIDE AT THE ORIGINAL INSERTION; H, BAR TOP TO "
-    f"MOVING BLOCK UNDERSIDE (ITEMS {ITEM_NUMBERS[FEED_BLOCK]}/{ITEM_NUMBERS[PIVOT_BLOCK]}), LEAST OVER BOTH "
-    "COMPLETE PASSES, MARK TO MARK: INNER AT STEP 9, OUTER AT STEP 13A; N, SEATED FLANGE "
-    f"NUT {_item(FLANGE_NUT)} BEARING FACE "
-    "TO THE FAR END OF ITS COMPLETE THREADS, NOT BODY HEIGHT; W, WASHER "
-    "STACK (NONE IS ADDED); U, PROPOSED CUT END TO THE FIRST COMPLETE "
-    "THREAD, NOT THE CHAMFER. MARK THE LOWER FACTORY END, THE ORIGINAL "
-    "INSERTION AND THE ORIGINAL LOWER LOADED COMPLETE-THREAD INTERVAL.",
-    f"HD2. WITH LMIN/LMAX THE STUD'S FINISHED-LENGTH LIMITS ON {STUD_REWORK_SHEET} "
-    f"({_STUD_LIMITS}), NOT STOCK "
-    "LENGTH, REQUIRE GMIN = BMIN + HMIN + DMIN - LMAX >= "
-    f"{_STUD_CLEARANCE} AND QMIN = LMIN - DMAX - BMAX - WMAX - NMAX - UMAX "
-    f">= {_STUD_PITCH}. THE NUT'S WHOLE COMPLETE-THREAD SPAN MUST STAY ON "
-    "COMPLETE STUD THREAD AND THE ORIGINAL LOWER LOADED INTERVAL MUST STAY "
-    "INTACT BELOW THE BAR. AN UNKNOWN MEASUREMENT OR A FAILED LIMIT REJECTS "
-    "THE SETUP: NO DEEPER INSERTION, NO CUT THROUGH ENGAGED THREADS.",
-    "HD3. AT STEP 13B, KEEP THE CARRIER OFF AND THE OTHER HOLD-DOWNS SECURE. "
-    "REMOVE, SHORTEN AND REFIT ONE STUD AT A TIME. SHORTEN ONLY THE UNUSED "
-    f"UPPER END TO THE FINISHED LENGTH ON {STUD_REWORK_SHEET}; DEBURR, GAUGE THE COMPLETE THREADS AND "
-    "REMEASURE U. RESTORE THE ORIGINAL INSERTION AND SEAT ITS NUT FULLY "
-    "WITH NO WASHER BEFORE REMOVING ANOTHER STUD; DO NOT FORCE OR BOTTOM "
-    "DEEPER. AFTER THE LAST STUD REFIT, WITH THE CARRIER STILL OFF, REDO "
-    f"STEP 6: TEMPORARILY SEAT BOTH SHOULDER SCREWS {_item(PIVOT_SCREW)}, "
-    "SLACKEN THE HOLD-DOWN NUTS, BRING THE FEED CARRIAGE TO EACH STATION "
-    "WITH THE HANDWHEEL AND THE PIVOT CARRIAGE BY HAND, INDICATE, TAP, "
-    "RETIGHTEN AND READ EVERY STATION; THEN RENEW THE SWEEP-LIMIT MARKS THE "
-    "SAME WAY, CROSSING OUT ANY OLD MARK THAT MOVED. REMOVE THE TEMPORARY SCREWS.",
-    "HD4. WITH THE CARRIER AND BOTH SCREWS FITTED PER O1, HAND-SWEEP ITS "
-    "COMPLETE PASS TO THE HD3 MARKS: "
-    f"EVERY STUD CLEARS EVERY MOVING BLOCK BY {_STUD_CLEARANCE} MIN "
-    f"THROUGHOUT AND SHOWS {_STUD_PITCH} MIN BEYOND ITS SEATED NUT, THE NUT'S "
-    "WHOLE COMPLETE-THREAD SPAN ENGAGED. REJECT ANY INCOMPATIBLE SETUP.",
-)
 
+# Carriage play (#2177) prints as the plain inch step .002 TIR (0.0508 mm), the
+# F3 pattern (Q5, Delegated ruling 2026-11-07 (Main), no precedent; owner
+# review #2144; pending owner confirmation). trammel.CARRIAGE_PLAY_TIR_MAX
+# keeps its 0.05; the same radial stack holds at the printed limit.
+CARRIAGE_PLAY_TIR_PRINTED = 0.002 * trammel.INCH
+_PRINTED_PLAY_RADIUS = trammel.CARRIAGE_PLAY_RADIUS_PER_PLAY * CARRIAGE_PLAY_TIR_PRINTED
+if _PRINTED_PLAY_RADIUS > trammel.RADIUS_FROM_SHOULDER_CLEARANCE:
+    raise AssertionError("the printed carriage play exceeds the shoulder allowance")
+if trammel.RADIUS_FROM_SHOULDER_CLEARANCE + _PRINTED_PLAY_RADIUS > trammel.TOP_EDGE_HALF_BAND:
+    raise AssertionError("the printed carriage play breaks the strap's top-edge budget")
+_PLAY_TIR = f"{_length(CARRIAGE_PLAY_TIR_PRINTED, 3)} TIR MAX"
+# The top-hat washer's flank clearance, inch at .XXX, rounded up: the
+# conservative side of holding.WASHER_CLEARANCE_MIN.
+WASHER_CLEARANCE_PRINTED = _outward(holding.WASHER_CLEARANCE_MIN, 3, up=True)
+if min(holding.WASHER_GAPS_MIN.values()) < WASHER_CLEARANCE_PRINTED:
+    raise AssertionError("the designed washer gaps do not meet the printed minimum")
+# The leadscrew's settings close its metric cut along the KP08 stations
+# (owner ruling 4, 2026-11-01): each prints its inch value with the exact
+# millimetres as REF.
+_NEAR_STUB = f"{_length(leadscrew.NEAR_STUB, 3)} ({leadscrew.NEAR_STUB:.1f} MM REF)"
+_HUB_GAP = f"{_length(leadscrew.HUB_GAP, 3)} ({leadscrew.HUB_GAP:.1f} MM REF)"
+_PIVOT_GAP = f"{_length(PIVOT_RUNNING_GAP[0], 3)}-{_length(PIVOT_RUNNING_GAP[1], 3)}"
+_PILLOW = f"PILLOW BLOCK {_item(PILLOW_BLOCK)}"
+_FEELER = "FEELER GAUGE"
+
+# Rule 22 (TL-00 rubric review ce83/c752): one linear sequence in the order
+# the work is done, each step one action of six lines or fewer, every check
+# and its remedy separate steps, and every cross-reference a printed step
+# number. Top-level numbers 1-13 keep their former meaning (MHA-CH-06-TL-21
+# and the carriage screw's sheet cite steps 5 and 10); the former P, F, HD
+# and O series are folded in where they are done.
+ASSEMBLY_STEPS = (
+    f"1. ROCK EACH OF THE 4 CARRIAGES {_item(CARRIAGE)} SIDEWAYS ON ITS RAIL "
+    "UNDER A TEST INDICATOR.",
+    "1A. KEEP THE 2 TIGHTEST CARRIAGES, ONE PER RAIL.",
+    "1B. MOVE A CARRIAGE OFF ITS RAIL ONLY ONTO THE KIT'S DUMMY RAIL.",
+    f"1C. TRIM EACH RAIL {_item(RAIL)} TO ITS BASE BAR PER THE {BASE_BAR_NUMBER} "
+    "PROCESS PLAN: BOTH ENDS FLUSH WITH THE BAR.",
+    "1D. CHECK THE END COUNTERBORE WALLS OF EACH TRIMMED RAIL TO "
+    f"{RAIL_RECEIPT_REFERENCE} NOTE [A].",
+    "1E. TRANSFER EACH RAIL'S HOLES TO ITS BAR PER THAT PLAN: RAIL AND BAR "
+    "MARKED AS A PAIR.",
+    f"1F. CHECK THAT ALL {trammel.RAIL_HOLE_COUNT} SCREWS ENTER EACH BAR FREELY "
+    "BY HAND WITHOUT MOVING THE RAIL.",
+    "1G. CLEAN ALL CUTTING GRIT FROM THE RAILS AND BARS.",
+    f"2. LAY BASE BAR 1 {_item(BASE_BAR_1)} AS DRAWN AND BASE BAR 2 "
+    f"{_item(BASE_BAR_2)} TURNED OVER, AS SHOWN ON SHEET 1.",
+    "2A. FIT RAIL 1 ON BAR 1 AND RAIL 2 ON BAR 2, EACH WITH "
+    f"{trammel.RAIL_HOLE_COUNT} {_RAIL_SCREW} {_item(RAIL_SCREW)}: NEAR ENDS FLUSH.",
+    f"2B. FIT AN END BRACKET {_item(END_BRACKET)} AT EACH PILLOW-BLOCK STATION "
+    f"ON BAR 1 WITH {len(leadscrew.BAR_SCREW_LATERALS)} {_BAR_SCREW} "
+    f"{_item(PILLOW_BLOCK_SCREW)} FROM BELOW: NO WASHERS, "
+    f"{_torque(leadscrew.BAR_SCREW_TORQUE_NM)}.",
+    f"3. CUT THE UNUSED UPPER END OF EACH OF THE {hold_down_stud.QUANTITY} STUDS "
+    f"{_item(HOLD_DOWN_STUD)} TO THE FINISHED LENGTH ON {STUD_REWORK_SHEET}.",
+    f"3A. THREAD EACH STUD INTO A T-NUT {_item(T_NUT)} UNTIL ITS LOWER END IS "
+    "FLUSH WITH THE T-NUT FOOT.",
+    "3B. SET THE BARS ON THE TABLE WITH THEIR NEAR ENDS TOWARD THE SPINDLE: "
+    "2 STUDS PER BAR IN THE OUTER T-SLOT.",
+    f"3C. FIT A FLANGE NUT {_item(FLANGE_NUT)} ON EACH STUD FINGER-TIGHT.",
+    f"4. FIT THE FEED BLOCK {_item(FEED_BLOCK)} ON RAIL 1'S CARRIAGE AND THE "
+    f"PIVOT BLOCK {_item(PIVOT_BLOCK)} ON RAIL 2'S: PIVOT COUNTERBORES TOWARD "
+    "THE SPINDLE, FEED LUG TOWARD THE COLUMN.",
+    # Owner ruling 2026-11-01 (option A): each carriage screw is cut to its own
+    # counterbore (rule 19); the jig's RV-05 accepts the reach it leaves.
+    "5. MEASURE EACH BLOCK'S 4 COUNTERBORE FLOOR HEIGHTS ABOVE ITS BOTTOM TO .001.",
+    f"5A. CUT EACH {_CARRIAGE_SCREW} {_item(CARRIAGE_SCREW)} TO ITS OWN FLOOR "
+    f"HEIGHT + {_length(pivot_block.SCREW_REACH, 3)} "
+    f"(±{_length(pivot_block.SCREW_CUT_BAND, 3)}) UNDER THE HEAD.",
+    "5B. DEBURR EACH CUT END.",
+    "5C. FASTEN EACH BLOCK WITH ITS 4 SCREWS: EACH TIP ENGAGES "
+    f"{_length(pivot_block.REACH_MIN, 3)}-{_length(pivot_block.REACH_MAX, 3)} "
+    "OF THE CARRIAGE'S M4 X 5 TAP AND NEVER BOTTOMS.",
+    f"5D. SEAT BOTH SHOULDER SCREWS {_item(PIVOT_SCREW)} TEMPORARILY FOR INDICATING.",
+    "6. ZERO THE DRO X AND Y AT THE SPINDLE ORIGIN (SHEET 1).",
+    "6A. SET EACH STATION ROW OF THE SHEET 1 SETTING TABLE: CENTRE THE "
+    f"SHOULDER-SCREW HEAD UNDER THE {ALIGNMENT_INDICATOR} BY SLIDING THE "
+    "CARRIAGE IN X AND TAPPING THE BAR IN Y.",
+    f"6B. TIGHTEN THE 4 HOLD-DOWN NUTS {_item(FLANGE_NUT)}.",
+    f"6C. CHECK EVERY STATION ROW AGAIN: {_BAND_TEXT}.",
+    "6D. IF A ROW FAILS, REDO STEPS 6A-6C.",
+    "6E. SET EACH LIMIT ROW OF THE SETTING TABLE AS IN STEP 6A, IN X ONLY.",
+    "6F. WITNESS-MARK THE BAR AT THE CARRIAGE'S SPINDLE-END FACE AT EACH LIMIT "
+    "ROW, WITH THE PASS NAME, INNER OR OUTER.",
+    # The foot (UNVERIFIED, #2184) between TL-28's two bounds: no thinner,
+    # so the 5/8's tip stays clear of the bar screw's in the shared THRU
+    # thread; no thicker, so its full thread holds 1.5 D
+    # (end_bracket.KP08_FOOT_THICK_MIN/MAX).
+    f"7. CHECK EACH {_PILLOW} FOOT IS "
+    f"{_bound(end_bracket.KP08_FOOT_THICK_MIN, 3, up=True)} TO "
+    f"{_bound(end_bracket.KP08_FOOT_THICK_MAX, 3, up=False)} THICK AT ITS 2 HOLES.",
+    f"7A. FIT EACH PILLOW BLOCK ON ITS END BRACKET WITH 2 {_KP08_SCREW} "
+    f"{_item(PILLOW_BLOCK_SCREW)}, LOOSE.",
+    f"7B. MEASURE THE FEED NUT {_item(FEED_NUT)} TO THE RECEIPT LIMITS ON "
+    f"{feed_nut.REWORK_SHEET_REFERENCE}.",
+    "7C. IF IT IS OUTSIDE THEM, REJECT THE NUT.",
+    "7D. FACE AND COUNTERSINK THE NUT PER THAT SHEET.",
+    "7E. CHECK ITS FACED LENGTH TO THAT SHEET.",
+    "7F. IF IT IS OUTSIDE THAT LENGTH, REJECT THE NUT.",
+    f"8. OIL THE LEADSCREW {_item(LEADSCREW)} WITH ISO VG 32.",
+    "8A. THREAD THE LEADSCREW THROUGH THE PILLOW BLOCKS, THE LUG CLEARANCE AND "
+    f"THE FEED NUT, NUT FLANGE TOWARD THE LUG: {_NEAR_STUB} PAST THE NEAR "
+    "PILLOW BLOCK.",
+    "8B. ALIGN EACH PILLOW BLOCK WITH THE FEED CARRIAGE AT THAT END OF ITS "
+    "TRAVEL: LEADSCREW CENTRED IN THE LUG'S "
+    f"Ø{_length(feed_block.SCREW_CLEARANCE_DIA, feed_block.NUT_PATTERN_PLACES)} "
+    "CLEARANCE WITHOUT FORCING.",
+    f"8C. TIGHTEN THE PILLOW-BLOCK SCREWS TO {_KP08_TORQUE}: LEADSCREW STILL "
+    f"{_length(leadscrew.NEAR_STUB, 3)} PAST THE NEAR PILLOW BLOCK.",
+    "8D. TURN THE FEED NUT ON THE LEADSCREW UNTIL ITS "
+    f"{feed_nut.SCREW_COUNT} HOLES CENTRE IN THE TAP CLOCKING ON "
+    f"{feed_block.NUT_CLOCK_REFERENCE}, AS READ WITH A MITRE SQUARE ON THE "
+    "LUG'S TOP EDGE THROUGH THE SCREW AXIS.",
+    f"8E. CHECK THAT ALL {feed_nut.SCREW_COUNT} HOLES SIT WITHIN THAT CLOCKING.",
+    "8F. IF THEY CANNOT ALL BE SET WITHIN IT, REJECT THE NUT.",
+    "8G. WITH THE NUT HELD AT THAT CLOCKING, TURN THE LEADSCREW UNTIL THE NUT "
+    "SEATS FLAT ON THE LUG FACE AWAY FROM THE SPINDLE: NEVER SLIDE THE NUT.",
+    "8H. CLAMP THE NUT TO THE LUG.",
+    f"8J. SPOT THE {feed_nut.SCREW_COUNT} TAPS THROUGH THE NUT'S HOLES WITH A "
+    f"{_SPOT_DRILL} DRILL.",
+    f"8K. DRILL {_TAP_DRILL} AND TAP {feed_nut.SCREW_THREAD} THRU AT EACH SPOT.",
+    f"8L. MEASURE THE HEAD OF EACH OF THE {feed_nut.SCREW_COUNT} FLAT HEAD SCREWS "
+    f"{_item(RISER_SCREW)} WITH A CALIPER: Ø{_HEAD_LIMIT} MAX.",
+    "8M. IF A HEAD IS OVER, USE A SCREW THAT PASSES: NEVER MACHINE THE NUT BODY.",
+    f"8N. TIGHTEN THE {feed_nut.SCREW_COUNT} SCREWS CROSSWISE IN 2 STAGES TO "
+    f"{_NUT_TORQUE} WITH THE LEADSCREW A FEW TURNS INTO THE NUT.",
+    "8P. CHECK THAT THE LEADSCREW TURNS WITHOUT BINDING.",
+    "8Q. IF IT BINDS, LOOSEN THE 4 SCREWS, RE-CENTRE THE NUT AND RETIGHTEN AS "
+    "IN STEP 8N.",
+    "8R. IF IT STILL BINDS, OPEN THE NUT'S COUNTERSINKS PER "
+    f"{feed_nut.REWORK_SHEET_REFERENCE}.",
+    f"8S. PUSH THE HANDWHEEL {_item(HANDWHEEL)} ON: HUB {_HUB_GAP} OFF THE FAR "
+    "PILLOW BLOCK.",
+    "8T. TIGHTEN THE HANDWHEEL AND PILLOW-BLOCK SET SCREWS ON THE LEADSCREW "
+    "FLATS WITH LOCTITE 222 THREADLOCKER.",
+    "8U. CHECK THE FEED END TO END BY HANDWHEEL: NO BINDING, NO NUT OR LUG "
+    "CONTACT WITH A PILLOW BLOCK, NO OTHER MOVING-PART CONTACT.",
+    "8V. IF IT BINDS, REDO STEPS 8B-8R.",
+    f"9. REMOVE THE TEMPORARY SHOULDER SCREWS {_item(PIVOT_SCREW)}.",
+    f"9A. SET A SPACER {_item(PIVOT_SPACER)} ON EACH BLOCK WITH NO SHIMS.",
+    f"9B. LOWER THE CARRIER {_item(CARRIER)} ONTO THE SPACERS WITH A1 AND B1 OVER "
+    "THE BLOCK COUNTERBORES.",
+    "9C. SEAT BOTH SHOULDER SCREWS THROUGH A1 AND B1 IN THE COUNTERBORES BY HAND.",
+    f"9D. MEASURE EACH HEAD-TO-CARRIER GAP WITH A {_FEELER}.",
+    "9E. REMOVE BOTH SHOULDER SCREWS.",
+    "9F. LIFT THE CARRIER OFF.",
+    f"9G. STACK SHIMS {_item(PIVOT_SHIM)} UNDER EACH SPACER TO CLOSE ITS GAP TO "
+    f"{_PIVOT_GAP}: PACK {_length(PIVOT_FIT_PACK_MAX, 3)} MAX AS MEASURED, NONE "
+    "BETWEEN SPACER AND CARRIER.",
+    "9H. LOWER THE CARRIER ONTO THE SPACERS AGAIN AS IN STEP 9B.",
+    f"9J. CLEAN THE {pivot_screw.THREAD} SHOULDER-SCREW THREADS.",
+    "9K. GREASE THE SHOULDERS AND SPACER FACES LIGHTLY WITH NLGI 2 LITHIUM "
+    "GREASE: THREADS GREASE-FREE.",
+    "9L. APPLY LOCTITE 222 TO THE THREADS.",
+    f"9M. TORQUE BOTH SHOULDER SCREWS TO {_torque(PIVOT_SCREW_TORQUE_NM)}: "
+    "SHOULDERS SEATED IN THE COUNTERBORES, HEADS NOT CLAMPING THE CARRIER.",
+    f"9N. CHECK BOTH HEAD GAPS WITH A {_FEELER} OVER THE WHOLE INNER PASS BY "
+    f"HANDWHEEL, MARK TO MARK: {_PIVOT_GAP}, CARRIER TURNS FREE.",
+    "9P. IF A GAP FAILS, REDO STEPS 9E-9M FOR THAT SUPPORT: NEVER LOOSEN A "
+    "SEATED SCREW TO GAIN CLEARANCE.",
+    # The carrier stays on its A1/B1 seats from step 9 to 13: its HUB tap is
+    # made in place on the running jig. The HUB is set from the spindle
+    # origin (the apex) by the printed offset, so the pin spacing moves it
+    # with the cut (owner ruling 3, 2026-11-07).
+    "10. FEED THE CARRIAGES BY HANDWHEEL TO THE SYMMETRIC ROW OF THE SHEET 1 "
+    "SETTING TABLE: A1 HEAD AT ITS RAIL 1 X.",
+    f"10A. CHECK THE A1 AND B1 HEADS WITH THE {ALIGNMENT_INDICATOR}: EACH READS "
+    f"ITS SYMMETRIC-ROW X AND Y WITHIN {_HUB_BAND_TEXT}.",
+    "10B. IF ONE FAILS, REDO STEP 6 AND STEPS 10-10A.",
+    f"10C. MOVE THE TABLE UNTIL THE DRO READS {_HUB_DRO}.",
+    "10D. RECORD THIS DRO SETTING FOR STEP 20.",
+    f"10E. DRILL AND TAP THE CARRIER'S HUB {carrier.HUB_THREAD} THRU AT THIS "
+    "SETTING, SPOT FIRST, SPINDLE-GUIDED, NO COUNTERBORE.",
+    f"11. STAND THE {QUANTITIES[STOP_PIN]} STOP PINS {_item(STOP_PIN)} CHAMFERED "
+    f"END DOWN IN THE STOP HOLES OF THE RISER {_item(RISER)} (DRILLED FIRST TO "
+    f"{carrier.RISER_NUMBER}).",
+    "11A. SET THE RISER ON THE CARRIER WITH THE CARRIAGES AT THE SYMMETRIC ROW: "
+    f"STOP-PIN AXES AT DRO {_STOP_DRO}.",
+    "11B. CLAMP THE RISER TO THE CARRIER.",
+    f"11C. SPOT THE {len(riser.SCREW_HOLES) + len(STRAP_CLAMP_ROLES)} "
+    "THROUGH-HOLE CENTRES FROM BELOW THROUGH THE CARRIER.",
+    f"11D. FINISH THE RISER TO {carrier.RISER_NUMBER}.",
+    f"11E. FIT THE RISER WITH {len(riser.SCREW_HOLES)} {_RISER_SCREW}S "
+    f"{_item(RISER_SCREW)}: BOTH STOP PINS LOOSE IN THEIR HOLES.",
+    f"11F. LEAVE OUT THE TOP-HAT WASHER {_item(HUB_WASHER)} AND THE 3 STRAP "
+    "CLAMP SCREWS UNTIL STEPS 19-21.",
+    f"12. FIT THE FEED LEVER {_item(FEED_LEVER)} WITH 2 {_LEVER_SCREW} "
+    f"{_item(LEVER_SCREW)} AND WEDGE-LOCK PAIRS {_item(LEVER_LOCK_WASHER)}: "
+    f"{_LEVER_TORQUE}, GRIP TOWARD THE OPERATOR.",
+    "12A. TURN THE HANDWHEEL TO FEED: NEVER FORCE THE LEVER AGAINST THE "
+    "ENGAGED NUT.",
+    "13. MOVE THE CARRIER TO A2 AND B2 AS IN STEPS 15-15H.",
+    f"13A. CHECK THE GAP FROM EACH STUD TOP {_item(HOLD_DOWN_STUD)} TO EVERY "
+    "MOVING BLOCK OVER THE WHOLE OUTER PASS BY HANDWHEEL, MARK TO MARK, WITH "
+    f"A {_STUD_CLEARANCE} {_FEELER} STACK: {_STUD_CLEARANCE} MIN.",
+    "13B. IF THE GAUGE STOPS, CUT A NEW STUD SHORTER BY THE MISSING CLEARANCE "
+    f"PLUS {_STUD_REMEDY_EXTRA}.",
+    "13C. IF A STUD WAS CUT, FIT IT IN PLACE OF THE OLD ONE AS IN STEPS 3A AND "
+    "3C, ONE STUD AT A TIME WITH THE OTHER HOLD-DOWN NUTS TIGHT.",
+    "13D. IF A STUD WAS REPLACED, REDO STEPS 6C AND 13A.",
+    f"13E. CHECK EACH STUD AT ITS SEATED FLANGE NUT: {_STUD_PITCH} MIN BEYOND "
+    "THE NUT, EVERY NUT THREAD ENGAGED.",
+    "13F. IF A STUD FAILS, STOP AND REFER THE SETUP TO THE DESIGNER.",
+    "13G. RETURN THE CARRIER TO A1 AND B1 AS IN STEPS 15-15H.",
+    "13H. REPEAT STEPS 13A-13F OVER THE INNER PASS.",
+    "14. CHECK EVERY STATION ROW OF THE SETTING TABLE AFTER FINAL TIGHTENING: "
+    f"{_BAND_TEXT}.",
+    "14A. IF A ROW FAILS, REDO STEP 6 WITH THE CARRIER OFF AS IN STEPS 15-15C.",
+    "14B. CHECK THAT THE HANDWHEEL FEEDS BOTH PASSES MARK TO MARK WITHOUT "
+    "BINDING: CARRIAGES ON THEIR RAILS, NO CONTACT WITH THE STUDS, NUTS OR "
+    "COLUMN COVER.",
+    # Carriage play moves the cut radius about 1:1; this replaces preload (#2177).
+    f"14C. CHECK THE CARRIAGE PLAY WITH THE {ALIGNMENT_INDICATOR} ON A "
+    "SHOULDER-SCREW HEAD, ROCKING THE CARRIER SIDEWAYS TO THE RAIL BY HAND: "
+    f"{_PLAY_TIR}.",
+)
+# The stud acceptance the kit drawing's stud sheet points to, and the sheet
+# the drawing prints it on (the drawing asserts the sheet).
+HOLD_DOWN_STEPS_REFERENCE = "13A-13F"
+HOLD_DOWN_SHEET_NUMBER = 9
+HOLD_DOWN_REFERENCE = (
+    f"{DRAWING_NUMBER}, STEPS {HOLD_DOWN_STEPS_REFERENCE} (SHEET {HOLD_DOWN_SHEET_NUMBER})"
+)
 OPERATION_STEPS = (
-    "O1. PASS CHANGE: STOP/ISOLATE THE SPINDLE, WITHDRAW CUTTER/HOLDER "
-    "AND SUPPORT THE CARRIER. REMOVE BOTH SHOULDER SCREWS AND LIFT THE "
-    "CARRIER. MOVE THE FEED CARRIAGE WITH THE HANDWHEEL AND THE PIVOT "
-    "CARRIAGE BY HAND UNTIL THE OTHER HOLE PAIR (A2/B2 OR A1/B1) LINES UP "
-    "OVER BOTH BLOCK COUNTERBORES; LOWER THE CARRIER ONTO IT. KEEP EACH SUPPORT'S "
-    "SHIMS AND SPACER IN PLACE, REFIT BOTH SCREWS PER P2 AND CHECK P1-P3 "
-    "BEFORE CUTTING.",
-    "O2. SERVICE: SUPPORT THE CARRIER BEFORE REMOVING ITS TWO SCREWS. "
-    "KEEP THE SELECTED SHIMS WITH THEIR SUPPORTS. AFTER REASSEMBLY REPEAT "
-    "THE PIVOT GAP, FEED ALIGNMENT, HD4 AND ACTUAL TOOLING-CLEARANCE CHECKS.",
-    f"O3. SELF-CUT THE 6061 RISER WITH THE {trammel.RISER_CUTTER_IN} CUTTER "
-    "BEFORE LOADING WORK, THE TOP-HAT WASHER AND CL, CR AND HUB SCREWS OUT. "
-    "KEEP ALL FOUR RISER SCREWS AND BOTH STOP PINS FITTED. THE FINISHED BAND "
-    f"CLEARS THE {trammel.PART_CUTTER_IN} STRAP CUTTER BY "
-    f"{(trammel.RISER_CUTTER_DIA - trammel.PART_CUTTER_DIA) / 2.0:.2f} MM PER "
-    "SIDE; THE STRAP CUTTER DOES NOT CUT THE RISER.",
-    f"O4. EACH STRAP BLANK ARRIVES FACED, LAID OUT AND BANDSAWN PER {PROCESS_PLAN} "
-    "S0-S1, WITH NO HUB HOLE; ITS LOOSE CL/CR HOLES ARE TRANSFERRED AND "
-    "DRILLED OFF-JIG PER S2 OP20. "
-    "SEAT IT FLAT ON THE RISER, RAW EDGE TOWARD -Y AGAINST BOTH STOP PINS, "
-    "ALONG THE STRAP TO ITS END MARK; FIT THE CL AND CR "
-    f"{_STRAP_CLAMPS} DIRECTLY ON THE WORK AND TIGHTEN.",
-    f"O5. PER {PROCESS_PLAN} S2 OP30-OP40, MOVE TABLE TO THE STEP 10 DRO POSITION "
-    f"({_HUB_DRO}) AND, SPINDLE-GUIDED, DRILL AND REAM THE STRAP'S HUB HOLE "
-    "THRU INTO THE RISER'S RELIEF. NEVER REDRILL OR RETAP THE CARRIER.",
-    f"O6. SEAT THE TOP-HAT WASHER {_item(HUB_WASHER)} SPIGOT DOWN IN THE REAMED "
-    "HOLE, FLANGE FLAT ON THE STRAP. FIT THE HUB "
-    f"{_STRAP_CLAMPS} THROUGH IT INTO THE CARRIER'S HUB TAP; TORQUE "
-    f"{_torque(holding.HUB_TORQUE_NM)}; THE HEAD NEED NOT BEAR FULLY ON THE FLANGE. CUT "
-    f"PER {PROCESS_PLAN} S3 OP10-OP20, RETAINING ALL THREE CLAMPS THROUGH BOTH "
-    "PASSES. EACH START IS AN EDGE CUT WITH AIR BESIDE THE CUTTER, NEVER A "
-    "FULL-WIDTH SLOT OR PLUNGE.",
+    "15. ISOLATE THE SPINDLE.",
+    "15A. WITHDRAW THE CUTTER AND ITS HOLDER.",
+    "15B. WITH THE CARRIER SUPPORTED, REMOVE BOTH SHOULDER SCREWS.",
+    "15C. LIFT THE CARRIER OFF THE SPACERS: EACH SUPPORT'S SHIMS AND SPACER "
+    "STAY IN PLACE.",
+    "15D. MOVE THE FEED CARRIAGE BY HANDWHEEL AND THE PIVOT CARRIAGE BY HAND "
+    "UNTIL THE OTHER HOLE PAIR LINES UP OVER BOTH BLOCK COUNTERBORES.",
+    "15E. LOWER THE CARRIER ONTO THAT HOLE PAIR.",
+    "15F. REFIT BOTH SHOULDER SCREWS AS IN STEPS 9J-9M.",
+    "15G. CHECK BOTH HEAD GAPS AS IN STEP 9N BEFORE CUTTING.",
+    "15H. IF A GAP FAILS, CORRECT IT AS IN STEP 9P.",
+    "16. FOR SERVICE, REMOVE THE CARRIER AS IN STEPS 15-15C.",
+    "16A. KEEP EACH SUPPORT'S SHIMS WITH THAT SUPPORT.",
+    "16B. AFTER REASSEMBLY, REPEAT STEPS 9N, 8U, 13A, 13E AND 17-17A.",
+    "17. WITH THE SPINDLE ISOLATED, CHECK THE ACTUAL SPINDLE, CUTTER, TOOL AND "
+    "HOLDER AGAINST THE FIXTURE OVER BOTH PASSES AND THE WHOLE Z RANGE USED, "
+    "INCLUDING BREAKTHROUGH AND RETRACTION: NO CONTACT.",
+    "17A. CHECK THE CLOSEST APPROACH TO BOTH SHOULDER-SCREW HEADS, THE 3 STRAP "
+    "CLAMP SCREW HEADS, THE TOP-HAT WASHER AND BOTH STOP PINS AT FULL HEIGHT: "
+    "CLEARANCE SEEN OR MEASURED AT EACH.",
+    "17B. REPEAT STEPS 17-17A AFTER ANY TOOL, DEPTH OR SETUP CHANGE.",
+    "17C. REDO STEP 6 AFTER ANY CHANGE TO THE TABLE SETUP.",
+    f"18. CUT THE RISER IN PLACE WITH THE {trammel.RISER_CUTTER_IN} CUTTER OVER "
+    "BOTH PASSES, MARK TO MARK, BEFORE THE FIRST STRAP: TOP-HAT WASHER AND "
+    "STRAP CLAMP SCREWS OUT, 4 RISER SCREWS AND BOTH STOP PINS FITTED.",
+    f"19. LOAD ONLY A STRAP BLANK FINISHED PER {PROCESS_PLAN} S0-S1 AND S2 "
+    "OP20: FACED, LAID OUT, BANDSAWN, END-CLAMP HOLES DRILLED, NO HUB HOLE.",
+    "19A. SEAT THE BLANK FLAT ON THE RISER: RAW EDGE TOWARD -Y AGAINST BOTH "
+    "STOP PINS, ALONG THE STRAP TO ITS END MARK.",
+    f"19B. TIGHTEN 2 {_STRAP_CLAMPS} DIRECTLY ON THE STRAP INTO THE CARRIER'S "
+    "2 END-CLAMP TAPS.",
+    "20. MOVE THE TABLE TO THE DRO SETTING RECORDED IN STEP 10D.",
+    f"20A. DRILL AND REAM THE STRAP'S HUB HOLE THRU PER {PROCESS_PLAN} S2 "
+    "OP30-OP40, SPINDLE-GUIDED, INTO THE RISER'S RELIEF: NEVER INTO THE "
+    "CARRIER.",
+    f"21. SEAT THE TOP-HAT WASHER {_item(HUB_WASHER)} SPIGOT DOWN IN THE REAMED "
+    "HOLE: FLANGE FLAT ON THE STRAP.",
+    f"21A. TORQUE THE HUB CLAMP SCREW, A {_STRAP_CLAMPS}, TO "
+    f"{_torque(holding.HUB_TORQUE_NM)} THROUGH THE WASHER INTO THE CARRIER'S "
+    "HUB TAP: ITS HEAD NEED NOT BEAR FULLY ON THE FLANGE.",
+    "21B. CHECK THE TOP-HAT WASHER TO BOTH CUTTER FLANKS WITH THE WASHER AND "
+    f"ALL 3 CLAMP SCREWS FITTED: {_length(WASHER_CLEARANCE_PRINTED, 3)} MIN.",
+    "21C. SET THE CUTTING DEPTH FROM THE ACTUAL SEATED STRAP, NOT FROM THE "
+    "REFERENCE HEIGHTS.",
+    f"21D. CUT THE STRAP PER {PROCESS_PLAN} S3 OP10-OP20 OVER BOTH PASSES WITH "
+    "ALL 3 CLAMP SCREWS IN PLACE.",
+    "21E. START EACH CUT AT AN EDGE WITH CLEARANCE BESIDE THE CUTTER, NEVER AS "
+    "A FULL-WIDTH SLOT OR A PLUNGE.",
 )
 # The fixture's highest point over the strap: the uncut stock stop pins at
 # full length and tilt (holding.TOOLING_TOP_Z_MAX), above every clamp head.
@@ -2233,31 +2234,44 @@ if not TOOLING_TOP_Z_MAX >= _STOP_PIN_TOP_MAX > max(_HUB_HEAD_TOP_MAX, *holding.
     raise AssertionError("the stop pins no longer stand tallest over the strap")
 if holding.CLAMP_TOP_Z["CL"] != holding.CLAMP_TOP_Z["CR"]:
     raise AssertionError("the CL and CR heads no longer stand at one height")
-CAPTURE_CHECKS = (
-    "TOOLING CLEARANCE: BEFORE USE, WITH THE SPINDLE ISOLATED, CHECK THE "
-    "ACTUAL SPINDLE, CUTTER, NON-CUTTING TOOL AND HOLDER AGAINST THE "
-    "FIXTURE THROUGH BOTH PASSES AND THE ENTIRE USED Z RANGE, INCLUDING "
-    "BREAKTHROUGH AND RETRACTION. INCLUDE BOTH SHOULDER-SCREW HEADS, THE "
-    "CL, CR AND HUB SCREW HEADS, THE TOP-HAT WASHER AND BOTH STOP PINS AT "
-    "FULL HEIGHT. "
-    "VERIFY VISIBLE OR MEASURED CLEARANCE AT EVERY CLOSEST APPROACH: "
-    "NO SPINDLE/TOOL/HOLDER CONTACT WITH THE FIXTURE.",
-    "KEEP THE REPEATED STEP 6 ACTUAL SPINDLE-AXIS REGISTER; REINDICATE AFTER "
-    "XY CHANGES. RECHECK CLEARANCE AFTER TOOL/DEPTH/SETUP CHANGES.",
-    f"REFERENCE TABLE HEIGHTS: WORK {_length(PART_TOP_Z, 3)}; SHOULDER-SCREW HEADS "
-    f"{_length(PIVOT_HEAD_TOP_Z, 3)}, NOMINAL. "
-    "SET CUTTING DEPTH FROM THE ACTUAL SEATED WORK, NOT THESE REFERENCES.",
-    f"CLAMP HEADS FROM TABLE: CL/CR {_length(holding.CLAMP_TOP_Z['CL'], 3)}, "
-    f"HUB {_length(holding.CLAMP_TOP_Z['hub'], 3)}, NOMINAL; THE STOP PIN TOPS "
-    f"STAND TALLEST, FIXTURE TOP {_bound(TOOLING_TOP_Z_MAX, 3, up=True)} MAX. "
-    f"TOP-HAT WASHER {holding.WASHER_CLEARANCE_MIN:.1f} MM MIN TO BOTH CUTTER "
-    "FLANKS. CHECK WITH THE WASHER AND CLAMPS FITTED, NOT AS FOR THE RISER "
-    "SELF-CUT.",
-    "ACCEPTANCE: THE CARRIAGE/RAIL AND TABLE ANCHORS PASS THE ASSEMBLY CHECKS "
-    "AFTER FINAL TIGHTENING (EVERY STEP 6 READING WITHIN "
-    f"±{_length(ALIGNMENT_BAND, ALIGNMENT_PLACES)}; "
-    "FREE SWEEP WITH BOTH CARRIAGES ON THEIR RAILS) AND HD4 AT EVERY STUD.",
+# The heights from the table top the tooling-clearance and depth steps
+# read as references only.
+REFERENCE_HEIGHTS = (
+    "REFERENCE HEIGHTS ABOVE THE TABLE, NOMINAL: "
+    f"STRAP TOP {_length(PART_TOP_Z, 3)}, SHOULDER-SCREW HEADS "
+    f"{_length(PIVOT_HEAD_TOP_Z, 3)}, END-CLAMP HEADS "
+    f"{_length(holding.CLAMP_TOP_Z['CL'], 3)}, HUB CLAMP HEAD "
+    f"{_length(holding.CLAMP_TOP_Z['hub'], 3)}. THE STOP PIN TOPS STAND "
+    f"TALLEST: FIXTURE TOP {_bound(TOOLING_TOP_Z_MAX, 3, up=True)} MAX."
 )
+# Sheet 2, under the BOM: what item 8's QTY counts and the fitting stock to
+# buy (owner ruling 2026-10-27), the rail kit's acceptance (#2177; its
+# brand and grade notes are on MHA-CH-06-TL-VN-83, rule 24), and the two
+# base-bar rows' shared Number as two configurations, each on its own TL-20
+# sheet in configuration order (TL-00 review 62753c5e). No line is longer
+# than the shim buy list's 75 characters, the widest the field under the BOM
+# already prints.
+_BASE_BAR_SHEETS = tuple(
+    base_bar.CONFIGURATIONS.index(configuration) + 1 for configuration in (base_bar.BAR1, base_bar.BAR2)
+)
+BOM_NOTE = "\n".join((
+    f"ITEM {ITEM_NUMBERS[PIVOT_SHIM]}: SHIM FITTING STOCK, FITTED AT STEP 9G.",
+    f"BOM QTY. {pivot_shim.QUANTITY} IS THE MODELLED PACK, {pivot_shim.PER_SUPPORT} X "
+    f"{_length(pivot_shim.THICKNESS, 3)} A SUPPORT.",
+    "BUY, COVERING THE WORST CASE AT BOTH SUPPORTS:",
+    ", ".join(
+        f"{sku} ({_length(thickness, 3)}) X{count}"
+        for sku, (thickness, count) in PIVOT_SHIM_BUY.items()
+    ) + ".",
+    f"ITEMS {ITEM_NUMBERS[RAIL]}-{ITEM_NUMBERS[CARRIAGE]}: ONE MATCHED RAIL AND CARRIAGE KIT,",
+    "ACCEPTED BY THE CARRIAGE PLAY CHECK, STEP 14C.",
+    f"ITEMS {ITEM_NUMBERS[BASE_BAR_1]}-{ITEM_NUMBERS[BASE_BAR_2]}: ONE NUMBER, TWO CONFIGURATIONS "
+    f"({BASE_BAR_NUMBER} SHEETS {_BASE_BAR_SHEETS[0]}, {_BASE_BAR_SHEETS[1]}).",
+))
+if int(ITEM_NUMBERS[CARRIAGE]) != int(ITEM_NUMBERS[RAIL]) + 1:
+    raise AssertionError("the BOM note's kit items are no longer consecutive")
+if int(ITEM_NUMBERS[BASE_BAR_2]) != int(ITEM_NUMBERS[BASE_BAR_1]) + 1:
+    raise AssertionError("the BOM note's base-bar items are no longer consecutive")
 
 # --- Assembly extent at the modelled pose (sheet layout reads it) -----------------
 
