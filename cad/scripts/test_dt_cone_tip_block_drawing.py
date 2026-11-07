@@ -52,7 +52,7 @@ def test_adjuster_embed_band_stays_inside_its_engagement_window() -> None:
     assert low == pytest.approx(1.0 * 4.826 + spec.ADJUSTER_CSK, abs=1e-3)
     assert high == pytest.approx(spec.BLOCK_Z - 0.127 - spec.ADJUSTER_CSK)
     assert low < spec.ADJUSTER_EMBED < high
-    assert drawing.ADJUSTER_CSK_QUALIFIER == "90° CSK Ø.197 BOTH ENDS"
+    assert drawing._CSK_DIA_TEXT == ".197"
 
 
 def test_adjuster_callout_names_both_countersinks_under_the_thread() -> None:
@@ -65,7 +65,7 @@ def test_adjuster_callout_names_both_countersinks_under_the_thread() -> None:
     rewritten = drawing._adjuster_callout_definitions(native)
     assert rewritten[5] == native[5]
     assert rewritten[7] == (
-        "<hw-threaddesc> <hw-threadclass> <hw-thru>\n90° CSK Ø.197 BOTH ENDS"
+        f"<hw-threaddesc> <hw-threadclass> <hw-thru>\n{drawing.ADJUSTER_CSK_QUALIFIER}"
     )
     with pytest.raises(RuntimeError):
         drawing._adjuster_callout_definitions({**native, 5: native[7]})
@@ -102,12 +102,9 @@ def test_pinch_thread_callout_keeps_native_variables_but_limits_both_extents() -
     text = "\n".join(rewritten.values())
     assert "THRU ALL" not in text
     assert text.count("TO SLOT") == 2
-    assert drawing._PINCH_THREAD_QUALIFIER in text
     assert all(token in text for token in drawing._PINCH_THREAD_NATIVE_TOKENS)
-    # Drill line, thread line, then the prose (Main eye-pass af561fa7).
-    assert rewritten[5] == (
-        "<hw-threaddesc> <hw-threadclass> TO SLOT\nCOAXIAL WITH CLEARANCE"
-    )
+    # Drill line, then thread line; no prose locates the far jaw.
+    assert rewritten[5] == "<hw-threaddesc> <hw-threadclass> TO SLOT"
     # Rule 12 (machinist review of 04848e25c): the tap drill says DRILL.
     assert rewritten[7] == "<MOD-DIAM> <hw-thrutapdrldia> DRILL TO SLOT"
     assert "LEFT-JAW" not in text
@@ -173,15 +170,12 @@ def test_block_stands_on_the_platform_and_keeps_every_axis_relation() -> None:
 def test_pinch_thread_readback_checks_the_thread_part_not_string_order() -> None:
     """c6981bac (run 244bc8bb) resolved exactly this and was wrongly refused."""
     resolved = {
-        1: "4-40 UNC - 2B TO SLOT\nCOAXIAL WITH CLEARANCE",
+        1: "4-40 UNC - 2B TO SLOT",
         2: "",
         3: "<MOD-DIAM> 2.26 DRILL TO SLOT",
         4: "",
     }
     assert drawing._pinch_thread_callout_resolved(resolved)
-    assert not drawing._pinch_thread_callout_resolved(
-        {**resolved, 1: "COAXIAL WITH CLEARANCE\n4-40 UNC - 2B TO SLOT"}
-    )
     assert not drawing._pinch_thread_callout_resolved(
         {**resolved, 3: "<MOD-DIAM> 2.26 THRU ALL"}
     )
@@ -722,11 +716,15 @@ def test_r3_prints_no_two_place_dimension_it_does_not_need() -> None:
 def test_every_three_place_size_names_its_mate_at_its_dimension() -> None:
     """Rules 3/4 (machinist review of d84a42ca7): a three-place size given a
     function is a tight band, and its dimension names the mate it serves.
-    The tap's two stations locate one hole, named on that hole's callout."""
+    The tap's two stations locate one hole, named on that hole's callout;
+    the bore's location names its mate on the bore's callout (rule 4: a
+    location carries its value only)."""
     grades = dt_cone_tip_block_spec.DRAWING_PRECISION_BY_NAME
     texts = {**drawing.DIMENSION_CALLOUTS, **drawing.DIMENSION_CALLOUTS_ABOVE}
+    assert "PassageCenter" not in texts
     for name in ("FootTapX", "FootTapZ"):
         texts[name] = drawing.FOOT_TAP_QUALIFIER
+    texts["PassageCenter"] = drawing.BORE_FLAG_TEXT
     three_place = {name for name, places in grades.items() if places == 3}
     assert three_place == {"Depth", "PassageCenter", "FootTapX", "FootTapZ"}
     # The width's band is its own, one-sided; its reason still names the edge.
