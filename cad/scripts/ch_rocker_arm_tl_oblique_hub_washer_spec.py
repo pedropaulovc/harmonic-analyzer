@@ -73,13 +73,18 @@ FLANGE_EDGE_BREAK_MAX = 0.127  # .005
 # --- Spigot: the owner's Ø9.95 ±.05 mm locating land -------------------------
 # The owner's millimetre band printed in inch at four places, wholly inside
 # 9.90-10.00 mm: Ø.3917 ±.0019 (9.9009-9.9974; ±.0020 would reach 9.8984).
-SPIGOT_DIA = 9.95
+# The model nominal sits on that printed grid (the owner's 9.95 rounds to
+# .3917), so the native tolerance's own limits are the printed limits.
+SPIGOT_DIA = 9.94918  # .3917
 SPIGOT_DIA_PLACES = 4
 SPIGOT_DIA_TOL = 0.04826  # ±.0019
 SPIGOT_DIA_OWNER_LIMITS = (9.90, 10.00)
-SPIGOT_DIA_LIMITS = _printed_limits(
+SPIGOT_DIA_LIMITS = (SPIGOT_DIA - SPIGOT_DIA_TOL, SPIGOT_DIA + SPIGOT_DIA_TOL)
+_SPIGOT_PRINTED = _printed_limits(
     SPIGOT_DIA, SPIGOT_DIA_PLACES, (-SPIGOT_DIA_TOL, SPIGOT_DIA_TOL)
 )
+if any(abs(a - b) > 1e-9 for a, b in zip(SPIGOT_DIA_LIMITS, _SPIGOT_PRINTED)):
+    raise AssertionError("the spigot's native limits differ from its printed limits")
 # About .35 mm below the seat face, at the title block's .XXX row.
 SPIGOT_LENGTH = 0.3556  # .014
 SPIGOT_LENGTH_PLACES = 3

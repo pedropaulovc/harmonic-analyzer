@@ -54,7 +54,12 @@ def test_owner_r4_top_hat_sizes() -> None:
     # about .35 mm long, 13/64 drilled bore.
     assert spec.OD == 11.0
     assert spec.THICK == pytest.approx(0.06 * INCH)
-    assert spec.SPIGOT_DIA == 9.95
+    # The owner's 9.95 on the printed .3917 grid: native limits == printed.
+    assert spec.SPIGOT_DIA == pytest.approx(0.3917 * INCH)
+    assert round(9.95 / INCH, spec.SPIGOT_DIA_PLACES) == 0.3917
+    assert spec.SPIGOT_DIA_LIMITS == pytest.approx(
+        (spec.SPIGOT_DIA - spec.SPIGOT_DIA_TOL, spec.SPIGOT_DIA + spec.SPIGOT_DIA_TOL)
+    )
     assert spec.SPIGOT_DIA_OWNER_LIMITS == (9.90, 10.00)
     assert spec.SPIGOT_LENGTH == pytest.approx(0.014 * INCH)
     assert abs(spec.SPIGOT_LENGTH - 0.35) < 0.01
