@@ -57,15 +57,14 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from dt_pinion_cam_pin_spec import (
-    CAP_RADIUS_CALLOUT,
     CAP_SAG,
-    DEPTH_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     PIN_DIA as PIN_DIA,
-    PIN_DIA_CALLOUT,
     PIN_LEN,
+    RETAINING_COMPOUND,
+    SEAT_NUMBER,
     SURFACE_FINISHES,
 )
 
@@ -124,10 +123,18 @@ RIGHT_KEEP = {
     "CapR": (0.105, 0.110),
 }
 OVERALL_TEXT_XY = (RIGHT_CENTER[0], RIGHT_CENTER[1] + HALF_DIA + 0.067)
+# The shank is the drill rod as received (title block), so its callout says
+# the size is the stock's (rule 4: stock that is good enough stays stock),
+# the supplier's ±.0005 printed as its acceptance, without repeating the
+# Material cell (machinist review of 7f7fc1717); the fit by its standard
+# name, bonded with its LOCTITE grade (dt_pinion_cam_pin_spec: U27, #290).
+# The length and the crown radius carry their values only (rule 7).
+PIN_DIA_CALLOUT = (
+    "STOCK, AS SUPPLIED; BONDED FIT IN\n"
+    f"{SEAT_NUMBER} FOLLOWER SEAT, {RETAINING_COMPOUND}"
+)
 DIMENSION_CALLOUTS = {
     "PinDia": PIN_DIA_CALLOUT,
-    "Depth": DEPTH_CALLOUT,
-    "CapR": CAP_RADIUS_CALLOUT,
 }
 
 # A representative station on the exposed shank identifies the whole

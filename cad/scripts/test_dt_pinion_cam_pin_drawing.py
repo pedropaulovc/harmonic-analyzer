@@ -130,7 +130,10 @@ def test_bonded_slip_fit_replaces_the_press() -> None:
         "BOND 2X MHA-DT-25, ONE INTO EACH MHA-DT-14 FOLLOWER SEAT WITH LOCTITE 638."
     )
     assert "MHA-DT-14" in drawing.DIMENSION_CALLOUTS["PinDia"]
-    assert "SLIP FIT" in drawing.DIMENSION_CALLOUTS["PinDia"]
+    # Rule 4: the standard fit name with its LOCTITE grade.
+    assert "BONDED FIT IN" in drawing.DIMENSION_CALLOUTS["PinDia"]
+    assert "LOCTITE 638" in drawing.DIMENSION_CALLOUTS["PinDia"]
+    assert "SLIP FIT" not in drawing.DIMENSION_CALLOUTS["PinDia"]
     import draw_dt_pinion_bracket
 
     assert "MHA-DT-25" in draw_dt_pinion_bracket.DIMENSION_CALLOUTS["PinSeatDia"]
@@ -178,10 +181,8 @@ def test_no_gdt_the_shank_carries_the_finish_and_only_the_fit_is_banded() -> Non
         ("PinProfile", "PinDia"): "PIN_DIA_BAND[0]",
     }
     assert "FINAL SIZE" not in drawing.DIMENSION_CALLOUTS["PinDia"]
-    assert drawing.DIMENSION_CALLOUTS["Depth"] is dt_pinion_cam_pin_spec.DEPTH_CALLOUT
-    assert (
-        drawing.DIMENSION_CALLOUTS["CapR"] is dt_pinion_cam_pin_spec.CAP_RADIUS_CALLOUT
-    )
+    # Rule 7: the length and the crown radius carry their values only.
+    assert set(drawing.DIMENSION_CALLOUTS) == {"PinDia"}
     assert "CapR" in drawing.RIGHT_KEEP
     # The reference overall replaces the crown-height prose (drawing-guidelines.md rule 10 (dimension from a real feature)).
     assert "_overall_reference(adapter, right)" in source
@@ -272,18 +273,20 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert int(spec["quantity"]) == 2
 
 
-def test_pin_diameter_callout_leaves_the_stock_to_the_title_block() -> None:
+def test_pin_diameter_callout_names_the_stock_not_the_material() -> None:
     """Codex P2 on #814: the PinDia callout said drill rod while the title
     block said AISI 1018 rod.  Machinist review of 7f7fc1717: naming the stock
-    on the callout at all repeated the Material cell.  The callout now states
-    only the fit, so it cannot disagree with the title block, and the h9
-    bonded slip fit still assumes the drill rod the registry row names."""
+    on the callout repeated the Material cell.  Screen f21dfcdd C1 (rule 4):
+    the as-received shank is called out as stock, so it says the size is the
+    stock's without naming the material, and the bonded fit still assumes
+    the drill rod the registry row names."""
     import _config
 
     row = _config.parts("dt-pinion-cam-pin")
     callout = drawing.DIMENSION_CALLOUTS["PinDia"]
-    assert callout is dt_pinion_cam_pin_spec.PIN_DIA_CALLOUT
-    assert callout == f"SLIP FIT IN {dt_pinion_cam_pin_spec.SEAT_NUMBER} FOLLOWER SEAT"
+    assert callout is drawing.PIN_DIA_CALLOUT
+    assert callout.startswith("STOCK, AS SUPPLIED;")
+    assert len(callout.splitlines()) <= 2
     assert "DRILL ROD" not in callout.upper()
     assert row["material_specification"].upper() not in callout.upper()
     assert "drill rod" in row["material_specification"].lower()

@@ -136,17 +136,17 @@ def test_each_ream_callout_names_its_running_mate() -> None:
     # Machinist review r1 (#1014): the mate and fit ride each bore's own
     # callout (drawing-guidelines.md rule 4 (tighten only for function, and
     # name the mate)), named exactly as the mate's title block reads.
+    # Size, process, then at most two rows of words (rule 7).
     callouts = drawing.DIMENSION_CALLOUTS
     for name, part in (
         ("PivotBoreDia", "dt-pinion-pivot-shaft"),
         ("LiftBoreDia", "dt-pinion-lift-rod"),
     ):
-        row = _config.parts(part)
+        number = str(_config.parts(part)["number"])
         lines = callouts[name].splitlines()
-        assert lines[0] == "THRU - REAM"
-        assert "RUNNING FIT ON" in lines
-        assert str(row["number"]) in lines
-        assert str(row["title"]).upper() in lines
+        assert lines[0] == "REAM THRU"
+        assert lines[1] == f"RUNNING FIT ON {number}"
+        assert len(lines) <= 3
     # R2 (converged-r7): REAM_SLIDE, one fit per shaft with MHA-DT-14; the
     # stock 1/4 in reamer wording went with the line-to-line band.
     assert dt_pinion_pivot_block_spec.BORE_DIA_BAND == REAM_SLIDE
@@ -177,25 +177,14 @@ def test_front_view_locations_start_at_the_pivot_bore() -> None:
     # The lift-bore rise stands outside the block's west end (rule 14).
     rise_x, _ = drawing.FRONT_KEEP["LiftBoreCz"]
     assert rise_x < drawing._front_x(-dt_pinion_pivot_block_spec.BLOCK_WEST)
-    # Review r2: the sheet says why the spacing is held from the pivot bore,
-    # on one line (a multi-line above-callout does not print); the three-place
-    # rise names its function too (#2106 final review).
-    assert set(drawing.ABOVE_CALLOUTS) == {"LiftBoreX", "LiftBoreCz"}
-    assert all("\n" not in text for text in drawing.ABOVE_CALLOUTS.values())
-    three_place = {
-        name
-        for name, places in dt_pinion_pivot_block_spec.DRAWING_PRECISION[
-            "BlockProfile"
-        ].items()
-        if places == 3
-    }
-    assert three_place <= set(drawing.ABOVE_CALLOUTS)
+    # The three-place locations carry value and band only (rule 7).
+    assert not hasattr(drawing, "ABOVE_CALLOUTS")
 
 
 def test_hole_states_are_annotated() -> None:
     callouts = drawing.DIMENSION_CALLOUTS
-    assert callouts["PivotBoreDia"].startswith("THRU")
-    assert callouts["LiftBoreDia"].startswith("THRU")
+    assert callouts["PivotBoreDia"].startswith("REAM THRU")
+    assert callouts["LiftBoreDia"].startswith("REAM THRU")
     assert "+0.05/-0.00" not in "\n".join(callouts.values())
     assert model_toleranced_dimensions(block) == {
         ("BlockProfile", "PivotBoreDia"): "*deviations(BORE_DIA_BAND)",
@@ -258,13 +247,12 @@ def test_assembly_and_base_depend_on_geometry_not_drawing_notes() -> None:
         assert "build_dt_pinion_pivot_block.py" not in deps, script
 
 
-def test_views_carry_no_hidden_lines_and_the_drill_callout_names_its_process() -> None:
+def test_views_carry_no_hidden_lines() -> None:
     # Fable review r4 (drawing-guidelines.md rule 9 (show internal shape in solid lines)): the holes are standard drills and reams fully
     # defined by their callouts, so every view is hidden-lines-removed.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "set_hidden_lines_visible" not in source
     assert "for view in (front, top, right, iso):" in source
-    assert 'process="DRILL"' in source
     assert "symbol_xy=PIVOT_FINISH_XY" in source
     assert "char_height=0.0025" in source
     # The Ra leader must leave the block through its top face, left of the
