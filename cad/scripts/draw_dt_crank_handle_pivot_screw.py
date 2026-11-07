@@ -72,6 +72,7 @@ from dt_crank_handle_pivot_screw_notes import (
     SHOULDER_FIT_CALLOUT,
     SHOULDER_LENGTH_CALLOUT,
     SHOULDER_LENGTH_NOTE,
+    THREAD_NOTE,
 )
 from dt_crank_handle_pivot_screw_spec import (
     DRAWING_DIMENSIONS,
@@ -88,7 +89,6 @@ from dt_crank_handle_pivot_screw_spec import (
     SEAT_STATION,
     SHOULDER_DIA,
     SURFACE_FINISHES,
-    THREAD_CALLOUT,
     THREAD_MODEL_DIA,
     THREAD_SIZE,
     TIP_CHAMFER,
@@ -570,7 +570,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_attached_note(
         adapter,
         side,
-        text=THREAD_CALLOUT,
+        text=THREAD_NOTE,
         entity_xy=THREAD_PICK,
         note_xy=THREAD_NOTE_XY,
         label="MHA-DT-32 thread callout",

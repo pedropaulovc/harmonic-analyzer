@@ -7,7 +7,12 @@ editing them re-keys only this sheet.
 
 from __future__ import annotations
 
-from dt_crank_handle_pivot_screw_spec import CHAMFER_CALLOUT, END_PLAY_RANGE, inch_text
+from dt_crank_handle_pivot_screw_spec import (
+    CHAMFER_CALLOUT,
+    END_PLAY_RANGE,
+    THREAD_CALLOUT,
+    inch_text,
+)
 
 # The fitted shoulder, stated once (user ruling 2026-09-29, after the
 # MHA-DT-32 machinist review): under-head to seat face is the bonded handle's
@@ -29,13 +34,23 @@ SHOULDER_LENGTH_NOTE = "\n".join(
         f"{inch_text(END_PLAY_RANGE[1], 3)} END PLAY.",
     )
 )
-# The head's bands: its diameter keeps a bearing annulus on the cup floor
-# outside the floor hole, its length keeps it below the cup's face, which it
+# The head's bands.  Its length keeps it below the cup's face, which it
 # clears (rule 3's CLEARS form; KEEPS HEAD BELOW read as design rationale).
-# Two rows: on one the 52-mm block's left end ran into the head face's
+# Its three-place diameter is what MHA-DT-35's pocket is bored to (that
+# sheet's matched pocket fit), so the callout names that mate (rule 4): the
+# fan-out local repeat of e308920ca9 (2 of 3 runs) found "BEARS ON MHA-DT-35
+# FLOOR" named a face's job, not the diameter's.  Rows of 15 characters at
+# most: on one 52-mm row the block's left end ran into the head face's
 # extension line (fan-out r2 5065c806b3, rule 14).
-HEAD_DIA_CALLOUT = "BEARS ON\nMHA-DT-35 FLOOR"
+HEAD_DIA_CALLOUT = "SETS MHA-DT-35\nPOCKET BORE"
 HEAD_LENGTH_CALLOUT = "CLEARS\nMHA-DT-35 FACE"
+# The slender screw wants tailstock support.  The thread end only screws into
+# the arm's tap, so a centre there touches no running, seating or slotted
+# face; the slotted head end is the end the collet holds, so it takes none
+# (rule 11: say CENTRES OK where they do no harm; fan-out local repeat of
+# e308920ca9, 2 of 3 runs).  Its own row under the thread size, at that end's
+# leader, so it reads as this end only.
+THREAD_NOTE = f"{THREAD_CALLOUT}\nCENTRE OK"
 # The relief's 45-degree lead keeps the seat annulus flat by staying inside
 # the arm's tapped thread (dt_crank_handle_pivot_screw_spec), said in plain
 # words (fan-out r2: "LEAD, INSIDE" is a private phrase, rule 26).  Rows of

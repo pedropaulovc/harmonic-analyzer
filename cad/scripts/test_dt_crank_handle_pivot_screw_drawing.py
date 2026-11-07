@@ -407,7 +407,10 @@ def test_cup_wall_follows_ruling_b_without_changing_the_head_or_fit() -> None:
 def test_thread_callout_names_the_size_but_not_the_title_block_class() -> None:
     assert spec.THREAD_CALLOUT == "#4-40 UNC"
     assert "2A" not in spec.THREAD_CALLOUT
-    assert drawing.THREAD_CALLOUT is spec.THREAD_CALLOUT
+    # The sheet prints it once, at the thread's leader, over the thread end's
+    # centre statement (fan-out local repeat of e308920ca9, rule 11).
+    assert notes.THREAD_NOTE == f"{spec.THREAD_CALLOUT}\nCENTRE OK"
+    assert drawing.THREAD_NOTE is notes.THREAD_NOTE
 
 
 def test_running_shoulder_carries_the_only_finish_symbol() -> None:
@@ -509,7 +512,8 @@ def test_fitted_shoulder_length_is_one_flagged_numbered_note() -> None:
     # Standard fit name and forms on the other callouts (rules 3, 4, 7).
     assert notes.SHOULDER_FIT_CALLOUT == "RUNNING FIT IN\nMHA-DT-08 REAMED BORE"
     assert notes.HEAD_LENGTH_CALLOUT == "CLEARS\nMHA-DT-35 FACE"
-    assert notes.HEAD_DIA_CALLOUT == "BEARS ON\nMHA-DT-35 FLOOR"
+    assert notes.HEAD_DIA_CALLOUT == "SETS MHA-DT-35\nPOCKET BORE"
+    assert max(map(len, notes.HEAD_DIA_CALLOUT.splitlines())) <= 15
 
 
 def test_sheet_placements_stay_inside_the_border() -> None:

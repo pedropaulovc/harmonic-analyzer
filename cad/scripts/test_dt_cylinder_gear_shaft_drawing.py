@@ -101,8 +101,20 @@ def test_the_od_names_its_mates_and_its_stock_route_at_the_callout() -> None:
         "RUNNING FIT IN MHA-DT-12 AND MHA-DT-02 BORES; 3/8 GROUND STOCK OK"
     )
     assert "GROUND STOCK" not in notes.DRAWING_NOTES
-    flat = " ".join(notes.DRAWING_NOTES.splitlines())
-    assert "SPOTS FOR MHA-SH-VN-54 SET SCREWS DRILLED AT ASSEMBLY THROUGH MHA-DT-02 TAPS" in flat
+    # The spots print at a leader on the bar, not in the unflagged block
+    # (fan-out local repeat of e308920ca9, 3 of 3 runs).
+    assert "SPOTS" not in notes.DRAWING_NOTES
+    flat = " ".join(notes.SPOT_NOTE.splitlines())
+    assert flat == (
+        "NO FLATS; SPOTS FOR MHA-SH-VN-54 SET SCREWS "
+        "DRILLED AT ASSEMBLY THROUGH MHA-DT-02 TAPS"
+    )
+    assert drawing.SPOT_NOTE is notes.SPOT_NOTE
+    # The leader lands on the bar inside the south strap's width, right of the
+    # length's witness, and the text stands between the bar and that length.
+    assert drawing.SHAFT_LEFT_X < drawing.SPOT_EDGE[0] < drawing.SPOT_NOTE_XY[0]
+    assert drawing.SPOT_EDGE[0] - drawing.SHAFT_LEFT_X < dt_arbor_pedestal_spec.STRAP_T / 1000.0
+    assert drawing.PROFILE_KEEP["Depth"][1] < drawing.SPOT_NOTE_XY[1] < drawing.SPOT_EDGE[1]
     assert _config.parts("sh-vn-arbor-set-screw")["number"] == notes.SET_SCREW_NUMBER
     assert _config.parts("dt-arbor-pedestal")["number"] == notes.PEDESTAL_NUMBER
     # The part stamps the notes module's text, and the sheet prints its callout.
@@ -153,4 +165,4 @@ def test_both_ends_are_domed_and_the_dome_form_is_model_owned() -> None:
     assert '_dome_end(adapter, SHAFT_LENGTH, "NorthDome")' in source
     assert "_hide_reference_sketches(adapter)" in source
     assert part.DOME_SPHERE_RADIUS > part.SHAFT_RADIUS
-    assert "NO FLATS" in notes.DRAWING_NOTES
+    assert notes.SPOT_NOTE.startswith("NO FLATS")

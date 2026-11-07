@@ -32,6 +32,7 @@ from _drawing_dimensions import (
     set_reference_dimension,
 )
 from _drawing_finish import add_surface_finish
+from _drawing_leader_notes import add_attached_note
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -43,7 +44,7 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from cylinder_bank_layout import ARBOR_DOME_HEIGHT, ARBOR_LENGTH
-from dt_cylinder_gear_shaft_notes import SHAFT_DIA_CALLOUT
+from dt_cylinder_gear_shaft_notes import SHAFT_DIA_CALLOUT, SPOT_NOTE
 from dt_cylinder_gear_shaft_spec import (
     DOME_CALLOUT,
     DRAWING_DIMENSIONS,
@@ -154,6 +155,15 @@ FINISH_SYMBOL = (FINISH_EDGE[0], 0.206)
 # Note text height, as on draw_ch_pivot_shaft's identical O.D. symbol: at the
 # template default the Ra text printed ~8 mm tall over the bar (r2 render).
 FINISH_CHAR_HEIGHT = 0.0025
+# The set-screw spot requirement lands on the bar's lower flank 5 mm in from
+# the south end, under the pedestal strap the tap passes through, right of the
+# length's witness at that end.  Its two rows (~108 mm) stand in the band
+# between the bar and the length's reference text below it.
+SPOT_EDGE = (
+    SHAFT_LEFT_X + 0.005,
+    PROFILE_CENTER[1] - SHAFT_DIA * SHEET_SCALE[0] / 2000.0,
+)
+SPOT_NOTE_XY = (SHAFT_LEFT_X + 0.016, PROFILE_CENTER[1] - 0.012)
 
 
 def _rotate_view(adapter: Any, view: Any, angle: float, *, label: str) -> None:
@@ -370,6 +380,15 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bearing"),
         label="arbor bearing finish",
         char_height=FINISH_CHAR_HEIGHT,
+    )
+    add_attached_note(
+        adapter,
+        profile,
+        text=SPOT_NOTE,
+        entity_xy=SPOT_EDGE,
+        note_xy=SPOT_NOTE_XY,
+        label="arbor set-screw spots",
+        entity_type="SILHOUETTE",
     )
 
     # 0.020: a note is left-aligned on its anchor, so the ink starts here. The

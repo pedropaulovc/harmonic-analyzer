@@ -28,15 +28,21 @@ SHAFT_DIA_CALLOUT = "RUNNING FIT IN MHA-DT-12 AND MHA-DT-02 BORES; 3/8 GROUND ST
 # Part-specific facts a machinist cannot read off the views (rule 7).  A
 # 6.5:.375 slender bar is turned between centres, which may stay.  The length
 # is cut at assembly, so the shop supplies the bar long (7-1/2 in covers the
-# nominal span, both domes and facing stock) and domes the cut ends.  The set
-# screws' cup points bear in spots drilled through the pedestal taps at
-# assembly (#743), so the bar is never flatted: a match-drill at assembly with
-# its mates, a requirement (rule 7).
+# nominal span, both domes and facing stock) and domes the cut ends.
 DRAWING_NOTES = "\n".join(
     (
         "CENTRES OK.",
         "SUPPLY 7-1/2 LONG, UNCUT; CUT AND DOME BOTH ENDS AT ASSEMBLY.",
-        f"NO FLATS; SPOTS FOR {SET_SCREW_NUMBER} SET SCREWS DRILLED AT ASSEMBLY",
-        f"THROUGH {PEDESTAL_NUMBER} TAPS.",
+    )
+)
+# The set screws' cup points bear in spots drilled through the pedestal taps
+# at assembly (#743), so the bar is never flatted: a match-drill at assembly
+# with its mates, a requirement (rule 7).  It prints at a leader on the bar's
+# end under the pedestal strap, not in the unflagged block: the fan-out local
+# repeat of e308920ca9 (3 of 3 runs) found nothing tied it to the shaft.
+SPOT_NOTE = "\n".join(
+    (
+        f"NO FLATS; SPOTS FOR {SET_SCREW_NUMBER} SET SCREWS",
+        f"DRILLED AT ASSEMBLY THROUGH {PEDESTAL_NUMBER} TAPS",
     )
 )
