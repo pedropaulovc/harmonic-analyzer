@@ -211,3 +211,69 @@ def test_table_creation_and_settled_readback_have_operation_spans() -> None:
         ("create_carrier_hole_table", "drawing.carrier_hole_table.create"),
         ("settled", "drawing.carrier_hole_table.settled"),
     ]
+
+
+@pytest.mark.parametrize("failure", [None, "reject", "readback"])
+def test_outer_row_authoring_binds_raw_named_dimensions(monkeypatch, failure):
+    import _com
+    import build_ch_rocker_arm_tl_oblique_carrier as builder
+
+    class RawDispatch:
+        def InvokeTypes(self, *_args):
+            raise AssertionError("bind the raw dimension before accessing members")
+
+    wrappers = {}
+    controls = {}
+    selected = []
+    for name in ("A2DY", "B2DY"):
+        state = {}
+
+        def set_values(lower, upper, state=state):
+            state.update(lower=lower, upper=upper)
+            return failure != "reject"
+
+        tolerance = SimpleNamespace(
+            Type=0, SetValues=set_values,
+            GetMinValue=lambda state=state: state["lower"],
+            GetMaxValue=lambda state=state: state["upper"] + (
+                1e-4 if failure == "readback" else 0.0
+            ),
+        )
+        dimension = SimpleNamespace(
+            SystemValue=spec.A2_DY / 1000.0, Tolerance=tolerance,
+        )
+        raw = RawDispatch()
+        assert not hasattr(raw, "_oleobj_") and not hasattr(raw, "Tolerance")
+        wrappers[raw] = dimension
+        controls[name] = (raw, dimension, state)
+
+    def early_bound(value, interface):
+        raw = getattr(value, "_oleobj_", None)
+        if raw in wrappers:
+            assert interface == "IDimension"
+            return wrappers[raw]
+        # As in _com._early_bound, a bare raw dispatch passes through.
+        # Omitting _bind in the author therefore fails on .Tolerance.
+        return value
+
+    def named_dimension(_adapter, feature, name):
+        assert feature == "PinHoleProfile"
+        selected.append(name)
+        return None, controls[name][0]
+
+    monkeypatch.setattr(_com, "_early_bound", early_bound)
+    monkeypatch.setattr(builder, "_early_bound", early_bound)
+    monkeypatch.setattr(builder, "_named_dimension", named_dimension)
+    if failure is not None:
+        message = "rejected" if failure == "reject" else "changed"
+        with pytest.raises(RuntimeError, match=f"local row limits {message}"):
+            builder._author_outer_pin_rows(None)
+        return
+    builder._author_outer_pin_rows(None)
+    assert selected == ["A2DY", "B2DY"]
+    for _raw, dimension, state in controls.values():
+        assert dimension.SystemValue == spec.A2_DY / 1000.0
+        assert dimension.Tolerance.Type == 2
+        assert (state["lower"], state["upper"]) == pytest.approx(
+            tuple(value / 1000.0 for value in spec.OUTER_Y_DEVIATIONS)
+        )

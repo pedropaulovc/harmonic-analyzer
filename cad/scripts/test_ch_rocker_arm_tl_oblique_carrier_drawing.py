@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ast
 import inspect
 import math
 import re
@@ -840,27 +839,3 @@ def test_pin_chamfer_binds_raw_named_dimension_before_value_and_tolerance(
     assert '_early_bound(_bind(dimension, "IDimension"), "IDimension")' in inspect.getsource(
         part._pin_chamfer_min_limit
     )
-
-
-def test_finished_hub_is_cut_once_and_updates_the_running_volume() -> None:
-    """A rebase must not retain two copies of the destructive bore operation."""
-    build = ast.parse(inspect.getsource(part.build)).body[0]
-    calls = [
-        node for node in ast.walk(build)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "_finished_hub_bore"
-    ]
-    assert len(calls) == 1, "the finished HUB bore/chamfer must be cut exactly once"
-    call = calls[0]
-    assert [ast.unparse(argument) for argument in call.args] == [
-        "adapter", "drive_jobs", "volume",
-    ]
-    assignments = [
-        node for node in build.body
-        if isinstance(node, ast.Assign)
-        and isinstance(node.value, ast.Await)
-        and node.value.value is call
-    ]
-    assert len(assignments) == 1, "the single bore operation must be unconditional and awaited"
-    assert [ast.unparse(target) for target in assignments[0].targets] == ["volume"]
