@@ -194,7 +194,7 @@ def test_the_d_bore_slides_on_the_sleeve_boss_and_flat_at_every_printed_limit() 
     assert flat_fit == pytest.approx(spec.FLAT_CLEARANCE, abs=1e-6)
     link = f"SEE NOTE {spec.BORE_FIT_NOTE}"
     assert link in drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"].splitlines()
-    assert drawing.DIMENSION_CALLOUTS_BELOW["FlatToAxis"] == link
+    assert drawing.DIMENSION_CALLOUTS_BELOW["FlatToAxis"].splitlines()[0] == link
     note = " ".join(spec.BORE_FIT_TEXT.split())
     printed = re.findall(r"(\d*\.\d+-\d*\.\d+) ON THE (ROUND|FLAT)", note)
     assert [kind for _, kind in printed] == ["ROUND", "FLAT"]

@@ -76,6 +76,7 @@ from pd_transgear_disc_hub_spec import (
     DRAWING_PRECISION_BY_NAME,
     FLANGE_DIA,
     FLANGE_THICK_CALLOUT,
+    FLAT_STOP_TEXT,
     GEOMETRIC_TOLERANCES_IN,
     HUB_FRONT_Z,
     HUB_LENGTH_CALLOUT,
@@ -149,7 +150,9 @@ BORE_CALLOUT = "\n".join(
         BORE_WALL_TEXT,
     )
 )
-FLAT_CALLOUT = f"SEE NOTE {BORE_FIT_NOTE}"
+# The flat is blind: its callout states where it stops (rule 9, a blind
+# depth a callout states), on the flange rear face the .144 locates.
+FLAT_CALLOUT = f"SEE NOTE {BORE_FIT_NOTE}\n{FLAT_STOP_TEXT}"
 # The numbered notes, in the order their callouts link them; top-left
 # anchored in the empty field above the face view, left of the overall's
 # callout.
@@ -250,9 +253,7 @@ FLANGE_THICK_TEXT_BLOCK = (0.047, 0.017)
 _OIL_HOLE_SHOULDER = (_OIL_HOLE_X - 0.002, AXIS_Y - _FLANGE_R - 0.033)
 SIDE_KEEP = {
     "HubDia": (HUB_FRONT_X - 0.014, AXIS_Y),
-    # Its five-line block (size, fit, REF clearance, root) keeps its top under
-    # the spigot end's ⊥ frame and its left edge clear of the spigot.
-    "SpigotDia": (SPIGOT_END_X + 0.040, AXIS_Y - 0.0053),
+    "SpigotDia": (SPIGOT_END_X + 0.040, AXIS_Y - 0.003),
     # Clear the spigot's whole fit-callout box, not just its dimension line.
     "FlangeDia": (SPIGOT_END_X + 0.083, AXIS_Y),
     "FlangeThick": (

@@ -72,6 +72,13 @@ CLAMP_SLOT_PLACES = 3
 CLAMP_SLOT_CBORE_WIDTH_PLACES = 3
 CLAMP_SLOT_CBORE_WIDTH_LIMITS = (-0.127, 0.254)  # -.005/+.010
 HANGER_STATION_NAMES = ("PivotTapStation", "BracketTapStation1", "BracketTapStation2")
+# The hook taps' stations print as REF, "(11.459)": the MHA-PD-14 hook is the
+# master, and SPOT THRU MHA-PD-14 AT ASSEMBLY on their callout sets their
+# position, so a band on them controls nothing (round 3 machinist review of
+# the fan-out). The pivot's station and the row height it shares keep the
+# ±.002 (HOLE_POSITION_TOL; owner exception RV-01 in pd-support-bar.yaml).
+HOOK_TAP_REFERENCE_NAMES = ("BracketTapStation1", "BracketTapStation2")
+BANDED_HANGER_NAMES = ("HangerRowHeight", "PivotTapStation")
 CLAMP_STATION_NAMES = (
     "ClampStation1",
     "ClampStation2",
@@ -136,9 +143,10 @@ DIMENSION_CALLOUTS = {
     # thread class is the title block's (rule 2). The pivot is one hole
     # countersunk on both faces: no "2X", which on the hook taps' callout
     # counts holes (r6 machinist review, rule 12).
-    # The hook taps' route under their ±.002 (delegated ruling 2026-11-07,
-    # FoPdFab2 Q1): spotted through the MHA-PD-14 base's holes at assembly.
-    # The pivot's ±.002 is an owner exception (pd-support-bar.yaml RV-01).
+    # The hook taps' route (delegated ruling 2026-11-07, FoPdFab2 Q1):
+    # spotted through the MHA-PD-14 base's holes at assembly, which sets
+    # their stations (HOOK_TAP_REFERENCE_NAMES, printed REF). The pivot's
+    # ±.002 is an owner exception (pd-support-bar.yaml RV-01).
     "PivotCskDia": "BOTH FACES\nLOCATES MHA-PD-VN-57",
     "BracketCskDia": "BOTH FACES\nSPOT THRU MHA-PD-14 AT ASSEMBLY",
     # The slot width's upper limit is the head's: wider, the MHA-SH-VN-53

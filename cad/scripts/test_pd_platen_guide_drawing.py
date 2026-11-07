@@ -273,15 +273,20 @@ def test_only_the_platen_taps_are_spotted_and_the_lock_taps_are_accepted() -> No
 
 
 class _FakeHoleTable:
-    """Native hole table stand-in: TAG / X LOC / Y LOC / SIZE, rows unordered."""
+    """Native hole table stand-in: TAG / X LOC / Y LOC / SIZE, rows unordered,
+    the SIZE cells merged.  Like the farm's SolidWorks (round 3), inserting a
+    column re-renders the generated cells (.140 for 0.140, the size's CRLF)
+    and splits the SIZE merge."""
 
     def __init__(self) -> None:
         stations = list(reversed(drawing.HOLE_STATIONS_MM))
         self.cells = [["TAG", "X LOC", "Y LOC", "SIZE"]] + [
-            [f"A{i}", f"{station / 25.4:.3f}", "0.140", "4-40"]
+            [f"A{i}", f"{station / 25.4:.3f}", "0.140", "4-40 UNC - 2B THRU ALL"]
             for i, station in enumerate(stations, start=1)
         ]
         self.widths = [0.02, 0.03, 0.03, 0.06]
+        self.size_merged = True
+        self.merge_calls: list[tuple[int, int, int, int]] = []
 
     @property
     def RowCount(self) -> int:
@@ -296,9 +301,21 @@ class _FakeHoleTable:
 
     def InsertColumn2(self, where: int, index: int, title: str, _width: int) -> bool:
         assert (where, index) == (3, 3)
+        for row in self.cells[1:]:
+            row[2] = ".140"
+            row[3] = "4-40 UNC - 2B\r\nTHRU ALL"
         for row in self.cells:
             row.append("")
         self.widths.append(0.01)
+        self.size_merged = False
+        return True
+
+    def IsCellMerged(self, row: int, column: int) -> tuple[bool, int, int]:
+        return (column == 3 and row > 0 and self.size_merged, 1, 3)
+
+    def MergeCells(self, *cells: int) -> bool:
+        self.merge_calls.append(cells)
+        self.size_merged = True
         return True
 
     def SetColumnTitle2(self, column: int, title: str, _flag: bool) -> bool:
@@ -325,8 +342,11 @@ def test_the_hole_table_names_each_taps_mate() -> None:
     assert {drawing.HOLE_TABLE_MATES[s] for s in drawing.FRONT_X} == {platen}
     assert {drawing.HOLE_TABLE_MATES[s] for s in drawing.REAR_X} == {lock}
     table = _FakeHoleTable()
-    generated = drawing._add_mate_column(table)
-    drawing._check_mate_column(table, generated)
+    generated, size_merged = drawing._add_mate_column(table)
+    assert size_merged is True
+    drawing._check_mate_column(table, generated, size_merged)
+    assert table.merge_calls == [(1, 3, table.RowCount - 1, 3)]
+    assert table.size_merged
     assert table.cells[0][4] == drawing.HOLE_TABLE_MATE_COLUMN
     for row in table.cells[1:]:
         x_mm = float(row[1]) * 25.4
@@ -335,7 +355,11 @@ def test_the_hole_table_names_each_taps_mate() -> None:
     assert table.widths[4] == drawing.HOLE_TABLE_MATE_COLUMN_WIDTH
     table.cells[3][4] = platen if table.cells[3][4] == lock else lock
     with pytest.raises(RuntimeError, match="MATE cells differ"):
-        drawing._check_mate_column(table, generated)
+        drawing._check_mate_column(table, generated, size_merged)
+    table.cells[3][4] = platen if table.cells[3][4] == lock else lock
+    table.cells[3][1] = "9.999"
+    with pytest.raises(RuntimeError, match="tags or locations"):
+        drawing._check_mate_column(table, generated, size_merged)
 
 
 def test_drawing_contract_imports_without_pywin32() -> None:

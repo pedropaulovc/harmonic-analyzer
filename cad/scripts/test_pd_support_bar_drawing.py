@@ -55,6 +55,63 @@ def test_printed_bands_match_the_bar_and_drilled_slot_limits() -> None:
     assert part.CLAMP_SLOT_WIDTH_LIMITS == (0.0, drilled_oversize_mm(unit="in"))
 
 
+def test_hook_tap_stations_are_reference_and_only_the_pivot_row_is_banded() -> None:
+    """Round 3 machinist review (over-specification): SPOT THRU MHA-PD-14 AT
+    ASSEMBLY sets the hook taps' stations, so they print REF with no band;
+    the row height and the pivot's station keep ±.002 (RV-01)."""
+    import inspect
+
+    banded = set(sheet_spec.BANDED_HANGER_NAMES)
+    reference = set(sheet_spec.HOOK_TAP_REFERENCE_NAMES)
+    assert banded == {"HangerRowHeight", "PivotTapStation"}
+    assert reference == {"BracketTapStation1", "BracketTapStation2"}
+    assert banded | reference == {"HangerRowHeight", *sheet_spec.HANGER_STATION_NAMES}
+    source = inspect.getsource(part.build)
+    assert "for name in BANDED_HANGER_NAMES:" in source
+    assert "HANGER_STATION_NAMES" not in source
+    assert "SPOT THRU MHA-PD-14" in sheet_spec.DIMENSION_CALLOUTS["BracketCskDia"]
+
+
+def _station_annotations(tolerance_type: int = 0, names=None):
+    names = sheet_spec.HOOK_TAP_REFERENCE_NAMES if names is None else names
+    tolerance = SimpleNamespace(Type=tolerance_type)
+    display = SimpleNamespace(GetDimension2=lambda _i: SimpleNamespace(Tolerance=tolerance))
+    return [
+        SimpleNamespace(name=name, GetSpecificAnnotation=lambda: display)
+        for name in ("PivotTapStation", *names)
+    ]
+
+
+@pytest.fixture
+def reference_calls(monkeypatch):
+    calls = []
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
+    monkeypatch.setattr(
+        drawing,
+        "set_reference_dimension",
+        lambda _adapter, annotation, *, label: calls.append((annotation.name, label)),
+    )
+    return calls
+
+
+def test_hook_tap_stations_go_reference_once_each(reference_calls) -> None:
+    drawing._reference_hook_tap_stations(None, _station_annotations())
+    assert [name for name, _label in reference_calls] == list(
+        sheet_spec.HOOK_TAP_REFERENCE_NAMES
+    )
+
+
+def test_hook_tap_reference_refuses_a_band_or_a_missing_station(reference_calls) -> None:
+    with pytest.raises(RuntimeError, match="carries a band"):
+        drawing._reference_hook_tap_stations(None, _station_annotations(tolerance_type=1))
+    with pytest.raises(RuntimeError, match="BracketTapStation2 dimensions, not 1"):
+        drawing._reference_hook_tap_stations(
+            None, _station_annotations(names=("BracketTapStation1",))
+        )
+    assert all(name != "PivotTapStation" for name, _label in reference_calls)
+
+
 def test_clamp_holes_find_the_back_arc_taps_at_the_printed_worst_case() -> None:
     """Review of PR #1471: the clamp row printed .X (±0.8), whose 2.263
     position zone over-runs the 0.812 the #8 clearance holes float on the

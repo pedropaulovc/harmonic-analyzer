@@ -70,7 +70,11 @@ from _drawing_annotation_extent import (
     require_leader_clear,
     sheet_region,
 )
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
 from _drawing_edges import scan_view_edges
 from _drawing_finish import add_surface_finish
 import _drawing_hidden_sketches as hidden_sketches
@@ -122,6 +126,7 @@ from pd_support_bar_drawing_spec import (
     DRAWING_PRECISION,
     FRONT_FACE_VIEW_LETTER,
     FRONT_FINISH_REASON,
+    HOOK_TAP_REFERENCE_NAMES,
     STATION_END_LABEL,
     SURFACE_FINISHES,
     TOP_FINISH_REASON,
@@ -196,7 +201,8 @@ def _back_x(model_x: float) -> float:
 # 312.4 mm on the sheet, with the spotting route's line) and the line's
 # upper tail rises to 234.8 mm, so 22 mm out (305.0) the shoulder crossed it.
 # The section line runs up through the pivot, its arrows and letters left of
-# it. Every location carries its value and band alone (rule 7): the mate
+# it. Every location carries its value and band alone (rule 7; the hook
+# taps' stations REF, their callout's spotting route sets them): the mate
 # each row serves stands on its hole's countersink callout.
 # The pivot and the latch-hook pair each take ONE stacked callout on their
 # countersink's Ø (tap line, countersink, faces and mate; machinist review
@@ -1416,6 +1422,28 @@ def _set_countersink_suffixes(adapter: Any, annotations: list[Any]) -> None:
             raise RuntimeError(f"{name}: countersink suffix did not persist: {applied!r}")
 
 
+def _reference_hook_tap_stations(adapter: Any, annotations: list[Any]) -> None:
+    """The hook taps' stations, "(11.459)" and "(11.735)": spotted through
+    MHA-PD-14 at assembly (their callout), so they print REF with no band
+    (round 3 machinist review). Each imports once and carries no band before
+    its parentheses go on (draw_fr_top_frame._reference_plan_outlines)."""
+    for name in HOOK_TAP_REFERENCE_NAMES:
+        matches = [
+            annotation
+            for annotation in annotations
+            if dimension_name(adapter, _early_bound(annotation, "IAnnotation")) == name
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(f"back face imported {len(matches)} {name} dimensions, not 1")
+        annotation = _early_bound(matches[0], "IAnnotation")
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        if int(tolerance.Type) != 0:  # swTolType_e.swTolNONE
+            raise RuntimeError(f"hook tap {name} carries a band; a reference takes none")
+        set_reference_dimension(adapter, annotation, label=f"hook tap {name}")
+
+
 def _place_caption(adapter: Any, text: str, top_centre: tuple[float, float]) -> None:
     """A view caption whose measured box's top centre lands on ``top_centre``
     (INote.GetExtent; draw_pd_transgear_feed_pinion._place_rear_caption)."""
@@ -1593,6 +1621,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
     )
     _set_countersink_suffixes(adapter, annotations)
+    _reference_hook_tap_stations(adapter, annotations)
     # Places (and so each dimension's band or limit) are authored on the part;
     # the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)

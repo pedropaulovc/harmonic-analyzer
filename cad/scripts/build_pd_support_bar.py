@@ -103,6 +103,7 @@ from pd_support_bar_spec import (
     UNIT,
 )
 from pd_support_bar_drawing_spec import (
+    BANDED_HANGER_NAMES,
     CLAMP_HOLE_CALLOUT_PLACES,
     CLAMP_POSITION_PLACES,
     CLAMP_SLOT_CBORE_WIDTH_LIMITS,
@@ -956,14 +957,16 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # The rest of the print's places, then its bands and limits: the hanger
-    # holes' row and stations carry the pivot and hook positions' ±.002
+    # row's height and the pivot's station carry the pivot position's ±.002
     # (HOLE_POSITION_TOL; paper_drive_geom and transgear_hanger_joints read
-    # HOLE_POSITION_BAND, its printed reach); the clamp holes' row and
-    # stations print .XXX alone, under the title block's CLAMP_POSITION_BAND;
-    # the countersinks their single MAX limits. The bands are millimetres;
-    # UNIT prints them in inches.
+    # HOLE_POSITION_BAND, its printed reach, which the hook taps spotted
+    # through MHA-PD-14 still land within); the hook taps' stations print
+    # .XXX alone, as the drawing's REF (HOOK_TAP_REFERENCE_NAMES); the clamp
+    # holes' row and stations print .XXX alone, under the title block's
+    # CLAMP_POSITION_BAND; the countersinks their single MAX limits. The
+    # bands are millimetres; UNIT prints them in inches.
     apply_drawing_precision(adapter, SHEET_PRECISION)
-    for name in ("HangerRowHeight", *HANGER_STATION_NAMES):
+    for name in BANDED_HANGER_NAMES:
         set_dimension_symmetric_tolerance(
             adapter,
             "HangerRowReference",

@@ -285,16 +285,18 @@ def _hole_table_rows(table: Any) -> dict[float, tuple[int, str]]:
     return rows
 
 
-def _add_mate_column(table: Any) -> tuple[tuple[str, ...], ...]:
+def _add_mate_column(table: Any) -> tuple[tuple[tuple[str, ...], ...], bool | None]:
     """Write HOLE_TABLE_MATES into a custom MATE column after SIZE.
 
     Returns the generated TAG/X LOC/Y LOC/SIZE cells, which the column must
-    leave unchanged through the rebuild (``_check_mate_column``).
+    leave in place through the rebuild (``_check_mate_column``), and whether
+    the SIZE cells were merged before it went in.
     """
     if int(table.ColumnCount) != 4:
         raise RuntimeError("the MATE column expects the native four-column hole table")
     rows = _hole_table_rows(table)
     generated = _table_cells(table, 4)
+    size_merged = _size_cells_merged(table)
     inserted = table.InsertColumn2(
         _INSERT_COLUMN_AFTER, 3, HOLE_TABLE_MATE_COLUMN, _INSERT_COLUMN_DEFAULT_WIDTH
     )
@@ -311,16 +313,55 @@ def _add_mate_column(table: Any) -> tuple[tuple[str, ...], ...]:
     )
     if abs(actual - HOLE_TABLE_MATE_COLUMN_WIDTH) > 1e-6:
         raise RuntimeError(f"hole-table MATE column width did not persist: {actual!r}")
-    return generated
+    return generated, size_merged
 
 
-def _check_mate_column(table: Any, generated: tuple[tuple[str, ...], ...]) -> None:
-    """Only the MATE column changed: each row names its tap's mate."""
+def _normalised(cells: tuple[tuple[str, ...], ...]) -> tuple[tuple[str, ...], ...]:
+    """Cells with their whitespace (SolidWorks' CRLF and wraps) collapsed."""
+    return tuple(tuple(" ".join(value.split()) for value in row) for row in cells)
+
+
+def _size_cells_merged(table: Any) -> bool | None:
+    """Whether every hole row's SIZE cell (column 3) is one merged cell;
+    None when SolidWorks will not report it (the probe is telemetry only)."""
+    last = int(table.RowCount) - 1
+    try:
+        for row in range(2, last + 1):
+            state = table.IsCellMerged(row, 3)
+            merged = state[0] if isinstance(state, tuple) else state
+            if not merged:
+                return False
+    except Exception as error:  # noqa: BLE001 - a probe, logged and not relied on
+        _telemetry.info(f"hole-table SIZE merge state unreadable: {error!r}")
+        return None
+    return True
+
+
+def _row_key(row: tuple[str, ...]) -> tuple[str, float, float]:
+    """A hole row's tag and X/Y LOC, the locations compared as numbers
+    (SolidWorks may print .140 or 0.140 for the same cell)."""
+    return row[0], round(float(row[1]), 4), round(float(row[2]), 4)
+
+
+def _check_mate_column(
+    table: Any, generated: tuple[tuple[str, ...], ...], size_merged: bool | None
+) -> None:
+    """Only the MATE column changed: each row keeps its tag, location and
+    size, and names its tap's mate.  The native table's one SIZE for the
+    tag group (rule 10) is merged again if the inserted column split it."""
     if int(table.ColumnCount) != 5:
         raise RuntimeError("hole table lost or duplicated the MATE column")
     cells = _table_cells(table, 5)
-    if tuple(row[:4] for row in cells) != generated:
-        raise RuntimeError(f"MATE column changed generated hole-table cells: {cells!r}")
+    before = _normalised(generated)
+    after = _normalised(tuple(row[:4] for row in cells))
+    _telemetry.info(f"hole-table cells before MATE: {before!r}; after: {after!r}")
+    if tuple(map(_row_key, after[1:])) != tuple(map(_row_key, before[1:])):
+        raise RuntimeError(f"MATE column changed hole-table tags or locations: {cells!r}")
+    # The nine taps keep one size, still the #4-40 tap (its native text may
+    # re-render, so the compare is on the one size, not its exact string).
+    sizes_after = {row[3] for row in after[1:]} - {""}
+    if len(sizes_after) != 1 or "4-40" not in next(iter(sizes_after)):
+        raise RuntimeError(f"MATE column changed the hole-table size: {cells!r}")
     rows = _hole_table_rows(table)
     mates = {row: HOLE_TABLE_MATES[station] for station, (row, _tag) in rows.items()}
     expected = tuple(
@@ -329,9 +370,21 @@ def _check_mate_column(table: Any, generated: tuple[tuple[str, ...], ...]) -> No
     )
     if tuple(row[4] for row in cells) != expected:
         raise RuntimeError(f"hole-table MATE cells differ: {cells!r}")
+    merged_after = _size_cells_merged(table)
+    if size_merged and merged_after is False:
+        try:
+            restored = table.MergeCells(1, 3, int(table.RowCount) - 1, 3)
+        except Exception as error:  # noqa: BLE001 - logged; the table stays valid
+            restored = repr(error)
+        merged_after = _size_cells_merged(table)
+        _telemetry.info(
+            f"hole-table SIZE merge restored after the MATE column: "
+            f"MergeCells={restored!r}, merged={merged_after!r}"
+        )
     _telemetry.info(
         "hole-table mates: "
-        f"{ {tag: HOLE_TABLE_MATES[station] for station, (_row, tag) in rows.items()}!r}"
+        f"{ {tag: HOLE_TABLE_MATES[station] for station, (_row, tag) in rows.items()}!r}; "
+        f"SIZE merged before={size_merged!r} after={merged_after!r}"
     )
 
 
@@ -510,9 +563,9 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("combining the platen-guide tap sizes changed the table rows")
     # Each tap's mate in its own column (rule 10), checked after a rebuild as
     # draw_fr_harmonic_base checks its NOTE column.
-    generated = _add_mate_column(hole_table)
+    generated, size_merged = _add_mate_column(hole_table)
     drawing_model.EditRebuild3()
-    _check_mate_column(hole_table, generated)
+    _check_mate_column(hole_table, generated, size_merged)
     _place_hole_tags(front, hole_table)
 
     # Datums A (platen-mating face), B (bottom edge) and C (left end) frame the
