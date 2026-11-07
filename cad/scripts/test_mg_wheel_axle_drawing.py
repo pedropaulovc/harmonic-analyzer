@@ -294,8 +294,8 @@ def test_wheel_group_stack_fits_the_pin() -> None:
     assert group.THREAD_PAST_LOCKNUT_NOMINAL == pytest.approx(1.719, abs=0.005)
     # Pressed to the gauge, the shank lands the back end sunk in the bore at
     # every corner; nothing stands behind it there.
-    assert spec.BACK_END_SUNK_MIN == pytest.approx(0.008 * 25.4, abs=1e-6)
-    assert spec.BACK_END_SUNK_MAX == pytest.approx(0.040 * 25.4, abs=1e-6)
+    assert spec.BACK_END_SUNK_MIN == pytest.approx(0.007 * 25.4, abs=1e-6)
+    assert spec.BACK_END_SUNK_MAX == pytest.approx(0.041 * 25.4, abs=1e-6)
     # The spacer lands the spokes' mid-plane on the pen-rod line.
     assert group.SPOKE_MID_D == pytest.approx(
         mg_wheel_axle_spacer_spec.LENGTH

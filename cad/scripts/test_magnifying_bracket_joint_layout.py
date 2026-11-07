@@ -109,23 +109,26 @@ def test_side_by_side_stations_have_head_clearance_and_head_bearing() -> None:
     assert joint.SCREW_MAJOR_DIA < joint.CLEARANCE_DIA < joint.SCREW_HEAD_DIA
     assert joint.COUNTERBORE_DIA - joint.SCREW_HEAD_DIA == pytest.approx(0.244)
     assert joint.HEAD_FLOAT_MIN == pytest.approx(0.122)
-    # Both location bands plus the lever grid's nominal offset.
-    assert joint.HEAD_POSITION_MISMATCH_MAX == pytest.approx(0.1016 + joint.LEVER_STATION_OFFSET_MAX)
+    # The taps are spotted through the bracket's holes with the clearance
+    # drill: the mismatch is that drilled hole's radial play only.
+    assert joint.BRACKET_POSITION_BAND == pytest.approx(0.005 * 25.4)
+    assert joint.SPOT_TRANSFER_ERROR == pytest.approx(0.002 * 25.4)
+    assert joint.HEAD_POSITION_MISMATCH_MAX == joint.SPOT_TRANSFER_ERROR
     assert joint.HEAD_FLOAT_MIN >= joint.HEAD_POSITION_MISMATCH_MAX
     # Native 2.591 prints .102 +.004/0: the shank floats in .102 MIN.
     assert joint.SHANK_FLOAT_MIN == pytest.approx((0.102 * 25.4 - 2.1844) / 2.0)
     assert joint.SHANK_FLOAT_MIN >= joint.HEAD_POSITION_MISMATCH_MAX
     assert joint.GRIP_MIN == pytest.approx(0.120 * 25.4)
-    assert joint.COUNTERBORE_END_WALL_MIN == pytest.approx(6.9992)
+    assert joint.COUNTERBORE_END_WALL_MIN == pytest.approx(6.9992 - 0.0762)
     # The bracket ordinate is from its actual lower edge, not its midplane.
     head_radius = (joint.COUNTERBORE_DIA + joint.DRILLED_DIAMETER_PLUS) / 2.0
     row_from_lower = joint.RECEIVER_ROW_Y - joint.SIDE_PLATE_Y[0]
-    lower_wall = row_from_lower - joint.POSITION_BAND - head_radius
+    lower_wall = row_from_lower - joint.BRACKET_POSITION_BAND - head_radius
     upper_wall = (
         joint.SIDE_PLATE_HEIGHT + joint.SIDE_PLATE_HEIGHT_DEVIATIONS[0]
-        - row_from_lower - joint.POSITION_BAND - head_radius
+        - row_from_lower - joint.BRACKET_POSITION_BAND - head_radius
     )
-    assert (row_from_lower, lower_wall, upper_wall) == pytest.approx((4.79, 2.7892, 0.42 * 25.4 - 4.79 - 2.0008))
+    assert (row_from_lower, lower_wall, upper_wall) == pytest.approx((4.79, 2.713, 0.42 * 25.4 - 4.79 - 2.077))
     assert joint.COUNTERBORE_HEIGHT_WALL_MIN == pytest.approx(min(lower_wall, upper_wall))
     assert joint.HEAD_PROTRUSION == pytest.approx(2.1082)
     # A flush head would run the screw past the tap's full thread.
@@ -149,7 +152,7 @@ def test_accepted_foot_corners_retain_head_bearing_and_clearance_hole_material()
     lower_head_walls, upper_head_walls = [], []
     lower_hole_walls, upper_hole_walls = [], []
     for width in (0.42 * 25.4, 0.44 * 25.4):
-        for row_from_lower in (4.79 - joint.POSITION_BAND, 4.79 + joint.POSITION_BAND):
+        for row_from_lower in (4.79 - joint.BRACKET_POSITION_BAND, 4.79 + joint.BRACKET_POSITION_BAND):
             # The 3.8 circle plus its .10 allowance is a conservative screen,
             # not an invented catalog head-major maximum.
             lower_head_walls.append(row_from_lower - 3.90 / 2.0)
@@ -157,9 +160,9 @@ def test_accepted_foot_corners_retain_head_bearing_and_clearance_hole_material()
             # Native 2.591 prints .102 +.004/0: the accepted hole is .106 MAX.
             lower_hole_walls.append(row_from_lower - 0.106 * 25.4 / 2.0)
             upper_hole_walls.append(width - row_from_lower - 0.106 * 25.4 / 2.0)
-    assert (min(lower_head_walls), min(upper_head_walls)) == pytest.approx((2.7892, 0.42 * 25.4 - 6.7908))
+    assert (min(lower_head_walls), min(upper_head_walls)) == pytest.approx((2.713, 0.42 * 25.4 - 6.867))
     assert (min(lower_hole_walls), min(upper_hole_walls)) == pytest.approx(
-        (4.7392 - 0.053 * 25.4, 0.42 * 25.4 - 4.8408 - 0.053 * 25.4),
+        (4.663 - 0.053 * 25.4, 0.42 * 25.4 - 4.917 - 0.053 * 25.4),
     )
     assert joint.COUNTERBORE_HEIGHT_WALL_MIN == pytest.approx(
         min(*lower_head_walls, *upper_head_walls),
@@ -225,7 +228,7 @@ def test_width_shortfall_can_make_upper_edge_the_limiting_material_wall() -> Non
     # Deliberately beyond the printed width's lower limit, but still above the wall
     # floor: make the upper edge active so a lower-only budget cannot pass.
     narrowed = _joint_with_values(SIDE_PLATE_HEIGHT_DEVIATIONS=(-2.0, 0.8))
-    row_max = 4.79 + joint.POSITION_BAND
+    row_max = 4.79 + joint.BRACKET_POSITION_BAND
     assert narrowed["COUNTERBORE_HEIGHT_WALL_MIN"] == pytest.approx(9.0 - row_max - 1.95)
     assert narrowed["CLEARANCE_HOLE_HEIGHT_WALL_MIN"] == pytest.approx(9.0 - row_max - 0.053 * 25.4)
     for name in (
@@ -242,8 +245,8 @@ def test_width_shortfall_can_make_upper_edge_the_limiting_material_wall() -> Non
     ({"SIDE_PLATE_LENGTH_DEVIATIONS": (-40.0, 40.0)}, "rule 17"),
     ({"THREAD_DEPTH": 4.85}, "bottoms"),
     ({"SIDE_PLATE_HEIGHT": 8.0}, r"rule 17 \(walls and webs\) wall"),
-    ({"COUNTERBORE_DIA": 3.70}, "head float"),
-    ({"CLEARANCE_DIA": 2.35}, "shank float"),
+    ({"COUNTERBORE_DIA": 3.60}, "head float"),
+    ({"CLEARANCE_DIA": 2.25}, "shank float"),
     ({"RECEIVER_ROW_FROM_TOP": 3.85}, "receiver pilot material wall"),
     ({"RECEIVER_ROW_FROM_TOP": 2.95}, "receiver pilot material wall"),
 ])

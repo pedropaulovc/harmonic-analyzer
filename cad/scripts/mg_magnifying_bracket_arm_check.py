@@ -64,7 +64,6 @@ from magnifying_bracket_joint_layout import (
     SIDE_PLATE_Y,
     SIDE_PLATE_Z,
     GRIP_MIN,
-    POSITION_BAND,
     SIDE_PLATE_HEIGHT,
     SIDE_PLATE_HEIGHT_DEVIATIONS,
 )
@@ -253,10 +252,11 @@ SCREW_SHEAR_ALLOWABLE = 0.6 * 483.0 / 3.0  # 96.6 N/mm^2
 
 
 def _row_from_lower_limits(row: float) -> tuple[float, float]:
-    """The mounting ordinate's printed (min, max) from the foot's lower edge."""
+    """The mounting ordinate's printed (min, max) from the foot's lower edge:
+    the title block's .XXX row (the holes drill to the row; the MHA-SM-03
+    taps are spotted through them)."""
     lower, upper = printed_deviations(
-        row, DRAWING_PRECISION["MountingCoordinates"]["MountingY0"],
-        (-POSITION_BAND, POSITION_BAND), unit=UNIT,
+        row, DRAWING_PRECISION["MountingCoordinates"]["MountingY0"], unit=UNIT,
     )
     return row + lower, row + upper
 
