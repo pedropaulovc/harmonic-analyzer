@@ -1936,18 +1936,18 @@ def test_general_torque_note_covers_every_fastener_no_step_torques() -> None:
         spec.LEVER_SCREW: "12. ",
         spec.PIVOT_SCREW: "P2. ",
         spec.PILLOW_BLOCK_SCREW: "F1B. ",
-        spec.HUB_SCREW: "O5. ",
-        spec.LEFT_CLAMP_SCREW: "O5. ",
     }
     steps = (*spec.ASSEMBLY_STEPS, *spec.PIVOT_FIT_STEPS, *spec.FEED_FIT_STEPS,
              *spec.OPERATION_STEPS)
     for label in torqued.values():
         step = next(text for text in steps if text.startswith(label))
         assert "N·m" in step
-    loading = next(text for text in steps if text.startswith("O5. "))
-    assert all(spec._item(family) in loading for family in (spec.HUB_SCREW, spec.LEFT_CLAMP_SCREW))
-    # The common screw runs snug into the rails, but fitting step 2 torques
-    # its TL-28 bar screws; the general note covers only the rail screws.
+    loading = next(text for text in steps if text.startswith("O6. "))
+    assert spec._item(spec.RAIL_SCREW) in loading
+    assert spec._item(spec.HUB_WASHER) in loading
+    assert spec._torque(spec.holding.HUB_TORQUE_NM) in loading
+    # The common family has mixed joints: step 2 torques the bar screws and
+    # O6 torques the hub clamp; the general note covers the other instances.
     fitting = next(text for text in steps if text.startswith("2. "))
     assert spec._item(spec.RAIL_SCREW) in fitting
     assert spec._torque(leadscrew.BAR_SCREW_TORQUE_NM) in fitting
