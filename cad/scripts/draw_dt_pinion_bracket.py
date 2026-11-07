@@ -237,17 +237,13 @@ LEFT_KEEP = {
     # sits down-right, under the 7.000, and its leader climbs at a slant,
     # right of the witness and clear of the 4.50 dimension line.
     "CrossHoleDia": (0.125, 0.078),
-    # Codex #858 P2, user ruling (a): both through-thickness stations run from
-    # broad face A (the view's left edge) -- the cross hole's under the view,
-    # left of both callout leaders, the seat's above it, under the 9.0.
-    # pc-ra eye pass: centred between its witnesses the seat's 4.50 was cut
-    # by the seat-axis witness, so its text sits left of face A, outside the
-    # extension lines.  pc-rc eye pass (nit D): centred, the cross hole's
-    # 4.50 threw its right arrow outside the span, where the THRU callout's
-    # leader cut through it -- so it sits left of face A too, arrows inside,
-    # nothing right of the hole's witness.  The seat's stands further left
-    # and higher, its right end short of face A.
-    "CrossHoleCz": (0.058, 0.099),
+    # Codex #858 P2, user ruling (a): the seat's through-thickness station
+    # runs from broad face A (the view's left edge), above the view, under the
+    # 9.0; the cross hole shares its centreline, so it prints no station of
+    # its own (fan-out round 1: the .18 beside the .180 located one line
+    # twice).  pc-ra eye pass: centred between its witnesses the seat's 4.50
+    # was cut by the seat-axis witness, so its text sits left of face A,
+    # outside the extension lines, its right end short of face A.
     "PinSeatCz": (0.043, 0.2055),
 }
 SECTION_CENTER = (0.350, 0.115)

@@ -155,7 +155,6 @@ def test_blind_seat_dimensions_are_assigned_to_readable_views() -> None:
         "PinSeatCy",
         "Depth",
         "CrossHoleDia",
-        "CrossHoleCz",
         "PinSeatCz",
     }
 
@@ -186,8 +185,7 @@ def test_follower_seat_station_is_printed_from_face_a_with_a_rule_12_web() -> No
     face_a = drawing.LEFT_CENTER[0] - (
         dt_pinion_bracket_geometry.THICKNESS * drawing.SHEET_SCALE[0] / 2000.0
     )
-    for name in ("PinSeatCz", "CrossHoleCz"):
-        assert drawing.LEFT_KEEP[name][0] < face_a, name
+    assert drawing.LEFT_KEEP["PinSeatCz"][0] < face_a
 
 
 def _segment_distance(
@@ -323,10 +321,12 @@ def test_set_pin_cross_hole_is_located_by_model_dimensions() -> None:
         "SPRING PIN, PRESS FIT",
     ]
     dims = dt_pinion_bracket_spec.DRAWING_DIMENSIONS
-    assert dims["CrossHoleProfile"] == {"CrossHoleDia", "CrossHoleCz"}
+    # Through the thickness the hole shares the seat's centreline, which
+    # PinSeatCz locates: the sheet prints that line once.
+    assert dims["CrossHoleProfile"] == {"CrossHoleDia"}
     by_name = dt_pinion_bracket_spec.DRAWING_PRECISION_BY_NAME
     assert by_name["CrossHoleDia"] == 4
-    assert by_name["CrossHoleCz"] == 2
+    assert "CrossHoleCz" not in by_name
     # The station is the model's relation to its globals, not a typed number,
     # and no hidden sketch is left for a hidden-owner import.
     build_source = inspect.getsource(bracket)
@@ -460,7 +460,6 @@ def test_every_web_and_ligament_clears_the_floor_at_the_printed_bands() -> None:
     # sheet's own, stated once in pinion_bracket_geometry.
     for name, places in (
         ("Depth", geometry.THICKNESS_PLACES),
-        ("CrossHoleCz", geometry.CROSS_HOLE_CZ_PLACES),
         ("BottomCapRadius", geometry.END_RADIUS_PLACES),
         ("TopCapRadius", geometry.END_RADIUS_PLACES),
     ):

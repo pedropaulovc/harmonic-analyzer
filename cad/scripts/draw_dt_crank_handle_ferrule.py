@@ -98,8 +98,9 @@ SECTION_CENTER = (0.215, 0.165)
 ISO_CENTER = (0.365, 0.205)
 CAPTION_XY = (0.195, 0.113)
 # Moved 10 right of iteration 1 so the bore's block, set right of the
-# chamfer's dimension line, keeps clear of it.
-ISO_NOTE_POS = (0.345, 0.160)
+# chamfer's dimension line, keeps clear of it; 10 more for the bore's
+# matched-fit route row.
+ISO_NOTE_POS = (0.355, 0.160)
 # Note 1 stands under the views, left of the title block.
 NOTES_XY = (0.030, 0.085)
 

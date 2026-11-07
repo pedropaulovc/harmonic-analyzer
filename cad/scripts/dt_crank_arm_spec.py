@@ -184,6 +184,17 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
 # cheek around the hub seat reaches its wall only at the mill's width
 # tolerance.  The fiducial and the pivot tap's mouth limit are flagged at
 # their features (dt_crank_arm_notes).
-STOCK_NOTE = "WIDTH AND THICKNESS: CF FLAT BAR AS SUPPLIED."
-DRAWING_NOTES = STOCK_NOTE
+STOCK_NOTE = "1. WIDTH AND THICKNESS: CF FLAT BAR AS SUPPLIED."
+# The hub-seat press fit's acceptance, flagged from the seat callout (SEE NOTE
+# 2): the callout's two word rows name the fit and its mate, and its width is
+# bounded by the border and the seam leader.
+_PRESS_LOW_IN, _PRESS_HIGH_IN = (
+    f"{value / 25.4:.4f}".lstrip("0")
+    for value in dt_crank_hub_geometry.SEAT_PRESS_INTERFERENCE
+)
+SEAT_PRESS_NOTE = (
+    f"2. HUB SEAT: {_PRESS_LOW_IN}-{_PRESS_HIGH_IN} DIAMETRAL INTERFERENCE"
+    " ON MHA-DT-31."
+)
+DRAWING_NOTES = "\n".join((STOCK_NOTE, SEAT_PRESS_NOTE))
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

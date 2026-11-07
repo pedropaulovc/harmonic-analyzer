@@ -144,7 +144,7 @@ FRONT_KEEP = {
 # 10.6 mm stack, its 29 mm value sat on the line and both extension-line
 # ends struck it (machinist r2, r4; offsetting it only added a shelf).
 RIGHT_KEEP = {
-    "OutsideDia": (0.248, RIGHT_CENTER[1]),
+    "OutsideDia": (0.238, RIGHT_CENTER[1]),
     "FaceWidth": (0.205, 0.220),
     "OverallThickness": (0.237, 0.363),
 }
@@ -166,9 +166,10 @@ DIMENSION_CALLOUTS = {
 }
 # The crescent wall's stated minimum (rule 20) lands on the cam OD at the
 # thin side, 10 degrees off the -Y axis so the pick misses the bore's centre
-# mark; the note stands under the gear, left of the cam diameter's rows.
+# mark; the note stands under the gear's lowest teeth (r1: at y 0.232 the
+# tooth outline struck BORE), above the notch width's rows.
 CAM_WALL_PICK_DEG = -80.0
-CAM_WALL_NOTE_XY = (0.030, 0.232)
+CAM_WALL_NOTE_XY = (0.020, 0.216)
 # Decimal places are the part's (cylinder_gear_spec.DRAWING_PRECISION,
 # applied by build_cylinder_gear); the sheet only reads them back.
 
