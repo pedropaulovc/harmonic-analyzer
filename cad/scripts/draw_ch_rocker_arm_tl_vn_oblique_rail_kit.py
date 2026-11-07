@@ -284,6 +284,40 @@ WALL_FLAGS = (
     ), (0.296, 0.190)),
 )
 
+
+def wall_flag_regions(edge_xy: tuple[float, float], note_xy: tuple[float, float]) -> tuple[Box, Box]:
+    """Separate text lane from INote.GetExtent's text-plus-leader envelope.
+
+    Same 1 mm tip reserve as draw_pn_vn_pen_marker.GRIP_NOTE_EXTENT; it is
+    not permission for the text anchor or the attached tip to leave its lane.
+    """
+    text = (note_xy[0] - 0.001, note_xy[1] - 0.007,
+            note_xy[0] + 0.012, note_xy[1] + 0.002)
+    envelope = (
+        min(text[0], edge_xy[0] - 0.001), min(text[1], edge_xy[1] - 0.001),
+        max(text[2], edge_xy[0] + 0.001), max(text[3], edge_xy[1] + 0.001),
+    )
+    return text, envelope
+
+
+def assert_wall_flag_landing(note: Any, edge_xy: tuple[float, float], text_cell: Box) -> None:
+    """Read the settled text anchor and both leader endpoints independently."""
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    anchor = tuple(float(v) for v in annotation.GetPosition() or ())[:2]
+    if len(anchor) != 2 or not _inside((*anchor, *anchor), text_cell):
+        raise RuntimeError(f"rail wall flag text left its lane: {anchor!r}")
+    if int(annotation.GetLeaderCount()) != 1:
+        raise RuntimeError("rail wall flag must retain exactly one leader")
+    points = tuple(float(v) for v in annotation.GetLeaderPointsAtIndex(0) or ())
+    if len(points) < 6:
+        raise RuntimeError("rail wall flag leader is unreadable")
+    ends = ((points[0], points[1]), (points[-3], points[-2]))
+    if not any(
+        _inside((*start, *start), text_cell) and math.dist(tip, edge_xy) <= 0.001
+        for start, tip in (ends, ends[::-1])
+    ):
+        raise RuntimeError(f"rail wall flag leader left its intended feature: {ends!r}")
+
 # View captions (3 mm text, top edge at y, centred on the view): each under
 # its view's outline, FRONT's under its stack's flag.
 _CAPTION_GAP = 0.0027
@@ -628,6 +662,7 @@ def append_rail_receipt_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
     annotations = _receipt_dimensions(adapter, front)
 
     notes = []
+    wall_flags = []
     with _telemetry.span("drawing.rail_annotations"):
         centred = [
             (caption_text(label, scale), x, y, (
@@ -650,8 +685,8 @@ def append_rail_receipt_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
                 adapter, front, text="[A]", entity_xy=edge_xy,
                 note_xy=note_xy, label=f"rail wall {label}",
             )
-            box = (note_xy[0] - 0.001, note_xy[1] - 0.007,
-                   note_xy[0] + 0.012, note_xy[1] + 0.002)
+            text_cell, box = wall_flag_regions(edge_xy, note_xy)
+            wall_flags.append((wall_note, edge_xy, text_cell))
             notes.append((wall_note, "[A]", "[A]", box))
         notes.append((note, ITEM_LABEL, ITEM_LABEL, ITEM_LABEL_CELL))
         note = _literal_note(adapter, rail.DRAWING_NOTES, _NOTE_X, RECEIPT_NOTE_TOP)
@@ -711,6 +746,8 @@ def append_rail_receipt_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
                     f"rail note leaves its reserved space/border: {linked_text!r}: {box!r}"
                 )
         title_fit()
+        for wall_note, edge_xy, text_cell in wall_flags:
+            assert_wall_flag_landing(wall_note, edge_xy, text_cell)
         assert_receipt_stack_clear(
             adapter,
             annotations,

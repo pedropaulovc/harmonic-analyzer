@@ -440,6 +440,36 @@ def test_rail_receipt_note_points_at_the_stations() -> None:
     assert draw.caption_text("RIGHT", (2, 1)) == "VIEW A  2:1"
 
 
+def test_wall_flag_extent_includes_the_native_leader(monkeypatch) -> None:
+    # 114c1622 near-end flag: GetExtent includes text AND leader to the end.
+    reported = (
+        0.023639363281249964, 0.16034543750000008,
+        0.06191944531249996, 0.17927042187500009,
+    )
+    _, edge, target = draw.WALL_FLAGS[0]
+    text_cell, envelope = draw.wall_flag_regions(edge, target)
+    assert not _inside_box(reported, text_cell)
+    assert _inside_box(reported, envelope)
+    monkeypatch.setattr(draw, "_early_bound", lambda value, _interface: value)
+    annotation = SimpleNamespace(
+        GetPosition=lambda: (*target, 0.0),
+        GetLeaderCount=lambda: 1,
+        GetLeaderPointsAtIndex=lambda _index: (*target, 0.0, *edge, 0.0),
+    )
+    note = SimpleNamespace(GetAnnotation=lambda: annotation)
+    draw.assert_wall_flag_landing(note, edge, text_cell)
+    # A leader-inclusive envelope is not a replacement for the text-lane guard.
+    annotation.GetPosition = lambda: (*edge, 0.0)
+    with pytest.raises(RuntimeError, match="text left its lane"):
+        draw.assert_wall_flag_landing(note, edge, text_cell)
+    annotation.GetPosition = lambda: (*target, 0.0)
+    annotation.GetLeaderPointsAtIndex = lambda _index: (
+        *target, 0.0, edge[0] + 0.003, edge[1], 0.0,
+    )
+    with pytest.raises(RuntimeError, match="intended feature"):
+        draw.assert_wall_flag_landing(note, edge, text_cell)
+
+
 @pytest.mark.parametrize("bar_deviation", (-trammel.RAIL_LENGTH_BAND, trammel.RAIL_LENGTH_BAND))
 @pytest.mark.parametrize("near_station", (8.0, 9.964, 12.0))
 def test_actual_station_can_differ_from_reference_with_safe_walls(
