@@ -41,6 +41,7 @@ from _drawing_dimensions import (
     set_reference_dimensions,
 )
 import _drawing_hidden_sketches as hidden_sketches
+from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -50,7 +51,9 @@ from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+from build_dt_crank_pin_eye import LOOP_GAP_DEG
 from dt_crank_pin_eye_notes import (
+    CLOSURE_FLAG,
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -106,6 +109,13 @@ def _side_xy(model_z_mm: float, model_y_mm: float) -> tuple[float, float]:
 LOOP_CENTER_XY = _side_xy(-LOOP_R, 0.0)
 TAIL_END_XY = _side_xy(0.0, TAIL_LEN)
 HALF_OD = (LOOP_R + WIRE_DIA / 2.0) * _S  # 0.0265
+# The loop's cut end (build_dt_crank_pin_eye: the loop stops LOOP_GAP_DEG
+# short of the tail root), at its end face's centre on the wire's path; the
+# flag to note 1 stands up and right of it, over the loop and right of the
+# tail, in open paper under the top view.
+_GAP_RAD = math.radians(LOOP_GAP_DEG)
+LOOP_END_XY = _side_xy(-LOOP_R + LOOP_R * math.cos(_GAP_RAD), LOOP_R * math.sin(_GAP_RAD))
+CLOSURE_FLAG_XY = (LOOP_END_XY[0] + 0.030, LOOP_CENTER_XY[1] + HALF_OD + 0.012)
 
 # Side view: the loop's inside diameter labelled down and right of the loop,
 # its chain callout in the open field under it; the tail's length on the
@@ -234,6 +244,15 @@ async def build(adapter: Any) -> dict[str, str]:
     # keeps its Ø inside "( )".
     set_reference_dimensions(adapter, annotations, REFERENCE_DIMENSIONS)
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
+    # Rule 7: the closure's gap is flagged where it applies, at the loop end.
+    add_leader_note(
+        adapter,
+        CLOSURE_FLAG,
+        text_xy=CLOSURE_FLAG_XY,
+        attach_xy=LOOP_END_XY,
+        label="closure flag",
+        view=side,
+    )
 
     return await finalize_drawing(
         adapter,

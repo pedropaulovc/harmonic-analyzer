@@ -63,11 +63,15 @@ if not REFERENCE_DIMENSIONS <= set(DRAWING_PRECISION_BY_NAME):
 
 # Note 1 is the delegated closure (fan-out rulings 2026-11-07, pin eye A;
 # owner review #2144): the loop's cut end butts the tail's side, in plane,
-# not joined (build_dt_crank_pin_eye.BUTT_AIR_BAND).
+# not joined (build_dt_crank_pin_eye.BUTT_AIR_BAND).  The square-cut end
+# meets the tail at an angle, so the gap is read at its closest point; the
+# side view flags the note at the loop end (draw_dt_crank_pin_eye).
+CLOSURE_NOTE = 1
+CLOSURE_FLAG = f"SEE NOTE {CLOSURE_NOTE}"
 DRAWING_NOTES = "\n".join(
     (
-        "1. LOOP AND TAIL IN ONE PLANE; LOOP END CUT TO BUTT THE TAIL,",
-        "   NOT JOINED, GAP 0-.010.",
+        f"{CLOSURE_NOTE}. LOOP AND TAIL IN ONE PLANE; LOOP END CUT TO BUTT THE TAIL,",
+        "   NOT JOINED, GAP 0-.010 AT THE CLOSEST POINT.",
         "2. TAIL STRAIGHT.",
     )
 )
