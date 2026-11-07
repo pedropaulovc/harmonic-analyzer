@@ -484,7 +484,9 @@ def test_sunk_field_depth_names_why_it_holds_three_places() -> None:
         "EngravingDepth": 3,
     }
     rows = drawing.SECTION_CALLOUTS["FieldDepth"].split("\n")
-    assert rows == ["SUNK FIELD DEPTH", "ABOVE ENGRAVING FLOOR"]
+    assert rows == ["SUNK FIELD, SHALLOWER", "THAN ENGRAVING"]
+    # A depth comparison, never a second datum (run 20261107T220230661Z).
+    assert "FLOOR" not in drawing.SECTION_CALLOUTS["FieldDepth"]
     # Left-aligned at the shelf; ~2.45 mm a glyph on the r5 render, the
     # widest row stays 3 mm inside the 419.1 mm right border.
     assert drawing.SECTION_KEEP["FieldDepth"][0] + max(map(len, rows)) * 0.00245 < 0.4191 - 0.003
