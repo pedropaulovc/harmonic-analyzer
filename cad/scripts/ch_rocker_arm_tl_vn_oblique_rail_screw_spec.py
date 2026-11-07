@@ -2,22 +2,25 @@ r"""MHA-CH-06-TL-VN-61 oblique-trammel rail screw: McMaster 91251A197.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  Shop fixture hardware (cad/docs/subsystem-identities.md), modelled
-so the jig assembly can mate it and run native interference: the
-``#8-32 X 3/4 SHCS`` that holds an HGR15 kit rail to its TL-20 base bar, tapped THRU; the head seats on the rail's counterbore floor.
-It is also the screw that holds each TL-28 end bracket to TL-20 Bar1 from
-below, its head in the bar's counterbore: the jig's common screw
-(``fasteners.COMMON_SCREW``, oblique simplification PR2), the C4 fastener
-table's ``RAIL_TO_BAR`` and ``BRACKET_TO_BAR`` rows.  It is one row on the
-jig's BOM; the shop inventory carries no screw stock (no ``INVENTORY_ID``),
-and the assembly steps cite it by item and callout (``fasteners.callout``).
+so the jig assembly can mate it and run native interference: the jig's one common
+``#8-32 X 3/4 SHCS`` (``fasteners.COMMON_SCREW``, oblique simplification PR2; owner
+rulings 2026-11-07).  It holds each HGR15 kit rail to its TL-20 base bar, tapped
+THRU, its head on the rail's counterbore floor; each TL-28 end bracket to TL-20 Bar1
+from below, its head in the bar's counterbore; and the CL and CR end clamps and the
+HUB clamp to the TL-21 carrier's ordinary #8-32 THRU taps.  The C4 fastener table's
+``COMMON_SCREW_ROWS`` are ``RAIL_TO_BAR``, ``BRACKET_TO_BAR``, ``END_CLAMP`` and
+``HUB_CLAMP`` (16 + 4 + 2 + 1 = 23 screws, one BOM row).  The shop inventory carries
+no screw stock (no ``INVENTORY_ID``), and the assembly steps cite it by item and
+callout (``fasteners.callout``).
 
 Sources:
 
 * SOURCED, https://www.mcmaster.com/91251A197/ read live 2026-10-17:
   #8-32 UNC class 3A, 3/4 in under the head, fully threaded, head Ø0.27 x 0.164 in, 9/64 in hex, Rockwell C37, ASTM A574, $18.68 per pack of 100.
-* FROM THE FASTENER TABLE (imported): thread, printed length, head, count,
-  grip and the joint (``fasteners.RAIL_TO_BAR``); the catalogue's thread and
-  length must equal the row's (checked at import).
+* FROM THE FASTENER TABLE (imported): thread, printed length and head, which every
+  common row shares, and the rail joint's grip (``fasteners.RAIL_TO_BAR``); the count
+  is ``fasteners.COMMON_SCREW_COUNT`` (23). The catalogue's thread and length must
+  equal the row's (checked at import).
 * STANDARD: the page gives no socket depth, so it is the standard's
   minimum key engagement (``_mcmaster_91251a197``; the 91251A108 convention).
 * The geometry is the 91251A family's catalogue recipe
@@ -45,8 +48,8 @@ UNIT = drawing_unit(
 )
 SKU = PART_NO
 ROW = fasteners.RAIL_TO_BAR
-ROWS = fasteners.COMMON_SCREW_ROWS  # the rail screws, then the TL-28 bar screws
-QUANTITY = fasteners.COMMON_SCREW_COUNT  # 16 + 4
+ROWS = fasteners.COMMON_SCREW_ROWS  # the rail, TL-28 bar, end-clamp and hub-clamp screws
+QUANTITY = fasteners.COMMON_SCREW_COUNT  # 16 + 4 + 2 + 1
 PACK_QUANTITY = 100  # McMaster sells 91251A197 in packs of 100
 CALLOUT = fasteners.callout(ROW)  # "#8-32 X 3/4 SHCS"
 

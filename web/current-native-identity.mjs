@@ -5,7 +5,7 @@
  */
 import mapping from './content/current-native-identities.json' with { type: 'json' }
 
-export const CURRENT_NATIVE_IDENTITY_MAP_SHA256 = '2f6ded1e6c69d184ea5e060720b25e6a9a5856815508889016ee22f33a8be754'
+export const CURRENT_NATIVE_IDENTITY_MAP_SHA256 = '0c3ec906a75a3541d72fd13e5bc999297f2eb8584f48f63d8a519bbd4cb76e24'
 export const CURRENT_NATIVE_OCCURRENCE_NAMESPACE = 'archive-role-local'
 export const CURRENT_NATIVE_IDENTITY_PROJECTION = Object.freeze({
   kind: 'current-native-identity-projection',

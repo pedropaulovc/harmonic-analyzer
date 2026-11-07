@@ -70,8 +70,6 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     ("build_pn_pen_hanger", "band"): ("DRAWING_BANDS", "values"),
     ("build_pn_pen_rod", "band"): ("DRAWING_BANDS", "values"),
     ("build_pn_pen_v_block", "band"): ("DRAWING_BANDS", "values"),
-    ("build_ch_rocker_arm_tl_oblique_hub_stud", "band"): ("DRAWING_BANDS", "values"),
-    ("build_ch_rocker_arm_tl_oblique_hub_sleeve", "band"): ("DRAWING_BANDS", "values"),
     # _single_limits passes each single-limit band (MIN chamfer, MAX rounds).
     ("build_pn_pen_v_block", "limit_band"): (
         "tuple(limit[3] for limit in _SINGLE_LIMITS)",
@@ -87,9 +85,7 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         " __import__('dt_pinion_cam_spec').THIN_WALL_MIN_BAND,"
         " __import__('pn_pen_frame_spec').TAP_WALL_MIN_BAND,"
         " __import__('pn_pen_rod_spec').TAP_WALL_MIN_BAND,"
-        " __import__('dt_crank_handle_pivot_screw_spec').TIP_CHAMFER_BAND,"
-        " __import__('ch_rocker_arm_tl_oblique_hub_stud_spec').ROOT_FILLET_BAND,"
-        " __import__('ch_rocker_arm_tl_oblique_hub_stud_spec').SUPPLY_LENGTH_BAND)",
+        " __import__('dt_crank_handle_pivot_screw_spec').TIP_CHAMFER_BAND)",
         "each",
     ),
     # for configuration, teeth in CONFIGS: band = band_for(teeth); deviations(band)

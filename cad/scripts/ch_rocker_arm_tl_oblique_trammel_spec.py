@@ -52,8 +52,8 @@ Error sensitivity (printed next to the bands that carry it):
 
 * rail angle: 0.1 degree of pin-line angle changes R by
   ``RADIUS_PER_TENTH_DEG`` (about 4.7 mm) and moves the arc centre about as
-  far. That is why HUB and CL are reamed in place on the running jig, where
-  the real circle sits.
+  far. The strap HUB is therefore reamed in place on the running jig; the
+  carrier tap is made at the same DRO setting, not used as a precision locator.
 * pin-pair Y: a Y error between the A1/B1 and A2/B2 pairs moves the second
   circle's centre 1:1, so the 16.00 band moves 1:1. A2/B2 are therefore
   dimensioned from A1/B1, never from a plate edge.
@@ -78,7 +78,7 @@ Error sensitivity (printed next to the bands that carry it):
   term, and both together stay inside half the strap's .020 in (0.508) one-sided
   ``TOP_EDGE_BAND`` that the hub aims at the middle of. The rail/carriage
   pair's height and width tolerances do not apply: one carriage runs on each
-  rail, the selected shims set the carrier height, and HUB and CL are reamed
+  rail, the selected shims set the carrier height, and the strap HUB is reamed
   in place. So neither Z0 preload nor C accuracy is required of the pair.
 
 Sweep (Main, 2026-10-16). The brief swept the cutter over the whole 350
@@ -245,17 +245,6 @@ RISER_SCREW_WALLS = (
     - _RISER_CSK_MOUTH_MAX
     - _RISER_RADIAL_SHIFT,
 )
-# The 6061 blank extends beyond the extra left clamp. The .59 Y station
-# preserves the existing >=5 mm raw-edge allowance after extending its ends.
-# The self-cut 9/16 band is 2.38125 mm clear of the 3/8 strap cutter on each
-# side: the strap cutter does not cut the riser.
-RISER_BLANK_LENGTH = 350.52  # 13.80
-RISER_BLANK_WIDTH = 41.148  # 1.62: enlarged HUB sleeve hole retains .080 edge wall
-RISER_BLANK_ORIGIN = (-RISER_BLANK_LENGTH / 2.0, 14.986)  # y .59
-RISER_BAND_Y = (
-    math.sqrt(RISER_INNER_RADIUS**2 - (RISER_BLANK_LENGTH / 2.0) ** 2) - H1,
-    RISER_OUTER_RADIUS - H1,
-)
 
 # --- Blank, tip lands, CL/CR ⚙ ------------------------------------------------
 # The strap blank is sawn from the 1/8 x 1-1/2 in 1018 cold-finish flat bought
@@ -272,21 +261,13 @@ TIP_ANGLE = (rocker.TOP_ARC_LEN / 2.0) / rocker.R_TOP
 # it with at least the .080 wall of waste beyond each edge.
 STRAP_SPAN_Y = (R_INNER * math.cos(TIP_ANGLE) - H1, R_OUTER - H1)
 BLANK_EDGE_WASTE = (BLANK_WIDTH - (STRAP_SPAN_Y[1] - STRAP_SPAN_Y[0])) / 2.0
-# CL (a 1/4 in dowel in a tooling hole) and CR (the clamp screw) sit in the
-# blank's end waste on the hub radius, angularly midway between the tip land
-# and the blank's square end, so the saw cut that drops the waste has room on
-# both sides of the hole.
+# Both common #8 clamps sit in the blank's end waste on the hub radius,
+# angularly midway between the tip land and square end, leaving room for the
+# final cut that removes the waste. Neither station is a locating dowel.
 _BLANK_END_ANGLE = math.asin((BLANK_LENGTH / 2.0) / HUB_RADIUS)
 CL_ANGLE = (TIP_ANGLE + _BLANK_END_ANGLE) / 2.0
 CR = on_hub_radius(HUB_RADIUS * math.sin(CL_ANGLE))
 CL = (-CR[0], CR[1])
-# Additional hold-down outboard of CL; CL remains the locating dowel.
-# Its radius is the actual main-line hub radius (808.254), not a rounded
-# concept value. The 350 mm held blank leaves material under its entire head.
-LEFT_CLAMP = on_hub_radius(-169.5)
-# The same points from the hub (the strap's own frame for the T1 setup):
-CL_FROM_HUB = (CL[0] - HUB[0], CL[1] - HUB[1])
-CR_FROM_HUB = (CR[0] - HUB[0], CR[1] - HUB[1])
 
 # --- Sweep and stops ⚙ --------------------------------------------------------
 # Each pass runs until the part cutter has passed the tip land by its own
@@ -576,10 +557,5 @@ if abs((STUD_Y[0] - STUD_Y[1]) - 2.0 * TSLOT_PITCH) > 1e-9:
     raise AssertionError("the hold-down studs do not land two T-slot pitches apart")
 if min(RISER_SCREW_WALLS) < WALL_TARGET_MM:
     raise AssertionError("a riser countersink breaks rule 17's .080 wall target")
-if not (
-    RISER_BLANK_ORIGIN[1] + 5.0 <= RISER_BAND_Y[0]
-    and RISER_BAND_Y[1] <= RISER_BLANK_ORIGIN[1] + RISER_BLANK_WIDTH - 5.0
-):
-    raise AssertionError("the riser's nominal band runs within 5 of a blank edge")
 if BLANK_EDGE_WASTE < WALL_TARGET_MM:
     raise AssertionError("the strap blank leaves under .080 of waste beyond an edge")

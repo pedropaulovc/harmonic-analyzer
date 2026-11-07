@@ -24,7 +24,6 @@ from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
-from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _feature_requirements import part_metadata, requirement
 from _gtol_cone import ConeFace
@@ -53,6 +52,9 @@ from ch_rocker_arm_tl_oblique_riser_spec import (
     SCREW_DIA,
     SCREW_DIA_PRINTED,
     SCREW_HOLES,
+    STOP_DIA,
+    STOP_HOLE_DIA,
+    STOP_PIN_HOLES,
     THICKNESS,
 )
 from solidworks_mcp.adapters.com_variant import double_array
@@ -69,13 +71,17 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# A 350.52 x 41.148 x 6.096 blank: the plan view at 1:2 carries the outline,
-# station as a REFERENCE value (X stack below the view; row heights beside it)
-# and one callout per hole size above it (the screw hole's size from the
-# part's blanked ScrewHoleReference sketch, shown in the plan only, its
-# countersink in its below text). Section A-A cuts across the width through
-# screw hole 3 at 2:1 to show the thickness and the countersink's form; its
-# caption sits below it. The shaded isometric sits bottom left.
+# A 350.52 x 42.926 x 6.096 blank: the plan view at 1:2 carries the outline,
+# each carrier-located station as a REFERENCE value and the two end-stop
+# holes' ordinary .XX stations (X stack below the view; row heights beside
+# it), one callout per hole size above it for the carrier-located holes (the
+# screw hole's size from the part's blanked ScrewHoleReference sketch, its
+# countersink in its below text) and the stop holes' below and right of it
+# (from the blanked StopHoleReference sketch on stop 2). Both #30 sizes print
+# the .128 design nominal over the actual .1285 cut. Section A-A cuts across
+# the width through screw hole 3 at 2:1 to show the thickness and the
+# countersink's form; its caption sits below it. The shaded isometric sits
+# bottom left.
 SHEET_SCALE = (1.0, 2.0)
 VIEW_SCALE = (1, 2)
 SECTION_SCALE = (2, 1)
@@ -85,10 +91,11 @@ SECTION_CENTER = (0.355, 0.215)
 # Below the section's thickness dimension (review r5: the caption sat on the
 # sectioned part).
 CAPTION_XY = (0.355, 0.140)
-ISO_CENTER = (0.110, 0.070)
-ISO_NOTE_XY = (0.060, 0.040)
-SHEET_NAMES = ("RISER", "LEFT CLAMP CLEARANCE")
-LEFT_CLAMP_DIMENSIONS = frozenset(("LeftClampX", "LeftClampY", "LeftClampDia"))
+# Bottom left, 8 mm (sheet) lower than before the stop stations joined the X
+# stack: its last row (the length) now runs 20 mm lower, over the iso's high
+# left end.
+ISO_CENTER = (0.110, 0.062)
+ISO_NOTE_XY = (0.060, 0.032)
 # The cutting line runs across the width at screw hole 3, 7 mm (sheet) past
 # both edges so its letters clear the outline; at screw 3 the arrows' letters
 # fall between the Screw3X and Screw1X extension lines (jig-r6: at screw 1
@@ -117,27 +124,30 @@ def _stack_row(index: int) -> float:
 
 # Model points (mm) off the part, mapped onto each view at run time.
 PLAN_KEEP: dict[str, tuple[float, float, float]] = {
-    # X stations from the left end, nearest the part first, length last. CL's
-    # 9.11 span is too short for its text, which stands left of the end
-    # (jig-r6: every baseline extension crossed it); CR's text stands right
-    # of the length's.
-    "ClX": (-24.0, _stack_row(0), _T),
-    "Screw3X": (SCREW_HOLES[2][0] / 2.0, _stack_row(1), _T),
-    "Screw1X": (SCREW_HOLES[0][0] / 2.0, _stack_row(2), _T),
-    "HubX": (HUB_HOLE[0] / 2.0, _stack_row(3), _T),
-    "Screw2X": (SCREW_HOLES[1][0] / 2.0, _stack_row(4), _T),
-    "Screw4X": (SCREW_HOLES[3][0] / 2.0, _stack_row(5), _T),
-    "CrX": (CR_HOLE[0] - 45.0, _stack_row(6), _T),
-    "BlankLength": (BLANK_LENGTH / 2.0, _stack_row(7), _T),
-    "LeftClampX": (-24.0, _stack_row(8), _T),
-    "LeftClampY": (-90.0, part_spec.LEFT_CLAMP_HOLE[1] / 2.0, _T),
+    # X stations from the left end, nearest the part first, length last. The
+    # stop's and CL's spans are too short for their texts, which stand left of
+    # the end (jig-r6: every baseline extension crossed it); CR's and stop
+    # 2's texts stand right of the length's.
+    "Stop1X": (-24.0, _stack_row(0), _T),
+    "ClX": (-24.0, _stack_row(1), _T),
+    "Screw3X": (SCREW_HOLES[2][0] / 2.0, _stack_row(2), _T),
+    "Screw1X": (SCREW_HOLES[0][0] / 2.0, _stack_row(3), _T),
+    "HubX": (HUB_HOLE[0] / 2.0, _stack_row(4), _T),
+    "Screw2X": (SCREW_HOLES[1][0] / 2.0, _stack_row(5), _T),
+    "Screw4X": (SCREW_HOLES[3][0] / 2.0, _stack_row(6), _T),
+    "CrX": (CR_HOLE[0] - 45.0, _stack_row(7), _T),
+    "Stop2X": (STOP_PIN_HOLES[1][0] - 45.0, _stack_row(8), _T),
+    "BlankLength": (BLANK_LENGTH / 2.0, _stack_row(9), _T),
     # Row heights from the bottom edge, one line each ("2X (13.35)"), centred
     # in their spans. Each 2X pair's dimension stands right of the view, so
     # its extension line runs from the dimensioned left hole through its
     # partner (review r5), shortest nearest; the stock width stands right of
     # them, so its extension lines stop at the right end (jig-r6: on the left
     # they ran the length and crossed the section letter). The single HUB row
-    # stands left.
+    # stands left. The stops' "2X .19" is the shortest, nearest the outline;
+    # its span is too short for its text, which stands below the bottom edge
+    # (above it, it would meet the CL/CR row's text).
+    "StopY": (BLANK_LENGTH + 20.0, -10.0, _T),
     "ClampY": (_ROW_FIRST, CL_HOLE[1] / 2.0, _T),
     "ScrewOuterY": (_ROW_FIRST + _ROW_PITCH, SCREW_HOLES[2][1] / 2.0, _T),
     "ScrewInnerY": (_ROW_FIRST + 2.0 * _ROW_PITCH, SCREW_HOLES[0][1] / 2.0, _T),
@@ -145,22 +155,26 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     # Left of the CL station's text and its dimension line (review r7: this
     # dimension's lower arrow ran down through "(9.11)").
     "HubY": (-56.0, HUB_HOLE[1] / 2.0, _T),
-    # One callout per hole size above the view, left to right: CL (2X), HUB,
-    # and the screw holes' (leader to screw 2, the reference circle's hole),
-    # which carries the countersink. Each ends in two location rows. The
-    # retained 0c3 CL ink/shelf needs 3 mm right and 1.5 mm up on paper:
-    # the left border gains air and the diagonal stays above A-A's upper
-    # tail. Moving right alone would repeat review r12's crossing.
+    # One callout per carrier-located hole size above the view, left to
+    # right: CL (2X), HUB, and the screw holes' (leader to screw 2, the
+    # reference circle's hole), which carries the countersink. Each ends in
+    # two location rows. The retained 0c3 CL ink/shelf needs 3 mm right and
+    # 1.0 mm up on paper: the left border gains air and the diagonal stays
+    # above A-A's upper tail. Moving right alone would repeat review r12's
+    # crossing. (Up 1.0, not 0c3's 1.5: the 1.778 wider blank already lifts
+    # every block above the view .445 on paper.)
     # The screw block stands past the right end
     # so its leader climbs past HUB's shoulder (jig-r8: with the location
     # rows HUB's shoulder ran to 189 mm on the sheet and screw 2's leader,
     # rising to a block centred at model X 300, crossed it at 175 mm).
-    "ClampDia": (-20.0, _CALLOUT_Y + 13.0, _T),
+    "ClampDia": (-20.0, _CALLOUT_Y + 12.0, _T),
     "HubDia": (HUB_HOLE[0], _CALLOUT_Y, _T),
     "ScrewDia": (BLANK_LENGTH + 10.0, _CALLOUT_Y + 8.0, _T),
-    # Sheet 2 has no competing callouts: use the HUB block's safe height,
-    # 21.5 mm below the retained LEFT block that breached the top border.
-    "LeftClampDia": (85.0, _CALLOUT_Y, _T),
+    # The stop holes' block, below and right of stop 2 (the reference
+    # circle's hole): its leader drops steeply past the right end's
+    # extension line, clear of StopY's text, and the block stands right of
+    # every X-stack extension line and left of section A-A.
+    "StopDia": (BLANK_LENGTH + 50.0, -80.0, _T),
 }
 # The thickness's text stands outside its 12 mm (sheet) span (jig-r6: its
 # extension lines ran through "6.0 STOCK").
@@ -261,17 +275,12 @@ _HOLE_ROWS = (
             ("hub_hole", HUB_HOLE, part_spec.HUB_DIA, "HUB", "HUB_DIA"),
             ("cl_hole", CL_HOLE, part_spec.CLAMP_DIA, "CL", "CLAMP_DIA"),
             ("cr_hole", CR_HOLE, part_spec.CLAMP_DIA, "CR", "CLAMP_DIA"),
-            (
-                "left_clamp_hole", part_spec.LEFT_CLAMP_HOLE,
-                part_spec.LEFT_CLAMP_DIA, "LEFT_CLAMP", "LEFT_CLAMP_DIA",
-            ),
         )
     ),
 )
 for name, (x, y), cut_dia, dia, sources, dia_sources in _HOLE_ROWS:
     dia_places = DRAWING_PRECISION_BY_NAME[
-        {"hub_hole": "HubDia", "cl_hole": "ClampDia", "cr_hole": "ClampDia",
-         "left_clamp_hole": "LeftClampDia"}.get(
+        {"hub_hole": "HubDia", "cl_hole": "ClampDia", "cr_hole": "ClampDia"}.get(
             name, "ScrewDia"
         )
     ]
@@ -295,6 +304,40 @@ for name, (x, y), cut_dia, dia, sources, dia_sources in _HOLE_ROWS:
             "thru": (True, dia_sources),
         },
         precision={"dia": dia_places},
+    )
+
+# The two loose end-stop pin holes are drilled at ordinary .XX stations from
+# the blank's left end and lower edge, not spotted from the carrier, so their
+# stations are banded requirements. The wizard cuts the actual #30 inside the
+# .128 +.004/0 design band, as the screw holes'.
+_STOP_SOURCES = ("STOP_PIN_HOLES", "BLANK_ORIGIN", "STOP_PIN_CARRIER_POINTS")
+_STOP_DIA_SOURCES = ("STOP_HOLE_DIA", "STOP_DIA", "STOP_SPEC", "STOP_DRILL")
+for index, ((x, y), x_name) in enumerate(
+    zip(STOP_PIN_HOLES, ("Stop1X", "Stop2X"), strict=True), start=1
+):
+    x_places = DRAWING_PRECISION_BY_NAME[x_name]
+    y_places = DRAWING_PRECISION_BY_NAME["StopY"]
+    dia_places = DRAWING_PRECISION_BY_NAME["StopDia"]
+    requirement(
+        f"stop_hole_{index}",
+        kind="hole",
+        faces=(CylinderFace(STOP_DIA, contains_x_mm=x),),
+        requirements=("dia", "thru", "station", "height"),
+        fields={
+            "at": ([x, y, part_spec.THICKNESS], (*_STOP_SOURCES, "THICKNESS")),
+            "axis": ([0.0, 0.0, -1.0], ("__frame__",)),
+            "station": (_limits(x, x_places), _STOP_SOURCES),
+            "station_nominal": (x, _STOP_SOURCES),
+            "height": (_limits(y, y_places), _STOP_SOURCES),
+            "height_nominal": (y, _STOP_SOURCES),
+            "dia": (
+                limits(STOP_HOLE_DIA, dia_places, part_spec.DRILLED_BAND),
+                (*_STOP_DIA_SOURCES, "DRILLED_BAND"),
+            ),
+            "dia_nominal": (STOP_HOLE_DIA, _STOP_DIA_SOURCES),
+            "thru": (True, _STOP_DIA_SOURCES),
+        },
+        precision={"dia": dia_places, "station": x_places, "height": y_places},
     )
 
 for index, (x, _y) in enumerate(SCREW_HOLES, start=1):
@@ -341,40 +384,30 @@ def _view_mapper(adapter: Any, view: Any):
     return to_sheet
 
 
-def _mark_reference(adapter: Any, annotation: Any, name: str) -> None:
-    """Parenthesise one station as a REFERENCE value; a row height shared by a
-    hole pair carries its count in the same prefix, "2X (13.35)", one line
-    (jig-r6: a count above the value overflowed the 6.7 mm span)."""
-    display = set_reference_dimension(adapter, annotation, label=name)
-    count = ROW_COUNTS.get(name)
-    if count is None:
-        return
-    prefix = f"{count} ("
+def _set_row_count(adapter: Any, display: Any, name: str, prefix: str) -> None:
     display.SetText(1, prefix)  # swDimensionTextPrefix
     got = str(display.GetText(1) or "")
     if got != prefix:
         raise RuntimeError(f"{name} count prefix did not take: {got!r}")
 
 
-def _left_clamp_sheet(adapter: Any) -> list[Any]:
-    """Keep the extra hole's three native dimensions off the crowded main sheet."""
-    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    if not drawing.ActivateSheet(SHEET_NAMES[1]):
-        raise RuntimeError("cannot activate the left-clamp clearance sheet")
-    plan = place_view(adapter, str(SOURCE), "*Front", *PLAN_CENTER, scale=VIEW_SCALE)
-    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    set_hidden_lines_removed(adapter, plan)
-    on_plan = _view_mapper(adapter, plan)
-    annotations = curate_view_dimensions(
-        adapter, plan,
-        keep={name: on_plan(PLAN_KEEP[name]) for name in LEFT_CLAMP_DIMENSIONS},
-        view_label="left clamp clearance",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
+def _mark_reference(adapter: Any, annotation: Any, name: str) -> None:
+    """Parenthesise one station as a REFERENCE value; a row height shared by a
+    hole pair carries its count in the same prefix, "2X (13.35)", one line
+    (jig-r6: a count above the value overflowed the 6.7 mm span)."""
+    display = set_reference_dimension(adapter, annotation, label=name)
+    count = ROW_COUNTS.get(name)
+    if count is not None:
+        _set_row_count(adapter, display, name, f"{count} (")
+
+
+def _mark_ordinary_row_count(adapter: Any, annotation: Any, name: str) -> None:
+    """An ordinary (banded) row height shared by a hole pair: "2X .19"."""
+    display = _early_bound(
+        _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
+        "IDisplayDimension",
     )
-    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
-    if not drawing.ActivateSheet(SHEET_NAMES[0]):
-        raise RuntimeError("cannot restore the riser sheet")
-    return annotations
+    _set_row_count(adapter, display, name, f"{ROW_COUNTS[name]} ")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -399,9 +432,6 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         unit=part_drawing_unit(PART_STEM),
     )
-    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="riser")
-    if not _early_bound(drawing_model, "IDrawingDoc").ActivateSheet(SHEET_NAMES[0]):
-        raise RuntimeError("cannot activate the riser sheet")
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -437,7 +467,7 @@ async def build(adapter: Any) -> dict[str, str]:
         *curate_view_dimensions(
             adapter,
             plan,
-            keep={name: on_plan(xyz) for name, xyz in PLAN_KEEP.items() if name not in LEFT_CLAMP_DIMENSIONS},
+            keep={name: on_plan(xyz) for name, xyz in PLAN_KEEP.items()},
             view_label="plan view",
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
@@ -449,20 +479,26 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
     ]
-    annotations.extend(_left_clamp_sheet(adapter))
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
-    # The stations are located from the carrier at assembly: REFERENCE values.
+    # The carrier-located stations are REFERENCE values; the stop holes'
+    # ordinary stations keep the title block's .XX band.
     referenced: set[str] = set()
+    counted: set[str] = set()
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
         if name in REFERENCE_DIMENSIONS:
             _mark_reference(adapter, annotation, name)
             referenced.add(name)
+        elif name in ROW_COUNTS:
+            _mark_ordinary_row_count(adapter, annotation, name)
+            counted.add(name)
     if referenced != REFERENCE_DIMENSIONS:
         raise RuntimeError(
             f"reference stations not marked: {sorted(REFERENCE_DIMENSIONS - referenced)}"
         )
+    if counted != set(ROW_COUNTS) - REFERENCE_DIMENSIONS:
+        raise RuntimeError(f"ordinary row counts not marked: {sorted(counted)}")
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
@@ -472,7 +508,6 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Rocker Oblique Trammel Riser Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        expected_sheet_names=SHEET_NAMES,
     )
 
 

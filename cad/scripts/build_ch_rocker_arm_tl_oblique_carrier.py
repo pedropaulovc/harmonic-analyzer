@@ -19,16 +19,12 @@ Z, model Z = -carrier Y, so a Top-plane sketch reads carrier (X, Y)):
   the feature's distance and carries the finished thickness section A-A prints,
   driven from Plate's depth;
 * ``StationReference``, a hidden Top-plane sketch of points, carries every
-  printed X station as a baseline from A1's axis (rule 10); the spot and tap
+  printed X station as a baseline from A1's axis (rule 10); the tap
   placements below stay origin-based, driven from it;
-* the CL centre-drill spot is a 90 degree cone, revolved on a plane through
-  its axis parallel to the Front plane (the plane's offset is the spot's Y
-  station) as the pivot plate's seat cone;
-* the unchanged HUB bore and controlled underside chamfer show the finished
-  assembly-machined state; TL-00 step 10 still owns its drilling/reaming
-  location and sequence, so no independent HUB station is printed here;
-* the CR, riser and feed-lever taps are UNC Hole Wizard features from the
-  top face, through;
+* the CL and CR end-clamp taps (``ClTap``, ``CrTap``), the HUB clamp tap
+  (``HubTap``), the riser and the feed-lever taps are UNC Hole Wizard
+  features from the top face, through; the three clamp taps are the
+  ordinary #8-32 of the common clamp screw;
 * each pin hole carries a hidden reference axis (``PIN_HOLE_AXES``), two
   offset planes' intersection, which the jig assembly mates on.
 
@@ -51,10 +47,6 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _bind, _early_bound
 from _dimensions import drive_dimension, name_dimensions
-from _drawing_dimension_insert import (
-    add_angular_reference_dimension,
-    add_diametric_linear_dimension,
-)
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -88,26 +80,17 @@ from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
 from _visibility import blank_reference_geometry
 from ch_rocker_arm_tl_oblique_carrier_spec import (
-    CR,
-    CR_SPEC,
-    CR_TAP_DRILL,
+    CLAMP_SPEC,
+    CLAMP_TAP_DRILL,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     LEVER_HOLES,
     LEVER_SPEC,
     LEVER_TAP_DRILL,
-    LEFT_CLAMP,
-    LEFT_CLAMP_SPEC,
-    LEFT_CLAMP_TAP_DRILL,
-    LEFT_CLAMP_DRILL_DEPTH,
-    LEFT_CLAMP_THREAD_DEPTH,
-    LEFT_CLAMP_THREAD_TOL_TYPE,
-    LEFT_CLAMP_THREAD_PLACES,
+    END_CLAMPS,
     HUB,
-    HUB_HOLE_DIA,
-    HUB_HOLE_BAND,
-    HUB_CHAMFER,
+    HUB_SPEC,
     OUTLINE_X,
     OUTLINE_Y,
     PIN_HOLE_AXES,
@@ -122,10 +105,6 @@ from ch_rocker_arm_tl_oblique_carrier_spec import (
     RISER_SPEC,
     REFERENCE_SKETCHES,
     RISER_TAP_DRILL,
-    SPOT_DIA,
-    SPOT_FLANK_ANGLE,
-    SPOT_REFERENCE,
-    SPOTS,
     LEVER_STATION_BAND,
     STATION_REFERENCE,
     STATIONS,
@@ -150,18 +129,12 @@ _SAVED_DRAWING_PROPERTIES = (
     "Isometric View Note",
 )
 
-AXIS_OVERRUN = 2.0  # the revolve axis centerline's free end above the top face
 THROUGH_CUT_DEPTH = 2.0 * (THICKNESS + 1.0)
 _UP = (0.0, 1.0, 0.0)  # the top face's outward normal (model +Y)
 
 _R_PIN = PIN_HOLE_DIA / 2.0
-_R_SPOT = SPOT_DIA / 2.0
 V_PLATE = PLATE_LENGTH * PLATE_WIDTH * THICKNESS
 V_PINS = len(PIN_HOLES) * math.pi * _R_PIN**2 * THICKNESS
-# A 90 degree cone: its depth equals its mouth radius.
-V_SPOT = (
-    math.pi * _R_SPOT**2 * (_R_SPOT * math.tan(math.radians(SPOT_FLANK_ANGLE))) / 3.0
-)
 # Each 45 degree chamfer removes a triangle of legs c revolved about the hole
 # axis at its centroid radius r + c/3 (pn_pen_v_block's chamfer volume).
 V_PIN_CHAMFER = len(PIN_HOLES) * math.pi * PIN_CHAMFER**2 * (_R_PIN + PIN_CHAMFER / 3.0)
@@ -231,153 +204,6 @@ def _sketch_mapper(
     return to_sketch
 
 
-async def _spot(
-    adapter, prefix: str, point: tuple[float, float]
-) -> list[tuple[str, str]]:
-    """One Ø3 x 90 degree centre-drill spot: a plane through its axis parallel
-    to the Front plane (offset = the Y station), and a revolved cone on it
-    (the pivot plate's ``_cone_cut``: face -> mouth -> apex -> face, a
-    centerline axis, the cone depth fixing the flank, a driven face-to-flank
-    reference proving it).
-
-    The printed station and size live in the hidden ``SpotReference`` sketch
-    (a reference plane's offset cannot be imported into a drawing: farm
-    jig-r1); the plane offset, the cone's station and its mouth diameter are
-    driven from it, so none of them is marked."""
-    from solidworks_mcp.adapters.base import CreatePlaneParameters, RevolveParameters
-
-    x, y = point
-    plane = f"{prefix}AxisPlane"
-    check(
-        f"create_plane {plane}",
-        await adapter.create_plane(
-            CreatePlaneParameters(mode="offset", base_plane="Front Plane", offset=-y)
-        ),
-    )
-    name_last_feature(adapter, plane)
-    plane_offset = name_dimensions(adapter, plane, [f"{prefix}PlaneOffset"])[0]
-    jobs = [(plane_offset, f'"{prefix}Y@{SPOT_REFERENCE}"')]
-    blank_reference_geometry(adapter, ((plane, "PLANE"),))
-
-    label = f"{prefix} spot"
-    dims = SketchDims()
-    check(f"create_sketch {label}", await adapter.create_sketch(plane))
-    to_sketch = _sketch_mapper(adapter, u_axis=0, v_axis=1, label=label)
-    drop = _R_SPOT * math.tan(math.radians(SPOT_FLANK_ANGLE))
-    profile = [
-        to_sketch((x, 0.0, -y)),
-        to_sketch((x + _R_SPOT, 0.0, -y)),
-        to_sketch((x, -drop, -y)),
-    ]
-    set_sketch_direct_db(adapter, True)
-    axis = check(
-        f"{label} axis",
-        await adapter.add_centerline(*profile[0], *to_sketch((x, AXIS_OVERRUN, -y))),
-    )
-    lines = await add_line_chain(adapter, profile)
-    set_sketch_direct_db(adapter, False)
-    face, flank, axis_side = lines
-    for i in range(len(lines)):
-        check(
-            f"{label} junction {i}",
-            await adapter.add_sketch_constraint(
-                f"{lines[i]}.end", f"{lines[(i + 1) % len(lines)]}.start", "coincident"
-            ),
-        )
-    for first, second, relation in (
-        (face, None, "horizontal"),
-        (axis_side, None, "vertical"),
-        (axis, None, "vertical"),
-        (f"{axis}.start", f"{face}.start", "coincident"),
-    ):
-        check(
-            f"{label} {relation} {first}",
-            await adapter.add_sketch_constraint(first, second, relation),
-        )
-    # The axis foot sits on the top face (sketch v = 0): a zero station gets
-    # its relation, not a dimension (anchor_point_to_origin).
-    await anchor_point_to_origin(
-        adapter, f"{face}.start", profile[0][0], profile[0][1], f"{label} station"
-    )
-    if profile[0][0] != 0.0:
-        dims.record(f"{prefix}SpotX", f'"{prefix}XOrigin@{SPOT_REFERENCE}"')
-    await add_diametric_linear_dimension(
-        adapter,
-        axis,
-        f"{flank}.start",
-        to_sketch((x + _R_SPOT, 3.0, -y)),
-        f"{label} mouth diameter",
-    )
-    dims.record(f"{prefix}SpotMouthDia", f'"SpotDia@{SPOT_REFERENCE}"')
-    await dimension_between(
-        adapter,
-        f"{flank}.start",
-        f"{flank}.end",
-        "vertical_distance",
-        drop,
-        f"{label} cone depth",
-    )
-    dims.record(
-        f"{prefix}SpotDepth",
-        f'"SpotDia@{SPOT_REFERENCE}" / 2 / tan({90.0 - SPOT_FLANK_ANGLE:g})',
-    )
-    bisector = math.radians(180.0 + SPOT_FLANK_ANGLE / 2.0)
-    reach = 0.5 * _R_SPOT
-    await add_angular_reference_dimension(
-        adapter,
-        face,
-        flank,
-        to_sketch(
-            (
-                x + _R_SPOT + reach * math.cos(bisector),
-                reach * math.sin(bisector),
-                -y,
-            )
-        ),
-        f"{label} face-to-flank angle",
-        expected_degrees=SPOT_FLANK_ANGLE,
-    )
-    dims.record(f"{prefix}SpotFlankAngle")
-    check(
-        f"{label} axis length",
-        await adapter.add_sketch_dimension(axis, None, "linear", AXIS_OVERRUN),
-    )
-    dims.record(f"{prefix}SpotAxisLength")
-    await ensure_fully_defined(adapter, f"{label} profile")
-    check(f"exit_sketch {label}", await adapter.exit_sketch())
-    name_last_feature(adapter, f"{prefix}SpotProfile")
-    jobs += dims.apply(adapter, f"{prefix}SpotProfile")
-    check(
-        f"revolve-cut {label}",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
-    )
-    name_last_feature(adapter, f"{prefix}Spot")
-    return jobs
-
-
-async def _spot_reference(adapter) -> list[tuple[str, str]]:
-    """The hidden reference sketch that carries the spot's printed height and
-    Ø3 (drawing-simplicity-policy: a value the sheet prints but no importable
-    feature dimension carries). A Top-plane sketch reads carrier (X, Y): CL by
-    X and Y, a Ø3 circle on the spot's mouth, its X driven from its printed
-    station from A1 (``STATION_REFERENCE``)."""
-    ref = SketchDims()
-    check("create_sketch spot reference", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter,
-        *SPOTS["Cl"],
-        _R_SPOT,
-        "CL spot reference",
-        dims=ref,
-        names=("ClXOrigin", "ClY", "SpotDia"),
-        drives=(_origin_x("ClX"), None, None),
-    )
-    await ensure_fully_defined(adapter, "spot reference sketch")
-    check("exit_sketch spot reference", await adapter.exit_sketch())
-    name_last_feature(adapter, SPOT_REFERENCE)
-    return ref.apply(adapter, SPOT_REFERENCE)
-
-
 def _add_point(adapter, point: tuple[float, float], label: str) -> str:
     """One sketch point straight into the sketch DB (no inference snap),
     registered for the adapter's dimension refs (build_dt_pinion_lever)."""
@@ -427,10 +253,7 @@ async def _station_reference(adapter) -> list[tuple[str, str]]:
         "EdgeX": '"PlateHalfLength@PlateProfile" - ' + _pin_dim("A1X"),
         "LeverX": _pin_dim("A1X"),
     }
-    y_drives = {
-        "EdgeX": '"PlateNearY@PlateProfile"',
-        "ClX": f'"ClY@{SPOT_REFERENCE}"',
-    }
+    y_drives = {"EdgeX": '"PlateNearY@PlateProfile"'}
     for name, point in STATIONS.items():
         target = _add_point(adapter, point, f"{name} station")
         await anchor_point_to_point(
@@ -686,111 +509,6 @@ def _pin_chamfer_min_limit(adapter) -> None:
     _telemetry.success(f"{label}: single limit {PIN_CHAMFER:g} MIN")
 
 
-def _left_clamp_thread_dimension(adapter):
-    """Resolve the one Wizard-owned full-thread depth, including its subfeatures."""
-    from _com import _com_invoke
-    from _dimensions import _feature_display_dimensions
-    from _drawing_marks import _feature_tree
-
-    feature = _early_bound(_feature_by_name(adapter, "LeftClampTap"), "IFeature")
-    definition = _early_bound(feature.GetDefinition(), "IWizardHoleFeatureData2")
-    if abs(float(definition.ThreadDepth) * 1000.0 - LEFT_CLAMP_THREAD_DEPTH) > 1e-5:
-        raise RuntimeError("LeftClampTap: native full-thread depth changed")
-    matches = []
-    for current in _feature_tree(feature):
-        owner = str(_com_invoke(current, "IFeature", "Name"))
-        for display in _feature_display_dimensions(current):
-            dimension = _com_invoke(display, "IDisplayDimension", "GetDimension2", 0)
-            name = str(_com_invoke(dimension, "IDimension", "FullName"))
-            parts = name.split("@")
-            if int(_com_invoke(dimension, "IDimension", "GetType")) != 0:
-                continue
-            if len(parts) < 2 or parts[1] != owner:
-                continue
-            value = float(_com_invoke(dimension, "IDimension", "SystemValue")) * 1000.0
-            if abs(value - LEFT_CLAMP_THREAD_DEPTH) < 1e-5:
-                matches.append((display, dimension))
-    if len(matches) != 1:
-        raise RuntimeError(f"LeftClampTap: expected one owned full-thread dimension, got {len(matches)}")
-    # Keep the retained raw handles; each consumer binds its required interface.
-    # _early_bound alone treats a bare PyIDispatch (no _oleobj_) as a test double.
-    return matches[0]
-
-
-def _require_left_clamp_thread_min(adapter, *, stage: str = "model") -> int:
-    display, dimension = _left_clamp_thread_dimension(adapter)
-    display = _early_bound(_bind(display, "IDisplayDimension"), "IDisplayDimension")
-    dimension = _early_bound(_bind(dimension, "IDimension"), "IDimension")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    precision = int(display.GetPrimaryPrecision2())
-    tolerance_type = int(tolerance.Type)
-    lower = float(tolerance.GetMinValue())
-    upper = float(tolerance.GetMaxValue())
-    observed = (
-        f"stage={stage!r}, precision={precision}, tolerance_type={tolerance_type}, "
-        f"lower_m={lower!r}, upper_m={upper!r}"
-    )
-    _telemetry.info(f"LeftClampTap source thread-depth: {observed}")
-    if (tolerance_type != LEFT_CLAMP_THREAD_TOL_TYPE
-            or abs(lower) > 1e-12 or abs(upper) > 1e-12
-            or precision != LEFT_CLAMP_THREAD_PLACES):
-        raise RuntimeError(
-            f"LeftClampTap: source-model thread-depth MIN did not persist: {observed}; "
-            f"expected precision={LEFT_CLAMP_THREAD_PLACES}, "
-            f"tolerance_type={LEFT_CLAMP_THREAD_TOL_TYPE}, lower_m=upper_m=0"
-        )
-    return tolerance_type
-
-
-def _author_left_clamp_thread_min(adapter) -> None:
-    display, dimension = _left_clamp_thread_dimension(adapter)
-    display = _early_bound(_bind(display, "IDisplayDimension"), "IDisplayDimension")
-    dimension = _early_bound(_bind(dimension, "IDimension"), "IDimension")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = LEFT_CLAMP_THREAD_TOL_TYPE
-    if not tolerance.SetValues(0.0, 0.0):
-        raise RuntimeError("LeftClampTap: source thread-depth MIN rejected")
-    display.SetPrecision3(LEFT_CLAMP_THREAD_PLACES, -1, -1, -1)
-    _require_left_clamp_thread_min(adapter)
-
-
-async def _finished_hub_bore(adapter, drive_jobs, volume: float) -> float:
-    """Model the assembly-reamed bore and its controlled underside relief."""
-    from solidworks_mcp.adapters.base import ExtrusionParameters
-
-    dims = SketchDims()
-    check("create HUB bore sketch", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter, *HUB, HUB_HOLE_DIA / 2.0, "assembly HUB bore",
-        dims=dims, names=("HubX", "HubY", "HubHoleDia"),
-    )
-    await ensure_fully_defined(adapter, "assembly HUB bore")
-    check("exit HUB bore sketch", await adapter.exit_sketch())
-    name_last_feature(adapter, "HubHoleProfile")
-    drive_jobs += dims.apply(adapter, "HubHoleProfile")
-    check("cut finished HUB bore", await adapter.create_cut_extrude(
-        ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
-    ))
-    name_last_feature(adapter, "HubHole")
-    bore_volume = math.pi * (HUB_HOLE_DIA / 2.0) ** 2 * THICKNESS
-    volume = await volume_check(adapter, "finished HUB bore", volume - bore_volume, 0.001 * bore_volume)
-    check("chamfer HUB underside", await adapter.add_chamfer(
-        HUB_CHAMFER, [[HUB[0] - HUB_HOLE_DIA / 2.0, -THICKNESS, -HUB[1]]]
-    ))
-    name_last_feature(adapter, "HubChamfer")
-    name_dimensions(adapter, "HubChamfer", ["HubChamferSize"])
-    _, size = _named_dimension(adapter, "HubChamfer", "HubChamferSize")
-    size = _early_bound(_bind(size, "IDimension"), "IDimension")
-    if abs(float(size.SystemValue) * 1000.0 - HUB_CHAMFER) > 1e-6:
-        raise RuntimeError("HUB underside chamfer leg did not read back")
-    if int(_early_bound(size.Tolerance, "IDimensionTolerance").Type) != 0:
-        raise RuntimeError("HUB underside chamfer acquired an explicit size band")
-    chamfer_volume = math.pi * HUB_CHAMFER**2 * (HUB_HOLE_DIA / 2.0 + HUB_CHAMFER / 3.0)
-    return await volume_check(
-        adapter, "HUB underside chamfer", volume - chamfer_volume, 0.01 * chamfer_volume
-    )
-
-
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -865,56 +583,51 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(
         adapter, "pin chamfers", volume - V_PIN_CHAMFER, 0.05 * V_PIN_CHAMFER + 0.05
     )
-    volume = await _finished_hub_bore(adapter, drive_jobs, volume)
 
-    # --- X stations from A1, then the CL centre-drill spot -------------------
+    # --- X stations from A1 ---------------------------------------------------
     # The printed baselines first: the hidden sketch of points that drives
-    # every spot and tap X placement, ahead of them in the tree. Then the
-    # spot's printed height and Ø3: the hidden reference sketch that drives
-    # its plane and cone, ahead of them in the tree.
+    # every tap X placement, ahead of them in the tree.
     drive_jobs += await _station_reference(adapter)
-    drive_jobs += await _spot_reference(adapter)
-    for prefix, point in SPOTS.items():
-        drive_jobs += await _spot(adapter, prefix, point)
-        volume = await volume_check(
-            adapter, f"{prefix} spot", volume - V_SPOT, 0.05 * V_SPOT + 0.05
-        )
 
     # --- Taps from the top face, through ------------------------------------
-    cr = wizard_holes(
-        adapter,
-        CR_SPEC,
-        [_top(CR)],
-        _UP,
-        f"CR clamp tap ({CR_SPEC.size})",
-        name="CrTap",
-        expect_dia_mm=CR_TAP_DRILL,
-        placement_dims=[(("CrXOrigin", _origin_x("CrX")), ("CrY", None))],
-    )
-    drive_jobs += cr.placement_drive_jobs
-    v_cr = math.pi * (cr.hole_dia_mm / 2.0) ** 2 * THICKNESS
-    volume = await volume_check(adapter, "CR tap", volume - v_cr, 0.03 * v_cr)
+    # The CL and CR end clamps: one ordinary #8-32 feature each, X from its
+    # printed station, Y from the pin line.
+    for key, point in END_CLAMPS.items():
+        prefix = key.title()
+        clamp = wizard_holes(
+            adapter,
+            CLAMP_SPEC,
+            [_top(point)],
+            _UP,
+            f"{key} clamp tap ({CLAMP_SPEC.size})",
+            name=f"{prefix}Tap",
+            expect_dia_mm=CLAMP_TAP_DRILL,
+            placement_dims=[
+                ((f"{prefix}XOrigin", _origin_x(f"{prefix}X")), (f"{prefix}Y", None)),
+            ],
+        )
+        drive_jobs += clamp.placement_drive_jobs
+        v_clamp = math.pi * (clamp.hole_dia_mm / 2.0) ** 2 * THICKNESS
+        volume = await volume_check(
+            adapter, f"{key} tap", volume - v_clamp, 0.03 * v_clamp
+        )
 
-    left_clamp = wizard_holes(
+    # The HUB clamp: on the origin's X, so its placement takes the origin-axis
+    # relation; its unmarked HubY places it. The sheet prints no HUB station:
+    # it is made in situ at the assembly's HUB setting (HUB_TAP_CALLOUT).
+    hub = wizard_holes(
         adapter,
-        LEFT_CLAMP_SPEC,
-        [_top(LEFT_CLAMP)],
+        HUB_SPEC,
+        [_top(HUB)],
         _UP,
-        "left clamp blind bottoming tap (#10-24)",
-        name="LeftClampTap",
-        expect_dia_mm=LEFT_CLAMP_TAP_DRILL,
-        placement_dims=[
-            (("LeftClampXOrigin", _origin_x("LeftClampX")), ("LeftClampY", None)),
-        ],
+        f"HUB clamp tap ({HUB_SPEC.size})",
+        name="HubTap",
+        expect_dia_mm=CLAMP_TAP_DRILL,
+        placement_dims=[((None, None), ("HubY", None))],
     )
-    drive_jobs += left_clamp.placement_drive_jobs
-    _author_left_clamp_thread_min(adapter)
-    # A flat bottom removes only this cylinder. A silently retained 118-degree
-    # point fails the volume check instead of consuming the specified floor.
-    v_left = math.pi * (LEFT_CLAMP_TAP_DRILL / 2.0) ** 2 * LEFT_CLAMP_DRILL_DEPTH
-    volume = await volume_check(
-        adapter, "left clamp flat-bottom pilot", volume - v_left, 0.01 * v_left
-    )
+    drive_jobs += hub.placement_drive_jobs
+    v_hub = math.pi * (hub.hole_dia_mm / 2.0) ** 2 * THICKNESS
+    volume = await volume_check(adapter, "HUB tap", volume - v_hub, 0.03 * v_hub)
 
     riser = wizard_holes(
         adapter,
@@ -1007,13 +720,7 @@ async def build(adapter) -> dict[str, str]:
         display_unit=UNIT,
     )
     _pin_chamfer_min_limit(adapter)
-    set_dimension_bilateral_tolerance(
-        adapter, "HubHoleProfile", "HubHoleDia", *deviations(HUB_HOLE_BAND),
-        display_unit=UNIT,
-    )
-    _require_left_clamp_thread_min(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    _require_left_clamp_thread_min(adapter, stage="after drawing precision")
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -1026,7 +733,6 @@ async def build(adapter) -> dict[str, str]:
         },
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
-    _require_left_clamp_thread_min(adapter, stage="after final part save")
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
 

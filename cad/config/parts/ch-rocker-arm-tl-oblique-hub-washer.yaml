@@ -1,11 +1,11 @@
 ch-rocker-arm-tl-oblique-hub-washer:
   title: Rocker Oblique Trammel Hub Washer
   # Shop fixture: the parent MHA-CH-06 Number plus -TL-nn (subsystem-identities.md).
-  number: MHA-CH-06-TL-35
+  number: MHA-CH-06-TL-52
   material: Brass
   material_specification: C36000 free-machining brass
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
-  process: "turn from 1/2 in C360 brass round: face, turn the O.D., drill #9 through, part off to thickness; break edges"
+  process: "turn from 1/2 in C360 brass round in one chucking: face the spigot end, drill 13/64 through, turn the spigot and the flange O.D., part off to flange thickness; break the flange edges, leave the spigot end sharp"
   drawing_unit: in

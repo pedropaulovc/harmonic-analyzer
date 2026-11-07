@@ -1,4 +1,4 @@
-"""Create the purchased reference drawing for the oblique-trammel rail screw."""
+"""Create the purchased reference drawing for the oblique-trammel common screw (MHA-CH-06-TL-VN-61: rails, lower brackets, HUB/CL/CR)."""
 
 from __future__ import annotations
 
