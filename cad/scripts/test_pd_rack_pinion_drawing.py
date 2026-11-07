@@ -338,7 +338,7 @@ def test_single_pin_contacts_every_actual_finite_corner_on_the_running_datum() -
     assert spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM == pytest.approx(0.040 * 25.4)
     from _gear_quality import toothspace_runout_tir_mm
 
-    assert spec.TOOTH_SPACE_RUNOUT_TIR_MM == toothspace_runout_tir_mm() == 0.05
+    assert spec.TOOTH_SPACE_RUNOUT_TIR_MM == toothspace_runout_tir_mm() == 0.0508
     contacts = spec.tooth_space_gauge_contacts(1.0003)
     assert len(contacts) == len(spec.manufactured_profiles()) == 4
     for profile, contact in zip(spec.manufactured_profiles(), contacts, strict=True):
