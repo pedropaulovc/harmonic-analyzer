@@ -486,9 +486,10 @@ def test_rail_row_is_a_drawn_centreline_and_its_height_carries_no_words() -> Non
 
 def test_tap_callout_clears_the_border_and_the_seat_labels() -> None:
     """r3: the callout's first line touched the 267 mm border. Its four lines
-    span about 9.6 above and below the keep point; its widest is the mate."""
+    span about 10.5 above and below the keep point (r1 sheet); its widest is
+    the mate."""
     x, y = drawing.TAP_CALLOUT_XY
-    half_h = 4 * 0.0048 / 2.0
+    half_h = 0.0105
     widest = max(
         len(f"8X Ø.136 THRU ALL{drawing.RAIL_PITCH_TEXT}"),
         *map(len, drawing.RAIL_TAP_CALLOUT_BELOW),
@@ -1281,24 +1282,38 @@ def test_each_seat_names_its_own_mate_on_each_member() -> None:
     """Pre-screen 957501d1 blocker: "TABLE AND RAIL SEATS" over both symbols
     named the table by a generic noun and did not say which face seats
     which. Each symbol carries its own label: the rail as the kit's member
-    by its same-parent number (rule 4), the mill table as the shop names it.
-    Bar 2 is bar 1 turned over, so the roles swap."""
+    by its same-parent number (rule 4); the mill table, which has no drawing
+    number (farm r1), as shop equipment under the declared RV-02. Bar 2 is
+    bar 1 turned over, so the roles swap."""
+    from machinist_exceptions import load_exceptions
+
     rail_number = _config.parts("ch-rocker-arm-tl-vn-oblique-rail-kit")["number"]
     own = _config.parts(spec.PART_NAME)["number"]
     short = drawing.RAIL_SHORT_NUMBER
     assert short == "TL-VN-83"
     assert rail_number == own.rsplit("-TL-", 1)[0] + "-" + short
     assert drawing.RAIL_SEAT_LABEL.split("\n") == ["SEATS", "RAIL OF", short]
-    assert drawing.TABLE_SEAT_LABEL.split("\n") == ["SEATS ON", "PM-30MV", "TABLE"]
-    rail, table = drawing.RAIL_SEAT_LABEL, drawing.TABLE_SEAT_LABEL
+    table = " ".join(drawing.TABLE_SEAT_LABEL.split("\n"))
+    assert table == "SEATS ON PM-30MV MILL TABLE (SHOP EQUIPMENT)"
+    rail = drawing.RAIL_SEAT_LABEL
     assert drawing.SEAT_LABELS == {
-        spec.BAR1: {"top_seat": rail, "underside_seat": table},
-        spec.BAR2: {"top_seat": table, "underside_seat": rail},
+        spec.BAR1: {"top_seat": rail, "underside_seat": drawing.TABLE_SEAT_LABEL},
+        spec.BAR2: {"top_seat": drawing.TABLE_SEAT_LABEL, "underside_seat": rail},
     }
     assert "TABLE AND RAIL" not in rail + table
+    declared = {
+        entry.id: entry for entry in load_exceptions(_config.CONFIG_DIR, STEM, "part")
+    }
+    assert set(declared) == {"RV-01", "RV-02"}
+    shop = declared["RV-02"]
+    assert shop.kind == "minor"
+    assert table.removeprefix("SEATS ON ") in shop.where
+    assert "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144" in (
+        shop.reason
+    )
 
 
-def test_seat_symbols_and_labels_stand_above_the_end_view_outboard() -> None:
+def test_seat_symbols_and_labels_stand_above_the_end_view() -> None:
     top_x, top_y = drawing.TOP_SEAT_FINISH_XY
     under_x, under_y = drawing.UNDERSIDE_SEAT_FINISH_XY
     half_thick = spec.BAR_THICK * drawing._S / 2000.0
@@ -1309,27 +1324,29 @@ def test_seat_symbols_and_labels_stand_above_the_end_view_outboard() -> None:
     assert min(top_y, under_y) > end_top
     # Clear of the far rise's dimension line and its text.
     assert top_x > drawing._RIGHT + drawing._FAR_RISE_LANE
-    rise_text_right = drawing._RIGHT + drawing._FAR_RISE_LANE + drawing._FAR_RISE_TEXT_HALF
+    rise_text_top = drawing.FRONT_KEEP["FarSlotRise"][1] + 0.00175
+    symbol_top = top_y + drawing._SEAT_SYMBOL_TOP_UP
+    tap_foot = drawing.TAP_CALLOUT_XY[1] - 0.0105
+    hole_8 = drawing._sheet_x(drawing.FRONT_CENTER, spec.RAIL_HOLE_X[-1])
     for text in (drawing.RAIL_SEAT_LABEL, drawing.TABLE_SEAT_LABEL):
         width = drawing.seat_label_width(text)
-        assert width == pytest.approx(0.0026 * 8)
-        # The top seat's label ends left of its symbol's V arm; the
-        # underside's starts right of its "Ra 125" and stays inside the border.
+        height = drawing.seat_label_height(text)
+        assert width <= 0.0027 * 12 + 1e-12
+        # The top seat's label ends left of its symbol's V arm, level with
+        # the symbol, above the end view's top and the far rise's text, and
+        # right of the tap callout's leader to hole 8.
         left_x, left_top = drawing.seat_label_xy("top_seat", text)
         assert left_x + width <= top_x - 0.003
+        assert left_top - height < top_y < left_top
+        assert left_top - height > max(end_top, rise_text_top) + 0.002
+        assert left_x >= hole_8 + 0.020
+        # The underside's stands on its symbol from its V, inside the right
+        # border, under the tap callout's foot.
         right_x, right_top = drawing.seat_label_xy("underside_seat", text)
-        assert right_x >= under_x + 0.015
-        assert right_x + width <= 0.4194 - 0.003
-        # Level with the symbols, above the end view's top and the far
-        # rise's text, below the tap callout's foot.
-        for top in (left_top, right_top):
-            bottom = top - 2 * drawing._SEAT_LABEL_HALF_HIGH
-            assert bottom > end_top + 0.002
-            assert bottom < top_y < top
-            assert top <= drawing.TAP_CALLOUT_XY[1] - 4 * 0.0048 / 2.0 - 0.005
-        assert left_x > rise_text_right or left_top - 2 * drawing._SEAT_LABEL_HALF_HIGH > (
-            drawing.FRONT_KEEP["FarSlotRise"][1] + 0.00175
-        )
+        assert under_x - 0.003 <= right_x <= under_x
+        assert right_x + width <= 0.4194 - 0.005
+        assert right_top - height >= symbol_top + 0.0015
+        assert right_top <= tap_foot - 0.005
     with pytest.raises(KeyError):
         drawing.seat_label_xy("side", drawing.RAIL_SEAT_LABEL)
 

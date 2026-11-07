@@ -412,31 +412,34 @@ UNDERSIDE_SEAT_FINISH_XY = (
     END_CENTER[0] + _END_HALF_THICK + SEAT_SYMBOL_OUT,
     _END_TOP + SEAT_SYMBOL_UP,
 )
-# Each seat names what it seats, beside its own symbol, outboard (machinist
-# review pre-screen 957501d1: one "TABLE AND RAIL SEATS" over both symbols
-# named no table and did not say which face seats which). The rail is the
-# kit's member by its same-parent number (rule 4); the mill table is shop
-# equipment with no drawing number, named as the shop inventory names it.
-# Bar 2 is bar 1 turned over, so its two faces swap roles.
+# Each seat names what it seats, beside its own symbol (machinist review
+# pre-screen 957501d1: one "TABLE AND RAIL SEATS" over both symbols named no
+# table and did not say which face seats which). The rail is the kit's
+# member by its same-parent number (rule 4). The mill table is shop
+# equipment with no drawing number: farm r1 (20261107T221729532Z) asked for
+# one, so it is named as shop equipment and declared (RV-02; Main's
+# delegated ruling 2026-11-07, the FoDtFab1 Q2 dividing-head pattern). Bar 2
+# is bar 1 turned over, so its two faces swap roles.
 _PARENT_PREFIX = _config.parts(part_spec.PART_NAME)["number"].rsplit("-TL-", 1)[0] + "-"
 RAIL_SHORT_NUMBER = part_spec.RAIL_NUMBER.removeprefix(_PARENT_PREFIX)
 if RAIL_SHORT_NUMBER == part_spec.RAIL_NUMBER:
     raise AssertionError("the rail kit is not under the base bar's parent number")
 RAIL_SEAT_LABEL = f"SEATS\nRAIL OF\n{RAIL_SHORT_NUMBER}"
-TABLE_SEAT_LABEL = "SEATS ON\nPM-30MV\nTABLE"
+TABLE_SEAT_LABEL = "SEATS ON\nPM-30MV MILL\nTABLE (SHOP\nEQUIPMENT)"
 SEAT_LABELS = {
     part_spec.BAR1: {"top_seat": RAIL_SEAT_LABEL, "underside_seat": TABLE_SEAT_LABEL},
     part_spec.BAR2: {"top_seat": TABLE_SEAT_LABEL, "underside_seat": RAIL_SEAT_LABEL},
 }
-# Measured on the pre-screen sheet: a symbol runs about 15.5 right of its V
-# tip (its xy) to the end of "Ra 125", its middle about 3.3 above the tip;
-# its V's left arm reaches about 2 left of the tip. Three label lines stand
-# about 14.4 tall (two measured 9.6), 2.6 a glyph.
-_SEAT_SYMBOL_BODY = 0.0155
+# Measured on the r1 sheet: a symbol's middle stands 3.3 and its "Ra 125"
+# box's top 7.4 above its V tip (its xy); its V's left arm reaches about 2
+# left of the tip. Label lines stand 4.4 apart, 3.5 tall, up to 2.7 a glyph
+# ("SEATS ON" 21.5 wide).
 _SEAT_SYMBOL_MID_UP = 0.0033
+_SEAT_SYMBOL_TOP_UP = 0.0074
 _SEAT_LABEL_GAP = 0.002
-_SEAT_LABEL_HALF_HIGH = 0.0072
-_GLYPH = 0.0026
+_LABEL_LINE_PITCH = 0.0044
+_LABEL_TEXT_HIGH = 0.0035
+_GLYPH = 0.0027
 
 
 def seat_label_width(text: str) -> float:
@@ -444,14 +447,24 @@ def seat_label_width(text: str) -> float:
     return _GLYPH * max(len(line) for line in text.split("\n"))
 
 
+def seat_label_height(text: str) -> float:
+    """A seat label's height on the sheet (m), first cap to last baseline."""
+    return (len(text.split("\n")) - 1) * _LABEL_LINE_PITCH + _LABEL_TEXT_HIGH
+
+
 def seat_label_xy(key: str, text: str) -> tuple[float, float]:
-    """A seat label's top-left: centred on its symbol's height, ending left
-    of the top seat's V arm or starting right of the underside's "Ra 125"."""
-    top = _END_TOP + SEAT_SYMBOL_UP + _SEAT_SYMBOL_MID_UP + _SEAT_LABEL_HALF_HIGH
+    """A seat label's top-left. The top seat's stands left of its symbol,
+    centred on its height, where the plan's far end leaves room. The
+    underside's stands on its symbol, from its V: right of it the right
+    border leaves no room for the table's lines (r1: 25)."""
     if key == "top_seat":
-        return (TOP_SEAT_FINISH_XY[0] - 2 * _SEAT_LABEL_GAP - seat_label_width(text), top)
+        mid = _END_TOP + SEAT_SYMBOL_UP + _SEAT_SYMBOL_MID_UP
+        x = TOP_SEAT_FINISH_XY[0] - 2 * _SEAT_LABEL_GAP - seat_label_width(text)
+        return (x, mid + seat_label_height(text) / 2.0)
     if key == "underside_seat":
-        return (UNDERSIDE_SEAT_FINISH_XY[0] + _SEAT_SYMBOL_BODY + _SEAT_LABEL_GAP, top)
+        foot = _END_TOP + SEAT_SYMBOL_UP + _SEAT_SYMBOL_TOP_UP + _SEAT_LABEL_GAP
+        x = UNDERSIDE_SEAT_FINISH_XY[0] - _SEAT_LABEL_GAP
+        return (x, foot + seat_label_height(text))
     raise KeyError(key)
 
 
@@ -478,10 +491,10 @@ BRACKET_DRILL_TEXT = " DRILL"
 BRACKET_FAR_SIDE_TEXT = " FAR SIDE"
 BRACKET_CALLOUT_BELOW = (f"MATCHES {part_spec.BRACKET_MATE}", "BAR 1 ONLY")
 # The tap callout's four lines (two native, two of words), centred about here
-# over the plan's far end, about 9.6 above and below: its top clears the 267
-# border by about 12, its foot the seat labels by about 16, and its leader
-# runs down to hole 8 left of them.
-TAP_CALLOUT_XY = (0.327, 0.245)
+# over the plan's far end, about 10.5 above and below (r1): its top clears
+# the 267 border by about 5, its foot the underside seat's label by about 6,
+# and its leader runs down to hole 8 left of the top seat's label.
+TAP_CALLOUT_XY = (0.327, 0.2515)
 # The bracket callout's four lines (two native, two of words), centred about
 # here: right of the length's extension line, under the end view, above the
 # title block (the widening dropped the end view's foot 13, so the block
