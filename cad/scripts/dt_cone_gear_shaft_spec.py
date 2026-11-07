@@ -386,26 +386,26 @@ for _land in FLAT_LANDS[:-1]:
             f"(radius {_next_radius_max:.4f})"
         )
 
-# One length origin (#914 option A, Main ruling 2026-09-25): the collar's
-# thrust face, the face the post bears on.  drawing-guidelines.md rule 14 (keep text off the part) allows one
-# origin per view, baseline from it.  The journal runs back from it to the
-# front stub, and the three land steps and the tip run forward from it.
-# Measuring the steps from the same face as the gear stack keeps the
-# journal's .X length out from between them.  The tip is a station too (#917
-# R5 (a), Main 2026-09-26): the collar is what the tip cup's embed is set
-# against, and front-to-tip as the controlling length stacked the journal's
-# .X on the overall's, doubling the collar-to-tip band; the front-to-tip
-# overall is a reference.  Each land's end plane is offset from
+# Two length origins, one per chucking (drawing-guidelines.md rule 11; Main's
+# delegated ruling (b), 2026-11-07, round 6).  The journal-side chucking faces
+# the collar's thrust face, the face the post bears on: the journal runs back
+# from it to the front stub and the collar web forward to the collar's
+# tip-side face.  The tip-side chucking faces that tip-side face, the seat the
+# gear stack is pushed onto (MHA-DT-07 first): the three land steps and the
+# tip run forward from it, so a step and the gear it stands behind share one
+# face and the collar web never enters between them.  The journal (1.70) and
+# the web (.125) chain the two origins and the front stub to the tip; the
+# front-to-tip overall is a reference.  Each land's end plane is offset from
 # SECTION_ORIGINS[i] by SECTION_KNOBS[i], the value its SecEnd{i} global
 # carries; land 0 is the journal, extruded from the front face.  Each flat is
-# cut from the collar face to its land's end by the same knob.
-DATUM_STATION = COLLAR_START_STATION
+# cut back from its land's end plane over its land.
+DATUM_STATION = COLLAR_END_STATION
 SECTION_ORIGINS = (
     "Front Plane",
-    "CollarFace",
-    "CollarFace",
-    "CollarFace",
-    "CollarFace",
+    "CollarEndPlane",
+    "CollarEndPlane",
+    "CollarEndPlane",
+    "CollarEndPlane",
 )
 SECTION_KNOBS = tuple(
     end if origin == "Front Plane" else end - DATUM_STATION
@@ -468,10 +468,10 @@ SURFACE_FINISHES = (
 # note block starts 20 mm in and the title block begins at 216 mm.
 STACK_NOTE = 2
 TAILSTOCK_NOTE = 3
-# The printed step lengths (from the collar's thrust face, the journal end)
+# The printed step lengths (from the collar's tip-side face, SECTION_KNOBS)
 # and the collar web, as their dimensions print them.
 STACK_LENGTHS_TEXT = ", ".join(
-    inch_text(SECTION_ENDS[land] - SECTION_ENDS[0], 3) for land in (1, 2, 3)
+    inch_text(SECTION_KNOBS[land], 3) for land in (1, 2, 3)
 ) + f" AND {inch_text(COLLAR_THICKNESS, 3)}"
 DRAWING_NOTES = "\n".join(
     (
@@ -511,20 +511,21 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # (SECTION_DIA_BANDS, FLAT_AF_BAND), so their places are only the number's
 # spelling.
 #
-# Land steps Sec1End..Sec3End: three places, which is the title-block .XXX
-# general grade (+-.005) and no explicit band.  This is a location
-# requirement, not a spelling: each step sits SEAT_STEP_SETBACK behind the
-# smaller gear's south face, and the proof below books the step's printed
-# limit with the collar's, the stack's and the fillet's in that 1.0 mm; the
-# .XX grade (+-.01) alone would take half of it.
+# Land steps Sec1End..Sec3End (from the collar's tip-side face): three
+# places, which is the title-block .XXX general grade (+-.005) and no
+# explicit band.  This is a location requirement, not a spelling: each step
+# sits SEAT_STEP_SETBACK behind the smaller gear's south face, and the proof
+# below books the step's printed limit with the stack's and the fillet's in
+# that 1.0 mm; the .XX grade (+-.01) alone would take half of it.
 #
-# Tip station Sec4End (collar face to the tip): two places, the title
-# block's .XX grade (+-.01), by user ruling 2026-09-29.  The tip block is
-# fixed by its hold-down, so this band lands on the adjuster's embed;
+# Tip station Sec4End (collar's tip-side face to the tip): two places, the
+# title block's .XX grade (+-.01), by user ruling 2026-09-29.  The tip block
+# is fixed by its hold-down, so this band, with the collar web's (the post
+# bears on the other collar face), lands on the adjuster's embed;
 # build_dt_drive_train_assembly closes that stack by the block's depth and the
 # 1.0D adjuster engagement instead of a tighter length.  Journal length
-# Sec0End (collar face back to the front stub): two places, the .XX grade,
-# since the journal's guaranteed bearing span below reads it (never .X).
+# Sec0End (collar thrust face back to the front stub): two places, the .XX
+# grade, since the journal's guaranteed bearing span below reads it (never .X).
 # Step radius: three places; nothing depends on it beyond the setback proof.
 #
 # Collar (#914): the diameter is the bar's as supplied (STOCK_DIA), so it
@@ -617,15 +618,15 @@ if JOURNAL_SUPPORT_SPAN_MIN_MM <= 0.0:
 # The setback proof (user ruling 2026-09-28).  Each step and its root fillet
 # must stay south of the smaller gear's south face -- the larger gear's north
 # face -- with the stack pushed onto the collar at its shortest: the step at
-# the north end of its printed limits, the fillet's R.004 +.000 run
-# along the smaller land, the collar web's printed short limit (the stack
-# stands on the collar's north face, the steps are measured from its south
-# face), the stack's own shortfall up to that face
-# (dt_cone_gear_stack.face_band) and the fleet's MARGIN_SPARE.  The fillet
-# runs the same .004 along the flat's root
-# as along the round's, so the one budget covers the smaller gear's round
-# bore and its flat alike.  In service the stack only floats north, off the
-# step.
+# the north end of its printed limits, the fillet's R.004 +.000 run along the
+# smaller land, the stack's own shortfall up to that face
+# (dt_cone_gear_stack.face_band) and the fleet's MARGIN_SPARE.  The steps and
+# the stack share the collar's tip-side face (round 6), so the collar web no
+# longer stands between them; its printed short limit is still charged, as a
+# second spare, so the re-datum loosens no proof (FoDtFab4's condition).  The
+# fillet runs the same .004 along the flat's root as along the round's, so the
+# one budget covers the smaller gear's round bore and its flat alike.  In
+# service the stack only floats north, off the step.
 SEAT_STEP_BUDGET: dict[str, dict[str, float]] = {}
 for _name, _j, _end in zip(("Sec1End", "Sec2End", "Sec3End"), SEAT_STEP_GEARS, SECTION_ENDS[1:4]):
     if abs(_end - FRONT_STUB - seat_step_station(_j)) > 1e-9:

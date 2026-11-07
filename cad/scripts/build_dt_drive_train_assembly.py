@@ -2608,13 +2608,16 @@ def tip_pivot_head_worst_gap_mm(north_face_band_mm: float) -> float:
 
 PIVOT_HEAD_WORST_GAP = tip_pivot_head_worst_gap_mm(TIP_NORTH_FACE_BAND_MM)
 # Adjuster engagement: the cup seats on the tip, so the engagement moves by the
-# tip's station (post band + Sec4End, collar face to tip) against the north
-# face's, and the set end play (cone_stack_end_play.SHAFT_END_PLAY) backs the
-# cup off the tip by up to its upper limit.  The block's working window (the
-# 1.0D engagement exception at the shallow end, full thread under the rim at
-# the deep end) must hold both extremes.
+# tip's station (post band + CollarWidth + Sec4End: the post bears on the
+# collar's thrust face and Sec4End runs from its tip-side face, rule 11)
+# against the north face's, and the set end play
+# (cone_stack_end_play.SHAFT_END_PLAY) backs the cup off the tip by up to its
+# upper limit.  The block's working window (the 1.0D engagement exception at
+# the shallow end, full thread under the rim at the deep end) must hold both
+# extremes.
 TIP_EMBED_BAND_MM = (
-    shaft_printed_band("Sec4End")
+    shaft_printed_band("CollarWidth")
+    + shaft_printed_band("Sec4End")
     + POST_BOSS_FACE_AXIAL_BAND_MM
     + TIP_NORTH_FACE_BAND_MM
 )

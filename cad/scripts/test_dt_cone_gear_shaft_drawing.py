@@ -282,10 +282,10 @@ def test_display_precision_is_owned_by_the_part() -> None:
     assert "draw_dt_cone_gear_shaft.py" in PRECISION_MIGRATED_DRAWINGS
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "set_dimension_precision" not in source
-    # Pure references (overall and supplementary setup sheet) take their
-    # places from the existing spec constant, never a literal or a new band.
-    assert source.count("SetPrecision3") == 2
-    assert source.count("SetPrecision3(DRAWING_REFERENCE_PRECISION, ") == 2
+    # The pure reference (the overall) takes its places from the existing
+    # spec constant, never a literal or a new band.
+    assert source.count("SetPrecision3") == 1
+    assert source.count("SetPrecision3(DRAWING_REFERENCE_PRECISION, ") == 1
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in (
         Path(part.__file__).read_text(encoding="utf-8")
     )
@@ -698,22 +698,22 @@ def test_a_dimension_text_box_spans_every_text_item() -> None:
         drawing._dimension_text_box(empty, "Sec1Dia")
 
 
-def test_lengths_are_baseline_from_the_collar_face() -> None:
-    """Option A (#914): one origin, the collar face.  Every length below the
-    shaft that starts there stands on its own tier, the shortest nearest the
-    part, the tip station (#917 R5 (a)) outermost; the journal runs the other
-    way on the first tier, and the front-to-tip overall, now a REFERENCE,
+def test_lengths_are_baseline_from_each_chucking_face() -> None:
+    """Rule 11 (round 6): the gear lands and the tip run from the collar's
+    tip-side face, each on its own tier, the shortest nearest the part and the
+    tip station (#917 R5 (a)) outermost; the web and the journal run from the
+    thrust face on the first tier, and the front-to-tip overall, a REFERENCE,
     sits lowest, clear of the title block."""
     spec = dt_cone_gear_shaft_spec
-    from_datum = {
-        "CollarWidth": spec.COLLAR_THICKNESS,
+    from_seat = {
         "Sec1End": spec.SECTION_KNOBS[1],
         "Sec2End": spec.SECTION_KNOBS[2],
         "Sec3End": spec.SECTION_KNOBS[3],
         "Sec4End": spec.SECTION_KNOBS[4],
     }
     tiers = [
-        drawing.SIDE_KEEP[name][1] for name in sorted(from_datum, key=from_datum.get)
+        drawing.SIDE_KEEP[name][1]
+        for name in ("CollarWidth", *sorted(from_seat, key=from_seat.get))
     ]
     assert tiers == sorted(tiers, reverse=True)
     assert len(set(tiers)) == len(tiers)
@@ -722,24 +722,19 @@ def test_lengths_are_baseline_from_the_collar_face() -> None:
     journal = drawing.SIDE_KEEP["Sec0End"]
     assert journal[1] == tiers[0]
     big_end = drawing.SIDE_CENTER[0] + spec.SHAFT_LENGTH / 2000.0
-    datum_x = big_end - spec.DATUM_STATION / 1000.0
-    # the journal's text is right of the datum, the collar web's left of it
-    assert journal[0] > datum_x + 0.010
-    assert (
-        drawing.SIDE_KEEP["CollarWidth"][0] < datum_x - spec.COLLAR_THICKNESS / 1000.0
-    )
+    thrust_x = big_end - spec.COLLAR_START_STATION / 1000.0
+    seat_x = big_end - spec.DATUM_STATION / 1000.0
+    # the journal's text is right of the thrust face, the collar web's left
+    # of the tip-side face (the web's span is too narrow for it)
+    assert journal[0] > thrust_x + 0.010
+    assert drawing.SIDE_KEEP["CollarWidth"][0] < seat_x
     overall = drawing.OVERALL_REFERENCE_TEXT_XY[1]
     assert overall < tiers[-1] and overall > 0.066 + 0.008
     tip_x = big_end - spec.SHAFT_LENGTH / 1000.0
     assert tip_x < drawing.OVERALL_REFERENCE_TEXT_XY[0] < big_end
-    # each station's text stands inside its own span, unless the span is too
-    # narrow for it (the web's): then left of that span
-    for name, span in from_datum.items():
-        x = drawing.SIDE_KEEP[name][0]
-        if name == "CollarWidth":
-            assert x < datum_x - span / 1000.0, name
-            continue
-        assert datum_x - span / 1000.0 < x < datum_x, name
+    # each station's text stands inside its own span
+    for name, span in from_seat.items():
+        assert seat_x - span / 1000.0 < drawing.SIDE_KEEP[name][0] < seat_x, name
 
 
 def test_every_length_tier_is_one_line() -> None:
@@ -759,10 +754,10 @@ def _length_texts_crossed(side_keep, overall_xy):
     """
     spec = dt_cone_gear_shaft_spec
     big_end = drawing.SIDE_CENTER[0] + spec.SHAFT_LENGTH / 2000.0
-    datum_x = big_end - spec.DATUM_STATION / 1000.0
+    thrust_x = big_end - spec.COLLAR_START_STATION / 1000.0
+    seat_x = big_end - spec.DATUM_STATION / 1000.0
     tip_x = big_end - spec.SHAFT_LENGTH / 1000.0
-    from_datum = {
-        "CollarWidth": spec.COLLAR_THICKNESS,
+    from_seat = {
         "Sec1End": spec.SECTION_KNOBS[1],
         "Sec2End": spec.SECTION_KNOBS[2],
         "Sec3End": spec.SECTION_KNOBS[3],
@@ -771,16 +766,23 @@ def _length_texts_crossed(side_keep, overall_xy):
     places = spec.DRAWING_PRECISION_BY_NAME
     texts = {
         name: (f"{value:.{places[name]}f}", side_keep[name])
-        for name, value in from_datum.items()
+        for name, value in from_seat.items()
     }
+    texts["CollarWidth"] = (
+        f"{spec.COLLAR_THICKNESS:.{places['CollarWidth']}f}",
+        side_keep["CollarWidth"],
+    )
     texts["Sec0End"] = (
-        f"{spec.DATUM_STATION:.{places['Sec0End']}f}",
+        f"{spec.JOURNAL_END:.{places['Sec0End']}f}",
         side_keep["Sec0End"],
     )
     texts["overall"] = (f"({spec.SHAFT_LENGTH:.1f})", overall_xy)
-    # (line x, the lowest tier it reaches)
-    lines = [(datum_x - value / 1000.0, side_keep[name][1]) for name, value in from_datum.items()]
-    lines.append((datum_x, min(y for _x, y in side_keep.values())))
+    # (line x, the lowest tier it reaches): each tip-side station's far line,
+    # the tip-side face down to the lowest of its stations' tiers (the web's
+    # far line too), and the thrust face down to the web's and journal's tier.
+    lines = [(seat_x - value / 1000.0, side_keep[name][1]) for name, value in from_seat.items()]
+    lines.append((seat_x, min(side_keep[name][1] for name in (*from_seat, "CollarWidth"))))
+    lines.append((thrust_x, min(side_keep[name][1] for name in ("CollarWidth", "Sec0End"))))
     lines += [(big_end, overall_xy[1]), (tip_x, overall_xy[1])]
     crossed = []
     for name, (text, (x, y)) in texts.items():
@@ -1210,9 +1212,10 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
             for j in (15, 16, 17)
         )
     )
-    # Native station knobs and printed baselines share the collar-face origin.
+    # Native station knobs and printed baselines share the collar's tip-side
+    # face (rule 11, round 6).
     assert dt_cone_gear_shaft_spec.SECTION_KNOBS[1:] == pytest.approx(
-        tuple(end - dt_cone_gear_shaft_spec.COLLAR_START_STATION for end in ends[1:])
+        tuple(end - dt_cone_gear_shaft_spec.COLLAR_END_STATION for end in ends[1:])
     )
     # The terminal stub starts at the T018 interface setback and extends to
     # the cup apex, rather than a frozen shaft-length snapshot.
@@ -1773,24 +1776,31 @@ def test_the_build_hides_every_plane_it_creates(monkeypatch) -> None:
     assert len(blanked) == len(adapter.create_plane.call_args_list)
 
 
-def test_every_land_is_placed_from_the_one_origin(monkeypatch) -> None:
-    """Option A (#914): the collar face is the one length origin.  Its plane
-    comes first, from the front face by the journal; lands 1-3 end on planes
-    offset from it and extrude back to it, so each depth IS the shoulder's
-    station from the collar face.  The tip land ends on a plane from the same
-    face (#917 R5 (a)); the front-to-tip overall is only a reference."""
+def test_every_land_is_placed_from_its_chucking_origin(monkeypatch) -> None:
+    """Rule 11 (round 6): the collar's thrust face comes first, from the front
+    face by the journal, then its tip-side face one web on; the collar is
+    turned onto the journal, and lands 1-4 end on planes offset from the
+    tip-side face and extrude back to it, so each depth IS the shoulder's
+    station from that face.  The front-to-tip overall is only a reference."""
     spec = dt_cone_gear_shaft_spec
     adapter, stubs, _dims, _gated = _stubbed_build(monkeypatch)
     planes = _planes(adapter)
-    assert planes[0] == ("Front Plane", spec.COLLAR_START_STATION)
+    assert planes[:2] == [
+        ("Front Plane", spec.COLLAR_START_STATION),
+        ("CollarFace", spec.COLLAR_THICKNESS),
+    ]
     for i in range(1, len(spec.SECTIONS)):
         assert (spec.SECTION_ORIGINS[i], spec.SECTION_KNOBS[i]) in planes, i
     extrusions = [c.args[0] for c in adapter.create_extrusion.call_args_list]
-    assert [e.depth for e in extrusions[: len(spec.SECTIONS)]] == list(
-        spec.SECTION_KNOBS
-    )
-    assert [e.reverse_direction for e in extrusions[: len(spec.SECTIONS)]] == [
+    # journal, collar, then the four gear lands
+    assert [e.depth for e in extrusions[: len(spec.SECTIONS) + 1]] == [
+        spec.SECTION_KNOBS[0],
+        spec.COLLAR_THICKNESS,
+        *spec.SECTION_KNOBS[1:],
+    ]
+    assert [e.reverse_direction for e in extrusions[: len(spec.SECTIONS) + 1]] == [
         False,
+        True,
         True,
         True,
         True,
@@ -1811,7 +1821,11 @@ def test_build_turns_the_collar_between_the_journal_and_the_64t(monkeypatch) -> 
     edge is buried under it."""
     spec = dt_cone_gear_shaft_spec
     adapter, stubs, _dims, _gated = _stubbed_build(monkeypatch)
-    assert ("CollarFace", spec.COLLAR_THICKNESS) in _planes(adapter)
+    planes = _planes(adapter)
+    assert ("CollarFace", spec.COLLAR_THICKNESS) in planes
+    # The collar plane comes before every tip-side land plane measured from it.
+    first_land = planes.index((spec.SECTION_ORIGINS[1], spec.SECTION_KNOBS[1]))
+    assert planes.index(("CollarFace", spec.COLLAR_THICKNESS)) < first_land
     radii = [c.args[3] for c in stubs["define_circle"].call_args_list]
     assert spec.COLLAR_DIA / 2.0 in [pytest.approx(r) for r in radii]
     extrusions = [c.args[0] for c in adapter.create_extrusion.call_args_list]
@@ -1871,29 +1885,46 @@ def test_sketch_x_direction_is_read_from_the_sketch(monkeypatch) -> None:
         part._sketch_x_per_model_x(adapter)
 
 
-def test_one_length_origin_is_the_collar_face() -> None:
+def test_each_chucking_measures_from_its_own_collar_face() -> None:
+    """Rule 11 (round 6, Main's delegated ruling (b)): the journal and the web
+    run from the collar's thrust face; the gear lands and the tip from its
+    tip-side face, the face the gear stack stands on."""
     spec = dt_cone_gear_shaft_spec
-    assert spec.DATUM_STATION == spec.COLLAR_START_STATION
+    assert spec.DATUM_STATION == spec.COLLAR_END_STATION
+    assert spec.COLLAR_END_STATION - spec.COLLAR_START_STATION == spec.COLLAR_THICKNESS
     assert spec.SECTION_ORIGINS == (
         "Front Plane",
-        "CollarFace",
-        "CollarFace",
-        "CollarFace",
-        "CollarFace",
+        "CollarEndPlane",
+        "CollarEndPlane",
+        "CollarEndPlane",
+        "CollarEndPlane",
     )
     assert spec.SECTION_KNOBS[0] == spec.JOURNAL_END
-    # #917 R5 (a): the tip is a station from the collar face too, so the
-    # collar-to-tip chain is one length, not the journal plus the overall.
-    # It prints at two places (user ruling 2026-09-29): the adjuster's embed
-    # window absorbs its band.
     for i in (1, 2, 3, 4):
         assert spec.SECTION_KNOBS[i] == pytest.approx(
-            spec.SECTION_ENDS[i] - spec.COLLAR_START_STATION
+            spec.SECTION_ENDS[i] - spec.COLLAR_END_STATION
         )
+    # The tip prints at two places (user ruling 2026-09-29): the adjuster's
+    # embed window absorbs its band and the web's.
     assert spec.DRAWING_PRECISION_BY_NAME["Sec4End"] == 2
-    # The front-to-tip overall and supplementary setup measurements are
-    # read-only references; their places are handed over by the spec.
+    # The journal, the web and the tip station chain the two ends; the
+    # front-to-tip overall is a reference, its places handed over by the spec.
+    assert spec.SECTION_KNOBS[0] + spec.COLLAR_THICKNESS + spec.SECTION_KNOBS[4] == (
+        pytest.approx(spec.SHAFT_LENGTH)
+    )
     assert spec.DRAWING_REFERENCE_PRECISION == 2
+    # Note 2 prints the stack lengths as their dimensions print them.
+    assert spec.STACK_LENGTHS_TEXT == "4.576, 4.847, 5.118 AND .125"
+    import build_dt_drive_train_assembly as bdt
+
+    # The post bears on the thrust face and the tip runs from the other, so
+    # the tip-embed stack charges the web's band with the tip station's.
+    assert bdt.TIP_EMBED_BAND_MM == pytest.approx(
+        bdt.shaft_printed_band("CollarWidth")
+        + bdt.shaft_printed_band("Sec4End")
+        + bdt.POST_BOSS_FACE_AXIAL_BAND_MM
+        + bdt.TIP_NORTH_FACE_BAND_MM
+    )
 
 
 class _Curve:
@@ -1961,160 +1992,6 @@ def test_the_overall_is_added_as_a_checked_reference() -> None:
     assert "set_reference_dimension(" in source
     assert "SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)" in source
     assert 'orientation="horizontal"' in source
-
-
-def _setup_reference_sheet(monkeypatch, *, measurement_error=0.0):
-    """Run the real reference loop and its native measurement/parenthesis
-    helpers against edge/annotation doubles, not typed displayed values."""
-    from types import SimpleNamespace
-    from unittest.mock import Mock
-
-    import _drawing_dimensions
-    import _drawing_edge_dimensions
-
-    spec = dt_cone_gear_shaft_spec
-    seat = _Edge(_Curve(-spec.COLLAR_END_STATION / 1000.0, spec.COLLAR_DIA / 2000.0))
-    ends = [
-        _Edge(_Curve(-spec.SECTION_ENDS[land] / 1000.0, spec.SECTION_DIAS[land] / 2000.0))
-        for land in drawing.SETUP_REFERENCE_LANDS
-    ]
-    # The journal-side collar circle and small-land starts must NOT win:
-    # the picker needs both the station and the diameter of the end edge.
-    distractors = [
-        _Edge(None),
-        _Edge(_Curve(-spec.COLLAR_START_STATION / 1000.0, spec.COLLAR_DIA / 2000.0)),
-        _Edge(_Curve(-spec.COLLAR_END_STATION / 1000.0, spec.SECTION_DIAS[1] / 2000.0)),
-        *(
-            _Edge(_Curve(-spec.COLLAR_END_STATION / 1000.0, spec.SECTION_DIAS[land] / 2000.0))
-            for land in (2, 3, 4)
-        ),
-    ]
-    model = SimpleNamespace(
-        ActivateSheet=Mock(return_value=True),
-        EditSheet=Mock(),
-        EditRebuild3=Mock(),
-    )
-    adapter = SimpleNamespace(
-        currentModel=model,
-        _attempt=lambda fn: fn(),
-        swApp=SimpleNamespace(IsSame=lambda left, right: int(left is right)),
-    )
-    side = object()
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _kind: obj)
-    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda obj, _kind: obj)
-    monkeypatch.setattr(
-        drawing._sw_type_info, "early_bound_or_flag", lambda obj, *_interfaces: obj
-    )
-    monkeypatch.setattr(drawing, "visible_view_entities", lambda *_a, **_k: [*distractors, seat, *ends])
-    place = Mock(return_value=side)
-    origin_note = Mock(return_value=object())
-    monkeypatch.setattr(drawing, "place_view", place)
-    monkeypatch.setattr(drawing, "set_hidden_lines_removed", Mock())
-    monkeypatch.setattr(drawing, "add_attached_note", origin_note)
-    # Keep the real parenthesizing helper: only native prefix/suffix may be
-    # written, leaving ShowDimensionValue and the unrounded measurement live.
-    monkeypatch.setattr(drawing, "set_reference_dimension", _drawing_dimensions.set_reference_dimension)
-
-    class Display:
-        def __init__(self, entities):
-            self.entities = entities
-            self.dangling = False
-            self.precision = None
-            self.text = {}
-            self.ShowDimensionValue = True
-            start, end = (abs(edge.GetCurve().CircleParams[2]) for edge in entities)
-            self.native = SimpleNamespace(
-                SystemValue=end - start + measurement_error / 1000.0,
-                Tolerance=SimpleNamespace(Type=0),
-            )
-            self.annotation = SimpleNamespace(
-                GetSpecificAnnotation=lambda: self,
-                GetAttachedEntities3=lambda: self.entities,
-                GetAttachedEntityTypes=lambda: (1, 1),
-                IsDangling=lambda: self.dangling,
-            )
-
-        def GetAnnotation(self):
-            return self.annotation
-
-        def GetDimension2(self, _index):
-            return self.native
-
-        def SetText(self, part, value):
-            assert part in (1, 2), "a setup reference must not override its native value"
-            self.text[part] = value
-
-        def GetText(self, part):
-            return self.text.get(part, "")
-
-        def SetPrecision3(self, primary, dual, primary_tol, dual_tol):
-            assert (dual, primary_tol, dual_tol) == (-1, -1, -1)
-            self.precision = primary
-            return 0
-
-        def GetPrimaryPrecision2(self):
-            return self.precision
-
-    def add_dimension(_adapter, view, **kwargs):
-        assert view is side
-        assert kwargs["entities"][0] is seat
-        assert kwargs["orientation"] == "horizontal"
-        display = Display(kwargs["entities"])
-        return display
-
-    add = Mock(side_effect=add_dimension)
-    monkeypatch.setattr(drawing, "add_edge_dimension", add)
-    references = drawing._add_setup_sheet(adapter)
-    return SimpleNamespace(
-        adapter=adapter, side=side, seat=seat, ends=ends, references=references,
-        add=add, origin_note=origin_note,
-    )
-
-
-def test_setup_sheet_measures_exact_native_edges(monkeypatch) -> None:
-    fixture = _setup_reference_sheet(monkeypatch)
-    assert len(fixture.references) == len(fixture.add.call_args_list) == 4
-    measured = []
-    for index, reference in enumerate(fixture.references):
-        display = reference.display
-        assert reference.entities == (fixture.seat, fixture.ends[index])
-        assert display.text == {1: "(", 2: ")"}
-        assert display.ShowDimensionValue is True
-        assert display.native.Tolerance.Type == 0
-        assert display.precision == dt_cone_gear_shaft_spec.DRAWING_REFERENCE_PRECISION
-        measured.append(display.native.SystemValue * 1000.0)
-    assert measured[:3] == pytest.approx((116.234, 123.110, 129.986), abs=0.001)
-    assert measured[3] == pytest.approx(163.61, abs=0.005)
-    assert fixture.origin_note.call_args.kwargs["entity"] is fixture.seat
-    assert fixture.origin_note.call_args.kwargs["attached_to"] is fixture.seat
-
-
-def test_setup_native_nominal_error_hidden_by_rounding_is_rejected(monkeypatch) -> None:
-    # A 0.01 mm miss can print the same one-place reference; readback must
-    # compare the exact native measurement, not rounded visible text.
-    with pytest.raises(RuntimeError, match="measures .* expected"):
-        _setup_reference_sheet(monkeypatch, measurement_error=0.01)
-
-
-@pytest.mark.parametrize(
-    "damage",
-    ("band", "prefix", "suffix", "hidden_value", "precision"),
-)
-def test_setup_settled_readback_rejects_a_lost_reference_contract(monkeypatch, damage) -> None:
-    fixture = _setup_reference_sheet(monkeypatch)
-    display = fixture.references[0].display
-    if damage == "band":
-        display.native.Tolerance.Type = 4
-    elif damage == "prefix":
-        display.text[1] = ""
-    elif damage == "suffix":
-        display.text[2] = ""
-    elif damage == "hidden_value":
-        display.ShowDimensionValue = False
-    elif damage == "precision":
-        display.precision += 1
-    with pytest.raises(RuntimeError, match="is not an unbanded native reference"):
-        drawing._assert_setup_references(fixture.adapter, fixture.references)
 
 
 def test_drive_train_seats_the_shaft_and_64t_on_the_collar(monkeypatch) -> None:
