@@ -168,10 +168,12 @@ DIMENSION_PREFIXES = {"EarHole1Z": "2X ", "EarHoleHeight": "2X "}
 # The bands tighter than the title block name their mate once
 # (drawing-guidelines.md rules 4 and 7): the bore is a sliding fit matched to
 # the purchased column, its clearance the acceptance (sh_column_clamp_fit);
-# the depth at three places sets the clamp screws' engagement in the back
-# arc's taps (sh_column_clamp_front_spec); the ear stations and height name
-# those taps once, on the hole callout (HOLE_CALLOUT_BELOW).  The bore axis on
-# the split face is drawn: the top view's centre mark.  All under the value:
+# the ear stations and height name the back arc's taps once, on the hole
+# callout (HOLE_CALLOUT_BELOW).  The overall depth holds the title block's
+# .XXX row, which already covers the clamp screws' engagement in those taps
+# (sh_column_clamp_front_spec), so it prints bare: a reason on an overall
+# with no band of its own is narration (rule 7).  The bore axis on the split
+# face is drawn: the top view's centre mark.  All under the value:
 # SOLIDWORKS prints nothing of an above-callout holding a line break
 # (draw_dt_cone_gear_shaft._printable_above_callouts).
 COLUMN_NUMBER = _config.parts("fr-tube-frame")["number"]
@@ -183,7 +185,6 @@ DIMENSION_CALLOUTS = {
         f"SLIDING FIT ON {COLUMN_NUMBER} COLUMN\n"
         f"CLEARANCE {BORE_CLEARANCE_TEXT} DIAMETRAL"
     ),
-    "Depth": f"SETS SCREW ENGAGEMENT\nIN {BACK_ARC_MATE}",
 }
 HOLE_CALLOUT_BELOW = f"MATCHES {BACK_ARC_MATE} TAPS"
 

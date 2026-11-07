@@ -1029,7 +1029,6 @@ def test_native_recipe_uses_one_true_length_driver_and_independent_end_features(
 
 def test_rework_sheet_does_not_duplicate_fixture_qualification() -> None:
     assert draw.SHEET_NAMES == ("REWORK",)
-    assert draw.HOLD_DOWN_REFERENCE == jig.HOLD_DOWN_REFERENCE
     # The jig's HD2-HD3 cut to this kit drawing's REWORK sheet, its second.
     assert jig.STUD_REWORK_SHEET == f"{ROW['number']} SHEET 2"
     assert "REWORK PER SHEET 2" in draw.GENERAL_TEXT
@@ -1148,7 +1147,6 @@ def test_drawing_keeps_source_only_chamfer_and_part_only_rework_sheet(monkeypatc
         ("REWORK", "Upper Cut-End Chamfer", None),
         ("REWORK", f"{CONFIGURATION} Rework Stock Note", None),
     ]
-    assert (f"INSTALLED ACCEPTANCE:\n{jig.HOLD_DOWN_REFERENCE}", draw.ASSEMBLY_REFERENCE_XY) in captions
     if drift == "configuration":
         views[-1].ReferencedConfiguration = "TNut"
     elif drift == "source":

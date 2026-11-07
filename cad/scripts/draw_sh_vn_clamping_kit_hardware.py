@@ -58,7 +58,6 @@ from _purchased_fastener_drawing import _box, _inside
 import sh_vn_clamping_kit_hold_down_stud_spec as stud
 import sh_vn_clamping_kit_t_nut_spec as tnut
 import sh_vn_clamping_kit_flange_nut_spec as flange_nut
-from ch_rocker_arm_tl_oblique_jig_assembly_spec import HOLD_DOWN_REFERENCE
 from _layout_audit import display_box, estimated_text_runs
 from _drawing_layout_audit import annotation_display
 from _machinist_review_mode import MachinistReviewMode
@@ -102,7 +101,6 @@ THREAD_NOTE_XY = (0.065, 0.180)
 THREAD_CALLOUT = f"{stud.THREAD} UNC\nEXISTING THREAD"
 LOWER_END_NOTE_XY = (0.155, 0.083)
 CHAMFER_NOTE_XY = (0.155, 0.225)
-ASSEMBLY_REFERENCE_XY = (0.025, 0.056)
 STUD_REWORK_PROPERTIES = {
     "Stock Length": f"{stud.STOCK_LENGTH} IN STOCK",
     "Stock Note": stud.STOCK_NOTE,
@@ -612,11 +610,6 @@ def append_stud_rework_sheets(adapter: Any) -> tuple[Callable[[], None], ...]:
     add_property_linked_note(
         adapter, f"{stud.CONFIGURATION} Rework Stock Note", *STOCK_NOTE_XY
     )
-    if add_note(
-        adapter, f"INSTALLED ACCEPTANCE:\n{HOLD_DOWN_REFERENCE}",
-        *ASSEMBLY_REFERENCE_XY,
-    ) is None:
-        raise RuntimeError("failed to add the hold-down assembly acceptance reference")
     assert_rework_view_controls(adapter, front, end)
 
     def settled() -> None:
