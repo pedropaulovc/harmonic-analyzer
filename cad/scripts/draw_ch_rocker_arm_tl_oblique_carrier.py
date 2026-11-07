@@ -1,18 +1,21 @@
 r"""Create the drawing for the oblique-trammel jig's carrier plate (MHA-CH-06-TL-21).
 
 The carrier uses one native hole table (#2151, owner Option B), with tags on
-actual hole edges and X/Y from the actual A1 bore axis, +X along A1-B1, at
-.XXX under the title block. Only A2/B2 Y carries the flagged .964 ±.002
-note. The HUB row is REF: that ordinary #8-32 tap is made in situ at the
-assembly's HUB setting (MHA-CH-06-TL-00 step 10). No chained hole-location
-dimensions remain.
+actual hole edges and X/Y from the plate's lower-left corner (owner review
+2026-11-07, rule 10: a corner an edge finder picks up, never a hole centre)
+at .XXX under the title block. The holes whose stacks assume a station from
+A1 hold that relation at ±.005 in flagged NOTE 2; A2/B2 Y keeps the flagged
+.964 ±.002 from the A1-B1 axis line (NOTE 1). The HUB row is REF: that
+ordinary #8-32 tap is made in situ at the assembly's HUB setting
+(MHA-CH-06-TL-00 step 10). No chained hole-location dimensions remain.
 
-The CARRIER sheet keeps the outline, the reamed size, the native tap
-callouts and section A-A (3:1, cropped to and identified as A1, carrying the
-finished thickness and underside chamfer); the shaded isometric stands above
-the title block. The HOLE TABLE sheet holds the complete table and its
-tagged plan. The HUB CLAMP sheet carries the HUB tap's native callout alone,
-naming where it is made; it prints no station.
+The CARRIER sheet keeps the outline, the reamed size and its running fit,
+the native tap callouts and section A-A (3:1, cropped to and identified as
+A1, carrying the finished thickness and underside chamfer; its cutting
+plane a short whole line across A1 alone, rule 9); the shaded isometric
+stands above the title block. The HOLE TABLE sheet holds the complete table
+and its tagged plan. The HUB CLAMP sheet carries the HUB tap's native
+callout alone, naming where it is made; it prints no station.
 """
 
 from __future__ import annotations
@@ -56,7 +59,11 @@ from ch_rocker_arm_tl_oblique_callouts import (
     set_callout_lengths_to_three_places,
 )
 from _drawing_notes import add_note, add_property_linked_note
-from _oblique_carrier_hole_table import create_carrier_hole_table
+from _oblique_carrier_hole_table import (
+    A1_RELATED,
+    create_carrier_hole_table,
+    table_location,
+)
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
@@ -75,10 +82,8 @@ from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from ch_rocker_arm_tl_oblique_carrier_spec import (
     CALLOUT_PREFIXES,
-    CALLOUTS_BELOW,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    TABLE_LOCATION_PLACES,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -117,18 +122,33 @@ def _xy(x: float, y: float) -> tuple[float, float, float]:
 _A1 = part_spec.PIN_HOLES["A1"]
 # Every text position is a MODEL point (mm), mapped onto its view at run time
 # (1:2: sheet x = 222 + X/2, y = 175 + Y/2). Only outline and native size
-# controls remain; the table owns all locations. The left end's 34.9 from A1
-# stands between the end and A1, under the REAM leader's reach, its arrows
-# held inside so its line stops at the end (_arrows_inside).
+# controls remain; the table owns all locations, A1's from the plate's
+# corner too, so the left end's and the -Y edge's dimensions to A1 are gone.
 TOP_KEEP: dict[str, tuple[float, float, float]] = {
     "PlateLength": _xy(56.0, -194.4),
     "PlateWidth": _xy(279.0, -8.0),
-    "PlateNearY": _xy(-350.0, -24.0),
-    "EdgeX": _xy(-242.5, -120.4),
     # B9e4's complete native/PDF glyph block reaches y 164.57: the whole block
     # stands 16 sheet mm lower, its mate wrapped to two rows (x ~21..84).
     "PinHoleDia": _xy(-339.0, -106.3),
 }
+# The part still marks EdgeX (the left end to A1) and PlateNearY (the -Y
+# edge to A1) for the drawing; A1's corner row prints those values, so the
+# sheet curates them out rather than locate A1 twice. Unmarking them in the
+# spec would re-key the part and every importer of the carrier spec.
+TABLE_ROW_DIMENSIONS = frozenset({"EdgeX", "PlateNearY"})
+
+# Owner ruling 2026-11-07 (rubric d870c66, rule 4 fits): the fit is set by
+# both parts' limits of size and named by its standard fit name, the
+# clearance only as REF. The spec's PIN_HOLE_CALLOUT still says "DIAMETRAL
+# CLEARANCE": changing it there re-keys the part and every importer of the
+# carrier spec (riser, jig assembly), so the sheet owns its wording.
+PIN_FIT_CALLOUT = (
+    "4X REAM THRU\nRUNNING FIT ON\n"
+    f"{part_spec.PIN_NUMBER}\n"
+    f"(CLEARANCE {part_spec.inch_text(part_spec.PIN_CLEARANCE_MIN, 4)}-"
+    f"{part_spec.inch_text(part_spec.PIN_CLEARANCE_MAX, 4)})"
+)
+CALLOUTS_BELOW = {**part_spec.CALLOUTS_BELOW, "PinHoleDia": PIN_FIT_CALLOUT}
 
 # Section A-A along the pin line (model Z = 0), at 3:1, +Y up, its cut
 # direction SolidWorks' own, cropped to A1's slab. It is a FULL section: the
@@ -161,6 +181,19 @@ SECTION_SCALE = (3, 1)
 _SECTION_HALF = part_spec.SECTION_HALF_SPAN  # about A1's axis, model mm
 _SECTION_LINE_X = (386.0, -342.0)  # carrier X, +X end first
 SECTION_LINE_MODEL_MM = tuple((x, 0.0, 0.0) for x in _SECTION_LINE_X)
+# Owner review 2026-11-07 (rule 9): a cutting plane is one whole line joining
+# both arrows, and a section showing one hole has a short plane across that
+# hole only. The cut is made through the long line above (so it closes and
+# imports), then its drawn line is shortened across A1
+# (``_shorten_section_line``) and the document's line style draws it whole.
+# ±24 model mm (±12 sheet mm at 1:2): each arrow rises ~12 sheet mm and its
+# letter ~5 more, so the left one stands clear left of A2's bore (sheet -6.0
+# to -1.2 from A1's axis, 9.8 up) and both stay inside the plate's left end
+# (-17.6).
+SECTION_SHORT_HALF = 24.0
+SECTION_SHORT_X = (_A1[0] + SECTION_SHORT_HALF, _A1[0] - SECTION_SHORT_HALF)
+# swDetailingSectionViewLineStyleDisplay_StandardWithConnector.
+SECTION_LINE_STYLE = 0
 # The crop fence's corners, model mm on the cut plane: the cut's span, the
 # stock's thickness and 1 mm above and below it.
 SECTION_CROP_MODEL_MM = (
@@ -298,54 +331,72 @@ requirement(
     precision={"height": part_spec.THICKNESS_PLACES},
 )
 
-# Native table baselines: A1 is the origin, B1 defines +X and the Y=0 line.
-# Every location is .XXX at the title block; A2/B2 Y carries the flagged
-# .964 ±.002 local control from the A1-B1 axis line (RV-02).
+# Native table: X/Y LOC from the plate's lower-left corner (rule 10), .XXX at
+# the title block. NOTE 2's rows (A1_RELATED) also hold X from A1 and Y from
+# the A1-B1 axis line at the title block's ±.005; A2/B2 Y from that line at
+# the flagged .964 ±.002 (NOTE 1, RV-02). B1 sets the line, so its relation
+# is X only.
 _DIA_PLACES = part_spec.DRAWING_PRECISION_BY_NAME["PinHoleDia"]
 _STATION_PLACES = part_spec.TABLE_LOCATION_PLACES
+_ORIGIN = ("_oblique_carrier_hole_table", "ORIGIN")
+_RELATION = ("_oblique_carrier_hole_table", "A1_RELATION_NOTE")
+_POSITIONS = ("station", "height", "a1_station", "a1_height")
 
 
-def _from_a1(x: float, places: int) -> float:
-    """A hole's printed X: its table baseline from A1's axis."""
-    return _printed(x - _A1[0], places)
-
-
-_CHAIN: dict[str, dict[str, tuple[Any, tuple[Any, ...]]]] = {"A1": {}}
-for _key in ("B1", "A2", "B2"):
-    _x, _y = part_spec.PIN_HOLES[_key]
-    _CHAIN[_key] = {
-        "station": (
-            _limits(_x - _A1[0], _STATION_PLACES),
-            ("PIN_HOLES", "TABLE_LOCATION_PLACES"),
-        ),
-        "station_nominal": (_from_a1(_x, _STATION_PLACES), ("PIN_HOLES",)),
-        "parent": ("pin_hole_a1", ("PIN_HOLES",)),
+def _table_fields(
+    tag: str, sources: tuple[Any, ...], places: int = _STATION_PLACES
+) -> dict[str, tuple[Any, tuple[Any, ...]]]:
+    """A hole's table row from the corner and, for a NOTE 2 row, its
+    relation to A1 and the A1-B1 axis line."""
+    dx, dy = table_location(tag)
+    fields: dict[str, tuple[Any, tuple[Any, ...]]] = {
+        "station": (_limits(dx, places), (*sources, "OUTLINE_X", _ORIGIN)),
+        "station_nominal": (_printed(dx, places), (*sources, "OUTLINE_X", _ORIGIN)),
+        "station_from": ("plate_left_end", ("OUTLINE_X", _ORIGIN)),
+        "height": (_limits(dy, places), (*sources, "OUTLINE_Y", _ORIGIN)),
+        "height_nominal": (_printed(dy, places), (*sources, "OUTLINE_Y", _ORIGIN)),
+        "height_from": ("plate_near_edge", ("OUTLINE_Y", _ORIGIN)),
     }
-    if _key != "B1":
-        _CHAIN[_key].update({
-            "height": (
-                limits(part_spec.OUTER_Y_NOMINAL, _STATION_PLACES,
+    if tag not in A1_RELATED:
+        return fields
+    x, y, _diameter = part_spec.TABLE_HOLES[tag]
+    fields.update({
+        "parent": ("pin_hole_a1", ("PIN_HOLES", _RELATION)),
+        "a1_station": (_limits(x - _A1[0], places), (*sources, "PIN_HOLES", _RELATION)),
+        "a1_station_nominal": (_printed(x - _A1[0], places), (*sources, "PIN_HOLES")),
+    })
+    if tag in ("A2", "B2"):
+        fields.update({
+            "a1_height": (
+                limits(part_spec.OUTER_Y_NOMINAL, places,
                        (part_spec.OUTER_Y_BAND, -part_spec.OUTER_Y_BAND)),
                 ("OUTER_Y_NOMINAL", "OUTER_Y_BAND", "OUTER_Y_NOTE"),
             ),
-            "height_nominal": (part_spec.OUTER_Y_NOMINAL, ("OUTER_Y_NOMINAL",)),
-            "height_from": ("pin_hole_a1", ("PIN_HOLES",)),
+            "a1_height_nominal": (part_spec.OUTER_Y_NOMINAL, ("OUTER_Y_NOMINAL",)),
         })
+    elif tag != "B1":
+        fields.update({
+            "a1_height": (_limits(y - _A1[1], places), (*sources, _RELATION)),
+            "a1_height_nominal": (_printed(y - _A1[1], places), (*sources,)),
+        })
+    return fields
+
+
+def _positions(fields: dict[str, Any]) -> tuple[str, ...]:
+    return tuple(name for name in _POSITIONS if name in fields)
+
+
+_PIN_ROWS = {key: _table_fields(key, ("PIN_HOLES",)) for key in part_spec.PIN_HOLES}
 
 for _key, (_x, _y) in part_spec.PIN_HOLES.items():
-    _chain = _CHAIN[_key]
+    _rows = _PIN_ROWS[_key]
     requirement(
         f"pin_hole_{_key.lower()}",
         kind="hole",
         faces=(
             CylinderFace(part_spec.PIN_HOLE_DIA, contains_x_mm=_x, contains_z_mm=-_y),
         ),
-        requirements=(
-            "dia",
-            "thru",
-            "note",
-            *(name for name in ("station", "height") if name in _chain),
-        ),
+        requirements=("dia", "thru", "note", *_positions(_rows)),
         fields={
             "at": ([_x, 0.0, -_y], ("PIN_HOLES",)),
             "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
@@ -356,52 +407,52 @@ for _key, (_x, _y) in part_spec.PIN_HOLES.items():
             "dia_nominal": (part_spec.PIN_HOLE_DIA, ("PIN_HOLE_DIA",)),
             "thru": (True, ("PIN_HOLE_CALLOUT",)),
             "note": (
-                " ".join(part_spec.CALLOUTS_BELOW["PinHoleDia"].splitlines()),
-                ("CALLOUTS_BELOW", "PIN_HOLE_CALLOUT", "PIN_NUMBER"),
+                " ".join(PIN_FIT_CALLOUT.splitlines()),
+                (
+                    ("draw_ch_rocker_arm_tl_oblique_carrier", "PIN_FIT_CALLOUT"),
+                    "PIN_NUMBER",
+                    "PIN_CLEARANCE_MIN",
+                    "PIN_CLEARANCE_MAX",
+                ),
             ),
-            **_chain,
+            **_rows,
         },
         precision={
             "dia": _DIA_PLACES,
-            **{
-                name: _STATION_PLACES
-                for name in ("station", "height")
-                if name in _chain
-            },
+            **dict.fromkeys(_positions(_rows), _STATION_PLACES),
         },
     )
 
-# (stem, points, thread, tap drill, spec name, station places, height places)
+# (stem, table tag prefix, points, thread, tap drill, spec name, places)
 _TAPS = (
     *(
         (
             f"{_key.lower()}_tap",
+            _key,
             (_point,),
             part_spec.CLAMP_THREAD,
             part_spec.CLAMP_TAP_DRILL,
             "CLAMP_SPEC",
-            _STATION_PLACES,
             _STATION_PLACES,
         )
         for _key, _point in part_spec.END_CLAMPS.items()
     ),
     (
         "riser_tap",
+        "R",
         part_spec.RISER_SCREWS,
         part_spec.RISER_THREAD,
         part_spec.RISER_TAP_DRILL,
         "RISER_SPEC",
         part_spec.RISER_STATION_PLACES,
-        part_spec.RISER_STATION_PLACES,
     ),
     (
-        # On the tap axis, X 8.861 from A1 in the table.
         "lever_tap",
+        "L",
         part_spec.LEVER_HOLES,
         part_spec.LEVER_THREAD,
         part_spec.LEVER_TAP_DRILL,
         "LEVER_SPEC",
-        _STATION_PLACES,
         _STATION_PLACES,
     ),
 )
@@ -426,22 +477,18 @@ def _tap_fields(
     }
 
 
-for _stem, _points, _thread, _drill, _spec_name, _places, _y_places in _TAPS:
+for _stem, _prefix, _points, _thread, _drill, _spec_name, _places in _TAPS:
     for _index, (_x, _y) in enumerate(_points, start=1):
+        _rows = _table_fields(
+            _prefix if len(_points) == 1 else f"{_prefix}{_index}", (_spec_name,), _places
+        )
         requirement(
             f"{_stem}_{_index}",
             kind="hole",
             faces=(CylinderFace(_drill, contains_x_mm=_x, contains_z_mm=-_y),),
-            requirements=("thread", "dia", "station", "height", "thru"),
-            fields={
-                **_tap_fields(_x, _y, _thread, _drill, _spec_name),
-                "station": (_limits(_x - _A1[0], _places), (_spec_name, "PIN_HOLES")),
-                "station_nominal": (_from_a1(_x, _places), (_spec_name, "PIN_HOLES")),
-                "parent": ("pin_hole_a1", ("PIN_HOLES",)),
-                "height": (_limits(_y, _y_places), (_spec_name,)),
-                "height_nominal": (_printed(_y, _y_places), (_spec_name,)),
-            },
-            precision={"dia": _CALLOUT_PLACES, "station": _places, "height": _y_places},
+            requirements=("thread", "dia", *_positions(_rows), "thru"),
+            fields={**_tap_fields(_x, _y, _thread, _drill, _spec_name), **_rows},
+            precision={"dia": _CALLOUT_PLACES, **dict.fromkeys(_positions(_rows), _places)},
         )
 
 # The HUB clamp tap is made in situ at the assembly's HUB setting: no printed
@@ -692,26 +739,83 @@ def _set_callout_texts(
         raise RuntimeError(f"dimension texts not applied: {sorted(remaining)}")
 
 
-_ARROWS_INSIDE = 0  # swDimArrowsInside
-
-
-def _arrows_inside(adapter: Any, annotations: list[Any], name: str) -> None:
-    """Hold one short dimension's arrows inside its extension lines, read
-    back (_oblique_block_drawing). Machinist review of
-    07a678696 (r1-r3 clarity): SolidWorks put the 34.9's arrows outside its
-    17.5 sheet mm span, and its dimension line ran on past the left end into
-    the REAM leader."""
-    (annotation,) = [
-        item for item in annotations if dimension_name(adapter, item) == name
+def _section_line_frame(
+    adapter: Any, top: Any, reported: tuple[float, ...]
+) -> tuple[tuple[float, ...], tuple[float, ...]]:
+    """A-A's reported line ends as (the +X end, the -X end). GetLineInfo
+    answers in the view's own frame (_layout_audit), so the ends the line was
+    created through are mapped into the top view's sketch frame (and, failing
+    that, the sheet) and matched in either order."""
+    sheet = [
+        model_point_in_view(adapter, top, _metres(point), label="section A-A line end")
+        for point in SECTION_LINE_MODEL_MM
     ]
-    display = _early_bound(
-        _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
-        "IDisplayDimension",
+    sketch = _view_sketch_points(adapter, _early_bound(top, "IView"), sheet)
+    start, end = reported[:3], reported[3:]
+    for frame in (sketch, [(x, y, 0.0) for x, y in sheet]):
+        for first, second in ((start, end), (end, start)):
+            if (
+                math.dist(first[:2], frame[0][:2]) <= 1e-6
+                and math.dist(second[:2], frame[1][:2]) <= 1e-6
+            ):
+                return first, second
+    raise RuntimeError(
+        f"carrier section A-A line {reported!r} matches neither its sketch ends "
+        f"{sketch!r} nor its sheet ends {sheet!r}"
     )
-    display.ArrowSide = _ARROWS_INSIDE
-    rebuild_drawing(adapter, label=f"{name} arrows inside")
-    if int(display.ArrowSide) != _ARROWS_INSIDE:
-        raise RuntimeError(f"{name}: arrows did not move inside")
+
+
+def _hatch_counts(native: Any) -> tuple[int, int]:
+    native.UpdateViewDisplayGeometry()
+    return int(native.GetFaceHatchCount()), int(native.GetSolidHatchCount())
+
+
+def _shorten_section_line(
+    adapter: Any, top: Any, section: Any, annotations: list[Any]
+) -> None:
+    """Shorten A-A's drawn line to SECTION_SHORT_X, across A1 alone (rule 9),
+    once the long line has cut, imported and been cropped. IDrSection
+    SetLineInfo takes the frame GetLineInfo reports, so the new ends are the
+    old line interpolated at their carrier X. Read back: the line persists,
+    the cut keeps its hatch count and its dimensions stay visible."""
+    native = _early_bound(section, "IView")
+    definition = _early_bound(native.GetSection(), "IDrSection")
+    reported = tuple(float(value) for value in definition.GetLineInfo())
+    if len(reported) != 6 or not all(map(math.isfinite, reported)):
+        raise RuntimeError(f"carrier section A-A: unreadable cutting line {reported!r}")
+    plus_x, minus_x = _section_line_frame(adapter, top, reported)
+    x0, x1 = _SECTION_LINE_X
+    short = tuple(
+        a + (x - x0) / (x1 - x0) * (b - a)
+        for x in SECTION_SHORT_X
+        for a, b in zip(plus_x, minus_x, strict=True)
+    )
+    before = _hatch_counts(native)
+    if not definition.SetLineInfo(double_array(list(short))):
+        raise RuntimeError("carrier section A-A refused its short cutting line")
+    rebuild_drawing(adapter, label="carrier section A-A short line")
+    applied = tuple(float(value) for value in definition.GetLineInfo())
+    after = _hatch_counts(native)
+    _telemetry.info(
+        f"carrier section A-A line {reported!r} -> {applied!r} (asked {short!r}); "
+        f"face/solid hatches {before} -> {after}"
+    )
+    if not any(
+        len(applied) == 6 and all(abs(a - b) <= 1e-8 for a, b in zip(applied, wanted))
+        for wanted in (short, short[3:] + short[:3])
+    ):
+        raise RuntimeError(f"carrier section A-A short line did not persist: {applied!r}")
+    # A crop view may count no face hatch (types/IView/GetFaceHatches: crop
+    # views report solid hatches), so the proof is that the counts hold.
+    if after != before:
+        raise RuntimeError(f"carrier section A-A lost its cut: hatches {before} -> {after}")
+    hidden = [
+        dimension_name(adapter, annotation)
+        for annotation in annotations
+        if int(_early_bound(annotation, "IAnnotation").Visible) != 1
+    ]
+    if hidden:
+        raise RuntimeError(f"carrier section A-A short line hid {hidden}")
 
 
 def _metres(point_mm: tuple[float, float, float]) -> tuple[float, float, float]:
@@ -966,8 +1070,9 @@ def _pin_section(adapter: Any, source_model: Any, top: Any) -> tuple[list[Any], 
     partial cut imported nothing (carrier-diag); the line crosses the whole
     plate, so the cut closes (carrier r11). Curated before it is
     cropped (the cropped import dropped StockThick), then cropped (fr_nameplate
-    A-A), centred, and its dimensions placed again. A section shows no hidden
-    lines.
+    A-A), centred, and its dimensions placed again; then its drawn line is
+    shortened across A1 alone (rule 9, ``_shorten_section_line``), still
+    while the sketch is shown. A section shows no hidden lines.
     """
     line = [
         model_point_in_view(adapter, top, _metres(point), label="section A-A line")
@@ -1008,6 +1113,7 @@ def _pin_section(adapter: Any, source_model: Any, top: Any) -> tuple[list[Any], 
             label="section A-A chamfer text",
         )
         offset_dimension_text(adapter, annotations, {"PinChamferSize": chamfer_text})
+        _shorten_section_line(adapter, top, section, annotations)
     _sketch_section_breaks(adapter, section)
     position_section_caption(
         adapter, section, SECTION_CAPTION_XY, label="carrier section A-A"
@@ -1098,14 +1204,12 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
-    # swDetailingSectionViewLineStyleDisplay (542) = StandardWithoutConnector
-    # (1): A-A's line prints its end segments only (draw_fr_rocker_arm_support).
-    # Carrier-r1 review: drawn whole along the pin line, it read as the origin
-    # of every Y dimension instead of the reamed holes' axes.
+    # swDetailingSectionViewLineStyleDisplay (542): A-A's short line is drawn
+    # whole from one arrow to the other (SECTION_LINE_STYLE, rule 9).
     extension = _early_bound(drawing_model.Extension, "IModelDocExtension")
-    if not extension.SetUserPreferenceInteger(542, 0, 1):
-        raise RuntimeError("failed to set the end-only section cutting line")
-    if extension.GetUserPreferenceInteger(542, 0) != 1:
+    if not extension.SetUserPreferenceInteger(542, 0, SECTION_LINE_STYLE):
+        raise RuntimeError("failed to set the whole section cutting line")
+    if extension.GetUserPreferenceInteger(542, 0) != SECTION_LINE_STYLE:
         raise RuntimeError("section cutting-line style did not persist")
 
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=VIEW_SCALE)
@@ -1114,9 +1218,6 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
 
     on_top = _view_mapper(adapter, top)
-    # Every X station from A1 lives on StationReference, a sketch the part
-    # saves hidden: _drawing_hidden_sketches shows it in the view that
-    # imports it.
     annotations = hidden_sketches.curate_view_dimensions(
         adapter,
         top,
@@ -1128,7 +1229,6 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations.extend(section_annotations)
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     _set_callout_texts(adapter, annotations, CALLOUT_PREFIXES, part=1)
-    _arrows_inside(adapter, annotations, "EdgeX")
     ream = [
         item for item in annotations if dimension_name(adapter, item) == "PinHoleDia"
     ]
@@ -1187,7 +1287,13 @@ async def build(adapter: Any) -> dict[str, str]:
         _hide_thread_labels(adapter, view)
     table_settled = _hole_table_sheet(adapter, source_model)
     _hub_sheet(adapter)
-    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    # Only the dimensions this sheet keeps reach it; the hidden drivers
+    # (PinSpacing, A2DX, ClX, ...) are table rows, not dimensions.
+    assert_imported_precision(
+        adapter,
+        annotations,
+        {name: DRAWING_PRECISION_BY_NAME[name] for name in (*TOP_KEEP, *SECTION_KEEP_MODEL_MM)},
+    )
 
     def pin_controls_settled() -> None:
         _assert_ream_control(adapter, ream[0])

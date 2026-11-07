@@ -26,12 +26,10 @@ def test_table_inventory_is_complete_and_replaces_location_dimensions():
         "R1", "R2", "R3", "R4", "L1", "L2",
     }
     assert set(table.TAG_OFFSETS) == set(spec.TABLE_HOLES)
-    assert set(drawing.TOP_KEEP) == {
-        "PlateLength", "PlateWidth", "PlateNearY", "EdgeX", "PinHoleDia",
-    }
+    assert set(drawing.TOP_KEEP) == {"PlateLength", "PlateWidth", "PinHoleDia"}
     assert "A1 ONLY" in inspect.getsource(drawing._pin_section)
-    assert "LOCATIONS REF" in spec.TABLE_ROW_NOTES["HUB"]
-    assert "station" not in drawing._CHAIN["A1"]
+    assert "LOCATIONS REF" in table.ROW_NOTES["HUB"]
+    assert "a1_station" not in drawing._PIN_ROWS["A1"]
     assert assembly.ALIGNMENT_BAND == pytest.approx(.0008 * I)
     assert "carrier.POSITION_BAND" not in inspect.getsource(assembly)
     assert drawing.MACHINIST_REVIEW.name == "ENFORCE"
@@ -127,10 +125,10 @@ def test_local_row_band_is_functional_not_an_unconditional_pass_constant():
 
 class NativeCells:
     def __init__(self):
-        a1x, a1y = spec.PIN_HOLES["A1"]
         self.cells = [["TAG", "X LOC", "Y LOC", "SIZE", "NOTE"]] + [
-            [tag, f"{(x-a1x)/I:.3f}", f"{(y-a1y)/I:.3f}", "native size", spec.TABLE_ROW_NOTES[tag]]
-            for tag, (x, y, _dia) in spec.TABLE_HOLES.items()
+            [tag, *(f"{value / I:.3f}" for value in table.table_location(tag)),
+             "native size", table.ROW_NOTES[tag]]
+            for tag in spec.TABLE_HOLES
         ]
         self.RowCount = len(self.cells)
         self.ColumnCount = 5
@@ -270,16 +268,20 @@ def test_outer_note_reads_actual_model_limits_and_never_writes_them(monkeypatch)
     assert "SetValues" not in source and "SetPrecision" not in source
 
 
-def test_native_table_renames_default_tags_and_reattaches_the_real_edge():
+def test_native_table_renames_default_tags_and_keeps_the_corner_origin():
     assert "manual_tags" not in inspect.signature(insert_hole_table).parameters
     source = inspect.getsource(table.create_carrier_hole_table)
-    assert 'edges["A1"]' in source and "origin.Reattach()" in source
+    # Owner review 2026-11-07 (rule 10): the origin stays on the real corner
+    # vertex it is inserted on; it is never reattached to a hole.
+    assert "datum_xy=_point(adapter, view, *ORIGIN)" in source
+    assert "Reattach" not in source
     assert "datum_point=" not in source and "manual_tags" not in source
-    # Rename only after the datum is A1 (rows identify by their A1 cells),
-    # then rebuild before the generated rows are frozen.
-    assert (source.index("origin.Reattach()") < source.index("_assign_tags(feature, table)")
+    # Rename from each row's own corner cells, then rebuild before the
+    # generated rows are frozen.
+    assert (source.index("insert_hole_table(") < source.index("_assign_tags(feature, table)")
             < source.index('label="carrier owner tags"') < source.index("rows = _rows(table)"))
     assert "cells[:4] != generated[tag]" in source
+    assert "carrier table datum left its corner vertex" in source
     assert "GetCorrespondingEntity2" in inspect.getsource(table._source_edges)
     assert "GetAttachedEntities3" in inspect.getsource(table._tags)
     assert "table_settled" in inspect.getsource(drawing.build)
@@ -315,7 +317,7 @@ class DefaultTagTable(NativeCells):
 
 
 @pytest.mark.parametrize("base", [0, 1])
-def test_default_tags_are_renamed_two_phase_by_each_rows_a1_cells(base):
+def test_default_tags_are_renamed_two_phase_by_each_rows_corner_cells(base):
     native = DefaultTagTable(base=base)
     assert {cells[0] for cells in native.cells[1:]} >= {"A1", "A2"}  # live collisions
     table._assign_tags(native, native)
@@ -329,7 +331,8 @@ def test_default_tags_are_renamed_two_phase_by_each_rows_a1_cells(base):
     direct.EnableUpdate = False
     for row, tag in holes.items():
         direct.SetHoleTag(row - 1 + base, tag)
-    assert {cells[0] for cells in direct.cells[1:]} != set(spec.TABLE_HOLES)
+    # (A refused pair can leave the right set of names on the wrong rows.)
+    assert any(direct.cells[row][0] != tag for row, tag in holes.items())
 
 
 @pytest.mark.parametrize("fault", ["refused", "unreadable", "ambiguous_row", "precision"])

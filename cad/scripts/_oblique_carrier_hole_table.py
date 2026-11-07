@@ -1,8 +1,15 @@
 """Native carrier hole table: source/view/edge/tag/row identity, never typed XY.
 
-#2151 owner Option B. The generated HUB coordinates remain untouched and are
-explicitly REF in the NOTE column: TL-00 step 10 taps that ordinary #8-32
-receiver in situ at the HUB DRO setting and alone owns its location.
+#2151 owner Option B; owner review 2026-11-07 (rule 10): X/Y LOC run from the
+plate's lower-left corner, where the left end meets the -Y edge, which an
+edge finder picks up; never from a hole centre. The holes whose stacks
+assume a station from A1 (B1, A2, B2, CL, CR, R1-R4: the spec's pin
+intervals, station and riser-wall errors) keep that one relation at ±.005
+in flagged NOTE 2 (coordinator ruling 2026-11-07, option (b)); NOTE 1 keeps
+A2/B2's Y .964 ±.002 from the A1-B1 axis line. The generated HUB
+coordinates remain untouched and are explicitly REF in the NOTE column:
+TL-00 step 10 taps that ordinary #8-32 receiver in situ at the HUB DRO
+setting and alone owns its location.
 
 Creation and settled readback have separate operation-level tracing spans;
 individual hole/row traversal stays inside those spans.
@@ -43,6 +50,41 @@ TAG_OFFSETS = {
 # stay exact, and every hole still maps one-to-one.
 PINNED_DIAMETER_TOLERANCE_M = 0.5e-6
 _EXACT_M = 1e-8
+# The table's origin: the plate's lower-left corner (carrier mm).
+ORIGIN = (spec.OUTLINE_X[0], spec.OUTLINE_Y[0])
+# NOTE 2's rows: every hole whose stack assumes one ±.005 station from A1
+# (spec.table_coordinate_errors, pin_coordinate_intervals). The lever taps
+# relate to the -Y edge only; the HUB is REF.
+A1_RELATED = ("B1", "A2", "B2", "CL", "CR", "R1", "R2", "R3", "R4")
+A1_RELATION_NOTE = (
+    "B1, A2, B2, CL, CR, R1-R4: LOCATE FROM A1 IN X AND\n"
+    "FROM THE A1-B1 AXIS LINE IN Y WITHIN \u00b1.005"
+)
+ORIGIN_NOTE = "X/Y LOC FROM THE LOWER-LEFT PLATE CORNER"
+HUB_NOTE = "HUB LOCATION REF \u2014 TAP IN SITU AT TL-00 STEP 10"
+# Each row's NOTE cell: the pass it sets or its function, and its flags.
+ROW_NOTES = {
+    "A1": "R800 / MHA-CH-13",
+    "B1": "R800 / MHA-CH-13; NOTE 2",
+    "A2": "R816 / MHA-CH-13; NOTES 1, 2",
+    "B2": "R816 / MHA-CH-13; NOTES 1, 2",
+    "CL": "END CLAMP; NOTE 2",
+    "CR": "END CLAMP; NOTE 2",
+    **{f"R{i}": "LOCATES TL-24 RISER; NOTE 2" for i in range(1, 5)},
+    **{f"L{i}": "FEED LEVER; SEE CALLOUT" for i in range(1, 3)},
+    "HUB": spec.TABLE_ROW_NOTES["HUB"],
+}
+if set(ROW_NOTES) != set(spec.TABLE_HOLES) or any(
+    ("NOTE 2" in note or "NOTES 1, 2" in note) != (tag in A1_RELATED)
+    for tag, note in ROW_NOTES.items()
+):
+    raise AssertionError("NOTE 2's rows, and only those, carry its flag")
+
+
+def table_location(tag: str) -> tuple[float, float]:
+    """A hole's X/Y LOC from the table's corner origin, carrier mm."""
+    x, y, _diameter = spec.TABLE_HOLES[tag]
+    return x - ORIGIN[0], y - ORIGIN[1]
 
 
 def _hole_tag(values: tuple[float, ...]) -> str | None:
@@ -121,19 +163,17 @@ def _rows(table: Any) -> dict[str, tuple[int, tuple[str, ...]]]:
     if int(table.RowCount) != len(spec.TABLE_HOLES) + 1 or int(table.ColumnCount) not in (4, 5):
         raise RuntimeError("carrier table has the wrong row/column inventory")
     rows = {}
-    a1x, a1y = spec.PIN_HOLES["A1"]
     for row in range(1, int(table.RowCount)):
         cells = tuple(str(table.DisplayedText2(row, col, False) or "").strip()
                       for col in range(int(table.ColumnCount)))
         tag = cells[0]
         if tag not in spec.TABLE_HOLES or tag in rows:
             raise RuntimeError(f"carrier table has an extra/duplicate native tag: {tag!r}")
-        x, y, _diameter = spec.TABLE_HOLES[tag]
-        for text, nominal in zip(cells[1:3], (x - a1x, y - a1y), strict=True):
+        for text, nominal in zip(cells[1:3], table_location(tag), strict=True):
             if not re.fullmatch(r"-?\d*\.\d{3}", text):
                 raise RuntimeError(f"carrier table {tag} lost .XXX precision: {text!r}")
             if abs(float(text) - round(nominal / spec.trammel.INCH, spec.TABLE_LOCATION_PLACES)) > 1e-9:
-                raise RuntimeError(f"carrier table {tag} is not measured from A1: {cells!r}")
+                raise RuntimeError(f"carrier table {tag} is not measured from the corner: {cells!r}")
         if not cells[3]:
             raise RuntimeError(f"carrier table {tag} has no native SIZE")
         rows[tag] = (row, cells)
@@ -143,18 +183,17 @@ def _rows(table: Any) -> dict[str, tuple[int, tuple[str, ...]]]:
 
 
 def _row_holes(table: Any) -> dict[int, str]:
-    """Each generated row's physical hole, from its own native A1-baseline cells.
+    """Each generated row's physical hole, from its own native corner cells.
 
     The printed .XXX location pairs of the thirteen holes are distinct, so a
     row identifies exactly one hole or the table is refused.
     """
     if int(table.RowCount) != len(spec.TABLE_HOLES) + 1:
         raise RuntimeError("carrier table has the wrong row inventory")
-    a1x, a1y = spec.PIN_HOLES["A1"]
     expected = {
         tag: tuple(round(value / spec.trammel.INCH, spec.TABLE_LOCATION_PLACES)
-                   for value in (x - a1x, y - a1y))
-        for tag, (x, y, _diameter) in spec.TABLE_HOLES.items()
+                   for value in table_location(tag))
+        for tag in spec.TABLE_HOLES
     }
     if len(set(expected.values())) != len(expected):
         raise AssertionError("two carrier holes print the same table location")
@@ -168,7 +207,9 @@ def _row_holes(table: Any) -> dict[int, str]:
             if all(abs(float(text) - value) <= 1e-9 for text, value in zip(texts, location, strict=True))
         ]
         if len(matches) != 1 or matches[0] in holes.values():
-            raise RuntimeError(f"carrier table row {row} is not exactly one hole from A1: {texts!r}")
+            raise RuntimeError(
+                f"carrier table row {row} is not exactly one hole from the corner: {texts!r}"
+            )
         holes[row] = matches[0]
     return holes
 
@@ -277,30 +318,22 @@ def create_carrier_hole_table(
     model = _early_bound(model, "IModelDoc2")
     edges = _source_edges(adapter, view, model, source)
     _outer_row_source(model)
-    # Insert against a real corner, then use the documented IDatumOrigin
-    # reattachment to the actual A1 circular edge. No constructed datum point.
-    # Default alphanumeric tags, renamed below from each row's own A1 cells.
+    # The origin is the plate's real lower-left corner vertex (rule 10: a
+    # corner the shop picks up with an edge finder, never a hole centre). No
+    # constructed datum point. Default alphanumeric tags, renamed below from
+    # each row's own corner cells.
     order = sorted(spec.TABLE_HOLES, key=lambda tag: spec.TABLE_HOLES[tag][:2])
     table = insert_hole_table(
         adapter, view,
-        datum_xy=_point(adapter, view, spec.OUTLINE_X[0], spec.OUTLINE_Y[0]),
+        datum_xy=_point(adapter, view, *ORIGIN),
         hole_points=[_point(adapter, view, x + diameter / 2.0, y)
                      for x, y, diameter in (spec.TABLE_HOLES[tag] for tag in order)],
         hole_entities=[edges[tag] for tag in order],
-        anchor_xy=TABLE_ANCHOR, basic_locations=False, label="carrier A1 baseline",
+        anchor_xy=TABLE_ANCHOR, basic_locations=False, label="carrier corner baseline",
         unit=spec.UNIT, location_places=spec.TABLE_LOCATION_PLACES,
     )
     feature = _early_bound(_early_bound(table, "IHoleTableAnnotation").HoleTable, "IHoleTable")
     origin = _early_bound(feature.DatumOrigin, "IDatumOrigin")
-    draw = adapter.currentModel
-    draw.ClearSelection2(True)
-    manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-    data = _early_bound(manager.CreateSelectData(), "ISelectData")
-    data.View = view
-    if not _early_bound(edges["A1"], "IEntity").Select4(False, data) or not origin.Reattach():
-        raise RuntimeError("carrier hole-table origin could not attach to the actual A1 axis")
-    draw.ClearSelection2(True)
-    rebuild_drawing(adapter, label="carrier A1 table datum")
     _assign_tags(feature, table)
     rebuild_drawing(adapter, label="carrier owner tags")
     rows = _rows(table)
@@ -312,7 +345,7 @@ def create_carrier_hole_table(
     for tag, (row, _cells) in rows.items():
         if not table.IsCellTextEditable(row, 4):
             raise RuntimeError(f"carrier {tag} NOTE cell is not editable")
-        table.SetText2(row, 4, False, spec.TABLE_ROW_NOTES[tag])
+        table.SetText2(row, 4, False, ROW_NOTES[tag])
     for column, width in enumerate(TABLE_WIDTHS):
         actual = float(table.SetColumnWidth(column, width, 0))
         if abs(actual - width) > 1e-6:
@@ -320,10 +353,13 @@ def create_carrier_hole_table(
     _tags(adapter, view, edges, place=True)
     # NOTE 1 is flagged in the A2/B2 rows; the exact owner text is linked to
     # the saved model property and checked against both native local controls.
+    # NOTE 2 (A1_RELATION_NOTE) is flagged in its own rows.
     add_note(adapter, "1", .225, .163)
     flagged = add_property_linked_note(adapter, "Outer Pin Row Note", .235, .163)
-    add_note(adapter, "HOLE LOCATIONS FROM A1; +X ALONG A1-B1", .225, .143)
-    add_note(adapter, "HUB LOCATION REF — TAP IN SITU AT TL-00 STEP 10", .225, .128)
+    add_note(adapter, "2", .225, .153)
+    add_note(adapter, A1_RELATION_NOTE, .235, .153)
+    add_note(adapter, ORIGIN_NOTE, .225, .133)
+    add_note(adapter, HUB_NOTE, .225, .123)
     rebuild_drawing(adapter, label="carrier table and tags")
 
     def check_active_table() -> None:
@@ -334,14 +370,17 @@ def create_carrier_hole_table(
                 or bool(feature.GetHoleLocationUseDocPrecision())
                 or int(feature.GetHoleLocationPrecision()) != spec.TABLE_LOCATION_PLACES):
             raise RuntimeError("carrier table lost individual .XXX rows")
+        # The rows' corner cells prove where the origin is; its mark stays
+        # on the one corner vertex it was inserted on, not on a hole edge.
         annotation = _early_bound(origin.GetAnnotation(), "IAnnotation")
         attached = tuple(annotation.GetAttachedEntities3() or ())
         if (len(attached) != 1 or attached[0] is None
-                or int(adapter.swApp.IsSame(attached[0], current["A1"])) != 1
+                or any(int(adapter.swApp.IsSame(attached[0], edge)) == 1
+                       for edge in current.values())
                 or annotation.IsDangling()):
-            raise RuntimeError("carrier table datum no longer owns A1's actual axis")
+            raise RuntimeError("carrier table datum left its corner vertex")
         for tag, (_row, cells) in rows_now.items():
-            if cells[:4] != generated[tag] or cells[4] != spec.TABLE_ROW_NOTES[tag]:
+            if cells[:4] != generated[tag] or cells[4] != ROW_NOTES[tag]:
                 raise RuntimeError(f"carrier generated row or flag changed: {tag}")
         _tags(adapter, view, current, place=False)
         if str(_early_bound(flagged, "INote").GetText()).strip() != spec.OUTER_Y_NOTE:
