@@ -625,7 +625,7 @@ def test_bracket_holes_are_the_leadscrew_layouts() -> None:
         wanted.fit,
     )
     # A #12 drill (.189): its worst-case float holds TL-28's reversal lost
-    # motion under the owner's ~.9 mm (leadscrew LOAD_CASES).
+    # motion, 0.876, under the owner's 1.06 mm (R4; leadscrew LOAD_CASES).
     assert spec.BRACKET_HOLE_DRILL == "#12"
     assert spec.BRACKET_HOLE_DIA == NUMBER_DRILL_MM["#12"] == pytest.approx(0.189 * 25.4, abs=1e-3)
     assert CLEARANCE_MM[("#8", "close")] < spec.BRACKET_HOLE_DIA < CLEARANCE_MM[("#8", "normal")]
@@ -658,9 +658,11 @@ def test_bracket_counterbores_sink_and_seat_the_heads() -> None:
 
 def test_bracket_hole_float_bounds_the_lost_motion_on_reversal() -> None:
     """Owner ruling Main 2026-11-06 (option B): TL-28 may slip onto its bar
-    screws' positive stop above ~1344 N; up to ~.9 mm reversal lost motion.
-    The worst case is the largest drilled hole over the #8 UNC-3A minimum
-    major; the basic-major figure is disclosed beside it."""
+    screws' positive stop above ~1344 N. The owner's R4 ruling (Main, via the
+    coordinator after farm 84d5991d45) keeps option B and raises the accepted
+    reversal lost motion from ~.9 to 1.06 mm; the #12 geometry and its 0.876
+    worst case are unchanged. The worst case is the largest drilled hole over
+    the #8 UNC-3A minimum major; the basic-major figure is disclosed beside it."""
     hole_max = spec.BRACKET_HOLE_DIA + drilled_oversize_mm(unit=spec.UNIT)
     assert spec.BRACKET_SCREW_FLOAT_MAX == pytest.approx(
         (hole_max - THREAD_MAJOR_MM[leadscrew.BAR_SCREW]) / 2.0
@@ -676,7 +678,8 @@ def test_bracket_hole_float_bounds_the_lost_motion_on_reversal() -> None:
     assert leadscrew.BRACKET_REVERSAL_LOST_MOTION == pytest.approx(
         2.0 * leadscrew.BRACKET_STOP_FLOAT_MAX
     )
-    assert leadscrew.BRACKET_REVERSAL_LOST_MOTION_ACCEPTED == 0.9
+    assert leadscrew.BRACKET_REVERSAL_LOST_MOTION == pytest.approx(0.876, abs=1e-3)
+    assert leadscrew.BRACKET_REVERSAL_LOST_MOTION_ACCEPTED == 1.06
     assert (
         leadscrew.BRACKET_REVERSAL_LOST_MOTION
         <= leadscrew.BRACKET_REVERSAL_LOST_MOTION_ACCEPTED

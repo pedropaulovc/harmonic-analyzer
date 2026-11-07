@@ -332,9 +332,11 @@ BRACKET_HOLE_FIT = "normal"
 # The Hole Wizard's normal-fit #8 counterbore with its hole overridden to a
 # #12 drill (.189), between the close (.180) and normal (.196) fits: the
 # smallest standard drill whose float still takes the two patterns' spacing
-# (end bracket spec, ``BAR_PAIR_MISFIT``) and whose worst-case float keeps
-# TL-28's reversal lost motion under the owner's ~.9 mm (leadscrew
-# LOAD_CASES, owner ruling Main 2026-11-06 option B).
+# (end bracket spec, ``BAR_PAIR_MISFIT``); its worst-case float holds TL-28's
+# reversal lost motion to 0.876 mm, under the owner's 1.06 mm (leadscrew
+# LOAD_CASES; owner option B 2026-11-06, ceiling raised from ~.9 by the R4
+# ruling). The #12 stays: a #9 would change the head's counterbore contact
+# and the engagement.
 BRACKET_HOLE_DRILL = "#12"
 BRACKET_HOLE_DIA = NUMBER_DRILL_MM[BRACKET_HOLE_DRILL]  # .189
 BRACKET_SCREW_HEAD_DIA = 0.270 * INCH  # #8 SHCS head, ASME B18.3 max
