@@ -29,6 +29,7 @@ from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -83,6 +84,7 @@ from dt_crank_handle_pivot_screw_spec import (
     SHOULDER_DIA,
     SHOULDER_FIT_CALLOUT,
     SHOULDER_LENGTH_CALLOUT,
+    SHOULDER_LENGTH_NOTE,
     SURFACE_FINISHES,
     THREAD_CALLOUT,
     THREAD_MODEL_DIA,
@@ -308,6 +310,11 @@ SEAT_EDGE_NOTE_XY = (SEAT_X + 0.024, SIDE_CENTER[1] + 0.060)
 # review of f166646c4), beside detail A's fence.
 _ARROWS_INSIDE = 0  # swDimArrowsSide_e.swDimArrowsInside
 ISO_NOTE_XY = (0.352, 0.200)
+# Numbered note 1's upper-left corner: right of the head length's callout
+# (text ends near x 0.305), under the end view (bottom near y 0.158) and
+# above the title block; its widest line (~36 characters at ~2.7 mm) ends
+# short of the right border (0.4191).
+NOTES_XY = (0.315, 0.145)
 
 
 def _set_relief_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
@@ -584,6 +591,8 @@ async def build(adapter: Any) -> dict[str, str]:
         char_height=0.0025,
     )
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    if add_note(adapter, SHOULDER_LENGTH_NOTE, *NOTES_XY) is None:
+        raise RuntimeError("failed to add the pivot screw's numbered note")
 
     return await finalize_drawing(
         adapter,

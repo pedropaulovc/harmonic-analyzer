@@ -92,6 +92,23 @@ def test_notes_are_short_specific_facts_with_no_dimension_in_them() -> None:
         assert not re.search(r"\d+\.\d|±|\+/-", line)
 
 
+def test_the_od_names_its_mates_and_its_stock_route_at_the_callout() -> None:
+    """Fan-out screen 20261107T081227004Z: the .0008 band's only fit route,
+    ground stock, sat in an unlinked general note; the set-screw spots named
+    no mate."""
+    assert spec.SHAFT_DIA_CALLOUT.splitlines() == [
+        "RUNNING FIT IN MHA-DT-12 AND MHA-DT-02 BORES",
+        "3/8 GROUND STOCK OK",
+    ]
+    assert "GROUND STOCK" not in spec.DRAWING_NOTES
+    notes = " ".join(spec.DRAWING_NOTES.splitlines())
+    assert "SPOTS FOR MHA-SH-VN-54 SET SCREWS DRILLED AT ASSEMBLY THROUGH MHA-DT-02 TAPS" in notes
+    import _config
+
+    assert _config.parts("sh-vn-arbor-set-screw")["number"] == spec.SET_SCREW_NUMBER
+    assert _config.parts("dt-arbor-pedestal")["number"] == spec.PEDESTAL_NUMBER
+
+
 def test_the_isometric_note_states_the_only_off_sheet_scale() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
     ratio = re.search(r"(\d+)\s*:\s*(\d+)", spec.ISOMETRIC_VIEW_NOTE)
