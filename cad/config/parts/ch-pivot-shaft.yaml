@@ -8,3 +8,9 @@ ch-pivot-shaft:
   fit_class: shaft_in_bushing
   process: "turned from Ø5/16 in bar (steel): O.D. turned to the running band over the full length, chuck and tailstock centre with a follow rest; both ends faced to length and domed on the lathe; two set-screw flats milled in line, one side"
   drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "accept"
+      where: "the Ø.2500 +.0000/-.0008 journal, RUNNING FIT IN MHA-CH-06, 1/4 GROUND STOCK OK"
+      finding: "the -.0008 lower deviation is not a plain inch step: it reads as a converted millimetre value (rule 4)"
+      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (fan-out F1 and F5). The band is the fleet-shared ground-shaft class _fit_shaft_h.SHAFT_H (0/-.0008), kept fleet-wide and restated at that family's next re-key; the callout names its route, bought 1/4 ground stock. Accepts the printed step only, no other band or fit departure."

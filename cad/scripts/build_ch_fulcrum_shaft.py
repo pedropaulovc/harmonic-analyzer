@@ -61,12 +61,12 @@ from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _drawing_prefix import set_dimension_prefix
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
+from ch_fulcrum_shaft_notes import DRAWING_NOTES, ISO_VIEW_NOTE
 from ch_fulcrum_shaft_spec import (
     ACROSS_FLAT,
     CYLINDER_HALF,
     DIMENSION_PREFIXES,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     FLAT_BASELINE,
     FLAT_DEPTH,
@@ -74,7 +74,6 @@ from ch_fulcrum_shaft_spec import (
     FLAT_HEIGHT,
     FLAT_LENGTH,
     FLAT_PITCH,
-    ISO_VIEW_NOTE,
     SHAFT_DIA,
     SHAFT_DIA_BAND,
     SHAFT_LENGTH,

@@ -258,17 +258,21 @@ def test_the_flats_print_once_as_two_places() -> None:
 def test_the_running_fit_names_its_mate_clear_of_its_witnesses() -> None:
     """Baseline machinist review: the Ø6.350 0/-0.02 band named no mate
     (rule 4), and inside its witness pair the lower extension line ran
-    through its text (rule 14). The callout names the hubs it runs in, and
-    the text stands under the bar's lower flank, right of the south tip."""
+    through its text (rule 14). The callout names the hubs it runs in and,
+    the band being narrower than the turned-diameter row, its route (fan-out
+    F1: bought ground stock), and the text stands under the bar's lower
+    flank, right of the south tip."""
     arm = _config.parts("ch-rocker-arm")["number"]
-    assert drawing.SHAFT_FIT_CALLOUT == f"RUNNING FIT IN\n{arm} HUBS"
+    assert drawing.SHAFT_FIT_CALLOUT == f"RUNNING FIT IN {arm}\n1/4 GROUND STOCK OK"
     source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
     assert '{"ShaftDia":SHAFT_FIT_CALLOUT}' in source
     x, y = drawing.PROFILE_KEEP["ShaftDia"]
     lower_flank = drawing.PROFILE_CENTER[1] - spec.SHAFT_DIA * drawing._MM / 2.0
     assert y < lower_flank - 0.005
+    # The vertical dimension line stands at x and the text block hangs east
+    # of it (the v48 render: block from the line to the right).
     south_tip = drawing.SOUTH_END_X + spec.DOME_HEIGHT * drawing._MM
-    assert x - PROFILE_DIA_CALLOUT_HALF_WIDTH > south_tip
+    assert x > south_tip + 0.020
 
 
 def test_finishes_print_at_note_height() -> None:
@@ -317,12 +321,12 @@ def test_the_dome_radius_prints_as_a_spherical_reference() -> None:
     assert "_set_spherical_reference(adapter, radius_annotations[0]" in source
 
 
-# The ASME B inner border's right edge, and the half-width of the profile's
+# The ASME B inner border's right edge, and the width of the profile's
 # diameter callout: its widest line is the mate's.
 INNER_BORDER_RIGHT = 0.419
-PROFILE_DIA_CALLOUT_HALF_WIDTH = len(
-    f"{_config.parts('ch-rocker-arm')['number']} HUBS"
-) * drawing.CALLOUT_CHAR_WIDTH / 2.0
+PROFILE_DIA_CALLOUT_WIDTH = max(
+    len(line) for line in drawing.SHAFT_FIT_CALLOUT.splitlines()
+) * drawing.CALLOUT_CHAR_WIDTH
 
 
 def test_detail_a_takes_the_north_flat_and_dome_clear_of_the_profile() -> None:
@@ -334,9 +338,18 @@ def test_detail_a_takes_the_north_flat_and_dome_clear_of_the_profile() -> None:
     left = drawing.DETAIL_CENTER[0] - drawing._DETAIL_FENCE_R
     right = drawing.DETAIL_CENTER[0] + drawing._DETAIL_FENCE_R
     assert left < tip < far < right
-    radius_x, _ = drawing.DETAIL_KEEP["Radius"]
-    dia_x, _ = drawing.PROFILE_KEEP["ShaftDia"]
-    assert radius_x - 0.010 > dia_x + PROFILE_DIA_CALLOUT_HALF_WIDTH
+    # The profile's diameter callout hangs east of its dimension line; its
+    # widest row ends west of DETAIL A's fence at that height, and the
+    # dome's radius text stands above it.
+    dia_x, dia_y = drawing.PROFILE_KEEP["ShaftDia"]
+    rise = drawing.DETAIL_CENTER[1] - dia_y
+    assert abs(rise) < drawing._DETAIL_FENCE_R
+    fence_west = drawing.DETAIL_CENTER[0] - math.sqrt(
+        drawing._DETAIL_FENCE_R**2 - rise**2
+    )
+    assert dia_x + PROFILE_DIA_CALLOUT_WIDTH + 0.001 < fence_west
+    _radius_x, radius_y = drawing.DETAIL_KEEP["Radius"]
+    assert radius_y - 0.010 > dia_y
     af_x, _ = drawing.DETAIL_KEEP["FlatAF"]
     assert right < af_x < INNER_BORDER_RIGHT - 0.015
     # The isometric moved under the profile to make room: right of the notes,
