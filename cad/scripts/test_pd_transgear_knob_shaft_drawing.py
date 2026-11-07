@@ -283,16 +283,16 @@ def test_neck_diameter_prints_limits_and_one_reason() -> None:
     assert spec.FRONT_RELIEF_DIA + lo == pytest.approx(spec.FRONT_RELIEF_DIA_MIN)
     assert spec.FRONT_RELIEF_AREA_MIN == pytest.approx(math.pi * 3.81**2 / 4.0)
     neck = dict(drawing.NOTE_TEXTS)[drawing.NECK_NOTE]
-    assert neck == f"NECK UNDER DRIVE COLLAR {spec.DRIVE_COLLAR_NUMBER}."
+    assert neck == f"NECK AND D-FLAT END UNDER DRIVE COLLAR {spec.DRIVE_COLLAR_NUMBER}."
     assert drawing.DIMENSION_SUFFIXES["FrontReliefDia"] == f" {drawing.NECK_LINK}"
     assert drawing.NECK_LINK == f"SEE NOTE {drawing.NECK_NOTE}"
-    # Round-4 repeat: the flat end's limits name the feature they locate
-    # (linked to the neck note they read as the neck corner's tangent, which
-    # the nominal flat end coincides with), in fewer characters than that
-    # link, so the text stays inside the keep's checked box.
+    # Rounds 4-5: the nominal flat end coincides with the neck corner's
+    # tangent, so its limits link the neck note, which names the D-flat end
+    # in words (a bare link read as the tangent; a bare label as coined).
+    # The link is the round-4-rendered suffix, so the text stays in its keep.
     assert spec.CORE_FLAT_CUT_END_FROM_F == pytest.approx(spec.FRONT_CORNER_RADIUS)
-    assert drawing.DIMENSION_SUFFIXES["FlatEnd"] == " FLAT END" == f" {drawing.FLAT_END_LABEL}"
-    assert len(drawing.DIMENSION_SUFFIXES["FlatEnd"]) < len(f" {drawing.NECK_LINK}")
+    assert drawing.DIMENSION_SUFFIXES["FlatEnd"] == f" {drawing.NECK_LINK}"
+    assert "D-FLAT END" in neck
     assert "FrontReliefDia" not in drawing.DIMENSION_CALLOUTS_BELOW
     # Negative control: the two-place general band would put the neck's
     # crown into the torqued core-flat plane.

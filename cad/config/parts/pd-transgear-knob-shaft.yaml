@@ -45,6 +45,6 @@ pd-transgear-knob-shaft:
       reason: "loosening it re-sets the MHA-PD-22 D-bore flat clearance (.0008-.0020) its own sheet and tests carry, so the band is kept with the matched sliding fit printed at the callout (L3). Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144"
     - id: "RV-06"
       kind: "accept"
-      where: "detail B, front neck Ø.155/.150 LIMITS, linked SEE NOTE 4 (NECK UNDER DRIVE COLLAR MHA-PD-22.)"
+      where: "detail B, front neck Ø.155/.150 LIMITS, linked SEE NOTE 4 (NECK AND D-FLAT END UNDER DRIVE COLLAR MHA-PD-22.)"
       finding: "neck relief limits over-specified; print at the title-block row or as a single MAX (rule 5)"
       reason: "owner ruling, machinist review r8: the .155 maximum keeps the neck's crown out of the MHA-PD-22 torqued core-flat plane (the title-block .157 fails that air) and the .150 minimum keeps the section that carries the drive torque, so neither the row nor a single MAX holds both"
