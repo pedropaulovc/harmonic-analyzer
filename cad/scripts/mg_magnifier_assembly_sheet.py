@@ -312,6 +312,14 @@ STEP_TEXT = {
         f"{_step(_steps.ENDSHAKE_SET_KEY)}."
     ),
     "axle-accepted": f"REPEAT THE {_step(_steps.AXLE_CHECKED_KEY)} CHECK.",
+    # The final reading's own remedy: strip the stack back to the bare axle
+    # and take the trial-fit loop again (machinist review, stab-split s2).
+    "axle-reset": (
+        f"IF IT FAILS, REMOVE ITEMS {ITEM_NUMBERS[NUT]}, "
+        f"{ITEM_NUMBERS[FRONT_WASHER]}, {ITEM_NUMBERS[WHEEL]}, "
+        f"{ITEM_NUMBERS[BACK_WASHER]} AND {ITEM_NUMBERS[SPACER]} AND RETURN TO "
+        f"{_step(_steps.AXLE_TRIAL_KEY)}."
+    ),
     _steps.LEVER_THREADED_KEY: (
         f"SCREW {_LEVER} INTO {_BRACKET} UNTIL ITS FLAT TIP STANDS PROUD OF THE "
         f"FAR FACE AS {THREAD_PROJECTION_DETAIL_TITLE} SETS IT; READ THE "
