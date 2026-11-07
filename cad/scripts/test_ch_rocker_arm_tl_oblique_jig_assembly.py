@@ -1955,8 +1955,13 @@ def test_general_torque_note_covers_every_fastener_no_step_torques() -> None:
     for label in torqued.values():
         step = next(text for text in steps if text.startswith(label))
         assert "N·m" in step
-    # Common rail and strap-clamp screws run snug. Fitting step 2 torques
-    # the bracket family's lower screws separately from F1B's upper KP08 screws.
+    loading = next(text for text in steps if text.startswith("O6. "))
+    assert spec._item(spec.RAIL_SCREW) in loading
+    assert spec._item(spec.HUB_WASHER) in loading
+    assert spec._torque(spec.holding.HUB_TORQUE_NM) in loading
+    # O6 torques the common family's hub clamp; its rail/end-clamp instances
+    # use the general snug note. Step 2 torques the bracket family's lower
+    # screws separately from F1B's upper KP08 screws.
     fitting = next(text for text in steps if text.startswith("2. "))
     assert spec._item(spec.RAIL_SCREW) in fitting
     assert spec._item(spec.PILLOW_BLOCK_SCREW) in fitting
