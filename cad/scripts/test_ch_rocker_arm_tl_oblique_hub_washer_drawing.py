@@ -16,7 +16,7 @@ import ch_rocker_strap_spec as strap
 import draw_ch_rocker_arm_tl_oblique_hub_washer as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
-from _inch_wall_limits import WALL_TARGET_MM
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _machinist_review_mode import MachinistReviewMode
 from _mcmaster_91251a197 import DIMS as HUB_SCREW
 from _printed_tolerance import edge_break_chamfer_mm, inside_corner_radius_mm
@@ -40,6 +40,26 @@ def test_registry_row_is_the_turned_brass_washer() -> None:
     assert part.MATERIAL == "Brass"
 
 
+def test_flange_wall_shortfall_is_the_declared_owner_minor() -> None:
+    # Owner ruling 2026-11-07 (#2249, option A): .06 ±.01 flange kept, its
+    # .005-broken rims leave .040, stated floored on the sheet.
+    from machinist_exceptions import load_exceptions
+
+    assert spec.FLANGE_WALL_MIN == pytest.approx(1.270 - 2.0 * 0.127)
+    assert spec.FLANGE_WALL_MIN < WALL_FLOOR_MM
+    assert spec.FLANGE_WALL_MIN_TEXT == ".040"
+    assert spec.FLANGE_WALL_CALLOUT == "WALL .040 MIN AT RIMS"
+    assert spec.DIMENSION_CALLOUTS["WasherThickness"].splitlines()[-1] == (
+        spec.FLANGE_WALL_CALLOUT
+    )
+    (wall,) = load_exceptions(_config.CONFIG_DIR, "ch_rocker_arm_tl_oblique_hub_washer", "part")
+    assert (wall.id, wall.kind) == ("RV-01", "minor")
+    assert spec.FLANGE_WALL_CALLOUT in wall.where
+    assert "2026-11-07" in wall.reason and "#2249" in wall.reason
+    # The 1.5D full thread the thicker .XX flanges would cost is the holding
+    # spec's; this sheet carries no thread gate.
+
+
 def test_sheet_is_registered_and_enforced() -> None:
     sheet = DRAWINGS_BY_NAME["ch_rocker_arm_tl_oblique_hub_washer"]
     assert drawing.SPEC is sheet
@@ -50,17 +70,16 @@ def test_sheet_is_registered_and_enforced() -> None:
 
 
 def test_owner_r4_top_hat_sizes() -> None:
-    # Owner R4 rulings 2026-11-07: literal Ø11 flange, Ø9.95 ±.05 mm spigot
-    # about .35 mm long, 13/64 drilled bore.
-    assert spec.OD == 11.0
+    # Owner R4 rulings 2026-11-07: Ø11 flange (on the .433 grid), spigot
+    # Ø.391 ±.002 about .35 mm long (#2249, option A), 13/64 drilled bore.
+    assert round(11.0 / INCH, spec.OD_PLACES) == 0.433
+    assert spec.OD == pytest.approx(0.433 * INCH)
     assert spec.THICK == pytest.approx(0.06 * INCH)
-    # The owner's 9.95 on the printed .3917 grid: native limits == printed.
-    assert spec.SPIGOT_DIA == pytest.approx(0.3917 * INCH)
-    assert round(9.95 / INCH, spec.SPIGOT_DIA_PLACES) == 0.3917
+    # The spigot on the .001 grid: native limits == printed.
+    assert spec.SPIGOT_DIA == pytest.approx(0.391 * INCH)
     assert spec.SPIGOT_DIA_LIMITS == pytest.approx(
         (spec.SPIGOT_DIA - spec.SPIGOT_DIA_TOL, spec.SPIGOT_DIA + spec.SPIGOT_DIA_TOL)
     )
-    assert spec.SPIGOT_DIA_OWNER_LIMITS == (9.90, 10.00)
     assert spec.SPIGOT_LENGTH == pytest.approx(0.014 * INCH)
     assert abs(spec.SPIGOT_LENGTH - 0.35) < 0.01
     assert spec.BORE_DRILL == "13/64"
@@ -68,16 +87,14 @@ def test_owner_r4_top_hat_sizes() -> None:
     assert spec.HEIGHT == pytest.approx(spec.THICK + spec.SPIGOT_LENGTH)
 
 
-def test_only_the_spigot_carries_an_explicit_band_inside_the_owners() -> None:
-    # Ø.3917 ±.0019 prints wholly inside 9.90-10.00 mm; every other size
-    # takes a title-block row.
+def test_only_the_spigot_carries_an_explicit_band() -> None:
+    # Ø.391 ±.002 on the .001 grid; every other size takes a title-block row.
     assert model_toleranced_dimensions(part) == {
         ("WasherProfile", "SpigotDia"): "SPIGOT_DIA_TOL",
     }
-    assert spec.SPIGOT_DIA_TOL == pytest.approx(0.0019 * INCH)
-    assert spec.SPIGOT_DIA_LIMITS == pytest.approx((9.90092, 9.99744))
-    low, high = spec.SPIGOT_DIA_OWNER_LIMITS
-    assert low <= spec.SPIGOT_DIA_LIMITS[0] < spec.SPIGOT_DIA_LIMITS[1] <= high
+    assert spec.SPIGOT_DIA_PLACES == 3
+    assert spec.SPIGOT_DIA_TOL == pytest.approx(0.002 * INCH)
+    assert spec.SPIGOT_DIA_LIMITS == pytest.approx((9.8806, 9.9822))
     assert spec.OD_LIMITS == pytest.approx((10.8712, 11.1252))
     assert spec.THICK_LIMITS == pytest.approx((1.270, 1.778))
     assert spec.SPIGOT_LENGTH_LIMITS == pytest.approx((0.2286, 0.4826))
@@ -91,7 +108,8 @@ def test_spigot_locates_loose_in_mains_strap_hole() -> None:
     )
     assert spec.STRAP_HOLE_LIMITS == pytest.approx((10.16, 10.1727))
     assert spec.SPIGOT_FLOAT_MIN > 0.0
-    assert spec.SPIGOT_FLOAT_MAX == pytest.approx((10.1727 - 9.90092) / 2.0)
+    assert spec.SPIGOT_FLOAT_MAX == pytest.approx((10.1727 - 9.8806) / 2.0)
+    assert spec.SPIGOT_FLOAT_MAX == pytest.approx(0.14605)
     callout = spec.DIMENSION_CALLOUTS["SpigotDia"]
     assert spec.STRAP_NUMBER == strap.NUMBER == "MHA-CH-13"
     assert f"STRAP {strap.NUMBER}" in callout
@@ -111,7 +129,7 @@ def test_local_edge_limits_keep_a_cylindrical_locating_land() -> None:
         spec.STRAP_HOLE_LIMITS[0]
     )
     assert spec.ROOT_SEAT_CLEARANCE_MIN == pytest.approx(
-        (10.16 - 9.99744) / 2.0 - 0.0762
+        (10.16 - 9.9822) / 2.0 - 0.0762
     )
     assert spec.SPIGOT_END_EDGE_BREAK_MAX == 0.0
     # The strap prints both hub-hole edges sharp: no entry break to charge.
@@ -121,8 +139,18 @@ def test_local_edge_limits_keep_a_cylindrical_locating_land() -> None:
         spec.SPIGOT_LENGTH_LIMITS[0] - spec.SPIGOT_ROOT_RADIUS_MAX
     )
     assert spec.SPIGOT_LAND_MIN > 0.0
-    od = spec.DIMENSION_CALLOUTS["WasherOd"]
-    assert od.splitlines()[-1] == "BREAK EDGES .005 MAX"
+    # The owner's .005 flange break, with its function: the seat ring left on
+    # the strap outside its hub hole, which the title block's .010 would lose.
+    thickness = spec.DIMENSION_CALLOUTS["WasherThickness"]
+    assert thickness.splitlines()[:2] == [
+        "BREAK EDGES .005 MAX:",
+        "KEEPS SEAT RING ON STRAP;",
+    ]
+    assert spec.SEAT_RING_MIN == pytest.approx(
+        (10.8712 - 10.1727) / 2.0 - spec.SPIGOT_FLOAT_MAX - 0.127
+    )
+    assert spec.SEAT_RING_MIN > 0.0
+    assert spec.SEAT_RING_MIN - edge_break_chamfer_mm(unit=spec.UNIT) + 0.127 < 0.0
     length = spec.DIMENSION_CALLOUTS["SpigotLength"]
     assert "END EDGE SHARP, NO BURR" in length
     assert "ROOT R.003 MAX: SEATS" in length
@@ -144,7 +172,11 @@ def test_od_keeps_its_xxx_row_for_the_cutter_floor_and_says_so() -> None:
     assert spec.OD_PLACES == 3
     assert spec.CUTTER_CLEARANCE_MIN == 1.5
     od = spec.DIMENSION_CALLOUTS["WasherOd"]
-    assert "1.5 MM MIN" in od and "STRAP CUTTER" in od and spec.JIG_NUMBER in od
+    # The sheet is inch: the 1.5 mm floor prints floored, .059.  The callout
+    # never opens on "MAX", which reads as a one-sided limit on the size.
+    assert od.startswith("UPPER LIMIT KEEPS\n.059 MIN TO 3/8 STRAP\n")
+    assert "CUTTER SWEEP" in od and spec.JIG_NUMBER in od
+    assert "BREAK" not in od
 
 
 def test_every_marked_dimension_has_one_view_and_model_places() -> None:
@@ -156,7 +188,7 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME == {
         "WasherOd": 3,
         "WasherThickness": 2,
-        "SpigotDia": 4,
+        "SpigotDia": 3,
         "SpigotLength": 3,
         "WasherBore": 3,
     }
@@ -196,9 +228,14 @@ def test_side_view_dimensions_sit_clear_of_the_part() -> None:
     # Both lengths chain on one row above the part, text off the narrow spans.
     rows = {drawing.RIGHT_KEEP[name][1] for name in ("WasherThickness", "SpigotLength")}
     assert rows == {drawing._LENGTH_ROW_Y}
-    assert drawing._LENGTH_ROW_Y - top >= 0.015
-    assert drawing.LENGTH_TEXT_XY["WasherThickness"][0] < drawing.HEAD_FACE_X - 0.010
+    assert drawing._LENGTH_ROW_Y - top >= 0.025
+    # The thickness's three callout rows stand well left of the head-side
+    # face's extension line.
+    assert drawing.LENGTH_TEXT_XY["WasherThickness"][0] < drawing.HEAD_FACE_X - 0.035
     assert drawing.LENGTH_TEXT_XY["SpigotLength"][0] > drawing.SPIGOT_END_X + 0.030
+    # Each Ø's text block centres on the axis, midway between its arrows.
+    assert drawing.RIGHT_KEEP["WasherOd"][1] == drawing.RIGHT_CENTER[1]
+    assert drawing.RIGHT_KEEP["SpigotDia"][1] == drawing.RIGHT_CENTER[1]
 
 
 def _calls(path: str) -> dict[str, ast.Call]:

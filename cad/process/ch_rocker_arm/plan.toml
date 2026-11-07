@@ -136,7 +136,7 @@ do = "rough_profile"
 feature = "top_edge"
 tool = "endmills-lms-6784/3-8in-4fl"
 holder = "r8-collets-lms-4860/3-8in"
-note = "Do not unclamp CL/CR. Clean chips from the fresh hub hole. Install the MHA-CH-06-TL-52 brass top-hat washer, its Ø9.95 +/-.05 spigot in the reamed hub hole, 13/64 bore and Ø11 flange on the strap, then the common 91251A197 #8-32 x 3/4 SHCS into the carrier HUB tap at 1 N m. Seat the flange flat; there is no measured centring gate. Confirm both end heads, both stop pins and the washer stand on real stock and clear the full cutter sweeps per TL-00. Install the A1/B1 inner stops. Apply bandsaw_preform.entry; cut the R800 edge with the 3/8 cutter following the qualified jig feed. No plunge or chain drill."
+note = "Do not unclamp CL/CR. Clean chips from the fresh hub hole. Install the MHA-CH-06-TL-52 brass top-hat washer, its Ø.391 +/-.002 in spigot in the reamed hub hole, 13/64 bore and Ø11 flange on the strap, then the common 91251A197 #8-32 x 3/4 SHCS into the carrier HUB tap at 1 N m. Seat the flange flat; there is no measured centring gate. Confirm both end heads, both stop pins and the washer stand on real stock and clear the full cutter sweeps per TL-00. Install the A1/B1 inner stops. Apply bandsaw_preform.entry; cut the R800 edge with the 3/8 cutter following the qualified jig feed. No plunge or chain drill."
 [[setups.ops]]
 op = 20
 do = "rough_profile"
