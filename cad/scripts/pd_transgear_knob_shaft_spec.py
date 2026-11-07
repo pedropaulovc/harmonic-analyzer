@@ -141,7 +141,7 @@ SPAN_LIMITS = (
 SPAN_BAND = (SPAN_LIMITS[1] - SPAN_NOMINAL, SPAN_LIMITS[0] - SPAN_NOMINAL)
 SPAN_DEVIATIONS = deviations(SPAN_BAND)
 SPAN_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
-SPAN_PREFIX = f"CONTROL SPAN {SPAN_TEETH} TEETH "
+SPAN_PREFIX = f"SPAN {SPAN_TEETH} TEETH "
 _SPAN_SENSITIVITY = 2.0 * math.sin(math.pi * SPAN_TEETH / TEETH)
 _SPAN_ROUNDING_ALLOWANCE = (
     10**-SPAN_PLACES * MM_PER_IN + 4.0 * _SPAN_GEOMETRY_ERROR
@@ -244,9 +244,16 @@ TIP_CHAMFER = (THREAD_BLANK_DIA - THREAD_BASIC_MINOR) / 2.0
 # station (machinist review r8: the callout gave no thread length).
 THREAD_CALLOUT = f"{THREAD} UNC\nTHREAD TO RELIEF"
 TIP_CHAMFER_CALLOUT = "CHAMFER 45 DEG TO MINOR"
-# The tip prints as its station from F (.XX, R9-17), not as a thread length.
-TIP_STATION = 23.876  # .94
+# The tip face is the stud chucking's faced end (rule 11): F prints as its
+# station from the tip at the .XXX row (STUD_STATION_PLACES).  The thumbnut
+# stack (the collar spec) still charges it the .XX row's ±.010
+# (TIP_STATION_PLACES), a conservative band no tighter than the print.
+TIP_STATION = 23.876  # .940
+STUD_STATION_PLACES = 3
+_STUD_STATION_BAND = printed_band_mm(STUD_STATION_PLACES, unit=UNIT)
 TIP_STATION_PLACES = 2
+if _STUD_STATION_BAND > printed_band_mm(TIP_STATION_PLACES, unit=UNIT):
+    raise AssertionError("MHA-PD-08 prints F from the tip looser than its stacks charge")
 
 # --- Solid D-core; no gear bore and no transverse torque hole ---------------
 # .191 SHAFT_H (#290 fit F10; 4.850 before): under the drive collar's .192
@@ -312,11 +319,14 @@ TOOTH_SPACE_CALLOUT_POINT_MM = (
     _GAUGE_SIN * _GAUGE_X + _GAUGE_COS * _GAUGE_Y,
     0.0,
 )
-# FRONT STATION from F, not the shortened active D length.  Its stacks (the
-# collar's D support, the thumbnut's core-step air, the thread relief) all hold
-# at the .XX grade, so it prints two places.
+# The core's front: printed as a station from the tip face (CORE_FRONT_FROM_
+# TIP, .XXX), so from F it is the difference of two .XXX stations, at the
+# .XX row's ±.010 (CORE_FRONT_FROM_F_PLACES, asserted below).  Its stacks
+# (the collar's D support, the thumbnut's core-step air, the thread relief)
+# all hold at that band.
 CORE_FRONT_FROM_F = 5.334  # .21
 CORE_FRONT_FROM_F_PLACES = 2
+CORE_FRONT_FROM_TIP = TIP_STATION - CORE_FRONT_FROM_F  # .730
 
 # Ordinary turned undercut at F: no tiny-radius grade or front disk cut.
 # .155, not .157: paid the 0.05 tooth-space TIR under the earlier, smaller
@@ -374,13 +384,12 @@ CORE_FLAT_REACH_PAST_SHOULDER_MIN = (
 )
 # The tool's rounded end lies in air under the neck floor.  Detail B prints
 # both of its limits as the part's native FlatEnd (LIMIT, from F) and
-# FlatToolRadius (MAX) dimensions; the prefix names the feature they locate.
-# Its reach past the core shoulder is the neck width's function (three
-# places, the drawing's callout): the narrowest printed neck
+# FlatToolRadius (MAX) dimensions, their values alone (a location prints its
+# value and band).  Its reach past the core shoulder is the neck width's
+# function (three places, the drawing's callout): the narrowest printed neck
 # (FRONT_RELIEF_WIDTH_MIN) less the farthest allowed tool end is
-# CORE_FLAT_REACH_PAST_SHOULDER_MIN, asserted below; the .XX row would
-# leave none.
-CORE_FLAT_CUT_END_PREFIX = "D-FLAT TOOL END "
+# CORE_FLAT_REACH_PAST_SHOULDER_MIN, asserted below; the .XX row would leave
+# none.
 if (
     CORE_FLAT_GEAR_AIR_MIN < 0.050 - 1e-9
     or CORE_FLAT_REACH_PAST_SHOULDER_MIN < 0.100 - 1e-9
@@ -392,14 +401,27 @@ if FRONT_RELIEF_WIDTH_MIN <= 2.0 * FRONT_CORNER_RADIUS_MAX:
 # --- Thread relief: single-point tool exit and thumbnut clearance (R9-53) ----
 # Pedro's owner ruling 2026-11-05 (coordinator session): single-point the
 # #8-32 UNC-2A thread on the lathe, not with a die. Full thread ends at
-# PLAIN_CORE in front of F, on the relief's front shoulder (.XX). The existing
+# PLAIN_CORE in front of F, on the relief's front shoulder, printed from the
+# tip face (THREAD_END_FROM_TIP, .XXX) and so at the .XX row's band from F
+# (PLAIN_CORE_PLACES). The existing
 # relief provides a tool-exit space below the conservative thread-root estimate;
 # the thumbnut at the collar's rearward stop runs on full thread or over that
 # relief. Single-pointing removes the die's assumed 1.5-pitch lead requirement,
 # not the functional relief, its floor diameter or either shoulder station.
 PLAIN_CORE = 7.62  # .30
 PLAIN_CORE_PLACES = 2
-THREAD_LENGTH_REF = TIP_STATION - PLAIN_CORE  # .64 REF
+THREAD_END_FROM_TIP = TIP_STATION - PLAIN_CORE  # .640
+# Each F-referenced stud station is two .XXX stations from the tip apart, so
+# its band is twice the .XXX row's: no wider than the .XX row its stacks
+# (here, the collar's and the thumbnut's) charge.
+if 2.0 * _STUD_STATION_BAND > min(
+    printed_band_mm(CORE_FRONT_FROM_F_PLACES, unit=UNIT),
+    printed_band_mm(PLAIN_CORE_PLACES, unit=UNIT),
+) + 1e-9:
+    raise AssertionError(
+        "MHA-PD-08 core front or thread end from F, two .XXX stations from "
+        "the tip, is looser than the band its stacks charge"
+    )
 # Ø.10 at the .XX row (.09-.11): the relief clears the thumbnut and lets the
 # tool exit below the thread root, so it takes the loosest row whose maximum
 # stays under the root estimate (machinist review of cf6e32b19: .110 at .XXX
@@ -445,16 +467,25 @@ CUP_FACE_STATION = RING_LENGTH + PLATE_HUB_TO_BOSS + END_FLOAT  # 1.356
 # boss's own bands, and the feeler setting.
 CUP_FACE_STATION_BAND = RING_LENGTH_TOL + PLATE_HUB_TO_BOSS_BAND + END_FLOAT_SET_TOL
 # The journal runs on behind the cup's front face to carry the cup's pin
-# (K-1); pinion rear face to the rear end face, at the .XX row (#2169, Main
-# delegated ruling 2026-11-04 under #989): the shortest 1.61 journal behind
-# the farthest cup station, less its rear-end EDGE_BREAK_MAX, still leaves
-# the knob cup's (MHA-PD-16) pin-hole end wall over its .080 target, and the
-# longest stays .031 inside the shortest cup (pd_transgear_knob_cup_spec).
+# (K-1).  The rear chucking faces the rear end to the controlled overall
+# length from the tip face (OVERALL_LENGTH, .XXX) and the pinion's rear face
+# to the face width from F, so the journal (pinion rear face to rear end,
+# 1.62 REF) carries the overall's, F's (from the tip) and the face width's
+# bands (#2169, Main delegated ruling 2026-11-04 under #989, re-derived for
+# the tip-referenced scheme): the shortest journal behind the farthest cup
+# station, less its rear-end EDGE_BREAK_MAX, still leaves the knob cup's
+# (MHA-PD-16) pin-hole end wall over its floor, and the longest stays inside
+# the shortest cup (pd_transgear_knob_cup_spec asserts both).
 # The cup and pin stations stay where they are; only the journal grows.
 JOURNAL_REAR_EXTENSION = 6.7056  # .264
-JOURNAL_LENGTH = CUP_FACE_STATION + JOURNAL_REAR_EXTENSION  # 1.62
+JOURNAL_LENGTH = CUP_FACE_STATION + JOURNAL_REAR_EXTENSION  # 1.62 REF
 JOURNAL_LENGTH_PLACES = 2
-_JOURNAL_LENGTH_BAND = printed_band_mm(JOURNAL_LENGTH_PLACES, unit=UNIT)
+OVERALL_LENGTH_PLACES = 3  # controlled, tip face to rear face
+_JOURNAL_LENGTH_BAND = (
+    printed_band_mm(OVERALL_LENGTH_PLACES, unit=UNIT)
+    + _STUD_STATION_BAND
+    + FACE_WIDTH_BAND
+)
 # The journal behind the cup's front face at the printed worst case.
 JOURNAL_REAR_EXTENSION_MIN = JOURNAL_REAR_EXTENSION - (
     _JOURNAL_LENGTH_BAND + CUP_FACE_STATION_BAND
@@ -473,8 +504,7 @@ THREAD_END_Z = -PLAIN_CORE
 PINION_REAR_Z = FACE_WIDTH
 CUP_FACE_Z = PINION_REAR_Z + CUP_FACE_STATION  # at the stack pose
 REAR_END_Z = FACE_WIDTH + JOURNAL_LENGTH
-OVERALL_LENGTH = REAR_END_Z - TIP_Z  # 2.79 REF
-OVERALL_LENGTH_PLACES = 2  # a reference overall, tip face to rear face
+OVERALL_LENGTH = REAR_END_Z - TIP_Z  # 2.790
 
 FRONT_CORE_AIR_MIN = (
     ROOT_DIA_EXACT_MIN - CORE_DIA - max(CORE_DIA_BAND)
@@ -688,32 +718,6 @@ if TIP_CHAMFER_MAX > THREAD_PITCH + 1e-9:
     )
 
 
-def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> str:
-    """Render an aligned gear data block for a property-linked note."""
-    return "\n".join([title] + [f"{label}:  {value}" for label, value in rows])
-
-
-DISC_NUMBER = "MHA-PD-06"
-DISC_TEETH = DISC.TEETH
-# What a machinist needs to cut and check the teeth; design parameters stay
-# in this module (Main ruling 2026-10-10).
-GEAR_DATA = gear_data_note(
-    [
-        ("NUMBER OF TEETH", f"{TEETH}"),
-        ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
-        ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
-        ("PITCH DIAMETER (REF)", inch_text(PITCH_DIA, 4)),
-        ("WHOLE DEPTH (REF)", inch_text(WHOLE_DEPTH, 4)),
-        ("CUTTER", f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T"),
-        (
-            f"SPAN OVER {SPAN_TEETH} TEETH",
-            f"{inch_text(min(SPAN_LIMITS), SPAN_PLACES)}-"
-            f"{inch_text(max(SPAN_LIMITS), SPAN_PLACES)}",
-        ),
-        ("MATES WITH", f"DISC {DISC_NUMBER}, {DISC_TEETH}T"),
-    ]
-)
-
 # The drive collar MHA-PD-22: its D-bore slides on the D-core.
 DRIVE_COLLAR_NUMBER = _config.parts("pd-transgear-drive-collar")["number"]
 
@@ -746,12 +750,15 @@ GEOMETRIC_CONTROLS = (
 
 # --- Marked-dimension contract ------------------------------------------------
 # ``StudProfile`` is the Right-plane revolve in front of F (the core, the
-# thread relief, the thread blank and the tip chamfer); it also carries two
-# construction-only witnesses, the tooth-tip blank across the face
-# (OutsideDia) and the overall length from the tip face to the rear face
-# (OverallLength, a reference), drawing-simplicity-policy.md `How the
-# repository implements the guidelines`'s reference-sketch allowance, so every
-# turned size imports natively beside its axial extent.  ``CoreFlatProfile``
+# thread relief, the thread blank and the tip chamfer).  The stud chucking
+# dimensions from its faced tip: F (TipStation), the core's front
+# (CoreFromTip) and the thread's end (ThreadEndFromTip) are stations from
+# the tip face.  It also carries two construction-only witnesses, the
+# tooth-tip blank across the face (OutsideDia) and the controlled overall
+# length from the tip face to the rear face (OverallLength) that the rear
+# chucking faces to, drawing-simplicity-policy.md `How the repository
+# implements the guidelines`'s reference-sketch allowance, so every turned
+# size imports natively beside its axial extent.  ``CoreFlatProfile``
 # carries the D-flat's in-air tool end (FlatEnd, FlatToolRadius).  The
 # flat's distance from the axis (FlatToAxis) prints from
 # ``CoreFlatReference``, a hidden Front-plane reference sketch driven by the
@@ -760,8 +767,9 @@ GEOMETRIC_CONTROLS = (
 # from the tip: ``SpanProfile`` carries the tangent span over two teeth as
 # its driven LIMIT carrier, and ``RootProfile``, a hidden Front-plane
 # construction circle, the root envelope's MIN.
-# ``JournalProfile`` is the revolve behind the teeth.  ``GearBlank`` owns the
-# face width, which is also the straight gaps' depth.
+# ``JournalProfile`` is the revolve behind the teeth; its length, the rest
+# of the overall, prints as a reference.  ``GearBlank`` owns the face width,
+# which is also the straight gaps' depth.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
     "CoreFlatProfile": {"FlatEnd", "FlatToolRadius"},
@@ -770,12 +778,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RootProfile": {"RootDia"},
     "StudProfile": {
         "CoreDia",
-        "CoreFront",
+        "CoreFromTip",
         "FrontReliefDia",
         "FrontReliefWidth",
         "FrontCornerRadius",
         "ReliefDia",
-        "PlainCore",
+        "ThreadEndFromTip",
         "ThreadBlankDia",
         "TipStation",
         "OutsideDia",
@@ -794,14 +802,14 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "RootProfile": {"RootDia": ROOT_DIA_PLACES},
     "StudProfile": {
         "CoreDia": CORE_DIA_PLACES,
-        "CoreFront": CORE_FRONT_FROM_F_PLACES,
+        "CoreFromTip": STUD_STATION_PLACES,
         "FrontReliefDia": FRONT_RELIEF_DIA_PLACES,
         "FrontReliefWidth": FRONT_RELIEF_WIDTH_PLACES,
         "FrontCornerRadius": FRONT_CORNER_RADIUS_PLACES,
         "ReliefDia": RELIEF_DIA_PLACES,
-        "PlainCore": PLAIN_CORE_PLACES,
+        "ThreadEndFromTip": STUD_STATION_PLACES,
         "ThreadBlankDia": THREAD_BLANK_DIA_PLACES,
-        "TipStation": TIP_STATION_PLACES,
+        "TipStation": STUD_STATION_PLACES,
         "OutsideDia": OUTSIDE_DIA_PLACES,
         "OverallLength": OVERALL_LENGTH_PLACES,
     },
