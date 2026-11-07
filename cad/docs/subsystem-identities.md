@@ -130,6 +130,13 @@ above the X-dimension tiers and its lower arrow below the clearance-hole
 leader. Native dimensions and normal fonts remain; the .308 text sits clear
 of its narrow datum-witness span. Retained-PDF lane measurements guide this
 placement but do not replace the fresh native drawing/layout/review gates.
+TL-32 keeps its VIEW D sheet reference beneath that direction letter, separate
+from the counterbore callout. The counterbore leader stays above the direction
+arrow and identifies its floor through B-B, not through the nut-face sheet.
+TL-VN-84 retains its associative 3:1 end details and normal text; the detail
+bank reserves the settled native frames as well as the geometric fences.
+Containment is read again after projection settlement and in the final sheet
+callback: a smaller early `GetOutline` does not prove the finished view fits.
 
 TL-00's last sheet, LINEAR MOTION FROM ABOVE (owner, PR4 #2227), is the
 arrangement's named plan of the same assembly with the TL-21 carrier and

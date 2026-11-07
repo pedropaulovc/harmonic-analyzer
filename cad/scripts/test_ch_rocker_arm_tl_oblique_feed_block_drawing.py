@@ -280,3 +280,27 @@ def test_only_the_kp08_axis_height_prints_exact_millimetres():
     # Owner ruling 4 (2026-11-01): the KP08 vendor line prints exact mm; the
     # nut's taps print nothing (transferred).
     assert spec.METRIC_DIMENSIONS=={('NutPatternReference','NutCentreZ'):(3,printed_band_mm(3,unit='mm'))}
+
+
+def test_counterbore_callout_and_view_d_reference_use_separate_lanes():
+    import _oblique_block_drawing as drawing
+
+    name = "CarriageCounterbores3Dia"
+    assert spec.CALLOUTS_ABOVE[name] == "4X COUNTERBORE"
+    assert spec.CALLOUTS_BELOW[name] == "FLOOR: SECTION B-B"
+    assert drawing.VIEW_SHEET_REF == "(SHEET 2)"
+    assert drawing.FEED_PLAN_KEEP[name] != drawing.PLAN_KEEP[name]
+    # Retained 84d PDF rectangles, translated by the authored lane changes.
+    # These are predictions, not native results; the fresh PDF is still gated.
+    rise = (drawing.FEED_PLAN_KEEP[name][1] - .150) * 1000
+    bottom_leader = 141.6389 + rise
+    top_text = 158.7648 + rise
+    assert bottom_leader - 160.934 - .065 >= 4.0
+    assert 184.937 - .065 - top_text >= 2.0
+    dx = (drawing.VIEW_SHEET_REF_OFFSET[0] - .010) * 1000
+    dy = (drawing.VIEW_SHEET_REF_OFFSET[1] + .008) * 1000
+    ref_left, ref_right = 214.812 + dx, 234.6405 + dx
+    ref_top = 156.8682 + dy
+    assert abs((ref_left + ref_right) / 2 - (204.812 + 209.7703) / 2) < .1
+    assert 156.3695 - ref_top >= 2.0
+    assert 141.2195 + rise - ref_top >= 10.0

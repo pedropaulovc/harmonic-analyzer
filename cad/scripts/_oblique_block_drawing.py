@@ -122,6 +122,10 @@ ISO_XY, ISO_SCALE = (.355,.228), SHEET_SCALE
 FEED_PLAN_XY = (.170,.181)
 FEED_PLAN_KEEP = PLAN_KEEP | {
     'LugWidth':(.181,.1305),'PlanLugX':(.1554,.1225),'PlanOverallY':(.285,.181),
+    # 84d's counterbore leader crossed VIEW D at y160.934; its text also
+    # met D's sheet reference. Raise only this callout: its bottom row starts
+    # y165.219 and its top ends y182.765, below the y184.937 width witness.
+    'CarriageCounterbores3Dia':(.245,.174),
 }
 FEED_SIDE_XY = (.170,.060)
 FEED_SIDE_KEEP = {'TopBoreDepth':(.120,.068)}
@@ -131,11 +135,10 @@ FEED_ISO_XY, FEED_ISO_SCALE = (.360,.225), (1,2)
 VIEW_LETTER = 'D'
 VIEW_LETTER_HEIGHT = .005
 VIEW_ARROW_RUN = .015
-# VIEW D prints on sheet 2: the arrow's letter says so on a row under it,
-# centred under the letter, clear of the 4X DRILL leader above (review of
-# farm run 20261101T175835750Z).
+# VIEW D prints on sheet 2. Keep that reference centred under D, with a
+# separate text row; it is not a face/sheet qualifier for the counterbores.
 VIEW_SHEET_REF = '(SHEET 2)'
-VIEW_SHEET_REF_OFFSET = (.010, -.008)
+VIEW_SHEET_REF_OFFSET = (-.0075, -.011)
 # VIEW D is the standard Right view at 2:1. Relative to the former Left
 # view its Z direction reverses: mirror the annotation lanes about NUT_XY,
 # not the model or its native dimensions. The lug end remains below the block.
