@@ -1895,7 +1895,7 @@ def test_side_rail_and_crossbar_print_as_two_sections_without_a_sheet_scale() ->
     assert not hasattr(drawing, "RAIL_SECTION_SCALE_LABEL")
     assert "SCALE 1 : 3" not in Path(drawing.__file__).read_text(encoding="utf-8")
     side = source[source.index('section_label="E"'):source.index("crossbar_cut = [")]
-    assert "2X SIDE RAIL WEB" in side
+    assert "suffix=SIDE_WEB_QUALIFIER" in side
     assert all(q not in side for q in ('"CROSSBAR WEB"', '"CROSSBAR FLANGE"', '"2X POCKET"'))
     crossbar = source[source.index("section_label=CROSSBAR_SECTION_LETTER"):]
     for qualifier in ('"CROSSBAR WEB"', '"CROSSBAR FLANGE"', '"2X POCKET"'):
@@ -5387,19 +5387,20 @@ def test_socket_callout_leaves_its_leader_a_clear_corridor_to_a2() -> None:
     assert boss_y - y >= 0.035
 
 
-def test_side_rail_web_text_stands_over_its_own_section() -> None:
-    """Local machinist review of farm run 20261107T170344738Z's PDF (r1):
-    parked right of E-E the 2X SIDE RAIL WEB rows ran out over M-M.  They
-    now stand centred over E-E's rail, the 37.5 mm row ending left of M-M's
-    T and its caption's left edge, and starting clear of the plan's 1.35
-    SIDE FLANGE text (its shoulder ends at x 266.6 mm)."""
+def test_side_rail_web_text_stands_beside_its_own_section() -> None:
+    """Local machinist reviews: parked right of E-E the 2X SIDE RAIL WEB
+    rows ran out over M-M (farm run 20261107T170344738Z's PDF); centred over
+    E-E the web's extension lines ran up through "RAIL" (farm run
+    20261107T204437943Z).  The shorter "2X WEB" stands left of E-E's web,
+    off both extension lines and clear of the plan's 1.35 SIDE FLANGE text
+    (its shoulder ends at x 266.7 mm)."""
     x, y = drawing.SIDE_WEB_TEXT_XY
-    assert x == pytest.approx(drawing.SIDE_SECTION_PROFILE_X, abs=0.0002)
-    half = 0.0375 / 2.0
+    assert drawing.SIDE_WEB_QUALIFIER == "2X WEB"
+    half = len(drawing.SIDE_WEB_QUALIFIER) * 0.00258 / 2.0
     ink = drawing.INK_CLEARANCE
-    m_left = drawing._side_section_xy(part.BAR_X0, 0.0)[0]
-    assert x + half <= m_left - 0.02
-    assert x - half >= 0.2666 + 0.005
+    web_left = drawing._side_section_xy(-part.WEB_OUT_X, 0.0)[0]
+    assert x + half <= web_left - ink
+    assert x - half >= 0.2667 + 0.005
     # The dimension line (5.56 mm under the text point) clears E-E's flange top.
     assert y - 0.00556 - drawing._side_section_xy(0.0, part.HALF_H)[1] >= ink
 

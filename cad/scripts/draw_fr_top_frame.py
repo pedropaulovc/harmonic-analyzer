@@ -1067,14 +1067,17 @@ SIDE_SECTION_SCALE = (1, 4)
 # under its T.  Both drop 3.5 mm from the old E-E caption's 91.5 so M-M's
 # top stays 2.3 mm under the crossbar web callout's ink (y 88.4).
 SIDE_SECTION_CAPTION_XY = (0.290, 0.088)
-# E-E's web value and its 2X SIDE RAIL WEB row stand centred over E-E's
-# own rail, its dimension line printed 5.56 mm under the text point and
-# 3.8 mm over the flange: parked right of the rail (0.327) the rows ran out
-# over M-M and read as M-M's (local machinist review of farm run
-# 20261107T170344738Z's PDF, r1, 2 of 3 runs).  The 37.5 mm qualifier row
-# then spans x 278..315, 11 mm right of the plan's 1.35 SIDE FLANGE text
-# and 3.4 mm over M-M's pocket-depth rows.
-SIDE_WEB_TEXT_XY = (0.2967, 0.120)
+# E-E's web value and its 2X WEB row stand left of E-E's rail, on its
+# dimension line (printed 5.56 mm under the text point, 3.8 mm over the
+# flange).  Parked right of the rail (0.327) the 37.5 mm "2X SIDE RAIL WEB"
+# row ran out over M-M and read as M-M's (local machinist review of farm
+# run 20261107T170344738Z's PDF, r1, 2 of 3 runs); centred over the rail
+# (0.2967) the web's two extension lines ran up through "RAIL" (farm run
+# 20261107T204437943Z, r1).  E-E cuts the side rail only, so "2X WEB" says
+# it; its 15.5 mm row ends 2 mm left of the web's left extension line and
+# starts 10 mm right of the plan's 1.35 SIDE FLANGE text (x 266.7 mm).
+SIDE_WEB_TEXT_XY = (0.285, 0.120)
+SIDE_WEB_QUALIFIER = "2X WEB"
 # Each section's web axis centreline runs this far (paper mm, times the
 # section's scale denominator in model mm) past the T's top and underside.
 SECTION_AXIS_OVERRUN_MM = 2.0
@@ -4113,7 +4116,7 @@ async def build(adapter: Any) -> dict[str, str]:
         p1=(-WEB_IN_X, 0.0, SIDE_SECTION_Z),
         text_xy=SIDE_WEB_TEXT_XY, label="side rail web thickness",
         expected_mm=WEB_T, orientation="horizontal", exact_linear=True,
-        suffix="2X SIDE RAIL WEB", edges=side_section_edges,
+        suffix=SIDE_WEB_QUALIFIER, edges=side_section_edges,
     )
     # The web stands on its flange's centre: a drawn centreline shows it
     # (rule 10) where a prose note under the caption used to (rule 9); the
