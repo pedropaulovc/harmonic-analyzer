@@ -114,12 +114,9 @@ FRONT_KEEP = {
 # read it as a plain lead-in): its minimum leg brings the cut end under the
 # #6-32 tap drill so the cut thread starts in the lever's tap, and its
 # maximum, at the steepest angle, is charged to the full threads the shank
-# keeps past the jam nut.  The callout names both mates.
-CHAMFER_CALLOUT = {
-    "ChamferWidth": (
-        "MIN: CUT END STARTS IN MHA-SM-03 TAP\nMAX: KEEPS FULL THREAD PAST MHA-CH-14"
-    )
-}
+# keeps past the jam nut.  Rule 7 allows one reason line per feature, so the
+# callout names both mates on one line (RV-01 accepts the band itself).
+CHAMFER_CALLOUT = {"ChamferWidth": "STARTS IN MHA-SM-03; THREAD PAST MHA-CH-14"}
 EXPECTED_CONTROLS = {
     "FinishedOverall": (
         FINISHED_OVERALL_MM / 1000,
