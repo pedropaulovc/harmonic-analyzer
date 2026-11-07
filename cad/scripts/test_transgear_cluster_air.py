@@ -64,7 +64,10 @@ def test_shims_close_every_cluster_into_the_window():
     thickness; the disc's end float is that gap plus the recess."""
     low, high = FIT.RING_FLOAT_RANGE
     assert low == FIT.END_FLOAT_MIN
-    assert high == pytest.approx(FIT.END_FLOAT_MIN + SHIM.THICKNESS_MAX)
+    # The top is one shim over the floor, rounded up to the .001 inch step.
+    shimmed_top = FIT.END_FLOAT_MIN + SHIM.THICKNESS_MAX
+    assert shimmed_top <= high < shimmed_top + 0.0254
+    assert high / 0.0254 == pytest.approx(round(high / 0.0254))
     for thickness in (SHIM.THICKNESS_MIN, SHIM.THICKNESS_MAX):
         for unshimmed in FIT.UNSHIMMED_FLOAT_RANGE:
             gap, count = unshimmed, 0
