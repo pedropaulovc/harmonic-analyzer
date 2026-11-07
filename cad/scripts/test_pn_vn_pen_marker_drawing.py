@@ -99,8 +99,9 @@ def test_drawing_is_the_purchased_reference_sheet() -> None:
     assert drawing.SPEC is sheet
     assert sheet.artifact_stem == part.PART_NAME == STEM
     assert sheet.source_kind == "part"
-    # The sheet note carries no numbers; the model and the SKU carry them.
-    assert not re.search(r"\d", spec.DRAWING_NOTES)
+    # The grip note names its mate by the registered drawing number (rule 4).
+    assert spec.V_BLOCK_NUMBER == _config.parts("pn-pen-v-block")["number"]
+    assert spec.V_BLOCK_NUMBER in spec.DRAWING_NOTES
 
 
 def _overlaps(a: tuple[float, ...], b: tuple[float, ...]) -> bool:
@@ -155,7 +156,8 @@ def test_grip_note_is_the_part_note_on_a_leader_to_the_grip_band() -> None:
     # Every word of the part's note, printed once, on short lines.
     assert " ".join(text.split("\n")) == spec.DRAWING_NOTES
     lines = text.split("\n")
-    assert len(lines) == 3
+    # Rule 7: a callout carries at most two lines of words.
+    assert len(lines) <= 2
     assert all(len(line) <= drawing.GRIP_NOTE_WIDTH for line in lines)
     # The tip sits on the grip's silhouette in FRONT, inside the band.
     front, half = drawing.FRONT_CENTER, drawing._SIDE_HALF

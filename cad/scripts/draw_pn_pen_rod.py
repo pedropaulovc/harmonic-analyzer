@@ -2,20 +2,22 @@ r"""Create the curated machinist drawing for the pen square rod.
 
 The SLDPRT remains authoritative.  This recipe supplies only the rod's views,
 the placement of its imported model dimensions, the stud-tap callout, the
-overall-length reference and the property-linked view notes; sheet/template
-and export behavior lives in ``_drawing_common``.  Places, bands and mate
-callouts are authored on the part (``pn_pen_rod_spec``).
+overall-length reference, VIEW A's viewing arrow and the property-linked
+notes; sheet/template and export behavior lives in ``_drawing_common``.
+Places, bands, mate callouts and the pivot's fit note are authored on the
+part (``pn_pen_rod_spec``).
 
 The sheet prints decimal inch (the part's ``drawing_unit: in``).  The side
 view (2:1, the sheet scale) lays the rod axis horizontal, as the bar sits in
 the lathe (drawing-guidelines.md rule 11), and carries the square's and the
 pivot's lengths from the shoulder, the pivot's banded diameter between its
-flanks, the shoulder root's R MAX and the (4.82) end-to-end reference; the
-labelled end view (5:1) under it looks at the tapped top face and carries the
-square's banded SQ size, the native Hole Wizard callout of the #0-80 stud
-tap, its drill Ø at .XXX and both depths at .XX, and the tap's .067 MIN wall
-(RV-01, from the part's hidden TapWallReference sketch, shown in that view
-only); the labelled 1:1 isometric sits right.
+flanks (SEE NOTE 1: its matched fit), the shoulder root's R MAX, the (4.82)
+end-to-end reference and VIEW A's lettered arrow onto the tapped top face;
+VIEW A (5:1) under it looks at that face and carries the square's banded SQ
+size, the native Hole Wizard callout of the #0-80 stud tap, its drill Ø at
+.XXX and both depths at .XX, and the tap's .067 MIN wall (RV-01, from the
+part's hidden TapWallReference sketch, shown in that view only); the
+labelled 1:1 isometric sits right, note 1 in the field under the side view.
 
 Run with SolidWorks open::
 
@@ -56,6 +58,7 @@ from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measur
 from _drawing_edges import ViewEdges, scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -71,6 +74,8 @@ from pn_pen_rod_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
+    END_VIEW_LETTER,
+    END_VIEW_NOTE,
     PIVOT_DIA,
     PIVOT_LENGTH,
     ROD_SECTION,
@@ -243,9 +248,9 @@ _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 # over the square, 18 mm over the block, 7 mm left of the SQ line's upper
 # arrow piece (x 0.132, to y ~0.0939); its leader drops almost straight to
 # the drill rim.  The view label (anchored top-left, text 4.5 mm under its
-# anchor, ~75 mm long at the scale note's ~2.5 mm a character) centred 7 mm
-# under the square: x 0.0425..0.1175, y 0.051..0.0545, left of the SQ
-# line's lower arrow piece (x 0.132, to y ~0.0561).
+# anchor, END_NOTE_WIDTH long at the scale note's ~2.5 mm a character)
+# centred 7 mm under the square, left of the SQ line's lower arrow piece
+# (x 0.132, to y ~0.0561).
 END_KEEP = {
     "Depth": (END_CENTER[0] + 0.052, END_CENTER[1] + 0.00051),
     "TapWallMin": (
@@ -267,15 +272,81 @@ END_KEEP = {
 TAP_WALL_TEXT_XY = (END_CENTER[0] - _END_HALF_M - 0.028, END_KEEP["TapWallMin"][1])
 _TEXT_SETTLE_M = 0.0005
 TAP_CALLOUT_XY = (END_CENTER[0] + 0.022, END_CENTER[1] + 0.035)
-END_NOTE_WIDTH = 0.075
+END_NOTE_WIDTH = len(END_VIEW_NOTE) * 0.0025
 END_NOTE_XY = (
     END_CENTER[0] - END_NOTE_WIDTH / 2.0,
     END_CENTER[1] - _END_HALF_M - 0.007,
 )
+# VIEW A's viewing arrow (rule 9): a letter note whose straight leader is the
+# arrow (draw_fr_top_frame._add_view_arrow; the native projected-view arrow
+# is not switchable through the API), level on the rod axis and pointing
+# left onto the tapped top face it looks at, its tip 3.5 mm off that face,
+# the 5 mm letter 10 mm right of the tip: x ~0.331..0.345 on y 0.170, in
+# the 43 mm field between the top face's extension lines and the isometric
+# (x 0.3709).
+VIEW_LETTER_HEIGHT = 0.005
+VIEW_ARROW_TIP_GAP = 0.0035
+VIEW_ARROW_RUN = 0.010
+VIEW_ARROW_SQUARE_TOL = 0.0003
+_VIEW_A_TIP = (_sx(SQUARE_LENGTH) + VIEW_ARROW_TIP_GAP, _sy(0.0))
+VIEW_A_ARROW = (
+    (_VIEW_A_TIP[0] + VIEW_ARROW_RUN, _VIEW_A_TIP[1] + VIEW_LETTER_HEIGHT / 2.0),
+    _VIEW_A_TIP,
+)
+# Note 1 (the pivot's matched fit, two lines of ~53 characters, ~125 x 9 mm
+# at ~2.35 mm a character, anchored top-left) in the empty field under the
+# side view: x 0.150..0.275, y ~0.116..0.125, 14 mm under the R MAX block
+# (bottom 0.139), 25 mm right of the stud tap's callout (x <= 0.1248) and
+# left of the isometric's note (x >= 0.35).
+NOTES_XY = (0.150, 0.125)
 # The isometric (1:1 outline 18.2 x 115.3 mm: x 0.3709..0.3891, y
 # 0.1174..0.2327, 43 mm right of the top face's extension lines) takes its
 # ~60 mm scale note 8 mm under it: x 0.350..0.410, y ~0.1050..0.1085.
 ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.0577 - 0.008)
+
+
+def _add_view_arrow(adapter: Any, side: Any) -> None:
+    """VIEW A's letter arrow on the side view, square onto the top face
+    (draw_fr_top_frame._add_view_arrow, the letter on the arrow's right)."""
+    text_xy, tip_xy = VIEW_A_ARROW
+    label = f"view {END_VIEW_LETTER} viewing arrow"
+    note = add_leader_note(
+        adapter, END_VIEW_LETTER, text_xy=text_xy, attach_xy=tip_xy, view=side, label=label
+    )
+    # add_note leaves text at the document height; size the letter here and
+    # prove the leader tip did not move with it.
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError(f"{label} note has no text format")
+    text_format.CharHeight = VIEW_LETTER_HEIGHT
+    if not annotation.SetTextFormat(0, False, text_format):
+        raise RuntimeError(f"failed to size the {label} letter")
+    rebuild_drawing(adapter, label=f"{label} letter")
+    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+    if len(points) < 6 or math.dist((points[-3], points[-2]), tip_xy) > 0.001:
+        raise RuntimeError(f"{label} tip moved when its letter was sized")
+    # The leader leaves the letter's nearer side at the text's mid-height:
+    # slide the letter by any miss in y so the arrow stands level.
+    miss = tip_xy[1] - points[1]
+    if abs(miss) > VIEW_ARROW_SQUARE_TOL:
+        x, y, z = (float(value) for value in annotation.GetPosition())
+        if not annotation.SetPosition2(x, y + miss, z):
+            raise RuntimeError(f"failed to square the {label}")
+        rebuild_drawing(adapter, label=f"square {label}")
+        points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+        if (
+            len(points) < 6
+            or math.dist((points[-3], points[-2]), tip_xy) > 0.001
+            or abs(tip_xy[1] - points[1]) > VIEW_ARROW_SQUARE_TOL
+        ):
+            raise RuntimeError(f"{label} did not square: leader {points}")
+    if points[0] <= tip_xy[0]:
+        raise RuntimeError(f"{label} does not point left onto the top face: {points}")
+    _telemetry.info(
+        f"{label}: leader {points[0]:.5f},{points[1]:.5f} -> "
+        f"{points[-3]:.5f},{points[-2]:.5f} (level when the y agree)"
+    )
 
 
 def _lay_side_view_horizontal(adapter: Any, side: Any) -> None:
@@ -526,6 +597,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
             "End View Note",
             "Isometric View Note",
         ),
@@ -534,6 +606,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
             "End View Note",
             "Isometric View Note",
         ),
@@ -618,16 +691,18 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(_end_x(END_CENTER, STUD_TAP_DRILL_DIA / 2.0), END_CENTER[1]),
         callout_xy=TAP_CALLOUT_XY,
         label="adjuster stud blind tap",
-        process="TAP",
     )
-    # The title block's THREADS row owns the general thread class (rule 2).
+    # Size first (rule 26): no process prefix; the title block's THREADS row
+    # owns the general thread class (rule 2).
     omit_title_block_thread_class(stud_callout, label="adjuster stud blind tap")
     set_hole_callout_precision(
         stud_callout, STUD_TAP_PRECISION, label="adjuster stud blind tap"
     )
 
     _overall_reference(adapter, side)
+    _add_view_arrow(adapter, side)
 
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "End View Note", *END_NOTE_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 

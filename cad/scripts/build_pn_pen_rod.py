@@ -61,6 +61,7 @@ from _holes import blind_hole_volume_mm3, wizard_holes
 from pn_pen_rod_spec import (
     DRAWING_BANDS,
     DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
     DRAWING_PRECISION,
     END_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
@@ -344,6 +345,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         PART_NAME,
         {
+            "Manufacturing Notes": DRAWING_NOTES,
             "End View Note": END_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
@@ -356,6 +358,7 @@ async def build(adapter) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
             "End View Note",
             "Isometric View Note",
         ),

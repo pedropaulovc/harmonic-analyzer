@@ -373,13 +373,13 @@ DRAWING_NOTES = "\n".join(
         "   THROUGH BOTH UNDER ITS OWN WEIGHT.",
     )
 )
-# Leadered on the upper plate in section A-A: its lateral station is the
-# lower plate's (both centred on the rod line), which the strap's foot
-# corners fix (note 1).
-UPPER_PLATE_LOCATION_CALLOUT = "IN LINE WITH\nLOWER PLATE"
-# What that station leaves the reader to work out (rule 10): the upper
-# plate's +x edge stands past the tapered strap's edge at the plate's top
-# face.  Section A-A prints it as a reference, measured on the sheet.
+# The upper plate's lateral station is the lower plate's: both slots sit on
+# one centreline the front view draws through them (drawing-guidelines.md
+# rule 26: features in line share a drawn centreline), and the lower plate
+# is fixed by the strap's foot corners (note 1).  What that station leaves the
+# reader to work out (rule 10): the upper plate's +x edge stands past the
+# tapered strap's edge at the plate's top face.  Section A-A prints it as a
+# reference, measured on the sheet.
 UPPER_PLATE_OVERHANG = GUIDE_PLATE_WIDTH / 2.0 - (
     STRAP_TOP_X[1]
     + (STRAP_BOT_X[1] - STRAP_TOP_X[1])
@@ -389,5 +389,6 @@ UPPER_PLATE_OVERHANG = GUIDE_PLATE_WIDTH / 2.0 - (
 DRAWING_REFERENCE_PRECISION = 2
 if UPPER_PLATE_OVERHANG <= 0.0:
     raise AssertionError("the upper guide plate no longer overhangs the strap edge")
-FRONT_VIEW_NOTE = "FRONT VIEW SCALE 1:1"
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
+# The front view is projected and at the sheet's 1:1 (no label, rule 9); the
+# one pictorial is named in words, its 1:1 the title block's.
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW"

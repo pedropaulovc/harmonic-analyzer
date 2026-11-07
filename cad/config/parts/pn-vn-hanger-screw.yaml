@@ -7,10 +7,6 @@ pn-vn-hanger-screw:
   material: Plain Carbon Steel
   material_specification: Low-strength steel, McMaster-Carr 93075A199
   finish: zinc plated
-  installation_notes: |-
-    INSTALLATION - FROM BEHIND THE MHA-MG-08 WHEEL BAR, THROUGH THE
-    MHA-PN-02 PEN-HANGER STRAP INTO THE MHA-PN-VN-54 NUT, LOCKED BY
-    THE MHA-PN-VN-55 JAM NUT.
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance
