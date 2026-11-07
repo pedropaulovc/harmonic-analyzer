@@ -40,6 +40,7 @@ from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -74,8 +75,6 @@ from _session import run_build
 import _telemetry
 from dt_crank_handle_spec import (
     COUNTERBORE_DEPTH,
-    COUNTERBORE_FIT_NOTE,
-    COUNTERBORE_FLOOR_CALLOUT,
     COUNTERBORE_FLOOR_X,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -92,36 +91,24 @@ from dt_crank_handle_spec import (
     S_CONCAVE_CENTER,
     S_CONVEX_CENTER,
     S_CONVEX_R,
-    SCREW_NUMBER,
     SHOULDER_R,
     SHOULDER_X,
     TANGENT_POINT_DIAMETERS,
-    TENON_FIT_NOTE,
     TENON_R,
-    TENON_ROOT_CALLOUT,
     TENON_ROOT_RELIEF,
-    TENON_ROOT_RELIEF_CALLOUT,
     TENON_ROOT_ROUND_REACH,
     TENON_X0,
     WAIST_X,
     UNIT,
-    inch_text,
 )
-from dt_crank_handle_pivot_screw_spec import (
-    DIAMETRAL_CLEARANCE_MAX,
-    DIAMETRAL_CLEARANCE_MIN,
-)
-
-# The reamed bore prints as a reference over the running clearance its model
-# band gives on the MHA-DT-32 shoulder's band, at the places that hold it
-# exactly (#290 fit F12: .0050-.0075).  Rule 4: the mate reads by name and
-# number (MHA-DT-08 machinist review of 1bdd4e8d7), on a row of its own so the
-# widest row, and so the block's clearance to the title block, stays put.
-SCREW_NAME = "PIVOT SCREW"
-PIVOT_BORE_CALLOUT = (
-    f"REAM THRU; {inch_text(DIAMETRAL_CLEARANCE_MIN, 4)}-"
-    f"{inch_text(DIAMETRAL_CLEARANCE_MAX, 4)}\n"
-    f"DIAMETRAL CLEARANCE ON\n{SCREW_NAME}\n{SCREW_NUMBER} SHOULDER"
+from dt_crank_handle_notes import (
+    COUNTERBORE_CALLOUT,
+    COUNTERBORE_FLOOR_CALLOUT,
+    PIVOT_BORE_CALLOUT,
+    SHEET_NOTES,
+    TENON_CALLOUT,
+    TENON_ROOT_CALLOUT,
+    TENON_ROOT_RELIEF_CALLOUT,
 )
 
 
@@ -154,17 +141,20 @@ _S = SHEET_SCALE[0] / 1000.0
 FRONT_BBOX_CX = (TENON_X0 + OAK_END_X) / 2.0
 FRONT_CENTER = (0.162, 0.130)
 RIGHT_CENTER = (0.362, FRONT_CENTER[1])
-# Detail B took the upper right, so the isometric, its note and the section's
-# caption share the lower left, under the fitted tenon's callout (bottom y
-# ~0.059, x 0.056..0.123) and left of the reamed bore's (x >= 0.145 down to y
-# ~0.056).  The 1:1 isometric reads x 0.089..0.138, y 0.020..0.055 (farm r1 of
-# 1bdd4e8d7), 3.6 mm under the tenon's block; the caption (top-centre
-# anchored, 45 x 15 mm: x 0.023..0.068, y 0.040..0.055, 3.8 mm under that
-# block) and the note (top-left anchored, ~59 x 5 mm, top y 0.034) stand left
-# of it.
-ISO_CENTER = (0.112, 0.040)
-ISO_NOTE_POS = (0.016, 0.034)
-CAPTION_XY = (0.045, 0.055)
+# Detail B took the upper right, so the lower left holds, top down: the
+# fitted tenon's three-row callout (keep y 0.078, ~16 mm tall: y
+# ~0.070..0.086, x ~0.048..0.131), the numbered notes (top-left anchored at
+# y 0.064, three rows of 2.5 mm characters, ~113 x 17 mm), the section's
+# caption (top-centre anchored, one row now that the scale equals the
+# sheet's, top y 0.043) and the isometric's note (top y 0.026).  The 1:1
+# isometric (~49 x 35 mm, -0.020/+0.0152 about its centre in y) moves right,
+# x ~0.148..0.197, y ~0.016..0.051: 7 mm under the reamed bore's block (y
+# >= 0.058), 19 mm left of the title block (x 0.216), clear of the notes'
+# right end (x ~0.132).
+ISO_CENTER = (0.172, 0.036)
+ISO_NOTE_POS = (0.016, 0.026)
+CAPTION_XY = (0.045, 0.043)
+NOTES_XY = (0.016, 0.064)
 
 END_R = HANDLE_MAX_DIA * _S / 2.0
 
@@ -201,11 +191,11 @@ _ROW = (0.195, 0.205, 0.242, 0.250, 0.258)
 _SHELF = 0.0015
 _BELOW = 0.098
 _CALLOUT_ROW = 0.080
-# The fitted tenon's six-row block (32.4 mm tall, centred on its keep) hangs
-# under the shoulder and waist shelves: top y 0.0912, 3.9 mm under their
-# shoulder lines (y 0.0951).  MHA-DT-08 machinist review of 1bdd4e8d7: on the
-# shared callout row its "(Ø.299)" stood 1.2 mm into those shoulders.
-_TENON_CALLOUT_ROW = 0.075
+# The fitted tenon's three-row block (~16 mm tall, centred on its keep) hangs
+# under the shoulder and waist shelves' shoulder lines (y 0.0951), over the
+# numbered notes.  MHA-DT-08 machinist review of 1bdd4e8d7: on the shared
+# callout row its "(Ø.299)" stood 1.2 mm into those shoulders.
+_TENON_CALLOUT_ROW = 0.078
 FRONT_KEEP = {
     "TenonLength": (_front_x((TENON_X0 + SHOULDER_X) / 2.0), _ROW[0]),
     "WaistStation": (_front_x((TENON_X0 + WAIST_X) / 2.0), _ROW[1]),
@@ -359,8 +349,8 @@ DETAIL_KEEP = {
 # the part seating on each inside corner (drawing-guidelines.md rules 4 and 7).
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": PIVOT_BORE_CALLOUT,
-    "TenonDia": TENON_FIT_NOTE,
-    "CounterboreDia": COUNTERBORE_FIT_NOTE,
+    "TenonDia": TENON_CALLOUT,
+    "CounterboreDia": COUNTERBORE_CALLOUT,
     "TenonRootRadius": TENON_ROOT_CALLOUT,
     "TenonRootRelief": TENON_ROOT_RELIEF_CALLOUT,
     "CounterboreFloorRadius": COUNTERBORE_FLOOR_CALLOUT,
@@ -562,6 +552,36 @@ def _ferrule_seat_detail(adapter: Any, section: Any) -> Any:
     return detail
 
 
+def _drop_sheet_scale_from_caption(adapter: Any, view: Any, *, label: str) -> None:
+    """Rule 9: a view prints its scale only when it differs from the sheet's.
+
+    Section A-A runs at the sheet's 4:1, yet its native linked caption carried
+    a ``SCALE <VLSCALEV>`` row (screen f21dfcdd C0), so that row goes; the
+    label row keeps its native fields.  No scale row: nothing to do.
+    """
+    if VIEW_SCALE[0] / VIEW_SCALE[1] != SHEET_SCALE[0] / SHEET_SCALE[1]:
+        raise AssertionError(f"{label}: section scale differs from the sheet's")
+    bound_view = _early_bound(view, "IView")
+    notes = [_early_bound(raw, "INote") for raw in (bound_view.GetNotes() or ())]
+    captions = [
+        note for note in notes if "<VLLABEL>" in str(note.PropertyLinkedText or "")
+    ]
+    if len(captions) != 1:
+        raise RuntimeError(f"{label}: expected one native linked section caption")
+    (note,) = captions
+    linked = str(note.PropertyLinkedText or "")
+    rows = linked.splitlines()
+    kept = [row for row in rows if "<VLSCALE" not in row]
+    if len(kept) == len(rows):
+        return
+    if not any("<VLLABEL>" in row for row in kept):
+        raise RuntimeError(f"{label}: caption scale shares the label's row: {linked!r}")
+    note.PropertyLinkedText = "\r\n".join(kept)
+    rebuild_drawing(adapter, label=f"drop {label} caption scale")
+    if "<VLSCALE" in str(note.PropertyLinkedText or ""):
+        raise RuntimeError(f"{label}: caption scale row did not go: {linked!r}")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -615,6 +635,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=VIEW_SCALE,
         label="crank handle longitudinal section",
     )
+    _drop_sheet_scale_from_caption(adapter, front, label="crank handle")
     position_section_caption(adapter, front, CAPTION_XY, label="crank handle")
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     for view in (front, right, iso):
@@ -651,9 +672,9 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     by_name = {dimension_name(adapter, a): a for a in annotations}
-    # The tenon and the counterbore are fitted to the ferrule and cup (their
-    # to-suit callouts), and the S-curve's tangent point is fixed by its
-    # arcs, so their sizes print as references.
+    # The tenon and the counterbore are bonded fits to the ferrule and cup,
+    # and the S-curve's tangent point is fixed by its arcs, so their sizes
+    # print as references.
     for name in sorted(REFERENCE_DIMENSIONS | TANGENT_POINT_DIAMETERS):
         set_reference_dimension(
             adapter,
@@ -675,6 +696,8 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to crank-handle end view")
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_POS)
+    if add_note(adapter, SHEET_NOTES, *NOTES_XY) is None:
+        raise RuntimeError("failed to add the crank handle's numbered notes")
 
     return await finalize_drawing(
         adapter,

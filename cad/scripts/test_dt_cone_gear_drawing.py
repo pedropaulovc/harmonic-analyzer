@@ -195,14 +195,18 @@ def test_each_sheet_gets_its_own_actual_cutting_recipe() -> None:
         # ENFORCE round 1 of #971: "TOOL T" told the shop how to set the
         # cutter (rule 7); the plunge stays, a reference depth.
         assert "TOOL T" not in data
-        # Stock cutters name their template; T006's space is the last sheet.
+        # Stock cutters by number and range; T006's space is the last sheet.
         last = len(spec.CONFIGURATION_TEETH) + 1
-        cutter = f"NOT STOCK; FORM = TOOTH SPACE, SHEET {last}" if teeth == 6 else "; TEMPLATE "
+        cutter = f"NOT STOCK; FORM = TOOTH SPACE, SHEET {last}" if teeth == 6 else " INVOLUTE GEAR CUTTER, "
         assert cutter in data, teeth
         assert ("RELIEF BELOW R.0603" in data) == (teeth == 6)
         assert "TIF" not in data
         assert notes.CYLINDER_MATE_NUMBER in data
-        for obsolete in ("CONTACT RATIO", "RANGE ONLY", "MATCH FLANKS", "LONG ADDENDUM"):
+        # Rule 26 (screen of f21dfcdd2ba7): no private gear phrases.
+        for obsolete in (
+            "CONTACT RATIO", "RANGE ONLY", "MATCH FLANKS", "LONG ADDENDUM",
+            "TEMPLATE", "FINITE", "RADIAL BELOW BASE", "ABOVE-BASE", "INCLINED",
+        ):
             assert obsolete not in data
         assert len(data.splitlines()) * 0.00351 <= drawing.GEAR_DATA_HEIGHT
 
@@ -264,40 +268,75 @@ def test_root_envelope_is_the_actual_translated_arc_not_a_bisector_circle() -> N
     assert drawing.DIMENSION_CALLOUTS["FloorDia"].splitlines()[0] == "ROOT ENVELOPE"
 
 
-def test_tight_bands_name_their_mates_at_the_callout() -> None:
-    """Machinist review of the round-2 build: straight witnesses with no
-    circle left the circular thickness unmeasurable, so under the value the
-    callout names the pitch circle (N / 48 in). ENFORCE round 1 of #971:
-    each tight band names its mate and fit at the callout (rule 4). ENFORCE
+def test_tight_bands_name_their_mates_once_in_flagged_notes() -> None:
+    """ENFORCE round 1 of #971: each tight band names its mate and fit at
+    the callout (rule 4). Screen of f21dfcdd2ba7: a mate serving several
+    dimensions is named once, in one numbered note those dimensions flag,
+    and a callout carries at most two lines of words (rule 7). ENFORCE
     round 2: a multi-line callout above a value never prints, so every
     above-callout is one line."""
-    assert "MHA-DT-04" in drawing.DIMENSION_CALLOUTS["BoreAF"]
-    assert "MHA-DT-04" in drawing.DIMENSION_CALLOUTS["BoreCutDia"]
-    assert "MHA-DT-04" in drawing.DIMENSION_CALLOUTS["FaceWidth"]
-    assert notes.CYLINDER_MATE_NUMBER in drawing.DIMENSION_CALLOUTS["FloorDia"]
-    above = drawing.CALLOUTS_ABOVE
+    callouts, above = drawing.DIMENSION_CALLOUTS, drawing.CALLOUTS_ABOVE
+    bore_flag, teeth_flag = drawing.BORE_NOTE_FLAG, drawing.TEETH_NOTE_FLAG
+    for name in ("BoreCutDia", "BoreAF"):
+        assert bore_flag in callouts[name].splitlines(), name
+    assert above["BoreFlatClock"] == bore_flag
+    assert above["BlankDia"] == teeth_flag
+    assert callouts["FloorDia"].splitlines() == ["ROOT ENVELOPE", teeth_flag]
+    assert "MHA-DT-04" in callouts["FaceWidth"]
     assert set(above) == {"ToothThickness", "BlankDia", "BoreFlatClock"}
     assert all("\n" not in text for text in above.values())
-    for key in ("ToothThickness", "BlankDia"):
-        assert notes.CYLINDER_MATE_NUMBER in above[key], key
-    assert "MHA-DT-04" in above["BoreFlatClock"]
-    label = "CIRCULAR TOOTH THICKNESS"
-    # The circle is named, unsized: an offset imported dimension prints the
-    # last sheet's text on every sheet (T006 printed T120's Ø63.500 in the
-    # farm runs of 746809f62 and 5000ea76b), so its rows are the same on all
-    # twenty and GEAR DATA sizes the circle (teeth, diametral pitch).
-    thickness = drawing.DIMENSION_CALLOUTS["ToothThickness"]
-    assert thickness == f"{label}\nON PITCH CIRCLE"
-    assert not any(char.isdigit() for char in thickness)
-    assert max(map(len, thickness.splitlines())) <= len(label)
+    # The mates appear once each, in the notes; no dimension repeats them.
+    for text in (*callouts.values(), *above.values()):
+        assert notes.CYLINDER_MATE_NUMBER not in text, text
+    for name in ("BoreCutDia", "BoreAF", "BoreFlatClock"):
+        assert "MHA-DT-04" not in callouts[name] + above.get(name, "")
+    # Two lines of words on the thickness: its name over the value, the flag
+    # under it (offset text prints the last sheet's rows on every sheet, so
+    # neither carries a size).
+    thickness_rows = [above["ToothThickness"], *callouts["ToothThickness"].splitlines()]
+    assert thickness_rows == ["CIRCULAR TOOTH THICKNESS", teeth_flag]
+    assert drawing.TOOTH_THICKNESS_ROWS == tuple(thickness_rows)
     for teeth in spec.CONFIGURATION_TEETH:
         data = notes.gear_data(teeth)
         assert f"T{teeth:03d} / {teeth}" in data
         assert f"DIAMETRAL PITCH / PRESSURE ANGLE:  {spec.DIAMETRAL_PITCH:.2f}" in data
+        pitch = spec.inch_text(teeth * spec.MODULE_MM, 4)
+        assert f"PITCH DIAMETER (REF):  {pitch}" in data
     # The bore diameter's rows stay as narrow as its value, clear of the
     # flat's witness on T006/T012 (r2: a 20-character row crossed it).
-    assert max(map(len, drawing.DIMENSION_CALLOUTS["BoreCutDia"].splitlines())) <= 10
-    assert len(above["ToothThickness"]) <= len(label)
+    assert max(map(len, callouts["BoreCutDia"].splitlines())) <= 10
+
+
+def test_numbered_notes_state_the_bore_fit_from_both_parts_limits() -> None:
+    """Note 1 is the D-bore's matched sliding fit on its MHA-DT-04 land, with
+    the diametral clearances both parts' printed limits give (REF); note 2
+    names the mesh and the over-pins and backlash acceptances."""
+    import cone_shaft_land_bands as lands
+
+    for teeth in spec.CONFIGURATION_TEETH:
+        land = lands.SECTION_DIA_BANDS[spec.land_section(teeth)]
+        (round_min, round_max), (flat_min, flat_max) = drawing.bore_clearances_mm(teeth)
+        assert round_min == pytest.approx(spec.BORE_DIA_BAND[1] - land[0])
+        assert round_max == pytest.approx(spec.BORE_DIA_BAND[0] - land[1])
+        assert flat_min == pytest.approx(spec.BORE_AF_BAND[1] - lands.FLAT_AF_BAND[0])
+        assert flat_max == pytest.approx(spec.BORE_AF_BAND[0] - lands.FLAT_AF_BAND[1])
+        assert 0.0 < round_min < round_max and 0.0 < flat_min < flat_max
+        text = drawing.sheet_notes(teeth)
+        lines = text.splitlines()
+        assert lines[0].startswith("1. SLIDING FIT ON MHA-DT-04")
+        assert lines[2].startswith(f"2. TEETH MESH WITH {notes.CYLINDER_MATE_NUMBER}")
+        clearance = (
+            f"(CLEARANCE {spec.inch_text(round_min, 4)}-{spec.inch_text(round_max, 4)} ON \u00d8, "
+            f"{spec.inch_text(flat_min, 4)}-{spec.inch_text(flat_max, 4)} ACROSS FLAT)"
+        )
+        assert clearance in text
+        # Under the manufacturing notes, above the tallest tip-diameter block
+        # and left of Gear Data (2.5 mm text: 3.51 mm a line, 1.79 mm a
+        # character).
+        x, y = drawing.NUMBERED_NOTES_POS
+        assert y < drawing.MANUFACTURING_NOTES_POS[1] - 2 * 0.00351
+        assert y - len(lines) * 0.00351 > drawing.front_keep(teeth)["BlankDia"][1] + 0.010
+        assert x + max(map(len, lines)) * 0.00179 < drawing.GEAR_DATA_POS[0] - 0.005
 
 
 def test_refused_rows_block_the_complete_native_family(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -444,8 +483,9 @@ def test_custom_six_sheet_defines_the_tooth_space_point_by_point() -> None:
     lines = data.splitlines()
     assert lines[0] == "T006 TOOTH SPACE FORM, INCH"
     assert drawing.SHEET_NAMES[0] == "T006"
-    assert "OVER PINS PER SHEET 1 " in lines[-1]
-    assert notes.CYLINDER_MATE_NUMBER in lines[-2]
+    assert "OVER PINS PER SHEET 1 " in lines[-2]
+    assert notes.CYLINDER_MATE_NUMBER in lines[-3]
+    assert "WIDE ONLY" not in data
     assert "(REF)" not in data
     assert "COMPARATOR" not in data and "TIF" not in data
     assert "INSPECT" not in data and "TOOL" not in data and "GRIND" not in data
@@ -453,7 +493,8 @@ def test_custom_six_sheet_defines_the_tooth_space_point_by_point() -> None:
     assert "ROOT: ARC R.0433 ABOUT GEAR AXIS" in lines
     assert "ROOT ARC TO R.0603: STRAIGHT LINES ROW TO ROW" in lines
     assert "ABOVE R.0603: INVOLUTE, BASE R.0587" in lines
-    # Wide only, by half the T006 thinning band (0/-.0016 on thickness).
+    # Wide, never narrow (the one-sided band), by half the T006 thinning
+    # band (0/-.0016 on thickness).
     assert spec.CUSTOM_SIX_FORM_TOLERANCE_MM == pytest.approx(0.02032)
     assert "FORM TOLERANCE: X +.0008 / -.0000" in lines
     points = spec.custom_six_form_points_mm()
@@ -815,6 +856,10 @@ def test_every_sheet_layout_keeps_views_dimensions_and_title_block_separate() ->
 # ink 24.66 mm tall, the C of CIRCULAR 0.25 mm in and 6.49 mm up, the bottom
 # row's first glyph at least 3.0 mm in (T084's longer pitch diameter) and
 # 0.9 mm up; and the root-envelope stack's shelf 10.08 mm under its anchor.
+# They stay the budget's bounds now the block is a row shorter, its name on
+# top and its flag, a short centred row, at the bottom: the ink is lower, the
+# C stands higher and the bottom row's first glyph farther in, each farther
+# from the leader that closes on the shelf's start.
 _THICKNESS_SHELF_LENGTH = 0.06421
 _THICKNESS_INK_HEIGHT = 0.02466
 _THICKNESS_C_GLYPH = (0.00025, 0.00649, 0.00353, 0.01006)
@@ -931,9 +976,84 @@ def test_bore_view_enlarges_every_d_bore_clear_of_its_neighbours() -> None:
         assert dia_x + _BORE_DIA_TEXT_RIGHT_REACH < clock_box[0] - 0.005
         assert vy + reach + 0.003 < front_bottom, teeth
         assert drawing.bore_view_label(teeth).splitlines() == [
-            "BORE PROFILE",
+            "DETAIL A",
             f"SCALE {view_numerator:g} : {view_denominator:g}",
         ]
+
+
+# The detail letter's ink at DETAIL_LETTER_HEIGHT, half its width and height
+# (sheet metres), and the air it keeps to the lines round it.
+_LETTER_HALF = (0.0011, 0.00135)
+_LETTER_AIR = 0.0003
+
+
+def _letter_box(xy: tuple[float, float]) -> Box:
+    return Box(
+        xy[0] - _LETTER_HALF[0], xy[1] - _LETTER_HALF[1],
+        xy[0] + _LETTER_HALF[0], xy[1] + _LETTER_HALF[1],
+    )
+
+
+def _corner_radii(box: Box, centre: tuple[float, float]) -> tuple[float, float]:
+    """Nearest and farthest distance of ``box``'s corners from ``centre``."""
+    radii = [
+        math.dist(corner, centre)
+        for corner in ((box.xmin, box.ymin), (box.xmin, box.ymax), (box.xmax, box.ymin), (box.xmax, box.ymax))
+    ]
+    return min(radii), max(radii)
+
+
+def test_enlarged_views_are_lettered_with_boundaries_on_the_front_view() -> None:
+    """Rule 9 (screen of f21dfcdd2ba7): the bore view is DETAIL A, its
+    boundary ringing the bore on every front view; sheet 21's plot is
+    DETAIL B, its boundary ringing T006's 12 o'clock tooth space. Each
+    letter stands outside its boundary, clear of the lines round it."""
+    for teeth in spec.CONFIGURATION_TEETH:
+        details = drawing.front_details(teeth)
+        assert [detail.letter for detail in details] == (["A", "B"] if teeth == 6 else ["A"])
+        bore = details[0]
+        centre, radius = drawing.front_detail_on_sheet(teeth, bore)
+        assert centre == pytest.approx(drawing.FRONT_CENTER)
+        numerator, denominator = drawing._SCALE_BY_TEETH[teeth]
+        ratio = numerator / denominator
+        root = spec.floor_limits_mm(teeth)[0] * ratio / 2000.0
+        assert spec.bore_dia_mm(teeth) * ratio / 2000.0 < radius < root
+        # The letter sits in the web, clear of the boundary, the root
+        # envelope and both centre-mark arms.
+        letter = _letter_box(drawing.detail_letter_xy(bore, centre, radius))
+        inner, outer = _corner_radii(letter, centre)
+        assert inner >= radius + _LETTER_AIR, teeth
+        assert outer <= root - _LETTER_AIR, teeth
+        assert letter.xmin > centre[0] + _LETTER_AIR and letter.ymax < centre[1] - _LETTER_AIR
+        # T012's web dimension runs down left; the letter stands down right.
+        assert abs(math.remainder(bore.letter_angle_deg - spec.WEB_REFERENCE_ANGLE_DEG, 360.0)) >= 90.0
+    form = drawing.front_details(6)[1]
+    a_centre, a_radius = drawing.front_detail_on_sheet(6, drawing.front_details(6)[0])
+    b_centre, b_radius = drawing.front_detail_on_sheet(6, form)
+    # B takes the whole 12 o'clock space (its root and both tip corners) and
+    # stands clear of A's ring.
+    root_mm = spec.stock_form_profile(6).template.root_radius_mm
+    _radius, corner_x, corner_y = spec.custom_six_form_points_mm()[-1]
+    for x_mm, y_mm in ((0.0, root_mm), (corner_x, corner_y + root_mm), (-corner_x, corner_y + root_mm)):
+        assert math.dist((x_mm, y_mm), form.centre_mm) < form.radius_mm
+    assert math.dist(a_centre, b_centre) > a_radius + b_radius + 0.0005
+    # Its letter stands outside the tip circle, left of the root envelope's
+    # block and under it.
+    letter = _letter_box(drawing.detail_letter_xy(form, b_centre, b_radius))
+    inner, _outer = _corner_radii(letter, b_centre)
+    assert inner >= b_radius + _LETTER_AIR
+    assert _corner_radii(letter, a_centre)[0] > drawing.rendered_half_od(6) + _LETTER_AIR
+    floor_x, floor_y = drawing.front_keep(6)["FloorDia"]
+    assert letter.xmax < floor_x - _FLOOR_TEXT_HALF_WIDTH - 0.005
+    assert letter.ymax < floor_y + drawing.FLOOR_STACK_HALF_HEIGHT
+    # The plot on the last sheet carries the same letter and its scale.
+    assert drawing.form_plot_label().splitlines() == [
+        "DETAIL B (SHEET 1)", f"SCALE {drawing.FORM_PLOT_SCALE:g} : 1",
+    ]
+    assert drawing.form_plot_labels()[0][0] == drawing.form_plot_label()
+    source = inspect.getsource(drawing.build)
+    assert "_mark_front_details(adapter, front, teeth" in source
+    assert 'for name in ("BlankDia", "FloorDia"):' in source
 
 
 def test_settled_clock_check_refuses_outside_arrow_stubs() -> None:
@@ -980,18 +1100,20 @@ def test_settled_clocks_refuse_stub_arcs_on_any_sheet(monkeypatch: pytest.Monkey
     assert sheets == ["T012", "T018"]
 
 
-# The T012 thickness callout as run 20261024T091056564Z printed it, each PDF
-# text run's ink relative to its shelf's start (sheet metres); its bottom row,
-# now unsized, is that print's "ON PITCH CIRCLE" glyphs recentred.
+# The T012 thickness callout, each PDF text run's ink relative to its shelf's
+# start (sheet metres): run 20261024T091056564Z's print, its name row moved
+# over the value and its flag, recentred, under it. The root envelope's flag
+# prints just above the block and the tip diameter's far left of it.
 _T012_THICKNESS_RUNS = (
-    ("BACKLASHWITHMHA-DT-12", (0.00164, 0.02110, 0.06282, 0.02466)),
-    ("0.831", (0.01856, 0.01210, 0.02898, 0.01567)),
-    ("+", (0.03160, 0.01718, 0.03390, 0.01951)),
-    ("-", (0.03213, 0.01325, 0.03338, 0.01354)),
-    ("0.075", (0.03432, 0.01657, 0.04560, 0.02014)),
-    ("0.075", (0.03432, 0.01205, 0.04560, 0.01561)),
-    ("CIRCULARTOOTHTHICKNESS", (0.00025, 0.00649, 0.06391, 0.01006)),
-    ("ONPITCHCIRCLE", (0.01287, 0.00078, 0.05145, 0.00456)),
+    ("CIRCULARTOOTHTHICKNESS", (0.00025, 0.01560, 0.06391, 0.01917)),
+    ("0.831", (0.01856, 0.00650, 0.02898, 0.01007)),
+    ("+", (0.03160, 0.01158, 0.03390, 0.01391)),
+    ("-", (0.03213, 0.00765, 0.03338, 0.00794)),
+    ("0.075", (0.03432, 0.01097, 0.04560, 0.01454)),
+    ("0.075", (0.03432, 0.00645, 0.04560, 0.01001)),
+    ("SEENOTE2", (0.01960, 0.00078, 0.04460, 0.00456)),
+    ("SEENOTE2", (0.02500, 0.02800, 0.05000, 0.03178)),
+    ("SEENOTE2", (-0.12000, 0.06000, -0.09500, 0.06378)),
 )
 # Its dimension's pen and the witnesses' half spacing at 6:1, as printed.
 _PEN = 0.00013

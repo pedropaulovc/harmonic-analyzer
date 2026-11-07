@@ -36,17 +36,24 @@ def cutter_description(teeth: int) -> str:
         # space as T006 geometry (ENFORCE round 1 of #971: as a tool sheet it
         # carried the gear's title block and no tool material).
         return f"NOT STOCK; FORM = TOOTH SPACE, SHEET {len(spec.CONFIGURATION_TEETH) + 1}"
+    # A numbered stock cutter is ground for the lowest count of its range,
+    # so its number and range say all a handbook reader needs; "TEMPLATE nT"
+    # was a private phrase (rule 26, screen of f21dfcdd2ba7).
     minimum, maximum = template.teeth_range
-    upper = "UP" if maximum is None else str(maximum)
-    return f"#{template.cutter_number} {minimum}-{upper}T; TEMPLATE {template.reference_teeth}T"
+    teeth_range = f"{minimum}T AND UP" if maximum is None else f"{minimum}-{maximum}T"
+    return f"#{template.cutter_number} INVOLUTE GEAR CUTTER, {teeth_range}"
 
 
 def _tooth_form(template) -> str:
+    # Standard words only (rule 26): the stock cutter's own form is what it
+    # cuts, so "FINITE", "RADIAL BELOW BASE" and "ABOVE-BASE ROOT ARC" told
+    # the builder nothing a handbook defines.
     if template.relief is not None:
-        return f"FINITE INVOLUTE; RELIEF BELOW R{spec.inch_text(template.relief_junction_radius_mm, 4)}"
-    if template.root_radius_mm < template.base_radius_mm:
-        return "FINITE INVOLUTE; RADIAL BELOW BASE"
-    return "FINITE INVOLUTE; ABOVE-BASE ROOT ARC"
+        return (
+            f"INVOLUTE; RELIEF BELOW R{spec.inch_text(template.relief_junction_radius_mm, 4)}"
+            f", SHEET {len(spec.CONFIGURATION_TEETH) + 1}"
+        )
+    return "INVOLUTE, AS CUT BY THE CUTTER"
 
 
 def gear_data(teeth: int) -> str:
@@ -70,6 +77,9 @@ def gear_data(teeth: int) -> str:
     rows = (
         ("CONFIGURATION / TEETH", f"T{teeth:03d} / {teeth}"),
         ("DIAMETRAL PITCH / PRESSURE ANGLE", f"{spec.DIAMETRAL_PITCH:.2f} / {spec.PRESSURE_ANGLE_DEG:.1f} DEG"),
+        # The circle the circular tooth thickness is measured on (its callout
+        # no longer names it: rule 7 allows two lines of words).
+        ("PITCH DIAMETER (REF)", inch(teeth * spec.MODULE_MM, 4)),
         ("CUTTER", cutter_description(teeth)),
         # The cutter's own radial offset is a setup quantity, not something
         # the shop needs: the plunge from the blank OD is (ENFORCE round 1 of
@@ -80,8 +90,12 @@ def gear_data(teeth: int) -> str:
         ("WHOLE DEPTH MAX / CUTTER ROOT ARC R (REF)",
          f"{inch(whole_depth_max, 4)} / {inch(profile.template.root_radius_mm, 4)}"),
         ("TOOTH FORM", _tooth_form(profile.template)),
-        ("MATE", f"{CYLINDER_MATE_NUMBER}, 120T; INCLINED AXES"),
-        ("BACKLASH WITH MATE (REF)", f"{inch(minimum, 3)} TO {inch(maximum, 3)}"),
+        ("MATE", f"{CYLINDER_MATE_NUMBER}, 120T"),
+        # The fit route of the tip, thickness and root bands (drawing-
+        # guidelines "What the shop holds"): the cone mesh is set at assembly,
+        # so its backlash is accepted there, inside the mesh's RSS budget.
+        ("BACKLASH WITH MATE, ACCEPT AT ASSEMBLY",
+         f"{inch(minimum, 3)} TO {inch(maximum, 3)}"),
         ("ROOT RADIAL MIN/MAX (REF)",
          f"{inch(profile.root_radius_min_mm, 4)} / {inch(profile.root_radius_max_mm, 4)}"),
         # Pending exception ruling: MHA-DT-03 web (#971).
