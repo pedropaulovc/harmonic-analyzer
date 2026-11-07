@@ -256,7 +256,8 @@ def test_dowel_callout_is_parked_clear_of_the_top_view() -> None:
 
     rows = drawing.DIMENSION_CALLOUTS["PinHoleDia"].splitlines()
     assert 1 + len(rows) <= TEXT_ROW_LIMIT
-    widest = max(len(row) for row in rows)
+    # The depth token prints as one glyph.
+    widest = max(len(row.replace("<HOLE-DEPTH>", "D")) for row in rows)
     assert 2.0 * drawing.PIN_CALLOUT_HALF_WIDTH == pytest.approx(
         widest * 0.00252, abs=0.0005
     )
@@ -697,13 +698,13 @@ def test_the_sheet_carries_no_notes_block() -> None:
     assert drawing_source.count("add_property_linked_note(") == 1
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in drawing_source
     # No quantity rides above B's Ø (the 2X pattern is gone); the slip hole's
-    # and the slot's callouts name their mate and the clearance it sets
-    # (rule 4), and the depth states one floor for both.
+    # and the slot's callouts name their fit on their mate (rule 4), and the
+    # depth states one floor for both.
     assert not hasattr(drawing, "CALLOUTS_ABOVE")
     assert drawing.DIMENSION_CALLOUTS == {
         "BoreDia": drawing.BORE_CALLOUT,
-        "PinHoleDia": sm_knife_mount_spec.PIN_HOLE_CALLOUT,
-        "SlotWidth": sm_knife_mount_spec.SLOT_WIDTH_CALLOUT,
+        "PinHoleDia": drawing.PIN_HOLE_CALLOUT,
+        "SlotWidth": drawing.SLOT_WIDTH_CALLOUT,
         "PinHoleDepth": sm_knife_mount_spec.PIN_DEPTH_CALLOUT,
     }
     dowel_number = _config.parts("sm-vn-knife-mount-dowel")["number"]
@@ -717,23 +718,19 @@ def test_the_sheet_carries_no_notes_block() -> None:
     assert sm_knife_mount_spec.PIN_SLIP_PRINTED == pytest.approx((low, high))
     assert low * 25.4 - 1e-9 <= dowel.SLIP_CLEARANCE_MIN < (low + 0.0001) * 25.4
     assert (high - 0.0001) * 25.4 < dowel.SLIP_CLEARANCE_MAX <= high * 25.4 + 1e-9
-    # B's hole names its process (a flat-bottomed ream), the clearance band
-    # it sets and its mate; the slot names its open end and its mate.  Each
-    # fact once, and each callout few enough rows for the layout audit's
-    # limit with its value row.
+    # B's hole names its process and REF depth, its mate and the clearance
+    # as REF; the slot its mate.  Each fact once, and each callout few
+    # enough rows for the layout audit's limit with its value row.
     from _layout_audit import TEXT_ROW_LIMIT
 
-    hole = sm_knife_mount_spec.PIN_HOLE_CALLOUT
-    assert "REAM" in hole.split()
-    assert "FLAT-BOTTOM" in hole or "FLAT BOTTOM" in hole
-    assert hole.count(f"{low:.4f}-{high:.4f}".replace("0.", ".")) == 1
-    assert "CLEARANCE" in hole
+    hole = drawing.PIN_HOLE_CALLOUT
+    assert hole.count(f"{low:.4f}-{high:.4f} REF)".replace("0.", ".")) == 1
     assert hole.count(dowel_number) == 1
-    slot = sm_knife_mount_spec.SLOT_WIDTH_CALLOUT
-    assert "OPEN-END SLOT" in slot
+    slot = drawing.SLOT_WIDTH_CALLOUT
     assert slot.count(dowel_number) == 1
     for callout in (hole, slot):
         assert 1 + len(callout.splitlines()) <= TEXT_ROW_LIMIT
+        assert "DIAMETRAL" not in callout
     assert not any(
         "PRESS" in text or "INTERFERENCE" in text
         for text in drawing.DIMENSION_CALLOUTS.values()
