@@ -143,7 +143,10 @@ COLLAR_SET_STEP = "\n".join(
         "OFF THE FRONT MHA-DT-18 ON A FEELER.",
         f"SET THE BACK MHA-DT-23 CAM'S BACK FACE {_leaf_setting(BACK_COLLAR_LEAF_F)} "
         "OFF THE BACK MHA-DT-18 ON A FEELER.",
-        "TIGHTEN THEIR SET SCREWS AND STAKE EACH TAP MOUTH AT 2 POINTS.",
+        "TIGHTEN THEIR SET SCREWS.",
+        "STAKE EACH TAP MOUTH AT 2 POINTS.",
+        # Rule 23 (rubric sample round 5): the bench acceptance.
+        "CHECK THAT NEITHER CAM TURNS OR SLIDES ON MHA-DT-17 BY HAND.",
     )
 )
 

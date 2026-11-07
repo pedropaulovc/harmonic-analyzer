@@ -119,9 +119,10 @@ from dt_drive_train_assembly_sheet import (
     HANDLE_FERRULE_CURE,
     LEVER_PIN_HOLE_FIT,
     T120_FITUP_BAND_CHECK,
+    T120_FITUP_BAND_REMEDY,
     T120_FITUP_PUSH,
-    T120_FITUP_REMEDY,
     T120_FITUP_SHOULDER_CHECK,
+    T120_FITUP_SHOULDER_REMEDY,
     inch_ceil_mm,
     inch_floor_mm,
     inch_max_text,
@@ -227,8 +228,8 @@ CLUSTER_TITLES: dict[Cluster, str] = {
 # extra sheets as needed").  The rubric sample review of v47 split every step
 # into one-thing sub-steps (rule 22), so a field may end inside a step, at a
 # lettered sub-step, and its pointer names that sub-step.  The numbered steps
-# read in sheet order: 1-5 on sheet 7 (MHA-PD-00 cites 4 and 5 there), 6-9D
-# on 8, 9E-16 on 9 and 17-23 on 10; the checks follow the full-detail view
+# read in sheet order: 1-5 on sheet 7 (MHA-PD-00 cites 4 and 5 there), 6-23
+# on 8-10 (split at the sub-steps below); the checks follow the full-detail view
 # (gate review of 042726e87: the steps jumped 6 -> 11 -> 7 -> 8 -> 11).
 SEQUENCE_SHEET = 7
 BANK_SHEET = 8
@@ -886,7 +887,7 @@ BANK_SPRING_FEELER = inch_text(bank.BANK_SPRING_SET, FEELER_PLACES)
 # Every DRO target the bank steps set, with what to measure first and how to
 # check it, prints once here as a table row the steps cite (rubric sample
 # review of v47: equations in prose and converted millimetre bands).  The DRO
-# is zeroed on the MHA-FR-01 hole-table datum faces at step 8G.
+# is zeroed on the MHA-FR-01 hole-table datum faces at step DRO_ZERO_STEP.
 def _step_ref(key: str, letter: str = "") -> str:
     return f"{steps.step_number(key)}{letter}"
 
@@ -1094,7 +1095,7 @@ def cam_stake_note_xy(tip: tuple[float, float]) -> tuple[float, float]:
 
 # Step 10 screws the back MHA-CH-08 down with the channel's own hold-down.
 NORTH_BRACKET_SCREW = str(_config.parts("ch-vn-bracket-hold-down-screw")["number"])
-# Step 8A hangs each MHA-CH-00 connecting rod and rocker arm pair on its cam by
+# Steps 8A-8C hang each MHA-CH-00 connecting rod and rocker arm pair on its cam by
 # their own numbers (rubric sample review of v47: "ROD + ARM PAIR" named no part).
 CONNECTING_ROD = str(_config.parts("ch-connecting-rod")["number"])
 ROCKER_ARM = str(_config.parts("ch-rocker-arm")["number"])
@@ -1136,8 +1137,9 @@ CONE_CRANK_STEPS = _note_text(
         "   FLAT AND AGAINST THE LAST.",
         f"1B. MEASURE THE {CONE_GEAR_COUNT}-GEAR STACK, T120 FRONT FACE TO T006 BACK FACE:",
         f"   ACCEPT {inch_window(STACK_L20_ACCEPT, 3)}.",
-        "1C. IF THE STACK IS LONG, RE-FACE ITS THICKEST GEAR; IF SHORT, REMAKE ITS",
-        "   THINNEST GEAR. REPEAT 1B.",
+        "1C. IF THE STACK IS LONG, RE-FACE ITS THICKEST GEAR.",
+        "1D. IF IT IS SHORT, REMAKE ITS THINNEST GEAR.",
+        "1E. REPEAT 1B UNTIL THE STACK READS IN ITS WINDOW.",
         # U37c cut-to-fit acceptance survives the taller post and longer stock:
         # MHA-DT-VN-61's registry/spec own the selected screw and reference length.
         # Each screw is cut against its own matched post/platform hole, never
@@ -1153,18 +1155,19 @@ CONE_CRANK_STEPS = _note_text(
         f"{inch_max_text(post_screw.POST_SCREW_CUT_TO_FIT_SHORT, post_screw.CUT_TO_FIT_SHORT_PLACES)}"
         " SHORT OF THE MHA-DT-20 UNDERSIDE, NEVER PROUD;",
         f"   ({inch_text(post_screw.CUT_LENGTH_MM, post_screw.DRAWING_PRECISION_BY_NAME[post_screw.CUT_LENGTH_DIMENSION])}) "
-        "REF CUT LENGTH. DEBURR THE ENDS. " + POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT,
-        "2B. RUN BOTH MHA-DT-VN-61 IN. LEAVE MHA-DT-VN-61 LOOSE ENOUGH TO TURN MHA-DT-05.",
+        "REF CUT LENGTH. " + POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT,
+        "2B. DEBURR THE CUT ENDS.",
+        "2C. RUN BOTH MHA-DT-VN-61 IN, LOOSE ENOUGH TO TURN MHA-DT-05.",
         # #1074: the collar's bearing on the boss end reacts the tip
         # adjuster's preload (#914), and the model mates it (#1058).
-        "2C. JOURNAL MHA-DT-04 IN THE MHA-DT-05 CONE BOSS UNTIL THE MHA-DT-04",
+        "2D. JOURNAL MHA-DT-04 IN THE MHA-DT-05 CONE BOSS UNTIL THE MHA-DT-04",
         "   COLLAR BEARS ON THE BOSS BACK END.",
-        "2D. SLIP MHA-DT-VN-54 ON THE MHA-DT-04 TIP STUB.",
+        "2E. SLIP MHA-DT-VN-54 ON THE MHA-DT-04 TIP STUB.",
         # User ruling 2026-09-29 (eight-views-4 photo): MHA-DT-21 is a prism
         # standing directly on MHA-DT-20, held by one #4-40 socket head cap
         # screw up from under the plate through its counterbored hole.
-        "2E. STAND MHA-DT-21 ON MHA-DT-20 AT ITS HOLE.",
-        "2F. RUN MHA-DT-VN-60 UP FROM UNDER THE PLATE THROUGH THE COUNTERBORE",
+        "2F. STAND MHA-DT-21 ON MHA-DT-20 AT ITS HOLE.",
+        "2G. RUN MHA-DT-VN-60 UP FROM UNDER THE PLATE THROUGH THE COUNTERBORE",
         "   INTO THE MHA-DT-21 FOOT, SNUG.",
         # User ruling 2026-09-29: the stack's back float is held on the
         # shaft by MHA-DT-VN-54, set off T006 by one feeler and locked on the
@@ -1180,53 +1183,57 @@ CONE_CRANK_STEPS = _note_text(
         "3C. REMOVE THE FEELER.",
         "3D. THREAD MHA-DT-VN-55 INTO MHA-DT-21 UNTIL IT TOUCHES THE MHA-DT-04 TIP.",
         "   MHA-DT-VN-55 " + ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT,
-        "3E. HOLD MHA-DT-05 PUSHED TOWARD MHA-DT-21 ALONG THE SHAFT THROUGH 3G.",
-        "   TURN MHA-DT-05 ON ITS SCREWS UNTIL THE TIP CENTRES IN THE CUP.",
-        "3F. TIGHTEN BOTH MHA-DT-VN-61.",
-        "3G. RECHECK THAT THE TIP IS CENTRED.",
-        "3H. THREAD MHA-DT-VN-55 IN UNTIL MHA-DT-04 JUST STOPS SHUTTLING AND STILL",
-        "   TURNS FREELY.",
-        "3J. BACK MHA-DT-VN-55 OFF 1/8 TURN.",
-        "3K. TIGHTEN MHA-DT-VN-56 ACROSS THE SLIT.",
-        "3L. CHECK THE MHA-DT-04 END PLAY WITH A DIAL INDICATOR ON THE SHAFT END,",
-        f"   PUSHING THE SHAFT BACK AND FORTH ALONG ITS AXIS: {inch_window(SHAFT_END_PLAY, 3)}.",
-        "3M. IF THE END PLAY IS OUT, LOOSEN MHA-DT-VN-56 AND REPEAT 3H-3L.",
+        "3E. HOLD MHA-DT-05 PUSHED TOWARD MHA-DT-21 ALONG THE SHAFT THROUGH 3H.",
+        "3F. TURN MHA-DT-05 ON ITS SCREWS UNTIL THE TIP CENTRES IN THE CUP.",
+        "3G. TIGHTEN BOTH MHA-DT-VN-61.",
+        "3H. RECHECK THAT THE TIP IS CENTRED.",
+        "3J. THREAD MHA-DT-VN-55 IN UNTIL MHA-DT-04 JUST STOPS SHUTTLING.",
+        "3K. BACK MHA-DT-VN-55 OFF 1/8 TURN.",
+        "3L. TIGHTEN MHA-DT-VN-56 ACROSS THE SLIT.",
+        "3M. DIAL-INDICATE THE MHA-DT-04 END PLAY AT THE SHAFT END: "
+        f"{inch_window(SHAFT_END_PLAY, 3)}.",
+        "3N. IF THE END PLAY IS OUT, LOOSEN MHA-DT-VN-56.",
+        "3P. REPEAT 3J-3M UNTIL THE END PLAY READS IN ITS WINDOW.",
         # User ruling 2026-09-28: the crank journal runs directly in the post;
         # the centres are fixed, and the only mesh requirement is no binding.
         # CONTRACT-crank: MHA-DT-VN-67 press to the blind-hole floor.  Owner
         # ruling D1 (2026-10-15): no crank-seat washer -- the collar is held
         # hard on the boss's front face, the 16T set on its feeler off the
-        # back face, and only then is its pin match-drilled (4C-4N).
+        # back face, and only then is its pin match-drilled (4E-4S).
         # User ruling 2026-09-30 (#1154): the 16T's shoulder and turned band
         # are feeler-checked against T120 before the pin is drilled, turning
         # by hand, and the free-running revolution after them (Codex P2 on
         # #1154, review 3).
         "4. PRESS 2X MHA-DT-VN-67 TO THE FLOORS OF THE MHA-DT-11 COLLAR HOLES.",
-        "4A. FIT MHA-DT-11 IN THE MHA-DT-05 CRANK BORE.",
-        "4B. SLIDE MHA-DT-10 ON, UNPINNED, A TOOTH IN A GAP OF MHA-DT-07.",
+        # Rule 23 (rubric sample round 5): the press fit's bench acceptance
+        # and its slip-fit remedy, the sheet 1 LOCTITE 638 note.
+        "4A. CHECK THAT NEITHER MHA-DT-VN-67 TURNS OR PULLS OUT BY HAND.",
+        "4B. IF ONE DOES, BOND IT IN WITH LOCTITE 638 PER THE SHEET 1 NOTE.",
+        "4C. FIT MHA-DT-11 IN THE MHA-DT-05 CRANK BORE.",
+        "4D. SLIDE MHA-DT-10 ON, UNPINNED, A TOOTH IN A GAP OF MHA-DT-07.",
         # Owner ruling D1 (2026-10-15): the collar bears on the boss with no
         # washer, the 16T's feeler is the end play, and the shaft end stands
         # proud of the 16T by dt_crankshaft_spec.SHAFT_END_PROUD_RANGE at
         # every accepted part set; it is left as it comes, not faced.  These
         # print in step 4 itself (rubric sample round 4: the separate crank end
         # fit block repeated the step and crowded sheet 10).
-        "4C. HOLD THE MHA-DT-11 COLLAR REAR FACE HARD ON THE MHA-DT-05 BOSS FRONT",
-        "   FACE, NO WASHER.",
-        f"4D. SET MHA-DT-10 {inch_text(PINION_SEAT_FEELER, FEELER_PLACES)} OFF THE BOSS BACK FACE "
-        "WITH A FEELER: END PLAY = THE FEELER.",
-        "4E. " + T120_FITUP_PUSH,
-        "4F. " + T120_FITUP_BAND_CHECK,
-        "4G. " + T120_FITUP_SHOULDER_CHECK,
-        "4H. " + T120_FITUP_REMEDY + " REPEAT 4C-4G.",
-        "4J. TURN MHA-DT-07 ONE FULL REVOLUTION BY HAND: IT MUST NEVER BIND.",
+        "4E. HOLD MHA-DT-11'S COLLAR HARD ON THE MHA-DT-05 BOSS, NO WASHER.",
+        f"4F. SET MHA-DT-10 {inch_text(PINION_SEAT_FEELER, FEELER_PLACES)} OFF THE BOSS BACK FACE "
+        "WITH A FEELER.",
+        "4G. " + T120_FITUP_PUSH,
+        "4H. " + T120_FITUP_BAND_CHECK,
+        "4J. " + T120_FITUP_SHOULDER_CHECK,
+        "4K. " + T120_FITUP_BAND_REMEDY,
+        "4L. " + T120_FITUP_SHOULDER_REMEDY,
+        "4M. REPEAT 4E-4J UNTIL THE FEELER PASSES BOTH.",
+        "4N. TURN MHA-DT-07 ONE FULL REVOLUTION BY HAND: IT MUST NEVER BIND.",
         # Rubric sample round 4: the bind remedy names what to check and how.
-        "4K. IF IT BINDS, FIND WHERE WITH THE 4F-4G FEELER; CORRECT AS 4H.",
-        "4L. MATCH-DRILL THROUGH THE MHA-DT-10 BOSS AT ITS MID-LENGTH INTO",
-        "   MHA-DT-11.",
-        f"4M. {pinion.PIN_FIT_LINES[0]}.",
-        f"4N. TAP {pinion.PIN_NUMBER} IN: {pinion.PIN_FIT_LINES[1]}.",
-        "4P. TURN MHA-DT-07 ONE FULL REVOLUTION AGAIN: NO BINDING.",
-        "4Q. CHECK THAT THE MHA-DT-11 END STANDS "
+        "4P. IF IT BINDS, FIND WHERE WITH THE 4H-4J FEELER; CORRECT AS 4K-4M.",
+        "4Q. MATCH-DRILL THE MHA-DT-10 BOSS AT MID-LENGTH INTO MHA-DT-11.",
+        f"4R. {pinion.PIN_FIT_LINES[0]}.",
+        f"4S. TAP {pinion.PIN_NUMBER} IN: {pinion.PIN_FIT_LINES[1]}.",
+        "4T. TURN MHA-DT-07 ONE FULL REVOLUTION AGAIN: NO BINDING.",
+        "4U. CHECK THAT THE MHA-DT-11 END STANDS "
         # A stack result, not a set window: rounded outward (Codjiflo, #2194).
         f"{inch_envelope((max(CRANK_END_PROUD_RANGE[0], 0.0), CRANK_END_PROUD_RANGE[1]), 3)}"
         " PROUD OF THE MHA-DT-10 BACK FACE; LEAVE IT PROUD, DO NOT FACE.",
@@ -1257,15 +1264,21 @@ CONE_CRANK_STEPS = _note_text(
         # through tap (user ruling 2026-10-15); no threadlocker.
         f"7. EPOXY MHA-DT-34 ON THE MHA-DT-08 TENON WITH {HANDLE_EPOXY}.",
         "7A. EPOXY MHA-DT-35 IN THE MHA-DT-08 BUTT THE SAME WAY.",
-        f"7B. CURE THEM ON MHA-DT-32, WAXED WITH {HANDLE_RELEASE}, THROUGH BOTH;",
-        f"   HOLD {HANDLE_FERRULE_CURE} UNTIL CURED.",
-        "7C. WIPE THE WAX OFF MHA-DT-32.",
-        "7D. SLIDE MHA-DT-08 ON MHA-DT-32.",
-        "7E. THREAD MHA-DT-32 INTO MHA-DT-06, NO THREADLOCKER, SHOULDER TIGHT.",
-        "7F. CHECK THE MHA-DT-08 END PLAY ON MHA-DT-32 WITH FEELERS: "
+        f"7B. SLIDE MHA-DT-32, WAXED WITH {HANDLE_RELEASE}, THROUGH BOTH BORES.",
+        # Rule 23 (rubric sample round 5): the epoxy's cure before load and the
+        # bond's bench acceptance.  The waxed screw through both bores is the
+        # centring check.
+        f"7C. LEAVE IT 24 H TO CURE: IT HOLDS {HANDLE_FERRULE_CURE}.",
+        "7D. CHECK THAT MHA-DT-34 AND MHA-DT-35 DO NOT TURN OR SLIDE ON",
+        "   MHA-DT-08 BY HAND.",
+        "7E. WIPE THE WAX OFF MHA-DT-32.",
+        "7F. SLIDE MHA-DT-08 ON MHA-DT-32.",
+        "7G. THREAD MHA-DT-32 INTO MHA-DT-06, NO THREADLOCKER, SHOULDER TIGHT.",
+        "7H. CHECK THE MHA-DT-08 END PLAY ON MHA-DT-32 WITH FEELERS: "
         f"{inch_window(handle_screw.END_PLAY_RANGE, 3)}.",
-        "7G. FILE THE MHA-DT-32 TIP FLUSH TO THE ARM INBOARD FACE.",
-        f"7H. STAKE THE TAP MOUTH ONTO IT AT {HANDLE_STAKE_POINTS} (SHEET {FULL_DETAIL_SHEET}).",
+        "7J. FILE THE MHA-DT-32 TIP FLUSH TO THE ARM INBOARD FACE.",
+        f"7K. STAKE THE TAP MOUTH ONTO IT AT {HANDLE_STAKE_POINTS} (SHEET {FULL_DETAIL_SHEET}).",
+        "7L. CHECK THAT MHA-DT-32 DOES NOT TURN BY HAND AND MHA-DT-08 SPINS FREE.",
     )
 )
 
@@ -1277,10 +1290,12 @@ CONE_CRANK_STEPS = _note_text(
 # spring directly on gear 19.  A thick front disc moves its strap to the
 # front, hence W in the front strap's Y; the back pedestal is then set from
 # the actual accepted stack on the spring-gap feeler.  The front pedestal's
-# location and seat run as 8F-8Q, so step 9C stays the spring-gap set that
+# location and seat run as 8K-8Y, so step 9C stays the spring-gap set that
 # MHA-DT-VN-68's print cites ("SHEET 13, DETAIL A (9C)").  Every DRO target is
 # a SETTING_TABLE row on sheet 14.  Step 23 stands the cone set over the
 # pivot seat drilled at PIVOT_SEAT_STEP.
+# The DRO zero every later bank, pivot-seat and back-ear setting reads from.
+DRO_ZERO_STEP = "8N"
 PIVOT_SEAT_STEP = "9Q"
 BANK_STEPS = _note_text(
     (
@@ -1292,93 +1307,88 @@ BANK_STEPS = _note_text(
         # Each connecting rod comes pinned to its rocker arm (MHA-CH-00's
         # bench pinning step, cited by key): its ring is captured in the closed
         # cam slot as the next gear goes on, so the pair travels with its gear.
-        "8A. SLIDE THEM ONTO A 3/8 GROUND SETTING MANDREL ~7.5 LONG, ALL ALIKE, CAM",
-        f"   SIDE FRONT. AS EACH GEAR GOES ON, SET ITS {CONNECTING_ROD} CONNECTING ROD",
-        f"   AND {ROCKER_ARM} ROCKER ARM PAIR ({RODS_PINNED_REF}) ON ITS CAM.",
-        "8B. CLAMP THE STACK LIGHTLY END TO END. MEASURE GEAR 0 CAM FACE TO GEAR 19",
-        f"   BACK FACE WITH A 5-6 IN MICROMETER: ACCEPT {STACK_WINDOW}.",
-        "8C. IF LONG, SLIDE THE GEARS OFF IN ORDER, WITH THEIR PAIRS, TO THE",
-        "   THICKEST CAM; RE-FACE ITS CAM FACE; RESTACK AND REPEAT 8B.",
-        "8D. IF SHORT, REMAKE THE THINNEST GEAR AND REPEAT 8B.",
-        "8E. SLIDE THE STACK OFF, GEAR 0 FIRST, EACH GEAR WITH ITS PAIR.",
-        "8F. PUT BASE MHA-FR-01, OUT OF THE FRAME, ON THE MILL TABLE, PAD TRAMMED,",
+        # Rubric sample round 5: one gear and one pair per line, then repeat.
+        "8A. SLIDE GEAR 0, CAM SIDE FRONT, ONTO A 3/8 GROUND SETTING MANDREL LONG",
+        "   ENOUGH TO PASS BOTH MHA-DT-02.",
+        f"8B. AS EACH GEAR GOES ON, SET ITS {CONNECTING_ROD} CONNECTING ROD AND {ROCKER_ARM}",
+        f"   ROCKER ARM PAIR ({RODS_PINNED_REF}) ON ITS CAM.",
+        "8C. REPEAT 8A-8B FOR GEARS 1 TO 19 IN ORDER, ALL ALIKE.",
+        "8D. CLAMP THE STACK LIGHTLY END TO END.",
+        "8E. MEASURE GEAR 0 CAM FACE TO GEAR 19 BACK FACE WITH A 5-6 IN MICROMETER:",
+        f"   ACCEPT {STACK_WINDOW}.",
+        "8F. IF LONG, RE-FACE THE THICKEST GEAR'S CAM FACE.",
+        "8G. IF SHORT, REMAKE THE THINNEST GEAR.",
+        "8H. RESTACK IN ORDER AND REPEAT 8D-8E UNTIL THE STACK READS IN ITS WINDOW.",
+        "8J. SLIDE THE STACK OFF, GEAR 0 FIRST, EACH GEAR WITH ITS PAIR.",
+        "8K. PUT BASE MHA-FR-01, OUT OF THE FRAME, ON THE MILL TABLE, PAD TRAMMED,",
         "   OVERHANG SUPPORTED; CONE SET (MHA-DT-20) NOT FITTED.",
-        "8G. STAND THE FRONT MHA-DT-02 ALONE ON THE MANDREL, ON THE BASE.",
-        "   EDGE-FIND BOTH MHA-FR-01 HOLE-TABLE DATUM FACES (SEE ITS PRINT);",
-        "   ZERO DRO X AND Y.",
-        "8H. MIC MHA-DT-26 AND RECORD ITS THICKNESS AS W (SETTING TABLE ROW 2,",
-        f"   SHEET {SETTING_SHEET}).",
-        "8J. SET THE FRONT MHA-DT-02 INNER FACE TO ITS Y AND THE MANDREL CENTRE",
-        "   (EDGE-FIND BOTH SIDES, HALVE) TO ITS X: SETTING TABLE ROWS 2 AND 3.",
+        "8L. STAND THE FRONT MHA-DT-02 ALONE ON THE MANDREL, ON THE BASE.",
+        "8M. EDGE-FIND BOTH MHA-FR-01 HOLE-TABLE DATUM FACES (SEE ITS PRINT).",
+        f"{DRO_ZERO_STEP}. ZERO DRO X AND Y THERE.",
+        f"8P. MIC MHA-DT-26; RECORD IT AS W (SETTING TABLE ROW 2, SHEET {SETTING_SHEET}).",
+        "8Q. SET THE FRONT MHA-DT-02 INNER FACE TO ITS Y (SETTING TABLE ROW 2).",
+        "8R. SET THE MANDREL CENTRE TO ITS X (ROW 3), EDGE-FOUND BOTH SIDES.",
         # The seat's drill, tap and depth are the MHA-FR-01 transfer callout's,
         # so the step names the print, never a copy (as the rig's seats do).
-        "8K. SPOT MHA-FR-01 THROUGH THE FOOT HOLE WITH AN 11/64 TRANSFER PUNCH.",
-        "8L. LIFT THE FRONT MHA-DT-02 OFF.",
-        "8M. DRILL AND TAP THE SEAT PER MHA-FR-01 (PLUG, THEN BOTTOMING TAP).",
-        "8N. BLOW OUT THE CHIPS.",
+        "8S. SPOT MHA-FR-01 THROUGH THE FOOT HOLE WITH AN 11/64 TRANSFER PUNCH.",
+        "8T. LIFT THE FRONT MHA-DT-02 OFF.",
+        "8U. DRILL AND TAP THE SEAT PER MHA-FR-01 (PLUG, THEN BOTTOMING TAP).",
+        "8V. BLOW OUT THE CHIPS.",
         # Check 4 re-reads both coordinates after the cone swing's radial
         # shims move the pedestals.
-        "8P. REFIT THE FRONT MHA-DT-02 AT X AND Y; TIGHTEN MHA-DT-VN-62.",
-        "8Q. RECHECK X AND Y AND RECORD THEM IN THE PEDESTAL RECHECK TABLE",
-        f"   (SHEET {SETTING_SHEET}).",
+        "8W. REFIT THE FRONT MHA-DT-02 AT X AND Y.",
+        "8X. TIGHTEN MHA-DT-VN-62.",
+        "8Y. RECHECK X AND Y; RECORD THEM IN THE PEDESTAL RECHECK TABLE.",
         "9. FROM THE BACK, LOAD THE MICED MHA-DT-26, THEN GEARS 0 TO 19, CAM SIDE",
         "   FRONT, THEIR PAIRS HANGING FREE, THEN MHA-DT-VN-68.",
         # One action with its stop condition, not a check and its remedy.
-        "9A. STONE ANY BORE BURR THAT DRAGS ON THE MANDREL, SO EVERY PART SLIDES",
-        "   FREE.",
-        # Support the loaded mandrel until the second pedestal is fitted.
-        "9B. SEAT MHA-DT-26 ON THE FRONT MHA-DT-02, THE BANK CLOSED TO THE FRONT ON",
-        "   THE DISC, THE MANDREL BACK END PROPPED AT BORE HEIGHT (V-BLOCK ON",
-        "   PARALLELS); REMOVE THE PROP ONLY TO SLIDE THE BACK MHA-DT-02 ON.",
-        f"9C. SLIDE THE BACK MHA-DT-02 ON UNTIL A {BANK_SPRING_FEELER} FEELER BESIDE MHA-DT-VN-68,",
-        f"   BETWEEN ITS INNER FACE AND GEAR 19'S BACK FACE (SHEET {BANK_SETTINGS_SHEET},",
-        "   DETAIL A), IS LIGHTLY PINCHED.",
+        "9A. STONE ANY BORE BURR THAT DRAGS ON THE MANDREL.",
+        # Support the loaded mandrel until the second pedestal replaces the prop.
+        "9B. SEAT MHA-DT-26 ON THE FRONT MHA-DT-02, BANK CLOSED UP, MANDREL BACK",
+        "   END PROPPED AT BORE HEIGHT ON A V-BLOCK.",
+        f"9C. SLIDE THE BACK MHA-DT-02 ON IN PLACE OF THE PROP UNTIL A {BANK_SPRING_FEELER} FEELER",
+        "   BESIDE MHA-DT-VN-68, BETWEEN ITS INNER FACE AND GEAR 19'S BACK FACE (SHEET",
+        f"   {BANK_SETTINGS_SHEET}, DETAIL A), IS LIGHTLY PINCHED.",
         "9D. SET ITS X (SETTING TABLE ROW 3).",
-        "9E. SPOT ITS FOOT HOLE AS 8K.",
+        "9E. SPOT ITS FOOT HOLE AS 8S.",
         # Lift it off before drilling: the mandrel covers that foot's hole.
         "9F. SLIDE THE BACK MHA-DT-02 OFF.",
-        "9G. DRAW THE LOADED MANDREL OUT OF THE FRONT MHA-DT-02, HOLDING MHA-DT-26",
-        "   AND MHA-DT-VN-68.",
-        "9H. LAY IT IN V-BLOCKS ON PARALLELS OFF THE BASE, PAIRS HANGING FREE.",
-        "9J. DRILL AND TAP THE BACK SEAT AND BLOW OUT ITS CHIPS AS 8M AND 8N.",
-        "9K. PASS THE MANDREL BACK THROUGH THE FRONT MHA-DT-02.",
-        "9L. SEAT THE DISC AND BANK TO THE FRONT AND PROP THE MANDREL AS 9B.",
-        "9M. REFIT THE BACK MHA-DT-02 AT THE 9C FEELER AND THE 9D X.",
-        "9N. TIGHTEN MHA-DT-VN-62. REMOVE THE FEELER.",
-        "9P. RECHECK X AND RECORD IT IN THE PEDESTAL RECHECK TABLE.",
-        f"{PIVOT_SEAT_STEP}. DRO STILL ZEROED, DRILL AND TAP THE MHA-FR-01 PIVOT SEAT PER ITS",
-        "   PRINT NOTE.",
+        "9G. MOVE THE LOADED MANDREL INTO V-BLOCKS OFF THE BASE, PAIRS FREE.",
+        "9H. DRILL AND TAP THE BACK SEAT AS 8U.",
+        "9J. BLOW OUT ITS CHIPS.",
+        "9K. PUT THE MANDREL BACK THROUGH THE FRONT MHA-DT-02 AS 9B.",
+        "9L. REFIT THE BACK MHA-DT-02 AT THE 9C FEELER AND THE 9D X.",
+        "9M. TIGHTEN MHA-DT-VN-62.",
+        "9N. REMOVE THE FEELER.",
+        "9P. RECHECK X; RECORD IT IN THE PEDESTAL RECHECK TABLE.",
+        f"{PIVOT_SEAT_STEP}. DRILL AND TAP THE MHA-FR-01 PIVOT SEAT PER ITS PRINT ({DRO_ZERO_STEP} ZERO).",
         "9R. MEASURE MHA-DT-02 OUTER FACE TO OUTER FACE.",
-        "9S. TURN MHA-DT-13: ITS CYLINDER IS THAT SPAN, PLUS A "
-        f"{inch_text(bank.ARBOR_DOME_HEIGHT, 2)} DOME",
-        "   EACH END (SEE ITS PRINT).",
-        "9T. PUSH MHA-DT-13 IN FROM THE BACK, END TO END WITH THE MANDREL, UNTIL",
-        f"   THE MANDREL IS OUT AND EACH DOME STANDS {inch_text(bank.ARBOR_DOME_HEIGHT, 2)} PROUD (DEPTH GAUGE).",
+        "9S. TURN MHA-DT-13 TO THAT SPAN, PLUS "
+        f"{inch_text(bank.ARBOR_DOME_HEIGHT, 2)} DOMES (SEE ITS PRINT).",
+        "9T. PUSH MHA-DT-13 IN FROM THE BACK, PUSHING THE MANDREL OUT, UNTIL EACH",
+        f"   DOME STANDS {inch_text(bank.ARBOR_DOME_HEIGHT, 2)} PROUD (DEPTH GAUGE).",
         "9U. SPOT MHA-DT-13 THROUGH EACH CROWN TAP WITH A #43 DRILL, .02 DEEP.",
         "9V. BLOW OUT THE CHIPS.",
         "9W. RUN THE FRONT MHA-SH-VN-54 IN TIGHT, THEN THE BACK ONE.",
-        "9X. CHECK THAT EACH GEAR TURNS FREE BY HAND, THE BANK HELD ON MHA-DT-26",
-        "   BY MHA-DT-VN-68.",
+        "9X. CHECK THAT EACH GEAR TURNS FREE BY HAND.",
+        "9Y. CHECK THAT MHA-DT-13 DOES NOT TURN OR SLIDE BY HAND.",
         # #936 P1 b, option A (user ruling 2026-09-26): the back MHA-CH-08 ear
-        # is the rocker bank's axial datum (rocker_bank_layout), set on the 8G
+        # is the rocker bank's axial datum (rocker_bank_layout), set on the 8N
         # DRO zero so the cams and the rocker stations share one datum.  Hub
         # 19 bears on the back MHA-CH-VN-56 washer against that face (user,
         # 2026-10-10), so the target moves back (LESS Y) by the miced washer's
         # excess.  Channel assembly MHA-CH-00 cites this step by key
         # (channel_steps.NORTH_BRACKET_SET_REF).
-        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}. MHA-FR-05 SCREWED DOWN ON THE BASE"
-        " (FRAME ASSEMBLY MHA-FR-00 STEP 8),",
-        "   DRO STILL ZEROED AS 8G: FROM MHA-CH-00 TAKE THE BACK MHA-CH-08, ONE",
-        f"   {NORTH_BRACKET_SCREW} AND ONE MHA-CH-VN-56.",
+        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}. MHA-FR-05 ON THE BASE (MHA-FR-00 STEP 8), {DRO_ZERO_STEP} DRO ZERO: TAKE",
+        f"   THE BACK MHA-CH-08, ONE {NORTH_BRACKET_SCREW} AND ONE MHA-CH-VN-56 FROM MHA-CH-00.",
         f"{steps.step_number(NORTH_BRACKET_SET_KEY)}A. STAND THE MHA-CH-08 ON THE MHA-FR-05 RAIL, FOOT TO THE BACK.",
-        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}B. MIC THE MHA-CH-VN-56 AND RECORD ITS THICKNESS AS W (SETTING TABLE",
-        "   ROW 5).",
-        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}C. SET THE EAR INNER FACE TO ITS Y (SETTING TABLE ROW 5); CLAMP.",
-        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}D. DRILL AND TAP THE RAIL THROUGH THE MHA-CH-08 FOOT PER THE MHA-FR-05",
-        "   SEAT CALLOUT (MHA-FR-05 VIEW B).",
-        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}E. SCREW THE MHA-CH-08 DOWN WITH THE {NORTH_BRACKET_SCREW}.",
-        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}F. RECHECK Y.",
-        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}G. KEEP THAT MHA-CH-VN-56 FOR THE BACK END OF "
+        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}B. MIC THE MHA-CH-VN-56; RECORD IT AS W (SETTING TABLE ROW 5).",
+        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}C. SET THE EAR INNER FACE TO ITS Y (SETTING TABLE ROW 5).",
+        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}D. CLAMP IT.",
+        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}E. DRILL AND TAP THE RAIL THROUGH THE FOOT PER MHA-FR-05 VIEW B.",
+        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}F. SCREW THE MHA-CH-08 DOWN WITH THE {NORTH_BRACKET_SCREW}.",
+        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}G. RECHECK Y.",
+        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}H. KEEP THAT MHA-CH-VN-56 FOR THE BACK END OF "
         f"{channel_step_ref('north-ear-datum')}.",
     )
 )
@@ -1498,10 +1508,12 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             "ARE TRANSFERRED, NOT PRE-DRILLED. SET BOTH MHA-DT-18 LOOSE ON THE BASE.\n"
             f"FIT MHA-DT-24: {SPRING_EAST_WEST}.\n"
             "PARK MHA-DT-16: THE MHA-DT-25 PINS REST ON THE CAMS UNDER THE SPRING.\n"
-            "FACE A MHA-DT-01 TOOTH TIP TO A MHA-DT-12 TOOTH TIP ON THE LEVEL LINE OF "
-            f"CENTRES. SLIDE THE RIG IN UNTIL A {TIP_GAP.TIP_GAP_FEELER_TEXT} IS SNUG "
+            "TURN MHA-DT-01 SO A TOOTH TIP FACES A MHA-DT-12 TOOTH TIP ON THE LEVEL "
+            "LINE OF CENTRES.\n"
+            f"SLIDE THE RIG IN UNTIL A {TIP_GAP.TIP_GAP_FEELER_TEXT} IS SNUG "
             f"BETWEEN THE TIPS: {TIP_GAP.TIP_GAP_ACCEPT_TEXT}.\n"
-            f"SET THE TIP GAP AS {steps.step_number('rig-located')}C AT THE FRONT AND "
+            f"SET THE TIP GAP AS {steps.step_number('rig-located')}C-"
+            f"{steps.step_number('rig-located')}D AT THE FRONT AND "
             "BACK STATIONS, SQUARING BOTH MHA-DT-18 TO THE DRUM.",
         ),
         ("rig-set", f"{_RIG_SET_STEP}\nCLAMP BOTH MHA-DT-18."),
@@ -1534,7 +1546,8 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             "CONE SET ON THE BASE: OIL THE MHA-DT-VN-52 SHOULDER.\n"
             f"STAND MHA-DT-20 ON MHA-FR-01 OVER THE STEP {PIVOT_SEAT_STEP} PIVOT SEAT.\n"
             "RUN MHA-DT-VN-52 DOWN THROUGH ITS PIVOT BORE, SHOULDER SEATED HARD ON THE "
-            "BASE; MHA-DT-20 SWINGS FREELY UNDER THE HEAD.\n"
+            "BASE.\n"
+            "CHECK THAT MHA-DT-20 SWINGS FREELY UNDER THE HEAD.\n"
             "RUN 1X MHA-SH-VN-52, THE SWING STOP, INTO ITS TAPPED MHA-FR-01 SEAT (HOLE "
             "TABLE), HEAD SEATED.\n"
             "SWING THE CONE SET IN.\n"
@@ -1598,7 +1611,8 @@ CHECKS = _note_text(
         "4A. SWING THE CONE SET ON MHA-DT-VN-52 TO THE MHA-SH-VN-52 STOP, CLEAR OF",
         "   EVERY MHA-DT-12.",
         "4B. ZERO DIAL INDICATORS: EACH MHA-DT-02 IN X, THE FRONT ONE IN Y.",
-        "4C. EASE THE MHA-DT-02 SCREWS (MHA-DT-VN-62) TO SNUG-LOOSE.",
+        "4C. EASE THE MHA-DT-02 SCREWS (MHA-DT-VN-62) UNTIL EACH PEDESTAL MOVES",
+        "   UNDER LIGHT TAPS.",
         "4D. SWING IN ON RADIAL SHIMS, TIP TO MHA-DT-12 ROOT: "
         f"{inch_text(set_stack.feeler_gap_mm(12), FEELER_PLACES)} AT T012, "
         f"{_T120_SET_FEELER} AT T120.",
@@ -1608,24 +1622,27 @@ CHECKS = _note_text(
         "ITS ACCEPT RANGE.",
         "4G. IF A PEDESTAL IS OUT, EASE ITS MHA-DT-VN-62.",
         "4H. RESET IT INTO ITS ACCEPT RANGE ON ITS INDICATORS.",
-        "4J. TIGHTEN ITS MHA-DT-VN-62. STEPS "
+        "4J. TIGHTEN ITS MHA-DT-VN-62. DO NOT REDO STEPS "
         f"{steps.step_number(NORTH_BRACKET_SET_KEY)} AND "
-        f"{steps.step_number('rig-located')}-{steps.step_number('rig-seats-transferred')} "
-        "STAND; CHECK 7 RE-PROVES THE RIG.",
+        f"{steps.step_number('rig-located')}-{steps.step_number('rig-seats-transferred')}: "
+        "CHECK 7 RECHECKS THE RIG.",
         "4K. SWING THE CONE SET OUT.",
         "4L. REMOVE THE SHIMS.",
         f"4M. SWING IN UNTIL A {_T120_SET_FEELER} FEELER IS SNUG T120 TIP TO ROOT.",
         "4N. HOLD IT THERE AND TIGHTEN MHA-DT-VN-51.",
-        "4P. LEAVE MHA-DT-02 TIGHT AFTER THIS SET; IF LOOSENED, REDO CHECKS 4-7.",
+        # Rule 23 (rubric sample round 5): the adjustable clamp's acceptance.
+        "4P. PUSH THE CONE SET BY HAND: IT DOES NOT SWING, AND THE "
+        f"{_T120_SET_FEELER} FEELER AT T120 IS STILL SNUG.",
+        "4Q. LEAVE MHA-DT-02 TIGHT AFTER THIS SET; IF LOOSENED, REDO CHECKS 4-7.",
         # User ruling 2026-10-10: T012's arithmetic worst-corner overlap is a
         # REF fit-up note, never a gate (dt_mesh_checks; the RSS corner is gated).
-        "4Q. IF T012 BINDS AFTER THE SET (TIP-TO-ROOT INTERFERENCE UP TO "
+        "4R. IF T012 BINDS AFTER THE SET (TIP-TO-ROOT INTERFERENCE UP TO "
         f"{inch_text(-mesh_checks.cone_check(12).interference_margin_worst_mm, 3)} REF), STONE "
-        "ITS TIP UNTIL IT TURNS FREE; THE T120 SET STANDS.",
-        "4R. VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT "
+        "ITS TIP UNTIL IT TURNS FREE; DO NOT RESET T120.",
+        "4S. VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT "
         f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT}; SHOULDER FULLY SEATED; MHA-DT-20 STAYS "
         "SEATED THROUGH CHECK 4.",
-        "4S. VERIFY THE MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT "
+        "4T. VERIFY THE MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT "
         f"{stop_screw.MIN_USEFUL_ENGAGEMENT_TEXT}; HEAD FULLY SEATED.",
         # Rubric sample round 2: the notch's reference, the running direction
         # and the sine sense must be readable.  Notches up = cosine mode,
@@ -1644,14 +1661,14 @@ CHECKS = _note_text(
         "UP, COMING UP IN THE RUNNING DIRECTION.",
         # The saved pose is engaged with MHA-DT-VN-51 tight (SETUP_NOTES):
         # zeroing ends by re-setting the swing as check 4 does.
-        "5E. RETURN MHA-DT-16 TO PARK. RE-SET THE CONE SET SWING AS 4K-4N.",
+        "5E. RETURN MHA-DT-16 TO PARK. RE-SET THE CONE SET SWING AS 4K-4P.",
         "6. PARKED, MHA-DT-24 HOLDS MHA-DT-01 CLEAR OF EVERY MHA-DT-12.",
         f"7. PARKED, PINS ON THE CAMS: A {TIP_GAP.TIP_GAP_SETTING_TEXT} FEELER IS SNUG TIP TO TIP",
         f"   AT THE FRONT AND BACK STATIONS; {TIP_GAP.TIP_GAP_ACCEPT_TEXT}",
-        f"   (SHEET {CONTINUATION_SHEET}, STEP {steps.step_number('rig-located')}C).",
+        f"   (SHEET {CONTINUATION_SHEET}, STEP {steps.step_number('rig-located')}D).",
         "7A. IF A STATION IS OUT, EASE THE MHA-DT-VN-57 SCREWS.",
         f"7B. REFIT THE STEP {steps.step_number('rig-set')} LEAVES SNUG.",
-        f"7C. RE-SET THE RIG AS STEP {steps.step_number('rig-located')}D.",
+        f"7C. RE-SET THE RIG AS STEP {steps.step_number('rig-located')}E.",
         "7D. TIGHTEN MHA-DT-VN-57.",
         "7E. RECHECK THOSE LEAVES.",
         "7F. REPEAT CHECKS 6 AND 7.",
@@ -1733,10 +1750,9 @@ def _split_sequence_chain(
 
 
 # The fields, in reading order (package_note_fields): sheet 7's left field
-# carries the direction key and steps 1-3E, its full-height right field steps
-# 3F-5 (MHA-PD-00 cites 4 and 5 on SEQUENCE_SHEET); sheet 8's left field steps
-# 6-8G and its right field 8H-9C; sheet 9's left field 9D-11, its right field
-# 11A-16B; sheet 10's left field 16C-21B and its right field 21C-23.  Sub-step
+# carries the direction key and the first steps, its full-height right field
+# the rest through 5 (MHA-PD-00 cites 4 and 5 on SEQUENCE_SHEET); sheets 8-10
+# carry 6-23, each field cut at a sub-step by the constants below.  Sub-step
 # splits keep every field full once the one-thing lines grew the sequence
 # (rubric sample rounds 2 and 4); test_every_note_field_holds_its_stacked_blocks
 # proves each fits.
@@ -1749,8 +1765,8 @@ CONE_CRANK_PRIMARY, CONE_CRANK_CONTINUED, CRANK_CONTINUED = _split_sequence_chai
     (CRANK_CONTINUED_FROM, _CRANK_CONTINUED_HEADING),
 )
 _BANK_CONTINUED_HEADING = "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK"
-BANK_CONTINUED_FROM = f"{steps.step_number('cylinder-stack-accepted')}H"
-BANK_LAST_FROM = f"{steps.step_number('cylinder-bank-located')}D"
+BANK_CONTINUED_FROM = f"{steps.step_number('cylinder-stack-accepted')}G"
+BANK_LAST_FROM = f"{steps.step_number('cylinder-bank-located')}B"
 BANK_PRIMARY, BANK_CONTINUED, BANK_LAST = _split_sequence_chain(
     BANK_STEPS,
     (BANK_CONTINUED_FROM, _BANK_CONTINUED_HEADING),
