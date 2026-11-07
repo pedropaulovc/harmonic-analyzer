@@ -3,7 +3,7 @@ module: M06
 title: "Mill I — tramming, squaring, edge finding"
 status: in progress      # not started | in progress | competent | applied
 hours_estimated: 24
-hours_actual: 6.5
+hours_actual: 21.75
 ---
 
 # M06 — Mill I — tramming, squaring, edge finding
@@ -120,3 +120,6 @@ Log entries for this module, newest last. Create them with
 | date | entry | outcome | hours |
 |---|---|---|---|
 | 2026-10-29 | [vise install and first cuts](../entries/2026-10-29-vise-install-and-first-cuts.md) | partial | 6.5 |
+| 2026-11-04 | [oblique-jig end brackets](../entries/2026-11-04-oblique-end-brackets-scrapped.md) | scrapped | 5.25 |
+| 2026-11-05 | [base bar on the table](../entries/2026-11-05-base-bar-on-the-table.md) | partial | 4 |
+| 2026-11-06 | [base bar, both edges, controller reset](../entries/2026-11-06-base-bar-both-edges-and-a-controller-reset.md) | partial | 6 |
