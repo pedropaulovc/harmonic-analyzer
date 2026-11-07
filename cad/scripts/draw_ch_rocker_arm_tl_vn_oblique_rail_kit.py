@@ -244,10 +244,13 @@ _DIM_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
 STATION_ARROW_SIDES = dict.fromkeys(DRAWN_STATIONS, _DIM_ARROWS_OUTSIDE)
 _CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 _TOL_NONE = 0  # swTolType_e.swTolNONE
+# Only the drawn dimensions' places: curation deletes the other stations, so
+# the readback must not expect them.
 FRONT_DIMENSION_PRECISION = {
     name: places
     for places_by_name in rail.DRAWING_PRECISION.values()
     for name, places in places_by_name.items()
+    if name in RECEIPT_DIMENSIONS
 }
 # The flag: a note of its own, centred under the station (a callout on the
 # station stacked that value onto the row over it). Its top stands 4 mm
@@ -374,8 +377,11 @@ RECEIPT_NOTE_CELL = (0.015, _NOTES_BOTTOM - 0.001, _FOOTER_RIGHT, RECEIPT_NOTE_T
 END_VIEW_LETTER = "B"
 VIEW_LETTER_HEIGHT = 0.005
 # The letter's upper-left, from the arrow tip; its readback cell, from the tip.
-VIEW_ARROW_TEXT_OFFSET = (0.005, VIEW_LETTER_HEIGHT / 2.0)
-VIEW_ARROW_CELL_REACH = (-0.001, -0.005, 0.012, 0.005)
+# A 5 mm "B" is about 4 mm wide: 4 + 4 = 8 mm right of the tip, inside the
+# 9.5 mm reach, which ends short of the isometric's cell (TOP's far end stands
+# about 10.4 mm left of it).
+VIEW_ARROW_TEXT_OFFSET = (0.004, VIEW_LETTER_HEIGHT / 2.0)
+VIEW_ARROW_CELL_REACH = (-0.001, -0.005, 0.0095, 0.005)
 
 
 def caption_text(label: str, scale: tuple[int, int]) -> str:

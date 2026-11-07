@@ -674,13 +674,13 @@ def test_controls_print_at_the_title_block_rows() -> None:
         else:
             assert band == printed_band_mm(digits)
             assert spec.control_si(name)[1] == band / 1000.0
-    # Every KP08 flat is one size; the printed one says how many, and the
-    # handwheel's station that its flat runs to the end.
+    # Every KP08 flat is one size; the printed one says how many and names
+    # the pillow blocks by their short number. The handwheel's flat station
+    # prints bare.
     assert (spec.FLAT_LENGTH_CALLOUT, spec.FLAT_AF_CALLOUT) == ("4X", "3X")
     assert draw.FLAT_CALLOUTS == {
-        "FlatLength": "4X, KP08 FLATS",
+        "FlatLength": "4X FLATS FOR\nTL-VN-56",
         "FlatAF": "3X\nC, D, E",
-        "HandwheelFlatStation": "1X FLAT TO END",
     }
     # The feed absorbs the band at either limit.
     short_margin = (feed.NEAR_STUB - feed.NEAR_STUB_MIN) + (
@@ -978,20 +978,24 @@ def test_feed_nut_rework_is_native_banded_controls_on_sheet_3() -> None:
         },
     }
     # A set prefix replaces a diameter's own Ø (run 20261105T023247678Z
-    # printed "4X 3.60/3.46"), so the hole's count carries the token too.
+    # printed "4X 3.60/3.46"), so the hole's count carries the token too; the
+    # countersink's carries the Y14.5 countersink symbol as well.
     assert nut.DIMENSION_PREFIXES == {
-        ("Countersink1Profile", "CskDia"): "4X <MOD-DIAM>",
+        ("Countersink1Profile", "CskDia"): "4X <HOLE-SINK><MOD-DIAM>",
         ("ReceiptReference", "ReceiptHoleDia"): "4X <MOD-DIAM>",
     }
-    # "4X Ø4.76/4.50": the count, then SolidWorks' own diameter token, once.
+    # "4X ⌵ Ø4.76/4.50 X 82°": the count, the countersink symbol, then
+    # SolidWorks' own diameter token, once; the angle is the sheet's suffix.
     # CskDia is the mouth's diameter (REWORK_CONTROLS' 4.6), printed in the
     # section as a linear size, which adds no Ø of its own (run 6 printed
     # "4X 4.6"); the callout lines below carry none either.
-    assert nut.CSK_PREFIX == f"{nut.SCREW_COUNT}X <MOD-DIAM>" == "4X <MOD-DIAM>"
+    assert nut.HOLE_PREFIX == f"{nut.SCREW_COUNT}X <MOD-DIAM>" == "4X <MOD-DIAM>"
+    assert nut.CSK_PREFIX == f"{nut.SCREW_COUNT}X <HOLE-SINK><MOD-DIAM>"
     assert nut.REWORK_CONTROLS["CskDia"][0] == nut.CSK_DIA
     assert "Ø" not in draw.CSK_SCREW_CALLOUT and "MOD-DIAM" not in draw.CSK_SCREW_CALLOUT
     assert nut.CSK_ANGLE == 82.0
-    assert nut.CSK_CALLOUT == "82° CSK"
+    assert nut.CSK_SUFFIX == " X 82°"
+    assert "CSK" not in draw.CSK_SCREW_CALLOUT
     assert nut.CSK_APEX_DEPTH * math.tan(math.radians(41.0)) == pytest.approx(
         nut.CSK_DIA / 2.0
     )
@@ -1034,7 +1038,7 @@ def test_feed_nut_rework_is_native_banded_controls_on_sheet_3() -> None:
 def test_rework_bands_name_their_mates_at_their_callouts() -> None:
     """Rule 4 (run 20261104T230444981Z, 4475311251): the flange's 3.3/3.7
     names the lug the faced seat bears on and the screws it grips; the
-    countersink's band names the flat head that seats in it and how it seats;
+    countersink's band names the flat head that seats in it and its walls;
     the faced length names the KP08 it clears; each receipt limit names what
     it fits."""
     import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
@@ -1061,18 +1065,18 @@ def test_rework_bands_name_their_mates_at_their_callouts() -> None:
     )
     assert row.head == fasteners.FLAT_HEAD
     assert row.grip_mm == pytest.approx(nut.FLANGE_THICK + nut.HEAD_PROUD_NOMINAL)
-    rows = countersink.splitlines()
-    assert rows[0] == f"{nut.CSK_ANGLE:.0f}° CSK FOR {nut.SCREW_THREAD} FLAT HEAD"
+    # The countersink's size line is the dimension's own (symbol prefix,
+    # angle suffix); the callout is the screw by its same-parent short
+    # number and SKU, then the spec's walls (RV-01).
     assert nut.SCREW_DIMS.head_angle_deg == nut.CSK_ANGLE
-    assert rows[1] == f"{nut.SCREW_SKU} ({screw_row['number']})"
-    # Seating: the head stands proud at every countersink the band and the
-    # opening remedy allow, never flush or below the face.
-    assert 0.0 < nut.HEAD_PROUD_MIN < nut.HEAD_PROUD_MAX
-    assert rows[2] == "HEAD PROUD OF FACE"
+    screw_short = draw.short_number(screw_row["number"])
+    assert screw_short == "TL-VN-67"
+    rows = countersink.splitlines()
+    assert rows == [f"FOR {screw_short} ({nut.SCREW_SKU})", nut.CSK_WALL_TEXT]
+    assert countersink == "FOR TL-VN-67 (91771A112)\nMIN WALL 0.40 TO BODY, 0.45 TO OD"
     # Nothing the spec does not establish: no seat depth, no flush; the only
-    # numbers past the screw's are the spec's walls (RV-01).
-    assert len(rows) == 4 and rows[3] == nut.CSK_WALL_TEXT
-    assert "FLUSH" not in countersink and not re.search(r"\d\.\d", "\n".join(rows[:3]))
+    # numbers past the screw's are the spec's walls.
+    assert "FLUSH" not in countersink and not re.search(r"\d\.\d", rows[0])
     # The faced face is named where it is: the seat face the lug bears on.
     assert draw.SPIGOT_NOTE.replace("\n", " ") == "SPIGOT FACED FLUSH WITH FLANGE SEAT FACE"
     assert nut.LENGTH == nut.FLANGE_THICK + nut.BODY_LENGTH  # no spigot left
@@ -1082,8 +1086,8 @@ def test_rework_bands_name_their_mates_at_their_callouts() -> None:
     assert lane == "below" and draw.KP08_NUMBER == kp08
     assert faced.splitlines()[-1] == kp08
     # The receipt limits print once, natively; each callout below them names
-    # its mate by its registry number, with no number of its own but the
-    # body's RV-02 wall row, the spec's.
+    # its mate, with no number of its own but the body's RV-02 wall row, the
+    # spec's.
     mates = {}
     for name, (lane, text) in draw.RECEIPT_CALLOUTS.items():
         rows = text.splitlines()
@@ -1094,12 +1098,14 @@ def test_rework_bands_name_their_mates_at_their_callouts() -> None:
         mates[name] = rows[-1]
     assert mates == {
         "ReceiptFlangeDia": "LUG FACE",
-        "ReceiptBodyDia": screw_row["number"],
+        "ReceiptBodyDia": f"CLEARS HEADS OF {nut.SCREW_COUNT}X {screw_short}",
         "ReceiptHoleDia": f"{feed_block.NUMBER} LUG",
         "ReceiptHolePcd": f"{feed_block.NUMBER} LUG",
     }
     assert draw.RECEIPT_CALLOUTS["ReceiptFlangeDia"][1].startswith(f"WITHIN {feed_block.NUMBER}\n")
-    assert f"{nut.SCREW_COUNT}X" in draw.RECEIPT_CALLOUTS["ReceiptBodyDia"][1]
+    assert draw.RECEIPT_CALLOUTS["ReceiptBodyDia"][1] == (
+        "CLEARS HEADS OF 4X TL-VN-67\nMIN WALL 0.75 TO THREAD"
+    )
 
 
 def test_rework_tolerances_live_only_in_the_feed_nut_member() -> None:
@@ -1634,11 +1640,16 @@ def test_rework_sheet_lays_the_nut_out_axis_horizontal_and_clear() -> None:
     for name, (measured, point, text, value_rows) in run11.items():
         assert draw._inside(measured, centred_block(point, text, value_rows)), name
 
-    # Run 9's text point and wall row: the model holds the measured block and
-    # crosses the border, as the render did.
-    run9_text = (
-        "\n".join(draw.CSK_SCREW_CALLOUT.splitlines()[:-1])
-        + "\nWALL 0.39 MIN TO BODY, 0.54 MIN TO OD"
+    # Run 9's text point and printed rows (that round's callout, the wall row
+    # as it then read): the model holds the measured block and crosses the
+    # border, as the render did.
+    run9_text = "\n".join(
+        (
+            "82° CSK FOR #4-40 FLAT HEAD",
+            f"{nut.SCREW_SKU} ({draw.NUT_SCREW_NUMBER})",
+            "HEAD PROUD OF FACE",
+            "WALL 0.39 MIN TO BODY, 0.54 MIN TO OD",
+        )
     )
     run9_model = leadered_block(
         sheet_point(nut.FLANGE_DIA / 2.0 + 1.0, nut.LENGTH + 6.0), run9_text
@@ -2177,9 +2188,8 @@ def test_details_carry_the_near_station_and_the_printed_flat() -> None:
     assert set(by_label["E"].keep) == {"FlatAF"}
     assert (spec.PRINTED_FLAT, spec.PRINTED_LENGTH_FLAT) == ("Handwheel", "FarKP08")
     assert draw.FLAT_CALLOUTS == {
-        "FlatLength": "4X, KP08 FLATS",
+        "FlatLength": "4X FLATS FOR\nTL-VN-56",
         "FlatAF": "3X\nC, D, E",
-        "HandwheelFlatStation": "1X FLAT TO END",
     }
     for detail in draw.END_DETAILS:
         fence = detail.radius_mm * draw._DETAIL_PER_MODEL_MM
@@ -2206,20 +2216,22 @@ def test_details_carry_the_near_station_and_the_printed_flat() -> None:
     text_x, text_y = far.keep["FlatLength"]
     assert text_x - draw.FLAT_LENGTH_TEXT_HALF_WIDTH > flat_end
     assert text_x + draw.FLAT_LENGTH_TEXT_HALF_WIDTH < _fence_box(wheel)[0]
-    assert draw.FLAT_LENGTH_TEXT_HALF_WIDTH * 2 > 0.0022 * len(
-        draw.FLAT_CALLOUTS["FlatLength"]
-    )
+    flat_rows = draw.FLAT_CALLOUTS["FlatLength"].splitlines()
+    assert draw.FLAT_LENGTH_TEXT_HALF_WIDTH * 2 > 0.0022 * max(map(len, flat_rows))
     # The across-flat's dimension line stands left of E's fence, short of the
     # flat's start (so its extension line leaves the fence over the flat, not
     # along the thread), its text (widest row "C, D, E", about 15 mm) clear of
     # both fences and between the far crest and the flat, and a row over the
-    # flat length's two rows.
+    # flat length's rows (its value and its callout's).
     af_x, af_y = wheel.keep["FlatAF"]
     flat_start = spec.FLAT_STARTS["Handwheel"]
     assert wheel.centre_mm - wheel.radius_mm < flat_start
     assert af_x + 0.0075 < _fence_box(wheel)[0]
     assert af_x - 0.0075 > _fence_box(far)[2] + 0.004
-    assert af_y - 3 * draw.TEXT_HALF_HEIGHT > text_y + 2 * draw.TEXT_HALF_HEIGHT
+    af_rows = 1 + len(draw.FLAT_CALLOUTS["FlatAF"].splitlines())
+    assert af_y - af_rows * draw.TEXT_HALF_HEIGHT > (
+        text_y + (1 + len(flat_rows)) * draw.TEXT_HALF_HEIGHT
+    )
     radius = spec.MAJOR_DIA / 2.0
     crest = draw.detail_xy(wheel.centre_mm, wheel.centre, 0.0, -radius)[1]
     flat = draw.detail_xy(wheel.centre_mm, wheel.centre, 0.0, spec.FLAT_AF - radius)[1]
@@ -3085,14 +3097,13 @@ def test_countersink_wall_shortfall_is_a_declared_owner_ruled_minor() -> None:
 
     wall, _thread, _faced = load_exceptions(_config.CONFIG_DIR, draw.PART_STEM, "part")
     assert (wall.id, wall.kind) == ("RV-01", "minor")
-    # "where" quotes the printed callout: the prefix's Ø token as printed,
-    # the band, the angle and the wall line, exactly.
-    # LIMIT prints the maximum over the minimum at the band's two places.
-    printed = (
-        f"{nut.CSK_PREFIX.replace('<MOD-DIAM>', 'Ø')}{nut.CSK_DIA_MAX:.2f}/"
-        f"{nut.CSK_DIA_MIN:.2f} {nut.CSK_CALLOUT}"
-    )
-    assert printed == "4X Ø4.76/4.50 82° CSK"
+    # "where" quotes the printed callout: the prefix's countersink symbol and
+    # Ø token as printed, the band, the angle suffix and the wall line,
+    # exactly. LIMIT prints the maximum over the minimum at the band's two
+    # places.
+    symbols = nut.CSK_PREFIX.replace("<HOLE-SINK>", "⌵ ").replace("<MOD-DIAM>", "Ø")
+    printed = f"{symbols}{nut.CSK_DIA_MAX:.2f}/{nut.CSK_DIA_MIN:.2f}{nut.CSK_SUFFIX}"
+    assert printed == "4X ⌵ Ø4.76/4.50 X 82°"
     label = draw.REWORK_SECTION_LABEL
     assert wall.where == (
         f"sheet {nut.REWORK_SHEET}, Section {label}-{label}, the {printed} callout: "

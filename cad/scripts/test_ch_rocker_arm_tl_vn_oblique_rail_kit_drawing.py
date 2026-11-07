@@ -418,18 +418,21 @@ def test_hole_sketch_places_every_station_from_the_end_face(monkeypatch) -> None
 def test_rail_receipt_note_points_at_the_stations() -> None:
     bar = _config.parts("ch-rocker-arm-tl-oblique-base-bar")
     lines = note_lines(rail.DRAWING_NOTES, label=NAME)
-    assert len(lines) == 3
-    assert all(len(line) <= 70 for line in lines), lines
+    # The pairing and free screw entry are the jig's steps (rule 7): the
+    # sheet's note is the wall acceptance alone.
+    assert lines == ("[A] WALL FROM EACH END COUNTERBORE TO RAIL END: 2.0 MIN.",)
     note = " ".join(lines)
     assert rail.WALL_ACCEPTANCE_MM == 2.0
-    assert "[A] WALL FROM EACH END COUNTERBORE TO RAIL END: 2.0 MIN." in note
     assert "TAP WALL" not in note
     assert "TRANSFER TO" not in note
     assert "MHA-CH-06-TL-00 SHEET 1 LIMITS; SEALS ON RAIL, NO BIND" in rail.END_FIT_CALLOUT
-    assert "KEEP EACH RAIL WITH ITS MATCHED BASE BAR" in note
-    assert "ALL SCREWS MUST ENTER FREELY BY HAND" in note
-    assert f"BASE BAR {bar['number']}" in rail.RECEIPT_FLAG
-    assert "STATIONS REF" in rail.RECEIPT_FLAG
+    # The flag gives the hole pattern as one REF pattern (rule 10), then its
+    # match-transfer mate.
+    assert rail.RECEIPT_FLAG.splitlines() == [
+        f"{rail.HOLE_COUNT}X HOLES ON ({rail.HOLE_PITCH:.3f}) PITCH",
+        f"MATCH-TRANSFER TO BASE BAR {bar['number']}",
+    ]
+    assert rail.RECEIPT_FLAG.splitlines()[0] == "8X HOLES ON (60.000) PITCH"
     assert rail.END_FIT_CALLOUT.splitlines()[0] == "RAIL ENDS FLUSH WITH BASE BAR ENDS"
     assert len(rail.END_FIT_CALLOUT.splitlines()) == 2
     assert rail.CBORE_END_WALL_WORST >= base_bar.WALL_TARGET_MM
@@ -438,7 +441,10 @@ def test_rail_receipt_note_points_at_the_stations() -> None:
         "near counterbore", "far counterbore",
     }
     assert len(draw.WALL_FLAGS) == 2
-    assert draw.caption_text("RIGHT", (2, 1)) == "END VIEW  2:1"
+    # The 2:1 end profile is lettered VIEW B; views at the sheet's scale
+    # print no scale (rule 9).
+    assert draw.caption_text("RIGHT", (2, 1)) == "VIEW B  2:1"
+    assert draw.caption_text("TOP", draw.SHEET_SCALE) == "TOP"
 
 
 def test_wall_flag_extent_includes_the_native_leader(monkeypatch) -> None:
@@ -624,13 +630,12 @@ def test_carriage_volume_against_the_reference_step() -> None:
     assert carriage.UNDERSIDE_Z < carriage.CENTROID[2] < carriage.MOUNTING_FACE_Z
 
 
-def test_carriage_note_is_the_owner_kit_description_and_play_acceptance() -> None:
+def test_carriage_note_is_the_owner_kit_description() -> None:
     """The owner's description (#2177), the rail named by its item on the same
-    sheet, the play check's home, how the carrier is rocked and where the
-    indicator reads (20261104T194839817Z: 'AT PIVOT' named an undrawn feature)."""
-    assert carriage.JIG_NUMBER == jig.DRAWING_NUMBER
+    sheet; the sideways-play acceptance is the jig's assembly check
+    (MHA-CH-06-TL-00 steps 1, 14C), not this part sheet's (rule 7)."""
     lines = note_lines(carriage.DRAWING_NOTES, label=NAME)
-    assert len(lines) == 3
+    assert len(lines) == 2
     assert all(len(line) <= 70 for line in lines), lines
     note = " ".join(lines)
     assert lines[0].startswith(f"{carriage.ITEM_TAG} ")
@@ -640,12 +645,11 @@ def test_carriage_note_is_the_owner_kit_description_and_play_acceptance() -> Non
         "NOT GENUINE HIWIN",
         f"MATCHED KIT WITH RAIL {rail.ITEM_TAG}",
         "Z0 PRELOAD, C ACCURACY NOT REQUIRED",
-        f"IN {jig.DRAWING_NUMBER}: ROCK SIDEWAYS",
-        f"{trammel.CARRIAGE_PLAY_TIR_MAX:.2f} MM TIR MAX AT SHOULDER SCREW",
     ):
         assert fact in note, fact
     assert "PIVOT" not in note
     assert trammel.CARRIAGE_PLAY_TIR_MAX == 0.02
+    assert jig.DRAWING_NUMBER not in note
     # The item tags are the sheet's own member labels.
     assert [label.split()[0] for _, label in draw.VARIANTS] == [
         rail.ITEM_TAG, carriage.ITEM_TAG,
@@ -742,41 +746,36 @@ def test_package_is_the_registered_configured_reference_with_a_receipt_sheet(
 
 def test_receipt_dimensions_are_the_marked_model_dimensions() -> None:
     marked = set().union(*rail.DRAWING_DIMENSIONS.values())
-    assert set(draw.RECEIPT_DIMENSIONS) == marked
-    assert set(draw.FRONT_DIMENSION_PRECISION) == marked
-    # The short first span uses outside arrows; all other stations stay inside.
-    assert draw.STATION_ARROW_SIDES == {
-        name: (1 if index == 0 else 0)
-        for index, name in enumerate(rail.STATION_DIMENSIONS)
-    }
+    # The first station alone locates the pattern; the flag gives the pitch
+    # (rule 10: a regular pattern counts as one axis).
+    assert draw.DRAWN_STATIONS == rail.STATION_DIMENSIONS[:1] == ("Station1",)
+    assert set(draw.RECEIPT_DIMENSIONS) == {"Station1", "Length"}
+    assert set(draw.RECEIPT_DIMENSIONS) <= marked
+    assert draw.STATION_NOMINALS == {"Station1": rail.HOLE_X[0]}
+    # The short first span carries its arrows and its text outside.
+    assert draw.STATION_ARROW_SIDES == {"Station1": 1}
+    assert draw.TEXT_OUTSIDE_START == {"Station1": 0.027}
     assert draw.RECEIPT_DIMENSIONS["Length"][:2] == (0.0, rail.LENGTH)
-    offsets = []
-    for name, x in zip(rail.STATION_DIMENSIONS, rail.HOLE_X, strict=True):
-        start, end, offset = draw.RECEIPT_DIMENSIONS[name]
-        assert (start, end) == (0.0, x)  # baseline from the -X end face
-        offsets.append(offset)
-    # Rows step outward with the station: shortest nearest the part, so no
-    # extension line crosses a nearer row's dimension line.
-    assert offsets == sorted(offsets, reverse=True)
-    assert all(b - a == pytest.approx(-draw.STATION_ROW_PITCH) for a, b in zip(offsets, offsets[1:]))
+    start, end, offset = draw.RECEIPT_DIMENSIONS["Station1"]
+    assert (start, end) == (0.0, rail.HOLE_X[0])  # from the -X end face
+    assert offset == -draw.STATION_FIRST_DROP
     rail_edge = draw._FRONT_HALF[1]
-    assert -offsets[0] - 0.003 > rail_edge
+    assert -offset - 0.003 > rail_edge
     assert draw.RECEIPT_DIMENSIONS["Length"][2] - 0.003 > rail_edge
-    # The pitch leaves a row's text CLEAR_GAP_M under the nearer row's
-    # extension-line overrun, which ends over the 75 and 135 values.
-    text_top = draw.TEXT_OVER_LINE + draw.DIMENSION_TEXT_HEIGHT / 2.0
-    assert draw.STATION_ROW_PITCH - text_top - _EXTENSION_GAP >= draw.CLEAR_GAP_M + 0.0005
+    # assert_imported_precision checks exactly the dimensions the view keeps:
+    # a checked name that never reaches the sheet fails the build.
+    assert set(draw.FRONT_DIMENSION_PRECISION) == set(draw.RECEIPT_DIMENSIONS)
 
 
 _EXTENSION_GAP = 0.0016  # extension lines start off, and overrun, by this much
 
 
-def _stack_ink(*, pitch=None, lift=None):
+def _stack_ink(*, lift=None):
     """The receipt stack as SolidWorks printed run 20261104T222143958Z's:
     each text centred at its requested point, its dimension line
     ``TEXT_OVER_LINE`` under it, the extension lines from the part to just
-    past the line. ``pitch`` re-spaces the station rows; ``lift`` raises
-    named texts off their lines (sheet metres)."""
+    past the line. ``lift`` raises named texts off their lines (sheet
+    metres)."""
     per_mm = draw._sheet_mm(draw.SHEET_SCALE)
     center_y = draw.FRONT_CENTER[1]
     end_face_x = draw.FRONT_CENTER[0] - draw._FRONT_HALF[0]
@@ -787,8 +786,6 @@ def _stack_ink(*, pitch=None, lift=None):
 
     inks = {}
     for name, (start, end, offset) in draw.RECEIPT_DIMENSIONS.items():
-        if pitch is not None and name != "Length":
-            offset = -(draw.STATION_FIRST_DROP + rail.STATION_DIMENSIONS.index(name) * pitch)
         x, y = draw.receipt_text_point(name, sheet(start), sheet(end), offset)
         line_y = y - draw.TEXT_OVER_LINE
         y += (lift or {}).get(name, 0.0)
@@ -837,79 +834,57 @@ def test_native_short_station_ink_uses_the_outside_witness_lane() -> None:
     """Pinned native text/line extents, 20261107T002231Z-1-4eb76c9d.
 
     Unlike the font estimator, these include the entire native tolerance
-    block. Translate only the authored text targets and the FRONT origin;
-    keep measured widths, heights, row lines and witness overruns unchanged.
+    block. Translate only the authored text target and the FRONT origin;
+    keep the measured width, height, row line and witness overruns unchanged.
     """
-    native_x = (
-        (0.0222, 0.0525), (0.0614, 0.0939), (0.0751, 0.1098),
-        (0.0901, 0.1248), (0.1051, 0.1398), (0.1201, 0.1548),
-        (0.1351, 0.1698), (0.1501, 0.1848),
-    )
+    left, right = 0.0222, 0.0525  # Station1's native text x, that run
+    line_y = 0.1492
+    witness_end = 0.065
     _, _, inks, flag = _stack_ink()
-    old_inks = {}
     view_shift = draw.FRONT_CENTER[0] - 0.170
     old_end = 0.170 - draw._FRONT_HALF[0]
     new_end = old_end + view_shift
     front_cell = draw.view_cell(draw.FRONT_CENTER, draw._FRONT_HALF)
-    for index, (name, (left, right)) in enumerate(zip(rail.STATION_DIMENSIONS, native_x, strict=True)):
-        line_y = 0.1492 - index * 0.0085
-        witness_end = 0.065 + index * 0.030
-        old_box = (left, line_y, right, line_y + 0.0035)
-        old_segments = [
-            ((0.060, 0.159), (0.060, line_y - 0.001)),
-            ((witness_end, 0.159), (witness_end, line_y - 0.001)),
-            ((0.060, line_y), (witness_end, line_y)),
-        ]
-        if index == 0:
-            old_segments.append(((left, line_y), (0.060, line_y)))
-        old_inks[name] = (old_box, old_segments)
-        station = draw.STATION_NOMINALS[name]
-        old_target = old_end - 0.023 if index == 0 else old_end + station * 0.00025
-        new_target, _ = draw.receipt_text_point(
-            name, (new_end, 0.160), (new_end + station * 0.0005, 0.160), 0.0
-        )
-        dx = new_target - old_target
-        box = (left + dx, line_y, right + dx, line_y + 0.0035)
-        segments = [
-            ((a[0] + view_shift, a[1]), (b[0] + view_shift, b[1]))
-            for a, b in old_segments[:3]
-        ]
-        if name in draw.TEXT_OUTSIDE_START:
-            segments.append(((box[0], line_y), (0.060 + view_shift, line_y)))
-            assert box[2] + draw.CLEAR_GAP_M <= front_cell[0], name
-            assert box[0] >= BORDER[0] + 0.005, name
-        inks[name] = (box, segments)
-    old_findings = draw.receipt_stack_findings(old_inks, flag)
-    for index in range(3, 9):
-        assert f"Station{index} line runs within 2 mm of Station2 text" in old_findings
+    (name,) = draw.DRAWN_STATIONS
+    station = draw.STATION_NOMINALS[name]
+    old_target = old_end - 0.023
+    new_target, _ = draw.receipt_text_point(
+        name, (new_end, 0.160), (new_end + station * 0.0005, 0.160), 0.0
+    )
+    dx = new_target - old_target
+    box = (left + dx, line_y, right + dx, line_y + 0.0035)
+    segments = [
+        ((0.060 + view_shift, 0.159), (0.060 + view_shift, line_y - 0.001)),
+        ((witness_end + view_shift, 0.159), (witness_end + view_shift, line_y - 0.001)),
+        ((0.060 + view_shift, line_y), (witness_end + view_shift, line_y)),
+        ((box[0], line_y), (0.060 + view_shift, line_y)),
+    ]
+    assert name in draw.TEXT_OUTSIDE_START
+    assert box[2] + draw.CLEAR_GAP_M <= front_cell[0]
+    assert box[0] >= BORDER[0] + 0.005
+    inks[name] = (box, segments)
     assert draw.receipt_stack_findings(inks, flag) == []
 
 
-def test_receipt_stack_rule_refuses_run_20261104T222143958Z() -> None:
-    """The farm's FIX: the callout under 435.00 lifted that value 2.5 mm,
-    onto 375.00's text and its line, off its own (5.5 mm rows)."""
-    _, _, inks, flag = _stack_ink(pitch=0.0055, lift={"Station8": 0.0025})
+def test_receipt_stack_rule_refuses_a_value_lifted_off_its_line() -> None:
+    """Run 20261104T222143958Z's FIX: a callout under a station lifted that
+    value 2.5 mm off its own line."""
+    _, _, inks, flag = _stack_ink(lift={"Station1": 0.0025})
     findings = draw.receipt_stack_findings(inks, flag)
-    assert "Station8 text foot stands 3.35 mm off its own line" in findings
-    assert "Station7 text and Station8 text overlap" in findings
-    assert "Station7 line runs within 2 mm of Station8 text" in findings
-
-
-def test_receipt_stack_rule_refuses_a_row_pitch_under_the_gap() -> None:
-    # 5.5 mm rows leave each text 1.15 mm under the next row's line.
-    _, _, inks, flag = _stack_ink(pitch=0.0055)
-    findings = draw.receipt_stack_findings(inks, flag)
-    assert "Station1 line runs within 2 mm of Station2 text" in findings
-    assert len([f for f in findings if "line runs within" in f]) >= 7
+    assert "Station1 text foot stands 3.35 mm off its own line" in findings
 
 
 def test_receipt_stack_rule_refuses_a_flag_on_the_stack() -> None:
     _, _, inks, flag = _stack_ink()
-    last_line = inks["Station8"][1][0][0][1]
-    raised = (flag[0], last_line - 0.001, flag[2], last_line + 0.0025)
+    last = draw.DRAWN_STATIONS[-1]
+    line = inks[last][1][0]
+    last_line = line[0][1]
+    # Raised onto the station's line and widened back over its run (the
+    # centred flag otherwise starts right of the short first span).
+    raised = (min(flag[0], line[0][0]), last_line - 0.001, flag[2], last_line + 0.0025)
     findings = draw.receipt_stack_findings(inks, raised)
     assert "the flag is not under the last station line" in findings
-    assert "Station8 line runs into the flag" in findings
+    assert f"{last} line runs into the flag" in findings
 
 
 def _inside_box(inner, outer) -> bool:
@@ -920,18 +895,16 @@ def _inside_box(inner, outer) -> bool:
 
 
 def test_receipt_texts_fit_their_spans_rows_and_the_border() -> None:
-    end_face_x, per_mm, inks, _ = _stack_ink()
+    _, _, inks, _ = _stack_ink()
     boxes = {name: text for name, (text, _) in inks.items()}
     front_cell = draw.view_cell(draw.FRONT_CENTER, draw._FRONT_HALF)
-    for name in rail.STATION_DIMENSIONS:
+    # The drawn station's span is too short for its text: it stands outside,
+    # left of FRONT's cell and inside the border.
+    for name in draw.DRAWN_STATIONS:
         box = boxes[name]
-        if name in draw.TEXT_OUTSIDE_START:
-            assert box[2] + draw.CLEAR_GAP_M <= front_cell[0], name
-            assert box[0] >= BORDER[0] + 0.005, name
-            continue
-        x = draw.STATION_NOMINALS[name]
-        # Long stations fit between their own extension lines.
-        assert end_face_x + 0.002 <= box[0] and box[2] + 0.002 <= end_face_x + x * per_mm, name
+        assert name in draw.TEXT_OUTSIDE_START, name
+        assert box[2] + draw.CLEAR_GAP_M <= front_cell[0], name
+        assert box[0] >= BORDER[0] + 0.005, name
 
 
 def test_receipt_sheet_views_captions_and_notes_fit() -> None:
@@ -959,7 +932,7 @@ def test_receipt_sheet_views_captions_and_notes_fit() -> None:
         cell = cells[f"*{label.title()}"]
         assert y < cell[1] and cell[0] < x < cell[2], label
         assert y - 0.006 > footer, label
-        expected_label = "END VIEW" if label == "RIGHT" else label
+        expected_label = "VIEW B" if label == "RIGHT" else label
         assert draw.caption_text(label, scale).startswith(expected_label)
         box = (x - draw._CAPTION_HALF_WIDTH, y - 0.006, x + draw._CAPTION_HALF_WIDTH, y + 0.001)
         caption_boxes[label] = box
@@ -1014,6 +987,37 @@ def test_native_multiline_length_ink_clears_witnesses_and_top_caption() -> None:
     assert top_caption_y - 0.006 >= text[3] + draw.CLEAR_GAP_M
 
 
+def test_view_b_arrow_lands_on_tops_far_end_clear_of_the_isometric() -> None:
+    """Rule 9: the 2:1 end profile is VIEW B, named by a 5 mm letter arrow on
+    TOP's far (+X) end face at mid-height, the letter right of it and left of
+    the isometric."""
+    assert draw.END_VIEW_LETTER == "B"
+    assert draw.caption_text("RIGHT", draw.PROFILE_SCALE) == "VIEW B  2:1"
+    cells = {name: draw.view_cell(center, half) for name, center, half, _ in draw.VIEWS}
+    slack = draw._CELL_SLACK
+    top = cells["*Top"]
+    outline = (top[0] + slack, top[1] + slack, top[2] - slack, top[3] - slack)
+    text_xy, tip = draw.view_arrow_points(outline)
+    assert tip == pytest.approx(
+        (draw.TOP_CENTER[0] + draw._TOP_HALF[0], draw.TOP_CENTER[1])
+    )
+    height = draw.VIEW_LETTER_HEIGHT
+    width = 0.62 * height  # estimate_text_box's advance for one character
+    letter = (text_xy[0], text_xy[1] - height, text_xy[0] + width, text_xy[1])
+    cell = draw.view_arrow_cell(tip)
+    assert _inside_box(letter, cell)
+    assert cell[0] < tip[0] < letter[0]
+    assert BORDER[0] <= cell[0] and cell[2] <= BORDER[2]
+    assert BORDER[1] <= cell[1] and cell[3] <= BORDER[3]
+    assert not _overlaps(cell, TITLE_BLOCK)
+    assert letter[2] + draw.CLEAR_GAP_M <= cells["*Isometric"][0]
+    for name in ("*Front", "*Right"):
+        assert not _overlaps(cell, cells[name]), name
+    for label, x, y, _scale in draw.CAPTIONS:
+        caption = (x - draw._CAPTION_HALF_WIDTH, y - 0.006, x + draw._CAPTION_HALF_WIDTH, y + 0.001)
+        assert not _overlaps(cell, caption), label
+
+
 class _Tolerance:
     def __init__(self, kind: int, low: float, high: float) -> None:
         self.Type = kind
@@ -1063,7 +1067,7 @@ def _receipt_annotations():
                 places=rail.REFERENCE_PLACES,
             ),
         )
-        for name, x in zip(rail.STATION_DIMENSIONS, rail.HOLE_X, strict=True)
+        for name, x in zip(draw.DRAWN_STATIONS, rail.HOLE_X, strict=False)
     ]
     for annotation in annotations:
         annotation.display.ArrowSide = draw.STATION_ARROW_SIDES[annotation.name]
@@ -1087,7 +1091,7 @@ def _receipt_annotations():
         "length-bare",
         "length-fit-flag",
         "missing",
-        "arrows",
+        "extra",
         "short-arrows",
         "nominal",
     ],
@@ -1098,25 +1102,31 @@ def test_receipt_controls_readback_refuses_every_drift(monkeypatch, fault) -> No
     annotations = _receipt_annotations()
     by_name = {annotation.name: annotation.display for annotation in annotations}
     if fault == "widened":
-        by_name["Station4"].dimension.Tolerance = _Tolerance(4, -1e-5, 1e-5)
+        by_name["Station1"].dimension.Tolerance = _Tolerance(4, -1e-5, 1e-5)
     elif fault == "bilateral":
-        by_name["Station2"].dimension.Tolerance = _Tolerance(2, -1e-5, 1e-5)
+        by_name["Station1"].dimension.Tolerance = _Tolerance(2, -1e-5, 1e-5)
     elif fault == "bare":
-        by_name["Station5"].texts = {}
+        by_name["Station1"].texts = {}
     elif fault == "callout":
-        by_name["Station8"].texts = {4: rail.RECEIPT_FLAG}
+        by_name["Station1"].texts = {4: rail.RECEIPT_FLAG}
     elif fault == "length-bare":
         by_name["Length"].texts = {}
     elif fault == "length-fit-flag":
         by_name["Length"].texts[3] = ""
     elif fault == "missing":
         annotations = annotations[1:]
-    elif fault == "arrows":
-        by_name["Station5"].ArrowSide = 1
+    elif fault == "extra":
+        # An undrawn station (the flag gives the pattern) reaching the sheet.
+        annotations.append(
+            _Annotation(
+                "Station2",
+                _Display(rail.HOLE_X[1], {1: "(", 2: ")"}, _Tolerance(0, 0, 0)),
+            )
+        )
     elif fault == "short-arrows":
         by_name["Station1"].ArrowSide = 0
     elif fault == "nominal":
-        by_name["Station6"].dimension.SystemValue += 0.0001
+        by_name["Station1"].dimension.SystemValue += 0.0001
     if fault is None:
         draw.assert_receipt_controls(object(), annotations)
     else:
@@ -1126,7 +1136,7 @@ def test_receipt_controls_readback_refuses_every_drift(monkeypatch, fault) -> No
 
 def test_sheet_one_footer_and_purchase_note_fit_their_budgets() -> None:
     lines = note_lines(draw.FOOTER_NOTES, label=NAME)
-    assert len(lines) == 3
+    assert len(lines) == 2
     purchase_note = (
         f"QTY {ROW['quantity']} INSTALLED MEMBERS; PURCHASE UNIT: {draw.PURCHASE_UNIT}."
     )
