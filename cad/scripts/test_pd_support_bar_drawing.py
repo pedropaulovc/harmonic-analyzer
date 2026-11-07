@@ -61,10 +61,11 @@ def test_clamp_holes_find_the_back_arc_taps_at_the_printed_worst_case() -> None:
     #8-32 shanks. Fixed fastener: each screw threads into an MHA-SH-02
     back-arc tap held ±.004 along the bar and in height (sh_column_clamp_fit),
     so the bar's zone (2·√2·band, plus the print's rounding) plus the tap's
-    must stay inside the least hole's float; the band is the widest .XXX
-    that does. A drift in the band, the hole, the shank or the taps' bands
-    breaks one of these."""
+    must stay inside the least hole's float; the title block's .XXX ±.005
+    does (delegated ruling 2026-11-07). A drift in the band, the hole, the
+    shank or the taps' bands breaks one of these."""
     from _hole_spec import HoleSpec, blind_cut_dia_mm
+    from _printed_tolerance import printed_band_mm
     from sh_column_clamp_back_geom import HOLE_SPEC as BACK_ARC_TAP
     from sh_column_clamp_fit import EAR_HEIGHT_BAND, EAR_STATION_BAND
     from sh_vn_clamp_screw_spec import SHANK_DIA
@@ -87,11 +88,10 @@ def test_clamp_holes_find_the_back_arc_taps_at_the_printed_worst_case() -> None:
     # The .XXX print rounds the mm stations, so the zone carries that
     # rounding on top of the band's.
     band = part.CLAMP_POSITION_BAND
-    assert band == pytest.approx(0.1778)  # ±.007
+    assert band == pytest.approx(printed_band_mm(3, unit="in")) == pytest.approx(0.127)
     assert part.clamp_position_zone(band) >= zone(band)
     assert part.BACK_ARC_TAP_ZONE == pytest.approx(tap_zone)
-    assert part.clamp_position_zone(band) + tap_zone <= hole_float  # .800 <= .812
-    assert part.clamp_position_zone(band + 0.0254) + tap_zone > hole_float
+    assert part.clamp_position_zone(band) + tap_zone <= hole_float  # .653 <= .812
 
 
 def test_row_nominals_are_the_built_holes() -> None:
@@ -249,25 +249,24 @@ def test_rows_stack_shortest_nearest_the_bar() -> None:
         x = drawing.FRONT_KEEP[name][0]
         assert drawing.LEFT_END < x < drawing.LEFT_END + span * drawing._S
     # In the front-face view that end is on the sheet's right: the long clamp
-    # rows' texts stand between it and their holes. The first two rows'
-    # banded texts are wider than their spans, so they stand right of the
-    # end's extension line and left of the isometric view (its r6 outline's
-    # left edge), at a conservative 2.76 mm a character (2.3 measured).
+    # rows' texts stand between it and their holes; the first two rows' stand
+    # right of the end's extension line (the first's text is wider than its
+    # span) and left of the isometric view (its r6 outline's left edge), at a
+    # conservative 2.76 mm a character (2.3 measured).
     iso_left = 0.3216
     for name, station, hole_x in zip(
         sheet_spec.CLAMP_STATION_NAMES, part.CLAMP_STATIONS, part.CLAMP_ROW_X
     ):
         x = drawing.BACK_KEEP[name][0]
-        value, band = (
-            f"{v / 25.4:.3f}".lstrip("0")
-            for v in (station, part.CLAMP_POSITION_BAND)
-        )
-        text = f"{value} \u00b1{band}"
+        text = f"{station / 25.4:.3f}".lstrip("0")
         half = len(text) * 0.00276 / 2.0
-        if (drawing.RIGHT_END - drawing._back_x(hole_x)) > 2.0 * half:
+        if x < drawing.RIGHT_END:
             assert drawing._back_x(hole_x) < x - half < x + half < drawing.RIGHT_END
         else:
             assert drawing.RIGHT_END < x - half < x + half < iso_left, name
+    first = drawing.RIGHT_END - drawing._back_x(part.CLAMP_ROW_X[0])
+    assert drawing.BACK_KEEP["ClampStation1"][0] > drawing.RIGHT_END
+    assert first < len(f"{part.CLAMP_STATIONS[0] / 25.4:.3f}".lstrip("0")) * 0.00276
 
 
 def test_clamp_callout_stands_between_the_bar_and_the_length_line() -> None:
@@ -400,10 +399,10 @@ def test_west_slots_take_up_the_column_pitch() -> None:
     # the printed .196) at the worst height misalignment.
     radial = (4.978 - SHANK_DIA) / 2.0
     station = part.CLAMP_POSITION_BAND
-    assert station == pytest.approx(0.1778)  # ±.007
+    assert station == pytest.approx(0.127)  # the title block's ±.005
     height = station + EAR_HEIGHT_BAND
     slack = math.sqrt(radial**2 - height**2)
-    assert slack == pytest.approx(0.2948, abs=1e-4)
+    assert slack == pytest.approx(0.3358, abs=1e-4)
     # Each slot's least travel each way: its .118 run at .XXX.
     assert part.CLAMP_SLOT_RUN == 2.0 * part.CLAMP_SLOT_TRAVEL == 2.9972
     assert part.CLAMP_SLOT_WIDTH == part.CLAMP_HOLE_DIA == pytest.approx(4.978)
@@ -411,8 +410,8 @@ def test_west_slots_take_up_the_column_pitch() -> None:
     # Between an east and a west screw: both bar stations, both clamps' tap
     # stations and both clamps' shift on their columns.
     between = 2.0 * (station + EAR_STATION_BAND + BORE_DIAMETRAL_CLEARANCE[1] / 2.0)
-    assert between == pytest.approx(0.8636)
-    for pitch, margin in ((top, 0.6512), (base, 0.1412)):
+    assert between == pytest.approx(0.762)
+    for pitch, margin in ((top, 0.8346), (base, 0.3246)):
         left = travel + 2.0 * slack - (pitch + between)
         assert left == pytest.approx(margin, abs=5e-4)
         assert part.clamp_slot_closure_margin(pitch) == pytest.approx(left)
@@ -420,7 +419,7 @@ def test_west_slots_take_up_the_column_pitch() -> None:
     assert 2.0 * slack - (top + between) < 0.0
     # The east pair share one clamp: only their stations and taps open it.
     east = 2.0 * slack - 2.0 * (station + EAR_STATION_BAND)
-    assert east == pytest.approx(0.0309, abs=1e-4)
+    assert east == pytest.approx(0.2143, abs=1e-4)
     assert part.clamp_east_pair_margin() == pytest.approx(east)
 
 
@@ -469,9 +468,9 @@ def test_slot_counterbores_leave_rule_17_walls() -> None:
     inner, outer = sorted(part.CLAMP_STATIONS)[2:]
     shortest = part.BAR_LENGTH - printed_band_mm(1, unit="in")
     end_wall = shortest - (outer + station) - cbore_reach
-    assert end_wall == pytest.approx(2.899, abs=5e-3)
+    assert end_wall == pytest.approx(2.946, abs=5e-3)
     web = (outer - inner) - 2.0 * station - 2.0 * cbore_reach
-    assert web == pytest.approx(22.757, abs=5e-3)
+    assert web == pytest.approx(22.860, abs=5e-3)
     # The clamp line stands CLAMP_ROW_HEIGHT under the top face, so the
     # bottom face (the height's printed minimum) is the nearer one.
     side = (
@@ -481,7 +480,7 @@ def test_slot_counterbores_leave_rule_17_walls() -> None:
         - station
         - cbore_max / 2.0
     )
-    assert side == pytest.approx(6.968, abs=5e-3)
+    assert side == pytest.approx(7.019, abs=5e-3)
     for wall in (end_wall, web, side):
         assert wall >= WALL_TARGET_MM
     # Nominally 5.806 to the end, 23.495 between.
@@ -617,6 +616,13 @@ def slot_depth_native(monkeypatch):
     position = [0.07575, 0.0592, 0.41865]
     state = {"ignore_seed": False, "activations": [], "seeds": []}
 
+    def baseline() -> float:
+        return next(
+            start[1]
+            for start, end in lines["ClampSlotCboreDepth"]
+            if start[1] == end[1] and {start[0], end[0]} == {_FRONT_X, _FLOOR_X}
+        )
+
     class Display:
         _offset = False
 
@@ -631,7 +637,7 @@ def slot_depth_native(monkeypatch):
                 # Model the documented native creation-point re-dress. An
                 # omitted/ignored baseline seed must fail the witness guard.
                 state["activations"].append(position[1])
-                dy = position[1] - 0.0480875
+                dy = position[1] - baseline()
                 lines["ClampSlotCboreDepth"] = [
                     (start, (end[0], end[1] + dy))
                     if start[0] == end[0]
@@ -664,20 +670,33 @@ def slot_depth_native(monkeypatch):
         GetNotes=lambda: [caption],
     )
     moves = []
+    seats = []
 
     def move(_adapter, annotation, dx, dy, *, label):
-        assert display.OffsetText is True
         box = boxes[annotation.name]
         boxes[annotation.name] = (
             box[0] + dx, box[1] + dy, box[2] + dx, box[3] + dy,
         )
+        if not display.OffsetText:
+            # Before OffsetText the line follows its text: the baseline and
+            # the witnesses' far ends move with it, the witnesses' feet stay.
+            position[1] += dy
+            lines[annotation.name] = [
+                (start, (end[0], end[1] + dy))
+                if start[0] == end[0]
+                else ((start[0], start[1] + dy), (end[0], end[1] + dy))
+                for start, end in lines[annotation.name]
+            ]
+            seats.append((dx, dy))
+            return
         # A positive-control native route leaves the mouth horizontally,
         # then turns outside the actual bar. Unlike the previous fixture,
         # this includes an OffsetText leader that the material guard sees.
         left, bottom = boxes[annotation.name][:2]
+        line_y = baseline()
         lines[annotation.name].extend([
-            ((_FRONT_X, 0.0480875), (left, 0.0480875)),
-            ((left, 0.0480875), (left, bottom)),
+            ((_FRONT_X, line_y), (left, line_y)),
+            ((left, line_y), (left, bottom)),
         ])
         moves.append((dx, dy))
 
@@ -692,10 +711,12 @@ def slot_depth_native(monkeypatch):
         lambda _adapter, annotation, *, label: boxes[annotation.name],
     )
     monkeypatch.setattr(drawing, "dimension_segments", lambda annotation: lines[annotation.name])
+    # Sheet y 0.048 is the clamp line, as in the material proof below.
     monkeypatch.setattr(
         drawing, "_sheet",
         lambda _adapter, _view, point, _label: (
-            0.053 - point[2] / 1000.0, 0.048 + point[1] / 1000.0,
+            0.053 - point[2] / 1000.0,
+            0.048 + (point[1] - spec.CLAMP_TAP_Y) / 1000.0,
         ),
     )
     monkeypatch.setattr(drawing, "move_annotation", move)
@@ -706,7 +727,7 @@ def slot_depth_native(monkeypatch):
     )
     return SimpleNamespace(
         section=section, boxes=boxes, lines=lines, witnesses=witnesses,
-        display=display, moves=moves, state=state,
+        display=display, moves=moves, seats=seats, state=state, position=position,
         details=[annotations["ClampSlotCboreWidth"]],
         depth=[annotations["ClampSlotCboreDepth"]],
         back=[annotations["ClampStation4"], annotations["ClampRowHeight"]],
@@ -741,6 +762,53 @@ def test_slot_depth_ignored_baseline_seed_refuses_native_redress(slot_depth_nati
         )
     assert native.state["activations"] == [0.0592]
     assert native.moves == []
+
+
+def test_slot_depth_seats_a_drifted_baseline_on_the_clamp_line(slot_depth_native):
+    """Round 1 of the fan-out: with the callout lines gone the bare .19's line
+    stood ~8.4 mm over the clamp line, its floor witness into the upper bar.
+    The baseline is measured and moved onto the clamp line before OffsetText,
+    so the witnesses the guards keep are the seated ones."""
+    native = slot_depth_native
+    drift = 0.0083
+    native.lines["ClampSlotCboreDepth"] = [
+        (start, (end[0], end[1] + drift))
+        if start[0] == end[0]
+        else ((start[0], start[1] + drift), (end[0], end[1] + drift))
+        for start, end in native.lines["ClampSlotCboreDepth"]
+    ]
+    native.position[1] += drift
+    # Positive control: the drifted native ink crosses the upper bar.
+    drifted = drawing._slot_depth_native_lines(native.depth[0])[0]
+    material = drawing._slot_section_material_boxes(None, native.section, drifted)
+    with pytest.raises(RuntimeError, match="upper bar"):
+        drawing._require_slot_depth_ink_outside_material(
+            native.lines["ClampSlotCboreDepth"], material
+        )
+    witnesses = drawing._place_slot_depth_callout(
+        None, native.section, native.details, native.depth, native.back
+    )
+    assert native.seats == [(0.0, pytest.approx(0.048 - (0.0480875 + drift)))]
+    for got, expected in zip(witnesses, native.witnesses):
+        assert got[0] == expected[0]
+        assert got[1] == pytest.approx(
+            (expected[1][0], expected[1][1] + 0.048 - 0.0480875)
+        )
+    assert native.state["seeds"][0][1] == pytest.approx(0.048)
+
+
+def test_slot_depth_refuses_a_baseline_that_does_not_seat(slot_depth_native, monkeypatch):
+    native = slot_depth_native
+    monkeypatch.setattr(drawing, "move_annotation", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        drawing, "_sheet",
+        lambda _adapter, _view, point, _label: (0.053 - point[2] / 1000.0, 0.040),
+    )
+    with pytest.raises(RuntimeError, match="did not settle on the clamp line"):
+        drawing._place_slot_depth_callout(
+            None, native.section, native.details, native.depth, native.back
+        )
+    assert native.state["seeds"] == []
 
 
 @pytest.mark.parametrize("flip", [-1.0, 1.0])

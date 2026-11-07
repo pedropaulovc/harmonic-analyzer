@@ -244,11 +244,31 @@ def test_tap_walls_to_the_edges_pay_both_breaks_and_print_at_the_floor() -> None
     # Rule 20: the sheet states the shortfall at the tap pattern's note, and
     # the package declares it (delegated ruling RV-01).
     assert guide.TAP_EDGE_WALL_TEXT == "WALL .060 MIN, TAPS TO EDGES"
-    assert drawing.FCF_MATE_NOTE.endswith(guide.TAP_EDGE_WALL_TEXT)
+    assert drawing.TAP_WALL_NOTE.endswith(guide.TAP_EDGE_WALL_TEXT)
     exceptions = _config.parts("pd-platen-guide")["machinist_exceptions"]
     assert any(
         entry["kind"] == "minor" and ".060" in entry["where"] for entry in exceptions
     )
+
+
+def test_only_the_platen_taps_are_spotted_and_the_lock_taps_are_accepted() -> None:
+    """Main's final ruling 2026-11-07: the platen-screw taps are spotted
+    through MHA-PD-02's holes at assembly; the lock taps are cut to the Ø.008
+    zone (accepted, RV-03) and MHA-PD-12's holes are transferred from them."""
+    platen = _config.parts("pd-platen")["number"]
+    lock = _config.parts("pd-guide-lock")["number"]
+    tags = [f"A{i}" for i in range(1, len(drawing.HOLE_STATIONS_MM) + 1)]
+    assert len(drawing.PLATEN_TAP_TAGS) == len(drawing.FRONT_X)
+    assert drawing.FCF_MATE_NOTE.startswith(", ".join(drawing.PLATEN_TAP_TAGS))
+    assert platen in drawing.FCF_MATE_NOTE
+    assert lock not in drawing.FCF_MATE_NOTE
+    lock_tags = [tag for tag in tags if tag not in drawing.PLATEN_TAP_TAGS]
+    assert len(lock_tags) == len(drawing.REAR_X)
+    exceptions = _config.parts("pd-platen-guide")["machinist_exceptions"]
+    (entry,) = [entry for entry in exceptions if entry["id"] == "RV-03"]
+    assert entry["kind"] == "accept"
+    assert all(tag in entry["where"] for tag in lock_tags)
+    assert entry["reason"].startswith("Delegated ruling 2026-11-07 (Main), no precedent")
 
 
 def test_drawing_contract_imports_without_pywin32() -> None:

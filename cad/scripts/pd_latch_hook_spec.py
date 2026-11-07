@@ -23,15 +23,14 @@ The sheet prints decimal inch (the row's ``drawing_unit: in``); every
 length here stays physical millimetres.  How the sheet locates things:
 
 * screw-hole X from the ear's outer face (x = 0), Y from the base's low-Y
-  edge (y = 0), both ±POSITION_TOL at .XXX: the Ø.128 drilled hole's float
-  over the basic #4-40 major, less the MHA-PD-07 bar taps' own band, is
-  what each printed position may spend (the fixed-fastener stack, as the
-  guide lock's on its screws); the hole callout names that mate
-  (SCREW_HOLE_MATE), so the band reads as the taps' and not as arbitrary.
-  The callout prints the size under DRILLED HOLES with no drill named
-  (a named #30 would print its exact .1285, rule 3; the shop's #30 is
-  inside the row).  The X stations follow the bar's taps, so they print
-  off the grid, the rounding counted in the stack;
+  edge (y = 0), at the title block's .XXX row: the MHA-PD-07 bar's taps
+  are spotted through these holes at assembly, so the screw stack spends
+  no printed position and the row is judged only by the walls and the
+  head clearance; the hole callout names the taps the holes serve
+  (SCREW_HOLE_MATE).  The callout prints the size under DRILLED HOLES with
+  no drill named (a named #30 would print its exact .1285, rule 3; the
+  shop's #30 is inside the row).  The X stations print off the grid, the
+  rounding counted in the walls;
 * the base length at the .XX row: it bounds the far screw hole's -X edge
   wall;
 * the width at the .XX row: the ear's +Y edge in the guide-lock sweep (the
@@ -42,21 +41,23 @@ length here stays physical millimetres.  How the sheet locates things:
 * the inside bend radius R.05 at the .XX row (INSIDE_BEND_R_MAX, R.06, the
   screw-head clearance reads); the 90 deg bend at the title block's angular
   row;
-* every formed arm feature (roll, straight, tab) ±FORMED_TOL at .XX, the
-  radii to the inside surface; the far face at the pin, located in X and Y
-  from the origin, only as a reference (REFERENCE_DIMENSIONS): a hand-rolled
-  roll holds no tighter band there, and the fit-up sets the strip on the pin
-  (square, its face at that station) before the pin's centre is
-  transferred.  The roll start and the tab end close on the pin's station,
-  so their model values sit off the grid; FORMED_BAND, what the assembly's
-  checks read, is the band with that rounding counted;
+* every formed arm feature (roll, tab) ±FORMED_TOL at .XX, the radii to
+  the inside surface; the straight's length (it carries the pin hole) and
+  the far face at the pin, located in X and Y from the origin, only as
+  references (REFERENCE_DIMENSIONS): a hand-rolled roll holds no tighter
+  band there, and the fit-up sets the strip on the pin (square, its face
+  at that station) before the pin's centre is transferred, so a banded
+  straight would be a second controlling value on the transferred hole
+  (round 1, 20261107T102905222Z).  The roll start and the tab end close on
+  the pin's station, so their model values sit off the grid; FORMED_BAND,
+  what the assembly's checks read, is the band with that rounding counted;
 * the pin hole: size only, drilled (the title block's DRILLED HOLES row),
   its centre transferred at assembly from the MHA-PD-VN-58 latch pin (note
   2; the model keeps it at the geometry's nominal); the far face's
   reference station ends on the pin axis, which the front view draws as a
   centreline, so the station needs no words;
 * the flat pattern (a hidden reference sketch beside the side view, under
-  its own VIEW A (FLAT PATTERN) label): the blank's length across the bend
+  its own FLAT PATTERN label): the blank's length across the bend
   and the arm's developed stations of the taper and the full round's
   centre (centre-marked on the sheet), at .XX (developed from the formed
   part, so off the grid; no check reads them), the arm's two strip widths
@@ -100,11 +101,9 @@ from pd_latch_hook_geometry import (
     INNER_ROLL_R,
     INSIDE_BEND_R,
     LOW_W,
-    OUTER_ROLL_END,
     OUTER_ROLL_START,
     OUTER_TAB_END,
     OUTER_TAB_R,
-    OUTER_TAB_START,
     PIN_HOLE_DIA,
     PIN_HOLE_ZL,
     ROUND_R,
@@ -115,7 +114,6 @@ from pd_latch_hook_geometry import (
     SHEET_T_PLUS,
     WIDTH,
 )
-from pd_support_bar_spec import HOLE_POSITION_BAND as BAR_TAP_BAND
 from pd_latch_hook_bracket_screw_spec import HEAD_DIA, MAJOR_DIA, MAJOR_DIA_MIN
 
 UNIT = drawing_unit("parts/pd-latch-hook", _config.parts("pd-latch-hook"))
@@ -124,28 +122,31 @@ UNIT = drawing_unit("parts/pd-latch-hook", _config.parts("pd-latch-hook"))
 # The title block's DRILLED HOLES row: a drilled hole only grows.
 HOLE_GROWTH = drilled_oversize_mm(unit=UNIT)
 HOLE_PLACES = 3
-# The screws' fit (the fixed-fastener stack): each screw stands in its bar
-# tap up to the bar's per-axis band off the model (radial reach hypot(b, b));
-# the smallest drilled hole clears the basic major by CLEARANCE_RADIAL_MIN;
-# the hook's printed hole position, at .XXX, gets the widest band whose
-# reach at the printed limits (the rounding to .XXX included) keeps the
-# stack inside that clearance.
+# The screws' fit: the MHA-PD-07 bar's #4-40 taps are spotted through these
+# holes at assembly (delegated ruling 2026-11-07, Q1: the hook is the
+# master), so each tap stands on its hole's axis and the screw stack spends
+# no printed position; the smallest drilled hole floats over the basic
+# major by CLEARANCE_RADIAL_MIN.  The hook's hole positions then take the
+# title block's .XXX row with no explicit band (rule 4: a hole over a tapped
+# mate is never located tighter than Ø(H-F)/2); the walls and the head
+# clearance are judged at that row.
 CLEARANCE_RADIAL_MIN = (SCREW_HOLE_DIA - MAJOR_DIA) / 2.0
-BAR_TAP_RADIAL = math.hypot(BAR_TAP_BAND, BAR_TAP_BAND)
+if CLEARANCE_RADIAL_MIN <= 0.0:
+    raise AssertionError("the MHA-PD-14 screw hole does not clear the #4-40 major")
 POSITION_PLACES = 3
+POSITION_TOL = printed_band_mm(POSITION_PLACES, unit=UNIT)
 WIDTH_PLACES = 2
 # The .32 width's title-block band (the assembly's sweep reads it).
 WIDTH_TOL = printed_band_mm(WIDTH_PLACES, unit=UNIT)
 BASE_LENGTH_PLACES = 2
 EAR_HEIGHT_PLACES = 2
 ARM_WIDTH_PLACES = 2  # the arm's strip widths, from the ear's top edge
-FORMED_TOL = 0.508  # ±.020 printed on every formed arm feature (roll, straight, tab)
+FORMED_TOL = 0.508  # ±.020 printed on every formed arm feature (roll, tab)
 FORMED_PLACES = 2
 # The formed dimensions' model values, as build_pd_latch_hook dimensions them.
 FORMED_VALUES = {
     "RollStart": -OUTER_ROLL_START[1],
     "RollR": INNER_ROLL_R,
-    "StraightLen": math.dist(OUTER_ROLL_END, OUTER_TAB_START),
     "TabR": OUTER_TAB_R,
     "TabEndX": -OUTER_TAB_END[0],
 }
@@ -173,41 +174,10 @@ WALL_FLOOR = WALL_FLOOR_MM
 HEAD_CLEARANCE_FLOOR = 0.2  # screw head rim to the inside bend radius
 
 
-def _position(value: float, tol: float | None = None) -> tuple[float, float]:
-    """(lower, upper) deviation of a printed screw-hole position."""
-    tol = POSITION_TOL if tol is None else tol
-    return printed_deviations(value, POSITION_PLACES, (-tol, tol), unit=UNIT)
-
-
-def _position_radial(tol: float) -> float:
-    """The stack's radial reach at a ±``tol`` print: the bar tap's, plus each
-    hole's farthest printed corner off its model (the rounding included)."""
-
-    def reach(value: float) -> float:
-        return max(abs(d) for d in _position(value, tol))
-
-    return BAR_TAP_RADIAL + max(
-        math.hypot(reach(-x), reach(SCREW_HOLE_Y)) for x in SCREW_HOLE_X
-    )
-
-
-_POSITION_STEP = 25.4 * 10.0**-POSITION_PLACES  # one printed .001 in
-_POSITION_STEPS = max(
-    (
-        k
-        for k in range(1, math.ceil(CLEARANCE_RADIAL_MIN / _POSITION_STEP))
-        if _position_radial(k * _POSITION_STEP) <= CLEARANCE_RADIAL_MIN + 1e-9
-    ),
-    default=0,
-)
-# ± on the screw-hole positions: .002 (0.0508; .003 would reach 0.205 > 0.203).
-POSITION_TOL = _POSITION_STEPS * _POSITION_STEP
-if POSITION_TOL <= 0.0:
-    raise AssertionError(
-        "MHA-SH-VN-52 screws in the MHA-PD-07 bar taps through the MHA-PD-14 hook: "
-        f"no .XXX position band fits the radial clearance {CLEARANCE_RADIAL_MIN:.4f}"
-    )
-SCREW_POSITION_RADIAL = _position_radial(POSITION_TOL)
+def _position(value: float) -> tuple[float, float]:
+    """(lower, upper) deviation of a printed screw-hole position: the title
+    block's .XXX row, the rounding to .XXX included."""
+    return printed_deviations(value, POSITION_PLACES, unit=UNIT)
 
 
 def _row(value: float, places: int) -> tuple[float, float]:
@@ -290,10 +260,10 @@ for _name, (_nominal, _worst) in WALLS.items():
 # Finished, each wall also pays the title block's in-plane edge break at
 # both its edges: the outside edge's and the hole mouth's, or both holes'
 # mouths (Codjiflo, #2124; the platen clip's .032 sheet, RV-02 on
-# MHA-PD-03).  The screw holes' walls to the base's edges land between the
-# .060 floor and the .080 target (the holes stand on the MHA-PD-07 bar's
-# taps), and the sheet states the least on the screw-hole callout (rule 20);
-# every other wall still holds the target.
+# MHA-PD-03).  The screw holes' walls to the base's edges land at the .060
+# floor (RV-01; the base cannot grow into the lock sweep), and the sheet
+# states the least on the screw-hole callout (rule 20); every other wall
+# still holds the target.
 _EDGE_BREAK = max(edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT))
 WALLS_FINISHED: dict[str, float] = {
     name: worst - 2.0 * _EDGE_BREAK for name, (_nominal, worst) in WALLS.items()
@@ -371,17 +341,18 @@ DRAWING_NOTES = "\n".join(
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
-# The flat pattern stands beside the side view, out of projection: a
-# lettered view label (rule 26), what it shows in parentheses.  Its chain
-# lines are the bends' centrelines, the standard flat-pattern convention.
-FLAT_PATTERN_NOTE = "VIEW A (FLAT PATTERN)"
+# The flat pattern stands beside the side view, out of projection: labelled
+# in words with no view letter (no parent carries a viewing arrow; round 1,
+# 20261107T102905222Z).  Its chain lines are the bends' centrelines, the
+# standard flat-pattern convention.
+FLAT_PATTERN_NOTE = "FLAT PATTERN"
 PAIR_CALLOUT = "2X"
 # Size first, then process (rule 26): the dimension prints Ø.128 and this
 # line follows it.  No drill is named: Ø.128 is a size under DRILLED HOLES.
 SCREW_HOLE_CALLOUT = "DRILL THRU"
-# Under the drill line: the mate the ±POSITION_TOL bands serve (review 4).
-# Plain drilled to the print, not match-drilled: the taps are fixed.
-SCREW_HOLE_MATE = "LOCATE TO MHA-PD-07 TAPS"
+# Under the drill line: the taps the holes serve.  The holes are the master:
+# the bar's taps are spotted through them at assembly (MHA-PD-07's sheet).
+SCREW_HOLE_MATE = "FOR MHA-PD-07 #4-40 TAPS"
 # One line (an above-callout): note 2 names the process and the pin.
 PIN_HOLE_CALLOUT = "SEE NOTE 2"
 ROUND_CALLOUT = "FULL ROUND"
@@ -401,10 +372,11 @@ REFERENCE_SKETCHES = (FLAT_SKETCH,)
 # (drawing-simplicity-policy.md `How the repository implements the guidelines`).  The second screw hole shares its size
 # and Y with the first (same globals) and prints once under "2X".
 FORMED_DIMENSIONS: dict[str, set[str]] = {
-    "ArmProfile": {"RollStart", "RollR", "StraightLen", "TabR", "TabEndX"},
+    "ArmProfile": {"RollStart", "RollR", "TabR", "TabEndX"},
 }
-# The far face at the pin: printed in parentheses (see the band comment).
-REFERENCE_DIMENSIONS = frozenset({"FaceX", "FaceY"})
+# The straight's length and the far face at the pin: printed in parentheses
+# (see the band comment; the pin hole in the straight is transferred).
+REFERENCE_DIMENSIONS = frozenset({"StraightLen", "FaceX", "FaceY"})
 # The arm's strip widths, above and below the taper, on the flat pattern.
 ARM_WIDTH_DIMENSIONS = frozenset({"FlatArmW", "FlatLowW"})
 # The flat pattern's bend centrelines (the ear's bend, the roll, the tab):
@@ -414,9 +386,6 @@ BEND_LINE_DIMENSIONS = frozenset({"FlatBendC", "FlatRollC", "FlatTabC"})
 # The full round's radius follows from the .45 low width it rounds (review
 # 6: printed bare it took the .XXX row's tighter band), so a reference.
 ROUND_REFERENCE = "RoundR"
-POSITION_DIMENSIONS: dict[str, tuple[str, ...]] = {
-    "ScrewHoleProfile": ("ScrewX1", "ScrewX2", "ScrewY"),
-}
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BaseEarProfile": {"BaseLength", "EarHeight"},
     "BaseEar": {"Width"},

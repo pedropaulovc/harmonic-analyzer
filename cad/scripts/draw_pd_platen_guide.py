@@ -135,17 +135,30 @@ DATUM_B_SYMBOL_X_M = FRONT_LEFT_X_M + (FRONT_X[2] + FRONT_X[3]) / 2000.0
 BAR_SLIDE_STATION_MM = (FRONT_X[0] + REAR_X[0]) / 2.0
 BAR_SLIDE_FINISH_XY = (FRONT_LEFT_X_M + BAR_SLIDE_STATION_MM / 1000.0 + 0.003, 0.075)
 FINISH_CHAR_HEIGHT = 0.0025
-# The position frame names the parts whose holes the 9X taps must match
-# (machinist review round 3: a frame and basic table with no mating pattern
-# named read as over-specification). The note stands right of the frame, under
-# the overall length's line and above the tags over the bar. It also states
-# the taps' finished wall to the edges, at the floor (rule 20; delegated
-# ruling RV-01 in pd-platen-guide.yaml).
+# The position frame's fit route (Main's final ruling 2026-11-07): the
+# platen-screw taps are spotted through MHA-PD-02's holes at assembly, then
+# drilled and tapped (the PD-00 step); the lock taps are cut to the Ø.008 zone
+# (RV-03) and MHA-PD-12's holes are transferred from them, so the note names
+# only the platen taps. It stands right of the frame, under the overall
+# length's line and above the tags over the bar; one line fits there (a second
+# line would run into the A3/A7 tags).
+PLATEN_TAP_TAGS = tuple(
+    f"A{index}"
+    for index, station in enumerate(HOLE_STATIONS_MM, start=1)
+    if station in FRONT_X
+)
 FCF_MATE_NOTE = (
-    f"MATCHES {_config.parts('pd-platen')['number']} AND "
-    f"{_config.parts('pd-guide-lock')['number']} HOLES; {TAP_EDGE_WALL_TEXT}"
+    f"{', '.join(PLATEN_TAP_TAGS)}: SPOT THRU "
+    f"{_config.parts('pd-platen')['number']} AT ASSEMBLY, DRILL, TAP"
 )
 FCF_MATE_NOTE_XY = (0.141, 0.1285)
+# The route's bench acceptance and the taps' finished wall to the edges, at
+# the floor (rule 20; delegated ruling RV-01 in pd-platen-guide.yaml): one
+# line under the bar, right of datum B's tag (box bottom ~0.0945) and over
+# the bar-slide finish's text (top ~0.087), left of the depth's text stack
+# (x 0.318), under the A5..A9 tags (bottom ~0.100).
+TAP_WALL_NOTE = f"SCREWS ENTER BY HAND; {TAP_EDGE_WALL_TEXT}"
+TAP_WALL_NOTE_XY = (0.155, 0.093)
 # The right view's depth: its text stack (keep = its centre) left of the
 # extension lines (x 0.365 and 0.375), its underline on its own dimension
 # line (~0.075), under the height's ".29" (bottom ~0.108) and datum A's tag
@@ -497,7 +510,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="guide hole-pattern position",
     )
     if add_note(adapter, FCF_MATE_NOTE, *FCF_MATE_NOTE_XY) is None:
-        raise RuntimeError("hole-pattern mate note was not inserted")
+        raise RuntimeError("hole-pattern route note was not inserted")
+    if add_note(adapter, TAP_WALL_NOTE, *TAP_WALL_NOTE_XY) is None:
+        raise RuntimeError("tap acceptance and wall note was not inserted")
     # The platen hangs by the top rail's bottom face (datum B) on the bar's top
     # edge and slides along it: the one running surface takes the part-owned
     # Ra symbol, landed on that face's edge in the front view.

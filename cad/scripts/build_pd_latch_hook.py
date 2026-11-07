@@ -144,8 +144,6 @@ from pd_latch_hook_spec import (
     FORMED_DIMENSIONS,
     FORMED_TOL,
     ISOMETRIC_VIEW_NOTE,
-    POSITION_DIMENSIONS,
-    POSITION_TOL,
     REFERENCE_SKETCHES,
     UNIT,
 )
@@ -1022,18 +1020,9 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
-    # The drilled holes, the width and the inside bend radius take the title
-    # block's rows (DRILLED HOLES, .XX).
-    # Screw-hole positions from the formed ear and the low-Y edge.
-    for feature_name, dimension_names in POSITION_DIMENSIONS.items():
-        for dimension_name in dimension_names:
-            set_dimension_symmetric_tolerance(
-                adapter,
-                feature_name,
-                dimension_name,
-                POSITION_TOL,
-                display_unit=UNIT,
-            )
+    # The drilled holes, the width, the inside bend radius and the screw-hole
+    # positions (the bar's taps are spotted through them at assembly) take
+    # the title block's rows (DRILLED HOLES, .XX, .XXX): no explicit band.
     # Every hand-formed arm feature carries the one formed band; the far face
     # at the pin carries none (the sheet prints it as a reference).
     for feature_name, dimension_names in FORMED_DIMENSIONS.items():

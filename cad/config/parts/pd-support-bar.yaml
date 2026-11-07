@@ -7,3 +7,9 @@ pd-support-bar:
   tolerance_class: machined_block
   process: "machined (steel); back face drilled and tapped for the transgear pivot (flat-bottomed blind tap) and the latch hook's base screws (through taps)"
   drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "accept"
+      where: "principal view: the #8-32 pivot tap's station 6.617 \u00b1.002 from END A, and the hanger row height .571 \u00b1.002 from the top face"
+      finding: "hole location band narrower than the \u00b1.005 drilled-hole row, with no fit route named at the feature (rule 4, shop table)"
+      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144. The MHA-PD-VN-57 pivot screw threads into this tap through the MHA-PD-18 arm and MHA-PD-20 spacer, so there is no mate to transfer it from; its position feeds the transgear hanger's latch, spacer-sweep and pen-inset stacks. The hook taps on the same row are spotted through MHA-PD-14 at assembly."

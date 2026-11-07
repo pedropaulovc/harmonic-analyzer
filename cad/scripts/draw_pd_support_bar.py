@@ -202,9 +202,11 @@ def _back_x(model_x: float) -> float:
 # stands right of its hole, its bottom shelf ~6 mm over the top face, ~13 mm
 # over the hole: the pivot's left end 25 mm right of its hole, so the leader
 # meets the countersink ~62 deg off the A-A line; the pair's, on the right
-# hole (the reference circle's, build_pd_support_bar), 31 mm right of it, so
-# its leader never crosses the left hole and its block starts past the pivot
-# block's right end (the widest rows ~50 and ~54 mm).
+# hole (the reference circle's, build_pd_support_bar), 66 mm right of it to
+# its centre, so its leader never crosses the left hole and passes ~3 mm
+# under the pivot block, whose right end its block starts ~5 mm past (widest
+# rows ~53 mm, and ~82 mm for the pair's spotting route, at 2.64 mm a
+# character); it ends ~30 mm short of section A-A's .374.
 ROW_STEP = 0.013
 FRONT_KEEP = {
     "PivotTapStation": (LEFT_END + 0.042, FACE_BOTTOM - ROW_STEP),
@@ -213,7 +215,7 @@ FRONT_KEEP = {
     "Length": (FACE_CENTER[0], FACE_BOTTOM - 4.0 * ROW_STEP),
     "HangerRowHeight": (RIGHT_END + 0.022, FACE_BOTTOM - 0.010),
     "PivotCskDia": (_face_x(PIVOT_TAP_X) + 0.059, FACE_TOP + 0.017),
-    "BracketCskDia": (_face_x(BRACKET_TAP_X[1]) + 0.058, FACE_TOP + 0.017),
+    "BracketCskDia": (_face_x(BRACKET_TAP_X[1]) + 0.066, FACE_TOP + 0.017),
 }
 # The top face's slide roughness on its edge, left of the section line.
 TOP_FINISH_MODEL_X = -178.0
@@ -230,8 +232,8 @@ TOP_REASON_TOP = (
 )
 
 # The clamp stations from the same left (x = -226) end, on the sheet's right
-# here, shortest nearest the bar. The first two spans (5.75 and 23.25 mm on
-# the sheet) are too short for their banded texts, which stand right of the
+# here, shortest nearest the bar. The first two rows' texts (spans of 5.75 and
+# 23.25 mm on the sheet, the first narrower than its text) stand right of the
 # end's extension line, under END A and left of the isometric view; the long
 # rows' texts stand between their holes and the end. The bar height reads off
 # that end too (the BarProfile dimension's model edge), the clamp row's height
@@ -325,10 +327,16 @@ DETAIL_KEEP = {
 # and the through slot, so neither extension line crosses the cut: over the
 # top face (r6) the floor's extension line ran up through the hatch and read
 # as a seam (its 0.13 stroke from the floor's lower corner, PDF paths).
-# SLOT_DEPTH_SHELF_DROP seeds the dimension line through the open slot.
-# After the callout is hung, OffsetText keeps the original line in the open
-# slot while placing its native text right of B-B, below detail C's shelf.
-# Native segment readback must stay out of the actual section material.
+# SLOT_DEPTH_SHELF_DROP seeds the dimension line through the open slot: a
+# horizontal dimension's line runs about half its text block under the
+# block's centre (the anchor), ~2.9 mm for the bare .19 (round 1 of the
+# fan-out: anchored 11.2 over the clamp line, the 4-line block's seed, the
+# line stood ~8.4 over it, 5 mm into the upper bar). _seat_slot_depth_baseline
+# then measures the native line and moves it onto the clamp line, so the
+# seed need only land in the slot. After the callout is hung, OffsetText
+# keeps the original line in the open slot while placing its native text
+# right of B-B, below detail C's shelf. Native segment readback must stay
+# out of the actual section material.
 # The caption's top centre stands SLOT_CAPTION_DROP under the
 # section's centre: its block (r7: 14.6 tall, its top 0.05 under the anchor)
 # then has 3 mm of air under the cut and 3.4 over the inner border's edge
@@ -342,7 +350,7 @@ SLOT_SECTION_CAPTION_XY = (
     SLOT_SECTION_CENTER[1] - SLOT_CAPTION_DROP,
 )  # top centre
 SLOT_SECTION_KEEP_NAMES = ("ClampSlotCboreDepth",)
-SLOT_DEPTH_SHELF_DROP = 0.0112
+SLOT_DEPTH_SHELF_DROP = 0.0029
 SLOT_DEPTH_TEXT_SIDE = 0.018
 SLOT_CALLOUT_AIR_M = 0.003
 
@@ -944,15 +952,10 @@ def _assert_slot_depth_callout_clear(
     )
 
 
-def _place_slot_depth_callout(
-    adapter: Any,
-    section: Any,
-    detail_annotations: list[Any],
-    section_annotations: list[Any],
-    back_annotations: list[Any],
-) -> list[Any]:
-    """Move only the native depth text; retain its original dimension line."""
-    depth = _dimension_annotation(adapter, section_annotations, "ClampSlotCboreDepth")
+def _slot_depth_native_lines(
+    depth: Any,
+) -> tuple[list[Any], float]:
+    """The depth's two native witnesses and its baseline's sheet y."""
     original_lines = dimension_segments(depth)
     witnesses = [
         line
@@ -973,7 +976,44 @@ def _place_slot_depth_callout(
         raise RuntimeError(
             "section B-B depth: no unambiguous native dimension baseline"
         )
-    baseline_y = widget[0][0][1]
+    return witnesses, widget[0][0][1]
+
+
+def _seat_slot_depth_baseline(
+    adapter: Any, section: Any, depth: Any
+) -> tuple[list[Any], float]:
+    """Put the depth's native baseline on the clamp line, through the open
+    slot, by measuring it: how far the line sits from the text's keep point
+    follows the text block's line count (round 1 of the fan-out: the bare
+    .19 left the 4-line block's SLOT_DEPTH_SHELF_DROP seed 5 mm into the
+    upper bar), so the seed is only a first guess."""
+    target = _sheet(adapter, section, (SLOT_SECTION_X, CLAMP_TAP_Y, 0.0), "B-B clamp line")[1]
+    for _attempt in range(4):
+        witnesses, baseline_y = _slot_depth_native_lines(depth)
+        error = target - baseline_y
+        if abs(error) <= CAPTION_SETTLE_M:
+            _telemetry.info(
+                f"section B-B depth baseline y={baseline_y:.5f} on the clamp line "
+                f"y={target:.5f}"
+            )
+            return witnesses, baseline_y
+        move_annotation(adapter, depth, 0.0, error, label="section B-B depth baseline")
+    raise RuntimeError(
+        f"section B-B depth baseline y={baseline_y:.5f} did not settle on the "
+        f"clamp line y={target:.5f}"
+    )
+
+
+def _place_slot_depth_callout(
+    adapter: Any,
+    section: Any,
+    detail_annotations: list[Any],
+    section_annotations: list[Any],
+    back_annotations: list[Any],
+) -> list[Any]:
+    """Move only the native depth text; retain its original dimension line."""
+    depth = _dimension_annotation(adapter, section_annotations, "ClampSlotCboreDepth")
+    witnesses, baseline_y = _seat_slot_depth_baseline(adapter, section, depth)
     annotation = _early_bound(depth, "IAnnotation")
     x, _y, z = (float(value) for value in annotation.GetPosition())
     # OffsetText can re-dress a line onto its annotation's creation-point y.

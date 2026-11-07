@@ -7,11 +7,11 @@ pd-latch-hook:
   finish: hardened, tempered blue after drilling, 44-50 HRC
   quantity: 1
   tolerance_class: machined_block
-  process: ".032 in annealed 1095 sheet: cut the blank to the flat pattern, bend the ear 90 degrees, drill the screw holes from the formed ear, roll the arm and form the tab annealed; fit to the support bar, clamp the hanger at full feed mesh, transfer the latch pin's centre to the strip and drill the pin hole on the mark; remove, harden and temper blue, reinstall"
+  process: ".032 in annealed 1095 sheet: cut the blank to the flat pattern, bend the ear 90 degrees, drill the screw holes from the formed ear, roll the arm and form the tab annealed; fit to the support bar (its taps spotted through the screw holes), clamp the hanger at full feed mesh, transfer the latch pin's centre to the strip and drill the pin hole on the mark; remove, harden and temper blue, reinstall"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
-      where: "the 2X #30 DRILL THRU screw-hole callout: WALL .063 MIN TO EDGES (the +Y edge .063, the -Y edge .071 and the far -X end .064)"
+      where: "the 2X Ø.128 DRILL THRU screw-hole callout: WALL .060 MIN TO EDGES (the +Y edge .060, the -Y edge .068 and the far -X end .061)"
       finding: "screw-hole walls to the base's edges below the .080 target at the finished worst case (rule 17)"
-      reason: "Main delegated ruling 2026-11-04 on #2166 (option A, the existing geometry kept), following the owner's approved band for thin walls between .060 and .080 (DT-35 .060, DT-08 .0602; #989), RV-04 on MHA-PD-18 (#1379) and RV-01 on MHA-PD-12 (#2124); owner review on #2144. The holes locate to the MHA-PD-07 bar's fixed taps; growing the base to .35 by .68 with the row at .169 restores .080 but moves the base edges into the lock sweep. The .083 unbroken wall pays the .010 outside edge break and the .010 hole-mouth break and lands at .063"
+      reason: "Main delegated ruling 2026-11-04 on #2166 (option A, the existing geometry kept), following the owner's approved band for thin walls between .060 and .080 (DT-35 .060, DT-08 .0602; #989), RV-04 on MHA-PD-18 (#1379) and RV-01 on MHA-PD-12 (#2124); owner review on #2144. Growing the base to .35 by .68 with the row at .169 restores .080 but moves the base edges into the lock sweep. Delegated ruling 2026-11-07 (Main, Q1): the MHA-PD-07 bar's taps are spotted through these holes at assembly, so their positions take the title block's .XXX row; the .080 unbroken wall pays the .010 outside edge break and the .010 hole-mouth break and lands at the .060 floor"
