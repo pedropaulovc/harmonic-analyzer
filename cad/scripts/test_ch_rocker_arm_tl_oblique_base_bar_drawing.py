@@ -670,6 +670,7 @@ def test_metric_vendor_stations_are_model_authored_in_mm() -> None:
 class _Display:
     def __init__(self, places: int) -> None:
         self.doc_units, self.places, self.calls = True, places, []
+        self.texts = {1: "", 2: " mm"}
 
     def GetUseDocUnits(self):
         return self.doc_units
@@ -680,16 +681,21 @@ class _Display:
     def GetPrimaryPrecision2(self):
         return self.places
 
-    def GetText(self, _part):
-        return " mm"
+    def GetText(self, part):
+        return self.texts.get(part, "")
+
+    def SetText(self, part, text):
+        self.calls.append(f"SetText{part}")
+        self.texts[part] = text  # Native setter replaces this entire text part.
 
     def SetUnits2(self, use_doc, *_args):
         self.calls.append("SetUnits2")
         self.doc_units = use_doc
         return 0
 
-    def SetPrecision3(self, *_args):
+    def SetPrecision3(self, places, *_args):
         self.calls.append("SetPrecision3")
+        self.places = places
         return 0
 
 
@@ -720,6 +726,62 @@ def test_metric_sheet_sets_units_but_never_rewrites_model_precision(
             None, [_Annotation("RailHole1X", bad)], {"RailHole1X": 2}
         )
     assert bad.calls == []
+
+
+def test_metric_reference_is_authored_with_units_inside_parentheses(monkeypatch) -> None:
+    import _drawing_metric_vendor as metric
+    import _metric_vendor_dimension as model
+
+    native_dimension = object()
+    display = _Display(3)
+    monkeypatch.setattr(model, "_named_dimension", lambda *_args: (display, native_dimension))
+    monkeypatch.setattr(model, "_early_bound", lambda obj, _iface: obj)
+    model.set_metric_vendor_units(
+        None, "RailHoles", "RailHole1X", places=3, presentation="reference"
+    )
+    assert display.texts == {1: "(", 2: " mm)"}
+    assert display.places == 3
+    model_text = dict(display.texts)
+    display.calls.clear()
+    display.doc_units = True  # The inch drawing import adopts document units.
+    monkeypatch.setattr(metric, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(metric, "_annotation_name", lambda _adapter, ann: ann.name)
+    metric.print_imported_metric_dimensions(
+        None, [_Annotation("RailHole1X", display)], {"RailHole1X": 3},
+        references={"RailHole1X"},
+    )
+    assert display.calls == ["SetUnits2"]  # No drawing-side text or precision repair.
+    assert display.texts == model_text
+    # The old generic REF formatter replaced the same native suffix with ")".
+    display.SetText(2, ")")
+    with pytest.raises(RuntimeError, match="does not print millimetres"):
+        metric.print_imported_metric_dimensions(
+            None, [_Annotation("RailHole1X", display)], {"RailHole1X": 3},
+            references={"RailHole1X"},
+        )
+
+
+@pytest.mark.parametrize("prefix,suffix", (("", " mm)"), ("(", " mm"), ("(", ")")))
+def test_metric_reference_requires_both_parentheses_and_unit(monkeypatch, prefix, suffix) -> None:
+    import _drawing_metric_vendor as metric
+
+    display = _Display(3)
+    display.texts = {1: prefix, 2: suffix}
+    monkeypatch.setattr(metric, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(metric, "_annotation_name", lambda _adapter, ann: ann.name)
+    with pytest.raises(RuntimeError, match="does not print millimetres"):
+        metric.print_imported_metric_dimensions(
+            None, [_Annotation("RailHole1X", display)], {"RailHole1X": 3},
+            references={"RailHole1X"},
+        )
+
+
+def test_base_bar_reference_text_is_owned_by_the_model() -> None:
+    build = BUILD.read_text(encoding="utf-8")
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'presentation="reference"' in build
+    assert 'references=DRAWING_DIMENSIONS["RailHoles"]' in sheet
+    assert "set_reference_dimensions(" not in sheet
 
 
 def test_notes_follow_the_simplicity_policy() -> None:

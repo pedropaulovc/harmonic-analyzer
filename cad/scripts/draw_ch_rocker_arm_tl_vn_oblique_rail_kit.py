@@ -44,6 +44,7 @@ from _drawing_common import read_required_properties
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
+    set_dimension_callouts,
     set_reference_dimension,
 )
 from _drawing_layout_check import LeaderSegment, _segment_crosses_box
@@ -374,6 +375,8 @@ def assert_receipt_controls(adapter: Any, annotations: list[Any]) -> None:
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
         brackets = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
         callout = str(display.GetText(_CALLOUT_BELOW) or "").replace("\r\n", "\n")
+        above = str(display.GetText(3) or "").replace("\r\n", "\n")
+        expected_above = rail.END_FIT_CALLOUT if name == "Length" else ""
         value = abs(float(dimension.SystemValue))
         expected = rail.LENGTH if name == "Length" else STATION_NOMINALS[name]
         if (
@@ -381,6 +384,7 @@ def assert_receipt_controls(adapter: Any, annotations: list[Any]) -> None:
             or int(tolerance.Type) != _TOL_NONE
             or brackets != ("(", ")")
             or callout
+            or above != expected_above
         ):
             raise RuntimeError(
                 f"rail reference {name}: value {value!r}, expected {expected!r}, "
@@ -411,6 +415,11 @@ def _receipt_dimensions(adapter: Any, front: Any) -> list[Any]:
             continue
         display = _display(annotation)
         display.ArrowSide = STATION_ARROW_SIDES[name]
+    # Length witnesses identify both actual rail end faces. Put the fit flag
+    # above its value, away from the proven eight station-text lanes below.
+    set_dimension_callouts(
+        adapter, annotations, {"Length": rail.END_FIT_CALLOUT}, location="above"
+    )
     assert_receipt_controls(adapter, annotations)
     return annotations
 

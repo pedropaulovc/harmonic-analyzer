@@ -503,7 +503,10 @@ async def build(adapter) -> dict[str, str]:
         )
         set_metric_vendor_units(adapter, feature_name, dimension_name, places=places)
     for (feature_name, dimension_name), places in RAIL_REFERENCE_DIMENSIONS.items():
-        set_metric_vendor_units(adapter, feature_name, dimension_name, places=places)
+        set_metric_vendor_units(
+            adapter, feature_name, dimension_name, places=places,
+            presentation="reference",
+        )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

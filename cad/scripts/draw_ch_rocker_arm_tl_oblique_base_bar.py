@@ -44,7 +44,7 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts, set_reference_dimensions
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
@@ -903,8 +903,8 @@ async def build(adapter: Any) -> dict[str, str]:
             name: places
             for (_feature, name), places in part_spec.RAIL_REFERENCE_DIMENSIONS.items()
         },
+        references=DRAWING_DIMENSIONS["RailHoles"],
     )
-    set_reference_dimensions(adapter, annotations, DRAWING_DIMENSIONS["RailHoles"])
     _set_dimension_text(adapter, annotations, DIMENSION_TEXT)
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
 

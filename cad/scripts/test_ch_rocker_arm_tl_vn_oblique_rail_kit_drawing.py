@@ -422,12 +422,13 @@ def test_rail_receipt_note_points_at_the_stations() -> None:
     assert all(len(line) <= 70 for line in lines), lines
     note = " ".join(lines)
     assert bar["number"] in note
-    assert not re.search(r"\d", note.replace(bar["number"], ""))
-    assert "TRANSFER ACTUAL RAIL HOLES" in note
+    assert rail.WALL_ACCEPTANCE_IN == ".080"
+    assert f"RAIL C'BORE/END; BAR TAP/END-SLOT-BRKT C'BORE: {rail.WALL_ACCEPTANCE_IN} IN MIN." in note
+    assert "MHA-CH-06-TL-00 SHEET 1 LIMITS; SEALS ON RAIL, NO BIND" in note
+    assert "KEEP PAIRS; ALL SCREWS FREE BY HAND" in note
     assert f"BASE BAR {bar['number']}" in rail.RECEIPT_FLAG
     assert "STATIONS REF" in rail.RECEIPT_FLAG
-    assert "FREELY BY HAND" in note and "BOTH ENDS FLUSH" in note
-    assert "ACTUAL WALLS AND FULL TRAVEL" in note
+    assert rail.END_FIT_CALLOUT == "RAIL ENDS FLUSH WITH BASE BAR ENDS [A]"
     assert rail.CBORE_END_WALL_WORST >= base_bar.WALL_TARGET_MM
     assert rail.CBORE_END_WALLS_WORST == pytest.approx((6.214, 5.96))
 
@@ -723,6 +724,15 @@ def _stack_ink(*, pitch=None, lift=None):
             text, anchor=(x, y), height=draw.DIMENSION_TEXT_HEIGHT, reference=2
         )
         text_box = (box.xmin, box.ymin, box.xmax, box.ymax)
+        if name == "Length":
+            above = estimate_text_box(
+                rail.END_FIT_CALLOUT, anchor=(x, y + 0.005),
+                height=draw.DIMENSION_TEXT_HEIGHT, reference=2,
+            )
+            text_box = (
+                min(text_box[0], above.xmin), text_box[1],
+                max(text_box[2], above.xmax), above.ymax,
+            )
         x0, x1 = sheet(start)[0], sheet(end)[0]
         segments = [((x0, line_y), (x1, line_y))]
         if name in draw.TEXT_OUTSIDE_START:  # the leg under the outside text
@@ -947,7 +957,10 @@ def _receipt_annotations():
     for annotation in annotations:
         annotation.display.ArrowSide = draw.STATION_ARROW_SIDES[annotation.name]
     annotations.append(
-        _Annotation("Length", _Display(rail.LENGTH, {1: "(", 2: ")"}, _Tolerance(0, 0, 0), rail.DRAWING_PRECISION["Rail"]["Length"]))
+        _Annotation("Length", _Display(
+            rail.LENGTH, {1: "(", 2: ")", 3: rail.END_FIT_CALLOUT},
+            _Tolerance(0, 0, 0), rail.DRAWING_PRECISION["Rail"]["Length"],
+        ))
     )
     return annotations
 
@@ -961,6 +974,7 @@ def _receipt_annotations():
         "bare",
         "callout",
         "length-bare",
+        "length-fit-flag",
         "missing",
         "arrows",
         "short-arrows",
@@ -982,6 +996,8 @@ def test_receipt_controls_readback_refuses_every_drift(monkeypatch, fault) -> No
         by_name["Station8"].texts = {4: rail.RECEIPT_FLAG}
     elif fault == "length-bare":
         by_name["Length"].texts = {}
+    elif fault == "length-fit-flag":
+        by_name["Length"].texts[3] = ""
     elif fault == "missing":
         annotations = annotations[1:]
     elif fault == "arrows":
