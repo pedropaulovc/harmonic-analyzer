@@ -423,12 +423,14 @@ def test_rail_receipt_note_points_at_the_stations() -> None:
     note = " ".join(lines)
     assert bar["number"] in note
     assert rail.WALL_ACCEPTANCE_IN == ".080"
-    assert f"RAIL C'BORE/END; BAR TAP/END-SLOT-BRKT C'BORE: {rail.WALL_ACCEPTANCE_IN} IN MIN." in note
-    assert "MHA-CH-06-TL-00 SHEET 1 LIMITS; SEALS ON RAIL, NO BIND" in note
+    assert f"WALL FROM EACH RAIL COUNTERBORE TO RAIL END: {rail.WALL_ACCEPTANCE_IN} IN MIN." in note
+    assert f"MHA-CH-06-TL-20: TAP WALL TO ENDS, SLOTS, COUNTERBORES {rail.WALL_ACCEPTANCE_IN} IN MIN." in note
+    assert "MHA-CH-06-TL-00 SHEET 1 LIMITS; SEALS ON RAIL, NO BIND" in rail.END_FIT_CALLOUT
     assert "KEEP PAIRS; ALL SCREWS FREE BY HAND" in note
     assert f"BASE BAR {bar['number']}" in rail.RECEIPT_FLAG
     assert "STATIONS REF" in rail.RECEIPT_FLAG
-    assert rail.END_FIT_CALLOUT == "RAIL ENDS FLUSH WITH BASE BAR ENDS [A]"
+    assert rail.END_FIT_CALLOUT.splitlines()[0] == "RAIL ENDS FLUSH WITH BASE BAR ENDS [A]"
+    assert len(rail.END_FIT_CALLOUT.splitlines()) == 2
     assert rail.CBORE_END_WALL_WORST >= base_bar.WALL_TARGET_MM
     assert rail.CBORE_END_WALLS_WORST == pytest.approx((6.214, 5.96))
 
