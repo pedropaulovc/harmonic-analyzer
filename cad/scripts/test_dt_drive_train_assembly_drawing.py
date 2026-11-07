@@ -1290,6 +1290,15 @@ def test_a_lowered_view_box_slides_clear_of_the_title_block() -> None:
     assert outline[2] + shift[0] <= left + 1e-9 or outline[1] + shift[1] >= top - 1e-9
 
 
+def test_view_labels_print_a_scale_only_where_it_differs_from_the_sheet() -> None:
+    """Rule 9 (rubric sample round 11 #0): every repeated label scale went."""
+    assert drawing.view_label("ISOMETRIC", (1.0, 3.0), (1.0, 3.0)) == "ISOMETRIC"
+    assert drawing.view_label("DETAIL A", (4.0, 1.0), (1.0, 1.0)) == "DETAIL A 4:1"
+    assert drawing.SHEET_SCALES[drawing.SHEET_NAMES[drawing.BANK_SETTINGS_SHEET - 1]] == (1.0, 1.0)
+    for text in (drawing.BANK_VIEW_CAPTION, drawing.DRUM_VIEW_CAPTION, drawing.BOM_REFERENCE_NOTES):
+        assert not re.search(r"\b\d+(?:\.\d+)?:\d+(?:\.\d+)?\b", text), text
+
+
 def test_the_sheet_scales_follow_the_chosen_cluster_and_full_detail_scales() -> None:
     chosen = {**drawing.CLUSTER_SCALES, "crank": (1.0, 4.0)}
     scales = drawing.package_sheet_scales(chosen, (2.0, 3.0))
