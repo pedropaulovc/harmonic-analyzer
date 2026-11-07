@@ -19,6 +19,8 @@ hole-table trigger, the reason and callout word limits, the step limits, the
 drawing-number rule and rule 26's lists) are stated requirements, not
 invented ones: confirm a finding that applies them by counting or reading the
 sheet yourself.
+A confirmed step-limit cluster's `where` lists every offending step you
+counted, by number, never a sample or "and similar".
 
 Classify each sheet-supported issue using this package kind's contract:
 
