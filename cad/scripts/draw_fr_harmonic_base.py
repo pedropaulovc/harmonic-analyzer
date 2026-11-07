@@ -1306,10 +1306,12 @@ TRANSFER_NAMEPLATE_LEADER_HOLE = max(
 # precedent; owner review #2144 (pending owner confirmation): D1 is spotted
 # through the MHA-DT-20 platform's reamed pivot bore at assembly (rule 4's
 # transfer route; the MHA-DT-00 step that sets the platform is the drive-train
-# slice's), so the .002 offsets from the MHA-DT-02 seat stay as the check of
-# where it lands, booked unchanged in cone_set_stack. The note is the sheet's
-# own: fr_harmonic_base_spec.pivot_seat_step is in the part builder's closure
-# and would re-key the base and every assembly over presentation text.
+# slice's). The .002 offsets from the MHA-DT-02 seat stay as the native banded
+# dimensions, booked unchanged in cone_set_stack, with no sentence repeating
+# them: run 20261107T171816615Z (2/3) counted that line over rule 7's
+# four-line note block. The note is the sheet's own:
+# fr_harmonic_base_spec.pivot_seat_step is in the part builder's closure and
+# would re-key the base and every assembly over presentation text.
 PIVOT_SEAT_NOTE_XY = (0.020, 0.100)
 
 
@@ -1317,7 +1319,6 @@ def pivot_seat_step(tag: str) -> str:
     """Numbered note 1 for the physical pivot, by its native hole-table tag."""
     return (
         f"1. {tag}: TRANSFER FROM MHA-DT-20 PIVOT BORE AT ASSEMBLY;\n"
-        "CHECK THE BANDED OFFSETS FROM THE MHA-DT-02 SEAT.\n"
         f"{tag} TABLE X/Y ARE REFERENCE."
     )
 
