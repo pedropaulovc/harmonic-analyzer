@@ -45,10 +45,11 @@ def test_package_notes_carry_no_dimension_text() -> None:
         assert not _DIMENSION_TEXT.search(text), text
 
 
-def _printed_step_sheets(module) -> dict[int, int]:
-    """Step number -> 1-based sheet, read from where the assembly drawing
-    actually places each wrapped sequence block (``_add_note_block`` calls
-    naming ``SHEET_NAMES[i]`` and a module-level block)."""
+def _printed_step_sheets(module) -> dict[str, int]:
+    """Step head (``12`` or ``12A``) -> 1-based sheet, read from where the
+    assembly drawing actually places each wrapped sequence block
+    (``_add_note_block`` calls naming ``SHEET_NAMES[i]`` and a module-level
+    block)."""
     tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
     placed: dict[str, int] = {}
     for node in ast.walk(tree):
@@ -69,23 +70,23 @@ def _printed_step_sheets(module) -> dict[int, int]:
             assert block.id not in placed, block.id
             placed[block.id] = sheet.slice.value + 1
     assert placed, module.__name__
-    printed: dict[int, int] = {}
+    printed: dict[str, int] = {}
     for block, sheet in placed.items():
         for line in getattr(module, block).splitlines():
-            match = re.match(r"(\d+)\. ", line)
+            match = re.match(r"(\d+[A-Z]?)\. ", line)
             if match:
-                step = int(match.group(1))
+                step = match.group(1)
                 assert step not in printed, (module.__name__, step)
                 printed[step] = sheet
     return printed
 
 
-def _cited_groups(line: str, number: str) -> dict[int, set[int]]:
-    """Sheet -> the step numbers the pointer prints after that SHEET."""
+def _cited_groups(line: str, number: str) -> dict[int, set[str]]:
+    """Sheet -> the step heads the pointer prints after that SHEET."""
     _, *parts = re.split(r"\bSHEET (\d+)\b", line.replace(number, ""))
     assert parts and len(parts) % 2 == 0, line
     return {
-        int(sheet): {int(value) for value in re.findall(r"\b\d+\b", text)}
+        int(sheet): set(re.findall(r"\b\d+[A-Z]?\b", text))
         for sheet, text in zip(parts[::2], parts[1::2], strict=True)
     }
 
@@ -116,11 +117,11 @@ def test_assembly_pointer_cites_the_sheets_and_steps_that_cut_and_form_each_memb
     # The pen sheet has no keyed sequence: its numbered steps naming the pen
     # wire are the ones the pointer must cite.
     pen_steps = {
-        int(text.split(".", 1)[0])
+        text.split(".", 1)[0]
         for text in pen_sheet.ASSEMBLY_STEPS
         if text[:1].isdigit() and "PEN WIRE" in text
     }
-    assert pen_steps == {step for _sheet, step in drawing.PEN_WIRE_CITATIONS}
+    assert pen_steps == {str(step) for _sheet, step in drawing.PEN_WIRE_CITATIONS}
     printed = {
         "mg-magnifier": _printed_step_sheets(magnifier),
         "pn-pen": _printed_step_sheets(pen),
@@ -128,7 +129,7 @@ def test_assembly_pointer_cites_the_sheets_and_steps_that_cut_and_form_each_memb
     cited = {"mg-magnifier": lever_steps, "pn-pen": pen_steps}
     lines = drawing.ASSEMBLY_NOTE.splitlines()
     for stem, number in numbers.items():
-        expected: dict[int, set[int]] = {}
+        expected: dict[int, set[str]] = {}
         for step in cited[stem]:
             expected.setdefault(printed[stem][step], set()).add(step)
         [line] = [line for line in lines if number in line]

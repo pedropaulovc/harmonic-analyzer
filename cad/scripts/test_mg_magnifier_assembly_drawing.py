@@ -145,27 +145,29 @@ def test_the_press_gauge_is_a_reference_accepted_at_the_nuts() -> None:
     # nuts are set, at the DETAIL A gauge with a named instrument.
     checked = notes.STEP_TEXT[steps.AXLE_CHECKED_KEY]
     assert "DETAIL A" in checked and "CALIPER DEPTH ROD" in checked
-    accepted = steps.SEQUENCE.index("axle-accepted")
+    accepted = steps.SEQUENCE.index(steps.AXLE_ACCEPTED_KEY)
     assert accepted > steps.SEQUENCE.index(steps.LOCKNUT_JAMMED_KEY)
-    assert notes.STEP_TEXT["axle-accepted"] == (
-        f"REPEAT THE STEP {steps.step_number(steps.AXLE_CHECKED_KEY)} CHECK."
+    assert notes.STEP_TEXT[steps.AXLE_ACCEPTED_KEY].startswith("CHECK ")
+    assert f"STEP {steps.step_number(steps.AXLE_CHECKED_KEY)}" in (
+        notes.STEP_TEXT[steps.AXLE_ACCEPTED_KEY]
     )
     # The final reading has its own remedy: the stack comes off, back to the
     # trial fit.
-    assert steps.SEQUENCE[accepted + 1] == "axle-reset"
-    assert notes.STEP_TEXT["axle-reset"] == (
-        "IF IT FAILS, REMOVE ITEMS 18, 17, 15, 14 AND 13 AND RETURN TO STEP "
-        f"{steps.step_number(steps.AXLE_TRIAL_KEY)}."
+    assert steps.SEQUENCE[accepted + 1 : accepted + 3] == ("axle-stack-removed", "axle-reset")
+    assert notes.STEP_TEXT["axle-reset"].endswith(
+        f"RETURN TO STEP {steps.step_number(steps.AXLE_TRIAL_KEY)}."
     )
     # The endshake callout keeps one reason line; the steps carry the method.
     assert stack.SETTING_CALLOUTS[stack.FEATURE][stack.ENDSHAKE_DIMENSION] == (
         4, "WHEEL FREE, NO RATTLE"
     )
-    # Each side has its own remedy, back through the press-hold check.
+    # Each side has its own remedy; a re-press goes back through the
+    # press-hold check.
     for key, side in (("axle-pressed-further", "OVER THE MAX"), ("axle-pressed-back", "UNDER THE MIN")):
-        remedy = notes.STEP_TEXT[key]
-        assert side in remedy
-        assert remedy.endswith(f"RETURN TO STEP {steps.step_number(steps.AXLE_HELD_KEY)}.")
+        assert side in notes.STEP_TEXT[key]
+    assert notes.STEP_TEXT["axle-rechecked"].endswith(
+        f"RETURN TO STEP {steps.step_number(steps.AXLE_HELD_KEY)}."
+    )
     # The one-line callout centres over the value: at the 2.7 mm a capital
     # measured on the e04fd60ab sheet it stays inside the right border.
     x, _y = drawing.PRESSED_KEEP[stack.PRESS_GAUGE_DIMENSION]
@@ -173,13 +175,14 @@ def test_the_press_gauge_is_a_reference_accepted_at_the_nuts() -> None:
 
 
 def test_each_press_is_accepted_at_the_bench_with_a_slip_fit_remedy() -> None:
-    """Rule 23: a press prints a bench acceptance and what a slip fit gets."""
+    """Rule 23: a press prints a bench acceptance and what a slip fit gets,
+    each a lettered sub-step of the press (rule 22, the shared step lint)."""
     for pressed, held, taken_out, remedy in (
         (steps.DRUM_PRESSED_KEY, steps.DRUM_HELD_KEY, "drum-pulled-off", "drum-bonded"),
         (steps.AXLE_PRESSED_KEY, steps.AXLE_HELD_KEY, "axle-pressed-out", "axle-remade"),
     ):
-        number = steps.step_number(pressed)
-        assert steps.SEQUENCE[number : number + 3] == (held, taken_out, remedy)
+        (step,) = (step for step in steps.STEPS if step[0] == pressed)
+        assert step[1:4] == (held, taken_out, remedy)
         assert notes.STEP_TEXT[held].endswith("DOES NOT TURN OR SLIDE BY HAND.")
         # One action per step (rule 22): the slip test takes the part out,
         # the next step is the remedy.
@@ -189,10 +192,11 @@ def test_each_press_is_accepted_at_the_bench_with_a_slip_fit_remedy() -> None:
     # wheel remade, by the one general bond note that prints with the checks
     # (owner ruling 2026-11-07).
     axle = notes.ITEM_NUMBERS["mg-wheel-axle"]
-    assert notes.STEP_TEXT["axle-remade"] == (
-        f"REMAKE THAT ITEM {axle} TO ITS PRESS SIZE AND RETURN TO STEP "
-        f"{steps.step_number(steps.AXLE_PRESSED_KEY)}."
+    assert "REMAKE IT TO ITS PRESS SIZE" in notes.STEP_TEXT["axle-remade"]
+    assert notes.STEP_TEXT["axle-repressed"].endswith(
+        f"RETURN TO STEP {steps.step_number(steps.AXLE_PRESSED_KEY)}."
     )
+    assert f"ITEM {axle}" in notes.STEP_TEXT["axle-repressed"]
     assert notes.STEP_TEXT["drum-bonded"].endswith(
         f"WITH {notes.BOND_GRADE}, {notes.BOND_NOTE_REF}."
     )
@@ -200,6 +204,20 @@ def test_each_press_is_accepted_at_the_bench_with_a_slip_fit_remedy() -> None:
     assert notes.BOND_NOTE.startswith(f"NOTE 1, {notes.BOND_GRADE} BOND:")
     for rule in ("DEGREASE", "APPLY TO THE SPIGOT ONLY", "NONE IN THE AXLE BORE", "CURE 24 H", "DOES NOT TURN BY HAND"):
         assert rule in notes.BOND_NOTE
+
+
+def test_the_axle_press_accepts_the_plain_end_window_the_axle_spec_proves() -> None:
+    """The bar sheet no longer prints the pressed axle's end window (fanout/mg
+    #2260); the press step accepts it, read from the axle spec's limits."""
+    low, high = (
+        float(text) * 25.4 for text in notes.BACK_END_SUNK_TEXT.split("-")
+    )
+    assert low == pytest.approx(mg_wheel_axle_spec.BACK_END_SUNK_MIN, abs=0.0127)
+    assert high == pytest.approx(mg_wheel_axle_spec.BACK_END_SUNK_MAX, abs=0.0127)
+    assert 0.0 < low < high
+    pressed = notes.STEP_TEXT[steps.AXLE_PRESSED_KEY]
+    assert f": ITS PLAIN END {notes.BACK_END_SUNK_TEXT} BELOW THE FAR FACE OF ITEM " in pressed
+    assert "CALIPER DEPTH ROD" in pressed
 
 
 def test_each_hand_set_clamp_is_checked_to_hold_its_setting() -> None:
@@ -221,14 +239,36 @@ def test_the_joints_left_loose_cite_the_mha_ha_00_step_that_seats_them() -> None
     """Rule 23 across the package boundary: drawing and step, by number."""
     import ha_harmonic_analyzer_assembly_steps as ha_steps
 
-    assert notes.STEP_TEXT[steps.COLUMN_CLAMP_STARTED_KEY].endswith(
-        f"{ha_steps.step_ref('magnifier-bar-clamped')} TIGHTENS THEM."
-    )
+    (step,) = (step for step in steps.STEPS if step[0] == steps.COLUMN_CLAMP_STARTED_KEY)
+    assert any(ha_steps.step_ref("magnifier-bar-clamped") in notes.STEP_TEXT[key] for key in step[1:])
     assert any(
         ha_steps.step_ref("magnifier-bracket-screwed") in line
         for line in notes.ASSEMBLY_CHECKS
         if line.startswith("LOOSE ITEMS:")
     )
+
+
+def test_every_printed_step_is_one_short_action_by_the_shared_lint() -> None:
+    """Rule 22, offline, by the shared step lint (#2248): each printed step
+    is at most six lines and one action, a check's remedies follow it as
+    lettered sub-steps of its step, a press is followed by its hand check and
+    slip-fit remedy, every step cite names a printed head, and every direction
+    word is one the sheet defines. No step is allowlisted."""
+    from _test_assembly_steps import step_structure_violations
+
+    continued = " ".join(drawing.ASSEMBLY_STEPS_CONTINUED.split())
+    # The direction words the sheet uses, each with its definition as printed:
+    # a standard view name and a sense seen in a lettered view (rule 26).
+    direction_key = "\n".join(
+        phrase for phrase in ("RIGHT SIDE VIEW ON SHEET 1", "CLOCKWISE AS SEEN IN VIEW D")
+        if phrase in continued
+    )
+    violations = step_structure_violations(
+        {"STEP": (drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_STEPS_CONTINUED)},
+        reference_kinds={"STEP": "STEP"},
+        direction_key=direction_key,
+    )
+    assert violations == [], "\n".join(violations)
 
 
 def _circle_box(detail) -> tuple[float, float, float, float]:
@@ -554,10 +594,11 @@ def test_the_package_has_five_landscape_sheets_with_the_wire_steps_on_sheet_5() 
     # cites the wire steps there: the lever group and the wire, and only
     # they, continue on sheet 5.
     continued = notes.ASSEMBLY_STEPS[drawing.STEPS_SPLIT:]
-    first = steps.step_number(steps.LEVER_THREADED_KEY)
+    first = steps.SEQUENCE.index(steps.LEVER_THREADED_KEY)
     assert [step.split(". ", 1)[0] for step in continued] == [
-        str(number) for number in range(first, len(steps.SEQUENCE) + 1)
+        steps.step_number(key) for key in steps.SEQUENCE[first:]
     ]
+    assert steps.step_number(steps.LEVER_THREADED_KEY).isdigit()
     assert all(
         " ".join(step.split()) in " ".join(drawing.ASSEMBLY_STEPS_CONTINUED.split())
         for step in continued
@@ -638,9 +679,12 @@ def test_the_wire_tie_step_sets_tie_1_at_its_modelled_rest_angle() -> None:
         (wheel.TIE1_X / math.hypot(wheel.TIE1_X, wheel.TIE1_Y),
          wheel.TIE1_Y / math.hypot(wheel.TIE1_X, wheel.TIE1_Y))
     )
-    step = notes.STEP_TEXT["wheel-turned"]
-    assert "VIEW D" in step and "TIE 1" in step and "PROTRACTOR" in step
-    assert "O'CLOCK" not in " ".join(notes.ASSEMBLY_STEPS)
+    step = notes.STEP_TEXT[steps.WHEEL_TURNED_KEY]
+    assert "VIEW D" in step and notes.WIRE_TIE_HOLE in step and "PROTRACTOR" in step
+    printed = " ".join((*notes.ASSEMBLY_STEPS, *notes.ASSEMBLY_CHECKS))
+    assert "O'CLOCK" not in printed
+    # Rule 26: the hole by its plain name, never the coined TIE 1 label.
+    assert "TIE 1" not in printed and drawing.TIE1_LABEL == notes.WIRE_TIE_HOLE
     # The vertex lies on the bar's bottom edge, the picks beyond it.
     vx, vy = drawing.TIE1_VERTEX_MM
     assert vy == -drawing.BORE_ROW_HEIGHT
@@ -1748,11 +1792,18 @@ def test_wheel_rest_view_dimensions_tie_1_from_the_bar_edge(monkeypatch):
     assert (kwargs["p1"][0] - vertex[0]) * (tie[0] - cx) > 0.0
     assert math.dist(kwargs["p1"], (cx, cy)) < detail.crop_radius
     assert precision == [(0, -1, -1, -1)]
-    # TIE 1's label stands outside the crop, its leader on the hole's rim.
-    ((text, text_xy, tip),) = leaders
-    assert text == "TIE 1"
+    # The tie hole's label stands outside the crop, its leader on the hole's
+    # rim; the bar's label stands outside it too, its leader on the bar's top
+    # strip inside the crop.
+    ((text, text_xy, tip), (bar_text, bar_xy, bar_tip)) = leaders
+    assert text == notes.WIRE_TIE_HOLE
     assert math.dist(text_xy, (cx, cy)) > detail.crop_radius
     assert math.dist(tip, tie) == pytest.approx(drawing.TIE_HOLE_DIA / 2.0 * detail.mm)
+    assert bar_text == f"ITEM {notes.ITEM_NUMBERS['mg-wheel-bar']}"
+    assert math.dist(bar_xy, (cx, cy)) > detail.crop_radius
+    assert bar_tip == pytest.approx(project(detail.model_m(drawing.BAR_LABEL_ATTACH_MM)))
+    assert math.dist(bar_tip, (cx, cy)) < detail.crop_radius
+    assert edge_y < bar_tip[1] < cy + 2.0 * drawing.BAR_TOP_ABOVE_ROW / 1000.0
     assert labels == [(detail.label_text, *detail.label_xy)]
     settled()
     assert ("fence", view, detail) in events
@@ -2121,12 +2172,12 @@ def test_the_package_fields_stay_inside_the_border_and_off_the_title_block() -> 
 
 def test_the_finished_caption_centres_over_its_view() -> None:
     outline = (0.257, 0.080, 0.311, 0.214)
-    text = "FINISHED ASSEMBLY (SCALE 1:4)"
+    # The finished view is sheet 4's main view: no scale (rule 9).
+    text = drawing.FINISHED_CAPTION
+    assert "SCALE" not in text
     left, top = drawing.caption_over(outline, text)
     width = len(text) * drawing.CAPTION_CHAR_WIDTH
     assert left + width / 2.0 == pytest.approx((outline[0] + outline[2]) / 2.0)
-    # r6 printed this caption 68.8 mm wide.
-    assert width == pytest.approx(0.0688, abs=0.0005)
     assert left > drawing.STEPS_RIGHT
     assert top - drawing.NOTE_LINE_PITCH > outline[3]
     assert top < drawing.INNER_BORDER[3]
@@ -2266,20 +2317,23 @@ def test_the_steps_and_checks_fit_their_column() -> None:
         assert max(len(line) for line in block.splitlines()) <= width
     # Sheet 5's column at the native note pitch ends left of VIEW D's ink.
     assert drawing.CONTINUED_RIGHT + drawing._PAD < drawing.REST_INK_LEFT
-    # Each block's native box runs right of the title block's left edge, so
-    # each must end above the title block. Final native whole-note/layout
-    # checks establish clearance for this exact text.
+    # Sheet 4's column ends a pad short of the title block's left edge, so it
+    # may run down beside the title block to the bottom border; sheet 5's
+    # blocks run right of that edge, so each must end above the title block.
+    # Final native whole-note/layout checks establish clearance for this
+    # exact text.
+    assert drawing.BESIDE_TITLE_BLOCK
     continued_bottom = drawing.STEPS_XY[1] - len(
         drawing.ASSEMBLY_STEPS_CONTINUED.splitlines()
     ) * drawing.NOTE_LINE_PITCH
     assert continued_bottom - drawing.CHECKS_XY[1] == pytest.approx(2 * drawing._PAD)
-    for block, top in (
-        (drawing.ASSEMBLY_STEPS, drawing.STEPS_XY[1]),
-        (drawing.ASSEMBLY_STEPS_CONTINUED, drawing.STEPS_XY[1]),
-        (drawing.ASSEMBLY_CHECKS, drawing.CHECKS_XY[1]),
+    for block, top, floor in (
+        (drawing.ASSEMBLY_STEPS, drawing.STEPS_XY[1], drawing.INNER_BORDER[1]),
+        (drawing.ASSEMBLY_STEPS_CONTINUED, drawing.STEPS_XY[1], drawing.TITLE_BLOCK[3]),
+        (drawing.ASSEMBLY_CHECKS, drawing.CHECKS_XY[1], drawing.TITLE_BLOCK[3]),
     ):
         bottom = top - len(block.splitlines()) * drawing.NOTE_LINE_PITCH
-        assert bottom > drawing.TITLE_BLOCK[3] + drawing._PAD
+        assert bottom > floor + drawing._PAD
     assert drawing.STEPS_XY[0] > drawing.INNER_BORDER[0]
     assert drawing.STEPS_XY[1] < drawing.INNER_BORDER[3]
     assert drawing.STEPS_RIGHT + drawing._PAD <= drawing.FINISHED_FIELD[0]
@@ -2307,7 +2361,7 @@ def test_steps_stay_tight_and_a_blank_line_opens_each_later_group() -> None:
     titles = [title for title, _key in notes.STEP_GROUPS]
     for block in (drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_STEPS_CONTINUED):
         rows = block.splitlines()
-        starts = [i for i, row in enumerate(rows) if re.match(r"\d+\. ", row)]
+        starts = [i for i, row in enumerate(rows) if re.match(r"\d+[A-Z]?\. ", row)]
         numbered += len(starts)
         # The heading, then the first group's title, sit directly over the
         # block's first step.
@@ -2423,7 +2477,9 @@ def test_the_exploded_ladders_keep_the_simplified_configuration() -> None:
                 view_configuration(scale, _SW_SHADED_EDGES)
                 == SIMPLIFIED_VIEW_CONFIGURATION
             )
-    assert drawing.exploded_caption("WHEEL GROUP", (1.0, 3.0)).endswith("(SCALE 1:3)")
+    # Each exploded view is its sheet's main view, whose scale the title
+    # block prints, so its caption prints none (rule 9).
+    assert "SCALE" not in drawing.exploded_caption("WHEEL GROUP")
 
 
 def test_the_lever_group_takes_1_2_5_centred_with_its_caption_under_it() -> None:
@@ -2455,7 +2511,7 @@ def test_the_lever_group_takes_1_2_5_centred_with_its_caption_under_it() -> None
         centre[0] + width / 2.0,
         centre[1] + height / 2.0,
     )
-    text = drawing.exploded_caption(drawing.LEVER_GROUP, (1.0, 2.5))
+    text = drawing.exploded_caption(drawing.LEVER_GROUP)
     left, top = drawing.lever_caption_xy(outline, text)
     assert top < outline[1]
     assert left + len(text) * drawing.CAPTION_CHAR_WIDTH / 2.0 == pytest.approx(centre[0])

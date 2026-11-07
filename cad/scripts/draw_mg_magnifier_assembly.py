@@ -44,6 +44,7 @@ from dataclasses import dataclass
 import hashlib
 import math
 from pathlib import Path
+import re
 import sys
 import textwrap
 from typing import Any, Callable
@@ -130,7 +131,7 @@ from mg_magnifying_wheel_geom import TIE1_X, TIE1_Y, TIE_HOLE_DIA
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
 from mg_magnifying_vertical_rod_geom import SHOULDER_X as VROD_SHOULDER_X
 from mg_wheel_axle_spec import TIP_Y
-from mg_wheel_bar_geom import BORE_ROW_HEIGHT
+from mg_wheel_bar_geom import BAR_TOP_ABOVE_ROW, BORE_ROW_HEIGHT
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -304,11 +305,11 @@ LEVER_GROUP = "LEVER GROUP"
 LEVER_LABEL = "lever group exploded"
 # Sheet 4: the wheel group's steps down a 190 mm left column, the finished
 # assembly centred in the remaining field above the title block, its caption
-# centred over it. The wider column keeps full parent-scoped vendor Numbers
-# intact without reducing the default text size or its line pitch.
+# centred over it. The column is narrow enough to run down beside the title
+# block (BESIDE_TITLE_BLOCK below): one step per action needs the rows.
 # The lever wire's balloon stands right of the view (FINISHED_WIRE_BALLOON_*).
 STEPS_XY = (0.018, 0.2605)
-STEPS_LINE_WIDTH = 80  # characters; default-format note text (as MHA-MS-00)
+STEPS_LINE_WIDTH = 72  # characters; default-format note text (as MHA-MS-00)
 # Sheet 5: the lever group's and the wire's steps, then the checks, down a
 # 237 mm column (one step per action needs the rows), VIEW D right of it.
 CONTINUED_LINE_WIDTH = 100
@@ -319,7 +320,10 @@ NOTE_LINE_PITCH = 0.0046
 # has settled. Its width is the character count at the r6 PDF's measured
 # pitch ("FINISHED ASSEMBLY (SCALE 1:4)": 29 characters, 68.8 mm).
 CAPTION_CHAR_WIDTH = 0.00237
-STEPS_RIGHT = STEPS_XY[0] + STEPS_LINE_WIDTH * CAPTION_CHAR_WIDTH
+# The note columns' widths are the native note's measured pitch: the
+# 80-character sequence of run 20261024T041027643Z spanned x 17.6-227.8 mm.
+NOTE_CHAR_WIDTH = (0.2278 - 0.0176) / 80
+STEPS_RIGHT = STEPS_XY[0] + STEPS_LINE_WIDTH * NOTE_CHAR_WIDTH
 CAPTION_GAP = 0.004
 FINISHED_FIELD = (
     STEPS_RIGHT + _PAD,
@@ -336,9 +340,6 @@ FINISHED_SCALE_LADDER = (SHEET_SCALE, (1.0, 5.0), (1.0, 6.0))
 FINISHED_LABEL = "finished assembly"
 FINISHED_CAPTION = "FINISHED ASSEMBLY"
 # Sheet 5's VIEW D field, right of the continued column, above the title block.
-# The column's width is the native note's measured pitch: the 80-character
-# sequence of run 20261024T041027643Z spanned x 17.6-227.8 mm.
-NOTE_CHAR_WIDTH = (0.2278 - 0.0176) / 80
 CONTINUED_RIGHT = STEPS_XY[0] + CONTINUED_LINE_WIDTH * NOTE_CHAR_WIDTH
 WHEEL_REST_FIELD = (
     CONTINUED_RIGHT + _PAD,
@@ -539,11 +540,12 @@ if explode.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
 
 
 def _wrapped(lines: tuple[str, ...], *, width: int) -> str:
-    """Wrap each line, a numbered step under its own number; rows stay tight."""
+    """Wrap each line, a numbered step under its own head (``12.`` or
+    ``12A.``); rows stay tight."""
     out: list[str] = []
     for line in lines:
         number, sep, rest = line.partition(". ")
-        if sep and number.isdigit():
+        if sep and re.fullmatch(r"\d+[A-Z]?", number):
             out += textwrap.wrap(
                 rest,
                 width=width,
@@ -579,7 +581,7 @@ def _sequence(
 
 
 _GROUP_STARTS = (
-    *(steps.step_number(key) - 1 for _title, key in notes.STEP_GROUPS),
+    *(steps.SEQUENCE.index(key) for _title, key in notes.STEP_GROUPS),
     len(notes.ASSEMBLY_STEPS),
 )
 STEP_GROUP_LINES = tuple(
@@ -588,11 +590,13 @@ STEP_GROUP_LINES = tuple(
         notes.STEP_GROUPS, _GROUP_STARTS, _GROUP_STARTS[1:], strict=False
     )
 )
-# The sequence's native box runs ~12 mm right of the title block's left edge
-# (run 20261024T041027643Z: x 17.6-227.8 mm), so on both instruction sheets
-# every block must end above the title block. Sheet 4 takes the wheel group;
-# sheet 5 continues with the lever group and the lever wire (MHA-HA-00 and
-# MHA-SH-VN-56 cite the wire steps there), followed by the checks.
+# The sequence's native box runs 2.63 mm a character from x 17.6 mm (run
+# 20261024T041027643Z: 80 characters spanned x 17.6-227.8 mm). A block whose
+# box ends a pad short of the title block's left edge may run down beside it
+# to the bottom border; a wider one must end above the title block. Sheet 4
+# takes the wheel group; sheet 5 continues with the lever group and the lever
+# wire (MHA-HA-00 and MHA-SH-VN-56 cite the wire steps there), followed by the
+# checks.
 if notes.STEP_GROUPS[1][1] != steps.LEVER_THREADED_KEY:
     raise AssertionError("sheet 5 continues the sequence at the lever group")
 STEPS_SPLIT = _GROUP_STARTS[1]
@@ -610,15 +614,28 @@ CHECKS_XY = (
     - (ASSEMBLY_STEPS_CONTINUED.count("\n") + 1) * NOTE_LINE_PITCH
     - 2 * _PAD,
 )
+
+
+def _note_floor(width: int) -> float:
+    """The lowest y a note block ``width`` characters wide may reach."""
+    right = STEPS_XY[0] + width * NOTE_CHAR_WIDTH
+    if right + _PAD < TITLE_BLOCK[0]:
+        return INNER_BORDER[1] + _PAD
+    return TITLE_BLOCK[3] + _PAD
+
+
+BESIDE_TITLE_BLOCK = _note_floor(STEPS_LINE_WIDTH) < TITLE_BLOCK[3]
+if not BESIDE_TITLE_BLOCK:
+    raise AssertionError("the sheet 4 column no longer clears the title block")
 if any(
-    top - (block.count("\n") + 1) * NOTE_LINE_PITCH < TITLE_BLOCK[3] + _PAD
-    for block, top in (
-        (ASSEMBLY_STEPS, STEPS_XY[1]),
-        (ASSEMBLY_STEPS_CONTINUED, STEPS_XY[1]),
-        (ASSEMBLY_CHECKS, CHECKS_XY[1]),
+    top - (block.count("\n") + 1) * NOTE_LINE_PITCH < _note_floor(width)
+    for block, top, width in (
+        (ASSEMBLY_STEPS, STEPS_XY[1], STEPS_LINE_WIDTH),
+        (ASSEMBLY_STEPS_CONTINUED, STEPS_XY[1], CONTINUED_LINE_WIDTH),
+        (ASSEMBLY_CHECKS, CHECKS_XY[1], CONTINUED_LINE_WIDTH),
     )
 ):
-    raise AssertionError("an assembly instruction note runs down beside the title block")
+    raise AssertionError("an assembly instruction note runs past its floor")
 
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 DETAIL_POSITION_TOL_M = 1e-4
@@ -765,10 +782,20 @@ if not (
     and TIE1_LINE_END_MM < WHEEL_REST_CROP_MM
 ):
     raise AssertionError("VIEW D's angle picks must lie past the vertex, inside the crop")
-# TIE 1's label stands outside the crop, down and toward the clamp side (left
-# on the sheet); the view's label is centred under the crop.
-TIE1_LABEL_OFFSET = (-0.060, -0.048)
-TIE1_LABEL = "TIE 1"
+# The tie hole's label stands outside the crop, down and toward the clamp side
+# (left on the sheet), a row under the view's label, which is centred under
+# the crop. Rule 26: the hole by its plain name, as the steps name it.
+TIE1_LABEL_OFFSET = (-0.060, -0.072)
+TIE1_LABEL = notes.WIRE_TIE_HOLE
+# The bar the angle is read from (machinist review fanout/mg-asm preview:
+# VIEW D's 30 deg read as off a spoke edge, item 1 unseen). A leader names it
+# on its top strip, between its top edge and the spoke lying along it; the
+# label stands outside the crop, up and to the left.
+BAR_LABEL = f"ITEM {notes.ITEM_NUMBERS['mg-wheel-bar']}"
+BAR_LABEL_ATTACH_MM = (27.0, BAR_TOP_ABOVE_ROW - 0.9)
+BAR_LABEL_OFFSET = (-0.068, 0.034)
+if math.hypot(*BAR_LABEL_ATTACH_MM) > WHEEL_REST_CROP_MM - 2.0:
+    raise AssertionError("VIEW D's bar label must point inside the crop")
 CONTINUOUS_LINE_STYLE = 0  # swLineStyles_e.swLineCONTINUOUS
 CENTER_LINE_STYLE = 4  # swLineStyles_e.swLineCENTER
 THIN_LINE_WEIGHT = 0  # swLineWeights_e.swLW_THIN
@@ -822,7 +849,9 @@ class WheelRestView:
 
     @property
     def label_text(self) -> str:
-        return f"{self.title}\nSCALE {self.scale[0]} : {self.scale[1]}"
+        # Sheet 5's title-block scale is VIEW D's, so the label prints none
+        # (rule 9).
+        return self.title
 
     @property
     def label_xy(self) -> tuple[float, float]:
@@ -835,10 +864,14 @@ class WheelRestView:
 WHEEL_REST = WheelRestView()
 if tuple(float(value) for value in WHEEL_REST.scale) != WHEEL_REST_SCALE:
     raise AssertionError("VIEW D's scale is sheet 5's scale")
-REST_INK_LEFT = WHEEL_REST.centre[0] + TIE1_LABEL_OFFSET[0]
+REST_INK_LEFT = WHEEL_REST.centre[0] + min(TIE1_LABEL_OFFSET[0], BAR_LABEL_OFFSET[0])
 _rest_box = (
     REST_INK_LEFT,
-    WHEEL_REST.label_xy[1] - 2 * NOTE_LINE_PITCH,
+    min(
+        WHEEL_REST.label_xy[1],
+        WHEEL_REST.centre[1] + TIE1_LABEL_OFFSET[1],
+    )
+    - NOTE_LINE_PITCH,
     WHEEL_REST.centre[0] + WHEEL_REST.crop_radius,
     WHEEL_REST.centre[1] + WHEEL_REST.crop_radius,
 )
@@ -1334,9 +1367,9 @@ def _wheel_rest_view(
     adapter: Any, source_step: Callable[[str], None]
 ) -> Callable[[], None]:
     """VIEW D on sheet 5: place, isolate and crop the hub view, then draw
-    TIE 1's axis line, dimension its angle from the bar's bottom edge, point
-    out TIE 1 and label the view; the returned check re-reads the crop and
-    the angle once the drawing has settled."""
+    the tie hole's axis line, dimension its angle from the bar's bottom edge,
+    point out the tie hole and the bar and label the view; the returned check
+    re-reads the crop and the angle once the drawing has settled."""
     detail = WHEEL_REST
     _activate_sheet(adapter, SHEET_NAMES[4])
     view = _placed_detail(adapter, detail)
@@ -1344,7 +1377,7 @@ def _wheel_rest_view(
     _crop(adapter, view, detail)
     source_step(f"{detail.title} crop")
     line_end = (TIE1_LINE_END_MM * TIE1_DIRECTION[0], TIE1_LINE_END_MM * TIE1_DIRECTION[1])
-    axle, tie, end, edge_pick, line_pick, text = (
+    axle, tie, end, edge_pick, line_pick, text, bar = (
         (float(point[0]), float(point[1]))
         for point in model_points_in_view(
             adapter,
@@ -1358,10 +1391,19 @@ def _wheel_rest_view(
                     TIE1_EDGE_PICK_MM,
                     TIE1_LINE_PICK_MM,
                     TIE1_ANGLE_TEXT_MM,
+                    BAR_LABEL_ATTACH_MM,
                 )
             ),
             label=detail.title,
-            names=("axle axis", "TIE 1", "TIE 1 line end", "bar edge pick", "line pick", "angle text"),
+            names=(
+                "axle axis",
+                "TIE 1",
+                "TIE 1 line end",
+                "bar edge pick",
+                "line pick",
+                "angle text",
+                "bar label attach",
+            ),
         )
     )
     axis_label = f"{detail.title} TIE 1 axis line"
@@ -1402,6 +1444,14 @@ def _wheel_rest_view(
     add_leader_note(
         adapter, TIE1_LABEL, text_xy=label_xy, attach_xy=tip, view=view,
         label=f"{detail.title} TIE 1 label",
+    )
+    add_leader_note(
+        adapter,
+        BAR_LABEL,
+        text_xy=(axle[0] + BAR_LABEL_OFFSET[0], axle[1] + BAR_LABEL_OFFSET[1]),
+        attach_xy=bar,
+        view=view,
+        label=f"{detail.title} bar label",
     )
     _activate(adapter, view, label=detail.title)
     caption = add_note(adapter, detail.label_text, *detail.label_xy)
@@ -2157,8 +2207,11 @@ def _fit_ring(
     return scale
 
 
-def exploded_caption(group: str, scale: tuple[float, float]) -> str:
-    return f"{group} {notes.EXPLODED_CAPTION} (SCALE {scale_text(scale)})"
+def exploded_caption(group: str) -> str:
+    """An exploded view's caption. The view is its sheet's main view, so its
+    scale is the title block's (finalize_drawing ``sheet_scales``) and the
+    caption prints none (rule 9)."""
+    return f"{group} {notes.EXPLODED_CAPTION}"
 
 
 def _component_stem(component: Any) -> str:
@@ -3013,12 +3066,12 @@ async def build(adapter: Any) -> dict[str, str]:
     _add_note_block(
         adapter,
         SHEET_NAMES[1],
-        exploded_caption(WHEEL_GROUP, scales[WHEEL_LABEL]),
+        exploded_caption(WHEEL_GROUP),
         WHEEL_CAPTION_XY,
         label="wheel caption",
     )
     source_step("wheel caption")
-    lever_caption = exploded_caption(LEVER_GROUP, scales[LEVER_LABEL])
+    lever_caption = exploded_caption(LEVER_GROUP)
     _add_note_block(
         adapter,
         SHEET_NAMES[2],
@@ -3027,7 +3080,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="lever caption",
     )
     source_step("lever caption")
-    finished_caption = f"{FINISHED_CAPTION} (SCALE {scale_text(scales[FINISHED_LABEL])})"
+    # The finished view is sheet 4's main view: its scale is the title
+    # block's, so the caption prints none (rule 9).
+    finished_caption = FINISHED_CAPTION
     _add_note_block(
         adapter,
         SHEET_NAMES[3],
