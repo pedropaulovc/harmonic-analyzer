@@ -6,36 +6,91 @@ that cites a step by key follows. The sheet prints the step text
 (mg_magnifier_assembly_sheet.STEP_TEXT); this module holds only the order.
 Pure data: no SolidWorks, no config reads.
 
-The bench builds the wheel group and the lever group apart. The wheel bar is
-clamped to the front column, and the bracket screwed to the summing lever, at
-MHA-HA-00; the lever wire goes on after both, so its two steps come last.
+Each step does one thing (drawing-guidelines.md rule 22): a check and its
+remedy are their own steps. The bench builds the wheel group and the lever
+group apart. The wheel bar is clamped to the front column, and the bracket
+screwed to the summing lever, at MHA-HA-00; the lever wire goes on after
+both, so its steps come last (WIRE_HOOKED_KEY to WIRE_TIED_KEY, which the
+MHA-SH-VN-56 sheet cites as one range).
 """
 
 from __future__ import annotations
 
 DRAWING_NUMBER = "MHA-MG-00"
 
+DRUM_PRESSED_KEY = "drum-pressed"
+DRUM_HELD_KEY = "drum-held"
 AXLE_PRESSED_KEY = "axle-pressed"
+AXLE_HELD_KEY = "axle-held"
+AXLE_TRIAL_KEY = "axle-trial-fitted"
+AXLE_CHECKED_KEY = "axle-checked"
 COLUMN_CLAMP_STARTED_KEY = "column-clamp-started"
 ENDSHAKE_SET_KEY = "endshake-set"
+ENDSHAKE_CHECKED_KEY = "endshake-checked"
 LOCKNUT_JAMMED_KEY = "locknut-jammed"
 LEVER_THREADED_KEY = "lever-threaded"
 CLAMP_SET_KEY = "clamp-set"
+CLAMP_HELD_KEY = "clamp-held"
 FIXTURE_SET_KEY = "fixture-set"
+FIXTURE_HELD_KEY = "fixture-held"
 WIRE_HOOKED_KEY = "lever-wire-hooked"
 WIRE_TIED_KEY = "lever-wire-tied"
 
 SEQUENCE: tuple[str, ...] = (
+    # Wheel group. Each press is accepted at the bench before anything else
+    # goes on it (rule 23): it does not turn or slide by hand, and a slip fit
+    # has its own single-action steps (rule 22).
+    DRUM_PRESSED_KEY,
+    DRUM_HELD_KEY,
+    "drum-pulled-off",
+    "drum-bonded",
     AXLE_PRESSED_KEY,
+    AXLE_HELD_KEY,
+    "axle-pressed-out",
+    "axle-remade",
+    AXLE_TRIAL_KEY,
+    "trial-nuts-jammed",
+    AXLE_CHECKED_KEY,
+    "trial-parts-removed",
+    "axle-pressed-further",
+    "axle-pressed-back",
+    "column-clamps-fitted",
     COLUMN_CLAMP_STARTED_KEY,
-    "drum-pressed",
+    "axle-oiled",
     "wheel-stacked",
     ENDSHAKE_SET_KEY,
+    ENDSHAKE_CHECKED_KEY,
+    "endshake-loosened",
+    "endshake-tightened",
     LOCKNUT_JAMMED_KEY,
+    "endshake-rechecked",
+    "locknut-reset",
+    "axle-accepted",
+    "axle-reset",
+    # Lever group.
     LEVER_THREADED_KEY,
+    "clamp-thumb-screw-started",
     CLAMP_SET_KEY,
+    "clamp-thumb-screw-tightened",
+    # Each hand-set clamp is checked to hold its setting (rule 23).
+    CLAMP_HELD_KEY,
+    "clamp-reset",
+    "fixture-thumb-screw-started",
+    "rod-through-fixture",
+    "rod-seated",
     FIXTURE_SET_KEY,
+    "fixture-thumb-screw-tightened",
+    FIXTURE_HELD_KEY,
+    "fixture-reset",
+    # Lever wire, on the machine.
     WIRE_HOOKED_KEY,
+    "lever-wire-hook-twisted",
+    "lever-wire-hook-trimmed",
+    "machine-at-rest",
+    "wheel-turned",
+    "lever-wire-wrapped",
+    "lever-wire-through-tie",
+    "lever-wire-tie-twisted",
     WIRE_TIED_KEY,
 )
 
