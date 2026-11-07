@@ -1053,11 +1053,12 @@ def _knife_seat_footprint(station_z: float, z_label: str) -> list[tuple[float, f
     """Print-worst (x, z) hull of one knife-mount block's top seat, over both
     orientations of the block on its two pins."""
     slip = KNIFE_DOWEL.SLIP_CLEARANCE_MAX / 2.0
-    # Along the line: D from the sockets, the ream off D; across it: the
-    # screw axis from the sockets, the ream off its line.
+    # Along the line: D from the left rail's outer face (sheet 3's corner
+    # origin), the ream off D; across it: the screw axis from the sockets,
+    # the ream off its line.
     x_band = (
         PRINTED_LINEAR_BAND_MM[
-            DRAWING_REFERENCE_PRECISION["hanger x from left sockets"]
+            DRAWING_REFERENCE_PRECISION["crossbar median D from left rail face"]
         ]
         + HANGER_PIN_X_FROM_D_TOL
         + slip

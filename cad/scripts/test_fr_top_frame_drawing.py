@@ -831,7 +831,7 @@ def test_knife_seat_footprints_cover_both_ways_round() -> None:
     hole (datum B) on the +X pin or turned 180 deg onto the -X pin.  Owner
     ruling 2026-11-06: both reams sit under one 2X ⌖Ø.004|A|D, BASIC from
     D, so either pin's envelope is the same: along the line D's band from
-    the sockets plus the zone radius, across it the screw axis's band plus
+    the left rail's face plus the zone radius, across it the screw axis's band plus
     the pattern's implied-zero .XXX, each with the round hole's slip.  Each
     hull holds both blocks' unturned print-worst corners at the along- and
     across-line extremes, and the edge-break check certifies those hulls."""
@@ -840,7 +840,7 @@ def test_knife_seat_footprints_cover_both_ways_round() -> None:
 
     slip = dowel.SLIP_CLEARANCE_MAX / 2.0
     x_band = (
-        spec.PRINTED_LINEAR_BAND_MM[spec.DRAWING_REFERENCE_PRECISION["hanger x from left sockets"]]
+        spec.PRINTED_LINEAR_BAND_MM[spec.DRAWING_REFERENCE_PRECISION["crossbar median D from left rail face"]]
         + spec.HANGER_PIN_X_FROM_D_TOL
         + slip
     )
@@ -2343,9 +2343,12 @@ def test_crossbar_median_control_cancels_the_socket_station_chain() -> None:
 
 
 def test_hanger_x_locates_datum_d_not_a_hole() -> None:
-    """182.0 runs from the upper-left socket axis to D's trace -- the native
-    centreline between the crossbar's two side-face edges -- a plain .X
-    locator; no competing hole-axis X dimension survives."""
+    """The 199.2 (7.840) runs from the left rail's outer face -- the Y edge
+    of sheet 3's corner origin, so the view keeps one origin (farm run
+    20261107T105312645Z: the old 7.165 from the upper-left socket axis read
+    as a second origin) -- to D's trace, the native centreline between the
+    crossbar's two side-face edges, an .XXX locator; no competing hole-axis
+    X dimension survives."""
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     block = source[source.index("# D's own station"):source.index("# #946:")]
     assert "crossbar_median_x = (BAR_X0 + BAR_X1) / 2.0" in block
@@ -2355,8 +2358,12 @@ def test_hanger_x_locates_datum_d_not_a_hole() -> None:
         "((BAR_X0, HALF_H-EDGE_CHAMFER, 0.0), (BAR_X1, HALF_H-EDGE_CHAMFER, 0.0))"
         in block
     )
-    assert 'label="hanger x from left sockets"' in block
-    assert "expected_mm=COLUMN_X + crossbar_median_x" in block
+    assert 'label="crossbar median D from left rail face"' in block
+    assert "expected_mm=OUTER_X + crossbar_median_x" in block
+    assert "p0=left_rail_face" in block
+    assert "left_rail_face = (-OUTER_X, HALF_H, FRONT_COLUMN_Z + BOSS_DIA / 2.0 + 10.0)" in block
+    # Between the upper-left boss and the set-screw boss on the rail's face.
+    assert part.FRONT_COLUMN_Z + part.BOSS_DIA / 2.0 + 10.0 < part.GOOSENECK_Z - spec.HUB_SET_BOSS_W
     # Typed coordinate pick (the documented CENTERLINE select type) at the
     # mid-bar point, clear of both holes; no entity re-key of the helper.
     assert 'entity_types=("EDGE", "CENTERLINE")' in block
@@ -2367,7 +2374,7 @@ def test_hanger_x_locates_datum_d_not_a_hole() -> None:
         < 0.0
         < part.STUD_Z_REAR - spec.HANGER_WASHER.OD_MAX
     )
-    assert "center=True" in block
+    assert "center=True" not in block
     assert "reference=" not in block and "set_basic_dimension" not in block
     # rule 7: a location carries its value and band only.
     assert "suffix=" not in block[block.index("_checked_dimension("):]
