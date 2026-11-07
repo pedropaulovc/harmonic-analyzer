@@ -569,6 +569,7 @@ def test_table_creation_and_settled_readback_have_operation_spans() -> None:
             ):
                 traced.append((function.name, ast.literal_eval(decorator.args[0])))
     assert sorted(traced) == [
+        ("_owned_table", "drawing.carrier_hole_table.ownership"),
         ("create_carrier_hole_table", "drawing.carrier_hole_table.create"),
         ("settled", "drawing.carrier_hole_table.settled"),
     ]
