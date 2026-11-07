@@ -401,22 +401,17 @@ def test_no_vendor_model_of_the_new_hardware_is_tracked() -> None:
 _SIZE = re.compile(r"#\d|\d+/\d+|\d\s*(?:mm|in\b|\")|\d\s*[xX]\s*\d|°")
 
 
-def test_sheet_states_the_cut_and_no_size_in_the_registry_names() -> None:
-    """The ordinary purchased reference sheet carries the actual stock identity
-    and off-mechanism cut instruction, not a commodity receiving procedure."""
+def test_sheet_points_to_the_cut_step_and_no_size_in_the_registry_names() -> None:
+    """The ordinary purchased reference sheet carries the actual stock identity;
+    the cut is MHA-PD-00's step, which the general line cites by number."""
+    import pd_paper_drive_assembly_steps as steps
+
     row = _config.parts(part.PART_NAME)
     for field in ("title", "stock_name", "supplier", "finish", "material"):
         assert not _SIZE.search(str(row[field])), (field, row[field])
-    assert row["installation_notes"] == screw.PURCHASED_STOCK_NOTE
-    lines = row["installation_notes"].splitlines()
-    # The builder's own budget beside the general line (round 4's native
-    # failure ran four lines).
-    from _purchased_fastener_drawing import note_lines
-
-    assert note_lines(row["installation_notes"], label="plate screw") == tuple(lines)
-    with pytest.raises(ValueError, match="rule 7"):
-        note_lines(row["installation_notes"] + "\nA FOURTH LINE.", label="plate screw")
-    assert all(len(line) <= 70 for line in lines), lines
+    assert "installation_notes" not in row
+    assert drawing.CUT_STEP == steps.step_number("arm-plate-screws-cut")
+    assert f"MHA-PD-00 STEP {drawing.CUT_STEP}" in drawing.GENERAL_TEXT
 
 
 def test_drawing_is_the_purchased_reference_sheet() -> None:

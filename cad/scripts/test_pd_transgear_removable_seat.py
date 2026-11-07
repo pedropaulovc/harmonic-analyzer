@@ -257,13 +257,6 @@ def test_knob_pin_pressed_end_stays_inside_the_collar() -> None:
     ) == pytest.approx(-0.4064)
 
 
-def test_knob_pin_sheet_prints_the_press_stop_range() -> None:
-    notes = " ".join(
-        _config.parts("pd-vn-transgear-knob-drive-pin")["installation_notes"].split()
-    )
-    assert f"{knob_pin.PROUD_TEXT} PROUD OF THE SEAT FACE" in notes
-
-
 _CRANK_SEAT = dict(
     seat_face=crank.SEAT_COLLAR,
     seat_face_band=crank.SEAT_COLLAR_BAND,

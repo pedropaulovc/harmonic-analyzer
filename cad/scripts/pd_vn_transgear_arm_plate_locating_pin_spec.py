@@ -49,14 +49,6 @@ INSERTION_LIMITS_MM = (
 if min(PRESS_INTERFERENCE_MM) <= 0.0 or min(SLIP_DIAMETRAL_CLEARANCE_MM) <= 0.0:
     raise AssertionError(f"{SKU} loses the arm's press or the plate's slip")
 
-# Where the pins go and what they do; the press direction and proud set are
-# MHA-PD-00's arm-plate-located step (machinist review: assembly steps, not
-# part facts).
-PURCHASED_STOCK_NOTE = "\n".join((
-    "INSTALLATION - TWO PER TRANSGEAR ARM MHA-PD-18;",
-    "LOCATE THE MHA-PD-19 PLATE (MHA-PD-00).",
-))
-
 
 def nominal_material_properties() -> dict[str, object]:
     """Nominal reference-cylinder mass/CG, not an end-form certificate."""

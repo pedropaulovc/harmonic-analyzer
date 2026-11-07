@@ -25,14 +25,10 @@ PART_NAME = "pd-vn-chain-connecting-link"
 MATERIAL = "Plain Carbon Steel"
 
 
-async def _add_supplier_references(adapter) -> None:
-    await add_chain_stock_references(adapter, connecting=True)
-
-
 async def build(adapter) -> dict[str, str]:
     return await build_link(
         adapter, part_name=PART_NAME, material=MATERIAL,
-        before_save=_add_supplier_references, **CONNECTING_LINK,
+        before_save=add_chain_stock_references, **CONNECTING_LINK,
     )
 
 

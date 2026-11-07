@@ -100,21 +100,11 @@ LENGTH = CUT_LENGTH
 # title block's .010 edge break on purpose: at .010 the break would take the
 # arm tap's last thread and the joint's worst engagement falls to 1.47D, under
 # the 1.5D ``transgear_hanger_joints`` requires.  The MHA-PD-00 cut step,
-# which does the cut, prints this limit and the tip's proud limit; the part
-# sheet's note only says what the cut is for.
+# which does the cut, prints this limit and the tip's proud limit.
 CUT_END_BREAK_MAX = 0.1016  # .004
 # The cut tip may stand this far proud of the arm's front face (the joint
 # stack's ``transgear_hanger_joints.PLATE_SCREW_CUT_PROUD_MAX``).
 CUT_PROUD_MAX = 0.2032  # .008
-
-# The views show the screw as cut, shorter than the ITEM row's 1 in stock
-# (machinist review round 3); its length is the MHA-PD-00 cut step's.  Three
-# lines: no more fit beside the purchased sheet's general line (rule 7).
-PURCHASED_STOCK_NOTE = "\n".join((
-    "CUT TO LENGTH AND BREAK THE CUT END AT ASSEMBLY (MHA-PD-00 CUT STEP,",
-    "BEFORE THE GUIDE-LOCK SWEEP), SO THE TIP CLEARS THE SWEEP AND THE",
-    "THREAD STAYS FULLY ENGAGED IN THE MHA-PD-18 ARM. VIEWS SHOW IT AS CUT.",
-))
 
 
 # --- Supplier engineering drawing references -----------------------------------

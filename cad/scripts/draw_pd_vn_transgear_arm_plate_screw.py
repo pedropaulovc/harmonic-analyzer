@@ -36,6 +36,12 @@ ITEM = "#8-32 x 1 OVAL HEAD SLOTTED SCREW"
 # criteria. The part's reference sketch still authors the unprinted rows by
 # design; FRONT imports none of them.
 PRINTED_REFERENCES = ("SupplierHeadDiameter",)
+# The cut is assembly work (MHA-PD-00 step "arm-plate-screws-cut" prints the
+# proud limit and the cut-end break): the part sheet only points to it. The
+# step number is a literal so a renumbered MHA-PD-00 does not re-key this
+# sheet; test_pd_vn_transgear_arm_plate_screw_drawing pins it to the key.
+CUT_STEP = 11
+GENERAL_TEXT = f"PURCHASED PART, CUT AT ASSEMBLY PER MHA-PD-00 STEP {CUT_STEP}. VIEWS SHOW IT CUT."
 
 
 def _printed_rows() -> tuple[tuple[str, float, str], ...]:
@@ -87,7 +93,7 @@ async def build(adapter: Any) -> dict[str, str]:
         settled = True
 
     return await build_purchased_fastener_drawing(
-        adapter, SPEC, item=ITEM, cut_to_suit=True, view_layout=view_layout,
+        adapter, SPEC, item=ITEM, general_text=GENERAL_TEXT, view_layout=view_layout,
         supplier_margins=supplier_screw_margins(dimensions, planes=planes, sides=sides),
         supplier_dimensions=supplier_dimensions,
         settled_checks=(assert_supplier_dimensions_settled,),
