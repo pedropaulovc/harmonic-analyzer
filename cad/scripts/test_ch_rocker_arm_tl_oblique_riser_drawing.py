@@ -353,39 +353,81 @@ def test_row_heights_stand_a_text_width_apart() -> None:
         assert spec.GLOBALS[name] * _PLAN_SCALE > _TEXT_MM + 1.0, name
 
 
-def test_stop_row_text_stands_below_the_edge_clear_of_its_neighbours() -> None:
-    """The stops' "2X .19" span is too short for its text, which stands below
-    the bottom edge, nearest the outline: clear of the right end's extension
-    line, of the CL/CR row's dimension line and of the bottom edge."""
-    x, y, _ = drawing.PLAN_KEEP["StopY"]
-    text = f"2X .{round(spec.GLOBALS['StopY'] / INCH * 100):02d}"
-    half = len(text) * _CHAR_MM / 2.0
+# Native run 26bb's right-end ink (PDF/PNG crop, paper mm at 1:2): an
+# outside row-height text starts 1.5 mm right of its dimension line and its
+# shelf ends 15.6 mm right of it; an extension line overshoots its dimension
+# line by 1.0 mm; an outside arrow's tail reaches 6.3 mm past the edge it
+# points at. The (.64) text sat centred on its own line.
+_OUTSIDE_TEXT_LEAD_MM = 1.5
+_OUTSIDE_SHELF_END_MM = 15.6
+_EXTENSION_OVERSHOOT_MM = 1.0
+_ARROW_TAIL_MM = 6.3
+
+
+def _right_of_outline(name: str) -> float:
+    """A right-hand row height's dimension line, paper mm off the outline."""
+    return (drawing.PLAN_KEEP[name][0] - spec.BLANK_LENGTH) * _PLAN_SCALE
+
+
+def test_stop_and_clamp_row_heights_do_not_strike_each_other() -> None:
+    """Machinist review of native run 26bb (FIX): the .19 dimension line and
+    its stop extension line ran through "2X (.64)", and the (.64) lower arrow
+    ran down through "2X .19". The stops' row stands nearest the outline with
+    its text on a shelf below the edge; the CL/CR row stands clear of that
+    shelf, its centred text clear of the stops' lines."""
+    stop_x = _right_of_outline("StopY")
+    clamp_x = _right_of_outline("ClampY")
+    stop_text = f"2X .{round(spec.GLOBALS['StopY'] / INCH * 100):02d}"
+    assert stop_text == "2X .19"
+    # The span is too short for the text: it stands outside, below the edge.
     assert spec.GLOBALS["StopY"] * _PLAN_SCALE < _TEXT_MM
-    assert (x - spec.BLANK_LENGTH) * _PLAN_SCALE - half >= _AIR_MM
-    assert x < drawing.PLAN_KEEP["ClampY"][0]
+    _x, y, _ = drawing.PLAN_KEEP["StopY"]
     assert y * _PLAN_SCALE + _TEXT_MM / 2.0 <= -_AIR_MM
+    # Its text clears the right end's extension line (the length's).
+    assert stop_x + _OUTSIDE_TEXT_LEAD_MM >= _AIR_MM
+    # The CL/CR row's lower arrow tail drops right of the stops' shelf.
+    assert clamp_x - (stop_x + _OUTSIDE_SHELF_END_MM) >= _AIR_MM
+    # The stops' dimension and extension lines end left of "2X (.64)".
+    clamp_half = len("2X (.64)") * _CHAR_MM / 2.0
+    assert (clamp_x - clamp_half) - (stop_x + _EXTENSION_OVERSHOOT_MM) >= _AIR_MM
+    # The stops' upper arrow tail rises past the stop row into the band of
+    # the CL/CR text; it must stand left of that text too (same check), and
+    # the CL/CR lower arrow tail stays above the stop callout block.
+    stop_block_top = drawing.PLAN_KEEP["StopDia"][1] * _PLAN_SCALE + 2.0 * _TEXT_MM
+    assert -_ARROW_TAIL_MM - stop_block_top >= _AIR_MM
+
+
+def test_stock_width_stands_clear_of_section_a_a() -> None:
+    """Shifting the row heights outboard keeps the stock width's text left of
+    section A-A, which shows the thickness across at 2:1."""
+    plan_left = drawing.PLAN_CENTER[0] * 1000.0 - spec.BLANK_LENGTH * _PLAN_SCALE / 2.0
+    width_x = plan_left + drawing.PLAN_KEEP["BlankWidth"][0] * _PLAN_SCALE
+    width_text = f"{spec.BLANK_WIDTH / INCH:.2f}".lstrip("0")
+    section_scale = drawing.SECTION_SCALE[0] / drawing.SECTION_SCALE[1]
+    section_left = drawing.SECTION_CENTER[0] * 1000.0 - spec.THICKNESS * section_scale / 2.0
+    assert section_left - (width_x + len(width_text) * _CHAR_MM / 2.0) >= _AIR_MM
+
+
+# Native run 26bb: the stop block's widest row and shelf spanned 48.7 mm,
+# centred on its requested X (237.2-285.9 on paper, only 1.6 mm right of the
+# right end's extension line at 237.6).
+_STOP_BLOCK_HALF_MM = 24.4
 
 
 def test_stop_callout_block_stands_below_right_of_stop_two() -> None:
     """The stop holes' block hangs off stop 2 (the reference circle's hole),
-    right of every X-stack extension line and left of section A-A."""
+    right of every X-stack extension line and left of section A-A, under the
+    stops' row-height shelf."""
     x, y, _ = drawing.PLAN_KEEP["StopDia"]
     stop_x, stop_y = spec.STOP_PIN_HOLES[1]
     assert x > spec.BLANK_LENGTH > stop_x and y < drawing.PLAN_KEEP["StopY"][1]
-    block_half = (
-        max(len(row) for row in spec.CALLOUTS_BELOW["StopDia"].split("\n"))
-        * _CHAR_MM
-        / 2.0
-    )
-    plan_left = drawing.PLAN_CENTER[0] * 1000.0 - spec.BLANK_LENGTH * _PLAN_SCALE / 2.0
-    block_left = plan_left + x * _PLAN_SCALE - block_half
-    block_right = plan_left + x * _PLAN_SCALE + block_half
-    assert block_left - (plan_left + spec.BLANK_LENGTH * _PLAN_SCALE) >= _AIR_MM
-    section_left = (
-        drawing.SECTION_CENTER[0] * 1000.0
-        - spec.BLANK_WIDTH * drawing.SECTION_SCALE[0] / drawing.SECTION_SCALE[1] / 2.0
-    )
-    assert section_left - block_right >= _AIR_MM
+    block_left = (x - spec.BLANK_LENGTH) * _PLAN_SCALE - _STOP_BLOCK_HALF_MM
+    block_right = (x - spec.BLANK_LENGTH) * _PLAN_SCALE + _STOP_BLOCK_HALF_MM
+    assert block_left >= _AIR_MM + 2.0  # off the length's extension line
+    plan_right = drawing.PLAN_CENTER[0] * 1000.0 + spec.BLANK_LENGTH * _PLAN_SCALE / 2.0
+    section_scale = drawing.SECTION_SCALE[0] / drawing.SECTION_SCALE[1]
+    section_left = drawing.SECTION_CENTER[0] * 1000.0 - spec.THICKNESS * section_scale / 2.0
+    assert section_left - (plan_right + block_right) >= _AIR_MM
     assert stop_y > 0.0
 
 

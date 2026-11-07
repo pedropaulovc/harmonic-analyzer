@@ -113,9 +113,17 @@ _T = THICKNESS
 _STACK_PITCH = 20.0
 _STACK_TOP = -12.0
 # Row heights right of the view: "2X (28.29)" is about 21 mm wide, so the
-# dimensions stand 27 mm apart, the first 14 mm off the outline.
+# dimensions stand 27 mm apart. The first stands 23 mm off the outline, the
+# stops' outside "2X .19" and its shelf between them (machinist review of
+# native run 26bb, FIX: at 14 mm the .19 line struck "2X (.64)" and the
+# (.64) arrow struck "2X .19").
 _ROW_PITCH = 54.0
-_ROW_FIRST = BLANK_LENGTH + 28.0
+_ROW_FIRST = BLANK_LENGTH + 46.0
+# The stops' row height, 4 mm (sheet) off the outline. Native placement puts
+# an outside text's left 1.5 mm right of its dimension line, its shelf
+# running to 15.6 mm; its dimension and extension lines end left of the CL/CR
+# row's centred text, and that row's outside arrow tail right of its shelf.
+_STOP_ROW_X = BLANK_LENGTH + 8.0
 # Callout blocks start this high, clear of the section arrows' letters.
 _CALLOUT_Y = BLANK_WIDTH + 48.0
 
@@ -148,8 +156,9 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     # they ran the length and crossed the section letter). The single HUB row
     # stands left. The stops' "2X .19" is the shortest, nearest the outline;
     # its span is too short for its text, which stands below the bottom edge
-    # (above it, it would meet the CL/CR row's text).
-    "StopY": (BLANK_LENGTH + 20.0, -10.0, _T),
+    # on a shelf right of its line (above it, it would meet the CL/CR row's
+    # text).
+    "StopY": (_STOP_ROW_X, -10.0, _T),
     "ClampY": (_ROW_FIRST, CL_HOLE[1] / 2.0, _T),
     "ScrewOuterY": (_ROW_FIRST + _ROW_PITCH, SCREW_HOLES[2][1] / 2.0, _T),
     "ScrewInnerY": (_ROW_FIRST + 2.0 * _ROW_PITCH, SCREW_HOLES[0][1] / 2.0, _T),
@@ -174,9 +183,11 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "ScrewDia": (BLANK_LENGTH + 10.0, _CALLOUT_Y + 8.0, _T),
     # The stop holes' block, below and right of stop 2 (the reference
     # circle's hole): its leader drops steeply past the right end's
-    # extension line, clear of StopY's text, and the block stands right of
-    # every X-stack extension line and left of section A-A.
-    "StopDia": (BLANK_LENGTH + 50.0, -80.0, _T),
+    # extension line, under the stops' row-height shelf, and the block
+    # stands right of every X-stack extension line and left of section A-A
+    # (native run 26bb: centred at L + 50 its 48.7 mm ink came within 1.6 mm
+    # of the length's extension line).
+    "StopDia": (BLANK_LENGTH + 62.0, -80.0, _T),
 }
 # The thickness's text stands outside its 12 mm (sheet) span (jig-r6: its
 # extension lines ran through "6.0 STOCK").

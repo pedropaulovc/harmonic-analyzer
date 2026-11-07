@@ -120,18 +120,27 @@ def test_compatible_standard_reamer_clears_without_counterbore() -> None:
 def test_spigot_centres_washer_and_free_seating_uses_available_clearance() -> None:
     assert holding.SPIGOT_DIA_LIMITS == washer.SPIGOT_DIA_LIMITS
     assert holding.SPIGOT_FLOAT_MAX == washer.SPIGOT_FLOAT_MAX
+    assert holding.SPIGOT_DIA_LIMITS == pytest.approx((9.8806, 9.9822))
+    assert holding.SPIGOT_FLOAT_MAX == pytest.approx(0.14605)
     assert holding.SPIGOT_LAND_MIN == washer.SPIGOT_LAND_MIN > 0.1
     assert holding.HUB_ASSEMBLY_OFFSET_CAPACITY == pytest.approx(
         (washer.BORE_LIMITS[0] - holding.SCREW_FILLET_DIA_MAX) / 2.0 + washer.ROOT_SEAT_CLEARANCE_MIN
     )
-    assert holding.HUB_ASSEMBLY_OFFSET_CAPACITY == pytest.approx(0.19558)
-    assert holding.STRAP_BEARING_LAND_MIN > 0.08
-    assert holding.WASHER_GAPS == pytest.approx({"inner": 2.754, "outer": 2.246})
+    assert holding.HUB_ASSEMBLY_OFFSET_CAPACITY == pytest.approx(0.2032)
+    assert holding.STRAP_BEARING_LAND_MIN == pytest.approx(
+        washer.SEAT_RING_MIN - washer.STRAP_HOLE_ENTRY_BREAK_MAX
+    )
+    assert holding.STRAP_BEARING_LAND_MIN == pytest.approx(0.0762)
+    assert holding.WASHER_GAPS == pytest.approx({
+        "inner": trammel.HUB_RADIUS - trammel.R_INNER - washer.OD / 2.0,
+        "outer": trammel.R_OUTER - trammel.HUB_RADIUS - washer.OD / 2.0,
+    })
     assert min(holding.WASHER_GAPS_MIN.values()) >= holding.WASHER_CLEARANCE_MIN == 1.5
     shifted = holding.washer_cutter_gaps(0.1)
     for name, gap in holding.WASHER_GAPS_MIN.items():
         assert gap - shifted[name] == pytest.approx(0.1)
-    assert washer.OD == 11.0
+    assert washer.OD == pytest.approx(0.433 * 25.4)
+    assert washer.OD_LIMITS == pytest.approx((10.8712, 11.1252))
     assert holding.HUB_TORQUE_NM == 1.0
     with pytest.raises(ValueError):
         holding.washer_cutter_gaps(-0.001)
