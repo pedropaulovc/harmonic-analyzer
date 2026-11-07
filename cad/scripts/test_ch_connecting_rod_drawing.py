@@ -237,10 +237,15 @@ def test_every_tight_band_names_its_mate() -> None:
         f"REAM THRU\nPRESS FIT ON {drawing.PIN_NUMBER}\nSEE NOTE 1"
     )
     assert drawing.ARM_NUMBER in drawing.DETAIL_CALLOUTS["SlotWidth"]
-    # Rule 7: the tine's band states its function, no second sentence; the
-    # ring face's location carries its value and band only.
-    assert drawing.DETAIL_CALLOUTS["TineNear"] == "2X TINE WALL\nLOCATES SLOT"
-    assert "RingFaceNear" not in drawing.DETAIL_CALLOUTS
+    # Rule 7: the tine's band states its function in one line, with the
+    # arm its slot serves (rule 4, fan-out round 1).
+    assert drawing.DETAIL_CALLOUTS["TineNear"] == (
+        f"2X TINE WALL\nLOCATES SLOT FOR {drawing.ARM_NUMBER}"
+    )
+    # Fan-out round 1: the plate face's tight band names the mate it locates.
+    assert drawing.DETAIL_CALLOUTS["RingFaceNear"] == (
+        f"LOCATES RING IN\n{drawing.CAM_NUMBER} CAM SLOT"
+    )
     assert drawing.LEFT_CALLOUTS["RingThick"] == (
         f"SLIDING FIT IN CAM\nSLOT OF {drawing.CAM_NUMBER}"
     )
@@ -647,7 +652,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert spec["material"] == rod.MATERIAL == "Plain Carbon Steel"
     assert spec["material_specification"] == "AISI 1018 low-carbon steel plate"
     assert spec["finish"] == (
-        "BLACK ENAMEL; MASK BORE, PLATE FACES, PIN HOLE AND FORK SLOT; "
+        "BLACK ENAMEL; MASK BORE, .086 RING FACES, PIN HOLE AND FORK SLOT; "
         "OIL BARE MACHINED SURFACES"
     )
     assert int(spec["quantity"]) == 20
