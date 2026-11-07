@@ -324,9 +324,15 @@ def _owned_table(adapter: Any, view: Any, feature: Any, table: Any) -> None:
     ``==``. Failures print the actual names and IsSame states.
     """
     app = adapter.swApp
+    view = _early_bound(view, "IView")
+    feature = _early_bound(feature, "IHoleTable")
+    table = _early_bound(table, "ITableAnnotation")
     expected = _early_bound(table.GetAnnotation(), "IAnnotation")
     view_name = str(view.GetName2())
-    view_feature = _early_bound(adapter.currentModel, "IModelDoc2").FeatureByName(view_name)
+    # FeatureByName is declared on IDrawingDoc for drawings, not IModelDoc2
+    # (farm 114c1622); GetFirstView is IDrawingDoc too.
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    view_feature = drawing.FeatureByName(view_name)
     hole_features = []
     sub = None if view_feature is None else _early_bound(view_feature, "IFeature").GetFirstSubFeature()
     while sub is not None:
@@ -340,7 +346,7 @@ def _owned_table(adapter: Any, view: Any, feature: Any, table: Any) -> None:
     own_same = [(str(item.GetName()), int(app.IsSame(item, expected))) for item in own]
     sheet_views, listed = [], []
     # GetFirstView is the sheet (root) view; GetNextView walks its model views.
-    current, index = _early_bound(adapter.currentModel, "IDrawingDoc").GetFirstView(), 0
+    current, index = drawing.GetFirstView(), 0
     while current is not None:
         current = _early_bound(current, "IView")
         name = str(current.GetName2())

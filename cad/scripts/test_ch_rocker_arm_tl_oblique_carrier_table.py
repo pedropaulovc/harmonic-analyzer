@@ -361,6 +361,49 @@ def test_table_ownership_is_the_view_feature_and_the_sheets_only_hole_table(monk
         assert "feature_annotations=[('Hole Table1', -1)]" in message
 
 
+def test_hole_table_native_calls_are_declared_on_their_bound_interfaces():
+    # Farm 114c1622: _early_bound(drawing, "IModelDoc2").FeatureByName raised
+    # natively; the adapter census never reads this helper module. Parse the
+    # pinned generated typelib as data (no COM, no imports of the wrapper).
+    from test_mg_threaded_adapter_contract import _native_declaration, _undeclared_bound_calls
+
+    tree = ast.parse(inspect.getsource(table))
+    assert not _undeclared_bound_calls(tree)
+    owned = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "_owned_table")
+    bound = {
+        node.targets[0].id: node.value.args[1].value for node in ast.walk(owned)
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Name) and node.value.func.id == "_early_bound"
+        and isinstance(node.targets[0], ast.Name)
+    }
+    # Every parameter and document the census follows is explicitly bound.
+    assert {name: bound[name] for name in ("view", "feature", "table", "drawing")} == {
+        "view": "IView", "feature": "IHoleTable", "table": "ITableAnnotation", "drawing": "IDrawingDoc",
+    }
+    # Mutation control: the 114c binding is caught by the same census.
+    binding = next(
+        node.value for node in ast.walk(owned)
+        if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name)
+        and node.targets[0].id == "drawing"
+    )
+    binding.args[1] = ast.Constant("IModelDoc2")
+    assert "IModelDoc2.FeatureByName" in _undeclared_bound_calls(tree)
+    # Members reached through comprehension items or property reads, which
+    # the named-binding walker does not follow.
+    for interface, member in (
+        ("IAnnotation", "GetName"), ("ITableAnnotation", "GetAnnotation"),
+        ("IHoleTable", "GetFeature"), ("IHoleTable", "GetTableAnnotations"),
+        ("IHoleTable", "HoleTag"), ("IHoleTable", "SetHoleTag"),
+        ("ITableAnnotation", "Text2"), ("ITableAnnotation", "DisplayedText2"),
+        ("ITableAnnotation", "SetText2"), ("IFeature", "GetNextSubFeature"),
+    ):
+        assert member in _native_declaration(interface)[0], f"{interface}.{member}"
+    for interface, member in (
+        ("ITableAnnotation", "Type"), ("IFeature", "Name"), ("IHoleTable", "EnableUpdate"),
+    ):
+        assert member in _native_declaration(interface)[1]["_prop_map_get_"], f"{interface}.{member}"
+
+
 @pytest.mark.parametrize("fault", [None, "size", "note", "moved_note", "columns"])
 def test_frozen_rows_name_the_row_and_both_values(fault):
     native = NativeCells()
