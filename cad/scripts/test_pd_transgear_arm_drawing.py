@@ -531,10 +531,10 @@ def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:
     low, high = spec.LATCH_PIN_PRESS_PRINTED
     assert 0.0 < low <= loosest + 1e-9
     assert loosest < tightest <= high + 1e-9 < tightest + 0.00254
-    # The callout names the pin and links the note that carries the press
+    # The callout links the note that names the pin and carries the press
     # and the owner-accepted ligament shortfall (RV-04), the wall rounded
     # down so the sheet never promises more than the budget holds.
-    assert spec.LATCH_PIN_NUMBER in arm_notes.PIN_HOLE_CALLOUT
+    assert spec.LATCH_PIN_NUMBER in arm_notes.NOTES[arm_notes.LATCH_PIN_NOTE - 1]
     assert f"SEE NOTE {arm_notes.LATCH_PIN_NOTE}" in arm_notes.PIN_HOLE_CALLOUT
     note = " ".join(arm_notes.NOTES[arm_notes.LATCH_PIN_NOTE - 1].split())
     assert ".0006-.0013" in note
@@ -677,8 +677,6 @@ def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() ->
     # It stands off its line on a leader, right of the line.
     line_x = drawing.SECTION_KEEP["FloorDepth"][0]
     assert floor[0] > line_x + 0.005
-    # Clear above the sheet's fit notes.
-    assert floor[1] > drawing.NOTES_XY[1] + 0.002
     # The line stands off the pivot end it dimensions.
     pivot_end_x = drawing._front_x(-geometry.PIVOT_END_R)
     assert line_x < pivot_end_x

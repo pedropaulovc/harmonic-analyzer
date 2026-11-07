@@ -835,7 +835,7 @@ def test_the_stock_refs_carry_the_receiving_ceilings_the_cut_end_reserve_uses() 
     assert set(ceilings) <= spec.DRAWING_REFERENCE_DIMENSIONS
     step = 10.0 ** -spec.DRAWING_PRECISION_BY_NAME["RackHeight"]
     for name, ceiling_mm in ceilings.items():
-        printed = float(spec.DIMENSION_CALLOUTS[name].split()[1])
+        printed = float(spec.DIMENSION_CALLOUTS[name].split()[0])
         # Rounded down: never admits a section above the ceiling, never
         # rejects one more than a print step below it.
         assert printed * 25.4 <= ceiling_mm

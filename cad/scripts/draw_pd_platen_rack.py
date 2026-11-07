@@ -30,7 +30,11 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
 from _drawing_edge_dimensions import assert_dimension_measures
 from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
@@ -147,11 +151,40 @@ def _assert_native_dimensions(adapter: Any, annotations: list[Any]) -> None:
                 f"DrivenState {int(dimension.DrivenState)})"
             )
         reference = name in DRAWING_REFERENCE_DIMENSIONS
-        if bool(display.ShowParenthesis) != reference or bool(annotation.IsDangling()):
-            raise RuntimeError(f"rack size {name!r} has wrong reference state or is dangling")
+        # The callout-carrying stock REFs print their parentheses as the
+        # value's own prefix/suffix (set_reference_dimension), so the plain
+        # MAX above reads outside them; the others keep the native ones.
+        if name in DIMENSION_CALLOUTS:
+            text = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+            if bool(display.ShowParenthesis) or text != ("(", ")"):
+                raise RuntimeError(f"rack size {name!r} lost its value-only parentheses: {text!r}")
+        elif bool(display.ShowParenthesis) != reference:
+            raise RuntimeError(f"rack size {name!r} has wrong reference state")
+        if bool(annotation.IsDangling()):
+            raise RuntimeError(f"rack size {name!r} is dangling")
     missing = DRAWING_NOMINALS_MM.keys() - found
     if missing:
         raise RuntimeError(f"rack sheet is missing sizes {sorted(missing)}")
+
+
+def _parenthesize_values_only(adapter: Any, annotations: list[Any]) -> None:
+    """The callout-carrying stock REFs: native parentheses off (they would
+    wrap the callout too), the value's own instead."""
+    done: set[str] = set()
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name not in DIMENSION_CALLOUTS:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.ShowParenthesis = False
+        if bool(display.ShowParenthesis):
+            raise RuntimeError(f"rack size {name!r} kept its native parentheses")
+        set_reference_dimension(adapter, annotation, label=name)
+        done.add(name)
+    missing = set(DIMENSION_CALLOUTS) - done
+    if missing:
+        raise RuntimeError(f"rack stock REFs never reached the sheet: {sorted(missing)}")
 
 
 def _add_sheet_notes(adapter: Any, front: Any, end: Any) -> None:
@@ -262,7 +295,9 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
     ]
-    # Above the value: the end view's outline sits just under both REF lines.
+    # Above the value, outside its parentheses: the end view's outline sits
+    # just under both REF lines.
+    _parenthesize_values_only(adapter, annotations)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="above")
     # Showing EndStockProfile prints the section's real stock outline and seam;
     # it remains hidden in the source part and in the isometric/assembly views.

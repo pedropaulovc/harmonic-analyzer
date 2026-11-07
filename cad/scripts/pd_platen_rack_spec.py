@@ -678,7 +678,7 @@ def _receiving_ceiling_text(limit_mm: float) -> str:
     print never admits a section the cut-end envelope refuses."""
     scale = 10**_PLACES["RackHeight"]
     value = math.floor(round(limit_mm / MM_PER_IN * scale, 9)) / scale
-    return f"RECEIVE {value:.{_PLACES['RackHeight']}f} MAX".replace(" 0.", " .")
+    return f"{value:.{_PLACES['RackHeight']}f} MAX AS PURCHASED".removeprefix("0")
 
 
 # The two stock sizes carry their receiving maxima as callout text on the
@@ -687,7 +687,10 @@ def _receiving_ceiling_text(limit_mm: float) -> str:
 # a functional acceptance rides its native callout (rule 4's DIAMETRAL
 # CLEARANCE callouts); owner review on #2144.  The rack-travel cut-end
 # reserve (paper_drive_geom.feed_rack_cut_end_section_maxima_mm) is paid at
-# these ceilings, so a larger section must be rejected on receipt.
+# these ceilings, so a larger section must be rejected on receipt.  The
+# sheet parenthesizes only the REF value, so the plain limit above it reads
+# outside the parentheses (novice-rubric fan-out round 1: a limit inside a
+# reference's parentheses, and RECEIVE, read as neither REF nor limit).
 DIMENSION_CALLOUTS = {
     "RackHeight": _receiving_ceiling_text(quality.rack_stock_height_max_mm()),
     "RackDepth": _receiving_ceiling_text(quality.rack_face_width_max_mm()),

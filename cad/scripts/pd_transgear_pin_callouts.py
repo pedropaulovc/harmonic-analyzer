@@ -11,6 +11,7 @@ fit, the bushings and the paper-drive assembly import.
 
 from __future__ import annotations
 
+import pd_transgear_arm_geometry as ARM
 import pd_vn_transgear_retaining_ring_spec as RING
 from pd_transgear_pin_spec import (
     ARM_NUMBER,
@@ -27,14 +28,22 @@ from pd_transgear_pin_spec import (
 # the fit (rule 23).  The shank's .0002 band is narrower than the shop's
 # turned-diameter row, so numbered note 1, linked from the shank Ø by SEE
 # NOTE 1, names its fit route: the shank is turned to the measured arm ream
-# (rule 4: standard fit names, the interference as REF).  Kept here, not in
-# the widely imported spec, so the wording re-keys only this part.
+# (rule 4: standard fit names, the interference as REF).  The note prints the
+# arm's undersize ream limits, so the route and the shank's band agree on
+# the sheet (round 1: without them a 1/8 ream read as .1250 and up).  The
+# ring groove's Ø and width name their ring once, in note 2 (rule 4).  Kept
+# here, not in the widely imported spec, so the wording re-keys only this
+# part.
 SHANK_FIT_NOTE = 1
+RING_GROOVE_NOTE = 2
 DRAWING_NOTES = "\n".join((
-    f"{SHANK_FIT_NOTE}. PRESS FIT IN {ARM_NUMBER}: TURN SHANK TO MEASURED REAM",
-    f"    (INTERFERENCE {inch_text(PRESS_INTERFERENCE[0], 4)}-"
-    f"{inch_text(PRESS_INTERFERENCE[1], 4)}). RUNNING FIT IN",
-    f"    {', '.join(RUNNING_MATES[:-1])} AND {RUNNING_MATES[-1]}.",
+    f"{SHANK_FIT_NOTE}. PRESS FIT IN THE Ø{inch_text(ARM.PIN_BORE_DIA_MIN, 4)}-"
+    f"{inch_text(ARM.PIN_BORE_DIA_MAX, 4)} REAM OF {ARM_NUMBER}:",
+    "    TURN SHANK TO MEASURED REAM (INTERFERENCE "
+    f"{inch_text(PRESS_INTERFERENCE[0], 4)}-{inch_text(PRESS_INTERFERENCE[1], 4)}).",
+    f"    RUNNING FIT IN {', '.join(RUNNING_MATES[:-1])} AND {RUNNING_MATES[-1]}.",
+    f"{RING_GROOVE_NOTE}. RING GROOVE Ø AND WIDTH: FOR RING {RING_NUMBER}",
+    f"    (McMASTER {RING.SKU}).",
     "1/4 IN BAR STOCK OK.",
 ))
 
@@ -43,11 +52,10 @@ TEXT_SUFFIX = 2  # swDimensionTextSuffix
 CALLOUT_ABOVE = 3  # swDimensionTextCalloutAbove
 CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 
-# The ring the groove takes, named once above the groove Ø for both of the
-# groove's catalogue bands, Ø and width (rule 4: one feature names its mate
-# once; one line: an above-callout holding a line break is stored but never
-# printed).
-GROOVE_CALLOUT = f"FOR {RING_NUMBER} RING, McMASTER {RING.SKU}"
+# The ring the groove takes is named once, in note 2, which both of the
+# groove's catalogue bands, Ø and width, link to (rule 4: one feature with
+# several tight dimensions names its mate once, on one note linked to all).
+GROOVE_CALLOUT = f"SEE NOTE {RING_GROOVE_NOTE}"
 # The shank's band and its fits are numbered note 1 (rule 7: a callout carries
 # at most two lines of words; the fit route is the note's).
 SHANK_CALLOUT = f"SEE NOTE {SHANK_FIT_NOTE}"
@@ -63,6 +71,7 @@ CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
     CALLOUT_BELOW: {
         ("PinProfile", "ShankDia"): SHANK_CALLOUT,
         ("PinProfile", "GrooveStation"): GROOVE_STATION_CALLOUT,
+        ("PinProfile", "GrooveWidth"): GROOVE_CALLOUT,
     },
     # The root radius is a single limit, its own one-line "R.005 MAX" (a
     # local MAX under the title block's inside corner needs no reason): the

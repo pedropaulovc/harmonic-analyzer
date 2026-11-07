@@ -325,9 +325,9 @@ ARM_SHEET_PRECISION = {
     for name, places in DRAWING_PRECISION_BY_NAME.items()
     if name not in PIN_SECTION_KEEP
 }
-# The value and its three callout lines (~18 mm tall, ~48 mm wide), the
-# block's right end 4 mm short of the dimension line.
-PIN_MOUTH_TEXT_XY = (PIN_SECTION_REAR_X - 0.010 - 0.024, _PIN_MOUTH_Y + 0.008)
+# The value and its two callout lines (~14 mm tall, ~84 mm wide), the
+# block's right end 10 mm short of the dimension line's stand-off.
+PIN_MOUTH_TEXT_XY = (PIN_SECTION_REAR_X - 0.010 - 0.042, _PIN_MOUTH_Y + 0.006)
 # The caption's top stands this far under the cut face.
 _PIN_CAPTION_GAP_M = 0.006
 # Half a millimetre: run 20261027T212717523Z's four moves left it 0.26 mm
@@ -372,9 +372,10 @@ _GTOL_CALLOUT_ABOVE = 3  # swGTolTextParts_e.swGTolTextCalloutAbove
 
 
 NOTE_HEIGHT = 0.0025
-# Under section A-A's floor-depth text, left of its caption, above the
-# lower border: the sheet's one open field.
-NOTES_XY = (0.016, 0.046)
+# Sheet 2's open lower-left field (top-left corner): under section D-D's
+# caption, left of the title block, above the lower border.  Sheet 1 has no
+# field the eight lines fit (round 1: they ran through its lower border).
+NOTES_XY = (0.016, 0.090)
 
 
 # Native tap callout: arrow on the rear entry break's own edge, text above
@@ -976,11 +977,6 @@ async def build(adapter: Any) -> dict[str, str]:
         _set_tap_callout_text(callout, qualifier, label=label)
         set_hole_callout_precision(callout, {"hw-thrutapdrldia": 3}, label=label)
 
-    # The fit notes the callouts link to, in sheet context.
-    ddoc.ActivateView("")
-    if add_note(adapter, NOTES_TEXT, *NOTES_XY, height=NOTE_HEIGHT) is None:
-        raise RuntimeError("failed to add the arm's fit notes")
-
     # Sheet 2: the pin bore's rear mouth in section D-D, cut from a plan on
     # sheet 1's plan centre.
     if not ddoc.ActivateSheet(SHEET_NAMES[1]):
@@ -1009,6 +1005,11 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_hidden_lines_removed(adapter, iso)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    # The fit notes the callouts link to, on sheet 2's open lower-left field
+    # (round 1: on sheet 1 they ran through the lower border).
+    ddoc.ActivateView("")
+    if add_note(adapter, NOTES_TEXT, *NOTES_XY, height=NOTE_HEIGHT) is None:
+        raise RuntimeError("failed to add the arm's fit notes")
     if not ddoc.ActivateSheet(SHEET_NAMES[0]):
         raise RuntimeError("cannot return to the arm sheet")
 

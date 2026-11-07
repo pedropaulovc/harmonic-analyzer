@@ -694,6 +694,10 @@ def _name_hole_table_mates(
             raise RuntimeError(
                 f"platen hole-table column {column} width did not persist: {actual!r}"
             )
+    rebuild_drawing(adapter, label="platen hole-table widths")
+    widths = {column: float(table.GetColumnWidth(column)) for column in HOLE_TABLE_WIDTHS}
+    if any(abs(widths[column] - width) > 1e-6 for column, width in HOLE_TABLE_WIDTHS.items()):
+        raise RuntimeError(f"platen hole-table widths drifted: {widths!r}")
     table.SetColumnHidden(_HOLE_TABLE_SIZE_COLUMN, True)  # VT_VOID, not success.
     rebuild_drawing(adapter, label="platen hole-table mates")
     _check_hole_table(table, generated, rows)
@@ -723,14 +727,15 @@ def _check_hole_table(
         table.ColumnHidden(column) for column in HOLE_TABLE_WIDTHS
     ):
         raise RuntimeError("platen hole table shows SIZE or hides a printed column")
-    widths = {
-        column: float(table.GetColumnWidth(column)) for column in HOLE_TABLE_WIDTHS
-    }
-    if any(
-        abs(widths[column] - width) > 1e-6
-        for column, width in HOLE_TABLE_WIDTHS.items()
-    ):
-        raise RuntimeError(f"platen hole-table widths drifted: {widths!r}")
+    # Widths are read only in the all-visible window (_check_hole_table_widths,
+    # before SIZE is hidden): with a column hidden, GetColumnWidth's index
+    # domain no longer matches ColumnHidden's (round 1 read the MATE column's
+    # width as 0.0 at index 4), as on the paper-drive BOM.
+    if int(table.ColumnCount) != columns - 1:
+        raise RuntimeError(
+            f"platen hole table shows {int(table.ColumnCount)} of {columns} columns, expected {columns - 1}"
+        )
+    widths = HOLE_TABLE_WIDTHS
     height = sum(float(table.GetRowHeight(row)) for row in range(int(table.RowCount)))
     left, top = HOLE_TABLE_ANCHOR
     box = (left, top - height, left + sum(widths.values()), top)

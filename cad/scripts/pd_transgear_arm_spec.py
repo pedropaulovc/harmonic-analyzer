@@ -215,7 +215,7 @@ if not all(
 # break lacks); the callout gives the angle, the end and the mate whose seat
 # fillet the minimum clears (rule 4).
 PIN_MOUTH_CALLOUT = "\n".join(
-    ("X 45\u00b0 REAR MOUTH", f"CLEARS {PIN.PIN_NUMBER}", "SEAT FILLET")
+    ("X 45\u00b0 REAR MOUTH", f"CLEARS {PIN.PIN_NUMBER} SEAT FILLET")
 )
 
 # The true overall, pivot-end extreme to the square end, prints as a

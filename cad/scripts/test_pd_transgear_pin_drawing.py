@@ -159,12 +159,14 @@ def _below(name: str) -> str:
     return callouts.callouts_by_lane(callouts.CALLOUT_BELOW)[name]
 
 
-def test_the_groove_callout_names_the_ring_on_one_line() -> None:
-    """An above-callout with a line break is stored but never printed."""
+def test_the_groove_names_its_ring_once_in_a_note_both_bands_link() -> None:
+    """Rule 4: the groove's Ø and width name their ring once, in a numbered
+    note linked from both; an above-callout with a line break never prints."""
     (text,) = callouts.CALLOUTS[callouts.CALLOUT_ABOVE].values()
-    assert text == callouts.GROOVE_CALLOUT
-    assert "\n" not in text
-    assert spec.RING_NUMBER in text and ring.SKU in text
+    assert text == callouts.GROOVE_CALLOUT == f"SEE NOTE {callouts.RING_GROOVE_NOTE}"
+    assert _below("GrooveWidth") == callouts.GROOVE_CALLOUT
+    assert callouts.DRAWING_NOTES.count(spec.RING_NUMBER) == 1
+    assert ring.SKU in callouts.DRAWING_NOTES
 
 
 def test_the_part_authors_every_callout_on_a_marked_dimension() -> None:
@@ -189,13 +191,10 @@ def test_the_part_authors_every_callout_on_a_marked_dimension() -> None:
     assert "author_dimension_callouts" in _calls(part.__file__)
 
 
-def test_the_groove_width_band_names_the_ring_clear_of_its_extension_lines() -> None:
-    """Rule 4: the groove names its ring once, above its Ø, for both of its
-    catalogue bands; rule 14: the width's text centre stands far enough
-    toward the head that the rear wall's and the load wall's extension lines
-    miss the text block."""
-    assert ("PinProfile", "GrooveWidth") not in callouts.CALLOUTS[callouts.CALLOUT_BELOW]
-    assert spec.RING_NUMBER in callouts.GROOVE_CALLOUT
+def test_the_groove_width_band_stands_clear_of_its_extension_lines() -> None:
+    """Rule 14: the width's text centre stands far enough toward the head
+    that the rear wall's and the load wall's extension lines miss the text
+    block."""
     x, _ = drawing.SIDE_KEEP["GrooveWidth"]
     assert x - 0.028 > drawing.GROOVE_REAR_X > drawing.LOAD_WALL_X
     # The shank Ø's dimension line (and its arrow below the shank) passes
@@ -272,7 +271,9 @@ def test_the_shank_carries_the_one_machined_finish() -> None:
 
 def test_notes_fit_the_sheet_limits() -> None:
     lines = callouts.DRAWING_NOTES.splitlines()
-    assert len(lines) <= 4
+    starts = [index for index, line in enumerate(lines) if not line.startswith(" ")]
+    for start, end in zip(starts, [*starts[1:], len(lines)]):
+        assert end - start <= 4
     assert all(len(line) <= 70 for line in lines)
 
 

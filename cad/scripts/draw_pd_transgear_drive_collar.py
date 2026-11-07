@@ -157,7 +157,10 @@ _BORE_EDGE_Y = SIDE_CENTER[1] + BORE_DIA * _S / 2000.0
 SIDE_KEEP = {
     "PilotLength": (_PILOT_X + 0.019, _LENGTH_ROW_Y),
     "CollarLength": (_REAR_X - 0.018, _LENGTH_ROW_Y),
-    "CollarDia": (_PILOT_X + 0.069, SIDE_CENTER[1]),
+    # 22 mm above the axis: round 1's OD text on the axis line ran into the
+    # pilot's "CLEARS BORE" beside it; raised, it reads between the OD's
+    # upper extension line and the pilot block's top.
+    "CollarDia": (_PILOT_X + 0.069, SIDE_CENTER[1] + 0.022),
     "PilotDia": (_PILOT_X + 0.022, SIDE_CENTER[1]),
     # Three callout rows now, not six: the text drops the 11 mm the three
     # removed rows took, so its dimension line keeps running in the bore's air.

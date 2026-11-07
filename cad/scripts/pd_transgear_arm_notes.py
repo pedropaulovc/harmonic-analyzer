@@ -58,8 +58,8 @@ NOTES = (
     f"{LATCH_PIN_NOTE}. LATCH-PIN HOLE: PRESS FIT ON LATCH PIN {LATCH_PIN_NUMBER}\n"
     f"   (INTERFERENCE {_inch_range(LATCH_PIN_PRESS_PRINTED)})."
     f" PIN HOLE TO FACES {inch_text(LATCH_PIN_WALL_PRINTED, 3)} MIN.",
-    f"{SPRING_NOTE}. COUNTERBORE Ø AND FLOOR: SEAT AND PRELOAD PIVOT SPRING"
-    f" {_SPRING['number']}.",
+    f"{SPRING_NOTE}. COUNTERBORE Ø AND FLOOR: SEAT AND PRELOAD\n"
+    f"   PIVOT SPRING {_SPRING['number']}.",
 )
 NOTES_TEXT = "\n".join(NOTES)
 
@@ -73,9 +73,11 @@ LOCATOR_CALLOUT_TEXT = "\n".join((
     f"2X REAM THRU, DOWEL {LOCATOR_PIN.PART_NUMBER}",
     f"SEE NOTE {LOCATOR_NOTE}",
 ))
+# Note 3 names the latch pin; the callout stays inside the right border
+# (round 1: its mate line ran past it).
 PIN_HOLE_CALLOUT = "\n".join((
     "BLIND FLAT-BOTTOM REAM",
-    f"LATCH PIN {LATCH_PIN_NUMBER}, SEE NOTE {LATCH_PIN_NOTE}",
+    f"SEE NOTE {LATCH_PIN_NOTE}",
 ))
 SPRING_CALLOUT = f"SEE NOTE {SPRING_NOTE}"
 # The 8-32 plate taps carry no frame: they are spotted and drilled through
