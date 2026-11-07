@@ -184,6 +184,12 @@ RIGHT_KEEP = {"PlateThick": (RIGHT_CENTER[0] - 0.016, _TOP + 0.012)}
 HOLE_CALLOUT_XY = (_LEFT + 0.045, _TOP + 0.021)
 # The native Hole Wizard diameter prints .XXX (.120), like the pilot's.
 HOLE_CALLOUT_PRECISION = {"hw-diam": 3}
+# The fit-up route under the native size row (rule 19; run 20261107T102146937Z
+# found a tapped mate held by loose edge bands): MHA-FR-01's #4-40 taps are
+# spotted through this finished plate's holes at assembly, owner-ratified as
+# fr-harmonic-base machinist exception RV-01, so the plate's stations need
+# hold no stack against them.
+HOLE_CALLOUT_ROUTE = f"{_BASE_NUMBER} TAPS SPOTTED THROUGH AT ASSEMBLY"
 
 
 def _hole_rim_edge(edges: ViewEdges, hole: tuple[float, float]) -> Any:
@@ -295,6 +301,20 @@ def _set_prefix(display: Any, prefix: str, *, label: str) -> None:
     display.SetText(1, prefix)  # swDimensionTextPrefix
     if str(display.GetText(1) or "") != prefix:
         raise RuntimeError(f"{label}: dimension prefix {prefix!r} did not persist")
+
+
+def _append_hole_callout_row(display: Any, row: str, *, label: str) -> None:
+    """Add ``row`` under a native hole callout's format text, keeping its
+    Hole Wizard variables live: the row joins the prefix DEFINITION (5), the
+    compartment add_native_hole_callout's process prefix also writes."""
+    display = _early_bound(display, "IDisplayDimension")
+    existing = str(display.GetText(5) or "")  # swDimensionTextPrefixDefinition
+    if not existing.strip() or row in existing:
+        raise RuntimeError(f"{label}: hole callout format text {existing!r} cannot take {row!r}")
+    definition = f"{existing.rstrip()}\n{row}"
+    display.SetText(1, definition)  # swDimensionTextPrefix
+    if str(display.GetText(5) or "") != definition:
+        raise RuntimeError(f"{label}: hole callout row did not persist: {display.GetText(5)!r}")
 
 
 def _set_dimension_prefixes(
@@ -707,6 +727,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hole_callout_precision(
         holes, HOLE_CALLOUT_PRECISION, label="nameplate screw holes"
     )
+    _append_hole_callout_row(holes, HOLE_CALLOUT_ROUTE, label="nameplate screw holes")
 
     # SectionReference lies in A-A's cutting plane, saved hidden: a derived
     # view takes it from the part as it stands when it is cut and selects it

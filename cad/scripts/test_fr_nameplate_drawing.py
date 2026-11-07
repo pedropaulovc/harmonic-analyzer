@@ -828,3 +828,25 @@ def test_part_registry_row_carries_the_title_block_facts() -> None:
     assert "brass" in str(row["material_specification"]).lower()
     assert row["finish"]
     assert int(row["quantity"]) == 1
+
+
+def test_hole_callout_names_the_transfer_route_under_the_native_size(monkeypatch) -> None:
+    # Run 20261107T102146937Z (blocker, rule 19): the tapped mate's position
+    # zone is far tighter than the plate's loose edge bands. MHA-FR-01's taps
+    # are spotted through these holes (fr-harmonic-base RV-01), so the callout
+    # names that route on its own row under the live format text.
+    assert drawing.HOLE_CALLOUT_ROUTE == "MHA-FR-01 TAPS SPOTTED THROUGH AT ASSEMBLY"
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    texts = {5: "<NUM_INST>X <MOD-DIAM><hw-diam> THRU ALL"}
+
+    def set_text(part: int, text: str) -> None:
+        assert part == 1
+        texts[5] = text
+
+    display = SimpleNamespace(GetText=lambda part: texts.get(part, ""), SetText=set_text)
+    drawing._append_hole_callout_row(display, drawing.HOLE_CALLOUT_ROUTE, label="holes")
+    assert texts[5] == (
+        "<NUM_INST>X <MOD-DIAM><hw-diam> THRU ALL\nMHA-FR-01 TAPS SPOTTED THROUGH AT ASSEMBLY"
+    )
+    with pytest.raises(RuntimeError, match="cannot take"):
+        drawing._append_hole_callout_row(display, drawing.HOLE_CALLOUT_ROUTE, label="holes")
