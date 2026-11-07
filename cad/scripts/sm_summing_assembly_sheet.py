@@ -11,6 +11,7 @@ here does not rebuild the summing assembly. No SolidWorks.
 from __future__ import annotations
 
 import _config
+import ha_harmonic_analyzer_assembly_steps as ha_steps
 import sm_vn_knife_mount_dowel_spec as knife_dowel
 from _assembly_contract import assembly_contract
 from _inch_fraction import inch_fraction
@@ -144,7 +145,8 @@ ASSEMBLY_STEPS = (
     f"1J. SPOT THROUGH EACH {BRACKET_NUMBER} HOLE WITH A DRILL THAT JUST FITS "
     "THE HOLE.",
     f"1K. WITH {BRACKET_NUMBER} OFF, DRILL AND TAP BOTH SPOTS PER THE MHA-SM-03 "
-    "BRACKET TAP CALLOUT.",
+    f"BRACKET TAP CALLOUT. {BRACKET_NUMBER} IS SCREWED ON WITH ITS TWO "
+    f"MHA-MG-VN-53 SCREWS AT {ha_steps.step_ref('magnifier-bracket-screwed')}.",
     "2. SPIN THE MHA-SM-VN-55 JAM NUT ONTO MHA-SM-VN-50 FROM ITS CUT END UP TO "
     "THE EYE.",
     "2A. THREAD MHA-SM-VN-50 INTO THE TAPPED BOSS OF MHA-SM-03 UNTIL ITS CUT "
@@ -176,8 +178,10 @@ ASSEMBLY_STEPS = (
     "FRAME'S GOOSENECK HUB WITH THE HUB SET SCREW MHA-FR-VN-52 (FITTED PER "
     "MHA-FR-00) BACKED CLEAR.",
     "9A. HOOK THE LOWER LOOP OF MHA-SM-VN-51 INTO THE EYE OF MHA-SM-VN-50.",
-    "10. LEVEL SETTING, WITH THE CHANNEL SPRINGS FITTED AND EVERY CHANNEL "
-    "AMPLITUDE SET TO ZERO: SLIDE THE GOOSENECK POST IN ITS HUB UNTIL THE "
+    f"10. LEVEL SETTING, AT {ha_steps.step_ref('summing-levelled')} WITH THE "
+    "MHA-CH-VN-50 CHANNEL SPRINGS HOOKED (ITS STEP "
+    f"{ha_steps.step_number('channel-anchors-set')}) AND EVERY CHANNEL "
+    "AMPLITUDE AT ZERO: SLIDE THE GOOSENECK POST IN ITS HUB UNTIL THE "
     f"LEVER PLATE TOP IS {LEVEL_CRITERION} (DIGITAL ANGLE GAUGE ACROSS THE "
     "PLATE), THEN TIGHTEN THE HUB SET SCREW MHA-FR-VN-52 ON THE POST. THE "
     "GOOSENECK HEIGHT REFERENCE DIMENSION ON SHEET 1 IS THE NOMINAL START.",
