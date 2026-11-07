@@ -9,6 +9,7 @@ from typing import Any
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
     view_name,
@@ -27,7 +28,6 @@ from _drawing_centerline import add_view_centerline
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_leader_notes import add_leader_note
-from _drawing_notes import add_property_linked_note, property_link
 from _drawing_registry import DRAWINGS_BY_NAME
 from _machinist_review_mode import MachinistReviewMode
 from _drawing_view_display import set_hidden_lines_removed
@@ -35,6 +35,7 @@ from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+from dt_crank_pin_notes import TAPER_CALLOUT, TAPER_NOTE
 from dt_crank_pin_spec import (
     BIG_END_DIA,
     DIMENSION_CALLOUTS,
@@ -60,8 +61,10 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
+# Every orthographic view prints at the sheet scale: the end view is the
+# projected right-side view, so it needs no label (drawing-guidelines.md
+# rule 9); at 4:1 it read as an unlabelled enlarged view.
 SHEET_SCALE = (2.0, 1.0)
-END_VIEW_SCALE = 4.0
 FRONT_CENTER = (0.110, 0.195)
 RIGHT_CENTER = (
     FRONT_CENTER[0] + PIN_LENGTH * SHEET_SCALE[0] / 2000.0 + 0.080,
@@ -84,7 +87,11 @@ TAPER_SILHOUETTE_PICK = (
 # The taper note's top-left corner: above the pin and just right of the
 # leader tip, so the leader leaves the start of the first line down-left,
 # outside the text block (round 2 had it run back through all four lines).
+# The taper callout is two rows now (ratio, SEE NOTE 1), still above the pin.
 TAPER_NOTE_XY = (TAPER_SILHOUETTE_PICK[0] + 0.006, FRONT_CENTER[1] + 0.063)
+# The numbered note: under the side view's length dimension, left of the
+# title block (x 0.218).
+NOTES_XY = (0.020, 0.120)
 
 # The ring cross-hole, seen end-on as a circle on the axis.
 RING_HOLE_CENTER = (
@@ -173,16 +180,12 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
-            "End View Note",
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
-            "End View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -205,7 +208,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(4, 1))
+    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
@@ -242,19 +245,19 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to pin end view")
 
-    add_property_linked_note(adapter, "End View Note", RIGHT_CENTER[0] - 0.022, 0.162)
-
-    # The part's one note (taper ratio and matched fit) is flagged on the
-    # taper it governs: its leader tip lands on the cone's upper outline,
-    # mid-taper and clear of the ring cross-hole.
+    # The taper's callout (ratio, SEE NOTE 1) is flagged on the taper it
+    # governs: its leader tip lands on the cone's upper outline, mid-taper and
+    # clear of the ring cross-hole.  Note 1 states the matched fit.
     add_leader_note(
         adapter,
-        property_link("Manufacturing Notes"),
+        TAPER_CALLOUT,
         text_xy=TAPER_NOTE_XY,
         attach_xy=TAPER_SILHOUETTE_PICK,
-        label="taper fit note",
+        label="taper fit callout",
         view=front,
     )
+    if add_note(adapter, TAPER_NOTE, *NOTES_XY) is None:
+        raise RuntimeError("failed to add the crank pin's numbered note")
 
     return await finalize_drawing(
         adapter,
