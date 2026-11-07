@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from solidworks_mcp.adapters.solidworks.drawing import visible_component_entities
+from solidworks_mcp.adapters.sw_type_info import constant
 
 from _com import _early_bound
 from _drawing_common import rebuild_drawing
@@ -122,50 +123,122 @@ def _rows(table: Any) -> dict[str, tuple[int, tuple[str, ...]]]:
     if int(table.RowCount) != len(spec.TABLE_HOLES) + 1 or int(table.ColumnCount) not in (4, 5):
         raise RuntimeError("carrier table has the wrong row/column inventory")
     rows = {}
-    a1x, a1y = spec.PIN_HOLES["A1"]
+    expected = _location_expected()
     for row in range(1, int(table.RowCount)):
         cells = tuple(str(table.DisplayedText2(row, col, False) or "").strip()
                       for col in range(int(table.ColumnCount)))
         tag = cells[0]
         if tag not in spec.TABLE_HOLES or tag in rows:
             raise RuntimeError(f"carrier table has an extra/duplicate native tag: {tag!r}")
-        x, y, _diameter = spec.TABLE_HOLES[tag]
-        for text, nominal in zip(cells[1:3], (x - a1x, y - a1y), strict=True):
-            if not re.fullmatch(r"-?\d*\.\d{3}", text):
-                raise RuntimeError(f"carrier table {tag} lost .XXX precision: {text!r}")
-            if abs(float(text) - round(nominal / spec.trammel.INCH, spec.TABLE_LOCATION_PLACES)) > 1e-9:
-                raise RuntimeError(f"carrier table {tag} is not measured from A1: {cells!r}")
-        if not cells[3]:
-            raise RuntimeError(f"carrier table {tag} has no native SIZE")
+        values = tuple(map(_location_value, cells[1:3]))
+        if values != expected[tag]:
+            raise RuntimeError(f"carrier table {tag} is not measured from A1: {cells!r}")
+        _location_display(tag, cells[1:3])
+        _size_semantics(tag, cells[3])
         rows[tag] = (row, cells)
     if set(rows) != set(spec.TABLE_HOLES):
         raise RuntimeError("carrier table omitted a tagged hole")
     return rows
 
 
+_LOCATION = re.compile(r"-?(?:\d+\.?\d*|\.\d+)")
+
+
 def _location_value(text: str) -> Decimal:
-    """The exact printed number of a generated .XXX location cell.
+    """The exact printed number of a generated location cell.
 
     SolidWorks redisplays ``.000`` as ``0.000`` after a column insert (farm
-    957501d1). Leading-zero and zero-sign styles (``.000``/``0.000``/
-    ``-0.000``) are one value; any other digit, a nonzero sign or a place
-    lost/gained is not. The three-place format itself is still required.
+    957501d1, then the reverse in a7547069). Leading/trailing zeros and the
+    zero sign (``.120``/``0.12``/``-0.000``) are display format, not data:
+    the .XXX format is set and read back natively (``_hole_table_format``,
+    ``IHoleTable.SetHoleLocationPrecision``), and the cells are compared by
+    value, so a rounding that changes the value (``.123`` -> ``.12``) fails.
     """
-    if not re.fullmatch(r"-?\d*\.\d{3}", text):
-        raise RuntimeError(f"carrier table location lost .XXX precision: {text!r}")
+    if not _LOCATION.fullmatch(text):
+        raise RuntimeError(f"carrier table location is not a number: {text!r}")
     return Decimal(text)
+
+
+def _location_expected() -> dict[str, tuple[Decimal, Decimal]]:
+    """Each tag's source X/Y from A1, at the table's .XXX places, by value."""
+    a1x, a1y = spec.PIN_HOLES["A1"]
+    return {
+        tag: tuple(Decimal(repr(round(value / spec.trammel.INCH, spec.TABLE_LOCATION_PLACES)))
+                   for value in (x - a1x, y - a1y))
+        for tag, (x, y, _diameter) in spec.TABLE_HOLES.items()
+    }
+
+
+def _location_display(tag: str, texts: tuple[str, ...]) -> None:
+    """Log (never refuse) a value-correct location not printed as .XXX."""
+    if not all(re.fullmatch(r"-?\d*\.\d{3}", text) for text in texts):
+        _telemetry.info(f"carrier table {tag} location display {tuple(texts)!r} is not .XXX (value-equal)")
+
+
+_SIZE_TOKENS = re.compile(r"<[^<>]*>|[+-]?\d*\.\d+|\S")
+_STACKS = re.compile(r"(?:\s*<STACK\b[^<>]*>.*?</STACK>)+", re.IGNORECASE | re.DOTALL)
+_STACK = re.compile(r"<STACK\b[^<>]*>(.*?)<OVER>(.*?)</STACK>", re.IGNORECASE | re.DOTALL)
+_NUMBER = re.compile(r"[+-]?\d*\.\d+")
+
+
+def _value(token: str) -> Any:
+    """A printed number as its exact Decimal value (``.38 == 0.38 == .380``);
+    anything else as text. Printed places are the format preferences' job."""
+    return Decimal(token) if _NUMBER.fullmatch(token) else token
+
+
+def _tolerance(block: str) -> tuple[Any, ...]:
+    """One run of adjacent ``<STACK>`` cells as its (upper, lower) printed
+    values. SolidWorks splits a band across stacks of signs and of values
+    (``+/+`` then ``.00/.00``) or keeps one (``+ .00/- .00``): the tops and
+    the bottoms concatenate in order, and the stack attributes are layout.
+    A band whose two values are both zero is no band: ``()``, as plain SIZE.
+    A stack of another shape is kept whole (whitespace aside) as data.
+    """
+    pairs = _STACK.findall(block)
+    if len(pairs) != len(re.findall(r"<STACK\b", block, re.IGNORECASE)):
+        return (("STACK", "".join(block.split())),)
+    band = tuple(_value("".join("".join(pair[i].split()) for pair in pairs)) for i in (0, 1))
+    if all(isinstance(value, Decimal) and value == 0 for value in band):
+        return ()
+    return (("TOL", *band),)
+
+
+def _size_semantics(tag: str, text: str) -> tuple[Any, ...]:
+    """A generated SIZE cell as SolidWorks symbol tokens, characters, each
+    number's exact Decimal value and each tolerance band's printed (upper,
+    lower); whitespace, leading/trailing zeros and stack layout are
+    formatting, not data (the format itself is set and read back by
+    ``_hole_table_format``).
+
+    Farm a7547069 printed the pin rows' REAM band at the document's two
+    places as ``+.00/+.00`` stacks, then ``+ .00/- .00`` after the NOTE
+    column; 957501d1 printed the same rows plain. An all-zero band equals the
+    plain size; a nonzero band is kept, so any changed value still differs.
+    """
+    if not text:
+        raise RuntimeError(f"carrier table {tag} has no native SIZE")
+    tokens: list[Any] = []
+    at = 0
+    for match in _STACKS.finditer(text):
+        tokens += [_value(token) for token in _SIZE_TOKENS.findall(text[at:match.start()])]
+        tokens += _tolerance(match.group())
+        at = match.end()
+    tokens += [_value(token) for token in _SIZE_TOKENS.findall(text[at:])]
+    return tuple(tokens)
 
 
 def _frozen_rows(
     table: Any, generated: dict[str, tuple[str, ...]], *,
     notes: dict[str, str] | None, stage: str,
 ) -> dict[str, tuple[int, tuple[str, ...]]]:
-    """TAG/X/Y/SIZE exactly as first generated, plus the NOTE column, by tag.
+    """TAG/X/Y/SIZE as first generated, plus the NOTE column, by tag.
 
-    ``notes=None`` requires the freshly inserted NOTE cells to be empty. X/Y
-    compare by exact printed decimal value (``_rows`` has already held them
-    to .XXX and to A1); TAG/SIZE/NOTE compare byte for byte. Failures name
-    the row, expected and actual cells.
+    ``notes=None`` requires the freshly inserted NOTE cells to be empty. The
+    row's identity is its tag at its exact A1 location (``_rows``); X/Y
+    compare by printed decimal value and SIZE by ``_size_semantics``, never
+    by serialization. TAG/NOTE compare byte for byte. Failures name the row,
+    expected and actual cells.
     """
     rows = _rows(table)
     columns = int(table.ColumnCount)
@@ -173,8 +246,9 @@ def _frozen_rows(
         raise RuntimeError(f"carrier table has {columns} columns {stage}; expected TAG/X/Y/SIZE/NOTE")
     for tag, (row, cells) in rows.items():
         expected = (*generated[tag], "" if notes is None else notes[tag])
-        if (cells[0], *map(_location_value, cells[1:3]), *cells[3:]) != (
-                expected[0], *map(_location_value, expected[1:3]), *expected[3:]):
+        if (cells[0], *map(_location_value, cells[1:3]), _size_semantics(tag, cells[3]), cells[4]) != (
+                expected[0], *map(_location_value, expected[1:3]),
+                _size_semantics(tag, expected[3]), expected[4]):
             raise RuntimeError(
                 f"carrier generated row or flag changed {stage}: {tag} (row {row}) "
                 f"expected={expected!r} actual={cells!r}"
@@ -185,30 +259,22 @@ def _frozen_rows(
 def _row_holes(table: Any) -> dict[int, str]:
     """Each generated row's physical hole, from its own native A1-baseline cells.
 
-    The printed .XXX location pairs of the thirteen holes are distinct, so a
-    row identifies exactly one hole or the table is refused.
+    The .XXX source location pairs of the thirteen holes are distinct, so a
+    row's printed values identify exactly one hole or the table is refused.
     """
     if int(table.RowCount) != len(spec.TABLE_HOLES) + 1:
         raise RuntimeError("carrier table has the wrong row inventory")
-    a1x, a1y = spec.PIN_HOLES["A1"]
-    expected = {
-        tag: tuple(round(value / spec.trammel.INCH, spec.TABLE_LOCATION_PLACES)
-                   for value in (x - a1x, y - a1y))
-        for tag, (x, y, _diameter) in spec.TABLE_HOLES.items()
-    }
+    expected = _location_expected()
     if len(set(expected.values())) != len(expected):
         raise AssertionError("two carrier holes print the same table location")
     holes: dict[int, str] = {}
     for row in range(1, int(table.RowCount)):
         texts = tuple(str(table.DisplayedText2(row, col, False) or "").strip() for col in (1, 2))
-        if not all(re.fullmatch(r"-?\d*\.\d{3}", text) for text in texts):
-            raise RuntimeError(f"carrier table row {row} lost .XXX precision: {texts!r}")
-        matches = [
-            tag for tag, location in expected.items()
-            if all(abs(float(text) - value) <= 1e-9 for text, value in zip(texts, location, strict=True))
-        ]
+        values = tuple(map(_location_value, texts))
+        matches = [tag for tag, location in expected.items() if location == values]
         if len(matches) != 1 or matches[0] in holes.values():
             raise RuntimeError(f"carrier table row {row} is not exactly one hole from A1: {texts!r}")
+        _location_display(matches[0], texts)
         holes[row] = matches[0]
     return holes
 
@@ -368,6 +434,36 @@ def _owned_table(adapter: Any, view: Any, feature: Any, table: Any) -> None:
         )
 
 
+# Document Properties > Tables > Hole (DP_Tables-Hole.md), drawing-document
+# scope only, set before the table exists: new tables take these defaults.
+# One serialization for every read (farm 957501d1 and a7547069 printed
+# '.000' and '0.000' in opposite order across the NOTE-column rebuild):
+# no leading zero (ASME inch, as draw_fr_rocker_arm_support), trailing zeros
+# shown so .XXX keeps three places, no dual display.
+HOLE_TABLE_FORMAT = (
+    ("Integer", "swDetailingLeadingZero", "swDetailingHoleTable", "swLeadingZero_DoNotShow"),
+    ("Integer", "swDetailingDimTrailingZero", "swDetailingHoleTable", "swDimShowTrailingZeroes"),
+    ("Toggle", "swTableHoleDualDimensionDisplay", "swDetailingNoOptionSpecified", False),
+)
+
+
+def _hole_table_format(adapter: Any) -> None:
+    """Set and read back HOLE_TABLE_FORMAT on the active drawing document."""
+    extension = _early_bound(_early_bound(adapter.currentModel, "IModelDoc2").Extension, "IModelDocExtension")
+    for kind, preference, option, value in HOLE_TABLE_FORMAT:
+        wanted = value if isinstance(value, bool) else constant(value)
+        name, scope = constant(preference), constant(option)
+        set_ok = getattr(extension, f"SetUserPreference{kind}")(name, scope, wanted)
+        actual = getattr(extension, f"GetUserPreference{kind}")(name, scope)
+        actual = bool(actual) if kind == "Toggle" else int(actual)
+        # SetUserPreferenceToggle returns the resulting state, not success.
+        if (kind == "Integer" and not set_ok) or actual != wanted:
+            raise RuntimeError(
+                f"carrier hole-table {preference}@{option} did not take: "
+                f"expected={value!r} ({wanted!r}) actual={actual!r}"
+            )
+
+
 @_telemetry.traced("drawing.carrier_hole_table.create")
 def create_carrier_hole_table(
     adapter: Any, view: Any, model: Any, source: Path,
@@ -378,6 +474,7 @@ def create_carrier_hole_table(
     model = _early_bound(model, "IModelDoc2")
     edges = _source_edges(adapter, view, model, source)
     _outer_row_source(model)
+    _hole_table_format(adapter)
     # Insert against a real corner, then use the documented IDatumOrigin
     # reattachment to the actual A1 circular edge. No constructed datum point.
     # Default alphanumeric tags, renamed below from each row's own A1 cells.
@@ -406,6 +503,14 @@ def create_carrier_hole_table(
     rebuild_drawing(adapter, label="carrier owner tags")
     rows = _rows(table)
     generated = {tag: cells[:4] for tag, (_row, cells) in rows.items()}
+    # The native SIZE readback, raw and semantic, for the record: a zero
+    # band stack is accepted as the plain size, not refused (owner ruling on
+    # the printed SIZE column pending; a7547069 printed one on the pin rows).
+    stacked = {tag: cells[3] for tag, cells in generated.items() if "<STACK" in cells[3].upper()}
+    _telemetry.info(
+        f"carrier hole-table SIZE readback: {len(stacked)} row(s) with a tolerance stack "
+        f"{ {tag: (text, _size_semantics(tag, text)) for tag, text in stacked.items()}!r}"
+    )
     if not table.InsertColumn2(3, 3, "NOTE", 0):  # swTableItemInsertPosition_After
         raise RuntimeError("carrier table refused the NOTE column")
     if not table.SetColumnTitle2(4, "NOTE", False):

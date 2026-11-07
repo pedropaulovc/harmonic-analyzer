@@ -6,6 +6,7 @@ import inspect
 import itertools
 import math
 import re
+from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -231,10 +232,20 @@ def test_source_census_maps_actual_wizard_circles_one_to_one(monkeypatch, tmp_pa
             _census(monkeypatch, tmp_path, raw)
 
 
-def test_native_rows_require_exact_tag_axis_and_three_places():
+def _round_away_a_place(cells):
+    """Round a location cell to two places where that CHANGES its value."""
+    row, column = next((r, c) for r, row_cells in enumerate(cells[1:], 1)
+                       for c in (1, 2) if not row_cells[c].endswith("0"))
+    cells[row][column] = cells[row][column][:-1]
+
+
+def test_native_rows_require_exact_tag_axis_and_values():
     cells = NativeCells()
     assert set(table._rows(cells)) == set(spec.TABLE_HOLES)
-    for mutation in ("wrong_axis", "wrong_tag", "duplicate_tag", "precision", "empty_size", "missing"):
+    trailing = NativeCells()
+    trailing.cells[2][1] += "0"  # same value: display only, accepted
+    assert set(table._rows(trailing)) == set(spec.TABLE_HOLES)
+    for mutation in ("wrong_axis", "wrong_tag", "duplicate_tag", "rounded", "empty_size", "missing"):
         bad = NativeCells()
         if mutation == "wrong_axis":
             bad.cells[2][1] = "17.723"
@@ -242,8 +253,8 @@ def test_native_rows_require_exact_tag_axis_and_three_places():
             bad.cells[1][0], bad.cells[2][0] = bad.cells[2][0], bad.cells[1][0]
         elif mutation == "duplicate_tag":
             bad.cells[2][0] = bad.cells[1][0]
-        elif mutation == "precision":
-            bad.cells[2][1] += "0"
+        elif mutation == "rounded":
+            _round_away_a_place(bad.cells)
         elif mutation == "empty_size":
             bad.cells[2][3] = ""
         else:
@@ -397,12 +408,56 @@ def test_hole_table_native_calls_are_declared_on_their_bound_interfaces():
         ("IHoleTable", "HoleTag"), ("IHoleTable", "SetHoleTag"),
         ("ITableAnnotation", "Text2"), ("ITableAnnotation", "DisplayedText2"),
         ("ITableAnnotation", "SetText2"), ("IFeature", "GetNextSubFeature"),
+        # _hole_table_format dispatches these by name on IModelDocExtension.
+        ("IModelDocExtension", "SetUserPreferenceInteger"), ("IModelDocExtension", "GetUserPreferenceInteger"),
+        ("IModelDocExtension", "SetUserPreferenceToggle"), ("IModelDocExtension", "GetUserPreferenceToggle"),
     ):
         assert member in _native_declaration(interface)[0], f"{interface}.{member}"
     for interface, member in (
         ("ITableAnnotation", "Type"), ("IFeature", "Name"), ("IHoleTable", "EnableUpdate"),
     ):
         assert member in _native_declaration(interface)[1]["_prop_map_get_"], f"{interface}.{member}"
+
+
+@pytest.mark.parametrize("fault", [None, "integer_rejected", "integer_not_persisted", "dual_stays_on"])
+def test_hole_table_format_is_set_and_read_back_on_the_drawing(monkeypatch, fault):
+    names = iter(range(100, 200))
+    ids = {}
+    monkeypatch.setattr(table, "constant", lambda name: ids.setdefault(name, next(names)))
+    monkeypatch.setattr(table, "_early_bound", lambda value, _interface: value)
+    prefs, calls = {}, []
+
+    def set_integer(pref, option, value):
+        calls.append(("Integer", pref, option, value))
+        if fault == "integer_rejected":
+            return False
+        prefs[pref, option] = value + (1 if fault == "integer_not_persisted" else 0)
+        return True
+
+    def set_toggle(pref, option, value):
+        calls.append(("Toggle", pref, option, value))
+        prefs[pref, option] = True if fault == "dual_stays_on" else value
+        return prefs[pref, option]  # the resulting state, not a success flag
+
+    extension = SimpleNamespace(
+        SetUserPreferenceInteger=set_integer, GetUserPreferenceInteger=lambda p, o: prefs.get((p, o), -1),
+        SetUserPreferenceToggle=set_toggle, GetUserPreferenceToggle=lambda p, o: prefs.get((p, o), True),
+    )
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(Extension=extension))
+    if fault is None:
+        table._hole_table_format(adapter)
+        assert calls == [
+            ("Integer", ids["swDetailingLeadingZero"], ids["swDetailingHoleTable"], ids["swLeadingZero_DoNotShow"]),
+            ("Integer", ids["swDetailingDimTrailingZero"], ids["swDetailingHoleTable"], ids["swDimShowTrailingZeroes"]),
+            ("Toggle", ids["swTableHoleDualDimensionDisplay"], ids["swDetailingNoOptionSpecified"], False),
+        ]
+    else:
+        with pytest.raises(RuntimeError, match="did not take: expected="):
+            table._hole_table_format(adapter)
+    # Names, never literal ints: constant() resolves them from the seat's
+    # installed swconst.tlb at run time (native-only; draw_fr_rocker_arm_support).
+    source = inspect.getsource(table.create_carrier_hole_table)
+    assert source.index("_hole_table_format(adapter)") < source.index("insert_hole_table(")
 
 
 @pytest.mark.parametrize("fault", [None, "size", "note", "moved_note", "columns"])
@@ -438,15 +493,22 @@ def _strip_leading_zero(text):
     return re.sub(r"^(-?)0\.", r"\1.", text)
 
 
-def test_location_value_is_the_exact_printed_three_place_number():
-    zero = {table._location_value(t) for t in (".000", "0.000", "-0.000", "-.000", "00.000")}
+def test_location_value_is_the_exact_printed_number():
+    zero = {table._location_value(t) for t in (".000", "0.000", "-0.000", "-.000", "00.000", "0", "0.0")}
     assert zero == {0}
-    assert table._location_value("-0.181") == table._location_value("-.181")
+    assert table._location_value("0.12") == table._location_value(".120") == table._location_value("0.1200")
+    assert table._location_value("-0.181") == table._location_value("-.1810")
     assert table._location_value("-0.181") != table._location_value("0.181")
     assert table._location_value("1.250") != table._location_value("1.251")
-    for text in ("0.00", "0.0000", "1.25", "", "1,250", "+.181"):
-        with pytest.raises(RuntimeError, match="lost .XXX"):
+    assert table._location_value("0.123") != table._location_value("0.12")  # rounding is a value
+    for text in ("", "1,250", "+.181", ".", "-", "1.2.3", "<MOD-DIAM>"):
+        with pytest.raises(RuntimeError, match="location is not a number"):
             table._location_value(text)
+
+
+def _trimmed(text):
+    """The same value with every leading/trailing zero dropped (0 -> '0')."""
+    return format(Decimal(text).normalize(), "f")
 
 
 @pytest.mark.parametrize("style", ["leading_zero", "zero_sign"])
@@ -471,7 +533,7 @@ def test_frozen_location_cells_ignore_zero_style_only(side, style):
         == set(spec.TABLE_HOLES)
 
 
-@pytest.mark.parametrize("drift", ["last_place", "sign", "lost_place", "extra_place"])
+@pytest.mark.parametrize("drift", ["last_place", "sign", "rounded"])
 def test_frozen_location_cells_still_refuse_real_drift(drift):
     native = NativeCells()
     generated = {tag: cells[:4] for tag, (_row, cells) in table._rows(native).items()}
@@ -479,14 +541,125 @@ def test_frozen_location_cells_still_refuse_real_drift(drift):
     assert b1[0] == "B1" and table._location_value(b1[1]) != 0  # nonzero coordinate
     if drift == "last_place":
         generated["B1"] = ("B1", b1[1][:-1] + str((int(b1[1][-1]) + 1) % 10), *generated["B1"][2:])
+        match = "changed now: B1 \\(row 2\\)"
     elif drift == "sign":
         flipped = b1[1][1:] if b1[1].startswith("-") else "-" + b1[1]
         generated["B1"] = ("B1", flipped, *generated["B1"][2:])
+        match = "changed now: B1 \\(row 2\\)"
     else:
-        b1[1] = b1[1][:-1] if drift == "lost_place" else b1[1] + "0"
-    match = "changed now: B1 \\(row 2\\)" if drift in ("last_place", "sign") else "lost .XXX"
+        # A cell rounded to fewer places that CHANGES its value (.123 -> .12).
+        row, column = next((r, c) for r, cells in enumerate(native.cells[1:], 1)
+                           for c in (1, 2) if not cells[c].endswith("0"))
+        native.cells[row][column] = native.cells[row][column][:-1]
+        match = "is not measured from A1"
     with pytest.raises(RuntimeError, match=match):
         table._frozen_rows(native, generated, notes=spec.TABLE_ROW_NOTES, stage="now")
+
+
+@pytest.mark.parametrize("side", ["table", "generated"])
+def test_frozen_location_cells_accept_value_equal_leading_and_trailing_zeros(side):
+    # 0 vs .000, 0.12 vs .120: display format, logged, never a refusal.
+    native = NativeCells()
+    generated = {tag: cells[:4] for tag, (_row, cells) in table._rows(native).items()}
+    padded = {tag: (cells[0], *(text + "0" for text in cells[1:3]), cells[3])
+              for tag, cells in generated.items()}
+    trimmed = {tag: (cells[0], *map(_trimmed, cells[1:3]), cells[3]) for tag, cells in generated.items()}
+    assert trimmed["A1"][1:3] == ("0", "0")
+    assert any(not cells[c].endswith("0") for cells in trimmed.values() for c in (1, 2))
+    for restyled in (padded, trimmed):
+        table_cells = NativeCells()
+        expected = generated
+        if side == "table":
+            for row in table_cells.cells[1:]:
+                row[:4] = restyled[row[0]]
+        else:
+            expected = restyled
+        assert set(table._frozen_rows(table_cells, expected, notes=spec.TABLE_ROW_NOTES, stage="now")) \
+            == set(spec.TABLE_HOLES)
+        assert set(table._row_holes(table_cells).values()) == set(spec.TABLE_HOLES)
+
+
+# A1's generated SIZE as two farm runs actually serialized it.
+_SIZE_957_PLAIN = "<MOD-DIAM>.38<HOLE-DEPTH>.46"  # 957501d1, before and after NOTE
+_SIZE_A754_BEFORE = (
+    "<MOD-DIAM>.38 <STACK divider=DIM valign=BOTTOM>+<OVER>+</STACK>"
+    "<STACK divider=DIM valign=BOTTOM halign=LEFT>.00<OVER>.00</STACK><HOLE-DEPTH>.46"
+)
+_SIZE_A754_AFTER = "<MOD-DIAM>.38<STACK divider=no>+ .00<OVER>- .00</STACK><HOLE-DEPTH>.46"
+
+
+def test_size_semantics_compare_printed_values_not_serialization():
+    plain = table._size_semantics("A1", _SIZE_957_PLAIN)
+    assert plain == ("<MOD-DIAM>", Decimal(".38"), "<HOLE-DEPTH>", Decimal(".46"))
+    # Leading/trailing zeros and whitespace are format: one value.
+    for same in ("<MOD-DIAM>0.38 <HOLE-DEPTH> .46", "<MOD-DIAM>.380<HOLE-DEPTH>.460"):
+        assert table._size_semantics("A1", same) == plain, same
+    for changed in (
+        "<MOD-DIAM>.4<HOLE-DEPTH>.46",  # another value at fewer places
+        "<MOD-DIAM>.39<HOLE-DEPTH>.46",  # another size
+        "<MOD-DIAM>.38<HOLE-DEPTH>.47",  # another depth
+        ".38<HOLE-DEPTH>.46",  # no diameter symbol
+        "<MOD-DIAM>.38 THRU",  # another form
+    ):
+        assert table._size_semantics("A1", changed) != plain, changed
+    # Both a7547069 zero-band serializations ARE the plain size: accepted.
+    for stacked in (_SIZE_A754_BEFORE, _SIZE_A754_AFTER):
+        assert table._size_semantics("A1", stacked) == plain, stacked
+    # A nonzero band is data: kept, and any changed value differs.
+    band = "<MOD-DIAM>.376<STACK divider=no>+ .0015<OVER>+ .0010</STACK><HOLE-DEPTH>.46"
+    split = ("<MOD-DIAM>.376 <STACK divider=DIM>+<OVER>+</STACK>"
+             "<STACK divider=DIM halign=LEFT>.0015<OVER>.0010</STACK><HOLE-DEPTH>.46")
+    kept = table._size_semantics("A1", band)
+    assert kept == table._size_semantics("A1", split)
+    assert ("TOL", Decimal(".0015"), Decimal(".0010")) in kept
+    for changed in (
+        band.replace("+ .0010", "- .0010"),  # nonzero sign flip
+        band.replace(".0015", ".0016"),  # value
+        band.replace(".0015", ".002"),  # value at fewer places
+        "<MOD-DIAM>.376<HOLE-DEPTH>.46",  # band dropped
+    ):
+        assert table._size_semantics("A1", changed) != kept, changed
+    # A stack of another shape is kept as data, not refused.
+    odd = table._size_semantics("A1", "<MOD-DIAM>.38<STACK>H7</STACK>")
+    assert ("STACK", "<STACK>H7</STACK>") in odd and odd != plain
+    with pytest.raises(RuntimeError, match="A1 has no native SIZE"):
+        table._size_semantics("A1", "")
+
+
+@pytest.mark.parametrize("generated_size,actual_size", [
+    (_SIZE_957_PLAIN, _SIZE_957_PLAIN),  # 957501d1 (with the '.000' -> '0.000' flip)
+    (_SIZE_A754_BEFORE, _SIZE_A754_AFTER),  # a7547069 (with the '0.000' -> '.000' flip)
+    (_SIZE_957_PLAIN, _SIZE_A754_AFTER),  # zero band appears
+    (_SIZE_A754_BEFORE, _SIZE_957_PLAIN),  # zero band disappears
+])
+def test_observed_size_serializations_pass_and_real_changes_still_fail(generated_size, actual_size):
+    native = NativeCells()
+    native.cells[1][3] = generated_size
+    generated = {tag: cells[:4] for tag, (_row, cells) in table._rows(native).items()}
+    # Each run's observed location style flip across the NOTE column.
+    before, after = (".000", "0.000") if generated_size == _SIZE_957_PLAIN else ("0.000", ".000")
+    generated["A1"] = ("A1", before, before, generated_size)
+    native.cells[1][1:4] = [after, after, actual_size]
+    assert set(table._frozen_rows(native, generated, notes=spec.TABLE_ROW_NOTES, stage="now")) \
+        == set(spec.TABLE_HOLES)
+    # Real changes on the same row still fail: size, depth, coordinate, note,
+    # another hole's identity, and a missing row.
+    for mutate, match in (
+        (lambda cells: cells[1].__setitem__(3, actual_size.replace(".38", ".39")), r"changed now: A1 \(row 1\)"),
+        (lambda cells: cells[1].__setitem__(3, actual_size.replace(".46", ".47")), r"changed now: A1 \(row 1\)"),
+        (lambda cells: cells[1].__setitem__(4, spec.TABLE_ROW_NOTES["B1"]), r"changed now: A1 \(row 1\)"),
+        (lambda cells: cells[2].__setitem__(1, "1.000"), "not measured from A1"),
+        (lambda cells: cells[2].__setitem__(0, "A1"), "extra/duplicate"),
+    ):
+        bad = NativeCells()
+        bad.cells[1][3] = actual_size
+        mutate(bad.cells)
+        with pytest.raises(RuntimeError, match=match):
+            table._frozen_rows(bad, generated, notes=spec.TABLE_ROW_NOTES, stage="now")
+    missing = NativeCells()
+    missing.RowCount -= 1
+    with pytest.raises(RuntimeError, match="row/column inventory"):
+        table._frozen_rows(missing, generated, notes=spec.TABLE_ROW_NOTES, stage="now")
 
 
 def test_freshly_inserted_note_cells_must_be_empty_before_writing():
@@ -554,15 +727,15 @@ def test_default_tags_are_renamed_two_phase_by_each_rows_a1_cells(base):
         table._rows(direct)
 
 
-@pytest.mark.parametrize("fault", ["refused", "unreadable", "ambiguous_row", "precision"])
+@pytest.mark.parametrize("fault", ["refused", "unreadable", "ambiguous_row", "rounded"])
 def test_tag_assignment_refuses_unproven_rows_and_writes(monkeypatch, fault):
     native = DefaultTagTable(refuse=fault == "refused")
     if fault == "unreadable":
         monkeypatch.setattr(native, "HoleTag", lambda _index: "A99")
     elif fault == "ambiguous_row":
         native.cells[2][1:3] = native.cells[1][1:3]
-    elif fault == "precision":
-        native.cells[3][1] += "0"
+    elif fault == "rounded":
+        _round_away_a_place(native.cells)
     with pytest.raises(RuntimeError):
         table._assign_tags(native, native)
     assert native.EnableUpdate is True
@@ -771,18 +944,23 @@ def test_every_superseded_driver_prints_in_the_native_table_at_its_places():
     # A driver shared by two rows drives one coordinate they share.
     for cells in TABLE_SUPERSEDED_DRIVERS.values():
         assert len({spec.TABLE_HOLES[tag][axis] for tag, axis in cells}) == 1, cells
-    # The production row guard reads every covered cell at exactly .XXX ...
+    # The production row guard reads every covered cell at its .XXX value ...
     native = NativeCells()
     rows = table._rows(native)
     for tag, axis in covered:
         assert re.fullmatch(r"-?\d*\.\d{3}", rows[tag][1][1 + axis]), (tag, axis)
-    # ... and refuses any of them printed at other places.
+    # ... and refuses any of them rounded to a different value; a dropped
+    # trailing zero is the same value (display, logged, not refused).
     for tag, axis in sorted(covered):
         bad = NativeCells()
         row = next(i for i, cells in enumerate(bad.cells) if cells[0] == tag)
-        bad.cells[row][1 + axis] = bad.cells[row][1 + axis][:-1]
-        with pytest.raises(RuntimeError, match="lost .XXX precision"):
-            table._rows(bad)
+        text = bad.cells[row][1 + axis]
+        bad.cells[row][1 + axis] = text[:-1]
+        if text.endswith("0"):
+            assert tag in table._rows(bad)
+        else:
+            with pytest.raises(RuntimeError, match=f"{tag} is not measured from A1"):
+                table._rows(bad)
     # A2DY/B2DY's .964 ±.002 is the model-linked flagged note
     # (test_outer_note_reads_actual_model_limits_and_never_writes_them).
     assert spec.inch_text(spec.OUTER_Y_NOMINAL, spec.TABLE_LOCATION_PLACES) in spec.OUTER_Y_NOTE
@@ -824,7 +1002,7 @@ def _settled_harness(monkeypatch, *, fail_check=False):
         SetColumnWidth=lambda _col, width, _style: width,
         GetRowHeight=lambda _row: .005, GetColumnWidth=lambda col: table.TABLE_WIDTHS[col],
     )
-    rows = {tag: (row, (tag,)) for row, tag in enumerate(spec.TABLE_HOLES, 1)}
+    rows = {tag: (row, (tag, ".000", ".000", "<MOD-DIAM>.38")) for row, tag in enumerate(spec.TABLE_HOLES, 1)}
     sheet_doc = SimpleNamespace(
         GetCurrentSheet=current, ActivateSheet=activate, ClearSelection2=lambda *_: None,
         SelectionManager=SimpleNamespace(CreateSelectData=lambda: SimpleNamespace()),
@@ -844,7 +1022,7 @@ def _settled_harness(monkeypatch, *, fail_check=False):
         "_rows": lambda _table: rows, "_tags": lambda *_a, **_k: None,
         "_frozen_rows": lambda *_a, **_k: rows, "add_note": lambda *_: None,
         "add_property_linked_note": lambda *_: SimpleNamespace(GetText=lambda: spec.OUTER_Y_NOTE),
-        "_owned_table": check,
+        "_owned_table": check, "_hole_table_format": lambda _adapter: None,
     }.items():
         monkeypatch.setattr(table, name, value)
     return state, seen, lambda: table.create_carrier_hole_table(adapter, None, None, Path("carrier.SLDPRT"))
