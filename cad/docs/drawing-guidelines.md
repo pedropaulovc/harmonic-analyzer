@@ -344,7 +344,10 @@ are gear data, not narration.
   is a finish statement under rule 2, not a note line and not a method.
 - **Flag it where it applies.** A requirement that matters (a matched fit, a
   match-drill, a "do not cut" face) goes on the feature callout or the assembly
-  step with a leader to the feature, not buried in a general note block.
+  step with a leader to the feature, not buried in a general note block. A
+  short requirement (`SHARP`, `NO BURR`) is written at its leader; a
+  numbered flag symbol is for a note too long to repeat, and its number
+  reads the same as a note on that sheet.
 - **Geometry, not method** (ASME Y14.5 §1.4(e)). `MACHINE BOTH POCKETS`,
   `CAST`, `MILL FROM SOLID` are not requirements; the dimensioned feature is. A
   process word appears only where it is the requirement: REAM for a fit bore, a
@@ -388,13 +391,26 @@ Hidden lines appear only where they inform (ASME Y14.3).
   ghosts of removed material mean the cut is in the wrong place.
 - Never dimension to a hidden line. Cut a section or breakout instead.
 - **Every section, detail and auxiliary view says what it shows.** It is
-  labelled with a letter (`SECTION A-A`, `DETAIL B`, `VIEW C`), plus its scale
-  when that differs from the sheet scale, and its cutting plane, detail
-  boundary or viewing arrow sits on a parent view with the same letter. A
-  view named only in prose (`LEVER TIP DETAIL`, `GRADUATED UNDERSIDE`), or an
-  enlarged view with no boundary on a parent, is unlabelled. A rotated view
-  says so. Projected principal views (front, top, side in third-angle
-  alignment) need no label.
+  labelled with a letter (`SECTION A-A`, `DETAIL B`, `VIEW C`), and its
+  cutting plane, detail boundary or viewing arrow sits on a parent view
+  with the same letter. Its scale is printed only when it differs from the
+  sheet scale (ASME Y14.3); a scale equal to the sheet's restates the title
+  block. A view named only in prose (`LEVER TIP DETAIL`, `GRADUATED
+  UNDERSIDE`), or an enlarged view with no boundary on a parent, is
+  unlabelled. A rotated view says so. Projected principal views (front,
+  top, side in third-angle alignment) need no label. Two or more pictorial
+  views are told apart by a label in words (`ISOMETRIC VIEW FROM TOP`,
+  `ISOMETRIC VIEW FROM BOTTOM`), not by orientation arrows.
+- **The cutting plane is drawn whole.** A cutting-plane line runs from one
+  arrow to the other, with both arrows attached to it; arrows standing
+  alone are not a cutting plane. A section that shows one feature (a
+  broken-out or partial section) has a short cutting plane across that
+  feature only, not across the whole part.
+- **Choose the plane so the cut reads.** On a spoked, ribbed or webbed part
+  the plane passes through a spoke, rib or web so its solid profile shows
+  and solid material is not mistaken for dimension lines. A plane that
+  leaves cut pieces floating with nothing joining them becomes separate
+  sections, one per piece, or an offset section.
 - **A section shows the whole cut or says which part of it is shown.** Where
   the cutting plane passes through several like features and the section is
   broken to one of them, the label names that feature (`SECTION A-A, HOLE
@@ -420,15 +436,18 @@ Hidden lines appear only where they inform (ASME Y14.3).
 - **Use a hole table when the holes outgrow dimensions.** When one view
   locates eight or more hole axes, or when a location dimension line would
   cross another dimension line, locate the holes with a tagged hole table
-  instead of individual dimensions: an origin mark on a real datum (above),
-  a tag at each hole, X and Y from that origin, the size callout once per tag
-  group and one column naming the mate (rule 4). The view then carries the
-  overall, the datum features and the non-hole geometry. Ordinate
-  dimensioning with grouped hole callouts is an equal alternative for a view
-  with no more than two hole sizes. A single regular pattern (`20X Ø.089 ON
-  .250 PITCH`) counts as one axis. The CAD system's origin mark, drawn as
-  arrows offset along the datum bore's centrelines, marks that bore; it is
-  not a mid-air origin.
+  instead of individual dimensions: a tag at each hole, X and Y from the
+  origin, the size callout once per tag group and one column naming the
+  mate (rule 4). The origin is a corner the shop picks up with an edge
+  finder: the intersection of two finished edges, or the virtual sharp of
+  a broken or rounded corner. It is never a hole centre. Where holes must
+  be held to each other more closely than to the corner, give that
+  relation its own banded column or note (`Y FROM A1-B1 LINE`); the corner
+  origin still locates the pattern. The view then carries the overall, the
+  datum features and the non-hole geometry. Ordinate dimensioning with
+  grouped hole callouts is an equal alternative for a view with no more
+  than two hole sizes; its zero follows the same corner rule. A single
+  regular pattern (`20X Ø.089 ON .250 PITCH`) counts as one axis.
 - **Identical holes take one callout.** Give them one `nX` callout or one
   table tag group, never a repeated callout per hole.
 - The overall size is real and conspicuous. Nothing reads like an overall
@@ -755,8 +774,10 @@ beside them. Every symbol, abbreviation and phrase is one they can look up.
   acceptance in ordinary words (`SLIDES IN, NO ROCK`, `TURNS FREE, NO
   RATTLE`) is a stated acceptance, not a private phrase. An `nX` count on a
   section that names its hole applies to that hole's table group.
-- **Project labels.** A label made up for this project (`R816`, `CL`, `CR`,
-  `TIE 1`) is defined where it first appears or in one linked key on the
+- **Project labels.** Name a feature by what it is when a plain name fits
+  (`WIRE TIE HOLE`, `2X WIRE TIE HOLE`) rather than coining a label
+  (`TIE 1`) and defining it in a note. A label that is still needed (`R816`,
+  `CL`, `CR`) is defined where it first appears or in one linked key on the
   same sheet, or replaced by a hole-table tag or a standard numbered flag
   note. A symbol followed by a number (`R816`) is either a dimension with its
   unit or a defined label; the reader never has to choose.
