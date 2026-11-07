@@ -70,7 +70,6 @@ from sm_vn_knife_hanger_stud_spec import (
     CHAMFER_ANGLE_TOLERANCE,
     CHAMFER_WIDTH,
     CHAMFER_WIDTH_TOLERANCE,
-    DIMENSION_CALLOUTS,
     DIMENSION_PRECISION,
     DIMENSION_TOLERANCE_TYPES,
     DRAWING_DIMENSIONS,
@@ -110,8 +109,8 @@ _ANGLE_TEXT_RADIUS = 0.016
 # The B-size inner border is 12.7 mm in from the sheet edge; the title block
 # spans x >= 0.216 below y = 0.065.
 FRONT_KEEP = {
-    # Text and dimension line left of the head, the three callout lines (under
-    # 72 mm wide) centred 6 mm inside the left border and 10 mm clear of the hex.
+    # Text and dimension line left of the head, the two callout lines centred
+    # 6 mm inside the left border and 10 mm clear of the hex.
     "CutLength": (0.055, FRONT_CENTER[1]),
     # The text stands wholly above the tail's top extension line and right of
     # the shank, so neither extension line crosses "10.62 min." or its lines.
@@ -134,6 +133,15 @@ FRONT_KEEP = {
 # The chamfer callout stands below-right of the tip, under the tail's lower
 # extension line and right of the leg's own extension lines.
 CHAMFER_TEXT_XY = (0.157, TIP_SHEET_Y - 0.014)
+# Words under each control, at most two lines (rule 7). The cut length names
+# its assembly step once; the plain title-block chamfer needs only its end;
+# the tail states its thread-form acceptance. The spec's older
+# DIMENSION_CALLOUTS stay for the part's re-key, unused by this sheet.
+DIMENSION_CALLOUTS = {
+    "CutLength": "UNDER HEAD TO TIP\nCUT AT MHA-SM-00 STEP 4",
+    "ChamferWidth": "CUT END",
+    "ThreadLengthMin": "FULL THREAD FROM TIP\nEXCEPT 1 PITCH MAX AT CUT END",
+}
 # The purchased-screw note flags the unmodified head: its leader lands on
 # the head-top edge, the note stands up and right in the open field.
 HEAD_PICK_MM = (HEAD_AF / 4, HEAD_TOP_Y, 0.0)
