@@ -1352,15 +1352,19 @@ CONE_CRANK_STEPS = _note_text(
         "6A. CHECK THAT MHA-DT-31 DOES NOT SLIDE IN MHA-DT-06 BY HAND.",
         "6B. IF IT DOES, BOND IT IN WITH LOCTITE 638 PER THE SHEET 1 NOTE.",
         "6C. MATCH-REAM THE MHA-DT-31/MHA-DT-06 SEAM PIN HOLE PER MHA-DT-31.",
-        "6D. DRIVE MHA-DT-VN-59 INTO IT FLUSH.",
+        # FoDtVn1 (#2270): which end goes out moved here from the pin's sheet;
+        # the faced cut end stays flush, the supplier's chamfer leads in
+        # (dt_vn_crank_hub_pin_spec).
+        "6D. DRIVE MHA-DT-VN-59 INTO IT FLUSH, FACED END OUT.",
         "6E. SLIDE THE ARM ONTO MHA-DT-11: HUB FRONT FACE FLUSH WITH THE",
         f"   {HUB_FRONT_FACE_DATUM}, PUNCH MARKS ALIGNED.",
         # Rule 23 (rubric sample round 14, #0): the step 5 wheel is captured
         # between the MHA-DT-11 seat collar and the MHA-DT-31 hub rear face
         # (build_dt_drive_train_assembly CRANK_HUB_SPROCKET_AIR, open at the
-        # SeatCollar band); this is its bench acceptance (Main's wording).
-        f"6F. CHECK THAT {CRANK_CHAIN_WHEEL} TURNS AND SLIDES FREELY WITH END PLAY BETWEEN",
-        "   THE MHA-DT-11 COLLAR AND THE MHA-DT-31 HUB.",
+        # SeatCollar band); this is its bench acceptance.  Round 15 (#1, 2/3
+        # runs): the 2X MHA-DT-VN-67 stop it turning, so it only slides.
+        f"6F. CHECK THAT {CRANK_CHAIN_WHEEL} SLIDES FREELY ON THE 2X MHA-DT-VN-67 WITH END",
+        "   PLAY BETWEEN THE MHA-DT-11 COLLAR AND THE MHA-DT-31 HUB.",
         "6G. ONLY THEN TAPER-REAM 1:48 THROUGH THE HUB AND SHAFT.",
         "6H. DRIVE MHA-DT-09, REMOVABLE BY A TAP ON ITS SMALL END.",
         "6J. HANG MHA-DT-27 FROM THE MHA-DT-09 HEAD: CLEAR OF THE HUB.",
@@ -1684,7 +1688,8 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             f"SLIDE THE RIG IN UNTIL A {TIP_GAP.TIP_GAP_FEELER_TEXT} IS SNUG "
             f"BETWEEN THE TIPS: {TIP_GAP.TIP_GAP_ACCEPT_TEXT}.\n"
             f"SET THE TIP GAP AS {steps.step_number('rig-located')}D-"
-            f"{steps.step_number('rig-located')}E AT THE FRONT AND BACK STATIONS.",
+            # Round 15 (#2, rule 26): the stations by gear (sheet 8's key).
+            f"{steps.step_number('rig-located')}E AT GEAR 0 AND AT GEAR 19.",
         ),
         ("rig-set", f"{_RIG_SET_STEP}\nCLAMP BOTH MHA-DT-18."),
         # The seats' drill, tap and depth are the MHA-FR-01 transfer callouts'
@@ -1862,9 +1867,9 @@ CHECKS = _note_text(
         "5G. RE-SET THE CONE SET SWING AS 4K-4P.",
         "6. PARKED, MHA-DT-24 HOLDS MHA-DT-01 CLEAR OF EVERY MHA-DT-12.",
         f"7. PARKED, PINS ON THE CAMS: A {TIP_GAP.TIP_GAP_SETTING_TEXT} FEELER IS SNUG TIP TO TIP",
-        f"   AT THE FRONT AND BACK STATIONS, {TIP_GAP.TIP_GAP_ACCEPT_TEXT}",
+        f"   AT GEAR 0 AND AT GEAR 19, {TIP_GAP.TIP_GAP_ACCEPT_TEXT}",
         f"   (SHEET {CONTINUATION_SHEET}, STEP {steps.step_number('rig-located')}E).",
-        "7A. IF A STATION IS OUT, EASE THE MHA-DT-VN-57 SCREWS.",
+        "7A. IF ONE IS OUT, EASE THE MHA-DT-VN-57 SCREWS.",
         f"7B. REFIT THE STEP {steps.step_number('rig-set')} LEAVES SNUG.",
         f"7C. RE-SET THE RIG AS STEP {steps.step_number('rig-located')}F.",
         "7D. TIGHTEN MHA-DT-VN-57.",
