@@ -167,9 +167,13 @@ DETAIL_LABEL_INSET = 0.040
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 DETAIL_POSITION_TOL_M = 1e-4
 # DETAIL A's boundary on the 1:5 front view: black like the outlines, its
-# letter just outside the circle's upper-right 45 degree point.
+# letter centred under the circle in the open sheet below the lever, so no
+# line (the circle, the knife-mount bolt) strikes it (farm r1: lettered at
+# the upper right, the circle and the bolt ran through it). A note's
+# position is its text's upper-left corner.
 DETAIL_BOUNDARY_COLOR = 0  # COLORREF black
-DETAIL_LETTER_GAP = 0.001
+DETAIL_LETTER_GAP = 0.002
+DETAIL_LETTER_HALF_WIDTH = 0.0013
 
 # --- Sheet 2 ------------------------------------------------------------------
 EXPLODED_ISO_CENTER = (0.112, 0.150)
@@ -657,7 +661,7 @@ def _crop_detail(adapter: Any, view: Any) -> None:
 
 def _mark_detail_boundary(adapter: Any, front: Any) -> None:
     """DETAIL A's boundary on the 1:5 front view: a black circle round the
-    region the 1:1 detail shows, lettered at its upper right (rule 9: an
+    region the 1:1 detail shows, lettered beneath it (rule 9: an
     enlarged view has a lettered boundary on its parent)."""
     label = f"{notes.DETAIL_TITLE} boundary"
     centre = model_point_in_view(
@@ -678,9 +682,11 @@ def _mark_detail_boundary(adapter: Any, front: Any) -> None:
     adapter.currentModel.EditRebuild3()
     if int(circle.Color) != DETAIL_BOUNDARY_COLOR:
         raise RuntimeError(f"{label}: circle reads colour {int(circle.Color)}")
-    reach = radius * math.sqrt(0.5) + DETAIL_LETTER_GAP
     _activate_view(adapter, front, label=label)
-    letter_xy = (centre[0] + reach, centre[1] + reach)
+    letter_xy = (
+        centre[0] - DETAIL_LETTER_HALF_WIDTH,
+        centre[1] - radius - DETAIL_LETTER_GAP,
+    )
     if add_note(adapter, notes.DETAIL_LETTER, *letter_xy) is None:
         raise RuntimeError(f"failed to letter the {label}")
     _telemetry.info(f"summing: {label} centre {centre!r} radius {radius!r}")
