@@ -143,7 +143,6 @@ from fr_harmonic_base_spec import (
     STACK_HEIGHT,
     POCKET_HALF_X,
     UNIT,
-    pivot_seat_step,
     socket_bore_finish_key,
 )
 
@@ -1300,10 +1299,25 @@ TRANSFER_NAMEPLATE_LEADER_HOLE = max(
     TRANSFER_NAMEPLATE_HOLES, key=lambda hole: (round(hole[0], 1), -hole[1])
 )
 # The cone swing set is made against the arbor carried by MHA-DT-02.
-# Both native banded offsets and the physical pivot's hole-table row cite spec-owned
-# numbered note 1 in the B4 notes lane; the free note states the assembly
-# setup and table-reference status.
+# Both native banded offsets and the physical pivot's hole-table row cite
+# numbered note 1 in the B4 notes lane. Delegated ruling 2026-11-07 (Main), no
+# precedent; owner review #2144 (pending owner confirmation): D1 is spotted
+# through the MHA-DT-20 platform's reamed pivot bore at assembly (rule 4's
+# transfer route; the MHA-DT-00 step that sets the platform is the drive-train
+# slice's), so the .002 offsets from the MHA-DT-02 seat stay as the check of
+# where it lands, booked unchanged in cone_set_stack. The note is the sheet's
+# own: fr_harmonic_base_spec.pivot_seat_step is in the part builder's closure
+# and would re-key the base and every assembly over presentation text.
 PIVOT_SEAT_NOTE_XY = (0.020, 0.100)
+
+
+def pivot_seat_step(tag: str) -> str:
+    """Numbered note 1 for the physical pivot, by its native hole-table tag."""
+    return (
+        f"1. {tag}: TRANSFER FROM MHA-DT-20 PIVOT BORE AT ASSEMBLY;\n"
+        "CHECK THE BANDED OFFSETS FROM THE MHA-DT-02 SEAT.\n"
+        f"{tag} TABLE X/Y ARE REFERENCE."
+    )
 
 # The cross-tap callout carries hole facts only, in three rows: count, drill
 # and depth; the depths' datum; the thread and its depth after FAR WALL
