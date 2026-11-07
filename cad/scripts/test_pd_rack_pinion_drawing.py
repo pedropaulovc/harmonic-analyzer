@@ -259,10 +259,17 @@ def test_bore_callout_links_its_fit_note() -> None:
     bore_note = callouts.DRAWING_NOTES.split(f"\n{callouts.TAP_NOTE}. ")[0]
     assert bore_note.startswith(f"{callouts.BORE_NOTE}. ")
     # The face view looks at the rear face: the chamfered front edge is its
-    # far side (no datum letter names that face since the frame went).
-    chamfer = re.search(r"CHAMFER (\d*\.\d+) X 45\u00b0 FAR SIDE", bore_note)
+    # far side (no datum letter names that face since the frame went).  It is
+    # a feature, not the title block's break: both limits print, with the
+    # spigot root its least clears.
+    chamfer = re.search(
+        r"CHAMFER (\d*\.\d+)-(\d*\.\d+) X 45\u00b0 FAR SIDE,\s+CLEARS SPIGOT ROOT\.",
+        bore_note,
+    )
     assert chamfer is not None
-    assert float(chamfer.group(1)) * 25.4 == pytest.approx(spec.BORE_FRONT_CHAMFER)
+    assert [float(v) * 25.4 for v in chamfer.groups()] == pytest.approx(
+        spec.BORE_FRONT_CHAMFER_LIMITS
+    )
 
 
 def test_sheet_gear_data_names_the_mesh_once_with_its_backlash_acceptance() -> None:
@@ -291,12 +298,13 @@ def test_sheet_gear_data_names_the_mesh_once_with_its_backlash_acceptance() -> N
         assert banned not in data
     assert not hasattr(spec, "PROFILE_SHIFT")
     assert not hasattr(spec, "MESH_PINION_PROFILE_SHIFT")
-    # The span prints once, on the face view.
-    assert "SPAN" not in data
+    # The span prints once, on the face view; the block carries its route.
+    for limit in spec.SPAN_LIMITS:
+        assert f"{limit / 25.4:.4f}".lstrip("0") not in data
     low, high = callouts.BACKLASH_ACCEPT_MM
-    assert f"BACKLASH WITH MATE (FEELER):  {low / 25.4:.3f}-{high / 25.4:.3f}".replace(
-        "0.", "."
-    ) in rows
+    assert (
+        f"SPAN MATCHED FIT:  BACKLASH WITH MATE {low / 25.4:.3f}-{high / 25.4:.3f}, FEELER"
+    ).replace("0.", ".") in rows
     tight, loose = mesh_check.reducer_band_meshes()
     assert 0.0 < callouts.BACKLASH_BUDGET_MM[0] <= low < high
     assert high <= callouts.BACKLASH_BUDGET_MM[1]
@@ -316,7 +324,12 @@ def test_sheet_gear_data_names_the_mesh_once_with_its_backlash_acceptance() -> N
     )
     assert sheet_text.count(callouts.KNOB_NUMBER) == 1
     assert drawing.DIMENSION_CALLOUTS["OutsideDia"] == "SEE GEAR DATA"
-    assert drawing.DIMENSION_CALLOUTS_ABOVE == {"ToothSpan": "SEE GEAR DATA"}
+    # The span's .0007 band is under the milled row and still controls (the
+    # mesh gates read its translation corners): its callout names the route.
+    assert drawing.DIMENSION_CALLOUTS_ABOVE == {
+        "ToothSpan": "MATCHED FIT,\nSEE GEAR DATA"
+    }
+    assert spec.SPAN_LIMITS[1] - spec.SPAN_LIMITS[0] < 2 * 0.001 * 25.4  # milled ±.001
 
 
 def test_numbered_notes_fit_the_lower_left_lane() -> None:
@@ -652,7 +665,7 @@ def test_model_and_drawing_consume_the_spec_geometry() -> None:
         "BoreDia": callouts.BORE_CALLOUT,
         "OutsideDia": callouts.MESH_CALLOUT,
     }
-    assert drawing.DIMENSION_CALLOUTS_ABOVE == {"ToothSpan": callouts.MESH_CALLOUT}
+    assert drawing.DIMENSION_CALLOUTS_ABOVE == {"ToothSpan": callouts.SPAN_CALLOUT}
     assert drawing.RIGHT_DIMENSION_CALLOUTS == {"FaceWidth": callouts.FACE_WIDTH_CALLOUT}
 
 
