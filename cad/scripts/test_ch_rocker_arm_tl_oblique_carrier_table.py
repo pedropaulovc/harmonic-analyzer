@@ -139,6 +139,96 @@ class NativeCells:
         return self.cells[row][col]
 
 
+# The Hole Wizard cuts the exact inch drill, not _hole_spec's 3-decimal mm
+# pin: #29 (.1360) for #8-32, #43 (.0890) for #4-40, F (.2570) for 5/16-18.
+# Farm build 26bb read CL at radius 1.7272 mm (.1360 / 2), 2e-7 m off 3.454.
+_WIZARD_DRILL_IN = {"CL": .1360, "CR": .1360, "HUB": .1360,
+                    **{f"R{i}": .0890 for i in range(1, 5)},
+                    **{f"L{i}": .2570 for i in range(1, 3)}}
+
+
+def _wizard_dia_mm(tag):
+    return _WIZARD_DRILL_IN[tag] * I if tag in _WIZARD_DRILL_IN else spec.TABLE_HOLES[tag][2]
+
+
+_BODY = object()
+
+
+def _top_circle(x_mm, y_mm, dia_mm, *, top=True):
+    curve = SimpleNamespace(IsCircle=lambda: True, CircleParams=(
+        x_mm / 1000.0, 0.0 if top else -spec.THICKNESS / 1000.0, -y_mm / 1000.0,
+        -0.0, 1.0, -0.0, dia_mm / 2000.0,
+    ))
+    return SimpleNamespace(GetCurve=lambda: curve, GetBody=lambda: _BODY)
+
+
+def _census(monkeypatch, tmp_path, edges):
+    monkeypatch.setattr(table, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(table, "visible_component_entities", lambda *_args: edges)
+    source = tmp_path / "carrier.SLDPRT"
+    extension = SimpleNamespace(
+        GetUserPreferenceInteger=lambda pref, _option: 3 if pref == 47 else 1,
+        GetCorrespondingEntity2=lambda raw: raw,
+    )
+    model = SimpleNamespace(
+        GetPathName=lambda: str(source), GetType=lambda: 1, Extension=extension,
+        ConfigurationManager=SimpleNamespace(ActiveConfiguration=SimpleNamespace(Name="Default")),
+        GetBodies2=lambda *_args: (_BODY,),
+    )
+    adapter = SimpleNamespace(
+        swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)),
+        currentModel=SimpleNamespace(Extension=extension),
+    )
+    view = SimpleNamespace(
+        ReferencedDocument=model, GetReferencedModelName=lambda: str(source),
+        ReferencedConfiguration="Default", GetVisibleComponents=lambda: (object(),),
+        GetCorrespondingEntity=lambda edge: edge,
+    )
+    return table._source_edges(adapter, view, model, source)
+
+
+def test_pinned_cut_diameters_are_within_their_rounding_of_the_wizard_drills():
+    for tag in _WIZARD_DRILL_IN:
+        pinned = spec.TABLE_HOLES[tag][2]
+        assert pinned != _wizard_dia_mm(tag)
+        assert abs(pinned - _wizard_dia_mm(tag)) / 1000.0 <= table.PINNED_DIAMETER_TOLERANCE_M
+    sizes = sorted({diameter for *_xy, diameter in spec.TABLE_HOLES.values()})
+    assert min(b - a for a, b in itertools.pairwise(sizes)) / 1000.0 > (
+        100 * table.PINNED_DIAMETER_TOLERANCE_M
+    )
+
+
+@pytest.mark.parametrize(
+    "fault", [None, "extra", "duplicate", "missing", "off_centre", "beyond_rounding", "wrong_size"],
+)
+def test_source_census_maps_actual_wizard_circles_one_to_one(monkeypatch, tmp_path, fault):
+    edges = {
+        tag: _top_circle(x, y, _wizard_dia_mm(tag))
+        for tag, (x, y, _diameter) in spec.TABLE_HOLES.items()
+    }
+    raw = [*edges.values(), _top_circle(*spec.CL, _wizard_dia_mm("CL"), top=False)]
+    cl_x, cl_y = spec.CL
+    if fault == "extra":
+        raw.append(_top_circle(cl_x + 5.0, cl_y, _wizard_dia_mm("CL")))
+    elif fault == "duplicate":
+        raw.append(_top_circle(cl_x, cl_y, _wizard_dia_mm("CL")))
+    elif fault == "missing":
+        raw.remove(edges["HUB"])
+    elif fault == "off_centre":
+        raw[raw.index(edges["CL"])] = _top_circle(cl_x + 1e-4, cl_y, _wizard_dia_mm("CL"))
+    elif fault == "beyond_rounding":
+        raw[raw.index(edges["CL"])] = _top_circle(cl_x, cl_y, spec.CLAMP_TAP_DRILL + 0.002)
+    elif fault == "wrong_size":
+        raw[raw.index(edges["CL"])] = _top_circle(cl_x, cl_y, _wizard_dia_mm("R1"))
+    if fault is None:
+        found = _census(monkeypatch, tmp_path, raw)
+        assert set(found) == set(spec.TABLE_HOLES)
+        assert all(found[tag] is edge for tag, edge in edges.items())
+    else:
+        with pytest.raises(RuntimeError, match="extra/duplicate/unidentified|missing physical"):
+            _census(monkeypatch, tmp_path, raw)
+
+
 def test_native_rows_require_exact_tag_axis_and_three_places():
     cells = NativeCells()
     assert set(table._rows(cells)) == set(spec.TABLE_HOLES)

@@ -36,6 +36,24 @@ TAG_OFFSETS = {
     "R3": (-.010, .009), "R4": (.005, .009),
     "L1": (.008, .003), "L2": (.008, -.005), "HUB": (.009, .009),
 }
+# _hole_spec pins each cut diameter to 3-decimal mm. The Hole Wizard cuts
+# the exact inch drill: farm build 26bb read CL's #29 (.1360 in) as radius
+# 1.7272 mm against the pinned 3.454 diameter. Size identifies a hole only
+# within that pinned rounding (half a 3rd-decimal unit); centre and axis
+# stay exact, and every hole still maps one-to-one.
+PINNED_DIAMETER_TOLERANCE_M = 0.5e-6
+_EXACT_M = 1e-8
+
+
+def _hole_tag(values: tuple[float, ...]) -> str | None:
+    """The one table hole whose exact centre/axis and pinned size fit ``values``."""
+    matches = [
+        tag for tag, (x, y, diameter) in spec.TABLE_HOLES.items()
+        if max(abs(values[0] - x / 1000.0), abs(values[2] + y / 1000.0),
+               abs(values[3]), abs(abs(values[4]) - 1.0), abs(values[5])) <= _EXACT_M
+        and abs(2.0 * values[6] - diameter / 1000.0) <= PINNED_DIAMETER_TOLERANCE_M + 1e-12
+    ]
+    return matches[0] if len(matches) == 1 else None
 
 
 def _point(adapter: Any, view: Any, x: float, y: float) -> tuple[float, float]:
@@ -80,13 +98,8 @@ def _source_edges(adapter: Any, view: Any, model: Any, source: Path) -> dict[str
             values = _circle_parameters(raw)
             if values is None or abs(values[1]) > 1e-8:
                 continue
-            matches = [
-                tag for tag, (x, y, diameter) in spec.TABLE_HOLES.items()
-                if max(abs(values[0] - x / 1000.0), abs(values[2] + y / 1000.0),
-                       abs(values[6] - diameter / 2000.0), abs(values[3]),
-                       abs(abs(values[4]) - 1.0), abs(values[5])) <= 1e-8
-            ]
-            if len(matches) != 1 or matches[0] in found:
+            tag = _hole_tag(values)
+            if tag is None or tag in found:
                 raise RuntimeError(f"carrier table has extra/duplicate/unidentified top circle: {values}")
             canonical = extension.GetCorrespondingEntity2(raw)
             if canonical is None:
@@ -97,7 +110,7 @@ def _source_edges(adapter: Any, view: Any, model: Any, source: Path) -> dict[str
                     or int(adapter.swApp.IsSame(edge.GetBody(), bodies[0])) != 1
                     or _circle_parameters(edge) != values):
                 raise RuntimeError("carrier table source/view edge correspondence failed")
-            found[matches[0]] = _early_bound(raw, "IEdge")
+            found[tag] = _early_bound(raw, "IEdge")
     if set(found) != set(spec.TABLE_HOLES):
         raise RuntimeError(f"carrier table is missing physical holes: {set(spec.TABLE_HOLES) - set(found)}")
     return found
