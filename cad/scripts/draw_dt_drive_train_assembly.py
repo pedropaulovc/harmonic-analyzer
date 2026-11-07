@@ -304,9 +304,12 @@ BANK_SPRING_LABEL = (
 # letter; MHA-FR-05's print owns its VIEW B.
 BANK_VIEW_LETTER = "C"
 DRUM_VIEW_LETTER = "D"
-BANK_VIEW_CAPTION = f"VIEW {BANK_VIEW_LETTER} 1:1 - CYLINDER BANK ONLY (ARROW: SHEET 1)"
+# Rule 9 (rubric sample round 11): a view label prints its scale only where it
+# differs from its sheet's; sheet 13 is at BANK_SETTING_SCALE, so only
+# DETAIL A (4:1) carries one.
+BANK_VIEW_CAPTION = f"VIEW {BANK_VIEW_LETTER} - CYLINDER BANK ONLY (ARROW: SHEET 1)"
 DRUM_VIEW_CAPTION = (
-    f"VIEW {DRUM_VIEW_LETTER} 1:1 - ARBOR AND DRUM ONLY\nPARTIAL (ARROW: SHEET 1)"
+    f"VIEW {DRUM_VIEW_LETTER} - ARBOR AND DRUM ONLY\nPARTIAL (ARROW: SHEET 1)"
 )
 SHEET1_VIEW_ARROWS = (
     (BANK_VIEW_LETTER, bank_settings.AXIS_Y + 34.0),
@@ -488,7 +491,7 @@ BOM_SHEET_CLEARANCE = 0.003
 # The grouped cone-gear description cannot reliably carry the station pointer
 # (farm leaf 20260923T040258Z-1-0726d474). Keep it as a separate, full note.
 BOM_REFERENCE_NOTES = (
-    "REFERENCE 1:8\n"
+    "REFERENCE VIEW\n"
     f"BALLOONS ON SHEETS {min(CLUSTER_SHEETS.values())}-{max(CLUSTER_SHEETS.values())}\n"
     "MHA-DT-03 CONE GEAR\n"
     f"STATIONS: SHEET {SETTING_SHEET}"
@@ -1329,7 +1332,7 @@ CONE_CRANK_STEPS = _note_text(
         "6C. SLIDE THE ARM ONTO MHA-DT-11: HUB FRONT FACE FLUSH WITH THE",
         f"   {HUB_FRONT_FACE_DATUM}, PUNCH MARKS ALIGNED.",
         "6D. ONLY THEN TAPER-REAM 1:48 THROUGH THE HUB AND SHAFT.",
-        "6E. LIGHT-DRIVE MHA-DT-09, REMOVABLE BY A TAP ON ITS SMALL END.",
+        "6E. DRIVE MHA-DT-09, REMOVABLE BY A TAP ON ITS SMALL END.",
         "6F. HANG MHA-DT-27 FROM THE MHA-DT-09 HEAD: CLEAR OF THE HUB.",
         "6G. CLAMP MHA-DT-28 UNDER MHA-SH-VN-51.",
         f"6H. CUT MHA-DT-VN-65 TO {KEEPER_CHAIN_BEADS} BEADS.",
@@ -1448,8 +1451,9 @@ BANK_STEPS = _note_text(
         "9Q. WRITE THE DRO X IN THE PEDESTAL RECHECK TABLE.",
         f"{PIVOT_SEAT_STEP}. DRILL AND TAP THE MHA-FR-01 PIVOT SEAT PER ITS PRINT ({DRO_ZERO_STEP} ZERO).",
         "9S. MEASURE MHA-DT-02 OUTER FACE TO OUTER FACE.",
-        "9T. TURN MHA-DT-13 TO THAT SPAN, PLUS "
-        f"{inch_text(bank.ARBOR_DOME_HEIGHT, 2)} DOMES (SEE ITS PRINT).",
+        # Round 11: the length plainly, both domes counted.
+        f"9T. TURN MHA-DT-13 TO THE 9S SPAN + {inch_text(2.0 * bank.ARBOR_DOME_HEIGHT, 2)} "
+        f"({inch_text(bank.ARBOR_DOME_HEIGHT, 2)} DOME EACH END).",
         "9U. PUSH MHA-DT-13 IN FROM THE BACK, AGAINST THE MANDREL, UNTIL EACH DOME",
         f"   STANDS {inch_text(bank.ARBOR_DOME_HEIGHT, 2)} PROUD (DEPTH GAUGE).",
         "9V. SPOT MHA-DT-13 THROUGH EACH CROWN TAP WITH A #43 DRILL, .02 DEEP.",
@@ -2105,6 +2109,12 @@ def _scale_text(scale: tuple[float, float]) -> str:
     return f"{scale[0]:g}:{scale[1]:g}"
 
 
+def view_label(name: str, scale: tuple[float, float], sheet_scale: tuple[float, float]) -> str:
+    """Rule 9: a view's label carries its scale only when it differs from the
+    sheet's (rubric sample round 11 refused every repeated one)."""
+    return name if tuple(scale) == tuple(sheet_scale) else f"{name} {_scale_text(scale)}"
+
+
 def cluster_ring_scale(
     outline: tuple[float, float, float, float],
     placed: tuple[float, float],
@@ -2741,7 +2751,7 @@ def _place_setting_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     station table beside them."""
     _activate_sheet(adapter, SHEET_NAMES[SETTING_SHEET - 1])
     _heading(adapter, SETTING_SHEET)
-    _reference_iso(adapter, caption="FINISHED ASSEMBLY 1:8", label="setting reference isometric")
+    _reference_iso(adapter, caption="FINISHED ASSEMBLY", label="setting reference isometric")
     findings = []
     top = NOTE_FIELD_LEFT[1]
     for title, header, rows, label in (
@@ -3696,14 +3706,15 @@ def _place_assembled_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
         field_mm=tuple(value * 1000.0 for value in bounds),
     )
     findings += _stack_note_field(adapter, notes.blocks, bounds, label=notes.label)
-    scale = f"{int(ASSEMBLED_SCALE[0])}:{int(ASSEMBLED_SCALE[1])}"
-    _caption_under(adapter, front, f"FRONT {scale}", label="front caption")
-    _caption_under(adapter, top, f"TOP {scale}", label="top caption")
-    _caption_under(adapter, right, f"RIGHT {scale}", label="right caption")
+    # Rule 9: the sheet is at ASSEMBLED_SCALE, so the projected views' labels
+    # carry no scale; the isometric's would only if it differed.
+    _caption_under(adapter, front, "FRONT", label="front caption")
+    _caption_under(adapter, top, "TOP", label="top caption")
+    _caption_under(adapter, right, "RIGHT", label="right caption")
     _caption_under(
         adapter,
         iso,
-        f"ISOMETRIC {int(ASSEMBLED_ISO_SCALE[0])}:{int(ASSEMBLED_ISO_SCALE[1])}",
+        view_label("ISOMETRIC", ASSEMBLED_ISO_SCALE, ASSEMBLED_SCALE),
         label="isometric caption",
     )
     return findings
@@ -3882,8 +3893,7 @@ def _balloon_cluster_sheet(
     _heading(
         adapter,
         number,
-        f"{CLUSTER_TITLES[cluster]} - EXPLODED ISOMETRIC "
-        f"{_scale_text(scale)}; ITEMS PER SHEET 2",
+        f"{CLUSTER_TITLES[cluster]} - EXPLODED ISOMETRIC; ITEMS PER SHEET 2",
     )
     return _balloon_annotations(balloons), landings
 
@@ -3893,7 +3903,7 @@ def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     _heading(adapter, SEQUENCE_SHEET)
     _reference_iso(
         adapter,
-        caption="FINISHED ASSEMBLY 1:8",
+        caption="FINISHED ASSEMBLY",
         label="sequence reference isometric",
         center=SEQUENCE_ISO_CENTER,
     )
@@ -3903,21 +3913,21 @@ def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
 def _place_bank_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     _activate_sheet(adapter, SHEET_NAMES[BANK_SHEET - 1])
     _heading(adapter, BANK_SHEET)
-    _reference_iso(adapter, caption="FINISHED ASSEMBLY 1:8", label="bank reference isometric")
+    _reference_iso(adapter, caption="FINISHED ASSEMBLY", label="bank reference isometric")
     return _stack_sheet_note_fields(adapter, facts, BANK_SHEET)
 
 
 def _place_fit_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     _activate_sheet(adapter, SHEET_NAMES[FIT_SHEET - 1])
     _heading(adapter, FIT_SHEET)
-    _reference_iso(adapter, caption="FINISHED ASSEMBLY 1:8", label="fit reference isometric")
+    _reference_iso(adapter, caption="FINISHED ASSEMBLY", label="fit reference isometric")
     return _stack_sheet_note_fields(adapter, facts, FIT_SHEET)
 
 
 def _place_checks_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     _activate_sheet(adapter, SHEET_NAMES[CHECKS_SHEET - 1])
     _heading(adapter, CHECKS_SHEET)
-    _reference_iso(adapter, caption="CHECK REFERENCE 1:8", label="checks reference isometric")
+    _reference_iso(adapter, caption="CHECK REFERENCE", label="checks reference isometric")
     return _stack_sheet_note_fields(adapter, facts, CHECKS_SHEET)
 
 
@@ -3925,7 +3935,7 @@ def _place_continuation_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     _activate_sheet(adapter, SHEET_NAMES[CONTINUATION_SHEET - 1])
     _heading(adapter, CONTINUATION_SHEET)
     _reference_iso(
-        adapter, caption="FINISHED ASSEMBLY 1:8", label="continuation reference isometric"
+        adapter, caption="FINISHED ASSEMBLY", label="continuation reference isometric"
     )
     return _stack_sheet_note_fields(adapter, facts, CONTINUATION_SHEET)
 
@@ -4315,7 +4325,7 @@ def _place_full_detail_sheet(adapter: Any) -> tuple[float, float]:
         view,
         # The model's *Right looks from model +X: the machine's LEFT side
         # (DIRECTION_NOTES).
-        f"VIEW {FULL_DETAIL_VIEW_LETTER} {_scale_text(scale)} - {FULL_DETAIL_CAPTION}",
+        f"VIEW {FULL_DETAIL_VIEW_LETTER} - {FULL_DETAIL_CAPTION}",
         label=f"{label} caption",
     )
     _note_handle_stake(adapter, view, label=f"{label} stake note")

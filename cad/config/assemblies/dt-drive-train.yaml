@@ -130,3 +130,8 @@ machinist_exceptions:
     where: "sheet 10 steps 18A-18B, 19B and 20: MHA-DT-24 pinion spring foot pad on one MHA-SH-VN-52 #4-40 fillister screw in its transferred MHA-FR-01 seat, the crest bearing on the parked back MHA-DT-14 flank"
     finding: "one-screw part that can turn about its screw with no locating feature (rule 23 static clamp)"
     reason: "Owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR #2248): no dowel, pin or second screw. The spring is very rarely used and any turning is inconsequential; the operator realigns the spring by eye and retorques the screw"
+  - id: "DT-06"
+    kind: "minor"
+    where: "sheet 9 steps 10-10J: the back MHA-CH-08 set at DRO Y on the MHA-FR-05 rail and held by one MHA-CH-VN-57 #8-32 through its foot"
+    finding: "one-screw part whose turning would change a setting, with no dowel, tongue, step or second screw (rule 23 static clamp)"
+    reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144. Pending owner confirmation; the dowel option is #2277. 10D clamps the ear at Y, 10F screws it down, 10G rechecks Y and 10H checks by hand that it does not turn. The wave-spring preload acts along the shaft axis in the screw's plane, so it puts no torque about the screw, and once MHA-CH-00 sets the pivot shaft in both ears the two brackets turn only together"
