@@ -57,6 +57,50 @@ def test_owner_flange_and_gauge_pin_nose_are_kept() -> None:
     assert spec.TIP_SET == pytest.approx(0.080 * INCH)
     assert spec.TIP_SET_BAND == pytest.approx(0.008 * INCH)
     assert spec.NOSE_LENGTH == spec.TIP_SET
+    # The literal flange prints .71 x .12 at the title block's .XX; the part
+    # is accepted on the PRINTED nominal +/-.01, not on 18 x 3 +/-.254.
+    assert spec.FLANGE_PLACES == 2
+    assert spec.FLANGE_DIA_PRINTED == pytest.approx(0.71 * INCH)
+    assert spec.FLANGE_THICK_PRINTED == pytest.approx(0.12 * INCH)
+    assert spec.FLANGE_DIA_LIMITS == pytest.approx((17.780, 18.288))
+    assert spec.FLANGE_THICK_LIMITS == pytest.approx((2.794, 3.302))
+    assert not hasattr(spec, "FLANGE_BAND")
+    # TL-21's seat width beside the HUB chamfer at the smallest printed flange.
+    seat = (
+        spec.FLANGE_DIA_LIMITS[0] / 2.0
+        - (spec.CARRIER_BORE_DIA + REAM_H7[0]) / 2.0
+        - 0.03 * INCH
+    )
+    assert seat >= WALL_TARGET_MM
+
+
+def test_nose_band_names_why_it_is_tight() -> None:
+    # The .0001 band against MHA-CH-13's .4000 +.0005/0 hub hole (.0000-.0006
+    # locating clearance) holds the carrier's .005 edge-to-HUB allocation; the
+    # strap hole's limits print REF (the strap's sheet controls them).
+    assert spec.STRAP_HOLE_LIMITS == pytest.approx((0.4 * INCH, 0.4005 * INCH))
+    assert spec.NOSE_CLEARANCE == pytest.approx((0.0, 0.0006 * INCH))
+    assert spec.EDGE_TO_HUB_ALLOCATION == pytest.approx(0.005 * INCH)
+    callout = spec.DIMENSION_CALLOUTS["NoseDia"]
+    assert "STRAP MHA-CH-13 HUB" in callout
+    assert "(.4000-.4005 REF)" in callout
+    assert "HOLDS THE .005\nEDGE-TO-HUB ALLOCATION" in callout
+    assert "TOP OF RISER " + spec.RISER_NUMBER in spec.DIMENSION_CALLOUTS["FitLength"]
+
+
+def test_end_view_is_the_true_nose_end_projection() -> None:
+    # Third angle: the nose (+Z) end's view stands on the nose's side. "*Left"
+    # draws +Z right and its right-side view is "*Front", the nose face.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'place_view(adapter, str(SOURCE), "*Left", *SIDE_CENTER' in source
+    assert 'place_view(adapter, str(SOURCE), "*Front", *END_CENTER' in source
+    assert drawing._sx(spec.LENGTH) > drawing._sx(0.0)
+    assert drawing.END_CENTER[0] > drawing._sx(spec.LENGTH)
+    assert drawing.SIDE_KEEP["NoseDia"][0] > drawing._sx(spec.LENGTH)
+    # The fit-up text leaves its .79 span on a leader, clear of the end view.
+    fit_x, fit_y = drawing.FIT_LENGTH_TEXT_XY
+    assert fit_x > drawing._sx(spec.LENGTH)
+    assert fit_y < drawing._BELOW
 
 
 def test_shank_slips_in_the_carrier_bore_and_spans_carrier_and_riser() -> None:
@@ -140,8 +184,8 @@ def test_every_marked_dimension_is_kept_on_the_side_view_at_model_places() -> No
         (feature, name) for feature, names in spec.DRAWING_DIMENSIONS.items() for name in names
     }
     assert spec.DRAWING_PRECISION_BY_NAME == {
-        "FlangeDia": 3,
-        "FlangeThick": 3,
+        "FlangeDia": 2,
+        "FlangeThick": 2,
         "ShankDia": 4,
         "ShankLength": 2,
         "NoseDia": 4,

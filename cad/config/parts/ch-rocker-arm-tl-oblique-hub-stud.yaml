@@ -8,5 +8,5 @@ ch-rocker-arm-tl-oblique-hub-stud:
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
-  process: "turn from 3/4 in 1018 round: face the flange end, turn the .709 x .118 flange, the slip-fit shank and the .4000 locating nose with the shank root at R.008 MAX; supply .82 MIN above the flange seat; at assembly face the nose to .080 +/-.008 above the actual MHA-CH-06-TL-24 riser, then drill and tap #10-24 to the printed depths from the faced nose; break edges"
+  process: "turn from 3/4 in 1018 round: face the flange end, turn the .71 x .12 flange, the slip-fit shank and the .4000 locating nose with the shank root at R.008 MAX; supply .82 MIN above the flange seat; at assembly face the nose to .080 +/-.008 above the actual MHA-CH-06-TL-24 riser, then drill and tap #10-24 to the printed depths from the faced nose; break edges"
   drawing_unit: in
