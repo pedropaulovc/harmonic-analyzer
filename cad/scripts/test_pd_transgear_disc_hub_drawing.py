@@ -192,12 +192,10 @@ def test_the_d_bore_slides_on_the_sleeve_boss_and_flat_at_every_printed_limit() 
     assert round_fit == pytest.approx(spec.BOSS_CLEARANCE_LIMITS, abs=1e-6)
     assert spec.BOSS_CLEARANCE == spec.BOSS_CLEARANCE_LIMITS[1]
     assert flat_fit == pytest.approx(spec.FLAT_CLEARANCE, abs=1e-6)
-    bore_callout = " ".join(drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"].split())
-    printed = re.search(r"\(DIA CLR (\d*\.\d+-\d*\.\d+) ON", bore_callout)
-    assert printed is not None
-    assert _clr(printed.group(1)) == pytest.approx(round_fit, abs=0.00005 * IN)
-    flat_callout = " ".join(drawing.DIMENSION_CALLOUTS_BELOW["FlatToAxis"].split())
-    printed = re.search(r"\(CLR (\d*\.\d+-\d*\.\d+) ON", flat_callout)
+    assert spec.SLEEVE_NUMBER in drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"]
+    assert drawing.DIMENSION_CALLOUTS_BELOW["FlatToAxis"] == f"SEE NOTE {spec.FLAT_FIT_NOTE}"
+    flat_note = " ".join(spec.FLAT_FIT_TEXT.split())
+    printed = re.search(r"CLEARANCE (\d*\.\d+-\d*\.\d+)\.", flat_note)
     assert printed is not None
     assert _clr(printed.group(1)) == pytest.approx(flat_fit, abs=0.00005 * IN)
 
@@ -274,8 +272,11 @@ def test_the_spigot_seats_on_the_step_square_and_clear_of_the_disc() -> None:
     fit = (disc_bore[0] - spigot[1], disc_bore[1] - spigot[0])
     assert fit == pytest.approx(disc.SPIGOT_DIAMETRAL_CLEARANCE)
     assert fit[0] >= 0.0
-    callout = " ".join(drawing.DIMENSION_CALLOUTS_BELOW["SpigotDia"].split())
-    printed = re.search(r"\(DIA CLR (\d*\.\d+-\d*\.\d+) IN", callout)
+    assert drawing.DIMENSION_CALLOUTS_BELOW["SpigotDia"].splitlines()[0] == (
+        f"SEE NOTE {spec.SPIGOT_FIT_NOTE}"
+    )
+    note = " ".join(spec.SPIGOT_FIT_TEXT.split())
+    printed = re.search(r"CLEARANCE (\d*\.\d+-\d*\.\d+)\.", note)
     assert printed is not None
     assert _clr(printed.group(1)) == pytest.approx(fit, abs=0.00005 * IN)
     # The common seat annulus at the actual partial-depth cutter end, with
@@ -555,25 +556,29 @@ def _sheet_text() -> str:
         (
             *drawing.DIMENSION_CALLOUTS_BELOW.values(),
             *drawing.DIMENSION_CALLOUTS_ABOVE.values(),
+            drawing.NOTES_TEXT,
         )
     )
 
 
 def test_every_mate_the_sheet_cites_is_named_with_its_own_number() -> None:
-    """drawing-guidelines.md rule 3 (decimal places carry the tolerance): every part number the sheet cites is a mate's, printed
-    after that mate's name, and is the number the mate's own sheet carries."""
-    name_by_number: dict[str, str] = {}
-    for stem, name in (
-        ("pd-transgear-feed-pinion", spec.SLEEVE_NAME),
-        ("pd-vn-transgear-disc-screw", spec.SCREW_NAME),
-        ("pd-rack-pinion", spec.DISC_NAME),
-    ):
-        name_by_number[_config.parts(stem)["number"]] = name
+    """drawing-guidelines.md rule 4 (tighten only for function, and name the
+    mate): every part number the sheet cites is a mate's own number, and each
+    matched fit names its mate by name and number."""
+    cited_mates = {
+        _config.parts(stem)["number"]
+        for stem in (
+            "pd-transgear-feed-pinion",
+            "pd-vn-transgear-disc-screw",
+            "pd-rack-pinion",
+            "pd-transgear-drive-collar",
+        )
+    }
     printed = " ".join(_sheet_text().split())
     cited = re.findall(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", printed)
-    assert set(cited) == set(name_by_number)
-    for number, name in name_by_number.items():
-        assert printed.count(f"{name} {number}") == printed.count(number), number
+    assert set(cited) == cited_mates
+    assert f"{spec.DISC_NAME} {spec.DISC_NUMBER}" in spec.SPIGOT_FIT_TEXT
+    assert f"{spec.SLEEVE_NAME} {spec.SLEEVE_NUMBER}" in spec.FLAT_FIT_TEXT
 
 
 def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:

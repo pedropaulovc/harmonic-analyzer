@@ -26,10 +26,12 @@ import argparse
 from dataclasses import dataclass
 import math
 import sys
+import textwrap
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -63,18 +65,17 @@ from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
 from _session import run_build
 import _telemetry
-from pd_rack_pinion_spec import inch_text
 from pd_transgear_disc_hub_geometry import BOLT_CIRCLE_DIA
 from pd_transgear_disc_hub_spec import (
     BORE_DATUM,
     BORE_DIA,
     BORE_WALL_TEXT,
-    BOSS_CLEARANCE_LIMITS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FLANGE_DIA,
     FLANGE_THICK_CALLOUT,
-    FLAT_CLEARANCE,
+    FLAT_FIT_NOTE,
+    FLAT_FIT_TEXT,
     GEOMETRIC_TOLERANCES_IN,
     HUB_FRONT_Z,
     HUB_LENGTH_CALLOUT,
@@ -82,10 +83,11 @@ from pd_transgear_disc_hub_spec import (
     OIL_HOLE_STATION,
     SCREW_HOLE_CALLOUT_ABOVE,
     SCREW_HOLE_CALLOUT_BELOW,
-    SLEEVE_NAME,
     SLEEVE_NUMBER,
     SPIGOT_CALLOUT_BELOW,
     SPIGOT_DIA,
+    SPIGOT_FIT_NOTE,
+    SPIGOT_FIT_TEXT,
     SPIGOT_LENGTH,
     SPIGOT_LENGTH_CALLOUT,
 )
@@ -136,30 +138,44 @@ SPIGOT_END_X = _side_x(SPIGOT_LENGTH)
 _FLANGE_R = FLANGE_DIA / 2.0 * _S
 _SPIGOT_R = SPIGOT_DIA / 2.0 * _S
 
-# The D-bore's two native bands set its fits; each callout adds extent and
-# the mating feature by name and number with the clearance the pair gives
-# (this spec computes both).  No process word: a reamer
-# would cut away the flat, and the dimensions define the D-profile (the
-# crank drive gear's D-bore wording).  The bore's last line states the
-# finished wall over it, the body's and the spigot's (#2168, rule 20).
+# The round bore is reamed (the owned .3135 reamer) before the flat is cut,
+# so its band is the shop table's reamed row; REAM marks the fit, and the
+# callout names it and its mate (rule 4).  Its last line states the finished
+# wall over it, the body's and the spigot's (#2168, rule 20).  The flat's
+# location carries only its value and band: its matched fit is the numbered
+# note it links (rule 7).
 BORE_CALLOUT = "\n".join(
     (
-        "THRU",
-        f"(DIA CLR {inch_text(BOSS_CLEARANCE_LIMITS[0], 4)}-"
-        f"{inch_text(BOSS_CLEARANCE_LIMITS[1], 4)}",
-        f"ON {SLEEVE_NAME}",
-        f"{SLEEVE_NUMBER} BOSS)",
+        "REAM THRU",
+        f"SLIDING FIT ON {SLEEVE_NUMBER}",
         BORE_WALL_TEXT,
     )
 )
-FLAT_CALLOUT = "\n".join(
+FLAT_CALLOUT = f"SEE NOTE {FLAT_FIT_NOTE}"
+# The two matched fits, numbered in the order their callouts link them;
+# top-left anchored in the empty field above the face view, left of the
+# overall's stack callout.
+_NOTE_WIDTH = 60
+
+
+def _numbered(number: int, text: str) -> str:
+    return "\n".join(
+        textwrap.wrap(
+            f"{number}. {text}",
+            width=_NOTE_WIDTH,
+            subsequent_indent="   ",
+            break_on_hyphens=False,
+        )
+    )
+
+
+NOTES_TEXT = "\n".join(
     (
-        "BORE FLAT",
-        f"(CLR {inch_text(FLAT_CLEARANCE[0], 4)}-{inch_text(FLAT_CLEARANCE[1], 4)}",
-        f"ON {SLEEVE_NAME}",
-        f"{SLEEVE_NUMBER} FLAT)",
+        _numbered(SPIGOT_FIT_NOTE, SPIGOT_FIT_TEXT),
+        _numbered(FLAT_FIT_NOTE, FLAT_FIT_TEXT),
     )
 )
+NOTES_XY = (0.020, 0.262)
 
 # Every size and callout sits outside the silhouettes.
 # - Face view: the bolt circle diameter above-left, its arrows on the
@@ -205,12 +221,13 @@ FLAT_CALLOUT = "\n".join(
 #   flange's extension lines; the spigot end's inside the spigot's, between
 #   its upper extension line and its diameter's text, left of that
 #   dimension's line.
-# Estimated (width, height) of the bore's block: six rows as run
-# 20261101T054343686Z printed it, plus the wall row (#2168).  The block's
-# top stays where six rows put it, under the oil hole's block: the shoulder
-# drops one row further down the bore's -60° ray.
-BORE_TEXT_BLOCK = (0.046, 0.037)
-_BORE_SHOULDER_DROP = 0.116
+# Estimated (width, height) of the bore's block: the two size rows, REAM,
+# the fit and the wall row (5.3 mm a row, 2.4 mm a character, as run
+# 20261101T054343686Z printed the seven-row block).  The shoulder sits on
+# the bore's -60° ray, the block's top under the oil hole's block and its
+# right end left of the title block.
+BORE_TEXT_BLOCK = (0.058, 0.027)
+_BORE_SHOULDER_DROP = 0.108
 _BORE_SHOULDER = (
     END_CENTER[0] + _BORE_SHOULDER_DROP / math.tan(math.radians(60.0)),
     AXIS_Y - _BORE_SHOULDER_DROP,
@@ -227,7 +244,7 @@ END_KEEP = {
 _OIL_HOLE_X = _side_x(HUB_FRONT_Z + OIL_HOLE_STATION)
 # Estimated (width, height) of the oil hole's and the flange thickness's
 # text blocks (3.5 mm caps, 2.61 mm advance).
-OIL_HOLE_TEXT_BLOCK = (0.066, 0.028)
+OIL_HOLE_TEXT_BLOCK = (0.069, 0.017)
 FLANGE_THICK_TEXT_BLOCK = (0.047, 0.017)
 _OIL_HOLE_SHOULDER = (_OIL_HOLE_X - 0.002, AXIS_Y - _FLANGE_R - 0.033)
 SIDE_KEEP = {
@@ -664,6 +681,9 @@ async def build(adapter: Any) -> dict[str, str]:
             datums=(BORE_DATUM,),
             label=frame.label,
         )
+    # The matched-fit notes the spigot's and the flat's callouts link.
+    if add_note(adapter, NOTES_TEXT, *NOTES_XY) is None:
+        raise RuntimeError("failed to add the disc hub's matched-fit notes")
     # Re-assert the display mode now the last annotation has landed: an
     # annotation attached after placement can leave a view's edge set
     # unregenerated, and only a real mode change rebuilds it.
