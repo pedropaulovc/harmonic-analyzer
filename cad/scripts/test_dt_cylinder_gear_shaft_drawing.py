@@ -14,6 +14,7 @@ import dt_cylinder_gear_shaft_notes as notes
 import dt_cylinder_gear_shaft_spec as spec
 import draw_dt_cylinder_gear_shaft as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
+from _hole_spec import blind_cut_dia_mm
 
 
 def test_every_marked_dimension_lands_where_a_turner_reads_it() -> None:
@@ -106,9 +107,13 @@ def test_the_od_names_its_mates_and_its_stock_route_at_the_callout() -> None:
     assert "SPOTS" not in notes.DRAWING_NOTES
     flat = " ".join(notes.SPOT_NOTE.splitlines())
     assert flat == (
-        "NO FLATS; SPOTS FOR MHA-SH-VN-54 SET SCREWS "
-        "DRILLED AT ASSEMBLY THROUGH MHA-DT-02 TAPS"
+        "NO FLATS; MHA-SH-VN-54 SPOTS: Ø.089 (#43) DRILL "
+        "POINT ONLY, AT ASSEMBLY THROUGH MHA-DT-02 TAPS"
     )
+    # Farm r5 (3 of 3): the spot carries its size, the pedestal tap's drill.
+    tap_drill_in = blind_cut_dia_mm(dt_arbor_pedestal_spec.SET_SCREW_HOLE_SPEC) / 25.4
+    assert notes.SPOT_DRILL.startswith(f"Ø{tap_drill_in:.3f}".replace("Ø0.", "Ø."))
+    assert "#43" in notes.SPOT_DRILL
     assert drawing.SPOT_NOTE is notes.SPOT_NOTE
     # The leader lands on the bar inside the south strap's width, right of the
     # length's witness, and the text stands between the bar and that length.

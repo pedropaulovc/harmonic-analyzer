@@ -39,10 +39,16 @@ DRAWING_NOTES = "\n".join(
 # at assembly (#743), so the bar is never flatted: a match-drill at assembly
 # with its mates, a requirement (rule 7).  It prints at a leader on the bar's
 # end under the pedestal strap, not in the unflagged block: the fan-out local
-# repeat of e308920ca9 (3 of 3 runs) found nothing tied it to the shaft.
+# repeat of e308920ca9 (3 of 3 runs) found nothing tied it to the shaft.  The
+# spot is cut by the drill that passes the tap, its #43 tap drill
+# (dt_arbor_pedestal_spec, "cup bears in a spot drilled ... with the #43 tap
+# drill"), to its point only: farm r5 36077d60b3 (3 of 3 runs) found no size
+# or depth.  Hard-coded like the numbers above; the drawing test checks the
+# size against the pedestal tap's drill offline.
+SPOT_DRILL = "Ø.089 (#43)"
 SPOT_NOTE = "\n".join(
     (
-        f"NO FLATS; SPOTS FOR {SET_SCREW_NUMBER} SET SCREWS",
-        f"DRILLED AT ASSEMBLY THROUGH {PEDESTAL_NUMBER} TAPS",
+        f"NO FLATS; {SET_SCREW_NUMBER} SPOTS: {SPOT_DRILL} DRILL",
+        f"POINT ONLY, AT ASSEMBLY THROUGH {PEDESTAL_NUMBER} TAPS",
     )
 )

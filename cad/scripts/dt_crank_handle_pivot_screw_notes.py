@@ -36,13 +36,14 @@ SHOULDER_LENGTH_NOTE = "\n".join(
 )
 # The head's bands.  Its length keeps it below the cup's face, which it
 # clears (rule 3's CLEARS form; KEEPS HEAD BELOW read as design rationale).
-# Its three-place diameter is what MHA-DT-35's pocket is bored to (that
-# sheet's matched pocket fit), so the callout names that mate (rule 4): the
-# fan-out local repeat of e308920ca9 (2 of 3 runs) found "BEARS ON MHA-DT-35
-# FLOOR" named a face's job, not the diameter's.  Rows of 15 characters at
-# most: on one 52-mm row the block's left end ran into the head face's
-# extension line (fan-out r2 5065c806b3, rule 14).
-HEAD_DIA_CALLOUT = "SETS MHA-DT-35\nPOCKET BORE"
+# Its three-place diameter is what MHA-DT-35's pocket is bored to clear (that
+# sheet's matched clearance), so the callout names that mate in the CLEARS
+# form (rules 3 and 4): the fan-out local repeat of e308920ca9 (2 of 3 runs)
+# found "BEARS ON MHA-DT-35 FLOOR" named a face's job, not the diameter's, and
+# farm r5 36077d60b3 (2 of 3) found "SETS" named no fit.  Rows of 15
+# characters at most: on one 52-mm row the block's left end ran into the head
+# face's extension line (fan-out r2 5065c806b3, rule 14).
+HEAD_DIA_CALLOUT = "CLEARS POCKET\nOF MHA-DT-35"
 HEAD_LENGTH_CALLOUT = "CLEARS\nMHA-DT-35 FACE"
 # The slender screw wants tailstock support.  The thread end only screws into
 # the arm's tap, so a centre there touches no running, seating or slotted

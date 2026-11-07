@@ -157,7 +157,7 @@ FINISH_SYMBOL = (FINISH_EDGE[0], 0.206)
 FINISH_CHAR_HEIGHT = 0.0025
 # The set-screw spot requirement lands on the bar's lower flank 5 mm in from
 # the south end, under the pedestal strap the tap passes through, right of the
-# length's witness at that end.  Its two rows (~108 mm) stand in the band
+# length's witness at that end.  Its two rows (~120 mm) stand in the band
 # between the bar and the length's reference text below it.
 SPOT_EDGE = (
     SHAFT_LEFT_X + 0.005,

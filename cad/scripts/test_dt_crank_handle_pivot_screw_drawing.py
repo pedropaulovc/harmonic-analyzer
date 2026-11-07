@@ -512,7 +512,7 @@ def test_fitted_shoulder_length_is_one_flagged_numbered_note() -> None:
     # Standard fit name and forms on the other callouts (rules 3, 4, 7).
     assert notes.SHOULDER_FIT_CALLOUT == "RUNNING FIT IN\nMHA-DT-08 REAMED BORE"
     assert notes.HEAD_LENGTH_CALLOUT == "CLEARS\nMHA-DT-35 FACE"
-    assert notes.HEAD_DIA_CALLOUT == "SETS MHA-DT-35\nPOCKET BORE"
+    assert notes.HEAD_DIA_CALLOUT == "CLEARS POCKET\nOF MHA-DT-35"
     assert max(map(len, notes.HEAD_DIA_CALLOUT.splitlines())) <= 15
 
 

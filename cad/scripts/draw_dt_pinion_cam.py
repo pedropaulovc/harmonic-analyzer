@@ -115,7 +115,9 @@ FRONT_KEEP = {
     # name, stays 3 mm inside the left border.
     "BoreDia": (0.058, 0.180),
     "CollarCy": (0.150, 0.200),
-    "ThinWallMin": (FRONT_CENTER[0], 0.195),
+    # Farm r5 36077d60b3 (3 of 3 runs): at y 0.195 "THIN-SIDE WALL" printed
+    # on the bore callout's stacked "+.0005"; 9 mm higher both rows clear it.
+    "ThinWallMin": (FRONT_CENTER[0], 0.204),
 }
 SIDE_KEEP = {
     "Depth": (SIDE_CENTER[0], SIDE_CENTER[1] + 0.055),
