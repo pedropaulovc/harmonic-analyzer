@@ -1511,9 +1511,17 @@ _PLAN_S = drawing.GEOMETRY_VIEW_SCALE / 1000.0
 _SECTION_PLAN = {
     "B": drawing.GEOMETRY_TOP_CENTER,
     "E": drawing.GEOMETRY_TOP_CENTER,
+    "M": drawing.GEOMETRY_TOP_CENTER,
     "D": drawing.HUB_TOP_CENTER,
 }
 _LETTER_ENDS = ("B-outer", "B-inner", "E-inner", "E-outer", "D-outer", "D-inner")
+# The live letters: H and K at B's and D's calibrated stations; E's outer
+# letter at its old station, its inner one beside the front-left boss since
+# E-E stopped at the side rail (owner 2026-11-07); M's at the crossbar.
+_LIVE_LETTER_ENDS = (
+    "H-outer", "H-inner", "E-inner", "E-outer", "K-outer", "K-inner", "M-inner", "M-outer",
+)
+_LIVE_AS_BASELINE = {"H": "B", "K": "D"}
 # b49e1's cutting-line ends, as the build then typed them, start first.
 _B49E1_BOSS_DIA = 52.2
 _B49E1_BAR_X1 = -4.0  # the 22-wide crossbar's +X face
@@ -1572,20 +1580,26 @@ def _plan_point(key, x, z):
 
 
 def _letter_tails(ends):
-    """Each letter's arrow tail, keyed '<section>-<outer|inner>'; E's cut
-    starts at its inner end, B's and D's at their outer ends."""
-    order = {"B": ("outer", "inner"), "E": ("inner", "outer"), "D": ("outer", "inner")}
+    """Each letter's arrow tail, keyed '<section>-<outer|inner>'; E's and
+    M's cuts start at their inner (+X) ends, B's and D's at their outer."""
+    order = {"E": ("inner", "outer"), "M": ("inner", "outer")}
     return {
-        f"{key}-{name}": _plan_point(key, *point)
+        f"{key}-{name}": _plan_point(_LIVE_AS_BASELINE.get(key, key), *point)
         for key, pair in ends.items()
-        for name, point in zip(order[key], pair)
+        for name, point in zip(order.get(key, ("outer", "inner")), pair)
     }
+
+
+def _letter_extents(letter):
+    if letter == drawing.CROSSBAR_SECTION_LETTER:
+        return drawing.CROSSBAR_SECTION_LETTER_EXTENTS
+    return drawing.SECTION_CUT_BASELINE_LETTER_EXTENTS[_LIVE_AS_BASELINE.get(letter, letter)]
 
 
 def _letter_boxes(ends):
     boxes = {}
     for name, (x, y) in _letter_tails(ends).items():
-        dx0, dy0, dx1, dy1 = drawing.SECTION_CUT_BASELINE_LETTER_EXTENTS[name[0]]
+        dx0, dy0, dx1, dy1 = _letter_extents(name[0])
         boxes[name] = (x + dx0, y + dy0, x + dx1, y + dy1)
     return boxes
 
@@ -1655,11 +1669,29 @@ def _corner_witnesses(boss_dia):
     )
 
 
-def _letter_ink(name, *, boss_dia):
+def _front_rail_edges(key, x0, x1):
+    """The -Z (front) rail's inner and outer plan edges from x0 to x1."""
+    near = -(part.INNER_Z + part.EDGE_CHAMFER)
+    far = -(part.OUTER_Z - part.EDGE_CHAMFER)
+    return (
+        _segment_ink("rail inner edge", _plan_line(key, (x0, near), (x1, near)), drawing.INK_CLEARANCE),
+        _segment_ink("rail outer edge", _plan_line(key, (x0, far), (x1, far)), drawing.INK_CLEARANCE),
+    )
+
+
+def _boss_ink(key, boss_dia):
+    boss = _plan_point(key, -part.COLUMN_X, part.FRONT_COLUMN_Z)
+    boss_r = boss_dia / 2.0 * _PLAN_S
+    return ("corner boss", lambda box: max(0.0, _box_point_gap(box, boss) - boss_r), drawing.INK_CLEARANCE)
+
+
+def _letter_ink(name, *, boss_dia, live=False):
     """(what, gap function, clearance) for the ink round one letter: the
     plan's own edges, projected from the model, and the dimension ink b49e1
-    printed beside it."""
+    printed beside it.  ``live`` reads E's inner letter at its live station
+    (beside the front-left boss) rather than b49e1's (by the crossbar)."""
     ink = drawing.INK_CLEARANCE
+    name = _LIVE_AS_BASELINE.get(name[0], name[0]) + name[1:]
     if name == "B-outer":
         edge = _plan_line("B", (-part.COLUMN_X, part.OUTER_Z), (part.COLUMN_X, part.OUTER_Z))
         return (
@@ -1673,23 +1705,39 @@ def _letter_ink(name, *, boss_dia):
     if name == "B-inner":
         face = _plan_line("B", (part.BAR_X1, part.INNER_Z), (part.INNER_X, part.INNER_Z))
         return (_segment_ink("rail inner face", face, ink),)
-    if name == "E-inner":
-        near = -(part.INNER_Z + part.EDGE_CHAMFER)
-        far = -(part.OUTER_Z - part.EDGE_CHAMFER)
+    if (name == "E-inner" and not live) or name == "M-inner":
         return (
-            _segment_ink("rail inner edge", _plan_line("E", (part.BAR_X1, near), (part.INNER_X, near)), ink),
-            _segment_ink("rail outer edge", _plan_line("E", (part.BAR_X1, far), (part.INNER_X, far)), ink),
+            *_front_rail_edges("E", part.BAR_X1, part.INNER_X),
             *(
                 _segment_ink(f"18.0 witness {i}", _mm_segment(w), ink)
                 for i, w in enumerate(_GUSSET_RUN_WITNESSES)
             ),
             ("18.0", lambda box: _box_box_gap(box, _mm(_GUSSET_RUN_TEXT)), ink),
         )
-    if name == "E-outer":
-        boss = _plan_point("E", -part.COLUMN_X, part.FRONT_COLUMN_Z)
-        boss_r = boss_dia / 2.0 * _PLAN_S
+    if name == "E-inner":
         return (
-            ("corner boss", lambda box: max(0.0, _box_point_gap(box, boss) - boss_r), ink),
+            *_front_rail_edges("E", -part.INNER_X, part.BAR_X0),
+            _boss_ink("E", boss_dia),
+            _segment_ink(
+                "window width left witness",
+                ((_WIN_WIDTH_LEFT_EXTENSION_X, _PLAN_TOP_Y), (_WIN_WIDTH_LEFT_EXTENSION_X, _WIN_WIDTH_LINE_Y)),
+                ink,
+            ),
+        )
+    if name == "M-outer":
+        leg = _plan_line(
+            "E",
+            (part.BAR_X0 - part.GUSSET, -part.INNER_Z),
+            (part.BAR_X0, -part.INNER_Z + part.GUSSET),
+        )
+        return (
+            *_front_rail_edges("E", -part.INNER_X, part.BAR_X0),
+            _segment_ink("-X gusset leg", leg, ink),
+            ("18.0", lambda box: _box_box_gap(box, _mm(_GUSSET_RUN_TEXT)), ink),
+        )
+    if name == "E-outer":
+        return (
+            _boss_ink("E", boss_dia),
             *(
                 _segment_ink(f"corner witness {i}", _mm_segment(w), ink)
                 for i, w in enumerate(_corner_witnesses(boss_dia))
@@ -1700,12 +1748,12 @@ def _letter_ink(name, *, boss_dia):
     return (_segment_ink("hub rail face", face, ink),)
 
 
-def _letter_shortfalls(ends, name, *, boss_dia):
+def _letter_shortfalls(ends, name, *, boss_dia, live=False):
     """The ink a letter stands too close to, with its gap in mm."""
     box = _letter_boxes(ends)[name]
     return {
         what: round(gap(box) * 1000.0, 2)
-        for what, gap, clearance in _letter_ink(name, boss_dia=boss_dia)
+        for what, gap, clearance in _letter_ink(name, boss_dia=boss_dia, live=live)
         if gap(box) < clearance
     }
 
@@ -1730,17 +1778,18 @@ def test_section_letter_model_reproduces_b49e1() -> None:
     assert shortfalls["D-inner"]["hub rail face"] == 0.0
 
 
-@pytest.mark.parametrize("name", _LETTER_ENDS)
-def test_section_cut_calibration_keeps_historical_letter_clearance(name: str) -> None:
-    """Replay the measured B/E/D glyphs at the preserved cutting endpoints.
+@pytest.mark.parametrize("name", _LIVE_LETTER_ENDS)
+def test_section_cut_letters_keep_their_ink_clearance(name: str) -> None:
+    """Replay the measured B/E/D glyphs (and M's estimate) at the live
+    cutting endpoints: H and K at B's and D's calibrated stations, E's outer
+    letter at its old one, E's inner letter beside the front-left boss on
+    the front rail, M's either side of the crossbar.
 
-    This guards the historical placement calibration only.  It cannot prove
-    live H/K glyph clearance, which requires native inspection.
+    This guards the placement calibration only.  It cannot prove live
+    H/K/M glyph clearance, which requires native inspection.
     """
-    live_ends = drawing.section_cut_ends()
-    baseline_ends = {"B": live_ends["H"], "E": live_ends["E"], "D": live_ends["K"]}
     assert (
-        _letter_shortfalls(baseline_ends, name, boss_dia=part.BOSS_DIA)
+        _letter_shortfalls(drawing.section_cut_ends(), name, boss_dia=part.BOSS_DIA, live=True)
         == {}
     )
 
@@ -1809,19 +1858,54 @@ def test_short_plan_width_text_parks_clear_of_its_extension_lines(
 
 def test_section_cuts_cross_the_same_stock() -> None:
     """The preserved ends keep what each removed section shows: H cuts the
-    rail's plain T between the junction land and the corner boss, E runs
-    from outside the left rail past the crossbar T, K from outside the
-    set-screw boss past the hub rail's inner face, each at its own station."""
+    rail's plain T between the junction land and the corner boss; E runs
+    from outside the left rail into the window past its inner face, M across
+    the crossbar T between the window's gusset legs -- each a short whole
+    plane across its own piece (owner 2026-11-07: a plane that leaves pieces
+    floating becomes separate sections) -- and K from outside the set-screw
+    boss past the hub rail's inner face, each at its own station."""
     ends = drawing.section_cut_ends()
     (hx, h_outer), (hx_inner, h_inner) = ends["H"]
     assert hx == hx_inner and part.LAND_X1 < hx < part.COLUMN_X - part.BOSS_DIA / 2.0
     assert h_inner < part.INNER_Z and h_outer > drawing.PLAN_HALF_Z
     (e_inner, ez), (e_outer, ez_outer) = ends["E"]
     assert ez == ez_outer == drawing.SIDE_SECTION_Z
-    assert e_inner > part.BAR_X1 and e_outer < -drawing.PLAN_HALF_X
+    assert e_outer < -drawing.PLAN_HALF_X
+    assert -part.INNER_X < e_inner < part.BAR_X0 - part.GUSSET
+    (m_inner, mz), (m_outer, mz_outer) = ends[drawing.CROSSBAR_SECTION_LETTER]
+    assert mz == mz_outer == drawing.SIDE_SECTION_Z
+    assert e_inner < m_outer < part.BAR_X0 - part.GUSSET
+    assert part.BAR_X1 + part.GUSSET < m_inner < part.INNER_X
     (k_outer, kz), (k_inner, kz_inner) = ends["K"]
     assert kz == kz_inner == part.GOOSENECK_Z
     assert k_outer < part.SET_BOSS_FACE_X and -part.INNER_X < k_inner < part.BAR_X0
+
+
+def test_side_rail_and_crossbar_print_as_two_sections_without_a_sheet_scale() -> None:
+    """Owner 2026-11-07: E-E's one plane left the side rail and the crossbar
+    floating apart, so each is its own removed section with its own letter,
+    the crossbar's dimensions on M-M; H-H prints at the sheet's 1:3, so no
+    note restates that scale."""
+    import inspect
+
+    source = inspect.getsource(drawing.build)
+    assert 'section_label="E"' in source
+    assert "section_label=CROSSBAR_SECTION_LETTER" in source
+    assert drawing.CROSSBAR_SECTION_LETTER not in {"A", "B", "D", "E", "F", "G", "H", "J", "K", "L"}
+    assert not hasattr(drawing, "RAIL_SECTION_SCALE_LABEL")
+    assert "SCALE 1 : 3" not in Path(drawing.__file__).read_text(encoding="utf-8")
+    side = source[source.index('section_label="E"'):source.index("crossbar_cut = [")]
+    assert "2X SIDE RAIL WEB" in side
+    assert all(q not in side for q in ('"CROSSBAR WEB"', '"CROSSBAR FLANGE"', '"2X POCKET"'))
+    crossbar = source[source.index("section_label=CROSSBAR_SECTION_LETTER"):]
+    for qualifier in ('"CROSSBAR WEB"', '"CROSSBAR FLANGE"', '"2X POCKET"'):
+        assert qualifier in crossbar
+    # Both 1:4 captions stand side by side, M-M's under its T.
+    assert drawing.CROSSBAR_SECTION_CAPTION_XY[1] == drawing.SIDE_SECTION_CAPTION_XY[1]
+    assert drawing.CROSSBAR_SECTION_CAPTION_XY[0] - drawing.SIDE_SECTION_CAPTION_XY[0] >= 0.0436 + 0.003
+    assert drawing.CROSSBAR_SECTION_PROFILE_X == pytest.approx(
+        drawing._side_section_xy(part.HANGER_X, 0.0)[0]
+    )
 
 
 # Each removed section's profile ink on b49e1 (mm, x only): B-B's T, E-E's
@@ -5047,12 +5131,28 @@ def test_keeper_transfer_prefix_preserves_the_native_hole_definition() -> None:
     assert precision.id == "KEEPER_TAP_CALLOUT_PRECISION"
 
 
-def test_sheet_three_locates_its_holes_in_one_table_from_the_upper_left_socket() -> None:
+def _table_origin_mark() -> tuple[tuple[float, float], dict[str, tuple[float, float, float, float]]]:
+    """The table origin's sheet point (the plan's lower-left virtual sharp)
+    and its two arrows as boxes padded 2 mm for their "0"/"X"/"Y" labels."""
+    s = drawing.DETAIL_VIEW_SCALE / 1000.0
+    cx, cy = drawing.DETAIL_TOP_CENTER
+    ox = cx + drawing.TABLE_ORIGIN_XZ[0] * s
+    oy = cy - drawing.TABLE_ORIGIN_XZ[1] * s
+    d, length, pad = drawing.TABLE_ORIGIN_ARROW_OFFSET, drawing.TABLE_ORIGIN_ARROW_LENGTH, 0.002
+    return (ox, oy), {
+        "X arrow": (ox - pad, oy - d - pad, ox + length + pad, oy - d + pad),
+        "Y arrow": (ox - d - pad, oy - pad, ox - d + pad, oy + length + pad),
+    }
+
+
+def test_sheet_three_locates_its_holes_in_one_table_from_the_lower_left_corner() -> None:
     """drawing-guidelines.md rule 10: the sockets and the hanger holes each
-    carry a mate, so one tagged table locates them from the upper-left
-    socket's axis, a MATE column naming each group's mate; the keeper taps
-    are transferred from MHA-CH-07 at assembly, so their callout places them
-    and no station dimension survives on the sheet."""
+    carry a mate, so one tagged table locates them, a MATE column naming each
+    group's mate; the keeper taps are transferred from MHA-CH-07 at assembly,
+    so their callout places them and no station dimension survives on the
+    sheet.  Owner 2026-11-07: the origin is a corner the shop picks up with
+    an edge finder, never a hole centre -- the virtual sharp of the left and
+    rear rails' outer faces, so every hole reads positive."""
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     for retired in (
         "front hanger z from upper sockets", "rear hanger z from upper sockets",
@@ -5062,7 +5162,15 @@ def test_sheet_three_locates_its_holes_in_one_table_from_the_upper_left_socket()
     ):
         assert retired not in source, retired
     assert "_socket_hole_table(adapter, detail_top, detail_top_edges)" in source
-    assert drawing.TABLE_ORIGIN_XZ == (-part.COLUMN_X, part.FRONT_COLUMN_Z)
+    assert drawing.TABLE_ORIGIN_XZ == (-part.OUTER_X, part.OUTER_Z)
+    assert all(
+        x >= drawing.TABLE_ORIGIN_XZ[0] and z <= drawing.TABLE_ORIGIN_XZ[1]
+        for x, z, _d, _m in drawing.TABLE_HOLES
+    )
+    assert drawing.negative_locations((("A1", ".673", ".750", ""), ("B1", "-1.0", "2.0", ""))) == ["-1.0"]
+    source_table = source[source.index("def _socket_hole_table("):]
+    assert "negative_locations(rows[1:])" in source_table
+    assert "_set_table_origin_arrows(adapter, table, corner_xy)" in source_table
     holes = {(x, z): (diameter, mate) for x, z, diameter, mate in drawing.TABLE_HOLES}
     assert len(holes) == 6
     for x in (-part.COLUMN_X, part.COLUMN_X):
@@ -5079,7 +5187,17 @@ def test_sheet_three_locates_its_holes_in_one_table_from_the_upper_left_socket()
     ) * drawing.DETAIL_VIEW_SCALE / 1000.0
     assert table[3] < plan_bottom - 0.001
     assert table[1] > drawing.EDGE_NOTE_XY[1] + 0.001
-    source_table = source[source.index("def _socket_hole_table("):]
+    # The origin mark's arrows and labels stand clear of the table, the
+    # lower-left boss and the rails' outer edges.
+    (ox, oy), arrows = _table_origin_mark()
+    s = drawing.DETAIL_VIEW_SCALE / 1000.0
+    cx, cy = drawing.DETAIL_TOP_CENTER
+    boss = (cx - part.COLUMN_X * s, cy - part.REAR_COLUMN_Z * s)
+    boss_r = part.BOSS_DIA / 2.0 * s
+    for name, box in arrows.items():
+        assert _box_box_gap(box, table) >= drawing.INK_CLEARANCE, name
+        assert _box_point_gap(box, boss) - boss_r >= drawing.INK_CLEARANCE, name
+    assert arrows["X arrow"][3] < oy and arrows["Y arrow"][2] < ox
     assert "table.SetColumnHidden(_HOLE_TABLE_SIZE_COLUMN, True)" in source_table
 
 
@@ -5109,10 +5227,9 @@ def test_hole_tags_stand_in_the_windows_beside_their_holes() -> None:
     """Farm run 20261106T204855971Z: the native tags, parked up-right of
     their holes, sat under the hanger and keeper callouts' leaders.  Each
     now stands in the open window next to its hole, an ink clearance inside
-    the rails and the crossbar, clear of the D centreline and of the keeper
-    callout.  The origin socket's tag stands outside the frame instead,
-    clear of the table's origin mark (farm run 20261106T210746725Z: its X
-    arrow, (94.7, 202.7)->(107.5, 202.7) mm, ran through "A2")."""
+    the rails and the crossbar, clear of the D centreline, of the keeper
+    callout and of the table's origin mark at the lower-left corner (farm
+    run 20261106T210746725Z: the mark's X arrow ran through a tag)."""
     s = drawing.DETAIL_VIEW_SCALE / 1000.0
     cx, cy = drawing.DETAIL_TOP_CENTER
     ink = drawing.INK_CLEARANCE
@@ -5123,19 +5240,15 @@ def test_hole_tags_stand_in_the_windows_beside_their_holes() -> None:
     bottom, top = cy - part.INNER_Z * s, cy + part.INNER_Z * s
     _callout, callout_box = _keeper_callout_placed()
     half_w, half_h = drawing._HOLE_TAG_HALF
-    origin_mark = (0.0947, 0.2027, 0.1075, cy - part.FRONT_COLUMN_Z * s)
+    _origin, arrows = _table_origin_mark()
     for x, z, diameter, _mate in drawing.TABLE_HOLES:
         x0, y1 = drawing.hole_tag_position(x, z, diameter)
         box = (x0, y1 - 2 * half_h, x0 + 2 * half_w, y1)
         assert _box_box_gap(box, callout_box) >= ink, (x, z)
-        assert _box_box_gap(box, origin_mark) >= ink, (x, z)
+        for arrow in arrows.values():
+            assert _box_box_gap(box, arrow) >= ink, (x, z)
         hx, hy = cx + x * s, cy - z * s
         assert math.dist((x0 + half_w, y1 - half_h), (hx, hy)) < 0.023
-        if (x, z) == drawing.TABLE_ORIGIN_XZ:
-            # Outside the frame's outer face, under the boss.
-            assert box[2] <= cx - part.OUTER_X * s - ink
-            assert box[3] <= hy - part.BOSS_DIA / 2.0 * s
-            continue
         d_x = cx + part.HANGER_X * s
         if diameter == part.HANGER_CLEARANCE_DIA:
             # B1 in the left window; B2 in the right, off the C DRILL
@@ -5154,7 +5267,7 @@ def test_socket_callout_leaves_its_leader_a_clear_corridor_to_a2() -> None:
     """Farm runs 20261106T212431241Z (row past the frame) and
     20261106T214613300Z (leader down the 7.165's extension line): the
     block's widest row, 2.58 mm a glyph, stays inside the frame and ends
-    between the origin mark's Y arrow and the 7.165's extension line."""
+    left of the 7.165's extension line."""
     x, _y = drawing.DETAIL_TOP_KEEP["B0Dia"]
     rows = drawing.DETAIL_CALLOUTS["B0Dia"].splitlines()
     assert len(rows) <= 2
@@ -5162,7 +5275,7 @@ def test_socket_callout_leaves_its_leader_a_clear_corridor_to_a2() -> None:
     ink = drawing.INK_CLEARANCE
     assert x - half >= drawing.SHEET_FRAME[0] + ink
     extension_x = _plan(-part.COLUMN_X, 0.0)[0]
-    assert 0.081 + ink <= x + half <= extension_x - 0.005
+    assert x + half <= extension_x - 0.005
 
 
 def test_cross_tap_callout_counts_all_four_taps_then_names_its_mate() -> None:
@@ -5203,7 +5316,7 @@ def test_hole_table_rows_bind_by_magnitude_with_one_sign_per_axis() -> None:
         bound = drawing.bind_hole_table_rows(rows, 25.4)
         assert sorted(bound.values()) == list(range(len(drawing.TABLE_HOLES)))
         assert bound[1] == len(drawing.TABLE_HOLES) - 1
-    mixed = list(cells(1.0, -1.0))
+    mixed = list(cells(1.0, 1.0))  # every Y below the rear corner reads negative
     mixed[-1] = (mixed[-1][0], mixed[-1][1], mixed[-1][2].lstrip("-"), mixed[-1][3])
     with pytest.raises(RuntimeError, match="mixes signs"):
         drawing.bind_hole_table_rows(tuple(mixed), 25.4)
@@ -5308,8 +5421,8 @@ def test_transfer_plan_and_station_fields_remain_inside_the_hole_sheet() -> None
 
 
 def test_crossbar_pocket_depth_stands_between_the_side_rail_and_the_t() -> None:
-    # The underside's 138.0 names the pockets and the section through them;
-    # E-E prints their depth, flange underside to the T's underside, arrows
+    # The underside's 138.0 names the pockets; M-M, the crossbar's own
+    # section, prints their depth, flange underside to the T's underside, arrows
     # inside.  Its two rows print 24.4 x 9.2 mm (2X POCKET by the 40d9d030e
     # render's glyphs), the underline 1.0 under the block and 0.1 past each
     # side; extension lines overshoot their line 1.03 mm (the 8.0's there).
@@ -5363,7 +5476,7 @@ def test_crossbar_pocket_depth_stands_between_the_side_rail_and_the_t() -> None:
         assert segment_box_distance(segment, text) >= ink, name
     assert segment_box_overlap_length(leader, text) == 0.0
     # Between the side rail's inner face and the T, under the side web's line
-    # (printed 5.56 mm under its text point) and over E-E's caption.
+    # (printed 5.56 mm under its text point) and over the 1:4 captions.
     assert text.xmin - xy(-part.INNER_X, 0.0)[0] >= ink
     assert drawing.SIDE_WEB_TEXT_XY[1] - 0.00556 - text.ymax >= ink
     assert leader.y1 - drawing.SIDE_SECTION_CAPTION_XY[1] >= ink
@@ -5537,6 +5650,30 @@ def test_top_frame_drawing_is_six_sheets() -> None:
             '"G-G"',
         ):
             assert retired not in source, (module.__name__, retired)
+
+
+def test_pictorials_are_named_in_words_not_face_arrows() -> None:
+    """Owner 2026-11-07 (rule 26): several isometric views are labelled
+    ISOMETRIC VIEW FROM TOP / FROM BOTTOM, not with arrows to face names.
+    Each caption stands under its view (v48: views at y 126..205 mm), over
+    the title block (top 64.7 mm), and carries no scale: both views print at
+    the sheet's 1:4."""
+    import inspect
+
+    assert all(view.labels == () for view in drawing.PICTORIAL_VIEWS)
+    assert drawing.PICTORIAL_SCALE == drawing.SHEET_SCALES["PICTORIAL"]
+    tops = {view.octant[1] for view in drawing.PICTORIAL_VIEWS}
+    assert tops == {1, -1}
+    captions = dict(drawing.PICTORIAL_CAPTIONS)
+    assert set(captions) == {"ISOMETRIC VIEW FROM TOP", "ISOMETRIC VIEW FROM BOTTOM"}
+    for view in drawing.PICTORIAL_VIEWS:
+        text = "ISOMETRIC VIEW FROM " + ("TOP" if view.octant[1] > 0 else "BOTTOM")
+        x, y = captions[text]
+        assert x == view.center_xy[0]
+        assert 0.0647 + 0.010 <= y <= 0.126 - 0.010
+        assert "SCALE" not in text
+    build = inspect.getsource(drawing.build)
+    assert build.index("place_pictorial_sheet(") < build.index("_add_pictorial_captions(adapter)")
 
 
 # The facing note's rows render about 2.6 mm per character at its 3.5 mm
@@ -5886,35 +6023,30 @@ def test_precise_curve_native_members_match_generated_extension_contract() -> No
         assert retval[0] == expected_returns[call.func.attr]
 
 
-# --- Note 3: the sharp-edge flag note (owner ruling 2026-11-06) -----------
-
-# The largest triangle the tightest fit draws round a 3.5 mm "3" (its sides
-# measured 8.5..10.5 mm across SOLIDWORKS's triangle balloons), apex up,
-# its centroid on the number's centre.
-_FLAG_SIDE = 0.0105
+# --- SHARP at the leaders (owner ruling 2026-11-07) -----------------------
 
 
-def test_general_notes_number_the_sharp_edge_flag_note() -> None:
-    """Gating C of the machinist review: the SHARP prose under the view
-    labels named edges with no leader to them.  The general notes are
-    numbered and the third is the flag note the flags point back to."""
+def test_sharp_is_written_at_its_leaders_with_no_flag_note() -> None:
+    """Owner 2026-11-07: the triangle flags pointing to note 3 confused the
+    reader; a short requirement is written at its leader (rule 7).  Note 3
+    is gone; the two remaining general notes keep their numbers."""
     rows = spec.DRAWING_NOTES.splitlines()
-    assert [row.split(".", 1)[0] for row in rows] == ["1", "2", "3"]
-    assert spec.DRAWING_NOTE_FLAG == 3
-    assert drawing.SHARP_EDGE_FLAG_TEXT == "3"
+    assert [row.split(".", 1)[0] for row in rows] == ["1", "2"]
+    assert not hasattr(spec, "DRAWING_NOTE_FLAG")
+    assert drawing.SHARP_EDGE_TEXT == "SHARP"
     assert spec.EDGE_CHAMFER == pytest.approx(0.06 * 25.4)
     assert rows[0] == "1. CONVEX EDGES .06 X 45° UNLESS NOTED; NOT HOLE/SLOT MOUTHS."
-    assert rows[2] == "3. EDGES FLAGGED 3: NO .06 CHAMFER; TITLE-BLOCK EDGE BREAK."
+    assert "FLAGGED" not in spec.DRAWING_NOTES
     # No row wider than the one the sheet already printed in its band.
     assert max(map(len, rows)) <= 64
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "SHARP\"" not in source and "SHARP\\n" not in source
+    assert "SetBalloon" not in source and "_SW_BALLOON" not in source
     assert "GUSSETS SHARP" not in source and "HUB_LEFT_NOTE" not in source
     assert drawing.HUB_BOTTOM_TITLE == "VIEW L"
 
 
 def _sharp_edge_segments():
-    """Each flagged edge's ends (model mm), from the part's own constants."""
+    """Each SHARP edge's ends (model mm), from the part's own constants."""
     bar_top = -(part.INNER_Z - part.GUSSET)
     rib_lo = part.GOOSENECK_Z - part.HUB_RIB_W / 2.0
     rib_hi = part.GOOSENECK_Z + part.HUB_RIB_W / 2.0
@@ -5961,24 +6093,24 @@ def _on_segment(point, ends) -> float:
     return t
 
 
-def test_sharp_edge_flags_land_inside_the_edges_the_model_leaves_sharp() -> None:
-    """Every flag lands well inside one edge the model leaves sharp, and no
+def test_sharp_edge_notes_land_inside_the_edges_the_model_leaves_sharp() -> None:
+    """Every SHARP leader lands well inside one edge the model leaves sharp, and no
     edge break the model cuts (EXTERNAL_EDGE_BREAKS) picks that edge: the
     edges the old prose named (the front crossbar side bottoms between the
     pocket end and the gusset leg, the four gusset hypotenuse bottoms under
     the knife seats, the hub rib's inner bottom, the V-gusset ramps)."""
     edges = _sharp_edge_segments()
-    assert list(drawing.SHARP_EDGE_FLAGS) == [
+    assert list(drawing.SHARP_EDGE_LEADERS) == [
         "front -X bar side", "front -X gusset", "rear -X gusset",
         "front +X bar side", "front +X gusset", "rear +X gusset",
         "hub rib inner bottom", "front -X V-gusset ramp", "front +X V-gusset ramp",
         "rear -X V-gusset ramp", "rear +X V-gusset ramp",
     ]
-    views = [key for key, _landing, _centre in drawing.SHARP_EDGE_FLAGS.values()]
+    views = [key for key, _landing, _centre in drawing.SHARP_EDGE_LEADERS.values()]
     assert views.count(drawing.SHARP_EDGE_LOCATOR) == 6
     assert views.count(drawing.SHARP_EDGE_DETAIL) == 5
     picks = _external_break_points()
-    for name, (_key, landing, _centre) in drawing.SHARP_EDGE_FLAGS.items():
+    for name, (_key, landing, _centre) in drawing.SHARP_EDGE_LEADERS.items():
         ends = edges[name]
         t = _on_segment(landing, ends)
         assert 0.1 <= t <= 0.9, name
@@ -6006,8 +6138,8 @@ def _on_segment_or_none(point, ends):
         return None
 
 
-def _flag_landing_sheet(key, landing):
-    """A flag's landing (model mm) on the sheet (m)."""
+def _sharp_landing_sheet(key, landing):
+    """A SHARP leader's landing (model mm) on the sheet (m)."""
     x, _y, z = landing
     if key == drawing.SHARP_EDGE_LOCATOR:
         (cx, cy), scale = drawing.HUB_BOTTOM_CENTER, drawing._HUB_BOTTOM_M_PER_MM
@@ -6018,35 +6150,18 @@ def _flag_landing_sheet(key, landing):
     return cx + (x - part.GOOSENECK_X) * scale, cy + (z - part.GOOSENECK_Z) * scale
 
 
-def _flag_ink(centre, landing):
-    """A flag's triangle sides and its leader (Segments, sheet m): the
-    leader from where the line to the landing leaves the triangle."""
-    from _layout_geometry import Segment
+def _sharp_ink(centre, landing):
+    """A SHARP's text-box sides and its leader (Segments, sheet m): the
+    leader from the box side nearer the landing, at mid-height (SOLIDWORKS's
+    smart leader side), to the landing."""
+    from _layout_geometry import Box, Segment
 
     cx, cy = centre
-    h = _FLAG_SIDE * math.sqrt(3.0) / 2.0
-    corners = [
-        (cx - _FLAG_SIDE / 2.0, cy - h / 3.0),
-        (cx + _FLAG_SIDE / 2.0, cy - h / 3.0),
-        (cx, cy + 2.0 * h / 3.0),
-    ]
-    sides = [Segment(*corners[i], *corners[(i + 1) % 3]) for i in range(3)]
-    dx, dy = landing[0] - cx, landing[1] - cy
-    exits = []
-    for side in sides:
-        ex, ey = side.x1 - side.x0, side.y1 - side.y0
-        det = dx * -ey + ex * dy
-        if abs(det) < 1e-15:
-            continue
-        rx, ry = side.x0 - cx, side.y0 - cy
-        t = (rx * -ey + ex * ry) / det
-        u = (dx * ry - dy * rx) / det
-        if 0.0 <= u <= 1.0 and t > 0.0:
-            exits.append(t)
-    t = min(exits)
-    assert t < 1.0, "landing inside its own flag"
-    leader = Segment(cx + t * dx, cy + t * dy, *landing)
-    return sides, leader
+    hw, hh = drawing.SHARP_EDGE_TEXT_HALF
+    sides = _box_sides(Box(cx - hw, cy - hh, cx + hw, cy + hh))
+    assert abs(landing[0] - cx) > hw or abs(landing[1] - cy) > hh, "landing under its own text"
+    start = (cx - hw if landing[0] < cx else cx + hw, cy)
+    return sides, Segment(*start, *landing)
 
 
 def _crosses(a, b) -> bool:
@@ -6059,14 +6174,14 @@ def _crossing_x(a, b) -> float:
     return a.x0 + t * (a.x1 - a.x0)
 
 
-def _sharp_flag_layout():
+def _sharp_layout():
     return {
-        name: (key, *_flag_ink(centre, _flag_landing_sheet(key, landing)), centre)
-        for name, (key, landing, centre) in drawing.SHARP_EDGE_FLAGS.items()
+        name: (key, *_sharp_ink(centre, _sharp_landing_sheet(key, landing)), centre)
+        for name, (key, landing, centre) in drawing.SHARP_EDGE_LEADERS.items()
     }
 
 
-def _locator_flag_obstacles():
+def _locator_sharp_obstacles():
     """The locator's modelled ink (sheet m) the flags keep clear of: lines,
     text boxes, printed circles, both ream frames with their leaders and
     quantity rows, the knockout and ream-size leaders and the view label."""
@@ -6098,7 +6213,7 @@ def _locator_flag_obstacles():
     return lines, boxes, _locator_circles()
 
 
-def _detail_flag_obstacles():
+def _detail_sharp_obstacles():
     """Detail J's ink (sheet m) as farm run 20261106T222724559Z's layout
     audit read it: the pad width's extension lines, line and leader, Ø1.18's
     leader, the .28's line and leader, the boss's centre-mark arms, the
@@ -6110,8 +6225,8 @@ def _detail_flag_obstacles():
     tx, ty = drawing.HUB_GUSSET_T_TEXT_XY
     cx, cy = drawing.HUB_DETAIL_CENTER
     lines = {
-        "1.10 extension front": Segment(335.29 * mm, 146.06 * mm, 351.0 * mm, 146.06 * mm),
-        "1.10 extension rear": Segment(335.29 * mm, 201.94 * mm, 351.0 * mm, 201.94 * mm),
+        "1.10 extension front": Segment(335.29 * mm, 146.06 * mm, lx + 1.0 * mm, 146.06 * mm),
+        "1.10 extension rear": Segment(335.29 * mm, 201.94 * mm, lx + 1.0 * mm, 201.94 * mm),
         "1.10 line": Segment(lx, 146.06 * mm, lx, 201.94 * mm),
         "1.10 leader": Segment(lx, ly, 381.62 * mm, 203.67 * mm),
         "1.18 leader": Segment(281.56 * mm, 150.37 * mm, 237.91 * mm, 94.42 * mm),
@@ -6139,36 +6254,36 @@ def _box_sides(box):
     ]
 
 
-def _flag_gap(sides, segment) -> float:
+def _sharp_gap(sides, segment) -> float:
     return min(_segment_gap(side, segment) for side in sides)
 
 
-def test_sharp_edge_flags_and_leaders_stand_clear_of_the_sheet_ink() -> None:
-    """The flags stand in the views' open windows: no flag or leader
-    touches another; every triangle stands 2 mm off the modelled ink and the
+def test_sharp_edge_notes_and_leaders_stand_clear_of_the_sheet_ink() -> None:
+    """The SHARP notes stand in the views' open windows: no note or leader
+    touches another; every text box stands 2 mm off the modelled ink and the
     sheet frame, every leader 1 mm off lines, text and circles.  The three
     -X locator leaders each cross the 5.42 POCKET's extension line once (the
     lines fence the -X junctions; RsTopFrame 2026-11-06), 3 mm or more from
     its ends, and nothing else."""
     from _layout_geometry import segment_box_distance, segment_circle_distance
 
-    layout = _sharp_flag_layout()
+    layout = _sharp_layout()
     names = list(layout)
     for i, a in enumerate(names):
         _key, a_sides, a_leader, _centre = layout[a]
         for b in names[i + 1 :]:
             _key, b_sides, b_leader, _centre = layout[b]
             assert _segment_gap(a_leader, b_leader) >= 0.0015, (a, b)
-            assert min(_flag_gap(a_sides, side) for side in b_sides) >= 0.003, (a, b)
-            assert _flag_gap(a_sides, b_leader) >= 0.0015, (a, b)
-            assert _flag_gap(b_sides, a_leader) >= 0.0015, (a, b)
+            assert min(_sharp_gap(a_sides, side) for side in b_sides) >= 0.003, (a, b)
+            assert _sharp_gap(a_sides, b_leader) >= 0.0015, (a, b)
+            assert _sharp_gap(b_sides, a_leader) >= 0.0015, (a, b)
     fx0, fy0, fx1, fy1 = drawing.SHEET_FRAME
     for name, (_key, sides, _leader, _centre) in layout.items():
         for side in sides:
             for x, y in ((side.x0, side.y0), (side.x1, side.y1)):
                 assert fx0 + 0.002 <= x <= fx1 - 0.002 and fy0 + 0.002 <= y <= fy1 - 0.002, name
-    locator_lines, locator_boxes, locator_circles = _locator_flag_obstacles()
-    detail_lines, detail_boxes, detail_circle = _detail_flag_obstacles()
+    locator_lines, locator_boxes, locator_circles = _locator_sharp_obstacles()
+    detail_lines, detail_boxes, detail_circle = _detail_sharp_obstacles()
     extension = {name for name in locator_lines if name.startswith("138.0 extension")}
     crossed = {}
     for name, (key, sides, leader, _centre) in layout.items():
@@ -6177,7 +6292,7 @@ def test_sharp_edge_flags_and_leaders_stand_clear_of_the_sheet_ink() -> None:
         else:
             lines, boxes, circles = detail_lines, detail_boxes, ()
         for line_name, line in lines.items():
-            assert _flag_gap(sides, line) >= 0.002, (name, line_name)
+            assert _sharp_gap(sides, line) >= 0.002, (name, line_name)
             if line_name in extension and _crosses(leader, line):
                 crossed.setdefault(name, []).append(line_name)
                 x = _crossing_x(leader, line)
@@ -6189,7 +6304,7 @@ def test_sharp_edge_flags_and_leaders_stand_clear_of_the_sheet_ink() -> None:
                 continue
             assert _segment_gap(leader, line) >= 0.001, (name, line_name)
         for box_name, box in boxes.items():
-            assert min(_flag_gap(sides, side) for side in _box_sides(box)) >= 0.002, (name, box_name)
+            assert min(_sharp_gap(sides, side) for side in _box_sides(box)) >= 0.002, (name, box_name)
             assert segment_box_distance(leader, box) >= 0.001, (name, box_name)
         for circle in circles:
             assert segment_circle_distance(leader, circle) >= 0.001, name
@@ -6199,9 +6314,9 @@ def test_sharp_edge_flags_and_leaders_stand_clear_of_the_sheet_ink() -> None:
         "front -X gusset": ["138.0 extension -1"],
         "rear -X gusset": ["138.0 extension +1"],
     }
-    # On J, the rib's inner bottom flag stands in the window between the
+    # On J, the rib's inner bottom SHARP stands in the window between the
     # rail's inner face and the 1.10's line; the other four outside the
-    # rail, their triangles off the detail circle.
+    # rail, their text off the detail circle.
     cx, cy, radius = detail_circle
     rib_face = cx + (-part.INNER_X - part.GOOSENECK_X) * 0.002
     _key, sides, leader, _centre = layout["hub rib inner bottom"]
@@ -6216,32 +6331,24 @@ def test_sharp_edge_flags_and_leaders_stand_clear_of_the_sheet_ink() -> None:
             ), name
 
 
-class _FakeFlagNote:
-    def __init__(self, *, balloon_ok=True, style=2, text="3", offset=(0.0012, -0.0009)):
-        self.balloon_ok, self.style, self.text = balloon_ok, style, text
+class _FakeSharpNote:
+    def __init__(self, *, balloon=False, text="SHARP", offset=(0.0012, -0.0009)):
+        self.balloon, self.text = balloon, text
         self.offset = offset
-        self.calls = []
         self.annotation = object()
-
-    def SetBalloon(self, style, fit):
-        self.calls.append(("SetBalloon", style, fit))
-        return self.balloon_ok
 
     def GetAnnotation(self):
         return self.annotation
 
     def HasBalloon(self):
-        return self.balloon_ok
-
-    def GetBalloonStyle(self):
-        return self.style
+        return self.balloon
 
     def GetText(self):
         return self.text
 
 
-def _run_flag(monkeypatch, note, *, move=True):
-    """Run ``_add_sharp_edge_flag`` against fakes: the "3" first prints at
+def _run_sharp(monkeypatch, note, *, move=True):
+    """Run ``_add_sharp_edge_note`` against fakes: the SHARP first prints at
     ``note.offset`` from the requested centre, and ``move_annotation``
     shifts it (or not)."""
     centre = (0.080, 0.1825)
@@ -6261,7 +6368,7 @@ def _run_flag(monkeypatch, note, *, move=True):
     def display(_adapter, annotation):
         assert annotation is note.annotation
         x, y = state["xy"]
-        run = {"t": "3", "pos": [x - 0.00125, y - 0.00175, 0.0], "h": 0.0035, "w": 0.0025, "ang": 0.0}
+        run = {"t": "SHARP", "pos": [x - 0.006, y - 0.00175, 0.0], "h": 0.0035, "w": 0.012, "ang": 0.0}
         return {"texts": [run]}, 0
 
     def moved(_adapter, annotation, dx, dy, *, label):
@@ -6280,22 +6387,21 @@ def _run_flag(monkeypatch, note, *, move=True):
         lambda annotation, xy, **kwargs: log.setdefault("lands", (annotation, xy)),
     )
     monkeypatch.setattr(drawing._telemetry, "event", lambda *_a, **_k: None)
-    result = drawing._add_sharp_edge_flag(
-        object(), "view", Edges(), landing_mm=(1.0, 2.0, 3.0), centre_xy=centre, label="flag",
+    result = drawing._add_sharp_edge_note(
+        object(), "view", Edges(), landing_mm=(1.0, 2.0, 3.0), centre_xy=centre, label="sharp",
     )
     return result, log, state, centre, landing_xy
 
 
-def test_sharp_edge_flag_attaches_a_triangle_three_and_centres_it(monkeypatch) -> None:
-    note = _FakeFlagNote()
-    result, log, state, centre, landing_xy = _run_flag(monkeypatch, note)
+def test_sharp_edge_note_attaches_sharp_and_centres_it(monkeypatch) -> None:
+    note = _FakeSharpNote()
+    result, log, state, centre, landing_xy = _run_sharp(monkeypatch, note)
     assert result is note
     assert log["edge_point"] == (1.0, 2.0, 3.0)
     assert log["attached"] == {
-        "text": "3", "entity": "edge", "leader_attach_xy": landing_xy,
-        "note_xy": centre, "label": "flag",
+        "text": "SHARP", "entity": "edge", "leader_attach_xy": landing_xy,
+        "note_xy": centre, "label": "sharp",
     }
-    assert note.calls == [("SetBalloon", 2, 0)]
     assert log["moved"] == pytest.approx((-0.0012, 0.0009))
     assert state["xy"] == pytest.approx(centre)
     assert log["lands"] == (note.annotation, landing_xy)
@@ -6304,18 +6410,17 @@ def test_sharp_edge_flag_attaches_a_triangle_three_and_centres_it(monkeypatch) -
 @pytest.mark.parametrize(
     ("kwargs", "move"),
     [
-        ({"balloon_ok": False}, True),
-        ({"style": 1}, True),
-        ({"text": "3 "}, True),
+        ({"balloon": True}, True),
+        ({"text": "SHARP "}, True),
         ({}, False),
     ],
 )
-def test_sharp_edge_flag_refuses_a_wrong_border_text_or_place(monkeypatch, kwargs, move) -> None:
+def test_sharp_edge_note_refuses_a_border_wrong_text_or_place(monkeypatch, kwargs, move) -> None:
     with pytest.raises(RuntimeError):
-        _run_flag(monkeypatch, _FakeFlagNote(**kwargs), move=move)
+        _run_sharp(monkeypatch, _FakeSharpNote(**kwargs), move=move)
 
 
-def test_build_flags_both_views_after_their_dimensions() -> None:
+def test_build_writes_sharp_on_both_views_after_their_dimensions() -> None:
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     build = next(
         node for node in tree.body
@@ -6323,32 +6428,30 @@ def test_build_flags_both_views_after_their_dimensions() -> None:
     )
     calls = [
         ast.unparse(call) for call in ast.walk(build)
-        if isinstance(call, ast.Call) and _called_name(call) == "_add_sharp_edge_flags"
+        if isinstance(call, ast.Call) and _called_name(call) == "_add_sharp_edge_notes"
     ]
     assert calls == [
-        "_add_sharp_edge_flags(adapter, hub_bottom_parent, hub_bottom_edges, SHARP_EDGE_LOCATOR)",
-        "_add_sharp_edge_flags(adapter, geometry_bottom, geometry_bottom_edges, SHARP_EDGE_DETAIL)",
+        "_add_sharp_edge_notes(adapter, hub_bottom_parent, hub_bottom_edges, SHARP_EDGE_LOCATOR)",
+        "_add_sharp_edge_notes(adapter, geometry_bottom, geometry_bottom_edges, SHARP_EDGE_DETAIL)",
     ]
     source = ast.unparse(build)
-    flags = source.index("_add_sharp_edge_flags(")
-    assert source.index("label='underside gusset thickness'") < flags
-    assert source.index("_hanger_section(adapter, hub_bottom_parent)") > flags
+    notes = source.index("_add_sharp_edge_notes(")
+    assert source.index("label='underside gusset thickness'") < notes
+    assert source.index("_hanger_section(adapter, hub_bottom_parent)") > notes
 
 
-def test_sharp_edge_flag_native_members_match_generated_note_contract() -> None:
+def test_sharp_edge_note_native_members_match_generated_note_contract() -> None:
     from test_native_bank_retention_contract import _bind, _dispatch, _members
 
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     helper = next(
         node for node in tree.body
-        if isinstance(node, ast.FunctionDef) and node.name == "_add_sharp_edge_flag"
+        if isinstance(node, ast.FunctionDef) and node.name == "_add_sharp_edge_note"
     )
     methods, _getters, _setters = _members("INote")
     expected_returns = {
-        "SetBalloon": 11,  # VT_BOOL
         "GetAnnotation": 9,  # VT_DISPATCH
-        "HasBalloon": 11,
-        "GetBalloonStyle": 3,  # VT_I4
+        "HasBalloon": 11,  # VT_BOOL
         "GetText": 8,  # VT_BSTR
     }
     calls = [

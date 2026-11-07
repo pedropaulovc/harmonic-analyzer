@@ -78,7 +78,6 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_selection import _select_view_entity
 from _drawing_sheets import (
-    FaceLabel,
     PictorialView,
     create_blank_drawing_sheets,
     place_pictorial_sheet,
@@ -150,7 +149,6 @@ from build_fr_top_frame import (
 )
 from fr_top_frame_spec import (
     DRAWING_DIMENSIONS,
-    DRAWING_NOTE_FLAG,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     EDGE_CHAMFER,
@@ -248,36 +246,27 @@ DETAIL_PLAN_HALF_D = PLAN_HALF_Z * DETAIL_VIEW_SCALE / 1000.0
 
 
 # Sheet 1: two octant pictorials, opposite corners, so every face is seen
-# once and named once.  Drawn at 1:4 -- two 1:3 isometrics of a 428 x 262
-# plan would not fit side by side inside the B-sheet border.
+# once.  Drawn at 1:4 -- two 1:3 isometrics of a 428 x 262 plan would not
+# fit side by side inside the B-sheet border.  Each is named in words under
+# it (owner 2026-11-07, rule 26: several isometric views are labelled
+# ISOMETRIC VIEW FROM TOP / FROM BOTTOM, not with arrows to face names),
+# with no scale: both print at the sheet's 1:4.
 #
-# The face names are the MACHINE's, the one convention the whole package
-# uses: FRONT is the operator side, model -Z, the rail at the top of the
-# plan; REAR is +Z, the face the standard front elevation shows; RIGHT is
-# +X (dimensions.yaml's assembly frame).  Sheet 3's FRONT/REAR hanger and
-# keeper Z read the same way, so no key note translates between two
-# meanings of FRONT (machinist review of 2056e3344).
+# The machine's face names stay the package's one convention: FRONT is the
+# operator side, model -Z, the rail at the top of the plan; REAR is +Z, the
+# face the standard front elevation shows; RIGHT is +X (dimensions.yaml's
+# assembly frame).  Sheet 3's FRONT/REAR hanger and keeper Z read the same
+# way (machinist review of 2056e3344).
 PICTORIAL_SCALE = SHEET_SCALES["PICTORIAL"]
-_LABEL_X = (BAR_X1 + INNER_X) / 2.0  # over the right window, clear of the web
 PICTORIAL_VIEWS = (
-    PictorialView(
-        octant=(-1, 1, 1),  # REAR-TOP-LEFT
-        center_xy=(0.115, 0.165),
-        labels=(
-            FaceLabel("TOP", (_LABEL_X, HALF_H, (INNER_Z + OUTER_Z) / 2.0), (0.028, 0.232)),
-            FaceLabel("REAR", (_LABEL_X, 0.0, OUTER_Z), (0.170, 0.088)),
-            FaceLabel("LEFT", (-OUTER_X, 0.0, 40.0), (0.024, 0.092)),
-        ),
-    ),
-    PictorialView(
-        octant=(1, -1, 1),  # REAR-BOTTOM-RIGHT
-        center_xy=(0.305, 0.165),
-        labels=(
-            FaceLabel("REAR", (_LABEL_X, 0.0, OUTER_Z), (0.222, 0.228)),
-            FaceLabel("RIGHT", (OUTER_X, 0.0, 40.0), (0.392, 0.226)),
-            FaceLabel("BOTTOM", (_LABEL_X, -HALF_H, (WEB_IN_Z + WEB_OUT_Z) / 2.0), (0.352, 0.096)),
-        ),
-    ),
+    PictorialView(octant=(-1, 1, 1), center_xy=(0.115, 0.165), labels=()),  # REAR-TOP-LEFT
+    PictorialView(octant=(1, -1, 1), center_xy=(0.305, 0.165), labels=()),  # REAR-BOTTOM-RIGHT
+)
+# Each caption's text centred under its view: the views print y 126..205 mm
+# on the v48 render, the title block's top at 64.7 (x 216..419).
+PICTORIAL_CAPTIONS = (
+    ("ISOMETRIC VIEW FROM TOP", (0.115, 0.112)),
+    ("ISOMETRIC VIEW FROM BOTTOM", (0.305, 0.112)),
 )
 
 # Sheet 2: overall envelope and non-hole geometry.  Top/front remain
@@ -660,8 +649,8 @@ HUB_BOSS_DROP_OFFSET_XY = (0.085, 0.0600)
 HUB_GUSSET_ANGLE_TEXT_XY = (0.186, 0.0645)
 # The side view is a removed view (a left view laid under the plan), so
 # the plan names it with a viewing arrow and letter and the view carries
-# its own title and scale; its sharp edges carry note 3's flags on sheet 6
-# (SHARP_EDGE_FLAGS).  The arrow looks +X onto the left
+# its own title and scale; its sharp edges carry SHARP leaders on sheet 6
+# (SHARP_EDGE_LEADERS).  The arrow looks +X onto the left
 # rail's outer face at z -80, between the front socket's boss and section
 # K's letters: its letter stands 11 mm right of the 115.1's text and 5 mm
 # over the historical D letter's placement baseline.
@@ -693,50 +682,48 @@ HUB_BOTTOM_SCALE = (1, 3)
 UNDERSIDE_VIEW_LETTER = "L"
 HUB_BOTTOM_TITLE = f"VIEW {UNDERSIDE_VIEW_LETTER}"
 HUB_BOTTOM_TITLE_XY = (0.020, 0.122)
-# Owner ruling 2026-11-06 (machinist review, gating C: the SHARP prose under
-# the view labels had no leader to the edges it exempted): the general notes'
-# third row is a numbered flag note (fr_top_frame_spec.DRAWING_NOTES), and
-# its flag -- the note's number in a triangle (INote.SetBalloon,
-# swBS_Triangle) -- stands on one straight leader to each edge the model
-# leaves sharp (build_fr_top_frame._external_edge_breaks): on the 1:3
-# locator the front crossbar's two side bottoms between the pocket end and
-# the gusset leg and the four gusset hypotenuse bottoms, under the knife
+# Owner ruling 2026-11-07 (after 2026-11-06's numbered flag note 3, whose
+# triangle flags confused him): SHARP is written at a straight leader to
+# each edge the model leaves sharp (build_fr_top_frame._external_edge_breaks;
+# drawing-guidelines.md rule 7, a short requirement at its leader): on the
+# 1:3 locator the front crossbar's two side bottoms between the pocket end
+# and the gusset leg and the four gusset hypotenuse bottoms, under the knife
 # seats; on detail J (2:1) the hub rib's inner bottom and the V-gussets'
 # four ramp edges.  The view G side view draws each ramp's two edges as one
 # line, inside the band the 60.0, .31 and 20 DEG already fence, and the rib's
-# inner bottom behind its broken outer one; J draws all five apart.
+# inner bottom behind its broken outer one; J draws all five apart.  Each
+# note carries one leader: SOLIDWORKS 2026 refuses a note attached to
+# several edges (_drawing_tables.add_hole_group_tags), so no nX.
 #
 # Each entry: the view, a point (model mm) on the edge the leader lands on
 # (``ViewEdges.exact_line_through`` picks that edge, ``model_point_in_view``
-# its sheet point), and the flag's centre (sheet m) where the "3" is
-# centred (``_add_sharp_edge_flag``).  The clearances below are from farm run
-# 20261106T222724559Z's layout-audit ink with datums B and C gone, for a
-# triangle of up to 10.5 mm sides centred on its "3" (3.5 mm text, tightest
-# fit), its leader from the triangle toward the landing.
+# its sheet point), and the sheet point (m) the printed SHARP is centred on
+# (``_add_sharp_edge_note``).  The clearances below are from farm run
+# 20261106T222724559Z's layout-audit ink, for a SHARP of 3.5 mm text (five
+# glyphs, SHARP_EDGE_TEXT_HALF) with its leader leaving the side nearer its
+# landing at mid-height.
 #
 # Locator, left window: the 5.42 POCKET and 1.70 dimensions' extension lines
 # (y 177.06 and 222.94 mm, x 23.7..100.3) fence the -X junctions, so each -X
 # leader crosses one of them once, far from its ends (RsTopFrame,
 # 2026-11-06): no other line, arrow, text or leader.  The -X bar side's
-# leader runs 19 deg shallow so its arrow (tip 0.3 mm over the gusset's
-# vertex, y 175.33) stays under that line; it crosses at x 95.8.  The -X
-# gusset's flag stands left of that flag, its leader crossing at x 76.8 and
-# passing 2 mm under it to the gusset's lower end.  The rear -X gusset's
-# leader climbs the channel between the F-F left arrow and the bar, 2.1 mm
-# under the cutting line and 2.5 mm right of the F, crossing at x 97.1.
-# Right window: the +X bar side's flag sits under the front frame's leader,
-# its leader passing 1.3 mm under that leader where it crosses the bar edge;
-# the +X gusset's flag stands right of it, its leader 3.4 mm under it.  The
-# rear +X gusset's leader climbs between the bar and the F-F right arrow
-# (2.9 mm from the F, 2.7 mm under the cutting line).
-# Detail J: the rib's inner bottom flag stands in the window between that
-# edge and the 1.10 line (3.0 mm and 3.2 mm off them), its leader landing
-# 5 mm under the boss's centre mark.  The rail fills J between x 265.7 and
+# SHARP stands 2 mm over that line, so its leader runs shallow enough that
+# the arrow (tip 0.3 mm over the gusset's vertex, y 175.33) stays under it.
+# The -X gusset's SHARP stands left of it on the same row, 10 mm apart, its
+# leader passing more than 1.5 mm under the bar side's SHARP to the gusset's
+# lower end.  The rear -X gusset's leader climbs the channel between the F-F
+# left arrow and the bar, under the cutting line.  Right window: the +X bar
+# side's SHARP sits under the front frame's leader; the +X gusset's stands
+# right of it and 3 mm lower, so the two never stack.  The rear +X gusset's
+# leader climbs between the bar and the F-F right arrow, under the cutting
+# line.
+# Detail J: the rib's inner bottom SHARP stands in the window between that
+# edge and the 1.10 line (2 mm or more off each), its leader landing 5 mm
+# under the boss's centre mark.  The rail fills J between x 265.7 and
 # 334.3, so each ramp edge's leader crosses its rail lines: the front -X one
-# from under the circle (Ø1.18's leader fences the left; 9.4 mm right of the
-# caption), the front +X one level from the window (27 mm over the rail, the
-# nearest open side), the rear two from over the circle, under the sheet
-# frame, clear of the .28's leader by 12.8 mm.
+# from under the circle (Ø1.18's leader fences the left), the front +X one
+# level from the window (the nearest open side), the rear two from over the
+# circle, under the sheet frame, clear of the .28's leader.
 SHARP_EDGE_LOCATOR = "underside locator"
 SHARP_EDGE_DETAIL = "detail J"
 _SHARP_BAR_SIDE_Z = -(INNER_Z - GUSSET) + 0.15 * (INNER_Z - GUSSET - BAR_POCKET_Z)
@@ -757,14 +744,14 @@ def hub_gusset_ramp_point(side: float, dz: float) -> tuple[float, float, float]:
     )
 
 
-SHARP_EDGE_FLAGS: dict[str, tuple[str, tuple[float, float, float], tuple[float, float]]] = {
+SHARP_EDGE_LEADERS: dict[str, tuple[str, tuple[float, float, float], tuple[float, float]]] = {
     "front -X bar side": (
-        SHARP_EDGE_LOCATOR, (BAR_X0, -HALF_H, _SHARP_BAR_SIDE_Z), (0.080, 0.1825),
+        SHARP_EDGE_LOCATOR, (BAR_X0, -HALF_H, _SHARP_BAR_SIDE_Z), (0.080, 0.181),
     ),
     "front -X gusset": (
         SHARP_EDGE_LOCATOR,
         (BAR_X0 - 0.85 * GUSSET, -HALF_H, -INNER_Z + 0.15 * GUSSET),
-        (0.061, 0.183),
+        (0.057, 0.181),
     ),
     "rear -X gusset": (
         SHARP_EDGE_LOCATOR,
@@ -777,7 +764,7 @@ SHARP_EDGE_FLAGS: dict[str, tuple[str, tuple[float, float, float], tuple[float, 
     "front +X gusset": (
         SHARP_EDGE_LOCATOR,
         (BAR_X1 + 0.7 * GUSSET, -HALF_H, -INNER_Z + 0.3 * GUSSET),
-        (0.139, 0.175),
+        (0.139, 0.1735),
     ),
     "rear +X gusset": (
         SHARP_EDGE_LOCATOR,
@@ -785,7 +772,7 @@ SHARP_EDGE_FLAGS: dict[str, tuple[str, tuple[float, float, float], tuple[float, 
         (0.117, 0.1995),
     ),
     "hub rib inner bottom": (
-        SHARP_EDGE_DETAIL, (-INNER_X, -HALF_H, GOOSENECK_Z - 2.5), (0.342, 0.160),
+        SHARP_EDGE_DETAIL, (-INNER_X, -HALF_H, GOOSENECK_Z - 2.5), (0.3445, 0.160),
     ),
     "front -X V-gusset ramp": (
         SHARP_EDGE_DETAIL, hub_gusset_ramp_point(-1.0, -27.0), (0.271, 0.093),
@@ -800,11 +787,14 @@ SHARP_EDGE_FLAGS: dict[str, tuple[str, tuple[float, float, float], tuple[float, 
         SHARP_EDGE_DETAIL, hub_gusset_ramp_point(1.0, 27.0), (0.320, 0.254),
     ),
 }
-SHARP_EDGE_FLAG_TEXT = str(DRAWING_NOTE_FLAG)
-_SW_BALLOON_TRIANGLE = 2  # swBalloonStyle_e.swBS_Triangle
-_SW_BALLOON_FIT_TIGHTEST = 0  # swBalloonFit_e.swBF_Tightest
-# The "3" stands this close to its planned centre once re-centred.
-SHARP_EDGE_FLAG_CENTRE_TOL = 0.0005
+SHARP_EDGE_TEXT = "SHARP"
+# The printed SHARP's half extent about its centre (sheet m): five glyphs
+# at the 2.5 mm a 3.5 mm capital measured on this sheet's hole tags
+# (_HOLE_TAG_HALF), rounded out.
+SHARP_EDGE_TEXT_HALF = (0.0065, 0.00175)
+# A centred note's text (a SHARP, an iso caption) stands this close to
+# its planned centre once re-centred.
+NOTE_TEXT_CENTRE_TOL = 0.0005
 HUB_DETAIL_CENTER = (0.300, 0.174)
 HUB_DETAIL_SCALE = (2, 1)
 HUB_DETAIL_CAPTION_XY = (0.300, 0.090)
@@ -820,7 +810,8 @@ HUB_BOSS_DIA_TEXT_XY = (0.205, 0.124)
 # run 20261027T195317391Z measured them on J at y 146.0 and 202.0 mm, x
 # 268.97..331.02, the rail's inner face at x 334.2 and the window right of
 # it empty to the detail circle (centre (300, 174), radius 76).  Its line
-# stands in that window 15.8 mm off the rail, arrows inside (with its text
+# stands in that window 19.8 mm off the rail, wide enough for the rib's
+# SHARP (SHARP_EDGE_LEADERS) to stand between them, arrows inside (with its text
 # offset, SolidWorks put them outside and left the stub floating at the
 # line's mid on sheet 5).  The text sits outside the detail like the 7.0's
 # over it (HUB_GUSSET_T_OFFSET_XY), in the native D1 form measured on sheet
@@ -830,7 +821,7 @@ HUB_BOSS_DIA_TEXT_XY = (0.205, 0.124)
 # its lower-left corner 2.4 mm outside the circle and its right end 2.5 mm
 # inside the border, the value's top 10.7 mm under the 7.0's last row.  The
 # stub climbs from the line's mid to the underline's near end.
-RIB_WIDTH_LINE_XY = (0.350, 0.174)
+RIB_WIDTH_LINE_XY = (0.354, 0.174)
 RIB_WIDTH_TEXT_XY = (0.3952, 0.212)
 HUB_BOTTOM_KEEP = {"HubDia": HUB_BOSS_DIA_TEXT_XY, "RibWidth": RIB_WIDTH_LINE_XY}
 HUB_BOTTOM_CALLOUTS = {
@@ -1131,8 +1122,8 @@ HANGER_KNOCKOUT_CALLOUT_XY = (
 # left of the Ø45 barrels, 7.0 left of detail J's fence (r 38 about the
 # gooseneck) and 12.0 inside the sheet frame; its extension lines run at
 # y 177 / 223, under and over that fence and between the corner bosses.
-# The block (two rows: the value and "2X POCKET, E-E" naming the section
-# that cuts the T; three rows printed 17.5 mm tall on farm c75ac06, its
+# The block (two rows: the value and "2X POCKET"; three rows printed 17.5 mm
+# tall on farm c75ac06 when it also named E-E, its
 # widest row 33.9 mm by the 40d9d030e render's glyphs) parks on an offset
 # leader above the plan's top-left corner: 2.4 inside the sheet frame's left
 # edge, 2.45 under its top, 1.9 over the plan's top and its top-left boss,
@@ -1158,26 +1149,31 @@ POCKET_FROM_SOCKET_LINE_XY = (
     HUB_BOTTOM_CENTER[1] + (FRONT_COLUMN_Z - BAR_POCKET_Z) / 2.0 * _HUB_BOTTOM_M_PER_MM,
 )
 
-# Sheet 1, Section E-E: the side rails and the crossbar T, cut inside the
-# crossbar pockets (|z| <= 69, where the crossbar is a T) and clear of every hole
-# station (keeper taps at z -83.5 / 82.5, hangers at -84.0 / 90.1, corner
-# bosses at z +/-112), so the section carries rail and T stock only.
+# Sheet 2, Sections E-E and M-M: the left side rail and the crossbar T, cut
+# on one station inside the crossbar pockets (|z| <= 69, where the crossbar
+# is a T) and clear of every hole station (keeper taps at z -83.5 / 82.5,
+# hangers at -84.0 / 90.1, corner bosses at z +/-112), so each section
+# carries rail or T stock only.
 SIDE_SECTION_Z = -56.0
 # Removed sections are centred on the cut span, so each centre puts the
-# dimensioned profile where it sat when the full cut drew its twin as well:
+# dimensioned profile where it sat when one full cut drew both pieces:
 # H-H's single T at the old right-hand T (the web/flange/chamfer callouts
-# keep their lanes), E-E's left rail + web pair where those two stood.
+# keep their lanes), E-E's left rail and M-M's crossbar T where those two
+# stood in the old E-E.
 RAIL_SECTION_CENTER = (0.3566, 0.205)
 # The lone T is 12 mm tall at 1:3, so the native caption climbs to the web
-# width callout unless it is pinned.  H-H prints at the sheet's own 1:3; the
-# native caption omits a scale equal to the sheet's, so a note under it says
-# so beside E-E's 1:4 (machinist review: the two read alike).
+# width callout unless it is pinned.  H-H prints at the sheet's own 1:3, so
+# its caption carries no scale (ASME Y14.3; rule 9: a scale equal to the
+# sheet's restates the title block).
 RAIL_SECTION_CAPTION_XY = (0.3566, 0.169)
-RAIL_SECTION_SCALE_LABEL = "SCALE 1 : 3"
-RAIL_SECTION_SCALE_XY = (0.3445, 0.1585)
-SIDE_SECTION_CENTER = (0.3183, 0.106)
+SIDE_SECTION_CENTER = (0.2967, 0.106)
 SIDE_SECTION_SCALE = (1, 4)
-SIDE_SECTION_CAPTION_XY = (0.3183, 0.0915)
+# The two 1:4 captions (each 43.6 mm wide with its scale row, farm run
+# 20261107T052027513Z) stand side by side under their own sections, 8 mm
+# apart: E-E's 6.7 mm left of its rail so it clears M-M's, M-M's centred
+# under its T.  Both drop 3.5 mm from the old E-E caption's 91.5 so M-M's
+# top stays 2.3 mm under the crossbar web callout's ink (y 88.4).
+SIDE_SECTION_CAPTION_XY = (0.290, 0.088)
 # The web text sits 8 mm left so its 37.5 mm qualifier row ends at 345.8 mm,
 # 4.1 short of the crossbar flange's 8.0 dimension line at 349.9 (farm
 # 30394c1da: the row ran 3.8 mm past that line, text-on-line).
@@ -1208,10 +1204,10 @@ UNDERSIDE_VIEW_ARROW = (
 RAIL_SECTION_PROFILE_X = 0.35643
 SIDE_SECTION_PROFILE_X = 0.29666
 HUB_SECTION_PROFILE_X = 0.33198
-# E-E's crossbar T dimensions: the web's and the flange's dimension lines
+# M-M's crossbar T dimensions: the web's and the flange's dimension lines
 # stand one 5 mm gap off the T (the web's below its underside, the flange's
 # right of its +X face) and their text parks on a leader at the right of the
-# section, under the side rail web's text and right of the caption.  The
+# section, under E-E's side rail web text and right of M-M's caption.  The
 # pockets' depth (flange underside to the T's underside) stands 2 mm left of
 # the flange's -X face, its arrows inside: outside, their tails would cross
 # the side web's dimension line above and the web's arrow tail below.  Its
@@ -1222,11 +1218,21 @@ _SIDE_SECTION_M_PER_MM = SIDE_SECTION_SCALE[0] / SIDE_SECTION_SCALE[1] / 1000.0
 
 
 def _side_section_xy(x: float, y: float) -> tuple[float, float]:
-    """Sheet point of model ``(x, y)`` in E-E, profile pinned at x -197."""
+    """Sheet point of model ``(x, y)`` on E-E's and M-M's shared 1:4 row:
+    E-E's rail pinned at x -197, M-M's crossbar where the old single E-E
+    printed it (CROSSBAR_SECTION_PROFILE_X)."""
     return (
         SIDE_SECTION_PROFILE_X + (x + COLUMN_X) * _SIDE_SECTION_M_PER_MM,
         SIDE_SECTION_CENTER[1] + y * _SIDE_SECTION_M_PER_MM,
     )
+
+
+# The crossbar's own section (rule 9: E-E's plane left the rail and the T
+# floating apart).  M: the next letter no view, datum or table tag uses.
+CROSSBAR_SECTION_LETTER = "M"
+CROSSBAR_SECTION_PROFILE_X = _side_section_xy(HANGER_X, 0.0)[0]
+CROSSBAR_SECTION_CENTER = (CROSSBAR_SECTION_PROFILE_X, SIDE_SECTION_CENTER[1])
+CROSSBAR_SECTION_CAPTION_XY = (CROSSBAR_SECTION_PROFILE_X, SIDE_SECTION_CAPTION_XY[1])
 
 
 CROSSBAR_WEB_LINE_XY = _side_section_xy(HANGER_X, -HALF_H - 20.0)
@@ -1257,6 +1263,10 @@ SECTION_CUT_BASELINE_LETTER_EXTENTS = {
     "E": (-0.0015, 0.0158, 0.0020, 0.0221),
     "D": (-0.0024, 0.0158, 0.0028, 0.0221),
 }
+# M has no measured glyph: E's box widened by 1.4 mm each side for M's
+# broader letterform (an estimate, rounded outward; the layout audit on the
+# next render is its measurement).
+CROSSBAR_SECTION_LETTER_EXTENTS = (-0.0029, 0.0158, 0.0034, 0.0221)
 # The two window clear widths print their values on one line across the
 # plan's lower rail.  The right one's text ("183.9" on b49e1, now 182.9 in
 # as many glyphs) measured on b49e1 about its text point
@@ -1382,17 +1392,24 @@ DETAIL_TOP_KEEP = {
 }
 # Sheet 3's tagged hole table (drawing-guidelines.md rule 10: more than one
 # hole group carries a mate): the four socket bores and the two hanger
-# clearance holes, X and Y from the upper-left socket's axis, the table's
-# native origin mark reattached to a view point on that axis.  The keeper
-# taps stay out: MHA-CH-07 transfers them at assembly, so their callout
-# places them.  The table hangs in the band under the plan, over the
-# edge-break note, left of the title block: the plan's lower bosses end at
-# y 93.3 mm; farm run 20261106T204855971Z measured the table 46.4 mm tall,
-# so the note's first row starts at 41.0, 3.9 under it.  The native SIZE
-# column is hidden: it printed the doc-precision "Ø1.00 THRU" and
-# "Ø .24 THRU ALL" against the plan's own callouts, which already give each
-# tag group's size once (rule 10).
-HOLE_TABLE_ANCHOR = (0.0175, 0.0915)
+# clearance holes, X and Y from the frame's lower-left corner on the plan
+# (the rear-left), the virtual sharp of the left rail's and the rear rail's
+# outer faces, which the boss breaks: a corner the shop picks up with an
+# edge finder on those two straight faces, never a hole centre (owner
+# 2026-11-07, rule 10).  Every hole then reads positive X and Y.  The
+# table's native origin mark is reattached to a view point on that sharp,
+# its X and Y arrows set below and left of it (TABLE_ORIGIN_ARROW_*).  The
+# keeper taps stay out: MHA-CH-07 transfers them at assembly, so their
+# callout places them.  The table hangs in the band under the plan, over
+# the edge-break note, left of the title block: the origin mark's X arrow
+# runs 9 mm under the corner (y 95.0 mm), its labels 2 mm either side, so
+# the table's top starts at 81.5, 2.5 under them; farm run
+# 20261106T204855971Z measured the table 46.4 mm tall (then seven rows of
+# 6 mm and its header), so the note's first row starts at 33.0, 2.1 under
+# it.  The native SIZE column is hidden: it printed the doc-precision
+# "Ø1.00 THRU" and "Ø .24 THRU ALL" against the plan's own callouts, which
+# already give each tag group's size once (rule 10).
+HOLE_TABLE_ANCHOR = (0.0175, 0.0815)
 HOLE_TABLE_ROW_HEIGHT = 0.006
 HOLE_TABLE_TAG_WIDTH = 0.012
 HOLE_TABLE_LOC_WIDTH = 0.019
@@ -1400,7 +1417,7 @@ HOLE_TABLE_MATE_COLUMN = "MATE"
 # "MHA-FR-03, MHA-FR-01": 20 glyphs at the base table's measured 2.47 mm.
 HOLE_TABLE_MATE_WIDTH = 0.054
 _HOLE_TABLE_SIZE_COLUMN = 3
-EDGE_NOTE_XY = (0.030, 0.041)
+EDGE_NOTE_XY = (0.030, 0.033)
 # Each hole's tag stands in the open window beside it on a leader to the
 # axis: the native default parked it up-right of the hole, where the
 # hanger callout's and the keeper callout's leaders ran through "B2" and
@@ -1412,21 +1429,24 @@ EDGE_NOTE_XY = (0.030, 0.041)
 # window, because the C DRILL callout's native leader runs a diameter of
 # that hole from up-right to its arrow on the lower-left rim, where a
 # left-window tag's leader lay along it (farm run 20261107T000550920Z,
-# machinist review: overlapping leaders at B2).  The upper-left
-# socket carries the table's origin mark, whose X arrow ran through "A2"
-# inside the window (farm run 20261106T210746725Z, leader-through-text and
-# leader-crosses-leader), so its tag stands outside the frame, down-left of
-# the boss, its leader reaching the rim's lower-left side.
+# machinist review: overlapping leaders at B2).
 HOLE_TAG_SOCKET_INSET = 0.014
 HOLE_TAG_HANGER_OFFSET = (0.014, 0.006)
-HOLE_TAG_ORIGIN_SOCKET_OFFSET = (-0.0147, -0.0165)
 # The tag's printed "A1" box about its centre (2 glyphs at 3.5 mm): the note
 # position SolidWorks takes is the box's upper-left corner.
 _HOLE_TAG_HALF = (0.0025, 0.00175)
 _TITLE_BLOCK_LEFT = 0.216
 SOCKET_TABLE_MATES = "MHA-FR-03, MHA-FR-01"
 HANGER_TABLE_MATE = "MHA-SM-VN-52"
-TABLE_ORIGIN_XZ = (-COLUMN_X, FRONT_COLUMN_Z)
+TABLE_ORIGIN_XZ = (-OUTER_X, OUTER_Z)
+# The origin mark's arrow tips about the corner (sheet m): the X arrow runs
+# right 16 mm on a line 9 mm under the corner, the Y arrow up 16 mm on a
+# line 9 mm left of it (the native mark draws each from the corner's own
+# ordinate, "0", to its letter; default 13.5 mm off, which put X into the
+# table).  9 mm clears the lower-left boss (it reaches 1.7 mm under and
+# 2.7 mm left of the corner at 1:2) with the labels' 2 mm.
+TABLE_ORIGIN_ARROW_OFFSET = 0.009
+TABLE_ORIGIN_ARROW_LENGTH = 0.016
 # (x, z, diameter, mate) in part mm.
 TABLE_HOLES: tuple[tuple[float, float, float, str], ...] = (
     *(
@@ -1454,7 +1474,7 @@ def bind_hole_table_rows(
     every row must then share one sign per axis.
     """
     expected = [
-        (x - TABLE_ORIGIN_XZ[0], z - TABLE_ORIGIN_XZ[1]) for x, z, _d, _m in TABLE_HOLES
+        (abs(x - TABLE_ORIGIN_XZ[0]), abs(z - TABLE_ORIGIN_XZ[1])) for x, z, _d, _m in TABLE_HOLES
     ]
     if len(rows) != len(expected):
         raise RuntimeError(f"hole table has {len(rows)} rows for {len(expected)} holes")
@@ -1512,17 +1532,20 @@ def leading_zero_locations(rows: tuple[tuple[str, ...], ...]) -> list[str]:
     ]
 
 
+def negative_locations(rows: tuple[tuple[str, ...], ...]) -> list[str]:
+    """The data rows' LOC cells (columns 1, 2) that print negative: from the
+    lower-left corner every hole reads up and right of it."""
+    return [cell for row in rows for cell in row[1:3] if cell.startswith("-")]
+
+
 def hole_tag_position(x: float, z: float, diameter: float) -> tuple[float, float]:
     """The sheet point (the tag box's upper-left corner) for one TABLE_HOLES
     hole's tag: a socket's in the window diagonally inside it, a hanger
     hole's in a window beside the crossbar toward the frame's middle (the
-    front one right of it, the rear one left); the origin
-    socket's outside the frame, clear of the table's origin mark."""
+    front one right of it, the rear one left)."""
     s = DETAIL_VIEW_SCALE / 1000.0
     cx, cy = DETAIL_TOP_CENTER[0] + x * s, DETAIL_TOP_CENTER[1] - z * s
-    if (x, z) == TABLE_ORIGIN_XZ:
-        dx, dy = HOLE_TAG_ORIGIN_SOCKET_OFFSET
-    elif diameter == BORE_DIA:
+    if diameter == BORE_DIA:
         dx = -math.copysign(HOLE_TAG_SOCKET_INSET, x)
         dy = math.copysign(HOLE_TAG_SOCKET_INSET, z)
     else:
@@ -2467,13 +2490,13 @@ def _assert_section_display(
     plane and is part of a cut face (see ``_cut_face_edge``).
 
     Cut-faces-only is the separate question of what lies BEYOND the plane.
-    H-H, E-E and K-K cut across a closed rail band whose far side would print
+    H-H, E-E, M-M and K-K cut across a closed rail band whose far side would print
     over the cut faces they exist to dimension; A-A cuts a corner boss with
     open air behind it and stays a full section.  Both flags are read back
     because SolidWorks accepts either silently.
 
     ``GetPartialSection`` is read against ``removed``: a REMOVED section (H-H,
-    E-E -- ``create_section_view(partial=True)``) is partial by definition,
+    E-E, M-M -- ``create_section_view(partial=True)``) is partial by definition,
     its line deliberately stopping past the one profile it dimensions; on a
     full section the same flag means the line fell short and the cut did not
     close (no hatch, line and labels in the dangling colour).
@@ -3102,10 +3125,16 @@ def section_cut_ends() -> dict[str, tuple[Point, Point]]:
     if outer_y + b_down - band_low < TEXT_CLEARANCE:
         raise ValueError(f"historical B placement fits its band by {outer_y + b_down - band_low:.4f} m")
     inner_y = center_y - INNER_Z * s + clear - b_down
-    # E: the outer letter ends an ink clearance left of the corner boss (and
-    # the (439.0) witness line on its Ø45 extreme); the inner one starts an ink
-    # clearance right of the 18.0 gusset run's outer witness line.
+    # E (the left side rail): the outer letter ends an ink clearance left of
+    # the corner boss (and the (439.0) witness line on its Ø45 extreme); the
+    # inner one, past the rail's inner face, starts an ink clearance right of
+    # the front-left boss it stands beside on the front rail.  M (the
+    # crossbar) mirrors that: its +X letter starts an ink clearance right of
+    # the 18.0 gusset run's outer witness line (E's old inner station, moved
+    # out by M's wider glyph), its -X letter ends one left of the -X
+    # gusset's leg.  Each line crosses its own piece and window air only.
     e0, _e_down, e1, _e_up = SECTION_CUT_BASELINE_LETTER_EXTENTS["E"]
+    m0, _m_down, m1, _m_up = CROSSBAR_SECTION_LETTER_EXTENTS
     # Historical D placement fixes K's ends at the same hub-rail faces.
     d0, _d_down, d1, _d_up = SECTION_CUT_BASELINE_LETTER_EXTENTS["D"]
     return {
@@ -3114,8 +3143,12 @@ def section_cut_ends() -> dict[str, tuple[Point, Point]]:
             (rail_x, (center_y - inner_y) / s),
         ),
         "E": (
-            (BAR_X1 + GUSSET + (clear - e0) / s, SIDE_SECTION_Z),
+            (-COLUMN_X + BOSS_DIA / 2.0 + (clear - e0) / s, SIDE_SECTION_Z),
             (-PLAN_HALF_X - (clear + e1) / s, SIDE_SECTION_Z),
+        ),
+        CROSSBAR_SECTION_LETTER: (
+            (BAR_X1 + GUSSET + (clear - m0) / s, SIDE_SECTION_Z),
+            (BAR_X0 - GUSSET - (clear + m1) / s, SIDE_SECTION_Z),
         ),
         "K": (
             (-OUTER_X - (clear + d1) / s, GOOSENECK_Z),
@@ -3131,9 +3164,11 @@ def _pin_section_profile(
     target_x: float,
     *,
     label: str,
+    target_y: float | None = None,
 ) -> None:
     """Slide a removed section along the sheet until ``model_point`` (the
-    rail centreline it cuts) prints at ``target_x``.
+    rail centreline it cuts) prints at ``target_x`` (and at ``target_y``
+    when given; otherwise on its own row).
 
     A removed section's outline, and so where SolidWorks centres it, grows
     with its cutting line, air included: on leaders955-f542 #955's longer
@@ -3146,7 +3181,8 @@ def _pin_section_profile(
     position = tuple(float(value) for value in view.Position)
     if len(position) != 2:
         raise RuntimeError(f"{label} section has no position")
-    moved = (position[0] + target_x - x, position[1])
+    row = y if target_y is None else target_y
+    moved = (position[0] + target_x - x, position[1] + row - y)
     if not view.SetViewPosition(double_array(list(moved)), False):
         raise RuntimeError(f"failed to pin the {label} section's profile")
     rebuild_drawing(adapter, label=f"pin {label} profile")
@@ -3155,10 +3191,10 @@ def _pin_section_profile(
         f"{label} rail centreline pinned {x*1000.0:.2f} -> {pinned_x*1000.0:.2f} mm",
         section_profile=label, from_x_mm=round(x*1000.0, 3), sheet_x_mm=round(pinned_x*1000.0, 3),
     )
-    if abs(pinned_x - target_x) > 0.00005 or abs(pinned_y - y) > 0.00005:
+    if abs(pinned_x - target_x) > 0.00005 or abs(pinned_y - row) > 0.00005:
         raise RuntimeError(
             f"{label} section profile prints at ({pinned_x*1000.0:.3f}, {pinned_y*1000.0:.3f}) mm, "
-            f"not at x {target_x*1000.0:.3f} mm on its row"
+            f"not at ({target_x*1000.0:.3f}, {row*1000.0:.3f}) mm"
         )
 
 
@@ -3386,26 +3422,45 @@ def _gusset_ramp_angle(adapter: Any, view: Any, view_edges: ViewEdges) -> None:
         raise RuntimeError("gusset ramp angle changed after text positioning")
 
 
-def _flag_text_centre(adapter: Any, annotation: Any, *, label: str) -> tuple[float, float]:
-    """The centre (sheet m) of a flag's one printed number, read through the
-    layout audit's own reader: the run's lower-left on its baseline, the
+def _note_text_centre(
+    adapter: Any, annotation: Any, text: str, *, label: str
+) -> tuple[float, float]:
+    """The centre (sheet m) of a note's one printed ``text`` run, read through
+    the layout audit's own reader: the run's lower-left on its baseline, the
     width SolidWorks reports and its cap height (``display_box``).  An
     estimated width, a refused read or any other count of runs fails."""
     display, refused = annotation_display(adapter, annotation)
     runs = [
         raw for raw in display.get("texts", ())
-        if str(raw.get("t", "")).strip() == SHARP_EDGE_FLAG_TEXT
+        if str(raw.get("t", "")).strip() == text
     ]
     box = display_box({"texts": runs}) if len(runs) == 1 else None
     if refused or box is None or estimated_text_runs({"texts": runs}):
         raise RuntimeError(
-            f"{label}: the flag's {SHARP_EDGE_FLAG_TEXT!r} is not one measured run "
+            f"{label}: {text!r} is not one measured run "
             f"({len(runs)} runs, refused {refused})"
         )
     return (box.xmin + box.xmax) / 2.0, (box.ymin + box.ymax) / 2.0
 
 
-def _add_sharp_edge_flag(
+def _centre_note_text(
+    adapter: Any, annotation: Any, text: str, centre_xy: tuple[float, float], *, label: str
+) -> tuple[float, float]:
+    """Move a note so its printed ``text`` is centred on ``centre_xy`` (where
+    SolidWorks puts the text about its requested position is not known);
+    the measured centre, which must land within NOTE_TEXT_CENTRE_TOL."""
+    x, y = _note_text_centre(adapter, annotation, text, label=label)
+    dx, dy = centre_xy[0] - x, centre_xy[1] - y
+    if math.hypot(dx, dy) > NOTE_TEXT_CENTRE_TOL:
+        move_annotation(adapter, annotation, dx, dy, label=label)
+        x, y = _note_text_centre(adapter, annotation, text, label=label)
+    miss = math.dist((x, y), centre_xy)
+    if miss > NOTE_TEXT_CENTRE_TOL:
+        raise RuntimeError(f"{label}: {text!r} stands {miss * 1000.0:.2f} mm off its centre")
+    return x, y
+
+
+def _add_sharp_edge_note(
     adapter: Any,
     view: Any,
     edges: ViewEdges,
@@ -3414,15 +3469,14 @@ def _add_sharp_edge_flag(
     centre_xy: tuple[float, float],
     label: str,
 ) -> Any:
-    """One note-3 flag (SHARP_EDGE_FLAGS): the number in a triangle on a
-    straight leader to the edge through ``landing_mm``.
+    """One SHARP (SHARP_EDGE_LEADERS) on a straight leader to the edge
+    through ``landing_mm``.
 
     The note is attached by the scanned edge object with its landing set
     before insertion (``add_attached_note``), so it can only land on that
-    edge.  Where SolidWorks centres the bordered text about the requested
-    point is not known, so the "3" is read back and moved onto
-    ``centre_xy``, the point the layout's clearances are measured from;
-    after that the border, the text and the leader's landing are read back.
+    edge.  The printed SHARP is then read back and moved onto ``centre_xy``,
+    the point the layout's clearances are measured from; after that the
+    text, its plain border and the leader's landing are read back.
     """
     edge = edges.exact_line_through(landing_mm, label=label).edge
     landing = model_point_in_view(
@@ -3431,36 +3485,21 @@ def _add_sharp_edge_flag(
     )
     note = _early_bound(
         add_attached_note(
-            adapter, view, text=SHARP_EDGE_FLAG_TEXT, entity=edge,
+            adapter, view, text=SHARP_EDGE_TEXT, entity=edge,
             leader_attach_xy=landing, note_xy=centre_xy, label=label,
         ),
         "INote",
     )
-    if not note.SetBalloon(_SW_BALLOON_TRIANGLE, _SW_BALLOON_FIT_TIGHTEST):
-        raise RuntimeError(f"{label}: the flag's triangle border was refused")
-    rebuild_drawing(adapter, label=f"{label} flag border")
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-    x, y = _flag_text_centre(adapter, annotation, label=label)
-    dx, dy = centre_xy[0] - x, centre_xy[1] - y
-    if math.hypot(dx, dy) > SHARP_EDGE_FLAG_CENTRE_TOL:
-        move_annotation(adapter, annotation, dx, dy, label=f"{label} flag")
-        x, y = _flag_text_centre(adapter, annotation, label=label)
-    miss = math.dist((x, y), centre_xy)
-    if (
-        miss > SHARP_EDGE_FLAG_CENTRE_TOL
-        or not note.HasBalloon()
-        or int(note.GetBalloonStyle()) != _SW_BALLOON_TRIANGLE
-        or str(note.GetText()) != SHARP_EDGE_FLAG_TEXT
-    ):
+    x, y = _centre_note_text(adapter, annotation, SHARP_EDGE_TEXT, centre_xy, label=label)
+    if note.HasBalloon() or str(note.GetText()) != SHARP_EDGE_TEXT:
         raise RuntimeError(
-            f"{label}: flag reads {note.GetText()!r}, border "
-            f"{int(note.GetBalloonStyle())}, its number {miss * 1000.0:.2f} mm "
-            "off its centre"
+            f"{label}: note reads {note.GetText()!r}, balloon {bool(note.HasBalloon())}"
         )
-    _assert_leader_lands(annotation, landing, what="sharp-edge flag", label=label)
+    _assert_leader_lands(annotation, landing, what="sharp-edge note", label=label)
     box = display_box(annotation_display(adapter, annotation)[0])
     _telemetry.event(
-        "drawing.sharp_edge_flag", label=label, centre_mm=f"{x * 1000:.2f},{y * 1000:.2f}",
+        "drawing.sharp_edge_note", label=label, centre_mm=f"{x * 1000:.2f},{y * 1000:.2f}",
         ink_mm=(
             "" if box is None else
             f"{box.xmin * 1000:.2f},{box.ymin * 1000:.2f},{box.xmax * 1000:.2f},{box.ymax * 1000:.2f}"
@@ -3469,21 +3508,32 @@ def _add_sharp_edge_flag(
     return note
 
 
-def _add_sharp_edge_flags(adapter: Any, view: Any, edges: ViewEdges, view_key: str) -> int:
-    """Every SHARP_EDGE_FLAGS flag of ``view_key`` on ``view``; their count."""
+def _add_sharp_edge_notes(adapter: Any, view: Any, edges: ViewEdges, view_key: str) -> int:
+    """Every SHARP_EDGE_LEADERS note of ``view_key`` on ``view``; their count."""
     placed = 0
-    for name, (key, landing_mm, centre_xy) in SHARP_EDGE_FLAGS.items():
+    for name, (key, landing_mm, centre_xy) in SHARP_EDGE_LEADERS.items():
         if key != view_key:
             continue
-        _add_sharp_edge_flag(
+        _add_sharp_edge_note(
             adapter, view, edges, landing_mm=landing_mm, centre_xy=centre_xy,
-            label=f"{view_key} {name} sharp-edge flag",
+            label=f"{view_key} {name} sharp-edge note",
         )
         placed += 1
     if not placed:
-        raise RuntimeError(f"no sharp-edge flags for {view_key!r}")
+        raise RuntimeError(f"no sharp-edge notes for {view_key!r}")
     return placed
 
+
+def _add_pictorial_captions(adapter: Any) -> None:
+    """Each PICTORIAL_CAPTIONS note, its text read back centred under its
+    view on the active pictorial sheet."""
+    for text, centre_xy in PICTORIAL_CAPTIONS:
+        label = f"pictorial caption {text}"
+        note = add_note(adapter, text, *centre_xy)
+        if note is None:
+            raise RuntimeError(f"failed to add the {label}")
+        annotation = _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation")
+        _centre_note_text(adapter, annotation, text, centre_xy, label=label)
 
 
 # SolidWorks attaches one of its own automatic "Tapped Hole" notes to a view
@@ -3588,23 +3638,64 @@ def _socket_bore_circle(edges: ViewEdges, x: float, z: float, *, label: str) -> 
 
 
 def _hole_table_axes(edges: ViewEdges) -> tuple[Any, Any]:
-    """The plan's longest visible X-running and Z-running straight edges.
+    """The plan's two datum edges: the longest visible straight edge of the
+    rear rail's outer face (X-running, at z OUTER_Z) and of the left rail's
+    (Z-running, at x -OUTER_X), whose virtual sharp is TABLE_ORIGIN_XZ.
 
     They give the native table its axis directions; its origin is then
-    reattached to the socket-axis point, so which edges they are is moot.
+    reattached to the theoretical point on that sharp.
     """
-    def longest(axis: int) -> Any:
+    def longest(axis: int, across: int, at: float, face: str) -> Any:
         runs = [
             item for item in edges.lines
             if all(
                 abs(item.line[0][k] - item.line[1][k]) < 1e-6 for k in (0, 1, 2) if k != axis
             )
+            and abs(item.line[0][across] - at) < 1e-3
         ]
         if not runs:
-            raise RuntimeError(f"holes/sockets plan has no straight edge along axis {axis}")
+            raise RuntimeError(f"holes/sockets plan shows no straight edge of the {face}")
         return max(runs, key=lambda item: abs(item.line[0][axis] - item.line[1][axis])).edge
 
-    return longest(0), longest(2)
+    return (
+        longest(0, 2, TABLE_ORIGIN_XZ[1], "rear rail's outer face"),
+        longest(2, 0, TABLE_ORIGIN_XZ[0], "left rail's outer face"),
+    )
+
+
+def _set_table_origin_arrows(adapter: Any, table: Any, corner_xy: tuple[float, float]) -> None:
+    """Set the hole table's origin mark's arrow tips (TABLE_ORIGIN_ARROW_*)
+    about the corner and read the mark back: the origin on the corner, the X
+    arrow level under it running right from its ordinate, the Y arrow plumb
+    left of it running up from its ordinate."""
+    feature = _early_bound(_early_bound(table, "IHoleTableAnnotation").HoleTable, "IHoleTable")
+    origin = _early_bound(feature.DatumOrigin, "IDatumOrigin")
+    annotation = _early_bound(origin.GetAnnotation(), "IAnnotation")
+    position = tuple(float(value) for value in annotation.GetPosition() or ())
+    if len(position) < 2 or math.dist(position[:2], corner_xy) > 0.0001:
+        raise RuntimeError(f"holes/sockets origin mark stands at {position!r}, not on {corner_xy!r}")
+    ox, oy = corner_xy
+    offset, length = TABLE_ORIGIN_ARROW_OFFSET, TABLE_ORIGIN_ARROW_LENGTH
+    tips = [ox + length, oy - offset, ox - offset, oy + length]
+    if origin.SetAxisPoints(double_array(tips)) is not True:
+        raise RuntimeError(f"holes/sockets origin mark refused its arrow tips {tips!r}")
+    rebuild_drawing(adapter, label="holes/sockets origin arrows")
+    axis = [float(value) for value in origin.GetAxisPoints2() or ()]
+    _telemetry.info(f"holes/sockets origin mark axis points: {axis!r}")
+    if len(axis) != 8:
+        raise RuntimeError(f"holes/sockets origin mark reads {axis!r}")
+    x_start, x_tip, y_start, y_tip = axis[0:2], axis[2:4], axis[4:6], axis[6:8]
+    expected = {
+        "X tip": (x_tip, (ox + length, oy - offset)),
+        "Y tip": (y_tip, (ox - offset, oy + length)),
+        "X start": ((x_start[1],), (oy - offset,)),
+        "Y start": ((y_start[0],), (ox - offset,)),
+    }
+    for name, (got, want) in expected.items():
+        if any(abs(g - w) > 0.0001 for g, w in zip(got, want)):
+            raise RuntimeError(f"holes/sockets origin {name} reads {got!r}, not {want!r}")
+    if not (ox - 0.001 <= x_start[0] < ox + length / 2.0 and oy - 0.001 <= y_start[1] < oy + length / 2.0):
+        raise RuntimeError(f"holes/sockets origin arrows do not start at the corner: {axis!r}")
 
 
 def _socket_hole_table(adapter: Any, view: Any, edges: ViewEdges) -> Any:
@@ -3612,7 +3703,7 @@ def _socket_hole_table(adapter: Any, view: Any, edges: ViewEdges) -> Any:
     origin = create_view_theoretical_datum(
         adapter, view,
         point_xy=(TABLE_ORIGIN_XZ[0] / 1000.0, -TABLE_ORIGIN_XZ[1] / 1000.0),
-        label="upper-left socket axis table origin",
+        label="lower-left virtual sharp table origin",
     )
     hole_entities = []
     hole_points = []
@@ -3632,13 +3723,14 @@ def _socket_hole_table(adapter: Any, view: Any, edges: ViewEdges) -> Any:
             label="hole-table rim",
         ))
     _drop_hole_table_leading_zeros(adapter)
+    corner_xy = model_point_in_view(
+        adapter, view,
+        (TABLE_ORIGIN_XZ[0] / 1000.0, HALF_H / 1000.0, TABLE_ORIGIN_XZ[1] / 1000.0),
+        label="hole-table origin",
+    )
     table = insert_hole_table(
         adapter, view,
-        datum_xy=model_point_in_view(
-            adapter, view,
-            (TABLE_ORIGIN_XZ[0] / 1000.0, HALF_H / 1000.0, TABLE_ORIGIN_XZ[1] / 1000.0),
-            label="hole-table origin",
-        ),
+        datum_xy=corner_xy,
         datum_point=origin,
         datum_axes=_hole_table_axes(edges),
         hole_points=tuple(hole_points),
@@ -3649,6 +3741,7 @@ def _socket_hole_table(adapter: Any, view: Any, edges: ViewEdges) -> Any:
         unit=UNIT,
         location_places=3,
     )
+    _set_table_origin_arrows(adapter, table, corner_xy)
     table = _early_bound(table, "ITableAnnotation")
     columns = int(table.ColumnCount)
     rows = tuple(
@@ -3659,6 +3752,8 @@ def _socket_hole_table(adapter: Any, view: Any, edges: ViewEdges) -> Any:
     if leading_zero_locations(rows[1:]):
         raise RuntimeError(f"holes/sockets LOC cells kept a leading zero: {rows!r}")
     bound = bind_hole_table_rows(rows[1:], LENGTH_UNITS[UNIT])
+    if negative_locations(rows[1:]):
+        raise RuntimeError(f"holes/sockets LOC cells read negative from the corner: {rows!r}")
     if table.InsertColumn2(_INSERT_COLUMN_AFTER, 3, HOLE_TABLE_MATE_COLUMN, 0) is not True:
         raise RuntimeError("holes/sockets table refused its MATE column")
     if table.SetColumnTitle2(4, HOLE_TABLE_MATE_COLUMN, False) is not True:
@@ -3861,16 +3956,16 @@ async def build(adapter: Any) -> dict[str, str]:
     if extension.GetUserPreferenceInteger(542, 0) != 0:
         raise RuntimeError("section cutting-line style did not persist")
     ddoc = _early_bound(drawing_model, "IDrawingDoc")
-    # Sheet 1 primes the reader: two octant pictorials with the faces named
-    # where they are seen, in the machine's names that sheet 3's FRONT/REAR
-    # hanger and keeper Z use, so no orientation key is needed.  The old 1:5
-    # isometric tucked under the geometry sheet's front view is gone with it.
+    # Sheet 1 primes the reader: two octant pictorials, each named in words
+    # under it (PICTORIAL_CAPTIONS).  The old 1:5 isometric tucked under the
+    # geometry sheet's front view is gone with it.
     if not ddoc.ActivateSheet("PICTORIAL"):
         raise RuntimeError("failed to activate top-frame pictorial sheet")
     place_pictorial_sheet(
         adapter, str(SOURCE), PICTORIAL_VIEWS, scale=PICTORIAL_SCALE,
         label="top-frame pictorials",
     )
+    _add_pictorial_captions(adapter)
 
     if not ddoc.ActivateSheet("GEOMETRY"):
         raise RuntimeError("failed to activate top-frame geometry sheet")
@@ -3889,7 +3984,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
     )
     # drawing-guidelines.md rule 9 (show internal shape in solid lines): the plan view's hidden rail undersides and land
-    # pads repeat what sections H-H and E-E plus the sheet 6 underside
+    # pads repeat what sections H-H, E-E and M-M plus the sheet 6 underside
     # view already describe, so they come off the dimensioned plan.
     set_hidden_lines_removed(adapter, geometry_top)
     set_hidden_lines_removed(adapter, geometry_front)
@@ -4092,19 +4187,19 @@ async def build(adapter: Any) -> dict[str, str]:
           (rail_cut_x, HALF_H + SECTION_AXIS_OVERRUN_MM * 3, REAR_COLUMN_Z)),),
     )
     _position_view_caption(adapter, rail_section, RAIL_SECTION_CAPTION_XY)
-    if add_note(adapter, RAIL_SECTION_SCALE_LABEL, *RAIL_SECTION_SCALE_XY) is None:
-        raise RuntimeError("failed to state H-H's scale")
     _assert_section_display(
         adapter, rail_section, label="H-H T rail section", cut_surface_only=True, removed=True
     )
     # H-H cuts the front/rear rails only, so the 34.2 side rails and the
     # crossbar had no web thickness, root radius or rim chamfer anywhere on
     # the print, yet the keeper taps and the hanger holes are cut into
-    # exactly that stock.  E-E is a second removed section: its cutting line
-    # runs from outside the left side rail to just past the crossbar, so the
-    # print shows the one side rail it dimensions and the crossbar T beside
-    # it, its web and flange dimensioned at the T's own station between the
-    # gussets -- not the right rail's identical, unannotated twin.
+    # exactly that stock.  One plane at z -56 cuts both, but the left side
+    # rail and the crossbar T are two pieces with only the window between
+    # them, so they are two removed sections (owner 2026-11-07, rule 9: a
+    # plane that leaves pieces floating becomes separate sections): E-E
+    # across the left side rail only, M-M across the crossbar only, each
+    # cutting plane a short whole line across its own piece -- not the right
+    # rail's identical, unannotated twin.
     _pin_sheet_scale(adapter)
     side_cut = [
         model_point_in_view(
@@ -4122,7 +4217,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _orient_cut_section(adapter, side_section, (1.0, 0.0, 0.0))
     _pin_section_profile(
         adapter, side_section, (-COLUMN_X, 0.0, SIDE_SECTION_Z),
-        SIDE_SECTION_PROFILE_X, label="E-E",
+        SIDE_SECTION_PROFILE_X, label="E-E", target_y=SIDE_SECTION_CENTER[1],
     )
     set_hidden_lines_removed(adapter, side_section)
     side_section_edges = scan_view_edges(side_section, label="E-E side rail section")
@@ -4134,6 +4229,40 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_mm=WEB_T, orientation="horizontal", exact_linear=True,
         suffix="2X SIDE RAIL WEB", edges=side_section_edges,
     )
+    # The web stands on its flange's centre: a drawn centreline shows it
+    # (rule 10) where a prose note under the caption used to (rule 9); the
+    # web's 2X carries the right rail.
+    _add_view_centerlines(
+        adapter, side_section,
+        (((-COLUMN_X, -HALF_H - SECTION_AXIS_OVERRUN_MM * 4, SIDE_SECTION_Z),
+          (-COLUMN_X, HALF_H + SECTION_AXIS_OVERRUN_MM * 4, SIDE_SECTION_Z)),),
+    )
+    _position_view_caption(adapter, side_section, SIDE_SECTION_CAPTION_XY)
+    _assert_section_display(
+        adapter, side_section, label="E-E side rail section", cut_surface_only=True, removed=True
+    )
+    _pin_sheet_scale(adapter)
+    crossbar_cut = [
+        model_point_in_view(
+            adapter, geometry_top, (x/1000.0, 0.0, z/1000.0),
+            label="crossbar section station",
+        )
+        for x, z in cut_ends[CROSSBAR_SECTION_LETTER]
+    ]
+    crossbar_section = create_section_view(
+        adapter, geometry_top,
+        line_start=crossbar_cut[0], line_end=crossbar_cut[1],
+        view_xy=CROSSBAR_SECTION_CENTER, section_label=CROSSBAR_SECTION_LETTER,
+        scale=SIDE_SECTION_SCALE, partial=True, label="crossbar manufacturing section",
+    )
+    _orient_cut_section(adapter, crossbar_section, (1.0, 0.0, 0.0))
+    _pin_section_profile(
+        adapter, crossbar_section, (HANGER_X, 0.0, SIDE_SECTION_Z),
+        CROSSBAR_SECTION_PROFILE_X, label=f"{CROSSBAR_SECTION_LETTER}-{CROSSBAR_SECTION_LETTER}",
+        target_y=SIDE_SECTION_CENTER[1],
+    )
+    set_hidden_lines_removed(adapter, crossbar_section)
+    crossbar_section_edges = scan_view_edges(crossbar_section, label="crossbar section")
     # The crossbar T: its web below the flange's R.12 roots and above the
     # bottom break, its flange from the top face to the underside's flat
     # between its edge break and the root.
@@ -4147,38 +4276,32 @@ async def build(adapter: Any) -> dict[str, str]:
          "crossbar flange thickness", "CROSSBAR FLANGE"),
     ):
         _checked_dimension(
-            adapter, side_section, p0=p0, p1=p1, text_xy=xy, label=label,
+            adapter, crossbar_section, p0=p0, p1=p1, text_xy=xy, label=label,
             expected_mm=expected, orientation=orientation, exact_linear=True,
-            suffix=qualifier, offset_text=offset, edges=side_section_edges,
+            suffix=qualifier, offset_text=offset, edges=crossbar_section_edges,
         )
     # The pockets either side of the web, as the underside's 138.0 names
     # them: their depth from the flange underside's flat to the T's
     # underside, the 1.437 grip less the .32 flange -- a reference.
     pocket_depth = _checked_dimension(
-        adapter, side_section,
+        adapter, crossbar_section,
         p0=(flange_flat_x, FLANGE_BOT_Y, SIDE_SECTION_Z), p1=(HANGER_X, -HALF_H, SIDE_SECTION_Z),
         text_xy=CROSSBAR_POCKET_DEPTH_LINE_XY, label="crossbar pocket depth",
         expected_mm=FLANGE_BOT_Y + HALF_H, orientation="vertical", exact_linear=True,
         suffix="2X POCKET", offset_text=CROSSBAR_POCKET_DEPTH_TEXT_XY,
-        edges=side_section_edges, reference=True,
+        edges=crossbar_section_edges, reference=True,
     )
     pocket_depth.ArrowSide = _DIM_ARROWS_INSIDE
     if int(pocket_depth.ArrowSide) != _DIM_ARROWS_INSIDE:
         raise RuntimeError("crossbar pocket depth did not keep its arrows inside")
-    # Both webs stand on their flanges' centres: drawn centrelines show it
-    # (rule 10) where a prose note under the caption used to (rule 9); the
-    # side web's 2X carries the right rail.
     _add_view_centerlines(
-        adapter, side_section,
-        tuple(
-            ((x, -HALF_H - SECTION_AXIS_OVERRUN_MM * 4, SIDE_SECTION_Z),
-             (x, HALF_H + SECTION_AXIS_OVERRUN_MM * 4, SIDE_SECTION_Z))
-            for x in (-COLUMN_X, HANGER_X)
-        ),
+        adapter, crossbar_section,
+        (((HANGER_X, -HALF_H - SECTION_AXIS_OVERRUN_MM * 4, SIDE_SECTION_Z),
+          (HANGER_X, HALF_H + SECTION_AXIS_OVERRUN_MM * 4, SIDE_SECTION_Z)),),
     )
-    _position_view_caption(adapter, side_section, SIDE_SECTION_CAPTION_XY)
+    _position_view_caption(adapter, crossbar_section, CROSSBAR_SECTION_CAPTION_XY)
     _assert_section_display(
-        adapter, side_section, label="E-E side rail section", cut_surface_only=True, removed=True
+        adapter, crossbar_section, label="crossbar section", cut_surface_only=True, removed=True
     )
     # The plan and front views are projected at the title block's own scale,
     # so a label restating it would be the one thing on the sheet saying
@@ -4975,7 +5098,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("rail pad width did not keep its arrows inside")
     # The locator is drawn at the title block's own scale, so it names
     # itself and says nothing a reader can already read off the title block;
-    # its sharp edges carry note 3's flags (SHARP_EDGE_FLAGS, placed below).
+    # its sharp edges carry SHARP leaders (SHARP_EDGE_LEADERS, placed below).
     if add_note(adapter, HUB_BOTTOM_TITLE, *HUB_BOTTOM_TITLE_XY) is None:
         raise RuntimeError("failed to label underside locator")
     # The faced underside plane (user ruling 2026-10-12): the part's own
@@ -5128,12 +5251,12 @@ async def build(adapter: Any) -> dict[str, str]:
     # The 60.0 feather span is dimensioned once, on the hub side view that
     # also carries the drop and the ramp angle; repeating it here would be
     # the same length stated twice on two sheets.
-    # Note 3's flags on the edges the model leaves sharp: the bar and gusset
+    # SHARP on the edges the model leaves sharp: the bar and gusset
     # bottoms on the locator, the hub rib's inner bottom and the V-gusset
-    # ramps on J (SHARP_EDGE_FLAGS), after every dimension and frame they
+    # ramps on J (SHARP_EDGE_LEADERS), after every dimension and frame they
     # are placed clear of.
-    _add_sharp_edge_flags(adapter, hub_bottom_parent, hub_bottom_edges, SHARP_EDGE_LOCATOR)
-    _add_sharp_edge_flags(adapter, geometry_bottom, geometry_bottom_edges, SHARP_EDGE_DETAIL)
+    _add_sharp_edge_notes(adapter, hub_bottom_parent, hub_bottom_edges, SHARP_EDGE_LOCATOR)
+    _add_sharp_edge_notes(adapter, geometry_bottom, geometry_bottom_edges, SHARP_EDGE_DETAIL)
     _position_view_caption(adapter, geometry_bottom, HUB_DETAIL_CAPTION_XY)
     # F-F imports HangerGrip from the crossbar extrude it cuts.
     hanger_section, hanger_dimensions = _hanger_section(adapter, hub_bottom_parent)

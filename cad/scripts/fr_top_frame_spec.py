@@ -707,14 +707,12 @@ HANGER_PIN_FLOOR_FILLET_LIFT_MAX = KNIFE_DOWEL.PRESS_FLOOR_LIFT_MAX
 # the hub boss (build_fr_top_frame._external_edge_breaks: the front crossbar
 # side bottoms, the four gusset hypotenuse bottoms, the hub rib's inner bottom
 # and the V-gusset ramp edges) are the "UNLESS NOTED": owner ruling
-# 2026-11-06 numbers the notes and makes the third a flag note, its flag (a
-# triangle round "3") on a leader to each of those edges on the UNDERSIDE
-# sheet (draw_fr_top_frame.SHARP_EDGE_FLAGS), replacing the prose under
-# the view labels the machinist review could not tie to an edge.  Flagged
-# edges keep the title block break, and the note says so (machinist review
-# r1: "SHARP" alone read as cancelling the burr removal too).  Each row
-# stays within the 64 characters the unnumbered first row printed on sheet 3
-# (EDGE_NOTE_XY): "HOLE/SLOT" pays for the "1. ".
+# 2026-11-07 writes SHARP at a leader to each of those edges on the
+# UNDERSIDE sheet (draw_fr_top_frame.SHARP_EDGE_LEADERS), so no numbered
+# flag note sends the reader back to this block (2026-11-06's triangle flags
+# confused the owner).  Each row stays within the 64 characters the
+# unnumbered first row printed on sheet 3 (EDGE_NOTE_XY): "HOLE/SLOT" pays
+# for the "1. ".
 # Owner ruling 2026-10-18 (exception RV-02, #1625): the cast inside corners
 # the model leaves sharp (window corners, flange junctions) take the casting's
 # own root radius at most; the R.12 T-roots are dimensioned (the "UNLESS
@@ -727,14 +725,11 @@ INSIDE_CORNER_R_MAX = 3.048  # .12
 _EDGE_CHAMFER_TEXT = render_number(
     EDGE_CHAMFER / IN, UNIT, DRAWING_REFERENCE_PRECISION["top rim chamfer"]
 )
-DRAWING_NOTE_FLAG = 3
 DRAWING_NOTES = (
     f"1. CONVEX EDGES {_EDGE_CHAMFER_TEXT}"
     " X 45° UNLESS NOTED; NOT HOLE/SLOT MOUTHS.\n"
     # TODO(#1625): remove when the title block gains its inside-corner default
-    f"2. INSIDE CORNERS R{render_number(INSIDE_CORNER_R_MAX / IN, UNIT, 2)} MAX UNLESS NOTED.\n"
-    f"{DRAWING_NOTE_FLAG}. EDGES FLAGGED {DRAWING_NOTE_FLAG}: NO {_EDGE_CHAMFER_TEXT}"
-    " CHAMFER; TITLE-BLOCK EDGE BREAK."
+    f"2. INSIDE CORNERS R{render_number(INSIDE_CORNER_R_MAX / IN, UNIT, 2)} MAX UNLESS NOTED."
 )
 # User rulings 2026-10-11, 2026-10-14 and 2026-10-18 (cohesive appearance;
 # exception RV-03): the whole top plane between the four corner bosses is
