@@ -209,7 +209,7 @@ SHEET_NAMES = (
     "ASSEMBLY SEQUENCE CONT. - PINION RIG + CONE SET ON THE BASE",
     "FULL-DETAIL SIDE VIEW",
     "CHECKS + SETUP",
-    "CYLINDER BANK + DRUM STATION SETTINGS",
+    "CYLINDER BANK + MHA-DT-01 STATION SETTINGS",
     "SETTING TABLES + CONE STATIONS",
 )
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
@@ -309,7 +309,7 @@ DRUM_VIEW_LETTER = "D"
 # DETAIL A (4:1) carries one.
 BANK_VIEW_CAPTION = f"VIEW {BANK_VIEW_LETTER} - CYLINDER BANK ONLY (ARROW: SHEET 1)"
 DRUM_VIEW_CAPTION = (
-    f"VIEW {DRUM_VIEW_LETTER} - ARBOR AND DRUM ONLY\nPARTIAL (ARROW: SHEET 1)"
+    f"VIEW {DRUM_VIEW_LETTER} - MHA-DT-22 AND MHA-DT-01 ONLY\nPARTIAL (ARROW: SHEET 1)"
 )
 SHEET1_VIEW_ARROWS = (
     (BANK_VIEW_LETTER, bank_settings.AXIS_Y + 34.0),
@@ -996,6 +996,9 @@ FEELER_STACK_HEADER = ("SETTING", "LEAVES (MM, AS STAMPED)", "STEPS")
 
 def _feeler_stack_rows() -> tuple[tuple[str, str, str], ...]:
     settings = (
+        # Rubric sample round 13 (#4): the cone set's feelers are leaves too.
+        (COLLAR_FEELER, (COLLAR_FEELER,), _step_ref("tip-adjuster-set", "A")),
+        (PINION_SEAT_FEELER, (PINION_SEAT_FEELER,), _step_ref("crank-mesh-checked", "F")),
         (
             FITUP.DRUM_END_SHIM,
             (FITUP.DRUM_END_SHIM,),
@@ -1181,6 +1184,7 @@ CHANNEL_RODS_SET_AT = _step_ref("cylinder-stack-accepted", "B")
 # configuration (pd_transgear_removable_spec: T12 on the crank); the machinist
 # review of 8e6a0dbd8 asked for its own number.
 CRANK_CHAIN_WHEEL = str(_config.parts("pd-transgear-removable")["number"])
+PLATEN_NUMBER = str(_config.parts("pd-platen")["number"])
 
 
 ASSEMBLED_HEADING = (
@@ -1240,8 +1244,7 @@ CONE_CRANK_STEPS = _note_text(
         "2C. RUN BOTH MHA-DT-VN-61 IN, LOOSE ENOUGH TO TURN MHA-DT-05.",
         # #1074: the collar's bearing on the boss end reacts the tip
         # adjuster's preload (#914), and the model mates it (#1058).
-        "2D. JOURNAL MHA-DT-04 IN THE MHA-DT-05 CONE BOSS UNTIL THE MHA-DT-04",
-        "   COLLAR BEARS ON THE BOSS BACK END.",
+        "2D. JOURNAL MHA-DT-04 IN MHA-DT-05 UNTIL ITS COLLAR BEARS ON THE BOSS.",
         "2E. SLIP MHA-DT-VN-54 ON THE MHA-DT-04 TIP STUB.",
         # User ruling 2026-09-29 (eight-views-4 photo): MHA-DT-21 is a prism
         # standing directly on MHA-DT-20, held by one #4-40 socket head cap
@@ -1257,7 +1260,11 @@ CONE_CRANK_STEPS = _note_text(
         "2G. RUN MHA-DT-VN-60 UP THRU THE MHA-DT-20 COUNTERBORE, HELD SQUARE.",
         "2H. DRILL AND REAM UP THRU MHA-DT-20 INTO MHA-DT-21 PER BOTH CALLOUTS.",
         "2J. PRESS MHA-DT-VN-69 UP THRU MHA-DT-20 TO THE MHA-DT-21 HOLE FLOOR.",
-        "2K. CHECK THAT MHA-DT-21 DOES NOT TURN ON MHA-DT-20 BY HAND.",
+        # Rule 23 (rubric sample round 13, #3): a press that goes in by hand
+        # is a slip fit, and the step says what to do then (as 4A-4B).
+        "2K. CHECK THAT MHA-DT-VN-69 DOES NOT SLIDE BY HAND.",
+        "2L. IF IT DOES, BOND IT IN WITH LOCTITE 638 PER THE SHEET 1 NOTE.",
+        "2M. CHECK THAT MHA-DT-21 DOES NOT TURN ON MHA-DT-20 BY HAND.",
         # User ruling 2026-09-29: the stack's back float is held on the
         # shaft by MHA-DT-VN-54, set off T006 by one feeler and locked on the
         # D-flat; the cup screw alone then sets MHA-DT-04's end play
@@ -1333,8 +1340,7 @@ CONE_CRANK_STEPS = _note_text(
         f"{inch_envelope((max(CRANK_END_PROUD_RANGE[0], 0.0), CRANK_END_PROUD_RANGE[1]), 3)}"
         " PROUD OF MHA-DT-10.",
         "4V. DO NOT FACE THAT END.",
-        f"5. SLIDE {CRANK_CHAIN_WHEEL} T12 ONTO MHA-DT-11 BEFORE THE ARM, ITS HOLES OVER",
-        "   THE 2X MHA-DT-VN-67.",
+        f"5. SLIDE {CRANK_CHAIN_WHEEL} T12 ON MHA-DT-11, HOLES OVER THE 2X MHA-DT-VN-67.",
         # U33 (user, 2026-09-23): crank hub MHA-DT-31 pressed into the arm and
         # seam-pinned by MHA-DT-VN-59; the MHA-DT-09 cross-hole runs behind
         # the arm through the hub barrel. The seam's size and depth print
@@ -1342,25 +1348,28 @@ CONE_CRANK_STEPS = _note_text(
         # ream's acceptance (the ring clear of the hub) is an assembly setting.
         # Codex #1140: the keeper chain's bead count is the spec's solve.
         "6. PRESS MHA-DT-31 INTO MHA-DT-06 TO THE SHOULDER: FACES FLUSH.",
-        "6A. MATCH-DRILL AND REAM THE MHA-DT-31/MHA-DT-06 JOINT-LINE PIN HOLE",
+        # Rule 23 (rubric sample round 13, #3): the press's slip-fit remedy.
+        "6A. CHECK THAT MHA-DT-31 DOES NOT SLIDE IN MHA-DT-06 BY HAND.",
+        "6B. IF IT DOES, BOND IT IN WITH LOCTITE 638 PER THE SHEET 1 NOTE.",
+        "6C. MATCH-DRILL AND REAM THE MHA-DT-31/MHA-DT-06 JOINT-LINE PIN HOLE",
         "   PER THE MHA-DT-31 HOLE CALLOUT.",
-        "6B. DRIVE MHA-DT-VN-59 INTO IT FLUSH.",
-        "6C. SLIDE THE ARM ONTO MHA-DT-11: HUB FRONT FACE FLUSH WITH THE",
+        "6D. DRIVE MHA-DT-VN-59 INTO IT FLUSH.",
+        "6E. SLIDE THE ARM ONTO MHA-DT-11: HUB FRONT FACE FLUSH WITH THE",
         f"   {HUB_FRONT_FACE_DATUM}, PUNCH MARKS ALIGNED.",
-        "6D. ONLY THEN TAPER-REAM 1:48 THROUGH THE HUB AND SHAFT.",
-        "6E. DRIVE MHA-DT-09, REMOVABLE BY A TAP ON ITS SMALL END.",
-        "6F. HANG MHA-DT-27 FROM THE MHA-DT-09 HEAD: CLEAR OF THE HUB.",
-        "6G. CLAMP MHA-DT-28 UNDER MHA-SH-VN-51.",
-        f"6H. CUT MHA-DT-VN-65 TO {KEEPER_CHAIN_BEADS} BEADS.",
-        "6J. THREAD IT THROUGH THE MHA-DT-28 LOOP AND MHA-DT-27.",
-        "6K. SNAP ONE END BEAD INTO EACH DOME OF MHA-DT-VN-66.",
+        "6F. ONLY THEN TAPER-REAM 1:48 THROUGH THE HUB AND SHAFT.",
+        "6G. DRIVE MHA-DT-09, REMOVABLE BY A TAP ON ITS SMALL END.",
+        "6H. HANG MHA-DT-27 FROM THE MHA-DT-09 HEAD: CLEAR OF THE HUB.",
+        "6J. CLAMP MHA-DT-28 UNDER MHA-SH-VN-51.",
+        f"6K. CUT MHA-DT-VN-65 TO {KEEPER_CHAIN_BEADS} BEADS.",
+        "6L. THREAD IT THROUGH THE MHA-DT-28 LOOP AND MHA-DT-27.",
+        "6M. SNAP ONE END BEAD INTO EACH DOME OF MHA-DT-VN-66.",
         # Rule 23 (rubric sample round 7, #1): the anchor eye's bench check.
         # Its turning changes no setting, so a seated screw and this check
         # retain it (rule 23 static clamp, owner ruling 2026-11-07).
-        "6L. CHECK THAT MHA-DT-28 DOES NOT TURN UNDER MHA-SH-VN-51 BY HAND.",
+        "6N. CHECK THAT MHA-DT-28 DOES NOT TURN UNDER MHA-SH-VN-51 BY HAND.",
         # Rule 23 (rubric sample round 12, #1): the taper-pinned crank arm's
         # bench acceptance.
-        "6M. CHECK THAT MHA-DT-06 DOES NOT TURN OR SLIDE ON MHA-DT-11 BY HAND.",
+        "6P. CHECK THAT MHA-DT-06 DOES NOT TURN OR SLIDE ON MHA-DT-11 BY HAND.",
         # Local review of 747487c71 and owner ruling 2026-10-24 (#1900): the
         # ferrule cures centred on the pivot bore.  Rule 23: the handle spins
         # on the MHA-DT-32 shoulder, so the screw is staked in the arm's
@@ -1372,8 +1381,7 @@ CONE_CRANK_STEPS = _note_text(
         # bond's bench acceptance.  Round 10 (rule 22): the cure is one action;
         # the centring requirement it carried had no check.
         "7C. LEAVE MHA-DT-32 IN BOTH BORES THROUGH THE 24 H CURE.",
-        "7D. CHECK THAT MHA-DT-34 AND MHA-DT-35 DO NOT TURN OR SLIDE ON",
-        "   MHA-DT-08 BY HAND.",
+        "7D. CHECK BY HAND THAT NEITHER MHA-DT-34 NOR MHA-DT-35 MOVES.",
         "7E. WIPE THE WAX OFF MHA-DT-32.",
         "7F. SLIDE MHA-DT-08 ON MHA-DT-32.",
         "7G. THREAD MHA-DT-32 INTO MHA-DT-06, NO THREADLOCKER, SHOULDER TIGHT.",
@@ -1422,7 +1430,7 @@ BANK_STEPS = _note_text(
         f"   ACCEPT {STACK_WINDOW}.",
         "8F. IF LONG, RE-FACE THE THICKEST GEAR'S CAM FACE.",
         "8G. IF SHORT, REMAKE THE THINNEST GEAR.",
-        "8H. REPEAT 8D-8E ON THE RESTACKED GEARS UNTIL THE STACK READS IN ITS WINDOW.",
+        "8H. REPEAT 8D-8E UNTIL THE STACK READS IN ITS WINDOW.",
         "8J. SLIDE THE STACK OFF, GEAR 0 FIRST, EACH GEAR WITH ITS PAIR.",
         # Rubric sample round 9 (rule 22): the base set-up is two actions.
         "8K. PUT BASE MHA-FR-01 ON THE MILL TABLE OUT OF THE FRAME, WITHOUT ITS",
@@ -1566,18 +1574,21 @@ RIG_REWORDINGS: dict[str, tuple[tuple[str, str], ...]] = {
     # MHA-DT-33 and the front strap go on first: neither passes the Ø15
     # head or a bonded drum (Codex #860, PRRT_kwDOPHDy386mTbe7).
     "arbor-collar-pinned": (
+        # Rubric sample round 13 (rule 26): "the drum bond" was a private label.
+        ("BEFORE THE DRUM BOND: ", f"BEFORE STEP {steps.step_number('drum-bonded')}: "),
         ("PIN STATION; DRIVE ", "PIN STATION.\nDRIVE "),
         ("THRU BOTH, BOTH ENDS SUB-FLUSH AND", "THRU BOTH: BOTH ENDS SUB-FLUSH,"),
         ("OF EACH OTHER; THEN SLIDE ", "OF EACH OTHER.\nSLIDE "),
     ),
     # The drum is bonded to the setting MHA-DT-22 prints only as a REF:
-    # bond, set the station, wipe.
+    # bond, set the station, wipe.  Round 13: the station is named by its
+    # view, not as "the drum station".
     "drum-bonded": (
         (
             "SLIDE MHA-DT-22 INTO MHA-DT-01 AND BOND WITH LOCTITE 638, DRUM FRONT END "
             "AT THE DRUM STATION SETTING; WIPE",
             "BOND MHA-DT-22 INTO MHA-DT-01 WITH LOCTITE 638.\n"
-            "AT ONCE, SET THE DRUM FRONT END AT THE DRUM STATION SETTING (SHEET "
+            f"AT ONCE, SET MHA-DT-01 AT ITS VIEW {DRUM_VIEW_LETTER} STATION (SHEET "
             f"{BANK_SETTINGS_SHEET}).\nWIPE",
         ),
     ),
@@ -1636,15 +1647,15 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         (
             "straps-pinned-to-torque-shaft",
             f"{reworded['straps-pinned-to-torque-shaft']}\n"
-            "CHECK THAT THE CLUSTER SWINGS FREELY AND MHA-DT-19 TURNS WITH IT IN BOTH "
+            # Rubric sample round 13 (rule 26): "the cluster" named no parts.
+            "CHECK THAT MHA-DT-19 AND BOTH MHA-DT-14 SWING FREELY AS ONE IN BOTH "
             "MHA-DT-18.",
         ),
         # Main's TbPB ruling (1), 2026-09-27: the set screws stay loose here;
         # the cam set tightens and stakes them once the cams are set (#1176).
         (
             "cams-and-lever-fitted",
-            f"FIT {cams}X MHA-DT-23 AND MHA-DT-16 ON MHA-DT-17 IN THE MHA-DT-18 LIFT "
-            "BORES.\n"
+            f"FIT {cams}X MHA-DT-23 AND MHA-DT-16 ON MHA-DT-17 IN BOTH MHA-DT-18.\n"
             "TURN EACH CAM ECCENTRIC DOWN.\n"
             "LEAVE EACH CAM'S #2-56 SET SCREW (SUPPLIED WITH MHA-DT-23) LOOSE.\n"
             "SEAT MHA-DT-16 ON MHA-DT-17 TO THE BORE FLOOR.",
@@ -1673,12 +1684,21 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         ("rig-set", f"{_RIG_SET_STEP}\nCLAMP BOTH MHA-DT-18."),
         # The seats' drill, tap and depth are the MHA-FR-01 transfer callouts'
         # (build_harmonic_base), so the sheet names the print, never a copy.
+        # Rubric sample round 13 (#0, rule 22): as the bank does at 8U-8X, the
+        # rig and spring come off for the drilling, go back at their 18-19
+        # settings, and those settings are rechecked once screwed down.
         (
             "rig-seats-transferred",
             f"SPOT MHA-FR-01 THROUGH THE {slotted} MHA-DT-18 HOLES AND THE MHA-DT-24 "
             "FOOT HOLE.\n"
-            "DRILL AND TAP EACH PER ITS MHA-FR-01 TRANSFER CALLOUT.\n"
-            f"FIT {slotted}X MHA-DT-VN-57 AND 1X MHA-SH-VN-52 AT THE SPRING FOOT.",
+            "LIFT THE RIG AND MHA-DT-24 OFF THE BASE.\n"
+            "DRILL AND TAP EACH SEAT PER ITS MHA-FR-01 TRANSFER CALLOUT.\n"
+            f"REFIT THE RIG AND MHA-DT-24 AT THE {steps.step_number('rig-located')}B-"
+            f"{steps.step_number('rig-set')}B SETTINGS.\n"
+            f"FIT {slotted}X MHA-DT-VN-57 AND 1X MHA-SH-VN-52 AT THE SPRING FOOT.\n"
+            f"RECHECK THE {steps.step_number('rig-located')}E TIP GAP AND THE "
+            f"{steps.step_number('rig-set')}-{steps.step_number('rig-set')}B LEAVES.\n"
+            "IF ONE IS OUT, RESET IT AS CHECKS 7A-7E.",
         ),
         # The cams' phase is set with the lever parked; the cam set then sets
         # each cam along the rod, tightens its set screw and stakes the tap.
@@ -1821,8 +1841,9 @@ CHECKS = _note_text(
         # the left in the FRONT view (7:50-8:15, 8:42-8:48; notches on top
         # = cosines, 7:57-8:12), so the cylinders' outputs read
         # cos(k theta - 90°) = +sin(k theta).
-        "5. ZEROING: CRANK FORWARD IS CLOCKWISE IN THE SHEET 1 FRONT VIEW: THE "
-        "PLATEN FEEDS AWAY FROM THE CRANK, AND THE MHA-DT-12 RUN CLOCKWISE.",
+        # Round 13 (rule 4): the platen by its drawing number.
+        "5. ZEROING: CRANK FORWARD IS CLOCKWISE IN THE SHEET 1 FRONT VIEW: "
+        f"{PLATEN_NUMBER} FEEDS AWAY FROM THE CRANK, AND MHA-DT-12 RUN CLOCKWISE.",
         "5A. SWING THE CONE SET CLEAR AS 4A.",
         "5B. TURN EACH MHA-DT-12 BY HAND UNTIL ITS NOTCH POINTS STRAIGHT UP.",
         "5C. TURN MHA-DT-16 TO ENGAGE MHA-DT-01.",
@@ -1866,6 +1887,8 @@ INTERFACE_NOTES = _note_text(
         "MHA-SH-VN-52 ({stop} SWING STOP + {foot} SPRING FOOT), {slotted}X MHA-DT-VN-57 AND",
         "{hold_down}X MHA-DT-VN-62.",
         f"PAPER DRIVE MHA-PD-00: {CRANK_CHAIN_WHEEL} T12 CHAIN WHEEL ON MHA-DT-11.",
+        # Rubric sample round 13 (rule 4): check 5's feed sense names it.
+        f"   ITS {PLATEN_NUMBER} PLATEN FEEDS AS CHECK 5 STATES.",
         "FRAME ASSEMBLY MHA-FR-00: ITS MHA-FR-05 RAIL TAKES THE BACK MHA-CH-08 "
         f"AT STEP {steps.step_number(NORTH_BRACKET_SET_KEY)}.",
         "CHANNEL ASSEMBLY MHA-CH-00:",
@@ -1888,10 +1911,11 @@ CONSUMABLES_NOTES = _note_text(
         "UNLESS ITS STEP GIVES ANOTHER SETTING.",
         # Rule 23 (rubric d9f8b0c): one package note may carry the bond's
         # degrease, apply and cure rules; the bonds are part-spec steps.
-        f"LOCTITE 638 BONDS (STEPS {steps.step_number('drum-bonded')}-"
-        f"{steps.step_number('cam-pins-bonded')}): DEGREASE BOTH PARTS; COAT THE "
+        # Round 13: every bond cites the note (2L, 4B, 6B, 12-14), so the
+        # note names no step range; the station it sets at once is 12A's.
+        "LOCTITE 638 BONDS: DEGREASE BOTH PARTS; COAT THE "
         "INSERTED PART, NEVER A BLIND SEAT; KEEP IT OFF RUNNING LANDS; SET STEP "
-        f"{steps.step_number('drum-bonded')}'S DRUM STATION AT ONCE, BEFORE IT GRABS; CURE "
+        f"{steps.step_number('drum-bonded')}A AT ONCE, BEFORE IT GRABS; CURE "
         "24 H BEFORE LOADING OR OILING. ACCEPT: THE BONDED PART DOES NOT TURN OR "
         "SLIDE BY HAND.",
     )
@@ -1929,7 +1953,7 @@ def _split_sequence_chain(
 # splits keep every field full once the one-thing lines grew the sequence
 # (rubric sample rounds 2 and 4); test_every_note_field_holds_its_stacked_blocks
 # proves each fits.
-CONE_CONTINUED_FROM = f"{steps.step_number('tip-adjuster-set')}F"
+CONE_CONTINUED_FROM = f"{steps.step_number('tip-adjuster-set')}E"
 CRANK_CONTINUED_FROM = str(steps.step_number("crank-hub-fitted"))
 _CRANK_CONTINUED_HEADING = "ASSEMBLY SEQUENCE CONT. - CRANK"
 CONE_CRANK_PRIMARY, CONE_CRANK_CONTINUED, CRANK_CONTINUED = _split_sequence_chain(
@@ -1938,7 +1962,7 @@ CONE_CRANK_PRIMARY, CONE_CRANK_CONTINUED, CRANK_CONTINUED = _split_sequence_chai
     (CRANK_CONTINUED_FROM, _CRANK_CONTINUED_HEADING),
 )
 _BANK_CONTINUED_HEADING = "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK"
-BANK_CONTINUED_FROM = f"{steps.step_number('cylinder-stack-accepted')}G"
+BANK_CONTINUED_FROM = f"{steps.step_number('cylinder-stack-accepted')}F"
 BANK_LAST_FROM = f"{steps.step_number('cylinder-bank-located')}B"
 BANK_PRIMARY, BANK_CONTINUED, BANK_LAST = _split_sequence_chain(
     BANK_STEPS,
@@ -1949,7 +1973,7 @@ RIG_SPLITS = (
     (f"{steps.step_number('arbor-collar-pinned')}A", RIG_SEQUENCE_HEADING),
     (f"{steps.step_number('straps-pinned-to-torque-shaft')}C", RIG_SEQUENCE_HEADING),
     (
-        f"{steps.step_number('cam-collars-set')}C",
+        f"{steps.step_number('cam-collars-set')}A",
         "ASSEMBLY SEQUENCE CONT. - PINION RIG AND CONE SET ON THE BASE",
     ),
 )

@@ -204,7 +204,9 @@ def test_full_turn_checks_use_the_spec_ratio_and_clear_the_unrelieved_platform()
     # stops on the MHA-DT-01 side.
     assert "THE MHA-DT-12 FINISHING CLOCKWISE TO TAKE UP PLAY" in checks
     assert "CRANK FORWARD IS CLOCKWISE IN THE SHEET 1 FRONT VIEW" in checks
-    assert "THE PLATEN FEEDS AWAY FROM THE CRANK" in checks
+    # Rubric sample round 13 (rule 4): the platen by its drawing number.
+    assert "MHA-PD-02 FEEDS AWAY FROM THE CRANK" in checks
+    assert "PLATEN" not in checks
     assert "LEVEL ON THE MHA-DT-01 SIDE (LEFT IN THE FRONT VIEW)" in checks
     # The crank mesh's free turn is check 2; the step-4 turn is the same test.
     assert "TURN MHA-DT-07 ONE FULL REVOLUTION BY HAND: IT MUST NEVER BIND" in _step_body(
@@ -303,4 +305,23 @@ def test_the_fits_are_named_never_a_diametral_band() -> None:
     for band in re.findall(r"(?:CLEARANCE|INTERFERENCE)[^()]*\)?", " ".join(printed.split())):
         assert band.endswith("REF)"), band
 
+
+def test_no_private_part_labels_print() -> None:
+    """Rule 26 / rule 4 (rubric sample round 13 #1): parts print by drawing
+    number, never as "the drum", "the arbor", "the cluster" or "the platen"."""
+    import dt_drum_station_setting_spec as drum_station
+
+    printed = " ".join(
+        (
+            *SEQUENCE_BLOCKS,
+            drawing.CHECKS,
+            drawing.CONSUMABLES_NOTES,
+            drawing.DRUM_VIEW_CAPTION,
+            *drawing.SHEET_NAMES,
+            *drum_station.DIMENSION_CALLOUTS.values(),
+        )
+    ).split()
+    printed = " ".join(printed)
+    for label in (r"\bDRUM\b", r"(?<!PINION )\bARBOR\b(?! COLLAR)", r"\bTHE CLUSTER\b", r"\bPLATEN\b"):
+        assert not re.search(label, printed), (label, re.search(rf".{{40}}{label}.{{40}}", printed))
 

@@ -36,6 +36,12 @@ is a step led by a check verb, or one stating its acceptance (``ACCEPT``,
 ``MUST``, ``DOES NOT``, ``PASSES``...), or a declarative line with no
 imperative at all (a functional check).
 
+A press and its slip fit (rule 23: "a press whose part slides in by hand is
+a slip fit; the step says what to do then"): a step led by a ``PRESS_VERBS``
+verb is followed, in its own numbered step, by a check and then by a remedy
+(``4. PRESS ...``, ``4A. CHECK THAT NEITHER ... PULLS OUT BY HAND``, ``4B. IF
+ONE DOES, BOND IT IN ...``).
+
 Codes and directions: a lettered step reference (``AS 8S``, ``4K-4P``,
 ``STEP 18D``, ``CHECKS 4-7``) names a printed head; a short code such as
 ``HD1`` or ``T120`` is one the caller declares defined (the BOM or a labelled
@@ -80,6 +86,8 @@ _OBJECT = re.compile(r"(?:THE|EACH|BOTH|ITS|IT|THEM|A|AN|ALL|ONE|MHA-[\w-]+|\d[\
 # One hole made to its callout: the second verb finishes the first's hole.
 COMPOUND_ACTIONS = frozenset({("DRILL", "TAP"), ("DRILL", "REAM"), ("MATCH-DRILL", "REAM")})
 CHECK_VERBS = frozenset({"CHECK", "RECHECK", "VERIFY", "MEASURE", "DIAL-INDICATE"})
+# A press-fit insertion: its next two steps are its hand check and remedy.
+PRESS_VERBS = frozenset({"PRESS"})
 _ACCEPTANCE = re.compile(r"\b(ACCEPT|MUST|SHALL|DOES NOT|PASSES|STILL)\b")
 _REASON = re.compile(r"\b(SO (?:IT|THAT|THE|EACH|BOTH)|BECAUSE|SINCE|WHICH|IT HOLDS)\b")
 # A head: 12. or 12A. at a line start (I and O never letter a sub-step).
@@ -238,6 +246,18 @@ def _structure(step: Step, previous: Step | None) -> list[tuple[str, str]]:
     return found
 
 
+def _press(step: Step, following: Sequence[Step]) -> list[tuple[str, str]]:
+    lead = _LEAD_VERB.match(_strip_lead(step.body))
+    if lead is None or lead.group(1) not in PRESS_VERBS or _is_remedy(step):
+        return []
+    check, remedy = (*following[:2], None, None)[:2]
+    if check is None or check.number != step.number or not _is_check(check):
+        return [("press-check", "the press is not followed by a hand check of its step")]
+    if remedy is None or remedy.number != step.number or not _is_remedy(remedy):
+        return [("press-check", f"the {check.head} check has no slip-fit remedy after it")]
+    return []
+
+
 def _references(
     step: Step, heads: Mapping[str, frozenset[str]], kinds: Mapping[str, str]
 ) -> list[tuple[str, str]]:
@@ -301,6 +321,7 @@ def step_structure_violations(
             previous = found[index - 1] if index else None
             for rule, detail in (
                 *_structure(step, previous),
+                *_press(step, found[index + 1 :]),
                 *_references(step, heads, reference_kinds),
                 *_codes(step, defined, direction_key),
             ):

@@ -45,6 +45,8 @@ EXTERNAL_NUMBERS = frozenset(
         # Step 8A's MHA-CH-00 connecting rod and rocker arm pairs.
         drawing.CONNECTING_ROD,
         drawing.ROCKER_ARM,
+        # Check 5's feed sense, named on sheet 14's interface lines.
+        drawing.PLATEN_NUMBER,
     }
 )
 # Named installation assemblies are external interfaces, not drive-train BOM rows.
@@ -264,7 +266,7 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
     assert names[drawing.BANK_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CRANK + CYLINDER BANK"
     assert names[drawing.CHECKS_SHEET - 1] == "CHECKS + SETUP"
     assert names[drawing.FIT_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK + PINION RIG"
-    assert names[drawing.BANK_SETTINGS_SHEET - 1] == "CYLINDER BANK + DRUM STATION SETTINGS"
+    assert names[drawing.BANK_SETTINGS_SHEET - 1] == "CYLINDER BANK + MHA-DT-01 STATION SETTINGS"
     assert names[drawing.SETTING_SHEET - 1] == "SETTING TABLES + CONE STATIONS"
     assert sorted(drawing.CLUSTER_SHEETS.values()) == [3, 4, 5, 6]
     assert set(drawing.SHEET_SCALES) == set(names)

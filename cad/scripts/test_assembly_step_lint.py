@@ -91,6 +91,19 @@ def _rules(text: str, **kwargs) -> set[str]:
         # A compass word, and a direction with no key.
         ("5. TURN IT NORTH.", "direction"),
         ("5. TURN IT CLOCKWISE.", "direction"),
+        # R13 #3: step 6's press with no hand check after it (R13 head 3fe6c2c).
+        (
+            "6. PRESS MHA-DT-31 INTO MHA-DT-06 TO THE SHOULDER: FACES FLUSH.\n"
+            "6A. MATCH-DRILL AND REAM THE JOINT-LINE PIN HOLE.",
+            "press-check",
+        ),
+        # R13 #3: 2J's press with a check but no slip-fit remedy after it.
+        (
+            "2. STAND IT.\n"
+            "2J. PRESS MHA-DT-VN-69 UP THRU MHA-DT-20 TO THE MHA-DT-21 HOLE FLOOR.\n"
+            "2K. CHECK THAT MHA-DT-21 DOES NOT TURN ON MHA-DT-20 BY HAND.",
+            "press-check",
+        ),
     ],
 )
 def test_each_rule_catches_its_round_9_step(printed: str, rule: str) -> None:
@@ -113,6 +126,10 @@ def test_each_rule_catches_its_round_9_step(printed: str, rule: str) -> None:
         # A leading condition before the one action.
         "5. ZERO IT.\n5A. COSINES: TURN MHA-DT-01 UNTIL ALL NOTCHES POINT UP.",
         "5. TURN IT CLOCKWISE.",
+        # A press, its hand check, then its slip-fit remedy.
+        "4. PRESS 2X MHA-DT-VN-67 TO THE FLOORS OF THE MHA-DT-11 COLLAR HOLES.\n"
+        "4A. CHECK THAT NEITHER MHA-DT-VN-67 TURNS OR PULLS OUT BY HAND.\n"
+        "4B. IF ONE DOES, BOND IT IN WITH LOCTITE 638 PER THE SHEET 1 NOTE.",
     ],
 )
 def test_one_action_steps_pass(printed: str) -> None:
