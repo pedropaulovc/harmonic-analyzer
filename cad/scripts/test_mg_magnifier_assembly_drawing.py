@@ -175,7 +175,20 @@ def test_each_press_is_accepted_at_the_bench_with_a_slip_fit_remedy() -> None:
         assert steps.SEQUENCE[number : number + 2] == (held, slip)
         assert notes.STEP_TEXT[held].endswith("DOES NOT TURN OR SLIDE BY HAND.")
         assert "BY HAND" in notes.STEP_TEXT[slip]
-        assert notes.STEP_TEXT[slip].endswith(f"RETURN TO STEP {number}.")
+    # The axle, the cheap part, is remade; the drum is bonded rather than the
+    # wheel remade, by the one general bond note that prints with the checks.
+    axle = notes.ITEM_NUMBERS["mg-wheel-axle"]
+    assert notes.STEP_TEXT["axle-slip-fit"].endswith(
+        f"REMAKE ITEM {axle} TO ITS PRESS SIZE AND RETURN TO STEP "
+        f"{steps.step_number(steps.AXLE_PRESSED_KEY)}."
+    )
+    assert notes.STEP_TEXT["drum-slip-fit"].endswith(
+        f"WITH {notes.BOND_GRADE}, {notes.BOND_NOTE_REF}."
+    )
+    assert notes.BOND_NOTE in notes.ASSEMBLY_CHECKS
+    assert notes.BOND_NOTE.startswith(f"NOTE 1, {notes.BOND_GRADE} BOND:")
+    for rule in ("DEGREASE", "APPLY TO THE SPIGOT ONLY", "NONE IN THE AXLE BORE", "CURE 24 H", "DOES NOT TURN BY HAND"):
+        assert rule in notes.BOND_NOTE
 
 
 def test_each_hand_set_clamp_is_checked_to_hold_its_setting() -> None:
@@ -2353,9 +2366,9 @@ def test_whole_check_note_rewrap_clears_r22_aggregate_keepout(
     printed_rows = note.GetText().splitlines()
     assert " ".join(printed_rows).split() == " ".join(notes.ASSEMBLY_CHECKS).split()
     assert printed_rows[0] == notes.ASSEMBLY_CHECKS[0]
-    # Every CHECK row, and the loose-items row, starts its own line; the
-    # check block moves only through the existing line-count formula.
-    starts = [i for i, row in enumerate(printed_rows) if row.startswith(("CHECK:", "LOOSE ITEMS:"))]
+    # Every CHECK row, the loose-items row and the bond note start their own
+    # line; the check block moves only through the existing line-count formula.
+    starts = [i for i, row in enumerate(printed_rows) if row.startswith(("CHECK:", "LOOSE ITEMS:", "NOTE 1,"))]
     assert len(starts) == len(notes.ASSEMBLY_CHECKS)
     assert drawing.CHECKS_XY == (
         drawing.STEPS_XY[0],
