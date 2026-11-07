@@ -331,8 +331,9 @@ def test_clusters_partition_the_bom() -> None:
     assert len(spec.BAR_SCREW_INSTANCES) == len(spec.leadscrew.BASE_BAR_HOLES)
     # The feed nut's four flat heads are riser-screw instances (option B,
     # 2026-11-04): shown over the nut on the feed sheet, ballooned with the
-    # riser's four on the carrier sheet. Both bracket screw joints are
-    # ballooned with their shared 5/8 family on the feed sheet.
+    # riser's four on the carrier sheet and again on the feed sheet (TL-00
+    # review ce83ac3b). Both bracket screw joints are ballooned with their
+    # shared 5/8 family on the feed sheet.
     assert feed.context == (
         spec.instance_name(spec.CARRIAGE, 0),
         *feed_screws,
@@ -347,6 +348,10 @@ def test_clusters_partition_the_bom() -> None:
     assert spec.CARRIAGE_SCREW not in feed.visible
     assert set(feed_screws) | set(spec.NUT_SCREW_INSTANCES) <= feed.visible
     assert spec.FEED_NUT in feed.stems and spec.RISER_SCREW not in feed.stems
+    [(repeated, anchor, _degrees)] = feed.repeated
+    assert repeated == spec.RISER_SCREW and anchor.instance in spec.NUT_SCREW_INSTANCES
+    assert feed.ballooned == (*feed.stems, spec.RISER_SCREW)
+    assert all(not c.repeated for c in drawing.CLUSTERS if c is not feed)
     carrier_sheet = next(c for c in drawing.CLUSTERS if c.sheet == "CARRIER EXPLODED")
     assert carrier_sheet.partial == ((spec.RISER_SCREW, spec.RISER_SCREW_INSTANCES),)
     assert not set(spec.RISER_SCREW_INSTANCES) & set(spec.NUT_SCREW_INSTANCES)
@@ -660,7 +665,7 @@ def test_each_cluster_rings_inside_its_sheet() -> None:
             drawing.BALLOON_RADIUS,
             clearance=_drawing_balloons._BALLOON_CLEARANCE_M,
         )
-        assert len(cluster.stems) * gap <= 2.0 * math.pi
+        assert len(cluster.ballooned) * gap <= 2.0 * math.pi
 
 
 def test_a_low_ring_slides_left_of_the_title_block() -> None:
@@ -1001,6 +1006,67 @@ def test_feed_sheet_balloons_land_on_clear_edges_of_their_own_parts() -> None:
     assert _dot(spec.PILLOW_BLOCK_PLACEMENTS[near][1][1], away) > 0.0
 
 
+def test_feed_nut_balloons_land_on_the_nut_body_and_a_flat_head_beyond_it() -> None:
+    """TL-00 review ce83ac3b (sheet 5): 17 on the exploded nut's body, not
+    the rim that showed past the lug; 26 again at the nut, on a flat head."""
+    _right, _up, toward = _iso_axes()
+
+    def toward_viewer(placement, k):
+        origin = np.array(spec.frame_point(placement, (0.0, 0.0, 0.0)))
+        tip = np.array(spec.frame_point(placement, tuple(float(i == k) for i in range(3))))
+        return float((tip - origin) @ toward)
+
+    nut = spec.feed_nut
+    anchor = drawing.BALLOON_ANCHORS[spec.FEED_NUT]
+    assert anchor.instance == spec.instance_name(spec.FEED_NUT, 0)
+    x, y, z = anchor.point_mm
+    # The body end's outer circle (the revolve profile's (radius, axial)
+    # corner), at part +X: the side of it the view sees past the body.
+    assert (x, y) in nut.PROFILE and x == nut.BODY_DIA / 2.0 and z == 0.0
+    assert y == nut.LENGTH > nut.FLANGE_THICK
+    assert toward_viewer(spec.FEED_NUT_PLACEMENTS[0], 0) > 0.5
+
+    feed = next(c for c in drawing.CLUSTERS if c.sheet == FEED_SHEET)
+    anchor = drawing.cluster_anchors(feed)[spec.RISER_SCREW]
+    index = spec.NUT_SCREW_INSTANCES.index(anchor.instance)
+    dims = spec.riser_screw.DIMS
+    # The flat top's sharp rim (top at part y 0, head_dia across), part +Z.
+    assert anchor.point_mm == (0.0, 0.0, dims.head_dia / 2.0)
+    assert toward_viewer(spec.NUT_SCREW_PLACEMENTS[index], 2) > 0.5
+
+
+def _projected_gap(a, b) -> float:
+    """A lower bound on the gap (mm) between two point sets' convex hulls:
+    the widest separation along either hull's edge normals."""
+    from scipy.spatial import ConvexHull
+
+    gap = -math.inf
+    for points in (a, b):
+        for normal in ConvexHull(points).equations[:, :2]:
+            gap = max(gap, (b @ normal).min() - (a @ normal).max(), (a @ normal).min() - (b @ normal).max())
+    return gap
+
+
+def test_exploded_feed_nut_and_its_screws_stand_apart_on_the_feed_sheet() -> None:
+    """The isometric at the replay scale: the nut's whole outline clears the
+    feed block's lug and every other part; its four flat heads, together,
+    clear it beyond and every other part (ce83ac3b: 3.3, 4.7 and 8.0 mm)."""
+    feed = next(c for c in drawing.CLUSTERS if c.sheet == FEED_SHEET)
+    ratio = _replay_ratio(feed)
+    right, up, _toward = _iso_axes()
+    outlines = {}
+    for name, _normals, _offsets, vertices in _sheet_bodies(FEED_SHEET):
+        outlines.setdefault(name, []).append(np.column_stack((vertices @ right, vertices @ up)) * ratio)
+    outlines = {name: np.vstack(points) for name, points in outlines.items()}
+    nut = outlines.pop(spec.instance_name(spec.FEED_NUT, 0))
+    screws = np.vstack([outlines.pop(name) for name in spec.NUT_SCREW_INSTANCES])
+    assert spec.instance_name(spec.FEED_BLOCK, 0) in outlines
+    assert _projected_gap(screws, nut) >= 2.0
+    for name, outline in outlines.items():
+        assert _projected_gap(nut, outline) >= 2.0, name
+        assert _projected_gap(screws, outline) >= 2.0, name
+
+
 def test_re_routed_balloons_on_sheets_3_to_6_land_on_their_own_edges() -> None:
     """The same run's replay of every walked leader on sheets 3-6: 25 ran
     over the near KP08 to the screw end in its foot, 11 crossed a bracket
@@ -1147,9 +1213,9 @@ def _part_solids():
                  block.BLOCK_HEIGHT),
         ],
         spec.LEADSCREW: [_cylinder(1, 0.0, screw.LENGTH, screw.MAJOR_DIA / 2.0)],
-        spec.FEED_NUT: [
+        spec.FEED_NUT: [  # its native revolve profile, flange then body
             _cylinder(1, 0.0, nut.FLANGE_THICK, nut.FLANGE_DIA / 2.0),
-            _cylinder(1, 0.0, nut.BODY_LENGTH, nut.BODY_DIA / 2.0),
+            _cylinder(1, nut.FLANGE_THICK, nut.LENGTH - nut.FLANGE_THICK, nut.BODY_DIA / 2.0),
         ],
         spec.PILLOW_BLOCK: [
             _box(-kp08.LENGTH / 2.0, kp08.LENGTH / 2.0, -kp08.WIDTH / 2.0,
@@ -1248,13 +1314,17 @@ def _replay_ratio(cluster):
     return min(cluster.scale[0] / cluster.scale[1], fitted[0] / fitted[1])
 
 
-def _approach_replay(stem):
-    """Replay the declared balloon on its sheet: (the instance drawn at its
-    landing, the other instances drawn frontmost along its approach ray until
-    the ray is past every body, those drawn within LANDING_CLEARANCE_M of the
+def _approach_replay(stem, sheet=None):
+    """Replay the declared balloon on its sheet (``sheet``, or the one that
+    balloons ``stem`` as its own): (the instance drawn at its landing, the
+    other instances drawn frontmost along its approach ray until the ray is
+    past every body, those drawn within LANDING_CLEARANCE_M of the
     landing)."""
-    cluster = next(c for c in drawing.CLUSTERS if stem in c.stems)
-    anchor = drawing.BALLOON_ANCHORS[stem]
+    cluster = next(
+        c for c in drawing.CLUSTERS
+        if (c.sheet == sheet and stem in c.ballooned) or (sheet is None and stem in c.stems)
+    )
+    anchor = drawing.cluster_anchors(cluster)[stem]
     own = anchor.instance or spec.instance_name(stem, 0)
     ratio = _replay_ratio(cluster)
     right, up, _toward = _iso_axes()
@@ -1263,7 +1333,7 @@ def _approach_replay(stem):
     landing = np.array([moved @ right, moved @ up]) * ratio
     vertices = np.vstack([body[3] for body in _sheet_bodies(cluster.sheet)])
     reach = np.hypot(vertices @ right * ratio - landing[0], vertices @ up * ratio - landing[1]).max()
-    angle = math.radians(drawing.BALLOON_APPROACH_DEG[stem])
+    angle = math.radians(drawing.cluster_approaches(cluster)[stem])
     steps = np.arange(0.05, reach, 0.1)
     ray = landing + np.outer(steps, (math.cos(angle), math.sin(angle)))
     turns = np.linspace(0.0, 2.0 * math.pi, 48, endpoint=False)
@@ -1282,25 +1352,42 @@ def test_declared_approaches_are_the_re_routed_balloons() -> None:
     assert set(drawing.BALLOON_APPROACH_DEG) == {
         spec.PIVOT_BLOCK, spec.HOLD_DOWN_STUD, spec.PIVOT_SHIM,
         spec.FEED_BLOCK, spec.LEADSCREW, spec.PILLOW_BLOCK,
-        spec.PILLOW_BLOCK_SCREW, spec.END_BRACKET, spec.CARRIAGE_SCREW,
-        spec.RISER, spec.FEED_LEVER,
+        spec.PILLOW_BLOCK_SCREW, spec.END_BRACKET, spec.FEED_NUT,
+        spec.CARRIAGE_SCREW, spec.RISER, spec.FEED_LEVER,
     }
     for stem in drawing.BALLOON_APPROACH_DEG:
         assert sum(stem in cluster.stems for cluster in drawing.CLUSTERS) == 1
         assert drawing.BALLOON_ANCHORS[stem].point_mm is not None
+    # A repeated balloon is declared and frozen on its repeating sheet only.
+    for cluster in drawing.CLUSTERS:
+        for stem, anchor, degrees in cluster.repeated:
+            assert drawing.cluster_anchors(cluster)[stem] == anchor != drawing.BALLOON_ANCHORS[stem]
+            assert drawing.cluster_approaches(cluster)[stem] == degrees
+            assert stem not in drawing.BALLOON_APPROACH_DEG
 
 
-@pytest.mark.parametrize("stem", sorted(drawing.BALLOON_APPROACH_DEG))
-def test_declared_approaches_clear_every_other_occurrence(stem) -> None:
+_DECLARED = sorted(
+    (cluster.sheet, stem)
+    for cluster in drawing.CLUSTERS
+    for stem in drawing.cluster_approaches(cluster)
+    if stem in cluster.ballooned
+)
+
+
+@pytest.mark.parametrize(("sheet", "stem"), _DECLARED)
+def test_declared_approaches_clear_every_other_occurrence(sheet, stem) -> None:
     """Ray-cast on the spec's exploded poses and part envelopes through the
     isometric: the landing is its own part's ink (or its silhouette), the
     declared leader crosses no other instance on its sheet, and none is drawn
     within LANDING_CLEARANCE_M of the landing (the nearest at the farm's
-    scales: 4 riser screw 5.2 mm, 15 KP08 screw 4.2, 17 bracket 2.5, 11 KP08
-    2.7, 25 none within 6; 3 none, 19 bar 2 2.2, the rail sheet's carriage
-    screw none within 3; 7 the next shim 2.9; 8 riser screw 5.3, 10 none)."""
-    anchor = drawing.BALLOON_ANCHORS[stem]
-    drawn, crossed, beside = _approach_replay(stem)
+    scales: 15 KP08 screw 4.2, 17 bracket 2.5, 11 KP08 2.7, 25 none within 6;
+    3 none, 19 bar 2 2.2, the rail sheet's carriage screw none within 3; 7
+    the next shim 2.9; 8 riser screw 5.3, 10 none; at the feed sheet's replay
+    scale since review ce83ac3b: 4 none within 8, the nut's 17 its screw
+    4.7, their 26 the next screw 1.9)."""
+    cluster = next(c for c in drawing.CLUSTERS if c.sheet == sheet)
+    anchor = drawing.cluster_anchors(cluster)[stem]
+    drawn, crossed, beside = _approach_replay(stem, sheet)
     assert drawn in {anchor.instance or spec.instance_name(stem, 0), None}
     assert not crossed
     assert not beside
@@ -1672,15 +1759,21 @@ def test_feed_balloons_prove_their_declared_leaders_with_the_explode_active(
     monkeypatch.setattr(drawing, "_activate_sheet", lambda *a: None)
     monkeypatch.setattr(drawing, "_link_view_to_bom", lambda *a, **kw: None)
     monkeypatch.setattr(drawing, "_source_configuration_active", active)
-    monkeypatch.setattr(drawing, "_ring_balloons", lambda *a, **kw: events.append("ring"))
+    passed = {}
+    monkeypatch.setattr(
+        drawing, "_ring_balloons",
+        lambda *a, approach_deg, **kw: events.append("ring") or passed.update(approach=approach_deg),
+    )
     monkeypatch.setattr(
         drawing, "_relax_cluster_slide",
         lambda a, v, landings, **kw: events.append("relax") or landings,
     )
-    monkeypatch.setattr(
-        drawing, "add_component_bom_balloons",
-        lambda a, v, *, items, **kw: [SimpleNamespace(stem=stem) for stem, _item in items],
-    )
+
+    def create(a, v, *, items, anchors, **kw):
+        passed.update(items=items, anchors=anchors)
+        return [SimpleNamespace(stem=stem) for stem, _item in items]
+
+    monkeypatch.setattr(drawing, "add_component_bom_balloons", create)
     monkeypatch.setattr(
         drawing, "_assert_declared_leaders_clear",
         lambda a, v, declared, **kw: events.append(("clear", {d.stem for d in declared})),
@@ -1689,9 +1782,20 @@ def test_feed_balloons_prove_their_declared_leaders_with_the_explode_active(
     assert events == [
         "activate", "restore", "ring", "relax",
         "activate",
-        ("clear", {stem for stem in drawing.BALLOON_APPROACH_DEG if stem in cluster.stems}),
+        ("clear", {
+            spec.FEED_BLOCK, spec.LEADSCREW, spec.PILLOW_BLOCK, spec.PILLOW_BLOCK_SCREW,
+            spec.END_BRACKET, spec.FEED_NUT, spec.RISER_SCREW,
+        }),
         "restore",
     ]
+    # Balloon 26 again, at the nut: its frozen landing and approach here.
+    [(_stem, anchor, degrees)] = cluster.repeated
+    assert [stem for stem, _item in passed["items"]] == [
+        stem for stem in spec.ITEM_NUMBERS if stem in cluster.ballooned
+    ]
+    assert spec.RISER_SCREW in dict(passed["items"])
+    assert passed["anchors"][spec.RISER_SCREW] == anchor
+    assert passed["approach"][spec.RISER_SCREW] == degrees
 
 
 def test_crossed_leaders_swap_ring_slots() -> None:
@@ -2120,7 +2224,7 @@ def test_package_settled_checks_reread_native_bom_without_mutating_layout(
     seat._balloon_cluster.side_effect = (
         lambda _adapter, _view, cluster, _items, _bom_name: [
             SimpleNamespace(stem=stem)
-            for stem in cluster.stems
+            for stem in cluster.ballooned
         ]
     )
     linear_view, linear_landing = object(), SimpleNamespace(stem=spec.RAIL)

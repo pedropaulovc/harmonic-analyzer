@@ -1132,6 +1132,59 @@ SOURCE_CONFIGURATION = "Default"
 _END_CLAMP_SCREWS = tuple(STRAP_CLAMP_SCREW_INSTANCES[role] for role in ("CL", "CR"))
 _HUB_CLAMP_SCREW = STRAP_CLAMP_SCREW_INSTANCES["HUB"]
 _BLOCK_RIDERS = (CARRIAGE_SCREW, FEED_NUT, *NUT_SCREW_INSTANCES, PIVOT_SHIM, PIVOT_SPACER)
+
+
+def _part_axis(placement: Placement, axis: int) -> tuple[float, float, float]:
+    """Machine-frame direction of a placed part's own ``axis`` (0, 1, 2)."""
+    origin = frame_point(placement, (0.0, 0.0, 0.0))
+    tip = frame_point(placement, tuple(1.0 if k == axis else 0.0 for k in range(3)))
+    return tuple(t - o for t, o in zip(tip, origin, strict=True))
+
+
+# TL-00 review ce83ac3b (sheet 5, Main 2026-11-07): the feed nut stayed
+# seated behind the lug and its four flat heads were driven back THROUGH the
+# lug: "nut screws back out" moved them along machine +X, but on the oblique
+# rail the block's +X (the nut's and each nut screw's part +Y, away from the
+# spindle) runs along machine -X and -Y. The nut now backs off the lug face
+# along that axis, and its screws further, so their tips stand past its body
+# end. A native step moves along one machine axis, so each move is its two
+# horizontal components, summing to exactly that axis.
+NUT_EXPLODE_AXIS = _part_axis(FEED_NUT_PLACEMENTS[0], 1)
+if any(
+    math.dist(direction, NUT_EXPLODE_AXIS) > 1e-12
+    for direction in (
+        *(_part_axis(placement, 1) for placement in NUT_SCREW_PLACEMENTS),
+        _part_axis(FEED_BLOCK_PLACEMENTS[0], 0),
+    )
+):
+    raise AssertionError("the feed nut, its screws and the block's +X no longer share one axis")
+if abs(NUT_EXPLODE_AXIS[2]) > 1e-12 or abs(math.hypot(*NUT_EXPLODE_AXIS) - 1.0) > 1e-12:
+    raise AssertionError("the feed nut's axis is not a horizontal unit vector")
+FEED_NUT_BACK_OFF = 70.0  # its seat face off the lug face, mm along the axis
+NUT_SCREW_BACK_OUT = 55.0  # each screw further, mm along the axis
+# Each screw's tip (its head top sits feed_nut.SCREW_GRIP off the lug face)
+# stands past the nut's longest body end by at least this much, so it stays
+# past the body in the isometric too.
+NUT_SCREW_EXPLODED_CLEARANCE = 25.0
+if (
+    feed_nut.SCREW_GRIP - riser_screw.DIMS.length + FEED_NUT_BACK_OFF + NUT_SCREW_BACK_OUT
+    - (FEED_NUT_BACK_OFF + feed_nut.LENGTH_MAX)
+    < NUT_SCREW_EXPLODED_CLEARANCE
+):
+    raise AssertionError("the exploded nut screws do not stand clear past the nut's body")
+_NUT_SCREW_MOVES = tuple(
+    (f"nut screws back out along {key}", NUT_SCREW_INSTANCES, key, NUT_SCREW_BACK_OUT * component)
+    for key, component in zip("xy", NUT_EXPLODE_AXIS[:2])
+)
+_FEED_NUT_MOVES = tuple(
+    (
+        f"feed nut backs off along {key}",
+        (FEED_NUT, *NUT_SCREW_INSTANCES),
+        key,
+        FEED_NUT_BACK_OFF * component,
+    )
+    for key, component in zip("xy", NUT_EXPLODE_AXIS[:2])
+)
 EXPLODE_STEPS = (
     ("shoulder screws withdraw", (PIVOT_SCREW,), "z", 250.0),
     ("spacers lift off", (PIVOT_SPACER,), "z", 45.0),
@@ -1156,7 +1209,8 @@ EXPLODE_STEPS = (
         60.0,
     ),
     ("carrier lifts off the pins", (CARRIER, *CARRIER_RIDERS), "z", 230.0),
-    ("nut screws back out", NUT_SCREW_INSTANCES, "x", 30.0),
+    *_NUT_SCREW_MOVES,
+    *_FEED_NUT_MOVES,
     ("blocks lift off", (PIVOT_BLOCK, FEED_BLOCK, *_BLOCK_RIDERS), "z", 90.0),
     ("carriage screws lift out", (CARRIAGE_SCREW,), "z", 60.0),
     ("carriages lift off the rails", (CARRIAGE,), "z", 50.0),

@@ -533,7 +533,13 @@ def test_explode_selectors_resolve_to_the_placed_occurrences() -> None:
         ]
 
     assert names("riser screws lift out") == [f"{spec.RISER_SCREW}-{n}" for n in range(1, 5)]
-    assert names("nut screws back out") == [f"{spec.RISER_SCREW}-{n}" for n in range(5, 9)]
+    nut_screws = [f"{spec.RISER_SCREW}-{n}" for n in range(5, 9)]
+    for key in "xy":
+        assert names(f"nut screws back out along {key}") == nut_screws
+        assert names(f"feed nut backs off along {key}") == [
+            *(component.Name2 for component in groups[spec.FEED_NUT]),
+            *nut_screws,
+        ]
     # Rail screws lift; the bracket family's lower TL-28 screws drop.
     assert names("rail screws lift out") == [f"{spec.RAIL_SCREW}-{n}" for n in range(1, 17)]
     assert names("bar screws drop out") == [f"{spec.PILLOW_BLOCK_SCREW}-{n}" for n in range(5, 9)]
@@ -550,6 +556,87 @@ def test_explode_selectors_resolve_to_the_placed_occurrences() -> None:
             "not placed", spec.NUT_SCREW_INSTANCES[:1], groups, {}, member_names
         )
 
+
+def test_feed_nut_and_its_screws_explode_along_their_axis_clear_of_the_lug() -> None:
+    """TL-00 review ce83ac3b (sheet 5): the nut and its four flat heads
+    explode off the lug's +X face along the screws' axis, away from the
+    spindle, the screws past the nut's body end."""
+    axis = spec.NUT_EXPLODE_AXIS
+
+    def part_axis(placement, k):
+        origin = spec.frame_point(placement, (0.0, 0.0, 0.0))
+        tip = spec.frame_point(placement, tuple(float(i == k) for i in range(3)))
+        return [t - o for t, o in zip(tip, origin)]
+
+    # The pose proof: the nut's and every nut screw's part +Y (head up) is
+    # the feed block's +X, horizontal, away from the spindle and off the
+    # machine axes on the oblique rail, so each move is two native steps.
+    for placement in (*spec.FEED_NUT_PLACEMENTS, *spec.NUT_SCREW_PLACEMENTS):
+        assert part_axis(placement, 1) == pytest.approx(axis, abs=1e-12)
+    assert part_axis(spec.FEED_BLOCK_PLACEMENTS[0], 0) == pytest.approx(axis, abs=1e-12)
+    assert axis[2] == 0.0 and math.hypot(*axis) == pytest.approx(1.0)
+    assert sum(a * r for a, r in zip(axis, spec.rail_direction(spec.leadscrew.RAIL))) > 0.0
+    assert abs(axis[0]) > 1e-3 and abs(axis[1]) > 1e-3
+    nut = spec.instance_name(spec.FEED_NUT, 0)
+    lift = dict(zip("xyz", (0.0, 0.0, 90.0)))  # the blocks lift off with them
+    for name, along in (
+        (nut, spec.FEED_NUT_BACK_OFF),
+        *((screw, spec.FEED_NUT_BACK_OFF + spec.NUT_SCREW_BACK_OUT)
+          for screw in spec.NUT_SCREW_INSTANCES),
+    ):
+        for k, key in enumerate("xyz"):
+            assert spec.explode_shift(name, key) == pytest.approx(
+                along * axis[k] + lift[key], abs=1e-9
+            )
+    # Along the axis from the lug face: the nut's seat face stands off it,
+    # its body end past that, and each screw's tip past the body end.
+    seat = spec.FEED_NUT_BACK_OFF
+    body_end = seat + spec.feed_nut.LENGTH_MAX
+    tip = (
+        spec.feed_nut.SCREW_GRIP - spec.riser_screw.DIMS.length
+        + spec.FEED_NUT_BACK_OFF + spec.NUT_SCREW_BACK_OUT
+    )
+    assert seat > 0.0
+    assert tip - body_end >= spec.NUT_SCREW_EXPLODED_CLEARANCE
+
+
+def _assert_feed_nut_explode_guards(**overrides) -> None:
+    """Exercise the feed nut's explode assertions with altered inputs only."""
+    path = Path(spec.__file__)
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+
+    def assigns(node, name):
+        return isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == name for target in node.targets
+        )
+
+    start = next(node.lineno for node in tree.body if assigns(node, "NUT_EXPLODE_AXIS"))
+    stop = next(node.lineno for node in tree.body if assigns(node, "_NUT_SCREW_MOVES"))
+    body = [node for node in tree.body if start <= node.lineno < stop]
+    exec(
+        compile(ast.Module(body=body, type_ignores=[]), str(path), "exec"),
+        dict(vars(spec), **overrides),
+    )
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    (
+        # A nut screw no longer on the nut's axis: here the block's +Y.
+        ({"NUT_SCREW_PLACEMENTS": spec.FEED_BLOCK_PLACEMENTS}, "share one axis"),
+        # A screw too long to stand past the nut's body end.
+        (
+            {"riser_screw": types.SimpleNamespace(DIMS=types.SimpleNamespace(
+                length=spec.riser_screw.DIMS.length + 10.0
+            ))},
+            "stand clear",
+        ),
+    ),
+)
+def test_feed_nut_explode_guards_refuse_an_off_axis_or_buried_screw(overrides, message) -> None:
+    _assert_feed_nut_explode_guards()
+    with pytest.raises(AssertionError, match=message):
+        _assert_feed_nut_explode_guards(**overrides)
 
 
 def test_named_views_are_the_machine_frame() -> None:

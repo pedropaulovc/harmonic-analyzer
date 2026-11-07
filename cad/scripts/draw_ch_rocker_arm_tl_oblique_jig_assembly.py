@@ -126,6 +126,10 @@ class Cluster:
     # A family this sheet shows only some instances of, (family, instances);
     # it is still ballooned here, on one of those.
     partial: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    # A family ballooned on its own sheet and again here, on one of its
+    # context instances: (family, its frozen landing here, its declared
+    # approach degrees here, as BALLOON_APPROACH_DEG's).
+    repeated: tuple[tuple[str, BalloonAnchor, float], ...] = ()
 
     @property
     def visible(self) -> frozenset[str]:
@@ -134,6 +138,11 @@ class Cluster:
         shown = [stem for stem in self.stems if stem not in partial]
         shown += [name for names in partial.values() for name in names]
         return frozenset((*shown, *self.context))
+
+    @property
+    def ballooned(self) -> tuple[str, ...]:
+        """The families ballooned on this sheet: its own and its repeats."""
+        return (*self.stems, *(stem for stem, _anchor, _degrees in self.repeated))
 
 
 def _carriage_screws(block: str) -> tuple[str, ...]:
@@ -202,13 +211,25 @@ CLUSTERS = (
         ),
         (1.0, 3.0),
         # The integral lug moves with the feed block on rail 1, fastened to
-        # its carriage by its four carriage screws. The feed nut's four flat
-        # heads are riser screws, ballooned on the carrier's sheet. Both
-        # TL-28 screw joints belong to this sheet's short-screw family.
+        # its carriage by its four carriage screws. Both TL-28 screw joints
+        # belong to this sheet's short-screw family. The feed nut's four flat
+        # heads are riser screws, ballooned on the carrier's sheet and again
+        # here (TL-00 review ce83ac3b, sheet 5): on the second one's head top
+        # rim, part +Z, out to the upper left beyond the nut's balloon.
         context=(
             spec.instance_name(spec.CARRIAGE, 0),
             *_carriage_screws(spec.FEED_BLOCK),
             *spec.NUT_SCREW_INSTANCES,
+        ),
+        repeated=(
+            (
+                spec.RISER_SCREW,
+                BalloonAnchor(
+                    point_mm=(0.0, 0.0, spec.riser_screw.DIMS.head_dia / 2.0),
+                    instance=spec.NUT_SCREW_INSTANCES[1],
+                ),
+                135.0,
+            ),
         ),
     ),
     Cluster(
@@ -581,6 +602,24 @@ BOM_COMPONENT_IDENTITIES = dict(spec.COMPONENT_IDENTITIES)
 _CLUSTERED = [stem for cluster in CLUSTERS for stem in cluster.stems]
 if sorted(_CLUSTERED) != sorted(BOM_COMPONENTS):
     raise AssertionError("the clusters must partition the BOM's families")
+for _cluster in CLUSTERS:
+    for _stem, _anchor, _degrees in _cluster.repeated:
+        if (
+            _stem in _cluster.stems
+            or _anchor.point_mm is None
+            or _anchor.instance not in _cluster.context
+            or _anchor.instance
+            not in {
+                spec.instance_name(_stem, index)
+                for index in range(len(spec.PLACEMENTS[_stem]))
+            }
+        ):
+            raise AssertionError(
+                f"{_cluster.sheet}: a repeated balloon lands frozen on a context "
+                "instance of a family ballooned on another sheet"
+            )
+    if len(set(_cluster.ballooned)) != len(_cluster.ballooned):
+        raise AssertionError(f"{_cluster.sheet}: a family is ballooned twice")
 # Literal stems, so the config-dependency analysis reads exactly these rows.
 PART_ROWS = {
     "ch-rocker-arm-tl-oblique-base-bar--Bar1": _config.parts(
@@ -729,8 +768,8 @@ BALLOON_ANCHORS[spec.RAIL_SCREW] = BalloonAnchor(
 # on a clear edge of its own part, its leader leaving along a declared open
 # route (BALLOON_APPROACH_DEG):
 # - the feed block's spindle-end (part -X) face, on its edge with the lug-side
-#   (-Y) face a quarter up: below the nut and its screws, clear of the
-#   carriage and the leadscrew below; out to the upper right, above 25's;
+#   (-Y) face a quarter up: clear of the carriage and the leadscrew below; out
+#   to the upper right, above 25's;
 # - the leadscrew's far end, which stands past the far KP08 where the
 #   handwheel slid off: its end chamfer's outer circle on the operator's
 #   side (part -Z; the handwheel set screw's flat is on +X and ends short
@@ -764,6 +803,15 @@ BALLOON_ANCHORS[spec.PILLOW_BLOCK] = BalloonAnchor(
         + spec.pillow_block.BOSS_RADIUS * math.sin(math.radians(KP08_RIM_DEG)),
     ),
     instance=spec.instance_name(spec.PILLOW_BLOCK, 0),
+)
+# TL-00 review ce83ac3b (sheet 5): balloon 17 landed on the thin rim of the
+# nut that showed past the lug. The nut now stands off the lug along its
+# axis (spec.FEED_NUT_BACK_OFF), its body end facing away from the viewer:
+# 17 lands on that end's outer circle at part +X, on the arc the view sees
+# past the body itself; out to the upper right, clear of its screws beyond.
+BALLOON_ANCHORS[spec.FEED_NUT] = BalloonAnchor(
+    point_mm=(spec.feed_nut.BODY_DIA / 2.0, spec.feed_nut.LENGTH, 0.0),
+    instance=spec.instance_name(spec.FEED_NUT, 0),
 )
 # The same run's replay of every walked leader on sheets 3-6 (the spec's
 # exploded poses and part envelopes, ray-cast frontmost) found seven more
@@ -882,10 +930,24 @@ BALLOON_APPROACH_DEG = {
     spec.PILLOW_BLOCK: 10.0,
     spec.PILLOW_BLOCK_SCREW: 35.0,
     spec.END_BRACKET: -30.0,
+    spec.FEED_NUT: 60.0,
     # Sheet 6.
     spec.RISER: 90.0,
     spec.FEED_LEVER: 180.0,
 }
+
+
+def cluster_anchors(cluster: Cluster) -> dict[str, BalloonAnchor]:
+    """Each family's landing on ``cluster``'s sheet: BALLOON_ANCHORS', its
+    repeated families' there."""
+    return BALLOON_ANCHORS | {stem: anchor for stem, anchor, _degrees in cluster.repeated}
+
+
+def cluster_approaches(cluster: Cluster) -> dict[str, float]:
+    """Each declared balloon's approach on ``cluster``'s sheet:
+    BALLOON_APPROACH_DEG's, its repeated families' there."""
+    return BALLOON_APPROACH_DEG | {stem: degrees for stem, _anchor, degrees in cluster.repeated}
+
 
 EXPLODED_VIEW_NAMES = {
     ASSEMBLY_VIEW_CONFIGURATION: spec.EXPLODED_VIEW_NAME,
@@ -2011,7 +2073,7 @@ def _ring_balloons(
 ) -> None:
     """Ring every one of ``view``'s balloons together, ``BALLOON_MARGIN``
     outside its outline, set each declared one (``approach_deg``, the
-    exploded sheets' ``BALLOON_APPROACH_DEG``) where its approach meets that
+    exploded sheets' ``cluster_approaches``) where its approach meets that
     ring, then move them between their own ring slots until no two leaders
     cross (:func:`approached_ring_slots`); attachments stay."""
     # _spread_balloons rings on the outline it reads first: read it the same.
@@ -2892,18 +2954,20 @@ def _balloon_cluster(
     items: Sequence[tuple[str, str]],
     bom_name: str,
 ) -> list[BalloonLanding]:
-    """One BOM-linked ring with one real-edge balloon per family; each
-    declared balloon's leader proven clear once the ring is placed."""
+    """One BOM-linked ring with one real-edge balloon per family ballooned
+    there; each declared balloon's leader proven clear once the ring is
+    placed."""
     _activate_sheet(adapter, cluster.sheet)
     label = f"jig {cluster.sheet.lower()}"
     _link_view_to_bom(view, bom_name, label=label)
-    wanted = tuple(item for item in items if item[0] in cluster.stems)
+    wanted = tuple(item for item in items if item[0] in cluster.ballooned)
+    approaches = cluster_approaches(cluster)
     with _source_configuration_active(view, label=label):
         landings = add_component_bom_balloons(
             adapter,
             view,
             items=wanted,
-            anchors=BALLOON_ANCHORS,
+            anchors=cluster_anchors(cluster),
             label=f"{label} BOM coverage",
             margin=BALLOON_MARGIN,
         )
@@ -2911,17 +2975,17 @@ def _balloon_cluster(
         adapter,
         view,
         landings,
-        approach_deg=BALLOON_APPROACH_DEG,
+        approach_deg=approaches,
         label=f"{label} balloons",
     )
     landings = _relax_cluster_slide(adapter, view, landings, label=f"{label} ring")
-    if sorted(landing.stem for landing in landings) != sorted(cluster.stems):
+    if sorted(landing.stem for landing in landings) != sorted(cluster.ballooned):
         raise RuntimeError(
             f"{label} carries balloons for "
             f"{sorted(landing.stem for landing in landings)!r}, "
-            f"expected one for each of {sorted(cluster.stems)!r}"
+            f"expected one for each of {sorted(cluster.ballooned)!r}"
         )
-    declared = [landing for landing in landings if landing.stem in BALLOON_APPROACH_DEG]
+    declared = [landing for landing in landings if landing.stem in approaches]
     if declared:
         with _source_configuration_active(view, label=label):
             _assert_declared_leaders_clear(
@@ -3230,8 +3294,11 @@ def _place_package(
             EXPLODED_CAPTION_XY,
             label=f"{cluster.sheet.lower()} caption",
         )
-    if sorted(landing.stem for landing in landings) != sorted(BOM_COMPONENTS):
-        raise RuntimeError("jig package requires exactly one balloon per BOM family")
+    repeats = [stem for cluster, _view, _scale in placed for stem, _a, _d in cluster.repeated]
+    if sorted(landing.stem for landing in landings) != sorted((*BOM_COMPONENTS, *repeats)):
+        raise RuntimeError(
+            "jig package requires one balloon per BOM family, plus each sheet's repeats"
+        )
     # The linear-motion balloons repeat items the exploded sheets already
     # balloon, so they stay out of that one-per-family partition.
     linear_landings = _balloon_linear_motion(
