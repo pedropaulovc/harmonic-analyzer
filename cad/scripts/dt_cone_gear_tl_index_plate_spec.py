@@ -29,18 +29,23 @@ Precision: the three hole circles are BASIC and every index hole carries a
 position frame to the bore, datum A (``INDEX_POSITION``), so neither the
 title block's ±1° angle nor its three-place band governs the spacing; a DRO
 bolt-circle drill holds the zone, and the 40:1 worm divides what is left.
-The pin holes are drilled, not reamed. The bore pilots the plate on the
-head's hub (+.003/0 over the measured stock bore) so the hole circles stay
-concentric with the crank.
+The pin holes are reamed to a sliding fit on the head's index pin (delegated
+ruling 2026-11-07, owner review #2144, pending owner confirmation): a drilled
+hole holds only the drilled-hole row, not the Ø.004 zone. The bore pilots the
+plate on the head's hub (+.003/0 over the measured stock bore) so the hole
+circles stay concentric with the crank.
 
 Rule 17 shortfall (stated on the sheet; owner ruling 2026-11-02, RV-01 in the
-part's machinist_exceptions, provisional until #2157): Ø.157
-holes on the 57- and 51-hole circles leave about .03 in between neighbouring
-holes and between those two circles, at the worst case of the drill band and
+part's machinist_exceptions, provisional until #2157): Ø.1570
+holes on the 57- and 51-hole circles leave about .035 in between neighbouring
+holes and between those two circles, at the worst case of the ream band and
 the position zone, below the .060 floor. The plate's
 3.94 OD leaves no larger radius at the .080 edge target; a smaller measured
 pin is the likely cure. The 24-hole circle stands at Ø2.700, not the brief's
 Ø2.800, so its web to the 51-hole circle meets the .080 target.
+
+The head is shop equipment with no drawing number; the sheet names it once
+(RV-03, delegated ruling 2026-11-07).
 """
 
 from __future__ import annotations
@@ -51,7 +56,7 @@ import _config
 from _hole_spec import CLEARANCE_MM
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_tolerance import printed_band_mm
 
 PART_NAME = "dt-cone-gear-tl-index-plate"
 UNIT = drawing_unit(
@@ -79,7 +84,11 @@ def holes_per_tooth(teeth: int, circle: int) -> float:
 
 
 # --- Index-hole circles: hole count -> bolt-circle diameter -------------------
-INDEX_HOLE_DIA = 0.157 * INCH  # GUESS (#2157): Ø4 mm index-pin class (#22 drill)
+INDEX_HOLE_DIA = 0.157 * INCH  # GUESS (#2157): Ø4 mm index-pin class
+# Reamed to a sliding fit on the head's index pin (delegated ruling 2026-11-07,
+# owner review #2144, pending owner confirmation).
+INDEX_HOLE_DEVIATIONS = (0.0, 0.0005 * INCH)
+INDEX_HOLE_PLACES = 4
 RING_COUNTS = (57, 51, 24)
 RING_PCDS = {
     57: 3.600 * INCH,  # GUESS (#2157): outermost at the .080 edge target
@@ -117,10 +126,10 @@ MOUNT_SEED = (
 # --- Printed precision --------------------------------------------------------
 # Places: OD, thickness and the countersink at .XX; the bore (banded, the
 # hub pilot), the bolt circles (index arm reach, head taps) and the drill
-# sizes at .XXX (rule 3: drill diameters print three places).
+# size at .XXX (rule 3: drill diameters print three places); the reamed index
+# holes at .XXXX with their band.
 _XX = printed_band_mm(2, unit=UNIT)
 _XXX = printed_band_mm(3, unit=UNIT)
-DRILLED_OVERSIZE = drilled_oversize_mm(unit=UNIT)
 
 # The three-place print rounds the wizard table's 4.978 mm.
 if abs(CLEARANCE_MM[(MOUNT_SCREW, "normal")] - MOUNT_HOLE_DIA) > 0.0005 * INCH:
@@ -150,7 +159,7 @@ def _pitch(circle: int) -> float:
     return RING_PCDS[circle] * math.sin(math.pi / circle)
 
 
-_INDEX_R_MAX = (INDEX_HOLE_DIA + DRILLED_OVERSIZE) / 2.0
+_INDEX_R_MAX = (INDEX_HOLE_DIA + INDEX_HOLE_DEVIATIONS[1]) / 2.0
 _CSK_R_MAX = (CSK_DIA + _XX) / 2.0
 WEBS_MM: dict[str, float] = {
     **{
@@ -231,14 +240,21 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 _THREE_PLACE = frozenset(
     {
         "BoreDia",
-        PRINTED_HOLE,
         "MountHoleDia",
         "MountPcd",
         *(f"Ring{n}Pcd" for n in RING_COUNTS),
     }
 )
+
+
+def _places(name: str) -> int:
+    if name == PRINTED_HOLE:
+        return INDEX_HOLE_PLACES
+    return 3 if name in _THREE_PLACE else 2
+
+
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    feature: {name: 3 if name in _THREE_PLACE else 2 for name in names}
+    feature: {name: _places(name) for name in names}
     for feature, names in DRAWING_DIMENSIONS.items()
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -272,7 +288,11 @@ def inch_text(value_mm: float, places: int) -> str:
     return text[1:] if text.startswith("0.") else text
 
 
+# The head is shop equipment with no drawing number: the sheet names it once,
+# in full, and the callouts call it BS-0 HEAD (RV-03: Delegated ruling
+# 2026-11-07 (Main), no precedent; owner review #2144).
 HEAD = "BS-0 HEAD"
+HEAD_NOTE = f"1. {HEAD}: PM BS-0 DIVIDING HEAD\n   (SHOP EQUIPMENT)."
 CSK_CALLOUT = (
     f"<HOLE-SINK><MOD-DIAM>{inch_text(CSK_DIA, CSK_PLACES)} X {CSK_ANGLE:.0f}\u00b0"
 )
@@ -288,7 +308,7 @@ CALLOUTS_ABOVE: dict[str, str] = {
 # (rule 7); the countersink prints with its symbol (rule 26).
 WEB_CALLOUT = f"WEB {inch_text(WEB_MIN_PRINTED * INCH, 2)} MIN"
 CALLOUTS_BELOW: dict[str, str] = {
-    PRINTED_HOLE: f"DRILL THRU\nONE OF EACH CIRCLE ON VERTICAL CL\n{WEB_CALLOUT}",
+    PRINTED_HOLE: f"REAM THRU\nSLIDING FIT ON {HEAD} INDEX PIN\n{WEB_CALLOUT}",
     "BoreDia": f"BORE THRU\nLOCATING FIT ON\n{HEAD} PLATE HUB",
     "MountHoleDia": f"DRILL THRU\n{CSK_CALLOUT}\nEQ SP, ONE ON VERTICAL CL",
     "MountPcd": f"MATCHES {HEAD}\nPLATE-SCREW TAPS",

@@ -11,7 +11,7 @@ dt-cone-gear-tl-index-plate:
   quantity: 1
   tolerance_class: machined_block
   drawing_unit: in
-  process: "face owned 1/4 in 6061-T651 plate to .22; turn the Ø3.94 OD and bore Ø.829 to the BS-0 plate hub; drill the 57-, 51- and 24-hole circles and the three countersunk #8 mounting holes on the mill DRO's bolt-hole-circle function; break edges"
+  process: "face owned 1/4 in 6061-T651 plate to .22; turn the Ø3.94 OD and bore Ø.829 to the BS-0 plate hub; drill and ream the 57-, 51- and 24-hole circles and the three countersunk #8 mounting holes on the mill DRO's bolt-hole-circle function; break edges"
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
@@ -23,3 +23,8 @@ dt-cone-gear-tl-index-plate:
       where: "face view: the 57-, 51- and 24-hole circle diameters boxed BASIC and the 132X position frame Ø.004 to datum A (the bore axis)"
       finding: "geometric control (position frame, datum and basic dimensions) on a shop-tooling part (rule 5)"
       reason: "owner ruling 2026-11-02 (Pedro): the index holes' angular spacing is the plate's function; without a position control the title block's ±1° on EQ SP would let neighbouring Ø.157 holes run together, so all 132 holes are held to a Ø.004 zone about their BASIC positions from the bore that pilots the plate on the BS-0 head"
+    - id: "RV-03"
+      kind: "accept"
+      where: "face view: the bore, Ø1.500 BC and 132X index-hole callouts name BS-0 HEAD; note 1 names it in full"
+      finding: "mate named without a drawing number (rule 4)"
+      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144: the PM BS-0 dividing head is shop equipment with no project identity; the sheet names it as PM BS-0 DIVIDING HEAD (SHOP EQUIPMENT) and no new identity is created"
