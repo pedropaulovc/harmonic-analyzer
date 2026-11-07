@@ -6,8 +6,8 @@ behaviour lives in ``_drawing_common``.
 
 One B sheet at 2:1: the decorated face (front) carries the outline's width
 and height and each screw hole's station from its two adjacent edges; the
-edge view (right) carries the plate thickness; section A-A, cut across the
-whole plate and cropped to its left border and sunk field, carries the
+edge view (right) carries the plate thickness; section A-A, a short cut
+across the left border and the start of the sunk field, carries the
 field's depth, the engraving floor below the decorated face and, as a
 reference, the floor left under the engraving.  Every dimension but that
 reference is a model dimension imported with the places the part authored
@@ -40,6 +40,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 from _check import check
 from _com import _early_bound
+import _config
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -68,19 +69,18 @@ from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
 from fr_nameplate_drawing_spec import (
-    DIMENSION_CALLOUTS,
     DIMENSION_PREFIXES,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
+    ENGRAVING_DEPTH_CALLOUT,
     ENGRAVING_FLOOR_DEPTH,
     FIELD_DEPTH,
+    FLOOR_MINIMUM_NOTE,
     FLOOR_UNDER_ENGRAVING,
     FLOOR_UNDER_ENGRAVING_CALLOUT,
-    HOLE_CALLOUT_PROCESS,
-    MINIMUM_NOTES,
+    SCREW_ENGAGEMENT_NOTE,
     SCREW_HOLE_DIA,
-    SECTION_CALLOUTS,
     SECTION_FIELD_X,
     SECTION_GROOVE_X,
     SECTION_REFERENCE,
@@ -120,15 +120,22 @@ RIGHT_CENTER = (0.276, 0.170)
 ISO_CENTER = (0.366, 0.222)
 ISO_NOTE_XY = (0.330, 0.183)
 NOTES_XY = (0.030, 0.085)
-# r4 review: the engraving DXF draws a whole slotted screw head round each
-# hole, and the drilled hole removes its centre. Stated once, under the DXF
-# rows (whose fourth row ends near y 0.064), as a fact of the part, not a
-# method: the hole wins where the two meet.
-SCREW_HEAD_NOTE = "SCREW HOLES CUT THROUGH THE ENGRAVED SCREW HEADS"
-SCREW_HEAD_NOTE_XY = (0.030, 0.061)
 # The stated worst-case minimums (fr-nameplate machinist exceptions RV-02 and
-# RV-03), two rows a line below the screw-head note, in the empty bottom-left.
-MINIMUM_NOTES_XY = (0.030, 0.050)
+# RV-03), two rows a line below the DXF rows (whose fourth row ends near y
+# 0.064), in the empty bottom-left. The screws' row names the screw and the
+# receiver it threads into by drawing number (rule 4).
+_SCREW_NUMBER = _config.parts("sh-vn-brass-fillister-screw")["number"]
+_BASE_NUMBER = _config.parts("fr-harmonic-base")["number"]
+MINIMUM_NOTES = "\n".join(
+    (FLOOR_MINIMUM_NOTE, f"{_SCREW_NUMBER} {SCREW_ENGAGEMENT_NOTE} IN {_BASE_NUMBER}")
+)
+MINIMUM_NOTES_XY = (0.030, 0.055)
+# The thickness is stock with no band of its own, so it carries no reason;
+# the field depth names its feature only (rule 7: no design narration).
+SECTION_CALLOUTS = {
+    "FieldDepth": "SUNK FIELD DEPTH",
+    "EngravingDepth": ENGRAVING_DEPTH_CALLOUT,
+}
 SECTION_CENTER = (0.350, 0.115)
 # The native caption's top centre. r4 printed the floor reference's text
 # right-aligned on its dimension line, its "(0.800)" row 0.88 mm into a
@@ -206,21 +213,23 @@ def _hole_rim_edge(edges: ViewEdges, hole: tuple[float, float]) -> Any:
     return max(rims, key=lambda item: item.circle[2]).edge
 
 
-# Section A-A: a cut across the whole plate at SECTION_Y (plate-local, the
-# spec's), in the gap between the CHICAGO row and the scroll ornament, so the
-# line meets no engraving but the border pinstripe on each side.  It starts
-# and ends SECTION_OVERRUN outside the outline, so both arrows and both
-# letters print off the plate (r2 review C3).  The removed section is cropped
-# to its left end, SECTION_CROP (plate x, z corners): the raised border (x
-# 0..3.15), the pinstripe groove (x 3.16..3.60, the engraving floor) and the
-# sunk field.  Each depth is SectionReference's model dimension, on its own
-# dimension line from the decorated face (the raised border top), its text
-# above the cut; the floor left under the groove chains below the engraving
-# depth as a sheet reference, its text below.
+# Section A-A: a short cut at SECTION_Y (plate-local, the spec's), in the gap
+# between the CHICAGO row and the scroll ornament, across only what the
+# section shows (rule 9: a partial section's plane crosses its feature, not
+# the whole part): it starts SECTION_OVERRUN outside the left edge, so that
+# arrow and letter print off the plate (r2 review C3), and ends
+# SECTION_FIELD_RUN past the crop's right edge, on the sunk field.  The
+# removed section is cropped to SECTION_CROP (plate x, z corners): the raised
+# border (x 0..3.15), the pinstripe groove (x 3.16..3.60, the engraving
+# floor) and the sunk field.  Each depth is SectionReference's model
+# dimension, on its own dimension line from the decorated face (the raised
+# border top), its text above the cut; the floor left under the groove
+# chains below the engraving depth as a sheet reference, its text below.
 SECTION_OVERRUN = 3.0
-SECTION_X_START = -SECTION_OVERRUN
-SECTION_X_END = PLATE_WIDTH + SECTION_OVERRUN
+SECTION_FIELD_RUN = 2.0
 SECTION_CROP = ((-0.6, 0.6), (8.0, -(PLATE_THICKNESS + 0.6)))
+SECTION_X_START = -SECTION_OVERRUN
+SECTION_X_END = SECTION_CROP[1][0] + SECTION_FIELD_RUN
 _SECTION_CROP_CENTER = (
     (SECTION_CROP[0][0] + SECTION_CROP[1][0]) / 2.0,
     (SECTION_CROP[0][1] + SECTION_CROP[1][1]) / 2.0,
@@ -368,10 +377,10 @@ def _orient_section(adapter: Any, view: Any) -> None:
 def _crop_section(adapter: Any, view: Any) -> None:
     """Crop A-A to SECTION_CROP: the border, the groove and the field's start.
 
-    The full cut is the plate's whole width (848 mm at 8:1); the fence is a
-    rectangle sketched in the section's own sketch round the projected crop
-    corners (``draw_fr_rocker_arm_support._crop_view_b_to_rail``'s sequence),
-    with no crop outline, so the cut face simply stops on the field.
+    The partial cut spans the short cutting line (about 104 mm at 8:1); the
+    fence is a rectangle sketched in the section's own sketch round the
+    projected crop corners (``draw_fr_rocker_arm_support._crop_view_b_to_rail``'s
+    sequence), with no crop outline, so the cut face simply stops on the field.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
@@ -425,7 +434,7 @@ def _crop_section(adapter: Any, view: Any) -> None:
         status != 1
         or not bool(view.IsCropped())
         or outline[2] - outline[0] > width + 0.025
-        or outline[2] - outline[0] > 0.25 * (before[2] - before[0])
+        or outline[2] - outline[0] >= before[2] - before[0]
     ):
         raise RuntimeError(
             f"section A-A did not crop to {width * 1000.0:.1f} mm: status {status}, "
@@ -683,17 +692,17 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     ]
     _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="above")
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
+    # The native callout alone, 4X Ø.120 THRU: size first, its process the
+    # title block's DRILLED HOLES row (rule 26: no process word ahead of it).
     holes = add_native_hole_callout(
         adapter,
         front,
         edge=_hole_rim_edge(scan_view_edges(front, label="front"), TOP_LEFT),
         callout_xy=HOLE_CALLOUT_XY,
         label="nameplate screw holes",
-        process=HOLE_CALLOUT_PROCESS,
     )
     set_hole_callout_precision(
         holes, HOLE_CALLOUT_PRECISION, label="nameplate screw holes"
@@ -724,8 +733,6 @@ async def build(adapter: Any) -> dict[str, str]:
     _floor_reference(adapter, section)
 
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
-    if add_note(adapter, SCREW_HEAD_NOTE, *SCREW_HEAD_NOTE_XY) is None:
-        raise RuntimeError("failed to place the screw-head engraving note")
     # Named exceptions: fr-nameplate RV-02 (floor) and RV-03 (screw thread).
     if add_note(adapter, MINIMUM_NOTES, *MINIMUM_NOTES_XY) is None:
         raise RuntimeError("failed to place the stated-minimum notes")
