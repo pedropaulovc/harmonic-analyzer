@@ -605,8 +605,8 @@ def test_cone_swing_check_requires_installed_stop_inspection_and_seating() -> No
     minimum = float(printed.group(1)) * 25.4
     assert 1.5 * stop_screw.SHANK_DIA - 1e-9 <= minimum
     assert minimum <= stop_screw.MIN_USEFUL_ENGAGEMENT_MM + 1e-9
-    assert "HEAD FULLY SEATED" in check
-    assert "MHA-DT-20 STAYS SEATED THROUGH CHECK 4" in check
+    assert "CHECK THAT ITS HEAD IS FULLY SEATED" in check
+    assert "CHECK THAT MHA-DT-20 AND THE MHA-DT-VN-52 SHOULDER STAY SEATED" in check
 
 
 def test_cone_swing_check_requires_pivot_thread_engagement() -> None:
@@ -620,7 +620,7 @@ def test_cone_swing_check_requires_pivot_thread_engagement() -> None:
     minimum = float(printed.group(1)) * 25.4
     assert pivot_screw.THREAD_SOLID_DIA - 1e-9 <= minimum
     assert minimum <= pivot_screw.MIN_USEFUL_ENGAGEMENT_MM + 1e-9
-    assert "SHOULDER FULLY SEATED" in check
+    assert "MHA-DT-VN-52 SHOULDER STAY SEATED" in check
 
 
 def _flat(text: str) -> str:
@@ -694,6 +694,12 @@ def test_the_rig_steps_print_the_fitup_sequence_once_in_order() -> None:
     )
     flat = _unlettered(RIG_STEPS)
     for key, step in zip(keys, fitup.ASSEMBLY_SEQUENCE, strict=True):
+        if key == "lever-pin-set":
+            # Rubric sample round 6 (rule 22): the sheet re-composes the lever
+            # pin set from the same spec constants as one-thing lines, the
+            # hole's drill folded into the match-drill
+            # (test_lever_pin_step_states_existing_drill_size_and_slip_fit).
+            continue
         assert flat.count(_flat(step)) == 1, key
         assert _flat(step) in _unlettered(_rig_step_body(key)), key
     numbers = [steps.step_number(key) for key in keys]
@@ -717,9 +723,11 @@ def test_lever_pin_step_states_existing_drill_size_and_slip_fit() -> None:
     assert pin.PIN_DIA == 25.4 / 16.0
     assert "SLIP FIT" in _flat(pin.PIN_DIA_CALLOUT)
     step = _rig_step_body(pin.LEVER_PIN_SET_STEP_KEY)
-    assert step.startswith(_flat(drawing.LEVER_PIN_HOLE_FIT))
-    assert "MHA-DT-16'S PRINTED STATION: #51 DRILL THRU" in step
-    assert "MHA-DT-30 SLIP FIT" in step
+    assert step.startswith(f"{pin.LEVER_PIN_SET_NAME}, GRIP PARKED: MATCH-DRILL #51 THRU")
+    assert f"{pin.LEVER_NUMBER}'S HUB AT ITS PRINTED STATION AND {pin.LIFT_ROD_NUMBER} TOGETHER" in step
+    assert f"INSERT {pin.PIN_NUMBER}, A SLIP FIT." in step
+    assert "TRIM BOTH ENDS." in step
+    assert "PEEN BOTH ENDS FLUSH WITH THE HUB." in step
     assert "LIGHT HAMMER" not in step
     assert "REAM" not in step
 

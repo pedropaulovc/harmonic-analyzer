@@ -19,7 +19,6 @@ from _printed_tolerance import drilled_oversize_mm
 import dt_crank_handle_spec as _handle
 import dt_crank_pinion_spec as pinion
 import dt_pinion_lever_geometry as _lever
-import dt_pinion_lever_pin_spec as _lever_pin
 
 MM_PER_IN = 25.4
 
@@ -113,10 +112,3 @@ if not (
         f"LEVER PIN SET's {LEVER_PIN_HOLE_DRILL} drill ({_LEVER_PIN_DRILL_MM} mm) "
         "cuts outside the lever and lift rod's drilled pin-hole limits"
     )
-LEVER_PIN_HOLE_FIT = "\n".join(
-    (
-        f"HOLE AT {_lever_pin.LEVER_NUMBER}'S PRINTED STATION: "
-        f"{LEVER_PIN_HOLE_DRILL} DRILL THRU;",
-        f"{_lever_pin.PIN_NUMBER} SLIP FIT.",
-    )
-)

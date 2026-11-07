@@ -130,11 +130,12 @@ def test_post_screws_keep_spec_owned_stock_and_cut_to_fit_acceptance() -> None:
     fitup = _step_body("post-and-tip-block")
     assert row["number"] == drawing.BOM_PART_NUMBERS["dt-vn-post-mount-screw"]
     assert row["supplier_skus"][0] == screw.SKU
-    assert f"MSC {screw.SKU}" in drawing.BOM_DESCRIPTIONS["dt-vn-post-mount-screw"]
+    # Rubric sample round 6 (rule 22): the stock is the BOM row's, not step 2's.
     assert (
-        f"MSC {screw.SKU}, {screw.THREAD} X {screw.STOCK_LENGTH_MM / 25.4:g} IN STOCK"
-        in fitup
+        f"{screw.THREAD} X {screw.STOCK_LENGTH_MM / 25.4:g} FILLISTER STOCK, MSC {screw.SKU}"
+        == drawing.BOM_DESCRIPTIONS["dt-vn-post-mount-screw"]
     )
+    assert f"MSC {screw.SKU}" not in fitup
     places = screw.DRAWING_PRECISION_BY_NAME[screw.CUT_LENGTH_DIMENSION]
     assert f"({sheet.inch_text(screw.CUT_LENGTH_MM, places)}) REF CUT LENGTH" in fitup
     # The step prints the part sheet's exact maximum short, never a wider one.
