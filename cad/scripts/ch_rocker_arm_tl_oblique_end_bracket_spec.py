@@ -487,10 +487,16 @@ CALLOUTS_BELOW = {
     # tip (BAR_REACH_MAX, 12.294) passes the full thread into the bottoming
     # tap's lead; at .50 that lead runs past the 5/8 KP08 screw's tip on the
     # least foot; at .45 the top lead does the same to the bar screw's tip.
-    # The rows name the screws' tips and the tap leads, the true bounds.
+    # The rows name the mating screws by their catalogue lengths (the leadscrew
+    # spec's purchased 3/4 bar and 5/8 KP08 SHCS; farm 26bb: "the sheet shows
+    # no screw length or other mate"), each tip and tap lead the true bound;
+    # the depth itself prints only through its native dimension.
     BAR_THREAD_DEPTH_DIMENSION: (
-        "FULL THREAD FROM BOTTOM\nBOTH HOLES\nBOTH DEPTHS: EACH SCREW\n"
-        "TIP IN FULL THREAD AND\nEACH TAP LEAD SHORT OF\nTHE OPPOSED SCREW TIP"
+        "FULL THREAD FROM BOTTOM\nBOTH HOLES\n"
+        f"{leadscrew.BAR_SCREW_LENGTH} BAR SCREW TIP IN\n"
+        "FULL THREAD, TAP LEAD\n"
+        f"SHORT OF {leadscrew.KP08_SCREW_LENGTH} KP08 SCREW\n"
+        "TIP; TOP DEPTH SAME,\nSCREWS SWAPPED"
     ),
 }
 # drawing-guidelines.md (units): an as-bought fraction is an untoleranced REF;

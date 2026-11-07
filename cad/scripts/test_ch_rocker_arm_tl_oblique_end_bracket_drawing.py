@@ -361,16 +361,25 @@ def test_three_place_depths_are_set_by_the_opposed_screws() -> None:
     assert bar_high + spec.TAP_LEAD > spec.THICK_MIN - spec.KP08_REACH_MAX
     # At .45 the top tap's lead passes the bar screw's tip.
     assert kp08_high + spec.TAP_LEAD > spec.THICK_MIN - spec.BAR_REACH_MAX
-    # The sheet names that function beside the depth, in plain words.
-    text = spec.CALLOUTS_BELOW[spec.BAR_THREAD_DEPTH_DIMENSION]
-    assert text.split("\n") == [
-        "FULL THREAD FROM BOTTOM",
-        "BOTH HOLES",
-        "BOTH DEPTHS: EACH SCREW",
-        "TIP IN FULL THREAD AND",
-        "EACH TAP LEAD SHORT OF",
-        "THE OPPOSED SCREW TIP",
-    ]
+    # The sheet names that function beside the depth: the catalogue screws
+    # whose tips bound it (farm 26bb: no screw length or mate named), each
+    # on one row, and no retyped depth (it prints from its native dimension).
+    rows = spec.CALLOUTS_BELOW[spec.BAR_THREAD_DEPTH_DIMENSION].split("\n")
+    assert "FULL THREAD" in rows[0] and "BOTTOM" in rows[0]
+    assert any(f"{leadscrew.BAR_SCREW_LENGTH} BAR SCREW" in row for row in rows)
+    assert any(f"{leadscrew.KP08_SCREW_LENGTH} KP08 SCREW" in row for row in rows)
+    assert any("TAP LEAD" in row for row in rows)
+    _assert_no_retyped_depth("\n".join(rows))
+
+
+def _assert_no_retyped_depth(text: str) -> None:
+    """Mate identifiers and fractions may print; a depth may not, in any
+    form: no decimal number at all, nor either depth's mm or inch value."""
+    assert not re.search(r"\d*\.\d", text), text
+    for depth in (spec.BAR_THREAD_DEPTH, spec.KP08_THREAD_DEPTH):
+        for printed in (f"{depth / 25.4:.3f}", f"{depth / 25.4:.3f}".lstrip("0")):
+            assert printed not in text, (printed, text)
+        assert f"{depth:.2f}" not in text and f"{depth:.1f}" not in text
 
 
 def test_threads_are_stated_by_the_callouts_alone() -> None:
@@ -613,7 +622,8 @@ def test_bottom_thread_depth_prints_from_its_own_native_dimension() -> None:
     }
     assert spec.DRAWING_PRECISION_BY_NAME[spec.BAR_THREAD_DEPTH_DIMENSION] == 3
     assert set(drawing.SECTION_KEEP) == {spec.BAR_THREAD_DEPTH_DIMENSION}
-    assert not re.search(r"\d", spec.CALLOUTS_BELOW[spec.BAR_THREAD_DEPTH_DIMENSION])
+    # Mates may print (3/4, 5/8, KP08); the depth prints only natively.
+    _assert_no_retyped_depth(spec.CALLOUTS_BELOW[spec.BAR_THREAD_DEPTH_DIMENSION])
     builder = Path(part.__file__).read_text(encoding="utf-8")
     assert 'create_sketch("Top")' in builder
     assert "thread_ref.record(BAR_THREAD_DEPTH_DIMENSION, '\"BarThreadDepth\"')" in builder
