@@ -318,6 +318,11 @@ _DETAIL_PER_MODEL_MM = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
 # handwheel station's, 32 mm under the axis) and left of the title block,
 # each fence's centre on DETAIL_ROW_Y. Their dimension texts stand in one row
 # under the fences and their captions in one row under that.
+# Reserve the settled native frame, not only the geometric fence. The 0c3
+# final audit already put C at x8.518..77.294 mm despite passing its early
+# placement check; 84d read that same frame before the check and refused.
+# Translate the whole bank +8 mm: C's final left is x16.518, E's final
+# right x200.288, preserving all fence/text gaps and the x215.9 title keep-out.
 DETAIL_ROW_Y = 0.082
 DETAIL_TEXT_ROW_Y = 0.050
 DETAIL_CAPTION_TOP = 0.036
@@ -351,7 +356,7 @@ def _text_row_radius_mm() -> float:
 # C: the near end and the near KP08's two flats (0 .. 12.5), its station
 # from the near end's centre under the fence.
 _NEAR_CENTRE_MM = (FLAT_STATIONS["NearKP08"] + FLAT_LENGTH / 2.0) / 2.0
-_NEAR_XY = (0.043, DETAIL_ROW_Y)
+_NEAR_XY = (0.051, DETAIL_ROW_Y)
 # D: the far KP08's two flats (375.5 .. 383.5); its station is the main
 # view's. The printed flat length (every KP08 flat's) stands under the
 # fence, right of the flat: the flat length's text (widest row
@@ -360,7 +365,7 @@ _NEAR_XY = (0.043, DETAIL_ROW_Y)
 # run out to it (review jbf-r17, rule 14: both extension lines crossed the
 # text), left of fence E.
 _FAR_CENTRE_MM = FLAT_STATIONS["FarKP08"]
-_FAR_XY = (0.091, DETAIL_ROW_Y)
+_FAR_XY = (0.099, DETAIL_ROW_Y)
 # E: the handwheel's open flat and the cut end, its
 # across-flat left of it, square to the axis: its extension line off the
 # flat runs back along the flat and out of the fence over the thread. The
@@ -371,7 +376,7 @@ _FAR_XY = (0.091, DETAIL_ROW_Y)
 # on its dimension line) stands between D's fence and E's.
 _WHEEL_CENTRE_MM = (FLAT_STARTS["Handwheel"] + LENGTH) / 2.0
 _WHEEL_RADIUS_MM = 7.0
-_WHEEL_XY = (0.1615, DETAIL_ROW_Y)
+_WHEEL_XY = (0.1695, DETAIL_ROW_Y)
 # The across-flat runs from the far crest (clock 180, radius -4) to the flat
 # (FLAT_AF - 4 toward clock 0): its middle stands at half their sum.
 _AF_MID_RADIUS_MM = (FLAT_AF - MAJOR_DIA) / 2.0
@@ -660,6 +665,16 @@ def _outline(view: Any, label: str) -> tuple[float, float, float, float]:
     if len(box) != 4 or not all(map(math.isfinite, box)):
         raise RuntimeError(f"{label}: invalid view outline {box!r}")
     return box
+
+
+def _require_detail_bounds(view: Any, detail: EndDetail) -> None:
+    """Read the settled native frame; an earlier transient outline is no proof."""
+    box = _outline(view, f"detail {detail.label}")
+    if not _inside_sheet(box):
+        raise RuntimeError(f"detail {detail.label} leaves the drawable sheet: {box!r}")
+    centre = ((box[0] + box[2]) / 2.0, (box[1] + box[3]) / 2.0)
+    if max(abs(centre[i] - detail.centre[i]) for i in (0, 1)) > DETAIL_SETTLE_M:
+        raise RuntimeError(f"detail {detail.label} moved from its reserved centre: {box!r}")
 
 
 def _center_view(
@@ -1169,19 +1184,22 @@ def _create_end_detail(adapter: Any, main: Any, detail: EndDetail) -> Any:
         label=f"detail {detail.label}",
     )
     _require_detail_orientation(adapter, view, detail)
+    _require_detail_bounds(view, detail)
     return view
 
 
 @_telemetry.traced("drawing.end_details")
-def _add_end_details(adapter: Any, main: Any) -> list[Any]:
+def _add_end_details(adapter: Any, main: Any) -> tuple[list[Any], list[Any]]:
     """Detail each flat station at 3:1, where the main view's 0.36 mm flats
     read: each detail's dimensions, its letter on the main view and its
-    caption under the row of texts. Returns the details' dimension
-    annotations; ``curate_view_dimensions`` fails the build if one does not
-    arrive."""
+    caption under the row of texts. Returns annotations and retained native
+    views for final containment checks; ``curate_view_dimensions`` refuses if
+    any dimension does not arrive."""
     annotations: list[Any] = []
+    views: list[Any] = []
     for detail in END_DETAILS:
         view = _create_end_detail(adapter, main, detail)
+        views.append(view)
         set_hidden_lines_removed(adapter, view)
         if detail.keep:
             annotations += curate_view_dimensions(
@@ -1199,7 +1217,7 @@ def _add_end_details(adapter: Any, main: Any) -> list[Any]:
             label=f"detail {detail.label} caption",
             sheet_scale=SHEET_SCALE,
         )
-    return annotations
+    return annotations, views
 
 
 # --- Shared member-sheet plumbing -------------------------------------------------
@@ -1314,7 +1332,8 @@ def _append_leadscrew_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     annotations += _add_clock_sections(adapter, main)
-    annotations += _add_end_details(adapter, main)
+    detail_annotations, detail_views = _add_end_details(adapter, main)
+    annotations += detail_annotations
     verify_machining_controls(
         annotations,
         expected=EXPECTED_CONTROLS,
@@ -1361,6 +1380,8 @@ def _append_leadscrew_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
             [],
             label=LEADSCREW_SHEET_NAME,
         )
+        for detail, view in zip(END_DETAILS, detail_views, strict=True):
+            _require_detail_bounds(view, detail)
         verify_machining_controls(
             annotations,
             expected=EXPECTED_CONTROLS,

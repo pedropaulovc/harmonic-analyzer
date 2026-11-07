@@ -285,6 +285,9 @@ assert abs(NUT_MACHINE_Z - lead.SCREW_AXIS_Z) < 1e-6
 
 CALLOUTS_SUFFIX = dict(pivot.CALLOUTS_SUFFIX)
 CALLOUTS_ABOVE = dict(pivot.CALLOUTS_ABOVE) | {
+    # The front view's leader identifies the counterbored face; B-B gives
+    # its floor. VIEW D / SHEET 2 identifies the separate leadscrew face.
+    "CarriageCounterbores3Dia": "4X COUNTERBORE",
     "NutClearanceDia": "DRILL THRU",
 }
 CALLOUTS_BELOW = dict(pivot.CALLOUTS_BELOW) | {
