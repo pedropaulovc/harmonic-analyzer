@@ -138,16 +138,23 @@ for _side, _station in zip(("south", "north"), bank.PIVOT_SHAFT_FLAT_STATIONS, s
     )
 
 # The O.D.'s band is for the 20 rocker hubs it runs in; the callout names
-# them (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)).
-SHAFT_FIT_CALLOUT = f"RUNNING FIT IN\n{_config.parts('ch-rocker-arm')['number']} HUBS"
+# them (drawing-guidelines.md rule 4 (tighten only for function, and name the
+# mate)) and, the band being narrower than the shop's turned-diameter row,
+# its route at the feature: bought ground stock (fan-out F1, delegated ruling
+# 2026-11-07). Two lines of words (rule 7), each short enough to end clear of
+# DETAIL A's fence.
+SHAFT_FIT_CALLOUT = (
+    f"RUNNING FIT IN {_config.parts('ch-rocker-arm')['number']}\n1/4 GROUND STOCK OK"
+)
 
 PROFILE_KEEP = {
     # Over the bar, centred: the overall length, tip to tip.
     "OverallLength": (PROFILE_CENTER[0], 0.242),
     # Right of the south end and under the bar's lower flank: inside the
     # witness pair the toleranced text and its fit callout sat on the lower
-    # extension line (baseline machinist review).
-    "ShaftDia": (SOUTH_END_X + 0.030, PROFILE_CENTER[1] - 0.012),
+    # extension line (baseline machinist review). Low enough that the mate's
+    # row, the widest, passes under DETAIL A's fence.
+    "ShaftDia": (SOUTH_END_X + 0.030, PROFILE_CENTER[1] - 0.020),
 }
 
 PIVOT_BEARING = requirement(
@@ -168,11 +175,11 @@ PIVOT_BEARING = requirement(
 # the witness lines and against the dome (PR #1317 eye pass), so a native 5:1
 # detail carries them. The fence centres on the axis midway between the dome
 # tip and the flat's far end and takes in both; the detail stands right of
-# the profile's diameter callout (x <= 0.29), clear of the right border
-# (0.419) with its dimensions.
+# the profile's diameter callout (x <= 0.33 with its ground-stock route row),
+# clear of the right border (0.419) with its dimensions.
 DETAIL_SCALE = (5, 1)
 DETAIL_RADIUS_MM = 6.0
-DETAIL_CENTER = (0.345, 0.185)
+DETAIL_CENTER = (0.355, 0.185)
 DETAIL_FENCE_Z_MM = (DOME_HEIGHT - (NORTH_FLAT_STATION + FLAT_LENGTH / 2.0)) / 2.0
 _DETAIL_MM = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
 _DETAIL_FENCE_R = DETAIL_RADIUS_MM * _DETAIL_MM
