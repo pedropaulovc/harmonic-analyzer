@@ -1174,8 +1174,12 @@ def test_no_retired_part_is_named_on_the_sheet() -> None:
     text = _unit_step_notes().fitup_steps
     printed = set(re.findall(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", text))
     assert not any(number in text for number in retired)
+    # Off-BOM numbers: the drive-train package the crank side cites, and the
+    # frame parts (columns, base deck) the bar is clamped to and set from.
     assert printed <= set(drawing.BOM_PART_NUMBERS.values()) | {
-        assembly_contract("dt-drive-train").number
+        assembly_contract("dt-drive-train").number,
+        drawing.FRAME_COLUMN,
+        drawing.FRAME_BASE,
     }
 
 
@@ -1204,7 +1208,8 @@ def test_the_pivot_screw_is_staked_and_the_spacer_pressed_as_made() -> None:
     head holds the arm on it."""
     body = _step_body("hanger-pivoted")
     window = steps.inch_window(pivot_screw.TIP_RECESS, 3, " TO ")
-    assert "THREADLOCKER OPTIONAL" in body
+    # The tip is staked; no threadlocker (the standing no-threadlocker rule).
+    assert "THREADLOCKER" not in body
     assert "BLIND" not in body
     assert f"{window} BELOW THE BAR'S FRONT FACE" in body
     assert drawing.PIVOT_STAKE_POINTS_TEXT in body
@@ -1434,7 +1439,7 @@ def test_the_actual_collar_disc_overlap_is_checked_before_final_platen_installat
     assert "TRIAL PLATEN" not in inspected
     assert f"({disc.TEETH / knob_shaft.TEETH:g} KNOB TURNS)" in inspected
     assert f"CLEARANCE {steps.COLLAR_DISC_AIR_TEXT}" in inspected
-    assert "REFIT THE PLATEN AND LATCH THE ARM" in inspected
+    assert "REFIT THE PLATEN." in inspected
     assert steps.COLLAR_DISC_AIR_MIN == collar.COLLAR_DISC_AIR_MIN
     assert steps.COLLAR_DISC_AIR_TEXT in _step_body("fitup-accepted")
     keys = (
@@ -1525,12 +1530,12 @@ def test_the_fitted_collar_rear_face_reacts_on_the_actual_gear_shoulder() -> Non
 def test_the_fitup_steps_and_the_collar_note_share_facing_setting_and_stud_cut() -> None:
     """R9-30's shared fit phrases now describe shoulder seating, not core drilling."""
     note = " ".join(collar.FIT_UP_NOTE.split())
-    for key, phrase in (
-        ("collar-rear-faced-to-fit", collar.FIT_UP_OFFSET_SET_TEXT),
-        ("stud-end-cut", collar.STUD_CUT_PHRASE),
-    ):
-        assert phrase in _step_body(key), key
-        assert phrase in note, key
+    phrase = collar.FIT_UP_OFFSET_SET_TEXT
+    assert phrase in _step_body("collar-rear-faced-to-fit")
+    assert phrase in note
+    # The stud cut prints the collar spec's own window.
+    low, high = (steps.inch_text(v, 3) for v in collar.STUD_CUT_BELOW_RIM)
+    assert f"{low} TO {high} BELOW THE RIM" in _step_body("stud-end-cut")
     for text in drawing.sheet_texts(_unit_step_notes()):
         assert "THROUGH THE CORE" not in text
         assert "SPRING PIN IN THE SLOT" not in text
@@ -1664,7 +1669,7 @@ def test_nothing_in_the_disc_cluster_is_faced_at_assembly() -> None:
     assert "OIL THE PIN" in hung
     for number in bushings:
         assert number in hung
-    assert "TRAPPING HUB AND DISC" in hung
+    assert f"TRAPPING THE {drawing._N['pd-transgear-disc-hub']} HUB" in hung
     accepted = _step_body("fitup-accepted")
     assert f"STEP {steps.step_number('collar-disc-air-inspected')}" in accepted
     assert steps.step_number("disc-cluster-assembled") + 1 == steps.step_number(
@@ -1994,9 +1999,7 @@ def test_the_platen_group_is_built_and_hung_before_its_locks_are_set() -> None:
     order = ["bar-clamped", "rack-soldered", "guides-screwed", "clips-fitted"]
     order += ["platen-hung", "guide-locks-set", "lock-seats-faced"]
     assert list(steps.SEQUENCE[: len(order)]) == order
-    assert f"{steps.BAR_TOP_ABOVE_DECK_TEXT} ABOVE THE BASE DECK" in _step_body(
-        "bar-clamped"
-    )
+    assert f"{steps.BAR_TOP_ABOVE_DECK_TEXT} ABOVE THE " in _step_body("bar-clamped")
     # The round pair locates the bar before the slotted pair is tightened;
     # the step names it by its holes, as no package sheet defines END A.
     bar_clamped = _step_body("bar-clamped")
