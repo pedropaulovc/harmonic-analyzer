@@ -116,8 +116,11 @@ NUMERAL_FINAL_MIN_STROKE_MM3 = 0.0058
 # Width and thickness give the sliding clearance in the .330 x .134 stop
 # rebate at the title block's .XXX; graduation positions set the
 # amplitude-bar stations through the linear READOUT table, at their own
-# +/-.002. The overall length (.XX), tick lengths and numeral layout take the
-# title block. Graduation width and both engraving depths name no mate, so
+# +/-.002: the zero tick's dimension from the end face carries it, and the
+# drawing's station table holds every other graduation to it from zero (the
+# pitches print as references). The overall length (.XX), tick lengths and
+# numeral layout take the title block. Graduation width and both engraving
+# depths name no mate, so
 # they are single ".nnn MIN" limits (coordinator ruling 2026-10-23); the
 # title block's finish calls for the enamel fill they hold. Their ceilings
 # are stated facts, not bands (coordinator ruling 2026-10-23, on codjiflo's
@@ -186,11 +189,10 @@ DRAWING_PRECISION_BY_NAME = {
     name: places for dims in DRAWING_PRECISION.values() for name, places in dims.items()
 }
 # The model's own bands, beyond the title block's rows (physical mm, printed
-# in inch): the scale stations' +/-.002.
+# in inch): the zero tick's +/-.002. The station table prints the same band
+# for every graduation from zero; detail A's pitches are references.
 DRAWING_TOLERANCES = {
     "ScaleStartX": GRADUATION_POSITION_TOLERANCE_MM,
-    "FullTickPitch": GRADUATION_POSITION_TOLERANCE_MM,
-    "MinorTickPitch": GRADUATION_POSITION_TOLERANCE_MM,
 }
 
 DRAWING_VALUES_BY_NAME = {

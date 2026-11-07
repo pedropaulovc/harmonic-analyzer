@@ -123,7 +123,9 @@ def test_dimension_links_name_notes_that_print_on_sheet_one() -> None:
         assert link == f"SEE NOTE {number}"
         assert sum(line.startswith(f"{number}. ") for line in notes) == 1
     linked = {name for name, text in callouts.CALLOUTS.items() if "SEE NOTE" in text}
-    assert linked == {"BodyWidth", "BodyThickness", "ScaleStartX", "FullTickPitch", "MinorTickPitch"}
+    assert linked == {"BodyWidth", "BodyThickness", "ScaleStartX"}
+    # The station table on sheet 2 links note 2 by sheet.
+    assert callouts.STATION_TABLE_TITLE.splitlines()[-1] == callouts.STATION_LINK_FROM_SHEET_2
     assert "MHA-MS-02" in notes[0] and "MHA-CH-01" in notes[1]
 
 
@@ -178,14 +180,15 @@ def test_every_printed_size_is_owned_and_precisioned_by_model() -> None:
     # Nothing on this part is .X (owner ruling): the overall length, tick
     # lengths and numeral layout print .XX; the bar's section in the stop
     # rebate, the engraving limits and the scale stations print .XXX,
-    # except the minor pitch's .XXXX; its physical band remains +/-.002.
+    # except the minor pitch's .XXXX; both pitches print as references.
     assert {name: places for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places != 2} == (
         {**dict.fromkeys(("BodyWidth", "BodyThickness", "Tick0Width", "TickDepth", "NumeralDepth",
                          "ScaleStartX", "FullTickPitch"), 3), "MinorTickPitch": 4}
     )
     assert spec.DRAWING_PRECISION_BY_NAME["BodyLength"] == 2
-    # Only the scale stations carry their own band; the rest ride the title block.
-    assert set(spec.DRAWING_TOLERANCES) == {"ScaleStartX", "FullTickPitch", "MinorTickPitch"}
+    # Only the zero tick carries its own band; the station table prints the
+    # same band for every other graduation; the rest ride the title block.
+    assert set(spec.DRAWING_TOLERANCES) == {"ScaleStartX"}
     assert {"BodyThickness", "TickDepth", "FullTickLength", "MinorTickLength",
             "HalfTickLength", "FullTickPitch", "MinorTickPitch", "NumeralHeight",
             "NumeralXGap", "NumeralYGap", "NumeralDepth"} <= marked
@@ -229,14 +232,15 @@ def test_last_graduation_is_complete_at_printed_band_extremes() -> None:
     groove that still leaves the last graduation whole, at the .080 rule-17
     target."""
     values, bands = spec.DRAWING_VALUES_BY_NAME, spec.DRAWING_TOLERANCES
+    station_band = spec.GRADUATION_POSITION_TOLERANCE_MM
     assert "BodyLength" not in bands
     assert spec.DRAWING_PRECISION_BY_NAME["BodyLength"] == 2
     assert spec.BODY_LENGTH_TOLERANCE_MM == pytest.approx(0.254)
-    assert bands["ScaleStartX"] == bands["FullTickPitch"] == pytest.approx(0.0508)
+    assert bands["ScaleStartX"] == station_band == pytest.approx(0.0508)
     stock_min = values["BodyLength"] - spec.BODY_LENGTH_TOLERANCE_MM
     last_center_max = (
         values["ScaleStartX"] + bands["ScaleStartX"]
-        + (spec.DIVISION_COUNT - 1) * values["FullTickPitch"] + bands["FullTickPitch"]
+        + (spec.DIVISION_COUNT - 1) * values["FullTickPitch"] + station_band
     )
     assert stock_min == pytest.approx(201.676)
     assert last_center_max == pytest.approx(198.6016)
@@ -273,11 +277,25 @@ def test_printed_pitches_agree_across_all_calibrated_subdivisions() -> None:
     assert (spec.DIVISION_SPACING, spec.MINOR_SPACING) == (14.2, 1.42)
     for index in range((spec.DIVISION_COUNT - 1) * spec.MINOR_PER_DIVISION + 1):
         assert abs(index * spec.MINOR_SPACING / 25.4 - index * minor) <= band, index
-    # Rule 10: each pitch counts its equal spaces from zero over the same span.
-    full_count = int(callouts.PREFIXES["FullTickPitch"].rstrip("X "))
-    minor_count = int(callouts.PREFIXES["MinorTickPitch"].rstrip("X "))
-    assert full_count * spec.DIVISION_SPACING == pytest.approx(spec.SCALE_SPAN)
-    assert minor_count * spec.MINOR_SPACING == pytest.approx(spec.SCALE_SPAN)
+    # Rules 10 and 26: the pitches print as references; the station table
+    # locates every graduation from the zero tick, each cell inside its band.
+    assert (callouts.PREFIXES["FullTickPitch"], callouts.SUFFIXES["FullTickPitch"]) == ("(", ")")
+    assert (callouts.PREFIXES["MinorTickPitch"], callouts.SUFFIXES["MinorTickPitch"]) == ("(", ")")
+    assert not {"FullTickPitch", "MinorTickPitch"} & set(callouts.CALLOUTS)
+    columns = [column.splitlines() for column in callouts.station_table_columns()]
+    assert columns[0] == [callouts.STATION_ROW_HEADING, *(str(n) for n in range(spec.DIVISION_COUNT))]
+    assert [column[0] for column in columns[1:]] == [f"+{m}" for m in range(spec.MINOR_PER_DIVISION)]
+    cells = {
+        numeral * spec.MINOR_PER_DIVISION + minor: text
+        for minor, column in enumerate(columns[1:])
+        for numeral, text in enumerate(column[1:])
+    }
+    last = (spec.DIVISION_COUNT - 1) * spec.MINOR_PER_DIVISION
+    assert sorted(cells) == list(range(last + 1))
+    for index, text in cells.items():
+        assert abs(index * spec.MINOR_SPACING / 25.4 - float(text)) <= 0.0005, index
+    assert (cells[0], cells[spec.MINOR_PER_DIVISION], cells[last]) == (".000", ".559", "5.591")
+    assert "EACH ±.002" in callouts.STATION_TABLE_TITLE
 
 
 def test_engraving_sizes_are_min_limits_and_graduation_depth_keeps_its_stock() -> None:
@@ -604,6 +622,11 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
         drawing, "add_property_linked_note",
         lambda adapter, name, x, y: linked_notes.append((active["sheet"], name, (x, y))),
     )
+    table_notes = []
+    monkeypatch.setattr(
+        drawing, "add_note",
+        lambda adapter, text, x, y: table_notes.append((active["sheet"], text, (x, y))) or object(),
+    )
     monkeypatch.setattr(
         drawing, "set_hidden_lines_removed", lambda adapter, view: clean_views.append(view),
     )
@@ -668,6 +691,16 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     assert "Numeral Tool Note" not in required_properties
     assert all(name != "Numeral Tool Note" for _sheet, name, _xy in linked_notes)
     assert ("BAR", "Manufacturing Notes", drawing.NOTES_XY) in linked_notes
+    # Sheet 2's station table: the title, then each column on one top line,
+    # left to right and right of detail A, the last inside the border.
+    columns = callouts.station_table_columns()
+    assert [sheet for sheet, _text, _xy in table_notes] == ["GRADUATIONS"] * (len(columns) + 1)
+    assert table_notes[0][1:] == (callouts.STATION_TABLE_TITLE, drawing.STATION_TITLE_XY)
+    assert [text for _sheet, text, _xy in table_notes[1:]] == list(columns)
+    xs = [xy[0] for _sheet, _text, xy in table_notes[1:]]
+    assert {xy[1] for _sheet, _text, xy in table_notes[1:]} == {drawing.STATION_COLUMNS_TOP}
+    assert xs == sorted(xs) and xs[-1] + drawing.STATION_COLUMN_PITCH < 0.422
+    assert drawing.STATION_TITLE_XY[0] > drawing.DETAIL_CENTER[0] + drawing.DETAIL_RADIUS_MM * 6.0 / 1000.0
     # Rule 9: each reduced parent is labelled under its centre on its sheet.
     dx, dy = drawing.PARENT_LABEL_OFFSET
     parent_labels = [
@@ -958,10 +991,10 @@ def test_every_tight_band_states_its_function() -> None:
     """Rule 4: a band tighter than the title block names its mate or purpose;
     the .XXX fit sizes that ride the title block name their mate too. Each
     mate is named once, in the numbered note its dimensions link."""
-    reasons = dict.fromkeys(("ScaleStartX", "FullTickPitch", "MinorTickPitch"), callouts.STATION_LINK)
-    assert set(reasons) == set(spec.DRAWING_TOLERANCES)
-    for name, link in reasons.items():
-        assert callouts.CALLOUTS[name].startswith(link), name
+    assert set(spec.DRAWING_TOLERANCES) == {"ScaleStartX"}
+    assert callouts.CALLOUTS["ScaleStartX"] == callouts.STATION_LINK
+    # The station table's band links the same note.
+    assert callouts.STATION_LINK in callouts.STATION_TABLE_TITLE
     # The bar's section slides in the stop rebate: .XXX (+/-.005) from the
     # title block, and each links that fit's note.
     for name in ("BodyWidth", "BodyThickness"):
@@ -1176,9 +1209,9 @@ def test_part_authors_every_callout_on_its_own_feature(monkeypatch) -> None:
 
     monkeypatch.setattr(builder, "_named_dimensions", named)
     builder.author_dimension_callouts(None)
-    assert {name: displays[name].GetText(callouts.CALLOUT_BELOW) for name in callouts.CALLOUTS} == callouts.CALLOUTS
-    assert {name: displays[name].GetText(callouts.PREFIX) for name in callouts.PREFIXES} == callouts.PREFIXES
-    assert set(displays) == {*callouts.CALLOUTS, *callouts.PREFIXES}
+    for lane, texts in callouts.LANES:
+        assert {name: displays[name].GetText(lane) for name in texts} == texts, lane
+    assert set(displays) == set(callouts.FEATURE_OF)
     assert sorted(asked) == sorted(set(callouts.FEATURE_OF.values()))
     monkeypatch.setattr(builder, "_named_dimensions",
                         lambda adapter, feature, names: {name: (_TextDisplay(keeps=False), None) for name in names})
@@ -1194,9 +1227,10 @@ def _imported(monkeypatch, displays):
 
 
 def test_drawing_reads_back_part_callouts_and_min_limit_types(monkeypatch) -> None:
-    good = {name: _TextDisplay(text.replace("\n", "\r\n")) for name, text in callouts.CALLOUTS.items()}
-    for name, prefix in callouts.PREFIXES.items():
-        good.setdefault(name, _TextDisplay()).SetText(callouts.PREFIX, prefix)
+    good = {}
+    for lane, texts in callouts.LANES:
+        for name, text in texts.items():
+            good.setdefault(name, _TextDisplay()).SetText(lane, text.replace("\n", "\r\n"))
     drawing._assert_imported_text_and_limits(None, _imported(monkeypatch, good))
     with pytest.raises(RuntimeError, match="differ from the part"):
         drawing._assert_imported_text_and_limits(

@@ -441,9 +441,9 @@ def _assert_layer_placement(adapter, sketch_name: str, path) -> None:
 
 @_telemetry.traced("dim.ms_stick_text")
 def author_dimension_callouts(adapter) -> None:
-    """Write each callout below, and each count prefix ahead of, its source
-    dimension and read them back: the drawing imports this text and never
-    sets it (#1942)."""
+    """Write each callout below, each prefix ahead of and each suffix after
+    its source dimension and read them back: the drawing imports this text
+    and never sets it (#1942)."""
     by_feature: dict[str, set[str]] = {}
     for name, feature in callouts.FEATURE_OF.items():
         by_feature.setdefault(feature, set()).add(name)
@@ -451,8 +451,7 @@ def author_dimension_callouts(adapter) -> None:
         displays = _named_dimensions(adapter, feature, names)
         for name in sorted(names):
             display, _dimension = displays[name]
-            for part_id, texts in ((callouts.CALLOUT_BELOW, callouts.CALLOUTS),
-                                   (callouts.PREFIX, callouts.PREFIXES)):
+            for part_id, texts in callouts.LANES:
                 if name not in texts:
                     continue
                 display.SetText(part_id, texts[name])

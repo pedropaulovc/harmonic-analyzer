@@ -1,7 +1,8 @@
 r"""Four-sheet manufacturing package for the unchanged graduated brass stick.
 
 BAR gives the envelope, the left-origin scale station and the numbered notes
-its dimensions link. GRADUATIONS enlarges the full/minor pitch; TICK LENGTHS
+its dimensions link. GRADUATIONS tables every graduation's station from the
+zero tick and enlarges a decade with its pitches as references; TICK LENGTHS
 gives groove width and each length a local detail without cross-strip
 extension lines. ENGRAVING separates numeral dimensions (detail F at the 0,
 detail H at the 10) from the open-edge Top detail for the square-bottom
@@ -58,7 +59,7 @@ from _machinist_review_mode import MachinistReviewMode
 from _ms_drawing_contract import assert_manufacturing_dimensions
 from _part_properties import part_drawing_unit
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
+from solidworks_mcp.adapters.solidworks.drawing import add_note, dimension_name, place_view
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -146,10 +147,19 @@ FRONT_KEEP = {
     "ScaleStartX": (0.180, 0.150),
 }
 TOP_KEEP = {"BodyThickness": (0.275, 0.130)}
+# Detail A shows a decade's pitches as references; the station table locates.
 DETAIL_KEEP = {
     "FullTickPitch": (0.180, 0.218),
     "MinorTickPitch": (0.075, 0.085),
 }
+# Sheet 2's station table, right of detail A and under the parent's label:
+# the title's upper-left, then one note per column (upper-left corners),
+# all columns starting on the same line so their rows align.
+STATION_TITLE_XY = (0.245, 0.232)
+STATION_COLUMNS_TOP = 0.212
+STATION_NUMERAL_COLUMN_X = 0.245
+STATION_FIRST_VALUE_X = 0.267
+STATION_COLUMN_PITCH = 0.0145
 # Local fences keep extension lines beside their tick. D sits between the
 # first two minor ticks, 0.7 inside the ruled edge, model radius 1.8: both
 # minor ticks and a plain stretch of edge show, and tick zero and the next
@@ -337,12 +347,12 @@ def _assert_numeral_depth_owner(annotation: Any) -> None:
 
 @_telemetry.traced("drawing.ms_stick.imported_text_and_limits")
 def _assert_imported_text_and_limits(adapter: Any, annotations: list[Any]) -> None:
-    """Every imported dimension prints the callout and count prefix its part
+    """Every imported dimension prints the callout, prefix and suffix its part
     authored, and each MIN-limit size still prints as a single MIN limit. The
     width ceiling and the stock under the grooves print nowhere else, so a
     lost row or a changed tolerance type must fail the drawing; the part, not
     the drawing, writes the text (#1942)."""
-    names = {*callouts.CALLOUTS, *callouts.PREFIXES, *part.MIN_LIMIT_DEVIATIONS_MM}
+    names = {*callouts.FEATURE_OF, *part.MIN_LIMIT_DEVIATIONS_MM}
     displays: dict[str, list[Any]] = {name: [] for name in names}
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
@@ -354,8 +364,7 @@ def _assert_imported_text_and_limits(adapter: Any, annotations: list[Any]) -> No
         raise RuntimeError(f"imported dimensions missing from the sheet: {missing}")
     wrong = {
         (name, part_id): printed
-        for part_id, texts in ((callouts.CALLOUT_BELOW, callouts.CALLOUTS),
-                               (callouts.PREFIX, callouts.PREFIXES))
+        for part_id, texts in callouts.LANES
         for name, text in texts.items()
         for display in displays[name]
         if callouts.callout_rows(printed := str(display.GetText(part_id) or ""))
@@ -389,6 +398,18 @@ def _assert_dimension_contract(adapter: Any, annotations: list[Any]) -> None:
         bands={**{name: (-tolerance, tolerance) for name, tolerance in part.DRAWING_TOLERANCES.items()},
                **part.MIN_LIMIT_DEVIATIONS_MM},
     )
+
+
+@_telemetry.traced("drawing.ms_stick.station_table")
+def _station_table(adapter: Any) -> None:
+    """Sheet 2's graduation stations: a title, then one note per column."""
+    columns = callouts.station_table_columns()
+    xs = (STATION_NUMERAL_COLUMN_X,
+          *(STATION_FIRST_VALUE_X + index * STATION_COLUMN_PITCH for index in range(len(columns) - 1)))
+    for text, x, y in ((callouts.STATION_TABLE_TITLE, *STATION_TITLE_XY),
+                       *((column, x, STATION_COLUMNS_TOP) for column, x in zip(columns, xs, strict=True))):
+        if add_note(adapter, text, x, y) is None:
+            raise RuntimeError(f"failed to add station table note {text.splitlines()[0]!r}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -451,6 +472,7 @@ async def build(adapter: Any) -> dict[str, str]:
         annotations += curate_view_dimensions(adapter, detail, keep=DETAIL_KEEP,
                                                view_label="graduation detail",
                                                dimensions_by_feature=part.DRAWING_DIMENSIONS)
+    _station_table(adapter)
 
     if not ddoc.ActivateSheet(SHEET_NAMES[2]):
         raise RuntimeError("failed to activate tick lengths sheet")
