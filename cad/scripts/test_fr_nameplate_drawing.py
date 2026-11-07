@@ -372,13 +372,14 @@ def _segment_distance(
 
 
 def test_section_a_crosses_the_plate_between_the_lettering_rows() -> None:
-    # Both ends stand off the outline, so the arrows and letters print off
-    # the plate (r2 review C3).
+    # A short partial plane: it starts off the outline, so that arrow and
+    # letter print off the plate (r2 review C3), and stops on the sunk field
+    # just past what the cropped section shows (rule 9).
     outline = _rings(part.OUTLINE_DXF)[0]
     y = drawing.SECTION_Y
-    assert drawing.SECTION_X_START < 0.0 < spec.PLATE_WIDTH < drawing.SECTION_X_END
-    for x in (drawing.SECTION_X_START, drawing.SECTION_X_END):
-        assert not dxf.point_in_ring(outline, (x, y))
+    assert drawing.SECTION_X_START < 0.0 < drawing.SECTION_CROP[1][0] < drawing.SECTION_X_END
+    assert drawing.SECTION_X_END < 0.1 * spec.PLATE_WIDTH
+    assert not dxf.point_in_ring(outline, (drawing.SECTION_X_START, y))
     # The only engraved rings the line meets are the border's (pinstripe and
     # field edges, which span the plate); every letter and the ornament
     # stand at least a millimetre clear of it.
@@ -749,6 +750,8 @@ def test_declared_exceptions_name_the_printed_minimums() -> None:
     floor, screws = print_spec.MINIMUM_NOTES.splitlines()
     assert floor in declared["RV-02"].where
     assert screws in declared["RV-03"].where
+    # The sheet's rows state the same facts, the screws' naming its parts.
+    assert floor in drawing.MINIMUM_NOTES and screws in drawing.MINIMUM_NOTES
     # Each states its worst case in inches, rounded down to three places.
     for note, worst in (
         (floor, print_spec.ENGRAVING_FLOOR_MIN),
@@ -770,11 +773,8 @@ def test_notes_and_callouts_carry_no_numbers_and_stay_short() -> None:
     assert all(len(note) <= 60 for note in notes), notes
     texts = [
         *notes,
-        print_spec.FIELD_DEPTH_CALLOUT,
-        print_spec.ENGRAVING_DEPTH_CALLOUT,
+        *drawing.SECTION_CALLOUTS.values(),
         print_spec.FLOOR_UNDER_ENGRAVING_CALLOUT,
-        drawing.SCREW_HEAD_NOTE,
-        *print_spec.DIMENSION_CALLOUTS.values(),
     ]
     assert not any(re.search(r"\d", text) for text in texts), texts
     # Each vendored contour by the exact path cut_release stages it at.
@@ -790,7 +790,6 @@ def test_texts_stand_inside_the_border_and_off_the_title_block() -> None:
         drawing.FLOOR_REFERENCE["text_xy"],
         drawing.HOLE_CALLOUT_XY,
         drawing.NOTES_XY,
-        drawing.SCREW_HEAD_NOTE_XY,
         drawing.MINIMUM_NOTES_XY,
         drawing.ISO_NOTE_XY,
         drawing.SECTION_CENTER,
