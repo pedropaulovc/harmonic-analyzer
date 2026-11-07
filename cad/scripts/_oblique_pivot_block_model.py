@@ -20,7 +20,7 @@ from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension
 from _metric_vendor_dimension import set_metric_vendor_units
 from _feature_tree import name_last_feature
 from _fit_deviations import deviations
-from _holes import wizard_holes
+from _holes import blind_hole_volume_mm3, wizard_holes
 from _part_checks import volume_check, report_mass_properties
 from _part_properties import part_drawing_unit
 from _rebuild import force_rebuild
@@ -413,26 +413,31 @@ async def _nut_pattern_reference(adapter, part) -> None:
 
 
 def _native_nut_tap_diameter(adapter, part) -> float:
-    """Use the committed Wizard drill, not the rounded catalogue volume value."""
+    """Use the committed Wizard drill, not the rounded catalogue volume value.
+    The nut taps are blind (Main's TL-32 ruling, 2026-11-07), so the drill is
+    ``IWizardHoleFeatureData2.TapDrillDiameter`` (get/set VT_R8, metres), the
+    member _holes.wizard_holes reads for a blind tap."""
     from _feature_tree import _feature_by_name
 
+    if part.NUT_TAP_SPEC.end != "blind":
+        raise RuntimeError(f"{part.PART_NAME}: NutTaps must be blind, spec reads {part.NUT_TAP_SPEC.end!r}")
     feature = _feature_by_name(adapter, "NutTaps")
     # GetDefinition is VT_DISPATCH. Bind the raw InvokeTypes return before
     # reading its property; _early_bound alone passes bare PyIDispatch through.
     definition = _bind(_com_invoke(feature, "IFeature", "GetDefinition"), "IWizardHoleFeatureData2")
     if feature.GetTypeName2() != "HoleWzd" or definition is None:
         raise RuntimeError(f"{part.PART_NAME}: NutTaps has no native Hole Wizard definition")
-    diameter = float(definition.ThruTapDrillDiameter) * 1000.0
+    diameter = float(definition.TapDrillDiameter) * 1000.0
     # TAP_DRILL_MM pins this table entry to three decimal mm; the Wizard
     # retains the exact native value. This tests that representation, not a
     # manufacturing allowance. Solid-cylinder matching below stays at 1e-6 mm.
     if not math.isfinite(diameter) or diameter <= 0.0 or round(diameter, 3) != part.NUT_TAP_DRILL:
         raise RuntimeError(
-            f"{part.PART_NAME}: NutTaps.ThruTapDrillDiameter={diameter!r} mm "
+            f"{part.PART_NAME}: NutTaps.TapDrillDiameter={diameter!r} mm "
             f"does not represent catalogue drill {part.NUT_TAP_DRILL!r} mm"
         )
     _telemetry.info(
-        f"{part.PART_NAME}: native NutTaps through-tap drill {diameter!r} mm; "
+        f"{part.PART_NAME}: native NutTaps blind tap drill {diameter!r} mm; "
         f"catalogue three-decimal value {part.NUT_TAP_DRILL!r} mm"
     )
     return diameter
@@ -621,15 +626,23 @@ async def build_block_model(adapter, part) -> None:
         check("NutClearance",await adapter.create_cut_extrude(ExtrusionParameters(depth=part.LUG_WIDTH*2)))
         name_last_feature(adapter,"NutClearance")
         name_dimensions(adapter,"NutClearance",["NutClearanceDepth"])
-        nut_taps = wizard_holes(adapter,part.NUT_TAP_SPEC,
+        tap = part.NUT_TAP_SPEC
+        nut_taps = wizard_holes(adapter,tap,
              [[part.NUT_FACE_X,y,z] for y,z in part.NUT_HOLES_YZ],(1.0,0.0,0.0),
-             "feed nut screw taps (#4-40 through)",name="NutTaps",expect_dia_mm=part.NUT_TAP_DRILL,
+             f"feed nut screw taps ({tap.size} {tap.end.replace('_',' ')})",name="NutTaps",
+             expect_dia_mm=part.NUT_TAP_DRILL,
              placement_dims=[((f"NutPlacement{i}U",None),(f"NutPlacement{i}V",None))
                              for i in range(1,len(part.NUT_HOLES_YZ)+1)])
+        # Blind (Main's TL-32 ruling, 2026-11-07): wizard_holes gates the
+        # thread depth; the drill depth is gated here, 0.005 mm like it.
+        if tap.end != "blind" or abs(nut_taps.depth_mm - part.NUT_TAP_DRILL_DEPTH) > 0.005:
+            raise RuntimeError(f"{part.PART_NAME}: NutTaps {tap.end} drill {nut_taps.depth_mm!r} mm deep, "
+                               f"expected blind {part.NUT_TAP_DRILL_DEPTH!r} mm")
         # The taps are transferred through the TL-VN-84 FeedNut at assembly:
-        # modelled where the nominal nut puts them.
+        # modelled where the nominal nut puts them. Each blind drill is its
+        # cylinder plus its 118° point, inside the lug.
         expected -= math.pi*(part.SCREW_CLEARANCE_DIA/2)**2*part.LUG_WIDTH
-        expected -= len(part.NUT_HOLES_YZ)*math.pi*(nut_taps.hole_dia_mm/2)**2*part.LUG_WIDTH
+        expected -= len(part.NUT_HOLES_YZ)*blind_hole_volume_mm3(nut_taps.hole_dia_mm,nut_taps.depth_mm)
         await _nut_pattern_reference(adapter, part)
     await name_bore_axis(adapter,"Right Plane",spec.BORE_X,"Top Plane",0.0,"pivot axis")
     name_last_feature(adapter,spec.PIVOT_AXIS_NAME)

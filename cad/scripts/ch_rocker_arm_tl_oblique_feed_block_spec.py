@@ -6,8 +6,13 @@ ruling 2026-11-04, #2177 option B) seats flat on the lug's +X face, flush
 with the block's +X end, its spigot faced off, so the lug needs no recess.
 Four #4-40 X 5/8 flat heads
 (MHA-CH-06-TL-VN-67) pass through the nut's countersunk flange holes into
-the lug's four #4-40 taps, tapped THRU, on the nut's 16 mm PCD at 45° to the
-lug's faces; all coordinates are block-local. The taps are transferred
+the lug's four blind #4-40 taps (``NUT_TAP_THREAD_DEPTH`` .500 of thread on
+a #43 drill ``NUT_TAP_DRILL_DEPTH`` .635 deep, both from the +X face), on
+the nut's 16 mm PCD at 45° to the lug's faces; all coordinates are
+block-local. The taps are blind, not THRU, so the deep #43 drill's wander
+stays short of the leadscrew clearance (farm r1 blocker on VIEW D; Delegated
+ruling 2026-11-07 (Main), no precedent; owner review #2144, pending owner
+confirmation). The taps are transferred
 through the seated nut at TL-00 assembly, with the nut threaded on the
 aligned leadscrew (Main ruling 2026-11-03, Codjiflo P1 on #2112): the sheet
 locates them only by that transfer callout, as it located the retired
@@ -20,7 +25,9 @@ and the screw clearance sit on the inch grid; the axis closes on the leadscrew's
 (``NUT_AXIS_Y`` from its lateral, ``NUT_AXIS_Z`` = its height over the
 carriage top). The axis height belongs to the metric-only KP08 vendor line,
 so it prints exact millimetres, labelled mm (owner ruling 4, 2026-11-01;
-``METRIC_DIMENSIONS``).
+``METRIC_DIMENSIONS``): 11.765, the KP08's 15 over TL-28 faced to .975
+(option 2 of the same 2026-11-07 ruling: TL-28 faced, not as bought, so the
+axis stack over the clearance carries .005, not .012).
 """
 from __future__ import annotations
 import math
@@ -76,9 +83,10 @@ if any(_EDGE_VERTICAL[_i - 1] == _vertical for _i, _vertical in enumerate(_EDGE_
     raise AssertionError("TL-32 plan outline has a collinear split (a step or a seam)")
 NUT_FACE_X = LUG_X1
 NUT_AXIS_Y = -lead.SCREW_LATERAL
-NUT_AXIS_Z = 12.4  # the leadscrew axis over the carriage top (checked below)
-# .351: the smallest three-place drill that clears the Tr8 major at the
-# vertical stack (LEADSCREW_RADIAL_CLEARANCE, below).
+NUT_AXIS_Z = 11.765  # the leadscrew axis over the carriage top (checked below)
+# .351: sized as the smallest three-place drill clearing the Tr8 major over
+# the as-bought TL-28 stack (.435 mm); with TL-28 faced (.257 mm) it keeps
+# .171 mm of radial slack (LEADSCREW_RADIAL_CLEARANCE, below).
 SCREW_CLEARANCE_DIA = 0.351 * 25.4  # 8.915
 # The nut is turned 45° about its axis, so its four holes sit on the lug's
 # diagonals (the owner's option-B sketch, 2026-11-04). The band binds EVERY
@@ -101,8 +109,36 @@ NUT_HOLES_YZ = tuple(
     for side_y in (-1, 1)
     for side_z in (-1, 1)
 )
-NUT_TAP_SPEC = HoleSpec("tapped", feed_nut.SCREW_THREAD, end="through_all")
+# Blind taps from the +X face. Every #4-40 X 5/8's tip reaches the full
+# thread at the thread's least depth; the only owned #4-40 tap is a plug tap
+# (shop inventory '#4-40 UNC plug hand tap'), whose 5-pitch chamfer cuts
+# below the full thread, so the drill's least depth leaves that lead under
+# the thread's deepest (rule 18). Both depths print three places (the native
+# callout's lengths, ±.005), from the +X face; the drill depth is cylindrical,
+# its 118° point beyond it.
+NUT_TAP_DEPTH_PLACES = 3
+_NUT_TAP_DEPTH_BAND = printed_band_mm(NUT_TAP_DEPTH_PLACES, unit=UNIT)  # .005
+NUT_TAP_THREAD_DEPTH = 0.500 * 25.4  # 12.7
+NUT_TAP_DRILL_DEPTH = 0.635 * 25.4  # 16.129
+NUT_TAP_THREAD_DEPTH_TEXT = carrier.inch_text(NUT_TAP_THREAD_DEPTH, NUT_TAP_DEPTH_PLACES)  # .500
+NUT_TAP_DRILL_DEPTH_TEXT = carrier.inch_text(NUT_TAP_DRILL_DEPTH, NUT_TAP_DEPTH_PLACES)  # .635
+NUT_TAP_DRILL_SIZE_TEXT = "#43"
+NUT_TAP_SPEC = HoleSpec(
+    "tapped", feed_nut.SCREW_THREAD, end="blind", depth_mm=NUT_TAP_DRILL_DEPTH,
+    overrides_mm={"ThreadDepth": NUT_TAP_THREAD_DEPTH},
+)
 NUT_TAP_DRILL = TAP_DRILL_MM[feed_nut.SCREW_THREAD]
+NUT_TAP_THREAD_DEPTH_MIN = NUT_TAP_THREAD_DEPTH - _NUT_TAP_DEPTH_BAND
+NUT_TAP_THREAD_DEPTH_MAX = NUT_TAP_THREAD_DEPTH + _NUT_TAP_DEPTH_BAND
+NUT_TAP_DRILL_DEPTH_MIN = NUT_TAP_DRILL_DEPTH - _NUT_TAP_DEPTH_BAND
+NUT_TAP_DRILL_DEPTH_MAX = NUT_TAP_DRILL_DEPTH + _NUT_TAP_DEPTH_BAND
+NUT_TAP_PITCH = 25.4 / float(feed_nut.SCREW_THREAD.rsplit("-", 1)[1])  # .025
+PLUG_TAP_LEAD = 5.0 * NUT_TAP_PITCH  # .125
+NUT_TAP_POINT_LENGTH = (NUT_TAP_DRILL + drilled_oversize_mm(unit=UNIT)) / 2 / math.tan(math.radians(59.0))
+if NUT_TAP_THREAD_DEPTH_MIN < feed_nut.SCREW_TIP_REACH_MAX:
+    raise AssertionError("a #4-40 X 5/8 tip reaches past TL-32's least full thread")
+if NUT_TAP_DRILL_DEPTH_MIN - NUT_TAP_THREAD_DEPTH_MAX < PLUG_TAP_LEAD - 1e-9:
+    raise AssertionError("TL-32's tap drill leaves no room for the plug tap's lead")
 # The nut points away from the spindle; its screws enter from the +X face.
 NUT_REACH_X = (LUG_X0, NUT_FACE_X + feed_nut.REACH)
 NUT_MACHINE_Z = trammel.CARRIAGE_TOP_Z + NUT_AXIS_Z
@@ -168,15 +204,15 @@ NUT_CLOCK_SHEET = 2  # VIEW D's, the 'Nut interface' sheet
 NUT_CLOCK_REFERENCE = f"{NUMBER} SHEET {NUT_CLOCK_SHEET} {NUT_CLOCK_VIEW}"
 
 # --- The leadscrew in the lug: the vertical stack the clearance absorbs ---------
-# The KP08s seat on TL-28's as-bought 1 in thickness (±.012) and the lug's
-# clearance stands 12.400 ±.13 mm over the carriage face, so the leadscrew may
-# run LEADSCREW_OFFSET_Z (.435 mm) off the clearance's axis vertically
-# (Codjiflo P1 on #2112); laterally the KP08s float to centre it, within the
-# clearance's own station band. The Ø.351 clears the Tr8's major at both, by
-# 0.005 mm at the KP08's nominal 15 axis height, which is UNVERIFIED until the
-# pillow blocks are measured (#2184).
+# The KP08s seat on TL-28 faced to .975 ±.005 (end_bracket.THICK_BAND) and
+# the lug's clearance stands 11.765 ±.13 mm over the carriage face, so the
+# leadscrew may run LEADSCREW_OFFSET_Z (.257 mm) off the clearance's axis
+# vertically (Codjiflo P1 on #2112); laterally the KP08s float to centre it,
+# within the clearance's own station band. The Ø.351 clears the Tr8's major
+# at both, at the KP08's nominal 15 axis height, which is UNVERIFIED until
+# the pillow blocks are measured (#2184).
 _AXIS_Y_BAND = printed_band_mm(NUT_PATTERN_PLACES, unit=UNIT)  # .005
-LEADSCREW_OFFSET_Z = end_bracket.THICK_STOCK_BAND + METRIC_BAND  # .435 mm
+LEADSCREW_OFFSET_Z = end_bracket.THICK_BAND + METRIC_BAND  # .257 mm
 LEADSCREW_OFFSET_Y = _AXIS_Y_BAND
 LEADSCREW_OFFSET = math.hypot(LEADSCREW_OFFSET_Y, LEADSCREW_OFFSET_Z)
 LEADSCREW_RADIAL_CLEARANCE = (SCREW_CLEARANCE_DIA - lead.SCREW_MAJOR_DIA) / 2
@@ -231,7 +267,7 @@ HEAD_TO_BODY_SHARP_CENTRED = HEAD_TO_BODY_CENTRED - _SHARP_EXCESS  # -0.078
 if HEAD_TO_BODY_SHARP_CENTRED >= 0.0:
     raise AssertionError("B18.6.3's largest flat head clears the body; drop F2's head check")
 
-# --- Rule 17: lug walls at the printed worst case (.080 target) -----------------
+# --- Rule 17: lug walls at the printed worst case plus drill wander -------------
 # Every transferred tap sits where the nut puts it: the leadscrew at its
 # offset from the clearance, the nut's hole at its station band, the spot's
 # residual, and that tap's own clocking anywhere in NutClock's band, each
@@ -241,17 +277,40 @@ if HEAD_TO_BODY_SHARP_CENTRED >= 0.0:
 # a tap's largest reach toward it. NutClock measures from +Z, the angle a
 # below from Y: the band is symmetric about 45°, so the two are the same
 # set, and |cos|, |sin| put the same set in every quadrant.
+# Rule 17's wander on the deep #43 drill (.635 deep is 7.1 D): the fleet's
+# 0.3° drift (fr_top_frame_spec.KEEPER_TAP_DRILL_WANDER_DEG), charged in
+# any direction over each section's deepest point from the spotted +X face.
+# The thread section (its major, wander at the thread's deepest) and the
+# drill-only section below it (the drill at its DRILLED HOLES +.004, wander
+# at the drill's deepest) are each walled; the least governs. The Ø.351
+# (2.2 D) is no deep hole and is held at its VIEW D stations; its wander is
+# not charged.
+NUT_TAP_DRILL_WANDER_DEG = 0.3
 NUT_TAP_MAJOR = THREAD_MAJOR_MM[feed_nut.SCREW_THREAD]
+_DRILL_TAN = math.tan(math.radians(NUT_TAP_DRILL_WANDER_DEG))
+# Section -> (radius, wander), mm.
+NUT_TAP_SECTIONS: dict[str, tuple[float, float]] = {
+    "thread": (NUT_TAP_MAJOR / 2, NUT_TAP_THREAD_DEPTH_MAX * _DRILL_TAN),  # 1.422, .067
+    "drill": ((NUT_TAP_DRILL + drilled_oversize_mm(unit=UNIT)) / 2,
+              NUT_TAP_DRILL_DEPTH_MAX * _DRILL_TAN),  # 1.181, .085
+}
 _CLEARANCE_R = (SCREW_CLEARANCE_DIA + drilled_oversize_mm(unit=UNIT)) / 2
 _TAP_RADIUS = feed_nut.HOLE_PCD / 2 + feed_nut.HOLE_STATION_BAND + FIT_UP_RESIDUAL
 _TAP_RADIUS_MIN = feed_nut.HOLE_PCD / 2 - feed_nut.HOLE_STATION_BAND - FIT_UP_RESIDUAL
 _CLOCK_STEPS = 100  # 0.1° across the ±5° band; both limits included
+# The lug's width is 1.64 less .87, each at its printed band: the drill
+# point's wall to the lug's -X face takes the least.
+LUG_WIDTH_MIN = (
+    LUG_WIDTH
+    - printed_band_mm(pivot.DRAWING_PRECISION_BY_NAME["BlockLength"], unit=pivot.UNIT)
+    - printed_band_mm(DRAWING_PRECISION_BY_NAME["PlanLugX"], unit=UNIT)
+)
 
 
 def lug_walls_mm(clock_tol_deg: float = NUT_CLOCK_TOL_DEG) -> dict[str, float]:
     """The lug's tap walls, mm, with every tap anywhere within
     ``NUT_CLOCK_DEG`` ± ``clock_tol_deg`` (a wider band is the test's
-    negative control)."""
+    negative control), each the least over ``NUT_TAP_SECTIONS``."""
     clockings = tuple(
         math.radians(NUT_CLOCK_DEG + clock_tol_deg * (2 * k / _CLOCK_STEPS - 1))
         for k in range(_CLOCK_STEPS + 1)
@@ -263,15 +322,21 @@ def lug_walls_mm(clock_tol_deg: float = NUT_CLOCK_TOL_DEG) -> dict[str, float]:
         LEADSCREW_OFFSET_Y * abs(math.cos(a)) + LEADSCREW_OFFSET_Z * abs(math.sin(a))
         for a in clockings
     )
+
+    def least(wall) -> float:
+        return min(wall(radius, wander) for radius, wander in NUT_TAP_SECTIONS.values())
+
     return {
-        "taps to the leadscrew clearance": _TAP_RADIUS_MIN - offset_toward_tap
-        - NUT_TAP_MAJOR / 2 - _CLEARANCE_R,
-        "taps to the lug end": (NUT_AXIS_Y - LUG_Y0) - _AXIS_Y_BAND - LEADSCREW_OFFSET_Y
-        - reach_y - NUT_TAP_MAJOR / 2,
-        "taps to the bottom face": NUT_AXIS_Z - METRIC_BAND - LEADSCREW_OFFSET_Z
-        - reach_z - NUT_TAP_MAJOR / 2,
-        "taps to the top face": BLOCK_HEIGHT - NUT_AXIS_Z - METRIC_BAND - LEADSCREW_OFFSET_Z
-        - reach_z - NUT_TAP_MAJOR / 2,
+        "taps to the leadscrew clearance": least(
+            lambda r, w: _TAP_RADIUS_MIN - offset_toward_tap - r - w - _CLEARANCE_R),
+        "taps to the lug end": least(
+            lambda r, w: (NUT_AXIS_Y - LUG_Y0) - _AXIS_Y_BAND - LEADSCREW_OFFSET_Y - reach_y - r - w),
+        "taps to the bottom face": least(
+            lambda r, w: NUT_AXIS_Z - METRIC_BAND - LEADSCREW_OFFSET_Z - reach_z - r - w),
+        "taps to the top face": least(
+            lambda r, w: BLOCK_HEIGHT - NUT_AXIS_Z - METRIC_BAND - LEADSCREW_OFFSET_Z - reach_z - r - w),
+        "tap drill points to the lug's -X face": LUG_WIDTH_MIN
+        - (NUT_TAP_DRILL_DEPTH_MAX + NUT_TAP_POINT_LENGTH),
     }
 
 
@@ -279,17 +344,20 @@ LUG_WALLS_MM = lug_walls_mm()
 # Owner ruling 2026-11-04 (#2177, option B): the clearance-to-tap wall's
 # shortfall under the .080 target, over the .060 floor, is accepted and
 # stated as plain fact on the clearance callout, floored to three places (a
-# MIN never rounds up), the riser RV-01 precedent. The window refuses a wall
-# under the floor and a stale statement once the wall reaches the target.
+# MIN never rounds up), the riser RV-01 precedent. Delegated ruling
+# 2026-11-07 (Main), no precedent; owner review #2144 (pending owner
+# confirmation): blind taps and TL-28 faced keep it over the floor with the
+# drill's wander charged. The window refuses a wall under the floor and a
+# stale statement once the wall reaches the target.
 NUT_WALL_MIN_MM = min(LUG_WALLS_MM.values())
 if not WALL_FLOOR_MM <= NUT_WALL_MIN_MM < WALL_TARGET_MM:
     raise AssertionError("the TL-32 clearance-to-tap wall no longer matches its stated shortfall")
+if NUT_WALL_MIN_MM != LUG_WALLS_MM["taps to the leadscrew clearance"]:
+    raise AssertionError("a TL-32 wall other than the clearance's governs")
 if min(v for k, v in LUG_WALLS_MM.items() if k != "taps to the leadscrew clearance") < WALL_TARGET_MM:
     raise AssertionError("a TL-32 tap-to-face wall is under the .080 target")
 NUT_WALL_MIN = math.floor(NUT_WALL_MIN_MM / 25.4 * 1000.0 + 1e-9) / 1000.0 * 25.4
 NUT_WALL_MIN_TEXT = f"WALL {carrier.inch_text(NUT_WALL_MIN, 3)} MIN TO TAPS"
-# The nut screws' tips stop inside the THRU tap.
-assert feed_nut.SCREW_TIP_REACH_MAX < LUG_WIDTH
 # The round flange stands within the lug's span of the +X face at the
 # leadscrew's offset, clear of the lug end and the bottom and top faces.
 NUT_Y = (

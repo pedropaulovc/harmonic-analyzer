@@ -1744,7 +1744,9 @@ def test_bracket_slip_stop_and_lost_motion_follow_ruling_b() -> None:
     assert leadscrew.BAR_SCREW_PRELOAD == pytest.approx(3360.9, abs=0.1)
     assert leadscrew.BAR_SCREW_THRUST_ECCENTRICITY == pytest.approx(0.0)
     assert leadscrew.BRACKET_SLIP_THRUST == pytest.approx(1344.3, abs=0.1)
-    assert leadscrew.BRACKET_OPENING_THRUST == pytest.approx(352.2, abs=0.1)
+    # The axis stands 39.765 over the bar top with TL-28 faced to .975
+    # (Delegated ruling 2026-11-07 (Main), option 2 on TL-32's tap wall).
+    assert leadscrew.BRACKET_OPENING_THRUST == pytest.approx(357.8, abs=0.1)
     # The normal feed's thrust comes from the cutter load, not the crank.
     assert spec.NORMAL_FEED_CHIP_LOAD_MM == 0.0254
     kc = 1500.0 * 0.0254 ** -0.22

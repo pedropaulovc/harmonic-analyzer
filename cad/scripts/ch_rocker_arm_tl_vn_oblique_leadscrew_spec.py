@@ -28,8 +28,8 @@ KP08 bracket, so the screw never passes a stud.
 
 Why lateral 2.165 (54.991): the KP08 envelope (55 across the axis,
 ``KP08_MARGIN`` all round) must stay outside pivot block 1's side (lateral 20
-⚙), which runs between the two blocks; the 1 in bracket on the faced .47 bar
-lifts the axis to 52.338. The handwheel grip sweeps below the carrier
+⚙), which runs between the two blocks; the .975 bracket (faced from 1 in
+bar) on the faced .47 bar lifts the axis to 51.703. The handwheel grip sweeps below the carrier
 underside.
 Each bracket stands wholly on bar 1 (the user's 2026-10-17 ruling A′: the
 bar widened, now 5.50 wide, its column-side edge at lateral 88.9 ⚙), its outer
@@ -59,7 +59,7 @@ Thrust is taken on the KP08 inner-ring set screws gripping the screw's flats
 finish pass only.
 
 LOAD_CASES: 1 kN hand-abuse thrust along the screw at its axis (lateral
-2.165, 40.4 above the bar top), on each TL-28's 2 x #8-32 torqued to 2.8 N·m
+2.165, 39.8 above the bar top), on each TL-28's 2 x #8-32 torqued to 2.8 N·m
 (25 in·lbf; head bearing on TL-20's counterbore floor limits it): preload
 T/(0.2 d) 3.36 kN a screw; the pair's centroid is on the screw axis (e = 0),
 so the bracket slips at 1.34 kN (μ 0.2). It starts to open (F·h = n·P·w/6,
@@ -223,9 +223,14 @@ HANDWHEEL_SWEEP_R = max(
 # KP08's 42 bolt span and 15 axis height, and the KP08 stations along the
 # Tr8 screw (its millimetre sheet's flat stations read them).
 SCREW_LATERAL = 54.991  # 2.165; TL-32's nut lug reads it
-BRACKET_THICK = 1.0 * INCH  # OnlineMetals 1165 half-by-one bar, on edge
-KP08_BASE_Z = trammel.BASE_BAR_THICK + BRACKET_THICK  # 37.338
-SCREW_AXIS_Z = KP08_BASE_Z + KP08_AXIS_HEIGHT  # 52.338
+# TL-28 is faced to .975 from the OnlineMetals 1165 half-by-one bar, on edge
+# (as bought 1 ±.012: the thinnest bar still cleans up), so the KP08 axis
+# stack over TL-32's lug clearance carries .005, not .012. Delegated ruling
+# 2026-11-07 (Main), no precedent; owner review #2144 (pending owner
+# confirmation), option 2 on TL-32's VIEW D tap wall.
+BRACKET_THICK = 0.975 * INCH
+KP08_BASE_Z = trammel.BASE_BAR_THICK + BRACKET_THICK  # 36.703
+SCREW_AXIS_Z = KP08_BASE_Z + KP08_AXIS_HEIGHT  # 51.703
 # Far KP08 outer face to the handwheel's hub end. Retain the 13 mm nominal
 # engagement when moving the near support; the screw cut follows both ends.
 HUB_GAP = 11.0
@@ -532,10 +537,10 @@ BRACKET_SLIP_THRUST = FRICTION_MIN * BAR_SCREW_PRELOAD / _worst_shear  # 1.34 kN
 # axis above the bar top, against the pair's preload over the bracket width.
 # Reported, not required: the heel may lift elastically (owner ruling
 # 2026-10-27, #1943 review).
-_thrust_height = SCREW_AXIS_Z - trammel.BASE_BAR_THICK  # 40.4
+_thrust_height = SCREW_AXIS_Z - trammel.BASE_BAR_THICK  # 39.8
 BRACKET_OPENING_THRUST = (
     _n * BAR_SCREW_PRELOAD * BRACKET_WIDTH / (6.0 * _thrust_height)
-)  # 352 N
+)  # 358 N
 
 # Owner ruling 2026-11-06 (Main, option B of the PR2 two-hole review; it
 # replaces the 2026-10-27 no-slip criterion for TL-28 on TL-20): "slip to

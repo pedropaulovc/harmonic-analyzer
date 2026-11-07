@@ -34,7 +34,8 @@ def test_identity_stock_and_common_pivot_interface():
     assert 'Owner exception confirmed' in engagement['reason']
     assert (metric['id'],metric['kind'])==('RV-02','minor')
     assert 'ruling 4B' in metric['reason']
-    assert metric['where']=='VIEW D: the KP08 leadscrew axis 12.400 ±.13 mm'
+    assert metric['where']=='VIEW D: the KP08 leadscrew axis 11.765 ±.13 mm'
+    assert 'Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144' in metric['reason']
     assert (wall['id'],wall['kind'])==('RV-04','minor')
     assert spec.NUT_WALL_MIN_TEXT in wall['where']
     assert '#2184' in wall['reason']
@@ -120,7 +121,7 @@ def test_flush_end_readback_reads_exact_plane_and_vertices(case):
             model._require_flush_lug_end(body,spec)
 
 
-def test_nut_face_carries_the_screw_clearance_and_four_through_taps_only():
+def test_nut_face_carries_the_screw_clearance_and_four_blind_taps_only():
     assert spec.NUT_FACE_X==spec.LUG_X1
     assert math.isclose(spec.NUT_AXIS_Y,-lead.SCREW_LATERAL)
     assert math.isclose(trammel.CARRIAGE_TOP_Z+spec.NUT_AXIS_Z,lead.SCREW_AXIS_Z)
@@ -133,7 +134,11 @@ def test_nut_face_carries_the_screw_clearance_and_four_through_taps_only():
     model=(FOLDER/'_oblique_pivot_block_model.py').read_text(encoding='utf-8')
     assert 'NutDowel' not in model and 'DOWEL' not in model
     assert spec.NUT_TAP_SPEC.kind=='tapped' and spec.NUT_TAP_SPEC.size=='#4-40'
-    assert spec.NUT_TAP_SPEC.end=='through_all'
+    # Farm r1 blocker (VIEW D): THRU, the deep #43's wander took the wall
+    # under the floor. Delegated ruling 2026-11-07 (Main): blind taps.
+    assert spec.NUT_TAP_SPEC.end=='blind'
+    assert spec.NUT_TAP_SPEC.depth_mm==spec.NUT_TAP_DRILL_DEPTH
+    assert spec.NUT_TAP_SPEC.overrides_mm=={'ThreadDepth':spec.NUT_TAP_THREAD_DEPTH}
     assert spec.NUT_TAP_DRILL==TAP_DRILL_MM['#4-40']
     assert spec.NUT_TAP_SPEC.size==feed_nut.SCREW_THREAD
 
@@ -172,15 +177,36 @@ def test_four_taps_sit_on_the_nut_pcd_on_the_lug_diagonals_and_are_transferred()
     assert spec.NUT_HOLES_YZ[index][1]==max(z for _y,z in spec.NUT_HOLES_YZ)
 
 
-def test_clearance_is_the_smallest_three_place_drill_over_the_vertical_stack():
-    # TL-28's as-bought 1 in (±.012) and the lug's 12.400 ±.13 mm put the
-    # leadscrew up to .435 mm off the clearance's axis (Codjiflo P1 on #2112).
-    assert math.isclose(spec.LEADSCREW_OFFSET_Z,.012*INCH+printed_band_mm(3,unit='mm'))
-    assert round(spec.LEADSCREW_OFFSET_Z,4)==.4348
+def test_clearance_clears_the_faced_vertical_stack():
+    # TL-28 faced .975 ±.005 (Delegated ruling 2026-11-07, option 2) and the
+    # lug's 11.765 ±.13 mm put the leadscrew up to .257 mm off the
+    # clearance's axis vertically (Codjiflo P1 on #2112).
+    end_bracket=__import__('ch_rocker_arm_tl_oblique_end_bracket_spec')
+    assert math.isclose(end_bracket.THICK_BAND,.005*INCH)
+    assert math.isclose(spec.LEADSCREW_OFFSET_Z,.005*INCH+printed_band_mm(3,unit='mm'))
+    assert round(spec.LEADSCREW_OFFSET_Z,4)==.257
     assert spec.LEADSCREW_RADIAL_CLEARANCE>spec.LEADSCREW_OFFSET
-    assert round((spec.LEADSCREW_RADIAL_CLEARANCE-spec.LEADSCREW_OFFSET)*1000)==5
-    # Ø.350 would not clear the stack.
-    assert (.350*INCH-lead.SCREW_MAJOR_DIA)/2<spec.LEADSCREW_OFFSET
+    assert round((spec.LEADSCREW_RADIAL_CLEARANCE-spec.LEADSCREW_OFFSET)*1000)==171
+    # The axis is the KP08's 15 over the faced bracket, exact mm.
+    assert math.isclose(lead.BRACKET_THICK,.975*INCH)
+    assert spec.NUT_AXIS_Z==11.765
+
+
+def test_blind_tap_depths_hold_the_screws_the_plug_tap_and_the_far_face():
+    # The thread's least depth takes every #4-40 X 5/8 tip; the drill's least
+    # depth leaves the owned plug tap's 5-pitch lead below the thread's
+    # deepest; the drill point stays .080 off the lug's -X face at its least
+    # width (1.64 - .87, each at .XX).
+    band=printed_band_mm(3,unit=spec.UNIT)
+    assert (spec.NUT_TAP_THREAD_DEPTH,spec.NUT_TAP_DRILL_DEPTH)==(.500*INCH,.635*INCH)
+    assert (spec.NUT_TAP_THREAD_DEPTH_TEXT,spec.NUT_TAP_DRILL_DEPTH_TEXT,spec.NUT_TAP_DRILL_SIZE_TEXT)==('.500','.635','#43')
+    assert spec.NUT_TAP_THREAD_DEPTH-band>=feed_nut.SCREW_TIP_REACH_MAX
+    assert spec.NUT_TAP_DRILL_DEPTH-band-(spec.NUT_TAP_THREAD_DEPTH+band)>=5*INCH/40-1e-9
+    assert math.isclose(spec.LUG_WIDTH_MIN,.75*INCH)
+    point=(spec.NUT_TAP_DRILL+drilled_oversize_mm(unit=spec.UNIT))/2/math.tan(math.radians(59))
+    far=spec.LUG_WALLS_MM["tap drill points to the lug's -X face"]
+    assert math.isclose(far,.75*INCH-(spec.NUT_TAP_DRILL_DEPTH+band)-point)
+    assert far>=WALL_TARGET_MM
 
 
 def test_transfer_spot_enters_every_hole_and_the_heads_clear_the_nut_body():
@@ -233,15 +259,25 @@ def test_clearance_to_tap_wall_is_the_stated_shortfall_and_every_face_wall_meets
     assert WALL_FLOOR_MM<=clearance<WALL_TARGET_MM
     assert all(v>=WALL_TARGET_MM for k,v in walls.items() if k!='taps to the leadscrew clearance')
     # The radial wall at the clocking limit: the offset's largest component
-    # along a tap at 50° from the lug's Y axis, the tap at its least radius.
+    # along a tap at 50° from the lug's Y axis, the tap at its least radius,
+    # its thread major moved by the #43's 0.3° wander at the thread's deepest
+    # (rule 17; the drill-only section below it, smaller, walls more).
     a=math.radians(spec.NUT_CLOCK_DEG+spec.NUT_CLOCK_TOL_DEG)
     toward=spec.LEADSCREW_OFFSET_Y*math.cos(a)+spec.LEADSCREW_OFFSET_Z*math.sin(a)
     radius=feed_nut.HOLE_PCD/2-feed_nut.HOLE_STATION_BAND-spec.FIT_UP_RESIDUAL
     clearance_r=(spec.SCREW_CLEARANCE_DIA+drilled_oversize_mm(unit=spec.UNIT))/2
-    expected=radius-toward-THREAD_MAJOR_MM['#4-40']/2-clearance_r
+    wander=(spec.NUT_TAP_THREAD_DEPTH+printed_band_mm(3,unit=spec.UNIT))*math.tan(math.radians(.3))
+    assert spec.NUT_TAP_DRILL_WANDER_DEG==.3
+    expected=radius-toward-THREAD_MAJOR_MM['#4-40']/2-wander-clearance_r
     assert math.isclose(clearance,expected)
-    assert spec.NUT_WALL_MIN_TEXT=='WALL .060 MIN TO TAPS'
+    assert spec.NUT_WALL_MIN_TEXT=='WALL .063 MIN TO TAPS'
     assert spec.NUT_WALL_MIN<=clearance
+    # Negative control: the same taps THRU the lug's .77 (wander over its
+    # least .75 width) on the as-bought TL-28's .435 mm stack fall under the
+    # .060 floor, the farm r1 blocker.
+    thru_toward=spec.LEADSCREW_OFFSET_Y*math.cos(a)+(.012*INCH+printed_band_mm(3,unit='mm'))*math.sin(a)
+    thru=radius-thru_toward-THREAD_MAJOR_MM['#4-40']/2-.75*INCH*math.tan(math.radians(.3))-clearance_r
+    assert thru<WALL_FLOOR_MM
 
 
 def test_view_d_prints_size_then_process_names_the_leadscrew_and_bare_locations():
@@ -286,8 +322,8 @@ def test_every_tap_is_bound_by_the_native_clocking_band_the_walls_charge():
     assert math.isclose(spec.NUT_CLOCK_RAY,feed_nut.HOLE_PCD/2)
     # Negative control: a tap free to sit 10° off its diagonal, as an
     # unequally spaced nut clocked by one hole could leave it, takes the
-    # clearance wall under the .060 floor.
-    assert spec.lug_walls_mm(spec.NUT_CLOCK_TOL_DEG+10.0)['taps to the leadscrew clearance']<WALL_FLOOR_MM
+    # clearance wall under the stated minimum.
+    assert spec.lug_walls_mm(spec.NUT_CLOCK_TOL_DEG+10.0)['taps to the leadscrew clearance']<spec.NUT_WALL_MIN
     # The band is a native driving angle on the hidden NutPatternReference,
     # toleranced on the model, never typed.
     shared=(FOLDER/'_oblique_pivot_block_model.py').read_text(encoding='utf-8')
@@ -297,8 +333,8 @@ def test_every_tap_is_bound_by_the_native_clocking_band_the_walls_charge():
 
 
 
-def test_nut_screws_stop_inside_the_through_tap():
-    assert feed_nut.SCREW_TIP_REACH_MAX<spec.LUG_WIDTH
+def test_nut_screws_stop_inside_the_blind_thread():
+    assert feed_nut.SCREW_TIP_REACH_MAX<spec.NUT_TAP_THREAD_DEPTH_MIN<spec.NUT_TAP_DRILL_DEPTH_MAX<spec.LUG_WIDTH_MIN
 
 
 def test_round_flange_stays_within_the_lug_face():
