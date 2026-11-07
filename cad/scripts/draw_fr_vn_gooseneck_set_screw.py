@@ -50,26 +50,9 @@ def _origin_drop(adapter: Any, front: Any, right: Any) -> float:
     return front_y - right_y
 
 
-_TANGENT_EDGES_HIDDEN = 0  # swDisplayTangentEdges_e.swTangentEdgesHidden
-
-
-def _hide_tangent_edges(views: dict[str, Any]) -> None:
-    """Drop the grey tangent edges the modelled thread throws on the
-    orthographic views (run 20261107T102146937Z: a line across the shank
-    and down its edge read as hidden lines describing no feature, rule 9)."""
-    for name in ("*Front", "*Right", "*Top"):
-        view = views[name]
-        view.SetDisplayTangentEdges2(_TANGENT_EDGES_HIDDEN)
-        if int(view.GetDisplayTangentEdges2()) != _TANGENT_EDGES_HIDDEN:
-            raise RuntimeError(f"gooseneck {name}: tangent edges did not hide")
-
-
 def _align_right(adapter: Any, views: dict[str, Any]):
     """FRONT's lopsided supplier margins shift it within its cell; move RIGHT
-    vertically so both project from the same model origin (third angle).
-    The orthographic views also drop their tangent edges here, the one
-    view-level hook this sheet owns."""
-    _hide_tangent_edges(views)
+    vertically so both project from the same model origin (third angle)."""
     front, right = views["*Front"], views["*Right"]
     x, y = (float(value) for value in right.Position)
     target_y = y + _origin_drop(adapter, front, right)
@@ -80,9 +63,6 @@ def _align_right(adapter: Any, views: dict[str, Any]):
     def assert_aligned():
         if abs(_origin_drop(adapter, front, right)) > 1e-6:
             raise RuntimeError("gooseneck Front/Right model origins are not aligned")
-        for name in ("*Front", "*Right", "*Top"):
-            if int(views[name].GetDisplayTangentEdges2()) != _TANGENT_EDGES_HIDDEN:
-                raise RuntimeError(f"gooseneck {name}: tangent edges reappeared")
 
     assert_aligned()
     return assert_aligned

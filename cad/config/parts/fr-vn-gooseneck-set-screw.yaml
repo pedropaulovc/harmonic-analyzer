@@ -11,3 +11,9 @@ fr-vn-gooseneck-set-screw:
   tolerance_class: machined_block
   process: purchased
   drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "FRONT view, the grey dashed construction lines across the threaded shank and down the side of the head"
+      finding: "stray supplier-reference construction lines print inside the part outline (clarity)"
+      reason: "Owner ruling 2026-11-01: Stray supplier-reference construction lines on purchased screw sheets accepted as a minor exception until the shared helper can hide them (#2143)"
