@@ -1242,52 +1242,91 @@ def test_a_preferred_scale_off_the_ladder_is_refused() -> None:
         drawing.cluster_ring_scale(CONE_CRANK_OUTLINE_1_3, (3.0, 7.0), label="odd")
 
 
-# R9 (20261107T062630010Z) cluster_ring_fit telemetry: the cone set's and the
-# pinion rig's outlines at the 1:3 they stepped down to.
-CONE_SET_OUTLINE_R9_1_3 = (0.1571, 0.0903, 0.2779, 0.2297)
+# R9 (20261107T062630010Z) cluster_ring_fit telemetry: the pinion rig's
+# outline at the 1:3 it stepped down to; round 10 (20261107T084706335Z) the
+# cone set's at 1:2.5.
 PINION_RIG_OUTLINE_R9_1_3 = (0.1681, 0.1106, 0.2669, 0.2094)
+CONE_SET_OUTLINE_R10_1_2_5 = (0.0761, 0.0565, 0.2189, 0.2215)
 
 
-@pytest.mark.parametrize(
-    ("cluster", "outline", "expected"),
-    [
-        ("cone-set", CONE_SET_OUTLINE_R9_1_3, (1.0, 2.5)),
-        ("pinion-rig", PINION_RIG_OUTLINE_R9_1_3, (1.0, 2.0)),
-    ],
-)
-def test_the_cone_set_and_rig_grow_into_their_lowered_ring_regions(
-    cluster: str, outline: tuple[float, ...], expected: tuple[float, float]
-) -> None:
-    """Rubric sample round 9: R9 printed both at 1:3, too small to read.  Their
-    regions run down into the empty lower-left, so from the 1:2 preference
-    the ladder now stops at 1:2.5 (cone set) and 1:2 (rig)."""
+def _rescaled(
+    outline: tuple[float, ...], scale: tuple[float, float], to: tuple[float, float]
+) -> tuple[float, float, float, float]:
     x0, y0, x1, y1 = outline
-    k = (1.0 / 2.0) / (1.0 / 3.0)
+    k = (to[0] / to[1]) / (scale[0] / scale[1])
     cx, cy, hw, hh = (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2 * k, (y1 - y0) / 2 * k
-    preferred = (cx - hw, cy - hh, cx + hw, cy + hh)
-    region = drawing.CLUSTER_RING_REGIONS[cluster]
-    assert drawing.cluster_ring_scale(preferred, (1.0, 2.0), label=cluster, region=region) == expected
-    # The region it ran in before would not have held it.
+    return (cx - hw, cy - hh, cx + hw, cy + hh)
+
+
+RAISED_CASES = [
+    ("cone-set", CONE_SET_OUTLINE_R10_1_2_5, (1.0, 2.5), (1.0, 2.5), 0.040),
+    ("pinion-rig", PINION_RIG_OUTLINE_R9_1_3, (1.0, 3.0), (1.0, 2.0), 0.0),
+]
+
+
+@pytest.mark.parametrize(("cluster", "outline", "read_at", "expected", "_off"), RAISED_CASES)
+def test_the_cone_set_and_rig_rise_to_a_readable_scale(
+    cluster: str,
+    outline: tuple[float, ...],
+    read_at: tuple[float, float],
+    expected: tuple[float, float],
+    _off: float,
+) -> None:
+    """Rubric sample round 9 printed both at 1:3, too small to read; raised
+    over the title block, the ladder from the 1:2 preference stops at 1:2.5
+    (cone set) and 1:2 (rig)."""
+    preferred = _rescaled(outline, read_at, (1.0, 2.0))
+    assert drawing.cluster_ring_scale(preferred, (1.0, 2.0), label=cluster, cluster=cluster) == expected
+    # The shared region would not have held it.
     assert drawing.cluster_ring_scale(preferred, (1.0, 2.0), label=cluster) != expected
+
+
+@pytest.mark.parametrize(("cluster", "outline", "read_at", "scale", "off_centre"), RAISED_CASES)
+def test_a_raised_ring_stands_near_the_centre_clear_of_heading_and_title_block(
+    cluster: str,
+    outline: tuple[float, ...],
+    read_at: tuple[float, float],
+    scale: tuple[float, float],
+    off_centre: float,
+) -> None:
+    """Round 12 (20261107T121145212Z, gating 3/3, rule 15): slid left of the
+    title block, both rings left the sheet's right half empty.  Raised, the
+    rig stands centred and the cone set within 40 mm of centre, and neither
+    the view's box nor any balloon the ellipse can carry touches the title
+    block, the sheet heading or the frame."""
+    fitted = _rescaled(outline, read_at, scale)
+    shift, overflows, slide = drawing.raised_ring_fit(fitted, cluster)
+    assert overflows == []
+    assert 0.0 <= slide <= off_centre + 1e-9
+    margin, r = drawing.CLUSTER_BALLOON_MARGINS[cluster], drawing.BALLOON_DIAMETER / 2.0
+    box = (fitted[0] + shift[0], fitted[1] + shift[1], fitted[2] + shift[0], fitted[3] + shift[1])
+    cx, cy = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
+    rx, ry = (box[2] - box[0]) / 2 + margin, (box[3] - box[1]) / 2 + margin
+    keep_outs = (_title_block_keep_out(), drawing.cluster_heading_keep_out(cluster))
+    shapes = [box] + [
+        (cx + rx * math.cos(a) - r, cy + ry * math.sin(a) - r, cx + rx * math.cos(a) + r, cy + ry * math.sin(a) + r)
+        for a in (math.radians(d / 4) for d in range(1440))
+    ]
+    for shape in shapes:
+        for keep in keep_outs:
+            assert not drawing._boxes_overlap(shape, keep), (shape, keep)
+    assert cy + ry + r <= drawing.RAISED_RING_TOP + 1e-9
+
+
+def test_the_cluster_heading_keep_out_covers_round_12s_printed_heading() -> None:
+    """Round 12's sheet 4 heading printed to x 188.2 mm, down to y 253.5 mm."""
+    left, bottom, right, _top = drawing.cluster_heading_keep_out("cone-set")
+    clearance = drawing.CLUSTER_TITLE_BLOCK_CLEARANCE
+    assert right - clearance >= 0.1882 and bottom + clearance <= 0.2535
 
 
 def test_the_bank_and_crank_keep_their_proven_ring_region() -> None:
     for cluster in ("cylinder-bank", "crank"):
         assert drawing.CLUSTER_RING_REGIONS[cluster] == drawing.CLUSTER_RING_REGION
+        assert cluster not in drawing.RAISED_RING_CLUSTERS
+        assert drawing.CLUSTER_BALLOON_MARGINS[cluster] == drawing.CLUSTER_BALLOON_MARGIN
     assert set(drawing.CLUSTER_RING_REGIONS) == set(drawing.CLUSTER_SCALES)
-
-
-def test_a_lowered_view_box_slides_clear_of_the_title_block() -> None:
-    """Round 10 (20261107T084706335Z): the 1:2.5 cone set's view box
-    [76.1, 56.5, 218.9, 221.5] mm overlapped the title block 2.9 x 9.5 mm
-    while its balloon ring cleared it; the fit now slides the box too."""
-    outline = (0.0761, 0.0565, 0.2189, 0.2215)
-    shift, overflows, _slide = drawing.cluster_ring_fit(
-        outline, drawing.CLUSTER_RING_REGIONS["cone-set"]
-    )
-    assert overflows == []
-    left, _bottom, _right, top = _title_block_keep_out()
-    assert outline[2] + shift[0] <= left + 1e-9 or outline[1] + shift[1] >= top - 1e-9
+    assert set(drawing.CLUSTER_BALLOON_MARGINS) == set(drawing.CLUSTER_SCALES)
 
 
 def test_view_labels_print_a_scale_only_where_it_differs_from_the_sheet() -> None:

@@ -768,7 +768,7 @@ def _stub_drive_train_sheets(monkeypatch, fitted_for):
         "_view_outline": lambda _view: (0.0, 0.0, 0.1, 0.1),
         "cluster_ring_scale": lambda _outline, preferred, **_kwargs: fitted_for(preferred),
         "_set_view_scale": set_scale,
-        "cluster_ring_fit": lambda _outline: ((0.0, 0.0), [], 0.0),
+        "fit_cluster_ring": lambda _outline, _cluster: ((0.0, 0.0), [], 0.0),
         "_shift_view": idle,
         "add_component_bom_balloons": ballooned,
         "_spread_balloons": idle,

@@ -501,18 +501,34 @@ BOM_REFERENCE_NOTES = (
 CLUSTER_VIEW_CENTER = (0.200, 0.165)
 # Top keeps baseline-4's ~5 mm clearance under the two-line sheet heading.
 CLUSTER_RING_REGION = (0.020, 0.072, 0.415, 0.248)
-# Rubric sample round 9: sheets 4 and 6 left their lower-left quarter empty
-# (R9 renders) while the 1:3 views read too small.  Their rings may run down
-# to 0.030 (17 mm over the border), where the title-block slide
-# (cluster_ring_fit) keeps the low arc left of the block; the bank and crank
-# keep the region their proven sheets fit.
+# Rubric sample round 9: sheets 4 and 6 printed at 1:3, too small to read.
+# Round 12 (20261107T121145212Z, gating 3/3): lowered to 0.030 and slid left
+# off the title block, their 1:2.5 and 1:2 rings left each sheet's right half
+# empty (rule 15).  Those two now rise instead (raised_ring_fit): the ring
+# clears the title block's top and runs up to the frame wherever the sheet
+# heading is not.  The bank and crank keep the region their proven sheets fit.
+RAISED_RING_CLUSTERS: frozenset[Cluster] = frozenset({"cone-set", "pinion-rig"})
+# The frame's inner top edge (12.7 mm in) less the title-block clearance.
+RAISED_RING_TOP = DRAWING_TEMPLATES[SPEC.layout].height_m - 0.0127 - BOM_SHEET_CLEARANCE
 CLUSTER_RING_REGIONS: dict[Cluster, tuple[float, float, float, float]] = {
     "cylinder-bank": CLUSTER_RING_REGION,
-    "cone-set": (CLUSTER_RING_REGION[0], 0.030, *CLUSTER_RING_REGION[2:]),
+    "cone-set": (CLUSTER_RING_REGION[0], 0.030, CLUSTER_RING_REGION[2], RAISED_RING_TOP),
     "crank": CLUSTER_RING_REGION,
-    "pinion-rig": (CLUSTER_RING_REGION[0], 0.030, *CLUSTER_RING_REGION[2:]),
+    "pinion-rig": (CLUSTER_RING_REGION[0], 0.030, CLUSTER_RING_REGION[2], RAISED_RING_TOP),
 }
+# Width of one sheet-heading character: round 12's sheet 4 heading printed
+# 67 characters across 170.2 mm (2.54 mm each); this over-reads it 10%.
+CLUSTER_HEADING_CHAR_WIDTH = 0.0028
 CLUSTER_BALLOON_MARGIN = 0.012
+# The raised cone-set ring at 1:2.5 (round 10's 142.8 x 165.0 mm outline) is
+# 199 mm tall at the shared margin, more than the 194.7 mm between the title
+# block's clearance and RAISED_RING_TOP; its circles sit 8 mm off the outline.
+CLUSTER_BALLOON_MARGINS: dict[Cluster, float] = {
+    "cylinder-bank": CLUSTER_BALLOON_MARGIN,
+    "cone-set": 0.008,
+    "crank": CLUSTER_BALLOON_MARGIN,
+    "pinion-rig": CLUSTER_BALLOON_MARGIN,
+}
 BALLOON_DIAMETER = 0.010
 # How far past the view outline balloon ink reaches: _spread_balloons puts each
 # circle CENTRE on the ellipse CLUSTER_BALLOON_MARGIN outside, so the ink stops
@@ -1027,7 +1043,7 @@ PEDESTAL_RECHECK_ROWS = (
 )
 
 # Step 7's bond and release agents, named so the fitter buys the right ones.
-HANDLE_EPOXY = "30-MINUTE TWO-PART EPOXY"
+HANDLE_EPOXY = "30-MINUTE EPOXY"
 HANDLE_RELEASE = "PASTE WAX"
 # Rule 23 (#1174): MHA-DT-32's lock is the arm's tap mouth staked onto the
 # filed tip, after the MHA-PD-VN-57 pivot (user ruling 2026-10-15).
@@ -1342,6 +1358,9 @@ CONE_CRANK_STEPS = _note_text(
         # Its turning changes no setting, so a seated screw and this check
         # retain it (rule 23 static clamp, owner ruling 2026-11-07).
         "6L. CHECK THAT MHA-DT-28 DOES NOT TURN UNDER MHA-SH-VN-51 BY HAND.",
+        # Rule 23 (rubric sample round 12, #1): the taper-pinned crank arm's
+        # bench acceptance.
+        "6M. CHECK THAT MHA-DT-06 DOES NOT TURN OR SLIDE ON MHA-DT-11 BY HAND.",
         # Local review of 747487c71 and owner ruling 2026-10-24 (#1900): the
         # ferrule cures centred on the pivot bore.  Rule 23: the handle spins
         # on the MHA-DT-32 shoulder, so the screw is staked in the arm's
@@ -1460,7 +1479,10 @@ BANK_STEPS = _note_text(
         "9W. BLOW OUT THE CHIPS.",
         "9X. RUN THE FRONT MHA-SH-VN-54 IN TIGHT, THEN THE BACK ONE.",
         "9Y. CHECK THAT EACH GEAR TURNS FREE BY HAND.",
-        "9Z. CHECK THAT MHA-DT-13 DOES NOT TURN OR SLIDE BY HAND.",
+        # Rule 23 (rubric sample round 12, #0): MHA-DT-13, set in both crowns
+        # (9X), ties the two pedestals into one frame on two screws; the
+        # bench check covers all three.
+        "9Z. CHECK BY HAND THAT MHA-DT-13 AND BOTH MHA-DT-02 DO NOT MOVE.",
         # #936 P1 b, option A (user ruling 2026-09-26): the back MHA-CH-08 ear
         # is the rocker bank's axial datum (rocker_bank_layout), set on the
         # DRO zero so the cams and the rocker stations share one datum.  Hub
@@ -2091,11 +2113,6 @@ def cluster_ring_fit(
         balloon_radius=BALLOON_DIAMETER / 2.0,
         keep_out=keep_out,
     )
-    # The view's own box: its corners stand outside the ring's ellipse, so a
-    # ring clear of the block can still leave a corner on it (round 10,
-    # 20261107T084706335Z: the 1:2.5 cone set's box overlapped it 2.9 x 9.5).
-    if outline[1] + shift[1] < keep_out[3]:
-        x = min(x, keep_out[0] - outline[2])
     ring_left = outline[0] + x - CLUSTER_RING_REACH
     if ring_left < region[0]:
         overflows.append(
@@ -2103,6 +2120,108 @@ def cluster_ring_fit(
             "clearing the title block"
         )
     return (x, shift[1]), overflows, x - shift[0]
+
+
+def cluster_heading(cluster: Cluster) -> str:
+    """A cluster sheet's heading text under its sheet name."""
+    return f"{CLUSTER_TITLES[cluster]} - EXPLODED ISOMETRIC; ITEMS PER SHEET 2"
+
+
+def cluster_heading_keep_out(cluster: Cluster) -> tuple[float, float, float, float]:
+    """The cluster sheet's heading as (left, bottom, right, top), grown by the
+    title-block clearance: its width from its longest line at
+    CLUSTER_HEADING_CHAR_WIDTH, its depth from its lines at NOTE_LINE_PITCH
+    plus 1 mm (round 12's two lines printed down to 253.5 mm, 0.45 mm under
+    the pitch alone)."""
+    lines = heading_text(CLUSTER_SHEETS[cluster], cluster_heading(cluster)).splitlines()
+    return (
+        0.0,
+        HEADING_XY[1] - len(lines) * NOTE_LINE_PITCH - 0.001 - CLUSTER_TITLE_BLOCK_CLEARANCE,
+        HEADING_XY[0]
+        + max(len(line) for line in lines) * CLUSTER_HEADING_CHAR_WIDTH
+        + CLUSTER_TITLE_BLOCK_CLEARANCE,
+        DRAWING_TEMPLATES[SPEC.layout].height_m,
+    )
+
+
+def _boxes_overlap(
+    a: tuple[float, float, float, float], b: tuple[float, float, float, float]
+) -> bool:
+    return a[2] > b[0] and a[0] < b[2] and a[3] > b[1] and a[1] < b[3]
+
+
+RAISED_RING_SEARCH_STEP = 0.0005
+
+
+def raised_ring_fit(
+    outline: tuple[float, float, float, float], cluster: Cluster
+) -> tuple[tuple[float, float], list[str], float]:
+    """Shift that fits a RAISED_RING_CLUSTERS view's balloon ring, its
+    overflows, and how far its centre sits off the region's centre.
+
+    The ring stands as low as its ink clears the title block's top (or, too
+    tall for that, against the region's top), then takes the x nearest the
+    region's centre where neither the view's box nor any balloon the ellipse
+    can carry (``_spread_balloons`` puts each centre on it, the cluster's
+    margin outside the outline) touches the title block or the sheet heading.
+    Only the outline's size matters: the shift re-centres wherever it landed.
+    """
+    margin = CLUSTER_BALLOON_MARGINS[cluster]
+    radius = BALLOON_DIAMETER / 2.0
+    reach = margin + radius
+    x0, y0, x1, y1 = CLUSTER_RING_REGIONS[cluster]
+    width, height = outline[2] - outline[0], outline[3] - outline[1]
+    ring_w, ring_h = width + 2.0 * reach, height + 2.0 * reach
+    overflows = [
+        f"{axis} {size * 1000:.1f} mm > {room * 1000:.1f} mm"
+        for axis, size, room in (("width", ring_w, x1 - x0), ("height", ring_h, y1 - y0))
+        if size > room
+    ]
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    keep_outs = (
+        (
+            template.title_block_left_m - CLUSTER_TITLE_BLOCK_CLEARANCE,
+            0.0,
+            template.width_m,
+            template.title_block_top_m + CLUSTER_TITLE_BLOCK_CLEARANCE,
+        ),
+        cluster_heading_keep_out(cluster),
+    )
+    cy = max(y0, keep_outs[0][3]) + ring_h / 2.0
+    if cy + ring_h / 2.0 > y1:
+        cy = y1 - ring_h / 2.0
+    centre = (x0 + x1) / 2.0
+    rx, ry = width / 2.0 + margin, height / 2.0 + margin
+    arc = [(math.cos(math.radians(a)), math.sin(math.radians(a))) for a in range(360)]
+
+    def clear(cx: float) -> bool:
+        if cx - ring_w / 2.0 < x0 or cx + ring_w / 2.0 > x1:
+            return False
+        boxes = [(cx - width / 2.0, cy - height / 2.0, cx + width / 2.0, cy + height / 2.0)]
+        for cos_a, sin_a in arc:
+            bx, by = cx + rx * cos_a, cy + ry * sin_a
+            boxes.append((bx - radius, by - radius, bx + radius, by + radius))
+        return not any(_boxes_overlap(box, keep) for box in boxes for keep in keep_outs)
+
+    def shift_to(cx: float) -> tuple[float, float]:
+        return (cx - (outline[0] + outline[2]) / 2.0, cy - (outline[1] + outline[3]) / 2.0)
+
+    if overflows:
+        return shift_to(centre), overflows, 0.0
+    for n in range(int((x1 - x0) / RAISED_RING_SEARCH_STEP) + 1):
+        for cx in (centre + n * RAISED_RING_SEARCH_STEP, centre - n * RAISED_RING_SEARCH_STEP):
+            if clear(cx):
+                return shift_to(cx), overflows, cx - centre
+    return shift_to(centre), ["no centre clears the heading and the title block"], 0.0
+
+
+def fit_cluster_ring(
+    outline: tuple[float, float, float, float], cluster: Cluster
+) -> tuple[tuple[float, float], list[str], float]:
+    """The cluster's ring fit: raised_ring_fit or cluster_ring_fit."""
+    if cluster in RAISED_RING_CLUSTERS:
+        return raised_ring_fit(outline, cluster)
+    return cluster_ring_fit(outline, CLUSTER_RING_REGIONS[cluster])
 
 
 def _scale_text(scale: tuple[float, float]) -> str:
@@ -2120,12 +2239,13 @@ def cluster_ring_scale(
     placed: tuple[float, float],
     *,
     label: str,
-    region: tuple[float, float, float, float] = CLUSTER_RING_REGION,
+    cluster: Cluster | None = None,
 ) -> tuple[float, float]:
     """The largest ladder scale, from ``placed`` down, whose balloon ring fits.
 
     ``outline`` is the view's outline at ``placed``; a view's outline scales
-    with its scale, and the fit reads only its size (cluster_ring_fit).
+    with its scale, and the fit reads only its size (``fit_cluster_ring`` for
+    ``cluster``, else cluster_ring_fit in the shared region).
     Raises naming every scale's overflow when none on the ladder fits.
     """
     if placed not in CLUSTER_SCALE_LADDER:
@@ -2136,7 +2256,10 @@ def cluster_ring_scale(
     for scale in CLUSTER_SCALE_LADDER[CLUSTER_SCALE_LADDER.index(placed) :]:
         k = (scale[0] / scale[1]) / (placed[0] / placed[1])
         hw, hh = (x1 - x0) / 2.0 * k, (y1 - y0) / 2.0 * k
-        _shift, overflows, _slide = cluster_ring_fit((cx - hw, cy - hh, cx + hw, cy + hh), region)
+        scaled = (cx - hw, cy - hh, cx + hw, cy + hh)
+        _shift, overflows, _slide = (
+            cluster_ring_fit(scaled) if cluster is None else fit_cluster_ring(scaled, cluster)
+        )
         if not overflows:
             return scale
         findings.append(f"{_scale_text(scale)}: {'; '.join(overflows)}")
@@ -3792,8 +3915,7 @@ def _fit_cluster_view(
     configuration = _configure_view(adapter, view, exploded=True, label=label)
     view = set_drawing_view_instance_visibility(adapter, view, frozenset(facts.clusters[cluster]), mode="show", label=label)
     preferred_outline = _view_outline(view)
-    region = CLUSTER_RING_REGIONS[cluster]
-    scale = cluster_ring_scale(preferred_outline, preferred, label=label, region=region)
+    scale = cluster_ring_scale(preferred_outline, preferred, label=label, cluster=cluster)
     outline = preferred_outline
     # The ladder predicts each fit from the preferred outline; the re-read
     # outline is the proof, before any balloon exists. A shaded pictorial's
@@ -3813,7 +3935,7 @@ def _fit_cluster_view(
                 )
             _set_view_scale(adapter, view, scale, label=label)
             outline = _view_outline(view)
-        shift, overflows, slide = cluster_ring_fit(outline, region)
+        shift, overflows, slide = fit_cluster_ring(outline, cluster)
         if not overflows:
             break
     _telemetry.event(
@@ -3875,7 +3997,7 @@ def _balloon_cluster_sheet(
             for stem, anchor in DRIVE_TRAIN_BALLOON_ANCHORS[cluster].items()
         },
         label=f"drive-train {cluster} BOM coverage",
-        margin=CLUSTER_BALLOON_MARGIN,
+        margin=CLUSTER_BALLOON_MARGINS[cluster],
     )
     balloons = [landing.note for landing in landings]
     # One ring over every balloon at this sheet's clearance; the shared call
@@ -3884,17 +4006,13 @@ def _balloon_cluster_sheet(
         adapter,
         view,
         balloons,
-        margin=CLUSTER_BALLOON_MARGIN,
+        margin=CLUSTER_BALLOON_MARGINS[cluster],
         clearance=CLUSTER_BALLOON_CLEARANCE[cluster],
     )
     rebuild_drawing(adapter, label=f"{label} ring")
     _uncross_balloon_leaders(adapter, balloons, label=label)
     _verify_balloon_attachments(balloons, balloon_items, label=label)
-    _heading(
-        adapter,
-        number,
-        f"{CLUSTER_TITLES[cluster]} - EXPLODED ISOMETRIC; ITEMS PER SHEET 2",
-    )
+    _heading(adapter, number, cluster_heading(cluster))
     return _balloon_annotations(balloons), landings
 
 
