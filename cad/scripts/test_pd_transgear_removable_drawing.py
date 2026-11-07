@@ -350,15 +350,16 @@ def test_the_pin_locations_name_exactly_the_parts_the_drive_pins_press_into() ->
         r"|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])"
     )
     below = callouts.callouts_by_name(callouts.CALLOUT_BELOW)
-    for name in ("PinPosY", "PinNegY"):
-        assert set(number.findall(below[name])) == numbers, name
+    # Named once, on the 2X pattern callout; the locations carry no words.
+    assert set(number.findall(below["PinPosDia"])) == numbers
+    assert "PinPosY" not in below and "PinNegY" not in below
     # The mates print at the band they explain, not in the general notes.
     assert not number.findall(notes.DRAWING_NOTES)
 
 
 def test_the_plate_band_names_the_chain_it_serves() -> None:
     callout = callouts.callouts_by_name(callouts.CALLOUT_BELOW)["BlankWidth"]
-    assert "ANSI #25 CHAIN" in callout and "SUPPLIED" in callout
+    assert _config.parts("sh-vn-chain-link")["number"] in callout
 
 
 def test_the_sheet_names_t24_and_covers_what_every_configuration_shares() -> None:
@@ -432,7 +433,7 @@ def test_imported_callouts_read_back_through_crlf_and_trimmed_standoff(
     drawing._assert_dimension_callouts(None, _imported(monkeypatch, printed))
 
 
-@pytest.mark.parametrize("lost", ["PinPosY", "PinNegY", "BlankWidth"])
+@pytest.mark.parametrize("lost", ["PinPosDia", "BlankWidth"])
 def test_an_imported_dimension_missing_its_mate_row_is_refused(
     monkeypatch, lost: str
 ) -> None:
