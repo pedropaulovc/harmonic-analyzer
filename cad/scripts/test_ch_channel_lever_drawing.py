@@ -59,25 +59,15 @@ def test_bands_are_native_on_the_model_from_named_constants() -> None:
 
 def test_every_tight_band_names_its_mate_or_function() -> None:
     callouts = {**drawing.FRONT_CALLOUTS, **drawing.TOP_CALLOUTS}
-    for name in (
-        "FulcrumDia",
-        "LeverThick",
-        "PlateOffset",
-        "HubLength",
-        "BarPinCx",
-        "SpringCx",
-    ):
+    for name in ("FulcrumDia", "LeverThick", "HubLength"):
         assert callouts[name]
     assert drawing.SHAFT_NUMBER in callouts["FulcrumDia"]
     assert "REAM" in callouts["FulcrumDia"]
     assert drawing.BAR_NUMBER in callouts["LeverThick"]
-    assert drawing.BAR_NUMBER in callouts["PlateOffset"]
-    # Machinist r5: each hole's mate rides its own hole callout.
-    assert callouts["BarPinCx"] == callouts["SpringCx"] == "SETS LEVER RATIO"
-    assert drawing.HOLE_MATES == {
-        "bar-pin hole": f"RUNS ON PIN\n{drawing.PIN_NUMBER}",
-        "spring-eye hole": f"HOOKS SPRING\n{drawing.SPRING_NUMBER}",
-    }
+    assert drawing.SHAFT_NUMBER in callouts["HubLength"]
+    # Rule 7: a location dimension carries its value and band only.
+    for location in ("PlateOffset", "BarPinCx", "SpringCx"):
+        assert location not in callouts
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     for label in drawing.HOLE_MATES:
         assert f'_callout, label="{label}")' in source
@@ -100,7 +90,7 @@ def test_twenty_long_hubs_still_float_between_the_keepers() -> None:
     stations = drawing.STATIONS
     # The pitch prints .278 (7.0612) +.001/.000: each hub may come out the
     # printed maximum, past the 7.0565 model.
-    _lower, upper = printed_deviations(
+    lower, upper = printed_deviations(
         spec.HUB_LENGTH,
         notes.DRAWING_PRECISION["Hub"]["HubLength"],
         (spec.HUB_LENGTH_BAND[1], spec.HUB_LENGTH_BAND[0]),
@@ -109,6 +99,13 @@ def test_twenty_long_hubs_still_float_between_the_keepers() -> None:
     growth = stations * upper
     assert spec.HUB_LENGTH_BAND[1] == 0.0  # ch_bar_pivot_pin_spec's pitch minimum
     assert growth < sum(assembly.KEEPER_HUB_FLOAT)
+    # The callout's stack acceptance is the printed limits times the stations,
+    # and its end play the keepers' float less the longest stack's growth.
+    stack = tuple(stations * (spec.HUB_LENGTH + d) / 25.4 for d in (lower, upper))
+    end_play = (sum(assembly.KEEPER_HUB_FLOAT) - growth) / 25.4
+    assert drawing.HUB_STACK_ACCEPTANCE == (
+        f"STACK {stack[0]:.3f}-{stack[1]:.3f}, END PLAY {end_play:.3f} MIN"
+    ).replace(" 0.", " .")
 
 
 def test_plate_band_is_the_notch_allowance() -> None:

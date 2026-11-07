@@ -304,7 +304,7 @@ def test_printed_profile_controls_are_their_sources() -> None:
     }
     assert arm_notes.DRAWING_DIMENSIONS["TopEdgeReference"] == {"TopAbovePivot"}
     assert arm_drawing.BASIC_PROFILE_DIMENSIONS == {
-        "TopRadius", "BottomRadius", "TopAbovePivot"
+        "TopRadius", "BottomRadius", "TopAbovePivot", "BottomBelowPivot"
     }
     assert arm_drawing.BASIC_PROFILE_DIMENSIONS == arm_drawing.FRONT_KEEP.keys()
     assert set(arm_drawing.END_KEEP) == {"RodTipLen", "TipLandAngle"}

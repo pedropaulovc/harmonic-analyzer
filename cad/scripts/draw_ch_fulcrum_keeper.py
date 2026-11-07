@@ -60,17 +60,19 @@ from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
-import ch_channel_assembly_steps as steps
+from ch_fulcrum_keeper_notes import (
+    BORE_CALLOUT,
+    CROWN_CALLOUT,
+    FOOT_HOLE_MATE,
+    SET_SCREW_QUALIFIER,
+)
 from ch_fulcrum_keeper_spec import (
     BORE_CENTRE_CALLOUT,
-    BORE_PAIR_CALLOUT,
     CBORE_DIA_MM,
     CROWN_R,
-    CROWN_ROUND_CALLOUT,
     CROWN_TOP_Y,
     DRAWING_DIMENSIONS,
     FOOT_HOLE_CALLOUT_PRECISION,
-    FOOT_SCREW_SIDE_CALLOUT,
     FOOT_TIP_X,
     LUG_HALF_T,
     OVERALL_LENGTH,
@@ -132,68 +134,53 @@ TAP_R_SHEET = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) * SHEET_SCALE[0] / 2000.0
 # from the crown tap left of the hole. Text left of the plan (x 40..62 mm at
 # y 238) laid the leader across the plan at y ~229 and through the tap's
 # end-on circle, where it crossed the tap callout's leader at (99.7, 229.3)
-# mm (leader-crosses-leader, farm run r8, HEAD c126e34b). The block's left
-# end, x 126, keeps clear of the ScrewFromSide extension at y 228 above and
-# of the front view's crown stack (x <= 108) and foot below. Its y rose 1 mm
-# for the DRILL row (FOOT_HOLE_PROCESS, MR-fleet r7), which grows the block
-# both ways, keeping it clear of the plan above and the crown radius below.
-FOOT_HOLE_CALLOUT_XY = (0.126, 0.203)
-# The keeper is supplied undrilled (BORE_PAIR_CALLOUT), so the crown tap,
-# which stops at the bore, is cut after the pair-ream, on the bore's axis
-# (MR-fleet r2, 0eca37c: "TAP TO BORE" with no bore yet left the stage
-# open, and the 7.000 off the side face read as locating it); its mouth is
-# staked over the seated set screw at the channel assembly
-# (drawing-guidelines.md rule 23 (lock threaded joints exposed to operating
-# loads)'s lock, joint_retention).  The native sizes lead and say where they
+# mm (leader-crosses-leader, farm run r8, HEAD c126e34b). Native hangs the
+# leader's shoulder under the LAST row, so the rows widen downward: DRILL
+# alone on top (MR-fleet r7), the two sizes, then the two mate rows
+# (FOOT_HOLE_MATE, widest last). The leader then climbs left of every row
+# above the bottom one: with the 21-character bottom row (~54 mm at 2.57 mm a
+# character) centred at x 131 the shoulder ends at x ~104, ~12 mm short of
+# the rim, which clears each upper row's left end by ~2 mm or more. Five
+# rows (~5.5 mm pitch) centred at y 199 put the top row under the plan's
+# bottom edge (y 214) and the shoulder (y ~187) over the crown radius's rows.
+FOOT_HOLE_CALLOUT_XY = (0.131, 0.199)
+# The keeper is supplied undrilled, so the crown tap, which stops at the
+# bore, is cut after the line-ream (MR-fleet r2, 0eca37c: "TAP TO BORE" with
+# no bore yet left the stage open). The native sizes lead and say where they
 # stop (both "<hw-thru>" extents read TO BORE; the thread class is the title
-# block's), and the place, stage and staking step close the thread's own
-# part (draw_ch_pivot_bracket's apex tap; MR-fleet r3, cb6e11e: seven rows
-# mixing sequence, staking and size buried the thread on the last row).
+# block's), and the mate and stage close the thread's own part
+# (SET_SCREW_QUALIFIER, two rows; its staking is MHA-CH-00's step).
 # Machinist review r13: as two 86 mm rows centred at x 50 the block ran
-# 5.7 mm past the left inner border (x 12.7).  Five rows of at most 24
-# characters (~61 mm printed, 2.56 mm a character in r13) centred at x 58
-# start at x ~27, ~14 mm in from it, and end ~4 mm left of the plan's inner
-# face (x 93.5), in the band between the front view and the plan.  The tap's
+# 5.7 mm past the left inner border (x 12.7). Rows of at most 24 characters
+# (~61 mm printed, 2.56 mm a character in r13) centred at x 58 start at
+# x ~27, ~14 mm in from it, and end ~4 mm left of the plan's inner face
+# (x 93.5), in the band between the front view and the plan. The tap's
 # station prints above the plan (MR-fleet r1, 991a56e: in the front view its
 # text sat 1 mm under this block's shoulder and the two read as one), so
 # nothing else stands in that band.
 SET_SCREW_EXTENT = "TO BORE"
-SET_SCREW_QUALIFIER = (
-    "ON BORE AXIS AFTER REAM;\n"
-    "STAKE AT ASSEMBLY PER\n"
-    f"{steps.step_ref(steps.SET_SCREWS_STAKED_KEY)}"
-)
 SET_SCREW_CALLOUT_XY = (0.058, 0.196)
 _THREAD_CLASS = re.compile(r"\s*(?:-\s*)?<hw-threadclass>\s*", re.IGNORECASE)
 # The foot hole's process, on its own row above the native through row.
 FOOT_HOLE_PROCESS = "DRILL\n"
 # The crown tap's native drill size prints .XXX.
 SET_SCREW_CALLOUT_PRECISION = {"hw-tapdrldia": 3}
-# The two keepers' bores are drilled and reamed through in one pass at their
-# installed spacing (one straight line whatever LugRise prints) and each crown
-# is then rounded, a full round tangent to both sides at the bore's height:
-# bench instructions of the pair-ream step, so each rides its own dimension.
-# The bore's (7.0) reference station off the side face states its place on
-# the width's centre plane and the part it holds there for (owner ruling
-# Q10-B: the MHA-CH-VN-55 set screw's full thread under the full round).
-_PAIR_REAM_STEP = steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)
+# The bore and crown name the line-ream they follow and the shaft the bore
+# slides on (ch_fulcrum_keeper_notes). The bore's (.275) reference station
+# off the side face states its place on the width's centre plane and the
+# part it holds there for (owner ruling Q10-B: the MHA-CH-VN-55 set screw's
+# full thread under the full round).
 DIMENSION_CALLOUTS = {
-    "BoreDia": f"{BORE_PAIR_CALLOUT},\nPER {_PAIR_REAM_STEP}",
-    "CrownRadius": f"{CROWN_ROUND_CALLOUT},\nPER {_PAIR_REAM_STEP}",
+    "BoreDia": BORE_CALLOUT,
+    "CrownRadius": CROWN_CALLOUT,
     "BoreFromSide": BORE_CENTRE_CALLOUT,
 }
-# The three-place size states the function that holds it there (rule 4,
-# machinist review baseline: 6.000 / 3.000 / 7.000 printed with neither a
-# band nor a reason): the foot hole's side station centres the transferred
-# frame tap in its web. The lug thickness and the tap's station print at the
-# title block's .XX (owner ruling Q11-B), so they carry no function line.
 # The supplied blank's least height states what it is (MR-fleet r3: the
-# square-topped blank's height was printed nowhere).
+# square-topped blank's height was printed nowhere). Locations carry only
+# their values (rule 7): the foot hole's side station's reason, the frame
+# tap it centres, rides the foot-hole callout (FOOT_HOLE_MATE).
 FRONT_CALLOUTS = {
     "SupplyHeight": SUPPLY_HEIGHT_CALLOUT,
-}
-TOP_CALLOUTS = {
-    "ScrewFromSide": FOOT_SCREW_SIDE_CALLOUT,
 }
 
 # Per-view survivors of the marked-dimension import: parametric name ->
@@ -488,30 +475,35 @@ def _set_tap_callout_text(display: Any) -> None:
 
 
 def foot_hole_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    """Put FOOT_HOLE_PROCESS on its own row above the native THRU row.
+    """Put FOOT_HOLE_PROCESS on its own row above the native THRU row and
+    FOOT_HOLE_MATE under the counterbore row.
 
     A counterbored callout prints its through row from the CalloutAbove
-    part (7) and the counterbore row from the Prefix part (5), so
-    ``add_native_hole_callout(process=...)``, which writes the Prefix, put
-    DRILL ahead of the counterbore (MR-fleet r7, cc1a81a: "DRILL ⌴Ø3.80",
-    and a leader-through-own-text on the widened row). On its own row the
-    word stays narrower than the counterbore row the leader lands on.
+    part (7), the counterbore row from the Prefix part (5) and closes with
+    the CalloutBelow part (8), so ``add_native_hole_callout(process=...)``,
+    which writes the Prefix, put DRILL ahead of the counterbore (MR-fleet r7,
+    cc1a81a: "DRILL ⌴Ø3.80", and a leader-through-own-text on the widened
+    row). On its own row the word stays narrower than the rows under it,
+    which the leader climbs past (FOOT_HOLE_CALLOUT_XY). The mate rows follow
+    the sizes (rule 7).
     """
     if set(definitions) != {5, 6, 7, 8}:
         raise RuntimeError(f"unexpected foot-hole callout parts: {definitions!r}")
     thru_parts = [part for part, text in definitions.items() if "THRU" in text.upper()]
-    if len(thru_parts) != 1:
+    if len(thru_parts) != 1 or thru_parts[0] == 8:
         raise RuntimeError(f"foot-hole THRU row is not in one part: {definitions!r}")
     part = thru_parts[0]
+    below = definitions[8].rstrip()
     return {
         **definitions,
         part: compose_hole_callout_prefix(FOOT_HOLE_PROCESS, definitions[part]),
+        8: f"{below}\n{FOOT_HOLE_MATE}" if below else FOOT_HOLE_MATE,
     }
 
 
 @_telemetry.traced("drawing.fulcrum_keeper.foot_hole_process")
 def _set_foot_hole_process(display: Any) -> None:
-    """Write the foot hole's process row and prove it persisted first."""
+    """Write the foot hole's process and mate rows and prove they persisted."""
     native = _early_bound(display, "IDisplayDimension")
     definitions = {part: str(native.GetText(part) or "") for part in (5, 6, 7, 8)}
     updated = foot_hole_callout_definitions(definitions)
@@ -521,9 +513,13 @@ def _set_foot_hole_process(display: Any) -> None:
     persisted = {part: str(native.GetText(part) or "") for part in (5, 6, 7, 8)}
     resolved = {part: str(native.GetText(part) or "") for part in (1, 2, 3, 4)}
     first = resolved[3] or resolved[1]
-    if persisted != updated or not first.startswith(FOOT_HOLE_PROCESS):
+    if (
+        persisted != updated
+        or not first.startswith(FOOT_HOLE_PROCESS)
+        or not resolved[4].rstrip().endswith(FOOT_HOLE_MATE)
+    ):
         raise RuntimeError(
-            "foot-hole process row did not persist first: "
+            "foot-hole process/mate rows did not persist: "
             f"definitions={persisted!r}, resolved={resolved!r}"
         )
     _telemetry.info(f"foot-hole callout: {resolved!r}")
@@ -593,7 +589,8 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    top_annotations = curate_view_dimensions(
+    # The plan's stations print bare (rule 7): no callouts to set.
+    curate_view_dimensions(
         adapter,
         top,
         keep=TOP_KEEP,
@@ -619,7 +616,6 @@ async def build(adapter: Any) -> dict[str, str]:
         SUPPLY_HEIGHT_TOL_TYPE,
         SUPPLY_HEIGHT_MIN,
     )
-    set_dimension_callouts(adapter, top_annotations, TOP_CALLOUTS)
     kept = [*front_annotations, *right_annotations]
     for name in REFERENCE_DIMENSIONS:
         set_reference_dimension(

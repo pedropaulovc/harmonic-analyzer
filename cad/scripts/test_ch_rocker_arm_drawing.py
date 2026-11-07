@@ -171,31 +171,6 @@ def test_view_arrow_names_the_removed_right_view_from_the_notes_letter() -> None
     assert drawing.add_leader_note.__module__ == "_drawing_leader_notes"
 
 
-def test_hub_width_callout_names_the_fit_up_step_that_takes_up_the_stack() -> None:
-    """r5 Opus C2 (rule 19): 20 hubs at +0.05/0 can run 1.0 long; the sheet
-    names the MHA-CH-00 step whose stack acceptance re-faces a long stack."""
-    import ch_channel_assembly_steps as channel_steps
-    import draw_ch_channel_assembly as channel_sheet
-    import rocker_bank_layout as bank
-
-    key = drawing.ROCKER_STACK_STEP_KEY
-    assert drawing.HUB_LENGTH_TEXT.startswith(ch_rocker_arm_notes.HUB_LENGTH_CALLOUT)
-    assert drawing.HUB_LENGTH_TEXT.endswith(f"PER\n{channel_steps.step_ref(key)}")
-    number = channel_steps.step_number(key)
-    printed = " ".join(channel_sheet.FITUP_STEPS.split())
-    step = printed.split(f" {number}. ", 1)[1].split(f" {number + 1}. ", 1)[0]
-    assert "RE-FACE A LONG STACK" in step
-    # The MHA-CH-00 fitter package prints the acceptance band on the rocker
-    # bank view's native stack dimension (drawing policy: no limits in note
-    # text), so the step names that dimension and the dimension carries
-    # STACK_L20_ACCEPT.
-    asm = channel_sheet.asm
-    assert "TO THE ROCKER BANK VIEW'S STACK DIMENSION" in step
-    lower, upper = asm.DIMENSION_TOLERANCES[asm.STACK_LENGTH_DIMENSION]
-    nominal = asm.PIVOT_CHAIN_Z[3] - asm.PIVOT_CHAIN_Z[2]
-    assert (nominal + lower, nominal + upper) == pytest.approx(bank.STACK_L20_ACCEPT)
-
-
 def test_rod_drill_callout_prints_the_limits_it_exports() -> None:
     # The callout's printed size is the #47 drill's exact decimal, so its
     # DRILLED HOLES +.004/0 limits are the exported ones and admit the drill.
@@ -272,7 +247,7 @@ def test_native_gdt_and_finish_present() -> None:
 
 
 def test_profile_nominals_are_kept_natively_without_note_only_duplicates() -> None:
-    names = {"TopRadius", "BottomRadius", "TopAbovePivot"}
+    names = {"TopRadius", "BottomRadius", "TopAbovePivot", "BottomBelowPivot"}
     assert drawing.BASIC_PROFILE_DIMENSIONS == names
     assert names <= drawing.FRONT_KEEP.keys()
     assert not hasattr(drawing, "NOTE_ONLY_DIMENSIONS")
@@ -473,13 +448,13 @@ def _profile_annotations(monkeypatch: pytest.MonkeyPatch, displays: dict) -> lis
     ]
 
 
-def test_basic_profile_dimensions_converts_all_three_nominals_only(
+def test_basic_profile_dimensions_converts_all_four_nominals_only(
     bound: None, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     adapter = object()
     displays = {
         name: _ProfileDisplay()
-        for name in ("TopRadius", "BottomRadius", "TopAbovePivot", "PivotDia")
+        for name in ("TopRadius", "BottomRadius", "TopAbovePivot", "BottomBelowPivot", "PivotDia")
     }
     annotations = _profile_annotations(monkeypatch, displays)
     calls = []
@@ -490,38 +465,25 @@ def test_basic_profile_dimensions_converts_all_three_nominals_only(
     drawing._basic_profile_dimensions(adapter, annotations)
     assert calls == [
         ((adapter, displays[name]), {"label": f"arc-system {name}"})
-        for name in ("TopRadius", "BottomRadius", "TopAbovePivot")
+        for name in ("TopRadius", "BottomRadius", "TopAbovePivot", "BottomBelowPivot")
     ]
     # Leader dressing is _dress_arc_radii's job, not the BASIC conversion's.
     assert all(display.writes == [] for display in displays.values())
 
 
-@pytest.mark.parametrize("missing", ["TopRadius", "BottomRadius", "TopAbovePivot"])
+@pytest.mark.parametrize("missing", ["TopRadius", "BottomRadius", "TopAbovePivot", "BottomBelowPivot"])
 def test_basic_profile_dimensions_rejects_each_missing_nominal(
     bound: None, monkeypatch: pytest.MonkeyPatch, missing: str,
 ) -> None:
     displays = {
         name: _ProfileDisplay()
-        for name in ("TopRadius", "BottomRadius", "TopAbovePivot")
+        for name in ("TopRadius", "BottomRadius", "TopAbovePivot", "BottomBelowPivot")
         if name != missing
     }
     annotations = _profile_annotations(monkeypatch, displays)
     monkeypatch.setattr(drawing, "set_basic_dimension", lambda *_args, **_kwargs: None)
     with pytest.raises(RuntimeError, match=f"BASIC dimensions missing:.*{missing}"):
         drawing._basic_profile_dimensions(object(), annotations)
-
-
-@pytest.mark.parametrize("radius", ["TopRadius", "BottomRadius"])
-def test_dress_arc_radii_rejects_an_unpersisted_centre_callout(
-    bound: None, monkeypatch: pytest.MonkeyPatch, radius: str,
-) -> None:
-    displays = {
-        name: _ProfileDisplay("text" if name == radius else None)
-        for name in ("TopRadius", "BottomRadius")
-    }
-    annotations = _profile_annotations(monkeypatch, displays)
-    with pytest.raises(RuntimeError, match="did not persist"):
-        drawing._dress_arc_radii(object(), annotations)
 
 
 @pytest.mark.parametrize("missing", ["TopRadius", "BottomRadius"])
@@ -2110,6 +2072,7 @@ def test_build_keeps_pivot_out_of_strict_part_precision() -> None:
     ))
     assert set(precision) == {
         "TopAbovePivot",
+        "BottomBelowPivot",
         "HubLength",
         "StrapThickness",
         "HubRootRadius",
@@ -2855,9 +2818,9 @@ def test_front_native_process_keeps_the_nominal_token_and_model_bore_band(
     before = {name: display.model.SystemValue for name, display in displays.items()}
     drawing._dress_detail_dimensions(adapter, [display.GetAnnotation() for display in displays.values()], keep={**drawing.HUB_KEEP, **drawing.END_KEEP})
     pivot = displays["PivotDia"]
-    assert pivot.text[1].startswith("REAM ")
-    assert "<MOD-DIAM>" in pivot.text[1]
-    assert pivot.text[2] == " THRU"
+    # Size, then process, then depth (rule 26): REAM THRU follows the limits.
+    assert not any(part == 1 for part, _text in pivot.writes)
+    assert pivot.text[2] == " REAM THRU"
     assert not any(part == 0 for part, _text in pivot.writes)
     assert not any(nominal in text for _part, text in pivot.writes for nominal in (
         "6.50", "5.588", "10.20", "+0.03",
@@ -2876,11 +2839,9 @@ def test_front_native_process_keeps_the_nominal_token_and_model_bore_band(
     assert angle.ShowDimensionValue is True
     assert not any(part == 0 for part, _text in angle.writes)
     assert pivot.ShowDimensionValue is True
-    # The ream band reads as clearance on its named mate (MR #1020).
+    # The ream band names its mate (MR #1020; rule 4).
     assert (pivot.text[3], pivot.text[4]) == ("<native-upper>", ch_rocker_arm_notes.PIVOT_FIT_CALLOUT)
-    assert ch_rocker_arm_notes.PIVOT_FIT_CALLOUT == (
-        "(.0060-.0078 DIAMETRAL\nCLEARANCE ON PIVOT\nSHAFT MHA-CH-05)"
-    )
+    assert "MHA-CH-05" in ch_rocker_arm_notes.PIVOT_FIT_CALLOUT
 
 
 @pytest.mark.parametrize("name", ["PivotDia", "RodTipLen", "HubDia", "TipLandAngle"])
@@ -2940,7 +2901,7 @@ def test_tip_angle_native_dressing_refuses_wrong_kind_and_ignored_setters(monkey
         )
 
 
-@pytest.mark.parametrize("ignored", ["prefix", "suffix", "hub_precision", "fit_callout"])
+@pytest.mark.parametrize("ignored", ["suffix", "hub_precision", "fit_callout"])
 def test_front_native_dressing_rejects_ignored_text_or_lost_hub_precision(
     monkeypatch: pytest.MonkeyPatch, ignored: str,
 ) -> None:
@@ -2950,7 +2911,7 @@ def test_front_native_dressing_rejects_ignored_text_or_lost_hub_precision(
     elif ignored == "fit_callout":
         displays["PivotDia"].ignored_text = 4
     else:
-        displays["PivotDia"].ignored_text = 1 if ignored == "prefix" else 2
+        displays["PivotDia"].ignored_text = 2
     with pytest.raises(RuntimeError):
         drawing._dress_detail_dimensions(adapter, [display.GetAnnotation() for display in displays.values()], keep=drawing.HUB_KEEP)
 
@@ -3090,8 +3051,7 @@ def test_outline_dimensions_measure_real_endpoints_and_choose_exact_positive_z_l
     assert locator.model.GetToleranceType() == 1
     assert locator.ShowDimensionValue is True
     assert locator.text[1] == locator.text[2] == ""
-    assert locator.text[4] == drawing.LAND_LABEL == "LAND"
-    assert locator.writes[-2:] == [(4, ""), (4, "LAND")]
+    assert locator.text[4] == ""
     assert locator.MaxWitnessLineLength == drawing.TAPER_WITNESS_LENGTH
     # The J land's mirrored BASIC LAND row from the same centred A (main-r1).
     assert left_land["orientation"] == "horizontal"
@@ -3104,7 +3064,6 @@ def test_outline_dimensions_measure_real_endpoints_and_choose_exact_positive_z_l
     assert left_locator.arc_conditions[1] == 1
     assert left_locator.model.GetToleranceType() == 1
     assert left_locator.text[1] == left_locator.text[2] == ""
-    assert left_locator.writes[-2:] == [(4, ""), (4, "LAND")]
     assert left_locator.MaxWitnessLineLength == drawing.TAPER_WITNESS_LENGTH
     width_display = state.displays["rocker overall width"]
     assert (width_display.text[1], width_display.text[2]) == ("(", ")")
@@ -3114,8 +3073,7 @@ def test_outline_dimensions_measure_real_endpoints_and_choose_exact_positive_z_l
         display = state.displays[label]
         assert display.arc_conditions[1] == 1
         assert display.model.GetToleranceType() == 1
-        assert display.text[4] == drawing.TAPER_LABEL == "R32.126/TAPER"
-        assert display.writes[-1] == (4, drawing.TAPER_LABEL)
+        assert display.text[4] == ""
         assert display.MaxWitnessLineLength == drawing.TAPER_WITNESS_LENGTH
 
 
@@ -3170,7 +3128,7 @@ def test_land_locator_final_rebuild_readback_and_exact_front_census(
     elif defect == "basic":
         display.tolerance_type = 0
     elif defect == "text":
-        display.text[4] = ""
+        display.text[4] = "LAND"
     elif defect == "hidden-value":
         display.ShowDimensionValue = False
     elif defect == "reference":
@@ -5306,8 +5264,8 @@ def test_bound_view_annotations_preserves_native_exception_identity_and_read_ord
 
 
 @pytest.mark.parametrize("axis", ["X", "Y"])
-@pytest.mark.parametrize("defect", [None, "wrong", "attachment", "uncentred", "basic", "text"])
-def test_pin_coordinates_are_native_centred_basic_with_labels_after_boxing(monkeypatch, axis, defect):
+@pytest.mark.parametrize("defect", [None, "wrong", "attachment", "uncentred", "basic"])
+def test_pin_coordinates_are_native_centred_basic_without_words(monkeypatch, axis, defect):
     import _drawing_edge_dimensions
     adapter, _imported = _imported_native_quantities(monkeypatch)
     pivot, rod = object(), object()
@@ -5330,8 +5288,6 @@ def test_pin_coordinates_are_native_centred_basic_with_labels_after_boxing(monke
                 display.model.SetArcEndCondition = lambda *_a: 0
             elif defect == "basic":
                 display.model.SetToleranceType = lambda _kind: True
-            elif defect == "text":
-                display.ignored_text = 4
         displays[current_axis] = display
         return display
     monkeypatch.setattr(drawing, "add_edge_dimension", create)
@@ -5340,8 +5296,7 @@ def test_pin_coordinates_are_native_centred_basic_with_labels_after_boxing(monke
         for display in displays.values():
             assert display.arc_conditions == {1: 1, 2: 1}
             assert display.model.GetToleranceType() == 1
-            assert display.text[4] == "PIN AXIS"
-            assert display.writes[-2:] == [(4, ""), (4, "PIN AXIS")]
+            assert display.text[4] == ""
     else:
         with pytest.raises(RuntimeError):
             drawing._add_pin_coordinates(adapter, object())

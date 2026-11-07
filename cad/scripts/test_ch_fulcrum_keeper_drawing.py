@@ -9,8 +9,8 @@ from pathlib import Path
 import pytest
 
 import build_ch_fulcrum_keeper as part
-import ch_channel_assembly_steps as steps
 import draw_ch_fulcrum_keeper as drawing
+import ch_fulcrum_keeper_notes
 import ch_fulcrum_keeper_spec
 import _config
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -69,21 +69,6 @@ def test_geometry_matches_the_top_frame_contract() -> None:
     # spacing, that covers the faced rail seats' flatness (ch_fulcrum_shaft_spec).
     assert spec.BORE_DIA == 6.35
     assert spec.BORE_DIA_BAND == (0.0508, 0.0381)  # (upper, lower)
-    # The mate is the OTHER keeper of the pair, which the quantity note states.
-    # MR-fleet r1: the supply condition -- no bore until the pair-ream, the
-    # crown rounded after it -- is on the two callouts.
-    pair_ream = " ".join(spec.BORE_PAIR_CALLOUT.split())
-    assert pair_ream.startswith(
-        "SUPPLIED UNDRILLED; PAIR-REAM WITH THE OTHER MHA-CH-07"
-    )
-    assert f"(NOTE {spec.QUANTITY_NOTE}) AT INSTALLED SPACING" in pair_ream
-    assert "AT INSTALLED SPACING; THE MHA-CH-04 SHAFT SLIDES THROUGH BOTH" in pair_ream
-    assert " ".join(spec.CROWN_ROUND_CALLOUT.split()) == (
-        "FULL ROUND TANGENT TO BOTH SIDES, CENTER AT BORE HEIGHT"
-    )
-    notes = spec.DRAWING_NOTES.splitlines()
-    quantity = [line for line in notes if "2 REQUIRED" in line]
-    assert len(quantity) == 1 and quantity[0].startswith(f"{spec.QUANTITY_NOTE}. ")
 
 
 def test_crown_set_screw_tap_stops_at_the_bore() -> None:
@@ -139,7 +124,8 @@ def test_rule_12_worst_case_walls_and_thread() -> None:
 def test_side_station_names_the_frame_tap_and_the_web_needs_xx() -> None:
     spec = ch_fulcrum_keeper_spec
     frame = _config.parts("fr-top-frame")["number"]
-    assert frame in drawing.TOP_CALLOUTS["ScrewFromSide"]
+    # The .XXX side station's reason rides the foot-hole callout (rule 7).
+    assert frame in ch_fulcrum_keeper_notes.FOOT_HOLE_MATE
     # At .X (+-.1 for .XX's +-.01 on both the lug and the tap station) the
     # outer web would fall under the 1.5 floor.
     bands = spec._BAND_BY_PLACES
@@ -400,22 +386,28 @@ def test_fitup_exports_for_the_top_frame() -> None:
     )
 
 
-def test_print_carries_no_datums_or_frames_and_cites_the_fitup_steps() -> None:
-    # Policy: brackets carry no GD&T; the bore pair's coaxiality is a named
-    # step (F5) and the set-screw lock is a staked mouth (F6).
+def test_print_carries_no_datums_or_frames_and_no_assembly_steps() -> None:
+    # Policy: brackets carry no GD&T; the bore pair's coaxiality is the
+    # line-ream at assembly and the set-screw lock is MHA-CH-00's staking
+    # step, which the part sheet does not cite (rule 7).
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "add_datum_feature" not in source
     assert "add_feature_control_frame" not in source
     assert not hasattr(ch_fulcrum_keeper_spec, "GEOMETRIC_TOLERANCES_MM")
-    pair_ream = steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"].endswith(f"PER {pair_ream}")
-    assert drawing.DIMENSION_CALLOUTS["CrownRadius"].endswith(f"PER {pair_ream}")
-    assert steps.step_ref(steps.SET_SCREWS_STAKED_KEY) in drawing.SET_SCREW_QUALIFIER
-    # MR-fleet r2/r3: supplied undrilled, the crown tap that stops at the bore
-    # is cut after the pair-ream, on the bore's axis; the native sizes lead.
+    printed = " ".join((
+        *drawing.DIMENSION_CALLOUTS.values(),
+        drawing.SET_SCREW_QUALIFIER,
+        ch_fulcrum_keeper_notes.FOOT_HOLE_MATE,
+        ch_fulcrum_keeper_notes.DRAWING_NOTES,
+    ))
+    assert "MHA-CH-00" not in printed and "STEP" not in printed
+    # Supplied undrilled, the crown tap that stops at the bore is cut after
+    # the line-ream; the native sizes lead.
     assert drawing.SET_SCREW_EXTENT == "TO BORE"
-    assert drawing.SET_SCREW_QUALIFIER.splitlines()[0] == "ON BORE AXIS AFTER REAM;"
-    assert "STAKE AT ASSEMBLY PER" in drawing.SET_SCREW_QUALIFIER
+    # Rule 7: at most two rows of words under each callout's sizes.
+    for rows in (drawing.DIMENSION_CALLOUTS["BoreDia"], drawing.DIMENSION_CALLOUTS["CrownRadius"],
+                 drawing.SET_SCREW_QUALIFIER, ch_fulcrum_keeper_notes.FOOT_HOLE_MATE):
+        assert len(rows.splitlines()) <= 2
 
 
 _NATIVE_TAP = {
@@ -426,7 +418,7 @@ _NATIVE_TAP = {
 }
 
 
-def test_tap_callout_says_to_bore_and_closes_with_place_and_staking() -> None:
+def test_tap_callout_says_to_bore_and_closes_with_mate_and_stage() -> None:
     updated = drawing.set_screw_callout_definitions(dict(_NATIVE_TAP))
     assert updated[7] == "<MOD-DIAM><hw-thrutapdrldia> TO BORE"
     assert updated[5] == f"<hw-threaddesc> TO BORE\n{drawing.SET_SCREW_QUALIFIER}"
@@ -654,12 +646,23 @@ def _value_block(xy, value, callout):
 
 def _tap_rows() -> list[str]:
     """The crown-tap callout as printed: native drill and thread rows (TO
-    BORE, no class), then the place, stage and staking rows."""
+    BORE, no class), then the mate and stage rows."""
     extent = drawing.SET_SCREW_EXTENT
     return [
         f"Ø 1.51 {extent}",
         f"1-72 UNF {extent}",
         *drawing.SET_SCREW_QUALIFIER.splitlines(),
+    ]
+
+
+def _foot_hole_rows() -> list[str]:
+    """The foot-hole callout as printed: DRILL on its own row, the through
+    and counterbore rows, then the mate rows."""
+    return [
+        drawing.FOOT_HOLE_PROCESS.strip(),
+        "Ø .094 THRU ALL",
+        "⌴ Ø .150 ↧ .083",
+        *ch_fulcrum_keeper_notes.FOOT_HOLE_MATE.splitlines(),
     ]
 
 
@@ -697,10 +700,10 @@ def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
     notes_top = drawing.NOTES_TOP
     notes = Box(0.020, notes_top - 5 * _PITCH, 0.182, notes_top)
     overall_length = _text_block(drawing.FRONT_KEEP["OverallLength"], ["16.50"])
-    foot_hole = Box(0.1035, 0.1945, 0.1469, 0.2095)  # r13 printed + DRILL row
+    foot_hole = _text_block(drawing.FOOT_HOLE_CALLOUT_XY, _foot_hole_rows())
     tap = _text_block(drawing.SET_SCREW_CALLOUT_XY, _tap_rows())
     keeps = {**drawing.FRONT_KEEP, **drawing.TOP_KEEP}
-    callouts = {**drawing.FRONT_CALLOUTS, **drawing.TOP_CALLOUTS}
+    callouts = dict(drawing.FRONT_CALLOUTS)
     values = {
         "SetScrewLocation": "4.00",
         "LugThickness": "8.00",
@@ -800,15 +803,44 @@ def test_tap_callout_stands_inside_the_border_clear_of_the_plan() -> None:
     )
     station = "SetScrewLocation"
     set_screw_location = _value_block(drawing.TOP_KEEP[station], "4.00", "")
-    foot_hole = Box(0.1035, 0.1945, 0.1469, 0.2095)  # r13 printed + DRILL row
+    foot_hole = _text_block(drawing.FOOT_HOLE_CALLOUT_XY, _foot_hole_rows())
     for other in (plan, set_screw_location, foot_hole):
         assert _box_gap(block, other) >= _AIR, other
     bend = (block.xmax + _SHOULDER_RUN, block.ymin)
     leader = Segment(*bend, drawing.TAP_X_SHEET, cy - drawing.TAP_R_SHEET)
-    foot_hole_leader = Segment(0.1035592, 0.1963903, 0.1146083, 0.224464)  # r13 printed
-    assert _segment_crossing(leader, foot_hole_leader) is None
+    assert _segment_crossing(leader, _foot_hole_leader()) is None
     assert point_segment_distance((foot_hole.xmin, foot_hole.ymin), leader) >= 0.003
     assert point_segment_distance((plan.xmin, plan.ymin), leader) >= 0.003
+
+
+def _foot_hole_leader():
+    """Native hangs the shoulder under the last row and points the arrow at
+    the counterbore rim facing the shoulder's end."""
+    from _layout_geometry import Segment
+
+    block = _text_block(drawing.FOOT_HOLE_CALLOUT_XY, _foot_hole_rows())
+    bend = (block.xmin - _SHOULDER_RUN, block.ymin)
+    centre = (drawing.HOLE_X_SHEET, drawing.TOP_CENTER[1])
+    dx, dy = bend[0] - centre[0], bend[1] - centre[1]
+    scale = drawing.CBORE_R_SHEET / math.hypot(dx, dy)
+    return Segment(*bend, centre[0] + dx * scale, centre[1] + dy * scale)
+
+
+def test_foot_hole_leader_climbs_left_of_its_own_upper_rows() -> None:
+    # The mate rows widen the block downward, so the shoulder under the last
+    # row stands left of every row above it and the leader clears them.
+    from _layout_geometry import Box, segment_box_distance
+
+    rows = _foot_hole_rows()
+    assert [len(row) for row in rows] == sorted(len(row) for row in rows)
+    block = _text_block(drawing.FOOT_HOLE_CALLOUT_XY, rows)
+    leader = _foot_hole_leader()
+    for index, row in enumerate(rows[:-1]):
+        top = block.ymax - index * _PITCH
+        half = len(row) * _CHAR / 2.0
+        cx = drawing.FOOT_HOLE_CALLOUT_XY[0]
+        box = Box(cx - half, top - _CAP, cx + half, top)
+        assert segment_box_distance(leader, box) >= 0.001, row
 
 
 def test_the_auto_tapped_hole_note_is_removed() -> None:
@@ -818,13 +850,14 @@ def test_the_auto_tapped_hole_note_is_removed() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'redundant_note_substrings=("Tapped Hole",)' in source
     assert "expected_redundant_notes=1" in source
-    assert "tapped hole" not in ch_fulcrum_keeper_spec.DRAWING_NOTES.lower()
+    assert "tapped hole" not in ch_fulcrum_keeper_notes.DRAWING_NOTES.lower()
 
 
-def test_foot_hole_callout_says_drill_above_its_through_row() -> None:
+def test_foot_hole_callout_says_drill_above_and_its_mates_below() -> None:
     # MR-fleet r6 (rule 12): "Ø2.39 THRU ALL" left drill against ream unsaid.
     # r7 (cc1a81a): the Prefix part is the counterbore row, so DRILL printed
     # ahead of the counterbore; it belongs on its own row over the THRU part.
+    # The mates close the callout from its CalloutBelow part.
     native = {
         5: "<HOLE-SPOT><MOD-DIAM><hw-cbdiam> <HOLE-DEPTH><hw-cbdepth>",
         6: "",
@@ -832,7 +865,11 @@ def test_foot_hole_callout_says_drill_above_its_through_row() -> None:
         8: "",
     }
     updated = drawing.foot_hole_callout_definitions(native)
-    assert updated == {**native, 7: "DRILL\n<MOD-DIAM><hw-diam> <hw-thru>"}
+    assert updated == {
+        **native,
+        7: "DRILL\n<MOD-DIAM><hw-diam> <hw-thru>",
+        8: ch_fulcrum_keeper_notes.FOOT_HOLE_MATE,
+    }
     with pytest.raises(RuntimeError, match="THRU row"):
         drawing.foot_hole_callout_definitions({**native, 5: native[7]})
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -840,18 +877,20 @@ def test_foot_hole_callout_says_drill_above_its_through_row() -> None:
     assert 'label="keeper foot screw hole",\n    )' in source
 
 
-def test_notes_cover_the_tap_the_screw_and_the_quantity() -> None:
-    notes = ch_fulcrum_keeper_spec.DRAWING_NOTES
+def test_notes_and_callouts_name_each_mate_once() -> None:
+    notes = ch_fulcrum_keeper_notes.DRAWING_NOTES
     # The material is the title block's MATERIAL cell (rule 2; baseline
     # review: a material note restated it).
     assert "MATERIAL" not in notes and "1018" not in notes
     # The finish is the title block's Finish field; the note does not restate it.
     assert "BLACK OXIDE" not in notes.upper()
-    # The pair ream is on the bore callout (KEEPERS_PAIR_REAMED_KEY), not a note.
+    # The line-ream is on the bore callout, not a note.
     assert "REAM" not in notes
-    assert "MHA-CH-04" in notes
-    assert "MHA-CH-VN-55" in notes
-    assert "MHA-CH-VN-52 #2-56 FILLISTER" in notes
+    # Each mate rides the feature it serves (rule 4), not a note.
+    assert "MHA-CH-VN-55" in drawing.SET_SCREW_QUALIFIER
+    assert "MHA-CH-VN-52" in ch_fulcrum_keeper_notes.FOOT_HOLE_MATE
+    assert "MHA-CH-04" in drawing.DIMENSION_CALLOUTS["BoreDia"]
+    assert "MHA-CH-VN-55" not in notes and "MHA-CH-VN-52" not in notes
     assert "2 REQUIRED" in notes
     # Rule 7: at most four short lines (#2108 review: five drew a finding).
     assert len(notes.splitlines()) <= 4
@@ -859,13 +898,14 @@ def test_notes_cover_the_tap_the_screw_and_the_quantity() -> None:
     # Codjiflo #2108, rule 20: RV-04's accepted tip wall prints as a plain
     # fact, its full worst case floored to .001.
     spec = ch_fulcrum_keeper_spec
-    assert "FOOT HOLE FOR\n   MHA-CH-VN-52 #2-56 FILLISTER" in notes
     assert f"TIP WALL {spec.FOOT_TIP_WALL_TEXT} MIN." in notes
     assert spec.FOOT_TIP_WALL_TEXT == ".072"
     assert 0.060 * 25.4 <= spec.FOOT_TIP_WALL_WORST_MM < WALL_TARGET_MM
     assert "RULING" not in notes and "EXCEPTION" not in notes
     # MR-fleet r7: a datum-reason note drew three findings of its own.
     assert "INNER LUG FACE" not in notes and "3. " not in notes
+    # The part stamps these notes, not the spec's former prose.
+    assert part.DRAWING_NOTES is notes
 
 
 def test_keeper_is_one_body_with_no_ball() -> None:

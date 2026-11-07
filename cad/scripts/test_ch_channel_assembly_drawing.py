@@ -1008,9 +1008,8 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     spacing, feet on one flat; the actual shaft gauges that line in the
     clamped setup. The pair is then set on the top frame by DRO with the
     shaft through both, and each crown tap's mouth is staked over its set
-    screw (drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads)'s lock). The keeper print points at these steps."""
+    screw (drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads)'s lock). The keeper print says AT ASSEMBLY, citing no step."""
     import ch_fulcrum_keeper_spec as keeper
-    import draw_ch_fulcrum_keeper as keeper_drawing
     from channel_frame_geom import LEVER_FULCRUM_XY
     from frame_column_stations import COLUMN_X
 
@@ -1053,17 +1052,14 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     assert keeper.PAIR_REAMER_REACH_MARGIN_MM > 0.0
     # #1660 r2 (rules 22 and 24): the crown and its tap centre on the bore
     # made here, so the keeper is finished in this step, but its sizes and the
-    # tap's place are the keeper print's (CrownRadius and the crown tap, which
-    # point back at this step); the assembly sheet restates none of them.
+    # tap's place are the keeper print's (CrownRadius and the crown tap, made
+    # AT ASSEMBLY); the assembly sheet restates none of them.
     assert (
         "THEN, ON EACH BORE'S AXIS, FINISH THAT KEEPER'S CROWN AND CROWN TAP "
         f"TO THE {number} DRAWING." in reamed
     )
     for part_data in ("R7.0", "#1-72", " PIN ", "CROWN TOP", "9.8", "10.6"):
         assert part_data not in reamed
-    assert keeper_drawing.DIMENSION_CALLOUTS["CrownRadius"].endswith(
-        f"PER {steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)}"
-    )
     # #1660 r2 (rule 19): the lever bank has no stack fit-up because it needs
     # none. Twenty hubs at the top of their band leave end play at the
     # shortest lug span the two inner-face bands allow, and the bars on the
@@ -1146,15 +1142,6 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     assert "TRANSFER EACH FOOT HOLE INTO THE RAIL" in fitted
     staked = _step_body(steps.SET_SCREWS_STAKED_KEY)
     assert "STAKE EACH TAP MOUTH AT 2 POINTS" in staked
-    # The keeper print cites these steps by key.
-    assert keeper_drawing.DIMENSION_CALLOUTS["BoreDia"].endswith(
-        f"PER {steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)}"
-    )
-    assert keeper_drawing.DIMENSION_CALLOUTS["CrownRadius"].endswith(
-        f"PER {steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)}"
-    )
-    staking = steps.step_ref(steps.SET_SCREWS_STAKED_KEY)
-    assert staking in keeper_drawing.SET_SCREW_QUALIFIER
 
 
 def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
