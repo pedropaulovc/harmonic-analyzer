@@ -174,7 +174,7 @@ def test_reference_entry_pays_published_fillet_and_the_transferred_tap_axis() ->
     # The tap's location on the arm, through the plate hole's own zone and
     # the dowels' relative travel, stays inside the radius the arm's walls pay.
     location = (
-        plate.REDUCER_POSITION_RADIUS
+        plate.SCREW_HOLE_POSITION_RADIUS_MM
         + registration.LOCATOR_GEAR_PLANE_TRAVEL_MAX_MM / 2.0
         + centring
         + (arm.THICKNESS + arm.THICKNESS_BAND) * math.tan(tilt)

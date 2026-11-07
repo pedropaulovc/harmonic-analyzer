@@ -176,11 +176,6 @@ CSK_HALF_ANGLE_LIMITS_RAD = tuple(
     math.radians((CSK_ANGLE_DEG + sign * CSK_ANGLE_BAND_DEG) / 2.0)
     for sign in (-1.0, 1.0)
 )
-# Each screw hole's projected zone (P .276) starts at face A and runs into the
-# arm MHA-PD-18, the mate's side (ASME Y14.5 projected tolerance zone;
-# coordinator ruling 2026-10-27, #2017): the 7.0 mm reach rounded UP to the
-# inch sheet's .001 grid, as the frame prints it.
-CLAMP_PLATE_PROJECTED_HEIGHT_MM = 7.0104  # .276
 CSK_DIA_DEVIATIONS_MM = printed_deviations(CSK_DIA, CSK_DIA_PLACES, unit=UNIT)
 CSK_DIA_LIMITS_MM = tuple(CSK_DIA + deviation for deviation in CSK_DIA_DEVIATIONS_MM)
 CSK_DEPTH = (
@@ -224,14 +219,58 @@ WALL_TARGET = ARM.WALL_TARGET
 # Actual rounded diameter and angular limits control every cone cut and
 # the shortest-stock head seat, not symmetric bands around an unprinted model.
 CSK_DIA_BAND = printed_band_mm(CSK_DIA_PLACES, unit=UNIT)
-# Each cone is coaxial with its hole (the plan's 2X CSK callout). The zone
-# lies outside the plate, so inside it each axis is the zone's straight
-# extension: tilted at most D/H, and off true position by at most the zone
-# radius plus that tilt over the height above face A. The floor pays two
-# independent such radii (cone and hole) at the deepest stock's rear face,
-# with no coaxial credit.
-# Pay the cone rim's vertical lever and its shallowest global generatrix.
-_CSK_AXIS_TILT_MAX_RAD = math.atan(REDUCER_POSITION_DIAMETER / CLAMP_PLATE_PROJECTED_HEIGHT_MM)
+# Each screw hole prints a plain position frame at the drilled-hole location
+# row (drawing-guidelines.md shop table: ±.005 from its datum, Ø.014 as a
+# diametral zone): the arm's plate taps are spotted through these holes at
+# assembly with the plate doweled on, so the holes are the joint's master
+# and need no reamed-pattern zone (fan-out Q2-A and L1; rule 26 bars the
+# projected-zone modifier; delegated ruling 2026-11-07 (Main), no
+# precedent; owner review #2144; pending owner confirmation).  The frame
+# holds the hole's axis inside the zone over the drilled cylinder, face A to
+# the cone's floor; the drill's own run-off (ARM.DRILL_RUN_OFF_DEG, #2000
+# holds the method) bounds its tilt, so past the floor the axis runs on at
+# that tilt over the shortest such cylinder (the thinnest stock less the
+# deepest cone).  Each cone is coaxial with its hole (one hole callout
+# carries both); the floor pays two independent such radii (cone and hole)
+# at the deepest stock's rear face, with no coaxial credit, and the cone
+# rim's vertical lever and its shallowest global generatrix.  The deepest
+# cone depends on the axis radius, the radius on the cylinder that cone
+# leaves: both settle together.
+SCREW_HOLE_POSITION_DIAMETER_MM = 0.3556  # Ø.014
+SCREW_HOLE_POSITION_RADIUS_MM = SCREW_HOLE_POSITION_DIAMETER_MM / 2.0
+_CSK_AXIS_TILT_MAX_RAD = math.radians(ARM.DRILL_RUN_OFF_DEG)
+_THINNEST_STOCK_MM = THICKNESS_OVER_ARM - THICKNESS_OVER_ARM_BAND
+_DEEPEST_STOCK_MM = THICKNESS_OVER_ARM + THICKNESS_OVER_ARM_BAND
+
+
+def _axis_radius_at(height_mm: float, zone_length_mm: float) -> float:
+    """Axis offset bound at ``height_mm`` above face A for a zone held over
+    ``zone_length_mm`` from face A."""
+    return SCREW_HOLE_POSITION_RADIUS_MM + max(0.0, height_mm - zone_length_mm) * math.tan(
+        _CSK_AXIS_TILT_MAX_RAD
+    )
+
+
+def _deepest_cone_mm(zone_length_mm: float) -> float:
+    radius = _axis_radius_at(_DEEPEST_STOCK_MM, zone_length_mm)
+    return (
+        ((CSK_DIA_LIMITS_MM[1] - SCREW_HOLE_DIA) / 2.0 + 2.0 * radius)
+        / math.tan(CSK_HALF_ANGLE_LIMITS_RAD[0] - _CSK_AXIS_TILT_MAX_RAD)
+        + CSK_DIA_LIMITS_MM[1] / 2.0 * math.sin(_CSK_AXIS_TILT_MAX_RAD)
+    )
+
+
+_zone_length = _THINNEST_STOCK_MM - CSK_DEPTH
+for _pass in range(50):
+    _next = _THINNEST_STOCK_MM - _deepest_cone_mm(_zone_length)
+    if not _next > 0.0:
+        raise AssertionError("the deepest cone leaves no drilled cylinder for the frame")
+    if abs(_next - _zone_length) < 1e-12:
+        break
+    _zone_length = _next
+else:
+    raise AssertionError("the screw holes' zone length and cone depth did not settle")
+SCREW_HOLE_ZONE_LENGTH_MIN_MM = _next
 
 
 def screw_axis_radius_mm(height_mm: float) -> float:
@@ -239,17 +278,11 @@ def screw_axis_radius_mm(height_mm: float) -> float:
     at ``height_mm`` above face A, inside the plate."""
     if height_mm < 0.0:
         raise ValueError("inside the plate is above face A")
-    return REDUCER_POSITION_RADIUS + height_mm * math.tan(_CSK_AXIS_TILT_MAX_RAD)
+    return _axis_radius_at(height_mm, SCREW_HOLE_ZONE_LENGTH_MIN_MM)
 
 
-SCREW_AXIS_RADIUS_IN_PLATE_MM = screw_axis_radius_mm(
-    THICKNESS_OVER_ARM + THICKNESS_OVER_ARM_BAND
-)
-_CSK_DEPTH_MAX = (
-    ((CSK_DIA_LIMITS_MM[1] - SCREW_HOLE_DIA) / 2.0 + 2.0 * SCREW_AXIS_RADIUS_IN_PLATE_MM)
-    / math.tan(CSK_HALF_ANGLE_LIMITS_RAD[0] - _CSK_AXIS_TILT_MAX_RAD)
-    + CSK_DIA_LIMITS_MM[1] / 2.0 * math.sin(_CSK_AXIS_TILT_MAX_RAD)
-)
+SCREW_AXIS_RADIUS_IN_PLATE_MM = screw_axis_radius_mm(_DEEPEST_STOCK_MM)
+_CSK_DEPTH_MAX = _deepest_cone_mm(SCREW_HOLE_ZONE_LENGTH_MIN_MM)
 # Full worst-case wall terms (enforce brief 2026-10-26). The title block's
 # R0.25 / C0.25 MAX edge break, on each exposed edge at a wall (the arm's
 # constant). Drill run-off of 0.3 deg (#2000 holds the method) wherever a

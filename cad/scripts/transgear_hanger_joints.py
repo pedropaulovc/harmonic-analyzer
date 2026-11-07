@@ -209,10 +209,12 @@ _HEAD_RADIUS_MAX = PLATE_SCREW.HEAD_RADIUS_FROM_THREAD_AXIS_MAX_MM
 _TAP_STOCK_MIN = ARM.THICKNESS - ARM.THICKNESS_BAND
 _TAP_TRANSFER_CENTRING_RADIUS_MM = PLATE.DRILL_GROWTH / 2.0
 _TAP_AXIS_TILT_MAX = math.radians(ARM.DRILL_RUN_OFF_DEG)
-# The tap's location on the arm, through the plate hole's own zone and the
-# dowels' relative travel, must sit inside the radius the arm's walls pay.
+# The tap's location on the arm, through the plate hole's own position zone
+# (its axis anywhere in it over the hole's length, the arm face included)
+# and the dowels' relative travel, must sit inside the radius the arm's
+# walls pay.
 PLATE_TAP_LOCATION_RADIUS_MAX_MM = (
-    PLATE.REDUCER_POSITION_RADIUS
+    PLATE.SCREW_HOLE_POSITION_RADIUS_MM
     + REGISTRATION.LOCATOR_GEAR_PLANE_TRAVEL_MAX_MM / 2.0
     + _TAP_TRANSFER_CENTRING_RADIUS_MM
     + (ARM.THICKNESS + ARM.THICKNESS_BAND) * math.tan(_TAP_AXIS_TILT_MAX)
