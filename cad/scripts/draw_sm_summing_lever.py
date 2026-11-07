@@ -101,6 +101,7 @@ from sm_summing_lever_notes import (
     DRAWING_DIMENSIONS,
     FRONT_VIEW_LETTER,
     SPRING_ROW_LOCATORS,
+    SPRING_TAP_CALLOUT_BELOW,
     SPRING_TAP_PRECISION,
     RECEIVER_ISOMETRIC_OCTANT,
 )
@@ -1911,6 +1912,26 @@ def _dress_bracket_depth_callout(callout: Any) -> None:
         raise RuntimeError(f"bracket tap callout omits native depths: {required_depths}")
 
 
+def _set_callout_below(display: Any, text: str, *, label: str) -> None:
+    """Write ``text`` under a native hole callout and read it back.
+
+    swDimensionTextCalloutBelowDefinition (8) pairs with the writable
+    swDimensionTextCalloutBelow (4); the prefix, size and depth definitions
+    stay untouched, so the Hole Wizard variables stay associative
+    (draw_sm_gooseneck._set_tap_callout_below)."""
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    below = definitions[8].replace("\r", "").rstrip()
+    updated = f"{below}\n{text}" if below else text
+    display.SetText(4, updated)
+    if str(display.GetText(8) or "").replace("\r", "") != updated or any(
+        str(display.GetText(part) or "") != definitions[part] for part in (5, 6, 7)
+    ):
+        raise RuntimeError(
+            f"{label} callout row or native definitions did not persist: "
+            f"{[str(display.GetText(part) or '') for part in (5, 6, 7, 8)]!r}"
+        )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -2206,6 +2227,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hole_callout_precision(
         spring_callout, SPRING_TAP_PRECISION, label="spring-hole pattern"
     )
+    _set_callout_below(spring_callout, SPRING_TAP_CALLOUT_BELOW, label="spring-hole pattern")
     # The Top view reverses model Z, so -HOLE_Z_FIRST prints the seed hole at
     # the TOP of the column. The frame sits above the +Z trunnion stub with
     # its right stub ending over the rim, so the leader drops just past the

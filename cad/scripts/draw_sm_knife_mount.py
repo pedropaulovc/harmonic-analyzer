@@ -118,7 +118,6 @@ from sm_knife_mount_spec import (
     STUD_TAP_POINT_ANGLE_DEG,
     STUD_TAP_POINT_ANGLE_PLACES,
     STUD_TAP_THREAD_DEPTH,
-    STUD_TAP_THREAD_DEPTH_BAND,
     STUD_TAP_THREAD_DEPTH_PLACES,
     SUPPORT_Z_THICK,
     SURFACE_FINISHES,
@@ -470,20 +469,19 @@ TAP_CALLOUT_TOP_REACH = 0.0084
 # T+H3 (2026-10-24): 20 mm lower again, under datum C's tag (bottom ~196 mm),
 # over the lowered front view's top edge.
 TAP_CALLOUT_XY = (_sheet_x(-BLK_HALF_X) - 0.031, TOP_CENTER[1] - TOP_HALF_Z - 0.038)
-# Each native length the callout prints and its own band, (upper, lower) mm.
-# The full thread's band and the drill depth's are symmetric, +/-.005 and
-# +/-.002.
-TAP_CALLOUT_BANDS: dict[str, tuple[float, tuple[float, float]]] = {
-    "hw-threaddepth": (
-        STUD_TAP_THREAD_DEPTH,
-        (STUD_TAP_THREAD_DEPTH_BAND, -STUD_TAP_THREAD_DEPTH_BAND),
-    ),
+# Each native length the callout prints and its own band, (upper, lower) mm,
+# or None where the title block's .XXX row is the band: the full thread's
+# +/-.005 is that row, so it prints none of its own (rule 2; machinist review
+# round 3, farm run 20261107T121714736Z: ".375±.005" restated the title
+# block).  The drill depth keeps its symmetric +/-.002.
+TAP_CALLOUT_BANDS: dict[str, tuple[float, tuple[float, float] | None]] = {
+    "hw-threaddepth": (STUD_TAP_THREAD_DEPTH, None),
     "hw-tapdrldepth": (
         STUD_TAP_DRILL_DEPTH,
         (STUD_TAP_DRILL_DEPTH_BAND, -STUD_TAP_DRILL_DEPTH_BAND),
     ),
 }
-# Both bands print their deviations at three places, ±.005 and ±.002.
+# The drill depth's band prints its deviations at three places, ±.002.
 TAP_CALLOUT_BAND_PLACES = 3
 # swTolType_e: no band of its own, bilateral, symmetric.
 _TOL_NONE = 0
@@ -795,8 +793,8 @@ def tap_callout_tolerance(band: tuple[float, float]) -> tuple[int, float, float]
 
 
 def _band_tap_callout(callout: Any) -> None:
-    """Author the tap's bands on its hole callout -- the full thread's
-    +/-0.13, the drill depth's +/-0.05 -- and prove the drill point its
+    """Author the tap's bands on its hole callout -- the full thread at the
+    title block's .XXX, the drill depth's +/-0.05 -- and prove the drill point its
     118 deg.  The pilot prints its drill's name, no Ø, so the title block's
     DRILLED HOLES row governs it (``_prove_tap_drill`` read its Ø).
 
@@ -830,6 +828,14 @@ def _band_tap_callout(callout: Any) -> None:
                 f"knife-hanger tap callout {variable_name} reads "
                 f"{actual:g}, expected {nominal:g} mm"
             )
+        if band is None:
+            # The title block's row governs: no band of the callout's own.
+            variable.ToleranceType = _TOL_NONE
+            if int(variable.ToleranceType) != _TOL_NONE:
+                raise RuntimeError(
+                    f"knife-hanger tap callout {variable_name} kept a band of its own"
+                )
+            continue
         kind, lower, upper = tap_callout_tolerance(band)
         variable.ToleranceType = kind
         variable.ToleranceMin = lower / 1000.0

@@ -1514,6 +1514,12 @@ def test_notes_are_short_stated_shortfalls() -> None:
             assert word not in text.upper()
     # The uniform plate retains 1.5D of full #6-32 thread at its lower limit.
     assert notes.SPRING_TAP_ENGAGEMENT_MIN >= 1.5 * notes.SPRING_TAP_MAJOR_DIA
+    # The 20X callout prints that full thread (round 3 read VIEW G's .20 web
+    # as the plate): floored, never rounded up, and still 1.5D.
+    printed = float(notes.SPRING_TAP_CALLOUT_BELOW.split()[2])
+    assert notes.SPRING_TAP_CALLOUT_BELOW == "FULL THREAD .22 MIN"
+    assert printed * 25.4 <= notes.SPRING_TAP_ENGAGEMENT_MIN
+    assert printed >= 1.5 * 0.138
     assert not hasattr(notes, "BRACKET_RECEIVER_NOTE")
     assert "summation anchor position" not in sm_summing_lever_spec.GEOMETRIC_TOLERANCES_MM
 

@@ -398,8 +398,8 @@ def test_end_view_frames_stand_between_the_callout_and_the_views() -> None:
     # inked ~23 mm, centred on the keep, ~5.75 mm a row) end over
     # the tap frame; datum B's tag hangs between the two frames; each frame's
     # right end plus its 6.35 mm shoulder stays left of the end view's
-    # Ø.50 rim, and the frames start right of the section's top dimension
-    # text (r8: to x ~153 mm).
+    # Ø.50 rim, and the frames start right of section A-A's crop (x ~155.4
+    # mm) and its top dimension text (r8: to x ~153 mm).
     centre = (drawing.END_CENTER[0], drawing.ARM_AXIS_Y)
     od_r = geom.TUBE_DIA / 2.0 * drawing._S
     callout_bottom = drawing.TAP_CALLOUT_XY[1] - 3 * 0.00575 / 2.0
@@ -410,7 +410,7 @@ def test_end_view_frames_stand_between_the_callout_and_the_views() -> None:
     assert tag_bottom - 0.0015 >= drawing.COUNTERBORE_FRAME_XY[1]
     assert tag_bottom + drawing.END_DATUM_TAG_BOX < tap_top - row
     for frame in (drawing.TAP_FRAME_XY, drawing.COUNTERBORE_FRAME_XY):
-        assert frame[0] >= 0.155
+        assert frame[0] >= drawing._section_x(drawing.SECTION_CROP_X_MM[1]) + 0.004
         assert frame[0] + drawing.END_FRAME_WIDTH + 0.00635 < centre[0] - od_r - 0.003
     # The two leaders land on opposite sides of the arm axis, so they never
     # cross; the counterbore's under it, the tap's over it.

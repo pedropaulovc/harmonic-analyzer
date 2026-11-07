@@ -12,6 +12,8 @@ offline drawing test.
 
 from __future__ import annotations
 
+import math
+
 # LINEAR_BAND is re-exported for test_ch_vn_spring_hook_drawing (the bracket
 # side's millimetre .XX row); the lever's own plate band is
 # COEFFICIENT_T_DEVIATIONS.
@@ -165,6 +167,13 @@ if SPRING_TAP_ENGAGEMENT_MIN < 1.5 * SPRING_TAP_MAJOR_DIA:
         f"20X {HOLE_SPEC.size} keeps {SPRING_TAP_ENGAGEMENT_MIN:.3f} of full "
         f"thread, under 1.5D"
     )
+# The full thread the plate leaves prints under the 20X callout, floored to
+# .XX: the plate's thickness is on VIEW F (sheet 2), and machinist review
+# round 3 (farm run 20261107T121714736Z, r1) read VIEW G's .20 counter web
+# as the plate and called the taps short of 1.5D.
+SPRING_TAP_CALLOUT_BELOW = (
+    f"FULL THREAD {math.floor(SPRING_TAP_ENGAGEMENT_MIN / 25.4 * 100.0) / 100.0:.2f} MIN"
+).replace(" 0.", " .")
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
 # Sheet 2 looks from +X/-Y/-Z: the existing pictorial shows the coefficient

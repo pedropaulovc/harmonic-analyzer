@@ -67,6 +67,7 @@ from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_prec
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_scan import _zoomed_on
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
@@ -212,8 +213,8 @@ TAP_CALLOUT_XY = (0.158, 0.254)
 # Ø.50 rim (the end piece's OD, flush with the tube's), tagged right of it
 # from a pick on its upper-right rim, its box clear of the elevation's arm
 # end (x 0.2365) and the end view's leg (x 0.205 +/- 0.0021, below the arm
-# axis).  Left of the arm's end circle, between the section's top
-# dimensions (text to x ~0.153) and the end view: the tap's ⌖ Ø.012 | A
+# axis).  Left of the arm's end circle, between section A-A (its crop's
+# right edge at x ~0.1554) and the end view: the tap's ⌖ Ø.012 | A
 # frame (~31 mm, one 7 mm row) under the tap callout, datum B's tag hung
 # under its middle, and the counterbore's ⌖ Ø.008 | B frame under that.
 # Each frame's leader leaves a 6.35 mm shoulder off its right end: the tap
@@ -223,16 +224,20 @@ END_GTOL_ROW = 0.007
 END_FRAME_WIDTH = 0.031
 END_DATUM_TAG_STEM = 0.003
 END_DATUM_TAG_BOX = 0.007
-TAP_FRAME_XY = (0.158, 0.2415)
+TAP_FRAME_XY = (0.160, 0.2415)
 DATUM_B_XY = (
     TAP_FRAME_XY[0] + END_FRAME_WIDTH / 2.0,
     TAP_FRAME_XY[1] - END_GTOL_ROW - END_DATUM_TAG_STEM - END_DATUM_TAG_BOX,
 )
-COUNTERBORE_FRAME_XY = (0.158, 0.2195)
+COUNTERBORE_FRAME_XY = (0.160, 0.2195)
 TAP_FRAME_RIM_DEG = 135.0
 COUNTERBORE_FRAME_RIM_DEG = 200.0
 DATUM_A_RIM_DEG = 45.0
 DATUM_A_OFFSET = (0.008, -0.009)
+# The datum pick's zoom window half-span (_drawing_scan._HIT_ZOOM_HALF; the
+# FR-02 hanger datums' HANGER_DATUM_PICK_ZOOM_HALF): the aperture shrinks to
+# hundredths of a millimetre.
+DATUM_A_PICK_ZOOM_HALF = 0.0025
 
 # Section A-A: a full section on the horizontal plane through the arm axis,
 # cut faces only, cropped to the end piece and the tube over its shank.  A
@@ -795,7 +800,11 @@ def _add_axis_frames(adapter: Any, end: Any, tap_edge: Any) -> None:
     sm_gooseneck_spring_joint charges (THREAD_AXIS_OFFSET_MAX,
     COUNTERBORE_AXIS_OFFSET_MAX), as zones.  The rims are concentric on the
     end face; the scan pins each by its own radius, the datum's hit-test must
-    resolve to the OD rim, and each frame selects its circle directly."""
+    resolve to the OD rim, and each frame selects its circle directly.  At
+    1:3 the OD rim stands ~1 mm from the counterbore's, inside a fit-zoom
+    pick aperture (round 3, farm run 20261107T121714736Z: the pick landed on
+    a neighbour), so the pick is made zoomed in (draw_fr_top_frame's hanger
+    datum precedent)."""
     centre = model_point_in_view(
         adapter, end, (ARM_END_X / 1000.0, ARM_Y / 1000.0, 0.0), label="end face centre"
     )
@@ -809,15 +818,19 @@ def _add_axis_frames(adapter: Any, end: Any, tap_edge: Any) -> None:
         end_face_centre, COUNTERBORE_DIA / 2.0, axis=axis, label="counterbore rim"
     )
     datum_pick = _rim_point(centre, _TUBE_R, DATUM_A_RIM_DEG)
-    add_datum_feature(
-        adapter,
-        end,
-        edge_xy=datum_pick,
-        expected_entity=od_rim.edge,
-        symbol_xy=(datum_pick[0] + DATUM_A_OFFSET[0], datum_pick[1] + DATUM_A_OFFSET[1]),
-        datum="A",
-        label="end piece OD datum A",
-    )
+    with _zoomed_on(adapter, datum_pick, DATUM_A_PICK_ZOOM_HALF):
+        add_datum_feature(
+            adapter,
+            end,
+            edge_xy=datum_pick,
+            expected_entity=od_rim.edge,
+            symbol_xy=(
+                datum_pick[0] + DATUM_A_OFFSET[0],
+                datum_pick[1] + DATUM_A_OFFSET[1],
+            ),
+            datum="A",
+            label="end piece OD datum A",
+        )
     tap_frame = add_feature_control_frame(
         adapter,
         end,

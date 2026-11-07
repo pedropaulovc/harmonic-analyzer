@@ -352,7 +352,8 @@ def test_tap_callout_prints_four_rows_with_its_bands_and_drill_point() -> None:
     stacked_band_rows = sum(
         1
         for _, band in drawing.TAP_CALLOUT_BANDS.values()
-        if drawing.tap_callout_tolerance(band)[0] != drawing._TOL_SYMMETRIC
+        if band is not None
+        and drawing.tap_callout_tolerance(band)[0] != drawing._TOL_SYMMETRIC
     )
 
     def printed_rows(definitions: dict[int, str], stacked: int) -> int:
@@ -388,13 +389,13 @@ def test_tap_callout_prints_four_rows_with_its_bands_and_drill_point() -> None:
         sm_knife_mount_spec.STUD_TAP_DRILL_DEPTH_BAND,
         -sm_knife_mount_spec.STUD_TAP_DRILL_DEPTH_BAND,
     )
+    # The full thread's .375 takes the title block's .XXX row (round 3:
+    # ".375±.005" restated it, rule 2), the band the spec charges.
     assert drawing.TAP_CALLOUT_BANDS["hw-threaddepth"] == (
         sm_knife_mount_spec.STUD_TAP_THREAD_DEPTH,
-        (
-            sm_knife_mount_spec.STUD_TAP_THREAD_DEPTH_BAND,
-            -sm_knife_mount_spec.STUD_TAP_THREAD_DEPTH_BAND,
-        ),
+        None,
     )
+    assert sm_knife_mount_spec.STUD_TAP_THREAD_DEPTH_BAND == sm_knife_mount_spec._XXX
 
 
 def test_tap_callout_parks_between_the_top_view_and_the_front_view() -> None:
@@ -1049,7 +1050,7 @@ def test_tap_callout_bands_its_full_thread_and_drill_depth_with_a_pitch_of_runou
     bands = drawing.TAP_CALLOUT_BANDS
     assert set(bands) == {"hw-threaddepth", "hw-tapdrldepth"}
     assert bands["hw-threaddepth"][0] == pytest.approx(9.525)  # .375
-    assert bands["hw-threaddepth"][1] == pytest.approx((0.127, -0.127))
+    assert bands["hw-threaddepth"][1] is None  # the title block's ±.005
     assert bands["hw-tapdrldepth"][0] == pytest.approx(11.1252)  # .438
     assert bands["hw-tapdrldepth"][1] == pytest.approx((0.0508, -0.0508))
     # swTolType_e: both bands symmetric (4), each (lower, upper) as
