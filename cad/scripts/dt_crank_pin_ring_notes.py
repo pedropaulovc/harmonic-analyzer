@@ -54,9 +54,11 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 REFERENCE_DIMENSIONS = frozenset({"WireDia", "JointDia"})
 # The wire is bought stock: an untoleranced reference whose supplier tolerance
 # governs (owner rule; #290 reviews asked for a printed band).
+# The joint is closed through the MHA-DT-09 cross-hole: note 1, flagged from
+# the joint it governs (rule 7).
 DIMENSION_CALLOUTS: dict[str, str] = {
     "WireDia": "WIRE AS SUPPLIED;\nSUPPLIER TOLERANCE",
-    "JointDia": "SILVER-SOLDER BUTT JOINT",
+    "JointDia": "SILVER-SOLDER BUTT JOINT\nSEE NOTE 1",
 }
 if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
     DRAWING_PRECISION_BY_NAME

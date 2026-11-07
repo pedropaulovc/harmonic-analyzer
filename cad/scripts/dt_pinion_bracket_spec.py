@@ -28,7 +28,6 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from dt_pinion_bracket_geometry import (
     ARBOR_BORE as ARBOR_BORE,
     C2C as C2C,
-    CROSS_HOLE_CZ_PLACES,
     END_RADIUS_PLACES,
     HALF_WIDTH as HALF_WIDTH,
     OVERALL_LENGTH as OVERALL_LENGTH,
@@ -67,9 +66,12 @@ PIN_SEAT_DIA_BAND = REAM_H7
 # functional requirement, not habit: the hole is match-drilled on into the
 # MHA-DT-19 shaft, and every bit it runs off the bore axis comes straight off
 # the shaft wall beside it (SHAFT_LIGAMENT_WORST).  Codex #858 P2, user
-# ruling (a): no location lives in prose.  Through the thickness the model's
-# own CrossHoleCz (half the thickness from broad face A) prints at .XX; its
-# far-face web is STRAP_FACE_WEB_WORST.  Across the bar the hole's centre sits
+# ruling (a): no location lives in prose.  Through the thickness the hole
+# shares the follower seat's centreline, which the seat's own PinSeatCz
+# (.180 from broad face A) locates; a second .18 station on that same line
+# printed one location twice (machinist review, fan-out round 1).  Its
+# far-face web is STRAP_FACE_WEB_WORST, still charged the looser .XX row.
+# Across the bar the hole's centre sits
 # ON the pivot-axis line the flank view draws (where the 7.000 starts), so it
 # needs no offset: the former 3.18 from the pivot-bore wall (a hidden
 # reference sketch) ran to a hidden line, which rule 9 forbids (r1 machinist
@@ -147,9 +149,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # face A prints as the model's own PinSeatCz -- see PIN_SEAT_WEB_WORST.
     "PinSeatProfile": {"PinSeatDia", "PinSeatCy", "PinSeatCz"},
     "PinSeat": {"PinSeatDepth"},
-    # Option E-a: the set-pin cross hole.  Its size and its station from
-    # broad face A (Codex #858 P2); its centre sits on the pivot-axis line.
-    "CrossHoleProfile": {"CrossHoleDia", "CrossHoleCz"},
+    # Option E-a: the set-pin cross hole.  Its size; through the thickness it
+    # shares the seat's centreline (PinSeatCz), across the bar the pivot-axis
+    # line.
+    "CrossHoleProfile": {"CrossHoleDia"},
 }
 
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`
@@ -164,8 +167,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # ruling (a), PIN_SEAT_WEB_WORST).  Two (.XX) on the rest: the bar thickness
 # (the rig feeler-sets its span and reads the printed limits), the bore centre
 # distance (no check reads its band; at the engaged pose a .010 error moves
-# the mesh centre a quarter of that), the unmated end radii, the cross hole's
-# station and the seat depth, which a flat-bottom reamer bottoms out.
+# the mesh centre a quarter of that), the unmated end radii and the seat
+# depth, which a flat-bottom reamer bottoms out.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "StrapProfile": {
         "PivotBoreDia": 4,
@@ -177,7 +180,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Strap": {"Depth": THICKNESS_PLACES},
     "PinSeatProfile": {"PinSeatDia": 4, "PinSeatCy": 3, "PinSeatCz": 3},
     "PinSeat": {"PinSeatDepth": 2},
-    "CrossHoleProfile": {"CrossHoleDia": 4, "CrossHoleCz": CROSS_HOLE_CZ_PLACES},
+    "CrossHoleProfile": {"CrossHoleDia": 4},
 }
 
 _PRECISION_NAMES = [

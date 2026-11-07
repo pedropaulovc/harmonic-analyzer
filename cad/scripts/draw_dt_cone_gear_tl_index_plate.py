@@ -89,7 +89,11 @@ FACE_KEEP = {
     "Ring51Pcd": (_FX + 0.115, _FY + 0.008),
     "Ring24Pcd": (_FX + 0.110, _FY - 0.040),
     "MountHoleDia": (_FX - 0.095, _FY + 0.030),
-    "BoreDia": (_FX - 0.087, _FY - 0.050),
+    # Above the plate, right of the Ø3.94's leader and left of the vertical
+    # centreline, so its leader drops steeply onto the bore's upper left:
+    # from the lower left it crossed datum A's leader, which SolidWorks
+    # places on the bore's lower left (round 1, rule 14).
+    "BoreDia": (_FX - 0.030, _FY + 0.108),
     "MountPcd": (_FX - 0.020, _FY - 0.100),
 }
 # Above the edge view's top, clear of its witness lines.
