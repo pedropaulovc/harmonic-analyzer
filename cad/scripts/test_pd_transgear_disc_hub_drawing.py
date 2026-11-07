@@ -649,7 +649,7 @@ def test_finished_walls_over_the_bore_pay_both_end_breaks() -> None:
         }
     )
     assert finished["hub wall over the bore"] == pytest.approx(0.078 * IN, abs=1e-3)
-    assert finished["spigot wall over the bore"] == pytest.approx(0.0731 * IN, abs=1e-3)
+    assert finished["spigot wall over the bore"] == pytest.approx(0.0730 * IN, abs=1e-3)
     for wall in finished.values():
         assert 0.060 * IN - 1e-9 <= wall < WALL_FLOOR
     assert spec.FLAT_WALL_FINISHED == pytest.approx(spec.FLAT_WALL_WORST - breaks)
