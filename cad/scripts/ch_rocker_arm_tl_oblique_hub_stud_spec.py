@@ -13,10 +13,10 @@ the riser's HUB clearance and supports the strap under the washer.
 
 The shank is a free slip in the carrier bore (.3990-.3995 in the
 .4000-.4005 reamed hole, .0005-.0015 diametral); the nose keeps the gauge
-pin's .4000 -.0001/0 because it locates the strap (owner, 2026-11-06): its
-band is what keeps the strap's hub-hole float inside the carrier's existing
-.005 edge-to-HUB allocation (``EDGE_TO_HUB_ALLOCATION``), and the sheet says
-so at the band, quoting the strap hole's limits as REF only.
+pin's .4000 -.0001/0 because it locates the strap (owner, 2026-11-06). Its
+radial float in the strap's hub hole (``NOSE_CLEARANCE[1] / 2``, .0003) moves
+the strap against the jig's cut, so the sheet prints that float at the band
+with the strap hole's limits REF only (the strap's sheet controls them).
 The flange is the owner's literal 18 x 3 mm (parent ruling 2026-11-06: the
 model keeps the exact millimetres).  The inch sheet prints it .71 x .12 at
 the title block's .XX row, so the part is accepted on the PRINTED limits,
@@ -116,11 +116,8 @@ NOSE_CLEARANCE = (
 )
 if NOSE_CLEARANCE[0] < 0.0:
     raise AssertionError("the hub stud nose interferes with the strap's hub hole")
-# Why the band is .0001: the strap's top edge is cut relative to the HUB, and
-# the carrier's existing edge-to-HUB allocation (.005, of which its
-# HUB_RADIAL_STACK leaves only ~.000044 in) is what the nose's locating float
-# must not reopen.  Not reallocated here; named on the sheet (rule 4).
-EDGE_TO_HUB_ALLOCATION = 0.005 * INCH
+# The nose's radial float in the strap's hub hole moves the strap against the
+# jig's cut edge; the sheet prints it at the band (rule 4) beside the mate.
 TIP_SET = 2.032  # .080 above the actual riser, set at assembly
 TIP_SET_BAND = 0.2032  # +/-.008
 NOSE_LENGTH = TIP_SET
@@ -234,19 +231,18 @@ DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
 CARRIER_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-carrier")["number"]
 RISER_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-riser")["number"]
 STRAP_NUMBER = _config.parts("ch-rocker-strap")["number"]
-# Every tight band names its mate by name and number (rule 4) and why it is
-# tight: the nose's holds the edge-to-HUB allocation, the strap hole's limits
-# quoted REF (the strap's sheet controls them); the root names the seat it
-# must not hold off; the fit and supply lengths say how the proud is set and
-# which riser face it is read from (rule 19).
+# Every tight band names its mate by name and number (rule 4) and what it
+# holds: the nose's locating float in the strap hole, whose limits print REF
+# (the strap's sheet controls them); the root names the seat it must not hold
+# off; the fit and supply lengths say how the proud is set and which riser
+# face it is read from (rule 19).
 DIMENSION_CALLOUTS: dict[str, str] = {
     "ShankDia": f"SLIP FIT IN CARRIER\n{CARRIER_NUMBER} HUB BORE",
     "NoseDia": (
         f"LOCATES STRAP {STRAP_NUMBER} HUB\n"
         f"HOLE ({inch_text(STRAP_HOLE_LIMITS[0], 4)}-"
-        f"{inch_text(STRAP_HOLE_LIMITS[1], 4)} REF): BAND\n"
-        f"HOLDS THE {inch_text(EDGE_TO_HUB_ALLOCATION, 3)}\n"
-        "EDGE-TO-HUB ALLOCATION"
+        f"{inch_text(STRAP_HOLE_LIMITS[1], 4)} REF):\n"
+        f"{inch_text(NOSE_CLEARANCE[1] / 2.0, 5).rstrip('0')} MAX RADIAL FLOAT"
     ),
     "RootRadius": f"CLEARS CARRIER HUB\nCHAMFER {CARRIER_NUMBER}",
     "FitLength": (

@@ -15,10 +15,11 @@ ch-rocker-arm-tl-vn-oblique-left-clamp-screw:
   # Modified purchased part: cut to the actual strap/riser grip plus the
   # 8.40-8.62 reach below the carrier top, cut tip chamfered 45 deg x .030-.035.
   process: purchased
-  # Footer lines stay inside the purchased sheet's reserved note space (no
-  # line over the ITEM row's 64 characters, at most three lines).
-  installation_notes: |-
-    CUT TO THE ACTUAL STRAP/RISER GRIP AT ASSEMBLY; FINISH AND
-    GAUGE THE CUT TIP PER MHA-CH-06-TL-00 STEP O6 AND THE CUT-END
-    CHAMFER CONTROLS ON THIS SHEET.
+  # One footer line, at most the ITEM row's 64 characters: every extra note
+  # line lifts the bottom-row cells 4.5 mm, and at three lines the annotated
+  # Front cell (29 mm) no longer held the screw's 1:1 native outline
+  # (30.95 mm), so the views fell to 1:2 and the Top references' short spans
+  # lost their dimension lines (84d native run). The cut-end chamfer controls
+  # print on the sheet itself.
+  installation_notes: "CUT TO STRAP/RISER GRIP; FINISH TIP PER MHA-CH-06-TL-00 STEP O6"
   drawing_unit: in
