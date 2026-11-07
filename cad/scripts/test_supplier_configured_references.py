@@ -382,7 +382,7 @@ def test_chain_top_fit_lane_accommodates_five_to_one_source_gauge():
     import draw_sh_vn_chain_link as chain_drawing
 
     cells = supplier_drawing.supplier_fit_cells(
-        supplier_drawing.supplier_state_cells(0.08, maximum=False),
+        supplier_drawing.supplier_state_cells(0.08),
         chain_drawing._CHAIN_SUPPLIER_MARGINS,
         label="chain reference",
     )
@@ -398,7 +398,7 @@ def test_chain_top_roller_square_projects_over_front_roller_circle():
     cells = {
         name: center
         for name, center, _box in supplier_drawing.supplier_fit_cells(
-            supplier_drawing.supplier_state_cells(0.08, maximum=False),
+            supplier_drawing.supplier_state_cells(0.08),
             chain_drawing._CHAIN_SUPPLIER_MARGINS,
             label="chain reference",
         )
@@ -414,7 +414,7 @@ def test_chain_top_roller_square_projects_over_front_roller_circle():
 
 def test_connecting_link_top_fit_lane_accommodates_two_to_one_pin_length():
     cells = supplier_drawing.supplier_fit_cells(
-        supplier_drawing.supplier_state_cells(0.08, maximum=False),
+        supplier_drawing.supplier_state_cells(0.08),
         chain_dimensions.SUPPLIER_MARGINS,
         label="connecting link reference",
     )
