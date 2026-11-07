@@ -15,8 +15,9 @@ rocker trammel pivot plate's; its few helpers are copied here as private
 functions, since that kit is being retired.
 
 Both #30 sizes print their three-place design nominal (.128), not the
-wizard's actual .1285 cut, from blanked reference sketches on ``TopFace``
-(``ScrewHoleReference``, ``StopHoleReference``), as
+wizard's actual .1285 cut, and the 12 mm HUB relief prints .472, not the
+drill's .47244, each from a blanked reference sketch on ``TopFace``
+(``ScrewHoleReference``, ``HubHoleReference``, ``StopHoleReference``), as
 build_pd_transgear_arm_plate's ``CountersinkReference``; the screw hole's
 callout carries the countersink. The plan cannot carry a native hole callout
 for the screws, because the only visible edges of the screw holes there
@@ -78,6 +79,8 @@ from ch_rocker_arm_tl_oblique_riser_spec import (
     DRAWING_PRECISION,
     DRILLED_BAND,
     GLOBALS,
+    HUB_DIA_PRINTED,
+    HUB_HOLE,
     ISOMETRIC_VIEW_NOTE,
     SCREW_DIA,
     SCREW_DIA_PRINTED,
@@ -189,8 +192,9 @@ _ROW_PLANES = (
 )
 # The printed sizes' reference circles, one blanked sketch each on TopFace:
 # (sketch, centre, printed dia, (x, y, size) names, (x, y, size) drives).
-# Each rounds the hole its one callout's leader lands on: screw 2, and stop 2
-# by the right end (its block stands below and right of the view).
+# Each rounds the hole its one callout's leader lands on: screw 2, the HUB
+# relief, and stop 2 by the right end (its block stands below and right of
+# the view).
 _REFERENCE_CIRCLES = (
     (
         "ScrewHoleReference",
@@ -198,6 +202,13 @@ _REFERENCE_CIRCLES = (
         SCREW_DIA_PRINTED,
         ("ScrewRefX", "ScrewRefY", "ScrewDia"),
         ('"Screw2X"', '"ScrewInnerY"', '"ScrewDia"'),
+    ),
+    (
+        "HubHoleReference",
+        HUB_HOLE,
+        HUB_DIA_PRINTED,
+        ("HubRefX", "HubRefY", "HubDia"),
+        ('"HubX"', '"HubY"', '"HubDia"'),
     ),
     (
         "StopHoleReference",
@@ -208,7 +219,7 @@ _REFERENCE_CIRCLES = (
     ),
 )
 # Blanked before the save; the drawing shows them in the plan only.
-REFERENCE_SKETCHES = ("ScrewHoleReference", "StopHoleReference")
+REFERENCE_SKETCHES = ("ScrewHoleReference", "HubHoleReference", "StopHoleReference")
 if tuple(row[0] for row in _REFERENCE_CIRCLES) != REFERENCE_SKETCHES:
     raise AssertionError("_REFERENCE_CIRCLES and REFERENCE_SKETCHES disagree")
 
