@@ -52,9 +52,9 @@ def test_bands_are_native_on_the_model_from_named_constants() -> None:
         ("Hub", "HubLength"): "*deviations(HUB_LENGTH_BAND)",
         ("LeverBody", "LeverThick"): "LEVER_THICKNESS_TOLERANCE",
         ("PlateOffsetReference", "PlateOffset"): "PLATE_OFFSET_TOLERANCE",
-        ("BarPinHole", "BarPinCx"): "BAR_PIN_X_TOLERANCE",
-        ("SpringHole", "SpringCx"): "LEVER_SPRING_X_TOLERANCE",
     }
+    # The drilled arms print plain, at the title block's .XXX row (Q1-A).
+    assert spec.BAR_PIN_X_TOLERANCE == spec.LEVER_SPRING_X_TOLERANCE == pytest.approx(0.127)
 
 
 def test_every_tight_band_names_its_mate_or_function() -> None:

@@ -32,7 +32,7 @@ UNIT = drawing_unit("parts/ch-channel-lever", _config.parts("ch-channel-lever"))
 # (spring_mount_geom.CHANNEL_ANCHOR_XY = knife -15 + sm_summing_lever_spec.HOLE_X
 # 39.85) = 175.05.  The neutral lever tilt is -0.00223 deg, so the exact
 # projection correction 175.05 / cos(phi) - 175.05 is 1.3e-7 mm -- six orders
-# below the +/-0.10 hook-arm allocation (error_budget.yaml), hence the flat
+# below the +/-0.127 hook-arm allocation (error_budget.yaml), hence the flat
 # nominal.  Was 177.8 (7"), which left the spring leaning 2.75 mm off plumb.
 LEVER_SPRING_X = 175.05  # fulcrum -> spring-hole c2c, plumb over the anchor
 # Bar height, full length; the end carries the spring hole. The arm was
@@ -84,11 +84,15 @@ PIVOT_HOLE_BAND = (0.0254, 0.0)
 # both plate offsets, leaves the bar-to-bar running gap (owner ruling
 # 2026-10-15, #1038 option 2).
 LEVER_THICKNESS_TOLERANCE = 0.0508  # +/-.002
-# Both transfer arms carry the error budget's +/-.004 gain allocation
-# (error_budget.yaml lever_bar_pin_arm / lever_spring_hook_arm), measured from
-# the fulcrum bore that the lever turns about.
-BAR_PIN_X_TOLERANCE = 0.1016  # +/-.004
-LEVER_SPRING_X_TOLERANCE = 0.1016  # +/-.004
+# Both transfer arms are drilled holes located from the fulcrum bore the
+# lever turns about, so they print plain at the title block's .XXX row
+# (+/-.005, drawing-guidelines rule 3), the shop's drilled-hole location row.
+# The error budget (error_budget.yaml lever_bar_pin_arm /
+# lever_spring_hook_arm) allocates the same band, ~1/6 and ~1/7 of each
+# arm's allowable. Delegated ruling 2026-11-07 (Main), no precedent; owner
+# review #2144 (Q1-A) -- pending owner confirmation.
+BAR_PIN_X_TOLERANCE = printed_band_mm(3, unit=UNIT)  # +/-.005
+LEVER_SPRING_X_TOLERANCE = printed_band_mm(3, unit=UNIT)  # +/-.005
 # The 20 hubs stack face to face between the fulcrum keepers.  A hub may only
 # come out long (ch_bar_pivot_pin_spec's bar-to-bar clearance takes the pitch
 # at its nominal minimum), and twenty of them at the band's top must still

@@ -365,7 +365,7 @@ def test_the_slot_absorbs_radial_rod_hole_error_without_moving_the_windows() -> 
     baseline = copy.deepcopy(check.WINDOWS)
     observed = {}
     with pytest.MonkeyPatch.context() as patch:
-        patch.setitem(rocker.GEOMETRIC_TOLERANCES_MM, "rod-pin hole position", "0.24")
+        patch.setitem(rocker.GEOMETRIC_TOLERANCES_MM, "rod-pin hole position", "0.49")
         try:
             importlib.reload(check)
             observed = copy.deepcopy(check.WINDOWS)
@@ -377,4 +377,4 @@ def test_the_slot_absorbs_radial_rod_hole_error_without_moving_the_windows() -> 
 
 def test_the_module_refuses_a_rod_hole_error_the_slot_run_cannot_admit() -> None:
     with pytest.raises(AssertionError):
-        _reload_with_rod_position("0.25")
+        _reload_with_rod_position("0.51")

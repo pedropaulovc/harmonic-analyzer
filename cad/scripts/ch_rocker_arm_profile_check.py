@@ -265,11 +265,15 @@ if ROD_SLOT_WIDTH_MIN - ROD_PIN_MAX <= 0.0:
 ROD_HOLE_RADIAL = float(rocker.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"]) / 2.0
 ROD_HOLE_PLAY = (_ROD_HOLE_HIGH - ROD_PIN_MIN) / 2.0  # 0.0597
 ROD_SLOT_PLAY = (ROD_SLOT_WIDTH_MAX - ROD_PIN_MIN) / 2.0  # 0.0076
-# The slot's 0.75 run (inventory gauges.arm-outline-template; formerly
+# The slot's 1.00 run (inventory gauges.arm-outline-template; formerly
 # ROD_SLOT_FLAT, three places) must admit the pin at the rocker's worst
 # radial position error and play, so the radial slot absorbs that error and
-# only its width sets the clocking below.
-ROD_SLOT_FLAT = 0.75
+# only its width sets the clocking below. It grew from 0.75 when the rod-pin
+# hole's zone widened to the drilled-hole row's Ø.014 (delegated ruling
+# 2026-11-07, Q3-A; owner review #2144); the template is not yet made
+# (inventory verify = false), and its inventory note restates the run at
+# the next inventory edit.
+ROD_SLOT_FLAT = 1.00
 if (ROD_SLOT_FLAT - printed_band_mm(_ROD_SLOT_PLACES)) / 2.0 < (
     ROD_HOLE_RADIAL + ROD_HOLE_PLAY + printed_band_mm(_ROD_SLOT_PLACES)
 ):

@@ -115,8 +115,12 @@ TOP_EDGE_ABOVE_PIVOT = _rocker_interface.CENTER_Y - _rocker_interface.PIVOT_MID_
 # test_rocker_bank_layout pins the slack.
 # Manufacturing GD&T zones as their frames print them (decimal inch, the
 # source of truth); GEOMETRIC_TOLERANCES_MM restates them in mm for geometry.
+# The #47 rod-pin hole is drilled, so its zone is the shop's drilled-hole
+# location row (+/-.005, about Ø.014); error_budget.yaml rocker_rod_pin_radius
+# books half of it. Delegated ruling 2026-11-07 (Main), no precedent; owner
+# review #2144 (Q3-A) -- pending owner confirmation.
 GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
-    "rod-pin hole position": ".008",
+    "rod-pin hole position": ".014",
     "strap position to hub": ".004",
     "hub OD position to bore": ".004",
     "top edge surface profile": ".020",

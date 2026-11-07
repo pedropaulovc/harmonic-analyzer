@@ -94,13 +94,11 @@ from ch_channel_lever_notes import (
 from ch_channel_lever_spec import (
     BAR_PIN_HOLE_SPEC,
     BAR_PIN_X,
-    BAR_PIN_X_TOLERANCE,
     BAR_TALL,
     HUB_DIA,
     HUB_LENGTH,
     HUB_LENGTH_BAND,
     LEVER_SPRING_X,
-    LEVER_SPRING_X_TOLERANCE,
     LEVER_THICKNESS,
     LEVER_THICKNESS_TOLERANCE,
     PIVOT_HOLE_BAND,
@@ -464,20 +462,12 @@ async def build(adapter) -> dict[str, str]:
         adapter, "PlateOffsetReference", "PlateOffset", PLATE_OFFSET_TOLERANCE,
         display_unit=UNIT,
     )
-    set_dimension_symmetric_tolerance(
-        adapter, "BarPinHole", "BarPinCx", BAR_PIN_X_TOLERANCE, display_unit=UNIT
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "SpringHole", "SpringCx", LEVER_SPRING_X_TOLERANCE, display_unit=UNIT
-    )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     for feature_name, dimension_name in (
         ("FulcrumProfile", "FulcrumDia"),
         ("Hub", "HubLength"),
         ("LeverBody", "LeverThick"),
         ("PlateOffsetReference", "PlateOffset"),
-        ("BarPinHole", "BarPinCx"),
-        ("SpringHole", "SpringCx"),
     ):
         tolerance_at_value_places(adapter, feature_name, dimension_name)
 
