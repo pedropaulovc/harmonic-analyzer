@@ -82,7 +82,7 @@ def test_registration_charges_both_translation_axes_for_end_material() -> None:
 
 
 def test_plain_stock_pins_clear_self_cut_and_set_retraction_height() -> None:
-    assert riser.STOP_PIN_LENGTH == 19.05
+    assert riser.STOP_PIN_LENGTH == pytest.approx(19.05, rel=0.0, abs=1e-12)
     assert riser.STOP_PIN_LENGTH_BAND == pytest.approx(0.254)
     assert riser.STOP_HOLE_DIA > riser.STOP_PIN_DIA_LIMITS[1]
     assert riser.STOP_PIN_CONTACT_FLOAT_MAX > riser.STOP_PIN_FLOAT_MAX
