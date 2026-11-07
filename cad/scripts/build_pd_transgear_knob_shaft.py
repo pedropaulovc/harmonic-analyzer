@@ -78,7 +78,6 @@ from pd_transgear_knob_shaft_spec import (
     CORE_FLAT_TOOL_END_RADIUS_BAND,
     CORE_FLAT_TOOL_END_RADIUS_TOL_TYPE,
     CORE_FLAT_CUT_END_BAND,
-    CORE_FLAT_CUT_END_PREFIX,
     CORE_FLAT_CUT_END_TOL_TYPE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -91,7 +90,6 @@ from pd_transgear_knob_shaft_spec import (
     FRONT_CORNER_RADIUS,
     FRONT_CORNER_RADIUS_BAND,
     FRONT_CORNER_RADIUS_TOL_TYPE,
-    GEAR_DATA,
     GEOMETRIC_CONTROLS,
     JOURNAL_DIA,
     JOURNAL_DIA_BAND,
@@ -329,7 +327,7 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
         "tooth-tip blank witness",
         await adapter.add_line(0.0, OUTSIDE_DIA / 2.0, -FACE_WIDTH, OUTSIDE_DIA / 2.0),
     )
-    # Construction witness for the reference overall length: from the tip
+    # Construction witness for the controlled overall length: from the tip
     # face's top corner back to the rear end face's station.
     overall = check(
         "overall-length witness",
@@ -420,20 +418,31 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
         "stud tip chamfer rise",
     )
     profile.record("TipChamferRise", '"TipChamfer"')
-    for name, line, value in (
-        ("CoreFront", core_step, CORE_FRONT_FROM_F),
-        ("FrontReliefWidth", neck_step, FRONT_RELIEF_WIDTH),
-        ("PlainCore", thread_end, PLAIN_CORE),
+    # The stud chucking's lengths run from its faced tip (rule 11): F
+    # (TipStation, above), the core's front and the thread's end.  The neck's
+    # width is its groove's own size beside F.
+    for name, line, value, expr in (
+        ("CoreFromTip", core_step, TIP_STATION - CORE_FRONT_FROM_F, '"TipStation" - "CoreFront"'),
+        ("ThreadEndFromTip", thread_end, TIP_STATION - PLAIN_CORE, '"TipStation" - "PlainCore"'),
     ):
         await dimension_between(
             adapter,
             f"{line}.start",
-            "origin",
+            f"{tip_face}.end",
             "horizontal_distance",
             value,
             f"stud {name}",
         )
-        profile.record(name, f'"{name}"')
+        profile.record(name, expr)
+    await dimension_between(
+        adapter,
+        f"{neck_step}.start",
+        "origin",
+        "horizontal_distance",
+        FRONT_RELIEF_WIDTH,
+        "stud FrontReliefWidth",
+    )
+    profile.record("FrontReliefWidth", '"FrontReliefWidth"')
     await dimension_between(
         adapter,
         f"{outside}.start",
@@ -884,9 +893,6 @@ async def build(adapter: Any) -> dict[str, str]:
         display_unit=UNIT,
     )
     _apply_neck_and_flat_limits(adapter)
-    set_dimension_prefix(
-        adapter, "CoreFlatProfile", "FlatEnd", CORE_FLAT_CUT_END_PREFIX
-    )
     apply_span_limits(
         adapter, nominal_mm=SPAN_NOMINAL, deviations=SPAN_DEVIATIONS,
         places=SPAN_PLACES, prefix=SPAN_PREFIX, unit=UNIT,
@@ -907,10 +913,7 @@ async def build(adapter: Any) -> dict[str, str]:
     apply_drawing_properties(
         adapter,
         PART_NAME,
-        {
-            "Gear Data": GEAR_DATA,
-            TOOTH_SPACE_CALLOUT_PROPERTY: TOOTH_SPACE_CALLOUT,
-        },
+        {TOOTH_SPACE_CALLOUT_PROPERTY: TOOTH_SPACE_CALLOUT},
     )
     return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)
 

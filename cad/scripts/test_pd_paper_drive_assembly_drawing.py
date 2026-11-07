@@ -1529,7 +1529,7 @@ def test_the_rear_cup_is_pinned_and_the_nut_seats_on_the_faced_pilot() -> None:
         - cup_pin.HOLE_MAX / 2.0
         - knob_shaft.EDGE_BREAK_MAX
     )
-    assert end_wall == pytest.approx(0.0815 * 25.4, abs=1e-9)
+    assert end_wall == pytest.approx(0.0805 * 25.4, abs=1e-9)
     assert end_wall >= cup.WALL_FLOOR
     seq = steps.SEQUENCE
     assert seq.index("pilot-faced-to-fit") < seq.index("knob-stack-fitted")
