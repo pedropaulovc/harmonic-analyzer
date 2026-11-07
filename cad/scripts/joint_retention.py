@@ -985,9 +985,8 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "build_dt_drive_train_assembly.py pinch_screw placement and 'pinch screw in the "
             "cross-bore' mates, head-on-+X assert; cone_tip_block_spec PINCH_THREAD, "
-            "WORST_PINCH_ENGAGEMENT_MM; config/parts/dt-vn-cone-tip-pinch-screw.yaml "
-            "installation_notes; CONE_CRANK_STEPS 3 (tip-adjuster-set 'TIGHTEN MHA-DT-VN-56 ACROSS "
-            "THE SLIT'); CONSUMABLES_NOTES '#4-40 ... SCREWS: SNUG'"
+            "WORST_PINCH_ENGAGEMENT_MM; CONE_CRANK_STEPS 3 (tip-adjuster-set 'TIGHTEN "
+            "MHA-DT-VN-56 ACROSS THE SLIT'); CONSUMABLES_NOTES '#4-40 ... SCREWS: SNUG'"
         ),
     ),
     Joint(
