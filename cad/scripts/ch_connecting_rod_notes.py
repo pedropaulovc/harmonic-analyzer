@@ -1,5 +1,6 @@
 r"""Connecting-rod drawing-only data -- the marked-dimension and precision
-contract and the isometric-view label the part build stamps into the SLDPRT.
+contract, the pin hole's fit note and the isometric-view label the part build
+stamps into the SLDPRT.
 
 Split OUT of ``ch_connecting_rod_spec`` (codex #354): assemblies import
 geometry from the spec, so drawing-only prose living there made every notes
@@ -15,9 +16,24 @@ from __future__ import annotations
 # each tight band names its mate on its own callout (drawing-guidelines.md
 # rules 4 and 7). The tines' known shortfall against the .080 wall target is
 # the near tine's own printed lower limit, named TINE WALL on its callout
-# (rule 20), so the sheet carries no general note. The material (1018 plate),
-# the black finish and the inside corners' R.040 MAX are title-block rows,
-# never restated here (rule 2).
+# (rule 20). The material (1018 plate), the black finish and the inside
+# corners' R.040 MAX are title-block rows, never restated here (rule 2).
+#
+# The one note is the reamed pin hole's matched press fit, linked from its
+# callout: its .0004 band is narrower than the shop's reamer row, so the hole
+# is reamed to its pin. The acceptance is the ANSI FN2 window the pin budget
+# is held to (ch_rod_pivot_pin_spec.PRESS_INTERFERENCE_MAX), rounded inward.
+# Pending owner confirmation (fan-out Q1, delegated ruling 2026-11-07, #2144).
+PIN_NAME = "ROD PIVOT PIN"
+PIN_NUMBER = "MHA-CH-10"
+PIN_FIT_NOTE_NUMBER = 1
+PIN_FIT_INTERFERENCE = (".0002", ".0008")
+DRAWING_NOTES = (
+    f"{PIN_FIT_NOTE_NUMBER}. MATCHED PRESS FIT ON {PIN_NAME} {PIN_NUMBER}:"
+    f"\n    REAM {PIN_FIT_INTERFERENCE[0]}-{PIN_FIT_INTERFERENCE[1]}"
+    " UNDER THE MEASURED PIN."
+)
+
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  build_ch_connecting_rod marks exactly these. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

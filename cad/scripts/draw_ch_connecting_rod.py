@@ -69,7 +69,11 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
-from ch_connecting_rod_notes import DRAWING_DIMENSIONS, DRAWING_PRECISION
+from ch_connecting_rod_notes import (
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
+    PIN_FIT_NOTE_NUMBER,
+)
 from ch_connecting_rod_spec import (
     CENTER_DISTANCE,
     FORK_BASE_Y,
@@ -86,7 +90,6 @@ from ch_connecting_rod_spec import (
     STRAP_DIAMETRAL_CLEARANCE,
     SURFACE_FINISHES,
 )
-from ch_rod_pivot_pin_spec import BUDGET as PIN_JOINT_BUDGET
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -122,12 +125,15 @@ LEFT_CENTER = (0.080, FRONT_CENTER[1])
 ISO_CENTER = (0.398, 0.212)
 # Over the isometric: below it, the detail's boss-length witness runs out.
 ISO_NOTE_XY = (0.352, 0.262)
+# The pin hole's matched-fit note (upper-left): top centre, between the side
+# view's detail letter and the isometric's label, over the reamed hole's
+# callout.
+NOTES_XY = (0.110, 0.262)
 
 # The mates the tight bands name (drawing-guidelines.md rule 7).
 CAM_NUMBER = str(_config.parts("dt-cylinder-gear")["number"])
 ARM_NUMBER = str(_config.parts("ch-rocker-arm")["number"])
 PIN_NUMBER = str(_config.parts("ch-rod-pivot-pin")["number"])
-ROD_NUMBER = str(_config.parts("ch-connecting-rod")["number"])
 
 
 def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
@@ -163,12 +169,11 @@ FRONT_KEEP = {
 # One arrow on the rim nearest each text (set_near_side_diameter).
 NEAR_SIDE_DIAMETERS = ("RingOuterDia", "StrapBoreDia")
 # Descriptive text beneath each native value/band: the strap bore and its
-# cam; the fork's crown, a full round on the pin tangent to its sides; the
-# reamed press hole and its pin (drawing-guidelines.md rule 12 (hole and slot
-# callouts say what to do): the decimal Ø and the process).
+# cam, named by the standard fit with its clearance as REF (rule 4); the
+# fork's crown, a full round on the pin tangent to its sides; the reamed
+# press hole, size then process (rules 12 and 26), its pin and the linked
+# matched-fit note (rule 7: a callout carries at most two lines of words).
 _CLEARANCE_LEAST, _CLEARANCE_MOST = STRAP_DIAMETRAL_CLEARANCE
-_PRESS_LEAST = PIN_JOINT_BUDGET["interference_min"]
-_PRESS_MOST = PIN_JOINT_BUDGET["interference_max"]
 
 
 def _inch(value_mm: float, places: int) -> str:
@@ -178,15 +183,11 @@ def _inch(value_mm: float, places: int) -> str:
 
 FRONT_CALLOUTS = {
     "StrapBoreDia": (
-        f"BORE; RUNS ON CAM OF\n{CAM_NUMBER},"
-        f" {_inch(_CLEARANCE_LEAST, 3)}-{_inch(_CLEARANCE_MOST, 3)}\n"
-        "DIAMETRAL CLEARANCE"
+        f"BORE\nRUNNING FIT ON {CAM_NUMBER}\n"
+        f"(CLEARANCE {_inch(_CLEARANCE_LEAST, 3)}-{_inch(_CLEARANCE_MOST, 3)})"
     ),
     "ForkWidthDim": "FULL R",
-    "PinHoleDia": (
-        f"THRU - REAM; PRESS\nFIT ON PIN {PIN_NUMBER},\n"
-        f"{_inch(_PRESS_LEAST, 5)}-{_inch(_PRESS_MOST, 5)} INTERFERENCE"
-    ),
+    "PinHoleDia": f"REAM THRU\nPRESS FIT ON {PIN_NUMBER}\nSEE NOTE {PIN_FIT_NOTE_NUMBER}",
 }
 
 # The side view at 1:1: the plate's thickness at the ring (#982 review r1),
@@ -195,9 +196,10 @@ FRONT_CALLOUTS = {
 LEFT_KEEP = {
     "RingThick": (0.045, _left_xy(0.0, RING_BOTTOM_Y)[1] - 0.007),
 }
-# Three short lines: two long ones ran into the sheet border (r2).
+# Two short lines: the plate's fit in its cam slot, named once here (rule 7;
+# long lines ran into the sheet border, r2).
 LEFT_CALLOUTS = {
-    "RingThick": f"RING AND SHANK;\nRUNS IN CAM SLOT\nOF {CAM_NUMBER}",
+    "RingThick": f"SLIDING FIT IN CAM\nSLOT OF {CAM_NUMBER}",
 }
 # The overall length, ring bottom to crown top, as a reference: the side
 # view's ring-bottom silhouette and the far tine's crown-top silhouette,
@@ -269,20 +271,19 @@ DETAIL_KEEP = {
     # boss length outside.
     "SlotDepth": (_FAR_X + 0.016, (_TINE_TOP_Y + _ROOT_Y) / 2.0 + 0.004),
     "ForkBossLength": (_FAR_X + 0.034, (_TINE_TOP_Y + _ROOT_Y) / 2.0),
-    # Under the fork, from the datum face: the plate's near face (text left
-    # of the datum face, its longest line 5 mm clear of the face's witness;
-    # at 30 mm the witness ran through MHA-DT-12, ENFORCE review).
+    # Under the fork, from the datum face: the plate's near face, a location
+    # with its value and band only (rule 7), text left of the datum face.
     "RingFaceNear": (_FACE_X - 0.036, _REF_END_Y - 0.010),
 }
 # The near tine's band locates the slot from the datum face (the channel's
 # axial budget) and, with the far tine's, holds the gap to the next channel's
-# rod (#982 review r2: a clearance alone would not need it). Its printed lower
-# limit is the tines' known shortfall against the .080 wall target, named
-# TINE WALL (rule 20; MHA-CH-03 RV-02).
+# rod (#982 review r2: a clearance alone would not need it); one short reason
+# says so (rule 7). Its printed lower limit is the tines' known shortfall
+# against the .080 wall target, named TINE WALL (rule 20; MHA-CH-03 RV-02).
+# The slot names its fit on the arm by the standard name (rule 4).
 DETAIL_CALLOUTS = {
-    "TineNear": f"2X TINE WALL;\nLOCATES SLOT;\nCLEARS NEXT ROD\n{ROD_NUMBER}",
-    "SlotWidth": f"RUNS ON ARM\n{ARM_NUMBER}",
-    "RingFaceNear": f"PLATE FACE; RING IN\nCAM SLOT OF {CAM_NUMBER}",
+    "TineNear": "2X TINE WALL\nLOCATES SLOT",
+    "SlotWidth": f"RUNNING FIT ON\nARM {ARM_NUMBER}",
 }
 
 BORE_FINISH_EDGE = _sheet_xy(RING_BORE_DIA / 2.0, 0.0)
@@ -453,6 +454,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Isometric View Note",
+            "Manufacturing Notes",
         ),
         required=(
             "Number",
@@ -460,6 +462,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Isometric View Note",
+            "Manufacturing Notes",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -721,6 +724,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     return await finalize_drawing(
         adapter,
