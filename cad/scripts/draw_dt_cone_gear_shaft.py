@@ -159,8 +159,12 @@ SETUP_SEAT_NOTE = "COLLAR FACE\nSEAT FOR MHA-DT-07"
 BIG_END_X = 0.2526
 SIDE_CENTER = (BIG_END_X - SHAFT_LENGTH / 2000.0, 0.150)
 TIP_END_X = BIG_END_X - SHAFT_LENGTH / 1000.0
-ISO_CENTER = (0.363, 0.232)
-NOTES_XY = (0.058, 0.060)
+# 10 mm right of round 2's (0.363): the collar's two-line callout, its limits
+# now at the feature, reaches x ~0.330 under the pictorial's low end.
+ISO_CENTER = (0.373, 0.232)
+# At the left frame, as the other part sheets' note blocks: the four note
+# lines run up to 72 characters before the title block.
+NOTES_XY = (0.020, 0.060)
 # Off-sheet-left donor: the five diameters are model dimensions of circular
 # profile sketches, so they can only be IMPORTED into a view that faces those
 # circles.  They are imported here, dragged onto the shoulder each one
@@ -221,15 +225,15 @@ STATION_TEXT_CLEARANCE = 0.002
 # tip face when its station moves.  With its suffix the Ø6.350 text runs over
 # A-A's upper letter, so the three tip-end texts stand 2.5 mm higher than
 # r1's (the tip detail with them); Ø9.525 stands right of all three suffixes,
-# its two mate lines centred on it clear above A-A's letter.  The journal's
-# inch size (four-place value, five-place band) widened Ø12.2555's box to
-# 40 mm, so it stands 4.5 mm nearer the end again, clear of both A-A's box
-# and its "4 FLATS IN LINE" callout (#290 batch 0).
+# its two mate lines centred on it clear above A-A's letter.
 SIDE_DIAMETERS = {
-    # Round 1 native proof: the fit line's box ended at x 0.3244, past
-    # section A-A's left edge (0.3141); the shorter line and a 4 mm nudge
-    # left keep ~5 mm of air.
-    "Sec0Dia": (0.2575, 0.1715),
+    # The journal's matched-fit callout, "RUNNING FIT, MATCHED TO MHA-DT-05"
+    # at 33 characters, read 2.69 mm a character on round 2's render
+    # (20261107T104940656Z: 24 characters over 0.2575..0.3221), so ~89 mm.
+    # Its line stands on the journal 9.4 mm in from the collar face, so the
+    # block ends ~4 mm short of section A-A's across-flat ink (x 0.312); the
+    # pivot finish moves up and left, above the block (PIVOT_FINISH_XY).
+    "Sec0Dia": (0.2190, 0.1715),
     "Sec1Dia": (0.1600, 0.1800),
     "Sec2Dia": (BIG_END_X - (2.0 * SECTION_ENDS[2] + SECTION_ENDS[1]) / 3000.0, 0.1785),
     "Sec3Dia": (BIG_END_X - (2.0 * SECTION_ENDS[3] + SECTION_ENDS[2]) / 3000.0, 0.1905),
@@ -238,7 +242,9 @@ SIDE_DIAMETERS = {
     # and two arrows inside it, so the collar alone takes the near-side
     # diametric style: one arrow on the top rim from outside, leader up to
     # the text, nothing drawn inside the ring.
-    "CollarDia": (0.2088, 0.1760),
+    # It starts above the journal's line at Sec0Dia's x; the build lifts it
+    # further, over the pivot finish.
+    "CollarDia": (0.2088, 0.1830),
 }
 NEAR_SIDE_DIAMETERS = ("CollarDia",)
 # The collar is the 5/8 bar's OD as supplied (user ruling 2026-09-26), so
@@ -250,9 +256,9 @@ DIAMETER_TEXT_WIDTH = 0.032
 # One-line suffixes after a dimension's value: the tip-end seats' flag to
 # the land note.  Lengths carry their value and band only (rule 7).
 DIMENSION_SUFFIXES = dict(SEAT_MATE_SUFFIXES)
-# The collar prints its reference diameter over the stock statement and its
-# mates' line, lines as wide as "5/8 BAR AS SUPPLIED" or wider.  At
-# LENGTH_CHAR_WIDTH a line
+# The collar prints its reference diameter over the stock line with its edge
+# break and the roots line with its mates, lines as wide as "5/8 BAR AS
+# SUPPLIED" or wider.  At LENGTH_CHAR_WIDTH a line
 # that long is wider than the whole journal land, so hanging right from its
 # rim arrow the block ran under the pivot-journal finish and that finish's
 # leader crossed it (final877 eye pass).  The build lifts the block above the
@@ -275,8 +281,15 @@ DIMENSION_CALLOUTS = {
     "CollarDia": COLLAR_STOCK_CALLOUT,
     **SEAT_MATE_CALLOUTS,
 }
-# The pivot-journal finish symbol, above whose ink the collar's text must stand.
-PIVOT_FINISH_XY = (0.2400, 0.1800)
+# The pivot-journal finish symbol, above whose ink the collar's text must
+# stand.  It sits above the journal's callout block (top ~0.182 on round 2)
+# and its leader drops to the journal near the collar
+# (PIVOT_FINISH_ATTACH_INSET from the faced end), left of the journal's
+# dimension line at Sec0Dia's x.  Round 2 measured the symbol's ink from
+# its xy at -0.0047..+0.0137 m across, 0..+0.0073 m up, and its leader
+# leaving 6.4 mm left of the xy.
+PIVOT_FINISH_XY = (0.2214, 0.1850)
+PIVOT_FINISH_ATTACH_INSET = 0.0375
 
 
 class CutParent(Enum):
@@ -1669,9 +1682,12 @@ async def build(adapter: Any) -> dict[str, str]:
         )
 
     # Leader anchor for the land that RUNS (sheet metres): the journal's top
-    # flank, 20 mm in from the faced end.
+    # flank, PIVOT_FINISH_ATTACH_INSET in from the faced end.
     big_end_x = SIDE_CENTER[0] + SHAFT_LENGTH / 2000.0
-    pivot_top = (big_end_x - 0.020, SIDE_CENTER[1] + SECTION_DIAS[0] / 2000.0)
+    pivot_top = (
+        big_end_x - PIVOT_FINISH_ATTACH_INSET,
+        SIDE_CENTER[1] + SECTION_DIAS[0] / 2000.0,
+    )
     pivot_finish = add_surface_finish(
         adapter,
         side,

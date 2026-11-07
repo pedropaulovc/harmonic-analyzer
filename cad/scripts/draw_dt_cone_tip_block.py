@@ -39,11 +39,12 @@ import _drawing_hidden_sketches as hidden_sketches
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_leader_note
 import _drawing_leaders
+from _drawing_attachment import _is_same_attachment
 from _drawing_edge_dimensions import (
     add_edge_dimension,
     assert_dimension_measures,
-    find_edge_near,
 )
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
@@ -1245,49 +1246,111 @@ def _circle_entity(
     return edge
 
 
+def _view_b_face_edge(adapter: Any, view: Any, *, along: int, label: str) -> Any:
+    """VIEW B's visible straight edge on the -X face running along model
+    axis ``along`` (1: the north face's vertical edge; 2: the foot edge).
+
+    Picked by model geometry, not a sheet hit-test: round 2's coordinate pick
+    beside the hole's centre mark left three entities selected (farm run
+    20261107T104940656Z).  The north edge lies on z = Z_NORTH, the foot edge
+    on y = 0; of the coincident projections the -X face's (least x) is the
+    one VIEW B looks at.
+    """
+    candidates: list[tuple[float, float, Any]] = []
+    for raw_edge in visible_view_entities(view, 1, label=f"{label} edges"):
+        edge = _early_bound(raw_edge, "IEdge")
+        start, end = edge.GetStartVertex(), edge.GetEndVertex()
+        if start is None or end is None:
+            continue
+        p0 = tuple(float(v) * 1000.0 for v in _early_bound(start, "IVertex").GetPoint())
+        p1 = tuple(float(v) * 1000.0 for v in _early_bound(end, "IVertex").GetPoint())
+        across = [axis for axis in range(3) if axis != along]
+        if any(abs(p0[axis] - p1[axis]) > 0.01 for axis in across):
+            continue
+        on_plane = abs(p0[2] - Z_NORTH) < 0.01 if along == 1 else abs(p0[1]) < 0.01
+        if not on_plane:
+            continue
+        candidates.append((abs(p1[along] - p0[along]), p0[0], edge))
+    full = BLOCK_HEIGHT if along == 1 else BLOCK_Z
+    spanning = [item for item in candidates if abs(item[0] - full) < 0.01]
+    if not spanning:
+        raise RuntimeError(
+            f"{label}: no visible {full:.2f} mm edge; spans "
+            f"{sorted(round(item[0], 3) for item in candidates)!r}"
+        )
+    return min(spanning, key=lambda item: item[1])[2]
+
+
 # swDimensionPrecisionSettings_e.swDoNotChangePrecisionSetting
 _PRECISION_UNCHANGED = -1
+
+
+def _check_face_attachment(adapter: Any, dimension: Any, face_edge: Any, label: str) -> None:
+    """The dimension hangs on the face edge it was given plus one other entity.
+
+    The hole end is a point pick, which may resolve to the drill circle or the
+    concentric cosmetic-thread circle; both share the centre, so the value
+    readback guards that end and only the face edge's identity is checked.
+    """
+    display = _early_bound(dimension, "IDisplayDimension")
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    attached = [item for item in (annotation.GetAttachedEntities3() or ()) if item is not None]
+    types = tuple(int(t) for t in (annotation.GetAttachedEntityTypes() or ()))
+    faces = [item for item in attached if _is_same_attachment(adapter, item, face_edge, "EDGE")]
+    if bool(annotation.IsDangling()) or len(attached) != 2 or len(faces) != 1:
+        raise RuntimeError(
+            f"{label} is not attached to its face edge and one hole entity: "
+            f"attachments={len(attached)}, face matches={len(faces)}, types={types}"
+        )
+    _telemetry.debug(f"{label}: attachment types {types}")
 
 
 def _add_view_b_pinch_dimensions(adapter: Any, view: Any, thread_edge: Any) -> None:
     """Locate VIEW B's far-jaw thread in its own view (VIEW_B_DIMENSIONS).
 
-    Each runs from a picked face edge to the thread's own circular edge, which
-    SolidWorks dimensions at its centre.  The readback is by value: the
-    depth's two candidate face edges lie the same .19 from the centred hole,
-    and a wrong height pick (the top edge) reads 5.67 mm, not 46.99.
+    Each runs from a face edge (picked by entity) to the thread's circle,
+    which SolidWorks dimensions at its centre.  The circle is picked by sheet
+    point on its rim at 45 deg, clear of the 0/90/180/270 deg centre-mark arms
+    (none exist yet: this runs before the centre marks), so
+    add_edge_dimension's entity pick never meets the round-2 failure (farm
+    run 20261107T104940656Z: the entity pick left three entities selected).
     """
-    pinch_y = _elevation_y(PINCH_HEIGHT, LEFT_CENTER)
-    north = find_edge_near(
-        adapter,
-        view,
-        (_LEFT_NORTH_X, _elevation_y(PINCH_HEIGHT / 2.0, LEFT_CENTER)),
-        axis="x",
-        label="VIEW B north face",
-    )
-    foot = find_edge_near(
-        adapter,
-        view,
-        (LEFT_CENTER[0] - BLOCK_Z * _S / 4.0, _elevation_y(0.0, LEFT_CENTER)),
-        axis="y",
-        label="VIEW B foot",
-    )
-    for name, face_xy, orientation, expected_mm in (
-        ("ViewBPinchDepth", north, "horizontal", BLOCK_Z / 2.0),
-        ("ViewBPinchHeight", foot, "vertical", PINCH_HEIGHT),
+    curve = _early_bound(_early_bound(thread_edge, "IEdge").GetCurve(), "ICurve")
+    params = tuple(float(value) for value in curve.CircleParams)
+    centre = model_point_in_view(adapter, view, params[:3], label="VIEW B thread centre")
+    rim_offset = params[6] * 1000.0 * _S / math.sqrt(2.0)
+    rim_xy = (centre[0] + rim_offset, centre[1] + rim_offset)
+    north = _view_b_face_edge(adapter, view, along=1, label="VIEW B north face")
+    foot = _view_b_face_edge(adapter, view, along=2, label="VIEW B foot")
+    for name, face_edge, face_xy, orientation, expected_mm in (
+        (
+            "ViewBPinchDepth",
+            north,
+            (_LEFT_NORTH_X, _elevation_y(BLOCK_HEIGHT / 2.0, LEFT_CENTER)),
+            "horizontal",
+            BLOCK_Z / 2.0,
+        ),
+        (
+            "ViewBPinchHeight",
+            foot,
+            (LEFT_CENTER[0] - BLOCK_Z * _S / 4.0, _elevation_y(0.0, LEFT_CENTER)),
+            "vertical",
+            PINCH_HEIGHT,
+        ),
     ):
         label = f"VIEW B {name}"
         dimension = add_edge_dimension(
             adapter,
             view,
             p0=face_xy,
-            p1=(LEFT_CENTER[0], pinch_y),
+            p1=rim_xy,
             text_xy=VIEW_B_DIMENSIONS[name],
             label=label,
             orientation=orientation,
-            entities=(None, thread_edge),
+            entities=(face_edge, None),
         )
         assert_dimension_measures(adapter, dimension, expected_mm=expected_mm, label=label)
+        _check_face_attachment(adapter, dimension, face_edge, label)
         display = _early_bound(dimension, "IDisplayDimension")
         places = VIEW_B_DIMENSION_PLACES[name]
         display.SetPrecision3(
@@ -1764,6 +1827,9 @@ async def build(adapter: Any) -> dict[str, str]:
     offset_dimension_text(adapter, top_annotations, TOP_TEXT_OFFSETS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
 
+    # VIEW B's stations go on before any centre mark exists, so neither pick
+    # can meet a centre-mark line.
+    _add_view_b_pinch_dimensions(adapter, left, pinch_thread_edge)
     for view, label in (
         (front, "adjuster entry elevation"),
         (right, "pinch clearance entry"),
@@ -1772,7 +1838,6 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add centre marks to {label} view")
-    _add_view_b_pinch_dimensions(adapter, left, pinch_thread_edge)
 
     adjuster_callout = add_native_hole_callout(
         adapter,

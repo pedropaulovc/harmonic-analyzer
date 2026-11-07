@@ -75,10 +75,16 @@ def test_pocket_names_its_mate_once_on_one_flag_note() -> None:
         "1. POCKET FOR MHA-DT-32 PIVOT SCREW HEAD: BORE TO THE",
         "   MEASURED HEAD, RUNNING FIT (CLEARANCE .008-.016).",
     ]
-    # The body's bond names its standard fit and the handle's glue line.
-    assert drawing.BODY_FIT_CALLOUT.splitlines() == [
-        "BONDED FIT IN MHA-DT-08, EPOXY",
-        "(CLEARANCE .002-.006)",
+    # The body's bond is a matched fit on flag note 2: the .XXX grade alone
+    # cannot give the glue line, so the route prints (round 2 review).
+    assert drawing.DIMENSION_CALLOUTS["BodyDia"] == "SEE NOTE 2"
+    assert drawing.BODY_NOTE_TEXT.splitlines() == [
+        "2. BODY: BONDED FIT IN MHA-DT-08 CRANK HANDLE, EPOXY:",
+        "   TURN TO THE MEASURED COUNTERBORE (CLEARANCE .002-.006).",
+    ]
+    assert drawing.NOTES_TEXT.splitlines() == [
+        *notes.POCKET_NOTE_TEXT.splitlines(),
+        *drawing.BODY_NOTE_TEXT.splitlines(),
     ]
 
 
