@@ -74,17 +74,18 @@ def test_owner_flange_and_gauge_pin_nose_are_kept() -> None:
     assert seat >= WALL_TARGET_MM
 
 
-def test_nose_band_names_why_it_is_tight() -> None:
-    # The .0001 band against MHA-CH-13's .4000 +.0005/0 hub hole (.0000-.0006
-    # locating clearance) holds the carrier's .005 edge-to-HUB allocation; the
-    # strap hole's limits print REF (the strap's sheet controls them).
+def test_nose_band_names_its_mate_and_float() -> None:
+    # The tight band against MHA-CH-13's .4000 +.0005/0 hub hole prints its
+    # actual radial float (NOSE_CLEARANCE upper / 2); the strap hole's limits
+    # print REF (the strap's sheet controls them). No allocation claim here.
     assert spec.STRAP_HOLE_LIMITS == pytest.approx((0.4 * INCH, 0.4005 * INCH))
     assert spec.NOSE_CLEARANCE == pytest.approx((0.0, 0.0006 * INCH))
-    assert spec.EDGE_TO_HUB_ALLOCATION == pytest.approx(0.005 * INCH)
+    assert not hasattr(spec, "EDGE_TO_HUB_ALLOCATION")
     callout = spec.DIMENSION_CALLOUTS["NoseDia"]
-    assert "STRAP MHA-CH-13 HUB" in callout
-    assert "(.4000-.4005 REF)" in callout
-    assert "HOLDS THE .005\nEDGE-TO-HUB ALLOCATION" in callout
+    assert callout == (
+        "LOCATES STRAP MHA-CH-13 HUB\nHOLE (.4000-.4005 REF):\n.0003 MAX RADIAL FLOAT"
+    )
+    assert "ALLOCATION" not in callout
     assert "TOP OF RISER " + spec.RISER_NUMBER in spec.DIMENSION_CALLOUTS["FitLength"]
 
 
