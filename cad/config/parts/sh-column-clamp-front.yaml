@@ -17,3 +17,8 @@ sh-column-clamp-front:
       where: "the sheet note EAR TO MHA-SH-02 TAP OFFSET UP TO .003 OVER #8 SCREW CLEARANCE"
       finding: "ear-hole-to-tap screw-line stack not held by the loose bands at the worst case, no fit-up adjustment (rules 19, 20)"
       reason: "the printed +/-.004 ear stations and heights alone spend .0113 (0.287 mm) of the #8 screw's .0160 (0.406 mm) radial clearance in the .196 MIN hole; 0.3 deg drill wander through both arcs (.0036 over the .690 MAX front depth + .0031 over the .60 MAX back depth) brings the worst offset to .0181 (0.459 mm), .0021 (0.0525 mm) over, inside the ruled 0.053 mm (stated rounded up as .003); no slot, oversize or match-drill is added (owner-ruled shortfall)"
+    - id: "RV-03"
+      kind: "accept"
+      where: "split-face view: the 2X .689 ±.004 ear-hole station and the 2X .315 ±.004 ear-hole height"
+      finding: "drilled-hole locations at ±.004, narrower than the ±.005 shop-table row and not a plain inch step, with no fit route named at the holes (rule 4)"
+      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (fan-out location-band ruling L3). The ±.004 stations and heights are the #8 screw line's budget shared with MHA-SH-02's taps (sh_column_clamp_fit): at the ±.005 row the RV-02 screw-line shortfall grows past its ruled 0.053 mm and the RV-01 ear web falls under its ruled .072, and RV-02 adds no slot, oversize or match-drill. They are DRO locations off the drawn bore axis, checked with a height gauge and pin."

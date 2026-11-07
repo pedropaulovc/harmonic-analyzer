@@ -42,9 +42,11 @@ _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 # text sits 6 mm higher.
 STOCK_CENTER = (0.150, 0.170)
 STOCK_TEXT = (0.175, 0.189)
-# An unhatched end view, not a section: the sheet has no cutting plane.
-STOCK_LABEL = f"WIRE END VIEW SCALE {STOCK_SCALE[0]}:{STOCK_SCALE[1]}"
-STOCK_LABEL_XY = (0.121, 0.152)
+# An unhatched end view, not a section: the sheet has no cutting plane. It is
+# drawn at the sheet scale, so it prints none (ASME Y14.3, rule 9); the label
+# stays centred under the circle (~2.5 mm per glyph).
+STOCK_LABEL = "WIRE END VIEW"
+STOCK_LABEL_XY = (0.134, 0.152)
 STOCK_FIELD = (0.100, 0.130, 0.260, 0.220)
 
 
