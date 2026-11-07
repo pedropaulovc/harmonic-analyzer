@@ -198,8 +198,13 @@ def test_full_turn_checks_use_the_spec_ratio_and_clear_the_unrelieved_platform()
     assert "WITHOUT BINDING THROUGH ONE FULL MHA-DT-07 TURN" in checks
     assert "MHA-DT-07 CLEAR OF THE UNRELIEVED MHA-DT-20 TOP THROUGHOUT" in checks
     assert "RELIEF THROUGHOUT" not in checks
-    assert "FINISHING IN THE RUNNING DIRECTION TO TAKE UP PLAY" in checks
-    assert "TURN THE CRANK FORWARD (CLOCKWISE, SHEET 1 FRONT VIEW)" in checks
+    # Owner ruling 2026-11-07 (engineerguy video 4): forward is clockwise in
+    # the FRONT view, the platen feeds away from the crank, and the sine notch
+    # stops on the MHA-DT-01 side.
+    assert "THE MHA-DT-12 FINISHING CLOCKWISE TO TAKE UP PLAY" in checks
+    assert "CRANK FORWARD IS CLOCKWISE IN THE SHEET 1 FRONT VIEW" in checks
+    assert "THE PLATEN FEEDS AWAY FROM THE CRANK" in checks
+    assert "LEVEL ON THE MHA-DT-01 SIDE (LEFT IN THE FRONT VIEW)" in checks
     # The crank mesh's free turn is check 2; the step-4 turn is the same test.
     assert "TURN MHA-DT-07 ONE FULL REVOLUTION BY HAND: IT MUST NEVER BIND" in _step_body(
         "crank-mesh-checked"
@@ -220,7 +225,7 @@ def test_step_four_holds_the_collar_on_the_boss_and_leaves_the_end_proud() -> No
         f"SET MHA-DT-10 {sheet.inch_text(pinion.SEAT_FEELER_MM, sheet.FEELER_PLACES)} "
         "OFF THE BOSS BACK FACE WITH A FEELER",
         "MATCH-DRILL THE MHA-DT-10",
-        f"END STANDS {drawing.inch_envelope((least, most), 3)} PROUD OF THE MHA-DT-10 BACK FACE",
+        f"END STANDS {drawing.inch_envelope((least, most), 3)} PROUD OF MHA-DT-10.",
         "DO NOT FACE",
     )
     positions = [fitup.index(phrase) for phrase in order]

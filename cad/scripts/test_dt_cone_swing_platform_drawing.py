@@ -1393,6 +1393,9 @@ def test_tip_dowel_note_stands_in_the_band_over_the_title_block() -> None:
     assert bottom >= 0.0648 + 0.0015
     assert x > 0.2185 + 0.002  # plan caption row
     assert right < 0.4191 - 0.002  # the sheet's inner border
+    # Round 7's layout audit: the section A-A label's box starts at x 0.3217
+    # and reaches down to y 0.0744, inside the note's first row.
+    assert right < 0.3217 - 0.002
     # Under A-A's SCALE 2:1 (ink 0.0760..0.0795 from x 0.332) by the same air.
     assert drawing.TIP_DOWEL_NOTE_CHAR_HEIGHT == 0.0025
 

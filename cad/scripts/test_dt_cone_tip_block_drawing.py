@@ -1154,10 +1154,12 @@ def test_dowel_hole_callout_keeps_two_rows_and_flags_its_note() -> None:
     for phrase in (
         "PRESS FIT FOR MHA-DT-VN-69",
         f"MATCH-DRILLED UP THRU MHA-DT-20 AT {step}",
-        "PERMANENT PAIR",
-        "DOWEL STAYS IN THE BLOCK",
+        "MHA-DT-VN-69, PERMANENT.",
     ):
         assert phrase in flat, phrase
+    # Round 7 (#0): rule 7's four short rows, no lift-off narration.
+    assert len(note.split("\n")) <= 4
+    assert "TOGETHER" not in note
     assert "FLOOR" not in note
     assert any(text == note for text, _x, _y in drawing._sheet_notes(drawing.FRONT_CENTER))
     assert spec.DRAWING_PRECISION_BY_NAME["DowelHoleDia"] == 4

@@ -448,11 +448,15 @@ TIP_DOWEL_CALLOUT = "\n".join(
 # MHA-DT-21 holds pressed, and is reamed to size through with the block on,
 # after MHA-DT-21's press ream has been drilled and reamed up through this
 # plate.  Two rows of at most TIP_DOWEL_NOTE_WIDTH characters under a hanging
-# indent; the step reference never breaks across rows.
-TIP_DOWEL_NOTE_WIDTH = 62
+# indent; the step reference never breaks across rows.  Round 7's layout
+# audit measured 62 characters at 107.7 mm (x 221.6..329.3 mm), 7.6 mm into
+# the box of the section A-A label above it (from x 321.7 mm).  The callout's
+# SEE NOTE 1 names the hole, so the note opens on the fit; its longest row
+# is 48 characters, about 85 mm.
+TIP_DOWEL_NOTE_WIDTH = 55
 _NBSP = "\u00a0"
 TIP_DOWEL_NOTE = textwrap.fill(
-    f"TIP DOWEL HOLE: SLIP FIT FOR {TIP_DOWEL_PIN_NUMBER}. MATCH-REAM THRU AT "
+    f"SLIP FIT FOR {TIP_DOWEL_PIN_NUMBER}. MATCH-REAM THRU AT "
     f"{step_ref('post-and-tip-block').replace(' ', _NBSP)}, AFTER THE "
     f"{TIP_BLOCK_NUMBER} REAM.",
     width=TIP_DOWEL_NOTE_WIDTH,
