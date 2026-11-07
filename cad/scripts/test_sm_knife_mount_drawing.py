@@ -332,17 +332,17 @@ def test_tap_callout_moves_clear_of_the_row_dimension_tail() -> None:
     assert tail_x > x + drawing.TAP_CALLOUT_HALF_WIDTH + ARROW_TEXT_CLEARANCE_M
     top = y + drawing.TAP_CALLOUT_TOP_REACH
     assert top <= tail_end - ARROW_TEXT_CLEARANCE_M - 0.001
-    assert drawing.TAP_FRAME_XY[1] == pytest.approx(y - drawing.TAP_FRAME_DROP)
 
 
-def test_tap_callout_prints_three_rows_with_its_bands_and_drill_point() -> None:
+def test_tap_callout_prints_four_rows_with_its_bands_and_drill_point() -> None:
     # Tall-block (the 4-row limit): the c673e62ee seat's definitions, the
     # pilot's stacked upper deviation a row of its own, printed five rows with
     # the mate below the thread.  Now the pilot is named by its drill (no Ø,
     # no band, no stacked row), the thread prints no class (the title block's
-    # thread row), and the reason naming the mate is the one row under the
-    # thread, no process row above it: three.  The symmetric bands, the drill
-    # point and the thread's native depth stay.
+    # thread row), and the reason naming the mate and the route spotting the
+    # tap through MHA-FR-02 are the rows under the thread, no process row
+    # above it: four.  The symmetric bands, the drill point and the thread's
+    # native depth stay.
     from _layout_audit import TEXT_ROW_LIMIT
 
     drill_row = "<MOD-DIAM> <hw-tapdrldia> <HOLE-DEPTH> <hw-tapdrldepth>"
@@ -373,12 +373,12 @@ def test_tap_callout_prints_three_rows_with_its_bands_and_drill_point() -> None:
     assert printed_rows(run, 1) == TEXT_ROW_LIMIT + 1
     assert stacked_band_rows == 0
     wanted = drawing.tap_callout_definitions(seat)
-    assert printed_rows(wanted, stacked_band_rows) == 3 <= TEXT_ROW_LIMIT
+    assert printed_rows(wanted, stacked_band_rows) == 4 <= TEXT_ROW_LIMIT
     assert wanted[7] == (
         f"{drawing.TAP_DRILL_CALLOUT} <HOLE-DEPTH> <hw-tapdrldepth> X <hw-drlang>"
     )
     assert wanted[5] == "<hw-threaddesc> <HOLE-DEPTH> <hw-threaddepth>"
-    assert wanted[8] == drawing.TAP_CALLOUT_REASON
+    assert wanted[8] == f"{drawing.TAP_CALLOUT_REASON}\n{drawing.TAP_CALLOUT_ROUTE}"
     joined = "".join(wanted.values())
     assert "threadclass" not in joined
     assert "<MOD-DIAM>" not in joined and "<hw-tapdrldia>" not in joined
@@ -410,11 +410,12 @@ def test_tap_callout_parks_between_the_top_view_and_the_front_view() -> None:
     assert top < top_view_bottom
     assert drawing.SLOT_DATUM_C_XY[1] - top >= TEXT_SEPARATION_HEIGHTS * 0.0035
     assert x + drawing.TAP_CALLOUT_HALF_WIDTH < drawing.FRONT_CENTER[0] - 0.0035 - 0.005
-    # The frame (7 mm tall) stays over the 29.6 height line's upper witness
-    # line (y at the block top), not beside it, a text height and more clear.
-    frame_bottom = drawing.TAP_FRAME_XY[1] - 0.007
+    # The block's four rows stay over the 29.6 height line's upper witness
+    # line (y at the block top), a text height and more clear: the five-row
+    # c673e62ee envelope reached 15.6 mm under the anchor.
+    block_bottom = y - 0.0156
     front_top = drawing._front_y(sm_knife_mount_spec.BLK_TOP)
-    assert frame_bottom - front_top >= TEXT_SEPARATION_HEIGHTS * 0.0035
+    assert block_bottom - front_top >= TEXT_SEPARATION_HEIGHTS * 0.0035
     # T+H3 lowered the front and right views 15 mm, the band they open
     # taking the callout's 20 mm drop.
     assert drawing.FRONT_CENTER[1] == drawing.RIGHT_CENTER[1] == 0.125
@@ -431,73 +432,6 @@ def test_tap_callout_parks_between_the_top_view_and_the_front_view() -> None:
     reason_width = len(drawing.TAP_CALLOUT_REASON) * run_mm_per_char
     assert 2.0 * drawing.TAP_CALLOUT_HALF_WIDTH >= reason_width + 0.005
     assert len(drawing.TAP_CALLOUT_REASON) >= len(drawing.TAP_DRILL_CALLOUT)
-
-
-def test_tap_frame_leader_lands_clear_of_the_tap_callout_leader() -> None:
-    # Farm run 20261009T164113078Z: both leaders landed on the tap's
-    # lower-left rim and the frame's, climbing from the frame's right end,
-    # crossed the callout's 2 mm short of the tip (leader-crosses-leader,
-    # enforced in report mode).  The leader ends below are that run's
-    # printed ones (the 25-wide block, the #6-32 tap's Ø2.705 drill); the
-    # frame now lands on the lower-right rim instead.
-    from _layout_audit import TEXT_CLEARANCE_HEIGHTS, _segment_crossing
-    from _layout_geometry import Segment
-
-    callout_shoulder_end, run_callout_tip = (0.0947, 0.1986), (0.1137, 0.2326)
-    frame_end, old_frame_tip = (0.1103, 0.1900), (0.1130, 0.2332)
-    callout = Segment(*callout_shoulder_end, *run_callout_tip)
-    assert _segment_crossing(callout, Segment(*frame_end, *old_frame_tip)) is not None
-
-    def lower_rim(x_side: float, tap_drill_dia: float) -> tuple[float, float]:
-        rim = tap_drill_dia / 2.0 / 2.0**0.5 * drawing.SHEET_SCALE[0] / 1000.0
-        return (drawing._sheet_x(0.0) + x_side * rim, drawing.TOP_CENTER[1] - rim)
-
-    run_tap_drill_dia = 2.705
-    run_rim = lower_rim(drawing.TAP_CALLOUT_RIM_SIDE, run_tap_drill_dia)
-    assert math.dist(run_rim, run_callout_tip) < 0.001
-    assert drawing.TAP_FRAME_RIM_SIDE == -drawing.TAP_CALLOUT_RIM_SIDE
-    # Farm run 20261027T133857303Z printed the frame's leader root 47.9207
-    # mm right of and 3.5 mm under TAP_FRAME_XY (its 6.35 shoulder off the
-    # frame's right end); the frame keeps that shape wherever TAP_FRAME_XY
-    # puts it, and the tips land on the #10-24 drill's lower rims.
-    frame_root = (drawing.TAP_FRAME_XY[0] + 0.0479207, drawing.TAP_FRAME_XY[1] - 0.0035)
-    frame_tip = lower_rim(drawing.TAP_FRAME_RIM_SIDE, drawing.STUD_TAP_DIA)
-    frame = Segment(*frame_root, *frame_tip)
-    callout_tip = lower_rim(drawing.TAP_CALLOUT_RIM_SIDE, drawing.STUD_TAP_DIA)
-    # The callout's leader leaves its block's right end, under its last row:
-    # at most the half width right of the anchor, anywhere from a text
-    # clearance over the frame's top up to the anchor.
-    callout_right = drawing.TAP_CALLOUT_XY[0] + drawing.TAP_CALLOUT_HALF_WIDTH
-    lowest = drawing.TAP_FRAME_XY[1] + TEXT_CLEARANCE_HEIGHTS * 0.0035
-    for root_y in (lowest, drawing.TAP_CALLOUT_XY[1]):
-        callout = Segment(callout_right, root_y, *callout_tip)
-        assert _segment_crossing(callout, frame) is None
-        # The callout's root stays left of the frame's.
-        assert callout.x0 < frame.x0
-    # The frame's leader passes left of the datum-A tag's 7 mm box over the
-    # front view's top seat.
-    tag_left = drawing.DATUM_A_X - 0.0035
-    tag_top = drawing._front_y(sm_knife_mount_spec.BLK_TOP) + 0.018 + 0.0075
-    assert frame_root[1] < tag_top < frame_tip[1]
-
-    def x_at(y: float) -> float:
-        return frame_root[0] + (frame_tip[0] - frame_root[0]) * (
-            (y - frame_root[1]) / (frame_tip[1] - frame_root[1])
-        )
-
-    assert x_at(tag_top) < tag_left - 0.001
-    # Datum B's former bare tag box (x 116.5..123.5, y 207.7..214.7 mm in farm
-    # run 20261027T133857303Z) passed 0.08 mm off this leader and was crossed
-    # in farm run 20261027T143609236Z.  B now rides its ⊥ frame, whose leader
-    # shoulder and frame stand well right of this leader, and the two
-    # leaders do not cross.
-    b_elbow, b_tip = datum_b_frame_leader()
-    assert x_at(b_elbow[1]) <= b_elbow[0] - 0.010
-    assert x_at(drawing.PIN_FRAME_XY[1]) <= drawing.PIN_FRAME_XY[0] - 0.010
-    assert _segment_crossing(frame, Segment(*b_elbow, *b_tip)) is None
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "tap_rim = _tap_lower_rim(adapter, top, TAP_CALLOUT_RIM_SIDE)" in source
-    assert "edge_xy=_tap_lower_rim(adapter, top, TAP_FRAME_RIM_SIDE)" in source
 
 
 # Farm run 20261027T133857303Z's printed ink near datum B (sheet metres): the
@@ -931,12 +865,6 @@ def test_native_gdt_and_bore_geometry() -> None:
             ("A", "B", "C"),
             True,
         ),
-        "knife-hanger tap position": (
-            "position",
-            "knife-hanger tap position",
-            ("A", "B", "C"),
-            True,
-        ),
     }
     # A lower frame takes its upper frame's Ø flag (add_feature_control_frame):
     # the slot's stacked ⊥, none; the bore's composite segment, Ø.  The
@@ -951,7 +879,7 @@ def test_native_gdt_and_bore_geometry() -> None:
             True,
         ),
     }
-    assert source.count('datums=("A", "B", "C")') == 2
+    assert source.count('datums=("A", "B", "C")') == 1
     assert source.count('datums=("A", "B")') == 1
     assert source.count('datums=("A",)') == 1
     assert source.count("lower_frame=") == 2
@@ -979,18 +907,20 @@ def test_native_gdt_and_bore_geometry() -> None:
     bore_frame = bore_frame[: bore_frame.index("    bore_basic = ")]
     assert 'tolerance=GEOMETRIC_TOLERANCES_IN["knife-bore position"],' in bore_frame
     assert "composite=True," in bore_frame
+    # The slot's position and both perpendicularities at their shop rows,
+    # the tap spotted through MHA-FR-02 with no frame (delegated rulings sm
+    # Q1-Q3).
     assert sm_knife_mount_spec.GEOMETRIC_TOLERANCES_IN == {
         "knife-bore position": ".008",
         "knife-bore orientation": ".002",
-        "knife-hanger tap position": ".005",
-        "dowel slot position": ".002",
-        "dowel hole perpendicularity": ".0006",
-        "dowel slot perpendicularity": ".0006",
+        "dowel slot position": ".004",
+        "dowel hole perpendicularity": ".001",
+        "dowel slot perpendicularity": ".001",
     }
     # Owner ruling 2026-10-27 (#2016): the name a sibling's assembly check
     # imports.
-    assert sm_knife_mount_spec.DOWEL_HOLE_PERPENDICULARITY_TOL == pytest.approx(0.01524)
-    assert sm_knife_mount_spec.DOWEL_SLOT_PERPENDICULARITY_TOL == pytest.approx(0.01524)
+    assert sm_knife_mount_spec.DOWEL_HOLE_PERPENDICULARITY_TOL == pytest.approx(0.0254)
+    assert sm_knife_mount_spec.DOWEL_SLOT_PERPENDICULARITY_TOL == pytest.approx(0.0254)
     assert sm_knife_mount_spec.KNIFE_BORE_POSITION_TOL == pytest.approx(0.2032)
     assert sm_knife_mount_spec.KNIFE_BORE_ORIENTATION_TOL == pytest.approx(0.0508)
     assert (
@@ -998,7 +928,7 @@ def test_native_gdt_and_bore_geometry() -> None:
         < sm_knife_mount_spec.KNIFE_BORE_POSITION_TOL
     )
     assert sm_knife_mount_spec.STUD_TAP_POSITION_TOL == pytest.approx(0.127)
-    assert sm_knife_mount_spec.SLOT_POSITION_TOL == pytest.approx(0.0508)
+    assert sm_knife_mount_spec.SLOT_POSITION_TOL == pytest.approx(0.1016)
     # The composite refinement is an extra GD&T row: the package declares it
     # (drawing-simplicity-policy.md, GD&T allowlist), citing the ruling.
     declared = _config.parts("sm-knife-mount")["machinist_exceptions"]
@@ -1235,7 +1165,7 @@ def test_tap_point_rides_the_native_definitions_and_the_reason_names_the_mate() 
             f"{drawing.TAP_DRILL_CALLOUT} <HOLE-DEPTH> <hw-tapdrldepth> X <hw-drlang>\n"
             "<hw-threaddesc> <HOLE-DEPTH> <hw-threaddepth>"
         ),
-        8: drawing.TAP_CALLOUT_REASON,
+        8: f"{drawing.TAP_CALLOUT_REASON}\n{drawing.TAP_CALLOUT_ROUTE}",
     }
     assert drawing.tap_callout_definitions(
         {**before, 5: before[5].replace(" <hw-threadclass>", "-<hw-threadclass>")}
