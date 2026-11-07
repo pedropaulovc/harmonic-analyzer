@@ -121,7 +121,9 @@ VIEW_A_ARROW = (
 # Numbered notes (rule 7): each callout links its note by SEE NOTE n, so the
 # callouts stay within two lines of words. Note 1 is the OD's matched fit
 # (rule 4: both mates by name and number, and the acceptance); note 2 the
-# cut length's fit-up at assembly (rule 19).
+# cut length's fit-up at assembly (rule 19), at the plain lower end so the
+# trim never takes the top end's chamfer (local repeat review of run
+# 20261107T102146937Z: which end is cut, and is the lower end chamfered?).
 _BASE_ROW = _config.parts("fr-harmonic-base")
 _TOP_ROW = _config.parts("fr-top-frame")
 OD_FIT_NOTE_NUMBER = 1
@@ -134,7 +136,7 @@ NOTES = "\n".join(
         f"{str(_BASE_ROW['title']).upper()} AND",
         f"    {_TOP_ROW['number']} TOP FRAME SOCKETS ARE FITTED TO THIS TUBE;",
         "    IT SLIDES IN BY HAND, NO PERCEPTIBLE ROCK.",
-        f"{LENGTH_FIT_NOTE_NUMBER}. CUT TO FIT AT ASSEMBLY TO THE {_BASE_ROW['number']} /",
+        f"{LENGTH_FIT_NOTE_NUMBER}. CUT LOWER END TO FIT AT ASSEMBLY TO THE {_BASE_ROW['number']} /",
         f"    {_TOP_ROW['number']} / {_config.parts('fr-vn-tube-frame-cap')['number']} STACK.",
     )
 )
@@ -187,6 +189,9 @@ _CHAMFER_DIMENSION = 10  # swDimensionType_e.swChamferDimension
 _CHAMFER_TEXT_DIST_ANG = 2
 _CHAMFER_LENGTH = 0  # IDisplayDimension.ChamferPrecision index: length
 _CHAMFER_ANGLE = 1  # IDisplayDimension.ChamferPrecision index: angle
+# The break is the top end's only (the cap's lead-in); the lower end keeps
+# the title block's edge break. The edge it names rides over the value.
+CHAMFER_EDGE_CALLOUT = "TOP END ONLY"
 # The cut length is set at assembly: the supply size rides above the (40.109)
 # reference and SEE NOTE 2 below it (rule 19), so the requirement is flagged
 # on the length itself.
@@ -675,7 +680,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # The chamfer prints its size alone: the cap's seating is the assembly's
     # check, not this part's (rule 7).
     chamfer_settled = _add_top_chamfer_dimension(
-        adapter, length, text_xy=CHAMFER_TEXT_XY, callout_above=""
+        adapter, length, text_xy=CHAMFER_TEXT_XY, callout_above=CHAMFER_EDGE_CALLOUT
     )
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the annulus end view")
