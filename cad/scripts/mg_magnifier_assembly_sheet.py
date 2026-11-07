@@ -236,9 +236,10 @@ STEP_TEXT = {
     # A press that goes on by hand is a slip fit (rule 23). Owner ruling
     # 2026-11-07: a bond equals a press, so a slip drum is bonded rather than
     # the wheel remade (BOND_NOTE); a slip axle is remade.
-    "drum-slip-fit": (
-        f"IF IT DOES, OR {_DRUM} SLID ON BY HAND: PULL IT OFF AND BOND IT TO "
-        f"{_WHEEL} WITH {BOND_GRADE}, {BOND_NOTE_REF}."
+    "drum-pulled-off": f"IF IT DOES, OR {_DRUM} SLID ON BY HAND, PULL {_DRUM} OFF.",
+    "drum-bonded": (
+        f"IF {_DRUM} CAME OFF, BOND IT TO {_WHEEL} WITH {BOND_GRADE}, "
+        f"{BOND_NOTE_REF}."
     ),
     # Machinist review (run 20261024T053015093Z): the REF depth is the first
     # stop; the ACCEPT limit governs any further press.
@@ -247,9 +248,10 @@ STEP_TEXT = {
         f"THE REF DEPTH IN {PRESS_DETAIL_TITLE}."
     ),
     _steps.AXLE_HELD_KEY: f"CHECK {_AXLE} DOES NOT TURN OR SLIDE BY HAND.",
-    "axle-slip-fit": (
-        f"IF IT DOES, OR {_AXLE} SLID IN BY HAND: PRESS IT OUT, REMAKE {_AXLE} TO "
-        f"ITS PRESS SIZE AND RETURN TO {_step(_steps.AXLE_PRESSED_KEY)}."
+    "axle-pressed-out": f"IF IT DOES, OR {_AXLE} SLID IN BY HAND, PRESS {_AXLE} OUT.",
+    "axle-remade": (
+        f"REMAKE THAT {_AXLE} TO ITS PRESS SIZE AND RETURN TO "
+        f"{_step(_steps.AXLE_PRESSED_KEY)}."
     ),
     _steps.AXLE_TRIAL_KEY: f"TRIAL-FIT {_STACK} ON {_AXLE}, IN THAT ORDER.",
     "trial-nuts-jammed": (

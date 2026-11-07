@@ -39,13 +39,15 @@ WIRE_TIED_KEY = "lever-wire-tied"
 SEQUENCE: tuple[str, ...] = (
     # Wheel group. Each press is accepted at the bench before anything else
     # goes on it (rule 23): it does not turn or slide by hand, and a slip fit
-    # has its own step.
+    # has its own single-action steps (rule 22).
     DRUM_PRESSED_KEY,
     DRUM_HELD_KEY,
-    "drum-slip-fit",
+    "drum-pulled-off",
+    "drum-bonded",
     AXLE_PRESSED_KEY,
     AXLE_HELD_KEY,
-    "axle-slip-fit",
+    "axle-pressed-out",
+    "axle-remade",
     AXLE_TRIAL_KEY,
     "trial-nuts-jammed",
     AXLE_CHECKED_KEY,
