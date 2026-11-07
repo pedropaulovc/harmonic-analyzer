@@ -344,7 +344,7 @@ TOP_KEEP = {
     "SlotEndFromB": SLOT_END_TEXT_XY,
     "HoleRowFace": ROW_FACE_TEXT_XY,
 }
-# The knife bore is bored (Ra 63 µin, +.0012/0 band): the process is stated
+# The knife bore is bored (Ra 63 µin, +.0015/0 band): the process is stated
 # (blind machinist review, 2026-10-09: a bare THRU left drill or ream open),
 # and the band's mate and fit under it (rule 4): the summing lever's hex
 # trunnion, whose top ridge rocks on the bore's crown.  The mate's number is

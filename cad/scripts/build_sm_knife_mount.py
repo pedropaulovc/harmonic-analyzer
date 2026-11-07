@@ -179,7 +179,7 @@ if (
 # (draw_sm_knife_mount) at the places that carry it unrounded.
 BORE_CENTRE_DEPTH = BLK_TOP - BORE_CY
 # The spec judges the tap's web at its mirror; re-judge it here at the
-# derived top (2.110: the charged pilot envelope, Ø3.924, not the accepted
+# derived top (2.106: the charged pilot envelope, Ø3.924, not the accepted
 # Ø3.8989, at the sharpest accepted point, 117 deg).
 _TAP_WEB_WORST = sm_knife_mount_spec.tap_web_worst(
     BLK_TOP,
@@ -505,7 +505,7 @@ async def build(adapter) -> dict[str, str]:
     # coords are zero -> origin-axis relations, no placement dims). The
     # analytic expectation subtracts the nominal drill cylinder to its depth
     # plus its 118 deg point; even the charged pilot envelope at its sharpest
-    # accepted point stops _TAP_WEB_WORST (2.110) above the bore crown, so
+    # accepted point stops _TAP_WEB_WORST (2.106) above the bore crown, so
     # none of it overlaps the bore void.
     wizard_holes(
         adapter,
@@ -734,8 +734,8 @@ async def build(adapter) -> dict[str, str]:
         places=HOLE_ROW_FACE_PLACES,
         display_unit=UNIT,
     )
-    # The bored knife bore's +.0012/0 band (sm_knife_mount_spec.BORE_DIA_BAND),
-    # printed at its four places: Ø.4720 +.0012/.0000 THRU.
+    # The bored knife bore's +.0015/0 band (sm_knife_mount_spec.BORE_DIA_BAND),
+    # printed at its four places: Ø.4720 +.0015/.0000 THRU.
     set_dimension_bilateral_tolerance(
         adapter,
         "BoreProfile",

@@ -96,12 +96,15 @@ _XX = printed_band_mm(2, unit=UNIT)
 _XXX = printed_band_mm(3, unit=UNIT)
 # The Ø.472 bore is BORED through on the boring head (no .472 reamer is
 # owned; the .4835 decimal reamer re-nominal fails the tap's crown web) to an
-# explicit .4720 +.0012/.0000 band, Ra 63 µin on its knife seat: the rock
-# budget takes the smallest bore, the webs the largest.
-BORE_DIA_BAND = (0.03048, 0.0)  # +.0012/.0000 in
+# explicit .4720 +.0015/.0000 band, Ra 63 µin on its knife seat: the rock
+# budget takes the smallest bore, the webs the largest.  A plain inch step
+# (rule 4; machinist review round 4, farm run 20261107T161739921Z: the
+# former +.0012 read as converted millimetres), loosened rather than
+# tightened (fan-out L2): every web still holds at the largest bore.
+BORE_DIA_BAND = (0.0381, 0.0)  # +.0015/.0000 in
 BORE_DIA_PLACES = 4
 BORE_R_MIN = R_BORE + min(BORE_DIA_BAND) / 2.0  # 5.9944
-BORE_R_MAX = R_BORE + max(BORE_DIA_BAND) / 2.0  # 6.00964
+BORE_R_MAX = R_BORE + max(BORE_DIA_BAND) / 2.0  # 6.01345
 # The block's overall sizes print two places (.XX): every stack below reads
 # them, so none takes the .X row.
 BLOCK_SIZE_PLACES = 2
@@ -330,8 +333,8 @@ def drill_point_height(drill_dia: float, point_angle_deg: float) -> float:
 # The metal the tap's drill point leaves over the bore crown, every band at
 # its worst (the drill depth's band, the charged pilot envelope at its
 # sharpest accepted point, the largest bored bore, the bore's position zone
-# KNIFE_BORE_POSITION_TOL): 14.605 - 0.1016 - 0.0152 - 11.176 - 1.2023 =
-# 2.110, over the rule-17 .080 target.
+# KNIFE_BORE_POSITION_TOL): 14.605 - 0.1016 - 0.0191 - 11.176 - 1.2023 =
+# 2.106, over the rule-17 .080 target.
 STUD_TAP_WEB_MIN = WALL_TARGET_MM
 STUD_TAP_POINT_H = drill_point_height(
     STUD_TAP_DIA_MAX, STUD_TAP_POINT_ANGLE_MIN_DEG
@@ -549,7 +552,7 @@ STUD_TAP_Z_WALL = (
 )
 # The bore's flanks: its axis BASIC PIN_HOLE_X from B within its zone
 # radius, B off the +X face by its .XX band: near 12.7 - 0.254 - 0.102 -
-# 6.010 = 6.335, far 25.146 - 13.056 - 6.010 = 6.081.
+# 6.013 = 6.331, far 25.146 - 13.056 - 6.013 = 6.077.
 _BORE_FROM_PLUS_X_FACE_MAX = (
     BLK_HALF_X + PIN_HOLE_SIDE_TOL + KNIFE_BORE_POSITION_TOL / 2.0
 )

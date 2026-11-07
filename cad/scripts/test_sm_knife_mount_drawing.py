@@ -1133,8 +1133,8 @@ def test_tap_crown_web_charges_a_pilot_wider_than_accepted_at_its_sharpest_point
     assert spec.STUD_TAP_DRILL_DEPTH_MAX == pytest.approx(11.176)
     # The bore's Ø.008 location zone charges 0.1016 of crown (owner ruling
     # 2026-10-27, #2016).
-    assert spec.STUD_TAP_WEB_WORST == pytest.approx(2.1098448537, abs=1e-9)
-    assert part._TAP_WEB_WORST == pytest.approx(2.1098448537, abs=1e-9)
+    assert spec.STUD_TAP_WEB_WORST == pytest.approx(2.1060348537, abs=1e-9)
+    assert part._TAP_WEB_WORST == pytest.approx(2.1060348537, abs=1e-9)
     assert part._TAP_WEB_WORST >= spec.STUD_TAP_WEB_MIN == pytest.approx(2.032)
     # The nominal pilot at an exact 118 deg overstated the web.
     assert spec.tap_web_worst(
@@ -1413,7 +1413,7 @@ def test_the_slip_seats_hold_their_margins_and_webs() -> None:
 
 def test_the_bore_states_its_bored_band_and_mate() -> None:
     # Machinist review B3: a bare THRU left drill or ream open; the bore is
-    # bored to Ø.4720 +.0012/0 (S3: a boring head, not a ream; Ra 63 µin
+    # bored to Ø.4720 +.0015/0 (S3: a boring head, not a ream; Ra 63 µin
     # stays).  ENFORCE review (2026-10-24, rule 4): the band names its mate,
     # the lever's trunnion.  The process word and the mate's number, the
     # lever's from the registry; three rows, the ones BORE_DIA_TEXT_TOP_REACH
@@ -1434,9 +1434,11 @@ def test_the_bore_states_its_bored_band_and_mate() -> None:
     assert len(rows) <= 3
     widest = max(len(row) for row in rows)
     assert drawing.BORE_DIA_TEXT_HALF_WIDTH >= widest * 0.00252 / 2.0
-    assert sm_knife_mount_spec.BORE_DIA_BAND == pytest.approx((0.03048, 0.0))
+    # A plain inch step (round 4: +.0012 read as converted millimetres),
+    # loosened under fan-out L2.
+    assert sm_knife_mount_spec.BORE_DIA_BAND == pytest.approx((0.0381, 0.0))
     assert sm_knife_mount_spec.BORE_R_MIN == sm_knife_mount_spec.R_BORE
-    assert sm_knife_mount_spec.BORE_R_MAX == pytest.approx(6.00964)
+    assert sm_knife_mount_spec.BORE_R_MAX == pytest.approx(6.01345)
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert (
         "        \"BoreProfile\",\n"

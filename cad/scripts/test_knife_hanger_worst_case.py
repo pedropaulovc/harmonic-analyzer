@@ -55,9 +55,9 @@ def test_the_tap_point_leaves_the_web_over_the_bore_crown() -> None:
     # (Ø.008, owner ruling 2026-10-27), bore radius oversize, maximum
     # cylindrical drill depth and point height.
     assert knife_mount.STUD_TAP_WEB_WORST == pytest.approx(
-        14.605 - 0.1016 - 0.01524 - 11.176 - point_height
+        14.605 - 0.1016 - 0.01905 - 11.176 - point_height
     )
-    assert knife_mount.STUD_TAP_WEB_WORST == pytest.approx(2.1098448537)
+    assert knife_mount.STUD_TAP_WEB_WORST == pytest.approx(2.1060348537)
     assert knife_mount.STUD_TAP_WEB_WORST >= knife_mount.STUD_TAP_WEB_MIN
     # The built top is the spec's 14.866.
     built = knife_mount.tap_web_worst(
@@ -65,7 +65,7 @@ def test_the_tap_point_leaves_the_web_over_the_bore_crown() -> None:
         knife_mount.STUD_TAP_DRILL_DEPTH,
         knife_mount.STUD_TAP_DIA,
     )
-    assert built == pytest.approx(2.1098448537)
+    assert built == pytest.approx(2.1060348537)
     assert build_sm_knife_mount._TAP_WEB_WORST == pytest.approx(built)
     assert built >= knife_mount.STUD_TAP_WEB_MIN
     # A .004 wider drill-depth band consumes the remaining functional web.
@@ -117,8 +117,8 @@ def test_previous_drill_depth_fails_when_pilot_and_point_limits_are_charged() ->
         drill_dia_oversize=0.0,
         point_angle_deg=118.0,
     )
-    assert optimistic == pytest.approx(2.0066261148, abs=5e-6)
-    assert charged == pytest.approx(1.9450448537)
+    assert optimistic == pytest.approx(2.0028161148, abs=5e-6)
+    assert charged == pytest.approx(1.9412348537)
     assert charged < optimistic < knife_mount.STUD_TAP_WEB_MIN
 
 
@@ -734,19 +734,19 @@ def test_the_knife_mount_webs_hold_round_the_hole_and_the_slot() -> None:
     assert knife_mount.HOLE_ROW_FACE_TOL == knife_mount._XX
     assert knife_mount.BLOCK_SIZE_TOL == knife_mount._XX
     assert knife_mount.BLOCK_HEIGHT_PRINTED == pytest.approx(29.718)
-    assert knife_mount.BORE_DIA_BAND == pytest.approx((0.03048, 0.0))
+    assert knife_mount.BORE_DIA_BAND == pytest.approx((0.0381, 0.0))
     webs = {
         "round hole to +X face": (knife_mount.PIN_HOLE_SIDE_WEB, 3.19151),
         "round hole to Z faces": (knife_mount.PIN_HOLE_Z_WEB, 4.84251),
         "slot cheeks to Z faces": (knife_mount.SLOT_CHEEK_WEB, 4.428156),
         "slot end to -X face": (knife_mount.SLOT_END_TO_MOUTH, 3.44551),
         "tap to Z faces": (knife_mount.STUD_TAP_Z_WALL, 3.867492),
-        "bore to side faces": (knife_mount.BORE_SIDE_WEB, 6.08076),
-        "bore to bottom face": (knife_mount.BORE_BOTTOM_WALL, 2.75336),
+        "bore to side faces": (knife_mount.BORE_SIDE_WEB, 6.07695),
+        "bore to bottom face": (knife_mount.BORE_BOTTOM_WALL, 2.74955),
         "round hole to tap": (knife_mount.PIN_HOLE_TAP_WEB, 3.50901),
         "slot end to tap": (knife_mount.SLOT_TAP_WEB, 2.49301),
-        "round hole to bore": (knife_mount.PIN_HOLE_BORE_WEB, 6.329395),
-        "slot to bore": (knife_mount.SLOT_BORE_WEB, 5.878502),
+        "round hole to bore": (knife_mount.PIN_HOLE_BORE_WEB, 6.325585),
+        "slot to bore": (knife_mount.SLOT_BORE_WEB, 5.874692),
     }
     for label, (web, expected) in webs.items():
         assert web == pytest.approx(expected, abs=5e-4), label
