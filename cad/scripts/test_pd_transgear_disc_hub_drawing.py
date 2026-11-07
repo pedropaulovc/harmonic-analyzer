@@ -310,7 +310,7 @@ def test_the_spigot_seats_on_the_step_square_and_clear_of_the_disc() -> None:
     gap = (
         spec.SPIGOT_LENGTH_MIN
         - disc.FACE_WIDTH_MAX
-        - float(disc.GEOMETRIC_TOLERANCES_MM["disc rear face parallelism to front"])
+        - disc.REAR_FACE_PARALLELISM_BOUND_MM
         - tilt * disc.BORE_DIA_MAX / 2.0
     )
     assert spec.DISC_STEP_GAP_WORST == pytest.approx(gap)
