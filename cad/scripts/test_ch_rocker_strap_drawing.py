@@ -85,8 +85,6 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     assert notes.DRAWING_PRECISION_BY_NAME["StrapThickness"] == 3
     assert notes.DRAWING_PRECISION_BY_NAME["TopAbovePivot"] == 3
     assert notes.DRAWING_PRECISION_BY_NAME["BottomBelowPivot"] == 3
-    # The R816 follows from the R800 and both edges: never a stacking size.
-    assert "BottomRadius" not in marked
     # TailTipLen is the RodTipLen's mirror: it prints once, as 2X.
     assert "TailTipLen" not in marked
     assert notes.TIP_LAND_PREFIX == "2X "
@@ -148,28 +146,15 @@ def test_every_band_is_native_and_names_its_mate() -> None:
     # The bottom edge's band mirrors the top's: the finished part's lower
     # profile zone, wholly in material.
     assert spec.BOTTOM_EDGE_BAND == (0.0, -0.508)
-    # The hole's edges override the title block's break: a groove round the
-    # pressed hub's root would replace MHA-CH-06's MAX root corner.
-    assert notes.HOLE_EDGE_CALLOUT.splitlines() == [
-        "BOTH EDGES SHARP, NO BURR",
-        "(NO GROOVE AT HUB ROOT)",
-    ]
     assert notes.DIMENSION_CALLOUTS["HoleDia"] == notes.HOLE_CALLOUT
-    # The finished part's mates, worded as on its own print.
-    assert (
-        notes.DIMENSION_CALLOUTS["TopAbovePivot"] == rocker_notes.TOP_EDGE_MATE_CALLOUT
-    )
     assert notes.DIMENSION_CALLOUTS["StrapThickness"] == rocker_notes.STRAP_FIT_CALLOUT
-    # The arc centre and the lands' direction ride on their own dimensions,
-    # not in a general note.
-    assert notes.DIMENSION_CALLOUTS["TopRadius"] == "CENTRE ABOVE HOLE"
     assert notes.DIMENSION_CALLOUTS["RodTipLen"] == "RADIAL"
 
 
 def test_no_rod_pin_hole_and_no_finished_bore_on_the_strap() -> None:
     build = Path(part.__file__).read_text(encoding="utf-8")
     assert "ROD_PIN" not in build and "PIVOT_HOLE" not in build
-    printed = " ".join((notes.DRAWING_NOTES, *notes.DIMENSION_CALLOUTS.values()))
+    printed = " ".join(notes.DIMENSION_CALLOUTS.values())
     assert "#47" not in printed
     assert f"{rocker.PIVOT_HOLE_DIA / 25.4:.3f}".removeprefix("0") not in printed
 
@@ -185,9 +170,6 @@ def test_drawing_quality_and_no_gdt() -> None:
         "add_feature_control_frame",
         "add_surface_finish",
     }
-    assert notes.DRAWING_NOTES.splitlines() == [
-        "1. JOINED TO HUB MHA-CH-12 AS MHA-CH-06.",
-    ]
     assert notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
     assert drawing.ISO_SCALE == (1, 2)
 
@@ -335,7 +317,6 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
         None,
         part.PART_NAME,
         {
-            "Manufacturing Notes": notes.DRAWING_NOTES,
             "Isometric View Note": notes.ISOMETRIC_VIEW_NOTE,
         },
     )

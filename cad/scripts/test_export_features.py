@@ -401,9 +401,9 @@ def _assert_rocker_print_authority() -> None:
         for node in ast.walk(dressing) if isinstance(node, ast.Assign)
         for target in node.targets if isinstance(target, ast.Name)
     }
-    prefix = eval(compile(ast.Expression(assignments["ream_prefix"]), draw.__file__, "eval"), {}, {"prefix": ""})
-    suffix = eval(compile(ast.Expression(assignments["through_suffix"]), draw.__file__, "eval"), {}, {"suffix": ""})
-    assert prefix.split()[0] == pivot["process"].upper(), "pivot process drifted from its native dimension text"
+    # Size, then process, then depth (rule 26): REAM THRU follows the limits.
+    suffix = eval(compile(ast.Expression(assignments["ream_suffix"]), draw.__file__, "eval"), {}, {"suffix": ""})
+    assert suffix.split()[0] == pivot["process"].upper(), "pivot process drifted from its native dimension text"
     assert pivot["thru"] and "THRU" in suffix, "hole end drifted from its native dimension text"
     # Both ends are dimensioned on the views (J and K LAND rows, both tapers,
     # 2X 5.59): the symmetry is cited to those natives, not a mirror note.

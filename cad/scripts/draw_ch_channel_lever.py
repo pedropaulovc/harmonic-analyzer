@@ -150,15 +150,17 @@ def _inch(value_mm: float) -> str:
 
 
 # The bar-to-hub roots are inside corners: the title block's INSIDE CORNERS
-# row controls them, so no callout repeats it (rule 2; review r1-r3).
+# row controls them, so no callout repeats it (rule 2; review r1-r3). A
+# location dimension carries its value and band only (rule 7): the plate
+# offset's mate rides the plate thickness's callout, each drilled hole's its
+# own hole callout. The fulcrum bore names its standard fit and the clearance
+# range as REF (rule 4).
 FRONT_CALLOUTS = {
     "FulcrumDia": (
-        f"REAM THRU; RUNS ON\nSHAFT {SHAFT_NUMBER},"
-        f" {_inch(_CLEARANCE_LEAST)}-{_inch(_CLEARANCE_MOST)}\nDIAMETRAL CLEARANCE"
+        f"REAM THRU\nRUNNING FIT ON {SHAFT_NUMBER}\n"
+        f"(CLEARANCE {_inch(_CLEARANCE_LEAST)}-{_inch(_CLEARANCE_MOST)} REF)"
     ),
     "BarHeight": "FULL R AT TIP",
-    "BarPinCx": "SETS LEVER RATIO",
-    "SpringCx": "SETS LEVER RATIO",
 }
 # What engages each drilled hole rides its own hole callout (machinist r5:
 # on the arm's location it did not say the hole is a running bore).
@@ -166,12 +168,21 @@ HOLE_MATES = {
     "bar-pin hole": f"RUNS ON PIN\n{PIN_NUMBER}",
     "spring-eye hole": f"HOOKS SPRING\n{SPRING_NUMBER}",
 }
-# Each drilled hole's native size prints .XXX.
-HOLE_PRECISION = {"hw-diam": 3}
+# Each drilled hole's native size prints the exact decimal of its named drill
+# (rule 3: #47 is .0785, #21 is .159).
+HOLE_PRECISION = {"bar-pin hole": {"hw-diam": 4}, "spring-eye hole": {"hw-diam": 3}}
+# The hub length's +.001/.000 is narrower than the shop's turned-length row
+# (+/-.001), so its callout names the fit route: the 20-hub stack on the
+# fulcrum shaft is the matched mate, accepted by its measured length and its
+# end play between the MHA-CH-07 keepers (test_ch_channel_lever_drawing
+# derives both from the printed limits and build_ch_channel_assembly's
+# KEEPER_HUB_FLOAT).
+HUB_STACK_ACCEPTANCE = "STACK 5.560-5.580, END PLAY .010 MIN"
 TOP_CALLOUTS = {
     "LeverThick": f"SLIDING FIT IN NOTCH\nOF {BAR_NUMBER}",
-    "PlateOffset": f"LOCATES {BAR_NUMBER} NOTCH;\nSETS GAP TO NEXT BAR",
-    "HubLength": f"{STATIONS} HUBS STACK;\nSETS STATION PITCH",
+    "HubLength": (
+        f"SETS PITCH OF {STATIONS}X STACK ON {SHAFT_NUMBER};\n{HUB_STACK_ACCEPTANCE}"
+    ),
 }
 
 FRONT_KEEP = {
@@ -352,7 +363,9 @@ async def build(adapter: Any) -> dict[str, str]:
         process=drill_process(BAR_PIN_HOLE_SPEC) + "\n",
     )
     _name_hole_mate(bar_pin_callout, label="bar-pin hole")
-    set_hole_callout_precision(bar_pin_callout, HOLE_PRECISION, label="bar-pin hole")
+    set_hole_callout_precision(
+        bar_pin_callout, HOLE_PRECISION["bar-pin hole"], label="bar-pin hole"
+    )
     spring_callout = add_native_hole_callout(
         adapter,
         front,
@@ -362,7 +375,9 @@ async def build(adapter: Any) -> dict[str, str]:
         process=drill_process(SPRING_EYE_HOLE_SPEC) + "\n",
     )
     _name_hole_mate(spring_callout, label="spring-eye hole")
-    set_hole_callout_precision(spring_callout, HOLE_PRECISION, label="spring-eye hole")
+    set_hole_callout_precision(
+        spring_callout, HOLE_PRECISION["spring-eye hole"], label="spring-eye hole"
+    )
     rebuild_drawing(adapter, label="hole callout mates")
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):

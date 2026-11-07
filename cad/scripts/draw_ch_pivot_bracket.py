@@ -235,30 +235,34 @@ TOP_KEEP = {
 # washer it holds) and neither extension line rises into its letters (r1
 # machinist review FIX: centred over the 8 mm span, both struck the callout).
 EAR_THICK_TEXT_OFFSET = (0.042, 0.010)
-# REAM marks a fit bore, so the callout names its mate (drawing-guidelines.md
-# rule 4); the drilled hold-down hole says drill and through. The two lengths
-# that carry their own band say what the band holds, naming the mate: the
-# ear's faces bear on the bank's thrust washers, and the tap's station from
-# the inboard face puts the apex screw's cup on the pivot shaft's flat
-# (ch_pivot_bracket_spec, rocker_bank_layout). The foot length and the
-# hold-down station ride the title block. The foot-to-ear corner's R MAX,
-# tighter than the title block's inside corners, names what it serves: the
-# hold-down screw's head seats on the foot top beside the ear's outboard face
+# REAM marks a fit bore, so the callout names its mate and its standard fit
+# (drawing-guidelines.md rule 4); the drilled hold-down hole says drill and
+# through. The ear thickness carries its own band and says what it holds: its
+# faces bear on the bank's thrust washers. The tap's station from the inboard
+# face is a location, so it carries its value and band only (rule 7); the
+# set screw it places on the pivot shaft's flat rides the tap's own callout
+# (SET_SCREW_MATE). The foot length and the hold-down station ride the title
+# block. The foot-to-ear corner's R MAX, tighter than the title block's
+# inside corners, names what it serves: the hold-down screw's head seats on
+# the foot top beside the ear's outboard face
 # (ch_pivot_bracket_drawing_spec.CORNER_R_MAX), so a larger round lifts it.
 DIMENSION_CALLOUTS = {
-    "ShaftBoreDia": f"REAM THRU\nSLIP FIT ON\nPIVOT SHAFT {PIVOT_SHAFT_NUMBER}",
+    "ShaftBoreDia": f"REAM THRU\nSLIDING FIT ON {PIVOT_SHAFT_NUMBER}",
     "HoleDia": "DRILL THRU",
     "EarThick": f"THRUST FACES ON {THRUST_WASHER_NUMBER}",
-    "SetScrewLocation": f"SET SCREW ON FLAT OF\nPIVOT SHAFT {PIVOT_SHAFT_NUMBER}",
-    "CornerRadius": f"CLEARS HEAD OF\nHOLD-DOWN SCREW\n{HOLD_DOWN_SCREW_NUMBER}",
+    "CornerRadius": f"CLEARS HEAD OF\n{HOLD_DOWN_SCREW_NUMBER}",
 }
 # The right view prints the corner radius and the ear thickness.
 RIGHT_KEEP_NAMES = ("CornerRadius", "EarThick")
 # The apex tap runs down into the bore and stops there. Both native extents
 # ("<hw-thru>", the drill's and the thread's) say so in words; the thread
-# class is the title block's. The arch's lift gives the tap 1.5D of full
-# thread (ch_pivot_bracket_spec), so the callout states no shortfall.
-SET_SCREW_PROCESS = "TAP"
+# class is the title block's. The thread size leads (rule 26: size first, so
+# no TAP prefix). The arch's lift gives the tap 1.5D of full thread
+# (ch_pivot_bracket_spec), so the callout states no shortfall; its last row
+# names the set screw it takes and the pivot-shaft flat that screw bears on
+# (rule 4), which the tap's station off the inboard face serves.
+SET_SCREW_NUMBER = str(_config.parts("sh-vn-arbor-set-screw")["number"])
+SET_SCREW_MATE = f"FOR {SET_SCREW_NUMBER} ON\nFLAT OF {PIVOT_SHAFT_NUMBER}"
 # Hole Wizard callouts print three places on the inch sheet.
 SET_SCREW_CALLOUT_PRECISION = {"hw-tapdrldia": 3}
 SET_SCREW_EXTENT = "TO BORE"
@@ -276,8 +280,9 @@ _THREAD_CLASS = re.compile(r"\s*(?:-\s*)?<hw-threadclass>\s*", re.IGNORECASE)
 def set_screw_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
     """Rewrite the native tap callout's definition parts (5..8).
 
-    Both ``<hw-thru>`` extents become TO BORE and the thread class goes (the
-    title block states it). Every Hole Wizard size variable stays.
+    Both ``<hw-thru>`` extents become TO BORE, the thread class goes (the
+    title block states it) and SET_SCREW_MATE closes the thread's part.
+    Every Hole Wizard size variable stays.
     """
     if set(definitions) != {5, 6, 7, 8}:
         raise RuntimeError(f"unexpected tap callout parts: {definitions!r}")
@@ -293,9 +298,8 @@ def set_screw_callout_definitions(definitions: dict[int, str]) -> dict[int, str]
     if len(thread_parts) != 1:
         raise RuntimeError(f"tap thread line is not in one callout part: {updated!r}")
     part = thread_parts[0]
-    updated[part] = re.sub(
-        r" {2,}", " ", _THREAD_CLASS.sub(" ", updated[part])
-    ).rstrip()
+    without_class = re.sub(r" {2,}", " ", _THREAD_CLASS.sub(" ", updated[part]))
+    updated[part] = f"{without_class.rstrip()}\n{SET_SCREW_MATE}"
     return updated
 
 
@@ -775,7 +779,6 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(TOP_CENTER[0] + tap_r, _top_y(0.0)),
         callout_xy=SET_SCREW_CALLOUT_XY,
         label="apex set-screw tap",
-        process=SET_SCREW_PROCESS,
     )
     _set_tap_callout_text(tap_callout)
     set_hole_callout_precision(
