@@ -826,9 +826,40 @@ def test_added_left_clamp_is_a_blind_full_thread_receiver_on_its_own_sheet() -> 
     assert "expected_sheet_names=SHEET_NAMES" in inspect.getsource(drawing.build)
 
 
+@pytest.fixture
+def raw_dimension_binding(monkeypatch):
+    """Model _com_invoke's bare PyIDispatch, not a prewrapped dimension fake."""
+    import _com
+
+    class RawDispatch:
+        def InvokeTypes(self, *_args):
+            raise AssertionError("raw dispatch must be bound before member access")
+
+    wrappers = {}
+
+    def retained(wrapper, interface):
+        raw = RawDispatch()
+        wrappers[raw] = (interface, wrapper)
+        return raw
+
+    def early_bound(value, interface):
+        # Match the real passthrough: bare raw dispatch has no _oleobj_.
+        # Only _bind supplies the envelope needed to select a native wrapper.
+        raw = getattr(value, "_oleobj_", None)
+        if raw in wrappers:
+            expected, wrapper = wrappers[raw]
+            assert interface == expected
+            return wrapper
+        return value
+
+    monkeypatch.setattr(_com, "_early_bound", early_bound)
+    monkeypatch.setattr(part, "_early_bound", early_bound)
+    return retained
+
+
 @pytest.mark.parametrize("persisted_precision", [3, 2])
 def test_thread_min_is_authored_and_read_back_on_the_model(
-    monkeypatch, persisted_precision: int,
+    monkeypatch, raw_dimension_binding, persisted_precision: int,
 ) -> None:
     values = []
 
@@ -845,8 +876,14 @@ def test_thread_min_is_authored_and_read_back_on_the_model(
         GetPrimaryPrecision2=lambda: persisted_precision,
     )
     dimension = SimpleNamespace(Tolerance=tolerance)
-    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(part, "_left_clamp_thread_dimension", lambda _adapter: (display, dimension))
+    raw_display = raw_dimension_binding(display, "IDisplayDimension")
+    raw_dimension = raw_dimension_binding(dimension, "IDimension")
+    assert not hasattr(raw_dimension, "_oleobj_")
+    assert not hasattr(raw_dimension, "Tolerance")
+    monkeypatch.setattr(
+        part, "_left_clamp_thread_dimension",
+        lambda _adapter: (raw_display, raw_dimension),
+    )
     if persisted_precision == 3:
         part._author_left_clamp_thread_min(None)
     else:
@@ -918,3 +955,32 @@ def test_finished_hub_bore_and_controlled_chamfer_clear_the_stud_root() -> None:
     features = _features()
     assert "assembly_hub_bore" in features
     assert "assembly_hub_underside_chamfer" in features
+
+
+def test_pin_chamfer_binds_raw_named_dimension_before_value_and_tolerance(
+    monkeypatch, raw_dimension_binding,
+) -> None:
+    values = {}
+
+    def set_values(lower, upper):
+        values.update(lower=lower, upper=upper)
+        return True
+
+    tolerance = SimpleNamespace(
+        Type=0, SetValues=set_values,
+        GetMinValue=lambda: values["lower"], GetMaxValue=lambda: values["upper"],
+    )
+    raw = raw_dimension_binding(
+        SimpleNamespace(SystemValue=spec.PIN_CHAMFER / 1000.0, Tolerance=tolerance),
+        "IDimension",
+    )
+    monkeypatch.setattr(part, "_named_dimension", lambda *_args: (None, raw))
+    part._pin_chamfer_min_limit(None)
+    assert tolerance.Type == spec.PIN_CHAMFER_TOL_TYPE
+    assert values == pytest.approx({
+        "lower": spec.PIN_CHAMFER_BAND[1] / 1000.0,
+        "upper": spec.PIN_CHAMFER_BAND[0] / 1000.0,
+    })
+    assert '_early_bound(_bind(size, "IDimension"), "IDimension")' in inspect.getsource(
+        part._finished_hub_bore
+    )

@@ -147,18 +147,20 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "HubY": (-56.0, HUB_HOLE[1] / 2.0, _T),
     # One callout per hole size above the view, left to right: CL (2X), HUB,
     # and the screw holes' (leader to screw 2, the reference circle's hole),
-    # which carries the countersink. Each ends in two location rows; CL's
-    # stands over the sheet's free left margin, its shelf ending left of the
-    # A-A cutting plane at screw 3 and above its arrow (review r12: at model
-    # X -20 the shelf ended on the upper arrow's tail and the leader crossed
-    # the plane). The screw block stands past the right end
+    # which carries the countersink. Each ends in two location rows. The
+    # retained 0c3 CL ink/shelf needs 3 mm right and 1.5 mm up on paper:
+    # the left border gains air and the diagonal stays above A-A's upper
+    # tail. Moving right alone would repeat review r12's crossing.
+    # The screw block stands past the right end
     # so its leader climbs past HUB's shoulder (jig-r8: with the location
     # rows HUB's shoulder ran to 189 mm on the sheet and screw 2's leader,
     # rising to a block centred at model X 300, crossed it at 175 mm).
-    "ClampDia": (-26.0, _CALLOUT_Y + 10.0, _T),
+    "ClampDia": (-20.0, _CALLOUT_Y + 13.0, _T),
     "HubDia": (HUB_HOLE[0], _CALLOUT_Y, _T),
     "ScrewDia": (BLANK_LENGTH + 10.0, _CALLOUT_Y + 8.0, _T),
-    "LeftClampDia": (85.0, _CALLOUT_Y + 43.0, _T),
+    # Sheet 2 has no competing callouts: use the HUB block's safe height,
+    # 21.5 mm below the retained LEFT block that breached the top border.
+    "LeftClampDia": (85.0, _CALLOUT_Y, _T),
 }
 # The thickness's text stands outside its 12 mm (sheet) span (jig-r6: its
 # extension lines ran through "6.0 STOCK").
