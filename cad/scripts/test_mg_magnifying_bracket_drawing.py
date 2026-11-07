@@ -137,15 +137,11 @@ def test_structural_reasons_are_authored_on_native_source_dimensions(monkeypatch
             ("TapCoordinates", "TapFromSide"): "RETAINS TAP WALL",
         }
         assert expected["FlangeProfile", "FlangeDepth"] == "MHA-MG-VN-53\nSCREW GRIP"
-        assert spec.MOUNTING_MATE_FLAG == "[1]"
-        assert spec.DIMENSION_CALLOUTS["MountingCoordinates"] == {
-            name: "[1]" for name in ("MountingX0", "MountingX1", "MountingY0")
-        }
-        assert spec.MOUNTING_HOLE_PROCESS == "[1] MATES MHA-SM-03 TAPPED HOLES"
+        assert "MountingCoordinates" not in spec.DIMENSION_CALLOUTS
 
 
 @pytest.mark.parametrize("fault", (None, "missing", "duplicate", "changed"))
-@pytest.mark.parametrize("dimension", ("NoseR", "MountingX0", "MountingX1", "MountingY0"))
+@pytest.mark.parametrize("dimension", ("NoseR", "TapFromTip", "FlangeDepth"))
 def test_drawing_only_reads_the_imported_structural_reasons(monkeypatch, fault, dimension) -> None:
     annotations = []
     for callouts in spec.DIMENSION_CALLOUTS.values():

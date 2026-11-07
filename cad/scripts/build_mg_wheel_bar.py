@@ -77,7 +77,6 @@ from _drawing_marks import (
 from _drawing_precision import _named_dimensions, apply_drawing_precision
 from _drawing_tolerances import (
     set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
 )
 from _fit_deviations import deviations
 from _column_clamp_interface import BAR_DEPTH
@@ -85,7 +84,6 @@ from mg_wheel_bar_geom import (
     AXLE_BORE_BAND,
     AXLE_BORE_DIA,
     AXLE_BORE_X,
-    BAR_DEPTH_BAND,
     BAR_LENGTH,
     BAR_SIDE,
     BAR_TOP_ABOVE_ROW,
@@ -106,7 +104,6 @@ import mg_wheel_bar_callouts as callouts
 from mg_wheel_bar_spec import (
     AXLE_BORE_STATION,
     BORE_ROW_FROM_TOP,
-    CLAMP_POSITION_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
@@ -494,51 +491,17 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
 
-    # Manufacturing drawing support: the native bands, then mark exactly the
+    # Manufacturing drawing support: the native band, then mark exactly the
     # print's dimensions and stamp the make-critical title-block properties.
-    # The height has no band: the title block's .XX governs it. Each band
-    # prints at its dimension's inch places.
-    # Equal deviations print as one symmetric +/- band.
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "Bar",
-        "BarDepth",
-        BAR_DEPTH_BAND[0],
-        places=DRAWING_PRECISION["Bar"]["BarDepth"],
-        display_unit=UNIT,
-    )
+    # Only the reamed bore carries a band of its own; the depth, height, row
+    # and stations are the title block's (the clamp row and stations at .XXX,
+    # mg_wheel_bar_spec.CLAMP_POSITION_BAND).
     set_dimension_bilateral_tolerance(
         adapter,
         "AxleBoreProfile",
         "AxleBoreDia",
         *deviations(AXLE_BORE_BAND),
         places=DRAWING_PRECISION["AxleBoreProfile"]["AxleBoreDia"],
-        display_unit=UNIT,
-    )
-    # The clamp row and stations carry the MHA-SH-02 taps' band; the hanger
-    # and axle row is the title block's.
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "BoreRowReference",
-        "ClampRowFromTop",
-        CLAMP_POSITION_BAND,
-        places=DRAWING_PRECISION["BoreRowReference"]["ClampRowFromTop"],
-        display_unit=UNIT,
-    )
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "BoreRowReference",
-        "ClampStation1",
-        CLAMP_POSITION_BAND,
-        places=DRAWING_PRECISION["BoreRowReference"]["ClampStation1"],
-        display_unit=UNIT,
-    )
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "BoreRowReference",
-        "ClampStation2",
-        CLAMP_POSITION_BAND,
-        places=DRAWING_PRECISION["BoreRowReference"]["ClampStation2"],
         display_unit=UNIT,
     )
     clear_dimensions_for_drawing(adapter)
