@@ -32,6 +32,7 @@ import sys
 from typing import Any, NamedTuple
 
 from solidworks_mcp.adapters.com_variant import dispatch_array
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     _note_text,
     add_note,
@@ -69,7 +70,6 @@ from _drawing_hidden_sketches import (
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_layout_check import DrawableRegion
 from _drawing_layout_collect import _iter_tables, _iter_view_annotations
-from _drawing_leader_notes import add_leader_note
 from _drawing_leaders import set_near_side_diameter
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -90,6 +90,7 @@ import _telemetry
 from build_fr_harmonic_base import (
     BASE_CROSS_TAP_DRILL_DIA,
     BASE_CROSS_TAP_SPEC,
+    BASE_SPOTFACE_DEPTH,
     BLOCK_SCREW_HOLE_DIA,
     BLOCK_SCREW_XZ,
     COLUMN_SOCKET_DIAMETER,
@@ -137,11 +138,9 @@ from fr_harmonic_base_spec import (
     DRAWING_REFERENCE_PRECISION,
     GREEN_TOP,
     HOLE_TABLE_PRECISION,
-    HEIGHT_REFERENCE_CALLOUTS,
     PART_SURFACE_FINISHES,
     PIVOT_SEAT_DIMENSIONS,
     STACK_HEIGHT,
-    POCKET_CORNER_FILLET_R,
     POCKET_HALF_X,
     UNIT,
     pivot_seat_step,
@@ -168,27 +167,22 @@ VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
 # Sheet 5 carries the front cross-tap elevation alone (see HOLE_SIDE_CENTER).
 SHEET_NAMES = ("GEOMETRY", "HOLES-SOCKETS", "UNDERSIDE", "UNDERSIDE-LUGS", "CROSS-TAPS")
 CROSS_TAP_SHEET_SCALE = (1.0, 2.0)
-CROSS_TAP_VIEW_LABEL = "FRONT CROSS-TAP VIEW SCALE 1:2"
+# Its sheet scale is the view's, so the label names the view and nothing else
+# (rule 9: a scale prints only where it differs from the sheet's).
+CROSS_TAP_VIEW_LABEL = "FRONT VIEW"
 
-# Section A-A is projected from a vertical cutting line, which lays machine +Y
-# across the sheet: it reads as the upright section turned 90 degrees
-# clockwise. That qualifier rides in the NATIVE view label beside the scale, so
-# the sheet carries exactly one "SECTION A-A" and it is the one under the view.
+# Section B-B is turned 90 degrees clockwise after it is cut, and that
+# qualifier rides in the NATIVE view label beside its 1:2 scale, so the sheet
+# carries exactly one "SECTION B-B" and it is the one under the view.
 # The custom-scale compartment PREFIXES the scale SolidWorks formats itself
-# (label renders "<this text> 1 : 4"), so spelling the ratio here too printed
+# (label renders "<this text> 1 : 2"), so spelling the ratio here too printed
 # it twice -- state the rotation and let the native value follow. The text is
-# a document preference, so it labels every section: sheet 3's B-B is cut on
-# a vertical line too and the build proves it turns the same way.
+# a document preference, so it would label every scaled section; A-A is a
+# direct projection of its vertical cutting line at its sheet's own 1:4, so it
+# is cut with that sheet pinned at 1:4 and its caption carries no scale
+# compartment at all (novice-rubric screen 20261107T081227004Z: a view scale
+# equal to the sheet's restates the title block).
 SECTION_LABEL_SCALE_TEXT = "ROTATED 90 DEG CW  SCALE"
-# A native section caption carries its scale compartment -- the only place
-# the rotation text rides -- only when the view's scale differs from the
-# sheet's AT CREATION (_section_axis.position_section_caption). A-A is drawn
-# at its sheet's own 1:4, so it was captioned only while the sheet scale had
-# drifted off 1:4; the inch build's drift landed on 1:4 and review b2 found
-# "ROTATED 90 DEG CW  SCALE 1 : 4" gone. A-A is therefore cut with its sheet
-# held at this scale and the sheet restored straight after; B-B (1:2) is cut
-# with its sheet pinned at the printed 1:4. Both captions are then checked.
-SECTION_CAPTION_SHEET_SCALE = (1.0, 1.0)
 
 if abs((BOTTOM_REAR_Z - BOTTOM_FRONT_Z) - BOTTOM_WIDTH) > 1e-12:
     raise AssertionError("base drawing extents disagree with the overall depth")
@@ -203,19 +197,27 @@ SIDE_CENTER = (0.145, 0.100)
 # so it is centred in that region instead of floating above a dead strip.
 ISO_SCALE = (1, 6)
 ISO_CENTER = (0.3425, 0.175)
-# The stamped-ID note's top-left corner, below the plan. SolidWorks runs its
-# leader from the right end of the note's last line (hb-render-5: 44.0 mm
-# right of and 11.8 mm below this anchor) to the serial in the deck's corner.
-# From (0.125, 0.130) the leader to the old +X-rim serial ran through the A3
-# socket bore (2026-09-25 Codex machinist review, clarity). With the serial
-# now inboard on the deck, this anchor makes the leader short and steep: it
-# stays well clear of every socket bore and crosses each plan outline's lower
-# edge left of where that outline's width dimension starts its witness line,
-# so it crosses no dimension. 3 mm lower and 2 mm left of its old place, so
-# the DeckX witness line above it (GEOMETRY_TOP_KEEP) ends ~2.9 mm over its
-# top row.
-SERIAL_NOTE_XY = (0.098, 0.132)
-SERIAL_LEADER_START_OFFSET_M = (0.0440, -0.0118)
+# The stamped ID's leader note sits on the open deck just inboard of the
+# serial, so its short leader crosses no outline or dimension; the two
+# reference dimensions below the plan and right of it locate the serial from
+# X0 Y0 (novice-rubric screen 20261107T081227004Z: "APPROX AS SHOWN" on a DO
+# NOT SCALE sheet located it by words only and gave no character height).
+# The note's two 9-glyph rows (22 mm x 9 mm) stand right of the deck's
+# front-left hole cluster and below its rear holes.
+SERIAL_NOTE_XY = (0.156, 0.1655)
+SERIAL_NOTE = (
+    f'STAMP "{SERIAL_TEXT}"\n'
+    f"{SERIAL_HEIGHT_MM / 25.4:.2f} HIGH".replace("0.", ".", 1)
+)
+# Serial location from the table corner, the X on a third baseline row clear
+# below DeckX's line and witness ends, the Y right of the plan with its text
+# below the flange's rear edge.
+SERIAL_X_TEXT_XY = (0.137, 0.1315)
+SERIAL_Y_LINE_X = 0.2085
+SERIAL_Y_TEXT_XY = (SERIAL_Y_LINE_X, 0.1455)
+# Sheet point on the flange's rear edge (the table's Y0 line) clear of every
+# other plan edge, where the Y reference dimension picks it.
+SERIAL_Y_EDGE_PICK_X_MM = 100.0
 # The deck Ra symbol remains left of the plan and below the R22.2 callout.
 DECK_FINISH_XY = (0.040, 0.1855)
 DECK_FINISH_FACE_INSET_M = 0.004
@@ -231,24 +233,30 @@ HOLE_TOP_CENTER = (0.280, 0.195)
 HOLE_SIDE_CENTER = (0.200, 0.150)
 SECTION_CENTER = (0.375, 0.135)
 HOLE_TABLE_ANCHOR = (0.018, 0.260)
-# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the A1-A4 matched fit sits on the sockets, not in a general note
-# (Main's hb-render-6 eye pass). It is a leader note on A2 -- the rear-left
-# socket, min(COLUMN_SOCKET_XZ) -- because A2 faces the open band between
-# the hole table and the plan, under the TOP VIEW caption; "4X" carries it
-# to all four. The table's SIZE cells are generated by SolidWorks and are
-# not text-editable, so the note marks their diameter as reference.
-SOCKET_FIT_NOTE = (
-    "4X: FIT TO ASSIGNED\n"
-    "MHA-FR-03 TUBE:\n"
-    "CLOSE HAND-SLIP, NO\n"
-    "PERCEPTIBLE ROCK.\n"
-    "TABLE <MOD-DIAM> REF.\n"
-    "RETAIN MATCH MARKS."
-)
-# Reflow the full tube ID without shrinking text; the hb-render-6 width model
-# leaves 6.4 mm to the table and 6.54 mm to the plan's west edge.
-SOCKET_FIT_NOTE_XY = (0.1690, 0.2262)
-SOCKET_FIT_STATION = min(COLUMN_SOCKET_XZ)
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the socket matched fit is a
+# numbered note, flagged from the sockets' hole-table rows (novice-rubric
+# screen 20261107T081227004Z: the six-line leader note on A2 broke the two-line
+# limit, and the rows named MHA-FR-02 while the leader named MHA-FR-03). It
+# names the tube the bores fit and the frame whose sockets the pattern
+# matches. The table's SIZE cells are generated by SolidWorks and are not
+# text-editable, so the note marks their diameter as reference. Two rows
+# under note 1, left of the title block (72 glyphs reach x 0.199).
+SOCKET_NOTE_NUMBER = 2
+SOCKET_FLAG = f"SEE NOTE {SOCKET_NOTE_NUMBER}"
+SOCKET_NOTE_XY = (0.020, 0.080)
+
+
+def socket_note(tags: list[str]) -> str:
+    """Numbered note 2 for the socket rows ``tags`` (the generated table tags)."""
+    if len(tags) != len(COLUMN_SOCKET_XZ):
+        raise ValueError(f"socket note needs {len(COLUMN_SOCKET_XZ)} tags, got {tags!r}")
+    return (
+        f"{SOCKET_NOTE_NUMBER}. {tags[0]}-{tags[-1]}: MATCHED FIT TO MHA-FR-03 TUBE:"
+        " SLIDES IN BY HAND, NO ROCK.\n"
+        "PATTERN MATCHES MHA-FR-02 SOCKETS. TABLE <MOD-DIAM> IS REFERENCE."
+    )
+
+
 # hb-render-6's sheet-2 notes at the default note height: 2.49 mm per
 # character and 4.6 mm per row, the text hanging from its top-left anchor.
 NOTE_CHAR_M = 0.00249
@@ -380,9 +388,9 @@ SIDE_KEEP = {
     # The front view, not the plan: a chamfer dimension imports only where its
     # edge shows in profile (farm leaf 20261010T064423Z: the plan import
     # delivered every other plan dimension but this one). Above DeckRise in
-    # the strip right of the front view and below the plan; the serial note
-    # holds the matching strip on the left.
-    "DeckEdgeChamfer": (0.205, 0.138),
+    # the strip right of the front view and below the plan, right of the
+    # serial's Y reference text (SERIAL_Y_TEXT_XY).
+    "DeckEdgeChamfer": (0.218, 0.134),
 }
 HOLE_TOP_KEEP = {
     # D1 is held from the nearer transferred pedestal seat. The point-only
@@ -409,8 +417,8 @@ PIVOT_SEAT_CALLOUTS = dict.fromkeys(PIVOT_SEAT_DIMENSIONS, PIVOT_SEAT_FLAG)
 # columns' slack, so the table keeps its native extent beside the notes lane.
 # Review b2: the other .XXX-located taps name the part whose pattern they
 # match -- the four MHA-FR-05 hold-downs and MHA-DT-20's lock and stop.
-# Review b12: the A1-A4 sockets name MHA-FR-02, whose four column sockets
-# their pattern matches so the tubes stand parallel.
+# The A1-A4 sockets cite numbered note 2, which names both the tube they fit
+# and MHA-FR-02, whose four column sockets their pattern matches.
 HOLE_TABLE_NOTE_COLUMN = "NOTE"
 HOLE_TABLE_NOTE_COLUMN_WIDTH = 0.029  # SEE NOTE 1 prints ~24.7 mm
 HOLE_TABLE_ROW_NOTES: dict[tuple[float, float], str] = {
@@ -418,7 +426,7 @@ HOLE_TABLE_ROW_NOTES: dict[tuple[float, float], str] = {
     LOCK_KNOB_XZ: "MHA-DT-20",
     STOP_SCREW_XZ: "MHA-DT-20",
     **dict.fromkeys(HOLE_XZ, "MHA-FR-05"),
-    **dict.fromkeys(COLUMN_SOCKET_XZ, "MHA-FR-02"),
+    **dict.fromkeys(COLUMN_SOCKET_XZ, SOCKET_FLAG),
 }
 if len(HOLE_TABLE_ROW_NOTES) != 3 + len(HOLE_XZ) + len(COLUMN_SOCKET_XZ) or max(
     map(len, HOLE_TABLE_ROW_NOTES.values())
@@ -448,11 +456,8 @@ SECTION_KEEP = {
     # on the 200 dpi sheet-2 render).  This lands it in the same
     # 382-418 mm callout column the two dimensions above use, ABOVE its own
     # dimension line: the leader drops from the arrow to the block's bottom-left
-    # corner, so a block straddling the dimension line gets its widest caption
-    # row struck by that drop (measured at y 0.103: the line crossed '4X
-    # SPOTFACE' over 3.5 mm). One caption row (5.8 mm) higher than the old
-    # 0.113 since the caption gained a row, so the block's bottom row stays
-    # where it was.
+    # corner, so a block straddling the dimension line gets its widest row
+    # struck by that drop (measured at y 0.103).
     "SpotFaceDepth": (0.3845, 0.1186),
 }
 # Sheet 5 stations at 1:2 around HOLE_SIDE_CENTER (view x 0.075-0.325, y
@@ -473,38 +478,42 @@ HOLE_SIDE_KEEP = {
     "CrossTapX": (0.0936, 0.117),
     "CrossTapFarX": (0.186, 0.106),
 }
-# The front cross-tap view's label, centred under the view and about 6 mm
-# under the 16.756 text (the label anchors at its left end).
-HOLE_SIDE_LABEL_XY = (0.162, 0.093)
+# The front view's label, centred under the view and about 6 mm under the
+# 16.756 text (the label anchors at its left end).
+HOLE_SIDE_LABEL_XY = (0.1875, 0.093)
+# Location and height dimensions print value and band only (rule 7); the
+# extension lines show the faces (novice-rubric screen 20261107T081227004Z
+# struck GREEN LAND FROM UNDERSIDE, DECK ABOVE LAND, CROSS-SCREW AXIS FROM
+# FLANGE UNDERSIDE and 4X TAPS ON SOCKET AXES). A size callout may still name
+# its feature.
 GEOMETRY_CALLOUTS = {
     "PadCornerRadius": "PAD",
     "FlangeCornerRadius": "FLANGE",
     "DeckCornerRadius": "DECK",
-    "DeckEdgeChamfer": "X 45 DEG\nDECK EDGE",
-    "DeckRise": "DECK ABOVE\nLAND",
-    "GreenTopHeight": HEIGHT_REFERENCE_CALLOUTS["GreenTopHeight"],
+    "DeckEdgeChamfer": "X 45<MOD-DEG>\nDECK EDGE",
 }
 # One chamfer feature breaks both plates' top rims, so its caption names the
 # feature -- in the PLURAL -- rather than whichever of its edges the import
 # attached to. Plural, not spelled out: this column is 32 mm wide, and a
-# caption row wider than that leaves the sheet (see SECTION_KEEP). The
-# spotface depth names what it seats (the cross screw's head), so its band
-# reads as a face clean-up under that head, not as a fit; rows of at most
-# 12 characters keep it in the column.
+# caption row wider than that leaves the sheet (see SECTION_KEEP).
 SECTION_CALLOUTS = {
-    "TopRimChamfer": "X 45 DEG\nTOP RIMS",
-    "BottomEdgeChamfer": "X 45 DEG\nUNDERSIDE",
-    "SpotFaceDepth": "4X SPOTFACE\nDEPTH, SEATS\nMHA-FR-VN-53",
+    "TopRimChamfer": "X 45<MOD-DEG>\nTOP RIMS",
+    "BottomEdgeChamfer": "X 45<MOD-DEG>\nUNDERSIDE",
 }
-HOLE_SIDE_CALLOUTS = {
-    "SpotFaceDia": "4X SPOTFACE\nCROSS-SCREW HOLES\nFRONT/REAR",
-    "CrossScrewAxisHeight": HEIGHT_REFERENCE_CALLOUTS["CrossScrewAxisHeight"],
+# One spotface callout in symbol form (rule 26): sheet 5's diameter carries
+# count, symbol, size and the depth as REF beside the seat it makes, and
+# section A-A's banded depth is the control that REF points at (the rule's
+# own `<HOLE-DEPTH> (.235)` form). The depth control keeps its count and
+# symbols only, so the cross screw is named once, on sheet 5.
+SPOTFACE_DEPTH_REF = f"({BASE_SPOTFACE_DEPTH / 25.4:.3f})".replace("(0.", "(.")
+SECTION_AFFIXES = {"SpotFaceDepth": ("4X <HOLE-SPOT> <HOLE-DEPTH> ", "")}
+HOLE_SIDE_AFFIXES = {
+    "SpotFaceDia": ("4X <HOLE-SPOT> <MOD-DIAM>", f" <HOLE-DEPTH> {SPOTFACE_DEPTH_REF}"),
 }
-# Review b12: the two cross-tap baselines print .XXX because the taps sit on
-# the A1-A4 socket axes (the column stations MHA-FR-02 matches). One line
-# above the far baseline's text states it for both: it sits between that
-# text and the view's bottom edge, right of the near baseline's witness.
-CROSS_TAP_AXIS_CALLOUTS = {"CrossTapFarX": "4X TAPS ON SOCKET AXES"}
+# Counts, not words, on section B-B's heights: the four lug bottoms share one
+# level, and the cross rib's relief is the long rib's by equation.
+UNDERSIDE_SECTION_AFFIXES = {"LugBottom": ("4X ", ""), "RibRelief": ("2X ", "")}
+HOLE_SIDE_CALLOUTS = {"SpotFaceDia": "SEATS MHA-FR-VN-53"}
 
 # Layout belongs to physical model X/Z stations, never generated tag letters.
 # Keep the proven anchors when native size families merge or re-letter.
@@ -1445,12 +1454,9 @@ UNDERSIDE_SECTION_TEXT_MM = {
     "RibRelief": (UNDERSIDE_OUTSIDE_Y_MM, 0.0),
 }
 # B-B cuts only the long rib, but the cross rib's relief is the same
-# "RibRelief" by equation, so its one height names both ribs (plate-r5
-# review: the cross rib's level was in no view, and the 3.0 was unlabelled).
-UNDERSIDE_SECTION_CALLOUTS = {
-    "LugBottom": "4X LUG\nBOTTOMS",
-    "RibRelief": "BOTH\nRIBS",
-}
+# "RibRelief" by equation, so its one height counts both ribs (plate-r5
+# review: the cross rib's level was in no view); the four lug bottoms share
+# LugBottom the same way. The counts ride as prefixes (DIMENSION_AFFIXES).
 
 # Sheet 4: retained lug and rib locations from the table's X0 Y0 -- the
 # flange's rear-west theoretical corner. One *Bottom view at 1:2 carries
@@ -1483,33 +1489,6 @@ LUGS_Y_COLUMNS = (
     ("LongRibY", 54.75, 52.0),
     ("Lug0Y", 76.25, 86.0),
 )
-# The lug-bottoms pointer lands on the front-west lug's own bottom face, inside
-# its rectangle (review e409ce3: at (-200, -109) it ended on the socket boss):
-# midway across the lug's span inside the pocket and midway along the run
-# between the boss rim and the lug's inner face, clear of the R.23 corners.
-_TIP_LUG = next(s for s in CROSS_TAP_LUG_SHAPES if s[1] < 0.0 and s[3] < 0.0)
-_TIP_BOSS = next(s for s in SOCKET_BOSS_SHAPES if s[1] < 0.0 and s[2] < 0.0)
-_LUG_TIP_X = (max(_TIP_LUG[1], -POCKET_HALF_X) + _TIP_LUG[2]) / 2.0
-_LUG_TIP_Z = (
-    _TIP_BOSS[2] + math.sqrt(_TIP_BOSS[3] ** 2 - (_LUG_TIP_X - _TIP_BOSS[1]) ** 2)
-    + _TIP_LUG[4]
-) / 2.0
-if not (
-    math.dist((_LUG_TIP_X, _LUG_TIP_Z), _TIP_BOSS[1:3]) - _TIP_BOSS[3]
-    > POCKET_CORNER_FILLET_R
-    and min(_LUG_TIP_X - max(_TIP_LUG[1], -POCKET_HALF_X), _TIP_LUG[2] - _LUG_TIP_X)
-    > POCKET_CORNER_FILLET_R
-    and _TIP_LUG[4] - _LUG_TIP_Z > POCKET_CORNER_FILLET_R
-):
-    raise AssertionError("lug-bottom leader tip is not on the lug's flat bottom face")
-# label -> (text, top-left sheet xy, leader tip machine (X, Z)).
-LUGS_LEVEL_NOTES = {
-    "cross-tap lug bottoms": (
-        "LUG BOTTOMS:\nSECTION B-B, SHEET 3",
-        (0.067, 0.071),
-        (_LUG_TIP_X, _LUG_TIP_Z),
-    ),
-}
 UNDERSIDE_LUGS_KEEP = {
     **{
         name: (
@@ -1526,13 +1505,12 @@ UNDERSIDE_LUGS_KEEP = {
         for name, offset_mm, depth_mm in LUGS_Y_COLUMNS
     },
 }
-LUGS_NOTE = (
-    "BOTTOM VIEW SCALE 1:2\n"
-    "LUG AND RIB LOCATIONS\n"
-    "FROM X0 Y0 (HOLE TABLE ORIGIN):\n"
-    "FLANGE OUTER SHARP CORNER"
-)
-LUGS_NOTE_XY = (0.020, 0.052)
+# The view's plain name under its left half, left of the title block: the
+# baselines' extension lines show their X0 Y0 corner (novice-rubric screen
+# 20261107T081227004Z struck the prose label block, its scale equal to the
+# sheet's, and the LUG BOTTOMS pointer that deferred to section B-B).
+LUGS_NOTE = "BOTTOM VIEW"
+LUGS_NOTE_XY = (0.140, 0.062)
 
 
 _SW_NOTE = 6  # swAnnotationType_e.swNote
@@ -2089,20 +2067,112 @@ def _require_single_center_marks(
         raise RuntimeError(f"{label} carries {count} center marks, expected {expected}")
 
 
-def _require_section_caption_scale(adapter: Any, section: Any, *, label: str) -> None:
-    """The section's one native caption must carry the scale compartment that
-    prints SECTION_LABEL_SCALE_TEXT."""
+def _require_section_caption_scale(
+    adapter: Any, section: Any, *, label: str, scaled: bool
+) -> None:
+    """The section's one native caption carries the scale compartment that
+    prints SECTION_LABEL_SCALE_TEXT exactly when ``scaled``: B-B's 1:2 on a
+    1:4 sheet does, A-A at its sheet's own 1:4 must not restate it."""
     notes = [
         _early_bound(raw, "INote")
         for raw in (_early_bound(section, "IView").GetNotes() or ())
     ]
     linked = [str(note.PropertyLinkedText or "") for note in notes]
     captions = [text for text in linked if "<VLLABEL>" in text]
-    if len(captions) != 1 or "<VLSCALEV>" not in captions[0]:
+    if len(captions) != 1 or ("<VLSCALEV>" in captions[0]) != scaled:
         raise RuntimeError(
-            f"{label} caption lacks the scale compartment that prints "
-            f"{SECTION_LABEL_SCALE_TEXT!r}: linked notes {linked!r}"
+            f"{label} caption {'lacks' if scaled else 'carries'} the scale compartment "
+            f"that prints {SECTION_LABEL_SCALE_TEXT!r}: linked notes {linked!r}"
         )
+
+
+def _set_dimension_affixes(
+    adapter: Any, annotations: list[Any], affixes: dict[str, tuple[str, str]]
+) -> None:
+    """Write and read back the prefix and suffix of named model dimensions."""
+    remaining = dict(affixes)
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name not in remaining:
+            continue
+        prefix, suffix = remaining.pop(name)
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.SetText(1, prefix)  # swDimensionTextPrefix
+        display.SetText(2, suffix)  # swDimensionTextSuffix
+        actual = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+        if actual != (prefix, suffix):
+            raise RuntimeError(f"{name} prefix/suffix did not persist: {actual!r}")
+    if remaining:
+        raise RuntimeError(f"dimension affixes not applied: {sorted(remaining)}")
+
+
+def _add_serial_location(adapter: Any, view: Any) -> None:
+    """Locate the stamped ID from X0 Y0 with two reference dimensions.
+
+    The serial is a cosmetic DXF cut with no model dimension to import, so the
+    sheet measures it: a view-owned point on the serial station, X from a
+    second point on the table's theoretical corner (its extension line drops
+    below the plan with PadX/DeckX's) and Y from the flange's rear edge, the
+    Y0 line, so no extension line lies along an outline. Both read as REF at
+    the spec's reference places; the leader note gives the character height.
+    """
+    corner = create_view_theoretical_datum(
+        adapter,
+        view,
+        point_xy=(-BOTTOM_LENGTH / 2000.0, -BOTTOM_REAR_Z / 1000.0),
+        label="stamped-ID X0 Y0 corner",
+    )
+    serial = create_view_theoretical_datum(
+        adapter,
+        view,
+        point_xy=(SERIAL_XZ[0] / 1000.0, -SERIAL_XZ[1] / 1000.0),
+        label="stamped-ID station",
+    )
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    name = view_name(adapter, view)
+    rear_edge_pick = (
+        TOP_CENTER[0] + SERIAL_Y_EDGE_PICK_X_MM * VIEW_SCALE / 1000.0,
+        TOP_CENTER[1] - BOTTOM_REAR_Z * VIEW_SCALE / 1000.0,
+    )
+    for label, first, text_xy, expected_mm in (
+        ("stamped-ID X", corner, SERIAL_X_TEXT_XY, SERIAL_XZ[0] + BOTTOM_LENGTH / 2.0),
+        ("stamped-ID Y", None, SERIAL_Y_TEXT_XY, BOTTOM_REAR_Z - SERIAL_XZ[1]),
+    ):
+        if not ddoc.ActivateView(name):
+            raise RuntimeError(f"failed to activate the {label} view {name!r}")
+        draw.ClearSelection2(True)
+        manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        data = manager.CreateSelectData()
+        data.View = view
+        if first is None:
+            picked = draw.Extension.SelectByID2(
+                "", "EDGE", *rear_edge_pick, 0.0, False, 0, null_callout(), 0
+            )
+        else:
+            picked = first.Select4(False, data)
+        if not picked or not serial.Select4(True, data):
+            raise RuntimeError(f"failed to select the {label} dimension's ends")
+        if first is None:
+            dimension = draw.AddVerticalDimension2(*text_xy, 0.0)
+        else:
+            dimension = draw.AddHorizontalDimension2(*text_xy, 0.0)
+        draw.ClearSelection2(True)
+        if dimension is None:
+            raise RuntimeError(f"failed to add the {label} dimension")
+        display = _early_bound(dimension, "IDisplayDimension")
+        model_dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        model_dimension.DrivenState = 1  # swDimensionDriven
+        measured_mm = float(model_dimension.SystemValue) * 1000.0
+        if abs(measured_mm - expected_mm) > 0.01:
+            raise RuntimeError(
+                f"{label} measures {measured_mm:.3f} mm, expected {expected_mm:.3f} mm"
+            )
+        set_reference_dimension(adapter, display.GetAnnotation(), label=label)
+        display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
+        if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
+            raise RuntimeError(f"{label} reference precision did not persist")
 
 
 _TEXT_OBSTACLE_KINDS = ("note ", "label ", "table ", "origin ", "section ")
@@ -2341,9 +2411,12 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     extension = _early_bound(drawing_model.Extension, "IModelDocExtension")
-    if not extension.SetUserPreferenceInteger(542, 0, 1):
-        raise RuntimeError("failed to set end-only section cutting line")
-    if extension.GetUserPreferenceInteger(542, 0) != 1:
+    # swDetailingSectionViewLineStyleDisplay: 0 draws each cutting-plane line
+    # whole, arrow to arrow (novice-rubric screen 20261107T081227004Z: the
+    # end-only stubs left A-A and B-B with no line across the part, rule 9).
+    if not extension.SetUserPreferenceInteger(542, 0, 0):
+        raise RuntimeError("failed to set whole section cutting lines")
+    if extension.GetUserPreferenceInteger(542, 0) != 0:
         raise RuntimeError("section cutting-line style did not persist")
     # swDetailingSectionViewLabels_{PerStandard,Scale,CustomScale} = 242/247/84
     # and swDetailingViewLabelsScale_SCALEcustom = 3, read off this install's
@@ -2431,18 +2504,11 @@ async def build(adapter: Any) -> dict[str, str]:
     if int(overall_height.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
         raise RuntimeError("base overall reference precision did not persist")
 
-    # Right of the 334.0/444.5/457.2 stack, under the border: at the stack's
-    # old place the 457.2 now runs through it.
-    add_note(adapter, "TOP VIEW SCALE 1:4", 0.212, 0.258)
-    add_note(adapter, "FRONT VIEW SCALE 1:4", 0.105, 0.075)
+    # The plan and front view project from each other at the sheet's scale,
+    # so neither carries a label (rule 9); only the 1:6 pictorial does.
     add_note(adapter, "ISOMETRIC VIEW SCALE 1:6", 0.3183, 0.145)
-    _attached_note(
-        adapter,
-        top,
-        _serial_edge(top),
-        f'STAMPED ID "{SERIAL_TEXT}"\nAPPROX AS SHOWN',
-        SERIAL_NOTE_XY,
-    )
+    _attached_note(adapter, top, _serial_edge(top), SERIAL_NOTE, SERIAL_NOTE_XY)
+    _add_serial_location(adapter, top)
     deck_control = surface_finish_by_key(PART_SURFACE_FINISHES, "deck")
     deck_face = resolve_faces(
         _early_bound(top.ReferencedDocument, "IModelDoc2"),
@@ -2497,7 +2563,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, str(SOURCE), "*Top", *HOLE_TOP_CENTER, scale=SHEET_SCALE
     )
     section_line_x = _plan_xy(COLUMN_X, 0.0, center=HOLE_TOP_CENTER)[0]
-    _set_active_sheet_scale(adapter, SECTION_CAPTION_SHEET_SCALE)
+    # Pinned at its own 1:4 so the native caption carries no scale compartment
+    # (see SECTION_LABEL_SCALE_TEXT): a sheet scale drifted off 1:4 would add one.
+    _set_active_sheet_scale(adapter, SHEET_SCALE)
     section = create_section_view(
         adapter,
         hole_top,
@@ -2508,8 +2576,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
         label="base column-socket section",
     )
-    _set_active_sheet_scale(adapter, SHEET_SCALE)
-    _require_section_caption_scale(adapter, section, label="section A-A")
+    _require_section_caption_scale(adapter, section, label="section A-A", scaled=False)
     # drawing-guidelines.md rule 12 (hole and slot callouts say what to do) again: the hole table plus the spotface depth
     # define every hole on this sheet, and section A-A shows the socket, its
     # depth and the cross tap through it in SOLID lines, so no view here needs
@@ -2538,6 +2605,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     set_dimension_callouts(adapter, section_dimensions, SECTION_CALLOUTS)
+    _set_dimension_affixes(adapter, section_dimensions, SECTION_AFFIXES)
     # No root-radius callout: a 0.5 mm internal root at the pad-to-flange
     # junction is not measurable with hobby-shop kit, so the model keeps its
     # fillet and the deck cutter's own corner radius defines it (2026-09
@@ -2611,15 +2679,11 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model.EditRebuild3()
     _spread_hole_tags(hole_top, hole_table)
     _check_hole_table_notes(hole_table, *table_flag)
-    pivot_tag = _hole_table_station_rows(hole_table)[PIVOT_SCREW_XZ].tag
+    station_rows = _hole_table_station_rows(hole_table)
+    pivot_tag = station_rows[PIVOT_SCREW_XZ].tag
     add_note(adapter, pivot_seat_step(pivot_tag), *PIVOT_SEAT_NOTE_XY)
-    _attached_note(
-        adapter,
-        hole_top,
-        hole_entities[TABLE_HOLES.index((*SOCKET_FIT_STATION, COLUMN_SOCKET_DIAMETER))],
-        SOCKET_FIT_NOTE,
-        SOCKET_FIT_NOTE_XY,
-    )
+    socket_tags = sorted(station_rows[station].tag for station in COLUMN_SOCKET_XZ)
+    add_note(adapter, socket_note(socket_tags), *SOCKET_NOTE_XY)
     # The transferred seats: each group is its own native Hole Wizard
     # feature, so one associative callout per group carries its size and
     # count -- 4X for the block seats, 2X for the pedestal seats, and the lone
@@ -2722,7 +2786,7 @@ async def build(adapter: Any) -> dict[str, str]:
     socket_annotation.BentLeaderLength = SOCKET_FINISH_SHOULDER
     if abs(float(socket_annotation.BentLeaderLength) - SOCKET_FINISH_SHOULDER) > 1e-7:
         raise RuntimeError("socket bore finish leader shoulder did not persist")
-    add_note(adapter, "TOP VIEW SCALE 1:4", *HOLES_TOP_LABEL_XY)
+    add_note(adapter, "TOP VIEW", *HOLES_TOP_LABEL_XY)
     # Two nested outlines (flange, pad side) sit 1.6 mm apart at the table
     # origin, so the corner is named instead of left to
     # be inferred from A1-A4 symmetry. The note reads from the open field left
@@ -2762,7 +2826,9 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=UNDERSIDE_SECTION_SCALE,
         label="base underside section",
     )
-    _require_section_caption_scale(adapter, underside_section, label="section B-B")
+    _require_section_caption_scale(
+        adapter, underside_section, label="section B-B", scaled=True
+    )
     _turn_underside_section_clockwise(adapter, underside_section)
     for view in (bottom, underside_section):
         set_hidden_lines_removed(adapter, view)
@@ -2793,10 +2859,8 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     set_dimension_callouts(adapter, bottom_dimensions, UNDERSIDE_BOTTOM_CALLOUTS)
-    set_dimension_callouts(
-        adapter, underside_section_dimensions, UNDERSIDE_SECTION_CALLOUTS
-    )
-    add_note(adapter, "BOTTOM VIEW SCALE 1:4", *UNDERSIDE_BOTTOM_NOTE_XY)
+    _set_dimension_affixes(adapter, underside_section_dimensions, UNDERSIDE_SECTION_AFFIXES)
+    add_note(adapter, "BOTTOM VIEW", *UNDERSIDE_BOTTOM_NOTE_XY)
 
     # Sheet 4 defines retained lug/rib locations, never the removed interior
     # islands. The model owns the locations, prefixes and decimal places.
@@ -2813,15 +2877,6 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     add_note(adapter, LUGS_NOTE, *LUGS_NOTE_XY)
-    for label, (text, text_xy, tip_mm) in LUGS_LEVEL_NOTES.items():
-        add_leader_note(
-            adapter,
-            text,
-            text_xy=text_xy,
-            attach_xy=_lugs_xy(*tip_mm),
-            label=label,
-            view=lugs,
-        )
 
     # Sheet 5, the front cross-tap elevation on its own at 1:2, with its
     # spotface, tap and clearance callouts and its axis-height and X
@@ -2843,9 +2898,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     set_dimension_callouts(adapter, hole_side_dimensions, HOLE_SIDE_CALLOUTS)
-    set_dimension_callouts(
-        adapter, hole_side_dimensions, CROSS_TAP_AXIS_CALLOUTS, location="above"
-    )
+    _set_dimension_affixes(adapter, hole_side_dimensions, HOLE_SIDE_AFFIXES)
     tap_callout = add_native_hole_callout(
         adapter,
         hole_side,
