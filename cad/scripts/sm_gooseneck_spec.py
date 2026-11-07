@@ -207,13 +207,18 @@ TAP_CALLOUT_BELOW = f"FOR {SCREW_NUMBER}; DEPTHS FROM C'BORE FLOOR"
 # instead of prose (delegated ruling sm Q6, 2026-11-07 (Main), no precedent;
 # owner review #2144; pending owner confirmation; RV-03): the tap ⌖ to A, the
 # end piece's Ø.50 OD (flush with the tube's), and the counterbore ⌖ to B,
-# the tap.  Each zone is twice its radial offset.
+# the tap.  Each zone is twice its radial offset; the literal values are the
+# part-owned mapping the drawing's frames read (test_part_owned_geometric_
+# tolerances), checked here against the offsets the stacks charge.
 GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
+    "tap position": ".012",
+    "counterbore position": ".008",
+}
+if GEOMETRIC_TOLERANCES_IN != {
     "tap position": _inch(2.0 * THREAD_AXIS_OFFSET_MAX, 3),
     "counterbore position": _inch(2.0 * COUNTERBORE_AXIS_OFFSET_MAX, 3),
-}
-if GEOMETRIC_TOLERANCES_IN != {"tap position": ".012", "counterbore position": ".008"}:
-    raise AssertionError("gooseneck axis zones moved off their ruled values")
+}:
+    raise AssertionError("gooseneck axis zones are not twice the charged offsets")
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  StationReference is a hidden construction sketch on the
