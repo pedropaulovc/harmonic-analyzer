@@ -21,3 +21,8 @@ machinist_exceptions:
     where: "fitting steps 1 and 4: the head's three #8 flat head plate screws, reused and tightened evenly"
     finding: "plate mounting screws carry indexing torque without a mechanical lock (rule 23)"
     reason: "owner ruling 2026-11-02 (Pedro): item 1 mounts exactly as the maker's stock plate does on the BS-0 head; the spindle lock carries the cutting torque, so only hand indexing torque at the pin reaches the three countersunk #8 flat heads, and check 3 (one full blank turn returns the pin to its starting hole) detects any slip"
+  - id: "RV-02"
+    kind: "accept"
+    where: "fitting steps 1-4, exploded view and parts list: the PM BS-0 dividing head and its three #8 flat head plate screws"
+    finding: "the dividing head and its plate screws have no drawing number and no parts-list row (rules 4 and 22)"
+    reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (FoDtFab1 Q2: name the head as shop equipment, PM BS-0 DIVIDING HEAD (SHOP EQUIPMENT); no new identity). The head and the screws it already carries are the owner's shop equipment, not kit items: the sheet names them as shop equipment and shows them in the exploded view, and the parts list holds only item 1, the one part the kit supplies."
