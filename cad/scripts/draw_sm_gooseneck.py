@@ -162,12 +162,14 @@ SLEEVE_TOP_Y = _front_y(SLEEVE_TOP)
 # The elevation's dimensions: both vertical runs on the leg's right, the
 # sleeve's inside the leg's; the sleeve's Ø with its fit callout on the leg's
 # left, between the end view's leg and the elevation's, above the title block
-# (top y 0.066); the arm straight over the arm; the bend radius
-# right of the bend, its line 10 degrees above the leg's tangent so it passes
-# under section line A's right arrow and label (at about 40 degrees it ran
-# through the label, farm run 20261027T224212504Z) and over the leg length's
-# upper extension line.  The tube's reference Ø crosses the bare leg on its
-# left, level with the hidden reference line, opposite the leg length.
+# (top y 0.066); the arm straight over the arm; the bend radius inside the
+# bend, its block centred 25 mm right of the leg's axis so the 37.5-mm
+# "TUBE CENTERLINE" row clears the bend's inner edge by 3.6 mm (farm run
+# 20261107T102825912Z: "TO TUBE CENTERLINE" centred 19 mm right ran under
+# the arc) and ends 8 mm short of the overall height's line, its bottom row
+# over the leg length's upper extension line.  The tube's reference Ø crosses
+# the bare leg on its left, level with the hidden reference line, opposite
+# the leg length.
 # The reference overall height (foot face to the arm's top) stands outermost
 # on the leg's right, beyond the leg length (its text ended at x 0.310 in farm
 # run 20261101T004958072Z) and clear of the isometric (left edge x 0.358),
@@ -184,7 +186,7 @@ FRONT_KEEP = {
     "LegLength": (LEG_AXIS_X + 0.034, (SLEEVE_TOP_Y + BEND_TANGENT_Y) / 2.0),
     "TubeOdRef": (LEG_AXIS_X - 0.030, _front_y(TUBE_OD_REF_Y)),
     "ArmStraight": (END_FACE_X - 0.010, ARM_AXIS_Y + 0.014),
-    "BendRadius": (LEG_AXIS_X + 0.019, ARM_AXIS_Y - 0.0176),
+    "BendRadius": (LEG_AXIS_X + 0.025, ARM_AXIS_Y - 0.0176),
     "OverallHeight": (
         LEG_AXIS_X + 0.052,
         (FOOT_Y + _front_y(ARM_Y + _TUBE_R)) / 2.0,

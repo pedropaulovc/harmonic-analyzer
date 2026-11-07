@@ -206,8 +206,10 @@ _COUNTER_SPRING_WIDTH = 0.0341
 # CLEARS' 31.38 mm), wider than the 'MHA-SM-VN-51' row under it.
 BODY_DIA_TEXT_WIDTH = 0.036
 BODY_DIA_TEXT_HEIGHT = block_height(2, _callout_lines("BodyDia"))
-# '3.60 min.' alone: a location carries its value and limit only (rule 7).
-PLAIN_LENGTH_TEXT_WIDTH = _COUNTER_SPRING_WIDTH
+# 'PLAIN BODY;' over 'SEE NOTE 1': the length names the feature it ends on,
+# the loop's seat (machinist review 20261107T102825912Z: a bare '.14 min.'
+# ended on nothing drawn).  About 30.5 mm at 'THREAD BLANK;''s advance.
+PLAIN_LENGTH_TEXT_WIDTH = 0.0305
 PLAIN_LENGTH_TEXT_HEIGHT = block_height(1, _callout_lines("PlainLength"))
 # 'TO FULL THREAD' 35.69 mm (font advance) over '5.71 max.', 21.44 mm as
 # '5.67 max.' rendered, on one line.

@@ -381,10 +381,13 @@ def test_plain_length_and_full_thread_limits_print_on_the_part() -> None:
     geom.require_body_form(full_thread_station_max=geom.PLAIN_LENGTH_MIN + geom.PITCH)
     with pytest.raises(AssertionError, match="must follow the plain-body limit"):
         geom.require_body_form(full_thread_station_max=geom.PLAIN_LENGTH_MIN)
-    # The plain length is a location: value and limit only (rule 7); the
-    # full-thread limit stands ABOVE its value, which alone takes the
-    # dimension line.
-    assert "StationReference" not in spec.DIMENSION_CALLOUTS
+    # The plain length names the feature it ends on, the loop's seat, and
+    # links the loop's note (machinist review 20261107T102825912Z: a bare
+    # '.14 min.' ended on nothing drawn); the full-thread limit stands ABOVE
+    # its value, which alone takes the dimension line.
+    assert spec.DIMENSION_CALLOUTS["StationReference"] == {
+        "PlainLength": f"PLAIN BODY;\n{spec.LOOP_NOTE_LINK}"
+    }
     assert spec.DIMENSION_CALLOUTS_ABOVE["StationReference"] == {
         "FullThread": "TO FULL THREAD"
     }
@@ -918,6 +921,7 @@ def test_readback_contract_mirrors_every_printed_and_callout_control() -> None:
         "BodyDia",
         "HeadDia",
         "HeadReliefChamfer",
+        "PlainLength",
         "TipChamfer",
         "UnderHeadCornerR",
     }
