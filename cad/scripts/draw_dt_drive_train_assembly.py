@@ -117,6 +117,7 @@ import dt_drum_station_setting_spec as drum_station_setting
 from dt_pinion_lever_pin_spec import (
     LEVER_NUMBER,
     LEVER_PIN_SET_NAME,
+    LEVER_PIN_SET_STEP_KEY,
     LIFT_ROD_NUMBER,
     PIN_NUMBER as LEVER_PIN_NUMBER,
 )
@@ -1106,6 +1107,33 @@ def cam_stake_note_xy(tip: tuple[float, float]) -> tuple[float, float]:
     )
 
 
+# Rubric sample round 7 (#3): step 22C's peen on the lever cross pin is
+# called out in view E, as the stakes are.  MHA-DT-30's origin is its centre
+# on its own axis (build_dt_pinion_lever_pin), which runs along the lift
+# rod's pin-hole axis; the side view sees the pin end-on in the MHA-DT-16 hub.
+LEVER_PIN_STEM = "dt-pinion-lever-pin"
+LEVER_PIN_CENTRE_M = (0.0, 0.0, 0.0)
+LEVER_PIN_PEEN_NOTE = "\n".join(
+    (
+        f"PEEN {LEVER_PIN_NUMBER}",
+        "FLUSH BOTH ENDS",
+        f"(STEP {steps.step_number(LEVER_PIN_SET_STEP_KEY)}C)",
+    )
+)
+# Round 7's render (run 20261107T043210166Z) puts the hub near (253, 140) mm
+# on sheet 11: the note stands 30 mm right of it and 4 mm above, its three
+# rows (about 13.5 mm) between the lever grip (bottom near 147 mm) and the
+# MHA-DT-32 stake note (top near 117 mm); the leader leaves the text's left
+# end and runs back over the hub to the pin.
+LEVER_PIN_PEEN_NOTE_DX = 0.030
+LEVER_PIN_PEEN_NOTE_RISE = 0.004
+
+
+def lever_pin_peen_note_xy(tip: tuple[float, float]) -> tuple[float, float]:
+    """Top-left sheet point of the peen note for the pin at sheet ``tip``."""
+    return (tip[0] + LEVER_PIN_PEEN_NOTE_DX, tip[1] + LEVER_PIN_PEEN_NOTE_RISE)
+
+
 # Step 10 screws the back MHA-CH-08 down with the channel's own hold-down.
 NORTH_BRACKET_SCREW = str(_config.parts("ch-vn-bracket-hold-down-screw")["number"])
 # Steps 8A-8C hang each MHA-CH-00 connecting rod and rocker arm pair on its cam by
@@ -1219,6 +1247,9 @@ CONE_CRANK_STEPS = _note_text(
         f"{inch_window(SHAFT_END_PLAY, 3)}.",
         "3N. IF THE END PLAY IS OUT, LOOSEN MHA-DT-VN-56.",
         "3P. REPEAT 3J-3M UNTIL THE END PLAY READS IN ITS WINDOW.",
+        # Rule 23 (rubric sample round 7, #0): the set-screwed collar's
+        # bench acceptance.
+        "3Q. CHECK BY HAND: MHA-DT-VN-54 DOES NOT TURN OR SLIDE ON MHA-DT-04.",
         # User ruling 2026-09-28: the crank journal runs directly in the post;
         # the centres are fixed, and the only mesh requirement is no binding.
         # CONTRACT-crank: MHA-DT-VN-67 press to the blind-hole floor.  Owner
@@ -1261,7 +1292,7 @@ CONE_CRANK_STEPS = _note_text(
         "4U. CHECK THAT THE MHA-DT-11 END STANDS "
         # A stack result, not a set window: rounded outward (Codjiflo, #2194).
         f"{inch_envelope((max(CRANK_END_PROUD_RANGE[0], 0.0), CRANK_END_PROUD_RANGE[1]), 3)}"
-        " PROUD OF THE MHA-DT-10 BACK FACE.",
+        " PROUD OF MHA-DT-10.",
         "4V. DO NOT FACE THAT END.",
         f"5. SLIDE {CRANK_CHAIN_WHEEL} T12 ONTO MHA-DT-11 BEFORE THE ARM, ITS HOLES OVER",
         "   THE 2X MHA-DT-VN-67.",
@@ -1284,6 +1315,8 @@ CONE_CRANK_STEPS = _note_text(
         f"6H. CUT MHA-DT-VN-65 TO {KEEPER_CHAIN_BEADS} BEADS.",
         "6J. THREAD IT THROUGH THE MHA-DT-28 LOOP AND MHA-DT-27.",
         "6K. SNAP ONE END BEAD INTO EACH DOME OF MHA-DT-VN-66.",
+        # Rule 23 (rubric sample round 7, #1): the anchor eye's bench check.
+        "6L. CHECK THAT MHA-DT-28 DOES NOT TURN UNDER MHA-SH-VN-51 BY HAND.",
         # Local review of 747487c71 and owner ruling 2026-10-24 (#1900): the
         # ferrule cures centred on the pivot bore.  Rule 23: the handle spins
         # on the MHA-DT-32 shoulder, so the screw is staked in the arm's
@@ -1571,7 +1604,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             f"{LEVER_NUMBER}'S HUB AT ITS PRINTED STATION AND {LIFT_ROD_NUMBER} TOGETHER.\n"
             f"INSERT {LEVER_PIN_NUMBER}, A SLIP FIT.\n"
             "TRIM BOTH ENDS.\n"
-            "PEEN BOTH ENDS FLUSH WITH THE HUB.",
+            f"PEEN BOTH ENDS FLUSH WITH THE HUB (SHEET {FULL_DETAIL_SHEET}).",
         ),
         # The cone set goes on last, into the pivot seat drilled at
         # PIVOT_SEAT_STEP; the stop and lock seats are MHA-FR-01 print holes.
@@ -1677,30 +1710,31 @@ CHECKS = _note_text(
         "4U. VERIFY THE MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT "
         f"{stop_screw.MIN_USEFUL_ENGAGEMENT_TEXT}.",
         "4V. CHECK THAT ITS HEAD IS FULLY SEATED.",
-        # A 4G-4J pedestal reset leaves the rig's transferred seats alone.
-        "4W. DO NOT REDO STEPS "
-        f"{steps.step_number(NORTH_BRACKET_SET_KEY)} AND "
-        f"{steps.step_number('rig-located')}-{steps.step_number('rig-seats-transferred')} "
-        "AFTER 4G-4J; CHECK 7 RECHECKS THEM.",
         # Rubric sample round 2: the notch's reference, the running direction
         # and the sine sense must be readable.  Notches up = cosine mode,
         # turned 90° = sine mode (book pp. 66-67; dimensions.yaml ch14).
-        # PENDING OWNER CONFIRMATION (rubric-sample owner question 1): the
-        # crank's forward sense (clockwise in the sheet 1 FRONT view) and the
-        # sine position (a quarter turn short of the top, so the cylinders'
-        # outputs read cos(k theta - 90°) = sin(k theta)).
-        "5. ZEROING: TURN THE CRANK FORWARD (CLOCKWISE, SHEET 1 FRONT VIEW); THE "
-        "WAY THE MHA-DT-12 THEN TURN IS THEIR RUNNING DIRECTION.",
-        "5A. SWING THE CONE SET CLEAR AS 4A; TURN EACH MHA-DT-12 NOTCH UP.",
-        "5B. TURN MHA-DT-16 TO ENGAGE MHA-DT-01.",
-        "5C. COSINES: TURN MHA-DT-01 BY MHA-DT-15 UNTIL ALL NOTCHES POINT STRAIGHT "
-        "UP, FINISHING IN THE RUNNING DIRECTION TO TAKE UP PLAY.",
-        "5D. SINES: AS 5C, BUT STOP ALL NOTCHES A QUARTER TURN SHORT OF STRAIGHT "
-        "UP, COMING UP IN THE RUNNING DIRECTION.",
+        # Owner ruling 2026-11-07 (rubric-sample owner question 1): follow
+        # engineerguy video 4, "Operation" (jfH-NbsmvD4).  Forward is
+        # clockwise in the sheet 1 FRONT view: the crank arm at 1:51-1:52,
+        # gear 4 turning counter-clockwise at 2:16-2:21, and the platen
+        # feeding away from the crank at 4:02-4:10 and 10:03.  The sine notch
+        # sits level with the axis on the alignment-pinion (MHA-DT-01) side,
+        # the left in the FRONT view (7:50-8:15, 8:42-8:48; notches on top
+        # = cosines, 7:57-8:12), so the cylinders' outputs read
+        # cos(k theta - 90°) = +sin(k theta).
+        "5. ZEROING: CRANK FORWARD IS CLOCKWISE IN THE SHEET 1 FRONT VIEW: THE "
+        "PLATEN FEEDS AWAY FROM THE CRANK, AND THE MHA-DT-12 RUN CLOCKWISE.",
+        "5A. SWING THE CONE SET CLEAR AS 4A.",
+        "5B. TURN EACH MHA-DT-12 BY HAND UNTIL ITS NOTCH POINTS STRAIGHT UP.",
+        "5C. TURN MHA-DT-16 TO ENGAGE MHA-DT-01.",
+        "5D. COSINES: TURN MHA-DT-01 BY MHA-DT-15 UNTIL ALL NOTCHES POINT STRAIGHT "
+        "UP, THE MHA-DT-12 FINISHING CLOCKWISE TO TAKE UP PLAY.",
+        "5E. SINES: AS 5D, BUT STOP ALL NOTCHES LEVEL ON THE MHA-DT-01 SIDE "
+        "(LEFT IN THE FRONT VIEW), A QUARTER TURN SHORT OF THE TOP.",
         # The saved pose is engaged with MHA-DT-VN-51 tight (SETUP_NOTES):
         # zeroing ends by re-setting the swing as check 4 does.
-        "5E. RETURN MHA-DT-16 TO PARK.",
-        "5F. RE-SET THE CONE SET SWING AS 4K-4P.",
+        "5F. RETURN MHA-DT-16 TO PARK.",
+        "5G. RE-SET THE CONE SET SWING AS 4K-4P.",
         "6. PARKED, MHA-DT-24 HOLDS MHA-DT-01 CLEAR OF EVERY MHA-DT-12.",
         f"7. PARKED, PINS ON THE CAMS: A {TIP_GAP.TIP_GAP_SETTING_TEXT} FEELER IS SNUG TIP TO TIP",
         f"   AT THE FRONT AND BACK STATIONS; {TIP_GAP.TIP_GAP_ACCEPT_TEXT}",
@@ -1805,7 +1839,7 @@ CONE_CRANK_PRIMARY, CONE_CRANK_CONTINUED, CRANK_CONTINUED = _split_sequence_chai
     (CRANK_CONTINUED_FROM, _CRANK_CONTINUED_HEADING),
 )
 _BANK_CONTINUED_HEADING = "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK"
-BANK_CONTINUED_FROM = f"{steps.step_number('cylinder-stack-accepted')}G"
+BANK_CONTINUED_FROM = f"{steps.step_number('cylinder-stack-accepted')}F"
 BANK_LAST_FROM = f"{steps.step_number('cylinder-bank-located')}B"
 BANK_PRIMARY, BANK_CONTINUED, BANK_LAST = _split_sequence_chain(
     BANK_STEPS,
@@ -1822,7 +1856,7 @@ RIG_SPLITS = (
 )
 # The one-thing check lines (rubric sample round 4) run checks 1-5 down
 # sheet 12's left field; 5A heads its right field, over the saved pose.
-CHECKS_CONTINUED_FROM = "5A"
+CHECKS_CONTINUED_FROM = "5B"
 CHECKS_PRIMARY, CHECKS_CONTINUED = _split_sequence_notes(
     CHECKS,
     CHECKS_CONTINUED_FROM,
@@ -4204,6 +4238,7 @@ def _place_full_detail_sheet(adapter: Any) -> tuple[float, float]:
     )
     _note_handle_stake(adapter, view, label=f"{label} stake note")
     _note_cam_stake(adapter, view, label=f"{label} cam stake note")
+    _note_lever_pin_peen(adapter, view, label=f"{label} lever pin peen note")
     return scale
 
 
@@ -4310,6 +4345,46 @@ def _note_cam_stake(adapter: Any, view: Any, *, label: str) -> None:
     _telemetry.event(
         "drawing.cam_stake_note",
         tips_mm=tuple(tuple(round(value * 1000.0, 2) for value in t) for t in tips),
+        extent_mm=tuple(
+            round(value * 1000.0, 2) for value in _note_extent(adapter, note, label=label)
+        ),
+        leader_mm=tuple(round(float(value) * 1000.0, 2) for value in points),
+    )
+    if len(points) < 6:
+        raise RuntimeError(f"{label}: the leader is unreadable: {points!r}")
+
+
+def _note_lever_pin_peen(adapter: Any, view: Any, *, label: str) -> None:
+    """Point step 22C's peen note at MHA-DT-30 in the MHA-DT-16 hub
+    (LEVER_PIN_CENTRE_M), the note right of it (lever_pin_peen_note_xy)."""
+    stem = frozenset({LEVER_PIN_STEM})
+    tips: list[tuple[float, float]] = []
+    for leaf in _view_component_leaves(adapter, view, label=label):
+        if not (leaf.visible and _stems_matching(leaf.identities, stem)):
+            continue
+        (centre,) = _anchor_model_points(
+            adapter, leaf, (LEVER_PIN_CENTRE_M,), {}, stem=LEVER_PIN_STEM, label=label
+        )
+        tips.append(model_point_in_view(adapter, view, centre, label=label))
+    if len(tips) != 1:
+        raise RuntimeError(f"{label}: expected one visible {LEVER_PIN_STEM}, got {tips!r}")
+    (tip,) = tips
+    note = _early_bound(
+        add_leader_note(
+            adapter,
+            LEVER_PIN_PEEN_NOTE,
+            text_xy=lever_pin_peen_note_xy(tip),
+            attach_xy=tip,
+            label=label,
+            view=view,
+        ),
+        "INote",
+    )
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+    _telemetry.event(
+        "drawing.lever_pin_peen_note",
+        tip_mm=tuple(round(value * 1000.0, 2) for value in tip),
         extent_mm=tuple(
             round(value * 1000.0, 2) for value in _note_extent(adapter, note, label=label)
         ),

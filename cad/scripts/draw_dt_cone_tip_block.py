@@ -126,17 +126,16 @@ DOWEL_HOLE_CALLOUT_PRINTED = DOWEL_HOLE_CALLOUT.replace("<HOLE-DEPTH>", "\u21a7"
 # precedent, dt_pinion_lift_rod_spec.PIN_HOLE_CALLOUT; MHA-DT-00 step
 # post-and-tip-block points back at this callout), and the pair's
 # disassembly (round 6, #0: the dowel is pressed into a blind ream, so the
-# sheet declares the block and dowel a permanent pair; the dowel only slips
-# in MHA-DT-20, so the two lift off it together).  Wrapped to a hanging
-# indent under its number, at most DOWEL_NOTE_WIDTH characters a row; the
-# step reference and PERMANENT PAIR never break across rows.
+# sheet declares the press fit permanent; the dowel only slips in MHA-DT-20,
+# so the two lift off it together).  Round 7 (#0, #1): the note is the
+# requirement only, four rows at most (rule 7), clear of the border.
+# Wrapped to a hanging indent under its number, at most DOWEL_NOTE_WIDTH
+# characters a row; the step reference never breaks across rows.
 DOWEL_NOTE_WIDTH = 30
 _NBSP = "\u00a0"
 DOWEL_NOTE = textwrap.fill(
-    f"PRESS FIT FOR {DOWEL_PIN_NUMBER}, MATCH-DRILLED UP THRU {PLATFORM_NUMBER} "
-    f"AT {step_ref('post-and-tip-block').replace(' ', _NBSP)}. PERMANENT{_NBSP}PAIR: "
-    f"THE DOWEL STAYS IN THE BLOCK, AND BOTH LIFT OFF {PLATFORM_NUMBER} "
-    "TOGETHER.",
+    f"PRESS FIT FOR {DOWEL_PIN_NUMBER}, PERMANENT. MATCH-DRILLED UP THRU "
+    f"{PLATFORM_NUMBER} AT {step_ref('post-and-tip-block').replace(' ', _NBSP)}.",
     width=DOWEL_NOTE_WIDTH,
     initial_indent=f"{DOWEL_NOTE_NUMBER}. ",
     subsequent_indent="   ",

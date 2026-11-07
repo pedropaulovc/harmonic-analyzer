@@ -48,7 +48,6 @@ from _drawing_common import (
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
-    offset_dimension_text,
     set_dimension_callouts,
     set_reference_dimension,
 )
@@ -224,15 +223,16 @@ FLATS_KEEP = {
     # the witness ran through the old "FROM CROWN RIM" words).
     "BackFlatFromRim": (_RIM_X - 0.013, _FLATS_TOP + 0.017),
     "FrontFlatFromRim": ((_RIM_X + _FRONT_FLAT_X) / 2.0, _FLATS_TOP + 0.023),
-    # The dimension line ~11 mm left of the crown apex (CAP_SAG past the rim).
-    "AcrossFlat": (_RIM_X - 0.012, FLATS_CENTER[1]),
+    # Round-6 review #4: the 6 mm span is shorter than its text, so a text
+    # centred on the span was struck by its own dimension line and both
+    # witnesses.  The text (value, its one callout line under it) stands
+    # below the lower witness (y ~0.137) on its own dimension line, which
+    # runs down to it ~11 mm left of the crown apex.  R7 review #1: the
+    # offset-text leader instead crossed the callout and ended in open space.
+    # The callout line (~80 mm) spans x ~0.04..0.12, above the 1:2 isometric's
+    # top (y ~0.109).
+    "AcrossFlat": (_RIM_X - 0.012, FLATS_CENTER[1] - 0.013),
 }
-# Round-6 review #4: the across-flat's 6 mm span is shorter than its text, so
-# a centred text was struck by its own dimension line and both witnesses.  The
-# text leaves on a leader to the clear field below-left of the crown, its top
-# under the lower witness (y ~0.137) and its one callout line short of the
-# 1:2 isometric's top (y ~0.109).
-ACROSS_FLAT_TEXT_XY = (_RIM_X - 0.024, FLATS_CENTER[1] - 0.013)
 
 # The rod's flank in the *Right view: the bearing finish leader drops onto it.
 ROD_FLANK_Y = RIGHT_CENTER[1] + ROD_DIA * SHEET_SCALE[0] / 2000.0
@@ -487,7 +487,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     annotations = [*right_annotations, *detail_annotations, *flats_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    offset_dimension_text(adapter, flats_annotations, {"AcrossFlat": ACROSS_FLAT_TEXT_XY})
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _show_as_reference(adapter, right_annotations, DRAWING_REFERENCE_DIMENSIONS)
     if not auto_center_marks(adapter, detail, holes=True, size=0.0025):

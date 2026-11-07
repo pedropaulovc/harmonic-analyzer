@@ -311,15 +311,21 @@ def test_view_b_arrow_lies_along_its_line_of_sight_in_the_end_view() -> None:
     assert min(tip[1], tail[1]) - drawing.VIEW_LETTER_HEIGHT > 0.167 + 0.020
 
 
+CAP_SAG_M = spec.CAP_SAG / 1000.0
+
+
 def test_across_flat_text_leaves_its_lines() -> None:
-    # Round-6 review #4: the across-flat text sits below its lower witness and
-    # left of the dimension line on a leader; the .583 text ends short of the
-    # rim witness.
-    dim_x, _ = drawing.FLATS_KEEP["AcrossFlat"]
-    text_x, text_y = drawing.ACROSS_FLAT_TEXT_XY
+    # Round-6 review #4: the across-flat text sits below its lower witness, on
+    # its own dimension line, left of the crown; the .583 text ends short of
+    # the rim witness.  R7 review #1: the words are the dimension's own
+    # below-text callout, so there is no separate leadered note to stray.
+    text_x, text_y = drawing.FLATS_KEEP["AcrossFlat"]
     lower_witness_y = drawing.FLATS_CENTER[1] - spec.ROD_DIA / 2000.0
     assert text_y < lower_witness_y - 0.008
-    assert text_x < dim_x
+    assert text_x < drawing._RIM_X - CAP_SAG_M - 0.005
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "offset_dimension_text" not in source
+    assert "ACROSS_FLAT_TEXT_XY" not in source
     # One callout line (~2.5 mm a glyph) under the value: inside the border and
     # above the 1:2 isometric's top (y ~0.109).
     half_width = len(spec.ACROSS_FLAT_CALLOUT) * 0.0025 / 2.0

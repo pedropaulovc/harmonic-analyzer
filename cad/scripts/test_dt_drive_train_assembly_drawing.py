@@ -727,7 +727,16 @@ def test_lever_pin_step_states_existing_drill_size_and_slip_fit() -> None:
     assert f"{pin.LEVER_NUMBER}'S HUB AT ITS PRINTED STATION AND {pin.LIFT_ROD_NUMBER} TOGETHER" in step
     assert f"INSERT {pin.PIN_NUMBER}, A SLIP FIT." in step
     assert "TRIM BOTH ENDS." in step
-    assert "PEEN BOTH ENDS FLUSH WITH THE HUB." in step
+    assert f"PEEN BOTH ENDS FLUSH WITH THE HUB (SHEET {drawing.FULL_DETAIL_SHEET})." in step
+    # Round 7 (#3): view E calls the peen out at the hub, citing 22C.
+    assert drawing.LEVER_PIN_PEEN_NOTE.split("\n") == [
+        f"PEEN {pin.PIN_NUMBER}",
+        "FLUSH BOTH ENDS",
+        "(STEP 22C)",
+    ]
+    assert "PEEN BOTH ENDS" in [
+        line.split(". ", 1)[1] for line in RIG_STEPS.splitlines() if line.startswith("22C. ")
+    ][0]
     assert "LIGHT HAMMER" not in step
     assert "REAM" not in step
 
