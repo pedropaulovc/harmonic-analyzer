@@ -320,7 +320,7 @@ TITLE_BLOCK = (
 PLAN_CENTER = (0.274, 0.205)
 ELEVATION_CENTER = (0.274, 0.113)
 CAPTION_XY = (0.018, 0.255)
-CAPTION_WIDTH = 46  # characters; default-format note text, left of the plan
+CAPTION_WIDTH = 45  # characters; default-format note text, clear left of the plan
 ALIGNMENT_XY = (0.018, 0.093)
 ALIGNMENT_WIDTH = 68  # characters; stops left of the title block
 # Default-format note text: about 2.9 mm a character on the farm's templates.

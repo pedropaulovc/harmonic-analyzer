@@ -305,6 +305,20 @@ def test_clusters_partition_the_bom() -> None:
     assert spec.LOCKED_TO[spec.CARRIAGE_SCREW] == (
         ((spec.FEED_BLOCK, 0),) * 4 + ((spec.PIVOT_BLOCK, 0),) * 4
     )
+    # R4: the common #8 rail screw is one BOM row over three joints: the
+    # rails into their bars, the TL-28 brackets up into Bar1, then the
+    # strap's CL, CR and HUB clamps, context on the carrier sheet.
+    rail_family = tuple(
+        spec.instance_name(spec.RAIL_SCREW, index)
+        for index in range(spec.QUANTITIES[spec.RAIL_SCREW])
+    )
+    assert rail_family == (
+        *spec.RAIL_SCREW_INSTANCES,
+        *spec.BAR_SCREW_INSTANCES,
+        *spec.STRAP_CLAMP_SCREW_INSTANCES.values(),
+    )
+    carrier_cluster = next(c for c in drawing.CLUSTERS if c.sheet == "CARRIER EXPLODED")
+    assert set(spec.STRAP_CLAMP_SCREW_INSTANCES.values()) <= set(carrier_cluster.context)
     # The feed nut's four flat heads are riser-screw instances (option B,
     # 2026-11-04): shown over the nut on the feed sheet, ballooned with the
     # riser's four on the carrier sheet.

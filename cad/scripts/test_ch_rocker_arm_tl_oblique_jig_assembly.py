@@ -58,6 +58,20 @@ PART_STEMS = {
     physical.replace("-", "_")
     for physical, _configuration in spec.COMPONENT_IDENTITIES.values()
 }
+# Registry rows outside the jig's own MHA-CH-06-TL- series and the shop
+# clamping kit are shared vendor inputs reused unchanged from the machine
+# (R4: the loose 1/8 stop pins are MHA-SM-VN-53 stock); each keeps its
+# global identity and machine quantity, and the jig only consumes its count.
+JIG_PREFIX = spec.DRAWING_NUMBER.rsplit("-", 1)[0] + "-"
+SHARED_VENDOR_FAMILIES = frozenset(
+    family
+    for family, (physical, _configuration) in spec.COMPONENT_IDENTITIES.items()
+    if not _config.parts(physical)["number"].startswith((JIG_PREFIX, "MHA-SH-VN-"))
+)
+JIG_ONLY_PART_STEMS = PART_STEMS - {
+    spec.COMPONENT_IDENTITIES[family][0].replace("-", "_")
+    for family in SHARED_VENDOR_FAMILIES
+}
 PIVOT_FAMILIES = {spec.PIVOT_SCREW: 2, spec.PIVOT_SPACER: 2, spec.PIVOT_SHIM: 10}
 # Each screw family and its fastener-table rows (count, callout, engagement):
 # the riser screw's TL-VN-67 also holds the feed nut on (owner ruling
@@ -1150,7 +1164,7 @@ def test_kit_bom_descriptions_use_native_member_authority() -> None:
 
 
 def test_bom_follows_the_part_registry() -> None:
-    prefix = spec.DRAWING_NUMBER.rsplit("-", 1)[0] + "-"
+    assert SHARED_VENDOR_FAMILIES == {spec.STOP_PIN}
     rows = {
         family: _config.parts(physical)
         for family, (physical, _configuration) in spec.COMPONENT_IDENTITIES.items()
@@ -1163,12 +1177,20 @@ def test_bom_follows_the_part_registry() -> None:
             row["configuration_quantities"][configuration]
             if configuration is not None else row["quantity"]
         )
+        if stem in SHARED_VENDOR_FAMILIES:
+            # The machine's registry row is untouched: its own number and
+            # quantity (the knife mounts' four); the jig consumes the riser's
+            # two stop holes' worth, bought as the same stock pin.
+            assert configuration is None and row["process"] == "purchased", stem
+            assert number == "MHA-SM-VN-53" and quantity == spec.stop_pin.QUANTITY == 4
+            assert spec.QUANTITIES[stem] == len(riser.STOP_PIN_HOLES) == 2
+            continue
         assert quantity == spec.QUANTITIES[stem], stem
         # VN records procurement, not absence of shop rework. Shared kit
         # registry properties stay common; HoldDownStud's native rework
         # properties are checked with its configured producer.
         assert (row["process"] == "purchased") == number.startswith(
-            (prefix + "VN-", "MHA-SH-VN-")
+            (JIG_PREFIX + "VN-", "MHA-SH-VN-")
         ), stem
 
 
@@ -1201,7 +1223,10 @@ def test_jig_is_a_shop_fixture_outside_the_machine_tree() -> None:
                 reachable.add(ref)
                 if ref in bg.ASSEMBLY_ORDER:
                     frontier.append(ref)
-    assert not ({JIG} | PART_STEMS) & reachable
+    # Only the jig's own parts and the tooling kit stay out of the machine; a
+    # shared vendor input is the machine's part, reused with no new identity.
+    assert not ({JIG} | JIG_ONLY_PART_STEMS) & reachable
+    assert PART_STEMS - JIG_ONLY_PART_STEMS <= reachable
 
 
 
@@ -1773,7 +1798,8 @@ def test_r4_operation_order_cites_the_plan_and_retains_all_clamps() -> None:
     assert "PER MHA-CH-06 PLAN S2 OP30-OP40" in steps["O5"]
     assert f"TORQUE {spec._torque(spec.holding.HUB_TORQUE_NM)}" in steps["O6"]
     assert "PER MHA-CH-06 PLAN S3 OP10-OP20" in steps["O6"]
-    assert "PARTIAL HEAD BEARING IS ACCEPTED" in steps["O6"]
+    assert "THE HEAD NEED NOT BEAR FULLY ON THE FLANGE" in steps["O6"]
+    assert "ACCEPTED" not in steps["O6"] and "CENTRE" not in steps["O6"]
     assert "RETAINING ALL THREE CLAMPS THROUGH BOTH PASSES" in steps["O6"]
     assert "NEVER A FULL-WIDTH SLOT OR PLUNGE" in steps["O6"]
     for text in steps.values():
