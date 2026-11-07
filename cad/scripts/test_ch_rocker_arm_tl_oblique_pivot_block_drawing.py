@@ -324,7 +324,7 @@ def test_printed_callouts_read_size_process_depth_and_name_each_mate_once():
     for retired in ('SETS ', 'FROM TOP', 'SECTION', 'HGH15CA', 'M4 X 20', 'COUNTERBORE', 'BELOW SHOULDER'):
         assert retired not in words
     assert printed['CarriageCounterbores3Dia'] == {
-        'prefix': '4X <HOLE-CBORE><MOD-DIAM>', 'suffix': ' <HOLE-DEPTH> (.390)', 'above': '', 'below': ''}
+        'prefix': '4X <HOLE-SPOT><MOD-DIAM>', 'suffix': ' <HOLE-DEPTH> (.390)', 'above': '', 'below': ''}
     assert math.isclose((spec.BLOCK_HEIGHT - spec.CBORE_FLOOR) / INCH, .390)
     assert printed['BoreDia']['suffix'] == ' REAM <HOLE-DEPTH> (.359)'
     assert math.isclose(spec.BORE_DEPTH / INCH, .359, abs_tol=5e-5)

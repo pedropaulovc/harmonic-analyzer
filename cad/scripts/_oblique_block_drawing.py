@@ -479,7 +479,9 @@ BLOCK_CALLOUTS = {
     'TapDrillDia': {'suffix': ' DRILL THRU', 'above': '', 'below': f'{part.PIVOT_TAP} UNC THRU'},
     'CarriageDrills1Dia': {'prefix': f'{_HOLES} <MOD-DIAM>', 'suffix': ' DRILL THRU', 'above': '',
                            'below': f'MATCHES {CARRIAGE_NUMBER} CARRIAGE'},
-    'CarriageCounterbores3Dia': {'prefix': f'{_HOLES} <HOLE-CBORE><MOD-DIAM>',
+    # Dimension text takes gtol.sym's HOLE-SPOT (Counterbore(Spotface)); the
+    # Hole Wizard callout variable <HOLE-CBORE> printed literally here (r1).
+    'CarriageCounterbores3Dia': {'prefix': f'{_HOLES} <HOLE-SPOT><MOD-DIAM>',
                                  'suffix': f' <HOLE-DEPTH> {_inch_ref(part.CBORE_DEPTH)}',
                                  'above': '', 'below': ''},
     'TopBoreDepth': {'below': ''},
