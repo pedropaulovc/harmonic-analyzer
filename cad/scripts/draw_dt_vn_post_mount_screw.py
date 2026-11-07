@@ -4,19 +4,20 @@ MSC 40923906 is bought as 4 in stock and cut to length, so the sheet is a
 modified-purchased-part drawing (the boss hook's pattern), not the purchased
 reference sheet: a Front view carrying the cut length -- the part's hidden
 reference-sketch dimension, imported at its model-owned places -- and an
-isometric, both 1:1. No single length suits every in-band post and plate
-(dt_vn_post_mount_screw_spec's U27 check), so the length prints as a REFERENCE
-at CUT_LENGTH_MM, with no band and the cut-to-fit acceptance beneath it:
-cut at assembly, end flush to the spec band's allowance short of the MHA-DT-20
-underside, never proud (dt_vn_post_mount_screw_spec.CUT_TO_FIT_CALLOUT).
-The cut end's break is the title block's general edge break; the sheet
-carries no part-local break limit (Main's ruling on the run-7 sheet).  The
-only note says the undimensioned purchased geometry is reference.  No
-installation sequence or rule number is printed: the sequence is an MHA-DT-00
-assembly step (Main's eye pass of warm-c486, drawing-guidelines.md rule 7
-(notes: few, flagged, never a method)).  The engagement minimum prints as a
-plain fact, "ENGAGEMENT 0.88D MIN", on the cut-length callout's last line,
-never in a note; the spec's asserts still guard its value.
+isometric, both 1:1. The Front lies on a horizontal axis, head left, as the
+screw sits in the lathe and as sheet 2 draws the supplied stock, so neither
+sheet shows a rotated view (drawing-guidelines.md rules 9 and 11). No single
+length suits every in-band post and plate (dt_vn_post_mount_screw_spec's U27
+check), so the length prints as a REFERENCE at CUT_LENGTH_MM, with no band and
+'SEE NOTE 1' beneath it (rule 7): note 1 (CUT_LENGTH_NOTE) gives the cut end's
+acceptance, flush to the spec band's allowance short of the MHA-DT-20
+underside, and the engagement minimum as a plain fact (rule 20). The cut
+end's break is the title block's general edge break; the sheet carries no
+part-local break limit (Main's ruling on the run-7 sheet).  The other note
+says the undimensioned purchased geometry is reference.  No installation
+sequence or rule number is printed: the sequence is an MHA-DT-00 assembly
+step (rule 7 (notes: few, flagged, never a method)); the spec's asserts
+still guard the engagement value.
 
 The separate supplier maximum-limit sheet is a construction-only source
 diagram, not a correction of the installed MSC solid (deferred in issue 1806).
@@ -24,8 +25,9 @@ Its coordinates belong to the source model sketch, not model XYZ or the
 drawing crop sketch. Map them through the inverse model-to-sketch transform,
 then measure and turn the projected axial direction onto sheet +X before
 centering, cropping or importing dimensions. The intended fixed 2:1 full
-profile is horizontal in its reserved cell and the 6:1 head uses the same
-frame. A native PNG and source-vertex readback proved that the zero-body
+profile is horizontal in its reserved cell and the 6:1 head, DETAIL A, uses
+the same frame; its boundary circle sits on the full view (rule 9). A native
+PNG and source-vertex readback proved that the zero-body
 view's GetOutline is not its displayed construction-ink extent. Before final
 settling, capture canonical native geometry and frame probes in the actual
 supplier configuration, then restore the original source configuration. Final
@@ -111,9 +113,11 @@ from dt_vn_post_mount_screw_spec import (
     CUT_LENGTH_DIMENSION,
     CUT_LENGTH_MM,
     CUT_LENGTH_SKETCH,
-    CUT_TO_FIT_CALLOUT,
+    CUT_TO_FIT_SHORT_PLACES,
     DRAWING_PRECISION_BY_NAME,
     FRONT_VIEW_DIMENSIONS,
+    POST_MOUNT_ENGAGEMENT_PRINTED,
+    POST_SCREW_CUT_TO_FIT_SHORT,
     SKU,
     SUPPLIER_PRECISION,
     SUPPLIER_PROFILE_DIMENSIONS,
@@ -125,6 +129,7 @@ from dt_vn_post_mount_screw_spec import (
     SUPPLIER_STOCK_FEATURE,
     SUPPLIER_STOCK_TITLE,
     SUPPLIER_THREAD_MAJOR_DIMENSION,
+    inch_text,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -144,19 +149,32 @@ DRAWING_SUMMARY = {
 }
 
 SHEET_SCALE = (1.0, 1.0)
-# The screw stands head up in the Front view: under-head face at model y 0,
-# cut end at -CUT_LENGTH_MM, head top ~6 above.
-FRONT_CENTER = (0.100, 0.165)
+# The screw lies head left in the turned Front (_lay_front_head_left): the
+# under-head face (model y 0) and the cut end (model y -CUT_LENGTH_MM) sit
+# on one horizontal line whose midpoint is FRONT_AXIS_MID; the head reaches
+# ~6 mm further left.
+FRONT_CENTER = (0.115, 0.190)
+FRONT_AXIS_MID = (0.118, 0.190)
 ISO_CENTER = (0.270, 0.185)
-# The cut length reads on the left, where its reference line runs along the
-# shank's silhouette, midway along the span, far enough out that its
-# five-line acceptance callout (22 capitals at its widest) clears the head
-# and stays inside the border.
-# (The view is placed by its outline's centre.)
+# The cut length reads below the shank, its text under the span's midpoint,
+# its one word line beneath it, between its own extension lines.
 FRONT_KEEP = {
-    CUT_LENGTH_DIMENSION: (FRONT_CENTER[0] - 0.047, FRONT_CENTER[1]),
+    CUT_LENGTH_DIMENSION: (FRONT_AXIS_MID[0], FRONT_AXIS_MID[1] - 0.024),
 }
-DIMENSION_CALLOUTS = {CUT_LENGTH_DIMENSION: CUT_TO_FIT_CALLOUT}
+# Rule 7: the acceptance does not fit between the extension lines in two
+# word lines (round 1: the lines struck the text, rule 14), so it is a
+# numbered note the callout links to. The note gives the cut end's
+# acceptance against its mate, at the spec band's own places, and the
+# engagement minimum as a plain fact (rule 20, the spec's floored worst case).
+CUT_LENGTH_NOTE_NUMBER = 1
+CUT_LENGTH_CALLOUT = f"SEE NOTE {CUT_LENGTH_NOTE_NUMBER}"
+DIMENSION_CALLOUTS = {CUT_LENGTH_DIMENSION: CUT_LENGTH_CALLOUT}
+CUT_LENGTH_NOTE = (
+    f"{CUT_LENGTH_NOTE_NUMBER}. CUT END FLUSH TO "
+    f"{inch_text(POST_SCREW_CUT_TO_FIT_SHORT, CUT_TO_FIT_SHORT_PLACES)} "
+    "SHORT OF MHA-DT-20 UNDERSIDE.\n"
+    f"    ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN."
+)
 
 # A sheet circle (the source head's crop fence) must land within this of its
 # ask, in sheet metres; a snapped circle misses by a millimetre.
@@ -166,7 +184,9 @@ _CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 FRONT_PRECISION = {
     CUT_LENGTH_DIMENSION: DRAWING_PRECISION_BY_NAME[CUT_LENGTH_DIMENSION]
 }
-# Below the Front view (its lower end ~0.119), above the stock rows.
+# Below the Front's cut-length callout, above the stock rows: note 1 first,
+# then the general reference note.
+CUT_LENGTH_NOTE_XY = (0.016, 0.118)
 NOTES_XY = (0.016, 0.100)
 STOCK_ROWS = (
     ("Supplier", 0.016, 0.060),
@@ -197,19 +217,33 @@ STOCK_HEAD_KEEP = {
 # Fixed source scales and reserved ink cells, not a post-dimension rescale.
 STOCK_VIEW_CELL = (0.115, 0.073, 0.410, 0.177)
 STOCK_HEAD_CELL = (0.018, 0.142, 0.193, 0.264)
+# The 6:1 head view is DETAIL A of the full 2:1 view (rule 9): its boundary
+# circles the same head on the full view, at the head crop's radius. The full
+# view sets its profile's midpoint, (L - H) / 2 along the source axis, on
+# STOCK_CENTER; the head view's centre is -H / 2, so the head sits L / 2
+# source millimetres left of STOCK_CENTER.
+DETAIL_LETTER = "A"
+_STOCK_RATIO = STOCK_SCALE[0] / STOCK_SCALE[1]
+_SUPPLIER_STOCK_LENGTH_MM = next(
+    row.expected_mm for row in SUPPLIER_PROFILE_DIMENSIONS
+    if row.name == "SupplierStockLength"
+)
+DETAIL_BOUNDARY_CENTER = (
+    STOCK_CENTER[0] - _STOCK_RATIO * _SUPPLIER_STOCK_LENGTH_MM / 2000.0,
+    STOCK_CENTER[1],
+)
+DETAIL_BOUNDARY_RADIUS_M = STOCK_HEAD_RADIUS_MM * _STOCK_RATIO / 1000.0
+# The full view is the sheet's principal view and takes no caption: the
+# sheet's title says what it shows, and its scale is the sheet's.
 STOCK_NOTES = (
     (SUPPLIER_STOCK_TITLE, 0.200, 0.258, (0.195, 0.247, 0.415, 0.264)),
     (
-        f"SLOT-PLANE HEAD ENVELOPE  SCALE {STOCK_HEAD_SCALE[0]:g}:{STOCK_HEAD_SCALE[1]:g}",
-        0.030, 0.139, (0.018, 0.128, 0.193, 0.142),
+        f"DETAIL {DETAIL_LETTER}  SCALE {STOCK_HEAD_SCALE[0]:g}:{STOCK_HEAD_SCALE[1]:g}",
+        0.080, 0.139, (0.018, 0.128, 0.193, 0.142),
     ),
-    # Over the full view's plain shank, right of the 6:1 head view's
-    # uncropped outline (x ~0.155), left of the 1.500 thread dimension's
-    # extension line (x ~0.266) and above the shank (y ~0.121).
-    (
-        f"FULL SOURCE-STOCK ENVELOPE  SCALE {STOCK_SCALE[0]:g}:{STOCK_SCALE[1]:g}",
-        0.158, 0.137, (0.156, 0.126, 0.262, 0.139),
-    ),
+    # Down and left of the boundary circle, clear of it, of the full view's
+    # under-head extension line and of the head view's caption.
+    (DETAIL_LETTER, 0.110, 0.097, (0.105, 0.090, 0.118, 0.100)),
 )
 
 
@@ -600,6 +634,14 @@ def _present_supplier_stock_sheet(adapter, full, head):
         keep=STOCK_HEAD_KEEP,
         label="source head slot-plane bounding profile",
     )
+    # DETAIL A's boundary on the full view (rule 9), in the full view's own
+    # sketch at the head crop's radius; the settled ink guard reads it back.
+    _activate(adapter, full, label="full source view for its detail boundary")
+    _sketch_circle(
+        adapter, full, DETAIL_BOUNDARY_CENTER, DETAIL_BOUNDARY_RADIUS_M,
+        label=f"DETAIL {DETAIL_LETTER} boundary",
+    )
+    adapter.currentModel.ClearSelection2(True)
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     # ActivateView("") returns False for sheet context; require native context.
     ddoc.ActivateView("")
@@ -633,16 +675,15 @@ def _assert_supplier_feature_valid(feature, *, label):
         )
 
 
-def _assert_supplier_crop_circle(adapter, view, circle, cell):
-    """Check the actual selected circle before Crop2 consumes its profile."""
-    label = f"MSC source crop {view_name(adapter, view)}"
+def _circle_on_sheet(adapter, view, circle, *, label):
+    """Map a view-sketch circle's centre and two radii onto the sheet."""
     sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     centre, radius = native_circle_geometry(circle, label=label)
     inverse = _early_bound(sketch.ModelToSketchTransform, "IMathTransform").Inverse()
     if inverse is None:
-        raise RuntimeError(f"{label}: crop sketch inverse is unavailable")
-    sheet = [
+        raise RuntimeError(f"{label}: view sketch inverse is unavailable")
+    return [
         _transform_point(utility, point, inverse, label=label)
         for point in (
             centre,
@@ -650,6 +691,12 @@ def _assert_supplier_crop_circle(adapter, view, circle, cell):
             (centre[0], centre[1] + radius, centre[2]),
         )
     ]
+
+
+def _assert_supplier_crop_circle(adapter, view, circle, cell):
+    """Check the actual selected circle before Crop2 consumes its profile."""
+    label = f"MSC source crop {view_name(adapter, view)}"
+    sheet = _circle_on_sheet(adapter, view, circle, label=label)
     cx, cy, _cz = sheet[0]
     dx = tuple(sheet[1][index] - sheet[0][index] for index in range(2))
     dy = tuple(sheet[2][index] - sheet[0][index] for index in range(2))
@@ -670,6 +717,18 @@ def _assert_supplier_crop_circle(adapter, view, circle, cell):
     _telemetry.info(f"{label}: native_crop_bounds_m={bounds!r} cell_m={cell!r}")
     if not _inside(bounds, cell):
         raise RuntimeError(f"{label}: native source ink leaves its cell: {bounds!r}")
+
+
+def _assert_detail_boundary(adapter, view, circle, *, label):
+    """The full view's one drawing-sketch circle is DETAIL A's boundary."""
+    sheet = _circle_on_sheet(adapter, view, circle, label=label)
+    radii = [math.dist(point[:2], sheet[0][:2]) for point in sheet[1:]]
+    if (
+        any(abs(point[2]) > CIRCLE_TOL_M for point in sheet)
+        or math.dist(sheet[0][:2], DETAIL_BOUNDARY_CENTER) > CIRCLE_TOL_M
+        or any(abs(radius - DETAIL_BOUNDARY_RADIUS_M) > CIRCLE_TOL_M for radius in radii)
+    ):
+        raise RuntimeError(f"{label}: DETAIL {DETAIL_LETTER} boundary moved: {sheet!r}")
 
 
 def _assert_supplier_profile_ink(adapter, view, cell, geometry, *, cropped):
@@ -703,8 +762,10 @@ def _assert_supplier_profile_ink(adapter, view, cell, geometry, *, cropped):
         f"{label}: drawing_sketch_segment_count={len(drawing_segments)} "
         f"drawing_sketch_segment_types={drawing_types!r} cropped={bool(view.IsCropped())}"
     )
-    if drawing_segments:
+    # The full view's own sketch holds exactly DETAIL A's boundary circle.
+    if len(drawing_segments) != 1:
         raise RuntimeError(f"{label}: full view has unexpected drawing-sketch geometry")
+    _assert_detail_boundary(adapter, view, drawing_segments[0], label=label)
     view.UpdateViewDisplayGeometry()
     bounds = native_sketch_view_bounds(adapter, view, geometry, label=label)
     _telemetry.info(f"{label}: native_ink_bounds_m={bounds!r} cell_m={cell!r}")
@@ -1190,6 +1251,49 @@ def activate_front_for_notes(adapter: Any, front: Any) -> None:
         raise RuntimeError(f"failed to activate the Front view {name!r} for the notes")
 
 
+# The turned Front's axis must read horizontal to within this, in sheet metres.
+AXIS_TOL_M = 1e-6
+
+
+def _lay_front_head_left(adapter: Any, front: Any) -> None:
+    """Turn the finished Front so the screw lies on a horizontal axis, head left.
+
+    Sheet 2 draws the supplied stock that way (its measured source axis turned
+    onto sheet +X), so the finished view matches it and neither sheet shows a
+    rotated view (rule 9); a turned part reads as it sits in the lathe (rule
+    11). The turn is measured from the projected axis, under-head face to cut
+    end, not assumed; then the axis midpoint is set on FRONT_AXIS_MID.
+    """
+    view = _early_bound(front, "IView")
+    axis = ((0.0, 0.0, 0.0), (0.0, -CUT_LENGTH_MM / 1000.0, 0.0))
+    label = "finished Front axis"
+    head, tip = model_points_in_view(adapter, view, axis, label=label)
+    view.Angle = float(view.Angle) - math.atan2(tip[1] - head[1], tip[0] - head[0])
+    if not adapter.currentModel.EditRebuild3():
+        raise RuntimeError("cannot rebuild the turned finished Front")
+    view.UpdateViewDisplayGeometry()
+    head, tip = model_points_in_view(adapter, view, axis, label=label)
+    position = tuple(float(value) for value in view.Position)
+    if not view.SetViewPosition(double_array([
+        position[index] + FRONT_AXIS_MID[index] - (head[index] + tip[index]) / 2.0
+        for index in range(2)
+    ]), False):
+        raise RuntimeError("cannot position the turned finished Front")
+    if not adapter.currentModel.EditRebuild3():
+        raise RuntimeError("cannot rebuild the positioned finished Front")
+    view.UpdateViewDisplayGeometry()
+    head, tip = model_points_in_view(adapter, view, axis, label=label)
+    _telemetry.info(f"{label}: head_m={head!r} tip_m={tip!r} angle={float(view.Angle)!r}")
+    if (
+        abs(tip[0] - head[0] - CUT_LENGTH_MM / 1000.0) > AXIS_TOL_M
+        or abs(tip[1] - head[1]) > AXIS_TOL_M
+        or math.dist(
+            ((head[0] + tip[0]) / 2.0, (head[1] + tip[1]) / 2.0), FRONT_AXIS_MID
+        ) > CIRCLE_TOL_M
+    ):
+        raise RuntimeError(f"finished Front is not head-left on its axis: {head!r} -> {tip!r}")
+
+
 def _view_dimension_names(adapter: Any, view: Any) -> list[str]:
     return [
         dimension_name(adapter, _early_bound(item, "IAnnotation"))
@@ -1247,7 +1351,7 @@ def _verify_finished_controls(adapter, front, installed_configuration) -> None:
         or int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0
         or str(display.GetText(1) or "") != "("
         or str(display.GetText(2) or "") != ")"
-        or str(display.GetText(4) or "") != CUT_TO_FIT_CALLOUT
+        or str(display.GetText(4) or "") != CUT_LENGTH_CALLOUT
         or display.GetOverride()
         or not display.ShowDimensionValue
         or annotations[0].IsDangling()
@@ -1361,6 +1465,7 @@ async def _build_read_only_source(adapter, source_model, source_sha256):
         )
     if not drawing_doc.ActivateSheet(SHEET_NAMES[0]):
         raise RuntimeError("cannot activate finished screw sheet for presentation")
+    _lay_front_head_left(adapter, front)
 
     # The cut length lives on a part-hidden reference sketch, so the Front
     # view takes the opt-in curation that shows it in this view only.
@@ -1376,6 +1481,9 @@ async def _build_read_only_source(adapter, source_model, source_sha256):
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
 
     activate_front_for_notes(adapter, front)
+    cut_note = _literal_note(adapter, CUT_LENGTH_NOTE, *CUT_LENGTH_NOTE_XY)
+    if str(cut_note.GetText()).split() != CUT_LENGTH_NOTE.split():
+        raise RuntimeError("cut-length note 1 did not keep its text")
     add_property_linked_note(
         adapter, "Manufacturing Notes", *NOTES_XY, char_height=0.003
     )

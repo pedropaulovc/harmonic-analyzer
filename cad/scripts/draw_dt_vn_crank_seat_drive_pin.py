@@ -10,12 +10,15 @@ from collections.abc import Callable
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _supplier_pin_drawing import DOWEL_SUPPLIER_MARGINS, add_supplier_dowel_dimensions
 from dt_vn_crank_seat_drive_pin_spec import SUPPLIER_REFERENCE
 
 
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 SPEC = DRAWINGS_BY_NAME["dt_vn_crank_seat_drive_pin"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "Ø3/32 x 1/4 DOWEL PIN"
