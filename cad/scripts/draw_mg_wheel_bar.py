@@ -120,19 +120,15 @@ FRONT_KEEP = {
     "ClampStation1": (LEFT_END + 0.082, _BAR_BOTTOM - 0.038),
     "ClampStation2": (LEFT_END + 0.152, _BAR_BOTTOM - 0.046),
     "Length": (FRONT_CENTER[0], _BAR_BOTTOM - 0.054),
-    # The bar height and the clamp row's drop from the top face off the right
-    # end, in the open sheet between the bar and the end view: off the left
-    # end the height's text sat on the border's zone letter and frame line.
-    # Both share the top face's extension line: the shorter row nearer the
-    # bar, its value and band above the top face; the height's line outside
-    # it, its text under the bottom face.
+    # The bar height and the row's drop from the top face off the right end,
+    # in the open sheet between the bar and the end view: off the left end
+    # the height's text sat on the border's zone letter and frame line. Both
+    # share the top face's extension line: the shorter row nearer the bar,
+    # its value above the top face; the height's line outside it, its text
+    # under the bottom face. The one row height, measured at the outer clamp
+    # hole, locates all four holes on their shared centreline.
     "Side": (RIGHT_END + 0.040, _BAR_BOTTOM - 0.014),
     "ClampRowFromTop": (RIGHT_END + 0.021, _BAR_TOP + 0.015),
-    # The hanger and axle row's drop off the left end, its text above the top
-    # face and left of the bar, clear of the hanger callout's leader. Both
-    # drops are measured at a hole (the hanger's, the outer clamp's), their
-    # extension lines running out past the bar's ends.
-    "BoreRowFromTop": (LEFT_END - 0.018, _BAR_TOP + 0.008),
     # The reamed Ø up and right of the bore, the press lines standing clear
     # of the bar.
     "AxleBoreDia": (AXLE_BORE_SHEET_X + 0.035, FRONT_CENTER[1] + 0.042),

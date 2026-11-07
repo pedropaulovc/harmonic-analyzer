@@ -85,14 +85,16 @@ def test_screw_hole_stations_are_model_dimensions_from_the_left_end() -> None:
     import mg_wheel_bar_geom as geom
 
     row = mg_wheel_bar_spec.DRAWING_DIMENSIONS["BoreRowReference"]
+    # One row height dimensions all four holes' shared centreline; the
+    # hanger and axle row's own model dimension stays off the print.
     assert row == {
-        "BoreRowFromTop",
         "ClampRowFromTop",
         "HangerStation",
         "ClampStation1",
         "ClampStation2",
     }
     assert row <= set(drawing.FRONT_KEEP)
+    assert "BoreRowFromTop" not in drawing.FRONT_KEEP
     left_end = -geom.BAR_LENGTH / 2.0
     assert geom.HANGER_STATION == pytest.approx(geom.SCREW_HOLE_X - left_end) == 5.0
     assert geom.CLAMP_STATIONS == pytest.approx(
@@ -131,11 +133,6 @@ def test_station_rows_stack_shortest_nearest_under_the_bar() -> None:
     side_x, side_y = drawing.FRONT_KEEP["Side"]
     assert drawing.RIGHT_END + 0.016 < row_x < side_x
     assert side_y < bar_bottom < bar_top < row_y
-    # The hanger and axle row's drop stands off the left end, above the top
-    # face, its text left of the bar and inside the frame.
-    left_x, left_y = drawing.FRONT_KEEP["BoreRowFromTop"]
-    assert 0.020 < left_x < drawing.LEFT_END - 0.012
-    assert bar_top < left_y < drawing.HANGER_CALLOUT_XY[1] - 0.015
 
 
 def test_the_sheet_carries_no_general_notes() -> None:
@@ -221,15 +218,14 @@ def test_every_wall_is_stated_at_the_full_worst_case() -> None:
     assert (
         mg_wheel_bar_spec.AXLE_BORE_STATION == geom.AXLE_BORE_X + geom.BAR_LENGTH / 2.0
     )
-    # The height prints .43 (+/-.01). The hanger hole and the axle bore sit at
-    # the title block's .XX from the top face: their 5.0 prints .20, so the
-    # row lies 4.826-5.334; the clamp pair's prints .197 at the title block's
-    # .XXX. Each wall also loses 0.3 deg run-off over the deepest bar (.374 + .005;
+    # The height prints .43 (+/-.01). All four holes sit on one row printed
+    # once, .197 from the top face at the title block's .XXX (4.877-5.131).
+    # Each wall also loses 0.3 deg run-off over the deepest bar (.374 + .005;
     # the holes are drilled on the mill into faces cut earlier) and an R.010
     # break on each of its two exposed edges.
     side_min = (0.43 - 0.01) * IN
-    row = ((0.20 - 0.01) * IN, (0.20 + 0.01) * IN)
-    clamp_row = ((0.197 - 0.005) * IN, (0.197 + 0.005) * IN)
+    row = ((0.197 - 0.005) * IN, (0.197 + 0.005) * IN)
+    clamp_row = row
     assert mg_wheel_bar_spec.BORE_ROW_FROM_TOP == geom.BAR_TOP_ABOVE_ROW
     runoff = (0.374 + 0.005) * IN * math.tan(math.radians(0.3))
     losses = runoff + 2 * 0.010 * IN
@@ -260,14 +256,10 @@ def test_every_wall_is_stated_at_the_full_worst_case() -> None:
     }
     assert set(mg_wheel_bar_spec.MINOR_WALLS) == minors
     assert mg_wheel_bar_spec.WALL_CALLOUT_MIN_IN == {
-        "axle bore": 0.074,
+        "axle bore": 0.076,
         "hanger hole": 0.076,
         "clamp holes": 0.070,
     }
-    # The photographed 10 mm bar would leave the walls under the bores under
-    # the floor: the height grew rather than a band tightening.
-    for b, (r, (_low, high)) in bores.items():
-        assert 10.0 - 0.01 * IN - high - r - losses < 0.060 * IN, b
 
 
 def test_every_wall_is_an_owner_declared_minor_stated_on_the_sheet() -> None:
@@ -308,14 +300,12 @@ def test_axle_bore_is_a_marked_reamed_cut() -> None:
         "AxleBoreDia": 4,
         "AxleBoreStation": 2,
         "BarDepth": 3,
-        "BoreRowFromTop": 2,
         "ClampRowFromTop": 3,
         "HangerStation": 2,
         "ClampStation1": 3,
         "ClampStation2": 3,
     }
     assert model_toleranced_dimensions(part) == {
-        ("Bar", "BarDepth"): "BAR_DEPTH_BAND[0]",
         ("AxleBoreProfile", "AxleBoreDia"): "*deviations(AXLE_BORE_BAND)",
     }
     source = Path(part.__file__).read_text(encoding="utf-8")

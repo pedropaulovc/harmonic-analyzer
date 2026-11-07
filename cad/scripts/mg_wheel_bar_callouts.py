@@ -30,11 +30,11 @@ def _wall_row(bore: str) -> str:
 # interference prints once, as REF on the axle's own sheet, keeping this
 # callout to two lines of words (rule 7).
 AXLE_BORE_CALLOUT = "REAM THRU\nPRESS FIT ON MHA-MG-07 AXLE\n" + _wall_row("axle bore")
-# The depth's explicit band sets the stack that places the pressed axle's end
-# under the back face, so it names that stack once (rule 7: an overall with
-# an explicit band that sets a stack); the end's range is the MHA-MG-00
-# assembly step's acceptance, not this sheet's. Two short lines keep the text
-# right of the end view's extension lines inside the border (rule 14).
+# The depth's .XXX is a three-place size given a function: it sets the stack
+# that places the pressed axle's end under the back face, so it names that
+# stack once (rules 3 and 4); the end's range is the MHA-MG-00 assembly
+# step's acceptance, not this sheet's. Two short lines keep the text right
+# of the end view's extension lines inside the border (rule 14).
 BAR_DEPTH_CALLOUT = "SETS MHA-MG-07\nAXLE END STACK"
 # Under the drawing's own native hole callouts (drawing annotations, not
 # imported model dimensions, so the sheet writes them): the hanger hole's

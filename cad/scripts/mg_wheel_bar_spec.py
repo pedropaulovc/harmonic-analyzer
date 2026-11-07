@@ -57,11 +57,13 @@ AXLE_BORE_STATION = AXLE_BORE_X - LEFT_END_X  # 61.0
 # would fail the floor.
 BAR_SIDE_PLACES = 2
 # The bore row reads from the TOP face, the face the pen-hanger strap's top is
-# flush with and the top assembly sets the bar by. It prints twice, from each
-# end: the hanger hole and the axle bore at the title block's .XX, the clamp
-# pair with the taps' band below.
+# flush with and the top assembly sets the bar by. All four holes share the
+# one drawn centreline, so the row prints once, at the clamp pair's .197 (the
+# title block's .XXX the MHA-SH-02 tap stack below needs); the hanger hole and
+# the axle bore take the same limits (machinist review fanout/mg r5: one line
+# printed .20 and .197 read as a purposeless .003 offset).
 BORE_ROW_FROM_TOP = BAR_TOP_ABOVE_ROW  # 5.0
-BORE_ROW_PLACES = 2
+BORE_ROW_PLACES = 3
 # The clamp holes' position band, a fixed-fastener stack as on the support bar
 # (build_pd_support_bar.CLAMP_POSITION_BAND): each #8-32 clamp screw stands in
 # its MHA-SH-02 back-arc tap (+/-0.1 station and height, sh_column_clamp_fit)
@@ -158,38 +160,38 @@ WALL_CALLOUT_MIN_IN = {
     )
     / 1000
     for bore in BORE_BANDS
-}  # axle bore .074, hanger hole .076, clamp holes .068
+}  # axle bore .079, hanger hole .076, clamp holes .070
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows.  The bar depth is the extrude's named depth, banded because it
-# places the wheel axle's back end on the back face (mg_wheel_axle_spec).
+# print shows.  The bar depth is the extrude's named depth, at the title
+# block's .XXX, naming the axle-end stack it sets (mg_wheel_axle_spec).
 # The reamed axle bore is a sketch-cut whose diameter (with its reamer band)
 # and station from the left end are model dimensions.  The three screw bores
 # are native Hole Wizard clearance holes (sizes on their native callouts);
-# their stations from the left end and the two rows' drops from the top face
-# ride the hidden BoreRowReference sketch, driven by the same equations as the
-# Hole Wizard placement points. ---
+# their stations from the left end and the row's drop from the top face ride
+# the hidden BoreRowReference sketch, driven by the same equations as the
+# Hole Wizard placement points; its BoreRowFromTop drives the hanger and axle
+# row and stays off the print (the clamp row's .197 dimensions the one line).
+# ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarProfile": {"Length", "Side"},
     "Bar": {"BarDepth"},
     "AxleBoreProfile": {"AxleBoreDia", "AxleBoreStation"},
     "BoreRowReference": {
-        "BoreRowFromTop",
         "ClampRowFromTop",
         "HangerStation",
         "ClampStation1",
         "ClampStation2",
     },
 }
-# The length prints .X (no stack reads it); the height, the axle and hanger
-# row and the bore and hanger stations .XX; the depth and the clamp row and
-# stations .XXX for their bands; the reamed bore .XXXX for its +.0005.
+# The length prints .X (no stack reads it); the height and the bore and hanger
+# stations .XX; the depth, the row and the clamp stations .XXX for their
+# stacks; the reamed bore .XXXX for its +.0005.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BarProfile": {"Length": 1, "Side": BAR_SIDE_PLACES},
     "Bar": {"BarDepth": BAR_DEPTH_PLACES},
     "AxleBoreProfile": {"AxleBoreDia": AXLE_BORE_PLACES, "AxleBoreStation": 2},
     "BoreRowReference": {
-        "BoreRowFromTop": BORE_ROW_PLACES,
         "ClampRowFromTop": CLAMP_POSITION_PLACES,
         "HangerStation": PEN_HANGER_STATION_PLACES,
         "ClampStation1": CLAMP_POSITION_PLACES,
