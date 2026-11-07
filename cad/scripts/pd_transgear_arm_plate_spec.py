@@ -27,7 +27,6 @@ from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 import pd_transgear_arm_plate_geometry as PLATE
-import _transgear_arm_plate_locating_interface as LOCATING_PIN
 import paper_drive_arm_registration as REGISTRATION
 from pd_transgear_arm_plate_geometry import (
     BAND_XX,
@@ -219,16 +218,10 @@ FINISH_CAPTIONS = {
 # the seat and wall budgets bound both axes inside the plate by the hole's
 # zone and the drill's run-off
 # (pd_transgear_arm_plate_geometry.SCREW_AXIS_RADIUS_IN_PLATE_MM).  The
-# locating holes', the screw holes' and the hub station's callouts are the
-# draw script's (their wording is sheet-only).
+# locating holes', the screw holes' and the hub station's callouts are
+# ``pd_transgear_arm_plate_notes``'s (their wording is sheet-only).
 # Two lines of words under REAM THRU (rule 7).
 BORE_CALLOUT = f"REAM THRU\nRUNNING FIT ON\nKNOB SHAFT {KNOB_SHAFT_NUMBER}"
-# The locating holes' mouth break, the last sentence of their numbered note:
-# the dowel engagement pays it, tighter than the title block's edge break
-# (the wall budgets and the full-cylinder span in
-# _transgear_arm_plate_locating_interface are judged at it).
-_MOUTH_BREAK_TEXT = f"{LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM / 25.4:.3f}".removeprefix("0")
-LOCATOR_MOUTH_BREAK = f"BREAK EDGES {_MOUTH_BREAK_TEXT} MAX."
 # The countersink's .XXX diameter seats the screw's oval head and bounds the
 # walls beside it (pd_transgear_arm_plate_geometry.WALLS), so the screw-hole
 # callout names the screw.
@@ -242,6 +235,22 @@ HUB_TO_BOSS_CALLOUT = f"SETS CUP {KNOB_CUP_NUMBER}\nON SHAFT {KNOB_SHAFT_NUMBER}
 # Three short lines (12 characters at most), so the block stands clear of
 # the hub-to-boss dimension's boss-face witness line.
 THICKNESS_CALLOUT = f"SETS SCREW\nREACH IN ARM\n{ARM_NUMBER}"
+# The hub face's station sets the knob shaft's integral 15T (and so its mesh
+# with the reducer disc) and, through the drive collar seated on the 15T's
+# front face F, the removable chain sprocket's plane
+# (paper_drive_arm_registration.KNOB_F_MACHINE_Z_MM,
+# transgear_cluster_fit.F_CHAIN): its callout names both by drawing number.
+SPROCKET_NUMBER = "MHA-PD-09"
+# The overall width and height, printed as references (drawing-guidelines.md
+# rule 10): the side edges and the end round's extreme under the -X top
+# corner, at the outline's own .XX places.  They restate the toleranced
+# outline, so they carry no band.
+OVERALL_WIDTH_MM = EDGE_PLUS_X - PLATE.EDGE_MINUS_X
+OVERALL_HEIGHT_MM = PLATE.TOP_LEFT[1] + PLATE.END_R
+DRAWING_REFERENCE_PRECISION = {
+    "OverallWidth": PLATE.OUTLINE_PLACES,
+    "OverallHeight": PLATE.OUTLINE_PLACES,
+}
 
 # Two sheets (drawing-guidelines.md rule 15): the rear face's plan with the
 # isometric, then mounting face A's view with every frame and datum and

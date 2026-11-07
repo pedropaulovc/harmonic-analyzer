@@ -18,6 +18,7 @@ import pd_rack_pinion_spec as disc
 import pd_transgear_arm_plate_geometry as geometry
 import pd_vn_transgear_arm_plate_screw_spec as screw
 import pd_transgear_arm_plate_spec as spec
+import pd_transgear_arm_plate_notes as notes
 import pd_cluster_air as cluster_air
 import transgear_cluster_fit as cluster_fit
 import transgear_hanger_joints as joints
@@ -26,7 +27,7 @@ from _buildgraph import module_deps_of
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fit_deviations import deviations
-from _printed_tolerance import printed_deviations
+from _printed_tolerance import edge_break_chamfer_mm, edge_break_radius_mm, printed_deviations
 from pd_cluster_stack_band import FIT_LENGTH_BAND_IN
 
 
@@ -213,6 +214,29 @@ def test_the_worst_case_walls_hold_at_the_printed_bands() -> None:
     )
     assert geometry.WALLS["countersinks to the side edges"][1] == pytest.approx(side_wall)
     assert side_wall >= geometry.WALL_TARGET
+
+
+def test_the_slip_hole_mouths_take_the_title_block_break() -> None:
+    """Fan-out L2 (delegated ruling 2026-11-07 (Main)): the plate's dowel
+    slip holes print no break of their own; every stack their mouths touch
+    holds at the title block's .010 on both legs."""
+    brk = max(
+        edge_break_radius_mm(unit=geometry.UNIT), edge_break_chamfer_mm(unit=geometry.UNIT)
+    )
+    assert geometry.LOCATOR_MOUTH_BREAK_MAX_MM == pytest.approx(brk)
+    span = (
+        geometry.THICKNESS_OVER_ARM - geometry.THICKNESS_OVER_ARM_BAND
+        - 2.0 * geometry.LOCATOR_MOUTH_BREAK_MAX_MM
+    )
+    assert geometry.LOCATOR_FULL_CYLINDER_SPAN_MIN_MM == pytest.approx(span)
+    assert geometry.LOCATOR_MOUTH_POSITION_RADIUS_MM == pytest.approx(
+        geometry.REDUCER_POSITION_RADIUS * (1.0 + 2.0 * geometry.LOCATOR_MOUTH_BREAK_MAX_MM / span)
+    )
+    for index in (1, 2):
+        for wall in ("to plate edge/notch", "to countersink", "to running bore"):
+            assert geometry.WALLS[f"locator {index} {wall}"][1] >= geometry.WALL_TARGET
+    assert "BREAK" not in notes.LOCATOR_NOTE
+    assert not hasattr(spec, "LOCATOR_MOUTH_BREAK")
 
 
 def test_the_screw_hole_callout_states_the_model_countersink() -> None:
@@ -668,13 +692,39 @@ def test_the_locator_shelf_ends_left_of_hole_1_witness_line() -> None:
     assert max(map(len, drawing.LOCATOR_CALLOUT.splitlines())) <= 21
 
 
+def test_the_screw_hole_callout_ends_left_of_hole_1_witness_line() -> None:
+    """Fan-out round 2 (run 20261107T121559938Z): the .4281's witness line
+    rose from hole 1 through the 2X Ø.228 callout's '82°' and screw number.
+    Its block (count, value, three lines: the locator block's build, so its
+    measured shelf) ends 2 mm (sheet) short of that line, inside the left
+    border, its shelf above the -X top corner (the overall height's upper
+    witness line) and under the locator callout's shelf."""
+    text_x, text_y, _ = drawing.PLAN_KEEP["ScrewHoleDia"]
+    printed = drawing.SCREW_HOLE_CALLOUT.replace("<HOLE-SINK>", "V").replace("<MOD-DIAM>", "D")
+    widest = max(_LOCATOR_VALUE_CHARS, *map(len, printed.splitlines()))
+    half = widest * _SHELF_CHAR_MODEL / 2.0
+    left = text_x + _SHELF_CENTRE_OFFSET_MODEL - half
+    right = text_x + _SHELF_CENTRE_OFFSET_MODEL + half
+    assert geometry.SCREW_HOLES[0][0] - right >= 2.0 / drawing.SHEET_SCALE[0]
+    assert drawing.PLAN_CENTER[0] + left * drawing.SHEET_SCALE[0] / 1000.0 >= 0.0125 + 0.002
+    assert len(printed.splitlines()) == len(drawing.LOCATOR_CALLOUT.splitlines())
+    shelf_y = text_y - _SHELF_DROP_MODEL
+    assert shelf_y - geometry.TOP_LEFT[1] >= 2.0 / drawing.SHEET_SCALE[0]
+    _locator_left, _locator_right, locator_shelf_y = _locator_shelf_model()
+    assert locator_shelf_y - (text_y + _SHELF_DROP_MODEL) >= 2.0 / drawing.SHEET_SCALE[0]
+    # The witness line rises past the block to the .4281's row.
+    assert drawing.PLAN_KEEP["ScrewHoleX1"][1] > text_y + _SHELF_DROP_MODEL
+
+
 def test_the_locating_hole_note_stands_under_the_plan_right_of_its_label() -> None:
     """The numbered note's block (top-left at its xy) stands right of the
     REAR VIEW label and the bore's finish symbol (about 12 mm wide), left of
     the title block (x > 0.216 below y 0.066), above the lower border."""
     x, y = drawing.LOCATOR_NOTE_XY
     lines = drawing.LOCATOR_NOTE.splitlines()
-    assert max(map(len, lines)) <= drawing.LOCATOR_NOTE_WIDTH
+    assert max(map(len, lines)) <= notes.LOCATOR_NOTE_WIDTH
+    # Rule 7: a note prints at most four lines.
+    assert len(lines) <= 4
     width = max(map(len, lines)) * _CHAR_MM / 1000.0
     label_right = drawing.REAR_LABEL_XY[0] + len(spec.REAR_VIEW_LABEL) * _CHAR_MM / 1000.0
     finish_x = drawing.PLAN_CENTER[0] + drawing.BORE_FINISH_MODEL[0] * drawing.SHEET_SCALE[0] / 1000.0
@@ -779,6 +829,7 @@ def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
             ("KNOB_CUP_NUMBER", "pd-transgear-knob-cup"),
             ("ARM_NUMBER", "pd-transgear-arm"),
             ("DOWEL_NUMBER", "pd-vn-transgear-arm-plate-locating-pin"),
+            ("SPROCKET_NUMBER", "pd-transgear-removable"),
         )
     }
     for name, number in numbers.items():
@@ -792,37 +843,40 @@ def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
     assert numbers["KNOB_SHAFT_NUMBER"] in bore
     locator = flat(drawing.LOCATOR_CALLOUT)
     assert drawing.CALLOUTS_ABOVE["LocatorDia1"] == f"{len(geometry.LOCATOR_SITES_MM)}X"
-    assert locator.startswith(f"REAM THRU, SEE NOTE {drawing.LOCATOR_NOTE_NUMBER}")
+    assert locator.startswith(f"REAM THRU, SEE NOTE {notes.LOCATOR_NOTE_NUMBER}")
     # Rule 7: under the size and process, at most two lines of words.
     assert len(drawing.LOCATOR_CALLOUT.splitlines()) == 3
     assert "LOCATIONAL CLEARANCE FIT ON" in locator
     assert numbers["DOWEL_NUMBER"] in locator
     note = flat(drawing.LOCATOR_NOTE)
     # The REF clearance (in the note) encloses the dowel's limits in the
-    # reamed hole.
-    match = re.search(r"\(CLEARANCE (\.\d{4})-(\.\d{4})\) ON (\S+)\.", note)
+    # reamed hole; the dowel is named once, on the callout.
+    match = re.search(r"\(CLEARANCE (\.\d{4})-(\.\d{4})\)", note)
     assert match, note
-    assert match.group(3) == numbers["DOWEL_NUMBER"]
-    low, high = map(float, match.groups()[:2])
+    assert numbers["DOWEL_NUMBER"] not in note
+    low, high = map(float, match.groups())
     clearance_in = [value / 25.4 for value in dowel.SLIP_DIAMETRAL_CLEARANCE_MM]
     assert 0.0 < low <= clearance_in[0] < low + 1e-4
     assert high - 1e-4 < clearance_in[1] <= high
-    assert note.startswith(f"{drawing.LOCATOR_NOTE_NUMBER}. ")
-    for required in (numbers["ARM_NUMBER"], steps.knob_setting_ref(), ".002 MAX"):
+    assert note.startswith(f"{notes.LOCATOR_NOTE_NUMBER}. ")
+    for required in (numbers["ARM_NUMBER"], steps.knob_setting_ref()):
         assert required in note, required
     # The S-K setting's value is VIEW K's native dimension, not sheet text.
     for text in (locator, note):
         assert f"{disc.CENTRE_DISTANCE:.3f}" not in text
     assert drawing.DIMENSION_CALLOUTS["LocatorDia1"] == drawing.LOCATOR_CALLOUT
-    assert numbers["KNOB_SHAFT_NUMBER"] in drawing.HUB_STATION_CALLOUT
+    # The hub station names what it sets by drawing number: the knob shaft
+    # (its integral 15T) and the chain sprocket on the collar.
+    for name in ("KNOB_SHAFT_NUMBER", "SPROCKET_NUMBER"):
+        assert numbers[name] in drawing.HUB_STATION_CALLOUT, name
     assert numbers["KNOB_CUP_NUMBER"] in spec.HUB_TO_BOSS_CALLOUT
     assert drawing.DIMENSION_CALLOUTS["HubFaceToMounting"] == drawing.HUB_STATION_CALLOUT
     assert drawing.DIMENSION_CALLOUTS["HubToBoss"] == spec.HUB_TO_BOSS_CALLOUT
-    # The locating callout's width is bounded by its border test instead;
-    # the screw-hole callout's 24 printed characters clear the left border
-    # from its text point (EDGE_MINUS_X - 6).
+    # The locating and screw-hole callouts' widths are bounded by their
+    # border and witness-line tests instead.
     widths = [
-        text for name, text in drawing.DIMENSION_CALLOUTS.items() if name != "LocatorDia1"
+        text for name, text in drawing.DIMENSION_CALLOUTS.items()
+        if name not in ("LocatorDia1", "ScrewHoleDia")
     ]
     for text in (*widths, *drawing.CALLOUTS_ABOVE.values()):
         printed = text.replace("<HOLE-SINK>", "V").replace("<MOD-DIAM>", "D")
@@ -853,3 +907,173 @@ def test_section_a_a_projects_level_with_the_face_a_view() -> None:
     )
     assert section_k == pytest.approx(view_k, abs=1e-9)
     assert drawing._BACK_K[1] == pytest.approx(view_k)
+
+
+def test_each_2x_group_prints_one_frame_with_its_count() -> None:
+    """Machinist screen (clarity, fan-out round 2): one frame for the 2X
+    dowel reams and one for the 2X screw holes, each member the same
+    control at its own site."""
+    groups = drawing.frame_groups()
+    assert [(shown, hidden, count) for shown, hidden, count in groups] == [
+        ("plate_locator_1_position", ("plate_locator_2_position",), "2X"),
+        ("plate_hole_1_position", ("plate_hole_2_position",), "2X"),
+    ]
+    controls = {control.key: control for control in spec.GEOMETRIC_CONTROLS}
+    for shown, hidden, _count in groups:
+        for key in hidden:
+            assert (controls[key].tolerance, controls[key].datums) == (
+                controls[shown].tolerance, controls[shown].datums,
+            )
+    # The knob bore's own frame stays (RV-02 accepts it).
+    assert "knob_axis_perpendicularity" not in {
+        key for shown, hidden, _ in groups for key in (shown, *hidden)
+    }
+    # Each count stands above its shown frame (a 3.5 mm line on a 1 mm
+    # gap): the locator's inside the upper border, the hole's under the
+    # locator frame (6.9 mm tall).
+    count_height = 0.0045
+    locator_top = drawing.FRAME_XY["plate_locator_1_position"][1]
+    hole_top = drawing.FRAME_XY["plate_hole_1_position"][1]
+    assert locator_top + count_height <= 0.2667 - 0.002
+    assert hole_top + count_height <= locator_top - 0.0069 - 0.002
+
+
+class _FakeGtol:
+    def __init__(self, accept: bool = True) -> None:
+        self.texts: dict[int, str] = {}
+        self.accept = accept
+
+    def SetText(self, which: int, text: str) -> bool:  # noqa: N802 - COM name
+        if self.accept:
+            self.texts[which] = text
+        return self.accept
+
+    def GetText(self, which: int) -> str:  # noqa: N802 - COM name
+        return self.texts.get(which, "")
+
+
+class _FakeFrame:
+    def __init__(self, gtol: _FakeGtol, *, sticky_visible: bool = False) -> None:
+        self._visible = 1
+        self.sticky_visible = sticky_visible
+        self.gtol = gtol
+
+    @property
+    def Visible(self) -> int:  # noqa: N802 - COM name
+        return self._visible
+
+    @Visible.setter
+    def Visible(self, value: int) -> None:  # noqa: N802 - COM name
+        if not self.sticky_visible:
+            self._visible = value
+
+    def GetSpecificAnnotation(self) -> _FakeGtol:  # noqa: N802 - COM name
+        return self.gtol
+
+
+def _fake_frames(**overrides: _FakeFrame) -> dict[str, _FakeFrame]:
+    keys = [control.key for control in spec.GEOMETRIC_CONTROLS]
+    return {key: overrides.get(key, _FakeFrame(_FakeGtol())) for key in keys}
+
+
+def _patch_com(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    rebuilds: list[str] = []
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(
+        drawing, "rebuild_drawing", lambda _adapter, *, label: rebuilds.append(label)
+    )
+    return rebuilds
+
+
+def test_one_frame_per_group_hides_repeats_and_reads_the_count_back(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rebuilds = _patch_com(monkeypatch)
+    frames = _fake_frames()
+    drawing._one_frame_per_group(object(), frames)
+    assert len(rebuilds) == 1
+    for shown, hidden, count in drawing.frame_groups():
+        assert frames[shown].Visible == 1
+        assert frames[shown].gtol.GetText(3) == count
+        for key in hidden:
+            assert frames[key].Visible == 3
+            assert frames[key].gtol.texts == {}
+    assert frames["knob_axis_perpendicularity"].Visible == 1
+    assert frames["knob_axis_perpendicularity"].gtol.texts == {}
+
+
+@pytest.mark.parametrize(
+    ("override", "message"),
+    [
+        ("plate_hole_2_position", "did not stay hidden"),
+        ("plate_locator_1_position", "was refused"),
+    ],
+)
+def test_one_frame_per_group_fails_on_a_refused_readback(
+    monkeypatch: pytest.MonkeyPatch, override: str, message: str
+) -> None:
+    _patch_com(monkeypatch)
+    frame = (
+        _FakeFrame(_FakeGtol(), sticky_visible=True)
+        if override == "plate_hole_2_position"
+        else _FakeFrame(_FakeGtol(accept=False))
+    )
+    with pytest.raises(RuntimeError, match=message):
+        drawing._one_frame_per_group(object(), _fake_frames(**{override: frame}))
+
+
+def test_the_overall_references_restate_the_outline() -> None:
+    """Fan-out round 2 (clarity): the overall width and height print as
+    references at the outline's places, measured across the side edges and
+    from the -X top corner to the end round's extreme."""
+    width = geometry.EDGE_PLUS_X - geometry.EDGE_MINUS_X
+    height = geometry.TOP_LEFT[1] + geometry.END_R
+    assert spec.OVERALL_WIDTH_MM == pytest.approx(width)
+    assert spec.OVERALL_HEIGHT_MM == pytest.approx(height)
+    assert spec.DRAWING_REFERENCE_PRECISION == {
+        "OverallWidth": geometry.OUTLINE_PLACES, "OverallHeight": geometry.OUTLINE_PLACES,
+    }
+    assert geometry.TOP_LEFT[1] == max(geometry.TOP_LEFT[1], geometry.TOP_RIGHT[1])
+    # The picks sit on the outline the dimensions measure.
+    for (x, y, z), (top, notch) in zip(
+        drawing.OVERALL_WIDTH_EDGES_MODEL,
+        ((geometry.TOP_RIGHT, geometry.NOTCH_RIGHT), (geometry.TOP_LEFT, geometry.NOTCH_LEFT)),
+    ):
+        assert x == top[0] == notch[0] and notch[1] < y < top[1] and z == 0.0
+    assert drawing.OVERALL_HEIGHT_CORNER_MODEL == (
+        geometry.EDGE_MINUS_X, geometry.TOP_LEFT[1], geometry.REAR_FACE_Z,
+    )
+    assert drawing.OVERALL_HEIGHT_ROUND_MODEL == ((0.0, 0.0, geometry.REAR_FACE_Z), geometry.END_R)
+
+
+def _plan_sheet_x(model_x: float) -> float:
+    return _view_sheet_x(drawing.PLAN_CENTER[0], model_x, mirrored=False)
+
+
+def test_the_overall_references_stand_clear() -> None:
+    """The height's text stands left of the top corner's height inside the
+    left border; its lower witness line (the end round's extreme, run out
+    left) passes over the bore callout's block.  The width stands a row
+    under the side widths with the view's label under it, all above the
+    lower border."""
+    height_text = f"({spec.OVERALL_HEIGHT_MM / 25.4:.2f})"
+    x, y, _ = drawing.OVERALL_HEIGHT_TEXT_MODEL
+    left = _plan_sheet_x(x) - _text_half_width_sheet(height_text)
+    right = _plan_sheet_x(x) + _text_half_width_sheet(height_text)
+    assert left >= 0.0125 + 0.002
+    top_left_text = _printed(geometry.TOP_LEFT[1], "TopLeftY")
+    neighbour = _plan_sheet_x(drawing.PLAN_KEEP["TopLeftY"][0]) - _text_half_width_sheet(top_left_text)
+    assert neighbour - right >= _GAP
+    assert geometry.KINK[1] < y < geometry.TOP_LEFT[1]
+    bore_lines = len(drawing.PLAN_CALLOUTS["BoreDia"].splitlines()) + 1
+    bore_top = drawing.PLAN_KEEP["BoreDia"][1] + 0.9 + bore_lines * _LINE_MODEL / 2.0
+    assert -geometry.END_R - bore_top >= 2.0 / drawing.SHEET_SCALE[0]
+    # The width: 12 mm (sheet) under the side widths' row, the label under
+    # its text, the label's line above the lower border.
+    scale = drawing.SHEET_SCALE[0] / 1000.0
+    widths_y = drawing._BACK_K[1] + drawing.BACK_KEEP["EdgeLeftX"][1] * scale
+    width_y = drawing.OVERALL_WIDTH_TEXT_XY[1]
+    assert widths_y - width_y >= 0.010
+    assert width_y - 0.002 - drawing.FRONT_LABEL_XY[1] >= 0.004
+    assert drawing.FRONT_LABEL_XY[1] - 0.004 >= 0.0125 + 0.002
+    assert drawing.OVERALL_WIDTH_TEXT_XY[0] == pytest.approx(drawing._BACK_K[0])

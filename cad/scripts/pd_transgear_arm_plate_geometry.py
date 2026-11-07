@@ -206,13 +206,18 @@ NOTCH_BAND = max(
 # B-referenced frame here, so they take that circle, not the arm's zone.
 REDUCER_POSITION_DIAMETER = reducer_k_setting_diameter_mm()
 REDUCER_POSITION_RADIUS = REDUCER_POSITION_DIAMETER / 2.0
+# The plate's slip-hole mouths take the title block's edge break (its
+# axial and radial legs): the slip fit only locates, and every stack the
+# mouths touch -- the full cylinder the frame holds, the mouth's position
+# radius and the walls below -- still holds at it, so the sheet prints no
+# tighter break (fan-out L2, delegated ruling 2026-11-07 (Main)).  The
+# arm's press holes keep the interface's tighter break for dowel grip.
+LOCATOR_MOUTH_BREAK_MAX_MM = ARM.OUTLINE_EDGE_BREAK_MAX_MM
 LOCATOR_FULL_CYLINDER_SPAN_MIN_MM = (
-    THICKNESS_OVER_ARM - THICKNESS_OVER_ARM_BAND
-    - 2.0 * LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM
+    THICKNESS_OVER_ARM - THICKNESS_OVER_ARM_BAND - 2.0 * LOCATOR_MOUTH_BREAK_MAX_MM
 )
 LOCATOR_MOUTH_POSITION_RADIUS_MM = REDUCER_POSITION_RADIUS * (
-    1.0 + 2.0 * LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM
-    / LOCATOR_FULL_CYLINDER_SPAN_MIN_MM
+    1.0 + 2.0 * LOCATOR_MOUTH_BREAK_MAX_MM / LOCATOR_FULL_CYLINDER_SPAN_MIN_MM
 )
 DRILL_GROWTH = drilled_oversize_mm(unit=UNIT)
 WALL_TARGET = ARM.WALL_TARGET
@@ -368,7 +373,7 @@ for _index, (_x, _y) in enumerate(LOCATOR_SITES_MM, 1):
     WALLS[f"locator {_index} to plate edge/notch"] = (
         _edge_air - LOCATOR_HOLE_DIA_MM / 2.0,
         _edge_air - max(OUTLINE_BAND, NOTCH_BAND) - LOCATOR_MOUTH_POSITION_RADIUS_MM
-        - LOCATING_PIN.SLIP_HOLE_LIMITS_MM[1] / 2.0 - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM
+        - LOCATING_PIN.SLIP_HOLE_LIMITS_MM[1] / 2.0 - LOCATOR_MOUTH_BREAK_MAX_MM
         - OUTLINE_EDGE_BREAK_MAX_MM - HOLE_RUN_OFF_MM,
     )
     _csk_air = min(math.hypot(_x - x, _y - y) for x, y in SCREW_HOLES)
@@ -376,14 +381,14 @@ for _index, (_x, _y) in enumerate(LOCATOR_SITES_MM, 1):
         _csk_air - (LOCATOR_HOLE_DIA_MM + CSK_DIA) / 2.0,
         _csk_air - LOCATOR_MOUTH_POSITION_RADIUS_MM - SCREW_AXIS_RADIUS_IN_PLATE_MM
         - (LOCATING_PIN.SLIP_HOLE_LIMITS_MM[1] + CSK_DIA_LIMITS_MM[1]) / 2.0
-        - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM - OUTLINE_EDGE_BREAK_MAX_MM
+        - LOCATOR_MOUTH_BREAK_MAX_MM - OUTLINE_EDGE_BREAK_MAX_MM
         - 2.0 * HOLE_RUN_OFF_MM,
     )
     WALLS[f"locator {_index} to running bore"] = (
         math.hypot(_x, _y) - (LOCATOR_HOLE_DIA_MM + BORE_DIA) / 2.0,
         math.hypot(_x, _y) - LOCATOR_MOUTH_POSITION_RADIUS_MM
         - LOCATING_PIN.SLIP_HOLE_LIMITS_MM[1] / 2.0 - _BORE_R_MAX
-        - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM - HOLE_RUN_OFF_MM - BORE_RUN_OFF_MM,
+        - LOCATOR_MOUTH_BREAK_MAX_MM - HOLE_RUN_OFF_MM - BORE_RUN_OFF_MM,
     )
 for _name, (_nominal, _worst) in WALLS.items():
     if _worst < WALL_TARGET:
