@@ -156,7 +156,6 @@ def test_notes_are_few_and_carry_no_values() -> None:
         f"{2.0 * spec.MEAN_R:g}",
     ):
         assert value not in text, value
-    assert "SILVER-SOLDERED" in text
     assert "MHA-DT-09" in text and "CROSS-HOLE" in text
     for callout in notes.DIMENSION_CALLOUTS.values():
         assert not any(ch.isdigit() for ch in callout), callout

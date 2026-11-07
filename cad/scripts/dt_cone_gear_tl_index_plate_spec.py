@@ -273,7 +273,9 @@ def inch_text(value_mm: float, places: int) -> str:
 
 
 HEAD = "BS-0 HEAD"
-CSK_CALLOUT = f"CSK<MOD-DIAM>{inch_text(CSK_DIA, CSK_PLACES)} X {CSK_ANGLE:.0f}\u00b0"
+CSK_CALLOUT = (
+    f"<HOLE-SINK><MOD-DIAM>{inch_text(CSK_DIA, CSK_PLACES)} X {CSK_ANGLE:.0f}\u00b0"
+)
 HOLE_COUNT = sum(RING_COUNTS)
 CALLOUTS_ABOVE: dict[str, str] = {
     PRINTED_HOLE: f"{HOLE_COUNT}X",
@@ -282,11 +284,13 @@ CALLOUTS_ABOVE: dict[str, str] = {
 }
 # Rule 20: the known web shortfall is stated as a plain fact at the holes; it
 # emits the stated shortfall of owner ruling RV-01 (machinist_exceptions).
+# Each callout is its size and process lines plus at most two lines of words
+# (rule 7); the countersink prints with its symbol (rule 26).
 WEB_CALLOUT = f"WEB {inch_text(WEB_MIN_PRINTED * INCH, 2)} MIN"
 CALLOUTS_BELOW: dict[str, str] = {
-    PRINTED_HOLE: f"DRILL THRU\nONE OF EACH CIRCLE\nON VERTICAL CL\n{WEB_CALLOUT}",
-    "BoreDia": f"THRU\nLOCATING FIT ON\n{HEAD} PLATE HUB",
-    "MountHoleDia": f"DRILL THRU\n{CSK_CALLOUT}\nEQ SP, ONE ON\nVERTICAL CL",
+    PRINTED_HOLE: f"DRILL THRU\nONE OF EACH CIRCLE ON VERTICAL CL\n{WEB_CALLOUT}",
+    "BoreDia": f"BORE THRU\nLOCATING FIT ON\n{HEAD} PLATE HUB",
+    "MountHoleDia": f"DRILL THRU\n{CSK_CALLOUT}\nEQ SP, ONE ON VERTICAL CL",
     "MountPcd": f"MATCHES {HEAD}\nPLATE-SCREW TAPS",
 }
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

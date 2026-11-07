@@ -181,38 +181,33 @@ _PROFILE_TOP = _front_y(max(FLAT_TIP[1], FREE_FLAT_TIP[1]))
 _PAD_EAST = _front_x(FOOT_END[0])
 # The pad hole's axis, the profile's and the wing's datum (the screw).
 _HOLE_AXIS_X = _front_x(FOOT_END[0] - HOLE_FROM_END)
-# Half the printed width of each qualified dimension's text lines, as pc-r12's
-# render measured them (sheet metres, 11.8 px/mm; the preload line scaled
-# from those).  A text wider than its own dimension goes east of the hole
-# axis's extension line, which the FootLen and FreeKinkH rows share:
-# centred between the extension lines, pc-r12 printed those lines through
-# FREE, BEND and TANGENT.
-PRELOAD_REASON = "SETS PRELOAD ON MHA-DT-14"
+# Half the printed width of each dimension's text (sheet metres, 11.8 px/mm
+# as pc-r12's render measured them).  A text wider than its own dimension
+# goes east of the hole axis's extension line, which the FootLen and FreeKinkH
+# rows share: centred between the extension lines, pc-r12 printed those lines
+# through the text.  A bare value (".538 ±.020") prints narrower than any
+# former qualifier row.
+VALUE_HALF_WIDTH = 0.012
 QUALIFIER_HALF_WIDTH = {
-    "FREE, TO KINK TANGENT": 0.026,
-    "TO BEND TANGENT": 0.021,
-    PRELOAD_REASON: 0.033,
     PAD_LEN_CALLOUT: 0.024,
 }
-# The dimensions banded +/-0.5 set the crest's preload on the MHA-DT-14 strap
-# (dt_pinion_spring_spec.FORMED_BANDED_DIMENSIONS), so each names that mate
-# (drawing-guidelines.md rule 4); the kink angle and FlatLen ride the
-# title-block rows, bare.  The wing, located from the hole's axis at .XX,
-# clears the bend at FootLen's low limit, and the web it leaves the hole is
-# stated (rule 20; Codex, PR #1675).
+# The +/-.020 formed bands are wider than the title-block .XXX row, so they
+# need neither mate nor reason (drawing-guidelines.md rule 4), and a location
+# carries no words (rule 7): the phantom and the general note say which form
+# each prints on.  The wing, located from the hole's axis at .XX, clears the
+# bend at FootLen's low limit, and the web it leaves the hole is stated
+# (rule 20; Codex, PR #1675; owner ruling RV-01).
 DIMENSION_CALLOUTS = {
-    "FootLen": f"TO BEND TANGENT\n{PRELOAD_REASON}",
-    "FreeKinkH": f"FREE, TO KINK TANGENT\n{PRELOAD_REASON}",
-    "FreeKinkV": f"FREE, TO KINK TANGENT\n{PRELOAD_REASON}",
-    "BendR": PRELOAD_REASON,
-    "KinkR": PRELOAD_REASON,
     "PadLen": PAD_LEN_CALLOUT,
 }
 
 
 def callout_half_width(name: str) -> float:
-    """Half the printed width of ``name``'s widest callout line."""
-    return max(QUALIFIER_HALF_WIDTH[line] for line in DIMENSION_CALLOUTS[name].split("\n"))
+    """Half the printed width of ``name``'s widest text line."""
+    callout = DIMENSION_CALLOUTS.get(name)
+    if callout is None:
+        return VALUE_HALF_WIDTH
+    return max(QUALIFIER_HALF_WIDTH[line] for line in callout.split("\n"))
 
 
 TEXT_TO_EXTENSION_GAP = 0.003

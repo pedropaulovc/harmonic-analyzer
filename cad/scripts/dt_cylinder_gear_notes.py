@@ -19,30 +19,27 @@ def inch_text(value_mm: float, places: int) -> str:
 
 # Narrow rows (machinist review r1): the leader leaves the block's lower
 # right corner, and only a corner left of x ~0.07 m clears the cam diameter's
-# diametral line on its way down to the bore.  The worst-case wall to the cam
-# OD is under the .080 in target, so it is stated as a plain fact (rule 20).
-BORE_FIT_CALLOUT = (
-    "REAM THRU;\n"
-    "ALL 20 GEARS\n"
-    "RUNS ON SHAFT\n"
-    "MHA-DT-13\n"
-    f"{inch_text(spec.CAM_WALL_MIN_MM, 3)} MIN WALL\n"
-    "TO CAM OD"
-)
+# diametral line on its way down to the bore.  Size and process, then two
+# lines of words naming the fit and its mate (rules 4 and 7).
+BORE_FIT_CALLOUT = "REAM THRU\nRUNNING FIT ON\nSHAFT MHA-DT-13"
+# The worst-case crescent wall to the cam OD is under the .080 in target, so
+# it is stated as a plain fact (rule 20), at its own leader on the thin side.
+CAM_WALL_NOTE = f"WALL {inch_text(spec.CAM_WALL_MIN_MM, 3)} MIN TO BORE"
 # TODO(#744): validate the forked rod and centered channel bank in the native
 # assembly. The drawing requirement below does not certify that integration.
 # The bank is a solid stack preloaded onto its datum (#948 ruling R, PR #1292):
 # no gear interface opens, so a connecting-rod ring never overhangs its cam
 # and the callout no longer states an overhang bound.
 # Rows <= 18 characters: the stacking text stands right of the side view's
-# rims, clear of its extension lines, inside the border.
-STACK_FIT_CALLOUT = "STACKS CAM FACE TO\nBACK FACE ON SHAFT\nMHA-DT-13"
+# rims, clear of its extension lines, inside the border.  The band sets the
+# stack, so it names the stack and its shaft once (rules 4 and 7).
+STACK_FIT_CALLOUT = "SETS STACK ON\nSHAFT MHA-DT-13"
 GEAR_DATA = "\n".join(
     (
         "GEAR DATA",
         f"NUMBER OF TEETH:  {spec.TEETH}",
         f"DIAMETRAL PITCH:  {spec.DIAMETRAL_PITCH:.2f}",
-        f"PRESSURE ANGLE:  {spec.PRESSURE_ANGLE_DEG:.1f} DEG",
+        f"PRESSURE ANGLE:  {spec.PRESSURE_ANGLE_DEG:.1f}\u00b0",
         f"PITCH DIAMETER (REF):  {inch_text(spec.PITCH_DIA, 3)}",
         # One reference value (machinist review r1): the two-micron
         # envelope read as limits.
@@ -51,9 +48,9 @@ GEAR_DATA = "\n".join(
         f"+{inch_text(spec.WHOLE_DEPTH_BAND[0], spec.WHOLE_DEPTH_PLACES)}"
         f"/{inch_text(spec.WHOLE_DEPTH_BAND[1], spec.WHOLE_DEPTH_PLACES)}; "
         "SETS BACKLASH WITH CONE GEARS MHA-DT-03",
-        f"FORM CUTTER:  #{spec.CUTTER_NUMBER}, "
-        f"{spec.CUTTER_TEETH_RANGE[0]}-{spec.CUTTER_TEETH_RANGE[1]}T; "
-        f"{spec.CUTTER_REFERENCE_TEETH}T REFERENCE",
+        f"FORM CUTTER:  #{spec.CUTTER_NUMBER} "
+        f"({spec.CUTTER_TEETH_RANGE[0]}-{spec.CUTTER_TEETH_RANGE[1]}T RANGE, "
+        f"{spec.CUTTER_REFERENCE_TEETH}T PROFILE)",
         f"PITCH TOOTH THICKNESS (REF):  {inch_text(spec.PITCH_TOOTH_THICKNESS_MM, 4)}",
         f"TOOTH FORM:  {TOOTH_FORM_NOTE}",
         "TOOTH CUTTING SETUP, ACCEPT AT SETUP:  "

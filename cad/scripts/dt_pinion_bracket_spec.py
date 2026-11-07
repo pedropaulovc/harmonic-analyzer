@@ -115,11 +115,19 @@ if min(PIN_SEAT_WEB_WORST, PIN_SEAT_NEAR_WEB_WORST) < WALL_TARGET_MM:
 # The seat floor is modelled sharp; the corner allowance lets the builder pick
 # a flat-bottom reamer or end mill (rule 16, r2/r3 machinist review, #1007):
 # a stud bottomed on that corner stands off at most this radius, well inside
-# the seat depth's .XX band.  Three rows, so the block grows right, not up
-# into the isometric view.
+# the seat depth's .XX band.  The seat callout prints it.
 PIN_SEAT_FLOOR_CORNER_R_MAX = 0.2032  # .008
-PIN_SEAT_DEPTH_CALLOUT = (
-    "FOLLOWER SEAT REAM DEPTH\nFROM ENTRY FACE\nFLOOR CORNERS R.008 MAX"
+# The seat's size callout: process and its REF depth (rule 26: never deferred
+# to a view; Section B-B's .16 controls the floor), the bonded mate (rule 4),
+# then the floor-corner allowance.
+PIN_SEAT_CALLOUT = "\n".join(
+    (
+        f"FLAT-BOTTOM REAM <HOLE-DEPTH> ({PIN_SEAT / 25.4:.2f})".replace("(0.", "(."),
+        "BONDED FIT ON MHA-DT-25",
+        f"FLOOR CORNERS R{PIN_SEAT_FLOOR_CORNER_R_MAX / 25.4:.3f} MAX".replace(
+            "R0.", "R."
+        ),
+    )
 )
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the

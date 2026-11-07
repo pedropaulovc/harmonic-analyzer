@@ -129,18 +129,19 @@ def test_ring_matches_the_photographed_brass_collar() -> None:
     assert part.MATERIAL == "Brass"
 
 
-def test_callouts_name_the_mating_tenon_and_no_general_note_remains() -> None:
+def test_callouts_name_the_mating_tenon_and_flag_the_skim_note() -> None:
     row = _config.parts("dt-crank-handle")
     assert notes.HANDLE_NUMBER == row["number"]
-    # MHA-DT-34 machinist ENFORCE (r1-r3): the bore's matched fit and the OD's
-    # skim sit on their own callouts, not in a general note; THRU rides on the
-    # bore, and bonding the ring on is the assembly's business.
-    assert notes.HANDLE_NUMBER in notes.BORE_FIT_CALLOUT.splitlines()[0]
-    # The OD's skim names its mate and states the walls it leaves (rule 20).
-    od_rows = notes.OUTER_DIA_CALLOUT.splitlines()
-    assert od_rows[2] == "WITH MHA-DT-08"
+    # Rule 7: each callout is its size and process plus at most two lines of
+    # words; the OD's skim and the walls it leaves are numbered note 1,
+    # flagged from the OD.  Bonding the ring on is the assembly's business.
+    assert notes.HANDLE_NUMBER in notes.BORE_FIT_CALLOUT
     for callout in (notes.BORE_FIT_CALLOUT, notes.OUTER_DIA_CALLOUT):
+        assert len(callout.splitlines()) <= 3
         assert "EPOXY" not in callout and "LATHE" not in callout
+    assert f"SEE NOTE {notes.SKIM_NOTE}" in notes.OUTER_DIA_CALLOUT
+    assert notes.SHEET_NOTES.startswith(f"{notes.SKIM_NOTE}. ")
+    assert notes.HANDLE_NUMBER in notes.SHEET_NOTES
     # The prose lives in the notes module, which the mating parts never import.
     for name in ("DRAWING_NOTES", "HANDLE_NUMBER", "SEAT_FACE_WALL_MIN"):
         assert not hasattr(spec, name), name
