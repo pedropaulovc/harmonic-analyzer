@@ -57,11 +57,11 @@ from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
 import pd_transgear_pin_callouts as callouts
+from pd_transgear_pin_callouts import DRAWING_NOTES
 from pd_transgear_pin_spec import (
     DIA,
     DIA_BAND,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     FRONT_LAND,
     GROOVE_DIA,

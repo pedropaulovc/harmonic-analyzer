@@ -24,7 +24,7 @@ from _printed_tolerance import (
     printed_band_mm,
 )
 from _surface_finish import MACHINED_UM
-from pd_cluster_stack_band import FIT_LENGTH_BAND_IN, STACK_NAME
+from pd_cluster_stack_band import FIT_LENGTH_BAND_IN
 
 
 def test_required_drawing_paths() -> None:
@@ -190,12 +190,12 @@ def test_the_part_authors_every_callout_on_a_marked_dimension() -> None:
 
 
 def test_the_groove_width_band_names_the_ring_clear_of_its_extension_lines() -> None:
-    """Rule 4: the catalogue width band names its ring at its own callout;
-    rule 14: the text centre stands far enough toward the head that the
-    rear wall's and the load wall's extension lines miss the text block."""
-    callout = _below("GrooveWidth")
-    assert callout == callouts.GROOVE_WIDTH_CALLOUT
-    assert spec.RING_NUMBER in callout and "\n" not in callout
+    """Rule 4: the groove names its ring once, above its Ø, for both of its
+    catalogue bands; rule 14: the width's text centre stands far enough
+    toward the head that the rear wall's and the load wall's extension lines
+    miss the text block."""
+    assert ("PinProfile", "GrooveWidth") not in callouts.CALLOUTS[callouts.CALLOUT_BELOW]
+    assert spec.RING_NUMBER in callouts.GROOVE_CALLOUT
     x, _ = drawing.SIDE_KEEP["GrooveWidth"]
     assert x - 0.028 > drawing.GROOVE_REAR_X > drawing.LOAD_WALL_X
     # The shank Ø's dimension line (and its arrow below the shank) passes
@@ -206,8 +206,7 @@ def test_the_groove_width_band_names_the_ring_clear_of_its_extension_lines() -> 
 
 def test_the_part_notes_carry_no_assembly_step() -> None:
     """The press into the arm is the assembly's pin-pressed step (rule 24)."""
-    assert spec.DRAWING_NOTES == "1/4 IN BAR STOCK OK."
-    assert "PRESSED" not in spec.DRAWING_NOTES
+    assert "PRESSED" not in callouts.DRAWING_NOTES
 
 
 @pytest.mark.parametrize(
@@ -231,12 +230,12 @@ def test_the_functional_station_runs_from_the_head_seat_to_the_load_wall() -> No
 
 
 def test_the_station_names_the_stack_it_sets() -> None:
-    """Rule 4: the station's ±band names the disc cluster stack it serves."""
+    """Rule 4: the station's ±band names the stack it serves by drawing number."""
     import transgear_cluster_fit as fit
 
     callout = _below("GrooveStation")
     assert callout == callouts.GROOVE_STATION_CALLOUT
-    assert "LOAD WALL" in callout and STACK_NAME in callout
+    assert "\n" not in callout and spec.FRONT_BUSHING_NUMBER in callout
     assert spec.DRAWING_PRECISION_BY_NAME["GrooveStation"] == 3
     assert fit.GS[1:] == (spec.GROOVE_STATION, spec.GROOVE_STATION_BAND)
 
@@ -272,7 +271,7 @@ def test_the_shank_carries_the_one_machined_finish() -> None:
 
 
 def test_notes_fit_the_sheet_limits() -> None:
-    lines = spec.DRAWING_NOTES.splitlines()
+    lines = callouts.DRAWING_NOTES.splitlines()
     assert len(lines) <= 4
     assert all(len(line) <= 70 for line in lines)
 
@@ -287,12 +286,11 @@ def test_the_shank_callout_names_both_fits_its_band_sets() -> None:
     assert spec.PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
     assert (loosest, tightest) == pytest.approx((0.00762, 0.0254))
     callout = _below("ShankDia")
-    assert callout == callouts.SHANK_CALLOUT
-    assert f"PRESS FIT IN {spec.ARM_NUMBER} REAM" in callout
-    assert ".0003-.0010 DIAMETRAL INTERFERENCE" in callout
-    assert all(number in callout for number in spec.RUNNING_MATES)
-    assert "INTERFERENCE" not in spec.DRAWING_NOTES
-    assert "GROUND" not in spec.DRAWING_NOTES
+    assert callout == callouts.SHANK_CALLOUT == f"SEE NOTE {callouts.SHANK_FIT_NOTE}"
+    assert callouts.DRAWING_NOTES.startswith(f"{callouts.SHANK_FIT_NOTE}. ")
+    assert spec.ARM_NUMBER in callouts.DRAWING_NOTES
+    assert all(number in callouts.DRAWING_NOTES for number in spec.RUNNING_MATES)
+    assert "GROUND" not in callouts.DRAWING_NOTES
 
 
 def test_registry_row_is_the_turned_steel_mha_179() -> None:
@@ -342,5 +340,5 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
     _drawing_marks.apply_drawing_properties(None, part.PART_NAME, extra)
     carried.update(stamped)
     assert [name for name in required if not str(carried.get(name) or "").strip()] == []
-    assert carried["Manufacturing Notes"] == spec.DRAWING_NOTES
+    assert carried["Manufacturing Notes"] == callouts.DRAWING_NOTES
     assert carried["Isometric View Note"] == spec.ISOMETRIC_VIEW_NOTE
