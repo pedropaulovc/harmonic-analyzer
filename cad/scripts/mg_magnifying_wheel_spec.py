@@ -88,11 +88,15 @@ from mg_wheel_group import HUB_RUNNING, WHEEL_BORE_MAX
 # The spoke pattern's pitch prints on the face view between two spoke
 # centrelines, the 60 and 120 deg spokes', on a hidden Front-plane sketch
 # (SPOKE_REFERENCE): each centreline is a construction stub through the rim
-# (SPOKE_STUB_R), and the angle between them is a DRIVEN reference (the
-# Tie2Angle precedent) printed "6X 60°".  The seed spoke lies on local +X,
-# so two spokes lie on the face view's horizontal centerline, which the
-# drawing draws through them and the bore (drawing-guidelines.md rule 26: a
-# location is a dimension or a drawn line, not a sentence).
+# (SPOKE_STUB_R), and the angle between them is a DRIVEN reference printed
+# "6X 60°".  The seed spoke lies on local +X, so two spokes lie on the face
+# view's horizontal centerline, which the drawing draws through them and the
+# bore (drawing-guidelines.md rule 26: a location is a dimension or a drawn
+# line, not a sentence).  TIE 2's radial is clocked on the same sketch: a
+# stub on its axis and one on the TIE2_CLOCK_SPOKE spoke (the 180 deg one,
+# on that drawn centreline), the DRIVEN angle between them TIE2_FROM_SPOKE_DEG
+# with its vertex on the bore axis (drawing-guidelines.md rule 10: dimension
+# from a real feature).
 SECTION_PLANE = "SectionAPlane"
 DIAMETER_REFERENCE = "DiameterReference"
 SPOKE_REFERENCE = "SpokeReference"
@@ -102,9 +106,15 @@ SPOKE_PITCH_DEG = 360.0 / SPOKE_COUNT
 SPOKE_PITCH_SPOKES = (1, 2)
 SPOKE_STUB_R = (RIM_INNER_DIA / 2.0 - 4.0, RIM_OUTER_DIA / 2.0 + 3.0)
 SPOKE_PITCH_PREFIX = f"{SPOKE_COUNT}X "
+TIE2_CLOCK_SPOKE = 3
+TIE2_FROM_SPOKE_DEG = (
+    clock_to_local_deg(TIE2_CLOCK_DEG) - TIE2_CLOCK_SPOKE * SPOKE_PITCH_DEG
+) % 360.0
+if not 0.0 < TIE2_FROM_SPOKE_DEG < 90.0:
+    raise AssertionError("TIE 2 must sit in the acute sector past its spoke")
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     DIAMETER_REFERENCE: {"RimOuterDiaDim", "RimInnerDiaDim"},
-    SPOKE_REFERENCE: {"SpokePitch"},
+    SPOKE_REFERENCE: {"SpokePitch", "Tie2Clock"},
     "SpokeProfile": {"SpokeRootWidth", "SpokeTipWidth"},
     "Spoke": {"SpokeAxial"},
     "HubProfile": {"HubDia", "SpigotDia", "HubLength", "SpigotLength", "HubFrontZ"},
@@ -113,7 +123,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RimFillets": {"RimFilletR"},
     "GrooveProfile": {"GrooveR", "GrooveBottomDia"},
     "Tie1Profile": {"Tie1X", "Tie1Y", "Tie1HoleDia"},
-    "Tie2Profile": {"Tie2HoleDia", "Tie2Angle"},
+    "Tie2Profile": {"Tie2HoleDia"},
 }
 # Each fillet feature's R imports onto its FIRST picked edge
 # (build_mg_wheel_axle: the drawing's inserted radius lands on the first
@@ -136,7 +146,7 @@ RIM_FILLET_PRINTED = (3, -1)
 # matched fits, a reference nominal at the places their reamers carry.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     DIAMETER_REFERENCE: {"RimOuterDiaDim": 2, "RimInnerDiaDim": 2},
-    SPOKE_REFERENCE: {"SpokePitch": 0},
+    SPOKE_REFERENCE: {"SpokePitch": 0, "Tie2Clock": 0},
     "SpokeProfile": {"SpokeRootWidth": 2, "SpokeTipWidth": 2},
     "Spoke": {"SpokeAxial": 2},
     "HubProfile": {
@@ -151,7 +161,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "RimFillets": {"RimFilletR": 2},
     "GrooveProfile": {"GrooveR": 3, "GrooveBottomDia": 3},
     "Tie1Profile": {"Tie1X": TIE1_PLACES, "Tie1Y": TIE1_PLACES, "Tie1HoleDia": 3},
-    "Tie2Profile": {"Tie2HoleDia": 3, "Tie2Angle": 0},
+    "Tie2Profile": {"Tie2HoleDia": 3},
 }
 # Matched fits (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the spigot is turned to the stated
 # interference in the finished drum's bore and the bore reamed to the stated
