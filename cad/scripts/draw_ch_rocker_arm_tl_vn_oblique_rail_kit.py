@@ -267,21 +267,18 @@ RECEIPT_FLAG_CELL = (
     RECEIPT_FLAG_XY[1] + 0.001,
 )
 
-# Two short feature flags at each end: one on the counterbore rim and one
-# on the rail end. Their lanes stay outside the Length callout's native ink.
+# Exactly one [A] flag per rail end, attached to the end counterbore's
+# lower rim. The complete leaders remain below the rail and the Length line.
 _NEAR_END_X = FRONT_CENTER[0] - _FRONT_HALF[0]
-_FAR_END_X = FRONT_CENTER[0] + _FRONT_HALF[0]
 WALL_FLAGS = (
-    ("near end", (_NEAR_END_X, FRONT_CENTER[1]), (0.024, 0.179)),
     ("near counterbore", (
         _NEAR_END_X + rail.HOLE_X[0] * _sheet_mm(SHEET_SCALE),
-        FRONT_CENTER[1] + rail.CBORE_DIA / 2.0 * _sheet_mm(SHEET_SCALE),
-    ), (0.044, 0.190)),
-    ("far end", (_FAR_END_X, FRONT_CENTER[1]), (0.302, 0.179)),
+        FRONT_CENTER[1] - rail.CBORE_DIA / 2.0 * _sheet_mm(SHEET_SCALE),
+    ), (0.014, 0.158)),
     ("far counterbore", (
         _NEAR_END_X + rail.HOLE_X[-1] * _sheet_mm(SHEET_SCALE),
-        FRONT_CENTER[1] + rail.CBORE_DIA / 2.0 * _sheet_mm(SHEET_SCALE),
-    ), (0.296, 0.190)),
+        FRONT_CENTER[1] - rail.CBORE_DIA / 2.0 * _sheet_mm(SHEET_SCALE),
+    ), (0.300, 0.158)),
 )
 
 
@@ -300,7 +297,7 @@ def wall_flag_regions(edge_xy: tuple[float, float], note_xy: tuple[float, float]
     return text, envelope
 
 
-def assert_wall_flag_landing(note: Any, edge_xy: tuple[float, float], text_cell: Box) -> None:
+def assert_wall_flag_landing(note: Any, edge_xy: tuple[float, float], text_cell: Box) -> tuple[Segment, ...]:
     """Read the settled text anchor and both leader endpoints independently."""
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     anchor = tuple(float(v) for v in annotation.GetPosition() or ())[:2]
@@ -311,12 +308,30 @@ def assert_wall_flag_landing(note: Any, edge_xy: tuple[float, float], text_cell:
     points = tuple(float(v) for v in annotation.GetLeaderPointsAtIndex(0) or ())
     if len(points) < 6:
         raise RuntimeError("rail wall flag leader is unreadable")
+    if len(points) % 3:
+        raise RuntimeError("rail wall flag leader points are incomplete")
     ends = ((points[0], points[1]), (points[-3], points[-2]))
     if not any(
         _inside((*start, *start), text_cell) and math.dist(tip, edge_xy) <= 0.001
         for start, tip in (ends, ends[::-1])
     ):
         raise RuntimeError(f"rail wall flag leader left its intended feature: {ends!r}")
+    vertices = tuple((points[i], points[i + 1]) for i in range(0, len(points), 3))
+    return tuple(zip(vertices, vertices[1:]))
+
+
+def require_wall_leaders_clear(
+    leaders: tuple[Segment, ...], length_text: Box, length_segments: list[Segment],
+) -> None:
+    """Check actual settled leader paths, not just their bounding rectangles."""
+    horizontal = [segment for segment in length_segments if _horizontal(segment)]
+    for leader in leaders:
+        if _crosses(leader, length_text, gap=CLEAR_GAP_M):
+            raise RuntimeError("rail wall flag leader crosses Length text")
+        for (x0, y0), (x1, y1) in horizontal:
+            line_box = (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
+            if _crosses(leader, line_box, gap=0.0001):
+                raise RuntimeError("rail wall flag leader crosses overall Length line")
 
 # View captions (3 mm text, top edge at y, centred on the view): each under
 # its view's outline, FRONT's under its stack's flag.
@@ -353,7 +368,7 @@ RECEIPT_NOTE_CELL = (0.015, _NOTES_BOTTOM - 0.001, _FOOTER_RIGHT, RECEIPT_NOTE_T
 
 
 def caption_text(label: str, scale: tuple[int, int]) -> str:
-    printed_label = "VIEW A" if label == "RIGHT" else label
+    printed_label = "END VIEW" if label == "RIGHT" else label
     return f"{printed_label}  {scale[0]}:{scale[1]}"
 
 
@@ -746,8 +761,14 @@ def append_rail_receipt_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
                     f"rail note leaves its reserved space/border: {linked_text!r}: {box!r}"
                 )
         title_fit()
+        length_annotation = next(
+            annotation for annotation in annotations
+            if dimension_name(adapter, annotation) == "Length"
+        )
+        length_text, length_segments = _receipt_ink(length_annotation, label="Length wall-flag clearance")
         for wall_note, edge_xy, text_cell in wall_flags:
-            assert_wall_flag_landing(wall_note, edge_xy, text_cell)
+            leaders = assert_wall_flag_landing(wall_note, edge_xy, text_cell)
+            require_wall_leaders_clear(leaders, length_text, length_segments)
         assert_receipt_stack_clear(
             adapter,
             annotations,

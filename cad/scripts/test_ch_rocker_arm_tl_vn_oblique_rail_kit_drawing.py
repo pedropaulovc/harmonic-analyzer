@@ -422,7 +422,7 @@ def test_rail_receipt_note_points_at_the_stations() -> None:
     assert all(len(line) <= 70 for line in lines), lines
     note = " ".join(lines)
     assert rail.WALL_ACCEPTANCE_MM == 2.0
-    assert "WALL FROM EACH END COUNTERBORE TO RAIL END: 2.0 MIN." in note
+    assert "[A] WALL FROM EACH END COUNTERBORE TO RAIL END: 2.0 MIN." in note
     assert "TAP WALL" not in note
     assert "TRANSFER TO" not in note
     assert "MHA-CH-06-TL-00 SHEET 1 LIMITS; SEALS ON RAIL, NO BIND" in rail.END_FIT_CALLOUT
@@ -435,9 +435,10 @@ def test_rail_receipt_note_points_at_the_stations() -> None:
     assert rail.CBORE_END_WALL_WORST >= base_bar.WALL_TARGET_MM
     assert rail.CBORE_END_WALLS_WORST == pytest.approx((6.214, 5.96))
     assert {label for label, _, _ in draw.WALL_FLAGS} == {
-        "near end", "far end", "near counterbore", "far counterbore",
+        "near counterbore", "far counterbore",
     }
-    assert draw.caption_text("RIGHT", (2, 1)) == "VIEW A  2:1"
+    assert len(draw.WALL_FLAGS) == 2
+    assert draw.caption_text("RIGHT", (2, 1)) == "END VIEW  2:1"
 
 
 def test_wall_flag_extent_includes_the_native_leader(monkeypatch) -> None:
@@ -446,7 +447,8 @@ def test_wall_flag_extent_includes_the_native_leader(monkeypatch) -> None:
         0.023639363281249964, 0.16034543750000008,
         0.06191944531249996, 0.17927042187500009,
     )
-    _, edge, target = draw.WALL_FLAGS[0]
+    edge = (0.062036, 0.160)
+    target = (0.024, 0.179)
     text_cell, envelope = draw.wall_flag_regions(edge, target)
     assert not _inside_box(reported, text_cell)
     assert _inside_box(reported, envelope)
@@ -468,6 +470,43 @@ def test_wall_flag_extent_includes_the_native_leader(monkeypatch) -> None:
     )
     with pytest.raises(RuntimeError, match="intended feature"):
         draw.assert_wall_flag_landing(note, edge, text_cell)
+
+
+def test_below_rail_wall_flags_clear_native_overall_ink(monkeypatch) -> None:
+    monkeypatch.setattr(draw, "_early_bound", lambda value, _interface: value)
+    # Native 957501d1 extents, translated by the proven +20/+4 mm correction.
+    length_text = (0.0706, 0.1744, 0.2073, 0.1870)
+    length_lines = [((0.062, 0.1744), (0.282, 0.1744))]
+    for _label, edge, target in draw.WALL_FLAGS:
+        text_cell, envelope = draw.wall_flag_regions(edge, target)
+        assert envelope[3] < length_lines[0][0][1] - draw.CLEAR_GAP_M
+        annotation = SimpleNamespace(
+            GetPosition=lambda: (*target, 0.0),
+            GetLeaderCount=lambda: 1,
+            GetLeaderPointsAtIndex=lambda _index: (*target, 0.0, *edge, 0.0),
+        )
+        note = SimpleNamespace(GetAnnotation=lambda: annotation)
+        leaders = draw.assert_wall_flag_landing(note, edge, text_cell)
+        draw.require_wall_leaders_clear(leaders, length_text, length_lines)
+    # Crossing-path mutation against the measured overall-line segment.
+    with pytest.raises(RuntimeError, match="overall Length line"):
+        draw.require_wall_leaders_clear(
+            (((0.250, 0.190), (0.277, 0.161875)),),
+            length_text, length_lines,
+        )
+    with pytest.raises(RuntimeError, match="Length text"):
+        draw.require_wall_leaders_clear(
+            (((0.080, 0.200), (0.080, 0.160)),),
+            length_text, length_lines,
+        )
+    source = Path(draw.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    settled = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "settled")
+    assert any(
+        isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+        and n.func.id == "require_wall_leaders_clear"
+        for n in ast.walk(settled)
+    )
 
 
 @pytest.mark.parametrize("bar_deviation", (-trammel.RAIL_LENGTH_BAND, trammel.RAIL_LENGTH_BAND))
@@ -920,7 +959,7 @@ def test_receipt_sheet_views_captions_and_notes_fit() -> None:
         cell = cells[f"*{label.title()}"]
         assert y < cell[1] and cell[0] < x < cell[2], label
         assert y - 0.006 > footer, label
-        expected_label = "VIEW A" if label == "RIGHT" else label
+        expected_label = "END VIEW" if label == "RIGHT" else label
         assert draw.caption_text(label, scale).startswith(expected_label)
         box = (x - draw._CAPTION_HALF_WIDTH, y - 0.006, x + draw._CAPTION_HALF_WIDTH, y + 0.001)
         caption_boxes[label] = box
