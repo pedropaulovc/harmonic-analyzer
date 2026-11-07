@@ -1838,7 +1838,11 @@ GENERAL_TORQUE_NOTE = (
 # Step 1 cites its documents by Number (TL-00 review 62753c5e): the base
 # bar's process plan and the rail kit's receipt sheet, whose note [A] states
 # the counterbore-to-end wall each trimmed rail keeps.
-BASE_BAR_NUMBER = _config.parts(base_bar.PART_NAME)["number"]
+# A literal row (base_bar_spec's convention): drawing closures track this
+# concrete registry row, not a dynamic read of another part's.
+BASE_BAR_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-base-bar")["number"]
+if base_bar.PART_NAME != "ch-rocker-arm-tl-oblique-base-bar":
+    raise AssertionError("step 1's base-bar Number reads another part's row")
 RAIL_RECEIPT_REFERENCE = f"{base_bar.RAIL_NUMBER} SHEET {guide_rail.RECEIPT_SHEET}"
 ASSEMBLY_STEPS = (
     # Select carriages and finish all rail/bar preparation before fastening
