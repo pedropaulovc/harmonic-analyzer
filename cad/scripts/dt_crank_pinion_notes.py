@@ -44,9 +44,11 @@ _BORE_CLEARANCE = spec.BORE_DIAMETRAL_CLEARANCE
 # serve, once (rule 4: a mate serving several features is named once):
 # their short limits keep full tips in the 64T mesh, their long ones the
 # 120T gear's clearance (build_dt_drive_train_assembly proves both). Note 2
-# is the turned band's supply size and the size fitted at assembly with the
-# check that sets it (rule 19), linked from the turned diameter alone so it
-# cannot be read against the tip diameter (machinist review r1 of #1652); it
+# is the size the turned band is fitted to at assembly with the check that
+# sets it (rule 19), linked from the turned diameter alone so it cannot be
+# read against the tip diameter (machinist review r1 of #1652); the supply
+# size stays on that diameter only (fan-out r4 fbaa9035a1, rule 7: a linked
+# note does not repeat the feature's controlling value); it
 # names the check, never its step number (a part never reads the step
 # registry). Note 3 is the reamed bore's standard fit name with the
 # clearance its limits and MHA-DT-11's make, as reference: the bore slides
@@ -57,10 +59,8 @@ DRAWING_NOTES = "\n".join(
     (
         f"{MESH_NOTE_NUMBER}. MESH WITH CRANK DRIVE GEAR {spec.MESH_GEAR_NUMBER}; "
         f"CLEARANCE TO {CONE_GEAR_120T}.",
-        f"{TURNED_DIA_NOTE_NUMBER}. SUPPLY "
-        f"Ø{inch_text(spec.TURNED_DIA, spec.TURNED_DIA_PLACES)} "
-        f"±{inch_text(spec.TURNED_DIA_TOLERANCE_MM, spec.TURNED_DIA_PLACES)}; "
-        f"FITTED AT ASSEMBLY TO Ø{inch_text(spec.TURNED_DIA_FITUP_MIN, spec.TURNED_DIA_PLACES)} "
+        f"{TURNED_DIA_NOTE_NUMBER}. FITTED AT ASSEMBLY TO "
+        f"Ø{inch_text(spec.TURNED_DIA_FITUP_MIN, spec.TURNED_DIA_PLACES)} "
         f"MIN TO PASS MHA-DT-00 FEELER CHECK TO 120T GEAR {spec.CONE_GEAR_NUMBER}.",
         f"{BORE_FIT_NOTE_NUMBER}. SLIDING FIT ON CRANKSHAFT {spec.CRANKSHAFT_NUMBER} "
         f"(CLEARANCE {inch_text(_BORE_CLEARANCE[0], 4)}-{inch_text(_BORE_CLEARANCE[1], 4)}).",

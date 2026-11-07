@@ -485,9 +485,10 @@ def test_notes_carry_the_tooth_edge_override_not_an_obsolete_boss_shortfall() ->
     # Four numbered notes, each a single line, numbered in order.
     assert len(lines) <= 4
     assert [line.split(".", 1)[0] for line in lines] == ["1", "2", "3", "4"]
-    # The T120 fit-up may turn the band down; the sheet states the supply
-    # size, the fitted floor and the check that sets it in note 2, which the
-    # turned diameter alone links (rule 19; machinist review r1 of #1652).
+    # The T120 fit-up may turn the band down; note 2, which the turned
+    # diameter alone links, states the fitted floor and the check that sets
+    # it (rule 19; machinist review r1 of #1652), and leaves the supply size
+    # to that diameter (fan-out r4, rule 7: no second controlling value).
     supply = (
         f"Ø{spec.inch_text(spec.TURNED_DIA, spec.TURNED_DIA_PLACES)} "
         f"±{spec.inch_text(spec.TURNED_DIA_TOLERANCE_MM, spec.TURNED_DIA_PLACES)}"
@@ -496,9 +497,10 @@ def test_notes_carry_the_tooth_edge_override_not_an_obsolete_boss_shortfall() ->
     # Fan-out r2 (rule 4): the gear the feeler check reads against is named
     # by its number in the note the Ø.730 flags.
     assert _note(notes.TURNED_DIA_NOTE_NUMBER) == (
-        f"2. SUPPLY {supply}; FITTED AT ASSEMBLY TO {floor} "
+        f"2. FITTED AT ASSEMBLY TO {floor} "
         "TO PASS MHA-DT-00 FEELER CHECK TO 120T GEAR MHA-DT-03."
     )
+    assert supply not in notes.DRAWING_NOTES
     assert not hasattr(spec, "BOSS_WALL_EXCEPTION")
     for internal in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "RULE "):
         assert internal not in notes.DRAWING_NOTES
