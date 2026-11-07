@@ -399,9 +399,12 @@ def test_the_rear_mouth_prints_its_modelled_band_on_its_native_leg_in_d_d() -> N
         (geometry.PIN_MOUTH_CHAMFER - tolerance, geometry.PIN_MOUTH_CHAMFER + tolerance)
     )
     assert geometry.PIN_MOUTH_CHAMFER_LIMITS == pytest.approx((0.1524, 0.254))
-    assert spec.PIN_MOUTH_CALLOUT.splitlines()[0] == "X 45\u00b0 REAR MOUTH"
-    assert cluster_pin.PIN_NUMBER in spec.PIN_MOUTH_CALLOUT
-    lines = [".008 \u00b1.002", *spec.PIN_MOUTH_CALLOUT.splitlines()]
+    # Round 4: the mouth is named by the datum its face is opposite, never by
+    # the undefined direction word REAR.
+    assert arm_notes.PIN_MOUTH_CALLOUT.splitlines()[0] == "X 45\u00b0 MOUTH OPPOSITE DATUM A"
+    assert "REAR" not in arm_notes.PIN_MOUTH_CALLOUT
+    assert cluster_pin.PIN_NUMBER in arm_notes.PIN_MOUTH_CALLOUT
+    lines = [".008 \u00b1.002", *arm_notes.PIN_MOUTH_CALLOUT.splitlines()]
     width = max(map(len, lines)) * _CAPS_CHAR_WIDTH
     half_height = len(lines) * _LINE_PITCH / 2.0
     x, y = drawing.PIN_MOUTH_TEXT_XY
@@ -859,9 +862,23 @@ def test_the_counterbore_and_its_floor_name_the_pivot_spring() -> None:
     # seat and preload.
     assert arm_notes.DIMENSION_CALLOUTS["SpotFaceDia"] == arm_notes.SPRING_CALLOUT
     assert arm_notes.DIMENSION_CALLOUTS["FloorDepth"] == arm_notes.SPRING_CALLOUT
-    assert f"SEE NOTE {arm_notes.SPRING_NOTE}" == arm_notes.SPRING_CALLOUT
+    assert arm_notes.SPRING_CALLOUT == f"SEE NOTE {arm_notes.SPRING_NOTE}, SHEET 2"
     note = " ".join(arm_notes.NOTES[arm_notes.SPRING_NOTE - 1].split())
     assert spring in note and "PRELOAD" in note
+
+
+def test_every_sheet_one_note_link_names_the_notes_sheet() -> None:
+    """Round 4 (clarity, rule 7): sheet 1's flags pointed to notes printed only
+    on sheet 2. Every link names that sheet."""
+    links = [
+        line
+        for text in arm_notes.DIMENSION_CALLOUTS.values()
+        for line in text.splitlines()
+        if "SEE NOTE" in line
+    ]
+    assert len(links) == 5
+    assert all(line.endswith(f", SHEET {arm_notes.NOTES_SHEET}") for line in links)
+    assert arm_notes.NOTES_SHEET == 2 == len(drawing.SHEET_NAMES)
 
 
 def test_the_locating_holes_name_their_dowel_press_and_match_drill() -> None:
@@ -1108,6 +1125,26 @@ def test_section_d_d_carries_the_rear_mouth_on_its_own_sheet() -> None:
     caption_top = axis_y - half - drawing._PIN_CAPTION_GAP_M
     title_block_top = 0.065
     assert caption_top - 0.016 > title_block_top + 0.005
+
+
+def test_sheet_one_captions_hang_under_their_own_cuts() -> None:
+    """Round 4 (clarity): B-B's caption sat against section A-A's right end
+    beside its (.33), and A-A's on the title block's top edge. Each now hangs
+    under its own cut: B-B's stacked name (~32 mm wide) stands ~10 mm right
+    of A-A's end, and A-A's one line stays above the title block."""
+    targets = drawing.section_caption_targets()
+    assert {label: sheet for label, (sheet, _xy) in targets.items()} == {
+        "A-A": 0, "B-B": 0, "D-D": 1,
+    }
+    assert drawing.SECTION_CAPTION_TEXTS["B-B"].splitlines() == ["<VLNAME>", "<VLLABEL>"]
+    section_right = drawing._front_x(geometry.TIP_STATION)
+    bb_x, bb_top = targets["B-B"][1]
+    assert bb_x - 0.032 / 2.0 > section_right + 0.008
+    a_a_bottom = drawing.SECTION_CENTER[1] - geometry.THICKNESS * drawing._S / 2000.0
+    assert bb_top < drawing.LOCATOR_SECTION_CENTER[1] and bb_top - 0.016 > 0.065 + 0.005
+    aa_x, aa_top = targets["A-A"][1]
+    assert aa_top < a_a_bottom
+    assert aa_top - 0.008 > 0.065 + 0.003
 
 
 def test_the_rear_face_has_no_frame_and_the_stock_band_carries_its_parallelism() -> None:

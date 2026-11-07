@@ -210,14 +210,6 @@ if not all(
         f"MHA-PD-18 pin bore press on MHA-PD-23 is {PIN_PRESS_INTERFERENCE}, "
         "not .0003..0010"
     )
-# The rear mouth's chamfer prints its own native leg dimension and band in
-# section D-D (#2174: a modelled feature with a minimum the title block's
-# break lacks); the callout gives the angle, the end and the mate whose seat
-# fillet the minimum clears (rule 4).
-PIN_MOUTH_CALLOUT = "\n".join(
-    ("X 45\u00b0 REAR MOUTH", f"CLEARS {PIN.PIN_NUMBER} SEAT FILLET")
-)
-
 # The true overall, pivot-end extreme to the square end, prints as a
 # reference; a derived reference has no part-side places, so the spec owns
 # its digits (three).

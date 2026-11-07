@@ -343,11 +343,16 @@ GUIDE_EDGE_XY = (
 # socket text moves right with it, ~6 mm clear of the guide's right end.
 GUIDE_CALLOUT_HALF_WIDTH = 0.050
 GUIDE_CALLOUT_XY = (0.137, 0.248)
-# Four rows at most (r4 tall-block): the drill, the far-side counterbore and
-# the screw whose heads it sinks share one (r5 asked for the process word).
-GUIDE_CALLOUT_PROCESS = (
-    f"PATTERN MATCHES {GUIDE_NUMBER}\nDRILL, C'BORE FAR SIDE FOR {GUIDE_SCREW_NUMBER}\n"
-)
+# Three rows: the size, the pattern's mate, and the counterbore by its symbol
+# with its side and the screw whose heads it sinks after its depth (round 4,
+# rule 26: "DRILL, C'BORE FAR SIDE FOR ..." wrote the counterbore in words over
+# its own symbol row).  The side and screw join the definition part that ends
+# on the counterbore's depth (_name_counterbore_side).
+GUIDE_CALLOUT_PROCESS = f"PATTERN MATCHES {GUIDE_NUMBER}\n"
+GUIDE_CBORE_SUFFIX = f"FAR SIDE FOR {GUIDE_SCREW_NUMBER}"
+# A hole callout's format parts (prefix, suffix, callout above, callout below)
+# read back at their definitions 5-8 and are written at 1-4.
+_DEFINITION_TO_WRITABLE = {5: 1, 6: 2, 7: 3, 8: 4}
 SOCKET_DRILL_DIA = blind_cut_dia_mm(SOCKET_SPEC)
 SOCKET_DRILL_R_SHEET = SOCKET_DRILL_DIA / 2.0 * _S
 SOCKET_EDGE_XY = (
@@ -456,6 +461,37 @@ def hole_tag_corner(
         sy = 1 if y == GUIDE_HOLE_Y[0] else -1
     offset = rim * _S * _DIAG + _TAG_GAP_M
     return (_front_x(x) + sx * offset, _front_y(y) + sy * offset), (sx, sy)
+
+
+def counterbore_side_definition(definitions: dict[int, str]) -> tuple[int, str]:
+    """The one format part ending on the counterbore's depth, with its side
+    and screw (GUIDE_CBORE_SUFFIX) after it: ``⌴ Ø.26 ↧ .115 FAR SIDE FOR ...``.
+    The through hole prints THRU, so the counterbore's is the callout's only
+    depth token; any other shape fails loud."""
+    if set(definitions) != set(_DEFINITION_TO_WRITABLE):
+        raise RuntimeError(f"unexpected hole callout parts: {definitions!r}")
+    holders = [part for part, text in definitions.items() if "<HOLE-DEPTH>" in text]
+    if len(holders) != 1 or GUIDE_CBORE_SUFFIX in "\n".join(definitions.values()):
+        raise RuntimeError(f"guide callout has no single counterbore depth: {definitions!r}")
+    part = holders[0]
+    definition = definitions[part]
+    head, _marker, tail = definition.rpartition("<HOLE-DEPTH>")
+    if "<HOLE-DEPTH>" in head or len(tail.split()) != 1:
+        raise RuntimeError(f"guide callout's depth does not close its part: {definitions!r}")
+    return part, f"{definition.rstrip()} {GUIDE_CBORE_SUFFIX}"
+
+
+def _name_counterbore_side(display: Any) -> None:
+    """Write the counterbore's side and screw after its depth; read back."""
+    display = _early_bound(display, "IDisplayDimension")
+    definitions = {
+        part: str(display.GetText(part) or "") for part in _DEFINITION_TO_WRITABLE
+    }
+    part, updated = counterbore_side_definition(definitions)
+    display.SetText(_DEFINITION_TO_WRITABLE[part], updated)
+    applied = str(display.GetText(part) or "")
+    if applied.replace("\r", "") != updated.replace("\r", ""):
+        raise RuntimeError(f"guide counterbore side did not persist: {applied!r}")
 
 
 # VIEW B (rules 9, 26): the 1:1 right side is not projected at the sheet's
@@ -1262,6 +1298,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hole_callout_precision(
         guide_callout, GUIDE_CALLOUT_PRECISION, label="guide-screw counterbored holes"
     )
+    _name_counterbore_side(guide_callout)
     socket = (_SOCKET_RIGHT_X, _SOCKET_HIGH_Y)  # *Front: model +X right, +Y up
     socket_callout = add_native_hole_callout(
         adapter,

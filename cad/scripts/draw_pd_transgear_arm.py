@@ -102,11 +102,15 @@ from pd_transgear_arm_spec import (
     DRAWING_REFERENCE_PRECISION,
     ISO_VIEW_SCALE,
     OVERALL_LENGTH,
-    PIN_MOUTH_CALLOUT,
     STOCK_TEXT_PREFIX,
     STOCK_TEXT_SUFFIX,
 )
-from pd_transgear_arm_notes import DIMENSION_CALLOUTS, NOTES_TEXT, PLATE_TAP_QUALIFIER
+from pd_transgear_arm_notes import (
+    DIMENSION_CALLOUTS,
+    NOTES_TEXT,
+    PIN_MOUTH_CALLOUT,
+    PLATE_TAP_QUALIFIER,
+)
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -270,10 +274,10 @@ SECTION_KEEP = {
         SECTION_CENTER[1] - 0.016,
     ),
 }
-# Its left edge stands 12 mm right of the line.  SOLIDWORKS centres its two
-# lines (the value, and the link to note 4) on this point, over the sheet's
-# fit notes.
-FLOOR_TEXT_XY = (0.075, 0.059)
+# Its left edge stands ~12 mm right of the line.  SOLIDWORKS centres its two
+# lines (the value, and the link to note 4 on sheet 2) on this point; 6 mm
+# right of 0.075 since the link names the notes' sheet (round 4).
+FLOOR_TEXT_XY = (0.081, 0.059)
 # Section A-A's column right of the stud bore, where both its frames stand.
 _STUD_FRAME_X = _front_x(PIN_STATION) + 0.012
 END_KEEP = {
@@ -741,34 +745,60 @@ def _section_caption(view: Any, label: str) -> tuple[Any, str]:
 
 @_telemetry.traced("drawing.transgear_arm.section_captions_without_scale")
 def _section_captions_without_scale(adapter: Any, sections: dict[str, Any]) -> None:
-    """Give each section's native caption the name line only (its scale is
-    the sheet's), so A-A, B-B and D-D read alike."""
+    """Give each section's native caption its name and letters only (its
+    scale is the sheet's), so A-A, B-B and D-D read alike; B-B stacks them
+    (SECTION_CAPTION_TEXTS).  Line breaks read back as CR LF."""
     for label, view in sections.items():
         note, linked_text = _section_caption(view, label)
-        if linked_text != SECTION_CAPTION_TEXT:
-            note.PropertyLinkedText = SECTION_CAPTION_TEXT
+        if linked_text.replace("\r", "") != SECTION_CAPTION_TEXTS[label]:
+            note.PropertyLinkedText = SECTION_CAPTION_TEXTS[label]
     rebuild_drawing(adapter, label="section captions without scale")
     for label, view in sections.items():
-        if _section_caption(view, label)[1] != SECTION_CAPTION_TEXT:
+        if _section_caption(view, label)[1].replace("\r", "") != SECTION_CAPTION_TEXTS[label]:
             raise RuntimeError(f"section {label} caption without scale did not persist")
 
 
-@_telemetry.traced("drawing.transgear_arm.pin_section_caption_settled")
-def _pin_section_caption_settled(adapter: Any, section: Any) -> None:
-    """After finalize_drawing's last sheet-scale reset and rebuild: hang
-    section D-D's caption, centred, under its cut face (bounded measured
-    moves, then one final check of the resolved extent), inside the sheet,
-    with its linked name line. ``INote.GetText`` reads the linked fields
-    blank even here (run 20261027T215106763Z: ' \\r\\n '), so the resolved
-    text is evidenced by its extent: one line, as A-A's."""
-    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateSheet(SHEET_NAMES[1]):
-        raise RuntimeError("cannot activate the pin-bore section sheet")
-    note, linked_text = _section_caption(section, "D-D")
-    half = edge_half_width(PIN_STATION) * _S / 1000.0
-    target = (
-        PIN_SECTION_CENTER[0],
-        PIN_SECTION_CENTER[1] - half - _PIN_CAPTION_GAP_M,
-    )
+# Each section's caption hangs centred under its cut, its top this far below
+# the cut face (round 4: SolidWorks left B-B's caption 17 mm under its view,
+# pressed against section A-A's right end beside A-A's (.33), and A-A's
+# caption down against the title block's top edge).  B-B's caption stacks its
+# name over its letters, narrow enough to stand ~11 mm clear of A-A's end.
+_SECTION_CAPTION_GAP_M = {"A-A": 0.004, "B-B": 0.004, "D-D": _PIN_CAPTION_GAP_M}
+SECTION_CAPTION_TEXTS = {
+    "A-A": SECTION_CAPTION_TEXT,
+    "B-B": "<VLNAME>\n<VLLABEL>",
+    "D-D": SECTION_CAPTION_TEXT,
+}
+
+
+def section_caption_targets() -> dict[str, tuple[int, tuple[float, float]]]:
+    """Each section's sheet index and its caption's top-centre target."""
+    halves = {
+        "A-A": (0, SECTION_CENTER, THICKNESS / 2.0),
+        "B-B": (0, LOCATOR_SECTION_CENTER, edge_half_width(LOCATOR_SITES_MM[0][0])),
+        "D-D": (1, PIN_SECTION_CENTER, edge_half_width(PIN_STATION)),
+    }
+    return {
+        label: (
+            sheet,
+            (centre[0], centre[1] - half_mm * _S / 1000.0 - _SECTION_CAPTION_GAP_M[label]),
+        )
+        for label, (sheet, centre, half_mm) in halves.items()
+    }
+
+
+@_telemetry.traced("drawing.transgear_arm.section_caption_settled", label_param="label")
+def _section_caption_settled(adapter: Any, section: Any, *, label: str) -> None:
+    """After finalize_drawing's last sheet-scale reset and rebuild: hang a
+    section's caption, centred, under its cut face (bounded measured moves,
+    then one final check of the resolved extent), inside the sheet, with its
+    linked name line. ``INote.GetText`` reads the linked fields blank even
+    here (run 20261027T215106763Z: ' \\r\\n '), so the resolved text is
+    evidenced by its extent: at least one line tall."""
+    sheet, target = section_caption_targets()[label]
+    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateSheet(SHEET_NAMES[sheet]):
+        raise RuntimeError(f"cannot activate section {label}'s sheet")
+    note, linked_text = _section_caption(section, label)
 
     def miss() -> tuple[tuple[float, ...], tuple[float, float]]:
         extent = tuple(float(value) for value in note.GetExtent())
@@ -776,17 +806,17 @@ def _pin_section_caption_settled(adapter: Any, section: Any) -> None:
 
     for move in range(_CAPTION_MOVES):
         extent, error = miss()
-        _telemetry.info(f"section D-D caption move {move}: extent {extent}, off {error}")
+        _telemetry.info(f"section {label} caption move {move}: extent {extent}, off {error}")
         if max(map(abs, error)) < _CAPTION_SETTLE_M:
             break
-        move_annotation(adapter, note.GetAnnotation(), *error, label="section D-D caption")
+        move_annotation(adapter, note.GetAnnotation(), *error, label=f"section {label} caption")
     extent, error = miss()
     if max(map(abs, error)) >= _CAPTION_SETTLE_M:
-        raise RuntimeError(f"section D-D caption stands at {extent}, its top centre asked at {target}")
-    require_inside("section D-D caption", (extent[0], extent[1], extent[3], extent[4]), sheet_region(adapter))
+        raise RuntimeError(f"section {label} caption stands at {extent}, its top centre asked at {target}")
+    require_inside(f"section {label} caption", (extent[0], extent[1], extent[3], extent[4]), sheet_region(adapter))
     if str(note.PropertyLinkedText or "") != linked_text or extent[4] - extent[1] < _CAPTION_ONE_LINE_MIN_M:
-        raise RuntimeError(f"section D-D caption {linked_text!r} resolved to {extent}")
-    _telemetry.info(f"section D-D caption at {extent}")
+        raise RuntimeError(f"section {label} caption {linked_text!r} resolved to {extent}")
+    _telemetry.info(f"section {label} caption at {extent}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -1034,7 +1064,10 @@ async def build(adapter: Any) -> dict[str, str]:
         # thread and drill.
         redundant_note_substrings=("Tapped Hole",),
         expected_redundant_notes=len(TAP_CALLOUTS) * len(SHEET_NAMES),
-        settled_checks=(lambda: _pin_section_caption_settled(adapter, pin_section),),
+        settled_checks=tuple(
+            lambda view=view, label=label: _section_caption_settled(adapter, view, label=label)
+            for label, view in (("A-A", section), ("B-B", locator_section), ("D-D", pin_section))
+        ),
     )
     return artefacts
 

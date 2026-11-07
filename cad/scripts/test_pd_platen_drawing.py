@@ -64,7 +64,8 @@ def test_printed_guide_and_screw_numbers_resolve_to_the_registered_parts() -> No
     registered = {row["number"] for row in _config.parts().values()}
     printed = set(
         re.findall(
-            r"\bMHA-[A-Z0-9]+(?:-[A-Z0-9]+)+\b", draw.GUIDE_CALLOUT_PROCESS
+            r"\bMHA-[A-Z0-9]+(?:-[A-Z0-9]+)+\b",
+            draw.GUIDE_CALLOUT_PROCESS + draw.GUIDE_CBORE_SUFFIX,
         )
     )
     assert printed <= registered, printed - registered
@@ -392,11 +393,26 @@ def test_hole_table_mates_match_the_registered_patterns_and_callouts():
             assert mate == guide
             assert mate in re.findall(pattern, draw.GUIDE_CALLOUT_PROCESS)
     assert _config.parts("sh-vn-brass-fillister-screw")["number"] in (
-        draw.GUIDE_CALLOUT_PROCESS
+        draw.GUIDE_CBORE_SUFFIX
     )
     # A number fits its MATE cell at ~2.55 mm a character plus the cell's air.
     widest = max(len(mate) for mate in draw.HOLE_TABLE_MATES.values())
     assert widest * 0.00255 + 0.004 <= draw.HOLE_TABLE_WIDTHS[draw._HOLE_TABLE_MATE_INDEX]
+
+
+def test_counterbore_side_follows_its_symbol_row_not_words():
+    # Round 4 (rule 26): the counterbore is its symbol, never the word C'BORE;
+    # its side and screw follow its depth on the symbol row.
+    assert "C'BORE" not in draw.GUIDE_CALLOUT_PROCESS + draw.GUIDE_CBORE_SUFFIX
+    assert "DRILL" not in draw.GUIDE_CALLOUT_PROCESS
+    row = "<HOLE-CBORE> <MOD-DIAM><hw-cbdia> <HOLE-DEPTH> <hw-cbdepth>"
+    definitions = {5: "<MOD-DIAM><hw-diam> <hw-thru>", 6: "", 7: "", 8: row}
+    part, updated = draw.counterbore_side_definition(definitions)
+    assert (part, updated) == (8, f"{row} {draw.GUIDE_CBORE_SUFFIX}")
+    with pytest.raises(RuntimeError, match="single counterbore depth"):
+        draw.counterbore_side_definition({**definitions, 8: f"{row} {draw.GUIDE_CBORE_SUFFIX}"})
+    with pytest.raises(RuntimeError, match="does not close"):
+        draw.counterbore_side_definition({**definitions, 8: f"{row}\nMORE TEXT"})
 
 
 def _tag_box(station, width=0.008, height=0.0035):
