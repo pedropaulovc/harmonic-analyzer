@@ -118,9 +118,12 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:3"
 RELIEF_WIDTH_CALLOUT = "TOP RELIEF\nCTR ON PIVOT\nOPEN THRU\nPIVOT END"
 PIVOT_BORE_CALLOUT_BELOW = ("RUNNING FIT ON MHA-DT-VN-52 SHOULDER",)
 POST_MOUNT_LOCATING_CALLOUT = "LOCATES MHA-DT-05 CONE PIVOT POST"
-# A drawing number identifies the hold-down's mate without lengthening its
-# leader shelf into the title block.
-HOLDDOWN_CALLOUT_BELOW = ("FROM UNDERSIDE", "LOCATES MHA-DT-21")
+# The hold-down's +-.004 stations are tighter than the shop's +-.005
+# drilled-hole row, so the hole is spotted from its mate MHA-DT-21 at
+# assembly (delegated ruling 2026-11-07 (Main), no precedent; owner review
+# #2144); MHA-DT-00's step does the spotting.  The drawing number names the
+# mate without lengthening the row into the title block.
+HOLDDOWN_CALLOUT_BELOW = ("FROM UNDERSIDE", "SPOT FROM MHA-DT-21")
 # The process belongs to the THRU row, not the counterbore-diameter row.
 HOLDDOWN_PROCESS = "DRILL"
 PIVOT_PROCESS = "REAM"
