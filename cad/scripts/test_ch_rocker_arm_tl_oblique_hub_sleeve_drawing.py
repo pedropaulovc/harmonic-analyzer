@@ -69,7 +69,8 @@ def test_wall_and_length_match_the_riser() -> None:
     length = spec.DIMENSION_CALLOUTS["SleeveLength"]
     assert f"MATCH RISER {spec.RISER_NUMBER}" in length
     assert "THICKNESS AT HUB" in length and "BELOW ITS TOP" in length
-    assert "HUB STUD " + stud.NUMBER in spec.DIMENSION_CALLOUTS["SleeveBore"]
+    bore = " ".join(spec.DIMENSION_CALLOUTS["SleeveBore"].split())
+    assert "HUB STUD " + stud.NUMBER in bore
 
 
 def test_od_keeps_its_xxx_row_for_the_cutter_and_says_so() -> None:
