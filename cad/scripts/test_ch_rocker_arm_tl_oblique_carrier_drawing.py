@@ -822,7 +822,7 @@ def test_added_left_clamp_is_a_blind_full_thread_receiver_on_its_own_sheet() -> 
     assert drawing.LEFT_CLAMP_DIMENSIONS == {"LeftClampX", "LeftClampY"}
     source = inspect.getsource(drawing._left_clamp_sheet)
     assert "add_native_hole_callout" in source
-    assert "_left_clamp_depth_callout(callout)" in source
+    assert "_left_clamp_depth_callout(callout, source_thread_tolerance=" in source
     assert "expected_sheet_names=SHEET_NAMES" in inspect.getsource(drawing.build)
 
 
@@ -857,7 +857,7 @@ def raw_dimension_binding(monkeypatch):
     return retained
 
 
-@pytest.mark.parametrize("persisted_precision", [3, 2])
+@pytest.mark.parametrize("persisted_precision", [3, 2, -2])
 def test_thread_min_is_authored_and_read_back_on_the_model(
     monkeypatch, raw_dimension_binding, persisted_precision: int,
 ) -> None:
@@ -886,9 +886,14 @@ def test_thread_min_is_authored_and_read_back_on_the_model(
     )
     if persisted_precision == 3:
         part._author_left_clamp_thread_min(None)
+        assert part._require_left_clamp_thread_min(None, stage="drawing source reopened") == 5
     else:
-        with pytest.raises(RuntimeError, match="source-model thread-depth MIN did not persist"):
+        with pytest.raises(
+            RuntimeError, match="source-model thread-depth MIN did not persist",
+        ) as error:
             part._author_left_clamp_thread_min(None)
+        assert f"precision={persisted_precision}" in str(error.value)
+        assert "tolerance_type=5" in str(error.value)
     assert tolerance.Type == spec.LEFT_CLAMP_THREAD_TOL_TYPE == 5
     assert values == [(0.0, 0.0)]
     assert requested_precision == [(3, -1, -1, -1)]
@@ -898,40 +903,134 @@ def test_thread_min_is_authored_and_read_back_on_the_model(
 
 
 @pytest.mark.parametrize("source_thread_tolerance", [5, 0])
-def test_drawing_preserves_source_min_and_never_repairs_it(
-    monkeypatch, source_thread_tolerance: int,
+@pytest.mark.parametrize("reject_callout_tolerance", [False, True])
+@pytest.mark.parametrize("reject_callout_precision", [False, True])
+def test_drawing_presents_only_verified_source_min(
+    monkeypatch, source_thread_tolerance, reject_callout_tolerance, reject_callout_precision,
 ) -> None:
-    import win32com.client.dynamic
+    tolerance_writes = []
 
     class Variable:
-        def __init__(self, name, nominal, tolerance):
+        def __init__(self, name, nominal):
             self.VariableName = name
             self.Length = nominal / 1000.0
-            self.Precision = 0
-            self._tolerance = tolerance
-            self._oleobj_ = self
+            self._precision = 0
+            self._tolerance = 0  # callout presentation does NOT inherit model MIN
+
+        @property
+        def Precision(self):
+            return self._precision
+
+        @Precision.setter
+        def Precision(self, value):
+            self._precision = 2 if reject_callout_precision else value
 
         @property
         def ToleranceType(self):
             return self._tolerance
 
         @ToleranceType.setter
-        def ToleranceType(self, _value):
-            raise AssertionError("drawing must not assign a source-model tolerance")
+        def ToleranceType(self, value):
+            assert self.VariableName == "hw-threaddepth", "pilot must not gain a tolerance"
+            tolerance_writes.append(value)
+            if not reject_callout_tolerance:
+                self._tolerance = value
 
-    thread = Variable("hw-threaddepth", spec.LEFT_CLAMP_THREAD_DEPTH, source_thread_tolerance)
-    pilot = Variable("hw-tapdrldepth", spec.LEFT_CLAMP_DRILL_DEPTH, 0)
+    thread = Variable("hw-threaddepth", spec.LEFT_CLAMP_THREAD_DEPTH)
+    pilot = Variable("hw-tapdrldepth", spec.LEFT_CLAMP_DRILL_DEPTH)
     callout = SimpleNamespace(GetHoleCalloutVariables=lambda: (thread, pilot))
-    monkeypatch.setattr(win32com.client.dynamic, "Dispatch", lambda value: value)
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    if source_thread_tolerance == 5:
-        drawing._left_clamp_depth_callout(callout)
+    if source_thread_tolerance != 5:
+        with pytest.raises(RuntimeError, match="cannot present an unverified source MIN"):
+            drawing._left_clamp_depth_callout(
+                callout, source_thread_tolerance=source_thread_tolerance,
+            )
+        assert tolerance_writes == []
+        assert thread.Precision == 0
+    elif reject_callout_tolerance or reject_callout_precision:
+        with pytest.raises(
+            RuntimeError, match="source depth precision/tolerance was not preserved",
+        ) as error:
+            drawing._left_clamp_depth_callout(
+                callout, source_thread_tolerance=source_thread_tolerance,
+            )
+        assert f"precision=0->{thread.Precision}" in str(error.value)
+        assert f"tolerance_type=0->{thread.ToleranceType}" in str(error.value)
+        assert tolerance_writes == [5]
+    else:
+        drawing._left_clamp_depth_callout(
+            callout, source_thread_tolerance=source_thread_tolerance,
+        )
         assert thread.Precision == 3
         assert pilot.Precision == 2
-    else:
-        with pytest.raises(RuntimeError, match="source depth precision/tolerance was not preserved"):
-            drawing._left_clamp_depth_callout(callout)
-    assert thread.ToleranceType == source_thread_tolerance
+        assert thread.ToleranceType == 5
+        assert tolerance_writes == [5]
+    assert pilot.ToleranceType == 0
+    assert thread.Length == spec.LEFT_CLAMP_THREAD_DEPTH / 1000.0
+
+
+def test_thread_min_guards_span_format_save_and_reopen() -> None:
+    source = inspect.getsource(part.build)
+    assert source.index("apply_drawing_precision(") < source.index(
+        'stage="after drawing precision"'
+    ) < source.index("save_part_and_images(") < source.index(
+        'stage="after final part save"'
+    )
+    source = inspect.getsource(drawing.build)
+    assert source.index("adapter.open_model(") < source.index(
+        'stage="drawing source reopened"'
+    ) < source.index("new_project_drawing(")
+    assert "_author_left_clamp_thread_min" not in source
+    assert "source_thread_tolerance = _require_left_clamp_thread_min(" in source
+    assert "source_thread_tolerance=source_thread_tolerance" in source
+
+
+@pytest.mark.parametrize("tolerance_type,lower,upper", [(0, 0.0, 0.0), (5, -0.001, 0.0), (5, 0.0, 0.001)])
+def test_saved_thread_min_guard_reports_actual_limits(
+    monkeypatch, raw_dimension_binding, tolerance_type, lower, upper,
+) -> None:
+    tolerance = SimpleNamespace(
+        Type=tolerance_type, GetMinValue=lambda: lower, GetMaxValue=lambda: upper,
+    )
+    display = raw_dimension_binding(
+        SimpleNamespace(GetPrimaryPrecision2=lambda: 3), "IDisplayDimension",
+    )
+    dimension = raw_dimension_binding(SimpleNamespace(Tolerance=tolerance), "IDimension")
+    monkeypatch.setattr(part, "_left_clamp_thread_dimension", lambda _adapter: (display, dimension))
+    with pytest.raises(RuntimeError, match="source-model thread-depth MIN did not persist") as error:
+        part._require_left_clamp_thread_min(None, stage="after final part save")
+    for expected in (
+        "stage='after final part save'", f"tolerance_type={tolerance_type}",
+        f"lower_m={lower!r}", f"upper_m={upper!r}",
+    ):
+        assert expected in str(error.value)
+
+
+def test_callout_trace_is_read_only_and_reports_native_values(monkeypatch) -> None:
+    import win32com.client.dynamic
+
+    class Variable:
+        _oleobj_ = property(lambda self: self)
+        VariableName = property(lambda self: "hw-threaddepth")
+        Length = property(lambda self: 0.007874)
+        Precision = property(lambda self: -2)
+        ToleranceType = property(lambda self: 0)
+
+    messages = []
+    monkeypatch.setattr(win32com.client.dynamic, "Dispatch", lambda value: value)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing._telemetry, "info", messages.append)
+    callout = SimpleNamespace(
+        GetHoleCalloutVariables=lambda: (Variable(),),
+        GetText=lambda part: "<hw-threaddepth>" if part == 5 else ".310",
+    )
+    drawing._trace_left_clamp_callout(callout, stage="native callout created")
+    assert len(messages) == 1
+    for expected in (
+        "stage='native callout created'", "'length_m': 0.007874",
+        "'precision': -2", "'tolerance_type': 0", "<hw-threaddepth>",
+    ):
+        assert expected in messages[0]
 
 
 def test_finished_hub_bore_and_controlled_chamfer_clear_the_stud_root() -> None:
