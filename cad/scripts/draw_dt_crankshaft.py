@@ -83,19 +83,16 @@ from dt_crankshaft_notes import (
     DRIVE_PIN_CALLOUT,
     DRIVE_PIN_DEPTH_BAND,
     FIDUCIAL_NOTE,
+    FIT_CALLOUT,
     JOURNAL_FIT,
-    JOURNAL_ROUTE,
     KNOCKOUT_CALLOUT_ABOVE,
     KNOCKOUT_CALLOUT_BELOW,
     NECK_LANDS,
     NECKS,
     PINION_PIN_CALLOUT,
-    PINION_SEAT_FIT,
-    PINION_SEAT_ROUTE,
     SHAFT_LENGTH_MATE,
-    SHANK_FIT,
-    SHANK_ROUTE,
     SHEET_NOTES,
+    SLIDING_FIT,
     SPIGOT_CALLOUT,
 )
 from dt_crankshaft_spec import (
@@ -301,15 +298,18 @@ DIAMETER_POSITIONS = {
     "CollarDiaDim": (SPIGOT_END_X + 0.002, 0.2075),
     "NeckDiaDim": (JOURNAL_END_X + 0.0006, 0.230),
 }
-# Each fit diameter names its fit and mate above the value and its route and
-# clearance under it (drawing-guidelines.md rule 4; rule 7: two lines of
-# words); the bare necks carry their own loose diameter.  The 2X Ø11.388
-# names both bearing lands across the relief.  The spigot's diameter and
-# length link note 2, the chain they clear.
+# Each fit diameter keeps its fit name above its value and links numbered
+# note 3 (each mate, the matched-fit route and the clearance) under it, so
+# each block stays as narrow as its value row: the #9 cross-hole's leader
+# passes right of the Ø.3750's block and the 16T pin note's leader right of
+# the Ø.3125's (farm round 1: the 116-mm route rows ran through both).  The
+# bare necks carry their own loose diameter.  The 2X Ø.4490 names both
+# bearing lands across the relief.  The spigot's diameter and length link
+# note 2, the chain they clear.
 CALLOUTS_ABOVE = {
-    "ShaftDiaDim": SHANK_FIT,
+    "ShaftDiaDim": SLIDING_FIT,
     "JournalDiaDim": JOURNAL_FIT,
-    "PinionSeatDiaDim": PINION_SEAT_FIT,
+    "PinionSeatDiaDim": SLIDING_FIT,
     "NeckDiaDim": NECKS,
 }
 # The drive-pin locations print their value and band only (drawing-guidelines.md
@@ -317,9 +317,9 @@ CALLOUTS_ABOVE = {
 CALLOUTS_BELOW = {
     "OverallLength": "OVERALL",
     "SpigotLength": SPIGOT_CALLOUT,
-    "ShaftDiaDim": SHANK_ROUTE,
-    "JournalDiaDim": JOURNAL_ROUTE,
-    "PinionSeatDiaDim": PINION_SEAT_ROUTE,
+    "ShaftDiaDim": FIT_CALLOUT,
+    "JournalDiaDim": FIT_CALLOUT,
+    "PinionSeatDiaDim": FIT_CALLOUT,
     "SpigotDiaDim": SPIGOT_CALLOUT,
     "NeckDiaDim": NECK_LANDS,
 }
@@ -388,11 +388,13 @@ WIZARD_CALLOUT_PRECISION = {"hw-diam": 3}
 # text and left of the dome's extension line (x 0.0897).
 # Its leader leaves the text's left end up-left to the lower hole's floor.
 KNOCKOUT_CALLOUT_XY = (0.064, 0.115)
-# The punch-mark note's two rows (~55 mm) sit, anchored upper-left, below the
-# knockout callout (bottom ~0.105) and above the general note, left of the
-# side view's baseline rows; its leader rises left of the knockout text to
-# the mark at about 225 deg on the dome.
-FIDUCIAL_NOTE_XY = (0.0145, 0.099)
+# The punch-mark note's two rows (~53 mm) sit, anchored upper-left, below the
+# knockout callout (its last row at y ~0.107) and left of the dome's extension
+# line (x 0.0897).  The mark lies left of the text's middle, so the leader
+# leaves the text's left end and rises steeply to the mark at about 225 deg on
+# the dome: clear of its own first row, and left of the knockout callout's
+# leader (x 0.036-0.038) all the way up.
+FIDUCIAL_NOTE_XY = (0.022, 0.100)
 # The 16T retention-pin hole is match-drilled through the seated pinion's
 # radial hole at assembly; its callout (dt_crankshaft_notes.PINION_PIN_CALLOUT)
 # gives the REF size, the operation, the pinion hole that locates it and the

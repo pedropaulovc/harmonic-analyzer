@@ -1203,13 +1203,20 @@ def process_after_size(definitions: dict[int, str], process: str, *, label: str)
 
     Rule 26 orders a hole callout size, process, depth: ``Ø.2500 +.0005/.0000
     REAM THRU ALL``, ``Ø.120 DRILL THRU ALL``.  The size and depth stay
-    native and associative.
+    native and associative: the Hole Wizard writes the depth as its
+    ``<hw-thru>`` variable (round 1 seat: ``<MOD-DIAM> <hw-diam> <hw-thru>``),
+    or as literal THRU text.
     """
-    thru_parts = [part for part in (5, 6, 7) if "THRU" in definitions[part].upper()]
+    # Exactly "<hw-thru>", so "<hw-thruholedia>" (the hold-down's drill size)
+    # is neither the depth token nor a second THRU row.
+    thru = re.compile(r"<hw-thru>|\bTHRU\b")
+    thru_parts = [part for part in (5, 6, 7) if thru.search(definitions[part])]
     if len(thru_parts) != 1:
         raise RuntimeError(f"{label}: THRU row is not one upper part: {definitions!r}")
     part = thru_parts[0]
-    updated, count = re.subn(r"\bTHRU\b", f"{process} THRU", definitions[part], count=1)
+    updated, count = thru.subn(
+        lambda match: f"{process} {match.group(0)}", definitions[part], count=1
+    )
     if count != 1:
         raise RuntimeError(f"{label}: no THRU token in {definitions[part]!r}")
     return {**definitions, part: updated}

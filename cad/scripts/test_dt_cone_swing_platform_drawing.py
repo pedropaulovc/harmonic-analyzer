@@ -667,7 +667,7 @@ def _holddown_x_text_box() -> tuple[float, float, float, float]:
 
 
 # The hold-down callout's widest row: DRILL Ø3.05 THRU ALL at 50.0 mm (r8),
-# or the mate row LOCATES MHA-DT-21, not yet printed (~47..52 mm).  The
+# or the mate row SPOT FROM MHA-DT-21 (19 characters, ~46..52 mm).  The
 # underline's left end, where the leader leaves, stands 1.6 mm before it.
 _CALLOUT_HALF_WIDTHS = (0.0250, 0.0262)
 _CALLOUT_SHOULDER = 0.0016
@@ -1603,7 +1603,7 @@ def test_holddown_callout_drills_in_its_thru_row_and_names_face_and_mate() -> No
     updated = drawing.holddown_callout_definitions(dict(_CBORE_PARTS))
     assert updated[5] == _CBORE_PARTS[5]
     assert updated[7] == "<MOD-DIAM><hw-diam> DRILL THRU ALL"
-    assert updated[8] == "FROM UNDERSIDE\nLOCATES MHA-DT-21"
+    assert updated[8] == "FROM UNDERSIDE\nSPOT FROM MHA-DT-21"
     counted = drawing.holddown_callout_definitions(
         {**_CBORE_PARTS, 7: "<NUM_INST>X <MOD-DIAM><hw-diam> THRU ALL"}
     )
@@ -1614,6 +1614,20 @@ def test_holddown_callout_drills_in_its_thru_row_and_names_face_and_mate() -> No
     )
     assert pivot[5] == "<MOD-DIAM><hw-diam> REAM THRU ALL"
     assert pivot[8] == "RUNNING FIT ON MHA-DT-VN-52 SHOULDER"
+    # Round 1 seat: the Hole Wizard writes the depth as its <hw-thru> token.
+    native = drawing.pivot_callout_definitions(
+        {5: "<MOD-DIAM> <hw-diam> <hw-thru>", 6: "", 7: "", 8: ""}
+    )
+    assert native[5] == "<MOD-DIAM> <hw-diam> REAM <hw-thru>"
+    holddown = drawing.holddown_callout_definitions(
+        {
+            5: "<HOLE-CBORE><MOD-DIAM><hw-cbdia> <HOLE-DEPTH><hw-cbdepth>",
+            6: "",
+            7: "<MOD-DIAM><hw-thruholedia> <hw-thru>",
+            8: "",
+        }
+    )
+    assert holddown[7] == "<MOD-DIAM><hw-thruholedia> DRILL <hw-thru>"
     # Fail closed on a layout the rewrite was not written for.
     with pytest.raises(RuntimeError, match="already prints below"):
         drawing.holddown_callout_definitions({**_CBORE_PARTS, 8: "X"})

@@ -142,19 +142,19 @@ FRONT_BBOX_CX = (TENON_X0 + OAK_END_X) / 2.0
 FRONT_CENTER = (0.162, 0.130)
 RIGHT_CENTER = (0.362, FRONT_CENTER[1])
 # Detail B took the upper right, so the lower left holds, top down: the
-# fitted tenon's three-row callout (keep y 0.078, ~16 mm tall: y
-# ~0.070..0.086, x ~0.048..0.131), the numbered notes (top-left anchored at
-# y 0.064, three rows of 2.5 mm characters, ~113 x 17 mm), the section's
+# fitted tenon's four-row callout (keep y 0.078, ~22 mm tall: y
+# ~0.067..0.089, x ~0.048..0.131), the numbered notes (top-left anchored at
+# y 0.062, two rows of 2.5 mm characters, ~117 x 11 mm), the section's
 # caption (top-centre anchored, one row now that the scale equals the
 # sheet's, top y 0.043) and the isometric's note (top y 0.026).  The 1:1
 # isometric (~49 x 35 mm, -0.020/+0.0152 about its centre in y) moves right,
 # x ~0.148..0.197, y ~0.016..0.051: 7 mm under the reamed bore's block (y
 # >= 0.058), 19 mm left of the title block (x 0.216), clear of the notes'
-# right end (x ~0.132).
+# right end (x ~0.133).
 ISO_CENTER = (0.172, 0.036)
 ISO_NOTE_POS = (0.016, 0.026)
 CAPTION_XY = (0.045, 0.043)
-NOTES_XY = (0.016, 0.064)
+NOTES_XY = (0.016, 0.062)
 
 END_R = HANDLE_MAX_DIA * _S / 2.0
 
@@ -191,7 +191,7 @@ _ROW = (0.195, 0.205, 0.242, 0.250, 0.258)
 _SHELF = 0.0015
 _BELOW = 0.098
 _CALLOUT_ROW = 0.080
-# The fitted tenon's three-row block (~16 mm tall, centred on its keep) hangs
+# The fitted tenon's four-row block (~22 mm tall, centred on its keep) hangs
 # under the shoulder and waist shelves' shoulder lines (y 0.0951), over the
 # numbered notes.  MHA-DT-08 machinist review of 1bdd4e8d7: on the shared
 # callout row its "(Ø.299)" stood 1.2 mm into those shoulders.

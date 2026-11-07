@@ -535,6 +535,10 @@ def test_retention_pin_note_clears_the_profile_and_title_block() -> None:
     for name, (dx, dy) in drawing.DIAMETER_POSITIONS.items():
         if dx > x0 - 0.030:
             assert bottom > dy + 0.010, name
+    # The leader starts at the end of the last row (farm round 1), so that
+    # row is the longest: the leader then drops from the text's right end,
+    # right of the Ø.3125's block and still left of the isometric.
+    assert len(lines[-1]) == max(map(len, lines))
 
 
 def test_note_text_is_shifted_into_its_field_from_the_measured_box() -> None:

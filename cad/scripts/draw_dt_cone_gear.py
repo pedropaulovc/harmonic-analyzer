@@ -47,6 +47,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     view_name,
 )
 
+import _config
 from _check import check
 from _com import _early_bound, _read_member
 from _cone_gear_readback import assert_saved_configuration_topology
@@ -88,9 +89,11 @@ from _pdf_ink import PageInk, read_pdf_ink
 from _session import run_build
 import _telemetry
 from cone_shaft_land_bands import FLAT_AF_BAND, SECTION_DIA_BANDS
-from dt_cone_gear_notes import CUTTER_DETAIL_SHEET
+from dt_cone_gear_notes import CUTTER_DETAIL_SHEET, T006_NUMBER
 from dt_cone_gear_spec import (
     BORE_AF_BAND,
+    BORE_AF_PLACES,
+    BORE_BAND_PLACES,
     BORE_DIA_BAND,
     CUSTOM_SIX_FORM_TOLERANCE_NOTE,
     CONFIGURATION_TEETH,
@@ -104,6 +107,7 @@ from dt_cone_gear_spec import (
     blank_dia_band,
     inch_text,
     tooth_thickness_band,
+    bore_flat_af_mm,
     bore_flat_offset_mm,
     floor_limits_mm,
     gap_floor_deviations_mm,
@@ -485,6 +489,7 @@ def cutter_grind_data() -> str:
     root = template.root_radius_mm
     junction = template.relief_junction_radius_mm
     return "\n".join((
+        f"{T006_NUMBER}, CONTINUED FROM SHEET {SHEET_NAMES.index('T006') + 1}:",
         "T006 TOOTH SPACE FORM, INCH",
         "SYMMETRIC ABOUT THE SPACE CENTERLINE (CL):",
         "X ACROSS CL, Y ALONG CL FROM THE ROOT,",
@@ -516,6 +521,9 @@ def cutter_grind_data() -> str:
 # and root): note 1 holds the D-bore's fit on MHA-DT-04, note 2 the teeth's
 # mesh with MHA-DT-12 (``sheet_notes``).
 SHAFT_MATE = "MHA-DT-04"
+# A matched pair names its mate by name and number (rule 4; round-1 review
+# of the fan-out: note 1 named MHA-DT-04 by number only, and no land).
+SHAFT_NAME = str(_config.parts("dt-cone-gear-shaft")["title"]).upper()
 CYLINDER_MATE = "MHA-DT-12"
 BORE_NOTE_NUMBER = 1
 TEETH_NOTE_NUMBER = 2
@@ -598,9 +606,14 @@ def sheet_notes(teeth: int) -> str:
     over-pins and assembly backlash acceptances in GEAR DATA.
     """
     (round_min, round_max), (flat_min, flat_max) = bore_clearances_mm(teeth)
+    land = (
+        f"\u00d8{inch_text(bore_dia_mm(teeth), BORE_BAND_PLACES)} LAND, "
+        f"{inch_text(bore_flat_af_mm(teeth), BORE_AF_PLACES)} ACROSS FLAT"
+    )
     return "\n".join((
-        f"{BORE_NOTE_NUMBER}. SLIDING FIT ON {SHAFT_MATE}: BORE AND FLAT MADE TO THE MEASURED LAND",
-        f"   (CLEARANCE {_inch_limits(round_min, round_max)} ON \u00d8, "
+        f"{BORE_NOTE_NUMBER}. SLIDING FIT ON {SHAFT_NAME} {SHAFT_MATE}, {land}:",
+        "   BORE AND FLAT MADE TO THE MEASURED LAND "
+        f"(CLEARANCE {_inch_limits(round_min, round_max)} ON \u00d8, "
         f"{_inch_limits(flat_min, flat_max)} ACROSS FLAT).",
         f"{TEETH_NOTE_NUMBER}. TEETH MESH WITH {CYLINDER_MATE}: ACCEPT OVER PINS, "
         "THEN BY BACKLASH AT ASSEMBLY,",
@@ -629,6 +642,49 @@ BLANK_DIA_LIFT = 0.0175
 # axis (ENFORCE round 3, T006) the leader ran diagonally from x 134 mm down
 # through the root envelope's block, whose left edge stands at 121 mm.
 BLANK_DIA_SHIFT_X = 0.020
+# The near-side leader lands on the tip circle on the radial through its
+# shoulder's end, which stands this far from the block's centre (sheet
+# metres): right of and below it, the block left of its leader. Measured on
+# the T006 and T012 ink of farm run 20261107T103503238Z (shoulder end 17.3
+# mm right of and 7.3 mm under the point; the arrow on the same radial within
+# 0.1 deg); the block spans BLANK_DIA_BLOCK about its point.
+BLANK_DIA_SHOULDER_FROM_TEXT = (0.0173, -0.0073)
+BLANK_DIA_BLOCK = (-0.0122, -0.0064, 0.0156, 0.0063)
+# T006's six teeth leave a space at 12 o'clock, so its leader landed in air,
+# inside DETAIL B's boundary (round-1 review of the fan-out); the 60 and 120
+# deg tips sit on that boundary, 0 deg carries the thickness and 180 deg the
+# centre-mark line. Its leader lands on the 240 deg tip instead, the block
+# down left, under the front view's outline and over DETAIL A's flat-clock
+# arc, its shoulder end this far from the gear axis.
+T006_BLANK_DIA_TOOTH_DEG = 240.0
+T006_BLANK_DIA_SHOULDER_REACH = 0.046
+
+
+def blank_dia_keep(teeth: int) -> tuple[float, float]:
+    """Sheet point of the tip diameter's text block."""
+    if teeth != 6:
+        return (
+            FRONT_CENTER[0] - BLANK_DIA_SHIFT_X,
+            FRONT_CENTER[1] + rendered_half_od(teeth) + BLANK_DIA_LIFT,
+        )
+    angle = math.radians(T006_BLANK_DIA_TOOTH_DEG)
+    return (
+        FRONT_CENTER[0] + T006_BLANK_DIA_SHOULDER_REACH * math.cos(angle)
+        - BLANK_DIA_SHOULDER_FROM_TEXT[0],
+        FRONT_CENTER[1] + T006_BLANK_DIA_SHOULDER_REACH * math.sin(angle)
+        - BLANK_DIA_SHOULDER_FROM_TEXT[1],
+    )
+
+
+def blank_dia_arrow_deg(teeth: int) -> float:
+    """Angle round the gear axis where the tip diameter's arrow lands."""
+    x, y = blank_dia_keep(teeth)
+    return math.degrees(math.atan2(
+        y + BLANK_DIA_SHOULDER_FROM_TEXT[1] - FRONT_CENTER[1],
+        x + BLANK_DIA_SHOULDER_FROM_TEXT[0] - FRONT_CENTER[0],
+    ))
+
+
 # The functional root-envelope stack stands right of the tip circle,
 # above the thickness witness and the thickness text's shelf
 # (``tooth_thickness_shelf``), and clear of the side
@@ -740,10 +796,7 @@ def front_keep(teeth: int) -> dict[str, tuple[float, float]]:
     half_od = rendered_half_od(teeth)
     keep = {
         "FloorDia": (FRONT_CENTER[0] + half_od + FLOOR_DIA_GAP_X, floor_dia_y(teeth)),
-        "BlankDia": (
-            FRONT_CENTER[0] - BLANK_DIA_SHIFT_X,
-            FRONT_CENTER[1] + half_od + BLANK_DIA_LIFT,
-        ),
+        "BlankDia": blank_dia_keep(teeth),
         # Vertical dimension on the +X tooth: the anchor's x places its
         # line just right of the tip circle. Its y is where the import first
         # hangs the text, below the gear; the text then leaves the line for

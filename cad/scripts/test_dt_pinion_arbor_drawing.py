@@ -283,6 +283,14 @@ def test_every_post_import_name_is_carried_by_a_kept_or_moved_dimension() -> Non
     )
     assert set(drawing.DIMENSION_CALLOUTS) <= carried
     assert set(spec.DRAWING_PRECISION_BY_NAME) == carried | drawing.UNPRINTED_DIMENSIONS
+    # The seat's precision readback expects exactly the printed set (round 1
+    # f08277cd raised on the unprinted drum station).
+    assert set(drawing.PRINTED_PRECISION_BY_NAME) == carried
+    source = inspect.getsource(drawing.build)
+    assert (
+        "assert_imported_precision(adapter, annotations, PRINTED_PRECISION_BY_NAME)"
+        in source
+    )
     assert set(drawing.DIAMETER_POSITIONS) <= carried
     # Every donor diameter moves to the profile, and nothing else moves.
     assert set(drawing.DIAMETER_POSITIONS) == set(drawing.DONOR_KEEP)

@@ -488,8 +488,15 @@ REFERENCE_LENGTHS = {
 }
 # Marked in the model (dt_pinion_arbor_spec.DRAWING_DIMENSIONS) but not
 # imported: the drum station is MHA-DT-00's setting, not this part's.  Its
-# feature owns nothing else, so the targeted import never brings it in.
+# feature owns nothing else, so the targeted import never brings it in, and
+# its sketch stays as the part saved it, hidden.  The precision readback
+# covers only what prints (round 1 f08277cd: the seat raised on it).
 UNPRINTED_DIMENSIONS = frozenset({"DrumStationFromHeadRear"})
+PRINTED_PRECISION_BY_NAME = {
+    name: places
+    for name, places in DRAWING_PRECISION_BY_NAME.items()
+    if name not in UNPRINTED_DIMENSIONS
+}
 # The turning axis runs the full part and this far past each crown.
 AXIS_OVERSHOOT_MM = 3.0
 # Each land's Ra symbol hangs off one flank on the land's head side of its
@@ -1287,7 +1294,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _radius_leader_outside(adapter, detail_annotations, "HeadCapR")
     for name in ARROWS_INSIDE:
         _arrows_inside(adapter, principal_annotations, name)
-    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    assert_imported_precision(adapter, annotations, PRINTED_PRECISION_BY_NAME)
     for name, label in REFERENCE_LENGTHS.items():
         matches = [
             annotation

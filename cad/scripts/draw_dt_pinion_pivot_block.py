@@ -20,6 +20,7 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -162,21 +163,33 @@ FRONT_KEEP = {
     # edge right of the top view.
     "PivotBoreDia": (0.224, 0.205),
     # Up-left of the lift bore, in the clear band left of the top view and
-    # above the lift-bore rise.
-    "LiftBoreDia": (0.045, 0.182),
+    # above the lift-bore rise.  Farm round 1 (f08277cd0ee5) centred the
+    # block at x 0.045: its widest row ran through the inner border (x
+    # ~0.0124) onto zone letter C.  At 0.055 the widest row ("RUNNING FIT ON
+    # MHA-DT-17", ~63 mm) spans ~0.0236..0.0864: 11 mm inside the border and
+    # left of the .728 extension line (x ~0.1025).
+    "LiftBoreDia": (0.055, 0.182),
 }
 RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], FRONT_TOP_Y + 0.00925)}
 TOP_KEEP = {}
 # Each reamed bore: size, then process, then at most two rows of words
 # (rule 7; rule 26 size-process-depth order).  The lift bore's .728/.085
 # locations from the pivot bore carry value and band only; their one reason
-# and its mates ride the lift-bore callout by drawing number (rule 4): the
-# lift rod's eccentric cam MHA-DT-23 parks just clear of the follower pin
-# MHA-DT-25 (dt_pinion_pivot_block_geometry; build_dt_drive_train_assembly
-# park-gap band).  The rod's title gives way to that row: the drawing number
-# names the mate.
+# and its mates go in numbered note 1, flagged from the lift-bore callout
+# (rule 4: mates by drawing number; rule 26: standard words, not a coined
+# "park gap"): the lift rod's eccentric cam MHA-DT-23 parks just clear of
+# the follower pin MHA-DT-25 (dt_pinion_pivot_block_geometry;
+# build_dt_drive_train_assembly's park-gap band).
 CAM_NUMBER = _config.parts("dt-pinion-cam")["number"]
 FOLLOWER_PIN_NUMBER = _config.parts("dt-pinion-cam-pin")["number"]
+LIFT_BORE_NOTE_NUMBER = 1
+LIFT_BORE_NOTE = (
+    f"{LIFT_BORE_NOTE_NUMBER}. .728 AND .085 SET {CAM_NUMBER} TO "
+    f"{FOLLOWER_PIN_NUMBER} CLEARANCE."
+)
+# Upper-left, in the open band under the front view's 1.57 row (y ~0.074)
+# and left of the title block (x 0.216): ~140 mm at the note font.
+LIFT_BORE_NOTE_XY = (0.020, 0.058)
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": "\n".join(
         ("REAM THRU", f"RUNNING FIT ON {PIVOT_SHAFT_MATE[0]}", PIVOT_SHAFT_MATE[1])
@@ -185,7 +198,7 @@ DIMENSION_CALLOUTS = {
         (
             "REAM THRU",
             f"RUNNING FIT ON {LIFT_ROD_MATE[0]}",
-            f"PARK GAP {CAM_NUMBER} TO {FOLLOWER_PIN_NUMBER}",
+            f"SEE NOTE {LIFT_BORE_NOTE_NUMBER}",
         )
     ),
 }
@@ -423,8 +436,10 @@ async def build(adapter: Any) -> dict[str, str]:
         char_height=0.0025,
     )
 
-    # The sheet carries no general notes (DIMENSION_CALLOUTS); only the isometric's
-    # scale override is labelled.
+    # The sheet's one numbered note is the lift-bore stations' reason, flagged
+    # from that bore's callout; the isometric's scale override is labelled.
+    if add_note(adapter, LIFT_BORE_NOTE, *LIFT_BORE_NOTE_XY) is None:
+        raise RuntimeError("failed to add the lift-bore station note")
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(

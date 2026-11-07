@@ -52,7 +52,7 @@ CROSS_HOLE_CALLOUT = see_note(CROSS_HOLE_NOTE_NUMBER)
 CROSS_HOLE_NOTE = "\n".join(
     (
         f"{CROSS_HOLE_NOTE_NUMBER}. TAPER-REAM 1:48 AT ASSEMBLY WITH CRANK HUB MHA-DT-31 FOR PIN",
-        "   MHA-DT-09, DRIVE FIT; STOP WHILE ITS KEEPER RING MHA-DT-27 CLEARS THE HUB.",
+        "   MHA-DT-09, DRIVE FIT; STOP WHILE KEEPER RING MHA-DT-27 CLEARS THE HUB.",
     )
 )
 
@@ -80,30 +80,42 @@ def _clearance(
     )
 
 
-# The three fit diameters.  Each band (.0008 wide) is narrower than the shop's
-# turned-diameter row, so each callout names its fit route (rule 4, "What the
-# shop holds") in its two lines of words (rule 7): the fit and its mate above
-# the value, the route and the clearance from both parts' printed limits
-# under it.  The limits themselves are unchanged.
-def fit_route(clearance: tuple[float, float]) -> str:
-    """The route row under a fit diameter: turned to the mate's measured bore."""
-    least, most = clearance
-    return f"TURN TO MEASURED BORE (CLEARANCE {inch_text(least, 4)}-{inch_text(most, 4)})"
-
-
-SHANK_FIT = "SLIDING FIT IN MHA-DT-31,"
-SHANK_ROUTE = fit_route(_clearance(hub.HUB_BORE_DIA, hub.HUB_BORE_BAND, SHAFT_DIA, SHAFT_DIA_BAND))
-JOURNAL_FIT = "2X RUNNING FIT IN MHA-DT-05,"
-JOURNAL_ROUTE = fit_route(
-    _clearance(JOURNAL_BORE_DIA, JOURNAL_BORE_BAND, JOURNAL_DIA, JOURNAL_DIA_BAND)
-)
-PINION_SEAT_FIT = "SLIDING FIT IN MHA-DT-10,"
-PINION_SEAT_ROUTE = fit_route(
-    _clearance(pinion.BORE_DIA, pinion.BORE_DIA_BAND, PINION_SEAT_DIA, PINION_SEAT_DIA_BAND)
+# Note 3: the three fit diameters.  Each band (.0008 wide) is narrower than
+# the shop's turned-diameter row, so each callout names its fit route (rule 4,
+# "What the shop holds").  Each callout keeps the fit name above its value
+# and SEE NOTE 3 under it.  Note 3 names each mate, the matched route (turn
+# to the mate's measured bore) and the clearance from both parts' printed
+# limits.  The limits themselves are unchanged.  The route cannot ride the
+# callouts: a 45-character row under each diameter ran ~116 mm wide, through
+# the #9 cross-hole's and the 16T pin hole's leaders, the neighbouring blocks
+# and the border (farm round 1 layout audit).  Every block stays as narrow as
+# its value row.
+FIT_NOTE_NUMBER = 3
+FIT_CALLOUT = see_note(FIT_NOTE_NUMBER)
+SLIDING_FIT = "SLIDING FIT"
+JOURNAL_FIT = "2X RUNNING FIT"
+FIT_CLEARANCES = {
+    "MHA-DT-31": _clearance(hub.HUB_BORE_DIA, hub.HUB_BORE_BAND, SHAFT_DIA, SHAFT_DIA_BAND),
+    "MHA-DT-05": _clearance(JOURNAL_BORE_DIA, JOURNAL_BORE_BAND, JOURNAL_DIA, JOURNAL_DIA_BAND),
+    "MHA-DT-10": _clearance(
+        pinion.BORE_DIA, pinion.BORE_DIA_BAND, PINION_SEAT_DIA, PINION_SEAT_DIA_BAND
+    ),
+}
+if len({tuple(round(v, 6) for v in pair) for pair in FIT_CLEARANCES.values()}) != 1:
+    raise AssertionError(f"note 3 states one clearance for three fits: {FIT_CLEARANCES}")
+_FIT_LEAST, _FIT_MOST = next(iter(FIT_CLEARANCES.values()))
+FIT_NOTE = "\n".join(
+    (
+        f"{FIT_NOTE_NUMBER}. TURN EACH FIT TO THE MEASURED MATE BORE (CLEARANCE "
+        f"{inch_text(_FIT_LEAST, 4)}-{inch_text(_FIT_MOST, 4)}):",
+        f"   <MOD-DIAM>{inch_text(SHAFT_DIA, 4)} IN MHA-DT-31, "
+        f"2X <MOD-DIAM>{inch_text(JOURNAL_DIA, 4)} IN MHA-DT-05, "
+        f"<MOD-DIAM>{inch_text(PINION_SEAT_DIA, 4)} IN MHA-DT-10.",
+    )
 )
 
 # The sheet's numbered notes, in one block under the general note.
-SHEET_NOTES = "\n".join((CROSS_HOLE_NOTE, SPIGOT_NOTE))
+SHEET_NOTES = "\n".join((CROSS_HOLE_NOTE, SPIGOT_NOTE, FIT_NOTE))
 
 # The banded far-end stations name their stack on their own row: a callout
 # below would lift the value into the row above.  No AIR (rule 26).
@@ -154,8 +166,7 @@ KNOCKOUT_CALLOUT_BELOW = "DRIVE-PIN KNOCKOUT"
 # spot is free: the MHA-DT-00 hub step aligns it with the hub's mark before
 # the taper ream, so any spot on the dome serves.  Rule 26: a plain
 # requirement, never BY EYE.  Two rows: a note stacked one word a row read
-# as a five-line callout (rule 7), so the note stands below the knockout
-# callout where the rows have room.
+# as a five-line callout (rule 7).
 FIDUCIAL_NOTE = "PUNCH MARK,\nLOCATION NOT CRITICAL"
 
 # The 16T retention-pin hole is match-drilled through the seated pinion's
@@ -167,13 +178,16 @@ FIDUCIAL_NOTE = "PUNCH MARK,\nLOCATION NOT CRITICAL"
 # the hole's hidden edges (rule 9).  Two lines of words (rule 7); the fit by
 # its standard name, matching the MHA-DT-10 sheet (DRIVE FIT ON PIN
 # MHA-DT-29).  The pin's flush ends and hand-removal check are the MHA-DT-00
-# step 4 acceptance, not this sheet's (rule 7).
+# step 4 acceptance, not this sheet's (rule 7).  The pinion row is last and
+# the longest: SolidWorks starts the note's leader at the end of its last
+# row, so it leaves the text's right end and drops right of the Ø.3125's
+# block (farm round 1: from a short last row it ran through that block).
 PINION_PIN_CALLOUT = "\n".join(
     (
         f"(<MOD-DIAM>{inch_text(pinion.PIN_DIA, pinion.PIN_HOLE_DIA_PLACES)})"
-        " MATCH DRILL AND REAM AT ASSEMBLY",
-        f"THRU RADIAL HOLE OF PINION {pinion.PINION_NUMBER},",
-        f"DRIVE FIT ON PIN {pinion.PIN_NUMBER}",
+        " MATCH DRILL, REAM AT ASSEMBLY",
+        f"DRIVE FIT ON PIN {pinion.PIN_NUMBER},",
+        f"THRU THE RADIAL HOLE OF PINION {pinion.PINION_NUMBER}",
     )
 )
 
