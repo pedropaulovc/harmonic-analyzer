@@ -15,6 +15,7 @@ import pytest
 import _config
 import build_pd_rack_pinion as part
 import draw_pd_rack_pinion as drawing
+import pd_rack_pinion_callouts as callouts
 import pd_rack_pinion_spec as spec
 import pd_transgear_feed_pinion_spec as feed_spec
 import pd_transgear_disc_hub_geometry as hub_geometry
@@ -136,8 +137,8 @@ def test_finished_tap_web_pays_both_mouths_and_prints_its_least() -> None:
     """#2167 (Codjiflo on #2124): at the front face the web also loses the
     bore's chamfer at its .015 leg and the tap's .004 break (.0666), at the
     rear the bore's .010 title-block break and the .004 (.0716): over the
-    .060 floor, under the .080 target, and the tap callout's last line
-    states the least (rule 20)."""
+    .060 floor, under the .080 target, and the taps' numbered note (their
+    callout links it) states the least (rule 20)."""
     inch = 25.4
     finished = spec.TAP_TO_BORE_WALL_FINISHED
     assert finished["front face"] == pytest.approx(
@@ -150,19 +151,20 @@ def test_finished_tap_web_pays_both_mouths_and_prints_its_least() -> None:
     assert 0.060 * inch <= spec.TAP_TO_BORE_WALL_FINISHED_MIN < 0.080 * inch
     assert spec.TAP_TO_BORE_WALL_FINISHED_MIN == pytest.approx(0.0666 * inch, abs=1e-3)
     assert spec.TAP_WALL_TEXT == "WALL .066 MIN TO BORE"
-    assert spec.TAP_CALLOUT_LINES[-1] == spec.TAP_WALL_TEXT
+    tap_note = callouts.DRAWING_NOTES.split(f"\n{callouts.TAP_NOTE}. ")[1]
+    assert tap_note.rstrip(".").endswith(spec.TAP_WALL_TEXT)
 
 
-def test_the_package_declares_the_tap_web_the_callout_prints() -> None:
+def test_the_package_declares_the_tap_web_the_sheet_prints() -> None:
     """#2167: Main's delegated minor (option A, the geometry kept) names the
-    generated wall line the tap callout prints last (rule 20)."""
+    generated wall line the taps' note prints last (rule 20)."""
     exceptions = _config.parts("pd-rack-pinion")["machinist_exceptions"]
     (entry,) = [entry for entry in exceptions if entry["id"] == "RV-03"]
     assert entry["kind"] == "minor"
     assert spec.TAP_WALL_TEXT in entry["where"]
     assert "delegated ruling 2026-11-04" in entry["reason"]
     assert "#2144" in entry["reason"]
-    assert spec.TAP_CALLOUT_QUALIFIER.split("\n")[-1] == spec.TAP_WALL_TEXT
+    assert f"{spec.TAP_WALL_TEXT}." in callouts.DRAWING_NOTES
 
 
 def test_the_bore_pilots_on_the_hub_spigot_at_every_limit() -> None:
@@ -186,14 +188,15 @@ def test_the_bore_pilots_on_the_hub_spigot_at_every_limit() -> None:
     assert (least, greatest) == pytest.approx(spec.SPIGOT_DIAMETRAL_CLEARANCE)
     # The disc's float on the spigot feeds the transferred taps' wall.
     assert spec.DISC_OFFSET_MAX == pytest.approx(greatest / 2.0)
-    note = spec.BORE_FIT_CALLOUT
-    assert "MATE HUB MHA-PD-17 SPIGOT" in note
-    printed = re.search(r"\(DIA CLR (\d*\.\d+)-(\d*\.\d+)\)", note)
+    note = callouts.DRAWING_NOTES
+    assert f"LOCATIONAL CLEARANCE FIT ON {spec.HUB_NUMBER}" in note
+    printed = re.search(r"\(CLEARANCE (\d*\.\d+)-(\d*\.\d+) REF\)", note)
     assert printed is not None
     assert [float(v) * 25.4 for v in printed.groups()] == pytest.approx(
         [least, greatest], abs=0.5e-4 * 25.4
     )
-    assert all(len(line) <= 70 for line in note.splitlines())
+    for banned in ("DIA CLR", "DIAMETRAL", "GOVERN"):
+        assert banned not in note
 
 
 def test_the_bore_front_chamfer_clears_the_spigot_corner() -> None:
@@ -216,22 +219,90 @@ def test_thickness_band_is_the_printed_xxx_band() -> None:
     )
 
 
-def test_tap_callout_carries_both_mouth_breaks_and_transfer() -> None:
+def test_tap_callout_carries_the_mouth_breaks_and_links_its_transfer_note() -> None:
     definitions = {5: "", 6: "<hw-thread> - <hw-threadclass> THRU", 7: "", 8: ""}
     updated = drawing.tap_callout_definitions(definitions)
     assert updated[6].startswith("<hw-thread> THRU\n")
-    assert updated[6].endswith(spec.TAP_CALLOUT_QUALIFIER)
+    assert updated[6].endswith(callouts.TAP_CALLOUT_QUALIFIER)
     assert {k: v for k, v in updated.items() if k != 6} == {5: "", 7: "", 8: ""}
-    text = spec.TAP_CALLOUT_QUALIFIER
+    text = callouts.TAP_CALLOUT_QUALIFIER
+    # Rule 7: at most two lines of words under the size and thread lines.
+    assert len(text.splitlines()) <= 2
     assert "CSK" not in text
-    printed_break = re.search(r"BREAK EDGE (\d*\.\d+) MAX BOTH SIDES", text)
+    printed_break = re.search(r"BREAK EDGES (\d*\.\d+) MAX", text)
     assert printed_break is not None
     assert float(printed_break.group(1)) * 25.4 == pytest.approx(spec.MOUTH_BREAK_MAX)
-    assert "MHA-PD-17" in text and "MATCH-MARK" in text
+    assert spec.SCREW_NUMBER in text
+    assert f"SEE NOTE {callouts.TAP_NOTE}" in text
+    tap_note = callouts.DRAWING_NOTES.split(f"\n{callouts.TAP_NOTE}. ")[1]
+    assert spec.HUB_NUMBER in tap_note and "MATCH-DRILL AT ASSEMBLY" in tap_note
     for banned in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "BOOK FIDELITY"):
-        assert banned not in text.upper()
+        assert banned not in (text + callouts.DRAWING_NOTES).upper()
     with pytest.raises(RuntimeError):
         drawing.tap_callout_definitions({5: "", 6: "", 7: "", 8: ""})
+
+
+def test_bore_callout_links_its_fit_note() -> None:
+    lines = callouts.BORE_CALLOUT.splitlines()
+    assert lines[0] == "REAM THRU"
+    assert len(lines) - 1 <= 2
+    assert f"SEE NOTE {callouts.BORE_NOTE}" in lines
+    bore_note = callouts.DRAWING_NOTES.split(f"\n{callouts.TAP_NOTE}. ")[0]
+    assert bore_note.startswith(f"{callouts.BORE_NOTE}. ")
+    chamfer = re.search(r"CHAMFER (\d*\.\d+) X 45\u00b0 AT FACE ([A-Z])", bore_note)
+    assert chamfer is not None
+    assert float(chamfer.group(1)) * 25.4 == pytest.approx(spec.BORE_FRONT_CHAMFER)
+    assert chamfer.group(2) == spec.FRONT_FACE_DATUM
+
+
+def test_sheet_gear_data_names_the_mesh_once_with_its_backlash_acceptance() -> None:
+    """Policy 3: the span and tip keep their bands; their fit route is the
+    backlash acceptance against MHA-PD-08, inside the reducer's budget."""
+    import paper_drive_mesh_check as mesh_check
+
+    data = callouts.GEAR_DATA_NOTE
+    rows = data.splitlines()
+    assert rows[0] == "GEAR DATA"
+    for line in spec.GEAR_DATA.splitlines():
+        if not line.startswith(("SPAN OVER", "MATES WITH")):
+            assert line in rows
+    # The span prints once, on the face view.
+    assert "SPAN" not in data
+    low, high = callouts.BACKLASH_ACCEPT_MM
+    assert f"BACKLASH WITH MATE (FEELER):  {low / 25.4:.3f}-{high / 25.4:.3f}".replace(
+        "0.", "."
+    ) in rows
+    tight, loose = mesh_check.reducer_band_meshes()
+    assert 0.0 < callouts.BACKLASH_BUDGET_MM[0] <= low < high
+    assert high <= callouts.BACKLASH_BUDGET_MM[1]
+    assert callouts.BACKLASH_BUDGET_MM[0] < tight.backlash_mm[0]
+    assert callouts.BACKLASH_BUDGET_MM[1] < loose.backlash_mm[1]
+    # Rule 4: the teeth's one mate is named once on the sheet; span and tip
+    # link the block.
+    sheet_text = "\n".join(
+        (
+            data,
+            callouts.DRAWING_NOTES,
+            callouts.TAP_CALLOUT_QUALIFIER,
+            *drawing.DIMENSION_CALLOUTS.values(),
+            *drawing.DIMENSION_CALLOUTS_ABOVE.values(),
+            *drawing.RIGHT_DIMENSION_CALLOUTS.values(),
+        )
+    )
+    assert sheet_text.count(spec.KNOB_NUMBER) == 1
+    assert drawing.DIMENSION_CALLOUTS["OutsideDia"] == "SEE GEAR DATA"
+    assert drawing.DIMENSION_CALLOUTS_ABOVE == {"ToothSpan": "SEE GEAR DATA"}
+
+
+def test_numbered_notes_fit_the_lower_left_lane() -> None:
+    note = dict(advance_ratio=109.7 / (42 * 3.5), line_spacing=16.8 * 25.4 / 72.0 / 3.5)
+    box = estimate_text_box(
+        callouts.DRAWING_NOTES, anchor=drawing.NOTES_XY, height=0.0035, **note
+    )
+    assert box is not None
+    assert box.xmin >= 0.0127 and box.ymin >= 0.0127
+    assert box.xmax < 0.216  # the title block's left edge
+    assert box.ymax < drawing._TAP_SHOULDER[1] - 0.005
 
 
 def test_gear_data_block_is_what_the_machinist_needs() -> None:
@@ -423,7 +494,7 @@ def test_the_bore_callout_with_its_fit_clears_the_gear_data_and_the_rim() -> Non
     clear the gear data block to the left and the toothed rim to the right."""
     note = dict(advance_ratio=109.7 / (42 * 3.5), line_spacing=16.8 * 25.4 / 72.0 / 3.5)
     data = estimate_text_box(
-        spec.GEAR_DATA, anchor=drawing.GEAR_DATA_XY,
+        callouts.GEAR_DATA_NOTE, anchor=drawing.GEAR_DATA_XY,
         height=drawing.GEAR_DATA_CHAR_HEIGHT, **note,
     )
     size = f"\N{DIAMETER SIGN}{spec.BORE_DIA:.3f} +0.018"
@@ -578,10 +649,10 @@ def test_model_and_drawing_consume_the_spec_geometry() -> None:
     )
     assert part.BORE_DIAMETER == spec.BORE_DIA == hub_geometry.SPIGOT_DIA
     assert drawing.DIMENSION_CALLOUTS == {
-        "BoreDia": f"{spec.BORE_CALLOUT}\n{spec.BORE_FIT_CALLOUT}",
-        "OutsideDia": spec.MESH_CALLOUT_STACKED,
+        "BoreDia": callouts.BORE_CALLOUT,
+        "OutsideDia": callouts.MESH_CALLOUT,
     }
-    assert drawing.DIMENSION_CALLOUTS_ABOVE == {"ToothSpan": spec.MESH_CALLOUT}
+    assert drawing.DIMENSION_CALLOUTS_ABOVE == {"ToothSpan": callouts.MESH_CALLOUT}
     assert drawing.RIGHT_DIMENSION_CALLOUTS == {"FaceWidth": spec.FACE_WIDTH_CALLOUT}
 
 
@@ -594,20 +665,23 @@ def test_part_config_properties() -> None:
 
 
 @pytest.mark.parametrize(
-    ("module_name", "spec_name", "orientation", "centre", "station", "pin", "gap_phase"),
+    ("module_name", "spec_name", "text_name", "orientation", "centre", "station", "pin", "gap_phase"),
     [
         # The disc's teeth run its full face width; the front face shows them.
         # build_pd_rack_pinion cuts its gaps with build_stock_form_gear's
         # default bisector phase, half a pitch (pi / N).
         (
-            "draw_pd_rack_pinion", "pd_rack_pinion_spec", "*Front", "FRONT_CENTER",
+            "draw_pd_rack_pinion", "pd_rack_pinion_spec", "pd_rack_pinion_spec",
+            "*Front", "FRONT_CENTER",
             "FACE_WIDTH", "TOOTH_SPACE_GAUGE_PIN_DIA_MM", math.pi / spec.TEETH,
         ),
         # Run 11: the sleeve's end view looks at the step face, whose run-out
         # gaps are partial depth; the straight pass is full depth at the rear.
         # build_pd_transgear_feed_pinion places its gaps at the inspection phase.
+        # Its sheet text lives in the drawing-only callouts module.
         (
             "draw_pd_transgear_feed_pinion", "pd_transgear_feed_pinion_spec",
+            "pd_transgear_feed_pinion_callouts",
             "*Back", "REAR_CENTER", "TOOTH_SPACE_INSPECTION_END_MM",
             "TOOTHSPACE_GAUGE_DIA_MM", feed_spec.TOOTH_SPACE_INSPECTION_PHASE_RAD,
         ),
@@ -615,7 +689,7 @@ def test_part_config_properties() -> None:
 )
 def test_sheet_calls_out_the_tooth_space_on_its_full_depth_face_view(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, module_name: str, spec_name: str,
-    orientation: str, centre: str, station: str, pin: str, gap_phase: float,
+    text_name: str, orientation: str, centre: str, station: str, pin: str, gap_phase: float,
 ) -> None:
     module = importlib.import_module(module_name)
     owner = importlib.import_module(spec_name)
@@ -654,8 +728,8 @@ def test_sheet_calls_out_the_tooth_space_on_its_full_depth_face_view(
         gap_phase + module.TOOTH_SPACE_GAP_INDEX * pitch, abs=1e-12
     )
     assert callout.kwargs["note_xy"] == module.TOOTH_SPACE_CALLOUT_XY
-    # The callout links the part's own control, checked against the spec first.
+    # The callout links the part's own control, checked against its text first.
     (required,) = seat.require_source_control.call_args_list
-    assert required.args[1] == owner.TOOTH_SPACE_CALLOUT
+    assert required.args[1] == importlib.import_module(text_name).TOOTH_SPACE_CALLOUT
     names = [name for name, _args, _kwargs in seat.mock_calls]
     assert names.index("require_source_control") < names.index("add_toothspace_callout")
