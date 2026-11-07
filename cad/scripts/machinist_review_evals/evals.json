@@ -2718,7 +2718,7 @@
           "rule": 10,
           "polarity": "positive",
           "confidence": "high",
-          "evidence": "v40 fr-top-frame sheet 3: origin is the upper-left socket bore axis, a physical feature that can be indicated; dimensions run baseline from it. Rule 10 permits origins on a real feature such as a bore axis."
+          "evidence": "v40 fr-top-frame sheet 3: origin is the upper-left socket bore axis, a physical feature that can be indicated, so it is not a blocker. Since 2026-11-07 rule 10 wants a hole-table or ordinate zero on a picked-up corner, which is a presentation (clarity) finding at most."
         },
         {
           "text": "Does not raise a blocker against '2X Ø3.45 ↧16.0 KEEPER TAP 8-32 UNC-2B ↧10.0' or 'HANGER DRILL 2X Ø13.49 THRU ALL'.",
