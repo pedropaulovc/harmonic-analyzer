@@ -15,9 +15,9 @@ the strip until it snaps into the hole.
 Process (the sheet's notes): the blank is the flat pattern; every form is
 made annealed; fit to the bar, clamp the hanger at full feed mesh, set the
 annealed arm square on the pin with the strip's far face at its drawn
-station, and match-drill the pin hole from the pin; remove, harden and
-temper blue, reinstall.  The order of cutting, bending and drilling is the
-shop's.
+station, transfer the pin's centre to the strip and drill the pin hole on
+the mark; remove, harden and temper blue, reinstall.  The order of cutting,
+bending and drilling is the shop's.
 
 The sheet prints decimal inch (the row's ``drawing_unit: in``); every
 length here stays physical millimetres.  How the sheet locates things:
@@ -28,8 +28,10 @@ length here stays physical millimetres.  How the sheet locates things:
   what each printed position may spend (the fixed-fastener stack, as the
   guide lock's on its screws); the hole callout names that mate
   (SCREW_HOLE_MATE), so the band reads as the taps' and not as arbitrary.
-  The X stations follow the bar's taps, so they print off the grid, the
-  rounding counted in the stack;
+  The callout prints the size under DRILLED HOLES with no drill named
+  (a named #30 would print its exact .1285, rule 3; the shop's #30 is
+  inside the row).  The X stations follow the bar's taps, so they print
+  off the grid, the rounding counted in the stack;
 * the base length at the .XX row: it bounds the far screw hole's -X edge
   wall;
 * the width at the .XX row: the ear's +Y edge in the guide-lock sweep (the
@@ -44,20 +46,22 @@ length here stays physical millimetres.  How the sheet locates things:
   radii to the inside surface; the far face at the pin, located in X and Y
   from the origin, only as a reference (REFERENCE_DIMENSIONS): a hand-rolled
   roll holds no tighter band there, and the fit-up sets the strip on the pin
-  (square, its face at that station) before the hole is match-drilled.  The
-  roll start and the tab end close on the pin's station, so their model
-  values sit off the grid; FORMED_BAND, what the assembly's checks read, is
-  the band with that rounding counted;
+  (square, its face at that station) before the pin's centre is
+  transferred.  The roll start and the tab end close on the pin's station,
+  so their model values sit off the grid; FORMED_BAND, what the assembly's
+  checks read, is the band with that rounding counted;
 * the pin hole: size only, drilled (the title block's DRILLED HOLES row),
-  match-drilled at assembly on the MHA-PD-VN-58 latch pin (the model keeps
-  it at the geometry's nominal); the far face's reference station carries
-  PIN_STATION_CALLOUT, so the drawn station is the pin axis at that face;
+  its centre transferred at assembly from the MHA-PD-VN-58 latch pin (note
+  2; the model keeps it at the geometry's nominal); the far face's
+  reference station ends on the pin axis, which the front view draws as a
+  centreline, so the station needs no words;
 * the flat pattern (a hidden reference sketch beside the side view, under
-  its own FLAT PATTERN label): the blank's length across the bend and the
-  arm's developed stations of the taper and the full round's centre, at .XX
-  (developed from the formed part, so off the grid; no check reads them),
-  the arm's two strip widths (the controlling widths above), and the three
-  bends' centrelines located as references (BEND_LINE_DIMENSIONS).
+  its own VIEW A (FLAT PATTERN) label): the blank's length across the bend
+  and the arm's developed stations of the taper and the full round's
+  centre (centre-marked on the sheet), at .XX (developed from the formed
+  part, so off the grid; no check reads them), the arm's two strip widths
+  (the controlling widths above), and the three bends' centrelines located
+  as references (BEND_LINE_DIMENSIONS).
 * the formed overall height, the ear's top edge to the full round's tip: a
   reference only, at DRAWING_REFERENCE_PRECISION.
 
@@ -350,34 +354,37 @@ if HEAD_CLEARANCE_WORST < HEAD_CLEARANCE_FLOOR - 1e-9:
 
 # --- Sheet text --------------------------------------------------------------
 # The title block's MATERIAL cell (the registry row's ``material``, annealed)
-# and FINISH cell (the hardening, after the match-drill): no note restates
-# either (final review).
+# and FINISH cell (the hardening, after the pin hole is drilled): no note
+# restates either (final review).
 MATERIAL_TITLE = f"{SHEET_T / 25.4:.3f} 1095 sheet, annealed".lstrip("0")
 # Part facts only: the fit-up and clamp sequence is the assembly's (the
-# registry row's process).  Note 2 names the pin the match-drilled hole
-# clears; the hole callout points to it.
+# registry row's process).  Note 2 says what the pin hole's centre is
+# transferred from, when, and the bench acceptance (a solid pin guides no
+# drill, so "match-drill on the pin" was no standard form); the hole callout
+# points to it.  The FINISH cell already orders the hardening after drilling.
 DRAWING_NOTES = "\n".join(
     (
         "1. RADII TO INSIDE SURFACE.",
-        "2. PIN HOLE: MATCH-DRILL ON MHA-PD-VN-58",
-        "   LATCH PIN, SQUARE TO PIN.",
+        "2. PIN HOLE: TRANSFER MHA-PD-VN-58 PIN",
+        "   CENTRE AT ASSEMBLY, DRILL ON MARK.",
+        "   PIN ENTERS SQUARE, NO BIND.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
-# The flat pattern stands beside the side view, out of projection, so it is
-# labelled under its outline, with what its chain lines are.
-FLAT_PATTERN_NOTE = "FLAT PATTERN\nBEND LINES AT BEND CENTRES"
+# The flat pattern stands beside the side view, out of projection: a
+# lettered view label (rule 26), what it shows in parentheses.  Its chain
+# lines are the bends' centrelines, the standard flat-pattern convention.
+FLAT_PATTERN_NOTE = "VIEW A (FLAT PATTERN)"
 PAIR_CALLOUT = "2X"
-SCREW_HOLE_CALLOUT = "#30 DRILL THRU"
+# Size first, then process (rule 26): the dimension prints Ø.128 and this
+# line follows it.  No drill is named: Ø.128 is a size under DRILLED HOLES.
+SCREW_HOLE_CALLOUT = "DRILL THRU"
 # Under the drill line: the mate the ±POSITION_TOL bands serve (review 4).
 # Plain drilled to the print, not match-drilled: the taps are fixed.
 SCREW_HOLE_MATE = "LOCATE TO MHA-PD-07 TAPS"
 # One line (an above-callout): note 2 names the process and the pin.
 PIN_HOLE_CALLOUT = "SEE NOTE 2"
-# Under the far face's reference Y: that station is the pin's axis.
-PIN_STATION_CALLOUT = "PIN AXIS AT FAR FACE"
 ROUND_CALLOUT = "FULL ROUND"
-FLAT_ROUND_CALLOUT = "TO FULL-ROUND CENTRE"
 # drawing-guidelines.md rule 10 (dimension from a real feature): the formed overall height, the ear's top edge to the full round's
 # tip, a reference left of the side view (the front view's far-face Y to
 # the pin stays its own dimension).

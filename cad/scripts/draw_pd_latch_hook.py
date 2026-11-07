@@ -11,16 +11,18 @@ edge -- lands where the layout puts it):
   the roll's start below the ear, its inside radius (shortened leader: the
   centre is off the sheet), the straight's length, the inside tab radius, the tab
   end's X -- and the far face where the pin crosses it, in X and Y from the
-  origin as references, the Y flagged as the pin's axis at that face; the
-  pin hole's size, match-drilled at assembly (note 2 names the pin);
+  origin as references, both ending on the pin's axis, drawn as a
+  centreline; the pin hole's size, its centre transferred at assembly
+  (note 2 names the pin);
 * ``*Right`` (looking -X, Z running left): the width, the root relief and
   the full round; left of it the formed overall height, a reference from
   the ear's top edge to the full round's tip; beside it the flat pattern,
   the part's hidden ``FlatBlank`` reference sketch shown in this view only
-  (labelled FLAT PATTERN; its outline black at the visible-edge weight, its
-  bend centrelines black chain lines): the blank across the bend, the arm's
-  two strip widths (its controlling widths), its developed stations of the
-  taper and the round's centre, and the bend centrelines' references;
+  (labelled VIEW A (FLAT PATTERN); its outline black at the visible-edge
+  weight, its bend centrelines black chain lines): the blank across the
+  bend, the arm's two strip widths (its controlling widths), its developed
+  stations of the taper and the round's centre (centre-marked), and the
+  bend centrelines' references;
 * ``*Bottom`` (looking +Y, X right, Z up), projected under the front view
   (third angle, so unlabelled): the base length, the ear height and the
   inside bend.
@@ -89,9 +91,11 @@ from pd_latch_hook_geometry import (
     OUTER_TAB_END,
     PART_ORIGIN_MACHINE,
     PIN_HOLE_L,
+    PIN_HOLE_ZL,
     ROUND_C_L,
     ROUND_R,
     SCREW_HOLE_Y,
+    SHEET_T,
     TAB_C_L,
     WIDTH,
 )
@@ -100,12 +104,10 @@ from pd_latch_hook_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
-    FLAT_ROUND_CALLOUT,
     FLAT_SKETCH,
     OVERALL_HEIGHT,
     PAIR_CALLOUT,
     PIN_HOLE_CALLOUT,
-    PIN_STATION_CALLOUT,
     REFERENCE_DIMENSIONS,
     ROUND_CALLOUT,
     ROUND_REFERENCE,
@@ -268,15 +270,40 @@ BOTTOM_KEEP = {
 CALLOUTS_ABOVE = {
     "ScrewDia": PAIR_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
-    "DevRoundC": FLAT_ROUND_CALLOUT,
 }
 # The screw-hole callout's last line states the holes' finished wall to the
-# base's edges, under the .080 target (rule 20; pd-latch-hook.yaml).
+# base's edges, under the .080 target (rule 20; pd-latch-hook.yaml).  The
+# location dimensions (FaceX/FaceY, DevRoundC) carry no words (rule 7): they
+# end on the pin axis's centreline and the full round's centre mark.
 CALLOUTS_BELOW = {
     "ScrewDia": f"{SCREW_HOLE_CALLOUT}\n{SCREW_HOLE_MATE}\n{SCREW_HOLE_WALL_TEXT}",
-    "FaceY": PIN_STATION_CALLOUT,
     "RoundR": ROUND_CALLOUT,
 }
+# The pin's axis where it crosses the strip, the far face's reference
+# station's end: a centreline along U through the far face point, past the
+# near and far faces by the overshoot (3 mm on the sheet at 3:2).  Part-frame
+# millimetres (x, y, z), z the pin's height.
+PIN_AXIS_OVERSHOOT_MM = 2.0
+PIN_AXIS_ENDS = tuple(
+    (
+        FAR_FACE_POINT[0] + run * ARM_U[0],
+        FAR_FACE_POINT[1] + run * ARM_U[1],
+        PIN_HOLE_ZL,
+    )
+    for run in (-(SHEET_T + PIN_AXIS_OVERSHOOT_MM), PIN_AXIS_OVERSHOOT_MM)
+)
+# The flat pattern's full-round centre in FlatBlank sketch (u, v) = model
+# (-Z, Y): DevRoundC and FlatTabC end on it, so it carries a centre mark, a
+# cross of two centrelines CENTRE_MARK_ARM_MM each way (3 mm on the sheet).
+FLAT_ROUND_CENTRE = (FLAT_GAP + ROUND_R, ROUND_R - DEV_TIP)
+CENTRE_MARK_ARM_MM = 2.0
+FLAT_ROUND_MARK_ENDS = tuple(
+    tuple(
+        (0.0, FLAT_ROUND_CENTRE[1] + dv * sign, -(FLAT_ROUND_CENTRE[0] + du * sign))
+        for sign in (-1.0, 1.0)
+    )
+    for du, dv in ((CENTRE_MARK_ARM_MM, 0.0), (0.0, CENTRE_MARK_ARM_MM))
+)
 # The roll's centre sits ~80 mm left of the vertical: off the sheet at 3:2.
 SHORTENED_RADII = ("RollR",)
 # The formed overall height (drawing-guidelines.md rule 10 (dimension from a real feature)), a reference left of the side view: its
@@ -362,6 +389,54 @@ def _overall_reference(adapter: Any, right: Any) -> None:
     display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
     if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
         raise RuntimeError(f"{label} precision did not persist")
+
+
+@_telemetry.traced("drawing.latch_hook.view_centreline", label_param="label")
+def _view_centreline(
+    adapter: Any,
+    view: Any,
+    ends_mm: tuple[tuple[float, float, float], tuple[float, float, float]],
+    *,
+    label: str,
+) -> None:
+    """One black view-sketch centreline between two part-frame points (mm).
+
+    The model points are projected through the view and its sketch's own
+    transform, and the line is created direct-to-database so screen-space
+    inference cannot snap an end onto nearby geometry (the
+    draw_dt_pinion_arbor turning-axis recipe).
+    """
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError(f"failed to activate the view for the {label}")
+    draw.ClearSelection2(True)
+    sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for end in ends_mm:
+        x, y = model_point_in_view(
+            adapter, view, tuple(value / 1000.0 for value in end), label=f"{label} end"
+        )
+        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        segment = manager.CreateCenterLine(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if segment is None:
+        raise RuntimeError(f"failed to draw the {label}")
+    segment = _early_bound(segment, "ISketchSegment")
+    segment.Color = 0  # COLORREF black, not the under-defined sketch blue.
+    if int(segment.Color) != 0:
+        raise RuntimeError(f"{label} colour did not persist")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
 
 
 # A model sketch shown in a view draws thin and grey (review 3: the flat
@@ -525,6 +600,14 @@ async def build(adapter: Any) -> dict[str, str]:
     for name in sorted(references):
         set_reference_dimension(adapter, by_name[name], label=f"MHA-PD-14 {name}")
     _overall_reference(adapter, right)
+    # The far face's references end on the pin's axis and the flat pattern's
+    # round stations on the round's centre: both drawn, so neither location
+    # dimension carries words (rule 7).
+    _view_centreline(adapter, front, PIN_AXIS_ENDS, label="latch-pin axis")
+    for index, ends in enumerate(FLAT_ROUND_MARK_ENDS):
+        _view_centreline(
+            adapter, right, ends, label=f"flat full-round centre mark {index}"
+        )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the screw holes")
     # Re-asserted after annotating: the toggle regenerates the dashed edges.
