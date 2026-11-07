@@ -120,3 +120,4 @@ Log entries for this module, newest last. Create them with
 | date | entry | outcome | hours |
 |---|---|---|---|
 | 2026-10-29 | [vise install and first cuts](../entries/2026-10-29-vise-install-and-first-cuts.md) | partial | 6.5 |
+| 2026-11-05 | [oblique-jig end brackets](../entries/2026-11-05-oblique-end-brackets-scrapped.md) | scrapped | 5.25 |

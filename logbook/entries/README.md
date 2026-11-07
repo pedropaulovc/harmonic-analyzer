@@ -26,8 +26,8 @@ fabricated observation would poison the whole book.
   them.
 - Name the module in frontmatter so the module's session table can be updated.
 - Raw photos and video go outside the repo (`logbook/media/` is gitignored);
-  link them. Only frames destined for the book get committed, into
-  `book/figures/hand/`.
+  link them by their OneDrive paths, which never needs asking. Only frames
+  destined for the book get committed, into `book/figures/hand/`.
 - Explanatory sketches (setups, workholding, cutter paths) are drawings, not
   raw media: commit them as `figures/YYYY-MM-DD-<slug>.png` and embed them in
   the entry.
@@ -45,3 +45,4 @@ fabricated observation would poison the whole book.
 |---|---|---|---|---|---:|
 | 2026-10-29 | [Install the 6 in vise and start the oblique-jig base bar](2026-10-29-vise-install-and-first-cuts.md) | M06 | `ch-rocker-arm-tl-oblique-base-bar` | partial | 6.5 |
 | 2026-10-30 | [Get the pendant working, then rough the base bar to length](2026-10-30-pendant-and-roughing-base-bar-to-length.md) | M07 | `ch-rocker-arm-tl-oblique-base-bar` | scrapped | 5.0 |
+| 2026-11-05 | [Make the two oblique-jig end brackets](2026-11-05-oblique-end-brackets-scrapped.md) | M06 | `ch-rocker-arm-tl-oblique-end-bracket` | scrapped | 5.25 |

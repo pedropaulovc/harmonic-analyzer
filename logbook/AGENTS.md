@@ -67,8 +67,9 @@ The user hands over a session as bullet points or loosely organized notes.
 3. **Cross-check** part names, stock and equipment against the CAD registry
    and `cad/process/shop/inventory.toml`. Link the module, the part when the
    session made one (not for `practice`), and any PR or issue the session
-   produced. Where the notes and the repository disagree, ask; don't silently
-   correct either.
+   produced. Link the user's raw photos, video and voice notes by their
+   OneDrive paths; that never needs asking. Where the notes and the
+   repository disagree, ask; don't silently correct either.
 4. **Publish.** Update the entry index in `entries/README.md` and the
    `progress.md` roll-up, then commit and open a PR under the ordinary git
    workflow.

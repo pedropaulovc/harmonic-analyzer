@@ -104,4 +104,4 @@ Log entries for this module, newest last. Create them with
 
 | date | entry | outcome | hours |
 |---|---|---|---|
-| | | | |
+| 2026-11-05 | [oblique-jig end brackets](../entries/2026-11-05-oblique-end-brackets-scrapped.md) (drilling the six tap-drill holes) | scrapped | 1.5 of 5.25, counted under M06 |
