@@ -236,7 +236,7 @@ def test_neck_diameter_prints_limits_and_one_reason() -> None:
     # past the core shoulder.  A length carries its value alone.
     assert spec.FRONT_RELIEF_WIDTH_PLACES == 3
     assert spec.FRONT_RELIEF_WIDTH - printed_band_mm(2, unit=spec.UNIT) - 0.1778 < 0.1016
-    for name in ("FrontReliefWidth", "JournalLength", "ToothSpan"):
+    for name in ("FrontReliefWidth", "JournalLength"):
         assert name not in drawing.DIMENSION_CALLOUTS_BELOW, name
 
 
@@ -394,8 +394,12 @@ def test_supported_certified_pin_inspects_all_actual_finite_corners() -> None:
 def test_indicator_grade_has_one_live_source_and_span_does_not_certify_eccentricity() -> None:
     from _gear_quality import toothspace_runout_tir_mm
 
-    assert spec.TOOTH_SPACE_RUNOUT_TIR_MM == toothspace_runout_tir_mm() == 0.05
+    assert spec.TOOTH_SPACE_RUNOUT_TIR_MM == toothspace_runout_tir_mm() == 0.0508
     assert spec.TOOTH_SPACE_CALLOUT.splitlines()[0].startswith("TOOTH SPACE RUNOUT ")
+    # A plain .001 inch step that never exceeds the booked grade (F3).
+    printed = spec.TOOTH_SPACE_RUNOUT_TIR_TEXT
+    assert printed.startswith(".") and len(printed) == 4
+    assert float(printed) * spec.MM_PER_IN <= spec.TOOTH_SPACE_RUNOUT_TIR_MM + 1e-12
     assert spec.TOOTH_SPACE_CALLOUT_PROPERTY == "Tooth Space Inspection"
     assert all(word not in spec.TOOTH_SPACE_CALLOUT for word in ("CANDIDATE", "TODO", "GATE"))
     contact = toothspace_gauge_contact_mm(spec.STOCK_PROFILE, spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM)
@@ -660,9 +664,10 @@ def test_tight_bands_name_their_mates_once_by_number() -> None:
     assert f"(CLEARANCE {drawing._fit_range_text(low, high)})" in " ".join(drawing.NOTES.split())
     # The relief's plain clearance names its mate by number.
     assert _config.parts("pd-transgear-thumbnut")["number"] in above["ReliefDia"]
-    # The mesh is the gear data block's alone: no tooth dimension names it.
+    # The mesh mate is the gear data block's alone; the tooth tips and the
+    # span link it as their route (F5), naming no mate themselves.
     for name in ("OutsideDia", "ToothSpan"):
-        assert name not in callouts, name
+        assert callouts[name] == drawing.GEAR_DATA_LINK, name
     assert "MATES WITH" in spec.GEAR_DATA and spec.DISC_NUMBER in spec.GEAR_DATA
     assert "FrontReliefDia" in drawing.DIMENSION_SUFFIXES
     assert "MHA-PD-22" in drawing.DIMENSION_SUFFIXES["FrontReliefDia"]

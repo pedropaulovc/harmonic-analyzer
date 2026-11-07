@@ -297,10 +297,14 @@ END_KEEP: dict[str, tuple[float, float]] = {
     "FlatToAxis": (FRONT_CENTER[0] + HALF_OD + 0.005, FRONT_CENTER[1] - 0.022),
 }
 # Callouts over the vertical Ø texts (a below-callout there would sit on
-# the Ø's own line), each one line.  The tooth tips' mate is the gear data
-# block's; the thread relief's is a plain clearance.
+# the Ø's own line), each one line.  Every kept tight band prints its
+# matched-fit route at its callout (delegated ruling 2026-11-07 (Main) F5):
+# the tooth tips link the gear data block, which names the mesh mate and its
+# backlash acceptance; the thread relief's is a plain clearance.
+GEAR_DATA_LINK = "SEE GEAR DATA"
 DIMENSION_CALLOUTS_ABOVE = {
     "JournalDia": JOURNAL_FIT_LINK,
+    "OutsideDia": GEAR_DATA_LINK,
     "CoreDia": D_SECTION_FIT_LINK,
     "ReliefDia": f"CLEARS THUMBNUT {THUMBNUT_NUMBER}",
 }
@@ -309,12 +313,14 @@ if any("\n" in text for text in DIMENSION_CALLOUTS_ABOVE.values()):
 # The face width's ±band names the disc cluster stack (rule 4); its one
 # line hangs into the empty sixth baseline row below it.  The flat's link
 # hangs under its text, past the end of its witness line, and the D-flat
-# tool's end's under its prefixed limits ("D-FLAT TOOL END", the model's
-# prefix): two lines of words.  Lengths and the span print their values alone.
+# tool's end's and the span's under their prefixed limits ("D-FLAT TOOL
+# END", "CONTROL SPAN 2 TEETH", the model's prefixes): two lines of words
+# each.  Lengths print their values alone.
 DIMENSION_CALLOUTS_BELOW = {
     "FaceWidth": FACE_WIDTH_CALLOUT,
     "FlatToAxis": D_SECTION_FIT_LINK,
     "FlatEnd": D_SECTION_FIT_LINK,
+    "ToothSpan": GEAR_DATA_LINK,
 }
 # Detail B's neck Ø prints LIMITS and one reason on the value's line: its
 # maximum clears the collar's D-bore.
