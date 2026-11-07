@@ -332,14 +332,20 @@ REFERENCE_WITNESSES = {
     "CollarSpanReference": (COLLAR_SPAN_DIA_Z, COLLAR_SPAN_DIA_Z + SPAN_WITNESS_LEN),
     "BackStubReference": (BACK_STUB_DIA_Z, BACK_STUB_DIA_Z + SPAN_WITNESS_LEN),
 }
-# The collar span's diameter (line at x ~0.266, 2.2 mm clear of the pin
-# hole and 5 mm right of the front land's head-end witness at x 0.2608)
-# hangs its one-row block below the shaft, over the 1.82's text (y ~0.140)
-# and left of the neck-end witness (x 0.2966).  The back stub's (line at x
-# ~0.086, 2 mm inside the back land's crown-end witness at x 0.0881 and
-# right of the (.05)'s right arrow tail) rises above the shaft, past the
-# back land's diameter block (top y ~0.208) and the (.05) row (y ~0.222).
-COLLAR_SPAN_TEXT_XY = (_sheet_x(COLLAR_SPAN_DIA_Z), 0.1540)
+# The collar span's diameter hangs its block below the shaft, over the 1.82's
+# text (y ~0.140), in the slot between the front land's head-end witness
+# (x 0.2608) and the neck-end witness (x 0.2960).  Its text runs right of the
+# dimension line: round 4 (40a03f2a) put the line at x 0.2661 and the text
+# ended at x 0.2984, across the neck-end witness.  With the line 1.2 mm right
+# of the land's witness the text ends at ~0.2944, 1.6 mm short of the neck's
+# (COLLAR_SPAN_TEXT_RUN, the measured line-to-text-end run).  The back
+# stub's (line at x ~0.086, 2 mm inside the back land's crown-end witness at
+# x 0.0881 and right of the (.05)'s right arrow tail) rises above the shaft,
+# past the back land's diameter block (top y ~0.208) and the (.05) row
+# (y ~0.222).
+COLLAR_SPAN_TEXT_RUN = 0.2984 - 0.2661
+NECK_END_WITNESS_X = 0.2960
+COLLAR_SPAN_TEXT_XY = (_sheet_x(FRONT_JOURNAL_Z) + 0.0012, 0.1540)
 BACK_STUB_TEXT_XY = (_sheet_x(BACK_STUB_DIA_Z), 0.2360)
 SW_SEL_EXT_SKETCH_SEGS = 24  # swSelectType_e.swSelEXTSKETCHSEGS
 REFERENCE_WITNESS_LEN_TOL = 0.01  # mm; the witnesses are fully defined sketch lengths

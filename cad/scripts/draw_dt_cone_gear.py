@@ -92,7 +92,6 @@ from cone_shaft_land_bands import FLAT_AF_BAND, SECTION_DIA_BANDS
 from dt_cone_gear_notes import (
     CUTTER_DETAIL_SHEET,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     T006_NUMBER,
     TOOTH_EDGE_NOTE,
 )
@@ -277,7 +276,7 @@ CENTER_MARK_SINGLE = 2  # swCenterMarkStyle_e.swCenterMark_Single
 CLOCK_ARC_OVERRUN = 0.0003
 CLOCK_ARC_CENTRE_TOL = 0.0005
 CLOCK_FLIPS = ("SupplementaryAngle", "VerticallyOppositeAngle", "SupplementaryAngle")
-# Top-aligned with the manufacturing notes: the 14-line block (header + 13
+# Top-aligned with the numbered notes: the 14-line block (header + 13
 # rows) measured 49.1 mm tall natively (e91d2581 layout audit), 3.51 mm a
 # line; the 15-line block ends ~52.6 mm down, still above the largest side
 # view (top 0.197) with FaceWidth below it.
@@ -286,16 +285,14 @@ CLOCK_FLIPS = ("SupplementaryAngle", "VerticallyOppositeAngle", "SupplementaryAn
 GEAR_DATA_POS = (0.215, 0.263)
 # Rendered height budget of the Gear Data block, for the layout test.
 GEAR_DATA_HEIGHT = 0.056
-MANUFACTURING_NOTES_POS = (0.015, 0.263)
-# The numbered notes (``sheet_notes``) stand under the manufacturing notes
-# (3.51 mm a line at the same 2.5 mm height) with a 2.5 mm gap, above the
-# front view's dimensions, and their ~100 characters (1.79 mm each) end left
-# of Gear Data.
-_NOTE_LINE_PITCH = 0.00351
-NUMBERED_NOTES_POS = (
-    0.015,
-    MANUFACTURING_NOTES_POS[1] - len(DRAWING_NOTES.splitlines()) * _NOTE_LINE_PITCH - 0.0025,
-)
+# The numbered notes (``sheet_notes``) are the sheet's only notes, top-left,
+# above the front view's dimensions; their ~100 characters (1.79 mm each at
+# 2.5 mm) end left of Gear Data. The part's "Manufacturing Notes" property
+# (QTY and the sheet-21 pointer) is not printed: on sheets 2-20 it pointed at
+# another part and made five note lines (rule 7, round 4 of the fan-out);
+# sheet 1's GEAR DATA already sends the cutter and the relief to sheet 21,
+# whose table opens with T006's number, and the title block gives quantity.
+NUMBERED_NOTES_POS = (0.015, 0.263)
 CUTTER_DETAIL_POS = (0.015, 0.263)
 # Where the tooth-space sheet's hidden title-block source view stands (see
 # build): clear of the table, inside the border.
@@ -613,7 +610,7 @@ def sheet_notes(teeth: int) -> str:
     land, with the clearance both parts' limits give as REF. Note 2 names
     the mesh and the fit route of the tip, thickness and root bands: the
     over-pins and assembly backlash acceptances in GEAR DATA; it carries the
-    teeth's do-not-cut, flagged to them rather than in the general block.
+    teeth's do-not-cut, flagged to them rather than in a general block.
     """
     (round_min, round_max), (flat_min, flat_max) = bore_clearances_mm(teeth)
     land = (
@@ -1871,7 +1868,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Gear Data",
-            "Manufacturing Notes",
         ),
         required=(
             "Number",
@@ -1879,7 +1875,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Gear Data",
-            "Manufacturing Notes",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -2025,10 +2020,6 @@ async def build(adapter: Any) -> dict[str, str]:
 
         add_property_linked_note(
             adapter, "Gear Data", *GEAR_DATA_POS, char_height=0.0025
-        )
-        add_property_linked_note(
-            adapter, "Manufacturing Notes", *MANUFACTURING_NOTES_POS,
-            char_height=0.0025,
         )
         numbered = add_note(adapter, sheet_notes(teeth), *NUMBERED_NOTES_POS)
         if numbered is None:

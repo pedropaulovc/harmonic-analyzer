@@ -585,8 +585,12 @@ def test_each_plain_span_carries_its_own_diameter_and_mate() -> None:
     # Placement: the collar span's line clear of the pin hole and the front
     # land's head-end witness, the stub's inside the back land's crown end.
     collar_x = drawing.PRINCIPAL_KEEP["CollarSpanDia"][0]
-    assert collar_x - drawing._sheet_x(spec.FRONT_JOURNAL_Z) >= 0.004
+    assert collar_x - drawing._sheet_x(spec.FRONT_JOURNAL_Z) >= 0.001
     assert drawing._sheet_x(spec.PIN_Z) - pin_r / 1000.0 - collar_x >= 0.0015
+    # Round 4 (40a03f2a): the text, which runs right of its dimension line,
+    # crossed the neck-end witness at x 0.2960; it now ends short of it.
+    text_end = collar_x + drawing.COLLAR_SPAN_TEXT_RUN
+    assert drawing.NECK_END_WITNESS_X - text_end >= 0.0015
     stub_x = drawing.PRINCIPAL_KEEP["BackStubDia"][0]
     land_crown_x = drawing._sheet_x(spec.BACK_JOURNAL_Z + spec.JOURNAL_LEN)
     assert land_crown_x - stub_x >= 0.0015

@@ -364,12 +364,11 @@ def test_numbered_notes_state_the_bore_fit_from_both_parts_limits() -> None:
             f"{spec.inch_text(flat_min, 4)}-{spec.inch_text(flat_max, 4)} ACROSS FLAT)"
         )
         assert clearance in text
-        # Under the manufacturing notes, above the front view and its root
-        # envelope's stack, and left of Gear Data (2.5 mm text: 3.51 mm a
-        # line, 1.79 mm a character).
+        # The sheet's only notes, at most four lines (rule 7), top-left, above
+        # the front view and its root envelope's stack, and left of Gear Data
+        # (2.5 mm text: 3.51 mm a line, 1.79 mm a character).
+        assert len(lines) <= 4
         x, y = drawing.NUMBERED_NOTES_POS
-        general = len(notes.DRAWING_NOTES.splitlines())
-        assert y < drawing.MANUFACTURING_NOTES_POS[1] - general * 0.00351
         top = max(
             drawing.FRONT_CENTER[1] + drawing.rendered_half_od(teeth),
             drawing.front_keep(teeth)["FloorDia"][1] + drawing.FLOOR_STACK_HALF_HEIGHT,
@@ -717,20 +716,22 @@ def test_configuration_owned_bores_and_title_block_alloys_cover_the_family() -> 
 
 def test_notes_state_no_bore_joint_method_or_review_record() -> None:
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): native D-bore dimensions carry its fit, and the Gear Data block
-    # reports actual cutter/mesh facts separately. Every sheet keeps the same
-    # one manufacturing note, without review history or waived floors; the
-    # teeth's do-not-cut moved to the note flagged to them (sheet note 2).
-    # The quantity is plain words, and says the tooth-space sheet belongs to
-    # T006 (round-1 review: "T-CONFIGURATION SHEET" was a private label).
+    # reports actual cutter/mesh facts separately. The part's manufacturing
+    # note carries no review history or waived floors; the teeth's do-not-cut
+    # moved to the note flagged to them (sheet note 2).
     expected = notes.DRAWING_NOTES.splitlines()
-    assert len(expected) == 1 and "T-CONFIGURATION" not in notes.DRAWING_NOTES
+    assert "T-CONFIGURATION" not in notes.DRAWING_NOTES
     assert "EDGE" not in notes.DRAWING_NOTES
-    sheet = len(spec.CONFIGURATION_TEETH) + 1
-    assert f"SHEET {sheet} CONTINUES {notes.T006_NUMBER}" in expected[0]
-    assert notes.T006_NUMBER == spec.configuration_number(
-        str(_config.parts("dt-cone-gear")["number"]), 6
-    )
     assert not hasattr(notes, "ATTACHMENT")
+    # The gear sheets print only their numbered notes (round 4 of the
+    # fan-out: the part's QTY/sheet-21 line pointed at another part on sheets
+    # 2-20 and made five note lines). Sheet 1 sends the cutter and the relief
+    # to sheet 21 in GEAR DATA, and sheet 21 opens with T006's number.
+    build = inspect.getsource(drawing.build)
+    assert '"Manufacturing Notes"' not in build
+    sheet = f"SHEET {len(spec.CONFIGURATION_TEETH) + 1}"
+    assert notes.gear_data(6).count(sheet) == 2
+    assert drawing.cutter_grind_data().splitlines()[0].startswith(notes.T006_NUMBER)
     for teeth in spec.CONFIGURATION_TEETH:
         text = notes.drawing_notes(teeth)
         assert text.splitlines() == expected
