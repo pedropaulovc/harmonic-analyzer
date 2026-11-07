@@ -375,11 +375,8 @@ such build:
   COM leaf even when the stamped checks would run later in the doit graph.
   It also checks every would-be leaf in the entire requested closure with
   `-PoolHome`'s authoritative `agent.protocol.leaf_admitted`, naming refused
-  tasks/prefixes before FIFO registration (exit 2). The selected pool admission
-  rule must match the deployed fleet identity: PoolHome's full `agent_identity`
-  is normalized by the pool's own `agent_identity_tag` and compared with
-  reported worker `agent_version` tags. Mixed, missing or mismatching tags exit
-  2; check out the deployed pool release at PoolHome, or finish the rollout.
+  tasks/prefixes before FIFO registration (exit 2). Mixed agent versions are
+  expected during rolling upgrades and are not checked; the protocol version is.
   This deliberately over-refuses for doit `-s`/`--single` and cache hits: the
   entire requested closure is prechecked, even if some leaves would not run.
   After successful preflight, the parent exports the admitted label set as
