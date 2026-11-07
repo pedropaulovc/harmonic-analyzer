@@ -316,35 +316,3 @@ if PAIRED_MIN_CLEARANCE_MM < BORE_RUNNING_MIN_CLEARANCE_MM:
         f"after the rail-seat allowance {BORE_SEAT_ALLOWANCE_MM:.4f} "
         f"(< {BORE_RUNNING_MIN_CLEARANCE_MM})"
     )
-
-# The shaft is the first-made part of the keeper fit (rule 4: the band lives
-# here, the bore's .XXX is the mate's), and the levers run on the same O.D.
-SHAFT_FIT_CLEARANCE_MM = (
-    BORE_DIA_BAND[1] - SHAFT_DIA_BAND[0],
-    BORE_DIA_BAND[0] - SHAFT_DIA_BAND[1],
-)  # (0.0381, 0.07112), .0015-.0028 in
-# No line ends in punctuation: the widest row ends on the dimension's
-# vertical leader, and a trailing ';' touched it (machinist review r2).
-SHAFT_DIA_CALLOUT = "\n".join(
-    (
-        "SLIDING FIT IN MHA-CH-07 BORES",
-        "-".join(
-            f"{value / MM_PER_IN:.4f}".removeprefix("0")
-            for value in SHAFT_FIT_CLEARANCE_MM
-        )
-        + " DIAMETRAL CLEARANCE",
-        "MHA-CH-02 LEVERS RUN ON IT",
-    )
-)
-# AcrossFlat's .XXX is the set screw's seat height: it sets both the >= 1.5D
-# engagement and the proud limit above (a .XX band breaks both).
-ACROSS_FLAT_CALLOUT = "SETS MHA-CH-VN-55\nENGAGEMENT"
-DRAWING_NOTES = "\n".join(
-    (
-        "1/4 IN GROUND STOCK OK.",
-        "CENTRE MARKS .04 DEEP MAX.",
-    )
-)
-# The isometric renders at ISO_SCALE (1, 1) while the sheet/title block reads
-# 2:1, so without this the pictorial is silently half scale.
-ISO_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
