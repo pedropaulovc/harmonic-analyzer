@@ -305,10 +305,14 @@ ARC_PROFILE_DATUMS = ("A", "B", "C")
 ARC_PROFILE_FRAME_XY = {
     "TopRadius": (0.130, 0.211),
     # 10 mm left of the mm seat: Detail E's letter leader crossed the inch
-    # frame's C cell (inch r1 Opus).
-    "BottomRadius": (0.197, 0.163),
+    # frame's C cell (inch r1 Opus). Then 9 mm right of x 0.197, with its
+    # pick 18 mm (model) right: its leader's stub and rise crossed the lower
+    # .315's dimension line at x 0.196 twice (fab-2 r4). The stub now ends
+    # ~3.5 mm right of that line; the frame's right edge (~0.251) stays ~6 mm
+    # left of E's letter leader (x >= 0.2577 at the frame's height).
+    "BottomRadius": (0.206, 0.163),
 }
-ARC_PROFILE_PICK_X_MM = {"TopRadius": -130.0, "BottomRadius": 40.0}
+ARC_PROFILE_PICK_X_MM = {"TopRadius": -130.0, "BottomRadius": 58.0}
 # Both arcs keep the exterior radius-leader dressing.
 ARC_RADIUS_NAMES = ("TopRadius", "BottomRadius")
 # The lower frame's between symbol: its zone runs from the top-arc end at -X
@@ -1931,12 +1935,13 @@ def _pivot_finish_placement(
 # below-text row and sits 40 mm left of R816's two-row block; its extra 4 mm
 # height keeps the shoulder above the left taper's native BASIC box.
 # The lower arc's BASIC from A sits right of A under the strap, clear of
-# D's tag (left) and the lower profile frame's J↔K row (right).
+# D's tag (left) and left of the lower profile frame's leader (right). Its
+# text sits under the frame's bottom (~0.156) with ~4 mm of air.
 FRONT_KEEP = {
     "TopRadius": (0.120, 0.160),
     "BottomRadius": (0.160, 0.156),
     "TopAbovePivot": (0.165, 0.191),
-    "BottomBelowPivot": (0.196, 0.151),
+    "BottomBelowPivot": (0.196, 0.147),
 }
 
 _TOP_P = rocker_notes.DRAWING_PRECISION["TopEdgeReference"]["TopAbovePivot"]

@@ -85,9 +85,12 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     assert notes.DRAWING_PRECISION_BY_NAME["StrapThickness"] == 3
     assert notes.DRAWING_PRECISION_BY_NAME["TopAbovePivot"] == 3
     assert notes.DRAWING_PRECISION_BY_NAME["BottomBelowPivot"] == 3
-    # TailTipLen is the RodTipLen's mirror: it prints once, as 2X.
+    # TailTipLen is the RodTipLen's mirror: it prints once, as 2X, and so
+    # does the land's angle from vertical (r4: "RADIAL" named no centre).
     assert "TailTipLen" not in marked
-    assert notes.TIP_LAND_PREFIX == "2X "
+    assert notes.TIP_LAND_PREFIX == notes.TIP_LAND_ANGLE_PREFIX == "2X "
+    assert "TipLandAngle" in notes.DRAWING_DIMENSIONS["StrapProfile"]
+    assert notes.DRAWING_PRECISION_BY_NAME["TipLandAngle"] == 1
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "set_dimension_precision" not in source
     assert "assert_imported_precision(" in source
@@ -148,7 +151,6 @@ def test_every_band_is_native_and_names_its_mate() -> None:
     assert spec.BOTTOM_EDGE_BAND == (0.0, -0.508)
     assert notes.DIMENSION_CALLOUTS["HoleDia"] == notes.HOLE_CALLOUT
     assert notes.DIMENSION_CALLOUTS["StrapThickness"] == rocker_notes.STRAP_FIT_CALLOUT
-    assert notes.DIMENSION_CALLOUTS["RodTipLen"] == "RADIAL"
 
 
 def test_no_rod_pin_hole_and_no_finished_bore_on_the_strap() -> None:

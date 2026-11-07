@@ -26,6 +26,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -56,10 +57,12 @@ from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
 from _session import run_build
+from ch_rocker_arm_spec import _ALPHA_TOP
 from ch_rocker_strap_notes import (
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    TIP_LAND_ANGLE_PREFIX,
 )
 from ch_rocker_strap_spec import (
     ARM_THICKNESS,
@@ -71,6 +74,7 @@ from ch_rocker_strap_spec import (
     ROD_TIP_X,
     ROD_TIP_Y,
     TOP_EDGE_ABOVE_PIVOT,
+    TOP_END_X,
     TOP_END_Y,
 )
 
@@ -151,9 +155,16 @@ FRONT_KEEP = {
     # The land's two extension lines run ~5.6 mm apart, rising ~10 deg to the
     # right (perpendicular to the radial land); the upper one passes y ~0.206
     # at x 0.365. Between them (r1, r2) a line struck the text, so it stands
-    # above both, the dimension line carried up to it, high enough (r3 -> r4)
-    # that its RADIAL row below the value clears that line too.
+    # above both, the dimension line carried up to it.
     "RodTipLen": (_front(ROD_TIP_X, 0.0)[0] + 0.031, 0.226),
+    # The land's angle from vertical (r4: "RADIAL" named a centre the sheet
+    # does not show). Its text sits 25 mm down the acute wedge's bisector
+    # from the land's top end, below the rod tip: clear of the taper foot's
+    # extension line (x ~0.318) and above the thickness callout (y < 0.159).
+    "TipLandAngle": (
+        _front(TOP_END_X, TOP_END_Y)[0] + 0.025 * math.sin(_ALPHA_TOP / 2.0),
+        _front(TOP_END_X, TOP_END_Y)[1] - 0.025 * math.cos(_ALPHA_TOP / 2.0),
+    ),
 }
 # The 2.5 mm end view is narrower than its four-row callout: centred over it
 # (r1) both extension lines ran through the text, so the text stands below
@@ -225,6 +236,30 @@ def _exterior_radius_leaders(adapter: Any, annotations: list[Any]) -> None:
         remaining.remove(name)
     if remaining:
         raise RuntimeError(f"strap radius dimensions missing: {sorted(remaining)}")
+
+
+def _dress_tip_land_angle(adapter: Any, annotations: list[Any]) -> None:
+    """The imported land angle still measures the real radial land from
+    vertical (draw_ch_rocker_arm._dress_detail_dimensions) and counts both
+    ends."""
+    for annotation in annotations:
+        if dimension_name(adapter, annotation) != "TipLandAngle":
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        model_dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        actual = None if model_dimension is None else model_dimension.SystemValue
+        if (
+            int(display.Type2) != 3  # swAngularDimension
+            or type(actual) not in (int, float)
+            or not math.isfinite(actual)
+            or not math.isclose(abs(actual), _ALPHA_TOP, abs_tol=1e-8)
+        ):
+            raise RuntimeError("tip-land angle lost its native radial-land measurement")
+        display.SetText(1, TIP_LAND_ANGLE_PREFIX)
+        if str(display.GetText(1) or "") != TIP_LAND_ANGLE_PREFIX:
+            raise RuntimeError("tip land angle lost its 2X count")
+        return
+    raise RuntimeError("strap tip land angle dimension missing")
 
 
 @_telemetry.traced("drawing.strap_overall_length")
@@ -351,6 +386,7 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [*front_annotations, *right_annotations]
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _exterior_radius_leaders(adapter, front_annotations)
+    _dress_tip_land_angle(adapter, front_annotations)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     _add_overall_length(adapter, front)
     # The template centre-marks the hub hole as the view is placed

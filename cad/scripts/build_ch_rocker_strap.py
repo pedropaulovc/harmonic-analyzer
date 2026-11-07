@@ -32,8 +32,10 @@ import sys
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
+from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _document_units import apply_package_model_units
+from _drawing_dimension_insert import add_angular_reference_dimension
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -60,6 +62,7 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _sketch_circle import define_circle
+from ch_rocker_arm_spec import _ALPHA_TOP
 from ch_rocker_hub_fit import STRAP_HOLE_BAND
 from ch_rocker_strap_notes import (
     DRAWING_DIMENSIONS,
@@ -104,6 +107,64 @@ _SAVED_DRAWING_PROPERTIES = (
 )
 
 V_STRAP = (strap_area() - math.pi * (HOLE_DIA / 2.0) ** 2) * ARM_THICKNESS
+
+
+def _as_construction(adapter, entity_id: str) -> None:
+    """Flag a registered sketch line as construction geometry (the setter is
+    on ISketchSegment, not the ISketchLine the registry binds)."""
+    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{entity_id} did not take the construction flag")
+
+
+async def _tip_land_angle_reference(adapter, rod_tip_line: str, dims: SketchDims) -> None:
+    """Measure the real +X radial land from vertical (build_ch_rocker_arm's
+    construction): "RADIAL" alone named a centre the sheet does not show (r4
+    machinist review), so the end faces print their angle from the hole's
+    vertical centreline. A construction ray rooted at the land's top end,
+    vertical with its length driven, and a DRIVEN angle: the outline gains no
+    driving constraint."""
+    set_sketch_direct_db(adapter, True)
+    vertical = check(
+        "tip land vertical reference",
+        await adapter.add_line(TOP_END_X, TOP_END_Y, TOP_END_X, TOP_END_Y - TIP_FACE),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, vertical)
+    check(
+        "tip land vertical reference root",
+        await adapter.add_sketch_constraint(
+            f"{vertical}.start", f"{rod_tip_line}.start", "coincident"
+        ),
+    )
+    check(
+        "tip land vertical reference direction",
+        await adapter.add_sketch_constraint(vertical, None, "vertical"),
+    )
+    await dimension_between(
+        adapter,
+        f"{vertical}.start",
+        f"{vertical}.end",
+        "vertical_distance",
+        TIP_FACE,
+        "tip land vertical reference length",
+    )
+    dims.record("TipLandVerticalLength", '"TipFaceLen"')
+    # Text in the acute downward wedge: the measured land and ray, never a
+    # numeric text override.
+    await add_angular_reference_dimension(
+        adapter,
+        vertical,
+        rod_tip_line,
+        (
+            TOP_END_X + 2.0 * TIP_FACE * math.sin(_ALPHA_TOP / 2.0),
+            TOP_END_Y - 2.0 * TIP_FACE * math.cos(_ALPHA_TOP / 2.0),
+        ),
+        "tip land from vertical",
+        expected_degrees=math.degrees(_ALPHA_TOP),
+    )
+    dims.record("TipLandAngle")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -267,6 +328,7 @@ async def build(adapter) -> dict[str, str]:
             await adapter.add_sketch_dimension(line, None, "linear", TIP_FACE),
         )
         strap.record(name, '"TipFaceLen"')
+    await _tip_land_angle_reference(adapter, rod_tip_line, strap)
     await ensure_fully_defined(adapter, "strap sketch")
     check("exit_sketch strap", await adapter.exit_sketch())
     name_last_feature(adapter, "StrapProfile")

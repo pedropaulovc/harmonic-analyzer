@@ -21,7 +21,7 @@ __all__ = [
     "HOLE_CALLOUT",
     "ISOMETRIC_VIEW_NOTE",
     "STRAP_FIT_CALLOUT",
-    "TIP_LAND_CALLOUT",
+    "TIP_LAND_ANGLE_PREFIX",
     "TIP_LAND_PREFIX",
 ]
 
@@ -32,8 +32,10 @@ __all__ = [
 # the top edge's height over it (one-sided plus) and the bottom edge's depth
 # under it (one-sided minus) -- the finished part's bands -- both on the
 # hole's vertical centreline, the symmetry axis both arcs' centres lie on;
-# both tip lands' and both taper feet's offsets, each arc's radius and the
-# tip land. The thickness is the ``Strap`` extrude's depth, on the end view.
+# both tip lands' and both taper feet's offsets, each arc's radius, the
+# tip land and its angle from the hole's vertical centreline (the lands are
+# radial to the arcs' centre, which is off the sheet). The thickness is the
+# ``Strap`` extrude's depth, on the end view.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StrapProfile": {
         "HoleDia",
@@ -46,6 +48,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "BottomTailX",
         "BottomRodX",
         "RodTipLen",
+        "TipLandAngle",
     },
     "Strap": {"StrapThickness"},
 }
@@ -55,7 +58,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # shifts each edge's limits .005 off the rocker's profile zone); the radii at
 # one (noncritical sizes: each edge is held at the centreline by its own
 # height, and a .1 radius error moves the 5.76 half-chord's sagitta .002);
-# the offsets and the land at two (the title block's .XX).
+# the offsets and the land at two (the title block's .XX); the land angle at
+# one, under the title block's angular +/-1 deg.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "StrapProfile": {
         "HoleDia": 4,
@@ -68,6 +72,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "BottomTailX": 2,
         "BottomRodX": 2,
         "RodTipLen": 2,
+        "TipLandAngle": 1,
     },
     "Strap": {"StrapThickness": 3},
 }
@@ -81,8 +86,10 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 ):
     raise AssertionError("every marked strap dimension needs authored places")
 
-# Both lands print as one 2X (the J land is the K land's mirror).
+# Both lands print as one 2X (the J land is the K land's mirror), and so does
+# their angle.
 TIP_LAND_PREFIX = "2X "
+TIP_LAND_ANGLE_PREFIX = "2X "
 
 # drawing-guidelines.md rule 4: the press band names its mate and the fit;
 # the interference follows from both parts' limits. The hole's two edges stay
@@ -93,15 +100,11 @@ TIP_LAND_PREFIX = "2X "
 # prints).
 HOLE_EDGE_CALLOUT = "BOTH EDGES SHARP, NO BURR"
 HOLE_CALLOUT = f"REAM THRU\nPRESS FIT ON {HUB_NUMBER}\n{HOLE_EDGE_CALLOUT}"
-# The lands' radial direction rides the land's own length (r3 machinist
-# review, rule 7).
-TIP_LAND_CALLOUT = "RADIAL"
 # A location dimension carries its value and band only (rule 7), and each
 # arc prints its own radius (rule 26: no "concentric" or "centre above"
 # sentence), so only the sizes carry words.
 DIMENSION_CALLOUTS: dict[str, str] = {
     "HoleDia": HOLE_CALLOUT,
-    "RodTipLen": TIP_LAND_CALLOUT,
     "StrapThickness": STRAP_FIT_CALLOUT,
 }
 

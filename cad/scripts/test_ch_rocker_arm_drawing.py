@@ -567,10 +567,10 @@ def test_arc_profiles_attach_two_native_frames_to_nominal_circle_edges(
         frames,
         ("TopRadius", "BottomRadius"),
         (800.0, 816.0),
-        (-130.0, 40.0),
+        (-130.0, 58.0),
         # View F holds the sheet's left band: the lower frame sits under the
         # strap's right half, between the D and E detail letters.
-        ((0.130, 0.211), (0.197, 0.163)),
+        ((0.130, 0.211), (0.206, 0.163)),
         (".020", "0"),
         (ch_rocker_arm_notes.TOP_EDGE_MATE_CALLOUT, ""),
     ):
@@ -1162,7 +1162,8 @@ def test_native_profile_guard_logs_actual_position_frame_and_leaders(native_prof
     case.bottom.position = (0.021, 0.130, 0.00125)  # request != native readback
     drawing._require_arc_profile_clearance(case.adapter, case.front, case.profiles)
     text = "\n".join(case.logs)
-    assert "requested_frame_mm=(197.0, 163.0)" in text
+    requested = tuple(round(v * 1000.0, 3) for v in drawing.ARC_PROFILE_FRAME_XY["BottomRadius"])
+    assert f"requested_frame_mm={requested!r}" in text
     assert "actual_GetPosition_mm=(21.0, 130.0, 1.25)" in text
     assert "native_frame_ink_bbox_mm=" in text
     assert "native_leader_points_mm=" in text
