@@ -578,12 +578,12 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     # Hole stations baseline from socket axes (X from the left pair, Z from
     # the upper pair).  The knife line, summing axis and keeper fit-up are
     # other subsystems' stations: they print .XXX as they flow through.
-    # "crossbar median D" locates datum D from the left rail's outer face,
-    # the Y edge of sheet 3's corner origin (one origin per view, owner
-    # 2026-11-07), and the position frame holds the hanger axes BASIC zero
-    # on D; keeper coordinates are reference-only guides to
-    # assembly-transferred taps.
-    "crossbar median D from left rail face": 3,
+    # "crossbar median D" locates datum D from the left bosses' tangent,
+    # the Y edge of sheet 3's boss-corner origin (one origin per view; owner
+    # rulings 2026-11-07: the corner where the Ø1.77 boss ODs touch), and
+    # the position frame holds the hanger axes BASIC zero on D; keeper
+    # coordinates are reference-only guides to assembly-transferred taps.
+    "crossbar median D from left boss tangent": 3,
     "front hanger z from upper sockets": 3,
     "rear hanger z from upper sockets": 3,
     "keeper x from left sockets": 3,

@@ -92,6 +92,7 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from _title_block_units import LENGTH_UNITS, render_number
+from _transgear_zone_line import SketchedLine, require_placed, sketch_lines
 from build_fr_top_frame import (
     BAR_POCKET_Z,
     BAR_WEB_X0,
@@ -120,7 +121,6 @@ from build_fr_top_frame import (
     HUB_GUSSET_HALF_IN,
     HUB_GUSSET_HALF_OUT,
     HUB_GUSSET_T,
-    HUB_RIB_W,
     INNER_X,
     INNER_Z,
     KEEPER_TAP_SPEC,
@@ -357,10 +357,10 @@ def hanger_center_landing() -> tuple[float, float, float]:
 # is (rule 7; farm runs 20261106T214613300Z and T221139403Z).  The Z
 # stations are the table's rows.
 HANGER_CENTER_QUALIFIER = "2X"
-# The 199.2 locates D itself -- the crossbar's median, the native centreline
-# between its two side faces -- from the left rail's outer face (sheet 3's
-# corner origin) under the .XXX band; it carries its value only
-# (drawing-guidelines.md rule 7).
+# The 204.5 (8.050) locates D itself -- the crossbar's median, the native
+# centreline between its two side faces -- from the left bosses' tangent
+# (sheet 3's boss-corner origin) under the .XXX band; it carries its value
+# only (drawing-guidelines.md rule 7).
 CROSSBAR_MEDIAN_DATUM_XY = (0.142, 0.095)
 # Transfer fit-up owns these locations; the nominal model holes and their
 # sheet coordinates are references, not independent inspection requirements.
@@ -1278,34 +1278,39 @@ DETAIL_TOP_KEEP = {
     "C0Dia": (0.035, 0.236),
     # Three rows (the value, the mating tube and the fit it holds, machinist
     # review r1), the widest 25 glyphs (2.58 mm each, farm run
-    # 20261106T212431241Z: 64.5 mm).  It stands left of the rail, under the
+    # 20261106T212431241Z: 64.5 mm).  It stands left of the plan, under the
     # boss's leader, so its radial leader climbs to A2's lower-left rim and
-    # crosses the rail's outer face below that face's junction with the
-    # boss, where the 7.840's extension line starts: above A2 (0.255) the
-    # leader crossed the 7.840's dimension line at its left arrowhead
-    # (machinist reviews of farm run 20261107T170344738Z's PDF, 1 run in
-    # each of three).
+    # never reaches datum D's dimension line: above A2 (0.255) the leader
+    # crossed that line at its left arrowhead (machinist reviews of farm run
+    # 20261107T170344738Z's PDF, 1 run in each of three).  On its way it
+    # crosses the left boss tangent's phantom line, plan geometry like the
+    # boss outline it also crosses.
     "B0Dia": (0.047, 0.193),
 }
 # Sheet 3's tagged hole table (drawing-guidelines.md rule 10: more than one
 # hole group carries a mate): the four socket bores and the two hanger
 # clearance holes, X and Y from the frame's lower-left corner on the plan
-# (the rear-left), the virtual sharp of the left rail's and the rear rail's
-# outer faces, which the boss breaks: a corner the shop picks up with an
-# edge finder on those two straight faces, never a hole centre (owner
-# 2026-11-07, rule 10).  Every hole then reads positive X and Y.  The
-# table's native origin mark is reattached to a view point on that sharp,
-# its X and Y arrows set below and left of it (TABLE_ORIGIN_ARROW_*).  The
+# (the rear-left): owner ruling 2026-11-07, the virtual corner where the
+# Ø1.77 boss ODs touch -- the tangent to the two lower bosses' ODs (Y 0)
+# and the tangent to the two left bosses' ODs (X 0).  The bosses are the
+# frame's outermost surfaces, so they are what sits on the parallels and
+# against the jaw and what the edge finder picks up; the rail faces stand
+# .135/.210 behind them.  Both tangents print as thin phantom lines
+# (TABLE_TANGENT_*), the left one running on up as datum D's 8.050
+# extension line.  Every hole then reads positive X and Y.  The table's
+# native origin mark is reattached to a view point on that corner, its X
+# and Y arrows set below and left of it (TABLE_ORIGIN_ARROW_*).  The
 # keeper taps stay out: MHA-CH-07 transfers them at assembly, so their
 # callout places them.  The table hangs in the band under the plan, over
 # the edge-break note, left of the title block: the origin mark's X arrow
-# runs 9 mm under the corner (y 95.0 mm), its labels 2 mm either side, so
-# the table's top starts at 81.5, 2.5 under them; farm run
-# 20261106T204855971Z measured the table 46.4 mm tall (then seven rows of
-# 6 mm and its header), so the note's first row starts at 33.0, 2.1 under
-# it.  The native SIZE column is hidden: it printed the doc-precision
-# "Ø1.00 THRU" and "Ø .24 THRU ALL" against the plan's own callouts, which
-# already give each tag group's size once (rule 10).
+# runs where it ran under the rail faces' corner (y 95.0 mm less the 9 mm
+# offset), its labels 2 mm either side, so the table's top starts at 81.5,
+# 2.5 under them; farm run 20261106T204855971Z measured the table 46.4 mm
+# tall (then seven rows of 6 mm and its header), so the note's first row
+# starts at 33.0, 2.1 under it.  The native SIZE column is hidden: it
+# printed the doc-precision "Ø1.00 THRU" and "Ø .24 THRU ALL" against the
+# plan's own callouts, which already give each tag group's size once (rule
+# 10).
 HOLE_TABLE_ANCHOR = (0.0175, 0.0815)
 HOLE_TABLE_ROW_HEIGHT = 0.006
 HOLE_TABLE_TAG_WIDTH = 0.012
@@ -1335,15 +1340,27 @@ _HOLE_TAG_HALF = (0.0025, 0.00175)
 _TITLE_BLOCK_LEFT = 0.216
 SOCKET_TABLE_MATES = "MHA-FR-03, MHA-FR-01"
 HANGER_TABLE_MATE = "MHA-SM-VN-52"
-TABLE_ORIGIN_XZ = (-OUTER_X, OUTER_Z)
+TABLE_ORIGIN_XZ = (-COLUMN_X - BOSS_DIA / 2.0, REAR_COLUMN_Z + BOSS_DIA / 2.0)
 # The origin mark's arrow tips about the corner (sheet m): the X arrow runs
-# right 16 mm on a line 9 mm under the corner, the Y arrow up 16 mm on a
-# line 9 mm left of it (the native mark draws each from the corner's own
+# right 16 mm on a line 7.3 mm under the corner, the Y arrow up 16 mm on a
+# line 7.3 mm left of it (the native mark draws each from the corner's own
 # ordinate, "0", to its letter; default 13.5 mm off, which put X into the
-# table).  9 mm clears the lower-left boss (it reaches 1.7 mm under and
-# 2.7 mm left of the corner at 1:2) with the labels' 2 mm.
-TABLE_ORIGIN_ARROW_OFFSET = 0.009
+# table).  The boss corner stands 1.71 mm under and 2.67 mm left of the
+# rail faces' corner at 1:2, whose arrows stood 9 mm off: 7.3 keeps the X
+# arrow and its labels on the line they held over the table, and the bosses
+# reach no further than the corner's own lines.
+TABLE_ORIGIN_ARROW_OFFSET = 0.0073
 TABLE_ORIGIN_ARROW_LENGTH = 0.016
+# The two boss tangents that make the corner, thin phantom
+# (swLineStyles_e.swLinePHANTOM, swLW_THIN): the lower one from the corner
+# to the lower-right boss's tangent point, the left one from the corner up
+# past the upper-left boss to datum D's dimension line, whose extension
+# line it is (TABLE_TANGENT_TOP_Y, 2.5 mm over that line like a native
+# extension's overrun).
+TABLE_TANGENT_LINE_STYLE = 2
+TABLE_TANGENT_LINE_WEIGHT = 0
+D_STATION_TEXT_XY = (0.162, 0.240)
+TABLE_TANGENT_TOP_Y = D_STATION_TEXT_XY[1]
 # (x, z, diameter, mate) in part mm.
 TABLE_HOLES: tuple[tuple[float, float, float, str], ...] = (
     *(
@@ -3470,26 +3487,18 @@ def _socket_bore_circle(edges: ViewEdges, x: float, z: float, *, label: str) -> 
     return socket.edge
 
 
-def _face_line(
-    edges: ViewEdges, *, axis: int, across: int, at: float, face: str,
-    through: float | None = None,
-) -> Any:
-    """A plan's visible straight edge running along model ``axis`` with its
-    ``across`` coordinate at ``at`` mm: the one whose run spans ``through``
-    when given, else the longest.  Picked from the scanned edges, not by a
-    sheet point, so the edge break's inner line 0.76 mm away (farm run
-    20261107T122639370Z: a point pick measured 1.524 short) cannot win."""
+def _face_line(edges: ViewEdges, *, axis: int, across: int, at: float, face: str) -> Any:
+    """A plan's longest visible straight edge running along model ``axis``
+    with its ``across`` coordinate at ``at`` mm.  Picked from the scanned
+    edges, not by a sheet point, so the edge break's inner line 0.76 mm away
+    (farm run 20261107T122639370Z: a point pick measured 1.524 short) cannot
+    win."""
     runs = [
         item for item in edges.lines
         if all(
             abs(item.line[0][k] - item.line[1][k]) < 1e-6 for k in (0, 1, 2) if k != axis
         )
         and abs(item.line[0][across] - at) < 1e-3
-        and (
-            through is None
-            or min(item.line[0][axis], item.line[1][axis]) < through
-            < max(item.line[0][axis], item.line[1][axis])
-        )
     ]
     if not runs:
         raise RuntimeError(f"holes/sockets plan shows no straight edge of the {face}")
@@ -3497,17 +3506,47 @@ def _face_line(
 
 
 def _hole_table_axes(edges: ViewEdges) -> tuple[Any, Any]:
-    """The plan's two datum edges: the longest visible straight edge of the
+    """The plan's two axis edges: the longest visible straight edge of the
     rear rail's outer face (X-running, at z OUTER_Z) and of the left rail's
-    (Z-running, at x -OUTER_X), whose virtual sharp is TABLE_ORIGIN_XZ.
+    (Z-running, at x -OUTER_X), parallel to the boss tangents that make
+    TABLE_ORIGIN_XZ.
 
-    They give the native table its axis directions; its origin is then
-    reattached to the theoretical point on that sharp.
+    They give the native table its axis directions only; its origin is the
+    theoretical point on the boss corner.
     """
     return (
-        _face_line(edges, axis=0, across=2, at=TABLE_ORIGIN_XZ[1], face="rear rail's outer face"),
-        _face_line(edges, axis=2, across=0, at=TABLE_ORIGIN_XZ[0], face="left rail's outer face"),
+        _face_line(edges, axis=0, across=2, at=OUTER_Z, face="rear rail's outer face"),
+        _face_line(edges, axis=2, across=0, at=-OUTER_X, face="left rail's outer face"),
     )
+
+
+def _draw_boss_tangents(adapter: Any, view: Any) -> dict[str, SketchedLine]:
+    """TABLE_ORIGIN_XZ's two boss tangents on the plan, thin phantom: the
+    lower one from the corner to the lower-right boss's tangent point, the
+    left one from the corner up past the upper-left boss to
+    TABLE_TANGENT_TOP_Y, where it serves as datum D's extension line."""
+    x0, z0 = TABLE_ORIGIN_XZ
+    corner, lower_right = (
+        model_point_in_view(
+            adapter, view, (x / 1000.0, HALF_H / 1000.0, z / 1000.0), label=label,
+        )
+        for x, z, label in (
+            (x0, z0, "hole-table boss corner"),
+            (COLUMN_X, z0, "lower-right boss tangent point"),
+        )
+    )
+    font = {"style": TABLE_TANGENT_LINE_STYLE, "width": TABLE_TANGENT_LINE_WEIGHT}
+    lines = sketch_lines(
+        adapter, view,
+        {
+            "lower boss tangent": (tuple(corner[:2]), tuple(lower_right[:2])),
+            "left boss tangent": (tuple(corner[:2]), (corner[0], TABLE_TANGENT_TOP_Y)),
+        },
+        label="hole-table boss tangent", **font,
+    )
+    rebuild_drawing(adapter, label="hole-table boss tangents")
+    require_placed(adapter, lines, label="hole-table boss tangent", stage="drawn", **font)
+    return lines
 
 
 def _set_table_origin_arrows(adapter: Any, table: Any, corner_xy: tuple[float, float]) -> None:
@@ -4280,16 +4319,16 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("D",), quantity=HANGER_CENTER_QUALIFIER,
         label="hanger axes on crossbar median plane",
     )
-    # D's own station: the crossbar median from the left rail's outer face,
-    # the Y edge of the hole table's corner origin, so the view keeps one
-    # origin (farm run 20261107T105312645Z, machinist review r1+r3: the old
-    # 7.165 from the upper-left socket axis gave the view a second origin),
-    # in the .XXX band the seat-footprint stack charges.  The median is the
-    # native centreline between the two side-face edges (sheet 2's flange
-    # width picks), so it follows the faces.  The dimension picks it by the
-    # documented CENTERLINE select type at its mid-bar point, clear of both
-    # holes; the face end picks the rail's outer edge between the upper-left
-    # boss and the set-screw boss.
+    # D's own station: the crossbar median from the left bosses' tangent,
+    # the Y edge of the hole table's boss corner (owner ruling 2026-11-07),
+    # so the view keeps one origin (farm run 20261107T105312645Z, machinist
+    # review r1+r3: a 7.165 from the upper-left socket axis gave the view a
+    # second origin), in the .XXX band the seat-footprint stack charges.
+    # The median is the native centreline between the two side-face edges
+    # (sheet 2's flange width picks), so it follows the faces.  The
+    # dimension picks it by the documented CENTERLINE select type at its
+    # mid-bar point, clear of both holes, and the tangent by its sketch
+    # segment, which runs up past the dimension line as its extension line.
     crossbar_median_x = (BAR_X0 + BAR_X1) / 2.0
     _insert_crossbar_median(
         adapter, detail_top,
@@ -4299,24 +4338,14 @@ async def build(adapter: Any) -> dict[str, str]:
             label="crossbar sides for median D",
         )),
     )
-    # The face's run between the upper-left boss and the set-screw boss's
-    # rib, picked from the scan at its middle, so the extension line leaves
-    # that run's upper end and never lies along the rail's outline.
-    face_z = (FRONT_COLUMN_Z + BOSS_DIA / 2.0 + GOOSENECK_Z - HUB_RIB_W / 2.0) / 2.0
-    left_rail_face = (-OUTER_X, HALF_H, face_z)
+    tangents = _draw_boss_tangents(adapter, detail_top)
     _checked_dimension(
         adapter, detail_top,
-        p0=left_rail_face, p1=(crossbar_median_x, HALF_H, 0.0),
-        text_xy=(0.162, 0.240), label="crossbar median D from left rail face",
-        expected_mm=OUTER_X + crossbar_median_x, orientation="horizontal",
-        entity_types=("EDGE", "CENTERLINE"),
-        entities=(
-            _face_line(
-                detail_top_edges, axis=2, across=0, at=-OUTER_X, through=face_z,
-                face="left rail's outer face above the set-screw boss",
-            ),
-            None,
-        ),
+        p0=(TABLE_ORIGIN_XZ[0], HALF_H, 0.0), p1=(crossbar_median_x, HALF_H, 0.0),
+        text_xy=D_STATION_TEXT_XY, label="crossbar median D from left boss tangent",
+        expected_mm=crossbar_median_x - TABLE_ORIGIN_XZ[0], orientation="horizontal",
+        entity_types=("SKETCHSEGMENT", "CENTERLINE"),
+        entities=(tangents["left boss tangent"].segment, None),
     )
     # #946: RD4 reads off the rear keeper tap, from the rail's outer side.
     rear_keeper = (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_REAR)

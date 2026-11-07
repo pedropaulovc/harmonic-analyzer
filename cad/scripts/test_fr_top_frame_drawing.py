@@ -831,7 +831,7 @@ def test_knife_seat_footprints_cover_both_ways_round() -> None:
     hole (datum B) on the +X pin or turned 180 deg onto the -X pin.  Owner
     ruling 2026-11-06: both reams sit under one 2X ⌖Ø.004|A|D, BASIC from
     D, so either pin's envelope is the same: along the line D's band from
-    the left rail's face plus the zone radius, across it the screw axis's band plus
+    the left bosses' tangent plus the zone radius, across it the screw axis's band plus
     the pattern's implied-zero .XXX, each with the round hole's slip.  Each
     hull holds both blocks' unturned print-worst corners at the along- and
     across-line extremes, and the edge-break check certifies those hulls."""
@@ -840,7 +840,7 @@ def test_knife_seat_footprints_cover_both_ways_round() -> None:
 
     slip = dowel.SLIP_CLEARANCE_MAX / 2.0
     x_band = (
-        spec.PRINTED_LINEAR_BAND_MM[spec.DRAWING_REFERENCE_PRECISION["crossbar median D from left rail face"]]
+        spec.PRINTED_LINEAR_BAND_MM[spec.DRAWING_REFERENCE_PRECISION["crossbar median D from left boss tangent"]]
         + spec.HANGER_PIN_X_FROM_D_TOL
         + slip
     )
@@ -2343,12 +2343,12 @@ def test_crossbar_median_control_cancels_the_socket_station_chain() -> None:
 
 
 def test_hanger_x_locates_datum_d_not_a_hole() -> None:
-    """The 199.2 (7.840) runs from the left rail's outer face -- the Y edge
-    of sheet 3's corner origin, so the view keeps one origin (farm run
-    20261107T105312645Z: the old 7.165 from the upper-left socket axis read
-    as a second origin) -- to D's trace, the native centreline between the
-    crossbar's two side-face edges, an .XXX locator; no competing hole-axis
-    X dimension survives."""
+    """The 204.5 (8.050) runs from the left bosses' tangent -- the Y edge of
+    sheet 3's boss-corner origin (owner rulings 2026-11-07), so the view
+    keeps one origin (farm run 20261107T105312645Z: a 7.165 from the
+    upper-left socket axis read as a second origin) -- to D's trace, the
+    native centreline between the crossbar's two side-face edges, an .XXX
+    locator; no competing hole-axis X dimension survives."""
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     block = source[source.index("# D's own station"):source.index("# #946:")]
     assert "crossbar_median_x = (BAR_X0 + BAR_X1) / 2.0" in block
@@ -2358,23 +2358,15 @@ def test_hanger_x_locates_datum_d_not_a_hole() -> None:
         "((BAR_X0, HALF_H-EDGE_CHAMFER, 0.0), (BAR_X1, HALF_H-EDGE_CHAMFER, 0.0))"
         in block
     )
-    assert 'label="crossbar median D from left rail face"' in block
-    assert "expected_mm=OUTER_X + crossbar_median_x" in block
-    assert "p0=left_rail_face" in block
-    assert (
-        "face_z = (FRONT_COLUMN_Z + BOSS_DIA / 2.0 + GOOSENECK_Z - HUB_RIB_W / 2.0) / 2.0"
-        in block
-    )
-    # The face run between the upper-left boss and the set-screw boss's rib.
-    face_z = (part.FRONT_COLUMN_Z + part.BOSS_DIA / 2.0 + part.GOOSENECK_Z - part.HUB_RIB_W / 2.0) / 2.0
-    assert part.FRONT_COLUMN_Z + part.BOSS_DIA / 2.0 < face_z < part.GOOSENECK_Z - part.HUB_RIB_W / 2.0
-    # The face edge comes from the scan (a point pick took the edge break's
-    # inner line, 1.524 short); the median keeps its typed CENTERLINE pick
-    # at the mid-bar point, clear of both holes.
-    assert 'entity_types=("EDGE", "CENTERLINE")' in block
+    assert 'label="crossbar median D from left boss tangent"' in block
+    assert "expected_mm=crossbar_median_x - TABLE_ORIGIN_XZ[0]" in block
+    assert "text_xy=D_STATION_TEXT_XY" in block
+    # The tangent by its sketch segment; the median keeps its typed
+    # CENTERLINE pick at the mid-bar point, clear of both holes.
+    assert "tangents = _draw_boss_tangents(adapter, detail_top)" in block
+    assert 'entity_types=("SKETCHSEGMENT", "CENTERLINE")' in block
+    assert 'entities=(tangents["left boss tangent"].segment, None)' in block
     assert "p1=(crossbar_median_x, HALF_H, 0.0)" in block
-    assert "detail_top_edges, axis=2, across=0, at=-OUTER_X, through=face_z" in block
-    assert block.count("None,") == 1
     assert (
         part.STUD_Z_FRONT + spec.HANGER_WASHER.OD_MAX
         < 0.0
@@ -2385,12 +2377,38 @@ def test_hanger_x_locates_datum_d_not_a_hole() -> None:
     # rule 7: a location carries its value and band only.
     assert "suffix=" not in block[block.index("_checked_dimension("):]
     assert (part.BAR_X0 + part.BAR_X1) / 2.0 == pytest.approx(part.HANGER_X)
+    # D's station equals the hanger holes' table X, both from the corner.
+    d_station = part.HANGER_X - drawing.TABLE_ORIGIN_XZ[0]
+    assert d_station / 25.4 == pytest.approx(8.050, abs=0.0005)
 
 
-def test_face_line_takes_the_run_through_the_station_not_the_edge_break() -> None:
+def test_boss_tangents_make_the_table_corner_and_d_extension() -> None:
+    """Owner ruling 2026-11-07: the hole-table origin is the virtual corner
+    where the Ø1.77 boss ODs touch -- the lower bosses' tangent (Y 0) and
+    the left bosses' tangent (X 0) -- drawn as thin phantom lines, the left
+    one running up past the upper-left boss to datum D's dimension line."""
+    x0, z0 = drawing.TABLE_ORIGIN_XZ
+    r = part.BOSS_DIA / 2.0
+    assert x0 == pytest.approx(-part.COLUMN_X - r)
+    assert z0 == pytest.approx(part.REAR_COLUMN_Z + r)
+    # The bosses stand .210 / .135 proud of the rail faces.
+    assert (-x0 - part.OUTER_X) / 25.4 == pytest.approx(0.210, abs=0.0005)
+    assert (z0 - part.OUTER_Z) / 25.4 == pytest.approx(0.135, abs=0.0005)
+    assert (drawing.TABLE_TANGENT_LINE_STYLE, drawing.TABLE_TANGENT_LINE_WEIGHT) == (2, 0)
+    assert drawing.TABLE_TANGENT_TOP_Y == drawing.D_STATION_TEXT_XY[1]
+    # The left tangent reaches past the upper-left boss to D's line.
+    assert _plan(-part.COLUMN_X, part.FRONT_COLUMN_Z)[1] + r * _S < drawing.TABLE_TANGENT_TOP_Y
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    helper = source[source.index("def _draw_boss_tangents("):source.index("def _set_table_origin_arrows(")]
+    assert '"lower boss tangent": (tuple(corner[:2]), tuple(lower_right[:2]))' in helper
+    assert '"left boss tangent": (tuple(corner[:2]), (corner[0], TABLE_TANGENT_TOP_Y))' in helper
+    assert "(COLUMN_X, z0, \"lower-right boss tangent point\")" in helper
+    assert "require_placed(" in helper
+
+
+def test_face_line_takes_the_face_not_the_edge_break() -> None:
     """The scan pick holds the face line itself: the edge break's inner line
-    1.524 mm in never qualifies, and ``through`` picks the run that spans the
-    station even when the other run on the face is longer."""
+    1.524 mm in never qualifies; the face's longest run wins."""
     from types import SimpleNamespace
 
     x = -part.OUTER_X
@@ -2402,12 +2420,8 @@ def test_face_line_takes_the_run_through_the_station_not_the_edge_break() -> Non
     )
     edges = SimpleNamespace(lines=[inner, front, rear])
     assert drawing._face_line(edges, axis=2, across=0, at=x, face="left") == "rear run"
-    assert (
-        drawing._face_line(edges, axis=2, across=0, at=x, face="left", through=-50.0)
-        == "front run"
-    )
     with pytest.raises(RuntimeError, match="no straight edge"):
-        drawing._face_line(edges, axis=2, across=0, at=x, face="left", through=0.0)
+        drawing._face_line(edges, axis=2, across=0, at=x - 3.0, face="left")
 
 
 def test_crossbar_median_is_the_native_centreline_of_both_sides(monkeypatch) -> None:
@@ -5188,8 +5202,9 @@ def test_sheet_three_locates_its_holes_in_one_table_from_the_lower_left_corner()
     group's mate; the keeper taps are transferred from MHA-CH-07 at assembly,
     so their callout places them and no station dimension survives on the
     sheet.  Owner 2026-11-07: the origin is a corner the shop picks up with
-    an edge finder, never a hole centre -- the virtual sharp of the left and
-    rear rails' outer faces, so every hole reads positive."""
+    an edge finder, never a hole centre -- the virtual corner where the
+    Ø1.77 boss ODs touch, the lower and left bosses' tangents, so every hole
+    reads positive and A1 reads (.885, .885)."""
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     for retired in (
         "front hanger z from upper sockets", "rear hanger z from upper sockets",
@@ -5199,7 +5214,19 @@ def test_sheet_three_locates_its_holes_in_one_table_from_the_lower_left_corner()
     ):
         assert retired not in source, retired
     assert "_socket_hole_table(adapter, detail_top, detail_top_edges)" in source
-    assert drawing.TABLE_ORIGIN_XZ == (-part.OUTER_X, part.OUTER_Z)
+    x0, z0 = drawing.TABLE_ORIGIN_XZ
+    assert (x0, z0) == (
+        -part.COLUMN_X - part.BOSS_DIA / 2.0, part.REAR_COLUMN_Z + part.BOSS_DIA / 2.0,
+    )
+    locations = {
+        (x, z): (round((x - x0) / 25.4, 3), round((z0 - z) / 25.4, 3))
+        for x, z, _d, _m in drawing.TABLE_HOLES
+    }
+    assert locations[(-part.COLUMN_X, part.REAR_COLUMN_Z)] == (0.885, 0.885)
+    # The other rows shift +.210 in X and +.135 in Y from the rail-face corner.
+    for (x, z), (lx, ly) in locations.items():
+        assert lx == pytest.approx(round((x + part.OUTER_X) / 25.4, 3) + 0.210, abs=0.0011)
+        assert ly == pytest.approx(round((part.OUTER_Z - z) / 25.4, 3) + 0.135, abs=0.0011)
     assert all(
         x >= drawing.TABLE_ORIGIN_XZ[0] and z <= drawing.TABLE_ORIGIN_XZ[1]
         for x, z, _d, _m in drawing.TABLE_HOLES
@@ -5329,32 +5356,35 @@ def test_hole_tags_stand_in_the_windows_beside_their_holes() -> None:
 def test_socket_callout_leaves_its_leader_a_clear_corridor_to_a2() -> None:
     """Farm run 20261106T212431241Z (row past the frame); the machinist
     reviews of farm run 20261107T170344738Z's PDF (above A2 the leader
-    crossed the 7.840's dimension line at its left arrowhead).  The
-    block's widest row, 2.58 mm a glyph, stays inside the frame and ends
-    left of the rail's outer face; its radial leader to A2's near rim
-    crosses that face 2 mm or more below the face's junction with the
-    boss, where the 7.840's extension line starts, and stays under the
-    boss's own leader."""
+    crossed datum D's dimension line at its left arrowhead).  The block's
+    widest row, 2.58 mm a glyph, stays inside the frame and ends left of the
+    left boss tangent; its radial leader to A2's near rim stays well under
+    D's dimension line and under the boss leader's landing."""
     x, y = drawing.DETAIL_TOP_KEEP["B0Dia"]
     rows = drawing.DETAIL_CALLOUTS["B0Dia"].splitlines()
     assert len(rows) <= 2
     half = max(map(len, rows)) * 0.00258 / 2.0
     ink = drawing.INK_CLEARANCE
     assert x - half >= drawing.SHEET_FRAME[0] + ink
-    face_x = _plan(-part.OUTER_X, 0.0)[0]
-    assert x + half <= face_x - 0.005
+    tangent_x = _plan(drawing.TABLE_ORIGIN_XZ[0], 0.0)[0]
+    assert x + half <= tangent_x - 0.004
     cx, cy = _plan(-part.COLUMN_X, part.FRONT_COLUMN_Z)
-    start = (x + half, y)
-    run = math.dist(start, (cx, cy))
-    bore_r = part.BORE_DIA / 2.0 * _S
-    rim = (cx - (cx - start[0]) * bore_r / run, cy - (cy - start[1]) * bore_r / run)
-    t = (face_x - start[0]) / (rim[0] - start[0])
-    crossing_y = start[1] + t * (rim[1] - start[1])
-    boss_r = part.BOSS_DIA / 2.0 * _S
-    junction_y = cy - math.sqrt(boss_r**2 - (cx - face_x) ** 2)
-    assert junction_y - crossing_y >= 0.002
+
+    def landing(text_xy, radius):
+        run = math.dist(text_xy, (cx, cy))
+        return (
+            cx - (cx - text_xy[0]) * radius / run,
+            cy - (cy - text_xy[1]) * radius / run,
+        )
+
+    rim = landing((x + half, y), part.BORE_DIA / 2.0 * _S)
+    # D's dimension line prints about 2.5 mm under its text point.
+    assert drawing.D_STATION_TEXT_XY[1] - 0.0025 - max(rim[1], y) >= 0.02
+    boss_x, boss_y = drawing.DETAIL_TOP_KEEP["C0Dia"]
+    boss_landing = landing((boss_x, boss_y), part.BOSS_DIA / 2.0 * _S)
+    assert boss_landing[1] - rim[1] >= 0.005
     # Under the Ø1.77 boss leader's text point by more than the three rows.
-    assert drawing.DETAIL_TOP_KEEP["C0Dia"][1] - y >= 0.035
+    assert boss_y - y >= 0.035
 
 
 def test_side_rail_web_text_stands_over_its_own_section() -> None:

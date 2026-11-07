@@ -729,8 +729,8 @@ The grip no longer sets **MHA-SM-VN-52 thread engagement**: MHA-SM-00 step 4
 cuts each bolt to its own hole's measured stack plus **.351 ±.006 in** (8.9154 ±0.1524 mm)
 reach. The crossbar median datum D controls the hanger axes in X only:
 their BASIC X location is on D.
-The left-rail-face-to-D locator (from the hole table's corner origin)
-retains its ordinary location band; the front and
+The D locator from the left bosses' tangent (the hole table's boss-corner
+origin, owner ruling 2026-11-07) retains its ordinary location band; the front and
 rear Z station dimensions likewise remain ordinary toleranced dimensions.
 
 The mount's tap position is **Ø0.127 (.005) A B C**. Owner ruling
