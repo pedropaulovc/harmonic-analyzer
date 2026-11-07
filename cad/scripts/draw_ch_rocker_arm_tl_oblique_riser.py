@@ -235,7 +235,7 @@ requirement(
 _SCREW_SOURCES = ("SCREW_HOLES", "BLANK_ORIGIN", (_CALC, "RISER_SCREWS"))
 _SCREW_DIA_SOURCES = ("SCREW_DIA_PRINTED", "SCREW_DIA", "SCREW_SPEC", "SCREW_BODY_DIA")
 # (name, xy, cut dia, printed dia, station sources, dia sources): the wizard
-# cuts the #4 clearance (#30 drill) inside its printed Ø.1285 DRILLED HOLES band.
+# cuts the unchanged #4 clearance (#30 drill) inside the design Ø.128 +.004/0 band.
 _HOLE_ROWS = (
     *(
         (

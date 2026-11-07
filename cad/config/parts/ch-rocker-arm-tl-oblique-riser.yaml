@@ -8,7 +8,7 @@ ch-rocker-arm-tl-oblique-riser:
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
-  process: "start from 1/4 x 1-3/4 in 6061 bar; face to .24 and mill to 1.62 x 13.80; locate seven holes through the carrier and transfer the eighth from the left blind tap at assembly; drill #4 clearance through and countersink 82 degrees for four screws; drill .600 HUB, CL, CR and added left-clamp clearances through; self-cut the band with the 9/16 cutter before fitting the steel hub sleeve and loading the strap; break edges"
+  process: "start from 1/4 x 1-3/4 in 6061 bar; face to .24 and mill to 1.62 x 13.80; locate seven holes through the carrier and transfer the eighth from the left blind tap at assembly; drill #30 for the four #4 clearances and countersink 82 degrees; the three-place design nominal is .128 under DRILLED HOLES +.004/0, containing the actual .1285 drill (rounding to .129 would incorrectly exclude it); drill .600 HUB, CL, CR and added left-clamp clearances through; self-cut the band with the 9/16 cutter before fitting the steel hub sleeve and loading the strap; break edges"
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"

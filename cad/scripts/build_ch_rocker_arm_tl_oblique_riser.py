@@ -388,6 +388,15 @@ async def _countersink(
     return jobs
 
 
+def _require_screw_cut_in_printed_band(diameter_mm: float) -> None:
+    """Check the native Wizard cut against the reference's design limits."""
+    if not SCREW_DIA_PRINTED <= round(diameter_mm, 6) <= SCREW_DIA_PRINTED + DRILLED_BAND[0]:
+        raise RuntimeError(
+            f"wizard cut Ø{diameter_mm:.4f} is outside the printed "
+            f"Ø{SCREW_DIA_PRINTED} +{DRILLED_BAND[0]}/0"
+        )
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
@@ -481,17 +490,9 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(
         adapter, "screw holes", volume - v_screws, 0.01 * v_screws
     )
-    # The sheet prints ScrewDia, a reference circle, not the wizard's cut: the
-    # cut must lie in the printed size's DRILLED HOLES band.
-    if not (
-        SCREW_DIA_PRINTED
-        <= round(screws.hole_dia_mm, 6)
-        <= SCREW_DIA_PRINTED + DRILLED_BAND[0]
-    ):
-        raise RuntimeError(
-            f"wizard cut Ø{screws.hole_dia_mm:.4f} is outside the printed "
-            f"Ø{SCREW_DIA_PRINTED} +{DRILLED_BAND[0]}/0"
-        )
+    # ScrewDia owns the three-place design nominal, not a measurement of
+    # the #30 drill. Preserve readback on BOTH sides of its +.004/0 band.
+    _require_screw_cut_in_printed_band(screws.hole_dia_mm)
 
     # --- Planes through the two screw rows ----------------------------------
     for plane, y, y_drive in _ROW_PLANES:

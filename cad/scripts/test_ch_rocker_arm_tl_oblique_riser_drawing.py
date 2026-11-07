@@ -134,16 +134,32 @@ def test_flat_head_sinks_and_countersink_stays_in_the_blank() -> None:
 
 
 def test_the_screw_hole_has_one_callout_naming_its_countersink() -> None:
-    """Review r5: one callout, the #30 drill printed exactly at its places
-    (the DRILLED HOLES row bands it), the countersink below it."""
+    """Three-place design nominal, actual #30 cutter and unchanged countersink."""
     assert _on_inch_grid(spec.SCREW_DIA_PRINTED, spec.SCREW_DIA_PLACES)
+    assert spec.SCREW_DIA_PLACES == spec.DRAWING_PRECISION_BY_NAME["ScrewDia"] == 3
+    assert spec.SCREW_DIA_PRINTED == pytest.approx(0.128 * INCH)
+    assert spec.SCREW_DRILL == "#30"
+    assert spec.SCREW_DRILL_DIA == pytest.approx(0.1285 * INCH)
+    assert spec.SCREW_DIA == round(spec.SCREW_DRILL_DIA, 3)
     assert spec.GLOBALS["ScrewDia"] == spec.SCREW_DIA_PRINTED
     lo, hi = _features()["screw_hole_1"]["dia"]
     assert lo <= spec.SCREW_DIA <= hi
+    assert (lo, hi) == pytest.approx((0.128 * INCH, 0.132 * INCH))
+    assert round(spec.SCREW_DIA / INCH, 3) * INCH > spec.SCREW_DIA
     assert spec.CALLOUTS_ABOVE["ScrewDia"] == "4X"
     rows = spec.CALLOUTS_BELOW["ScrewDia"].split("\n")
-    assert rows[0] == "DRILL THRU" and rows[1] == spec.CSK_CALLOUT
+    assert rows[0] == "#30 DRILL THRU" and rows[1] == spec.CSK_CALLOUT
     assert "CskDia" not in set().union(*spec.DRAWING_DIMENSIONS.values())
+
+
+def test_native_screw_cut_readback_requires_both_design_limits() -> None:
+    lo = spec.SCREW_DIA_PRINTED
+    hi = lo + spec.DRILLED_BAND[0]
+    for diameter in (lo, spec.SCREW_DRILL_DIA, spec.SCREW_DIA, hi):
+        part._require_screw_cut_in_printed_band(diameter)
+    for diameter in (lo - 0.001, hi + 0.001):
+        with pytest.raises(RuntimeError, match="outside the printed"):
+            part._require_screw_cut_in_printed_band(diameter)
 
 
 def test_hole_locations_are_reference_values_from_the_carrier() -> None:
