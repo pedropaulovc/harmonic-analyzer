@@ -196,7 +196,10 @@ def test_screw_line_shortfall_is_the_owner_ruled_one() -> None:
 
 def test_tight_bands_name_their_mate() -> None:
     bore = drawing.DIMENSION_CALLOUTS["BoreDia"]
-    assert len(bore.split("\n")) == 2
+    # No row wider than round 1's 24 characters: the diameter line through
+    # the bore centre then runs diagonally, clear of the split face.
+    assert len(bore.split("\n")) == 3
+    assert max(map(len, bore.split("\n"))) <= 24
     assert "MHA-FR-03" in bore and spec.BORE_CLEARANCE_TEXT in bore
     low, high = spec.BORE_DIAMETRAL_CLEARANCE
     assert math.isclose(low, _in(0.004)) and math.isclose(high, _in(0.012))
