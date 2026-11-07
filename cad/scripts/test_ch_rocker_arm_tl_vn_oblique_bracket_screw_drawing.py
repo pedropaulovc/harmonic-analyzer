@@ -61,11 +61,20 @@ def test_quantity_thread_and_length_are_the_fastener_tables() -> None:
 
 def test_head_covers_the_kp08_hole_at_full_float() -> None:
     """The #8 at its UNC-3A minimum major floats 0.487 in the KP08's Ø5
-    (UNVERIFIED, #2184); the head's ASME B18.3 minimum still covers the hole
-    by 0.827, so it bears on the foot."""
-    assert spec.HEAD_DIA_MIN == pytest.approx(0.262 * IN)
+    (UNVERIFIED, #2184); the head's least flat bearing (ASME B18.3-2012
+    Table 1 #8: A min .257 less the K .008 edge break on each side, note
+    (12): .241) still covers the hole by 0.561, 0.074 more than the float,
+    so it bears on the foot."""
+    assert spec.HEAD_DIA_MIN == pytest.approx(0.257 * IN)
+    assert spec.HEAD_EDGE_BREAK_MAX == pytest.approx(0.008 * IN)
+    assert spec.HEAD_BEARING_DIA_MIN == pytest.approx(
+        spec.HEAD_DIA_MIN - 2.0 * spec.HEAD_EDGE_BREAK_MAX
+    )
+    assert spec.HEAD_BEARING_DIA_MIN == pytest.approx(0.241 * IN)
+    assert spec.HEAD_BEARING_R == pytest.approx(spec.HEAD_BEARING_DIA_MIN / 2.0)
     assert spec.HOLE_FLOAT == pytest.approx((5.0 - 0.1585 * IN) / 2.0)
-    assert spec.HEAD_OVER_HOLE == pytest.approx(0.827, abs=1e-3)
+    assert spec.HEAD_OVER_HOLE == pytest.approx(0.561, abs=1e-3)
+    assert spec.HEAD_OVER_HOLE - spec.HOLE_FLOAT == pytest.approx(0.0736, abs=1e-3)
     assert spec.HEAD_OVER_HOLE > spec.HOLE_FLOAT
     assert spec.TENSILE_PSI == 170_000
 

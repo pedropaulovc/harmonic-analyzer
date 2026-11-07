@@ -1615,7 +1615,9 @@ _NUT_TORQUE = _torque(NUT_SCREW_TORQUE_NM)
 # The listing's title says zinc alloy and its description cast iron; the jig
 # takes the weaker, zinc (Zamak 3, yield 208 MPa, SOURCED: AZoM
 # https://www.azom.com/article.aspx?ArticleID=9565, read 2026-11-04). The
-# head bears on the foot round the Ø5 hole (UNVERIFIED, #2184) with the
+# head's least flat bearing (bracket_screw.HEAD_BEARING_DIA_MIN, .241 in: ASME
+# B18.3 Table 1 #8, A min .257 less K .008 each edge, note (12)) bears on
+# the foot round the Ø5 hole (UNVERIFIED, #2184) with the
 # block floated fully to one side (bracket_screw.HOLE_FLOAT); the tap is the
 # worst-case full thread in TL-28's 6061 top-face thread. The torque is kept
 # at 1.0 N·m for the zinc foot. This is a seating torque: the KP08-to-TL-28
