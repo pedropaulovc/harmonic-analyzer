@@ -1060,13 +1060,16 @@ RAIL_SECTION_CENTER = (0.3566, 0.205)
 # sheet's restates the title block).
 RAIL_SECTION_CAPTION_XY = (0.3566, 0.169)
 SIDE_SECTION_CENTER = (0.2967, 0.106)
-SIDE_SECTION_SCALE = (1, 4)
-# The two 1:4 captions (each 43.6 mm wide with its scale row, farm run
-# 20261107T052027513Z) stand side by side under their own sections, 8 mm
-# apart: E-E's 6.7 mm left of its rail so it clears M-M's, M-M's centred
-# under its T.  Both drop 3.5 mm from the old E-E caption's 91.5 so M-M's
-# top stays 2.3 mm under the crossbar web callout's ink (y 88.4).
-SIDE_SECTION_CAPTION_XY = (0.290, 0.088)
+# E-E and M-M print at the sheet's own 1:3 (Main's delegated layout
+# ruling, 2026-11-07, after the machinist reviews of farm run
+# 20261107T204437943Z's PDF found the 1:4 T-sections cramped): like H-H,
+# their captions then carry no scale row (rule 9).  The captions (one
+# 44 mm "SECTION X-X" row) stand centred under their own sections, 3.5 mm
+# lower than the 1:4 pair so M-M's top stays clear of the crossbar web
+# callout's ink, which drops with the larger T; their bottoms stay 14 mm
+# over the title block's top (y 65.4).
+SIDE_SECTION_SCALE = (1, 3)
+SIDE_SECTION_CAPTION_XY = (0.2967, 0.0845)
 # E-E's web value and its 2X WEB row stand left of E-E's rail, on its
 # dimension line (printed 5.56 mm under the text point, 3.8 mm over the
 # flange).  Parked right of the rail (0.327) the 37.5 mm "2X SIDE RAIL WEB"
@@ -1076,7 +1079,7 @@ SIDE_SECTION_CAPTION_XY = (0.290, 0.088)
 # 20261107T204437943Z, r1).  E-E cuts the side rail only, so "2X WEB" says
 # it; its 15.5 mm row ends 2 mm left of the web's left extension line and
 # starts 10 mm right of the plan's 1.35 SIDE FLANGE text (x 266.7 mm).
-SIDE_WEB_TEXT_XY = (0.285, 0.120)
+SIDE_WEB_TEXT_XY = (0.284, 0.120)
 SIDE_WEB_QUALIFIER = "2X WEB"
 # Each section's web axis centreline runs this far (paper mm, times the
 # section's scale denominator in model mm) past the T's top and underside.
@@ -1105,22 +1108,23 @@ RAIL_SECTION_PROFILE_X = 0.35643
 SIDE_SECTION_PROFILE_X = 0.29666
 HUB_SECTION_PROFILE_X = 0.33198
 # M-M's crossbar T dimensions: the web's and the flange's dimension lines
-# stand one 5 mm gap off the T (the web's below its underside, the flange's
-# right of its +X face) and their text parks on a leader at the right of the
-# section, under E-E's side rail web text and right of M-M's caption.  The
-# pockets' depth (flange underside to the T's underside) stands 2 mm left of
-# the flange's -X face, its arrows inside: outside, their tails would cross
-# the side web's dimension line above and the web's arrow tail below.  Its
-# two rows (24.4 x 9.2 mm) park low between the side rail and the T, 2.3 mm
-# right of the rail and 3.0 under the side web's line, so the leader runs
-# shallow, 2.9 mm off its lower extension line's end.
+# stand one 5 mm paper gap off the T (15 model mm at 1:3: the web's below
+# its underside, the flange's right of its +X face) and their text parks on
+# a leader at the right of the section, right of M-M's caption, the
+# flange's 38.7 mm row 2 mm or more inside the sheet frame.  The pockets'
+# depth (flange underside to the T's underside) stands 2.7 mm left of the
+# flange's -X face, its arrows inside: outside, their tails would cross the
+# side web's dimension line above and the web's arrow tail below.  Its two
+# rows (24.4 x 9.2 mm) park low between the side rail and the T, 10 mm
+# right of the rail and 3.0 under the side web's line.
 _SIDE_SECTION_M_PER_MM = SIDE_SECTION_SCALE[0] / SIDE_SECTION_SCALE[1] / 1000.0
+_SECTION_DIM_GAP_MM = 5.0 * SIDE_SECTION_SCALE[1] / SIDE_SECTION_SCALE[0]
 
 
 def _side_section_xy(x: float, y: float) -> tuple[float, float]:
-    """Sheet point of model ``(x, y)`` on E-E's and M-M's shared 1:4 row:
-    E-E's rail pinned at x -197, M-M's crossbar where the old single E-E
-    printed it (CROSSBAR_SECTION_PROFILE_X)."""
+    """Sheet point of model ``(x, y)`` on E-E's and M-M's shared row: E-E's
+    rail pinned at x -197, M-M's crossbar the same model distance right of
+    it at the sections' scale (CROSSBAR_SECTION_PROFILE_X)."""
     return (
         SIDE_SECTION_PROFILE_X + (x + COLUMN_X) * _SIDE_SECTION_M_PER_MM,
         SIDE_SECTION_CENTER[1] + y * _SIDE_SECTION_M_PER_MM,
@@ -1135,12 +1139,14 @@ CROSSBAR_SECTION_CENTER = (CROSSBAR_SECTION_PROFILE_X, SIDE_SECTION_CENTER[1])
 CROSSBAR_SECTION_CAPTION_XY = (CROSSBAR_SECTION_PROFILE_X, SIDE_SECTION_CAPTION_XY[1])
 
 
-CROSSBAR_WEB_LINE_XY = _side_section_xy(HANGER_X, -HALF_H - 20.0)
-CROSSBAR_WEB_TEXT_XY = (0.382, 0.094)
-CROSSBAR_FLANGE_LINE_XY = _side_section_xy(BAR_X1 + 20.0, (HALF_H + FLANGE_BOT_Y) / 2.0)
-CROSSBAR_FLANGE_TEXT_XY = (0.382, 0.108)
+CROSSBAR_WEB_LINE_XY = _side_section_xy(HANGER_X, -HALF_H - _SECTION_DIM_GAP_MM)
+CROSSBAR_WEB_TEXT_XY = (0.382, 0.0925)
+CROSSBAR_FLANGE_LINE_XY = _side_section_xy(
+    BAR_X1 + _SECTION_DIM_GAP_MM, (HALF_H + FLANGE_BOT_Y) / 2.0
+)
+CROSSBAR_FLANGE_TEXT_XY = (0.3936, 0.108)
 CROSSBAR_POCKET_DEPTH_LINE_XY = _side_section_xy(BAR_X0 - 8.0, (FLANGE_BOT_Y - HALF_H) / 2.0)
-CROSSBAR_POCKET_DEPTH_TEXT_XY = (0.3155, 0.1068)
+CROSSBAR_POCKET_DEPTH_TEXT_XY = (0.3245, 0.1068)
 # swDimensionArrowsSide_e (draw_dt_cone_tip_block's native-arrow precedent).
 _DIM_ARROWS_INSIDE = 0
 

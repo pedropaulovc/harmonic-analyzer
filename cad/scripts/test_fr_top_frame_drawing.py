@@ -1900,9 +1900,12 @@ def test_side_rail_and_crossbar_print_as_two_sections_without_a_sheet_scale() ->
     crossbar = source[source.index("section_label=CROSSBAR_SECTION_LETTER"):]
     for qualifier in ('"CROSSBAR WEB"', '"CROSSBAR FLANGE"', '"2X POCKET"'):
         assert qualifier in crossbar
-    # Both 1:4 captions stand side by side, M-M's under its T.
+    # Both print at the sheet's 1:3 (no scale row), their one-row captions
+    # (44 mm) side by side, each centred under its own section.
+    assert drawing.SIDE_SECTION_SCALE == (1, 3)
     assert drawing.CROSSBAR_SECTION_CAPTION_XY[1] == drawing.SIDE_SECTION_CAPTION_XY[1]
-    assert drawing.CROSSBAR_SECTION_CAPTION_XY[0] - drawing.SIDE_SECTION_CAPTION_XY[0] >= 0.0436 + 0.003
+    assert drawing.SIDE_SECTION_CAPTION_XY[0] == pytest.approx(drawing.SIDE_SECTION_PROFILE_X, abs=0.0002)
+    assert drawing.CROSSBAR_SECTION_CAPTION_XY[0] - drawing.SIDE_SECTION_CAPTION_XY[0] >= 0.044 + 0.003
     assert drawing.CROSSBAR_SECTION_PROFILE_X == pytest.approx(
         drawing._side_section_xy(part.HANGER_X, 0.0)[0]
     )
