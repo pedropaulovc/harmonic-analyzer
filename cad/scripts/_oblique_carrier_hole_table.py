@@ -142,6 +142,80 @@ def _rows(table: Any) -> dict[str, tuple[int, tuple[str, ...]]]:
     return rows
 
 
+def _row_holes(table: Any) -> dict[int, str]:
+    """Each generated row's physical hole, from its own native A1-baseline cells.
+
+    The printed .XXX location pairs of the thirteen holes are distinct, so a
+    row identifies exactly one hole or the table is refused.
+    """
+    if int(table.RowCount) != len(spec.TABLE_HOLES) + 1:
+        raise RuntimeError("carrier table has the wrong row inventory")
+    a1x, a1y = spec.PIN_HOLES["A1"]
+    expected = {
+        tag: tuple(round(value / spec.trammel.INCH, spec.TABLE_LOCATION_PLACES)
+                   for value in (x - a1x, y - a1y))
+        for tag, (x, y, _diameter) in spec.TABLE_HOLES.items()
+    }
+    if len(set(expected.values())) != len(expected):
+        raise AssertionError("two carrier holes print the same table location")
+    holes: dict[int, str] = {}
+    for row in range(1, int(table.RowCount)):
+        texts = tuple(str(table.DisplayedText2(row, col, False) or "").strip() for col in (1, 2))
+        if not all(re.fullmatch(r"-?\d*\.\d{3}", text) for text in texts):
+            raise RuntimeError(f"carrier table row {row} lost .XXX precision: {texts!r}")
+        matches = [
+            tag for tag, location in expected.items()
+            if all(abs(float(text) - value) <= 1e-9 for text, value in zip(texts, location, strict=True))
+        ]
+        if len(matches) != 1 or matches[0] in holes.values():
+            raise RuntimeError(f"carrier table row {row} is not exactly one hole from A1: {texts!r}")
+        holes[row] = matches[0]
+    return holes
+
+
+def _hole_tag_reader(feature: Any, current: dict[int, str]) -> int:
+    """Measured offset of IHoleTable.HoleTag's index from the table row index."""
+    offsets = []
+    for offset in (1, 0):
+        try:
+            if all(str(feature.HoleTag(row - offset) or "").strip() == tag
+                   for row, tag in current.items()):
+                offsets.append(offset)
+        except Exception:  # an out-of-range probe index is simply not this convention
+            continue
+    if len(offsets) != 1:
+        raise RuntimeError("carrier HoleTag does not read back the generated TAG cells")
+    return offsets[0]
+
+
+def _assign_tags(feature: Any, table: Any) -> None:
+    """Rename SolidWorks' default A1..A13 tags to the owner tags, collision-free.
+
+    InsertHoleTable3's manual tags are prefixes that SolidWorks numbers per
+    prefix (farm 4d: "A1" printed as "A11"). The documented IHoleTable.HoleTag
+    setter takes the exact tag but refuses a name another row still holds, and
+    the defaults A1/A2 are also owner tags. Every row is therefore first moved
+    to an unused temporary, then to its owner tag, each write read back.
+    """
+    holes = _row_holes(table)
+    current = {row: str(table.DisplayedText2(row, 0, False) or "").strip() for row in holes}
+    if len(set(current.values())) != len(current) or not all(current.values()):
+        raise RuntimeError(f"carrier table generated duplicate or empty tags: {current!r}")
+    offset = _hole_tag_reader(feature, current)
+    temporary = {row: f"TMP{row}" for row in holes}
+    if set(temporary.values()) & (set(current.values()) | set(spec.TABLE_HOLES)):
+        raise AssertionError("carrier temporary tags collide with a live or owner tag")
+    feature.EnableUpdate = False
+    try:
+        for names in (temporary, holes):
+            for row, name in names.items():
+                feature.SetHoleTag(row - offset, name)
+                if str(feature.HoleTag(row - offset) or "").strip() != name:
+                    raise RuntimeError(f"carrier hole tag {name!r} was not assigned to row {row}")
+    finally:
+        feature.EnableUpdate = True
+
+
 def _tags(adapter: Any, view: Any, edges: dict[str, Any], *, place: bool) -> None:
     found = {}
     for raw in view.GetAnnotations() or ():
@@ -205,6 +279,7 @@ def create_carrier_hole_table(
     _outer_row_source(model)
     # Insert against a real corner, then use the documented IDatumOrigin
     # reattachment to the actual A1 circular edge. No constructed datum point.
+    # Default alphanumeric tags, renamed below from each row's own A1 cells.
     order = sorted(spec.TABLE_HOLES, key=lambda tag: spec.TABLE_HOLES[tag][:2])
     table = insert_hole_table(
         adapter, view,
@@ -213,7 +288,7 @@ def create_carrier_hole_table(
                      for x, y, diameter in (spec.TABLE_HOLES[tag] for tag in order)],
         hole_entities=[edges[tag] for tag in order],
         anchor_xy=TABLE_ANCHOR, basic_locations=False, label="carrier A1 baseline",
-        unit=spec.UNIT, location_places=spec.TABLE_LOCATION_PLACES, manual_tags=order,
+        unit=spec.UNIT, location_places=spec.TABLE_LOCATION_PLACES,
     )
     feature = _early_bound(_early_bound(table, "IHoleTableAnnotation").HoleTable, "IHoleTable")
     origin = _early_bound(feature.DatumOrigin, "IDatumOrigin")
@@ -226,6 +301,8 @@ def create_carrier_hole_table(
         raise RuntimeError("carrier hole-table origin could not attach to the actual A1 axis")
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="carrier A1 table datum")
+    _assign_tags(feature, table)
+    rebuild_drawing(adapter, label="carrier owner tags")
     rows = _rows(table)
     generated = {tag: cells[:4] for tag, (_row, cells) in rows.items()}
     if not table.InsertColumn2(3, 3, "NOTE", 0):  # swTableItemInsertPosition_After

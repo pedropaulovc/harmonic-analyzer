@@ -270,17 +270,80 @@ def test_outer_note_reads_actual_model_limits_and_never_writes_them(monkeypatch)
     assert "SetValues" not in source and "SetPrecision" not in source
 
 
-def test_native_table_uses_documented_manual_tags_and_real_edge_reattachment():
-    signature = inspect.signature(insert_hole_table)
-    assert signature.parameters["manual_tags"].default is None
+def test_native_table_renames_default_tags_and_reattaches_the_real_edge():
+    assert "manual_tags" not in inspect.signature(insert_hole_table).parameters
     source = inspect.getsource(table.create_carrier_hole_table)
     assert 'edges["A1"]' in source and "origin.Reattach()" in source
-    assert "datum_point=" not in source
-    assert "manual_tags=order" in source
+    assert "datum_point=" not in source and "manual_tags" not in source
+    # Rename only after the datum is A1 (rows identify by their A1 cells),
+    # then rebuild before the generated rows are frozen.
+    assert (source.index("origin.Reattach()") < source.index("_assign_tags(feature, table)")
+            < source.index('label="carrier owner tags"') < source.index("rows = _rows(table)"))
     assert "cells[:4] != generated[tag]" in source
     assert "GetCorrespondingEntity2" in inspect.getsource(table._source_edges)
     assert "GetAttachedEntities3" in inspect.getsource(table._tags)
     assert "table_settled" in inspect.getsource(drawing.build)
+
+
+class DefaultTagTable(NativeCells):
+    """SolidWorks' default A1..A13 tags in its XY order, rows not in spec order."""
+
+    def __init__(self, *, base=0, refuse=False):
+        super().__init__()
+        body = self.cells[1:]
+        body.reverse()
+        xy_order = sorted(spec.TABLE_HOLES, key=lambda tag: spec.TABLE_HOLES[tag][:2])
+        for row in body:
+            row[0] = f"A{xy_order.index(row[0]) + 1}"
+        self.cells[1:] = body
+        self.base, self.refuse, self.EnableUpdate, self.writes = base, refuse, True, []
+
+    # IHoleTable.HoleTag/SetHoleTag over the same rows (``base`` 0 or 1).
+    def HoleTag(self, index):
+        row = index + 1 - self.base
+        if not 1 <= row < self.RowCount:
+            raise IndexError(index)
+        return self.cells[row][0]
+
+    def SetHoleTag(self, index, name):
+        assert self.EnableUpdate is False
+        self.writes.append(name)
+        row = index + 1 - self.base
+        held = {cells[0] for i, cells in enumerate(self.cells[1:], 1) if i != row}
+        if not self.refuse and name not in held:  # a live duplicate is refused
+            self.cells[row][0] = name
+
+
+@pytest.mark.parametrize("base", [0, 1])
+def test_default_tags_are_renamed_two_phase_by_each_rows_a1_cells(base):
+    native = DefaultTagTable(base=base)
+    assert {cells[0] for cells in native.cells[1:]} >= {"A1", "A2"}  # live collisions
+    table._assign_tags(native, native)
+    assert native.EnableUpdate is True
+    assert set(table._rows(native)) == set(spec.TABLE_HOLES)
+    assert len(native.writes) == 2 * len(spec.TABLE_HOLES)
+    assert all(name.startswith("TMP") for name in native.writes[:len(spec.TABLE_HOLES)])
+    # A single-phase rename would be refused by the live default tags.
+    direct = DefaultTagTable(base=base)
+    holes = table._row_holes(direct)
+    direct.EnableUpdate = False
+    for row, tag in holes.items():
+        direct.SetHoleTag(row - 1 + base, tag)
+    assert {cells[0] for cells in direct.cells[1:]} != set(spec.TABLE_HOLES)
+
+
+@pytest.mark.parametrize("fault", ["refused", "unreadable", "ambiguous_row", "precision"])
+def test_tag_assignment_refuses_unproven_rows_and_writes(monkeypatch, fault):
+    native = DefaultTagTable(refuse=fault == "refused")
+    if fault == "unreadable":
+        monkeypatch.setattr(native, "HoleTag", lambda _index: "A99")
+    elif fault == "ambiguous_row":
+        native.cells[2][1:3] = native.cells[1][1:3]
+    elif fault == "precision":
+        native.cells[3][1] += "0"
+    with pytest.raises(RuntimeError):
+        table._assign_tags(native, native)
+    assert native.EnableUpdate is True
 
 
 @pytest.mark.parametrize("fault", ["wrong_edge", "missing", "duplicate", "orphan", "dangling"])
