@@ -56,8 +56,8 @@ ARM_FACE_WALL_MIN = _floor_3pl(FERRULE_ARM_FACE_WALL_MIN)
 BORE_FIT_CALLOUT = "\n".join(
     (
         "BORE THRU",
-        f"BONDED FIT, {HANDLE_NUMBER} TENON",
-        f"TURNED TO SUIT (CLEARANCE {inch_text(TENON_GLUE_LINE[0], 3)}-"
+        f"BONDED FIT ON {HANDLE_NUMBER} TENON TURNED",
+        f"TO MEASURED BORE (CLEARANCE {inch_text(TENON_GLUE_LINE[0], 3)}-"
         f"{inch_text(TENON_GLUE_LINE[1], 3)})",
     )
 )
