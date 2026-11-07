@@ -8,10 +8,10 @@ printed here is read from it.
 
 drawing-guidelines.md rule 7: a callout carries its size and process lines
 plus at most two lines of words; anything longer is a numbered note its
-callout links by ``SEE NOTE n``.  Rule 4: the bore's matched fit takes a
-standard fit name, the mate's drawing number and the resulting clearance as
-REF; one feature with several tight dimensions (the teeth: span and tip)
-names its mate once, in the GEAR DATA block both dimensions link.
+callout links by ``SEE NOTE n``.  Rule 4: the bore's fit takes a standard
+fit name, the mate's drawing number and the resulting clearance as REF; one
+feature with several tight dimensions (the teeth: span and tip) names its
+mate once, in the GEAR DATA block both dimensions link.
 """
 
 from __future__ import annotations
@@ -23,22 +23,25 @@ import pd_transgear_knob_shaft_spec as knob
 from pd_rack_pinion_spec import (
     BORE_FRONT_CHAMFER,
     CENTRE_DISTANCE_WINDOW,
-    FRONT_FACE_DATUM,
-    GEAR_DATA,
+    CUTTER_NUMBER,
+    CUTTER_TOOTH_RANGE,
+    DIAMETRAL_PITCH,
     HUB_NUMBER,
-    KNOB_NUMBER,
     MESH_PINION_TEETH,
     MOUTH_BREAK_MAX,
     PITCH_DIA,
     PRESSURE_ANGLE_DEG,
-    SCREW_NUMBER,
     SPIGOT_DIAMETRAL_CLEARANCE,
     TAP_WALL_TEXT,
+    TEETH,
+    WHOLE_DEPTH,
     inch_ceil_mm,
     inch_floor_mm,
     inch_text,
 )
 
+KNOB_NUMBER = "MHA-PD-08"
+SCREW_NUMBER = "MHA-PD-VN-55"
 BORE_NOTE = 1
 TAP_NOTE = 2
 
@@ -57,14 +60,20 @@ TAP_CALLOUT_QUALIFIER = "\n".join(TAP_CALLOUT_LINES)
 # The span and the tip serve the one mesh: each links the GEAR DATA block,
 # which names the mate once with its backlash acceptance.
 MESH_CALLOUT = "SEE GEAR DATA"
+# The .XXX thickness is the screw engagement's: its least is the tapped
+# length (pd_vn_transgear_disc_screw_spec), and .XX would cut that below
+# 1.5D.
+FACE_WIDTH_CALLOUT = f"SETS {SCREW_NUMBER}\nENGAGEMENT"
 
 _CLEARANCE = "-".join(inch_text(value, 4) for value in SPIGOT_DIAMETRAL_CLEARANCE)
-# Rule 20: the tap-to-bore web's stated shortfall (RV-03) rides the tap note.
+# The face view looks at the rear face, so the chamfered front (clamped)
+# edge is its far side.  Rule 20: the tap-to-bore web's stated shortfall
+# (RV-03) ends the tap note.
 DRAWING_NOTES = "\n".join(
     (
         f"{BORE_NOTE}. LOCATIONAL CLEARANCE FIT ON {HUB_NUMBER} SPIGOT",
         f"   (CLEARANCE {_CLEARANCE} REF). CHAMFER "
-        f"{inch_text(BORE_FRONT_CHAMFER, 3)} X 45\u00b0 AT FACE {FRONT_FACE_DATUM}.",
+        f"{inch_text(BORE_FRONT_CHAMFER, 3)} X 45\u00b0 FAR SIDE.",
         f"{TAP_NOTE}. MATCH-DRILL AT ASSEMBLY WITH {HUB_NUMBER}: SPOT THRU ITS FLANGE",
         f"   HOLES, THEN DRILL AND TAP; MATCH-MARK BOTH. {TAP_WALL_TEXT}.",
     )
@@ -97,21 +106,40 @@ BACKLASH_ACCEPT_MM = (
     inch_ceil_mm(BACKLASH_BUDGET_MM[0], 3),
     inch_floor_mm(BACKLASH_BUDGET_MM[1], 3),
 )
-if not BACKLASH_BUDGET_MM[0] <= BACKLASH_ACCEPT_MM[0] < BACKLASH_ACCEPT_MM[1] <= BACKLASH_BUDGET_MM[1]:
+if not (
+    BACKLASH_BUDGET_MM[0]
+    <= BACKLASH_ACCEPT_MM[0]
+    < BACKLASH_ACCEPT_MM[1]
+    <= BACKLASH_BUDGET_MM[1]
+):
     raise AssertionError(
         f"MHA-PD-06 backlash acceptance {BACKLASH_ACCEPT_MM} leaves the budget "
         f"{BACKLASH_BUDGET_MM}"
     )
 
-# The part's cutting rows (its "Gear Data" property) less the span, which the
-# face view prints with its limits, and the mate, restated with the backlash
-# acceptance that is the span band's fit route (rule 4).
-_MOVED_ROWS = ("SPAN OVER ", "MATES WITH:")
-GEAR_DATA_NOTE = "\n".join(
+# What a machinist needs to cut and check the teeth (Main ruling 2026-10-10):
+# the cutting rows, the mate and the backlash acceptance that is the span
+# band's fit route (rule 4).  The span prints on the face view with its
+# limits, not again here.
+_GEAR_DATA_ROWS = (
+    ("NUMBER OF TEETH", f"{TEETH}"),
+    ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
+    ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
+    ("PITCH DIAMETER (REF)", inch_text(PITCH_DIA, 4)),
+    ("WHOLE DEPTH (REF)", inch_text(WHOLE_DEPTH, 4)),
     (
-        *(line for line in GEAR_DATA.splitlines() if not line.startswith(_MOVED_ROWS)),
-        f"MATES WITH:  KNOB SHAFT {KNOB_NUMBER}, {MESH_PINION_TEETH}T",
-        "BACKLASH WITH MATE (FEELER):  "
-        + "-".join(inch_text(value, 3) for value in BACKLASH_ACCEPT_MM),
-    )
+        "CUTTER",
+        # #1 is open-ended (135T to rack): print the catalogue's range.
+        f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}T-RACK"
+        if CUTTER_TOOTH_RANGE[1] is None
+        else f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T",
+    ),
+    ("MATES WITH", f"KNOB SHAFT {KNOB_NUMBER}, {MESH_PINION_TEETH}T"),
+    (
+        "BACKLASH WITH MATE (FEELER)",
+        "-".join(inch_text(value, 3) for value in BACKLASH_ACCEPT_MM),
+    ),
+)
+GEAR_DATA_NOTE = "\n".join(
+    ("GEAR DATA", *(f"{label}:  {value}" for label, value in _GEAR_DATA_ROWS))
 )
