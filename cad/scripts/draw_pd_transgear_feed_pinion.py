@@ -15,9 +15,11 @@ lengths baselined from the rear face (drawing-guidelines.md rule 11 (turned
 parts read like the lathe)) and the step face (the disc hub's seat) square to
 the bore, all imported natively from the part with the places, bands and
 callout text the part authored (``pd_transgear_feed_pinion_spec``,
-``pd_transgear_feed_pinion_callouts``).  The oil hole is drilled through the
-seated hub at assembly, so the section carries only its drill note; its
-station belongs to the hub's sheet.  Decimal-inch sheet (#290); the model
+``pd_transgear_feed_pinion_callouts``).  The GEAR DATA block is the
+drawing's own note: its span row cites the MHA-PD-00 step that sets the
+mesh.  The oil hole is drilled through the seated hub into the bore at
+assembly, so the section carries only its drill note; its station belongs
+to the hub's sheet.  Decimal-inch sheet (#290); the model
 keeps its millimetre nominals.  Views C and D print at the sheet's 3:1, so
 no caption restates a scale (rule 9).
 """
@@ -68,6 +70,7 @@ from _part_properties import part_drawing_unit
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+import pd_paper_drive_assembly_steps as assembly_steps
 import pd_transgear_feed_pinion_callouts as callouts
 from paper_drive_stock_drawing import add_toothspace_callout, require_source_control
 from pd_rack_pinion_spec import inch_text
@@ -76,7 +79,9 @@ from pd_transgear_feed_pinion_spec import (
     BORE_DATUM,
     BORE_DIA,
     BOSS_DIA,
+    CUTTER_NUMBER,
     CUTTER_RUNOUT_MAX,
+    CUTTER_TOOTH_RANGE,
     DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -85,7 +90,9 @@ from pd_transgear_feed_pinion_spec import (
     HUB_NUMBER,
     OUTSIDE_DIA,
     OVERALL_LENGTH,
+    PITCH_DIA,
     PRESSURE_ANGLE_DEG,
+    RACK_NUMBER,
     RADIAL_SETTING,
     SURFACE_FINISHES,
     TEETH,
@@ -95,6 +102,7 @@ from pd_transgear_feed_pinion_spec import (
     TOOTH_SPACE_INSPECTION_PHASE_RAD,
     TOOTH_SPACE_CALLOUT_PROPERTY,
     TOOTH_EDGE_NOTE,
+    WHOLE_DEPTH,
 )
 
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -196,8 +204,10 @@ def _side_x(z_mm: float) -> float:
 # have an edge (2026-10-24 ENFORCE review): the root prints on the rear-face
 # view, where the full-depth gaps show their floors, and the cutter's
 # full-depth station and run-out limit (R9-67) on an outside view in the
-# section's direction, from the floor of the gap that faces it.
-FRONT_KEEP: dict[str, tuple[float, float]] = {"ToothSpan": (FRONT_CENTER[0], 0.112)}
+# section's direction, from the floor of the gap that faces it.  The span's
+# text stands 2.5 mm higher than with one callout row, so its matched-fit
+# row clears the toothspace control below (round 2).
+FRONT_KEEP: dict[str, tuple[float, float]] = {"ToothSpan": (FRONT_CENTER[0], 0.1145)}
 _SIDE_TOP = RIGHT_CENTER[1] + HALF_OD
 _SIDE_BOTTOM = RIGHT_CENTER[1] - HALF_OD
 _REAR_X = _side_x(0.0)
@@ -222,10 +232,11 @@ RIGHT_KEEP: dict[str, tuple[float, float]] = {
     # 4 mm farther out than run 20261027T064211655Z, whose "RACK" touched
     # the bore dimension's lower extension line (r1, r3).
     "OutsideDia": (_REAR_X - 0.044, RIGHT_CENTER[1]),
-    # Its fit's two rows (the standard fit name and mate, the route and the
-    # clearance REF) are the sheet's widest: centred this far out, the text
-    # starts right of the flat's dimension line and ends inside the border.
-    "BossDia": (_NOSE_X + 0.066, RIGHT_CENTER[1]),
+    # Its fit's two rows (the standard fit name and the mate's name and
+    # number, the route and the clearance REF) are the sheet's widest:
+    # centred this far out, the text starts right of the flat's dimension
+    # line and ends inside the border.
+    "BossDia": (_NOSE_X + 0.074, RIGHT_CENTER[1]),
     # Its dimension line stands just right of the nose; the text prints right
     # of the line, below the flat (run 20261027T032128736Z: 30 mm out, the
     # outside view's outline struck its last row).
@@ -251,8 +262,9 @@ RIGHT_KEEP: dict[str, tuple[float, float]] = {
 # ENFORCE review, r1, r2: without one, the 13.80 MAX's extension line
 # landed past the drawn end and the view read as the whole part).
 # It stands 4 mm higher than the uncropped view did, so the full depth's
-# extra row stays above the title block.
-LEFT_CENTER = (0.373, 0.116)
+# extra row stays above the title block, and 15 mm farther right than round
+# 2, so the full depth's text, naming the rack, clears the overall's.
+LEFT_CENTER = (0.388, 0.116)
 LEFT_CAPTION = f"VIEW {OUTSIDE_VIEW_LETTER}"
 # The caption's estimated width (the drawing test's 3.5 mm text box).
 _LEFT_CAPTION_WIDTH = 0.016
@@ -300,23 +312,24 @@ def _outside_sheet_xy(radial_y: float, axial_z: float) -> tuple[float, float]:
     return (_LEFT_REAR_X + axial_z * s, LEFT_CENTER[1] + radial_y * s)
 
 
-_FULL_DEPTH_TEXT_WIDTH = 0.0496
+_FULL_DEPTH_TEXT_WIDTH = 0.0757
 _CUTTER_TEXT_WIDTH = 0.0418
 LEFT_KEEP: dict[str, tuple[float, float]] = {
     "FullDepth": (_left_of(_LEFT_REAR_X, _FULL_DEPTH_TEXT_WIDTH), _LEFT_BOTTOM - 0.0100),
     "CutterRunout": (_left_of(_LEFT_REAR_X, _CUTTER_TEXT_WIDTH), _LEFT_BOTTOM - 0.0250),
 }
-# The caption stands centred over the cropped view (its upper left given):
-# under it the cutter rows' dimension lines fill the lane, and left of it
-# VIEW D's arrow points at the rear face.  It stands right of the boss's
-# lower dimension arrow, between the view's own box (the crop fence and its
-# margin) and the boss's callout above: at +7.5 mm the native box, top
-# 142.3 mm, took the caption's lower 4.8 mm (layout audit, round 1 run
-# 20261107T103915122Z); at +14.3 its native box clears that top by ~0.9 mm
-# and its text stays a clearance height under the boss's.
-_LEFT_CROP_CENTRE_X = _LEFT_REAR_X + OUTSIDE_CROP_Z * VIEW_SCALE[0] / 2000.0
+# The caption stands beside the cropped view, right of its own box (the crop
+# fence and the native margin round it) and level with the axis, the lane
+# right of the view being empty down to the title block.  Over the view it
+# read as one of B-B's callouts (round 2, run 20261107T121559938Z); at +7.5 mm
+# over it the native box, top 142.3 mm against the fence's 137.25, took the
+# caption's lower 4.8 mm (layout audit, round 1 run 20261107T103915122Z).
+_VIEW_BOX_MARGIN = 0.0051
+_CAPTION_VIEW_AIR = 0.003
+LEFT_CAPTION_HEIGHT = 0.0035
 LEFT_CAPTION_XY = (
-    _LEFT_CROP_CENTRE_X - _LEFT_CAPTION_WIDTH / 2.0, LEFT_CENTER[1] + HALF_OD + 0.0143
+    OUTSIDE_CROP_FENCE[2] + _VIEW_BOX_MARGIN + _CAPTION_VIEW_AIR,
+    LEFT_CENTER[1] + LEFT_CAPTION_HEIGHT / 2.0,
 )
 
 # Viewing arrows (rule 9): a letter note whose straight leader is the arrow
@@ -378,7 +391,7 @@ REAR_KEEP: dict[str, tuple[float, float]] = {
 # the process (rule 26).
 OIL_HOLE_NOTE = "\n".join(
     (
-        f"\u00d8{inch_text(OIL_HOLE_DIA, 3)} THRU",
+        f"\u00d8{inch_text(OIL_HOLE_DIA, 3)} INTO BORE",
         f"MATCH-DRILL AT ASSY WITH {HUB_NUMBER}",
     )
 )
@@ -392,9 +405,38 @@ OIL_HOLE_CALLOUT = (OIL_HOLE_EDGE[0] - 0.008 - _OIL_HOLE_NOTE_WIDTH, _SIDE_TOP +
 NOTE_HEIGHT = 0.0025
 
 _BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / 2000.0
-# The finite-form data block uses the upper-left lane.
+# The finite-form data block uses the upper-left lane.  It is the drawing's
+# own note (draw_pd_transgear_knob_shaft's pattern), not a part property: its
+# span row cites the MHA-PD-00 step that sets the mesh, and a part property
+# would re-key the part on every renumbering of that sequence.  What a
+# machinist needs to cut and check the teeth (Main ruling 2026-10-10); the
+# span prints on the end view with its limits, not again here.  The span's
+# .0008 band is matched to the rack at assembly: MHA-PD-00 sets the platen
+# shake at the datum on a dial, which sets the feed mesh depth, and the row
+# prints that window as MHA-PD-00 does (RACK_DATUM_BACKLASH_TEXT, the mesh
+# check's band rounded inward).
 GEAR_DATA_XY = (0.016, 0.262)
 GEAR_DATA_CHAR_HEIGHT = 0.0025
+MESH_SET_STEP = assembly_steps.step_ref("hanger-meshed")
+GEAR_DATA_ROWS = (
+    ("NUMBER OF TEETH", f"{TEETH}"),
+    ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
+    ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
+    ("PITCH DIAMETER (REF)", inch_text(PITCH_DIA, 4)),
+    ("WHOLE DEPTH (REF)", inch_text(WHOLE_DEPTH, 4)),
+    ("CUTTER", f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T"),
+    ("MATES WITH", f"PLATEN RACK {RACK_NUMBER}"),
+    # Three short lines keep the block left of the bore's callout.
+    (
+        "SPAN MATCHED FIT",
+        "BACKLASH WITH MATE\n"
+        f"   SET AT ASSY {assembly_steps.RACK_DATUM_BACKLASH_TEXT} (DIAL),\n"
+        f"   PER {MESH_SET_STEP}",
+    ),
+)
+GEAR_DATA_NOTE = "\n".join(
+    ("GEAR DATA", *(f"{label}:  {value}" for label, value in GEAR_DATA_ROWS))
+)
 # Separate radial-runout and relative-index controls share one source-linked
 # callout on the real finite tooth flank, not the OD. Its three rows use the
 # standard 3.5 mm font; at x 50 mm its lower-right corner stands up-left of
@@ -881,6 +923,27 @@ def _assert_part_authored_text(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(f"imported dimension text differs from the part's: {wrong!r}")
 
 
+def _add_sheet_note(
+    adapter: Any, text: str, xy: tuple[float, float], *, char_height: float, label: str
+) -> None:
+    """A sheet note at ``xy`` (top-left) at ``char_height``; its last line is
+    read back, so a note that lost its own text raises
+    (draw_pd_transgear_knob_shaft._add_sheet_note)."""
+    note = add_note(adapter, text, *xy)
+    if note is None:
+        raise RuntimeError(f"failed to add the {label}")
+    annotation = _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation")
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError(f"{label} has no text format")
+    text_format.CharHeight = float(char_height)
+    if annotation.SetTextFormat(0, False, text_format) is not True:
+        raise RuntimeError(f"failed to set the {label} text height")
+    got = str(_early_bound(note, "INote").GetText() or "").splitlines()
+    if not got or got[-1].strip() != text.splitlines()[-1].strip():
+        raise RuntimeError(f"{label} reads back {got!r}")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -895,7 +958,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Gear Data",
             "Manufacturing Notes",
             TOOTH_SPACE_CALLOUT_PROPERTY,
         ),
@@ -904,7 +966,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Gear Data",
             "Manufacturing Notes",
             TOOTH_SPACE_CALLOUT_PROPERTY,
         ),
@@ -1036,8 +1097,12 @@ async def build(adapter: Any) -> dict[str, str]:
         label="step face perpendicularity",
     )
 
-    add_property_linked_note(
-        adapter, "Gear Data", *GEAR_DATA_XY, char_height=GEAR_DATA_CHAR_HEIGHT
+    _add_sheet_note(
+        adapter,
+        GEAR_DATA_NOTE,
+        GEAR_DATA_XY,
+        char_height=GEAR_DATA_CHAR_HEIGHT,
+        label="gear data block",
     )
     add_property_linked_note(
         adapter, "Manufacturing Notes", *NOTES_XY, char_height=0.0025

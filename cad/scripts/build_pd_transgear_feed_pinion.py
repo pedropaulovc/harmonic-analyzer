@@ -853,11 +853,12 @@ async def build(adapter) -> dict[str, str]:
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     # Radial toothspace runout and calibrated all-space/wrap index are
     # distinct controls, saved together on the actual source toothpattern.
+    # The GEAR DATA block is the drawing's own note: its span row cites the
+    # MHA-PD-00 step that sets the mesh (draw_pd_transgear_feed_pinion).
     apply_drawing_properties(
         adapter,
         PART_NAME,
         {
-            "Gear Data": callouts.GEAR_DATA,
             "Manufacturing Notes": DRAWING_NOTES,
             TOOTH_SPACE_CALLOUT_PROPERTY: callouts.TOOTH_SPACE_CALLOUT,
         },

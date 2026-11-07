@@ -1,5 +1,5 @@
 """Text the MHA-PD-10 part authors: its marked dimensions' lanes and its sheet
-properties (the gear data block and the tooth-space inspection callout).
+property (the tooth-space inspection callout).
 
 The part builder writes every lane below on its source dimension; the
 drawing imports them verbatim and only reads them back.  Setting dimension
@@ -13,15 +13,16 @@ value it prints.
 
 Every band tighter than its title-block row names its mate and its fit at
 its own callout (drawing-guidelines.md rule 4): a standard fit name, the
-mate's drawing number and the clearance as REF, or a bench acceptance where
-a clearance would be ambiguous.  The teeth (tip and span) serve one mesh:
-each links the GEAR DATA block, which names the rack once with the backlash
-acceptance that is the span band's fit route.
+mate's name and drawing number and the clearance as REF, or a bench
+acceptance where a clearance would be ambiguous.  The teeth (tip and span)
+serve one mesh: each links the GEAR DATA block, which names the rack once
+and the span's matched fit.  That block is the drawing's own note
+(draw_pd_transgear_feed_pinion.GEAR_DATA_NOTE): its span row cites the
+MHA-PD-00 step that sets the mesh, so the assembly's numbering never re-keys
+this part.
 """
 
 from __future__ import annotations
-
-import math
 
 import pd_transgear_disc_hub_spec as HUB
 from pd_cluster_stack_band import STACK_NAME
@@ -29,20 +30,12 @@ from pd_rack_pinion_spec import inch_floor_mm, inch_text
 from pd_transgear_feed_pinion_spec import (
     BORE_DATUM,
     BORE_DIAMETRAL_CLEARANCE,
-    CUTTER_NUMBER,
-    CUTTER_TOOTH_RANGE,
-    DIAMETRAL_PITCH,
     HUB_NUMBER,
-    MM_PER_IN,
     PIN_NUMBER,
-    PITCH_DIA,
-    PRESSURE_ANGLE_DEG,
-    RACK_BACKLASH_RANGE,
     RACK_NUMBER,
     TEETH,
     TOOTHSPACE_GAUGE_DIA_MM,
     TOOTH_SPACE_RUNOUT_TIR_MM,
-    WHOLE_DEPTH,
 )
 from pd_transgear_pin_spec import FRONT_BUSHING_NUMBER
 
@@ -64,15 +57,23 @@ BORE_FIT_CALLOUT = "\n".join(
     (f"RUNNING FIT ON {PIN_NUMBER}", _clearance(BORE_DIAMETRAL_CLEARANCE))
 )
 BORE_CALLOUT = f"{BORE_PROCESS_CALLOUT}\n{BORE_FIT_CALLOUT}"
-# The tip and the two-tooth span serve the rack mesh, named once in the
-# gear data block.
+# The tip serves the rack mesh, named once in the gear data block.  The
+# two-tooth span's .0008 band is under the milled row and still controls (it
+# sets the cutter's radial setting limits, pd_transgear_feed_pinion_spec), so
+# its callout names its fit route as MHA-PD-06's and MHA-PD-08's spans do: a
+# matched fit, the block's span row naming how the mesh is set.
 MESH_CALLOUT = "SEE GEAR DATA"
+SPAN_CALLOUT = "MATCHED FIT,\nSEE GEAR DATA"
+# The hub as the shop reads it (its config title's last words; hard-coded
+# like HUB_NUMBER, checked against the registry by the drawing test).
+HUB_NAME = "DISC HUB"
 # The boss is the hub's locating fit, +.0005/.0000 under its +.0010/+.0005
 # bore: a band under the turned-diameter row, so it is turned to the hub's
-# bore (the matched-fit route, rule 4), both parts' limits still applying.
+# bore (the matched-fit route, rule 4: the mate by name and number), both
+# parts' limits still applying.
 BOSS_CALLOUT = "\n".join(
     (
-        f"LOCATIONAL CLEARANCE FIT IN {HUB_NUMBER},",
+        f"LOCATIONAL CLEARANCE FIT IN {HUB_NAME} {HUB_NUMBER},",
         f"TURN TO BORE {_clearance(HUB.BOSS_CLEARANCE_LIMITS)}",
     )
 )
@@ -94,9 +95,10 @@ FLAT_END_CALLOUT = f"CLEARS {HUB_NUMBER} FLAT"
 # edge of the section, which cuts through teeth, so they print on view C.
 # The full depth's teeth cover the rack's whole reach
 # (build_pd_paper_drive_assembly.RACK_FRONT_FROM_SLEEVE_REAR_WORST), its
-# function (2026-10-27 ENFORCE review, r2, r3); the rack is the gear data's
-# mate, named there once (2026-11-07 screen).
-FULL_DEPTH_CALLOUT = "\n".join((f"{TEETH}T FULL DEPTH", "COVERS RACK WIDTH"))
+# function (2026-10-27 ENFORCE review, r2, r3), the rack named by number.
+FULL_DEPTH_CALLOUT = "\n".join(
+    (f"{TEETH}T FULL DEPTH", f"COVERS {RACK_NUMBER} RACK WIDTH")
+)
 CUTTER_RUNOUT_CALLOUT = "CUTTER RUN-OUT"
 # The prefix lane replaces SolidWorks' own diameter symbol, so it carries it
 # (run 20261027T032128736Z printed a bare "ROOT 7.93 min.").  The translated
@@ -111,7 +113,7 @@ CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
     CALLOUT_BELOW: {
         ("SleeveProfile", "BoreDia"): BORE_CALLOUT,
         ("SleeveProfile", "OutsideDia"): MESH_CALLOUT,
-        ("SpanProfile", "ToothSpan"): MESH_CALLOUT,
+        ("SpanProfile", "ToothSpan"): SPAN_CALLOUT,
         ("SleeveProfile", "BossDia"): BOSS_CALLOUT,
         ("FlatProfile", "FlatToAxis"): FLAT_CALLOUT,
         ("GearBlank", "FaceWidth"): FACE_WIDTH_CALLOUT,
@@ -121,61 +123,6 @@ CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
         ("SleeveProfile", "CutterRunout"): CUTTER_RUNOUT_CALLOUT,
     },
 }
-
-# The rack mesh's datum backlash band (pd_transgear_feed_pinion_spec, the
-# band paper_drive_mesh_check.feed_rack_mesh gates and MHA-PD-00 sets as
-# platen shake on a dial), rounded inward onto the plain .0005 in dial step
-# (MHA-PD-00 prints the same window) so the printed window never admits a
-# backlash the mesh check refuses.
-_BACKLASH_STEP_IN = 0.0005
-BACKLASH_ACCEPT_MM = (
-    math.ceil(RACK_BACKLASH_RANGE[0] / MM_PER_IN / _BACKLASH_STEP_IN - 1e-9)
-    * _BACKLASH_STEP_IN
-    * MM_PER_IN,
-    math.floor(RACK_BACKLASH_RANGE[1] / MM_PER_IN / _BACKLASH_STEP_IN + 1e-9)
-    * _BACKLASH_STEP_IN
-    * MM_PER_IN,
-)
-if not (
-    RACK_BACKLASH_RANGE[0] <= BACKLASH_ACCEPT_MM[0]
-    < BACKLASH_ACCEPT_MM[1] <= RACK_BACKLASH_RANGE[1]
-):
-    raise AssertionError(
-        f"MHA-PD-10 backlash acceptance {BACKLASH_ACCEPT_MM} leaves the mesh "
-        f"band {RACK_BACKLASH_RANGE}"
-    )
-
-
-def _step_text(value_mm: float) -> str:
-    """A .0005-step inch value without a padding zero: ``.005``, ``.0055``."""
-    return inch_text(value_mm, 4).rstrip("0")
-
-
-def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> str:
-    """Render an aligned gear data block for a property-linked note."""
-    return "\n".join([title] + [f"{label}:  {value}" for label, value in rows])
-
-
-# What a machinist needs to cut and check the teeth; design parameters stay
-# in the spec (Main ruling 2026-10-10).  The two-tooth span prints on the end
-# view with its limits, so the block does not repeat it; the rack is named
-# here once, with the backlash acceptance that is the span band's fit route
-# (rule 4; 2026-11-07 screen).
-GEAR_DATA = gear_data_note(
-    [
-        ("NUMBER OF TEETH", f"{TEETH}"),
-        ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
-        ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
-        ("PITCH DIAMETER (REF)", inch_text(PITCH_DIA, 4)),
-        ("WHOLE DEPTH (REF)", inch_text(WHOLE_DEPTH, 4)),
-        ("CUTTER", f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T"),
-        ("MATES WITH", f"PLATEN RACK {RACK_NUMBER}"),
-        (
-            "BACKLASH WITH MATE (DIAL)",
-            "-".join(_step_text(value) for value in BACKLASH_ACCEPT_MM),
-        ),
-    ]
-)
 
 # The tooth-space runout limit: the shared grade
 # (fits.stock_form_quality.toothspace_runout_tir_mm, the .002 inch step), at

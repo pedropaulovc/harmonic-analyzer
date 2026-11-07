@@ -78,8 +78,11 @@ def test_part_authors_every_callout_on_a_marked_dimension() -> None:
     assert callouts.BORE_CALLOUT.endswith(callouts.BORE_FIT_CALLOUT)
     for name in ("BossDia", "FlatToAxis", "FaceWidth", "FlatEnd", "OverallLength"):
         assert spec.HUB_NUMBER in below[name], name
-    for name in ("OutsideDia", "ToothSpan"):
-        assert below[name] == "SEE GEAR DATA", name
+    assert below["OutsideDia"] == callouts.MESH_CALLOUT == "SEE GEAR DATA"
+    # The span's band still controls (it sets the cutter's radial setting
+    # limits): its callout names the matched fit and links the block's row.
+    assert below["ToothSpan"] == callouts.SPAN_CALLOUT
+    assert "MATCHED FIT" in callouts.SPAN_CALLOUT and "SEE GEAR DATA" in callouts.SPAN_CALLOUT
     assert spec.PIN_NUMBER not in below["OverallLength"]
     assert "MHA-PD-25" in below["OverallLength"]
     for name in ("FaceWidth", "OverallLength"):
@@ -94,11 +97,12 @@ def test_part_authors_every_callout_on_a_marked_dimension() -> None:
     }
 
 
-def test_fits_take_standard_names_and_the_rack_is_named_once() -> None:
-    """2026-11-07 screen (rule 4): each fit takes a standard fit name, its
+def test_fits_take_standard_names_and_name_their_mates() -> None:
+    """2026-11-07 screens (rule 4): each fit takes a standard fit name, its
     mate and its clearance as REF, or a bench acceptance where a plane-to-
     plane clearance would read ambiguously; no private DIA CLR / CLR; the
-    rack mate prints once, in the gear data block."""
+    matched boss names its mate by name and number, and the rack's number
+    prints where its function is stated."""
     import pd_transgear_disc_hub_spec as hub
 
     def window(limits: tuple[float, float]) -> str:
@@ -116,17 +120,21 @@ def test_fits_take_standard_names_and_the_rack_is_named_once() -> None:
             assert window(clearance) in text, text
     # The flats' plane-to-plane clearance is accepted on the bench.
     assert "NO ROCK" in callouts.FLAT_CALLOUT
+    # The matched (turned-to-bore) boss names the hub as the shop reads it.
+    assert _config.parts("pd-transgear-disc-hub")["title"].upper().endswith(
+        callouts.HUB_NAME
+    )
+    assert f"{callouts.HUB_NAME} {spec.HUB_NUMBER}" in callouts.BOSS_CALLOUT
     texts = [
         *callouts.CALLOUTS[callouts.CALLOUT_BELOW].values(),
-        callouts.GEAR_DATA,
+        drawing.GEAR_DATA_NOTE,
         callouts.TOOTH_SPACE_CALLOUT,
         drawing.OIL_HOLE_NOTE,
         spec.DRAWING_NOTES,
     ]
     sheet = "\n".join(texts)
     assert "DIA CLR" not in sheet and not re.search(r"\bCLR\b", sheet)
-    assert sheet.count(spec.RACK_NUMBER) == 1
-    assert f"MATES WITH:  PLATEN RACK {spec.RACK_NUMBER}" in callouts.GEAR_DATA
+    assert f"MATES WITH:  PLATEN RACK {spec.RACK_NUMBER}" in drawing.GEAR_DATA_NOTE
 
 
 def test_sheet_authors_no_manufacturing_value() -> None:
@@ -331,9 +339,9 @@ def test_cutter_stations_are_native_banded_model_dimensions() -> None:
     # the loose block keeps only the wall.
     assert lines == [spec.FLAT_WALL_NOTE]
     assert max(len(line) for line in lines) <= 70
-    # Short names, printed under the value, so the narrow text stands left
-    # of VIEW C's rear face; the rack is the gear data's mate, named there.
-    assert spec.RACK_NUMBER not in callouts.FULL_DEPTH_CALLOUT
+    # Short names, printed under the value, so the text stands left of VIEW
+    # C's rear face; the rack's number prints where its width is covered.
+    assert spec.RACK_NUMBER in callouts.FULL_DEPTH_CALLOUT
     assert "\n" not in callouts.CUTTER_RUNOUT_CALLOUT
     # Their witnesses run along the floor of the gap facing the outside
     # view: model 195°, a gap centre (gap centres at 15° + k·30°).
@@ -456,7 +464,7 @@ def test_sheet_text_names_the_right_parts() -> None:
         assert _config.parts(stem)["number"] == number, stem
     note = drawing.OIL_HOLE_NOTE
     hole, drill = note.split("\n")
-    printed = re.match(r"\u00d8(\d*\.\d+) THRU$", hole)
+    printed = re.match(r"\u00d8(\d*\.\d+) INTO BORE$", hole)
     assert printed is not None
     assert float(printed.group(1)) * 25.4 == pytest.approx(hub.OIL_HOLE_DIA)
     # The leader leaves the last row's end, so that row is the longer.
@@ -686,7 +694,7 @@ def test_section_values_and_bands_print_clear_of_each_other() -> None:
         spec.DRAWING_NOTES, drawing.NOTES_XY, height=0.0025
     )
     data_box = estimate_text_box(
-        callouts.GEAR_DATA,
+        drawing.GEAR_DATA_NOTE,
         anchor=drawing.GEAR_DATA_XY,
         height=drawing.GEAR_DATA_CHAR_HEIGHT,
         advance_ratio=_ADVANCE,
@@ -908,31 +916,34 @@ def test_finite_gear_data_and_model_consume_one_tooth_system() -> None:
         ),
         ("MATES WITH", f"PLATEN RACK {spec.RACK_NUMBER}"),
     ):
-        assert f"{label}:  {value}" in callouts.GEAR_DATA
+        assert f"{label}:  {value}" in drawing.GEAR_DATA_NOTE
     # The span prints once, on the end view with its limits.
-    assert "SPAN" not in callouts.GEAR_DATA
-    # The span band's fit route (rule 4): the rack mesh's datum backlash band
-    # as the dial reads it at assembly, rounded inward on the plain .0005 in
-    # dial step.
-    low, high = spec.RACK_BACKLASH_RANGE
-    accept = callouts.BACKLASH_ACCEPT_MM
-    assert low <= accept[0] < accept[1] <= high
-    step = 0.0005 * 25.4
-    assert accept[0] - low < step and high - accept[1] < step
-    for value in accept:
-        assert value / step == pytest.approx(round(value / step))
-    (row,) = [line for line in callouts.GEAR_DATA.splitlines() if "BACKLASH" in line]
-    printed = re.search(r"(\.\d+)-(\.\d+)$", row)
-    assert printed is not None
-    for text, value in zip(printed.groups(), accept):
-        assert float(text) * 25.4 == pytest.approx(value)
-        assert not text.endswith("0"), text
-    assert len(callouts.GEAR_DATA.splitlines()) == 9
-    assert "PROFILE SHIFT" not in callouts.GEAR_DATA
+    for limit in spec.SPAN_LIMITS:
+        assert _inch(limit, spec.SPAN_PLACES) not in drawing.GEAR_DATA_NOTE
+    # The span band's fit route (rule 4): the mesh is set at MHA-PD-00 on the
+    # mesh check's datum backlash band, the window that sheet prints, at the
+    # step that sets it; the part prints no window of its own.
+    import paper_drive_rack_setup as rack_setup
+    import pd_paper_drive_assembly_steps as steps
+
+    assert rack_setup.RACK_DATUM_BACKLASH_RANGE == spec.RACK_BACKLASH_RANGE
+    label, value = drawing.GEAR_DATA_ROWS[-1]
+    assert label == "SPAN MATCHED FIT"
+    assert "SET AT ASSY" in value
+    assert steps.RACK_DATUM_BACKLASH_TEXT in value
+    assert drawing.MESH_SET_STEP == steps.step_ref("hanger-meshed")
+    assert value.endswith(drawing.MESH_SET_STEP)
+    # That step is where MHA-PD-00 sets the shake that sets the mesh depth.
+    assembly_draw = Path(drawing.__file__).parent / "draw_pd_paper_drive_assembly.py"
+    assembly_source = assembly_draw.read_text(encoding="utf-8")
+    meshed = assembly_source.split('"hanger-meshed": (', 1)[1].split("),", 1)[0]
+    assert "RACK_DATUM_BACKLASH_TEXT} PLATEN SHAKE" in meshed
+    assert "SETS THE FEED MESH DEPTH" in meshed
+    assert "PROFILE SHIFT" not in drawing.GEAR_DATA_NOTE
     # A form-cut tooth is a translated involute: its pitch thickness does
     # not follow the generated-involute span relation, so only the span
     # (the inspected quantity) is printed.
-    assert "CIRCULAR THICKNESS" not in callouts.GEAR_DATA
+    assert "CIRCULAR THICKNESS" not in drawing.GEAR_DATA_NOTE
 
 
 def test_tangent_span_is_real_supported_flank_inspection() -> None:
@@ -994,7 +1005,8 @@ def test_certified_single_pin_contacts_real_finite_flanks() -> None:
     for invalid_diameter in (0.0, -spec.TOOTHSPACE_GAUGE_DIA_MM, math.inf, math.nan):
         with pytest.raises(ValueError):
             toothspace_gauge_contact_mm(spec.STOCK_PROFILE, invalid_diameter)
-    assert "CERTIFIED" not in callouts.GEAR_DATA and "STATION" not in callouts.GEAR_DATA
+    assert "CERTIFIED" not in drawing.GEAR_DATA_NOTE
+    assert "STATION" not in drawing.GEAR_DATA_NOTE
 
 
 def test_toothspace_control_is_source_owned_and_feature_local() -> None:
@@ -1185,6 +1197,21 @@ def test_the_cropped_view_c_has_a_break_on_the_boss() -> None:
     assert sorted(ys) == ys
     # The break stands clear of the MAX's extension line on the sheet.
     assert (drawing.OUTSIDE_CROP_Z - spec.CUTTER_RUNOUT_MAX) * s >= 0.0005
+
+
+def test_view_c_caption_stands_beside_its_own_view() -> None:
+    """Round 2 (run 20261107T121559938Z): over the view, the caption read as
+    one of B-B's callouts.  It stands right of VIEW C's native box (the crop
+    fence plus round 1's measured 5 mm margin), level with the view, inside
+    the border, and below the boss's callout."""
+    fence = drawing.OUTSIDE_CROP_FENCE
+    caption = _note_box(drawing.LEFT_CAPTION, drawing.LEFT_CAPTION_XY)
+    margin = 0.1423 - fence[3]  # round 1's native box top over the fence
+    assert caption.xmin > fence[2] + margin + 0.002
+    assert fence[1] < caption.ymin and caption.ymax < fence[3]
+    assert caption.xmax < drawing.SHEET_INNER_BORDER[2] - 0.002
+    boss = _printed_box("BossDia", drawing.RIGHT_KEEP["BossDia"])
+    assert caption.ymax + TEXT_CLEARANCE_HEIGHTS * _CAP_M < boss.ymin
 
 
 def test_tooth_edge_exception_is_flagged_at_the_teeth() -> None:
