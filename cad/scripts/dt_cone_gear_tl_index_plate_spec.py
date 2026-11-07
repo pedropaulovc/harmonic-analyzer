@@ -301,16 +301,21 @@ CALLOUTS_ABOVE: dict[str, str] = {
     PRINTED_HOLE: f"{HOLE_COUNT}X",
     **{f"Ring{n}Pcd": f"{n}X EQ SP ON" for n in RING_COUNTS},
     "MountHoleDia": f"{MOUNT_COUNT}X",
+    "MountPcd": f"{MOUNT_COUNT}X EQ SP ON",
 }
 # Rule 20: the known web shortfall is stated as a plain fact at the holes; it
 # emits the stated shortfall of owner ruling RV-01 (machinist_exceptions).
 # Each callout is its size and process lines plus at most two lines of words
-# (rule 7); the countersink prints with its symbol (rule 26).
+# (rule 7); the countersink prints with its symbol (rule 26).  A location
+# carries its value and band only (rule 7), so the mounting holes' bolt
+# circle states its pattern as the index circles do, and the mate rides the
+# holes' size callout (fan-out round 5).  The bottom hole stands on the
+# centre mark's vertical line, so the pattern's clocking is the drawn 90
+# degrees, as for the index circles.
 WEB_CALLOUT = f"WEB {inch_text(WEB_MIN_PRINTED * INCH, 2)} MIN"
 CALLOUTS_BELOW: dict[str, str] = {
     PRINTED_HOLE: f"REAM THRU\nSLIDING FIT ON {HEAD} INDEX PIN\n{WEB_CALLOUT}",
     "BoreDia": f"BORE THRU\nLOCATING FIT ON\n{HEAD} PLATE HUB",
-    "MountHoleDia": f"DRILL THRU\n{CSK_CALLOUT}\nEQ SP, ONE ON\nVERTICAL CL",
-    "MountPcd": f"MATCHES {HEAD}\nPLATE-SCREW TAPS",
+    "MountHoleDia": f"DRILL THRU\n{CSK_CALLOUT}\nFOR {HEAD}\nPLATE SCREWS",
 }
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

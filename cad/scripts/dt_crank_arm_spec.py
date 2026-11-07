@@ -36,6 +36,7 @@ from dt_crank_handle_pivot_screw_spec import THREAD_SIZE as PIVOT_SCREW_THREAD_S
 from dt_crank_hub_geometry import (
     ARM_THICKNESS,
     ARM_WIDTH,
+    ARM_WIDTH_STOCK_MINUS,
     AXIAL_PIN_DIA,  # noqa: F401 -- re-exported to the build and drawing
     AXIAL_PIN_RADIUS_FROM_AXIS,
     FIDUCIAL_MODEL_DEPTH,  # noqa: F401 -- re-exported to the build
@@ -127,6 +128,15 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 # Derived spans.
 ARM_END_X = ARM_C2C + END_RADIUS
 HALF_WIDTH = ARM_WIDTH / 2.0
+# The bore and pivot axis from the top long edge: a machinist sets the bore
+# from an edge, not from a drawn centreline (fan-out round 5, rule 10;
+# Main 2026-11-07).  Half the as-rolled width, at half the mill's band, so
+# the axis stays on the bar's centre for any bar the mill ships.  Its
+# construction line stands two thirds of the way from the anchor tap to the
+# pivot, in the arm's only empty span above the top edge.
+AXIS_FROM_EDGE_TOLERANCE = ARM_WIDTH_STOCK_MINUS / 2.0
+AXIS_FROM_EDGE_PLACES = 3
+AXIS_FROM_EDGE_STATION_X = (ANCHOR_SCREW_X + 2.0 * ARM_C2C) / 3.0
 
 # Width and thickness are the bar's as rolled, printed as the supplier's
 # fractions under the stock line's "AS SUPPLIED": the mill tolerance governs
@@ -152,16 +162,19 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "PivotStation",
         "AnchorStation",
         "AnchorOffset",
+        "AxisFromEdge",
         "Width",
     },
 }
 
 # Decimal places are authored on the model: every arm dimension takes the
-# title block's .XX.  The hub seat bore is made first at that band, and
-# MHA-DT-31 is turned to suit it.
+# title block's .XX but the axis from the top edge, which prints .XXX with
+# its own band (AXIS_FROM_EDGE_TOLERANCE).  The hub seat bore is made first
+# at that band, and MHA-DT-31 is turned to suit it.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     feature: dict.fromkeys(names, 2) for feature, names in DRAWING_DIMENSIONS.items()
 }
+DRAWING_PRECISION["StationReference"]["AxisFromEdge"] = AXIS_FROM_EDGE_PLACES
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
     for dimensions in DRAWING_PRECISION.values()

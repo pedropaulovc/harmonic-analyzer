@@ -46,6 +46,7 @@ from _holes import wizard_holes
 
 import _telemetry
 from _drawing_precision import apply_drawing_precision
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
@@ -67,6 +68,9 @@ from dt_crank_arm_spec import (
     FIDUCIAL_X,
     FIDUCIAL_Y,
     HALF_WIDTH,
+    AXIS_FROM_EDGE_PLACES,
+    AXIS_FROM_EDGE_STATION_X,
+    AXIS_FROM_EDGE_TOLERANCE,
     HANDLE_PIVOT_HOLE_SPEC,
     HUB_SEAT_DIA,
     ISOMETRIC_VIEW_NOTE,
@@ -469,6 +473,35 @@ async def build(adapter) -> dict[str, str]:
     )
     stations.record("WidthX", '"ArmC2C"')
     stations.record("WidthY", '"ArmWidth" / 2')
+    # The bore/pivot axis from the top long edge (dt_crank_arm_spec
+    # AXIS_FROM_EDGE_*): a vertical construction line from the axis up to the
+    # edge's height, its foot on the axis at its station.
+    set_sketch_direct_db(adapter, True)
+    edge_ref = check(
+        "axis-from-edge reference line",
+        await adapter.add_line(
+            AXIS_FROM_EDGE_STATION_X, 0.0, AXIS_FROM_EDGE_STATION_X, HALF_WIDTH
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, edge_ref)
+    check(
+        "axis-from-edge reference vertical",
+        await adapter.add_sketch_constraint(edge_ref, None, "vertical"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{edge_ref}.start", AXIS_FROM_EDGE_STATION_X, 0.0, "axis-from-edge foot"
+    )
+    stations.record("AxisFromEdgeX")
+    await dimension_between(
+        adapter,
+        f"{edge_ref}.start",
+        f"{edge_ref}.end",
+        "vertical_distance",
+        HALF_WIDTH,
+        "axis-from-edge reference",
+    )
+    stations.record("AxisFromEdge", '"ArmWidth" / 2')
     await ensure_fully_defined(adapter, "station reference sketch")
     check("exit_sketch station reference", await adapter.exit_sketch())
     name_last_feature(adapter, "StationReference")
@@ -547,6 +580,15 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    # The axis from the top edge holds half the mill's width band.
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "StationReference",
+        "AxisFromEdge",
+        AXIS_FROM_EDGE_TOLERANCE,
+        places=AXIS_FROM_EDGE_PLACES,
+        display_unit=part_drawing_unit(PART_NAME),
+    )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

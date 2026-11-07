@@ -86,6 +86,7 @@ from dt_crank_arm_spec import (
     ARM_THICKNESS,
     AXIAL_PIN_DIA,
     AXIAL_PIN_X,
+    AXIS_FROM_EDGE_STATION_X,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
@@ -166,8 +167,8 @@ def _add_arm_centerline(adapter: Any, view: Any) -> None:
     """Draw the arm's longitudinal centreline between its two long edges.
 
     The through-hub seat and handle pivot lie on the arm mid-width axis.  A
-    centreline through their centre marks states that relationship without an
-    invented cross-width dimension.
+    centreline through their centre marks draws that axis; the AxisFromEdge
+    station locates it from the top edge, where a machinist sets the bore.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
@@ -231,6 +232,13 @@ FRONT_KEEP = {
     "PivotStation": (_sheet_x(ARM_C2C / 2.0), 0.095),
     "AnchorStation": (_sheet_x(ANCHOR_SCREW_X / 2.0), 0.104),
     "AnchorOffset": (0.108, FRONT_CENTER[1] + HALF_WIDTH * SHEET_SCALE[0] / 1000.0 + 0.008),
+    # The bore/pivot axis from the top edge, on its own construction line in
+    # the empty span between the anchor and pivot callouts' leaders; its text
+    # stands above the edge on the AnchorOffset row (fan-out round 5).
+    "AxisFromEdge": (
+        _sheet_x(AXIS_FROM_EDGE_STATION_X),
+        FRONT_CENTER[1] + HALF_WIDTH * SHEET_SCALE[0] / 1000.0 + 0.008,
+    ),
     "Width": (0.279, FRONT_CENTER[1]),
     # The punch witness's ordinates from the hub-seat axis: the X above the
     # boss end, under the witness's callout; the Y left of the boss.
