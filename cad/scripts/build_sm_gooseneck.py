@@ -71,7 +71,6 @@ from _drawing_precision import (
     _named_dimensions,
     apply_drawing_precision,
 )
-from _drawing_prefix import set_dimension_prefix
 from _drawing_tolerances import _set_tolerance_precision
 from _extrude import extrude_at_offset
 from _feature_tree import name_last_feature
@@ -100,7 +99,6 @@ from sm_gooseneck_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     DRAWING_PRECISION_BY_NAME,
-    ELEVATION_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
     REFERENCE_DIMENSIONS,
     TUBE_OD_REF_SPAN,
@@ -1206,9 +1204,10 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _author_dimension_callouts(adapter)
     _author_reference_dimensions(adapter)
-    # A sketch-only diametric dimension prints no Ø of its own (farm run
-    # 20261031T233549214Z printed "(12.70)"); the revolve's sleeve Ø does.
-    set_dimension_prefix(adapter, "TubeOdReference", "TubeOdRef", "<MOD-DIAM>")
+    # The tube's stock Ø, a sketch-only diametric dimension, prints no Ø of
+    # its own (farm run 20261031T233549214Z printed "(12.70)"); it carries
+    # its wall callout, so _author_reference_dimensions writes its
+    # "(<MOD-DIAM>" prefix with the sleeve's.
     # The reference sketches own printed dimensions and only reference lines:
     # hide them so no assembly instance renders them (#880).  The drawing shows
     # them per view through _drawing_hidden_sketches to import those dimensions.
@@ -1220,7 +1219,6 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {
             "Manufacturing Notes": DRAWING_NOTES,
-            "Elevation View Note": ELEVATION_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )

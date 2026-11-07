@@ -287,13 +287,10 @@ if set(FRONT_KEEP) | set(SECTION_KEEP) != {
 
 # The four note lines run long, so they sit in the bottom left, under the
 # end view's foot (y ~0.067) and left of the title block (x 0.216); the
-# isometric's note sits under it.  The elevation's foot stands on the title
-# block's top and its bounding box spans the end face to the leg, so its note
-# stands over the view's upper right, right of the arm straight and clear of
-# the border (left of the foot it printed inside the view's box, farm run
-# 20261027T233507330Z).
+# isometric's note sits under it.  The elevation is a projected principal
+# view at the sheet's scale, so it carries no label (drawing-guidelines.md
+# rule 9).
 NOTES_XY = (0.016, 0.062)
-ELEVATION_NOTE_XY = (0.262, 0.262)
 ISO_NOTE_XY = (0.345, 0.085)
 TAPPED_HOLE_NOTE = "Tapped Hole"
 
@@ -762,7 +759,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "Elevation View Note",
             "Isometric View Note",
         ),
         required=(
@@ -771,7 +767,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "Elevation View Note",
             "Isometric View Note",
         ),
     )
@@ -839,7 +834,6 @@ async def build(adapter: Any) -> dict[str, str]:
     rebuild_drawing(adapter, label="gooseneck tap callout")
 
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
-    add_property_linked_note(adapter, "Elevation View Note", *ELEVATION_NOTE_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     # SolidWorks pins its own "1/4-28 Tapped Hole" note beside a tap's native
