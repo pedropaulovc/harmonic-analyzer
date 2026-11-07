@@ -39,7 +39,7 @@ import _config
 from _fit_deviations import deviations
 from _fit_ream_h7 import REAM_H7
 from _gear_fit_limits import gear_tip_band_mm
-from _gear_quality import toothspace_runout_tir_mm
+from _gear_quality import reducer_k_setting_diameter_mm, toothspace_runout_tir_mm
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
@@ -268,8 +268,11 @@ MESH_ANGLE_DEG = -168.0
 CENTRE_DISTANCE = 43.794
 # The setting the arm and plate sheets print: the knob bore is held this
 # band from the pin bore when the pair is match-drilled, and must still be
-# there with the plate screwed down.
-CENTRE_DISTANCE_WINDOW = (CENTRE_DISTANCE, 43.844)
+# there with the plate screwed down. Its top is K's setting-circle radius,
+# .002 in exactly (43.8448, inside the 43.851 contact-ratio limit).
+CENTRE_DISTANCE_WINDOW = (
+    CENTRE_DISTANCE, round(CENTRE_DISTANCE + reducer_k_setting_diameter_mm() / 2.0, 6)
+)
 # (upper, lower) deviations from CENTRE_DISTANCE, as every band here.
 CENTRE_DISTANCE_SET_BAND = (round(CENTRE_DISTANCE_WINDOW[1] - CENTRE_DISTANCE, 6), 0.0)
 CENTRE_DISTANCE_SET_TEXT = (
