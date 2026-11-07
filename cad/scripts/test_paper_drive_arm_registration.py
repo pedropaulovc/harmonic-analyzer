@@ -226,9 +226,12 @@ def test_measured_receiver_pays_full_two_pose_travel_and_uncertainty() -> None:
     widths = _receive()
     assert widths == pytest.approx((0.062, 0.054))
     assert math.hypot(*widths) <= registration.LOCATOR_GEAR_PLANE_TRAVEL_MAX_MM
-    assert registration.LOCATOR_GEAR_PLANE_TRAVEL_MAX_MM == 0.100
-    assert registration.REDUCER_AXIS_SETUP_RADIUS_MM == 0.050
-    assert registration.LOCATOR_COORDINATE_TRAVEL_MAX_MM <= 0.100 / math.sqrt(2.0)
+    # Both reamed patterns at their Ø.004 position row; K's setting circle Ø.004.
+    assert registration.LOCATOR_GEAR_PLANE_TRAVEL_MAX_MM == pytest.approx(2.0 * 0.1016)
+    assert registration.REDUCER_AXIS_SETUP_RADIUS_MM == pytest.approx(0.0508)
+    assert registration.LOCATOR_COORDINATE_TRAVEL_MAX_MM <= (
+        registration.LOCATOR_GEAR_PLANE_TRAVEL_MAX_MM / math.sqrt(2.0)
+    )
 
 
 def test_setup_must_hold_the_drawn_centre_distance_band_along_s_k() -> None:
@@ -319,7 +322,9 @@ def test_receiver_refuses_incomplete_inspection(changes) -> None:
 @pytest.mark.parametrize("replacement", [
     {"seat_normal_changes_mm": (0.0041, 0.0, 0.0)}, {"seat_normal_changes_mm": (-0.0041, 0.0, 0.0)},
     {"seat_normal_changes_mm": (0.0, 0.0)}, {"applied_force_n": (math.nan, 0.0, 0.0)},
-    {"applied_moment_nmm": (0.0, 0.0)}, {"gear_plane_k_xy_mm": (-0.045, -0.026)},
+    {"applied_moment_nmm": (0.0, 0.0)},
+    # Pull moved past the coordinate travel the push reading (x .030) allows.
+    {"gear_plane_k_xy_mm": (0.030 - registration.LOCATOR_COORDINATE_TRAVEL_MAX_MM - 0.005, -0.026)},
 ])
 def test_receiver_refuses_missing_signed_normal_values_or_excess_real_motion(replacement) -> None:
     readings = _readings()
