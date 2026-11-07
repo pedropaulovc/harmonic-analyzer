@@ -178,10 +178,19 @@ CAVITY_RADIUS_CORNER = (1, 1)
 # RimChamfer is ONE model feature: .06 x 45 on every edge of the two slant
 # faces and the two end faces (all twelve outside edges plus both pocket
 # rims) and on the cavity rims on both web faces. Its one size sits on an
-# outside corner, so the caption names everything else it governs; drawn
-# outside chamfers with no size read as breaks past the title block's 0.25
-# MAX (machinist review, MHA-FR-05). The r7 review's "delete the chamfer"
-# (over_spec) was rejected by Main: the callout stays.
+# outside corner; drawn outside chamfers with no size read as breaks past the
+# title block's edge break (machinist review, MHA-FR-05). The r7 review's
+# "delete the chamfer" (over_spec) was rejected by Main: the callout stays.
+# The edges it governs are too long a list for the callout's two word lines
+# in the lane between the front view and the section (rule 7), so they move
+# to numbered note 1, linked by SEE NOTE 1.
+CHAMFER_NOTE_NUMBER = 1
+CHAMFER_NOTE = (
+    f"{CHAMFER_NOTE_NUMBER}. CHAMFER ON ALL OUTSIDE EDGES AND ON THE POCKET AND CAVITY RIMS."
+)
+# Bottom-left, under the bottom view's origin arrows and left of the title
+# block: the sheet's one open band (y 15-40 mm).
+CHAMFER_NOTE_XY = (0.022, 0.033)
 DIMENSION_CALLOUTS = {
     "PocketRadius": "8X",
     "CavityRadius": "4X",
@@ -189,18 +198,15 @@ DIMENSION_CALLOUTS = {
     # near one (r6 machinist review).
     "WinWidth": "SQ POCKET BOTH SIDES",
     "CavWidth": "SQ CAVITY THRU",
-    "RimChamferSize": " X 45 DEG\nALL OUTSIDE\nEDGES AND\nPOCKET AND\nCAVITY RIMS",
+    "RimChamferSize": f" X 45<MOD-DEG>\nSEE NOTE {CHAMFER_NOTE_NUMBER}",
     # One location covers both opposed pockets, as the SQ size does.
     "PocketEndStation": "BOTH SIDES",
     "PocketBottomStation": "BOTH SIDES",
-    # One flat edge prints for both (the section is symmetric about the web);
-    # off its nearer web face it keeps the transferred seats clear of the
-    # web's faces (owner Q13d, rocker_bracket_seat_layout's stack). r6 review:
-    # "CENTERS" read as the mating part being centred, not what the 2.12 is.
-    "TopFlatPlusZStation": (
-        "BOTH SIDES\n"
-        f"KEEPS {_config.parts('ch-pivot-bracket')['number']}\nSEAT TAPS IN WEB"
-    ),
+    # One flat edge prints for both (the section is symmetric about the web).
+    # A location carries its value and nothing else (rule 7): the reason it
+    # keeps the transferred seats clear of the web (owner Q13d,
+    # rocker_bracket_seat_layout's stack) is design rationale, not printed.
+    "TopFlatPlusZStation": "BOTH SIDES",
 }
 # The sheet's own places. RimChamferSize's, the seat REF
 # stations' and the locations' are the PART's
@@ -284,7 +290,7 @@ if not NARROW < VIEW_B_CROP_HALF_Z_MM < FOOT_HOLE_INNER_Z:
         f"VIEW B fence half-width {VIEW_B_CROP_HALF_Z_MM} must keep the rail top "
         f"({NARROW}) and clear the foot holes ({FOOT_HOLE_INNER_Z:.2f})"
     )
-VIEW_B_CAPTION = f"VIEW B\nSCALE {SHEET_SCALE[0]:g}:{SHEET_SCALE[1]:g}"
+VIEW_B_CAPTION = "VIEW B"
 VIEW_B_CAPTION_XY = (
     VIEW_B_CENTER[0] - BOSS_DEPTH / 2.0 * VIEW_SCALE / 1000.0,
     VIEW_B_CENTER[1] - VIEW_B_CROP_HALF_Z_MM * VIEW_SCALE / 1000.0 - 0.004,
@@ -378,14 +384,51 @@ HOLE_TABLE_SIZE_COLUMN = 3
 HOLE_TABLE_SIZE_HEADING = "DRILL"
 # The four foot clearances match the base's hold-down taps (machinist review
 # b2: the .XXX table named no mate). MHA-FR-01's own hole table tags those
-# taps C2-C5 at the same 4.750 x 1.374 pattern. A free note anchors at its
-# text's top-left (inspect-3: at x 392 the 39.4 mm block crossed the right
-# border), so it starts 23 mm right of the seat callout's last character,
-# its top 4.7 mm under the table, above the title block.
-HOLE_PATTERN_NOTE = (
-    f"HOLE PATTERN\nMATCHES\n{_config.parts('fr-harmonic-base')['number']} C2-C5"
-)
-HOLE_PATTERN_NOTE_XY = (0.355, 0.092)
+# taps C2-C5 at the same 4.750 x 1.374 pattern. Rule 10: the table names the
+# mate in its own MATE column, not in a free note beside it.
+HOLE_TABLE_MATE_HEADING = "MATE"
+HOLE_TABLE_MATE = _config.parts("fr-harmonic-base")["number"]
+_INSERT_COLUMN_AFTER = 3  # swTableItemInsertPosition_After
+_TABLE_SIZE_CAN_CHANGE = 0  # swTableRowColChange_TableSizeCanChange
+HOLE_TABLE_MATE_COLUMN = HOLE_TABLE_SIZE_COLUMN + 1
+# Column widths (sheet m). The native widths (19/31/31/63 mm) left no room
+# for a fifth column before the right border (x 419 mm); the table text runs
+# about 3.0 mm a glyph: "X LOC" 15 mm, "Ø .313 THRU ALL" 45 mm, "MHA-FR-01"
+# 27 mm. At the 270 mm anchor the table ends at x 410 mm.
+HOLE_TABLE_COLUMN_WIDTHS = {0: 0.014, 1: 0.022, 2: 0.022, 3: 0.050, 4: 0.032}
+_RIGHT_BORDER_X = 0.419
+if HOLE_TABLE_ANCHOR[0] + sum(HOLE_TABLE_COLUMN_WIDTHS.values()) > _RIGHT_BORDER_X - 0.005:
+    raise AssertionError("rocker-arm-support hole table would reach the right border")
+
+
+@_telemetry.traced("drawing.rocker_support.hole_table_mate")
+def _add_hole_table_mate_column(adapter: Any, table: Any) -> None:
+    """Append the MATE column naming MHA-FR-01 on every row and set widths."""
+    column = HOLE_TABLE_MATE_COLUMN
+    if (
+        table.InsertColumn2(_INSERT_COLUMN_AFTER, HOLE_TABLE_SIZE_COLUMN, HOLE_TABLE_MATE_HEADING, 0)
+        is not True
+    ):
+        raise RuntimeError("rocker-arm-support hole table refused its MATE column")
+    if table.SetColumnTitle2(column, HOLE_TABLE_MATE_HEADING, False) is not True:
+        raise RuntimeError("rocker-arm-support MATE column title did not set")
+    for row in range(1, int(table.RowCount)):
+        if table.IsCellTextEditable(row, column) is not True:
+            raise RuntimeError(f"rocker-arm-support MATE cell at row {row} is not editable")
+        table.SetText2(row, column, False, HOLE_TABLE_MATE)
+    for index, width in HOLE_TABLE_COLUMN_WIDTHS.items():
+        actual = float(table.SetColumnWidth(index, width, _TABLE_SIZE_CAN_CHANGE))
+        if abs(actual - width) > 1e-6:
+            raise RuntimeError(f"hole-table column {index} width did not persist: {actual!r}")
+    rebuild_drawing(adapter, label="rocker-arm-support hole-table mate")
+    heading = str(table.DisplayedText2(0, column, False) or "").strip()
+    mates = {
+        str(table.DisplayedText2(row, column, False) or "").strip()
+        for row in range(1, int(table.RowCount))
+    }
+    if heading.upper() != HOLE_TABLE_MATE_HEADING or mates != {HOLE_TABLE_MATE}:
+        raise RuntimeError(f"hole-table MATE column reads {heading!r} over {mates!r}")
+    _telemetry.info(f"hole-table MATE column {heading!r} over {sorted(mates)!r}")
 
 
 @_telemetry.traced("drawing.rocker_support.hole_table_process")
@@ -799,13 +842,15 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
-    # swDetailingSectionViewLineStyleDisplay (swconst.tlb R2026x): end segments
-    # only. Span the full parent view so SolidWorks derives a stable, complete
-    # centre section; the dimensions occupy exterior lanes away from its arrows.
+    # swDetailingSectionViewLineStyleDisplay (swconst.tlb R2026x): 0 draws the
+    # cutting-plane line whole, from one arrow to the other (rule 9; the
+    # end-segments-only style, 1, read as loose arrows). Span the full parent
+    # view so SolidWorks derives a stable, complete centre section; the
+    # dimensions occupy exterior lanes away from its arrows.
     extension = _early_bound(drawing_model.Extension, "IModelDocExtension")
-    if not extension.SetUserPreferenceInteger(542, 0, 1):
-        raise RuntimeError("failed to set end-only section cutting line")
-    if extension.GetUserPreferenceInteger(542, 0) != 1:
+    if not extension.SetUserPreferenceInteger(542, 0, 0):
+        raise RuntimeError("failed to set connected section cutting line")
+    if extension.GetUserPreferenceInteger(542, 0) != 0:
         raise RuntimeError("section cutting-line style did not persist")
 
     # Explicit per-view scale: a view placed without one can silently
@@ -993,8 +1038,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _name_hole_table_process(adapter, hole_table)
     _assert_no_leading_zero_locations(hole_table)
-    if add_note(adapter, HOLE_PATTERN_NOTE, *HOLE_PATTERN_NOTE_XY) is None:
-        raise RuntimeError("failed to name the foot holes' mating pattern")
+    _add_hole_table_mate_column(adapter, hole_table)
+    if add_note(adapter, CHAMFER_NOTE, *CHAMFER_NOTE_XY) is None:
+        raise RuntimeError("failed to add the rim-chamfer note")
     _mirror_right_end_hole_tags(bottom)
     # The drawing-sketch datum and hole table leave the bottom view's edge set
     # stale, so regenerate it before export.
