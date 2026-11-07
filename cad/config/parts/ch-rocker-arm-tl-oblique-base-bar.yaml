@@ -20,7 +20,7 @@ ch-rocker-arm-tl-oblique-base-bar:
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
-      where: "front view: the HGR15 rail-hole row (15.00 ... 435.00 ±.08 mm) and the 8X TL-28 bracket-hole stations 57.00 ±.13 mm and 428.00 ±.13 mm"
+      where: "front view: RailHoles station references and BracketHoles vendor-mating station dimensions"
       finding: "metric vendor-mating hole stations print in millimetres on an inch sheet, beside inch dimensions from the same left end"
-      reason: "owner ruling 2026-11-01 (ruling 4B), relayed by Main: the KP08 pillow block, HGR15 rail and Tr8 nut are metric-only vendor lines, so the stations that mate with their holes keep the vendor's exact millimetres, printed in mm with the unit label and an explicit mm band (drawing-simplicity-policy.md, supplier-unit exception), not rounded inch conversions"
+      reason: "owner ruling 2026-11-01 (ruling 4B), relayed by Main: controlled interfaces to the metric-only KP08, HGR15 and Tr8 vendor lines retain exact millimetres, the mm unit label and their applicable explicit mm bands rather than rounded inch conversions (drawing-simplicity-policy.md, supplier-unit exception). Main's owner-delegated R4 ruling of 2026-11-07 supersedes the former independent rail-station bands: rail positions are untoleranced REF, transferred from the actual trimmed rail to its paired base bar and accepted by free screw insertion with rail ends flush to base-bar ends. This records the existing rulings, not a new waiver."
   drawing_unit: in

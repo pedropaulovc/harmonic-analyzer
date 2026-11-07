@@ -148,13 +148,10 @@ def test_base_bars_carry_their_rails_onto_the_studs() -> None:
         near = _image(rows, origin, (0.0, 0.0, 0.0))
         far = _image(rows, origin, (trammel.BASE_BAR_LENGTH, 0.0, 0.0))
         assert near[:2] == pytest.approx(trammel.rail_point(rail, trammel.RAIL_NEAR_S))
-        # #2177: the uncut kit rail is flush with the bar's near end and
-        # overhangs its far end.
+        # Datum-trimmed kit rail is flush at both bar ends.
         assert far[:2] == pytest.approx(trammel.rail_point(rail, trammel.BASE_BAR_FAR_S))
-        assert trammel.RAIL_FAR_S - trammel.BASE_BAR_FAR_S == pytest.approx(
-            trammel.RAIL_OVERHANG
-        )
-        assert trammel.RAIL_OVERHANG > 0.0
+        assert trammel.RAIL_FAR_S == pytest.approx(trammel.BASE_BAR_FAR_S)
+        assert trammel.RAIL_OVERHANG == pytest.approx(0.0)
         for which, slot in (
             ("near", (base_bar.NEAR_SLOT_X, base_bar.NEAR_SLOT_Y, 0.0)),
             ("far", (base_bar.FAR_SLOT_X, base_bar.FAR_SLOT_Y, 0.0)),
@@ -1189,13 +1186,12 @@ def test_sweep_extents_and_rail_margins(report) -> None:
     # The 2026-10-17 widening (column-side edge at lateral +88.9), narrowed to
     # 5.50 wide on 2026-10-30: the far column-side corners set X, the near
     # column-side corners the top of Y, the operator-side corners the bottom.
-    # The uncut 450 kit rail (#2177) runs RAIL_OVERHANG past the bar's far
-    # end, so each carriage's far margin to its rail end grows by it.
+    # The datum-trimmed rail shares both ends with its bar.
     assert report.fixed_x == pytest.approx((-462.96, 462.96), abs=0.01)
     assert report.fixed_y == pytest.approx((-115.33, 85.84), abs=0.01)
     assert report.bar_overhang == pytest.approx({1: 43.86, 2: 43.86}, abs=0.01)
-    assert report.carriage_margin["inner"] == pytest.approx((61.52, 24.81), abs=0.01)
-    assert report.carriage_margin["outer"] == pytest.approx((64.18, 12.93), abs=0.01)
+    assert report.carriage_margin["inner"] == pytest.approx((61.52, 14.738), abs=0.01)
+    assert report.carriage_margin["outer"] == pytest.approx((64.18, 2.858), abs=0.01)
     assert all(
         near > 0.0 and far > 0.0 for near, far in report.carriage_margin.values()
     )
@@ -1851,8 +1847,8 @@ def test_kit_rails_and_carriages_carry_the_owner_note_and_the_play_check() -> No
     # bought for its 2 rails and 2 of its carriages; Z0 preload and C
     # accuracy are not required, the fit-up play check replaces them.
     assert spec.QUANTITIES[spec.RAIL] == spec.QUANTITIES[spec.CARRIAGE] == 2
-    assert spec.BOM_DESCRIPTIONS[spec.RAIL] == f"{guide_rail.STYLE} RAIL, 450 MM, KIT, UNCUT"
-    assert trammel.RAIL_LENGTH == 450.0
+    assert spec.BOM_DESCRIPTIONS[spec.RAIL] == f"{guide_rail.STYLE} RAIL, 439.928 MM, KIT, TRIMMED"
+    assert trammel.RAIL_LENGTH == trammel.BASE_BAR_LENGTH == 439.928
     assert spec.BOM_DESCRIPTIONS[spec.CARRIAGE] == f"{carriage.STYLE} CARRIAGE, KIT"
     for description in spec.BOM_DESCRIPTIONS.values():
         assert "Z0" not in description and "PRELOAD" not in description
@@ -1883,6 +1879,9 @@ def test_kit_rails_and_carriages_carry_the_owner_note_and_the_play_check() -> No
     assert f"2 GREASED {carriage.STYLE} CARRIAGES {spec._item(spec.CARRIAGE)}" in three
     assert "ROCK ALL 4" in three and "KEEP THE 2 TIGHTEST, ONE PER RAIL" in three
     assert "ONLY ONTO A KIT FALSE RAIL" in three
+    assert "TRANSFER ITS HOLES TO THAT BAR" in three
+    assert "ALL EIGHT SCREWS MUST ENTER FREELY BY HAND" in three
+    assert "FLUSH BOTH ENDS" in three
 
 
 # The feed fit-up's one linear order (TL-00 review, farm 20261104T210601055Z,

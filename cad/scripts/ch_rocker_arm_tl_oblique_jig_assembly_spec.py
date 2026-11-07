@@ -347,8 +347,8 @@ def _turned_over(rows: Rows) -> Rows:
 
 
 # Base bars: origin on the spindle-end face, on the rail axis, bottom face on
-# the table; the bar runs from RAIL_NEAR_S ⚙, flush with its rail's near end,
-# to BASE_BAR_FAR_S ⚙, RAIL_OVERHANG ⚙ short of the rail's far end.
+# the table; the bar and its datum-trimmed rail both run from
+# RAIL_NEAR_S ⚙ to BASE_BAR_FAR_S ⚙, flush at both ends.
 # Turned over, the part's bottom face (its z = 0) is on top, so its origin
 # stands BASE_BAR_THICK ⚙ above the table.
 BASE_BAR_PLACEMENTS: tuple[tuple[Point3, Rows], ...] = tuple(
@@ -1699,7 +1699,11 @@ ASSEMBLY_STEPS = (
     # off a rail only ever rides the kit's plastic false rail (loading arbor).
     f"3. EACH RAIL ARRIVES WITH 2 GREASED {carriage.STYLE} CARRIAGES "
     f"{_item(CARRIAGE)}: ROCK ALL 4 SIDEWAYS UNDER AN INDICATOR; KEEP THE 2 "
-    "TIGHTEST, ONE PER RAIL. A CARRIAGE LEAVES A RAIL ONLY ONTO A KIT FALSE RAIL.",
+    "TIGHTEST, ONE PER RAIL. A CARRIAGE LEAVES A RAIL ONLY ONTO A KIT FALSE RAIL. "
+    "TRIM EACH RAIL TO ITS ACTUAL BAR, FLUSH BOTH ENDS; CHECK RETAINED WALLS. "
+    "TRANSFER ITS HOLES TO THAT BAR PER THE BASE-BAR PROCESS PLAN; "
+    "KEEP EACH PAIR IDENTIFIED. ALL EIGHT SCREWS MUST ENTER FREELY BY HAND "
+    "WITHOUT MOVING THE RAIL. CLEAN ALL CUTTING GRIT BEFORE RELOADING.",
     f"4. FIT THE FEED BLOCK {_item(FEED_BLOCK)} ON RAIL 1'S CARRIAGE, "
     f"THE PLAIN PIVOT BLOCK {_item(PIVOT_BLOCK)} ON RAIL 2'S, "
     "PIVOT COUNTERBORES TOWARD THE SPINDLE AND FEED LUG TOWARD THE COLUMN.",
@@ -1998,8 +2002,7 @@ CAPTURE_CHECKS = (
 def _bar_corners(rail: int) -> list[tuple[float, float]]:
     """A bar's plan corners: the operator- and column-side edges (the rail
     off the centreline since the 2026-10-17 widening) at both ends. The bar
-    starts flush with its rail's near end and stops short of its far end
-    (``trammel.RAIL_OVERHANG``)."""
+    and its datum-trimmed rail share both end stations."""
     near, far = trammel.RAIL_NEAR_S, trammel.BASE_BAR_FAR_S
     edges = (trammel.BASE_BAR_OPERATOR_EDGE, trammel.BASE_BAR_COLUMN_EDGE)
     return [trammel.rail_point(rail, s, lat) for s in (near, far) for lat in edges]

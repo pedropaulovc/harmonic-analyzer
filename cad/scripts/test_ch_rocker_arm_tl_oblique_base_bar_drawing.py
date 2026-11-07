@@ -45,14 +45,11 @@ def test_bar_is_milled_from_the_owned_bar_and_faced_to_thickness() -> None:
         assert value / 25.4 == pytest.approx(round(value / 25.4, 2), abs=1e-9)
     # Milled from 6 in, the widest part still fits the vise's stock jaws.
     assert spec.BAR_WIDTH + spec.BAR_WIDTH_BAND < 6.0 * 25.4
-    # Owner ruling 2026-11-04 (#2177 option B): the 450 kit rail goes on the
-    # 17.32 bar uncut, flush at the spindle end, and overhangs the far end.
-    assert spec.BAR_LENGTH == trammel.BASE_BAR_LENGTH
+    # Purchased 450 rails are datum-trimmed to the actual existing bars.
+    assert spec.BAR_LENGTH == trammel.BASE_BAR_LENGTH == trammel.RAIL_LENGTH
     assert round(spec.BAR_LENGTH / 25.4, 2) == 17.32
-    assert trammel.RAIL_OVERHANG == pytest.approx(
-        trammel.RAIL_LENGTH - spec.BAR_LENGTH, abs=1e-9
-    )
-    assert trammel.RAIL_OVERHANG == pytest.approx(10.072, abs=1e-9)
+    assert trammel.RAIL_OVERHANG == pytest.approx(0.0, abs=1e-9)
+    assert trammel.RAIL_TRIM_PER_END == pytest.approx(5.036)
     assert spec.RAIL_HOLE_X[-1] < spec.BAR_LENGTH
     # The 2026-10-30 ruling: 5.50 wide (vise fit) with the column-side edge
     # still 3.5 in off the rail, so the rail sits off the centreline. Rail 1's
@@ -64,7 +61,7 @@ def test_bar_is_milled_from_the_owned_bar_and_faced_to_thickness() -> None:
 
 
 def test_rail_holes_are_eight_on_the_rail_pitch() -> None:
-    assert spec.RAIL_HOLE_X == (15.0, 75.0, 135.0, 195.0, 255.0, 315.0, 375.0, 435.0)
+    assert spec.RAIL_HOLE_X == pytest.approx(tuple(9.964 + 60.0 * k for k in range(8)))
     assert spec.TAP_SPEC.kind == "tapped" and spec.TAP_SPEC.size == trammel.RAIL_SCREW
     assert spec.TAP_SPEC.end == "through_all"
 
@@ -151,18 +148,15 @@ def test_walls_meet_rule_17() -> None:
     )
     assert spec.SIDE_WALL_WORST == spec.FAR_SIDE_WALL_WORST
     assert min(spec.SIDE_WALL_WORST, spec.NEAR_END_WALL_WORST) >= WALL_TARGET_MM
-    # The kit rail's end taps: 15 from the spindle end, 4.93 from the far end
-    # of the 17.32 bar (option B), so the far end governs. The bar is drilled
-    # to print: the end wall reads the station's band (and the length's at the
-    # far end), the slot walls the slots' stations and rises at .XX.
+    # Nominal-model envelope only; actual transferred holes are inspected.
     xx_station = printed_band_mm(2, unit="in")
     tap_r = THREAD_MAJOR_MM[spec.RAIL_SCREW] / 2.0
     far_nominal = spec.BAR_LENGTH - spec.RAIL_HOLE_X[-1] - tap_r
-    assert far_nominal / 25.4 == pytest.approx(0.112, abs=5e-4)
+    assert far_nominal / 25.4 == pytest.approx(0.310, abs=5e-4)
     assert spec.RAIL_TAP_END_WALL_WORST == pytest.approx(
-        far_nominal - xx_station - spec.RAIL_HOLE_BAND
+        far_nominal - xx_station
     )
-    assert spec.RAIL_TAP_END_WALL_WORST < spec.RAIL_HOLE_X[0] - spec.RAIL_HOLE_BAND - tap_r
+    assert spec.RAIL_TAP_END_WALL_WORST < spec.RAIL_HOLE_X[0] - tap_r
     assert spec.RAIL_TAP_END_WALL_WORST >= WALL_TARGET_MM
     assert spec.RAIL_TAP_SLOT_WALL_WORST >= WALL_TARGET_MM
     build = BUILD.read_text(encoding="utf-8")
@@ -170,76 +164,30 @@ def test_walls_meet_rule_17() -> None:
     assert "adapter, low_corner, FAR_SLOT_X, FAR_SLOT_Y, FAR_SLOT_RISE" in build
 
 
-def test_receipt_band_accepts_only_rails_that_fit_the_printed_bar() -> None:
-    """Codjiflo P2 (PR #2187) and farm review 20261104T203420333Z: the bar is
-    drilled at its printed stations, never at measured ones, so the rail
-    sheet accepts a received rail only if every station, measured from the
-    flush end, lies within RAIL_RECEIPT_BAND of nominal: the fit's own
-    allowance (the #8's float in the rail's Ø4.5 less the bar's station band),
-    floored to the stations' printed places."""
-    band = spec.RAIL_RECEIPT_BAND
-    assert spec.RAIL_PATTERN_ALLOWANCE == pytest.approx(
-        (spec.RAIL_HOLE_DIA - THREAD_MAJOR_MM[spec.RAIL_SCREW]) / 2.0 - spec.RAIL_HOLE_BAND
+@pytest.mark.parametrize("wall_name", (
+    "counterbore_end_wall", "tap_end_wall", "tap_slot_wall", "tap_bracket_wall",
+))
+@pytest.mark.parametrize("bad_wall", (1.5, float("nan"), float("inf")))
+def test_matched_rail_rejects_insufficient_actual_walls(wall_name, bad_wall) -> None:
+    walls = dict.fromkeys(
+        ("counterbore_end_wall", "tap_end_wall", "tap_slot_wall", "tap_bracket_wall"), 3.0
     )
-    assert band == pytest.approx(
-        int(spec.RAIL_PATTERN_ALLOWANCE * 10**spec.RAIL_HOLE_PLACES)
-        / 10**spec.RAIL_HOLE_PLACES
-    )
-    assert band == pytest.approx(0.08)
-    assert band <= spec.RAIL_PATTERN_ALLOWANCE < band + 0.01
+    spec.require_matched_rail_walls(**walls)
+    walls[wall_name] = bad_wall
+    with pytest.raises(ValueError, match="matched rail wall"):
+        spec.require_matched_rail_walls(**walls)
 
-    def accepted(stations: tuple[float, ...]) -> bool:
-        return all(
-            abs(x - nominal) <= band + 1e-9
-            for x, nominal in zip(stations, spec.RAIL_HOLE_X, strict=True)
-        )
 
-    def fits(stations: tuple[float, ...]) -> bool:
-        # Each received hole against the bar's tap at its worst printed spot:
-        # the screw's float in the rail's hole covers both errors.
-        return all(
-            abs(x - nominal) + spec.RAIL_HOLE_POSITION_RADIUS
-            <= spec.RAIL_SCREW_CLEARANCE + 1e-9
-            for x, nominal in zip(stations, spec.RAIL_HOLE_X, strict=True)
-        )
-
-    count = len(spec.RAIL_HOLE_X)
-    # Received near E and pitch on a grid round the nominal 15 / 60: every
-    # accepted pattern fits a bar drilled anywhere inside its printed band.
-    grid = [
-        tuple(e + k * p for k in range(count))
-        for e in (14.8 + 0.01 * i for i in range(41))
-        for p in (59.97 + 0.001 * j for j in range(61))
-    ]
-    inside = [stations for stations in grid if accepted(stations)]
-    assert inside
-    assert all(fits(stations) for stations in inside)
-    # A pattern inside the band is accepted; one just past it is not.
-    assert accepted(tuple(15.05 + 59.995 * k for k in range(count)))
-    assert not accepted(tuple(15.0 + 60.015 * k for k in range(count)))
-    # The review's example, E 17/13 at P 60: the last tap would sit 0.85 from
-    # the end, under the floor; the receipt check rejects it.
-    tap_r = THREAD_MAJOR_MM[spec.RAIL_SCREW] / 2.0
-    e17 = tuple(17.0 + 60.0 * k for k in range(count))
-    assert spec.BAR_LENGTH - e17[-1] - tap_r == pytest.approx(0.845, abs=1e-3)
-    assert spec.BAR_LENGTH - e17[-1] - tap_r < WALL_FLOOR_MM
-    assert not accepted(e17)
-    # The bar's printed walls need no band beyond the stations' own.
-    walls = spec.bracket_hole_walls(leadscrew.BASE_BAR_HOLES)
-    assert walls["rail tap"] >= WALL_FLOOR_MM
-    # The base-bar plan prints the same acceptance and stations, and drills
-    # to print.
+def test_plan_uses_actual_rail_as_template_not_nominal_stations() -> None:
     plan = (
-        Path(__file__).resolve().parents[1]
-        / "process"
-        / "ch_rocker_arm_tl_oblique_base_bar"
-        / "plan.toml"
+        Path(__file__).resolve().parents[1] / "process"
+        / "ch_rocker_arm_tl_oblique_base_bar" / "plan.toml"
     ).read_text(encoding="utf-8")
-    stations = ", ".join(f"{x:g}" for x in spec.RAIL_HOLE_X)
-    assert f"within +/-{band:.2f} of {stations}" in plan
-    assert f"outside +/-{band:.2f}, stop and report before drilling" in plan
-    assert "never at a measured one" in plan
-    assert "received rail's station" not in plan
+    assert "transfer" in plan.lower()
+    assert "NOT DRO targets" in plan
+    assert "all eight screws enter freely by hand" in plan
+    assert "0.080 in" in plan
+    assert "+/-0.08" not in plan
 
 
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
@@ -279,36 +227,15 @@ def test_slot_run_is_centre_to_centre_with_centre_marks() -> None:
     assert drawing.FRONT_KEEP["SlotRun"][0] > drawing._RIGHT
 
 
-def test_rail_holes_hold_a_baseline_band_that_names_its_mate() -> None:
+def test_rail_hole_stations_are_matched_references_that_name_the_mate() -> None:
     stations = {f"RailHole{k}X" for k in range(1, 9)}
     assert spec.DRAWING_DIMENSIONS["RailHoles"] == stations
-    # c3-r7 (rule 4): only the stations, the rail's pitch, carry the band.
-    # Owner ruling 4 (2026-11-01): the HGR15 pattern is a metric vendor line,
-    # so each station prints exact millimetres at two places with its band.
-    rail = {
-        key: value
-        for key, value in spec.METRIC_DIMENSIONS.items()
-        if key[0] == "RailHoles"
+    assert spec.RAIL_REFERENCE_DIMENSIONS == {
+        ("RailHoles", name): 3 for name in stations
     }
-    assert set(rail) == {("RailHoles", name) for name in stations}
-    assert set(rail.values()) == {(2, spec.RAIL_HOLE_BAND)}
-    assert spec.RAIL_HOLE_BAND == 0.08
-    assert not stations & set(drawing.CALLOUTS_BELOW) - {"RailHole8X"}
-    assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 2 for name in stations)
-    assert all(x == round(x, 2) for x in spec.RAIL_HOLE_X)
-    # One DRO Y setting cuts the row: only the station band scatters one hole
-    # off another (exact stations add no rounding), inside the #8's float in
-    # the rail's Ø4.5.
-    assert spec.RAIL_HOLE_POSITION_RADIUS == pytest.approx(spec.RAIL_HOLE_BAND)
-    assert spec.RAIL_PATTERN_ALLOWANCE == pytest.approx(
-        spec.RAIL_SCREW_CLEARANCE - spec.RAIL_HOLE_POSITION_RADIUS
-    )
-    assert spec.RAIL_PATTERN_ALLOWANCE > 0.0
-    # The mate rides the outermost station, the one lane no extension line
-    # crosses; no other station carries a callout. The bar is drilled to
-    # print, so the callout names the mate by its drawing number and the
-    # fit-up acceptance (farm review 20261104T203420333Z: a received-rail
-    # band contradicted the printed ±0.08, and the match had no acceptance).
+    assert not any(feature == "RailHoles" for feature, _ in spec.METRIC_DIMENSIONS)
+    assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 3 for name in stations)
+    assert all(x == round(x, 3) for x in spec.RAIL_HOLE_X)
     rail_number = _config.parts("ch-rocker-arm-tl-vn-oblique-rail-kit")["number"]
     assert drawing.CALLOUTS_BELOW["RailHole8X"] == spec.RAIL_MATE_CALLOUT
     assert spec.RAIL_MATE_CALLOUT == (
@@ -389,11 +316,8 @@ def test_rail_row_names_what_it_buys() -> None:
     # The lane is sized for the widest line as measured on the r4 sheet,
     # about 2.6 mm a glyph (r1-r3 assumed 2.2 and the block overran).
     assert 2 * drawing._RAIL_ROW_TEXT_HALF >= widest * 0.0026
-    # The stations' band stays inside the screw clearance; the title block's
-    # .XX would not, so only the row (moving all eight together) takes it.
-    assert (
-        spec.RAIL_HOLE_BAND < spec.RAIL_SCREW_CLEARANCE < printed_band_mm(2, unit="in")
-    )
+    # The screw's nominal radial float is not a transfer-tool accuracy claim.
+    assert spec.RAIL_SCREW_CLEARANCE > 0.0
 
 
 def test_tap_callout_has_clear_air_under_the_border() -> None:
@@ -730,7 +654,6 @@ def test_metric_vendor_stations_are_model_authored_in_mm() -> None:
     stations print exact millimetres, labelled mm: the part authors them, the
     sheet proves they survived the import."""
     assert set(spec.METRIC_DIMENSIONS) == {
-        *(("RailHoles", f"RailHole{k}X") for k in range(1, len(spec.RAIL_HOLE_X) + 1)),
         ("BracketHoles", "BracketHole1X"),
         ("BracketHoles", "BracketHole5X"),
     }
@@ -747,6 +670,7 @@ def test_metric_vendor_stations_are_model_authored_in_mm() -> None:
 class _Display:
     def __init__(self, places: int) -> None:
         self.doc_units, self.places, self.calls = True, places, []
+        self.texts = {1: "", 2: " mm"}
 
     def GetUseDocUnits(self):
         return self.doc_units
@@ -757,16 +681,21 @@ class _Display:
     def GetPrimaryPrecision2(self):
         return self.places
 
-    def GetText(self, _part):
-        return " mm"
+    def GetText(self, part):
+        return self.texts.get(part, "")
+
+    def SetText(self, part, text):
+        self.calls.append(f"SetText{part}")
+        self.texts[part] = text  # Native setter replaces this entire text part.
 
     def SetUnits2(self, use_doc, *_args):
         self.calls.append("SetUnits2")
         self.doc_units = use_doc
         return 0
 
-    def SetPrecision3(self, *_args):
+    def SetPrecision3(self, places, *_args):
         self.calls.append("SetPrecision3")
+        self.places = places
         return 0
 
 
@@ -797,6 +726,62 @@ def test_metric_sheet_sets_units_but_never_rewrites_model_precision(
             None, [_Annotation("RailHole1X", bad)], {"RailHole1X": 2}
         )
     assert bad.calls == []
+
+
+def test_metric_reference_is_authored_with_units_inside_parentheses(monkeypatch) -> None:
+    import _drawing_metric_vendor as metric
+    import _metric_vendor_dimension as model
+
+    native_dimension = object()
+    display = _Display(3)
+    monkeypatch.setattr(model, "_named_dimension", lambda *_args: (display, native_dimension))
+    monkeypatch.setattr(model, "_early_bound", lambda obj, _iface: obj)
+    model.set_metric_vendor_units(
+        None, "RailHoles", "RailHole1X", places=3, presentation="reference"
+    )
+    assert display.texts == {1: "(", 2: " mm)"}
+    assert display.places == 3
+    model_text = dict(display.texts)
+    display.calls.clear()
+    display.doc_units = True  # The inch drawing import adopts document units.
+    monkeypatch.setattr(metric, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(metric, "_annotation_name", lambda _adapter, ann: ann.name)
+    metric.print_imported_metric_dimensions(
+        None, [_Annotation("RailHole1X", display)], {"RailHole1X": 3},
+        references={"RailHole1X"},
+    )
+    assert display.calls == ["SetUnits2"]  # No drawing-side text or precision repair.
+    assert display.texts == model_text
+    # The old generic REF formatter replaced the same native suffix with ")".
+    display.SetText(2, ")")
+    with pytest.raises(RuntimeError, match="does not print millimetres"):
+        metric.print_imported_metric_dimensions(
+            None, [_Annotation("RailHole1X", display)], {"RailHole1X": 3},
+            references={"RailHole1X"},
+        )
+
+
+@pytest.mark.parametrize("prefix,suffix", (("", " mm)"), ("(", " mm"), ("(", ")")))
+def test_metric_reference_requires_both_parentheses_and_unit(monkeypatch, prefix, suffix) -> None:
+    import _drawing_metric_vendor as metric
+
+    display = _Display(3)
+    display.texts = {1: prefix, 2: suffix}
+    monkeypatch.setattr(metric, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(metric, "_annotation_name", lambda _adapter, ann: ann.name)
+    with pytest.raises(RuntimeError, match="does not print millimetres"):
+        metric.print_imported_metric_dimensions(
+            None, [_Annotation("RailHole1X", display)], {"RailHole1X": 3},
+            references={"RailHole1X"},
+        )
+
+
+def test_base_bar_reference_text_is_owned_by_the_model() -> None:
+    build = BUILD.read_text(encoding="utf-8")
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'presentation="reference"' in build
+    assert 'references=DRAWING_DIMENSIONS["RailHoles"]' in sheet
+    assert "set_reference_dimensions(" not in sheet
 
 
 def test_notes_follow_the_simplicity_policy() -> None:

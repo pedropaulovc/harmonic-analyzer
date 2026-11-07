@@ -7,11 +7,11 @@ CARRIAGE`` in four native views; each member's installed quantity, the kit
 as the purchase unit, and the carriage's note (the owner's kit description
 and the fit-up play acceptance in MHA-CH-06-TL-00).
 
-Sheet 2, RAIL RECEIPT, is the rail's receipt check. The listing states no
-hole pattern, so the received rail is measured before the base bar is
-tapped: every hole station is the Rail member's own native model dimension
-from the -X end face (rule 10, baseline), each carrying the base bar's
-receipt band as its native tolerance, the length a parenthesised reference.
+Sheet 2 shows nominal REF geometry for the matched rail/bar route. Trim the
+actual rail flush with its actual bar and transfer its eight mounting holes.
+Every printed station remains model-linked but is parenthesised and
+untoleranced; no supplier pitch accuracy or transfer-tool accuracy is claimed.
+Free screw insertion, retained actual walls and full travel accept the pair.
 Each value sits on its own dimension line, clear of every other line; a note
 under the stack flags them as the note's check, and the note says what to
 do when one is out of band. FRONT (the hole face) and TOP stand
@@ -44,6 +44,7 @@ from _drawing_common import read_required_properties
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
+    set_dimension_callouts,
     set_reference_dimension,
 )
 from _drawing_layout_check import LeaderSegment, _segment_crosses_box
@@ -118,9 +119,9 @@ SOURCE_PROPERTIES = ("Number", "Material Specification", "Finish", *NOTE_PROPERT
 # --- Sheet 2: the rail receipt check --------------------------------------------
 # ASME B landscape 431.8 x 279.4, all in sheet metres. The border is 12.7 mm
 # in; the title block fills x >= 215.9 mm below y = 65.1 mm; the receipt
-# note's three lines top out at footer_top (70 mm).
+# note's three lines use the existing dynamic footer_top reserve.
 #
-# The 450 rail is 225 mm long at 1:2, the largest project scale whose
+# The trimmed rail fits at 1:2, the largest project scale whose
 # length fits the drawable width with the profile beside it.
 SHEET_SCALE = (1, 2)
 # The 15 x 15 profile prints 30 mm square at 2:1 (7.5 mm at the sheet's 1:2,
@@ -143,8 +144,7 @@ _CELL_SLACK = 0.002  # reserved cell beyond the expected outline, each side
 # Model-box half-extents on the sheet. FRONT looks down on the hole face
 # (length x width), TOP at the flank (length x height), RIGHT along the rail
 # at the end profile (width x height). The isometric's box is the r9 sheet's
-# 1:4 pictorial of the 440 rail (about 81 x 48 mm) read off its PDF; the 450
-# rail adds about 2 mm along it, inside the slack.
+# 1:4 pictorial of the 440 rail (about 81 x 48 mm) read off its PDF.
 _FRONT_HALF = (
     rail.LENGTH / 2.0 * _sheet_mm(SHEET_SCALE),
     rail.WIDTH / 2.0 * _sheet_mm(SHEET_SCALE),
@@ -159,15 +159,18 @@ _RIGHT_HALF = (
 )
 _ISO_HALF = (0.045, 0.028)
 
-# View centres. FRONT spans x 57.5..282.5 mm: its -X end stands 45 mm in
-# from the border so the first station's text fits left of the end face. Its
-# eight station rows, the receipt flag and the FRONT caption stand under it,
+# FRONT/TOP leave a left-hand text lane for the two shortest stations.
+# Its extra 2 mm border reserve accommodates the measured native text widths.
+# Eight station rows, the receipt flag and the FRONT caption stand under it,
 # down to the footer, the length row over it; TOP stands over FRONT, in
 # projection with it. RIGHT stands level with FRONT, right of its end; the
 # isometric fills the upper right, clear of TOP's end and over RIGHT's
 # outline.
-FRONT_CENTER = (0.170, 0.160)
-TOP_CENTER = (FRONT_CENTER[0], 0.203)
+FRONT_CENTER = (0.172, 0.160)
+# The two-line Length fit callout reaches Y=184.50 mm (a966 recipe evidence).
+# TOP's caption reserve extends 20.04 mm below its view centre; Y=211 mm
+# leaves 6.46 mm above that callout, without moving the eight station lanes.
+TOP_CENTER = (FRONT_CENTER[0], 0.211)
 RIGHT_CENTER = (0.340, FRONT_CENTER[1])
 ISO_CENTER = (0.345, 0.230)
 VIEWS = (
@@ -224,17 +227,21 @@ RECEIPT_DIMENSIONS = {
 }
 RECEIPT_DIMENSIONS["Length"] = (0.0, rail.LENGTH, LENGTH_ROW_RISE)
 STATION_NOMINALS = dict(zip(rail.STATION_DIMENSIONS, rail.HOLE_X, strict=True))
-# The first station spans 7.5 mm at 1:2, narrower than its "15.00 ±0.08"
-# text (about 24 mm): the text stands outside the span, left of the -X end
-# face and of FRONT's cell, its centre this far (sheet metres) from the
-# face's extension line, so its row can stand nearest the part.
-TEXT_OUTSIDE_START = {rail.STATION_DIMENSIONS[0]: 0.020}
-# Smart arrows put the 75 span's arrows outside, over the 15 row (run
-# 20261104T222143958Z); every station keeps its arrows inside, under its text.
-ARROWS_INSIDE = rail.STATION_DIMENSIONS
+# Native run 20261107T002231Z-1-4eb76c9d measured Station2's text
+# x=61.4..93.9 mm: only 1.4 mm from the common x=60 mm witnesses of
+# Stations3..8. Both short dimensions therefore use the OUTSIDE witness lane.
+# The widest short text is 32.5 mm. Half width + padded-cell reach + gap
+# is 16.25 + 7.59 + 2 = 25.84 mm; a 27 mm offset clears that whole cell.
+# The 2 mm FRONT/TOP shift also leaves the native text >6 mm inside the border.
+TEXT_OUTSIDE_START = dict.fromkeys(rail.STATION_DIMENSIONS[:2], 0.027)
+# Only Station1's 4.982 mm sheet span cannot fit the two native arrowheads.
+# Put its arrows outside; retain inside arrows on all longer stations.
 _DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
+_DIM_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
+STATION_ARROW_SIDES = dict.fromkeys(rail.STATION_DIMENSIONS, _DIM_ARROWS_INSIDE)
+STATION_ARROW_SIDES[rail.STATION_DIMENSIONS[0]] = _DIM_ARROWS_OUTSIDE
 _CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
-_TOL_SYMMETRIC = 4  # swTolType_e.swTolSYMMETRIC
+_TOL_NONE = 0  # swTolType_e.swTolNONE
 FRONT_DIMENSION_PRECISION = {
     name: places
     for places_by_name in rail.DRAWING_PRECISION.values()
@@ -250,9 +257,9 @@ _LAST_ROW_LINE_DROP = (
 )
 RECEIPT_FLAG_XY = (FRONT_CENTER[0], FRONT_CENTER[1] - _LAST_ROW_LINE_DROP - 0.004)
 RECEIPT_FLAG_CELL = (
-    RECEIPT_FLAG_XY[0] - 0.052,
+    RECEIPT_FLAG_XY[0] - 0.075,
     RECEIPT_FLAG_XY[1] - 0.0065,
-    RECEIPT_FLAG_XY[0] + 0.052,
+    RECEIPT_FLAG_XY[0] + 0.075,
     RECEIPT_FLAG_XY[1] + 0.001,
 )
 
@@ -356,9 +363,9 @@ def _display(annotation: Any) -> Any:
 
 
 def assert_receipt_controls(adapter: Any, annotations: list[Any]) -> None:
-    """Every station reads its nominal, the receipt band at the receipt
-    places, no reference brackets and no callout (the flag is its own note);
-    the length reads parenthesised. Never repairs native state."""
+    """Every nominal model reference is untoleranced and parenthesised.
+
+    Matching actual hardware is accepted by the fitting instructions."""
     found = {}
     for annotation in annotations:
         found[dimension_name(adapter, annotation)] = _display(annotation)
@@ -366,43 +373,31 @@ def assert_receipt_controls(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(
             f"receipt dimensions {sorted(found)} != {sorted(RECEIPT_DIMENSIONS)}"
         )
-    band = rail.RECEIPT_BAND / 1000.0
     for name, display in found.items():
         dimension = _early_bound(display.GetDimension2(0), "IDimension")
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
         brackets = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
         callout = str(display.GetText(_CALLOUT_BELOW) or "").replace("\r\n", "\n")
+        above = str(display.GetText(3) or "").replace("\r\n", "\n")
+        expected_above = rail.END_FIT_CALLOUT if name == "Length" else ""
         value = abs(float(dimension.SystemValue))
-        if name == "Length":
-            if (
-                abs(value - rail.LENGTH / 1000.0) > 1e-8
-                or brackets != ("(", ")")
-                or callout
-            ):
-                raise RuntimeError(
-                    f"rail length: value {value!r}, brackets {brackets!r}, "
-                    f"callout {callout!r}"
-                )
-            continue
+        expected = rail.LENGTH if name == "Length" else STATION_NOMINALS[name]
         if (
-            abs(value - STATION_NOMINALS[name] / 1000.0) > 1e-8
-            or int(tolerance.Type) != _TOL_SYMMETRIC
-            or abs(float(tolerance.GetMaxValue()) - band) > 1e-9
-            or abs(float(tolerance.GetMinValue()) + band) > 1e-9
-            or int(display.GetPrimaryTolPrecision2()) != rail.RECEIPT_PLACES
-            or "(" in brackets[0]
-            or ")" in brackets[1]
+            abs(value - expected / 1000.0) > 1e-8
+            or int(tolerance.Type) != _TOL_NONE
+            or brackets != ("(", ")")
             or callout
+            or above != expected_above
         ):
             raise RuntimeError(
-                f"rail {name}: value {value!r} (nominal {STATION_NOMINALS[name]!r}), "
-                f"tolerance type {int(tolerance.Type)} "
-                f"{float(tolerance.GetMinValue())!r}..{float(tolerance.GetMaxValue())!r}"
-                f" (band {band!r}), tol places {int(display.GetPrimaryTolPrecision2())}, "
-                f"brackets {brackets!r}, callout {callout!r}"
+                f"rail reference {name}: value {value!r}, expected {expected!r}, "
+                f"tolerance type {int(tolerance.Type)}, brackets {brackets!r}, "
+                f"callout {callout!r}"
             )
-        if name in ARROWS_INSIDE and int(display.ArrowSide) != _DIM_ARROWS_INSIDE:
-            raise RuntimeError(f"rail {name} did not keep its arrows inside")
+        if name == "Length":
+            continue
+        if int(display.ArrowSide) != STATION_ARROW_SIDES[name]:
+            raise RuntimeError(f"rail {name} did not keep its authored arrow side")
 
 
 @_telemetry.traced("drawing.rail_receipt_dimensions")
@@ -418,11 +413,16 @@ def _receipt_dimensions(adapter: Any, front: Any) -> list[Any]:
     assert_imported_precision(adapter, annotations, FRONT_DIMENSION_PRECISION)
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
+        set_reference_dimension(adapter, annotation, label=name)
         if name == "Length":
-            set_reference_dimension(adapter, annotation, label=name)
             continue
         display = _display(annotation)
-        display.ArrowSide = _DIM_ARROWS_INSIDE
+        display.ArrowSide = STATION_ARROW_SIDES[name]
+    # Length witnesses identify both actual rail end faces. Put the fit flag
+    # above its value, away from the proven eight station-text lanes below.
+    set_dimension_callouts(
+        adapter, annotations, {"Length": rail.END_FIT_CALLOUT}, location="above"
+    )
     assert_receipt_controls(adapter, annotations)
     return annotations
 

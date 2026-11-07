@@ -204,11 +204,10 @@ def _below_line(k: int) -> float:
 
 
 # The plan: the rail-hole stations stack above it from the end face, nearest
-# first (DRO absolutes), each in its own lane; the outermost (435.00 ±0.08 mm)
+# first (DRO absolutes), each in its own lane; the outermost station
 # carries the mate on a second line, the only lane no extension line crosses.
-# A station whose span is shorter than its text with a gap each side (the
-# 15.00 and 75.00: the millimetre label, owner ruling 4, makes them wider
-# than 37.5 on the sheet) prints left of the end face's extension line, where
+# A station whose span is shorter than its three-place metric text with a
+# gap each side prints left of the end face's extension line, where
 # no other line runs (r1 printed the 40.00 across that line), each on its own
 # lane; the rest print mid-span.
 #
@@ -254,7 +253,7 @@ _RAIL_ROW_TEXT_HALF = 0.0182
 # "5.50", four glyphs at 2.6 (the #290 "(5-1/2 in)" over "STOCK" was 0.0104).
 _BAR_WIDTH_TEXT_HALF = 0.0055
 # The metric vendor stations at about 2.6 a glyph (owner ruling 4).
-_RAIL_HOLE_TEXT_HALF = 0.0182  # "15.00 ±0.08 mm", 14 glyphs
+_RAIL_HOLE_TEXT_HALF = 0.0221  # Three-place station and band, 17 glyphs maximum
 _BRACKET_NEAR_X_TEXT_HALF = 0.0195  # "57.000 ±0.13 mm", 15 glyphs
 _BRACKET_ROW_TEXT_HALF = 0.0070  # "2.425": "61.400" was 13.9 wide on the c4-r9 sheet
 _BRACKET_OUTER_TEXT_BELOW = 0.004  # "6.400"'s centre under the bar's -Y edge
@@ -398,11 +397,9 @@ _SEAT_REASON_HALF = 0.026  # "TABLE AND RAIL SEATS", 20 glyphs
 SEAT_REASON_XY = (END_CENTER[0] - _SEAT_REASON_HALF, _END_TOP + 0.026)  # top-left
 # One slot's sizes count both slots; the width says they go through (r5).
 DIMENSION_TEXT = {"SlotWidth": ("2X ", " THRU"), "SlotRun": ("2X ", "")}
-# The width is milled to size (owner ruling #2083) and the thickness faced:
-# both take the title block's .XX band. The rail-hole stations' tight band
-# names its mate under the outermost station, the row, at the title block's
-# band since c3-r7, keeps its reason (r3: every hole in line with the rail's
-# row, which the one DRO setting gives).
+# Width/thickness retain the ordinary title-block bands. Rail station REFs
+# name the matched rail and free-screw-insertion acceptance under the last
+# station; the ordinary row-height callout retains its locating purpose.
 CALLOUTS_BELOW = {
     f"RailHole{_LAST_HOLE}X": RAIL_MATE_CALLOUT,
     "RailRowY": RAIL_ROW_CALLOUT,
@@ -438,8 +435,6 @@ def _printed(model: float, places: int) -> float:
 _CALLOUT_PLACES = 3  # every Hole Wizard length prints .XXX
 _TAP_DRILL_PRINTED = _printed(part_spec.TAP_DRILL, _CALLOUT_PLACES)
 _DRILLED = (drilled_oversize_mm(unit=_UNIT), 0.0)
-_PLACES = part_spec.RAIL_HOLE_PLACES
-_BAND = (part_spec.RAIL_HOLE_BAND, -part_spec.RAIL_HOLE_BAND)
 _FROM_LOW_SIDE = (
     "bar_low_side",
     (("draw_ch_rocker_arm_tl_oblique_base_bar", "build"),),
@@ -619,15 +614,8 @@ for _name, _x, _y, _rise, _x_source, _y_source, _rise_source in (
     )
 
 for _index, _x in enumerate(part_spec.RAIL_HOLE_X, start=1):
-    # Baseline from the spindle-end face (the frame's x 0), in the rail
-    # screws' clearance band, and from the faced -Y side at the title block's
-    # band (c3-r7: the row's height has no mate; one DRO setting lines the
-    # holes up).
+    # Actual rail transfers this nominal reference station to its own bar.
     _station: dict[str, tuple[Any, tuple[Any, ...]]] = {
-        "station": (
-            limits(_x, _PLACES, _BAND),
-            ("RAIL_HOLE_X", "RAIL_HOLE_BAND"),
-        ),
         "station_nominal": (_x, ("RAIL_HOLE_X",)),
         "height": (
             _limits(part_spec.RAIL_ROW_Y, part_spec.RAIL_ROW_PLACES),
@@ -640,7 +628,7 @@ for _index, _x in enumerate(part_spec.RAIL_HOLE_X, start=1):
         f"rail_hole_{_index}",
         kind="threaded_hole",
         faces=(CylinderFace(part_spec.TAP_DRILL, contains_x_mm=_x),),
-        requirements=("thread", "dia", "station", "height", "thru", "note"),
+        requirements=("thread", "dia", "height", "thru", "note"),
         fields={
             "at": ([_x, 0.0, part_spec.BAR_THICK], ("RAIL_HOLE_X", "BAR_THICK")),
             "axis": _INTO_BAR,
@@ -659,12 +647,11 @@ for _index, _x in enumerate(part_spec.RAIL_HOLE_X, start=1):
             # The matched-fit callout names the mate (RAIL_MATE_CALLOUT).
             "note": (
                 RAIL_MATE_CALLOUT,
-                ("RAIL_MATE_CALLOUT", "RAIL_SCREW_CLEARANCE", "RAIL_HOLE_BAND"),
+                ("RAIL_MATE_CALLOUT", "RAIL_SCREW_CLEARANCE"),
             ),
         },
         precision={
             "dia": _CALLOUT_PLACES,
-            "station": _PLACES,
             "height": part_spec.RAIL_ROW_PLACES,
         },
     )
@@ -912,7 +899,11 @@ async def build(adapter: Any) -> dict[str, str]:
         {
             name: places
             for (_feature, name), (places, _band) in METRIC_DIMENSIONS.items()
+        } | {
+            name: places
+            for (_feature, name), places in part_spec.RAIL_REFERENCE_DIMENSIONS.items()
         },
+        references=DRAWING_DIMENSIONS["RailHoles"],
     )
     _set_dimension_text(adapter, annotations, DIMENSION_TEXT)
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
