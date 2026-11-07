@@ -3,7 +3,7 @@
 Updated as modules and entries land. Numbers come from the entries — don't
 estimate here.
 
-_Last updated: 2026-11-07 (2026-11-05 entry: both oblique-jig end brackets scrapped)._
+_Last updated: 2026-11-07 (2026-11-04 to 11-06 entries: end brackets scrapped; new base-bar blank roughed on the table)._
 
 ## Modules
 
@@ -18,20 +18,20 @@ This table is only the entry-derived hours roll-up.
 | M03 | [Lathe II — drilling, boring, reaming](curriculum/m03-lathe-ii-drilling-boring-reaming.md) | 16 | 0 | 0 |
 | M04 | [Lathe III — parting to length](curriculum/m04-lathe-iii-parting-to-length-and-batch-work.md) | 20 | 0 | 0 |
 | M05 | [Lathe IV — slender work](curriculum/m05-lathe-iv-slender-work-steadies-tapers.md) | 16 | 0 | 0 |
-| M06 | [Mill I — tramming, squaring](curriculum/m06-mill-i-tramming-squaring-edge-finding.md) | 24 | 11.75 | 2 |
+| M06 | [Mill I — tramming, squaring](curriculum/m06-mill-i-tramming-squaring-edge-finding.md) | 24 | 21.75 | 4 |
 | M07 | [Mill II — profiling, workholding](curriculum/m07-mill-ii-profiling-slots-workholding.md) | 28 | 5 | 1 |
 | M08 | [Hole patterns and tapping](curriculum/m08-hole-patterns-reaming-and-tapping.md) | 16 | 0 | 0 |
 | M09 | [Dividing head and indexing](curriculum/m09-the-dividing-head-and-indexing.md) | 20 | 0 | 0 |
 | M10 | [Gear cutting](curriculum/m10-gear-cutting-making-the-cutter-then-the-gear.md) | 60+ | 0 | 0 |
 | M11 | [Soldering and finishing](curriculum/m11-soldering-finishing-and-assembly-craft.md) | 16 | 0 | 0 |
-| | **total** | **256+** | **16.75** | **3** |
+| | **total** | **256+** | **26.75** | **5** |
 
 ## Parts made
 
 | part | qty needed | qty made | qty scrapped | first entry |
 |---|---:|---:|---:|---|
 | `ch-rocker-arm-tl-oblique-base-bar` (shop fixture) | 2 | 0 | 1 | [2026-10-29](entries/2026-10-29-vise-install-and-first-cuts.md) |
-| `ch-rocker-arm-tl-oblique-end-bracket` (shop fixture) | 2 | 0 | 2 | [2026-11-05](entries/2026-11-05-oblique-end-brackets-scrapped.md) |
+| `ch-rocker-arm-tl-oblique-end-bracket` (shop fixture) | 2 | 0 | 2 | [2026-11-04](entries/2026-11-04-oblique-end-brackets-scrapped.md) |
 
 `0 / 146` registered part families started. The inventory and identity lookup
 are documented in the [subsystem identity guide](../cad/docs/subsystem-identities.md);

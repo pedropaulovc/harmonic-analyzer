@@ -79,4 +79,4 @@ Log entries for this module, newest last. Create them with
 | date | entry | outcome | hours |
 |---|---|---|---|
 | 2026-10-29 | [vise install and first cuts](../entries/2026-10-29-vise-install-and-first-cuts.md) (layout with Dykem and scriber) | partial | 0.5 of 6.5, counted under M06 |
-| 2026-11-05 | [oblique-jig end brackets](../entries/2026-11-05-oblique-end-brackets-scrapped.md) (height-gauge layout) | scrapped | 0.75 of 5.25, counted under M06 |
+| 2026-11-04 | [oblique-jig end brackets](../entries/2026-11-04-oblique-end-brackets-scrapped.md) (height-gauge layout) | scrapped | 0.75 of 5.25, counted under M06 |

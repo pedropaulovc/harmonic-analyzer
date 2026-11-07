@@ -1,5 +1,5 @@
 ---
-date: 2026-11-05
+date: 2026-11-04
 module: M06
 machine: mill
 part: ch-rocker-arm-tl-oblique-end-bracket
@@ -151,7 +151,8 @@ Contact sheet:
 (1: the indicator on the jaw; 2: the vise on its keys; 3: height-gauge layout;
 4–6: the facing crash).
 
-Raw media, in OneDrive `Imagens/Imagens da Câmera/2026/11/`:
+Raw media, in OneDrive `Imagens/Imagens da Câmera/2026/11/` (file names are
+UTC; the session ran on the evening of 2026-11-04 local):
 
 - `20261105_012746000_iOS.MOV`: indicating the vise jaw (22 s).
 - `20261105_012814773_iOS.HEIC`: the indicator set up on the vise.

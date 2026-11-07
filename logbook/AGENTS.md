@@ -60,7 +60,10 @@ The user hands over a session as bullet points or loosely organized notes.
    only on what's still missing. Resolve shorthand, tool names and part names
    rather than guessing them.
 2. **Draft** from [`entries/TEMPLATE.md`](entries/TEMPLATE.md) as
-   `entries/YYYY-MM-DD-<slug>.md`, dated the day of the session. Write in the
+   `entries/YYYY-MM-DD-<slug>.md`, dated the local (Seattle) day of the
+   session. iPhone file names in OneDrive are UTC, so an evening session's
+   files carry the next day's date: read the local capture time from the
+   video's `com.apple.quicktime.creationdate` tag (`ffprobe`). Write in the
    user's first person and keep their voice; the "What happened" narrative
    carries the story, including false starts. Leave a template section out
    or mark a value `not recorded` rather than padding it.
