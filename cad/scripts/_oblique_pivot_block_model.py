@@ -11,7 +11,7 @@ import _telemetry
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
-from _com import _early_bound
+from _com import _bind, _com_invoke, _early_bound
 from _dimensions import name_dimensions
 from _document_units import apply_package_model_units
 from _drawing_marks import clear_dimensions_for_drawing, mark_dimensions_for_drawing
@@ -412,6 +412,32 @@ async def _nut_pattern_reference(adapter, part) -> None:
     dims.apply(adapter, feature)
 
 
+def _native_nut_tap_diameter(adapter, part) -> float:
+    """Use the committed Wizard drill, not the rounded catalogue volume value."""
+    from _feature_tree import _feature_by_name
+
+    feature = _feature_by_name(adapter, "NutTaps")
+    # GetDefinition is VT_DISPATCH. Bind the raw InvokeTypes return before
+    # reading its property; _early_bound alone passes bare PyIDispatch through.
+    definition = _bind(_com_invoke(feature, "IFeature", "GetDefinition"), "IWizardHoleFeatureData2")
+    if feature.GetTypeName2() != "HoleWzd" or definition is None:
+        raise RuntimeError(f"{part.PART_NAME}: NutTaps has no native Hole Wizard definition")
+    diameter = float(definition.ThruTapDrillDiameter) * 1000.0
+    # TAP_DRILL_MM pins this table entry to three decimal mm; the Wizard
+    # retains the exact native value. This tests that representation, not a
+    # manufacturing allowance. Solid-cylinder matching below stays at 1e-6 mm.
+    if not math.isfinite(diameter) or diameter <= 0.0 or round(diameter, 3) != part.NUT_TAP_DRILL:
+        raise RuntimeError(
+            f"{part.PART_NAME}: NutTaps.ThruTapDrillDiameter={diameter!r} mm "
+            f"does not represent catalogue drill {part.NUT_TAP_DRILL!r} mm"
+        )
+    _telemetry.info(
+        f"{part.PART_NAME}: native NutTaps through-tap drill {diameter!r} mm; "
+        f"catalogue three-decimal value {part.NUT_TAP_DRILL!r} mm"
+    )
+    return diameter
+
+
 @_telemetry.traced("part.readback.oblique_block_geometry")
 def require_block_geometry(adapter, part) -> None:
     """Read physical bore axes and model dimensions; never certify a nominal box."""
@@ -427,6 +453,11 @@ def require_block_geometry(adapter, part) -> None:
         geometry = face_geometry(face, identities=frozenset({SURFACE_CYLINDER}))
         if geometry is not None and geometry.identity == SURFACE_CYLINDER:
             cylinders.append(geometry.parameters)
+    observations = [
+        {"origin_mm": [v * 1000.0 for v in parameters[:3]],
+         "axis": list(parameters[3:6]), "diameter_mm": parameters[6] * 2000.0}
+        for parameters in cylinders if len(parameters) == 7
+    ]
     expected = [
         ("pivot seat", 2, (spec.BORE_X, spec.BORE_Y, 0.0), spec.BORE_DIA),
         ("pivot tap", 2, (spec.BORE_X, spec.BORE_Y, 0.0), spec.PIVOT_TAP_DRILL),
@@ -437,9 +468,10 @@ def require_block_geometry(adapter, part) -> None:
         ],
     ]
     if hasattr(part, "NUT_FACE_X"):
+        nut_tap_diameter = _native_nut_tap_diameter(adapter, part)
         expected += [
             ("leadscrew clearance", 0, (0.0, part.NUT_AXIS_Y, part.NUT_AXIS_Z), part.SCREW_CLEARANCE_DIA),
-            *[(f"nut tap {index}", 0, (0.0, y, z), part.NUT_TAP_DRILL)
+            *[(f"nut tap {index}", 0, (0.0, y, z), nut_tap_diameter)
               for index, (y, z) in enumerate(part.NUT_HOLES_YZ, 1)],
         ]
     measured = {}
@@ -453,7 +485,11 @@ def require_block_geometry(adapter, part) -> None:
             and abs(parameters[6] * 2000.0 - diameter) < 1e-6
         ]
         if not matches:
-            raise RuntimeError(f"{part.PART_NAME}: no native {label} at {centre}, diameter {diameter}")
+            raise RuntimeError(
+                f"{part.PART_NAME}: no native {label} at {centre}, "
+                f"axis index {axis}, diameter {diameter!r} mm; "
+                f"observed solid cylinders: {observations!r}"
+            )
         measured[label] = [list(parameters) for parameters in matches]
     dimensions = {}
     for feature, names in part.DRAWING_DIMENSIONS.items():
@@ -524,7 +560,7 @@ async def build_block_model(adapter, part) -> None:
         check("NutClearance",await adapter.create_cut_extrude(ExtrusionParameters(depth=part.LUG_WIDTH*2)))
         name_last_feature(adapter,"NutClearance")
         name_dimensions(adapter,"NutClearance",["NutClearanceDepth"])
-        wizard_holes(adapter,part.NUT_TAP_SPEC,
+        nut_taps = wizard_holes(adapter,part.NUT_TAP_SPEC,
              [[part.NUT_FACE_X,y,z] for y,z in part.NUT_HOLES_YZ],(1.0,0.0,0.0),
              "feed nut screw taps (#4-40 through)",name="NutTaps",expect_dia_mm=part.NUT_TAP_DRILL,
              placement_dims=[((f"NutPlacement{i}U",None),(f"NutPlacement{i}V",None))
@@ -532,7 +568,7 @@ async def build_block_model(adapter, part) -> None:
         # The taps are transferred through the TL-VN-84 FeedNut at assembly:
         # modelled where the nominal nut puts them.
         expected -= math.pi*(part.SCREW_CLEARANCE_DIA/2)**2*part.LUG_WIDTH
-        expected -= len(part.NUT_HOLES_YZ)*math.pi*(part.NUT_TAP_DRILL/2)**2*part.LUG_WIDTH
+        expected -= len(part.NUT_HOLES_YZ)*math.pi*(nut_taps.hole_dia_mm/2)**2*part.LUG_WIDTH
         await _nut_pattern_reference(adapter, part)
     await name_bore_axis(adapter,"Right Plane",spec.BORE_X,"Top Plane",0.0,"pivot axis")
     name_last_feature(adapter,spec.PIVOT_AXIS_NAME)
