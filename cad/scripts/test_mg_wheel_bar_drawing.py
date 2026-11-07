@@ -148,17 +148,22 @@ def test_the_sheet_carries_no_general_notes() -> None:
 
 def test_part_authored_callouts_name_each_band_s_mate() -> None:
     import _config
+    from mg_wheel_axle_spec import BACK_END_SUNK_MAX, BACK_END_SUNK_MIN
 
     assert callouts.authored_by_name() == {
         "AxleBoreDia": {callouts.CALLOUT_BELOW: callouts.AXLE_BORE_CALLOUT},
+        "BarDepth": {callouts.CALLOUT_BELOW: callouts.BAR_DEPTH_CALLOUT},
     }
-    # The depth prints at the title block's .XXX with no reason: a reason on
-    # a stock size without its own band is narration (rule 7).
-    assert not hasattr(callouts, "BAR_DEPTH_CALLOUT")
-    # The literal keeps the wheel group and the axle out of the part recipe;
-    # the mate is named by its number (rule 4).
+    # The literals keep the wheel group and the axle out of the part recipe;
+    # the mate is named by its number (rule 4), the stack's range from the
+    # axle's own spec.
     axle = _config.parts("mg-wheel-axle")["number"]
     assert axle in callouts.AXLE_BORE_CALLOUT
+    sunk = [
+        render_number(v / IN, "in", 3) for v in (BACK_END_SUNK_MIN, BACK_END_SUNK_MAX)
+    ]
+    assert axle in callouts.BAR_DEPTH_CALLOUT
+    assert f"{sunk[0]}-{sunk[1]}" in callouts.BAR_DEPTH_CALLOUT
     assert callouts.CLAMP_HOLE_CALLOUT == "LOCATE TO MHA-SH-02 TAPS\nWALL .070 MIN"
     assert callouts.HANGER_HOLE_CALLOUT == "WALL .076 MIN"
     texts = [*callouts.authored_by_name().values()]

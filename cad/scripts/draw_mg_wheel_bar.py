@@ -137,12 +137,12 @@ FRONT_KEEP = {
     # of the bar.
     "AxleBoreDia": (AXLE_BORE_SHEET_X + 0.035, FRONT_CENTER[1] + 0.042),
 }
-# The bar depth (the extrude's model dimension, the title block's .XXX) under
-# the end view, its text just right of the extension lines: the 9.5 leaves no
-# room between them.
+# The bar depth (the extrude's model dimension at the title block's .XXX, a
+# three-place size naming its stack) under the end view, its text right of the
+# extension lines: the callout is wider than the 9.5.
 RIGHT_KEEP = {
     "BarDepth": (
-        RIGHT_CENTER[0] + BAR_DEPTH / 2000.0 + 0.012,
+        RIGHT_CENTER[0] + BAR_DEPTH / 2000.0 + 0.034,
         RIGHT_CENTER[1] - BAR_SIDE / 2000.0 - 0.014,
     ),
 }
@@ -155,8 +155,9 @@ HOLE_CALLOUT_PRECISION = {"hw-diam": 3}
 # The one native through extent reads DRILL THRU ALL, after the size
 # (rule 26: size, then process, then depth).
 DRILL_EXTENT = "DRILL <hw-thru>"
-# The bore's mate prints under its value, authored on the part's dimension
-# (mg_wheel_bar_callouts): the press fit on the axle.
+# Each mate prints under its value, authored on the part's dimension
+# (mg_wheel_bar_callouts): the bore's press fit on the axle and the depth's
+# axle-end stack.
 DRAWING_PRECISION_BY_NAME = {
     name: places
     for names in DRAWING_PRECISION.values()
