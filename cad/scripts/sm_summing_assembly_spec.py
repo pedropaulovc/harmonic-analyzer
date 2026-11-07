@@ -60,9 +60,11 @@ QUANTITIES = {
 # seated on the faced top -- plus this reach into its knife mount's tap. The
 # frame's printed grip band and the washer's catalogue thickness spread are
 # measured out of the reach; only this cut band reaches the tap. Three
-# decimal-inch places, so the sheet prints it as ".351 ±.006".
+# decimal-inch places, so the sheet prints it as ".351" under the title
+# block's .XXX ±.005 (the converted ±.006 band went to the title block:
+# Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144).
 HANGER_FIT_REACH = 8.9154  # .351
-HANGER_FIT_REACH_TOL = 0.1524  # .006
+HANGER_FIT_REACH_TOL = 0.127  # .005, the title block's three-place band
 HANGER_FIT_REACH_PLACES = 3
 
 # --- Assembly settings, as model dimensions -------------------------------------

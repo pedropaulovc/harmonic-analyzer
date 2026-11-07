@@ -61,9 +61,9 @@ def test_reach_extrema_are_the_fit_up_cut_band_alone() -> None:
     # Cutting each bolt to the stack measured at its own hole takes the
     # printed grip band and the washer's catalogue spread out of the reach.
     assert asm_spec.HANGER_FIT_REACH == pytest.approx(8.9154)  # .351
-    assert asm_spec.HANGER_FIT_REACH_TOL == pytest.approx(0.1524)  # .006
-    assert asm.HANGER_REACH_MIN == pytest.approx(8.763)
-    assert asm.HANGER_REACH_MAX == pytest.approx(9.0678)
+    assert asm_spec.HANGER_FIT_REACH_TOL == pytest.approx(0.127)  # .005
+    assert asm.HANGER_REACH_MIN == pytest.approx(8.7884)
+    assert asm.HANGER_REACH_MAX == pytest.approx(9.0424)
     assert asm.HANGER_REACH == pytest.approx(8.9175)
     assert asm.HANGER_REACH_MIN <= asm.HANGER_REACH <= asm.HANGER_REACH_MAX
     # The cut covers every printed grip and catalogue washer corner, and the
@@ -81,8 +81,8 @@ def test_reach_extrema_are_the_fit_up_cut_band_alone() -> None:
     ]
     assert min(cuts) == pytest.approx(asm.HANGER_CUT_LENGTH_MIN)
     assert max(cuts) == pytest.approx(asm.HANGER_CUT_LENGTH_MAX)
-    assert asm.HANGER_CUT_LENGTH_MIN == pytest.approx(46.0502)
-    assert asm.HANGER_CUT_LENGTH_MAX == pytest.approx(47.3456)
+    assert asm.HANGER_CUT_LENGTH_MIN == pytest.approx(46.0756)
+    assert asm.HANGER_CUT_LENGTH_MAX == pytest.approx(47.3202)
     assert hanger_screw.CATALOG_LENGTH - max(cuts) > hanger_screw.PITCH
 
 

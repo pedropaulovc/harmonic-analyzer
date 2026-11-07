@@ -86,8 +86,20 @@ def test_every_bom_part_is_installed_by_a_numbered_step() -> None:
     steps = " ".join(notes.ASSEMBLY_STEPS)
     for stem in notes.BOM_ORDER:
         assert drawing.BOM_PART_NUMBERS[stem] in steps, stem
-    numbers = [line.split(".", 1)[0] for line in notes.ASSEMBLY_STEPS]
-    assert numbers == [str(index) for index in range(1, len(notes.ASSEMBLY_STEPS) + 1)]
+    # Numbered steps run 1..n; a step's own sub-steps follow it lettered
+    # A, B, ... (no I or O), so other sheets' step citations stay put.
+    labels = [line.split(". ", 1)[0] for line in notes.ASSEMBLY_STEPS]
+    numbers = [label for label in labels if label.isdigit()]
+    assert numbers == [str(index) for index in range(1, len(numbers) + 1)]
+    letters = "ABCDEFGHJKLMNPQRSTUVWXYZ"
+    expected = []
+    for label in labels:
+        if label.isdigit():
+            group, index = label, 0
+        else:
+            expected.append(f"{group}{letters[index]}")
+            index += 1
+    assert [label for label in labels if not label.isdigit()] == expected
 
 
 def test_explode_moves_only_contracted_families_with_split_stations() -> None:
@@ -304,8 +316,7 @@ def test_step_six_runs_each_hanger_bolt_home_by_hand_before_drawing_up() -> None
     # Owner ruling 2026-10-27 (#2018 option C): accepted as is.  Each cut
     # bolt is run in by hand to its washer before it draws the mount's top
     # seat flat to the crossbar underside.
-    step = notes.ASSEMBLY_STEPS[5]
-    assert step.startswith("6. ")
+    step = next(s for s in notes.ASSEMBLY_STEPS if s.startswith("6. "))
     assert "MHA-SM-VN-52" in step
     assert "WASHER" in step
     assert step.index("BY HAND") < step.index("TIGHTEN")
@@ -329,17 +340,26 @@ def test_steps_and_checks_stay_above_the_inner_border() -> None:
     assert drawing.STEPS_XY[0] > drawing.SHEET_INNER_BORDER[0]
     assert drawing.STEPS_XY[1] < drawing.SHEET_INNER_BORDER[3]
     assert drawing.STEPS_RIGHT < drawing.TITLE_BLOCK[0]
+    split = notes.ASSEMBLY_STEPS.index(
+        next(s for s in notes.ASSEMBLY_STEPS if s.startswith("5. "))
+    )
     assert (
         drawing.STEPS_NOTE.split()
-        == " ".join(("ASSEMBLY SEQUENCE", *notes.ASSEMBLY_STEPS)).split()
+        == " ".join(("ASSEMBLY SEQUENCE", *notes.ASSEMBLY_STEPS[:split])).split()
     )
     assert (
         drawing.CHECKS_NOTE.split()
-        == " ".join(("ASSEMBLY SEQUENCE (CONT.)", *notes.ASSEMBLY_CHECKS)).split()
+        == " ".join(
+            (
+                "ASSEMBLY SEQUENCE (CONT.)",
+                *notes.ASSEMBLY_STEPS[split:],
+                *notes.ASSEMBLY_CHECKS,
+            )
+        ).split()
     )
     for number in drawing.BOM_PART_NUMBERS.values():
         if any(number in step for step in notes.ASSEMBLY_STEPS):
-            assert number in drawing.STEPS_NOTE
+            assert number in drawing.STEPS_NOTE + drawing.CHECKS_NOTE
 
 
 def test_one_blank_line_separates_consecutive_numbered_steps() -> None:
@@ -348,7 +368,13 @@ def test_one_blank_line_separates_consecutive_numbered_steps() -> None:
         starts = [i for i, line in enumerate(lines) if re.match(r"\d+\. ", line)]
         assert len(starts) > 1
         for previous, start in zip(starts, starts[1:]):
-            assert lines[start - 1] == ""
-            assert "" not in lines[previous : start - 1]
-        # The heading runs straight into step 1.
-        assert lines[starts[0] - 1].endswith(("SEQUENCE", "CHECKS:"))
+            # A blank line, or the CHECKS heading after its own blank line.
+            gap = lines[previous + 1 : start]
+            assert gap.count("") == 1
+            assert lines[start - 1] in ("", "CHECKS:")
+        # A lettered sub-step runs straight on from its step.
+        for index, line in enumerate(lines):
+            if re.match(r"\d+[A-Z]\. ", line):
+                assert lines[index - 1] != ""
+        # The heading runs straight into the first step.
+        assert lines[starts[0] - 1].endswith(("SEQUENCE", "(CONT.)", "CHECKS:"))
