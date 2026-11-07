@@ -2,22 +2,26 @@ r"""Create the manufacturing drawing for the transgear arm (MHA-PD-18).
 
 The principal view is ``*Front``, looking at the REAR face: the outline (the
 pivot radius, the tip station and the end-face width), the pivot bore, the
-MHA-PD-23 pin's reamed press bore, the plate-tap callout with its qualifier
-lines, and the hole stations from the pivot (the blanked
-``StationReference`` sketch, shown in this view only). The plate-tap stations
-follow the reducer's knob bore through ``pd_transgear_arm_geometry``; neither
-their imported dimensions nor the annotation picks fix a previous centre.
+MHA-PD-23 pin's reamed press bore, the plate-tap callout with its transfer
+line (the taps are spotted and drilled through MHA-PD-19's screw holes at
+assembly, so they carry no frame and their stations print as references),
+and the hole stations from the pivot (the blanked ``StationReference``
+sketch, shown in this view only). The plate-tap stations follow the
+reducer's knob bore through ``pd_transgear_arm_geometry``; neither their
+imported dimensions nor the annotation picks fix a previous centre.
 Section A-A cuts it on the centreline -- through the pivot, every hole and the
 latch-pin hole -- so the rear spot face's diameter, its floor from the FRONT
-face (the pivot head's end play) and the latch-pin hole's depth print on
-solid cut edges.  The end view (``*Right``, the square end) carries the
-thickness (the ground stock's, printed as a reference to it) and the
-latch-pin hole's reamed size, its height and the press of the pin to the
-hole floor.  The matched locating holes run through from the rear face the
-front view looks at, so their stations, size and position frames print there
-and in section B-B, which cuts them on their axes.  Sheet 2's section D-D
-cuts the pin bore on its axis: its projected zone, and the rear mouth's
-chamfer leg with its band.
+face (the pivot head's end play), the latch-pin hole's depth and the pin
+bore's position and perpendicularity frames print on solid cut edges.  The
+end view (``*Right``, the square end) carries the thickness (the ground
+stock's, printed as a reference to it) and the latch-pin hole's reamed size,
+its height and the press of the pin to the hole floor.  The matched locating
+holes run through from the rear face the front view looks at, so their
+stations and size print there, and section B-B, which cuts them on their
+axes, carries one position frame for the 2X group.  No frame carries a
+projected zone (delegated ruling 2026-11-07, rule 26).  Sheet 2's section
+D-D cuts the pin bore on its axis: the rear mouth's chamfer leg with its
+band.
 """
 
 from __future__ import annotations
@@ -26,7 +30,6 @@ import argparse
 import math
 import re
 import sys
-from dataclasses import dataclass
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
@@ -37,7 +40,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
 )
 
-import _config
 from _check import check
 from _com import _early_bound
 from _drawing_common import (
@@ -74,12 +76,10 @@ from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
-from _native_projected_zone import require_saved_projected_gtols
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
-import _transgear_zone_line as zone_lines
 from pd_transgear_arm_geometry import (
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
@@ -101,25 +101,12 @@ from pd_transgear_arm_spec import (
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     ISO_VIEW_SCALE,
-    LATCH_PIN_NUMBER,
-    LATCH_PIN_PRESS_PRINTED,
-    LATCH_PIN_WALL_PRINTED,
-    LOCATOR_PRESS_INTERFERENCE,
     OVERALL_LENGTH,
     PIN_MOUTH_CALLOUT,
-    PIN_PRESS_INTERFERENCE,
-    PIVOT_BORE_DIAMETRAL_CLEARANCE,
-    PIVOT_FIT_CLEARANCE_PLACES,
-    PROJECTED_ZONE_DIRECTION,
-    PROJECTED_ZONE_START_Z,
     STOCK_TEXT_PREFIX,
     STOCK_TEXT_SUFFIX,
 )
-import _transgear_arm_plate_locating_interface as LOCATING_PIN
-import pd_transgear_pin_spec as PIN
-import pd_vn_transgear_arm_plate_locating_pin_spec as LOCATOR_PIN
-from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
-from pd_paper_drive_assembly_steps import knob_setting_ref
+from pd_transgear_arm_notes import DIMENSION_CALLOUTS, NOTES_TEXT, PLATE_TAP_QUALIFIER
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -153,7 +140,7 @@ FRONT_CENTER = (0.189, 0.205)
 SECTION_CENTER = (FRONT_CENTER[0], 0.090)
 END_CENTER = (0.357, FRONT_CENTER[1])
 # On sheet 2, right of section D-D in its open field, its label over it.
-# On sheet 1 under section A-A it crowded A-A's zone frames, the floor
+# On sheet 1 under section A-A it crowded A-A's frames, the floor
 # depth's text and A-A's caption (machinist review of 67d749fb4, run
 # 20261028T000748086Z, gating clarity).
 ISO_CENTER = (0.330, 0.125)
@@ -271,9 +258,9 @@ OVERALL_PICKS = (
 # above-the-value callout prints one line only), clear of the overall
 # reference above it.
 SECTION_KEEP = {
-    # Half a millimetre higher than 0.019: the plate taps' 14.7 height
-    # arrow ends on face A under its last line (run
-    # 20261027T180656347Z: 1.9 mm, under the 2.0 arrow clearance).
+    # Half a millimetre higher than 0.019: an arrow on face A ran under its
+    # last line at 0.019 (run 20261027T180656347Z: 1.9 mm, under the 2.0
+    # arrow clearance).
     "SpotFaceDia": (0.1295, SECTION_CENTER[1] + 0.0196),
     "FloorDepth": (_front_x(-PIVOT_END_R) - 0.004, SECTION_CENTER[1] - 0.022),
     # 4 mm higher than 0.020: its dimension line stood 1.8 mm over the
@@ -284,15 +271,9 @@ SECTION_KEEP = {
     ),
 }
 # Its left edge stands 12 mm right of the line.  SOLIDWORKS centres its two
-# lines (the value, and the link to note 4) on this point: ~5 mm under the
-# plate taps' frames, over the sheet's fit notes.
+# lines (the value, and the link to note 4) on this point, over the sheet's
+# fit notes.
 FLOOR_TEXT_XY = (0.075, 0.059)
-# The top of both plate-tap frames in section A-A, 4.4 mm under its rear
-# face: the counterbore's extension lines run to its revolved profile's end,
-# 2 mm past that face, and at 1.5 mm under it they ran into tap 1's frame
-# (machinist review of eecbf880d, r1/r2 gating clarity: one struck its
-# "Ø0.050 (P)" cell). Now 2.5 mm under their ends.
-_TAP_FRAME_TOP_Y = SECTION_CENTER[1] - 0.0124
 # Section A-A's column right of the stud bore, where both its frames stand.
 _STUD_FRAME_X = _front_x(PIN_STATION) + 0.012
 END_KEEP = {
@@ -310,82 +291,26 @@ END_KEEP = {
 # offset 9 mm above its dimension line, under the top border, on a leader.
 STOCK_TEXT_XY = (END_CENTER[0], END_KEEP["Depth"][1] + 0.009)
 
-# Each projected zone's heavy chain line, from the face its mating part seats
-# on (``PROJECTED_ZONE_START_Z``) outward through its height on the side
-# ``PROJECTED_ZONE_DIRECTION`` names, in the view that shows its hole cut on
-# the axis.
-#
-# The plate taps' zones run rearward from the rear face, down section A-A
-# below the cut, on their axes; each tap frame's leader lands on the near
-# wall at the mouth, so none crosses its line. Both are one height the same
-# way, so one dimension carries both ("2X"). Its dimension line runs beside
-# tap 1's chain line, so both of its arrows sit on the zone's own ends, the
-# rear face and the far end; its value stands between the taps, on a leader.
-# Machinist review r7 (clarity, gating): drawn from face A, the chain ran
-# down inside the hole through the whole stock and did not read as a zone
-# projecting out of one face.
-#
-# The pin bore's zone runs forward 32.6 (65 mm at 2:1): up section A-A it
-# crossed the plan's 68.815, 128.90 and (141.4) dimension lines (review of
-# d5d1298b0, gating, r1/r2), and at 1:1 in sheet 1's lower-left corner it
-# read as shrunk to fit (review of 2ac1bdb28, gating, rule 15). It has its
-# own sheet: a plan at the sheet's 2:1, on sheet 1's plan centre, carries
-# cutting line D-D across the bore's axis, and section D-D, cut faces only,
-# also 2:1, stands under it with clear air on all sides; it looks toward
-# the pivot, so forward reads to the right. D, not C: datum C is this bore.
-# Datum A is tagged in A-A only, so the D-D height names its start face
-# after its value (machinist review r7: nothing marked which face).
-@dataclass(frozen=True)
-class ZoneChain:
-    view: str  # "A-A" or "D-D"
-    x_mm: float  # model X of the line, on the hole's axis
-    # Sheet offset of the height's dimension line from the chain's midpoint;
-    # None: another zone's dimension carries this one ("2X").
-    dimension: tuple[float, float] | None
-    # Where the value stands off its dimension line on a leader, if it does.
-    text_xy: tuple[float, float] | None = None
-    # The start face, after the value, where no datum tag shares the view.
-    face_callout: str = ""
-
-
-PROJECTED_ZONE_CHAINS: dict[str, ZoneChain] = {
-    "plate_tap_1_position": ZoneChain(
-        "A-A", PLATE_TAP_STATIONS[0], (0.0015, 0.0),
-        (
-            (_front_x(PLATE_TAP_STATIONS[0]) + _front_x(PLATE_TAP_STATIONS[1])) / 2.0,
-            # Beside tap 1's frame shoulder (y SECTION_CENTER - 0.0159),
-            # which ends left of the tap's hole, 9 mm short of the text's
-            # left end; the text stands right of the hole (since #2034 moved
-            # the taps 12 mm left on the sheet, the old shoulder reached over
-            # the text's left end: run 20261028T064655627Z, leader-through-text).
-            SECTION_CENTER[1] - 0.0165,
-        ),
-    ),
-    "plate_tap_2_position": ZoneChain("A-A", PLATE_TAP_STATIONS[1], None),
-    "feed_stud_projected_axis": ZoneChain("D-D", PIN_STATION, (0.0, 0.008), face_callout="FROM FACE A"),
-}
-SHEET_NAMES = ("Arm", "Pin bore projected zone")
+# Section D-D, on its own sheet: a plan at the sheet's 2:1, on sheet 1's plan
+# centre, carries cutting line D-D across the pin bore's axis, and section
+# D-D, cut faces only, also 2:1, stands under it with clear air on all
+# sides; it looks toward the pivot, so forward reads to the right. D, not C:
+# datum C is this bore.
+SHEET_NAMES = ("Arm", "Pin bore section")
 PIN_SECTION_LABEL = "D"
-# The middle of section D-D's cut face and the pin bore's chain line
-# together: under the sheet-2 plan's bottom edge (y 0.180) by 36 mm, over the
-# title block (top 0.065) by 41 mm with the caption between.
-PIN_SECTION_ZONE_CENTER = (FRONT_CENTER[0], 0.125)
+# The middle of section D-D's cut face: under the sheet-2 plan's bottom edge
+# (y 0.180) by 36 mm, over the title block (top 0.065) by 41 mm with the
+# caption between.
+PIN_SECTION_CENTER = (FRONT_CENTER[0], 0.125)
 # The rear mouth's chamfer leg, imported into D-D with its native band
 # (#2174): D-D cuts on the plane of its revolved profile, the rear face on the
 # cut face's left, +Y up.  Its dimension line stands 6 mm left of the rear
 # face, beside the mouth on the bore's upper wall, and its text stands off it
 # on a leader in the open field left of the section, the shoulder at the
 # mouth's height (section A-A's floor-depth idiom).  In A-A the mouth sits
-# over plate tap 2's frame row, with no lane for the text.
-_PIN_ZONE_HEIGHT = next(
-    control.projected_zone_height_mm
-    for control in GEOMETRIC_CONTROLS
-    if control.key == "feed_stud_projected_axis"
-)
-PIN_SECTION_REAR_X = (
-    PIN_SECTION_ZONE_CENTER[0] - (THICKNESS + _PIN_ZONE_HEIGHT) * _S / 2000.0
-)
-_PIN_MOUTH_Y = PIN_SECTION_ZONE_CENTER[1] + (
+# under the stud's frames, with no lane for the text.
+PIN_SECTION_REAR_X = PIN_SECTION_CENTER[0] - THICKNESS * _S / 2000.0
+_PIN_MOUTH_Y = PIN_SECTION_CENTER[1] + (
     PIN_BORE_DIA / 2.0 + PIN_MOUTH_CHAMFER / 2.0
 ) * _S / 1000.0
 PIN_SECTION_KEEP = {"PinMouthChamfer": (PIN_SECTION_REAR_X - 0.006, _PIN_MOUTH_Y)}
@@ -416,111 +341,64 @@ SECTION_CAPTION_TEXT = "<VLNAME> <VLLABEL>"
 _CAPTION_ONE_LINE_MIN_M = 0.004
 
 
-def projected_zone_count(key: str) -> int:
-    """How many drawn zones ``key``'s height dimension carries: its own and
-    every undimensioned zone of the same height run the same way."""
-    height = {c.key: c.projected_zone_height_mm for c in GEOMETRIC_CONTROLS}
+def dowel_group_frames() -> tuple[str, tuple[str, ...], str]:
+    """The 2X dowel group's one printed frame: the key whose frame prints,
+    the keys whose identical frames are hidden, and the count text above it.
 
-    def same(other: str) -> bool:
-        return (
-            height[other] == height[key]
-            and PROJECTED_ZONE_DIRECTION[other] == PROJECTED_ZONE_DIRECTION[key]
-        )
-
-    return 1 + sum(
-        1 for other, chain in PROJECTED_ZONE_CHAINS.items()
-        if chain.dimension is None and same(other)
-    )
-
-
-_SW_TEXT_PREFIX = 1  # swDimensionTextPrefix
-_SW_TEXT_SUFFIX = 2  # swDimensionTextSuffix
-_SW_DIMENSION_DRIVEN = 1  # swDimensionDrivenState_e.swDimensionDriven
-
-
-def _inch_range(limits: tuple[float, float], places: int = 4) -> str:
-    """A clearance or interference range in inches, widened outward to
-    ``places`` so it holds every part the two bands accept."""
-    return (
-        f"{inch_text(inch_floor_mm(min(limits), places), places)}-"
-        f"{inch_text(inch_ceil_mm(max(limits), places), places)}"
-    )
+    Machinist screen (clarity): identical frames were repeated on each hole
+    instead of given once for the 2X group.  Every locating-hole control
+    must be the same control at its own site, or one frame cannot speak for
+    them all.
+    """
+    group = [c for c in GEOMETRIC_CONTROLS if c.key.startswith("arm_locator_")]
+    if len(group) != len(LOCATOR_SITES_MM) or len(group) < 2:
+        raise AssertionError("MHA-PD-18's dowel group is not one control per locating hole")
+    shown, *hidden = group
+    for other in hidden:
+        if (
+            other.characteristic, other.tolerance, other.datums, other.tolerance_zone,
+            other.projected_zone_height_mm, other.face.diameter_mm,
+        ) != (
+            shown.characteristic, shown.tolerance, shown.datums, shown.tolerance_zone,
+            shown.projected_zone_height_mm, shown.face.diameter_mm,
+        ):
+            raise AssertionError(f"{other.key} is not {shown.key}'s control at its own site")
+    return shown.key, tuple(other.key for other in hidden), f"{len(group)}X"
 
 
-# Each fit callout keeps its size, its process and its mate; the fit's
-# acceptance and anything else it needs stand once in a numbered note on
-# this sheet, linked from the callout (rule 7: size and process lines plus at
-# most two lines of words; rule 4: a fit names its mate and its standard
-# name).  The counterbore is drawn in section A-A, so its Ø and floor carry
-# no words of their own, only the link to the spring they seat and preload.
-_PLATE = _config.parts("pd-transgear-arm-plate")
-_SPRING = _config.parts("pd-vn-transgear-pivot-spring")
-_PIVOT_SCREW = _config.parts("pd-vn-transgear-pivot-screw")
-PIVOT_NOTE, LOCATOR_NOTE, LATCH_PIN_NOTE, SPRING_NOTE = 1, 2, 3, 4
-NOTES = (
-    f"{PIVOT_NOTE}. PIVOT BORE: RUNNING FIT ON PIVOT SCREW {_PIVOT_SCREW['number']}"
-    " SHOULDER, REAMED TO\n"
-    "   THE MEASURED SHOULDER (CLEARANCE "
-    f"{_inch_range(PIVOT_BORE_DIAMETRAL_CLEARANCE, PIVOT_FIT_CLEARANCE_PLACES)}).",
-    f"{LOCATOR_NOTE}. 2X DOWEL HOLES: PRESS FIT ON DOWEL {LOCATOR_PIN.PART_NUMBER}"
-    f" (INTERFERENCE {_inch_range(LOCATOR_PRESS_INTERFERENCE)}).\n"
-    "   MOUTH BREAKS "
-    f"{inch_text(inch_floor_mm(LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM, 3), 3)}"
-    f" MAX FOR DOWEL GRIP. MATCH-DRILL WITH ARM PLATE {_PLATE['number']}\n"
-    f"   AT ASSEMBLY, {knob_setting_ref()}.",
-    f"{LATCH_PIN_NOTE}. LATCH-PIN HOLE: PRESS FIT ON LATCH PIN {LATCH_PIN_NUMBER}\n"
-    f"   (INTERFERENCE {_inch_range(LATCH_PIN_PRESS_PRINTED)})."
-    f" PIN HOLE TO FACES {inch_text(LATCH_PIN_WALL_PRINTED, 3)} MIN.",
-    f"{SPRING_NOTE}. COUNTERBORE Ø AND FLOOR: SEAT AND PRELOAD PIVOT SPRING"
-    f" {_SPRING['number']}.",
-)
-NOTES_TEXT = "\n".join(NOTES)
+_ANNOTATION_VISIBLE = 1  # swAnnotationVisibilityState_e.swAnnotationVisible
+_ANNOTATION_HIDDEN = 3  # swAnnotationVisibilityState_e.swAnnotationHidden
+_GTOL_CALLOUT_ABOVE = 3  # swGTolTextParts_e.swGTolTextCalloutAbove
+
+
 NOTE_HEIGHT = 0.0025
 # Under section A-A's floor-depth text, left of its caption, above the
 # lower border: the sheet's one open field.
 NOTES_XY = (0.016, 0.046)
 
-PIVOT_BORE_CALLOUT = f"REAM, SEE NOTE {PIVOT_NOTE}"
-PIN_BORE_CALLOUT = "\n".join((
-    "REAM THRU",
-    f"PRESS FIT ON PIN {PIN.PIN_NUMBER}",
-    f"(INTERFERENCE {_inch_range(PIN_PRESS_INTERFERENCE)})",
-))
-LOCATOR_CALLOUT_TEXT = "\n".join((
-    f"2X REAM THRU, DOWEL {LOCATOR_PIN.PART_NUMBER}",
-    f"SEE NOTE {LOCATOR_NOTE}",
-))
-PIN_HOLE_CALLOUT = "\n".join((
-    "BLIND FLAT-BOTTOM REAM",
-    f"LATCH PIN {LATCH_PIN_NUMBER}, SEE NOTE {LATCH_PIN_NOTE}",
-))
-SPRING_CALLOUT = f"SEE NOTE {SPRING_NOTE}"
-
-DIMENSION_CALLOUTS = {
-    "PivotBoreDia": PIVOT_BORE_CALLOUT,
-    "PinBoreDia": PIN_BORE_CALLOUT,
-    "SpotFaceDia": SPRING_CALLOUT,
-    "FloorDepth": SPRING_CALLOUT,
-    "PinHoleDia": PIN_HOLE_CALLOUT,
-    "LocatorDia1": LOCATOR_CALLOUT_TEXT,
-}
 
 # Native tap callout: arrow on the rear entry break's own edge, text above
 # the view with its top inside the upper border.  The title block's edge
-# break governs the tap mouths (no band is tightened to rescue a
-# thread).  transgear_hanger_joints pays the model's .004 breaks; re-run
-# with both at the title block's .010 it still gives the plate screw 1.52D
-# (.2499), over 1.5D, so the callout states neither break nor engagement.
+# break governs the tap mouths (no band is tightened to rescue a thread):
+# transgear_hanger_joints pays both at the title block's .010 and the plate
+# screw still engages 1.5D, so the callout states neither break nor
+# engagement.  The taps carry no frame: they are spotted and drilled through
+# MHA-PD-19's screw holes at assembly with the plate doweled on (PD-19's
+# holes are the master; delegated ruling 2026-11-07), and the callout's
+# last line says so.
 _PLATE_DRILL_R = blind_cut_dia_mm(PLATE_TAP_SPEC) / 2.0
 _CALLOUT_Y = _front_y(PIVOT_END_R) + 0.0232
 # Between the pivot bore's callout and the locator's, above section label B.
 PLATE_CALLOUT_XY = (0.160, _CALLOUT_Y)
+# Their stations print as references: the plate's holes set them.
+TAP_STATION_REFERENCES = ("PlateTapStation1", "PlateTapStation2")
 TAP_CALLOUTS = (
     (
         "plate taps",
         PLATE_TAP_STATIONS[0],
         _PLATE_DRILL_R,
         PLATE_CALLOUT_XY,
+        PLATE_TAP_QUALIFIER,
     ),
 )
 
@@ -612,11 +490,13 @@ def _wall_point(
     )
 
 
-# Position frames on the locating sockets stand in section B-B, which cuts
-# both on their axes, right of the socket mouths and each on its socket's side
-# of the arm's centre (machinist review: in the front view they sat inside
-# the silhouette).  Each leader enters its socket's mouth and lands on the
-# wall nearer the centre 1 mm in, as section A-A's tap frames do.
+# The dowel group's position frame stands in section B-B, which cuts both
+# sockets on their axes, right of the socket mouths on its socket's side of
+# the arm's centre (machinist review: in the front view frames sat inside
+# the silhouette).  Its leader enters its socket's mouth and lands on the
+# wall nearer the centre 1 mm in, as the stud's frames do in section A-A.
+# Each socket keeps a placement (``project_part_pmi`` projects every
+# control); the second's frame is hidden (``_one_frame_per_dowel_group``).
 _LOCATOR_MOUTH_X = LOCATOR_SECTION_CENTER[0] + THICKNESS / 2.0 * _S / 1000.0
 _LOCATOR_FRAME_GAP = 0.006
 _LOCATOR_FRAME_RISE = 0.0025
@@ -632,9 +512,10 @@ def _locator_frame_xy(offset_mm: float) -> tuple[float, float]:
     return (_LOCATOR_MOUTH_X + _LOCATOR_FRAME_GAP, centre_y + _FRAME_HALF_HEIGHT)
 
 
-def tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    """Drop the title-block thread class from the thread compartment; every
-    other compartment and every associative Hole Wizard variable stays."""
+def tap_callout_definitions(definitions: dict[int, str], qualifier: str) -> dict[int, str]:
+    """Drop the title-block thread class from the thread compartment and put
+    the qualifier line under it; every other compartment and every
+    associative Hole Wizard variable stays."""
     if set(definitions) != {5, 6, 7, 8}:
         raise RuntimeError(f"unexpected tap callout parts: {definitions!r}")
     thread_parts = [
@@ -648,21 +529,76 @@ def tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
     without_class = re.sub(
         r"\s*(?:-\s*)?<hw-threadclass>\s*", " ", definitions[part], flags=re.IGNORECASE
     )
+    without_class = re.sub(r" {2,}", " ", without_class).rstrip()
     updated = dict(definitions)
-    updated[part] = re.sub(r" {2,}", " ", without_class).rstrip()
+    updated[part] = f"{without_class}\n{qualifier}"
     return updated
 
 
-def _set_tap_callout_text(display: Any, *, label: str) -> None:
+def _set_tap_callout_text(display: Any, qualifier: str, *, label: str) -> None:
+    """Write the callout's definitions; IDisplayDimension::SetText is void,
+    so the definitions read back (parts 5-8) and the resolved text (parts
+    1-4) ending in the qualifier prove it took."""
     native = _early_bound(display, "IDisplayDimension")
     definitions = {part: str(native.GetText(part) or "") for part in (5, 6, 7, 8)}
-    updated = tap_callout_definitions(definitions)
+    updated = tap_callout_definitions(definitions, qualifier)
     for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
         if updated[definition_part] != definitions[definition_part]:
             native.SetText(writable_part, updated[definition_part])
     persisted = {part: str(native.GetText(part) or "") for part in (5, 6, 7, 8)}
-    if persisted != updated:
-        raise RuntimeError(f"{label} callout text did not persist: {persisted!r}")
+    resolved = {part: str(native.GetText(part) or "") for part in (1, 2, 3, 4)}
+    if persisted != updated or not any(
+        text.rstrip().endswith(qualifier) for text in resolved.values()
+    ):
+        raise RuntimeError(
+            f"{label} callout text did not persist: "
+            f"definitions={persisted!r}, resolved={resolved!r}"
+        )
+
+
+def _reference_tap_stations(adapter: Any, annotations: list[Any]) -> None:
+    """Print the plate-tap stations in parentheses, as references: the taps
+    are transferred from MHA-PD-19's holes, so the stations control nothing.
+    Linear dimensions, so no diameter glyph (``set_reference_dimension``)."""
+    found = set()
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name in TAP_STATION_REFERENCES:
+            set_reference_dimension(adapter, annotation, label=name)
+            found.add(name)
+    missing = set(TAP_STATION_REFERENCES) - found
+    if missing:
+        raise RuntimeError(f"tap station references never reached the sheet: {sorted(missing)}")
+
+
+@_telemetry.traced("drawing.transgear_arm.dowel_group_frame")
+def _one_frame_per_dowel_group(adapter: Any, frames: dict[str, Any]) -> None:
+    """One frame for the 2X dowel group (``dowel_group_frames``): the other
+    sockets' identical frames are hidden on the sheet
+    (``IAnnotation::Visible`` = swAnnotationHidden, drawing-local), and the
+    shown frame carries the count above it
+    (``IGtol::SetText(swGTolTextCalloutAbove)``).  After a rebuild each is
+    read back: hidden frames hidden, the shown frame visible with its count;
+    anything else fails the build."""
+    shown_key, hidden_keys, count = dowel_group_frames()
+    hidden = {key: _early_bound(frames[key], "IAnnotation") for key in hidden_keys}
+    for annotation in hidden.values():
+        annotation.Visible = _ANNOTATION_HIDDEN
+    shown = _early_bound(frames[shown_key], "IAnnotation")
+    gtol = _early_bound(shown.GetSpecificAnnotation(), "IGtol")
+    if not gtol.SetText(_GTOL_CALLOUT_ABOVE, count):
+        raise RuntimeError(f"{shown_key}: the dowel group's {count} was refused")
+    rebuild_drawing(adapter, label="dowel group frame")
+    for key, annotation in hidden.items():
+        if int(annotation.Visible) != _ANNOTATION_HIDDEN:
+            raise RuntimeError(f"{key}: the repeated dowel frame did not stay hidden")
+    above = str(gtol.GetText(_GTOL_CALLOUT_ABOVE) or "")
+    if int(shown.Visible) != _ANNOTATION_VISIBLE or above != count:
+        raise RuntimeError(
+            f"{shown_key}: the dowel group's frame reads visible={shown.Visible!r}, "
+            f"above={above!r}, not {count!r}"
+        )
+    _telemetry.info(f"dowel group: {shown_key} prints {count}; hidden {sorted(hidden)}")
 
 
 def _set_stock_text(adapter: Any, annotations: list[Any]) -> None:
@@ -728,132 +664,11 @@ def _end_radius_to_arc(adapter: Any, annotations: list[Any]) -> None:
     raise RuntimeError("arm plan view has no PivotEndR dimension to style")
 
 
-@_telemetry.traced("drawing.transgear_arm.projected_zone_chains", label_param="label")
-def _add_projected_zone_chains(adapter: Any, view: Any, label: str) -> None:
-    """Every projected zone drawn in ``view`` (section ``label``) at its
-    feature: a heavy chain line from its start face along the zone's
-    direction for its height, and, when its ``ZoneChain`` carries one, the
-    height's dimension on that line, prefixed with the count of zones it
-    carries ("2X"), printed as the frames print it, with its start face
-    after the value where the chain names one.
-
-    The ends are model points projected through the view in one frame, so
-    each line is its zone's own extent at true length and on its own side of
-    its face. The lines are authored together in the view's sketch, straight
-    to the database (``_transgear_zone_line``, shared with the plate), the
-    drawing rebuilds once, and their fonts and endpoints are read back
-    settled; each dimension measures its line itself.
-    """
-    chains = [(key, chain) for key, chain in PROJECTED_ZONE_CHAINS.items() if chain.view == label]
-    controls = {c.key: c for c in GEOMETRIC_CONTROLS}
-    heights = {key: controls[key].projected_zone_height_mm for key, _chain in chains}
-    native = _early_bound(view, "IView")
-    native.UpdateViewDisplayGeometry()
-    ratio = tuple(float(value) for value in native.ScaleRatio)
-    projected = model_points_in_view(
-        adapter, view,
-        [
-            (chain.x_mm / 1000.0, 0.0, z / 1000.0)
-            for key, chain in chains
-            for z in (
-                PROJECTED_ZONE_START_Z[key],
-                PROJECTED_ZONE_START_Z[key] + PROJECTED_ZONE_DIRECTION[key] * heights[key],
-            )
-        ],
-        label=f"section {label} projected zones",
-        names=[f"{key} {end}" for key, _chain in chains for end in ("start face", "far end")],
-    )
-    ends = {key: projected[2 * index : 2 * index + 2] for index, (key, _chain) in enumerate(chains)}
-    for key, (start, end) in ends.items():
-        dx, dy = end[0] - start[0], end[1] - start[1]
-        if min(abs(dx), abs(dy)) > 1e-6 or abs(
-            math.hypot(dx, dy) - heights[key] * ratio[0] / ratio[1] / 1000.0
-        ) > 1e-6:
-            raise RuntimeError(f"{key} projected zone projects as {(start, end)!r} at {ratio!r}")
-    sketched = zone_lines.sketch_lines(
-        adapter, view, {key: (start, end) for key, (start, end) in ends.items()},
-        style=zone_lines.CHAIN_LINE_STYLE, width=zone_lines.CHAIN_LINE_WEIGHT,
-        label=f"section {label} projected-zone chain",
-    )
-    rebuild_drawing(adapter, label=f"section {label} projected-zone chain lines")
-    zone_lines.require_placed(
-        adapter, sketched,
-        style=zone_lines.CHAIN_LINE_STYLE, width=zone_lines.CHAIN_LINE_WEIGHT,
-        label=f"section {label} projected-zone chain", stage="settled",
-    )
-    offsets = []
-    with zone_lines.dimension_input_suppressed(adapter):
-        for key, chain in chains:
-            if chain.dimension is None:
-                _telemetry.info(f"{key} projected zone: chain {ends[key]!r}")
-                continue
-            start, end = ends[key]
-            at = (
-                (start[0] + end[0]) / 2.0 + chain.dimension[0],
-                (start[1] + end[1]) / 2.0 + chain.dimension[1],
-            )
-            dimension = zone_lines.dimension_line(
-                adapter, view, sketched[key].segment,
-                vertical=abs(end[0] - start[0]) <= 1e-6, at=at,
-                label=f"{key} projected height",
-            )
-            measured = abs(float(_early_bound(dimension.GetDimension2(0), "IDimension").SystemValue))
-            if abs(measured * 1000.0 - heights[key]) > 1e-6:
-                raise RuntimeError(
-                    f"{key} height measures {measured * 1000.0:g}, not {heights[key]:g} mm"
-                )
-            # The frame's Ⓟ height is the control; the chain line's
-            # dimension repeats it, so it prints as a reference (codjiflo on
-            # 40288f27f, rule 3): driven, bracketed as the plate's zone
-            # heights are (set_reference_dimension's form), the count first.
-            model_dimension = _early_bound(dimension.GetDimension2(0), "IDimension")
-            model_dimension.DrivenState = _SW_DIMENSION_DRIVEN
-            dimension.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
-            count = projected_zone_count(key)
-            prefix = f"{count}X (" if count > 1 else "("
-            # The start face follows the value on its line: under it, it
-            # would crowd the 5 mm between D-D's dimension and chain lines.
-            suffix = f") {chain.face_callout}" if chain.face_callout else ")"
-            dimension.ShowParenthesis = False
-            dimension.SetText(_SW_TEXT_PREFIX, prefix)
-            dimension.SetText(_SW_TEXT_SUFFIX, suffix)
-            applied = (
-                int(model_dimension.DrivenState),
-                int(dimension.GetPrimaryPrecision2()),
-                bool(dimension.ShowParenthesis),
-                str(dimension.GetText(_SW_TEXT_PREFIX) or ""),
-                str(dimension.GetText(_SW_TEXT_SUFFIX) or ""),
-            )
-            wanted = (_SW_DIMENSION_DRIVEN, DRAWING_REFERENCE_PRECISION, False, prefix, suffix)
-            if applied != wanted:
-                raise RuntimeError(f"{key} reference height reads {applied}, not {wanted}")
-            if chain.text_xy is not None:
-                # The value stands off its dimension line on a leader; the
-                # line and its arrows stay on the zone's ends (the stock
-                # text's idiom).
-                annotation = _early_bound(dimension.GetAnnotation(), "IAnnotation")
-                dimension.OffsetText = True
-                if not annotation.SetPosition2(chain.text_xy[0], chain.text_xy[1], 0.0):
-                    raise RuntimeError(f"failed to offset {key}'s height text")
-                offsets.append((key, annotation, chain.text_xy))
-            _telemetry.info(
-                f"{key} projected zone: chain {ends[key]!r}, height "
-                f"{prefix}{measured * 1000.0:.4f} on {at!r}, text {chain.text_xy!r}"
-            )
-    if offsets:
-        rebuild_drawing(adapter, label=f"section {label} projected height texts")
-    for key, annotation, text_xy in offsets:
-        position = tuple(float(value) for value in annotation.GetPosition())
-        if math.dist(position[:2], text_xy) > 1e-6:
-            raise RuntimeError(f"{key} height text stayed at {position!r}")
-
-
-@_telemetry.traced("drawing.transgear_arm.pin_zone_section")
-def _pin_zone_section(adapter: Any, plan: Any) -> Any:
+@_telemetry.traced("drawing.transgear_arm.pin_bore_section")
+def _pin_bore_section(adapter: Any, plan: Any) -> Any:
     """Section D-D on its own sheet: the arm cut across the pin bore's axis
     in that sheet's plan, cut faces only, at the sheet's 2:1, looking toward
-    the pivot; the cut face and the bore's forward chain line together centre
-    on ``PIN_SECTION_ZONE_CENTER``."""
+    the pivot; its cut face centres on ``PIN_SECTION_CENTER``."""
     pin_x = _front_x(PIN_STATION)
     half = edge_half_width(PIN_STATION)
     section = create_section_view(
@@ -863,8 +678,8 @@ def _pin_zone_section(adapter: Any, plan: Any) -> Any:
         # pivot, under the letter left of the arrow (run 20261027T201320296Z:
         # it crossed the D at 5 mm).
         line_end=(pin_x, _front_y(-half) - _PIN_SECTION_LOWER_OVERRUN),
-        view_xy=PIN_SECTION_ZONE_CENTER, section_label=PIN_SECTION_LABEL,
-        scale=VIEW_SCALE, label="pin bore projected-zone section",
+        view_xy=PIN_SECTION_CENTER, section_label=PIN_SECTION_LABEL,
+        scale=VIEW_SCALE, label="pin bore section",
     )
     native = _early_bound(section, "IView")
     cut = _early_bound(native.GetSection(), "IDrSection")
@@ -877,19 +692,16 @@ def _pin_zone_section(adapter: Any, plan: Any) -> Any:
         float(value) for value in VIEW_SCALE
     ):
         raise RuntimeError(f"section D-D is not a {VIEW_SCALE!r} cut-face section: {ratio!r}")
-    (control,) = (c for c in GEOMETRIC_CONTROLS if c.key == "feed_stud_projected_axis")
-    far_z = PROJECTED_ZONE_DIRECTION[control.key] * control.projected_zone_height_mm
     for attempt in range(4):
         native.UpdateViewDisplayGeometry()
-        rear, front_face, far = model_points_in_view(
+        rear, front_face = model_points_in_view(
             adapter, section,
-            tuple((PIN_STATION / 1000.0, 0.0, z / 1000.0) for z in (THICKNESS, 0.0, far_z)),
-            label=f"section D-D zone extent, pass {attempt}",
-            names=("rear face", "face A", "zone end"),
+            tuple((PIN_STATION / 1000.0, 0.0, z / 1000.0) for z in (THICKNESS, 0.0)),
+            label=f"section D-D cut face, pass {attempt}",
+            names=("rear face", "face A"),
         )
-        xs = (rear[0], front_face[0], far[0])
-        centre = ((min(xs) + max(xs)) / 2.0, front_face[1])
-        miss = (PIN_SECTION_ZONE_CENTER[0] - centre[0], PIN_SECTION_ZONE_CENTER[1] - centre[1])
+        centre = ((rear[0] + front_face[0]) / 2.0, front_face[1])
+        miss = (PIN_SECTION_CENTER[0] - centre[0], PIN_SECTION_CENTER[1] - centre[1])
         if math.hypot(*miss) <= 1e-4:
             break
         position = tuple(float(value) for value in native.Position)
@@ -899,10 +711,11 @@ def _pin_zone_section(adapter: Any, plan: Any) -> Any:
             raise RuntimeError("failed to re-centre section D-D")
         rebuild_drawing(adapter, label="section D-D re-centred")
     else:
-        raise RuntimeError(f"section D-D zone centred at {centre!r}, not {PIN_SECTION_ZONE_CENTER!r}")
-    # Looking toward the pivot, forward (-Z) reads to the right of face A.
-    if not rear[0] < front_face[0] < far[0]:
-        raise RuntimeError(f"section D-D does not read forward to the right: {xs!r}")
+        raise RuntimeError(f"section D-D cut face centred at {centre!r}, not {PIN_SECTION_CENTER!r}")
+    # Looking toward the pivot, the rear face reads left of face A, where
+    # PIN_SECTION_KEEP stands the mouth's leg.
+    if not rear[0] < front_face[0]:
+        raise RuntimeError(f"section D-D does not read rear-left: {rear!r}, {front_face!r}")
     return section
 
 
@@ -942,12 +755,12 @@ def _pin_section_caption_settled(adapter: Any, section: Any) -> None:
     blank even here (run 20261027T215106763Z: ' \\r\\n '), so the resolved
     text is evidenced by its extent: one line, as A-A's."""
     if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateSheet(SHEET_NAMES[1]):
-        raise RuntimeError("cannot activate the pin-bore zone sheet")
+        raise RuntimeError("cannot activate the pin-bore section sheet")
     note, linked_text = _section_caption(section, "D-D")
     half = edge_half_width(PIN_STATION) * _S / 1000.0
     target = (
-        PIN_SECTION_ZONE_CENTER[0],
-        PIN_SECTION_ZONE_CENTER[1] - half - _PIN_CAPTION_GAP_M,
+        PIN_SECTION_CENTER[0],
+        PIN_SECTION_CENTER[1] - half - _PIN_CAPTION_GAP_M,
     )
 
     def miss() -> tuple[tuple[float, ...], tuple[float, float]]:
@@ -1066,11 +879,13 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, ARM_SHEET_PRECISION)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_reference_dimensions(adapter, annotations, ("PivotBoreDia",))
+    _reference_tap_stations(adapter, annotations)
     _set_stock_text(adapter, annotations)
     _end_radius_to_arc(adapter, annotations)
     offset_dimension_text(adapter, annotations, {"FloorDepth": FLOOR_TEXT_XY})
     # Model-owned circular zones and actual feature datums. BASIC stations
-    # are imported from the part; no drawing-only coordinate tolerances.
+    # are imported from the part; no drawing-only coordinate tolerances, and
+    # no projected zone (delegated ruling 2026-11-07, rule 26).
     bore_dia = {
         datum.letter: datum.face.diameter_mm
         for datum in PART_DATUMS if datum.letter != "A"
@@ -1115,34 +930,12 @@ async def build(adapter: Any) -> dict[str, str]:
                 label="feed stud position pin bore wall",
             ),
         ),
-        # The projected-zone frames stand in section A-A on the side their
-        # zone projects to (the plate taps' rear, the stud's front). Each
-        # tap frame's leader climbs to the hole's NEAR wall at the rear
-        # mouth, so it never crosses the tap's chain line on its axis; each
-        # frame stands far enough out that its 6 mm shoulder ends short of
-        # the hole (run 20261027T180656347Z: the shoulders ran across the
-        # chain lines). Each keeps its offset from its tap's axis: a fixed
-        # sheet x put tap 1's frame on its chain line once #2034 moved the
-        # taps 12 mm left (preview run 20261028T070651235Z).
-        "plate_tap_1_position": PmiDrawingPlacement(
-            section, (_front_x(PLATE_TAP_STATIONS[0]) - 0.07196, _TAP_FRAME_TOP_Y),
-            attachment_xy=_wall_point(
-                adapter, section, x_mm=PLATE_TAP_STATIONS[0] - _PLATE_DRILL_R,
-                z_mm=THICKNESS - 0.5, label="plate tap 1 wall",
-            ),
-        ),
-        "plate_tap_2_position": PmiDrawingPlacement(
-            section, (_front_x(PLATE_TAP_STATIONS[1]) + 0.01104, _TAP_FRAME_TOP_Y),
-            attachment_xy=_wall_point(
-                adapter, section, x_mm=PLATE_TAP_STATIONS[1] + _PLATE_DRILL_R,
-                z_mm=THICKNESS - 0.5, label="plate tap 2 wall",
-            ),
-        ),
-        "feed_stud_projected_axis": PmiDrawingPlacement(
+        # Plain ⊥ Ø.0008 to A over the bore, under the position frame.
+        "feed_stud_perpendicularity": PmiDrawingPlacement(
             section, (_STUD_FRAME_X, SECTION_CENTER[1] + 0.0195),
             attachment_xy=_wall_point(
                 adapter, section, x_mm=PIN_STATION - pin_r, z_mm=2.5,
-                label="feed stud projected axis pin bore wall",
+                label="feed stud perpendicularity pin bore wall",
             ),
         ),
         **{
@@ -1160,19 +953,19 @@ async def build(adapter: Any) -> dict[str, str]:
             ) for index, (x, y) in enumerate(LOCATOR_SITES_MM, 1)
         },
     }
-    project_part_pmi(
+    frames = project_part_pmi(
         adapter, placements=placements, datums=PART_DATUMS,
         controls=GEOMETRIC_CONTROLS, label="transgear arm locating frame",
     )
-    _add_projected_zone_chains(adapter, section, "A-A")
+    _one_frame_per_dowel_group(adapter, frames)
     _overall_reference(adapter, front)
     for view, label in ((front, "front"), (end, "end")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME centre marks to the {label} view")
 
     # Thread and tap drill ride the native callouts; the class is the title
-    # block's.
-    for label, station, radius, callout_xy in TAP_CALLOUTS:
+    # block's; the last line says the taps are transferred from MHA-PD-19.
+    for label, station, radius, callout_xy, qualifier in TAP_CALLOUTS:
         callout = add_native_hole_callout(
             adapter,
             front,
@@ -1180,7 +973,7 @@ async def build(adapter: Any) -> dict[str, str]:
             callout_xy=callout_xy,
             label=label,
         )
-        _set_tap_callout_text(callout, label=label)
+        _set_tap_callout_text(callout, qualifier, label=label)
         set_hole_callout_precision(callout, {"hw-thrutapdrldia": 3}, label=label)
 
     # The fit notes the callouts link to, in sheet context.
@@ -1188,15 +981,14 @@ async def build(adapter: Any) -> dict[str, str]:
     if add_note(adapter, NOTES_TEXT, *NOTES_XY, height=NOTE_HEIGHT) is None:
         raise RuntimeError("failed to add the arm's fit notes")
 
-    # Sheet 2: the pin bore's projected zone in section D-D, cut from a plan
-    # on sheet 1's plan centre (rule 15: its own sheet, not a shrunk view).
+    # Sheet 2: the pin bore's rear mouth in section D-D, cut from a plan on
+    # sheet 1's plan centre.
     if not ddoc.ActivateSheet(SHEET_NAMES[1]):
-        raise RuntimeError("cannot activate the pin-bore zone sheet")
+        raise RuntimeError("cannot activate the pin-bore section sheet")
     pin_plan = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
     set_hidden_lines_removed(adapter, pin_plan)
-    pin_section = _pin_zone_section(adapter, pin_plan)
+    pin_section = _pin_bore_section(adapter, pin_plan)
     set_hidden_lines_removed(adapter, pin_section)
-    _add_projected_zone_chains(adapter, pin_section, "D-D")
     mouth = hidden_sketches.curate_view_dimensions(
         adapter,
         pin_section,
@@ -1211,7 +1003,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, {"A-A": section, "B-B": locator_section, "D-D": pin_section}
     )
     if not auto_center_marks(adapter, pin_plan, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME centre marks to the pin-bore zone plan")
+        raise RuntimeError("failed to add ASME centre marks to the pin-bore section plan")
     iso = place_view(
         adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_VIEW_SCALE
     )
@@ -1236,10 +1028,6 @@ async def build(adapter: Any) -> dict[str, str]:
         redundant_note_substrings=("Tapped Hole",),
         expected_redundant_notes=len(TAP_CALLOUTS) * len(SHEET_NAMES),
         settled_checks=(lambda: _pin_section_caption_settled(adapter, pin_section),),
-    )
-    require_saved_projected_gtols(
-        adapter, artefacts["drawing"], GEOMETRIC_CONTROLS,
-        label="saved transgear arm drawing projected axes",
     )
     return artefacts
 

@@ -1,5 +1,5 @@
-"""Registration receiver/geometry regressions and the arm files' saved-GTOL
-audit (real builds, seat stubbed), not operating-domain proof."""
+"""Registration receiver/geometry regressions and the arm plate files'
+saved-GTOL audit (real builds, seat stubbed), not operating-domain proof."""
 from __future__ import annotations
 
 import asyncio
@@ -20,17 +20,6 @@ import pd_transgear_arm_plate_spec as plate_spec
 import _transgear_arm_plate_locating_interface as pin
 from _printed_tolerance import edge_break_chamfer_mm, edge_break_radius_mm
 from _test_stubbed_build import keyed_artefacts, offline_adapter, seat_calls, stub_seat
-
-
-def _arm_part_seat(module, seat) -> None:
-    seat._mass.side_effect = [
-        (1.0, [0.0, 0.0, module.THICKNESS / 2.0]),
-        (module.V_PIN + 1.0, [1.0, 0.0, 0.0]),
-        (1.0, [0.0, 0.0, 0.0]),
-    ]
-    seat._open_end_face_sketch.return_value = (module.PIN_HOLE_Z, 0.0, True)
-    seat._pin_section_sketch.return_value = (lambda y_mm, z_mm: (z_mm, y_mm), True)
-    seat.name_bore_axis.side_effect = [f"Axis{k}" for k in range(1, 9)]
 
 
 def _plate_part_seat(module, seat) -> None:
@@ -55,17 +44,17 @@ def _drawing_seat(module, seat) -> None:
 @pytest.mark.parametrize(
     ("module_name", "export", "key", "prepare"),
     [
-        ("build_pd_transgear_arm", "save_part_and_images", "part", _arm_part_seat),
         ("build_pd_transgear_arm_plate", "save_part_and_images", "part", _plate_part_seat),
-        ("draw_pd_transgear_arm", "finalize_drawing", "drawing", _drawing_seat),
         ("draw_pd_transgear_arm_plate", "finalize_drawing", "drawing", _drawing_seat),
     ],
 )
-def test_saved_arm_files_are_audited_for_their_projected_gtols(
+def test_saved_arm_plate_files_are_audited_for_their_projected_gtols(
     monkeypatch: pytest.MonkeyPatch, module_name, export, key, prepare
 ) -> None:
-    # Each arm part and drawing audits the file it SAVED, not the open model:
-    # its own projected-zone controls, read from the path the export returns.
+    # The arm plate's part and drawing audit the file they SAVED, not the
+    # open model: their own projected-zone controls, read from the path the
+    # export returns. The arm (MHA-PD-18) carries no projected zone
+    # (delegated ruling 2026-11-07), so it has nothing to audit.
     module = importlib.import_module(module_name)
     if hasattr(module, "SOURCE"):
         monkeypatch.setattr(module, "SOURCE", Path(__file__))
@@ -175,51 +164,66 @@ def test_three_accessible_rear_indicator_sites_bound_every_tilt_direction() -> N
 
 
 
-def test_native_controls_reference_actual_bores_and_project_past_real_chain_plane() -> None:
-    # The arm's pattern is located from S (Ø.0019, inside the 0.05 stack
+def test_native_controls_reference_actual_bores_and_reach_the_real_chain_plane() -> None:
+    # The arm's pattern is located from S (Ø.004, the reducer's position
     # zone); the plate's from its own knob bore K, so it carries K's Ø.0039
     # setting circle about S.
     for spec, geometry, prefix, zone in (
-        (arm_spec, arm, "arm", ".0019"), (plate_spec, plate, "plate", ".0039"),
+        (arm_spec, arm, "arm", ".004"), (plate_spec, plate, "plate", ".0039"),
     ):
         controls = {control.key: control for control in spec.GEOMETRIC_CONTROLS}
         for index, xy in enumerate(geometry.LOCATOR_SITES_MM, 1):
             control = controls[f"{prefix}_locator_{index}_position"]
             assert control.datums == ("A", "B", "C") and control.tolerance_zone == "diametral"
             assert control.tolerance == zone
+            assert float(zone) * 25.4 <= geometry.REDUCER_POSITION_DIAMETER + 1e-12
             assert (control.face.contains_x_mm, control.face.contains_y_mm) == xy
             assert control.face.diameter_mm == geometry.LOCATOR_HOLE_DIA_MM
         assert {(feature, name) for feature, name in spec.BASIC_REDUCER_DIMENSIONS if feature == "LocatorProfile"} == {
             ("LocatorProfile", name) for name in ("LocatorX1", "LocatorY1", "LocatorX2", "LocatorY2")
         }
-    arm_control = next(control for control in arm_spec.GEOMETRIC_CONTROLS if control.key == "feed_stud_projected_axis")
+    # The plate's knob bore K keeps its projected axis to the chain plane.
     plate_control = next(control for control in plate_spec.GEOMETRIC_CONTROLS if control.key == "knob_projected_axis")
-    for control, datum_z, height, zone in (
-        (arm_control, registration.ARM_FRONT_MACHINE_Z_MM, registration.S_PROJECTED_HEIGHT_MM, ".0019"),
-        (plate_control, registration.PLATE_MOUNT_MACHINE_Z_MM, registration.K_PROJECTED_HEIGHT_MM, ".0019"),
+    assert plate_control.projected_zone_height_mm == registration.K_PROJECTED_HEIGHT_MM
+    assert plate_control.tolerance == ".0019" and plate_control.datums == ("A",)
+    # The arm's pin bore S has a plain perpendicularity over the bore (no
+    # projected zone, rule 26); run on from the thinnest stock to the chain
+    # plane, the axis it allows stays inside the reducer's axis zone there.
+    arm_control = next(
+        control for control in arm_spec.GEOMETRIC_CONTROLS if control.key == "feed_stud_perpendicularity"
+    )
+    assert arm_control.projected_zone_height_mm is None
+    assert arm_control.characteristic == "perpendicularity"
+    assert arm_control.tolerance == ".0008" and arm_control.datums == ("A",)
+    assert (
+        float(arm_control.tolerance) * 25.4 * registration.S_PROJECTED_HEIGHT_MM
+        / (arm.THICKNESS - arm.THICKNESS_BAND)
+        <= registration.AXIS_PROJECTED_ZONE_DIAMETER_MM
+    )
+    for datum_z, height in (
+        (registration.ARM_FRONT_MACHINE_Z_MM, registration.S_PROJECTED_HEIGHT_MM),
+        (registration.PLATE_MOUNT_MACHINE_Z_MM, registration.K_PROJECTED_HEIGHT_MM),
     ):
-        assert control.projected_zone_height_mm == height
-        assert control.tolerance == zone and control.datums == ("A",)
         assert datum_z - height <= registration.CHAIN_PLANE_MACHINE_Z_LIMITS_MM[0]
         assert datum_z - height < registration.gear_plane_machine_z_mm() < datum_z
 
 
-def test_clamp_axes_have_real_projected_zones_and_each_countersink_rides_its_hole() -> None:
+def test_clamp_holes_have_real_projected_zones_and_the_arm_taps_no_frame() -> None:
     from _gtol_cylinder import CylinderFace
     arm_controls = {control.key: control for control in arm_spec.GEOMETRIC_CONTROLS}
     plate_controls = {control.key: control for control in plate_spec.GEOMETRIC_CONTROLS}
     # The cones are coaxial with their holes (the plan's 2X CSK callout): no frame of their own.
     assert not any("countersink" in key for key in plate_controls)
+    # The arm's taps are spotted through the plate's holes at assembly: the
+    # plate's holes are the master and the taps carry no frame.
+    assert not any("tap" in key for key in arm_controls)
     for index, (x, y) in enumerate(plate.SCREW_HOLES, 1):
-        tap = arm_controls[f"plate_tap_{index}_position"]
         hole = plate_controls[f"plate_hole_{index}_position"]
-        assert tap.projected_zone_height_mm == arm.CLAMP_TAP_PROJECTED_HEIGHT_MM
         assert hole.projected_zone_height_mm == plate.CLAMP_PLATE_PROJECTED_HEIGHT_MM
         assert isinstance(hole.face, CylinderFace)
         assert (hole.face.contains_x_mm, hole.face.contains_y_mm) == (x, y)
-        for control, zone in ((tap, ".0019"), (hole, ".0039")):
-            assert control.datums == ("A", "B", "C")
-            assert control.tolerance == zone and control.tolerance_zone == "diametral"
+        assert hole.datums == ("A", "B", "C")
+        assert hole.tolerance == ".0039" and hole.tolerance_zone == "diametral"
 
 
 def test_measured_receiver_pays_full_two_pose_travel_and_uncertainty() -> None:
