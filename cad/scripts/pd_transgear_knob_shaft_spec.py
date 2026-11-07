@@ -198,8 +198,14 @@ WHOLE_DEPTH = (OUTSIDE_DIA - ROOT_DIA) / 2.0
 FACE_WIDTH = 5.8928  # .232
 FACE_WIDTH_PLACES = 3
 FACE_WIDTH_BAND = FIT_LENGTH_BAND_IN
-# drawing-guidelines rule 4: the band names the stack it serves.
-FACE_WIDTH_CALLOUT = STACK_NAME
+# drawing-guidelines rule 4: the band names the stack it serves and, by
+# drawing number, the parts it stacks with to place F (transgear_cluster_fit
+# F_CHAIN: the thrust ring's length and the arm plate's hub face station).
+FACE_WIDTH_CALLOUT = (
+    f"{STACK_NAME} WITH\n"
+    f"{_config.parts('pd-transgear-knob-thrust-ring')['number']}, "
+    f"{_config.parts('pd-transgear-arm-plate')['number']}"
+)
 GAP_AZIMUTH_DEG = 180.0 / TEETH
 # The assembly spins the shaft and its whole mounted front stack (collar,
 # drive pins, wheel) about K so a pinion gap faces the reducer disc's tooth on
