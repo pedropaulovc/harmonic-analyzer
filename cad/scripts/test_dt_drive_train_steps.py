@@ -6,6 +6,7 @@ import re
 from fractions import Fraction
 
 from _assembly_contract import assembly_contract
+from _test_assembly_steps import step_structure_violations
 import _config
 import dt_cone_gear_stack
 import cone_stack_end_play
@@ -137,7 +138,7 @@ def test_post_screws_keep_spec_owned_stock_and_cut_to_fit_acceptance() -> None:
     )
     assert f"MSC {screw.SKU}" not in fitup
     places = screw.DRAWING_PRECISION_BY_NAME[screw.CUT_LENGTH_DIMENSION]
-    assert f"({sheet.inch_text(screw.CUT_LENGTH_MM, places)}) REF CUT LENGTH" in fitup
+    assert f"({sheet.inch_text(screw.CUT_LENGTH_MM, places)}) REF LONG" in fitup
     # The step prints the part sheet's exact maximum short, never a wider one.
     printed_short = float(re.search(r"FLUSH TO (\d*\.\d+) SHORT", fitup).group(1))
     assert printed_short * 25.4 == pytest.approx(screw.POST_SCREW_CUT_TO_FIT_SHORT, abs=1e-9)
@@ -166,7 +167,7 @@ def test_crank_fit_reads_t120_before_the_full_turn_and_retention_drilling() -> N
 
     fitup = _step_body("crank-mesh-checked")
     order = (
-        "SLIDE MHA-DT-10 ON, UNPINNED",
+        "SLIDE MHA-DT-10 ON WITHOUT ITS PIN",
         f"SET MHA-DT-10 {sheet.inch_text(pinion.SEAT_FEELER_MM, sheet.FEELER_PLACES)} OFF",
         "PUSH MHA-DT-10 AND T120 TOWARD EACH OTHER",
         f"A {sheet.T120_FITUP_FEELER_TEXT} FEELER PASSES ALL ROUND",
@@ -196,7 +197,7 @@ def test_full_turn_checks_use_the_spec_ratio_and_clear_the_unrelieved_platform()
     ratio = Fraction(pinion.TEETH, gear64.TEETH)
     assert f"CONE SET {ratio} TURN ({pinion.TEETH}T:{gear64.TEETH}T)" in checks
     assert "WITHOUT BINDING THROUGH ONE FULL MHA-DT-07 TURN" in checks
-    assert "MHA-DT-07 CLEAR OF THE UNRELIEVED MHA-DT-20 TOP THROUGHOUT" in checks
+    assert "MHA-DT-07 CLEARS THE UNRELIEVED MHA-DT-20 TOP THROUGH THAT TURN" in checks
     assert "RELIEF THROUGHOUT" not in checks
     # Owner ruling 2026-11-07 (engineerguy video 4): forward is clockwise in
     # the FRONT view, the platen feeds away from the crank, and the sine notch
@@ -252,5 +253,50 @@ def test_a_cite_to_the_wrong_step_is_caught() -> None:
     """Positive control: RIG SET sets the rig along the bank, not its tip gap."""
     assert TIP_GAP_FEELER not in _step_body("rig-set")
 
+
+
+def _defined_codes() -> list[str]:
+    """The short codes MHA-DT-00 defines: each cone gear's configuration
+    (the BOM's "T006-T120 BY 6") and the chain wheel the interface notes name."""
+    cone = re.search(r"\bT(\d+)-T(\d+) BY (\d+)\b", drawing.BOM_DESCRIPTIONS["dt-cone-gear"])
+    assert cone, drawing.BOM_DESCRIPTIONS["dt-cone-gear"]
+    first, last, step = (int(value) for value in cone.groups())
+    gears = {f"T{teeth:03d}" for teeth in range(first, last + 1, step)}
+    named = set(re.findall(r"\bT\d+\b", drawing.INTERFACE_NOTES))
+    assert named, "the interface notes name the T12 chain wheel"
+    return [re.escape(code) for code in sorted(gears | named)]
+
+
+def _direction_key() -> str:
+    """The sheet's direction definitions: the direction notes and check 5's
+    running sense."""
+    checks = " ".join(drawing.CHECKS.split())
+    forward = re.search(r"CRANK FORWARD IS CLOCKWISE IN THE SHEET 1 FRONT VIEW", checks)
+    assert forward, "check 5 defines the running sense"
+    return f"{drawing.DIRECTION_NOTES}\n{forward.group(0)}"
+
+
+def test_every_step_and_check_is_one_short_action_with_its_codes_defined() -> None:
+    """Drawing-guidelines rule 22, offline (rubric sample round 9: the review
+    re-sampled chained steps every round): each printed step or check is at
+    most six lines and one action, a check and its remedy are separate steps,
+    every lettered or numbered cite names a printed head, and every short code
+    and direction word is defined on the sheet.  No step is allowlisted."""
+    violations = step_structure_violations(
+        {"STEP": SEQUENCE_BLOCKS, "CHECK": (drawing.CHECKS,)},
+        reference_kinds={"STEP": "STEP", "CHECK": "CHECK"},
+        defined_codes=_defined_codes(),
+        direction_key=_direction_key(),
+    )
+    assert violations == [], "\n".join(violations)
+
+
+def test_the_fits_are_named_never_a_diametral_band() -> None:
+    """Rule 4 (d870c66): a fit is named; any clearance or interference band
+    prints only as REF."""
+    printed = "\n".join((*SEQUENCE_BLOCKS, drawing.CHECKS))
+    assert "DIAMETRAL" not in printed
+    for band in re.findall(r"(?:CLEARANCE|INTERFERENCE)[^()]*\)?", " ".join(printed.split())):
+        assert band.endswith("REF)"), band
 
 

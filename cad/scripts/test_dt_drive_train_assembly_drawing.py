@@ -575,7 +575,7 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     t012 = f"{feeler(set_stack.feeler_gap_mm(12))} AT T012"
     t120 = f"{feeler(set_stack.feeler_gap_mm(120))} AT T120"
     order = [
-        check.index("TO THE MHA-SH-VN-52 STOP, CLEAR OF EVERY MHA-DT-12"),
+        check.index("OUT TO THE MHA-SH-VN-52 STOP"),
         check.index("(MHA-DT-VN-62) UNTIL EACH PEDESTAL MOVES"),
         check.index(t012),
         check.index(t120),
@@ -650,13 +650,13 @@ def test_rig_is_located_by_its_parked_tip_gap() -> None:
 
     feeler = f"{tip_gap.TIP_GAP_SETTING_TEXT} FEELER"
     located = _rig_step_body("rig-located")
-    for phrase in ("TRANSFERRED", tip_gap.TIP_GAP_FEELER_TEXT, tip_gap.TIP_GAP_ACCEPT_TEXT):
+    for phrase in ("UNDRILLED SEATS", tip_gap.TIP_GAP_FEELER_TEXT, tip_gap.TIP_GAP_ACCEPT_TEXT):
         assert phrase in located, phrase
     check = _flat(drawing.CHECKS)
     assert feeler in check
     assert (
         f"{tip_gap.TIP_GAP_ACCEPT_TEXT} (SHEET {drawing.CONTINUATION_SHEET}, "
-        f"STEP {steps.step_number('rig-located')}D)"
+        f"STEP {steps.step_number('rig-located')}E)"
     ) in check
     # The inch acceptance rounds inward, inside the spec's window.
     printed = re.search(r"ACCEPT (\.\d{3})-(\.\d{3})", tip_gap.TIP_GAP_ACCEPT_TEXT)
@@ -677,8 +677,8 @@ def test_rig_is_located_by_its_parked_tip_gap() -> None:
 def test_the_rig_steps_print_the_fitup_sequence_once_in_order() -> None:
     """Codex #858 (PRRT_kwDOPHDy386mTbPB): the fit-up that produces the
     modelled pin stations reaches the fitter.  Each pinion_rig_fitup step
-    prints once, word for word, in its own step, in ASSEMBLY_SEQUENCE order;
-    nothing is pending."""
+    prints once, word for word or as its RIG_REWORDINGS re-break, in its own
+    step, in ASSEMBLY_SEQUENCE order; nothing is pending."""
     import dt_drive_train_steps as steps
     import pinion_rig_fitup as fitup
 
@@ -700,8 +700,9 @@ def test_the_rig_steps_print_the_fitup_sequence_once_in_order() -> None:
             # hole's drill folded into the match-drill
             # (test_lever_pin_step_states_existing_drill_size_and_slip_fit).
             continue
-        assert flat.count(_flat(step)) == 1, key
-        assert _flat(step) in _unlettered(_rig_step_body(key)), key
+        printed = _flat(drawing._reworded(_flat(step), *drawing.RIG_REWORDINGS.get(key, ())))
+        assert flat.count(printed) == 1, key
+        assert printed in _unlettered(_rig_step_body(key)), key
     numbers = [steps.step_number(key) for key in keys]
     assert numbers == sorted(numbers)
     printed = [int(n) for n in re.findall(r"^(\d+)\. ", RIG_STEPS, re.MULTILINE)]
@@ -728,6 +729,10 @@ def test_lever_pin_step_states_existing_drill_size_and_slip_fit() -> None:
     assert f"INSERT {pin.PIN_NUMBER}, A SLIP FIT." in step
     assert "TRIM BOTH ENDS." in step
     assert f"PEEN BOTH ENDS FLUSH WITH THE HUB (SHEET {drawing.FULL_DETAIL_SHEET})." in step
+    # Round 9 (rule 23): the cross pin's own bench check, 22D.
+    assert (
+        f"22D. CHECK THAT {pin.LEVER_NUMBER} DOES NOT TURN OR SLIDE ON {pin.LIFT_ROD_NUMBER} BY HAND."
+    ) in _flat(RIG_STEPS)
     # Round 7 (#3): view E calls the peen out at the hub, citing 22C.
     assert drawing.LEVER_PIN_PEEN_NOTE.split("\n") == [
         f"PEEN {pin.PIN_NUMBER}",
@@ -798,7 +803,7 @@ def test_the_spring_is_stationed_east_west_where_its_preload_is_gated() -> None:
     assert printed is not None
     # The inch sheet's .XX: within half a hundredth of the gated station.
     assert float(printed.group(1)) * 25.4 == pytest.approx(SCREW_EAST_OF_PIVOT, abs=0.127)
-    assert "CREST BEARING ON THE PARKED BACK MHA-DT-14 FLANK" in located
+    assert "UNTIL ITS CREST BEARS ON THE PARKED BACK MHA-DT-14 FLANK" in located
     assert "TERMINAL FLAT" not in _flat(RIG_STEPS)
     assert "TERMINAL FLAT" not in Path(drawing.__file__).read_text(encoding="utf-8")
     assert steps.step_number("rig-located") < steps.step_number("rig-set")
@@ -816,7 +821,7 @@ def test_drum_is_bonded_after_the_arbor_passes_the_front_strap() -> None:
     import dt_drive_train_steps as steps
 
     assert "FRONT MHA-DT-14 ON BEHIND IT" in _rig_step_body("arbor-collar-pinned")
-    assert "BOND WITH LOCTITE 638" in _rig_step_body("drum-bonded")
+    assert "BOND MHA-DT-22 INTO MHA-DT-01 WITH LOCTITE 638" in _rig_step_body("drum-bonded")
     assert "IN THE BACK MHA-DT-14 TOP BORE" in _rig_step_body("cluster-hung")
     order = [
         steps.step_number(key)
@@ -1235,6 +1240,42 @@ def test_a_ring_no_ladder_scale_fits_raises_naming_the_cluster_and_overflow() ->
 def test_a_preferred_scale_off_the_ladder_is_refused() -> None:
     with pytest.raises(ValueError, match="not on the ladder"):
         drawing.cluster_ring_scale(CONE_CRANK_OUTLINE_1_3, (3.0, 7.0), label="odd")
+
+
+# R9 (20261107T062630010Z) cluster_ring_fit telemetry: the cone set's and the
+# pinion rig's outlines at the 1:3 they stepped down to.
+CONE_SET_OUTLINE_R9_1_3 = (0.1571, 0.0903, 0.2779, 0.2297)
+PINION_RIG_OUTLINE_R9_1_3 = (0.1681, 0.1106, 0.2669, 0.2094)
+
+
+@pytest.mark.parametrize(
+    ("cluster", "outline", "expected"),
+    [
+        ("cone-set", CONE_SET_OUTLINE_R9_1_3, (1.0, 2.5)),
+        ("pinion-rig", PINION_RIG_OUTLINE_R9_1_3, (1.0, 2.0)),
+    ],
+)
+def test_the_cone_set_and_rig_grow_into_their_lowered_ring_regions(
+    cluster: str, outline: tuple[float, ...], expected: tuple[float, float]
+) -> None:
+    """Rubric sample round 9: R9 printed both at 1:3, too small to read.  Their
+    regions run down into the empty lower-left, so from the 1:2 preference
+    the ladder now stops at 1:2.5 (cone set) and 1:2 (rig)."""
+    x0, y0, x1, y1 = outline
+    k = (1.0 / 2.0) / (1.0 / 3.0)
+    cx, cy, hw, hh = (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2 * k, (y1 - y0) / 2 * k
+    preferred = (cx - hw, cy - hh, cx + hw, cy + hh)
+    region = drawing.CLUSTER_RING_REGIONS[cluster]
+    assert drawing.cluster_ring_scale(preferred, (1.0, 2.0), label=cluster, region=region) == expected
+    # The region it ran in before would not have held it.
+    assert drawing.cluster_ring_scale(preferred, (1.0, 2.0), label=cluster) != expected
+
+
+def test_the_bank_and_crank_keep_their_proven_ring_region() -> None:
+    for cluster in ("cylinder-bank", "crank"):
+        assert drawing.CLUSTER_RING_REGIONS[cluster] == drawing.CLUSTER_RING_REGION
+    assert set(drawing.CLUSTER_RING_REGIONS) == set(drawing.CLUSTER_SCALES)
+
 
 
 def test_the_sheet_scales_follow_the_chosen_cluster_and_full_detail_scales() -> None:
