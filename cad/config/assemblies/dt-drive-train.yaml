@@ -130,3 +130,8 @@ machinist_exceptions:
     where: "sheet 10 steps 18A, 19B and 20: MHA-DT-24 pinion spring foot pad on one MHA-SH-VN-52 #4-40 fillister screw in its transferred MHA-FR-01 seat, the crest bearing on the parked back MHA-DT-14 flank"
     finding: "one-screw part that can turn about its screw with no locating feature (rule 23 static clamp)"
     reason: "Owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR #2248): no dowel, pin or second screw. The spring is very rarely used and any turning is inconsequential; the operator realigns the spring by eye and retorques the screw"
+  - id: "DT-06"
+    kind: "minor"
+    where: "sheet 8 steps 6G and 6L; sheet 11 view E at the crank arm: MHA-DT-28 keeper chain anchor eye clamped under one MHA-SH-VN-51 #4-40 brass fillister screw on MHA-DT-06"
+    finding: "one-screw part that can turn about its screw with no locating feature (rule 23 static clamp)"
+    reason: "PROVISIONAL, pending owner confirmation (MHA-DT-00 rubric sample, PR #2248; Main 2026-11-07, the owner ask timed out): no dowel, tongue or second screw. The eye only anchors the MHA-DT-VN-65 keeper chain; turning it changes no setting or function. Step 6L checks by hand that it does not turn"

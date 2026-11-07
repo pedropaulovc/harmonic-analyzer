@@ -1119,13 +1119,14 @@ LEVER_PIN_PEEN_NOTE = "\n".join(
         f"(STEP {steps.step_number(LEVER_PIN_SET_STEP_KEY)}C)",
     )
 )
-# Round 7's render (run 20261107T043210166Z) puts the hub near (253, 140) mm
-# on sheet 11: the note stands 30 mm right of it and 4 mm above, its three
-# rows (about 13.5 mm) between the lever grip (bottom near 147 mm) and the
-# MHA-DT-32 stake note (top near 117 mm); the leader leaves the text's left
-# end and runs back over the hub to the pin.
+# Round 8's layout audit (run 20261107T055609546Z) measured the MHA-DT-32
+# stake note's box to y 132.1 mm on sheet 11 and this note's at y
+# 128.7-142.6 mm with a 4 mm rise, 3.3 mm into it; the round 8 evidence PDF
+# puts the lever grip's foot at about 147.7 mm right above it.  Risen 8.2 mm,
+# its three rows (13.9 mm) stand about 0.9 mm clear of each, 30 mm right of
+# the hub; the leader leaves the text's left end and runs back to the pin.
 LEVER_PIN_PEEN_NOTE_DX = 0.030
-LEVER_PIN_PEEN_NOTE_RISE = 0.004
+LEVER_PIN_PEEN_NOTE_RISE = 0.0082
 
 
 def lever_pin_peen_note_xy(tip: tuple[float, float]) -> tuple[float, float]:
