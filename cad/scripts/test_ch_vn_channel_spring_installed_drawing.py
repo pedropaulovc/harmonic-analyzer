@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 
+import ch_vn_channel_spring_installed_notes as notes
 import ch_vn_channel_spring_installed_spec as spec
 from spring_mount_geom import channel_force_n
 
@@ -16,6 +17,21 @@ def test_installed_spring_stays_within_catalogue_load_envelope() -> None:
 def test_two_point_qc_measures_the_catalogue_rate() -> None:
     measured = (channel_force_n(80.0) - channel_force_n(60.0)) / 20.0
     assert math.isclose(measured, spec.SPRING_RATE_N_PER_MM, rel_tol=1e-12)
+
+
+def test_matched_set_loads_stretch_a_catalogue_spring_to_the_qc_lengths() -> None:
+    """The printed dead loads land a catalogue spring within 1 mm of each QC
+    length, on its linear branch and under the catalogue maximum load."""
+    lb = 4.4482216152605
+    for load_lb, length in zip(notes.QC_LOADS_LB, notes.QC_LENGTHS_MM, strict=True):
+        stretched = spec.FREE_LENGTH_MM + (
+            load_lb * lb - spec.INITIAL_TENSION_N
+        ) / spec.SPRING_RATE_N_PER_MM
+        assert abs(stretched - length) < 1.0
+        assert spec.FREE_LENGTH_MM < stretched < spec.MAX_LENGTH_MM
+        assert load_lb * lb < spec.MAXIMUM_LOAD_N
+    assert all(len(line) <= 70 for line in notes.DRAWING_NOTES.splitlines())
+    assert len(notes.DRAWING_NOTES.splitlines()) <= 4
 
 
 def test_source_gauges_preserve_exact_values_and_supplier_spelling() -> None:
