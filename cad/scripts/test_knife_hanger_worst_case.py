@@ -170,27 +170,28 @@ def test_the_screw_reach_holds_engagement_and_stays_in_the_thread() -> None:
     assert asm.HANGER_UNDERHEAD_Y == pytest.approx(1037.4757)
     assert asm.HANGER_STUD_Y == pytest.approx(990.7757)
     assert asm.HANGER_REACH == pytest.approx(8.9175)
-    # MHA-SM-00 cuts each bolt to its measured stack plus .351 +/-.006 in.
-    assert asm.HANGER_REACH_MIN == pytest.approx(8.763)
-    assert asm.HANGER_REACH_MAX == pytest.approx(9.0678)
-    # Cut-tip lead costs one incomplete pitch: 7.7046667 >= 1.5D =7.239.
+    # MHA-SM-00 cuts each bolt to its measured stack plus .351, title-block
+    # +/-.005 in.
+    assert asm.HANGER_REACH_MIN == pytest.approx(8.7884)
+    assert asm.HANGER_REACH_MAX == pytest.approx(9.0424)
+    # Cut-tip lead costs one incomplete pitch: 7.7300667 >= 1.5D =7.239.
     assert asm.HANGER_ENGAGEMENT_MIN == pytest.approx(
         asm.HANGER_REACH_MIN - screw.INCOMPLETE_TIP_LEN_MAX
     )
     assert screw.INCOMPLETE_TIP_LEN_MAX == screw.PITCH
-    assert asm.HANGER_ENGAGEMENT_MIN == pytest.approx(7.7046666667)
+    assert asm.HANGER_ENGAGEMENT_MIN == pytest.approx(7.7300666667)
     assert asm.HANGER_ENGAGEMENT_FLOOR == pytest.approx(1.5 * screw.SHANK_DIA)
     assert asm.HANGER_ENGAGEMENT_MIN >= asm.HANGER_ENGAGEMENT_FLOOR
     assert asm.HANGER_ENGAGEMENT_FLOOR == pytest.approx(7.239)
-    # Full tap's shallowest limit stays 0.33 beyond the longest reach.
+    # Full tap's shallowest limit stays 0.36 beyond the longest reach.
     assert knife_mount.STUD_TAP_THREAD_DEPTH_MIN == pytest.approx(9.398)
     assert asm.HANGER_REACH_MAX <= knife_mount.STUD_TAP_THREAD_DEPTH_MIN
-    assert asm.HANGER_TIP_CLEARANCE == pytest.approx(0.3302)
+    assert asm.HANGER_TIP_CLEARANCE == pytest.approx(0.3556)
     # Modified-part incoming inspection proves this cut tail's full form;
     # catalogue "fully threaded" is not assumed to specify thread-to-head.
     assert screw.THREAD_LENGTH_MIN == pytest.approx(10.6172)  # .418 MIN
     assert screw.FULL_FORM_TAIL_MIN == pytest.approx(9.5588666667)
-    assert asm.HANGER_THREAD_SPARE == pytest.approx(0.4910666667)
+    assert asm.HANGER_THREAD_SPARE == pytest.approx(0.5164666667)
     assert (
         screw.THREAD_LENGTH_MIN - screw.INCOMPLETE_TIP_LEN_MAX >= asm.HANGER_REACH_MAX
     )
