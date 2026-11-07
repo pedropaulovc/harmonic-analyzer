@@ -688,11 +688,9 @@ def test_the_rig_steps_print_the_fitup_sequence_once_in_order() -> None:
     first = steps.SEQUENCE.index("arbor-collar-pinned") + 1
     assert printed == list(range(first, len(steps.SEQUENCE) + 1))
     assert "PENDING" not in RIG_STEPS
-    # The pivot shaft's match-drilled pin hole points at the step that drills it.
-    import draw_dt_pinion_pivot_shaft as shaft
-
-    key = shaft.SHAFT_DRILL_STEP_KEY
-    assert steps.step_ref(key) in _flat(shaft.DIMENSION_CALLOUTS["PinHoleDia"])
+    # The pivot shaft's match-drilled pin hole is drilled in this step, which
+    # names the hole (the part sheet carries no pointer to it, rule 7).
+    key = "straps-pinned-to-torque-shaft"
     assert fitup.SHAFT_DRILL_NAME in _rig_step_body(key)
 
 

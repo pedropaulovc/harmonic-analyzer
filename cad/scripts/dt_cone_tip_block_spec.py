@@ -581,6 +581,14 @@ for (_feature, _dimension), _places in _STACK_GRADES.items():
             f"a stack reads {_dimension} at {_places} places; the print carries "
             f"{DRAWING_PRECISION[_feature][_dimension]}"
         )
+# VIEW B's two sheet-added stations locate the far-jaw tap in its own view
+# (fan-out review: located nowhere in VIEW B), at the tap stations' places.
+# Sheet-added dimensions take their places from the spec (rule 3; the
+# drawing-purity contract).
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {
+    "ViewBPinchDepth": PINCH_DEPTH_PLACES,
+    "ViewBPinchHeight": PINCH_HEIGHT_PLACES,
+}
 DRAWING_PRECISION_BY_NAME = {
     name: places
     for dimensions in DRAWING_PRECISION.values()

@@ -290,7 +290,7 @@ def test_view_b_locates_its_thread_with_its_own_driven_stations() -> None:
     """Round-1 farm review (dt-fab-4, rule 7): VIEW B's far-jaw thread is
     located in VIEW B, to the right view's stations and places."""
     assert set(drawing.VIEW_B_DIMENSIONS) == {"ViewBPinchDepth", "ViewBPinchHeight"}
-    assert drawing.VIEW_B_DIMENSION_PLACES == {
+    assert dt_cone_tip_block_spec.DRAWING_REFERENCE_PRECISION == {
         "ViewBPinchDepth": dt_cone_tip_block_spec.PINCH_DEPTH_PLACES,
         "ViewBPinchHeight": dt_cone_tip_block_spec.PINCH_HEIGHT_PLACES,
     }

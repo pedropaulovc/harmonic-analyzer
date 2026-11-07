@@ -62,6 +62,7 @@ from dt_cone_tip_block_spec import (
     BLOCK_Z,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_PRECISION,
     FOOT_BORE_DIA,
     FOOT_DEPTH,
     FOOT_DEPTH_PLACES,
@@ -71,9 +72,7 @@ from dt_cone_tip_block_spec import (
     HOLDDOWN_THREAD,
     PINCH_BORE_DIA,
     PINCH_CLEARANCE_DIA,
-    PINCH_DEPTH_PLACES,
     PINCH_HEIGHT,
-    PINCH_HEIGHT_PLACES,
     SLIT_DEPTH,
     SLIT_W,
     SURFACE_FINISHES,
@@ -406,10 +405,6 @@ VIEW_B_DIMENSIONS = {
         _LEFT_NORTH_X + 0.010,
         _elevation_y(PINCH_HEIGHT / 2.0, LEFT_CENTER),
     ),
-}
-VIEW_B_DIMENSION_PLACES = {
-    "ViewBPinchDepth": PINCH_DEPTH_PLACES,
-    "ViewBPinchHeight": PINCH_HEIGHT_PLACES,
 }
 # VIEW B's letter caption sits just under its foot; the projected right and
 # bottom views carry none (rule 9).
@@ -1281,10 +1276,6 @@ def _view_b_face_edge(adapter: Any, view: Any, *, along: int, label: str) -> Any
     return min(spanning, key=lambda item: item[1])[2]
 
 
-# swDimensionPrecisionSettings_e.swDoNotChangePrecisionSetting
-_PRECISION_UNCHANGED = -1
-
-
 def _check_face_attachment(adapter: Any, dimension: Any, face_edge: Any, label: str) -> None:
     """The dimension hangs on the face edge it was given plus one other entity.
 
@@ -1352,10 +1343,8 @@ def _add_view_b_pinch_dimensions(adapter: Any, view: Any, thread_edge: Any) -> N
         assert_dimension_measures(adapter, dimension, expected_mm=expected_mm, label=label)
         _check_face_attachment(adapter, dimension, face_edge, label)
         display = _early_bound(dimension, "IDisplayDimension")
-        places = VIEW_B_DIMENSION_PLACES[name]
-        display.SetPrecision3(
-            places, _PRECISION_UNCHANGED, _PRECISION_UNCHANGED, _PRECISION_UNCHANGED
-        )
+        places = DRAWING_REFERENCE_PRECISION[name]
+        display.SetPrecision3(DRAWING_REFERENCE_PRECISION[name], -1, -1, -1)
         if int(display.GetPrimaryPrecision2()) != places:
             raise RuntimeError(f"{label} did not keep {places} decimal places")
         display.ArrowSide = _DIM_ARROWS_INSIDE
