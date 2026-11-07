@@ -1,14 +1,13 @@
 r"""Create the one-sheet cone-gear indexing-kit fitter sheet (MHA-DT-03-TL-00).
 
 The kit is the custom index plate (item 1, MHA-DT-03-TL-01) on the owner's
-PM BS-0 dividing head, which is not modelled. The sheet shows the plate face
-(countersunk side, the side that faces out on the head) with its balloon, the
-edge view and the shaded isometric, the one-row BOM, the fitting steps and
-checks, and the indexing table for the three cone gears the plate exists for.
-Hole-circle counts, tooth counts and the worm ratio come from
-``dt_cone_gear_tl_index_plate_spec``; this recipe only lays the sheet out and
-never edits the source assembly. Machinist review is OFF while the plate's
-sizes are best guesses (#2157).
+PM BS-0 dividing head, which is shop equipment and is not modelled. The sheet
+shows the plate face (countersunk side, the side that faces out on the head)
+with its balloon, the edge view and the shaded isometric, the one-row BOM, the
+fitting steps and checks, and the indexing table for the three cone gears the
+plate exists for. Hole-circle counts, tooth counts and the worm ratio come
+from ``dt_cone_gear_tl_index_plate_spec``; this recipe only lays the sheet out
+and never edits the source assembly.
 """
 
 from __future__ import annotations
@@ -43,9 +42,12 @@ from _drawing_view_configuration import (
     assert_full_detail_view,
 )
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 SPEC = DRAWINGS_BY_NAME["dt_cone_gear_tl_indexing_assembly"]
 ARTIFACT_STEM = SPEC.artifact_stem
 SOURCE = SPEC.source
@@ -73,8 +75,9 @@ ISO_NOTE_XY = (0.050, 0.046)
 # its left edge sits close enough to the views to end inside the right border.
 BOM_ANCHOR = (0.219, 0.262)
 STEPS_XY = (0.219, 0.235)
-CHECKS_XY = (0.219, 0.190)
-TABLE_XY = (0.219, 0.155)
+# The ten-line steps note (4.5 mm a line) ends above the checks.
+CHECKS_XY = (0.219, 0.183)
+TABLE_XY = (0.219, 0.150)
 BALLOON_MARGIN = 0.012
 
 PLATE = plate.PART_NAME
@@ -89,18 +92,22 @@ BOM_COMPONENT_IDENTITIES: dict[str, tuple[str, str | None]] = {PLATE: (PLATE, No
 BALLOON_ANCHORS = {PLATE: BalloonAnchor()}
 
 # Steps 1 and 4 reuse the head's own plate screws without a lock: owner
-# ruling RV-01 (the kit's machinist_exceptions) accepts that joint.
+# ruling RV-01 (the kit's machinist_exceptions) accepts that joint. The head
+# and its screws are shop equipment, named as such and not parts-list rows
+# (RV-02). A step does one thing (rule 22).
+HEAD = "PM BS-0 DIVIDING HEAD (SHOP EQUIPMENT)"
 ASSEMBLY_STEPS = "\n".join(
     (
-        "FITTING ON THE BS-0 DIVIDING HEAD",
-        "1. REMOVE THE STOCK INDEX PLATE; KEEP ITS THREE FLAT HEAD SCREWS.",
+        f"FITTING ON THE {HEAD}",
+        "1. REMOVE THE HEAD'S STOCK INDEX PLATE; KEEP ITS THREE #8 FLAT HEAD",
+        "   SCREWS.",
         "2. SLIDE ITEM 1 ONTO THE HEAD'S PLATE HUB, COUNTERSUNK FACE OUT.",
         "3. TURN ITEM 1 UNTIL ITS THREE COUNTERSINKS LINE UP WITH THE",
         "   HEAD'S PLATE-SCREW TAPS.",
         "4. FIT THE SCREWS FROM STEP 1 AND TIGHTEN THEM EVENLY.",
-        "5. SET THE CRANK PIN ON THE CIRCLE THE INDEXING TABLE NAMES. SET",
-        "   THE SECTOR ARMS TO SPAN ITS HOLE SPACES PER TOOTH: THE PIN'S",
-        "   HOLE PLUS THAT MANY MORE HOLES (10 SPACES = 11 HOLES).",
+        "5. SET THE CRANK PIN ON THE CIRCLE THE INDEXING TABLE NAMES.",
+        "6. SET THE SECTOR ARMS TO SPAN THE PIN'S HOLE PLUS THE TABLE'S",
+        "   HOLE SPACES PER TOOTH (10 SPACES = 11 HOLES).",
     )
 )
 ASSEMBLY_CHECKS = "\n".join(
