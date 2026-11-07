@@ -22,7 +22,7 @@ from __future__ import annotations
 import math
 
 import _config
-from _fit_close_running import SHAFT_G6_3_TO_6_MM
+from _fit_close_running import SHAFT_G6_3_TO_6_MM, measured_close_running_clearance_mm
 from _hole_spec import DRILL_POINT_H, HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM
 from _package_units import drawing_unit
@@ -193,17 +193,40 @@ if DRAWING_BANDS[("RodProfile", "Section")] != DRAWING_BANDS[("Rod", "Depth")]:
     raise AssertionError("one SQ size can only state a square whose flats share a band")
 # Every tight band names its mate on the dimension it governs (rule 4); the
 # shoulder radius names the part its seat face lands on, the tap wall what
-# it is.
+# it is.  The pivot's .0003 band is narrower than the shop's turned-diameter
+# row (+/-.0005), so its fit route (drawing-guidelines.md "What the shop
+# holds": a matched fit to a named mate with its stated clearance) rides
+# numbered note PIVOT_FIT_NOTE, linked from the diameter by SEE NOTE (rule 7:
+# the note counts as at the callout; two lines of words would overrun the
+# border from the diameter's left-hanging block).
+PIVOT_FIT_NOTE = 1
+# The pivot in the v-block's REAM_H7 bore: .0002-.0010 diametral.
+PIVOT_CLEARANCE_MM = measured_close_running_clearance_mm()
+
+
+def _inch_text(mm: float) -> str:
+    """A four-place inch value with no leading zero (.0002)."""
+    return f"{mm / 25.4:.4f}".removeprefix("0")
+
+
 DIMENSION_CALLOUTS: dict[str, str] = {
     "Depth": f"SQ, SLIDING FIT IN PEN\nHANGER {PEN_HANGER_NUMBER} GUIDES",
-    "PivotDia": f"SLIP FIT IN PEN V-BLOCK\n{PEN_V_BLOCK_NUMBER} PIVOT BORE",
+    "PivotDia": f"SEE NOTE {PIVOT_FIT_NOTE}",
     "ShoulderRadius": f"SEATS ON PEN V-BLOCK\n{PEN_V_BLOCK_NUMBER}",
     "TapWallMin": TAP_WALL_CALLOUT,
 }
+DRAWING_NOTES = "\n".join(
+    (
+        f"{PIVOT_FIT_NOTE}. PIVOT: SLIDING FIT IN {PEN_V_BLOCK_NUMBER} PIVOT BORE, TURNED",
+        "   TO THE MEASURED BORE (CLEARANCE "
+        f"{_inch_text(PIVOT_CLEARANCE_MM[0])}-{_inch_text(PIVOT_CLEARANCE_MM[1])}).",
+    )
+)
 
 # The 5:1 end view stands off projection (under the side view, rescaled), so
-# its label names the end it looks at: "*Top" looks down the rod axis onto
-# the tapped top face (machinist review 2026-10-23: unnamed, the tap's end
-# read only from the missing Ø4 circle and the isometric).
-END_VIEW_NOTE = "VIEW FROM SQUARE END SCALE 5:1"
+# it is a lettered removed view (rule 9): VIEW A, its viewing arrow on the
+# side view onto the tapped top face it shows ("*Top" looks down the rod
+# axis), its scale printed because it differs from the sheet's 2:1.
+END_VIEW_LETTER = "A"
+END_VIEW_NOTE = f"VIEW {END_VIEW_LETTER} SCALE 5:1"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

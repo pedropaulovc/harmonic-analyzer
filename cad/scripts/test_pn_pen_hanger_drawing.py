@@ -357,34 +357,43 @@ def test_overhang_reference_spans_the_strap_cut_and_the_plate_edge() -> None:
     assert 'orientation="horizontal"' in source
 
 
-def test_upper_plate_location_callout_stays_off_lines() -> None:
-    assert not re.search(r"\d", spec.UPPER_PLATE_LOCATION_CALLOUT)
-    tip_x, tip_y = draw.UPPER_PLATE_NOTE_TIP
-    text_x, text_y = draw.UPPER_PLATE_NOTE_XY
-    # The tip on the plate's -x edge, between the slot bottom and plate front.
-    assert tip_x == pytest.approx(draw._ax(-draw._HALF_PLATE))
-    assert draw._az(spec.PLATE_FRONT_Z) < tip_y < draw._az(spec.SLOT_BOTTOM_Z)
-    # The text right of the section's rightmost ink (the strap end), between
-    # the corner radius's text above and the slot width's block below (the
-    # note's two lines stand about 8.5 mm tall from its top-left).
-    assert text_x > draw._ax(draw._SECTION_X[0])
-    assert text_y < draw.SECTION_KEEP["SlotCornerR"][1] - 0.006
-    assert text_y - 0.0085 > draw.SLOT_WIDTH_TEXT_XY[1] + 0.0075 + 0.005
-    assert abs(text_y - tip_y) < text_x - tip_x
-    assert "view=section" in inspect.getsource(draw.build)
+def test_slots_share_one_drawn_centreline_in_the_front_view() -> None:
+    # Rule 26: features in line share a drawn centreline; no sentence locates
+    # the upper plate.
+    assert not hasattr(spec, "UPPER_PLATE_LOCATION_CALLOUT")
+    assert "add_leader_note" not in inspect.getsource(draw)
+    low, high = draw.CENTERLINE_Y_MM
+    assert low < spec.GUIDE_PLATE_YS[0] and high > draw._UPPER_TOP_Y
+    assert low == pytest.approx(spec.GUIDE_PLATE_YS[0] - draw.CENTERLINE_OVERSHOOT_MM)
+    assert high == pytest.approx(draw._UPPER_TOP_Y + draw.CENTERLINE_OVERSHOOT_MM)
+    # Its foot stays clear above the strap's bottom-width text.
+    assert draw._fy(low) - draw.FRONT_KEEP["StrapBotWidth"][1] > 0.005
+    assert "_add_slot_centerline(adapter, front)" in inspect.getsource(draw.build)
 
 
-def test_screw_hole_callout_is_a_native_drill_callout() -> None:
+def test_screw_hole_callout_is_a_native_drill_callout_size_first() -> None:
     source = inspect.getsource(draw.build)
-    assert 'process="DRILL"' in source
+    assert "process=" not in source
+    assert "_set_screw_hole_callout_text(screw_callout)" in source
     assert "SCREW_HOLE_DIA / 2.0" in source
     assert "omit_title_block_thread_class" not in inspect.getsource(draw)
     assert "redundant_note_substrings" not in source
+    native = {5: "", 6: "", 7: "<MOD-DIAM><hw-diam> <hw-thru>", 8: ""}
+    rewritten = draw.screw_hole_callout_definitions(native)
+    assert rewritten[7] == "<MOD-DIAM><hw-diam> DRILL <hw-thru>"
+    assert {part: text for part, text in rewritten.items() if part != 7} == {
+        5: "", 6: "", 8: ""
+    }
+    with pytest.raises(RuntimeError):
+        draw.screw_hole_callout_definitions(rewritten)
 
 
 def test_isometric_fills_the_right_of_the_sheet_at_full_size() -> None:
     assert draw.ISO_SCALE == (1, 1)
-    assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
+    # Rule 9: the title block states the 1:1, so the caption carries no scale.
+    assert "SCALE" not in spec.ISOMETRIC_VIEW_NOTE
+    assert not hasattr(spec, "FRONT_VIEW_NOTE")
+    assert "Front View Note" not in inspect.getsource(draw.build)
     # Right of the slot width's parked text block, the note under the view.
     assert draw.ISO_CENTER[0] - 0.021 > (
         draw.SLOT_WIDTH_TEXT_XY[0] + draw._SLOT_TEXT_HALF_WIDTH

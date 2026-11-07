@@ -2,22 +2,23 @@ r"""Create the curated machinist drawing for the pen hanger.
 
 The SLDPRT remains authoritative.  This recipe supplies only the hanger's views,
 the placement of its imported model dimensions, the hanger-screw hole callout,
-and the property-linked notes; sheet/template and export behavior lives in
-``_drawing_common``.  Dimension import and curation live in
-``_drawing_dimension_import``; places and bands are authored on the part.
+the slots' shared centreline and the property-linked notes; sheet/template and
+export behavior lives in ``_drawing_common``.  Dimension import and curation
+live in ``_drawing_dimension_import``; places and bands are authored on the
+part.
 
 The pen hanger is a black tapered steel strap (11 gauge, .63 -> .48 wide,
 6.69 tall; decimal-inch sheet) with two open U guide plates brazed across its
 front face; the pen rod
 hangs in both slots.  The front view (1:1, ``*Back``: looking at the strap's
 front face and the plates from the machine front, as note 1 names it) carries
-the strap outline, the screw-hole station, the upper plate's drop and the
-plates' sheet-stock thickness (a reference); section A-A (2:1) cuts the strap
-just above the upper plate and looks down onto its U, carrying the slot (its
-depth and the plate's reach both from the plate's free end), its corner
-radius, the strap's sheet-stock thickness (a reference), the plate's overhang
-past the strap (a reference) and its in-line callout; the shaded isometric
-(1:1) fills the right of the sheet.
+the strap outline, the screw-hole station, the upper plate's drop, the
+plates' sheet-stock thickness (a reference) and the centreline both slots
+share; section A-A (2:1) cuts the strap just above the upper plate and looks
+down onto its U, carrying the slot (its depth and the plate's reach both from
+the plate's free end), its corner radius, the strap's sheet-stock thickness
+(a reference) and the plate's overhang past the strap (a reference); the
+shaded isometric (1:1) fills the right of the sheet.
 
 Run with SolidWorks open::
 
@@ -36,6 +37,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
+    view_name,
 )
 
 from _check import check
@@ -58,7 +60,6 @@ from _drawing_dimensions import (
 )
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
-from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -78,6 +79,7 @@ from pn_pen_hanger_spec import (
     GUIDE_PLATE_T,
     GUIDE_PLATE_WIDTH,
     GUIDE_PLATE_YS,
+    ISOMETRIC_VIEW_NOTE,
     PLATE_FRONT_Z,
     REFERENCE_DIMENSIONS,
     SCREW_HOLE_DIA,
@@ -87,7 +89,6 @@ from pn_pen_hanger_spec import (
     STRAP_BOT_Y,
     STRAP_TOP_X,
     STRAP_Z,
-    UPPER_PLATE_LOCATION_CALLOUT,
     UPPER_PLATE_OVERHANG,
 )
 
@@ -185,9 +186,9 @@ SECTION_CENTER = (0.230, 0.195)
 # y 0.087..0.245, under the top border (0.267) and above its note; its left
 # edge (x 0.341) stands 40 mm right of the slot width's text block (x 0.298).
 ISO_CENTER = (0.362, 0.166)
-# The note's top-left: its ~60 mm line (x 0.340..0.400) sits under the iso
-# and 12 mm above the title block's top edge (y 0.065 for x >= 0.216).
-ISO_NOTE_XY = (0.340, 0.080)
+# The note's top-left: its line (~2.5 mm a character) centres under the iso
+# and stands 12 mm above the title block's top edge (y 0.065 for x >= 0.216).
+ISO_NOTE_XY = (ISO_CENTER[0] - len(ISOMETRIC_VIEW_NOTE) * 0.0025 / 2.0, 0.080)
 NOTES_XY = (0.110, 0.094)
 # Text centre: the leader leaves the hole's rim on the sheet-right side and
 # drops gently right, crossing only the strap's tapered edge and the
@@ -195,8 +196,14 @@ NOTES_XY = (0.110, 0.094)
 CALLOUT_XY = (0.137, 0.215)
 # The native Hole Wizard Ø variable of the #8 close clearance callout.
 SCREW_HOLE_CALLOUT_PRECISION = {"hw-diam": 3}
-# Under the front view's StrapTaperDx row (its text at y 0.045).
-FRONT_NOTE_XY = (0.030, 0.034)
+# The callout reads size, then process, then extent (drawing-guidelines.md
+# rules 12 and 26): DRILL follows the native diameter variable instead of
+# leading the callout as a prefix (fan-out screen 20261107T081227004Z:
+# "DRILL Ø .180 THRU ALL"; draw_dt_arbor_pedestal's hold-down recipe).
+SCREW_HOLE_PROCESS = "DRILL"
+_SCREW_HOLE_DIAMETER = "<hw-diam>"
+# swDimensionTextParts_e: each definition part and the part SetText writes.
+_DEFINITION_TO_WRITABLE = {5: 1, 6: 2, 7: 3, 8: 4}
 
 
 def _fx(model_x_mm: float) -> float:
@@ -336,13 +343,15 @@ SECTION_CAPTION_XY = (SECTION_CENTER[0], SECTION_ROW_Y["PlateWidth"] - 0.012)
 OVERHANG_PICK_Z = ((STRAP_Z[0] + STRAP_Z[1]) / 2.0, STRAP_Z[0] - 7.0)
 _OVERHANG_ROW_Y = _az(STRAP_Z[1]) + 0.006
 OVERHANG_TEXT_XY = (_ax(_HALF_PLATE) - 0.0085, _OVERHANG_ROW_Y + _VALUE_ABOVE_LINE)
-# The in-line callout (rule 10) on section A-A, where the plate shows in
-# plan: the leader tip on the plate's -x edge midway between the slot bottom
-# and the plate front; the text top-left 13 mm right of that edge, between
-# the corner radius's text above and the slot width's block below, so the
-# leader runs nearly level and crosses nothing.
-UPPER_PLATE_NOTE_TIP = (_ax(-_HALF_PLATE), _az((SLOT_BOTTOM_Z + PLATE_FRONT_Z) / 2.0))
-UPPER_PLATE_NOTE_XY = (UPPER_PLATE_NOTE_TIP[0] + 0.013, UPPER_PLATE_NOTE_TIP[1] + 0.006)
+# The slots' shared centreline (rule 26) in the front view: on the slots'
+# axis (model x 0), from below the lower plate to above the upper one, run
+# ASME Y14.2's uniform 3 mm on paper past both plates.
+CENTERLINE_OVERSHOOT_MM = 3.0 / (FRONT_SCALE[0] / FRONT_SCALE[1])
+CENTERLINE_Y_MM = (
+    GUIDE_PLATE_YS[0] - CENTERLINE_OVERSHOOT_MM,
+    _UPPER_TOP_Y + CENTERLINE_OVERSHOOT_MM,
+)
+_SW_LINE_CENTER = 4  # swLineStyles_e.swLineCENTER
 
 
 def _create_section(adapter: Any, front: Any) -> Any:
@@ -517,6 +526,144 @@ def _add_overhang_reference(adapter: Any, section: Any) -> None:
         raise RuntimeError(f"{label} precision did not persist")
 
 
+def _add_slot_centerline(adapter: Any, front: Any) -> None:
+    """Draw the centreline both slots share through the front view.
+
+    draw_pn_pen_v_block's view-owned recipe (``_add_pivot_axis_centerline``):
+    the model axis is projected through the view, each sheet point mapped
+    through the view sketch's ModelToSketchTransform, the line added straight
+    to the database (an inferred endpoint snaps onto nearby ink), its
+    endpoints read back, black in the CENTER font.
+    """
+    native = _early_bound(front, "IView")
+    native.UpdateViewDisplayGeometry()
+    ends = [
+        model_point_in_view(
+            adapter,
+            front,
+            (0.0, y / 1000.0, 0.0),
+            label=f"front view slot centreline at y {y:g}",
+        )
+        for y in CENTERLINE_Y_MM
+    ]
+    length = (CENTERLINE_Y_MM[1] - CENTERLINE_Y_MM[0]) * _FRONT_M_PER_MM
+    expected_x = _fx(0.0)
+    if (
+        abs(ends[0][0] - ends[1][0]) > 1e-6
+        or abs((ends[1][1] - ends[0][1]) - length) > 1e-6
+        or abs(ends[0][0] - expected_x) > 1e-4
+    ):
+        raise RuntimeError(f"front view slot centreline projects as {ends!r}")
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, front)):
+        raise RuntimeError("failed to activate the front view for the slot centreline")
+    draw.ClearSelection2(True)
+    sketch = _early_bound(native.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = [
+        tuple(
+            _early_bound(
+                _early_bound(
+                    utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+                ).MultiplyTransform(transform),
+                "IMathPoint",
+            ).ArrayData
+        )
+        for x, y in ends
+    ]
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        centerline = manager.CreateCenterLine(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if centerline is None:
+        raise RuntimeError("failed to create the slots' centreline in the front view")
+    _assert_centreline_placed(adapter, centerline, points)
+    # A view sketch line otherwise prints in the under-defined sketch blue.
+    segment = _early_bound(centerline, "ISketchSegment")
+    segment.Color = 0  # COLORREF black
+    segment.Style = _SW_LINE_CENTER
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="front view slot centreline")
+    if int(segment.Color) != 0 or int(segment.Style) != _SW_LINE_CENTER:
+        raise RuntimeError(
+            "slot centreline did not keep black centreline font: "
+            f"color={int(segment.Color)}, style={int(segment.Style)}"
+        )
+    _assert_centreline_placed(adapter, centerline, points)
+    _telemetry.info(
+        f"front view slot centreline drawn {ends[0]!r} -> {ends[1]!r} "
+        f"(view sketch {points[0]!r} -> {points[1]!r})"
+    )
+
+
+def _assert_centreline_placed(
+    adapter: Any, segment: Any, points: list[tuple[float, ...]]
+) -> None:
+    """Fail when the centreline's endpoints are not where they were authored
+    (draw_pn_pen_v_block ``_assert_centreline_placed``)."""
+    line = _early_bound(segment, "ISketchLine")
+    for expected, accessor in zip(points, ("GetStartPoint2", "GetEndPoint2")):
+        point = _early_bound(adapter._get_attr_or_call(line, accessor), "ISketchPoint")
+        actual = [
+            float(adapter._get_attr_or_call(point, axis)) for axis in ("X", "Y", "Z")
+        ]
+        drift = max(abs(a - b) for a, b in zip(actual, expected))
+        if drift > 1e-9:
+            raise RuntimeError(
+                f"slot centreline {accessor[3:-6].lower()} point sits "
+                f"{drift * 1000.0:.4g} mm from where it was authored "
+                f"({actual} instead of {list(expected)})"
+            )
+
+
+def screw_hole_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """Put DRILL after the screw hole's one native diameter variable."""
+    if set(definitions) != set(_DEFINITION_TO_WRITABLE):
+        raise RuntimeError(f"unexpected screw-hole callout parts: {definitions!r}")
+    joined = "\n".join(definitions.values())
+    if joined.count(_SCREW_HOLE_DIAMETER) != 1 or SCREW_HOLE_PROCESS in joined:
+        raise RuntimeError(f"screw-hole callout lacks one bare diameter: {definitions!r}")
+    return {
+        part: text.replace(
+            _SCREW_HOLE_DIAMETER, f"{_SCREW_HOLE_DIAMETER} {SCREW_HOLE_PROCESS}"
+        )
+        for part, text in definitions.items()
+    }
+
+
+def _set_screw_hole_callout_text(display: Any) -> None:
+    """Write the size-first definitions, prove they persisted and resolved."""
+    native = _early_bound(display, "IDisplayDimension")
+    definitions = {
+        part: str(native.GetText(part) or "") for part in _DEFINITION_TO_WRITABLE
+    }
+    updated = screw_hole_callout_definitions(definitions)
+    for definition_part, writable_part in _DEFINITION_TO_WRITABLE.items():
+        if updated[definition_part] != definitions[definition_part]:
+            native.SetText(writable_part, updated[definition_part])  # void return
+    persisted = {
+        part: str(native.GetText(part) or "") for part in _DEFINITION_TO_WRITABLE
+    }
+    resolved = "\n".join(
+        str(native.GetText(part) or "") for part in _DEFINITION_TO_WRITABLE.values()
+    )
+    if (
+        persisted != updated
+        or resolved.count(f" {SCREW_HOLE_PROCESS}") != 1
+        or resolved.lstrip().startswith(SCREW_HOLE_PROCESS)
+    ):
+        raise RuntimeError(
+            "screw-hole callout text did not persist size first: "
+            f"definitions={persisted!r}, resolved={resolved!r}"
+        )
+    _telemetry.info(f"hanger screw-hole callout: {resolved!r}")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -532,7 +679,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "Front View Note",
             "Isometric View Note",
         ),
         required=(
@@ -541,7 +687,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "Front View Note",
             "Isometric View Note",
         ),
     )
@@ -620,6 +765,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _add_overhang_reference(adapter, section)
+    _add_slot_centerline(adapter, front)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the hanger-screw hole")
 
@@ -635,26 +781,15 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         callout_xy=CALLOUT_XY,
         label="hanger-screw clearance hole",
-        process="DRILL",
     )
+    _set_screw_hole_callout_text(screw_callout)
     # The #15 drill's Ø prints .XXX (+.004/0 from the title block).
     set_hole_callout_precision(
         screw_callout, SCREW_HOLE_CALLOUT_PRECISION, label="hanger-screw clearance hole"
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
-    add_property_linked_note(adapter, "Front View Note", *FRONT_NOTE_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
-    # Rule 10: the upper plate's lateral station is the lower plate's, said
-    # on section A-A where the plate shows in plan beside its overhang.
-    add_leader_note(
-        adapter,
-        UPPER_PLATE_LOCATION_CALLOUT,
-        text_xy=UPPER_PLATE_NOTE_XY,
-        attach_xy=UPPER_PLATE_NOTE_TIP,
-        label="upper guide plate in line with the lower",
-        view=section,
-    )
 
     return await finalize_drawing(
         adapter,
