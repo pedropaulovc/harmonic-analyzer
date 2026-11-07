@@ -452,11 +452,8 @@ def _farm_command(command_class, display_name: str | None = None):
                     raise FarmPreflightError(str(exc)) from None
                 if display_name is not None:
                     os.environ["HARMONIC_FARM_DISPLAY_NAME"] = label
-                admitted, pool_identity = _require_leaf_admission(control)
-                if pool_identity is None:
-                    _farm_preflight()
-                else:
-                    _farm_preflight(pool_identity=pool_identity)
+                admitted = _require_leaf_admission(control)
+                _farm_preflight()
                 # No producer registration or build ID exists until every
                 # preflight passes.
             except BaseException as problem:
@@ -586,8 +583,8 @@ def _dirty_submodules() -> list[str]:
     return dirty
 
 
-def _farm_preflight(*, pool_identity: tuple[str, str] | None = None) -> None:
-    """Validate local inputs, fleet protocol/identity, and stamp committed HEAD."""
+def _farm_preflight() -> None:
+    """Validate local inputs and fleet protocol, and stamp committed HEAD."""
     status = _git("status", "--porcelain=v1", "--untracked-files=all")
     dirty = [line[3:] for line in status.splitlines()] + _dirty_submodules()
     if dirty:
@@ -610,9 +607,7 @@ def _farm_preflight(*, pool_identity: tuple[str, str] | None = None) -> None:
     if not _artifact_cache.enabled():
         raise FarmPreflightError("HARMONIC_REMOTE_CACHE_MODE must be ro or rw")
 
-    _require_fleet_protocol(
-        _pool_home(), _farm.FARM_PROTOCOL_VERSION, pool_identity=pool_identity
-    )
+    _require_fleet_protocol(_pool_home(), _farm.FARM_PROTOCOL_VERSION)
     os.environ["HARMONIC_FARM_COMMIT"] = sha
     os.environ["HARMONIC_SW_AUTOSTART"] = "0"
 
@@ -623,9 +618,7 @@ def _pool_home() -> Path:
     )
 
 
-def _require_leaf_admission(
-    control: TaskControl,
-) -> tuple[list[str], tuple[str, str] | None]:
+def _require_leaf_admission(control: TaskControl) -> list[str]:
     """Check would-be leaves, not local/aggregate tasks, against the selected pool."""
     tasks = sorted(
         task.name
@@ -636,7 +629,7 @@ def _require_leaf_admission(
         )
     )
     if not tasks:
-        return [], None
+        return []
     pool = _pool_home().resolve()
     missing = [
         str(path.relative_to(pool))
@@ -661,13 +654,9 @@ def _require_leaf_admission(
         "    spec.loader.exec_module(module)\n"
         "    return module\n"
         "protocol = load('pool_protocol', pool / 'agent' / 'protocol.py')\n"
-        "contract = load('pool_contract', pool / 'agent' / 'contract.py')\n"
-        "identity = protocol.agent_identity(pool / 'agent')\n"
         "tasks = json.load(sys.stdin)\n"
         "print(json.dumps({\n"
         "    'refused': [task for task in tasks if not protocol.leaf_admitted(task)],\n"
-        "    'agent_identity': identity,\n"
-        "    'agent_version': contract.agent_identity_tag(identity),\n"
         "}))\n"
     )
     argv = [
@@ -710,15 +699,9 @@ def _require_leaf_admission(
     if not isinstance(response, dict):
         raise FarmPreflightError("pool leaf admission returned an invalid response")
     refused = response.get("refused")
-    identity = response.get("agent_identity")
-    version = response.get("agent_version")
     if (
         not isinstance(refused, list)
         or any(not isinstance(task, str) or task not in tasks for task in refused)
-        or not isinstance(identity, str)
-        or not identity
-        or not isinstance(version, str)
-        or not version
     ):
         raise FarmPreflightError("pool leaf admission returned an invalid response")
     if refused:
@@ -729,7 +712,7 @@ def _require_leaf_admission(
                 for task in sorted(set(refused))
             )
         )
-    return tasks, (identity, version)
+    return tasks
 
 
 def _pool_farm(pool: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -791,34 +774,8 @@ def _dissenting_workers(reports: object, protocol: int) -> list[str]:
     return sorted(named)
 
 
-def _require_fleet_identity(summary: dict, pool_identity: tuple[str, str]) -> None:
-    """Match the pool's canonical tag to identities already reported by workers."""
-    identity, version = pool_identity
-    # agents --json exposes deployed identity tags as agent_version, not the
-    # release's full agent_identity_sha256. Use the pool's own tag normalizer.
-    reports = summary["workers"] or summary["ignored"]
-    counts: dict[str, int] = {}
-    for worker in reports:
-        reported = worker.get("agent_version") if isinstance(worker, dict) else None
-        tag = reported if isinstance(reported, str) and reported else "<unreported>"
-        counts[tag] = counts.get(tag, 0) + 1
-    if not reports or any(tag != version for tag in counts):
-        raise FarmPreflightError(
-            f"PoolHome agent identity {identity} (agent_version {version}) "
-            "does not match reported fleet identities:\n"
-            + "\n".join(
-                f"  {tag}: {count} worker(s)"
-                for tag, count in sorted((counts or {"<unreported>": 0}).items())
-            )
-            + "\nCheck out the deployed pool release at PoolHome, "
-            "or finish the rollout."
-        )
-
-
-def _require_fleet_protocol(
-    pool: Path, protocol: int, *, pool_identity: tuple[str, str] | None = None
-) -> None:
-    """Stop unless the fleet supports the protocol and selected admission rule."""
+def _require_fleet_protocol(pool: Path, protocol: int) -> None:
+    """Stop unless the fleet supports the required protocol."""
     result = _pool_farm(pool, "agents", "--json")
     lines = [line for line in result.stdout.splitlines() if line.strip()]
     if result.returncode != 0 or not lines:
@@ -834,8 +791,6 @@ def _require_fleet_protocol(
                 f"{lines[-1][:200]}"
             )
         raise FarmPreflightError(report)
-    if pool_identity is not None:
-        _require_fleet_identity(summary, pool_identity)
     workers = summary["workers"]
     fresh = sum(
         1 for worker in workers if isinstance(worker, dict) and worker.get("fresh")

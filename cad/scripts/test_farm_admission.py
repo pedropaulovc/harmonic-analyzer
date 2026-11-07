@@ -59,9 +59,7 @@ def admission(tmp_path, monkeypatch):
 
     monkeypatch.setattr(build, "_pool_farm", forbidden)
     monkeypatch.setattr(_farm, "run_leaf", forbidden)
-    monkeypatch.setattr(
-        build, "_farm_preflight", lambda **_kwargs: events.append("preflight")
-    )
+    monkeypatch.setattr(build, "_farm_preflight", lambda: events.append("preflight"))
     monkeypatch.setattr(
         _farm, "_build_id", lambda: events.append("mint") or "fixture-id"
     )
@@ -98,7 +96,7 @@ def admission(tmp_path, monkeypatch):
 
     monkeypatch.setattr(_doit_cmd_base, "JsonDB", MemoryJsonDB)
 
-    def pool(name="selected-pool", accepted=(), protocol=None, identity="a" * 64):
+    def pool(name="selected-pool", accepted=(), protocol=None):
         home = tmp_path / name
         package = home / "agent"
         package.mkdir(parents=True)
@@ -106,10 +104,6 @@ def admission(tmp_path, monkeypatch):
         (home / "pyproject.toml").write_text(
             '[project]\nname = "admission-fixture-pool"\nversion = "0.0.0"\n'
             'requires-python = ">=3.12,<3.15"\n[tool.uv]\npackage = false\n',
-            encoding="utf-8",
-        )
-        (package / "contract.py").write_text(
-            "def agent_identity_tag(identity):\n    return 'fixture-' + identity[:8]\n",
             encoding="utf-8",
         )
         if protocol is None:
@@ -122,7 +116,6 @@ def admission(tmp_path, monkeypatch):
                 "        log.write(json.dumps(task) + '\\n')\n"
                 "    return task in json.loads((HOME / 'rule.json').read_text(encoding='utf-8'))\n"
             )
-        protocol += f"\ndef agent_identity(_directory):\n    return {identity!r}\n"
         (package / "protocol.py").write_text(protocol, encoding="utf-8")
         monkeypatch.setenv("SOLIDWORKS_POOL_HOME", str(home))
         return home
@@ -479,9 +472,7 @@ def test_pool_import_or_rule_failure_is_fail_closed(admission, capsys, protocol)
         "[17]",
         '["unselected:probe"]',
         "noise\n[]",
-        '{"refused":["unselected:probe"],"agent_identity":"id","agent_version":"tag"}',
-        '{"refused":[],"agent_identity":"","agent_version":"tag"}',
-        '{"refused":[],"agent_identity":"id","agent_version":null}',
+        '{"refused":["unselected:probe"]}',
     ],
     ids=[
         "empty",
@@ -493,8 +484,6 @@ def test_pool_import_or_rule_failure_is_fail_closed(admission, capsys, protocol)
         "noncandidate",
         "noise",
         "foreign-task",
-        "missing-identity",
-        "missing-tag",
     ],
 )
 def test_invalid_pool_response_is_fail_closed(admission, monkeypatch, capsys, stdout):
@@ -555,105 +544,6 @@ def test_nonzero_admission_exit_does_not_trust_successful_looking_stdout(
     _assert_no_ownership_or_actions(admission)
 
 
-def _identity_fleet(versions, *, ignored=()):
-    def worker(index, version):
-        return {
-            "worker_id": f"worker-{index}",
-            "agent_version": version,
-            "farm_protocol_version": 5,
-            "fresh": True,
-        }
-
-    return {
-        "farm_protocol_version": 5,
-        "verdict": "matched",
-        "workers": [worker(i, version) for i, version in enumerate(versions)],
-        "ignored": [worker(i, version) for i, version in enumerate(ignored)],
-        "fresh_within_s": 120,
-        "evidence_horizon_s": 1209600,
-    }
-
-
-@pytest.mark.parametrize(
-    "versions",
-    [["fixture-bbbbbbbb"], ["fixture-aaaaaaaa", "fixture-bbbbbbbb"], [None], []],
-    ids=["different", "mixed", "missing", "unreported"],
-)
-def test_admitted_pool_rule_is_refused_when_deployed_identity_does_not_match(
-    admission, monkeypatch, capsys, versions
-):
-    home = admission.pool(accepted=["features:probe"])
-    admission.install(
-        {"features:probe": {"actions": [admission.action("features:probe")]}}
-    )
-    queried = []
-
-    def agents(pool, *args):
-        queried.append((pool, args))
-        return subprocess.CompletedProcess(
-            [], 0, json.dumps(_identity_fleet(versions)), ""
-        )
-
-    monkeypatch.setattr(build, "_pool_farm", agents)
-    monkeypatch.setattr(
-        build,
-        "_farm_preflight",
-        lambda **kwargs: build._require_fleet_protocol(home, 5, **kwargs),
-    )
-    assert admission.run("features:probe") == 2
-    error = capsys.readouterr().err
-    assert "PoolHome agent identity " + "a" * 64 in error
-    assert "agent_version fixture-aaaaaaaa" in error
-    assert "reported fleet identities" in error
-    for version in set(versions):
-        assert (
-            f"{version or '<unreported>'}: {versions.count(version)} worker(s)" in error
-        )
-    if not versions:
-        assert "<unreported>: 0 worker(s)" in error
-    assert (
-        "Check out the deployed pool release at PoolHome, or finish the rollout."
-        in error
-    )
-    assert queried == [(home, ("agents", "--json"))]
-    assert admission.queried(home) == ["features:probe"]
-    _assert_no_ownership_or_actions(admission)
-
-
-@pytest.mark.parametrize(
-    ("versions", "ignored"),
-    [
-        (["fixture-aaaaaaaa", "fixture-aaaaaaaa"], []),
-        ([], ["fixture-aaaaaaaa"]),
-        (["fixture-aaaaaaaa"], ["fixture-bbbbbbbb"]),
-    ],
-    ids=["matching", "last-report", "obsolete-report-ignored"],
-)
-def test_pool_identity_uses_existing_fleet_query_and_pool_canonical_tag(
-    admission, monkeypatch, versions, ignored
-):
-    home = admission.pool(accepted=["features:probe"])
-    control = build._validate_farm_selection(
-        [Task("features:probe", [admission.action("features:probe")])],
-        ["features:probe"],
-    )
-    labels, identity = build._require_leaf_admission(control)
-    assert labels == ["features:probe"]
-    assert identity == ("a" * 64, "fixture-aaaaaaaa")
-    queries = []
-
-    def agents(pool, *args):
-        queries.append((pool, args))
-        return subprocess.CompletedProcess(
-            [], 0, json.dumps(_identity_fleet(versions, ignored=ignored)), ""
-        )
-
-    monkeypatch.setattr(build, "_pool_farm", agents)
-    build._require_fleet_protocol(home, 5, pool_identity=identity)
-    assert queries == [(home, ("agents", "--json"))]
-    assert admission.events == []
-
-
 @pytest.mark.parametrize("missing", ["pyproject.toml", "agent/protocol.py"])
 def test_missing_pool_admission_files_are_refused_before_starting_uv(
     admission, monkeypatch, capsys, missing
@@ -709,9 +599,8 @@ def leaf_admitted(task):
         [Task("features:fixture-ok", [admission.action("features:fixture-ok")])],
         ["features:fixture-ok"],
     )
-    labels, identity = build._require_leaf_admission(control)
+    labels = build._require_leaf_admission(control)
     assert labels == ["features:fixture-ok"]
-    assert identity == ("a" * 64, "fixture-aaaaaaaa")
     runtime = json.loads((home / "runtime.json").read_text(encoding="utf-8"))
     assert Path(runtime["cwd"]).resolve() == home.resolve()
     assert Path(runtime["prefix"]).resolve() == (home / ".venv").resolve()
