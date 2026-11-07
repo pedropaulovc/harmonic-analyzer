@@ -44,7 +44,7 @@ from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _machinist_review_mode import MachinistReviewMode
 from _ms_drawing_contract import assert_manufacturing_dimensions
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from solidworks_mcp.adapters.solidworks.drawing import add_note, auto_center_marks, place_view
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -71,22 +71,25 @@ FRONT_KEEP = {
 }
 # Text left of the thin edge view, so neither witness line strikes it.
 RIGHT_KEEP = {"PlateThickness": (0.327, 0.225)}
-# Rule 7: the three hole locations carry their value and band only; the mate
-# they serve is named once, on the hole callout below.
-DIMENSION_CALLOUTS = {
-    # The thickness band sets the plate screws' reach into the blind taps.
-    "PlateThickness": f"SETS SCREW REACH IN\n{_config.parts('ms-stop-block')['number']} TAPS",
-}
-# The three-row callout is wider than the room between the .56 witnesses, so
-# it sits below the cover face, left of the hole-station texts.
-CLEARANCE_CALLOUT_XY = (0.075, 0.100)
-# The matched pair, its alignment and its acceptance in two lines of words
-# (rule 7), under the native size; the pilot-and-open sequence is the
-# assembly sheet's step 1.
-CLEARANCE_FUNCTION = (
-    f"MATCHED PAIR WITH {_config.parts('ms-stop-block')['number']}: LOCATING\n"
-    "ENDS AND EDGES FLUSH, SCREWS ENTER FREELY"
+# Rule 4: the matched pair, its screws and the thickness that sets their reach
+# are named once, in note 1; the thickness and the hole callout link it, and
+# the three hole locations carry only their value (title block .XXX).
+NOTE_NUMBER = 1
+NOTE_LINK = f"SEE NOTE {NOTE_NUMBER}"
+DIMENSION_CALLOUTS = {"PlateThickness": NOTE_LINK}
+# The pilot-and-open sequence is the assembly sheet's step 1.
+MATCHED_PAIR_NOTE = (
+    f"{NOTE_NUMBER}. MATCHED PAIR WITH {_config.parts('ms-stop-block')['number']} STOP BLOCK:"
+    f" {part.MATCH_DRILL_DATUM_ALIGNMENT}.\n"
+    f"    2X {_config.parts('ms-vn-stop-plate-screw')['number']} SCREWS ENTER FREELY;"
+    f" THICKNESS SETS THEIR REACH IN\n"
+    f"    {_config.parts('ms-stop-block')['number']} TAPS."
 )
+# Upper-left corner of the note: the open top-left field, as on MHA-MS-02.
+MATCHED_PAIR_NOTE_XY = (0.020, 0.262)
+# The size rows are wider than the room between the .56 witnesses, so the
+# callout sits below the cover face, left of the hole-station texts.
+CLEARANCE_CALLOUT_XY = (0.075, 0.100)
 CLEARANCE_PRECISION = {"hw-diam": part.HOLE_CALLOUT_PRECISION}
 # Leadered labels name the X=0 end and Y=0 edge the match-drill clamp aligns.
 # Note positions are the text's upper-left corner.
@@ -190,7 +193,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # the native callout prints 2X Ø.094 THRU with no process word ahead of it.
     clearance = add_native_hole_callout(adapter, front, edge_xy=edge, callout_xy=CLEARANCE_CALLOUT_XY,
                                         label="two cover clearance holes")
-    _append_callout_lines(clearance, CLEARANCE_FUNCTION)
+    _append_callout_lines(clearance, NOTE_LINK)
     set_hole_callout_precision(clearance, CLEARANCE_PRECISION, label="two cover clearance holes")
     _outside_arrow(clearance)
     _label_locating_edges(adapter, front)
@@ -201,14 +204,14 @@ async def build(adapter: Any) -> dict[str, str]:
         part.PLATE_DRAWING_PRECISION_BY_NAME,
         bands={
             "PlateThickness": (-part.PLATE_THICKNESS_TOLERANCE_MM, part.PLATE_THICKNESS_TOLERANCE_MM),
-            **{name: (-part.PLATE_HOLE_POSITION_TOLERANCE_MM, part.PLATE_HOLE_POSITION_TOLERANCE_MM)
-               for name in part.PLATE_LOCATION_DIMENSIONS},
         },
         angular=frozenset({"RoofChamferAngle"}),
     )
     for view in (front, right):
         set_hidden_lines_removed(adapter, view)
     add_property_linked_note(adapter, "Isometric View Note", ISO_CENTER[0] - 0.030, 0.124)
+    if add_note(adapter, MATCHED_PAIR_NOTE, *MATCHED_PAIR_NOTE_XY) is None:
+        raise RuntimeError("failed to add the stop plate matched-pair note")
     return await finalize_drawing(adapter, OUTPUTS,
                                   pdf_title="Measuring Stick Stop Plate Manufacturing Drawing",
                                   scale=SHEET_SCALE, layout=SPEC.layout)

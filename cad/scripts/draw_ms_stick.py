@@ -74,9 +74,9 @@ FRONT_CENTER = (0.155, 0.175)
 TOP_CENTER = (FRONT_CENTER[0], 0.110)
 # r2-r3 sheet 1: the 8.00 dimension line's tail touched the isometric at x 0.335.
 ISO_CENTER = (0.355, 0.145)
-# Upper-left of sheet 1's numbered notes: under the bottom view, its longest
-# line ending left of the title block.
-NOTES_XY = (0.020, 0.085)
+# Upper-left of sheet 1's numbered notes: under the bottom view and the
+# isometric label, the four lines ending above the title block.
+NOTES_XY = (0.020, 0.092)
 # Each detail's parent on sheets 2-4 is a 1:2 copy of a sheet 1 view: its
 # label's upper-left sits this far left of and below the copy's centre, so
 # the label centres under the bar, clear of its edge (rule 9).
@@ -96,21 +96,23 @@ DEPTH_SCALE = (15.0, 1.0)
 DEPTH_RADIUS_MM = 1.6
 NUMERAL_PARENT_CENTER = (0.130, 0.210)
 # r4 sheet 4: full-tick-end callout starts 62 mm left of its placement.
-# Shift the entire detail/dimension group right without changing its scale.
-NUMERAL_CENTER = (0.165, 0.135)
+# The detail/dimension group sits as far left as its 10X/11X texts allow, so
+# the NUMERALS V callout fits between its circle and G-G.
+NUMERAL_CENTER = (0.153, 0.135)
 # The fence includes the real full-tick endpoint and both numeral gap anchors.
 NUMERAL_RADIUS_MM = 7.0
 # Detail H, on the same parent: the 10 sits on the -X side of the last full
 # tick, so its tick-edge gap gets its own detail (rule 26: a location is a
 # dimension). The fence holds the whole 10, the tick's end and the gap; the
-# detail sits in the free corner under detail F's dimensions.
+# detail sits in the free corner under detail F's dimensions, its SCALE line
+# clear of the border (round 1 put it on the border).
 NUMERAL_10_MODEL_CENTER = (
     part.SCALE_START_X + part.SCALE_SPAN - 1.2,
     part.BODY_WIDTH - part.TICK_LENGTH - part.NUMERAL_GAP_MM - 0.6,
 )
 NUMERAL_10_RADIUS_MM = 2.6
-NUMERAL_10_CENTER = (0.060, 0.052)
-NUMERAL_10_KEEP = {"Numeral10XGap": (0.050, 0.078)}
+NUMERAL_10_CENTER = (0.060, 0.074)
+NUMERAL_10_KEEP = {"Numeral10XGap": (0.050, 0.100)}
 # A 1:1 parent spreads the across-the-bar cutting line (and its two arrows)
 # over a readable 11 mm instead of a 1:2 nick.
 NUMERAL_PROFILE_PARENT_CENTER = (0.200, 0.250)
@@ -168,15 +170,15 @@ LENGTH_DETAILS = (
 )
 EXACT_FENCES = frozenset({"D", "H"})
 NUMERAL_KEEP = {
-    "NumeralHeight": (0.215, 0.183),
-    "NumeralXGap": (0.100, 0.170),
-    "NumeralYGap": (0.100, 0.155),
+    "NumeralHeight": (0.203, 0.183),
+    "NumeralXGap": (0.088, 0.170),
+    "NumeralYGap": (0.088, 0.155),
 }
 # Text centre high enough that the shoulder under its last line clears the
 # top of SECTION G-G (machinist review, run 20261023T231808846Z-1d2625e9).
 DEPTH_KEEP = {"TickDepth": (0.380, 0.188)}
 # Text centre: the block ends left of G-G, its underside dimension line at the V.
-NUMERAL_DEPTH_KEEP = {"NumeralDepth": (0.235, 0.138)}
+NUMERAL_DEPTH_KEEP = {"NumeralDepth": (0.229, 0.138)}
 
 
 @_telemetry.traced("drawing.ms_ruled_face")

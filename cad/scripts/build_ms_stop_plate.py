@@ -97,11 +97,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, "Plate", "PlateThickness", spec.PLATE_THICKNESS_TOLERANCE_MM,
         display_unit=spec.UNIT,
     )
-    for name in spec.PLATE_LOCATION_DIMENSIONS:
-        set_dimension_symmetric_tolerance(
-            adapter, "PlateLocationReference", name, spec.PLATE_HOLE_POSITION_TOLERANCE_MM,
-            display_unit=spec.UNIT,
-        )
     clear_dimensions_for_drawing(adapter)
     for feature, names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature, names)

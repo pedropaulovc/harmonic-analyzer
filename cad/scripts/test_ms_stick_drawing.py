@@ -273,6 +273,11 @@ def test_printed_pitches_agree_across_all_calibrated_subdivisions() -> None:
     assert (spec.DIVISION_SPACING, spec.MINOR_SPACING) == (14.2, 1.42)
     for index in range((spec.DIVISION_COUNT - 1) * spec.MINOR_PER_DIVISION + 1):
         assert abs(index * spec.MINOR_SPACING / 25.4 - index * minor) <= band, index
+    # Rule 10: each pitch counts its equal spaces from zero over the same span.
+    full_count = int(callouts.PREFIXES["FullTickPitch"].rstrip("X "))
+    minor_count = int(callouts.PREFIXES["MinorTickPitch"].rstrip("X "))
+    assert full_count * spec.DIVISION_SPACING == pytest.approx(spec.SCALE_SPAN)
+    assert minor_count * spec.MINOR_SPACING == pytest.approx(spec.SCALE_SPAN)
 
 
 def test_engraving_sizes_are_min_limits_and_graduation_depth_keeps_its_stock() -> None:
@@ -1191,8 +1196,7 @@ def _imported(monkeypatch, displays):
 def test_drawing_reads_back_part_callouts_and_min_limit_types(monkeypatch) -> None:
     good = {name: _TextDisplay(text.replace("\n", "\r\n")) for name, text in callouts.CALLOUTS.items()}
     for name, prefix in callouts.PREFIXES.items():
-        good[name] = _TextDisplay()
-        good[name].SetText(callouts.PREFIX, prefix)
+        good.setdefault(name, _TextDisplay()).SetText(callouts.PREFIX, prefix)
     drawing._assert_imported_text_and_limits(None, _imported(monkeypatch, good))
     with pytest.raises(RuntimeError, match="differ from the part"):
         drawing._assert_imported_text_and_limits(
