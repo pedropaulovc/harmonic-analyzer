@@ -1969,7 +1969,11 @@ async def _build_reference_sheet(
                 raise RuntimeError(f"{label}: cannot restore sheet context for footer")
         for view, (name, center, cell) in zip(views, cells, strict=True):
             view_scale = scales[name]
-            caption = f"{name[1:].upper()}  {view_scale[0]}:{view_scale[1]}"
+            caption = name[1:].upper()
+            # ASME Y14.3: a view states its scale only when it differs from
+            # the sheet's (the title block); the owner flagged the repeat.
+            if view_scale != scale:
+                caption += f"  {view_scale[0]}:{view_scale[1]}"
             if spring and name == "*Front":
                 caption += "  (SHOWN AT INSTALLED LENGTH)"
             # Under the view itself, not the cell's floor: a short view in a

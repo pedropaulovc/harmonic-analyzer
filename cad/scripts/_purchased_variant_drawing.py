@@ -465,7 +465,11 @@ async def _draw_purchased_variants(
         placed.append((note, caption, caption, caption_cell))
         for view, (orientation, center, cell) in zip(views, cells, strict=True):
             scale = scales[orientation]
-            caption = f"{orientation[1:].upper()}  {scale[0]}:{scale[1]}"
+            caption = orientation[1:].upper()
+            # ASME Y14.3: state a view's scale only when it differs from the
+            # sheet's. The sheet takes the first member's FRONT scale.
+            if sheet_scale is None or scale != sheet_scale:
+                caption += f"  {scale[0]}:{scale[1]}"
             floor = cell[1]
             if not center_marks[orientation]:
                 floor = max(_box(view.GetOutline(), label=orientation)[1], floor)
