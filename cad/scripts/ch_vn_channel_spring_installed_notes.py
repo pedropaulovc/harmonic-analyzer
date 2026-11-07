@@ -1,6 +1,6 @@
 """Purchased reference-sheet notes for the 9432K31 channel spring.
 
-The sheet's footer holds at most four note lines (drawing-guidelines rule 7):
+The sheet's footer holds at most three note lines (drawing-guidelines rule 7):
 the matched-set acceptance only.  The catalogue's +/-10% rate band is too wide
 for channel consistency, so the springs are bought as one lot and the set is
 selected by measured rate (tolerance-policy.md, spring rate); the ITEM row
@@ -33,12 +33,11 @@ QC_LOADS_LB = tuple(round(channel_force_n(length) / _LB_N, 1) for length in QC_L
 
 DRAWING_NOTES = "\n".join(
     (
-        f"MATCHED SET: ORDER {_ORDER_QUANTITY} FROM ONE LOT. HANG EACH FROM A PIN AND "
-        "CALIPER",
-        f"ITS INSIDE-HOOK LENGTH UNDER {QC_LOADS_LB[0]:.1f} LB, THEN UNDER "
-        f"{QC_LOADS_LB[1]:.1f} LB (SAME WEIGHTS",
-        f"FOR EVERY SPRING). KEEP {_MATCHED_SET_SIZE} WHOSE LENGTH CHANGE IS WITHIN "
-        f"\u00b1{_MATCH_TOLERANCE_PERCENT:.2f}% OF",
-        "THEIR MEAN.",
+        f"MATCHED SET: ORDER {_ORDER_QUANTITY} FROM ONE LOT. HANG EACH FROM A PIN; "
+        "CALIPER THE",
+        f"INSIDE-HOOK LENGTH UNDER {QC_LOADS_LB[0]:.1f} LB, THEN "
+        f"{QC_LOADS_LB[1]:.1f} LB (SAME WEIGHTS FOR ALL).",
+        f"KEEP {_MATCHED_SET_SIZE} WHOSE LENGTH CHANGE IS WITHIN "
+        f"\u00b1{_MATCH_TOLERANCE_PERCENT:.2f}% OF THEIR MEAN.",
     )
 )

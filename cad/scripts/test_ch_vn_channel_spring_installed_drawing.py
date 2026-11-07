@@ -6,6 +6,7 @@ import math
 
 import ch_vn_channel_spring_installed_notes as notes
 import ch_vn_channel_spring_installed_spec as spec
+from _purchased_fastener_drawing import note_lines
 from spring_mount_geom import channel_force_n
 
 
@@ -30,8 +31,9 @@ def test_matched_set_loads_stretch_a_catalogue_spring_to_the_qc_lengths() -> Non
         assert abs(stretched - length) < 1.0
         assert spec.FREE_LENGTH_MM < stretched < spec.MAX_LENGTH_MM
         assert load_lb * lb < spec.MAXIMUM_LOAD_N
-    assert all(len(line) <= 70 for line in notes.DRAWING_NOTES.splitlines())
-    assert len(notes.DRAWING_NOTES.splitlines()) <= 4
+    # The purchased-sheet footer's rule-7 budget, which raises on the farm.
+    lines = note_lines(notes.DRAWING_NOTES, label="channel spring")
+    assert all(len(line) <= 70 for line in lines), lines
 
 
 def test_source_gauges_preserve_exact_values_and_supplier_spelling() -> None:
