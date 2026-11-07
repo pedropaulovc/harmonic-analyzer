@@ -73,20 +73,6 @@ PLAN_KEEP = {
     # hides only the display after the spec-generated note passes readback.
     'TapDrillDia':(.071,.2455),
 }
-# TL-22 and TL-32 share this top tier (machinist review of c40296ac, TL-32
-# sheet 1; TL-22's PDF placed it identically). With the value over its
-# reason, the two rows were centred at (240, 258.5) mm, right of the 1.64 at
-# its own height. Their underline sat on the y253.5 dimension line, so the
-# leader ran from mid-span along the line, through its right arrowhead and
-# across the right extension line. The 13 mm under the border cannot hold two
-# rows plus a clear rise, so the reason prints on the value's row
-# ("1.64 SETS COUNTERBORE END WALL": about 82 mm at that PDF's 2.74 mm a
-# character, in a 6.38 mm row). The row is centred so it spans x 162..244
-# and y 257.8..264.2: 5 mm right of the x157 cutting line, 2.5 mm under the
-# border, and its underline about 5 mm over the dimension line. The leader
-# then rises steeply above the span, clear of both extension lines and the
-# arrowheads.
-BLOCK_LENGTH_TEXT_XY = (.203,.261)
 ROW_DIMENSIONS = ('CarriageDrills3Y','CarriageDrills4Y')
 # A-A remains below the plan, top face up. Its depth text stays outboard
 # left of the dimension line; the baseline and actual section span come
@@ -97,9 +83,9 @@ SIDE_KEEP = {'TopBoreDepth':(.120,.088)}
 # Right view level with the plan: neither its B-B nor its A-A ever imported a
 # full-height dimension (farm rounds 1 to 9), though TL-32's B-B does. Top
 # face toward the plan (x 283), bottom at x 307, between the plan's 1.58
-# callout (ends ~x 277) and the pictorial (from ~x 311); the height prints
-# under it, clear of the 4X COUNTERBORE callout at y 150.
-RIGHT_XY = (.300,PLAN_XY[1])  # 5 mm clear of the plan's SETS COUNTERBORE row
+# (ends ~x 277) and the pictorial (from ~x 311); the height prints under it,
+# clear of the 4X counterbore callout at y 150.
+RIGHT_XY = (.300,PLAN_XY[1])
 RIGHT_KEEP = {'BlockHeight':(.300,.176)}
 SEAT_DEPTH_TEXT_XY = (.078,.104)
 # B-B: Y up, its +Y face (Y 20) at y 142.5, Z across with the top face toward
@@ -107,11 +93,10 @@ SEAT_DEPTH_TEXT_XY = (.078,.104)
 # above the title block (at y 122.5 TL-22's SCALE row met it, farm run
 # 20261027T181901497Z). Under the view, the 24.30 met the SECTION B-B
 # caption on TL-32 (farm run 20261027T171931429Z). Above it, the floor's
-# value and its two-row note stand right of x 353, clear of the block
-# height's extension lines (x 322.85, 347.15); the dimension line underlines
-# the last row, ~8.3 mm under the value's anchor, so the anchor stands
-# 13.5 mm over the +Y face (at 8.5 mm the line ran along the face, farm run
-# 20261027T181901497Z).
+# value and its one-row note stand right of x 353, clear of the block
+# height's extension lines (x 322.85, 347.15); the anchor stands 13.5 mm
+# over the +Y face (at 8.5 mm, with a two-row note, the dimension line ran
+# along the face, farm run 20261027T181901497Z).
 FLOOR_XY = (.335,.1225)
 FLOOR_KEEP = {'CboreFloor':(.380,.156)}
 FEED_FLOOR_KEEP = FLOOR_KEEP | {'SectionBlockHeight':(.335,.172)}
@@ -169,7 +154,7 @@ NUT_KEEP = {
 }
 NUT_CAPTION = 'VIEW D'
 NUT_CAPTION_XY = (.178,.058)  # the note's left edge; centred under the view
-# TL-32's cut-face sections hang their captions 6 mm under the face.
+# B-B hangs its caption 6 mm under its -Y face.
 SECTION_CAPTION_GAP = .006
 NUT_CALLOUT_XY = (.112,.165)
 NUT_ISO_XY = (.380,.215)
@@ -465,33 +450,74 @@ def _set_arrow_side(adapter, annotations, names, side) -> None:
 
 
 # swDimensionTextParts_e (swconst.tlb, SOLIDWORKS 3DEXPERIENCE R2026x, read
-# 2026-11-07): swDimensionTextSuffix = 2, swDimensionTextCalloutBelow = 4.
-_TEXT_SUFFIX = 2
-_TEXT_CALLOUT_BELOW = 4
+# 2026-11-07): swDimensionTextPrefix = 1, swDimensionTextSuffix = 2,
+# swDimensionTextCalloutAbove = 3, swDimensionTextCalloutBelow = 4.
+TEXT_PARTS = {'prefix': 1, 'suffix': 2, 'above': 3, 'below': 4}
+PIVOT_SCREW_NUMBER = 'MHA-CH-06-TL-VN-77'
+CARRIAGE_NUMBER = 'MHA-CH-06-TL-VN-83'  # the rail kit's Carriage member
 
 
-@_telemetry.traced("drawing.block_callout_to_value_row", label_param="name")
-def _inline_below_callout(adapter, annotations, name: str, text: str) -> None:
-    """Move the model's below-callout ``text`` of dimension ``name`` onto its
-    value's row as a suffix. The words and the native value are unchanged;
-    only the row moves. Refuses a callout other than the spec's.
+def _inch_ref(mm: float) -> str:
+    """A three-place inch REF value, ``(.390)``."""
+    return f"({f'{mm / 25.4:.3f}'.lstrip('0')})"
+
+
+# The printed text of the callouts both blocks share, by dimension and text
+# part. The sheet writes every part it prints: the saved models still carry
+# the specs' older CALLOUTS_ABOVE/BELOW (a spec edit re-keys both blocks and
+# every importer), so those constants are superseded here until the next
+# re-key. Machinist review of 957501d1 (TL-22 and TL-32): size, then process,
+# then depth (rule 26), the counterbore by its symbol with its depth as REF
+# against B-B's controlling floor, never deferred to a view (rule 9); each
+# mate once, by its MHA number (rule 4); no reason on an overall size and no
+# second mate name on the seat depth or assembly instruction on the floor
+# (rule 7). The floor keeps the RV-01 fact, worded as RV-01's ``where``.
+_HOLES = f'{len(part.BOLT_POINTS)}X'
+BLOCK_CALLOUTS = {
+    'BoreDia': {'suffix': f' REAM <HOLE-DEPTH> {_inch_ref(part.BORE_DEPTH)}', 'above': '',
+                'below': f'LOCATING FIT ON {PIVOT_SCREW_NUMBER} SHOULDER'},
+    'TapDrillDia': {'suffix': ' DRILL THRU', 'above': '', 'below': f'{part.PIVOT_TAP} UNC THRU'},
+    'CarriageDrills1Dia': {'prefix': f'{_HOLES} <MOD-DIAM>', 'suffix': ' DRILL THRU', 'above': '',
+                           'below': f'MATCHES {CARRIAGE_NUMBER} CARRIAGE'},
+    'CarriageCounterbores3Dia': {'prefix': f'{_HOLES} <HOLE-CBORE><MOD-DIAM>',
+                                 'suffix': f' <HOLE-DEPTH> {_inch_ref(part.CBORE_DEPTH)}',
+                                 'above': '', 'below': ''},
+    'TopBoreDepth': {'below': ''},
+    'CboreFloor': {'below': f'ENGAGES {part.ENGAGEMENT_TEXT} MIN ({part.ENGAGEMENT_DIAMETERS})'},
+    'BlockLength': {'below': ''},
+    'BlockWidth': {'below': ''},
+}
+
+
+def block_callouts(overrides=None) -> dict[str, dict[str, str]]:
+    """``BLOCK_CALLOUTS`` with a sheet's own ``overrides`` merged per
+    dimension: an override replaces only the parts it names."""
+    merged = {name: dict(parts) for name, parts in BLOCK_CALLOUTS.items()}
+    for name, parts in (overrides or {}).items():
+        unknown = sorted(set(parts) - set(TEXT_PARTS))
+        if unknown:
+            raise ValueError(f'{name}: unknown dimension text parts {unknown}')
+        merged.setdefault(name, {}).update(parts)
+    return merged
+
+
+@_telemetry.traced("drawing.block_callouts")
+def _set_callouts(adapter, annotations, callouts: dict[str, dict[str, str]]) -> None:
+    """Write each named dimension's printed text parts and read each back.
 
     COM contract (sldworks.tlb R2026x, IDisplayDimension, audited
     2026-11-07): ``GetText(WhichText: VT_I4) -> VT_BSTR`` and
     ``SetText(WhichText: VT_I4, Text: VT_BSTR) -> VT_VOID``. SetText reports
-    nothing and replaces (never appends to) the part, so both parts are read
-    back and the move is accepted only on the exact pair."""
-    display = _displays(adapter, annotations, (name,))[name]
-    below = str(display.GetText(_TEXT_CALLOUT_BELOW) or '')
-    if below != text:
-        raise RuntimeError(f'{name}: below-callout reads {below!r}, expected {text!r}')
-    suffix = f' {text}'
-    display.SetText(_TEXT_SUFFIX, suffix)
-    display.SetText(_TEXT_CALLOUT_BELOW, '')
-    read = (str(display.GetText(_TEXT_SUFFIX) or ''), str(display.GetText(_TEXT_CALLOUT_BELOW) or ''))
-    if read != (suffix, ''):
-        raise RuntimeError(f'{name}: callout did not move onto the value row, reads {read!r}')
-    rebuild_drawing(adapter, label=f'{name} callout on its value row')
+    nothing and replaces (never appends to) the part, so a part is accepted
+    only when it reads back exactly."""
+    for name, display in _displays(adapter, annotations, tuple(callouts)).items():
+        for part_name, text in callouts[name].items():
+            which = TEXT_PARTS[part_name]
+            display.SetText(which, text)
+            read = str(display.GetText(which) or '')
+            if read != text:
+                raise RuntimeError(f'{name}: {part_name} text reads {read!r}, expected {text!r}')
+    rebuild_drawing(adapter, label='block callouts')
 
 
 def _size_note(adapter, note, height: float, *, label: str) -> None:
@@ -514,23 +540,28 @@ def _section_letter_tops(dr_section) -> list[float]:
     return [info[1], info[4]]
 
 
-def _cut_face_only(adapter, view, letter: str, anchor: tuple[float, float, float],
-                   target: tuple[float, float], caption_top: tuple[float, float],
-                   sheet_scale: tuple[float, float]) -> None:
-    """Print only the cut face (rule 9): on TL-32 a line run past the part
-    also printed the lug or the block beyond the plane, 88 mm tall (farm run
-    20261027T190843112Z). R2026x declares the setter void; only its bool
-    getter is truth-tested (draw_ch_rocker_arm_tl_vn_oblique_leadscrew_kit).
-    The view keeps the place SolidWorks centred on the larger outline, and
-    the centre mark of a hole beyond the plane (farm run
-    20261027T192802646Z), so the marks go and the view moves until the model
-    point ``anchor`` (mm) lands on ``target`` (sheet m)."""
+def _section_with_material_beyond(adapter, view, letter: str, anchor: tuple[float, float, float],
+                                  target: tuple[float, float], caption_top: tuple[float, float],
+                                  sheet_scale: tuple[float, float]) -> None:
+    """Print the cut and the material beyond it in solid lines (rule 9).
+    B-B cuts both -X counterbored holes, each drilled through, so its cut
+    face alone printed three hatched pieces with nothing joining them
+    (machinist review of 957501d1, TL-22 and TL-32). The view looks -X from
+    the -X hole column: beyond it stands only the block's -X end, the whole
+    40 mm outline, and TL-32's lug (X from its .87 face) is behind the plane.
+    R2026x declares the setter void; only its bool getter is truth-tested
+    (draw_ch_rocker_arm_tl_vn_oblique_leadscrew_kit). The view keeps the
+    place SolidWorks centred on the larger outline, and the centre mark of a
+    hole off the plane (farm run 20261027T192802646Z), so the marks go and
+    the view moves until the model point ``anchor`` (mm) lands on ``target``
+    (sheet m)."""
     bound = _early_bound(view, 'IView')
     cut = _early_bound(bound.GetSection(), 'IDrSection')
-    cut.SetDisplayOnlySurfaceCut(True)
-    rebuild_drawing(adapter, label=f'section {letter} cut face only')
-    if not bool(cut.GetDisplayOnlySurfaceCut()):
-        raise RuntimeError(f'section {letter} kept geometry beyond the cut')
+    cut.SetDisplayOnlySurfaceCut(False)
+    rebuild_drawing(adapter, label=f'section {letter} with material beyond')
+    if bool(cut.GetDisplayOnlySurfaceCut()):
+        raise RuntimeError(f'section {letter} still prints its cut face only')
+    set_hidden_lines_removed(adapter, view)
     marks = tuple(bound.GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ())
     if marks:
         draw = adapter.currentModel
@@ -557,6 +588,40 @@ def _cut_face_only(adapter, view, letter: str, anchor: tuple[float, float, float
     _place_caption(adapter, view, caption_top, letter, sheet_scale)
 
 
+def _pin_sheet_scale(adapter, sheet_scale) -> None:
+    """Hold the active sheet at its printed scale and read it back. Inserting
+    model views drifts the sheet scale, and a native section caption carries
+    its scale field only when the view's scale differs from the sheet's AT
+    CREATION (draw_fr_top_frame._pin_sheet_scale), so each section is cut on
+    the pinned sheet: TL-22 and TL-32 printed SCALE 1 : 1 under both
+    sections of a 1:1 sheet (machinist review of 957501d1, rule 9).
+    ``ISheet.SetScale(Numerator, Denominator, FirstAngle, ...)`` -> VT_BOOL;
+    ``GetProperties2`` -> doubles, the scale at [2] and [3]."""
+    sheet = _early_bound(_early_bound(adapter.currentModel, 'IDrawingDoc').GetCurrentSheet(), 'ISheet')
+    if not sheet.SetScale(*sheet_scale, False, False):
+        raise RuntimeError(f'cannot pin the sheet at {sheet_scale!r}')
+    properties = [float(v) for v in (sheet.GetProperties2() or ())]
+    if len(properties) < 4 or (properties[2], properties[3]) != tuple(float(v) for v in sheet_scale):
+        raise RuntimeError(f'sheet scale did not hold at {sheet_scale!r}: {properties!r}')
+
+
+def _section_caption(view, letter: str):
+    """The section's one native caption, refused if it prints a scale: every
+    block section is drawn at the sheet's own scale, which the title block
+    states (rule 9)."""
+    label = f'section {letter} caption'
+    notes = tuple(_early_bound(view, 'IView').GetNotes() or ())
+    if len(notes) != 1:
+        raise RuntimeError(f'expected one native {label}, found {len(notes)} notes')
+    note = _early_bound(notes[0], 'INote')
+    # GetText reads linked fields blank; the linked text keeps the fields.
+    linked = str(note.PropertyLinkedText or '')
+    _telemetry.info(f'{label}: linked text {linked!r}')
+    if '<VLSCALEV>' in linked:
+        raise RuntimeError(f'{label} {linked!r} prints the scale the title block states')
+    return note
+
+
 def _place_caption(adapter, view, target, letter: str, sheet_scale) -> None:
     """Move the section's native caption so its box's top centre lands on
     ``target``: it kept its place under the larger outline, on the title
@@ -564,13 +629,8 @@ def _place_caption(adapter, view, target, letter: str, sheet_scale) -> None:
     finalization cannot move it after (draw_ch_rocker_arm_tl_vn_oblique_leadscrew_kit
     ``_place_view_caption``)."""
     label = f'section {letter} caption'
-    sheet = _early_bound(_early_bound(adapter.currentModel, 'IDrawingDoc').GetCurrentSheet(), 'ISheet')
-    if not sheet.SetScale(*sheet_scale, False, False):
-        raise RuntimeError(f'cannot pin the sheet scale before the {label}')
-    notes = tuple(_early_bound(view, 'IView').GetNotes() or ())
-    if len(notes) != 1:
-        raise RuntimeError(f'expected one native {label}, found {len(notes)} notes')
-    note = _early_bound(notes[0], 'INote')
+    _pin_sheet_scale(adapter, sheet_scale)
+    note = _section_caption(view, letter)
     annotation = _early_bound(note.GetAnnotation(), 'IAnnotation')
     # On the 2:1 sheet the caption steps ~0.48 mm at a time: a section
     # caption's top swung between 0.26 mm under and 0.21 mm over its target
@@ -648,7 +708,11 @@ def _view_arrow(adapter, plan, contract) -> None:
         raise RuntimeError(f'failed to insert the view {VIEW_LETTER} sheet reference')
 
 
-async def draw_block(adapter, spec, contract, *, read_source_properties=None):
+async def draw_block(adapter, spec, contract, *, read_source_properties=None, callouts=None):
+    """Draw one block's sheets. ``callouts`` holds the sheet's own printed
+    text parts by dimension, merged over ``BLOCK_CALLOUTS``
+    (:func:`block_callouts`)."""
+    printed = block_callouts(callouts)
     source = CAD_ROOT/'out'/'sldprt'/f'{spec.artifact_stem}.SLDPRT'
     check('open block',await adapter.open_model(str(source)))
     if read_source_properties is None:
@@ -672,10 +736,12 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     # names (third-angle): A-A below the plan looks up, B-B right of it looks
     # left. A-A stays short; B-B's ends use the reserved annotation lanes.
     _set_section_arrows(adapter)
+    _pin_sheet_scale(adapter, SHEET_SCALE)
     side = create_section_view(adapter,plan,
         line_start=_project(adapter,plan,(part.BLOCK_X1+4,0,contract.BLOCK_HEIGHT),'pivot cut start'),
         line_end=_project(adapter,plan,(part.BLOCK_X0-4,0,contract.BLOCK_HEIGHT),'pivot cut end'),
         view_xy=side_xy,section_label='A',scale=(1,1),partial=True,label='pivot shoulder seat')
+    _section_caption(side, 'A')
     iso = place_view(adapter,str(source),'*Isometric',*iso_xy,scale=iso_scale)
     set_hidden_lines_removed(adapter,plan)
     plan_annotations = curate_view_dimensions(adapter,plan,keep=plan_keep,view_label='plan',
@@ -687,8 +753,6 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)
     _set_arrow_side(adapter, side_annotations, ('TopBoreDepth',), _ARROWS_INSIDE)
     offset_dimension_text(adapter, side_annotations, {'TopBoreDepth': seat_text_xy})
-    _inline_below_callout(adapter, plan_annotations, 'BlockLength', contract.CALLOUTS_BELOW['BlockLength'])
-    offset_dimension_text(adapter, plan_annotations, {'BlockLength': BLOCK_LENGTH_TEXT_XY})
     annotations = plan_annotations + side_annotations
     x = part.CBORE_SECTION_X
     cut_axis = _project(adapter,plan,(x,part.BLOCK_WIDTH/2,contract.BLOCK_HEIGHT),'floor cut axis')
@@ -697,15 +761,18 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     start = (cut_axis[0], FLOOR_CUT_TOP_Y)
     end_y = -part.BLOCK_WIDTH/2-FLOOR_CUT_BOTTOM_OVERRUN_MM
     end = _project(adapter,plan,(x,end_y,contract.BLOCK_HEIGHT),'floor cut end')
+    _pin_sheet_scale(adapter, SHEET_SCALE)
     floor = create_section_view(adapter,plan,line_start=start,line_end=end,view_xy=FLOOR_XY,
                                 section_label='B',scale=(1,1),partial=True,
                                 label='carriage counterbore floor')
-    # Both blocks print B-B as its cut face only (rule 9), the top face's +Y
-    # corner where the full B-B put it. TL-32's B-B also prints the block
-    # height (CboreFloorReference's interior line); TL-22 prints it on A-A.
-    _cut_face_only(adapter, floor, 'B', (x, part.BLOCK_WIDTH/2, contract.BLOCK_HEIGHT),
-                   (FLOOR_XY[0]-contract.BLOCK_HEIGHT/2000, FLOOR_XY[1]+part.BLOCK_WIDTH/2000),
-                   (FLOOR_XY[0], FLOOR_XY[1]-part.BLOCK_WIDTH/2000-SECTION_CAPTION_GAP), SHEET_SCALE)
+    # Both blocks print B-B with the material beyond the cut, the top face's
+    # +Y corner where the full B-B put it. TL-32's B-B also prints the block
+    # height (CboreFloorReference's interior line); TL-22 prints it on the
+    # Right view.
+    _section_with_material_beyond(adapter, floor, 'B', (x, part.BLOCK_WIDTH/2, contract.BLOCK_HEIGHT),
+                                  (FLOOR_XY[0]-contract.BLOCK_HEIGHT/2000, FLOOR_XY[1]+part.BLOCK_WIDTH/2000),
+                                  (FLOOR_XY[0], FLOOR_XY[1]-part.BLOCK_WIDTH/2000-SECTION_CAPTION_GAP),
+                                  SHEET_SCALE)
     row_4y = _project(adapter,plan,(part.BLOCK_X1,part.BOLT_Y,contract.BLOCK_HEIGHT),'row 4Y')
     _fit_section_letters(adapter, side, (floor,), below_y=row_4y[1])
     annotations += curate_view_dimensions(adapter,floor,keep=floor_keep,view_label='B-B floor',
@@ -747,6 +814,7 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
         rebuild_drawing(adapter, label='feed nut screw tap callout')
         annotations += nut_annotations
         sheet_scales = {sheets[0]: SHEET_SCALE, sheets[1]: NUT_SCALE}
+    _set_callouts(adapter, annotations, printed)
     # Every printed dimension keeps its part-authored places; the repeated
     # row/column locations left off the sheet print nothing to check.
     kept = {*plan_keep, *side_keep, *floor_keep, *right_keep, *(NUT_KEEP if is_feed else ())}

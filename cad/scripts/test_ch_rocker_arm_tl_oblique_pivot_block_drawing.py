@@ -303,36 +303,80 @@ def test_b_letters_clear_upper_witnesses_border_and_lower_drill_leader():
     assert leader_at_arrow_left - (lower_end + 1.25) - .175 >= 3.0
 
 
-def test_block_length_reason_rides_its_value_row_clear_of_the_dimension():
-    """TL-22 printed the same top tier as TL-32 (c40296ac PDFs: the 1.64 over
-    SETS COUNTERBORE END WALL centred at (240, 258.5) mm, its underline on
-    the y253.5 dimension line), so its leader ran along the line too. Both
-    sheets now print the reason on the value's row, over the span. Text
-    metrics come from those PDFs: 2.74 mm a character, a 6.38 mm row box,
-    and a centre-anchored block."""
+def test_printed_callouts_read_size_process_depth_and_name_each_mate_once():
+    """Machinist review of 957501d1 (TL-22 and TL-32): size first, the
+    counterbore by its symbol with its depth REF against B-B's floor, mates
+    by MHA number, no reason on the overalls or the seat depth, and no
+    assembly instruction on the floor."""
     import _oblique_block_drawing as drawing
 
-    reason = spec.CALLOUTS_BELOW['BlockLength']
-    assert reason == 'SETS COUNTERBORE END WALL' and 'BlockLength' not in spec.CALLOUTS_SUFFIX
-    char_mm, row_mm = (274.22 - 205.78) / len(reason), 258.90 - 252.52
-    width = (len('1.64 ') + len(reason)) * char_mm
-    x, y = (value * 1000 for value in drawing.BLOCK_LENGTH_TEXT_XY)
-    left, right, bottom, top = x - width / 2, x + width / 2, y - row_mm / 2, y + row_mm / 2
-    span_left = drawing.PLAN_XY[0] * 1000 - spec.BLOCK_LENGTH / 2
-    span_right = span_left + spec.BLOCK_LENGTH
-    cut_x = drawing.PLAN_XY[0] * 1000 + spec.CBORE_SECTION_X
-    line_y = drawing.PLAN_KEEP['BlockLength'][1] * 1000
-    assert left - cut_x >= 4.0
-    assert span_left < left < (span_left + span_right) / 2 < right
-    assert 266.7 - top >= 2.0
-    # The underline (~0.7 under the box) clears the extension lines' 1 mm
-    # overrun by 3 mm; the old block's underline was under it.
-    assert bottom + .7 - (line_y + 1.0) >= 3.0
-    assert 258.5 - (264.46 - 252.52) / 2 + .7 - (line_y + 1.0) < 0.0
-    source = (Path(drawing.__file__)).read_text(encoding='utf-8')
-    body = source[source.index('def draw_block'):]
-    call = "\n    _inline_below_callout(adapter, plan_annotations, 'BlockLength', contract.CALLOUTS_BELOW['BlockLength'])\n"
-    assert call in body and 'if is_feed:' + call not in body
+    printed = drawing.BLOCK_CALLOUTS
+    # Every printed dimension is imported on both sheets, so the applier
+    # finds it; each exists in the part's own dimension set.
+    for keep in (drawing.PLAN_KEEP | drawing.SIDE_KEEP | drawing.FLOOR_KEEP,
+                 drawing.FEED_PLAN_KEEP | drawing.FEED_SIDE_KEEP | drawing.FEED_FLOOR_KEEP):
+        assert set(printed) <= set(keep)
+    assert set(printed) <= set(spec.DRAWING_PRECISION_BY_NAME)
+    assert all(set(parts) <= set(drawing.TEXT_PARTS) for parts in printed.values())
+    # No process or count stands above a size.
+    assert all(parts.get('above', '') == '' for parts in printed.values())
+    words = '\n'.join(text for parts in printed.values() for text in parts.values())
+    for retired in ('SETS ', 'FROM TOP', 'SECTION', 'HGH15CA', 'M4 X 20', 'COUNTERBORE', 'BELOW SHOULDER'):
+        assert retired not in words
+    assert printed['CarriageCounterbores3Dia'] == {
+        'prefix': '4X <HOLE-CBORE><MOD-DIAM>', 'suffix': ' <HOLE-DEPTH> (.390)', 'above': '', 'below': ''}
+    assert math.isclose((spec.BLOCK_HEIGHT - spec.CBORE_FLOOR) / INCH, .390)
+    assert printed['BoreDia']['suffix'] == ' REAM <HOLE-DEPTH> (.359)'
+    assert math.isclose(spec.BORE_DEPTH / INCH, .359, abs_tol=5e-5)
+    assert printed['TapDrillDia'] == {'suffix': ' DRILL THRU', 'above': '', 'below': '5/16-18 UNC THRU'}
+    assert printed['CarriageDrills1Dia']['prefix'] == '4X <MOD-DIAM>'
+    for name in ('TopBoreDepth', 'BlockLength', 'BlockWidth'):
+        assert printed[name] == {'below': ''}
+    # Mates by their registry numbers; the carriage is the rail kit's member.
+    screw = _config.parts('ch-rocker-arm-tl-vn-oblique-pivot-screw')['number']
+    kit = _config.parts('ch-rocker-arm-tl-vn-oblique-rail-kit')['number']
+    assert (drawing.PIVOT_SCREW_NUMBER, drawing.CARRIAGE_NUMBER) == (screw, kit)
+    assert printed['BoreDia']['below'] == f'LOCATING FIT ON {screw} SHOULDER'
+    assert printed['CarriageDrills1Dia']['below'] == f'MATCHES {kit} CARRIAGE'
+    # The floor keeps RV-01's plain fact, in the words its exception quotes.
+    (engagement,) = _config.parts(spec.PART_NAME)['machinist_exceptions']
+    assert printed['CboreFloor'] == {'below': f'ENGAGES {spec.ENGAGEMENT_TEXT} MIN ({spec.ENGAGEMENT_DIAMETERS})'}
+    assert printed['CboreFloor']['below'] in engagement['where']
+
+
+def test_sheet_callout_overrides_replace_only_the_parts_they_name():
+    import _oblique_block_drawing as drawing
+
+    merged = drawing.block_callouts({'BoreDia': {'below': 'X'}, 'NutCentreY': {'above': ''}})
+    assert merged['BoreDia'] == {**drawing.BLOCK_CALLOUTS['BoreDia'], 'below': 'X'}
+    assert merged['NutCentreY'] == {'above': ''}
+    assert drawing.block_callouts() == drawing.BLOCK_CALLOUTS
+    assert drawing.BLOCK_CALLOUTS['BoreDia']['below'] != 'X'
+    with pytest.raises(ValueError):
+        drawing.block_callouts({'BoreDia': {'callout': ''}})
+
+
+def test_sections_print_no_sheet_scale_and_b_b_joins_its_pieces():
+    """SCALE 1 : 1 printed under both sections of the 1:1 sheet, and B-B's
+    cut face alone left three hatched pieces (machinist review of 957501d1):
+    each section is cut on the pinned sheet and its caption refuses a scale
+    field; B-B prints the material beyond the cut, hidden lines removed."""
+    import _oblique_block_drawing as drawing
+
+    source = Path(drawing.__file__).read_text(encoding='utf-8')
+    body = source[source.index('async def draw_block'):]
+    pin = '    _pin_sheet_scale(adapter, SHEET_SCALE)\n'
+    assert body.count('create_section_view(') == 2
+    assert pin + '    side = create_section_view(' in body
+    assert pin + '    floor = create_section_view(' in body
+    assert "_section_caption(side, 'A')" in body
+    beyond = source[source.index('def _section_with_material_beyond'):source.index('def _pin_sheet_scale')]
+    assert 'SetDisplayOnlySurfaceCut(False)' in beyond and 'set_hidden_lines_removed(adapter, view)' in beyond
+    assert 'SetDisplayOnlySurfaceCut(True)' not in source
+    assert "'<VLSCALEV>' in linked" in source
+    # B-B looks -X from the -X column: TL-32's lug stands behind its plane.
+    import ch_rocker_arm_tl_oblique_feed_block_spec as feed
+    assert spec.CBORE_SECTION_X < feed.LUG_X0
 
 
 _PIVOT_GENERATED_TEXT = (

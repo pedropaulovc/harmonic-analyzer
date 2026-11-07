@@ -158,9 +158,6 @@ def test_four_taps_sit_on_the_nut_pcd_on_the_lug_diagonals_and_are_transferred()
     assert math.isclose(values['NutCentreY'],spec.NUT_AXIS_Y-spec.LUG_Y0)
     assert {name:spec.DRAWING_PRECISION_BY_NAME[name] for name in spec.NUT_PATTERN_PRINTED}=={
         'NutCentreZ':3,'NutCentreY':3,'NutClock':0}
-    # r1 review: the .515 names its mate; the D arrow says where VIEW D prints.
-    assert spec.CALLOUTS_BELOW['NutCentreY']=='ON KP08 LEADSCREW AXIS'
-    assert spec.CALLOUTS_BELOW['NutCentreZ']=='FROM CARRIAGE FACE\nON KP08 LEADSCREW AXIS'
     import _oblique_block_drawing as drawing
     assert drawing.VIEW_SHEET_REF==f'(SHEET {spec.NUT_CLOCK_SHEET})'
     assert drawing.NUT_CAPTION==spec.NUT_CLOCK_VIEW
@@ -245,8 +242,36 @@ def test_clearance_to_tap_wall_is_the_stated_shortfall_and_every_face_wall_meets
     assert math.isclose(clearance,expected)
     assert spec.NUT_WALL_MIN_TEXT=='WALL .060 MIN TO TAPS'
     assert spec.NUT_WALL_MIN<=clearance
-    assert spec.CALLOUTS_BELOW['NutClearanceDia']==f'LEADSCREW CLEARANCE\n{spec.NUT_WALL_MIN_TEXT}'
-    assert spec.CALLOUTS_ABOVE['NutClearanceDia']=='DRILL THRU'
+
+
+def test_view_d_prints_size_then_process_names_the_leadscrew_and_bare_locations():
+    # Machinist review of the 957501d1 sheet 2: 'DRILL THRU' printed above
+    # Ø.351 (rule 26); the mate was 'LEADSCREW' and 'KP08' (rule 4); the
+    # .515 and 12.400 mm locations carried words (rule 7). The sheet text is
+    # drawing-side, over the saved model's superseded CALLOUTS_*.
+    import draw_ch_rocker_arm_tl_oblique_feed_block as draw
+    assert draw.LEADSCREW_MATE=='TL-VN-84 LEADSCREW'
+    assert f'MHA-CH-06-{draw.LEADSCREW_MATE}'.startswith(feed_nut.NUMBER)
+    assert draw.CALLOUTS=={
+        'NutClearanceDia':{'suffix':' DRILL THRU','above':'',
+                           'below':f'FOR TL-VN-84 LEADSCREW\n{spec.NUT_WALL_MIN_TEXT}'},
+        'NutCentreY':{'above':'','below':''},
+        'NutCentreZ':{'above':'','below':''},
+    }
+    # Two lines of words at most, none naming a catalogue code.
+    printed=' '.join(text for parts in draw.CALLOUTS.values() for text in parts.values())
+    assert 'KP08' not in printed and 'CARRIAGE FACE' not in printed
+    assert len(draw.CALLOUTS['NutClearanceDia']['below'].splitlines())==2
+    # RV-04's locator still quotes the printed wall statement.
+    [rv04]=[e for e in _config.parts(spec.PART_NAME)['machinist_exceptions'] if e['id']=='RV-04']
+    assert spec.NUT_WALL_MIN_TEXT in draw.CALLOUTS['NutClearanceDia']['below'] and spec.NUT_WALL_MIN_TEXT in rv04['where']
+    # Merged over the shared sheet text, VIEW D's names add to it unchanged,
+    # and the B-B floor keeps RV-03's quoted engagement fact.
+    import _oblique_block_drawing as drawing
+    printed_parts=drawing.block_callouts(draw.CALLOUTS)
+    assert {name:printed_parts[name] for name in draw.CALLOUTS}==draw.CALLOUTS
+    [rv03]=[e for e in _config.parts(spec.PART_NAME)['machinist_exceptions'] if e['id']=='RV-03']
+    assert printed_parts['CboreFloor']['below'] in rv03['where']
 
 
 def test_every_tap_is_bound_by_the_native_clocking_band_the_walls_charge():
@@ -344,7 +369,7 @@ def test_feed_entrypoints_use_the_native_shared_geometry_and_not_a_separate_brac
     assert 'NutSeat' not in shared
     assert 'part.NUT_HOLES_YZ' in shared
     drawing=(FOLDER/'draw_ch_rocker_arm_tl_oblique_feed_block.py').read_text()
-    assert 'draw_block(adapter,SPEC,part,read_source_properties=_read_source_properties)' in drawing
+    assert 'draw_block(adapter,SPEC,part,read_source_properties=_read_source_properties,callouts=CALLOUTS)' in drawing
 
 
 def test_only_the_kp08_axis_height_prints_exact_millimetres():
@@ -357,8 +382,6 @@ def test_counterbore_callout_and_view_d_reference_use_separate_lanes():
     import _oblique_block_drawing as drawing
 
     name = "CarriageCounterbores3Dia"
-    assert spec.CALLOUTS_ABOVE[name] == "4X COUNTERBORE"
-    assert spec.CALLOUTS_BELOW[name] == "FLOOR: SECTION B-B"
     assert drawing.VIEW_SHEET_REF == "(SHEET 2)"
     assert drawing.FEED_PLAN_KEEP[name] != drawing.PLAN_KEEP[name]
     # Retained 84d PDF rectangles, translated by the authored lane changes.
@@ -375,41 +398,3 @@ def test_counterbore_callout_and_view_d_reference_use_separate_lanes():
     assert abs((ref_left + ref_right) / 2 - (204.812 + 209.7703) / 2) < .1
     assert 156.3695 - ref_top >= 2.0
     assert 141.2195 + rise - ref_top >= 10.0
-
-
-def test_block_length_reason_rides_its_value_row_clear_of_the_dimension():
-    """Machinist review of c40296ac (TL-32 sheet 1): the 1.64 and SETS
-    COUNTERBORE END WALL hung beside the dimension at its own height, and the
-    leader ran along the line, through the right arrowhead and across the
-    extension line. Predictions come from that PDF's rectangles: 2.74 mm a
-    character (the reason's 25 spanned x 205.78..274.22), a 6.38 mm row box,
-    and a centre-anchored text block (the two rows' centre, (240, 258.5), was
-    the old xy). TL-22 shares the layout (its own test checks the same)."""
-    import _oblique_block_drawing as drawing
-
-    reason = spec.CALLOUTS_BELOW['BlockLength']
-    assert reason == pivot.CALLOUTS_BELOW['BlockLength'] == 'SETS COUNTERBORE END WALL'
-    assert 'BlockLength' not in spec.CALLOUTS_SUFFIX
-    char_mm, row_mm = (274.22 - 205.78) / len(reason), 258.90 - 252.52
-    width = (len('1.64 ') + len(reason)) * char_mm
-    x, y = (value * 1000 for value in drawing.BLOCK_LENGTH_TEXT_XY)
-    left, right, bottom, top = x - width / 2, x + width / 2, y - row_mm / 2, y + row_mm / 2
-    span_left = drawing.FEED_PLAN_XY[0] * 1000 - spec.BLOCK_LENGTH / 2
-    span_right = span_left + spec.BLOCK_LENGTH
-    line_y = drawing.FEED_PLAN_KEEP['BlockLength'][1] * 1000
-    # One row stands over the span, right of the x157 B cutting line, under
-    # the y266.7 border, its underline (~0.7 under the box) well above the
-    # dimension line and the extension lines' 1 mm overrun.
-    assert left - 157.0 >= 4.0
-    assert span_left < left < (span_left + span_right) / 2 < right
-    assert 266.7 - top >= 2.0
-    assert bottom + .7 - (line_y + 1.0) >= 3.0
-    # Negative control: the old two-row block's underline sat on the line.
-    old_bottom = 258.5 - (264.46 - 252.52) / 2
-    assert old_bottom + .7 - (line_y + 1.0) < 0.0
-    source = (FOLDER / '_oblique_block_drawing.py').read_text(encoding='utf-8')
-    call = "    _inline_below_callout(adapter, plan_annotations, 'BlockLength', contract.CALLOUTS_BELOW['BlockLength'])\n"
-    assert call in source
-    assert source.index(call) < source.index(
-        "offset_dimension_text(adapter, plan_annotations, {'BlockLength': BLOCK_LENGTH_TEXT_XY})"
-    )
