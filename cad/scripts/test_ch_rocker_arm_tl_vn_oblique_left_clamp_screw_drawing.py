@@ -35,16 +35,23 @@ def test_catalogue_row_is_the_registered_mcmaster_screw() -> None:
     assert row["number"] == "MHA-CH-06-TL-VN-86"
     assert row["process"] == "purchased"
     notes = row["installation_notes"]
-    assert "CUT TO THE ACTUAL STRAP/RISER GRIP AT ASSEMBLY" in notes
-    assert "MHA-CH-06-TL-00 STEP O6" in notes
-    assert "CUT-END\nCHAMFER CONTROLS ON THIS SHEET" in notes
-    # The reflowed footer fits the purchased sheet's reserved note space
-    # (native failure: one 151-character line ran to x = .2969 m).
-    from _purchased_fastener_drawing import MAX_ITEM_CHARS, note_lines
+    assert notes == "CUT TO STRAP/RISER GRIP; FINISH TIP PER MHA-CH-06-TL-00 STEP O6"
+    # The footer fits the purchased sheet's reserved note space (native
+    # failure: one 151-character line ran to x = .2969 m) in ONE line: the 84d
+    # three-line reflow lifted the annotated Front cell to 29 mm, under the
+    # screw's 30.95 mm native 1:1 outline, so the shared scale fell to 1:2 and
+    # the Top references lost their tip-incident dimension lines.
+    import draw_ch_rocker_arm_tl_vn_oblique_left_clamp_screw as drawing
+    from _purchased_fastener_drawing import MAX_ITEM_CHARS, note_lines, view_band_bottom
 
     lines = note_lines(notes, label=STEM)
-    assert 1 < len(lines) <= 3
-    assert max(len(line) for line in lines) <= MAX_ITEM_CHARS
+    assert len(lines) == 1
+    assert len(lines[0]) <= MAX_ITEM_CHARS
+    # supplier_top Front cell: caption + .004 up to row top .176, less the
+    # reserved bottom (cut-end text) and top lanes; 84d trace: 1:1 = 30.95 mm.
+    _left, bottom, _right, top = drawing.SUPPLIER_MARGINS["*Front"]
+    front_fit = 0.176 - (view_band_bottom(notes, label=STEM) + 0.004) - bottom - top
+    assert front_fit >= 0.03095 + 0.005
     assert spec.SKU in row["material_specification"]
     metadata = recipe_declaration(spec.SKU, recipe.build_92220A165)
     assert metadata.module == recipe.__name__

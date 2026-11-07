@@ -133,7 +133,14 @@ _ABOVE = _sy(FLANGE_DIA / 2.0)
 # the flange seat (rule 11: lengths from the faced end), the shortest
 # nearest; the diameters stand above (shank, nose) or left of the flange.
 # The nose callout stands right of the nose, clear of the shank callout's
-# shelf (r2 review: the two had interleaved above the shank).
+# shelf (r2 review: the two had interleaved above the shank), and high enough
+# that its shoulder line runs above the end view's Ø.71 outline (top at
+# _ABOVE, the same row). A leadered keep is the block's LEFT edge (its
+# dimension line and shoulder start) and its vertical CENTRE: on the 84d sheet
+# the keep (+.036, +.008) put the ink at x .1955-.2681, y .1794-.2106, the
+# shoulder crossing that circle, and the shank callout's ink ending at x .1886.
+# At +.035, +.022 the left edge stays ~6 mm clear of the shank callout and the
+# shoulder ~8 mm above the circle where the block ends (x ~.27).
 SIDE_KEEP = {
     "FlangeThick": (_sx(FLANGE_THICK / 2.0), _BELOW - 0.010),
     "ShankLength": (_sx(FLANGE_THICK + SHANK_LENGTH / 2.0), _BELOW - 0.020),
@@ -141,7 +148,7 @@ SIDE_KEEP = {
     "SupplyLength": (_sx((FLANGE_THICK + LENGTH) / 2.0), _BELOW - 0.046),
     "FlangeDia": (_sx(0.0) - 0.018, _sy(0.0)),
     "ShankDia": (_sx(FLANGE_THICK + SHANK_LENGTH / 2.0), _ABOVE + 0.018),
-    "NoseDia": (_sx(LENGTH) + 0.036, _ABOVE + 0.008),
+    "NoseDia": (_sx(LENGTH) + 0.035, _ABOVE + 0.022),
     "RootRadius": (_sx(FLANGE_THICK) + 0.004, _ABOVE + 0.036),
 }
 # The fit-up reference's two-row callout is wider than the .79 span between
