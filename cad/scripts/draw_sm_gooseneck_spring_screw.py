@@ -98,6 +98,7 @@ from sm_gooseneck_spring_screw_spec import (
     DRAWING_PRECISION_BY_NAME,
     REFERENCE_DIMENSIONS,
     THREAD_CALLOUT,
+    THREAD_MATE_CALLOUT,
 )
 
 
@@ -192,8 +193,8 @@ def block_height(value_lines: int, callout_lines: int) -> float:
 
 
 def _callout_lines(name: str) -> int:
-    text = (
-        DIMENSION_CALLOUTS_BY_NAME.get(name) or DIMENSION_CALLOUTS_ABOVE_BY_NAME[name]
+    text = DIMENSION_CALLOUTS_BY_NAME.get(name) or DIMENSION_CALLOUTS_ABOVE_BY_NAME.get(
+        name, ""
     )
     return len(text.splitlines())
 
@@ -205,7 +206,7 @@ _COUNTER_SPRING_WIDTH = 0.0341
 # CLEARS' 31.38 mm), wider than the 'MHA-SM-VN-51' row under it.
 BODY_DIA_TEXT_WIDTH = 0.036
 BODY_DIA_TEXT_HEIGHT = block_height(2, _callout_lines("BodyDia"))
-# '3.60 min.' over 'PLAIN;' / 'MHA-SM-VN-51' / 'LOOP SEAT'.
+# '3.60 min.' alone: a location carries its value and limit only (rule 7).
 PLAIN_LENGTH_TEXT_WIDTH = _COUNTER_SPRING_WIDTH
 PLAIN_LENGTH_TEXT_HEIGHT = block_height(1, _callout_lines("PlainLength"))
 # 'TO FULL THREAD' 35.69 mm (font advance) over '5.71 max.', 21.44 mm as
@@ -694,7 +695,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_attached_note(
         adapter,
         side,
-        text=THREAD_CALLOUT,
+        text=f"{THREAD_CALLOUT}\n{THREAD_MATE_CALLOUT}",
         entity_xy=THREAD_PICK,
         note_xy=THREAD_NOTE_XY,
         label="MHA-SM-04 thread callout",
