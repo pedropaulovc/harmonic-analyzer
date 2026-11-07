@@ -181,16 +181,18 @@ def test_hub_width_callout_names_the_fit_up_step_that_takes_up_the_stack() -> No
     key = drawing.ROCKER_STACK_STEP_KEY
     assert drawing.HUB_LENGTH_TEXT.startswith(ch_rocker_arm_notes.HUB_LENGTH_CALLOUT)
     assert drawing.HUB_LENGTH_TEXT.endswith(f"PER\n{channel_steps.step_ref(key)}")
+    # The cited step stacks the hubs; the re-face of a long stack and the
+    # measurement it loops back to follow it (MHA-CH-00 steps are one action
+    # each, drawing-guidelines.md rule 22).
     number = channel_steps.step_number(key)
-    printed = " ".join(channel_sheet.FITUP_STEPS.split())
-    step = printed.split(f" {number}. ", 1)[1].split(f" {number + 1}. ", 1)[0]
-    assert "RE-FACE A LONG STACK" in step
-    # The MHA-CH-00 fitter package prints the acceptance band on the rocker
-    # bank view's native stack dimension (drawing policy: no limits in note
-    # text), so the step names that dimension and the dimension carries
+    assert number < channel_steps.step_number("rocker-stack-measured")
+    assert number < channel_steps.step_number("rocker-stack-refaced")
+    # The MHA-CH-00 fitter package prints the acceptance band on view D's
+    # native stack dimension (drawing policy: no limits in note text), so
+    # the measuring step names that view and the dimension carries
     # STACK_L20_ACCEPT.
     asm = channel_sheet.asm
-    assert "TO THE ROCKER BANK VIEW'S STACK DIMENSION" in step
+    assert channel_sheet.ROCKER_BANK.title in channel_sheet.FITUP_TEXT["rocker-stack-measured"]
     lower, upper = asm.DIMENSION_TOLERANCES[asm.STACK_LENGTH_DIMENSION]
     nominal = asm.PIVOT_CHAIN_Z[3] - asm.PIVOT_CHAIN_Z[2]
     assert (nominal + lower, nominal + upper) == pytest.approx(bank.STACK_L20_ACCEPT)

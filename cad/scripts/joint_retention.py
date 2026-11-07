@@ -42,6 +42,7 @@ import _buildgraph
 import _config
 import ch_channel_assembly_steps
 import dt_drive_train_steps
+import fr_frame_assembly_steps
 import ha_harmonic_analyzer_assembly_steps
 import mg_magnifier_assembly_steps
 import pd_paper_drive_assembly_steps
@@ -287,6 +288,7 @@ STEP_LISTS: dict[str, tuple[str, ...]] = {
     "ch_channel": ch_channel_assembly_steps.SEQUENCE,
     "pd_paper_drive": pd_paper_drive_assembly_steps.SEQUENCE,
     "mg_magnifier": mg_magnifier_assembly_steps.SEQUENCE,
+    "fr_frame": fr_frame_assembly_steps.SEQUENCE,
 }
 
 
@@ -755,8 +757,8 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "pd_vn_transgear_retaining_ring",  # MHA-PD-VN-61 external retaining ring (McMaster 97431A240) in the pin's groove
         "pd_vn_transgear_cluster_shim",  # MHA-PD-VN-68 shims (McMaster 94773A606) on the pin under the rear bushing; no thread
         "pd_vn_transgear_knob_drive_pin",  # MHA-PD-VN-54 dowel pressed into plain holes, no thread
-        "fr_tube_frame",  # columns: socket slip fit; cross holes enlarged so the MHA-FR-VN-53 shank passes "WITHOUT THREAD CONTACT" (MHA-FR-00 STEP 2/5)
-        "fr_vn_tube_frame_cap",  # McMaster 9275K141 push-on cap (MHA-FR-00 STEP 7)
+        "fr_tube_frame",  # columns: socket slip fit; cross holes opened to Ø.197 so a MHA-FR-VN-53 passes "ITS THREAD NOT CATCHING" (fr_frame_assembly_steps lower-/upper-holes-checked)
+        "fr_vn_tube_frame_cap",  # McMaster 9275K141 push-on cap (fr_frame_assembly_steps caps-pushed-on)
         "mg_vn_wheel_axle_back_washer",  # MHA-MG-VN-54 brass #10 washer (McMaster 92916A480) loose on the axle pin; no thread
         "mg_vn_wheel_axle_front_washer",  # MHA-MG-VN-55 brass #4 washer (McMaster 92916A250) loose on the axle's #4-40 end; no thread
         "mg_wheel_bar",  # #8 clearance holes (clamp screws) + #8 close clearance (pen-hanger screw, which runs into the hanger nut and jam nut in pen.SLDASM) + the reamed .1865 axle-pin press bore
@@ -802,12 +804,12 @@ JOINTS: tuple[Joint, ...] = (
         receiver="fr_harmonic_base",
         thread="#10-32 UNF-2A/2B",
         quantity=4,
-        installed_at="MHA-FR-00 STEP 6",
+        installed_at=fr_frame_assembly_steps.CROSS_SCREWS_DRIVEN_KEY,
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason="retains a tube_frame column in its base socket; base and columns never move relative to each other and no operating member bears on or turns about the horizontal screw axis (the screw passes clearance holes in both tube walls)",
         axial_capture="narrow fillister head seated on the Ø9 spotface of the base pad; the shank clears the near casting wall (#10 close) and engages only the far casting wall's blind 46 mm bottoming tap",
         lock=Lock.NONE,
-        evidence="build_fr_frame_assembly.py:build (lower cross screws, BASE_SCREW_Y/BASE_SCREW_SEAT_Z) + module asserts; fr_harmonic_base_fasteners.py:BASE_CROSS_TAP_SPEC, BASE_CROSS_CLEARANCE_SPEC, BASE_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT; draw_fr_frame_assembly.py ASSEMBLY_STEPS 2, 6 ('TIGHTEN ONLY UNTIL EVERY HEAD SEATS'), ASSEMBLY_CHECKS 2",
+        evidence="build_fr_frame_assembly.py:build (lower cross screws, BASE_SCREW_Y/BASE_SCREW_SEAT_Z) + module asserts; fr_harmonic_base_fasteners.py:BASE_CROSS_TAP_SPEC, BASE_CROSS_CLEARANCE_SPEC, BASE_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT; draw_fr_frame_assembly.py STEP_TEXT lower-holes-piloted, cross-screws-measured (CROSS_SCREW_FULL_THREAD_MIN_IN), cross-screws-driven ('ONLY UNTIL ITS HEAD SEATS'), cross-screw-heads-checked",
     ),
     Joint(
         id="fr-frame/cross-screw-in-top-frame",
@@ -816,12 +818,12 @@ JOINTS: tuple[Joint, ...] = (
         receiver="fr_top_frame",
         thread="#10-32 UNF-2A/2B",
         quantity=4,
-        installed_at="MHA-FR-00 STEP 6",
+        installed_at=fr_frame_assembly_steps.CROSS_SCREWS_DRIVEN_KEY,
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason="retains the top_frame casting on a tube_frame column; casting and columns are stationary relative to each other and no rotating/rocking member turns about the horizontal screw axis (clearance through both tube walls)",
         axial_capture="narrow fillister head seated flush in the Ø9 boss counterbore; the shank clears the near casting wall (#10 close, SideClearance) and engages only the far casting wall's blind 46 mm #10-32 bottoming tap (SideTaps)",
         lock=Lock.NONE,
-        evidence="build_fr_frame_assembly.py:build (upper cross screws, TOP_SCREW_Y/TOP_SCREW_SEAT_Z); build_fr_top_frame.py:SIDE_TAP_SPEC, SIDE_CLEARANCE_SPEC, TOP_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT, step 13 SideTaps/SideClearance; draw_fr_frame_assembly.py ASSEMBLY_STEPS 5, 6, ASSEMBLY_CHECKS 2",
+        evidence="build_fr_frame_assembly.py:build (upper cross screws, TOP_SCREW_Y/TOP_SCREW_SEAT_Z); build_fr_top_frame.py:SIDE_TAP_SPEC, SIDE_CLEARANCE_SPEC, TOP_CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT, step 13 SideTaps/SideClearance; draw_fr_frame_assembly.py STEP_TEXT upper-holes-piloted, cross-screws-measured, cross-screws-driven, cross-screw-heads-checked",
     ),
     Joint(
         id="fr-frame/support-hold-down-in-base",
@@ -830,12 +832,12 @@ JOINTS: tuple[Joint, ...] = (
         receiver="fr_harmonic_base",
         thread="1/4-20 UNC-2A/2B",
         quantity=4,
-        installed_at="MHA-FR-00 STEP 8",
+        installed_at=fr_frame_assembly_steps.SUPPORT_SCREWED_KEY,
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason="clamps the rocker_arm_support foot to the base deck; the support never moves on the base, and the rocker pivot it carries turns about machine Z (horizontal), so the rocker's reaction reaches these vertical (Y-axis) screws as cyclic tension/shear, not as torque about their own axis",
         axial_capture="hex head's under-head washer face bears on the 6.35 support foot (5/16 clearance drill); unchanged 12.42 mm stock insertion into the through-tapped 1/4-20 UNC-2B deck seat, with useful engagement limited by retained casting",
         lock=Lock.NONE,
-        evidence="build_fr_frame_assembly.py:build (lag-screw seed + grid) and LAG_* asserts; fr_harmonic_base_fasteners.py:HOLD_DOWN_SEAT_SPEC/HOLD_DOWN_ENGAGEMENT; fr_rocker_arm_support_spec.py:HOLE_SPEC; draw_fr_frame_assembly.py ASSEMBLY_STEPS 8 ('DRAW DOWN EVENLY UNTIL ALL HEADS SEAT')",
+        evidence="build_fr_frame_assembly.py:build (lag-screw seed + grid) and LAG_* asserts; fr_harmonic_base_fasteners.py:HOLD_DOWN_SEAT_SPEC/HOLD_DOWN_ENGAGEMENT; fr_rocker_arm_support_spec.py:HOLE_SPEC; draw_fr_frame_assembly.py STEP_TEXT support-screwed ('EVENLY, UNTIL EVERY HEAD SEATS'), support-heads-checked",
     ),
     Joint(
         id="fr-frame/nameplate-screw-in-base",
@@ -844,12 +846,12 @@ JOINTS: tuple[Joint, ...] = (
         receiver="fr_harmonic_base",
         thread="#4-40 UNC",
         quantity=4,
-        installed_at="MHA-FR-00 STEP 9",
+        installed_at=fr_frame_assembly_steps.NAMEPLATE_SCREWED_KEY,
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason="holds the cosmetic nameplate flat on the base deck; plate and base never move relative to each other and nothing in operation touches or turns the plate",
-        axial_capture="fillister head seated flush on the plate's decorated face; unchanged 4.85 mm nominal stock insertion into the through-tapped #4-40 UNC-2B deck seat",
+        axial_capture="fillister head seated flush on the plate's engraved face; unchanged 4.85 mm nominal stock insertion into the through-tapped #4-40 UNC-2B deck seat",
         lock=Lock.NONE,
-        evidence="build_fr_frame_assembly.py:build (nameplate corner screws, NAMEPLATE_SCREW_* asserts); fr_harmonic_base_fasteners.py:NAMEPLATE_SEAT_SPEC; build_fr_harmonic_base.py:NAMEPLATE_SEAT_SPEC; draw_fr_frame_assembly.py ASSEMBLY_STEPS 9",
+        evidence="build_fr_frame_assembly.py:build (nameplate corner screws, NAMEPLATE_SCREW_* asserts); fr_harmonic_base_fasteners.py:NAMEPLATE_SEAT_SPEC; build_fr_harmonic_base.py:NAMEPLATE_SEAT_SPEC; draw_fr_frame_assembly.py STEP_TEXT nameplate-set to nameplate-heads-checked",
     ),
     Joint(
         id="ha-harmonic-analyzer/gooseneck-set-screw-in-top-frame",
@@ -858,12 +860,17 @@ JOINTS: tuple[Joint, ...] = (
         receiver="fr_top_frame",
         thread="1/4-20 UNC",
         quantity=1,
-        installed_at="MHA-FR-00 STEP 10",
+        # Started loose at MHA-FR-00 (a keyed sheet, cited by its printed
+        # pointer: this row's assembly keeps no step list); MHA-HA-00
+        # summing-levelled tightens it on the post.
+        installed_at=fr_frame_assembly_steps.step_ref(
+            fr_frame_assembly_steps.GOOSENECK_STARTED_KEY
+        ),
         exposure=Exposure.OSCILLATING,
         exposure_reason="cup point is the ONLY retention of the summing gooseneck post (MHA-SM-01) in the top_frame rail-hub bore, both its slid-to-level height and its rotation; the post's arm carries the counter-spring hung from the rocking summing lever, so the load it reacts cycles every stroke",
         axial_capture="threads into the through-to-bore 1/4-20 GooseneckTap through the east-rail hub boss's Ø10 spot face; square head standing proud outboard; cup point bears radially on the gooseneck's Ø15.875 sleeve (as modelled it stands 0.21 clear)",
         lock=Lock.NONE,
-        evidence="build_fr_frame_assembly.py:build (gooseneck-set-screw, SET_SCREW_TIP_X, McMaster 91410A540 SHANK_LEN) + module comment; build_fr_top_frame.py:SET_TAP_SPEC, step 8 SetBoss/SetSpotFace, step 14 GooseneckTap; build_sm_summing_assembly.py docstring + gooseneck placement; spring_mount_geom.py docstring ('setup slides the gooseneck until level'); draw_fr_frame_assembly.py ASSEMBLY_STEPS 10 ('START MHA-FR-VN-52 ... LEAVE ITS CUP POINT CLEAR'), ASSEMBLY_CHECKS 5",
+        evidence="build_fr_frame_assembly.py:build (gooseneck-set-screw, SET_SCREW_TIP_X, McMaster 91410A540 SHANK_LEN) + module comment; build_fr_top_frame.py:SET_TAP_SPEC, step 8 SetBoss/SetSpotFace, step 14 GooseneckTap; build_sm_summing_assembly.py docstring + gooseneck placement; spring_mount_geom.py docstring ('setup slides the gooseneck until level'); draw_fr_frame_assembly.py STEP_TEXT gooseneck-set-screw-started ('CUP POINT CLEAR OF THE BORE; MHA-HA-00 STEP n TIGHTENS IT ON THE POST'), post-bore-checked; ha_harmonic_analyzer_assembly_sheet.py summing-levelled ('TIGHTEN MHA-FR-VN-52 ON THE POST')",
         exception="U-MHA-FR-VN-52-no-lock",
     ),
     # --- drive_train (MHA-DT-00): cone set and crank, and their screws into the frame's base ---
@@ -1327,10 +1334,11 @@ JOINTS: tuple[Joint, ...] = (
         lock=Lock.STAKED,
         lock_part="ch_pivot_bracket:staked tap mouth",
         lock_binds=("sh_vn_arbor_set_screw", "ch_pivot_bracket"),
-        lock_step="set-screws-driven",
+        lock_step=ch_channel_assembly_steps.PIVOT_SET_SCREWS_STAKED_KEY,
         evidence=(
-            "draw_ch_channel_assembly.py _fitup_steps 'set-screws-driven' ('RUN ONE MHA-SH-VN-54 DOWN EACH APEX TAP "
-            "ONTO ITS FLAT, NORTH FIRST; SNUG, AND STAKE EACH TAP MOUTH AT 2 POINTS.'); build_ch_channel_assembly.py apex set screw "
+            "draw_ch_channel_assembly.py _fitup_text 'set-screws-driven' ('RUN ONE ITEM 4 DOWN THE TAP AT THE TOP "
+            "OF EACH ITEM 3 EAR ONTO ITS FLAT, LEFT EAR FIRST, AND SNUG IT.') and 'pivot-set-screws-staked' "
+            "('STAKE THE MOUTH OF EACH ITEM 4 TAP AT 2 POINTS.'); build_ch_channel_assembly.py apex set screw "
             "placement (SET_SCREW_TIP_Y); ch_pivot_bracket_spec.SET_SCREW_HOLE_SPEC (#4-40 tapped, through_next) "
             "and SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT; ch_pivot_shaft_spec flats (FLAT_DEPTH, FLAT_LENGTH)"
         ),
@@ -1392,8 +1400,8 @@ JOINTS: tuple[Joint, ...] = (
         lock_step="",
         evidence=(
             "build_ch_channel_assembly.py BRACKET_SCREW_XZ loop + header; rocker_bracket_seat_layout.SEAT_SPEC; "
-            "draw_ch_channel_assembly.py _fitup_steps 'south-bracket-screwed' (MHA-CH-00 STEP 6: 'TRANSFER THE SOUTH "
-            "MHA-CH-08 FOOT HOLE INTO THE MHA-FR-05 RAIL, TAP AS MHA-FR-05, SCREW DOWN ONE MHA-CH-VN-57')"
+            "draw_ch_channel_assembly.py _fitup_text 'south-bracket-screwed' ('SCREW THE RIGHT ITEM 3 DOWN WITH ONE "
+            "ITEM 7'), after 'south-foot-transferred' taps the MHA-FR-05 rail through the foot hole"
         ),
     ),
     Joint(
@@ -1404,7 +1412,7 @@ JOINTS: tuple[Joint, ...] = (
         thread="#2-56",
         quantity=2,
         installed_at=ch_channel_assembly_steps.step_ref(
-            ch_channel_assembly_steps.KEEPERS_SET_KEY
+            ch_channel_assembly_steps.KEEPERS_SCREWED_KEY
         ),
         exposure=Exposure.OSCILLATING,
         exposure_reason=(
@@ -1425,7 +1433,7 @@ JOINTS: tuple[Joint, ...] = (
             "ch_fulcrum_keeper_spec.py docstring/SCREW_X/SCREW_HOLE_SPEC/KEEPER_TAP_SPEC (#2-56 blind, 11.5 drill, "
             "ThreadDepth 7.6; FOOT_SCREW_ENGAGEMENT_D) + DRAWING_NOTES 2; build_fr_top_frame.py step 'KeeperTaps' "
             "consumes KEEPER_TAP_SPEC; config parts/ch-vn-frame-side-screw.yaml (91794A080); draw_ch_channel_assembly.py "
-            "step fulcrum-keepers-set ('TRANSFER EACH FOOT HOLE INTO THE RAIL, TAP AS MHA-FR-02, SCREW DOWN ONE MHA-CH-VN-52')"
+            "step fulcrum-keepers-screwed ('SCREW EACH ITEM 8 DOWN WITH ONE ITEM 9'), after keeper-feet-transferred taps the rail"
         ),
     ),
     Joint(
@@ -1435,7 +1443,7 @@ JOINTS: tuple[Joint, ...] = (
         receiver="ch_fulcrum_keeper",
         thread="#1-72 UNF",
         quantity=2,
-        installed_at=ch_channel_assembly_steps.SET_SCREWS_STAKED_KEY,
+        installed_at=ch_channel_assembly_steps.FULCRUM_SET_SCREWS_DRIVEN_KEY,
         exposure=Exposure.OSCILLATING,
         exposure_reason=(
             "the two set screws alone hold the plain fulcrum_shaft axially and in rotation "
@@ -1450,9 +1458,10 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "build_ch_channel_assembly.py keeper loop (ch-vn-fulcrum-set-screw on each keeper's crown tap axis); "
             "ch_fulcrum_keeper_spec.SET_SCREW_HOLE_SPEC (#1-72 tapped, through_next) + DRAWING_NOTES 2; "
-            "draw_ch_fulcrum_keeper.SET_SCREW_QUALIFIER ('STAKE AT ASSEMBLY PER MHA-CH-00 STEP 13'); "
-            "draw_ch_channel_assembly.py step fulcrum-set-screws-staked ('TIGHTEN ONE MHA-CH-VN-55 SET SCREW ONTO EACH "
-            "FLAT AND STAKE EACH TAP MOUTH AT 2 POINTS'); ch_fulcrum_shaft_spec FLAT_DEPTH / FLAT_PITCH / "
+            "draw_ch_fulcrum_keeper.SET_SCREW_QUALIFIER (stake at MHA-CH-00 assembly); "
+            "draw_ch_channel_assembly.py steps fulcrum-set-screws-driven ('TIGHTEN ONE ITEM 10 SET SCREW ONTO EACH "
+            "FLAT.') and fulcrum-set-screws-staked ('STAKE THE MOUTH OF EACH ITEM 10 TAP AT 2 POINTS.'); "
+            "ch_fulcrum_shaft_spec FLAT_DEPTH / FLAT_PITCH / "
             "FLAT_STATION_WINDOW_MM; config parts/ch-vn-fulcrum-set-screw.yaml (91375A942)"
         ),
     ),
