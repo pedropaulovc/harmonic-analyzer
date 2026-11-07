@@ -6,3 +6,9 @@ sh-column-clamp-back:
   tolerance_class: machined_block
   drawing_unit: in
   process: "machined from solid stock or casting"
+  machinist_exceptions:
+    - id: "RV-02"
+      kind: "accept"
+      where: "split-face view: the 2X .689 ±.004 tap station and the 2X .315 ±.004 tap height"
+      finding: "drilled-hole locations at ±.004, narrower than the ±.005 shop-table row and not a plain inch step, with no fit route named at the taps (rule 4)"
+      reason: "Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144 (fan-out location-band ruling L3). The ±.004 stations and heights are the #8 screw line's budget shared with MHA-SH-01's clearance holes (sh_column_clamp_fit): at the ±.005 row the owner-ruled screw-line shortfall (sh-column-clamp-front RV-02, 0.053 mm) grows past its ruled value, and that ruling adds no slot, oversize or match-drill. They are DRO locations off the drawn bore axis, checked with a height gauge and pin. RV-01 (the retired back-wall shortfall) is not reused."

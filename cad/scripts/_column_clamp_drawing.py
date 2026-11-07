@@ -2,8 +2,9 @@
 
 ``draw_sh_column_clamp_front`` and ``draw_sh_column_clamp_back`` print the
 same split-face view of the shared semi-arc (``_clamp_arc``): both mark the
-ear pair's imported dimensions ``2X`` and both draw the bore axis the ear
-stations measure from.  Drawing-only: no part recipe imports this module.
+ear pair's imported dimensions ``2X``, both draw the bore axis the ear
+stations measure from, and both name the other arc's ear holes once, under
+their native hole callout.  Drawing-only: no part recipe imports this module.
 """
 
 from __future__ import annotations
@@ -33,6 +34,88 @@ def set_dimension_prefixes(
             raise RuntimeError(f"dimension prefix {prefix!r} did not persist")
     if remaining:
         raise RuntimeError(f"dimension prefixes not applied: {sorted(remaining)}")
+
+
+# swDimensionText_e: the writable callout-below part and the definitions
+# (prefix, suffix, callout above, callout below) it pairs with.
+_CALLOUT_BELOW = 4
+_DEFINITIONS = (5, 6, 7, 8)
+_WRITABLE = {5: 1, 6: 2, 7: 3, 8: 4}
+
+
+def _definitions(display: Any) -> dict[int, str]:
+    return {part: str(display.GetText(part) or "") for part in _DEFINITIONS}
+
+
+def set_hole_callout_below(display: Any, text: str, *, label: str) -> None:
+    """Write ``text`` under a native hole callout and read it back.
+
+    Only the callout-below definition changes; the prefix, size and depth
+    definitions stay untouched, so the Hole Wizard variables stay associative
+    (draw_pd_guide_lock._set_hole_callout_below).
+    """
+    display = _early_bound(display, "IDisplayDimension")
+    before = _definitions(display)
+    # SolidWorks may store CRLF row breaks; compare both sides without CR.
+    below = before[8].replace("\r", "").rstrip()
+    updated = f"{below}\n{text}" if below else text
+    display.SetText(_CALLOUT_BELOW, updated)
+    after = _definitions(display)
+    if after[8].replace("\r", "") != updated or any(
+        after[part] != before[part] for part in (5, 6, 7)
+    ):
+        raise RuntimeError(
+            f"{label}: hole callout mate or native definitions did not persist: "
+            f"{after!r}"
+        )
+
+
+def drill_thru_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """Swap a plain through hole's one native extent for ``DRILL THRU``.
+
+    The installed calloutformat.txt formats a plain through hole as
+    ``<MOD-DIAM> <hw-diam> <hw-thru>``, so the size reads first, then the
+    process and the depth (drawing-guidelines.md rules 12 and 26;
+    draw_fr_top_frame._hanger_hole_callout_definitions).  Any other hole
+    type's tokens mean the wrong feature.
+    """
+    native = "\n".join(definitions.values())
+    if (
+        set(definitions) != set(_DEFINITIONS)
+        or native.count("<hw-diam>") != 1
+        or native.count("<hw-thru>") != 1
+        or any(
+            token in native
+            for token in (
+                "<hw-thruholedia>",
+                "<hw-cbdia>",
+                "<hw-cbdepth>",
+                "<HOLE-SPOT>",
+                "<HOLE-SINK>",
+            )
+        )
+    ):
+        raise RuntimeError(f"unexpected native through-hole callout: {definitions!r}")
+    return {
+        part: text.replace("<hw-thru>", "DRILL THRU")
+        for part, text in definitions.items()
+    }
+
+
+def set_drill_thru(display: Any, *, label: str) -> None:
+    """Print a plain through hole as ``nX Ø.nnn DRILL THRU``, natively."""
+    display = _early_bound(display, "IDisplayDimension")
+    before = _definitions(display)
+    updated = drill_thru_definitions(before)
+    for part, text in updated.items():
+        if text != before[part]:
+            display.SetText(_WRITABLE[part], text)
+    after = _definitions(display)
+    resolved = "\n".join(str(display.GetText(part) or "") for part in (1, 2, 3, 4))
+    if after != updated or resolved.count("DRILL THRU") != 1:
+        raise RuntimeError(
+            f"{label}: DRILL THRU did not persist: {after!r}, resolved {resolved!r}"
+        )
 
 
 @_telemetry.traced("drawing.column_clamp.bore_axis_centerline")
