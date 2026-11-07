@@ -133,7 +133,11 @@ FRONT_KEEP = {
     # line's lower arrowhead; up-right of the hub the field is clear between
     # the rod's Ø6.0 line and section A-A's fence letter.
     "HubOd": (0.100, _front_y(0.0) + 0.0095),
-    "HubBore": (0.105, _front_y(-HUB_OD / 2.0) - 0.014),
+    # Fan-out repeat (3/3): centred under the hub, the leader left the
+    # underline's left end and rose through the "B" of BORE.  The block now
+    # starts right of the bore's axis, so the leader climbs up-left, away
+    # from its own text, and sits lower, clear of DETAIL B's fence.
+    "HubBore": (0.1225, _front_y(-HUB_OD / 2.0) - 0.024),
     "RodTipY": (0.035, FRONT_CENTER[1] + 0.010),
     "RodDia": (0.105, _front_y(ROD_DIA_TEXT_Y)),
 }

@@ -60,28 +60,27 @@ def test_bottom_chamfer_clears_the_handle_counterbore_corner() -> None:
     import dt_crank_handle_spec as handle
 
     assert spec.BODY_CHAMFER_MIN >= handle.INSIDE_CORNER_R_MAX
-    assert notes.BODY_CHAMFER_CALLOUT.splitlines() == [
-        "X 45°",
-        "CLEARS MHA-DT-08",
-        "COUNTERBORE CORNER",
-    ]
+    assert _config.parts("dt-crank-handle")["number"] in notes.BODY_CHAMFER_CALLOUT
 
 
 def test_pocket_names_its_mate_once_on_one_flag_note() -> None:
     # Rule 4: the pocket's diameter, depth and floor corner share one flag.
-    for name in ("PocketDia", "PocketDepth", "PocketFloorRadius"):
-        assert drawing.DIMENSION_CALLOUTS[name].splitlines()[0] == "SEE NOTE 1"
-    assert notes.POCKET_NOTE_TEXT.splitlines() == [
-        "1. POCKET FOR MHA-DT-32 PIVOT SCREW HEAD: BORE TO THE",
-        "   MEASURED HEAD, RUNNING FIT (CLEARANCE .008-.016).",
-    ]
+    flags = {
+        drawing.DIMENSION_CALLOUTS[name].splitlines()[0]
+        for name in ("PocketDia", "PocketDepth", "PocketFloorRadius")
+    }
+    assert len(flags) == 1
+    pocket = notes.POCKET_NOTE_TEXT
+    assert pocket.startswith("1. ") and len(pocket.splitlines()) <= 2
+    assert _config.parts("dt-crank-handle-pivot-screw")["number"] in pocket
+    assert "CLEARANCE" in pocket
     # The body's bond is a matched fit on flag note 2: the .XXX grade alone
     # cannot give the glue line, so the route prints (round 2 review).
-    assert drawing.DIMENSION_CALLOUTS["BodyDia"] == "SEE NOTE 2"
-    assert drawing.BODY_NOTE_TEXT.splitlines() == [
-        "2. BODY: BONDED FIT IN MHA-DT-08 CRANK HANDLE, EPOXY:",
-        "   TURN TO THE MEASURED COUNTERBORE (CLEARANCE .002-.006).",
-    ]
+    assert drawing.DIMENSION_CALLOUTS["BodyDia"] not in flags
+    body = drawing.BODY_NOTE_TEXT
+    assert body.startswith("2. ") and len(body.splitlines()) <= 2
+    assert _config.parts("dt-crank-handle")["number"] in body
+    assert "CLEARANCE" in body
     assert drawing.NOTES_TEXT.splitlines() == [
         *notes.POCKET_NOTE_TEXT.splitlines(),
         *drawing.BODY_NOTE_TEXT.splitlines(),

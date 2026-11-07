@@ -61,9 +61,13 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 if not REFERENCE_DIMENSIONS <= set(DRAWING_PRECISION_BY_NAME):
     raise AssertionError("every reference eye dimension must be marked")
 
+# Note 1 is the delegated closure (fan-out rulings 2026-11-07, pin eye A;
+# owner review #2144): the loop's cut end butts the tail's side, in plane,
+# not joined (build_dt_crank_pin_eye.BUTT_AIR_BAND).
 DRAWING_NOTES = "\n".join(
     (
-        "1. LOOP CLOSED ON THE TAIL; LOOP AND TAIL IN ONE PLANE.",
+        "1. LOOP AND TAIL IN ONE PLANE; LOOP END CUT TO BUTT THE TAIL,",
+        "   NOT JOINED, GAP 0-.010.",
         "2. TAIL STRAIGHT.",
     )
 )

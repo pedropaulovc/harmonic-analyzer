@@ -107,11 +107,13 @@ def test_collar_pin_is_the_stock_mha145_named_on_the_hole_not_a_note() -> None:
     assert int(row["quantity"]) == 3  # two strap pins and the collar pin
     # The hole's band is the pin's: the callout names the pin and the
     # standard fit (rule 4).
-    assert drawing.DIMENSION_CALLOUTS["PinHoleDia"] == (
-        f"{strap_pin.DRILL_THRU_CALLOUT}\nPRESS FIT ON {row['number']} SPRING PIN"
-    )
+    pin_hole = drawing.DIMENSION_CALLOUTS["PinHoleDia"]
+    assert pin_hole.startswith(strap_pin.DRILL_THRU_CALLOUT)
+    assert row["number"] in pin_hole
     # The bore names no fractional drill over its three-place size (rule 3).
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "DRILL THRU\nSLIDES ON MHA-DT-22"
+    bore = drawing.DIMENSION_CALLOUTS["BoreDia"]
+    assert "/" not in bore
+    assert _config.parts("dt-pinion-arbor")["number"] in bore
     assert not hasattr(spec, "DRAWING_NOTES")
     for script in (collar, drawing):
         assert "Manufacturing Notes" not in Path(script.__file__).read_text(

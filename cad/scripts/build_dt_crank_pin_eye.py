@@ -3,14 +3,17 @@ r"""Reproduction script: crank keeper-chain anchor eye (book ch. 11, p. 14).
 The small brass wire eye clamped under the slotted anchor screw on the crank
 arm's front face (page001_img02). A straight TAIL_LEN tail lies on the face
 with its end trapped under the screw head, and the wire runs tangent off the
-tail into a closed LOOP_R loop turned 90 deg up off the face, like the
-photographed hook. The loop's hole axis runs across the arm width, and the
-keeper chain (MHA-DT-VN-65) threads it. See ``dt_crank_pin_eye_spec`` for the frame.
+tail into a LOOP_R loop turned 90 deg up off the face, like the photographed
+hook, whose free end is cut to butt the tail's side, in plane, left free
+(0-.010 air; ``BUTT_AIR_BAND``). The loop's hole axis runs across the arm
+width, and the keeper chain (MHA-DT-VN-65) threads it. See
+``dt_crank_pin_eye_spec`` for the frame.
 
-Modelled as a torus about an X-parallel axis LOOP_R along -Z from the origin
-(loop in the YZ plane, through the origin tangent to Y) plus a tail cylinder
-along +Y from the origin. Both bodies share the Top-plane wire circle at the
-origin.
+Modelled as a revolve of the Top-plane wire circle at the origin about an
+X-parallel axis LOOP_R along -Z (loop in the YZ plane, through the origin
+tangent to Y), swept away from the tail and stopped short of it, plus a tail
+cylinder along +Y from the origin. The two bodies meet only on that shared
+wire circle.
 
 ``EyeReference`` (blanked, on the Right plane, the eye's own plane): a circle
 on the loop's inside edge and the tail's axis, whose diameter and whose
@@ -38,7 +41,7 @@ from _drawing_marks import (
 )
 from _drawing_precision import apply_drawing_precision
 from _document_units import apply_package_model_units
-from _feature_tree import name_last_feature
+from _feature_tree import _feature_by_name, name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
@@ -72,31 +75,72 @@ _SAVED_DRAWING_PROPERTIES = (
     "Manufacturing Notes",
 )
 
-def _tail_loop_overlap(steps: int = 64) -> float:
-    """Volume the tail shares with the loop, by midpoint integration.
+# Delegated ruling 2026-11-07 (Main, fan-out rulings: FoDtFab4 pin eye A),
+# no precedent; owner review #2144: the loop's free end is cut to butt the
+# side of the tail, in the eye's plane, left free, with 0-.010 air between
+# them.  A full torus ran the loop back through the tail's own wire (fan-out
+# review, rule 21).  The loop leaves the tail root heading away from the
+# tail and comes back round toward it from below; on that return arc, the
+# wire at loop angle phi (from the root, toward the tail) reaches up to
+# z = -LOOP_R + (LOOP_R + r) cos(phi), and the tail's underside is z = -r.
+# The loop stops where that air is the band's middle, .005.
+BUTT_AIR_BAND = (0.0, 0.254)  # 0-.010 in
+BUTT_AIR = sum(BUTT_AIR_BAND) / 2.0
 
-    The tail runs tangent into the loop, so the two tubes overlap until their
-    centrelines part by a wire diameter (about 1.7 mm along the tail).
-    """
+
+def _butt_angle_deg(air: float) -> float:
+    """Loop angle (from the tail root) where the free end leaves ``air``
+    below the tail's underside."""
     r = WIRE_DIA / 2.0
-    cell = 2.0 * r / steps
-    dy = TAIL_LEN / steps
-    shared = 0.0
-    for iy in range(steps):
-        y = (iy + 0.5) * dy
-        for ix in range(steps):
-            x = -r + (ix + 0.5) * cell
-            for iz in range(steps):
-                z = -r + (iz + 0.5) * cell
-                if x * x + z * z > r * r:
-                    continue
-                ring = math.hypot(y, z + LOOP_R) - LOOP_R
-                if ring * ring + x * x <= r * r:
-                    shared += cell * cell * dy
-    return shared
+    return math.degrees(math.acos((LOOP_R - r - air) / (LOOP_R + r)))
 
 
-V_EYE = V_LOOP + V_TAIL - _tail_loop_overlap()
+LOOP_GAP_DEG = _butt_angle_deg(BUTT_AIR)
+LOOP_SWEEP_DEG = 360.0 - LOOP_GAP_DEG
+if not _butt_angle_deg(BUTT_AIR_BAND[0]) < LOOP_GAP_DEG < _butt_angle_deg(BUTT_AIR_BAND[1]):
+    raise AssertionError("the loop's free end must stop inside its 0-.010 air band")
+# The loop and the tail meet only on the shared root face: no shared volume.
+V_LOOP_SWEPT = V_LOOP * LOOP_SWEEP_DEG / 360.0
+V_EYE = V_LOOP_SWEPT + V_TAIL
+
+
+async def _revolve_loop(adapter) -> None:
+    """Sweep the loop away from the tail, so its open arc faces the tail.
+
+    FeatureRevolve2's single direction is not tied to the sketch's sense, so
+    the loop's centre of mass decides: with the gap on the tail's (+Y) side
+    it sits below Y = 0.  A loop swept the other way is deleted and swept
+    reversed from the same profile.
+    """
+    from solidworks_mcp.adapters.base import RevolveParameters
+
+    for reverse in (False, True):
+        check(
+            "revolve loop",
+            await adapter.create_revolve(
+                RevolveParameters(angle=LOOP_SWEEP_DEG, reverse_direction=reverse)
+            ),
+        )
+        name_last_feature(adapter, "Loop")
+        await volume_check(adapter, "loop", V_LOOP_SWEPT, 0.01 * V_LOOP_SWEPT)
+        mass = await adapter.get_mass_properties()
+        if not mass.is_success:
+            raise RuntimeError(f"loop: get_mass_properties failed: {mass.error}")
+        if float(mass.data.center_of_mass[1]) < 0.0:
+            return
+        if reverse:
+            raise RuntimeError("loop: both sweep directions left the gap off the tail side")
+        model = adapter.currentModel
+        model.ClearSelection2(True)
+        if not _feature_by_name(adapter, "Loop").Select2(False, 0):
+            raise RuntimeError("loop: failed to select the wrong-way sweep")
+        # swDeleteSelectionOptions 0: the feature only, keeping its profile.
+        if not model.Extension.DeleteSelection2(0):
+            raise RuntimeError("loop: failed to delete the wrong-way sweep")
+        await force_rebuild(adapter)
+        model.ClearSelection2(True)
+        if not _feature_by_name(adapter, "WireProfile").Select2(False, 0):
+            raise RuntimeError("loop: failed to reselect the wire profile")
 
 
 async def _wire_circle(adapter, dims: SketchDims, names: tuple[str, str, str]) -> None:
@@ -107,7 +151,7 @@ async def _wire_circle(adapter, dims: SketchDims, names: tuple[str, str, str]) -
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
+    from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
@@ -136,9 +180,7 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch wire", await adapter.exit_sketch())
     name_last_feature(adapter, "WireProfile")
     drive_jobs += prof.apply(adapter, "WireProfile")
-    check("revolve loop", await adapter.create_revolve(RevolveParameters(angle=360.0)))
-    name_last_feature(adapter, "Loop")
-    await volume_check(adapter, "loop", V_LOOP, 0.01 * V_LOOP)
+    await _revolve_loop(adapter)
 
     # Tail: the same Top-plane wire circle, extruded along the plane normal
     # (+Y) from the loop's tangent point toward the screw.
