@@ -94,6 +94,7 @@ import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec
 from _inch_wall_limits import WALL_TARGET_MM
+from _package_units import drawing_unit
 from _printed_tolerance import printed_band_mm
 
 INCH = trammel.INCH
