@@ -9,12 +9,14 @@ would re-key them on every drawing edit. Imported ONLY by
 The model is the INSTALLED pin, so the blank's cut length prints from a
 blanked reference sketch as a single MIN limit (drawing-simplicity-policy.md
 `How the repository implements the guidelines`: the model dimension, never
-note text, owns it). The journal's two fits are flagged at its Ø callout,
-where they apply (rules 4 and 7): pressed in the fork's reamed hole (user
-ruling 2026-10-09, PR #1292 review F1), running in the arm's #47 hole. The
-sheet carries no note: pressing the pin and dressing its ends flush is an
-assembly instruction (rule 7), which MHA-CH-00's rod-forks-pinned step gives.
-The title block owns the drill rod (MATERIAL) and its finish.
+note text, owns it), and the installed length prints as the size set at
+assembly with its limits and acceptance (rule 19: a supply size and a
+set-at-assembly size for one feature). The journal's two fits are flagged at
+its Ø callout, where they apply (rules 4 and 7): pressed in the fork's reamed
+hole (user ruling 2026-10-09, PR #1292 review F1), running in the arm's #47
+hole. The sheet carries no note: pressing the pin and dressing its ends is
+MHA-CH-00's rod-forks-pinned step. The title block owns the drill rod
+(MATERIAL) and its finish.
 """
 
 from __future__ import annotations
@@ -25,11 +27,12 @@ from __future__ import annotations
 # (drawing-guidelines.md rule 11 (turned parts read like the lathe), turned part). The journal is the as-bought
 # 5/64 drill rod: the sheet prints it as the stock fraction, a REFERENCE whose
 # supplier grind (+/-.0002) governs (#290 ruling: fractions only on as-bought
-# stock, shown as REF); the installed length is the fork's thickness,
-# printed as REFERENCE (the fork print owns it) at its three places. The
-# blank's cut length lives on the blanked ``BlankReference`` sketch on the
-# same plane as a single MIN limit at two places (the dressing stock in
-# ch_rod_pivot_pin_spec.joint_budget is judged at it).
+# stock, shown as REF). The installed length is set at assembly, flush with
+# the fork's outer faces, so it carries the fork thickness's worst-case
+# band natively at three places (fan-out round 1, rule 19: a set size needs
+# limits). The blank's cut length lives on the blanked ``BlankReference``
+# sketch on the same plane as a single MIN limit at two places (the dressing
+# stock in ch_rod_pivot_pin_spec.joint_budget is judged at it).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {"PinDia", "PinLen"},
     "BlankReference": {"BlankLen"},
@@ -43,7 +46,9 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for dimensions in DRAWING_PRECISION.values()
     for name, decimals in dimensions.items()
 }
-REFERENCE_DIMENSIONS = frozenset({"PinLen"})
+# The installed length's setting and acceptance, under its band (rule 19's
+# `SET AT ASSEMBLY`; the mate by number, rule 4).
+PIN_LENGTH_CALLOUT = "SET AT ASSEMBLY\nFLUSH WITH MHA-CH-03 FORK FACES"
 if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
     DRAWING_PRECISION_BY_NAME
 ):

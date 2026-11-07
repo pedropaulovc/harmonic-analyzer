@@ -57,12 +57,15 @@ from _sketch import (
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _com import _early_bound
 from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _fit_deviations import deviations
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
 from _saved_part_guard import require_saved_drawing_properties
+from ch_connecting_rod_spec import FORK_THICKNESS_BAND
 from ch_rod_pivot_pin_notes import DRAWING_DIMENSIONS, DRAWING_PRECISION
 from ch_rod_pivot_pin_spec import (
     PIN_BLANK_LENGTH,
@@ -228,10 +231,18 @@ async def build(adapter) -> dict[str, str]:
 
     # The journal is the as-bought 5/64 drill rod: untoleranced, the sheet
     # prints it as the stock fraction's REFERENCE (the supplier's grind
-    # governs); the installed length is the fork's, parenthesized as
-    # REFERENCE on the sheet; the blank's cut length is a single MIN limit (it
-    # only has to leave dressing stock, ch_rod_pivot_pin_spec.joint_budget
-    # blank_excess_min).
+    # governs). The installed length is set at assembly flush with the fork's
+    # outer faces, so it carries the fork thickness's worst-case band (rule
+    # 19: a set size has limits). The blank's cut length is a single MIN
+    # limit (it only has to leave dressing stock,
+    # ch_rod_pivot_pin_spec.joint_budget blank_excess_min).
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "PinProfile",
+        "PinLen",
+        *deviations(FORK_THICKNESS_BAND),
+        display_unit=part_drawing_unit(PART_NAME),
+    )
     _blank_min_limit(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

@@ -70,28 +70,38 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert part.DRAWING_DIMENSIONS is notes.DRAWING_DIMENSIONS
     marked = set().union(*notes.DRAWING_DIMENSIONS.values())
     assert set(drawing.RIGHT_KEEP) == marked == {"PinDia", "PinLen", "BlankLen"}
-    assert notes.REFERENCE_DIMENSIONS == {"PinLen"}
     # Drawing-only data stays out of the spec the channel assembly imports.
-    for name in ("DRAWING_DIMENSIONS", "DRAWING_PRECISION", "REFERENCE_DIMENSIONS"):
+    for name in ("DRAWING_DIMENSIONS", "DRAWING_PRECISION", "PIN_LENGTH_CALLOUT"):
         assert not hasattr(spec, name), name
     assert not hasattr(drawing, "FRONT_KEEP")
 
 
 def test_precision_and_band_are_authored_on_the_part() -> None:
     # The journal is the as-bought drill rod: no model band (its stock
-    # fraction prints as a REFERENCE; the supplier's grind governs).
+    # fraction prints as a REFERENCE; the supplier's grind governs). The
+    # installed length is set at assembly flush with the fork's outer faces,
+    # so it carries the fork thickness's worst-case band (fan-out round 1,
+    # rule 19: a set-at-assembly size has limits and its acceptance).
     assert "draw_ch_rod_pivot_pin.py" in PRECISION_MIGRATED_DRAWINGS
     source = _source()
     assert "set_dimension_precision" not in source
     assert "SetPrecision3" not in source
     assert "assert_imported_precision(" in source
-    # A LINEAR reference: the plural helper forces a diameter glyph.
-    assert "set_reference_dimensions(" not in source
-    assert "set_reference_dimension(adapter, matches[0]" in source
+    assert "set_reference_dimension" not in source
     assert "hidden_sketches.curate_view_dimensions(" in source
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in _build_source()
     assert "require_saved_drawing_properties(" in _build_source()
-    assert model_toleranced_dimensions(part) == {}
+    assert model_toleranced_dimensions(part) == {
+        ("PinProfile", "PinLen"): "*deviations(FORK_THICKNESS_BAND)",
+    }
+    assert rod.FORK_THICKNESS_BAND == pytest.approx((0.006 * 25.4, -0.006 * 25.4))
+    assert notes.PIN_LENGTH_CALLOUT.splitlines() == [
+        "SET AT ASSEMBLY",
+        "FLUSH WITH MHA-CH-03 FORK FACES",
+    ]
+    assert '"PinLen": PIN_LENGTH_CALLOUT' in source
+    # The blank's MIN still leaves stock over the longest set length.
+    assert spec.PIN_BLANK_LENGTH > spec.PIN_INSTALLED_LENGTH + rod.FORK_THICKNESS_BAND[0]
 
 
 def test_blank_length_is_a_model_dimension_with_its_min_limit() -> None:
