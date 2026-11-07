@@ -10,6 +10,7 @@ import pytest
 
 import _config
 import build_ch_rocker_arm_tl_oblique_hub_stud as part
+import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_oblique_hub_stud_spec as spec
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_hub_stud as drawing
@@ -18,6 +19,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _fit_ream_h7 import REAM_H7
 from _hole_spec import THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_TARGET_MM
+from _layout_geometry import Segment, segment_circle_distance
 from _machinist_review_mode import MachinistReviewMode
 
 STEM = "ch-rocker-arm-tl-oblique-hub-stud"
@@ -86,6 +88,76 @@ def test_nose_band_names_why_it_is_tight() -> None:
     assert "(.4000-.4005 REF)" in callout
     assert "HOLDS THE .005\nEDGE-TO-HUB ALLOCATION" in callout
     assert "TOP OF RISER " + spec.RISER_NUMBER in spec.DIMENSION_CALLOUTS["FitLength"]
+
+
+def test_nose_callout_states_actual_float_against_floored_relative_allowance() -> None:
+    callout = drawing.DIMENSION_CALLOUTS["NoseDia"]
+    suffix = "\nOF .00037 LEFT IN TL-21'S\n.005 PIN-RELATIVE BUDGET"
+    assert callout == spec.DIMENSION_CALLOUTS["NoseDia"] + suffix
+    assert "ALLOCATION" not in callout
+    assert "MAX RADIAL FLOAT" in callout
+    assert carrier.HUB_NOSE_RADIAL_FLOAT == pytest.approx(spec.NOSE_CLEARANCE[1] / 2)
+    assert carrier.HUB_NOSE_RADIAL_FLOAT <= carrier.NOSE_FLOAT_ALLOWANCE
+    printed = float(callout.split("\nOF ", 1)[1].split(" ", 1)[0])
+    available = carrier.NOSE_FLOAT_ALLOWANCE / INCH
+    assert printed <= available < printed + 0.00001
+    assert drawing.SIDE_KEEP["NoseDia"] == pytest.approx(
+        (drawing._sx(spec.LENGTH) + 0.035, drawing._ABOVE + 0.030)
+    )
+    assert {
+        name: text for name, text in drawing.DIMENSION_CALLOUTS.items() if name != "NoseDia"
+    } == {
+        name: text for name, text in spec.DIMENSION_CALLOUTS.items() if name != "NoseDia"
+    }
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)" in source
+
+
+def test_both_nose_wordings_clear_ink_and_shoulder_obstacles_at_normal_font() -> None:
+    # 84d native PNG: four note rows + two value/tolerance rows, ink/shoulder
+    # x .1955..2681, y .1794..2106. The requested keep was x .195599,y .195:
+    # x is the LEFT ink edge, not the measured block's .2318 centre.
+    # Use the existing leadscrew-kit regression's conservative normal-font
+    # envelope (6.5 mm/row, 2.9 mm/character), covering 84d's 5.2/2.66 mm.
+    row_pitch, char_advance = 0.0065, 0.0029
+
+    def envelope(point, text):
+        rows = 2 + len(text.splitlines())  # value and tolerance are real rows
+        return (
+            point[0] - 0.001,
+            point[1] - rows * row_pitch / 2,
+            point[0] + max(map(len, text.splitlines())) * char_advance,
+            point[1] + rows * row_pitch / 2,
+        )
+
+    old_text = (
+        "LOCATES STRAP MHA-CH-13 HUB\nHOLE (.4000-.4005 REF): BAND\n"
+        "HOLDS THE .005\nEDGE-TO-HUB ALLOCATION"
+    )
+    old = envelope(
+        (drawing._sx(spec.LENGTH) + 0.036, drawing._ABOVE + 0.008), old_text,
+    )
+    measured = (0.1955, 0.1794, 0.2681, 0.2106)
+    assert old[0] <= measured[0] and old[1] <= measured[1]
+    assert old[2] >= measured[2] and old[3] >= measured[3]
+    radius = spec.FLANGE_DIA * drawing._K / 2
+    circle = (*drawing.END_CENTER, radius)
+    assert segment_circle_distance(Segment(0.1955, 0.1794, 0.2681, 0.1794), circle) == 0
+
+    x, table_y = drawing.SIDE_KEEP["NoseDia"]
+    for text, y, rows in (
+        (spec.DIMENSION_CALLOUTS["NoseDia"], drawing._ABOVE + 0.022, 5),
+        (drawing.DIMENSION_CALLOUTS["NoseDia"], table_y, 7),
+    ):
+        assert 2 + len(text.splitlines()) == rows
+        left, bottom, right, top = envelope((x, y), text)
+        assert bottom >= drawing.END_CENTER[1] + radius + 0.002
+        assert segment_circle_distance(Segment(left, bottom, right, bottom), circle) >= 0.002
+        # Unchanged neighboring ink measured in 84d: shank's right edge,
+        # nose-tap callout's left edge. RootRadius is farther left (<.13).
+        assert left >= 0.189 + 0.002
+        assert right <= 0.2798 - 0.002
+        assert top <= 0.2667 - 0.002
 
 
 def test_end_view_is_the_true_nose_end_projection() -> None:

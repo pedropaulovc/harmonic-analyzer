@@ -715,16 +715,29 @@ def _left_clamp_thread_dimension(adapter):
     return matches[0]
 
 
-def _require_left_clamp_thread_min(adapter) -> None:
+def _require_left_clamp_thread_min(adapter, *, stage: str = "model") -> int:
     display, dimension = _left_clamp_thread_dimension(adapter)
     display = _early_bound(_bind(display, "IDisplayDimension"), "IDisplayDimension")
     dimension = _early_bound(_bind(dimension, "IDimension"), "IDimension")
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    if (int(tolerance.Type) != LEFT_CLAMP_THREAD_TOL_TYPE
-            or abs(float(tolerance.GetMinValue())) > 1e-12
-            or abs(float(tolerance.GetMaxValue())) > 1e-12
-            or int(display.GetPrimaryPrecision2()) != LEFT_CLAMP_THREAD_PLACES):
-        raise RuntimeError("LeftClampTap: source-model thread-depth MIN did not persist")
+    precision = int(display.GetPrimaryPrecision2())
+    tolerance_type = int(tolerance.Type)
+    lower = float(tolerance.GetMinValue())
+    upper = float(tolerance.GetMaxValue())
+    observed = (
+        f"stage={stage!r}, precision={precision}, tolerance_type={tolerance_type}, "
+        f"lower_m={lower!r}, upper_m={upper!r}"
+    )
+    _telemetry.info(f"LeftClampTap source thread-depth: {observed}")
+    if (tolerance_type != LEFT_CLAMP_THREAD_TOL_TYPE
+            or abs(lower) > 1e-12 or abs(upper) > 1e-12
+            or precision != LEFT_CLAMP_THREAD_PLACES):
+        raise RuntimeError(
+            f"LeftClampTap: source-model thread-depth MIN did not persist: {observed}; "
+            f"expected precision={LEFT_CLAMP_THREAD_PLACES}, "
+            f"tolerance_type={LEFT_CLAMP_THREAD_TOL_TYPE}, lower_m=upper_m=0"
+        )
+    return tolerance_type
 
 
 def _author_left_clamp_thread_min(adapter) -> None:
@@ -1010,6 +1023,7 @@ async def build(adapter) -> dict[str, str]:
     )
     _require_left_clamp_thread_min(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    _require_left_clamp_thread_min(adapter, stage="after drawing precision")
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -1023,6 +1037,7 @@ async def build(adapter) -> dict[str, str]:
         },
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
+    _require_left_clamp_thread_min(adapter, stage="after final part save")
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
 

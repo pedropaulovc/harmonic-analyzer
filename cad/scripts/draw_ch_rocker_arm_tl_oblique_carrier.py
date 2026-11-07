@@ -507,34 +507,79 @@ for _stem, _points, _thread, _drill, _spec_name, _places, _y_places in _TAPS:
         )
 
 
-def _left_clamp_depth_callout(callout: Any) -> None:
-    """Print the model-owned required thread depth as MIN, pilot at .XX."""
+def _trace_left_clamp_callout(callout: Any, *, stage: str) -> None:
+    """Read native depth state without changing model or callout tolerances."""
     from win32com.client.dynamic import Dispatch as dynamic_dispatch
+
+    depths = {}
+    for raw in callout.GetHoleCalloutVariables() or ():
+        variable = dynamic_dispatch(raw._oleobj_)
+        name = str(variable.VariableName)
+        if name in ("hw-threaddepth", "hw-tapdrldepth"):
+            length = _early_bound(raw, "ICalloutLengthVariable")
+            depths[name] = {
+                "length_m": float(length.Length),
+                "precision": int(length.Precision),
+                "tolerance_type": int(variable.ToleranceType),
+            }
+    native = _early_bound(callout, "IDisplayDimension")
+    text = {part: str(native.GetText(part) or "") for part in range(1, 9)}
+    _telemetry.info(f"LeftClampTap callout: stage={stage!r}, depths={depths!r}, text={text!r}")
+
+
+def _left_clamp_depth_callout(callout: Any, *, source_thread_tolerance: int) -> None:
+    """Present a verified saved-model MIN through the separate callout API."""
+    if source_thread_tolerance != part_spec.LEFT_CLAMP_THREAD_TOL_TYPE:
+        raise RuntimeError(
+            f"left clamp: cannot present an unverified source MIN: "
+            f"tolerance_type={source_thread_tolerance}"
+        )
 
     required = {
         "hw-threaddepth": (
             part_spec.LEFT_CLAMP_THREAD_DEPTH,
             part_spec.LEFT_CLAMP_THREAD_PLACES,
-            part_spec.LEFT_CLAMP_THREAD_TOL_TYPE,
+            source_thread_tolerance,
         ),
         "hw-tapdrldepth": (part_spec.LEFT_CLAMP_DRILL_DEPTH, 2, 0),
     }
     for raw in callout.GetHoleCalloutVariables() or ():
-        variable = dynamic_dispatch(raw._oleobj_)
+        variable = _early_bound(raw, "ICalloutVariable")
         name = str(variable.VariableName)
         if name not in required:
             continue
         nominal, places, tolerance_type = required.pop(name)
         length = _early_bound(raw, "ICalloutLengthVariable")
-        if abs(float(length.Length) * 1000.0 - nominal) > 1e-5:
-            raise RuntimeError(f"left clamp {name}: wrong native depth")
+        observed_mm = float(length.Length) * 1000.0
+        before_precision = int(length.Precision)
+        before_tolerance = int(variable.ToleranceType)
+        if abs(observed_mm - nominal) > 1e-5:
+            raise RuntimeError(
+                f"left clamp {name}: wrong native depth: observed_mm={observed_mm!r}, "
+                f"expected_mm={nominal!r}"
+            )
         length.Precision = places
-        if int(length.Precision) != places or int(variable.ToleranceType) != tolerance_type:
-            raise RuntimeError(f"left clamp {name}: source depth precision/tolerance was not preserved")
+        if name == "hw-threaddepth":
+            # SDK: IDimensionTolerance.Type does not override this independent
+            # multi-value callout setting. Copy only the verified model control.
+            variable.ToleranceType = source_thread_tolerance
+        precision = int(length.Precision)
+        actual_tolerance = int(variable.ToleranceType)
+        observed = (
+            f"length_mm={observed_mm!r}, precision={before_precision}->{precision}, "
+            f"tolerance_type={before_tolerance}->{actual_tolerance}; "
+            f"expected precision={places}, tolerance_type={tolerance_type}"
+        )
+        _telemetry.info(f"LeftClampTap callout formatted {name}: {observed}")
+        if precision != places or actual_tolerance != tolerance_type:
+            raise RuntimeError(
+                f"left clamp {name}: source depth precision/tolerance was not preserved: "
+                f"{observed}"
+            )
     if required:
         raise RuntimeError(f"left clamp callout omits native depths: {sorted(required)}")
-    # The MIN belongs to the model. A drawing may set callout decimal places,
-    # never repair a missing source tolerance here.
+    # No model IDimension or tolerance is mutated here. The reopened source
+    # must already own the MIN and explicit precision before a drawing exists.
 
 
 # Copied from _trammel_block_drawing (the old trammel kit is being retired;
@@ -1127,10 +1172,15 @@ def _hole_table_sheet(adapter: Any, source_model: Any) -> Any:
 
 
 async def build(adapter: Any) -> dict[str, str]:
+    from build_ch_rocker_arm_tl_oblique_carrier import _require_left_clamp_thread_min
+
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open carrier source", await adapter.open_model(str(SOURCE)))
+    source_thread_tolerance = _require_left_clamp_thread_min(
+        adapter, stage="drawing source reopened",
+    )
     source_model = adapter.currentModel
     required = (
         "Number",
@@ -1245,10 +1295,14 @@ async def build(adapter: Any) -> dict[str, str]:
             label=label,
             edge=_circle_edge(adapter, top, drill, label, center_x_mm=x, center_y_mm=y),
         )
+        if thread == part_spec.LEFT_CLAMP_THREAD:
+            _trace_left_clamp_callout(callout, stage="native callout created")
         _strip_thread_class(callout, label=f"{label} callout", thread=thread)
+        if thread == part_spec.LEFT_CLAMP_THREAD:
+            _trace_left_clamp_callout(callout, stage="thread class stripped")
         set_callout_lengths_to_three_places(callout, label=f"{label} callout")
         if thread == part_spec.LEFT_CLAMP_THREAD:
-            _left_clamp_depth_callout(callout)
+            _left_clamp_depth_callout(callout, source_thread_tolerance=source_thread_tolerance)
         if function is not None:
             _append_callout_below(callout, function, label=f"{label} callout")
 

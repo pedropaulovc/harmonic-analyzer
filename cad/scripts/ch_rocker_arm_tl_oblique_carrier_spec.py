@@ -45,8 +45,9 @@ Values marked (calc) are read from ``trammel``, never retyped:
   ``trammel.HUB_OFFSET`` (``HUB_OFFSET_BAND``), then reamed to Ø.4000
   +.0005/0 (the purchased .4000 reamer) for the removable TL-33 hub clamp stud.
   The pin spacing moves HUB with the cut. The residual pin-shape error is
-  bounded against that same HUB by ``PIN_RELATIVE_ERROR``, in addition to
-  the setting and pin-clearance stack ``HUB_RADIAL_STACK``.
+  bounded against that same HUB by ``PIN_RELATIVE_ERROR``. Together with
+  carrier/stud slip and strap/nose float it fills ``PIN_RELATIVE_STACK``;
+  the separate setting/pin-clearance half remains ``HUB_RADIAL_STACK``.
 * (calc) CR (+6.334, 1.156): 1/4-20 UNC tapped THRU for the clamp screw that
   clamps the MHA-CH-13 strap (``CR_TAP_CALLOUT``); its SHCS head (Ø.375) is
   under the Ø12 mm that clears both cutter paths.
@@ -614,12 +615,37 @@ PIN_RELATIVE_ERROR = {
     name: max(abs(value) for value in PIN_ROUNDED_BUDGET[name])
     for name in ("inner", "outer")
 }
-# Owner's .010 half-band less the conservatively rounded .005 HUB stack.
+# Owner's .010 half-band is two independent .005 allocations: setting and
+# pin-shoulder clearance first; correlated shape plus both locating floats
+# second. Never spend the first half's tiny remainder on the stud nose.
 PIN_RELATIVE_ALLOWANCE = _TOP_EDGE_HALF_BAND - 0.005 * trammel.INCH
 if HUB_RADIAL_STACK > 0.005 * trammel.INCH:
     raise AssertionError("HUB setting and clearance exceed the reserved .005")
-if max(PIN_RELATIVE_ERROR.values()) >= PIN_RELATIVE_ALLOWANCE:
-    raise AssertionError("correlated pin errors exceed the remaining .005 HUB budget")
+HUB_SHANK_RADIAL_FLOAT = HUB_SLIP_CLEARANCE_MAX / 2.0
+HUB_NOSE_RADIAL_FLOAT = hub_stud.NOSE_CLEARANCE[1] / 2.0
+NOSE_FLOAT_ALLOWANCE = (
+    PIN_RELATIVE_ALLOWANCE - max(PIN_RELATIVE_ERROR.values()) - HUB_SHANK_RADIAL_FLOAT
+)
+
+
+def require_pin_relative_budget(nose_radial_float: float) -> float:
+    """Return the complete relative stack, refusing a nose fit beyond its half."""
+    if not math.isfinite(nose_radial_float) or nose_radial_float < 0.0:
+        raise ValueError("nose radial float must be finite and nonnegative")
+    stack = max(PIN_RELATIVE_ERROR.values()) + HUB_SHANK_RADIAL_FLOAT + nose_radial_float
+    if stack > PIN_RELATIVE_ALLOWANCE:
+        raise AssertionError(
+            "correlated pin error plus carrier/stud and strap/nose float exceed "
+            f"the relative .005 budget: stack_mm={stack!r}, "
+            f"allowance_mm={PIN_RELATIVE_ALLOWANCE!r}, "
+            f"nose_float_mm={nose_radial_float!r}, "
+            f"nose_allowance_mm={NOSE_FLOAT_ALLOWANCE!r}"
+        )
+    return stack
+
+
+PIN_RELATIVE_STACK = require_pin_relative_budget(HUB_NOSE_RADIAL_FLOAT)
+PIN_RELATIVE_REMAINING = PIN_RELATIVE_ALLOWANCE - PIN_RELATIVE_STACK
 # Owner's approximate bounds: .0088/.0177 absolute, .0001/.0038 relative.
 # The .0001 is rounded: the continuous top-edge enclosure is under .0002.
 for _name, _expected in (("R800", .0089), ("R816", .0178), ("inner", .0002), ("outer", .0039)):

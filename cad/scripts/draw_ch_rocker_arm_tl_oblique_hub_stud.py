@@ -26,6 +26,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -61,8 +62,9 @@ from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
+import ch_rocker_arm_tl_oblique_carrier_spec as carrier
+import ch_rocker_arm_tl_oblique_hub_stud_spec as stud_spec
 from ch_rocker_arm_tl_oblique_hub_stud_spec import (
-    DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FIT_LENGTH_PLACES,
@@ -76,6 +78,18 @@ from ch_rocker_arm_tl_oblique_hub_stud_spec import (
     TAP_DRILL_DIA,
     TAP_SPEC,
 )
+
+# This layer owns the pin-relative allocation; the independently importable
+# stud spec owns only the actual fit. Round available float DOWN, never up.
+_NOSE_FLOAT_ALLOWANCE_IN = math.floor(carrier.NOSE_FLOAT_ALLOWANCE / 25.4 * 1e5) / 1e5
+_NOSE_FLOAT_ALLOWANCE_TEXT = f"{_NOSE_FLOAT_ALLOWANCE_IN:.5f}".lstrip("0")
+DIMENSION_CALLOUTS = {
+    **stud_spec.DIMENSION_CALLOUTS,
+    "NoseDia": (
+        stud_spec.DIMENSION_CALLOUTS["NoseDia"]
+        + f"\nOF {_NOSE_FLOAT_ALLOWANCE_TEXT} LEFT IN TL-21'S\n.005 PIN-RELATIVE BUDGET"
+    ),
+}
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -132,8 +146,11 @@ _ABOVE = _sy(FLANGE_DIA / 2.0)
 # Side view: the length rows hang under the flange's bottom edge, each from
 # the flange seat (rule 11: lengths from the faced end), the shortest
 # nearest; the diameters stand above (shank, nose) or left of the flange.
-# The nose callout stands right of the nose, clear of the shank callout's
-# shelf (r2 review: the two had interleaved above the shank).
+# The leadered nose keep is the ink's LEFT edge in x and centre in y (84d
+# native ink). Its five note rows plus two value/tolerance rows need the
+# table-layer +.030 rise: at the conservative normal 6.5 mm row pitch the
+# lower ink/shoulder envelope clears the end-view flange by 7.25 mm.
+# +.035 in x also leaves room between the shank and nose-tap callout ink.
 SIDE_KEEP = {
     "FlangeThick": (_sx(FLANGE_THICK / 2.0), _BELOW - 0.010),
     "ShankLength": (_sx(FLANGE_THICK + SHANK_LENGTH / 2.0), _BELOW - 0.020),
@@ -141,7 +158,7 @@ SIDE_KEEP = {
     "SupplyLength": (_sx((FLANGE_THICK + LENGTH) / 2.0), _BELOW - 0.046),
     "FlangeDia": (_sx(0.0) - 0.018, _sy(0.0)),
     "ShankDia": (_sx(FLANGE_THICK + SHANK_LENGTH / 2.0), _ABOVE + 0.018),
-    "NoseDia": (_sx(LENGTH) + 0.036, _ABOVE + 0.008),
+    "NoseDia": (_sx(LENGTH) + 0.035, _ABOVE + 0.030),
     "RootRadius": (_sx(FLANGE_THICK) + 0.004, _ABOVE + 0.036),
 }
 # The fit-up reference's two-row callout is wider than the .79 span between
