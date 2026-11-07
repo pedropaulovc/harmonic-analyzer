@@ -2754,7 +2754,7 @@ def test_prompts_define_the_classification_contract() -> None:
         assert "contradiction > missing > unbuildable > over_specification" in prompt
         assert "FIX if and only if blockers" in prompt
         assert 'never invent a hybrid category such as "minor clarity"' in prompt
-        assert "the first that applies in this precedence" in prompt
+        assert "use this precedence only when one defect meets more than one type" in prompt
 
 
 # --- owner-declared machinist exceptions -------------------------------------
@@ -5758,11 +5758,17 @@ def test_aggregate_counts_unique_runs_and_only_confirmed_gating_clusters(
 
 
 @pytest.mark.parametrize(
-    ("members", "verdict"),
-    [(["r1.blockers.1"], "SHIP"), (["r1.blockers.1", "r3.blockers.1"], "FIX")],
+    ("members", "category", "verdict"),
+    [
+        (["r1.blockers.1"], "blockers", "FIX"),
+        (["r1.blockers.1"], "clarity", "SHIP"),
+        (["r1.blockers.1"], "over_specification", "SHIP"),
+        (["r1.blockers.1", "r3.blockers.1"], "clarity", "FIX"),
+    ],
 )
-def test_aggregate_gates_only_findings_raised_by_two_runs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, members: list[str], verdict: str,
+def test_aggregate_gates_blockers_on_one_run_and_other_categories_on_two(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, members: list[str], category: str,
+    verdict: str,
 ) -> None:
     source = _png_source(tmp_path / "sheet.png")
 
@@ -5772,7 +5778,7 @@ def test_aggregate_gates_only_findings_raised_by_two_runs(
             return _session_reply(command, kwargs, _finding_verdict())
         rest = [finding["id"] for finding in findings if finding["id"] not in members]
         value = {"clusters": [
-            _judge_cluster(members),
+            _judge_cluster(members, category=category),
             _judge_cluster(rest, decision="misread"),
         ]}
         return _session_reply(command, kwargs, value)
