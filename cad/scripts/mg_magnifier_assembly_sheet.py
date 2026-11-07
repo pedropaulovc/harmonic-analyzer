@@ -210,6 +210,19 @@ _STACK = (
     f"{ITEM_NUMBERS[WHEEL]} ({_DRUM} AWAY FROM {_BAR}) AND {ITEM_NUMBERS[FRONT_WASHER]}"
 )
 
+# Rule 23: a specified anaerobic bond equals a press fit. The one bond in this
+# package is the slip-fit drum's fallback (provisional ruling 2026-11-06,
+# pending owner confirmation); its degrease, apply, keep-off and cure rules
+# print once, as a general note with the checks on sheet 5, in two lines
+# (the sheet 5 column has under three to spare).
+BOND_GRADE = "LOCTITE 638"
+BOND_NOTE_REF = "NOTE 1 (SHEET 5)"
+BOND_NOTE = (
+    f"NOTE 1, {BOND_GRADE} BOND: DEGREASE; APPLY TO THE SPIGOT ONLY, NONE IN THE "
+    "AXLE BORE OR WIRE SEATS; CURE 24 H AT ROOM TEMPERATURE BEFORE LOAD OR OIL. "
+    f"ACCEPT: {_DRUM} DOES NOT TURN BY HAND."
+)
+
 # One line per step key (mg_magnifier_assembly_steps.SEQUENCE); each step does
 # one thing, a check and its remedy are separate steps (rule 22). Settings are
 # named, never valued: their values print as the model dimensions on sheet 1.
@@ -220,11 +233,12 @@ STEP_TEXT = {
         f"PRESS {_DRUM} ONTO THE SPIGOT OF {_WHEEL}, HARD AGAINST THE BOSS."
     ),
     _steps.DRUM_HELD_KEY: f"CHECK {_DRUM} DOES NOT TURN OR SLIDE BY HAND.",
-    # A press that goes on by hand is a slip fit (rule 23): the remedy is to
-    # remake the part its sheet rejects, never a fix at the bench.
+    # A press that goes on by hand is a slip fit (rule 23). Provisional ruling
+    # 2026-11-06, pending owner confirmation: a bond equals a press, so a slip
+    # drum is bonded rather than the wheel remade (BOND_NOTE).
     "drum-slip-fit": (
-        f"IF IT DOES, OR {_DRUM} SLID ON BY HAND, PULL IT OFF, REMAKE THE PART "
-        f"OFF ITS PRESS SIZE AND RETURN TO {_step(_steps.DRUM_PRESSED_KEY)}."
+        f"IF IT DOES, OR {_DRUM} SLID ON BY HAND: PULL IT OFF AND BOND IT TO "
+        f"{_WHEEL} WITH {BOND_GRADE}, {BOND_NOTE_REF}."
     ),
     # Machinist review (run 20261024T053015093Z): the REF depth is the first
     # stop; the ACCEPT limit governs any further press.
@@ -234,8 +248,8 @@ STEP_TEXT = {
     ),
     _steps.AXLE_HELD_KEY: f"CHECK {_AXLE} DOES NOT TURN OR SLIDE BY HAND.",
     "axle-slip-fit": (
-        f"IF IT DOES, OR {_AXLE} SLID IN BY HAND, PRESS IT OUT, REMAKE THE PART "
-        f"OFF ITS PRESS SIZE AND RETURN TO {_step(_steps.AXLE_PRESSED_KEY)}."
+        f"IF IT DOES, OR {_AXLE} SLID IN BY HAND: PRESS IT OUT, REMAKE {_AXLE} TO "
+        f"ITS PRESS SIZE AND RETURN TO {_step(_steps.AXLE_PRESSED_KEY)}."
     ),
     _steps.AXLE_TRIAL_KEY: f"TRIAL-FIT {_STACK} ON {_AXLE}, IN THAT ORDER.",
     "trial-nuts-jammed": (
@@ -396,4 +410,5 @@ ASSEMBLY_CHECKS = (
     f"LOOSE ITEMS: BOTH {_item(BRACKET_SCREW)} SCREWS GO WITH THE ASSEMBLY; "
     f"{_ha_steps.step_ref('magnifier-bracket-screwed')} DRIVES THEM THROUGH "
     f"{_BRACKET} INTO {SUMMING_LEVER_NUMBER} UNTIL THE HEADS SEAT.",
+    BOND_NOTE,
 )
