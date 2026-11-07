@@ -16,9 +16,9 @@ is modelled by a hidden reference sketch). The wire is purchased stock, so it
 prints as REFERENCE on the tail's end, where the top view sees it end-on.
 
 drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the loop
-is closed on the tail, and the tail is clamped flat under the anchor screw's
-head; the loop's callout names the chain that threads it. The title block
-owns the brass wire.
+is closed on the tail and the tail is straight; the clamping under the anchor
+screw's head is MHA-DT-00's step, not this sheet's.  The loop's callout names
+the chain that threads it. The title block owns the brass wire.
 """
 
 from __future__ import annotations
@@ -64,7 +64,6 @@ if not REFERENCE_DIMENSIONS <= set(DRAWING_PRECISION_BY_NAME):
 DRAWING_NOTES = "\n".join(
     (
         "1. LOOP CLOSED ON THE TAIL; LOOP AND TAIL IN ONE PLANE.",
-        "2. TAIL STRAIGHT AND FLAT; CLAMPS UNDER THE MHA-SH-VN-51 HEAD"
-        " ON THE MHA-DT-06 ARM.",
+        "2. TAIL STRAIGHT.",
     )
 )

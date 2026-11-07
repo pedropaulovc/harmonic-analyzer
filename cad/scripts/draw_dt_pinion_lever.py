@@ -42,7 +42,6 @@ from _drawing_common import (
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
 from _drawing_leaders import set_near_side_diameter
-from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
@@ -53,7 +52,9 @@ from _paths import CAD_ROOT
 from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
+from dt_pinion_lever_geometry import BORE, BORE_DEPTH, BORE_DEPTH_PLACES
 from dt_pinion_lever_spec import (
+    BORE_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     HUB_OD,
@@ -62,6 +63,7 @@ from dt_pinion_lever_spec import (
     REFERENCE_SKETCHES,
     ROD_LEN,
 )
+from dt_pinion_lift_rod_spec import ROD_DIA, ROD_DIA_BAND
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -161,11 +163,31 @@ DETAIL_KEEP = {
     name: (DETAIL_CENTER[0] - z * _DS, DETAIL_CENTER[1] + y * _DS)
     for name, (z, y) in DETAIL_TEXT_MODEL_MM.items()
 }
+# The hub bore's band is narrower than the shop table's turned-diameter row,
+# so its callout names the fit route: a sliding fit made to the measured
+# MHA-DT-17 rod, with the diametral clearance the two parts' printed limits
+# give as REF (drawing-guidelines.md rule 4).  Its blind depth rides the
+# callout as REF; DETAIL B's .32 from B controls the floor (rule 26).
+_MM_PER_IN = 25.4
+if BORE != ROD_DIA:
+    raise AssertionError("the hub bore and the lift rod share one nominal")
+BORE_CLEARANCE_IN = (
+    (BORE_BAND[1] - ROD_DIA_BAND[0]) / _MM_PER_IN,
+    (BORE_BAND[0] - ROD_DIA_BAND[1]) / _MM_PER_IN,
+)
+_BORE_DEPTH_TEXT = f"{BORE_DEPTH / _MM_PER_IN:.{BORE_DEPTH_PLACES}f}".removeprefix("0")
+HUB_BORE_CALLOUT = "\n".join(
+    (
+        f"BORE OR REAM <HOLE-DEPTH> ({_BORE_DEPTH_TEXT}) FLAT BOTTOM",
+        f"FIT TO MEASURED {LIFT_ROD_NUMBER} ROD,",
+        "SLIDING FIT (CLEARANCE "
+        + "-".join(f"{value:.4f}".removeprefix("0") for value in BORE_CLEARANCE_IN)
+        + ")",
+    )
+)
+# Location and length dimensions carry their value only (rule 7).
 DIMENSION_CALLOUTS = {
-    "HubBore": f"BORE OR REAM\nSLIP ON {LIFT_ROD_NUMBER}",
-    "BoreDepthFromB": "FLAT BOTTOM",
-    "RodTipY": "FROM HUB AXIS",
-    "GripFromB": "GRIP AXIS",
+    "HubBore": HUB_BORE_CALLOUT,
     # The match-drill and its mate only: MHA-DT-00 names the hole in its step.
     "PinHoleDia": PIN_HOLE_CALLOUT,
 }
@@ -467,14 +489,12 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Isometric View Note",
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
-            "Isometric View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -559,9 +579,6 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center marks to front view")
     if not auto_center_marks(adapter, detail, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the pin hole")
-
-    # Top-left anchored under the relocated isometric (bottom y ~0.102).
-    add_property_linked_note(adapter, "Isometric View Note", 0.1545, 0.097)
 
     return await finalize_drawing(
         adapter,

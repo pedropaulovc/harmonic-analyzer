@@ -36,7 +36,6 @@ from dt_cylinder_end_disc_spec import (
     BORE_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    THICKNESS_CALLOUT,
     WASHER_OD,
     WASHER_THICK,
 )
@@ -69,11 +68,12 @@ SECTION_LINE = (
     (FRONT_CENTER[0], FRONT_CENTER[1] - HALF_OD - 0.005),
     (FRONT_CENTER[0], FRONT_CENTER[1] + HALF_OD + 0.005),
 )
-# The .11 thickness text and its two-line datum callout sit right of the
-# 2.8 mm-wide extension-line pair on the extended dimension line: centred over
-# the lines, their overshoot struck 'AND' in the callout (machinist review,
-# 2026-10-23). The ~62 mm block clears the right line by ~6 mm and stays
-# above the isometric.
+# The .11 thickness sits right of the 2.8 mm-wide extension-line pair on the
+# extended dimension line: centred over the lines, their overshoot struck its
+# text (machinist review, 2026-10-23).  It prints its value alone: a reason on
+# a size with no band of its own is narration (drawing-guidelines.md rule 7),
+# and the disc's thickness is measured and compensated where the pedestal is
+# located, so it sets no printed stack.
 SECTION_KEEP = {
     "DiscDia": (0.195, 0.175),
     "BoreDia": (0.270, 0.175),
@@ -81,7 +81,6 @@ SECTION_KEEP = {
 }
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
-    "DiscThick": THICKNESS_CALLOUT,
 }
 
 # swDimensionTextParts_e.swDimensionTextCalloutBelow. These are ordinary
