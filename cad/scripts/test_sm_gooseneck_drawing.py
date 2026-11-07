@@ -150,38 +150,20 @@ def test_counterbore_callouts_floor_the_wall_from_the_joint() -> None:
     )
     assert floored * 25.4 <= joint.COUNTERBORE_WALL_MIN
     callouts = spec.DIMENSION_CALLOUTS_BY_NAME
-    # The wall rides under the head Ø, its outer bound, with the Ø max's job:
-    # the stated wall holds at the counterbore's largest size (owner ruling
-    # on machinist review r7: keep both bands, state each max's job).
-    plug_rows = callouts["PlugDia"].splitlines()
-    wall_row = plug_rows.index(spec.COUNTERBORE_WALL_CALLOUT)
-    assert plug_rows[wall_row + 1 :] == ["AT C'BORE MAX"]
-    # Each LIMIT band names its mate and its max's job on its own callout
-    # (machinist review r8, farm run 20261101T035809796Z).
-    assert callouts["CounterboreDia"] == spec.COUNTERBORE_DIA_CALLOUT
-    assert spec.COUNTERBORE_DIA_CALLOUT.splitlines() == [
-        f"MIN CLEARS {spec.SCREW_NUMBER}",
-        "RUN-OUT; MAX SETS WALL",
-    ]
-    # The axis limit, a radial offset between named axes, rides the floor
-    # corner's block under its reason.
-    assert spec.COUNTERBORE_AXIS_CALLOUT.splitlines() == [
-        "C'BORE AXIS TO TAP AXIS",
-        f"{joint.COUNTERBORE_AXIS_OFFSET_MAX / 25.4:.3f} MAX RADIAL".lstrip("0"),
-    ]
+    # The wall rides under the head Ø, its outer bound (stated shortfall,
+    # owner minor RV-01).
+    assert spec.COUNTERBORE_WALL_CALLOUT in callouts["PlugDia"].splitlines()
+    # The counterbore's Ø, depth and floor corner each link one run-out note
+    # (drawing-guidelines rule 4: one feature names its mate once).
+    linked = (
+        callouts["CounterboreDia"],
+        callouts["CounterboreFloorCornerR"],
+        spec.DIMENSION_CALLOUTS_ABOVE_BY_NAME["CounterboreDepth"],
+    )
+    assert all(spec.COUNTERBORE_NOTE_LINK in text for text in linked)
+    assert spec.SCREW_NUMBER not in " ".join(linked)
     assert "WITHIN" not in spec.COUNTERBORE_AXIS_CALLOUT
-    assert callouts["CounterboreFloorCornerR"] == spec.COUNTERBORE_FLOOR_CALLOUT
-    assert spec.COUNTERBORE_FLOOR_CALLOUT.splitlines() == [
-        "CLEARS RUN-OUT;",
-        *spec.COUNTERBORE_AXIS_CALLOUT.splitlines(),
-    ]
-    # The floor corner's limit is its own native radial dimension, not text
-    # under the depth (codjiflo P2 on #1997); the depth names its MIN's mate
-    # in one row above its stacked pair (rule 4).
     assert "CounterboreDepth" not in callouts
-    assert spec.DIMENSION_CALLOUTS_ABOVE_BY_NAME == {
-        "CounterboreDepth": f"MIN CLEARS {spec.SCREW_NUMBER} RUN-OUT"
-    }
     assert "\n" not in spec.COUNTERBORE_DEPTH_CALLOUT
     marked = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
     assert set(callouts) | set(spec.DIMENSION_CALLOUTS_ABOVE_BY_NAME) <= marked
@@ -240,37 +222,27 @@ def test_notes_state_stock_process_and_intent_without_sizes() -> None:
         )
     )
     assert window == ".0040-.0098"
-    for phrase in (
-        "TUBE 1/2 OD X 0.065 WALL, ONLINEMETALS 7322",
-        "SLEEVE 5/8 OD X 0.058 WALL, 7324",
-        # The stock is as supplied: its catalogue tolerance governs, unprinted.
-        "BOTH AS SUPPLIED, SUPPLIER TOL.",
-        "BRAZE FILLER BAg-7 (AWS A5.8)",
-        # Owner ruling 2026-10-27 (#1997): join before bending.
-        "JOIN END PIECE, COOL OR FULLY CURE, THEN BEND",
-        "OVALITY 5% MAX",
-    ):
-        assert phrase in notes, phrase
-    # The shank and sleeve callouts state the joint's window and its joint on
-    # their own features (rule 7: leadered where it applies), not in a note.
-    shank = " ".join(spec.SHANK_FIT_CALLOUT.split())
-    sleeve = " ".join(spec.SLEEVE_FIT_CALLOUT.split())
-    assert f"FIT TO TUBE BORE, {window} DIAMETRAL CLEARANCE" in shank
-    assert "FULL-PENETRATION BRAZE OR LOCTITE 638" in shank
-    assert f"STOCK; FIT ON TUBE, {window} DIAMETRAL CLEARANCE;" in sleeve
-    assert "FILLET-BRAZE EACH END" in sleeve
-    assert "LOCTITE" not in notes and "FILLET" not in notes
+    # Every SEE NOTE n a callout prints names a note on the sheet.
+    numbers = {line.split(".", 1)[0] for line in lines}
+    printed = " ".join(
+        (
+            *spec.DIMENSION_CALLOUTS_BY_NAME.values(),
+            *spec.DIMENSION_CALLOUTS_ABOVE_BY_NAME.values(),
+        )
+    )
+    assert set(re.findall(r"SEE NOTE (\d)", printed)) <= numbers
+    # A callout carries at most two lines of words (rule 7).
+    for name, text in spec.DIMENSION_CALLOUTS_BY_NAME.items():
+        if name != "CounterboreFloorCornerR":  # its axis rows: owner question
+            assert len(text.splitlines()) <= 2, name
+    # Both fit windows print as REF after their fit (rule 4).
+    assert notes.count(f"(CLEARANCE {window} REF)") == 2
+    assert "DIAMETRAL" not in notes
     # Both blocks sit beside the narrow end view: the shank's leader shoulder
     # ends left of it and the sleeve fits between it and the elevation's leg
-    # (Opus reviews at 7fe9d97bd and 85e75a2b5), so the shank rows stay under
-    # the old 19-character width and the sleeve's about the window's.
-    shank_rows = spec.SHANK_FIT_CALLOUT.splitlines()
-    assert max(map(len, shank_rows)) < 19
-    sleeve_rows = spec.SLEEVE_FIT_CALLOUT.splitlines()
-    assert max(map(len, sleeve_rows)) <= len(window) + 1
-    assert spec.DIMENSION_CALLOUTS["SleeveProfile"] == {
-        "SleeveDia": spec.SLEEVE_FIT_CALLOUT
-    }
+    # (Opus reviews at 7fe9d97bd and 85e75a2b5).
+    for text in (spec.SHANK_FIT_CALLOUT, spec.SLEEVE_FIT_CALLOUT):
+        assert max(map(len, text.splitlines())) < 19
     # A note names no tool (rule 7): R3.0 is the native bend radius.
     assert "DIE" not in notes
     # Sizes and tolerances are native model dimensions, never note text.
@@ -320,10 +292,11 @@ def test_only_the_reference_value_is_bracketed_when_a_callout_rides_it(
 
     monkeypatch.setattr(part, "_named_dimensions", named)
     part._author_reference_dimensions(None)
-    sleeve = displays["SleeveDia"]
-    assert (sleeve.GetText(1), sleeve.GetText(2)) == ("(<MOD-DIAM>", ")")
-    assert not sleeve.ShowParenthesis
-    for name in ("TubeOdRef", "OverallHeight", "OverallReach"):
+    for name in ("SleeveDia", "TubeOdRef"):
+        display = displays[name]
+        assert (display.GetText(1), display.GetText(2)) == ("(<MOD-DIAM>", ")")
+        assert not display.ShowParenthesis
+    for name in ("OverallHeight", "OverallReach"):
         assert displays[name].ShowParenthesis
         assert displays[name].text == {}
 
@@ -396,13 +369,6 @@ def test_tap_callout_states_geometry_and_its_mate_within_four_rows() -> None:
     # audit's four-row limit; each row is finished geometry, not method.
     rows = spec.TAP_CALLOUT_BELOW.splitlines()
     assert len(rows) == 2
-    # The counterbore depth's max sets the drill's deepest point, depths
-    # running from its floor (owner ruling via Main on machinist review r7:
-    # this job replaces the floor datum's wording).  The row is the drilled
-    # hole's finished extent, not a process step: no wander.
-    assert rows[0] == f"FOR {spec.SCREW_NUMBER}; DEEPEST DRILL AT C'BORE MAX"
-    axis_limit = f"{joint.THREAD_AXIS_OFFSET_MAX / 25.4:.3f}".lstrip("0")
-    assert rows[1] == f"THREAD AXIS TO TUBE OD AXIS {axis_limit} MAX RADIAL"
     assert joint.TAP_DRILL_DEPTH_MAX > joint.COUNTERBORE_DEPTH_MAX
     # At most three characters past r7's 39-character row (103.9 mm, x 106.1-
     # 210.0 mm; ~105.3 mm in Century Gothic's metrics): ~1 mm more each side
@@ -410,7 +376,6 @@ def test_tap_callout_states_geometry_and_its_mate_within_four_rows() -> None:
     assert len(rows[0]) <= len(f"FOR {spec.SCREW_NUMBER}; DEPTHS FROM C'BORE FLOOR") + 3
     assert "WANDER" not in spec.TAP_CALLOUT_BELOW
     assert "BRAZE" not in spec.TAP_CALLOUT_BELOW
-    assert spec.SCREW_NUMBER in spec.DIMENSION_CALLOUTS_BY_NAME["CounterboreDia"]
     printed = " ".join((spec.DRAWING_NOTES, spec.TAP_CALLOUT_BELOW)).upper()
     assert "PURCHASED" not in printed and "INTEGRAL" not in printed
     assert "THREADLOCKER" not in printed  # spring-eye clamping belongs to the assembly

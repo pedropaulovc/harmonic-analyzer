@@ -80,16 +80,21 @@ require_body_form(
 )
 
 THREAD_CALLOUT = THREAD
-CHAMFER_CALLOUT = "X 45 DEG"
+CHAMFER_CALLOUT = "X 45°"
 # Callouts the PART authors on its dimensions (the drawing only reads them
 # back; a drawing-side SetText can write through to the part, #1942).  The
-# six limits are tighter than the title block, so each names what it serves
-# (drawing-guidelines.md rule 4).  Below the value (the corner radius's
-# two rows too: SolidWorks prints no line break in the above compartment,
-# pn_pen_v_block_spec; its value stands over them on the leader's shoulder,
-# draw_pn_pen_rod's "R0.2 MAX / SEATS ON PEN V-BLOCK / MHA-PN-05"):
+# six limits are tighter than the title block, and all six serve the
+# MHA-SM-VN-51 loop, so the head Ø, its relief chamfer, the under-head corner
+# and the body Ø each link one numbered note that names the loop once
+# (drawing-guidelines.md rules 4 and 7: one mate, once; at most two lines of
+# words on a callout).  The plain length is a location: its value and limit
+# only (rule 7).  Below the value (the corner radius's rows too: SolidWorks
+# prints no line break in the above compartment, pn_pen_v_block_spec).
 COUNTER_SPRING_NUMBER = str(_config.parts("sm-vn-counter-spring")["number"])
 PLUG_NUMBER = str(_config.parts("sm-gooseneck")["number"])
+# The thread names its mate on its own drawing-side callout (rule 4: at the
+# callout it serves; novice-rubric screen: an unflagged general note did not).
+THREAD_MATE_CALLOUT = f"INTO {PLUG_NUMBER} TAP"
 # The head's retention under its 1.0 target stands only on owner minor RV-01
 # (sm_gooseneck_spring_joint.owner_minor).
 if joint.HEAD_RETENTION_MIN < joint.HEAD_RETENTION_TARGET:
@@ -97,24 +102,22 @@ if joint.HEAD_RETENTION_MIN < joint.HEAD_RETENTION_TARGET:
         _config.parts("sm-gooseneck-spring-screw"), "RV-01", "sm_gooseneck_spring_screw"
     )
 # The head's worst-case overlap of the loop's eye, under the 1.0 check (owner
-# minor RV-01), stated on the head Ø as a plain fact (drawing-guidelines.md
-# rule 20; codjiflo P2 on #1997), in inches floored, never rounded up: the
-# joint's 0.9525 at the printed .449 floor is .037.  Two rows, so neither is
-# wider than the part number's.
+# minor RV-01), stated in the loop's note as a plain fact
+# (drawing-guidelines.md rule 20; codjiflo P2 on #1997), in inches floored,
+# never rounded up: the joint's 0.9525 at the printed .449 floor is .037.
 _RETENTION_MILS = math.floor(joint.HEAD_RETENTION_MIN / MM_PER_IN * 1000.0)
-HEAD_RETENTION_CALLOUT = f"LOOP OVERLAP\n.{_RETENTION_MILS:03d} MIN"
+HEAD_RETENTION_CALLOUT = f"LOOP OVERLAP .{_RETENTION_MILS:03d} MIN"
+LOOP_NOTE = 1
+LOOP_NOTE_LINK = f"SEE NOTE {LOOP_NOTE}"
 DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
     "HeadProfile": {
-        "HeadDia": f"{COUNTER_SPRING_NUMBER}\nWIRE CLEARS;\n{HEAD_RETENTION_CALLOUT}",
-        "HeadReliefChamfer": f"{CHAMFER_CALLOUT};\n{COUNTER_SPRING_NUMBER}\nWIRE CLEARS",
+        "HeadDia": LOOP_NOTE_LINK,
+        "HeadReliefChamfer": f"{CHAMFER_CALLOUT}\n{LOOP_NOTE_LINK}",
     },
     "ShankProfile": {
-        "BodyDia": f"THREAD BLANK;\n{COUNTER_SPRING_NUMBER}\nLOOP SEAT",
+        "BodyDia": f"THREAD BLANK;\n{LOOP_NOTE_LINK}",
         "TipChamfer": CHAMFER_CALLOUT,
-        "UnderHeadCornerR": f"{COUNTER_SPRING_NUMBER}\nLOOP CLEARS",
-    },
-    "StationReference": {
-        "PlainLength": f"PLAIN;\n{COUNTER_SPRING_NUMBER}\nLOOP SEAT",
+        "UnderHeadCornerR": LOOP_NOTE_LINK,
     },
 }
 # Above the value: the full-thread limit's span is wider than its ".225 max."
@@ -391,7 +394,11 @@ REFERENCE_DIMENSIONS = frozenset({"OverallLength"})
 # The fitter's clamp step (user ruling 2026-09-21: no torque value, no
 # threadlocker) prints on the summing assembly sheet as MHA-SM-00 step 8,
 # not here: a part sheet carries no assembly instruction (machinist review
-# 2026-10-23).  The plain length and the full-thread limit print on their
-# features (machinist FIX round 1), so one note is left.
-DRAWING_NOTES = f"1. THREAD MATES THE TAPPED END PIECE OF {PLUG_NUMBER}."
+# 2026-10-23).  The one note is the loop's, linked from the head Ø, its
+# relief chamfer, the under-head corner and the body Ø, with the head's
+# stated overlap shortfall; the thread's mate rides the thread callout.
+DRAWING_NOTES = (
+    f"{LOOP_NOTE}. {COUNTER_SPRING_NUMBER} LOOP SEATS ON BODY, CLEARS HEAD EDGES; "
+    f"{HEAD_RETENTION_CALLOUT}"
+)
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 2:1"
