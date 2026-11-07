@@ -45,7 +45,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 from _check import check
 from _com import _early_bound
 from _drawing_annotation_extent import move_annotation, require_clear, sheet_region
-from _drawing_attachment import _assert_leader_lands
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -70,7 +69,7 @@ from _drawing_finish import add_surface_finish
 from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_layout_audit import annotation_display
-from _drawing_leader_notes import add_attached_note, add_leader_note
+from _drawing_leader_notes import add_leader_note
 from _drawing_leaders import dimension_segments, set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
@@ -655,8 +654,7 @@ HUB_BOSS_DROP_OFFSET_XY = (0.085, 0.0600)
 HUB_GUSSET_ANGLE_TEXT_XY = (0.186, 0.0645)
 # The side view is a removed view (a left view laid under the plan), so
 # the plan names it with a viewing arrow and letter and the view carries
-# its own title and scale; its sharp edges carry SHARP leaders on sheet 6
-# (SHARP_EDGE_LEADERS).  The arrow looks +X onto the left
+# its own title and scale.  The arrow looks +X onto the left
 # rail's outer face at z -80, between the front socket's boss and section
 # K's letters: its letter stands 11 mm right of the 115.1's text and 5 mm
 # over the historical D letter's placement baseline.
@@ -688,123 +686,8 @@ HUB_BOTTOM_SCALE = (1, 3)
 UNDERSIDE_VIEW_LETTER = "L"
 HUB_BOTTOM_TITLE = f"VIEW {UNDERSIDE_VIEW_LETTER}"
 HUB_BOTTOM_TITLE_XY = (0.020, 0.122)
-# Owner ruling 2026-11-07 (after 2026-11-06's numbered flag note 3, whose
-# triangle flags confused him): SHARP is written at a straight leader to
-# each edge the model leaves sharp (build_fr_top_frame._external_edge_breaks;
-# drawing-guidelines.md rule 7, a short requirement at its leader): on the
-# 1:3 locator the front crossbar's two side bottoms between the pocket end
-# and the gusset leg and the four gusset hypotenuse bottoms, under the knife
-# seats; on detail J (2:1) the hub rib's inner bottom and the V-gussets'
-# four ramp edges.  The view G side view draws each ramp's two edges as one
-# line, inside the band the 60.0, .31 and 20 DEG already fence, and the rib's
-# inner bottom behind its broken outer one; J draws all five apart.  Each
-# note carries one leader: SOLIDWORKS 2026 refuses a note attached to
-# several edges (_drawing_tables.add_hole_group_tags), so no nX.
-#
-# Each entry: the view, a point (model mm) on the edge the leader lands on
-# (``ViewEdges.exact_line_through`` picks that edge, ``model_point_in_view``
-# its sheet point), and the sheet point (m) the printed SHARP is centred on
-# (``_add_sharp_edge_note``).  The clearances below are from farm run
-# 20261106T222724559Z's layout-audit ink, for a SHARP of 3.5 mm text
-# (SHARP_EDGE_TEXT_INK) with its leader leaving the side nearer its landing
-# at mid-height.  Two SHARPs never share a column closer than the audit's
-# 5.66 mm row pitch (they would read as one block) nor stand closer than
-# a text height side by side.
-#
-# Locator: each SHARP stands inside its window, half a text height (the
-# layout audit's text clearance) off the rails' and the crossbar's lines and
-# the gussets, never over them.  Left window: the 5.42 POCKET and 1.70
-# dimensions' extension lines (y 177.06 and 222.94 mm, x 23.7..100.3) fence
-# the -X junctions (RsTopFrame, 2026-11-06).  The -X bar side's SHARP
-# stands over the lower line and its leader crosses it once, shallow enough
-# that the arrow (tip 0.3 mm over the gusset's vertex, y 175.33) stays under
-# it.  The -X gusset's SHARP stands in the 8 mm band between that line and
-# the window's front edge, its short leader running right to the gusset's
-# lower end under the bar side's leader.  The rear -X gusset's leader
-# climbs the channel between the F-F left arrow and the bar, crossing the
-# upper line.  Right window: both front SHARPs stand low in the window,
-# the bar side's under the front frame's leader and the gusset's right of
-# it, its leader passing under the bar side's text.  The rear +X gusset's
-# leader climbs between the bar and the F-F right arrow, under the cutting
-# line.
-# Detail J: the rib's inner bottom SHARP stands in the window between that
-# edge and the 1.10 line (2 mm or more off each), its leader landing 5 mm
-# under the boss's centre mark.  The rail fills J between x 265.7 and
-# 334.3, so each ramp edge's leader crosses its rail lines: the front -X one
-# from under the circle (Ø1.18's leader fences the left), the front +X one
-# level from the window (the nearest open side), the rear two from over the
-# circle, under the sheet frame, clear of the .28's leader.
-SHARP_EDGE_LOCATOR = "underside locator"
-SHARP_EDGE_DETAIL = "detail J"
-_SHARP_BAR_SIDE_Z = -(INNER_Z - GUSSET) + 0.15 * (INNER_Z - GUSSET - BAR_POCKET_Z)
-
-
-def hub_gusset_ramp_point(side: float, dz: float) -> tuple[float, float, float]:
-    """The point (model mm) of a hub V-gusset's ramp edge ``dz`` along the
-    bore's z from its axis, on the ``side`` (-1 or +1 X) face: the ramp falls
-    HUB_BOSS_DROP from the rail underside at the feather to the boss bottom at
-    HUB_GUSSET_HALF_IN (build_fr_top_frame's gusset trapezoid)."""
-    run = HUB_GUSSET_HALF_OUT - HUB_GUSSET_HALF_IN
-    if not HUB_GUSSET_HALF_IN <= abs(dz) <= HUB_GUSSET_HALF_OUT:
-        raise ValueError(f"no ramp edge {dz} mm from the hub bore axis")
-    return (
-        GOOSENECK_X + side * HUB_GUSSET_T / 2.0,
-        -HALF_H - HUB_BOSS_DROP * (HUB_GUSSET_HALF_OUT - abs(dz)) / run,
-        GOOSENECK_Z + dz,
-    )
-
-
-SHARP_EDGE_LEADERS: dict[str, tuple[str, tuple[float, float, float], tuple[float, float]]] = {
-    "front -X bar side": (
-        SHARP_EDGE_LOCATOR, (BAR_X0, -HALF_H, _SHARP_BAR_SIDE_Z), (0.0725, 0.1835),
-    ),
-    "front -X gusset": (
-        SHARP_EDGE_LOCATOR,
-        (BAR_X0 - 0.85 * GUSSET, -HALF_H, -INNER_Z + 0.15 * GUSSET),
-        (0.080, 0.1726),
-    ),
-    "rear -X gusset": (
-        SHARP_EDGE_LOCATOR,
-        (BAR_X0 - 0.5 * GUSSET, -HALF_H, INNER_Z - 0.5 * GUSSET),
-        (0.091, 0.199),
-    ),
-    "front +X bar side": (
-        SHARP_EDGE_LOCATOR, (BAR_X1, -HALF_H, _SHARP_BAR_SIDE_Z), (0.126, 0.178),
-    ),
-    "front +X gusset": (
-        SHARP_EDGE_LOCATOR,
-        (BAR_X1 + 0.7 * GUSSET, -HALF_H, -INNER_Z + 0.3 * GUSSET),
-        (0.146, 0.173),
-    ),
-    "rear +X gusset": (
-        SHARP_EDGE_LOCATOR,
-        (BAR_X1 + 0.4 * GUSSET, -HALF_H, INNER_Z - 0.6 * GUSSET),
-        (0.119, 0.1995),
-    ),
-    "hub rib inner bottom": (
-        SHARP_EDGE_DETAIL, (-INNER_X, -HALF_H, GOOSENECK_Z - 2.5), (0.3445, 0.160),
-    ),
-    "front -X V-gusset ramp": (
-        SHARP_EDGE_DETAIL, hub_gusset_ramp_point(-1.0, -27.0), (0.271, 0.093),
-    ),
-    "front +X V-gusset ramp": (
-        SHARP_EDGE_DETAIL, hub_gusset_ramp_point(1.0, -22.0), (0.346, 0.128),
-    ),
-    "rear -X V-gusset ramp": (
-        SHARP_EDGE_DETAIL, hub_gusset_ramp_point(-1.0, 27.0), (0.274, 0.253),
-    ),
-    "rear +X V-gusset ramp": (
-        SHARP_EDGE_DETAIL, hub_gusset_ramp_point(1.0, 27.0), (0.320, 0.254),
-    ),
-}
-SHARP_EDGE_TEXT = "SHARP"
-# The printed SHARP's ink about its centre (sheet m: left, down, right,
-# up), from farm run 20261107T084432155Z: the text 14.6 mm wide and 3.5
-# tall about its measured centre, and the layout audit's box for the same
-# text (14.2 wide) 0.95 mm higher; the union, so both readings clear.
-SHARP_EDGE_TEXT_INK = (-0.0073, -0.00175, 0.0073, 0.0027)
-# A centred note's text (a SHARP, an iso caption) stands this close to
-# its planned centre once re-centred.
+# A centred caption's text (an iso caption) stands this close to its
+# planned centre once re-centred.
 NOTE_TEXT_CENTRE_TOL = 0.0005
 HUB_DETAIL_CENTER = (0.300, 0.174)
 HUB_DETAIL_SCALE = (2, 1)
@@ -821,8 +704,7 @@ HUB_BOSS_DIA_TEXT_XY = (0.205, 0.124)
 # run 20261027T195317391Z measured them on J at y 146.0 and 202.0 mm, x
 # 268.97..331.02, the rail's inner face at x 334.2 and the window right of
 # it empty to the detail circle (centre (300, 174), radius 76).  Its line
-# stands in that window 19.8 mm off the rail, wide enough for the rib's
-# SHARP (SHARP_EDGE_LEADERS) to stand between them, arrows inside (with its text
+# stands in that window 15.8 mm off the rail, arrows inside (with its text
 # offset, SolidWorks put them outside and left the stub floating at the
 # line's mid on sheet 5).  The text sits outside the detail like the 7.0's
 # over it (HUB_GUSSET_T_OFFSET_XY), in the native D1 form measured on sheet
@@ -832,7 +714,7 @@ HUB_BOSS_DIA_TEXT_XY = (0.205, 0.124)
 # its lower-left corner 2.4 mm outside the circle and its right end 2.5 mm
 # inside the border, the value's top 10.7 mm under the 7.0's last row.  The
 # stub climbs from the line's mid to the underline's near end.
-RIB_WIDTH_LINE_XY = (0.354, 0.174)
+RIB_WIDTH_LINE_XY = (0.350, 0.174)
 RIB_WIDTH_TEXT_XY = (0.3952, 0.212)
 HUB_BOTTOM_KEEP = {"HubDia": HUB_BOSS_DIA_TEXT_XY, "RibWidth": RIB_WIDTH_LINE_XY}
 HUB_BOTTOM_CALLOUTS = {
@@ -846,7 +728,7 @@ HUB_GUSSET_T_OFFSET_XY = (0.390, 0.243)
 # old 73.0 across the whole land put its -X extension line in the knockout
 # callout's leader path (farm run 20261027T133857303Z, leader-crosses-line).
 # The +X end's extension lines stand at the bar face (x 109.17 mm, from its
-# sharp front edge at y 175) and the land end (x 117.17, from y 163.8), right
+# front edge at y 175, unbroken at .06) and the land end (x 117.17, from y 163.8), right
 # of the knockout leader's arrow at x 102.3, and pass under nothing.  The
 # dimension line runs
 # at y 145 between them, arrows inside (8 mm), the text parked right on a jog
@@ -3471,70 +3353,6 @@ def _centre_note_text(
     return x, y
 
 
-def _add_sharp_edge_note(
-    adapter: Any,
-    view: Any,
-    edges: ViewEdges,
-    *,
-    landing_mm: tuple[float, float, float],
-    centre_xy: tuple[float, float],
-    label: str,
-) -> Any:
-    """One SHARP (SHARP_EDGE_LEADERS) on a straight leader to the edge
-    through ``landing_mm``.
-
-    The note is attached by the scanned edge object with its landing set
-    before insertion (``add_attached_note``), so it can only land on that
-    edge.  The printed SHARP is then read back and moved onto ``centre_xy``,
-    the point the layout's clearances are measured from; after that the
-    text, its plain border and the leader's landing are read back.
-    """
-    edge = edges.exact_line_through(landing_mm, label=label).edge
-    landing = model_point_in_view(
-        adapter, view, tuple(value / 1000.0 for value in landing_mm),
-        label=f"{label} landing",
-    )
-    note = _early_bound(
-        add_attached_note(
-            adapter, view, text=SHARP_EDGE_TEXT, entity=edge,
-            leader_attach_xy=landing, note_xy=centre_xy, label=label,
-        ),
-        "INote",
-    )
-    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-    x, y = _centre_note_text(adapter, annotation, SHARP_EDGE_TEXT, centre_xy, label=label)
-    if note.HasBalloon() or str(note.GetText()) != SHARP_EDGE_TEXT:
-        raise RuntimeError(
-            f"{label}: note reads {note.GetText()!r}, balloon {bool(note.HasBalloon())}"
-        )
-    _assert_leader_lands(annotation, landing, what="sharp-edge note", label=label)
-    box = display_box(annotation_display(adapter, annotation)[0])
-    _telemetry.event(
-        "drawing.sharp_edge_note", label=label, centre_mm=f"{x * 1000:.2f},{y * 1000:.2f}",
-        ink_mm=(
-            "" if box is None else
-            f"{box.xmin * 1000:.2f},{box.ymin * 1000:.2f},{box.xmax * 1000:.2f},{box.ymax * 1000:.2f}"
-        ),
-    )
-    return note
-
-
-def _add_sharp_edge_notes(adapter: Any, view: Any, edges: ViewEdges, view_key: str) -> int:
-    """Every SHARP_EDGE_LEADERS note of ``view_key`` on ``view``; their count."""
-    placed = 0
-    for name, (key, landing_mm, centre_xy) in SHARP_EDGE_LEADERS.items():
-        if key != view_key:
-            continue
-        _add_sharp_edge_note(
-            adapter, view, edges, landing_mm=landing_mm, centre_xy=centre_xy,
-            label=f"{view_key} {name} sharp-edge note",
-        )
-        placed += 1
-    if not placed:
-        raise RuntimeError(f"no sharp-edge notes for {view_key!r}")
-    return placed
-
-
 def _add_pictorial_captions(adapter: Any) -> None:
     """Each PICTORIAL_CAPTIONS note, its text read back centred under its
     view on the active pictorial sheet."""
@@ -5137,8 +4955,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if int(rib_width_display.ArrowSide) != _DIM_ARROWS_INSIDE:
         raise RuntimeError("rail pad width did not keep its arrows inside")
     # The locator is drawn at the title block's own scale, so it names
-    # itself and says nothing a reader can already read off the title block;
-    # its sharp edges carry SHARP leaders (SHARP_EDGE_LEADERS, placed below).
+    # itself and says nothing a reader can already read off the title block.
     if add_note(adapter, HUB_BOTTOM_TITLE, *HUB_BOTTOM_TITLE_XY) is None:
         raise RuntimeError("failed to label underside locator")
     # The faced underside plane (user ruling 2026-10-12): the part's own
@@ -5151,7 +4968,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     land = _checked_dimension(
         adapter, hub_bottom_parent,
-        # The front crossbar's +X side bottom is sharp between its gusset
+        # The front crossbar's +X side bottom is unbroken at .06 between its gusset
         # (|z| 75) and the pocket (|z| 69); the land end's outline is its
         # edge break's upper edge (LAND_END_TEXT_XY).
         p0=(BAR_X1, -HALF_H, -(BAR_POCKET_Z + INNER_Z - GUSSET)/2),
@@ -5291,12 +5108,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # The 60.0 feather span is dimensioned once, on the hub side view that
     # also carries the drop and the ramp angle; repeating it here would be
     # the same length stated twice on two sheets.
-    # SHARP on the edges the model leaves sharp: the bar and gusset
-    # bottoms on the locator, the hub rib's inner bottom and the V-gusset
-    # ramps on J (SHARP_EDGE_LEADERS), after every dimension and frame they
-    # are placed clear of.
-    _add_sharp_edge_notes(adapter, hub_bottom_parent, hub_bottom_edges, SHARP_EDGE_LOCATOR)
-    _add_sharp_edge_notes(adapter, geometry_bottom, geometry_bottom_edges, SHARP_EDGE_DETAIL)
     _position_view_caption(adapter, geometry_bottom, HUB_DETAIL_CAPTION_XY)
     # F-F imports HangerGrip from the crossbar extrude it cuts.
     hanger_section, hanger_dimensions = _hanger_section(adapter, hub_bottom_parent)

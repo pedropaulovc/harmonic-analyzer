@@ -712,18 +712,25 @@ print's limits, not on the nominal model. Each corner's crop chord ends on
 the smallest printed corner-boss barrel at the farthest printed rail faces
 (`CORNER_CROP_BOSS_R_MIN`, `CORNER_CROP_FACE_OFFSETS`), so no conforming
 casting keeps a flange nib outside a barrel. The 1/16 in × 45° break goes
-only on edges that hold its print-worst leg and sliver land at those limits.
-The crossbar flange underside (`T_FLANGE_SHELF_PRINTED_MIN`) and the hub
+only on edges that hold its print-worst leg and sliver land at those limits;
+the crossbar flange underside (`T_FLANGE_SHELF_PRINTED_MIN`) and the hub
 rib's outer bottom beside the set-screw boss (`HUB_RIB_STUB_PRINTED_MIN`)
-do not, so they stay sharp. The rib's inner bottom, the V-gussets and the
-knife-seat bottoms also stay sharp, as the sheet notes say. No band is
+do. The model leaves the rest unbroken at .06: the crossbar's front side
+bottoms and the gusset hypotenuses under the knife seats, the rib's inner
+bottom and the V-gussets. Owner ruling 2026-11-07 scopes general note 1 to
+the convex cast edges the views show chamfered, so those edges take the
+title block's .010 break and nothing on the sheet reads SHARP. That break
+(`TITLE_BLOCK_EDGE_BREAK_MAX`, 0.254) stays inside the knife seats' 0.5
+edge-break clearance, and the dowel reams' underside mouths keep their wall
+to the crossbar side inside it (`PIN_HOLE_MOUTH_BAR_WALL`). No band is
 tightened to recover a break.
 
 The grip no longer sets **MHA-SM-VN-52 thread engagement**: MHA-SM-00 step 4
 cuts each bolt to its own hole's measured stack plus **.351 ±.006 in** (8.9154 ±0.1524 mm)
 reach. The crossbar median datum D controls the hanger axes in X only:
 their BASIC X location is on D.
-The socket-to-D locator retains its ordinary location band; the front and
+The left-rail-face-to-D locator (from the hole table's corner origin)
+retains its ordinary location band; the front and
 rear Z station dimensions likewise remain ordinary toleranced dimensions.
 
 The mount's tap position is **Ø0.127 (.005) A B C**. Owner ruling

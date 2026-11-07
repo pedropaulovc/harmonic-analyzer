@@ -91,8 +91,9 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   are judged at the print's limits, since a conforming casting may carry
   any printed size: edges too close to a feature, too short or on too
   narrow a flange shelf there, or under a knife-mount seat, for the printed
-  worst break stay sharp (listed in _external_edge_breaks); hole and bore
-  low ends stay sharp.
+  worst break the model leaves unbroken at .06 (listed in
+  _external_edge_breaks), as it does hole and bore low ends; the title
+  block's .010 break applies to them (owner ruling 2026-11-07).
 
 Layout: plan profile in XZ, ring mid-plane extruded symmetrically in Y
 (rails y -18.2499..+18.2499 local). Sketches on the Top plane use the
@@ -267,7 +268,12 @@ from _fit_deviations import deviations
 from fr_vn_tube_frame_cap_spec import MAX_OUTER_DIAMETER as CAP_MAX_OUTER_DIAMETER
 import sm_knife_mount_spec as KNIFE_MOUNT
 import sm_vn_knife_mount_dowel_spec as KNIFE_DOWEL
-from _printed_tolerance import angular_band_deg, printed_deviations
+from _printed_tolerance import (
+    angular_band_deg,
+    edge_break_chamfer_mm,
+    edge_break_radius_mm,
+    printed_deviations,
+)
 from ch_vn_frame_side_screw_spec import SHANK_DIA as KEEPER_SCREW_MAJOR_DIA
 from _mcmaster_90280a837 import (
     HEAD_DIA as CROSS_SCREW_HEAD_DIA,
@@ -677,7 +683,21 @@ _EDGE_LOCATION_BAND = (
     + PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["crossbar pocket length"]]
 )
 KNIFE_SEAT_EDGE_BREAK_MIN_CLEARANCE = 0.5
-BORE_CHAMFER = 0.762  # .03 note 9: x 45 TOP-end bore lead-ins (non-functional); low ends stay sharp
+# Owner ruling 2026-11-07 (RV-04 rescoped to the edges the .06 break fits):
+# the model leaves the edges _external_edge_breaks does not pick unbroken at
+# .06; the title block's .010 break applies, as a radius or a chamfer at its
+# largest.  It stays inside the knife seats' edge-break clearance, so a seat
+# over the crossbar's front side bottoms or a gusset hypotenuse still bears
+# on flat face where the .06 bands are kept off it.
+TITLE_BLOCK_EDGE_BREAK_MAX = max(
+    edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT)
+)  # 0.254
+if TITLE_BLOCK_EDGE_BREAK_MAX >= KNIFE_SEAT_EDGE_BREAK_MIN_CLEARANCE:
+    raise AssertionError(
+        f"the title block's {TITLE_BLOCK_EDGE_BREAK_MAX:g} edge break reaches the"
+        f" knife seats' {KNIFE_SEAT_EDGE_BREAK_MIN_CLEARANCE:g} edge-break clearance"
+    )
+BORE_CHAMFER = 0.762  # .03 note 9: x 45 TOP-end bore lead-ins (non-functional); low ends take the title block's .010 break
 # The set boss's spot face keeps a land inside its cast face's edge breaks at
 # the print-worst corner (drawing-guidelines.md rule 17 (walls and webs)): the shallowest spot (its .X station
 # against the cast face) leaves the most of each break's printed worst leg on
@@ -717,9 +737,10 @@ for _label, _land in SET_SPOT_LAND_MIN.items():
             f"land {_land:.3f}"
         )
 # Edge-break eligibility is judged at the print's limits, not on the nominal
-# model: a conforming casting may carry any printed size, so an edge stays
-# sharp wherever some printed extreme leaves it too short, or its face too
-# narrow, for the printed worst break (_external_edge_breaks).
+# model: a conforming casting may carry any printed size, so the model
+# leaves an edge unbroken at .06 wherever some printed extreme leaves it too
+# short, or its face too narrow, for the printed worst break
+# (_external_edge_breaks); the title block's .010 break applies there.
 # A T flange's underside break needs that leg and the sliver land on the
 # flat between the flange's outer face and its R.12 web root: the least
 # printed overhang less the largest printed root. The rails keep 7.150 and
@@ -746,8 +767,8 @@ T_FLANGE_SHELF_PRINTED_MIN = {
 # (centred on the tap, on the bore axis), halved, is 4.699: over the printed
 # worst legs of the breaks at both its ends (the rib's corner and side
 # bottom, the boss's side bottom), so it is broken and joins the boss's
-# breaks to the rib's. Were it shorter it would stay sharp, those breaks
-# keeping the rest of it as a land on the rib's outer face.
+# breaks to the rib's. Were it shorter the model would leave it unbroken at
+# .06, those breaks keeping the rest of it as a land on the rib's outer face.
 HUB_RIB_STUB_PRINTED_MIN = (
     _printed_limit(HUB_RIB_W, DRAWING_PRECISION["RibProfile"]["RibWidth"], -1.0)
     - _printed_limit(
@@ -799,9 +820,15 @@ PIN_HOLE_SCREW_WALL = (
     - _CLEARANCE_MAX_R
     - 2.0 * HANGER_DRIFT_AT_REAM_FLOOR
 )  # 2.609
+# At the underside mouth the ream has not drifted, but the crossbar's front
+# side bottom it stands beside takes the title block's break there.
+PIN_HOLE_MOUTH_BAR_WALL = (
+    _REAM_BAR_FACE_REACH - _PIN_HOLE_MAX_R - TITLE_BLOCK_EDGE_BREAK_MAX
+)  # 2.943
 PIN_HOLE_FLOOR_MARGIN = HANGER_GRIP - HANGER_GRIP_TOL - _REAM_FLOOR_DEPTH_MAX
 for _label, _value in (
     ("ream wall to the crossbar side face", PIN_HOLE_BAR_WALL),
+    ("ream mouth wall inside the crossbar side's edge break", PIN_HOLE_MOUTH_BAR_WALL),
     ("ream wall to the screw clearance hole", PIN_HOLE_SCREW_WALL),
     ("ream floor below the finished top", PIN_HOLE_FLOOR_MARGIN),
 ):
@@ -1027,8 +1054,10 @@ for _label, _value in BAR_POCKET_HOLE_WALLS.items():
 # round hole (datum B) on the +X pin, or turned 180 deg onto the -X pin
 # (codjiflo, PR #1978), each ream under the same 2X frame, so the same band.
 # _external_edge_breaks keeps every finished edge-break band 0.5 off both hulls.
-# The front hull overhangs the crossbar's sharp sides short of the gusset
-# legs (the 25.4-wide block on the 25.146-wide bar); that overhang is not a break.
+# The front hull overhangs the crossbar's side bottoms short of the gusset
+# legs (the 25.4-wide block on the 25.146-wide bar); the model leaves those
+# unbroken at .06 and the title block's .010 break applies
+# (TITLE_BLOCK_EDGE_BREAK_MAX, inside the 0.5 clearance).
 def _convex_hull(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
     """Counter-clockwise convex hull (monotone chain) of plan points."""
     ordered = sorted(set(points))
@@ -1979,7 +2008,7 @@ def _external_edge_breaks() -> tuple[
     (``printed_length``) cannot hold the printed worst legs at both its
     ends, or whose flange shelf at its printed worst
     (``T_FLANGE_SHELF_PRINTED_MIN``) cannot hold one leg and the sliver
-    land, stays sharp instead of being picked.
+    land, is left unbroken at .06 instead of being picked.
 
     Every pick must be the convex edge it claims: its solid angle, measured
     on ``_casting_occupies``, is below 180 degrees and equals the angle its
@@ -1993,14 +2022,15 @@ def _external_edge_breaks() -> tuple[
     the web roots) and the hub rib's outer bottom either side of the
     set-screw boss (4.699 at the printed limits,
     ``HUB_RIB_STUB_PRINTED_MIN``) hold the printed worst legs, so they are
-    picked. Not broken: the crossbar's front full-depth side bottoms from
-    the pocket end to the gusset leg and all four gusset hypotenuse bottoms
-    (a knife-mount seat sits over each), the hub rib's inner bottom edge
-    (beside the hub boss barrel), the tapered hub
-    V-gusset edges (they feather into the underside), and every hole, bore,
-    counterbore, spot-face, tap and slot edge. The vertical junctions of the
-    bar sides with the gusset hypotenuses are re-entrant (225 degrees), not
-    edges to break.
+    picked. Left unbroken at .06, the title block's .010 break applying
+    (owner ruling 2026-11-07, TITLE_BLOCK_EDGE_BREAK_MAX): the crossbar's
+    front full-depth side bottoms from the pocket end to the gusset leg and
+    all four gusset hypotenuse bottoms (a knife-mount seat sits over each),
+    the hub rib's inner bottom edge (beside the hub boss barrel), the
+    tapered hub V-gusset edges (they feather into the underside), and every
+    hole, bore, counterbore, spot-face, tap and slot edge. The vertical
+    junctions of the bar sides with the gusset hypotenuses are re-entrant
+    (225 degrees), not edges to break.
     """
     c = EDGE_CHAMFER
     z_col = abs(FRONT_COLUMN_Z)
@@ -2051,7 +2081,7 @@ def _external_edge_breaks() -> tuple[
     ) -> bool:
         # At the print's limits an edge too short for the printed worst legs
         # at both its ends, or on a flange shelf too narrow for one leg and
-        # the sliver land, stays sharp: no pick.
+        # the sliver land, is left unbroken at .06: no pick.
         if (
             printed_length is not None
             and printed_length <= 2.0 * EDGE_BREAK_PRINTED_MAX
@@ -2168,7 +2198,7 @@ def _external_edge_breaks() -> tuple[
     # to the gusset legs. The T flange's underside edges are picked only on
     # a printed shelf that holds a break (T_FLANGE_SHELF_PRINTED_MIN). The
     # knife-mount seats sit over the front side bottoms and every gusset
-    # hypotenuse, whose bottoms stay sharp.
+    # hypotenuse, whose bottoms take the title block's .010 break instead.
     for x_web in (BAR_WEB_X0, BAR_WEB_X1):
         along_z(x_web, y_bottom, -BAR_POCKET_Z, BAR_POCKET_Z)
     for x_bar in (BAR_X0, BAR_X1):
@@ -2182,8 +2212,8 @@ def _external_edge_breaks() -> tuple[
     start("WestWindowBreaks")
     # The west window's flange underside, round its corners into the
     # front/rear runs to the junction lands, the lands' free vertical
-    # corners, end bottoms and short window-face bottoms (to the sharp
-    # gusset hypotenuse), and the front/rear window web bottoms the land
+    # corners, end bottoms and short window-face bottoms (to the gusset
+    # hypotenuse, unbroken at .06), and the front/rear window web bottoms the land
     # ends meet.
     along_z(INNER_X, y_under, -INNER_Z, INNER_Z, printed_shelf=side_shelf)
     for sz in (-1.0, 1.0):
@@ -3496,7 +3526,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # 18. .03 x 45 lead-ins on the four cap-recess mouths and gooseneck bore
-    # top; bore and counterbore low ends stay sharp.
+    # top; bore and counterbore low ends take the title block's .010 break.
     boss_top_y = HALF_H + BOSS_ABOVE
     r_gn = GOOSENECK_BORE_DIA / 2.0
     check(

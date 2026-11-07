@@ -705,16 +705,15 @@ HANGER_PIN_FLOOR_FILLET_LIFT_MAX = KNIFE_DOWEL.PRESS_FLOOR_LIFT_MAX
 # place, 1.6) overrides the title block's 0.25 max break on the convex casting
 # edges the model chamfers; hole, bore, counterbore, tap and slot mouths keep
 # the title-block break (the counterbore and tap walls are proved without a
-# chamfer).  The edges the model leaves sharp under a knife seat or beside
-# the hub boss (build_fr_top_frame._external_edge_breaks: the front crossbar
-# side bottoms, the four gusset hypotenuse bottoms, the hub rib's inner bottom
-# and the V-gusset ramp edges) are the "UNLESS NOTED": owner ruling
-# 2026-11-07 writes SHARP at a leader to each of those edges on the
-# UNDERSIDE sheet (draw_fr_top_frame.SHARP_EDGE_LEADERS), so no numbered
-# flag note sends the reader back to this block (2026-11-06's triangle flags
-# confused the owner).  Each row stays within the 64 characters the
-# unnumbered first row printed on sheet 3 (EDGE_NOTE_XY): "HOLE/SLOT" pays
-# for the "1. ".
+# chamfer).  Owner ruling 2026-11-07 rescopes the note to the convex cast
+# edges where the .06 break fits, the ones the views show chamfered.  The
+# edges under a knife seat or beside the hub boss
+# (build_fr_top_frame._external_edge_breaks: the front crossbar side
+# bottoms, the four gusset hypotenuse bottoms, the hub rib's inner bottom
+# and the V-gusset ramp edges): the model leaves these unbroken at .06; the
+# title block's .010 break applies, so no edge reads SHARP anywhere and
+# nothing is noted.  Each row stays within the 64 characters the unnumbered
+# first row printed on sheet 3 (EDGE_NOTE_XY).
 # Owner ruling 2026-10-18 (exception RV-02, #1625): the cast inside corners
 # the model leaves sharp (window corners, flange junctions) take the casting's
 # own root radius at most; the R.12 T-roots are dimensioned (the "UNLESS
@@ -728,8 +727,7 @@ _EDGE_CHAMFER_TEXT = render_number(
     EDGE_CHAMFER / IN, UNIT, DRAWING_REFERENCE_PRECISION["top rim chamfer"]
 )
 DRAWING_NOTES = (
-    f"1. CONVEX EDGES {_EDGE_CHAMFER_TEXT}"
-    " X 45° UNLESS NOTED; NOT HOLE/SLOT MOUTHS.\n"
+    f"1. CONVEX CAST EDGES {_EDGE_CHAMFER_TEXT} X 45° WHERE SHOWN.\n"
     # TODO(#1625): remove when the title block gains its inside-corner default
     f"2. INSIDE CORNERS R{render_number(INSIDE_CORNER_R_MAX / IN, UNIT, 2)} MAX UNLESS NOTED."
 )
