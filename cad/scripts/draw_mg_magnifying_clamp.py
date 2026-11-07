@@ -203,6 +203,13 @@ BOTTOM_KEEP = {
         BOTTOM_CENTER[1] + _FLAT_NORMAL[1],
     )
 }
+# Each end view's .25 runs from the tap centre to one flat with a single
+# arrow, which reads as an unmarked radius (machinist review, fanout/mg r1).
+# Both stay imported and proved but print hidden: each tap's centre mark sits
+# on the hex axis, which the (1/2) HEX STOCK REF and the front view's .25
+# from the flat locate.
+END_VIEW_HIDDEN_LOCATIONS = frozenset(set(TOP_LOCATION_KEEP) | set(BOTTOM_KEEP))
+PRINTED_DIMENSIONS = VISIBLE_DIMENSIONS - END_VIEW_HIDDEN_LOCATIONS
 
 # Process and mate belong to the actual bore diameter; the common-flat .25
 # carries its value only (rule 7), its leader's line the hex axis the bore
@@ -1010,6 +1017,10 @@ async def build(adapter: Any) -> dict[str, str]:
         display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
         dimension = _early_bound(display.GetDimension2(0), "IDimension")
         _assert_ordinary_location(display, dimension, name)
+        if name in END_VIEW_HIDDEN_LOCATIONS:
+            annotation.Visible = 3
+            if annotation.Visible != 3:
+                raise RuntimeError(f"{name}: end-view location did not hide")
     set_dimension_callouts(adapter, [*right_annotations, *top_annotations], DIMENSION_CALLOUTS)
     _group_flat_locations(adapter, right, right_annotations)
     # Blank the location sketch again now its dimensions are in; every front
@@ -1099,7 +1110,7 @@ async def build(adapter: Any) -> dict[str, str]:
             visibility[name] = annotation.Visible
         if set(visibility) != set(DRAWING_PRECISION_BY_NAME) or any(type(value) is not int or value not in (1, 3) for value in visibility.values()):
             raise RuntimeError(f"clamp native dimension census changed: {visibility!r}")
-        if {name for name, state in visibility.items() if state == 1} != VISIBLE_DIMENSIONS:
+        if {name for name, state in visibility.items() if state == 1} != PRINTED_DIMENSIONS:
             raise RuntimeError(f"clamp visible native dimension census changed: {visibility!r}")
         if str(height_display.GetText(4) or "") or bore_display.GetText(4) != LEVER_BORE_CALLOUT or int(_early_bound(bore_dimension.Tolerance, "IDimensionTolerance").Type) != 0:
             raise RuntimeError("clamp settled height qualifier, bore wall callout or title-block acceptance changed")
