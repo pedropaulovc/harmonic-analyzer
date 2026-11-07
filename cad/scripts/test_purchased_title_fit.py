@@ -13,8 +13,10 @@ from _drawing_notes import property_link
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
+# The clamp screw (MHA-CH-06-TL-VN-68) is retired. CL, CR and HUB clamps use the
+# common MHA-CH-06-TL-VN-61 screw, which the rail row already covers.
 _FAMILIES = (("bracket", "62"), ("carriage", "64"),
-             ("clamp", "68"), ("lever", "69"), ("rail", "61"))
+             ("lever", "69"), ("rail", "61"))
 # Name/number rules are the existing landscape-template measurements. The
 # Material cell and font-dependent extents below are synthetic stress geometry;
 # only the authorized native run can qualify actual ink and font readbacks.
