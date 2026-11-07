@@ -20,15 +20,21 @@ same SKU held TL-28 to TL-20 before PR2; it replaces the #6-32 button heads
 
 The head on the KP08 foot (``HEAD_OVER_HOLE``): the #8's float in the Ø5
 hole at its minimum major (``leadscrew.KP08_SCREW_FLOAT_MAX``) is under the
-head's least radius over the hole, so the head bears on the foot at full
-float.
+head's least flat-bearing radius over the hole, so the head bears on the
+foot at full float.
 
 Sources:
 
 * SOURCED, https://www.mcmaster.com/91251A196/ read live 2026-10-17:
   #8-32 UNC class 3A, 5/8 in under the head, fully threaded, head Ø0.27 x 0.164 in, 9/64 in hex, Rockwell C37, ASTM A574, 170,000 psi, $15.24 per pack of 100.
-* STANDARD: ASME B18.3 #8 socket head diameter 0.262 in minimum
-  (``HEAD_DIA_MIN``), taken for the bearing on the KP08 foot.
+* STANDARD: ASME B18.3-2012 Table 1 (hexagon socket head cap screws), #8
+  row: head diameter A 0.257 in minimum (``HEAD_DIA_MIN``) and head edge
+  break K 0.008 in maximum (``HEAD_EDGE_BREAK_MAX``); note (12) lets the
+  edge between bearing surface and head side be broken by up to K measured
+  along the bearing surface, so the least flat bearing is A min - 2K =
+  0.241 in (``HEAD_BEARING_DIA_MIN``), the one taken on the KP08 foot.
+  https://www.finesz.com/pic/ASME%20B18.3.pdf (0.262 in is the LOW HEAD
+  socket cap screw's A min, Table 12, not this screw's).
 * FROM THE FASTENER TABLE (imported): thread, printed length, head, count,
   grip and the joint (``fasteners.KP08_TO_BRACKET``); the catalogue's thread and
   length must equal the row's (checked at import).
@@ -79,13 +85,16 @@ TENSILE_PSI = 170_000
 # --- The head on the KP08 foot at full float -----------------------------------
 # The KP08 floats on its screws by the hole's radial clearance (the #8 at its
 # UNC-3A minimum major in the UNVERIFIED Ø5) while F1B aligns it; the head's
-# least diameter still covers the hole at that float, and its annulus out to
+# least flat bearing (ASME B18.3 Table 1: A min less K on each edge, note
+# (12)) still covers the hole at that float, and its annulus out to
 # HEAD_BEARING_R is the foot-bearing budget's (jig assembly spec).
-HEAD_DIA_MIN = 0.262 * 25.4  # ASME B18.3 #8 socket head, minimum
-HEAD_BEARING_R = HEAD_DIA_MIN / 2.0  # 3.327
+HEAD_DIA_MIN = 0.257 * 25.4  # ASME B18.3 Table 1 #8, A minimum
+HEAD_EDGE_BREAK_MAX = 0.008 * 25.4  # ASME B18.3 Table 1 #8, K maximum
+HEAD_BEARING_DIA_MIN = HEAD_DIA_MIN - 2.0 * HEAD_EDGE_BREAK_MAX  # .241, 6.121
+HEAD_BEARING_R = HEAD_BEARING_DIA_MIN / 2.0  # 3.061
 HOLE_FLOAT = leadscrew.KP08_SCREW_FLOAT_MAX  # 0.487
-HEAD_OVER_HOLE = HEAD_BEARING_R - leadscrew.KP08_HOLE_DIA / 2.0  # 0.827
-if not HEAD_OVER_HOLE > HOLE_FLOAT:
+HEAD_OVER_HOLE = HEAD_BEARING_R - leadscrew.KP08_HOLE_DIA / 2.0  # 0.561
+if not HEAD_OVER_HOLE > HOLE_FLOAT:  # 0.074 to spare
     raise AssertionError(f"{SKU}: the head falls into the KP08 hole at full float")
 
 # Exact-current product table and engineering drawing read 2026-10-21.
