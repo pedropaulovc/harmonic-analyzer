@@ -1077,6 +1077,61 @@ def test_section_a_a_stands_in_the_free_field_clear_of_every_other_ink() -> None
     assert caption.ymax < axis.ymin
 
 
+@pytest.mark.parametrize(
+    ("linked", "label_line"),
+    [
+        ("<VLNAME> <VLLABEL>\r\nSCALE <VLSCALE>", "<VLNAME> <VLLABEL>"),
+        (
+            "<VLNAME> <FONT size=3.5><VLLABEL>\r\n"
+            "<VLSCALE><FONT size=6.35> <FONT size=3.5><VLSCALEV><FONT size=6.35>",
+            "<VLNAME> <FONT size=3.5><VLLABEL>",
+        ),
+        ("<VLNAME> <VLLABEL>\r\nSCALE <VLSCALEV>\r\n", "<VLNAME> <VLLABEL>"),
+    ],
+)
+def test_section_caption_drops_only_its_scale_line(linked, label_line) -> None:
+    """Round 5 (rule 9): SECTION A-A is at the sheet's 3:1, so its caption
+    keeps its label line and loses the scale line SolidWorks links."""
+    assert drawing.VIEW_SCALE == tuple(int(v) for v in drawing.SHEET_SCALE)
+    assert drawing.caption_without_scale(linked) == label_line
+
+
+@pytest.mark.parametrize(
+    "linked",
+    ["<VLNAME> <VLLABEL> SCALE <VLSCALEV>", "<VLLABEL>\r\nSCALE <VLSCALEV>"],
+)
+def test_section_caption_of_unforeseen_form_is_left_alone(linked) -> None:
+    assert drawing.caption_without_scale(linked) is None
+
+
+class _CaptionNote:
+    def __init__(self, linked: str) -> None:
+        self.PropertyLinkedText = linked
+
+
+class _SectionView:
+    def __init__(self, notes, ratio=(3.0, 1.0)) -> None:
+        self._notes = notes
+        self.ScaleRatio = ratio
+
+    def GetNotes(self):
+        return self._notes
+
+
+def test_section_caption_scale_is_removed_natively(monkeypatch) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _iface: value)
+    rebuilds: list[str] = []
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda _a, *, label: rebuilds.append(label))
+    caption = _CaptionNote("<VLNAME> <VLLABEL>\r\nSCALE <VLSCALEV>")
+    other = _CaptionNote("")
+    drawing._drop_sheet_scale_from_caption(None, _SectionView([other, caption]))
+    assert caption.PropertyLinkedText == "<VLNAME> <VLLABEL>"
+    assert other.PropertyLinkedText == ""
+    assert len(rebuilds) == 1
+    with pytest.raises(RuntimeError, match="not at the sheet scale"):
+        drawing._drop_sheet_scale_from_caption(None, _SectionView([caption], (2.0, 1.0)))
+
+
 class _FakeSketchManager:
     AddToDB = False
 

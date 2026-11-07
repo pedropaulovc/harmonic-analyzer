@@ -861,6 +861,63 @@ def _add_section_axis_centerline(adapter: Any, section: Any) -> None:
     rebuild_drawing(adapter, label="disc hub section A-A axis")
 
 
+def caption_without_scale(linked_text: str) -> str | None:
+    """The section caption's linked fields with its scale line removed: the
+    label line (``<VLNAME>`` and ``<VLLABEL>``) alone; None unless the text
+    is exactly a label line and one scale line (blank lines aside)."""
+    lines = [line for line in linked_text.replace("\r\n", "\n").split("\n") if line.strip()]
+    scale_lines = [line for line in lines if "<VLSCALE" in line]
+    kept = [line for line in lines if "<VLSCALE" not in line]
+    if (
+        len(scale_lines) != 1
+        or len(kept) != 1
+        or "<VLNAME>" not in kept[0]
+        or "<VLLABEL>" not in kept[0]
+    ):
+        return None
+    return kept[0]
+
+
+@_telemetry.traced("drawing.disc_hub.section_caption_scale")
+def _drop_sheet_scale_from_caption(adapter: Any, section: Any) -> None:
+    """SECTION A-A is drawn at the sheet's scale, so its caption prints no
+    scale (rule 9: a scale equal to the sheet's restates the title block;
+    round 5 machinist review).  SolidWorks links one anyway for a section
+    given its own ratio, so the scale line is removed from the native
+    caption's linked fields, as draw_pd_transgear_arm sets a section
+    caption's fields."""
+    native = _early_bound(section, "IView")
+    ratio = tuple(float(value) for value in native.ScaleRatio)
+    if abs(ratio[0] / ratio[1] - SHEET_SCALE[0] / SHEET_SCALE[1]) > 1e-9:
+        raise RuntimeError(f"disc hub section A-A is not at the sheet scale: {ratio!r}")
+    captions = []
+    for raw_note in native.GetNotes() or ():
+        note = _early_bound(raw_note, "INote")
+        linked_text = str(note.PropertyLinkedText or "")
+        if "<VLLABEL>" in linked_text:
+            captions.append((note, linked_text))
+    if len(captions) != 1:
+        raise RuntimeError(
+            f"expected one native section A-A caption, found {len(captions)}"
+        )
+    note, linked_text = captions[0]
+    _telemetry.info(f"disc hub section A-A caption fields {linked_text!r}")
+    if "<VLSCALE" not in linked_text:
+        return
+    wanted = caption_without_scale(linked_text)
+    if wanted is None:
+        # An unforeseen field layout keeps its scale line rather than lose
+        # the sheet: the caption's text is logged above.
+        _telemetry.warn(
+            f"disc hub section A-A caption scale line not separable: {linked_text!r}"
+        )
+        return
+    note.PropertyLinkedText = wanted
+    rebuild_drawing(adapter, label="disc hub section A-A caption without scale")
+    if str(note.PropertyLinkedText or "") != wanted:
+        raise RuntimeError("disc hub section A-A caption fields did not persist")
+
+
 def _section_a_a(adapter: Any, end: Any) -> Any:
     """SECTION A-A, cut on the face view's horizontal centreline: laid
     spigot up, hidden lines removed, centred, captioned, the flat's length
@@ -883,6 +940,7 @@ def _section_a_a(adapter: Any, end: Any) -> Any:
     position_section_caption(
         adapter, section, SECTION_CAPTION_XY, label="disc hub section A-A"
     )
+    _drop_sheet_scale_from_caption(adapter, section)
     _flat_length_reference(adapter, section)
     _add_section_axis_centerline(adapter, section)
     return section
