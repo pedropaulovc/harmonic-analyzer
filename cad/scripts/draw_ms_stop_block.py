@@ -53,7 +53,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _named_views import octant_view_name
 from _machinist_review_mode import MachinistReviewMode
 from _ms_drawing_contract import assert_manufacturing_dimensions
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from solidworks_mcp.adapters.solidworks.drawing import add_note, auto_center_marks, place_view
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -92,14 +92,20 @@ RIGHT_KEEP = {
 BOTTOM_KEEP = {
     "ThumbFromEnd": (0.175, 0.031), "ThumbFromPlate": (0.090, 0.073),
 }
-STICK_FIT = f"SLIDING FIT ON\nMS-STICK {_config.parts('ms-stick')['number']}"
+# Rule 4: the rebate is one feature with two tight bands, so both carry only
+# SEE NOTE 1 and the one numbered note names the stick that slides in it.
+REBATE_NOTE_NUMBER = 1
+REBATE_NOTE = f"{REBATE_NOTE_NUMBER}. SLIDING FIT ON {_config.parts('ms-stick')['number']} MEASURING STICK"
+REBATE_NOTE_LINK = f"SEE NOTE {REBATE_NOTE_NUMBER}"
+# Upper-left corner of the note text: the empty field left of the .84 and
+# above the .56, clear of the cover-face view.
+REBATE_NOTE_XY = (0.020, 0.262)
 # Native horizontal size witnesses end at this corner rather than spanning
 # the view; the shorter angle arc stays below the overall length dimension.
-# The rebate bands exist only for the stick that slides in it.
 DIMENSION_CALLOUTS = {
     "RoofChamferSize": "2 CORNERS",
-    "WindowWidth": f"OPEN REBATE\n{STICK_FIT}",
-    "WindowHeight": STICK_FIT,
+    "WindowWidth": REBATE_NOTE_LINK,
+    "WindowHeight": REBATE_NOTE_LINK,
 }
 # Leadered labels name the X=0 end and Y=0 edge the match-drill clamp aligns.
 LOCATING_END_XY = (0.232, 0.160)
@@ -110,12 +116,13 @@ LOCATING_EDGE_X_MM = 5.0
 # The title block owns the general internal thread class. Keep Hole Wizard's
 # variable definitions, not the resolved text that would freeze drill/depths.
 FINAL_SHEET_REMOVED_NOTES = ("Tapped Hole",)
-COVER_HOLE_PROCESS = (
-    f"2X MATCH-DRILL FROM {part.MATCH_DRILL_MASTER}\n"
-    f"{_config.parts('ms-stop-plate')['number']}; CLAMP WITH\n"
-    f"{part.MATCH_DRILL_DATUM_ALIGNMENT}\n"
-    f"DEPTHS FROM {part.BLOCK_MATING_FACE_NOTE}\n"
-    f"{part.MATCHED_PAIR_NOTE}\n"
+# Rule 7: two lines of words under the native size and thread rows: the
+# match-drill from its master, named by number and name as a matched pair
+# (rule 4), and the clamp alignment. The ↧ depths run from the entry face by
+# the symbol's own meaning.
+COVER_HOLE_MATCH_DRILL = (
+    f"MATCH-DRILL FROM {_config.parts('ms-stop-plate')['number']} STOP PLATE\n"
+    f"WITH {part.MATCH_DRILL_DATUM_ALIGNMENT}"
 )
 # The 4-40 runs from the underside through the floor and opens into the
 # rebate; THRU alone does not say which wall it stops at (rules 1, 12).
@@ -254,17 +261,18 @@ async def build(adapter: Any) -> dict[str, str]:
                                                dimensions_by_feature=part.BLOCK_DRAWING_DIMENSIONS)
     set_hidden_lines_removed(adapter, iso)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    if add_note(adapter, REBATE_NOTE, *REBATE_NOTE_XY) is None:
+        raise RuntimeError("failed to add the stop block rebate note")
     plate_edge = model_point_in_view(
         adapter, front, (
             (part.PLATE_HOLE_XS[1] + part.PLATE_TAP_DRILL_DIA / 2.0) / 1000.0,
             part.PLATE_HOLE_Y / 1000.0, part.PLATE_Z_MAX / 1000.0,
         ), label="plate tap mouth")
     plate_callout = add_native_hole_callout(
-        adapter, front, edge_xy=plate_edge, callout_xy=(0.065, 0.127),
+        adapter, front, edge_xy=plate_edge, callout_xy=(0.072, 0.127),
         label="two cover blind taps",
-        process=COVER_HOLE_PROCESS,
     )
-    _remove_general_thread_class(plate_callout)
+    _remove_general_thread_class(plate_callout, last_line=COVER_HOLE_MATCH_DRILL)
     set_hole_callout_precision(plate_callout, COVER_TAP_PRECISION, label="two cover blind taps")
     thumb_edge = model_point_in_view(
         adapter, bottom, (
