@@ -1927,8 +1927,10 @@ def test_kp08_screws_torque_inside_the_foot_thread_and_screw_budgets() -> None:
     # F1B tightens each KP08's two #8-32 X 5/8 SHCS (TL-VN-62, 91251A196; the
     # owner-approved second length, ruling Main 2026-11-06 option B) to
     # 1.0 N·m: the foot taken as Zamak 3 (208 MPa), bearing under the socket
-    # head round its Ø5 hole (UNVERIFIED, #2184) with the block floated
-    # fully to one side; TL-28's top-face tap at its worst-case full thread;
+    # head's least flat bearing (ASME B18.3 Table 1 #8: A min .257 less the
+    # K .008 edge break on each side, note (12): .241) round its Ø5 hole (UNVERIFIED, #2184)
+    # with the block floated fully to one side; TL-28's top-face tap at its
+    # worst-case full thread;
     # the screw under half its 170 ksi on the #8-32's 0.0140 in² stress area.
     row = fasteners.KP08_TO_BRACKET
     assert fasteners.callout(row) == "#8-32 X 5/8 SHCS"
@@ -1936,7 +1938,18 @@ def test_kp08_screws_torque_inside_the_foot_thread_and_screw_budgets() -> None:
     preload = spec.KP08_SCREW_TORQUE_NM / (0.20 * row.major_mm / 1000.0)
     assert spec.KP08_SCREW_PRELOAD_N == pytest.approx(preload)
     r = bracket_screw.HEAD_BEARING_R
-    assert r == bracket_screw.HEAD_DIA_MIN / 2.0 < bracket_screw.DIMS.head_dia / 2.0
+    assert bracket_screw.HEAD_DIA_MIN == pytest.approx(0.257 * 25.4)
+    assert bracket_screw.HEAD_EDGE_BREAK_MAX == pytest.approx(0.008 * 25.4)
+    assert bracket_screw.HEAD_BEARING_DIA_MIN == pytest.approx(
+        bracket_screw.HEAD_DIA_MIN - 2.0 * bracket_screw.HEAD_EDGE_BREAK_MAX
+    )
+    assert bracket_screw.HEAD_BEARING_DIA_MIN == pytest.approx(0.241 * 25.4)
+    assert r == bracket_screw.HEAD_BEARING_DIA_MIN / 2.0 < bracket_screw.HEAD_DIA_MIN / 2.0
+    # The flat bearing still covers the hole at full float, 0.074 to spare.
+    assert bracket_screw.HEAD_OVER_HOLE == pytest.approx(r - leadscrew.KP08_HOLE_DIA / 2.0)
+    assert bracket_screw.HEAD_OVER_HOLE - bracket_screw.HOLE_FLOAT == pytest.approx(
+        0.0736, abs=1e-3
+    )
     assert bracket_screw.HOLE_FLOAT == pytest.approx(
         (leadscrew.KP08_HOLE_DIA - leadscrew.SHCS_8_MAJOR_MIN) / 2.0, abs=1e-3
     )
@@ -1945,7 +1958,7 @@ def test_kp08_screws_torque_inside_the_foot_thread_and_screw_budgets() -> None:
     assert spec.KP08_FOOT_BEARING_MPA == pytest.approx(preload / area, rel=1e-4)
     margins = spec.KP08_SCREW_MARGINS
     assert margins["foot bearing"] == pytest.approx(208.0 * area / preload, rel=1e-4)
-    assert round(margins["foot bearing"], 2) == 2.63
+    assert round(margins["foot bearing"], 2) == 1.70
     strip = 0.75 * math.pi * row.major_mm * spec.KP08_SCREW_ENGAGEMENT_MIN * 207.0
     assert margins["TL-28 thread strip"] == pytest.approx(strip / 3.0 / preload)
     assert margins["screw stress"] == pytest.approx(
